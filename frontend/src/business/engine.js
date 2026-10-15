@@ -262,13 +262,17 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200, row = 
 
 /** 参照面板数据行数(用于动态切换弹窗/下拉模式:≤20 弹窗,>20 下拉)
  *  2026-09-28:按 **refPanel** 记忆化(此前按字段发请求 ⇒ 68 个参照字段同指一面板会发 35 次);
- *  30 秒 TTL,过期即重算,保持"刷新面板后自动切换模式"的既有语义。 */
+ *  30 秒 TTL,过期即重算,保持"刷新面板后自动切换模式"的既有语义。
+ *  2026-10-15:带 `countOnly` —— 这里只要 totalSize,不要行。此前走完整取数,对**档案模式**
+ *  参照(商品档案 INV:3,874 行 × 75 列 = 4.1 MB,档案模式按契约忽略 pageSize 全量返回)
+ *  等于每次打开面板都白拉 4 MB;库存报表三张的「存货」参照全指 INV,实测有并行负载时
+ *  28~36 s,直接打穿前端 axios 15 s 线。带 countOnly 后服务端只跑 COUNT、list 返回空。 */
 export async function refRowCount(field) {
   const r = normRef(field)
   if (!r.refPanel) return 0
   try {
     return await memoRef(refCntCache, r.refPanel, REF_CNT_TTL, async () => {
-      const res = await queryFormDataList({ panelCode: r.refPanel, condition: {}, pageNo: 1, pageSize: 1 })
+      const res = await queryFormDataList({ panelCode: r.refPanel, condition: {}, pageNo: 1, pageSize: 1, countOnly: true })
       return res.totalSize || 0
     })
   } catch (e) {

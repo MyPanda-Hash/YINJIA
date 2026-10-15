@@ -22,6 +22,17 @@ public interface PanelRuntimeService {
                                           Map<String, Object> condition, int pageNo, int pageSize,
                                           List<Map<String, Object>> advFilters);
 
+    /**
+     * 同上,外加 {@code countOnly} = 只要「共 N 条」不要行(前端「参照字段行数」判定专用)。
+     * 默认实现忽略该开关、照常取数 —— 只有真正实现取数分层的运行时(见 {@code QueryService})
+     * 才覆写它,契约保持向后兼容。
+     */
+    default Map<String, Object> queryFormDataList(String panelCode, String keyword,
+                                                  Map<String, Object> condition, int pageNo, int pageSize,
+                                                  List<Map<String, Object>> advFilters, boolean countOnly) {
+        return queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, advFilters);
+    }
+
     List<Map<String, Object>> getApprovalHistory(String panelCode, String formNo);
 
     Map<String, Object> callButton(String panelCode, String buttonName,

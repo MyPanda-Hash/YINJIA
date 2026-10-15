@@ -53,19 +53,40 @@ public class QueryService {
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                                  Map<String, Object> condition, int pageNo, int pageSize,
                                                  List<Map<String, Object>> advFilters) {
+        return queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, advFilters, false);
+    }
+
+    /**
+     * @param countOnly 只要「共 N 条」不要行。前端「参照字段行数」判定(≤20 弹窗 / &gt;20 下拉,
+     *                  {@code engine.refRowCount})只需要 totalSize,却会走完整取数 —— 对
+     *                  **档案模式**(如商品档案 INV:3,874 行 × 75 列 = 4.1 MB,且档案模式按契约
+     *                  忽略 pageSize 全量返回)这一条就把 4 MB 白拉一遍。库存报表三张
+     *                  (库存状况表/库存台账/收发存汇总表)的「存货」参照全指 INV ⇒ 每次打开
+     *                  都白拉一次,并行负载下实测 28~36 s &gt; 前端 axios 15 s 线(2026-10-15)。
+     *                  置 true 时:照常算 totalSize,直接返回空 list,不执行取数 SQL。
+     */
+    public Map<String, Object> queryFormDataList(String panelCode, String keyword,
+                                                 Map<String, Object> condition, int pageNo, int pageSize,
+                                                 List<Map<String, Object>> advFilters, boolean countOnly) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         Map<String, String> l2c = def.labelToCol();
-        if ("flat".equals(def.mode())) return queryFlat(def, keyword, condition, l2c, pageNo, pageSize, advFilters);
-        return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize, advFilters)
-                : queryArchive(def, keyword, condition, l2c, pageNo, pageSize);
+        if ("flat".equals(def.mode())) {
+            return queryFlat(def, keyword, condition, l2c, pageNo, pageSize, advFilters, countOnly);
+        }
+        return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize, advFilters, countOnly)
+                : queryArchive(def, keyword, condition, l2c, pageNo, pageSize, countOnly);
     }
 
     // ============ 平表模式(报表/库存状况,一行一记录直接返回) ============
 
     private Map<String, Object> queryFlat(PanelRegistry.PanelDef def, String keyword,
                                           Map<String, Object> condition, Map<String, String> l2c,
-                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters) {
+                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters,
+                                          boolean countOnly) {
         boolean ledger = "STOCK_LEDGER".equals(def.code()); // 台账:正序 + 首期初行/末期末行(T+ 三段式)
+        // 服务端每页条数上限(2026-10-15):库存报表三张是「整表重算型」视图,单页行数直接决定
+        // 响应体与前端渲染量;面板配置(page_size=50)就是期望值,任何客户端要更多都夹回该值。
+        pageSize = Math.min(Math.max(pageSize, 1), flatPageCap(def));
         String hint = recompileOnRead(def.lineTable()) ? " OPTION (RECOMPILE)" : "";
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
@@ -97,6 +118,23 @@ public class QueryService {
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where + hint, Integer.class, args.toArray());
 
+        // 台账三段式:首行=期初结存(仅期初组有值),末行=期末结存(仅期末组有值)。
+        // 期初=查询段起点前的累计;期末=期初+段内净额。依赖弹窗必填的 仓库/存货/日期段。
+        // 两行合成行也算进 totalSize(分页页码才对得上),故在 countOnly 分支之前先判。
+        int totalOut = total == null ? 0 : total;
+        boolean ledgerSynthetic = ledger && condition != null
+                && !strOf(condition.get("仓库")).isBlank() && !strOf(condition.get("存货")).isBlank()
+                && !strOf(condition.get("开始日期")).isBlank() && !strOf(condition.get("结束日期")).isBlank();
+        if (ledgerSynthetic) totalOut += 2;
+
+        // 只要「共 N 条」:到此为止(argv 见方法注释),不再执行取数 SQL
+        if (countOnly) {
+            Map<String, Object> counted = new HashMap<>();
+            counted.put("totalSize", totalOut);
+            counted.put("list", List.of());
+            return counted;
+        }
+
         // 列表默认排序(2026-10-14 用户口径「应该最新的单据日期在最上面」):
         //   有日期列且该列确实存在 ⇒ 「日期 DESC, id DESC」(同一天按录入先后倒排);
         //   否则退回 id DESC(原行为);台账(ledger)保持 id ASC。
@@ -124,33 +162,29 @@ public class QueryService {
             list.add(m);
         }
 
-        // 台账三段式:首行=期初结存(仅期初组有值),末行=期末结存(仅期末组有值)。
-        // 期初=查询段起点前的累计;期末=期初+段内净额。依赖弹窗必填的 仓库/存货/日期段。
-        int totalOut = total == null ? 0 : total;
-        if (ledger && condition != null) {
+        // 台账三段式合成行(见上方 ledgerSynthetic 判定):期初=查询段起点前的累计,期末=期初+段内净额。
+        // 依赖弹窗必填的 仓库/存货/日期段。
+        if (ledgerSynthetic) {
             String wh = strOf(condition.get("仓库"));
             String item = strOf(condition.get("存货"));
             String ds = strOf(condition.get("开始日期"));
             String de = strOf(condition.get("结束日期"));
-            if (!wh.isBlank() && !item.isBlank() && !ds.isBlank() && !de.isBlank()) {
-                // 期初 = 段起点前累计(视图中限 单据日期<=de 的行,取 <ds 部分;用视图暴露的收入/发出列)
-                // 仓库/存货=编码(参照绑定编码),按编码列精确匹配 —— 名称重名(「端盖」24码)会并流
-                Map<String, Object> opening = jdbc.queryForMap(
-                        "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
-                                + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 <= ?" + hint,
-                        ds, ds, wh, item, de);
-                double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
-                Map<String, Object> netm = jdbc.queryForMap(
-                        "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
-                        wh, item, ds, de);
-                double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
-                totalOut += 2;
-                int lastPage = (int) Math.ceil(totalOut / (double) pageSize);
-                if (pageNo == 1) list.add(0, ledgerRow("期初结存", oq, oa, null, null));
-                if (pageNo == lastPage) list.add(ledgerRow("期末结存", null, null, cq, ca));
-            }
+            // 期初 = 段起点前累计(视图中限 单据日期<=de 的行,取 <ds 部分;用视图暴露的收入/发出列)
+            // 仓库/存货=编码(参照绑定编码),按编码列精确匹配 —— 名称重名(「端盖」24码)会并流
+            Map<String, Object> opening = jdbc.queryForMap(
+                    "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
+                            + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
+                            + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 <= ?" + hint,
+                    ds, ds, wh, item, de);
+            double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
+            Map<String, Object> netm = jdbc.queryForMap(
+                    "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
+                            + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
+                    wh, item, ds, de);
+            double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
+            int lastPage = (int) Math.ceil(totalOut / (double) pageSize);
+            if (pageNo == 1) list.add(0, ledgerRow("期初结存", oq, oa, null, null));
+            if (pageNo == lastPage) list.add(ledgerRow("期末结存", null, null, cq, ca));
         }
 
         Map<String, Object> out = new HashMap<>();
@@ -183,8 +217,34 @@ public class QueryService {
         }
     }
 
-    /** 台账合成行:期初行只填期初组,期末行只填期末组;单价=金额/数量(数量0→0) */
-    private Map<String, Object> ledgerRow(String type, Double oq, Double oa, Double cq, Double ca) {
+    /**
+     * 平表(报表)每页条数上限(2026-10-15)。
+     *
+     * <p>库存报表三张(库存状况表/库存台账/收发存汇总表)的取数是「整表重算型」视图:
+     * {@code v_stock_balance} 等视图的 {@code id} 是 {@code ROW_NUMBER() OVER(...)},
+     * 计数与分页两条 SQL 都要把整份视图物化一遍 ⇒ **单页要多少行,直接决定这次请求的
+     * 计算量与响应体大小**。面板在 {@code yj_panel.page_size} 里已经声明期望值(50),
+     * 这里把它变成服务端硬上限:任何客户端(旧版前端、桌面小部件、手工调接口)要更多都夹回来,
+     * 保证「一页 50 条」这条口径不依赖调用方自觉。
+     *
+     * <p>范围刻意收窄到这三张报表面板:它们唯一的调用方(列表页)本来就用
+     * {@code yj_panel.page_size}=50,夹取不改变任何现有行为;其它平表(明细表/统计表/
+     * STOCK_STATUS 桌面小部件等)一律不受影响(给一个 1000 行的纯防呆上限)。
+     */
+    private static int flatPageCap(PanelRegistry.PanelDef def) {
+        String code = def.code() == null ? "" : def.code();
+        switch (code) {
+            case "STOCK_BALANCE":
+            case "STOCK_LEDGER":
+            case "STOCK_SUMMARY":
+                Integer configured = def.pageSize();
+                return configured != null && configured > 0 ? configured : 50;
+            default:
+                return 1000;
+        }
+    }
+
+    /** 台账合成行:期初行只填期初组,期末行只填期末组;单价=金额/数量(数量0→0) */    private Map<String, Object> ledgerRow(String type, Double oq, Double oa, Double cq, Double ca) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("单据类型", type);
         if (oq != null) {
@@ -213,7 +273,7 @@ public class QueryService {
 
     private Map<String, Object> queryArchive(PanelRegistry.PanelDef def, String keyword,
                                              Map<String, Object> condition, Map<String, String> l2c,
-                                             int pageNo, int pageSize) {
+                                             int pageNo, int pageSize, boolean countOnly) {
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
@@ -221,6 +281,15 @@ public class QueryService {
 
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where, Integer.class, args.toArray());
+
+        // 只要「共 N 条」:档案模式本就全量返回(见方法上方注释),对参照取数(如商品档案 INV
+        // 3,874 行 × 75 列 = 4.1 MB)白拉一遍是最贵的一处,countOnly 时到此为止。
+        if (countOnly) {
+            Map<String, Object> counted = new HashMap<>();
+            counted.put("totalSize", total == null ? 0 : total);
+            counted.put("list", List.of());
+            return counted;
+        }
 
         // 全量返回(上限 ARCH_LOAD_CAP):保存语义为"缺席行=已删除",必须保证明细完整
         String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t " + where
@@ -251,7 +320,8 @@ public class QueryService {
 
     private Map<String, Object> queryDocs(PanelRegistry.PanelDef def, String keyword,
                                           Map<String, Object> condition, Map<String, String> l2c,
-                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters) {
+                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters,
+                                          boolean countOnly) {
         boolean split = def.hasHeadTable();
         String docTable = split ? def.headTable() : def.lineTable();
         String g = def.groupCol();
@@ -311,6 +381,14 @@ public class QueryService {
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(DISTINCT t.[" + g + "]) FROM " + docTable + " t " + where,
                 Integer.class, args.toArray());
+
+        // 只要「共 N 条」(参照取数只要行数):不再跑分页单号查询与头/行两次取数
+        if (countOnly) {
+            Map<String, Object> counted = new HashMap<>();
+            counted.put("totalSize", total == null ? 0 : total);
+            counted.put("list", List.of());
+            return counted;
+        }
 
         // 默认排序:创建时间(asp_time1)倒序 = 最新单据在第一页 / 左栏「单据选择」顶部(2026-09-20 起全面板统一)。
         // 旧写法按组列(单据编号)字符串降序,只在单号零填充时才等价于"最新在上":一旦混入外部系统单号

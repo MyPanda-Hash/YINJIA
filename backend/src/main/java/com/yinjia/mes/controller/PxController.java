@@ -562,7 +562,8 @@ public class PxController {
                 advFilters.add(row);
             }
         }
-        return ApiResult.ok(service.queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, advFilters));
+        return ApiResult.ok(service.queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, advFilters,
+                Boolean.parseBoolean(String.valueOf(body.getOrDefault("countOnly", "false")))));
     }
 
     @GetMapping("/getApprovalHistory")

@@ -39,7 +39,10 @@ for (let i = 0; i < 40; i++) {
         const m = JSON.parse(e.data)
         if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return }
         if (m.method === 'Network.requestWillBeSent' && m.params.request.url.includes('/api/')) {
-          inflight.set(m.params.requestId, { url: m.params.request.url, method: m.params.request.method, t0: Date.now() })
+          const pd = m.params.request.postData || ''
+          let pc = ''
+          try { pc = JSON.parse(pd).panelCode || '' } catch {}
+          inflight.set(m.params.requestId, { url: m.params.request.url, method: m.params.request.method, pc, pd: pd.slice(0, 200), t0: Date.now() })
         }
         if (m.method === 'Network.loadingFinished' && inflight.has(m.params.requestId)) {
           const r = inflight.get(m.params.requestId); inflight.delete(m.params.requestId)
@@ -95,11 +98,20 @@ for (const p of PANELS) {
       err: /timeout of|超时|加载失败|Network Error/i.test(txt) ? txt.match(/.{0,60}(timeout of|超时|加载失败|Network Error).{0,60}/i)[0] : null,
       pager: (document.querySelector('.report-pager, .rp-text, .page-no')||{}).innerText || '' })
   })()`)
-  const top = finished.filter(f => f.ms > 300).sort((a, b) => b.ms - a.ms).slice(0, 6)
-  report.push({ panel: p, state: JSON.parse(state || '{}'), slow: slow.slice(), top })
+  const top = finished.filter(f => f.ms > 300).sort((a, b) => b.ms - a.ms).slice(0, 8)
+  const byPanel = {}
+  for (const f of finished) {
+    const k = (f.pc || f.url.replace(host, '')) + '|' + f.pd.replace(/\s+/g, '')
+    byPanel[k] = byPanel[k] || { n: 0, max: 0 }
+    byPanel[k].n++; byPanel[k].max = Math.max(byPanel[k].max, f.ms)
+  }
+  report.push({ panel: p, state: JSON.parse(state || '{}'), slow: slow.slice(), top, byPanel })
   console.log(`\n=== ${p} ===`)
-  console.log('  页面:', state)
-  for (const f of top) console.log(`  ${String(f.ms).padStart(7)} ms  ${f.method} ${f.url}`)
+  const st = JSON.parse(state || '{}')
+  console.log('  页面: rows=' + st.rows + ' pager=' + st.pager + ' err=' + st.err + ' toasts=' + JSON.stringify((st.toasts || []).filter(t => t.length < 60).slice(0, 6)))
+  for (const f of top) console.log(`  ${String(f.ms).padStart(7)} ms  ${f.method} ${f.url}  panel=${f.pc} body=${f.pd}`)
+  console.log('  ── 全部 /api 请求(按 body 归并) ──')
+  for (const [k, v] of Object.entries(byPanel).sort((a, b) => b[1].max - a[1].max)) console.log(`    ×${String(v.n).padStart(2)}  max ${String(v.max).padStart(6)} ms  ${k}`)
   for (const s of slow) console.log(`  [SLOW] ${String(s.ms).padStart(7)} ms  ${s.url} ${s.err || ''}`)
 }
 

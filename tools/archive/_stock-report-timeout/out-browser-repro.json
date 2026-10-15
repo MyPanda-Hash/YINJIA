@@ -1,0 +1,166 @@
+[
+ {
+  "panel": "STOCK_BALANCE",
+  "state": {
+   "rows": 50,
+   "toasts": [
+    "销售管理\n采购管理\n库存核算\n库存明细\n库存统计\n库存报表",
+    "库存状况表",
+    "查询\n导出报表\n单据：-\n◁\n◀\n第 0/0 张\n▶\n▷",
+    "刷新",
+    "打印\n▼",
+    "更多\n▼",
+    "库存状况表",
+    "共 0 条",
+    "◁",
+    "◀",
+    "第 1/1 页",
+    "▶",
+    "▷",
+    "库存状况表\n当前业务数据\n暂无符合条件的数据",
+    "序号",
+    "仓库编码\n⇅",
+    "仓库编码\n⇅",
+    "仓库\n⇅",
+    "仓库\n⇅",
+    "存货编码\n⇅",
+    "存货编码\n⇅",
+    "存货\n⇅",
+    "存货\n⇅",
+    "规格型号\n⇅",
+    "主计量\n⇅",
+    "现存量\n⇅",
+    "结存单价\n⇅",
+    "结存金额\n⇅",
+    "合计",
+    "1\n\t\nCK00001\n\t\nCK00001\n\t\n正品仓\n\t\n正品仓\n\t\nTEST-MAT-B\n\t\nTEST-MAT-B\n\t\n测试物料B\n\t\n测试物料B\n\t\nB-002\n\t\n箱\n\t\n50\n\t\n80\n\t\n4000",
+    "2\n\t\nCK00001\n\t\nCK00001\n\t\n正品仓\n\t\n正品仓\n\t\nTEST-MAT-A\n\t\nTEST-MAT-A\n\t\n测试物料A\n\t\n测试物料A\n\t\nA-001\n\t\n个\n\t\n80\n\t\n35\n\t\n2800",
+    "3\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCP005\n\t\nCP005\n\t\n轴套 C\n\t\n轴套 C\n\t\n\t\n件\n\t\n-432\n\t\n0\n\t\n0",
+    "4\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCP003\n\t\nCP003\n\t\n铝型材-散热片\n\t\n铝型材-散热片\n\t\n\t\n件\n\t\n-17\n\t\n-5861.552941\n\t\n99646.4",
+    "5\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCP002\n\t\nCP002\n\t\n铝板 6061\n\t\n铝板 6061\n\t\n\t\n件\n\t\n529\n\t\n23.65\n\t\n12510.85",
+    "6\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCL004\n\t\nCL004\n\t\n切削液\n\t\n切削液\n\t\n20L/桶\n\t\n升\n\t\n-512\n\t\n0\n\t\n0",
+    "7\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCL003\n\t\nCL003\n\t\n6063铝棒\n\t\n6063铝棒\n\t\nΦ120\n\t\nkg\n\t\n-87\n\t\n0\n\t\n0",
+    "8\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCL002\n\t\nCL002\n\t\n6061铝锭\n\t\n6061铝锭\n\t\nA00\n\t\nkg\n\t\n-1014\n\t\n-7.827692\n\t\n7937.28",
+    "9\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCL002\n\t\nCL002\n\t\n6061铝锭\n\t\n6061铝锭\n\t\n\t\nkg\n\t\n-1236\n\t\n0\n\t\n0",
+    "10\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nCL001\n\t\nCL001\n\t\n45#圆钢\n\t\n45#圆钢\n\t\nΦ60\n\t\nkg\n\t\n-452\n\t\n-57.876106\n\t\n26160",
+    "11\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nC-95-14**TB\n\t\nC-95-14**TB\n\t\n006项目/功能炭棒滤芯\n\t\n006项目/功能炭棒滤芯\n\t\n30*10*182\n\t\n支\n\t\n630\n\t\n137.27333",
+    "12\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nC-95-14\n\t\nC-95-14\n\t\n006项目/功能炭棒滤芯\n\t\n006项目/功能炭棒滤芯\n\t\n30*10*182\n\t\n支\n\t\n-965\n\t\n0\n\t\n0",
+    "13\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nC-95-13**TB\n\t\nC-95-13**TB\n\t\n006项目/功能炭棒滤芯\n\t\n006项目/功能炭棒滤芯\n\t\n57*21*66.5\n\t\n支\n\t\n-444\n\t\n0\n\t\n0",
+    "14\n\t\nCK01\n\t\nCK01\n\t\n原料仓\n\t\n原料仓\n\t\nC-95-13\n\t\nC-95-13\n\t\n006项目/功能炭棒滤芯\n\t\n006项目/功能炭棒滤芯\n\t\n57*21*66.5\n\t\n支\n\t\n-19\n\t\n0\n\t\n0",
+    "15\n\t\nCK00005\n\t\nCK00005\n\t\n原料不良品仓\n\t\n原料不良品仓\n\t\nYJ-AJ-022\n\t\nYJ-AJ-022\n\t\nPP棉\n\t\nPP棉\n\t\n22*12*263\n\t\n支\n\t\n6000\n\t\n0.75\n\t\n4500",
+    "16\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nY-S-T\n\t\nY-S-T\n\t\n硫酸氧钛\n\t\n硫酸氧钛\n\t\n123334-00-9 工业级93%\n\t\nkg\n\t\n1\n\t\n51\n\t\n51",
+    "17\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-ZZ-001\n\t\nYJ-ZZ-001\n\t\n热缩膜\n\t\n热缩膜\n\t\n25*0.19\n\t\nkg\n\t\n-72.9\n\t\n-89.432098\n\t\n6519.6",
+    "18\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-ZX-007\n\t\nYJ-ZX-007\n\t\nM4-D（临时编码）\n\t\nM4-D（临时编码）\n\t\n\t\nkg\n\t\n2525\n\t\n38.20792\n\t\n9647",
+    "19\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-ZX-005\n\t\nYJ-ZX-005\n\t\nM3-D（大于150目）\n\t\nM3-D（大于150目）\n\t\n\t\nkg\n\t\n-630\n\t\n0\n\t\n0",
+    "20\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-ZX-004\n\t\nYJ-ZX-004\n\t\nM3-D胶粉\n\t\nM3-D胶粉\n\t\n80-120目\n\t\nkg\n\t\n0\n\t\n0\n\t\n240000",
+    "21\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-ZX-003\n\t\nYJ-ZX-003\n\t\nM2-D胶粉\n\t\nM2-D胶粉\n\t\n80-120目\n\t\nkg\n\t\n-13850\n\t\n0\n\t\n0",
+    "22\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YPS-007\n\t\nYJ-YPS-007\n\t\n专用炭X4\n\t\n专用炭X4\n\t\n80-250\n\t\nkg\n\t\n-2306\n\t\n0\n\t\n0",
+    "23\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YPS-004\n\t\nYJ-YPS-004\n\t\n依品晟-400\n\t\n依品晟-400\n\t\n\t\nkg\n\t\n-902\n\t\n0\n\t\n0",
+    "24\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YPS-002\n\t\nYJ-YPS-002\n\t\n依品晟（250-400）\n\t\n依品晟（250-400）\n\t\n\t\nkg\n\t\n-5025\n\t\n0\n\t\n0",
+    "25\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YKRS-014\n\t\nYJ-YKRS-014\n\t\n英克瑞斯X5（60-250）\n\t\n英克瑞斯X5（60-250）\n\t\n\t\nkg\n\t\n13000\n\t\n21",
+    "26\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YKRS-008\n\t\nYJ-YKRS-008\n\t\n英克瑞斯酸洗（150-400）\n\t\n英克瑞斯酸洗（150-400）\n\t\n\t\nkg\n\t\n-6012\n\t\n",
+    "27\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YKRS-007\n\t\nYJ-YKRS-007\n\t\n英克瑞斯酸洗炭\n\t\n英克瑞斯酸洗炭\n\t\n80-250目\n\t\nkg\n\t\n-1000\n\t\n0\n\t\n0",
+    "28\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YKB-002\n\t\nYJ-YKB-002\n\t\n雅可比MCA-ST（80-325）\n\t\n雅可比MCA-ST（80-325）\n\t\n\t\nkg\n\t\n-25\n\t\n",
+    "29\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YKB-001\n\t\nYJ-YKB-001\n\t\n雅可比酸洗-HX1（80-200）\n\t\n雅可比酸洗-HX1（80-200）\n\t\n\t\nkg\n\t\n-412\n\t",
+    "30\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YCYX-055\n\t\nYJ-YCYX-055\n\t\n折叠棉\n\t\n折叠棉\n\t\n97*80*260-1mm\n\t\n支\n\t\n906\n\t\n5.4\n\t\n4892.4",
+    "31\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YCYX-034\n\t\nYJ-YCYX-034\n\t\n折叠棉\n\t\n折叠棉\n\t\n63*48.5*241-1（0.22精度）\n\t\n个\n\t\n-32\n\t\n-105\n",
+    "32\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YCYX-027\n\t\nYJ-YCYX-027\n\t\n折叠棉\n\t\n折叠棉\n\t\n63*48.5*231\n\t\n支\n\t\n0\n\t\n0\n\t\n3432",
+    "33\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-YCYX-021\n\t\nYJ-YCYX-021\n\t\n折叠棉\n\t\n折叠棉\n\t\n83±1.5*71*125\n\t\n支\n\t\n464\n\t\n5.710344\n\t\n26",
+    "34\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XWR-040\n\t\nYJ-XWR-040\n\t\n白色无纺布80g\n\t\n白色无纺布80g\n\t\n123*160\n\t\n张\n\t\n0\n\t\n0\n\t\n285",
+    "35\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XWR-032\n\t\nYJ-XWR-032\n\t\n白色无纺布100g\n\t\n白色无纺布100g\n\t\n50.6-14mm\n\t\n张\n\t\n200\n\t\n0.05\n\t\n",
+    "36\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XWR-031\n\t\nYJ-XWR-031\n\t\n白色无纺布80g\n\t\n白色无纺布80g\n\t\n119*135\n\t\n张\n\t\n200\n\t\n0.065\n\t\n13",
+    "37\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XWR-003\n\t\nYJ-XWR-003\n\t\n白色无纺布130g\n\t\n白色无纺布130g\n\t\n220*495（20寸）\n\t\n张\n\t\n22500\n\t\n1.",
+    "38\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XT-001\n\t\nYJ-XT-001\n\t\n垫片\n\t\n垫片\n\t\n硅胶垫片（水卫适专用）\n\t\nPCS\n\t\n-8000\n\t\n0\n\t\n0",
+    "39\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XH-002\n\t\nYJ-XH-002\n\t\n鑫恒酸洗（80-250）\n\t\n鑫恒酸洗（80-250）\n\t\n\t\nkg\n\t\n1000\n\t\n184\n\t\n18400",
+    "40\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-XH-001\n\t\nYJ-XH-001\n\t\n鑫恒（80-250）\n\t\n鑫恒（80-250）\n\t\n\t\nkg\n\t\n-1000\n\t\n-55.5\n\t\n55500",
+    "41\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-TS-033\n\t\nYJ-TS-033\n\t\nPP棉\n\t\nPP棉\n\t\n40±1*30+1*497.5±0.5\n\t\n支\n\t\n6561\n\t\n11.074188\n",
+    "42\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-TS-024\n\t\nYJ-TS-024\n\t\nPP棉\n\t\nPP棉\n\t\n65*49*244.5\n\t\n支\n\t\n358\n\t\n9.217877\n\t\n3300",
+    "43\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-TS-006\n\t\nYJ-TS-006\n\t\nPP棉\n\t\nPP棉\n\t\n63*49*242\n\t\n支\n\t\n-300\n\t\n0\n\t\n0",
+    "44\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-TJHZ-001\n\t\nYJ-TJHZ-001\n\t\n雅可比CS（80-200）\n\t\n雅可比CS（80-200）\n\t\n\t\nkg\n\t\n0\n\t\n0\n\t\n2850",
+    "45\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-SX-062\n\t\nYJ-SX-062\n\t\n端盖\n\t\n端盖\n\t\n蓝色一米（超棉）\n\t\nPCS\n\t\n1350\n\t\n0.104444\n\t\n141",
+    "46\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-SX-053\n\t\nYJ-SX-053\n\t\n端盖\n\t\n端盖\n\t\n灰色水卫适（超棉)\n\t\nPCS\n\t\n1222\n\t\n1.302176\n\t\n1591.26",
+    "47\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-SX-043\n\t\nYJ-SX-043\n\t\n垫片\n\t\n垫片\n\t\n10寸（TPR）\n\t\nPCS\n\t\n3000\n\t\n11.1188\n\t\n33356.4",
+    "48\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-SX-042\n\t\nYJ-SX-042\n\t\n端盖\n\t\n端盖\n\t\n蓝色一米（无棉）\n\t\nPCS\n\t\n-3540\n\t\n0\n\t\n0",
+    "49\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-SX-038\n\t\nYJ-SX-038\n\t\n端盖\n\t\n端盖\n\t\n蓝色中性（无棉）\n\t\nPCS\n\t\n3600\n\t\n0.375\n\t\n1350",
+    "50\n\t\nCK00006\n\t\nCK00006\n\t\n华北工控仓\n\t\n华北工控仓\n\t\nYJ-SX-035\n\t\nYJ-SX-035\n\t\n端盖\n\t\n端盖\n\t\n蓝色大咖（超棉+丝印）\n\t\nPCS\n\t\n900\n\t\n40.015555\n\t\n36014"
+   ],
+   "err": null,
+   "pager": "第 1/19 页"
+  },
+  "slow": [],
+  "top": [
+   {
+    "url": "http://127.0.0.1:8090/api/px/queryFormDataList",
+    "method": "POST",
+    "pc": "STOCK_BALANCE",
+    "pd": "{\"panelCode\":\"STOCK_BALANCE\",\"condition\":{},\"pageNo\":1,\"pageSize\":50}",
+    "t0": 1792037529119,
+    "ms": 341
+   }
+  ],
+  "byPanel": {
+   "/api/px/getPanelConfig?panelCode=STOCK_BALANCE|": {
+    "n": 1,
+    "max": 58
+   },
+   "WH|{\"panelCode\":\"WH\",\"condition\":{},\"pageNo\":1,\"pageSize\":1,\"countOnly\":true}": {
+    "n": 1,
+    "max": 12
+   },
+   "INV|{\"panelCode\":\"INV\",\"condition\":{},\"pageNo\":1,\"pageSize\":1,\"countOnly\":true}": {
+    "n": 1,
+    "max": 15
+   },
+   "/api/report/templates?panelCode=STOCK_BALANCE|": {
+    "n": 1,
+    "max": 17
+   },
+   "/api/px/getPanelConfig?panelCode=WH|": {
+    "n": 1,
+    "max": 11
+   },
+   "WH|{\"panelCode\":\"WH\",\"condition\":{},\"keyword\":\"\",\"pageNo\":1,\"pageSize\":100}": {
+    "n": 1,
+    "max": 11
+   },
+   "STOCK_BALANCE|{\"panelCode\":\"STOCK_BALANCE\",\"condition\":{},\"pageNo\":1,\"pageSize\":50}": {
+    "n": 1,
+    "max": 341
+   }
+  }
+ },
+ {
+  "panel": "STOCK_LEDGER",
+  "state": {
+   "rows": 0,
+   "toasts": [
+    "库存台账",
+    "单据：-",
+    "◁",
+    "◀",
+    "第 0/0 张",
+    "▶",
+    "▷"
+   ],
+   "err": null,
+   "pager": "第 0/0 张"
+  },
+  "slow": [],
+  "top": [],
+  "byPanel": {}
+ },
+ {
+  "panel": "STOCK_SUMMARY",
+  "state": {
+   "rows": 0,
+   "toasts": [
+    "收发存汇总表"
+   ],
+   "err": null,
+   "pager": "第 0/0 张"
+  },
+  "slow": [],
+  "top": [],
+  "byPanel": {}
+ }
+]
