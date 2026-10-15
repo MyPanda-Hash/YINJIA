@@ -31,9 +31,11 @@ public class StockFlowService {
     private static final Logger log = LoggerFactory.getLogger(StockFlowService.class);
 
     private final JdbcTemplate jdbc;
+    private final StockWarnService warn;
 
-    public StockFlowService(JdbcTemplate jdbc) {
+    public StockFlowService(JdbcTemplate jdbc, StockWarnService warn) {
         this.jdbc = jdbc;
+        this.warn = warn;
     }
 
     /**
@@ -82,6 +84,9 @@ public class StockFlowService {
         int src = inbound ? inS : outS;
         String tbl = inbound ? "inh" : "outh";
         int n = 0;
+        // 出库审批闸门(用户 2026-10-15 第十六轮):出库后该批次余额 < 预警数量 ⇒ 抛异常 ⇒ 事务回滚、审批失败并提示。
+        //   一张单可能多行打同一批次 ⇒ acc 按 物料|仓库|批号 累计"本单已出量",逐行单独比会漏判。
+        Map<String, java.math.BigDecimal> warnAcc = new java.util.HashMap<>();
         for (Map<String, Object> r : rows) {
             Object rid = r.get("rid");
             if (rid == null) continue;                       // 没有来源行 id 就不记流水(唯一键的一半,无法幂等)
@@ -103,6 +108,10 @@ public class StockFlowService {
                 continue;                                    // 已记过(未弃审的重复审核)/ 已冲过:不重复写
             }
             if (!forward) continue;                          // 没记过流水,弃审时无流水可冲
+            if (!inbound) {
+                warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
+                        java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
+            }
             n += insert(tbl, inbound, r, no, user, src, rid);
         }
         if (n > 0) log.info("[库存流水] {} {} {} {} 行(src={})", panelCode, no, forward ? "写入" : "红冲", n, src);

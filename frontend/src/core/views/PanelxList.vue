@@ -636,6 +636,17 @@
                   <el-table-column prop="当月单据数" :label="tt('当月单据数')" width="110" align="right" />
                   <el-table-column prop="当月合计" :label="tt('当月合计')" width="110" align="right" />
                   <el-table-column prop="余额" :label="tt('余额')" width="110" align="right" />
+                  <!-- 预警数量:库存明细里直接设置(用户 2026-10-15 第十六轮)。落库到 kucun.[预警数量],
+                       出库审批时按「出库后余额 < 预警数量」拦截(StockWarnService.checkOutbound)。
+                       余额低于预警时数字标红,一眼看出哪批要警戒。 -->
+                  <el-table-column :label="tt('预警数量')" width="160">
+                    <template #default="{ row: g }">
+                      <el-input-number size="small" :controls="false" :min="0" style="width: 110px"
+                                       :model-value="mcWarn(row.id, g.批次号)"
+                                       @change="(v) => saveMcWarn(row, g.批次号, v)" />
+                      <span v-if="g.余额 < mcWarn(row.id, g.批次号)" class="mc-warn-hit">{{ tt('低于预警') }}</span>
+                    </template>
+                  </el-table-column>
                   <el-table-column :label="tt('首次月结')" min-width="140">
                     <template #default="{ row: g }">
                       {{ (g.单据.find((x) => String(x['单据类型'] || '').includes('月结')) || {})['单据编号'] || '—' }}
@@ -2854,6 +2865,27 @@ const mcDetailLoading = ref({})
  * 所以外层每一行是一条批次号,点开就是「先月结、后当月单据」。
  * 每组给四个汇总数:月结数量 / 当月单据数 / 当月合计 / 余额(= 月结 + 当月,即该批当前余额)。
  */
+/** 该批次已设的预警数量(展开区显示/编辑用) */
+function mcWarn(id, lot) {
+  return Number(mcDetail.value?.[id]?.['预警']?.[lot] ?? 0)
+}
+
+/** 保存预警数量(库存明细里直接设;落 kucun.[预警数量],出库审批据此拦截) */
+async function saveMcWarn(row, lot, qty) {
+  const id = row.id
+  try {
+    await request.post('/stock/warn/set', {
+      wzdm: row['存货编码'] ?? '', ckdm: row['仓库编码'] ?? '', lot: lot || '', qty: Number(qty) || 0,
+    })
+    if (mcDetail.value[id]) {
+      mcDetail.value[id]['预警'] = { ...(mcDetail.value[id]['预警'] || {}), [lot]: Number(qty) || 0 }
+    }
+    ElMessage.success(tt('预警数量已保存'))
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('保存预警数量失败'))
+  }
+}
+
 function mcBatchGroups(id) {
   const rows = mcDetail.value?.[id]?.['单据明细'] || []
   const map = new Map()
@@ -9197,6 +9229,7 @@ onUnmounted(() => {
 .mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
 .mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
 .mc-detail-snap.mc-dim { color: #94a3b8; }
+.mc-warn-hit { color: #dc2626; font-size: 11px; margin-left: 6px; }
 .mc-snap-note { font-style: normal; color: #94a3b8; font-size: 11px; }
 .mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }
 .mc-detail-tables { display: flex; flex-wrap: wrap; gap: 12px; }
