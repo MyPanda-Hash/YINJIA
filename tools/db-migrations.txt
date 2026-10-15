@@ -3644,3 +3644,17 @@ migrate-asm-insp-passqty-rename-20261017.sql
 #   (各「[OK] 4 batches」,复跑 0 行新增)。
 #   执行前两账套已各打快照:db\HSDZ_MES-pre-srvsync-20261017.bak / HSDZ_MES_TEST-pre-srvsync-20261017.bak。
 migrate-srv-config-sync-20261017.sql
+
+# —— 2026-10-17 服务器快照回补:6 张经典 HSDZ 遗留表(建表 + 表级中文注明)——
+#   用户口径:「当前服务器快照缺失的表需要补充回到当前的数据库内,数据也按照服务器快照完成恢复」。
+#   与快照库 HSDZ_MES_SRV1015 逐表比对,正式库缺 14 张,分三类:
+#     ① 6 张经典遗留(**本脚本**):dm_langue / gscs / permission / s_commdata / s_sys / s_xtcs;
+#     ② 6 张 2026-10-16 主动下架的检验单(qc_mold_insp_*/qc_cut_insp_*/qc_fin_spec_*;另案,不在本脚本);
+#     ③ 2 张 *_bak_ 备份表(mate_bak_20261013 / rd_dev_task_bak_20261013;**不补** ——
+#        AGENTS.md 第 10 组棘轮基线为 0,体检 10 号项「备份/临时表」补了立刻 FAIL)。
+#   ① 这 6 张在后端源码里只出现在注释中(「对齐 HSDZ permission.GROP」),运行期零引用 ⇒ 不改任何行为。
+#   ⚠ 数据(**7,936 行**)不写进本脚本:其中 s_commdata.JSZ 是真实手机号、gscs 是公司电话,
+#     按 AGENTS.md「敏感信息不入库」不得进 git;改由 tools/archive/_migration-gap-20261017/
+#     _restore-legacy-data.sql 从快照库一次性回灌(DB_ID 守卫 + 空表守卫,幂等;故意不进本清单)。
+#   登记:tools/db-inuse-tables.txt(快照回补节) + tools/db-legacy-whitelist.txt(冻结表 6 条)。
+migrate-legacy-restore-20261017.sql

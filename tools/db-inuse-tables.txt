@@ -230,12 +230,25 @@ table:s_log   # 上机日志
 table:scjl   # 生产记录
 view:v_wo_completion_detail   # 完工明细只读视图(scjl已完工未作废记录;WO_COMPLETION_LIST)
 
+# ---- 快照回补(6 张;2026-10-17 按服务器快照 HSDZ_MES_SRV1015 补回 —— 经典 HSDZ 资产,
+#      后端源码里只出现在注释中(「对齐 HSDZ permission.GROP」),运行期零引用,补回不改任何行为。
+#      建表脚本 tools/migrate-legacy-restore-20261017.sql;数据含真实手机号故不入 git,
+#      由 tools/archive/_migration-gap-20261017/_restore-legacy-data.sql 从快照一次性回灌) ----
+table:dm_langue   # 多语言词条表(经典 HSDZ:chs/cht/eng/oth/bz 五语文本;MES 多语言走 yj_translation)
+table:gscs   # 公司参数表(经典 HSDZ:一行一公司,gsmc 公司名称/gsdh 电话等 55 列)
+table:permission   # 权限明细表(经典 HSDZ:账号×模块×权限位×分组;MES 权限走 yj_role/yj_role_panel)
+table:s_commdata   # 通讯数据表(经典 HSDZ:短信/语音外呼队列,JSZ=接收号码)
+table:s_sys   # 系统表(经典 HSDZ:界面元素/菜单的字段级元数据;MES 面板元数据走 yj_panel/yj_field)
+table:s_xtcs   # 系统参数表(经典 HSDZ:工单二维码长度/超交百分比等;MES 运行期参数走 yj_app_setting)
+
 # ---- 例外保留(3 张;未用但按上列理由不删) ----
 table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_hash 幂等记录)
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
 # 合计 212 张在册 + 3 张例外保留 = 215 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 2026-10-17 快照回补 6 张经典 HSDZ 遗留表(dm_langue/gscs/permission/s_commdata/s_sys/s_xtcs)——
+#   在册 212 → **218**,+ 例外 3 = **221 张**(库内实点数已核对);冻结登记见 db-legacy-whitelist.txt。
 # 2026-10-16 下架「成型检验单 QC_MOLD_INSP / 切炭检验单 QC_CUT_INSP / 成品检验规范 QC_FIN_SPEC」3 张面板,
 # 2026-10-17 合并 origin/main(1887d0a0):两侧新增表全部登记 ——
 #   远端侧 bd_stock_close/bl_stock_close(库存月结)等,本地侧 qc_proc_insp_*/qc_first_insp_* 等检验单表;

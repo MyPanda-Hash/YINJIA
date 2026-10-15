@@ -10,6 +10,10 @@
 # 格式:table:<表名> | panel:<面板码> | col:<表>.<列> | dupkey:<面板>.<列> | skiplabel:<中文标签> | count:<检查号>=<基线>
 #
 # ---- 冻结表(遗留/拼音缩写:禁新增、禁扩展、禁新代码引用;现有面板引用见「关联面板」列,改动前须评估) ----
+# 2026-10-17 快照回补 6 张经典 HSDZ 遗留表 → 一并冻结(建表 tools/migrate-legacy-restore-20261017.sql):
+#   dm_langue / gscs / permission / s_commdata / s_sys / s_xtcs
+#   (它们不是 MES 自有结构,故必须冻结 —— 否则体检 01 表命名 / 02 表注明 / 03 列注明会 FAIL;
+#    这三项现均为 PASS,是靠本白名单豁免的。)
 table:Porder
 table:day_report
 table:day_report_detail
@@ -17,6 +21,7 @@ table:dm_ck
 table:dm_gf
 table:dm_key
 table:dm_kh
+table:dm_langue
 table:dtproperties
 table:equip_check
 table:equip_check_detail
@@ -27,6 +32,7 @@ table:feed_confirm_detail
 table:form_flow_link
 table:gran_record
 table:gran_record_detail
+table:gscs
 table:gxgs
 table:inh
 table:inv_cost_ledger
@@ -41,6 +47,7 @@ table:order_bt
 table:outh
 table:pack_confirm
 table:pack_confirm_detail
+table:permission
 table:plang
 table:plang_pc
 table:qr_batch_registry
@@ -48,7 +55,10 @@ table:report_column_settings
 table:rod_return
 table:rod_return_detail
 table:s_allno
+table:s_commdata
 table:s_log
+table:s_xtcs
+table:s_sys
 table:sample_req
 table:sample_req_detail
 table:scjl
