@@ -325,6 +325,80 @@ END
 CLOSE curdf DEALLOCATE curdf;
 GO
 
+/* ============ J. 纸张抬头补 4 个可填字段(2026-10-16) ============
+ * 用户口径(2026-10-16 第五轮,截图红框):「当前上面这一部分均不能填写需要实现变为可填写的实现,
+ *   让当前实现没有成功对应上」。
+ *
+ * 病根:图片顶部的「表单管理人 / 密级 / 使用范围」与抬头的「生产日期」**在库里根本没有对应字段**
+ *   —— 既不是 qc_first_insp_head 的列,也没有 yj_field 登记行。纸张按 head['表单管理人'] 取名,
+ *   取到的是 undefined ⇒ 永远空白,而且**没有地方能填**(面板引擎只认登记过的字段)。
+ * 本段补:① 头表 +4 列;② yj_field 登记(place=header,可编辑、可见);③ 列级中文注明;
+ *   ④ en 译名(同一中文标签全局共享,已有就跳过)。幂等。
+ */
+IF COL_LENGTH(N'dbo.qc_first_insp_head', N'表单管理人') IS NULL ALTER TABLE dbo.qc_first_insp_head ADD [表单管理人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_head', N'密级') IS NULL ALTER TABLE dbo.qc_first_insp_head ADD [密级] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_head', N'使用范围') IS NULL ALTER TABLE dbo.qc_first_insp_head ADD [使用范围] nvarchar(60) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_head', N'生产日期') IS NULL ALTER TABLE dbo.qc_first_insp_head ADD [生产日期] nvarchar(20) NULL;
+GO
+
+DECLARE @hdr TABLE (col sysname, note nvarchar(400));
+INSERT INTO @hdr VALUES
+ (N'表单管理人', N'纸张右上信息格:本表的管理责任人(与成型工艺清单 RD_MOLD_PROC 同名字段同口径)'),
+ (N'密级',       N'纸张右上信息格:文件密级 保密/内部/公开'),
+ (N'使用范围',   N'纸张右上信息格:文件使用范围(炭棒成型车间 等)'),
+ (N'生产日期',   N'纸张抬头「生产日期」:本次首件所属的生产日期(与单据日期/检验日期分开,可单独填)');
+DECLARE @hc sysname, @hn nvarchar(400);
+DECLARE curh CURSOR LOCAL FAST_FORWARD FOR SELECT col,note FROM @hdr;
+OPEN curh FETCH NEXT FROM curh INTO @hc,@hn;
+WHILE @@FETCH_STATUS=0
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id=OBJECT_ID(N'dbo.qc_first_insp_head') AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.qc_first_insp_head'),@hc,'ColumnId') AND name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description',@hn,N'SCHEMA',N'dbo',N'TABLE',N'qc_first_insp_head',N'COLUMN',@hc;
+  FETCH NEXT FROM curh INTO @hc,@hn;
+END
+CLOSE curh DEALLOCATE curh;
+GO
+
+/* yj_field 登记:seq 5/6/7/8 落在「单据编号 10」之前(纸张上它们是右上角信息格与抬头首格,
+   排在主抬头两行之前);place 只写 header(不写 query:它们不是查询条件)。 */
+DECLARE @hf TABLE (col nvarchar(50), seq int, width int, dtype nvarchar(20), dict nvarchar(500));
+INSERT INTO @hf VALUES
+ (N'表单管理人', 5, 120, N'文本', NULL),
+ (N'密级',       6, 80,  N'下拉框', N'SELECT v FROM (VALUES (N''保密''),(N''内部''),(N''公开'')) AS t(v)'),
+ (N'使用范围',   7, 140, N'下拉框', N'SELECT v FROM (VALUES (N''炭棒成型车间''),(N''工艺科/成型车间''),(N''工程技术中心''),(N''银嘉内部''),(N''公司内'')) AS t(v)'),
+ (N'生产日期',   8, 110, N'日期', NULL);
+DECLARE @fc nvarchar(50), @fs int, @fw int, @fd nvarchar(20), @fq nvarchar(500);
+DECLARE curhf CURSOR LOCAL FAST_FORWARD FOR SELECT col,seq,width,dtype,dict FROM @hf;
+OPEN curhf FETCH NEXT FROM curhf INTO @fc,@fs,@fw,@fd,@fq;
+WHILE @@FETCH_STATUS=0
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code=N'QC_FIRST_INSP' AND col_name=@fc)
+    INSERT INTO yj_field(panel_code,col_name,label,data_type,dict_sql,place,seq,width,editable,required,hidden,visible)
+    VALUES(N'QC_FIRST_INSP',@fc,@fc,@fd,@fq,N'header',@fs,@fw,1,0,0,1);
+  FETCH NEXT FROM curhf INTO @fc,@fs,@fw,@fd,@fq;
+END
+CLOSE curhf DEALLOCATE curhf;
+GO
+
+/* en 译名(同一中文标签全局共享:已有就跳过) */
+DECLARE @ht TABLE (label nvarchar(50), en nvarchar(120));
+INSERT INTO @ht VALUES
+ (N'表单管理人', N'Form Administrator'),
+ (N'密级',       N'Confidentiality'),
+ (N'使用范围',   N'Scope of Use'),
+ (N'生产日期',   N'Production Date');
+DECLARE @hl nvarchar(50), @he nvarchar(120);
+DECLARE curht CURSOR LOCAL FAST_FORWARD FOR SELECT label,en FROM @ht;
+OPEN curht FETCH NEXT FROM curht INTO @hl,@he;
+WHILE @@FETCH_STATUS=0
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope=N'field' AND ref_key=@hl AND locale=N'en')
+    INSERT INTO yj_translation(scope,ref_key,locale,text,source) VALUES(N'field',@hl,N'en',@he,N'manual');
+  FETCH NEXT FROM curht INTO @hl,@he;
+END
+CLOSE curht DEALLOCATE curht;
+GO
+
 /* ============ I. 自检 ============ */
 DECLARE @bad int = 0;
 IF OBJECT_ID(N'dbo.qc_first_insp_head', N'U') IS NULL SET @bad = @bad + 1;
@@ -339,6 +413,11 @@ IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'db
 IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.qc_first_insp_detail') AND minor_id = 0 AND name = N'MS_Description') = 0 SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'panel' AND ref_key = N'首件检验单' AND locale = N'en') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'field' AND ref_key = N'工艺清单单号' AND locale = N'en') SET @bad = @bad + 1;
+/* 纸张抬头 4 个可填字段(第 J 段):列 + yj_field + 译名 三处缺一不可 */
+IF COL_LENGTH(N'dbo.qc_first_insp_head', N'表单管理人') IS NULL OR COL_LENGTH(N'dbo.qc_first_insp_head', N'密级') IS NULL
+   OR COL_LENGTH(N'dbo.qc_first_insp_head', N'使用范围') IS NULL OR COL_LENGTH(N'dbo.qc_first_insp_head', N'生产日期') IS NULL SET @bad = @bad + 1;
+IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_FIRST_INSP' AND col_name IN (N'表单管理人', N'密级', N'使用范围', N'生产日期') AND place LIKE N'%header%' AND editable = 1 AND visible = 1) < 4 SET @bad = @bad + 1;
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'field' AND ref_key = N'生产日期' AND locale = N'en') SET @bad = @bad + 1;
 IF @bad > 0 RAISERROR(N'首件检验单迁移自检失败(缺表/缺面板/缺字段/缺注明/缺译名)', 16, 1);
 ELSE PRINT N'首件检验单就绪(QC_FIRST_INSP / qc_first_insp_head / qc_first_insp_detail)';
 GO

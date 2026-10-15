@@ -2960,6 +2960,9 @@ public class ButtonService {
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", today);
         head.put("检验日期", today);
+        // 生产日期(2026-10-16 第 J 段新加的抬头字段):纸张上单独一格,自动出单默认 = 今天,
+        //   品质可在纸面改(图片上这一格本来是手填的;与单据日期/检验日期分开存)。
+        head.put("生产日期", today);
         head.put("工单号", wo);
         if (xc != 0) head.put("工单行号", xc);
         head.put("报工单号", repNo);

@@ -23,24 +23,70 @@
          这里按可勾的选项渲染;其余列是文本录入格(图片里那些 "/" 是"本格无需填写"的占位)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="fi-sheet">
-    <!-- ① 报告头右上信息三格(表单管理人/密级/使用范围) -->
+    <!-- ① 报告头右上信息三格(表单管理人/密级/使用范围)
+         ⚠ 2026-10-16 用户口径(截图红框)「当前上面这一部分均不能填写需要实现变为可填写的实现」:
+           原实现是纯文本 `<span>{{ head[...] }}</span>`,而这 4 个抬头字段当时**库里根本没有**
+           (既非头表列、也无 yj_field 登记)⇒ 永远空白且无处可填。现已在 migrate-first-insp.sql
+           第 J 段补上列 + yj_field 登记,这里按可填格子渲染(草稿态可填、只读态显示文本)。 -->
     <div class="fi-topbar">
       <table class="fi-info"><tbody>
-        <tr><th>{{ tt('表单管理人') }}</th><td>{{ head['表单管理人'] || '' }}</td></tr>
-        <tr><th>{{ tt('密级') }}</th><td>{{ head['密级'] || '' }}</td></tr>
-        <tr><th>{{ tt('使用范围') }}</th><td>{{ head['使用范围'] || '' }}</td></tr>
+        <tr v-for="f in INFO_FIELDS" :key="f.key">
+          <th>{{ tt(f.label) }}</th>
+          <td>
+            <el-select
+              v-if="editable && !isLocked(f.key) && f.options"
+              v-model="head[f.key]"
+              size="small"
+              clearable
+              class="fi-cell"
+              :placeholder="tt('请选择')"
+              @change="emit('dirty')"
+            >
+              <el-option v-for="o in f.options" :key="o" :label="tt(o)" :value="o" />
+            </el-select>
+            <el-input
+              v-else-if="editable && !isLocked(f.key)"
+              v-model="head[f.key]"
+              size="small"
+              class="fi-cell"
+              maxlength="50"
+              @input="emit('dirty')"
+            />
+            <span v-else>{{ head[f.key] || '' }}</span>
+          </td>
+        </tr>
       </tbody></table>
     </div>
 
     <!-- ② 大标题 -->
     <div class="fi-titlerow"><div class="fi-title">{{ tt('炭棒成型车间首件检验记录表') }}</div></div>
 
-    <!-- ③ 抬头四对 -->
+    <!-- ③ 抬头四对:全部可填(产品编号/产品型号 支持参照或手填;生产日期用日期选择;组别取生产线) -->
     <table class="fi-head"><tbody><tr>
-      <th>{{ tt('产品编号') }}</th><td>{{ head['产品编码'] || '' }}</td>
-      <th>{{ tt('产品型号') }}</th><td>{{ head['规格型号'] || head['产品名称'] || '' }}</td>
-      <th>{{ tt('生产日期') }}</th><td>{{ head['生产日期'] || head['检验日期'] || head['单据日期'] || '' }}</td>
-      <th>{{ tt('组别') }}</th><td>{{ head['生产线'] || head['生产车间'] || '' }}</td>
+      <template v-for="f in HEAD_FIELDS" :key="f.key">
+        <th>{{ tt(f.label) }}</th>
+        <td>
+          <el-date-picker
+            v-if="editable && !isLocked(f.key) && f.date"
+            v-model="head[f.key]"
+            type="date"
+            size="small"
+            value-format="YYYY-MM-DD"
+            class="fi-cell"
+            :placeholder="tt('选择日期')"
+            @change="emit('dirty')"
+          />
+          <el-input
+            v-else-if="editable && !isLocked(f.key)"
+            v-model="head[f.key]"
+            size="small"
+            class="fi-cell"
+            maxlength="200"
+            @input="emit('dirty')"
+          />
+          <span v-else>{{ headText(f) }}</span>
+        </td>
+      </template>
     </tr></tbody></table>
 
     <!-- ④ 两级表头 + 标准行 + 1#..8# 数据区 -->
@@ -238,6 +284,47 @@ const samples = [1, 2, 3, 4, 5, 6, 7, 8]
  * 其余列(尺寸/重量/强度/浊度/压降)八个样品都录(第 1 条同样说了要录 2 支,但图片上它们 8# 都给了录入格)。
  */
 const CHECK_SAMPLES = 2
+
+/**
+ * 纸张右上信息三格(图片上那三行)。数据键 = yj_field 的 col_name(与后端列同名)。
+ * 密级/使用范围 给下拉候选(与成型工艺清单 RD_MOLD_PROC 同一套口径,见 migrate-first-insp.sql 第 J 段)。
+ */
+const INFO_FIELDS = [
+  { key: '表单管理人', label: '表单管理人' },
+  { key: '密级', label: '密级', options: ['保密', '内部', '公开'] },
+  { key: '使用范围', label: '使用范围', options: ['炭棒成型车间', '工艺科/成型车间', '工程技术中心', '银嘉内部', '公司内'] },
+]
+
+/**
+ * 抬头四对(图片上那一行)。**纸面标签 → 数据键**的映射:
+ *   产品编号 → 产品编码(报工带出的产品编号就是它)
+ *   产品型号 → 规格型号(报工带出的规格;没有再退回产品名称,纸面不空)
+ *   生产日期 → 生产日期(第 J 段新加的独立字段;空则回落到检验日期/单据日期,见 headDates)
+ *   组别     → 生产线(纸面「组别」= 产线/车间口径)
+ */
+const HEAD_FIELDS = [
+  { key: '产品编码', label: '产品编号' },
+  { key: '规格型号', label: '产品型号' },
+  { key: '生产日期', label: '生产日期', date: true },
+  { key: '生产线', label: '组别' },
+]
+
+/** 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与其它纸张同口径) */
+function isLocked(key) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
+  return !!f && (f.editable === false || f.editable === 0)
+}
+
+/**
+ * 只读态取值:生产日期这一格给**回落链** —— 老单据(第 J 段加字段之前生成的)没这个值,
+ * 直接显示会空白(图片上这里是有日期的);按 生产日期 → 检验日期 → 单据日期 依次回落。
+ * 可填态不用它(v-model 直绑真实字段,填什么存什么)。
+ */
+function headText(f) {
+  if (f.key === '生产日期') return head['生产日期'] || head['检验日期'] || head['单据日期'] || ''
+  if (f.key === '规格型号') return head['规格型号'] || head['产品名称'] || ''
+  return head[f.key] || ''
+}
 
 /** 这一列的「定义行」(标准行)与某样品的行 —— 行不存在时按需补出来(老单据/手填列) */
 function rowOf(sample, col) {
