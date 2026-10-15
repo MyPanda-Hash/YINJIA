@@ -174,10 +174,34 @@ public class KingdeePushService {
         // 为什么是它:真实账套只读实测(deploy/_probe-matout.mjs)inv_pick 有 4801 张,是料件出库的对口单据;
         // 同族对照 pur_inbound 3266 / sal_out_bound 5084 / inv_other_out 1130,其余候选路径一律 519 无此接口。
         boolean isMatOut = "MATERIAL_OUT".equals(panelCode);
-        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out" : "bd_sale_out";
-        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out" : "bl_sale_out";
+        // 产品入库单直推(2026-10-14 用户口径「先把产品入库的转erp补齐」):作为**金蝶产品入库单**
+        // (inv_product)落到目标账套。字段完全对照金蝶接口(沙箱实测,证据见
+        // tools/archive/_dump-out/kingdee-save-inv-product-1014.md):
+        //   · 保存接口是 protobuf 校验,**数值/布尔一律要传字符串**(否则 proto: invalid value for string type);
+        //   · 落库字段(22):bill_date / dept_number / dept_id / emp_number / emp_id / remark /
+        //     seq / material_id / material_number / material_name / qty / base_qty / inv_qty /
+        //     unit_id / unit_number / base_unit_id / base_unit_number / stock_id / stock_number /
+        //     coefficient / comment;
+        //   · **静默忽略**:trans_type、material_model;条件性:batch_no(仅批次管理商品)、aux_*(仅多单位商品);
+        //   · 检验类键(check_type / inspect_way / qc_type)**静默忽略且不报错** ⇒ 明细行的
+        //     「检验方式」(全检/抽检,用户指定放明细行)只存 MES 本地,本方法**不推送**。
+        boolean isFinIn = "FINISH_IN".equals(panelCode);
+        // 其他入库单 / 其他出库单 直推(2026-10-14):作为金蝶「其他入库单/其他出库单」
+        // (inv_other_in / inv_other_out)落到目标账套。沙箱实测(证据
+        // tools/archive/_dump-out/kingdee-save-inv-other-1014.md · kingdee-transtype-1014.md):
+        //   · ⚠ 这两个单据**必须传 trans_type_id**(业务类型):只发 trans_type/number/name 都会报
+        //     「请填写"业务类型"」;而金蝶**没有业务类型档案接口**(9 条候选路径全 519)
+        //     ⇒ 只能按账套配置 id(真实账套实测:其他入库=12 / 其他出库=13),MES 侧落在「业务类型id」字段上。
+        //   · 其余字段落库口径与产品入库单同族(数值/布尔一律传字符串)。
+        boolean isOtherIn = "OTHER_IN".equals(panelCode);
+        boolean isOtherOut = "OTHER_OUT".equals(panelCode);
+        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out"
+                : isFinIn ? "bd_finish_in" : isOtherIn ? "bd_other_in" : isOtherOut ? "bd_other_out" : "bd_sale_out";
+        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out"
+                : isFinIn ? "bl_finish_in" : isOtherIn ? "bl_other_in" : isOtherOut ? "bl_other_out" : "bl_sale_out";
         // 日志文案用的单据名(此前硬编码"采购入库单",材料出库单接进来后会把日志写错单)
-        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单" : "销售出库单";
+        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单"
+                : isFinIn ? "产品入库单" : isOtherIn ? "其他入库单" : isOtherOut ? "其他出库单" : "销售出库单";
 
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -231,7 +255,7 @@ public class KingdeePushService {
         // ④ 构建金蝶 body(平铺;不传 bill_no → 金蝶自动生成编号,MES 编号放备注追溯)
         ObjectNode body = json.createObjectNode();
         body.put("bill_date", str(head.get("单据日期")));
-        if (!isOrder && !isMatOut) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单无此项
+        if (!isOrder && !isMatOut && !isFinIn) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单/产品入库单无此项(产品入库单实测 trans_type 被静默忽略)
         // 采购订单直推带 bill_no(2026-09-23):沿用公司 YJ- 编号(MES 同号)——真实账套的订单本来就是
         // YJ- 号(实测 YJ-20260924-01 等),入库单按号挂源单;不带 bill_no 金蝶自动编号(CGDD-…),
         // 入库单的 src_bill_no 按 MES 号就查不到源单(沙箱踩坑:CGDD-20260909-00001 无法被 YJ 号挂联)
@@ -239,7 +263,64 @@ public class KingdeePushService {
         String remark = str(head.get("备注"));
         body.put("remark", (remark.isEmpty() ? "" : remark) + " [MES:" + docNo + "]");
         if (isPur || isOrder) body.put("supplier_number", str(head.get("供应商编码")));
-        else if (!isMatOut) body.put("customer_number", str(head.get("客户编码")));
+        else if (!isMatOut && !isFinIn && !isOtherOut) body.put("customer_number", str(head.get("客户编码")));
+
+        // 其他入库单 / 其他出库单 头(2026-10-14):**业务类型(trans_type_id)是必填** ——
+        // 沙箱实测:只发 trans_type / trans_type_number / trans_type_name 都会报「请填写"业务类型"」,
+        // 只有 trans_type_id 是保存接口认的键;而金蝶没有业务类型档案接口(9 条候选路径全 519),
+        // 故只能按账套配置:MES 字段「业务类型id」优先,空则回落本账套常见默认(其他入库 12 / 其他出库 13,
+        // 真实账套实测值)。对方单位:其他入库=供应商(实测 100% 有值),其他出库=部门+经手人(实测 97%)。
+        if (isOtherIn || isOtherOut) {
+            String transTypeId = str(head.get("业务类型id"));
+            if (transTypeId.isEmpty()) transTypeId = isOtherIn ? "12" : "13";
+            body.put("trans_type_id", transTypeId);
+            log.info("{}[{}]推送业务类型 trans_type_id={}(来自{}字段)", docLabel, docNo, transTypeId,
+                    str(head.get("业务类型id")).isEmpty() ? "账套默认" : "单据");
+            if (isOtherIn) {
+                String supNo = str(head.get("供应商编码"));
+                if (supNo.isEmpty()) supNo = archiveCode("bs_supplier", "供应商名称", "供应商编码", str(head.get("供应商")));
+                if (!supNo.isEmpty()) body.put("supplier_number", supNo);
+            } else {
+                String deptNo = str(head.get("部门编码"));
+                if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("部门")));
+                if (!deptNo.isEmpty()) {
+                    body.put("dept_number", deptNo);
+                    String deptId = str(safeIdMap(DEPT_LIST_PATH, "部门").get(deptNo));
+                    if (!deptId.isEmpty()) body.put("dept_id", deptId);
+                }
+                String empNo = str(head.get("经手人编码"));
+                if (empNo.isEmpty()) empNo = archiveCode("bs_emp", "员工名称", "员工编码", str(head.get("经手人")));
+                if (!empNo.isEmpty()) {
+                    body.put("emp_number", empNo);
+                    String empId = str(safeIdMap(EMP_LIST_PATH, "职员").get(empNo));
+                    if (!empId.isEmpty()) body.put("emp_id", empId);
+                }
+            }
+        }
+
+        // 产品入库单(inv_product)头:部门 + 经手人(2026-10-14 沙箱实测:dept_number/dept_id/
+        // emp_number/emp_id 四键均**确实落库**)。MES 侧存的是名称(生产车间/经手人),按档案解析成编码;
+        // 解析不到就不带该字段(不阻断,金蝶按自己的默认值处理)。
+        if (isFinIn) {
+            String deptNo = str(head.get("部门编码"));
+            if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("部门")));
+            if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("生产车间")));
+            if (!deptNo.isEmpty()) {
+                body.put("dept_number", deptNo);
+                String deptId = str(safeIdMap(DEPT_LIST_PATH, "部门").get(deptNo));
+                if (!deptId.isEmpty()) body.put("dept_id", deptId);
+            } else {
+                log.warn("产品入库单[{}]无部门/生产车间,本次不带 dept_number(金蝶按默认部门处理)", docNo);
+            }
+            String empNo = str(head.get("经手人编码"));
+            if (empNo.isEmpty()) empNo = archiveCode("bs_emp", "员工名称", "员工编码", str(head.get("经手人")));
+            if (!empNo.isEmpty()) {
+                body.put("emp_number", empNo);
+                String empId = str(safeIdMap(EMP_LIST_PATH, "职员").get(empNo));
+                if (!empId.isEmpty()) body.put("emp_id", empId);
+                else log.warn("产品入库单[{}]经手人编码[{}]在金蝶职员档案中无对应id:本次只带 emp_number", docNo, empNo);
+            }
+        }
 
         // 材料出库单(生产领料单)头:部门 + 经手人 + 领料类型。
         // 金蝶 inv_pick 头**没有** 供应商/客户/仓库/业务类型(与采购入库/销售出库不同),
@@ -327,8 +408,8 @@ public class KingdeePushService {
         boolean linkSaleSrc = soRefs != null;
         // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位;
         // 材料出库行叫 材料编码/数量/单价/计量单位(料件口径,与采购入库的"存货"族不同名)
-        String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : "存货编码";
-        String qtyKey = isPur ? "实收数量" : "数量";
+        String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : isFinIn ? "产品编码" : "存货编码";
+        String qtyKey = isPur || isFinIn ? "实收数量" : "数量";
         String priceKey = isPur || isOrder || isMatOut ? "单价" : "售价";
         String unitKey = isOrder ? "单位" : "计量单位";
         // 行仓库编号 → 金蝶仓库id(采购订单不推仓库,不必拉)
@@ -355,6 +436,23 @@ public class KingdeePushService {
                 e.put("qty", plainDecimal(num(line, qtyKey)));
                 e.put("price", plainDecimal(num(line, priceKey)));
                 double cessO = num(line, "税率%"); if (cessO != 0) e.put("cess", plainDecimal(cessO));
+            } else if (isFinIn) {
+                // 产品入库单(inv_product)实测口径:数量族**必须传字符串**(沙箱实测 proto 校验:
+                //   数字型 qty 报「invalid value for string type: 123.0」,见
+                //   tools/archive/_dump-out/kingdee-save-inv-product-1014.md)⇒ 用 plainDecimal 转字符串;
+                // 金蝶按系数自算数量族,故只传 qty;该单据**无税金族**,价格族在真实账套恒空(30 张样本 0%)。
+                e.put("qty", plainDecimal(num(line, qtyKey)));
+                e.put("seq", String.valueOf(rowNo));
+                String comment = str(line.get("备注")); if (!comment.isEmpty()) e.put("comment", comment);
+            } else if (isOtherIn || isOtherOut) {
+                // 其他入库/出库:与产品入库单同口径 —— 数量族传**字符串**;
+                // 其他入库行另有 成本/单位成本 两键(真实账套实测 19% 行有值),按「有值才推」。
+                e.put("qty", plainDecimal(num(line, qtyKey)));
+                e.put("seq", String.valueOf(rowNo));
+                if (isOtherIn) {
+                    String cost = str(line.get("成本")); if (!cost.isEmpty()) e.put("cost", cost);
+                    String unitCost = str(line.get("单位成本")); if (!unitCost.isEmpty()) e.put("unit_cost", unitCost);
+                }
             } else {
                 e.put("qty", num(line, qtyKey));
                 e.put("price", num(line, priceKey));
@@ -368,7 +466,8 @@ public class KingdeePushService {
                 double unitCost = num(line, "单位成本"); if (unitCost != 0) e.put("unit_cost", unitCost);
                 String comment = str(line.get("明细备注")); if (!comment.isEmpty()) e.put("comment", comment);
             }
-            String model = str(line.get("规格型号")); if (!model.isEmpty()) e.put("material_model", model);
+            // 规格型号:金蝶 inv_product 的 material_model 实测**静默忽略**(商品自带规格),产品入库单不推
+            if (!isFinIn) { String model = str(line.get("规格型号")); if (!model.isEmpty()) e.put("material_model", model); }
             // 计量单位(保存接口要 unit_id=金蝶单位ID,报错文案里的"unit"即此):行上"单位id"列
             // → 当前账套单位主数据(measure_unit)按名称换ID。单位ID按账套各不同(bs_uom 存的是
             // 读入账套的ID,跨账套复用会静默错单位),按当前凭证实时拉取 → 测试/真实套切换零改动
@@ -411,7 +510,11 @@ public class KingdeePushService {
                             + "(金蝶 inv_pick 收 stock_id,缺了会报「请填写仓库」)", docNo, rowNo, stock);
                 }
             }
-            String batch = str(line.get("批号")); if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
+            String batch = str(line.get("批号"));
+            // 产品入库单:行上批号为空时退回**表头批次号**(生产链按「工单号+工单行号」收敛时,
+            // 批次号写在表头;金蝶 inv_product 的 batch_no 是行级键,实测仅批次管理商品才落库)
+            if (isFinIn && batch.isEmpty()) batch = str(head.get("批次号"));
+            if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
             // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
             // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
@@ -470,6 +573,9 @@ public class KingdeePushService {
         String apiPath = isOrder ? "/jdy/v2/scm/pur_order"
                 : isPur ? "/jdy/v2/scm/pur_inbound"
                 : isMatOut ? "/jdy/v2/scm/inv_pick"   // 材料出库单 → 金蝶「生产领料单」
+                : isFinIn ? "/jdy/v2/scm/inv_product" // 产品入库单 → 金蝶「产品入库单」
+                : isOtherIn ? "/jdy/v2/scm/inv_other_in"   // 其他入库单 → 金蝶「其他入库单」
+                : isOtherOut ? "/jdy/v2/scm/inv_other_out" // 其他出库单 → 金蝶「其他出库单」
                 : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
         if (res.path("errcode").asInt(-1) != 0) {
@@ -760,6 +866,8 @@ public class KingdeePushService {
     /** 基础资料:仓库 / 职员(与商品\|计量单位同款 number→id;金蝶保存接口收的是 *_id) */
     private static final String STORE_LIST_PATH = "/jdy/v2/bd/store";
     private static final String EMP_LIST_PATH = "/jdy/v2/bd/emp";
+    /** 部门档案(2026-10-14 产品入库单转ERP 用:金蝶 inv_product 头收 dept_number/dept_id) */
+    private static final String DEPT_LIST_PATH = "/jdy/v2/bd/department";
     /** path → {Map<编号,金蝶id>, 加载时刻};按当前账套 22h 缓存 */
     private final Map<String, Object[]> basedataCache = new HashMap<>();
 

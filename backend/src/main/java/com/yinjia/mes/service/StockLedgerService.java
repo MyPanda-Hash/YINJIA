@@ -29,14 +29,32 @@ public class StockLedgerService {
     }
 
     /**
+     * 历史回填模式(2026-10-14):拉取的金蝶历史单据入库时,用 JVM 参数 {@code -Dmes.hist.backfill=true} 打开。
+     *
+     * <p>用户口径(2026-10-14):「无批号就先按无批号算,允许期初为负」。回填期间放开三处库存控制:
+     * <ul>
+     *   <li>出库行无批号 ⇒ 不再要求补批号,按无批号扣减(金蝶侧这批出库行本就没有批号);</li>
+     *   <li>台账无该库存行 ⇒ 补一行 0 结存后继续(扣成负数由下一条容忍);</li>
+     *   <li>出库后 / 冲回后余额为负 ⇒ 不再拒绝。</li>
+     * </ul>
+     * 为什么必须放开:回填的验收标准是「期初 + 记账 = 金蝶现存量」,而区间内存在非本仓拉取的
+     * 库存移动(盘点/委外/调拨等),期间必然出现负结存 —— 终点对得上即可。
+     * ⚠ 该开关**默认关闭**:日常录单/审核的库存控制一个字都没变。
+     */
+    private static final boolean HIST_BACKFILL = "true".equalsIgnoreCase(System.getProperty("mes.hist.backfill"));
+
+    /**
      * 是否参与记账的面板。
      *
      * <p>2026-10-08:OTHER_IN / OUTSOURCE_IN / OTHER_OUT / OUTSOURCE_ISSUE 四张面板整体下架
-     * (tools/migrate-drop-extra-docs-pu-req-20261008.sql),记账集合收敛为下面四张。
+     * (tools/migrate-drop-extra-docs-pu-req-20261008.sql),记账集合收敛为四张。
+     * <p>2026-10-14:**恢复 其他入库单 / 其他出库单 记账**(用户口径「要恢复库存记账」)——
+     * 两面板已按金蝶字段重建(含行表 仓库/仓库编码/批号 与头表 部门/经手人),流水段号沿用既有口径
+     * (3=其他入库 / 7=其他出库,见 StockFlowService)。委外两张复核后仍未使用,保持下架。
      */
     public static boolean postsStock(String panelCode) {
         return switch (panelCode) {
-            case "PURCHASE_IN", "FINISH_IN", "MATERIAL_OUT", "SALE_OUT" -> true;
+            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "MATERIAL_OUT", "SALE_OUT", "OTHER_OUT" -> true;
             default -> false;
         };
     }
@@ -55,8 +73,8 @@ public class StockLedgerService {
 
     private void apply(String panelCode, String no, String user, boolean forward) {
         boolean inbound = switch (panelCode) {
-            case "PURCHASE_IN", "FINISH_IN" -> true;
-            default -> false; // MATERIAL_OUT, SALE_OUT(2026-10-08 起出库只剩这两张)
+            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN" -> true; // 2026-10-14 恢复 其他入库
+            default -> false; // MATERIAL_OUT, SALE_OUT, OTHER_OUT
         };
         List<Map<String, Object>> rows = loadRows(panelCode, no);
         // 弃审时无明细行或仓库缺失 → 跳过台账冲回(不阻断弃审;正常审核过的必有行和仓库)
@@ -130,24 +148,31 @@ public class StockLedgerService {
         }
         if (!forward || qty < 0) {
             Double yl = bal(code, ckdm, lot);
-            if (yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
+            if (!HIST_BACKFILL && yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
         }
         return n;
     }
 
     private void applyOut(String code, String ckdm, String lot, double qty, String user, boolean forward) {
-        if (lot == null && forward) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
+        if (lot == null && forward && !HIST_BACKFILL) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
         double sign = forward ? 1 : -1;
         int n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
                         + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
                         + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
                 sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
-            if (forward) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
-            throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + ")");
+            if (!forward) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + ")");
+            if (!HIST_BACKFILL) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
+            // 历史回填:补一行 0 结存再扣(金蝶该键在 MES 台账尚无行,属区间外/其它类型移动造成的缺口)
+            jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, asp_user1, asp_time1, asp_cancel)"
+                            + " VALUES (?, ?, ?, GETDATE(), 0, 0, ?, GETDATE(), 'N')", code, ckdm, lot, "stock:" + user);
+            n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
+                            + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
+                            + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
+                    sign * qty, sign * qty, user, code, ckdm, lot, lot);
         }
         Double yl = bal(code, ckdm, lot);
-        if (yl != null && yl < -0.0001) {
+        if (!HIST_BACKFILL && yl != null && yl < -0.0001) {
             throw new IllegalStateException(forward
                     ? "现存量不足(物料 " + code + " 批 " + lot + " 出库后余额将变 " + yl + "),不能出库"
                     : "冲回将使现存量异常(物料 " + code + " 批 " + lot + " 余额 " + yl + "),不可弃审");
@@ -182,7 +207,8 @@ public class StockLedgerService {
         // 其余行表没有这两列(已核实),保持原样。
         // 往来单位/经手人(2026-09-30):**照抄 v_stock_movement 的口径** —— 只有 1 采购入库(供应商)、
         // 5 销售出库(客户)两段有往来单位;材料出库段只有 领用人(语义不同,不取)。
-        // 2026-10-08:调用方 postsStock 已把面板收敛为这四张,default 只是防御(返回空表,由 apply 抛「无明细行」)。
+        // 2026-10-14:其他入库/其他出库 两段恢复,经手人取头表(其他出库有、其他入库无),往来单位仍不取
+        //   (保持与 v_stock_movement 同口径;新表虽新增 供应商/部门 列,但改流水口径会牵动既有报表)。
         return switch (panelCode) {
             case "PURCHASE_IN" -> jdbc.queryForList(
                     // 批号口径(2026-09-22):**批次号优先、(供应商)批号兜底** —— 采购链按「只用批次号」
@@ -212,7 +238,23 @@ public class StockLedgerService {
                             + " N'产成品入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_finish_in l LEFT JOIN bd_finish_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            // 2026-10-08:原 OTHER_IN / OUTSOURCE_IN 两个入库段随面板下架整体移除
+            // 2026-10-14 恢复:其他入库(段 3)。表结构为**按金蝶 inv_other_in 重建**的新表:
+            //   行表有 存货编码/存货名称/规格型号/仓库/仓库编码/批号/数量/单价/金额/计量单位(与出库段同形);
+            //   头表**没有仓库列**(仓库在行上)⇒ 头仓库与行仓库同源(旧 OTHER_OUT 段同款处理);
+            //   头表没有经手人(其他入库是供应商口径)⇒ 经手人 NULL;往来单位按 v_stock_movement 旧口径不取
+            //   (该视图只有 1 采购入库 / 5 销售出库 两段有往来单位)。
+            case "OTHER_IN" -> jdbc.queryForList(
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库编码] AS [行仓库编码], l.[仓库] AS [头仓库],"
+                            + " l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price,"
+                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            // 金额 NULL 安全(2026-10-14):金蝶这三类单据的价格族**天然为空**(实测非空率 0%),
+                            // 而 v_stock_movement 把 inh.金额 透传成「收入金额」,再进 inv_cost_ledger(该列 NOT NULL)
+                            // ⇒ 金额留 NULL 会让成本重算整笔失败(实测报「不能将值 NULL 插入列 '收入金额'」)。
+                            // 口径:金额缺失时按 0 记(不臆造成本);有单价时按 单价×数量。
+                            + " ISNULL(l.[金额], ISNULL(l.[单价], 0) * l.[数量]) AS 金额,"
+                            + " N'其他入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
+                            + " FROM bl_other_in l LEFT JOIN bd_other_in h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "SALE_OUT" -> jdbc.queryForList(
                     // 2026-09-30:**列名不许回退** —— 销售出库明细的仓库名称列早在 41a683aa
                     // (2026-09-23「仓库字段正名」)就已改名 仓库,采购分支当时同步改了、销售分支漏改,
@@ -230,7 +272,18 @@ public class StockLedgerService {
                             + " N'销售出库单' AS [单据类型], h.[单据日期] AS [单据日期], h.[客户] AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            // 2026-10-08:原 OTHER_OUT / OUTSOURCE_ISSUE 两个出库段随面板下架整体移除
+            // 2026-10-14 恢复:其他出库(段 7)。新表按金蝶 inv_other_out 重建:
+            //   行表 存货编码/存货名称/规格型号/仓库/仓库编码/批号/数量/单价/金额/计量单位;
+            //   头表有 部门 + 经手人 ⇒ 经手人取头表(与旧实现一致);头表无仓库列 ⇒ 头仓库与行仓库同源。
+            //   price 传 NULL(与其他出库/材料出库同款:出库按结存成本计价,不用单据单价)。
+            case "OTHER_OUT" -> jdbc.queryForList(
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库编码] AS [行仓库编码], l.[仓库] AS [头仓库],"
+                            + " l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
+                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], ISNULL(l.[单价], 0) * l.[数量]) AS 金额,"
+                            + " N'其他出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
+                            + " FROM bl_other_out l LEFT JOIN bd_other_out h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "MATERIAL_OUT" -> jdbc.queryForList(
                     "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
                             + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"

@@ -1,0 +1,37 @@
+=== 金蝶账套全量盘点 + 生产工单有无(只读)===
+时间: 2026-10-14T09:30:44.110Z
+
+
+########## 真实账套(MES 同步用) —— 应用 clientId=359797(REAL)##########
+push_app_authorize 返回 1 条授权记录:
+  · 企业=惠州市银嘉环保科技有限公司  outerInstanceId=580147507460444160  instanceId=2098296770800193538  accountId=1735565918201383132  domain=https://tf.jdy.com  到期=2027-09-10T15:59:59.000+00:00  status=1
+
+  --- 账套 [惠州市银嘉环保科技有限公司] outerInstanceId=580147507460444160 ---
+    生产任务单  /jdy/v2/pm/mo_taskbill         ✅ count=0
+    委外加工单  /jdy/v2/pm/subm_workorder      ✅ count=0
+    生产领料单  /jdy/v2/scm/inv_pick           ✅ count=4981
+    产品入库单  /jdy/v2/scm/inv_product        ✅ count=2880
+    商品     /jdy/v2/bd/material            ✅ count=3877
+
+########## 沙箱(转ERP 默认落它) —— 应用 clientId=359220(SANDBOX)##########
+push_app_authorize 返回 2 条授权记录:
+  · 企业=华实创新（惠州）科技有限公司  outerInstanceId=579023121319858176  instanceId=2097172384679456770  accountId=1788814946310785767  domain=https://tf.jdy.com  到期=2026-12-07T15:59:59.000+00:00  status=1
+  · 企业=华实创新（惠州）科技有限公司  outerInstanceId=579046204055359488  instanceId=2097195467416080386  accountId=1788817066171085812  domain=https://tf.jdy.com  到期=2026-12-07T15:59:59.000+00:00  status=1
+
+  --- 账套 [华实创新（惠州）科技有限公司] outerInstanceId=579023121319858176 ---
+    生产任务单  /jdy/v2/pm/mo_taskbill         ✅ count=0
+    委外加工单  /jdy/v2/pm/subm_workorder      ✅ count=0
+    生产领料单  /jdy/v2/scm/inv_pick           ✅ count=0
+    产品入库单  /jdy/v2/scm/inv_product        ✅ count=0
+    商品     /jdy/v2/bd/material            ✅ count=48
+
+  --- 账套 [华实创新（惠州）科技有限公司] outerInstanceId=579046204055359488 ---
+    生产任务单  /jdy/v2/pm/mo_taskbill         ✅ count=0
+    委外加工单  /jdy/v2/pm/subm_workorder      ✅ count=0
+    生产领料单  /jdy/v2/scm/inv_pick           ✅ count=2
+    产品入库单  /jdy/v2/scm/inv_product        ✅ count=0
+    商品     /jdy/v2/bd/material            ✅ count=298
+
+=== 结论口径 ===
+若上述**每个**账套的「生产任务单(mo_taskbill)」都是 0,则:星辰开放接口里没有可拉的生产工单;
+工单只可能在生态应用(云蝶轻智造/轻智造云)自有库中,须走该应用方通道 —— 见 deploy/云蝶轻智造对接需求清单.md。

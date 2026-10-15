@@ -40,22 +40,26 @@ public class StockFlowService {
      * 入库面板(src 1..4,与 v_stock_movement 的段号同口径)。
      *
      * <p>2026-10-08:OTHER_IN(3)/OUTSOURCE_IN(4) 及其他出入库单据面板整体下架
-     * (tools/migrate-drop-extra-docs-pu-req-20261008.sql)—— 段号 3/4 与 7/8 自此无面板使用;
+     * (tools/migrate-drop-extra-docs-pu-req-20261008.sql)—— 段号 4/8 自此无面板使用;
      * 段号本身是流水表的既有口径(v_stock_movement 按 src 分段),不回收,以免历史流水无法解读。
+     * <p>2026-10-14:**段号 3 恢复使用** —— 其他入库单面板按金蝶字段重建并重新接入库存记账
+     * (用户口径「要恢复库存记账」);段号 4(委外入库)仍无面板。
      */
     private static int inSrc(String panelCode) {
         return switch (panelCode) {
             case "PURCHASE_IN" -> 1;
             case "FINISH_IN" -> 2;
+            case "OTHER_IN" -> 3;
             default -> -1;
         };
     }
 
-    /** 出库面板(src 5..8;7=其他出库、8=委外发料已随面板下架,见 inSrc 注释)。 */
+    /** 出库面板(src 5..8);2026-10-14 起段号 7(其他出库)重新启用,8(委外发料)仍无面板。 */
     private static int outSrc(String panelCode) {
         return switch (panelCode) {
             case "SALE_OUT" -> 5;
             case "MATERIAL_OUT" -> 6;
+            case "OTHER_OUT" -> 7;
             default -> -1;
         };
     }

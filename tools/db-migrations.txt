@@ -3063,3 +3063,50 @@ migrate-sale-out-order-cols2-20261015.sql
 #     有意**不进链**(前者清写入者标记、后者按硬编码 id 删探针残留角色,登记会让 DbSync 在
 #     所有环境自动执行),已登记进 tools/verify/DbNormAudit.java 检查 12 的 allowOffChain 白名单。
 fix-stock-report-module-group.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-14 产品入库单(产成品入库单 FINISH_IN)转ERP 补齐 ──
+#   用户口径(2026-10-14):① 产品入库单要能转ERP(推金蝶「产品入库单」/jdy/v2/scm/inv_product;
+#     此前转ERP 通道只有 采购入库/销售出库/材料出库);② 字段完全对照金蝶接口来写;
+#     ③ 补一个检验字段 —— 用户指定放**明细行**(每行一个「检验方式」= 全检/抽检)。
+#   金蝶侧真源:字段清单 tools/archive/_dump-out/kingdee-3docs-fields-1014.md(逐键+样例值);
+#     非空率统计 tools/archive/_dump-out/kingdee-3docs-fieldfill-1014.md(30 张真实单据逐键)。
+#     本脚本按用户口径「有数据的字段要保留、不要无用数据」只登记非空率>0 的键 + 链路必需族。
+#   沙箱实测(2026-10-14)两条硬约束:保存接口 protobuf 校验要求**数值/布尔一律传字符串**;
+#     检验类键(check_type / inspect_way / qc_type)**静默忽略且不报错**
+#     ⇒ 「检验方式」只存 MES 本地、不推送金蝶(证据 tools/archive/_dump-out/kingdee-save-inv-product-1014.md)。
+#   幂等(COL_LENGTH + 注明双向 + yj_field/译名 NOT EXISTS + 末尾自检);两账套均执行。
+migrate-finish-in-erp-cols-20261014.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-14 其他入库单 / 其他出库单:重建三件套 + 字段对照金蝶 + 转ERP 支撑列 ──
+#   用户口径:「其他出库/入库也是一样(同产品入库),详细和统计也要做」。
+#   这 6 个面板(OTHER_IN/_DETAIL/_STATS × 2)+ 10 张表 + 8 视图曾于 2026-10-08 整体下架
+#   (migrate-drop-extra-docs-pu-req-20261008.sql);本次按**金蝶接口字段**重建,
+#   面板编码 / 单号前缀(OI/OO)/ 模块归属(库存核算)沿用下架前登记。
+#   由 tools/archive/_gen-other-docs-migration.mjs 生成(改规格后重跑生成器,勿手改)。
+#   字段取舍依据(实测):_dump-out/kingdee-3docs-fields-1014.md(逐键+样例)、
+#     _dump-out/kingdee-3docs-fieldfill-1014.md(30 张真实单据非空率)、
+#     _dump-out/kingdee-save-inv-other-1014.md 与 kingdee-transtype-1014.md(保存接口实测)。
+#   ⚠ 其他入库/出库保存**必须传 trans_type_id**(单发 number/name/trans_type 均报「请填写"业务类型"」),
+#     且金蝶**无业务类型档案接口**(9 条候选全 519)⇒ 按账套在 MES 侧配置(真实账套实测 12/13)。
+#   幂等(OBJECT_ID / NOT EXISTS 守卫 + 末尾自检);两账套均执行。
+migrate-other-docs-rebuild-20261014.sql
+
+# ── 2026-10-14 产成品入库单 部门/部门编码 由文本改参照 DEPT ──
+#   用户反馈「其他出库和入库没有下拉数据下来」(2026-10-14)时排查到的参照面板自身口径不一致:
+#   Phase 1 新建这两列时按文本登记,而采购入库单/销售出库单的同名字段是参照 DEPT。纯元数据 UPDATE,零 DDL。
+#   幂等(窄条件 + 自检);两账套均执行。
+migrate-finish-in-dept-ref-20261014.sql
+
+# ── 2026-10-14 「存货图片」列加宽到 nvarchar(500)(拉取截断根因) ──
+#   拉取 9/1 至今单据时产品入库单 2 张整单失败:String or binary data would be truncated。
+#   根因:金蝶分录 picture 是 OSS 长 URL(实测 297/303 字符),而 bl_finish_in/bl_purchase_in 的 [存货图片]
+#   只有 nvarchar(200)(sys.columns.max_length 返回字节数,400 字节 = 200 字符)。统一加宽到 500 字符。
+#   幂等(仅当宽度 < 500 字符才 ALTER;nvarchar 加宽是元数据变更);两账套均执行。
+migrate-doc-image-col-width-20261014.sql
+# ── 2026-10-14 仓库名称与金蝶对齐(CP-02:B仓 → 成品B仓) ──
+#   拉取单据做「审核+记账」排练时,产品入库单 183 张卡在「仓库档案不存在:[成品B仓]」——
+#   金蝶该仓叫「成品B仓」而 MES 档案同编码 CP-02 叫「B仓」;产成品入库行表只有仓库名称列,
+#   台账按名称解析 ⇒ 名称必须对齐。拉取单据里出现的 4 个仓库名中唯一不一致的一个。
+migrate-wh-name-align-kingdee-20261014.sql

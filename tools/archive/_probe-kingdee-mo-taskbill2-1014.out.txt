@@ -1,0 +1,27 @@
+账套 clientId=359797 outerInstanceId=580147507460444160  ✅ token 已取
+
+=== ① mo_taskbill:各种参数组合下的 count ===
+  裸参数(仅分页)                           → count=0 rows=0
+  bill_status=C(已审核)                 → count=0 rows=0
+  宽 modify 窗口(近 3 年)                 → count=0 rows=0
+  bill_status=C + 宽 modify 窗口        → count=0 rows=0
+  bill_status=A(全部/草稿?)              → count=0 rows=0
+  按取样产品 A-32-01 的 material_number 过滤 → count=0 rows=0
+
+=== ② 下游单据:生产领料单 inv_pick / 产品入库单 inv_product(取 3 条看来源单)===
+--- /jdy/v2/scm/inv_pick → count=4978
+  列表行字段: create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, pick_type
+  · bill_no=SCLL-20261014-00007  bill_date=2026-10-14  bill_status=C  dept_name=X烧结车间  remark=
+  · bill_no=SCLL-20261014-00006  bill_date=2026-10-14  bill_status=C  dept_name=烧结车间  remark=
+  · bill_no=SCLL-20261014-00005  bill_date=2026-10-14  bill_status=C  dept_name=烧结车间  remark=
+  详情顶层键: id, bill_no, bill_date, bill_status, create_time, modify_time, audit_time, creator_id, creator_name, creator_number, modifier_id, modifier_name, modifier_number, bill_type_name, bill_type_number, bill_type_id, auditor_id, auditor_name, auditor_number, remark, dept_id, dept_name, dept_number, emp_id, emp_name
+  分录数=2;分录字段: picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux1_id, aux1_name, aux1_number, aux2_id, aux2_name, aux2_number, aux3_id, aux3_name, aux3_number, barcode, batch_no, pro_place, pro_reg_no, pro_license, kf_date, valid_date, kf_type, kf_period, sn_list, sn_list_id, base_unit_id, base_unit_name, base_unit_number, unit_id, unit_name, unit_number, aux_unit_id, aux_unit_name, aux_unit_number, conversion_rate, qty, inv_qty, base_qty, inv_base_qty, aux_qty, def_float_qty, aux_coefficient, coefficient, price, cost, unit_cost, comment, src_bill_no, src_bill_type_id, src_bill_type_name, src_bill_type_number, src_inter_id, src_bill_date, src_seq, src_entry_id, custom_entity_field, src_product_entry_id
+  分录里与来源/工单相关的键: src_bill_no=  src_bill_type_id=  src_bill_type_name=  src_bill_type_number=  src_inter_id=0  src_bill_date=  src_seq=0  src_entry_id=0  src_product_entry_id=0
+--- /jdy/v2/scm/inv_product → count=2879
+  列表行字段: create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, emp_id, emp_name, emp_number
+  · bill_no=CPRK-20261014-00002  bill_date=2026-10-14  bill_status=C  dept_name=组装车间  emp_name=周荣香  remark=
+  · bill_no=CPRK-20261014-00001  bill_date=2026-10-14  bill_status=C  dept_name=组装车间  emp_name=余均亚  remark=
+  · bill_no=CPRK-20261013-00007  bill_date=2026-10-13  bill_status=C  dept_name=组装车间  emp_name=王万华  remark=
+  详情顶层键: id, bill_no, bill_date, bill_status, create_time, modify_time, audit_time, creator_id, creator_name, creator_number, modifier_id, modifier_name, modifier_number, bill_type_name, bill_type_number, bill_type_id, auditor_id, auditor_name, auditor_number, remark, dept_id, dept_name, dept_number, emp_id, emp_name
+  分录数=7;分录字段: picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux1_id, aux1_name, aux1_number, aux2_id, aux2_name, aux2_number, aux3_id, aux3_name, aux3_number, barcode, batch_no, pro_place, pro_reg_no, pro_license, kf_date, valid_date, kf_type, kf_period, sn_list, sn_list_id, base_unit_id, base_unit_name, base_unit_number, unit_id, unit_name, unit_number, aux_unit_id, aux_unit_name, aux_unit_number, conversion_rate, qty, inv_qty, base_qty, inv_base_qty, aux_qty, def_float_qty, aux_coefficient, coefficient, price, cost, unit_cost, comment, src_bill_no, src_bill_type_id, src_bill_type_name, src_bill_type_number, src_inter_id, src_bill_date, src_seq, src_entry_id, custom_entity_field, recv_qty, recv_base_qty, customer_id, customer_number, customer_name
+  分录里与来源/工单相关的键: src_bill_no=  src_bill_type_id=  src_bill_type_name=  src_bill_type_number=  src_inter_id=0  src_bill_date=  src_seq=0  src_entry_id=0

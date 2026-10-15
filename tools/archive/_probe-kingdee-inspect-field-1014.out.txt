@@ -1,0 +1,27 @@
+=== 星辰「全检/抽检」字段定位探针(只读)===
+账套: 惠州市银嘉环保科技有限公司 outerInstanceId=580147507460444160
+时间: 2026-10-14T09:34:31.547Z
+
+=== ① 商品档案 material_detail 全字段 + 检验相关扫描 ===
+
+--- 成品 A-32-01 (A-32-01 / S阻垢炭棒/滤芯) 顶层键 86 个:
+    id, number, name, enable, base_unit_id, base_unit_name, aux_unit_name, mul_label, barcode, model, brand_id, producing_pace, help_code, is_multi_unit, fix_unit_id1, coefficient1, conversion_unit_id1, fix_unit_id2, coefficient2, conversion_unit_id2, fix_unit_id3, coefficient3, conversion_unit_id3, purchase_unit_id, sale_unit_id, store_unit_id, aux_unit_id, aux_unit_number, is_weight, is_serial, is_batch, is_sale, is_purchase, is_subpart, is_assembly, is_kf_period, kf_period_type, kf_period, alarm_day, is_asst_attr, aux_entity, barcode_entity, price_entity, inv_mgr_type, min_inventory_qty, max_inventory_qty, sec_inventory_qty, cost_method, fetch_category_id, tax_rate, in_tax_rate, stock_id, space_id, vender_id, purchase_id, refistration_number, pro_license, gross_weight, net_weight, weight_unit_id, length, wide, high, volume, images, check_type, remark, custom_field, parent_number, parent_id, bom_entity, valid_qty, qty_inv, attachments_url, product_department_id, product_department_number, min_package_qty, modify_time, is_backflushed, backflushed_stock_id, backflushed_stock_name, backflushed_stock_number, backflushed_space_id, backflushed_space_name, backflushed_space_number, short_name
+    check_type = "1"
+
+    键/值扫描命中(1):
+      [键命中] check_type = "1"
+    嵌套数组 price_entity: 1 项,键 = id, price_barcode, price_unit_id, price_unit_name, price_unit_number, price_purchase_price, price_max_purchase_price, price_cost_price, price_distribution_price, price_trade_price, price_retail_price, price_min_sales_price, price_near_pur_price, price_near_pur_tax_price, price_near_sal_price, price_near_sal_tax_price, price_sale_price1, price_sale_price2, price_sale_price3, price_sale_price4, price_sale_price5, price_sale_price6, price_sale_price7, price_sale_price8, price_sale_price9, price_sale_price10, price_aux_id, price_aux_id1, price_aux_number1, price_aux_name1, price_aux_id2, price_aux_number2, price_aux_name2, price_aux_id3, price_aux_name3, price_aux_number3, price_aux_id4, price_aux_number4, price_aux_name4, price_aux_id5, price_aux_number5, price_aux_name5, price_min_pur_tax_price, price_near_pur_unit_cost, price_near_supplier, price_outsourceprice
+
+=== ② 产品入库单 inv_product 详情:值扫描 + 自定义字段容器 ===
+单据 CPRK-20261014-00002  键/值扫描命中(0):
+   (无)
+  custom_field        = {}
+  custom_entity_field = {}
+  分录里全部键(确认没有质检族): (无)
+
+=== ③ 检验单类接口探测(注意 inv_check_bill 是**盘点单**,不是检验单)===
+  /jdy/v2/scm/inv_check_bill     ✅ count=36   已登记 = 盘点单(不是检验单)
+  /jdy/v2/qc/qc_bill             ❌ HTTP 519 status code 519   猜测
+  /jdy/v2/pm/inspect             ❌ HTTP 519 status code 519   猜测
+  /jdy/v2/scm/inv_inspect        ❌ HTTP 519 status code 519   猜测
+  /jdy/v2/bd/inspect_item        ❌ HTTP 519 status code 519   猜测

@@ -97,8 +97,21 @@ public class QueryService {
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where + hint, Integer.class, args.toArray());
 
+        // 列表默认排序(2026-10-14 用户口径「应该最新的单据日期在最上面」):
+        //   有日期列且该列确实存在 ⇒ 「日期 DESC, id DESC」(同一天按录入先后倒排);
+        //   否则退回 id DESC(原行为);台账(ledger)保持 id ASC。
+        // ⚠ 必须确认列真实存在:面板的 date_col 未必落在列表用的这张表上(单据面板的日期在头表),
+        //   盲写会直接 SQL 报「列名无效」把列表打挂 ⇒ 先查 sys.columns。
+        String orderBy = "t.id " + (ledger ? "ASC" : "DESC");
+        if (!ledger && def.dateCol() != null && !def.dateCol().isBlank()) {
+            Integer has = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                    Integer.class, "dbo." + def.lineTable(), def.dateCol());
+            if (has != null && has > 0) orderBy = "t.[" + def.dateCol() + "] DESC, t.id DESC";
+        }
+
         String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t " + where
-                + " ORDER BY t.id " + (ledger ? "ASC" : "DESC") + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY" + hint;
+                + " ORDER BY " + orderBy + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY" + hint;
         args.add((pageNo - 1) * pageSize);
         args.add(pageSize);
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
@@ -306,7 +319,21 @@ public class QueryService {
         // GROUP BY 后 ORDER BY 只能引用分组列或聚合:
         //   MAX(asp_time1) DESC → 取组内最新时间(=该单创建时间);asp_time1 全空的单据排最后;
         //   单据编号 DESC 兜底 → 同一秒并列时排序稳定,保证 OFFSET/FETCH 分页不重不漏。
-        String orderBy = "MAX(t.asp_time1) DESC, t.[" + g + "] DESC";
+        // 默认排序(2026-10-14 用户口径「应该最新的单据日期在最上面」):
+        //   **单据日期 DESC** → 次 asp_time1 DESC(同日按录入时间)→ 组列 DESC 兜底(分页稳定)。
+        //   旧写法只按 MAX(asp_time1) DESC(=同步/创建时间),金蝶同步进来的单据按**拉取顺序**排,
+        //   于是最老的单据反而排在第一页(实测:SO_ORDER 首行 2026-09-01)。
+        //   ⚠ 日期列必须先确认在该表上存在,否则盲写会把列表打挂(报「列名无效」)。
+        String dateCol = def.dateCol();
+        boolean hasDate = false;
+        if (dateCol != null && !dateCol.isBlank()) {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                    Integer.class, "dbo." + docTable, dateCol);
+            hasDate = n != null && n > 0;
+        }
+        String orderBy = (hasDate ? "MAX(t.[" + dateCol + "]) DESC, " : "")
+                + "MAX(t.asp_time1) DESC, t.[" + g + "] DESC";
         String pageSql = "SELECT t.[" + g + "] AS __no FROM " + docTable + " t " + where
                 + " GROUP BY t.[" + g + "]"
                 + " ORDER BY " + orderBy

@@ -1,0 +1,312 @@
+=== 银嘉真实账套:四类单据数据 + 成品入库单检验字段(只读)===
+账套: 惠州市银嘉环保科技有限公司 clientId=359797 outerInstanceId=580147507460444160
+时间: 2026-10-14T09:33:54.571Z
+
+=== ① 四类单据计数 + 最近 3 张 + 列表行字段 ===
+
+--- 采购入库单  /jdy/v2/scm/pur_inbound
+    count = 3382
+    列表行字段(18): create_time, bill_date, id, bill_no, bill_status, bill_close_state, supplier_id, supplier_name, supplier_number, emp_id, emp_name, emp_number, remark, total_amount, delivery_type_id, delivery_type_name, delivery_type_number, settle_status
+    · bill_no=CGRK-20261013-03415  bill_date=2026-10-13  bill_status=C  supplier_name=惠州市双喜科技有限公司  emp_name=王光珍  remark=
+    · bill_no=CGRK-20261014-03414  bill_date=2026-10-14  bill_status=C  supplier_name=深圳市陶氏水处理设备技术开发有限公司  emp_name=王光珍  remark=
+    · bill_no=CGRK-20261014-03413  bill_date=2026-10-14  bill_status=C  supplier_name=深圳兴文睿环保科技有限公司  emp_name=王光珍  remark=
+
+--- 材料出库单→星辰「生产领料单」  /jdy/v2/scm/inv_pick
+    count = 4978
+    列表行字段(10): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, pick_type
+    · bill_no=SCLL-20261014-00007  bill_date=2026-10-14  bill_status=C  dept_name=X烧结车间  remark=
+    · bill_no=SCLL-20261014-00006  bill_date=2026-10-14  bill_status=C  dept_name=烧结车间  remark=
+    · bill_no=SCLL-20261014-00005  bill_date=2026-10-14  bill_status=C  dept_name=烧结车间  remark=
+
+--- 成品入库单→星辰「产品入库单」  /jdy/v2/scm/inv_product
+    count = 2879
+    列表行字段(12): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, emp_id, emp_name, emp_number
+    · bill_no=CPRK-20261014-00002  bill_date=2026-10-14  bill_status=C  dept_name=组装车间  emp_name=周荣香  remark=
+    · bill_no=CPRK-20261014-00001  bill_date=2026-10-14  bill_status=C  dept_name=组装车间  emp_name=余均亚  remark=
+    · bill_no=CPRK-20261013-00007  bill_date=2026-10-13  bill_status=C  dept_name=组装车间  emp_name=王万华  remark=
+
+--- 销售出库单  /jdy/v2/scm/sal_out_bound
+    count = 5209
+    列表行字段(22): create_time, bill_date, id, bill_no, bill_status, settle_status, delivery_status, customer_id, customer_name, customer_number, emp_id, emp_name, emp_number, total_amount, material_group, material_qty, bill_dis_before_amount, bill_dis_amount, material_entity, express_entity, ivc_status , custom_field
+    · bill_no=XSCK-20261014-00008  bill_date=2026-10-14  bill_status=C  customer_name=张莉  emp_name=张莉
+    · bill_no=XSCK-20261014-00007  bill_date=2026-10-14  bill_status=C  customer_name=绍兴摩纳净水科技有限公司  emp_name=练玉珍
+    · bill_no=XSCK-20261014-00006  bill_date=2026-10-14  bill_status=C  customer_name=广东梵浦洛环保科技有限公司  emp_name=张莉
+
+--- 旁证:其他出库单  /jdy/v2/scm/inv_other_out
+    count = 1149
+    列表行字段(29): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, trans_type_id, trans_type_name, trans_type_number, customer_id, customer_name, customer_number, contact_phone, contact_country_id, contact_country_name, contact_country_number, contact_province_id, contact_province_name, contact_province_number, contact_city_id, contact_city_name, contact_city_number, contact_district_id, contact_district_name, contact_district_number, contact_linkman, contact_address
+    · bill_no=QTCK-20261014-01172  bill_date=2026-10-14  bill_status=C  customer_name=  dept_name=品质部
+    · bill_no=QTCK-20261014-01171  bill_date=2026-10-14  bill_status=C  customer_name=  dept_name=工程技术中心
+    · bill_no=QTCK-20261014-01170  bill_date=2026-10-14  bill_status=C  customer_name=  dept_name=组装车间
+
+  四类单据计数小结: 采购入库单=有  材料出库单=有  成品入库单=有  销售出库单=有  旁证:其他出库单=有
+
+=== ② 成品入库单 inv_product:详情全字段 + 检验相关键 ===
+取单: CPRK-20261014-00002 (2026-10-14)  id=2590142888725894144
+
+[表头顶层键 31] id, bill_no, bill_date, bill_status, create_time, modify_time, audit_time, creator_id, creator_name, creator_number, modifier_id, modifier_name, modifier_number, bill_type_name, bill_type_number, bill_type_id, auditor_id, auditor_name, auditor_number, remark, dept_id, dept_name, dept_number, emp_id, emp_name, emp_number, material_entity, custom_field, acceptor_id, acceptor_name, acceptor_number
+
+[表头完整 JSON(截断长值)]
+{
+ "id": "2590142888725894144",
+ "bill_no": "CPRK-20261014-00002",
+ "bill_date": "2026-10-14",
+ "bill_status": "C",
+ "create_time": "2026-10-14 17:08:56",
+ "modify_time": "2026-10-14 17:11:34",
+ "audit_time": "2026-10-14 17:11:34",
+ "creator_id": "425692977",
+ "creator_name": "蒋小刚",
+ "creator_number": "multicorp_6171610_-952599178",
+ "modifier_id": "425692977",
+ "modifier_name": "蒋小刚",
+ "modifier_number": "multicorp_6171610_-952599178",
+ "bill_type_name": "产品入库单",
+ "bill_type_number": "inv_product_bill",
+ "bill_type_id": "inv_product_bill",
+ "auditor_id": "425692977",
+ "auditor_name": "蒋小刚",
+ "auditor_number": "multicorp_6171610_-952599178",
+ "remark": "",
+ "dept_id": "2170469887338617856",
+ "dept_name": "组装车间",
+ "dept_number": "BM00005",
+ "emp_id": "2208993878466477056",
+ "emp_name": "周荣香",
+ "emp_number": "ZY00049",
+ "material_entity": [
+  {
+   "picture": "",
+   "seq": 1,
+   "id": "2590142888725789696",
+   "material_id": "2182903041571781632",
+   "material_name": "PP复合A级炭棒/滤芯",
+   "material_number": "C-84-01",
+   "material_is_multi_unit": false,
+   "material_is_serial": false,
+   "material_is_asst_attr": false,
+   "material_is_kf_period": false,
+   "material_is_batch": true,
+   "material_model": "63*42*498.3",
+   "stock_id": "2220441270411712512",
+   "stock_name": "成品B仓",
+   "stock_number": "CP-02",
+   "stock_is_allow_freight": false,
+   "sp_id": "",
+   "sp_name": "",
+   "sp_number": "",
+   "aux_prop_id": "",
+   "aux_prop_name": "",
+   "aux_prop_number": "",
+   "aux1_id": "",
+   "aux1_name": "",
+   "aux1_number": "",
+   "aux2_id": "",
+   "aux2_name": "",
+   "aux2_number": "",
+   "aux3_id": "",
+   "aux3_name": "",
+   "aux3_number": "",
+   "barcode": "",
+   "batch_no": "PC0000",
+   "pro_place": "",
+   "pro_reg_no": "",
+   "pro_license": "",
+   "kf_date": "",
+   "valid_date": "",
+   "kf_type": "",
+   "kf_period": 0,
+   "sn_list": "",
+   "sn_list_id": "0",
+   "base_unit_id": "3",
+   "base_unit_name": "支",
+   "base_unit_number": "支",
+   "unit_id": "3",
+   "unit_name": "支",
+   "unit_number": "支",
+   "aux_unit_id": "",
+   "aux_unit_name": "",
+   "aux_unit_number": "",
+   "conversion_rate": "",
+   "qty": 954,
+   "inv_qty": 5255,
+   "base_qty": 954,
+   "inv_base_qty": 0,
+   "aux_qty": 0,
+   "def_float_qty": 0,
+   "aux_coefficient": 0,
+   "coefficient": 1,
+   "price": 0,
+   "cost": 0,
+   "unit_cost": 0,
+   "comment": "",
+   "src_bill_no": "",
+   "src_bill_type_id": "",
+   "src_bill_type_name": "",
+   "src_bill_type_number": "",
+   "src_inter_id": "0",
+   "src_bill_date": "",
+   "src_seq": "0",
+   "src_entry_id": "0",
+   "custom_entity_field": {},
+   "recv_qty": "0",
+   "recv_base_qty": "0",
+   "customer_id": "",
+   "customer_number": "",
+   "customer_name": ""
+  },
+  {
+   "picture": "",
+   "seq": 2,
+   "id": "2590142888725894145",
+   "material_id": "2182903036815439872",
+   "material_name": "A级烧结炭棒/滤芯",
+   "material_number": "B-58-07",
+   "material_is_multi_unit": false,
+   "material_is_serial": false,
+   "material_is_asst_attr": false,
+   "material_is_kf_period": false,
+   "material_is_batch": true,
+   "material_model": "48*30*264.5",
+   "stock_id": "2220441270411712512",
+   "stock_name": "成品B仓",
+   "stock_number": "CP-02",
+   "stock_is_allow_freight": false,
+   "sp_id": "",
+   "sp_name": "",
+   "sp_number": "",
+   "aux_prop_id": "",
+   "aux_prop_name": "",
+   "aux_prop_number": "",
+   "aux1_id": "",
+   "aux1_name": "",
+   "aux1_number": "",
+   "aux2_id": "",
+   "aux2_name": "",
+   "aux2_number": "",
+   "aux3_id": "",
+   "aux3_name": "",
+   "aux3_number": "",
+   "barcode": "",
+   "batch_no": "PC0000",
+   "pro_place": "",
+   "pro_reg_no": "",
+   "pro_license": "",
+   "kf_date": "",
+   "valid_date": "",
+   "kf_type": "",
+   "kf_period": 0,
+   "sn_list": "",
+   "sn_list_id": "0",
+   "base_unit_id": "3",
+   "base_unit_name": "支",
+   "base_unit_number": "支",
+   "unit_id": "3",
+   "unit_name": "支",
+   "unit_number": "支",
+   "aux_unit_id": "",
+   "aux_unit_name": "",
+   "aux_unit_number": "",
+   "conversion_rate": "",
+   "qty": 3185,
+   "inv
+
+[分录 7 行,分录键 78] picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux1_id, aux1_name, aux1_number, aux2_id, aux2_name, aux2_number, aux3_id, aux3_name, aux3_number, barcode, batch_no, pro_place, pro_reg_no, pro_license, kf_date, valid_date, kf_type, kf_period, sn_list, sn_list_id, base_unit_id, base_unit_name, base_unit_number, unit_id, unit_name, unit_number, aux_unit_id, aux_unit_name, aux_unit_number, conversion_rate, qty, inv_qty, base_qty, inv_base_qty, aux_qty, def_float_qty, aux_coefficient, coefficient, price, cost, unit_cost, comment, src_bill_no, src_bill_type_id, src_bill_type_name, src_bill_type_number, src_inter_id, src_bill_date, src_seq, src_entry_id, custom_entity_field, recv_qty, recv_base_qty, customer_id, customer_number, customer_name
+
+[第一条分录完整 JSON]
+{
+ "picture": "",
+ "seq": 1,
+ "id": "2590142888725789696",
+ "material_id": "2182903041571781632",
+ "material_name": "PP复合A级炭棒/滤芯",
+ "material_number": "C-84-01",
+ "material_is_multi_unit": false,
+ "material_is_serial": false,
+ "material_is_asst_attr": false,
+ "material_is_kf_period": false,
+ "material_is_batch": true,
+ "material_model": "63*42*498.3",
+ "stock_id": "2220441270411712512",
+ "stock_name": "成品B仓",
+ "stock_number": "CP-02",
+ "stock_is_allow_freight": false,
+ "sp_id": "",
+ "sp_name": "",
+ "sp_number": "",
+ "aux_prop_id": "",
+ "aux_prop_name": "",
+ "aux_prop_number": "",
+ "aux1_id": "",
+ "aux1_name": "",
+ "aux1_number": "",
+ "aux2_id": "",
+ "aux2_name": "",
+ "aux2_number": "",
+ "aux3_id": "",
+ "aux3_name": "",
+ "aux3_number": "",
+ "barcode": "",
+ "batch_no": "PC0000",
+ "pro_place": "",
+ "pro_reg_no": "",
+ "pro_license": "",
+ "kf_date": "",
+ "valid_date": "",
+ "kf_type": "",
+ "kf_period": 0,
+ "sn_list": "",
+ "sn_list_id": "0",
+ "base_unit_id": "3",
+ "base_unit_name": "支",
+ "base_unit_number": "支",
+ "unit_id": "3",
+ "unit_name": "支",
+ "unit_number": "支",
+ "aux_unit_id": "",
+ "aux_unit_name": "",
+ "aux_unit_number": "",
+ "conversion_rate": "",
+ "qty": 954,
+ "inv_qty": 5255,
+ "base_qty": 954,
+ "inv_base_qty": 0,
+ "aux_qty": 0,
+ "def_float_qty": 0,
+ "aux_coefficient": 0,
+ "coefficient": 1,
+ "price": 0,
+ "cost": 0,
+ "unit_cost": 0,
+ "comment": "",
+ "src_bill_no": "",
+ "src_bill_type_id": "",
+ "src_bill_type_name": "",
+ "src_bill_type_number": "",
+ "src_inter_id": "0",
+ "src_bill_date": "",
+ "src_seq": "0",
+ "src_entry_id": "0",
+ "custom_entity_field": {},
+ "recv_qty": "0",
+ "recv_base_qty": "0",
+ "customer_id": "",
+ "customer_number": "",
+ "customer_name": ""
+}
+   嵌套对象 custom_entity_field: 键 = 
+
+[检验相关键扫描 check|inspect|qc|quality|test|way|assay|sample|full]
+   (无命中)
+
+=== ③ 商品档案的检验配置(check_type 分布)===
+  样本(前 800 个商品)check_type 分布: check_type="1": 800
+  check_type=1 的样例: C-95-13 / 006项目/功能炭棒滤芯 / check_type=1 | C-95-13**TB / 006项目/功能炭棒滤芯 / check_type=1 | C-95-14 / 006项目/功能炭棒滤芯 / check_type=1 | C-95-14**TB / 006项目/功能炭棒滤芯 / check_type=1 | C-95-15 / 006项目/功能炭棒滤芯 / check_type=1
+
+=== ④ 星辰是否开放「检验单」类接口(候选路径探测)===
+  /jdy/v2/qc/qc_bill               ❌ HTTP 519 status code 519
+  /jdy/v2/qc/inspect               ❌ HTTP 519 status code 519
+  /jdy/v2/pm/qc_bill               ❌ HTTP 519 status code 519
+  /jdy/v2/scm/inv_check_bill       ✅ count=36
+  /jdy/v2/qc/qc_inspect_bill       ❌ HTTP 519 status code 519
+  /jdy/v2/pm/inspect_bill          ❌ HTTP 519 status code 519

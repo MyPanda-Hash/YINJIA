@@ -929,12 +929,33 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成产成品入库单（自制退库）"},
+                    // 转ERP(2026-10-14 用户口径「先把产品入库的转erp补齐」):产品入库单 → 金蝶「产品入库单」
+                    // /jdy/v2/scm/inv_product。字段完全对照金蝶接口(沙箱实测见
+                    // tools/archive/_dump-out/kingdee-save-inv-product-1014.md);
+                    // 明细行的「检验方式」(全检/抽检)是 MES 本地字段 —— 金蝶保存接口对检验类键静默忽略,不推送。
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 其他入库单(OTHER_IN)已下架(2026-10-08 用户口径:这类出入库单不需要)——不再登记按钮组;
-            // 同批下架的还有 OTHER_OUT / OUTSOURCE_IN / OUTSOURCE_ISSUE 与其明细表/统计表面板,
-            // 连同它们的记账分支(StockFlowService/StockLedgerService)一并移除。
+            // 其他入库单(2026-10-14 重建):面板/表/视图按金蝶字段重建(migrate-other-docs-rebuild-20261014.sql),
+            // 并接入转ERP(推金蝶「其他入库单」/jdy/v2/scm/inv_other_in)。
+            // ⚠ 金蝶该单据**必须传 trans_type_id**(业务类型;真实账套 其他入库=12),
+            //   而金蝶无业务类型档案接口 ⇒ 值落在 MES 的「业务类型id」字段上(空则用账套默认)。
+            java.util.Map.entry("OTHER_IN", List.of(
+                    new String[]{"新增", "新增"},
+                    // 选单(2026-10-14 补,与产成品入库单同形):来源 = SELECT_FLOWS 的 PU_ORDER;
+                    // ⚠ actions[0] 必须是字面量「选单」,写成「选采购订单」会让工具栏主按钮回落成未实现
+                    new String[]{"选单", "选单", "选采购订单"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 销售出库单:选单=销售订单;生单灰(PANDA:生成销货单,销货单未迁移)
             java.util.Map.entry("SALE_OUT", List.of(
                     new String[]{"新增", "新增"},
@@ -966,7 +987,22 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 其他出库单(OTHER_OUT)已下架(2026-10-08)——不再登记按钮组(同 OTHER_IN)。
+            // 其他出库单(2026-10-14 重建):同其他入库单,转ERP 推金蝶「其他出库单」/jdy/v2/scm/inv_other_out
+            // (业务类型 trans_type_id 真实账套=13)。委外三单(OUTSOURCE_*)仍保持 2026-10-08 下架状态。
+            java.util.Map.entry("OTHER_OUT", List.of(
+                    new String[]{"新增", "新增"},
+                    // 选单(2026-10-14 补,与材料出库单同形):来源 = SELECT_FLOWS 的 MANU_ORDER
+                    new String[]{"选单", "选单", "选生产工单"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 委外三单:OUTSOURCE_IN / OUTSOURCE_ISSUE 于 2026-10-08 下架(面板+表+视图+菜单),
             // 只留 委外加工单 OUTSOURCE_ORDER(其「生成委外发料单」动作随之改为通用「生单」占位)。
             java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),
@@ -1054,6 +1090,11 @@ public class PanelConfigService {
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER")              // 销售订单 → 生产工单(计划层:选单生单)
+   // 2026-10-14 其他入库/其他出库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
+   //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库);其他出库 ← 生产工单(与材料出库单同源:生产领用类出库)。
+   //   ⚠ 这两条是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
+   , java.util.Map.entry("OTHER_IN", "PU_ORDER")
+   , java.util.Map.entry("OTHER_OUT", "MANU_ORDER")
             // 2026-09-30:原最后两条 RKD/CKD(采购单(旧)→入库单(旧) / 客户订单(旧)→出库单(旧))
             // 随 RKD/CKD 面板元数据一并删除 —— 这两个纺织遗留面板的 yj_field 按旧列名登记,
             // inh/outh 重建后已永久失效(菜单侧也从未挂载),保留映射只会让「选单」指向不存在的面板。
