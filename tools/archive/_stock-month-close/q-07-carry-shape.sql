@@ -7,8 +7,8 @@ SELECT N'结转单(按期间)' AS k, 单据编号, 单据类型, COUNT(*) AS 行
        CONVERT(nvarchar(10), MIN(单据日期), 120) AS 日期
 FROM inh WHERE 单据类型 = N'月结结转' GROUP BY 单据编号, 单据类型;
 GO
--- 每个 (物料,仓库) 在该单据里只应出现一次
-SELECT N'重复键(应 0)' AS k, COUNT(*) AS 重复组数 FROM (
+-- 同一 (物料,仓库) 有多条 = **按批号分行**(第十轮口径,正常);无批号的键只有 1 条
+SELECT N'同物料仓库多批号行(=批号分行,正常)' AS k, COUNT(*) AS 多行组数 FROM (
   SELECT 物料编码, 仓库编码, COUNT(*) AS c FROM inh WHERE 单据类型 = N'月结结转'
   GROUP BY 物料编码, 仓库编码 HAVING COUNT(*) > 1) t;
 GO

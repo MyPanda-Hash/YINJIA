@@ -123,10 +123,10 @@ const readExpand = async () => {
     return '表=' + tables + (hint ? ' 提示[' + hint + ']' : '') + (rows.length ? '\\n        行: ' + rows.join('  ///  ') : '');
   })()`)
 }
-await dump(`tr => (tr.innerText || '').includes('YJ-SX-043') && (tr.innerText || '').includes('CK00006')`)
-console.log('    有结转的行(YJ-SX-043/CK00006): ' + await readExpand())
+await dump(`tr => !tr.querySelector('.el-table__expand-icon') ? false : (tr.innerText || '').includes('YJ-SX-043') && (tr.innerText || '').includes('CK00006')`)
+console.log('    YJ-SX-043/CK00006 的第一个批号行(信息性:空=该批上月结存 0): ' + await readExpand())
 await ev(`document.querySelectorAll('.mc-detail .el-table__expand-icon').forEach(() => {})`)
-console.log('    说明:无结转的行(上月期末结存=0)展开应显示提示文字,不再是空表')
+console.log('    说明:上月期末结存为 0 的批号行展开显示提示文字;有余额的批号行 = 本批号结转 + 本批号当月单据')
 
 console.log('[8] 工具栏按钮: ' + await ev(`(() => {
   const labels = [...document.querySelectorAll('span.tb-main')].map(x => x.innerText.trim()).filter(Boolean);

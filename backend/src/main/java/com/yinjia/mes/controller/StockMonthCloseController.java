@@ -48,13 +48,16 @@ public class StockMonthCloseController {
      * @param period 期间 'YYYY-MM',缺省 = 上月
      * @param wzdm   物料编码(必填)
      * @param ckdm   仓库编码(必填)
-     * @param lot    批号(空 = 无批号那一组)
+     * @param lot    批号;**不传 = 不限批号**(所有批次一起看);传值(含**空串**)= 精确匹配该批号
+     *               —— 空串表示「无批号那一组」。⚠ 别给这个参数加 {@code defaultValue = ""}:
+     *               那会把"不传"变成"空批号",所有批次的行都被过滤掉(实测踩过:加了默认值后
+     *               本键 19 条批号结转行只剩 1 条,当月 17 张单据全被滤没)。
      */
     @GetMapping("/detail")
     public Map<String, Object> detail(@RequestParam(required = false) String period,
                                       @RequestParam String wzdm,
                                       @RequestParam String ckdm,
-                                      @RequestParam(required = false, defaultValue = "") String lot) {
+                                      @RequestParam(required = false) String lot) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("code", 200);
         out.put("message", "success");
