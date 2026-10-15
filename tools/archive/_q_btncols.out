@@ -1,0 +1,20 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q_btncols.sql ==
+  | panel_code | 
+  | panel_name | 
+  | category | 
+  | mode | 
+  | line_table | 
+  | head_table | 
+  | group_col | 
+  | pk_col | 
+  | code_col | 
+  | prefix | 
+  | date_col | 
+  | page_size | 
+  | detail_key | 
+  | module_group | 
+  | config | 
+  | config_at | 
+  | panel_name_en | 
+[OK] _q_btncols.sql (2 batches)

@@ -1,0 +1,2 @@
+panel_code|config
+QC_ASM_INSP|{"fixedItems":[{"group":"外观","items":["端盖两头","管身两侧"]},{"group":"尺寸","items":[],"label":"按照尺寸检验项目填充"},{"group":"出货重量","items":[],"label":"按照重量检验项目填充"}]}

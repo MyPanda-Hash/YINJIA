@@ -1,0 +1,151 @@
+########## HSDZ_MES ##########
+
+--- [1] yj_schema_log 10 条新迁移 ---
+{"script_name":"migrate-asm-insp-fixed-groups-20261016.sql","content_hash":"449055e2286c7ec2d683c1744dcb1e6d084e7c379b21b0f2deebaa091d7712f3","applied_at":"2026-10-15 09:10:41"}
+{"script_name":"migrate-asm-insp-fixed-items-20261016.sql","content_hash":"9e42de3474b90b07d11d21d1479ca0b6a6d762438f975d032859d83f7347ecb2","applied_at":"2026-10-15 08:55:39"}
+{"script_name":"migrate-asm-insp-passqty-in-20261017.sql","content_hash":"aa48df390646a349ea63b01693732d7f7bede2264198e046595bda642c3f95c0","applied_at":"2026-10-15 17:12:37"}
+{"script_name":"migrate-asm-insp-passqty-rename-20261017.sql","content_hash":"f7adc7f4f61de215ab6f3e1e8ccaa77900e20ee3253326c8764150391bbae211","applied_at":"2026-10-15 18:58:37"}
+{"script_name":"migrate-asm-insp-report-fields-20261016.sql","content_hash":"d302f1a1ce0009cc866ad8e6ea4d7d70456cbf339b0ef9ac54250a834cf56396","applied_at":"2026-10-15 06:31:50"}
+{"script_name":"migrate-asm-insp-type-rename-20261017.sql","content_hash":"f30409f892feb8fe0de4c32f004f9ca7b1a616b870c33ed937c7861ef1cf8673","applied_at":"2026-10-15 16:57:28"}
+{"script_name":"migrate-asm-insp-verdict-rename-20261016.sql","content_hash":"31f04aeedd336c9898295be1fc50da958638cd72223ccd8527d19b121b6451a4","applied_at":"2026-10-15 05:05:00"}
+{"script_name":"migrate-qc-proc-insp-audit-trail-20261017.sql","content_hash":"e32c8f470fcea4d43fc057401b07918593c3256ff70ab52ea5315ef385c7f13b","applied_at":"2026-10-15 07:18:49"}
+{"script_name":"migrate-qc-proc-insp-func-result-20261017.sql","content_hash":"51254fa1caa5cacf7fc624b3ff21553ee60f4be8d608e6f69a1ce21085205d40","applied_at":"2026-10-15 05:53:49"}
+{"script_name":"migrate-qc-proc-insp-report-vertical-20261017.sql","content_hash":"c9b156fe5fa0e605ba34e4df212f70e5c65b801a33852004ee0a7075a5c2e17b","applied_at":"2026-10-15 06:21:08"}
+
+--- [2] yj_field QC_ASM_INSP 表头字段 ---
+{"id":14541,"seq":10,"col_name":"单据编号","label":"单据编号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":false,"required":true}
+{"id":14542,"seq":20,"col_name":"单据日期","label":"单据日期","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":true}
+{"id":14543,"seq":30,"col_name":"工单号","label":"工单号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":true}
+{"id":16297,"seq":35,"col_name":"工单行号","label":"工单行号","data_type":"整数","place":"query,header","visible":true,"hidden":false,"editable":false,"required":false}
+{"id":14544,"seq":40,"col_name":"报工单号","label":"报工单号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14545,"seq":50,"col_name":"工序","label":"工序","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14546,"seq":60,"col_name":"批次号","label":"批次号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":17237,"seq":65,"col_name":"客户名称","label":"客户名称","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14547,"seq":70,"col_name":"产品编码","label":"产品编码","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14548,"seq":80,"col_name":"产品名称","label":"产品名称","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14549,"seq":90,"col_name":"规格型号","label":"规格型号","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14550,"seq":100,"col_name":"生产线","label":"生产线","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14551,"seq":110,"col_name":"生产车间","label":"生产车间","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14552,"seq":120,"col_name":"报工数量","label":"报工数量","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":17284,"seq":125,"col_name":"抽检总量","label":"抽检总量","data_type":"小数","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14553,"seq":130,"col_name":"检验数量","label":"检验数量","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14557,"seq":130,"col_name":"处理方式","label":"处理方式","data_type":"多行文本","place":"header,detail","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":17295,"seq":135,"col_name":"合格数量","label":"合格数量","data_type":"小数","place":"header","visible":true,"hidden":false,"editable":true,"required":true}
+{"id":14554,"seq":140,"col_name":"检验员","label":"检验员","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":17283,"seq":145,"col_name":"检验时间","label":"检验时间","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14555,"seq":150,"col_name":"检验日期","label":"检验日期","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":16178,"seq":155,"col_name":"检验方案","label":"检验方案","data_type":"参照","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14556,"seq":160,"col_name":"总结论","label":"总结论","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":16179,"seq":165,"col_name":"文件编码","label":"文件编码","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":16180,"seq":175,"col_name":"执行标准","label":"执行标准","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14558,"seq":180,"col_name":"备注","label":"备注","data_type":"多行文本","place":"header,detail","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":14559,"seq":190,"col_name":"单据状态","label":"单据状态","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":false,"required":false}
+{"id":14560,"seq":200,"col_name":"审核人","label":"审核人","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":false,"required":false}
+{"id":14561,"seq":210,"col_name":"审核时间","label":"审核时间","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":false,"required":false}
+
+--- [3] yj_field 全库旧标签「合格数量（入库）」残留 ---
+(0 行)
+
+--- [4] yj_field 全库「合格数量」登记 ---
+{"id":4633,"panel_code":"DAY_REPORT","col_name":"合格数量","label":"合格数量","place":"query,detail","seq":330,"required":false,"visible":true,"hidden":false}
+{"id":17295,"panel_code":"QC_ASM_INSP","col_name":"合格数量","label":"合格数量","place":"header","seq":135,"required":true,"visible":true,"hidden":false}
+{"id":16965,"panel_code":"QC_INSP","col_name":"合格数量","label":"合格数量","place":"detail","seq":90,"required":true,"visible":true,"hidden":false}
+
+--- [5] yj_translation 新旧 key ---
+{"scope":"field","ref_key":"合格数量","locale":"de","text":"Gutmenge","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"en","text":"Pass Qty","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"es","text":"Cantidad conforme","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"fr","text":"Quantité conforme","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"ja","text":"合格数量","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"ko","text":"합격 수량","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"ru","text":"Годное количество","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"th","text":"จำนวนที่ผ่าน","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"vi","text":"Số lượng đạt","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"zh-TW","text":"合格數量","source":"manual"}
+
+--- [6] yj_panel.config QC_ASM_INSP ---
+{"panel_code":"QC_ASM_INSP","config":"{\"fixedItems\":[{\"group\":\"外观\",\"items\":[\"端盖两头\",\"管身两侧\"]},{\"group\":\"尺寸\",\"items\":[],\"label\":\"按照尺寸检验项目填充\"},{\"group\":\"出货重量\",\"items\":[],\"label\":\"按照重量检验项目填充\"}]}"}
+
+--- [7] qc_asm_insp_head 含「合格」列 ---
+{"column_id":35,"col_name":"合格数量","type_name":"decimal","precision":18,"scale":4,"is_nullable":true}
+
+########## HSDZ_MES_TEST ##########
+
+--- [1] yj_schema_log 10 条新迁移 ---
+{"script_name":"migrate-asm-insp-fixed-groups-20261016.sql","content_hash":"449055e2286c7ec2d683c1744dcb1e6d084e7c379b21b0f2deebaa091d7712f3","applied_at":"2026-10-15 09:10:43"}
+{"script_name":"migrate-asm-insp-fixed-items-20261016.sql","content_hash":"9e42de3474b90b07d11d21d1479ca0b6a6d762438f975d032859d83f7347ecb2","applied_at":"2026-10-15 08:55:41"}
+{"script_name":"migrate-asm-insp-passqty-in-20261017.sql","content_hash":"aa48df390646a349ea63b01693732d7f7bede2264198e046595bda642c3f95c0","applied_at":"2026-10-15 17:12:41"}
+{"script_name":"migrate-asm-insp-passqty-rename-20261017.sql","content_hash":"f7adc7f4f61de215ab6f3e1e8ccaa77900e20ee3253326c8764150391bbae211","applied_at":"2026-10-15 18:58:48"}
+{"script_name":"migrate-asm-insp-report-fields-20261016.sql","content_hash":"d302f1a1ce0009cc866ad8e6ea4d7d70456cbf339b0ef9ac54250a834cf56396","applied_at":"2026-10-15 06:31:52"}
+{"script_name":"migrate-asm-insp-type-rename-20261017.sql","content_hash":"f30409f892feb8fe0de4c32f004f9ca7b1a616b870c33ed937c7861ef1cf8673","applied_at":"2026-10-15 16:57:32"}
+{"script_name":"migrate-asm-insp-verdict-rename-20261016.sql","content_hash":"31f04aeedd336c9898295be1fc50da958638cd72223ccd8527d19b121b6451a4","applied_at":"2026-10-15 05:05:04"}
+{"script_name":"migrate-qc-proc-insp-audit-trail-20261017.sql","content_hash":"e32c8f470fcea4d43fc057401b07918593c3256ff70ab52ea5315ef385c7f13b","applied_at":"2026-10-15 07:18:50"}
+{"script_name":"migrate-qc-proc-insp-func-result-20261017.sql","content_hash":"51254fa1caa5cacf7fc624b3ff21553ee60f4be8d608e6f69a1ce21085205d40","applied_at":"2026-10-15 05:53:51"}
+{"script_name":"migrate-qc-proc-insp-report-vertical-20261017.sql","content_hash":"c9b156fe5fa0e605ba34e4df212f70e5c65b801a33852004ee0a7075a5c2e17b","applied_at":"2026-10-15 06:31:52"}
+
+--- [2] yj_field QC_ASM_INSP 表头字段 ---
+{"id":6257,"seq":10,"col_name":"单据编号","label":"单据编号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":false,"required":true}
+{"id":6258,"seq":20,"col_name":"单据日期","label":"单据日期","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":true}
+{"id":6259,"seq":30,"col_name":"工单号","label":"工单号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":true}
+{"id":7552,"seq":35,"col_name":"工单行号","label":"工单行号","data_type":"整数","place":"query,header","visible":true,"hidden":false,"editable":false,"required":false}
+{"id":6260,"seq":40,"col_name":"报工单号","label":"报工单号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6261,"seq":50,"col_name":"工序","label":"工序","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6262,"seq":60,"col_name":"批次号","label":"批次号","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":9494,"seq":65,"col_name":"客户名称","label":"客户名称","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6263,"seq":70,"col_name":"产品编码","label":"产品编码","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6264,"seq":80,"col_name":"产品名称","label":"产品名称","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6265,"seq":90,"col_name":"规格型号","label":"规格型号","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6273,"seq":90,"col_name":"处理方式","label":"处理方式","data_type":"多行文本","place":"header,detail","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6266,"seq":100,"col_name":"生产线","label":"生产线","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6267,"seq":110,"col_name":"生产车间","label":"生产车间","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6274,"seq":110,"col_name":"备注","label":"备注","data_type":"多行文本","place":"header,detail","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6268,"seq":120,"col_name":"报工数量","label":"报工数量","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":9541,"seq":125,"col_name":"抽检总量","label":"抽检总量","data_type":"小数","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6269,"seq":130,"col_name":"检验数量","label":"检验数量","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":9552,"seq":135,"col_name":"合格数量","label":"合格数量","data_type":"小数","place":"header","visible":true,"hidden":false,"editable":true,"required":true}
+{"id":6270,"seq":140,"col_name":"检验员","label":"检验员","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":9540,"seq":145,"col_name":"检验时间","label":"检验时间","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6271,"seq":150,"col_name":"检验日期","label":"检验日期","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":7433,"seq":155,"col_name":"检验方案","label":"检验方案","data_type":"参照","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6272,"seq":160,"col_name":"总结论","label":"总结论","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":7434,"seq":165,"col_name":"文件编码","label":"文件编码","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":7435,"seq":175,"col_name":"执行标准","label":"执行标准","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":true,"required":false}
+{"id":6275,"seq":190,"col_name":"单据状态","label":"单据状态","data_type":"文本","place":"query,header","visible":true,"hidden":false,"editable":false,"required":false}
+{"id":6276,"seq":200,"col_name":"审核人","label":"审核人","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":false,"required":false}
+{"id":6277,"seq":210,"col_name":"审核时间","label":"审核时间","data_type":"文本","place":"header","visible":true,"hidden":false,"editable":false,"required":false}
+
+--- [3] yj_field 全库旧标签「合格数量（入库）」残留 ---
+(0 行)
+
+--- [4] yj_field 全库「合格数量」登记 ---
+{"id":3052,"panel_code":"DAY_REPORT","col_name":"合格数量","label":"合格数量","place":"query,detail","seq":330,"required":false,"visible":true,"hidden":false}
+{"id":9552,"panel_code":"QC_ASM_INSP","col_name":"合格数量","label":"合格数量","place":"header","seq":135,"required":true,"visible":true,"hidden":false}
+{"id":8223,"panel_code":"QC_INSP","col_name":"合格数量","label":"合格数量","place":"detail","seq":90,"required":true,"visible":true,"hidden":false}
+
+--- [5] yj_translation 新旧 key ---
+{"scope":"field","ref_key":"合格数量","locale":"de","text":"Gutmenge","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"en","text":"Pass Qty","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"es","text":"Cantidad conforme","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"fr","text":"Quantité conforme","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"ja","text":"合格数量","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"ko","text":"합격 수량","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"ru","text":"Годное количество","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"th","text":"จำนวนที่ผ่าน","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"vi","text":"Số lượng đạt","source":"manual"}
+{"scope":"field","ref_key":"合格数量","locale":"zh-TW","text":"合格數量","source":"manual"}
+
+--- [6] yj_panel.config QC_ASM_INSP ---
+{"panel_code":"QC_ASM_INSP","config":"{\"fixedItems\":[{\"group\":\"外观\",\"items\":[\"端盖两头\",\"管身两侧\"]},{\"group\":\"尺寸\",\"items\":[],\"label\":\"按照尺寸检验项目填充\"},{\"group\":\"出货重量\",\"items\":[],\"label\":\"按照重量检验项目填充\"}]}"}
+
+--- [7] qc_asm_insp_head 含「合格」列 ---
+{"column_id":35,"col_name":"合格数量","type_name":"decimal","precision":18,"scale":4,"is_nullable":true}
+
+
+--- [8] config JSON 解析 HSDZ_MES ---
+
+valid JSON = YES; top keys = [fixedItems]; fixedItems groups = [外观,尺寸,出货重量]; group0.items = ["端盖两头","管身两侧"]; group1.label = 按照尺寸检验项目填充
+
+
+--- [8] config JSON 解析 HSDZ_MES_TEST ---
+
+valid JSON = YES; top keys = [fixedItems]; fixedItems groups = [外观,尺寸,出货重量]; group0.items = ["端盖两头","管身两侧"]; group1.label = 按照尺寸检验项目填充

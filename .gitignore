@@ -125,3 +125,10 @@ frontend/.build-tmp/
 # ⚠ 历史上已入库的 png 保持原样(已跟踪文件不受本规则影响,不会被动删);
 #   将来确有需要入库的图,显式 `git add -f <路径>` 并在提交信息里说明理由。
 *.png
+
+# ── javac 落在仓库里的 .class 一律不入库(2026-10-17 审查增)────────────
+# `java -cp tools/lib/mssql-jdbc.jar tools/xxx.java` 这类单文件源码启动会在**源码旁边**留下 .class
+# (实测一次审查就攒出 tools/_PdfText.class、tools/archive/_q.class、_q_manu_order_state_probe.class)。
+# 它们是编译产物、不是证据:证据是 .out/.txt(本仓库已入库几百个,继续照旧)。
+# ⚠ tools/archive/_insp-report/_classes/*.class 是**故意入库**的探针产出(已跟踪,不受本规则影响)。
+*.class

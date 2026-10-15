@@ -1,0 +1,3 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q_buttons.sql ==
+[SQL FAIL] Invalid column name 'table_name'.
