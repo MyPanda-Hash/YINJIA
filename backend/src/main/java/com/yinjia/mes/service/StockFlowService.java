@@ -93,6 +93,18 @@ public class StockFlowService {
             if (str(r.get("仓库编码")) == null) continue;      // 仓库没解析出来 = 该行没动过 kucun(见 apply 的跳过分支)
             double qty = num(r.get("qty"));
             if (qty == 0) continue;                          // 零行不过账,也不记流水
+            // 出库审批闸门(用户第十六轮):**首次审核(insert)与弃审后重审(revive)都要过闸** ——
+            //   放在幂等查询之前,别只在 insert 分支校验(否则"弃审→把预警调高→重审"能绕过)。
+            if (forward && !inbound) {
+                warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
+                        java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
+            }
+            // 出库审批闸门(用户第十六轮):**首次审核(insert)与弃审后重审(revive)都要过闸** ——
+            //   放在幂等查询**之前**,否则"弃审 → 调预警 → 重审"能绕过校验。
+            if (forward && !inbound) {
+                warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
+                        java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
+            }
             // 幂等:先查 (src, rid) 是否已记过(唯一索引兜底),再决定 插 / 复活 / 红冲
             List<String> cancelFlag = jdbc.queryForList(
                     "SELECT ISNULL(asp_cancel, 'N') FROM " + tbl + " WHERE src = ? AND rid = ?", String.class, src, rid);
@@ -108,10 +120,6 @@ public class StockFlowService {
                 continue;                                    // 已记过(未弃审的重复审核)/ 已冲过:不重复写
             }
             if (!forward) continue;                          // 没记过流水,弃审时无流水可冲
-            if (!inbound) {
-                warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
-                        java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
-            }
             n += insert(tbl, inbound, r, no, user, src, rid);
         }
         if (n > 0) log.info("[库存流水] {} {} {} {} 行(src={})", panelCode, no, forward ? "写入" : "红冲", n, src);

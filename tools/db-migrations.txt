@@ -3247,3 +3247,10 @@ migrate-rd-approval-attach-20261016.sql
 #   建表 + 13 列 + (panel_code,doc_no) 索引 + 表/列中文注明;已登记 tools/db-inuse-tables.txt(yj_* 25→26)。
 #   幂等(建表/索引/注明各自判空);末尾自检表与关键列齐备否则 RAISERROR。两账套均执行。
 migrate-doc-annotation-20261016.sql
+
+# migrate-lot-rename-to-batchno.sql — 「批号」全库改叫「批次号」+ 出库单批次号改为不必填
+#   用户第十七轮:「把所有出库单的批号字段都改成批次号。批次号不用必填。」
+#   只改 label(物理列仍叫 批号/lot_no,ADR-0001 数据键不变);已核对无 ref_field/display_field 引用 '批号'。
+#   required 清 0 覆盖 MATERIAL_OUT/OTHER_OUT/SALE_OUT 三张出库单及其它 批号/lot_no 字段。
+#   自检:残留 label=批号 0 行、批号/lot_no 仍必填 0 行、出库三单批次号字段在册。幂等;两账套均执行。
+migrate-lot-rename-to-batchno.sql
