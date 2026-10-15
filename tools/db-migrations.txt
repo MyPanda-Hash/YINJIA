@@ -3257,3 +3257,13 @@ migrate-doc-annotation-20261016.sql
 #   下发空池 + poolAvailable=false(不再 500),FieldManagerDialog 据此给明确提示并禁用「添加」。
 #   幂等(逐列判 COL_LENGTH);两账套均执行。表已登记在册(yj_share_file),不新增表、无需改 db-inuse-tables.txt。
 migrate-share-file-spare-cols-20261016.sql
+# migrate-prodinfo-name-required-20261016.sql — 产品信息表(RD_PROD_INFO)「产品名称」设为必填。
+#   用户口径(2026-10-16):「把产品信息表的左上角的产品信息表这个栏目改为产品名称的填写框,留出空白
+#   然后背景提示词为:产品名称,然后可以在规格书等4张单据填写的时候通过产品编号进行一个引用,
+#   4张单据有产品名称的才引用,没有就不影响,产品信息表忘记填写这个产品名称就高亮提醒」。
+#   纸面那格已改成输入框(前端 recordSheetConfigs.RD_PROD_INFO 的 titleKey,同批提交);
+#   本脚本只把 yj_field.required 置 1 ⇒ 前端保存前校验缺必填并闪红(rs-focus),后端 assertRequired 同口径。
+#   为什么重要:下游 成型/组装工艺清单 的「产品名称」靠 产品编号 参照 RD_PROD_INFO 时同名带回
+#   (实测 refMap 已含 {"from":"产品名称","to":"产品名称"});规格书/出货检验计划表没有该字段,不动。
+#   幂等(仅当不是必填时改);末尾自检 required=1 否则 RAISERROR。两账套均执行。
+migrate-prodinfo-name-required-20261016.sql

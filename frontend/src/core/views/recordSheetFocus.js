@@ -70,6 +70,9 @@ export function pageOfKeyIn(cfg, key) {
   if ((cfg.cover?.fields || []).some((f) => f.key === key)) return 0
   if ((cfg.cover?.sign || []).some((s) => s.key === key)) return 0
   if (cfg.coverDocNoKey === key) return 0
+  // 大标题做成字段输入框的面板(如产品信息表的「产品名称」):标题也在报告头,同属第 0 页
+  // (2026-10-16:缺必填时这格要能闪,否则 focusField 直接返回 false、用户看不到高亮)
+  if (cfg.titleKey === key) return 0
   const sections = [...(cfg.sections || []), ...(cfg.tailSections || []), ...(cfg.tailDocSections || [])]
   for (const sec of sections) {
     if (keysOfBlock(sec).includes(key)) return pageOfBlock(sec)

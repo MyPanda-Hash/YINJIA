@@ -145,13 +145,21 @@
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
-            <el-input v-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
+          <!-- 大标题格。cfg.titleKey(2026-10-16 用户口径):这一格不用印死的表单名,而做成**字段输入框**
+               —— 产品信息表左上角原印「产品信息表」,改为「产品名称」填写框(留空 + 灰字提示词),
+               因为产品名称是下游 4 张文件靠「产品编号」参照带回的源头(见 PanelConfigService.buildRefMap)。
+               只读态显示该字段的值;值为空时回落到印死的表单名,老单据观感不变。
+               高亮:cfg.titleKey 也进 pageOfKeyIn(第 0 页),校验缺必填时这格会闪 rs-focus。 -->
+          <td class="rs-td rs-topic-cell" :class="{ 'rs-focus': cfg.titleKey && isFocus(cfg.titleKey) }"
+              :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
+            <el-input v-if="editable && cfg.titleKey" v-model="head[cfg.titleKey]" size="small" class="rs-topic-input"
+                      :placeholder="tt(cfg.titleKeyPh || cfg.titleKey)" @input="emit('dirty')" />
+            <el-input v-else-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
             <!-- 大标题:静态页标题(pages[i].staticTitle / cfg.staticTitle)**走 tt()** ——
                  规格书/成型工艺清单/组装/测试申请单这些静态标题在 locales 里都有译名,
                  而派生标题(titleFromKey 拼出来的如"开发性-测试申请单")是**数据+后缀**,
                  不能整串丢进 tt()(会机翻出一堆无意义词条),故只翻静态标题这一支。 -->
-            <span v-else class="rs-topic">{{ effStaticTitle ? tt(effStaticTitle) : (derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder)) }}</span>
+            <span v-else class="rs-topic">{{ (cfg.titleKey ? head[cfg.titleKey] : '') || (effStaticTitle ? tt(effStaticTitle) : (derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder))) }}</span>
           </td>
           <template v-if="infoSpan">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>

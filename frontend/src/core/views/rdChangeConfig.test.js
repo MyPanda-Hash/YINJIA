@@ -15,6 +15,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { recordSheetConfigs } from './recordSheetConfigs.js'
+import { pageOfKeyIn } from './recordSheetFocus.js'
 
 const panelx = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
 const devTask = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/DevTaskService.java', import.meta.url), 'utf8')
@@ -97,7 +98,34 @@ test('分组设计表:非组首行不得再输出序号/组名 <td>(否则整行
     '(2026-10-16 用户截图:「检验项目下面和检验要求下面有空白格」)')
 })
 
-// ── 四、规格书分发:rd_spec_doc_head 没有「编号」列(2026-10-16 用户报障 500) ──
+// ── 五、产品信息表:左上角大标题改成「产品名称」填写框 + 缺填要高亮 ──
+test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {
+  const cfg = recordSheetConfigs.RD_PROD_INFO
+  assert.equal(cfg.titleKey, '产品名称', '左上角大标题要绑 产品名称')
+  assert.equal(cfg.titleKeyPh, '产品名称', '背景提示词要是 产品名称')
+  assert.equal(cfg.staticTitle, '产品信息表', 'staticTitle 保留:只读态字段为空时回落显示表单名')
+  // 缺必填时 focusField 要先找到该键所在页;找不到就直接 return false(高亮根本不出现)
+  assert.equal(pageOfKeyIn(cfg, '产品名称'), 0, '产品名称 必须能定位到第 0 页,否则保存报错时不高亮')
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /v-if="editable && cfg\.titleKey"[\s\S]{0,220}?:placeholder="tt\(cfg\.titleKeyPh \|\| cfg\.titleKey\)"/,
+    '标题格要按 titleKey 渲染输入框 + 提示词')
+  assert.match(rec, /:class="\{ 'rs-focus': cfg\.titleKey && isFocus\(cfg\.titleKey\) \}"/,
+    '标题格要参与缺必填高亮(rs-focus)')
+})
+
+test('「规格书等 4 张单」= 四文件面板集合(前端判据与后端 DocArchive/DevFile 面一致)', () => {
+  // 用户口径里的「4 张单据」= 下游四个受控文件;产品名称能否带回由**后端 refMap**决定
+  // (实测:RD_MOLD_PROC / RD_ASM_PROC 的 产品编号 参照 refMap 含 {"from":"产品名称","to":"产品名称"};
+  //  RD_SPEC_DOC / RD_INSP_PLAN 没有「产品名称」字段 ⇒ 不带,符合「没有就不影响」)。
+  // 前端这一侧只负责:这 4 张单认得出「我方产品键」并在格上标注开发状态。
+  assert.match(panelx, /const DEV_FILE_PANELS = \['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN'\]/,
+    '四文件面板集合应保持这 4 张(规格书/成型/组装/出货检验计划)')
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /const DEV_PANEL_CODES = \['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN'\]/,
+    '纸面侧的开发状态角标面板集合应与之一致')
+})
+
+// ── 六、规格书分发:rd_spec_doc_head 没有「编号」列(2026-10-16 用户报障 500) ──
 test('DevTaskService 不得再引用 rd_spec_doc_head.编号(该列不存在 ⇒ 分发责任人 500)', () => {
   // ⚠ 匹配要带 SQL 上下文:修复注释里就写着 h.编号 这个反面例子,裸文本匹配会误报
   assert.ok(!/\(h\.编号 IS NULL OR h\.编号 = \?\)/.test(devTask),
