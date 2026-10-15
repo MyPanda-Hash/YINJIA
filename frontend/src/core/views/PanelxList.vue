@@ -486,8 +486,46 @@
                 :class="{ disabled: isDisabled('扫描填单') }"
                 @click="onSideAction('扫描填单')"
               >{{ tt('扫描填单') }}</div>
+
+              <!-- 标注笔 / 橡皮擦(2026-10-16 用户口径):仅**研发管理面板**(RD_*)且已载单据时出现。
+                   标注只落在**只读纸面与打印**上 —— 可编辑态的值在 <input> 里,HTML 无法只给其中几个字上色。 -->
+              <template v-if="annActive">
+                <div
+                  class="as-side-btn"
+                  :style="annMode === 'pen' ? 'background:#116a5b;color:#fff' : ''"
+                  @click="toggleAnnMode('pen')"
+                >{{ tt('标注笔') }}</div>
+                <div
+                  class="as-side-btn"
+                  :style="annMode === 'eraser' ? 'background:#b94d3f;color:#fff' : ''"
+                  @click="toggleAnnMode('eraser')"
+                >{{ tt('橡皮擦') }}</div>
+              </template>
             </div>
           </template>
+        </div>
+      </div>
+
+      <!-- 标注色盘(选中文字后浮出;position:fixed 用视口坐标,内联样式免动本文件巨大的样式段)。
+           点色即落库并关闭;「加粗」是叠加开关,勾上再点色 = 该段着色且加粗。 -->
+      <div
+        v-if="annPending"
+        :style="`position:fixed;left:${annPending.x + 8}px;top:${annPending.y + 8}px;z-index:3000;background:#fff;border:1px solid #d8d8d8;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:8px 10px;width:172px`"
+      >
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <i
+            v-for="cc in ANNOTATION_COLORS"
+            :key="cc"
+            :title="cc"
+            :style="`display:block;width:22px;height:22px;border-radius:4px;cursor:pointer;border:1px solid rgba(0,0,0,.12);background:${cc}`"
+            @click="pickAnnColor(cc)"
+          ></i>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#333;margin-bottom:8px">
+          <input v-model="annBold" type="checkbox" /> {{ tt('加粗') }}
+        </label>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <span style="font-size:12px;color:#888;cursor:pointer" @click="annPending = null">{{ tt('取消') }}</span>
         </div>
       </div>
     </template>
@@ -1960,7 +1998,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
@@ -1994,6 +2032,10 @@ import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import DocSelectRail from './DocSelectRail.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
+// 标注笔/橡皮擦:纸面(RecordSheetPanels 里的 AnnotatedText)通过 provide/inject 拿状态,
+// 侧栏按钮与色盘在本组件 ⇒ 不必逐层透传 prop
+import { provideAnnotations, ANN_KEY } from '@core/panel/annotationBus.js'
+import { ANNOTATION_COLORS } from '@core/panel/docAnnotation.js'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import QcCatalogSheet from './QcCatalogSheet.vue'
 import QcInspRecSheet from './QcInspRecSheet.vue'
@@ -3484,6 +3526,94 @@ const attachValues = computed(() => Object.fromEntries(attachKeys.value.map((k) 
 function applyAttachSlots(map) {
   Object.entries(map || {}).forEach(([k, v]) => { cur.value[k] = v })
 }
+
+// ═══ 标注笔 / 橡皮擦(2026-10-16 用户口径:研发管理面板侧栏「文档输出」下) ═══
+// 交互:点「标注笔」→ 在纸面用鼠标选中要标注的文字 → 弹色盘选色(可叠加粗)→ 落库;
+//       点「橡皮擦」→ 点已标注的字即擦掉那一段。
+// 只在**只读纸面 + 打印**生效:可编辑态的值在 <input> 里,HTML 无法只给其中几个字上色。
+// ⚠ 仅研发管理面板(RD_*)开放;且必须已载单据(标注按 panelCode+docNo 定位)。
+const isRdPanel = computed(() => String(panelCode.value || '').startsWith('RD_'))
+/** 当前单据的标注:{ [fieldKey]: [{start,end,color,bold}] } */
+const annMap = ref({})
+/** 当前模式:null=关 / 'pen'=标注笔 / 'eraser'=橡皮擦 */
+const annMode = ref(null)
+/** 待选色的标注(色盘锚点);null=没在选色 */
+const annPending = ref(null)
+const annBold = ref(false)
+const annBusy = ref(false)
+const annActive = computed(() => !!isRdPanel.value && !!curDocNo.value)
+function setAnnList(list) {
+  const m = {}
+  for (const a of list || []) {
+    const k = String(a.fieldKey || '')
+    if (!k) continue
+    ;(m[k] = m[k] || []).push(a)
+  }
+  annMap.value = m
+}
+async function loadAnns() {
+  if (!annActive.value) { annMap.value = {}; annPending.value = null; return }
+  try {
+    const res = await request.get('/annotation/list', { params: { panelCode: panelCode.value, docNo: curDocNo.value } })
+    setAnnList(res?.data)
+  } catch { annMap.value = {} }   // 读取失败不阻塞纸面
+}
+/** 标注笔:纸面选好范围 → 弹色盘(真正落库在 pickAnnColor) */
+function askAnn(fieldKey, start, end, at) {
+  annPending.value = { fieldKey, start, end, x: at?.x ?? 420, y: at?.y ?? 260, bold: annBold.value }
+}
+/** 色盘选色 → 落库(后端会把相交的旧段软删 ⇒ 再标即覆盖) */
+async function pickAnnColor(color) {
+  const p = annPending.value
+  if (!p || annBusy.value) return
+  annBusy.value = true
+  try {
+    const res = await request.post('/annotation/save', {
+      panelCode: panelCode.value, docNo: curDocNo.value,
+      fieldKey: p.fieldKey, start: p.start, end: p.end, color, bold: p.bold,
+    })
+    setAnnList(res?.data)
+    annPending.value = null
+  } catch (e) {
+    ElMessage.error(engine.errMsg?.(e) || tt('操作失败'))
+  } finally { annBusy.value = false }
+}
+/** 橡皮擦:擦掉与 [start,end) 相交的标注段 */
+async function eraseAnn(fieldKey, start, end) {
+  if (annBusy.value) return
+  annBusy.value = true
+  try {
+    const res = await request.post('/annotation/erase', {
+      panelCode: panelCode.value, docNo: curDocNo.value, fieldKey, start, end,
+    })
+    setAnnList(res?.data)
+  } catch (e) {
+    ElMessage.error(engine.errMsg?.(e) || tt('操作失败'))
+  } finally { annBusy.value = false }
+}
+function toggleAnnMode(m) {
+  annPending.value = null
+  annMode.value = annMode.value === m ? null : m
+}
+provideAnnotations({
+  anns: annMap,
+  mode: annMode,
+  active: annActive,
+  ask: askAnn,
+  erase: eraseAnn,
+})
+// 换单据/换面板即重载;退出研发面板自动关掉模式(免得状态串到别的面板)。
+// ⚠ 必须放进 onMounted:watch(source, cb) **注册时就立即求值 source**,而 source 读的是
+//   curDocNo → cur,而 cur 声明在本块**之后**(L3779 附近) ⇒ 直接写 watch(...) 会命中
+//   `Cannot access 'cur' before initialization` 的 TDZ(2026-10-16 实测,page 整页白)。
+//   放到 onMounted 里:此时 setup 已执行完,所有 const 都已初始化。
+onMounted(() => {
+  loadAnns()
+  watch([() => curDocNo.value, () => panelCode.value], () => {
+    loadAnns()
+    if (!isRdPanel.value) annMode.value = null
+  })
+})
 /** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
 const sheetAllFields = computed(() => {
   const header = headerFields.value || []

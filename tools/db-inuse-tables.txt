@@ -11,12 +11,13 @@
 #   dm_key=含明文接口密钥的历史资产(单独处置)。系统自带 dtproperties(is_ms_shipped=1)不在登记范围。
 # 格式:table:<表名>   # 中文说明
 
-# ---- 引擎元数据与运行时(yj_*,25 张;结构由代码与迁移脚本固定,不加自定义字段备用列) ----
+# ---- 引擎元数据与运行时(yj_*,26 张;结构由代码与迁移脚本固定,不加自定义字段备用列) ----
 table:yj_app_setting   # 系统参数表(键值对:收料超送比例等运行期可调口径,见 remark)
 table:yj_archive_change_log   # 档案式面板修改记录(每次存档留一条:操作人/时间/行变化摘要/字段级变化;只增不改)
 table:yj_attachment   # 单据附件表(panel_code+doc_no+field_key定位,文件名/存储名/大小/类型)
 table:yj_change_dept   # 产品变更申请单部门映射:纸面「部门评审意见」的部门行(YJ-QR-130 的 7 个部门)↔ 系统部门 yj_dept.id —— 账号按 yj_user.dept_id 命中本表即可填写对应部门行(管理员豁免)
 table:yj_dept   # 部门表(多级,parentId)
+table:yj_doc_annotation   # 单据纸面文字标注(标注笔/橡皮擦):panel_code+doc_no+field_key 定位,一条=一段字符区间 [start_pos,end_pos) + 颜色 #RRGGBB + 是否加粗;只读纸面与打印按它切段着色(可编辑态的值在 input 里无法分段上色)
 table:yj_doc_batch   # 采购订单送料批次台账(每张暂收单一个批次键;批次号=供应商编码去 YJ- 前缀 + - + 生单当天 yyyyMMdd,生单即定号、下游逐站继承;2026-10-04 口径,旧的"订单号+3位序号 / 入库审核取号回填"已废)
 table:yj_doc_modify_log   # 归档单修改记录(修改前后差异快照与审批链)
 table:yj_doc_status   # 单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)

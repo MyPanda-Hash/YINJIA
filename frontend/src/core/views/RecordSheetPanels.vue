@@ -223,7 +223,7 @@
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
-                  <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+                  <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
@@ -258,7 +258,7 @@
                 />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-                <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
             </template>
           </tr>
@@ -309,7 +309,7 @@
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
                 </template>
-                <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </tr>
@@ -320,13 +320,13 @@
             <td class="rs-td rs-label">{{ tt(row.label) }}</td>
             <td class="rs-td" :colspan="row.label2 ? 2 : 5">
               <el-input v-if="editable" v-model="head[row.key]" size="small" :maxlength="row.max || 500" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </td>
             <template v-if="row.label2">
               <td class="rs-td rs-label">{{ tt(row.label2) }}</td>
               <td class="rs-td" colspan="2">
                 <el-input v-if="editable" v-model="head[row.key2]" size="small" :maxlength="row.max2 || 500" class="rs-t-in" @input="emit('dirty')" />
-                <span v-else class="rs-txt">{{ head[row.key2] || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[row.key2] || ''" :field-key="String(row.key2 || '')" />
               </td>
             </template>
           </tr>
@@ -338,7 +338,7 @@
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
                 <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-                <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
             <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
@@ -351,7 +351,7 @@
               </div>
               <el-input v-else-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
               <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </td>
           </tr>
         </template>
@@ -711,7 +711,7 @@
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
-                  <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+                  <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
@@ -746,7 +746,7 @@
                 />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-                <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
             </template>
           </tr>
@@ -797,7 +797,7 @@
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
                 </template>
-                <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </tr>
@@ -808,13 +808,13 @@
             <td class="rs-td rs-label">{{ tt(row.label) }}</td>
             <td class="rs-td" :colspan="row.label2 ? 2 : 5">
               <el-input v-if="editable" v-model="head[row.key]" size="small" :maxlength="row.max || 500" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </td>
             <template v-if="row.label2">
               <td class="rs-td rs-label">{{ tt(row.label2) }}</td>
               <td class="rs-td" colspan="2">
                 <el-input v-if="editable" v-model="head[row.key2]" size="small" :maxlength="row.max2 || 500" class="rs-t-in" @input="emit('dirty')" />
-                <span v-else class="rs-txt">{{ head[row.key2] || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[row.key2] || ''" :field-key="String(row.key2 || '')" />
               </td>
             </template>
           </tr>
@@ -826,7 +826,7 @@
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
                 <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-                <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
             <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
@@ -839,7 +839,7 @@
               </div>
               <el-input v-else-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
               <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </td>
           </tr>
         </template>
@@ -934,7 +934,7 @@
           <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
             <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
             <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
+            <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
           </td>
         </tr>
       </tbody>
@@ -1241,6 +1241,8 @@ import { sumKeepScale } from '@/core/panel/sumTotals'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
+// 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
+import AnnotatedText from './AnnotatedText.vue'
 import StdLibManager from './StdLibManager.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
 // 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言

@@ -3214,3 +3214,12 @@ migrate-rd-prod-info-od-before-id-20261016.sql
 #           ② 登记 yj_field(data_type='附件', place='header', seq=167 紧跟备注 165, width=220, visible=1)。
 #   译名 N'附件1' 十语言已存在,无需新增。幂等;两账套均执行。
 migrate-rd-approval-attach-20261016.sql
+# migrate-doc-annotation-20261016.sql — 新建 yj_doc_annotation(单据纸面文字标注:标注笔/橡皮擦)。
+#   用户口径:「研发管理面板侧栏文档输出下加标注笔,选择填写内容标色加粗,颜色用色盘,
+#   标注后的字体打印出对应颜色;标注笔下加橡皮擦,可擦掉标注过的字的标注效果」。
+#   一条标注 = 某字段原文的一段字符区间 [start_pos,end_pos)(0 基,左闭右开) + 颜色 #RRGGBB + bold;
+#   同字段多段共存,写入时先软删相交旧段(后写覆盖先写);field_key 存 yj_field.label。
+#   分表理由:一段标注存不下一个列、且业务表列是金蝶同步/导出的读写面,塞标记会污染口径。
+#   建表 + 13 列 + (panel_code,doc_no) 索引 + 表/列中文注明;已登记 tools/db-inuse-tables.txt(yj_* 25→26)。
+#   幂等(建表/索引/注明各自判空);末尾自检表与关键列齐备否则 RAISERROR。两账套均执行。
+migrate-doc-annotation-20261016.sql
