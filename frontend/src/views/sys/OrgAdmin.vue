@@ -70,7 +70,7 @@
         <span class="col-title">{{ tt('角色与面板权限') }}</span>
         <el-button type="primary" size="small" @click="newRoleVisible = true">{{ tt('创建角色') }}</el-button>
       </div>
-      <el-table :data="roles" size="small" border height="200" highlight-current-row @current-change="onRoleSelect">
+      <el-table ref="roleTableRef" :data="roles" size="small" border height="200" highlight-current-row @current-change="onRoleSelect">
         <el-table-column prop="roleName" :label="tt('角色名称')" min-width="110" />
         <el-table-column prop="roleCode" :label="tt('编码')" width="100" />
         <el-table-column :label="tt('类型')" width="64" align="center">
@@ -88,6 +88,10 @@
 
       <div v-if="selRole" class="perm-box">
         <div class="perm-head">
+          <!-- 返回:退出权限配置态、回到三列布局(2026-10-15 用户报「变成上下模式退不回去,只能退出网页再进来」)。
+               必须**同时清掉角色表的 currentRow** —— el-table 的 current-change 对"再点同一行"不触发,
+               只清 selRole 的话,返回后点原来那个角色**再也打不开**了。 -->
+          <el-button size="small" link type="primary" class="perm-back" @click="closeRolePerms">← {{ tt('返回') }}</el-button>
           「{{ selRole.roleName }}」{{ tt('面板操作权限') }}
           <span class="perm-sub">{{ tt('（勾选对应操作权限;可见=能看到面板,其余为操作级别）') }}</span>
           <span class="perm-copy">
@@ -786,6 +790,8 @@ async function copyRolePerms() {
   }
 }
 const selRole = ref(null)
+/** 角色表实例:返回时要一并清 currentRow(否则同一个角色点不开第二次) */
+const roleTableRef = ref(null)
 const panelRows = ref([])
 const saving = ref(false)
 const savingUser = ref(false)
@@ -1009,6 +1015,17 @@ async function delRole(row) {
 async function onRoleSelect(row) {
   selRole.value = row
   if (row && !row.isAdmin) await loadRolePanels(row)
+}
+
+/**
+ * 退出权限配置态 → 回到最初的三列布局。
+ * ⚠ 必须连 `setCurrentRow(null)` 一起做:el-table 的 `current-change` 只在"当前行发生变化"时触发,
+ *   若只清 selRole 而表格仍把该行当作 current,用户返回后**再点同一个角色不会再触发**,
+ *   表现为"这个角色的权限再也打不开了"(比退不回去更难查)。
+ */
+function closeRolePerms() {
+  selRole.value = null
+  roleTableRef.value?.setCurrentRow?.(null)
 }
 
 async function loadRolePanels(row) {
