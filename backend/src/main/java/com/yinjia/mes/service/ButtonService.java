@@ -165,11 +165,12 @@ public class ButtonService {
             case "台账联动选项" -> ledgerRefOptions(def, formData);
             // 库存报表「重算成本」:全量重算移动加权成本物化表(审核钩子之外的兜底,如同步/导入旁路写入)
             case "重算成本" -> recalcInvCost(def);
-            // 库存明细「库存月结」(2026-10-15):上月月结 / 取消上月月结 / 重新月结
+            // 库存明细「库存月结」(2026-10-15):上月月结 / 取消月结 —— 两个按钮**并排放在工具栏上**
+            //   (不在「更多」里,见 PanelConfigService.flatButtonGroups);「重新月结」按用户口径已撤掉按钮,
+            //   引擎里仍保留 reclose(运维补做走 /api/stock/monthClose/run)。
             //   口径与边界见 StockMonthCloseService 类注释(结转行写进 inh 但**不进**累计视图;kucun 幂等重算)
             case "上月月结" -> monthClose(def, "close", buttonParam);
-            case "取消上月月结" -> monthClose(def, "cancel", buttonParam);
-            case "重新月结" -> monthClose(def, "reclose", buttonParam);
+            case "取消月结", "取消上月月结" -> monthClose(def, "cancel", buttonParam);
             // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
             case "生成产品批号" -> genProductLot(def, formData);
             // 项目实施计划:阶段完成按钮(填写实际完成时间)
@@ -5790,24 +5791,30 @@ public class ButtonService {
     private static final List<String> MONTH_CLOSE_PANELS = List.of("STOCK_DETAIL");
 
     /**
-     * 库存月结三按钮:期间缺省 = **上月**(与按钮名一致),可用 {@code buttonParam.period} 指定任意期间
-     * (补做历史月/核对用)。三个动作都幂等:月结重复点会提示先取消或重新月结;取消/重新月结可反复点。
-     * 写库口径(结转行、kucun 幂等重算、边界)全部在 {@link StockMonthCloseService} 类注释里。
+     * 库存月结两按钮(库存明细面板)。
+     *
+     * <p>期间口径(用户 2026-10-15):
+     * <ul>
+     *   <li><b>上月月结</b> —— 期间恒为**上月**(完整月);服务端还会再校验一次,本月/历史月都不给结;</li>
+     *   <li><b>取消月结</b> —— 不带参数,服务端取**最近一次已月结的期间**去取消(正常就是上月),
+     *       避免按钮名里出现"上月"却点到别的期间。</li>
+     * </ul>
      */
     private Map<String, Object> monthClose(PanelRegistry.PanelDef def, String mode, Map<String, Object> buttonParam) {
         if (!MONTH_CLOSE_PANELS.contains(def.code())) throw new IllegalStateException("该面板不支持库存月结");
-        Object raw = buttonParam == null ? null : buttonParam.get("period");
-        String period = raw == null || String.valueOf(raw).isBlank()
-                ? StockMonthCloseService.prevPeriod(java.time.LocalDate.now())
-                : StockMonthCloseService.normPeriod(String.valueOf(raw));
         String user = currentUserName();
-        Map<String, Object> res = switch (mode) {
-            case "close" -> monthCloseService.close(period, user);
-            case "cancel" -> monthCloseService.cancel(period, user);
-            default -> monthCloseService.reclose(period, user);
-        };
+        Map<String, Object> res;
+        if ("cancel".equals(mode)) {
+            res = monthCloseService.cancel(null, user);          // 取消:服务端解析「最近已月结期间」
+        } else {
+            Object raw = buttonParam == null ? null : buttonParam.get("period");
+            String period = raw == null || String.valueOf(raw).isBlank()
+                    ? StockMonthCloseService.prevPeriod(java.time.LocalDate.now())
+                    : StockMonthCloseService.normPeriod(String.valueOf(raw));
+            res = monthCloseService.close(period, user);
+        }
         Map<String, Object> out = new LinkedHashMap<>(res);
-        out.put("动作", switch (mode) { case "close" -> "上月月结"; case "cancel" -> "取消上月月结"; default -> "重新月结"; });
+        out.put("动作", "cancel".equals(mode) ? "取消月结" : "上月月结");
         return out;
     }
 }

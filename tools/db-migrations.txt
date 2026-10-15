@@ -3174,3 +3174,8 @@ migrate-stock-detail-panel.sql
 #     migrate-stock-movement-from-flow-2026-09-30.sql 同步改(历史脚本重放会盖回定义,2026-10-05 已踩过)。
 #   自检:两表 + 主键/审计四件套/表级注明 + 视图定义里含排除条件(先剥行注释再比)。幂等;两账套均执行。
 migrate-stock-month-close.sql
+# migrate-stock-detail-drop-price.sql — 库存明细面板摘掉「结存单价」列(用户 2026-10-15:「不用显示结存单价」)
+#   kucun.price 只有 277/2281 行有值(期初导入 2004 行全空)⇒ 列在界面上基本是空白,还误导。
+#   只删 yj_field 的登记行,不动 kucun 物理列;面板脚本同批改为不再注册该列(防重跑复活);译名保留(标签全局共享)。
+#   自检:该列不存在 + 面板仍 7 列 + 其余 7 个 col_name 齐备。幂等;两账套均执行。
+migrate-stock-detail-drop-price.sql

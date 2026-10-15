@@ -3,7 +3,7 @@
  * 【用户口径 2026-10-15】
  *   ① 「我要用这个 KUCUN 表做库存报表下的库存明细」⇒ 面板 `line_table = kucun`,**不建视图、不 join 档案**
  *      (与休眠的 `STOCK_STATUS`「库存状况」同一形态;另三张报表读的是 `v_stock_*` 视图)。
- *   ② 「现存量 + 累计入库/累计出库(照原样显示)」⇒ 列 = 存货编码·仓库·批号·累计入库量·累计出库量·现存量·结存单价·更新时间。
+ *   ② 「现存量 + 累计入库/累计出库(照原样显示)」⇒ 列 = 存货编码·仓库·批号·累计入库量·累计出库量·现存量·更新时间。
  *
  * 【为什么库存现状以 kucun 为准(实测 2026-10-15,详见 tools/archive/_kucun-stock-detail/)】
  *   · 2026-10-14 的金蝶期初导入(2004 行,`asp_user1='期初导入'`)**只写进 kucun、没写流水** ——
@@ -27,6 +27,7 @@
  *     2004 行「期初导入」带的是**金蝶累计值**,与 yl 不平(1888/2281 行不满足 yl = rkl − ckl)
  *     ⇒ 按用户口径照原样显示,**不换算、不隐藏**;读表人须知道这两列对期初行不是同一把尺子。
  *   · `price` 结存单价 = 最近一次入库的**单据单价**(出库不回填、期初导入行为 NULL;仅 277/2281 行有值);
+ *     ⚠ 2026-10-15 用户口径「不用显示结存单价」⇒ 本面板**不再注册这一列**(见 migrate-stock-detail-drop-price.sql);
  *   · 金额列**不做**:`kucun.total_je` 全表为 0(遗留零引用列),要金额只能 `单价 × 现存量`,口径另议。
  *   · 粒度 = (物料编码 wzdm, 仓库编码 ckdm, 批号 lot_no):仓库编码 100% 命中 `bs_wh`;
  *     物料编码 2268/2281 命中 `bs_inv`(13 行悬空,属源数据,本面板不掩盖)。
@@ -68,7 +69,7 @@ BEGIN
 END
 GO
 
-/* ═══ ② 字段(8 列;col_name 必须是 kucun 的真实列,否则取数 SQL 直接报「列名无效」) ═══ */
+/* ═══ ② 字段(7 列;col_name 必须是 kucun 的真实列,否则取数 SQL 直接报「列名无效」) ═══ */
 DECLARE @f TABLE (col_name sysname, label nvarchar(50), data_type nvarchar(20), ref_panel varchar(40),
                   ref_field nvarchar(128) NULL, display_field nvarchar(128) NULL, place varchar(40), seq int, width int);
 INSERT INTO @f VALUES
@@ -78,7 +79,6 @@ INSERT INTO @f VALUES
   ('rkl',         N'累计入库量', N'小数',   NULL,  NULL,       NULL,       'detail',       40, 100),
   ('ckl',         N'累计出库量', N'小数',   NULL,  NULL,       NULL,       'detail',       50, 100),
   ('yl',          N'现存量',     N'小数',   NULL,  NULL,       NULL,       'detail',       60, 100),
-  ('price',       N'结存单价',   N'小数',   NULL,  NULL,       NULL,       'detail',       70, 100),
   ('update_date', N'更新时间',   N'日期时间', NULL, NULL,       NULL,       'detail',       80, 150);
 
 INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq, width,
@@ -95,7 +95,7 @@ FROM yj_field j JOIN @f f ON f.col_name = j.col_name
 WHERE j.panel_code = 'STOCK_DETAIL';
 
 DECLARE @nf int = (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'STOCK_DETAIL');
-PRINT N'[字段] STOCK_DETAIL 字段行 = ' + CAST(@nf AS nvarchar(10)) + N'(应 8)';
+PRINT N'[字段] STOCK_DETAIL 字段行 = ' + CAST(@nf AS nvarchar(10)) + N'(应 7)';
 GO
 
 /* ═══ ③ 授权:三张库存报表授给全部角色(view,query,export,print),本面板照抄 ═══ */
@@ -178,21 +178,21 @@ IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'STOCK_DETAIL' AND mode
   SET @bad = @bad + 1;
 -- ② 字段 8 行,且 col_name 都必须是 kucun 的真实列(否则取数 SQL 报「列名无效」)
 DECLARE @n int = (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'STOCK_DETAIL');
-IF @n <> 8 SET @bad = @bad + 1;
+IF @n <> 7 SET @bad = @bad + 1;
 IF EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = 'STOCK_DETAIL'
              AND NOT EXISTS (SELECT 1 FROM sys.columns c
                              WHERE c.object_id = OBJECT_ID(N'dbo.kucun') AND c.name = f.col_name))
   SET @bad = @bad + 1;
 -- ③ 查询区/明细列齐备(存货编码·仓库·批号 进查询区;5 个数值/日期列进明细)
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'STOCK_DETAIL' AND place LIKE '%query%') <> 3 SET @bad = @bad + 1;
-IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'STOCK_DETAIL' AND place LIKE '%detail%') <> 8 SET @bad = @bad + 1;
+IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'STOCK_DETAIL' AND place LIKE '%detail%') <> 7 SET @bad = @bad + 1;
 -- ④ 授权:每个角色一行
 IF (SELECT COUNT(*) FROM yj_role_panel WHERE panel_code = 'STOCK_DETAIL') <> (SELECT COUNT(*) FROM yj_role)
   SET @bad = @bad + 1;
 -- ⑤ 译名:面板名 + 8 个标签,各 ≥10 语言
 IF (SELECT COUNT(*) FROM yj_translation WHERE scope = 'panel' AND ref_key = N'库存明细') < 10 SET @bad = @bad + 1;
 IF EXISTS (SELECT 1 FROM (VALUES (N'存货编码'),(N'仓库'),(N'批号'),(N'累计入库量'),(N'累计出库量'),
-                                (N'现存量'),(N'结存单价'),(N'更新时间')) AS l(lab)
+                                (N'现存量'),(N'更新时间')) AS l(lab)
            WHERE (SELECT COUNT(*) FROM yj_translation t WHERE t.scope = 'field' AND t.ref_key = l.lab) < 10)
   SET @bad = @bad + 1;
 
@@ -200,10 +200,10 @@ DECLARE @dbn sysname = DB_NAME();
 DECLARE @rows int = (SELECT COUNT(*) FROM kucun);
 DECLARE @nrole int = (SELECT COUNT(*) FROM yj_role);
 DECLARE @ngrant int = (SELECT COUNT(*) FROM yj_role_panel WHERE panel_code = 'STOCK_DETAIL');
-RAISERROR(N'[自检] %s:STOCK_DETAIL 字段 %d 行(应 8)/授权 %d 行(应 %d)/kucun 源表 %d 行;不符项 %d 条',
+RAISERROR(N'[自检] %s:STOCK_DETAIL 字段 %d 行(应 7)/授权 %d 行(应 %d)/kucun 源表 %d 行;不符项 %d 条',
           10, 1, @dbn, @n, @ngrant, @nrole, @rows, @bad);
 IF @bad = 0
-  RAISERROR(N'[OK] 库存明细面板(STOCK_DETAIL)已就位:flat 直读 kucun + 8 列 + 角色授权 + 10 语言译名', 10, 1);
+  RAISERROR(N'[OK] 库存明细面板(STOCK_DETAIL)已就位:flat 直读 kucun + 7 列 + 角色授权 + 10 语言译名', 10, 1);
 ELSE
   RAISERROR(N'[FAIL] STOCK_DETAIL 自检未过(见上一行数字)', 16, 1);
 GO

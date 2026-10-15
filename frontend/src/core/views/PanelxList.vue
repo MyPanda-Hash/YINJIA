@@ -498,9 +498,9 @@
       </div>
       <!-- 分仓库选择(2026-10-15,库存明细):与采购入库单「选单」弹窗同款的勾选列表,只是数据源 = 仓库档案,
            勾选后按编码多选过滤主表(condition._whCodes,后端走 IN)。浮层定位,不改表格结构。 -->
-      <aside v-if="isStockDetail" class="wh-dock">
+      <aside v-if="isStockDetail" class="wh-dock" :style="{ top: (mcNotice ? 96 : 52) + 'px' }">
+        <!-- 浮层定位:标题条与(可能的)提示条都占位在表格上方,故 top 随提示条是否出现而变(52 / 96) -->
         <div class="wh-dock-head">{{ tt('分仓库') }}</div>
-        <el-input v-model="whDockSearch" size="small" clearable :placeholder="tt('查找仓库')" :prefix-icon="Search" />
         <div class="wh-dock-meta">{{ tt('共有数据') }}:{{ whDockRows.length }} {{ tt('条') }}</div>
         <div class="wh-dock-list">
           <el-checkbox
@@ -515,10 +515,17 @@
             <span class="wh-dock-code">{{ w.code }}</span>
           </el-checkbox>
         </div>
+        <!-- 用户 2026-10-15:不要搜索框,只要一个「查询」按钮(勾完仓再点它过滤) -->
         <div class="wh-dock-actions">
           <el-button size="small" text @click="clearWhDock">{{ tt('全不选') }}</el-button>
+          <el-button size="small" type="primary" :icon="Search" @click="applyWhDock">{{ tt('查询') }}</el-button>
         </div>
       </aside>
+      <!-- 顶部常驻提示(用户口径:取消月结后要一直有一串「还没上月月结」的提示) -->
+      <div v-if="isStockDetail && mcNotice" class="mc-notice">
+        <el-icon><WarningFilled /></el-icon>
+        <span>{{ tt(mcNotice) }}</span>
+      </div>
       <el-table
         class="report-table"
         :data="reportList"
@@ -533,58 +540,35 @@
         @expand-change="onMcExpand"
       >
         <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
-        <!-- 库存月结明细(2026-10-15):展开该 (物料,仓库,批号) 在「上月」的入库/出库/结转行 + 月结快照 -->
+        <!-- 库存月结明细(2026-10-15):展开该 (物料,仓库,批号) 在「上月」的全部单据 —— **一张表**,
+             不按 入库/出库/结转 分组(用户口径:看「单据类型」就行);月结结转行显示成「2026-09月结」;
+             数量带方向(入库正/出库负)⇒ 整串单据的合计就是该月净变动 -->
         <el-table-column v-if="isStockDetail" type="expand" width="46">
           <template #default="{ row }">
             <div class="mc-detail">
               <div v-if="!mcDetail[row.id]" class="mc-detail-loading">{{ tt('展开加载中') }}…</div>
               <template v-else>
                 <div class="mc-detail-title">
-                  {{ tt('库存月结明细') }} ·
-                  {{ mcDetail[row.id]['期间'] }}
+                  {{ tt('单据明细') }} · {{ mcDetail[row.id]['期间'] }}
                   {{ tt('期间状态') }}:{{ mcDetail[row.id]['期间状态'] }}
                 </div>
                 <div v-if="mcDetail[row.id]['月结快照']" class="mc-detail-snap">
-                  <span v-for="(v, k) in mcDetail[row.id]['月结快照']" :key="k" class="mc-snap-item">
-                    <b>{{ tt(String(k)) }}</b>{{ v ?? '—' }}
-                  </span>
+                  <span class="mc-snap-item"><b>{{ tt('期初数量') }}</b>{{ mcDetail[row.id]['月结快照']['期初数量'] ?? '—' }}</span>
+                  <span class="mc-snap-item"><b>{{ tt('入库数量') }}</b>{{ mcDetail[row.id]['月结快照']['入库数量'] ?? '—' }}</span>
+                  <span class="mc-snap-item"><b>{{ tt('出库数量') }}</b>{{ mcDetail[row.id]['月结快照']['出库数量'] ?? '—' }}</span>
+                  <span class="mc-snap-item"><b>{{ tt('结存数量') }}</b>{{ mcDetail[row.id]['月结快照']['结存数量'] ?? '—' }}</span>
+                  <span class="mc-snap-item"><b>{{ tt('最晚出库日期') }}</b>{{ mcDetail[row.id]['月结快照']['最晚出库日期'] ?? '—' }}</span>
                 </div>
-                <div v-else class="mc-detail-snap mc-dim">{{ tt('该期间尚未月结') }}</div>
-                <div class="mc-detail-tables">
-                  <div class="mc-detail-block">
-                    <div class="mc-detail-block-title">{{ tt('本月入库') }}({{ (mcDetail[row.id]['入库明细'] || []).length }})</div>
-                    <el-table :data="mcDetail[row.id]['入库明细'] || []" size="small" border max-height="240">
-                      <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
-                      <el-table-column prop="单据类型" :label="tt('单据类型')" width="120" />
-                      <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="150" />
-                      <el-table-column prop="数量" :label="tt('数量')" width="100" align="right" />
-                      <el-table-column prop="单价" :label="tt('单价')" width="90" align="right" />
-                      <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="140" />
-                    </el-table>
-                  </div>
-                  <div class="mc-detail-block">
-                    <div class="mc-detail-block-title">{{ tt('本月出库') }}({{ (mcDetail[row.id]['出库明细'] || []).length }})</div>
-                    <el-table :data="mcDetail[row.id]['出库明细'] || []" size="small" border max-height="240">
-                      <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
-                      <el-table-column prop="单据类型" :label="tt('单据类型')" width="120" />
-                      <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="150" />
-                      <el-table-column prop="数量" :label="tt('数量')" width="100" align="right" />
-                      <el-table-column prop="成本单价" :label="tt('成本单价')" width="90" align="right" />
-                      <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="140" />
-                    </el-table>
-                  </div>
-                  <div class="mc-detail-block">
-                    <div class="mc-detail-block-title">
-                      {{ tt('结转行') }}({{ (mcDetail[row.id]['结转行'] || []).length }})
-                    </div>
-                    <el-table :data="mcDetail[row.id]['结转行'] || []" size="small" border max-height="240">
-                      <el-table-column prop="单据编号" :label="tt('单据编号')" width="150" />
-                      <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
-                      <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
-                      <el-table-column prop="单价" :label="tt('单价')" width="90" align="right" />
-                    </el-table>
-                  </div>
-                </div>
+                <div v-else class="mc-detail-snap mc-dim">{{ tt('该期间尚未月结,以下为期间内单据') }}</div>
+                <el-table :data="mcDetail[row.id]['单据明细'] || []" size="small" border max-height="340" show-summary>
+                  <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+                  <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
+                  <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
+                  <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
+                  <el-table-column prop="单价" :label="tt('单价')" width="90" align="right" />
+                  <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
+                  <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
+                </el-table>
               </template>
             </div>
           </template>
@@ -1975,7 +1959,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Plus, Search } from '@element-plus/icons-vue'
+import { Filter, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
@@ -2743,8 +2727,8 @@ function onStockWhChange(v) {
 
 // ---------- 库存明细:分仓库选择(与采购入库单「选单」弹窗同款的勾选列表,数据源 = 仓库档案 bs_wh)----------
 // 勾选结果走 condition._whCodes(逗号分隔编码),后端 QueryService 按编码 IN 过滤(不比名称:名称会重名/改名)。
+// 用户 2026-10-15:「搜索框不需要,只要有查询按钮就行」⇒ 没有关键字过滤,勾完点「查询」生效。
 const isStockDetail = computed(() => String(panelCode.value) === 'STOCK_DETAIL')
-const whDockSearch = ref('')
 const whDockChecked = ref([])
 watch(isStockDetail, async (v) => {
   if (!v) { whDockChecked.value = []; return }
@@ -2754,26 +2738,35 @@ watch(isStockDetail, async (v) => {
     warehouseOptions.value = res?.data || []
   } catch { warehouseOptions.value = [] }
 }, { immediate: true })
-const whDockRows = computed(() => {
-  const kw = String(whDockSearch.value || '').trim().toLowerCase()
-  const all = warehouseOptions.value || []
-  if (!kw) return all
-  return all.filter((w) => String(w.name || '').toLowerCase().includes(kw)
-    || String(w.code || '').toLowerCase().includes(kw))
-})
+const whDockRows = computed(() => warehouseOptions.value || [])
 function toggleWhDock(code, checked) {
   const set = new Set(whDockChecked.value.filter(Boolean))
   if (checked) set.add(code); else set.delete(code)
   whDockChecked.value = [...set]
+}
+function clearWhDock() {
+  whDockChecked.value = []
   applyWhDock()
 }
-function clearWhDock() { whDockChecked.value = []; applyWhDock() }
+/** 「查询」按钮:按勾选的仓库过滤主表(一个都没勾 = 取消过滤) */
 function applyWhDock() {
   const codes = whDockChecked.value.filter(Boolean)
   if (codes.length) condition['_whCodes'] = codes.join(',')
   else delete condition['_whCodes']
   search()
 }
+
+// ---------- 库存明细:顶部常驻提示(上月未月结/已取消时一直显示)----------
+const mcStatus = ref(null)
+const mcNotice = computed(() => (isStockDetail.value ? (mcStatus.value?.['提示'] || '') : ''))
+async function loadMcStatus() {
+  if (!isStockDetail.value) return
+  try {
+    const res = await request.get('/stock/monthClose/status')
+    mcStatus.value = res?.data || null
+  } catch { mcStatus.value = null }
+}
+watch(isStockDetail, (v) => { if (v) loadMcStatus() }, { immediate: true })
 
 // ---------- 库存明细:行展开 → 该 (物料,仓库,批号) 的月结明细(快照 + 本月入库/出库 + 结转行)----------
 const mcDetail = ref({})
@@ -2787,6 +2780,10 @@ async function onMcExpand(row, expanded) {
   try {
     const res = await request.get('/stock/monthClose/detail', {
       params: {
+        // 展开看**当前月**的单据(用户 2026-10-15 口径):
+        //   月结后,当月列表里就会带着「2026-09月结」这样的结转单据(它就是当月期初);
+        //   当月还没月结时,列出的就是当月正常单据。
+        period: mcStatus.value?.['当前期间'] || '',
         wzdm: row['存货编码'] ?? '',
         ckdm: row['仓库'] ?? '',
         lot: row['批号'] ?? '',
@@ -7043,15 +7040,15 @@ async function onButton(action) {
     search()
     return
   }
-  // 库存明细「库存月结」三按钮(2026-10-15):上月月结 / 取消上月月结 / 重新月结
-  //   期间缺省 = 上月(后端 StockMonthCloseService.prevPeriod);结果里带回键数/结转行数/入出结存合计。
-  //   ⚠ 口径:结转行写进 inh 但**不进**累计视图(三张报表/成本口径不变);kucun 是幂等重算(不是累加)。
-  if (action === '上月月结' || action === '取消上月月结' || action === '重新月结') {
-    const needConfirm = action !== '上月月结'
-    if (needConfirm) {
+  // 库存明细「库存月结」两按钮(2026-10-15 用户口径):上月月结 / 取消月结
+  //   · 只有这两个(「重新月结」按钮已按要求撤掉;引擎里仍保留 reclose,运维走 /api/stock/monthClose/run);
+  //   · 期间:上月月结恒为**上月**(服务端再校验);取消月结不带参数,服务端取「最近一次已月结期间」;
+  //   · 口径:结转行写进 inh 但**不进**累计视图(三张报表/成本口径不变);kucun 是幂等重算(不是累加)。
+  if (action === '上月月结' || action === '取消月结' || action === '取消上月月结') {
+    if (action !== '上月月结') {
       try {
         await ElMessageBox.confirm(
-          `${tt(action)}${tt('会重算结转行与库存余量,确定继续吗?')}`,
+          `${tt(action)}${tt('会删除该期间的结转行,确定继续吗?')}`,
           tt(action), { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
         )
       } catch { return }
@@ -7062,21 +7059,18 @@ async function onButton(action) {
         panelCode: panelCode.value, buttonName: action, formData: {}, buttonParam: {},
       })
       loading.close()
-      const d = res?.['月结'] || res || {}
-      if (d['取消'] && d['取消']['期间']) {
-        // 重新月结:先取消再月结,提示两段
-        ElMessage.success(`${tt('重新月结')}${tt('完成')}:${d['取消']['期间']} → ${d['月结']?.['结转单据编号'] ?? ''}`)
-      } else {
-        ElMessage.success(
-          `${tt(d['动作'] || action)}${tt('完成')}(${tt('期间')} ${d['期间'] ?? '-'} · ${tt('键数')} ${d['键数'] ?? '-'} · `
-          + `${tt('结转行')} ${d['结转行数'] ?? '-'} · ${tt('结存')} ${d['结存合计'] ?? '-'})`,
-        )
-      }
+      const d = res || {}
+      ElMessage.success(
+        `${tt(d['动作'] || action)}${tt('完成')}(${tt('期间')} ${d['期间'] ?? '-'} · ${tt('键数')} ${d['键数'] ?? '-'} · `
+        + `${tt('结转行')} ${d['结转行数'] ?? d['删除结转行'] ?? '-'} · ${tt('结存')} ${d['结存合计'] ?? '-'})`,
+      )
       await load()
-      mcDetail.value = {}   // 月结/取消/重新月结都会改结转行与余量 ⇒ 丢掉展开明细缓存
+      mcDetail.value = {}   // 月结/取消月结都会改结转行与余量 ⇒ 丢掉展开明细缓存
+      await loadMcStatus()  // 顶部提示随月结状态变(取消后要一直显示「还没上月月结」)
     } catch (e) {
       loading.close()
       ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))
+      await loadMcStatus()
     }
     return
   }
@@ -8961,8 +8955,15 @@ onUnmounted(() => {
 .wh-dock-item { height: 26px; margin-right: 0; }
 .wh-dock-name { font-size: 13px; }
 .wh-dock-code { margin-left: 6px; color: #94a3b8; font-size: 11px; }
-.wh-dock-actions { display: flex; justify-content: flex-end; }
-/* ── 月结明细展开区 ── */
+.wh-dock-actions { display: flex; justify-content: flex-end; gap: 6px; }
+/* ── 顶部常驻提示(上月未月结 / 已取消) ── */
+.mc-notice {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 4px 6px; padding: 6px 10px;
+  border: 1px solid #fde68a; border-radius: 6px;
+  background: #fffbeb; color: #92400e; font-size: 13px;
+}
+/* ── 月结明细展开区(一张表:单据类型区分,不再分入库/出库/结转) ── */
 .mc-detail { padding: 6px 10px 10px 46px; background: #fbfcfe; }
 .mc-detail-loading { color: #94a3b8; font-size: 12px; padding: 6px 0; }
 .mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }

@@ -277,6 +277,12 @@ public class PanelConfigService {
         if (flat) {
             // 报表(明细/统计表)统一:查询|查询,刷新 + 打印|打印,预览,导出 + 更多|发送邮件,表格调整,退出
             buttonGroups.add(group("查询", List.of("查询", "刷新")));
+            // 库存明细的月结按钮(2026-10-15 用户口径「放出来,不要在更多里面」):
+            // **一个动作一个组** —— 前端按组渲染,单动作组就是一颗可见按钮;塞进「更多」会变成下拉项。
+            if (MONTH_CLOSE_PANELS.contains(def.code())) {
+                buttonGroups.add(group("上月月结", List.of("上月月结")));
+                buttonGroups.add(group("取消月结", List.of("取消月结")));
+            }
             buttonGroups.add(group("打印", List.of("打印", "预览", "导出")));
             // 库存三报表的金额列读 inv_cost_ledger(移动加权成本),口径=物化值,需可手工重算:
             // 审核钩子覆盖走 ButtonService 的审核,但金蝶同步等旁路写入不经过审核动作。
@@ -798,22 +804,16 @@ public class PanelConfigService {
      * 平表面板「更多」组的动作清单。
      *
      * <p>为什么抽成一个方法:这组按钮是**按面板能力**拼的,而且「表格调整/表头调整」的相对位置有讲究
-     * ({@code 表头调整} 是按 {@code 表格调整} 的位置注入的,不能打乱)。月结三按钮插在「发送邮件」之后、
-     * 「表格调整」之前(2026-10-15):
-     * <ul>
-     *   <li>库存三报表(STOCK_LEDGER/SUMMARY/BALANCE)→ 重算成本(读 inv_cost_ledger);</li>
-     *   <li>库存明细(STOCK_DETAIL)→ 上月月结 / 取消上月月结 / 重新月结(读 kucun + 写 inh 结转单)。</li>
-     * </ul>
+     * ({@code 表头调整} 是按 {@code 表格调整} 的位置注入的,不能打乱)。
+     *
+     * <p>⚠ 月结两个按钮**不在这里**(用户 2026-10-15:「放出来,不要在更多里面」)——
+     * 它们在 {@link #buildDocConfig} 的 flat 分支里各自成组,渲染成工具栏上的可见按钮。
+     * 这里只剩:库存三报表(STOCK_LEDGER/SUMMARY/BALANCE)→ 重算成本(读 inv_cost_ledger)。
      */
     private static List<String> flatMoreActions(String panelCode) {
         List<String> out = new java.util.ArrayList<>();
         out.add("发送邮件");
         if (INV_COST_PANELS.contains(panelCode)) out.add("重算成本");
-        if (MONTH_CLOSE_PANELS.contains(panelCode)) {
-            out.add("上月月结");
-            out.add("取消上月月结");
-            out.add("重新月结");
-        }
         out.add("表格调整");
         out.add("退出");
         return out;
