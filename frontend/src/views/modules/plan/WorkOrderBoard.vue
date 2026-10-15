@@ -10,6 +10,10 @@
       <span class="wb-p">{{ tt('开工日期') }}
         <el-date-picker v-model="day" type="date" value-format="YYYY-MM-DD" style="width: 135px" @change="loadAll" />
       </span>
+      <!-- 刷新(2026-10-17 用户口径):本页此前只有切开工日期才会重新取数,而左侧骨架/明细/汇总
+           都依赖别处(快速排产排入、生产工单结案、报工)的写入 —— 加一个手动刷新按钮,
+           一次重取 骨架+按线明细+汇总条 三处(与快速排产页「刷新」同口径,只读查看,归「可见」动作)。 -->
+      <el-button size="small" :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
       <span class="wb-stats">
         {{ tt('待排产') }}（{{ s['待排产笔数'] ?? 0 }}{{ tt('笔') }}）；{{ tt('今日排产') }}（{{ s['今日排产']?.张数 ?? 0 }}{{ tt('张') }}/{{ num(s['今日排产']?.数量) }}{{ tt('件') }}）；{{ tt('总未完成量') }} {{ num(s['总未完成量']) }}
       </span>
@@ -190,6 +194,8 @@ const scope = ref('未完工')
 const schedRows = ref([])
 const checkedSched = ref([])
 const s = ref({})
+/** 刷新按钮 loading(2026-10-17):loadAll 期间置真,避免连点 */
+const loading = ref(false)
 
 const raVisible = ref(false)
 const raLine = ref('')
@@ -261,7 +267,12 @@ async function loadStats() {
   } catch { /* 统计失败不阻断 */ }
 }
 
-function loadAll() { loadSummary(); loadScheduled(); loadStats() }
+function loadAll() {
+  // 刷新按钮的 loading(2026-10-17):三个请求各自内部吞异常(不阻断其余取数),
+  // 故 Promise.all 只会全部成功 ⇒ finally 收口即可。
+  loading.value = true
+  return Promise.all([loadSummary(), loadScheduled(), loadStats()]).finally(() => { loading.value = false })
+}
 
 function openReassign() {
   if (!checkedSched.value.length) return
