@@ -1,0 +1,54 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-precount.sql ==
+  | yj_panel | 3 | 
+  | yj_field | 118 | 
+  | yj_role_panel | 14 | 
+  | yj_doc_status | 38 | 
+  | form_flow_link(src/tgt) | 5 | 
+  | yj_form_approval | 6 | 
+  | yj_translation(panel名) | 3 | 
+  | yj_translation(字段标签) | 266 | 
+  | PANEL_NAMES | 切炭检验单 | 
+  | PANEL_NAMES | 成品检验规范 | 
+  | PANEL_NAMES | 成型检验单 | 
+  | TOTAL_PANELS | 128 | 
+  | TOTAL_FIELDS | 4132 | 
+  | form_flow_link 列 | id | 
+  | form_flow_link 列 | source_panel_code | 
+  | form_flow_link 列 | source_form_no | 
+  | form_flow_link 列 | source_detail_key | 
+  | form_flow_link 列 | source_line_key | 
+  | form_flow_link 列 | target_panel_code | 
+  | form_flow_link 列 | target_form_no | 
+  | form_flow_link 列 | target_detail_key | 
+  | form_flow_link 列 | target_line_key | 
+  | form_flow_link 列 | inventory_code | 
+  | form_flow_link 列 | source_quantity | 
+  | form_flow_link 列 | linked_quantity | 
+  | form_flow_link 列 | link_status | 
+  | form_flow_link 列 | create_by | 
+  | form_flow_link 列 | create_time | 
+  | form_flow_link 列 | release_time | 
+  | form_flow_link 列 | batch_no | 
+  | form_flow_link 列 | batch_id | 
+  | form_flow_link 列 | 备用1 | 
+  | form_flow_link 列 | 备用2 | 
+  | form_flow_link 列 | 备用3 | 
+  | form_flow_link 列 | 备用4 | 
+  | form_flow_link 列 | 备用5 | 
+  | form_flow_link 列 | 备用6 | 
+  | form_flow_link 列 | 备用7 | 
+  | form_flow_link 列 | 备用8 | 
+  | form_flow_link 列 | 备用9 | 
+  | form_flow_link 列 | 备用10 | 
+  | form_flow_link 列 | 备用11 | 
+  | form_flow_link 列 | 备用12 | 
+  | form_flow_link 列 | 备用13 | 
+  | form_flow_link 列 | 备用14 | 
+  | form_flow_link 列 | 备用15 | 
+  | form_flow_link 列 | 备用16 | 
+  | form_flow_link 列 | 备用17 | 
+  | form_flow_link 列 | 备用18 | 
+  | form_flow_link 列 | 备用19 | 
+  | form_flow_link 列 | 备用20 | 
+[OK] _q-precount.sql (2 batches)

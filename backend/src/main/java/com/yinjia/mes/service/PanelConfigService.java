@@ -448,9 +448,10 @@ public class PanelConfigService {
                 g.put("actions", merged);
             }
         }
-        // 检验项目/检验方案维护(2026-10-09 用户口径):三类工序检验单就地维护检验标准(受控文件的
-        // 项目/标准/方法/取样/处置),入口只下发到 QC_MOLD_INSP / QC_CUT_INSP / QC_ASM_INSP 三张单,
-        // 紧跟「字段管理」之后;真正的写操作由 QcInspPlanController 以 QC_ASM_INSP 可见性把守。
+        // 检验项目/检验方案维护(2026-10-09 用户口径):工序检验单就地维护检验标准(受控文件的
+        // 项目/标准/方法/取样/处置),入口下发到 WO_INSP_PANELS(2026-10-16 起 = 组装成品检验单 +
+        // 制程检验单 + 首件检验单,成型/切炭两张已下架),
+        // 紧跟「字段管理」之后;真正的写操作由 QcInspPlanController 以同一面板集把守。
         // 同日追加「选检验项目」:在单据页把标准里的项目**勾选带入**当前明细(表区=检验项目)——
         // 它排在「检验项目维护」之前(先用、后维护)。
         if (WO_INSP_PANELS.contains(def.code())) {
@@ -1663,20 +1664,22 @@ public class PanelConfigService {
     private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
 
     /**
-     * 三类工序检验单(成型 CX / 切炭 QT / 组装成品 ZJ)—— 工具栏注入「检验项目维护」入口的面板集。
+     * 工序检验单 —— 工具栏注入「检验项目维护」入口的面板集。
      * 2026-10-09 用户口径:「给出一个按钮,让他可以在组装成品检验处对这个检验项目和检验方案进行维护」;
-     * 三张单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故三处都注入(组装单是主入口)。
+     * 各单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故都注入(组装单是主入口)。
+     * 2026-10-16 用户口径「删除成型检验单和切炭检验单」⇒ 这两张已整体下架,从本集移除。
      */
     private static final java.util.Set<String> WO_INSP_PANELS =
-            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
+            java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
 
     /**
      * 「取出货检验计划」(RD_INSP_PLAN)入口下发的面板集 —— **不含首件检验单**:
      * 首件检验的检验要求来自《成型工艺清单》RD_MOLD_PROC(见 {@link #FIRST_INSP_PANEL}),
      * 走「取成型工艺清单」另一个入口;把出货检验计划也挂上去只会让品质点错来源。
+     * 2026-10-16:成型/切炭两张已下架,同步移出本集。
      */
     private static final java.util.Set<String> SHIP_PLAN_PANELS =
-            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP", "QC_PROC_INSP");
+            java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP");
 
     /** 首件检验单(2026-10-15):工具栏注入「取成型工艺清单」入口 */
     private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";
@@ -2020,3 +2023,4 @@ public class PanelConfigService {
         }
     }
 }
+

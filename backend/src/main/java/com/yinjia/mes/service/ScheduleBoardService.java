@@ -31,18 +31,17 @@ public class ScheduleBoardService {
     private final JdbcTemplate jdbc;
 
     /**
-     * 三类工序检验单:面板 → 头表(工单追溯「质检段」用)。
-     * 三组表**同构**(头 27 列 / 行 15 列,建表见 {@code tools/migrate-qc-process-insp.sql}),
-     * 故同一段 SQL 换表名即可全查;出单口径见 {@code ButtonService.WO_INSP_PANEL}(成型/切炭/组装
-     * 报工审核各自动出单,混料/装箱不出单)。取值全部来自本类常量,无拼接注入面。
+     * 工序检验单:面板 → 头表(工单追溯「质检段」用)。
+     * 表**同构**(头/行结构一致,建表见 {@code tools/migrate-qc-process-insp.sql}),
+     * 故同一段 SQL 换表名即可全查;出单口径见 {@code ButtonService.WO_INSP_PANEL}
+     * (报工审核自动出单,混料/装箱不出单)。取值全部来自本类常量,无拼接注入面。
+     * <p>2026-10-16 用户口径「删除当前成型检验单和切炭检验单」⇒ 两张已整体下架,本表只剩组装成品检验单。</p>
      */
     private static final Map<String, String> INSP_HEAD = Map.of(
-            "QC_MOLD_INSP", "qc_mold_insp_head",
-            "QC_CUT_INSP", "qc_cut_insp_head",
             "QC_ASM_INSP", "qc_asm_insp_head");
 
-    /** 应检工序(2026-10-14):成型/切炭/组装 三道 —— 与 {@code ButtonService.WO_INSP_PANEL} 同源 */
-    private static final List<String> INSP_OPS = List.of("成型", "切炭", "组装");
+    /** 应检工序(2026-10-16 收敛):只剩组装 —— 与 {@code ButtonService.WO_INSP_PANEL} 同源 */
+    private static final List<String> INSP_OPS = List.of("组装");
 
     public ScheduleBoardService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -968,8 +967,9 @@ public class ScheduleBoardService {
                     qcArgs.toArray()));
         }
         qc.sort((a, b) -> String.valueOf(a.get("检验单号")).compareTo(String.valueOf(b.get("检验单号"))));
-        // 汇总(「对上」用):应检 = 成型/切炭/组装(与出单口径同源);已检 = 存活检验单上出现的工序;
-        // 缺检 = 应检 − 已检。合格/不合格取各单派生值求和(未检验的合格数为 NULL，Num.of 按 0 计)。
+        // 汇总(「对上」用):应检 = 组装(与出单口径同源;成型/切炭两张检验单 2026-10-16 已下架,
+        // 不再算应检);已检 = 存活检验单上出现的工序;缺检 = 应检 − 已检。
+        // 合格/不合格取各单派生值求和(未检验的合格数为 NULL，Num.of 按 0 计)。
         LinkedHashSet<String> doneOps = new LinkedHashSet<>();
         double passQty = 0, ngQty = 0, inspQty = 0;
         int auditedCnt = 0;

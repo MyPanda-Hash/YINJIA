@@ -160,3 +160,26 @@ test('导航层级同构:一级模块的二级目录一律是"带面板的分组
     }
   }
 })
+
+/**
+ * 2026-10-16 用户口径:「删除当前成型检验单和切炭检验单,以及成品检验规范。」
+ * 走的是**重路线**(与上一批 5 张只摘菜单不同):面板元数据、译名、报工自动出单钩子与物理表
+ * (qc_mold_insp_head/_detail、qc_cut_insp_head/_detail、qc_fin_spec_head/_detail)全部删除,
+ * 见 tools/migrate-drop-qc-mold-cut-finspec-20261016.sql。这里钉住「菜单里不得再有入口」——
+ * 面板都没了,放开注释也恢复不了;要回退得先跑备份里的建表/元数据脚本。
+ */
+test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树里不得再有入口', () => {
+  const all = JSON.stringify(menuTree)
+  for (const p of ['QC_MOLD_INSP', 'QC_CUT_INSP', 'QC_FIN_SPEC']) {
+    assert.ok(!all.includes(`"${p}"`), `菜单树里不应再有 ${p} 入口`)
+  }
+  for (const t of ['成型检验单', '切炭检验单', '成品检验规范']) {
+    assert.ok(!all.includes(t), `菜单树里不应再有「${t}」标题`)
+  }
+  // 制程品质组现役 = 首件 / 制程 / 组装成品 三张;质量单据组现役 = 7 张
+  const qc = menuTree.find((n) => n.code === 'qc')
+  const group = (code) => (qc.children || []).find((c) => c.code === code)
+  assert.deepEqual((group('process').children || []).map((c) => c.panelCode),
+    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP'])
+  assert.equal((group('qcDoc').children || []).length, 7)
+})

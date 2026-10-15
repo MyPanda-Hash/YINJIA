@@ -3229,3 +3229,17 @@ migrate-first-insp.sql
 #   ③ 其余 5 条(2 支样品、精度规定、标准来源、停线隔离、样品保留)都是**版式/录入规则**,
 #     在 `frontend/src/core/qc/QcFirstInspSheet.vue` 落地,不动表结构。幂等;两账套均执行。
 migrate-first-insp-req.sql
+
+# ── 2026-10-16 下架「成型检验单 / 切炭检验单 / 成品检验规范」3 张面板(重路线:连数据与物理表一起删) ──
+#   用户口径:「删除当前成型检验单和切炭检验单,以及成品检验规范。」
+#   (在做的「制程检验单 QC_PROC_INSP / 成品检验单 QC_ASM_INSP」已承接这两类工序检验与成品检验职能。)
+#   删:yj_panel 3 + yj_field 118 + yj_role_panel 14 + yj_doc_status(正式 38/测试 144) +
+#     form_flow_link(正式 5/测试 63) + yj_form_approval(正式 6/测试 0) + 面板名译名 3 + 孤儿字段标签译名 +
+#     **物理表 6 张**(qc_mold_insp_head/_detail、qc_cut_insp_head/_detail、qc_fin_spec_head/_detail)。
+#     无视图、无外键、无报表模板、无附件/列设置/批次表痕迹。
+#   ⚠ **带数据下架**(不是空表面板):正式库 成型 24 单 / 切炭 9 单 / 规范 8 单;测试库 109 / 18 / 21 单。
+#     执行前已全量备份(回退抓手 tools/archive/_qc-drop3/_backup-20261016-{prod,test}/:
+#     restore-metadata.sql + data.sql + tables-ddl.sql),回退顺序 = 建表 → 元数据 → 数据 → 回滚代码。
+#   yj_usage_log 审计留痕与 s_allno 发号痕迹**不删**。自检含「面板/字段总数 = 账前 −3 / −118」与越界数 = 0。
+migrate-drop-qc-mold-cut-finspec-20261016.sql
+

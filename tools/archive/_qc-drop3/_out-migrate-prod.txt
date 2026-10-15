@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-drop-qc-mold-cut-finspec-20261016.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 18 batches

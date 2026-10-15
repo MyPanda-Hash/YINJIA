@@ -1617,8 +1617,9 @@ public class ButtonService {
         woReport.unpost(def.code(), no, currentUserName());
         // 工序任务回退(A 项):报工弃审 → 任务完成量对称回退
         processTask.onUnreport(def.code(), no, currentUserName());
-        // 三类工序检验单弃审联动(9.29 批次④):报工弃审 → 关联合格的**草稿**检验单作废+释放占用;
+        // 工序检验单弃审联动(9.29 批次④):报工弃审 → 关联合格的**草稿**检验单作废+释放占用;
         // 检验单已审核则拒绝弃审(先弃审检验单),防「报工撤了、检验单还算数」的错位
+        // (2026-10-16:清单收敛为 组装成品检验单 + 首件检验单,成型/切炭/成品检验规范已下架)
         woInspUnauditCascade(def.code(), no, currentUserName());
         // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
         dualOutRedReverse(def.code(), no, currentUserName());
@@ -1712,7 +1713,7 @@ public class ButtonService {
                 }
             }
         }
-        // 三类工序检验单:成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
+        // 工序检验单:组装 报工审核 → 自动生成一张检验单草稿(2026-10-16 起成型/切炭两张已下架)
         woInspGenerate(def.code(), no, user);
         // 组装成品检验单 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿
         asmInspToStock(def.code(), no, user);
@@ -2800,30 +2801,27 @@ public class ButtonService {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════
-    // 三类工序检验单(9.29 生产管理批次 ④,2026-10-05)
+    // 工序检验单(9.29 生产管理批次 ④,2026-10-05;2026-10-16 收敛)
     //   会议口径:「成型、切断(切炭)、组装报工时各自自动生成一张检验单(三张独立,不合并——格式都不一样)」;
     //   组装成品检验单功能最全(合格/不合格各一行,合格数转库存、不合格数留系统待处理);
     //   成型/切炭先按通用模板做触发和流转(品质给格式后替换模板:只改 yj_field/版式,触发链不动)。
+    //   🔴 2026-10-16 用户口径「删除当前成型检验单和切炭检验单,以及成品检验规范」⇒ 本类只保留
+    //     **组装成品检验单 QC_ASM_INSP** 这一条自动生单链(两张工序检验单与成品检验规范的面板/表已整体下架,
+    //     见 tools/migrate-drop-qc-mold-cut-finspec-20261016.sql);制程/首件的工序检验能力由
+    //     QC_PROC_INSP(人工开单)与 QC_FIRST_INSP(报工自动出单,见 firstInspGenerate)承接。
     //   放在 ButtonService 里(private)是沿用本类既有的自动生单范式(dualOutFinishIn / inspAutoPurchaseIn …):
     //   这些钩子要在**同一次审核事务**里再造单,独立 Service 会与 ButtonService 形成构造器循环依赖。
     // ══════════════════════════════════════════════════════════════════════════════════
 
-    /** 工序 → 检验单面板(混料/装箱不在本批口径内,不出单) */
+    /** 工序 → 检验单面板(混料/装箱不在本批口径内,不出单;2026-10-16 起只剩组装) */
     private static final java.util.Map<String, String> WO_INSP_PANEL = java.util.Map.of(
-            "成型", "QC_MOLD_INSP", "切炭", "QC_CUT_INSP", "组装", "QC_ASM_INSP");
+            "组装", "QC_ASM_INSP");
 
     /** 检验单面板 → 头表名(作废/幂等查重用;取值全是本类常量,无拼接注入面) */
     private static final java.util.Map<String, String> WO_INSP_HEAD = java.util.Map.of(
-            "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head",
-            // 成品检验规范(2026-10-09):与三张检验单共用同一套「报工弃审 → 作废草稿 + 释放占用链」;
-            // 放进本表即可被 woInspUnauditCascade 的 tbl 解析命中(明细表名由 _head→_detail 推导)。
-            "QC_FIN_SPEC", "qc_fin_spec_head",
-            // 首件检验单(2026-10-15):同一套占用链 —— 报工弃审时随三张工序检验单一起作废。
+            "QC_ASM_INSP", "qc_asm_insp_head",
+            // 首件检验单(2026-10-15):同一套占用链 —— 报工弃审时随组装成品检验单一起作废。
             "QC_FIRST_INSP", "qc_first_insp_head");
-
-    /** 成品检验规范面板/表(2026-10-09 用户任务:8 份受控文件归纳的统一文档格式,组装报工审核时一并生成) */
-    private static final String FIN_SPEC_PANEL = "QC_FIN_SPEC";
-    private static final String FIN_SPEC_HEAD = "qc_fin_spec_head";
 
     /**
      * 报工单审核 → 按工序自动生成检验单草稿(成型/切炭/组装),并写 WO_REPORT→检验单 的占用链。
@@ -2890,10 +2888,6 @@ public class ButtonService {
                             + " target_panel_code, target_form_no, link_status, create_by, create_time)"
                             + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
                     repNo, repNo + "#" + r.get("id"), target, no, user);
-            // 成品检验规范(2026-10-09 用户口径「让当前的生产工单完成后能自动生成这个」):
-            // **组装**报工审核时顺带生成一张空格式规范草稿(表头带工单/产品/批次,正文与检验项目留空),
-            // 与三张检验单各自独立、互不覆盖;弃审随占用链一起作废。
-            if ("QC_ASM_INSP".equals(target)) finSpecGenerate(r, repNo, user);
         }
     }
 
@@ -3015,43 +3009,10 @@ public class ButtonService {
                 repNo, wo, batch, no, items.docNo() == null ? "无" : items.docNo());
     }
 
-    /**
-     * 组装报工审核 → 生成「成品检验规范」**空格式**草稿(用户:「文件中的数据不重要,主要是格式实现」)。
-     * <p>只带表头(工单号/报工单号/产品编码/产品名称/规格型号/批次号 + 文件名称/版本版次/管控状态/发行日期)
-     * 与 1 行修订履历(版本 A0 / 首次发行);正文五段、检验项目、处理方式**全部留空**由品质填写。
-     * <p>幂等:同一报工单已有存活规范则跳过(弃审作废后可再次生成);
-     * 占用链 WO_REPORT → QC_FIN_SPEC 与检验单同一套,故报工弃审能把它一起作废。
-     */
-    private void finSpecGenerate(Map<String, Object> r, String repNo, String user) {
-        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + FIN_SPEC_HEAD
-                + " WHERE 报工单号=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, repNo);
-        if (dup != null && dup > 0) return;                                    // 幂等
-        String today = LocalDate.now().toString();
-        Map<String, Object> head = new LinkedHashMap<>();
-        head.put("单据日期", today);
-        head.put("文件名称", "成品检验规范");
-        head.put("版本版次", "A0");
-        head.put("管控状态", "受控");
-        head.put("发行日期", today);
-        head.put("工单号", r.get("工单号"));
-        head.put("报工单号", repNo);
-        head.put("产品编码", r.get("产品编码"));
-        head.put("产品名称", r.get("产品名称"));
-        if (!String.valueOf(r.get("规格型号")).isBlank()) head.put("规格型号", r.get("规格型号"));
-        if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
-        Map<String, Object> rev = new LinkedHashMap<>();
-        rev.put("表区", "修订履历");
-        rev.put("版本", "A0");
-        rev.put("修订理由与内容简述", "首次发行");
-        rev.put("修订日期", today);
-        head.put("detail", Map.of("items", List.of(rev)));
-        Map<String, Object> saved = save(registry.panel(FIN_SPEC_PANEL), head, false);
-        String no = String.valueOf(saved.get("编号"));
-        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
-                        + " target_panel_code, target_form_no, link_status, create_by, create_time)"
-                        + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
-                repNo, repNo + "#" + r.get("id"), FIN_SPEC_PANEL, no, user);
-    }
+    // 【已删除】finSpecGenerate(组装报工审核 → 生成「成品检验规范 QC_FIN_SPEC」空格式草稿)——
+    //   2026-10-16 用户口径「删除…以及成品检验规范」,面板与 qc_fin_spec_head/_detail 已随
+    //   tools/migrate-drop-qc-mold-cut-finspec-20261016.sql 整体下架(含 form_flow_link 占用链)。
+    //   成品检验的纸面能力现由「组装成品检验单 QC_ASM_INSP」承接(报表 qc_asm_insp.jrxml)。
 
     // 【已删除】inspLine(检验单「数量判定」预铺行)—— 2026-10-15 用户口径「明细行不填入」后不再预铺明细,
     //   该辅助方法成了死代码(代码规范 D/E:不留无用方法)。合格/不合格改由明细列 合格数量/不合格数量 表达。
@@ -3059,13 +3020,14 @@ public class ButtonService {
     /**
      * 报工单弃审联动:把该报工生成的检验单**草稿**作废(软删)+ 释放占用链;
      * 检验单已审核/审批中则拒绝弃审(先弃审检验单)。这就是检验单链路的「可撤回」。
+     * <p>2026-10-16:清单随「成型/切炭/成品检验规范」下架收敛为 组装成品检验单 + 首件检验单两条。</p>
      */
     private void woInspUnauditCascade(String panelCode, String repNo, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
         List<Map<String, Object>> links = jdbc.queryForList(
                 "SELECT target_panel_code, target_form_no FROM form_flow_link"
                         + " WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
-                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP','QC_FIN_SPEC','QC_FIRST_INSP')"
+                        + "   AND target_panel_code IN ('QC_ASM_INSP','QC_FIRST_INSP')"
                         + "   AND link_status='ACTIVE'", repNo);
         for (Map<String, Object> l : links) {
             String p = String.valueOf(l.get("target_panel_code"));
@@ -6062,3 +6024,4 @@ public class ButtonService {
         return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
     }
 }
+

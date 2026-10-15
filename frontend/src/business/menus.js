@@ -340,7 +340,12 @@ export const menuTree = [
         // 制程品质(流程图·品质泳道:工序质检数据)
         // 2026-10-09 下架:「工序质检单 QC_OP / 检验记录单 QC_RECORD」已随那批无用面板整体删除
         // (tools/migrate-drop-qc-unused-panels-20261009.sql),不是摘菜单,放开注释也恢复不了;
-        // 本组现役只剩下面三张工序检验单(远端 9.29 批次④新增,与本地下架不冲突)。
+        // 🔴 2026-10-16 再下架两张:「成型检验单 QC_MOLD_INSP / 切炭检验单 QC_CUT_INSP」按用户口径
+        // (「删除当前成型检验单和切炭检验单,以及成品检验规范」)**连面板元数据与物理表一起删**
+        // (tools/migrate-drop-qc-mold-cut-finspec-20261016.sql),放开注释也恢复不了 ——
+        // 回退抓手在 tools/archive/_qc-drop3/_backup-20261016-{prod,test}/。
+        // 这两类的工序检验职能由「制程检验单 QC_PROC_INSP」(人工开单)与「首件检验单」
+        // (报工审核自动出单)承接,故不再各留一张按工序切的检验单。
         code: 'process', title: '制程品质', children: [
           // 首件检验单(2026-10-15 新增,面板 QC_FIRST_INSP):按《生产相关品质检验.xlsx》Sheet1 第2步
           // 「车间生产(首批,每天一个生产批次)→ 首件检验」建,实现方式照成品检验单(QC_ASM_INSP)。
@@ -350,11 +355,8 @@ export const menuTree = [
           // 制程检验单(2026-10-12 新增,面板 QC_PROC_INSP):按《生产相关品质检验.xlsx》第3步建。
           // 表样=截图「制程检验」页签:外观/尺寸/出货重量 三组 + 出货检验功能性测试组(用「表区」区分)。
           // 检验类别字段区分「首件检验(第2步)」与「制程检验(第3步)」。
-          // 置首位:它是制程检验的主单,下面三张是各工序的分单(用户 2026-10-12 口径:保留成型/切炭检验不动)。
           { code: 'qcProcInsp', title: '制程检验单', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
-          // 三类工序检验单(9.29 批次④,2026-10-05):报工审核自动出单;成型/切炭先按通用模板,组装成品含合格转库存/不合格待处理
-          { code: 'qcMoldInsp', title: '成型检验单', path: '/panelx/list/QC_MOLD_INSP', icon: 'Checked', panelCode: 'QC_MOLD_INSP', operationName: '新增流程' },
-          { code: 'qcCutInsp', title: '切炭检验单', path: '/panelx/list/QC_CUT_INSP', icon: 'Checked', panelCode: 'QC_CUT_INSP', operationName: '新增流程' },
+          // 组装成品检验单(9.29 批次④,2026-10-05):**组装**报工审核自动出单;含合格转库存/不合格待处理
           { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
         ],
       },
@@ -370,9 +372,11 @@ export const menuTree = [
         // 按用户口径删的就是这一个。注意:面板与业务表 qc_tc 已整体删除(tools/migrate-qc-tc-drop.sql),
         // 不是仅摘菜单,放开注释也恢复不了;特采单入口在 品质管理 > 来料品质 > 特采单。
         code: 'qcDoc', title: '质量单据', icon: 'DocumentChecked', children: [
-          // 成品检验规范(2026-10-09 用户任务):8 份受控文件(YJ-Q-60/62/89/94/125/129/130/含锌粉)归纳成的
-          // **统一文档格式**页面;报工审核(组装)时自动生成一张空格式草稿。⚠ 与组装成品检验单各自独立,互不影响。
-          { code: 'qcFinSpec', title: '成品检验规范', path: '/panelx/list/QC_FIN_SPEC', icon: 'Notebook', panelCode: 'QC_FIN_SPEC', operationName: '新增流程' },
+          // 🔴 2026-10-16 下架「成品检验规范 QC_FIN_SPEC」:用户口径「删除当前成型检验单和切炭检验单,
+          // 以及成品检验规范」。面板 + qc_fin_spec_head/_detail + 译名 + 报工审核自动出单钩子
+          // (ButtonService.finSpecGenerate)已整体删除(tools/migrate-drop-qc-mold-cut-finspec-20261016.sql),
+          // 放开注释也恢复不了;回退抓手 tools/archive/_qc-drop3/_backup-20261016-{prod,test}/。
+          // 成品检验的纸面能力由「组装成品检验单 QC_ASM_INSP」承接(报表 qc_asm_insp.jrxml)。
           { code: 'qcNcrp', title: '不合格报告(制程)', path: '/panelx/list/QC_BHG', icon: 'CircleClose', panelCode: 'QC_BHG', operationName: '新增流程' },
           { code: 'qcNcdp', title: '不合格品处理单(制程)', path: '/panelx/list/QC_BHC', icon: 'Box', panelCode: 'QC_BHC', operationName: '新增流程' },
           { code: 'qcNcdz', title: '不合格品处理单(自制物料)', path: '/panelx/list/QC_BHZ', icon: 'Files', panelCode: 'QC_BHZ', operationName: '新增流程' },

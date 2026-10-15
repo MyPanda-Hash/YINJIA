@@ -4125,10 +4125,10 @@ function blockRows(b) {
  *     见 tools/migrate-asm-insp-type-rename-20261017.sql)、摆在明细**第一列**且可填;
  *     外观/尺寸/出货重量 三类的检验项改由**生单时按出货检验计划预铺**成普通明细行
  *     (后端 ButtonService.woInspGenerate → AsmInspItems),单上还有「取出货检验计划」按钮按需补。
- *   其余四张不动:制程(QC_PROC_INSP)/首件(QC_FIRST_INSP)本来就由各自的纸张表接管(见模板上方),
- *   成型(QC_MOLD_INSP)/切炭(QC_CUT_INSP)仍按原来的分区呈现,它们的类别列仍叫「表区」。
+ *   其余两张不动:制程(QC_PROC_INSP)/首件(QC_FIRST_INSP)本来就由各自的纸张表接管(见模板上方)。
+ *   (2026-10-16:成型 QC_MOLD_INSP / 切炭 QC_CUT_INSP 两张已随面板整体下架,从本名单移除。)
  */
-const SECTION_PANELS = ['QC_MOLD_INSP', 'QC_CUT_INSP', 'QC_PROC_INSP', 'QC_FIRST_INSP']
+const SECTION_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
 
 /**
  * 本面板明细里承载「类别」的那一列(**数据键**):组装成品检验单 = 检验类型(2026-10-17 正名),

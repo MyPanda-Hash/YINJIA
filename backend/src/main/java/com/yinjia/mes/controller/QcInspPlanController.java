@@ -46,10 +46,13 @@ public class QcInspPlanController {
      *
      * <p>2026-10-12:原为单一 {@code QC_ASM_INSP}。制程检验单 QC_PROC_INSP 也要用同一个
      * 「检验项目设定」弹窗(用户口径:不同检验项目类别自动分格带出明细),故改为集合 ——
-     * 只要用户能看见其中任意一张检验单,就有权读写这套检验标准库。
+     * 只要用户能看见其中任意一张检验单,就有权读写这套检验标准库。</p>
+     *
+     * <p>2026-10-16:成型检验单 QC_MOLD_INSP / 切炭检验单 QC_CUT_INSP 随面板整体下架,移出本集合
+     * (与 {@code PanelConfigService.WO_INSP_PANELS} 保持同一份名单)。</p>
      */
     private static final java.util.List<String> PANELS =
-            java.util.List.of("QC_ASM_INSP", "QC_MOLD_INSP", "QC_CUT_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
+            java.util.List.of("QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
 
     /** 任一检验单可见即放行 */
     private void requireAnyPanelView() {
@@ -463,3 +466,4 @@ public class QcInspPlanController {
         return auth == null ? "system" : auth.getName();
     }
 }
+
