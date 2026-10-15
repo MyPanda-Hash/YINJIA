@@ -458,32 +458,33 @@ public class StockMonthCloseService {
      * @return {@code [新增行数, 更新行数, 孤儿清零行数]}
      */
     private int[] reconcileKucun(LocalDate endEx, String user) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT w, c, l, CAST(SUM(q) AS decimal(18,4)) AS yl,"
-                        + " CAST(SUM(CASE WHEN q > 0 THEN q ELSE 0 END) AS decimal(18,4)) AS cum_in,"
-                        + " CAST(SUM(CASE WHEN q < 0 THEN -q ELSE 0 END) AS decimal(18,4)) AS cum_out FROM ("
-                        + "  SELECT ISNULL(RTRIM(物料编码),N'') AS w, ISNULL(RTRIM(仓库编码),N'') AS c,"
-                        + "         ISNULL(RTRIM(批号),N'') AS l, 数量 AS q FROM inh"
-                        + "   WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(单据类型,'') <> N'" + CARRY_TYPE + "' AND 单据日期 < ?"
-                        + "  UNION ALL"
-                        + "  SELECT ISNULL(RTRIM(物料编码),N''), ISNULL(RTRIM(仓库编码),N''), ISNULL(RTRIM(批号),N''), -数量 FROM outh"
-                        + "   WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据日期 < ?"
-                        + " ) t GROUP BY w, c, l", endEx, endEx);
-        int ins = 0, upd = 0;
-        for (Map<String, Object> r : rows) {
-            String w = str(r.get("w")), c = str(r.get("c")), l = str(r.get("l"));
-            if (w.isEmpty() || c.isEmpty()) continue;
-            BigDecimal yl = dec(r.get("yl")), cumIn = dec(r.get("cum_in")), cumOut = dec(r.get("cum_out"));
-            int n = jdbc.update("UPDATE kucun SET rkl = ?, ckl = ?, yl = ?, update_date = GETDATE(),"
-                            + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ? AND ISNULL(RTRIM(lot_no),N'') = ?",
-                    cumIn, cumOut, yl, "monthclose:" + user, w, c, l);
-            if (n == 0) {
-                jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, ckl, yl, asp_user1, asp_time1, asp_cancel)"
-                                + " VALUES (?,?,?,GETDATE(),?,?,?,?,GETDATE(),'N')",
-                        w, c, l.isEmpty() ? null : l, cumIn, cumOut, yl, "monthclose:" + user);
-                ins++;
-            } else upd += n;
-        }
+        // ⚠ 性能(2026-10-15 用户报「取消后再月结超时」):第一版是**逐个键** UPDATE/INSERT ——
+        //   正式库 2823 个键 = 2823 次 round trip,实测 6~7 s(测试库)且正式库更慢 ⇒ 撞前端 axios 15 s 线。
+        //   改成**集合式两条语句**(聚合用派生表内联,不落临时表:临时表会随连接回池留下,下次同名建表直接报错):
+        //   ① 一条 UPDATE…FROM(聚合派生表 JOIN kucun)覆盖已存在的键;② 一条 INSERT…SELECT 补缺失的键。
+        String agg = "SELECT ISNULL(RTRIM(物料编码),N'') AS w, ISNULL(RTRIM(仓库编码),N'') AS c,"
+                + " ISNULL(RTRIM(批号),N'') AS l, CAST(SUM(q) AS decimal(18,4)) AS yl,"
+                + " CAST(SUM(CASE WHEN q > 0 THEN q ELSE 0 END) AS decimal(18,4)) AS cum_in,"
+                + " CAST(SUM(CASE WHEN q < 0 THEN -q ELSE 0 END) AS decimal(18,4)) AS cum_out FROM ("
+                + "  SELECT 物料编码, 仓库编码, 批号, 数量 AS q FROM inh"
+                + "   WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(单据类型,'') <> N'" + CARRY_TYPE + "' AND 单据日期 < ?"
+                + "  UNION ALL"
+                + "  SELECT 物料编码, 仓库编码, 批号, -数量 FROM outh"
+                + "   WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据日期 < ?"
+                + " ) t GROUP BY ISNULL(RTRIM(物料编码),N''), ISNULL(RTRIM(仓库编码),N''), ISNULL(RTRIM(批号),N'')";
+        int upd = jdbc.update(
+                "UPDATE k SET rkl = a.cum_in, ckl = a.cum_out, yl = a.yl, update_date = GETDATE(),"
+                        + " asp_user2 = ?, asp_time2 = GETDATE() FROM kucun k JOIN (" + agg + ") a"
+                        + " ON a.w = k.wzdm AND a.c = ISNULL(RTRIM(k.ckdm), N'') AND a.l = ISNULL(RTRIM(k.lot_no), N'')"
+                        + " WHERE a.w <> N'' AND a.c <> N''",
+                "monthclose:" + user, endEx, endEx);
+        int ins = jdbc.update(
+                "INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, ckl, yl, asp_user1, asp_time1, asp_cancel)"
+                        + " SELECT a.w, a.c, NULLIF(a.l, N''), GETDATE(), a.cum_in, a.cum_out, a.yl, ?, GETDATE(), 'N'"
+                        + " FROM (" + agg + ") a WHERE a.w <> N'' AND a.c <> N''"
+                        + "   AND NOT EXISTS (SELECT 1 FROM kucun k WHERE k.wzdm = a.w AND ISNULL(RTRIM(k.ckdm), N'') = a.c"
+                        + "        AND ISNULL(RTRIM(k.lot_no), N'') = a.l)",
+                "monthclose:" + user, endEx, endEx);
         // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
         //   (StockLedgerService.apply 在同一事务里既改 kucun 又写 inh/outh)⇒ 一个 `asp_user1 LIKE 'stock:%'`
         //   的键如果在流水里**一条都没有**,只可能是「流水被改了批号(换键)」留下的残影:

@@ -7053,6 +7053,9 @@ async function onButton(action) {
     try {
       const res = await engine.callButton({
         panelCode: panelCode.value, buttonName: action, formData: {}, buttonParam: {},
+        // 月结要按流水重算上千个库存键(正式库实测 2~3 s,数据还会长)⇒ 单次请求给足 120 s,
+        // 别让前端 15 s 线先报超时(服务端其实会跑完,用户看到的却是"报错")。
+        timeoutMs: 120000,
       })
       loading.close()
       const d = res || {}
