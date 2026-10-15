@@ -65,7 +65,11 @@ if ($LASTEXITCODE -ne 0) { throw "build-appjar 失败(exit=$LASTEXITCODE)" }
 
 # fat jar 自检:repackage 失败时磁盘上会留一个**瘦 jar**(~15MB、没有 BOOT-INF/lib),
 # 服务在内存里跑着看似正常,但一重启就起不来(build-appjar.ps1 头部有同样的警告)。
-$libCnt = (& jar tf $jar 2>$null | Select-String 'BOOT-INF/lib/' | Measure-Object).Count
+# ⚠ `jar` 未必在 PATH 上(本机实测:JAVA_HOME 指向 JDK 25,但 PATH 里没有它的 bin)——
+#   直接 `& jar tf` 会报 CommandNotFoundException,**打包成功却卡在自检、服务不会被重启**。
+#   一律走 $env:JAVA_HOME\bin\jar.exe(PATH 上没有就回退到 PATH 上的 jar)。
+$jarExe = if ($env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\jar.exe")) { "$env:JAVA_HOME\bin\jar.exe" } else { 'jar' }
+$libCnt = (& $jarExe tf $jar 2>$null | Select-String 'BOOT-INF/lib/' | Measure-Object).Count
 Write-Host "      fat jar 自检:BOOT-INF/lib = $libCnt 条"
 if ($libCnt -lt 50) { throw "打包产物不是 fat jar(BOOT-INF/lib 仅 $libCnt 条)⇒ repackage 很可能失败过,不要用它重启" }
 

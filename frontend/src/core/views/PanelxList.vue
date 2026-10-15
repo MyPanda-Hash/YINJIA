@@ -6903,6 +6903,42 @@ async function onButton(action) {
     search()
     return
   }
+  // 库存明细「库存月结」三按钮(2026-10-15):上月月结 / 取消上月月结 / 重新月结
+  //   期间缺省 = 上月(后端 StockMonthCloseService.prevPeriod);结果里带回键数/结转行数/入出结存合计。
+  //   ⚠ 口径:结转行写进 inh 但**不进**累计视图(三张报表/成本口径不变);kucun 是幂等重算(不是累加)。
+  if (action === '上月月结' || action === '取消上月月结' || action === '重新月结') {
+    const needConfirm = action !== '上月月结'
+    if (needConfirm) {
+      try {
+        await ElMessageBox.confirm(
+          `${tt(action)}${tt('会重算结转行与库存余量,确定继续吗?')}`,
+          tt(action), { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+        )
+      } catch { return }
+    }
+    const loading = ElMessage({ message: `${tt(action)}…`, duration: 0 })
+    try {
+      const res = await engine.callButton({
+        panelCode: panelCode.value, buttonName: action, formData: {}, buttonParam: {},
+      })
+      loading.close()
+      const d = res?.['月结'] || res || {}
+      if (d['取消'] && d['取消']['期间']) {
+        // 重新月结:先取消再月结,提示两段
+        ElMessage.success(`${tt('重新月结')}${tt('完成')}:${d['取消']['期间']} → ${d['月结']?.['结转单据编号'] ?? ''}`)
+      } else {
+        ElMessage.success(
+          `${tt(d['动作'] || action)}${tt('完成')}(${tt('期间')} ${d['期间'] ?? '-'} · ${tt('键数')} ${d['键数'] ?? '-'} · `
+          + `${tt('结转行')} ${d['结转行数'] ?? '-'} · ${tt('结存')} ${d['结存合计'] ?? '-'})`,
+        )
+      }
+      await load()
+    } catch (e) {
+      loading.close()
+      ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))
+    }
+    return
+  }
   // 库存三报表「重算成本」:全量重算移动加权物化表(审核钩子之外的兜底 —— 金蝶同步等旁路写入)
   if (action === '重算成本') {
     try {
