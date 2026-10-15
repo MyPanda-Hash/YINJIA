@@ -3117,3 +3117,6 @@ migrate-plangpc-schedule-quantity.sql
 migrate-wo-completion-list.sql
 # 完工明细对齐报工记录的报表呈现,多条记录同表展开而非逐张浏览。
 migrate-wo-completion-flat-report.sql
+
+# 生产链一致性：仅软作废明确空工单/空工序/零数量的报工残留，不删除有效事实。
+migrate-clean-invalid-wo-report.sql

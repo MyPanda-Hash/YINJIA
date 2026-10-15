@@ -256,9 +256,9 @@ public class WoReportService {
             if (closed != null && closed > 0) throw new IllegalStateException("工单 " + wo + " 已结案,不能报工");
             throw new IllegalStateException("工单 " + wo + " 未排产,不能报工(先在快速排产排入产线)");
         }
-        // 工序维度封顶(2026-10-07 对齐"两把尺子"):口径 = **该工单行该道工序的计划量**
+        // 工序维度封顶:口径 = **该工单行该道工序的计划量**
         //   = 本行排产数量 × 该道自己的换算率(与快速排产弹窗、预排台账、转序判据同一口径)。
-        //   仅作"明显误输"软拦(> 计划量 10 倍);**允许超产**(现场真实产出)。
+        //   现场允许超产 1%;审核时校验「已审核累计 + 本次」不得超过计划量×1.01。
         //   老口径(首道 Σ×率、其后逐道累乘、按整单)只在拿不到行/路线时兜底(历史数据兼容)。
         double rowPl = num(t.get("pl_sl"));
         Object rowIdObj = t.get("plang_id");
@@ -282,15 +282,19 @@ public class WoReportService {
         // 已报量也按**该行**(锚 scjl.gd_id → plang_pc.plang_id;老数据按批次兜底)统计,与转序一致
         Double opSum = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
-                        + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + " WHERE s.gldh=? AND s.gxdm=? AND s.id<>? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
                         + "   AND (? IS NULL"
                         + "        OR EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
                         + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ?))",
-                Double.class, wo, op, plangRowId, plangRowId, t.get("pc_batch"));
-        if (qty > cap * 10 + 0.0001) {
-            throw new IllegalStateException("报工数量 " + qty + " 明显异常(本行" + (rptBatch.isBlank() ? "" : "批次" + rptBatch + " ")
-                    + "工序[" + op + "]计划量 " + cap + ",已报 " + (opSum == null ? 0 : opSum)
-                    + ");如属超产请核对后分批报工");
+                Double.class, wo, op, rowId, plangRowId, plangRowId, t.get("pc_batch"));
+        double reported = opSum == null ? 0 : opSum;
+        double allowed = cap * 1.01d;
+        if (cap <= 0) {
+            throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能审核报工");
+        }
+        if (reported + qty > allowed + 0.0001d) {
+            throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]计划量 " + cap
+                    + ",允许至 " + allowed + ",已报 " + reported + ",本次 " + qty + ")");
         }
         // jc_no 产成品流水(产线--yyMMdd-8位,按 线+日 递增)
         String scx = String.valueOf(t.get("pc_scx"));
