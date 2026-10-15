@@ -356,6 +356,17 @@
                 </template>
                 <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               </template>
+              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」):
+                   工序检验单一族(当前只放制程检验单,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
+                   也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
+                   有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。 -->
+              <template v-if="canDirectAuditHere">
+                <div class="as-side-btn" :class="{ disabled: isDisabled('审核') }" @click="onSideAction('审核')">{{ tt('审核') }}</div>
+                <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
+                <!-- 审核记录(审批情况):读 yj_form_approval 全留痕 —— 2026-10-17 起后端 audit() 也写这张表,
+                     此前直审不留痕,这里只会是空的。只读视图、不限单据状态、谁都能看(与其它面板同口径)。 -->
+                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
+              </template>
               <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程 + 审批(冯总=admin)。
                    状态链 草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
                    显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签,
@@ -873,11 +884,95 @@
             @current-change="(p) => (archPage = p)"
           />
         </div>
-        <!-- ══════════ 分区渲染(2026-10-12):明细带「表区」列时按类别纵向分区 ══════════
-             用户口径:「不同检验项目类别就能自动分格开来实现」+「字母自动编 / 每区只显示本区内容」。
-             每区 = 区标题(A.外观…) + 该区**自己的列头** + 该区的行 ⇒ 不同区列集可不同。 -->
-        <!-- 制程检验单 · 交叉表版式(2026-10-12 用户口径「照截图:横向组头」):
-             外观 | 尺寸 | 出货重量 等表区并排,组名横跨在本组列之上;固定头列在左、结果判断在右。 -->
+        <!-- ══════════ 分区渲染(2026-10-16 恢复,检验单族):明细带「表区」列 ⇒ 按类别纵向分区 ══════════
+             用户口径:「不同检验项目类别就能自动分格开来实现」+「字母自动编 / 每区只显示本区内容」;
+             成品检验单再加:「外观/尺寸/出货重量 三区**固定**,没有数据时也显示成截图那个形式」。
+             每区 = 区标题(A.外观…) + 该区**自己的列头** + 该区的行 ⇒ 不同区列集可不同;
+             **固定组**哪怕一行都没有也出一块(区内给一个空行,点它即新增行、录入即落真行)。 -->
+        <template v-if="isSectioned(b)">
+          <div v-for="sec in archSections(b)" :key="'sec-' + b.id + '-' + (sec.sector || 'none')" class="arch-section">
+            <div class="arch-section-title">
+              <span>{{ sec.title }}</span>
+              <!-- 2026-10-16 用户口径「不需要增加除去非最底下的明细行的增加行的实现」⇒
+                   分区**不提供任何加行入口**(原「＋新增检验项」已删);本区没有数据时给一句指引,
+                   并把该区的固定项名点出来(固定项仍要看得见,但加行只在下方的「明细行」列表里做)。 -->
+              <span v-if="sec.empty" class="arch-section-hint">
+                {{ tt('暂无数据：请在下方「明细行」新增或带入') }}<template v-if="sec.fixedHint"> · {{ tt('本区固定项') }}：{{ sec.fixedHint }}</template>
+              </span>
+            </div>
+            <el-table
+              :data="sec.rows"
+              border
+              size="small"
+              :show-summary="false"
+              :row-class-name="(o) => rowCls(o, b)"
+              @selection-change="(r) => (delSel = r)"
+              @row-contextmenu="(row, col, ev) => onCtx(ev, row, b)"
+              @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, cell, ev, b)"
+              @row-click="(row) => onRowClick(row, b)"
+              @click.capture="(e) => onTableClick(b, e)"
+            >
+              <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
+              <el-table-column width="56" align="center" :label="tt('序号')">
+                <template #default="{ row }">{{ row._placeholder ? '' : sectionRowNo(sec.rows, row) }}</template>
+              </el-table-column>
+              <el-table-column
+                v-for="c in sec.cols"
+                :key="'sc-' + (sec.sector || 'none') + '-' + c.prop"
+                :prop="c.prop"
+                :label="tt(c.label)"
+                :width="c.width"
+                :min-width="c.width ? undefined : 120"
+                :show-overflow-tooltip="false"
+              >
+                <template #default="{ row }">
+                  <template v-if="archEditable(b) && !row._placeholder">
+                    <span v-if="c.field && c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-else-if="isSelectField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <template v-else-if="isActiveCell(row, b, c.prop)">
+                      <el-select
+                        v-if="isSelectField(c.field)"
+                        v-model="row[c.prop]"
+                        size="small"
+                        v-cell-focus
+                        clearable
+                        @change="markInlineDirty()"
+                      >
+                        <el-option v-for="o in fieldOptions(c.field)" :key="o" :label="o" :value="o" />
+                      </el-select>
+                      <el-input v-else v-model="row[c.prop]" size="small" v-cell-focus @input="markInlineDirty()" />
+                    </template>
+                    <span v-else class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                  </template>
+                  <!-- 空态行(本区没有数据时撑出列头与空格):「检验项目」格显示**该区固定项名**
+                       (端盖两头/管身两侧),其余格留空 —— **不可点、不加行**(用户口径:加行只在下方的
+                       「明细行」列表里做,分区不再提供任何加行入口)。 -->
+                  <template v-else-if="row._placeholder">
+                    <span v-if="c.prop === '检验项目' && row['检验项目']" class="cell-preset">{{ row['检验项目'] }}</span>
+                  </template>
+                  <span v-else>{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="detailEditable(b)" width="60" align="center" :label="tt('操作')">
+                <template #default="{ row }">
+                  <span v-if="!row._placeholder" class="arch-row-del" :title="tt('删除本行')" @click.stop="removeSectionRow(b, row)">✕</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </template>
+        <!-- ══════════ 明细行列表(通用表格)══════════
+             ⚠ 2026-10-16 修正:分区视图**不替代**这张明细表 —— 用户口径「中间为固定的检验项目、
+             下面为明细行」(照旧系统截图:上面是 A~E 分区,下面是「今日品检明细」那条列表)。
+             ⇒ 分区(中间)与明细行(下面)同时呈现:分区按表区铺出固定检验项、便于按组填写;
+               明细行列表照旧显示本单全部行/全部列(行选择、右键菜单、列筛选、导出等能力都还在)。 -->
+        <div v-if="isSectioned(b)" class="arch-detail-band">
+          <div class="arch-section-title">
+            <span>{{ tt('明细行') }}</span>
+            <span class="arch-section-hint">{{ tt('本单明细(全部列;与上方分区是同一批行)') }}</span>
+          </div>
+        </div>
         <el-table
           :data="pagedBlockRows(b)"
           :height="tableH(b)"
@@ -1759,8 +1854,15 @@
     <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
          同一个弹窗两用:上=方案表、下=该方案的项目表(可勾选);①勾选后「带入明细」把项目写进当前单据
          (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
-         (bs_qc_plan + bs_qc_item),维护动作不往检验单写数据。 -->
-    <QcInspPlanDialog v-model="qcInspPlanVisible" @pick="applyInspItems" />
+         (bs_qc_plan + bs_qc_item),维护动作不往检验单写数据。
+         2026-10-17 加**第二个只读来源**(组装成品检验单 QC_ASM_INSP 专属):「出货检验计划」——
+         按本单产品编码读 RD_INSP_PLAN 里已填的检验项目,勾选后同样「带入明细」,不碰标准库。 -->
+    <QcInspPlanDialog
+      v-model="qcInspPlanVisible"
+      :product-code="String(cur?.['产品编码'] || '')"
+      :ship-source="panelCode === 'QC_ASM_INSP'"
+      @pick="applyInspItems"
+    />
     <!-- 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(工单号+工单行号唯一确定),
          选中即生成一张草稿并跳过去(表头带产品/批次/产线,明细留空)。 -->
     <QcProcInspWoPicker v-model="woPickerVisible" @picked="openPickedProcInsp" />
@@ -3026,6 +3128,19 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
 const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_INSP_REC'
   || String(panelCode.value) === 'RD_DOM_TEST')
+/**
+ * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
+ *
+ * 为什么单开一个名单,而不是加进 hasApprovalBtns:
+ *   · hasApprovalBtns 那一组是「提交审批 / 审批通过 / 审批驳回 / 弃审 / 审批情况」——适用于**走审批流**的面板;
+ *   · 工序检验单(制程/成型/切炭/组装/首件)既不在两级审批的 8 张质量单据(QC_DOC_PREPARER)里,
+ *     也没有审批流配置 ⇒ 给它们一键直审才走得通(草稿 → 已审核)。
+ * 权限:**仅管理员**。2026-09-22「直审收权」后,前端审批组不再给非管理员直审入口,后端
+ * ButtonService.audit() 也硬拒非管理员(「其他角色请走提交审批」)——这里与后端同口径,
+ * 否则非管理员点了只会拿到 403。要给某个检验单放开:把面板码加进本名单即可。
+ */
+const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP']
+const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
 // 规格书两级分发(2026-09-12):已分配单仅 责任人∪总负责人∪管理员 可编辑,其他人可见只读
@@ -3538,6 +3653,10 @@ watch(cur, (v) => {
   detailRefPick.value = null
   // 产成品→材料联动：默认不选中（点击产成品明细行才过滤材料明细），切换单据时重置
   if (selectedProduct.value) selectedProduct.value = null
+  // 检验单族:换单后把声明过的固定检验项补成真行(端盖两头/管身两侧…)⇒ 分区里直接可填。
+  // 自动补的行若整行没填,保存时会被剔除(见 stripBlankAutoRows),故不会往库里留空行。
+  autoFixedKeys.clear()
+  ensureFixedRows()
 })
 
 /** 面板内切单守卫(翻页/点行):当前单有未保存修改时弹三态窗,干净则直切 */
@@ -3957,6 +4076,259 @@ function blockRows(b) {
   //   占位行只是显示物(_placeholder):进出都不落库、不参与合计/校验,对其它面板零影响。
   const minRows = panelCode.value === 'ROUTE' ? Math.max(MIN_ROWS, out.length + 1) : MIN_ROWS
   while (out.length < minRows) out.push({ _placeholder: true })
+  return out
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   检验单「按表区分区」渲染(2026-10-16 恢复 + 扩展)
+   ------------------------------------------------------------------------------
+   用户口径(成品检验单 QC_ASM_INSP):
+     ·「当前的外观 尺寸 出货重量 这些都是当前固定需要检测的内容」
+     ·「不要实现使用按钮的形式进行操作,根据当前的实现方式使用组件形式完成对默认情况下增加三个检验」
+     ·「按三区实现,没有数据的时候显示和当前截图形式相当即可」
+   ⇒ 形态 = 截图那种**纵向分区**:`A.外观` / `B.尺寸` / `C.出货重量` 各一块,
+     每块 = 区标题 + **该区自己的列头** + 该区的行(一行一个检验项目)。
+   ⚠ 数据模型不变:仍是「一行 = 一个检验项目」(表区/检验项目/检验结果/测量值1..5/结果判断),
+     分区只是**呈现**;报表(QcAsmInspReportSupport)与取数照旧按行读。
+   本实现复用 2026-10-13 `fde804ba`(制程检验单纵向分区)的辅助函数,并加两点:
+     ① 触发条件收敛到 SECTION_PANELS(免得影响其它带「表区」列的面板);
+     ② **固定组**:`yj_panel.config.fixedItems` 声明过的组,哪怕本单一行都没有也铺出来
+        (区内先给一个空行,点它/在其中录入即落成真行 —— 照「没有数据时显示截图形式」的口径)。
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/** 走分区渲染的面板(检验单族):明细带「表区」列 ⇒ 按类别分区 */
+const SECTION_PANELS = ['QC_ASM_INSP', 'QC_MOLD_INSP', 'QC_CUT_INSP', 'QC_PROC_INSP', 'QC_FIRST_INSP']
+
+/**
+ * 本面板是否走分区渲染:是检验单族 **且** 明细里有「表区」字段。
+ * ⚠ 判据必须用**该页签全部明细字段**(含隐藏),不能用 activeTab(b).cols ——
+ *   后者只装 visible 列,而「表区」在本单是 **hidden=1/visible=0**(2026-10-17 取证:
+ *   QC_ASM_INSP 的 表区 hidden=1 seq=170),用 cols 判会永远为假 ⇒ 分区根本不触发。
+ *   (与 applyShipPlanItems 里 hasArea() 那条注释是同一个坑。)
+ */
+function isSectioned(b) {
+  if (!SECTION_PANELS.includes(String(panelCode.value))) return false
+  const tabKey = b ? activeTab(b).key : 'items'
+  const fields = detailTabDefOf(tabKey)?.fields || []
+  return fields.some((f) => f.dataName === '表区')
+}
+
+/** 固定组声明(yj_panel.config 的 fixedItems,后端 metadata 下发) */
+function fixedGroups() {
+  const list = cfgCache.value?.metadata?.fixedItems
+  return Array.isArray(list) ? list : []
+}
+
+/** 该面板明细里「表区」的出现顺序(去重,跳过空值) */
+function sectorOrder(b) {
+  const out = []
+  for (const r of archRows(b)) {
+    if (r._placeholder) continue
+    const v = String(r['表区'] ?? '').trim()
+    if (v && !out.includes(v)) out.push(v)
+  }
+  // 声明过的固定组补进顺序(没有数据的组也要排上)
+  for (const g of fixedGroups()) {
+    const v = String(g?.group ?? '').trim()
+    if (v && !out.includes(v)) out.push(v)
+  }
+  return out
+}
+
+/** 类别 → 字母(A、B、C…):按该面板内类别首次出现顺序自动编 */
+function sectorLetter(b, sector) {
+  const order = sectorOrder(b)
+  const i = order.indexOf(sector)
+  if (i < 0) return ''
+  // 0→A, 25→Z, 26→AA(超出 26 个类别的兜底)
+  let n = i
+  let s = ''
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1 } while (n >= 0)
+  return s
+}
+
+/**
+ * 某区的列 = **面板明细字段配置原样**(yj_field 里 visible 的列,按 seq 顺序)。
+ *
+ * ⚠ 口径(2026-10-16 用户拍板「**字段保留我原来修改好的字段实现**」):
+ *   分区**只做"按表区切成块"这一件事**,不再对列做任何裁剪/重排 ——
+ *   早先那版会按"该区有没有值"筛列、并按定性/定量拼一套列集,结果把用户在「字段管理」里
+ *   调好的字段顺序打乱、还可能把某些字段藏掉(如 外观区不给测量值列)。现改为:
+ *     · 列集与顺序 = 面板字段配置(与下面的「明细行」列表**完全一致**);
+ *     · 只排除结构性隐藏列(表区=分区键、行号=区内自带序号);
+ *     · 全部区、空区都一样(空区也把字段铺全,才谈得上"固定填写")。
+ *
+ * ⚠ 用 archCols(全量可见列 + 配置顺序)而不是 archGridCols —— 后者做列级虚拟化
+ *   (只返回视口内列 + 插占位列),分区视图列少、不需要虚拟化,用它会漏列并把 spacer 当成列。
+ */
+function sectionCols(b) {
+  return (archCols(b) || []).filter((c) => c.prop && c.prop !== '表区' && c.prop !== '行号')
+}
+
+/** 区标题下该区行内的序号(1、2、3…),用于「1.外径」这种显示 */
+function sectionRowNo(rows, row) {
+  return rows.indexOf(row) + 1
+}
+
+/**
+ * 分区后的渲染单元:[{sector, letter, title, cols, rows}]。
+ * **固定组哪怕没有数据也出一块**(rows 为空 ⇒ 给一个占位行,照"没有数据时显示截图形式")。
+ */
+function archSections(b) {
+  if (!isSectioned(b)) return []
+  const all = pagedBlockRows(b)
+  const order = sectorOrder(b)
+  const byCat = new Map()
+  const noCat = []
+  for (const r of all) {
+    if (r._placeholder) continue
+    const v = String(r['表区'] ?? '').trim()
+    if (!v) { noCat.push(r); continue }
+    if (!byCat.has(v)) byCat.set(v, [])
+    byCat.get(v).push(r)
+  }
+  // 顺序用 sectorOrder(先出现先排 + 固定组兜底),未在 order 里的(分页外)按 Map 顺序补
+  const seq = [...order, ...[...byCat.keys()].filter((k) => !order.includes(k))]
+  const out = []
+  for (const s of seq) {
+    const rows = byCat.get(s) || []
+    const declared = fixedGroups().some((x) => String(x?.group ?? '').trim() === s)
+    // 没有数据、也没声明过 ⇒ 不铺(只有固定组才"空着也显示")
+    if (!rows.length && !declared) continue
+    const cols = sectionCols(b)
+    if (!cols.length) continue
+    const letter = sectorLetter(b, s)
+    const decl = fixedGroups().find((x) => String(x?.group ?? '').trim() === s)
+    /**
+     * 渲染行(2026-10-16 用户口径「**不需要增加除去非最底下的明细行的增加行的实现**」):
+     * 分区**只显示已有数据行**,不再铺"可点击新增"的占位行、也不给任何加行入口 ——
+     * 加行统一在下方「明细行」列表里做(「新增数据」按钮/带入计划)。
+     * 本区没有数据时给一行**纯展示的空行**(把列头与空格撑出来,照截图),「检验项目」格写该区固定项名
+     * (端盖两头/管身两侧)——固定项仍是"看得见的",但不可点、不落行。
+     */
+    let renderRows = rows
+    if (!rows.length) {
+      const items = (decl?.items || []).map((x) => String(x).trim()).filter(Boolean)
+      renderRows = items.length
+        ? items.map((it) => ({ _placeholder: true, 表区: s, 检验项目: it }))
+        : [{ _placeholder: true, 表区: s, 检验项目: '' }]
+    }
+    out.push({
+      sector: s,
+      letter,
+      title: letter ? `${letter}.${tt(s)}` : tt(s),
+      cols,
+      rows: renderRows,
+      empty: !rows.length,
+      // 空区指引里点出本区固定项(加行在下方「明细行」做,这里只做"要检什么"的提示)
+      fixedHint: !rows.length ? (decl?.items || []).map((x) => String(x).trim()).filter(Boolean).join(' / ') : '',
+    })
+  }
+  // 未填类别的行归到末尾一个「未分类」区(不丢数据)
+  if (noCat.length) {
+    const cols = sectionCols(b)
+    if (cols.length) out.push({ sector: '', letter: '', title: tt('未分类'), cols, rows: noCat, empty: false })
+  }
+  return out
+}
+
+/** 分区视图里删除某行(与表格「删除」同语义:从当前单据明细移除并置脏) */
+function removeSectionRow(b, row) {
+  if (!detailEditable(b) || row?._placeholder) return
+  const tabKey = activeTab(b).key
+  const rows = cur.value.detail?.[tabKey]
+  if (!Array.isArray(rows)) return
+  const i = rows.indexOf(row)
+  if (i < 0) return
+  rows.splice(i, 1)
+  markInlineDirty()
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   固定检验项 = **真行**(2026-10-16 用户口径「当前这三行无法填写啊,如果当前实现存在问题
+   有没有其他方法能够实现的?」)
+   ------------------------------------------------------------------------------
+   背景:上一步按「不要在分区里加行」把分区里的加行入口删了,结果固定项只以**空态展示行**出现 ——
+   **填不进去**(没有对应真行,格子无处存值)。换法:
+     ① 打开草稿时,按 yj_panel.config 的 fixedItems **自动把固定项补成明细真行**
+        (表区=组名、检验项目=固定项名 ⇒ 端盖两头 / 管身两侧),它们就是普通数据行,分区里直接可填;
+        **不新增任何加行按钮**(行来自声明,不来自用户点"加行");
+     ② 自动补的行若**整行没填过**,保存时**剔除**(不落库)—— 保住 2026-10-15「不预铺脏数据」的口径。
+   两张账都照顾到了:固定项"默认在、能填、读得到",库里又不会留下空行。
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 自动补出来的固定项行 —— 用**键**(归一化 表区|检验项目)记,不用行对象:
+ * ⚠ 2026-10-16 实测踩到:存行对象会失效 —— `cur.value` 是响应式的,组件里 push 的是原始对象、
+ *   保存时遍历到的是它的 **Proxy**,`Set.has(proxy)` 恒为 false ⇒ "没填的行"照样落库。
+ *   用键判定与对象身份无关,稳。
+ */
+const autoFixedKeys = new Set()
+
+/** 行键(归一化 表区|检验项目) */
+function fixedRowKey(sector, item) {
+  const n = (v) => String(v ?? '').trim().replace(/\s+/g, '')
+  return n(sector) + '|' + n(item)
+}
+
+/** 打开草稿时把声明过的固定项补成真行(已存在的不重复补;非草稿/非分区面板不动) */
+function ensureFixedRows() {
+  if (!SECTION_PANELS.includes(String(panelCode.value))) return
+  if (!draftEditable.value) return                       // 已审核只读:不补(补了也存不了,还显得像有数据)
+  const b = blocks.value[0]
+  if (!b || !isSectioned(b)) return
+  const groups = fixedGroups()
+  if (!groups.length) return
+  const tabKey = activeTab(b).key
+  if (!cur.value.detail) cur.value.detail = {}
+  const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
+  let added = 0
+  for (const g of groups) {
+    const sector = String(g?.group ?? '').trim()
+    if (!sector) continue
+    // 固定组没有列出具体项目时，仍需要一条真实明细行承载录入值。
+    // 组列名就是该行的检验项目：尺寸/出货重量可直接填写，也可由出货检验计划带入的
+    // 同组项目继续追加到本区；空行保存时仍由 stripBlankAutoRows 过滤。
+    const declaredItems = (g.items || []).map((it) => String(it).trim()).filter(Boolean)
+    const names = declaredItems.length ? declaredItems : [String(g.label || '').trim() || `按照${sector}检验项目填充`]
+    for (const name of names) {
+      if (!name) continue
+      if (rows.some((r) => norm(r['表区']) === norm(sector) && norm(r['检验项目']) === norm(name))) continue
+      const row = newDetailRow(tabKey)
+      row['表区'] = sector
+      row['检验项目'] = name
+      rows.push(row)
+      autoFixedKeys.add(fixedRowKey(sector, name))
+      added++
+    }
+  }
+  if (added) markInlineDirty()   // 让"有未保存改动"状态与界面一致(空行保存时会被剔除,不会落库)
+}
+
+/** 这一行填过东西没有(表区/检验项目/行号 等结构值不算;数值列默认 0 不算;是否列默认 false 不算) */
+function rowFilled(row) {
+  for (const [k, v] of Object.entries(row || {})) {
+    if (k.startsWith('__') || k === '表区' || k === '检验项目' || k === '行号') continue
+    if (v === undefined || v === null) continue
+    const s = String(v).trim()
+    if (s === '') continue
+    if (/^-?0(\.0+)?$/.test(s)) continue          // 数值列默认 0 = 没填
+    if (s === 'false') continue                    // 「是否」列默认 false = 没填
+    return true
+  }
+  return false
+}
+
+/** 提交前剔除"自动补的固定项行里仍然全空"的行(2026-10-15 口径:不预铺脏数据) */
+function stripBlankAutoRows(detail) {
+  if (!autoFixedKeys.size) return detail
+  const out = {}
+  for (const [k, arr] of Object.entries(detail || {})) {
+    out[k] = Array.isArray(arr)
+      ? arr.filter((r) => !(autoFixedKeys.has(fixedRowKey(r['表区'], r['检验项目'])) && !rowFilled(r)))
+      : arr
+  }
   return out
 }
 
@@ -4996,8 +5368,12 @@ async function exportSheetPdf() {
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {
   exportFmtVisible.value = false
-  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录)
-  const catalogExporter = { RD_PROGRESS: 'exportProgressExcel', QC_CATALOG: 'exportCatalogExcel' }[panelCode.value]
+  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录 / 制程检验单纸面)
+  const catalogExporter = {
+    RD_PROGRESS: 'exportProgressExcel',
+    QC_CATALOG: 'exportCatalogExcel',
+    QC_PROC_INSP: 'exportProcInspExcel',
+  }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value
     if (sheet && typeof sheet[catalogExporter] === 'function') {
@@ -5736,7 +6112,8 @@ function applyShipPlanItems(items) {
   for (const it of fresh) {
     const row = newDetailRow(tabKey)
     for (const k of KEYS) {
-      if (!has(k)) continue
+      // 表区:隐藏列也要写(它是报表分组键,见上面 hasArea 的注释)
+      if (!(k === '表区' ? hasArea(k) : has(k))) continue
       const v = String(it[k] ?? '').trim()
       if (v) row[k] = v
     }
@@ -5750,6 +6127,9 @@ function applyShipPlanItems(items) {
   return { added: n, total: (items || []).length, dupes }
 }
 
+/* 2026-10-16 注:原先的「带入固定检验项」动作与 applyFixedItems/normItemName 已删 —— 用户口径
+   「不要实现使用按钮的形式进行操作」,固定组/固定项改由明细区分区渲染(isSectioned/archSections)
+   默认铺出(固定项=预置空行,点行即落真行),故不再需要"点按钮补行"这条链路。 */
 /**
  * 选检验项目 → 带入当前单据明细(2026-10-09 用户口径:「在组装成品检验处看到对应的检验项目,
  * 选择填写检验单的数据」)。
@@ -5798,13 +6178,19 @@ function applyInspItems(items) {
     if (seen.has(k)) { dupes.push(it['项目名称'] || ''); continue }   // 已带入过 ⇒ 跳过不重复加
     seen.add(k)
     const row = newDetailRow(tabKey)
-    if (has('表区')) row['表区'] = category || '检验项目'
+    if (hasArea('表区')) row['表区'] = category || '检验项目'
     if (has('检验项目')) row['检验项目'] = it['项目名称'] || ''
     // 2026-10-16:四张检验单的列名已统一为「检验要求」——三张工序检验单原叫「标准要求」,
     // 已由 migrate-insp-req-align-20261016.sql 正名对齐出货检验计划表的用词(控制标准及要求),
     // 故此处只写 检验要求 一个键(旧的 标准要求 分支已随之删除)。
     if (has('检验要求')) row['检验要求'] = it['检验标准'] || ''
     if (it['检验方法'] && has('检验方法')) row['检验方法'] = it['检验方法']
+    // 检查频率(2026-10-17):出货检验计划来源带的「检测频率」,四张检验单的明细都有这一列
+    // (migrate-insp-req-align-20261016.sql 补的 检查频率),标准库来源没有就跳过。
+    if (it['检查频率'] && has('检查频率')) row['检查频率'] = it['检查频率']
+    // 备注(2026-10-15):计划表那一列照原样带过来(本单有备注列才写)。「不合格应对措施」
+    // 只有计划表/制程检验单有,组装成品检验单没有这一列 ⇒ 按 has() 自动跳过。
+    if (it['备注'] && has('备注')) row['备注'] = it['备注']
     if (it['取样要求'] && has('抽检量')) row['抽检量'] = it['取样要求']
     if (it['计量单位'] && has('单位')) row['单位'] = it['计量单位']
     // 检验数量 → 横表格数 + 上限(只对制程检验单这张横表;其它检验单是纵向明细,没有格的概念)
@@ -6046,14 +6432,27 @@ function validateInlineDraft() {
   return ''
 }
 
-async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
+/**
+ * 内联草稿落库。
+ *
+ * @param buttonName 后端按钮名(保存 / 保存为草稿)
+ * @param opts.silent 成功时不弹提示
+ * @param opts.skipValidation 「保存为草稿」用:不做必填校验(可以存一半)
+ * @param opts.reason 审批类动作(审核/提交审批/提交会签)的代称 —— 它会把失败提示改成
+ *   「{reason}前需先保存：<原因>」。**为什么需要**(2026-10-17 用户报障「未保存可以直接审核,出现错误」):
+ *   点审核时本函数会先静默保存一次(审核必须基于库里的数据),保存没过必填校验时只弹一句
+ *   「请至少添加一行明细」,用户根本不知道自己点的是审核、也不知道要先补什么 —— 加上归因后
+ *   用户一眼能看懂「审核前得先把这单存下来,缺的是明细行」。
+ */
+async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false, reason = '' } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
+  const pre = reason ? tt('{a}前需先保存：').replace('{a}', tt(reason)) : ''
   // 唯一键查重(2026-10-16):「相同编码不允许重复」是**数据正确性**规则,不是"填没填全"——
   // 所以它不受 skipValidation 影响,"保存为草稿"同样不放行(否则草稿先把重复码存进去,
   // 数据库侧的过滤唯一索引会把整笔保存打回,报错还是 SQL 原文,用户看不懂)。
   const dupUnique = validateArchiveUniqueKeys()
   if (dupUnique) {
-    ElMessage.warning(dupUnique)
+    ElMessage.warning(pre + dupUnique)
     return false
   }
   // ⚠ skipValidation 必须在这里真正生效(2026-09-20 修):
@@ -6062,7 +6461,7 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   //   用户口径:保存为草稿不做必填限制;保存/提交才做。
   const validation = skipValidation ? '' : validateInlineDraft()
   if (validation) {
-    ElMessage.warning(validation)
+    ElMessage.warning(pre + validation)
     // 文书面板(RecordSheetPanels/DocSheet/DataRecordSheet):自动定位缺失字段(翻页/滚动/闪烁);仅必填触发
     if (approvalSheetRef.value?.focusField) {
       const label = validation.replace(/第\s*\d+\s*行/g, '').match(/^(.+?)不能为空/)?.[1] || ''
@@ -6091,7 +6490,8 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
       for (const key of Object.keys(cur.value.detail || {})) detail[key] = changed
       payload = currentFormData(detail)
     } else {
-      payload = currentFormData({ ...(cur.value.detail || {}) })
+      // 检验单族:提交前把"自动补的固定项行里仍全空"的行剔除(用户 2026-10-15 口径:不预铺脏数据)
+      payload = currentFormData(stripBlankAutoRows({ ...(cur.value.detail || {}) }))
     }
     const res = await engine.callButton({
       panelCode: panelCode.value,
@@ -6112,7 +6512,7 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
     clearFreshDraft(documentNo)
     return true
   } catch (error) {
-    ElMessage.error(engine.errMsg(error) || '保存失败')
+    ElMessage.error(pre + (engine.errMsg(error) || '保存失败'))
     return false
   } finally {
     inlineSaving.value = false
@@ -7197,6 +7597,9 @@ async function onButton(action) {
     }
     return
   }
+  // 2026-10-16 注:固定组/固定项(外观·端盖两头/管身两侧、尺寸、出货重量)**不再用按钮带入** ——
+  //   用户口径「不要实现使用按钮的形式进行操作…默认情况下增加三个检验」⇒ 改为**明细区分区渲染**
+  //   (isSectioned / archSections):三区默认铺出、固定项以"预置空行"常在、点行即落成真行。
   // 选单通用化：任意 选X 动作且配置有 selectConfig 即走选单（对齐 PanelxForm 的通用分支）
   if (action === '选单' || action.startsWith('选')) {
     const sc = selectConfigFor(action)
@@ -7523,8 +7926,10 @@ async function onButton(action) {
     const actionDocumentNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
     // 列表页草稿是前端内联编辑态；审核/提交审批前必须先落库，否则状态刷新后会显示数据库中的旧空明细。
     // (提交会签同此:需会签/会签人 是头字段,刚填的必须先生效,否则后端按库里的旧值判"没填会签人")
+    // 2026-10-17 用户报障「未保存可以直接审核,出现错误」:保存没过必填校验时,提示必须**归因到这次审批动作**
+    // (reason=action ⇒「审核前需先保存：请至少添加一行明细」),否则用户只看到一句与审核无关的校验错误。
     if (['审核', '提交审批', '提交会签'].includes(action) && draftEditable.value) {
-      const saved = await saveInlineDraft('保存', { silent: true })
+      const saved = await saveInlineDraft('保存', { silent: true, reason: action })
       if (!saved) return
     }
     const res = await engine.callButton({
@@ -7770,6 +8175,9 @@ async function onImported(rows) {
 // 明细行单击：占位行 → 新增行；产成品明细行 → 联动过滤材料明细（存货 INV 面板为纯存货管理,行点击不做额外处理）
 function onRowClick(row, b) {
   if (row?._placeholder && detailEditable(b)) {
+    // 分区视图(检验单族)里的占位行只用于**撑出列头与空格**(2026-10-16 用户口径「不需要增加除去
+    // 最底下的明细行的增加行的实现」),点它**不加行** —— 加行统一走下方「明细行」列表。
+    if (isSectioned(b)) return
     openBlankDetailRow(b)
     return
   }
@@ -8943,6 +9351,39 @@ onUnmounted(() => {
   margin-bottom: 8px;
   background: #fff;
   position: relative;
+}
+/* ═══ 分区渲染(检验单族):区标题条 + 区内小表(照旧系统截图的分段观感) ═══ */
+.arch-section {
+  margin: 0 0 10px;
+}
+/* 明细行列表带(分区下面那条:通用明细表)—— 只要标题条,表体由通用 el-table 出 */
+.arch-detail-band {
+  margin: 12px 0 4px;
+}
+.arch-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  background: #e8f1fa;
+  border-left: 4px solid #2f6fb0;
+  font-weight: 600;
+  color: #1f4e79;
+  font-size: 13px;
+}
+.arch-section-hint {
+  font-weight: 400;
+  font-size: 12px;
+  color: #8a9bb0;
+}
+.arch-row-del {
+  cursor: pointer;
+  color: #c45656;
+}
+/* 空态行里显示的固定项名(端盖两头 / 管身两侧)—— 纯展示:分区不提供加行入口 */
+.cell-preset {
+  color: #2f6fb0;
+  font-weight: 600;
 }
 /* 档案大表分页器:右对齐贴在明细表头上沿 */
 .arch-pager {
