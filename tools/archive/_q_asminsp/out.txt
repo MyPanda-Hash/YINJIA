@@ -1,0 +1,297 @@
+=== yj_field for inspection panels ===
+panel_code | col_name | label | place | seq | editable | visible | hidden
+QC_ASM_INSP | 检验项目 | 检验项目 | detail | 10 | 1 | 1 | 0
+QC_ASM_INSP | 标准要求 | 标准要求 | detail | 20 | 1 | 1 | 0
+QC_ASM_INSP | 实测数值 | 实测数值 | detail | 30 | 1 | 1 | 0
+QC_ASM_INSP | 检验方法 | 检验方法 | detail | 40 | 1 | 1 | 0
+QC_ASM_INSP | 判定 | 判定 | detail | 50 | 1 | 1 | 0
+QC_ASM_INSP | 数量 | 数量 | detail | 60 | 1 | 1 | 0
+QC_ASM_INSP | 行号 | 行号 | detail | 70 | 0 | 0 | 1
+QC_ASM_INSP | 表区 | 表区 | detail | 90 | 0 | 1 | 0
+QC_ASM_INSP | 不合格数量 | 不合格数量 | detail | 310 | 1 | 1 | 0
+QC_ASM_INSP | 规格型号 | 规格型号 | header | 90 | 1 | 1 | 0
+QC_ASM_INSP | 生产车间 | 生产车间 | header | 110 | 1 | 1 | 0
+QC_ASM_INSP | 报工数量 | 报工数量 | header | 120 | 1 | 1 | 0
+QC_ASM_INSP | 检验数量 | 检验数量 | header | 130 | 1 | 1 | 0
+QC_ASM_INSP | 检验日期 | 检验日期 | header | 150 | 1 | 1 | 0
+QC_ASM_INSP | 执行标准 | 执行标准 | header | 175 | 1 | 1 | 0
+QC_ASM_INSP | 审核人 | 审核人 | header | 200 | 0 | 1 | 0
+QC_ASM_INSP | 审核时间 | 审核时间 | header | 210 | 0 | 1 | 0
+QC_ASM_INSP | 处理方式 | 处理方式 | header,detail | 80 | 1 | 1 | 0
+QC_ASM_INSP | 备注 | 备注 | header,detail | 100 | 1 | 1 | 0
+QC_ASM_INSP | 单据编号 | 单据编号 | query,header | 10 | 0 | 1 | 0
+QC_ASM_INSP | 单据日期 | 单据日期 | query,header | 20 | 1 | 1 | 0
+QC_ASM_INSP | 工单号 | 工单号 | query,header | 30 | 1 | 1 | 0
+QC_ASM_INSP | 工单行号 | 工单行号 | query,header | 35 | 0 | 1 | 0
+QC_ASM_INSP | 报工单号 | 报工单号 | query,header | 40 | 1 | 1 | 0
+QC_ASM_INSP | 工序 | 工序 | query,header | 50 | 1 | 1 | 0
+QC_ASM_INSP | 批次号 | 批次号 | query,header | 60 | 1 | 1 | 0
+QC_ASM_INSP | 产品编码 | 产品编码 | query,header | 70 | 1 | 1 | 0
+QC_ASM_INSP | 产品名称 | 产品名称 | query,header | 80 | 1 | 1 | 0
+QC_ASM_INSP | 生产线 | 生产线 | query,header | 100 | 1 | 1 | 0
+QC_ASM_INSP | 检验员 | 检验员 | query,header | 140 | 1 | 1 | 0
+QC_ASM_INSP | 检验方案 | 检验方案 | query,header | 155 | 1 | 1 | 0
+QC_ASM_INSP | 总结论 | 总结论 | query,header | 160 | 1 | 1 | 0
+QC_ASM_INSP | 文件编码 | 文件编码 | query,header | 165 | 1 | 1 | 0
+QC_ASM_INSP | 单据状态 | 单据状态 | query,header | 190 | 0 | 1 | 0
+QC_CUT_INSP | 表区 | 表区 | detail | 190 | 0 | 1 | 0
+QC_CUT_INSP | 行号 | 行号 | detail | 200 | 0 | 1 | 0
+QC_CUT_INSP | 检验项目 | 检验项目 | detail | 210 | 1 | 1 | 0
+QC_CUT_INSP | 标准要求 | 标准要求 | detail | 220 | 1 | 1 | 0
+QC_CUT_INSP | 实测数值 | 实测数值 | detail | 230 | 1 | 1 | 0
+QC_CUT_INSP | 检验方法 | 检验方法 | detail | 235 | 1 | 1 | 0
+QC_CUT_INSP | 判定 | 判定 | detail | 240 | 1 | 1 | 0
+QC_CUT_INSP | 数量 | 数量 | detail | 250 | 1 | 1 | 0
+QC_CUT_INSP | 不合格数量 | 不合格数量 | detail | 310 | 1 | 1 | 0
+QC_CUT_INSP | 规格型号 | 规格型号 | header | 90 | 1 | 1 | 0
+QC_CUT_INSP | 生产车间 | 生产车间 | header | 110 | 1 | 1 | 0
+QC_CUT_INSP | 报工数量 | 报工数量 | header | 120 | 1 | 1 | 0
+QC_CUT_INSP | 检验数量 | 检验数量 | header | 130 | 1 | 1 | 0
+QC_CUT_INSP | 检验日期 | 检验日期 | header | 150 | 1 | 1 | 0
+QC_CUT_INSP | 执行标准 | 执行标准 | header | 175 | 1 | 1 | 0
+QC_CUT_INSP | 审核人 | 审核人 | header | 200 | 0 | 1 | 0
+QC_CUT_INSP | 审核时间 | 审核时间 | header | 210 | 0 | 1 | 0
+QC_CUT_INSP | 处理方式 | 处理方式 | header,detail | 170 | 1 | 1 | 0
+QC_CUT_INSP | 备注 | 备注 | header,detail | 180 | 1 | 1 | 0
+QC_CUT_INSP | 单据编号 | 单据编号 | query,header | 10 | 0 | 1 | 0
+QC_CUT_INSP | 单据日期 | 单据日期 | query,header | 20 | 1 | 1 | 0
+QC_CUT_INSP | 工单号 | 工单号 | query,header | 30 | 1 | 1 | 0
+QC_CUT_INSP | 工单行号 | 工单行号 | query,header | 35 | 0 | 1 | 0
+QC_CUT_INSP | 报工单号 | 报工单号 | query,header | 40 | 1 | 1 | 0
+QC_CUT_INSP | 工序 | 工序 | query,header | 50 | 1 | 1 | 0
+QC_CUT_INSP | 批次号 | 批次号 | query,header | 60 | 1 | 1 | 0
+QC_CUT_INSP | 产品编码 | 产品编码 | query,header | 70 | 1 | 1 | 0
+QC_CUT_INSP | 产品名称 | 产品名称 | query,header | 80 | 1 | 1 | 0
+QC_CUT_INSP | 生产线 | 生产线 | query,header | 100 | 1 | 1 | 0
+QC_CUT_INSP | 检验员 | 检验员 | query,header | 140 | 1 | 1 | 0
+QC_CUT_INSP | 检验方案 | 检验方案 | query,header | 155 | 1 | 1 | 0
+QC_CUT_INSP | 总结论 | 总结论 | query,header | 160 | 1 | 1 | 0
+QC_CUT_INSP | 文件编码 | 文件编码 | query,header | 165 | 1 | 1 | 0
+QC_CUT_INSP | 单据状态 | 单据状态 | query,header | 190 | 0 | 1 | 0
+QC_MOLD_INSP | 表区 | 表区 | detail | 190 | 0 | 1 | 0
+QC_MOLD_INSP | 行号 | 行号 | detail | 200 | 0 | 1 | 0
+QC_MOLD_INSP | 检验项目 | 检验项目 | detail | 210 | 1 | 1 | 0
+QC_MOLD_INSP | 标准要求 | 标准要求 | detail | 220 | 1 | 1 | 0
+QC_MOLD_INSP | 实测数值 | 实测数值 | detail | 230 | 1 | 1 | 0
+QC_MOLD_INSP | 检验方法 | 检验方法 | detail | 235 | 1 | 1 | 0
+QC_MOLD_INSP | 判定 | 判定 | detail | 240 | 1 | 1 | 0
+QC_MOLD_INSP | 数量 | 数量 | detail | 250 | 1 | 1 | 0
+QC_MOLD_INSP | 不合格数量 | 不合格数量 | detail | 310 | 1 | 1 | 0
+QC_MOLD_INSP | 规格型号 | 规格型号 | header | 90 | 1 | 1 | 0
+QC_MOLD_INSP | 生产车间 | 生产车间 | header | 110 | 1 | 1 | 0
+QC_MOLD_INSP | 报工数量 | 报工数量 | header | 120 | 1 | 1 | 0
+QC_MOLD_INSP | 检验数量 | 检验数量 | header | 130 | 1 | 1 | 0
+QC_MOLD_INSP | 检验日期 | 检验日期 | header | 150 | 1 | 1 | 0
+QC_MOLD_INSP | 执行标准 | 执行标准 | header | 175 | 1 | 1 | 0
+QC_MOLD_INSP | 审核人 | 审核人 | header | 200 | 0 | 1 | 0
+QC_MOLD_INSP | 审核时间 | 审核时间 | header | 210 | 0 | 1 | 0
+QC_MOLD_INSP | 处理方式 | 处理方式 | header,detail | 170 | 1 | 1 | 0
+QC_MOLD_INSP | 备注 | 备注 | header,detail | 180 | 1 | 1 | 0
+QC_MOLD_INSP | 单据编号 | 单据编号 | query,header | 10 | 0 | 1 | 0
+QC_MOLD_INSP | 单据日期 | 单据日期 | query,header | 20 | 1 | 1 | 0
+QC_MOLD_INSP | 工单号 | 工单号 | query,header | 30 | 1 | 1 | 0
+QC_MOLD_INSP | 工单行号 | 工单行号 | query,header | 35 | 0 | 1 | 0
+QC_MOLD_INSP | 报工单号 | 报工单号 | query,header | 40 | 1 | 1 | 0
+QC_MOLD_INSP | 工序 | 工序 | query,header | 50 | 1 | 1 | 0
+QC_MOLD_INSP | 批次号 | 批次号 | query,header | 60 | 1 | 1 | 0
+QC_MOLD_INSP | 产品编码 | 产品编码 | query,header | 70 | 1 | 1 | 0
+QC_MOLD_INSP | 产品名称 | 产品名称 | query,header | 80 | 1 | 1 | 0
+QC_MOLD_INSP | 生产线 | 生产线 | query,header | 100 | 1 | 1 | 0
+QC_MOLD_INSP | 检验员 | 检验员 | query,header | 140 | 1 | 1 | 0
+QC_MOLD_INSP | 检验方案 | 检验方案 | query,header | 155 | 1 | 1 | 0
+QC_MOLD_INSP | 总结论 | 总结论 | query,header | 160 | 1 | 1 | 0
+QC_MOLD_INSP | 文件编码 | 文件编码 | query,header | 165 | 1 | 1 | 0
+QC_MOLD_INSP | 单据状态 | 单据状态 | query,header | 190 | 0 | 1 | 0
+QC_PROC_INSP | 表区 | 表区 | detail | 10 | 1 | 1 | 0
+QC_PROC_INSP | 行号 | 行号 | detail | 20 | 0 | 1 | 0
+QC_PROC_INSP | 检验项目 | 检验项目 | detail | 30 | 1 | 1 | 0
+QC_PROC_INSP | 检验要求 | 检验要求 | detail | 40 | 1 | 1 | 0
+QC_PROC_INSP | 检验方法 | 检验方法 | detail | 50 | 1 | 1 | 0
+QC_PROC_INSP | 检查频率 | 检查频率 | detail | 52 | 1 | 1 | 0
+QC_PROC_INSP | 检验仪器 | 检验仪器 | detail | 55 | 1 | 1 | 0
+QC_PROC_INSP | 抽检量 | 抽检量 | detail | 60 | 1 | 1 | 0
+QC_PROC_INSP | 实测数值 | 实测数值 | detail | 70 | 1 | 1 | 0
+QC_PROC_INSP | 测量值1 | 测量值1 | detail | 75 | 1 | 1 | 0
+QC_PROC_INSP | 测量值2 | 测量值2 | detail | 76 | 1 | 1 | 0
+QC_PROC_INSP | 测量值3 | 测量值3 | detail | 77 | 1 | 1 | 0
+QC_PROC_INSP | 测量值4 | 测量值4 | detail | 78 | 1 | 1 | 0
+QC_PROC_INSP | 测量值5 | 测量值5 | detail | 79 | 1 | 1 | 0
+QC_PROC_INSP | 单项判定 | 单项判定 | detail | 80 | 1 | 1 | 0
+QC_PROC_INSP | 格数 | 格数 | detail | 81 | 1 | 0 | 1
+QC_PROC_INSP | 测量值6 | 测量值6 | detail | 82 | 1 | 1 | 0
+QC_PROC_INSP | 测量值7 | 测量值7 | detail | 83 | 1 | 1 | 0
+QC_PROC_INSP | 测量值8 | 测量值8 | detail | 84 | 1 | 1 | 0
+QC_PROC_INSP | 测量值9 | 测量值9 | detail | 85 | 1 | 1 | 0
+QC_PROC_INSP | 测量值10 | 测量值10 | detail | 86 | 1 | 1 | 0
+QC_PROC_INSP | 不合格应对措施 | 不合格应对措施 | detail | 90 | 1 | 1 | 0
+QC_PROC_INSP | 不良数量 | 不良数量 | detail | 95 | 1 | 1 | 0
+QC_PROC_INSP | 结果判断 | 结果判断 | detail | 100 | 1 | 1 | 0
+QC_PROC_INSP | 备注2 | 备注2 | detail | 125 | 1 | 1 | 0
+QC_PROC_INSP | 规格型号 | 规格型号 | header | 120 | 1 | 1 | 0
+QC_PROC_INSP | 生产线 | 生产线 | header | 130 | 1 | 1 | 1
+QC_PROC_INSP | 生产车间 | 生产车间 | header | 140 | 1 | 1 | 1
+QC_PROC_INSP | 报工数量 | 报工数量 | header | 150 | 1 | 1 | 1
+QC_PROC_INSP | 抽检总量 | 抽检总量 | header | 160 | 1 | 1 | 0
+QC_PROC_INSP | 检验数量 | 检验数量 | header | 170 | 1 | 1 | 1
+QC_PROC_INSP | 检验日期 | 检验日期 | header | 190 | 1 | 1 | 0
+QC_PROC_INSP | 检验方案 | 检验方案 | header | 210 | 1 | 1 | 0
+QC_PROC_INSP | 文件编码 | 文件编码 | header | 220 | 1 | 1 | 1
+QC_PROC_INSP | 执行标准 | 执行标准 | header | 230 | 1 | 1 | 1
+QC_PROC_INSP | 审核人 | 审核人 | header | 270 | 0 | 1 | 1
+QC_PROC_INSP | 审核时间 | 审核时间 | header | 280 | 0 | 1 | 1
+QC_PROC_INSP | 处理方式 | 处理方式 | header,detail | 240 | 1 | 1 | 1
+QC_PROC_INSP | 备注 | 备注 | header,detail | 250 | 1 | 1 | 0
+QC_PROC_INSP | 单据编号 | 单据编号 | query,header | 10 | 0 | 1 | 0
+QC_PROC_INSP | 单据日期 | 单据日期 | query,header | 20 | 1 | 1 | 0
+QC_PROC_INSP | 检验时间 | 检验时间 | query,header | 30 | 1 | 1 | 1
+QC_PROC_INSP | 工单行号 | 工单行号 | query,header | 35 | 0 | 1 | 1
+QC_PROC_INSP | 检验类别 | 检验类别 | query,header | 40 | 1 | 1 | 0
+QC_PROC_INSP | 工单号 | 工单号 | query,header | 50 | 1 | 1 | 0
+QC_PROC_INSP | 报工单号 | 报工单号 | query,header | 60 | 1 | 1 | 1
+QC_PROC_INSP | 工序 | 工序 | query,header | 70 | 1 | 1 | 0
+QC_PROC_INSP | 批次号 | 批次号 | query,header | 80 | 1 | 1 | 0
+QC_PROC_INSP | 客户名称 | 客户名称 | query,header | 90 | 1 | 1 | 0
+QC_PROC_INSP | 产品编码 | 产品编码 | query,header | 100 | 1 | 1 | 0
+QC_PROC_INSP | 产品名称 | 产品名称 | query,header | 110 | 1 | 1 | 0
+QC_PROC_INSP | 检验员 | 检验员 | query,header | 180 | 1 | 1 | 0
+QC_PROC_INSP | 总结论 | 总结论 | query,header | 200 | 1 | 1 | 0
+QC_PROC_INSP | 单据状态 | 单据状态 | query,header | 260 | 0 | 1 | 1
+(156 rows)
+
+=== physical cols: qc_asm_insp_head ===
+name
+id
+单据编号
+单据日期
+工单号
+批次号
+报工单号
+工序
+产品编码
+产品名称
+规格型号
+生产线
+生产车间
+报工数量
+检验数量
+检验员
+检验日期
+总结论
+处理方式
+备注
+审核人
+审核时间
+asp_user1
+asp_time1
+asp_user2
+asp_time2
+asp_cancel
+单据状态
+检验方案
+文件编码
+执行标准
+工单行号
+(31 rows)
+
+=== physical cols: qc_asm_insp_detail ===
+name
+id
+单据编号
+行号
+检验项目
+标准要求
+实测数值
+判定
+数量
+处理方式
+备注
+asp_user1
+asp_time1
+asp_user2
+asp_time2
+asp_cancel
+表区
+检验方法
+合格数量
+不合格数量
+(19 rows)
+
+=== panel rows ===
+panel_code | panel_name | category | mode | line_table | head_table | prefix | module_group
+QC_ASM_INSP | 组装成品检验单 | 生产管理 | doc | qc_asm_insp_detail | qc_asm_insp_head | ZJ | 生产制造
+QC_PROC_INSP | 制程检验单 | 生产管理 | doc | qc_proc_insp_detail | qc_proc_insp_head | ZC | 生产制造
+(2 rows)
+
+=== rows in rd_insp_plan_head/detail ===
+planHead | planDetail | aliveHead
+3 | 4 | 3
+(1 rows)
+
+=== plan head sample ===
+单据编号 | 产品编号 | 标题 | 版本号 | 客户项目名称 | 产品整体尺寸
+IP-2026-10-0001 | null | null | null | null | null
+IP-TEST-0001 | C-84-02 | 【测试】出货检验项目控制计划(S阻垢炭棒 C-84-02) | V2026-10-13 | 对应客户121 | 对应产品整体尺寸
+IP-2026-10-0002 | null | null | null | null | null
+(3 rows)
+
+=== plan detail cols ===
+name
+id
+单据编号
+控制项目
+质量控制内容
+检测仪器
+控制标准及要求
+检验
+不合格应对措施
+检测频率
+取样方式
+检验内容
+控制方法
+asp_user1
+asp_time1
+asp_user2
+asp_time2
+asp_cancel
+检验类别
+序号
+备注
+备用1
+备用2
+备用3
+备用4
+备用5
+备用6
+备用7
+备用8
+备用9
+备用10
+备用11
+备用12
+备用13
+备用14
+备用15
+备用16
+备用17
+备用18
+备用19
+备用20
+(40 rows)
+
+=== plan detail sample ===
+单据编号 | 序号 | 控制项目 | 控制标准及要求 | 控制方法 | 检测频率 | 检测仪器 | 不合格应对措施 | 检验内容 | 质量控制内容
+IP-TEST-0001 | 10 | 外观-端盖两头 | 外观均匀完好，无弯曲变形、无明显划痕裂纹、无油污 | 目视 | 1PCS/一个生产批次 | 目视 | 挑出不良品 | 外观 | null
+IP-TEST-0001 | 20 | 尺寸-外径 | 外径：44.5±0.5mm | 游标卡尺测量 | 1PCS/一个生产批次 | 卡尺 | 挑出不良品 | 重要尺寸 | null
+IP-TEST-0001 | 30 | 出货重量 | ＞200克 | 电子秤称量 | 1PCS/一个生产批次 | 电子秤 | 挑出不良品 | 重量 | null
+IP-TEST-0001 | 40 | 余氯去除率 | ≥98% | 余氯去除率的加标试验，通入加标水5min后取样测试，计算去除率 | 型式检验 | 余氯检测仪 | 退货 | 性能 | null
+(4 rows)
+
+=== asm insp head rows ===
+单据编号 | 产品编码 | 产品名称 | 检验方案 | 文件编码 | 执行标准
+ZJ-2026-10-0005 | B-34-02 | S阻垢炭棒/滤芯 | null | null | null
+ZJ-2026-10-0006 | A-48-16 | A+级微矿化炭棒/滤芯 | null | null | null
+ZJ-2026-10-0007 | null | null | null | null | null
+ZJ-2026-10-0008 | T377 | PP复合阻垢炭棒/滤芯 | null | null | null
+ZJ-2026-10-0009 | null | null | null | null | null
+(5 rows)
+

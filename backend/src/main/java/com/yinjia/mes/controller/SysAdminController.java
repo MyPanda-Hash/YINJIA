@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
+import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.ReportService;
 import com.yinjia.mes.service.SysAdminService;
@@ -183,6 +184,20 @@ public class SysAdminController {
         dash.put("hasApproval", false);
         dash.put("actions", new String[][]{{"view", "可见"}});
         byModule.computeIfAbsent("我的桌面", k -> new ArrayList<>()).add(dash);
+        // 页面级虚拟面板(2026-10-16):订单结转 / 快速排产 / 工单排产 / 生产工单列表。
+        // 这四个界面**不是单据面板**(无 yj_panel 行,数据来自 plang / plang_pc / bl_so_order),
+        // 此前在矩阵里无从勾选 ⇒ 任何登录账号都能看到并进入(菜单无 panelCode 时 filterMenuTree 放行)。
+        // 与 DASHBOARD 同一先例:不插 yj_panel 行(避免污染报表/选单/字段配置等 registry.all() 下游),
+        // 授权照旧落 yj_role_panel;动作集按页面特性裁剪 —— 定义与理由见 PagePanelRegistry。
+        for (PagePanelRegistry.PagePanelDef def : PagePanelRegistry.ALL) {
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("panelCode", def.code());
+            p.put("panelName", def.name());
+            p.put("module", def.module());
+            p.put("hasApproval", false);
+            p.put("actions", def.actions());
+            byModule.computeIfAbsent(def.module(), k -> new ArrayList<>()).add(p);
+        }
         for (PanelRegistry.PanelDef def : registry.all()) {
             Map<String, Object> p = new LinkedHashMap<>();
             String group = ReportService.navGroup(def.moduleName());

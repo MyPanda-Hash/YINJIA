@@ -39,7 +39,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(169 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(171 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -130,14 +130,12 @@ table:qc_jjf   # 紧急放行申请单头表——面板 QC_JJF
 table:qc_jjf_detail   # 紧急放行申请单行表——面板 QC_JJF 明细
 table:qc_asm_insp_head   # 组装成品检验单头表(报工审核自动生成;9.29 批次④——面板 QC_ASM_INSP)
 table:qc_asm_insp_detail   # 组装成品检验单行表(合格/不合格各一行;合格转库存/不合格待处理)
-table:qc_cut_insp_head   # 切炭检验单头表(报工审核自动生成——面板 QC_CUT_INSP)
-table:qc_cut_insp_detail   # 切炭检验单行表(通用模板:检验项目/标准/实测/判定)
 table:qc_lyb   # 来料异常分析报告头表——面板 QC_LYB;供应商/物料批次/不良率
 table:qc_lyb_detail   # 来料异常分析报告行表——面板 QC_LYB 明细
-table:qc_mold_insp_head   # 成型检验单头表(报工审核自动生成——面板 QC_MOLD_INSP)
-table:qc_mold_insp_detail   # 成型检验单行表(通用模板:检验项目/标准/实测/判定)
-table:qc_fin_spec_detail   # 成品检验规范行表——面板 QC_FIN_SPEC 明细(按 表区 分三块:修订履历/检验项目/处理方式;「检验对象」列区分子节;migrate-qc-fin-spec.sql 新建)
-table:qc_fin_spec_head   # 成品检验规范头表——面板 QC_FIN_SPEC(8 份受控文件归纳的统一格式:修订履历+正文五段+检验项目分节+处理方式;报工审核自动生成草稿;migrate-qc-fin-spec.sql 新建)
+table:qc_proc_insp_detail   # 制程检验单行表——面板 QC_PROC_INSP 明细(表区=外观/尺寸/重量/功能性测试;尺寸与重量实测可含多个抽样值;migrate-qc-proc-insp.sql 新建)
+table:qc_proc_insp_head   # 制程检验单头表——面板 QC_PROC_INSP(2026-10-12 按《生产相关品质检验.xlsx》第3步建;检验类别区分 首件检验/制程检验;报工审核可自动生成)
+table:qc_first_insp_head   # 首件检验单头表——面板 QC_FIRST_INSP(2026-10-15;实现方式照组装成品检验单;本(工单号,批次号,工单行号)第一张报工审核时自动出草稿;migrate-first-insp.sql 新建)
+table:qc_first_insp_detail   # 首件检验单行表——面板 QC_FIRST_INSP 明细(检验项目/检验要求/检验方法/检查频率/实测数值/测量值1..5/结果判断;生成时按《成型工艺清单》RD_MOLD_PROC 的检验要求预铺 5 项)
 table:qc_return   # 暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码
 table:qc_return_detail   # 暂收退料单行表——面板 QC_RETURN 明细
 table:qc_scp   # 试产材料使用申请单头表——面板 QC_SCP
@@ -230,13 +228,21 @@ table:plang_pc   # 工单排产
 table:Porder   # 采购单
 table:s_log   # 上机日志
 table:scjl   # 生产记录
+view:v_wo_completion_detail   # 完工明细只读视图(scjl已完工未作废记录;WO_COMPLETION_LIST)
 
 # ---- 例外保留(3 张;未用但按上列理由不删) ----
 table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_hash 幂等记录)
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
-# 合计 205 张在册 + 3 张例外保留 = 208 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 合计 212 张在册 + 3 张例外保留 = 215 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 2026-10-16 下架「成型检验单 QC_MOLD_INSP / 切炭检验单 QC_CUT_INSP / 成品检验规范 QC_FIN_SPEC」3 张面板,
+# 2026-10-17 合并 origin/main(1887d0a0):两侧新增表全部登记 ——
+#   远端侧 bd_stock_close/bl_stock_close(库存月结)等,本地侧 qc_proc_insp_*/qc_first_insp_* 等检验单表;
+#   两侧的"撤销登记"逐条生效(删除行按 no-touch 规则自动合并)。分节实点:yj_* 26 + 自有业务 171 +
+#   遗留 15 = **212 在册** + 例外 3 = 215(旧的 205/208 是合并前本地侧的数,已按实点更正)。
+#   6 表同步撤销登记:qc_mold_insp_head/_detail、qc_cut_insp_head/_detail、qc_fin_spec_head/_detail
+#   (migrate-drop-qc-mold-cut-finspec-20261016.sql;在册 211 → **205**)。
 # 2026-10-09 合并 origin/main:远端新增 13 表全部登记(qc_{mold,cut,asm}_insp_head/_detail、wo_transfer_log、
 #   wo_split_log、wo_process_line、rd_asm_bom_head/_detail、rd_mold_formula_head/_detail);
 #   本地下架 17 表同步撤销登记(请购单/其他出入库/委外 10 张 + 品质管理无用 5 面板 7 张)。

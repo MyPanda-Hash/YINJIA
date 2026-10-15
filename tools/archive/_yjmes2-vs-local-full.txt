@@ -1,0 +1,670 @@
+库结构完整对比报告(只读,不截断)
+参考库 = HSDZ_MES_YJ2   (来自 db\yjmes2.bak 的还原库)
+目标库 = HSDZ_MES   (本机现役库)
+
+=== 1. 表(sys.tables) ===
+  参考 219 / 目标 213  |  仅参考 8  仅目标 2
+  -- 仅参考库有(目标库缺)--
+    [缺] dbo.dm_langue
+    [缺] dbo.gscs
+    [缺] dbo.mate_bak_20261013
+    [缺] dbo.permission
+    [缺] dbo.rd_dev_task_bak_20261013
+    [缺] dbo.s_commdata
+    [缺] dbo.s_sys
+    [缺] dbo.s_xtcs
+  -- 仅目标库有(参考库缺)--
+    [多] dbo.qc_proc_insp_detail
+    [多] dbo.qc_proc_insp_head
+
+=== 3. 视图(sys.views) ===
+  参考 97 / 目标 97  |  仅参考 0  仅目标 0
+  -- 仅参考库有(目标库缺)--
+  -- 仅目标库有(参考库缺)--
+
+=== 4. 面板(yj_panel.panel_code) ===
+  参考 125 / 目标 126  |  仅参考 0  仅目标 1
+  -- 仅参考库有(目标库缺)--
+  -- 仅目标库有(参考库缺)--
+    [多] QC_PROC_INSP
+
+=== 5. 面板字段(yj_field:面板.字段名)===
+  参考 3807 / 目标 3828  |  仅参考 33  仅目标 54
+  按面板统计(仅参考 / 仅目标):
+    QC_INSP_REQ  仅参考 1 / 仅目标 0
+    QC_INSP_REQ_SERIES  仅参考 30 / 仅目标 0
+    QC_PROC_INSP  仅参考 0 / 仅目标 54
+    RD_ALKALINE  仅参考 2 / 仅目标 0
+  -- 仅参考库有:逐条 --
+    [缺] QC_INSP_REQ.备用101
+    [缺] QC_INSP_REQ_SERIES.备用1
+    [缺] QC_INSP_REQ_SERIES.备用10
+    [缺] QC_INSP_REQ_SERIES.备用11
+    [缺] QC_INSP_REQ_SERIES.备用12
+    [缺] QC_INSP_REQ_SERIES.备用121
+    [缺] QC_INSP_REQ_SERIES.备用122
+    [缺] QC_INSP_REQ_SERIES.备用123
+    [缺] QC_INSP_REQ_SERIES.备用124
+    [缺] QC_INSP_REQ_SERIES.备用161
+    [缺] QC_INSP_REQ_SERIES.备用162
+    [缺] QC_INSP_REQ_SERIES.备用163
+    [缺] QC_INSP_REQ_SERIES.备用164
+    [缺] QC_INSP_REQ_SERIES.备用165
+    [缺] QC_INSP_REQ_SERIES.备用166
+    [缺] QC_INSP_REQ_SERIES.备用167
+    [缺] QC_INSP_REQ_SERIES.备用168
+    [缺] QC_INSP_REQ_SERIES.备用169
+    [缺] QC_INSP_REQ_SERIES.备用170
+    [缺] QC_INSP_REQ_SERIES.备用171
+    [缺] QC_INSP_REQ_SERIES.备用172
+    [缺] QC_INSP_REQ_SERIES.备用173
+    [缺] QC_INSP_REQ_SERIES.备用174
+    [缺] QC_INSP_REQ_SERIES.备用2
+    [缺] QC_INSP_REQ_SERIES.备用3
+    [缺] QC_INSP_REQ_SERIES.备用4
+    [缺] QC_INSP_REQ_SERIES.备用5
+    [缺] QC_INSP_REQ_SERIES.备用6
+    [缺] QC_INSP_REQ_SERIES.备用7
+    [缺] QC_INSP_REQ_SERIES.备用8
+    [缺] QC_INSP_REQ_SERIES.备用9
+    [缺] RD_ALKALINE.备用2
+    [缺] RD_ALKALINE.备用3
+  -- 仅目标库有:逐条 --
+    [多] QC_PROC_INSP.不合格应对措施
+    [多] QC_PROC_INSP.不良数量
+    [多] QC_PROC_INSP.产品名称
+    [多] QC_PROC_INSP.产品编码
+    [多] QC_PROC_INSP.单据日期
+    [多] QC_PROC_INSP.单据状态
+    [多] QC_PROC_INSP.单据编号
+    [多] QC_PROC_INSP.单项判定
+    [多] QC_PROC_INSP.处理方式
+    [多] QC_PROC_INSP.备注
+    [多] QC_PROC_INSP.备注2
+    [多] QC_PROC_INSP.实测数值
+    [多] QC_PROC_INSP.审核人
+    [多] QC_PROC_INSP.审核时间
+    [多] QC_PROC_INSP.客户名称
+    [多] QC_PROC_INSP.工单号
+    [多] QC_PROC_INSP.工单行号
+    [多] QC_PROC_INSP.工序
+    [多] QC_PROC_INSP.总结论
+    [多] QC_PROC_INSP.执行标准
+    [多] QC_PROC_INSP.批次号
+    [多] QC_PROC_INSP.报工单号
+    [多] QC_PROC_INSP.报工数量
+    [多] QC_PROC_INSP.抽检总量
+    [多] QC_PROC_INSP.抽检量
+    [多] QC_PROC_INSP.文件编码
+    [多] QC_PROC_INSP.格数
+    [多] QC_PROC_INSP.检查频率
+    [多] QC_PROC_INSP.检验仪器
+    [多] QC_PROC_INSP.检验员
+    [多] QC_PROC_INSP.检验数量
+    [多] QC_PROC_INSP.检验方案
+    [多] QC_PROC_INSP.检验方法
+    [多] QC_PROC_INSP.检验日期
+    [多] QC_PROC_INSP.检验时间
+    [多] QC_PROC_INSP.检验类别
+    [多] QC_PROC_INSP.检验要求
+    [多] QC_PROC_INSP.检验项目
+    [多] QC_PROC_INSP.测量值1
+    [多] QC_PROC_INSP.测量值10
+    [多] QC_PROC_INSP.测量值2
+    [多] QC_PROC_INSP.测量值3
+    [多] QC_PROC_INSP.测量值4
+    [多] QC_PROC_INSP.测量值5
+    [多] QC_PROC_INSP.测量值6
+    [多] QC_PROC_INSP.测量值7
+    [多] QC_PROC_INSP.测量值8
+    [多] QC_PROC_INSP.测量值9
+    [多] QC_PROC_INSP.生产线
+    [多] QC_PROC_INSP.生产车间
+    [多] QC_PROC_INSP.结果判断
+    [多] QC_PROC_INSP.行号
+    [多] QC_PROC_INSP.表区
+    [多] QC_PROC_INSP.规格型号
+
+=== 2. 列(sys.columns)===
+  参考库共 9934 列 / 目标库共 9706 列
+
+-- 2.1 仅参考库有(目标库缺)297 列:按表分组 --
+    dbo.dm_langue  22 列
+    dbo.gscs  55 列
+    dbo.inh  11 列
+    dbo.mate_bak_20261013  56 列
+    dbo.outh  11 列
+    dbo.permission  18 列
+    dbo.rd_dev_task_bak_20261013  33 列
+    dbo.s_commdata  28 列
+    dbo.s_sys  46 列
+    dbo.s_xtcs  17 列
+
+-- 2.1b 仅参考库有:逐列全量 --
+    [缺] dbo.dm_langue.asp_cancel  [nvarchar(2) NULL]
+    [缺] dbo.dm_langue.asp_print  [int(4) NULL]
+    [缺] dbo.dm_langue.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.dm_langue.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.dm_langue.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.dm_langue.asp_time4  [datetime2(8) NULL]
+    [缺] dbo.dm_langue.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.dm_langue.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.dm_langue.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.dm_langue.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.dm_langue.bz  [nvarchar(510) NULL]
+    [缺] dbo.dm_langue.chs  [nvarchar(510) NULL]
+    [缺] dbo.dm_langue.cht  [nvarchar(510) NULL]
+    [缺] dbo.dm_langue.comm  [nvarchar(40) NOT NULL]
+    [缺] dbo.dm_langue.eng  [nvarchar(510) NULL]
+    [缺] dbo.dm_langue.frm  [nvarchar(80) NULL]
+    [缺] dbo.dm_langue.id  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.dm_langue.lb_hi  [int(4) NULL]
+    [缺] dbo.dm_langue.lb_wi  [int(4) NULL]
+    [缺] dbo.dm_langue.oth  [nvarchar(510) NULL]
+    [缺] dbo.dm_langue.type  [nvarchar(400) NULL]
+    [缺] dbo.dm_langue.xc  [int(4) NULL]
+    [缺] dbo.gscs.asp_cancel  [nvarchar(2) NULL]
+    [缺] dbo.gscs.asp_print  [int(4) NULL]
+    [缺] dbo.gscs.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.gscs.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.gscs.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.gscs.asp_time4  [datetime2(8) NULL]
+    [缺] dbo.gscs.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.gscs.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.gscs.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.gscs.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.gscs.beginday  [datetime2(8) NULL]
+    [缺] dbo.gscs.bz  [nvarchar(100) NULL]
+    [缺] dbo.gscs.comm  [nvarchar(40) NOT NULL]
+    [缺] dbo.gscs.comqty  [int(4) NULL]
+    [缺] dbo.gscs.djzk  [nvarchar(40) NULL]
+    [缺] dbo.gscs.endday  [datetime2(8) NULL]
+    [缺] dbo.gscs.fkc  [nvarchar(2) NULL]
+    [缺] dbo.gscs.ghf  [float(8) NULL]
+    [缺] dbo.gscs.gsdh  [nvarchar(100) NULL]
+    [缺] dbo.gscs.gsgs  [nvarchar(40) NULL]
+    [缺] dbo.gscs.gsmc  [nvarchar(100) NOT NULL]
+    [缺] dbo.gscs.gszg  [nvarchar(40) NULL]
+    [缺] dbo.gscs.hg  [int(4) NULL]
+    [缺] dbo.gscs.hzb  [int(4) NULL]
+    [缺] dbo.gscs.id  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.gscs.jsfs  [nvarchar(10) NULL]
+    [缺] dbo.gscs.kjjm  [nvarchar(40) NULL]
+    [缺] dbo.gscs.maxrecord  [int(4) NULL]
+    [缺] dbo.gscs.mobqty  [int(4) NULL]
+    [缺] dbo.gscs.msbdh  [nvarchar(40) NULL]
+    [缺] dbo.gscs.mybs  [int(4) NULL]
+    [缺] dbo.gscs.mysj  [int(4) NULL]
+    [缺] dbo.gscs.pfwj  [nvarchar(100) NULL]
+    [缺] dbo.gscs.pos_dj  [nvarchar(4) NULL]
+    [缺] dbo.gscs.rem  [nvarchar(400) NULL]
+    [缺] dbo.gscs.rem1  [nvarchar(400) NULL]
+    [缺] dbo.gscs.sczg  [nvarchar(100) NULL]
+    [缺] dbo.gscs.sf  [nvarchar(100) NULL]
+    [缺] dbo.gscs.tm_cd  [float(8) NULL]
+    [缺] dbo.gscs.tm_gd  [float(8) NULL]
+    [缺] dbo.gscs.tm_sbj  [float(8) NULL]
+    [缺] dbo.gscs.tm_sxjj  [float(8) NULL]
+    [缺] dbo.gscs.tm_zbj  [float(8) NULL]
+    [缺] dbo.gscs.tm_zyjj  [float(8) NULL]
+    [缺] dbo.gscs.tpwz  [nvarchar(100) NULL]
+    [缺] dbo.gscs.ver  [nvarchar(10) NULL]
+    [缺] dbo.gscs.web  [nvarchar(100) NULL]
+    [缺] dbo.gscs.xpbt  [nvarchar(100) NULL]
+    [缺] dbo.gscs.xpsm1  [nvarchar(100) NULL]
+    [缺] dbo.gscs.xpsm2  [nvarchar(100) NULL]
+    [缺] dbo.gscs.xpzs  [nvarchar(2) NULL]
+    [缺] dbo.gscs.ysfh  [nvarchar(20) NULL]
+    [缺] dbo.gscs.yspy  [nvarchar(20) NULL]
+    [缺] dbo.gscs.ysys  [nvarchar(20) NULL]
+    [缺] dbo.gscs.zzb  [int(4) NULL]
+    [缺] dbo.inh.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.inh.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.inh.委外ID  [float(8) NULL]
+    [缺] dbo.inh.委外单号  [nvarchar(48) NULL]
+    [缺] dbo.inh.审核  [nvarchar(4) NULL]
+    [缺] dbo.inh.工单ID  [float(8) NULL]
+    [缺] dbo.inh.工单号  [nvarchar(48) NULL]
+    [缺] dbo.inh.订单ID  [float(8) NULL]
+    [缺] dbo.inh.订单号  [nvarchar(48) NULL]
+    [缺] dbo.inh.采购ID  [float(8) NULL]
+    [缺] dbo.inh.采购单号  [nvarchar(48) NULL]
+    [缺] dbo.mate_bak_20261013.OpComponentId  [int(4) NULL]
+    [缺] dbo.mate_bak_20261013.asp_cancel  [varchar(1) NULL]
+    [缺] dbo.mate_bak_20261013.asp_print  [int(4) NULL]
+    [缺] dbo.mate_bak_20261013.asp_time1  [datetime(8) NULL]
+    [缺] dbo.mate_bak_20261013.asp_time2  [datetime(8) NULL]
+    [缺] dbo.mate_bak_20261013.asp_time3  [datetime(8) NULL]
+    [缺] dbo.mate_bak_20261013.asp_time4  [datetime(8) NULL]
+    [缺] dbo.mate_bak_20261013.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.mate_bak_20261013.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.mate_bak_20261013.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.mate_bak_20261013.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.mate_bak_20261013.bz  [nvarchar(500) NULL]
+    [缺] dbo.mate_bak_20261013.bzl  [float(8) NULL]
+    [缺] dbo.mate_bak_20261013.color1  [nvarchar(60) NULL]
+    [缺] dbo.mate_bak_20261013.color2  [nvarchar(60) NULL]
+    [缺] dbo.mate_bak_20261013.comm  [nvarchar(40) NOT NULL]
+    [缺] dbo.mate_bak_20261013.gg2  [nvarchar(500) NULL]
+    [缺] dbo.mate_bak_20261013.id  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.mate_bak_20261013.in_dj  [float(8) NULL]
+    [缺] dbo.mate_bak_20261013.jine  [float(8) NULL]
+    [缺] dbo.mate_bak_20261013.jldw1  [nvarchar(8) NULL]
+    [缺] dbo.mate_bak_20261013.jldw2  [nvarchar(8) NULL]
+    [缺] dbo.mate_bak_20261013.lot_no1  [nvarchar(60) NULL]
+    [缺] dbo.mate_bak_20261013.lot_no2  [nvarchar(60) NULL]
+    [缺] dbo.mate_bak_20261013.m_date  [datetime(8) NULL]
+    [缺] dbo.mate_bak_20261013.m_no  [nvarchar(28) NOT NULL]
+    [缺] dbo.mate_bak_20261013.shl  [float(8) NULL]
+    [缺] dbo.mate_bak_20261013.siz1  [nvarchar(60) NULL]
+    [缺] dbo.mate_bak_20261013.siz2  [nvarchar(60) NULL]
+    [缺] dbo.mate_bak_20261013.sl2  [float(8) NULL]
+    [缺] dbo.mate_bak_20261013.wzdm1  [nvarchar(80) NULL]
+    [缺] dbo.mate_bak_20261013.wzdm2  [nvarchar(80) NOT NULL]
+    [缺] dbo.mate_bak_20261013.wzmc1  [nvarchar(500) NULL]
+    [缺] dbo.mate_bak_20261013.wzmc2  [nvarchar(500) NULL]
+    [缺] dbo.mate_bak_20261013.xc  [int(4) NULL]
+    [缺] dbo.mate_bak_20261013.ywdm  [nvarchar(16) NULL]
+    [缺] dbo.mate_bak_20261013.备用1  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用10  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用11  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用12  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用13  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用14  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用15  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用16  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用17  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用18  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用19  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用2  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用20  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用3  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用4  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用5  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用6  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用7  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用8  [nvarchar(1000) NULL]
+    [缺] dbo.mate_bak_20261013.备用9  [nvarchar(1000) NULL]
+    [缺] dbo.outh.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.outh.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.outh.委外ID  [float(8) NULL]
+    [缺] dbo.outh.委外单号  [nvarchar(48) NULL]
+    [缺] dbo.outh.审核  [nvarchar(4) NULL]
+    [缺] dbo.outh.工单ID  [float(8) NULL]
+    [缺] dbo.outh.工单号  [nvarchar(48) NULL]
+    [缺] dbo.outh.订单ID  [float(8) NULL]
+    [缺] dbo.outh.订单号  [nvarchar(48) NULL]
+    [缺] dbo.outh.采购ID  [float(8) NULL]
+    [缺] dbo.outh.采购单号  [nvarchar(48) NULL]
+    [缺] dbo.permission.COMM  [nvarchar(40) NOT NULL]
+    [缺] dbo.permission.GROP  [nvarchar(80) NULL]
+    [缺] dbo.permission.ID  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.permission.MODULE1  [nvarchar(40) NOT NULL]
+    [缺] dbo.permission.MODULE_NA  [nvarchar(40) NULL]
+    [缺] dbo.permission.REMARK  [nvarchar(400) NULL]
+    [缺] dbo.permission.RW  [nvarchar(20) NOT NULL]
+    [缺] dbo.permission.USERID  [nvarchar(40) NOT NULL]
+    [缺] dbo.permission.asp_cancel  [nvarchar(2) NULL]
+    [缺] dbo.permission.asp_print  [int(4) NULL]
+    [缺] dbo.permission.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.permission.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.permission.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.permission.asp_time4  [datetime2(8) NULL]
+    [缺] dbo.permission.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.permission.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.permission.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.permission.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.asp_cancel  [char(1) NOT NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.asp_user1  [nvarchar(200) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.asp_user2  [nvarchar(200) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.id  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.rd_dev_task_bak_20261013.下发人  [nvarchar(200) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.下发时间  [datetime2(8) NOT NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.产品名称  [nvarchar(400) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.产品编号  [nvarchar(400) NOT NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用1  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用10  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用11  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用12  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用13  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用14  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用15  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用16  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用17  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用18  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用19  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用2  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用20  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用3  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用4  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用5  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用6  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用7  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用8  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.备用9  [nvarchar(1000) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.源单据号  [nvarchar(200) NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.目标面板  [varchar(50) NOT NULL]
+    [缺] dbo.rd_dev_task_bak_20261013.负责人  [nvarchar(100) NULL]
+    [缺] dbo.s_commdata.COMM  [nvarchar(40) NOT NULL]
+    [缺] dbo.s_commdata.CTMC  [nvarchar(100) NULL]
+    [缺] dbo.s_commdata.DSFS  [tinyint(1) NULL]
+    [缺] dbo.s_commdata.FCSJ  [datetime2(8) NULL]
+    [缺] dbo.s_commdata.FSZ  [nvarchar(36) NULL]
+    [缺] dbo.s_commdata.ID  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.s_commdata.JBXX  [nvarchar(200) NULL]
+    [缺] dbo.s_commdata.JSZ  [nvarchar(36) NOT NULL]
+    [缺] dbo.s_commdata.KEY  [nvarchar(40) NULL]
+    [缺] dbo.s_commdata.KEYZ  [nvarchar(40) NULL]
+    [缺] dbo.s_commdata.REMARK  [nvarchar(510) NULL]
+    [缺] dbo.s_commdata.SYWJ  [nvarchar(40) NULL]
+    [缺] dbo.s_commdata.SZSJ  [datetime2(8) NOT NULL]
+    [缺] dbo.s_commdata.TXF  [tinyint(1) NULL]
+    [缺] dbo.s_commdata.XC  [int(4) NOT NULL]
+    [缺] dbo.s_commdata.YDF  [tinyint(1) NULL]
+    [缺] dbo.s_commdata.YDSJ  [datetime2(8) NULL]
+    [缺] dbo.s_commdata.ZDYXX  [nvarchar(500) NULL]
+    [缺] dbo.s_commdata.asp_cancel  [nvarchar(2) NULL]
+    [缺] dbo.s_commdata.asp_print  [int(4) NULL]
+    [缺] dbo.s_commdata.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.s_commdata.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.s_commdata.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.s_commdata.asp_time4  [datetime2(8) NULL]
+    [缺] dbo.s_commdata.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.s_commdata.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.s_commdata.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.s_commdata.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.BZ  [nvarchar(500) NULL]
+    [缺] dbo.s_sys.CHS  [nvarchar(500) NULL]
+    [缺] dbo.s_sys.CHT  [nvarchar(500) NULL]
+    [缺] dbo.s_sys.COMM  [nvarchar(40) NOT NULL]
+    [缺] dbo.s_sys.Cur_Lang  [nvarchar(20) NULL]
+    [缺] dbo.s_sys.DISP_ORDER  [int(4) NULL]
+    [缺] dbo.s_sys.DISP_YN  [nchar(2) NULL]
+    [缺] dbo.s_sys.ENG  [nvarchar(500) NULL]
+    [缺] dbo.s_sys.FILE_STR  [nvarchar(100) NULL]
+    [缺] dbo.s_sys.FLIE_NA  [nvarchar(300) NULL]
+    [缺] dbo.s_sys.GMF  [nvarchar(2) NULL]
+    [缺] dbo.s_sys.GROP  [nvarchar(80) NULL]
+    [缺] dbo.s_sys.HEAD_YN  [nchar(2) NULL]
+    [缺] dbo.s_sys.ID  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.s_sys.ISDATE  [nchar(2) NULL]
+    [缺] dbo.s_sys.ISDOUBLE  [nchar(2) NULL]
+    [缺] dbo.s_sys.KEY_YN  [nchar(2) NULL]
+    [缺] dbo.s_sys.LANKD  [int(4) NULL]
+    [缺] dbo.s_sys.LB_HI  [int(4) NULL]
+    [缺] dbo.s_sys.LB_LEFT  [int(4) NULL]
+    [缺] dbo.s_sys.LB_LEN  [int(4) NULL]
+    [缺] dbo.s_sys.LB_TAB  [nchar(2) NULL]
+    [缺] dbo.s_sys.LB_TOP  [int(4) NULL]
+    [缺] dbo.s_sys.LB_TYPE  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.LB_VALUE  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.LB_WI  [int(4) NULL]
+    [缺] dbo.s_sys.LB_YN  [nchar(2) NULL]
+    [缺] dbo.s_sys.Listna  [nvarchar(500) NULL]
+    [缺] dbo.s_sys.MC  [nvarchar(40) NOT NULL]
+    [缺] dbo.s_sys.OTH  [nvarchar(500) NULL]
+    [缺] dbo.s_sys.REMARK  [nvarchar(510) NULL]
+    [缺] dbo.s_sys.SYSMENUNO  [nvarchar(100) NULL]
+    [缺] dbo.s_sys.USERNA  [nvarchar(40) NOT NULL]
+    [缺] dbo.s_sys.VER  [nvarchar(10) NULL]
+    [缺] dbo.s_sys.XC  [int(4) NOT NULL]
+    [缺] dbo.s_sys.asp_cancel  [nvarchar(2) NULL]
+    [缺] dbo.s_sys.asp_print  [int(4) NULL]
+    [缺] dbo.s_sys.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.s_sys.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.s_sys.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.s_sys.asp_time4  [datetime2(8) NULL]
+    [缺] dbo.s_sys.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.s_sys.control  [nvarchar(500) NULL]
+    [缺] dbo.s_xtcs.asp_cancel  [nvarchar(2) NULL]
+    [缺] dbo.s_xtcs.asp_print  [int(4) NULL]
+    [缺] dbo.s_xtcs.asp_time1  [datetime2(8) NULL]
+    [缺] dbo.s_xtcs.asp_time2  [datetime2(8) NULL]
+    [缺] dbo.s_xtcs.asp_time3  [datetime2(8) NULL]
+    [缺] dbo.s_xtcs.asp_time4  [datetime2(8) NULL]
+    [缺] dbo.s_xtcs.asp_user1  [nvarchar(40) NULL]
+    [缺] dbo.s_xtcs.asp_user2  [nvarchar(40) NULL]
+    [缺] dbo.s_xtcs.asp_user3  [nvarchar(40) NULL]
+    [缺] dbo.s_xtcs.asp_user4  [nvarchar(40) NULL]
+    [缺] dbo.s_xtcs.bz  [nvarchar(510) NULL]
+    [缺] dbo.s_xtcs.comm  [nvarchar(40) NOT NULL]
+    [缺] dbo.s_xtcs.dm  [nvarchar(30) NULL]
+    [缺] dbo.s_xtcs.id  [int(4) NOT NULL IDENTITY]
+    [缺] dbo.s_xtcs.mc  [nvarchar(40) NULL]
+    [缺] dbo.s_xtcs.sm  [nvarchar(100) NULL]
+    [缺] dbo.s_xtcs.value  [nvarchar(60) NULL]
+
+-- 2.2 仅目标库有(参考库缺)69 列:按表分组 --
+    dbo.qc_proc_insp_detail  34 列
+    dbo.qc_proc_insp_head  35 列
+
+-- 2.2b 仅目标库有:逐列全量 --
+    [多] dbo.qc_proc_insp_detail.asp_cancel  [nvarchar(2) NULL]
+    [多] dbo.qc_proc_insp_detail.asp_time1  [datetime2(8) NULL]
+    [多] dbo.qc_proc_insp_detail.asp_time2  [datetime2(8) NULL]
+    [多] dbo.qc_proc_insp_detail.asp_user1  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_detail.asp_user2  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_detail.id  [bigint(8) NOT NULL IDENTITY]
+    [多] dbo.qc_proc_insp_detail.不合格应对措施  [nvarchar(1000) NULL]
+    [多] dbo.qc_proc_insp_detail.不良数量  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.单据编号  [nvarchar(100) NOT NULL]
+    [多] dbo.qc_proc_insp_detail.单项判定  [nvarchar(40) NULL]
+    [多] dbo.qc_proc_insp_detail.处理方式  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_detail.备注  [nvarchar(400) NULL]
+    [多] dbo.qc_proc_insp_detail.备注2  [nvarchar(400) NULL]
+    [多] dbo.qc_proc_insp_detail.实测数值  [nvarchar(1000) NULL]
+    [多] dbo.qc_proc_insp_detail.抽检量  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.格数  [int(4) NULL]
+    [多] dbo.qc_proc_insp_detail.检查频率  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_detail.检验仪器  [nvarchar(200) NULL]
+    [多] dbo.qc_proc_insp_detail.检验方法  [nvarchar(2000) NULL]
+    [多] dbo.qc_proc_insp_detail.检验要求  [nvarchar(1000) NULL]
+    [多] dbo.qc_proc_insp_detail.检验项目  [nvarchar(200) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值1  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值10  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值2  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值3  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值4  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值5  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值6  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值7  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值8  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.测量值9  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_detail.结果判断  [nvarchar(40) NULL]
+    [多] dbo.qc_proc_insp_detail.行号  [int(4) NULL]
+    [多] dbo.qc_proc_insp_detail.表区  [nvarchar(40) NULL]
+    [多] dbo.qc_proc_insp_head.asp_cancel  [nvarchar(2) NULL]
+    [多] dbo.qc_proc_insp_head.asp_time1  [datetime2(8) NULL]
+    [多] dbo.qc_proc_insp_head.asp_time2  [datetime2(8) NULL]
+    [多] dbo.qc_proc_insp_head.asp_user1  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.asp_user2  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.id  [bigint(8) NOT NULL IDENTITY]
+    [多] dbo.qc_proc_insp_head.产品名称  [nvarchar(400) NULL]
+    [多] dbo.qc_proc_insp_head.产品编码  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.单据日期  [date(3) NULL]
+    [多] dbo.qc_proc_insp_head.单据状态  [nvarchar(40) NULL]
+    [多] dbo.qc_proc_insp_head.单据编号  [nvarchar(100) NOT NULL]
+    [多] dbo.qc_proc_insp_head.处理方式  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.备注  [nvarchar(1000) NULL]
+    [多] dbo.qc_proc_insp_head.审核人  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.审核时间  [datetime2(8) NULL]
+    [多] dbo.qc_proc_insp_head.客户名称  [nvarchar(400) NULL]
+    [多] dbo.qc_proc_insp_head.工单号  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.工单行号  [int(4) NULL]
+    [多] dbo.qc_proc_insp_head.工序  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.总结论  [nvarchar(40) NULL]
+    [多] dbo.qc_proc_insp_head.执行标准  [nvarchar(400) NULL]
+    [多] dbo.qc_proc_insp_head.批次号  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.报工单号  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.报工数量  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_head.抽检总量  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_head.文件编码  [nvarchar(200) NULL]
+    [多] dbo.qc_proc_insp_head.检验员  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.检验数量  [decimal(9) NULL]
+    [多] dbo.qc_proc_insp_head.检验方案  [nvarchar(200) NULL]
+    [多] dbo.qc_proc_insp_head.检验日期  [date(3) NULL]
+    [多] dbo.qc_proc_insp_head.检验时间  [nvarchar(60) NULL]
+    [多] dbo.qc_proc_insp_head.检验类别  [nvarchar(40) NULL]
+    [多] dbo.qc_proc_insp_head.生产线  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.生产车间  [nvarchar(100) NULL]
+    [多] dbo.qc_proc_insp_head.规格型号  [nvarchar(400) NULL]
+
+-- 2.3 同名但定义不同(类型/长度/可空/自增)144 列:逐条 --
+    [异] dbo.bd_dispatch.业务类型   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_dispatch.单据日期   参考[date(3) NULL]  vs  目标[date(3) NOT NULL]
+    [异] dbo.bd_dispatch.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_dispatch.生产车间   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_finish_in.业务类型   参考[nvarchar(100) NOT NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_finish_in.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_manu_order.批号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_manu_order.机构   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_manu_order.测试程序   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_manu_order.附件1   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(-1) NULL]
+    [异] dbo.bd_manu_order.附件2   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(-1) NULL]
+    [异] dbo.bd_manu_order.附件3   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(-1) NULL]
+    [异] dbo.bd_manu_order.附件4   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(-1) NULL]
+    [异] dbo.bd_manu_order.附件5   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(-1) NULL]
+    [异] dbo.bd_manu_order.附件6   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(-1) NULL]
+    [异] dbo.bd_material_out.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.bd_material_out.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.bd_material_out.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.bd_material_out.业务类型   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_material_out.单据日期   参考[date(3) NULL]  vs  目标[date(3) NOT NULL]
+    [异] dbo.bd_material_out.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_outsource_order.业务类型   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_outsource_order.单据日期   参考[date(3) NULL]  vs  目标[date(3) NOT NULL]
+    [异] dbo.bd_outsource_order.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_outsource_order.委外供应商   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_pu_order.供应商   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_pu_order.单据日期   参考[date(3) NULL]  vs  目标[date(3) NOT NULL]
+    [异] dbo.bd_pu_order.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_pu_order.币种   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_pu_order.汇率   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bd_purchase_in.业务类型   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_purchase_in.供应商   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_purchase_in.单据日期   参考[date(3) NULL]  vs  目标[date(3) NOT NULL]
+    [异] dbo.bd_purchase_in.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_purchase_in.币种   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_purchase_in.汇率   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bd_sale_out.业务类型   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bd_sale_out.单据日期   参考[date(3) NULL]  vs  目标[date(3) NOT NULL]
+    [异] dbo.bd_sale_out.单据编号   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_sale_out.客户   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bd_sale_out.结算客户   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_dispatch.asp_cancel   参考[nvarchar(4) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.bl_dispatch.asp_time1   参考[datetime(8) NULL]  vs  目标[datetime2(8) NULL]
+    [异] dbo.bl_dispatch.asp_time2   参考[datetime(8) NULL]  vs  目标[datetime2(8) NULL]
+    [异] dbo.bl_dispatch.asp_user1   参考[nvarchar(80) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.bl_dispatch.asp_user2   参考[nvarchar(80) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.bl_dispatch.comm   参考[nvarchar(20) NOT NULL]  vs  目标[nvarchar(20) NULL]
+    [异] dbo.bl_dispatch.加工类型   参考[nvarchar(40) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_dispatch.单据编号   参考[nvarchar(120) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_dispatch.备注   参考[nvarchar(1000) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_dispatch.委外供应商   参考[nvarchar(200) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_dispatch.工人   参考[nvarchar(120) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_dispatch.工作中心   参考[nvarchar(120) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_dispatch.工序编码   参考[nvarchar(120) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_dispatch.已派工数量   参考[float(8) NULL]  vs  目标[decimal(9) NULL]
+    [异] dbo.bl_dispatch.派工加工状态   参考[nvarchar(40) NULL]  vs  目标[nvarchar(200) NULL]
+    [异] dbo.bl_dispatch.派工数量   参考[float(8) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_dispatch.班组   参考[nvarchar(120) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_dispatch.生产车间   参考[nvarchar(120) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_dispatch.累计汇报数量   参考[float(8) NULL]  vs  目标[decimal(9) NULL]
+    [异] dbo.bl_dispatch.计划数量   参考[float(8) NULL]  vs  目标[decimal(9) NULL]
+    [异] dbo.bl_dispatch.计量单位   参考[nvarchar(40) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_dispatch.设备   参考[nvarchar(200) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.bl_finish_in.产品名称   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_finish_in.仓库   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_finish_in.单据编号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_finish_in.实收数量   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_finish_in.计量单位   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_manu_order.合同号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_material_out.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.bl_material_out.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.bl_material_out.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.bl_material_out.仓库   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_material_out.单据编号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_material_out.数量   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_material_out.材料名称   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_material_out.计量单位   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_outsource_order.产品名称   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_outsource_order.单据编号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_outsource_order.数量   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_outsource_order.计量单位   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_pu_order.单价   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_pu_order.单位   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_pu_order.单据编号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_pu_order.数量   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_pu_order.物料名称   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_pu_order.物料编码   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_purchase_in.单据编号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_purchase_in.存货名称   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_purchase_in.实收数量   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_purchase_in.计量单位   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_sale_out.单据编号   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bl_sale_out.存货名称   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_sale_out.存货编码   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.bl_sale_out.数量   参考[decimal(9) NULL]  vs  目标[decimal(9) NOT NULL]
+    [异] dbo.bl_sale_out.计量单位   参考[nvarchar(200) NULL]  vs  目标[nvarchar(200) NOT NULL]
+    [异] dbo.bs_dict.代码   参考[nvarchar(100) NULL]  vs  目标[nvarchar(100) NOT NULL]
+    [异] dbo.bs_dict.名称   参考[nvarchar(400) NULL]  vs  目标[nvarchar(400) NOT NULL]
+    [异] dbo.qc_insp.暂收单号   参考[nvarchar(240) NULL]  vs  目标[nvarchar(120) NULL]
+    [异] dbo.rd_dom_test_detail.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_dom_test_detail.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_detail.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_detail.日期   参考[datetime(8) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_detail.期望完成日期   参考[datetime(8) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_detail.预计完成日期   参考[datetime(8) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_head.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_dom_test_head.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_head.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_dom_test_head.单据日期   参考[datetime(8) NULL]  vs  目标[nvarchar(40) NULL]
+    [异] dbo.rd_equip_use_detail.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_equip_use_detail.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_equip_use_detail.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_equip_use_detail.使用日期   参考[datetime(8) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_equip_use_head.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_equip_use_head.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_equip_use_head.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_equip_use_head.单据日期   参考[datetime(8) NULL]  vs  目标[nvarchar(40) NULL]
+    [异] dbo.rd_equip_use_head.备注   参考[nvarchar(500) NULL]  vs  目标[nvarchar(1000) NULL]
+    [异] dbo.rd_instr_use_detail.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_instr_use_detail.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_instr_use_detail.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_instr_use_detail.使用日期   参考[datetime(8) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_instr_use_head.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_instr_use_head.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_instr_use_head.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_instr_use_head.单据日期   参考[datetime(8) NULL]  vs  目标[nvarchar(40) NULL]
+    [异] dbo.rd_progress.项目层级   参考[nvarchar(40) NULL]  vs  目标[nvarchar(40) NOT NULL]
+    [异] dbo.rd_progress_detail.子项目/尺寸   参考[nvarchar(600) NULL]  vs  目标[nvarchar(200) NULL]
+    [异] dbo.rd_progress_detail.实施进度   参考[nvarchar(200) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.rd_progress_detail.未批准原因   参考[nvarchar(600) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.rd_progress_detail.测试员   参考[nvarchar(600) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_progress_detail.状态   参考[nvarchar(2000) NULL]  vs  目标[nvarchar(1000) NULL]
+    [异] dbo.rd_progress_detail.说明   参考[nvarchar(600) NULL]  vs  目标[nvarchar(400) NULL]
+    [异] dbo.rd_progress_detail.里程完成   参考[nvarchar(200) NULL]  vs  目标[nvarchar(40) NULL]
+    [异] dbo.rd_progress_detail.项目级   参考[nvarchar(200) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_progress_detail.项目负责   参考[nvarchar(200) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_spike_water_detail.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_spike_water_detail.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_spike_water_detail.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_spike_water_head.asp_cancel   参考[nvarchar(2) NULL]  vs  目标[char(1) NULL]
+    [异] dbo.rd_spike_water_head.asp_user1   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.rd_spike_water_head.asp_user2   参考[nvarchar(40) NULL]  vs  目标[nvarchar(100) NULL]
+    [异] dbo.yj_panel.line_table   参考[sysname(256) NOT NULL]  vs  目标[nvarchar(256) NULL]
+    [异] dbo.yj_user.comm   参考[nvarchar(40) NOT NULL]  vs  目标[nvarchar(40) NULL]
+
+=== 6. 汇总 ===
+  表:参考 219 / 目标 213  |  仅参考 8  仅目标 2
+  视图:参考 97 / 目标 97  |  仅参考 0  仅目标 0
+  面板:参考 125 / 目标 126  |  仅参考 0  仅目标 1
+  面板字段:参考 3807 / 目标 3828  |  仅参考 33  仅目标 54
+  列:仅参考 297 / 仅目标 69 / 定义不同 144
+
+  表差异数=10 视图差异数=0 面板差异数=1 字段差异数=87 列差异数=510

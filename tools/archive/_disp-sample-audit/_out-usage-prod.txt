@@ -1,0 +1,35 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-usage.sql ==
+  | DISPATCH | 工序派工单 | 生产制造 | doc | bl_dispatch | bd_dispatch | 生产制造 | 27 | 3 | 0 | 
+  | DISPATCH_DETAIL | 工序派工单明细表 | 报表 | flat | v_dispatch_detail | null | 新生产 | 36 | 0 | 0 | 
+  | DISPATCH_STATS | 工序派工单统计表 | 报表 | flat | v_dispatch_stats | null | 新生产 | 10 | 0 | 0 | 
+  | OUTSOURCE_ORDER | 委外加工单 | 委外加工 | doc | bl_outsource_order | bd_outsource_order | 委外加工 | 27 | 3 | 0 | 
+  | SAMPLE_REQ | 样品申请单 | 生产管理 | doc | sample_req_detail | sample_req | 生产制造 | 18 | 0 | 1 | 
+  | sample_req | 1 | 
+  | sample_req_detail | 0 | 
+  | bd_dispatch | 0 | 
+  | bl_dispatch | 0 | 
+  | bd_outsource_order | 0 | 
+  | bl_outsource_order | 0 | 
+  | v_dispatch_detail | 0 | 
+  | v_dispatch_stats | 0 | 
+  | sample_req | 2026-09-22 14:19:06.2538615 | 2026-09-22 14:19:06.2538615 | admin | 
+  | bd_dispatch | null | null | null | 
+  | bd_outsource_order | null | null | null | 
+  | 样品申请单 | action | 提交 | 1 | 2026-09-22 06:19:06.2671311 | 2026-09-22 06:19:06.2671311 | 
+  | yj_usage_log_total | 2653 | 
+  | yj_attachment | 0 | 
+  | yj_form_approval | 0 | 
+  | report_column_settings | 0 | 
+  | yj_doc_batch(source) | 0 | 
+  | yj_doc_batch(target) | 0 | 
+  | bd_dispatch | USER_TABLE | 2026-09-01 04:20:36.36 | 2026-09-28 05:21:12.23 | 
+  | bd_outsource_order | USER_TABLE | 2026-09-01 04:20:36.51 | 2026-09-28 05:21:14.357 | 
+  | bl_dispatch | USER_TABLE | 2026-09-01 04:20:36.367 | 2026-09-28 05:21:16.277 | 
+  | bl_outsource_order | USER_TABLE | 2026-09-01 04:20:36.517 | 2026-09-28 05:21:18.28 | 
+  | sample_req | USER_TABLE | 2026-09-14 03:48:07.437 | 2026-09-29 10:28:47.297 | 
+  | sample_req_detail | USER_TABLE | 2026-09-14 03:48:07.44 | 2026-09-29 10:28:47.51 | 
+  | v_dispatch_detail | VIEW | 2026-09-14 03:46:36.323 | 2026-09-24 05:33:16.487 | 
+  | v_dispatch_stats | VIEW | 2026-09-14 03:46:36.34 | 2026-09-24 08:36:46.1 | 
+  | SP | 1 | 2026-09-22 06:19:06.2430000 | 2026-09-22 06:19:06.2430000 | 
+[OK] _q-usage.sql (12 batches)

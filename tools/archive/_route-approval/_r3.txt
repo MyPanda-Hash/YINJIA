@@ -1,0 +1,26 @@
+=== ① 每条路线的审核判定(requireRouteAudited 口径)===
+路线	状态行	shr	canceled	stopped	deleting	modify_state	判定(可转工单?)
+GY-001	无状态行		N	N	N	N	🚫 拒绝(pending=N)
+GY-002	无状态行		N	N	N	N	🚫 拒绝(pending=N)
+GY-003	无状态行		N	N	N	N	🚫 拒绝(pending=N)
+GY-2026-10-0001	有		Y	N	N	N	🚫 拒绝(pending=N)
+GY-2026-10-0003	有	admin	N	N	N	N	✅ 可转工单(pending=N)
+GY-2026-10-0004	有		N	N	N	N	🚫 拒绝(pending=Y)
+GY-CB-STD	有	admin	N	N	N	N	✅ 可转工单(pending=N)
+
+=== ② 与 bs_route.审核状态 列一致性 ===
+工艺路线编码	审核状态	派生	
+GY-001	未审核	未审核	
+GY-2026-10-0003	已审核	已审核	
+GY-2026-10-0004	未审核	未审核	
+GY-CB-STD	已审核	已审核	
+-- 4 row(s)
+
+=== ③ OrderConvert pending 的新列(路线审核状态)===
+订单号	工艺路线	路线审核状态	
+ZL-20261014-02		未选择	
+ZL-20261014-01		未选择	
+ZL-20261014-01		未选择	
+ZL-20261013-04		未选择	
+ZL-20261013-02		未选择	
+-- 5 row(s)

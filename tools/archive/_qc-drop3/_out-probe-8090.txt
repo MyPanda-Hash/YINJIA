@@ -1,0 +1,33 @@
+[登录] ok  http://127.0.0.1:8090/api
+
+① 已下架 3 张:配置必须取不到
+  ✓ QC_MOLD_INSP 取配置被拒  HTTP 400 / body.code=400 / 面板不存在：QC_MOLD_INSP
+  ✓ QC_MOLD_INSP 取数被拒  HTTP 400 / body.code=400
+  ✓ QC_CUT_INSP 取配置被拒  HTTP 400 / body.code=400 / 面板不存在：QC_CUT_INSP
+  ✓ QC_CUT_INSP 取数被拒  HTTP 400 / body.code=400
+  ✓ QC_FIN_SPEC 取配置被拒  HTTP 400 / body.code=400 / 面板不存在：QC_FIN_SPEC
+  ✓ QC_FIN_SPEC 取数被拒  HTTP 400 / body.code=400
+
+② 保留的检验单 10 张:配置与取数都应 200
+  ✓ QC_FIRST_INSP 配置 200
+  ✓ QC_FIRST_INSP 取数 200
+  ✓ QC_PROC_INSP 配置 200
+  ✓ QC_PROC_INSP 取数 200
+  ✓ QC_ASM_INSP 配置 200
+  ✓ QC_ASM_INSP 取数 200
+  ✓ QC_BHG 配置 200
+  ✓ QC_BHG 取数 200
+  ✓ QC_BHC 配置 200
+  ✓ QC_BHC 取数 200
+  ✓ QC_BHZ 配置 200
+  ✓ QC_BHZ 取数 200
+  ✓ QC_JJF 配置 200
+  ✓ QC_JJF 取数 200
+  ✓ QC_SCP 配置 200
+  ✓ QC_SCP 取数 200
+  ✓ QC_LYB 配置 200
+  ✓ QC_LYB 取数 200
+  ✓ QC_SCY 配置 200
+  ✓ QC_SCY 取数 200
+
+=== 26 PASS / 0 FAIL ===

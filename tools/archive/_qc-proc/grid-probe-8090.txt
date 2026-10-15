@@ -1,0 +1,162 @@
+① 打开应用 http://127.0.0.1:8090
+   登录 = {"token":true}
+② hash 进面板 QC_PROC_INSP
+    {"hash":"#/panelx/list/QC_PROC_INSP","grid":true,"text":"银嘉数字化平台\nYINJIA-MES\nadmin\n已认证\nYINJIA-MES\n登录日期 2026-10-15\n服务到期 2027-08-13\n中\n更新公告\n2\n82\n系统管理员\n我的桌面\n研发管理\n智能供应链\n生产制造\n品质管理\n来料品质\n制程品质\n质量单据\n财务管理\n设备管理\n基础档案\n我的桌面\n制程检验单\n制程检"}
+③ 结构取证
+{
+  "grid": true,
+  "groups": [
+    {
+      "title": "A.外观 ＋",
+      "cols": 3
+    },
+    {
+      "title": "B.重量 ＋",
+      "cols": 3
+    },
+    {
+      "title": "C.性能 ＋",
+      "cols": 3
+    },
+    {
+      "title": "D.重要尺寸 ＋",
+      "cols": 2
+    }
+  ],
+  "items": [
+    {
+      "name": "外观-端盖两头",
+      "cells": "1",
+      "hasStep": true
+    },
+    {
+      "name": "外观-端盖两头",
+      "cells": "1",
+      "hasStep": true
+    },
+    {
+      "name": "外观-端盖两头",
+      "cells": "1",
+      "hasStep": true
+    },
+    {
+      "name": "出货重量",
+      "cells": "5",
+      "hasStep": true
+    },
+    {
+      "name": "出货重量",
+      "cells": "5",
+      "hasStep": true
+    },
+    {
+      "name": "出货重量",
+      "cells": "5",
+      "hasStep": true
+    },
+    {
+      "name": "余氯去除率",
+      "cells": "1",
+      "hasStep": true
+    },
+    {
+      "name": "余氯去除率",
+      "cells": "1",
+      "hasStep": true
+    },
+    {
+      "name": "余氯去除率",
+      "cells": "1",
+      "hasStep": true
+    },
+    {
+      "name": "尺寸-外径",
+      "cells": "5",
+      "hasStep": true
+    },
+    {
+      "name": "尺寸-外径",
+      "cells": "5",
+      "hasStep": true
+    }
+  ],
+  "firstRowCells": [
+    {
+      "span": 5,
+      "text": ""
+    },
+    {
+      "span": 5,
+      "text": ""
+    },
+    {
+      "span": 5,
+      "text": ""
+    },
+    {
+      "span": 1,
+      "text": ""
+    },
+    {
+      "span": 1,
+      "text": ""
+    },
+    {
+      "span": 1,
+      "text": ""
+    },
+    {
+      "span": 5,
+      "text": ""
+    },
+    {
+      "span": 5,
+      "text": ""
+    },
+    {
+      "span": 5,
+      "text": ""
+    },
+    {
+      "span": 1,
+      "text": "11"
+    },
+    {
+      "span": 1,
+      "text": ""
+    }
+  ],
+  "bodyRows": 5,
+  "fixedCols": [
+    "检验时间",
+    "客户名称",
+    "产品编码",
+    "型号（mm）",
+    "批号",
+    "抽检总量",
+    "结果判断"
+  ],
+  "plainAddBtn": [
+    "＋ 新增表区"
+  ],
+  "grpAddButtons": 4,
+  "bandHint": "组名旁的「＋」= 加一列（新增一个检验项目）；列头「−/＋」调格数",
+  "detailListRows": 11
+}
+④ 真点组内「＋」(应加出一列)
+    {"clicked":true,"before":11,"after":12,"dirty":false}
+   加列后结构 = {"grid":true,"groups":[{"title":"A.外观 ＋","cols":4},{"title":"B.重量 ＋","cols":3},{"title":"C.性能 ＋","cols":3},{"title":"D.重要尺寸 ＋","cols":2}],"items":[{"name":"外观-端盖两头","cells":"1","hasStep":true},{"name":"外观-端盖两头","cells":"1","hasStep":true},{"name":"外观-端盖两头","cells":"1","hasStep":true},{"name":"","cells":"1","hasStep":true},{"name":"出货重量","cells":"5","hasStep":true},{"name":"出货重量","cells":"5","hasStep":true},{"name":"出货重量","cells":"5","hasStep":true},{"name":"余氯去除率","cells":"1","hasStep":true},{"name":"余氯去除率","cells":"1","hasStep":true},{"name":"余氯去除率","cells":"1","hasStep":true},{"name":"尺寸-外径"
+⑤ 真点列头「−」(应把该列格数减 1)
+    {"clicked":true,"idx":4,"name":"出货重量","before":"1,1,1,1,5,5,5,1,1,1,5,5","after":"1,1,1,1,4,5,5,1,1,1,5,5"}
+⑥ 控制台
+   [EXCEPTION] ReferenceError: Cannot access 'Nl' before initialization
+    at oi (http://127.0.0.1:8090/assets/PanelxList-eiEbFe8f.js:7:224430)
+    at ip (http://127.0.0.1:8090/assets/PanelxList-eiEbFe8f.js:7:224593)
+    at tl.immediate (http://127.0.0.1:8090/assets/PanelxList-eiEbFe8f.js:7:204180)
+    at Nn (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:13:38)
+    at ke (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:13:108)
+    at Cr.l.call (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:13:3580)
+    at S (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:9:16919)
+    at xc (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:9:17133)
+    at Cr (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:13:3781)
+    at Yt (http://127.0.0.1:8090/assets/vue-vendor-J43A-09M.js:13:3287)

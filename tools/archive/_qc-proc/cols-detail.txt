@@ -1,0 +1,20 @@
+=== qc_proc_insp_detail ===
+id | 单据编号 | 表区 | 行号 | 检验项目 | 检验要求 | 检验方法 | 抽检量 | 实测数值 | 单项判定 | 不合格应对措施 | 结果判断 | 处理方式 | 备注 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 测量值1 | 测量值2 | 测量值3 | 测量值4 | 测量值5 | 检验仪器 | 不良数量 | 备注2 | 检查频率 | 
+
+=== qc_mold_insp_detail ===
+id | 单据编号 | 行号 | 检验项目 | 标准要求 | 实测数值 | 判定 | 数量 | 处理方式 | 备注 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 表区 | 检验方法 | 合格数量 | 不合格数量 | 
+
+=== qc_proc_insp_head ===
+id | 单据编号 | 单据日期 | 检验时间 | 检验类别 | 工单号 | 工单行号 | 报工单号 | 工序 | 批次号 | 客户名称 | 产品编码 | 产品名称 | 规格型号 | 生产线 | 生产车间 | 报工数量 | 抽检总量 | 检验数量 | 检验员 | 检验日期 | 总结论 | 检验方案 | 文件编码 | 执行标准 | 处理方式 | 备注 | 单据状态 | 审核人 | 审核时间 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 
+
+=== qc_mold_insp_head ===
+id | 单据编号 | 单据日期 | 工单号 | 批次号 | 报工单号 | 工序 | 产品编码 | 产品名称 | 规格型号 | 生产线 | 生产车间 | 报工数量 | 检验数量 | 检验员 | 检验日期 | 总结论 | 处理方式 | 备注 | 审核人 | 审核时间 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 单据状态 | 检验方案 | 文件编码 | 执行标准 | 工单行号 | 
+
+=== 关键列存在性 ===
+qc_proc_insp_detail.不合格数量 = 0
+qc_proc_insp_detail.不良数量 = 9
+qc_proc_insp_head.工单行号 = 4
+qc_mold_insp_head.工单行号 = 4
+
+=== QC_MOLD_INSP 工单行号 的 yj_field 配置 ===
+seq=35 type=整数 place=query,header w=80 edit=0 vis=1

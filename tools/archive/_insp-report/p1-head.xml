@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- prod_insp.jrxml 出厂检验报告(2026-10-12;表单编号 YJ-QR-05/A1)
+     取数:ReportService.headParams(头字段→参数) + detailRows(明细行→字段),字段名=yj_field.label。
+     排版规约同 so_order.jrxml:样式集中 / 属性归属 / box 写法 / 分节包 band / fontName=NotoSansSC -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="prod_insp" language="java" columnCount="1"
+              pageWidth="595" pageHeight="842" orientation="Portrait"
+              columnWidth="539" leftMargin="28" rightMargin="28" topMargin="28" bottomMargin="28"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing-font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <style name="cell" style="base" hAlign="Left" vAlign="Middle">
+    <box padding="2"><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+  </style>
+  <style name="cellC" style="cell" hAlign="Center"/>
+  <style name="cellR" style="cell" hAlign="Right"/>
+  <style name="th" style="cell" isBold="true" hAlign="Center" mode="Opaque" backcolor="#EFEFEF"/>
+  <style name="itemC" style="cellC" isBold="true"/>
+  <style name="cellS" style="base" fontSize="8" hAlign="Left" vAlign="Middle">
+    <box padding="2"><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+  </style>
+  <style name="cellSC" style="cellS" hAlign="Center"/>
+  <style name="cellXS" style="base" fontSize="7" hAlign="Left" vAlign="Top">
+    <box padding="1"><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+  </style>
+  <style name="company" style="base" fontSize="13" isBold="true" hAlign="Center" vAlign="Bottom"/>
+  <style name="docTitle" style="base" fontSize="20" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="meta" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="metaR" style="meta" hAlign="Right"/>
+  <style name="gridLabel" style="base" isBold="true" vAlign="Middle"/>
+  <style name="gridValue" style="base" vAlign="Middle"/>
+  <style name="conclusion" style="base" fontSize="11" isBold="true" hAlign="Left" vAlign="Middle"/>
+  <style name="note" style="base" fontSize="8" vAlign="Top"/>
+  <style name="sign" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="footerNote" style="base" fontSize="7" forecolor="#666666" vAlign="Middle"/>
+  <style name="pager" style="base" fontSize="8" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+
+  <parameter name="单据编号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据日期" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="客户" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="公司" class="java.lang.String" isForPrompting="false">
+    <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
+  

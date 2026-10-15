@@ -188,6 +188,11 @@ public class PanelConfigService {
                 "defaultOptions", List.of("启用", "已作废")));
         metadata.put("panelButtons", panelButtons);
         metadata.put("buttonGroups", buttonGroups);
+        // 唯一键声明(2026-10-16):yj_panel.config 里写了 "uniqueKeys" 才下发。
+        // 前端(PanelxList)据此在保存前对**已载入的全量行**即时查重;后端 ButtonService.saveArchive
+        // 用同一份声明做落库前预检 —— 一处声明,两端同源(契约见 docs/frontend/前端面板设计.md)。
+        java.util.List<java.util.List<String>> uniqueKeys = def.uniqueKeys();
+        if (!uniqueKeys.isEmpty()) metadata.put("uniqueKeys", uniqueKeys);
         if (classifyPanel != null && classifyTitle != null) {
             metadata.put("classifyPanel", classifyPanel);   // 前端「分类管理」跳转目标面板码
             metadata.put("classifyTitle", classifyTitle);   // 页签标题
@@ -320,7 +325,15 @@ public class PanelConfigService {
             // 位置:第一个动作 = 侧边栏主按钮,其余进 ▼ 下拉 ⇒ 主按钮仍是「保存」(即提交),
             //   草稿落在下拉,不改变既有主路径的点击习惯(与 PANDA_BUTTONS 各单据的写法一致)。
             buttonGroups.add(group("保存", List.of("保存", "保存为草稿")));
-            buttonGroups.add(group("删除", List.of("删除")));
+            // 删除组:四张工序检验单(成型/切炭/组装/制程)额外给「删除单据」——
+            // 用户 2026-10-14 口径「为当前的四张检验单增加删除中的删除单据的按钮」。
+            // 语义区别:「删除」= 进入明细行勾选删除模式(删行);「删除单据」= 删整张单据
+            // (前端 engine.deleteForms → ButtonService.delete:doc 面板草稿直接作废,
+            //  已审核抛「仅草稿状态可删除(已审核请先弃审)」,不会误删已审核单)。
+            // 只放开这四张单,其余无 PANDA 基准的面板维持原样(不扩大改动面)。
+            buttonGroups.add(group("删除", WO_INSP_PANELS.contains(def.code())
+                    ? List.of("删除", "删除单据")
+                    : List.of("删除")));
             buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
@@ -443,9 +456,10 @@ public class PanelConfigService {
                 g.put("actions", merged);
             }
         }
-        // 检验项目/检验方案维护(2026-10-09 用户口径):三类工序检验单就地维护检验标准(受控文件的
-        // 项目/标准/方法/取样/处置),入口只下发到 QC_MOLD_INSP / QC_CUT_INSP / QC_ASM_INSP 三张单,
-        // 紧跟「字段管理」之后;真正的写操作由 QcInspPlanController 以 QC_ASM_INSP 可见性把守。
+        // 检验项目/检验方案维护(2026-10-09 用户口径):工序检验单就地维护检验标准(受控文件的
+        // 项目/标准/方法/取样/处置),入口下发到 WO_INSP_PANELS(2026-10-16 起 = 组装成品检验单 +
+        // 制程检验单 + 首件检验单,成型/切炭两张已下架),
+        // 紧跟「字段管理」之后;真正的写操作由 QcInspPlanController 以同一面板集把守。
         // 同日追加「选检验项目」:在单据页把标准里的项目**勾选带入**当前明细(表区=检验项目)——
         // 它排在「检验项目维护」之前(先用、后维护)。
         if (WO_INSP_PANELS.contains(def.code())) {
@@ -458,12 +472,76 @@ public class PanelConfigService {
                     // 2026-10-09 **合并口径**(用户拍板):原来两个按钮(选检验项目 / 检验项目维护)收敛成同一个
                     // 入口 —— 弹窗两用:上=方案表、下=该项目表(可勾选),勾选后「带入明细」写入本单;
                     // 表头的新增/编辑/停用就地维护标准本身。基础档案里的 QC_ITEM/QC_PLAN 菜单已摘,维护只此一处。
-                    if (!merged.contains("检验项目/检验方案")) merged.add(anchor + 1, "检验项目/检验方案");
+                    // 2026-10-16 第三轮:**首件检验单不要这个入口**(用户口径「去除当前首件检验单中检验项目/
+                    //   检验方案的按钮」)—— 它的检验要求有专用来源《成型工艺清单》RD_MOLD_PROC(取成型工艺清单),
+                    //   挂上标准库入口只会让品质点错来源。
+                    if (!FIRST_INSP_PANEL.equals(def.code()) && !merged.contains("检验项目/检验方案")) {
+                        merged.add(anchor + 1, "检验项目/检验方案");
+                    }
+                    // 2026-10-13:制程检验单再加一个「取出货检验计划」入口(RD_INSP_PLAN)——
+                    // 用户口径「实现对应的产品编码就能获取到对应的检验内容进行填入」。
+                    // 2026-10-16 扩到**四张检验单**:用户口径「当前成品检验单实现方式需要修改,要能获取到
+                    //   出货检验计划中的内容,当前红框内容都需要是能获取到的」+「检验方法需要实现可一一对应」
+                    //   —— 四张单的明细列已统一为 检验项目/检验要求/检验方法/检查频率(yj_field 同名),
+                    //   与计划表的 控制项目/控制标准及要求/控制方法/检测频率 一一对应,故入口一并下发。
+                    if (!merged.contains("取出货检验计划")) {
+                        // 首件检验单不在 SHIP_PLAN_PANELS 内(来源是成型工艺清单,不是出货检验计划)
+                        if (SHIP_PLAN_PANELS.contains(def.code())) {
+                            int at = merged.indexOf("检验项目/检验方案");   // 排在它之前(按产品取现成计划更常用)
+                            merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
+                        }
+                    }
+                    // 2026-10-16 注:固定组/固定项(外观·端盖两头/管身两侧、尺寸、出货重量)**不再用按钮带入** ——
+                    //   用户口径「不要实现使用按钮的形式进行操作,根据当前的实现方式使用组件形式完成对默认
+                    //   情况下增加三个检验 外观/尺寸/出货重量」⇒ 改为**明细区分区渲染**(见 PanelxList 的
+                    //   isSectioned/archSections):三区默认铺出,固定项以"预置空行"形式常在,点行即落成真行。
+                    //   声明(yj_panel.config 的 fixedItems)仍经 metadata.fixedItems 下发给分区视图使用。
+                    // 2026-10-15:首件检验单的检验要求来自《成型工艺清单》RD_MOLD_PROC(用户口径
+                    //   「检验方式参考成型工艺清单内的检验要求进行编写」)—— 与「取出货检验计划」同位,
+                    //   但只下发到这一张单。
+                    if (FIRST_INSP_PANEL.equals(def.code()) && !merged.contains("取成型工艺清单")) {
+                        int at = merged.indexOf("检验项目/检验方案");
+                        merged.add(at < 0 ? anchor + 1 : at, "取成型工艺清单");
+                    }
+                    // 2026-10-15:制程检验单再加「选生产工单」(用户口径「选择生产工单加工单行号唯一确定
+                    // 当前的生产工单」)—— 排在「取出货检验计划」之前:先按工单行建单,再带检验项目。
+                    // 通用「选单」不可用(见 QcProcInspController 类注释:来源须已审核 + 须带量明细行 +
+                    // 头行映射只认来源表头),故走专用入口。
+                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("选生产工单")) {
+                        int at = merged.indexOf("取出货检验计划");
+                        merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
+                    }
+                    // 2026-10-16 第三轮:**首件检验单也要能选生产工单**(用户口径「让当前的首件检验单也可以
+                    //   选择到生产工单。当前制程检验单中存在实现方式,可以参照制程检验单的实现方式进行」)
+                    //   —— 同一个弹窗(按面板分流到 /qc/firstInsp/woLines + fromWoLine),选中一行即按
+                    //   「工单号+工单行号」建一张首件检验单草稿(表头带产品/批次/产线/客户,明细按
+                    //   《成型工艺清单》预铺),排在「取成型工艺清单」之前:先按工单行建单,再带检验项目。
+                    if (FIRST_INSP_PANEL.equals(def.code()) && !merged.contains("选生产工单")) {
+                        int at = merged.indexOf("取成型工艺清单");
+                        merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
+                    }
                     g.put("actions", merged);
                 }
             }
         }
         metadata.put("buttonGroups", buttonGroups);
+        // 固定检验项声明(yj_panel.config 的 "fixedItems")下发给前端 —— **现役唯一消费者是报表**
+        // (ReportService.fillQcAsmInsp → QcAsmInspReportSupport:声明过的组永远铺出来);
+        // 前端那份 metadata 供**分区视图**铺固定项占位行(PanelxList.ensureFixedRows),而 QC_ASM_INSP
+        // 已退出 SECTION_PANELS ⇒ 今天拿到它的面板集为空。原先那句「『带入固定检验项』按钮据此落行」
+        // 已作废:按钮动作 2026-10-16 就删了(PanelxList 里那条注释留着),别再照它写新代码。
+        // 声明式,和 uniqueKeys 一样"加固定项=改一行 JSON、不加代码"(见 PanelDef.fixedItems)。
+        if (!def.fixedItems().isEmpty()) {
+            List<Map<String, Object>> fixedList = new ArrayList<>();   // ⚠ 名字别叫 fixed:本方法上面已有同名局部变量
+            for (PanelRegistry.PanelDef.FixedGroup fg : def.fixedItems()) {
+                Map<String, Object> one = new LinkedHashMap<>();
+                one.put("group", fg.group());
+                one.put("items", fg.items());
+                one.put("label", fg.columnLabel());   // 组列名(分区占位行的检验项目名,与报表同源)
+                fixedList.add(one);
+            }
+            metadata.put("fixedItems", fixedList);
+        }
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
@@ -1679,12 +1757,25 @@ public class PanelConfigService {
     private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
 
     /**
-     * 三类工序检验单(成型 CX / 切炭 QT / 组装成品 ZJ)—— 工具栏注入「检验项目维护」入口的面板集。
+     * 工序检验单 —— 工具栏注入「检验项目维护」入口的面板集。
      * 2026-10-09 用户口径:「给出一个按钮,让他可以在组装成品检验处对这个检验项目和检验方案进行维护」;
-     * 三张单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故三处都注入(组装单是主入口)。
+     * 各单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故都注入(组装单是主入口)。
+     * 2026-10-16 用户口径「删除成型检验单和切炭检验单」⇒ 这两张已整体下架,从本集移除。
      */
     private static final java.util.Set<String> WO_INSP_PANELS =
-            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP");
+            java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
+
+    /**
+     * 「取出货检验计划」(RD_INSP_PLAN)入口下发的面板集 —— **不含首件检验单**:
+     * 首件检验的检验要求来自《成型工艺清单》RD_MOLD_PROC(见 {@link #FIRST_INSP_PANEL}),
+     * 走「取成型工艺清单」另一个入口;把出货检验计划也挂上去只会让品质点错来源。
+     * 2026-10-16:成型/切炭两张已下架,同步移出本集。
+     */
+    private static final java.util.Set<String> SHIP_PLAN_PANELS =
+            java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP");
+
+    /** 首件检验单(2026-10-15):工具栏注入「取成型工艺清单」入口 */
+    private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
     private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 

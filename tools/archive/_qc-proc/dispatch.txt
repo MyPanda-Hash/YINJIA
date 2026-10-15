@@ -1,0 +1,40 @@
+=== bd_dispatch ===
+id | 单据日期 | 单据编号 | 业务类型 | 生产车间 | 加工单号 | 产品名称 | 预开工日 | 预完工日 | 经手人 | 项目 | 部门 | 备注 | 单据状态 | 审核人 | 审核时间 | 审批人 | 审批时间 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 
+
+=== bl_dispatch ===
+id | 单据编号 | 工序编码 | 工序名称 | 产品名称 | 生产车间 | 工作中心 | 设备 | 班组 | 工人 | 加工类型 | 计划数量 | 已派工数量 | 派工数量 | 计量单位 | 预开工日 | 预完工日 | 派工加工状态 | 累计汇报数量 | 委外供应商 | 规格型号 | 备注 | asp_user1 | asp_time1 | asp_cancel | asp_user2 | asp_time2 | asp_print | comm | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 
+
+=== scjl ===
+comm | id | sc_no | wzdm | mc | gg | jldw | sc_date | ywman | gldh | gd_id | gxdm | sl | loss | loss_ra | bf_qty | bl_qty | lot_no | color | siz | gs | gz | dwzt | dwsj | kszt | kssj | wgzt | wgsj | bz | scx | scxmc | tm | delmark | post_no | kk | zfjl | other | jc_no | cp_no | gd_ph | lx | wj | htys | cpcz | sx | jm | sjd | jbbh | zsdd | cplsh | pl_sl | pp | khdm | ddwsl | jh_date | od_no | od_xc | ywymc | gsje | llxz | cgrkdh | lldh | djlx | zl | sl2 | sl3 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print | 批次号 | 报工单号 | 直销数量 | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 工单行号 | 
+
+=== DISPATCH 面板 yj_field(place|seq|label) ===
+detail | 10 | 工序编码
+detail | 20 | 工序名称
+detail | 50 | 工作中心
+detail | 60 | 设备
+detail | 70 | 班组
+detail | 80 | 工人
+detail | 90 | 加工类型
+detail | 100 | 计划数量
+detail | 110 | 已派工数量
+detail | 120 | 派工数量
+detail | 130 | 计量单位
+detail | 160 | 派工加工状态
+detail | 170 | 累计汇报数量
+detail | 180 | 委外供应商
+detail | 190 | 规格型号
+header | 50 | 加工单号
+header | 60 | 产品名称
+header | 70 | 预开工日
+header | 80 | 预完工日
+header | 90 | 经手人
+header | 100 | 项目
+header | 110 | 部门
+header | 120 | 备注
+query,header | 10 | 单据日期
+query,header | 20 | 单据编号
+query,header | 30 | 业务类型
+query,header | 40 | 生产车间
+
+=== 行数 ===
+bd_dispatch=0 bl_dispatch=0 scjl=18

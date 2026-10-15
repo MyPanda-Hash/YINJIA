@@ -1,0 +1,28 @@
+=== 引用 plang / plang_pc 的面板 ===
+MANU_ORDER | 生产工单 | doc | head=bd_manu_order | line=bl_manu_order
+MANU_ORDER_DETAIL | 生产工单明细表 | flat | head=null | line=v_manu_order_detail
+MANU_ORDER_STATS | 生产工单统计表 | flat | head=null | line=v_manu_order_stats
+
+=== 面板名含「工单」的全部面板 ===
+DISPATCH | 工序派工单 | doc | head=bd_dispatch | line=bl_dispatch
+DISPATCH_DETAIL | 工序派工单明细表 | flat | head=null | line=v_dispatch_detail
+DISPATCH_STATS | 工序派工单统计表 | flat | head=null | line=v_dispatch_stats
+LINE_LOAD | 产线排产负荷 | flat | head=null | line=v_line_load
+MANU_ORDER | 生产工单 | doc | head=bd_manu_order | line=bl_manu_order
+MANU_ORDER_DETAIL | 生产工单明细表 | flat | head=null | line=v_manu_order_detail
+MANU_ORDER_STATS | 生产工单统计表 | flat | head=null | line=v_manu_order_stats
+MANU_SCHEDULE | 生产排产 | flat | head=null | line=v_manu_schedule
+OUTSOURCE_ORDER | 委外加工单 | doc | head=bd_outsource_order | line=bl_outsource_order
+WO_ORDER | 生产工单(旧版) | doc | head=wo_order | line=wo_progress
+WO_PROGRESS | 工单工序进度 | flat | head=null | line=wo_progress
+WO_REPORT | 工序报工单 | doc | head=null | line=scjl
+
+=== plang 样例行(看 pl_xc 取值) ===
+pl_no=MO-2026-09-0108 xc=1 dm=S011-4 mc=A+级烧结炭棒/滤芯 lot=null scx=1号车间
+pl_no=MO-2026-09-0109 xc=1 dm=S062-11 mc=A+级烧结炭棒/滤芯 lot=null scx=null
+pl_no=MO-2026-09-0110 xc=1 dm=C-78-09 mc=除铅烧结炭棒/滤芯Z031 lot=null scx=1号车间
+pl_no=MO-2026-09-0112 xc=1 dm=C-95-39 mc=折叠复合A+级炭棒/滤芯 lot=null scx=null
+pl_no=MO-2026-09-0112 xc=2 dm=C-95-22 mc=折叠复合除铅炭棒/滤芯 lot=null scx=装箱线
+pl_no=MO-2026-09-0114 xc=1 dm=A-32-25 mc=抑菌阻垢复合滤芯 lot=null scx=1号车间
+pl_no=MO-2026-09-0114 xc=2 dm=A-32-26 mc=载银颗粒碳 lot=null scx=1号车间
+pl_no=MO-2026-09-0117 xc=1 dm=A-32-26 mc=载银颗粒碳 lot=null scx=null

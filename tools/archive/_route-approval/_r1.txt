@@ -1,0 +1,117 @@
+=== ① yj_panel: ROUTE 面板登记(是否走审核流: mode=doc) ===
+panel_code	panel_name	mode	category	line_table	head_table	group_col	pk_col	code_col	prefix	date_col	detail_key	module_group	
+INV	商品	archive	基础档案	bs_inv	null	null	id	null	null	null	inv	基础设置	
+OP	工序	archive	基础档案	bs_op	null	null	id	null	null	null	op	基础设置	
+PROD_LINE	生产线	archive	基础档案	bs_prod_line	null	null	id	生产线	null	null	prod_line	基础资料	
+ROUTE	工艺路线	doc	基础档案	bs_route	null	工艺路线编码	id	工艺路线编码	GY	null	items	基础设置	
+-- 4 row(s)
+
+=== ①b yj_ 表清单(找按钮/动作登记表) ===
+name	
+yj_app_setting	
+yj_archive_change_log	
+yj_attachment	
+yj_change_dept	
+yj_dept	
+yj_doc_batch	
+yj_doc_modify_log	
+yj_doc_status	
+yj_ext_bind_log	
+yj_field	
+yj_form_approval	
+yj_locale	
+yj_lot_seq	
+yj_message	
+yj_panel	
+yj_plan_term	
+yj_report_template	
+yj_role	
+yj_role_panel	
+yj_schema_log	
+yj_share_file	
+yj_share_file_cat	
+yj_std_lib	
+yj_translation	
+yj_usage_log	
+yj_user	
+-- 26 row(s)
+
+=== ①c yj_button(若有)ROUTE 的动作 ===
+-- Invalid object name 'yj_button'.
+
+=== ② yj_field: ROUTE 全量字段 ===
+col_name	label	place	seq	visible	hidden	editable	required	data_type	
+工序图片	工序图片	detail	10	0	1	1	0	文本	
+工序编码	工序编码	detail	20	1	0	1	1	参照	
+工序名称	工序名称	detail	30	1	0	1	0	参照	
+工序说明	工序说明	detail	40	1	0	1	0	文本	
+加工方式	工序控制	detail	50	1	0	1	1	下拉框	
+工序组	工序组	detail	60	1	0	1	0	文本	
+班组	班组	detail	70	1	0	1	0	参照	
+操作工	操作工	detail	80	1	0	1	0	参照	
+工序单位	工序单位	detail	90	1	0	1	0	文本	
+换算率	计划数量换算率	detail	100	1	0	1	0	数值	
+加工顺序	工序序列	detail	110	1	0	1	1	数值	
+是否末道工序	是否末道工序	detail	120	1	0	1	0	是否	
+允许超额	允许超额	detail	130	1	0	1	0	是否	
+是否质检	是否质检	detail	140	1	0	1	0	是否	
+是否首检	是否首检	detail	150	1	0	1	0	是否	
+生产车间	生产车间	detail	160	1	0	1	0	文本	
+工艺路线名称	工艺路线名称	header	10	1	0	1	1	文本	
+生效日期	生效日期	header	20	1	0	1	1	日期	
+失效日期	失效日期	header	30	1	0	1	1	日期	
+工艺类型	工艺类型	header	80	1	0	1	0	文本	
+备注	备注1	header	90	1	0	1	0	文本	
+备注2	备注2	header	100	1	0	1	0	文本	
+备注3	备注3	header	110	1	0	1	0	文本	
+生产单据类型	生产单据类型	header	120	1	0	1	0	文本	
+是否连续委外	是否连续委外	header	130	1	0	1	0	是否	
+停用	停用	query	30	0	0	1	0	是否	
+工资类型	工资类型	query	90	0	0	1	0	下拉框	
+计件依据	计件依据	query	100	0	0	1	0	下拉框	
+委外供应商	委外供应商	query	110	0	0	1	0	参照	
+按辅单位计价	按辅单位计价	query	120	0	0	1	0	是否	
+辅单位	辅单位	query	130	0	0	1	0	下拉框	
+默认报工数量	默认报工数量	query	150	0	0	1	0	小数	
+关键工序	关键工序	query	160	0	0	1	0	是否	
+标准合格率%	标准合格率%	query	170	0	0	1	0	小数	
+工艺路线编码	工艺路线编码	query,header	10	1	0	1	1	文本	
+审核状态	审核状态	query,header	50	1	0	0	0	文本	
+状态	状态	query,header	60	1	0	1	0	是否	
+工艺路线分组	工艺路线分组	query,header	70	1	0	1	0	文本	
+-- 38 row(s)
+
+=== ③ bs_route 数据 + yj_doc_status 审核状态 ===
+工艺路线编码	工艺路线名称	状态	审核状态	审核人	已审核	pending	canceled	archived	明细行数	
+GY-001	铝棒 Φ80 加工路线	Y	未审核	null	N	N	N	N	6	
+GY-001	铝棒 Φ80 加工路线	Y	未审核	null	N	N	N	N	6	
+GY-001	铝棒 Φ80 加工路线	Y	未审核	null	N	N	N	N	6	
+GY-001	铝棒 Φ80 加工路线	Y	未审核	null	N	N	N	N	6	
+GY-001	铝棒 Φ80 加工路线	Y	未审核	null	N	N	N	N	6	
+GY-001	铝棒 Φ80 加工路线	Y	未审核	null	N	N	N	N	6	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-002	减速箱体 A 加工路线	Y	未审核	null	N	N	N	N	8	
+GY-003	制门加工路线	Y	未审核	null	N	N	N	N	6	
+GY-003	制门加工路线	Y	未审核	null	N	N	N	N	6	
+GY-003	制门加工路线	Y	未审核	null	N	N	N	N	6	
+GY-003	制门加工路线	Y	未审核	null	N	N	N	N	6	
+GY-003	制门加工路线	Y	未审核	null	N	N	N	N	6	
+GY-003	制门加工路线	Y	未审核	null	N	N	N	N	6	
+GY-2026-10-0001		启用	未审核	null	N	N	Y	N	1	
+GY-2026-10-0003	88881010	0	已审核	admin	Y	N	N	N	5	
+GY-2026-10-0003	88881010	0	已审核	admin	Y	N	N	N	5	
+GY-2026-10-0003	88881010	0	已审核	admin	Y	N	N	N	5	
+GY-2026-10-0003	88881010	0	已审核	admin	Y	N	N	N	5	
+GY-2026-10-0003	88881010	0	已审核	admin	Y	N	N	N	5	
+GY-2026-10-0004	123	0	未审核	null	N	Y	N	N	2	
+GY-2026-10-0004	123	0	未审核	null	N	Y	N	N	2	
+GY-CB-STD	炭棒标准路线	0	已审核	admin	Y	N	N	N	3	
+GY-CB-STD	炭棒标准路线	0	已审核	admin	Y	N	N	N	3	
+GY-CB-STD	炭棒标准路线	0	已审核	admin	Y	N	N	N	3	
+-- 31 row(s)

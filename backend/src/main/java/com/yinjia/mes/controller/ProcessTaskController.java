@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ProcessTaskService;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +17,8 @@ import java.util.Map;
  * 工序任务(路线驱动,A 项 2026-10-05):一道工序一份待加工队列,可排序(急单/交期/排序号)、
  * 可派工到产线,报工回写完成量。前端页 /prod/plan/processQueue。
  * 权限:面板查看 = MANU_ORDER 可见;派工/排序 = MANU_ORDER「保存」词表。
+ * 例外(2026-10-16):/routes 与 /detail 是**弹窗共用接口**,改按调用页面面板「任一命中」放行
+ * (订单结转 / 快速排产 / 工单排产 / 生产工单),见 {@link PagePanelRegistry}。
  */
 @RestController
 @RequestMapping("/api/px/processTask")
@@ -88,7 +91,9 @@ public class ProcessTaskController {
     /** 可选工艺路线列表(含工序序列;订单结转/排产弹窗选择用) */
     @PostMapping("/routes")
     public ApiResult<List<Map<String, Object>>> routes() {
-        perm.requirePanelView("SO_ORDER");
+        // 三个页面的弹窗共用本接口:订单结转(选路线)、快速排产/生产工单(工序路线排线弹窗)
+        perm.requirePanelViewAny(PagePanelRegistry.ORDER_CONVERT, PagePanelRegistry.SCHEDULE_BOARD,
+                PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(service.routes());
     }
 
@@ -117,7 +122,8 @@ public class ProcessTaskController {
      */
     @PostMapping("/detail")
     public ApiResult<Map<String, Object>> detail(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        // 工单详情/追溯共用组件挂在工单排产看板与生产工单列表两处;MANU_ORDER 保留(旧入口同组件)
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD, "MANU_ORDER");
         Object rid = body.get("工单行id");
         Long rowId = null;
         if (rid instanceof Number n) rowId = n.longValue();

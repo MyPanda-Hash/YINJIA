@@ -1,0 +1,7 @@
+table	rows
+qc_mold_insp_head	24
+qc_mold_insp_detail	20
+qc_cut_insp_head	9
+qc_cut_insp_detail	7
+qc_fin_spec_head	8
+qc_fin_spec_detail	20

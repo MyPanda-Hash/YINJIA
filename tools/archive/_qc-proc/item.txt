@@ -1,0 +1,22 @@
+=== ① QC_ITEM.检验内容 的取值分布(天然的类别/分组) ===
+  检验内容 | 项目数
+  目数 | 2
+  卫生安全 | 11
+  性能 | 1
+
+=== ② QC_ITEM.检验内容 的字段配置(是否下拉/有无字典) ===
+  label | data_type | dict
+  检验内容 | 文本 | 
+
+=== ③ QC_ITEM 面板的取数配置 ===
+  panel_code | panel_name | mode | line_table | head_table | group_col | pk_col | code_col
+  QC_ITEM | 检验项目 | archive | bs_qc_item |  |  | id | 
+  QC_PLAN | 检验方案 | archive | bs_qc_plan |  |  | id | 
+
+=== ④ 现有方案 QC_PLAN ===
+  方案编码 | 方案名称 | 适用存货 | 适用存货类别 | 检验方式 | 文件编码
+  QP-CAS18 | Y料成品检验方案(CAS-18) | Y料 | 功能料-颗粒 | 抽检 | YJ-Q-125
+  QP-YCAS23 | Y料原料检验方案(Y-CAS-23) | Y-CAS-23 |  | 抽检 | YJ-Q-125
+
+=== ⑤ QC_ITEM 是否支持「参照」回填到检验单(看有无 ref) ===
+  panel_code | label | ref_panel | ref_field | display_field

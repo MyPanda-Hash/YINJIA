@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT name FROM sys.objects WHERE name IN (N'bs_line_capacity',N'outh',N'inh',N'kucun',N'wo_kit',N'v_line_load',N'v_manu_schedule',N'wo_progress') AND type IN ('U','V') ORDER BY name; SELECT name FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bs_line_capacity') ORDER BY column_id;

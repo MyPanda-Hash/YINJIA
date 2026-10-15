@@ -1,0 +1,6 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-usage.sql ==
+  | QC_CUT_INSP | 切炭检验单 | 生产管理 | doc | qc_cut_insp_detail | qc_cut_insp_head | 生产制造 | QT | 单据日期 | 40 | 7 | 9 | 
+  | QC_FIN_SPEC | 成品检验规范 | 品质管理 | doc | qc_fin_spec_detail | qc_fin_spec_head | 品质管理 | CPJY | 单据日期 | 38 | 0 | 5 | 
+  | QC_MOLD_INSP | 成型检验单 | 生产管理 | doc | qc_mold_insp_detail | qc_mold_insp_head | 生产制造 | CX | 单据日期 | 40 | 7 | 24 | 
+[SQL FAIL] Invalid object name 'dbo.qc_mold_insp'.

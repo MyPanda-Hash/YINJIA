@@ -1,5 +1,7 @@
 package com.yinjia.mes.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,8 @@ import java.util.Map;
  */
 @Service
 public class ProcessTaskService {
+
+    private static final Logger log = LoggerFactory.getLogger(ProcessTaskService.class);
 
     /** 默认工艺路线(产品未绑定时兜底) */
     public static final String DEFAULT_ROUTE = "GY-CB-STD";
@@ -242,8 +246,9 @@ public class ProcessTaskService {
             String op = String.valueOf(r.get("工序")).trim();
             double qty = num(r.get("报工数量")) * sign;
             if (wo.isEmpty() || op.isEmpty() || qty == 0) continue;
-            // 本行(工单号 + 工单行号 = 唯一工单):经 gd_id → plang_pc.plang_id;老数据按批次兜底
-            Long rowId = rowIdOfReport(wo, num(r.get("gd_id")), String.valueOf(r.get("批次号")));
+            // 本行唯一身份只经 gd_id→plang_pc.plang_id；无锚报告不再按批次猜测
+            Long rowId = rowIdOfReport(wo, num(r.get("gd_id")), null);
+             if (rowId == null) throw new IllegalStateException("报工缺少工单行锚点,不能回写工序任务");
             // 报工审核/弃审 → **回写该行状态**(2026-10-05 用户口径「报工需要能影响当前的工单情况」),幂等重算
             syncWorkOrderState(wo, rowId, user);
             List<Map<String, Object>> tasks = jdbc.queryForList(
@@ -270,22 +275,17 @@ public class ProcessTaskService {
     /** 手工重算某工单的任务完成量(按已审核报工重算;数据修复/对账用) */
     @Transactional
     public Map<String, Object> rebuild(String plNo, String user) {
-        List<String> ops = jdbc.queryForList(
-                "SELECT DISTINCT 工序 FROM dbo.wo_progress WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                String.class, plNo);
+        List<Map<String,Object>> targets = jdbc.queryForList(
+                "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", plNo);
         int n = 0;
-        for (String op : ops) {
-            Double done = jdbc.queryForObject(
-                    "SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=? AND gxdm=?"
-                            + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'", Double.class, plNo, op);
-            double d = done == null ? 0 : done;
-            n += jdbc.update("UPDATE dbo.wo_progress SET 完成数量=?, 状态=CASE WHEN ? >= 计划数量 THEN N'已完工'"
-                            + " WHEN ? > 0 THEN N'在加工' ELSE N'待加工' END, asp_user2=?, asp_time2=GETDATE()"
-                            + " WHERE 单据编号=? AND 工序=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                    d, d, d, user, plNo, op);
+        for (Map<String,Object> target : targets) {
+            long rowId = ((Number) target.get("id")).longValue();
+            Map<String,Object> state = jdbc.queryForMap("SELECT pl_sl,rk_sl,[批次号],[工艺路线] FROM dbo.plang WHERE id=?", rowId);
+            syncWorkOrderState(plNo, rowId, user);
+            n += jdbc.update("UPDATE dbo.wo_progress SET asp_user2=?, asp_time2=GETDATE() WHERE 工单行id=? AND ISNULL(asp_cancel,'N')<>'Y'", user, rowId);
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("重算工序数", ops.size());
+        out.put("重算工序数", n);
         out.put("更新行数", n);
         return out;
     }
@@ -299,14 +299,28 @@ public class ProcessTaskService {
 
     /**
      * 可选工艺路线列表(**含工序序列**,供弹窗选择;2026-10-05 用户口径:路线多时下拉不现实 → 改弹窗)。
+     *
+     * <p>2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」:每条路线带上
+     * 「审核状态」(已审核/未审核)，弹窗把未审核的置灰并说明原因;
+     * 只读展示，选单的硬拦在后端 {@code QuickScheduleService.requireRouteAudited}。</p>
+     *
+     * <p>口径与 {@code bs_route.审核状态} 字段(触发器派生)一致：shr 非空 且
+     * 未作废/未中止/非删除申请/非修改中 = 已审核；审批中(pending='Y')算未审核。</p>
      */
     public List<Map<String, Object>> routes() {
         return jdbc.queryForList(
                 "SELECT r.工艺路线编码 AS 编码, MAX(ISNULL(r.工艺路线名称, N'')) AS 名称, COUNT(*) AS 工序数,"
+                        // 审核状态:左连 ROUTE 的状态行(无状态行 = 从未走过审核流 = 未审核)
+                        + " CASE WHEN MAX(CASE WHEN s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y'"
+                        + "           AND ISNULL(s.stopped,'N')<>'Y' AND ISNULL(s.deleting,'N')<>'Y'"
+                        + "           AND ISNULL(s.modify_state,'N')<>'Y' THEN 1 ELSE 0 END) = 1"
+                        + "      THEN N'已审核' ELSE N'未审核' END AS 审核状态,"
                         + " STUFF((SELECT N'→' + x.工序名称 FROM dbo.bs_route x WHERE x.工艺路线编码 = r.工艺路线编码"
                         + "         AND ISNULL(x.asp_cancel,'N')<>'Y' AND ISNULL(x.工序名称,N'')<>N''"
                         + "         ORDER BY ISNULL(x.加工顺序,999) FOR XML PATH('')),1,1,N'') AS 工序序列"
-                        + " FROM dbo.bs_route r WHERE ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(r.工序名称,N'')<>N''"
+                        + " FROM dbo.bs_route r"
+                        + " LEFT JOIN dbo.yj_doc_status s ON s.panel_code = 'ROUTE' AND s.doc_no = r.工艺路线编码"
+                        + " WHERE ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(r.工序名称,N'')<>N''"
                         + " GROUP BY r.工艺路线编码 ORDER BY r.工艺路线编码");
     }
 
@@ -386,30 +400,53 @@ public class ProcessTaskService {
                         + " ISNULL(p.scx,N'') AS 排产产线"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
         }
-        // 报工口径:每道工序的完工量(只算已审核报工)。
+        // 报工口径:每道工序的**完工量(只算已审核)**+ **待审量(草稿/未审核)**。
         // ⚠ 行级(2026-10-10):传 rowId 时锚 scjl.gd_id → plang_pc.plang_id = 该行(老数据无 gd_id 时按该行批次兜底),
         //   否则会把同工单其它行的报工算进来(实测:行6 的界面显示出行7 的 56000)。
+        // 🔴 2026-10-16(用户报障「存在生产报工但工序进度不变蓝」):**待审量必须一起取出来**。
+        //   此前本查询直接 `AND wgzt='Y'` 把草稿报工整个滤掉 ⇒ 同一弹窗里「完工数据」段(不过滤 wgzt)
+        //   明明列出了这道工序的报工数量,工序步骤却按 0 着色 = 灰(未开始),两段自相矛盾。
+        //   现:完工量仍只算已审(**完工/转序/结案口径不变,绝不让草稿冒充产量**),
+        //   待审量单独出一列,只用来把该步判成「进行中」(蓝)并在描述里标注「待审」。
+        //   `gd_id IS NULL` 一并改为 `ISNULL(gd_id,0)=0`:scjl.gd_id 默认约束是 ((0)) 且可空
+        //   ⇒ 「未锚定」有 NULL 和 0 两种写法,只判 NULL 会漏(与 ScheduleBoardService 完工段/转序判据不一致)。
+        //   行定位补**第③级 scjl.[工单行号]**:草稿报工还没审核 ⇒ gd_id 仍是 0(权威行键只在审核时写),
+        //   但保存时 stampRowNo 已把 [工单行号] 落库 ⇒ 不加这一级,草稿就归属不到行、步骤条看不到它。
+        //   三级优先级与 {@link WoReportService#reportRows} 一致:①gd_id ②[工单行号] ③批次号。
         List<Map<String, Object>> reps;
         if (rowId != null) {
             reps = jdbc.queryForList(
-                    "SELECT ISNULL(s.gxdm,N'') AS 工序, SUM(ISNULL(s.sl,0)) AS 完工量, COUNT(*) AS 报工单数"
+                    "SELECT ISNULL(s.gxdm,N'') AS 工序,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) AS 完工量,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE ISNULL(s.sl,0) END) AS 待审量,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 1 ELSE 0 END) AS 报工单数,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE 1 END) AS 待审单数"
                             + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
-                            + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                            + "   AND (pc.plang_id=? OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'')="
-                            + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))"
-                            + " GROUP BY s.gxdm", no, rowId, rowId);
+                            + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                            + "   AND (pc.plang_id=?"
+                            + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[工单行号],0)>0"
+                            + "            AND ISNULL(s.[工单行号],0) = ISNULL((SELECT TOP 1 ISNULL(p.pl_xc,0) FROM dbo.plang p WHERE p.id=?),0))"
+                            + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[工单行号],0)=0 AND ISNULL(s.[批次号],N'')="
+                            + "            ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))"
+                            + " GROUP BY s.gxdm", no, rowId, rowId, rowId);
         } else {
             reps = jdbc.queryForList(
-                    "SELECT ISNULL(gxdm,N'') AS 工序, SUM(ISNULL(sl,0)) AS 完工量, COUNT(*) AS 报工单数"
-                            + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
+                    "SELECT ISNULL(gxdm,N'') AS 工序,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN ISNULL(sl,0) ELSE 0 END) AS 完工量,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN 0 ELSE ISNULL(sl,0) END) AS 待审量,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN 1 ELSE 0 END) AS 报工单数,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN 0 ELSE 1 END) AS 待审单数"
+                            + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " GROUP BY gxdm", no);
         }
         Map<String, Double> qty = new LinkedHashMap<>();
+        Map<String, Double> pendQty = new LinkedHashMap<>();
         Map<String, Integer> cnt = new LinkedHashMap<>();
         for (Map<String, Object> r : reps) {
             String op = String.valueOf(r.get("工序")).trim();
             if (op.isEmpty()) continue;
             qty.put(op, num(r.get("完工量")));
+            pendQty.put(op, num(r.get("待审量")));
             cnt.put(op, (int) num(r.get("报工单数")));
         }
         List<Map<String, Object>> steps = new ArrayList<>();
@@ -442,6 +479,10 @@ public class ProcessTaskService {
         String cur = "";
         for (Map<String, Object> l : lines) {
             String op = String.valueOf(l.get("工序名称")).trim();
+            // 当前工序 = 最后一道**有已审产出**的工序。
+            //   ⚠ 只认已审量:plang.[当前工序](由 syncOneRowState 维护)同样只按已审报工推进
+            //   ⇒ 这里若把草稿报工也算进去,弹窗的「当前工序」会与生产工单列表/工单状态打架。
+            //   (草稿报工只影响步骤**着色**,见下方 pendQty。)
             if (qty.getOrDefault(op, 0d) > 0) cur = op;
         }
         // 本行排产数量 = 各工序计划量的**共同基数**(不再累乘)
@@ -454,20 +495,31 @@ public class ProcessTaskService {
             if (rate <= 0) rate = 1;
             double stepPlan = round(basePlan * rate);   // 该道自己的计划量(独立折算,不累乘)
             double q = qty.getOrDefault(op, 0d);
+            double pend = pendQty.getOrDefault(op, 0d);
+            // 状态四态(2026-10-16 加「待审」):
+            //   · 超产/已完工 = **已审**量达标 ⇒ 绿(完成);超产是"已完成且超了",不能算未完成;
+            //   · 进行中 = 已审量 0<q<计划,或**只有待审报工** ⇒ 蓝;
+            //   · 未开始 = 已审、待审都为 0 ⇒ 灰。
+            //   ⚠ 待审**不参与**达标判定(计划量封顶/转序/结案仍只看已审),只影响"是否已开始"的着色。
             String st = (stepPlan > 0 && q > stepPlan) ? "超产"
                     : (stepPlan > 0 && q >= stepPlan) ? "已完工"
-                    : (q > 0 ? "进行中" : "未开始");
-            if ("已完工".equals(st) || "超产".equals(st)) doneSteps++;
+                    : (q > 0 || pend > 0) ? "进行中" : "未开始";
+            boolean finished = "已完工".equals(st) || "超产".equals(st);
+            if (finished) doneSteps++;
             if (q > stepPlan) overQty = round(overQty + (q - stepPlan));
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("序", i + 1);
             s.put("工序", op);
             s.put("换算率", round(rate));
             s.put("完工量", round(q));
+            s.put("待审量", round(pend));               // 草稿/未审报工量(只作着色与提示,不计入产出/进度)
             s.put("计划量", stepPlan);                 // 该道**自己**的工序计划量(基数 = 本行排产数量)
             s.put("报工单数", cnt.getOrDefault(op, 0));
             s.put("当前", op.equals(cur));
             s.put("状态", st);
+            // 完成标记(2026-10-16):前端**不要**再自己按状态字面量猜颜色 —— 超产=完成这件事
+            //   只在后端一处判定,避免"报工 161/160 却不显绿"再次出现。
+            s.put("已完成", finished);
             steps.add(s);
         }
         double outQty = 0;
@@ -632,9 +684,14 @@ public class ProcessTaskService {
      *
      * @param steps [{工序, 生产线, 计划完工日期?(yyyy-MM-dd), 计划数量?(忽略,一律按换算率算)}]
      * @param team  排产班组(可空;写 plang.lb / plang_pc.lb)
+     * @param planQty **排产数量**(2026-10-16 用户口径「实现排产数」;可空)。参考库口径
+     *   (《参考库生产管理盘点》§3.1 数量链):`xq_sl 需求数量 → pl_sl 排产数量(人工给定、可改) → rk_sl 入库数量`。
+     *   空 = 沿用该行现有排产数量、现值为 0(新结转刚放行)时取需求数量(旧口径「空=全排」);
+     *   给了就按它写 plang.pl_sl(+ plang_pc 镜像)并**重算各道计划数量**。
      */
     @Transactional
-    public Map<String, Object> preplanManual(String plNo, Long lineId, List<Map<String, Object>> steps, String team, String user) {
+    public Map<String, Object> preplanManual(String plNo, Long lineId, List<Map<String, Object>> steps, String team,
+                                             Double planQty, String user) {
         if (!notBlank(plNo)) throw new IllegalArgumentException("请提供工单号");
         String no = plNo.trim();
         Map<String, Object> steps0 = routeSteps(no, lineId);
@@ -644,6 +701,16 @@ public class ProcessTaskService {
         if (route.isEmpty()) throw new IllegalStateException("该工单未绑定工艺路线(或路线无工序明细),不能排线");
         if (steps == null || steps.size() != route.size())
             throw new IllegalArgumentException("必须为路线的每一道工序选好生产线(共 " + route.size() + " 道)");
+        // ── 排产数量(2026-10-16 用户口径「实现排产数」;2026-10-07 改成工序路线排线时这个参数被移除了) ──
+        //   参考库口径:pl_sl 是**排产确认量**,默认=需求数量、由排产员人工给定、可改(可小于需求=部分排产);
+        //   本系统 pl_sl 落工单行 plang,并由 WorkOrderScheduleRecord 镜像进排产记录 plang_pc(追溯「排产数据」段)。
+        double demandQty = num(head.get("需求数量"));
+        double curQty = num(head.get("排产数量"));
+        double qty = planQty != null ? round(planQty) : (curQty > 0 ? curQty : demandQty);
+        if (!Double.isFinite(qty) || qty <= 0)
+            throw new IllegalStateException("排产数量必须大于 0(本行需求数量 " + trimQty(demandQty) + ")");
+        if (demandQty > 0 && qty > demandQty + 0.0001)
+            throw new IllegalStateException("排产数量 " + trimQty(qty) + " 超过需求数量 " + trimQty(demandQty));
         // 逐道校验(按工序序对齐)
         List<Map<String, Object>> plan = new ArrayList<>();
         for (int i = 0; i < route.size(); i++) {
@@ -669,7 +736,12 @@ public class ProcessTaskService {
             p.put("工序", op);
             p.put("工序序", rt.get("工序序"));
             p.put("生产线", line);
-            p.put("计划数量", rt.get("计划数量"));
+            // 计划数量 = **本次排产数量** × 该工序自己的换算率(各道分开算,不累乘)
+            //   ⚠ 2026-10-16:基数改用本次排产数量(排产员在弹窗里给的那个),不再是 routeSteps 里按**旧** pl_sl
+            //     算出来的值 —— 否则「排产数量 100 + 计划数量还是按 160 算」两边自相矛盾。
+            double stepRate = num(rt.get("换算率"));
+            if (stepRate <= 0) stepRate = 1;
+            p.put("计划数量", round(qty * stepRate));
             p.put("计划完工日期", str(given.get("计划完工日期")) != null ? str(given.get("计划完工日期")) : rt.get("计划完工日期"));
             plan.add(p);
         }
@@ -684,6 +756,7 @@ public class ProcessTaskService {
             assignRow.put("加工单号", no);
             if (rowId != null) assignRow.put("行id", rowId);
             assignRow.put("生产线", firstPlan);
+            assignRow.put("排产数量", qty);        // 2026-10-16:人工给定的排产数量(assign 写 plang.pl_sl + plang_pc 镜像)
             if (str(team) != null) assignRow.put("排产班组", str(team));
             if (plan.get(0).get("计划完工日期") != null) assignRow.put("预完工日", plan.get(0).get("计划完工日期"));
             Map<String, Object> assigned = scheduleBoard.assign(List.of(assignRow), user);
@@ -691,6 +764,9 @@ public class ProcessTaskService {
             if (!headFailed.isEmpty()) throw new IllegalStateException("工单排产失败:" + String.join("; ", headFailed));
         } else if (!curLine.equals(firstPlan)) {
             throw new IllegalStateException("首道线 = 该工单行当前排产线「" + curLine + "」;换线请先撤销该行排产再重排");
+        } else {
+            // 已排产行**只改排产数量**(2026-10-16:预排线弹窗里数量也可改;换线仍要求先撤销 —— 上面那句守卫)
+            applyRowPlanQty(rowId, no, qty, user);
         }
         // ② 写台账(先作废**本工单行**的旧行;唯一键 = 工单号 + 工单行,不动同工单其它行)
         jdbc.update("UPDATE dbo.wo_process_line SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
@@ -713,9 +789,54 @@ public class ProcessTaskService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工单号", no);
         out.put("排产产线", plan.get(0).get("生产线"));
+        out.put("排产数量", qty);
         out.put("预排道数", plan.size());
         out.put("计划线", plan.stream().map(x -> x.get("工序") + ":" + x.get("生产线")).toList());
         return out;
+    }
+
+    /**
+     * 已排产行**改排产数量**(2026-10-16 用户口径「实现排产数」;参考库口径 pl_sl = 人工给定、**可改**)。
+     *
+     * <p>写 {@code plang.pl_sl}(排产数量)+ {@code yl}(余量 = 需求 − 排产),再经
+     * {@link WorkOrderScheduleRecord#sync} 同步进排产记录 {@code plang_pc}(追溯「排产数据」段 / 看板未交量的来源),
+     * 最后留痕 {@code yj_usage_log}。数量没变则什么都不做(幂等)。
+     *
+     * <p><b>守卫</b>(改小不能把已经发生的事实盖掉):
+     * <ul>
+     *   <li>不得小于该行**已入库数量**(入库量不能超过排产量);</li>
+     *   <li>不得小于该行**已审核报工量**(报工计划量按旧排产量算,改小会让台账/进度自相矛盾)。</li>
+     * </ul>
+     * 要改小到这些值以下,先处理报工/入库(弃审、作废)再改。
+     */
+    private void applyRowPlanQty(Object rowId, String no, double qty, String user) {
+        if (rowId == null) return;
+        Map<String, Object> cur = jdbc.queryForMap(
+                "SELECT ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl FROM dbo.plang WHERE id=?", rowId);
+        if (Math.abs(num(cur.get("pl_sl")) - qty) < 0.0001) return;          // 数量未变:不写库不留痕
+        double rk = num(cur.get("rk_sl"));
+        if (rk > qty + 0.0001)
+            throw new IllegalStateException("排产数量 " + trimQty(qty) + " 小于该行已入库数量 " + trimQty(rk)
+                    + ",不能改小(请先处理入库单)");
+        // 已审报工量(锚 scjl.gd_id → plang_pc.plang_id;老数据 gd_id 为空时按本行批次号兜底)
+        double done = num(jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
+                        + " WHERE ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=s.gd_id AND pc.plang_id=?)"
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "            (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id=?)))",
+                Double.class, rowId, rowId));
+        if (done > qty + 0.0001)
+            throw new IllegalStateException("排产数量 " + trimQty(qty) + " 小于该行已完成报工量 " + trimQty(done)
+                    + ",不能改小(请先处理报工单)");
+        int n = jdbc.update("UPDATE dbo.plang SET pl_sl=?, yl=ISNULL(xq_sl,0)-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                qty, qty, user, rowId);
+        if (n == 0) throw new IllegalStateException("工单行不存在:" + no);
+        WorkOrderScheduleRecord.sync(jdbc, rowId, user);                     // 排产记录镜像(数量/余量同源)
+        jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no)"
+                        + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username=?), ?),"
+                        + " N'工单', N'快速排产', N'改排产数量', ?)",
+                user, user, user, no);
     }
 
     /**
@@ -791,13 +912,16 @@ public class ProcessTaskService {
     /**
      * 该**工单行**该道工序的已审核报工量(转序判据):
      *   优先按 scjl.gd_id → plang_pc.plang_id 锚到行;老数据没有 gd_id 时退回按(工单号+批次号)匹配该行。
+     * <p>⚠ 2026-10-16:「未锚定」判据统一为 {@code ISNULL(gd_id,0)=0} —— {@code scjl.gd_id} 的默认约束是
+     * {@code ((0))} 且可空 ⇒ 未锚定有 NULL / 0 两种写法,只判 NULL 会漏掉 0 的那批,
+     * 于是同一条报工在「完工数据」段算得到、在「工序进度/转序」算不到(两段数量对不上)。
      */
     private double reportedQty(String plNo, Long rowId, String op) {
         Double d = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
                         + " LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
                         + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                        + "   AND (pc.plang_id=? OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'')="
+                        + "   AND (pc.plang_id=? OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
                         + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))",
                 Double.class, plNo, op, rowId, rowId);
         return d == null ? 0 : d;
@@ -924,7 +1048,7 @@ public class ProcessTaskService {
                     + " ORDER BY ISNULL(加工顺序,999)", String.class, route));
         }
         if (ops.isEmpty()) ops.addAll(List.of(PROCESS_ORDER));
-        // 本行各工序完工量:锚 scjl.gd_id → plang_pc.plang_id = 本行(老数据空 gd_id 用本行批次兜底)
+        // 本行各工序完工量优先用稳定 gd_id→plang_pc.plang_id；批次仅兼容历史无锚记录。
         Map<String, Double> qty = new LinkedHashMap<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT ISNULL(s.gxdm,N'') AS 工序, SUM(ISNULL(s.sl,0)) AS 完工量 FROM dbo.scjl s"
@@ -944,8 +1068,13 @@ public class ProcessTaskService {
         if (allDone) cur = ops.get(ops.size() - 1);
         double curQty = qty.getOrDefault(cur, 0d);
         boolean started = qty.values().stream().anyMatch(v -> v > 0);
-        // 生产完工判定(用户口径):**全部生产工序报工达标**  或  **入库数量达标**
-        boolean prodDone = plan > 0 && (allDone || inQty >= plan - 0.0001);
+        // 生产完工判定:只认本行工艺路线末道；末道计划量按该道换算率计算。
+        String lastOp = ops.get(ops.size() - 1);
+        Double lastRate = route.isEmpty() ? null : jdbc.queryForObject(
+                "SELECT TOP 1 ISNULL(换算率,1) FROM dbo.bs_route WHERE 工艺路线编码=? AND 工序名称=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, route, lastOp);
+        double lastPlan = plan * ((lastRate == null || lastRate <= 0) ? 1 : lastRate);
+        boolean prodDone = plan > 0 && qty.getOrDefault(lastOp, 0d) + 0.0001 >= lastPlan;
         String state = prodDone ? "生产完工" : (started ? "在制" : "未开工");
         // 🔴 2026-10-15 用户口径(报障):「全部报工完成后**不应**变为已结案,员工看到的应是**完工**;
         //   只有**最后组装成品检验完成入库后**才显示结案」。
@@ -955,10 +1084,45 @@ public class ProcessTaskService {
         //   现:**报工只负责"完工状态"**,结案改由 {@link #syncCloseState} 按
         //   「组装成品检验单已审核通过 且 入库≥排产」单独判定(在入库/检验的审核与弃审时重算)。
         //   ⇒ 这里**不再动 ja**(保持原值,人工结案/取消结案仍由生产工单页负责)。
+        // 🔴 完工时刻取**应用本地墙钟**(2026-10-16,与 scjl.wgsj 同口径,见 WoReportService.complete()):
+        //   GETDATE() 在 Docker(容器 TZ=UTC)下比北京时间慢 8 小时 ⇒ 工单行的完工时间会写成 8 小时前,
+        //   而首件检验单的「生产日期」正是取这一列(FirstInspBackfill),凌晨完工会被算成**前一天**。
+        //   语义不变:只在该行**首次**进入「生产完工」时写(ISNULL 保留原值 = 当时那一刻),退回在制即清空。
+        java.time.LocalDateTime doneAt = java.time.LocalDateTime.now();
         jdbc.update("UPDATE dbo.plang SET 当前工序=?, 当前工序完工量=?, 完工状态=?,"
-                        + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, GETDATE()) ELSE NULL END,"
-                        + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                cur, round(curQty), state, state, user, id);
+                        + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, ?) ELSE NULL END,"
+                        + " asp_user2=?, asp_time2=? WHERE id=?",
+                cur, round(curQty), state, state, doneAt, user, doneAt, id);
+        if (prodDone) assignProductionBatch(id, no, user, String.valueOf(t.get("原完工状态")));
+    }
+
+    /** 首次进入生产完工时生成当天生产批次；工单行 id 是唯一身份，重算/重审复用已有批次。 */
+    private void assignProductionBatch(long rowId, String workOrder, String user, String prevState) {
+        String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        int changed = jdbc.update("UPDATE dbo.plang SET [批次号]=COALESCE(NULLIF([批次号],N''),?),"
+                        + " asp_user2=?, asp_time2=GETDATE() WHERE id=? AND pl_no=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(完工状态,N'')=N'生产完工'",
+                today, user, rowId, workOrder);
+        if (changed != 1) return;
+        jdbc.update("UPDATE pc SET pc.[批次号]=p.[批次号],pc.asp_user2=?,pc.asp_time2=GETDATE()"
+                        + " FROM dbo.plang_pc pc JOIN dbo.plang p ON p.id=pc.plang_id"
+                        + " WHERE p.id=? AND ISNULL(pc.asp_cancel,'N')<>'Y'", user, rowId);
+        jdbc.update("UPDATE dbo.wo_progress SET [批次号]=p.[批次号],asp_user2=?,asp_time2=GETDATE()"
+                        + " FROM dbo.wo_progress w JOIN dbo.plang p ON p.id=w.工单行id"
+                        + " WHERE w.工单行id=? AND ISNULL(w.asp_cancel,'N')<>'Y'", user, rowId);
+        jdbc.update("UPDATE dbo.scjl SET [批次号]=p.[批次号],asp_user2=?,asp_time2=GETDATE()"
+                        + " FROM dbo.scjl s JOIN dbo.plang_pc pc ON pc.id=s.gd_id"
+                        + " JOIN dbo.plang p ON p.id=pc.plang_id"
+                        + " WHERE p.id=? AND ISNULL(s.asp_cancel,'N')<>'Y'", user, rowId);
+        // ★ 本行**第一次**进入生产完工(原状态不是完工)⇒ 回填首件检验单(2026-10-16 第二轮用户口径:
+        //   「让生产日期根据当前的生产工单完成首批次后进行回填…检验单是绑定工单号的…批次号是完工时
+        //     自动生产的」)。回填内容 = 该行完工当日(生产日期)+ 该行批次号,只填检验单上的空格。
+        if ("生产完工".equals(prevState)) return;      // 重算/重审/再次报工:已在完工态,不重复回填
+        int n = FirstInspBackfill.backfillOnFirstBatch(jdbc, rowId, workOrder, user);
+        if (n > 0) {
+            log.info("[首件检验] 工单 {} 行 {} 第一批完工(批号 {}) ⇒ 回填生产日期/批号 {} 张首件检验单",
+                    workOrder, rowId, today, n);
+        }
     }
 
     /**
@@ -1005,6 +1169,7 @@ public class ProcessTaskService {
         boolean asmOk = asm != null && asm > 0;
         String ja = (asmOk && inOk) ? "Y" : "N";
         jdbc.update("UPDATE dbo.plang SET ja=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", ja, user, rowId);
+        WorkOrderScheduleRecord.sync(jdbc, rowId, user);
         return ja;
     }
 
@@ -1056,4 +1221,8 @@ public class ProcessTaskService {
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
     }
     private static double round(double v) { return Math.round(v * 10000.0) / 10000.0; }
+    /** 数量按人看的写法(去尾零:160.0 → 160,160.5 → 160.5)——用于报错/回执文案 */
+    private static String trimQty(double v) {
+        return java.math.BigDecimal.valueOf(round(v)).stripTrailingZeros().toPlainString();
+    }
 }

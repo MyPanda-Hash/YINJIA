@@ -1,0 +1,154 @@
+########## HSDZ_MES ##########
+=== QC_ASM_INSP 全部字段(按 place/seq) ===
+place | seq | col_name | data_type | editable | visible | hidden
+detail | 10 | 检验项目 | 多行文本 | 1 | 1 | 0
+detail | 20 | 检验要求 | 多行文本 | 1 | 1 | 0
+detail | 30 | 实测数值 | 多行文本 | 1 | 1 | 0
+detail | 40 | 检验方法 | 多行文本 | 1 | 1 | 0
+detail | 50 | 检查频率 | 下拉框 | 1 | 1 | 0
+detail | 60 | 判定 | 多行文本 | 1 | 1 | 0
+detail | 70 | 数量 | 文本 | 1 | 1 | 0
+detail | 80 | 行号 | 文本 | 0 | 0 | 1
+detail | 100 | 表区 | 文本 | 0 | 0 | 1
+detail | 120 | 不合格数量 | 小数 | 1 | 1 | 0
+detail | 300 | 测量值1 | 小数 | 1 | 1 | 0
+detail | 301 | 测量值2 | 小数 | 1 | 1 | 0
+detail | 302 | 测量值3 | 小数 | 1 | 1 | 0
+detail | 303 | 测量值4 | 小数 | 1 | 1 | 0
+detail | 304 | 测量值5 | 小数 | 1 | 1 | 0
+header | 90 | 规格型号 | 文本 | 1 | 1 | 0
+header | 110 | 生产车间 | 文本 | 1 | 1 | 0
+header | 120 | 报工数量 | 文本 | 1 | 1 | 0
+header | 130 | 检验数量 | 文本 | 1 | 1 | 0
+header | 150 | 检验日期 | 文本 | 1 | 1 | 0
+header | 175 | 执行标准 | 文本 | 1 | 1 | 0
+header | 200 | 审核人 | 文本 | 0 | 1 | 0
+header | 210 | 审核时间 | 文本 | 0 | 1 | 0
+header,detail | 90 | 处理方式 | 多行文本 | 1 | 1 | 0
+header,detail | 110 | 备注 | 多行文本 | 1 | 1 | 0
+query,header | 10 | 单据编号 | 文本 | 0 | 1 | 0
+query,header | 20 | 单据日期 | 文本 | 1 | 1 | 0
+query,header | 30 | 工单号 | 文本 | 1 | 1 | 0
+query,header | 35 | 工单行号 | 整数 | 0 | 1 | 0
+query,header | 40 | 报工单号 | 文本 | 1 | 1 | 0
+query,header | 50 | 工序 | 文本 | 1 | 1 | 0
+query,header | 60 | 批次号 | 文本 | 1 | 1 | 0
+query,header | 70 | 产品编码 | 文本 | 1 | 1 | 0
+query,header | 80 | 产品名称 | 文本 | 1 | 1 | 0
+query,header | 100 | 生产线 | 文本 | 1 | 1 | 0
+query,header | 140 | 检验员 | 文本 | 1 | 1 | 0
+query,header | 155 | 检验方案 | 参照 | 1 | 1 | 0
+query,header | 160 | 总结论 | 文本 | 1 | 1 | 0
+query,header | 165 | 文件编码 | 文本 | 1 | 1 | 0
+query,header | 190 | 单据状态 | 文本 | 0 | 1 | 0
+
+=== 截图七列在 QC_ASM_INSP / QC_PROC_INSP 上是否登记 ===
+截图列 | 成品检验单 | 制程检验单
+客户名称 | — | 有
+产品编码 | 有 | 有
+规格型号 | 有 | 有
+批次号 | 有 | 有
+检验员 | 有 | 有
+产线常规功能性结果 | — | —
+结果判断 | — | 有
+总结论 | 有 | 有
+
+=== 截图里「型号(mm)」「批号」「检验人员」的近似字段 ===
+panel_code | col_name | place
+QC_ASM_INSP | 规格型号 | header
+QC_ASM_INSP | 检验员 | query,header
+QC_ASM_INSP | 批次号 | query,header
+QC_PROC_INSP | 规格型号 | header
+QC_PROC_INSP | 检验员 | query,header
+QC_PROC_INSP | 批次号 | query,header
+
+=== 成品检验单里「表区」现有取值(看有没有 功能性测试 区) ===
+表区 | 行数
+检验项目 | 1
+数量判定 | 6
+
+=== 产线常规功能性结果/客户名称 全库哪个面板有 ===
+字段 | 出现在
+客户名称 | PU_ORDER,QC_BHC,QC_BHG,QC_PROC_INSP
+产线常规功能性结果 | (无任何面板)
+结果判断 | QC_PROC_INSP
+总结论 | QC_ASM_INSP,QC_CUT_INSP,QC_INSP,QC_MOLD_INSP,QC_PROC_INSP
+检验人员 | (无任何面板)
+
+########## HSDZ_MES_TEST ##########
+=== QC_ASM_INSP 全部字段(按 place/seq) ===
+place | seq | col_name | data_type | editable | visible | hidden
+detail | 45 | 检查频率 | 下拉框 | 1 | 1 | 0
+detail | 190 | 表区 | 文本 | 0 | 1 | 0
+detail | 200 | 行号 | 文本 | 0 | 1 | 0
+detail | 210 | 检验项目 | 多行文本 | 1 | 1 | 0
+detail | 220 | 检验要求 | 多行文本 | 1 | 1 | 0
+detail | 230 | 实测数值 | 多行文本 | 1 | 1 | 0
+detail | 235 | 检验方法 | 多行文本 | 1 | 1 | 0
+detail | 240 | 判定 | 多行文本 | 1 | 1 | 0
+detail | 250 | 数量 | 文本 | 1 | 1 | 0
+detail | 300 | 测量值1 | 小数 | 1 | 1 | 0
+detail | 301 | 测量值2 | 小数 | 1 | 1 | 0
+detail | 302 | 测量值3 | 小数 | 1 | 1 | 0
+detail | 303 | 测量值4 | 小数 | 1 | 1 | 0
+detail | 304 | 测量值5 | 小数 | 1 | 1 | 0
+detail | 310 | 不合格数量 | 小数 | 1 | 1 | 0
+header | 90 | 规格型号 | 文本 | 1 | 1 | 0
+header | 110 | 生产车间 | 文本 | 1 | 1 | 0
+header | 120 | 报工数量 | 文本 | 1 | 1 | 0
+header | 130 | 检验数量 | 文本 | 1 | 1 | 0
+header | 150 | 检验日期 | 文本 | 1 | 1 | 0
+header | 175 | 执行标准 | 文本 | 1 | 1 | 0
+header | 200 | 审核人 | 文本 | 0 | 1 | 0
+header | 210 | 审核时间 | 文本 | 0 | 1 | 0
+header,detail | 170 | 处理方式 | 多行文本 | 1 | 1 | 0
+header,detail | 180 | 备注 | 多行文本 | 1 | 1 | 0
+query,header | 10 | 单据编号 | 文本 | 0 | 1 | 0
+query,header | 20 | 单据日期 | 文本 | 1 | 1 | 0
+query,header | 30 | 工单号 | 文本 | 1 | 1 | 0
+query,header | 35 | 工单行号 | 整数 | 0 | 1 | 0
+query,header | 40 | 报工单号 | 文本 | 1 | 1 | 0
+query,header | 50 | 工序 | 文本 | 1 | 1 | 0
+query,header | 60 | 批次号 | 文本 | 1 | 1 | 0
+query,header | 70 | 产品编码 | 文本 | 1 | 1 | 0
+query,header | 80 | 产品名称 | 文本 | 1 | 1 | 0
+query,header | 100 | 生产线 | 文本 | 1 | 1 | 0
+query,header | 140 | 检验员 | 文本 | 1 | 1 | 0
+query,header | 155 | 检验方案 | 参照 | 1 | 1 | 0
+query,header | 160 | 总结论 | 文本 | 1 | 1 | 0
+query,header | 165 | 文件编码 | 文本 | 1 | 1 | 0
+query,header | 190 | 单据状态 | 文本 | 0 | 1 | 0
+
+=== 截图七列在 QC_ASM_INSP / QC_PROC_INSP 上是否登记 ===
+截图列 | 成品检验单 | 制程检验单
+客户名称 | — | 有
+产品编码 | 有 | 有
+规格型号 | 有 | 有
+批次号 | 有 | 有
+检验员 | 有 | 有
+产线常规功能性结果 | — | —
+结果判断 | — | 有
+总结论 | 有 | 有
+
+=== 截图里「型号(mm)」「批号」「检验人员」的近似字段 ===
+panel_code | col_name | place
+QC_ASM_INSP | 规格型号 | header
+QC_ASM_INSP | 检验员 | query,header
+QC_ASM_INSP | 批次号 | query,header
+QC_PROC_INSP | 规格型号 | header
+QC_PROC_INSP | 检验员 | query,header
+QC_PROC_INSP | 批次号 | query,header
+
+=== 成品检验单里「表区」现有取值(看有没有 功能性测试 区) ===
+表区 | 行数
+检验项目 | 1
+数量判定 | 32
+
+=== 产线常规功能性结果/客户名称 全库哪个面板有 ===
+字段 | 出现在
+客户名称 | PU_ORDER,QC_BHC,QC_BHG,QC_PROC_INSP
+产线常规功能性结果 | (无任何面板)
+结果判断 | QC_PROC_INSP
+总结论 | QC_ASM_INSP,QC_CUT_INSP,QC_INSP,QC_MOLD_INSP,QC_PROC_INSP
+检验人员 | (无任何面板)
+

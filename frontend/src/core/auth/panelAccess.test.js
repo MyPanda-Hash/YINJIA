@@ -13,7 +13,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canViewPanel, canConfigFields, canConfigWarn } from './panelAccess.js'
+import { canViewPanel, canConfigFields, canConfigWarn, canDo, canDoAny, PAGE_PANELS } from './panelAccess.js'
 
 const ADMIN = { isAdmin: true, visiblePanels: [] }
 const LIMITED = { isAdmin: false, visiblePanels: ['RD_PROD_DOCLIST', 'RD_SPEC_DOC'] }
@@ -93,4 +93,64 @@ test('canConfigWarn:看不见的面板 / 拿不到权限信息时不放行', () 
   assert.equal(canConfigWarn(QC_ROLE, 'STOCK_STATUS'), false)
   assert.equal(canConfigWarn(WARN_ROLE, ''), false)
   assert.equal(canConfigWarn(WARN_ROLE, null), false)
+})
+
+/* ── canDo / canDoAny:页面级虚拟面板的动作词(2026-10-16) ──
+ * 订单结转/快速排产/工单排产/生产工单四页是**看板页面**(无 yj_panel 行,按钮不走 yj_button),
+ * 动作权限由 AuthController 单独下发 pagePerms(code → perms csv);真闸门是后端
+ * PanelPermissionService.requirePanelView / requireButtonAny —— 两边必须同一判据。 */
+
+const PLANNER = {
+  isAdmin: false,
+  pagePerms: {
+    ORDER_CONVERT: 'view,query,date,convert',
+    SCHEDULE_BOARD: 'view,query,assign',
+    WORK_ORDER_BOARD: 'view,query',
+    WORK_ORDER_LIST: 'view,query,print',
+  },
+}
+
+test('canDo:管理员恒可,普通账号按 pagePerms 逐词精确匹配', () => {
+  assert.equal(canDo(ADMIN, PAGE_PANELS.ORDER_CONVERT, 'convert'), true)
+  assert.equal(canDo(ADMIN, '任意页面码', '任意词'), true)
+  assert.equal(canDo(PLANNER, PAGE_PANELS.ORDER_CONVERT, 'convert'), true)
+  assert.equal(canDo(PLANNER, PAGE_PANELS.ORDER_CONVERT, 'date'), true)
+  // 同页没有的词 / 别的页面才有的词 ⇒ 一律不显示按钮(点了也是 403)
+  assert.equal(canDo(PLANNER, PAGE_PANELS.ORDER_CONVERT, 'unassign'), false)
+  assert.equal(canDo(PLANNER, PAGE_PANELS.SCHEDULE_BOARD, 'unassign'), false)
+  assert.equal(canDo(PLANNER, PAGE_PANELS.WORK_ORDER_BOARD, 'transfer'), false)
+  // 没被授予的面板整条空串 ⇒ 全部动作不放行
+  assert.equal(canDo({ isAdmin: false, pagePerms: {} }, PAGE_PANELS.WORK_ORDER_LIST, 'print'), false)
+})
+
+test('canDo:逐词精确匹配,不吃前缀(assign ≠ unassign)', () => {
+  // 用 LIKE/前缀匹配会把 unassign 误判成 assign —— 这两个词在排产页同时存在,最易踩
+  assert.equal(canDo({ isAdmin: false, pagePerms: { SCHEDULE_BOARD: 'view,unassign' } },
+    PAGE_PANELS.SCHEDULE_BOARD, 'assign'), false)
+  assert.equal(canDo({ isAdmin: false, pagePerms: { SCHEDULE_BOARD: 'view,assign' } },
+    PAGE_PANELS.SCHEDULE_BOARD, 'unassign'), false)
+})
+
+test('canDo:pagePerms 为 * (后端管理员口径)时全量放行', () => {
+  assert.equal(canDo({ isAdmin: false, pagePerms: { ORDER_CONVERT: '*' } }, PAGE_PANELS.ORDER_CONVERT, 'convert'), true)
+})
+
+test('canDo:拿不到权限信息 / 空参数时不放行', () => {
+  assert.equal(canDo(null, PAGE_PANELS.ORDER_CONVERT, 'convert'), false)
+  assert.equal(canDo(undefined, PAGE_PANELS.ORDER_CONVERT, 'convert'), false)
+  assert.equal(canDo({ isAdmin: false }, PAGE_PANELS.ORDER_CONVERT, 'convert'), false)
+  assert.equal(canDo(PLANNER, '', 'convert'), false)
+  assert.equal(canDo(PLANNER, PAGE_PANELS.ORDER_CONVERT, ''), false)
+})
+
+test('canDoAny:同一动作两个入口任一授予即可(与后端 requireButtonAny 同口径)', () => {
+  // 「排产」在快速排产页与生产工单页各有一个按钮:只授其中一处也应放行
+  const onlyQuick = { isAdmin: false, pagePerms: { SCHEDULE_BOARD: 'view,assign' } }
+  const onlyList = { isAdmin: false, pagePerms: { WORK_ORDER_LIST: 'view,assign' } }
+  const entries = [PAGE_PANELS.SCHEDULE_BOARD, PAGE_PANELS.WORK_ORDER_LIST]
+  assert.equal(canDoAny(onlyQuick, entries, 'assign'), true)
+  assert.equal(canDoAny(onlyList, entries, 'assign'), true)
+  assert.equal(canDoAny({ isAdmin: false, pagePerms: { WORK_ORDER_LIST: 'view' } }, entries, 'assign'), false)
+  assert.equal(canDoAny(PLANNER, [], 'assign'), false)
+  assert.equal(canDoAny(PLANNER, null, 'assign'), false)
 })

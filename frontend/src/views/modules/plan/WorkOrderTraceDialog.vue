@@ -18,7 +18,6 @@
         <span v-if="trace['头']?.['批次号']" class="wb-tag wb-tag-line">{{ tt('批次号') }} {{ trace['头']?.['批次号'] }}</span>
         <span class="wb-trace-scope">{{ tt('追溯口径') }}：{{ tt(trace['头']?.['追溯口径'] || '整单') }}</span>
       </div>
-      <div v-if="trace['口径说明']" class="wb-trace-scope-line">{{ trace['口径说明'] }}</div>
       <div class="wb-trace-desc">
         <span>{{ tt('产品') }}: {{ trace['头']?.['产品编码'] }} {{ trace['头']?.['产品名称'] }}</span>
         <span>{{ tt('规格型号') }}: {{ trace['头']?.['规格型号'] || '-' }}</span>
@@ -50,14 +49,19 @@
           </span>
         </div>
         <!-- 步骤状态按**每道工序自己的完成度**着色(2026-10-05 用户口径:未完成/已完成不能同色):
-             已完工=绿(success) / 进行中=蓝(process) / 未开始=灰(wait);完成量同时显示 x/计划量 -->
+             已完工/超产=绿(success) / 进行中=蓝(process) / 未开始=灰(wait);完成量同时显示 x/计划量。
+             🔴 2026-10-16 修(用户报障「报工超过所需要的量已完成却不会变色」):
+               后端状态是**四态**(已完工 / 超产 / 进行中 / 未开始),这里原来只映射三态 ——
+               `超产` 落进 else 分支被判成 wait(灰),于是 161/160 这种"做完且超了"的工序显示为未开始。
+               现改读后端给的 **已完成** 布尔(超产/已完工都在后端一处判定),不再靠前端比对状态字面量。 -->
         <el-steps :active="Number(prog['已完成步骤数'] || 0)" align-center finish-status="success">
           <el-step v-for="s in (prog['工序步骤'] || [])" :key="s['工序']" :title="tt(s['工序'])"
-                   :status="s['状态'] === '已完工' ? 'success' : (s['状态'] === '进行中' ? 'process' : 'wait')"
-                   :description="`${num(s['完工量'])}/${num(s['计划量'])}` + (s['报工单数'] ? `（${s['报工单数']}${tt('单')}）` : '')" />
+                   :status="stepStatus(s)"
+                   :description="`${num(s['完工量'])}/${num(s['计划量'])}` + (s['报工单数'] ? `（${s['报工单数']}${tt('单')}）` : '') + (s['待审量'] ? ` ${tt('待审')} ${num(s['待审量'])}` : '')" />
         </el-steps>
         <div class="wb-trace-sub">
           {{ tt('绿=已完工') }} ｜ {{ tt('蓝=进行中') }} ｜ {{ tt('灰=未开始') }}（{{ tt('工序进度') }}）
+          <span v-if="(prog['工序步骤'] || []).some((s) => s['待审量'])">｜ {{ tt('待审=草稿报工未审核,只算已开始(蓝),不计入产出与转序') }}</span>
         </div>
         <div v-if="!(prog['工序步骤'] || []).length" class="wb-trace-sub">{{ tt('该工单还没有工序进度') }}</div>
       </div>
@@ -119,6 +123,9 @@
           <el-table-column :label="tt('工序')" prop="工序" min-width="120" />
           <el-table-column :label="tt('计划数量')" prop="计划数量" width="100" align="right" />
           <el-table-column :label="tt('完成数量')" prop="完成数量" width="100" align="right" />
+          <!-- 单据状态(2026-10-16):报工记录含**草稿**未审行(与工序步骤的「待审」同源),
+               标出来才不会被误读成"已计入产量" -->
+          <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
           <el-table-column :label="tt('报工人')" prop="报工人" width="120" />
           <el-table-column :label="tt('报工时间')" prop="报工时间" width="150" />
         </el-table>
@@ -261,6 +268,26 @@ function scopeOf(seg) {
 /** 胶囊配色:按工单行=蓝(收敛到行) / 整单=灰(如实告知没行键) */
 function capsule(seg) { return scopeOf(seg) === '按工单行' ? 'by-row' : 'whole' }
 
+/**
+ * 工序步骤 → el-step 状态(2026-10-16)。
+ * 后端状态是**四态**:已完工 / 超产 / 进行中 / 未开始。原先前端只映射三态,
+ * `超产` 落进 else 被判成 wait(灰)⇒「报工 161/160 已完成却不变绿」。
+ * 现在**以后端 `已完成` 布尔为准**(超产=完成 只在后端一处判定),并保留字面量兜底,
+ * 使前端在拿到旧版后端返回时也不会把"超产"误判成未开始。
+ */
+function stepStatus(s) {
+  if (s?.['已完成'] === true) return 'success'
+  const st = String(s?.['状态'] || '')
+  if (st === '已完工' || st === '超产') return 'success'
+  // 兜底:状态缺失时按数量判(完工量已达计划量即视为完成)
+  if (!st) {
+    const plan = Number(s?.['计划量'] || 0)
+    if (plan > 0 && Number(s?.['完工量'] || 0) >= plan) return 'success'
+  }
+  if (st === '进行中' || Number(s?.['待审量'] || 0) > 0) return 'process'
+  return 'wait'
+}
+
 async function load() {
   const no = props.code
   if (!no) return
@@ -286,7 +313,9 @@ watch(() => [props.modelValue, props.code, props.行id], ([v]) => { if (v) load(
 /* 行级口径标识(2026-10-15):行号/批次胶囊 + 右侧口径 + 下方一段口径说明 */
 .wb-tag-line { background: #eef6ff; color: #1e6fb8; border: 1px solid #b9d8f5; border-radius: 10px; padding: 1px 8px; font-size: 12px; }
 .wb-trace-scope { font-size: 12px; color: #606266; margin-left: auto; }
-.wb-trace-scope-line { font-size: 12px; color: #909399; background: #f4f4f5; border-radius: 4px; padding: 5px 10px; margin-bottom: 8px; }
+/* 2026-10-16:原「口径说明」长段落(.wb-trace-scope-line)按用户口径**从界面移除** ——
+   每段标题旁的口径胶囊(.wb-scope-cap)已足够说明"这段是按行还是整单",整段文字反而压住头部。
+   后端 trace() 仍返回「口径说明」字段(归档回归探针 _verify-wo-row-scope 等按它断言),此处不再渲染。 */
 .wb-trace-no { font-size: 16px; font-weight: 700; color: #1e6fb8; }
 .wb-trace-desc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: #606266; background: #fdf6ec; border: 1px solid #f5dab1; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
 .wb-trace-block { margin-bottom: 12px; }

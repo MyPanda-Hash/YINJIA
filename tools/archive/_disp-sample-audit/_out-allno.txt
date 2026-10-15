@@ -1,0 +1,47 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-allno.sql ==
+  | comm | nvarchar | 
+  | ID | int | 
+  | dh | nvarchar | 
+  | lb | nvarchar | 
+  | ny | nvarchar | 
+  | bz | nvarchar | 
+  | asp_user1 | nvarchar | 
+  | asp_time1 | datetime2 | 
+  | asp_user2 | nvarchar | 
+  | asp_time2 | datetime2 | 
+  | asp_user3 | nvarchar | 
+  | asp_time3 | datetime2 | 
+  | asp_cancel | nvarchar | 
+  | asp_user4 | nvarchar | 
+  | asp_time4 | datetime2 | 
+  | asp_print | int | 
+  | ����1 | nvarchar | 
+  | ����2 | nvarchar | 
+  | ����3 | nvarchar | 
+  | ����4 | nvarchar | 
+  | ����5 | nvarchar | 
+  | ����6 | nvarchar | 
+  | ����7 | nvarchar | 
+  | ����8 | nvarchar | 
+  | ����9 | nvarchar | 
+  | ����10 | nvarchar | 
+  | ����11 | nvarchar | 
+  | ����12 | nvarchar | 
+  | ����13 | nvarchar | 
+  | ����14 | nvarchar | 
+  | ����15 | nvarchar | 
+  | ����16 | nvarchar | 
+  | ����17 | nvarchar | 
+  | ����18 | nvarchar | 
+  | ����19 | nvarchar | 
+  | ����20 | nvarchar | 
+  | 0 | 158565 | SJ-2026-10-0039 | SJ | 2026-10 | null | admin | 2026-10-15 17:30:22.9900000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158564 | SJ-2026-10-0038 | SJ | 2026-10 | null | admin | 2026-10-15 17:29:48.1970000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158563 | SJ-2026-10-0037 | SJ | 2026-10 | null | admin | 2026-10-15 17:29:23.9130000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158562 | SJ-2026-10-0036 | SJ | 2026-10 | null | admin | 2026-10-15 17:20:04.1570000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158561 | SJ-2026-10-0035 | SJ | 2026-10 | null | admin | 2026-10-15 17:02:45.5500000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158560 | SJ-2026-10-0034 | SJ | 2026-10 | null | admin | 2026-10-15 16:57:36.0470000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158559 | SJ-2026-10-0033 | SJ | 2026-10 | null | admin | 2026-10-15 16:19:17.7400000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 0 | 158558 | SJ-2026-10-0032 | SJ | 2026-10 | null | admin | 2026-10-15 16:19:04.9800000 | null | null | null | null | N | null | null | 0 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+[OK] _q-allno.sql (1 batches)

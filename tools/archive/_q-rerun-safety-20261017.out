@@ -1,0 +1,189 @@
+########## HSDZ_MES ##########
+
+--- EXIST 表 ---
+{"name":"qc_asm_insp_detail"}
+{"name":"qc_asm_insp_head"}
+{"name":"qc_proc_insp_detail"}
+{"name":"qc_proc_insp_head"}
+{"name":"yj_doc_status"}
+{"name":"yj_field"}
+{"name":"yj_form_approval"}
+{"name":"yj_panel"}
+{"name":"yj_report_template"}
+{"name":"yj_translation"}
+
+--- EXIST 列 qc_asm_insp_detail ---
+{"name":"检验结果"}
+{"name":"检验类型"}
+{"name":"结果判断"}
+{"name":"实测数值"}
+{"name":"数量"}
+
+--- EXIST 列 qc_proc_insp_detail ---
+{"name":"产线常规功能性结果"}
+
+--- RF:C2 yj_field 实测数值 in 成型/切炭/制程(需≥3) ---
+{"n":1}
+
+--- RF:C2b yj_field 数量 in 成型/切炭(需≥2) ---
+{"n":0}
+
+--- RF:面板 成型/切炭 是否还在 ---
+(0 行)
+
+--- RF:C1 物理列 数量/实测数值 是否还在(需在) ---
+{"数量":9,"实测数值":200}
+
+--- VR:F4 次序十连(需 1 行) ---
+{"n":0}
+
+--- VR:F4 十列逐个在不在(QC_ASM_INSP) ---
+{"col_name":"检验方法","seq":30}
+{"col_name":"测量值1","seq":50}
+{"col_name":"测量值5","seq":90}
+{"col_name":"检查频率","seq":100}
+{"col_name":"处理方式","seq":130}
+{"col_name":"产线常规功能性结果","seq":140}
+{"col_name":"结果判断","seq":150}
+{"col_name":"备注","seq":180}
+
+--- TR:E6 其它面板 表区 行数(需≥1) ---
+{"panel_code":"QC_FIRST_INSP","n":1}
+{"panel_code":"QC_PROC_INSP","n":1}
+{"panel_code":"RD_ASM_BOM","n":1}
+{"panel_code":"RD_ASM_PROC","n":1}
+{"panel_code":"RD_CHANGE","n":1}
+{"panel_code":"RD_DOM_TEST","n":1}
+{"panel_code":"RD_MOLD_PROC","n":1}
+{"panel_code":"RD_SPEC_DOC","n":1}
+
+--- TR:E7 译名 检验类型 en ---
+{"locale":"en","text":"Inspection Type"}
+
+--- FR:QC_PROC_INSP 产线常规功能性结果 登记行数(需=1) ---
+{"n":1}
+
+--- FR:译名 产线常规功能性结果 语言数(需≥9) ---
+{"n":10}
+
+--- FR:seq 98 撞号数(需 0) ---
+(0 行)
+
+--- AT:已审核无 AUDIT 留痕(需 0) ---
+{"n":0}
+
+--- PR:F1/F2/F3 旧物绝迹检查 ---
+{"旧列":null,"旧登记":0,"旧译名":0,"新登记行数":1}
+
+--- PR:F3 译名 合格数量 语言数(需≥10) ---
+{"n":10}
+
+--- PR:F4 新列注明存在 ---
+{"n":1}
+
+--- PI:B 段守卫 COL_LENGTH(合格数量（入库）) IS NULL ?(1=重跑会 ADD 加回旧列) ---
+{"will_readd_column":1,"will_reinsert_field":1,"will_reinsert_i18n":1}
+
+--- CFG:fixedItems 三组关键词齐(需 1) ---
+{"ok":1}
+
+--- CFG:QC_PROC_INSP 不得有 fixedItems(需 0) ---
+{"n":0}
+
+--- RPT:qc_proc_insp 模板行数与 LEN(需 1 / 16973) ---
+{"rows_":1,"len_":"16973","null_update_at":0}
+
+########## HSDZ_MES_TEST ##########
+
+--- EXIST 表 ---
+{"name":"qc_asm_insp_detail"}
+{"name":"qc_asm_insp_head"}
+{"name":"qc_proc_insp_detail"}
+{"name":"qc_proc_insp_head"}
+{"name":"yj_doc_status"}
+{"name":"yj_field"}
+{"name":"yj_form_approval"}
+{"name":"yj_panel"}
+{"name":"yj_report_template"}
+{"name":"yj_translation"}
+
+--- EXIST 列 qc_asm_insp_detail ---
+{"name":"检验结果"}
+{"name":"检验类型"}
+{"name":"结果判断"}
+{"name":"实测数值"}
+{"name":"数量"}
+
+--- EXIST 列 qc_proc_insp_detail ---
+{"name":"产线常规功能性结果"}
+
+--- RF:C2 yj_field 实测数值 in 成型/切炭/制程(需≥3) ---
+{"n":1}
+
+--- RF:C2b yj_field 数量 in 成型/切炭(需≥2) ---
+{"n":0}
+
+--- RF:面板 成型/切炭 是否还在 ---
+(0 行)
+
+--- RF:C1 物理列 数量/实测数值 是否还在(需在) ---
+{"数量":9,"实测数值":200}
+
+--- VR:F4 次序十连(需 1 行) ---
+{"n":0}
+
+--- VR:F4 十列逐个在不在(QC_ASM_INSP) ---
+{"col_name":"检验方法","seq":30}
+{"col_name":"测量值1","seq":45}
+{"col_name":"测量值5","seq":49}
+{"col_name":"检查频率","seq":55}
+{"col_name":"处理方式","seq":90}
+{"col_name":"备注","seq":110}
+{"col_name":"产线常规功能性结果","seq":200}
+{"col_name":"结果判断","seq":210}
+
+--- TR:E6 其它面板 表区 行数(需≥1) ---
+{"panel_code":"QC_FIRST_INSP","n":1}
+{"panel_code":"QC_PROC_INSP","n":1}
+{"panel_code":"RD_ASM_BOM","n":1}
+{"panel_code":"RD_ASM_PROC","n":1}
+{"panel_code":"RD_CHANGE","n":1}
+{"panel_code":"RD_DOM_TEST","n":1}
+{"panel_code":"RD_MOLD_PROC","n":1}
+{"panel_code":"RD_SPEC_DOC","n":1}
+
+--- TR:E7 译名 检验类型 en ---
+{"locale":"en","text":"Inspection Type"}
+
+--- FR:QC_PROC_INSP 产线常规功能性结果 登记行数(需=1) ---
+{"n":1}
+
+--- FR:译名 产线常规功能性结果 语言数(需≥9) ---
+{"n":10}
+
+--- FR:seq 98 撞号数(需 0) ---
+(0 行)
+
+--- AT:已审核无 AUDIT 留痕(需 0) ---
+{"n":0}
+
+--- PR:F1/F2/F3 旧物绝迹检查 ---
+{"旧列":null,"旧登记":0,"旧译名":0,"新登记行数":1}
+
+--- PR:F3 译名 合格数量 语言数(需≥10) ---
+{"n":10}
+
+--- PR:F4 新列注明存在 ---
+{"n":1}
+
+--- PI:B 段守卫 COL_LENGTH(合格数量（入库）) IS NULL ?(1=重跑会 ADD 加回旧列) ---
+{"will_readd_column":1,"will_reinsert_field":1,"will_reinsert_i18n":1}
+
+--- CFG:fixedItems 三组关键词齐(需 1) ---
+{"ok":1}
+
+--- CFG:QC_PROC_INSP 不得有 fixedItems(需 0) ---
+{"n":0}
+
+--- RPT:qc_proc_insp 模板行数与 LEN(需 1 / 16973) ---
+{"rows_":1,"len_":"16973","null_update_at":0}
