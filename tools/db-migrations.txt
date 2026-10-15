@@ -3215,3 +3215,17 @@ migrate-qc-proc-insp-col-count-20261017.sql
 #     QcFirstInspController(取成型工艺清单)/ PanelConfigService(按钮下发)/ 前端菜单与带入分支。
 #   幂等;两账套均执行。
 migrate-first-insp.sql
+
+# ── 2026-10-16 首件检验单「相关要求」落地:表头新增「客户代码」(相关要求第 6 条的判定依据) ──
+#   用户口径:「这个是针对当前的首件检验单的相关要求内容,查看一下下面所述的各项要求并实现。」
+#   纸面《相关要求》6 条里只有第 6 条「C-95客户相关产品脱模后立马进行首件检验。」在库里缺数据:
+#   C-95 = **客户代码**(dm_kh.dm = N'C-95' / 青岛伊可普电器有限公司),而 qc_first_insp_head 上只有
+#   「客户名称」(且从未写入过)⇒ 单据拿到手判不出"这是不是 C-95 的单"。
+#   ① `qc_first_insp_head` +**1** `客户代码` nvarchar(50) NULL + 列级 `MS_Description`
+#     + `yj_field`(place=query,header / seq 66 紧挨「客户名称 65」/ 可见可填);
+#     译名不重插 —— 标签「客户代码」全库已有 10 语言(KHDD/OP_TIME/STOCK_STATUS 在用)。
+#   ② 出单时由 `ButtonService.firstInspGenerate` 从工单行带入 客户代码(plang.khdm)+ 客户名称(dm_kh.mc);
+#     纸张版式**不打印**客户代码,它只作单据/追溯与单上提醒的判据。
+#   ③ 其余 5 条(2 支样品、精度规定、标准来源、停线隔离、样品保留)都是**版式/录入规则**,
+#     在 `frontend/src/core/qc/QcFirstInspSheet.vue` 落地,不动表结构。幂等;两账套均执行。
+migrate-first-insp-req.sql

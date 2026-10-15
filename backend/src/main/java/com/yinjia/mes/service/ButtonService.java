@@ -2980,6 +2980,21 @@ public class ButtonService {
         head.put("产品编码", productCode);
         head.put("产品名称", r.get("产品名称"));
         if (!str(r.get("规格型号")).isEmpty()) head.put("规格型号", r.get("规格型号"));
+        // 客户代码 + 客户名称(2026-10-16 第三轮用户口径:纸面《相关要求》第 6 条「C-95客户相关产品脱模后
+        //   立马进行首件检验」)—— C-95 是**客户代码**(dm_kh.dm),不是产品编码;本单原先只有一列
+        //   从未写入过的「客户名称」,判不出"这是不是 C-95 的单"。这里照工单行带入(客户代码 + 客户名),
+        //   纸张版式不打印它,只作单据/追溯与单上提醒(QcFirstInspSheet 的 C-95 横幅)的判据。
+        if (plangRowId > 0) {
+            List<Map<String, Object>> cust = jdbc.queryForList(
+                    "SELECT ISNULL(p.khdm,N'') AS 客户代码, ISNULL(dk.mc,N'') AS 客户名称"
+                            + " FROM dbo.plang p LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm WHERE p.id=?",
+                    plangRowId);
+            if (!cust.isEmpty()) {
+                Map<String, Object> c0 = cust.get(0);
+                if (!str(c0.get("客户代码")).isEmpty()) head.put("客户代码", c0.get("客户代码"));
+                if (!str(c0.get("客户名称")).isEmpty()) head.put("客户名称", c0.get("客户名称"));
+            }
+        }
         String line = str(r.get("生产线"));
         if (!line.isEmpty()) {
             head.put("生产线", line);

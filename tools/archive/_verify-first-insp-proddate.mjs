@@ -84,7 +84,8 @@ const sheetOfReport = async (repNo) => {
   const l = await list('QC_FIRST_INSP')
   return rowsOf(l).find((r) => String(r['报工单号'] || '') === String(repNo))
 }
-const headOf = async (no) => (await q(`SELECT ISNULL(批次号,'') AS 批次号, ISNULL(生产日期,'') AS 生产日期
+const headOf = async (no) => (await q(`SELECT ISNULL(批次号,'') AS 批次号, ISNULL(生产日期,'') AS 生产日期,
+  ISNULL(客户代码,'') AS 客户代码, ISNULL(客户名称,'') AS 客户名称
   FROM dbo.qc_first_insp_head WHERE 单据编号=${esc(no)}`))[0] || {}
 const plangOf = async (id) => (await q(`SELECT ISNULL([批次号],'') AS 批次号, ISNULL(完工状态,'') AS 完工状态,
   CONVERT(varchar(19), 完工时间, 120) AS 完工时间 FROM dbo.plang WHERE id=${id}`))[0] || {}
@@ -114,6 +115,9 @@ async function runFlow(cand, manualDate) {
   ok(`① ${tag} 检验单绑的是工单号(+工单行号)`,
     String(doc['工单号']) === cand.工单号 && Number(doc['工单行号'] || 0) === cand.行,
     `工单号=${doc['工单号']} 工单行号=${doc['工单行号']}`)
+  // 客户代码/客户名称随单带入(2026-10-16 第三轮:纸面相关要求第 6 条「C-95客户相关产品…」的判定依据)
+  ok(`① ${tag} 客户代码/客户名称随工单带入`, String(doc['客户代码'] || '') === String(cand.客户代码 || ''),
+    `客户代码=${JSON.stringify(doc['客户代码'])} 工单=${JSON.stringify(cand.客户代码)} 客户名称=${JSON.stringify(doc['客户名称'])}`)
   if (manualDate) {
     await q(`UPDATE dbo.qc_first_insp_head SET 生产日期=${esc(manualDate)}, 批次号=N'' WHERE 单据编号=${esc(sheet1)}`)
     console.log(`    (已模拟品质手填:生产日期=${manualDate},批次号清空)`)
@@ -164,6 +168,10 @@ async function creationWhileCompleted(cand) {
   await q(`UPDATE dbo.bs_route SET asp_cancel='Y' WHERE 工艺路线编码=${esc(cand.路线)}
     AND 工序名称<>${esc(lastOp)} AND ISNULL(asp_cancel,'N')<>'Y'`)
   made.路线还原.push({ route: cand.路线, ids: drop.map((r) => r.id).join(',') })
+  // 同批把这条工的客户临时改成 C-95(纸面《相关要求》第 6 条那个客户)⇒ 验出单把客户代码带到检验单,
+  //   单上的 C-95 提醒条(QcFirstInspSheet)就以它为判据(界面部分见 _probe-first-insp-reqs.mjs)。
+  await q(`UPDATE dbo.plang SET khdm=N'C-95' WHERE id=${cand.id}`)
+  const cust = (await q(`SELECT ISNULL(mc,N'') AS mc FROM dbo.dm_kh WHERE dm=N'C-95'`))[0]?.mc || ''
   await q(`UPDATE dbo.plang SET 完工时间='${SENTINEL}' WHERE id=${cand.id}`)
   const cap = Math.round(cand.计划量 * (await rateOf(cand.路线, lastOp)) * 100) / 100
   const r = await report(cand.工单号, cand.原批号, lastOp, cap)
@@ -177,13 +185,17 @@ async function creationWhileCompleted(cand) {
     const h = await headOf(doc['单据编号'])
     ok(`④ ${tag} 出单当场回填生产日期 = 本行完工日 ${day(p.完工时间)}`,
       String(h.生产日期) === day(p.完工时间), `生产日期=${JSON.stringify(h.生产日期)} 完工时间=${JSON.stringify(p.完工时间)}`)
+    ok(`④ ${tag} C-95 客户:出单带入 客户代码=C-95 + 客户名称=${cust}`,
+      String(h.客户代码) === 'C-95' && (!cust || String(h.客户名称) === cust),
+      `客户代码=${JSON.stringify(h.客户代码)} 客户名称=${JSON.stringify(h.客户名称)}`)
   }
 }
 
 try {
   // ── 选三条工单行:单行工单(报工锚点唯一)、有路线、已排产、本单还没有已审核报工 ──
   const cands = await q(`SELECT TOP 8 p.id, p.pl_no AS 工单号, ISNULL(p.pl_xc,1) AS 行, ISNULL(p.[工艺路线],'') AS 路线,
-      ISNULL(p.scx,'') AS 产线, ISNULL(p.pl_sl,0) AS 计划量, ISNULL(p.[批次号],'') AS 原批号
+      ISNULL(p.scx,'') AS 产线, ISNULL(p.pl_sl,0) AS 计划量, ISNULL(p.[批次号],'') AS 原批号,
+      ISNULL(p.khdm,N'') AS 客户代码
     FROM dbo.plang p
     WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.ja,'N') NOT IN ('Y','T')
       AND ISNULL(p.scx,'')<>'' AND ISNULL(p.pl_sl,0)>0 AND ISNULL(p.[工艺路线],'')<>''
@@ -205,7 +217,8 @@ try {
   // ── 备份 + 清完工态(让"首次进入生产完工"这条链从头走一遍) ──
   for (const c of picked) {
     const p = (await q(`SELECT ISNULL([批次号],'') AS 批次号, 完工状态, 完工时间, ISNULL(当前工序,'') AS 当前工序,
-        ISNULL(当前工序完工量,0) AS 当前工序完工量, ISNULL(scx,'') AS scx, ISNULL(ja,'N') AS ja
+        ISNULL(当前工序完工量,0) AS 当前工序完工量, ISNULL(scx,'') AS scx, ISNULL(ja,'N') AS ja,
+        ISNULL(khdm,N'') AS khdm
       FROM dbo.plang WHERE id=${c.id}`))[0]
     const pcs = await q(`SELECT id, ISNULL([批次号],'') AS 批次号 FROM dbo.plang_pc WHERE plang_id=${c.id}`)
     made.还原.push({ id: c.id, plang: p, pcs })
@@ -232,7 +245,7 @@ try {
         完工状态=${b.plang.完工状态 ? esc(b.plang.完工状态) : 'NULL'},
         完工时间=${b.plang.完工时间 ? `'${new Date(b.plang.完工时间).toISOString().slice(0, 19).replace('T', ' ')}'` : 'NULL'},
         当前工序=${esc(b.plang.当前工序)}, 当前工序完工量=${Number(b.plang.当前工序完工量) || 0},
-        scx=${esc(b.plang.scx)}, ja=${esc(b.plang.ja)} WHERE id=${b.id}`)
+        scx=${esc(b.plang.scx)}, ja=${esc(b.plang.ja)}, khdm=${esc(b.plang.khdm)} WHERE id=${b.id}`)
     for (const pc of b.pcs) await q(`UPDATE dbo.plang_pc SET 批次号=${esc(pc.批次号)} WHERE id=${pc.id}`)
   }
   await q(`DELETE FROM dbo.form_flow_link WHERE target_panel_code='QC_FIRST_INSP'
