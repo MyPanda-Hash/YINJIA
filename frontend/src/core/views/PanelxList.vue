@@ -4344,15 +4344,120 @@ function sumMethodFor(b, p) {
 const ARCH_FIT_MAX_COLS = 16
 const detailW = ref(0)
 const bodyH = ref(0)
+/**
+ * 明细表「填满页面 + 行多则边框扩大」用的两个量(2026-10-15 用户口径:
+ * 「明细表无法填充满页面进行修复,当行数和数据过多时当前明细表边框应该扩大」)。
+ *
+ *   bodyAvailH  = .body 内容区还能放下多少高(见 measureBodyAvailH)
+ *   naturalTableH = 每个明细区块的**表格内容自然高**(表头 + 全部行 + 合计行),
+ *                   下标与 blocks 一一对应(都是 `.body` 里 `.detail` 的 DOM 顺序)
+ *
+ * ⚠ 两个量都**不能依赖表格当前设定的高度**,否则就是自反馈:
+ *   表格长高 ⇒ .panelx-list 长高 ⇒ 重测"可用高度"更大 ⇒ 表格再长高 …… 每测一次漂一点。
+ *   所以:
+ *     · bodyAvailH 从**高度确定**的祖先 `.portal-content`(flex:1 + overflow:auto)反推,
+ *       而不是拿 `.body` 自己的 clientHeight(那个会被表格撑大);
+ *     · naturalTableH 取 `.el-table__body-wrapper` 里层 table 的高 —— el-table 设了 height 时
+ *       内层 table 仍是自然高、只有 body-wrapper 在滚,故它与 height 无关。
+ */
+const bodyAvailH = ref(0)
+const naturalTableH = ref([])
+/** 明细区块的非表格固定占高:上边框 1 + 区块头 33 + 下边框 1 + 区块下外边距 8 */
+const DETAIL_CHROME_H = 43
+/** 取 CSS 长度(如 '16px')的数值;解析不出来按 0 */
+const pxOf = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0 }
+
+/**
+ * .body 的可用高度 = .portal-content 的可视内容高,逐层扣掉 .body 到 .panelx-list 之间
+ *   **竖向占位**的兄弟(工具栏 / 单据抬头 / 表尾备注 / 审计行 + 各自外边距),
+ *   再扣 .body 自身内边距与 .body 内的主表预览(main-grid)。
+ *
+ * 为什么从 .portal-content 反推、而不是直接读 .body 的 clientHeight:
+ *   .body 是 flex:1 且 min-height:0,明细表长高会把 .body 一起撑高 ⇒ 用 .body 反推可用高度
+ *   就成了自反馈(每测一次表格再长一点)。.portal-content 是 flex:1 + overflow:auto,
+ *   高度由窗口决定、与内容无关,适合当基准。
+ *
+ * 为什么兄弟要判"与 .body 横向重叠"再扣:
+ *   · 左「单据选择」栏(DocSelectRail)与 .doc-rail-main 是**横向并排**的兄弟,把它 935px
+ *     的高度也扣掉,可用高度直接变成负数 ⇒ 横向不重叠的兄弟不占高度、不扣;
+ *   · 表尾 .footer 是 position:sticky(常驻可视区底部),一旦页面被撑出滚动条,它的 rect
+ *     会与 .body 的 rect 交叠 —— 若按"纵向上下分开"判,它会漏扣 75px,可用高度就虚高
+ *     (2026-10-15 实测:成型/切炭检验单多填了 75px,把表尾顶出可视区)。
+ */
+function measureBodyAvailH(body) {
+  const content = document.querySelector('.portal-content')
+  const list = document.querySelector('.panelx-list')
+  if (!body || !content || !list) return 0
+  const cs = getComputedStyle(content)
+  let avail = content.clientHeight - pxOf(cs.paddingTop) - pxOf(cs.paddingBottom)
+  // 从 .body 逐层往上走到 .panelx-list:每层扣掉"与本层同行(横向重叠)"的兄弟 + 本层自己的内边距
+  let node = body
+  while (node && node !== list && node.parentElement) {
+    const parent = node.parentElement
+    const nodeRect = node.getBoundingClientRect()
+    for (const sib of parent.children) {
+      if (sib === node) continue
+      const r = sib.getBoundingClientRect()
+      const sameColumn = r.right > nodeRect.left + 0.5 && r.left < nodeRect.right - 0.5
+      if (!sameColumn) continue   // 横向并排(左单据栏等)不占高度
+      const st = getComputedStyle(sib)
+      avail -= r.height + pxOf(st.marginTop) + pxOf(st.marginBottom)
+    }
+    const ns = getComputedStyle(node)
+    avail -= pxOf(ns.paddingTop) + pxOf(ns.paddingBottom)
+    node = parent
+  }
+  // 主表预览(mainTable 面板)是 .body 的另一个孩子,占掉的高度同样要扣(它自身高与明细表无关)
+  for (const mg of body.children) {
+    if (!mg.classList || !mg.classList.contains('main-grid')) continue
+    const st = getComputedStyle(mg)
+    avail -= mg.offsetHeight + pxOf(st.marginTop) + pxOf(st.marginBottom)
+  }
+  return Math.max(0, Math.round(avail))
+}
+
+/** 逐块量「表格内容自然高」(见 naturalTableH 注释)。值没变就不写 ref —— 内层 RO 每次
+ *  量完都赋一个新数组会白白触发一轮重渲染,而重渲染本身又会惊动 RO */
+function measureNaturalTableH() {
+  const out = []
+  for (const d of document.querySelectorAll('.panelx-list .body .detail')) {
+    const head = d.querySelector('.el-table__header-wrapper')
+    const bodyTbl = d.querySelector('.el-table__body-wrapper table')
+    const foot = d.querySelector('.el-table__footer-wrapper')
+    out.push((head?.offsetHeight || 0) + (bodyTbl?.offsetHeight || 0) + (foot?.offsetHeight || 0))
+  }
+  const prev = naturalTableH.value
+  if (prev.length !== out.length || out.some((v, i) => v !== prev[i])) naturalTableH.value = out
+}
+
 function measureDetailW() {
   const el = document.querySelector('.panelx-list .detail')
   detailW.value = el ? el.clientWidth - 2 /*左右边框*/ : 0
   const body = document.querySelector('.panelx-list .body')
   bodyH.value = body ? body.clientHeight : 0
+  bodyAvailH.value = measureBodyAvailH(body)
+  measureNaturalTableH()
+  observeNaturalTables()
 }
 let detailRO = null
+/** 内层明细表的 ResizeObserver:行数增减 / 多行文本撑高时,内容自然高变了要立刻重算 ——
+ *  这两种变化都**不会**改变 .panelx-list 的尺寸,根容器上的 RO 抓不到。
+ *  ⚠ 明细表是**后到**的(载入单据才有 DOM):observe 的实例集合变了要重新挂,
+ *    否则首次挂载时表还没渲染 ⇒ 一直没人观察,多行文本把行撑到 185px 也没人知道
+ *    (2026-10-15 实测踩到:400px 矮窗口下仍按 5 行高算,边框不扩大)。 */
+let naturalRO = null
+let naturalObserved = []
+function observeNaturalTables() {
+  if (!window.ResizeObserver) return
+  const els = [...document.querySelectorAll('.panelx-list .body .detail .el-table__body-wrapper table')]
+  if (els.length === naturalObserved.length && els.every((el, i) => el === naturalObserved[i])) return
+  naturalRO?.disconnect()
+  naturalRO = new ResizeObserver(() => measureNaturalTableH())
+  for (const t of els) naturalRO.observe(t)
+  naturalObserved = els
+}
 onMounted(() => {
-  nextTick(measureDetailW)
+  nextTick(() => { measureDetailW(); observeNaturalTables() })
   // ResizeObserver 监听根容器:窗口缩放/侧栏拖拽等一切布局变化都触发重测(比 window.resize 可靠)
   const root = document.querySelector('.panelx-list')
   if (root && window.ResizeObserver) {
@@ -4361,8 +4466,18 @@ onMounted(() => {
   }
   window.addEventListener('resize', measureDetailW)
 })
-onUnmounted(() => { detailRO?.disconnect(); window.removeEventListener('resize', measureDetailW) })
+onUnmounted(() => {
+  detailRO?.disconnect()
+  naturalRO?.disconnect()
+  window.removeEventListener('resize', measureDetailW)
+})
 watch(loading, () => !loading.value && nextTick(measureDetailW))
+// 区块集合/行数变化(载入单据、新增数据、带入检验项目、切换明细页签)后重测:
+// 自然高变了、根容器尺寸没变 ⇒ 只有这里能唤醒重算
+watch(
+  () => blocks.value.map((b) => `${b.id}:${archRows(b).length}:${activeTab(b).key}:${tabView(b, activeTab(b))}`).join('|'),
+  () => nextTick(() => { measureDetailW(); observeNaturalTables() })
+)
 function archColW(b, c) {
   if (!singleDocMode.value) return undefined
   return archColsMap.value[b.id]?.widths.get(c.prop) // 列宽缓存一次构建(含铺满/多退少补),逐列读取 O(1)
@@ -4370,13 +4485,22 @@ function archColW(b, c) {
 
 function tableH(b) {
   const hasFooter = tabView(b, activeTab(b)) !== 'summary'
+  const minH = HEAD_H + MIN_ROWS * ROW_H + (hasFooter ? FOOT_H : 0)
+  const pagerH = singleDocMode.value && archTotal(b) > ARCH_SIZE_OPTS[0] ? 40 : 0
   // 档案页(2026-09-16):表格高度填充 .body 可用高度(到表尾备注区为止,不越过)——
   // 固定 5 行高在小数据时下方大片空白,大数据时又只有 5 行视口
   if (singleDocMode.value && bodyH.value) {
-    const pagerH = archTotal(b) > ARCH_SIZE_OPTS[0] ? 40 : 0
-    return Math.max(HEAD_H + MIN_ROWS * ROW_H + (hasFooter ? FOOT_H : 0), bodyH.value - 8 - 2 - 33 - pagerH - 10)
+    return Math.max(minH, bodyH.value - 8 - 2 - 33 - pagerH - 10)
   }
-  return HEAD_H + MIN_ROWS * ROW_H + (hasFooter ? FOOT_H : 0)
+  // 单据明细(2026-10-15):高度取三者最大 ——
+  //   ① 5 行保底(空单据也有格可点);② 区块内**全部行**的自然高(行多就长高,不再只有 5 行视口,
+  //      边框随之扩大、页面滚动);③ 可用高度均分给各区块(行少时把边框填到页面底部,不留大片空白)
+  const idx = blocks.value.indexOf(b)
+  const natural = idx >= 0 ? (naturalTableH.value[idx] || 0) : 0
+  // 可用高度还没量到(=0)时 fillH 为负,自然被前两项压过 —— 不必单独兜底
+  const share = (bodyAvailH.value || 0) / Math.max(1, blocks.value.length)
+  const fillH = share - DETAIL_CHROME_H - pagerH
+  return Math.max(minH, natural, fillH)
 }
 
 function blockCols(b) {
