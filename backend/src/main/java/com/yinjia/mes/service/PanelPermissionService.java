@@ -56,16 +56,22 @@ public class PanelPermissionService {
         String[] edit = {"add", "modify"};
         for (String b : new String[]{"保存", "提交", "保存新增", "保存为草稿", "新增流程", "新增", "复制",
                 "阶段完成", "生成产品批号", "新增库存", "产品开发", "申请终止",
+                // 库存状况行内编辑「更新预警数量」(StockWarnService/ButtonService.updateStockWarn):
+                // 用户 2026-10-15 改口径 —— **库存状况的预警数量不改权限口径,只有库存明细用 warn**,
+                // 故本按钮放回编辑类词表(add/modify),与 warn 词无关。
+                "更新预警数量",
                 // 生产工单:首件完成通知(置首件标志+通知品质);排产入口=排产工作台(挂"保存"权)。
                 // 「生成采购申请」(原 ManuPurchaseReqHandler 按 BOM×排产−库存结转)已随 BOM 下架移除(2026-10-04):
                 // 前端已无该按钮,下面的词表条目仅为历史按钮行兜底,不再有对应处理器
                 "首件完成通知", "生成采购申请"})
             m.put(b, edit);
-        // 库存预警数量配置(2026-10-15 用户口径):不再吃编辑权(add/modify),单独要求「预警配置」(warn)词 ——
-        // 在组织架构「角色与面板权限」里逐面板勾,与自定义字段(field)同一张矩阵;管理员恒过。
-        // 入口 = 库存状况行内编辑(本词条,ButtonService.updateStockWarn)、库存明细展开区按批次设置
-        // (StockWarnController /api/stock/warn/set,同函数 requireWarnConfig 把关)。
-        m.put("更新预警数量", new String[]{"warn"});
+        // 库存明细展开区的预警配置(2026-10-15):用户当日改口径 ——
+        // **只有库存明细(STOCK_DETAIL)吃「预警配置」(warn)词,库存状况恢复原样(add/modify)**。
+        // 库存明细的两个写入口 = 统一设置 POST /api/stock/warn/setAll、
+        // 按批次单独设置 POST /api/stock/warn/set,二者共用 StockWarnController 里的
+        // requireWarnConfig 闸门 + 同一 warn 词(SysAdminController.PERMISSION_ACTIONS)。
+        // ⚠ 下面两条「设置预警数量 / 预警配置」是**库存明细口径的预留按钮名映射**(现网没有同名的按钮行,
+        //   未映射的按钮本就放行);保留指向 {"warn"} 是为了将来给库存明细加同名按钮时口径一致。
         m.put("设置预警数量", new String[]{"warn"});
         m.put("预警配置", new String[]{"warn"});
         m.put("申请修改", new String[]{"modify"});                       // 词表:modify=申请修改
@@ -289,15 +295,18 @@ public class PanelPermissionService {
     public static final String PERM_WARN = "warn";
 
     /**
-     * 库存预警数量配置权校验(2026-10-15 用户口径,机制同 {@link #requireFieldConfig}):
-     * 「只有勾了预警配置的角色(或管理员)才能配置库存预警数量。」
+     * **库存明细**预警数量配置权校验(2026-10-15 用户改口径,机制同 {@link #requireFieldConfig}):
+     * 「只要库存明细可以写就行,库存状况不需要。」
      *
-     * <p>写入口两个,共用本闸门(管理员恒过,普通用户要求该面板 perms 含 warn):
+     * <p>即:本闸门**只服务于库存明细(STOCK_DETAIL)**;库存状况(STOCK_STATUS)的行内编辑
+     * 「更新预警数量」已恢复 add/modify 口径(见本文件 BUTTON_PERMS 的编辑类词表),
+     * 与 warn 词无关。调用方 StockWarnController 已按 panelCode 自行收口(只对 STOCK_DETAIL 调本方法)。
+     *
+     * <p>库存明细的两个写入口共用本闸门(管理员恒过,普通用户要求该面板 perms 含 warn):
      * <ol>
-     *   <li>库存状况行内编辑「更新预警数量」→ ButtonService.updateStockWarn(经
-     *       {@link #requireButton} 的 BUTTON_PERMS 词条 {"warn"});</li>
-     *   <li>库存明细展开区按批次号设置 → StockWarnController POST /api/stock/warn/set
-     *       → 本方法(StockWarnService 的业务逻辑不动)。</li>
+     *   <li>统一设置所有批次 → StockWarnController POST /api/stock/warn/setAll;</li>
+     *   <li>按批次号单独设置 → StockWarnController POST /api/stock/warn/set
+     *       (StockWarnService 的业务逻辑不动)。</li>
      * </ol>
      * 配预警只是改 kucun.[预警数量] 这个出库审批拦截阈值,不生成/不改单据,故与 field 词同为
      * 「逐面板授予的配置权」,落在同一张 yj_role_panel.perms 矩阵里。

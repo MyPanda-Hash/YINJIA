@@ -62,6 +62,23 @@ public class StockWarnService {
         }
     }
 
+    /**
+     * **统一设置**:把该 (物料,仓库) 下**所有批次**的预警数量一次设成同一个值 ——
+     * 含从未设过的批次(<b>不新增行</b>:kucun 里没有该 (物料,仓库) 就返回 0)。
+     *
+     * <p>用户 2026-10-15 新口径:「库存明细的预警要可以统一设置,再单独设置。」
+     * 顺序 = 先本方法(**统一**),再 {@link #set}(**单独**,按批次号覆盖统一值);
+     * 两步都是普通 UPDATE,不需要额外状态位。
+     *
+     * @return 实际更新的 kucun 行数(0 = 该 (物料,仓库) 一行都没有,什么都没改)
+     */
+    public int setAll(String wzdm, String ckdm, BigDecimal warnQty, String user) {
+        BigDecimal q = warnQty == null ? BigDecimal.ZERO : warnQty;
+        return jdbc.update("UPDATE kucun SET 预警数量 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                        + " WHERE wzdm = ? AND ckdm = ?",
+                q, user, wzdm, ckdm);
+    }
+
     /** 该 (物料,仓库) 下每个批次的预警数量(展开明细用):{批号 → 预警数量}。 */
     public Map<String, BigDecimal> warnMap(String wzdm, String ckdm) {
         Map<String, BigDecimal> out = new LinkedHashMap<>();

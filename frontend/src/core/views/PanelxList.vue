@@ -609,6 +609,25 @@
                     ? tt('上月月结已取消,以下陈列该月原始单据')
                     : tt('上月未月结,以下陈列该月原始单据') }}
                 </div>
+                <!-- **统一预警**(用户 2026-10-15 新口径:「库存明细的预警要可以统一设置,再单独设置」):
+                     把该 (物料,仓库) 下**所有批次**(含从未设过的)一次设成同一个值 ⇒ POST /api/stock/warn/setAll;
+                     顺序口径 = 先在这里统一设置,再到下面的批次表里按批次单独覆盖(单独设置走 /set)。
+                     无「预警配置」(warn)词的角色**整体不显示**(输入框 + 按钮),服务端同词闸门兜底。 -->
+                <div v-if="canConfigWarnHere" class="mc-warn-all">
+                  <span class="mc-warn-all-label">{{ tt('统一预警') }}</span>
+                  <el-input-number
+                    v-model="mcAllWarn[row.id]"
+                    size="small"
+                    :controls="false"
+                    :min="0"
+                    :precision="0"
+                    style="width: 120px"
+                    :placeholder="tt('对本物料本仓库的所有批次统一设置')"
+                  />
+                  <el-button size="small" type="primary" :loading="!!mcAllWarnSaving[row.id]"
+                             @click="applyMcWarnAll(row)">{{ tt('应用') }}</el-button>
+                  <i class="mc-snap-note">{{ tt('对本物料本仓库的所有批次统一设置') }}</i>
+                </div>
                 <!-- **二次展开**(用户 2026-10-15 第十五轮:「根据统一批次号不同单据做二次展开」):
                      外层 = 批次号一行(汇总:月结数量 / 当月单据数 / 当月合计 / 余额),
                      点该行的 `>` 再展开 ⇒ 该批次的单据明细(**第一条是月结**,后面是当月单据)。 -->
@@ -639,7 +658,8 @@
                   <!-- 预警数量:库存明细里直接设置(用户 2026-10-15 第十六轮)。落库到 kucun.[预警数量],
                        出库审批时按「出库后余额 < 预警数量」拦截(StockWarnService.checkOutbound)。
                        余额低于预警时数字标红,一眼看出哪批要警戒。
-                       权限(同日):没勾「预警配置」的角色只读显示,编辑控件不渲染(服务端同词闸门兜底)。 -->
+                       权限(2026-10-15 用户改口径:只有库存明细用 warn 词):没勾「预警配置」的角色
+                       **输入框整体不渲染**(只读文本展示阈值),服务端同词闸门兜底。 -->
                   <el-table-column :label="tt('预警数量')" width="160">
                     <template #default="{ row: g }">
                       <el-input-number v-if="canConfigWarnHere" size="small" :controls="false" :min="0" style="width: 110px"
@@ -703,7 +723,7 @@
             <template #default="{ row }">
               <template v-if="isStockStatus && column.prop === '预警数量'">
                 <el-input-number
-                  v-if="canConfigWarnHere && warnEdit.id === row.id"
+                  v-if="warnEdit.id === row.id"
                   ref="warnEditRef"
                   v-model="warnEdit.value"
                   :controls="false"
@@ -715,9 +735,9 @@
                   @keyup.esc="warnEdit.id = null"
                   @blur="saveWarnEdit"
                 />
-                <!-- 没勾「预警配置」的角色:只读显示阈值,不给可点的编辑入口(服务端同词闸门兜底) -->
-                <span v-else-if="canConfigWarnHere" class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
-                <span v-else>{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
+                <!-- 库存状况(2026-10-15 用户改口径:库存状况不需要 warn 词):编辑入口恢复原样
+                     —— 不做 warn 词判定,服务端按 add/modify 在 /px/callButton 侧校验。 -->
+                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
               </template>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
@@ -2808,10 +2828,12 @@ const stockWh = ref('')
 const warehouseOptions = ref([])
 const isStockStatus = computed(() => String(panelCode.value) === 'STOCK_STATUS')
 /**
- * 「本面板能不能配库存预警数量」(2026-10-15 用户口径:只有勾了「预警配置」的角色或管理员才能配置)。
+ * 「本面板能不能配库存预警数量」(2026-10-15 用户改口径:只有**库存明细**用 warn 词)。
  * 判据 = 组织架构「角色与面板权限」勾的「预警配置」列(后端 AuthController 下发 warnPanels);
- * 服务端真闸门 = PanelPermissionService.requireWarnConfig(同一 warn 词)。
- * 无权限时**不渲染编辑控件**(只读显示当前阈值),避免点下去吃 403。
+ * 服务端真闸门 = PanelPermissionService.requireWarnConfig(同一 warn 词,StockWarnController
+ * 只在面板 = STOCK_DETAIL 时调用)。
+ * ⚠ 用途**仅限库存明细展开区**(统一预警 / 按批次设置);库存状况的行内编辑已恢复 add/modify 口径,
+ *   不受本判定约束(见模板里 isStockStatus 分支)。
  */
 const canConfigWarnHere = computed(() => canConfigWarn(user, panelCode.value))
 watch(isStockStatus, async (v) => {
@@ -2881,9 +2903,10 @@ function mcWarn(id, lot) {
   return Number(mcDetail.value?.[id]?.['预警']?.[lot] ?? 0)
 }
 
-/** 保存预警数量(库存明细里直接设;落 kucun.[预警数量],出库审批据此拦截)。
+/** 保存预警数量(**单独设置**,库存明细里按批次设;落 kucun.[预警数量],出库审批据此拦截)。
  *  带 panel = 当前面板码:服务端按该面板的「预警配置」(warn)词校验(管理员恒过),
- *  见 StockWarnController.set → PanelPermissionService.requireWarnConfig。 */
+ *  见 StockWarnController.set → PanelPermissionService.requireWarnConfig。
+ *  顺序口径:先「统一预警」(/setAll)再本方法,本方法按批次覆盖统一值。 */
 async function saveMcWarn(row, lot, qty) {
   if (!canConfigWarnHere.value) return   // 无「预警配置」词 ⇒ 不提交(服务端同词闸门兜底)
   const id = row.id
@@ -2898,6 +2921,40 @@ async function saveMcWarn(row, lot, qty) {
     ElMessage.success(tt('预警数量已保存'))
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('保存预警数量失败'))
+  }
+}
+
+/** 「统一预警」输入值(row.id → 待应用的预警数量);未填 = undefined */
+const mcAllWarn = reactive({})
+/** 统一预警提交中(row.id → true,按钮 loading 用) */
+const mcAllWarnSaving = reactive({})
+
+/**
+ * 统一预警(用户 2026-10-15 新口径):把该 (物料,仓库) 下**所有批次**(含未设过的)一次设成同一个值
+ * ⇒ POST /api/stock/warn/setAll;成功后丢掉该行的展开明细缓存并**重新拉取**,让批次表里的预警数字立刻刷新。
+ * 顺序口径:先统一、再单独(下面的按批次输入框走 /set 覆盖)。
+ */
+async function applyMcWarnAll(row) {
+  if (!canConfigWarnHere.value) return   // 无「预警配置」词 ⇒ 不提交(服务端同词闸门兜底)
+  const id = row.id
+  const v = mcAllWarn[id]
+  if (v === null || v === undefined || v === '') {
+    ElMessage.warning(tt('请填写预警数量'))
+    return
+  }
+  mcAllWarnSaving[id] = true
+  try {
+    await request.post('/stock/warn/setAll', {
+      wzdm: row['存货编码'] ?? '', ckdm: row['仓库编码'] ?? '', warnQty: Number(v) || 0,
+      panel: panelCode.value,
+    })
+    ElMessage.success(tt('已对全部批次统一设置预警数量'))
+    delete mcDetail.value[id]          // 丢缓存 ⇒ loadMcDetail 重新拉,批次表里的预警数字立刻刷新
+    await loadMcDetail(row, true)
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('统一设置预警数量失败'))
+  } finally {
+    mcAllWarnSaving[id] = false
   }
 }
 
@@ -2921,7 +2978,16 @@ async function onMcExpand(row, expanded) {
   if (!isStockDetail.value || !row) return
   const rows = Array.isArray(expanded) ? expanded : (expanded ? [row] : [])
   if (!rows.some((r) => r && r.id === row.id)) return   // 收起事件不拉数据
-  if (mcDetail.value[row.id]) return                    // 命中缓存
+  await loadMcDetail(row)
+}
+
+/**
+ * 拉/复用「某行 → 该 (物料,仓库) 的月结明细」。
+ * force=false(默认)命中缓存即返回;force=true 强制重新拉(统一预警改完要立刻刷新批次表数字)。
+ */
+async function loadMcDetail(row, force = false) {
+  if (!isStockDetail.value || !row) return
+  if (!force && mcDetail.value[row.id]) return          // 命中缓存
   mcDetailLoading.value[row.id] = true
   try {
     const res = await request.get('/stock/monthClose/detail', {
@@ -2978,6 +3044,8 @@ async function submitStockAdd() {
 }
 
 // ---------- 预警数量行内编辑(库存状况):点击变输入框,回车/失焦保存,Esc 取消 ----------
+// 权限(2026-10-15 用户改口径):库存状况**不吃 warn 词**,恢复原样 —— 前端不做 warn 判定,
+// 服务端按 add/modify 在 /px/callButton(ButtonService.updateStockWarn)侧校验。
 const warnEdit = reactive({ id: null, value: null })
 const warnEditRef = ref(null)
 watch(() => warnEdit.id, async (v) => {
@@ -2987,13 +3055,11 @@ watch(() => warnEdit.id, async (v) => {
   if (el && typeof el.focus === 'function') el.focus()
 })
 function startWarnEdit(row) {
-  if (!canConfigWarnHere.value) return   // 无「预警配置」词 ⇒ 只读(服务端同词闸门兜底)
   warnEdit.id = row.id
   warnEdit.value = row['预警数量'] == null || row['预警数量'] === '' ? null : Number(row['预警数量'])
 }
 async function saveWarnEdit() {
   if (warnEdit.id == null) return
-  if (!canConfigWarnHere.value) { warnEdit.id = null; return }
   const id = warnEdit.id
   const val = warnEdit.value
   warnEdit.id = null
@@ -9247,6 +9313,9 @@ onUnmounted(() => {
 .mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
 .mc-detail-snap.mc-dim { color: #94a3b8; }
 .mc-warn-hit { color: #dc2626; font-size: 11px; margin-left: 6px; }
+/* 统一预警(库存明细展开区):快照行下方、批次表上方的「输入框 + 应用」一排 */
+.mc-warn-all { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 8px 0; font-size: 12px; color: #334155; }
+.mc-warn-all-label { color: #64748b; font-weight: 500; }
 .mc-snap-note { font-style: normal; color: #94a3b8; font-size: 11px; }
 .mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }
 .mc-detail-tables { display: flex; flex-wrap: wrap; gap: 12px; }
