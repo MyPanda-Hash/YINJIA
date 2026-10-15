@@ -3482,9 +3482,13 @@ const curNo = computed(() => {
 /** 总页数(单据面板分页用;与后端 OFFSET/FETCH 口径一致) */
 const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
 
-// 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
-// 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState() }, { immediate: true })
+// ⚠ 「面板/当前单据变化 → 刷新这几个研发态」的 immediate watcher **不能写在这里**(2026-10-15 修):
+//   immediate 回调在 setup 期同步执行,而 loadRdFlowState → clearRdFlow 读的 rdFlow 定义在**后面**
+//   (const,未初始化即访问 ⇒ TDZ),于是**每开一张单据都抛一次**
+//   `ReferenceError: Cannot access 'rdFlow' before initialization`
+//   (生产包里是 `Cannot access 'Rl' before initialization`,见 tools/archive/_probe-panel-runtime-errors.mjs)。
+//   异常被 Vue 吞掉、页面照常渲染,所以一直没被业务发现,但它让**首次进入**研发面板时 rdFlow 状态为空
+//   (切一次面板才对)。移到 loadRdFlowState 定义之后注册(见下方同名 watch),语义不变。
 
 /* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
    判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
@@ -4803,6 +4807,18 @@ async function loadRdFlowState() {
     clearRdFlow()
   }
 }
+
+/**
+ * 产品开发下发按钮状态 / 规格书分配状态(编辑闸门)/ 研发文件闸门 / 立项流程状态
+ * —— 面板或当前单据一变就刷新。
+ *
+ * ⚠ 注册点必须在 `loadRdFlowState`(及其读的 `rdFlow`)定义**之后**:本 watch 是 immediate,
+ *   setup 期同步执行回调;放在前面会让首次进入时抛
+ *   `ReferenceError: Cannot access 'rdFlow' before initialization`(见 3485 行处的说明)。
+ */
+watch(() => [panelCode.value, cur.value?.['单据编号']],
+  () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState() },
+  { immediate: true })
 
 /** 懒加载启用账号清单(两个弹窗共用;接口挂 RD_APPROVAL 查看权,与 /rdDev/users 的 RD_PROD_INFO 权分开) */
 async function ensureRdFlowUsers() {
