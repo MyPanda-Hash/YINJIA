@@ -44,7 +44,7 @@ public class DashboardStatsService {
         out.put("archives", archives());
         out.put("docStats", docStats());
         out.put("todos", List.of());
-        out.put("latest", List.of());
+        out.put("latest", latestActivities());
         out.put("progress", progress());
         out.put("production", production());
         out.put("stock", stock());
@@ -57,24 +57,67 @@ public class DashboardStatsService {
     // ---------- 概览 KPI / 档案 / 单据流量 ----------
 
     private Map<String, Object> kpis() {
+        Map<String, Object> kpis = new HashMap<>();
+        // ── 生产口径统一到 plang(2026-10-15 修)────────────────────────────────
+        // 修前:moActive = Σ(所有面板的「草稿」) = 48;moTotal = Σ(MANU*/WO_* 面板的草稿+已审核) = 0
+        //   (MANU_ORDER/WO_ORDER 这两个面板本来就没有单据行 ⇒ moTotal 恒 0)。
+        //   后果:「生产任务负载」卡主值 48、脚注「总计 0 单」自相矛盾;
+        //   闭环率 = 已完工 / moTotal = 0/0 ⇒ **恒零的死指标**;
+        //   而卡上那句「25 单生产中」其实是对的 —— 它来自 prod.statusDist,查的是 plang。
+        //   真实工单只有 plang 一处(25 张在产)⇒ 三数统一由 plang 派生,保证 在产+已完工=总数。
+        try {
+            int moTotal = count("SELECT COUNT(*) FROM plang");
+            int moDone = count("SELECT COUNT(*) FROM plang WHERE rk_no IS NOT NULL AND rk_no <> ''");
+            kpis.put("moTotal", moTotal);
+            kpis.put("moDone", moDone);
+            kpis.put("moActive", Math.max(0, moTotal - moDone));
+        } catch (Exception e) {
+            kpis.put("moTotal", 0);
+            kpis.put("moDone", 0);
+            kpis.put("moActive", 0);
+        }
+        // 全系统草稿/已审核:保留(将来做「待处理草稿」卡要用),但卡片不再拿它当生产数
         int draftTotal = 0;
         int auditTotal = 0;
-        int moTotal = 0;
         for (Map<String, Object> row : docStats()) {
             Map<?, ?> st = (Map<?, ?>) row.get("status");
-            int draft = toInt(st.get("草稿"));
-            int audited = toInt(st.get("已审核"));
-            draftTotal += draft;
-            auditTotal += audited;
-            if (String.valueOf(row.get("panelCode")).startsWith("MANU") || String.valueOf(row.get("panelCode")).startsWith("WO_")) {
-                moTotal += draft + audited;
-            }
+            draftTotal += toInt(st.get("草稿"));
+            auditTotal += toInt(st.get("已审核"));
         }
-        Map<String, Object> kpis = new HashMap<>();
-        kpis.put("moActive", draftTotal);
-        kpis.put("moTotal", moTotal);
+        kpis.put("draftTotal", draftTotal);
+        kpis.put("auditTotal", auditTotal);
         kpis.put("approvePending", 0);
         return kpis;
+    }
+
+    /**
+     * 实时业务事件流:最近 6 条单据审核活动(取 yj_doc_status 审核留痕)。
+     *
+     * ⚠ 2026-10-15 前这里写的是 `out.put("latest", List.of())` —— **硬编码空列表**,
+     *   卡片标题「实时业务事件流 / 来自 SQL 业务单据的最新活动」却永远只显示空态,
+     *   等于一个没接数据源的死卡片。现接上真实活动(540 条可用留痕)。
+     * 时间统一转成字符串下发:前端 compactTime() 按"长度 ≥ 16 的字符串"切 MM-DD HH:mm,
+     *   若下发 epoch 数字会原样显示成一串毫秒。
+     */
+    private List<Map<String, Object>> latestActivities() {
+        try {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT TOP 6 doc_no, panel_code, shr, shsj FROM yj_doc_status"
+                            + " WHERE shsj IS NOT NULL AND ISNULL(canceled,'N')<>'Y' AND ISNULL(panel_code,'')<>''"
+                            + " ORDER BY shsj DESC")) {
+                Map<String, Object> e = new LinkedHashMap<>();
+                e.put("编号", String.valueOf(r.get("doc_no")));
+                e.put("panel", String.valueOf(r.get("panel_code")));
+                e.put("状态", "已审核");
+                e.put("时间", r.get("shsj") == null ? null : String.valueOf(r.get("shsj")));
+                e.put("操作人", r.get("shr") == null ? "" : String.valueOf(r.get("shr")));
+                out.add(e);
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private Map<String, Object> archives() {
@@ -133,6 +176,10 @@ public class DashboardStatsService {
             prod.put("workshopDist", nameValue("SELECT scx AS k, COUNT(*) AS v FROM plang"
                     + " WHERE ISNULL(scx,'') <> '' GROUP BY scx ORDER BY COUNT(*) DESC"));
             prod.put("trend7", dateTrend("plang", "pl_date", "cp_date"));
+            // 工单数据截止日(2026-10-15):近 7 天趋势全 0 时,卡片要能说明"不是图坏了,
+            // 是工单数据本身就停在某天" —— 实测本机 plang 的日期都在 2026-08。
+            List<Map<String, Object>> lastRow = jdbc.queryForList("SELECT CONVERT(varchar(10), MAX(pl_date), 23) AS d FROM plang");
+            prod.put("lastDate", lastRow.isEmpty() ? null : lastRow.get(0).get("d"));
             prod.put("stageRates", stageRates());
             prod.put("bomTree", List.of());
         } catch (Exception e) {
@@ -141,6 +188,7 @@ public class DashboardStatsService {
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
             prod.put("bomTree", List.of());
+            prod.put("lastDate", null);
         }
         return prod;
     }

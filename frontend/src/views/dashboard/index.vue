@@ -115,8 +115,11 @@
                 <span>{{ tt('新增 / 完工趋势') }}</span>
                 <span>{{ tt('近 7 天') }}</span>
               </div>
-              <SLine v-if="(prod.trend7 || []).length" :data="prod.trend7" compact />
-              <div v-else class="empty compact-empty trend-empty">{{ tt('暂无趋势数据') }}</div>
+              <SLine v-if="(prod.trend7 || []).length && !prodTrendAllZero" :data="prod.trend7" compact />
+              <div v-else class="empty compact-empty trend-empty">
+                <span>{{ tt('近 7 天无新增或完工') }}</span>
+                <em v-if="prod.lastDate">{{ tt('数据截至') }} {{ prod.lastDate }}</em>
+              </div>
               <div class="order-queue">
                 <div v-for="order in progress.slice(0, 3)" :key="order['编号']" class="order-row">
                   <div class="order-copy" :title="`${order['产品'] || tt('未指定产品')} ${order['编号'] || ''}`">
@@ -194,7 +197,9 @@
               <div class="card-title">{{ tt('实时业务事件流') }}</div>
               <p>{{ tt('来自 SQL 业务单据的最新活动') }}</p>
             </div>
-            <el-select v-model="flowPanel" size="small" class="flow-pick" @change="onFlowChange">
+            <!-- placeholder 必须走 tt():v-model 初值是 '' 而空串在 el-select 里被视为"未选择",
+                 会退回 Element Plus 的**默认中文占位符「请选择」**,切英文后仍是中文(多语言红线) -->
+            <el-select v-model="flowPanel" size="small" class="flow-pick" :placeholder="tt('全部事件')" @change="onFlowChange">
               <el-option :label="tt('全部事件')" value="" />
               <el-option :label="tt('产品开发业务流')" value="RD_PROD_INFO" />
             </el-select>
@@ -748,6 +753,13 @@ const docVolume = computed(() => {
 const archives = computed(() => stats.value.archives || {})
 const latest = computed(() => stats.value.latest || [])
 const progress = computed(() => stats.value.progress || [])
+/** 生产趋势是不是"一条贴底直线"(近 7 天全 0)—— 2026-10-15:
+ *  plang 的日期实测都停在 2026-08,近 7 天必然全 0。此时画一条贴底的线看着像图坏了,
+ *  改成空态并说明"数据截至",把"没数据"和"数据为0"区分开。 */
+const prodTrendAllZero = computed(() => {
+  const t = prod.value.trend7 || []
+  return t.length > 0 && t.every((d) => !Number(d.added || 0) && !Number(d.done || 0))
+})
 
 // ---------- 生产数据 ----------
 const prod = computed(() => stats.value.production || {})
@@ -833,13 +845,15 @@ const kpis = computed(() => {
   return [
     {
       title: tt('生产任务负载'), value: Number(stats.value.kpis.moActive || 0), unit: tt('单'), icon: 'Odometer',
-      tone: 'primary', state: tt('实时'), meta: `${tt('总计')} ${productionTotal.value} ${tt('单')}`, signal: `${productionRunning.value} ${tt('单生产中')}`,
+      tone: 'primary', state: tt('实时'), meta: `${tt('总计')} ${productionTotal.value} ${tt('单')}`, signal: `${productionDone.value} ${tt('已完工')}`,
       bars: trend.map((item) => Number(item.added || 0)),
     },
     {
-      title: tt('工单闭环率'), value: completionRate.value, unit: '%', icon: 'CircleCheck',
+      // 2026-10-15:原为「工单闭环率」—— 与「生产执行核心」里那个大环重复展示同一个数;
+      // 改成「已完工工单」(计数),闭环率降到 signal 里做辅助,4 张 KPI 卡各说一件事。
+      title: tt('已完工工单'), value: productionDone.value, unit: tt('单'), icon: 'CircleCheck',
       tone: 'steel', state: completionRate.value >= 80 ? tt('稳定') : tt('推进中'),
-      meta: `${productionDone.value} / ${productionTotal.value} ${tt('已完工')}`, signal: tt('生命周期'),
+      meta: `${productionDone.value} / ${productionTotal.value} ${tt('已完工')}`, signal: `${completionRate.value}% ${tt('工单闭环率')}`,
       bars: trend.map((item) => Number(item.done || 0)),
     },
     {
@@ -851,7 +865,8 @@ const kpis = computed(() => {
     {
       title: tt('销售订单金额'), value: formatCompact(amount), unit: tt('元'), icon: 'TrendCharts',
       tone: 'neutral', state: `${sales.value.total || 0} ${tt('张订单')}`, meta: `${salesDone.value} ${tt('张已审核')}`, signal: tt('业务流入'),
-      bars: (sales.value.byCustomer || []).map((item) => Number(item.value || 0)),
+      // 微条改用聚合口径(含「其它/未填客户」),与销售页签的甜甜圈同源;原用 byCustomer 是纯 TOP6
+      bars: (sales.value.customerShare || []).map((item) => Number(item.value || 0)),
     },
   ]
 })
