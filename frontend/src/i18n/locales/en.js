@@ -1086,6 +1086,8 @@ export default {
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
     '未保存提示': 'Unsaved Changes',
     '当前单据有未保存的修改，是否保存？': 'Current document has unsaved changes. Save it?',
+    // 页签 × 关闭时的三态问句标题(2026-10-16 用户口径「叉掉时还应该弹窗提示是否保存」)
+    '关闭前确认': 'Confirm before closing',
     '当前草稿尚未保存，是否保存？（不保存将撤回该单）': 'The current draft has not been saved. Save it? (Choosing No will withdraw it)',
     '勾选': 'Check',
     '提示：按住左键拖动框选，批量勾选/取消经过的权限': 'Tip: hold left button and drag a box to batch check/uncheck permissions in its path',

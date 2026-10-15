@@ -331,9 +331,42 @@ public class ButtonService {
         return "true".equalsIgnoreCase(s) || "Y".equalsIgnoreCase(s) || "1".equals(s);
     }
 
+    /**
+     * 「版本号」建单自动带出:`V<当天日期>-<当日流水两位>`(如 V2026-10-15-01)。
+     *
+     * 用户口径(2026-10-16):「成型工艺清单的版本号应该要不一样,现在是按日期自动生成,但是同一日期是一样的,
+     * 应该加上序列数,例如:V2026-10-15-01」。
+     *
+     * 口径与边界:
+     *   · 只在**表里真有「版本号」列**时给值(实测仅 rd_mold_proc_head / rd_mold_formula_head /
+     *     rd_asm_proc_head / rd_insp_plan_head 四张头表有该列)→ 其它面板零影响,不写面板名单;
+     *   · 流水 = 该表**当日**(有「单据日期」列则按它=今天;没有就恒 1)未作废行数 + 1,两位补零;
+     *   · 调用方只在**新建**且该格为空时写入 ⇒ 已有单/用户自己填的值一律不覆盖;
+     *   · 任何异常(缺列/类型怪)一律返回 null 放弃带出,绝不因为一个默认值把保存整个搞挂。
+     */
+    private String nextVersionNo(String table) {
+        try {
+            if (table == null || table.isBlank()) return null;
+            java.util.Set<String> cols = tableCols(table);
+            if (!cols.contains("版本号")) return null;
+            LocalDate today = LocalDate.now();
+            int n = 1;
+            if (cols.contains("单据日期")) {
+                Integer c = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + table + " WHERE CAST([" + "单据日期" + "] AS date) = ?"
+                                + " AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                        Integer.class, java.sql.Date.valueOf(today));
+                n = (c == null ? 0 : c) + 1;
+            }
+            return "V" + today + "-" + String.format("%02d", Math.max(1, n));
+        } catch (Exception e) {
+            log.warn("版本号自动带出失败({}):{}", table, e.getMessage());
+            return null;
+        }
+    }
+
     /** 单据保存:头字段并入每行(单表式)或分别写头表/行表(头行式);无编号=新建 */
-    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
-                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
+    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
         boolean split = def.hasHeadTable();
         if (no == null) {
             if (items.isEmpty()) {
@@ -344,6 +377,10 @@ public class ButtonService {
                 cols.put(def.groupCol(), no);
                 if (def.dateCol() != null && tableCols(table).contains(def.dateCol())) cols.put(def.dateCol(), LocalDate.now());
                 if (!split && def.codeCol() != null) cols.put(def.codeCol(), no);
+                // 版本号自动带当日流水(2026-10-16 用户口径):成型工艺清单原先版本号是「V+当天日期」,
+                // 同一天建第二张单版本号一模一样 ⇒ 必须加序列数,如 V2026-10-15-01。
+                String vno1 = nextVersionNo(table);
+                if (vno1 != null && !cols.containsKey("版本号")) cols.put("版本号", vno1);
                 // 空草稿也写入随表单提交的头字段(如 规格书种类):
                 // 规格书按类型页签过滤列表,不带分类的新单会从当前页签列表消失,导致"新增后无法填写"
                 for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
@@ -373,6 +410,12 @@ public class ButtonService {
             }
             no = formNoService.next(def.prefix(), user);
             clearStaleDocStatus(def, no);
+            // 版本号自动带当日流水(同空白草稿分支口径):见 nextVersionNo 注释
+            String vno2 = nextVersionNo(split ? def.headTable() : def.lineTable());
+            if (vno2 != null && def.byLabel("版本号") != null
+                    && (head.get("版本号") == null || String.valueOf(head.get("版本号")).isBlank())) {
+                head.put("版本号", vno2);
+            }
             // 存在"创建时间"字段的单据新建时自动填入当前时间(金蝶同步单据字段,nvarchar 字符串口径;
             // save() 已剥离前端传入值,此处是唯一填入点;修改已有单不覆盖)
             if (def.byLabel("创建时间") != null && head.get("创建时间") == null) {

@@ -2061,6 +2061,7 @@ import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaul
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
+import { useUnsavedStore } from '@/stores/unsaved'
 
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
@@ -2106,6 +2107,9 @@ const engine = usePanelRuntime()
 const { user, tabs, locale: localeStore } = useAppContext()
 const route = useRoute()
 const router = useRouter()
+/** 页签栏(× 关闭)取"未保存状态 + 保存/放弃"的登记处,见 stores/unsaved.js
+ *  (tabs 已由上面的 useAppContext() 解构出来,别重复声明) */
+const unsavedGuard = useUnsavedStore()
 
 // ── 纸质单据/标签打印:统一由面板 runtime 下发,本组件不直接依赖 business/print-formats ──
 const {
@@ -7030,6 +7034,15 @@ let guardAsking = false          // 弹窗进行中防重入
 onBeforeRouteLeave((to) => {
   if (leaveConfirmed.value) { leaveConfirmed.value = false; return true }
   if (guardAsking) return false // 弹窗进行中:拦截一切导航(三态选择后由 onLeaveChoice 放行)
+  // 「切到别的页签」不算离开(2026-10-16 用户口径:「填写的表格数据,无论是在切换 tab 页还是面板在
+  // 未×掉之前都是保留的,叉掉时还应该弹窗提示是否保存」):
+  //   本面板页签仍在页签栏里 + 目标是**别的路径** ⇒ 只是切页签,实例留在 keep-alive 里、内容原样保留,
+  //   不该弹三态框(尤其"不保存"会把新建草稿整单撤回 —— 切个页签就丢数据就是这么发生的)。
+  //   页签被 × 掉(tabs 里已经没有了)或同路径换单据(?code=)仍走下面的守卫弹窗。
+  if (to && to.path !== route.path && tabs.tabs.some((t) => t.path === route.path)) {
+    pendingLeave.value = null
+    return true
+  }
   if (!hasUnsavedChanges()) { pendingLeave.value = null; return true }
   pendingLeave.value = to
   guardAsking = true
@@ -7063,6 +7076,29 @@ function onLeaveDialogClose() {
   restoreCurrentTab()
 }
 
+/** 放弃未保存内容(离开守卫「不保存」与页签 × 「不保存」共用一条路):
+ *  · 本次新增且没保存过的草稿 → 撤回整单(走「删除」按钮路径:留痕 + 释放占用);
+ *  · 改既有草稿 → 只放弃修改,单据保留(避免误删已填写内容)。
+ *  返回是否处理成功(失败时调用方不得放行关闭)。 */
+async function discardUnsavedChanges() {
+  if (isFreshAddedDoc()) {
+    const withdrawNo = cur.value['编号']
+    try {
+      await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: withdrawNo }, buttonParam: {} })
+      ElMessage.success(`已撤回新增：${withdrawNo}`)
+      clearFreshDraft(withdrawNo)
+      await load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '撤回新增失败，请手动删除草稿')
+      return false
+    }
+  }
+  freshAdded.value = false
+  freshAddedNo.value = ''
+  inlineDirtyFlag.value = false
+  return true
+}
+
 /** 离开守卫三态选择:save=按保存按钮落库;discard=撤回新增/放弃修改;stay=留在本页 */
 async function onLeaveChoice(choice) {
   leaveChoiceHandled = true
@@ -7077,26 +7113,12 @@ async function onLeaveChoice(choice) {
   if (choice === 'save') {
     const saved = await saveInlineDraft('保存', { silent: true })
     if (!saved) { guardAsking = false; pendingLeave.value = null; restoreCurrentTab(); return }
-  } else if (isFreshAddedDoc()) {
-    // 不保存 + 新建未保存过或基线为空白草稿 → 撤回整单(走「删除」按钮路径:按开发规范留痕+释放占用)。
-    // 有修改的既有草稿(基线含实质数据)不走此分支:仅放弃修改,保留单据(避免误删已填写内容)
-    const withdrawNo = cur.value['编号']
-    try {
-      await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: withdrawNo }, buttonParam: {} })
-      ElMessage.success(`已撤回新增：${withdrawNo}`)
-      clearFreshDraft(withdrawNo)
-      await load() // 撤回后重载列表(挂起的切单/翻页动作据此定位)
-    } catch (e) {
-      ElMessage.error(engine.errMsg(e) || '撤回新增失败，请手动删除草稿')
-      guardAsking = false
-      pendingLeave.value = null
-      restoreCurrentTab()
-      return
-    }
+  } else if (!(await discardUnsavedChanges())) {
+    guardAsking = false
+    pendingLeave.value = null
+    restoreCurrentTab()
+    return
   }
-  freshAdded.value = false
-  freshAddedNo.value = ''
-  inlineDirtyFlag.value = false
   guardAsking = false
   pendingLeave.value = null
   const action = pendingAction
@@ -8163,6 +8185,19 @@ onMounted(() => {
   // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
   applyDocNoQuery()
   load()
+  // 把"未保存状态 + 保存/放弃"登记给页签栏:× 关闭时由它弹三态问句
+  // (2026-10-16 用户口径「叉掉时还应该弹窗提示是否保存」;守卫只覆盖"导航离开",覆盖不到点 × 关后台页签)
+  unsavedGuard.register(route.path, {
+    hasUnsaved: () => hasUnsavedChanges(),
+    save: () => saveInlineDraft('保存', { silent: true }),
+    discard: () => discardUnsavedChanges(),
+    // 已经问过并处理完:放行随后那次导航,避免 TabsBar 问一遍、路由守卫又问一遍
+    confirmLeave: () => { leaveConfirmed.value = true },
+  })
+})
+
+onUnmounted(() => {
+  unsavedGuard.unregister(route.path)
 })
 
 onDeactivated(() => {

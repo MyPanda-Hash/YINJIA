@@ -41,12 +41,14 @@
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTabsStore } from '@/stores/tabs'
+import { useUnsavedStore, tabClosePlan } from '@/stores/unsaved'
 import { useAppStore } from '@/stores/app'
 import { apiPageManuOrders } from '@/business/api'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 
 const tabs = useTabsStore()
+const unsaved = useUnsavedStore()
 const app = useAppStore()
 const router = useRouter()
 const route = useRoute()
@@ -80,16 +82,79 @@ function doCtx(cmd) {
   ctx.value.tab = null
   if (cmd === 'refresh') refresh()
   else if (cmd === 'close') closeAndGo(tab.path)
-  else if (cmd === 'others') { tabs.closeOthers(tab.path); router.replace(tab.path) }
-  else if (cmd === 'all') { tabs.closeAll(); router.replace('/dashboard') }
+  else if (cmd === 'others') { closeOthersGuarded(tab.path) }
+  else if (cmd === 'all') { closeAllGuarded() }
 }
 
-function closeAndGo(path) {
+/**
+ * 关页签前问一句(2026-10-16 用户口径:「面板在未×掉之前数据保留,叉掉时还应该弹窗提示是否保存」)。
+ * 面板(PanelxList)挂载时把自己的未保存状态与保存/放弃能力登记在 stores/unsaved,这里按 path 取;
+ * 没登记或报告不脏 ⇒ 直接关(判定表见 stores/unsaved.js 的 tabClosePlan,带单测)。
+ * @returns {Promise<boolean>} 是否放行关闭
+ */
+async function confirmCloseIfDirty(path) {
+  const api = unsaved.apiOf(path)
+  if (tabClosePlan(api).step !== 'ask') return true
+  let choice = null
+  try {
+    await ElMessageBox.confirm(tt('当前单据有未保存的修改，是否保存？'), tt('关闭前确认'), {
+      distinguishCancelAndClose: true,
+      confirmButtonText: tt('保存'),
+      cancelButtonText: tt('不保存'),
+      closeOnClickModal: false,
+      type: 'warning',
+    })
+    choice = 'save'
+  } catch (e) {
+    // cancel = 点了「不保存」;close = 右上角 × / ESC ⇒ 当作取消关闭(绝不静默丢数据)
+    choice = e === 'cancel' ? 'discard' : 'cancel'
+  }
+  const plan = tabClosePlan(api, choice)
+  if (plan.step === 'cancel') return false
+  if (plan.step === 'save') {
+    const ok = await api.save()
+    if (!ok) return false // 校验没过/保存失败:保持页签打开,让用户看到报错
+  } else if (plan.step === 'discard') {
+    const ok = await api.discard()
+    if (!ok) return false
+  }
+  api?.confirmLeave?.() // 已问过:放行随后那次导航,别让路由守卫再问一遍
+  return true
+}
+
+async function closeAndGo(path) {
+  if (!(await confirmCloseIfDirty(path))) return
   tabs.close(path)
   if (route.path === path) {
     const act = tabs.tabs.find((t) => t.path === tabs.active)
     router.replace(act ? { path: act.path, query: act.query || {} } : tabs.active)
   }
+}
+
+/** 关闭其他页签:逐个问(有未保存内容的不经确认不关) */
+async function closeOthersGuarded(keepPath) {
+  for (const t of [...tabs.tabs]) {
+    if (t.affix || t.path === keepPath) continue
+    if (!(await confirmCloseIfDirty(t.path))) {
+      // 中途取消:已经关掉的保持关掉,剩下的留着(与「关闭其他」的语义一致,不静默丢弃未保存内容)
+      if (route.path !== tabs.active) return
+      break
+    }
+  }
+  tabs.closeOthers(keepPath)
+  router.replace(keepPath)
+}
+
+/** 关闭全部页签:同样逐个问 */
+async function closeAllGuarded() {
+  for (const t of [...tabs.tabs]) {
+    if (t.affix) continue
+    if (!(await confirmCloseIfDirty(t.path))) {
+      if (route.path !== tabs.active) return
+      break
+    }
+  }
+  closeAll()
 }
 
 function closeAll() {
