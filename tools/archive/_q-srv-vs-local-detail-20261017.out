@@ -1,0 +1,224 @@
+=== 1. 服务器独有 yj_field 共 123 条 ===
+  真缺口: 9 条  按面板: QC_ASM_INSP(5) STOCK_LEDGER(2) STOCK_SUMMARY(2)
+  改名: 8 条  按面板: STOCK_SUMMARY(2) STOCK_LEDGER(2) STOCK_BALANCE(4)
+  面板已下架: 106 条  按面板: QC_MOLD_INSP(34) QC_CUT_INSP(34) QC_FIN_SPEC(38)
+  ── 「真缺口」逐条(面板还在本地、同 label 也没有):
+     QC_ASM_INSP | 标准要求 | label=标准要求 | place=detail
+     QC_ASM_INSP | 实测数值 | label=实测数值 | place=detail
+     QC_ASM_INSP | 判定 | label=判定 | place=detail
+     QC_ASM_INSP | 数量 | label=数量 | place=detail
+     STOCK_LEDGER | 结束日期 | label=结束日期 | place=detail
+     STOCK_SUMMARY | 开始日期 | label=开始日期 | place=detail
+     STOCK_LEDGER | 开始日期 | label=开始日期 | place=detail
+     STOCK_SUMMARY | 结束日期 | label=结束日期 | place=detail
+     QC_ASM_INSP | 表区 | label=表区 | place=detail
+  ── 「改名」逐条(同面板同 label,本地换了 col_name ⇒ 本地有意改名):
+     STOCK_SUMMARY | 存货 → 本地 存货
+     STOCK_LEDGER | 存货 → 本地 存货
+     STOCK_BALANCE | 仓库 → 本地 仓库
+     STOCK_BALANCE | 存货 → 本地 存货
+     STOCK_LEDGER | 仓库 → 本地 仓库
+     STOCK_BALANCE | 存货编码 → 本地 存货编码
+     STOCK_BALANCE | 仓库编码 → 本地 仓库编码
+     STOCK_SUMMARY | 仓库 → 本地 仓库
+
+=== 2. 服务器独有 yj_translation 共 46 条 ===
+  panel在用: 0 条
+  panel已下架: 5 条
+  field在用: 0 条
+  field已无引用: 41 条
+  其它: 0 条
+  ── 「field 在用」(本地还有该 label 的字段行,但缺这条译名 = 真缺口)按 locale 统计:
+     (无)
+     涉及 0 个标签,前 40 个: 
+  ── 「panel 在用」逐条:
+
+=== 3. 同名不同属性 188 条(全部) ===
+  dbo.bd_dispatch.业务类型  [服务器→本地] 可空 true→false
+  dbo.bd_dispatch.单据日期  [服务器→本地] 可空 true→false
+  dbo.bd_dispatch.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_dispatch.生产车间  [服务器→本地] 可空 true→false
+  dbo.bd_finish_in.业务类型  [服务器→本地] 长度 100→200
+  dbo.bd_finish_in.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_manu_order.批号  [服务器→本地] 可空 true→false
+  dbo.bd_manu_order.机构  [服务器→本地] 可空 true→false
+  dbo.bd_manu_order.测试程序  [服务器→本地] 可空 true→false
+  dbo.bd_manu_order.附件1  [服务器→本地] 长度 1000→-1
+  dbo.bd_manu_order.附件2  [服务器→本地] 长度 1000→-1
+  dbo.bd_manu_order.附件3  [服务器→本地] 长度 1000→-1
+  dbo.bd_manu_order.附件4  [服务器→本地] 长度 1000→-1
+  dbo.bd_manu_order.附件5  [服务器→本地] 长度 1000→-1
+  dbo.bd_manu_order.附件6  [服务器→本地] 长度 1000→-1
+  dbo.bd_material_out.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.bd_material_out.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.bd_material_out.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.bd_material_out.asp_user1  [服务器→本地] 长度 40→100
+  dbo.bd_material_out.asp_user2  [服务器→本地] 长度 40→100
+  dbo.bd_material_out.业务类型  [服务器→本地] 可空 true→false
+  dbo.bd_material_out.单据日期  [服务器→本地] 可空 true→false
+  dbo.bd_material_out.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_material_out.工单行号  [服务器→本地] 默认 ((0))→无
+  dbo.bd_outsource_order.业务类型  [服务器→本地] 可空 true→false
+  dbo.bd_outsource_order.单据日期  [服务器→本地] 可空 true→false
+  dbo.bd_outsource_order.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_outsource_order.委外供应商  [服务器→本地] 可空 true→false
+  dbo.bd_pu_order.供应商  [服务器→本地] 可空 true→false
+  dbo.bd_pu_order.单据日期  [服务器→本地] 可空 true→false
+  dbo.bd_pu_order.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_pu_order.币种  [服务器→本地] 可空 true→false
+  dbo.bd_pu_order.汇率  [服务器→本地] 可空 true→false
+  dbo.bd_purchase_in.业务类型  [服务器→本地] 可空 true→false
+  dbo.bd_purchase_in.供应商  [服务器→本地] 可空 true→false
+  dbo.bd_purchase_in.单据日期  [服务器→本地] 可空 true→false
+  dbo.bd_purchase_in.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_purchase_in.币种  [服务器→本地] 可空 true→false
+  dbo.bd_purchase_in.汇率  [服务器→本地] 可空 true→false
+  dbo.bd_sale_out.业务类型  [服务器→本地] 可空 true→false
+  dbo.bd_sale_out.单据日期  [服务器→本地] 可空 true→false
+  dbo.bd_sale_out.单据编号  [服务器→本地] 可空 true→false
+  dbo.bd_sale_out.客户  [服务器→本地] 可空 true→false
+  dbo.bd_sale_out.结算客户  [服务器→本地] 可空 true→false
+  dbo.bl_dispatch.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 4→1; 默认 无→('N')
+  dbo.bl_dispatch.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.bl_dispatch.asp_time1  [服务器→本地] 类型 datetime→datetime2; 精度 23,3→27,7
+  dbo.bl_dispatch.asp_time2  [服务器→本地] 类型 datetime→datetime2; 精度 23,3→27,7
+  dbo.bl_dispatch.asp_user1  [服务器→本地] 长度 80→100
+  dbo.bl_dispatch.asp_user2  [服务器→本地] 长度 80→100
+  dbo.bl_dispatch.comm  [服务器→本地] 可空 false→true; 默认 ('0')→无
+  dbo.bl_dispatch.加工类型  [服务器→本地] 长度 40→200; 可空 true→false
+  dbo.bl_dispatch.单据编号  [服务器→本地] 长度 120→200; 可空 true→false
+  dbo.bl_dispatch.备注  [服务器→本地] 长度 1000→400
+  dbo.bl_dispatch.委外供应商  [服务器→本地] 长度 200→400
+  dbo.bl_dispatch.工人  [服务器→本地] 长度 120→400
+  dbo.bl_dispatch.工作中心  [服务器→本地] 长度 120→400
+  dbo.bl_dispatch.工序编码  [服务器→本地] 长度 120→400; 可空 true→false
+  dbo.bl_dispatch.已派工数量  [服务器→本地] 类型 float→decimal; 长度 8→9; 精度 53,0→18,4
+  dbo.bl_dispatch.派工加工状态  [服务器→本地] 长度 40→200
+  dbo.bl_dispatch.派工数量  [服务器→本地] 类型 float→decimal; 长度 8→9; 精度 53,0→18,4; 可空 true→false
+  dbo.bl_dispatch.班组  [服务器→本地] 长度 120→400
+  dbo.bl_dispatch.生产车间  [服务器→本地] 长度 120→400
+  dbo.bl_dispatch.累计汇报数量  [服务器→本地] 类型 float→decimal; 长度 8→9; 精度 53,0→18,4
+  dbo.bl_dispatch.计划数量  [服务器→本地] 类型 float→decimal; 长度 8→9; 精度 53,0→18,4
+  dbo.bl_dispatch.计量单位  [服务器→本地] 长度 40→200; 可空 true→false
+  dbo.bl_dispatch.设备  [服务器→本地] 长度 200→400
+  dbo.bl_finish_in.产品名称  [服务器→本地] 可空 true→false
+  dbo.bl_finish_in.仓库  [服务器→本地] 可空 true→false
+  dbo.bl_finish_in.单据编号  [服务器→本地] 可空 true→false
+  dbo.bl_finish_in.存货图片  [服务器→本地] 长度 400→1000
+  dbo.bl_finish_in.实收数量  [服务器→本地] 可空 true→false
+  dbo.bl_finish_in.计量单位  [服务器→本地] 可空 true→false
+  dbo.bl_manu_order.合同号  [服务器→本地] 可空 true→false
+  dbo.bl_material_out.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.bl_material_out.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.bl_material_out.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.bl_material_out.asp_user1  [服务器→本地] 长度 40→100
+  dbo.bl_material_out.asp_user2  [服务器→本地] 长度 40→100
+  dbo.bl_material_out.仓库  [服务器→本地] 可空 true→false
+  dbo.bl_material_out.单据编号  [服务器→本地] 可空 true→false
+  dbo.bl_material_out.数量  [服务器→本地] 可空 true→false
+  dbo.bl_material_out.材料名称  [服务器→本地] 可空 true→false
+  dbo.bl_material_out.计量单位  [服务器→本地] 可空 true→false
+  dbo.bl_outsource_order.产品名称  [服务器→本地] 可空 true→false
+  dbo.bl_outsource_order.单据编号  [服务器→本地] 可空 true→false
+  dbo.bl_outsource_order.数量  [服务器→本地] 可空 true→false
+  dbo.bl_outsource_order.计量单位  [服务器→本地] 可空 true→false
+  dbo.bl_pu_order.单价  [服务器→本地] 可空 true→false
+  dbo.bl_pu_order.单位  [服务器→本地] 可空 true→false
+  dbo.bl_pu_order.单据编号  [服务器→本地] 可空 true→false
+  dbo.bl_pu_order.数量  [服务器→本地] 可空 true→false
+  dbo.bl_pu_order.物料名称  [服务器→本地] 可空 true→false
+  dbo.bl_pu_order.物料编码  [服务器→本地] 可空 true→false
+  dbo.bl_purchase_in.单据编号  [服务器→本地] 可空 true→false
+  dbo.bl_purchase_in.存货名称  [服务器→本地] 可空 true→false
+  dbo.bl_purchase_in.存货图片  [服务器→本地] 长度 400→1000
+  dbo.bl_purchase_in.实收数量  [服务器→本地] 可空 true→false
+  dbo.bl_purchase_in.计量单位  [服务器→本地] 可空 true→false
+  dbo.bl_sale_out.单据编号  [服务器→本地] 可空 true→false
+  dbo.bl_sale_out.存货名称  [服务器→本地] 可空 true→false
+  dbo.bl_sale_out.存货编码  [服务器→本地] 可空 true→false
+  dbo.bl_sale_out.数量  [服务器→本地] 可空 true→false
+  dbo.bl_sale_out.计量单位  [服务器→本地] 可空 true→false
+  dbo.bs_dict.代码  [服务器→本地] 可空 true→false
+  dbo.bs_dict.名称  [服务器→本地] 可空 true→false
+  dbo.bs_op.asp_cancel  [服务器→本地] 可空 true→false
+  dbo.erp_imp_row.asp_cancel  [服务器→本地] 默认 无→('N')
+  dbo.inh.asp_cancel  [服务器→本地] 默认 (N'N')→无
+  dbo.inh.委外ID  [服务器→本地] 默认 ((0))→无
+  dbo.inh.审核  [服务器→本地] 默认 (N'N')→无
+  dbo.inh.工单项次  [服务器→本地] 类型 float→int; 长度 8→4; 精度 53,0→10,0; 默认 ((0))→无
+  dbo.inh.订单ID  [服务器→本地] 默认 ((0))→无
+  dbo.inh.采购ID  [服务器→本地] 默认 ((0))→无
+  dbo.outh.asp_cancel  [服务器→本地] 默认 (N'N')→无
+  dbo.outh.委外ID  [服务器→本地] 默认 ((0))→无
+  dbo.outh.审核  [服务器→本地] 默认 (N'N')→无
+  dbo.outh.工单项次  [服务器→本地] 类型 float→int; 长度 8→4; 精度 53,0→10,0; 默认 ((0))→无
+  dbo.outh.订单ID  [服务器→本地] 默认 ((0))→无
+  dbo.outh.采购ID  [服务器→本地] 默认 ((0))→无
+  dbo.qc_insp.暂收单号  [服务器→本地] 长度 240→120
+  dbo.rd_dom_test_detail.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_dom_test_detail.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_dom_test_detail.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_dom_test_detail.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_dom_test_detail.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_dom_test_detail.日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0
+  dbo.rd_dom_test_detail.期望完成日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0
+  dbo.rd_dom_test_detail.预计完成日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0
+  dbo.rd_dom_test_head.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_dom_test_head.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_dom_test_head.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_dom_test_head.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_dom_test_head.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_dom_test_head.单据日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→40; 精度 23,3→0,0
+  dbo.rd_equip_use_detail.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_equip_use_detail.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_equip_use_detail.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_equip_use_detail.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_equip_use_detail.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_equip_use_detail.使用日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0
+  dbo.rd_equip_use_head.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_equip_use_head.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_equip_use_head.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_equip_use_head.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_equip_use_head.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_equip_use_head.单据日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→40; 精度 23,3→0,0
+  dbo.rd_equip_use_head.备注  [服务器→本地] 长度 500→1000
+  dbo.rd_instr_use_detail.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_instr_use_detail.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_instr_use_detail.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_instr_use_detail.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_instr_use_detail.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_instr_use_detail.使用日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0
+  dbo.rd_instr_use_head.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_instr_use_head.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_instr_use_head.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_instr_use_head.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_instr_use_head.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_instr_use_head.单据日期  [服务器→本地] 类型 datetime→nvarchar; 长度 8→40; 精度 23,3→0,0
+  dbo.rd_progress.项目层级  [服务器→本地] 可空 true→false
+  dbo.rd_progress_detail.子项目/尺寸  [服务器→本地] 长度 600→200
+  dbo.rd_progress_detail.实施进度  [服务器→本地] 长度 200→400
+  dbo.rd_progress_detail.未批准原因  [服务器→本地] 长度 600→400
+  dbo.rd_progress_detail.测试员  [服务器→本地] 长度 600→100
+  dbo.rd_progress_detail.状态  [服务器→本地] 长度 2000→1000
+  dbo.rd_progress_detail.说明  [服务器→本地] 长度 600→400
+  dbo.rd_progress_detail.里程完成  [服务器→本地] 长度 200→40
+  dbo.rd_progress_detail.项目级  [服务器→本地] 长度 200→100
+  dbo.rd_progress_detail.项目负责  [服务器→本地] 长度 200→100
+  dbo.rd_spike_water_detail.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_spike_water_detail.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_spike_water_detail.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_spike_water_detail.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_spike_water_detail.asp_user2  [服务器→本地] 长度 40→100
+  dbo.rd_spike_water_head.asp_cancel  [服务器→本地] 类型 nvarchar→char; 长度 2→1; 默认 (N'N')→('N')
+  dbo.rd_spike_water_head.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.rd_spike_water_head.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.rd_spike_water_head.asp_user1  [服务器→本地] 长度 40→100
+  dbo.rd_spike_water_head.asp_user2  [服务器→本地] 长度 40→100
+  dbo.scjl.jbbh  [服务器→本地] 类型 nvarchar→text; 长度 500→16
+  dbo.yj_panel.line_table  [服务器→本地] 类型 sysname→nvarchar; 可空 false→true
+  dbo.yj_user.asp_cancel  [服务器→本地] 默认 (N'N')→无
+  dbo.yj_user.asp_print  [服务器→本地] 默认 ((0))→无
+  dbo.yj_user.asp_time1  [服务器→本地] 默认 (getdate())→无
+  dbo.yj_user.comm  [服务器→本地] 可空 false→true; 默认 ((0))→无
+  dbo.yj_user.dlxz  [服务器→本地] 默认 (N'Y')→无
+  dbo.yj_user.islogin  [服务器→本地] 默认 (N'Y')→无

@@ -1,0 +1,352 @@
+# 服务器快照(HSDZ_MES_SRV1015) vs 本地(HSDZ_MES)  生成于 2026-10-15T19:40:49.596Z
+# 参考 = 服务器(2026-10-15 23:15 的完整备份还原);目标 = 本地库
+
+=== A 表 ===  参考 219 / 目标 215  |  只在服务器 14  只在本地 10
+  只在服务器: dbo.dm_langue
+  只在服务器: dbo.gscs
+  只在服务器: dbo.mate_bak_20261013
+  只在服务器: dbo.permission
+  只在服务器: dbo.qc_cut_insp_detail
+  只在服务器: dbo.qc_cut_insp_head
+  只在服务器: dbo.qc_fin_spec_detail
+  只在服务器: dbo.qc_fin_spec_head
+  只在服务器: dbo.qc_mold_insp_detail
+  只在服务器: dbo.qc_mold_insp_head
+  只在服务器: dbo.rd_dev_task_bak_20261013
+  只在服务器: dbo.s_commdata
+  只在服务器: dbo.s_sys
+  只在服务器: dbo.s_xtcs
+  只在本地  : dbo.bd_other_in
+  只在本地  : dbo.bd_other_out
+  只在本地  : dbo.bd_stock_close
+  只在本地  : dbo.bl_other_in
+  只在本地  : dbo.bl_other_out
+  只在本地  : dbo.bl_stock_close
+  只在本地  : dbo.qc_first_insp_detail
+  只在本地  : dbo.qc_first_insp_head
+  只在本地  : dbo.qc_proc_insp_detail
+  只在本地  : dbo.qc_proc_insp_head
+
+=== B 列 ===  参考 9934 / 目标 9942  |  缺列 430  多列 438  同名不同属性 188
+  ── 缺列(服务器有、本地没有),按表聚合:
+     dbo.mate_bak_20261013  (56): comm id m_no m_date wzdm1 lot_no1 color1 siz1 wzmc1 jldw1 xc wzdm2 lot_no2 color2 siz2 wzmc2 gg2 jldw2 bzl shl sl2 in_dj jine ywdm bz OpComponentId asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print 备用1 备用2 备用3 备用4 备用5 备用6 备用7 备用8 备用9 备用10 备用11 备用12 备用13 备用14 备用15 备用16 备用17 备用18 备用19 备用20
+     dbo.gscs  (55): id comm gsmc gsdh tpwz xpsm1 xpsm2 bz tm_cd tm_gd tm_zyjj tm_sxjj tm_sbj tm_zbj rem web djzk ghf ysys yspy ysfh mybs hg mysj kjjm pos_dj hzb zzb rem1 gsgs gszg xpzs xpbt msbdh beginday endday comqty mobqty fkc pfwj sf sczg jsfs ver maxrecord asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print
+     dbo.s_sys  (46): COMM ID SYSMENUNO MC USERNA XC LANKD LB_LEFT LB_TOP LB_WI LB_HI LB_TAB LB_YN LB_TYPE LB_VALUE LB_LEN DISP_ORDER FILE_STR FLIE_NA DISP_YN KEY_YN HEAD_YN CHS CHT ENG OTH BZ GMF GROP ISDOUBLE ISDATE REMARK VER control Listna Cur_Lang asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print
+     dbo.rd_dev_task_bak_20261013  (33): id 产品编号 产品名称 源单据号 目标面板 下发人 下发时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 负责人 备用1 备用2 备用3 备用4 备用5 备用6 备用7 备用8 备用9 备用10 备用11 备用12 备用13 备用14 备用15 备用16 备用17 备用18 备用19 备用20
+     dbo.qc_mold_insp_head  (31): id 单据编号 单据日期 工单号 批次号 报工单号 工序 产品编码 产品名称 规格型号 生产线 生产车间 报工数量 检验数量 检验员 检验日期 总结论 处理方式 备注 审核人 审核时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 单据状态 检验方案 文件编码 执行标准 工单行号
+     dbo.qc_cut_insp_head  (31): id 单据编号 单据日期 工单号 批次号 报工单号 工序 产品编码 产品名称 规格型号 生产线 生产车间 报工数量 检验数量 检验员 检验日期 总结论 处理方式 备注 审核人 审核时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 单据状态 检验方案 文件编码 执行标准 工单行号
+     dbo.qc_fin_spec_head  (31): id 单据编号 单据日期 文件编号 文件名称 版本版次 管控状态 发行日期 工单号 报工单号 产品编码 产品名称 规格型号 批次号 目的 范围 职责和权限 取样要求 工作程序 制定 审核 核准 备注 审核人 审核时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 单据状态
+     dbo.s_commdata  (28): COMM ID JSZ XC SZSJ JBXX ZDYXX DSFS FCSJ YDSJ TXF YDF FSZ CTMC KEY KEYZ SYWJ REMARK asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print
+     dbo.dm_langue  (22): comm id frm type xc lb_wi lb_hi chs cht eng oth bz asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print
+     dbo.qc_fin_spec_detail  (21): id 单据编号 行号 表区 检验对象 版本 修订理由与内容简述 修订日期 拟定 检验项目 称料 接受标准 检验方法 合格处置 不合格处置 备注 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel
+     dbo.qc_mold_insp_detail  (19): id 单据编号 行号 检验项目 标准要求 实测数值 判定 数量 处理方式 备注 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 表区 检验方法 合格数量 不合格数量
+     dbo.qc_cut_insp_detail  (19): id 单据编号 行号 检验项目 标准要求 实测数值 判定 数量 处理方式 备注 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 表区 检验方法 合格数量 不合格数量
+     dbo.permission  (18): COMM ID USERID MODULE1 RW MODULE_NA GROP REMARK asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print
+     dbo.s_xtcs  (17): comm id dm mc sm value bz asp_user1 asp_time1 asp_user2 asp_time2 asp_user3 asp_time3 asp_cancel asp_user4 asp_time4 asp_print
+     dbo.qc_asm_insp_detail  (3): 标准要求 判定 表区
+  ── 多列(本地有、服务器没有),按表聚合:
+     dbo.bd_other_in  (55): id 单据日期 单据编号 单据状态 业务类型 业务类型编码 业务类型id 供应商编码 供应商 部门 部门编码 经手人 经手人编码 备注 创建人 创建时间 修改人 修改时间 审核人 审核时间 外部数据ID 外部单据号 外部指纹 是否已转ERP ERP单号 转ERP操作人 转ERP时间 金蝶单据状态 金蝶审核人 金蝶审核时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 备用1 备用2 备用3 备用4 备用5 备用6 备用7 备用8 备用9 备用10 备用11 备用12 备用13 备用14 备用15 备用16 备用17 备用18 备用19 备用20
+     dbo.bl_other_in  (53): id 单据编号 序号 存货编码 存货名称 规格型号 仓库 仓库编码 计量单位 基本单位名称 基本单位编码 基本单位id 辅助单位名称 辅助单位编码 辅助单位id 换算率 换算系数 辅助换算系数 数量 辅助数量 库存数量 单价 金额 明细备注 批号 成本 单位成本 存货图片 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 备用1 备用2 备用3 备用4 备用5 备用6 备用7 备用8 备用9 备用10 备用11 备用12 备用13 备用14 备用15 备用16 备用17 备用18 备用19 备用20
+     dbo.bd_other_out  (53): id 单据日期 单据编号 单据状态 业务类型 业务类型编码 业务类型id 部门 部门编码 经手人 经手人编码 备注 创建人 创建时间 修改人 修改时间 审核人 审核时间 外部数据ID 外部单据号 外部指纹 是否已转ERP ERP单号 转ERP操作人 转ERP时间 金蝶单据状态 金蝶审核人 金蝶审核时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 备用1 备用2 备用3 备用4 备用5 备用6 备用7 备用8 备用9 备用10 备用11 备用12 备用13 备用14 备用15 备用16 备用17 备用18 备用19 备用20
+     dbo.bl_other_out  (50): id 单据编号 序号 存货编码 存货名称 规格型号 仓库 仓库编码 计量单位 基本单位名称 基本单位编码 基本单位id 辅助单位名称 辅助单位编码 辅助单位id 换算率 换算系数 辅助换算系数 数量 辅助数量 库存数量 单价 金额 明细备注 批号 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 备用1 备用2 备用3 备用4 备用5 备用6 备用7 备用8 备用9 备用10 备用11 备用12 备用13 备用14 备用15 备用16 备用17 备用18 备用19 备用20
+     dbo.qc_first_insp_head  (38): id 单据编号 单据日期 工单号 工单行号 报工单号 工序 批次号 客户名称 产品编码 产品名称 规格型号 生产线 生产车间 报工数量 检验数量 检验员 检验日期 总结论 工艺清单单号 处理方式 备注 审核人 审核时间 单据状态 检验方案 文件编码 执行标准 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 表单管理人 密级 使用范围 生产日期 客户代码
+     dbo.qc_proc_insp_detail  (36): id 单据编号 表区 行号 检验项目 检验要求 检验方法 抽检量 实测数值 单项判定 不合格应对措施 结果判断 处理方式 备注 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 测量值1 测量值2 测量值3 测量值4 测量值5 检验仪器 不良数量 备注2 检查频率 格数 测量值6 测量值7 测量值8 测量值9 测量值10 格数上限 产线常规功能性结果
+     dbo.qc_proc_insp_head  (36): id 单据编号 单据日期 检验时间 检验类别 工单号 工单行号 报工单号 工序 批次号 客户名称 产品编码 产品名称 规格型号 生产线 生产车间 报工数量 抽检总量 检验数量 检验员 检验日期 总结论 检验方案 文件编码 执行标准 处理方式 备注 单据状态 审核人 审核时间 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 列数
+     dbo.qc_first_insp_detail  (29): id 单据编号 表区 行号 检验项目 检验要求 检验方法 检查频率 实测数值 测量值1 测量值2 测量值3 测量值4 测量值5 结果判断 数量 不合格数量 处理方式 备注 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel 行类型 样品序号 检验列 标准 项目分组
+     dbo.bl_stock_close  (22): id 头id 行号 期间 物料编码 物料名称 规格型号 计量单位 仓库编码 仓库名称 批号 期初数量 入库数量 出库数量 结存数量 单价 最晚出库日期 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel
+     dbo.bd_stock_close  (19): id 期间 状态 结转单据编号 结转日期 行数 入库合计 出库合计 结存合计 月结人 月结时间 取消人 取消时间 备注 asp_user1 asp_time1 asp_user2 asp_time2 asp_cancel
+     dbo.bd_finish_in  (18): 单据类型 部门 部门编码 经手人编码 创建人 创建时间 修改人 修改时间 外部数据ID 外部单据号 外部指纹 是否已转ERP ERP单号 转ERP操作人 转ERP时间 金蝶单据状态 金蝶审核人 金蝶审核时间
+     dbo.bl_finish_in  (12): 序号 基本单位名称 基本单位编码 基本单位id 辅助单位名称 辅助单位编码 辅助单位id 换算率 换算系数 辅助换算系数 库存数量 检验方式
+     dbo.qc_asm_insp_detail  (11): 检验要求 结果判断 检验类型 检查频率 测量值1 测量值2 测量值3 测量值4 测量值5 产线常规功能性结果 检验结果
+     dbo.qc_asm_insp_head  (4): 客户名称 检验时间 抽检总量 合格数量
+     dbo.bs_qc_item  (1): 检验数量
+     dbo.bs_qc_plan  (1): 检验类型
+  ── 同名不同属性(前 60 条):
+     dbo.bs_op.asp_cancel  [可空 true→false]
+     dbo.erp_imp_row.asp_cancel  [默认值(无 → ('N'))]
+     dbo.qc_insp.暂收单号  [长度 240→120]
+     dbo.yj_user.comm  [可空 false→true; 默认值(((0)) → 无)]
+     dbo.yj_user.dlxz  [默认值((N'Y') → 无)]
+     dbo.yj_user.islogin  [默认值((N'Y') → 无)]
+     dbo.yj_user.asp_time1  [默认值((getdate()) → 无)]
+     dbo.yj_user.asp_cancel  [默认值((N'N') → 无)]
+     dbo.yj_user.asp_print  [默认值(((0)) → 无)]
+     dbo.yj_panel.line_table  [类型 sysname→nvarchar; 可空 false→true]
+     dbo.bd_material_out.单据日期  [可空 true→false]
+     dbo.bd_material_out.单据编号  [可空 true→false]
+     dbo.bd_material_out.业务类型  [可空 true→false]
+     dbo.bd_material_out.工单行号  [默认值(((0)) → 无)]
+     dbo.bd_material_out.asp_user1  [长度 40→100]
+     dbo.bd_material_out.asp_time1  [默认值((getdate()) → 无)]
+     dbo.bd_material_out.asp_user2  [长度 40→100]
+     dbo.bd_material_out.asp_cancel  [类型 nvarchar→char; 长度 2→1; 默认值((N'N') → ('N'))]
+     dbo.bd_material_out.asp_print  [默认值(((0)) → 无)]
+     dbo.rd_equip_use_head.单据日期  [类型 datetime→nvarchar; 长度 8→40; 精度 23,3→0,0]
+     dbo.rd_equip_use_head.备注  [长度 500→1000]
+     dbo.rd_equip_use_head.asp_user1  [长度 40→100]
+     dbo.rd_equip_use_head.asp_time1  [默认值((getdate()) → 无)]
+     dbo.rd_equip_use_head.asp_user2  [长度 40→100]
+     dbo.rd_equip_use_head.asp_cancel  [类型 nvarchar→char; 长度 2→1; 默认值((N'N') → ('N'))]
+     dbo.rd_equip_use_head.asp_print  [默认值(((0)) → 无)]
+     dbo.rd_equip_use_detail.使用日期  [类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0]
+     dbo.rd_equip_use_detail.asp_user1  [长度 40→100]
+     dbo.rd_equip_use_detail.asp_time1  [默认值((getdate()) → 无)]
+     dbo.rd_equip_use_detail.asp_user2  [长度 40→100]
+     dbo.rd_equip_use_detail.asp_cancel  [类型 nvarchar→char; 长度 2→1; 默认值((N'N') → ('N'))]
+     dbo.rd_equip_use_detail.asp_print  [默认值(((0)) → 无)]
+     dbo.bl_material_out.单据编号  [可空 true→false]
+     dbo.bl_material_out.仓库  [可空 true→false]
+     dbo.bl_material_out.材料名称  [可空 true→false]
+     dbo.bl_material_out.计量单位  [可空 true→false]
+     dbo.bl_material_out.数量  [可空 true→false]
+     dbo.bl_material_out.asp_user1  [长度 40→100]
+     dbo.bl_material_out.asp_time1  [默认值((getdate()) → 无)]
+     dbo.bl_material_out.asp_user2  [长度 40→100]
+     dbo.bl_material_out.asp_cancel  [类型 nvarchar→char; 长度 2→1; 默认值((N'N') → ('N'))]
+     dbo.bl_material_out.asp_print  [默认值(((0)) → 无)]
+     dbo.rd_instr_use_detail.使用日期  [类型 datetime→nvarchar; 长度 8→100; 精度 23,3→0,0]
+     dbo.rd_instr_use_detail.asp_user1  [长度 40→100]
+     dbo.rd_instr_use_detail.asp_time1  [默认值((getdate()) → 无)]
+     dbo.rd_instr_use_detail.asp_user2  [长度 40→100]
+     dbo.rd_instr_use_detail.asp_cancel  [类型 nvarchar→char; 长度 2→1; 默认值((N'N') → ('N'))]
+     dbo.rd_instr_use_detail.asp_print  [默认值(((0)) → 无)]
+     dbo.bd_dispatch.单据日期  [可空 true→false]
+     dbo.bd_dispatch.单据编号  [可空 true→false]
+     dbo.bd_dispatch.业务类型  [可空 true→false]
+     dbo.bd_dispatch.生产车间  [可空 true→false]
+     dbo.rd_instr_use_head.单据日期  [类型 datetime→nvarchar; 长度 8→40; 精度 23,3→0,0]
+     dbo.rd_instr_use_head.asp_user1  [长度 40→100]
+     dbo.rd_instr_use_head.asp_time1  [默认值((getdate()) → 无)]
+     dbo.rd_instr_use_head.asp_user2  [长度 40→100]
+     dbo.rd_instr_use_head.asp_cancel  [类型 nvarchar→char; 长度 2→1; 默认值((N'N') → ('N'))]
+     dbo.rd_instr_use_head.asp_print  [默认值(((0)) → 无)]
+     dbo.bd_finish_in.单据编号  [可空 true→false]
+     dbo.bd_finish_in.业务类型  [长度 100→200]
+     …(还有 128 条)
+
+=== C 视图 ===  参考 97 / 目标 103  |  只在服务器 0  只在本地 6  同名定义不同 9
+  只在服务器: (无)
+  只在本地  : dbo.v_other_in_detail dbo.v_other_in_stats dbo.v_other_out_detail dbo.v_other_out_stats dbo.v_stock_kucun dbo.v_wo_completion_detail
+  定义不同  : dbo.v_dispatch_stats dbo.v_material_out_detail dbo.v_material_out_stats dbo.v_purchase_in_detail dbo.v_purchase_in_stats dbo.v_sale_out_detail dbo.v_sale_out_stats dbo.v_sales_order_stats dbo.v_stock_movement
+
+=== D 元数据表 ===
+  yj_panel         服务器    125 / 本地    132
+     键:只在服务器 3  只在本地 10
+        只在服务器: QC_CUT_INSP
+        只在服务器: QC_FIN_SPEC
+        只在服务器: QC_MOLD_INSP
+        只在本地  : OTHER_IN
+        只在本地  : OTHER_IN_DETAIL
+        只在本地  : OTHER_IN_STATS
+        只在本地  : OTHER_OUT
+        只在本地  : OTHER_OUT_DETAIL
+        只在本地  : OTHER_OUT_STATS
+        只在本地  : QC_FIRST_INSP
+        只在本地  : QC_PROC_INSP
+        只在本地  : STOCK_DETAIL
+        只在本地  : WO_COMPLETION_LIST
+  yj_field         服务器   3950 / 本地   4217
+     键:只在服务器 156  只在本地 356
+        只在服务器: QC_MOLD_INSP|单据编号|query,header
+        只在服务器: QC_MOLD_INSP|单据日期|query,header
+        只在服务器: QC_MOLD_INSP|工单号|query,header
+        只在服务器: QC_MOLD_INSP|报工单号|query,header
+        只在服务器: QC_MOLD_INSP|工序|query,header
+        只在服务器: QC_MOLD_INSP|批次号|query,header
+        只在服务器: QC_MOLD_INSP|产品编码|query,header
+        只在服务器: QC_MOLD_INSP|产品名称|query,header
+        只在服务器: QC_MOLD_INSP|规格型号|header
+        只在服务器: QC_MOLD_INSP|生产线|query,header
+        只在服务器: QC_MOLD_INSP|生产车间|header
+        只在服务器: QC_MOLD_INSP|报工数量|header
+        只在服务器: QC_MOLD_INSP|检验数量|header
+        只在服务器: QC_MOLD_INSP|检验员|query,header
+        只在服务器: QC_MOLD_INSP|检验日期|header
+        只在服务器: QC_MOLD_INSP|总结论|query,header
+        只在服务器: QC_MOLD_INSP|处理方式|header,detail
+        只在服务器: QC_MOLD_INSP|备注|header,detail
+        只在服务器: QC_MOLD_INSP|单据状态|query,header
+        只在服务器: QC_MOLD_INSP|审核人|header
+        只在服务器: QC_MOLD_INSP|审核时间|header
+        只在服务器: QC_MOLD_INSP|行号|detail
+        只在服务器: QC_MOLD_INSP|检验项目|detail
+        只在服务器: QC_MOLD_INSP|标准要求|detail
+        只在服务器: QC_MOLD_INSP|实测数值|detail
+        …(还有 131 条)
+        只在本地  : QC_ASM_INSP|检验要求|detail
+        只在本地  : QC_ASM_INSP|结果判断|detail
+        只在本地  : QC_ASM_INSP|检验类型|detail
+        只在本地  : QC_PROC_INSP|单据编号|query,header
+        只在本地  : QC_PROC_INSP|单据日期|query,header
+        只在本地  : QC_PROC_INSP|检验时间|query,header
+        只在本地  : QC_PROC_INSP|检验类别|query,header
+        只在本地  : QC_PROC_INSP|工单号|query,header
+        只在本地  : QC_PROC_INSP|报工单号|query,header
+        只在本地  : QC_PROC_INSP|工序|query,header
+        只在本地  : QC_PROC_INSP|批次号|query,header
+        只在本地  : QC_PROC_INSP|客户名称|query,header
+        只在本地  : QC_PROC_INSP|产品编码|query,header
+        只在本地  : QC_PROC_INSP|产品名称|query,header
+        只在本地  : QC_PROC_INSP|规格型号|header
+        …(还有 341 条)
+  yj_translation   服务器   6271 / 本地   6343
+     键:只在服务器 83  只在本地 155
+        只在服务器: field|版本版次|en
+        只在服务器: field|产线产能|en
+        只在服务器: field|称料|en
+        只在服务器: field|成型计划|en
+        只在服务器: field|成型未完成|en
+        只在服务器: field|单支\n物料含量g|en
+        只在服务器: field|发行日期|en
+        只在服务器: field|范围|en
+        只在服务器: field|工作程序|en
+        只在服务器: field|供应商名称|en
+        只在服务器: field|管控状态|en
+        只在服务器: field|核准|en
+        只在服务器: field|混料计划|en
+        只在服务器: field|混料未完成|en
+        只在服务器: field|计划开工日|en
+        只在服务器: field|检测仪器、工具|en
+        只在服务器: field|检验标准1|en
+        只在服务器: field|检验标准2|en
+        只在服务器: field|检验标准3|en
+        只在服务器: field|检验标准4|en
+        只在服务器: field|检验标准5|en
+        只在服务器: field|检验标准6|en
+        只在服务器: field|检验标准7|en
+        只在服务器: field|检验标准-富锶B|en
+        只在服务器: field|检验对象|en
+        …(还有 58 条)
+        只在本地  : field|报工单号|ja
+        只在本地  : field|报工人|en
+        只在本地  : field|报工人|ja
+        只在本地  : field|标准|en
+        只在本地  : field|不良数量|en
+        只在本地  : field|仓库名称|zh-TW
+        只在本地  : field|测量值1|en
+        只在本地  : field|测量值10|en
+        只在本地  : field|测量值2|en
+        只在本地  : field|测量值3|en
+        只在本地  : field|测量值4|en
+        只在本地  : field|测量值5|en
+        只在本地  : field|测量值6|en
+        只在本地  : field|测量值7|en
+        只在本地  : field|测量值8|en
+        …(还有 140 条)
+  yj_button        服务器 ERR:Invalid object name 'yj_button'. / 本地 ERR:Invalid object name 'yj_button'.
+     键比对失败: Invalid object name 'yj_button'.
+  yj_role_panel    服务器    262 / 本地    367
+     键:只在服务器 174  只在本地 279
+        只在服务器: 1|QC_CUT_INSP
+        只在服务器: 1|QC_MOLD_INSP
+        只在服务器: 2|QC_CUT_INSP
+        只在服务器: 2|QC_MOLD_INSP
+        只在服务器: 2|RD_ALKALINE
+        只在服务器: 2|RD_ANTIBACT
+        只在服务器: 2|RD_APPROVAL
+        只在服务器: 2|RD_ASM_BOM
+        只在服务器: 2|RD_ASM_PROC
+        只在服务器: 2|RD_DOM_TEST
+        只在服务器: 2|RD_DROP_PREC
+        只在服务器: 2|RD_EQUIP_USE
+        只在服务器: 2|RD_FILTER_EFF
+        只在服务器: 2|RD_INSP_PLAN
+        只在服务器: 2|RD_INSTR_USE
+        只在服务器: 2|RD_MINERAL
+        只在服务器: 2|RD_MOLD_FORMULA
+        只在服务器: 2|RD_MOLD_PROC
+        只在服务器: 2|RD_PLAN
+        只在服务器: 2|RD_PROD_INFO
+        只在服务器: 2|RD_PROGRESS
+        只在服务器: 2|RD_RO_PROTECT
+        只在服务器: 2|RD_SCALE
+        只在服务器: 2|RD_SOAK
+        只在服务器: 2|RD_SPEC_DOC
+        …(还有 149 条)
+        只在本地  : 1|ORDER_CONVERT
+        只在本地  : 1|OTHER_IN
+        只在本地  : 1|OTHER_IN_DETAIL
+        只在本地  : 1|OTHER_IN_STATS
+        只在本地  : 1|OTHER_OUT
+        只在本地  : 1|OTHER_OUT_DETAIL
+        只在本地  : 1|OTHER_OUT_STATS
+        只在本地  : 1|QC_FIRST_INSP
+        只在本地  : 1|QC_PROC_INSP
+        只在本地  : 1|SCHEDULE_BOARD
+        只在本地  : 1|STOCK_DETAIL
+        只在本地  : 1|WO_COMPLETION_LIST
+        只在本地  : 1|WORK_ORDER_BOARD
+        只在本地  : 1|WORK_ORDER_LIST
+        只在本地  : 2|ORDER_CONVERT
+        …(还有 264 条)
+  yj_doc_status    服务器   6336 / 本地    306
+     键比对失败: Invalid column name 'form_no'.
+
+=== E 数据行数 ===  行数不同的表 110(服务器更多 65 / 本地更多 45)
+  ── 服务器更多(前 40;服务器行数 / 本地行数):
+     dbo.bl_so_order                            6374 /       31
+     dbo.yj_doc_status                          6336 /      306
+     dbo.bl_pu_order                            4714 /      133
+     dbo.bd_so_order                            3979 /       20
+     dbo.bs_inv                                 3927 /      338
+     dbo.bd_pu_order                            2243 /       51
+     dbo.s_allno                                 796 /      544
+     dbo.dm_kh                                   274 /       40
+     dbo.dm_gf                                   184 /       32
+     dbo.yj_usage_log                           2840 /     2690
+     dbo.yj_ext_bind_log                          70 /        0
+     dbo.yj_std_lib                              237 /      180
+     dbo.plang                                    40 /        3
+     dbo.rd_dev_task                              32 /        0
+     dbo.plang_pc                                 33 /        2
+     dbo.bs_wh                                    34 /       10
+     dbo.rd_spec_doc_detail                       21 /        0
+     dbo.bl_manu_order                            20 /        0
+     dbo.qc_insp_req_series                       20 /        0
+     dbo.yj_message                               35 /       16
+     dbo.rd_asm_proc_detail                       17 /        0
+     dbo.bs_qc_item                               14 /        0
+     dbo.yj_user                                  19 /        5
+     dbo.bs_emp                                  149 /      138
+     dbo.bs_dept                                  56 /       46
+     dbo.maint_plan_detail                        10 /        0
+     dbo.wo_progress                              10 /        0
+     dbo.bd_material_out                           9 /        0
+     dbo.bs_uom                                   50 /       42
+     dbo.rd_change_detail                         14 /        7
+     dbo.yj_archive_change_log                    23 /       16
+     dbo.bs_equip                                 18 /       12
+     dbo.rd_mold_proc_detail                       7 /        1
+     dbo.rd_prod_info_head                         9 /        3
+     dbo.scjl                                     10 /        4
+     dbo.bl_material_out                           5 /        0
+     dbo.bs_op                                    20 /       15
+     dbo.bs_reject                                15 /       10
+     dbo.bs_team                                  15 /       10
+     dbo.bs_region                                12 /        8
+  ── 本地更多(前 25):
+     dbo.mate                                      5 /    35578
+     dbo.yj_field                               3950 /     4217
+     dbo.inv_cost_ledger                          39 /      181
+     dbo.outh                                      0 /      128
+     dbo.bl_sale_out                               1 /      126
+     dbo.yj_role_panel                           262 /      367
+     dbo.form_flow_link                          119 /      205
+     dbo.kucun                                    42 /      128
+     dbo.yj_translation                         6271 /     6343
+     dbo.yj_schema_log                           482 /      547
+     dbo.sl_recv_detail                           29 /       83
+     dbo.bd_sale_out                               0 /       50
+     dbo.rd_progress_detail                        0 /       46
+     dbo.bl_purchase_in                           21 /       60
+     dbo.yj_doc_batch                             13 /       40
+     dbo.yj_form_approval                         92 /      117
+     dbo.wo_process_line                           3 /       24
+     dbo.inh                                      39 /       55
+     dbo.rd_insp_plan_detail                       1 /       17
+     dbo.sl_recv                                  13 /       25
+     dbo.qc_asm_insp_head                          0 /       11
+     dbo.qc_catalog_detail                        34 /       45
+     dbo.qc_insp_rec                              32 /       43
+     dbo.wo_split_log                              0 /        9
+     dbo.qc_asm_insp_detail                        0 /        7
