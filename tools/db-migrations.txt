@@ -3658,3 +3658,13 @@ migrate-srv-config-sync-20261017.sql
 #     _restore-legacy-data.sql 从快照库一次性回灌(DB_ID 守卫 + 空表守卫,幂等;故意不进本清单)。
 #   登记:tools/db-inuse-tables.txt(快照回补节) + tools/db-legacy-whitelist.txt(冻结表 6 条)。
 migrate-legacy-restore-20261017.sql
+
+# —— 2026-10-17 scjl.jbbh 类型对齐服务器快照:text → nvarchar(250) ——
+#   与快照库 HSDZ_MES_SRV1015 逐列比对,scjl 的 100 列里**只有 jbbh 有类型差异**
+#   (本地 text / 服务器 nvarchar(250));根因是本地这张表 2026-10-03 由
+#   migrate-legacy-plang-scjl-tables.sql 按参考库结构补建,用的是旧定义 text。
+#   ⚠ text 已弃用,且不能参与 = / ORDER BY / DISTINCT / EXISTS / EXCEPT / UNION。
+#   改法:text 不能直接 ALTER COLUMN ⇒ 加新列 → CAST 搬数据 → 删旧列 → sp_rename 改名 → 补回注明「班别」。
+#   安全性(实测):jbbh 无 yj_field 引用、无视图/存储过程引用(引用 scjl 的 4 个视图都不含它)、
+#   无外键/索引/默认约束 ⇒ 对面板与报表零影响。幂等(已是 nvarchar 则跳过)。两账套均执行。
+migrate-scjl-jbbh-nvarchar-20261017.sql

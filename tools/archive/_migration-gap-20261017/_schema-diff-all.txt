@@ -1,0 +1,200 @@
+类别 | 表 | 列 | 本地定义 | 快照定义 | 差异点
+------------------------------
+①快照有·本地无 | qc_asm_insp_detail | 标准要求 |  | nvarchar(200) | 
+①快照有·本地无 | qc_asm_insp_detail | 表区 |  | nvarchar(50) | 
+①快照有·本地无 | qc_asm_insp_detail | 判定 |  | nvarchar(20) | 
+②两边不同 | bd_dispatch | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_dispatch | 单据日期 | date(3) NOT NULL | date(3) | 可空
+②两边不同 | bd_dispatch | 生产车间 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_dispatch | 业务类型 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_finish_in | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_finish_in | 业务类型 | nvarchar(100) NOT NULL | nvarchar(50) NOT NULL | 长度
+②两边不同 | bd_manu_order | 测试程序 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_manu_order | 附件1 | nvarchar((max)) | nvarchar(500) | 长度
+②两边不同 | bd_manu_order | 附件2 | nvarchar((max)) | nvarchar(500) | 长度
+②两边不同 | bd_manu_order | 附件3 | nvarchar((max)) | nvarchar(500) | 长度
+②两边不同 | bd_manu_order | 附件4 | nvarchar((max)) | nvarchar(500) | 长度
+②两边不同 | bd_manu_order | 附件5 | nvarchar((max)) | nvarchar(500) | 长度
+②两边不同 | bd_manu_order | 附件6 | nvarchar((max)) | nvarchar(500) | 长度
+②两边不同 | bd_manu_order | 机构 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_manu_order | 批号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_material_out | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | bd_material_out | asp_print | int(4) | int(4) | 默认值
+②两边不同 | bd_material_out | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | bd_material_out | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | bd_material_out | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | bd_material_out | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_material_out | 单据日期 | date(3) NOT NULL | date(3) | 可空
+②两边不同 | bd_material_out | 工单行号 | int(4) | int(4) | 默认值
+②两边不同 | bd_material_out | 业务类型 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_outsource_order | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_outsource_order | 单据日期 | date(3) NOT NULL | date(3) | 可空
+②两边不同 | bd_outsource_order | 委外供应商 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_outsource_order | 业务类型 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_pu_order | 币种 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_pu_order | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_pu_order | 单据日期 | date(3) NOT NULL | date(3) | 可空
+②两边不同 | bd_pu_order | 供应商 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_pu_order | 汇率 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bd_purchase_in | 币种 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_purchase_in | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_purchase_in | 单据日期 | date(3) NOT NULL | date(3) | 可空
+②两边不同 | bd_purchase_in | 供应商 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_purchase_in | 汇率 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bd_purchase_in | 业务类型 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bd_sale_out | 单据编号 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_sale_out | 单据日期 | date(3) NOT NULL | date(3) | 可空
+②两边不同 | bd_sale_out | 结算客户 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_sale_out | 客户 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bd_sale_out | 业务类型 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_dispatch | asp_cancel | char(1) | nvarchar(2) | 类型,长度,默认值
+②两边不同 | bl_dispatch | asp_print | int(4) | int(4) | 默认值
+②两边不同 | bl_dispatch | asp_time1 | datetime2(8) | datetime(8) | 类型,精度
+②两边不同 | bl_dispatch | asp_time2 | datetime2(8) | datetime(8) | 类型,精度
+②两边不同 | bl_dispatch | asp_user1 | nvarchar(50) | nvarchar(40) | 长度
+②两边不同 | bl_dispatch | asp_user2 | nvarchar(50) | nvarchar(40) | 长度
+②两边不同 | bl_dispatch | comm | nvarchar(10) | nvarchar(10) NOT NULL | 可空,默认值
+②两边不同 | bl_dispatch | 班组 | nvarchar(200) | nvarchar(60) | 长度
+②两边不同 | bl_dispatch | 备注 | nvarchar(200) | nvarchar(500) | 长度
+②两边不同 | bl_dispatch | 单据编号 | nvarchar(100) NOT NULL | nvarchar(60) | 长度,可空
+②两边不同 | bl_dispatch | 工人 | nvarchar(200) | nvarchar(60) | 长度
+②两边不同 | bl_dispatch | 工序编码 | nvarchar(200) NOT NULL | nvarchar(60) | 长度,可空
+②两边不同 | bl_dispatch | 工作中心 | nvarchar(200) | nvarchar(60) | 长度
+②两边不同 | bl_dispatch | 计划数量 | decimal(9) | float(8) | 类型,长度,精度
+②两边不同 | bl_dispatch | 计量单位 | nvarchar(100) NOT NULL | nvarchar(20) | 长度,可空
+②两边不同 | bl_dispatch | 加工类型 | nvarchar(100) NOT NULL | nvarchar(20) | 长度,可空
+②两边不同 | bl_dispatch | 累计汇报数量 | decimal(9) | float(8) | 类型,长度,精度
+②两边不同 | bl_dispatch | 派工加工状态 | nvarchar(100) | nvarchar(20) | 长度
+②两边不同 | bl_dispatch | 派工数量 | decimal(9) NOT NULL | float(8) | 类型,长度,精度,可空
+②两边不同 | bl_dispatch | 设备 | nvarchar(200) | nvarchar(100) | 长度
+②两边不同 | bl_dispatch | 生产车间 | nvarchar(200) | nvarchar(60) | 长度
+②两边不同 | bl_dispatch | 委外供应商 | nvarchar(200) | nvarchar(100) | 长度
+②两边不同 | bl_dispatch | 已派工数量 | decimal(9) | float(8) | 类型,长度,精度
+②两边不同 | bl_finish_in | 仓库 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_finish_in | 产品名称 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_finish_in | 存货图片 | nvarchar(500) | nvarchar(200) | 长度
+②两边不同 | bl_finish_in | 单据编号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_finish_in | 计量单位 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_finish_in | 实收数量 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bl_manu_order | 合同号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_material_out | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | bl_material_out | asp_print | int(4) | int(4) | 默认值
+②两边不同 | bl_material_out | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | bl_material_out | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | bl_material_out | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | bl_material_out | 材料名称 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_material_out | 仓库 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_material_out | 单据编号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_material_out | 计量单位 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_material_out | 数量 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bl_outsource_order | 产品名称 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_outsource_order | 单据编号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_outsource_order | 计量单位 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_outsource_order | 数量 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bl_pu_order | 单价 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bl_pu_order | 单据编号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_pu_order | 单位 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_pu_order | 数量 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bl_pu_order | 物料编码 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_pu_order | 物料名称 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_purchase_in | 存货名称 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_purchase_in | 存货图片 | nvarchar(500) | nvarchar(200) | 长度
+②两边不同 | bl_purchase_in | 单据编号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_purchase_in | 计量单位 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_purchase_in | 实收数量 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bl_sale_out | 存货编码 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_sale_out | 存货名称 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bl_sale_out | 单据编号 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_sale_out | 计量单位 | nvarchar(100) NOT NULL | nvarchar(100) | 可空
+②两边不同 | bl_sale_out | 数量 | decimal(9) NOT NULL | decimal(9) | 可空
+②两边不同 | bs_dict | 代码 | nvarchar(50) NOT NULL | nvarchar(50) | 可空
+②两边不同 | bs_dict | 名称 | nvarchar(200) NOT NULL | nvarchar(200) | 可空
+②两边不同 | bs_op | asp_cancel | char(1) NOT NULL | char(1) | 可空
+②两边不同 | erp_imp_row | asp_cancel | char(1) | char(1) | 默认值
+②两边不同 | inh | asp_cancel | nvarchar(2) | nvarchar(2) | 默认值
+②两边不同 | inh | 采购ID | float(8) | float(8) | 默认值
+②两边不同 | inh | 订单ID | float(8) | float(8) | 默认值
+②两边不同 | inh | 工单项次 | int(4) | float(8) | 类型,长度,精度,默认值
+②两边不同 | inh | 审核 | nvarchar(2) | nvarchar(2) | 默认值
+②两边不同 | inh | 委外ID | float(8) | float(8) | 默认值
+②两边不同 | outh | asp_cancel | nvarchar(2) | nvarchar(2) | 默认值
+②两边不同 | outh | 采购ID | float(8) | float(8) | 默认值
+②两边不同 | outh | 订单ID | float(8) | float(8) | 默认值
+②两边不同 | outh | 工单项次 | int(4) | float(8) | 类型,长度,精度,默认值
+②两边不同 | outh | 审核 | nvarchar(2) | nvarchar(2) | 默认值
+②两边不同 | outh | 委外ID | float(8) | float(8) | 默认值
+②两边不同 | qc_insp | 暂收单号 | nvarchar(60) | nvarchar(120) | 长度
+②两边不同 | rd_dom_test_detail | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_dom_test_detail | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_dom_test_detail | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_dom_test_detail | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_dom_test_detail | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_dom_test_detail | 期望完成日期 | nvarchar(50) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_dom_test_detail | 日期 | nvarchar(50) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_dom_test_detail | 预计完成日期 | nvarchar(50) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_dom_test_head | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_dom_test_head | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_dom_test_head | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_dom_test_head | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_dom_test_head | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_dom_test_head | 单据日期 | nvarchar(20) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_equip_use_detail | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_equip_use_detail | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_equip_use_detail | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_equip_use_detail | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_equip_use_detail | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_equip_use_detail | 使用日期 | nvarchar(50) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_equip_use_head | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_equip_use_head | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_equip_use_head | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_equip_use_head | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_equip_use_head | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_equip_use_head | 备注 | nvarchar(500) | nvarchar(250) | 长度
+②两边不同 | rd_equip_use_head | 单据日期 | nvarchar(20) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_instr_use_detail | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_instr_use_detail | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_instr_use_detail | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_instr_use_detail | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_instr_use_detail | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_instr_use_detail | 使用日期 | nvarchar(50) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_instr_use_head | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_instr_use_head | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_instr_use_head | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_instr_use_head | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_instr_use_head | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_instr_use_head | 单据日期 | nvarchar(20) | datetime(8) | 类型,长度,精度
+②两边不同 | rd_progress | 项目层级 | nvarchar(20) NOT NULL | nvarchar(20) | 可空
+②两边不同 | rd_progress_detail | 测试员 | nvarchar(50) | nvarchar(300) | 长度
+②两边不同 | rd_progress_detail | 里程完成 | nvarchar(20) | nvarchar(100) | 长度
+②两边不同 | rd_progress_detail | 实施进度 | nvarchar(200) | nvarchar(100) | 长度
+②两边不同 | rd_progress_detail | 说明 | nvarchar(200) | nvarchar(300) | 长度
+②两边不同 | rd_progress_detail | 未批准原因 | nvarchar(200) | nvarchar(300) | 长度
+②两边不同 | rd_progress_detail | 项目负责 | nvarchar(50) | nvarchar(100) | 长度
+②两边不同 | rd_progress_detail | 项目级 | nvarchar(50) | nvarchar(100) | 长度
+②两边不同 | rd_progress_detail | 状态 | nvarchar(500) | nvarchar(1000) | 长度
+②两边不同 | rd_progress_detail | 子项目/尺寸 | nvarchar(100) | nvarchar(300) | 长度
+②两边不同 | rd_spike_water_detail | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_spike_water_detail | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_spike_water_detail | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_spike_water_detail | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_spike_water_detail | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_spike_water_head | asp_cancel | char(1) | nvarchar(1) | 类型,默认值
+②两边不同 | rd_spike_water_head | asp_print | int(4) | int(4) | 默认值
+②两边不同 | rd_spike_water_head | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | rd_spike_water_head | asp_user1 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | rd_spike_water_head | asp_user2 | nvarchar(50) | nvarchar(20) | 长度
+②两边不同 | s_sys | DISP_YN | nchar(2) | nchar(1) | 长度
+②两边不同 | s_sys | HEAD_YN | nchar(2) | nchar(1) | 长度
+②两边不同 | s_sys | ISDATE | nchar(2) | nchar(1) | 长度
+②两边不同 | s_sys | ISDOUBLE | nchar(2) | nchar(1) | 长度
+②两边不同 | s_sys | KEY_YN | nchar(2) | nchar(1) | 长度
+②两边不同 | s_sys | LB_TAB | nchar(2) | nchar(1) | 长度
+②两边不同 | s_sys | LB_YN | nchar(2) | nchar(1) | 长度
+②两边不同 | scjl | jbbh | text(16) | nvarchar(250) | 类型,长度
+②两边不同 | yj_panel | line_table | nvarchar(128) | sysname(256) NOT NULL | 类型,长度,可空
+②两边不同 | yj_user | asp_cancel | nvarchar(1) | nvarchar(1) | 默认值
+②两边不同 | yj_user | asp_print | int(4) | int(4) | 默认值
+②两边不同 | yj_user | asp_time1 | datetime2(8) | datetime2(8) | 默认值
+②两边不同 | yj_user | comm | nvarchar(20) | nvarchar(20) NOT NULL | 可空,默认值
+②两边不同 | yj_user | dlxz | nvarchar(1) | nvarchar(1) | 默认值
+②两边不同 | yj_user | islogin | nvarchar(1) | nvarchar(1) | 默认值

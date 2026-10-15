@@ -1,0 +1,60 @@
+表 | 索引名 | 种类 | 类型 | 唯一 | 筛选 | 键列 | 包含列
+--------------------------------------
+dm_langue | PK_dm_langue | PK | CLUSTERED | 1 |  | comm, id | 
+gscs | PK_gscs | PK | CLUSTERED | 1 |  | id | 
+permission | PK_permission | PK | CLUSTERED | 1 |  | COMM, ID | 
+s_commdata | PK__s_commda__3214EC27C3DB5918 | PK | CLUSTERED | 1 |  | COMM, ID | 
+s_commdata | comm | IX | NONCLUSTERED | 0 |  | COMM | 
+s_commdata | jsz | IX | NONCLUSTERED | 0 |  | JSZ | 
+s_commdata | xc | IX | NONCLUSTERED | 0 |  | XC | 
+s_sys | PK_s_sys | PK | CLUSTERED | 1 |  | COMM, ID | 
+s_xtcs | PK_s_xtcs | PK | CLUSTERED | 1 |  | comm, id | 
+表 | 列 | 注明
+----------
+dm_langue | frm | 微信ID
+dm_langue | lb_wi | 1=在线，0=不在线
+dm_langue | asp_user1 | 创建人
+dm_langue | asp_time1 | 创建时间
+dm_langue | asp_user2 | 最后修改人
+dm_langue | asp_time2 | 最后修改时间
+dm_langue | asp_user3 | 审核人
+dm_langue | asp_time3 | 审核时间
+dm_langue | asp_cancel | 删除标记
+dm_langue | asp_user4 | 删除人
+dm_langue | asp_time4 | 删除时间
+dm_langue | asp_print | 打印次数
+gscs | comm | 公司
+gscs | web | 网址
+gscs | djzk | 归属公司
+gscs | ghf | 预设挂号费
+gscs | ysys | 预设医生
+gscs | yspy | 预设配药
+gscs | ysfh | 预设复核
+gscs | mybs | 每页显示笔数
+gscs | hg | 行高
+gscs | mysj | 显示几个月的数据
+gscs | kjjm | 开机界面
+gscs | pos_dj | POS机是否显示单价
+gscs | hzb | 处方打印位置横坐标
+gscs | zzb | 处方打印位置纵坐标
+gscs | rem1 | 备注
+gscs | xpbt | 小票标题
+gscs | beginday | 开始日期
+gscs | endday | 结束日期
+gscs | comqty | 电脑用户数
+gscs | mobqty | 手机用户数
+gscs | fkc | 是否允许负库存(作废，改在系统参数中)
+gscs | pfwj | 皮肤文件
+gscs | sf | 运算服务器编号
+gscs | jsfs | 结算方式(年，月)
+gscs | ver | 使用版本号
+gscs | maxrecord | 最大记录数
+gscs | asp_user1 | 创建人
+gscs | asp_time1 | 创建时间
+表 | 服务器列注明条数
+------------
+dm_langue | 12
+gscs | 36
+permission | 13
+s_commdata | 27
+s_sys | 46
