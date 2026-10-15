@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled,
-  headFromSpecDetail, specCarryRows, DEFAULT_NOT_APPROVED_TIP,
+  headFromSpecDetail, specCarryRows, detailRowsOf, DEFAULT_NOT_APPROVED_TIP,
 } from './specCarry.js'
 
 /**
@@ -236,6 +236,112 @@ test('映射项缺 to / matchProject ⇒ 跳过该项,不影响其它项', () =>
 test('认不出来的 parse 名字 ⇒ 跳过该项(不静默把整句塞进某个格)', () => {
   const out = headFromSpecDetail({ headFromDetail: [{ parse: 'nope', matchProject: '尺寸' }] }, SPEC_ROWS)
   assert.deepEqual(out, {})
+})
+
+/* ── 2026-10-16 修正:规格书里的项目名是「<组名>·<子项名>」+ `*`/`#` 装饰 ────────────────
+   用户报障(截图):「这是规格书的数据,这是成型工艺清单的数据,数据没有对应导入下方表格,
+   比如碳棒尺寸,压降,抗压强度,其他的未填写的估计也不会导入,要根据规格书的检验项目的名字来对
+   成型工艺清单的数据进行一个填写,外径的 +-0.5 这个就是公差数据」。
+
+   实测(test 账套 SD-2026-10-0010 的 检验要求 行,**逐字**):
+     #*压降                    → ≤20kpa
+     *炭棒尺寸                 → 长度：99±0.5mm / 内径：12.5±0.5mm / 外径：34.5±0.5mm(每行一条)
+     强度·（裸棒）              → 成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂
+     强度·*抗压强度             → ≥30kgf
+     *余氯去除性能·除余氯寿命    → 去除率≥50% / 寿命920L，全程加标
+     *余氯去除性能·初始去除率    → ≥98%
+   ⇒ 上面那份「裸名配置」('尺寸'/'压降'/'抗压强度'/'跌落强度')**一个都没匹配上**,
+     所以用户截图里 炭棒尺寸/压降/抗压强度 三块全空。容错就三件事:
+       ① 去掉 `*`/`#`(全角也认)与空白;② 按 `·` 拆 组名/子项,两边都算命中;
+       ③ 配置名是项目名的**子串**也算命中('抗压强度' ⊂ '强度·*抗压强度')。 */
+const REAL_MOLD_AFS = {
+  fromKey: '产品编号',
+  specDrift: false,
+  headFromDetail: [
+    { parse: 'drop', matchProject: ['跌落强度', '裸棒'] },
+    { to: '强度要求kgf', matchProject: ['抗压强度'] },
+    { to: '压降标准kpa', matchProject: ['压降'] },
+    { parse: 'dimension', matchProject: ['炭棒尺寸'] },
+  ],
+}
+const REAL_SPEC_ROWS = [
+  { 检验项目: '#*压降', 检验要求: '≤20kpa', 检验方法: '数显压力表' },
+  { 检验项目: '*炭棒尺寸', 检验要求: '长度：99±0.5mm', 检验方法: '游标卡尺' },
+  { 检验项目: '*炭棒尺寸', 检验要求: '内径：12.5±0.5mm', 检验方法: '游标卡尺' },
+  { 检验项目: '*炭棒尺寸', 检验要求: '外径：34.5±0.5mm', 检验方法: '游标卡尺' },
+  { 检验项目: '*余氯去除性能·除余氯寿命', 检验要求: '去除率≥50%', 检验方法: '……' },
+  { 检验项目: '*余氯去除性能·除余氯寿命', 检验要求: '寿命920L，全程加标', 检验方法: '……' },
+  { 检验项目: '*余氯去除性能·初始去除率', 检验要求: '≥98%', 检验方法: '……' },
+  { 检验项目: '强度·（裸棒）', 检验要求: '成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂', 检验方法: '……' },
+  { 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: '……' },
+]
+
+test('真实项目名(带 * #、「组名·子项」)能匹配上裸名配置 —— 这就是用户截图里那三块空白的原因', () => {
+  assert.deepEqual(headFromSpecDetail(REAL_MOLD_AFS, REAL_SPEC_ROWS), {
+    强度要求kgf: '≥30kgf',
+    压降标准kpa: '≤20kpa',
+    跌落要求: '成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂',
+    跌落高度cm: '60',
+    跌落次数: '3',
+    外径mm: '34.5',
+    外径公差: '±0.5',
+    内径mm: '12.5',
+    内径公差: '±0.5',
+  })
+})
+
+test('尺寸在规格书里是**每行一条** ⇒ 多行合并成四格(长度不落格)', () => {
+  const out = headFromSpecDetail(REAL_MOLD_AFS, REAL_SPEC_ROWS.filter((r) => r.检验项目 === '*炭棒尺寸'))
+  assert.deepEqual(out, { 外径mm: '34.5', 外径公差: '±0.5', 内径mm: '12.5', 内径公差: '±0.5' })
+  assert.equal('长度' in out, false)
+})
+
+test('「整体尺寸(外包无纺布)」不是炭棒尺寸 —— 候选里没有它就不许拿来填', () => {
+  const out = headFromSpecDetail(REAL_MOLD_AFS, [
+    { 检验项目: '*整体尺寸(外包无纺布)', 检验要求: '外径：46±0.5mm\n内径：9.5±0.5mm\n长度：23±0.5mm' },
+  ])
+  assert.deepEqual(out, {}, '拿外包尺寸填炭棒尺寸 = 静默错数(46 不是炭棒的 34.5)')
+})
+
+test('候选是数组:按优先级取,前一个没匹配上才用后一个', () => {
+  const onlyLibRow = [{ 检验项目: '强度·跌落强度', 检验要求: '成型强度：高度50cm,跌3次无断裂' }]
+  assert.equal(headFromSpecDetail(REAL_MOLD_AFS, onlyLibRow).跌落高度cm, '50')
+  const bareRow = [{ 检验项目: '强度·（裸棒）', 检验要求: '成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂' }]
+  assert.equal(headFromSpecDetail(REAL_MOLD_AFS, bareRow).跌落高度cm, '60')
+})
+
+test('旧口径一字不变:裸名对裸名、忽略空白、全角装饰也认', () => {
+  assert.deepEqual(headFromSpecDetail(MOLD_AFS, SPEC_ROWS), {
+    跌落要求: '1.2m 高度自由跌落无破损',
+    强度要求kgf: '≥ 300N 不破裂',
+    压降标准kpa: '≤25kPa',
+    外径mm: '20',
+    外径公差: '±0.5',
+    内径mm: '5',
+    内径公差: '±0.3',
+  })
+  assert.equal(headFromSpecDetail({ headFromDetail: [{ to: '压降标准kpa', matchProject: '压降' }] },
+    [{ 检验项目: '＊＃压降', 检验要求: '≤9kpa' }]).压降标准kpa, '≤9kpa')
+})
+
+/* ── 明细落点:序号兜底(2026-10-16 用户口径)──────────────────────────────────────
+   用户报障:「出货检验记录表前面缺失序号」(截图左侧那一列整列空白)。
+   根因:规格书明细的 `序号` **不落库**(那张纸的序号是按组现算的,rd_spec_doc_detail.序号 实测全 NULL),
+   而 detail 映射写的是 { to:'序号', from:'序号' } ⇒ 带过去的是空串。
+   口径:indexWhenEmpty 的落点拿**行号**(1..N)兜底;规格书自己带了序号就用它自己的。 */
+test('序号:规格书那格是空的 ⇒ 按行号 1..N 兜底(那一列不再是空白)', () => {
+  const afs = { detail: [{ to: '序号', from: '序号', indexWhenEmpty: true }, { to: '控制项目', from: '检验项目' }] }
+  const rows = [{ 序号: null, 检验项目: '强度·*抗压强度' }, { 序号: '', 检验项目: '*炭棒尺寸' }, { 序号: '9', 检验项目: '#*压降' }]
+  assert.deepEqual(detailRowsOf(afs, rows), [
+    { 序号: '1', 控制项目: '强度·*抗压强度' },
+    { 序号: '2', 控制项目: '*炭棒尺寸' },
+    { 序号: '9', 控制项目: '#*压降' },
+  ])
+})
+
+test('没写 indexWhenEmpty 的落点照旧:空就是空(别的链一个字节不变)', () => {
+  const afs = { detail: [{ to: '序号', from: '序号' }, { to: '控制项目', from: '检验项目' }] }
+  assert.deepEqual(detailRowsOf(afs, [{ 序号: null, 检验项目: '压降' }]), [{ 序号: '', 控制项目: '压降' }])
 })
 
 /* ── 明细落点取哪一段行(2026-10-15:配方表那条 detailSource 分支已随口径变更撤掉)──────────

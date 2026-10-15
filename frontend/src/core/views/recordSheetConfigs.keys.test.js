@@ -607,8 +607,8 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
   assert.ok(Array.isArray(maps) && maps.length, 'autoFillSpec.headFromDetail 为空 ⇒ 检验要求不会回填')
   assert.deepEqual(
     maps.map((m) => [m.to ?? `parse:${m.parse}`, m.matchProject]),
-    [['跌落要求', '跌落强度'], ['强度要求kgf', '抗压强度'], ['压降标准kpa', '压降'], ['parse:dimension', '尺寸']],
-    '落点口径(用户给定):跌落强度→跌落要求 / 抗压强度→强度要求kgf / 压降→压降标准kpa / 尺寸→四格解析',
+    [['parse:drop', ['跌落强度', '裸棒']], ['强度要求kgf', ['抗压强度']], ['压降标准kpa', ['压降']], ['parse:dimension', ['炭棒尺寸']]],
+    '落点口径(2026-10-16 修正):项目名容错(去 * # / 组名·子项 / 子串),候选数组按优先级;尺寸只认「炭棒尺寸」',
   )
 
   // 收集纸面上的格:标签格(label 且无 key)与数据格(key)
@@ -626,6 +626,19 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
     if (!m.to) continue
     assert.ok(fx.labels.includes(m.to), `落点 '${m.to}' 不是本面板字段(label 写错会被 labelsToCols 静默丢弃)`)
     assert.ok(dataCells.has(m.to), `落点 '${m.to}' 在本面板纸面上不是数据格(挂不到格上)`)
+  }
+  // 解析型落点(整句拆成多格)没有 to,它的**输出键**必须逐个是真实数据格 —— 少一个就是静默丢值:
+  //   drop      ← core/insp/dropSpec.js(跌落要求 + 从原句抠的 高度cm / 跌落次数)
+  //   dimension ← core/insp/dimensionSpec.js(外径/内径 各两格)
+  const PARSER_KEYS = {
+    drop: ['跌落要求', '跌落高度cm', '跌落次数'],
+    dimension: ['外径mm', '外径公差', '内径mm', '内径公差'],
+  }
+  for (const m of maps) {
+    if (!m.parse) continue
+    const keys = PARSER_KEYS[m.parse]
+    assert.ok(keys, `未登记的解析器 '${m.parse}'`)
+    for (const k of keys) assert.ok(dataCells.has(k), `解析器 '${m.parse}' 的落点 '${k}' 在本面板纸面上不是数据格`)
   }
   // 上一版就是把这 4 个**块名**当落点(值只读显示在块名下方)—— 用户否决,钉住别再挂回去。
   // 机制上的强守卫是上面那句 dataCells.has(to):块名格是 rowspan 的显示标签格,**没有对应的 key**

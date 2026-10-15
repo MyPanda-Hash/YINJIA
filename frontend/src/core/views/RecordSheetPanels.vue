@@ -1309,7 +1309,7 @@ import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
@@ -2665,9 +2665,9 @@ async function autoFillFromSpec(code, afs) {
   // 明细落点的行 = 规格书本表区的行(payload.items)。原按 detailSource 取第二段的写法已随
   // 2026-10-15 口径变更撤掉(配方行改在配方计算弹窗里录);纯函数+单测在 core/insp/specCarry.js。
   const srcRows = detailMap.length ? specCarryRows(payload) : []
-  const filled = detailMap.length ? srcRows.map((r) => {
-    const row = {}
-    for (const m of detailMap) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
+  // ⚠ 行的构造走纯函数 detailRowsOf(有单测):它的 indexWhenEmpty 负责「规格书那格是空的就用行号兜底」
+  //   —— 规格书的 `序号` 不落库,直接搬会得到一整列空白(2026-10-16 用户报障,见该函数注释)。
+  const filled = detailMap.length ? detailRowsOf(afs, srcRows).map((row) => {
     if (dt?.filterKey) row[dt.filterKey] = dt.filterVal
     return row
   }) : []

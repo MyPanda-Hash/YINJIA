@@ -1,4 +1,5 @@
 import { parseDimensionRequirement } from './dimensionSpec.js'
+import { parseDropRequirement } from './dropSpec.js'
 
 /**
  * 「自动填充规格书」的失败口径(出货检验计划表 RD_INSP_PLAN ← 规格书 RD_SPEC_DOC)。
@@ -78,20 +79,70 @@ export function specDriftEnabled(afs) {
        里面的数据表格里面」
    即落点是**真实数据格**,映射写在 autoFillSpec.headFromDetail:
      规格书 · 检验项目      成型工艺清单 · 检验要求区
-       跌落强度      →       跌落要求
+       跌落(强度组的跌落行)→  跌落要求 / 跌落高度cm / 跌落次数(**整句解析**,见 dropSpec.js)
        抗压强度      →       强度要求kgf
        压降          →       压降标准kpa
-       尺寸          →       外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,见 dimensionSpec.js)
+       炭棒尺寸      →       外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,见 dimensionSpec.js)
+
+   2026-10-16 报障修正(用户截图:炭棒尺寸/压降/抗压强度 三块全空):
+     规格书那张纸上的项目名是 **`<组名>·<子项名>` 且带 `*`/`#` 装饰**(实测 SD-2026-10-0010:
+     `#*压降` / `*炭棒尺寸`(外径/内径/长度**每行一条**) / `强度·*抗压强度` / `强度·（裸棒）`),
+     而配置里写的是裸名 ⇒ 精确相等一个都匹配不上。现在匹配按三步容错:
+       ① 去掉全部空白与 `*`/`#`(全角也认);
+       ② 按 `·` 拆 组名/子项名,两边都算命中;
+       ③ 配置名是项目名的**子串**也算命中('抗压强度' ⊂ '强度*抗压强度')。
+     匹配优先级:整串相等 → 组名/子项相等 → 子串包含;同一候选取**最好那一档**的全部行。
+     ⚠ 尺寸那条**只认「炭棒尺寸」**,不拿 '尺寸' 当子串兜底 —— 规格书里还有
+       `*整体尺寸(外包无纺布)`(46±0.5,是组装后的滤芯尺寸),拿它填炭棒尺寸就是静默错数。
 
    ⚠ 与出货检验计划表那条链的差别:那边是「整表替换明细」,这里只写**表头格**。 */
 
 /** headFromDetail 里认的**解析器**名(落点不是一个格,而是把整句解析成多个格);新增解析器在此登记 */
-const DETAIL_PARSERS = { dimension: parseDimensionRequirement }
+const DETAIL_PARSERS = { dimension: parseDimensionRequirement, drop: parseDropRequirement }
+
+/** 项目名归一:去掉**全部空白**与 `*`/`#` 装饰(含全角 ＊＃) */
+function normProject(v) {
+  return String(v ?? '').replace(/\s+/g, '').replace(/[*#＊＃]/g, '')
+}
+
+/** 项目名的三个可比形态:整串 / 组名(`·` 前)/ 子项名(`·` 后) */
+function projectNames(v) {
+  const full = normProject(v)
+  const i = full.indexOf('·')
+  return { full, group: i > 0 ? full.slice(0, i) : full, sub: i >= 0 ? full.slice(i + 1) : '' }
+}
+
+/** 配置里的候选名:字符串或数组(数组按优先级) */
+function candidatesOf(m) {
+  const raw = Array.isArray(m?.matchProject) ? m.matchProject : [m?.matchProject]
+  return raw.map(normProject).filter(Boolean)
+}
+
+/**
+ * 按一个候选名找匹配的规格书行(**保序**;尺寸那类"一行一条"的项会命中多行)。
+ * 分档:0 整串相等 / 1 组名或子项相等 / 2 子串包含 —— 取命中最靠前的那一档,不再混档。
+ */
+function matchRows(rows, cand) {
+  let bestRank = 99
+  const best = []
+  for (const r of rows) {
+    const p = projectNames(r?.['检验项目'])
+    if (!p.full) continue
+    let rank = -1
+    if (p.full === cand) rank = 0
+    else if (p.group === cand || p.sub === cand) rank = 1
+    else if (p.full.includes(cand)) rank = 2
+    if (rank < 0) continue
+    if (rank < bestRank) { bestRank = rank; best.length = 0 }
+    if (rank === bestRank) best.push(r)
+  }
+  return best
+}
 
 /**
  * 规格书明细行 → 表头格的值。
  *
- * @param {{headFromDetail?: Array<{to?: string, parse?: string, matchProject: string}>}|null} afs 「自动填充规格书」配置
+ * @param {{headFromDetail?: Array<{to?: string, parse?: string, matchProject: string|string[]}>}|null} afs 「自动填充规格书」配置
  * @param {Array<Record<string, any>>|null} items 规格书明细行(键 = RD_SPEC_DOC 的字段 label)
  * @returns {Record<string, string>} **只含真取到的格**的 { 本面板字段label: 值 };
  *   某个 检验项目 在规格书里没有对应行(或那行 检验要求 为空、解析不出) = **该键不出现** ——
@@ -103,24 +154,62 @@ export function headFromSpecDetail(afs, items) {
   if (!Array.isArray(maps) || !maps.length) return out
   const rows = Array.isArray(items) ? items : []
   for (const m of maps) {
-    const want = norm(m?.matchProject)
-    if (!want) continue
-    // 匹配用 specDrift 同一条归一(去掉全部空白):「跌落 强度」这类排版差不算另一个检验项目
-    const hit = rows.find((r) => norm(r?.['检验项目']) === want)
-    if (!hit) continue
-    const val = String(hit['检验要求'] ?? '').trim()
-    if (!val) continue
-    // 整句解析型落点(尺寸):解析器自己保证"只吐真解析出来的格" —— 解析不出就是不写
+    const cands = candidatesOf(m)
+    if (!cands.length) continue
+    // 候选按优先级:前一个候选一个行都没命中,才轮到下一个
+    let hitRows = []
+    for (const cand of cands) {
+      hitRows = matchRows(rows, cand)
+      if (hitRows.length) break
+    }
+    if (!hitRows.length) continue
+    // 整句解析型落点(尺寸/跌落):解析器自己保证"只吐真解析出来的格" —— 解析不出就是不写;
+    // 多行(尺寸每行一条)按行序合并,后面的行补齐前面的行没解析出来的格
     const parse = String(m?.parse ?? '').trim()
     if (parse) {
       const fn = DETAIL_PARSERS[parse]
-      if (fn) Object.assign(out, fn(val))
+      if (!fn) continue
+      for (const r of hitRows) {
+        const val = String(r?.['检验要求'] ?? '').trim()
+        if (val) Object.assign(out, fn(val))
+      }
       continue
     }
     const to = String(m?.to ?? '').trim()
-    if (to) out[to] = val
+    if (!to) continue
+    const val = hitRows.map((r) => String(r?.['检验要求'] ?? '').trim()).find((v) => v) || ''
+    if (val) out[to] = val
   }
   return out
+}
+
+/**
+ * autoFillSpec.detail(整表替换型落点:出货检验计划表/组装BOM表)的行构造。
+ *
+ * ⚠ 2026-10-16 增补 `indexWhenEmpty`(用户报障「出货检验记录表前面缺失序号」):
+ *   规格书明细的 `序号` **不落库** —— 那张纸上的序号是渲染时按组现算的(实测 rd_spec_doc_detail.序号
+ *   全 NULL),所以 `{to:'序号', from:'序号'}` 带过去永远是空串,计划表左侧那一列整列空白。
+ *   口径:声明了 indexWhenEmpty 的落点,源值为空时用**行号(1..N)**兜底;规格书自己带了序号就用它自己的。
+ *
+ * @param {{detail?: Array<{to: string, from: string, indexWhenEmpty?: boolean}>}|null} afs 配置
+ * @param {Array<Record<string, any>>|null} srcRows 规格书本表区的行(payload.items)
+ * @returns {Array<Record<string, string>>} 明细行(键 = 本面板字段 label;一行一条、保序)
+ */
+export function detailRowsOf(afs, srcRows) {
+  const maps = Array.isArray(afs?.detail) ? afs.detail : []
+  const rows = Array.isArray(srcRows) ? srcRows : []
+  return rows.map((r, i) => {
+    const row = {}
+    for (const m of maps) {
+      const to = String(m?.to ?? '').trim()
+      if (!to) continue
+      const raw = r?.[m?.from]
+      let v = raw === undefined || raw === null ? '' : String(raw)
+      if (!v.trim() && m?.indexWhenEmpty) v = String(i + 1)
+      row[to] = v
+    }
+    return row
+  })
 }
 
 /**
