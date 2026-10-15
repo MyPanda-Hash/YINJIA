@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 金蝶 → MES 单据拉取(2026-10-14):把**真实账套**指定区间(默认 2026-09-01 至今)的 8 类单据拉进 MES。
  *
  * 覆盖:采购订单 / 销售订单 / 采购入库单 / 销售出库单 / 生产领料单(材料出库) /
@@ -11,7 +11,7 @@
  *      且 **inv_pick / inv_product 连 create_* 都不认**(实测 count 仍 = 全量)⇒ 这两个类型只能用 modify_*。
  *      因此本脚本按各自支持的键过滤(**modify 是 create 的超集**),再在本地按 **单据日期 >= from** 精筛。
  *   3. **幂等**:按「外部数据ID」(有该列的表)或「单据编号」判重 —— 先删该单的明细与头,再整单重插。
- *   4. 落库人 asp_user1 = '金蝶拉取',单据状态按金蝶 bill_status(C=已审核)写;
+ *   4. 落库人 asp_user1 = '试运行',单据状态按金蝶 bill_status(C=已审核)写;
  *      拉取自金蝶的单据天然已在金蝶 ⇒ 是否已转ERP='是'、ERP单号=金蝶单号(与既有同步口径一致)。
  *   5. 数量/金额等一律按 MES 列型写入;金蝶空值落 NULL(不臆造)。
  *
@@ -192,7 +192,7 @@ const report = []
 const say = (s) => { report.push(s); console.log(s) }
 say(`# 金蝶 → MES 拉取(目标库 ${DB};区间 ${FROM} ~ ${TO})`)
 say('')
-say(`- 金蝶账套:惠州市银嘉环保(只读)   落库人:金蝶拉取   时间:${new Date().toISOString()}`)
+say(`- 金蝶账套:惠州市银嘉环保(只读)   落库人:试运行   时间:${new Date().toISOString()}`)
 say('')
 say('| 单据 | 金蝶区间内(按单据日期) | 拉取成功 | 明细行 | 失败 | 备注 |')
 say('|---|---|---|---|---|---|')
@@ -236,9 +236,9 @@ for (const t of TYPES) {
       head['单据状态'] = headCols.has('单据状态') ? (d.bill_status === 'C' ? '已审核' : '草稿') : undefined
       if (headCols.has('是否已转ERP')) head['是否已转ERP'] = '是'
       if (headCols.has('ERP单号')) head['ERP单号'] = S(d.bill_no)
-      if (headCols.has('转ERP操作人')) head['转ERP操作人'] = '金蝶拉取'
+      if (headCols.has('转ERP操作人')) head['转ERP操作人'] = '试运行'
       if (headCols.has('转ERP时间')) head['转ERP时间'] = new Date()
-      if (headCols.has('asp_user1')) head['asp_user1'] = '金蝶拉取'
+      if (headCols.has('asp_user1')) head['asp_user1'] = '试运行'
       if (headCols.has('asp_time1')) head['asp_time1'] = new Date()
       if (headCols.has('asp_cancel')) head['asp_cancel'] = 'N'
       for (const k of Object.keys(head)) if (head[k] === undefined) delete head[k]
@@ -246,7 +246,7 @@ for (const t of TYPES) {
       const lines = (d.material_entity || []).map((m) => {
         const o = { 单据编号: S(d.bill_no) }
         for (const [kd, col] of lMap) o[col] = toVal(m[kd], lineCols.get(col).typ, lineCols.get(col).max_length)
-        if (lineCols.has('asp_user1')) o['asp_user1'] = '金蝶拉取'
+        if (lineCols.has('asp_user1')) o['asp_user1'] = '试运行'
         if (lineCols.has('asp_time1')) o['asp_time1'] = new Date()
         if (lineCols.has('asp_cancel')) o['asp_cancel'] = 'N'
         return o
