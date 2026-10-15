@@ -1103,6 +1103,7 @@ export default {
     '未分配': 'Non affecté',
     '原密码': 'Mot de passe actuel',
     '新密码': 'Nouveau mot de passe',
+    '重置密码': 'Réinitialiser le mot de passe',
     '确认密码': 'Confirmer',
     '请输入原密码': 'Saisir mot de passe',
     '至少 6 位': 'Min. 6 caractères',

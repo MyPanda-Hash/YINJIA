@@ -1093,6 +1093,7 @@ export default {
     '未分配': 'Chưa gán',
     '原密码': 'Mật khẩu hiện tại',
     '新密码': 'Mật khẩu mới',
+    '重置密码': 'Đặt lại mật khẩu',
     '确认密码': 'Xác nhận mật khẩu',
     '请输入原密码': 'Nhập mật khẩu hiện tại',
     '至少 6 位': 'Tối thiểu 6 ký tự',

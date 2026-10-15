@@ -1338,6 +1338,7 @@ export default {
     '未分配': 'Unassigned',
     '原密码': 'Current password',
     '新密码': 'New password',
+    '重置密码': 'Reset password',
     '确认密码': 'Confirm password',
     '请输入原密码': 'Enter current password',
     '至少 6 位': 'At least 6 characters',

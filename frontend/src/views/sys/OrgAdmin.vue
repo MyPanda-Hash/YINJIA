@@ -210,9 +210,22 @@
         <el-form-item :label="tt('姓名')">
           <el-input v-model="userForm.realName" :placeholder="tt('真实姓名')" />
         </el-form-item>
-        <el-form-item v-if="!editingUser" :label="tt('密码')">
-          <el-input v-model="userForm.password" type="password" :placeholder="tt('默认 123456')" />
+        <!-- 密码：新建必填；编辑时由「重置密码」开关控制(2026-10-15)。
+             原先这里写死 `v-if="!editingUser"` —— 编辑保存时 password 恒为空串，后端
+             SysAdminService:148 以 isBlank() 判定「保持原口令」⇒ 管理员**无法重置他人密码**，
+             且不报任何错。开关默认关 = 不动口令，避免"只想改个姓名却把口令改了"。 -->
+        <el-form-item v-if="!editingUser" :label="tt('密码')" required>
+          <el-input v-model="userForm.password" type="password" show-password :placeholder="tt('默认 123456')" />
         </el-form-item>
+        <template v-else>
+          <el-form-item :label="tt('重置密码')">
+            <el-switch v-model="userForm.resetPassword" />
+          </el-form-item>
+          <el-form-item v-if="userForm.resetPassword" :label="tt('新密码')" required>
+            <el-input v-model="userForm.password" type="password" show-password
+                      :placeholder="tt('新密码')" />
+          </el-form-item>
+        </template>
         <el-form-item :label="tt('部门')">
           <el-tree-select v-model="userForm.deptId" :data="deptSelectData" check-strictly clearable style="width: 100%" />
         </el-form-item>
@@ -267,6 +280,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
+import { buildUserSaveBody, emptyUserForm, REASON_LABEL, toSwitchEnabled } from '@core/sys/userForm'
 import PermRow from './PermRow.vue'
 
 const user = useUserStore()
@@ -779,7 +793,7 @@ const savingRole = ref(false)
 
 const userVisible = ref(false)
 const editingUser = ref(null)
-const userForm = reactive({ userName: '', realName: '', password: '', deptId: null, roleId: null, workshop: '', enabled: 1 })
+const userForm = reactive(emptyUserForm())
 const workshops = ref([])
 const newRoleVisible = ref(false)
 const roleForm = reactive({ roleCode: '', roleName: '', remark: '' })
@@ -911,13 +925,16 @@ async function delUser(row) {
 
 function openUser(row) {
   editingUser.value = row || null
+  // 先清成空表单(把上次残留的 password / 重置密码开关一起清掉),再填本行值
+  Object.assign(userForm, emptyUserForm())
   userForm.userName = row?.userName || ''
   userForm.realName = row?.realName || ''
-  userForm.password = ''
   userForm.deptId = row?.deptId ?? null
   userForm.roleId = row?.roleId ?? null
   userForm.workshop = row?.workshop || ''
-  userForm.enabled = row?.enabled ?? 1
+  // enabled 必须归一:接口给的是字符串 "1"/"0",而 el-switch 的 active/inactive 是数字 ——
+  // 不归一的话启用中的账号打开弹窗会显示成「关」,一保存就把账号停用了(2026-10-15 探针实测)
+  userForm.enabled = toSwitchEnabled(row?.enabled)
   loadWorkshops()
   userVisible.value = true
 }
@@ -932,12 +949,12 @@ async function loadWorkshops() {
 }
 
 async function saveUser() {
-  if (!userForm.userName.trim()) return ElMessage.warning(tt('请输入账号'))
+  // 取数口径收敛在 core/sys/userForm.js(有单测):什么时候发 password、什么时候必须拦
+  const built = buildUserSaveBody(userForm, editingUser.value?.id ?? null)
+  if (!built.ok) return ElMessage.warning(tt(REASON_LABEL[built.reason]))
   savingUser.value = true
   try {
-    const body = { ...userForm }
-    if (editingUser.value) body.id = editingUser.value.id
-    await request.post('/sys/user/save', body)
+    await request.post('/sys/user/save', built.body)
     ElMessage.success(tt('用户已保存'))
     userVisible.value = false
     await loadUsers()
