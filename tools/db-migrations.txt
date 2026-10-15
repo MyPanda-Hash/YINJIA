@@ -3193,3 +3193,21 @@ migrate-stock-detail-group-by-wh-item.sql
 #   视图重建为两键聚合(无 批号 列)、面板字段回到 9 列。
 #   自检:视图行数 = (物料,仓库) 组合数、视图无 批号 列、Σ现存量一致、字段 9 行且不含批号。幂等;两账套均执行。
 migrate-stock-detail-remove-lot.sql
+# migrate-stock-report-dup-fields-20261015.sql — 库存报表字段重复清洗(用户 2026-10-15 报障「库存状况表字段重复」)
+#   根因:migrate-server-converge-20261007.sql 的补缺守卫按 (panel_code,col_name,place) 判存在,
+#   而这四张报表的原始字段 place 是合并值 'query,detail' ⇒ 快照里的 'detail' 行被判「不存在」而重复插入:
+#   库存状况表 13 列(仓库编码/仓库/存货编码/存货 各两遍)、库存台账 33 列、收发存汇总表 23 列;
+#   同批复活的还有 开始日期/结束日期(早被 migrate-report-dialog-fields.sql 删掉,弹窗日期段是前端内置控件)。
+#   清洗规则:①同 label 多行删 place 不含 query 的那行(保留查询条件+参照绑定的原行);
+#   ②删 STOCK_LEDGER/STOCK_SUMMARY 的 开始日期/结束日期 行。清洗后 9/29/19 列,库存明细 9 列不碰。
+#   本脚本登记在链尾 ⇒ 全链重放(含收敛脚本重放)后仍以本脚本为准,重复行不会复活。
+#   自检:三面板同名 label 重复 = 0、开始/结束日期 = 0、字段数 9/29/19、保留行仍带 ref_panel。幂等;两账套均执行。
+migrate-stock-report-dup-fields-20261015.sql
+# migrate-lot-normalize-blank-to-pc0000.sql — 空批次号归一化为占位批次 PC0000
+#   用户第十四轮追问「为什么有空批次号的,但是没有合并,还有空月结」:期初导入 1380 行入库没带批号(455 万),
+#   人工单据也有空批号;而出库侧大量用 PC0000 占位 ⇒ 同一物料同仓被拆成「空」与「PC0000」两族(299 组),
+#   月结按三键结转 ⇒ 空批号自成一族,于是出现「批次号=空 的月结」(1368 行 / 441 万),还一正一负。
+#   本脚本把 inh/outh 空批号统一写成 PC0000(只动键,不动数量金额),删 kucun 空批号缓存行(月结重算重建);
+#   改动行打 asp_user2='lotmerge:migration' 便于回退。执行后需两账套各重跑一次月结。
+#   自检:三表空批号 = 0/0/0、流水量不变。幂等(第二次执行 0 行)。
+migrate-lot-normalize-blank-to-pc0000.sql
