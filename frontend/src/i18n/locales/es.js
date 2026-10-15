@@ -498,6 +498,8 @@ export default {
     '橡皮擦': 'Borrador',
     '在纸面上划选要标注的文字，再选颜色': 'Seleccione el texto en la hoja y elija un color',
     '点击已标注的文字即可擦除': 'Haga clic en el texto marcado para borrarlo',
+    '该表的承载表未预置备用列池（缺少 备用1..20 列），无法新增自定义字段': 'La tabla no tiene columnas de reserva (faltan 备用1..20); no se pueden añadir campos personalizados',
+    '需要新增字段时：请让管理员先为这张表补 备用1..20 列（见 tools/migrate-share-file-spare-cols-20261016.sql 的做法），补完即可在界面上加字段。': 'Para añadir campos, pida al administrador que agregue las columnas 备用1..20 a esta tabla (véase tools/migrate-share-file-spare-cols-20261016.sql); después podrá añadirlos aquí.',
     '加粗': 'Negrita',
     '已完工工单': 'Órdenes de trabajo completadas',
     '近 7 天无新增或完工': 'Sin órdenes nuevas o completadas en 7 días',

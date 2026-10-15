@@ -3223,3 +3223,13 @@ migrate-rd-approval-attach-20261016.sql
 #   建表 + 13 列 + (panel_code,doc_no) 索引 + 表/列中文注明;已登记 tools/db-inuse-tables.txt(yj_* 25→26)。
 #   幂等(建表/索引/注明各自判空);末尾自检表与关键列齐备否则 RAISERROR。两账套均执行。
 migrate-doc-annotation-20261016.sql
+# migrate-share-file-spare-cols-20261016.sql — 共享文件库(RD_SHARE_FILE / yj_share_file)补备用列池 备用1..20。
+#   用户口径(2026-10-16):「检测一遍研发管理里面的面板的字段编辑功能是否完善可用」。
+#   审计 26 张研发面板的「字段管理」查出 3 张不可用,其中**唯一在菜单里点得到的**是共享文件库:
+#   yj_share_file 只有 17 列、从未预置备用列,而后端逐列 `SELECT COUNT(*) FROM [表] WHERE [备用N] IS NOT NULL`
+#   第 1 列就抛「列名 '备用1' 无效」⇒ GET /api/px/extFields 500,界面只剩「Request failed with status code 500」。
+#   本脚本:yj_share_file 补 备用1..20 nvarchar(200) NULL(与其它面板同口径)+ 每列中文注明 + 末尾自检=20。
+#   配套代码(同批提交):PanelConfigService.extPoolOf/addExtField 先读 sys.columns 再探列,表无备用列时
+#   下发空池 + poolAvailable=false(不再 500),FieldManagerDialog 据此给明确提示并禁用「添加」。
+#   幂等(逐列判 COL_LENGTH);两账套均执行。表已登记在册(yj_share_file),不新增表、无需改 db-inuse-tables.txt。
+migrate-share-file-spare-cols-20261016.sql

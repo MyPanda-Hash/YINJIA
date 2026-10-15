@@ -488,6 +488,8 @@ export default {
     '橡皮擦': 'Cục tẩy',
     '在纸面上划选要标注的文字，再选颜色': 'Bôi đen đoạn chữ trên tờ giấy rồi chọn màu',
     '点击已标注的文字即可擦除': 'Bấm vào chữ đã đánh dấu để xóa',
+    '该表的承载表未预置备用列池（缺少 备用1..20 列），无法新增自定义字段': 'Bảng chưa có cột dự trữ (thiếu 备用1..20), không thể thêm trường tùy chỉnh',
+    '需要新增字段时：请让管理员先为这张表补 备用1..20 列（见 tools/migrate-share-file-spare-cols-20261016.sql 的做法），补完即可在界面上加字段。': 'Để thêm trường, quản trị viên cần bổ sung các cột 备用1..20 cho bảng này trước (xem tools/migrate-share-file-spare-cols-20261016.sql); sau đó có thể thêm tại đây.',
     '加粗': 'Đậm',
     '已完工工单': 'Lệnh sản xuất đã hoàn thành',
     '近 7 天无新增或完工': '7 ngày qua không có mới hoặc hoàn thành',

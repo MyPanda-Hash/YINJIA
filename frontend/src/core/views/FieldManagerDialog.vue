@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { poolUnavailableOf } from '@core/panel/extFieldPool.js'
 
 // 2026-09-28 修「点关闭无反应」:本组件此前声明 visible prop + emit('update:visible'),
 // 而父组件(PanelxList)用 v-model(即 modelValue / update:modelValue)⇒ 页脚「关闭」按钮
@@ -58,6 +59,13 @@ const tabPool = computed(() => {
   if (!tp || !needTab()) return null
   return tp[form.value.tab] || null
 })
+/**
+ * 承载表**没有预置备用列池**(或表不存在):这张表加不了自定义字段。
+ * 以前后端直接 500(逐列 `SELECT COUNT(*) ... WHERE [备用1] IS NOT NULL` 打到不存在的列),
+ * 界面只弹「Request failed with status code 500」并把对话框关掉 —— 用户完全不知道发生了什么。
+ * 现在后端下发 poolAvailable=false,这里负责说人话 + 禁用「添加」。
+ */
+const poolUnavailable = computed(() => poolUnavailableOf(data.value, needTab()))
 
 watch(() => props.modelValue, (v) => { if (v) { form.value = blankForm(); load() } })
 
@@ -111,6 +119,13 @@ async function retire(f) {
 <template>
   <el-dialog :model-value="modelValue" :title="tt('字段管理')" width="640px" append-to-body :close-on-click-modal="false" @update:model-value="emit('update:modelValue', $event)">
     <div v-loading="loading">
+      <!-- 承载表没有备用列池:说清楚"为什么不能加",而不是让用户点添加再吃一个 500 -->
+      <el-alert
+        v-if="poolUnavailable && !loading"
+        type="warning" :closable="false" show-icon
+        :title="tt('该表的承载表未预置备用列池（缺少 备用1..20 列），无法新增自定义字段')"
+        :description="tt('需要新增字段时：请让管理员先为这张表补 备用1..20 列（见 tools/migrate-share-file-spare-cols-20261016.sql 的做法），补完即可在界面上加字段。')"
+      />
       <div class="fm-summary">
         {{ tt('动态字段') }} {{ visibleFields.length }}
         <template v-if="data.tabPools">
@@ -188,7 +203,7 @@ async function retire(f) {
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">{{ tt('添加') }}</el-button>
+      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label" @click="submit">{{ tt('添加') }}</el-button>
     </template>
   </el-dialog>
 </template>
