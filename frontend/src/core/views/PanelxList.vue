@@ -2737,9 +2737,8 @@ const WH_DOCK_NONE = '__NONE__'
 const isStockDetail = computed(() => String(panelCode.value) === 'STOCK_DETAIL')
 const whDockSelected = ref('')
 watch(isStockDetail, async (v) => {
+  // 离开面板:清掉选中态(过滤条件本身不落在 condition 上,见 load() 里的「请求时派生」,不会串到别的面板)
   if (!v) { whDockSelected.value = ''; return }
-  // 进面板先落哨兵 ⇒ 初始列表为空(等用户勾一个仓库才有数据)
-  condition['_whCodes'] = WH_DOCK_NONE
   if (warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
@@ -2747,10 +2746,9 @@ watch(isStockDetail, async (v) => {
   } catch { warehouseOptions.value = [] }
 }, { immediate: true })
 const whDockRows = computed(() => warehouseOptions.value || [])
-/** 勾选即查询;再点一次同一个 = 取消(取消后回到空列表) */
+/** 勾选即查询(单选);再点同一个 = 取消选中(取消后回到空列表) */
 function pickWhDock(code) {
   whDockSelected.value = whDockSelected.value === code ? '' : code
-  condition['_whCodes'] = whDockSelected.value || WH_DOCK_NONE
   search()
 }
 
@@ -7618,6 +7616,11 @@ async function load(clamping = false) {
   try {
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    // 库存明细左栏「分仓库」的过滤条件**在请求时派生**,不写进共用的 condition ——
+    //   condition 由各面板共享、切面板时会被 reset 清空(顺序一变就互相影响);
+    //   2026-10-15 用户报「库存明细的查询会影响到库存状况表」就是这类跨面板串味。
+    //   未勾选 ⇒ 哨兵值 ⇒ 后端按编码 IN 天然返回 0 行(用户口径「没勾选就是空的」)。
+    if (isStockDetail.value) params.condition._whCodes = whDockSelected.value || WH_DOCK_NONE
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
     if (fuzzyApplied.value?.valid) {
       Object.assign(params.condition, fuzzyApplied.value.condition || {})

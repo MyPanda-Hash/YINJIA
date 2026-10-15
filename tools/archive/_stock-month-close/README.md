@@ -221,6 +221,34 @@ curl -X POST http://127.0.0.1:8090/api/px/callButton -H "Authorization: Bearer <
 
 左栏底部加了一行提示(10 语言):`勾选仓库即查询;只能选一个;不勾选时列表为空`。
 
+### 5.6 修「库存明细的查询影响库存状况表」(2026-10-15 用户报障)
+
+**症状**:在「库存明细」勾了仓库(或没勾时)之后切到**库存状况表**,后者的数据被同一个过滤条件影响。
+
+**根因**:我第一版把左栏过滤写进了 `condition['_whCodes']` —— 而 `condition` 是**各面板共用**的响应式对象,
+`PanelxList.vue` 里有两处会整份清空它(切面板的 watcher 在 7789、查询弹窗的 applyQueryDialog 在 6263),
+**清空与写入的先后顺序**取决于 watcher 注册顺序 ⇒ 条件会跨面板残留/被清掉,互相串味。
+
+**两道防线(都改)**:
+
+| 层 | 改法 |
+|---|---|
+| 前端 | 左栏过滤**不再写 `condition`**,改成**请求时派生**:`load()` 里 `if (isStockDetail) params.condition._whCodes = whDockSelected \|\| '__NONE__'`。条件随请求即取即用,不落在共享状态上 ⇒ 结构上不可能串到别的面板 |
+| 后端 | `QueryService.appendDirectFilters` 给 `_whCodes` 加**面板闸门** `WH_DOCK_PANELS = ["STOCK_DETAIL"]` —— 别的面板(状况表/台账/汇总都有「仓库编码」列)即使收到残留的 `_whCodes` 也**忽略** |
+
+**实测**:
+
+| 请求 | 结果 |
+|---|---|
+| `STOCK_DETAIL` 无条件 / `_whCodes=YCL-01` / 哨兵 `__NONE__` | 1611 / **612** / **0** |
+| `STOCK_BALANCE` 无条件 / **带哨兵** | 1634 / **1634(被闸门忽略 ✅)** |
+| `STOCK_LEDGER` 带哨兵 | 7095(忽略 ✅) |
+| 界面:明细勾恒亿仓(612)→ 切状况表 | 请求体 `{"panelCode":"STOCK_BALANCE","condition":{}}` → **1634 条** ✅ |
+
+> 诊断脚本 `_v-dock-leak.mjs`:hook `XMLHttpRequest` 抓前端**实际发出的** `queryFormDataList` 请求体,
+> 比盯界面数字更能定位"谁把条件带上去了"。⚠ hook 必须装在**页面重载之后**——装在登录页会被 reload 清掉
+> (第一版就是这么翻车的:`window.__q` 读出来是 undefined)。
+
 #### 5.3.1 追查「是不是不同日期造成的」——(2026-10-15 用户追问后实测,`q-05`/`q-06`)
 
 **批次号规则(代码为准)**:`BatchService` 第 18/197 行 ——
