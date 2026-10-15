@@ -595,6 +595,39 @@
                 >
                   <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
                 </el-select>
+                <!-- 物料编号列(c.type='inv-code'):商品档案**远程模糊筛选**(2026-10-16 用户口径
+                     「输入 Y 或者 003 时模糊搜索到含这些数字字母的」,例 YJ-LL-003)。
+                     口径与配方计算弹窗同一套(见 core/panel/invCarry.js invSearchRequest):
+                       · 打字才联网(debounce 300ms),**空关键字一个请求都不发** —— 服务端 keyword 是
+                         「本面板所有字段 LIKE %kw%」的 OR,空关键字等于不过滤:档案分支不吃 pageSize,
+                         会把整份 bs_inv(生产上几千行×113 列)拉回来;
+                       · 候选 = invSearchOptions(编码+名称子串、大小写无关、去重、封顶 50 项),
+                         下拉里显示「编码 — 名称」,选中写进单据的是**编码**;
+                       · 用 el-autocomplete 而不是 el-select:输入框本身就是值 ⇒ **档案里没有的新编码
+                         照样能手打**(el-select + allow-create 实测会吞:EP 只在"创建项"被选中时才落值,
+                         手打后直接点别处 = 输入丢失;而"手打新编码"是必须保留的例外通道);
+                       · trigger-on-focus=false:点一下空格子不发请求(与"空关键字不发"同一条口径)。
+                     选中/手打后:onInvCodePick / onInvCodeChange → onDetailTextCommit 带出 物料名称+物料种类。 -->
+                <el-autocomplete
+                  v-else-if="cellEditable(dt, row, c) && c.type === 'inv-code'"
+                  v-model="row[c.key]"
+                  size="small"
+                  class="rs-c-in rs-inv-sel"
+                  :style="designInputStyle(dt)"
+                  value-key="value"
+                  :debounce="300"
+                  :trigger-on-focus="false"
+                  :fetch-suggestions="(q, cb) => fetchInvCodes(row, q, cb)"
+                  popper-class="rs-inv-popper"
+                  :title="invOptHint(row)"
+                  @select="(item) => onInvCodePick(row, c.key, item)"
+                  @change="onInvCodeChange(row, c.key)"
+                >
+                  <!-- 下拉里显示「编码 — 名称」(写进单据的仍是编码本身) -->
+                  <template #default="{ item }">
+                    <span class="rs-inv-opt">{{ item.label }}</span>
+                  </template>
+                </el-autocomplete>
                 <!-- 日期/时间列:控件种类由 **yj_field.data_type** 决定(不在这里写死列名),
                      口径见 core/panel/sheetDateCells.js —— 2026-10-07 起实验室 11 张记录表的
                      使用日期/测试日期/日期/期望完成日期/预计完成日期 都是「日期」,起止时间是「时间区间」。
@@ -1290,7 +1323,9 @@ import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/pane
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
-import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
+import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
+// 商品档案候选生成(编码+名称子串匹配、去重、封顶 OPTION_CAP 项)—— 与配方计算弹窗同一套纯函数
+import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1392,6 +1427,62 @@ async function onDetailTextCommit(row, key) {
   } catch (e) {
     /* 无权限/网络异常都按「档案里没有」处理:保持用户输入,不弹错(与参照链路同款兜底) */
   }
+}
+
+/* ── 物料编号:商品档案远程模糊筛选(2026-10-16 用户口径)────────────────────────
+   原话:「物料编号可以在填写的时候模糊筛选下拉显示提供选择,比如 YJ-LL-003,
+          可以在输入 Y 或者 003 时模糊搜索到含这些数字字母的」。
+   判据全在纯函数里(有单测):请求体 = invCarry.invSearchRequest(空关键字返回 null ⇒ 连请求都不发),
+   候选 = recipeRows.invSearchOptions(编码+名称子串、大小写无关、去重、封顶 OPTION_CAP 项)。这里只管接线。
+
+   控件选 el-autocomplete 而不是 el-select(2026-10-16 活体实测踩过):el-select + allow-create 在
+   "打一个档案里没有的新编码、然后直接点别处"时会**把输入丢掉**(EP 只在"创建项"被选中时才落值);
+   而"手打新编码"是这条链上必须保留的例外通道。autocomplete 的输入框本身**就是值**,候选只是建议。
+
+   命中总数按**行对象**存(Map<行对象, {matched}>,靠 invOptsTick 触发重渲染 —— 行对象是稳定引用,
+   行号键会在加行/删行后错位;配方计算弹窗是行号键,所以它加删行要 resetRowOptions)。 */
+const INV_OPTS = new Map()          // 行对象 → { matched } 命中总数(>OPTION_CAP 时挂在 title 上提示继续输入)
+const INV_PICKED = new Map()        // 行对象 → 刚从下拉里选中的值(随后的 blur change 不重复带出)
+const invOptsTick = ref(0)
+function setInvOpts(row, val) { INV_OPTS.set(row, val); invOptsTick.value++ }
+/** 候选被上限截断时的提示(挂在控件 title 上:继续输入就能缩小) */
+function invOptHint(row) {
+  void invOptsTick.value
+  const r = INV_OPTS.get(row)
+  return r && r.matched > OPTION_CAP
+    ? tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(r.matched))
+    : ''
+}
+/**
+ * 打字即筛:交给 el-autocomplete 的回调(它自己 debounce 300ms、自己管下拉开合与"加载中")。
+ * 空关键字直接回空数组(一个请求都不发);读不到档案也回空数组 —— 只剩手打,不阻断录入。
+ */
+async function fetchInvCodes(row, q, cb) {
+  const req = invSearchRequest(q)
+  if (!req) { cb([]); return }
+  try {
+    const res = await request.post('/px/queryFormDataList', req)
+    const hits = invSearchOptions(invRowsOf(res?.data), '物料编号', q)
+    setInvOpts(row, { matched: hits.matched })
+    cb(hits.options)          // [{ value: 编码, label: '编码 — 名称' }]
+  } catch (e) {
+    cb([])
+  }
+}
+/** 从下拉里选中:记下这次的值(紧随其后的 blur change 不必再查一次),并按档案带出对侧值 */
+function onInvCodePick(row, key, item) {
+  const picked = item?.value ?? item
+  if (picked !== undefined && picked !== null) row[key] = String(picked)
+  INV_PICKED.set(row, String(picked ?? '').trim())
+  emit('dirty')
+  onDetailTextCommit(row, key)
+}
+/** 手打/失焦:置脏;刚在下拉里选过的那次已经带出过,不重复查 */
+function onInvCodeChange(row, key) {
+  emit('dirty')
+  const v = String(row[key] ?? '').trim()
+  if (INV_PICKED.get(row) === v) { INV_PICKED.delete(row); return }
+  onDetailTextCommit(row, key)
 }
 
 /** 副标题下拉的选项:优先取字段元数据的 options(标准库字段即标准库条目),退回变体选项 */

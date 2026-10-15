@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { invRowsOf, pickInvCarry, pickInvKind, invCarryPair, INV_CARRY } from './invCarry.js'
+import { invRowsOf, pickInvCarry, pickInvKind, invCarryPair, invSearchRequest, INV_CARRY } from './invCarry.js'
+import { invSearchOptions } from '../mold/recipeRows.js'
 
 // 背景(2026-10-14 用户报障):
 //   成型工艺清单「成型配方」页的 物料编号 / 物料名称 是普通文本、没配参照,
@@ -92,6 +93,33 @@ test('列映射口径钉死:明细列 ↔ 商品档案列(含种类带出源 所
     物料编号: { match: '存货编码', out: '存货名称', kind: '所属类别' },
     物料名称: { match: '存货名称', out: '存货编码', kind: '所属类别' },
   })
+})
+
+/* ── 物料编号「边填边模糊筛」(2026-10-16 用户口径)─────────────────────────────
+   原话:「物料编号可以在填写的时候模糊筛选下拉显示提供选择,比如 YJ-LL-003,
+          可以在输入 Y 或者 003 时模糊搜索到含这些数字字母的」。
+   服务端:`keyword` 是「本面板所有字段 LIKE %kw%」的 OR(QueryService.appendDirectFilters
+   第 771 行),所以 003 / Y 都能命中 YJ-LL-003;空 keyword 等于不过滤 = 把整个档案
+   (生产上几千行 × 113 列)拉回来 ⇒ 请求体干脆不给发。 */
+test('档案模糊搜索请求:打字才发;空关键字/纯空格结构上就不给发', () => {
+  assert.deepEqual(invSearchRequest('003'), { panelCode: 'INV', keyword: '003', condition: {}, pageNo: 1, pageSize: 50 })
+  assert.deepEqual(invSearchRequest(' Y '), { panelCode: 'INV', keyword: 'Y', condition: {}, pageNo: 1, pageSize: 50 }, '去前后空格')
+  assert.equal(invSearchRequest(''), null)
+  assert.equal(invSearchRequest('   '), null)
+  assert.equal(invSearchRequest(null), null)
+  assert.equal(invSearchRequest(undefined), null)
+})
+
+test('用户的例子:输入 003 / Y 都能筛出 YJ-LL-003(子串,大小写无关)', () => {
+  const rows = invRowsOf(archiveRes([
+    { 存货编码: 'YJ-LL-003', 存货名称: '胶粉', 所属类别: '胶粉' },
+    { 存货编码: 'YJ-SLD-012', 存货名称: '超高分子量聚乙烯', 所属类别: '胶粉' },
+  ]))
+  const q = (kw) => invSearchOptions(rows, '物料编号', kw).options.map((o) => o.value)
+  assert.deepEqual(q('003'), ['YJ-LL-003'])
+  assert.deepEqual(q('Y'), ['YJ-LL-003', 'YJ-SLD-012'])
+  assert.deepEqual(q('yj-ll'), ['YJ-LL-003'], '小写照样命中')
+  assert.deepEqual(q('12'), ['YJ-SLD-012'], '只记得数字也能找')
 })
 
 /* ── 物料种类也按档案带出(2026-10-16 用户口径)────────────────────────────────

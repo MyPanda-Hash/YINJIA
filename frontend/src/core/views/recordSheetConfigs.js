@@ -438,7 +438,11 @@ const RD_MOLD_FORMULA = {
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
           // 带出档案类别来承担(见 invCarry.pickInvKind;引擎认不出的类别一律不补)。
           { key: '物料种类', label: '物料种类', span: 2 },
-          { key: '物料编号', label: '物料编号', span: 4 },
+          // 物料编号:商品档案**远程模糊筛选下拉**(2026-10-16 用户口径:「输入 Y 或者 003 时
+          // 模糊搜索到含这些数字字母的」,例 YJ-LL-003)。type='inv-code' 由 RecordSheetPanels 渲染成
+          // el-select(remote + filterable + allow-create):打字才联网、候选封顶 50、档案里没有的编码照旧能手打;
+          // 选中后仍走 onDetailTextCommit 把 物料名称/物料种类 一并带出。口径见 core/panel/invCarry.js。
+          { key: '物料编号', label: '物料编号', span: 4, type: 'inv-code' },
           { key: '物料名称', label: '物料名称', span: 3 },
           { key: '实际添加比例', label: '实际添加\n比例%' },
           { key: '单支物料含量', label: '单支\n物料含量g' },

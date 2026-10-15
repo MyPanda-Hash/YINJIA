@@ -29,6 +29,25 @@ export const INV_CARRY = {
 /** 商品档案面板编码(QueryService 按它取 bs_inv) */
 export const INV_PANEL = 'INV'
 
+/**
+ * 「物料编号」边填边模糊筛的请求体(2026-10-16 用户口径:「输入 Y 或者 003 时模糊搜索到含这些
+ * 数字字母的」)。**空关键字返回 null** —— 调用方据此连请求都不发,这是结构上的闸门:
+ *
+ * 服务端 `keyword` 走的是「本面板所有字段 LIKE %kw%」的 OR(QueryService.appendDirectFilters),
+ * 空 keyword 等于**不过滤**:档案分支根本不吃 pageSize(它必须全量返回,见 queryArchive 注释),
+ * 于是一次空关键字查询 = 把整份 bs_inv(生产上几千行 × 113 列)拉回来。所以宁可一个候选都不给。
+ *
+ * pageSize 只是表明意图(档案分支忽略它),前端再把候选封顶 OPTION_CAP=50 项。
+ *
+ * @param {*} keyword 用户敲进下拉框的关键字
+ * @returns {Record<string, any>|null} 请求体;关键字为空/纯空格 ⇒ null(不许发)
+ */
+export function invSearchRequest(keyword) {
+  const kw = norm(keyword)
+  if (!kw) return null
+  return { panelCode: INV_PANEL, keyword: kw, condition: {}, pageNo: 1, pageSize: 50 }
+}
+
 const norm = (v) => (v === null || v === undefined ? '' : String(v).trim())
 
 /**

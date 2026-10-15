@@ -1,24 +1,28 @@
 /**
- * 验收探针:成型工艺清单 页 2「配方表」物料格(2026-10-16 用户口径)
+ * 验收探针:成型工艺清单 页 2「配方表」物料格(2026-10-16 用户口径,两轮)
  *
- *   用户原话(附截图,截图里 物料种类 六行全是「请选择」、物料编号/物料名称 却有值):
- *     「在成型工艺清单填写配方表的物料信息的时候,手动填写物料编码应该带出对应的物料类别以及
- *       物料名称,把填写框的物料种类的下拉框改为普通文本框」
+ *   第一轮原话(附截图,截图里 物料种类 六行全是「请选择」、物料编号/物料名称 却有值):
+ *     「手动填写物料编码应该带出对应的物料类别以及物料名称,把填写框的物料种类的下拉框改为普通文本框」
+ *   第二轮原话:
+ *     「物料编号可以在填写的时候模糊筛选下拉显示提供选择,比如 YJ-LL-003,
+ *       可以在输入 Y 或者 003 时模糊搜索到含这些数字字母的」
  *
- *   病根(已定位):页 2 的带出链路 RecordSheetPanels.onDetailTextCommit → invCarry.pickInvCarry
- *     **只写对侧那一格**(物料编号↔物料名称),从不写 物料种类 ⇒ 那格一直空着(截图里就是"请选择")。
- *     档案实测(HSDZ_MES.bs_inv):YJ-LL-003 → 存货名称 胶粉 / 所属类别 胶粉;
- *                                  YJ-SLD-012 → 超高分子量聚乙烯 / 所属类别 胶粉。
+ *   验收点:
+ *     V1 「物料种类」是普通文本框(不是下拉)
+ *     V2 物料编号 是**远程筛选下拉**(el-select + remote);输入 003 → 候选里有 YJ-LL-003
+ *     V3 输入 SLD → 候选里有 YJ-SLD-012;选中后 物料种类/物料名称 一并带出
+ *     V4 人手填过「物料种类」⇒ 不被档案覆盖
+ *     V5 档案里没有的编码照旧能手打(allow-create,下拉是候选不是白名单)
+ *     V6 模糊搜索确实带 keyword 发了请求,且**空关键字一个请求都没发**(空关键字 = 拉全档案)
  *
- *   ⚠ 空白单据的配方表**没有「加一行」入口**(空表那行的 .rsp-op-pad 没有点击处理,见
- *     RecordSheetPanels.vue 的空表 <tr>):配方表的第一行只能从「配方计算」弹窗填入。
- *     所以本探针分两段,第一段建单、由外部往**探针自己建的那张单**里插一行配方行(测试账套),
- *     第二段再在界面上手填物料编号做验收。收尾按精确单号删。
+ *   ⚠ 空白单据的配方表只能从「配方计算」弹窗填入第一行(空表那行的 .rsp-op-pad 没有点击处理),
+ *     所以本探针分两段:prep 建单 → 外部往**探针自己建的那张单**里插一行配方行(仅测试账套)
+ *     → verify 在界面上做验收。收尾按精确单号删(头表/明细/流转三处)。
  *
  *   用法:
  *     node recipe-kind-carry.cjs prep                      # 测试账套建一张单,打印 DOCNO=
  *     node recipe-kind-carry.cjs verify <单号>              # 界面验收(断言 + 截图)
- *     node recipe-kind-carry.cjs clean  <单号>              # 删单(界面上按精确单号删)
+ *     node recipe-kind-carry.cjs clean  <单号>              # 删单(按精确单号)
  */
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
@@ -32,13 +36,8 @@ const API = BASE + '/api'
 const PORT = 9391
 const OUT = path.join(process.env.TEMP, 'mes-ann2')
 const PANEL = 'RD_MOLD_PROC'
-/** 档案实测值:编码 → [所属类别, 存货名称] */
-const CODE1 = 'YJ-LL-003'
-const CODE1_KIND = '胶粉'
-const CODE1_NAME = '胶粉'
-const CODE2 = 'YJ-SLD-012'
-const CODE2_KIND = '胶粉'
-const CODE2_NAME = '超高分子量聚乙烯'
+const CODE1 = 'YJ-LL-003'      // 档案实测:所属类别 胶粉 / 存货名称 胶粉
+const CODE2 = 'YJ-SLD-012'     // 档案实测:所属类别 胶粉 / 存货名称 超高分子量聚乙烯
 const EDGE = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -81,12 +80,20 @@ async function main() {
     }
     const ws = new WebSocket(target.webSocketDebuggerUrl)
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
-    let id = 0; const pend = new Map(); let net = []; const errs = []
+    let id = 0; const pend = new Map(); const errs = []
+    const kwReqs = []; let kwEmpty = 0; let invReqs = 0
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data)
       if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); return }
-      const u = String(m.params?.response?.url || '')
-      if (m.method === 'Network.responseReceived' && u.includes('queryFormDataList')) net.push(`${m.params.response.status} ${u.replace(BASE, '').slice(0, 90)}`)
+      if (m.method === 'Network.requestWillBeSent') {
+        const u = String(m.params?.request?.url || '')
+        const pd = String(m.params?.request?.postData || '')
+        if (u.includes('queryFormDataList') && pd.includes('INV')) {
+          invReqs++
+          const mm = /"keyword"\s*:\s*"([^"]*)"/.exec(pd)
+          if (mm) { if (mm[1]) kwReqs.push(mm[1]); else kwEmpty++ }
+        }
+      }
       if (m.method === 'Runtime.exceptionThrown') errs.push((m.params.exceptionDetails?.exception?.description || '').slice(0, 200))
     }
     const send = (method, params) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })) })
@@ -121,9 +128,8 @@ localStorage.setItem('mes_login_date','2026-10-16'); 'ok'`)
       return
     }
 
-    // ── verify:切到目标单 → 成型配方 → 配方表物料格验收 ──
+    // ── verify:切到目标单 → 成型配方 → 物料格验收 ──
     const docNo = DOCARG
-    net = []
     const opened = await ev(`(async () => {
       const txt = (e) => (e.innerText || '').trim()
       const prev = [...document.querySelectorAll('.as-side-btn, .el-button')].find((b) => txt(b).includes('单据预览'))
@@ -144,9 +150,9 @@ localStorage.setItem('mes_login_date','2026-10-16'); 'ok'`)
     chk('V0', `切到了 ${docNo} 并有配方表页签`, !!opened?.hasSheet && (opened?.tabs || []).some((t) => t.includes('成型配方')),
       `status=${opened?.status} tabs=${JSON.stringify(opened?.tabs)}`)
 
-    // ① 物料种类 那格已从下拉改成普通文本框;② 手填物料编号带出 种类 + 名称
     const r1 = await ev(`(async () => {
       const txt = (e) => ((e.innerText || '').trim().replace(/\\s+/g, ''))
+      const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms))
       const tbl = [...document.querySelectorAll('table')].filter((t) => t.offsetParent && txt(t).includes('物料编号') && txt(t).includes('设计添加量')).pop()
       if (!tbl) return { err: '找不到配方表' }
       const ths = [...tbl.querySelectorAll('tr.rs-grp th')].map(txt)
@@ -154,78 +160,142 @@ localStorage.setItem('mes_login_date','2026-10-16'); 'ok'`)
       const rowTr = (i) => [...tbl.querySelectorAll('tr')].filter((tr) => tr.querySelector('.rs-c-in, input'))[i]
       const cellOf = (tr, n) => tr.children[idx(n)]
       const inp = (tr, n) => cellOf(tr, n) && cellOf(tr, n).querySelector('input')
-      const setVal = (el, v) => {
+      const setNative = (el, v) => {
         const d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')
         d.set.call(el, v)
         el.dispatchEvent(new Event('input', { bubbles: true }))
-        el.dispatchEvent(new Event('change', { bubbles: true }))
       }
-      const out = { ths, rows: [], }
-      // ⚠ 空表那行没有「加一行」入口,故先确认已经有行(由外部插入)
+      /** 本格那个下拉的 popper(popper-class="rs-inv-popper",见 RecordSheetPanels):
+          只认**可见**的那个 —— 页面上还有别的下拉(密级/使用范围/生产车间…)的 item 同在 document 里,
+          全局 querySelectorAll('.el-select-dropdown__item') 会把它们的选项一起捞进来(实测踩过:
+          003 那次候选里混进「保密」「170度」「40分钟」等字典词)。 */
+      const popper = () => [...document.querySelectorAll('.rs-inv-popper')]
+        .filter((p) => { const r = p.getBoundingClientRect(); return r.width > 0 && r.height > 0 })
+        .pop() || null
+      const items = () => {
+        const p = popper()
+        return p ? [...p.querySelectorAll('li')].map((e) => e.innerText.trim()).filter(Boolean) : []
+      }
+      const diag = () => ({
+        poppers: document.querySelectorAll('.rs-inv-popper').length,
+        visible: [...document.querySelectorAll('.rs-inv-popper')].filter((p) => p.getBoundingClientRect().height > 0).length,
+      })
+      /** 打字 → 等远程候选回来 → 返回候选文字(autocomplete:输入框本身就是值,不需要点开) */
+      const search = async (tr, n, kw) => {
+        const el = inp(tr, n)
+        el.focus()
+        setNative(el, kw)
+        await sleep2(2200)
+        return { items: items(), ...diag() }
+      }
+      /** 点候选里含 match 的那条(真实用户路径:模糊筛选 → 选中) */
+      const pickItem = async (match) => {
+        const p = popper()
+        const it = p && [...p.querySelectorAll('li')].find((e) => e.innerText.includes(match))
+        if (it) it.click()
+        await sleep2(1800)
+        return !!it
+      }
+      const out = { ths, rows: [], searches: {} }
       let tr = rowTr(0)
       if (!tr) return { err: '配方表没有任何数据行(外部没插成?)', ths }
       const kindCell = cellOf(tr, '物料种类')
       out.kindIsSelect = !!kindCell.querySelector('.el-select')
       out.kindIsInput = !!kindCell.querySelector('input')
+      const codeCell = cellOf(tr, '物料编号')
+      out.codeIsAuto = !!codeCell.querySelector('.el-autocomplete')
+      out.codeIsInput = !!codeCell.querySelector('input')
+      out.codeNoSelect = !codeCell.querySelector('.el-select')
 
-      // 行1:手填物料编号 → 带出 物料种类 + 物料名称
-      setVal(inp(tr, '物料编号'), ${JSON.stringify(CODE1)})
-      await new Promise((r) => setTimeout(r, 2200))
-      out.rows.push({ tag: 'row1(code)', kind: inp(tr, '物料种类').value, code: inp(tr, '物料编号').value, name: inp(tr, '物料名称').value })
+      // 行1:输入 003 → 模糊筛出 YJ-LL-003 → 选中 ⇒ 种类/名称带出
+      out.searches['003'] = await search(tr, '物料编号', '003')
+      out.picked1 = await pickItem(${JSON.stringify(CODE1)})
+      out.rows.push({ tag: 'row1(003)', code: inp(tr, '物料编号').value, kind: inp(tr, '物料种类').value, name: inp(tr, '物料名称').value })
 
       // 再加两行(有行了才有 ＋)
       const addBtn = () => { const b = tbl.querySelector('.rs-op-add'); if (b) b.click() }
-      addBtn(); await new Promise((r) => setTimeout(r, 700))
-      addBtn(); await new Promise((r) => setTimeout(r, 700))
+      addBtn(); await sleep2(700)
+      addBtn(); await sleep2(700)
       const tr2 = rowTr(1), tr3 = rowTr(2)
-      out.rowCount = [...tbl.querySelectorAll('tr')].filter((x) => x.querySelector('.rs-c-in, input')).length
 
-      // 行2:另一支料 → 种类/名称都按档案带
-      if (tr2) { setVal(inp(tr2, '物料编号'), ${JSON.stringify(CODE2)}); await new Promise((r) => setTimeout(r, 2200)) }
-      if (tr2) out.rows.push({ tag: 'row2(code)', kind: inp(tr2, '物料种类').value, code: inp(tr2, '物料编号').value, name: inp(tr2, '物料名称').value })
-
-      // 行3:种类先手填 → 不许被档案覆盖;然后填编码,名称照带
-      if (tr3) {
-        setVal(inp(tr3, '物料种类'), '炭粉'); await new Promise((r) => setTimeout(r, 300))
-        setVal(inp(tr3, '物料编号'), ${JSON.stringify(CODE1)}); await new Promise((r) => setTimeout(r, 2200))
-        out.rows.push({ tag: 'row3(手填种类)', kind: inp(tr3, '物料种类').value, code: inp(tr3, '物料编号').value, name: inp(tr3, '物料名称').value })
+      // 行2:输入 SLD → 筛出 YJ-SLD-012 → 选中
+      if (tr2) {
+        out.searches['SLD'] = await search(tr2, '物料编号', 'SLD')
+        out.picked2 = await pickItem(${JSON.stringify(CODE2)})
+        out.rows.push({ tag: 'row2(SLD)', code: inp(tr2, '物料编号').value, kind: inp(tr2, '物料种类').value, name: inp(tr2, '物料名称').value })
       }
 
-      // 行4:档案里没有的编码 → 什么都不动(静默)
-      addBtn(); await new Promise((r) => setTimeout(r, 700))
+      // 行3:种类先手填 → 不许被档案覆盖
+      if (tr3) {
+        setNative(inp(tr3, '物料种类'), '炭粉'); await sleep2(300)
+        out.searches['Y'] = await search(tr3, '物料编号', 'Y')
+        out.picked3 = await pickItem(${JSON.stringify(CODE1)})
+        out.rows.push({ tag: 'row3(手填种类)', code: inp(tr3, '物料编号').value, kind: inp(tr3, '物料种类').value, name: inp(tr3, '物料名称').value })
+      }
+
+      // 行4:档案里没有的编码 —— 手打 + 失焦,必须能留下(autocomplete:输入框本身就是值)
+      addBtn(); await sleep2(700)
       const tr4 = rowTr(3)
       if (tr4) {
-        setVal(inp(tr4, '物料编号'), 'ZZZ-NO-SUCH-CODE'); await new Promise((r) => setTimeout(r, 2200))
-        out.rows.push({ tag: 'row4(查不到)', kind: inp(tr4, '物料种类').value, code: inp(tr4, '物料编号').value, name: inp(tr4, '物料名称').value })
+        const el = inp(tr4, '物料编号')
+        el.focus()
+        setNative(el, 'ZZZ-NO-SUCH-CODE')
+        await sleep2(1600)
+        el.dispatchEvent(new Event('change', { bubbles: true }))   // ≈ 用户点别处(失焦)
+        await sleep2(1200)
+        out.rows.push({ tag: 'row4(手打新码)', code: inp(tr4, '物料编号').value, kind: inp(tr4, '物料种类').value, name: inp(tr4, '物料名称').value })
       }
-      tbl.scrollIntoView({ block: 'center' })
-      await new Promise((r) => setTimeout(r, 600))
       return out
     })()`)
-    console.log('[配方表]', JSON.stringify(r1, null, 1).slice(0, 1400))
-    if (r1?.err) { chk('V1', '取到配方表数据行', false, r1.err); }
+    console.log('[配方表]', JSON.stringify(r1, null, 1).slice(0, 1800))
+    if (r1?.err) { chk('V1', '取到配方表数据行', false, r1.err) }
     else {
       const row = (tag) => (r1.rows || []).find((x) => x.tag === tag) || {}
-      chk('V1', '「物料种类」已是普通文本框(不再是下拉)', r1.kindIsInput === true && r1.kindIsSelect === false,
+      const hasIn = (arr, s) => (arr || []).some((t) => String(t).includes(s))
+      const itemsOf = (k) => r1.searches?.[k]?.items || []
+      const searDetail = (k) => `${itemsOf(k).length} 项 · popper ${r1.searches?.[k]?.poppers} 个/可见 ${r1.searches?.[k]?.visible} · ${JSON.stringify(itemsOf(k).slice(0, 5))}`
+      chk('V1', '「物料种类」仍是普通文本框(不是下拉)', r1.kindIsInput === true && r1.kindIsSelect === false,
         `isInput=${r1.kindIsInput} isSelect=${r1.kindIsSelect}`)
-      chk('V2', `手填 物料编号=${CODE1} → 带出 种类/名称`, row('row1(code)').kind === CODE1_KIND && row('row1(code)').name === CODE1_NAME,
-        JSON.stringify(row('row1(code)')))
-      chk('V3', `手填 物料编号=${CODE2} → 带出 ${CODE2_KIND}/${CODE2_NAME}`,
-        row('row2(code)').kind === CODE2_KIND && row('row2(code)').name === CODE2_NAME, JSON.stringify(row('row2(code)')))
-      chk('V4', '人手填过的「物料种类」不被档案覆盖(仍是炭粉)', row('row3(手填种类)').kind === '炭粉',
-        JSON.stringify(row('row3(手填种类)')))
-      chk('V5', '档案里没有的编码 ⇒ 一格都不动(仍为空)',
-        row('row4(查不到)').kind === '' && row('row4(查不到)').name === '',
-        JSON.stringify(row('row4(查不到)')))
-      chk('V6', '带出确实走了商品档案查询(前端发过 queryFormDataList 且 2xx)',
-        net.some((n) => /^2\d\d/.test(n)), net.slice(0, 3).join(' | ') || '无')
+      chk('V2', '「物料编号」是输入框 + 模糊候选(autocomplete,不是死板下拉)', r1.codeIsAuto === true && r1.codeIsInput === true && r1.codeNoSelect === true,
+        `auto=${r1.codeIsAuto} input=${r1.codeIsInput} 无select=${r1.codeNoSelect}`)
+      chk('V3', `输入 003 ⇒ 候选含 ${CODE1}`, hasIn(itemsOf('003'), CODE1), searDetail('003'))
+      chk('V4', `输入 SLD ⇒ 候选含 ${CODE2}`, hasIn(itemsOf('SLD'), CODE2), searDetail('SLD'))
+      chk('V5', '输入 Y ⇒ 候选含 YJ-*', hasIn(itemsOf('Y'), 'YJ-'), searDetail('Y'))
+      chk('V6', `选中 ${CODE1} ⇒ 带出 种类/名称(胶粉/胶粉)`,
+        row('row1(003)').kind === '胶粉' && row('row1(003)').name === '胶粉' && row('row1(003)').code === CODE1,
+        JSON.stringify(row('row1(003)')))
+      chk('V7', `选中 ${CODE2} ⇒ 胶粉/超高分子量聚乙烯`,
+        row('row2(SLD)').kind === '胶粉' && row('row2(SLD)').name === '超高分子量聚乙烯',
+        JSON.stringify(row('row2(SLD)')))
+      chk('V8', '人手填过的「物料种类」不被覆盖(仍是炭粉)', row('row3(手填种类)').kind === '炭粉', JSON.stringify(row('row3(手填种类)')))
+      chk('V9', '档案里没有的编码手打后失焦仍在(不会被吞)', row('row4(手打新码)').code === 'ZZZ-NO-SUCH-CODE',
+        JSON.stringify(row('row4(手打新码)')))
+      chk('V10', '模糊搜索带 keyword 发了请求,且空关键字一次都没发',
+        kwReqs.length >= 3 && kwEmpty === 0, `keyword 请求=${JSON.stringify(kwReqs)} 空关键字请求=${kwEmpty} 档案请求总数=${invReqs}`)
     }
-    chk('V7', '无 JS 异常', errs.length === 0, errs.slice(0, 3).join(' | '))
+    chk('V11', '无 JS 异常', errs.length === 0, errs.slice(0, 3).join(' | '))
 
-    // ③ 截图存档
+    // 截图:把下拉打开、输入 003,留一张"候选里能看见 YJ-LL-003"的图
+    await ev(`(async () => {
+      const txt = (e) => ((e.innerText || '').trim().replace(/\\s+/g, ''))
+      const tbl = [...document.querySelectorAll('table')].filter((t) => t.offsetParent && txt(t).includes('物料编号') && txt(t).includes('设计添加量')).pop()
+      if (!tbl) return 'no-table'
+      const tr = [...tbl.querySelectorAll('tr')].filter((x) => x.querySelector('.rs-c-in, input'))[0]
+      if (!tr) return 'no-row'
+      const cell = tr.children[[...tbl.querySelectorAll('tr.rs-grp th')].map(txt).findIndex((h) => h.includes('物料编号'))]
+      const el = cell.querySelector('input')
+      el.focus()
+      const d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')
+      d.set.call(el, '003')
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 2400))
+      tbl.scrollIntoView({ block: 'center' })
+      await new Promise((r) => setTimeout(r, 500))
+      return 'ok'
+    })()`)
     const shot = await send('Page.captureScreenshot', { format: 'png' })
     if (shot?.result?.data) {
-      const p = path.join(OUT, 'recipe-kind-carry.png')
+      const p = path.join(OUT, 'recipe-inv-fuzzy.png')
       fs.writeFileSync(p, Buffer.from(shot.result.data, 'base64'))
       console.log('SHOT=' + p)
     }
