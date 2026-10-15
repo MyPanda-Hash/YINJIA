@@ -71,7 +71,11 @@ try {
   const info = await ev(`(() => {
     const toolbar = [...document.querySelectorAll('.panelx-list .tb-group')].map((g) => (g.innerText || '').replace(/\\s+/g, ' ').trim())
     const menu = [...document.querySelectorAll('.panelx-list .tb-menu .ctx-item')].map((e) => (e.innerText || '').trim())
-    const approvalText = [...document.querySelectorAll('.approval-layout, .approval-side, .as-side-btn, .as-side-del')].map((e) => (e.innerText || '').trim()).join(' ')
+    // ⚠ 文书式版面(首件检验单走这条)的按钮在右侧竖排:主按钮 .as-side-btn,
+    //   而**下拉动作是平铺的** .as-side-btn.sub(PanelxList 里 v-for="a in dropItems(g)" 直接铺出来,
+    //   「更多」组里的「取成型工艺清单」就在这)。原来只收 .as-side-btn/.as-side-del ⇒
+    //   收不到带 .sub 的动作,工具栏三条断言全部误报。
+    const approvalText = [...document.querySelectorAll('.approval-layout, .approval-side, .as-side-btn, .as-side-btn.sub, .as-side-del')].map((e) => (e.innerText || '').trim()).join(' ')
     const body = document.querySelector('.panelx-list .body')
     const tbl = document.querySelector('.panelx-list .detail .el-table')
     const sheet = document.querySelector('.panelx-list .fi-sheet')
