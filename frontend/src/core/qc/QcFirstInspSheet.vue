@@ -23,6 +23,18 @@
          这里按可勾的选项渲染;其余列是文本录入格(图片里那些 "/" 是"本格无需填写"的占位)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="fi-sheet">
+    <!-- 相关要求(纸面底部那 6 条)里**必须让人看见**的两条,做成纸张顶部提醒条 —— 只读态也显示,
+         打印/导出一样带出来(它们本身就是要贴在单上的处置要求):
+           · 第 6 条 C-95 客户相关产品:脱模后立马进行首件检验(判据 = 表头「客户代码」,出单时从工单带入);
+           · 第 4 条 表观严重粘模/明显脱粉:马上停止生产 + 已生产的产品暂时隔离标示(红色)。 -->
+    <div v-if="c95Notice || stopLineNotice" class="fi-alerts">
+      <div v-if="c95Notice" class="fi-alert is-warn">
+        ⚠ {{ tt('C-95客户相关产品脱模后立马进行首件检验。') }}
+      </div>
+      <div v-if="stopLineNotice" class="fi-alert is-danger">
+        ⚠ {{ tt('炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。') }}
+      </div>
+    </div>
     <!-- 顶栏 = 右上信息三格 + 大标题(同一块,标题在这块空白里居中)
          ① 报告头右上信息三格(表单管理人/密级/使用范围)
          ⚠ 2026-10-16 用户口径(截图红框)「当前上面这一部分均不能填写需要实现变为可填写的实现」:
@@ -95,6 +107,11 @@
       </template>
     </tr></tbody></table>
 
+    <!-- 相关要求第 3 条后半句:本单同时有「浊度」与「压降」两项测试时,先测初始浊度、再做压降测试 -->
+    <div v-if="turbidityPressureTip" class="fi-tip">
+      {{ tt('本单同时有浊度与压降两项测试：请先测初始浊度，再进行压降测试。') }}
+    </div>
+
     <!-- ④ 两级表头 + 标准行 + 1#..8# 数据区 -->
     <table class="fi-grid">
       <colgroup>
@@ -160,36 +177,45 @@
           </td>
           <td v-if="editable" class="col-op no-print"></td>
         </tr>
-        <!-- 数据区:1#..8# -->
+        <!-- 数据区:1#..8#(⚠ 相关要求第 1 条:每个测试项目只记录 2 支样品 ⇒ 只有 1#/2# 可填,
+             3#..8# 打 `/` 且不可录;老单据里这几行已填过的值照原样显示,不吞数据) -->
         <tr v-for="sample in samples" :key="sample" class="sample-row">
           <th class="rowlabel">{{ sample }}#</th>
           <td v-for="c in columns" :key="c.key" :class="{ 'is-check': isCheckCol(c) }">
-            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …)。
-                 ⚠ 按图片:这两列只给 1#、2# 勾选项(相关要求第 1 条「表观及脱粉项目测试后记录2支样品数据」),
-                   3#..8# 打 `/`；isCheckCol 只管格子底色,要不要给选项另判 sample <= CHECK_SAMPLES。 -->
+            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),同样只给 1#、2#。 -->
             <template v-if="isCheckCol(c)">
-              <div v-if="editable && sample <= CHECK_SAMPLES" class="fi-checks">
+              <div v-if="editable && sample <= SAMPLE_LIMIT" class="fi-checks">
                 <span v-for="o in checkOptions(c)" :key="o" class="fi-check">
                   <span
                     class="fi-box"
                     :class="{ on: isChecked(sample, c, o) }"
                     @click="toggleCheck(sample, c, o)"
                   >{{ isChecked(sample, c, o) ? '☑' : '□' }}</span>
-                  <span class="fi-check-txt" @click="toggleCheck(sample, c, o)">{{ tt(o) }}</span>
+                  <span
+                    class="fi-check-txt"
+                    :class="{ 'is-stop': stopOption(o) && isChecked(sample, c, o) }"
+                    @click="toggleCheck(sample, c, o)"
+                  >{{ tt(o) }}</span>
                 </span>
               </div>
-              <span v-else class="fi-checktext">{{ cellText(sample, c) || '/' }}</span>
+              <span v-else class="fi-checktext" :title="sample > SAMPLE_LIMIT ? tt('按相关要求：每个测试项目只记录 2 支样品（1#、2#）') : ''">
+                {{ cellText(sample, c) || '/' }}
+              </span>
             </template>
-            <!-- 其余列:文本录入格 -->
+            <!-- 其余列:文本录入格(1#/2#);3#..8# 只读 -->
             <template v-else>
               <el-input
-                v-if="editable"
+                v-if="editable && sample <= SAMPLE_LIMIT"
                 :model-value="cellText(sample, c)"
                 size="small"
                 class="fi-cell"
+                :title="precisionHint(c)"
                 @update:model-value="v => setMeasured(sample, c, v)"
+                @change="() => normalizePrecision(sample, c)"
               />
-              <span v-else>{{ cellText(sample, c) || '/' }}</span>
+              <span v-else :title="sample > SAMPLE_LIMIT ? tt('按相关要求：每个测试项目只记录 2 支样品（1#、2#）') : ''">
+                {{ cellText(sample, c) || '/' }}
+              </span>
             </template>
           </td>
           <td v-if="editable" class="col-op no-print"></td>
@@ -285,11 +311,81 @@ const groups = computed(() => groupsOf(columns.value))
 const groupCols = (g) => columns.value.filter((c) => c.group === g)
 const samples = [1, 2, 3, 4, 5, 6, 7, 8]
 /**
- * 表观/脱粉这两列**只给前 2 个样品勾选项** —— 图片里 3#..8# 的这两格是 `/`,
- * 依据是纸面"相关要求"第 1 条「表观及脱粉项目测试后记录2支样品数据」。
- * 其余列(尺寸/重量/强度/浊度/压降)八个样品都录(第 1 条同样说了要录 2 支,但图片上它们 8# 都给了录入格)。
+ * 相关要求第 1 条:「表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，
+ *   炭棒强度测试2支样品，浊度及压降测试记录2支样品。」
+ * ⇒ **每个测试项目都只记录 2 支样品**,纸面保留 1#..8# 八行(版式照图纸),但只有 1#/2# 可录,
+ *   3#..8# 打 `/`(图片上那排斜杠就是这个意思);老单据里 3#..8# 已填过的值照原样只读显示,不吞数据。
  */
-const CHECK_SAMPLES = 2
+const SAMPLE_LIMIT = 2
+
+/**
+ * 相关要求第 2 条:「…测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；
+ *   挤压强度及压降按表显数据记录。」
+ * ⇒ 按列名认规则(自定义列同规则生效):
+ *   · oneDecimal   —— 内外径/长度/重量:失焦(或回车)时按 0.1 取整并提示(不在打字过程中抢值);
+ *   · asDisplayed  —— 挤压强度/压降:表显多少记多少,**不取整**(列头给提示)。
+ */
+function precisionOf(c) {
+  const t = `${c.label || ''} ${c.key || ''}`
+  if (/外径|内径|长度|重量/.test(t)) return 'oneDecimal'
+  if (/挤压强度|压降/.test(t)) return 'asDisplayed'
+  return ''
+}
+/** 录入格的 title 提示(按本列的精度规则给) */
+function precisionHint(c) {
+  const rule = precisionOf(c)
+  if (rule === 'oneDecimal') return tt('按相关要求：内外径、长度及重量保留小数点后1位')
+  if (rule === 'asDisplayed') return tt('按表显数据记录（不取整）')
+  return ''
+}
+/** 一位小数:失焦时取整并提示;非纯数值(如 `/`、`≤0.5` 这类手写口径)一律不碰 */
+function normalizePrecision(sample, c) {
+  if (precisionOf(c) !== 'oneDecimal') return
+  const raw = String(cellText(sample, c) ?? '').trim()
+  if (!/^-?\d+(\.\d+)?$/.test(raw)) return
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return
+  const fixed = n.toFixed(1)
+  if (fixed === raw) return
+  setMeasured(sample, c, fixed)
+  if (Number(fixed) !== n) {
+    ElMessage.warning(tt('按相关要求：内外径、长度及重量保留小数点后1位（已取整：{a} → {b}）')
+      .replace('{a}', raw).replace('{b}', fixed))
+  }
+}
+
+/**
+ * 相关要求第 4 条:「炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。」
+ * ⇒ 这两个勾选项一旦记录:勾的当下弹一次红色警示,纸张顶部**常驻红色横幅**(只读态/打印件一样带),
+ *   选项文字标红(见 .fi-check-txt.is-stop)。刻意**不代填**「检验结果」—— 结论由品质据实填。
+ */
+const STOP_OPTIONS = ['严重粘模（脱皮）', '严重脱粉']
+const stopOption = (o) => STOP_OPTIONS.includes(o)
+const stopLineNotice = computed(() => {
+  bump.value
+  // ⚠ 直接扫明细行,别用 isChecked()(它经 rowOf 会**顺手补行** —— computed 里改数据是隐患)
+  return (props.head?.detail?.items || []).some((r) => String(r?.['实测数值'] ?? '')
+    .split(/[、,，;；]/).map((x) => x.trim()).some((x) => STOP_OPTIONS.includes(x)))
+})
+
+/**
+ * 相关要求第 6 条:「C-95客户相关产品脱模后立马进行首件检验。」
+ * C-95 是**客户代码**(dm_kh.dm;出单时从工单行带入 head['客户代码'],见 ButtonService.firstInspGenerate);
+ * 老单据 / 手工建的单只有客户名称或产品编码时,退而在这几个字段里找 "C-95"/"C95"(词边界,别误命中 ABC95)。
+ */
+const C95_KEYS = ['客户代码', '客户名称', '产品编码', '产品名称', '规格型号']
+const c95Notice = computed(() => C95_KEYS
+  .some((k) => /(^|[^A-Za-z0-9])C-?95([^0-9]|$)/i.test(String(props.head?.[k] || ''))))
+
+/**
+ * 相关要求第 3 条后半句:「如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试」
+ * ⇒ 本单同时存在这两列时,纸张上给一条测试顺序提示(列序本来就把浊度排在压降之前)。
+ */
+const turbidityPressureTip = computed(() => {
+  const cols = columns.value
+  const has = (re) => cols.some((c) => re.test(`${c.label || ''}${c.key || ''}`))
+  return has(/浊度|NTU/i) && has(/压降|kPa/i)
+})
 
 /**
  * 纸张右上信息三格(图片上那三行)。数据键 = yj_field 的 col_name(与后端列同名)。
@@ -430,9 +526,18 @@ function toggleCheck(sample, c, option) {
   if (!props.editable) return
   const cur = cellText(sample, c).split(/[、,，;；]/).map((s) => s.trim()).filter(Boolean)
   const i = cur.indexOf(option)
+  const turningOn = i < 0                                  // 这一步是"勾上"还是"取消"
   if (i >= 0) cur.splice(i, 1)
   else cur.push(option)
   setMeasured(sample, c, cur.join('、'))
+  // 相关要求第 4 条:勾上「严重粘模（脱皮）」/「严重脱粉」⇒ 当场红色警示(纸张顶部同时挂常驻红幅)
+  if (turningOn && stopOption(option)) {
+    ElMessageBox.alert(
+      tt('炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。'),
+      tt('相关要求'),
+      { type: 'error', confirmButtonText: tt('确定') },
+    ).catch(() => { /* 关掉即可,不阻断录入 */ })
+  }
 }
 </script>
 
@@ -445,6 +550,37 @@ function toggleCheck(sample, c, option) {
   margin: 14px auto 24px;
   color: #222;
   font-size: 13.5px;
+}
+/* 相关要求提醒条(纸张顶部;只读态与打印件一样带出来) */
+.fi-alerts {
+  display: flex;
+  flex-direction: column;
+}
+.fi-alert {
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid;
+}
+.fi-alert.is-warn {
+  background: #fff7e6;
+  border-color: #f0c36d;
+  color: #8a6d3b;
+}
+.fi-alert.is-danger {
+  background: #fdecea;
+  border-color: #e6a19a;
+  color: #b3261e;
+}
+/* 相关要求第 3 条:浊度/压降同测顺序提示 */
+.fi-tip {
+  margin: 6px 8px 0;
+  padding: 4px 10px;
+  background: #f4f8ff;
+  border: 1px solid #c6d8f2;
+  border-radius: 3px;
+  color: #1f5fa8;
+  font-size: 12.5px;
 }
 /* 顶栏(右上信息三格 + 大标题)
    ⚠ 2026-10-16 第二轮用户口径(截图红框)「让当前的红框内容居于空白位置中央」:
@@ -676,6 +812,11 @@ function toggleCheck(sample, c, option) {
 }
 .fi-checktext {
   font-size: 12.5px;
+}
+/* 相关要求第 4 条:严重粘模 / 严重脱粉 一旦勾上,选项文字标红 */
+.fi-check-txt.is-stop {
+  color: #b3261e;
+  font-weight: 600;
 }
 .fi-empty {
   height: 64px;
