@@ -120,7 +120,7 @@
               <span v-else class="ps-cell-text ps-name-block">{{ row[K['项目名称']] || '' }}</span>
             </td>
             <td class="c-sub">
-              <el-input v-if="editable" v-model="row[K['子项目/尺寸']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row[K['子项目/尺寸']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" :placeholder="tt('例：33*12*110（外径*内径*长度）')" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['子项目/尺寸']] || '' }}</span>
             </td>
             <td class="c-remark">

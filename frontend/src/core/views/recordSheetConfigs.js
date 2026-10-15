@@ -1176,15 +1176,18 @@ export const recordSheetConfigs = {
       //  免得"库里的元数据顺序"与"纸面顺序"两套口径。见 recordSheetConfigs.dims.test.js)
       // 三格用 pair.cells 铺开、各带 placeholder 提示词;旧的整串 [炭棒尺寸] 退化为历史列(不进纸面)
       // 注:产品名称/产品类别/产品类型/产品分类/下单数量 保留在元数据但不进纸面(兼容历史单据)
+      // 2026-10-16 用户口径:「把尺寸格式示例：33*12*110 写进去背景提示词」——
+      //   整体尺寸与炭棒三格统一按 **外径*内径*长度** 写;「开发产品」按项目带入时也是按这个格式拆的
+      //   (解析见 @core/progress/devProduct.parseCarbonSize)。
       { bar: '二、规格与尺寸', rows: [
         { pairs: [
-          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3 },
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3, ph: '例：33*12*110（外径*内径*长度）' },
         ]},
         { pairs: [
           { label: '炭棒尺寸', cells: [
-            { key: '炭棒外径', ph: '外径(mm)' },
-            { key: '炭棒内径', ph: '内径(mm)' },
-            { key: '炭棒长度', ph: '长度(mm)' },
+            { key: '炭棒外径', ph: '外径(mm) 如 33' },
+            { key: '炭棒内径', ph: '内径(mm) 如 12' },
+            { key: '炭棒长度', ph: '长度(mm) 如 110' },
           ], vspan: 3 },
         ]},
       ]},

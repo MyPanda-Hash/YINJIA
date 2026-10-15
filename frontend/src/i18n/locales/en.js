@@ -1113,6 +1113,11 @@ export default {
       'No project number on this row. Fill the project application’s document number in “Project No.” so it can be matched with product info sheets.',
     '该项目下已有这个产品编号，请换一个': 'This product code already exists under the project, please use another one',
     '已创建产品信息表': 'Product info sheet created',
+    // 尺寸格式示例(2026-10-16 用户口径「把尺寸格式示例 33*12*110 写进去背景提示词」)
+    '例：33*12*110（外径*内径*长度）': 'e.g. 33*12*110 (OD*ID*length)',
+    '外径(mm) 如 33': 'OD (mm), e.g. 33',
+    '内径(mm) 如 12': 'ID (mm), e.g. 12',
+    '长度(mm) 如 110': 'Length (mm), e.g. 110',
     '当前草稿尚未保存，是否保存？（不保存将撤回该单）': 'The current draft has not been saved. Save it? (Choosing No will withdraw it)',
     '勾选': 'Check',
     '提示：按住左键拖动框选，批量勾选/取消经过的权限': 'Tip: hold left button and drag a box to batch check/uncheck permissions in its path',
