@@ -503,23 +503,20 @@
         <div class="wh-dock-head">{{ tt('分仓库') }}</div>
         <div class="wh-dock-meta">{{ tt('共有数据') }}:{{ whDockRows.length }} {{ tt('条') }}</div>
         <div class="wh-dock-list">
+          <!-- 用户 2026-10-15 第五轮:① 勾选即查询(没有查询按钮)② 只能勾一个 ③ 一个都没勾 = 空列表 -->
           <el-checkbox
             v-for="w in whDockRows"
             :key="w.code"
             :label="w.code"
-            :model-value="whDockChecked.includes(w.code)"
+            :model-value="whDockSelected === w.code"
             class="wh-dock-item"
-            @change="(v) => toggleWhDock(w.code, v)"
+            @change="() => pickWhDock(w.code)"
           >
             <span class="wh-dock-name">{{ w.name }}</span>
             <span class="wh-dock-code">{{ w.code }}</span>
           </el-checkbox>
         </div>
-        <!-- 用户 2026-10-15:不要搜索框,只要一个「查询」按钮(勾完仓再点它过滤) -->
-        <div class="wh-dock-actions">
-          <el-button size="small" text @click="clearWhDock">{{ tt('全不选') }}</el-button>
-          <el-button size="small" type="primary" :icon="Search" @click="applyWhDock">{{ tt('查询') }}</el-button>
-        </div>
+        <div class="wh-dock-tip">{{ tt('勾选仓库即查询;只能选一个;不勾选时列表为空') }}</div>
       </aside>
       <!-- 顶部常驻提示(用户口径:取消月结后要一直有一串「还没上月月结」的提示) -->
       <div v-if="isStockDetail && mcNotice" class="mc-notice">
@@ -2733,12 +2730,16 @@ function onStockWhChange(v) {
 }
 
 // ---------- 库存明细:分仓库选择(与采购入库单「选单」弹窗同款的勾选列表,数据源 = 仓库档案 bs_wh)----------
-// 勾选结果走 condition._whCodes(逗号分隔编码),后端 QueryService 按编码 IN 过滤(不比名称:名称会重名/改名)。
-// 用户 2026-10-15:「搜索框不需要,只要有查询按钮就行」⇒ 没有关键字过滤,勾完点「查询」生效。
+// 用户 2026-10-15 第五轮口径:① **勾选即查询**(没有查询按钮)② **只能勾一个**(单选)③ **没勾选就是空的**。
+// 实现:单选值 whDockSelected(=仓库编码,'' 表示未选);未选时给 condition._whCodes 一个**哨兵值**,
+//   后端按编码 IN 过滤自然返回 0 行(比"前端假装空列表"更诚实:数据面真的查不到东西)。
+const WH_DOCK_NONE = '__NONE__'
 const isStockDetail = computed(() => String(panelCode.value) === 'STOCK_DETAIL')
-const whDockChecked = ref([])
+const whDockSelected = ref('')
 watch(isStockDetail, async (v) => {
-  if (!v) { whDockChecked.value = []; return }
+  if (!v) { whDockSelected.value = ''; return }
+  // 进面板先落哨兵 ⇒ 初始列表为空(等用户勾一个仓库才有数据)
+  condition['_whCodes'] = WH_DOCK_NONE
   if (warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
@@ -2746,20 +2747,10 @@ watch(isStockDetail, async (v) => {
   } catch { warehouseOptions.value = [] }
 }, { immediate: true })
 const whDockRows = computed(() => warehouseOptions.value || [])
-function toggleWhDock(code, checked) {
-  const set = new Set(whDockChecked.value.filter(Boolean))
-  if (checked) set.add(code); else set.delete(code)
-  whDockChecked.value = [...set]
-}
-function clearWhDock() {
-  whDockChecked.value = []
-  applyWhDock()
-}
-/** 「查询」按钮:按勾选的仓库过滤主表(一个都没勾 = 取消过滤) */
-function applyWhDock() {
-  const codes = whDockChecked.value.filter(Boolean)
-  if (codes.length) condition['_whCodes'] = codes.join(',')
-  else delete condition['_whCodes']
+/** 勾选即查询;再点一次同一个 = 取消(取消后回到空列表) */
+function pickWhDock(code) {
+  whDockSelected.value = whDockSelected.value === code ? '' : code
+  condition['_whCodes'] = whDockSelected.value || WH_DOCK_NONE
   search()
 }
 
@@ -8964,6 +8955,7 @@ onUnmounted(() => {
 .wh-dock-name { font-size: 13px; }
 .wh-dock-code { margin-left: 6px; color: #94a3b8; font-size: 11px; }
 .wh-dock-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.wh-dock-tip { font-size: 11px; color: #94a3b8; line-height: 1.4; }
 /* ── 顶部常驻提示(上月未月结 / 已取消) ── */
 .mc-notice {
   display: flex; align-items: center; gap: 8px;
