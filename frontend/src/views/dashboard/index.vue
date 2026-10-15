@@ -115,8 +115,11 @@
                 <span>{{ tt('新增 / 完工趋势') }}</span>
                 <span>{{ tt('近 7 天') }}</span>
               </div>
-              <SLine v-if="(prod.trend7 || []).length" :data="prod.trend7" compact />
-              <div v-else class="empty compact-empty trend-empty">{{ tt('暂无趋势数据') }}</div>
+              <SLine v-if="(prod.trend7 || []).length && !prodTrendAllZero" :data="prod.trend7" compact />
+              <div v-else class="empty compact-empty trend-empty">
+                <span>{{ tt('近 7 天无新增或完工') }}</span>
+                <em v-if="prod.lastDate">{{ tt('数据截至') }} {{ prod.lastDate }}</em>
+              </div>
               <div class="order-queue">
                 <div v-for="order in progress.slice(0, 3)" :key="order['编号']" class="order-row">
                   <div class="order-copy" :title="`${order['产品'] || tt('未指定产品')} ${order['编号'] || ''}`">
@@ -194,7 +197,9 @@
               <div class="card-title">{{ tt('实时业务事件流') }}</div>
               <p>{{ tt('来自 SQL 业务单据的最新活动') }}</p>
             </div>
-            <el-select v-model="flowPanel" size="small" class="flow-pick" @change="onFlowChange">
+            <!-- placeholder 必须走 tt():v-model 初值是 '' 而空串在 el-select 里被视为"未选择",
+                 会退回 Element Plus 的**默认中文占位符「请选择」**,切英文后仍是中文(多语言红线) -->
+            <el-select v-model="flowPanel" size="small" class="flow-pick" :placeholder="tt('全部事件')" @change="onFlowChange">
               <el-option :label="tt('全部事件')" value="" />
               <el-option :label="tt('产品开发业务流')" value="RD_PROD_INFO" />
             </el-select>
@@ -348,23 +353,36 @@
     <template v-else-if="mod === 'sales'">
       <div class="dash-grid">
         <div class="card metric-card col-4"><div class="kpi-num tone-primary">{{ sales.total }}</div><div class="kpi-title">{{ tt('销售订单数') }}</div></div>
-        <div class="card metric-card col-4"><div class="kpi-num tone-warning">{{ sales.amount ?? 0 }}</div><div class="kpi-title">{{ tt('明细金额合计（元）') }}</div></div>
+        <!-- 金额走 formatCompact:原样渲染是 17630591.27 一串裸数字,而概览页同一数值显示「1763万」 -->
+        <div class="card metric-card col-4"><div class="kpi-num tone-warning">{{ formatCompact(Number(sales.amount || 0)) }}</div><div class="kpi-title">{{ tt('明细金额合计（元）') }}</div></div>
         <div class="card metric-card col-4"><div class="kpi-num tone-steel">{{ salesDone }}</div><div class="kpi-title">{{ tt('已审核订单') }}</div></div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('客户订单分布') }}</div>
-          <div class="chart-box"><SDonut :data="sales.byCustomer" :sub="tt('订单')" /></div>
+          <div class="card-title with-seg">
+            {{ tt('客户订单分布') }}
+            <el-radio-group v-model="customerMetric" size="small" class="card-seg">
+              <el-radio-button value="count">{{ tt('订单数') }}</el-radio-button>
+              <el-radio-button value="amount">{{ tt('金额') }}</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="chart-box"><SDonut :data="salesCustomer" :sub="customerMetric === 'amount' ? tt('元') : tt('订单')" /></div>
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('订单状态分布') }}</div>
           <div class="chart-box"><SBars :data="sales.byStatus" show-pct /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('近 7 天订单趋势') }}</div>
-          <div class="chart-box"><SLine :data="sales.trend7" :legend-a="tt('新增')" :legend-b="tt('已审核')" /></div>
+          <div class="card-title">{{ tt('近 30 天订单趋势') }}</div>
+          <div class="chart-box"><SLine :data="sales.trend30" :legend-a="tt('新增')" :legend-b="tt('已审核')" /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('TOP 产品下单量') }}</div>
-          <div class="chart-box"><SBars :data="sales.topProducts" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
+          <div class="card-title with-seg">
+            {{ productMetric === 'amount' ? tt('TOP 产品下单金额') : tt('TOP 产品下单量') }}
+            <el-radio-group v-model="productMetric" size="small" class="card-seg">
+              <el-radio-button value="count">{{ tt('数量') }}</el-radio-button>
+              <el-radio-button value="amount">{{ tt('金额') }}</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="chart-box"><SBars :data="salesProducts" label-width="146px" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
         </div>
       </div>
     </template>
@@ -735,6 +753,13 @@ const docVolume = computed(() => {
 const archives = computed(() => stats.value.archives || {})
 const latest = computed(() => stats.value.latest || [])
 const progress = computed(() => stats.value.progress || [])
+/** 生产趋势是不是"一条贴底直线"(近 7 天全 0)—— 2026-10-15:
+ *  plang 的日期实测都停在 2026-08,近 7 天必然全 0。此时画一条贴底的线看着像图坏了,
+ *  改成空态并说明"数据截至",把"没数据"和"数据为0"区分开。 */
+const prodTrendAllZero = computed(() => {
+  const t = prod.value.trend7 || []
+  return t.length > 0 && t.every((d) => !Number(d.added || 0) && !Number(d.done || 0))
+})
 
 // ---------- 生产数据 ----------
 const prod = computed(() => stats.value.production || {})
@@ -753,6 +778,14 @@ const salesDone = computed(() => {
   const s = (sales.value.byStatus || []).find((x) => x.name === '已审核')
   return s ? s.value : 0
 })
+// 排行口径(2026-10-15):客户与产品两张排行各自可切「订单数/数量 ↔ 金额」——
+// 库里的金额此前只汇总成一个总数,两张排行全按笔数/数量排,看不出谁贡献的钱多。
+const customerMetric = ref('count')
+const productMetric = ref('count')
+const salesCustomer = computed(() => ((customerMetric.value === 'amount'
+  ? sales.value.customerShareAmount : sales.value.customerShare) || []))
+const salesProducts = computed(() => ((productMetric.value === 'amount'
+  ? sales.value.topProductsAmount : sales.value.topProducts) || []))
 
 // ---------- 质量数据 ----------
 const quality = computed(() => stats.value.quality || { total: 0, pass: 0, bad: 0, passRate: 0, byResult: [] })
@@ -812,13 +845,15 @@ const kpis = computed(() => {
   return [
     {
       title: tt('生产任务负载'), value: Number(stats.value.kpis.moActive || 0), unit: tt('单'), icon: 'Odometer',
-      tone: 'primary', state: tt('实时'), meta: `${tt('总计')} ${productionTotal.value} ${tt('单')}`, signal: `${productionRunning.value} ${tt('单生产中')}`,
+      tone: 'primary', state: tt('实时'), meta: `${tt('总计')} ${productionTotal.value} ${tt('单')}`, signal: `${productionDone.value} ${tt('已完工')}`,
       bars: trend.map((item) => Number(item.added || 0)),
     },
     {
-      title: tt('工单闭环率'), value: completionRate.value, unit: '%', icon: 'CircleCheck',
+      // 2026-10-15:原为「工单闭环率」—— 与「生产执行核心」里那个大环重复展示同一个数;
+      // 改成「已完工工单」(计数),闭环率降到 signal 里做辅助,4 张 KPI 卡各说一件事。
+      title: tt('已完工工单'), value: productionDone.value, unit: tt('单'), icon: 'CircleCheck',
       tone: 'steel', state: completionRate.value >= 80 ? tt('稳定') : tt('推进中'),
-      meta: `${productionDone.value} / ${productionTotal.value} ${tt('已完工')}`, signal: tt('生命周期'),
+      meta: `${productionDone.value} / ${productionTotal.value} ${tt('已完工')}`, signal: `${completionRate.value}% ${tt('工单闭环率')}`,
       bars: trend.map((item) => Number(item.done || 0)),
     },
     {
@@ -830,7 +865,8 @@ const kpis = computed(() => {
     {
       title: tt('销售订单金额'), value: formatCompact(amount), unit: tt('元'), icon: 'TrendCharts',
       tone: 'neutral', state: `${sales.value.total || 0} ${tt('张订单')}`, meta: `${salesDone.value} ${tt('张已审核')}`, signal: tt('业务流入'),
-      bars: (sales.value.byCustomer || []).map((item) => Number(item.value || 0)),
+      // 微条改用聚合口径(含「其它/未填客户」),与销售页签的甜甜圈同源;原用 byCustomer 是纯 TOP6
+      bars: (sales.value.customerShare || []).map((item) => Number(item.value || 0)),
     },
   ]
 })
@@ -1855,6 +1891,16 @@ function go(path, title) {
   width: 3px;
   background: var(--t-primary);
   content: '';
+}
+/* 标题带右侧分段开关(2026-10-15 销售排行口径切换):只加在带开关的卡上,不影响其它卡 */
+.card-title.with-seg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.card-title.with-seg .card-seg {
+  margin-left: auto;
+  font-weight: 400;
 }
 .chart-box {
   min-height: 220px;

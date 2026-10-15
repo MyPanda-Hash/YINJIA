@@ -28,7 +28,11 @@
       </el-tooltip>
     </div>
 
-    <!-- ===== 中：账号 / 认证状态·企业 / 登录日期 / 服务到期 ===== -->
+    <!-- ===== 中：账号 / 认证状态·企业 / 登录日期 =====
+         「服务到期」原为 T+ 顶栏的占位信息(user.serviceEnd 还带 '2027-08-13' 兜底假日期),
+         2026-10-15 按用户口径**从顶栏去掉** —— 顶栏只留真正的账号上下文;
+         该信息仍保留在「用户信息」弹窗里(见下方 el-descriptions)。
+         ⚠ 原先还带 id="serviceEndTime",已一并移除(无外部引用)。 -->
     <div class="t-center">
       <span class="t-user-info" id="useraccount">{{ user.account || user.realName }}</span>
       <span class="attestation">
@@ -39,7 +43,6 @@
         <span class="company">{{ user.factoryName }}</span>
       </span>
       <span class="t-user-info" id="logindate">{{ tt('登录日期') }} {{ user.loginDateText }}</span>
-      <span class="t-user-info" id="serviceEndTime">{{ tt('服务到期') }} {{ user.serviceEnd }}</span>
     </div>
 
     <!-- ===== 右：语言切换 / 搜索 / 更新公告 / 移动端 / 通知角标 / 全屏 / 帮助 / 用户 ===== -->

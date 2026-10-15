@@ -144,7 +144,41 @@ public class SysAdminService {
             isAdmin = (!r.isEmpty() && "Y".equals(r.get(0))) ? "Y" : "N";
         }
         Object id = body.get("id");
-        if (id != null && !String.valueOf(id).isBlank()) {
+        boolean editing = id != null && !String.valueOf(id).isBlank();
+
+        // ── 自锁守卫(2026-10-15 用户口径)────────────────────────────────────────
+        // 对照:userDelete 早有「不能删自己 / 不能删管理员」两条守卫,但**停用与降权没有** ——
+        //   同样是把自己锁在门外(进不去组织架构就再也改不回来),而且一路无提示。
+        //   口令是单向哈希、系统里也没有任何找回通道 ⇒ 一旦锁死只能改库,故三条一起补。
+        if (editing) {
+            int targetId = Integer.parseInt(String.valueOf(id));
+            List<Map<String, Object>> cur = jdbc.queryForList(
+                    "SELECT username, is_admin FROM yj_user WHERE id = ?", targetId);
+            if (cur.isEmpty()) throw new IllegalStateException("账号不存在");
+            String targetName = String.valueOf(cur.get(0).get("username"));
+            boolean targetIsAdminNow = "Y".equals(String.valueOf(cur.get(0).get("is_admin")));
+            boolean isSelf = targetName.equalsIgnoreCase(currentUsername());
+            // ① 不能停用当前登录账号
+            if (isSelf && !"1".equals(enabled)) {
+                throw new IllegalStateException("不能停用当前登录的账号：" + targetName);
+            }
+            // ② 不能把当前登录账号降为非管理员(is_admin 由 roleId 反查,改角色即降权)
+            if (isSelf && !"Y".equals(isAdmin)) {
+                throw new IllegalStateException("不能把当前登录的账号改为非管理员：" + targetName);
+            }
+            // ③ 不能停用/降权最后一个可用管理员 —— 防线之三:即便"当前账号"判定因将来改动而放宽
+            //    (或当前登录账号自身已被停用),也不会出现「一个能管组织架构的管理员都不剩」。
+            boolean staysUsableAdmin = "Y".equals(isAdmin) && "1".equals(enabled);
+            if (targetIsAdminNow && !staysUsableAdmin) {
+                Integer enabledAdmins = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM yj_user WHERE is_admin = 'Y' AND enabled = '1'", Integer.class);
+                if (enabledAdmins != null && enabledAdmins <= 1) {
+                    throw new IllegalStateException("系统至少要保留一个启用的管理员账号：" + targetName);
+                }
+            }
+        }
+
+        if (editing) {
             if (!password.isBlank()) {
                 jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=?, 生产车间=?, password_hash=? WHERE id=?",
                         realName, deptId, roleId, enabled, isAdmin, workshop, encoder.encode(password), Integer.parseInt(String.valueOf(id)));

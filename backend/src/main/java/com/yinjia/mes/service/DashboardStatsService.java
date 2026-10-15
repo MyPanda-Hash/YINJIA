@@ -44,7 +44,7 @@ public class DashboardStatsService {
         out.put("archives", archives());
         out.put("docStats", docStats());
         out.put("todos", List.of());
-        out.put("latest", List.of());
+        out.put("latest", latestActivities());
         out.put("progress", progress());
         out.put("production", production());
         out.put("stock", stock());
@@ -57,24 +57,67 @@ public class DashboardStatsService {
     // ---------- 概览 KPI / 档案 / 单据流量 ----------
 
     private Map<String, Object> kpis() {
+        Map<String, Object> kpis = new HashMap<>();
+        // ── 生产口径统一到 plang(2026-10-15 修)────────────────────────────────
+        // 修前:moActive = Σ(所有面板的「草稿」) = 48;moTotal = Σ(MANU*/WO_* 面板的草稿+已审核) = 0
+        //   (MANU_ORDER/WO_ORDER 这两个面板本来就没有单据行 ⇒ moTotal 恒 0)。
+        //   后果:「生产任务负载」卡主值 48、脚注「总计 0 单」自相矛盾;
+        //   闭环率 = 已完工 / moTotal = 0/0 ⇒ **恒零的死指标**;
+        //   而卡上那句「25 单生产中」其实是对的 —— 它来自 prod.statusDist,查的是 plang。
+        //   真实工单只有 plang 一处(25 张在产)⇒ 三数统一由 plang 派生,保证 在产+已完工=总数。
+        try {
+            int moTotal = count("SELECT COUNT(*) FROM plang");
+            int moDone = count("SELECT COUNT(*) FROM plang WHERE rk_no IS NOT NULL AND rk_no <> ''");
+            kpis.put("moTotal", moTotal);
+            kpis.put("moDone", moDone);
+            kpis.put("moActive", Math.max(0, moTotal - moDone));
+        } catch (Exception e) {
+            kpis.put("moTotal", 0);
+            kpis.put("moDone", 0);
+            kpis.put("moActive", 0);
+        }
+        // 全系统草稿/已审核:保留(将来做「待处理草稿」卡要用),但卡片不再拿它当生产数
         int draftTotal = 0;
         int auditTotal = 0;
-        int moTotal = 0;
         for (Map<String, Object> row : docStats()) {
             Map<?, ?> st = (Map<?, ?>) row.get("status");
-            int draft = toInt(st.get("草稿"));
-            int audited = toInt(st.get("已审核"));
-            draftTotal += draft;
-            auditTotal += audited;
-            if (String.valueOf(row.get("panelCode")).startsWith("MANU") || String.valueOf(row.get("panelCode")).startsWith("WO_")) {
-                moTotal += draft + audited;
-            }
+            draftTotal += toInt(st.get("草稿"));
+            auditTotal += toInt(st.get("已审核"));
         }
-        Map<String, Object> kpis = new HashMap<>();
-        kpis.put("moActive", draftTotal);
-        kpis.put("moTotal", moTotal);
+        kpis.put("draftTotal", draftTotal);
+        kpis.put("auditTotal", auditTotal);
         kpis.put("approvePending", 0);
         return kpis;
+    }
+
+    /**
+     * 实时业务事件流:最近 6 条单据审核活动(取 yj_doc_status 审核留痕)。
+     *
+     * ⚠ 2026-10-15 前这里写的是 `out.put("latest", List.of())` —— **硬编码空列表**,
+     *   卡片标题「实时业务事件流 / 来自 SQL 业务单据的最新活动」却永远只显示空态,
+     *   等于一个没接数据源的死卡片。现接上真实活动(540 条可用留痕)。
+     * 时间统一转成字符串下发:前端 compactTime() 按"长度 ≥ 16 的字符串"切 MM-DD HH:mm,
+     *   若下发 epoch 数字会原样显示成一串毫秒。
+     */
+    private List<Map<String, Object>> latestActivities() {
+        try {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT TOP 6 doc_no, panel_code, shr, shsj FROM yj_doc_status"
+                            + " WHERE shsj IS NOT NULL AND ISNULL(canceled,'N')<>'Y' AND ISNULL(panel_code,'')<>''"
+                            + " ORDER BY shsj DESC")) {
+                Map<String, Object> e = new LinkedHashMap<>();
+                e.put("编号", String.valueOf(r.get("doc_no")));
+                e.put("panel", String.valueOf(r.get("panel_code")));
+                e.put("状态", "已审核");
+                e.put("时间", r.get("shsj") == null ? null : String.valueOf(r.get("shsj")));
+                e.put("操作人", r.get("shr") == null ? "" : String.valueOf(r.get("shr")));
+                out.add(e);
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private Map<String, Object> archives() {
@@ -133,6 +176,10 @@ public class DashboardStatsService {
             prod.put("workshopDist", nameValue("SELECT scx AS k, COUNT(*) AS v FROM plang"
                     + " WHERE ISNULL(scx,'') <> '' GROUP BY scx ORDER BY COUNT(*) DESC"));
             prod.put("trend7", dateTrend("plang", "pl_date", "cp_date"));
+            // 工单数据截止日(2026-10-15):近 7 天趋势全 0 时,卡片要能说明"不是图坏了,
+            // 是工单数据本身就停在某天" —— 实测本机 plang 的日期都在 2026-08。
+            List<Map<String, Object>> lastRow = jdbc.queryForList("SELECT CONVERT(varchar(10), MAX(pl_date), 23) AS d FROM plang");
+            prod.put("lastDate", lastRow.isEmpty() ? null : lastRow.get(0).get("d"));
             prod.put("stageRates", stageRates());
             prod.put("bomTree", List.of());
         } catch (Exception e) {
@@ -141,6 +188,7 @@ public class DashboardStatsService {
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
             prod.put("bomTree", List.of());
+            prod.put("lastDate", null);
         }
         return prod;
     }
@@ -340,31 +388,93 @@ public class DashboardStatsService {
                     + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(单据状态,'')<>'' GROUP BY 单据状态 ORDER BY COUNT(*) DESC"));
             sales.put("byCustomer", nameValue("SELECT TOP 6 客户 AS k, COUNT(*) AS v FROM bd_so_order"
                     + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(客户,'')<>'' GROUP BY 客户 ORDER BY COUNT(*) DESC"));
-            sales.put("trend7", soTrend());
+            sales.put("trend7", soTrend(7));
+            sales.put("trend30", soTrend(30));
             sales.put("topProducts", nameValue("SELECT TOP 8 存货名称 AS k, SUM(ISNULL(数量,0)) AS v FROM bl_so_order"
                     + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货名称,'')<>'' GROUP BY 存货名称 ORDER BY SUM(ISNULL(数量,0)) DESC"));
+            // ── 2026-10-15 补「金额维度」与「口径对得上」 ────────────────────────────
+            // ⚠ 原设计只有 TOP6 且过滤掉客户为空的行 ⇒ 甜甜圈中心 98 而 KPI 写 335,用户以为丢单。
+            //   新增的 customerShare* 把 TOP6 之外的聚合成「其它」、空客户单列「未填客户」,
+            //   **各片合计恒等于全量**(订单数口径=total,金额口径=amount),与 KPI 永远对得上。
+            sales.put("customerShare", customerShare(
+                    "SELECT CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END AS k,"
+                            + " COUNT(*) AS v FROM bd_so_order h WHERE ISNULL(h.asp_cancel,'N')<>'Y' GROUP BY"
+                            + " CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END"));
+            sales.put("customerShareAmount", customerShare(
+                    "SELECT CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END AS k,"
+                            + " SUM(ISNULL(l.金额,0)) AS v FROM bd_so_order h JOIN bl_so_order l ON l.单据编号 = h.单据编号"
+                            + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' GROUP BY"
+                            + " CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END"));
+            sales.put("topProductsAmount", nameValue("SELECT TOP 8 存货名称 AS k, SUM(ISNULL(金额,0)) AS v FROM bl_so_order"
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货名称,'')<>'' GROUP BY 存货名称 ORDER BY SUM(ISNULL(金额,0)) DESC"));
         } catch (Exception e) {
             sales.put("byStatus", List.of());
             sales.put("byCustomer", List.of());
             sales.put("trend7", List.of());
+            sales.put("trend30", List.of());
             sales.put("topProducts", List.of());
+            sales.put("topProductsAmount", List.of());
+            sales.put("customerShare", List.of());
+            sales.put("customerShareAmount", List.of());
         }
         return sales;
     }
 
-    /** 销售近 7 天双序列:added=单据日期(新增),done=yj_doc_status.shsj(审核)按日 */
-    private List<Map<String, Object>> soTrend() {
-        List<String> days = lastDays(7);
+    /**
+     * 客户分布(聚合版):TOP6 + 「未填客户」+ 「其它」 —— 各片合计**恒等于全量**。
+     * 与 byCustomer 的区别:byCustomer 是纯 TOP6 且丢掉空客户的行,合计对不上 KPI。
+     * 排序按值降序;「未填客户」已在 TOP6 内则不重复追加;其余不足 6 名的并成「其它」。
+     */
+    private List<Map<String, Object>> customerShare(String sql) {
+        try {
+            List<Map<String, Object>> named = new ArrayList<>();
+            Map<String, Object> blank = null;
+            for (Map<String, Object> r : jdbc.queryForList(sql)) {
+                String k = String.valueOf(r.get("k"));
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", "__BLANK__".equals(k) ? "未填客户" : k);
+                item.put("value", toNum(r.get("v")));
+                if ("__BLANK__".equals(k)) blank = item; else named.add(item);
+            }
+            named.sort((a, b) -> Double.compare(numOf(b), numOf(a)));
+            List<Map<String, Object>> out = new ArrayList<>();
+            double rest = 0;
+            for (int i = 0; i < named.size(); i++) {
+                if (i < 6) out.add(named.get(i)); else rest += numOf(named.get(i));
+            }
+            boolean blankInTop = out.stream().anyMatch((x) -> "未填客户".equals(x.get("name")));
+            if (blank != null && !blankInTop && numOf(blank) > 0) out.add(blank);
+            if (rest > 0) {
+                Map<String, Object> other = new LinkedHashMap<>();
+                other.put("name", "其它");
+                other.put("value", toNum(rest));
+                out.add(other);
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private static double numOf(Map<String, Object> m) {
+        Object v = m == null ? null : m.get("value");
+        return v instanceof Number n ? n.doubleValue() : 0;
+    }
+
+    /** 销售近 N 天双序列:added=单据日期(新增),done=yj_doc_status.shsj(审核)按日 */
+    private List<Map<String, Object>> soTrend(int days) {
+        List<String> dayList = lastDays(days);
+        int back = Math.max(0, days - 1);
         Map<String, int[]> byDay = new LinkedHashMap<>();
-        for (String d : days) byDay.put(d, new int[2]);
+        for (String d : dayList) byDay.put(d, new int[2]);
         fillTrend(byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
-                + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
+                + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-" + back + ",CONVERT(date,GETDATE()))"
                 + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0);
         fillTrend(byDay, "SELECT CONVERT(varchar(10), s.shsj, 23) AS d, COUNT(*) AS v FROM yj_doc_status s"
                 + " JOIN bd_so_order h ON h.单据编号 = s.doc_no AND ISNULL(h.asp_cancel,'N')<>'Y'"
-                + " WHERE s.panel_code = 'SO_ORDER' AND s.shsj IS NOT NULL AND s.shsj >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
+                + " WHERE s.panel_code = 'SO_ORDER' AND s.shsj IS NOT NULL AND s.shsj >= DATEADD(day,-" + back + ",CONVERT(date,GETDATE()))"
                 + " GROUP BY CONVERT(varchar(10), s.shsj, 23)", 1);
-        return toTrend(days, byDay);
+        return toTrend(dayList, byDay);
     }
 
     // ---------- 质量 ----------

@@ -70,7 +70,7 @@
         <span class="col-title">{{ tt('角色与面板权限') }}</span>
         <el-button type="primary" size="small" @click="newRoleVisible = true">{{ tt('创建角色') }}</el-button>
       </div>
-      <el-table :data="roles" size="small" border height="200" highlight-current-row @current-change="onRoleSelect">
+      <el-table ref="roleTableRef" :data="roles" size="small" border height="200" highlight-current-row @current-change="onRoleSelect">
         <el-table-column prop="roleName" :label="tt('角色名称')" min-width="110" />
         <el-table-column prop="roleCode" :label="tt('编码')" width="100" />
         <el-table-column :label="tt('类型')" width="64" align="center">
@@ -88,6 +88,10 @@
 
       <div v-if="selRole" class="perm-box">
         <div class="perm-head">
+          <!-- 返回:退出权限配置态、回到三列布局(2026-10-15 用户报「变成上下模式退不回去,只能退出网页再进来」)。
+               必须**同时清掉角色表的 currentRow** —— el-table 的 current-change 对"再点同一行"不触发,
+               只清 selRole 的话,返回后点原来那个角色**再也打不开**了。 -->
+          <el-button size="small" link type="primary" class="perm-back" @click="closeRolePerms">← {{ tt('返回') }}</el-button>
           「{{ selRole.roleName }}」{{ tt('面板操作权限') }}
           <span class="perm-sub">{{ tt('（勾选对应操作权限;可见=能看到面板,其余为操作级别）') }}</span>
           <span class="perm-copy">
@@ -210,9 +214,22 @@
         <el-form-item :label="tt('姓名')">
           <el-input v-model="userForm.realName" :placeholder="tt('真实姓名')" />
         </el-form-item>
-        <el-form-item v-if="!editingUser" :label="tt('密码')">
-          <el-input v-model="userForm.password" type="password" :placeholder="tt('默认 123456')" />
+        <!-- 密码：新建必填；编辑时由「重置密码」开关控制(2026-10-15)。
+             原先这里写死 `v-if="!editingUser"` —— 编辑保存时 password 恒为空串，后端
+             SysAdminService:148 以 isBlank() 判定「保持原口令」⇒ 管理员**无法重置他人密码**，
+             且不报任何错。开关默认关 = 不动口令，避免"只想改个姓名却把口令改了"。 -->
+        <el-form-item v-if="!editingUser" :label="tt('密码')" required>
+          <el-input v-model="userForm.password" type="password" show-password :placeholder="tt('默认 123456')" />
         </el-form-item>
+        <template v-else>
+          <el-form-item :label="tt('重置密码')">
+            <el-switch v-model="userForm.resetPassword" />
+          </el-form-item>
+          <el-form-item v-if="userForm.resetPassword" :label="tt('新密码')" required>
+            <el-input v-model="userForm.password" type="password" show-password
+                      :placeholder="tt('新密码')" />
+          </el-form-item>
+        </template>
         <el-form-item :label="tt('部门')">
           <el-tree-select v-model="userForm.deptId" :data="deptSelectData" check-strictly clearable style="width: 100%" />
         </el-form-item>
@@ -267,6 +284,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
+import { buildUserSaveBody, emptyUserForm, REASON_LABEL, toSwitchEnabled } from '@core/sys/userForm'
 import PermRow from './PermRow.vue'
 
 const user = useUserStore()
@@ -772,6 +790,8 @@ async function copyRolePerms() {
   }
 }
 const selRole = ref(null)
+/** 角色表实例:返回时要一并清 currentRow(否则同一个角色点不开第二次) */
+const roleTableRef = ref(null)
 const panelRows = ref([])
 const saving = ref(false)
 const savingUser = ref(false)
@@ -779,7 +799,7 @@ const savingRole = ref(false)
 
 const userVisible = ref(false)
 const editingUser = ref(null)
-const userForm = reactive({ userName: '', realName: '', password: '', deptId: null, roleId: null, workshop: '', enabled: 1 })
+const userForm = reactive(emptyUserForm())
 const workshops = ref([])
 const newRoleVisible = ref(false)
 const roleForm = reactive({ roleCode: '', roleName: '', remark: '' })
@@ -911,13 +931,16 @@ async function delUser(row) {
 
 function openUser(row) {
   editingUser.value = row || null
+  // 先清成空表单(把上次残留的 password / 重置密码开关一起清掉),再填本行值
+  Object.assign(userForm, emptyUserForm())
   userForm.userName = row?.userName || ''
   userForm.realName = row?.realName || ''
-  userForm.password = ''
   userForm.deptId = row?.deptId ?? null
   userForm.roleId = row?.roleId ?? null
   userForm.workshop = row?.workshop || ''
-  userForm.enabled = row?.enabled ?? 1
+  // enabled 必须归一:接口给的是字符串 "1"/"0",而 el-switch 的 active/inactive 是数字 ——
+  // 不归一的话启用中的账号打开弹窗会显示成「关」,一保存就把账号停用了(2026-10-15 探针实测)
+  userForm.enabled = toSwitchEnabled(row?.enabled)
   loadWorkshops()
   userVisible.value = true
 }
@@ -932,12 +955,12 @@ async function loadWorkshops() {
 }
 
 async function saveUser() {
-  if (!userForm.userName.trim()) return ElMessage.warning(tt('请输入账号'))
+  // 取数口径收敛在 core/sys/userForm.js(有单测):什么时候发 password、什么时候必须拦
+  const built = buildUserSaveBody(userForm, editingUser.value?.id ?? null)
+  if (!built.ok) return ElMessage.warning(tt(REASON_LABEL[built.reason]))
   savingUser.value = true
   try {
-    const body = { ...userForm }
-    if (editingUser.value) body.id = editingUser.value.id
-    await request.post('/sys/user/save', body)
+    await request.post('/sys/user/save', built.body)
     ElMessage.success(tt('用户已保存'))
     userVisible.value = false
     await loadUsers()
@@ -992,6 +1015,17 @@ async function delRole(row) {
 async function onRoleSelect(row) {
   selRole.value = row
   if (row && !row.isAdmin) await loadRolePanels(row)
+}
+
+/**
+ * 退出权限配置态 → 回到最初的三列布局。
+ * ⚠ 必须连 `setCurrentRow(null)` 一起做:el-table 的 `current-change` 只在"当前行发生变化"时触发,
+ *   若只清 selRole 而表格仍把该行当作 current,用户返回后**再点同一个角色不会再触发**,
+ *   表现为"这个角色的权限再也打不开了"(比退不回去更难查)。
+ */
+function closeRolePerms() {
+  selRole.value = null
+  roleTableRef.value?.setCurrentRow?.(null)
 }
 
 async function loadRolePanels(row) {

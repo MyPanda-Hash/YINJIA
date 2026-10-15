@@ -15,7 +15,9 @@
         />
       </svg>
       <div class="donut-center">
-        <div class="donut-total">{{ total }}</div>
+        <!-- 走 fmt(组件内已有的千分位/万位紧凑口径):金额口径下原样输出会是 17630591.27 一串裸数字。
+             计数场景 < 1 万 ⇒ toLocaleString 结果与原来一致,对既有甜甜圈零影响。 -->
+        <div class="donut-total">{{ fmt(total) }}</div>
         <div class="donut-sub">{{ sub }}</div>
       </div>
     </div>
