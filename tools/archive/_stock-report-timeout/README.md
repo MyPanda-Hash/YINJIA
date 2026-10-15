@@ -66,20 +66,91 @@
 真浏览器复跑 `_probe-stock-timeout-browser.mjs`:打开库存状况表后 `/api` 请求里
 INV 那条已变成 `{"countOnly":true}`,**15 ms**,页面 50 行、分页「第 1/19 页」正常。
 
-## 六、留档文件
+## 六、⚠ 间歇性 15 s 超时的真正来源(2026-10-15 下午追加)
+
+用户追问「**是不是我当时在改后端或者增减数据导致的**」—— **是,而且这条才是间歇性超时的主因**;
+§3.1/§3.2 是"打开就慢"的常驻成本,这一条是"平时好好的、一超就是 15 s"的来源。
+
+### 6.1 现场状态:成本物化表是空的
+
+| 项 | 值 |
+|---|---|
+| `inv_cost_ledger`(移动加权成本物化表) | **0 行** |
+| `v_stock_balance` 的 `SUM(结存金额)` | 8,658,968.0950 |
+| `v_stock_movement` 的 `SUM(收入金额)` | 8,658,968.0950(**一分不差**) |
+
+⇒ 报表的「发出成本」这一层现在**完全没参与**,出库按 0 计价。见 [`q-11-cost.sql`](q-11-cost.sql)。
+
+### 6.2 重算这段 SQL 现在要 2 分钟
+
+`InvCostService.RECURSE`(`OPTION (MAXRECURSION 0)` 的递归 CTE)—— **只读**跑递归主体、
+不带 `DELETE`/`INSERT`,5,207 行流水 / 894 个 `(仓库键,存货编码)` 分区:
+
+| 次数 | 耗时 |
+|---|---|
+| 第 1 次 | **137,320 ms** |
+| 第 2 次 | **141,449 ms** |
+
+探针 [`q-12-recalc-timing.sql`](q-12-recalc-timing.sql)(只读,可复跑)。
+而 `InvCostService` 的注释还写着「单据审核/弃审后调它(**235 行流水,成本可忽略**)」
+—— 235 行的假设早已不成立(现 5,207 行,20 倍;递归段是 CTE 自连接逐行推进,随分区数退化)。
+
+### 6.3 谁在跑它、锁住了谁
+
+| 触发点 | 代码 |
+|---|---|
+| 8 类出入库单据 **审核 / 弃审**(每次!) | `ButtonService:4064 recalcInvCostIfStockDoc` → `invCost.recalcAll()` |
+| 面板「重算成本」按钮 | `ButtonService:4069 recalcInvCost` |
+| 启动自检(指纹不一致时) | `MesApplication:48` → `InvCostService.reconcileCostOnStartup` |
+
+`recalc()` 是 `@Transactional`,方法体 = `DELETE FROM inv_cost_ledger` + 递归 `INSERT … SELECT`
+⇒ **一个分钟级、全程锁住 `inv_cost_ledger` 的写事务**。而三张报表**都 JOIN 这张表**
+(`v_stock_ledger`/`v_stock_balance` 里 `LEFT JOIN dbo.inv_cost_ledger c ON c.src=m.src AND c.rid=m.rid`)
+⇒ 只要有人在审核/弃审/重算/同步,报表读就排在锁后面 → **前端 axios 15 s 超时**。
+
+### 6.4 回看本次排查早期的实测,全部对得上
+
+- `Probe.java` 第一次(11:40~11:57,当时另一会话正在批量删/导数据):
+  `COUNT v_stock_balance` **120 s**、`COUNT v_stock_ledger` **147 s**、`PAGE50 v_stock_balance` **158 s**;
+  同一条跑过一遍后 30~45 ms。当时归因"自动统计信息/坏计划",**现在看更应是等锁**。
+- 同一批里直接吃到一次**死锁牺牲品**(`SqlRunner` 报文:另一个进程持有可等待资源、当前会话被选作牺牲品)
+  —— **只读查询能死在锁上,前提就是有并发写事务**。
+- 库空闲时复测:三张报表接口 60~150 ms(§五)。
+
+**所以:"改后端代码"本身不会让库变慢**(重编译只影响进程本身),但
+①**重启服务 = 跑 DbSync 迁移**(`start-prod.ps1` 每次启动都同步,`ALTER TABLE`/`DELETE` 都是重写者);
+②**审核/弃审单据、金蝶同步、点「重算成本」** 才是那个分钟级写事务的扳机。
+"当时在增减数据"与现象完全吻合。
+
+### 6.5 建议(按性价比)
+
+1. **修重算 SQL(治本、优先)**:把 `s` 落进带聚簇索引 `(仓库键, 存货编码, rn)` 的临时表,
+   递归段对着它 seek —— 现在是 CTE 自连接逐行推进,894 个分区就退化到分钟级。目标:秒级。
+   顺带把空掉的 `inv_cost_ledger` 填回来(报表金额口径也一起恢复)。
+2. **别让写事务堵住读**:开 `READ_COMMITTED_SNAPSHOT`(RCSI),报表读不再被写事务阻塞(需拍板)。
+3. **重算失败要看得见**:`start-prod.ps1` 用 `Start-Process -WindowStyle Hidden` 起服务,
+   **stdout/stderr 全丢**(`backend/backend-out.log`、`backend-err.log` 至今 0 字节)
+   ⇒ 启动自检那句 `库存成本自检失败(不影响启动)` 谁也看不到。加个重定向即可。
+4. 报表物化(§四 末尾那条)仍然成立,但优先级排在 1 之后。
+
+## 七、留档文件
 
 | 文件 | 内容 |
 |---|---|
 | `q-01-config.sql` / `q-02-shape.sql` | 面板配置与数据量、参与表规模/索引/统计信息新鲜度 |
 | `q-03-qfields.sql` | 三张面板查询字段的参照源(证「存货 → INV」) |
 | `q-04-cols.sql` / `q-05-dbs.sql` | `yj_field` 列清单 / 实例上的库清单与兼容级别(生产库 = **100**) |
-| `Probe.java` / `Probe2.java` | DB 层计时:不带 hint 的 `COUNT(*)` 曾掉到 **120~158 s**(自动统计信息/坏计划),带 `OPTION(RECOMPILE)` 稳定 40~150 ms —— 佐证 RECOMPILE 必须保留 |
+| `Probe.java` / `Probe2.java` | DB 层计时:不带 hint 的 `COUNT(*)` 曾掉到 **120~158 s**,带 `OPTION(RECOMPILE)` 稳定 40~150 ms(§6.4 重新归因:那 120~158 s 更可能是**等锁**,不是坏计划 —— RECOMPILE 仍要保留,它是免疫陈旧计划的兜底) |
 | `_v-stock-timeout.cjs` / `_v-inv-and-cascade.cjs` / `_v-repeat.cjs` / `_v-panel-cfg.cjs` | 接口层计时与面板配置取证 |
 | `_probe-stock-timeout-browser.mjs` / `out-browser-repro.json` | **真浏览器复现**:逐请求列出打开的页面发了哪些 `/api`(修复前后对照) |
 | `_v-countonly-accept.cjs` | **验收脚本**(ALL PASS 即达标,可复跑) |
 | `q-06-bsinv.sql` / `q-07-locale.sql` | 顺带取证:两账套 `migrate-bs-inv-inspection-align-20261015.sql` 自检 —— 正式库 PASS、**测试库 FAIL(译名只落 1 条)**,见下方附记 |
+| `q-08-schemalog.sql` / `q-09-recent.sql` | 迁移日志:本次重启实际执行了哪两条脚本(用于排除「漂移是不是我这次重启造成的」) |
+| `q-10-writes.sql` | 报表源表最近被写的时间(证明当时确有并发写活动) |
+| `q-11-cost.sql` | **成本物化表 0 行**、结存金额 == Σ收入金额(口径已退化) |
+| `q-12-recalc-timing.sql` | **成本重算递归主体 137~141 s**(§六 的核心证据) |
 
-## 七、复跑方式
+## 八、复跑方式
 
 ```powershell
 # 接口验收(需 8090 在跑)
