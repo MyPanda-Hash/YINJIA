@@ -567,20 +567,38 @@
                     ? tt('上月月结已取消,以下陈列该月原始单据')
                     : tt('上月未月结,以下陈列该月原始单据') }}
                 </div>
-                <!-- 展开 = 这一行余额的来源:上月已月结就只有那张结转单(用户第八轮截图:
-                     「只要上一个月的结转,就是 9 月的」);上月没结/被取消才退回该月原始单据。
-                     上月期末结存 = 0 的键**本来就不写结转行** ⇒ 这里给一句人话,免得空表像坏了。 -->
+                <!-- **二次展开**(用户 2026-10-15 第十五轮:「根据统一批次号不同单据做二次展开」):
+                     外层 = 批次号一行(汇总:月结数量 / 当月单据数 / 当月合计 / 余额),
+                     点该行的 `>` 再展开 ⇒ 该批次的单据明细(**第一条是月结**,后面是当月单据)。 -->
                 <el-table v-if="(mcDetail[row.id]['单据明细'] || []).length"
-                          :data="mcDetail[row.id]['单据明细']" size="small" border max-height="340" show-summary>
-                  <el-table-column prop="月份" :label="tt('月份')" width="82" />
-                  <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
-                  <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
-                  <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
-                  <el-table-column prop="批号" :label="tt('批次号')" width="140" />
-                  <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
-                  <!-- 单价:用户 2026-10-15「把单价也给我删除了」⇒ 不展示(入库是单据单价、出库是成本单价,两把尺子) -->
-                  <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
-                  <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
+                          :data="mcBatchGroups(row.id)" size="small" border row-key="批次号">
+                  <el-table-column type="expand" width="46">
+                    <template #default="{ row: g }">
+                      <el-table :data="g.单据" size="small" border max-height="300">
+                        <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+                        <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
+                        <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
+                        <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
+                        <!-- 单价:用户 2026-10-15「把单价也给我删除了」⇒ 不展示 -->
+                        <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
+                        <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
+                      </el-table>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="批次号" :label="tt('批次号')" width="150">
+                    <template #default="{ row: g }">
+                      {{ g.批次号 || tt('无批次号') }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="月结数量" :label="tt('月结数量')" width="120" align="right" />
+                  <el-table-column prop="当月单据数" :label="tt('当月单据数')" width="110" align="right" />
+                  <el-table-column prop="当月合计" :label="tt('当月合计')" width="110" align="right" />
+                  <el-table-column prop="余额" :label="tt('余额')" width="110" align="right" />
+                  <el-table-column :label="tt('首次月结')" min-width="140">
+                    <template #default="{ row: g }">
+                      {{ (g.单据.find((x) => String(x['单据类型'] || '').includes('月结')) || {})['单据编号'] || '—' }}
+                    </template>
+                  </el-table-column>
                 </el-table>
                 <div v-else class="mc-detail-snap mc-dim">
                   {{ mcDetail[row.id]['上月状态'] === '已月结'
@@ -2768,6 +2786,7 @@ function pickWhDock(code) {
 // ---------- 库存明细:顶部常驻提示(上月未月结/已取消时一直显示)----------
 const mcStatus = ref(null)
 const mcNotice = computed(() => (isStockDetail.value ? (mcStatus.value?.['提示'] || '') : ''))
+
 async function loadMcStatus() {
   if (!isStockDetail.value) return
   try {
@@ -2777,9 +2796,34 @@ async function loadMcStatus() {
 }
 watch(isStockDetail, (v) => { if (v) loadMcStatus() }, { immediate: true })
 
-// ---------- 库存明细:行展开 → 该 (物料,仓库,批号) 的月结明细(快照 + 本月入库/出库 + 结转行)----------
+// ---------- 库存明细:行展开 → 该 (物料,仓库) 的月结明细;再按**批次号**二次展开看该批单据 ----------
 const mcDetail = ref({})
 const mcDetailLoading = ref({})
+
+/**
+ * 二次展开的数据源:把明细按**批次号**归组(用户 2026-10-15 第十五轮:
+ *   「根据统一批次号不同单据做二次展开」)。
+ *
+ * 组内**保持后端返回的顺序** —— 后端已按「批次号 → 组内月结行第一 → 日期 → 单号」排好,
+ * 所以外层每一行是一条批次号,点开就是「先月结、后当月单据」。
+ * 每组给四个汇总数:月结数量 / 当月单据数 / 当月合计 / 余额(= 月结 + 当月,即该批当前余额)。
+ */
+function mcBatchGroups(id) {
+  const rows = mcDetail.value?.[id]?.['单据明细'] || []
+  const map = new Map()
+  for (const r of rows) {
+    const key = String(r['批号'] ?? '')
+    if (!map.has(key)) map.set(key, { 批次号: key, 月结数量: 0, 当月单据数: 0, 当月合计: 0, 余额: 0, 单据: [] })
+    const g = map.get(key)
+    const qty = Number(r['数量'] || 0)
+    g.单据.push(r)
+    g.余额 += qty
+    if (String(r['单据类型'] || '').includes('月结')) g.月结数量 += qty
+    else { g.当月单据数 += 1; g.当月合计 += qty }
+  }
+  return [...map.values()].sort((a, b) => String(a.批次号).localeCompare(String(b.批次号), 'zh'))
+}
+
 async function onMcExpand(row, expanded) {
   if (!isStockDetail.value || !row) return
   const rows = Array.isArray(expanded) ? expanded : (expanded ? [row] : [])
