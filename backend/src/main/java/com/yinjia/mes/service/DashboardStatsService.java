@@ -21,7 +21,8 @@ import java.util.Map;
  *    现存量 TOP = v_stock_balance(库存状况表)按 存货编码+存货 跨仓库 SUM,全量下发由前端滚动展示;
  *  - 销售 = bd_so_order(头)/bl_so_order(行):状态取头表「单据状态」列(展示口径);金额=行 SUM(金额);
  *    TOP 产品 = 行 GROUP BY 存货名称。
- *  - 质量 = qc_insp_detail(明细):合格=SUM(合格数量),不合格=SUM(不良数量);趋势=按日期 送检/合格双线。
+ *  - 质量 = qc_insp_detail(明细):送检=SUM(送检数量),合格=SUM(合格数量),非合格=SUM(不合格数量);
+ *    趋势=按**表头 qc_insp.单据日期**分组的送检/合格双线(2026-10-15 修正列名口径,详见 quality())。
  *  - 研发 = rd_plan(实施计划单表):阶段进度按 阶段N_计划内容/实际完成 列在 Java 侧推导
  *    (未开始/进行中/逾期/全部完成),趋势=asp_time1 近 30 天新增。
  *  数据量级为起步演示库(几十行),聚合直查无索引压力;趋势日期在 Java 补零成连续序列。
@@ -371,33 +372,43 @@ public class DashboardStatsService {
     private Map<String, Object> quality() {
         Map<String, Object> quality = new HashMap<>();
         try {
-            int total = sum("SELECT ISNULL(SUM(ISNULL(数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
+            // ⚠ 列名口径(2026-10-15 修正):明细的数量列在面板上叫「送检数量」、不良列叫「不合格数量」——
+            //   2026-09-20 改过名(PanelConfigService.java:1148 / ButtonService.java:830),本方法当时漏改,
+            //   仍在 SUM(数量) / SUM(不良数量),而这两列**没有 yj_field**(面板无从录入)⇒ 看板恒 0。
+            int total = sum("SELECT ISNULL(SUM(ISNULL(送检数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
             int pass = sum("SELECT ISNULL(SUM(ISNULL(合格数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
-            int bad = sum("SELECT ISNULL(SUM(ISNULL(不良数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
+            int bad = sum("SELECT ISNULL(SUM(ISNULL(不合格数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
             quality.put("total", total);
             quality.put("pass", pass);
+            // 非合格数由后端下发:前端原用 total−pass,而 total 是另一列的口径,一旦两列不同源就会出负数
+            quality.put("bad", bad);
             quality.put("passRate", total > 0 ? Math.round(pass * 100.0 / total) : 0);
             List<Map<String, Object>> byResult = new ArrayList<>();
             byResult.add(Map.of("name", "合格", "value", pass));
             byResult.add(Map.of("name", "不合格", "value", bad));
             quality.put("byResult", byResult);
             // 近 7 天送检/合格(added=送检数量,done=合格数量,Java 补零)
+            // 日期口径(2026-10-15 用户拍板):按**表头 qc_insp.单据日期**分组。
+            //   明细的「日期」列是 nvarchar(40) 且 hidden=1(面板看不见、靠链路带),既取不到值,
+            //   拿字符串跟日期比还会隐式转换报错 ⇒ 整段掉进 catch 静默全 0。
             Map<String, int[]> byDay = new LinkedHashMap<>();
             List<String> days = lastDays(7);
             for (String d : days) byDay.put(d, new int[2]);
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), 日期, 23) AS d"
-                    + ", SUM(ISNULL(数量,0)) AS sent, SUM(ISNULL(合格数量,0)) AS ok FROM qc_insp_detail"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 日期 >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
-                    + " GROUP BY CONVERT(varchar(10), 日期, 23)")) {
+            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), h.单据日期, 23) AS d"
+                    + ", SUM(ISNULL(d.送检数量,0)) AS sent, SUM(ISNULL(d.合格数量,0)) AS ok"
+                    + " FROM qc_insp_detail d JOIN qc_insp h ON h.单据编号 = d.单据编号"
+                    + " WHERE ISNULL(d.asp_cancel,'N')<>'Y' AND h.单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
+                    + " GROUP BY CONVERT(varchar(10), h.单据日期, 23)")) {
                 int[] slot = byDay.get(String.valueOf(r.get("d")));
                 if (slot != null) { slot[0] = toInt(r.get("sent")); slot[1] = toInt(r.get("ok")); }
             }
             quality.put("trend7", toTrend(days, byDay));
-            quality.put("defectItems", nameValue("SELECT TOP 8 物料名称 AS k, SUM(ISNULL(不良数量,0)) AS v FROM qc_insp_detail"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(不良数量,0) > 0 GROUP BY 物料名称 ORDER BY SUM(ISNULL(不良数量,0)) DESC"));
+            quality.put("defectItems", nameValue("SELECT TOP 8 物料名称 AS k, SUM(ISNULL(不合格数量,0)) AS v FROM qc_insp_detail"
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(不合格数量,0) > 0 GROUP BY 物料名称 ORDER BY SUM(ISNULL(不合格数量,0)) DESC"));
         } catch (Exception e) {
             quality.put("total", 0);
             quality.put("pass", 0);
+            quality.put("bad", 0);
             quality.put("passRate", 0);
             quality.put("byResult", List.of());
             quality.put("trend7", List.of());

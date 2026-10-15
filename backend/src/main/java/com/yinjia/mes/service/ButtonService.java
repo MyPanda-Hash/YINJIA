@@ -405,7 +405,7 @@ public class ButtonService {
         //  提交审批/审批通过双双被拒,撤回/弃审也够不着)
         if ("删除申请中".equals(stStatus)) throw new IllegalStateException("删除申请审批期间不可保存，请等待审批完成或撤回申请");
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
-        // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
+        // 来料检验单数量守恒:每行 合格数量+不合格数量 ≤ 送检数量,超限拒绝保存
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
         // ⚠ 原「样品编号表(RD_SAMPLE_NO)的样品编号唯一性校验」2026-09-30 随面板下架移除
         //   (用户口径「样品编号表删掉」,见 tools/migrate-drop-sample-no-panel-2026-09-30.sql);
@@ -1397,7 +1397,7 @@ public class ButtonService {
         // —— 与「审批通过」共用同一方法,避免再次出现"只在审核路径生效"的漏挂(见 runWoAuditHooks 注释)
         runWoAuditHooks(def, no, currentUserName());
         // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
-        // 不良数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
+        // 不合格数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
         inspAutoPurchaseIn(def.code(), no, currentUserName());
         inspAutoReturn(def.code(), no, currentUserName());
         // 暂收退料单审核 → 把**勾了明细行「特采」开关**的行逐行生成特采单(2026-10-04 口径:
@@ -2946,7 +2946,10 @@ public class ButtonService {
                         + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号,"
+                // 2026-10-15:原先 SELECT 里没有「单位」,而下面 line.put("单位", ...) 恒拿 NULL 被守卫挡掉
+                //   (注释写着"退回行另有单位列,原先只写计量单位 → 单位全空"却没把列取回来)⇒ 补进 SELECT。
+                //   「数量」是 2026-09-20 已改名为「送检数量」的旧列(无 yj_field、恒 NULL),不再取。
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
                         + " 送检数量, 部门名称, 生产日期, 备注"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:特采判定已移到「暂收退料单」按钮 —— 检验行不再分流,
@@ -3025,20 +3028,20 @@ public class ButtonService {
                             + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
                             + " VALUES ('QC_INSP', ?, ?, 'PURCHASE_IN', ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
                     no, no + "#" + r.get("id"), piNo, piNo + "#" + tgtIds.get(i), r.get("物料编码"),
-                    r.get("数量"), r.get("合格数量"), h.get("批次号"), h.get("批次键"), user);
+                    r.get("送检数量"), r.get("合格数量"), h.get("批次号"), h.get("批次键"), user);
             jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     piNo, user, r.get("id"));
         }
     }
 
     /**
-     * 来料检验单(QC_INSP)审核后,把 不良数量>0 的明细行自动生成暂收退回单(QC_RETURN)草稿(2026-09-16):
-     * 退货数量=不良数量;物料编码/物料名称/规格型号/计量单位/单价/备注 ← 检验行;
+     * 来料检验单(QC_INSP)审核后,把 不合格数量>0 的明细行自动生成暂收退回单(QC_RETURN)草稿(2026-09-16):
+     * 退货数量=不合格数量;物料编码/物料名称/规格型号/计量单位/单价/备注 ← 检验行;
      * 头带入 业务员/供应商代码/供应商/部门/部门名称 + **采购订单号**(2026-09-20 随链下传,便于退回单追溯到原订单);
      * 行带入 **采购订单行号**;单据日期=创建当日不继承(2026-09-17 口径)。
-     * 行级占用写 form_flow_link(QC_INSP→QC_RETURN,source_quantity=数量,linked_quantity=不良数量,
+     * 行级占用写 form_flow_link(QC_INSP→QC_RETURN,source_quantity=送检数量,linked_quantity=不合格数量,
      * 与采购入库单的 合格 占用并行,余量=待检部分)。幂等:已有 ACTIVE 占用(重审)跳过;
-     * 无不良数量的行不生成(不产生空退回单)。检验明细无「退回单号」列,不做回填(入库侧回填见 inspAutoPurchaseIn)。
+     * 无不合格数量的行不生成(不产生空退回单)。检验明细无「退回单号」列,不做回填(入库侧回填见 inspAutoPurchaseIn)。
      * 生成的退回单留草稿由业务确认审核。
      *
      * 2026-09-20 修正三处「写了但落不了」的字段(标签与目标面板不一致/目标列缺失,保存时被静默忽略):
@@ -3079,15 +3082,23 @@ public class ButtonService {
                 "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_INSP' AND source_form_no=?"
                         + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
+        // ⚠ 列名口径(2026-10-15 修正):面板上数量列叫「送检数量」、不良列叫「不合格数量」——
+        //   2026-09-20 改过名(PanelConfigService.java:1148),本方法当时漏改,仍在读旧列
+        //   「数量」「不良数量」:这两列没有 yj_field、没有任何代码写它们(两账套实测非空值恒 0 行),
+        //   numOr(NULL)=0 ⇒ 下面不良行过滤恒空 ⇒ 本方法每次都直接 return ⇒
+        //   **检验单审核永远不生暂收退回单**,2026-10-04 定的「检验单→暂收退料单→特采单」第一环就断。
+        //   与已修好的兄弟方法 tcInApprovedGenerate(:3400) 同款别名链,血统两侧都能落。
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 不良数量, 送检数量,"
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号,"
+                        + " ISNULL(NULLIF(送检数量,0), 数量) AS 送检数量,"
+                        + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量,"
                         + " 备注, 单位, 计量单位, 单价, 采购订单行号"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:不再排除特采行 —— 特采改由本退料单审批通过后的「特采」按钮发起,
                         // 退料单因此成为特采的前置单据(它的「送检数量」就是特采单总数量的来源)
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> defect = rows.stream()
-                .filter(r -> numOr(r.get("不良数量")) > 0).toList();
+                .filter(r -> numOr(r.get("不合格数量")) > 0).toList();
         if (defect.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次号, 批次键 FROM qc_insp"
@@ -3105,7 +3116,7 @@ public class ButtonService {
             line.put("物料编码", r.get("物料编码"));
             line.put("物料名称", r.get("物料名称"));
             line.put("规格型号", r.get("规格型号"));   // 退回行字段=规格型号(原写「型号」落不下)
-            if (qtyLabel != null) line.put(qtyLabel, r.get("不良数量")); // 数量=检验行不良数量(标签按目标注册二择一)
+            if (qtyLabel != null) line.put(qtyLabel, r.get("不合格数量")); // 数量=检验行不合格数量(标签按目标注册二择一)
             // 送检数量(2026-10-04 用户口径):本退料单要**记录来料检验单送检数据的数量** ——
             // 退料单审批通过后点「特采」,特采单的「总数量」就取它。列存在才写(血统守卫)。
             if (thDef.byLabel("送检数量") != null) line.put("送检数量", r.get("送检数量"));
@@ -3149,7 +3160,7 @@ public class ButtonService {
                             + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
                             + " VALUES ('QC_INSP', ?, ?, 'QC_RETURN', ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
                     no, no + "#" + r.get("id"), thNo, thNo + "#" + tgtIds.get(i), r.get("物料编码"),
-                    r.get("数量"), r.get("不良数量"), h.get("批次号"), h.get("批次键"), user);
+                    r.get("送检数量"), r.get("不合格数量"), h.get("批次号"), h.get("批次键"), user);
         }
     }
 

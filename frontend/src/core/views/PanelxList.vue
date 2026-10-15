@@ -5051,8 +5051,9 @@ const docPrintRows = computed(() => {
   if (!b) return []
   return blockRows(b).filter((r) => !r._placeholder)
 })
-// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不良数量)
-const DOC_PRINT_MERGE_PAIRS = [['物料名称', '型号'], ['合格数量', '不良数量']]
+// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不合格数量)
+// ⚠ 按**字段标签**匹配,而「不良数量」2026-09-20 起叫「不合格数量」且该标签全库无面板注册 ⇒ 旧写法永不生效
+const DOC_PRINT_MERGE_PAIRS = [['物料名称', '型号'], ['合格数量', '不合格数量']]
 /** 列宽基准(按中文列名关键词,与界面语言无关);打印前归一化为百分比 */
 function dpBaseW(prop) {
   if (/序号/.test(prop)) return 4

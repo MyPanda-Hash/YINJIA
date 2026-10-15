@@ -3140,3 +3140,19 @@ migrate-wh-name-align-kingdee-20261014.sql
 #     `ADD [工单ID] float`),两账套各多出一列全 NULL 的 `工单ID float`(column_id 59/60)⇒ 自检 59/60 判 FAIL、sync 中止。
 #     已用 tools/archive/_fix-stray-gongdan-id-20261015.sql(守卫式删除,不登记进本清单)清掉,现两账套 58/59、工单ID 残留 0。
 migrate-stock-flow-trace-cols-20261015.sql
+
+# ── 2026-10-15 商品档案「来料检验」口径完整对齐服务器(用户拍板 A) ──
+#   为何:代码 QcRecvGenerateHandler.java:177 按 `bs_inv.来料检验` 逐行分流(送料暂收单「生成检验或入库单」,
+#   2026-10-05 用户口径「不再人工二选一」),但本地两账套**没有这一列**,只有上一代的计算列
+#   `是否来料检验`(migrate-po-inbound-fields.sql:20 建)⇒ 查一次就 Invalid column name '来料检验'、按钮 500。
+#   服务器备份库(YJMES2_SRV_1015,源 = yjmes2.bak)有真实列 `来料检验` nvarchar(10) NULL,且是活数据(否 3918 / 是 9)。
+#   该列本该由 migrate-material-inspection-field.sql(2026-09-20)建,但那条**登记为已执行、效果不在库**
+#   (2026-09-28 09:59 那批疑似 baseline 只登记未执行);同样残留见同日补回的 `qc_insp_detail.单位`。
+#   口径(完整对齐服务器,不自创第三种形态):建真实列 来料检验 ← 旧计算列回填 → 删旧计算列(bs_inv 列数 148 不变);
+#   INV 面板字段 是否来料检验(文本,header,45) → 来料检验(文本,detail,44,只读)、检验方式(下拉框) → 商品类型(文本,无字典);
+#   补 2 条译名(各 10 语言)+ 来料检验 列注明。
+#   ⚠ 只动 INV:`QC_PLAN`/`FINISH_IN` 的「检验方式」是**别的表自己的列**,不碰。
+#   安全性:`bs_inv.是否来料检验 / 来料检验` 不被任何视图/过程/索引/约束引用(三查皆空),DROP 无连带;
+#   Java 侧 `是否来料检验` 的引用全在 bl_purchase_in(采购入库行,另一张表)。
+#   自检:列就位/旧列已走/定义 nvarchar(10) NULL/两处字段配置与服务器一致/译名各 ≥10/注明非空/列数 148。幂等;两账套均执行。
+migrate-bs-inv-inspection-align-20261015.sql
