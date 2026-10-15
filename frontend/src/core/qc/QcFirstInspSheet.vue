@@ -112,9 +112,11 @@
         <tr v-for="sample in samples" :key="sample" class="sample-row">
           <th class="rowlabel">{{ sample }}#</th>
           <td v-for="c in columns" :key="c.key" :class="{ 'is-check': isCheckCol(c) }">
-            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …) -->
+            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …)。
+                 ⚠ 按图片:这两列只给 1#、2# 勾选项(相关要求第 1 条「表观及脱粉项目测试后记录2支样品数据」),
+                   3#..8# 打 `/`；isCheckCol 只管格子底色,要不要给选项另判 sample <= CHECK_SAMPLES。 -->
             <template v-if="isCheckCol(c)">
-              <div v-if="editable" class="fi-checks">
+              <div v-if="editable && sample <= CHECK_SAMPLES" class="fi-checks">
                 <span v-for="o in checkOptions(c)" :key="o" class="fi-check">
                   <span
                     class="fi-box"
@@ -230,6 +232,12 @@ const columns = computed(() => {
 const groups = computed(() => groupsOf(columns.value))
 const groupCols = (g) => columns.value.filter((c) => c.group === g)
 const samples = [1, 2, 3, 4, 5, 6, 7, 8]
+/**
+ * 表观/脱粉这两列**只给前 2 个样品勾选项** —— 图片里 3#..8# 的这两格是 `/`,
+ * 依据是纸面"相关要求"第 1 条「表观及脱粉项目测试后记录2支样品数据」。
+ * 其余列(尺寸/重量/强度/浊度/压降)八个样品都录(第 1 条同样说了要录 2 支,但图片上它们 8# 都给了录入格)。
+ */
+const CHECK_SAMPLES = 2
 
 /** 这一列的「定义行」(标准行)与某样品的行 —— 行不存在时按需补出来(老单据/手填列) */
 function rowOf(sample, col) {

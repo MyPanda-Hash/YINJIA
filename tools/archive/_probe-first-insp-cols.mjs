@@ -223,6 +223,17 @@ try {
   })()`)
   ok('④ 勾选后该格显示已勾选项', ticked.ok && /☑/.test(tickVal), tickVal)
 
+  // ④d 按图片:表观/脱粉两列只给 1#、2# 勾选项,3#..8# 打 / (相关要求第 1 条).
+  const perSample = await ev(`(() => {
+    const s = document.querySelector('.fi-sheet')
+    const rows = [...s.querySelectorAll('.sample-row')]
+    return rows.map((tr) => (tr.querySelectorAll('.fi-checks .fi-box').length))
+  })()`)
+  console.log(`  各样品行的勾选格数=${JSON.stringify(perSample)}`)
+  ok('④ 表观/脱粉只给 1#、2# 勾选项(3#..8# 是 /)',
+    perSample.length === 8 && perSample[0] > 0 && perSample[1] > 0 && perSample.slice(2).every((n) => n === 0),
+    JSON.stringify(perSample))
+
   // ④c 分组可选:把「炭棒表观状态」那列挪到「表观及脱粉」组,表头第一级应出现该分组
   const groupBefore = await ev(`[...document.querySelectorAll('.fi-sheet .fi-grid thead .group')].map(e => (e.innerText||'').trim())`)
   const moved = await ev(`(() => {
