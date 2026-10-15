@@ -3115,3 +3115,5 @@ migrate-plangpc-schedule-quantity.sql
 
 # 生产执行独立完工明细:scjl只读过滤视图+元数据面板,不复制事实。
 migrate-wo-completion-list.sql
+# 完工明细对齐报工记录的报表呈现,多条记录同表展开而非逐张浏览。
+migrate-wo-completion-flat-report.sql

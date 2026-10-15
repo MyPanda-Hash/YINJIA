@@ -6,6 +6,8 @@ for(const factory of ['YJ','YJ_TEST']){
  const headers={'Content-Type':'application/json',Authorization:'Bearer '+login.data.token}
  const cfg=await fetch(base+'/api/px/getPanelConfig?panelCode=WO_COMPLETION_LIST',{headers}).then(r=>r.json())
  assert.ok(cfg.data,'config '+JSON.stringify(cfg))
+ assert.equal(cfg.data.metadata.panelCategory,'报表','flat rows must use report renderer, not document browser')
+ assert.notEqual(cfg.data.metadata.singleDoc,true,'not a single-document panel')
  const query=await fetch(base+'/api/px/queryFormDataList',{method:'POST',headers,body:JSON.stringify({panelCode:'WO_COMPLETION_LIST',pageNo:1,pageSize:100})}).then(r=>r.json())
  assert.ok(query.code===0 || query.code===200,'query '+JSON.stringify(query))
  console.log('PASS '+factory+' independent completion list config and query; response='+JSON.stringify(query.data).slice(0,900))
