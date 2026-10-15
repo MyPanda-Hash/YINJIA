@@ -64,8 +64,10 @@ res.push(await dump('sl_recv', `单据日期 >= '${FROM}'`))
 res.push(await dump('sl_recv_detail', `单据编号 IN (SELECT 单据编号 FROM sl_recv WHERE 单据日期 >= '${FROM}')`))
 res.push(await dump('qc_insp', `单据日期 >= '${FROM}' AND ${IJ_OK}`))
 res.push(await dump('qc_insp_detail', `单据编号 IN (SELECT 单据编号 FROM qc_insp WHERE 单据日期 >= '${FROM}' AND ${IJ_OK})`))
-res.push(await dump('qc_insp_rec', `单据日期 >= '${FROM}'`))
-res.push(await dump('qc_insp_rec_detail', `单据编号 IN (SELECT 单据编号 FROM qc_insp_rec WHERE 单据日期 >= '${FROM}')`))
+// 检验数据记录:同样只导**来料检验=是**的物料(与检验单/检验目录同一口径)
+const REC_OK = `物料编码 IN (SELECT l.物料编码 FROM bl_pu_order l JOIN bs_inv iv ON iv.存货编码 = l.物料编码 WHERE ISNULL(iv.来料检验,N'') = N'是')`
+res.push(await dump('qc_insp_rec', `单据日期 >= '${FROM}' AND ${REC_OK}`))
+res.push(await dump('qc_insp_rec_detail', `单据编号 IN (SELECT 单据编号 FROM qc_insp_rec WHERE 单据日期 >= '${FROM}' AND ${REC_OK})`))
 res.push(await dump('qc_insp_req', `ISNULL(文件编码,N'') = N'QR-QC-001' AND 物料编号 IN (
     SELECT l.物料编码 FROM bl_pu_order l JOIN bs_inv iv ON iv.存货编码 = l.物料编码 WHERE ISNULL(iv.来料检验,N'') = N'是')`))
 res.push(await dump('plang', `pl_date >= '${FROM}'`))
