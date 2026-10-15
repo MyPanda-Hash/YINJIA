@@ -1,11 +1,14 @@
 /**
  * _add-warn-all-i18n.cjs — 「库存明细·统一预警」词条(10 语言)
  *
- * 背景(用户 2026-10-15 当日新口径):
- *   「只要库存明细可以写就行,库存状况不需要,而且库存明细的预警要可以统一设置,再单独设置。」
- * 前端 PanelxList.vue 库存明细展开区新增「统一预警」输入框 + 应用按钮(POST /api/stock/warn/setAll),
+ * 背景(用户 2026-10-15 当日新口径,两轮):
+ *   ① 「只要库存明细可以写就行,库存状况不需要,而且库存明细的预警要可以统一设置,再单独设置。」
+ *      ⇒ 展开区「统一预警」输入框 + 应用按钮(POST /api/stock/warn/setAll)—— 本轮词条;
+ *   ② 「统一预警是对所有数据的,要放在按钮栏那里,点击给弹窗。」
+ *      ⇒ 入口从展开区**移到按钮栏 + 弹窗**(POST /api/stock/warn/setAllData)—— 本轮补的词条
+ *        (将对全部数据设置 / 将对所选仓库的全部数据设置 / 无「预警配置」权限 / 已统一设置预警数量 / 更新行数)。
  * 按仓库规范(AGENTS.md §多语言强制规范)显示层一律走 tt(),故新增词条必须同时进 locales 的 biz 词表,
- * 否则切到英语/日语后新入口仍显示中文。
+ * 否则切到英语/日语后新弹窗仍显示中文。
  *
  * 用法:node tools/archive/_stock-warn-perm/_add-warn-all-i18n.cjs
  * 幂等:已存在 '中文词条': 行则跳过该词条;锚点 = '库存明细': 行之后(与月结/预警配置词条同段)。
@@ -21,6 +24,12 @@ const KEYS = [
   '请填写预警数量',
   '已对全部批次统一设置预警数量',
   '统一设置预警数量失败',
+  // ── 第二轮:按钮栏弹窗(全量口径)──
+  '将对全部数据设置',
+  '将对所选仓库的全部数据设置',
+  '无「预警配置」权限',
+  '已统一设置预警数量',
+  '更新行数',
 ]
 
 /** 每种语言按 KEYS 顺序给译文(10 语言 = 与上一轮 warn 词条同一批文件) */
@@ -32,6 +41,11 @@ const TEXT = {
     'Please enter a warning quantity',
     'Warning quantity applied to all batches',
     'Failed to apply the warning to all batches',
+    'Will apply to all data',
+    'Will apply to all data in the selected warehouse',
+    'No "Warning Config" permission',
+    'Warning quantity applied to all data',
+    'Rows updated',
   ],
   ja: [
     '全バッチのアラーム設定',
@@ -40,6 +54,11 @@ const TEXT = {
     'アラーム数量を入力してください',
     '全バッチのアラーム数量を設定しました',
     '全バッチのアラーム設定に失敗しました',
+    '全てのデータに設定します',
+    '選択した倉庫の全てのデータに設定します',
+    '「アラーム設定」の権限がありません',
+    '全データのアラーム数量を設定しました',
+    '更新行数',
   ],
   ko: [
     '전체 배치 경고 설정',
@@ -48,6 +67,11 @@ const TEXT = {
     '경고 수량을 입력하세요',
     '모든 배치의 경고 수량을 설정했습니다',
     '전체 배치 경고 설정에 실패했습니다',
+    '모든 데이터에 설정합니다',
+    '선택한 창고의 모든 데이터에 설정합니다',
+    '「경고 설정」권한이 없습니다',
+    '전체 데이터의 경고 수량을 설정했습니다',
+    '업데이트 행 수',
   ],
   'zh-TW': [
     '統一預警',
@@ -56,6 +80,11 @@ const TEXT = {
     '請填寫預警數量',
     '已對全部批次統一設定預警數量',
     '統一設定預警數量失敗',
+    '將對全部資料設定',
+    '將對所選倉庫的全部資料設定',
+    '無「預警配置」權限',
+    '已統一設定預警數量',
+    '更新行數',
   ],
   es: [
     'Aviso para todos los lotes',
@@ -64,6 +93,11 @@ const TEXT = {
     'Introduzca la cantidad de aviso',
     'Cantidad de aviso aplicada a todos los lotes',
     'No se pudo aplicar el aviso a todos los lotes',
+    'Se aplicará a todos los datos',
+    'Se aplicará a todos los datos del almacén seleccionado',
+    'Sin permiso de «Configuración de avisos»',
+    'Cantidad de aviso aplicada a todos los datos',
+    'Filas actualizadas',
   ],
   fr: [
     'Alerte pour tous les lots',
@@ -72,6 +106,11 @@ const TEXT = {
     "Veuillez saisir la quantité d'alerte",
     "Quantité d'alerte appliquée à tous les lots",
     "Échec de l'application de l'alerte à tous les lots",
+    "S'appliquera à toutes les données",
+    "S'appliquera à toutes les données de l'entrepôt sélectionné",
+    "Pas de permission « Configuration d'alerte »",
+    "Quantité d'alerte appliquée à toutes les données",
+    'Lignes mises à jour',
   ],
   de: [
     'Warnung für alle Chargen',
@@ -80,6 +119,11 @@ const TEXT = {
     'Bitte Warnmenge eingeben',
     'Warnmenge für alle Chargen festgelegt',
     'Warnmenge konnte nicht für alle Chargen festgelegt werden',
+    'Wird auf alle Daten angewendet',
+    'Wird auf alle Daten des ausgewählten Lagers angewendet',
+    'Keine Berechtigung „Warnkonfiguration“',
+    'Warnmenge für alle Daten festgelegt',
+    'Aktualisierte Zeilen',
   ],
   ru: [
     'Предупреждение для всех партий',
@@ -88,6 +132,11 @@ const TEXT = {
     'Введите количество предупреждения',
     'Предупреждение задано для всех партий',
     'Не удалось задать предупреждение для всех партий',
+    'Будет применено ко всем данным',
+    'Будет применено ко всем данным выбранного склада',
+    'Нет права «Настройка предупреждений»',
+    'Количество предупреждения задано для всех данных',
+    'Обновлено строк',
   ],
   vi: [
     'Cảnh báo cho tất cả lô',
@@ -96,6 +145,11 @@ const TEXT = {
     'Vui lòng nhập số lượng cảnh báo',
     'Đã đặt số lượng cảnh báo cho tất cả các lô',
     'Đặt cảnh báo cho tất cả các lô thất bại',
+    'Sẽ áp dụng cho tất cả dữ liệu',
+    'Sẽ áp dụng cho tất cả dữ liệu của kho đã chọn',
+    'Không có quyền «Cấu hình cảnh báo»',
+    'Đã đặt số lượng cảnh báo cho tất cả dữ liệu',
+    'Số dòng đã cập nhật',
   ],
   th: [
     'แจ้งเตือนทุกล็อต',
@@ -104,6 +158,11 @@ const TEXT = {
     'กรุณากรอกจำนวนแจ้งเตือน',
     'ตั้งจำนวนแจ้งเตือนให้ทุกล็อตแล้ว',
     'ตั้งจำนวนแจ้งเตือนทุกล็อตไม่สำเร็จ',
+    'จะตั้งให้ข้อมูลทั้งหมด',
+    'จะตั้งให้ข้อมูลทั้งหมดของคลังที่เลือก',
+    'ไม่มีสิทธิ์ «ตั้งค่าการแจ้งเตือน»',
+    'ตั้งจำนวนแจ้งเตือนให้ข้อมูลทั้งหมดแล้ว',
+    'จำนวนแถวที่อัปเดต',
   ],
 }
 

@@ -79,6 +79,32 @@ public class StockWarnService {
                 q, user, wzdm, ckdm);
     }
 
+    /**
+     * 统一预警(全量):把所有库存行的预警数量设成同一个值;ckdm 非空时只作用于该仓库。
+     *
+     * <p>与 {@link #setAll}(单个 物料+仓库 的全部批次)的区别 = <b>作用域</b>:
+     * 本方法面向「按钮栏·统一预警弹窗」(用户 2026-10-15 当日改口径:
+     * 「统一预警是对所有数据的,要放在按钮栏那里,点击给弹窗」),<b>不按物料过滤</b> ——
+     * 左栏勾了仓库就只刷该仓库,没勾就是整张 kucun。
+     *
+     * <p>作废行({@code asp_cancel = 'Y'})不动(与读口径一致)。
+     *
+     * @param ckdm    仓库编码;空/null = 全部仓库
+     * @param warnQty 目标预警数量(应已由调用方校验非负);null 视作 0
+     * @param user    操作人(写 kucun.asp_user2)
+     * @return 实际更新的 kucun 行数
+     */
+    public int setAllData(String ckdm, BigDecimal warnQty, String user) {
+        BigDecimal q = warnQty == null ? BigDecimal.ZERO : warnQty;
+        String c = ckdm == null ? "" : ckdm.trim();
+        String base = "UPDATE kucun SET 预警数量 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                + " WHERE ISNULL(asp_cancel, 'N') <> 'Y'";
+        if (c.isEmpty()) {
+            return jdbc.update(base, q, user);
+        }
+        return jdbc.update(base + " AND ckdm = ?", q, user, c);
+    }
+
     /** 该 (物料,仓库) 下每个批次的预警数量(展开明细用):{批号 → 预警数量}。 */
     public Map<String, BigDecimal> warnMap(String wzdm, String ckdm) {
         Map<String, BigDecimal> out = new LinkedHashMap<>();

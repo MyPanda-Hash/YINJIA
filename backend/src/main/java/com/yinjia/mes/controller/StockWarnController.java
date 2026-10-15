@@ -21,7 +21,7 @@ import java.util.Map;
  * 出库审批的拦截面在 {@link StockWarnService#checkOutbound}。
  *
  * <p><b>权限(2026-10-15 用户改口径:只要库存明细可以写就行,库存状况不需要)</b>:
- * 两个写接口(/set、/setAll)挂「预警配置」(warn 词)服务端闸门 ——
+ * 三个写接口(/set、/setAll、/setAllData)挂「预警配置」(warn 词)服务端闸门 ——
  * {@link PanelPermissionService#requireWarnConfig}(管理员恒过,普通用户要求该面板在
  * 组织架构「角色与面板权限」里勾了「预警配置」)。词表同 SysAdminController.PERMISSION_ACTIONS。
  * <b>闸门只对面板 = STOCK_DETAIL 生效</b>:库存状况的预警数量不走本接口,也不吃 warn 词
@@ -123,6 +123,41 @@ public class StockWarnController {
         d.put("仓库编码", ckdm);
         d.put("预警数量", warnQty);
         d.put("更新行数", updated);
+        out.put("data", d);
+        return out;
+    }
+
+    /** 写:**全量统一预警**(按钮栏「统一预警」弹窗用的口径)。
+     *
+     *  <p>body = {@code {warnQty, ckdm?, panel?, user?}}(panel 缺省 STOCK_DETAIL)。
+     *  <b>与 {@link #setAll} 的区别</b>:那个是「库存明细展开区按 物料+仓库 统一全部批次」,
+     *  本接口是「对**所有数据**统一」—— 不按物料过滤;ckdm 非空(左栏勾了仓库)则只刷该仓库,
+     *  为空 = 整张 kucun。校验口径与 /setAll 完全一致(面板白名单 + requireWarnConfig + 非负 + 缺省值)。
+     *
+     *  <p>权限:{@link PanelPermissionService#requireWarnConfig}(warn 词;管理员恒过,普通用户 403)。
+     *  返回 {@code data = {预警数量, 更新行数, 仓库编码(空=全部)}}。
+     */
+    @PostMapping("/setAllData")
+    public Map<String, Object> setAllData(@RequestBody Map<String, Object> body) {
+        String panel = str(body.get("panel"));
+        if (panel.isEmpty()) panel = PANEL_STOCK_DETAIL;   // 本接口的默认来源面板(库存明细按钮栏)
+        if (!WARN_PANELS.contains(panel)) throw new IllegalArgumentException("该面板不支持配置预警数量：" + panel);
+        requireWarnConfig(panel);
+        String ckdm = str(body.get("ckdm"));   // 空 = 全部仓库
+        Object q = body.get("warnQty");
+        BigDecimal warnQty = q == null || String.valueOf(q).isBlank()
+                ? BigDecimal.ZERO : new BigDecimal(String.valueOf(q));
+        String user = str(body.get("user"));
+        if (user.isEmpty()) user = "warn:admin";
+        if (warnQty.signum() < 0) throw new IllegalArgumentException("预警数量不能为负数");
+        int updated = warn.setAllData(ckdm, warnQty, user);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("code", 200);
+        out.put("message", "success");
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("预警数量", warnQty);
+        d.put("更新行数", updated);
+        d.put("仓库编码", ckdm);   // 空 = 全部数据
         out.put("data", d);
         return out;
     }
