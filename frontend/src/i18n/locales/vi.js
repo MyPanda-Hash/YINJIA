@@ -317,6 +317,7 @@ export default {
     '列': 'cột',
     '库存状况表': 'Tình trạng kho',
     '库存明细': 'Chi tiết tồn kho',
+    '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Tích chọn kho là truy vấn ngay; chỉ chọn được một; không chọn thì danh sách trống',
     '月份': 'Tháng',
     '月结状态': 'Trạng thái kết chuyển',
     '上月月结已取消,以下陈列该月与当月的原始单据': 'Kết chuyển tháng trước đã bị hủy; dưới đây là chứng từ gốc của tháng đó và tháng hiện tại',
