@@ -386,6 +386,11 @@ public class ButtonService {
                 for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
                     if (!e.getKey().equals(def.groupCol())) cols.put(e.getKey(), e.getValue());
                 }
+                // 产品编号唯一性:**这个分支也要过**(directAdd 与「开发产品」预填建单都走这里,
+                // 载荷只有头字段、没有明细) —— 见 ensureProductCodeUnique(String,String) 的注释
+                if ("RD_PROD_INFO".equals(def.code())) {
+                    ensureProductCodeUnique(str(cols.get("产品编号")), no);
+                }
                 // 空白草稿同口径:存在"创建时间"列即填入(新建时刻)
                 if (tableCols(table).contains("创建时间")) cols.put("创建时间", LocalDateTime.now().format(TS_FMT));
                 // 质量单据「责任人」预填(2026-10-04 用户口径「预填,让他自己修改」):
@@ -564,7 +569,56 @@ public class ButtonService {
         // 「保存为草稿」不校验(2026-09-20 用户口径):草稿=允许存一半,唯一性属于提交口径;
         // 两条草稿可以先占用同一个文档编号,谁先提交谁占住,后提交的那张在提交时被拒。
         if (markSaved && DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
+        // 产品编号唯一(2026-10-16 用户口径「一个立项申请的流程可以开发好几个产品,但是产品编号不能相同」):
+        // 四个受控文件只按 [产品编号] 关联产品信息表,重号会让"这个产品有哪些文件"分不清 ⇒ 全局唯一。
+        // 与文档编号同口径:保存(提交口径)才校验,保存为草稿放过;已作废单据不算占用。
+        if (markSaved && "RD_PROD_INFO".equals(def.code())) ensureProductCodeUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /**
+     * 产品编号不允许重复(同面板其它未作废单据占用即拒绝;空值跳过)。
+     *
+     * <p>为什么必须唯一:产品信息表是"这个产品"的档案,而下游四个受控文件(规格书/成型工艺清单/
+     * 组装工艺清单/出货检验计划表)一律**只按 [产品编号]** 关联它(参照带回、产品开发进度概览也是按它匹配)。
+     * 一旦两张产品信息表同号,下游就分不清属于哪一张 —— 用户口径「产品编号不能相同」。
+     * 一个立项可以开多个产品,靠的正是每张产品信息表各占一个**不同的**产品编号。
+     */
+    private void ensureProductCodeUnique(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
+        Object raw = head == null ? null : head.get("产品编号");
+        if (raw == null && head != null) {
+            PanelRegistry.FieldDef f = def.byCol("产品编号");
+            if (f != null) raw = head.get(f.label());
+        }
+        if (raw == null) {
+            // 载荷没带(局部提交):退回库里的现值,别把已有重号放过
+            try {
+                List<String> cur = jdbc.queryForList(
+                        "SELECT [产品编号] FROM rd_prod_info_head WHERE [单据编号] = ?", String.class, no);
+                if (!cur.isEmpty()) raw = cur.get(0);
+            } catch (Exception ignore) { /* 取不到就跳过 */ }
+        }
+        ensureProductCodeUnique(String.valueOf(raw == null ? "" : raw).trim(), no);
+    }
+
+    /**
+     * 产品编号唯一性本体(按值判定):空值跳过。
+     * ⚠ 必须**两个入口都过**:① 正式保存(带明细/带值);②「空草稿」分支(directAdd 与
+     * 「开发产品」按项目预填建单都走它,载荷只有头字段)—— 2026-10-16 实测漏了 ②,
+     * 于是同一个产品编号能建出两张产品信息表,正是用户要禁的那件事。
+     */
+    private void ensureProductCodeUnique(String code, String no) {
+        if (code == null || code.isEmpty()) return;
+        List<Map<String, Object>> dup = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] AS no FROM rd_prod_info_head"
+                        + " WHERE [产品编号] = ? AND [单据编号] <> ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PROD_INFO'"
+                        + " AND s.doc_no = rd_prod_info_head.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')",
+                code, no == null ? "" : no);
+        if (!dup.isEmpty()) {
+            throw new IllegalStateException("产品编号「" + code + "」已被产品信息表 " + str(dup.get(0).get("no"))
+                    + " 占用：一个产品编号只能对应一张产品信息表，请换号（同号老单已作废才可复用）");
+        }
     }
 
     /** 文档编号不允许重复:同面板其它单据占用即拒绝(空值跳过)。

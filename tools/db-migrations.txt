@@ -3267,4 +3267,12 @@ migrate-share-file-spare-cols-20261016.sql
 #   (实测 refMap 已含 {"from":"产品名称","to":"产品名称"});规格书/出货检验计划表没有该字段,不动。
 #   幂等(仅当不是必填时改);末尾自检 required=1 否则 RAISERROR。两账套均执行。
 migrate-prodinfo-name-required-20261016.sql
+# migrate-prodinfo-project-link-20261016.sql — 项目管理 ↔ 产品信息表 关联:产品信息表加「立项文档编号」。
+#   用户口径(2026-10-16):项目管理三张面板与产品信息表没关联;先立项通过 → 认为值得开发 → 才在产品信息表
+#   填数据继续往下走;一个立项可开发多个产品,但产品编号不能相同。
+#   关联键 = 立项申请的「文档编号」(RD_PLAN.文档编号 参照它,RD_PROGRESS 每行的 [项目编号]/[说明] 存的就是它)。
+#   改动:① rd_prod_info_head 加列 [立项文档编号] nvarchar(60) + MS_Description 中文注明;
+#        ② yj_field 登记(header/seq 36,参照 RD_APPROVAL.文档编号);③ yj_translation 补 en 译名。
+#   幂等(列判 COL_LENGTH、字段判四元组、译名判 scope+ref_key+locale);末尾自检并包在事务里。两账套均执行。
+migrate-prodinfo-project-link-20261016.sql
 migrate-change-title-20261016.sql
