@@ -1654,7 +1654,15 @@ export const recordSheetConfigs = {
     headMode: 'report',
     // 纸面大标题是**印死的表单名**(YJ-QR-130 的 B2),不是每张单各写各的 ⇒ 用 staticTitle
     // (titlePlaceholder 只在没有 staticTitle 时当输入框灰字占位,不落纸)
+    //
+    // ⚠ 2026-10-16(用户口径)「产品变更信息表的 KPC管控点申请单 这个栏改为可自主编辑的普通文本框,
+    //   背景提示词默认为现在的这个,未进行更改则默认背景提示词」⇒ 与产品信息表同一套机制:
+    //   titleKey 绑一个字段,编辑态是输入框(灰字提示词 = 现在的标题),值为空时纸上仍回落印
+    //   staticTitle(逐字同文)⇒ 不改的老单据观感一字不变。
+    //   字段由 tools/migrate-change-title-20261016.sql 建(rd_change_head.[标题] + yj_field 登记)。
     staticTitle: 'KPC管控点申请单',
+    titleKey: '标题',
+    titleKeyPh: 'KPC管控点申请单',
     titlePlaceholder: 'KPC管控点申请单',
     grid: [111, 205, 441, 147, 210, 128],
     head: { title: 2, infoLabel: 1, infoValue: 1 },

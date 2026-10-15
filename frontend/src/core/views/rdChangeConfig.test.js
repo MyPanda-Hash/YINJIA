@@ -99,8 +99,24 @@ test('分组设计表:非组首行不得再输出序号/组名 <td>(否则整行
 })
 
 // ── 五、产品信息表:左上角大标题改成「产品名称」填写框 + 缺填要高亮 ──
-test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {
-  const cfg = recordSheetConfigs.RD_PROD_INFO
+/**
+ * 2026-10-16(用户口径):「产品变更信息表的 KPC管控点申请单 这个栏改为可自主编辑的普通文本框,
+ *   背景提示词默认为现在的这个,未进行更改则默认背景提示词」。
+ * 与产品信息表同一条机制(cfg.titleKey),可靠性由三处共同保证:
+ *   ① 字段真的存在(rd_change_head.[标题] + yj_field 登记,见 migrate-change-title-20261016.sql);
+ *   ② 配置把大标题绑到它,提示词 = 现在的静态标题;
+ *   ③ 值为空时只读态/打印回落 staticTitle —— 不改的老单据观感不变(组件那支已由 RD_PROD_INFO 的用例钉着)。
+ */
+test('RD_CHANGE:大标题格改为可编辑输入框(titleKey=标题),提示词与静态标题同文', () => {
+  const cfg = recordSheetConfigs.RD_CHANGE
+  assert.ok(cfg, 'RD_CHANGE 配置缺失')
+  assert.equal(cfg.staticTitle, 'KPC管控点申请单', 'staticTitle 保留:空值时纸上仍印这句')
+  assert.equal(cfg.titleKey, '标题', '大标题要绑到「标题」字段(表头字段,可编辑)')
+  assert.equal(cfg.titleKeyPh, 'KPC管控点申请单', '背景提示词 = 现在的这个标题')
+  assert.equal(cfg.titleKeyPh, cfg.staticTitle, '提示词与静态标题同文 —— 不填就是老观感')
+})
+
+test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {  const cfg = recordSheetConfigs.RD_PROD_INFO
   assert.equal(cfg.titleKey, '产品名称', '左上角大标题要绑 产品名称')
   assert.equal(cfg.titleKeyPh, '产品名称', '背景提示词要是 产品名称')
   assert.equal(cfg.staticTitle, '产品信息表', 'staticTitle 保留:只读态字段为空时回落显示表单名')

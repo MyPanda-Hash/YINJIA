@@ -3267,3 +3267,4 @@ migrate-share-file-spare-cols-20261016.sql
 #   (实测 refMap 已含 {"from":"产品名称","to":"产品名称"});规格书/出货检验计划表没有该字段,不动。
 #   幂等(仅当不是必填时改);末尾自检 required=1 否则 RAISERROR。两账套均执行。
 migrate-prodinfo-name-required-20261016.sql
+migrate-change-title-20261016.sql
