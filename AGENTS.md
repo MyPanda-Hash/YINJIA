@@ -156,6 +156,14 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
     `BOOT-INF/classes/static`)→ 重启 `tools/scripts/start-prod.ps1`;完事再跑一次上面的取证脚本复核。
     纯前端改动**同时要提交** `backend/src/main/resources/static`(仓库跟踪它,是部署包的前端来源,
     按习惯单独一个 `chore: 前端静态产物同步(...)` 提交)。
+  - 🔴 **后端 class 更隐蔽,而且"下架类迁移"必踩(2026-10-16 用户报「生产工单丢失了部分实现」)**:
+    执行了下架/删表迁移之后,**正在跑的旧 jar 里代码还在查那张表** ⇒ 接口 500
+    `Invalid object name 'dbo.qc_cut_insp_head'`,界面表现是「某一段整片空白」,而**源码与数据库两头看都对**
+    ⇒ 极易误判成"代码丢了/被回退"。判据只有一条 —— **扫现役 jar**:
+    `java -Dstdout.encoding=UTF-8 tools/archive/_wo-trace-500-20261016/_JarClassScan.java`(**必须 [PASS]**)。
+    修法:停 → 重打包 → 起(`tools/scripts/rebuild-prod.ps1`);**只改后端 class** 时用
+    `jar uf` 只覆盖 `BOOT-INF/classes`(**排除 `static`**),这样前端一个字节不动、界面不会莫名变化。
+    事故全过程与取证脚本见 `tools/archive/_wo-trace-500-20261016/README.md`(踩坑台账 G12)。
 
 ## 🔴 两账套(正式库 / 测试库)纪律(2026-09-22 起生效,不可豁免)
 
