@@ -571,7 +571,7 @@
                   <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
                   <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
                   <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
-                  <el-table-column prop="单价" :label="tt('单价')" width="90" align="right" />
+                  <!-- 单价:用户 2026-10-15「把单价也给我删除了」⇒ 不展示(入库是单据单价、出库是成本单价,两把尺子) -->
                   <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
                   <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
                 </el-table>
