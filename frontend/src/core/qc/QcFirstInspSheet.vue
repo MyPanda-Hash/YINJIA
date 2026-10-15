@@ -79,11 +79,14 @@
       <div class="fi-title">{{ tt('炭棒成型车间首件检验记录表') }}</div>
     </div>
 
-    <!-- ③ 抬头四对:全部可填(产品编号/产品型号 支持参照或手填;生产日期用日期选择;组别取生产线) -->
+    <!-- ③ 抬头四对:全部可填(产品编号/产品型号 支持参照或手填;生产日期用日期选择;组别取生产线)
+         ⚠ 生产日期那一格给**固定宽 240px**(用户口径 2026-10-16 第五轮「增长当前生产日期框体长度
+           让当前控件不会超出距离」):日期控件自带 220px 默认宽,格子按 `table-layout:fixed` 平摊时
+           只有 ~150px ⇒ 控件会顶出格线、压到「组别」上。其余各列照旧平摊。 -->
     <table class="fi-head"><tbody><tr>
       <template v-for="f in HEAD_FIELDS" :key="f.key">
         <th>{{ tt(f.label) }}</th>
-        <td>
+        <td :style="f.date ? { width: '240px' } : null">
           <el-date-picker
             v-if="editable && !isLocked(f.key) && f.date"
             v-model="head[f.key]"
@@ -107,13 +110,12 @@
       </template>
     </tr></tbody></table>
 
-    <!-- 相关要求第 3 条后半句:本单同时有「浊度」与「压降」两项测试时,先测初始浊度、再做压降测试 -->
-    <div v-if="turbidityPressureTip" class="fi-tip">
-      {{ tt('本单同时有浊度与压降两项测试：请先测初始浊度，再进行压降测试。') }}
-    </div>
-
-    <!-- ④ 两级表头 + 标准行 + 1#..8# 数据区 -->
-    <table class="fi-grid">
+    <!-- ④ 两级表头 + 标准行 + 1#..8# 数据区
+         ⚠ 2026-10-16 第五轮(用户口径「修复当前红框会因为过多列而挤压的问题,当前实现可以拉滚动条移动」):
+           列多(自由新增测试项目)时**不再把每列压扁**,而是给表格一个最小宽度、外面套一层横向滚动容器
+           ⇒ 列宽保住 120px,不够就拉滚动条(打印时不裁切,见 .fi-grid-scroll 的 @media print)。 -->
+    <div class="fi-grid-scroll">
+    <table class="fi-grid" :style="{ minWidth: gridMinWidth }">
       <colgroup>
         <col style="width: 96px" />
         <col v-for="c in columns" :key="c.key" />
@@ -230,6 +232,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
 
     <!-- ⑤ 相关要求(图片底部 6 条) -->
     <div class="fi-requirements">
@@ -378,13 +381,15 @@ const c95Notice = computed(() => C95_KEYS
   .some((k) => /(^|[^A-Za-z0-9])C-?95([^0-9]|$)/i.test(String(props.head?.[k] || ''))))
 
 /**
- * 相关要求第 3 条后半句:「如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试」
- * ⇒ 本单同时存在这两列时,纸张上给一条测试顺序提示(列序本来就把浊度排在压降之前)。
+ * 数据区表格的**最小宽度**(列多时不挤压,超出就横向拉滚动条)。
+ * 用户口径(2026-10-16 第五轮):「修复当前红框会因为过多列而挤压的问题,当前实现可以拉滚动条移动」
+ * ⇒ 行标签 96 + 每个测试项目列 120 + (可编辑时的)操作列 40;表格 `width:100%` 照旧 ——
+ *   容器够宽就铺满、不够宽就按这个最小宽出滚动条(`table-layout:fixed` 下每列 ≈120px)。
  */
-const turbidityPressureTip = computed(() => {
-  const cols = columns.value
-  const has = (re) => cols.some((c) => re.test(`${c.label || ''}${c.key || ''}`))
-  return has(/浊度|NTU/i) && has(/压降|kPa/i)
+const COL_MIN_WIDTH = 120
+const gridMinWidth = computed(() => {
+  const cols = Math.max(1, columns.value.length)
+  return `${96 + cols * COL_MIN_WIDTH + (props.editable ? 40 : 0)}px`
 })
 
 /**
@@ -572,15 +577,15 @@ function toggleCheck(sample, c, option) {
   border-color: #e6a19a;
   color: #b3261e;
 }
-/* 相关要求第 3 条:浊度/压降同测顺序提示 */
-.fi-tip {
-  margin: 6px 8px 0;
-  padding: 4px 10px;
-  background: #f4f8ff;
-  border: 1px solid #c6d8f2;
-  border-radius: 3px;
-  color: #1f5fa8;
-  font-size: 12.5px;
+/* 数据区滚动容器(2026-10-16 第五轮):列多时不挤压 —— 表格按 gridMinWidth 撑开,这里出横向滚动条。
+   ⚠ 打印/导出时不能裁切:滚动容器打印时退回可见(表格保持最小宽,由打印机分页)。 */
+.fi-grid-scroll {
+  overflow-x: auto;
+}
+@media print {
+  .fi-grid-scroll {
+    overflow: visible;
+  }
 }
 /* 顶栏(右上信息三格 + 大标题)
    ⚠ 2026-10-16 第二轮用户口径(截图红框)「让当前的红框内容居于空白位置中央」:
@@ -828,6 +833,19 @@ function toggleCheck(sample, c, option) {
 /* 格内直编:去边框,白纸观感 */
 .fi-cell {
   width: 100%;
+}
+/* 抬头格子里的控件必须**收在格子里**(2026-10-16 第五轮用户口径「生产日期的控件不要超出当前框体」):
+   日期选择器自带 220px 默认宽(`--el-date-editor-width`),格子按 fixed 布局平摊时放不下就会顶出格线。
+   这里用更高特异性把 root 宽度按 100% 收口(生产日期那格另给了 240px 固定宽,所以控件也不憋屈)。 */
+.fi-head td .fi-cell {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.fi-head td :deep(.el-date-editor.el-input),
+.fi-head td :deep(.el-date-editor .el-input__wrapper) {
+  width: 100%;
+  box-sizing: border-box;
 }
 .fi-cell :deep(.el-input__wrapper),
 .fi-cell :deep(.el-textarea__inner),

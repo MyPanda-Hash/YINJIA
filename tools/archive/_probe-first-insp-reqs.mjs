@@ -126,11 +126,20 @@ try {
   console.log(`  挤压强度 33.33 → ${JSON.stringify(v2)} (${JSON.stringify(w2)})`)
   ok('② 挤压强度/压降:按表显数据记录(33.33 原样保留)', String(v2) === '33.33', String(v2))
 
-  // ── ③ 浊度 + 压降 同单 ⇒ 测试顺序提示 ─────────────────────────────────────
-  const tip = await ev(`(document.querySelector('.fi-sheet .fi-tip')?.innerText || '')`)
-  console.log(`  顺序提示=${JSON.stringify(String(tip).slice(0, 60))}`)
-  ok('③ 同单有浊度与压降 ⇒ 出现「先测初始浊度,再测压降」提示',
-    /浊度/.test(String(tip)) && /压降/.test(String(tip)), String(tip).slice(0, 80))
+  // ── ③ 浊度列排在压降列之前(顺序口径保留) ──────────────────────────────────
+  //    ⚠ 2026-10-16 第五轮用户口径:「删除黄框的内容」= 删掉原先那行「先测初始浊度,再测压降」提示条,
+  //      故这里改为验**列序**(浊度在压降之前)+ 提示条**不再出现**。
+  const order = await ev(`(() => {
+    // ⚠ 只认**列名**(列头第一个 input);用 th.innerText 会把分组下拉的「浊度及压降」也带进来,
+    //   于是"浊度"和"压降"匹配到同一列(踩过)
+    const label = (th) => { const i = th.querySelector('input'); return i ? i.value : (th.innerText || '') }
+    return [...document.querySelectorAll('.fi-sheet .fi-grid thead tr:nth-child(2) th.col-head')].map(label)
+  })()`)
+  const iT = (order || []).findIndex((x) => /浊度|NTU/i.test(x))
+  const iP = (order || []).findIndex((x) => /压降|kPa/i.test(x))
+  ok('③ 浊度列排在压降列之前(先测初始浊度,再做压降)', iT >= 0 && iP > iT, `浊度#${iT} 压降#${iP}`)
+  const tips = await ev(`document.querySelectorAll('.fi-sheet .fi-tip').length`)
+  ok('③ 纸张上不再有浊度/压降提示条(第五轮口径:删掉黄框那行)', Number(tips) === 0, String(tips))
 
   // ── ④ 严重粘模 ⇒ 红色警示 + 常驻红幅 ──────────────────────────────────────
   await ev(`(() => {
