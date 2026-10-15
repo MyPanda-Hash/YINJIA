@@ -468,50 +468,87 @@ public class StockMonthCloseService {
     // ==================== 展开明细(报表用) ====================
 
     /**
-     * 展开一个 (物料,仓库,批号) 的明细(用户 2026-10-15 口径改版)。
+     * 展开一个 (物料,仓库,批号) 的明细(2026-10-15 第二轮 + 第三轮口径)。
      *
-     * <ul>
-     *   <li><b>一张表,不再按 入库/出库/结转 分组</b>:全部单据按日期排在一起,靠「单据类型」区分;</li>
-     *   <li><b>月结单据直接展示</b>:`月结结转` 行显示成 <code>2026-09月结</code>(它落在次月 1 号,
-     *       所以取 单据日期 的上一个月 = 被结的月份),同一个月里可以有多张这样的单据;</li>
-     *   <li><b>数量带方向</b>:入库为正、出库为负 ⇒ 这串单据的合计就是该月净变动,加期初即结存
-     *       (「月结类似把单据汇总」的直观形态);</li>
-     *   <li>期间缺省 = <b>上月</b>;该期间已月结时另给 `月结快照`(期初/入/出/结存/最晚出库日期)。</li>
-     * </ul>
+     * <h4>列表构成(一张表,靠「单据类型」区分,数量带方向:入库正 / 出库负)</h4>
+     * <ol>
+     *   <li><b>上月部分</b>:
+     *     <ul>
+     *       <li>上月**已月结** ⇒ 只放那张**月结单据**(显示成 <code>2026-09月结</code>)——即「月结后按汇总展示」;</li>
+     *       <li>上月**未月结 / 已取消** ⇒ 把**该月的原始单据全部陈列出来**
+     *           (用户 2026-10-15 第三轮:「上月月结被取消后要把那个月的单据陈列出来」)。</li>
+     *     </ul>
+     *   </li>
+     *   <li><b>当月部分</b>:当月原始单据照常展示(当月还没月结时就是它的正常单据)。</li>
+     * </ol>
+     * 每行带 `月份`(yyyy-MM)列:跨两个月时一眼能分清。
+     *
+     * <h4>月结快照</h4>
+     * 取的是**上月**那次月结在 `bl_stock_close` 里的行(期初/入/出/结存/最晚出库日期);
+     * 上月未月结则为 null。⚠ 早先版本按「当前月」查快照 —— 月结是结**上月**的,所以永远查不到,
+     * 这条是 2026-10-15 第三轮一并修正的。
      */
     public Map<String, Object> detail(String period, String wzdm, String ckdm, String lot) {
-        String p = normPeriod(period == null || period.isBlank() ? prevPeriod(LocalDate.now()) : period);
+        String cur = normPeriod(period == null || period.isBlank() ? LocalDate.now().format(PERIOD_FMT) : period);
+        String prev = YearMonth.parse(cur, PERIOD_FMT).minusMonths(1).format(PERIOD_FMT);
         String w = nz(wzdm), c = nz(ckdm), l = nz(lot);
-        LocalDate start = periodStart(p), endEx = periodEndExclusive(p);
+        LocalDate curStart = periodStart(cur), curEndEx = periodEndExclusive(cur);
+        LocalDate prevStart = periodStart(prev), prevEndEx = periodEndExclusive(prev);
+        String prevState = periodState(prev);
+
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("期间", p);
-        out.put("期间状态", periodState(p));
+        out.put("期间", cur);
+        out.put("上月期间", prev);
+        out.put("上月状态", prevState);
         List<Map<String, Object>> snap = jdbc.queryForList(
                 "SELECT 期初数量, 入库数量, 出库数量, 结存数量, CONVERT(nvarchar(10), 最晚出库日期, 120) AS 最晚出库日期"
                         + " FROM bl_stock_close WHERE 期间 = ? AND 物料编码 = ? AND 仓库编码 = ?"
-                        + " AND ISNULL(RTRIM(批号),N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y'", p, w, c, l);
-        out.put("月结快照", snap.isEmpty() ? null : snap.get(0));
-        out.put("单据明细", jdbc.queryForList(
-                // 入库侧:含「月结结转」行(它就是上个月的月结单据,显示成 YYYY-MM月结)
-                "SELECT CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
-                        + "  CASE WHEN 单据类型 = N'" + CARRY_TYPE + "'"
-                        + "       THEN CONVERT(nvarchar(7), DATEADD(month, -1, 单据日期), 120) + N'月结'"
-                        + "       ELSE ISNULL(单据类型, N'') END AS 单据类型,"
-                        + "  ISNULL(单据编号, N'') AS 单据编号, 数量 AS 数量, 单价 AS 单价,"
-                        + "  ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人"
-                        + " FROM inh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据日期 >= ? AND 单据日期 < ?"
-                        + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
-                        + "  AND ISNULL(RTRIM(批号),N'') = ?"
+                        + " AND ISNULL(RTRIM(批号),N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y'", prev, w, c, l);
+        // 月结汇总只在**月结生效中**才展示:已取消时该次汇总已被撤销,界面改为陈列该月原始单据
+        // (用户 2026-10-15 第三轮口径),不然"已取消"和一组汇总数字并排会让人以为月结还在。
+        out.put("月结快照", "已月结".equals(prevState) && !snap.isEmpty() ? snap.get(0) : null);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if ("已月结".equals(prevState)) {
+            // 上月已月结 ⇒ 用那张月结单据代表它(它是结转行,落在当月 1 号)
+            rows.addAll(jdbc.queryForList(
+                    "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
+                            + "  CONVERT(nvarchar(7), DATEADD(month, -1, 单据日期), 120) + N'月结' AS 单据类型,"
+                            + "  ISNULL(单据编号, N'') AS 单据编号, 数量, 单价, ISNULL(往来单位, N'') AS 往来单位,"
+                            + "  ISNULL(经手人, N'') AS 经手人"
+                            + " FROM inh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据类型 = ? AND 单据编号 = ?"
+                            + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
+                            + "  AND ISNULL(RTRIM(批号),N'') = ?",
+                    CARRY_TYPE, carryNo(prev), w, c, l));
+        } else {
+            // 上月未月结/已取消 ⇒ 陈列上月的原始单据(入库正、出库负)
+            rows.addAll(flowRows(prevStart, prevEndEx, w, c, l));
+        }
+        // 当月原始单据(不含月结结转行:那一行属于上月的展示口径)
+        rows.addAll(flowRows(curStart, curEndEx, w, c, l));
+        rows.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("单据日期")))
+                .thenComparing(r -> String.valueOf(r.get("单据类型"))));
+        out.put("单据明细", rows);
+        return out;
+    }
+
+    /** 一段期间内的原始单据(入库为正、出库为负),不含月结结转行 —— 展开明细的公共片段 */
+    private List<Map<String, Object>> flowRows(LocalDate start, LocalDate endEx, String w, String c, String l) {
+        return jdbc.queryForList(
+                "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
+                        + "  ISNULL(单据类型, N'') AS 单据类型, ISNULL(单据编号, N'') AS 单据编号,"
+                        + "  数量 AS 数量, 单价 AS 单价, ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人"
+                        + " FROM inh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(单据类型,'') <> N'" + CARRY_TYPE + "'"
+                        + "  AND 单据日期 >= ? AND 单据日期 < ? AND ISNULL(RTRIM(物料编码),N'') = ?"
+                        + "  AND ISNULL(RTRIM(仓库编码),N'') = ? AND ISNULL(RTRIM(批号),N'') = ?"
                         + " UNION ALL "
-                        // 出库侧:数量取负,让整串单据的合计 = 该月净变动
-                        + "SELECT CONVERT(nvarchar(10), 单据日期, 120), ISNULL(单据类型, N''), ISNULL(单据编号, N''),"
-                        + "  -数量, 成本单价, ISNULL(往来单位, N''), ISNULL(经手人, N'')"
+                        + "SELECT CONVERT(nvarchar(7), 单据日期, 120), CONVERT(nvarchar(10), 单据日期, 120),"
+                        + "  ISNULL(单据类型, N''), ISNULL(单据编号, N''), -数量, 成本单价,"
+                        + "  ISNULL(往来单位, N''), ISNULL(经手人, N'')"
                         + " FROM outh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                         + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
-                        + "  AND ISNULL(RTRIM(批号),N'') = ?"
-                        + " ORDER BY 1, 3",
-                start, endEx, w, c, l, start, endEx, w, c, l));
-        return out;
+                        + "  AND ISNULL(RTRIM(批号),N'') = ?",
+                start, endEx, w, c, l, start, endEx, w, c, l);
     }
 
     // ==================== 内部工具 ====================

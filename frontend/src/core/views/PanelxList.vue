@@ -549,8 +549,9 @@
               <div v-if="!mcDetail[row.id]" class="mc-detail-loading">{{ tt('展开加载中') }}…</div>
               <template v-else>
                 <div class="mc-detail-title">
-                  {{ tt('单据明细') }} · {{ mcDetail[row.id]['期间'] }}
-                  {{ tt('期间状态') }}:{{ mcDetail[row.id]['期间状态'] }}
+                  {{ tt('单据明细') }} ·
+                  {{ tt('上月') }} {{ mcDetail[row.id]['上月期间'] }}
+                  {{ tt('月结状态') }}:{{ mcDetail[row.id]['上月状态'] }}
                 </div>
                 <div v-if="mcDetail[row.id]['月结快照']" class="mc-detail-snap">
                   <span class="mc-snap-item"><b>{{ tt('期初数量') }}</b>{{ mcDetail[row.id]['月结快照']['期初数量'] ?? '—' }}</span>
@@ -559,8 +560,13 @@
                   <span class="mc-snap-item"><b>{{ tt('结存数量') }}</b>{{ mcDetail[row.id]['月结快照']['结存数量'] ?? '—' }}</span>
                   <span class="mc-snap-item"><b>{{ tt('最晚出库日期') }}</b>{{ mcDetail[row.id]['月结快照']['最晚出库日期'] ?? '—' }}</span>
                 </div>
-                <div v-else class="mc-detail-snap mc-dim">{{ tt('该期间尚未月结,以下为期间内单据') }}</div>
+                <div v-else class="mc-detail-snap mc-dim">
+                  {{ mcDetail[row.id]['上月状态'] === '已取消'
+                    ? tt('上月月结已取消,以下陈列该月与当月的原始单据')
+                    : tt('上月未月结,以下陈列该月与当月的原始单据') }}
+                </div>
                 <el-table :data="mcDetail[row.id]['单据明细'] || []" size="small" border max-height="340" show-summary>
+                  <el-table-column prop="月份" :label="tt('月份')" width="82" />
                   <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
                   <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
                   <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
