@@ -25,6 +25,45 @@ export const ROW_SAMPLE = '样品'
 export const SHEET_SECTION = '首件检验'
 
 /**
+ * 图片《炭棒成型车间首件检验记录表》上的 **10 个测试项目**(分组 · 列名 · 数据键 · 单位)。
+ * 用户口径(2026-10-15 第三轮):「当前测试项目把这些先填充进去就可以了,不需要空着什么都没有」
+ * ⇒ 新建的首件检验单要**一打开就带着这 10 列**,不能是一张空表。
+ *
+ * ⚠ 与后端 `FirstInspItems.DEFS` **必须一致**(同一张图纸;后端负责按《成型工艺清单》把"标准"填上,
+ *   前端这份只兜"列本身要先有" —— 新建草稿还没选产品、也就还没有工艺清单可查那一刻)。
+ *   两处顺序/键/分组/单位任一改动都要同步,否则会出现"纸面列序与落库列序不一致"。
+ * 标准(row.standard)由后端给;前端兜底时留空(表观/脱粉/浊度三项图纸上就是「/」)。
+ */
+export const DEFAULT_TEST_ITEMS = [
+  { key: 'appearance', label: '炭棒表观状态', group: '表观及脱粉', unit: '', standard: '/' },
+  { key: 'depowder', label: '炭棒脱粉情况', group: '表观及脱粉', unit: '', standard: '/' },
+  { key: 'outer', label: '炭棒外径', group: '尺寸及重量', unit: 'mm', standard: '' },
+  { key: 'inner', label: '炭棒内径', group: '尺寸及重量', unit: 'mm', standard: '' },
+  { key: 'length', label: '炭棒长度', group: '尺寸及重量', unit: 'mm', standard: '' },
+  { key: 'weight', label: '炭棒重量', group: '尺寸及重量', unit: 'g', standard: '' },
+  { key: 'drop', label: '跌落', group: '强度', unit: '', standard: '' },
+  { key: 'compress', label: '挤压强度', group: '强度', unit: 'kgf', standard: '' },
+  { key: 'turbidity', label: '浊度NTU', group: '浊度及压降', unit: 'NTU', standard: '/' },
+  { key: 'pressure', label: '压降kPa', group: '浊度及压降', unit: 'kPa', standard: '' },
+]
+
+/**
+ * 明细里一列都没有时,把图片上的 10 个测试项目先铺进去(幂等:已有列就原样返回 0)。
+ * 只在**可编辑的新草稿**上调用 —— 历史单据(哪怕明细为空)不该被前端擅自灌数据。
+ * @param {object} head 单据表头(含 detail.items)
+ * @returns {number} 本次铺了几列(0 = 本来就有列,没动)
+ */
+export function seedDefaultColumns(head) {
+  const items = ensureItems(head)
+  if (items.length) return 0
+  for (const d of DEFAULT_TEST_ITEMS) {
+    const maxNo = items.reduce((m, r) => Math.max(m, Number(r?.['行号']) || 0), 0)
+    items.push(...rowsForColumn({ key: d.key, label: d.label, group: d.group, standard: d.standard }, maxNo))
+  }
+  return DEFAULT_TEST_ITEMS.length
+}
+
+/**
  * 从明细行折出列清单(按首次出现的先后;同一 key 只认第一行 —— 它是该列的"定义行")。
  * @param {Array<object>} items 明细行
  * @returns {Array<{key:string,label:string,group:string,standard:string,unit:string}>}
@@ -35,12 +74,17 @@ export function columnsOf(items) {
     if (!r) continue
     const key = String(r['检验列'] || r['检验项目'] || '').trim()
     if (!key || map.has(key)) continue
+    const label = String(r['检验项目'] || key)
+    const declared = String(DEFAULT_TEST_ITEMS.find((d) => d.key === key)?.unit || '')
     map.set(key, {
       key,
-      label: String(r['检验项目'] || key),
+      label,
       group: String(r['项目分组'] || GROUP_ORDER[GROUP_ORDER.length - 1]),
       standard: String(r['标准'] || r['检验要求'] || ''),
-      unit: unitOfLabel(String(r['检验项目'] || key)),
+      // 单位优先取**图纸声明**(DEFAULT_TEST_ITEMS 里写死的),再回落"从列名猜"。
+      // ⚠ 只靠猜不行:「炭棒外径」列名里没有 mm(图片上那个 mm 是列头单位的小字),
+      //   兜底铺列时就会把单位丢掉(单测抓到过)。
+      unit: declared || unitOfLabel(label),
     })
   }
   return [...map.values()]

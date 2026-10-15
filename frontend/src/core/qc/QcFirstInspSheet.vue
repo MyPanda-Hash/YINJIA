@@ -178,12 +178,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import {
   columnsOf, groupsOf, addColumn, removeColumn, updateColumn,
   columnHasContent, ensureItems, ROW_STANDARD, ROW_SAMPLE, GROUP_ORDER,
+  seedDefaultColumns,
 } from './firstInspCols.js'
 
 const props = defineProps({
@@ -201,6 +202,22 @@ const items = computed(() => {
   const d = props.head?.detail
   return d && Array.isArray(d.items) ? d.items : []
 })
+
+/**
+ * 新建草稿的**兜底铺列**:图片上的 10 个测试项目一打开就在(用户口径「把这些先填充进去就可以了,
+ * 不需要空着什么都没有」)。只在"可编辑 + 明细一行都没有"时动手,铺完标脏让用户保存。
+ * ⚠ 后端报工自动出单/点「取成型工艺清单」时**已经**按工艺清单铺过(那时能带出标准),这里是
+ *   "还没选产品 / 产品还没有工艺清单"那一刻的兜底 —— 已有列就一行不动(seedDefaultColumns 幂等)。
+ */
+watch(
+  () => [props.editable, props.head?.['单据编号'], items.value.length],
+  () => {
+    if (!props.editable || items.value.length) return
+    const n = seedDefaultColumns(props.head)
+    if (n) { bump.value++; emit('dirty') }
+  },
+  { immediate: true },
+)
 const columns = computed(() => {
   bump.value
   // ⚠ 必须**按分组排好**再渲染:表头第一级是分组(colspan = 本组列数),表体一格一列。

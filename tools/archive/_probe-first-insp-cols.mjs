@@ -91,7 +91,8 @@ try {
       sheet: true,
       title: (s.querySelector('.fi-title')?.innerText || '').trim(),
       groups: [...s.querySelectorAll('.fi-grid thead .group')].map(e => (e.innerText||'').trim()),
-      colHeads: [...s.querySelectorAll('.fi-grid thead .col-head')].map(e => (e.innerText||'').trim()),
+      // 读列名:取列头里「改名输入框」的 value(innerText 会把分组下拉的文字与删列「×」一起读进来)
+    colHeads: [...s.querySelectorAll('.fi-grid thead .col-head')].map(e => (e.querySelector('.fi-colname input')||{}).value || ''),
       stdRow: !!s.querySelector('.standard-row'),
       sampleLabels: [...s.querySelectorAll('.sample-row .rowlabel')].map(e => (e.innerText||'').trim()),
       corner: !!s.querySelector('.corner'),
@@ -111,6 +112,17 @@ try {
   ok('① 表头右上角有「＋」新增列', layout.addBtn === true)
   ok('① 底部相关要求 6 条', layout.reqs === 6, String(layout.reqs))
   ok('① 表尾含 检验结果/检验人', layout.foot.includes('检验结果') && layout.foot.includes('检验人'), JSON.stringify(layout.foot))
+  // 图片上的 10 个测试项目:新建草稿就应当**已经填好**(用户口径「当前测试项目把这些先填充进去就可以了,
+  // 不需要空着什么都没有」)。⚠ 本探针起的是**空草稿**(产品编码都还没填)⇒ 走的是"无工艺清单"兜底路径,
+  // 正好钉住"没有工艺清单也要先铺满 10 列"这条。
+  const EXPECT10 = ['炭棒表观状态', '炭棒脱粉情况', '炭棒外径', '炭棒内径', '炭棒长度', '炭棒重量',
+    '跌落', '挤压强度', '浊度NTU', '压降kPa']
+  console.log(`  新建草稿的列=${JSON.stringify(layout.colHeads)}`)
+  console.log(`  新建草稿的分组=${JSON.stringify(layout.groups)}`)
+  ok('① 新建草稿已铺好图片上的 10 个测试项目(不留空表)',
+    EXPECT10.every((n) => layout.colHeads.some((c) => c.includes(n))),
+    JSON.stringify(layout.colHeads))
+  ok('① 四个分组都出现', layout.groups.length === 4, JSON.stringify(layout.groups))
 
   const before = layout.colHeads.length
   // ② 点「＋」新增一列 —— 先把新列的列名改成可认的测试项目名(列头输入框),再看列是否长出来
@@ -283,6 +295,7 @@ try {
 }
 console.log(`\n== 首件检验「测试项目可新增」界面:${pass} PASS / ${fail} FAIL ==`)
 process.exit(fail ? 1 : 0)
+
 
 
 

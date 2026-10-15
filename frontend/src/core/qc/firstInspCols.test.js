@@ -13,6 +13,7 @@ import {
   SAMPLE_COUNT, GROUP_ORDER, ROW_STANDARD, ROW_SAMPLE,
   columnsOf, groupsOf, unitOfLabel, nextColumnKey, nextColumnLabel,
   rowsForColumn, addColumn, removeColumn, updateColumn, columnHasContent, ensureItems,
+  seedDefaultColumns, DEFAULT_TEST_ITEMS,
 } from './firstInspCols.js'
 
 const headOf = (items = []) => ({ 单据编号: 'SJ-T-1', detail: { items } })
@@ -159,6 +160,67 @@ test('未分组按纸张先后:表头 colspan 与表体列序必须一致(截图
   // 每组 colspan 之和 = 列数(表头两行宽度必须对得上表体)
   const span = groupsOf(cols).reduce((n, g) => n + ordered.filter((c) => c.group === g).length, 0)
   assert.equal(span, ordered.length, 'colspan 合计必须等于列数')
+})
+
+test('新建草稿兜底:一打开就带图片上的 10 个测试项目', () => {
+  const head = headOf()
+  const n = seedDefaultColumns(head)
+  assert.equal(n, 10)
+  const items = head.detail.items
+  // 10 列 × (1 标准 + 8 样品) = 90 行
+  assert.equal(items.length, 90)
+  const cols = columnsOf(items)
+  assert.deepEqual(cols.map((c) => c.label), [
+    '炭棒表观状态', '炭棒脱粉情况', '炭棒外径', '炭棒内径', '炭棒长度',
+    '炭棒重量', '跌落', '挤压强度', '浊度NTU', '压降kPa',
+  ])
+  // 四个分组都出现,且顺序与纸张一致
+  assert.deepEqual(groupsOf(cols), ['表观及脱粉', '尺寸及重量', '强度', '浊度及压降'])
+  // 每列都是 1 标准 + 8 样品,行号唯一
+  assert.equal(items.filter((r) => r['行类型'] === ROW_STANDARD).length, 10)
+  assert.equal(items.filter((r) => r['行类型'] === ROW_SAMPLE).length, 80)
+  assert.equal(new Set(items.map((r) => Number(r['行号']))).size, 90, '行号必须唯一')
+  // 表观/脱粉/浊度图纸上就是「/」,其余留白等工艺清单带
+  const stdOf = (k) => items.find((r) => r['检验列'] === k && r['行类型'] === ROW_STANDARD)['标准']
+  assert.equal(stdOf('appearance'), '/')
+  assert.equal(stdOf('depowder'), '/')
+  assert.equal(stdOf('turbidity'), '/')
+  assert.equal(stdOf('outer'), '')
+  // 单位能从列名看出来
+  assert.equal(cols.find((c) => c.key === 'outer').unit, 'mm')
+  assert.equal(cols.find((c) => c.key === 'pressure').unit, 'kPa')
+})
+
+test('兜底铺列幂等:已有列一行不动', () => {
+  const head = headOf()
+  addColumn(head, { label: '自定义项' })
+  const before = head.detail.items.length
+  assert.equal(seedDefaultColumns(head), 0, '已有列时不得再灌默认列')
+  assert.equal(head.detail.items.length, before)
+})
+
+test('兜底铺列后仍可正常加列/删列(行号不与默认列相撞)', () => {
+  const head = headOf()
+  seedDefaultColumns(head)
+  const c = addColumn(head, { label: '追加项' })
+  assert.equal(c.key, '追加项')
+  const nos = head.detail.items.map((r) => Number(r['行号']))
+  assert.equal(new Set(nos).size, nos.length, '兜底 + 新增后行号仍必须唯一')
+  assert.equal(removeColumn(head, 'appearance'), 9)
+})
+
+test('DEFAULT_TEST_ITEMS 与后端 FirstInspItems.DEFS 对齐(键/顺序/分组/单位)', () => {
+  // 后端那份是 Java 常量,不能直接 import ⇒ 把契约钉在测试里:改动任一侧都会红。
+  // 依据 = 后端 FirstInspItems.DEFS(10 项,顺序 appearance..pressure)。
+  assert.deepEqual(DEFAULT_TEST_ITEMS.map((d) => d.key), [
+    'appearance', 'depowder', 'outer', 'inner', 'length',
+    'weight', 'drop', 'compress', 'turbidity', 'pressure',
+  ])
+  assert.deepEqual(DEFAULT_TEST_ITEMS.map((d) => d.group), [
+    '表观及脱粉', '表观及脱粉', '尺寸及重量', '尺寸及重量', '尺寸及重量',
+    '尺寸及重量', '强度', '强度', '浊度及压降', '浊度及压降',
+  ])
+  assert.deepEqual(DEFAULT_TEST_ITEMS.map((d) => d.unit), ['', '', 'mm', 'mm', 'mm', 'g', '', 'kgf', 'NTU', 'kPa'])
 })
 
 test('nextColumnKey / nextColumnLabel 只在冲突时让号', () => {

@@ -54,25 +54,54 @@ public final class FirstInspItems {
         return new Result(docNo, columns, rows);
     }
 
-    private static List<Column> columns(Map<String, Object> h) {
-        List<Column> out = new ArrayList<>();
-        // 图纸上表观/脱粉两列固定存在，标准行显示「/」；检验要求表没有这两项的独立数值标准。
-        add(out, "appearance", "炭棒表观状态", "表观及脱粉", "/", "");
-        add(out, "depowder", "炭棒脱粉情况", "表观及脱粉", "/", "");
-        add(out, "outer", "炭棒外径", "尺寸及重量", labeled("外径", str(h.get("od")), str(h.get("odt"))), "mm");
-        add(out, "inner", "炭棒内径", "尺寸及重量", labeled("内径", str(h.get("idm")), str(h.get("idt"))), "mm");
-        add(out, "length", "炭棒长度", "尺寸及重量", labeled("长度要求", str(h.get("lengthReq"))), "mm");
-        add(out, "weight", "炭棒重量", "尺寸及重量", labeled("重量要求", str(h.get("weightReq"))), "g");
-        add(out, "drop", "跌落", "强度", labeled("跌落高度", unit(str(h.get("dropH")), "cm"), "跌落次数", unit(str(h.get("dropN")), "次"), "跌落要求", str(h.get("dropReq"))), "");
-        add(out, "compress", "挤压强度", "强度", labeled("测试间距", unit(str(h.get("span")), "mm"), "压头下降速度", unit(str(h.get("speed")), "mm/min"), "强度要求", unit(str(h.get("kgf")), "kgf")), "kgf");
-        // RD_MOLD_PROC 当前没有独立「浊度」字段；按图片保留这一列，标准用 / 表示需按检验要求/实测填写。
-        add(out, "turbidity", "浊度NTU", "浊度及压降", "/", "NTU");
-        add(out, "pressure", "压降kPa", "浊度及压降", labeled("压降标准", unit(str(h.get("pressure")), "kPa"), "是否测试", str(h.get("pressureTest"))), "kPa");
-        return out;
-    }
+    /**
+     * 图纸上固定 10 个测试项目(分组 · 列名 · 数据键 · 单位),**恒铺**。
+     * 用户口径(2026-10-15 第三轮):「当前测试项目把这些先填充进去就可以了,不需要空着什么都没有」
+     * ⇒ 首件检验单一建出来就带着这 10 列(表观/脱粉/外径/内径/长度/重量/跌落/挤压强度/浊度/压降),
+     *   标准能取到就填、取不到就留空等品质填,但**列本身不能消失**。
+     * ⚠ 2026-10-15 修:原实现是 `add()` 里"标准为空就不加这一列",于是产品还没有《成型工艺清单》时
+     *   整张纸一列都没有(实测就是这个报障),与图片版式也不符。
+     */
+    private record Def(String key, String label, String group, String unit) {}
 
-    private static void add(List<Column> out, String key, String label, String group, String standard, String unit) {
-        if (!standard.isBlank()) out.add(new Column(key, label, group, standard, unit));
+    private static final List<Def> DEFS = List.of(
+            new Def("appearance", "炭棒表观状态", "表观及脱粉", ""),
+            new Def("depowder", "炭棒脱粉情况", "表观及脱粉", ""),
+            new Def("outer", "炭棒外径", "尺寸及重量", "mm"),
+            new Def("inner", "炭棒内径", "尺寸及重量", "mm"),
+            new Def("length", "炭棒长度", "尺寸及重量", "mm"),
+            new Def("weight", "炭棒重量", "尺寸及重量", "g"),
+            new Def("drop", "跌落", "强度", ""),
+            new Def("compress", "挤压强度", "强度", "kgf"),
+            new Def("turbidity", "浊度NTU", "浊度及压降", "NTU"),
+            new Def("pressure", "压降kPa", "浊度及压降", "kPa"));
+
+    private static List<Column> columns(Map<String, Object> h) {
+        // 标准取值:按数据键给;取不到给空串(列照铺,标准格留白由品质填/后补工艺清单再带入)
+        Map<String, String> std = new LinkedHashMap<>();
+        // 表观/脱粉/浊度在 RD_MOLD_PROC 里没有独立数值标准(图纸标准行也是"/"),固定给"/"
+        std.put("appearance", "/");
+        std.put("depowder", "/");
+        std.put("turbidity", "/");
+        // 「标签：取值」逐段拼,只拼有值的段;一段都没有 ⇒ 空串(整格留白,列照铺)
+        std.put("outer", segs("外径", str(h.get("od")), "公差", str(h.get("odt"))));
+        std.put("inner", segs("内径", str(h.get("idm")), "公差", str(h.get("idt"))));
+        std.put("length", segs("长度要求", str(h.get("lengthReq"))));
+        std.put("weight", segs("重量要求", str(h.get("weightReq"))));
+        std.put("drop", segs("跌落高度", unit(str(h.get("dropH")), "cm"),
+                "跌落次数", unit(str(h.get("dropN")), "次"),
+                "跌落要求", str(h.get("dropReq"))));
+        std.put("compress", segs("测试间距", unit(str(h.get("span")), "mm"),
+                "压头下降速度", unit(str(h.get("speed")), "mm/min"),
+                "强度要求", unit(str(h.get("kgf")), "kgf")));
+        std.put("pressure", segs("压降标准", unit(str(h.get("pressure")), "kPa"),
+                "是否测试", str(h.get("pressureTest"))));
+
+        List<Column> out = new ArrayList<>();
+        for (Def d : DEFS) {
+            out.add(new Column(d.key(), d.label(), d.group(), std.getOrDefault(d.key(), ""), d.unit()));
+        }
+        return out;
     }
 
     private static Map<String, Object> row(String type, String sample, int sampleNo, Column c) {
@@ -91,19 +120,22 @@ public final class FirstInspItems {
         return r;
     }
 
-    private static String labeled(String label, String... values) {
-        String value = join(values);
-        return value.isBlank() ? "" : label + ":" + value;
-    }
-
-    private static String join(String... parts) {
-        StringBuilder out = new StringBuilder();
-        for (String p : parts) {
-            if (p == null || p.isBlank()) continue;
-            if (out.length() > 0) out.append(';');
-            out.append(p);
+    /**
+     * 逐段拼「标签：取值」,用「;」连接;**一段都没有值就返回空串**。
+     * ⚠ 2026-10-15 修:原实现先 join 再看空,于是工艺清单没维护时标准行出现
+     *   `跌落高度:跌落次数;跌落要求` 这种"只有标签没有值"的怪文案 —— 那种情况应当整格留白。
+     * 标签与取值之间用**中文冒号「：」**(与工艺清单纸面、图片上的写法一致)。
+     * @param kv 成对参数:标签1, 取值1, 标签2, 取值2, …
+     */
+    private static String segs(String... kv) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i + 1 < kv.length; i += 2) {
+            String label = kv[i], value = kv[i + 1];
+            if (value == null || value.isBlank()) continue;
+            if (sb.length() > 0) sb.append(';');
+            sb.append(label).append('：').append(value);
         }
-        return out.toString();
+        return sb.toString();
     }
 
     private static String unit(String value, String unit) { return value.isBlank() ? "" : value + unit; }

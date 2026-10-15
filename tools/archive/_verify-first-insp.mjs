@@ -115,9 +115,14 @@ try {
 
   const none = await get('/qc/firstInsp/fromMoldProc?productCode=NO-SUCH-PRODUCT-XYZ')
   const nd = none.json?.data || {}
-  ok('② 无工艺清单时仍保留图片固定表观列',
-    !nd.moldProcNo && (nd.columns || []).length === 3 && (nd.rows || []).length === 27,
+  ok('② 无工艺清单时也把图片上的 10 个测试项目先铺好(不留空表)',
+    !nd.moldProcNo && (nd.columns || []).length === 10 && (nd.rows || []).length === 90
+      && (nd.rows || []).filter((r) => r['行类型'] === '标准').length === 10,
     `moldProcNo=${nd.moldProcNo} columns=${(nd.columns || []).length} rows=${(nd.rows || []).length}`)
+  ok('② 无工艺清单时标准格留白(不出现"只有标签没有值"的怪文案)',
+    (nd.rows || []).filter((r) => r['行类型'] === '标准')
+      .every((r) => !/[:：]\s*(;|$)/.test(String(r['标准'] || ''))),
+    JSON.stringify((nd.rows || []).filter((r) => r['行类型'] === '标准').map((r) => r['标准'])))
 
   // ── ③ 报工审核 → 自动出首件检验单 ─────────────────────────────────────────
   const cands = await q(`SELECT TOP 20 p.pl_no AS 工单号, p.pl_xc AS 行, ISNULL(p.[批次号],'') AS 批次号, p.dm AS 产品编码, p.scx AS 生产线
