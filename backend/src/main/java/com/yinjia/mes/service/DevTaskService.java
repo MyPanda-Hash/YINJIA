@@ -282,7 +282,13 @@ public class DevTaskService {
                         + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档' ELSE N'草稿' END AS status"
                         + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
                         + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
-                        + " AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y' AND (h.编号 IS NULL OR h.编号 = ?)"
+                        // ⚠ 2026-10-16 修:`h.编号` 这一列**在 rd_spec_doc_head 上不存在**(实测列清单:
+                        //   id/单据编号/单据日期/名称/产品编号/…/规格书种类/…;历史上叫「编号」的列已不在)
+                        //   ⇒ 每次打开产品信息表的「规格书分发」都 500:列名 '编号' 无效,
+                        //   于是用户报的「申请修改后回去产品信息表分配责任人会报错」根本走不通。
+                        //   分发盖章写的就是**产品编号**(见 ButtonService 分发路径 UPDATE ... SET 产品编号=?),
+                        //   故此处判据同步改成 产品编号。
+                        + " AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y' AND (h.产品编号 IS NULL OR h.产品编号 = ?)"
                         + " AND NOT EXISTS (SELECT 1 FROM rd_spec_assign a WHERE a.单据编号 = h.单据编号 AND ISNULL(a.asp_cancel,'N') <> 'Y')"
                         + " ORDER BY h.id DESC", productCode));
         return out;

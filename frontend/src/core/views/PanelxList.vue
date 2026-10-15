@@ -368,6 +368,17 @@
                 <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
                 <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
                 <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
+                <!-- 反审核(弃审)—— 用户口径 2026-10-16「加上可反审核的机制,方便申请修改」:
+                     文书归档面板在「已审核/已归档」时,走「申请修改→管理员审批→修改→再归档」闭环太重;
+                     有审批权的人(∪管理员)可直接反审核退回草稿,改完保存即重新归档。
+                     后端 ButtonService.unaudit 对归档一族**先落快照**(snapshotOnUnaudit),
+                     所以修改记录照样逐条留痕,不丢审计。服务端另有 requireApprover 强制,此处同口径显隐。 -->
+                <div
+                  v-if="canUnauditHere"
+                  class="as-side-btn"
+                  :title="tt('反审核：退回草稿后可直接修改，保存时再归档（修改记录照样留痕）')"
+                  @click="pickModAction('弃审')"
+                >{{ tt('弃审') }}</div>
                 <div v-if="openModMenu" class="as-side-menu flip-up" @click.stop>
                   <template v-if="canApproveHere() || l2ApproverNow">
                     <template v-if="curDocStatus === '修改申请中'">
@@ -3277,6 +3288,14 @@ const specAssignBlocked = computed(() => !!(specDocAssign.value?.hasAssign)
   && user.account !== specDocAssign.value?.owner
   && user.account !== specDocAssign.value?.supervisor)
 const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value) && !specAssignBlocked.value)
+/**
+ * 侧栏「弃审」(反审核)是否放出 —— 用户口径 2026-10-16「加上可反审核的机制,方便申请修改」。
+ * 文书归档面板 + 已审核/已归档 + 有审批权(∪管理员)。与后端 ButtonService.unaudit 同口径:
+ * 它要求 requireApprover,且对归档一族先落快照 ⇒ 反审核后直接改、保存即重新归档,修改记录照样留痕。
+ */
+const canUnauditHere = computed(() => isDocArchivePanel.value
+  && ['已审核', '已归档'].includes(curDocStatus.value)
+  && canApproveHere())
 
 // ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
 // 服务端 ensureDevFileEditable 早就拦住了非责任人,但界面不置灰:用户能改、能点保存,点完才被拒。
@@ -6720,7 +6739,9 @@ function isDisabled(action) {
     新增: false, // 单单据面板新增按钮不置灰
     删除: !current.value,
     审核: !current.value || st !== '草稿',
-    弃审: !current.value || st !== '已审核',
+    // 反审核(弃审):后端 ButtonService.unaudit 接受「已审核/已归档」(变更单另接受「已生效」),
+    // 前端置灰口径必须与之一致 —— 否则文书归档面板归档后按钮永远点不动(用户口径 2026-10-16)
+    弃审: !current.value || !['已审核', '已归档', '已生效'].includes(st),
     中止执行: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     整单中止: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     草稿: !current.value || st !== '已中止',

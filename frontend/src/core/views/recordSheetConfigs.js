@@ -1603,6 +1603,12 @@ export const recordSheetConfigs = {
    *      (服务端 ButtonService.gateChangeDetail 另有强制还原,界面只是先说清楚);
    *   ② 性质 / 变更文件 用 type:'checks' 复选格(存储是顿号分隔文本,不是新字段类型);
    *   ③ 签字/日期 由服务端盖章(填了「变更后内容」才盖),界面上同样只读。
+   *
+   * 行高(2026-10-16 用户口径):「把表头改为可自由编辑的模式而不是固定的,在没有填写数据的时候
+   *   不要压这么扁,可以适当拉长看起来协调一点,现在有一点宽和有一点短了」——
+   *   本表横跨 1963px(设计 B..G 列宽之和),行高却只有 ~31px,空白单据看起来又宽又扁。
+   *   故逐行给 `h`(最小行高,内容多了仍自由撑开):表头格 38、大填写区 58 且 `rows: 2`(两行起),
+   *   与纸面观感相称。`h`/`rows` 由 RecordSheetPanels 的网格行渲染读取(见该组件同名注释)。
    */
   RD_CHANGE: {
     headMode: 'report',
@@ -1615,25 +1621,25 @@ export const recordSheetConfigs = {
     info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
     sections: [
       { bar: '一、基础信息', rows: [
-        { grid: [
+        { h: 38, grid: [
           { label: '文件编码' },
           { fixed: 'YJ-QR-130' },
           { label: '申请日期' },
           { key: '申请日期', span: 3 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { label: '申请部门' },
           { key: '申请部门', span: 2 },
           { label: '性质' },
           { key: '性质', type: 'checks', single: true, options: ['变更', '新增'], span: 2 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { label: '产品编码' },
           { key: '产品编号', span: 2 },
           { label: '申请人' },
           { key: '申请人', span: 2 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { label: '产品名称' },
           { key: '产品名称', span: 2 },
           { label: '单据编号' },
@@ -1643,29 +1649,29 @@ export const recordSheetConfigs = {
         // 快捷变更=冯总审批):数据键「变更类型」,落库列走备用列池的 备用1
         // (见 tools/migrate-rd-change-kind-2026-09-30.sql);快捷变更在后端
         // **禁止提交会签**(ButtonService.submitSignoff 明确拒绝),直接提交审批即可。
-        { grid: [
+        { h: 38, grid: [
           { label: '变更类型' },
           { key: '变更类型', type: 'select', span: 2 },
           { label: '需会签' },
           { key: '需会签', type: 'checks', single: true, options: ['是', '否'], span: 2 },
         ]},
         // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
-        { grid: [
+        { h: 38, grid: [
           { label: '会签人' },
           { key: '会签人', span: 5, ph: '多人用逗号分隔（账号）' },
         ]},
       ]},
       { bar: '二、变更/新增申请事由', rows: [
-        { grid: [
+        { h: 58, grid: [
           { label: '变更事由' },
-          { key: '变更事由', span: 5, area: true, ph: '本次要改什么、为什么改' },
+          { key: '变更事由', span: 5, area: true, rows: 2, ph: '本次要改什么、为什么改' },
         ]},
-        { grid: [
+        { h: 58, grid: [
           { label: '验证数据' },
-          { key: '验证数据', span: 5, area: true, ph: '支持本次变更的验证数据/试验结论' },
+          { key: '验证数据', span: 5, area: true, rows: 2, ph: '支持本次变更的验证数据/试验结论' },
         ]},
         // 四个受控文件的勾选(用户口径第②条):勾哪些,生效时就按哪些建下一版草稿
-        { grid: [
+        { h: 38, grid: [
           { label: '变更文件' },
           { key: '变更文件', type: 'checks', span: 5,
             options: ['成型工艺清单', '组装工艺清单', '规格书', '出货检验计划表'] },
@@ -1675,6 +1681,9 @@ export const recordSheetConfigs = {
     dataTables: [
       { page: 0, bar: '三、部门评审意见', fixedRows: true, lockKey: '部门', lockCols: ['变更后内容', '备注'],
         filterKey: '表区', filterVal: '部门评审意见',
+        // 数据表行的最小行高(2026-10-16 用户口径「没有填写数据的时候不要压这么扁」):
+        // 空表时每行只有 ~31px,和这张 1963px 宽的纸不成比例
+        rowH: 44,
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '部门', label: '部门', w: 175 },
@@ -1685,27 +1694,27 @@ export const recordSheetConfigs = {
     ],
     tailSections: [
       { page: 0, bar: '三.相关变更', rows: [
-        { grid: [
+        { h: 58, grid: [
           { label: '相关变更' },
-          { key: '相关变更', span: 5, area: true, ph: '与哪些文件/工序/在制品相关联' },
+          { key: '相关变更', span: 5, area: true, rows: 2, ph: '与哪些文件/工序/在制品相关联' },
         ]},
       ]},
       { page: 0, bar: '四、库存产品处理方式', rows: [
-        { grid: [
+        { h: 38, grid: [
           { label: '原料' },
           { label: '数量' },
           { key: '原料数量' },
           { label: '处理方式' },
           { key: '原料处理方式', type: 'select', span: 2 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { label: '半成品' },
           { label: '数量' },
           { key: '半成品数量' },
           { label: '处理方式' },
           { key: '半成品处理方式', type: 'select', span: 2 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { label: '成品' },
           { label: '数量' },
           { key: '成品数量' },
@@ -1714,27 +1723,27 @@ export const recordSheetConfigs = {
         ]},
       ]},
       { page: 0, bar: '五、其它', rows: [
-        { grid: [
+        { h: 38, grid: [
           { label: '文件管理人' },
           { key: '文件管理人', span: 2 },
           { label: '密级' },
           { key: '密级', type: 'select', span: 2 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { label: '文件使用范围' },
           { key: '文件使用范围', type: 'select', span: 2 },
           { label: '备注' },
           { key: '备注', span: 2 },
         ]},
       ]},
-      // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)
+      // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)——手签行也得留够高度
       { page: 0, bar: '批准', rows: [
-        { grid: [
+        { h: 38, grid: [
           { label: '批准', span: 2 },
           { label: '签字', span: 2 },
           { label: '日期', span: 2 },
         ]},
-        { grid: [
+        { h: 38, grid: [
           { span: 2 },
           { span: 2 },
           { span: 2 },

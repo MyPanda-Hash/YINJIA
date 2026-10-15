@@ -270,8 +270,10 @@
           </tr>
 
           <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
-               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols -->
-          <tr v-else-if="row.grid">
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols
+               row.h = 该行**最小行高**(2026-10-16:产品变更申请单表头空白时被压得很扁,
+               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开) -->
+          <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
@@ -310,7 +312,7 @@
                   </span>
                 </template>
                 <template v-else-if="editable && c.key">
-                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
@@ -555,7 +557,7 @@
                 <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(r.row)">×</span></td>
               </tr>
             </template>
-            <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
+            <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }" :style="dt.rowH ? { height: dt.rowH + 'px' } : null">
               <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :class="{ 'rsp-locked': isLockedCell(dt, row, c) }" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 <el-input v-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
@@ -764,8 +766,10 @@
           </tr>
 
           <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
-               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols -->
-          <tr v-else-if="row.grid">
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols
+               row.h = 该行**最小行高**(2026-10-16:产品变更申请单表头空白时被压得很扁,
+               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开) -->
+          <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
@@ -804,7 +808,7 @@
                   </span>
                 </template>
                 <template v-else-if="editable && c.key">
-                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
