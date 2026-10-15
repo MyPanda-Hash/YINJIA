@@ -483,6 +483,11 @@ public class PanelConfigService {
                             merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
                         }
                     }
+                    // 2026-10-16 注:固定组/固定项(外观·端盖两头/管身两侧、尺寸、出货重量)**不再用按钮带入** ——
+                    //   用户口径「不要实现使用按钮的形式进行操作,根据当前的实现方式使用组件形式完成对默认
+                    //   情况下增加三个检验 外观/尺寸/出货重量」⇒ 改为**明细区分区渲染**(见 PanelxList 的
+                    //   isSectioned/archSections):三区默认铺出,固定项以"预置空行"形式常在,点行即落成真行。
+                    //   声明(yj_panel.config 的 fixedItems)仍经 metadata.fixedItems 下发给分区视图使用。
                     // 2026-10-15:首件检验单的检验要求来自《成型工艺清单》RD_MOLD_PROC(用户口径
                     //   「检验方式参考成型工艺清单内的检验要求进行编写」)—— 与「取出货检验计划」同位,
                     //   但只下发到这一张单。
@@ -512,6 +517,23 @@ public class PanelConfigService {
             }
         }
         metadata.put("buttonGroups", buttonGroups);
+        // 固定检验项声明(yj_panel.config 的 "fixedItems")下发给前端 —— **现役唯一消费者是报表**
+        // (ReportService.fillQcAsmInsp → QcAsmInspReportSupport:声明过的组永远铺出来);
+        // 前端那份 metadata 供**分区视图**铺固定项占位行(PanelxList.ensureFixedRows),而 QC_ASM_INSP
+        // 已退出 SECTION_PANELS ⇒ 今天拿到它的面板集为空。原先那句「『带入固定检验项』按钮据此落行」
+        // 已作废:按钮动作 2026-10-16 就删了(PanelxList 里那条注释留着),别再照它写新代码。
+        // 声明式,和 uniqueKeys 一样"加固定项=改一行 JSON、不加代码"(见 PanelDef.fixedItems)。
+        if (!def.fixedItems().isEmpty()) {
+            List<Map<String, Object>> fixedList = new ArrayList<>();   // ⚠ 名字别叫 fixed:本方法上面已有同名局部变量
+            for (PanelRegistry.PanelDef.FixedGroup fg : def.fixedItems()) {
+                Map<String, Object> one = new LinkedHashMap<>();
+                one.put("group", fg.group());
+                one.put("items", fg.items());
+                one.put("label", fg.columnLabel());   // 组列名(分区占位行的检验项目名,与报表同源)
+                fixedList.add(one);
+            }
+            metadata.put("fixedItems", fixedList);
+        }
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
@@ -2023,4 +2045,3 @@ public class PanelConfigService {
         }
     }
 }
-

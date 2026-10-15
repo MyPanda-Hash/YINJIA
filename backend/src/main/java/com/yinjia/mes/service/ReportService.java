@@ -319,11 +319,17 @@ public class ReportService {
         try {
             if (GENERIC_CODE.equals(tpl.code())) {
                 print = fillGeneric(def, doc, docNo, rows);
+            } else if (QcAsmInspReportSupport.CODE.equals(tpl.code())) {
+                // 组装成品检验记录表(2026-10-16):**版式按当前明细里实际存在的检验项目动态生成** ——
+                // 检验项目来自出货检验计划表、每个产品不一样,故列不写死在 .jrxml 里(生成器见
+                // QcAsmInspReportSupport);这里只把「取数 → 矩阵 → 参数」喂给生成的报表。
+                print = fillQcAsmInsp(def, doc, docNo, rows);
             } else {
-                // 主数据源=明细全量。制程检验记录表是**矩阵版式**(外观/尺寸/重量三格由
-                // headParams 按「表区」归并后下发成参数),模板里没有 detail band ⇒ 数据源不参与渲染;
-                // 其余精细模板(so_order/sl_recv/出厂检验报告)照旧用明细行逐行渲染。
-                print = JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo, rows),
+                // 主数据源 = 明细**全量**(一单一模板、逐行渲染)。制程检验记录表 2026-10-17 起也是
+                // 「一行一个检验项目」的纵向表(与面板纸张表同源),用 $F{检验要求}/$F{检验方法} 等逐行取;
+                // 早先那套「按表区归并成 外观结果/尺寸_1..5/重量_1..5 参数」的矩阵版式已作废,
+                // 相应参数产出与解析代码已同批删除(别再往模板里加那些参数名)。
+                print = JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo),
                         new JRMapCollectionDataSource(rows));
             }
         } catch (JRException e) {
@@ -335,6 +341,24 @@ public class ReportService {
         } catch (JRException e) {
             throw new IllegalArgumentException("报表导出失败：" + rootMessage(e));
         }
+    }
+
+    /**
+     * 组装成品检验记录表填充(QC_ASM_INSP,2026-10-16):明细 → 矩阵(按「检验类型」分组、组内一个检验项目一列)
+     * → 动态生成的报表 + 参数。**列不写死**:当前明细里有什么检验项目就打什么(用户口径「不能固定死」)。
+     * 数据源只给一行(内容全走参数)—— Jasper 没有数据源就不渲染 detail 带,故必须给。
+     */
+    private JasperPrint fillQcAsmInsp(PanelRegistry.PanelDef def, Map<String, Object> doc, String docNo,
+                                      List<Map<String, ?>> rows) throws JRException {
+        Map<String, Object> head = headParams(doc, docNo);
+        // 固定检验项来自 yj_panel.config 的 "fixedItems"(如 外观组永远铺 端盖两头/管身两侧)——
+        // 声明式元数据,**报表是它今天的唯一消费者**(见 PanelDef.fixedItems);前端那份 metadata.fixedItems
+        // 只喂分区视图的占位行,而 QC_ASM_INSP 已退出 SECTION_PANELS,原「带入固定检验项」按钮也已删除。
+        QcAsmInspReportSupport.Matrix m = QcAsmInspReportSupport.matrix(
+                rows, str(doc.get("总结论")), def == null ? List.of() : def.fixedItems());
+        return JasperFillManager.fillReport(QcAsmInspReportSupport.report(m),
+                QcAsmInspReportSupport.params(m, head),
+                new JRMapCollectionDataSource(QcAsmInspReportSupport.dataRows()));
     }
 
     /**
@@ -478,20 +502,6 @@ public class ReportService {
 
     /** 头字段(标量)+ 单据编号/打印时间:精细模板与通用模板共用 */
     private static Map<String, Object> headParams(Map<String, Object> doc, String docNo) {
-        return headParams(doc, docNo, List.of());
-    }
-
-    /**
-     * 头参数 + 按「表区」归并的汇总结果(制程检验记录表用)。
-     *
-     * <p>背景:制程检验单(qc_proc_insp_detail)的明细按「表区」分成 外观/尺寸/重量/功能性测试 四组,
-     * 报表上半部是三组各占一格的**矩阵版式**(照用户截图),不是一个检验项一行 ——
-     * 因此需要把同表区的明细归并成一个字符串下发成参数。
-     *
-     * <p>归并口径:同表区多行时,取「检验项目:实测数值(判定)」逐行拼接,用 " · " 分隔;
-     * 无值则留空(模板 isBlankWhenNull)。模板缺失这些参数时不受影响(只是多几个键)。
-     */
-    private static Map<String, Object> headParams(Map<String, Object> doc, String docNo, List<Map<String, ?>> rows) {
         Map<String, Object> params = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : doc.entrySet()) {
             // 头字段(标量)一律下发为报表参数:模板要用哪个用哪个,加字段不必改 Java
@@ -501,154 +511,7 @@ public class ReportService {
         }
         params.put("单据编号", docNo);
         params.put("打印时间", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        // 制程检验记录表:按表区归并(其他面板的明细没有「表区」列,归并结果为空,不影响既有模板)
-        for (Map.Entry<String, String> e : SECTOR_PARAMS.entrySet()) {
-            params.put(e.getValue(), joinSector(rows, e.getKey()));
-        }
-        // 尺寸/重量各 5 格、外观 3 格:把该表区的值摊平成**定格数**的参数(照截图逐格)
-        for (Map.Entry<String, String[]> e : SPLIT_PARAMS.entrySet()) {
-            int slots = Integer.parseInt(e.getValue()[1]);
-            List<String> parts = "外观".equals(e.getKey())
-                    ? sectorRowValues(rows, e.getKey(), slots)   // 外观一格 = 一行(端盖/管身/其余)
-                    : splitParts(rows, e.getKey());              // 尺寸/重量:一行的 测量值1..5 摊平
-            for (int i = 0; i < slots; i++) {
-                params.put(e.getValue()[0] + "_" + (i + 1), i < parts.size() ? parts.get(i) : "");
-            }
-        }
         return params;
-    }
-
-    /** 需拆成定格的表区 → {参数名前缀, 格数}(2026-10-15:外观 3 格;尺寸/重量 5 格) */
-    private static final Map<String, String[]> SPLIT_PARAMS = Map.of(
-            "尺寸", new String[]{"尺寸", "5"},
-            "重量", new String[]{"重量", "5"},
-            "外观", new String[]{"外观", "3"});
-
-    /**
-     * 取某表区**每行一个**值(外观三格用):端盖两头 / 管身两侧 / 其余外观项 各占一格。
-     *
-     * <p>与 {@link #splitParts} 的差别:后者会把同一行里的多个值也摊平(尺寸/重量正需要那样),
-     * 而外观的**一格语义上就是一个检验项** —— 一行再按空格拆会串位
-     * (例:「无明显划痕 无裂纹」会占掉两格,把后面的项挤出去)。
-     * 空值也占位(保持与检验项一一对应,不左移)。
-     */
-    private static List<String> sectorRowValues(List<Map<String, ?>> rows, String sector, int max) {
-        List<String> out = new ArrayList<>();
-        if (rows == null) return out;
-        for (Map<String, ?> r : rows) {
-            if (!sector.equals(str(r.get("表区")))) continue;
-            String v = str(r.get("实测数值"));
-            if (v.isEmpty()) {
-                for (int i = 1; i <= MEASURE_SLOTS && v.isEmpty(); i++) v = num(r.get("测量值" + i));
-            }
-            out.add(v);
-            if (out.size() >= max) break;
-        }
-        return out;
-    }
-
-    /**
-     * 「测量值N」物理列的上限(2026-10-16:制程检验单明细测量值列 5 → 10,见
-     * {@code tools/migrate-qc-proc-insp-measure10.sql})。
-     *
-     * <p>⚠ 只放宽**读取**上限:纸质模板 {@code qc_proc_insp.jrxml} 的尺寸/重量仍是**固定 5 格**
-     * (照受控纸质表版式),第 6..10 格不会出现在打印件上 —— 要改版式得另开模板工单。
-     * 取值循环按本常量读到 10,是为了「首值优先」这类判断不因列表变长而漏读。
-     */
-    private static final int MEASURE_SLOTS = 10;
-
-    /**
-     * 取某表区的「实测值」,摊平成一个列表(最多 5 个,对应截图的 5 格)。
-     *
-     * <p>取值优先级(2026-10-12 加「测量值1..5」列、2026-10-16 扩到 1..10 后):
-     * <ol>
-     *   <li>优先读结构化列 {@code 测量值1..N}(面板上就是 N 个录入格),
-     *       同一行有多个值时全部摊平(如尺寸行 外径 填了 5 个格 ⇒ 5 个值);</li>
-     *   <li>取不到再回退到旧文本列 {@code 实测数值},按 "/" 拆(兼容历史数据)。</li>
-     * </ol>
-     * <p>⚠ 上限 5 是**纸质模板的格数**({@code qc_proc_insp.jrxml} 尺寸/重量各 5 格),
-     * 不是数据上限:模板之外的格这里不产出参数,免得摊平后串位。
-     */
-    private static List<String> splitParts(List<Map<String, ?>> rows, String sector) {
-        List<String> out = new ArrayList<>();
-        if (rows == null) return out;
-        // ① 结构化列优先:同表区每行的 测量值1..N 依次摊平(超出模板格数的丢掉)
-        for (Map<String, ?> r : rows) {
-            if (!sector.equals(str(r.get("表区")))) continue;
-            for (int i = 1; i <= MEASURE_SLOTS; i++) {
-                Object v = r.get("测量值" + i);
-                if (v == null) continue;
-                String t = num(v);
-                if (!t.isEmpty()) out.add(t);
-                if (out.size() >= 5) return out;
-            }
-        }
-        if (!out.isEmpty()) return out;
-        // ② 回退:旧文本列按 / 拆
-        for (Map<String, ?> r : rows) {
-            if (!sector.equals(str(r.get("表区")))) continue;
-            String v = str(r.get("实测数值"));
-            if (v.isEmpty()) continue;
-            for (String p : v.split("[/、,，\\s]+")) {
-                String t = p.trim();
-                if (!t.isEmpty()) out.add(t);
-                if (out.size() >= 5) return out;
-            }
-        }
-        return out;
-    }
-
-    /** 数值转显示串:去尾零(44.5000 → 44.5),null/0 视为未填 */
-    private static String num(Object o) {
-        if (o == null) return "";
-        if (o instanceof java.math.BigDecimal bd) {
-            if (bd.signum() == 0) return "";                       // 0 = 未填
-            return bd.stripTrailingZeros().toPlainString();
-        }
-        if (o instanceof Number n) {
-            double d = n.doubleValue();
-            if (d == 0d) return "";
-            return d == Math.rint(d) ? String.valueOf((long) d) : String.valueOf(d);
-        }
-        String t = String.valueOf(o).trim();
-        return "0".equals(t) ? "" : t;
-    }
-
-    /** 明细「表区」→ 报表参数名(制程检验记录表的三个矩阵格) */
-    private static final Map<String, String> SECTOR_PARAMS = Map.of(
-            "外观", "外观结果",
-            "尺寸", "尺寸结果",
-            "重量", "重量结果");
-
-    /** 取同表区明细,按「检验项目:实测值(判定)」拼接;无该表区则返回空串 */
-    private static String joinSector(List<Map<String, ?>> rows, String sector) {
-        if (rows == null || rows.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (Map<String, ?> r : rows) {
-            Object sec = r.get("表区");
-            if (sec == null || !sector.equals(String.valueOf(sec).trim())) continue;
-            String item = str(r.get("检验项目"));
-            String val = firstMeasure(r);           // 优先结构化测量值,回退旧文本列
-            String judge = str(r.get("单项判定"));
-            String one = item;
-            if (!val.isEmpty()) one = one.isEmpty() ? val : one + ":" + val;
-            if (!judge.isEmpty()) one = one.isEmpty() ? judge : one + "(" + judge + ")";
-            if (one.isEmpty()) continue;
-            if (sb.length() > 0) sb.append(" · ");
-            sb.append(one);
-        }
-        return sb.toString();
-    }
-
-    /** 单个明细行的实测值:优先 测量值1..N(取首个非空非零),回退 实测数值 文本 */
-    private static String firstMeasure(Map<String, ?> r) {
-        for (int i = 1; i <= MEASURE_SLOTS; i++) {
-            Object v = r.get("测量值" + i);
-            if (v == null) continue;
-            String t = num(v);
-            if (!t.isEmpty()) return t;
-        }
-        return str(r.get("实测数值"));
     }
 
     private static String str(Object o) {

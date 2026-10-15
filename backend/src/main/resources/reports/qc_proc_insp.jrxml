@@ -1,20 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-12)
+  制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-17 **纵向表版**)
   ============================================================================
-  版式来源:用户截图「制程检验」页签(《生产相关品质检验.xlsx》第 2 个页签)。
-  ⚠ 2026-10-14 用户口径:「当前制程表只需要这种形式实现即可。下面的表是组装成品的」
-    ⇒ 本报表**只含制程检验组**(原 ② 出货检验功能性测试组已移除,它属组装成品检验单 QC_ASM_INSP)。
-  结构:
-    制程检验组:表头 7 列(检验时间|客户名称|产品编码|型号(mm)|批号|抽检总量|结果判断)
-      表体 3 组 —— 外观(端盖两头|管身两侧|按项目填充) / 尺寸(5 格) / 出货重量(5 格)
+  用户 2026-10-17 口径:
+    「好的当前制程检验形式错误了,这个内容进行修改实现……不需要那些外观什么的」
+    「等下,表头内容可以不进行修改,当前针对检验结果处的格式进行修改即可」
+    「当前这个报表形式需要根据当前页面修改实现导出,形成和当前页面导出形式相同的 excel 形式
+      而不是当前的旧报表形式」
+  ⇒ 本模板与**面板纸张表(QcProcInspSheet.vue)同一版式**:
+      公司 + 标题 → 抬头(单据要素,每行 2 组「标签|值」)
+      → 表头两行:客户名称|产品编码|型号（mm）|批号|**检验人员：<值>**(跨 检验要求+检验方法)|产线常规功能性结果|结果判断
+                   检验要求 | 检验方法
+      → 明细:一行一个检验项目(检验要求/检验方法/产线常规功能性结果/结果判断;长文本 StretchHeight 自动长高)
+      → 结论区:检验结论 / 处理意见 ; 页脚:检验员/审核/批准 + 页码 + 打印时间
+  旧版式(外观/尺寸/出货重量 三组矩阵 + 尺寸_1..5/重量_1..5 定格参数)**已废弃** ——
+  随之 ReportService 里那套「按表区归并/摊平成定格」的参数也不再产出(见该文件同批清理)。
 
   ⚠ 数据契约(ReportService):
     · $P{...} = 头字段标量 headParams 按 yj_field.label 下发 + 单据编号/打印时间后端补;
-    · 三个矩阵格(外观结果/尺寸_1..5/重量_1..5)由 headParams 按明细「表区」归并后下发。
+    · $F{...} = 明细行(detailRows),字段名 = yj_field.label —— 纵向表里明细**全部行**都进 detail,
+      不再挑「表区=功能性测试」那一拨。
   ⚠ JR 6.x XSD 排版坑(与 so_order/sl_recv 同套):
     · 样式集中声明;<box><pen/></box> 写法;band 必须包在分节元素里;
-    · textAlignment/verticalAlignment 只作 textElement 属性;isStretchWithOverflow 已废弃,用 textAdjust。
+    · textAlignment/verticalAlignment 只作 textElement 属性;**长文本自动长高用 textAdjust="StretchHeight"**
+      (isStretchWithOverflow 已废弃);
+    · JR 的 reportElement x/y/width/height **只能是整数常量** ⇒ 列宽按 758pt 手工切好(见下方列宽注释)。
   ⚠ band 顺序(严格):title → pageHeader → columnHeader → detail → columnFooter → pageFooter → lastPageFooter → summary → noData
 -->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
@@ -24,7 +34,7 @@
               pageWidth="842" pageHeight="595" orientation="Landscape"
               columnWidth="758" leftMargin="42" rightMargin="42" topMargin="30" bottomMargin="30"
               whenNoDataType="AllSectionsNoDetail"
-              uuid="a7f3c1d8-52e9-4b06-9c14-8d2f6a0b7e31">
+              uuid="a7f3c1d8-52e9-4b06-9c14-8d2f6a0b7e32">
 
   <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
   <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
@@ -45,111 +55,71 @@
       <pen lineWidth="0.5" lineColor="#8A8A8A"/>
     </box>
   </style>
-  <style name="notice" style="base" fontSize="10" isBold="true" hAlign="Center" vAlign="Middle"
-         mode="Opaque" backcolor="#FFFF00">
-    <box padding="2">
-      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
-    </box>
-  </style>
   <style name="company" style="base" fontSize="16" isBold="true" hAlign="Center" vAlign="Bottom"/>
   <style name="docTitle" style="base" fontSize="15" isBold="true" hAlign="Center" vAlign="Middle"/>
   <style name="meta" style="base" fontSize="9" vAlign="Middle"/>
-  <style name="metaR" style="meta" hAlign="Right"/>
-  <style name="gridLabel" style="base" isBold="true" vAlign="Middle"/>
-  <style name="gridValue" style="base" vAlign="Middle"/>
   <style name="pager" style="base" vAlign="Middle"/>
   <style name="pagerR" style="pager" hAlign="Right"/>
   <style name="sign" style="base" fontSize="9" vAlign="Middle"/>
-  <style name="small" style="cell" fontSize="8"/>
+  <style name="blank" style="base">
+    <box padding="0">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
 
   <!-- 小字号单元格(表头/数据行用;字体大小必须在 style 里,不能写在 reportElement 上) -->
-  <style name="th6" style="th" fontSize="6"/>
   <style name="th7" style="th" fontSize="7"/>
   <style name="th8" style="th" fontSize="8"/>
-  <style name="c6" style="cellC" fontSize="6"/>
   <style name="c7" style="cellC" fontSize="7"/>
   <style name="c8" style="cellC" fontSize="8"/>
   <style name="l7" style="cell" fontSize="7"/>
   <style name="l8" style="cell" fontSize="8"/>
+  <style name="lb8" style="cell" fontSize="8" isBold="true" hAlign="Center" mode="Opaque" backcolor="#DCE6F1"/>
 
   <!-- ======================= 参数(头字段) ======================= -->
   <parameter name="单据编号" class="java.lang.String" isForPrompting="false"/>
   <parameter name="单据日期" class="java.util.Date" isForPrompting="false"/>
-  <parameter name="检验时间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据状态" class="java.lang.String" isForPrompting="false"/>
   <parameter name="检验类别" class="java.lang.String" isForPrompting="false"/>
   <parameter name="工单号" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="报工单号" class="java.lang.String" isForPrompting="false"/>
   <parameter name="工序" class="java.lang.String" isForPrompting="false"/>
   <parameter name="批次号" class="java.lang.String" isForPrompting="false"/>
   <parameter name="客户名称" class="java.lang.String" isForPrompting="false"/>
   <parameter name="产品编码" class="java.lang.String" isForPrompting="false"/>
   <parameter name="产品名称" class="java.lang.String" isForPrompting="false"/>
   <parameter name="规格型号" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="生产线" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="生产车间" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="报工数量" class="java.math.BigDecimal" isForPrompting="false"/>
   <parameter name="抽检总量" class="java.math.BigDecimal" isForPrompting="false"/>
-  <parameter name="检验数量" class="java.math.BigDecimal" isForPrompting="false"/>
   <parameter name="检验员" class="java.lang.String" isForPrompting="false"/>
   <parameter name="检验日期" class="java.util.Date" isForPrompting="false"/>
-  <parameter name="总结论" class="java.lang.String" isForPrompting="false"/>
   <parameter name="检验方案" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="文件编码" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="执行标准" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="总结论" class="java.lang.String" isForPrompting="false"/>
   <parameter name="处理方式" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="单据状态" class="java.lang.String" isForPrompting="false"/>
   <parameter name="审核人" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="审核时间" class="java.util.Date" isForPrompting="false"/>
   <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
-  <!-- 三个表区的汇总结果:报表填充前由 ReportService 按 表区 归并明细后下发 -->
-  <parameter name="外观结果" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="尺寸结果" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="重量结果" class="java.lang.String" isForPrompting="false"/>
-  <!-- 外观 3 格(2026-10-15):按明细「表区=外观」的行**逐行**取值(端盖两头/管身两侧/其余外观项),
-       见 ReportService.sectorRowValues(与尺寸/重量的「一行摊平」不同,一格 = 一个检验项) -->
-  <parameter name="外观_1" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="外观_2" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="外观_3" class="java.lang.String" isForPrompting="false"/>
-  <!-- 尺寸/重量各 5 格:填充前把「多值字符串」按 "/" 拆成 5 个值(见 ReportService.splitParts) -->
-  <parameter name="尺寸_1" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="尺寸_2" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="尺寸_3" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="尺寸_4" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="尺寸_5" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="重量_1" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="重量_2" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="重量_3" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="重量_4" class="java.lang.String" isForPrompting="false"/>
-  <parameter name="重量_5" class="java.lang.String" isForPrompting="false"/>
   <parameter name="公司名称" class="java.lang.String" isForPrompting="false">
     <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
   </parameter>
 
   <!-- ======================= 字段(明细行) ======================= -->
-  <field name="表区" class="java.lang.String"/>
   <field name="行号" class="java.lang.Integer"/>
+  <field name="表区" class="java.lang.String"/>
   <field name="检验项目" class="java.lang.String"/>
   <field name="检验要求" class="java.lang.String"/>
   <field name="检验方法" class="java.lang.String"/>
-  <field name="抽检量" class="java.math.BigDecimal"/>
-  <field name="实测数值" class="java.lang.String"/>
-  <field name="单项判定" class="java.lang.String"/>
-  <field name="不合格应对措施" class="java.lang.String"/>
+  <field name="产线常规功能性结果" class="java.lang.String"/>
   <field name="结果判断" class="java.lang.String"/>
 
-  <!-- ======================= 制程检验组(band: title) =======================
-       2026-10-15 用户口径:「格式修改为当前上面的实现模式就可以了」——按用户截图逐格实测改版:
-       截图 2868x372px,按表宽 758pt 换算得各列边界(measure-bands.py 量的竖线):
-         产品编码 0/29 · 型号（mm) 29/48 · 批号 77/130 · 抽检总量 207/196
-         外观组 403/119(端盖两头 56 · 管身两侧 42 · 按项目填充 21)
-         尺寸组 522/107(5 格) · 出货重量组 629/107(5 格) · 结果判断 736/22
-       与上一版的两处差别:
-         ① **去掉「检验时间」「客户名称」两列**(截图左起第一列就是产品编码);
-         ② 外观由「一格拼串」改为**三格各显其值**(端盖两头/管身两侧/其余外观项)。
-       列宽合计 758pt = columnWidth(与 calc.mjs 口径一致)。 -->
+  <!--
+    列宽(合计 758pt = columnWidth;照面板纸张表比例切):
+      客户名称 110 | 产品编码 90 | 型号（mm） 88 | 批号 88 | 检验要求 150 | 检验方法 150 | 产线常规功能性结果 40 | 结果判断 42
+    ⇒ x 坐标:0 / 110 / 200 / 288 / 376 / 526 / 676 / 716 / 758
+  -->
+
+  <!-- ======================= 标题 + 抬头(band: title) ======================= -->
   <title>
-    <band height="166">
-      <!-- 公司 + 标题:放在 title 最上方(title 在所有 band 之前渲染) -->
+    <band height="126">
+      <!-- ⚠ band 高度必须盖住里面所有元素(块底 = y+height);少 2pt 就会报
+           "Element bottom reaches outside band area" 而编译失败 -->
       <textField>
         <reportElement style="company" x="0" y="0" width="758" height="20"/>
         <textFieldExpression><![CDATA[$P{公司名称}]]></textFieldExpression>
@@ -158,90 +128,112 @@
         <reportElement style="docTitle" x="0" y="20" width="758" height="20"/>
         <textFieldExpression><![CDATA["制程检验记录表"]]></textFieldExpression>
       </textField>
-      <!-- 元信息行 -->
-      <textField isBlankWhenNull="true">
-        <reportElement style="meta" x="0" y="40" width="380" height="10"/>
-        <textFieldExpression><![CDATA["检验类别/工序：" + ($P{检验类别} == null ? "" : $P{检验类别}) + ($P{工序} == null ? "" : " / " + $P{工序})]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="metaR" x="380" y="40" width="378" height="10"/>
-        <textFieldExpression><![CDATA["编号：" + ($P{单据编号} == null ? "" : $P{单据编号}) + "    日期：" + ($P{单据日期} == null ? "" : new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format($P{单据日期}))]]></textFieldExpression>
-      </textField>
 
-      <!-- 黄底提示(2026-10-15 措辞按截图:检查频率来自**出货检验计划**) -->
-      <staticText>
-        <reportElement style="notice" x="0" y="52" width="758" height="16"/>
-        <text><![CDATA[以下检验项目对应出货检验计划的检查频率，1PCS/一个生产批次才进行测试]]></text>
-      </staticText>
+      <!-- 抬头:5 行 × 2 组「标签|值」(与面板纸张表同序) -->
+      <!-- 第 1 行 -->
+      <staticText><reportElement style="lb8" x="0" y="42" width="60" height="14"/><text><![CDATA[单据编号]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="60" y="42" width="150" height="14"/><textFieldExpression><![CDATA[$P{单据编号}]]></textFieldExpression></textField>
+      <staticText><reportElement style="lb8" x="379" y="42" width="60" height="14"/><text><![CDATA[单据日期]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="439" y="42" width="150" height="14"/><textFieldExpression><![CDATA[$P{单据日期} == null ? "" : new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format($P{单据日期})]]></textFieldExpression></textField>
+      <!-- 第 2 行 -->
+      <staticText><reportElement style="lb8" x="0" y="56" width="60" height="14"/><text><![CDATA[检验类别]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="60" y="56" width="150" height="14"/><textFieldExpression><![CDATA[$P{检验类别}]]></textFieldExpression></textField>
+      <staticText><reportElement style="lb8" x="379" y="56" width="60" height="14"/><text><![CDATA[工单号]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="439" y="56" width="150" height="14"/><textFieldExpression><![CDATA[$P{工单号}]]></textFieldExpression></textField>
+      <!-- 第 3 行 -->
+      <staticText><reportElement style="lb8" x="0" y="70" width="60" height="14"/><text><![CDATA[工序]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="60" y="70" width="150" height="14"/><textFieldExpression><![CDATA[$P{工序}]]></textFieldExpression></textField>
+      <staticText><reportElement style="lb8" x="379" y="70" width="60" height="14"/><text><![CDATA[产品名称]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="439" y="70" width="150" height="14"/><textFieldExpression><![CDATA[$P{产品名称}]]></textFieldExpression></textField>
+      <!-- 第 4 行 -->
+      <staticText><reportElement style="lb8" x="0" y="84" width="60" height="14"/><text><![CDATA[抽检总量]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="60" y="84" width="150" height="14"/><textFieldExpression><![CDATA[$P{抽检总量}]]></textFieldExpression></textField>
+      <staticText><reportElement style="lb8" x="379" y="84" width="60" height="14"/><text><![CDATA[检验日期]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="439" y="84" width="150" height="14"/><textFieldExpression><![CDATA[$P{检验日期} == null ? "" : new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format($P{检验日期})]]></textFieldExpression></textField>
+      <!-- 第 5 行 -->
+      <staticText><reportElement style="lb8" x="0" y="98" width="60" height="14"/><text><![CDATA[检验方案]]></text></staticText>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight"><reportElement style="l8" x="60" y="98" width="529" height="14"/><textFieldExpression><![CDATA[$P{检验方案}]]></textFieldExpression></textField>
 
-      <!-- 组标题行 y=70 高 12 -->
-      <staticText><reportElement style="th7" x="403" y="70" width="119" height="12" /><text><![CDATA[外观]]></text></staticText>
-      <staticText><reportElement style="th7" x="522" y="70" width="107" height="12" /><text><![CDATA[尺寸]]></text></staticText>
-      <staticText><reportElement style="th7" x="629" y="70" width="107" height="12" /><text><![CDATA[出货重量]]></text></staticText>
-
-      <!-- 固定 4 列 + 结果判断:表头跨两行(y=70..120) -->
-      <staticText><reportElement style="th6" x="0" y="70" width="29" height="50" /><text><![CDATA[产品编码]]></text></staticText>
-      <staticText><reportElement style="th6" x="29" y="70" width="48" height="50" /><text><![CDATA[型号（mm)]]></text></staticText>
-      <staticText><reportElement style="th6" x="77" y="70" width="130" height="50" /><text><![CDATA[批号]]></text></staticText>
-      <staticText><reportElement style="th6" x="207" y="70" width="196" height="50" /><text><![CDATA[抽检总量]]></text></staticText>
-      <staticText><reportElement style="th6" x="736" y="70" width="22" height="50" /><text><![CDATA[结果判断]]></text></staticText>
-
-      <!-- 外观 3 子列(y=82..120) -->
-      <staticText><reportElement style="th6" x="403" y="82" width="56" height="38" /><text><![CDATA[端盖两头]]></text></staticText>
-      <staticText><reportElement style="th6" x="459" y="82" width="42" height="38" /><text><![CDATA[管身两侧]]></text></staticText>
-      <staticText><reportElement style="th6" x="501" y="82" width="21" height="38" /><text><![CDATA[按项目填充]]></text></staticText>
-
-      <!-- 尺寸 / 出货重量 占位表头(y=82..120) -->
-      <staticText><reportElement style="th7" x="522" y="82" width="107" height="38" /><text><![CDATA[按照尺寸检验项目填充]]></text></staticText>
-      <staticText><reportElement style="th7" x="629" y="82" width="107" height="38" /><text><![CDATA[按照重量检验项目填充]]></text></staticText>
-
-      <!-- 数据行 y=120 高 42 -->
-      <textField isBlankWhenNull="true">
-        <reportElement style="c6" x="0" y="120" width="29" height="42" />
-        <textFieldExpression><![CDATA[$P{产品编码}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c6" x="29" y="120" width="48" height="42" />
-        <textFieldExpression><![CDATA[$P{规格型号}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c6" x="77" y="120" width="130" height="42" />
-        <textFieldExpression><![CDATA[$P{批次号}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c6" x="207" y="120" width="196" height="42" />
-        <textFieldExpression><![CDATA[$P{抽检总量} == null ? "" : new java.text.DecimalFormat("#,##0.###").format($P{抽检总量})]]></textFieldExpression>
-      </textField>
-
-      <!-- 外观 3 格:按明细「表区=外观」的行**逐行**取值(端盖两头/管身两侧/其余外观项) -->
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="403" y="120" width="56" height="42"/><textFieldExpression><![CDATA[$P{外观_1}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="459" y="120" width="42" height="42"/><textFieldExpression><![CDATA[$P{外观_2}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="501" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{外观_3}]]></textFieldExpression></textField>
-
-      <!-- 尺寸 5 格:后端把「测量值1..5 / 实测数值按 / 拆」的多值串摊平成 5 格 -->
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="522" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{尺寸_1}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="543" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{尺寸_2}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="564" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{尺寸_3}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="585" y="120" width="22" height="42"/><textFieldExpression><![CDATA[$P{尺寸_4}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="607" y="120" width="22" height="42"/><textFieldExpression><![CDATA[$P{尺寸_5}]]></textFieldExpression></textField>
-
-      <!-- 出货重量 5 格 -->
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="629" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{重量_1}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="650" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{重量_2}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="671" y="120" width="21" height="42"/><textFieldExpression><![CDATA[$P{重量_3}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="692" y="120" width="22" height="42"/><textFieldExpression><![CDATA[$P{重量_4}]]></textFieldExpression></textField>
-      <textField isBlankWhenNull="true"><reportElement style="c6" x="714" y="120" width="22" height="42"/><textFieldExpression><![CDATA[$P{重量_5}]]></textFieldExpression></textField>
-
-      <textField isBlankWhenNull="true">
-        <reportElement style="c6" x="736" y="120" width="22" height="42" />
-        <textFieldExpression><![CDATA[$P{总结论}]]></textFieldExpression>
-      </textField>
+      <!-- 分区带「检验结果」(与面板一致的蓝底条) -->
+      <staticText><reportElement style="bandTitle" x="0" y="114" width="758" height="12"/><text><![CDATA[检验结果]]></text></staticText>
     </band>
   </title>
-  <!-- 页眉:公司/标题/元信息已移到 title band(否则会重复渲染两遍) -->
+
   <pageHeader>
     <band height="1"/>
   </pageHeader>
+
+  <!-- ======================= 表头两行(band: columnHeader,每页重复) ======================= -->
+  <columnHeader>
+    <band height="28">
+      <!-- 左四列:跨两行(高 28) -->
+      <staticText><reportElement style="th7" x="0" y="0" width="110" height="28"/><text><![CDATA[客户名称]]></text></staticText>
+      <staticText><reportElement style="th7" x="110" y="0" width="90" height="28"/><text><![CDATA[产品编码]]></text></staticText>
+      <staticText><reportElement style="th7" x="200" y="0" width="88" height="28"/><text><![CDATA[型号（mm）]]></text></staticText>
+      <staticText><reportElement style="th7" x="288" y="0" width="88" height="28"/><text><![CDATA[批号]]></text></staticText>
+      <!-- 右侧两列:跨两行(高 28) -->
+      <staticText><reportElement style="th7" x="676" y="0" width="40" height="28"/><text><![CDATA[产线常规功能性结果]]></text></staticText>
+      <staticText><reportElement style="th7" x="716" y="0" width="42" height="28"/><text><![CDATA[结果判断]]></text></staticText>
+      <!-- 检验人员:跨「检验要求 + 检验方法」两列,占第一行 -->
+      <staticText><reportElement style="th8" x="376" y="0" width="90" height="14"/><text><![CDATA[检验人员：]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="l8" x="466" y="0" width="210" height="14"/><textFieldExpression><![CDATA[$P{检验员}]]></textFieldExpression></textField>
+      <!-- 第二行:两个字段名 -->
+      <staticText><reportElement style="th8" x="376" y="14" width="150" height="14"/><text><![CDATA[检验要求]]></text></staticText>
+      <staticText><reportElement style="th8" x="526" y="14" width="150" height="14"/><text><![CDATA[检验方法]]></text></staticText>
+    </band>
+  </columnHeader>
+
+  <!-- ======================= 明细:一行一个检验项目(band: detail) =======================
+       左四列是**单据级**值:只在第 1 行渲染(与面板纸张表"纵向合并"同一观感);
+       长文本(检验要求/检验方法)用 textAdjust="StretchHeight" —— 内容多高、这一行就多高。 -->
+  <detail>
+    <band height="16">
+      <!-- ⚠ printWhenExpression 是 <reportElement> 的**子元素**,不是 <textField> 的属性
+           (写成属性会报 cvc-complex-type.3.2.2;照 report-generic.jrxml 的既有写法) -->
+      <textField isBlankWhenNull="true">
+        <reportElement style="l7" x="0" y="0" width="110" height="16">
+          <printWhenExpression><![CDATA[new Boolean($V{REPORT_COUNT}.intValue() == 1)]]></printWhenExpression>
+        </reportElement>
+        <textFieldExpression><![CDATA[$P{客户名称}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="c7" x="110" y="0" width="90" height="16">
+          <printWhenExpression><![CDATA[new Boolean($V{REPORT_COUNT}.intValue() == 1)]]></printWhenExpression>
+        </reportElement>
+        <textFieldExpression><![CDATA[$P{产品编码}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="c7" x="200" y="0" width="88" height="16">
+          <printWhenExpression><![CDATA[new Boolean($V{REPORT_COUNT}.intValue() == 1)]]></printWhenExpression>
+        </reportElement>
+        <textFieldExpression><![CDATA[$P{规格型号}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="c7" x="288" y="0" width="88" height="16">
+          <printWhenExpression><![CDATA[new Boolean($V{REPORT_COUNT}.intValue() == 1)]]></printWhenExpression>
+        </reportElement>
+        <textFieldExpression><![CDATA[$P{批次号}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="l7" x="376" y="0" width="150" height="16"/>
+        <textFieldExpression><![CDATA[$F{检验要求}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="l7" x="526" y="0" width="150" height="16"/>
+        <textFieldExpression><![CDATA[$F{检验方法}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="c7" x="676" y="0" width="40" height="16"/>
+        <textFieldExpression><![CDATA[$F{产线常规功能性结果}]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="c7" x="716" y="0" width="42" height="16"/>
+        <textFieldExpression><![CDATA[$F{结果判断}]]></textFieldExpression>
+      </textField>
+    </band>
+  </detail>
+
+  <!-- ======================= 页脚:页码 / 打印时间 / 签署 ======================= -->
   <pageFooter>
     <band height="30">
       <textField>
@@ -272,10 +264,24 @@
         <reportElement style="sign" x="500" y="14" width="50" height="14"/>
         <text><![CDATA[批准：]]></text>
       </staticText>
-      <staticText>
-        <reportElement style="sign" x="550" y="14" width="208" height="14"/>
-        <text><![CDATA[]]></text>
-      </staticText>
     </band>
   </pageFooter>
+
+  <!-- ======================= 结论区(band: summary) =======================
+       ⚠ 顺序是**严格的**:summary 必须排在 pageFooter 之后(排前面会报
+         cvc-complex-type.2.4.a: 发现 pageFooter …应以 noData 之一开头) -->
+  <summary>
+    <band height="36">
+      <staticText><reportElement style="lb8" x="0" y="0" width="60" height="18"/><text><![CDATA[检验结论]]></text></staticText>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="l8" x="60" y="0" width="698" height="18"/>
+        <textFieldExpression><![CDATA[$P{总结论}]]></textFieldExpression>
+      </textField>
+      <staticText><reportElement style="lb8" x="0" y="18" width="60" height="18"/><text><![CDATA[处理意见]]></text></staticText>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="l8" x="60" y="18" width="698" height="18"/>
+        <textFieldExpression><![CDATA[$P{处理方式}]]></textFieldExpression>
+      </textField>
+    </band>
+  </summary>
 </jasperReport>

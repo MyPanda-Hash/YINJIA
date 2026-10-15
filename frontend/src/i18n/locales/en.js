@@ -658,6 +658,14 @@ export default {
     '带入': 'added',
     '行，请填写实测数值与判定': 'line(s); please fill in measured values and judgement',
     '取出货检验计划失败': 'Failed to fetch the shipment inspection plan',
+    // ---- 检验单分区渲染(2026-10-16:外观/尺寸/出货重量 三区固定,空数据也铺出区与列)----
+    // 分区**不加行**(用户口径「不需要增加除去最底下的明细行的增加行的实现」):加行只在下方「明细行」列表
+    '暂无数据：请在下方「明细行」新增或带入': 'No data yet — add or fetch rows in "Detail rows" below',
+    '本区固定项': 'Fixed items in this section',
+    // ⚠ 别在这里重复登记 '新增检验项'/'明细行'/'删除本行'/'序号' —— 本文件后面已有同名键
+    //   (1183/1723/727/1616),对象字面量后写的覆盖先写的,重复登记等于**永远不生效**的死词条。
+    // ---- 明细行列表(分区视图下面那张通用明细表:用户口径「中间固定检验项目、下面明细行」)----
+    '本单明细(全部列;与上方分区是同一批行)': "This document's detail rows (all columns; same rows as the sections above)",
     // ---- 带入固定检验项(2026-10-16:外观组的 端盖两头/管身两侧 是全产品通用的固定检查点)----
     '带入固定检验项': 'Add Fixed Inspection Items',
     '本面板没有配置固定检验项': 'No fixed inspection items configured for this panel',

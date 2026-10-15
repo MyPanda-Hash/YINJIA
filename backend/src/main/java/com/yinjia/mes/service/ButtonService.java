@@ -1617,10 +1617,15 @@ public class ButtonService {
         woReport.unpost(def.code(), no, currentUserName());
         // 工序任务回退(A 项):报工弃审 → 任务完成量对称回退
         processTask.onUnreport(def.code(), no, currentUserName());
-        // 工序检验单弃审联动(9.29 批次④):报工弃审 → 关联合格的**草稿**检验单作废+释放占用;
+        // 两类工序检验单弃审联动(9.29 批次④):报工弃审 → 关联合格的**草稿**检验单作废+释放占用;
         // 检验单已审核则拒绝弃审(先弃审检验单),防「报工撤了、检验单还算数」的错位
-        // (2026-10-16:清单收敛为 组装成品检验单 + 首件检验单,成型/切炭/成品检验规范已下架)
+        // (2026-10-16:清单收敛为 组装成品检验单 + 首件检验单,成型/切炭/成品检验规范已下架;
+        //  与 woInspUnauditCascade 里的 target_panel_code IN ('QC_ASM_INSP','QC_FIRST_INSP') 同一份名单)
         woInspUnauditCascade(def.code(), no, currentUserName());
+        // 组装成品检验单弃审联动(2026-10-17):审核时按表头「合格数量」自动生成的**产成品入库单
+        // 草稿**一并作废+释放占用(已审核则挡弃审,先弃审那张入库单)—— 保证「合格数量只在检验单已审核
+        // 期间存在于成品入库单里」,改完数量重审会按新值重开一张(见 asmInspUnauditCascade)
+        asmInspUnauditCascade(def.code(), no, currentUserName());
         // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
         dualOutRedReverse(def.code(), no, currentUserName());
         // 不良品处理冲回钩子同样随 QC_DISPOSAL 下架移除(见审核侧注释,2026-10-09)
@@ -1713,7 +1718,8 @@ public class ButtonService {
                 }
             }
         }
-        // 工序检验单:组装 报工审核 → 自动生成一张检验单草稿(2026-10-16 起成型/切炭两张已下架)
+        // 工序检验单:组装 报工审核 → 自动生成一张检验单草稿(2026-10-16 起成型/切炭两张已下架;
+        // 首件检验单走 firstInspGenerate,不在这张表里)
         woInspGenerate(def.code(), no, user);
         // 组装成品检验单 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿
         asmInspToStock(def.code(), no, user);
@@ -2880,7 +2886,20 @@ public class ButtonService {
             //   ⇒ 只建**空明细**的单头,检验项目/合格数量/不合格数量都由品质在明细里自己填。
             //   原来预铺的行(组装=合格/不合格两行 表区=数量判定;成型/切炭=外观一行)已取消;
             //   库存分流随之改为按明细列的 合格数量/不合格数量 汇总(见 asmInspToStock)。
-            head.put("detail", Map.of("items", List.of()));
+            // 🟡 2026-10-17 例外(用户口径「需要实现当前默认带入外观,尺寸,出货重量的出货检验计划的检验项」):
+            //   **组装成品检验单**生单时按产品编码从《出货检验计划表》预铺 外观/尺寸/出货重量 三类的检验项
+            //   (检验类型 / 检验项目 / 检验要求 / 检验方法 / 检查频率,见 AsmInspItems);计划里没有这三类
+            //   或该产品还没维护计划 ⇒ 照旧空明细,不算错。成型/切炭两张**仍按 2026-10-15 口径留空**。
+            Map<String, Object> detail = Map.of("items", List.of());
+            if ("QC_ASM_INSP".equals(target)) {
+                AsmInspItems.Result items = AsmInspItems.load(jdbc, String.valueOf(r.get("产品编码")));
+                if (!items.rows().isEmpty()) {
+                    detail = Map.of("items", items.rows());
+                    log.info("[组装成品检验] 报工 {} 按出货检验计划 {}(产品 {})预铺 {} 行检验项(外观/尺寸/出货重量)",
+                            repNo, items.planNo(), r.get("产品编码"), items.rows().size());
+                }
+            }
+            head.put("detail", detail);
             Map<String, Object> saved = save(registry.panel(target), head, false);
             String no = String.valueOf(saved.get("编号"));
             // 占用链:报工单 → 检验单(源行键=报工单号#scjl.id;弃审时据此作废+释放)
@@ -3049,15 +3068,24 @@ public class ButtonService {
     }
 
     /**
-     * 组装成品检验单审核 → 数量分流:
-     * <ul><li><b>合格数 = 表头检验数量 − Σ明细不合格数量</b>(2026-10-15 用户口径:明细只填「不合格数量」,
-     *   合格数量是派生值;2026-10-15 数据一致性修订:基数取**检验数量**而非报工数量 ——
-     *   报工审核自动生成的空草稿检验数量=0,旧口径会把报工总量全额写进入库单=没检就入库)
-     *   数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
-     *   与切炭直销同一落点,留草稿由仓库审核,不自动记账);</li>
-     * <li>不合格数量 &gt; 0 → **不再派生下游单**(2026-10-09 上游已下架「不良品处理单 QC_DISPOSAL」;
-     *   原分支遗漏未删,会让「填了不合格 ⇒ 审核 400 整单回滚」,2026-10-15 合并时收掉,见方法内注释)。</li></ul>
-     * 幂等:按 form_flow_link(源=检验单号) 判重,下游作废释放后可重新生成。
+     * 组装成品检验单审核 → 数量分流(2026-10-17 口径变更:数量改由**表头填报**)。
+     *
+     * <ul>
+     *   <li><b>合格数 = 表头「合格数量」</b>(用户口径:「为当前的表头增加合格数量(入库)的字段,
+     *     设定为必填。让当前审核完成后才对这些数量产生到产成品入库单内。」;2026-10-17 再按用户要求
+     *     把字段正名为「合格数量」)。此前是派生值
+     *     (检验数量 − Σ明细不合格数量),现在由品质在单头明确报出,规则与话术见
+     *     {@link AsmInspStockQty#resolve}(没填/负数/超过检验数量 → 拒绝审核;=0 → 不生成入库单);</li>
+     *   <li>数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,留草稿由仓库审核,不自动记账);</li>
+     *   <li>不合格数量 &gt; 0 → **不再派生下游单**(2026-10-09 上游已下架「不良品处理单 QC_DISPOSAL」;
+     *     原分支遗漏未删,会让「填了不合格 ⇒ 审核 400 整单回滚」,2026-10-15 合并时收掉,见方法内注释)。</li>
+     * </ul>
+     *
+     * <p><b>时机</b>:只有"审核 / 审批通过"走到这里(经 {@code runWoAuditHooks});保存与草稿阶段不碰库存。
+     * 弃审时由 {@link #asmInspUnauditCascade} 把这张自动生成的草稿作废并释放占用(已审核则挡弃审),
+     * 于是「合格数量只在检验单处于已审核期间存在于成品入库单里」,改了数量重审也会按新值重开一张。</p>
+     *
+     * <p>幂等:按 form_flow_link(源=检验单号) 判重,下游作废释放后可重新生成。</p>
      */
     private void asmInspToStock(String panelCode, String inspNo, String user) {
         if (!"QC_ASM_INSP".equals(panelCode)) return;
@@ -3069,31 +3097,26 @@ public class ButtonService {
                 "SELECT ISNULL(工单号,N'') AS 工单号, ISNULL(批次号,N'') AS 批次号, ISNULL(产品编码,N'') AS 产品编码,"
                         + " ISNULL(产品名称,N'') AS 产品名称, ISNULL(规格型号,N'') AS 规格型号,"
                         + " ISNULL(生产线,N'') AS 生产线, ISNULL(报工单号,N'') AS 报工单号,"
-                        + " ISNULL(报工数量,0) AS 报工数量, ISNULL(检验数量,0) AS 检验数量"
+                        + " ISNULL(报工数量,0) AS 报工数量, ISNULL(检验数量,0) AS 检验数量,"
+                        // 不加 ISNULL:要区分"没填(null)"与"填了 0"(前者拒绝审核、后者合法不生成)
+                        // 列名 = 「合格数量」(2026-10-17 由「合格数量（入库）」正名而来,见
+                        // tools/migrate-asm-insp-passqty-rename-20261017.sql;与 AsmInspStockQty.FIELD 同名)
+                        + " [合格数量] AS [合格数量]"
                         + " FROM qc_asm_insp_head"
                         + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
         if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
         Map<String, Object> h = heads.get(0);
-        List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT ISNULL(不合格数量,0) AS 不合格数量"
-                        + " FROM qc_asm_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", inspNo);
         // 🔴 2026-10-15 用户口径(第三次修订):「去除合格数量只保留不合格数量即可,最终的合格数量就是
-        //   [报工数量]减去[不合格数量]」。
-        //   ⇒ 明细只填「不合格数量」;合格数量 = **表头报工数量 − Σ明细不合格数量**(负值兜 0),
-        //     不再读明细的「合格数量」列(该字段登记行已由
-        //     tools/migrate-insp-pass-qty-derived-20261015.sql 注销,物理列留作历史)。
-        // 🔴🔴 2026-10-15 数据一致性再修订(用户报障「工序报工完成就默认变成合格数量」):
-        //   基数从「报工数量」改成「检验数量」—— 检验单是报工审核自动生成的**空草稿**
-        //   (明细全空、检验数量=0),照旧口径会把**报工总量**全额当合格数写进入库单,
-        //   等于"没检验就入库"。
-        //   新口径:检验数量为空/0 ⇒ pass=0 ⇒ 不生成任何下游单(等于没检过就不动库存),
-        //   与工单追溯「质检数据」段的 合格数量=检验数量−Σ不合格 完全一致。
-        //   老单(2026-10-15 前、明细有预铺的「判定+数量」两行)取数仍成立:
-        //   那种单的检验数量通常等于报工数量,数值不回归。
-        double ng = 0;
-        for (Map<String, Object> r : lines) ng += numOr(r.get("不合格数量"));
-        double pass = Math.max(0, numOr(h.get("检验数量")) - ng);
-        if (pass <= 0 && ng <= 0) return;                          // 品质没填数量:单据走过而已,不产生下游
+        //   [报工数量]减去[不合格数量]」→ 当时改成派生值(检验数量 − Σ明细不合格数量),
+        //   明细的「合格数量」列登记行由 migrate-insp-pass-qty-derived-20261015.sql 注销
+        //   (物理列留作历史,下面这段求和只读「不合格数量」时不再需要它)。
+        // 🔴🔴 2026-10-17 再改(本批):「合格数」不再派生 —— 用户要品质在**表头**明确报出
+        //   「合格数量」并设为必填(原字段名「合格数量（入库）」,同日按用户要求正名),审核时才按它
+        //   生成产成品入库单(见 AsmInspStockQty)。
+        //   保留明细「不合格数量」的原用途:工单追溯「质检数据」段的 不合格数量合计 照旧汇总,
+        //   只是不再参与入库数量的计算。
+        double pass = AsmInspStockQty.resolve(h.get(AsmInspStockQty.FIELD), numOr(h.get("检验数量")));
+        if (pass <= 0) return;                                     // 填 0 = 本单没有要入库的合格品
         // 工单侧数据(单位/单价/批号;保留 dualOutFinishIn 的 inline 取仓口径,后续可抽公共方法)
         String wo = String.valueOf(h.get("工单号"));
         String unit = null, lot = null;
@@ -3110,7 +3133,7 @@ public class ButtonService {
         }
         String batch = String.valueOf(h.get("批次号"));
         String wh = finishWarehouse();
-        if (pass > 0) {
+        {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("产品编码", h.get("产品编码"));
             line.put("产品名称", h.get("产品名称"));
@@ -3141,7 +3164,7 @@ public class ButtonService {
                 head.put("批次号", batch);       // 行号取不到时至少留批次(追溯按批次兜底)
             }
             head.put("经手人", user);
-            head.put("备注", "组装成品检验单 " + inspNo + " 合格数转库存");
+            head.put("备注", "组装成品检验单 " + inspNo + " 合格数量 " + AsmInspStockQty.text(pass) + " 转库存");
             head.put("detail", Map.of("items", List.of(line)));
             Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
             String fiNo = String.valueOf(saved.get("编号"));
@@ -3149,7 +3172,7 @@ public class ButtonService {
                             + " target_panel_code, target_form_no, link_status, create_by, create_time)"
                             + " VALUES ('QC_ASM_INSP', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())",
                     inspNo, fiNo, user);
-            // 回执:检验单头记入库单号(列表可直接看到货去哪了)
+            // 回执:检验单头记入库单号(列表可直接看到货去哪了);弃审时由 asmInspUnauditCascade 清掉
             jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
                     + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "合格转库存(" + fiNo + ")", user, inspNo);
         }
@@ -3158,9 +3181,35 @@ public class ButtonService {
         //   连带删了 QcDisposalService、删了 yj_panel 行与 qc_disposal 表,但**漏删了这里的分支**:
         //   一旦 不合格数量 > 0,审核走到 save(registry.panel("QC_DISPOSAL")) 就抛
         //   「面板不存在:QC_DISPOSAL」⇒ 整单 400 回滚(实测:不合格=3 时审核必失败、入库单也不生成)。
-        //   这与本分支「合格数量 = 报工数量 − 不合格数量」的口径直接冲突(填了不合格就审不过),
         //   故按上游的下架口径把该分支整段移除:不合格数量仍记在检验单明细上、追溯页「不合格数量合计」
         //   照常汇总,只是不再自动派生一张不良品处理单。
+    }
+
+    /**
+     * 组装成品检验单**弃审联动**(2026-10-17,与检验单→采购入库单/特采单那几处同构):
+     * 审核时按表头「合格数量」自动生成的**产成品入库单草稿**一并作废(+释放占用,由
+     * {@link #voidDoc} 里那句 form_flow_link RELEASED 完成)并清掉单头的「合格转库存(FI-…)」回执;
+     * 入库单已审核(仓库已记账)则**挡弃审**,提示先弃审那张入库单 —— 防止「检验单退回草稿了、
+     * 成品库存还挂着」的错位。作废后重审会按最新的「合格数量」重新开一张(占用链已释放)。
+     */
+    private void asmInspUnauditCascade(String panelCode, String no, String user) {
+        if (!"QC_ASM_INSP".equals(panelCode)) return;
+        List<String> fiNos = jdbc.queryForList(
+                "SELECT DISTINCT target_form_no FROM form_flow_link WHERE source_panel_code='QC_ASM_INSP'"
+                        + " AND source_form_no=? AND target_panel_code='FINISH_IN' AND link_status='ACTIVE'",
+                String.class, no);
+        for (String fiNo : fiNos) {
+            String st = String.valueOf(docStatusOf("FINISH_IN", fiNo).get("status"));
+            if ("草稿".equals(st) || "修改中".equals(st)) {
+                voidDoc(registry.panel("FINISH_IN"), fiNo, user);
+            } else {
+                throw new IllegalStateException("自动生成的产成品入库单 " + fiNo + " 已审核,请先弃审该入库单再弃审检验单");
+            }
+        }
+        if (!fiNos.isEmpty()) {
+            jdbc.update("UPDATE qc_asm_insp_head SET 处理方式 = NULL, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE 单据编号 = ? AND 处理方式 LIKE N'合格转库存%'", user, no);
+        }
     }
 
     /** 产线 → 所属车间(bs_prod_line.生产车间;线不存在返回 null) */
@@ -6024,4 +6073,3 @@ public class ButtonService {
         return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
     }
 }
-

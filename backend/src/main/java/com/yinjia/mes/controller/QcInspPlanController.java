@@ -379,7 +379,8 @@ public class QcInspPlanController {
                 "SELECT ISNULL([控制项目],N'') AS item, ISNULL([控制标准及要求],N'') AS req,"
                         + " ISNULL([控制方法],N'') AS method, ISNULL([检测频率],N'') AS freq,"
                         + " ISNULL([检测仪器],N'') AS instrument, ISNULL([不合格应对措施],N'') AS action,"
-                        + " ISNULL([检验内容],N'') AS category"
+                        + " ISNULL([检验内容],N'') AS category, ISNULL([检验类别],N'') AS kind,"
+                        + " ISNULL([序号],N'') AS seqNo, ISNULL([备注],N'') AS remark"
                         + " FROM dbo.rd_insp_plan_detail"
                         + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY ISNULL(TRY_CAST([序号] AS int), 999999), id", planNo);
@@ -387,13 +388,28 @@ public class QcInspPlanController {
         List<Map<String, Object>> mapped = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("表区", str(r.get("category")));            // RD_INSP_PLAN.检验内容 = 类别(决定分区)
+            // 2026-10-15 口径(用户):「可获取的内容就是当前出货检验计划里填写的内容」——
+            // 下发键名与 RD_INSP_PLAN 面板上**看得见的那几列**一一对齐:
+            // 序号 / 检验项目(=控制项目) / 检验要求(=控制标准及要求) / 检验方法(=控制方法)
+            // / 不合格应对措施 / 检查频率(=检测频率) / 备注;弹窗照它原样列出来,不再另起列名。
+            m.put("序号", str(r.get("seqNo")));
             m.put("检验项目", str(r.get("item")));
             m.put("检验要求", str(r.get("req")));
             m.put("检验方法", str(r.get("method")));
-            m.put("检查频率", str(r.get("freq")));
-            m.put("检验仪器", str(r.get("instrument")));
             m.put("不合格应对措施", str(r.get("action")));
+            m.put("检查频率", str(r.get("freq")));
+            m.put("备注", str(r.get("remark")));
+            // 下面两个是**计划表里填了但界面上隐藏**的列(类别=检验内容,决定打印分组;
+            // 检验类别=必测项/型式检验,计划表自己的分块键):弹窗不显示,但带入时要按它们归组,
+            // 故照旧下发;检验仪器同理(本单没有这一列时带入自动跳过)。
+            // ⚠ 类别键名**随接收面板而变**(2026-10-17):组装成品检验单把这一列正名为「检验类型」并摆在
+            //   明细第一列(见 migrate-asm-insp-type-rename-20261017.sql),其余四张检验单仍叫「表区」。
+            //   故两个键都下发,由前端按**本面板实际有的列**取用(PanelxList.areaKeyOf)——
+            //   这样同一个接口能同时喂五张单,不必按面板拼参数。
+            m.put("表区", str(r.get("category")));
+            m.put("检验类型", str(r.get("category")));
+            m.put("检验类别", str(r.get("kind")));
+            m.put("检验仪器", str(r.get("instrument")));
             mapped.add(m);
         }
         out.put("rows", mapped);
@@ -466,4 +482,3 @@ public class QcInspPlanController {
         return auth == null ? "system" : auth.getName();
     }
 }
-

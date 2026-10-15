@@ -60,13 +60,12 @@ try {
   await send('Page.navigate', { url: 'about:blank' }); await sleep(300)
   await send('Page.navigate', { url: `${BASE}/#/panelx/list/QC_ASM_INSP` }); await sleep(6500)
 
-  const heads = await ev(`[...document.querySelectorAll('.el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,'')).filter(Boolean)`)
-  console.log('   明细表头: ' + heads.join('|'))
-  ok('界面表头出现 测量值1..5', MEASURES.every((m) => heads.includes(m)), heads.join('|'))
-  const hi = MEASURES.map((m) => heads.indexOf(m))
-  ok('界面表头里 5 格连续且按序', hi.every((v, i) => v >= 0 && (i === 0 || v === hi[i - 1] + 1)), hi.join(','))
+  const heads = await ev(`[...document.querySelectorAll('.arch-section .el-table__header th, .el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,'')).filter(Boolean)`)
+  console.log('   明细表头(分区后): ' + heads.join('|'))
+  ok('界面表头出现 测量值1..5(定量区:尺寸/出货重量)', MEASURES.every((m) => heads.includes(m)), heads.join('|'))
+  ok('5 格都在(每区各一套,故用"都出现"判定)', MEASURES.every((m) => heads.filter((x) => x === m).length >= 1), heads.join('|'))
 
-  /* 该草稿明细可能为空 ⇒ 先点「新增数据」加一行(仅页面内存,不保存),再验测量值格可编辑。
+  /* 该草稿明细可能为空 ⇒ 先在某区加一行(仅页面内存,不保存),再验测量值格可编辑。
      ⚠ 列表页默认打开的那张可能是「已审核」(只读,格子点不开编辑器)⇒ 先按「下一张」翻页找草稿。 */
   const findDraft = async () => {
     for (let i = 0; i < 8; i++) {
@@ -81,30 +80,50 @@ try {
   if (!editable) {
     console.log('   -- 跳过「可编辑」子项:翻遍单据没找到草稿(只读态);落库由 _verify-insp-measure5-save.mjs 覆盖')
   } else {
+  /* 2026-10-16 口径:分区里**没有加行入口** —— 加行只在最下面「明细行」列表里做
+     (该列表的空占位行点击即新增行)。这里就用它建一行,再验测量值格可编辑。 */
   const added = await ev(`(()=>{
-     const btn=[...document.querySelectorAll('button,.el-button,.tb-main')].find(b=>/新增数据/.test((b.innerText||'').trim()));
-     if(!btn) return 'NO_BTN'; btn.click(); return 'CLICKED' })()`)
-  ok('点「新增数据」加一行(只为验可编辑性)', added === 'CLICKED', added)
-  await sleep(900)
+     const band=document.querySelector('.arch-detail-band');
+     const box=band && band.parentElement;
+     if(!box) return 'NO_BAND';
+     const tr=[...box.querySelectorAll('.el-table__body tbody tr')][0];
+     if(!tr) return 'NO_ROW';
+     const r=tr.getBoundingClientRect();
+     return JSON.stringify({x:Math.round(r.x+40), y:Math.round(r.y+r.height/2)}) })()`)
+  const rowPt = (() => { try { return JSON.parse(String(added)) } catch { return null } })()
+  if (rowPt && !rowPt.err && typeof rowPt.x === 'number') {
+    for (const t of ['mousePressed', 'mouseReleased']) {
+      await send('Input.dispatchMouseEvent', { type: t, x: rowPt.x, y: rowPt.y, button: 'left', clickCount: 1 })
+    }
+  }
+  await sleep(1200)
+  const rowCount = await ev(`(()=>{const band=document.querySelector('.arch-detail-band'); const box=band&&band.parentElement;
+     return box? [...box.querySelectorAll('.el-table__body tbody tr')].filter(tr=>!tr.className.includes('ph-row')).length : -1})()`)
+  ok('在「明细行」列表点空占位行 ⇒ 新增一行(加行入口在这里)', (rowCount || 0) > 0, 'realRows=' + rowCount)
 
-  /* 点开第一个数据行的「测量值1」格。
-     ⚠ 这类格子是**懒激活**(未激活时只渲染 <span class="cell-lazy">),
-       合成 td.click() 打不开编辑器 —— 必须用 CDP 真实鼠标事件(2026-10-16 实测)。 */
-  const cellPoint = async () => JSON.parse(String(await ev(`(()=>{
-     const heads=[...document.querySelectorAll('.el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
-     const ci=heads.indexOf('测量值1');
-     const tr=document.querySelector('.el-table__body-wrapper tbody tr');
-     if(!tr||ci<0) return JSON.stringify({err:true});
-     const td=tr.querySelectorAll('td')[ci]; const r=td.getBoundingClientRect();
-     return JSON.stringify({x:Math.round(r.x+r.width/2), y:Math.round(r.y+r.height/2)}) })()`)))
-  const pt = await cellPoint()
+  /* 点开「明细行」列表里那条真行的「测量值1」格。
+     ⚠ 格子是**懒激活**(未激活时只渲染 <span class="cell-lazy">),合成 td.click() 打不开,
+       必须用 CDP 真实鼠标;且要点 span 本身(空格子 td 中心可能落空)。 */
+  const cellPoint = async (label = '测量值1') => JSON.parse(String(await ev(`(()=>{
+     const band=document.querySelector('.arch-detail-band'); const box=band&&band.parentElement;
+     if(!box) return JSON.stringify({err:'NO_BAND'});
+     const hs=[...box.querySelectorAll('.el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
+     const ci=hs.indexOf(${JSON.stringify(label)});
+     const tr=[...box.querySelectorAll('.el-table__body tbody tr')].find(x=>!x.className.includes('ph-row'));
+     if(!tr||ci<0) return JSON.stringify({err:true,ci:ci});
+     const td=tr.querySelectorAll('td')[ci];
+     const sp=td.querySelector('.cell-lazy')||td.querySelector('.cell')||td;
+     const r=sp.getBoundingClientRect();
+     return JSON.stringify({x:Math.round(r.x+4), y:Math.round(r.y+r.height/2)}) })()`)))
+  const pt = await cellPoint('测量值1')
   ok('定位到「测量值1」格', !!pt && !pt.err, JSON.stringify(pt))
   for (const t of ['mousePressed', 'mouseReleased']) {
     await send('Input.dispatchMouseEvent', { type: t, x: pt.x, y: pt.y, button: 'left', clickCount: 1 })
   }
   await sleep(800)
   const typed = await ev(`(()=>{
-     const inp=document.querySelector('.el-table__body-wrapper input[type=number], .el-table__body-wrapper input.el-input__inner');
+     const band=document.querySelector('.arch-detail-band'); const box=band&&band.parentElement;
+     const inp=box && box.querySelector('.el-table__body input.el-input__inner, .el-table__body input[type=number]');
      if(!inp) return 'NO_INPUT';
      const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
      set.call(inp,''); inp.dispatchEvent(new Event('input',{bubbles:true}));
@@ -116,20 +135,17 @@ try {
   await sleep(300)
   /* ⚠ 格子处于编辑态时 td.innerText 是空的(里面是个 input)—— 必须**再点相邻格**让编辑器收格,
      才能读到模型回显(2026-10-16 实测踩到,第一版断言因此假失败)。 */
-  const pt2 = JSON.parse(String(await ev(`(()=>{
-     const h=[...document.querySelectorAll('.el-table__header th')].map(t=>(t.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
-     const ci=h.indexOf('测量值2');
-     const tr=document.querySelector('.el-table__body-wrapper tbody tr');
-     const td=tr.querySelectorAll('td')[ci]; const r=td.getBoundingClientRect();
-     return JSON.stringify({x:Math.round(r.x+r.width/2), y:Math.round(r.y+r.height/2)}) })()`)))
+  const pt2 = await cellPoint('测量值2')
   for (const t of ['mousePressed', 'mouseReleased']) {
     await send('Input.dispatchMouseEvent', { type: t, x: pt2.x, y: pt2.y, button: 'left', clickCount: 1 })
   }
   await sleep(800)
   const shown = await ev(`(()=>{
-     const heads=[...document.querySelectorAll('.el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
-     const ci=heads.indexOf('测量值1');
-     const tr=document.querySelector('.el-table__body-wrapper tbody tr');
+     const band=document.querySelector('.arch-detail-band'); const box=band&&band.parentElement;
+     if(!box) return '';
+     const hs=[...box.querySelectorAll('.el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
+     const ci=hs.indexOf('测量值1');
+     const tr=[...box.querySelectorAll('.el-table__body tbody tr')].find(x=>!x.className.includes('ph-row'));
      return tr ? (tr.querySelectorAll('td')[ci].innerText||'').trim() : '' })()`)
   ok('真实键入 12.5 后回显在「测量值1」格(值进了页面模型)', String(shown).includes('12.5'), '格子显示=' + String(shown))
   }

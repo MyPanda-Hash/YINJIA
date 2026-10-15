@@ -33,10 +33,18 @@ const H = { Authorization: 'Bearer ' + login.data.token }
 const cfg = (await fetch(`${BASE}/api/px/getPanelConfig?panelCode=${PANEL}`, { headers: H }).then((r) => r.json())).data
 const cols = (cfg?.metadata?.panelPageDto?.tablePages?.[0]?.gridTabs?.[0]?.columns || []).map((f) => (typeof f === 'string' ? f : f.dataName))
 console.log('   明细列(config): ' + cols.join('|'))
-const seq = ['检验要求', '检验方法', '产线常规功能性结果', '结果判断'].map((x) => cols.indexOf(x))
-ok('config 里 检验要求→检验方法→产线常规功能性结果→结果判断 依次相邻',
-  seq.every((v, i) => v >= 0 && (i === 0 || v === seq[i - 1] + 1)), seq.join(','))
-ok('config 明细含 产线常规功能性结果 / 结果判断', cols.includes('产线常规功能性结果') && cols.includes('结果判断'))
+/* ⚠ 表的**列序是活的**:用户会在面板「字段管理」里自己调(实测 2026-10-16 就被调成 10/20/30/50…180
+   的整十序号),所以这里只断言「该有的在、不该有的不在」这类**不变量**,不钉死整表顺序。 */
+const visible = cols.filter((x) => x !== '行号' && x !== '表区')
+const mIdx = ['测量值1', '测量值2', '测量值3', '测量值4', '测量值5'].map((x) => visible.indexOf(x))
+ok('明细含 检验要求/检验方法/产线常规功能性结果/结果判断,且不含旧名「判定」',
+  ['检验要求', '检验方法', '产线常规功能性结果', '结果判断'].every((x) => visible.includes(x))
+  && !visible.includes('判定'), visible.join('|'))
+ok('「数量」「实测数值」两个字段已按口径去掉(界面不再出现)',
+  !visible.includes('数量') && !visible.includes('实测数值'), visible.join('|'))
+ok('5 个测量值列都在且相邻', mIdx.every((v, i) => v >= 0 && (i === 0 || v === mIdx[i - 1] + 1)), mIdx.join(','))
+ok('两个带"结果"的字段相邻(产线常规功能性结果 → 结果判断)',
+  visible.indexOf('结果判断') === visible.indexOf('产线常规功能性结果') + 1, visible.slice(-3).join('|'))
 
 /* ② 界面 */
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-asmfunc-'))
@@ -57,11 +65,16 @@ try {
   await send('Page.navigate', { url: 'about:blank' }); await sleep(300)
   await send('Page.navigate', { url: `${BASE}/#/panelx/list/${PANEL}` }); await sleep(6500)
 
-  const heads = await ev(`[...document.querySelectorAll('.el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,'')).filter(Boolean)`)
-  console.log('   明细表头(界面): ' + heads.join('|'))
-  const hs = ['检验要求', '检验方法', '产线常规功能性结果', '结果判断'].map((x) => heads.indexOf(x))
-  ok('界面明细列次序 = 检验要求→检验方法→产线常规功能性结果→结果判断',
-    hs.every((v, i) => v >= 0 && (i === 0 || v === hs[i - 1] + 1)), hs.join(','))
+  const heads = await ev(`[...document.querySelectorAll('.arch-section .el-table__header th, .el-table__header th')].map(th=>(th.innerText||'').replace(/[\\s⇅↑↓]+/g,'')).filter(Boolean)`)
+  console.log('   明细表头(界面,分区后): ' + heads.join('|'))
+  /* ⚠ 2026-10-16 口径变更:明细区改为**按表区分区渲染**(QC_ASM_INSP),每区只显示本区该有的列
+     —— (外观区不出现测量值列、尺寸/出货重量区出现测量值1..5),故不再与 config 全量列一一相等。
+     改成断言:**界面出现的列必须都是 config 里登记过的列**(不出现野生列),且关键列都在。 */
+  const shownVisible = heads.filter((x) => x !== '行号' && x !== '表区' && x !== '序号' && x !== '操作')
+  const wild = shownVisible.filter((x) => !visible.includes(x))
+  ok('界面出现的明细列都在 config 登记范围内(无野生列)', wild.length === 0, '野生=' + wild.join('|'))
+  ok('分区渲染下仍能看到 检验要求/检验方法/检验结果/结果判断',
+    ['检验要求', '检验方法', '检验结果', '结果判断'].every((k) => shownVisible.includes(k)), shownVisible.join('|'))
 
   const formLabels = await ev(`[...document.querySelectorAll('.header-fields label')].map(l=>(l.innerText||'').trim())`)
   console.log('   表头字段: ' + formLabels.join('|'))
@@ -75,15 +88,25 @@ try {
   if (!isDraft) {
     console.log('   -- 跳过「可编辑」子项:当前打开的单不是草稿(只读);该子项由 _verify-asm-insp-func-save.mjs 覆盖')
   } else {
-    await ev(`(()=>{const b=[...document.querySelectorAll('button,.el-button,.tb-main')].find(x=>/新增数据/.test((x.innerText||'').trim()));b&&b.click();return 1})()`)
+    /* 2026-10-16 口径:分区里**没有加行入口**,固定项是自动补的**真行** ⇒ 直接在该行上验可编辑。 */
+    const targetRow = await ev(`(()=>{const s=[...document.querySelectorAll('.arch-section')].find(x=>/外观/.test(x.querySelector('.arch-section-title')?.innerText||''));
+       const tr=[...s.querySelectorAll('.el-table__body tbody tr')].find(x=>!/ph-row/.test(x.className));
+       return tr? (tr.innerText||'').replace(/\\s+/g,' ').trim() : 'NO_ROW'})()`)
+    ok('外观区有可直接编辑的真行(固定项自动补)', !/NO_ROW/.test(String(targetRow)), String(targetRow).slice(0, 120))
     await sleep(900)
+    /* 在该区里定位「产线常规功能性结果」列 × 第一条真行(非占位行)
+       ⚠ 点格里的 span(.cell-lazy),别点 td 中心:空格子的 span 宽度≈0,点中心会落空(2026-10-16 实测) */
     const cellPt = async (label) => JSON.parse(String(await ev(`(()=>{
-       const h=[...document.querySelectorAll('.el-table__header th')].map(t=>(t.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
+       const s=[...document.querySelectorAll('.arch-section')].find(x=>/外观/.test(x.querySelector('.arch-section-title')?.innerText||''));
+       if(!s) return JSON.stringify({err:'NO_SEC'});
+       const h=[...s.querySelectorAll('.el-table__header th')].map(t=>(t.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
        const ci=h.indexOf(${JSON.stringify(label)});
-       const tr=document.querySelector('.el-table__body-wrapper tbody tr');
-       if(!tr||ci<0) return JSON.stringify({err:true});
-       const td=tr.querySelectorAll('td')[ci]; const r=td.getBoundingClientRect();
-       return JSON.stringify({x:Math.round(r.x+r.width/2), y:Math.round(r.y+r.height/2)}) })()`)))
+       const tr=[...s.querySelectorAll('.el-table__body tbody tr')].find(x=>!x.className.includes('ph-row'));
+       if(!tr||ci<0) return JSON.stringify({err:true,ci:ci,rows:s.querySelectorAll('.el-table__body tbody tr').length});
+       const td=tr.querySelectorAll('td')[ci];
+       const sp=td.querySelector('.cell-lazy')||td.querySelector('.cell')||td;
+       const r=sp.getBoundingClientRect();
+       return JSON.stringify({x:Math.round(r.x+4), y:Math.round(r.y+r.height/2)}) })()`)))
     const pt = await cellPt('产线常规功能性结果')
     ok('定位到「产线常规功能性结果」格', !!pt && !pt.err, JSON.stringify(pt))
     /* 懒激活格子:合成 click 打不开编辑器,必须 CDP 真实鼠标 */
@@ -91,7 +114,7 @@ try {
       await send('Input.dispatchMouseEvent', { type: t, x: pt.x, y: pt.y, button: 'left', clickCount: 1 })
     }
     await sleep(700)
-    const ready = await ev(`(()=>{const i=document.querySelector('.el-table__body-wrapper input, .el-table__body-wrapper textarea');if(!i)return 'NO_EDITOR';return 'EDITOR:'+i.tagName})()`)
+    const ready = await ev(`(()=>{const i=document.querySelector('.arch-section .el-table__body input, .arch-section .el-table__body textarea');if(!i)return 'NO_EDITOR';return 'EDITOR:'+i.tagName})()`)
     ok('该格可编辑(出现输入框)', String(ready).startsWith('EDITOR'), String(ready))
     await send('Input.insertText', { text: '99.1%' })
     await sleep(300)
@@ -101,12 +124,12 @@ try {
     }
     await sleep(700)
     const shown = await ev(`(()=>{
-       const h=[...document.querySelectorAll('.el-table__header th')].map(t=>(t.innerText||'').replace(/[\\s⇅↑↓]+/g,''));
-       const ci=h.indexOf('产线常规功能性结果');
-       const tr=document.querySelector('.el-table__body-wrapper tbody tr');
-       return tr ? (tr.querySelectorAll('td')[ci].innerText||'').trim() : '' })()`)
+       const s=[...document.querySelectorAll('.arch-section')].find(x=>/外观/.test(x.querySelector('.arch-section-title')?.innerText||''));
+       if(!s) return '';
+       const tr=[...s.querySelectorAll('.el-table__body tbody tr')].find(x=>!x.className.includes('ph-row'));
+       return tr? (tr.innerText||'').replace(/\\s+/g,' ') : '' })()`)
     ok('键入 99.1% 后回显在「产线常规功能性结果」格', String(shown).includes('99.1'), '显示=' + String(shown))
-    ok('「结果判断」格也能打开编辑器', String(await ev(`(()=>{return document.querySelector('.el-table__body-wrapper input, .el-table__body-wrapper textarea')?'EDITOR':'NO'})()`)) === 'EDITOR')
+    ok('「结果判断」格也能打开编辑器', String(await ev(`(()=>{return document.querySelector('.arch-section .el-table__body input, .arch-section .el-table__body textarea')?'EDITOR':'NO'})()`)) === 'EDITOR')
   }
 
   const shot = await send('Page.captureScreenshot', { format: 'png' })
@@ -119,3 +142,4 @@ try {
 
 console.log(`\n==== 结果:${pass} 通过 / ${fail} 失败 ====`)
 process.exit(fail > 0 ? 1 : 0)
+
