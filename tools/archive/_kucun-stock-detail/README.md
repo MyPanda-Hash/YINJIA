@@ -67,7 +67,22 @@ node tools\archive\_kucun-stock-detail\_add-stock-detail-i18n.cjs
 | `q-16-panel-shape.sql` / `q-17-panel-conventions.sql` / `q-18-perm.sql` | 新建 flat 面板要抄的形态:`yj_panel` 列与先例、字段/参照写法、`yj_role_panel` 授权面 |
 | `q-19-kucun-facts.sql` | §2 那张数据画像表(负行/无批号/来源×自洽/悬空物料/索引) |
 | `_add-stock-detail-i18n.cjs` | 生成 10 语言菜单词条(幂等) |
-| `_v-stock-detail-api.ps1` | 上线验收(含两个本机坑的说明:BOM / curl 发中文正文) |
+| `_v-stock-detail-api.ps1` | 上线验收(接口层):面板配置 / 取数 / 三条件精确过滤(含两个本机坑的说明:BOM / curl 发中文正文) |
+| `_v-stock-detail-ui.mjs` | 上线验收(界面层):headless Edge + CDP,读侧栏与表格表头/行数(实测 5173 与 8090 均能出 9 列 × 50 行 / 共 2281 条) |
+
+### 5.1 验收结果(2026-10-15 实测)
+
+| 层 | 结果 |
+|---|---|
+| 接口(`_v-stock-detail-api.ps1`) | 面板 `库存明细` pageSize=50;明细列 8 个、查询区 3 个;取数 `totalSize=2281`;`存货编码=HP-08` → 3 行、`仓库=YCL-01` → **1010 行**、`批号=SX-20261014` → 54 行(全部按**编码精确等值**,非 LIKE) |
+| 界面(`_v-stock-detail-ui.mjs`) | 页面标题 `库存明细 · YINJIA-MES`;表头 = 序号 + 8 列(均可排序);本页 50 行、**共 2281 条 / 46 页**;首行 `A-32-32 / CP-02 / PC0000 / 9726 / 6951 / 2517 / (单价空) / 2026-10-14 21:09:05` |
+| 产物 | `frontend/dist` 与 `backend/src/main/resources/static` 的入口 chunk 都含 `STOCK_DETAIL`(菜单随包) |
+
+⚠ **两个地址的差别(2026-10-15 实测)**:`5173`(vite 源码即时生效)= 菜单里已有「库存报表 › 库存明细」;
+`8090` 跑的是**打进 jar 的旧前端**(实测入口 chunk `index-qzyu7WYp.js` 里没有 `STOCK_DETAIL`),
+所以 **8090 上菜单暂时看不到这一项** —— 但面板路由是通用的,直接开
+`http://127.0.0.1:8090/#/panelx/list/STOCK_DETAIL` 照样出数(实测同样 9 列 / 共 2281 条)。
+要让 8090 的菜单也出现,需重打 jar(`rebuild-prod.ps1`,会**重启服务**)。
 
 > ⚠ `_v-stock-detail-api.ps1` 必须 **UTF-8 with BOM** 保存,请求体必须走 `curl.exe -d "@文件"`:
 > Windows PowerShell 5.1 会把无 BOM 的 .ps1 按 GBK 解码、也会把 `-Body` 里的中文按非 UTF-8 发出去,
