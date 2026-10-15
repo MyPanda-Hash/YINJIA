@@ -162,6 +162,12 @@
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
         />
+        <QcFirstInspSheet
+          v-else-if="panelCode === 'QC_FIRST_INSP'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+        />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
              数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
         <ProdDocListSheet
@@ -1890,6 +1896,7 @@ import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import QcProcInspSheet from '@core/qc/QcProcInspSheet.vue'
+import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
@@ -1952,7 +1959,7 @@ const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC',
   // 制程检验单(2026-10-12):用户口径「参考检验数据记录的做法」—— 作为文书式面板,
   // 整页纸张居中 + 功能按钮右侧竖排,由 QcProcInspSheet 以报表形态接管
-  'QC_PROC_INSP', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+  'QC_PROC_INSP', 'QC_FIRST_INSP', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
  * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
@@ -5707,6 +5714,12 @@ function applyShipPlanItems(items) {
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
   const cols = new Set(b ? (activeTab(b).cols || []) : [])
   const has = (k) => cols.size === 0 || cols.has(k)
+  // ⚠「表区」是**隐藏列**(2026-10-17 取证:QC_ASM_INSP / QC_FIRST_INSP 的 表区 hidden=1,seq 170),
+  //   而 activeTab(b).cols 只装 visible 的列 ⇒ 走 has() 判断时它永远为假,带入的行表区全空,
+  //   打印时「外观 / 尺寸 / 重量」分组随之丢失(组装成品检验单报表按表区归组,见 QcAsmInspReportSupport)。
+  //   故表区单独按**该页签全部明细字段**(含隐藏)判断:它是报表分组键,不是给人看的列。
+  const dataCols = new Set((detailTabDefOf(tabKey)?.fields || []).map((f) => f.dataName))
+  const hasArea = (k) => dataCols.size === 0 || dataCols.has(k)
   // 后端已用这些键名下发(与 yj_field.label 对齐);本面板没有的列自动跳过
   const KEYS = ['表区', '检验项目', '检验要求', '检验方法', '检查频率', '检验仪器', '不合格应对措施', '备注']
   const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
@@ -5760,6 +5773,12 @@ function applyInspItems(items) {
   // 明细列名(用于判断本面板是否支持「表区」/「检验要求」这类别名字段 —— 制程检验单用别名)
   const cols = new Set(b ? (activeTab(b).cols || []) : [])
   const has = (k) => cols.size === 0 || cols.has(k)
+  // ⚠「表区」是**隐藏列**(2026-10-17 取证:QC_ASM_INSP / QC_FIRST_INSP 的 表区 hidden=1,seq 170),
+  //   而 activeTab(b).cols 只装 visible 的列 ⇒ 走 has() 判断时它永远为假,带入的行表区全空,
+  //   打印时「外观 / 尺寸 / 重量」分组随之丢失(组装成品检验单报表按表区归组,见 QcAsmInspReportSupport)。
+  //   故表区单独按**该页签全部明细字段**(含隐藏)判断:它是报表分组键,不是给人看的列。
+  const dataCols = new Set((detailTabDefOf(tabKey)?.fields || []).map((f) => f.dataName))
+  const hasArea = (k) => dataCols.size === 0 || dataCols.has(k)
   // 制程检验单是纸张横表(一个检验项目 = 一列):格数/格数上限 两个内部列不进列表列集,
   // 故按面板代号判断(与 QcProcInspSheet 的挂载条件一致)。
   const isProcSheet = panelCode.value === 'QC_PROC_INSP'

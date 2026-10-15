@@ -52,6 +52,7 @@ public class QcFirstInspController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("productCode", code);
         out.put("moldProcNo", r.docNo());
+        out.put("columns", r.columns());
         out.put("rows", r.rows());
         return ApiResult.ok(out);
     }

@@ -71,28 +71,33 @@ try {
   const info = await ev(`(() => {
     const toolbar = [...document.querySelectorAll('.panelx-list .tb-group')].map((g) => (g.innerText || '').replace(/\\s+/g, ' ').trim())
     const menu = [...document.querySelectorAll('.panelx-list .tb-menu .ctx-item')].map((e) => (e.innerText || '').trim())
+    const approvalText = [...document.querySelectorAll('.approval-layout, .approval-side, .as-side-btn, .as-side-del')].map((e) => (e.innerText || '').trim()).join(' ')
     const body = document.querySelector('.panelx-list .body')
     const tbl = document.querySelector('.panelx-list .detail .el-table')
+    const sheet = document.querySelector('.panelx-list .fi-sheet')
     const bodyText = document.body.innerText || ''
     return {
       hasPanel: !!document.querySelector('.panelx-list'),
       navHasFirstInsp: bodyText.includes('首件检验单'),
-      toolbar, menu,
+      toolbar, menu, approvalText,
+      hasFirstSheet: !!sheet,
       gapBelowTable: body && tbl ? Math.round(body.getBoundingClientRect().bottom - tbl.getBoundingClientRect().bottom) : null,
-      tableH: tbl ? Math.round(tbl.getBoundingClientRect().height) : null,
+      tableH: tbl ? Math.round(tbl.getBoundingClientRect().height) : (sheet ? Math.round(sheet.getBoundingClientRect().height) : null),
     }
   })()`)
   console.log(`  面板渲染=${info.hasPanel} 表格高=${info.tableH} 表底余量=${info.gapBelowTable}`)
   console.log(`  工具栏组=${JSON.stringify(info.toolbar)}`)
   console.log(`  下拉动作=${JSON.stringify(info.menu)}`)
+  console.log(`  首件纸张=${info.hasFirstSheet} 侧栏文字=${info.approvalText.slice(0, 240)}`)
   ok('① 面板页面渲染出 .panelx-list', info.hasPanel)
+  ok('① 首件纸张模板渲染', info.hasFirstSheet)
   ok('① 左导航含「首件检验单」', info.navHasFirstInsp)
-  const tb = JSON.stringify(info.toolbar) + JSON.stringify(info.menu)
+  const tb = JSON.stringify(info.toolbar) + JSON.stringify(info.menu) + info.approvalText
   ok('② 工具栏含「取成型工艺清单」', tb.includes('取成型工艺清单'), tb)
   ok('② 工具栏含「检验项目/检验方案」', tb.includes('检验项目/检验方案'))
   ok('② 工具栏不含「取出货检验计划」', !tb.includes('取出货检验计划'))
-  ok('③ 明细表填满页面(表底余量 ≤ 15px)', info.gapBelowTable !== null && info.gapBelowTable <= 15,
-    `gap=${info.gapBelowTable}`)
+  ok('③ 首件纸张明细表有实际高度', info.hasFirstSheet ? info.tableH > 300 : (info.gapBelowTable !== null && info.gapBelowTable <= 15),
+    info.hasFirstSheet ? `sheetH=${info.tableH}` : `gap=${info.gapBelowTable}`)
   ok('④ 无未捕获的运行时异常', errs.length === 0, errs.join(' | '))
 } finally {
   try { ws?.close() } catch { /* ignore */ }

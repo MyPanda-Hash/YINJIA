@@ -224,7 +224,12 @@ INSERT INTO @ft VALUES
  (N'密度管控',     N'Density Control'),
  (N'跌落强度',     N'Drop Strength'),
  (N'抗压强度',     N'Compressive Strength'),
- (N'压降',         N'Pressure Drop');
+ (N'压降',         N'Pressure Drop'),
+ (N'行类型',       N'Row Type'),
+ (N'样品序号',     N'Sample No.'),
+ (N'检验列',       N'Inspection Column'),
+ (N'标准',         N'Standard'),
+ (N'项目分组',     N'Item Group');
 DECLARE @lb nvarchar(50), @en nvarchar(120);
 DECLARE curt CURSOR LOCAL FAST_FORWARD FOR SELECT label, en FROM @ft;
 OPEN curt FETCH NEXT FROM curt INTO @lb, @en;
@@ -276,13 +281,58 @@ END
 CLOSE curc DEALLOCATE curc;
 GO
 
-/* ============ H. 自检 ============ */
+/* ============ H. 图片版动态列模型补充 ============
+ * 一条明细 = 一个样品 × 一个检验列；行类型=标准时填「标准」行，行类型=样品时填实测值。
+ * 检验列由 RD_MOLD_PROC 当前非空要求动态决定，因此不同产品可以有不同列集。
+ */
+IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'行类型') IS NULL ALTER TABLE dbo.qc_first_insp_detail ADD [行类型] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'样品序号') IS NULL ALTER TABLE dbo.qc_first_insp_detail ADD [样品序号] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'检验列') IS NULL ALTER TABLE dbo.qc_first_insp_detail ADD [检验列] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'标准') IS NULL ALTER TABLE dbo.qc_first_insp_detail ADD [标准] nvarchar(500) NULL;
+IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'项目分组') IS NULL ALTER TABLE dbo.qc_first_insp_detail ADD [项目分组] nvarchar(50) NULL;
+GO
+DECLARE @dyn TABLE (col sysname, note nvarchar(400));
+INSERT INTO @dyn VALUES
+ (N'行类型', N'动态首件纸张行类型:标准或样品'),
+ (N'样品序号', N'图片版首件检验样品序号:1#至8#'),
+ (N'检验列', N'由成型工艺清单非空检验要求动态生成的列键'),
+ (N'标准', N'由成型工艺清单检验要求填入图片版标准行'),
+ (N'项目分组', N'图片版动态检验列所属分组:表观及脱粉/尺寸及重量/强度/浊度及压降');
+DECLARE @dc sysname, @dn nvarchar(400);
+DECLARE curdyn CURSOR LOCAL FAST_FORWARD FOR SELECT col,note FROM @dyn;
+OPEN curdyn FETCH NEXT FROM curdyn INTO @dc,@dn;
+WHILE @@FETCH_STATUS=0
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id=OBJECT_ID(N'dbo.qc_first_insp_detail') AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.qc_first_insp_detail'),@dc,'ColumnId') AND name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description',@dn,N'SCHEMA',N'dbo',N'TABLE',N'qc_first_insp_detail',N'COLUMN',@dc;
+  FETCH NEXT FROM curdyn INTO @dc,@dn;
+END
+CLOSE curdyn DEALLOCATE curdyn;
+GO
+DECLARE @dynamicFields TABLE (col nvarchar(50), seq int, width int, dtype nvarchar(20));
+INSERT INTO @dynamicFields VALUES
+ (N'行类型', 165, 80, N'文本'),(N'样品序号',166,80,N'文本'),(N'检验列',167,110,N'文本'),(N'标准',168,260,N'多行文本'),(N'项目分组',169,120,N'文本');
+DECLARE @df nvarchar(50), @ds int, @dw int, @dd nvarchar(20);
+DECLARE curdf CURSOR LOCAL FAST_FORWARD FOR SELECT col,seq,width,dtype FROM @dynamicFields;
+OPEN curdf FETCH NEXT FROM curdf INTO @df,@ds,@dw,@dd;
+WHILE @@FETCH_STATUS=0
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code=N'QC_FIRST_INSP' AND col_name=@df)
+    INSERT INTO yj_field(panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible)
+    VALUES(N'QC_FIRST_INSP',@df,@df,@dd,N'detail',@ds,@dw,1,0,1,0);
+  FETCH NEXT FROM curdf INTO @df,@ds,@dw,@dd;
+END
+CLOSE curdf DEALLOCATE curdf;
+GO
+
+/* ============ I. 自检 ============ */
 DECLARE @bad int = 0;
 IF OBJECT_ID(N'dbo.qc_first_insp_head', N'U') IS NULL SET @bad = @bad + 1;
 IF OBJECT_ID(N'dbo.qc_first_insp_detail', N'U') IS NULL SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = N'QC_FIRST_INSP') SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_FIRST_INSP' AND place LIKE N'%header%') < 20 SET @bad = @bad + 1;
-IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_FIRST_INSP' AND place LIKE N'%detail%') < 15 SET @bad = @bad + 1;
+IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_FIRST_INSP' AND place LIKE N'%detail%') < 20 SET @bad = @bad + 1;
+IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'行类型') IS NULL OR COL_LENGTH(N'dbo.qc_first_insp_detail', N'样品序号') IS NULL OR COL_LENGTH(N'dbo.qc_first_insp_detail', N'检验列') IS NULL OR COL_LENGTH(N'dbo.qc_first_insp_detail', N'标准') IS NULL OR COL_LENGTH(N'dbo.qc_first_insp_detail', N'项目分组') IS NULL SET @bad = @bad + 1;
 IF COL_LENGTH(N'dbo.qc_first_insp_head', N'asp_cancel') IS NULL SET @bad = @bad + 1;
 IF COL_LENGTH(N'dbo.qc_first_insp_detail', N'asp_cancel') IS NULL SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.qc_first_insp_head') AND minor_id = 0 AND name = N'MS_Description') = 0 SET @bad = @bad + 1;

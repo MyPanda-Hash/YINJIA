@@ -102,27 +102,22 @@ try {
   ok('② fromMoldProc 200', fm.status === 200, `status=${fm.status}`)
   ok('② 命中工艺清单单号', String(fmd.moldProcNo || '') === MP, `moldProcNo=${fmd.moldProcNo}`)
   const frows = fmd.rows || []
-  const names = frows.map((r) => r['检验项目'])
-  ok('② 回 5 个检验项目且顺序与检验要求区块一致',
-    JSON.stringify(names) === JSON.stringify(['炭棒尺寸', '密度管控', '跌落强度', '抗压强度', '压降']),
-    JSON.stringify(names))
-  const reqOf = (n) => String((frows.find((r) => r['检验项目'] === n) || {})['检验要求'] || '')
-  ok('② 炭棒尺寸:外径/内径+公差拼接', reqOf('炭棒尺寸') === '炭棒外径:34.5±0.5;炭棒内径:12.5±0.5', reqOf('炭棒尺寸'))
-  ok('② 密度管控:范围+上下限拼接',
-    reqOf('密度管控') === '密度范围:密度范围 0.55~0.65;实际管控下限:0.55;实际管控上限:0.65', reqOf('密度管控'))
-  ok('② 跌落强度:高度+次数+要求拼接(带单位)',
-    reqOf('跌落强度') === '高度:50cm;跌落次数:3次;要求:炭棒无断裂', reqOf('跌落强度'))
-  ok('② 抗压强度:间距+速度+强度拼接(带单位)',
-    reqOf('抗压强度') === '测试间距:40mm;压头下降速度:5mm/min;强度要求:30kgf', reqOf('抗压强度'))
-  ok('② 压降:管路+流速+标准+是否测试拼接',
-    reqOf('压降') === '测试管路:大T滤瓶;测试流速:0.9L/min;压降标准:20kpa;是否测试:√', reqOf('压降'))
-  ok('② 每行的表区都是「检验项目」', frows.every((r) => r['表区'] === '检验项目'))
+  const fcols = fmd.columns || []
+  const standardRows = frows.filter((r) => r['行类型'] === '标准')
+  const sampleRows = frows.filter((r) => r['行类型'] === '样品')
+  ok('② 返回动态检验列并带标准行', fcols.length >= 2 && standardRows.length === fcols.length,
+    `columns=${fcols.length} standard=${standardRows.length}`)
+  ok('② 每个动态检验列预铺 8 个样品行', sampleRows.length === fcols.length * 8,
+    `samples=${sampleRows.length}`)
+  ok('② 标准行包含成型工艺清单要求', standardRows.some((r) => String(r['标准'] || '').trim() && r['标准'] !== '/'),
+    JSON.stringify(standardRows.map((r) => ({ col: r['检验列'], standard: r['标准'] })).slice(0, 8)))
+  ok('② 动态行保留项目分组', standardRows.every((r) => r['项目分组']))
 
   const none = await get('/qc/firstInsp/fromMoldProc?productCode=NO-SUCH-PRODUCT-XYZ')
   const nd = none.json?.data || {}
-  ok('② 无工艺清单的产品:moldProcNo 为空但仍是 5 行(只有项目名,不编造要求)',
-    !nd.moldProcNo && (nd.rows || []).length === 5 && (nd.rows || []).every((r) => !r['检验要求']),
-    `moldProcNo=${nd.moldProcNo} rows=${(nd.rows || []).length}`)
+  ok('② 无工艺清单时仍保留图片固定表观列',
+    !nd.moldProcNo && (nd.columns || []).length === 3 && (nd.rows || []).length === 27,
+    `moldProcNo=${nd.moldProcNo} columns=${(nd.columns || []).length} rows=${(nd.rows || []).length}`)
 
   // ── ③ 报工审核 → 自动出首件检验单 ─────────────────────────────────────────
   const cands = await q(`SELECT TOP 20 p.pl_no AS 工单号, p.pl_xc AS 行, ISNULL(p.[批次号],'') AS 批次号, p.dm AS 产品编码, p.scx AS 生产线
@@ -172,12 +167,17 @@ try {
           const fdoc = fd.json?.data || {}
           const dd = fdoc.detailData
           const items = Array.isArray(dd) ? dd : (dd?.items || [])
-          ok('③ 明细预铺 5 行检验项目',
-            items.length === 5 && items.every((r) => r['检验项目']),
-            `n=${items.length} ${JSON.stringify(items.map((r) => r['检验项目']))}`)
-          ok('③ 明细 5 行 = 工艺清单检验要求区块的 5 个块',
-            JSON.stringify(items.map((r) => r['检验项目']).sort()) ===
-            JSON.stringify(['压降', '密度管控', '抗压强度', '炭棒尺寸', '跌落强度']))
+          const standardRows = items.filter((r) => r['行类型'] === '标准')
+          const sampleRows = items.filter((r) => r['行类型'] === '样品')
+          const dynamicCols = [...new Set(items.map((r) => r['检验列']).filter(Boolean))]
+          ok('③ 明细按动态检验列预铺标准+样品行',
+            dynamicCols.length >= 2 && standardRows.length === dynamicCols.length
+              && sampleRows.length === dynamicCols.length * 8
+              && standardRows.every((r) => r['标准'] !== undefined),
+            `cols=${dynamicCols.length} standard=${standardRows.length} samples=${sampleRows.length}`)
+          ok('③ 标准行来源于成型工艺清单',
+            standardRows.some((r) => String(r['标准'] || '').trim() && String(r['标准']) !== '/'),
+            JSON.stringify(standardRows.map((r) => ({ col: r['检验列'], standard: r['标准'] })).slice(0, 8)))
 
           // ── ④ 幂等:同批次再来一张报工 ─────────────────────────────────────
           const save2 = await btn('WO_REPORT', '保存', {
