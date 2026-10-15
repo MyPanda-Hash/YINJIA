@@ -3730,6 +3730,22 @@ const curNo = computed(() => {
 /** 总页数(单据面板分页用;与后端 OFFSET/FETCH 口径一致) */
 const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
 
+// 立项申请流程状态(rdFlow)—————————— 必须声明在下面那个 immediate watch 之前 ——————————
+// ⚠ 2026-10-15 TDZ 修复:该 watch 带 immediate,setup 期间就会调 loadRdFlowState() → clearRdFlow() → 读 rdFlow。
+//   而 rdFlow 原先声明在 4906 行(远在这个 watch 之后) ⇒ 每次进**任何**面板页都抛
+//   `ReferenceError: Cannot access 'rdFlow' before initialization`(Vue 捕获后仍渲染,
+//   所以面板看着正常,但立项流程状态永远加载不到、控制台每次报错)。
+//   声明本身是纯字面量初始化,不含依赖,前移安全。
+// 判据(能不能点)全部来自后端 rdApprovalFlowState —— 前端不自己重算,免得与门禁漂移。
+const RD_FLOW_PANEL = 'RD_APPROVAL'
+const rdFlow = reactive({
+  status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
+  canDispatchLiaison: false, canConfirmOwner: false,
+})
+/** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
+const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
+const rdFlowUsers = ref([])
+
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
 watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs() }, { immediate: true })
@@ -4901,15 +4917,8 @@ async function confirmGrade() {
 //      确认责任人之后就可以在项目实施计划里面进行对应单据的填写」。
 // ⇒ 两步都挂在**立项申请 RD_APPROVAL** 上,由定级完成触发,都不是新建面板。
 // ⚠ 两字段存**账号**(username)而非姓名(与 rd_dev_task.file_owner 同款口径);显示时拼「姓名（账号）」。
-// ⚠ 判据(能不能点)全部来自后端 rdApprovalFlowState —— 前端不自己重算,免得与门禁漂移。
-const RD_FLOW_PANEL = 'RD_APPROVAL'
-const rdFlow = reactive({
-  status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
-  canDispatchLiaison: false, canConfirmOwner: false,
-})
-/** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
-const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
-const rdFlowUsers = ref([])
+// ⚠ RD_FLOW_PANEL / rdFlow / isRdSettled / rdFlowUsers 已**前移到 3733 行附近**的 immediate watch 之前
+//   (2026-10-15 TDZ 修复,原因见那处的注释)。
 const liaisonVisible = ref(false)
 const liaisonBusy = ref(false)
 const liaisonUser = ref('')
