@@ -492,6 +492,10 @@ public class StockMonthCloseService {
         String cur = normPeriod(period == null || period.isBlank() ? LocalDate.now().format(PERIOD_FMT) : period);
         String prev = YearMonth.parse(cur, PERIOD_FMT).minusMonths(1).format(PERIOD_FMT);
         String w = nz(wzdm), c = nz(ckdm), l = nz(lot);
+        // 第四轮口径:报表一行 = 一个 (仓库编码, 存货编码)(批号已合并) ⇒ 展开时**不再按批号过滤**,
+        // 该物料该仓的**所有批次**单据一起陈列(单据明细里带 `批号` 列,想看哪一批一眼可见)。
+        // 仍然保留按批号查的能力(传了具体批号就按批号过滤),给以后"按批展开"留口子。
+        String lotArg = ("*".equals(l) || l.isEmpty()) ? null : l;
         LocalDate curStart = periodStart(cur), curEndEx = periodEndExclusive(cur);
         LocalDate prevStart = periodStart(prev), prevEndEx = periodEndExclusive(prev);
         String prevState = periodState(prev);
@@ -500,10 +504,15 @@ public class StockMonthCloseService {
         out.put("期间", cur);
         out.put("上月期间", prev);
         out.put("上月状态", prevState);
+        // 月结快照:月结是按 (物料,仓库,批号) 存的 ⇒ 展开已合并批号的行时**跨批汇总**
         List<Map<String, Object>> snap = jdbc.queryForList(
-                "SELECT 期初数量, 入库数量, 出库数量, 结存数量, CONVERT(nvarchar(10), 最晚出库日期, 120) AS 最晚出库日期"
+                "SELECT CAST(SUM(期初数量) AS decimal(18,4)) AS 期初数量, CAST(SUM(入库数量) AS decimal(18,4)) AS 入库数量,"
+                        + " CAST(SUM(出库数量) AS decimal(18,4)) AS 出库数量, CAST(SUM(结存数量) AS decimal(18,4)) AS 结存数量,"
+                        + " CONVERT(nvarchar(10), MAX(最晚出库日期), 120) AS 最晚出库日期"
                         + " FROM bl_stock_close WHERE 期间 = ? AND 物料编码 = ? AND 仓库编码 = ?"
-                        + " AND ISNULL(RTRIM(批号),N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y'", prev, w, c, l);
+                        + (lotArg == null ? "" : " AND ISNULL(RTRIM(批号),N'') = ?")
+                        + " AND ISNULL(asp_cancel,'N') <> 'Y'",
+                lotArg == null ? new Object[]{prev, w, c} : new Object[]{prev, w, c, lotArg});
         // 月结汇总只在**月结生效中**才展示:已取消时该次汇总已被撤销,界面改为陈列该月原始单据
         // (用户 2026-10-15 第三轮口径),不然"已取消"和一组汇总数字并排会让人以为月结还在。
         out.put("月结快照", "已月结".equals(prevState) && !snap.isEmpty() ? snap.get(0) : null);
@@ -514,41 +523,55 @@ public class StockMonthCloseService {
             rows.addAll(jdbc.queryForList(
                     "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
                             + "  CONVERT(nvarchar(7), DATEADD(month, -1, 单据日期), 120) + N'月结' AS 单据类型,"
-                            + "  ISNULL(单据编号, N'') AS 单据编号, 数量, ISNULL(往来单位, N'') AS 往来单位,"
-                            + "  ISNULL(经手人, N'') AS 经手人"
+                            + "  ISNULL(单据编号, N'') AS 单据编号, ISNULL(批号, N'') AS 批号, 数量,"
+                            + "  ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人"
                             + " FROM inh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据类型 = ? AND 单据编号 = ?"
                             + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
-                            + "  AND ISNULL(RTRIM(批号),N'') = ?",
-                    CARRY_TYPE, carryNo(prev), w, c, l));
+                            + (lotArg == null ? "" : "  AND ISNULL(RTRIM(批号),N'') = ?"),
+                    lotArg == null ? new Object[]{CARRY_TYPE, carryNo(prev), w, c}
+                                   : new Object[]{CARRY_TYPE, carryNo(prev), w, c, lotArg}));
         } else {
             // 上月未月结/已取消 ⇒ 陈列上月的原始单据(入库正、出库负)
-            rows.addAll(flowRows(prevStart, prevEndEx, w, c, l));
+            rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
         }
         // 当月原始单据(不含月结结转行:那一行属于上月的展示口径)
-        rows.addAll(flowRows(curStart, curEndEx, w, c, l));
+        rows.addAll(flowRows(curStart, curEndEx, w, c, lotArg));
         rows.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("单据日期")))
                 .thenComparing(r -> String.valueOf(r.get("单据类型"))));
         out.put("单据明细", rows);
         return out;
     }
 
-    /** 一段期间内的原始单据(入库为正、出库为负),不含月结结转行 —— 展开明细的公共片段 */
-    private List<Map<String, Object>> flowRows(LocalDate start, LocalDate endEx, String w, String c, String l) {
+    /**
+     * 一段期间内的原始单据(入库为正、出库为负),不含月结结转行 —— 展开明细的公共片段。
+     *
+     * @param lot 批号;**null = 不限批号**(报表按 (仓库,存货) 归类后的展开口径,所有批次一起陈列);
+     *            传具体值 = 只取该批。SQL 片段按需拼接,参数顺序随之变化(入库段 + 出库段各一套)。
+     */
+    private List<Map<String, Object>> flowRows(LocalDate start, LocalDate endEx, String w, String c, String lot) {
+        String lotFilter = lot == null ? "" : "  AND ISNULL(RTRIM(批号),N'') = ?";
+        List<Object> args = new ArrayList<>(List.of(start, endEx, w, c));
+        if (lot != null) args.add(lot);
+        args.add(start);
+        args.add(endEx);
+        args.add(w);
+        args.add(c);
+        if (lot != null) args.add(lot);
         return jdbc.queryForList(
                 "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
                         + "  ISNULL(单据类型, N'') AS 单据类型, ISNULL(单据编号, N'') AS 单据编号,"
-                        + "  数量 AS 数量, ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人"
+                        + "  ISNULL(批号, N'') AS 批号, 数量 AS 数量,"
+                        + "  ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人"
                         + " FROM inh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(单据类型,'') <> N'" + CARRY_TYPE + "'"
                         + "  AND 单据日期 >= ? AND 单据日期 < ? AND ISNULL(RTRIM(物料编码),N'') = ?"
-                        + "  AND ISNULL(RTRIM(仓库编码),N'') = ? AND ISNULL(RTRIM(批号),N'') = ?"
+                        + "  AND ISNULL(RTRIM(仓库编码),N'') = ?" + lotFilter
                         + " UNION ALL "
                         + "SELECT CONVERT(nvarchar(7), 单据日期, 120), CONVERT(nvarchar(10), 单据日期, 120),"
-                        + "  ISNULL(单据类型, N''), ISNULL(单据编号, N''), -数量,"
+                        + "  ISNULL(单据类型, N''), ISNULL(单据编号, N''), ISNULL(批号, N''), -数量,"
                         + "  ISNULL(往来单位, N''), ISNULL(经手人, N'')"
                         + " FROM outh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据日期 >= ? AND 单据日期 < ?"
-                        + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
-                        + "  AND ISNULL(RTRIM(批号),N'') = ?",
-                start, endEx, w, c, l, start, endEx, w, c, l);
+                        + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?" + lotFilter,
+                args.toArray());
     }
 
     // ==================== 内部工具 ====================

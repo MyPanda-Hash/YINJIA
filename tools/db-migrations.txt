@@ -3179,3 +3179,11 @@ migrate-stock-month-close.sql
 #   只删 yj_field 的登记行,不动 kucun 物理列;面板脚本同批改为不再注册该列(防重跑复活);译名保留(标签全局共享)。
 #   自检:该列不存在 + 面板仍 7 列 + 其余 7 个 col_name 齐备。幂等;两账套均执行。
 migrate-stock-detail-drop-price.sql
+# migrate-stock-detail-group-by-wh-item.sql — 库存明细改为按(仓库编码,存货编码)归类 + 补 仓库名称/存货名称
+#   用户第四轮口径:「先只按仓库编码和存货编码分类,还有仓库名称,存货名称字段不能少」。
+#   面板 flat 取数不能带 GROUP BY ⇒ 新增聚合视图 dbo.v_stock_kucun(数据源仍是 kucun;兄弟报表同款做法:
+#   id=ROW_NUMBER、asp_cancel 常量 'N'),面板 line_table 指向它,字段重登记为 9 列
+#   (仓库编码·仓库名称·存货编码·存货名称·规格型号·累计入库量·累计出库量·现存量·更新时间)。
+#   自检:视图行数 = (物料,仓库) 两键组合数、现存量合计与 kucun 一致、9 个 col_name 都是视图真实列、名称字段在册。
+#   幂等(视图 CREATE OR ALTER;字段先删后插);两账套均执行。
+migrate-stock-detail-group-by-wh-item.sql

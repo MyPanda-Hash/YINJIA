@@ -570,6 +570,7 @@
                   <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
                   <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
                   <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
+                  <el-table-column prop="批号" :label="tt('批号')" width="140" />
                   <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
                   <!-- 单价:用户 2026-10-15「把单价也给我删除了」⇒ 不展示(入库是单据单价、出库是成本单价,两把尺子) -->
                   <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
@@ -2789,10 +2790,11 @@ async function onMcExpand(row, expanded) {
         // 展开看**当前月**的单据(用户 2026-10-15 口径):
         //   月结后,当月列表里就会带着「2026-09月结」这样的结转单据(它就是当月期初);
         //   当月还没月结时,列出的就是当月正常单据。
+        // ⚠ 不传 lot:报表一行 = 一个 (仓库编码, 存货编码)(批号已合并)⇒ 该物料该仓**所有批次**一起陈列,
+        //   单据明细里带 `批号` 列(2026-10-15 第四轮口径)。
         period: mcStatus.value?.['当前期间'] || '',
         wzdm: row['存货编码'] ?? '',
-        ckdm: row['仓库'] ?? '',
-        lot: row['批号'] ?? '',
+        ckdm: row['仓库编码'] ?? '',
       },
     })
     mcDetail.value[row.id] = res?.data || {}
