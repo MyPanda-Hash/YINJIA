@@ -23,43 +23,49 @@
          这里按可勾的选项渲染;其余列是文本录入格(图片里那些 "/" 是"本格无需填写"的占位)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="fi-sheet">
-    <!-- ① 报告头右上信息三格(表单管理人/密级/使用范围)
+    <!-- 顶栏 = 右上信息三格 + 大标题(同一块,标题在这块空白里居中)
+         ① 报告头右上信息三格(表单管理人/密级/使用范围)
          ⚠ 2026-10-16 用户口径(截图红框)「当前上面这一部分均不能填写需要实现变为可填写的实现」:
            原实现是纯文本 `<span>{{ head[...] }}</span>`,而这 4 个抬头字段当时**库里根本没有**
            (既非头表列、也无 yj_field 登记)⇒ 永远空白且无处可填。现已在 migrate-first-insp.sql
-           第 J 段补上列 + yj_field 登记,这里按可填格子渲染(草稿态可填、只读态显示文本)。 -->
-    <div class="fi-topbar">
-      <table class="fi-info"><tbody>
-        <tr v-for="f in INFO_FIELDS" :key="f.key">
-          <th>{{ tt(f.label) }}</th>
-          <td>
-            <el-select
-              v-if="editable && !isLocked(f.key) && f.options"
-              v-model="head[f.key]"
-              size="small"
-              clearable
-              class="fi-cell"
-              :placeholder="tt('请选择')"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in f.options" :key="o" :label="tt(o)" :value="o" />
-            </el-select>
-            <el-input
-              v-else-if="editable && !isLocked(f.key)"
-              v-model="head[f.key]"
-              size="small"
-              class="fi-cell"
-              maxlength="50"
-              @input="emit('dirty')"
-            />
-            <span v-else>{{ head[f.key] || '' }}</span>
-          </td>
-        </tr>
-      </tbody></table>
-    </div>
+           第 J 段补上列 + yj_field 登记,这里按可填格子渲染(草稿态可填、只读态显示文本)。
+         ⚠ 2026-10-16 第二轮用户口径(截图红框)「让当前的红框内容居于空白位置中央」:
+           原实现里标题是紧跟信息三格之后的普通块 ⇒ 顶部空一大片、标题贴着「产品编号」那一行。
+           现:标题**绝对居中于整块顶栏**(横向 = 整张纸正中,与纸质表单一致;纵向 = 顶栏空白正中)。 -->
+    <div class="fi-header">
+      <div class="fi-topbar">
+        <table class="fi-info"><tbody>
+          <tr v-for="f in INFO_FIELDS" :key="f.key">
+            <th>{{ tt(f.label) }}</th>
+            <td>
+              <el-select
+                v-if="editable && !isLocked(f.key) && f.options"
+                v-model="head[f.key]"
+                size="small"
+                clearable
+                class="fi-cell"
+                :placeholder="tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in f.options" :key="o" :label="tt(o)" :value="o" />
+              </el-select>
+              <el-input
+                v-else-if="editable && !isLocked(f.key)"
+                v-model="head[f.key]"
+                size="small"
+                class="fi-cell"
+                maxlength="50"
+                @input="emit('dirty')"
+              />
+              <span v-else>{{ head[f.key] || '' }}</span>
+            </td>
+          </tr>
+        </tbody></table>
+      </div>
 
-    <!-- ② 大标题 -->
-    <div class="fi-titlerow"><div class="fi-title">{{ tt('炭棒成型车间首件检验记录表') }}</div></div>
+      <!-- ② 大标题(不参与右栏排布;纵横向都以顶栏为参照居中) -->
+      <div class="fi-title">{{ tt('炭棒成型车间首件检验记录表') }}</div>
+    </div>
 
     <!-- ③ 抬头四对:全部可填(产品编号/产品型号 支持参照或手填;生产日期用日期选择;组别取生产线) -->
     <table class="fi-head"><tbody><tr>
@@ -440,7 +446,16 @@ function toggleCheck(sample, c, option) {
   color: #222;
   font-size: 13.5px;
 }
-/* 报告头右上信息三格 */
+/* 顶栏(右上信息三格 + 大标题)
+   ⚠ 2026-10-16 第二轮用户口径(截图红框)「让当前的红框内容居于空白位置中央」:
+     标题**绝对定位于整块顶栏**并两向居中 —— 横向仍以**整张纸**为参照(与纸质表单一致,不受右侧
+     380px 信息三格挤压),纵向落在这块空白的正中央。
+     padding-bottom 顶住标题行原来的高度(6+31+10 = 47px):标题一旦脱离文档流就撑不高顶栏了,
+     少这一段会把下面的抬头四对整体往上提,纸张版式就跟着动。 */
+.fi-header {
+  position: relative;
+  padding-bottom: 47px;
+}
 .fi-topbar {
   display: flex;
   justify-content: flex-end;
@@ -449,6 +464,11 @@ function toggleCheck(sample, c, option) {
   border-collapse: collapse;
   table-layout: fixed;
   width: 380px;
+  /* 标题绝对定位后横向上会压过信息三格那一行的范围(窄屏才可能真重叠);
+     这里让信息三格**盖在标题之上**并自带白底,任何时候都读得到、点得着。 */
+  position: relative;
+  z-index: 1;
+  background: #fff;
 }
 .fi-info th,
 .fi-info td {
@@ -462,11 +482,17 @@ function toggleCheck(sample, c, option) {
   width: 130px;
   text-align: center;
 }
-.fi-titlerow {
-  text-align: center;
-  padding: 6px 0 10px;
-}
 .fi-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 标题只是一行字,别挡住右上三格的输入框/下拉(它横向上确实覆盖到那一行) */
+  pointer-events: none;
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: 27px;
   font-weight: 700;
