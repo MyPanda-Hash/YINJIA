@@ -967,13 +967,16 @@
              下面为明细行」(照旧系统截图:上面是 A~E 分区,下面是「今日品检明细」那条列表)。
              ⇒ 分区(中间)与明细行(下面)同时呈现:分区按表区铺出固定检验项、便于按组填写;
                明细行列表照旧显示本单全部行/全部列(行选择、右键菜单、列筛选、导出等能力都还在)。 -->
-        <div v-if="isSectioned(b)" class="arch-detail-band">
+        <div v-if="isSectioned(b) && panelCode !== 'QC_ASM_INSP'" class="arch-detail-band">
           <div class="arch-section-title">
             <span>{{ tt('明细行') }}</span>
             <span class="arch-section-hint">{{ tt('本单明细(全部列;与上方分区是同一批行)') }}</span>
           </div>
         </div>
+        <!-- 组装成品检验单只显示上方三区；数据仍保存在同一明细模型中，供保存、查询和报表读取。
+             其它检验单继续保留下方通用明细表。 -->
         <el-table
+          v-if="panelCode !== 'QC_ASM_INSP'"
           :data="pagedBlockRows(b)"
           :height="tableH(b)"
           border
