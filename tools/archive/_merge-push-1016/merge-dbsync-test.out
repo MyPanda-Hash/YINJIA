@@ -1,0 +1,23 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp lib\mssql-jdbc.jar DbSync.java 2>&1 | Out-File -Encoding utf ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server @ HSDZ_MES_TEST as yinjia
+[新增] migrate-align-docdate-batch-time-20261016.sql
+== migrate-align-docdate-batch-time-20261016.sql ==
+  [OK] 4 batches
+[新增] migrate-rd-prod-info-od-before-id-20261016.sql
+== migrate-rd-prod-info-od-before-id-20261016.sql ==
+  [OK] 3 batches
+[新增] migrate-rd-approval-attach-20261016.sql
+== migrate-rd-approval-attach-20261016.sql ==
+  (0 rows)
+  [OK] 3 batches
+[新增] migrate-doc-annotation-20261016.sql
+== migrate-doc-annotation-20261016.sql ==
+  (0 rows)
+  [OK] 3 batches
+=== 同步完成: 执行 4, 跳过 479, 失败 0 ===

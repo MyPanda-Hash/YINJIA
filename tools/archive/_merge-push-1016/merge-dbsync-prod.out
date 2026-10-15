@@ -1,0 +1,13 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp lib\mssql-jdbc.jar DbSync.java 2>&1 | Out-File -Encoding utf ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+[新增] migrate-align-docdate-batch-time-20261016.sql
+== migrate-align-docdate-batch-time-20261016.sql ==
+  [SQL失败] 从字符串转换日期和/或时间时，转换失败。
+[SQL FAIL] migrate-align-docdate-batch-time-20261016.sql — 中止,后续脚本未执行
+=== 同步完成: 执行 0, 跳过 479, 失败 1 ===
