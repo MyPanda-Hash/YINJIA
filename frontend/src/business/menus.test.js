@@ -3,6 +3,13 @@ import assert from 'node:assert/strict'
 import { menuTree } from './menus.js'
 
 /** 研发管理二级目录:按研发流程分组(项目管理 / 测试记录 / 产品文件 / 共享文件) */
+test('完工明细为生产执行下的独立通用列表', () => {
+  const exec = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'exec')
+  const entry = exec.children.find((n) => n.panelCode === 'WO_COMPLETION_LIST')
+  assert.equal(entry?.title, '完工明细')
+  assert.equal(entry?.path, '/panelx/list/WO_COMPLETION_LIST')
+})
+
 const rd = menuTree.find((node) => node.code === 'rd')
 const group = (code) => (rd.children || []).find((node) => node.code === code)
 const leafCodes = (node) => (node.children || []).map((child) => child.panelCode || child.code)

@@ -3112,3 +3112,6 @@ migrate-qc-proc-insp-measure10.sql
 
 # 排产表原有数量回填:只补按 plang_id 精确关联的零数量,保留历史非零分批量与排产身份。
 migrate-plangpc-schedule-quantity.sql
+
+# 生产执行独立完工明细:scjl只读过滤视图+元数据面板,不复制事实。
+migrate-wo-completion-list.sql

@@ -251,6 +251,7 @@ export const menuTree = [
         code: 'exec', title: '生产执行', children: [
           { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
           { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
+          { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
           // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
           { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
         ],

@@ -43,7 +43,6 @@
       </el-dropdown>
       <el-button v-if="canDo('picking')" size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
-      <el-button size="small" :disabled="!checked.length && !currentRow" @click="openCompletion">{{ tt('完工明细') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
     </div>
 
@@ -131,7 +130,6 @@
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
-    <WorkOrderCompletionDialog v-model="completionVisible" :code="completionNo" :row-id="completionRowId" />
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -167,7 +165,6 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
-import WorkOrderCompletionDialog from './WorkOrderCompletionDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
@@ -216,20 +213,6 @@ const traceVisible = ref(false)
 const traceNo = ref('')
 /** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
 const traceRowId = ref(null)
-const completionVisible = ref(false)
-const completionNo = ref('')
-const completionRowId = ref(null)
-function openCompletion() {
-  const selected = checked.value.filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
-  const target = selected.length ? selected : (currentRow.value ? [currentRow.value] : [])
-  if (target.length !== 1) {
-    ElMessage.warning(tt(target.length ? '请只勾选一张工单' : '请先勾选一张工单'))
-    return
-  }
-  completionNo.value = target[0].工单号
-  completionRowId.value = target[0].行id
-  completionVisible.value = true
-}
 /** 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产 */
 const schedVisible = ref(false)
 const schedNo = ref('')

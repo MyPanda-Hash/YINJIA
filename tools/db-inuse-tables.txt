@@ -225,6 +225,7 @@ table:plang_pc   # 工单排产
 table:Porder   # 采购单
 table:s_log   # 上机日志
 table:scjl   # 生产记录
+view:v_wo_completion_detail   # 完工明细只读视图(scjl已完工未作废记录;WO_COMPLETION_LIST)
 
 # ---- 例外保留(3 张;未用但按上列理由不删) ----
 table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_hash 幂等记录)
