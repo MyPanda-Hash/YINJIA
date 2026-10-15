@@ -99,6 +99,9 @@ public class ScheduleBoardController {
      * 工序路线排线提交(2026-10-07):**排产 + 预排全程线** —— 首道线写 plang.scx / plang_pc(复用现有排产口径),
      * 全路线写台账 wo_process_line;前道报工完工后自动转序到下一道的计划线。
      * 撤销排产会**同时作废台账**(避免"没排产却有计划线")。
+     *
+     * <p>排产数量(2026-10-16 用户口径「实现排产数」):由排产员人工给定(参考库 pl_sl 口径「默认=需求数量、可改」),
+     * 空 = 沿用该行现值、现值为 0 时取需求数量(旧口径「空=全排」)。
      */
     @PostMapping("/preplan")
     @SuppressWarnings("unchecked")
@@ -109,7 +112,10 @@ public class ScheduleBoardController {
         Object id = body.get("行id");
         Long lineId = id == null || String.valueOf(id).isBlank() ? null : Long.valueOf(String.valueOf(id));
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.getOrDefault("步骤", List.of());
-        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), currentUser()));
+        Object qty = body.get("排产数量");
+        Double planQty = qty == null || String.valueOf(qty).isBlank() || "null".equals(String.valueOf(qty))
+                ? null : Double.valueOf(String.valueOf(qty));
+        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), planQty, currentUser()));
     }
 
     /** 撤销排产回池(换线=撤销+重排);有报工/入库不可撤销 */

@@ -684,9 +684,14 @@ public class ProcessTaskService {
      *
      * @param steps [{工序, 生产线, 计划完工日期?(yyyy-MM-dd), 计划数量?(忽略,一律按换算率算)}]
      * @param team  排产班组(可空;写 plang.lb / plang_pc.lb)
+     * @param planQty **排产数量**(2026-10-16 用户口径「实现排产数」;可空)。参考库口径
+     *   (《参考库生产管理盘点》§3.1 数量链):`xq_sl 需求数量 → pl_sl 排产数量(人工给定、可改) → rk_sl 入库数量`。
+     *   空 = 沿用该行现有排产数量、现值为 0(新结转刚放行)时取需求数量(旧口径「空=全排」);
+     *   给了就按它写 plang.pl_sl(+ plang_pc 镜像)并**重算各道计划数量**。
      */
     @Transactional
-    public Map<String, Object> preplanManual(String plNo, Long lineId, List<Map<String, Object>> steps, String team, String user) {
+    public Map<String, Object> preplanManual(String plNo, Long lineId, List<Map<String, Object>> steps, String team,
+                                             Double planQty, String user) {
         if (!notBlank(plNo)) throw new IllegalArgumentException("请提供工单号");
         String no = plNo.trim();
         Map<String, Object> steps0 = routeSteps(no, lineId);
@@ -696,6 +701,16 @@ public class ProcessTaskService {
         if (route.isEmpty()) throw new IllegalStateException("该工单未绑定工艺路线(或路线无工序明细),不能排线");
         if (steps == null || steps.size() != route.size())
             throw new IllegalArgumentException("必须为路线的每一道工序选好生产线(共 " + route.size() + " 道)");
+        // ── 排产数量(2026-10-16 用户口径「实现排产数」;2026-10-07 改成工序路线排线时这个参数被移除了) ──
+        //   参考库口径:pl_sl 是**排产确认量**,默认=需求数量、由排产员人工给定、可改(可小于需求=部分排产);
+        //   本系统 pl_sl 落工单行 plang,并由 WorkOrderScheduleRecord 镜像进排产记录 plang_pc(追溯「排产数据」段)。
+        double demandQty = num(head.get("需求数量"));
+        double curQty = num(head.get("排产数量"));
+        double qty = planQty != null ? round(planQty) : (curQty > 0 ? curQty : demandQty);
+        if (!Double.isFinite(qty) || qty <= 0)
+            throw new IllegalStateException("排产数量必须大于 0(本行需求数量 " + trimQty(demandQty) + ")");
+        if (demandQty > 0 && qty > demandQty + 0.0001)
+            throw new IllegalStateException("排产数量 " + trimQty(qty) + " 超过需求数量 " + trimQty(demandQty));
         // 逐道校验(按工序序对齐)
         List<Map<String, Object>> plan = new ArrayList<>();
         for (int i = 0; i < route.size(); i++) {
@@ -721,7 +736,12 @@ public class ProcessTaskService {
             p.put("工序", op);
             p.put("工序序", rt.get("工序序"));
             p.put("生产线", line);
-            p.put("计划数量", rt.get("计划数量"));
+            // 计划数量 = **本次排产数量** × 该工序自己的换算率(各道分开算,不累乘)
+            //   ⚠ 2026-10-16:基数改用本次排产数量(排产员在弹窗里给的那个),不再是 routeSteps 里按**旧** pl_sl
+            //     算出来的值 —— 否则「排产数量 100 + 计划数量还是按 160 算」两边自相矛盾。
+            double stepRate = num(rt.get("换算率"));
+            if (stepRate <= 0) stepRate = 1;
+            p.put("计划数量", round(qty * stepRate));
             p.put("计划完工日期", str(given.get("计划完工日期")) != null ? str(given.get("计划完工日期")) : rt.get("计划完工日期"));
             plan.add(p);
         }
@@ -736,6 +756,7 @@ public class ProcessTaskService {
             assignRow.put("加工单号", no);
             if (rowId != null) assignRow.put("行id", rowId);
             assignRow.put("生产线", firstPlan);
+            assignRow.put("排产数量", qty);        // 2026-10-16:人工给定的排产数量(assign 写 plang.pl_sl + plang_pc 镜像)
             if (str(team) != null) assignRow.put("排产班组", str(team));
             if (plan.get(0).get("计划完工日期") != null) assignRow.put("预完工日", plan.get(0).get("计划完工日期"));
             Map<String, Object> assigned = scheduleBoard.assign(List.of(assignRow), user);
@@ -743,6 +764,9 @@ public class ProcessTaskService {
             if (!headFailed.isEmpty()) throw new IllegalStateException("工单排产失败:" + String.join("; ", headFailed));
         } else if (!curLine.equals(firstPlan)) {
             throw new IllegalStateException("首道线 = 该工单行当前排产线「" + curLine + "」;换线请先撤销该行排产再重排");
+        } else {
+            // 已排产行**只改排产数量**(2026-10-16:预排线弹窗里数量也可改;换线仍要求先撤销 —— 上面那句守卫)
+            applyRowPlanQty(rowId, no, qty, user);
         }
         // ② 写台账(先作废**本工单行**的旧行;唯一键 = 工单号 + 工单行,不动同工单其它行)
         jdbc.update("UPDATE dbo.wo_process_line SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
@@ -765,9 +789,54 @@ public class ProcessTaskService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工单号", no);
         out.put("排产产线", plan.get(0).get("生产线"));
+        out.put("排产数量", qty);
         out.put("预排道数", plan.size());
         out.put("计划线", plan.stream().map(x -> x.get("工序") + ":" + x.get("生产线")).toList());
         return out;
+    }
+
+    /**
+     * 已排产行**改排产数量**(2026-10-16 用户口径「实现排产数」;参考库口径 pl_sl = 人工给定、**可改**)。
+     *
+     * <p>写 {@code plang.pl_sl}(排产数量)+ {@code yl}(余量 = 需求 − 排产),再经
+     * {@link WorkOrderScheduleRecord#sync} 同步进排产记录 {@code plang_pc}(追溯「排产数据」段 / 看板未交量的来源),
+     * 最后留痕 {@code yj_usage_log}。数量没变则什么都不做(幂等)。
+     *
+     * <p><b>守卫</b>(改小不能把已经发生的事实盖掉):
+     * <ul>
+     *   <li>不得小于该行**已入库数量**(入库量不能超过排产量);</li>
+     *   <li>不得小于该行**已审核报工量**(报工计划量按旧排产量算,改小会让台账/进度自相矛盾)。</li>
+     * </ul>
+     * 要改小到这些值以下,先处理报工/入库(弃审、作废)再改。
+     */
+    private void applyRowPlanQty(Object rowId, String no, double qty, String user) {
+        if (rowId == null) return;
+        Map<String, Object> cur = jdbc.queryForMap(
+                "SELECT ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl FROM dbo.plang WHERE id=?", rowId);
+        if (Math.abs(num(cur.get("pl_sl")) - qty) < 0.0001) return;          // 数量未变:不写库不留痕
+        double rk = num(cur.get("rk_sl"));
+        if (rk > qty + 0.0001)
+            throw new IllegalStateException("排产数量 " + trimQty(qty) + " 小于该行已入库数量 " + trimQty(rk)
+                    + ",不能改小(请先处理入库单)");
+        // 已审报工量(锚 scjl.gd_id → plang_pc.plang_id;老数据 gd_id 为空时按本行批次号兜底)
+        double done = num(jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
+                        + " WHERE ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=s.gd_id AND pc.plang_id=?)"
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "            (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id=?)))",
+                Double.class, rowId, rowId));
+        if (done > qty + 0.0001)
+            throw new IllegalStateException("排产数量 " + trimQty(qty) + " 小于该行已完成报工量 " + trimQty(done)
+                    + ",不能改小(请先处理报工单)");
+        int n = jdbc.update("UPDATE dbo.plang SET pl_sl=?, yl=ISNULL(xq_sl,0)-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                qty, qty, user, rowId);
+        if (n == 0) throw new IllegalStateException("工单行不存在:" + no);
+        WorkOrderScheduleRecord.sync(jdbc, rowId, user);                     // 排产记录镜像(数量/余量同源)
+        jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no)"
+                        + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username=?), ?),"
+                        + " N'工单', N'快速排产', N'改排产数量', ?)",
+                user, user, user, no);
     }
 
     /**
@@ -1147,4 +1216,8 @@ public class ProcessTaskService {
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
     }
     private static double round(double v) { return Math.round(v * 10000.0) / 10000.0; }
+    /** 数量按人看的写法(去尾零:160.0 → 160,160.5 → 160.5)——用于报错/回执文案 */
+    private static String trimQty(double v) {
+        return java.math.BigDecimal.valueOf(round(v)).stripTrailingZeros().toPlainString();
+    }
 }
