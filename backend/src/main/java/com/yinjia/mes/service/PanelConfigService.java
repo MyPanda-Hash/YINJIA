@@ -281,9 +281,7 @@ public class PanelConfigService {
             // 库存三报表的金额列读 inv_cost_ledger(移动加权成本),口径=物化值,需可手工重算:
             // 审核钩子覆盖走 ButtonService 的审核,但金蝶同步等旁路写入不经过审核动作。
             // 插在 表格调整 之前——其后的「表头调整」是按 表格调整 的位置注入的,不能打乱。
-            buttonGroups.add(group("更多", INV_COST_PANELS.contains(def.code())
-                    ? List.of("发送邮件", "重算成本", "表格调整", "退出")
-                    : List.of("发送邮件", "表格调整", "退出")));
+            buttonGroups.add(group("更多", flatMoreActions(def.code())));
         } else if (doc && panda != null) {
             for (String[] g : panda) {
                 buttonGroups.add(group(g[0], List.of(g).subList(1, g.length)));
@@ -792,6 +790,34 @@ public class PanelConfigService {
      */
     /** 读 inv_cost_ledger(移动加权成本)的库存三报表:工具栏放出「重算成本」(与 ButtonService.INV_COST_PANELS 同集合)。 */
     private static final List<String> INV_COST_PANELS = List.of("STOCK_LEDGER", "STOCK_SUMMARY", "STOCK_BALANCE");
+
+    /** 支持「库存月结」三按钮的面板(与 ButtonService.MONTH_CLOSE_PANELS 同集合)。 */
+    private static final List<String> MONTH_CLOSE_PANELS = List.of("STOCK_DETAIL");
+
+    /**
+     * 平表面板「更多」组的动作清单。
+     *
+     * <p>为什么抽成一个方法:这组按钮是**按面板能力**拼的,而且「表格调整/表头调整」的相对位置有讲究
+     * ({@code 表头调整} 是按 {@code 表格调整} 的位置注入的,不能打乱)。月结三按钮插在「发送邮件」之后、
+     * 「表格调整」之前(2026-10-15):
+     * <ul>
+     *   <li>库存三报表(STOCK_LEDGER/SUMMARY/BALANCE)→ 重算成本(读 inv_cost_ledger);</li>
+     *   <li>库存明细(STOCK_DETAIL)→ 上月月结 / 取消上月月结 / 重新月结(读 kucun + 写 inh 结转单)。</li>
+     * </ul>
+     */
+    private static List<String> flatMoreActions(String panelCode) {
+        List<String> out = new java.util.ArrayList<>();
+        out.add("发送邮件");
+        if (INV_COST_PANELS.contains(panelCode)) out.add("重算成本");
+        if (MONTH_CLOSE_PANELS.contains(panelCode)) {
+            out.add("上月月结");
+            out.add("取消上月月结");
+            out.add("重新月结");
+        }
+        out.add("表格调整");
+        out.add("退出");
+        return out;
+    }
 
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             // 销售订单:选单灰(无上游);生单=生产工单/销售出库单(已实现)

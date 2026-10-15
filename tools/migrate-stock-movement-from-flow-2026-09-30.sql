@@ -85,6 +85,9 @@ SELECT m.src, m.rid, m.单据日期, m.单据类型, m.单据编号, m.业务类
        m.往来单位, m.往来单位编码, m.经手人
 FROM (
   -- 入库流水(inh):src 0 期初结存 / 1 采购入库 / 2 产成品入库 / 3 其他入库 / 4 委外入库
+  -- 2026-10-15 月结(与 migrate-stock-month-close.sql 的视图定义**逐字一致**,改一处必须同步另一处):
+  --   排除「月结结转」行 —— 它是期间期初的记账标记,不是新的入库;
+  --   算进累计口径(v_stock_ledger/v_stock_balance/v_stock_summary + 成本递归)会让库存逐月翻倍。
   SELECT src,
          -- 期初行 rid 为 NULL ⇒ 用流水行自身 id 作合成键(见头部「rid 的两处坑」坑1)
          CAST(ISNULL(rid, id) AS int) AS rid,
@@ -109,6 +112,7 @@ FROM (
          CAST(NULL AS nvarchar(200)) AS 往来单位编码,
          CAST(经手人 AS nvarchar(200)) AS 经手人
     FROM dbo.inh WHERE ISNULL(asp_cancel, 'N') <> 'Y'
+      AND ISNULL(单据类型, N'') <> N'月结结转'
   UNION ALL
   -- 出库流水(outh):src 5 销售出库 / 6 材料出库 / 7 其他出库 / 8 委外发料
   SELECT src, CAST(ISNULL(rid, id) AS int),

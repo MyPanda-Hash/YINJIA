@@ -6,9 +6,17 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+/**
+ * 应用入口。
+ *
+ * <p>{@code @EnableScheduling}(2026-10-15):库存月结定时任务 {@link com.yinjia.mes.service.StockMonthCloseScheduler}
+ * 需要它才生效(每月 1 号 00:20 自动月结上月)。此前全应用没有任何定时任务,故这个注解是随月结一起引入的。
+ */
 @SpringBootApplication
+@EnableScheduling
 public class MesApplication {
 
     public static void main(String[] args) {

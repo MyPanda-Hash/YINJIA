@@ -38,7 +38,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(167 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(169 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -53,6 +53,7 @@ table:bd_pu_order   # 采购订单头表
 table:bd_purchase_in   # 采购入库单头表(审核过账kucun入库)
 table:bd_sale_out   # 销售出库单头表(审核过账kucun出库)
 table:bd_so_order   # 销售订单头表(星辰ERP同步)
+table:bd_stock_close   # 库存月结头表(2026-10-15):一行 = 一个已月结/已取消的期间;结转行写进 inh(单据类型=月结结转),本表只记状态与合计
 table:bd_tax_type   # 税别档案
 table:bl_dispatch   # 工序派工单行表(中文列,服务器口径;含生产车间列供统计视图分组)
 table:bl_finish_in   # 产成品入库单行表(负数量=红字冲回)
@@ -67,6 +68,7 @@ table:bl_pu_label   # 采购订单材料码打印单**行**表(本批次号下�
 table:bl_purchase_in   # 采购入库单行表(批号三键入库)
 table:bl_sale_out   # 销售出库单行表(批号三键出库)
 table:bl_so_order   # 销售订单行表(星辰ERP同步)
+table:bl_stock_close   # 库存月结行表(2026-10-15):一行 = 一个 (物料,仓库,批号) 的期初/入库/出库/结存快照,供报表展开明细
 table:bs_currency   # 币别档案(金蝶云·星辰 currency 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)
 table:bs_customer_group   # 客户分类档案(金蝶云·星辰 customer_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)
 table:bs_dept   # 部门档案(遗留,组织架构用yj_dept)
