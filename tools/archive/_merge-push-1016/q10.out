@@ -1,0 +1,78 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp lib\mssql-jdbc.jar SqlRunner.java "jdbc:sqlserver://127.0.0. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q10-align-culprit.sql ==
+  | bd_finish_in | 创建时间 | datetime2 | 
+  | bd_finish_in | 单据日期 | date | 
+  | bd_finish_in | 审核时间 | datetime2 | 
+  | bd_finish_in | 审批时间 | datetime2 | 
+  | bd_finish_in | 转ERP时间 | datetime2 | 
+  | bd_material_out | 创建时间 | nvarchar | 
+  | bd_material_out | 单据日期 | date | 
+  | bd_material_out | 审核时间 | datetime2 | 
+  | bd_material_out | 审批时间 | datetime2 | 
+  | bd_material_out | 转ERP时间 | nvarchar | 
+  | bd_other_in | 创建时间 | nvarchar | 
+  | bd_other_in | 单据日期 | date | 
+  | bd_other_in | 审核时间 | datetime2 | 
+  | bd_other_in | 转ERP时间 | datetime2 | 
+  | bd_other_out | 创建时间 | nvarchar | 
+  | bd_other_out | 单据日期 | date | 
+  | bd_other_out | 审核时间 | datetime2 | 
+  | bd_other_out | 转ERP时间 | datetime2 | 
+  | bd_pu_order | 创建时间 | nvarchar | 
+  | bd_pu_order | 单据日期 | date | 
+  | bd_pu_order | 审核时间 | datetime2 | 
+  | bd_pu_order | 审批时间 | datetime2 | 
+  | bd_pu_order | 转ERP时间 | nvarchar | 
+  | bd_purchase_in | 创建时间 | nvarchar | 
+  | bd_purchase_in | 单据日期 | date | 
+  | bd_purchase_in | 审核时间 | datetime2 | 
+  | bd_purchase_in | 审批时间 | datetime2 | 
+  | bd_purchase_in | 转ERP时间 | nvarchar | 
+  | bd_sale_out | 创建时间 | nvarchar | 
+  | bd_sale_out | 单据日期 | date | 
+  | bd_sale_out | 审核时间 | datetime2 | 
+  | bd_sale_out | 审批时间 | datetime2 | 
+  | bd_sale_out | 转ERP时间 | nvarchar | 
+  | bd_so_order | 创建时间 | nvarchar | 
+  | bd_so_order | 单据日期 | date | 
+  | bd_so_order | 审核时间 | datetime2 | 
+  | bd_so_order | 审批时间 | datetime2 | 
+  | qc_insp | 单据日期 | nvarchar | 
+  | qc_insp | 检验日期 | nvarchar | 
+  | qc_insp | 审核时间 | nvarchar | 
+  | qc_insp | 审批时间 | nvarchar | 
+  | sl_recv | 单据日期 | nvarchar | 
+  | sl_recv | 审核时间 | nvarchar | 
+  | sl_recv | 审批时间 | nvarchar | 
+  | bd_material_out | 创建时间 | 0 | null | 
+  | bd_material_out | 转ERP时间 | 8 | Oct 14 2026 12:23PM | 
+  | bd_other_in | 创建时间 | 0 | null | 
+  | bd_other_out | 创建时间 | 0 | null | 
+  | bd_pu_order | 创建时间 | 0 | null | 
+  | bd_pu_order | 转ERP时间 | 0 | null | 
+  | bd_purchase_in | 创建时间 | 0 | null | 
+  | bd_purchase_in | 转ERP时间 | 8 | Oct 14 2026 12:17PM | 
+  | bd_sale_out | 创建时间 | 0 | null | 
+  | bd_sale_out | 转ERP时间 | 8 | Oct 14 2026 12:20PM | 
+  | bd_so_order | 创建时间 | 0 | null | 
+  | qc_insp | 单据日期 | 0 | null | 
+  | qc_insp | 检验日期 | 0 | null | 
+  | qc_insp | 审核时间 | 0 | null | 
+  | qc_insp | 审批时间 | 0 | null | 
+  | sl_recv | 单据日期 | 0 | null | 
+  | sl_recv | 审核时间 | 0 | null | 
+  | sl_recv | 审批时间 | 0 | null | 
+  | sl_recv.单据日期 空串 | 0 | 
+  | qc_insp.单据日期 空串 | 0 | 
+  | bd_pu_order.单据日期 空串 | 0 | 
+  | sl_recv.审核时间 非空且ISDATE=0 | 0 | 
+  | qc_insp.审核时间 非空且ISDATE=0 | 0 | 
+  | qc_insp.检验日期 非空且ISDATE=0 | 0 | 
+[OK] q10-align-culprit.sql (1 batches)

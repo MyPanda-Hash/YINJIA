@@ -558,7 +558,7 @@
             <span class="wh-dock-code">{{ w.code }}</span>
           </el-checkbox>
         </div>
-        <div class="wh-dock-tip">{{ tt('勾选仓库即查询;只能选一个;不勾选时列表为空') }}</div>
+        <div class="wh-dock-tip">{{ tt('勾选仓库即查询(单选);不勾选显示全部') }}</div>
       </aside>
       <!-- 顶部常驻提示(用户口径:取消月结后要一直有一串「还没上月月结」的提示) -->
       <div v-if="isStockDetail && mcNotice" class="mc-notice">
@@ -593,7 +593,12 @@
                   {{ tt('月结状态') }}:{{ mcDetail[row.id]['上月状态'] }}
                 </div>
                 <div v-if="mcDetail[row.id]['月结快照']" class="mc-detail-snap">
-                  <span class="mc-snap-item"><b>{{ tt('期初数量') }}</b>{{ mcDetail[row.id]['月结快照']['期初数量'] ?? '—' }}</span>
+                  <!-- 「期初数量」= 上上个月(如 8 月)的月末结转,也就是被结那个月(9 月)的期初 ——
+                       用户第十二轮点名,故把来源月份写在数字后面,免得被当成本月数 -->
+                  <span class="mc-snap-item">
+                    <b>{{ tt('期初数量') }}</b>{{ mcDetail[row.id]['月结快照']['期初数量'] ?? '—' }}
+                    <i class="mc-snap-note">({{ mcDetail[row.id]['期初月份'] }}{{ tt('月末结转') }})</i>
+                  </span>
                   <span class="mc-snap-item"><b>{{ tt('入库数量') }}</b>{{ mcDetail[row.id]['月结快照']['入库数量'] ?? '—' }}</span>
                   <span class="mc-snap-item"><b>{{ tt('出库数量') }}</b>{{ mcDetail[row.id]['月结快照']['出库数量'] ?? '—' }}</span>
                   <span class="mc-snap-item"><b>{{ tt('结存数量') }}</b>{{ mcDetail[row.id]['月结快照']['结存数量'] ?? '—' }}</span>
@@ -601,20 +606,47 @@
                 </div>
                 <div v-else class="mc-detail-snap mc-dim">
                   {{ mcDetail[row.id]['上月状态'] === '已取消'
-                    ? tt('上月月结已取消,以下陈列该月与当月的原始单据')
-                    : tt('上月未月结,以下陈列该月与当月的原始单据') }}
+                    ? tt('上月月结已取消,以下陈列该月原始单据')
+                    : tt('上月未月结,以下陈列该月原始单据') }}
                 </div>
-                <el-table :data="mcDetail[row.id]['单据明细'] || []" size="small" border max-height="340" show-summary>
-                  <el-table-column prop="月份" :label="tt('月份')" width="82" />
-                  <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
-                  <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
-                  <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
-                  <el-table-column prop="批号" :label="tt('批号')" width="140" />
-                  <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
-                  <!-- 单价:用户 2026-10-15「把单价也给我删除了」⇒ 不展示(入库是单据单价、出库是成本单价,两把尺子) -->
-                  <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
-                  <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
+                <!-- **二次展开**(用户 2026-10-15 第十五轮:「根据统一批次号不同单据做二次展开」):
+                     外层 = 批次号一行(汇总:月结数量 / 当月单据数 / 当月合计 / 余额),
+                     点该行的 `>` 再展开 ⇒ 该批次的单据明细(**第一条是月结**,后面是当月单据)。 -->
+                <el-table v-if="(mcDetail[row.id]['单据明细'] || []).length"
+                          :data="mcBatchGroups(row.id)" size="small" border row-key="批次号">
+                  <el-table-column type="expand" width="46">
+                    <template #default="{ row: g }">
+                      <el-table :data="g.单据" size="small" border max-height="300">
+                        <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+                        <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
+                        <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" />
+                        <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
+                        <!-- 单价:用户 2026-10-15「把单价也给我删除了」⇒ 不展示 -->
+                        <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
+                        <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
+                      </el-table>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="批次号" :label="tt('批次号')" width="150">
+                    <template #default="{ row: g }">
+                      {{ g.批次号 || tt('无批次号') }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="月结数量" :label="tt('月结数量')" width="120" align="right" />
+                  <el-table-column prop="当月单据数" :label="tt('当月单据数')" width="110" align="right" />
+                  <el-table-column prop="当月合计" :label="tt('当月合计')" width="110" align="right" />
+                  <el-table-column prop="余额" :label="tt('余额')" width="110" align="right" />
+                  <el-table-column :label="tt('首次月结')" min-width="140">
+                    <template #default="{ row: g }">
+                      {{ (g.单据.find((x) => String(x['单据类型'] || '').includes('月结')) || {})['单据编号'] || '—' }}
+                    </template>
+                  </el-table-column>
                 </el-table>
+                <div v-else class="mc-detail-snap mc-dim">
+                  {{ mcDetail[row.id]['上月状态'] === '已月结'
+                    ? tt('上月期末结存为 0,无结转行')
+                    : tt('上月无出入库单据') }}
+                </div>
               </template>
             </div>
           </template>
@@ -2776,16 +2808,14 @@ function onStockWhChange(v) {
 }
 
 // ---------- 库存明细:分仓库选择(与采购入库单「选单」弹窗同款的勾选列表,数据源 = 仓库档案 bs_wh)----------
-// 用户 2026-10-15 第五轮口径:① **勾选即查询**(没有查询按钮)② **只能勾一个**(单选)③ **没勾选就是空的**。
-// 实现:单选值 whDockSelected(=仓库编码,'' 表示未选);未选时给 condition._whCodes 一个**哨兵值**,
-//   后端按编码 IN 过滤自然返回 0 行(比"前端假装空列表"更诚实:数据面真的查不到东西)。
-const WH_DOCK_NONE = '__NONE__'
+// 用户 2026-10-15 第五/七轮口径:① **勾选即查询**(没有查询按钮)② **只能勾一个**(单选)
+// ③ 第七轮改成 **不勾选 = 显示全部**(此前是"不勾选为空",用户嫌每次都得先勾一次太麻烦)。
+// 实现:单选值 whDockSelected(=仓库编码,'' 表示未选);过滤条件在 load() 里**请求时派生**,不写进共享 condition。
 const isStockDetail = computed(() => String(panelCode.value) === 'STOCK_DETAIL')
 const whDockSelected = ref('')
 watch(isStockDetail, async (v) => {
+  // 离开面板:清掉选中态(过滤条件本身不落在 condition 上,见 load() 里的「请求时派生」,不会串到别的面板)
   if (!v) { whDockSelected.value = ''; return }
-  // 进面板先落哨兵 ⇒ 初始列表为空(等用户勾一个仓库才有数据)
-  condition['_whCodes'] = WH_DOCK_NONE
   if (warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
@@ -2793,16 +2823,16 @@ watch(isStockDetail, async (v) => {
   } catch { warehouseOptions.value = [] }
 }, { immediate: true })
 const whDockRows = computed(() => warehouseOptions.value || [])
-/** 勾选即查询;再点一次同一个 = 取消(取消后回到空列表) */
+/** 勾选即查询(单选);再点同一个 = 取消选中(取消后回到空列表) */
 function pickWhDock(code) {
   whDockSelected.value = whDockSelected.value === code ? '' : code
-  condition['_whCodes'] = whDockSelected.value || WH_DOCK_NONE
   search()
 }
 
 // ---------- 库存明细:顶部常驻提示(上月未月结/已取消时一直显示)----------
 const mcStatus = ref(null)
 const mcNotice = computed(() => (isStockDetail.value ? (mcStatus.value?.['提示'] || '') : ''))
+
 async function loadMcStatus() {
   if (!isStockDetail.value) return
   try {
@@ -2812,9 +2842,34 @@ async function loadMcStatus() {
 }
 watch(isStockDetail, (v) => { if (v) loadMcStatus() }, { immediate: true })
 
-// ---------- 库存明细:行展开 → 该 (物料,仓库,批号) 的月结明细(快照 + 本月入库/出库 + 结转行)----------
+// ---------- 库存明细:行展开 → 该 (物料,仓库) 的月结明细;再按**批次号**二次展开看该批单据 ----------
 const mcDetail = ref({})
 const mcDetailLoading = ref({})
+
+/**
+ * 二次展开的数据源:把明细按**批次号**归组(用户 2026-10-15 第十五轮:
+ *   「根据统一批次号不同单据做二次展开」)。
+ *
+ * 组内**保持后端返回的顺序** —— 后端已按「批次号 → 组内月结行第一 → 日期 → 单号」排好,
+ * 所以外层每一行是一条批次号,点开就是「先月结、后当月单据」。
+ * 每组给四个汇总数:月结数量 / 当月单据数 / 当月合计 / 余额(= 月结 + 当月,即该批当前余额)。
+ */
+function mcBatchGroups(id) {
+  const rows = mcDetail.value?.[id]?.['单据明细'] || []
+  const map = new Map()
+  for (const r of rows) {
+    const key = String(r['批号'] ?? '')
+    if (!map.has(key)) map.set(key, { 批次号: key, 月结数量: 0, 当月单据数: 0, 当月合计: 0, 余额: 0, 单据: [] })
+    const g = map.get(key)
+    const qty = Number(r['数量'] || 0)
+    g.单据.push(r)
+    g.余额 += qty
+    if (String(r['单据类型'] || '').includes('月结')) g.月结数量 += qty
+    else { g.当月单据数 += 1; g.当月合计 += qty }
+  }
+  return [...map.values()].sort((a, b) => String(a.批次号).localeCompare(String(b.批次号), 'zh'))
+}
+
 async function onMcExpand(row, expanded) {
   if (!isStockDetail.value || !row) return
   const rows = Array.isArray(expanded) ? expanded : (expanded ? [row] : [])
@@ -7209,6 +7264,9 @@ async function onButton(action) {
     try {
       const res = await engine.callButton({
         panelCode: panelCode.value, buttonName: action, formData: {}, buttonParam: {},
+        // 月结要按流水重算上千个库存键(正式库实测 2~3 s,数据还会长)⇒ 单次请求给足 120 s,
+        // 别让前端 15 s 线先报超时(服务端其实会跑完,用户看到的却是"报错")。
+        timeoutMs: 120000,
       })
       loading.close()
       const d = res || {}
@@ -7771,6 +7829,12 @@ async function load(clamping = false) {
   try {
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    // 库存明细左栏「分仓库」的过滤条件**在请求时派生**,不写进共用的 condition ——
+    //   condition 由各面板共享、切面板时会被 reset 清空(顺序一变就互相影响);
+    //   2026-10-15 用户报「库存明细的查询会影响到库存状况表」就是这类跨面板串味。
+    //   用户 2026-10-15(第七轮):**不勾选 = 显示全部**(勾一次仓只是为了收窄,别让人每次都得先勾),
+    //   所以这里只在真选了仓库时才加条件;勾选即查询、单选由左栏控制。
+    if (isStockDetail.value && whDockSelected.value) params.condition._whCodes = whDockSelected.value
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
     if (fuzzyApplied.value?.valid) {
       Object.assign(params.condition, fuzzyApplied.value.condition || {})
@@ -9133,6 +9197,7 @@ onUnmounted(() => {
 .mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
 .mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
 .mc-detail-snap.mc-dim { color: #94a3b8; }
+.mc-snap-note { font-style: normal; color: #94a3b8; font-size: 11px; }
 .mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }
 .mc-detail-tables { display: flex; flex-wrap: wrap; gap: 12px; }
 .mc-detail-block { flex: 1 1 320px; min-width: 300px; }

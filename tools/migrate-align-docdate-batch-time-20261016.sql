@@ -133,11 +133,26 @@ BEGIN
     IF @k > 0 BEGIN SET @tot = @tot + @k; PRINT N'   ' + @t + N'.批次号: ' + CAST(@k AS nvarchar(12)) + N' 行'; END
   END
   -- 转ERP时间(仅该表有这列时)
+  -- ⚠ 2026-10-16 合并到开发机后首跑踩坑(本机数据与协作机不同):
+  --   bd_purchase_in / bd_sale_out / bd_material_out 的 转ERP时间 是 **nvarchar**,且各有 8 行(10-14 那批
+  --   asp_user1=N'试运行')被应用 ERP 推送写成了 JS 日期串 'Oct 14 2026 12:17PM' ⇒
+  --   原来无条件的 `CONVERT(date, 转ERP时间)` 直接报「从字符串转换日期和/或时间时,转换失败」,整条迁移中止
+  --   (DbSync「执行 0, 失败 1」,后续 §2/§3 与链上后面的脚本都不执行)。
+  --   处置:与下方 创建时间 同款**按列型分支** —— 文本列只比前 10 位(不做日期转换),日期列仍用 CONVERT(date,..);
+  --   写入表达式**不变**(文本列隐式转成 'yyyy-MM-dd',与本库既有 310 行形态一致)。兼容级别 100 没有 TRY_CONVERT,
+  --   所以只能靠列型分流,不能靠 TRY_ 函数兜底。
   IF COL_LENGTH(@t, N'转ERP时间') IS NOT NULL
   BEGIN
-    SET @s = N'UPDATE ' + QUOTENAME(@t) + N' SET 转ERP时间 = 单据日期'
-           + N' WHERE ' + @SYNC + N' AND 转ERP时间 IS NOT NULL'
-           + N'   AND CONVERT(date, 转ERP时间) <> CONVERT(date, 单据日期)';
+    DECLARE @tyErp sysname = (SELECT ty.name FROM sys.columns c JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                               WHERE c.object_id = OBJECT_ID(@t) AND c.name = N'转ERP时间');
+    IF @tyErp IN (N'date', N'datetime', N'datetime2', N'smalldatetime')
+      SET @s = N'UPDATE ' + QUOTENAME(@t) + N' SET 转ERP时间 = 单据日期'
+             + N' WHERE ' + @SYNC + N' AND 转ERP时间 IS NOT NULL'
+             + N'   AND CONVERT(date, 转ERP时间) <> CONVERT(date, 单据日期)';
+    ELSE
+      SET @s = N'UPDATE ' + QUOTENAME(@t) + N' SET 转ERP时间 = 单据日期'
+             + N' WHERE ' + @SYNC + N' AND 转ERP时间 IS NOT NULL'
+             + N'   AND LEFT(转ERP时间, 10) <> CONVERT(varchar(10), 单据日期, 120)';
     EXEC sp_executesql @s; SET @k = @@ROWCOUNT;
     IF @k > 0 BEGIN SET @tot = @tot + @k; PRINT N'   ' + @t + N'.转ERP时间: ' + CAST(@k AS nvarchar(12)) + N' 行'; END
   END

@@ -1,0 +1,11 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:6 字符: 3
++   java -cp D:/YINJIA-main/tools/lib/mssql-jdbc.jar D:/YINJIA-main/too ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q8-srv.sql ==
+  | DESKTOP-JHUNFT6 | HSDZ_MES | DESKTOP-JHUNFT6 | 9 | 29 | 
+[OK] q8-srv.sql (1 batches)

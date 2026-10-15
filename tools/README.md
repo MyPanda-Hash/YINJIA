@@ -22,7 +22,8 @@ tools/
 │                    + 冻结登记生成器(gen-legacy-whitelist.sql)
 ├── verify/          验证/冒烟/审计:*-smoke.cjs、*-test.cjs、i18n-verify-*.cjs、
 │                    menu-check*.cjs、analyze-panels.cjs、architecture-audit.mjs、
-│                    DbNormAudit.java(数据库规范 12 项体检,见 docs/development/数据库规范.md)
+│                    DbNormAudit.java(数据库规范 12 项体检,见 docs/development/数据库规范.md)、
+│                    StockReportFieldAudit.java(库存报表字段重复/幽灵列体检)
 └── archive/         一次性探针与任务产物(_ 前缀,入库保档;历史会话的诊断脚本)
 ```
 
@@ -47,6 +48,7 @@ tools/
 | 面板配置/条件冒烟 | `scripts\audit-panels.ps1`、`scripts\audit-conditions.ps1` |
 | **数据库规范体检**(13 项:命名/注明/元数据漂移/面板对象必备列/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
 | UI 冒烟(CDP) | `node verify\panels-ui-smoke.cjs`(在 tools/ 下运行,依赖 node_modules) |
+| **库存报表字段体检**(同名重复列 / 幽灵列;2026-10-15 用户报「库存状况表字段重复」后的回归闸) | `java -cp lib\mssql-jdbc.jar verify\StockReportFieldAudit.java [HSDZ_MES_TEST] [--all]`(默认卡库存报表组 5 面板;`--all` 扫全部 flat 面板,会报出生产排产/排单计划等历史遗留) |
 | **桌面看板 e2e**(概览口径 / 销售取数与界面 / 折线可分辨性 / 顶栏) | `node verify\dashboard-overview-api-e2e.cjs`、`dashboard-overview-ui-e2e.cjs`、`dashboard-sales-api-e2e.cjs`、`dashboard-sales-ui-e2e.cjs`、`dashboard-line-ui-e2e.cjs`、`dashboard-topbar-e2e.cjs`(需 8090 已启动;`*-api-*` 只读,`*-ui-*` 走 CDP 无头浏览器) |
 | **组织架构 e2e**(重置密码 / 权限配置态返回 / userSave 自锁守卫) | `node verify\orgadmin-password-reset-e2e.cjs`、`orgadmin-perm-back-e2e.cjs`、`user-save-guard-e2e.cjs` ⚠ 最后一个会**写测试账套**(YJ_TEST)并自带夹具与还原 —— 守住「不能停用自己 / 不能自我降权 / 不能停用降权最后一个可用管理员」三条自锁护栏,别在 HSDZ_MES 上跑 |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |

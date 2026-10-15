@@ -1,0 +1,49 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp lib\mssql-jdbc.jar SqlRunner.java "jdbc:sqlserver://127.0.0. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q9-align-probe.sql ==
+  | bd_finish_in | 单据日期 | null | null | 
+  | bd_manu_order | 单据日期 | null | null | 
+  | bd_prod_abn | 单据日期 | null | null | 
+  | bd_pu_label | 单据日期 | null | null | 
+  | bd_purchase_in | 单据日期 | null | null | 
+  | bl_finish_in | null | null | null | 
+  | bl_manu_order | null | null | null | 
+  | bl_material_out | null | null | null | 
+  | bl_other_in | null | null | null | 
+  | bl_other_out | null | null | null | 
+  | bl_pu_order | null | null | null | 
+  | bl_purchase_in | null | null | null | 
+  | bl_sale_out | null | null | null | 
+  | bl_so_order | null | null | null | 
+  | bl_stock_close | null | null | null | 
+  | erp_imp_log | null | null | null | 
+  | erp_imp_row | null | null | null | 
+  | feed_confirm | 单据日期 | null | null | 
+  | inh | 单据日期 | null | null | 
+  | inv_cost_ledger | 单据日期 | null | null | 
+  | outh | 单据日期 | null | null | 
+  | plang | null | null | null | 
+  | plang_pc | null | null | null | 
+  | qc_asm_insp_head | 单据日期 | null | null | 
+  | qc_catalog_detail | null | null | null | 
+  | qc_cut_insp_head | 单据日期 | null | null | 
+  | qc_fin_spec_head | 单据日期 | null | null | 
+  | qc_insp | 单据日期 | null | null | 
+  | qc_insp_detail | null | 日期 | null | 
+  | qc_jjf | 单据日期 | null | null | 
+  | qc_mold_insp_head | 单据日期 | null | null | 
+  | qc_return | 单据日期 | null | null | 
+  | qc_return_detail | null | null | null | 
+  | qc_tc_in | 单据日期 | null | null | 
+  | scjl | null | null | null | 
+  | sl_recv | 单据日期 | null | null | 
+  | sl_recv_detail | null | 日期 | null | 
+  | wo_progress | null | null | null | 
+  | wo_transfer_log | null | null | null | 
+[SQL FAIL] 'TRY_CONVERT' 不是可以识别的 内置函数名称。

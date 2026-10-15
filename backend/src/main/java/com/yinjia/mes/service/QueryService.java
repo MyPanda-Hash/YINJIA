@@ -40,6 +40,15 @@ public class QueryService {
         this.translations = translations;
     }
 
+    /**
+     * 自带左栏「分仓库」列表的面板 —— **只有它**认 {@code condition._whCodes}。
+     *
+     * <p>闸门理由(2026-10-15):库存状况表/台账/收发式汇总都有「仓库编码」列,一旦收到残留的
+     * {@code _whCodes}(前端切面板没清干净、或别的客户端乱传),就会被静默过滤成 0 行 ——
+     * 用户报的「库存明细的查询会影响到库存状况表」正是这类跨面板串味。前端同时改成"请求时派生",
+     * 这里是服务端的第二道防线。
+     */
+    private static final List<String> WH_DOCK_PANELS = List.of("STOCK_DETAIL");
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                                  Map<String, Object> condition, int pageNo, int pageSize) {
         return queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, null);
@@ -694,12 +703,15 @@ public class QueryService {
                 args.add(String.valueOf(whCode).trim());
             }
             // 多仓库过滤(2026-10-15,库存明细左侧「分仓库选择」):`_whCodes` = 逗号分隔的仓库编码列表 ⇒ IN(...)。
-            // 为什么单独一个键:通用条件一次只表达一个值(名称/编码),而左侧列表是多选;沿用 `_` 前缀的
-            // 「控制键」口径(与 _ckdm/_whCode/_itemCode 同族),不污染业务字段名。
-            // 列取 仓库编码 优先、退化到 仓库(库存明细是 flat 直读 kucun,标签就是「仓库」)。
+            // 为什么单独一个键:通用条件一次只表达一个值(名称/编码),而左侧列表是多选;
+            //   沿用 `_` 前缀的「控制键」口径(与 _ckdm/_whCode/_itemCode 同族),不污染业务字段名。
+            // ⚠ **按面板闸门**:只有 STOCK_DETAIL(自带左栏分仓库列表)认这个键 —— 否则一旦别的面板
+            //   (库存状况表/台账/汇总都有「仓库编码」列)收到残留的 _whCodes,就会被静默过滤成 0 行。
+            //   2026-10-15 用户报「库存明细的查询会影响到库存状况表」,这条闸门 + 前端「请求时派生」一起兜住。
             String whCol = l2c.getOrDefault("仓库编码", l2c.get("仓库"));
             Object whCodes = condition.get("_whCodes");
-            if (whCodes != null && !String.valueOf(whCodes).isBlank() && whCol != null) {
+            if (whCodes != null && !String.valueOf(whCodes).isBlank() && whCol != null
+                    && WH_DOCK_PANELS.contains(def.code())) {
                 List<String> codes = new ArrayList<>();
                 for (String s : String.valueOf(whCodes).split(",")) {
                     String t = s.trim();

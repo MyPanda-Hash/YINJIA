@@ -78,7 +78,7 @@ console.log('[5] 明细列: ' + await ev(`(() => {
   return heads.join(',') + '  | 含结存单价?' + (heads.includes('结存单价') ? '是(❌ 用户要求摘掉)' : '否 ✅');
 })()`))
 
-console.log('[6] 未勾选时应为空 → 勾「恒亿仓」即查询(单选):')
+console.log('[6] 未勾选=显示全部 → 勾「恒亿仓」即查询(单选) → 再点取消=回到全部:')
 const count0 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
@@ -87,7 +87,7 @@ await ev(`(() => {
 })()`)
 await sleep(6000)
 const count1 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
-// 再点同一个 = 取消 ⇒ 应回到空
+// 再点同一个 = 取消 ⇒ 应回到全部(第七轮口径)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
   const input = item && item.querySelector('input'); if (input) input.click();
@@ -95,27 +95,38 @@ await ev(`(() => {
 })()`)
 await sleep(5000)
 const count2 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
-console.log(`    未勾选=${count0}(应 0) → 勾恒亿仓=${count1}(应 612) → 再点取消=${count2}(应 0)`)
-// 勾回来,供下面的展开断言使用
+console.log(`    未勾选=${count0}(应 1535 全部) → 勾恒亿仓=${count1}(应 587) → 再点取消=${count2}(应回到 1535)`)
+// 勾「华北工控仓 CK00006」(展开断言的目标行 YJ-SX-043/CK00006 在 CK00006 下,列表按更新时间倒序 ⇒ 在第 1 页)
 await ev(`(() => {
-  const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
+  const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('CK00006'));
   const input = item && item.querySelector('input'); if (input) input.click();
   return 'ok'
 })()`)
 await sleep(6000)
 
-// 展开第一行
-console.log('[7] 展开第一行:')
-await ev(`(() => { const b = document.querySelector('.report-table .el-table__expand-icon'); b && b.click(); return 'ok' })()`)
-await sleep(6000)
-console.log('    ' + await ev(`(() => {
-  const d = document.querySelector('.mc-detail');
-  if (!d) return '（没有展开区 ❌）';
-  const tables = d.querySelectorAll('.el-table').length;
-  const heads = [...d.querySelectorAll('.el-table__header th')].map(t => t.innerText.trim()).filter(Boolean);
-  const first = [...d.querySelectorAll('.el-table__body tr')].slice(0, 3).map(tr => [...tr.querySelectorAll('td')].map(td => td.innerText.trim()).join(' | '));
-  return '表数量=' + tables + '(应 1) | 列:' + heads.join(',') + '\\n        前几行: ' + first.join('  ///  ');
-})()`))
+// 展开:① 首行(可能无结转 ⇒ 应给提示而不是空表) ② 有结转的行(YJ-SX-043 / CK00006 ⇒ 应只有 1 行 9月结转)
+console.log('[7] 展开:')
+const dump = async (rowSelector) => ev(`(() => {
+  const tr = [...document.querySelectorAll('.report-table .el-table__body tr')].find(${rowSelector});
+  if (!tr) return '（没找到该行）';
+  const ic = tr.querySelector('.el-table__expand-icon'); if (ic) ic.click();
+  return 'clicked'
+})()`)
+const readExpand = async () => {
+  await sleep(6000)
+  return ev(`(() => {
+    const d = document.querySelector('.mc-detail');
+    if (!d) return '（没有展开区）';
+    const tables = d.querySelectorAll('.el-table').length;
+    const hint = [...d.querySelectorAll('.mc-dim')].map(x => x.innerText.trim()).join(' / ');
+    const rows = [...d.querySelectorAll('.el-table__body tr')].map(tr => [...tr.querySelectorAll('td')].map(td => td.innerText.trim()).join(' | '));
+    return '表=' + tables + (hint ? ' 提示[' + hint + ']' : '') + (rows.length ? '\\n        行: ' + rows.join('  ///  ') : '');
+  })()`)
+}
+await dump(`tr => (tr.innerText || '').includes('YJ-SX-043') && (tr.innerText || '').includes('CK00006')`)
+console.log('    有结转的行(YJ-SX-043/CK00006): ' + await readExpand())
+await ev(`document.querySelectorAll('.mc-detail .el-table__expand-icon').forEach(() => {})`)
+console.log('    说明:无结转的行(上月期末结存=0)展开应显示提示文字,不再是空表')
 
 console.log('[8] 工具栏按钮: ' + await ev(`(() => {
   const labels = [...document.querySelectorAll('span.tb-main')].map(x => x.innerText.trim()).filter(Boolean);

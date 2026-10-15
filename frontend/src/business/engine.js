@@ -446,7 +446,14 @@ export async function fillCurrentStock(rows) {
   return targets.length
 }
 
-export async function callButton({ panelCode, buttonName, formData, buttonParam }) {
+/**
+ * 调用面板按钮。
+ *
+ * @param timeoutMs 可选:**单次请求的超时**(默认走 request.js 的 15 s)。重活儿(库存月结要按流水重算
+ *   上千个库存键、正式库实测 2~3 s 且随数据增长)留足余量,免得服务端还在跑、前端先报超时
+ *   —— 2026-10-15 用户报「取消后再月结超时报错」就是这个 15 s 线卡出来的(服务端其实跑完了)。
+ */
+export async function callButton({ panelCode, buttonName, formData, buttonParam, timeoutMs }) {
   // 按钮名对齐 SQL 后端（中止执行/整单中止→中止、草稿→取消中止、保存类→提交）
   // ⚠ 「保存为草稿」**不在**此列(2026-09-20 修):它必须原样透传给后端,后端 case "保存为草稿"
   //   走 save(markSaved=false) —— 只落库、不归档/不送审、不做必填校验。
@@ -456,7 +463,8 @@ export async function callButton({ panelCode, buttonName, formData, buttonParam 
     : buttonName === '草稿' ? '取消中止'
       : buttonName === '保存' || buttonName === '保存新增' ? '提交'
         : buttonName
-  return unwrap(await request.post('/px/callButton', { panelCode, buttonName: apiName, formData, buttonParam }))
+  const cfg = timeoutMs ? { timeout: timeoutMs } : undefined
+  return unwrap(await request.post('/px/callButton', { panelCode, buttonName: apiName, formData, buttonParam }, cfg))
 }
 
 export async function deleteForms({ panelCode, rowCodes }) {

@@ -1,0 +1,10 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp lib\mssql-jdbc.jar SqlRunner.java "jdbc:sqlserver://127.0.0. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-align-docdate-batch-time-20261016.sql ==
+[SQL FAIL] 从字符串转换日期和/或时间时，转换失败。

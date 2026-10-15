@@ -1,0 +1,4 @@
+SET NOCOUNT ON;
+SELECT TOP 6 单据编号, asp_user1, 转ERP时间 FROM bd_purchase_in WHERE 转ERP时间 IS NOT NULL AND ISDATE(转ERP时间)=1 ORDER BY 单据编号 DESC;
+SELECT TOP 6 单据编号, asp_user1, 转ERP时间 FROM bd_material_out WHERE 转ERP时间 IS NOT NULL AND ISDATE(转ERP时间)=1 ORDER BY 单据编号 DESC;
+SELECT COUNT(*) AS 采购入库_文本转ERP时间行数, SUM(CASE WHEN ISDATE(转ERP时间)=1 THEN 1 ELSE 0 END) AS 可解析 FROM bd_purchase_in WHERE 转ERP时间 IS NOT NULL;
