@@ -14,7 +14,7 @@
       <text v-if="lastA && data.length" :x="Math.min(lastA.x, W - 6)" :y="Math.max(lastA.y - 6, 10)" class="last-val" text-anchor="end">{{ lastText }}</text>
     </svg>
     <div class="line-x">
-      <span v-for="d in data" :key="d.date" class="lx">{{ d.date }}</span>
+      <span v-for="d in xLabels" :key="d.i" class="lx">{{ d.date }}</span>
     </div>
     <div class="line-legend">
       <span class="lg-k"><i class="lg-dot added"></i>{{ legendA }}</span>
@@ -33,6 +33,8 @@ const props = defineProps({
   // 图例文案(2026-09-28 桌面深度开发:出入库/送检合格等场景复用;默认保持原 新增/完工)
   legendA: { type: String, default: '新增' },
   legendB: { type: String, default: '完工' },
+  /** X 轴最多显示几个日期标签(2026-10-15:近 30 天趋势有 30 个点,全画会糊成一片) */
+  maxLabels: { type: Number, default: 8 },
 })
 
 const W = 320
@@ -69,6 +71,22 @@ const lastA = computed(() => xysA.value[xysA.value.length - 1] || null)
 const lastText = computed(() => {
   const d = props.data[props.data.length - 1]
   return d ? String(d.added || 0) : ''
+})
+/**
+ * X 轴标签抽稀:点太多时只显示 maxLabels 个,**首尾必含**,且取点位置与折线的
+ * 等距点位对齐(round(k*(n-1)/(m-1))),所以标签不会和折线错位。
+ * n <= maxLabels 时原样全显示 ⇒ 对既有 7 天/12 点图表零影响。
+ */
+const xLabels = computed(() => {
+  const n = props.data.length
+  const m = Math.max(2, Math.min(props.maxLabels, n))
+  if (n <= m) return props.data.map((d, i) => ({ i, date: d.date }))
+  const out = []
+  for (let k = 0; k < m; k++) {
+    const i = Math.round((k * (n - 1)) / (m - 1))
+    if (!out.some((x) => x.i === i)) out.push({ i, date: props.data[i].date })
+  }
+  return out
 })
 </script>
 

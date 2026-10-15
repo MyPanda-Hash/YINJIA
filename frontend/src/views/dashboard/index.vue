@@ -348,23 +348,36 @@
     <template v-else-if="mod === 'sales'">
       <div class="dash-grid">
         <div class="card metric-card col-4"><div class="kpi-num tone-primary">{{ sales.total }}</div><div class="kpi-title">{{ tt('销售订单数') }}</div></div>
-        <div class="card metric-card col-4"><div class="kpi-num tone-warning">{{ sales.amount ?? 0 }}</div><div class="kpi-title">{{ tt('明细金额合计（元）') }}</div></div>
+        <!-- 金额走 formatCompact:原样渲染是 17630591.27 一串裸数字,而概览页同一数值显示「1763万」 -->
+        <div class="card metric-card col-4"><div class="kpi-num tone-warning">{{ formatCompact(Number(sales.amount || 0)) }}</div><div class="kpi-title">{{ tt('明细金额合计（元）') }}</div></div>
         <div class="card metric-card col-4"><div class="kpi-num tone-steel">{{ salesDone }}</div><div class="kpi-title">{{ tt('已审核订单') }}</div></div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('客户订单分布') }}</div>
-          <div class="chart-box"><SDonut :data="sales.byCustomer" :sub="tt('订单')" /></div>
+          <div class="card-title with-seg">
+            {{ tt('客户订单分布') }}
+            <el-radio-group v-model="customerMetric" size="small" class="card-seg">
+              <el-radio-button value="count">{{ tt('订单数') }}</el-radio-button>
+              <el-radio-button value="amount">{{ tt('金额') }}</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="chart-box"><SDonut :data="salesCustomer" :sub="customerMetric === 'amount' ? tt('元') : tt('订单')" /></div>
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('订单状态分布') }}</div>
           <div class="chart-box"><SBars :data="sales.byStatus" show-pct /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('近 7 天订单趋势') }}</div>
-          <div class="chart-box"><SLine :data="sales.trend7" :legend-a="tt('新增')" :legend-b="tt('已审核')" /></div>
+          <div class="card-title">{{ tt('近 30 天订单趋势') }}</div>
+          <div class="chart-box"><SLine :data="sales.trend30" :legend-a="tt('新增')" :legend-b="tt('已审核')" /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('TOP 产品下单量') }}</div>
-          <div class="chart-box"><SBars :data="sales.topProducts" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
+          <div class="card-title with-seg">
+            {{ productMetric === 'amount' ? tt('TOP 产品下单金额') : tt('TOP 产品下单量') }}
+            <el-radio-group v-model="productMetric" size="small" class="card-seg">
+              <el-radio-button value="count">{{ tt('数量') }}</el-radio-button>
+              <el-radio-button value="amount">{{ tt('金额') }}</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="chart-box"><SBars :data="salesProducts" label-width="146px" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
         </div>
       </div>
     </template>
@@ -753,6 +766,14 @@ const salesDone = computed(() => {
   const s = (sales.value.byStatus || []).find((x) => x.name === '已审核')
   return s ? s.value : 0
 })
+// 排行口径(2026-10-15):客户与产品两张排行各自可切「订单数/数量 ↔ 金额」——
+// 库里的金额此前只汇总成一个总数,两张排行全按笔数/数量排,看不出谁贡献的钱多。
+const customerMetric = ref('count')
+const productMetric = ref('count')
+const salesCustomer = computed(() => ((customerMetric.value === 'amount'
+  ? sales.value.customerShareAmount : sales.value.customerShare) || []))
+const salesProducts = computed(() => ((productMetric.value === 'amount'
+  ? sales.value.topProductsAmount : sales.value.topProducts) || []))
 
 // ---------- 质量数据 ----------
 const quality = computed(() => stats.value.quality || { total: 0, pass: 0, bad: 0, passRate: 0, byResult: [] })
@@ -1855,6 +1876,16 @@ function go(path, title) {
   width: 3px;
   background: var(--t-primary);
   content: '';
+}
+/* 标题带右侧分段开关(2026-10-15 销售排行口径切换):只加在带开关的卡上,不影响其它卡 */
+.card-title.with-seg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.card-title.with-seg .card-seg {
+  margin-left: auto;
+  font-weight: 400;
 }
 .chart-box {
   min-height: 220px;

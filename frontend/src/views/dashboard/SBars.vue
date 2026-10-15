@@ -2,7 +2,7 @@
   <div class="sbars" :class="{ 'sbars-scroll': scroll }" :style="scrollStyle" :tabindex="scroll ? 0 : undefined">
     <template v-if="data.length">
       <div v-for="(d, i) in data" :key="i" class="bar-row" :class="{ top: i === 0 && sorted }" :title="`${d.name}：${fmt(d.value)}${d.meta ? '（' + d.meta + '）' : ''}`">
-        <span class="bar-label" :title="d.name">{{ d.name }}</span>
+        <span class="bar-label" :title="d.name" :style="labelWidth ? { width: labelWidth } : null">{{ d.name }}</span>
         <div class="bar-track">
           <div class="bar-fill" :style="{ width: pct(d.value) + '%', background: colorOf(i) }"></div>
         </div>
@@ -38,6 +38,11 @@ const props = defineProps({
   scroll: { type: Boolean, default: false },
   /** 滚动区最大高度;留空取默认 260px */
   maxHeight: { type: String, default: '' },
+  /**
+   * 标签列宽(2026-10-15):默认 88px 是给短标签用的,长物料名会被截成「除氯阻垢炭棒/…」。
+   * 需要更宽标签的卡片传 '120px' 之类;留空 = 保持原样式(不影响其它 10+ 处复用)。
+   */
+  labelWidth: { type: String, default: '' },
 })
 
 const scrollStyle = computed(() => (props.scroll ? { maxHeight: props.maxHeight || '260px' } : null))
@@ -139,12 +144,15 @@ function fmt(v) {
   filter: brightness(1.08);
 }
 .bar-val {
-  width: 48px;
+  /* 48px 放不下「518.4万」这类 6~7 字符的金额(会折成两行) —— 2026-10-15 加宽到 64px 并禁止折行;
+     数值仍右对齐,各行数值列同宽,条形的末端 x 保持一致。 */
+  width: 64px;
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--t-text-1);
   text-align: right;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 /* 首行(最大值)强调:视觉层级 top-first(UXPin 指南) */
