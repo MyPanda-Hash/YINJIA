@@ -204,6 +204,8 @@ export const menuTree = [
     //    所属业务对象下(如 智能供应链·销售管理:销售订单 → 销售订单明细表 → 销售订单统计表)。
     // 现终态:二级只剩 6 个业务域(生产计划/生产执行/生产记录/设备维护/样品管理/经典单据),
     // 4 张明细/统计面板按业务对象并入 生产计划 / 经典单据;LeftNav 的 mfg 特判已删除,全部模块走同一条通用分支。
+    // 2026-10-16 再收敛:样品管理 / 经典单据 两组随其仅有的 5 个叶子一并下架 ⇒ 现为 4 个业务域
+    // (生产计划/生产执行/生产记录/设备维护),详见下方该两组的摘除注释。
     children: [
       {
         // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
@@ -273,21 +275,38 @@ export const menuTree = [
           { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
         ],
       },
-      {
-        code: 'sample', title: '样品管理', children: [
-          { code: 'sampleReq', title: '样品申请单', path: '/panelx/list/SAMPLE_REQ', panelCode: 'SAMPLE_REQ', operationName: '新增流程' },
-        ],
-      },
-      {
-        code: 'legacy', title: '经典单据', children: [
-          // 生产工单已归位「生产计划」组(2026-09-24),此处不再重复入口
-          { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
-          { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
-          // 2026-10-14 同上:派工单的明细/统计表并回本域,取消二级「明细表/统计表」大类
-          { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
-          { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
-        ],
-      },
+      // ══════════ 2026-10-16 下架:「样品管理」「经典单据」两组整体摘除 ══════════
+      // 用户口径:「去除当前这两个菜单内的单据」。被摘的 5 个叶子 =
+      //   样品管理:样品申请单 SAMPLE_REQ
+      //   经典单据:工序派工单 DISPATCH / 委外加工单 OUTSOURCE_ORDER /
+      //             工序派工单明细表 DISPATCH_DETAIL / 工序派工单统计表 DISPATCH_STATS
+      // 两组各只有这几个叶子,摘完即空壳 —— 空分组违反本文件第 135 行那条测试
+      // (二级目录一律是「带面板的分组」),所以连二级目录一起摘。
+      //
+      // 走的是「轻路线」(先例见 docs/development/面板老化盘点-品质管理与智能供应链.md §5):
+      //   yj_panel / yj_field / yj_role_panel 元数据与物理表(sample_req / bd_dispatch /
+      //   bl_dispatch / bd_outsource_order / bl_outsource_order / 两张 v_dispatch_* 视图)
+      //   **原样保留**,只是不再挂菜单 ⇒ 随时可回滚。
+      //   同批数据侧取证(两账套行数 / 操作留痕 / 参照 / DB 依赖)在
+      //   tools/archive/_disp-sample-audit/(结论:4 张零数据零留痕,SAMPLE_REQ 只有 1 张
+      //   2026-09-22 的草稿测试单 SP-2026-09-0001)。
+      // 若要连元数据与物理表一起删(重路线),另立迁移脚本,不靠放开本段注释。
+      // 恢复办法:取消下面这两段的注释即可(菜单项、权限行、译名都还在)。
+      // {
+      //   code: 'sample', title: '样品管理', children: [
+      //     { code: 'sampleReq', title: '样品申请单', path: '/panelx/list/SAMPLE_REQ', panelCode: 'SAMPLE_REQ', operationName: '新增流程' },
+      //   ],
+      // },
+      // {
+      //   code: 'legacy', title: '经典单据', children: [
+      //     // 生产工单已归位「生产计划」组(2026-09-24),此处不再重复入口
+      //     { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
+      //     { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
+      //     // 2026-10-14 同上:派工单的明细/统计表并回本域,取消二级「明细表/统计表」大类
+      //     { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
+      //     { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
+      //   ],
+      // },
     ],
   },
   {

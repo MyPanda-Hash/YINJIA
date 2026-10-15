@@ -99,18 +99,40 @@ test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () =>
  *   · LeftNav 为此写了 `m.code === 'mfg'` 特判去"穿"这层,别的模块走通用分支 —— 两套实现;
  *   · 别的模块里明细/统计表都挂在所属业务对象下(智能供应链·销售管理:销售订单 → 明细表 → 统计表)。
  * 终态 = 二级只剩 6 个业务域,4 张明细/统计面板按业务对象并入 生产计划 / 经典单据。
+ * 2026-10-16:样品管理 / 经典单据 两组随其仅有的 5 个叶子整体下架 ⇒ 6 → 4 个业务域。
  */
-test('生产制造二级目录 = 6 个业务域(拍平「生产管理」空壳层 + 取消「明细表/统计表」大类)', () => {
+test('生产制造二级目录 = 4 个业务域(拍平「生产管理」空壳层 + 取消「明细表/统计表」大类 + 摘两组)', () => {
   const mfg = menuTree.find((n) => n.code === 'mfg')
   assert.deepEqual((mfg.children || []).map((c) => c.code),
-    ['plan', 'exec', 'records', 'device', 'sample', 'legacy'])
+    ['plan', 'exec', 'records', 'device'])
   assert.deepEqual((mfg.children || []).map((c) => c.title),
-    ['生产计划', '生产执行', '生产记录', '设备维护', '样品管理', '经典单据'])
+    ['生产计划', '生产执行', '生产记录', '设备维护'])
   // 空壳层 / 类型大类都不得回来
   assert.ok(!(mfg.children || []).some((c) => c.code === 'prod'), '不应再有 prod 空壳层')
   assert.ok(!(mfg.children || []).some((c) => c.title === '生产管理'), '不应再有「生产管理」空壳层')
   assert.ok(!(mfg.children || []).some((c) => c.title === '明细表' || c.title === '统计表'),
     '明细表/统计表不应再是二级大类')
+})
+
+/**
+ * 2026-10-16 用户口径「去除当前这两个菜单内的单据」:
+ * 样品管理(样品申请单 SAMPLE_REQ)与经典单据(工序派工单 DISPATCH / 委外加工单 OUTSOURCE_ORDER /
+ * 工序派工单明细表 DISPATCH_DETAIL / 工序派工单统计表 DISPATCH_STATS)两组整体摘除。
+ * 走轻路线(元数据与物理表保留可回滚)⇒ 钉住的是「菜单里不得再有入口」,不是「面板已删」。
+ * 恢复 = 放开 menus.js 里那两段的注释,届时本测试必须同步改回。
+ */
+test('样品管理 / 经典单据 两组下架:菜单树里不得再有这 5 张面板的入口或分组', () => {
+  const mfg = menuTree.find((n) => n.code === 'mfg')
+  for (const code of ['sample', 'legacy']) {
+    assert.ok(!(mfg.children || []).some((c) => c.code === code), `不应再有 ${code} 二级分组`)
+  }
+  for (const title of ['样品管理', '经典单据']) {
+    assert.ok(!(mfg.children || []).some((c) => c.title === title), `不应再有「${title}」分组`)
+  }
+  const all = JSON.stringify(mfg)
+  for (const p of ['SAMPLE_REQ', 'DISPATCH', 'OUTSOURCE_ORDER', 'DISPATCH_DETAIL', 'DISPATCH_STATS']) {
+    assert.ok(!all.includes(`"${p}"`), `菜单树里不应再有 ${p} 入口`)
+  }
 })
 
 test('生产制造的明细/统计表挂在所属业务对象下(与销售管理同款)', () => {
@@ -123,11 +145,9 @@ test('生产制造的明细/统计表挂在所属业务对象下(与销售管理
   assert.deepEqual((group('plan').children || []).map((c) => c.panelCode).filter(Boolean),
     ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD',
       'LINE_LOAD', 'MANU_ORDER_DETAIL', 'MANU_ORDER_STATS'])
-  assert.deepEqual((group('legacy').children || []).map((c) => c.panelCode),
-    ['DISPATCH', 'OUTSOURCE_ORDER', 'DISPATCH_DETAIL', 'DISPATCH_STATS'])
-  // 四张面板各出现一次:防并域时重复挂载或漏挂
+  // 两张生产工单报表各出现一次:防并域时重复挂载或漏挂
   const all = JSON.stringify(mfg)
-  for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS', 'DISPATCH_DETAIL', 'DISPATCH_STATS']) {
+  for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {
     assert.equal(all.split(`"${p}"`).length - 1, 1, `${p} 应在生产制造菜单里恰好出现一次`)
   }
 })

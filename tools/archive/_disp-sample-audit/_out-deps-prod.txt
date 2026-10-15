@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-deps.sql ==
+  | v_dispatch_detail | VIEW | 
+  | v_dispatch_stats | VIEW | 
+[OK] _q-deps.sql (2 batches)
