@@ -1,0 +1,15 @@
+﻿SET NOCOUNT ON;
+SELECT 'ZDGL 数据字典' AS 面板, COUNT(*) AS 行数 FROM bs_dict
+UNION ALL SELECT 'ROUTE 工艺路线', COUNT(*) FROM bs_route
+UNION ALL SELECT 'INV 商品', COUNT(*) FROM bs_inv
+UNION ALL SELECT 'MANU_ORDER 生产工单', COUNT(*) FROM bl_manu_order
+UNION ALL SELECT 'WO_REPORT_LIST 报工记录', COUNT(*) FROM scjl
+UNION ALL SELECT 'PROD_ABN 生产异常处理单', COUNT(*) FROM bd_prod_abn
+UNION ALL SELECT 'QC_INSP 来料检验单', COUNT(*) FROM qc_insp_detail
+UNION ALL SELECT 'QC_INSP_REC 检验数据记录', COUNT(*) FROM qc_insp_rec_detail
+UNION ALL SELECT 'PURCHASE_IN 采购入库单', COUNT(*) FROM bl_purchase_in
+UNION ALL SELECT 'STOCK_STATUS 库存状况', COUNT(*) FROM kucun
+UNION ALL SELECT 'FINISH_IN 产成品入库单', COUNT(*) FROM bl_finish_in
+UNION ALL SELECT 'SALE_OUT 销售出库单', COUNT(*) FROM bl_sale_out
+UNION ALL SELECT 'STOCK_LEDGER 库存台账', COUNT(*) FROM v_stock_ledger
+UNION ALL SELECT 'ERPLG ERP导入日志', COUNT(*) FROM erp_imp_log;

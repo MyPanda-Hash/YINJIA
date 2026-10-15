@@ -1,0 +1,15 @@
+panel_code|line_table
+ERPLG|erp_imp_log
+FINISH_IN|bl_finish_in
+INV|bs_inv
+MANU_ORDER|bl_manu_order
+PROD_ABN|bd_prod_abn
+PURCHASE_IN|bl_purchase_in
+QC_INSP|qc_insp_detail
+QC_INSP_REC|qc_insp_rec_detail
+ROUTE|bs_route
+SALE_OUT|bl_sale_out
+STOCK_LEDGER|v_stock_ledger
+STOCK_STATUS|kucun
+WO_REPORT_LIST|scjl
+ZDGL|bs_dict
