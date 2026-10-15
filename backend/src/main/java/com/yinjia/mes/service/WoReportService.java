@@ -303,19 +303,31 @@ public class WoReportService {
         // 就地完成化:补镜像 + 锚定 + 完工状态(草稿行本来就在 scjl,不另插行)
         // 「工单行号」(2026-10-15):权威行键 gd_id 在此写定,行号随之落库 —— 界面直接显示"哪一行",
         //   同工单号多行/多批次时一眼可辨(此前只有批次号,同天多笔转单批次号相同则分不出)。
+        //
+        // 🔴 完工时间口径(2026-10-16 用户口径「完工明细里的完工时间要取**当时完成报工那一刻**的时间」):
+        //   wgsj 必须写**应用所在机器的本地墙钟** {@code LocalDateTime.now()},**不能再用 GETDATE()**。
+        //   根因:SQL Server 跑在 Docker 容器里时容器 TZ=UTC(实测 SYSDATETIMEOFFSET=+00:00),
+        //   GETDATE() 比北京时间慢 8 小时 ⇒ 完工明细上显示 09:5x,而现场是 17:5x。
+        //   实证(HSDZ_MES,报工单 BG-2026-10-0047):同一行 scjl.asp_time1=17:56:23(应用写入,本地)
+        //   而 scjl.wgsj=09:56:39(库写入,UTC),两者本应只差 16 秒。
+        //   列类型 scjl.wgsj=datetime,与 asp_time1/asp_time2 同类型,而 asp_time1 一向由
+        //   ButtonService 用 {@code LocalDateTime.now()} 绑定写入(库里就是本地墙钟)⇒ 同款写法在这里同样成立,
+        //   且本机与服务器(原生 SQL Server,库时钟=本地)两种环境的取值都正确。
+        //   asp_time2 同批同源(留痕时间与完工时刻必须是同一把钟)。
+        java.time.LocalDateTime doneAt = java.time.LocalDateTime.now();
         jdbc.update("UPDATE dbo.scjl SET"
                         + " comm=?, gd_id=?, tm=?, scx=?, scxmc=?, jbbh=?,"
                         + " wzdm=?, mc=?, gg=?, jldw=?, khdm=?, lot_no=?, pl_sl=?,"
                         + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?, [工单行号]=?,"
-                        + " wgzt=N'Y', wgsj=GETDATE(), jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
-                        + " asp_user2=?, asp_time2=GETDATE()"
+                        + " wgzt=N'Y', wgsj=?, jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
+                        + " asp_user2=?, asp_time2=?"
                         + " WHERE id=?",
                 t.get("comm"), t.get("pc_id"), wo, scx, scx,
                 t.get("pc_lb"),
                 t.get("dm"), t.get("mc"), t.get("gg"), t.get("jldw"), t.get("khdm"), t.get("lot_no"), t.get("pl_sl"),
                 t.get("od_no"), t.get("od_xc"), t.get("zl"), t.get("llxz"), t.get("djlx"), t.get("pc_batch"),
                 t.get("pl_xc"),
-                jcNo, user, user, rowId);
+                doneAt, jcNo, user, user, doneAt, rowId);
     }
 
     /**

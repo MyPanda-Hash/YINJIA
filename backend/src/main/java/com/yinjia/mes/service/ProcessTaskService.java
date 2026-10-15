@@ -1084,10 +1084,15 @@ public class ProcessTaskService {
         //   现:**报工只负责"完工状态"**,结案改由 {@link #syncCloseState} 按
         //   「组装成品检验单已审核通过 且 入库≥排产」单独判定(在入库/检验的审核与弃审时重算)。
         //   ⇒ 这里**不再动 ja**(保持原值,人工结案/取消结案仍由生产工单页负责)。
+        // 🔴 完工时刻取**应用本地墙钟**(2026-10-16,与 scjl.wgsj 同口径,见 WoReportService.complete()):
+        //   GETDATE() 在 Docker(容器 TZ=UTC)下比北京时间慢 8 小时 ⇒ 工单行的完工时间会写成 8 小时前,
+        //   而首件检验单的「生产日期」正是取这一列(FirstInspBackfill),凌晨完工会被算成**前一天**。
+        //   语义不变:只在该行**首次**进入「生产完工」时写(ISNULL 保留原值 = 当时那一刻),退回在制即清空。
+        java.time.LocalDateTime doneAt = java.time.LocalDateTime.now();
         jdbc.update("UPDATE dbo.plang SET 当前工序=?, 当前工序完工量=?, 完工状态=?,"
-                        + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, GETDATE()) ELSE NULL END,"
-                        + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                cur, round(curQty), state, state, user, id);
+                        + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, ?) ELSE NULL END,"
+                        + " asp_user2=?, asp_time2=? WHERE id=?",
+                cur, round(curQty), state, state, doneAt, user, doneAt, id);
         if (prodDone) assignProductionBatch(id, no, user, String.valueOf(t.get("原完工状态")));
     }
 
