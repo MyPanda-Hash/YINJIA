@@ -190,11 +190,10 @@
                 @click="openStageDialog(row)"
               >{{ progressText(row) }}</span>
               <span v-else class="ps-cell-text">—</span>
-              <!-- 产品开发情况(用户口径「在状态显示对应的产品信息表的开发情况」):
-                   纯文字状态,不在这里放按钮(按钮在右边的「产品开发」列) -->
-              <div v-if="devStateOf(row).count" class="ps-dev-state" :class="{ done: devStateOf(row).allDone }">
-                {{ devStateText(row) }}
-              </div>
+              <!-- 2026-10-16 用户口径:「原来的小按钮删掉,现在还在」——
+                   原先这里还挂了一行产品开发情况的小标签,与「产品开发」列的按钮重复
+                   (而且 11px 小字看着就像状态文字/小按钮)⇒ 整行撤掉,开发情况只由
+                   「产品开发」列那个按钮承载(未开发/未归档时它是置灰的,同样看得见)。 -->
             </td>
             <td class="c-tester">
               <el-input v-if="editable" v-model="row[K['测试情况']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
@@ -1232,10 +1231,8 @@ defineExpose({ exportProgressExcel })
 .psd-next { color: #1677ff; }
 .psd-table :deep(.el-table__cell) { font-size: 12px; }
 .psd-empty { padding: 18px 4px; color: #909399; font-size: 13px; }
-/* ---- 产品开发(「产品开发」列上的按钮 + 状态列里的开发情况文字 + 弹窗里的产品卡片与流程节点)---- */
+/* ---- 产品开发(「产品开发」列上的按钮 + 弹窗里的产品卡片与流程节点)---- */
 .psd-warn { color: #e6a23c; }
-.ps-dev-state { margin-top: 3px; font-size: 12px; color: #0d5bd3; }
-.ps-dev-state.done { color: #2e7d32; }
 .ps-dev-tip { margin-top: 2px; font-size: 11px; color: #a8abb2; }
 .ps-dev-card { border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
 .ps-dev-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
