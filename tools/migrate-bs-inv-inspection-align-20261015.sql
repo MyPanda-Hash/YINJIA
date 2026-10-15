@@ -54,16 +54,22 @@ END
 ELSE PRINT N'[SKIP] 旧计算列 是否来料检验 已不在,无需回填';
 GO
 
-/* ═══ ③ 面板字段:INV 是否来料检验 → 来料检验(place/seq/可见性对齐服务器) ═══ */
+/* ═══ ③ 面板字段:INV 是否来料检验 → 来料检验(place/seq/可见性对齐服务器) ═══
+       ⚠ WHERE 必须**新旧名都匹配**(2026-10-15 拉取云端后 DbSync 实测):
+       只写 `col_name = N'是否来料检验'` 时,一旦该行**已被改名为 来料检验**(本机两账套即是:
+       早前的另一次改名只落了 col_name/label,没落 hidden),重跑就匹配 0 行 ⇒ hidden 永远补不上,
+       自检 ③ 恒 FAIL、脚本永远登记不进 yj_schema_log(DbSync 卡死在这一条)。
+       面板字段的改名**必须按目标态收敛**(同 ④),否则"幂等"只是空话。 */
 UPDATE yj_field SET col_name = N'来料检验', label = N'来料检验',
        data_type = N'文本', place = N'detail', seq = 44, editable = 0, visible = 1, hidden = 1
- WHERE panel_code = 'INV' AND col_name = N'是否来料检验';
+ WHERE panel_code = 'INV' AND col_name IN (N'是否来料检验', N'来料检验');
 PRINT N'[字段] INV·是否来料检验 → 来料检验: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
 GO
 
-/* ═══ ④ 面板字段:INV 检验方式 → 商品类型(服务器口径:文本、无字典;只动 INV,别的面板有自己的同名列) ═══ */
+/* ═══ ④ 面板字段:INV 检验方式 → 商品类型(服务器口径:文本、无字典;只动 INV,别的面板有自己的同名列)
+       同样按**新旧名都匹配**收敛(理由见 ③) ═══ */
 UPDATE yj_field SET col_name = N'商品类型', label = N'商品类型', data_type = N'文本', dict_sql = NULL
- WHERE panel_code = 'INV' AND col_name = N'检验方式';
+ WHERE panel_code = 'INV' AND col_name IN (N'检验方式', N'商品类型');
 PRINT N'[字段] INV·检验方式 → 商品类型: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
 GO
 
