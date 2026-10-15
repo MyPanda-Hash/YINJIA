@@ -95,7 +95,7 @@ await ev(`(() => {
 })()`)
 await sleep(5000)
 const count2 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
-console.log(`    未勾选=${count0}(应 1611 全部) → 勾恒亿仓=${count1}(应 612) → 再点取消=${count2}(应回到 1611)`)
+console.log(`    未勾选=${count0}(应 1535 全部) → 勾恒亿仓=${count1}(应 587) → 再点取消=${count2}(应回到 1535)`)
 // 勾「华北工控仓 CK00006」(展开断言的目标行 YJ-SX-043/CK00006 在 CK00006 下,列表按更新时间倒序 ⇒ 在第 1 页)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('CK00006'));

@@ -221,39 +221,33 @@ public class StockMonthCloseService {
             lines.add(ln);
         }
 
-        // ④ 写结转单(inh):**按 (物料编码, 仓库编码) 汇总、不带批号** ——
-        //    用户 2026-10-15 口径:「月结是没有批号的,而且月结应该是一个月只有一次的所有数量的月结」
-        //    ⇒ 一个月的月结只有一套结转行(单据编号 JZ-YYYYMM 一份),每行是"该仓该物料**全部批号**的期末合计",
-        //      批号留空。先删同期间旧的结转行,保证重跑/重新月结都只有一份。
-        Map<String, Agg> byItem = new LinkedHashMap<>();
-        Map<String, Key> itemKey = new LinkedHashMap<>();
+        // ④ 写结转单(inh):**按 (物料编码, 仓库编码, 批号) 一行、批号照实写**;并且**只保留本月这一套结转**。
+        //    用户 2026-10-15 第十三轮口径:
+        //      · 「月结也要分不同批次号的月结,而且月结要带有批次号」⇒ 行按批次号拆,批号照实写(无批号的键留空);
+        //      · 「每次月结要把上月月结数量带入进去,只显示前一个月的月结…只需要留有 9 月的月结,之前的 8 月月结不需要了」
+        //        ⇒ ① 本月结转数量 = 该批次**至今累计期末**,而上月结转数量本身就是上月期末余额
+        //             (期初 = 单据日期 < 本月 1 号的流水净额)⇒「把上月月结数量带入进去」天然成立;
+        //          ② **删掉其它期间的结转行**(JZ-其它) ⇒ 台账只挂本月一套结转标记。
+        //             安全:结转行被 v_stock_movement、kucun 重算、FIFO 队列**全部排除**(见各处 `<> CARRY_TYPE`),
+        //             删旧标记不动任何数字。
+        //      · 「该批次号的数据月结后数量为 0,就是删除这个批次号」⇒ 期末结存为 0 的批次**不写结转行**
+        //        (kucun 侧同口径删除见 reconcileKucun 的零余额清理)。
+        int deletedOther = jdbc.update("DELETE FROM inh WHERE 单据类型 = ? AND 单据编号 <> ?", CARRY_TYPE, no);
+        int deleted = jdbc.update("DELETE FROM inh WHERE 单据类型 = ? AND 单据编号 = ?", CARRY_TYPE, no);
+        int carryRows = 0;
         for (Map.Entry<Key, Agg> e : aggs.entrySet()) {
             Key k = e.getKey();
             Agg a = e.getValue();
-            String gid = k.wz + "\u0001" + k.ck;
-            Agg t = byItem.computeIfAbsent(gid, x -> new Agg());
-            t.opening = t.opening.add(a.opening);
-            t.in = t.in.add(a.in);
-            t.out = t.out.add(a.out);
-            t.end = t.end.add(a.end);
-            if (t.price == null) t.price = a.price;
-            if (t.name == null) { t.name = a.name; t.spec = a.spec; t.uom = a.uom; t.whName = a.whName; }
-            itemKey.putIfAbsent(gid, k);
-        }
-        int deleted = jdbc.update("DELETE FROM inh WHERE 单据类型 = ? AND 单据编号 = ?", CARRY_TYPE, no);
-        int carryRows = 0;
-        for (Map.Entry<String, Agg> e : byItem.entrySet()) {
-            Agg a = e.getValue();
-            if (a.end.signum() == 0) continue;
-            Key k = itemKey.get(e.getKey());
+            if (a.end.signum() == 0) continue;   // 数量为 0 ⇒ 不写结转行(= 这个批次号不留痕)
             jdbc.update("INSERT INTO inh (src, rid, 单据编号, 单据类型, 单据日期, 物料编码, 物料名称, 规格型号,"
                             + " 计量单位, 仓库编码, 仓库名称, 批号, 数量, 单价, 金额, 经手人, asp_user1, asp_time1, asp_cancel)"
-                            + " VALUES (0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, GETDATE(), 'N')",
+                            + " VALUES (0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), 'N')",
                     no, CARRY_TYPE, java.sql.Date.valueOf(carryDate), k.wz, a.name, a.spec, a.uom, k.ck, a.whName,
-                    a.end, a.price,
+                    k.lot.isEmpty() ? null : k.lot, a.end, a.price,
                     a.price == null ? null : a.price.multiply(a.end), "月结:" + user, "monthclose:" + user);
             carryRows++;
         }
+        log.info("[月结] {} 结转行 {} 条(已清其它期间结转行 {} 条)", p, carryRows, deletedOther);
 
         // ⑤ kucun:有则改、无则增(幂等重算到期末)
         int[] kc = reconcileKucun(endEx, user);
@@ -285,6 +279,7 @@ public class StockMonthCloseService {
         out.put("kucun新增", kc[0]);
         out.put("kucun更新", kc[1]);
         out.put("kucun清理孤儿行", kc[2]);
+        out.put("kucun删除零余额行", kc[3]);
         out.put("缺批号出库行", fifo.blankRows);
         out.put("缺批号回写行", fifo.writtenBack);
         out.put("跨批未回写行", fifo.crossLot);
@@ -455,7 +450,7 @@ public class StockMonthCloseService {
      * 只处理流水里出现过的键(不做全表刷),**外加**一步孤儿行清零(见方法内注释)。
      * 必须在 FIFO 回写之后调用(见类注释的计算顺序)。
      *
-     * @return {@code [新增行数, 更新行数, 孤儿清零行数]}
+     * @return {@code [新增行数, 更新行数, 孤儿清零行数, 零余额删除行数]}
      */
     private int[] reconcileKucun(LocalDate endEx, String user) {
         // ⚠ 性能(2026-10-15 用户报「取消后再月结超时」):第一版是**逐个键** UPDATE/INSERT ——
@@ -481,11 +476,19 @@ public class StockMonthCloseService {
         int ins = jdbc.update(
                 "INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, ckl, yl, asp_user1, asp_time1, asp_cancel)"
                         + " SELECT a.w, a.c, NULLIF(a.l, N''), GETDATE(), a.cum_in, a.cum_out, a.yl, ?, GETDATE(), 'N'"
-                        + " FROM (" + agg + ") a WHERE a.w <> N'' AND a.c <> N''"
+                        + " FROM (" + agg + ") a WHERE a.w <> N'' AND a.c <> N'' AND a.yl <> 0"   // 零余额键不重建(用户:数量为 0 就删除这个批次号)
                         + "   AND NOT EXISTS (SELECT 1 FROM kucun k WHERE k.wzdm = a.w AND ISNULL(RTRIM(k.ckdm), N'') = a.c"
                         + "        AND ISNULL(RTRIM(k.lot_no), N'') = a.l)",
                 "monthclose:" + user, endEx, endEx);
-        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
+        // 零余额键清理(用户 2026-10-15 第十三轮:「该批次号的数据月结后数量为 0,就是删除这个批次号」)——
+        //   某 (物料,仓库,批号) 截至期末的累计余额为 0 ⇒ 从 kucun **删除该行**(批次号不再出现在库存明细里)。
+        //   与上面两条配套:INSERT 只补非零键,所以删除是稳定的(不会下个月结又冒出来)。
+        //   ⚠ 代价:该批次的「累计入库量/累计出库量」历史也随之从明细里消失(报表读的就是 kucun);
+        //     若 (仓库,存货) 下**所有**批次都为 0,这一行整行消失 —— 这是"库存明细只列有余额的行"的口径。
+        int zeroPurged = jdbc.update(
+                "DELETE k FROM kucun k JOIN (" + agg + ") a"
+                        + " ON a.w = k.wzdm AND a.c = ISNULL(RTRIM(k.ckdm), N'') AND a.l = ISNULL(RTRIM(k.lot_no), N'')"
+                        + " WHERE a.yl = 0 AND a.w <> N'' AND a.c <> N''", endEx, endEx);        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
         //   (StockLedgerService.apply 在同一事务里既改 kucun 又写 inh/outh)⇒ 一个 `asp_user1 LIKE 'stock:%'`
         //   的键如果在流水里**一条都没有**,只可能是「流水被改了批号(换键)」留下的残影:
         //   重算只做 upsert、不清旧键 ⇒ 同一批货会在新旧两个键上各算一次(实测正式库 260 行 / +135 万)。
@@ -503,7 +506,7 @@ public class StockMonthCloseService {
                         + "        AND ISNULL(RTRIM(y.批号),N'') = ISNULL(RTRIM(kucun.lot_no),N'')"
                         + "        AND ISNULL(y.asp_cancel,'N') <> 'Y' AND y.单据日期 < ?)",
                 "orphan-purge:" + user, endEx, endEx);
-        return new int[]{ins, upd, purged};
+        return new int[]{ins, upd, purged, zeroPurged};
     }
 
     // ==================== 展开明细(报表用) ====================
@@ -581,8 +584,13 @@ public class StockMonthCloseService {
         //   结转行本身不进累计口径(v_stock_movement 已排除),所以这里只是"看单据",不参与任何合计。
         //   ⚠ 第八轮曾只留结转行(用户当时截图口径),第十二轮按用户要求把当月单据加回 —— 别再删了。
         rows.addAll(flowRows(curStart, curEndEx, w, c, lotArg));
-        rows.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("单据日期")))
-                .thenComparing(r -> String.valueOf(r.get("单据类型"))));
+        // 排序(用户 2026-10-15 第十三轮):「每个分类根据批次号再做一次展开,如同一批次号,
+        //   第一个是月结,后面是当月的单据」⇒ **按批次号分组**,组内**月结行排第一**,其余按日期、单号。
+        rows.sort(Comparator
+                .comparing((Map<String, Object> r) -> String.valueOf(r.get("批号")))
+                .thenComparing(r -> String.valueOf(r.get("单据类型")).contains("月结") ? 0 : 1)
+                .thenComparing(r -> String.valueOf(r.get("单据日期")))
+                .thenComparing(r -> String.valueOf(r.get("单据编号"))));
         out.put("单据明细", rows);
         return out;
     }
