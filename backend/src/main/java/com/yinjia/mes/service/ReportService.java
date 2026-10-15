@@ -539,7 +539,7 @@ public class ReportService {
             if (!sector.equals(str(r.get("表区")))) continue;
             String v = str(r.get("实测数值"));
             if (v.isEmpty()) {
-                for (int i = 1; i <= 5 && v.isEmpty(); i++) v = num(r.get("测量值" + i));
+                for (int i = 1; i <= MEASURE_SLOTS && v.isEmpty(); i++) v = num(r.get("测量值" + i));
             }
             out.add(v);
             if (out.size() >= max) break;
@@ -548,22 +548,34 @@ public class ReportService {
     }
 
     /**
+     * 「测量值N」物理列的上限(2026-10-16:制程检验单明细测量值列 5 → 10,见
+     * {@code tools/migrate-qc-proc-insp-measure10.sql})。
+     *
+     * <p>⚠ 只放宽**读取**上限:纸质模板 {@code qc_proc_insp.jrxml} 的尺寸/重量仍是**固定 5 格**
+     * (照受控纸质表版式),第 6..10 格不会出现在打印件上 —— 要改版式得另开模板工单。
+     * 取值循环按本常量读到 10,是为了「首值优先」这类判断不因列表变长而漏读。
+     */
+    private static final int MEASURE_SLOTS = 10;
+
+    /**
      * 取某表区的「实测值」,摊平成一个列表(最多 5 个,对应截图的 5 格)。
      *
-     * <p>取值优先级(2026-10-12 加「测量值1..5」列后):
+     * <p>取值优先级(2026-10-12 加「测量值1..5」列、2026-10-16 扩到 1..10 后):
      * <ol>
-     *   <li>优先读结构化列 {@code 测量值1..5}(面板上就是 5 个录入格),
+     *   <li>优先读结构化列 {@code 测量值1..N}(面板上就是 N 个录入格),
      *       同一行有多个值时全部摊平(如尺寸行 外径 填了 5 个格 ⇒ 5 个值);</li>
      *   <li>取不到再回退到旧文本列 {@code 实测数值},按 "/" 拆(兼容历史数据)。</li>
      * </ol>
+     * <p>⚠ 上限 5 是**纸质模板的格数**({@code qc_proc_insp.jrxml} 尺寸/重量各 5 格),
+     * 不是数据上限:模板之外的格这里不产出参数,免得摊平后串位。
      */
     private static List<String> splitParts(List<Map<String, ?>> rows, String sector) {
         List<String> out = new ArrayList<>();
         if (rows == null) return out;
-        // ① 结构化列优先:同表区每行的 测量值1..5 依次摊平
+        // ① 结构化列优先:同表区每行的 测量值1..N 依次摊平(超出模板格数的丢掉)
         for (Map<String, ?> r : rows) {
             if (!sector.equals(str(r.get("表区")))) continue;
-            for (int i = 1; i <= 5; i++) {
+            for (int i = 1; i <= MEASURE_SLOTS; i++) {
                 Object v = r.get("测量值" + i);
                 if (v == null) continue;
                 String t = num(v);
@@ -628,9 +640,9 @@ public class ReportService {
         return sb.toString();
     }
 
-    /** 单个明细行的实测值:优先 测量值1..5(取首个非空非零),回退 实测数值 文本 */
+    /** 单个明细行的实测值:优先 测量值1..N(取首个非空非零),回退 实测数值 文本 */
     private static String firstMeasure(Map<String, ?> r) {
-        for (int i = 1; i <= 5; i++) {
+        for (int i = 1; i <= MEASURE_SLOTS; i++) {
             Object v = r.get("测量值" + i);
             if (v == null) continue;
             String t = num(v);

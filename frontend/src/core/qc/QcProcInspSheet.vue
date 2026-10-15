@@ -1,19 +1,32 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表 · 分组横表版
-       版式照用户提供的表格图:
-         标题 → 抬头(一行 2 组,标签蓝底) → 分区带「检验结果」 →
-         **分组横表**:左侧固定列为单据要素,各「表区」横向并排、组名横跨本组各列,
-         右侧「结果判断」 → ＋新增检验项 → 检验结论 / 处理意见 / 检验人 | 审核人
+       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表 · 「一个检验项目 = 一列」版
 
-       ⚠ 组类别(定性/定量)由**表区名**判定,不看数据 ——
-         上一版按「该组行里有没有测量值」推断,新建行恒为空 ⇒ 恒判为定性 ⇒
-         测量值格永远没有输入框(即"填不了"的根因)。现规则:
-           · 表区名含 尺寸/重量/厚度/直径/长度/宽度/高度 → 定量组:
-             子列 = 项目 + 测量值1..5,行 = 该组各检验项目
-           · 其余(外观/性能/卫生安全…) → 定性组:
-             子列 = 该组各检验项目名,格 = 该项目的「实测数值」
-         组名可自由维护;要换判定的关键词只需改 QUANT_KEYS。
+       用户口径(2026-10-16):
+         「让当前检验项目可以选择多少格框线,再让当前框线可以增加」
+         「当前表可以不实现增加行,只需要保持原有的列增加和列表格增加」
+         拍板甲-1:一个检验项目 = 一列,列内格数可加减。
+         「对需要几个数据量填写就有几个数据列…当前就预设10个测量数据列,当不使用到数据列的情况下
+           就不激活当前的数据列,让当前的检验项目可以选择多少个数据列」
+         ⇒ 物理列预置 测量值1..10(值真落库),界面**只渲染本条「格数」用到的前 N 格**(1..10),
+            未用到的格既不渲染也不激活;要几格点列头 −/＋。
+
+       版式照纸质《制程检验记录表》:
+         标题 → 抬头 → 分区带「检验结果」→ **分组横表**
+           · 左侧固定列(检验时间/客户名称/产品编码/型号/批号/抽检总量)= 整表**一行**数据;
+           · 每个「表区」= 一组列,组名横跨本组各列;
+           · **每个「检验项目」占一列**,列头填项目名,列内格数由本行「格数」决定(1..10);
+           · 右侧「结果判断」= 头字段 总结论。
+         → (原「检验项目明细」表已按用户 2026-10-16 口径**删除**)
+         → 检验结论 / 处理意见 / 检验人 | 审核人
+
+       ⚠ 组类别(定量/定性)由**表区名**判定,不看数据(新建行恒为空,按数据推断会永远判错):
+           · 表区名含 尺寸/重量/厚度/直径/长度/宽度/高度 → 定量:第 k 格 = 测量值k(小数列)
+           · 其余(外观/性能/卫生安全…)                    → 定性:第 k 格 = 实测数值 按 "/" 拆的第 k 段
+         要换判定的关键词只改 QUANT_KEYS。
+
+       ⚠ 新增只有两种,没有「加行」:组内「＋」= 加一列(一个检验项目)、分区带右上「＋新增表区」= 加一张表。
+       格数落库在 qc_proc_insp_detail.格数(yj_field 登记 hidden=1/visible=0:值照存照取,不进列表列)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="qr-sheet">
     <!-- ① 标题 -->
@@ -53,29 +66,68 @@
       </tbody>
     </table>
 
-    <!-- ③ 分区带 -->
+    <!-- ③ 分区带(右上角两个动作:新增表区 / 带入检验项目) -->
     <div class="qr-band">
       <span class="qr-band-title">{{ tt('检验结果') }}</span>
-      <span v-if="editable" class="qr-band-act no-print" @click="emit('open-items')">
-        ⧉ {{ tt('带入检验项目') }}
+      <span v-if="editable" class="qr-band-acts no-print">
+        <span class="qr-band-act2" @click="addGroup()">＋ {{ tt('新增表区') }}</span>
+        <span class="qr-band-act2" @click="emit('open-items')">⧉ {{ tt('带入检验项目') }}</span>
       </span>
     </div>
 
-    <!-- ④ 分组横表 -->
+    <!-- ④ 分组横表:一个检验项目 = 一列,列内格数由「格数」决定(可加减) -->
     <table class="qr-grid">
       <thead>
         <tr>
-          <th v-for="c in fixedCols" :key="c.k" rowspan="2" class="c-fixed">{{ tt(c.label) }}</th>
+          <th v-for="c in fixedCols" :key="c.k" :rowspan="groups.length ? 2 : 1" class="c-fixed">
+            {{ tt(c.label) }}
+          </th>
           <th v-for="g in groups" :key="g.sector" :colspan="g.cols.length" class="c-group">
             {{ g.title }}
-            <span v-if="editable" class="qr-grp-add no-print" :title="tt('在本表区新增一项（定性组=加一列，定量组=加一行）')" @click.stop="addInGroup(g)">＋</span>
+            <span
+              v-if="editable"
+              class="qr-grp-add no-print"
+              :title="tt('在本表区新增一个检验项目（加一列）')"
+              @click.stop="addItemInGroup(g)"
+            >＋</span>
           </th>
-          <th rowspan="2" class="c-fixed">{{ tt('结果判断') }}</th>
+          <th :rowspan="groups.length ? 2 : 1" class="c-fixed">{{ tt('结果判断') }}</th>
           <th v-if="editable && groups.length" rowspan="2" class="c-op"></th>
         </tr>
-        <tr>
+        <tr v-if="groups.length">
           <template v-for="g in groups" :key="'sc' + g.sector">
-            <th v-for="c in g.cols" :key="'sc' + g.sector + c.k" class="c-sub">{{ c.label }}</th>
+            <th v-for="c in g.cols" :key="'sc' + c.uid" class="c-sub c-item-hd" :title="itemTip(c)">
+              <el-input
+                v-if="editable"
+                v-model="c.row['检验项目']"
+                size="small"
+                class="qr-cell-input"
+                maxlength="100"
+                @input="emit('dirty')"
+              />
+              <span v-else class="qr-cell-text">{{ c.row['检验项目'] || '' }}</span>
+              <span v-if="editable" class="qr-cells no-print">
+                <span
+                  class="qr-cells-btn"
+                  :class="{ off: c.cells <= 1 }"
+                  :title="tt('减一格')"
+                  @click.stop="stepCells(c, -1)"
+                >−</span>
+                <span class="qr-cells-n" :title="tt('格数')">{{ c.cells }}</span>
+                <span
+                  class="qr-cells-btn"
+                  :class="{ off: c.cells >= MAX_CELLS }"
+                  :title="tt('加一格')"
+                  @click.stop="stepCells(c, 1)"
+                >＋</span>
+              </span>
+              <span
+                v-if="editable"
+                class="qr-item-del no-print"
+                :title="tt('删除本项')"
+                @click.stop="removeItem(c)"
+              >×</span>
+            </th>
           </template>
         </tr>
       </thead>
@@ -94,18 +146,18 @@
             </td>
           </template>
           <template v-for="g in groups" :key="'g' + g.sector + ri">
-            <td v-for="c in g.cols" :key="'g' + g.sector + ri + c.k" class="c-val">
-              <template v-if="cellRow(g, c, ri)">
+            <template v-for="c in g.cols" :key="'g' + g.sector + ri + c.uid">
+              <td v-if="ri <= c.cells" class="c-val" :rowspan="cellSpan(c, ri)">
                 <el-input
                   v-if="editable"
-                  v-model="cellRow(g, c, ri)[g.quant ? c.prop : '实测数值']"
+                  :model-value="cellValue(c, ri)"
                   size="small"
                   class="qr-cell-input qr-cell-wrap"
-                  @input="emit('dirty')"
+                  @input="setCell(c, ri, $event)"
                 />
-                <span v-else class="qr-cell-text">{{ cellText(g, c, ri) }}</span>
-              </template>
-            </td>
+                <span v-else class="qr-cell-text">{{ cellValue(c, ri) }}</span>
+              </td>
+            </template>
           </template>
           <td v-if="ri === 1" class="c-fixed" :rowspan="rowCount">
             <el-input
@@ -121,70 +173,13 @@
         </tr>
         <tr v-if="!groups.length">
           <td :colspan="fixedCols.length + 2 + (editable ? 1 : 0)" class="c-empty">
-            {{ editable ? tt('暂无检验项，点击下方按钮新增') : tt('暂无检验项') }}
+            {{ editable ? tt('暂无检验项，点右上「＋新增表区」开始') : tt('暂无检验项') }}
           </td>
         </tr>
       </tbody>
     </table>
 
-    <!-- ④b 待归类检验项目:纵向(一行一项)—— 新增的行表区为空,先落在这里,
-         填上表区即自动并入上方横表对应分组(避免塞进窄组列里没法填) -->
-    <div v-if="ungroupedRows.length" class="qr-band qr-band-sub">
-      <span class="qr-band-title">{{ tt('待归类检验项目') }}</span>
-      <span class="qr-band-hint">{{ tt('填上「表区」后自动并入上方对应分组') }}</span>
-    </div>
-    <table v-if="ungroupedRows.length" class="qr-ungroup">
-      <thead>
-        <tr>
-          <th class="c-sector">{{ tt('表区') }}</th>
-          <th class="c-item">{{ tt('检验项目') }}</th>
-          <th class="c-req">{{ tt('检验要求') }}</th>
-          <th class="c-method">{{ tt('检验方法') }}</th>
-          <th v-for="m in MEASURE" :key="'um' + m" class="c-mv">{{ tt(m) }}</th>
-          <th class="c-judge">{{ tt('单项判定') }}</th>
-          <th v-if="editable" class="c-op"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(row, i) in ungroupedRows" :key="row.id ?? ('u' + i)">
-          <td class="c-sector">
-            <el-input v-if="editable" v-model="row['表区']" size="small" class="qr-cell-input" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row['表区'] || '' }}</span>
-          </td>
-          <td class="c-item">
-            <el-input v-if="editable" v-model="row['检验项目']" size="small" class="qr-cell-input" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row['检验项目'] || '' }}</span>
-          </td>
-          <td class="c-req">
-            <el-input v-if="editable" v-model="row['检验要求']" size="small" class="qr-cell-input qr-cell-wrap" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row['检验要求'] || '' }}</span>
-          </td>
-          <td class="c-method">
-            <el-input v-if="editable" v-model="row['检验方法']" size="small" class="qr-cell-input qr-cell-wrap" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row['检验方法'] || '' }}</span>
-          </td>
-          <td v-for="m in MEASURE" :key="'uv' + m" class="c-mv">
-            <el-input v-if="editable" v-model="row[m]" size="small" class="qr-cell-input" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ num(row[m]) }}</span>
-          </td>
-          <td class="c-judge">
-            <el-input v-if="editable" v-model="row['单项判定']" size="small" class="qr-cell-input" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row['单项判定'] || '' }}</span>
-          </td>
-          <td v-if="editable" class="c-op">
-            <span class="qr-del no-print" :title="tt('删除本行')" @click="removeRow(row)">×</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- ⑤ ＋新增检验项 -->
-    <div v-if="editable" class="qr-add-row no-print">
-      <span class="qr-add-btn" @click="addRow()">＋ {{ tt('新增检验项') }}</span>
-      <span class="qr-add-btn" style="margin-left:8px" @click="addGroup()">＋ {{ tt('新增表区') }}</span>
-    </div>
-
-    <!-- ⑥ 结论区 -->
+    <!-- ⑤ 结论区 -->
     <table class="qr-foot-table">
       <tbody>
         <tr>
@@ -241,14 +236,20 @@ const props = defineProps({
 })
 const emit = defineEmits(['dirty', 'open-items'])
 
-const MEASURE = ['测量值1', '测量值2', '测量值3', '测量值4', '测量值5']
+/** 定量项(表区名含这些词)的格 = 结构化列 测量值1..10;定性项的格 = 实测数值 按 "/" 拆的段 */
+const MEASURE = [
+  '测量值1', '测量值2', '测量值3', '测量值4', '测量值5',
+  '测量值6', '测量值7', '测量值8', '测量值9', '测量值10',
+]
+/** 物理列预置 10 个(2026-10-16 用户口径「当前就预设10个测量数据列」),界面只渲染用到的前 N 格 */
+const MAX_CELLS = MEASURE.length
+/** 新建检验项的默认格数(定量项):沿用老口径 5 格;要几格点列头 −/＋ 自己调(1..10)。
+ *  ⚠ 刻意不取 MAX_CELLS ——「不使用到数据列的情况下就不激活」,新项一上来铺满 10 格等于全激活。 */
+const DEFAULT_QUANT_CELLS = 5
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-/** 表区名含这些词 => 定量组(项目 + 测量值1..5);否则定性组(按项目名分列) */
 const QUANT_KEYS = ['尺寸', '重量', '厚度', '直径', '长度', '宽度', '高度']
-/** 表区为空时的暂存组名:保证新增行可见、可填表区 */
-const UNGROUPED = '未分类'
 
-/** 左侧固定列(照用户图:检验时间 | 客户名称 | 产品编码 | 型号(mm) | 批号 | 抽检总量) */
+/** 左侧固定列(照纸质表:检验时间 | 客户名称 | 产品编码 | 型号(mm) | 批号 | 抽检总量);整表就一行 */
 const fixedCols = [
   { k: '检验时间', label: '检验时间', key: '检验时间' },
   { k: '客户名称', label: '客户名称', key: '客户名称' },
@@ -270,12 +271,18 @@ const items = computed(() => {
 })
 
 /** 取(必要时创建)明细数组 —— 照 QcInspRecSheet addItem:
-    新建单据 head.detail 可能是 {} 或 {tabs:[…]} 而**没有 items**,
-    此前用「找 detail 下第一个数组」会拿到 null 直接 return ⇒ 点新增无反应。 */
+    新建单据 head.detail 可能是 {} 或 {tabs:[…]} 而**没有 items**。 */
 function ensureItems() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
   return d.items
+}
+
+/** 稳定的行键(v-for key 用;新建行没有 id,用本地序号,免得按索引复用 DOM) */
+let uidSeq = 0
+function uidOf(row) {
+  if (!row.__uid) row.__uid = 'q' + (++uidSeq)
+  return row.__uid
 }
 
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
@@ -283,9 +290,9 @@ const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataN
 const HEAD_SKIP = new Set([
   ...fixedCols.map((c) => c.key),
   '单据状态', '处理方式', '表区', '行号', '检验项目', '检验要求',
-  '检验方法', '检查频率', '检验仪器', '抽检量', '实测数值', '测量值1', '测量值2',
-  '测量值3', '测量值4', '测量值5', '单项判定', '不合格应对措施', '不良数量',
-  '结果判断', '备注2', '备注', '总结论', '检验员', '审核人', '审核时间',
+  '检验方法', '检查频率', '检验仪器', '抽检量', '实测数值', ...MEASURE, '单项判定',
+  '不合格应对措施', '不良数量',
+  '结果判断', '备注2', '备注', '总结论', '检验员', '审核人', '审核时间', '格数',
 ])
 const headRows = computed(() => {
   const names = (props.fields || [])
@@ -296,54 +303,117 @@ const headRows = computed(() => {
   return rows
 })
 
-/** 按「表区」分组;组类由表区名判定(不看数据) */
+/** 表区名 → 定量组?(只看名字,不看数据 —— 新建行恒为空,按数据推断会永远判错) */
+function isQuant(sector) {
+  const s = String(sector ?? '')
+  return QUANT_KEYS.some((k) => s.includes(k))
+}
+
+/** 数值列 → 显示串(去尾零;0 视为未填,与报表 ReportService.num 同口径) */
+function numText(v) {
+  if (v === undefined || v === null) return ''
+  const s = String(v).trim()
+  if (!s) return ''
+  if (/^-?\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s)
+    return n === 0 ? '' : String(n)
+  }
+  return s
+}
+
+/** 定性项的格值 = 实测数值 按 "/" 拆的段 */
+function segsOf(row) {
+  const raw = String(row['实测数值'] ?? '').trim()
+  return raw ? raw.split('/').map((s) => s.trim()) : []
+}
+
+/** 本行的格数:优先读落库的「格数」;取不到按老口径推(定量=已填到第几格或默认 5 格,定性=段数或 1) */
+function cellCount(row, quant) {
+  const n = Number(row['格数'])
+  if (Number.isFinite(n) && n > 0) return Math.min(Math.max(Math.round(n), 1), MAX_CELLS)
+  if (quant) {
+    let last = 0
+    MEASURE.forEach((m, i) => { if (numText(row[m])) last = i + 1 })
+    return last || DEFAULT_QUANT_CELLS
+  }
+  return Math.max(segsOf(row).length, 1)
+}
+
+/** 按「表区」分组:组 = 横向并排的一张表,组里**每一项 = 一列** */
 const groups = computed(() => {
+  bump.value
   const order = []
   const map = new Map()
   for (const r of items.value) {
-    // ⚠ 表区为空的行**必须也渲染**:新增出来的行表区就是空的,
-    //   此前 continue 跳过 => 行虽然 push 进去了却永远看不见、也就永远填不了表区(死循环)。
     const s = String(r['表区'] ?? '').trim()
-    if (!s) continue // 空表区 = 待归类,走下方纵向表(横表只放已成组的)
+    if (!s) continue // 空表区 = 还没归类,只在下方「检验项目明细」里可见/可改
     if (!map.has(s)) { map.set(s, []); order.push(s) }
     map.get(s).push(r)
   }
   return order.map((s, i) => {
-    const rs = map.get(s)
-    const quant = QUANT_KEYS.some((k) => s.includes(k))
-    const cols = quant
-      ? [{ k: '项目', label: '项目' }].concat(
-          MEASURE.map((m) => ({ k: m, label: m, prop: m })))
-      : rs.map((r, j) => ({ k: 'i' + j, label: String(r['检验项目'] || ''), itemIdx: j }))
-    return { sector: s, title: s === UNGROUPED ? tt(s) : (LETTERS[i] || '') + '.' + tt(s), cols, rows: rs, quant }
+    const quant = isQuant(s)
+    const cols = map.get(s).map((r) => ({ row: r, uid: uidOf(r), quant, cells: cellCount(r, quant) }))
+    return { sector: s, quant, title: (LETTERS[i] || '') + '.' + tt(s), cols }
   })
 })
 
-/** 待归类行(表区为空):纵向表格显示,填上表区后自动并入上方横表对应组 */
-const ungroupedRows = computed(() => {
-  bump.value
-  return items.value.filter((r) => !String(r['表区'] ?? '').trim())
-})
-
+/** 横表行数 = 所有列里最长的格数(整表共用一行数据,左固定列纵向合并) */
 const rowCount = computed(() => {
   let n = 1
-  for (const g of groups.value) n = Math.max(n, g.quant ? g.rows.length : 1)
+  for (const g of groups.value) for (const c of g.cols) n = Math.max(n, c.cells)
   return n
 })
 
-/** 单元格对应的明细行:定性组按项目下标,定量组按行号 */
-function cellRow(g, c, ri) {
-  if (!g.quant) return c.itemIdx != null ? (g.rows[c.itemIdx] || null) : null
-  return g.rows[ri - 1] || null
+/** 第 ri 格占几行:最后一格吞掉余下的行,列与列之间边框才对齐(照纸质表的合并格) */
+function cellSpan(c, ri) {
+  return ri === c.cells ? rowCount.value - c.cells + 1 : 1
 }
 
-function cellText(g, c, ri) {
-  const r = cellRow(g, c, ri)
-  if (!r) return ''
-  const v = g.quant ? r[c.prop] : r['实测数值']
-  if (v === undefined || v === null || String(v).trim() === '') return ''
-  const s = String(v).trim()
-  return /^-?\d+(\.\d+)?$/.test(s) ? String(Number(s)) : s
+/** 单元格值:定量 = 测量值k;定性 = 实测数值 的第 k 段 */
+function cellValue(c, ri) {
+  if (c.quant) return numText(c.row['测量值' + ri])
+  return segsOf(c.row)[ri - 1] || ''
+}
+
+/** 单元格录入:定量写 测量值k;定性写回 实测数值(按 "/" 拼,尾部空段不留) */
+function setCell(c, ri, v) {
+  const val = String(v ?? '')
+  if (c.quant) {
+    c.row['测量值' + ri] = val.trim() === '' ? null : val
+  } else {
+    const segs = segsOf(c.row)
+    while (segs.length < c.cells) segs.push('')
+    segs[ri - 1] = val
+    while (segs.length && !String(segs[segs.length - 1]).trim()) segs.pop()
+    c.row['实测数值'] = segs.join('/')
+  }
+  emit('dirty')
+}
+
+/** 列头加减格数(减格时把被撤掉的格清干净,免得留下"看不见的旧值"被报表读走) */
+function stepCells(c, delta) {
+  const next = Math.min(Math.max(c.cells + delta, 1), MAX_CELLS)
+  if (next === c.cells) return
+  c.row['格数'] = next
+  if (next < c.cells) {
+    if (c.quant) {
+      for (let k = next + 1; k <= MAX_CELLS; k++) c.row['测量值' + k] = null
+    } else {
+      c.row['实测数值'] = segsOf(c.row).slice(0, next).join('/')
+    }
+  }
+  bump.value++
+  emit('dirty')
+}
+
+/** 列头 tooltip:检验要求 / 检验方法(横表只放实测值,标准要求在这里看) */
+function itemTip(c) {
+  const out = []
+  const req = String(c.row['检验要求'] ?? '').trim()
+  const mtd = String(c.row['检验方法'] ?? '').trim()
+  if (req) out.push(tt('检验要求') + '：' + req)
+  if (mtd) out.push(tt('检验方法') + '：' + mtd)
+  return out.join('\n')
 }
 
 function isDateKey(k) {
@@ -355,22 +425,23 @@ function isLockedKey(k) {
   return !f || f.editable === false || f.editable === 0
 }
 
-/** 追加一行检验项目(表区留空,由用户填;填了表区即自动成组) */
-function addRow() {
-  ensureItems().push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+/** 组内新增一个检验项目(= 该组加一列) */
+function addItemInGroup(g) {
+  if (!g) return
+  ensureItems().push({ 表区: g.sector, 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '', 格数: g.quant ? DEFAULT_QUANT_CELLS : 1 })
   bump.value++      // 明细非响应式:手动强制刷新
   emit('dirty')
 }
 
-/** 组内新增一项:定性组表现为**加一列**,定量组表现为**加一行** */
-function addInGroup(g) {
-  if (!g) return
-  ensureItems().push({ 表区: g.sector, 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
-  bump.value++
-  emit('dirty')
+/** 删除一个检验项目(= 删掉那一列) */
+function removeItem(c) {
+  if (!c) return
+  const arr = ensureItems()
+  const i = arr.indexOf(c.row)
+  if (i >= 0) { arr.splice(i, 1); bump.value++; emit('dirty') }
 }
 
-/** 新增表区(加一整组列):让用户输入表区名,再建一行挂到该表区 */
+/** 新增表区(加一整组列):让用户输入表区名,再建一列挂到该表区 */
 async function addGroup() {
   let name = ''
   try {
@@ -382,27 +453,8 @@ async function addGroup() {
     name = String(r.value || '').trim()
   } catch { return }
   if (!name) return
-  ensureItems().push({ 表区: name, 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+  ensureItems().push({ 表区: name, 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '', 格数: isQuant(name) ? DEFAULT_QUANT_CELLS : 1 })
   bump.value++
-  emit('dirty')
-}
-
-/** 删除单行(待归类纵向表用) */
-function removeRow(row) {
-  const arr = ensureItems()
-  const i = arr.indexOf(row)
-  if (i >= 0) { arr.splice(i, 1); bump.value++; emit('dirty') }
-}
-
-/** 删除一个表区的全部行 */
-function removeGroup(g) {
-  if (!g) return
-  const arr = ensureItems()
-  for (const r of [...g.rows]) {
-    const i = arr.indexOf(r)
-    if (i >= 0) arr.splice(i, 1)
-  }
-  bump.value++      // 同上:手动强制刷新
   emit('dirty')
 }
 </script>
@@ -460,25 +512,20 @@ function removeGroup(g) {
   font-weight: 700;
   color: #1f4e79;
 }
-.qr-band-sub {
-  margin-top: 10px;
-}
-.qr-band-hint {
-  margin-left: 10px;
-  font-size: 11px;
-  font-weight: 400;
-  color: #5b7fa6;
-}
-.qr-band-act {
+/* 分区带右上角动作:新增表区 / 带入检验项目 */
+.qr-band-acts {
   position: absolute;
   right: 8px;
   top: 3px;
+}
+.qr-band-act2 {
+  margin-left: 12px;
   font-size: 12px;
   font-weight: 400;
   color: #2b6cb0;
   cursor: pointer;
 }
-.qr-band-act:hover {
+.qr-band-act2:hover {
   text-decoration: underline;
 }
 /* 分组横表 */
@@ -515,31 +562,54 @@ function removeGroup(g) {
   background: #fbfdff;
   font-weight: 500;
 }
+/* 列头(一项一列):项目名 + 格数加减 */
+.c-item-hd {
+  position: relative;
+}
+.qr-cells {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #2b6cb0;
+}
+.qr-cells-btn {
+  display: inline-block;
+  width: 16px;
+  line-height: 14px;
+  border: 1px solid #9db8d2;
+  border-radius: 2px;
+  cursor: pointer;
+  user-select: none;
+  background: #fff;
+}
+.qr-cells-btn:hover {
+  border-color: #5b9bd5;
+  background: #f2f8ff;
+}
+.qr-cells-btn.off {
+  color: #c2cbd6;
+  border-color: #dde4ec;
+  cursor: default;
+}
+.qr-cells-btn.off:hover {
+  background: #fff;
+}
+.qr-cells-n {
+  display: inline-block;
+  min-width: 16px;
+  margin: 0 4px;
+}
+.qr-item-del {
+  position: absolute;
+  right: 2px;
+  top: 0;
+  font-weight: 700;
+  color: #f56c6c;
+  cursor: pointer;
+}
 .c-op {
   width: 34px;
-}
-/* 待归类纵向表:与横表同观感,但列宽按自身需要 */
-/* 待归类纵向表:补齐边框(此前 .qr-table 样式随横表改名 .qr-grid 一并丢失,导致无框) */
-.qr-ungroup {
-  margin-top: 6px;
-  border-collapse: collapse;
-  width: 100%;
-  table-layout: fixed;
-  font-size: 12px;
-}
-.qr-ungroup th,
-.qr-ungroup td {
-  border: 1px solid #b8cfe6;
-  padding: 2px 4px;
-  min-height: 26px;
-  text-align: center;
-  vertical-align: middle;
-  word-break: break-all;
-}
-.qr-ungroup thead th {
-  background: #dce9f5;
-  color: #1f4e79;
-  font-weight: 600;
 }
 .c-empty {
   color: #8a94a0;
@@ -553,29 +623,6 @@ function removeGroup(g) {
 }
 .qr-grp-add:hover {
   color: #1f4e79;
-}
-.qr-del {
-  color: #f56c6c;
-  cursor: pointer;
-  font-weight: 700;
-}
-/* ＋新增检验项 */
-.qr-add-row {
-  padding: 8px 0 10px;
-}
-.qr-add-btn {
-  display: inline-block;
-  border: 1px dashed #9db8d2;
-  border-radius: 3px;
-  padding: 4px 14px;
-  color: #2b6cb0;
-  cursor: pointer;
-  font-size: 12px;
-  background: #fbfdff;
-}
-.qr-add-btn:hover {
-  border-color: #5b9bd5;
-  background: #f2f8ff;
 }
 /* 输入控件:方角、贴合单元格(以格子边框为唯一框) */
 .qr-cell-input :deep(.el-input__wrapper),

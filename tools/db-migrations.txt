@@ -3091,5 +3091,24 @@ migrate-page-panel-perms-20261016.sql
 hide-qc-proc-insp-spare-head-fields.sql
 migrate-insp-pass-qty-consistency-20261015.sql
 
+# ── 2026-10-16 制程检验单横表改「一个检验项目 = 一列,列内格数可加减」 ──
+#   用户口径:①「让当前检验项目可以选择多少格框线,再让当前框线可以增加」②「当前表可以不实现增加行,
+#     只需要保持原有的列增加和列表格增加」③ 拍板甲-1:一个检验项目 = 一列,列内格数可加减。
+#   ⇒ 每个检验项目(明细行)自带「格数」(1..5):定量项第 k 格 = 测量值k(已有列),
+#     定性项第 k 格 = 实测数值按 "/" 拆的第 k 段;新增只有「组内＋(加一列)」与「＋新增表区(加一张表)」。
+#   本脚本:加 qc_proc_insp_detail.格数 int + 中文注明 + yj_field(hidden=1/visible=0,值照存照取但不进列表列)
+#     + en 译名 + 存量回填(尺寸/重量类 5 格,其余 1 格)。幂等(COL_LENGTH 判空);两账套均执行。
+migrate-qc-proc-insp-cell-count.sql
+
+# ── 2026-10-16 制程检验单测量值列 5 → 10(「预设10个测量数据列,用到几格激活几格」) ──
+#   用户口径:「对需要几个数据量填写就有几个数据列…当前就预设10个测量数据列,当不使用到数据列
+#     的情况下就不激活当前的数据列,让当前的检验项目可以选择多少个数据列」。
+#   ⇒ 物理列预置 测量值1..10(值真落库,yj_field 登记),界面按每条明细的「格数」(1..10)只渲染用到的格,
+#     未用到的格既不渲染也不激活;格数上限由 5 放宽到 10(列注明同步更正)。
+#   前置:migrate-qc-proc-insp-cell-count.sql(格数列)与 migrate-qc-proc-insp-measure-cols.sql(1..5)。
+#   本脚本:加 测量值6..10 decimal(18,4) + 中文注明 + yj_field(seq 82..86) + en 译名(Measured 6..10)。
+#   幂等(COL_LENGTH 判空);两账套均执行。
+migrate-qc-proc-insp-measure10.sql
+
 # 排产表原有数量回填:只补按 plang_id 精确关联的零数量,保留历史非零分批量与排产身份。
 migrate-plangpc-schedule-quantity.sql
