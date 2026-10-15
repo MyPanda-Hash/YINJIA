@@ -1546,6 +1546,11 @@ public class ButtonService {
         if (!auditor.equals(shrAfter == null ? "" : String.valueOf(shrAfter))) {
             throw new IllegalStateException("单据已被他人审核，请刷新后查看");
         }
+        // 审核留痕(2026-10-17):与提交/通过/驳回/弃审写**同一张** yj_form_approval,
+        // 否则「审批情况」里看不到直接审核 —— 研发管理那套动作(提交/通过/驳回/会签/弃审…)全都有留痕,
+        // 直审是唯一漏网的;制程检验单只有直审这一条路 ⇒ 不补就是"审了但查不到谁审的、意见是什么"。
+        // 位置在竞态守卫**之后**:被守卫挡下的那次不该留痕。
+        recordApproval(def.code(), no, "AUDIT", "APPROVED", auditOpinionOf(formData));
         // 批次号自洽(2026-10-04 口径:批次号在**生单那一刻**就写在单头+全部明细行,不再有"入库审核取号回填"):
         // 保存后把单头值同步到全部明细行、缺号则按「供应商编码 + 当天」取号、顺批次键补齐历史台账。
         // 位置在库存过账**之前** —— kucun.lot_no 的口径是"批次号优先、批号兜底"(见 StockLedgerService.loadRows)。
@@ -2356,6 +2361,21 @@ public class ButtonService {
     }
 
     /**
+     * 直接「审核」的意见取值(2026-10-17)。
+     *
+     * <p>为什么不能直接用 {@link #opinionOf}:它只认「审批意见」,而前端直审弹窗(人工审核确认)填的是
+     * **「审核意见」**(PanelxList 的 审核 分支把 `auditOpinion` 放进载荷),照 opinionOf 取会恒为空 ——
+     * 于是留痕里"动作有了、意见丢了"。两个键都认,审核意见优先。
+     */
+    private String auditOpinionOf(Map<String, Object> formData) {
+        for (String k : new String[]{"审核意见", "审批意见"}) {
+            Object v = formData == null ? null : formData.get(k);
+            if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v).trim();
+        }
+        return "";
+    }
+
+    /**
      * 「申请修改」的修改原因(2026-09-30)。
      * 需求原文(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 2 条):「修改:不需要反审核,
      * 只需填写修改原因」;用户口径:「改完需要再审核」—— 故只在申请环节补这一格,审批闭环不动。
@@ -2368,8 +2388,11 @@ public class ButtonService {
     }
 
     public List<Map<String, Object>> queryApprovalHistory(String panelCode, String formNo) {
+        // 按**时间**排序而不是 id(2026-10-17):历史补录(migrate-qc-proc-insp-audit-trail-20261017.sql)
+        // 是后插的行,id 比当时的弃审行大 —— 按 id 排会把"审核 → 弃审"显示成"弃审 → 审核"(时间倒挂)。
+        // 同一秒内多行用 id 兜底定序。
         return jdbc.query("SELECT action, result, node_no, operator, opinion, create_time FROM yj_form_approval"
-                        + " WHERE panel_code = ? AND form_no = ? ORDER BY id ASC",
+                        + " WHERE panel_code = ? AND form_no = ? ORDER BY create_time ASC, id ASC",
                 (rs, i) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("action", rs.getString("action"));
@@ -2900,7 +2923,7 @@ public class ButtonService {
     private void firstInspGenerate(Map<String, Object> r, String repNo, String user) {
         String wo = str(r.get("工单号"));
         String batch = str(r.get("批次号"));
-        if (wo.isEmpty() || batch.isEmpty()) return;              // 没有批次就谈不上"本批第一张"
+        if (wo.isEmpty()) return; // 首件按工单号+工单行号幂等,完工批次可为空
         long curId = r.get("id") instanceof Number n ? n.longValue() : 0L;
 
         // 工单行:优先 scjl.[工单行号](2026-10-15 起审核时写定),缺了用 gd_id/批次反查
@@ -2916,18 +2939,18 @@ public class ButtonService {
         Integer prior = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM dbo.scjl s"
                         + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                        + "   AND s.id<>? AND ISNULL(s.[批次号],N'')=?"
+                        + "   AND s.id<>?"
                         + "   AND (? = 0"
                         + "        OR ISNULL(s.[工单行号],0) = ?"
                         + "        OR (? > 0 AND EXISTS (SELECT 1 FROM dbo.plang_pc pc"
                         + "                              WHERE pc.id = s.gd_id AND pc.plang_id = ?)))",
-                Integer.class, wo, curId, batch, xc, xc, plangRowId, plangRowId);
+                Integer.class, wo, curId, xc, xc, plangRowId, plangRowId);
         if (prior != null && prior > 0) return;                   // 本批已有更早的已审核报工 ⇒ 首件已过
 
         Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM dbo." + FIRST_INSP_HEAD
-                        + " WHERE 工单号=? AND ISNULL(批次号,N'')=? AND ISNULL(工单行号,0)=?"
+                        + " WHERE 工单号=? AND ISNULL(工单行号,0)=?"
                         + "   AND ISNULL(asp_cancel,'N')<>'Y'",
-                Integer.class, wo, batch, xc);
+                Integer.class, wo, xc);
         if (dup != null && dup > 0) return;                       // 幂等
 
         String today = LocalDate.now().toString();

@@ -125,9 +125,8 @@ public class QuickScheduleService {
         double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
         if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
-        // 工单号/行号/批次号(2026-09-28 客户拍板:批次号=纯日期):同订单共用工单号;行号=订单行号;
-        // 批次号=转单当日 yyyyMMdd,**不加尾缀**——同天多笔转单各自成行(plang.id=行身份),
-        // 行级关联锚=plang_pc.plang_id,同批次号互不串;分段区分靠 创建时间+生产线(分段弹窗展示)。
+        // 工单号+工单行号确定唯一工单行;生产批次号不在转单时生成。
+        // 批次号是完工后的日期属性,不能作为 plang 行身份;身份始终是 plang.id。
         String plNo;
         try {
             plNo = jdbc.queryForObject(
@@ -140,7 +139,7 @@ public class QuickScheduleService {
         // 取号流水在 s_allno(按 前缀+年月 独立序列),不与旧前缀混号。
         if (plNo == null || plNo.isBlank()) plNo = formNo.next("GD", user);
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
-        String batch = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        String batch = null; // 生产批次在工单行首次生产完工时生成
         String due = str(line.get("交货日期"));
         // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),不再是排产数量
         double remain = demand - qty;
@@ -151,12 +150,12 @@ public class QuickScheduleService {
                         + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?, ?)",
                 plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
                 str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, remain, due, due, due,
-                str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch,
+                null, sourceNo, Integer.parseInt(lineId), user, null,
                 // 工单关联工艺路线(2026-10-05):**用订单结转所选,不兜底默认**(用户口径「不需要实现默认选择」);
                 // 未选 = NULL,后续不推导"下一道工序",由经办人补选后再排产
                 (route != null && !route.isBlank()) ? route.trim() : null);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
-                "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
+                "PLANG", plNo, plNo + "#" + lineNo, "");
         return plNo;
     }
 

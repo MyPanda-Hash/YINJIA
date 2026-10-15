@@ -175,17 +175,14 @@ public class WoReportService {
         //   (实测 GD-2026-10-0002:行2/3/4 = GY-2026-10-0003,行1/5/6/7/8 = GY-CB-STD)
         //   ⇒ 给行2 报工时拿的是行1 的路线,工序校验/不跳序判断全落在**别的行**的工序集上
         //   (正确工序被拒 / 错误工序被放行)。现改为取**本行**(工单行id → 批次兜底)的路线。
-        Long repRowId = resolveRowIdForReport(wo, rptBatch);
+        Long repRowId = wantRowId;
+        if (repRowId == null) {
+            throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能审核");
+        }
         List<String> rtRows = repRowId != null
                 ? jdbc.queryForList("SELECT ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?"
                         + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([工艺路线],N'')<>N''", String.class, repRowId)
                 : List.of();
-        if (rtRows.isEmpty()) {
-            // 行定位不到(历史单/没带批次):退回整单口径,与旧行为一致
-            rtRows = jdbc.queryForList(
-                    "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                            + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
-        }
         String route = rtRows.isEmpty() ? "" : rtRows.get(0);
         if (!route.isBlank()) {
             List<String> ops = jdbc.queryForList(

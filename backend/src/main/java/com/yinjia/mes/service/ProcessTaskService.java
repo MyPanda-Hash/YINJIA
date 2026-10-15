@@ -242,8 +242,9 @@ public class ProcessTaskService {
             String op = String.valueOf(r.get("工序")).trim();
             double qty = num(r.get("报工数量")) * sign;
             if (wo.isEmpty() || op.isEmpty() || qty == 0) continue;
-            // 本行(工单号 + 工单行号 = 唯一工单):经 gd_id → plang_pc.plang_id;老数据按批次兜底
-            Long rowId = rowIdOfReport(wo, num(r.get("gd_id")), String.valueOf(r.get("批次号")));
+            // 本行唯一身份只经 gd_id→plang_pc.plang_id；无锚报告不再按批次猜测
+            Long rowId = rowIdOfReport(wo, num(r.get("gd_id")), null);
+             if (rowId == null) throw new IllegalStateException("报工缺少工单行锚点,不能回写工序任务");
             // 报工审核/弃审 → **回写该行状态**(2026-10-05 用户口径「报工需要能影响当前的工单情况」),幂等重算
             syncWorkOrderState(wo, rowId, user);
             List<Map<String, Object>> tasks = jdbc.queryForList(
@@ -270,22 +271,17 @@ public class ProcessTaskService {
     /** 手工重算某工单的任务完成量(按已审核报工重算;数据修复/对账用) */
     @Transactional
     public Map<String, Object> rebuild(String plNo, String user) {
-        List<String> ops = jdbc.queryForList(
-                "SELECT DISTINCT 工序 FROM dbo.wo_progress WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                String.class, plNo);
+        List<Map<String,Object>> targets = jdbc.queryForList(
+                "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", plNo);
         int n = 0;
-        for (String op : ops) {
-            Double done = jdbc.queryForObject(
-                    "SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=? AND gxdm=?"
-                            + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'", Double.class, plNo, op);
-            double d = done == null ? 0 : done;
-            n += jdbc.update("UPDATE dbo.wo_progress SET 完成数量=?, 状态=CASE WHEN ? >= 计划数量 THEN N'已完工'"
-                            + " WHEN ? > 0 THEN N'在加工' ELSE N'待加工' END, asp_user2=?, asp_time2=GETDATE()"
-                            + " WHERE 单据编号=? AND 工序=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                    d, d, d, user, plNo, op);
+        for (Map<String,Object> target : targets) {
+            long rowId = ((Number) target.get("id")).longValue();
+            Map<String,Object> state = jdbc.queryForMap("SELECT pl_sl,rk_sl,[批次号],[工艺路线] FROM dbo.plang WHERE id=?", rowId);
+            syncWorkOrderState(plNo, rowId, user);
+            n += jdbc.update("UPDATE dbo.wo_progress SET asp_user2=?, asp_time2=GETDATE() WHERE 工单行id=? AND ISNULL(asp_cancel,'N')<>'Y'", user, rowId);
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("重算工序数", ops.size());
+        out.put("重算工序数", n);
         out.put("更新行数", n);
         return out;
     }
@@ -979,7 +975,7 @@ public class ProcessTaskService {
                     + " ORDER BY ISNULL(加工顺序,999)", String.class, route));
         }
         if (ops.isEmpty()) ops.addAll(List.of(PROCESS_ORDER));
-        // 本行各工序完工量:锚 scjl.gd_id → plang_pc.plang_id = 本行(老数据空 gd_id 用本行批次兜底)
+        // 本行各工序完工量优先用稳定 gd_id→plang_pc.plang_id；批次仅兼容历史无锚记录。
         Map<String, Double> qty = new LinkedHashMap<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT ISNULL(s.gxdm,N'') AS 工序, SUM(ISNULL(s.sl,0)) AS 完工量 FROM dbo.scjl s"
@@ -999,8 +995,13 @@ public class ProcessTaskService {
         if (allDone) cur = ops.get(ops.size() - 1);
         double curQty = qty.getOrDefault(cur, 0d);
         boolean started = qty.values().stream().anyMatch(v -> v > 0);
-        // 生产完工判定(用户口径):**全部生产工序报工达标**  或  **入库数量达标**
-        boolean prodDone = plan > 0 && (allDone || inQty >= plan - 0.0001);
+        // 生产完工判定:只认本行工艺路线末道；末道计划量按该道换算率计算。
+        String lastOp = ops.get(ops.size() - 1);
+        Double lastRate = route.isEmpty() ? null : jdbc.queryForObject(
+                "SELECT TOP 1 ISNULL(换算率,1) FROM dbo.bs_route WHERE 工艺路线编码=? AND 工序名称=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, route, lastOp);
+        double lastPlan = plan * ((lastRate == null || lastRate <= 0) ? 1 : lastRate);
+        boolean prodDone = plan > 0 && qty.getOrDefault(lastOp, 0d) + 0.0001 >= lastPlan;
         String state = prodDone ? "生产完工" : (started ? "在制" : "未开工");
         // 🔴 2026-10-15 用户口径(报障):「全部报工完成后**不应**变为已结案,员工看到的应是**完工**;
         //   只有**最后组装成品检验完成入库后**才显示结案」。
@@ -1014,6 +1015,27 @@ public class ProcessTaskService {
                         + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, GETDATE()) ELSE NULL END,"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                 cur, round(curQty), state, state, user, id);
+        if (prodDone) assignProductionBatch(id, no, user);
+    }
+
+    /** 首次进入生产完工时生成当天生产批次；工单行 id 是唯一身份，重算/重审复用已有批次。 */
+    private void assignProductionBatch(long rowId, String workOrder, String user) {
+        String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        int changed = jdbc.update("UPDATE dbo.plang SET [批次号]=COALESCE(NULLIF([批次号],N''),?),"
+                        + " asp_user2=?, asp_time2=GETDATE() WHERE id=? AND pl_no=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(完工状态,N'')=N'生产完工'",
+                today, user, rowId, workOrder);
+        if (changed != 1) return;
+        jdbc.update("UPDATE pc SET pc.[批次号]=p.[批次号],pc.asp_user2=?,pc.asp_time2=GETDATE()"
+                        + " FROM dbo.plang_pc pc JOIN dbo.plang p ON p.id=pc.plang_id"
+                        + " WHERE p.id=? AND ISNULL(pc.asp_cancel,'N')<>'Y'", user, rowId);
+        jdbc.update("UPDATE dbo.wo_progress SET [批次号]=p.[批次号],asp_user2=?,asp_time2=GETDATE()"
+                        + " FROM dbo.wo_progress w JOIN dbo.plang p ON p.id=w.工单行id"
+                        + " WHERE w.工单行id=? AND ISNULL(w.asp_cancel,'N')<>'Y'", user, rowId);
+        jdbc.update("UPDATE dbo.scjl SET [批次号]=p.[批次号],asp_user2=?,asp_time2=GETDATE()"
+                        + " FROM dbo.scjl s JOIN dbo.plang_pc pc ON pc.id=s.gd_id"
+                        + " JOIN dbo.plang p ON p.id=pc.plang_id"
+                        + " WHERE p.id=? AND ISNULL(s.asp_cancel,'N')<>'Y'", user, rowId);
     }
 
     /**
