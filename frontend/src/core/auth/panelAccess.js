@@ -47,3 +47,26 @@ export function canConfigFields(user, panelCode) {
   const list = Array.isArray(user.fieldPanels) ? user.fieldPanels : []
   return list.includes('*') || list.includes(code)
 }
+
+/**
+ * 「当前账号能不能配置该面板的库存预警数量(预警配置)」的纯判定。
+ *
+ * 口径(2026-10-15 用户口径):「只有勾了预警配置的角色(或管理员)才能配置库存预警数量。」
+ * ⇒ 权限来自组织架构 →「角色与面板权限」里逐面板勾的「预警配置」列
+ *   (yj_role_panel.perms 的 warn 词,后端 AuthController 下发 warnPanels;管理员一律 ['*'])。
+ *
+ * 与后端真闸门同源:PanelPermissionService.requireWarnConfig(panelCode) 用的就是同一个词,
+ * 前端只做入口显隐 —— 拿不到权限信息时**一律不放行**(宁可看不到编辑入口,也别点下去吃 403)。
+ *
+ * @param {{isAdmin?:boolean, warnPanels?:string[]}|null|undefined} user
+ * @param {string} panelCode
+ * @returns {boolean}
+ */
+export function canConfigWarn(user, panelCode) {
+  const code = String(panelCode ?? '').trim()
+  if (!code) return false
+  if (!user) return false
+  if (user.isAdmin === true) return true
+  const list = Array.isArray(user.warnPanels) ? user.warnPanels : []
+  return list.includes('*') || list.includes(code)
+}

@@ -1113,6 +1113,7 @@ export default {
     '列': 'cols',
     '库存状况表': 'Stock Balance',
     '库存明细': 'Stock Detail',
+    '预警配置': 'Warning Config',
     '预警数量已保存': 'Warning quantity saved',
     '保存预警数量失败': 'Failed to save warning quantity',
     '低于预警': 'Below warning',

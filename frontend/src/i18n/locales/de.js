@@ -330,6 +330,7 @@ export default {
     '列': 'Spalten',
     '库存状况表': 'Lagerbestand',
     '库存明细': 'Bestandsdetail',
+    '预警配置': 'Warnkonfiguration',
     '预警数量已保存': 'Warnmenge gespeichert',
     '保存预警数量失败': 'Warnmenge konnte nicht gespeichert werden',
     '低于预警': 'Unter Warnwert',

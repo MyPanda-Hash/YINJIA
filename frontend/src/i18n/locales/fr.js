@@ -327,6 +327,7 @@ export default {
     '列': 'col.',
     '库存状况表': 'État du Stock',
     '库存明细': 'Détail du Stock',
+    '预警配置': 'Configuration des alertes',
     '预警数量已保存': 'Quantité d’alerte enregistrée',
     '保存预警数量失败': 'Échec de l’enregistrement de la quantité d’alerte',
     '低于预警': 'Sous le seuil d’alerte',

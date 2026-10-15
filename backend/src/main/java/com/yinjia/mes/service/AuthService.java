@@ -79,6 +79,14 @@ public class AuthService {
         return panelsWithPerm(admin, roleId, "field");
     }
 
+    /**
+     * 持有「预警配置」(warn)词的面板码(2026-10-15 库存预警数量配置权,机制同 fieldPanelsOf)。
+     * 管理员返回 `*`(= 全部,前端 canConfigWarn 认这个通配);普通用户 = 角色在该面板勾了「预警配置」。
+     */
+    public List<String> warnPanelsOf(boolean admin, Object roleId) {
+        return panelsWithPerm(admin, roleId, "warn");
+    }
+
     /** 持有指定权限词的面板码(通用实现;权限词见 yj_role_panel.perms 的 csv 约定) */
     public List<String> panelsWithPerm(boolean admin, Object roleId, String word) {
         if (admin) return List.of("*");

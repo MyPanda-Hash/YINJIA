@@ -85,6 +85,10 @@ public class AuthController {
             // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
             // PanelPermissionService.requireFieldConfig(同词 = field)。
             user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
+            // 库存预警数量配置权限面板(2026-10-15,同 field 机制):管理员=全部;普通用户=角色勾了「预警配置」的面板。
+            // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
+            // PanelPermissionService.requireWarnConfig(同词 = warn)。
+            user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
             Map<String, Object> out = new HashMap<>();
             out.put("token", jwtUtil.generate(username, factory));
             out.put("user", user);
@@ -103,6 +107,7 @@ public class AuthController {
         out.put("visiblePanels", user.get("visiblePanels"));
         out.put("approvePanels", user.get("approvePanels"));
         out.put("fieldPanels", user.get("fieldPanels"));
+        out.put("warnPanels", user.get("warnPanels"));
         return ApiResult.ok(out);
     }
 
@@ -165,6 +170,7 @@ public class AuthController {
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
+        user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
         return user;
     }
 

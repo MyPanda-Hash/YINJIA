@@ -43,7 +43,7 @@ public class PanelPermissionService {
     private static final Map<String, String> PERM_LABEL = Map.of(
             "view", "可见", "query", "查询单据", "add", "新增保存", "modify", "申请修改",
             "modlog", "修改记录", "del", "删除申请", "export", "导出打印", "audit", "审批",
-            "field", "自定义字段");
+            "field", "自定义字段", "warn", "预警配置");
 
     static {
         Map<String, String[]> m = new HashMap<>();
@@ -55,12 +55,19 @@ public class PanelPermissionService {
         // 编辑类(新增保存/申请修改 词表语义)
         String[] edit = {"add", "modify"};
         for (String b : new String[]{"保存", "提交", "保存新增", "保存为草稿", "新增流程", "新增", "复制",
-                "阶段完成", "生成产品批号", "新增库存", "更新预警数量", "产品开发", "申请终止",
+                "阶段完成", "生成产品批号", "新增库存", "产品开发", "申请终止",
                 // 生产工单:首件完成通知(置首件标志+通知品质);排产入口=排产工作台(挂"保存"权)。
                 // 「生成采购申请」(原 ManuPurchaseReqHandler 按 BOM×排产−库存结转)已随 BOM 下架移除(2026-10-04):
                 // 前端已无该按钮,下面的词表条目仅为历史按钮行兜底,不再有对应处理器
                 "首件完成通知", "生成采购申请"})
             m.put(b, edit);
+        // 库存预警数量配置(2026-10-15 用户口径):不再吃编辑权(add/modify),单独要求「预警配置」(warn)词 ——
+        // 在组织架构「角色与面板权限」里逐面板勾,与自定义字段(field)同一张矩阵;管理员恒过。
+        // 入口 = 库存状况行内编辑(本词条,ButtonService.updateStockWarn)、库存明细展开区按批次设置
+        // (StockWarnController /api/stock/warn/set,同函数 requireWarnConfig 把关)。
+        m.put("更新预警数量", new String[]{"warn"});
+        m.put("设置预警数量", new String[]{"warn"});
+        m.put("预警配置", new String[]{"warn"});
         m.put("申请修改", new String[]{"modify"});                       // 词表:modify=申请修改
         // 删除类(草稿直删需编辑权;归档单删除申请=del)
         m.put("删除", new String[]{"add", "modify", "del"});
@@ -276,5 +283,28 @@ public class PanelPermissionService {
         if (panelCode == null || panelCode.isBlank())
             throw new org.springframework.security.access.AccessDeniedException("面板编码不能为空");
         requireAnyPerm(panelCode, "自定义字段", PERM_FIELD);
+    }
+
+    /** 「预警配置」权限词(与 SysAdminController.PERMISSION_ACTIONS 的 warn 同源) */
+    public static final String PERM_WARN = "warn";
+
+    /**
+     * 库存预警数量配置权校验(2026-10-15 用户口径,机制同 {@link #requireFieldConfig}):
+     * 「只有勾了预警配置的角色(或管理员)才能配置库存预警数量。」
+     *
+     * <p>写入口两个,共用本闸门(管理员恒过,普通用户要求该面板 perms 含 warn):
+     * <ol>
+     *   <li>库存状况行内编辑「更新预警数量」→ ButtonService.updateStockWarn(经
+     *       {@link #requireButton} 的 BUTTON_PERMS 词条 {"warn"});</li>
+     *   <li>库存明细展开区按批次号设置 → StockWarnController POST /api/stock/warn/set
+     *       → 本方法(StockWarnService 的业务逻辑不动)。</li>
+     * </ol>
+     * 配预警只是改 kucun.[预警数量] 这个出库审批拦截阈值,不生成/不改单据,故与 field 词同为
+     * 「逐面板授予的配置权」,落在同一张 yj_role_panel.perms 矩阵里。
+     */
+    public void requireWarnConfig(String panelCode) {
+        if (panelCode == null || panelCode.isBlank())
+            throw new org.springframework.security.access.AccessDeniedException("面板编码不能为空");
+        requireAnyPerm(panelCode, "预警配置", PERM_WARN);
     }
 }

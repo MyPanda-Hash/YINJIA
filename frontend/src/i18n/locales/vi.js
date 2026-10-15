@@ -317,6 +317,7 @@ export default {
     '列': 'cột',
     '库存状况表': 'Tình trạng kho',
     '库存明细': 'Chi tiết tồn kho',
+    '预警配置': 'Cấu hình cảnh báo',
     '预警数量已保存': 'Đã lưu số lượng cảnh báo',
     '保存预警数量失败': 'Lưu số lượng cảnh báo thất bại',
     '低于预警': 'Dưới ngưỡng cảnh báo',
