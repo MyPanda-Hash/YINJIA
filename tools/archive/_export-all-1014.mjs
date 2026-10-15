@@ -50,17 +50,24 @@ const DOCS = [['bd_pu_order', 'bl_pu_order'], ['bd_so_order', 'bl_so_order'], ['
 const res = []
 console.log('— 8 类单据(头 + 行)—')
 for (const [h, l] of DOCS) {
-  res.push(await dump(h, `单据日期 >= '${FROM}'`))
-  res.push(await dump(l, `单据编号 IN (SELECT 单据编号 FROM ${h} WHERE 单据日期 >= '${FROM}')`))
+  // ⚠ 采购入库单只导**金蝶同步**的(asp_user1='试运行');库里保留原样,不删
+  const w = h === 'bd_purchase_in' ? `单据日期 >= '${FROM}' AND asp_user1 = N'试运行'` : `单据日期 >= '${FROM}'`
+  res.push(await dump(h, w))
+  res.push(await dump(l, `单据编号 IN (SELECT 单据编号 FROM ${h} WHERE ${w})`))
 }
 console.log('— 流转单据 —')
+// 来料检验单/检验记录:只导**真实流转**(对应采购订单商品 bs_inv.来料检验='是')
+const IJ_OK = `暂收单号 IN (SELECT sl.单据编号 FROM sl_recv sl
+    JOIN bl_pu_order l ON l.单据编号 = sl.采购订单号 AND ISNULL(l.asp_cancel,'N') <> 'Y'
+    JOIN bs_inv iv ON iv.存货编码 = l.物料编码 WHERE ISNULL(iv.来料检验,N'') = N'是')`
 res.push(await dump('sl_recv', `单据日期 >= '${FROM}'`))
 res.push(await dump('sl_recv_detail', `单据编号 IN (SELECT 单据编号 FROM sl_recv WHERE 单据日期 >= '${FROM}')`))
-res.push(await dump('qc_insp', `单据日期 >= '${FROM}'`))
-res.push(await dump('qc_insp_detail', `单据编号 IN (SELECT 单据编号 FROM qc_insp WHERE 单据日期 >= '${FROM}')`))
+res.push(await dump('qc_insp', `单据日期 >= '${FROM}' AND ${IJ_OK}`))
+res.push(await dump('qc_insp_detail', `单据编号 IN (SELECT 单据编号 FROM qc_insp WHERE 单据日期 >= '${FROM}' AND ${IJ_OK})`))
 res.push(await dump('qc_insp_rec', `单据日期 >= '${FROM}'`))
 res.push(await dump('qc_insp_rec_detail', `单据编号 IN (SELECT 单据编号 FROM qc_insp_rec WHERE 单据日期 >= '${FROM}')`))
-res.push(await dump('qc_insp_req', `ISNULL(文件编码,N'') = N'QR-QC-001'`))
+res.push(await dump('qc_insp_req', `ISNULL(文件编码,N'') = N'QR-QC-001' AND 物料编号 IN (
+    SELECT l.物料编码 FROM bl_pu_order l JOIN bs_inv iv ON iv.存货编码 = l.物料编码 WHERE ISNULL(iv.来料检验,N'') = N'是')`))
 res.push(await dump('plang', `pl_date >= '${FROM}'`))
 res.push(await dump('form_flow_link', `create_time >= '${FROM}'`))
 // 状态留痕:覆盖以上所有单号(+ 面板白名单,避免把无关面板的全表带出)
