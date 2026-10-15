@@ -1738,9 +1738,15 @@ public class PanelConfigService {
             }
             out.put("tabPools", tabPools);
             out.put("tabs", tabs);
+            out.put("poolAvailable", !tabPools.isEmpty());
         } else {
-            out.put("linePool", extPoolOf(def.lineTable()));
-            if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+            List<Map<String, Object>> linePool = extPoolOf(def.lineTable());
+            List<Map<String, Object>> headPool = def.hasHeadTable() ? extPoolOf(def.headTable()) : null;
+            out.put("linePool", linePool);
+            if (headPool != null) out.put("headPool", headPool);
+            // 承载表**一列备用列都没有**(或表不存在)⇒ 这张表加不了自定义字段。
+            // 前端据此显示明确提示并禁用「添加」,而不是让用户吃一个 500(2026-10-16 审计)。
+            out.put("poolAvailable", !linePool.isEmpty() || (headPool != null && !headPool.isEmpty()));
         }
         return out;
     }
@@ -1789,8 +1795,16 @@ public class PanelConfigService {
     private List<Map<String, Object>> extPoolOf(String table) {
         List<Map<String, Object>> pool = new ArrayList<>();
         if (table == null || table.isBlank()) return pool;
+        // 2026-10-16 修:先读该表**实际存在**哪些 备用N 列再逐个探脏行。
+        // 旧写法对不存在的列直接 `SELECT COUNT(*) FROM [表] WHERE [备用1] IS NOT NULL`,承载表没预置备用列
+        // (yj_share_file / qc_fin_spec_head/detail)或表已被删(RD_ASM_BOM/RD_MOLD_FORMULA)时抛
+        // "列名/对象名无效" ⇒ 整个 GET /px/extFields 500,用户在「字段管理」里只看到
+        // 「Request failed with status code 500」且对话框自动关闭(2026-10-16 审计实测)。
+        // 现在:只探存在的列;一列都没有 ⇒ 返回空池(前端据 poolAvailable=false 给明确提示)。
+        java.util.Set<String> spares = spareColsOf(table);
         for (int i = 1; i <= EXT_SPARE_COUNT; i++) {
             String spare = "备用" + i;
+            if (!spares.contains(spare)) continue;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("col", spare);
             List<Map<String, Object>> bound = jdbc.queryForList(
@@ -1805,6 +1819,17 @@ public class PanelConfigService {
             pool.add(m);
         }
         return pool;
+    }
+
+    /**
+     * 该表实际存在的 备用N 列名(表不存在 / 没有该前缀列 → 空集,**绝不抛错**)。
+     * 走 sys.columns + OBJECT_ID():表不存在时 OBJECT_ID 返回 NULL,子查询天然 0 行。
+     */
+    private java.util.Set<String> spareColsOf(String table) {
+        List<String> names = jdbc.queryForList(
+                "SELECT c.name FROM sys.columns c WHERE c.object_id = OBJECT_ID(?) AND c.name LIKE N'备用%'",
+                String.class, table);
+        return new java.util.LinkedHashSet<>(names);
     }
 
     private static String bracket(String ident) {
@@ -1897,8 +1922,16 @@ public class PanelConfigService {
             poolFrom = range[0];
             poolTo = range[1];
         }
+        // 2026-10-16:承载表必须**真的**有备用列。旧写法对每个候选列直接
+        // `SELECT COUNT(*) FROM [表] WHERE [备用N] IS NOT NULL`,表没预置备用列 / 表不存在时抛
+        // "列名无效"/"对象名无效" ⇒ 用户看到的是 500 而不是"这张表不能加字段"。
+        java.util.Set<String> spares = isTabbed(panelCode) ? null : spareColsOf(table);
+        if (spares != null && spares.isEmpty())
+            throw new IllegalStateException("承载表(" + table + ")未预置备用列池(缺少 备用1..20 列),"
+                    + "无法新增自定义字段;请先补列(参考 tools/migrate-share-file-spare-cols-20261016.sql)");
         for (int i = poolFrom; i <= poolTo && chosen == null; i++) {
             String spare = "备用" + i;
+            if (spares != null && !spares.contains(spare)) continue;
             Integer occ = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
                             + "WHERE (p.line_table = ? OR p.head_table = ?) AND f.col_name = ?", Integer.class, table, table, spare);
