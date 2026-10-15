@@ -27,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 //   正式库写的是**金蝶真实单据**(非造数),落库人记为「金蝶同步」;测试库仍记「样例取样」以便区分。
 const TAG = process.env.YINJIA_SAMPLE_TAG || 'test'
 const IS_PROD = TAG === 'prod'
-const SYNC_USER = IS_PROD ? '金蝶同步' : '样例取样'
+const SYNC_USER = IS_PROD ? '试运行' : '样例取样'
 const SUF = IS_PROD ? '-prod' : ''
 const TARGET_DB = process.env.YINJIA_SAMPLE_DB || (IS_PROD ? 'HSDZ_MES' : 'HSDZ_MES_TEST')
 
