@@ -375,7 +375,7 @@
                       </template>
                       <template v-else>
                         <el-input v-if="editable" v-model="head[waterKeys[i]]" size="small" class="rs-c-in" @input="emit('dirty')" />
-                        <span v-else class="rs-txt">{{ head[waterKeys[i]] || '' }}</span>
+                        <AnnotatedText v-else class="rs-txt" :text="head[waterKeys[i]] || ''" :field-key="String(waterKeys[i] || '')" />
                       </template>
                     </td>
                   </tr>
@@ -392,14 +392,14 @@
             <td class="rs-td rs-label">{{ tt('炭棒尺寸') }}</td>
             <td v-for="(cs, i) in cfg.soakColspans" :key="'sv' + i" class="rs-td" :colspan="cs">
               <el-input v-if="editable" v-model="head[soakSizeKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[soakSizeKeys[i]] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :text="head[soakSizeKeys[i]] || ''" :field-key="String(soakSizeKeys[i] || '')" />
             </td>
           </tr>
           <tr>
             <td class="rs-td rs-label">{{ tt('浸泡液用量（ml）') }}</td>
             <td v-for="(cs, i) in cfg.soakColspans" :key="'sv2' + i" class="rs-td" :colspan="cs">
               <el-input v-if="editable" v-model="head[soakVolKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[soakVolKeys[i]] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :text="head[soakVolKeys[i]] || ''" :field-key="String(soakVolKeys[i] || '')" />
             </td>
           </tr>
           <tr>
@@ -411,9 +411,9 @@
           </tr>
           <tr v-for="it in soakInstrumentRows" :key="it.name">
             <td class="rs-td rsp-item-name">{{ tt(it.name) }}</td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[0]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[0]] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[1]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[1]] || '' }}</span></td>
-            <td class="rs-td" :colspan="cfg.soakColspans[2]"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[2]] || '' }}</span></td>
+            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[0]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><AnnotatedText v-else class="rs-txt" :text="head[it.keys[0]] || ''" :field-key="String(it.keys[0] || '')" /></td>
+            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[1]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><AnnotatedText v-else class="rs-txt" :text="head[it.keys[1]] || ''" :field-key="String(it.keys[1] || '')" /></td>
+            <td class="rs-td" :colspan="cfg.soakColspans[2]"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><AnnotatedText v-else class="rs-txt" :text="head[it.keys[2]] || ''" :field-key="String(it.keys[2] || '')" /></td>
           </tr>
         </template>
       </tbody>
@@ -863,7 +863,7 @@
                       </template>
                       <template v-else>
                         <el-input v-if="editable" v-model="head[waterKeys[i]]" size="small" class="rs-c-in" @input="emit('dirty')" />
-                        <span v-else class="rs-txt">{{ head[waterKeys[i]] || '' }}</span>
+                        <AnnotatedText v-else class="rs-txt" :text="head[waterKeys[i]] || ''" :field-key="String(waterKeys[i] || '')" />
                       </template>
                     </td>
                   </tr>
@@ -880,14 +880,14 @@
             <td class="rs-td rs-label">{{ tt('炭棒尺寸') }}</td>
             <td v-for="(cs, i) in cfg.soakColspans" :key="'sv' + i" class="rs-td" :colspan="cs">
               <el-input v-if="editable" v-model="head[soakSizeKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[soakSizeKeys[i]] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :text="head[soakSizeKeys[i]] || ''" :field-key="String(soakSizeKeys[i] || '')" />
             </td>
           </tr>
           <tr>
             <td class="rs-td rs-label">{{ tt('浸泡液用量（ml）') }}</td>
             <td v-for="(cs, i) in cfg.soakColspans" :key="'sv2' + i" class="rs-td" :colspan="cs">
               <el-input v-if="editable" v-model="head[soakVolKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[soakVolKeys[i]] || '' }}</span>
+              <AnnotatedText v-else class="rs-txt" :text="head[soakVolKeys[i]] || ''" :field-key="String(soakVolKeys[i] || '')" />
             </td>
           </tr>
           <tr>
@@ -899,9 +899,9 @@
           </tr>
           <tr v-for="it in soakInstrumentRows" :key="it.name">
             <td class="rs-td rsp-item-name">{{ tt(it.name) }}</td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[0]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[0]] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[1]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[1]] || '' }}</span></td>
-            <td class="rs-td" :colspan="cfg.soakColspans[2]"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[2]] || '' }}</span></td>
+            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[0]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><AnnotatedText v-else class="rs-txt" :text="head[it.keys[0]] || ''" :field-key="String(it.keys[0] || '')" /></td>
+            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[1]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><AnnotatedText v-else class="rs-txt" :text="head[it.keys[1]] || ''" :field-key="String(it.keys[1] || '')" /></td>
+            <td class="rs-td" :colspan="cfg.soakColspans[2]"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><AnnotatedText v-else class="rs-txt" :text="head[it.keys[2]] || ''" :field-key="String(it.keys[2] || '')" /></td>
           </tr>
         </template>
       </tbody>
@@ -1003,7 +1003,7 @@
         <tr>
           <td class="rs-td rs-conclusion" :colspan="nCols">
             <el-input v-if="editable" v-model="head[cfg.conclusion.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head[cfg.conclusion.key] || '' }}</span>
+            <AnnotatedText v-else class="rs-txt" :text="head[cfg.conclusion.key] || ''" :field-key="String(cfg.conclusion.key || '')" />
           </td>
         </tr>
       </tbody>

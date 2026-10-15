@@ -499,6 +499,8 @@ export default {
     '工单闭环率': 'Closed-Loop-Rate von Arbeits aufträgen',
     '标注笔': 'Markierstift',
     '橡皮擦': 'Radiergummi',
+    '在纸面上划选要标注的文字，再选颜色': 'Text auf dem Blatt markieren, dann Farbe wählen',
+    '点击已标注的文字即可擦除': 'Markierten Text anklicken, um die Markierung zu löschen',
     '加粗': 'Fett',
     '已完工工单': 'Abgeschlossene Arbeitsaufträge',
     '近 7 天无新增或完工': 'Keine neuen oder abgeschlossenen Aufträge in 7 Tagen',

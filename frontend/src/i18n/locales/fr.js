@@ -496,6 +496,8 @@ export default {
     '工单闭环率': 'Fermetures des ordres de travail',
     '标注笔': 'Surligneur',
     '橡皮擦': 'Gomme',
+    '在纸面上划选要标注的文字，再选颜色': 'Sélectionnez le texte sur la feuille, puis choisissez une couleur',
+    '点击已标注的文字即可擦除': 'Cliquez sur le texte surligné pour l’effacer',
     '加粗': 'Gras',
     '已完工工单': 'Ordres de travail terminés',
     '近 7 天无新增或完工': 'Aucun ordre nouveau ou terminé en 7 jours',

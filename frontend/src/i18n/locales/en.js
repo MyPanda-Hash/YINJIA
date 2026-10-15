@@ -1301,6 +1301,8 @@ export default {
     '工单闭环率': 'Closure rate',
     '标注笔': 'Marker pen',
     '橡皮擦': 'Eraser',
+    '在纸面上划选要标注的文字，再选颜色': 'Select the text on the sheet, then pick a color',
+    '点击已标注的文字即可擦除': 'Click the marked text to erase it',
     '加粗': 'Bold',
     '已完工工单': 'Completed work orders',
     '近 7 天无新增或完工': 'No new or completed orders in the last 7 days',

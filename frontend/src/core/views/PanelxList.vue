@@ -140,14 +140,14 @@
         <QcCatalogSheet
           v-else-if="panelCode === 'QC_CATALOG'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
         />
         <!-- 来料品质·检验数据记录(QC_INSP_REC):纸张式检验报告,与原表「检验数据记录模版」一比一 -->
         <QcInspRecSheet
           v-else-if="panelCode === 'QC_INSP_REC'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -164,7 +164,7 @@
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -172,12 +172,12 @@
         <RecordSheetPanels
           v-else-if="isRecordSheetPanel"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable" :panel-code="panelCode"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
           :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
@@ -500,6 +500,10 @@
                   :style="annMode === 'eraser' ? 'background:#b94d3f;color:#fff' : ''"
                   @click="toggleAnnMode('eraser')"
                 >{{ tt('橡皮擦') }}</div>
+                <!-- 模式提示(开着才显示):第一次用最常见的卡点就是"点了标注笔以后呢?" -->
+                <div v-if="annMode" class="as-side-hint">
+                  {{ tt(annMode === 'pen' ? '在纸面上划选要标注的文字，再选颜色' : '点击已标注的文字即可擦除') }}
+                </div>
               </template>
             </div>
           </template>
@@ -1189,7 +1193,7 @@
     <template v-else-if="isQcInspReq">
       <div class="qc-insp-wrap" v-loading="loading">
         <QcInspReqSheet
-          :head="cur" :editable="draftEditable" :panel-code="panelCode" :fields="sheetAllFields"
+          :head="cur" :editable="draftEditable && !annOn" :panel-code="panelCode" :fields="sheetAllFields"
           @dirty="markInlineDirty"
           @save="saveInlineDraft('保存')"
           @refresh="load()"
@@ -3542,6 +3546,14 @@ const annPending = ref(null)
 const annBold = ref(false)
 const annBusy = ref(false)
 const annActive = computed(() => !!isRdPanel.value && !!curDocNo.value)
+/**
+ * 标注模式开着吗(标注笔或橡皮擦)。
+ * 它同时是**纸面开关**:标注模式下把交给表组件的 `:editable` 关掉,整张纸切成只读 ——
+ * 否则草稿单的值都在 <input>/<textarea> 里,HTML 无法只给其中几个字上色,
+ * 划选也没有 AnnotatedText 去换算下标 ⇒ 用户点标注笔"没有反应"(2026-10-16 报障的真因)。
+ * 退出模式即恢复可编辑;未保存的值在 cur 里,不因切渲染而丢。
+ */
+const annOn = computed(() => !!isRdPanel.value && annMode.value !== null)
 function setAnnList(list) {
   const m = {}
   for (const a of list || []) {
@@ -3644,11 +3656,13 @@ const draftEditable = computed(() => {
 /** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;**凡配了附件列位的单据,已审核/已完成也允许补附件**
  *  (合同/送货单/检验报告等佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单
  *  本来就是已审核,沿用"审核即锁定"这些单永远传不了附件)。仅「已作废」单据禁止。
- *  名单 = 已配 6 列位的单据:SALE/采购订单、生产工单、委外加工单、生产工单、客户订单
- *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
+ *  名单 = 已配附件列位的单据:SALE/采购订单、生产工单、委外加工单、生产工单、客户订单
+ *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)
+ *  + 立项申请表 RD_APPROVAL(2026-10-16 用户口径「给立项申请表的备注栏加一个可以上传附件的功能」:
+ *    该表只有一个附件列位 rd_approval.[附件1],纸面是文书式,佐证材料同属"审核后仍要补"的一类)。 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
-  'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
+  'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT', 'RD_APPROVAL',
 ])
 const attachEditable = computed(() => {
   if (draftEditable.value) return true
@@ -8654,6 +8668,17 @@ onUnmounted(() => {
   background: #f2f6fa;
   border-color: #b9c9dc;
   color: #2f4d75;
+}
+/* 标注模式的操作提示(开着才显示):「点了标注笔之后要干什么」是第一次用最容易卡住的地方 */
+.as-side-hint {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid #116a5b;
+  background: #f3f8f6;
+  color: #46605a;
+  font-size: 11.5px;
+  line-height: 1.6;
+  border-radius: 0 3px 3px 0;
 }
 .as-side-btn.sub {
   background: transparent;
