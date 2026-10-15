@@ -109,8 +109,8 @@ public class ReportService {
     private final JdbcTemplate jdbc;
     private final Map<String, CompiledTemplate> compiled = new ConcurrentHashMap<>();
 
-    /** 编译缓存条目:DB 模板 update_at 变了即自动重编译(上传即生效免重启) */
-    private record CompiledTemplate(Timestamp updatedAt, JasperReport report) {}
+    /** 编译缓存条目:模板**正文哈希**变了即重编译(上传即生效免重启) */
+    private record CompiledTemplate(Timestamp updatedAt, int textHash, JasperReport report) {}
 
     public ReportService(PanelRegistry registry, QueryService queryService, JdbcTemplate jdbc) {
         this.registry = registry;
@@ -698,15 +698,29 @@ public class ReportService {
         return false;
     }
 
-    /** 编译(带缓存):DB 模板按 update_at 失效重编(上传即生效);classpath 模板进程内一次 */
+    /**
+     * 编译(带缓存):模板**正文哈希**决定是否重编 —— 改库即生效,不必重启。
+     *
+     * <p>🔴 为什么不能只看 {@code update_at}(2026-10-17 实测踩坑):
+     * 手工 INSERT 的模板行 {@code update_at} 为 NULL,而旧判据是
+     * {@code c != null && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))} ⇒ 用缓存
+     * —— 进程一旦编译过一次(哪怕编译的是 classpath 旧模板),**此后改库永不生效**
+     * (实测:改库后导出仍是旧版式,xlsx 字节都不变;制程检验记录表改纵向表时撞到)。
+     * 现在以正文哈希为主判据:{@code jrxmlText} 变了 ⇒ 哈希变了 ⇒ 必重编;
+     * classpath 模板(jrxmlText = null,哈希 0)仍按"同进程内文件不会变"缓存,不额外开销。
+     */
     private JasperReport compile(ReportTemplate tpl) {
+        int hash = tpl.jrxmlText() == null ? 0 : tpl.jrxmlText().hashCode();
         CompiledTemplate c = compiled.get(tpl.code());
-        if (c != null && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))) return c.report();
+        if (c != null && c.textHash() == hash
+                && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))) {
+            return c.report();
+        }
         try {
             JasperReport report = tpl.jrxmlText() != null
                     ? JasperCompileManager.compileReport(new ByteArrayInputStream(tpl.jrxmlText().getBytes(StandardCharsets.UTF_8)))
                     : compileClasspath(tpl.file());
-            compiled.put(tpl.code(), new CompiledTemplate(tpl.updatedAt(), report));
+            compiled.put(tpl.code(), new CompiledTemplate(tpl.updatedAt(), hash, report));
             return report;
         } catch (JRException e) {
             throw new IllegalArgumentException("报表模板编译失败(" + tpl.code() + ")：" + rootMessage(e));
