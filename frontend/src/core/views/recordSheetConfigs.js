@@ -57,11 +57,10 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
-// 配方表「物料种类」的词表:集中放在 core/mold/materialKinds.js(引擎认得的那几个档案类别,
-// 2026-10-15 补「折算物料」共五个),并由 materialKinds.test.js 钉住
-// "下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
-// ⚠ 必须相对路径:本文件被 node --test 直接 import(keys.test.js),`@/` 别名只有 Vite 认
-import { MATERIAL_KINDS } from '../mold/materialKinds.js'
+// ⚠ 配方表「物料种类」**不再是下拉**(2026-10-16 用户口径:「把填写框的物料种类的下拉框改为普通文本框」):
+//   词表 MATERIAL_KINDS(core/mold/materialKinds.js)仍归**配方计算弹窗**用 —— 那里它是"按类别收窄
+//   物料编号/物料名称候选"的前置筛选。页 2 这格的类别改由 手填物料编号 → 商品档案 带出
+//   (invCarry.pickInvKind → materialKinds.carryKindOf,只补空格且只补引擎认得的词)。
 
 // ═══════════ 被并入面板的原始配置(2026-09-11 并入工艺清单面板第 2 页签,菜单已下线)═══════════
 // RD_MOLD_FORMULA 仍按页引用到成型工艺面板(sections/dataTables/tailSections 上的 page 标明归属;
@@ -435,7 +434,10 @@ const RD_MOLD_FORMULA = {
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
       { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
-          { key: '物料种类', label: '物料种类', span: 2, type: 'select', options: MATERIAL_KINDS },
+          // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
+          // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
+          // 带出档案类别来承担(见 invCarry.pickInvKind;引擎认不出的类别一律不补)。
+          { key: '物料种类', label: '物料种类', span: 2 },
           { key: '物料编号', label: '物料编号', span: 4 },
           { key: '物料名称', label: '物料名称', span: 3 },
           { key: '实际添加比例', label: '实际添加\n比例%' },

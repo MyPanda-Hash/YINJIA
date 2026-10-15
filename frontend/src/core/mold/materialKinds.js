@@ -20,7 +20,27 @@
  * 加新类别时:先确认档案里确实有这个 所属类别(bs_inv.所属类别),再往这里加,
  * 并在 groupOfMaterialType 里补上命中的关键词 —— 否则新选项会静默落错料位。
  *
- * 界面口径:下拉一律 `filterable + allow-create`(弹窗与页 2 配方表两处)—— 词表是**候选**不是白名单,
- * 档案里将来冒出的新类别不该被界面堵死(口径由工艺科定);代价是手打的词引擎认不认得要靠上面的告警兜。
+ * 界面口径(2026-10-16 变更):**配方计算弹窗**里那格仍是 `filterable + allow-create` 的下拉
+ *   —— 它同时是"按类别收窄 物料编号/物料名称 候选"的前置筛选(见 recipeRows.invRowsOfKind),
+ *   去掉下拉等于砸掉那个功能;
+ *   而**页 2 配方表的同一格已改成普通文本框**(用户口径:「把填写框的物料种类的下拉框改为普通文本框」)
+ *   —— 那格没有筛选职责,且现在**手填 物料编号 会把档案里的类别一并带出来**(invCarry.pickInvKind),
+ *   下拉的"防写错"作用由带出承担。不论哪一处,手打的词引擎认不认得仍靠上面的告警兜。
  */
 export const MATERIAL_KINDS = ['炭粉', '胶粉', '功能料-粉末', '功能料-颗粒', '折算物料']
+
+/**
+ * 物料档案的「所属类别」→ 可以写进单据「物料种类」的词(**不是**引擎认得的就给 '')。
+ *
+ * 为什么要有这道闸(而不是照抄档案值):档案里有 包装材料/辅助材料/成品 这类配不上料位的类别,
+ * 写进「物料种类」引擎认不出来 ⇒ 暂按粉料算 + 弹窗留一行小字告警 = 静默算错。宁可不补。
+ * 一处定义、两处用:配方计算弹窗的行补齐(recipeRows.invFillFor/materialFillFor)与
+ * 页 2 配方表的按编码带出(invCarry.pickInvKind)。
+ *
+ * @param {*} category 档案行 bs_inv.所属类别
+ * @returns {string} 引擎认得的类别词;认不出来给空串
+ */
+export function carryKindOf(category) {
+  const c = String(category ?? '').trim()
+  return MATERIAL_KINDS.includes(c) ? c : ''
+}

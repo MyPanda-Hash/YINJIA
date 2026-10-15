@@ -13,7 +13,7 @@
  * 键一律用单据页 2 配方表的**原始中文数据键**:一行数据两种视图,不另立一套键 ——
  * 另立一套就要在两边翻译,漏一个键就是静默丢值。
  */
-import { MATERIAL_KINDS } from './materialKinds.js'
+import { carryKindOf } from './materialKinds.js'
 
 /** 弹窗里可录入的四个输入格(其余列:序号自动编,实际添加比例/单支物料含量是算出来的) */
 export const RECIPE_INPUT_KEYS = ['物料种类', '物料编号', '物料名称', '设计添加量']
@@ -240,8 +240,8 @@ export function materialFillFor(row, inv, side) {
   const out = {}
   const code = norm(inv?.['存货编码'])
   if (code && norm(row?.['物料编号']) !== code) out['物料编号'] = code
-  const kind = norm(inv?.['所属类别'])
-  if (kind && MATERIAL_KINDS.includes(kind) && !norm(row?.['物料种类'])) out['物料种类'] = kind
+  const kind = carryKindOf(inv?.['所属类别'])
+  if (kind && !norm(row?.['物料种类'])) out['物料种类'] = kind
   return out
 }
 
@@ -251,9 +251,10 @@ export function materialFillFor(row, inv, side) {
  * 数据源 = 既有档案查询(商品档案 INV,列 `存货编码`/`存货名称`/`所属类别`),
  * 不新开后端接口。两条硬规矩:
  *   · 已有值的格一律不动(人手填的优先);
- *   · `所属类别` 必须是**引擎认得的词**(MATERIAL_KINDS 口径;materialKinds.test.js 钉着
- *     "词表里每个词都被 groupOfMaterialType 认出来")才补 —— 档案里的 包装材料/辅助材料/成品
- *     这类配不上料位的词填进「物料种类」只会让引擎认不出来(暂按粉料算 + 弹窗告警),不如不补。
+ *   · `所属类别` 必须是**引擎认得的词**(materialKinds.carryKindOf 那道闸,词表 = MATERIAL_KINDS;
+ *     materialKinds.test.js 钉着"词表里每个词都被 groupOfMaterialType 认出来")才补 —— 档案里的
+ *     包装材料/辅助材料/成品 这类配不上料位的词填进「物料种类」只会让引擎认不出来
+ *     (暂按粉料算 + 弹窗告警),不如不补。
  *
  * @param {Record<string, any>|null} row 弹窗里的编辑行
  * @param {Record<string, any>|null} inv 商品档案行(取不到传 null)
@@ -263,7 +264,7 @@ export function invFillFor(row, inv) {
   const out = {}
   const name = String(inv?.['存货名称'] ?? '').trim()
   if (name && !String(row?.['物料名称'] ?? '').trim()) out['物料名称'] = name
-  const kind = String(inv?.['所属类别'] ?? '').trim()
-  if (kind && MATERIAL_KINDS.includes(kind) && !String(row?.['物料种类'] ?? '').trim()) out['物料种类'] = kind
+  const kind = carryKindOf(inv?.['所属类别'])
+  if (kind && !String(row?.['物料种类'] ?? '').trim()) out['物料种类'] = kind
   return out
 }

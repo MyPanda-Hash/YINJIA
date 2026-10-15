@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { invRowsOf, pickInvCarry, invCarryPair, INV_CARRY } from './invCarry.js'
+import { invRowsOf, pickInvCarry, pickInvKind, invCarryPair, INV_CARRY } from './invCarry.js'
 
 // 背景(2026-10-14 用户报障):
 //   成型工艺清单「成型配方」页的 物料编号 / 物料名称 是普通文本、没配参照,
@@ -87,11 +87,42 @@ test('非这两个列(别的明细列)一律不参与', () => {
   assert.equal(pickInvCarry(rows, '物料种类', '炭棒'), '')
 })
 
-test('列映射口径钉死:明细列 ↔ 商品档案列', () => {
+test('列映射口径钉死:明细列 ↔ 商品档案列(含种类带出源 所属类别)', () => {
   assert.deepEqual(INV_CARRY, {
-    物料编号: { match: '存货编码', out: '存货名称' },
-    物料名称: { match: '存货名称', out: '存货编码' },
+    物料编号: { match: '存货编码', out: '存货名称', kind: '所属类别' },
+    物料名称: { match: '存货名称', out: '存货编码', kind: '所属类别' },
   })
+})
+
+/* ── 物料种类也按档案带出(2026-10-16 用户口径)────────────────────────────────
+   原话:「在成型工艺清单填写配方表的物料信息的时候,手动填写物料编码应该带出对应的物料类别
+          以及物料名称,把填写框的物料种类的下拉框改为普通文本框」。
+   实测(HSDZ_MES.bs_inv):YJ-LL-003 → 存货名称 胶粉、所属类别 胶粉;
+                            YJ-SLD-012 → 超高分子量聚乙烯、所属类别 胶粉。
+   页 2 配方表原先只带对侧那一格 ⇒ 物料名称 有值、物料种类 一直空着(用户截图即此),本次补上。 */
+test('物料编号 → 物料种类:档案「所属类别」带出(两个方向都带)', () => {
+  const rows = invRowsOf(archiveRes([{ 存货编码: 'YJ-LL-003', 存货名称: '胶粉', 所属类别: '胶粉' }]))
+  assert.equal(pickInvKind(rows, '物料编号', 'YJ-LL-003', ''), '胶粉')
+  assert.equal(pickInvKind(rows, '物料名称', '胶粉', ''), '胶粉', '按名称填的那一头同样带出')
+})
+
+test('档案类别引擎认不出来 ⇒ 不带出(带进去会让料位静默算错,见 materialKinds.js 注释)', () => {
+  const rows = invRowsOf(archiveRes([{ 存货编码: 'B-001', 存货名称: '纸箱', 所属类别: '包装材料' }]))
+  assert.equal(pickInvKind(rows, '物料编号', 'B-001', ''), '')
+})
+
+test('种类这格人手填过就不动它;查不到/重码/空输入同样不动', () => {
+  const rows = invRowsOf(archiveRes([{ 存货编码: 'YJ-LL-003', 存货名称: '胶粉', 所属类别: '胶粉' }]))
+  assert.equal(pickInvKind(rows, '物料编号', 'YJ-LL-003', '炭粉'), '', '人手填的种类优先,不许被档案覆盖')
+  assert.equal(pickInvKind(rows, '物料编号', 'YJ-LL-003', '  '), '胶粉', '空白(含纯空格)算没填')
+  assert.equal(pickInvKind(rows, '物料编号', 'YJ-999', ''), '')
+  assert.equal(pickInvKind(rows, '物料编号', '', ''), '')
+  const dup = invRowsOf(archiveRes([
+    { 存货编码: 'YJ-LL-003', 存货名称: '胶粉', 所属类别: '胶粉' },
+    { 存货编码: 'YJ-LL-003', 存货名称: '胶粉(旧)', 所属类别: '炭粉' },
+  ]))
+  assert.equal(pickInvKind(dup, '物料编号', 'YJ-LL-003', ''), '')
+  assert.equal(pickInvKind(rows, '实际添加比例', 'YJ-LL-003', ''), '')
 })
 
 // 生效范围:只有**同一张明细表里这两列都在**才启用(库里实测只有成型工艺清单的配方表两列齐全),

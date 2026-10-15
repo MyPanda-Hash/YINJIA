@@ -1290,7 +1290,7 @@ import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/pane
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
-import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, pickInvCarry } from '@/core/panel/invCarry'
+import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1348,12 +1348,14 @@ function setCellValue(row, c, picked) {
   emit('dirty')
 }
 
-// ---------- 明细「物料编号 ↔ 物料名称」按商品档案带出(2026-10-14) ----------
+// ---------- 明细「物料编号 ↔ 物料名称(+物料种类)」按商品档案带出(2026-10-14,2026-10-16 补种类) ----------
 // 用户报障「输入物料编号无法自动录入对应物料名称、输入物料名称无法自动录入对应物料编号」。
-// 这两列在 yj_field 里是**普通文本、没有参照**(ref_panel 为空),所以照参照那条路走不通,
+// 2026-10-16 用户口径:「手动填写物料编码应该带出对应的物料类别以及物料名称,把填写框的物料种类的
+// 下拉框改为普通文本框」—— 类别(物料种类)同样由这里带出,下拉已撤(见 recordSheetConfigs 配方表列)。
+// 这三列在 yj_field 里是**普通文本、没有参照**(ref_panel 为空),所以照参照那条路走不通,
 // 这里在**失焦/回车**(@change,不是 @input —— 否则每敲一个字发一次请求)按值查商品档案 INV。
 // 口径全在 core/panel/invCarry.js:唯一命中才带出,查不到/多条 ⇒ 静默不动(用户手输的编码可能还没建档)。
-// 生效范围由该明细表是否**同时**有这两列决定(库里只有成型工艺清单「配方表」两列齐全)。
+// 生效范围由该明细表是否**同时**有 物料编号/物料名称 两列决定(库里只有成型工艺清单「配方表」两列齐全)。
 const invCarryKeys = computed(() => {
   for (const dt of cfg.value?.dataTables || []) {
     const pair = invCarryPair(dt.cols)
@@ -1377,9 +1379,15 @@ async function onDetailTextCommit(row, key) {
       pageSize: 50,
     })
     const d = res?.data
-    const value = pickInvCarry(invRowsOf(d), key, typed)
-    if (!value) return // 查不到 / 多条命中 / 对侧为空 ⇒ 一个格都不动,也不提示
-    row[other] = value
+    const rows = invRowsOf(d)
+    const value = pickInvCarry(rows, key, typed)
+    // 物料种类:2026-10-16 增补 —— 用户口径「手动填写物料编码应该带出对应的物料类别以及物料名称」。
+    // 原先只写对侧那一格,于是页 2 那格里 物料名称 有值、物料种类 一直空着(用户截图即此)。
+    // 规则与对侧格不同:这格**人手填过就不动**(料位分组是工艺员的判断,见 pickInvKind 注释)。
+    const kind = pickInvKind(rows, key, typed, row['物料种类'])
+    if (!value && !kind) return // 查不到 / 多条命中 / 对侧为空 / 类别认不出 ⇒ 一个格都不动,也不提示
+    if (value) row[other] = value
+    if (kind) row['物料种类'] = kind
     emit('dirty')
   } catch (e) {
     /* 无权限/网络异常都按「档案里没有」处理:保持用户输入,不弹错(与参照链路同款兜底) */
