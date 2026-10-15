@@ -77,7 +77,32 @@ async function main() {
   chk('出货检验计划表 · 序号不再是空白', nums.length > 0 && nums.every((n) => String(n).trim() !== ''), nums.join(','))
   chk('出货检验计划表 · 同一个检验项目的行同号(规格书同一口径)', grouped, JSON.stringify([...byGroup.entries()].map(([g, n]) => `${g}=${n}`)))
   chk('出货检验计划表 · 组号按首次出现次序 1..G', new Set(nums).size === byGroup.size && [...new Set(nums)].every((n, i) => Number(n) === i + 1), nums.join(','))
-  chk('出货检验计划表 · 控制项目/要求/方法 照搬规格书', planRows[0]?.['控制项目'] === (items[0]?.['检验项目'] ?? ''), JSON.stringify(planRows[0]))
+  chk('出货检验计划表 · 要求/方法逐字照搬规格书(名字那列走规范,见下一条)',
+    planRows[0]?.['控制标准及要求'] === (items[0]?.['检验要求'] ?? '') && planRows[0]?.['控制方法'] === (items[0]?.['检验方法'] ?? ''),
+    JSON.stringify(planRows[0]))
+
+  // 带下去的名字:去掉冗余的组名前缀、保住 * / # 标记(2026-10-16 用户选 A)
+  const EXPECT_NAME = {
+    '强度·*抗压强度': '*抗压强度',
+    '强度·（裸棒）': '强度·（裸棒）',                 // 子项是括号补语 ⇒ 原样
+    '*余氯去除性能·初始去除率': '*余氯去除性能·初始去除率', // 组名是真信息 ⇒ 原样
+    '*余氯去除性能·除余氯寿命': '*余氯去除性能·除余氯寿命',
+    '*炭棒尺寸': '*炭棒尺寸',
+    '#*压降': '#*压降',
+  }
+  const bad = planRows.map((r, i) => ({ 源: items[i]?.['检验项目'], 期望: EXPECT_NAME[items[i]?.['检验项目']], 实际: r['控制项目'] }))
+    .filter((x) => x.期望 !== undefined && x.期望 !== x.实际)
+  chk('出货检验计划表 · 带下去的名字规范了(冗余组名前缀去掉、* / # 标记保留)', bad.length === 0, JSON.stringify(bad))
+
+  // 「规格书已变动」不许误报:页面上的 checkSpecDrift 就是拿 payload.items + 本表明细行去比
+  // (core/insp/specCarry.specDrift)—— 刚按规格书带完,必须判"无变动"。
+  // ⚠ 规格书里**同一个检验项目名会出现多行**(除余氯寿命×2 / 炭棒尺寸×3),这是这条比对的天然压力点。
+  const specRows = items.map((r) => ({ 检验项目: r['检验项目'], 检验要求: r['检验要求'], 检验方法: r['检验方法'] }))
+  const { specDrift } = await import('file://' + path.join(FE, 'insp/specCarry.js').replace(/\\/g, '/'))
+  const drift = specDrift(specRows, planRows)
+  console.log('[变动比对]', JSON.stringify({ added: drift.added, removed: drift.removed, changed: drift.changed }))
+  chk('刚按规格书带完 ⇒ 判「无变动」(不误报"规格书已变动")', drift.drifted === false,
+    `added=${JSON.stringify(drift.added)} removed=${JSON.stringify(drift.removed)} changed=${JSON.stringify(drift.changed)}`)
 
   console.log(fails ? `\n${fails} 项未通过` : '\n全部通过')
   if (fails) process.exitCode = 1

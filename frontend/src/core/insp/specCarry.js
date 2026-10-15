@@ -112,6 +112,35 @@ function normProject(v) {
   return String(v ?? '').replace(/\s+/g, '').replace(/[*#＊＃]/g, '')
 }
 
+/**
+ * 规格书的项目名 → **要写进下游面板**的名字(2026-10-16 用户选 A:
+ *   「只规范带下去的名字(`强度·*抗压强度` → `*抗压强度`),不碰标准库与历史单据」)。
+ *
+ * 判定是**有条件**的 —— 组名有时是真信息,一律砍掉会出歧义:
+ *   · `强度·*抗压强度`      → `*抗压强度`(组名已被子项名包含:强度 ⊂ 抗压强度 ⇒ 冗余);
+ *   · `*余氯去除性能·初始去除率` → **原样**(砍掉只剩「初始去除率」,看不出测的是哪个物质);
+ *   · `强度·（裸棒）`        → **原样**(子项是括号补语,脱离组名不成词);
+ *   · 没有 `·` 的名字(`*炭棒尺寸` / `#*压降`)→ **原样**(一个字节都不动)。
+ * `*`/`#` 是必检标记,一律保留(下游面板自己的标准库也是 `*外观` / `*压降测试` 这么命名的)。
+ *
+ * @param {*} v 规格书明细的 检验项目
+ * @returns {string} 带下去的名字(空值给空串)
+ */
+export function carryProjectName(v) {
+  const raw = String(v ?? '').trim()
+  if (!raw) return ''
+  const i = raw.indexOf('·')
+  if (i < 0) return raw
+  const group = raw.slice(0, i).trim()
+  const sub = raw.slice(i + 1).trim()
+  if (!group || !sub) return raw
+  if (/^[（(]/.test(sub)) return raw
+  return normProject(sub).includes(normProject(group)) ? sub : raw
+}
+
+/** 明细落点里可声明的**名字归一**器(与 DETAIL_PARSERS 同一套注册口径;新增在此登记) */
+const NAME_NORMS = { projectName: carryProjectName }
+
 /** 项目名的三个可比形态:整串 / 组名(`·` 前)/ 子项名(`·` 后) */
 function projectNames(v) {
   const full = normProject(v)
@@ -236,6 +265,13 @@ export function detailRowsOf(afs, srcRows) {
           ? String(groupNo.get(groupKeyOf(r)) || '')
           : String(i + 1)
       }
+      // 名字归一(可选):如 projectName —— 把规格书的「组名·子项名」规范成带下去的名字,
+      // 认不出来的归一名字 ⇒ 原样写(不静默吞掉值)
+      const normName = String(m?.norm ?? '').trim()
+      if (normName && v.trim()) {
+        const fn = NAME_NORMS[normName]
+        if (fn) v = fn(v)
+      }
       row[to] = v
     }
     return row
@@ -283,22 +319,50 @@ const norm = (v) => String(v ?? '').replace(/\s+/g, '')
  */
 export function specDrift(specRows, planRows) {
   const empty = { added: [], removed: [], changed: [], drifted: false }
-  const specs = (specRows || []).map((r) => ({ item: norm(r?.['检验项目']), req: norm(r?.['检验要求']), method: norm(r?.['检验方法']) })).filter((r) => r.item)
-  const plans = (planRows || []).map((r) => ({ item: norm(r?.['控制项目']), req: norm(r?.['控制标准及要求']), method: norm(r?.['控制方法']) })).filter((r) => r.item)
+  // 对齐键 = `组名·子项名` 的**末段**(归一后取最后一个 · 之后)——
+  // 2026-10-16:带下去的名字会被 carryProjectName 规范成 `*抗压强度`(去冗余组名前缀),
+  // 而规格书上仍是 `强度·*抗压强度`、改名前落库的行也是整串 ⇒ 三种形态必须算同一个检验项目,
+  // 否则一进页面就误报"规格书已变动"。
+  const keyOf = (v) => norm(v).split('·').pop()
+  const pick = (item, req, method) => ({ item: norm(item), key: keyOf(item), req: norm(req), method: norm(method) })
+  const specs = (specRows || [])
+    .map((r) => pick(r?.['检验项目'], r?.['检验要求'], r?.['检验方法']))
+    .filter((r) => r.item && r.key)
+  const plans = (planRows || [])
+    .map((r) => pick(r?.['控制项目'], r?.['控制标准及要求'], r?.['控制方法']))
+    .filter((r) => r.item && r.key)
   // 一边空:没有可比的内容(该走"没有可带入的规格书"那条提示,不在这里报"变动")
   if (!specs.length || !plans.length) return empty
 
-  const specByItem = new Map(specs.map((r) => [r.item, r]))
-  const planByItem = new Map(plans.map((r) => [r.item, r]))
-  const added = specs.filter((r) => !planByItem.has(r.item)).map((r) => r.item)
-  const removed = plans.filter((r) => !specByItem.has(r.item)).map((r) => r.item)
+  /* ⚠ 2026-10-16 修误报:规格书里**同一个检验项目名会出现多行** ——
+     实测 SD-2026-10-0010:`*炭棒尺寸` 3 行(外径/内径/长度)、`*余氯去除性能·除余氯寿命` 2 行
+     (寿命920L / 去除率≥50%)。旧实现用 Map 按名字对齐,**同名行互相盖掉**(只留最后一条),
+     于是刚按规格书带完就弹「规格书已变动:…(检验要求)…」——实测就是这么误报的。
+     现改为**按名字聚合两边的取值集合**(要求/方法各一个 Set),集合不同才算变动:
+     同名多行、行序不同都不再误报;真改字(≤5→≤6、目视→仪器)照样抓得到;
+     本表少了同名多行里的一行(集合缺一个取值)也算"与规格书不一致",照样提示。 */
+  const byKey = (list) => {
+    const m = new Map()
+    for (const x of list) {
+      if (!m.has(x.key)) m.set(x.key, { item: x.item, reqs: new Set(), methods: new Set() })
+      const e = m.get(x.key)
+      e.reqs.add(x.req)
+      e.methods.add(x.method)
+    }
+    return m
+  }
+  const sameSet = (a, b) => a.size === b.size && [...a].every((x) => b.has(x))
+  const S = byKey(specs)
+  const P = byKey(plans)
+  const added = [...S.keys()].filter((k) => !P.has(k)).map((k) => S.get(k).item)
+  const removed = [...P.keys()].filter((k) => !S.has(k)).map((k) => P.get(k).item)
   const changed = []
-  for (const s of specs) {
-    const p = planByItem.get(s.item)
+  for (const [k, s] of S) {
+    const p = P.get(k)
     if (!p) continue
     const fields = []
-    if (s.req !== p.req) fields.push('检验要求')
-    if (s.method !== p.method) fields.push('检验方法')
+    if (!sameSet(s.reqs, p.reqs)) fields.push('检验要求')
+    if (!sameSet(s.methods, p.methods)) fields.push('检验方法')
     if (fields.length) changed.push({ item: s.item, fields })
   }
   return { added, removed, changed, drifted: added.length + removed.length + changed.length > 0 }
