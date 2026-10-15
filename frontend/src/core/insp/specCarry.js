@@ -1,5 +1,6 @@
 import { parseDimensionRequirement } from './dimensionSpec.js'
 import { parseDropRequirement } from './dropSpec.js'
+import { parseTestMethod } from './testParamSpec.js'
 
 /**
  * 「自动填充规格书」的失败口径(出货检验计划表 RD_INSP_PLAN ← 规格书 RD_SPEC_DOC)。
@@ -98,7 +99,13 @@ export function specDriftEnabled(afs) {
    ⚠ 与出货检验计划表那条链的差别:那边是「整表替换明细」,这里只写**表头格**。 */
 
 /** headFromDetail 里认的**解析器**名(落点不是一个格,而是把整句解析成多个格);新增解析器在此登记 */
-const DETAIL_PARSERS = { dimension: parseDimensionRequirement, drop: parseDropRequirement }
+const DETAIL_PARSERS = {
+  dimension: parseDimensionRequirement,
+  drop: parseDropRequirement,
+  // 「检验方法」里那几个测试参数(测试间距mm/压头下降速度/压降测试流速)—— 与上面两个的区别是
+  // **取哪一列**由映射项的 `from` 指定(默认 检验要求,这里写 from:'检验方法')
+  testParams: parseTestMethod,
+}
 
 /** 项目名归一:去掉**全部空白**与 `*`/`#` 装饰(含全角 ＊＃) */
 function normProject(v) {
@@ -163,21 +170,24 @@ export function headFromSpecDetail(afs, items) {
       if (hitRows.length) break
     }
     if (!hitRows.length) continue
-    // 整句解析型落点(尺寸/跌落):解析器自己保证"只吐真解析出来的格" —— 解析不出就是不写;
-    // 多行(尺寸每行一条)按行序合并,后面的行补齐前面的行没解析出来的格
+    // 整句解析型落点(尺寸/跌落/测试参数):解析器自己保证"只吐真解析出来的格" —— 解析不出就是不写;
+    // 多行(尺寸每行一条)按行序合并,后面的行补齐前面的行没解析出来的格;
+    // 取哪一列由 `from` 指定(默认 检验要求;测试参数那几格在**检验方法**里)
     const parse = String(m?.parse ?? '').trim()
     if (parse) {
       const fn = DETAIL_PARSERS[parse]
       if (!fn) continue
+      const srcKey = String(m?.from ?? '').trim() || '检验要求'
       for (const r of hitRows) {
-        const val = String(r?.['检验要求'] ?? '').trim()
+        const val = String(r?.[srcKey] ?? '').trim()
         if (val) Object.assign(out, fn(val))
       }
       continue
     }
     const to = String(m?.to ?? '').trim()
     if (!to) continue
-    const val = hitRows.map((r) => String(r?.['检验要求'] ?? '').trim()).find((v) => v) || ''
+    const srcKey = String(m?.from ?? '').trim() || '检验要求'
+    const val = hitRows.map((r) => String(r?.[srcKey] ?? '').trim()).find((v) => v) || ''
     if (val) out[to] = val
   }
   return out
@@ -189,7 +199,11 @@ export function headFromSpecDetail(afs, items) {
  * ⚠ 2026-10-16 增补 `indexWhenEmpty`(用户报障「出货检验记录表前面缺失序号」):
  *   规格书明细的 `序号` **不落库** —— 那张纸上的序号是渲染时按组现算的(实测 rd_spec_doc_detail.序号
  *   全 NULL),所以 `{to:'序号', from:'序号'}` 带过去永远是空串,计划表左侧那一列整列空白。
- *   口径:声明了 indexWhenEmpty 的落点,源值为空时用**行号(1..N)**兜底;规格书自己带了序号就用它自己的。
+ *   口径:声明了 indexWhenEmpty 的落点,源值为空时兜底 ——
+ *     · `'group'`(现用)= **组号**:同一个检验项目(afs.detailGroupFrom 那列按 `·` 前段分组)同号,
+ *       与规格书那张纸的序号完全一致(炭棒尺寸 三行 = 3,3,3);
+ *     · `true` / `'row'` = 行号 1..N。
+ *   规格书自己带了序号就用它自己的(不覆盖已落库的值)。
  *
  * @param {{detail?: Array<{to: string, from: string, indexWhenEmpty?: boolean}>}|null} afs 配置
  * @param {Array<Record<string, any>>|null} srcRows 规格书本表区的行(payload.items)
@@ -198,6 +212,18 @@ export function headFromSpecDetail(afs, items) {
 export function detailRowsOf(afs, srcRows) {
   const maps = Array.isArray(afs?.detail) ? afs.detail : []
   const rows = Array.isArray(srcRows) ? srcRows : []
+  // 组号兜底(indexWhenEmpty:'group')用的分组:该列(afs.detailGroupFrom)按「首次出现次序」编号 ——
+  // 与规格书那张纸的序号**同一口径**(一个检验项目一个号,子项共享:炭棒尺寸 三行 = 3,3,3)。
+  // 分组键 = 去装饰/去空白后 `·` 之前那一段(`强度·（裸棒）` 与 `强度·*抗压强度` 同组)。
+  const groupCol = String(afs?.detailGroupFrom ?? '').trim()
+  const groupNo = new Map()
+  if (groupCol) {
+    for (const r of rows) {
+      const k = normProject(r?.[groupCol]).split('·')[0]
+      if (k && !groupNo.has(k)) groupNo.set(k, groupNo.size + 1)
+    }
+  }
+  const groupKeyOf = (r) => normProject(r?.[groupCol]).split('·')[0]
   return rows.map((r, i) => {
     const row = {}
     for (const m of maps) {
@@ -205,7 +231,11 @@ export function detailRowsOf(afs, srcRows) {
       if (!to) continue
       const raw = r?.[m?.from]
       let v = raw === undefined || raw === null ? '' : String(raw)
-      if (!v.trim() && m?.indexWhenEmpty) v = String(i + 1)
+      if (!v.trim() && m?.indexWhenEmpty) {
+        v = m.indexWhenEmpty === 'group'
+          ? String(groupNo.get(groupKeyOf(r)) || '')
+          : String(i + 1)
+      }
       row[to] = v
     }
     return row

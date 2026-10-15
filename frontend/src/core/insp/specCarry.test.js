@@ -344,6 +344,50 @@ test('没写 indexWhenEmpty 的落点照旧:空就是空(别的链一个字节�
   assert.deepEqual(detailRowsOf(afs, [{ 序号: null, 检验项目: '压降' }]), [{ 序号: '', 控制项目: '压降' }])
 })
 
+/* ── 2026-10-16(续):① 检验方法里那几个"测试参数"格 ② 序号改成与规格书同一口径的**组号** ──
+   用户口径:「接着做」——① 测试间距mm/压头下降速度/压降测试流速 也从规格书的**检验方法**抠
+   (实测 40 / 5 / 0.9);② 序号跟规格书一样"一个检验项目一个号"(炭棒尺寸 三行 = 3,3,3)。 */
+const PARAM_AFS = {
+  headFromDetail: [
+    { parse: 'testParams', from: '检验方法', matchProject: ['抗压强度'] },
+    { parse: 'testParams', from: '检验方法', matchProject: ['压降'] },
+  ],
+}
+const PARAM_ROWS = [
+  { 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: '将炭棒水平放置在仪器上，调整间距40mm，设置下压速度5mm/min，按测试键' },
+  { 检验项目: '#*压降', 检验要求: '≤20kpa', 检验方法: '测试用水纯水/超纯水，水温控制25±1℃，测试流速0.9L/min，通水10min后记录压差值' },
+]
+
+test('① 检验方法 → 测试间距mm / 压头下降速度 / 压降测试流速(from 指定取哪一列)', () => {
+  assert.deepEqual(headFromSpecDetail(PARAM_AFS, PARAM_ROWS),
+    { 测试间距mm: '40', 压头下降速度: '5', 压降测试流速: '0.9' })
+})
+
+test('① 检验方法里没有这些锚点词 ⇒ 一个格都不写(不猜)', () => {
+  assert.deepEqual(headFromSpecDetail(PARAM_AFS, [
+    { 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: '按测试键读取最大力压力值' },
+  ]), {})
+  assert.deepEqual(headFromSpecDetail(PARAM_AFS, [{ 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf' }]), {},
+    '连 检验方法 都没有 ⇒ 不写')
+})
+
+test('② 序号按**组号**兜底:同一个检验项目的多行同号,与规格书那张纸同一口径', () => {
+  const afs = { detailGroupFrom: '检验项目', detail: [{ to: '序号', from: '序号', indexWhenEmpty: 'group' }, { to: '控制项目', from: '检验项目' }] }
+  const rows = [
+    { 检验项目: '#*压降' },
+    { 检验项目: '*炭棒尺寸' }, { 检验项目: '*炭棒尺寸' }, { 检验项目: '*炭棒尺寸' },
+    { 检验项目: '*余氯去除性能·初始去除率' }, { 检验项目: '*余氯去除性能·除余氯寿命' },
+    { 检验项目: '强度·*抗压强度' }, { 检验项目: '强度·（裸棒）' },
+  ]
+  assert.deepEqual(detailRowsOf(afs, rows).map((r) => r['序号']), ['1', '2', '2', '2', '3', '3', '4', '4'],
+    '组号按首次出现次序;`组名·子项名` 的装饰与子项名不影响分组')
+})
+
+test('② 规格书自己带了序号 ⇒ 用它的(不覆盖已经落库的值)', () => {
+  const afs = { detailGroupFrom: '检验项目', detail: [{ to: '序号', from: '序号', indexWhenEmpty: 'group' }] }
+  assert.deepEqual(detailRowsOf(afs, [{ 序号: '7', 检验项目: 'a' }, { 序号: null, 检验项目: 'a' }]), [{ 序号: '7' }, { 序号: '1' }])
+})
+
 /* ── 明细落点取哪一段行(2026-10-15:配方表那条 detailSource 分支已随口径变更撤掉)──────────
    三条链(出货检验计划表 / 组装BOM表 / 成型工艺清单的检验要求)取的都是 payload.items
    —— 规格书本表区的行,由后端按各自端点选表区。 */

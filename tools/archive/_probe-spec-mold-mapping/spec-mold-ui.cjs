@@ -157,8 +157,9 @@ localStorage.setItem('mes_login_date','2026-10-16'); 'ok'`)
     if (read?.尺寸) {
       chk('③ 炭棒尺寸四格(外径/公差/内径/公差)', JSON.stringify(read.尺寸) === JSON.stringify(['34.5', '±0.5', '12.5', '±0.5']), JSON.stringify(read.尺寸))
       chk('③ 跌落强度块(高度cm/跌落次数/要求)', read.跌落?.[0] === '60' && read.跌落?.[1] === '3' && String(read.跌落?.[2] || '').includes('垂直跌落3次'), JSON.stringify(read.跌落))
-      chk('③ 抗压强度 · 强度要求kgf', read.抗压?.[2] === '≥30kgf', JSON.stringify(read.抗压))
-      chk('③ 压降 · 压降标准kpa', read.压降?.[2] === '≤20kpa', JSON.stringify(read.压降))
+      chk('③ 抗压强度(测试间距/压头下降速度/强度要求kgf)', JSON.stringify(read.抗压) === JSON.stringify(['40', '5', '≥30kgf']),
+        JSON.stringify(read.抗压) + '  ← 前两格取自规格书的**检验方法**')
+      chk('③ 压降(测试管路留空/压降测试流速/压降标准kpa)', read.压降?.[1] === '0.9' && read.压降?.[2] === '≤20kpa', JSON.stringify(read.压降))
     } else {
       chk('③ 读不到纸面格', false, JSON.stringify(read))
     }

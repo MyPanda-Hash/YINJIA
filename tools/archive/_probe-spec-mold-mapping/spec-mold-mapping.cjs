@@ -49,21 +49,34 @@ async function main() {
   console.log('[映射结果]', JSON.stringify(out, null, 1))
 
   // 期望值来自规格书原文(实测):外径34.5±0.5 / 内径12.5±0.5 / ≥30kgf / ≤20kpa / 高度60cm 跌落3次
+  // 2026-10-16 续:测试参数取自**检验方法**(间距40mm / 下压速度5mm/min / 测试流速0.9L/min)
   const expect = {
     外径mm: '34.5', 外径公差: '±0.5', 内径mm: '12.5', 内径公差: '±0.5',
     强度要求kgf: '≥30kgf', 压降标准kpa: '≤20kpa', 跌落高度cm: '60', 跌落次数: '3',
+    测试间距mm: '40', 压头下降速度: '5', 压降测试流速: '0.9',
   }
   for (const [k, v] of Object.entries(expect)) {
     chk(`检验要求区 · ${k} = ${v}`, out[k] === v, out[k] === undefined ? '(该键没出现)' : out[k])
   }
   chk('跌落要求 = 规格书原句', String(out['跌落要求'] || '').includes('垂直跌落3次') && String(out['跌落要求'] || '').includes('高度60cm'), out['跌落要求'])
 
-  // 出货检验计划表那条链:序号兜底(规格书明细的 序号 不落库)
+  // 出货检验计划表那条链:序号兜底(规格书明细的 序号 不落库)——
+  // 口径 = **组号**(同一个检验项目同号,与规格书那张纸一致)
   const planAfs = recordSheetConfigs?.RD_INSP_PLAN?.autoFillSpec
   const planRows = detailRowsOf(planAfs, items)
-  console.log('[出货检验计划表 明细]', JSON.stringify(planRows.slice(0, 4)))
-  chk('出货检验计划表 · 序号 按行号兜底(不再整列空白)', planRows.length > 0 && planRows.every((r, i) => r['序号'] === String(i + 1)),
-    planRows.map((r) => r['序号']).join(','))
+  const gkey = (s) => String(s ?? '').replace(/\s+/g, '').replace(/[*#＊＃]/g, '').split('·')[0]
+  console.log('[出货检验计划表 明细]', JSON.stringify(planRows.map((r) => ({ 序号: r['序号'], 项目: r['控制项目'] }))))
+  const byGroup = new Map()
+  let grouped = true
+  for (let i = 0; i < planRows.length; i++) {
+    const g = gkey(items[i]?.['检验项目'])
+    if (!byGroup.has(g)) byGroup.set(g, planRows[i]['序号'])
+    else if (byGroup.get(g) !== planRows[i]['序号']) grouped = false
+  }
+  const nums = planRows.map((r) => r['序号'])
+  chk('出货检验计划表 · 序号不再是空白', nums.length > 0 && nums.every((n) => String(n).trim() !== ''), nums.join(','))
+  chk('出货检验计划表 · 同一个检验项目的行同号(规格书同一口径)', grouped, JSON.stringify([...byGroup.entries()].map(([g, n]) => `${g}=${n}`)))
+  chk('出货检验计划表 · 组号按首次出现次序 1..G', new Set(nums).size === byGroup.size && [...new Set(nums)].every((n, i) => Number(n) === i + 1), nums.join(','))
   chk('出货检验计划表 · 控制项目/要求/方法 照搬规格书', planRows[0]?.['控制项目'] === (items[0]?.['检验项目'] ?? ''), JSON.stringify(planRows[0]))
 
   console.log(fails ? `\n${fails} 项未通过` : '\n全部通过')

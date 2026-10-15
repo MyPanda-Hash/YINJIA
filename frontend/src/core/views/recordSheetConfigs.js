@@ -1112,6 +1112,11 @@ export const recordSheetConfigs = {
         { to: '强度要求kgf', matchProject: ['抗压强度'] },
         { to: '压降标准kpa', matchProject: ['压降'] },
         { parse: 'dimension', matchProject: ['炭棒尺寸'] },
+        // 2026-10-16(续,「接着做」):测试参数那三格不在 检验要求 里,而在**检验方法**那句话里 ——
+        // 实测 强度·*抗压强度 的方法「调整间距40mm,设置下压速度5mm/min」/ #*压降 的方法「测试流速0.9L/min」。
+        // 每个项目一条(不是一条带多个候选:候选是"择一",这里两行都要解析,故各写一条、结果合并)。
+        { parse: 'testParams', from: '检验方法', matchProject: ['抗压强度'] },
+        { parse: 'testParams', from: '检验方法', matchProject: ['压降'] },
       ],
     },
   },
@@ -1548,12 +1553,15 @@ export const recordSheetConfigs = {
       detail: [
         // ⚠ 序号 **必须带 indexWhenEmpty**(2026-10-16 用户报障「出货检验记录表前面缺失序号」):
         //   规格书明细的 `序号` 不落库(那张纸按组现算,rd_spec_doc_detail.序号 实测全 NULL),
-        //   直接搬只会得到一整列空白 ⇒ 源值为空时用行号 1..N 兜底(见 specCarry.detailRowsOf)。
-        { to: '序号', from: '序号', indexWhenEmpty: true },
+        //   直接搬只会得到一整列空白 ⇒ 源值为空时按**组号**兜底(与规格书那张纸同一口径:
+        //   一个检验项目一个号,炭棒尺寸 三行 = 3,3,3;分组列见 detailGroupFrom)。
+        { to: '序号', from: '序号', indexWhenEmpty: 'group' },
         { to: '控制项目', from: '检验项目' },
         { to: '控制标准及要求', from: '检验要求' },
         { to: '控制方法', from: '检验方法' },
       ],
+      // 组号兜底的分组列:同一个检验项目(去 `*`/`#`、取 `·` 前段)的行共用一个序号
+      detailGroupFrom: '检验项目',
       defaults: {
         // 设计 F9 模板行的三段应对措施(与标准库各条目的 measure 同文)
         不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性',

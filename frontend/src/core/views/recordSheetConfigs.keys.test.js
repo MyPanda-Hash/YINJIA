@@ -606,9 +606,16 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
   const maps = afs.headFromDetail
   assert.ok(Array.isArray(maps) && maps.length, 'autoFillSpec.headFromDetail 为空 ⇒ 检验要求不会回填')
   assert.deepEqual(
-    maps.map((m) => [m.to ?? `parse:${m.parse}`, m.matchProject]),
-    [['parse:drop', ['跌落强度', '裸棒']], ['强度要求kgf', ['抗压强度']], ['压降标准kpa', ['压降']], ['parse:dimension', ['炭棒尺寸']]],
-    '落点口径(2026-10-16 修正):项目名容错(去 * # / 组名·子项 / 子串),候选数组按优先级;尺寸只认「炭棒尺寸」',
+    maps.map((m) => [m.to ?? `parse:${m.parse}`, m.from, m.matchProject]),
+    [
+      ['parse:drop', undefined, ['跌落强度', '裸棒']],
+      ['强度要求kgf', undefined, ['抗压强度']],
+      ['压降标准kpa', undefined, ['压降']],
+      ['parse:dimension', undefined, ['炭棒尺寸']],
+      ['parse:testParams', '检验方法', ['抗压强度']],
+      ['parse:testParams', '检验方法', ['压降']],
+    ],
+    '落点口径(2026-10-16):项目名容错(去 * # / 组名·子项 / 子串),候选数组按优先级;尺寸只认「炭棒尺寸」;测试参数取自 检验方法',
   )
 
   // 收集纸面上的格:标签格(label 且无 key)与数据格(key)
@@ -628,11 +635,13 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
     assert.ok(dataCells.has(m.to), `落点 '${m.to}' 在本面板纸面上不是数据格(挂不到格上)`)
   }
   // 解析型落点(整句拆成多格)没有 to,它的**输出键**必须逐个是真实数据格 —— 少一个就是静默丢值:
-  //   drop      ← core/insp/dropSpec.js(跌落要求 + 从原句抠的 高度cm / 跌落次数)
-  //   dimension ← core/insp/dimensionSpec.js(外径/内径 各两格)
+  //   drop       ← core/insp/dropSpec.js(跌落要求 + 从原句抠的 高度cm / 跌落次数)
+  //   dimension  ← core/insp/dimensionSpec.js(外径/内径 各两格)
+  //   testParams ← core/insp/testParamSpec.js(检验方法里的 测试间距mm/压头下降速度/压降测试流速)
   const PARSER_KEYS = {
     drop: ['跌落要求', '跌落高度cm', '跌落次数'],
     dimension: ['外径mm', '外径公差', '内径mm', '内径公差'],
+    testParams: ['测试间距mm', '压头下降速度', '压降测试流速'],
   }
   for (const m of maps) {
     if (!m.parse) continue
