@@ -424,7 +424,7 @@
       <div class="dash-grid">
         <div class="card metric-card col-3"><div class="kpi-num tone-steel">{{ quality.total }}</div><div class="kpi-title">{{ tt('检验明细总数') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-primary">{{ quality.pass }}</div><div class="kpi-title">{{ tt('合格数') }}</div></div>
-        <div class="card metric-card col-3"><div class="kpi-num tone-danger">{{ quality.total - quality.pass }}</div><div class="kpi-title">{{ tt('非合格数') }}</div></div>
+        <div class="card metric-card col-3"><div class="kpi-num tone-danger">{{ quality.bad }}</div><div class="kpi-title">{{ tt('非合格数') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-warning">{{ quality.passRate }}%</div><div class="kpi-title">{{ tt('合格率') }}</div></div>
         <div class="card col-6">
           <div class="card-title">{{ tt('检验结果分布') }}</div>
@@ -755,7 +755,7 @@ const salesDone = computed(() => {
 })
 
 // ---------- 质量数据 ----------
-const quality = computed(() => stats.value.quality || { total: 0, pass: 0, passRate: 0, byResult: [] })
+const quality = computed(() => stats.value.quality || { total: 0, pass: 0, bad: 0, passRate: 0, byResult: [] })
 
 // ---------- 研发数据(2026-09-28 桌面深度开发:阶段分布/趋势来自 DashboardStatsService;面板单据量复用 docStats 过滤) ----------
 const rd = computed(() => stats.value.rd || {})
@@ -784,7 +784,10 @@ const completionRate = computed(() => (
 const gaugeOffset = computed(() => 301.6 * (1 - completionRate.value / 100))
 const qualityRate = computed(() => Number(quality.value.passRate || 0))
 const qualityGaugeOffset = computed(() => 201.1 * (1 - Math.min(100, qualityRate.value) / 100))
-const qualityExceptions = computed(() => Math.max(0, Number(quality.value.total || 0) - Number(quality.value.pass || 0)))
+/** 非合格数:由后端按 SUM(不合格数量) 下发(2026-10-15)。
+ *  原来这里算 total−pass,但 total 与 pass 现在取自两个不同的列(送检数量 / 合格数量),
+ *  两者不同源时一减就会出负数 —— 口径应以后端的「不合格数量」为准。 */
+const qualityExceptions = computed(() => Number(quality.value.bad || 0))
 const qualityRisk = computed(() => {
   if (!quality.value.total) return { label: '暂无检验', tone: 'neutral' }
   if (qualityRate.value >= 95) return { label: '质量稳定', tone: 'stable' }
