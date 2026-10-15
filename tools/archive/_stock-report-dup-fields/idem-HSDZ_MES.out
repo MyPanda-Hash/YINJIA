@@ -1,0 +1,13 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:5 字符: 3
++   java -cp lib\mssql-jdbc.jar DbSync.java run migrate-stock-report-du ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-stock-report-dup-fields-20261015.sql ==
+  [print] [OK] HSDZ_MES:删除重复字段行 A=0 行,B(开始/结束日期)=0 行
+  [print] [自检] HSDZ_MES:库存报表字段 STOCK_BALANCE=9(应 9) STOCK_LEDGER=29(应 29) STOCK_SUMMARY=19(应 19) STOCK_DETAIL=9(应 9);同名 label 重复 0 组;不符项 0 条
+  [print] [OK] 库存报表字段重复已清洗(库存状况表不再有重复列)
+  [OK] 3 batches

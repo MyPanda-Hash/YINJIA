@@ -1,0 +1,72 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:4 字符: 3
++   java -cp D:/YINJIA-main/tools/lib/mssql-jdbc.jar D:/YINJIA-main/too ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q5-would-delete.sql ==
+  | STOCK_BALANCE | 9271 | 仓库编码 | 仓库编码 | 文本 | query,detail | 10 | 100 | - | - | 1 | 
+  | STOCK_BALANCE | 11730 | 仓库编码 | 仓库编码 | 文本 | detail | 10 | 130 | - | - | 1 | 
+  | STOCK_BALANCE | 9272 | 仓库 | 仓库 | 参照 | query,detail | 20 | 120 | WH | 仓库编码 | 1 | 
+  | STOCK_BALANCE | 11699 | 仓库 | 仓库 | 参照 | detail | 20 | 130 | - | - | 1 | 
+  | STOCK_BALANCE | 9273 | 存货编码 | 存货编码 | 文本 | query,detail | 30 | 120 | - | - | 1 | 
+  | STOCK_BALANCE | 11728 | 存货编码 | 存货编码 | 文本 | detail | 30 | 130 | - | - | 1 | 
+  | STOCK_BALANCE | 9274 | 存货 | 存货 | 参照 | query,detail | 40 | 200 | INV | 存货编码 | 1 | 
+  | STOCK_BALANCE | 11721 | 存货 | 存货 | 参照 | detail | 40 | 130 | - | - | 1 | 
+  | STOCK_BALANCE | 9275 | 规格型号 | 规格型号 | 文本 | detail | 50 | 140 | - | - | 1 | 
+  | STOCK_BALANCE | 9276 | 主计量 | 主计量 | 文本 | detail | 60 | 80 | - | - | 1 | 
+  | STOCK_BALANCE | 9277 | 现存量 | 现存量 | 小数 | detail | 70 | 100 | - | - | 1 | 
+  | STOCK_BALANCE | 9278 | 结存单价 | 结存单价 | 小数 | detail | 80 | 100 | - | - | 1 | 
+  | STOCK_BALANCE | 9279 | 结存金额 | 结存金额 | 小数 | detail | 90 | 120 | - | - | 1 | 
+  | STOCK_LEDGER | 9298 | 仓库编码 | 仓库编码 | 文本 | detail | 10 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 11731 | 开始日期 | 开始日期 | 文本 | detail | 10 | 130 | - | - | 1 | 
+  | STOCK_LEDGER | 9299 | 仓库 | 仓库 | 参照 | query,detail | 20 | 110 | WH | 仓库编码 | 1 | 
+  | STOCK_LEDGER | 11716 | 结束日期 | 结束日期 | 文本 | detail | 20 | 130 | - | - | 1 | 
+  | STOCK_LEDGER | 9300 | 存货编码 | 存货编码 | 文本 | detail | 30 | 110 | - | - | 1 | 
+  | STOCK_LEDGER | 9301 | 存货 | 存货 | 参照 | query,detail | 40 | 180 | INV | 存货编码 | 1 | 
+  | STOCK_LEDGER | 11722 | 仓库 | 仓库 | 文本 | detail | 40 | 130 | - | - | 1 | 
+  | STOCK_LEDGER | 9302 | 规格型号 | 规格型号 | 文本 | detail | 50 | 130 | - | - | 1 | 
+  | STOCK_LEDGER | 9303 | 计量单位 | 计量单位 | 文本 | detail | 60 | 70 | - | - | 1 | 
+  | STOCK_LEDGER | 11698 | 存货 | 存货 | 文本 | detail | 60 | 130 | - | - | 1 | 
+  | STOCK_LEDGER | 9610 | 批号 | 批号 | 文本 | detail | 65 | 110 | - | - | 1 | 
+  | STOCK_LEDGER | 9304 | 单据日期 | 单据日期 | 日期 | detail | 70 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9305 | 单据类型 | 单据类型 | 文本 | detail | 80 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9306 | 单据编号 | 单据编号 | 文本 | detail | 90 | 130 | - | - | 1 | 
+  | STOCK_LEDGER | 9307 | 业务类型 | 业务类型 | 文本 | detail | 100 | 70 | - | - | 1 | 
+  | STOCK_LEDGER | 9308 | 往来单位 | 往来单位 | 文本 | detail | 110 | 160 | - | - | 1 | 
+  | STOCK_LEDGER | 9611 | 往来单位编码 | 往来单位编码 | 文本 | detail | 115 | 120 | - | - | 1 | 
+  | STOCK_LEDGER | 9612 | 经手人 | 经手人 | 文本 | detail | 116 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9309 | 收入数量 | 收入数量 | 小数 | detail | 120 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 9310 | 收入单价 | 收入单价 | 小数 | detail | 130 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 9311 | 收入金额 | 收入金额 | 小数 | detail | 140 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9613 | 含税金额 | 含税金额 | 小数 | detail | 145 | 110 | - | - | 1 | 
+  | STOCK_LEDGER | 9614 | 税额 | 税额 | 小数 | detail | 146 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9312 | 发出数量 | 发出数量 | 小数 | detail | 150 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 9313 | 发出单价 | 发出单价 | 小数 | detail | 160 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 9314 | 发出金额 | 发出金额 | 小数 | detail | 170 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9615 | 发出单据金额 | 发出单据金额 | 小数 | detail | 175 | 110 | - | - | 1 | 
+  | STOCK_LEDGER | 9344 | 期初数量 | 期初数量 | 小数 | detail | 180 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 9345 | 期初平均单价 | 期初平均单价 | 小数 | detail | 190 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9346 | 期初金额 | 期初金额 | 小数 | detail | 200 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9347 | 期末数量 | 期末数量 | 小数 | detail | 210 | 90 | - | - | 1 | 
+  | STOCK_LEDGER | 9348 | 期末平均单价 | 期末平均单价 | 小数 | detail | 220 | 100 | - | - | 1 | 
+  | STOCK_LEDGER | 9349 | 期末金额 | 期末金额 | 小数 | detail | 230 | 100 | - | - | 1 | 
+  | STOCK_SUMMARY | 9318 | 仓库编码 | 仓库编码 | 文本 | detail | 10 | 90 | - | - | 1 | 
+  | STOCK_SUMMARY | 11727 | 开始日期 | 开始日期 | 文本 | detail | 10 | 130 | - | - | 1 | 
+  | STOCK_SUMMARY | 9319 | 仓库 | 仓库 | 参照 | query,detail | 20 | 110 | WH | 仓库名称 | 1 | 
+  | STOCK_SUMMARY | 11739 | 结束日期 | 结束日期 | 文本 | detail | 20 | 130 | - | - | 1 | 
+  | STOCK_BALANCE | 11699 | 仓库 | 仓库 | detail | 20 | 9272 | query,detail | 20 | WH | 
+  | STOCK_BALANCE | 11730 | 仓库编码 | 仓库编码 | detail | 10 | 9271 | query,detail | 10 | null | 
+  | STOCK_BALANCE | 11721 | 存货 | 存货 | detail | 40 | 9274 | query,detail | 40 | INV | 
+  | STOCK_BALANCE | 11728 | 存货编码 | 存货编码 | detail | 30 | 9273 | query,detail | 30 | null | 
+  | STOCK_LEDGER | 11722 | 仓库 | 仓库 | detail | 40 | 9299 | query,detail | 20 | WH | 
+  | STOCK_LEDGER | 11698 | 存货 | 存货 | detail | 60 | 9301 | query,detail | 40 | INV | 
+  | STOCK_SUMMARY | 11735 | 仓库 | 仓库 | detail | 40 | 9319 | query,detail | 20 | WH | 
+  | STOCK_SUMMARY | 11692 | 存货 | 存货 | detail | 60 | 9321 | query,detail | 40 | INV | 
+  | STOCK_LEDGER | 11716 | 结束日期 | 结束日期 | detail | 20 | 130 | 
+  | STOCK_LEDGER | 11731 | 开始日期 | 开始日期 | detail | 10 | 130 | 
+  | STOCK_SUMMARY | 11739 | 结束日期 | 结束日期 | detail | 20 | 130 | 
+  | STOCK_SUMMARY | 11727 | 开始日期 | 开始日期 | detail | 10 | 130 | 
+[OK] q5-would-delete.sql (1 batches)

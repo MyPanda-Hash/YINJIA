@@ -1,0 +1,133 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 308
++ ... njia@2026'; java -cp D:/YINJIA-main/tools/lib/mssql-jdbc.jar D:/YINJI ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q1-fields.sql ==
+  | STOCK_BALANCE | 库存状况表 | flat | v_stock_balance | 报表 | 
+  | STOCK_DETAIL | 库存明细 | flat | v_stock_kucun | 报表 | 
+  | STOCK_LEDGER | 库存台账 | flat | v_stock_ledger | 报表 | 
+  | STOCK_STATUS | 库存状况 | flat | kucun | 报表 | 
+  | STOCK_SUMMARY | 收发存汇总表 | flat | v_stock_summary | 报表 | 
+  | STOCK_BALANCE | 9271 | 仓库编码 | 仓库编码 | 文本 | query,detail | 10 | 100 | 0 | null | null | null | 
+  | STOCK_BALANCE | 12075 | 仓库编码 | 仓库编码 | 文本 | detail | 10 | 130 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9272 | 仓库 | 仓库 | 参照 | query,detail | 20 | 120 | 0 | WH | 仓库编码 | 仓库名称 | 
+  | STOCK_BALANCE | 12044 | 仓库 | 仓库 | 参照 | detail | 20 | 130 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9273 | 存货编码 | 存货编码 | 文本 | query,detail | 30 | 120 | 0 | null | null | null | 
+  | STOCK_BALANCE | 12073 | 存货编码 | 存货编码 | 文本 | detail | 30 | 130 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9274 | 存货 | 存货 | 参照 | query,detail | 40 | 200 | 0 | INV | 存货编码 | 存货名称 | 
+  | STOCK_BALANCE | 12066 | 存货 | 存货 | 参照 | detail | 40 | 130 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9275 | 规格型号 | 规格型号 | 文本 | detail | 50 | 140 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9276 | 主计量 | 主计量 | 文本 | detail | 60 | 80 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9277 | 现存量 | 现存量 | 小数 | detail | 70 | 100 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9278 | 结存单价 | 结存单价 | 小数 | detail | 80 | 100 | 0 | null | null | null | 
+  | STOCK_BALANCE | 9279 | 结存金额 | 结存金额 | 小数 | detail | 90 | 120 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13002 | 仓库编码 | 仓库编码 | 参照 | query,detail | 10 | 130 | 0 | WH | 仓库编码 | 仓库名称 | 
+  | STOCK_DETAIL | 13003 | 仓库名称 | 仓库名称 | 文本 | detail | 20 | 160 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13004 | 存货编码 | 存货编码 | 参照 | query,detail | 30 | 140 | 0 | INV | 存货编码 | 存货名称 | 
+  | STOCK_DETAIL | 13005 | 存货名称 | 存货名称 | 文本 | detail | 40 | 220 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13006 | 规格型号 | 规格型号 | 文本 | detail | 50 | 150 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13007 | 累计入库量 | 累计入库量 | 小数 | detail | 60 | 110 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13008 | 累计出库量 | 累计出库量 | 小数 | detail | 70 | 110 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13009 | 现存量 | 现存量 | 小数 | detail | 80 | 110 | 0 | null | null | null | 
+  | STOCK_DETAIL | 13010 | 更新时间 | 更新时间 | 日期时间 | detail | 90 | 150 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9298 | 仓库编码 | 仓库编码 | 文本 | detail | 10 | 90 | 0 | null | null | null | 
+  | STOCK_LEDGER | 12076 | 开始日期 | 开始日期 | 文本 | detail | 10 | 130 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9299 | 仓库 | 仓库 | 参照 | query,detail | 20 | 110 | 0 | WH | 仓库编码 | 仓库名称 | 
+  | STOCK_LEDGER | 12061 | 结束日期 | 结束日期 | 文本 | detail | 20 | 130 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9300 | 存货编码 | 存货编码 | 文本 | detail | 30 | 110 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9301 | 存货 | 存货 | 参照 | query,detail | 40 | 180 | 0 | INV | 存货编码 | 存货名称 | 
+  | STOCK_LEDGER | 12067 | 仓库 | 仓库 | 文本 | detail | 40 | 130 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9302 | 规格型号 | 规格型号 | 文本 | detail | 50 | 130 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9303 | 计量单位 | 计量单位 | 文本 | detail | 60 | 70 | 0 | null | null | null | 
+  | STOCK_LEDGER | 12043 | 存货 | 存货 | 文本 | detail | 60 | 130 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9610 | 批号 | 批号 | 文本 | detail | 65 | 110 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9304 | 单据日期 | 单据日期 | 日期 | detail | 70 | 100 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9305 | 单据类型 | 单据类型 | 文本 | detail | 80 | 100 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9306 | 单据编号 | 单据编号 | 文本 | detail | 90 | 130 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9307 | 业务类型 | 业务类型 | 文本 | detail | 100 | 70 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9308 | 往来单位 | 往来单位 | 文本 | detail | 110 | 160 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9611 | 往来单位编码 | 往来单位编码 | 文本 | detail | 115 | 120 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9612 | 经手人 | 经手人 | 文本 | detail | 116 | 100 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9309 | 收入数量 | 收入数量 | 小数 | detail | 120 | 90 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9310 | 收入单价 | 收入单价 | 小数 | detail | 130 | 90 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9311 | 收入金额 | 收入金额 | 小数 | detail | 140 | 100 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9613 | 含税金额 | 含税金额 | 小数 | detail | 145 | 110 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9614 | 税额 | 税额 | 小数 | detail | 146 | 100 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9312 | 发出数量 | 发出数量 | 小数 | detail | 150 | 90 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9313 | 发出单价 | 发出单价 | 小数 | detail | 160 | 90 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9314 | 发出金额 | 发出金额 | 小数 | detail | 170 | 100 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9615 | 发出单据金额 | 发出单据金额 | 小数 | detail | 175 | 110 | 0 | null | null | null | 
+  | STOCK_LEDGER | 9344 | 期初数量 | 期初数量 | 小数 | detail | 180 | 90 | 0 | null | null | null | 
+  | PURCHASE_IN | header | 创建人编码 | 2 | 12823:创建人编码 , 12825:创建人编码 | 
+  | PURCHASE_IN | header | 付款方式编码 | 2 | 12841:付款方式编码 , 12843:付款方式编码 | 
+  | PURCHASE_IN | header | 付款账户编码 | 2 | 12845:付款账户编码 , 12846:付款账户编码 | 
+  | PURCHASE_IN | header | 审核人编码 | 2 | 12835:审核人编码 , 12833:审核人编码 | 
+  | PURCHASE_IN | header | 未结算金额本位币 | 2 | 12839:未结算金额本位币 , 12837:未结算金额本位币 | 
+  | PURCHASE_IN | header | 修改人编码 | 2 | 12829:修改人编码 , 12827:修改人编码 | 
+  | SALE_OUT | header | 创建人编码 | 2 | 9258:创建人编码 , 7077:创建人编码 | 
+  | SALE_OUT | header | 附件 | 2 | 9243:附件 , 7057:附件 | 
+  | SALE_OUT | header | 审核人编码 | 2 | 9246:审核人编码 , 7061:审核人编码 | 
+  | SALE_OUT | header | 修改人编码 | 2 | 9260:修改人编码 , 7080:修改人编码 | 
+  | WO_SCHEDULE | detail | 成型计划数量 | 2 | 2947:成型计划数量 , 2069:成型计划数量 | 
+  | WO_SCHEDULE | detail | 成型完成 | 2 | 2075:成型完成 , 2953:成型完成 | 
+  | WO_SCHEDULE | detail | 订单数量 | 2 | 2946:订单数量 , 2068:订单数量 | 
+  | WO_SCHEDULE | detail | 规格型号 | 2 | 2945:规格型号 , 2067:规格型号 | 
+  | WO_SCHEDULE | detail | 混料完成 | 2 | 2074:混料完成 , 2952:混料完成 | 
+  | WO_SCHEDULE | detail | 切炭完成 | 2 | 2954:切炭完成 , 2076:切炭完成 | 
+  | WO_SCHEDULE | detail | 装箱完成 | 2 | 2956:装箱完成 , 2078:装箱完成 | 
+  | WO_SCHEDULE | detail | 组装完成 | 2 | 2077:组装完成 , 2955:组装完成 | 
+  | KHDD | je | 2 | 104:detail:seq17 , 95:header:seq8 | 
+  | MANU_ORDER | 单价 | 2 | 11185:header:seq450 , 11194:detail:seq350 | 
+  | MANU_ORDER | 金额 | 2 | 11186:header:seq460 , 11195:detail:seq360 | 
+  | MANU_ORDER | 排产数量 | 2 | 11174:query,header:seq35 , 11191:detail:seq320 | 
+  | MANU_ORDER | 批号 | 2 | 12395:detail:seq300 , 1125:header:seq30 | 
+  | MANU_ORDER | 入库数量 | 2 | 11175:query,header:seq40 , 11192:detail:seq330 | 
+  | MANU_ORDER | 需求数量 | 2 | 11173:query,header:seq30 , 11190:detail:seq310 | 
+  | MANU_ORDER | 余量 | 2 | 11176:query,header:seq45 , 11193:detail:seq340 | 
+  | MANU_ORDER_DETAIL | 产品名称 | 2 | 11854:query,detail:seq5 , 9059:query:seq5 | 
+  | MANU_SCHEDULE | 产品编码 | 2 | 11297:query,detail:seq70 , 11934:detail:seq90 | 
+  | MANU_SCHEDULE | 产品名称 | 2 | 11919:detail:seq100 , 11298:query,detail:seq80 | 
+  | MANU_SCHEDULE | 成型完成 | 2 | 11321:query,detail:seq225 , 11889:detail:seq360 | 
+  | MANU_SCHEDULE | 单据日期 | 2 | 11292:query,detail:seq20 , 11948:detail:seq20 | 
+  | MANU_SCHEDULE | 工序交期 | 2 | 11942:detail:seq260 , 11316:query,detail:seq165 | 
+  | MANU_SCHEDULE | 混料完成 | 2 | 11320:query,detail:seq220 , 11967:detail:seq330 | 
+  | MANU_SCHEDULE | 计划开工日 | 2 | 11330:query,detail:seq160 , 11964:detail:seq240 | 
+  | MANU_SCHEDULE | 加工单号 | 2 | 11853:detail:seq10 , 11291:query,detail:seq10 | 
+  | MANU_SCHEDULE | 交期 | 2 | 11306:query,detail:seq160 , 11855:detail:seq250 | 
+  | MANU_SCHEDULE | 交期紧迫度(天) | 2 | 11877:detail:seq270 , 11307:query,detail:seq170 | 
+  | MANU_SCHEDULE | 开产量 | 2 | 11341:query,detail:seq150 , 11956:detail:seq500 | 
+  | MANU_SCHEDULE | 客户 | 2 | 11873:detail:seq40 , 11294:query,detail:seq40 | 
+  | MANU_SCHEDULE | 客户等级 | 2 | 11311:query,detail:seq45 , 11905:detail:seq50 | 
+  | MANU_SCHEDULE | 排产数量 | 2 | 11303:query,detail:seq130 , 11910:detail:seq170 | 
+  | MANU_SCHEDULE | 批号 | 2 | 11885:detail:seq130 , 11301:query,detail:seq110 | 
+  | MANU_SCHEDULE | 切炭完成 | 2 | 11322:query,detail:seq230 , 11941:detail:seq390 | 
+  | MANU_SCHEDULE | 入库数量 | 2 | 11304:query,detail:seq140 , 11911:detail:seq210 | 
+  | MANU_SCHEDULE | 生产订单数量 | 2 | 11327:query,detail:seq140 , 11909:detail:seq160 | 
+  | MANU_SCHEDULE | 生产计划数量 | 2 | 11866:detail:seq180 , 11314:query,detail:seq135 | 
+  | MANU_SCHEDULE | 生产线 | 2 | 11295:query,detail:seq50 , 11923:detail:seq60 | 
+  | MANU_SCHEDULE | 生产状态 | 2 | 11951:detail:seq520 , 11342:query,detail:seq45 | 
+  | MANU_SCHEDULE | 实际完成数量 | 2 | 11315:query,detail:seq145 , 11891:detail:seq220 | 
+  | MANU_SCHEDULE | 未完成数量 | 2 | 11914:detail:seq470 , 11325:query,detail:seq245 | 
+  | MANU_SCHEDULE | 销售订单号 | 2 | 11293:query,detail:seq30 , 11884:detail:seq30 | 
+  | MANU_SCHEDULE | 销售订单数量 | 2 | 11965:detail:seq140 , 11313:query,detail:seq115 | 
+  | MANU_SCHEDULE | 需求数量 | 2 | 11302:query,detail:seq120 , 11903:detail:seq150 | 
+  | MANU_SCHEDULE | 重点管控 | 2 | 11326:query,detail:seq42 , 11927:detail:seq70 | 
+  | MANU_SCHEDULE | 装箱完成 | 2 | 11324:query,detail:seq240 , 11950:detail:seq450 | 
+  | MANU_SCHEDULE | 组装完成 | 2 | 11323:query,detail:seq235 , 11900:detail:seq420 | 
+  | MATERIAL_OUT_DETAIL | 材料名称 | 2 | 8997:detail:seq150 , 9011:query:seq5 | 
+  | MATERIAL_OUT_STATS | 材料名称 | 2 | 9141:query:seq5 , 9131:detail:seq40 | 
+  | PURCHASE_IN | 仓位编码 | 2 | 12718:detail:seq195 , 12814:header:seq680 | 
+  | PURCHASE_IN | 创建人编码 | 2 | 12823:header:seq730 , 12825:header:seq730 | 
+  | PURCHASE_IN | 付款方式编码 | 2 | 12843:header:seq820 , 12841:header:seq820 | 
+  | PURCHASE_IN | 付款账户编码 | 2 | 12845:header:seq840 , 12846:header:seq840 | 
+  | PURCHASE_IN | 批次号 | 2 | 12737:query,header:seq290 , 12741:detail:seq310 | 
+  | PURCHASE_IN | 审核人编码 | 2 | 12833:header:seq780 , 12835:header:seq780 | 
+  | PURCHASE_IN | 未结算金额本位币 | 2 | 12839:header:seq800 , 12837:header:seq800 | 
+  | PURCHASE_IN | 修改人编码 | 2 | 12829:header:seq750 , 12827:header:seq750 | 
+  | QC_CATALOG | 检测物料类别 | 2 | 7737:query:seq10 , 7742:detail:seq10 | 
+  | QC_CATALOG | 检验单号 | 2 | 7809:detail:seq70 , 7811:query:seq70 | 
+[OK] q1-fields.sql (1 batches)

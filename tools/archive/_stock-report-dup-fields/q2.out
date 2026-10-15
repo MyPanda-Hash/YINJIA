@@ -1,0 +1,64 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 308
++ ... njia@2026'; java -cp D:/YINJIA-main/tools/lib/mssql-jdbc.jar D:/YINJI ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q2-state.sql ==
+  | id | int | null | NO | 
+  | panel_code | varchar | 40 | NO | 
+  | col_name | nvarchar | 128 | NO | 
+  | label | nvarchar | 60 | NO | 
+  | data_type | nvarchar | 20 | NO | 
+  | dict_sql | nvarchar | 500 | YES | 
+  | ref_panel | varchar | 40 | YES | 
+  | ref_field | nvarchar | 128 | YES | 
+  | display_field | nvarchar | 128 | YES | 
+  | place | varchar | 60 | NO | 
+  | seq | int | null | NO | 
+  | width | int | null | YES | 
+  | editable | bit | null | NO | 
+  | required | bit | null | NO | 
+  | hidden | bit | null | NO | 
+  | alias | nvarchar | 60 | YES | 
+  | visible | bit | null | NO | 
+  | label_en | nvarchar | 200 | YES | 
+  | col_group | nvarchar | 50 | YES | 
+  | ref_filter | nvarchar | 200 | YES | 
+  | tab_key | nvarchar | 50 | YES | 
+  | STOCK_BALANCE | 13 | 13 | 4 | 0 | 
+  | STOCK_DETAIL | 9 | 9 | 2 | 0 | 
+  | STOCK_LEDGER | 33 | 33 | 2 | 0 | 
+  | STOCK_STATUS | 11 | 11 | 4 | 0 | 
+  | STOCK_SUMMARY | 23 | 23 | 2 | 0 | 
+  | 9318 | 仓库编码 | 仓库编码 | 文本 | detail | 10 | 90 | 0 | 
+  | 12072 | 开始日期 | 开始日期 | 文本 | detail | 10 | 130 | 0 | 
+  | 9319 | 仓库 | 仓库 | 参照 | query,detail | 20 | 110 | 0 | 
+  | 12084 | 结束日期 | 结束日期 | 文本 | detail | 20 | 130 | 0 | 
+  | 9320 | 存货编码 | 存货编码 | 文本 | detail | 30 | 110 | 0 | 
+  | 9321 | 存货 | 存货 | 参照 | query,detail | 40 | 180 | 0 | 
+  | 12080 | 仓库 | 仓库 | 文本 | detail | 40 | 130 | 0 | 
+  | 9322 | 期次 | 期次 | 文本 | detail | 50 | 80 | 0 | 
+  | 9323 | 规格型号 | 规格型号 | 文本 | detail | 60 | 130 | 0 | 
+  | 12037 | 存货 | 存货 | 文本 | detail | 60 | 130 | 0 | 
+  | 9324 | 主单位 | 主单位 | 文本 | detail | 70 | 70 | 0 | 
+  | 9326 | 期初数量 | 期初数量 | 小数 | detail | 90 | 90 | 0 | 
+  | 9327 | 期初平均单价 | 期初平均单价 | 小数 | detail | 100 | 100 | 0 | 
+  | 9328 | 期初金额 | 期初金额 | 小数 | detail | 110 | 100 | 0 | 
+  | 9329 | 本期入库数量 | 本期入库数量 | 小数 | detail | 120 | 100 | 0 | 
+  | 9330 | 入库平均单价 | 入库平均单价 | 小数 | detail | 130 | 100 | 0 | 
+  | 9331 | 本期入库金额 | 本期入库金额 | 小数 | detail | 140 | 100 | 0 | 
+  | 9332 | 本期出库数量 | 本期出库数量 | 小数 | detail | 150 | 100 | 0 | 
+  | 9333 | 出库平均单价 | 出库平均单价 | 小数 | detail | 160 | 100 | 0 | 
+  | 9334 | 本期出库金额 | 本期出库金额 | 小数 | detail | 170 | 100 | 0 | 
+  | 9335 | 期末结存数量 | 期末结存数量 | 小数 | detail | 180 | 100 | 0 | 
+  | 9336 | 期末平均单价 | 期末平均单价 | 小数 | detail | 190 | 100 | 0 | 
+  | 9337 | 期末结存金额 | 期末结存金额 | 小数 | detail | 200 | 100 | 0 | 
+  | STOCK_BALANCE | 库存状况表 | 报表 | flat | v_stock_balance | null | null | id | null | null | null | 50 | items | 系统管理 | null | null | Stock Balance | 
+  | STOCK_DETAIL | 库存明细 | 报表 | flat | v_stock_kucun | null | null | id | null | null | 更新时间 | 50 | items | 系统管理 | null | null | Stock Detail | 
+  | STOCK_LEDGER | 库存台账 | 报表 | flat | v_stock_ledger | null | null | id | null | null | null | 50 | items | 系统管理 | null | null | Stock Ledger | 
+  | STOCK_STATUS | 库存状况 | 报表 | flat | kucun | null | null | id | null | null | null | 50 | null | null | null | null | null | 
+  | STOCK_SUMMARY | 收发存汇总表 | 报表 | flat | v_stock_summary | null | null | id | null | null | null | 50 | items | 系统管理 | null | null | In-Out-Balance Summary | 
+[OK] q2-state.sql (1 batches)

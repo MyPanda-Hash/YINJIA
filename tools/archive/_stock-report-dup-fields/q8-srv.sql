@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT @@SERVERNAME AS srv, DB_NAME() AS dbn, CAST(SERVERPROPERTY('ServerName') AS nvarchar(100)) AS sn, (SELECT COUNT(*) FROM yj_field WHERE panel_code='STOCK_BALANCE') AS bal_fields, (SELECT COUNT(*) FROM yj_field WHERE panel_code='STOCK_LEDGER') AS led_fields;

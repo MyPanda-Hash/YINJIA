@@ -1,0 +1,39 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:2 字符: 1
++ java -cp lib\mssql-jdbc.jar verify\StockReportFieldAudit.java HSDZ_ME ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[库] HSDZ_MES  范围 = 全部 flat 面板
+  面板              名称                字段   同名标签  同名列ℹ  缺物理列   隐藏ℹ
+  DISPATCH_DETAIL 工序派工单明细表          36      0     0     0     2  ✅
+  DISPATCH_STATS  工序派工单统计表          10      0     0     0     0  ✅
+  ERPLG_ROW       ERP导入明细            8      0     0     0     0  ✅
+  FINISH_IN_DETAIL 产成品入库单明细表         23      0     0     0     0  ✅
+  FINISH_IN_STATS 产成品入库单统计表         12      0     0     0     0  ✅
+  LINE_LOAD       产线排产负荷            18      0     0     0     0  ✅
+  MANU_ORDER_DETAIL 生产工单明细表           26      0     1     0     1  ✅
+  MANU_ORDER_STATS 生产工单统计表            9      0     0     0     0  ✅
+  MANU_SCHEDULE   生产排产              82     29    29    23     0  ❌ 实际完成数量x2、生产状态x2、混料完成x2、排产数量x2、销售订单号x2、批号x2
+  MATERIAL_OUT_DETAIL 材料出库单明细表          29      0     1     0     1  ✅
+  MATERIAL_OUT_STATS 材料出库单统计表          14      0     1     0     1  ✅
+  OTHER_IN_DETAIL 其他入库单明细表          21      0     0     0     0  ✅
+  OTHER_IN_STATS  其他入库单统计表          14      0     0     0     0  ✅
+  OTHER_OUT_DETAIL 其他出库单明细表          22      0     0     0     0  ✅
+  OTHER_OUT_STATS 其他出库单统计表          14      0     0     0     0  ✅
+  PURCHASE_IN_DETAIL 采购入库单明细表          30      0     0     0     0  ✅
+  PURCHASE_IN_STATS 采购入库单统计表          17      0     0     0     0  ✅
+  SALE_OUT_DETAIL 销售出库单明细表          29      0     0     0     0  ✅
+  SALE_OUT_STATS  销售出库单统计表          12      0     0     0     0  ✅
+  SALES_ORDER_DETAIL 销售订单明细表           24      0     0     0     0  ✅
+  SALES_ORDER_STATS 销售订单统计表           15      0     0     0     0  ✅
+  STOCK_BALANCE   库存状况表              9      0     0     0     0  ✅
+  STOCK_DETAIL    库存明细               9      0     0     0     0  ✅
+  STOCK_LEDGER    库存台账              29      0     0     0     0  ✅
+  STOCK_STATUS    库存状况              11      0     1     0     0  ✅
+  STOCK_SUMMARY   收发存汇总表            19      0     0     0     0  ✅
+  WO_PROGRESS     工单工序进度             4      0     0     0     0  ✅
+  WO_REPORT_LIST  报工记录              12      0     0     0     0  ✅
+  WO_SCHEDULE     排单计划              37     17    18     0     0  ❌ 生产车间x2、混料完成x2、组装完成x2、产品编码x2、销售订单号x2、订单数量x2
+[FAIL] 共 69 处 —— 重复列会被 buildGridColumns 原样下发到界面。处置:重跑 tools\migrate-stock-report-dup-fields-20261015.sql(YINJIA_SQL_DB=<库> java -cp lib\mssql-jdbc.jar DbSync.java run migrate-stock-report-dup-fields-20261015.sql),若重跑后仍报,说明有新的迁移又插了重复行,按本文件头①~④定位是哪一条。

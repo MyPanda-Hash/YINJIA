@@ -1,0 +1,162 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 308
++ ... njia@2026'; java -cp D:/YINJIA-main/tools/lib/mssql-jdbc.jar D:/YINJI ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q3-flat-dup.sql ==
+  | DISPATCH_DETAIL | 工序派工单明细表 | v_dispatch_detail | 36 | 
+  | DISPATCH_STATS | 工序派工单统计表 | v_dispatch_stats | 10 | 
+  | ERPLG_ROW | ERP导入明细 | erp_imp_row | 8 | 
+  | FINISH_IN_DETAIL | 产成品入库单明细表 | v_finish_in_detail | 23 | 
+  | FINISH_IN_STATS | 产成品入库单统计表 | v_finish_in_stats | 12 | 
+  | LINE_LOAD | 产线排产负荷 | v_line_load | 18 | 
+  | MANU_ORDER_DETAIL | 生产工单明细表 | v_manu_order_detail | 26 | 
+  | MANU_ORDER_STATS | 生产工单统计表 | v_manu_order_stats | 9 | 
+  | MANU_SCHEDULE | 生产排产 | v_manu_schedule | 82 | 
+  | MATERIAL_OUT_DETAIL | 材料出库单明细表 | v_material_out_detail | 29 | 
+  | MATERIAL_OUT_STATS | 材料出库单统计表 | v_material_out_stats | 14 | 
+  | OTHER_IN_DETAIL | 其他入库单明细表 | v_other_in_detail | 21 | 
+  | OTHER_IN_STATS | 其他入库单统计表 | v_other_in_stats | 14 | 
+  | OTHER_OUT_DETAIL | 其他出库单明细表 | v_other_out_detail | 22 | 
+  | OTHER_OUT_STATS | 其他出库单统计表 | v_other_out_stats | 14 | 
+  | PURCHASE_IN_DETAIL | 采购入库单明细表 | v_purchase_in_detail | 30 | 
+  | PURCHASE_IN_STATS | 采购入库单统计表 | v_purchase_in_stats | 17 | 
+  | SALE_OUT_DETAIL | 销售出库单明细表 | v_sale_out_detail | 29 | 
+  | SALE_OUT_STATS | 销售出库单统计表 | v_sale_out_stats | 12 | 
+  | SALES_ORDER_DETAIL | 销售订单明细表 | v_sales_order_detail | 24 | 
+  | SALES_ORDER_STATS | 销售订单统计表 | v_sales_order_stats | 15 | 
+  | STOCK_BALANCE | 库存状况表 | v_stock_balance | 13 | 
+  | STOCK_DETAIL | 库存明细 | v_stock_kucun | 9 | 
+  | STOCK_LEDGER | 库存台账 | v_stock_ledger | 33 | 
+  | STOCK_STATUS | 库存状况 | kucun | 11 | 
+  | STOCK_SUMMARY | 收发存汇总表 | v_stock_summary | 23 | 
+  | WO_PROGRESS | 工单工序进度 | wo_progress | 4 | 
+  | WO_REPORT_LIST | 报工记录 | scjl | 12 | 
+  | WO_SCHEDULE | 排单计划 | v_wo_schedule | 37 | 
+  | MANU_SCHEDULE | 生产排产 | 产品编码 | 2 | 10978[query,detail,seq70,ref=-] ; 11589[detail,seq90,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 产品名称 | 2 | 11574[detail,seq100,ref=-] ; 10979[query,detail,seq80,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 成型完成 | 2 | 11002[query,detail,seq225,ref=-] ; 11544[detail,seq360,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 单据日期 | 2 | 10973[query,detail,seq20,ref=-] ; 11603[detail,seq20,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 工序交期 | 2 | 11597[detail,seq260,ref=-] ; 10997[query,detail,seq165,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 混料完成 | 2 | 11001[query,detail,seq220,ref=-] ; 11622[detail,seq330,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 计划开工日 | 2 | 11011[query,detail,seq160,ref=-] ; 11619[detail,seq240,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 加工单号 | 2 | 11508[detail,seq10,ref=-] ; 10972[query,detail,seq10,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 交期 | 2 | 10987[query,detail,seq160,ref=-] ; 11510[detail,seq250,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 交期紧迫度(天) | 2 | 11532[detail,seq270,ref=-] ; 10988[query,detail,seq170,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 开产量 | 2 | 11022[query,detail,seq150,ref=-] ; 11611[detail,seq500,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 客户 | 2 | 11528[detail,seq40,ref=-] ; 10975[query,detail,seq40,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 客户等级 | 2 | 10992[query,detail,seq45,ref=-] ; 11560[detail,seq50,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 排产数量 | 2 | 10984[query,detail,seq130,ref=-] ; 11565[detail,seq170,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 批号 | 2 | 11540[detail,seq130,ref=-] ; 10982[query,detail,seq110,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 切炭完成 | 2 | 11003[query,detail,seq230,ref=-] ; 11596[detail,seq390,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 入库数量 | 2 | 10985[query,detail,seq140,ref=-] ; 11566[detail,seq210,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 生产订单数量 | 2 | 11008[query,detail,seq140,ref=-] ; 11564[detail,seq160,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 生产计划数量 | 2 | 11521[detail,seq180,ref=-] ; 10995[query,detail,seq135,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 生产线 | 2 | 10976[query,detail,seq50,ref=-] ; 11578[detail,seq60,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 生产状态 | 2 | 11606[detail,seq520,ref=-] ; 11023[query,detail,seq45,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 实际完成数量 | 2 | 10996[query,detail,seq145,ref=-] ; 11546[detail,seq220,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 未完成数量 | 2 | 11569[detail,seq470,ref=-] ; 11006[query,detail,seq245,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 销售订单号 | 2 | 10974[query,detail,seq30,ref=-] ; 11539[detail,seq30,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 销售订单数量 | 2 | 11620[detail,seq140,ref=-] ; 10994[query,detail,seq115,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 需求数量 | 2 | 10983[query,detail,seq120,ref=-] ; 11558[detail,seq150,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 重点管控 | 2 | 11007[query,detail,seq42,ref=-] ; 11582[detail,seq70,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 装箱完成 | 2 | 11005[query,detail,seq240,ref=-] ; 11605[detail,seq450,ref=-] | 
+  | MANU_SCHEDULE | 生产排产 | 组装完成 | 2 | 11004[query,detail,seq235,ref=-] ; 11555[detail,seq420,ref=-] | 
+  | STOCK_BALANCE | 库存状况表 | 仓库 | 2 | 11699[detail,seq20,ref=-] ; 9272[query,detail,seq20,ref=WH] | 
+  | STOCK_BALANCE | 库存状况表 | 仓库编码 | 2 | 9271[query,detail,seq10,ref=-] ; 11730[detail,seq10,ref=-] | 
+  | STOCK_BALANCE | 库存状况表 | 存货 | 2 | 11721[detail,seq40,ref=-] ; 9274[query,detail,seq40,ref=INV] | 
+  | STOCK_BALANCE | 库存状况表 | 存货编码 | 2 | 9273[query,detail,seq30,ref=-] ; 11728[detail,seq30,ref=-] | 
+  | STOCK_LEDGER | 库存台账 | 仓库 | 2 | 9299[query,detail,seq20,ref=WH] ; 11722[detail,seq40,ref=-] | 
+  | STOCK_LEDGER | 库存台账 | 存货 | 2 | 9301[query,detail,seq40,ref=INV] ; 11698[detail,seq60,ref=-] | 
+  | STOCK_SUMMARY | 收发存汇总表 | 仓库 | 2 | 9319[query,detail,seq20,ref=WH] ; 11735[detail,seq40,ref=-] | 
+  | STOCK_SUMMARY | 收发存汇总表 | 存货 | 2 | 9321[query,detail,seq40,ref=INV] ; 11692[detail,seq60,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 产品编码 | 2 | 2065[query,detail,seq40,ref=-] ; 2943[detail,seq50,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 产品名称 | 2 | 2944[detail,seq60,ref=-] ; 2066[query,detail,seq50,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 成型计划数量 | 2 | 2069[detail,seq80,ref=-] ; 2947[detail,seq90,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 成型完成 | 2 | 2075[detail,seq140,ref=-] ; 2953[detail,seq150,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 订单数量 | 2 | 2068[detail,seq70,ref=-] ; 2946[detail,seq80,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 工单号 | 2 | 2939[detail,seq10,ref=-] ; 2062[query,detail,seq10,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 工单状态 | 2 | 2073[query,detail,seq120,ref=-] ; 2951[detail,seq130,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 规格型号 | 2 | 2945[detail,seq70,ref=-] ; 2067[detail,seq60,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 混料完成 | 2 | 2074[detail,seq130,ref=-] ; 2952[detail,seq140,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 交期 | 2 | 2948[detail,seq100,ref=-] ; 2070[query,detail,seq90,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 客户 | 2 | 2064[query,detail,seq30,ref=-] ; 2942[detail,seq40,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 切炭完成 | 2 | 2954[detail,seq160,ref=-] ; 2076[detail,seq150,ref=-] | 
+  | WO_SCHEDULE | 排单计划 | 生产车间 | 2 | 2950[detail,seq120,ref=-] ; 2072[query,detail,seq110,ref=-] | 
+  | MANU_ORDER_DETAIL | 产品名称 | 2 | 11509[query,detail,seq5] ; 9059[query,seq5] | 
+  | MANU_SCHEDULE | 产品编码 | 2 | 10978[query,detail,seq70] ; 11589[detail,seq90] | 
+  | MANU_SCHEDULE | 产品名称 | 2 | 11574[detail,seq100] ; 10979[query,detail,seq80] | 
+  | MANU_SCHEDULE | 成型完成 | 2 | 11002[query,detail,seq225] ; 11544[detail,seq360] | 
+  | MANU_SCHEDULE | 单据日期 | 2 | 10973[query,detail,seq20] ; 11603[detail,seq20] | 
+  | MANU_SCHEDULE | 工序交期 | 2 | 11597[detail,seq260] ; 10997[query,detail,seq165] | 
+  | MANU_SCHEDULE | 混料完成 | 2 | 11001[query,detail,seq220] ; 11622[detail,seq330] | 
+  | MANU_SCHEDULE | 计划开工日 | 2 | 11011[query,detail,seq160] ; 11619[detail,seq240] | 
+  | MANU_SCHEDULE | 加工单号 | 2 | 11508[detail,seq10] ; 10972[query,detail,seq10] | 
+  | MANU_SCHEDULE | 交期 | 2 | 10987[query,detail,seq160] ; 11510[detail,seq250] | 
+  | MANU_SCHEDULE | 交期紧迫度(天) | 2 | 11532[detail,seq270] ; 10988[query,detail,seq170] | 
+  | MANU_SCHEDULE | 开产量 | 2 | 11022[query,detail,seq150] ; 11611[detail,seq500] | 
+  | MANU_SCHEDULE | 客户 | 2 | 11528[detail,seq40] ; 10975[query,detail,seq40] | 
+  | MANU_SCHEDULE | 客户等级 | 2 | 10992[query,detail,seq45] ; 11560[detail,seq50] | 
+  | MANU_SCHEDULE | 排产数量 | 2 | 10984[query,detail,seq130] ; 11565[detail,seq170] | 
+  | MANU_SCHEDULE | 批号 | 2 | 11540[detail,seq130] ; 10982[query,detail,seq110] | 
+  | MANU_SCHEDULE | 切炭完成 | 2 | 11003[query,detail,seq230] ; 11596[detail,seq390] | 
+  | MANU_SCHEDULE | 入库数量 | 2 | 10985[query,detail,seq140] ; 11566[detail,seq210] | 
+  | MANU_SCHEDULE | 生产订单数量 | 2 | 11008[query,detail,seq140] ; 11564[detail,seq160] | 
+  | MANU_SCHEDULE | 生产计划数量 | 2 | 11521[detail,seq180] ; 10995[query,detail,seq135] | 
+  | MANU_SCHEDULE | 生产线 | 2 | 10976[query,detail,seq50] ; 11578[detail,seq60] | 
+  | MANU_SCHEDULE | 生产状态 | 2 | 11606[detail,seq520] ; 11023[query,detail,seq45] | 
+  | MANU_SCHEDULE | 实际完成数量 | 2 | 10996[query,detail,seq145] ; 11546[detail,seq220] | 
+  | MANU_SCHEDULE | 未完成数量 | 2 | 11569[detail,seq470] ; 11006[query,detail,seq245] | 
+  | MANU_SCHEDULE | 销售订单号 | 2 | 10974[query,detail,seq30] ; 11539[detail,seq30] | 
+  | MANU_SCHEDULE | 销售订单数量 | 2 | 11620[detail,seq140] ; 10994[query,detail,seq115] | 
+  | MANU_SCHEDULE | 需求数量 | 2 | 10983[query,detail,seq120] ; 11558[detail,seq150] | 
+  | MANU_SCHEDULE | 重点管控 | 2 | 11007[query,detail,seq42] ; 11582[detail,seq70] | 
+  | MANU_SCHEDULE | 装箱完成 | 2 | 11005[query,detail,seq240] ; 11605[detail,seq450] | 
+  | MANU_SCHEDULE | 组装完成 | 2 | 11004[query,detail,seq235] ; 11555[detail,seq420] | 
+  | MATERIAL_OUT_DETAIL | 材料名称 | 2 | 8997[detail,seq150] ; 9011[query,seq5] | 
+  | MATERIAL_OUT_STATS | 材料名称 | 2 | 9131[detail,seq40] ; 9141[query,seq5] | 
+  | STOCK_BALANCE | 仓库 | 2 | 11699[detail,seq20] ; 9272[query,detail,seq20] | 
+  | STOCK_BALANCE | 仓库编码 | 2 | 9271[query,detail,seq10] ; 11730[detail,seq10] | 
+  | STOCK_BALANCE | 存货 | 2 | 11721[detail,seq40] ; 9274[query,detail,seq40] | 
+  | STOCK_BALANCE | 存货编码 | 2 | 9273[query,detail,seq30] ; 11728[detail,seq30] | 
+  | STOCK_LEDGER | 仓库 | 2 | 9299[query,detail,seq20] ; 11722[detail,seq40] | 
+  | STOCK_LEDGER | 存货 | 2 | 9301[query,detail,seq40] ; 11698[detail,seq60] | 
+  | STOCK_STATUS | wzdm | 2 | 9415[query,detail,seq1] ; 9416[detail,seq2] | 
+  | STOCK_SUMMARY | 仓库 | 2 | 9319[query,detail,seq20] ; 11735[detail,seq40] | 
+  | STOCK_SUMMARY | 存货 | 2 | 9321[query,detail,seq40] ; 11692[detail,seq60] | 
+  | WO_SCHEDULE | 产品编码 | 2 | 2065[query,detail,seq40] ; 2943[detail,seq50] | 
+  | WO_SCHEDULE | 产品名称 | 2 | 2944[detail,seq60] ; 2066[query,detail,seq50] | 
+  | WO_SCHEDULE | 成型计划数量 | 2 | 2069[detail,seq80] ; 2947[detail,seq90] | 
+  | WO_SCHEDULE | 成型完成 | 2 | 2075[detail,seq140] ; 2953[detail,seq150] | 
+  | WO_SCHEDULE | 订单数量 | 2 | 2068[detail,seq70] ; 2946[detail,seq80] | 
+  | WO_SCHEDULE | 工单号 | 2 | 2939[detail,seq10] ; 2062[query,detail,seq10] | 
+  | WO_SCHEDULE | 工单状态 | 2 | 2073[query,detail,seq120] ; 2951[detail,seq130] | 
+  | WO_SCHEDULE | 规格型号 | 2 | 2945[detail,seq70] ; 2067[detail,seq60] | 
+  | WO_SCHEDULE | 混料完成 | 2 | 2074[detail,seq130] ; 2952[detail,seq140] | 
+  | MANU_SCHEDULE | 11007 | 重点管控 | query,detail | 42 | 
+  | MANU_SCHEDULE | 11023 | 生产状态 | query,detail | 45 | 
+  | MANU_SCHEDULE | 11582 | 重点管控 | detail | 70 | 
+  | MANU_SCHEDULE | 11008 | 生产订单数量 | query,detail | 140 | 
+  | MANU_SCHEDULE | 11009 | 每箱数量 | detail | 146 | 
+  | MANU_SCHEDULE | 11010 | 箱数 | detail | 148 | 
+  | MANU_SCHEDULE | 11022 | 开产量 | query,detail | 150 | 
+  | MANU_SCHEDULE | 11011 | 计划开工日 | query,detail | 160 | 
+  | MANU_SCHEDULE | 11564 | 生产订单数量 | detail | 160 | 
+  | MANU_SCHEDULE | 11012 | 混料计划 | detail | 200 | 
+  | MANU_SCHEDULE | 11013 | 混料未完成 | detail | 220 | 
+  | MANU_SCHEDULE | 11014 | 成型计划 | detail | 230 | 
+  | MANU_SCHEDULE | 11619 | 计划开工日 | detail | 240 | 
+  | MANU_SCHEDULE | 11015 | 成型未完成 | detail | 250 | 
+  | MANU_SCHEDULE | 11016 | 切炭计划 | detail | 260 | 
+  | MANU_SCHEDULE | 11017 | 切炭未完成 | detail | 280 | 
+  | MANU_SCHEDULE | 11018 | 组装计划 | detail | 290 | 
+  | MANU_SCHEDULE | 11019 | 组装未完成 | detail | 310 | 
+  | MANU_SCHEDULE | 11020 | 装箱计划 | detail | 320 | 
+  | MANU_SCHEDULE | 11021 | 装箱未完成 | detail | 340 | 
+  | MANU_SCHEDULE | 11611 | 开产量 | detail | 500 | 
+  | MANU_SCHEDULE | 11617 | 已报工 | detail | 510 | 
+  | MANU_SCHEDULE | 11606 | 生产状态 | detail | 520 | 
+[OK] q3-flat-dup.sql (1 batches)
