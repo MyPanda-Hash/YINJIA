@@ -499,12 +499,13 @@ public class StockMonthCloseService {
         //   与上面两条配套:INSERT 只补非零键,所以删除是稳定的(不会下个月结又冒出来)。
         //   ⚠ 代价:该批次的「累计入库量/累计出库量」历史也随之从明细里消失(报表读的就是 kucun);
         //     若 (仓库,存货) 下**所有**批次都为 0,这一行整行消失 —— 这是"库存明细只列有余额的行"的口径。
-        int zeroPurged = jdbc.update(
-                "DELETE k FROM kucun k JOIN (" + agg + ") a"
+        Integer zeroCnt = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM kucun k JOIN (" + agg + ") a"
                         + " ON a.w = k.wzdm AND a.c = ISNULL(RTRIM(k.ckdm), N'') AND a.l = ISNULL(RTRIM(k.lot_no), N'')"
                         + " WHERE a.yl = 0 AND a.w <> N'' AND a.c <> N''"
                         // ⚠ 设过预警数量的行**不删**:预警是主数据,不能随批次清零被删(第十六轮)
-                        + "   AND ISNULL(k.预警数量, 0) = 0", endEx, endEx);        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
+                        + "   AND ISNULL(k.预警数量, 0) = 0", Integer.class, endEx, endEx);
+        int zeroPurged = zeroCnt == null ? 0 : zeroCnt;        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
         //   (StockLedgerService.apply 在同一事务里既改 kucun 又写 inh/outh)⇒ 一个 `asp_user1 LIKE 'stock:%'`
         //   的键如果在流水里**一条都没有**,只可能是「流水被改了批号(换键)」留下的残影:
         //   重算只做 upsert、不清旧键 ⇒ 同一批货会在新旧两个键上各算一次(实测正式库 260 行 / +135 万)。

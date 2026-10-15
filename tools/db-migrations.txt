@@ -3254,3 +3254,8 @@ migrate-doc-annotation-20261016.sql
 #   required 清 0 覆盖 MATERIAL_OUT/OTHER_OUT/SALE_OUT 三张出库单及其它 批号/lot_no 字段。
 #   自检:残留 label=批号 0 行、批号/lot_no 仍必填 0 行、出库三单批次号字段在册。幂等;两账套均执行。
 migrate-lot-rename-to-batchno.sql
+# migrate-stock-detail-hide-zero.sql — 库存明细改为隐藏「现存量=0」的行(kucun 不再物理删除,修弃审报「台账无该行」)
+migrate-stock-detail-hide-zero.sql
+
+# migrate-lot-normalize-doc-lines.sql — 单据明细行的空批次号也归一化为 PC0000(修弃审报「台账无该行」;单据侧与流水侧口径一致)
+migrate-lot-normalize-doc-lines.sql
