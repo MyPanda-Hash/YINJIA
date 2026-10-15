@@ -3187,3 +3187,13 @@ migrate-stock-detail-drop-price.sql
 #   自检:视图行数 = (物料,仓库) 两键组合数、现存量合计与 kucun 一致、9 个 col_name 都是视图真实列、名称字段在册。
 #   幂等(视图 CREATE OR ALTER;字段先删后插);两账套均执行。
 migrate-stock-detail-group-by-wh-item.sql
+# migrate-align-docdate-batch-time-20261016.sql — 批号/批次号日期后缀、转ERP时间/创建时间、
+#   送料暂收单·来料检验单的日期与时间,统一对齐到各自**单据日期**(时间列落在 12:00)。
+#   为什么登记:这批修正在协作机上是拿 node 直连脚本改的(tools/archive/_align-*-1016.mjs、
+#   _fix-time-of-day-1016.mjs),硬编码 database:'HSDZ_MES'、不进迁移链;而部署走「本地库整体
+#   覆盖服务器」⇒ 不登记的话下次部署会把服务器上已对齐的批次号/日期**又带回去**。
+#   规则化要点:批号日期来源优先级 = 源采购订单(sl_recv/sl_recv_detail/qc_insp 三链)→ 本表
+#   单据日期/日期/发生日期 → 头表(bl_X→bd_X、X_detail→X、X_head→X);无来源的表跳过。
+#   自检:仍不一致合计必须为 0,否则 RAISERROR。全 UPDATE 带「现值≠目标值」守卫 ⇒ 幂等;
+#   只改值不增删行,不动物理表结构与 yj_field/yj_translation。两账套均执行。
+migrate-align-docdate-batch-time-20261016.sql
