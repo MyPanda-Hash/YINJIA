@@ -3205,3 +3205,12 @@ migrate-align-docdate-batch-time-20261016.sql
 #   「外径1/外径2/外径（+密封圈）」是变体属性,提到内径前会拆散核心「外径→内径」相邻关系,故不动。
 #   幂等:仅当内径仍在外径之前才交换;末尾断言「外径严格先于内径」,否则 RAISERROR。两账套均执行。
 migrate-rd-prod-info-od-before-id-20261016.sql
+# migrate-rd-approval-attach-20261016.sql — 立项申请表(RD_APPROVAL)加附件能力。
+#   用户口径:「给立项申请表的备注栏加一个可以上传附件的功能」。本仓附件是**元数据驱动**:
+#   yj_field.data_type=N'附件' 的字段自动进「附件条」(attachFields=headerFields.filter(dataType==='附件')),
+#   由 FileAttachCell.vue 渲染上传/查看/删除,文件本体存 yj_attachment(不进业务表)⇒ 无需改渲染代码。
+#   本脚本:① 补物理占位列 rd_approval.[附件1] nvarchar(1000) NULL + 中文注明
+#           (selectCols 按 col_name 出列,缺列会报"列名无效",所以占位列必须有)
+#           ② 登记 yj_field(data_type='附件', place='header', seq=167 紧跟备注 165, width=220, visible=1)。
+#   译名 N'附件1' 十语言已存在,无需新增。幂等;两账套均执行。
+migrate-rd-approval-attach-20261016.sql
