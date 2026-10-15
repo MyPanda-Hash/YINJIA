@@ -47,6 +47,8 @@ tools/
 | 面板配置/条件冒烟 | `scripts\audit-panels.ps1`、`scripts\audit-conditions.ps1` |
 | **数据库规范体检**(13 项:命名/注明/元数据漂移/面板对象必备列/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
 | UI 冒烟(CDP) | `node verify\panels-ui-smoke.cjs`(在 tools/ 下运行,依赖 node_modules) |
+| **桌面看板 e2e**(概览口径 / 销售取数与界面 / 折线可分辨性 / 顶栏) | `node verify\dashboard-overview-api-e2e.cjs`、`dashboard-overview-ui-e2e.cjs`、`dashboard-sales-api-e2e.cjs`、`dashboard-sales-ui-e2e.cjs`、`dashboard-line-ui-e2e.cjs`、`dashboard-topbar-e2e.cjs`(需 8090 已启动;`*-api-*` 只读,`*-ui-*` 走 CDP 无头浏览器) |
+| **组织架构 e2e**(重置密码 / 权限配置态返回 / userSave 自锁守卫) | `node verify\orgadmin-password-reset-e2e.cjs`、`orgadmin-perm-back-e2e.cjs`、`user-save-guard-e2e.cjs` ⚠ 最后一个会**写测试账套**(YJ_TEST)并自带夹具与还原 —— 守住「不能停用自己 / 不能自我降权 / 不能停用降权最后一个可用管理员」三条自锁护栏,别在 HSDZ_MES 上跑 |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |
 | **刷新数据库表清单**(表结构变更后必跑) | `java -cp lib\mssql-jdbc.jar gen\GenDbCatalogDump.java` → `node gen\gen-db-catalog.cjs`(重写 `docs\development\数据库表清单.md`) |
