@@ -78,17 +78,31 @@ console.log('[5] 明细列: ' + await ev(`(() => {
   return heads.join(',') + '  | 含结存单价?' + (heads.includes('结存单价') ? '是(❌ 用户要求摘掉)' : '否 ✅');
 })()`))
 
-// 勾「恒亿仓」→ 点左栏「查询」按钮
-console.log('[6] 勾「恒亿仓」+ 点左栏查询按钮:')
+console.log('[6] 未勾选时应为空 → 勾「恒亿仓」即查询(单选):')
+const count0 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
   const input = item && item.querySelector('input'); if (input) input.click();
-  const btn = [...document.querySelectorAll('.wh-dock button')].find(b => b.innerText.trim() === '查询');
-  if (btn) btn.click();
   return 'ok'
 })()`)
 await sleep(6000)
-console.log('    ' + await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`) + ' 条(勾恒亿仓前是 2507 / 测试库同口径)')
+const count1 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
+// 再点同一个 = 取消 ⇒ 应回到空
+await ev(`(() => {
+  const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
+  const input = item && item.querySelector('input'); if (input) input.click();
+  return 'ok'
+})()`)
+await sleep(5000)
+const count2 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
+console.log(`    未勾选=${count0}(应 0) → 勾恒亿仓=${count1}(应 612) → 再点取消=${count2}(应 0)`)
+// 勾回来,供下面的展开断言使用
+await ev(`(() => {
+  const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
+  const input = item && item.querySelector('input'); if (input) input.click();
+  return 'ok'
+})()`)
+await sleep(6000)
 
 // 展开第一行
 console.log('[7] 展开第一行:')
