@@ -46,6 +46,18 @@ export default {
   },
   biz: {
     '待超级管理员批准': 'Awaiting super-admin approval',
+    '完工明细': 'Completion Details',
+    '按工序汇总': 'Summary by Operation',
+    '完工记录': 'Completion Records',
+    '记录数': 'Record Count',
+    '暂无完工记录': 'No completion records',
+    '完工明细查询失败': 'Failed to load completion details',
+    '完工时间': 'Completion Time',
+    '产成品流水号': 'Finished Product Serial No.',
+    '排产行锚': 'Scheduled Row Link',
+    '工单号+工单行号': 'Work Order + Line No.',
+    '工单内唯一批次': 'Unique Batch within Work Order',
+    '仅显示本工单行已审核的完工记录；各工序数量分别统计，不跨工序累计。': 'Only approved completion records for this work order line are shown. Quantities are summarized separately for each operation, not added across operations.',
     '单据已批准': 'Document approved',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
     '批准通过': 'Approve',
