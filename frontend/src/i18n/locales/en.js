@@ -583,6 +583,17 @@ export default {
     '生产工单行加载失败': 'Failed to load production work order lines',
     '生成制程检验单失败': 'Failed to create the in-process inspection sheet',
     // ---- 制程检验单横表「一个检验项目 = 一列,列内格数可加减」(2026-10-16)----
+    // ---- 制程检验单纸张横表:固定列 + 表头「列数」动态列(2026-10-17)----
+    '列数': 'Columns',
+    '增加一列': 'Add a column',
+    '减少一列(清空该列已填数据)': 'Remove a column (clears its data)',
+    '减少列将清空该列已填数据，确定减少吗？': 'Reducing a column will clear the data filled in that column. Reduce it?',
+    '减少列': 'Reduce column',
+    '按照{sec}检验项目填充': 'Fill in per {sec} inspection items',
+    '固定列（不可删）': 'Fixed column (cannot be deleted)',
+    '先填列头项目名': 'Fill the item name in the column header first',
+    '有 {n} 行还没归类（表区为空），请在明细列表里补表区': '{n} row(s) have no section yet — please fill in the section in the detail list',
+    '本单已有 {n} 列（按存量数据），点 － 可减列并清空该列数据': 'This sheet already has {n} column(s) (from existing data); click − to reduce a column and clear its data',
     '制程检验记录表': 'In-Process Inspection Record',
     '格数': 'Cells',
     '加一格': 'Add one cell',
@@ -2185,6 +2196,12 @@ export default {
     '职位': 'Position',
     '项目编码': 'Project code',
     '项目名称': 'Project Name',
+    // ---- 检验类型/检验数量(2026-10-16 检验方案实现模式变更)----
+    '检验类型': 'Inspection Type',
+    '检验类型 = 项目分类（如 外观检测/重量检测）：一个方案 = 一类项目，带入检验单后即横表的「表区」；检验数量决定带入后该项目的格数（列头 ＋ 加不过它）。': 'Inspection Type = the item category (e.g. Appearance / Weight): one plan = one category, and it becomes the "section" of the grid on the inspection sheet; Inspection Qty sets how many cells the item gets after carrying in (the ＋ on the column header cannot go beyond it).',
+    '如 外观检测 / 重量检测 / 尺寸检测（可直接输入新类型）': 'e.g. Appearance / Weight / Dimension (type a new one directly)',
+    '可留空；填 N = 带入后该项目的格数（列头 ＋ 加不过它）': 'optional; N = cells of this item after carrying in (＋ cannot exceed it)',
+    '检验数量就这么几格，加不了了': 'Inspection Qty is the limit — cannot add more cells',
     '检验内容': 'Inspection Content',
     '检验标准': 'Inspection standard',
     '数据类型': 'Data type',
@@ -3296,6 +3313,10 @@ export default {
       'The list is filtered — this save updates the loaded rows only; rows not shown will not be deleted',
     // 档案面板改「只提交改动行」(2026-10-03 用户口径):没有改动就不再空跑一次保存
     '没有需要保存的改动': 'Nothing to save — no rows were changed',
+    // 档案唯一键查重(2026-10-16 用户口径「工序档案表增加校验,相同工序编码不允许出现重复」;
+    // 声明来源 = 面板配置 metadata.uniqueKeys ← yj_panel.config,后端 ButtonService 同口径兜底)
+    '{f}「{v}」重复（第 {a} 行与第 {b} 行），不允许重复':
+      '{f} "{v}" is duplicated (row {a} and row {b}) — duplicates are not allowed',
 
     // 工序路线排线(2026-10-07:排产时一次把整条工艺路线的线选好,人工选;首道线 = 工单排产线)
     '工序路线排线': 'Operation Route Line Planning',

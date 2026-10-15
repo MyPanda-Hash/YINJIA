@@ -188,6 +188,11 @@ public class PanelConfigService {
                 "defaultOptions", List.of("启用", "已作废")));
         metadata.put("panelButtons", panelButtons);
         metadata.put("buttonGroups", buttonGroups);
+        // 唯一键声明(2026-10-16):yj_panel.config 里写了 "uniqueKeys" 才下发。
+        // 前端(PanelxList)据此在保存前对**已载入的全量行**即时查重;后端 ButtonService.saveArchive
+        // 用同一份声明做落库前预检 —— 一处声明,两端同源(契约见 docs/frontend/前端面板设计.md)。
+        java.util.List<java.util.List<String>> uniqueKeys = def.uniqueKeys();
+        if (!uniqueKeys.isEmpty()) metadata.put("uniqueKeys", uniqueKeys);
         if (classifyPanel != null && classifyTitle != null) {
             metadata.put("classifyPanel", classifyPanel);   // 前端「分类管理」跳转目标面板码
             metadata.put("classifyTitle", classifyTitle);   // 页签标题
@@ -460,9 +465,12 @@ public class PanelConfigService {
                     // 表头的新增/编辑/停用就地维护标准本身。基础档案里的 QC_ITEM/QC_PLAN 菜单已摘,维护只此一处。
                     if (!merged.contains("检验项目/检验方案")) merged.add(anchor + 1, "检验项目/检验方案");
                     // 2026-10-13:制程检验单再加一个「取出货检验计划」入口(RD_INSP_PLAN)——
-                    // 用户口径「实现对应的产品编码就能获取到对应的检验内容进行填入」。只给这一张单:
-                    // 出货检验计划只服务制程工序,其余三张单仍走既有「检验项目/检验方案」标准库。
-                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("取出货检验计划")) {
+                    // 用户口径「实现对应的产品编码就能获取到对应的检验内容进行填入」。
+                    // 2026-10-16 扩到**四张检验单**:用户口径「当前成品检验单实现方式需要修改,要能获取到
+                    //   出货检验计划中的内容,当前红框内容都需要是能获取到的」+「检验方法需要实现可一一对应」
+                    //   —— 四张单的明细列已统一为 检验项目/检验要求/检验方法/检查频率(yj_field 同名),
+                    //   与计划表的 控制项目/控制标准及要求/控制方法/检测频率 一一对应,故入口一并下发。
+                    if (!merged.contains("取出货检验计划")) {
                         int at = merged.indexOf("检验项目/检验方案");   // 排在它之前(按产品取现成计划更常用)
                         merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
                     }

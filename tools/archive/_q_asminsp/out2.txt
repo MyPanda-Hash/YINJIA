@@ -1,0 +1,114 @@
+=== qc_proc_insp_detail cols ===
+[ERR] Ambiguous column name 'name'.
+
+=== qc_mold_insp_detail / qc_cut_insp_detail cols ===
+tbl | name
+qc_mold_insp_detail | id
+qc_mold_insp_detail | 单据编号
+qc_mold_insp_detail | 行号
+qc_mold_insp_detail | 检验项目
+qc_mold_insp_detail | 标准要求
+qc_mold_insp_detail | 实测数值
+qc_mold_insp_detail | 判定
+qc_mold_insp_detail | 数量
+qc_mold_insp_detail | 处理方式
+qc_mold_insp_detail | 备注
+qc_mold_insp_detail | asp_user1
+qc_mold_insp_detail | asp_time1
+qc_mold_insp_detail | asp_user2
+qc_mold_insp_detail | asp_time2
+qc_mold_insp_detail | asp_cancel
+qc_mold_insp_detail | 表区
+qc_mold_insp_detail | 检验方法
+qc_mold_insp_detail | 合格数量
+qc_mold_insp_detail | 不合格数量
+qc_cut_insp_detail | id
+qc_cut_insp_detail | 单据编号
+qc_cut_insp_detail | 行号
+qc_cut_insp_detail | 检验项目
+qc_cut_insp_detail | 标准要求
+qc_cut_insp_detail | 实测数值
+qc_cut_insp_detail | 判定
+qc_cut_insp_detail | 数量
+qc_cut_insp_detail | 处理方式
+qc_cut_insp_detail | 备注
+qc_cut_insp_detail | asp_user1
+qc_cut_insp_detail | asp_time1
+qc_cut_insp_detail | asp_user2
+qc_cut_insp_detail | asp_time2
+qc_cut_insp_detail | asp_cancel
+qc_cut_insp_detail | 表区
+qc_cut_insp_detail | 检验方法
+qc_cut_insp_detail | 合格数量
+qc_cut_insp_detail | 不合格数量
+(38 rows)
+
+=== comments on qc_proc_insp_detail 检查频率/检验仪器 ===
+name | value
+不合格应对措施 | 来源=出货检验计划表 RD_INSP_PLAN.不合格应对措施
+检查频率 | 检查频率(来源=出货检验计划表 RD_INSP_PLAN.检测频率;取值 1PCS/一个生产批次 · 生产量*1% · 型式检验)
+检验方法 | 截图「检验方法」;来源=出货检验计划表 RD_INSP_PLAN.控制方法
+检验要求 | 截图「检验要求」;来源=出货检验计划表 RD_INSP_PLAN.控制标准及要求
+检验仪器 | 截图「检验仪器/方法」列(与已有的 检验方法 同义,按截图分列展示)
+(5 rows)
+
+=== translations for labels of interest ===
+scope | ref_key | locale | text | source
+field | 标准要求 | en | Standard | manual
+field | 不合格应对措施 | de | Maßnahmen bei Nichtkonformität | manual
+field | 不合格应对措施 | en | Nonconformance Action | manual
+field | 不合格应对措施 | es | Medidas ante no conformidad | manual
+field | 不合格应对措施 | fr | Mesures en cas de non-conformité | manual
+field | 不合格应对措施 | ja | 不適合時の対応措置 | manual
+field | 不合格应对措施 | ko | 부적합 대응 조치 | manual
+field | 不合格应对措施 | ru | Меры при несоответствии | manual
+field | 不合格应对措施 | th | มาตรการรับมือสิ่งที่ไม่เป็นไปตามข้อกำหนด | manual
+field | 不合格应对措施 | vi | Biện pháp xử lý không phù hợp | manual
+field | 不合格应对措施 | zh-TW | 不合格應對措施 | manual
+field | 检测频率 | en | 检测频率 | manual
+field | 检查频率 | de | Prüfhäufigkeit | manual
+field | 检查频率 | en | Check Frequency | manual
+field | 检查频率 | es | Frecuencia de comprobación | manual
+field | 检查频率 | fr | Fréquence de vérification | manual
+field | 检查频率 | ja | 検査頻度 | manual
+field | 检查频率 | ko | 검사 빈도 | manual
+field | 检查频率 | ru | Частота проверки | manual
+field | 检查频率 | th | ความถี่ในการตรวจสอบ | manual
+field | 检查频率 | vi | Tần suất kiểm tra | manual
+field | 检查频率 | zh-TW | 檢查頻率 | manual
+field | 检验方法 | en | Inspection Method | manual
+field | 检验要求 | de | Prüfanforderung | manual
+field | 检验要求 | en | Inspection Requirement | manual
+field | 检验要求 | es | Requisito de inspección | manual
+field | 检验要求 | fr | Exigence d'inspection | manual
+field | 检验要求 | ja | 検査要件 | manual
+field | 检验要求 | ko | 검사 요구사항 | manual
+field | 检验要求 | ru | Требование контроля | manual
+field | 检验要求 | th | ข้อกำหนดการตรวจสอบ | manual
+field | 检验要求 | vi | Yêu cầu kiểm tra | manual
+field | 检验要求 | zh-TW | 檢驗要求 | manual
+field | 检验仪器 | en | Instrument | manual
+field | 控制方法 | en | 控制方法 | manual
+(35 rows)
+
+=== yj_field data_type for 标准要求/检验要求 ===
+panel_code | col_name | label | data_type | place | seq | width
+OP | 检验要求 | 检验要求 | 文本 | detail | 150 | 140
+QC_ASM_INSP | 标准要求 | 标准要求 | 多行文本 | detail | 20 | 180
+QC_CUT_INSP | 标准要求 | 标准要求 | 多行文本 | detail | 220 | 180
+QC_MOLD_INSP | 标准要求 | 标准要求 | 多行文本 | detail | 220 | 180
+QC_PROC_INSP | 检验要求 | 检验要求 | 文本 | detail | 40 | 240
+RD_SPEC_DOC | 检验要求 | 检验要求 | 文本 | detail | 80 | 260
+(6 rows)
+
+=== detail rows sample of qc_asm_insp_detail ===
+单据编号 | 表区 | 行号 | 检验项目 | 标准要求 | 实测数值 | 检验方法 | 判定 | 数量 | 处理方式 | 不合格数量
+ZJ-2026-10-0005 | 数量判定 | null | 成品检验 | null | null | null | 合格 | null | 入库 | null
+ZJ-2026-10-0005 | 数量判定 | null | 成品检验 | null | null | null | 不合格 | null | 待处理 | null
+ZJ-2026-10-0006 | 数量判定 | null | 成品检验 | null | null | null | 合格 | null | 入库 | null
+ZJ-2026-10-0006 | 数量判定 | null | 成品检验 | null | null | null | 不合格 | null | 待处理 | 0.0000
+ZJ-2026-10-0008 | 数量判定 | null | 成品检验 | null | null | null | 合格 | 421.0000 | 入库 | null
+ZJ-2026-10-0008 | 数量判定 | null | 成品检验 | null | null | null | 不合格 | null | 待处理 | 0.0000
+ZJ-2026-10-0008 | 检验项目 | null | 目数(+20目) | +20目占比≤15% | null | 1.称取100g Y料成品，从上到下依次放20目、325目筛网进行震动筛分5min；2.称量计算各区间占比。 | null | null | null | null
+(7 rows)
+

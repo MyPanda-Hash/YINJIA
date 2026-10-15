@@ -6,12 +6,23 @@
      也不改动已录入单据 —— 与 StdLibManager「改库不污染已录入数据」同口径。
 
      入口:组装成品检验单(以及成型/切炭检验单)工具栏「更多」组里的「检验项目维护」按钮。
-     可撤回:删本组件 + PanelxList 的挂载与 action 分支 + PanelConfigService 的按钮注入。 -->
+     可撤回:删本组件 + PanelxList 的挂载与 action 分支 + PanelConfigService 的按钮注入。
+
+     2026-10-16 实现模式变更(用户口径「修改当前检验方案的实现模式,不需要绑定文件编码,而是设定
+     当前检验的类型,然后下方增加可选的检验数量」):
+       · 方案的「文件编码」退场(yj_field 已隐藏,老值留在库里),换成「检验类型」= **项目分类**
+         (外观检测/重量检测/尺寸检测…),自由录入 + 常用候选;
+       · 「一个方案 = 一类项目」:选定方案后,下方新增项目的类别默认继承该类型,带入明细时
+         它当作横表的「表区」名(curPlan.检验类型 贴到每一行上,见 confirmPick);
+       · 项目的「检验数量」可选:带入后 = 该项目在横表里的格数,也是列头「＋」的上限
+         (留空 = 不设上限,照旧自由加减)。 -->
 <template>
   <el-dialog :model-value="modelValue" :title="tt('检验项目/检验方案')" width="1200px" top="4vh" append-to-body
              destroy-on-close @update:model-value="(v) => emit('update:modelValue', v)" @open="load">
     <div class="qcplan-tip">
       {{ tt('上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。') }}
+      <br />
+      {{ tt('检验类型 = 项目分类（如 外观检测/重量检测）：一个方案 = 一类项目，带入检验单后它就是横表的「表区」。项目的检验数量可留空；填了 N，带入后该项目在横表里就有 N 格、列头「＋」加不过它。') }}
     </div>
 
     <!-- ═══ ① 检验方案(主表) ═══ -->
@@ -40,7 +51,9 @@
         <el-table-column :label="tt('适用存货')" prop="适用存货" width="120" show-overflow-tooltip />
         <el-table-column :label="tt('适用存货类别')" prop="适用存货类别" width="130" show-overflow-tooltip />
         <el-table-column :label="tt('检验方式')" prop="检验方式" width="80" />
-        <el-table-column :label="tt('文件编码')" prop="文件编码" width="100" />
+        <!-- 2026-10-16 用户口径:「不需要绑定文件编码,而是设定当前检验的类型」——
+             原来这一列是受控文件号(文件编码 YJ-Q-125);现在 = 方案的**项目分类**(外观检测/重量检测…) -->
+        <el-table-column :label="tt('检验类型')" prop="检验类型" width="120" show-overflow-tooltip />
         <el-table-column :label="tt('取样规则')" prop="取样规则" min-width="190" show-overflow-tooltip />
         <el-table-column :label="tt('项目数')" prop="项目数" width="70" align="right" />
         <el-table-column :label="tt('状态')" width="80">
@@ -93,6 +106,8 @@
         <el-table-column :label="tt('标准上限')" prop="标准上限" width="90" align="right" />
         <el-table-column :label="tt('计量单位')" prop="计量单位" width="80" />
         <el-table-column :label="tt('取样要求')" prop="取样要求" width="110" show-overflow-tooltip />
+        <!-- 检验数量(2026-10-16 用户口径「下方增加可选的检验数量」):= 带入后横表该项目的格数上限 -->
+        <el-table-column :label="tt('检验数量')" prop="检验数量" width="80" align="right" />
         <el-table-column :label="tt('检验方法')" prop="检验方法" min-width="180" show-overflow-tooltip />
         <el-table-column :label="tt('合格处置')" prop="合格处置" width="90" show-overflow-tooltip />
         <el-table-column :label="tt('不合格处置')" prop="不合格处置" width="100" show-overflow-tooltip />
@@ -138,8 +153,20 @@
           <el-input v-model="planForm.取样规则" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }"
                     :placeholder="tt('如 每50kg成品取样1个，每个样品200g')" />
         </el-form-item>
-        <el-form-item :label="tt('文件编码')">
-          <el-input v-model="planForm.文件编码" style="width: 200px" :placeholder="tt('如 YJ-Q-125')" />
+        <!-- 检验类型(2026-10-16):取代原来的「文件编码」—— 方案按**项目分类**归属(外观检测/重量检测…)。
+             与项目的「检验内容」同款:候选给常用值 + 已有值,想开新类型直接打字(allow-create),不预设死。 -->
+        <el-form-item :label="tt('检验类型')">
+          <el-select
+            v-model="planForm.检验类型"
+            style="width: 260px"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            :placeholder="tt('如 外观检测 / 重量检测 / 尺寸检测（可直接输入新类型）')"
+          >
+            <el-option v-for="t in typeOptions" :key="t" :label="t" :value="t" />
+          </el-select>
         </el-form-item>
         <el-form-item :label="tt('执行标准')">
           <el-input v-model="planForm.执行标准" />
@@ -209,6 +236,13 @@
         <el-form-item :label="tt('取样要求')">
           <el-input v-model="itemForm.取样要求" style="width: 320px" :placeholder="tt('如 称取100g')" />
         </el-form-item>
+        <!-- 检验数量(2026-10-16 用户口径「下方增加可选的检验数量」):可选。
+             填 N ⇒ 带入检验单后该项目在横表里就有 N 格,且列头「＋」加不过 N(留空 = 不设上限)。
+             存量已按取样要求里写死的「nPCS」回填(1PCS→1 / 5PCS→5),其余留空。 -->
+        <el-form-item :label="tt('检验数量')">
+          <el-input v-model="itemForm.检验数量" style="width: 140px"
+                    :placeholder="tt('可留空；填 N = 带入后该项目的格数（列头 ＋ 加不过它）')" />
+        </el-form-item>
         <el-form-item :label="tt('检验方法')">
           <el-input v-model="itemForm.检验方法" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" />
         </el-form-item>
@@ -243,7 +277,11 @@ const picked = ref([])
 const itemTable = ref(null)
 function confirmPick() {
   if (!picked.value.length) return
-  emit('pick', picked.value.slice())
+  // 2026-10-16 拍板:带入时把**当前方案的「检验类型」**贴到每一行上 ——
+  // 它是这批项目在检验单横表里所属的「表区」(方案 = 一类项目);
+  // 方案没填类型时照旧按项目自己的「检验内容」分类,老数据行为不变。
+  const type = String(curPlan.value?.['检验类型'] ?? '').trim()
+  emit('pick', picked.value.map((it) => (type ? { ...it, 检验类型: type } : { ...it })))
   emit('update:modelValue', false)
 }
 
@@ -273,6 +311,26 @@ const categoryOptions = computed(() => {
   }
   // 当前正在编辑的值也纳入(编辑已有项目时能选中自身)
   const cur = String(itemForm.value?.['检验内容'] ?? '').trim()
+  if (cur) set.add(cur)
+  return [...set]
+})
+
+/**
+ * 检验类型的候选(2026-10-16):常用分类 + 已在用的值(方案的检验类型 ∪ 方案下项目的类别)。
+ * 与「检验内容」同款:可自由输入新类型(allow-create),不预设死 —— 类别是业务口径,不是字典项。
+ */
+const TYPE_PRESETS = ['外观检测', '重量检测', '尺寸检测', '性能检测', '材质检测', '包装检测']
+const typeOptions = computed(() => {
+  const set = new Set(TYPE_PRESETS)
+  for (const p of plans.value || []) {
+    const t = String(p['检验类型'] ?? '').trim()
+    if (t) set.add(t)
+  }
+  for (const it of items.value || []) {
+    const c = String(it['检验内容'] ?? '').trim()
+    if (c) set.add(c)
+  }
+  const cur = String(planForm.value?.['检验类型'] ?? '').trim()
   if (cur) set.add(cur)
   return [...set]
 })
@@ -379,9 +437,16 @@ async function destroyPlan() {
 }
 
 function openItemForm(row) {
+  // 新增项目时「检验内容(类别)」默认继承当前方案的「检验类型」(方案 = 一类项目,2026-10-16)——
+  // 用户口径「让当前的检验类型格决定…」:类型定在上方方案格上,下方项目跟着走,不用再各填一次。
   itemForm.value = row
-    ? { ...row, 标准下限: row['标准下限'] ?? '', 标准上限: row['标准上限'] ?? '', 序号: row['序号'] ?? '' }
-    : { 数据类型: '定量', 判定规则: '符合标准', 项目编码: '', 项目名称: '', 序号: (items.value.length + 1) * 10 }
+    ? { ...row, 标准下限: row['标准下限'] ?? '', 标准上限: row['标准上限'] ?? '', 序号: row['序号'] ?? '', 检验数量: row['检验数量'] ?? '' }
+    : {
+        数据类型: '定量', 判定规则: '符合标准', 项目编码: '', 项目名称: '',
+        序号: (items.value.length + 1) * 10,
+        检验内容: String(curPlan.value?.['检验类型'] ?? '').trim(),
+        检验数量: '',
+      }
   itemFormVisible.value = true
 }
 

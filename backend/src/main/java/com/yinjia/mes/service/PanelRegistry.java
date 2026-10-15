@@ -45,7 +45,7 @@ public class PanelRegistry {
     public record PanelDef(String code, String name, String nameEn, String category, String mode,
                            String lineTable, String headTable, String groupCol,
                            String pkCol, String codeCol, String prefix, String dateCol,
-                           Integer pageSize, String detailKey, String moduleGroup,
+                           Integer pageSize, String detailKey, String moduleGroup, String config,
                            List<FieldDef> fields) {
         public boolean isDoc() { return "doc".equals(mode); }
         public boolean hasHeadTable() { return headTable != null && !headTable.isBlank(); }
@@ -56,6 +56,47 @@ public class PanelRegistry {
         /** 明细页签键(与接口返回 detail.<key> 一致;缺省 items) */
         public String tabKey() {
             return detailKey == null || detailKey.isBlank() ? "items" : detailKey;
+        }
+
+        private static final com.fasterxml.jackson.databind.ObjectMapper CONFIG_JSON =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+
+        /**
+         * **唯一键声明**(yj_panel.config 的 {@code "uniqueKeys"},2026-10-16 起):
+         * 每个元素是一组「组内列不得重复出现同一取值」的字段标签(数据键=中文 label)。
+         * 写法:{@code {"uniqueKeys":["工序编码"]}}(单列)或
+         * {@code {"uniqueKeys":[["仓库","仓位编码"]]}}(组合键);两种可混用。
+         *
+         * <p>用途:全是**声明式**的 —— ButtonService.saveArchive 据此在落库前预检
+         * (给业务话术),PanelConfigService 把同一份声明下发给前端做保存前即时查重。
+         * 哪张面板哪几列唯一由元数据说了算,**不加代码**(与"加面板=插行"同一条规矩)。
+         *
+         * <p>解析失败(手写 config 写坏)时返回空表并在日志里骂一句:宁可不拦业务,
+         * 也不能因为一段配置让整个面板存不进去 —— 数据库侧的过滤唯一索引仍是最后一道闸。
+         */
+        public List<List<String>> uniqueKeys() {
+            if (config == null || !config.contains("uniqueKeys")) return List.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("uniqueKeys");
+                if (!node.isArray()) return List.of();
+                List<List<String>> out = new ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode e : node) {
+                    List<String> keys = new ArrayList<>();
+                    if (e.isArray()) {
+                        for (com.fasterxml.jackson.databind.JsonNode k : e) {
+                            if (k.isTextual() && !k.asText().isBlank()) keys.add(k.asText().trim());
+                        }
+                    } else if (e.isTextual() && !e.asText().isBlank()) {
+                        keys.add(e.asText().trim());
+                    }
+                    if (!keys.isEmpty()) out.add(List.copyOf(keys));
+                }
+                return List.copyOf(out);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[uniqueKeys] 面板 {} 的 config 不是合法 JSON,唯一性预检跳过:{}", code, config);
+                return List.of();
+            }
         }
         /** 模块分组(对齐 HSDZ permission.GROP;缺省 其他) */
         public String moduleName() {
@@ -103,14 +144,15 @@ public class PanelRegistry {
                             rs.getString("tab_key")));
                 });
         Map<String, PanelDef> out = new HashMap<>();
-        jdbc.query("SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group FROM yj_panel",
+        jdbc.query("SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group, config FROM yj_panel",
                 rs -> {
                     String code = rs.getString("panel_code");
                     out.put(code, new PanelDef(code, rs.getString("panel_name"), rs.getString("panel_name_en"), rs.getString("category"),
                             rs.getString("mode"), rs.getString("line_table"), rs.getString("head_table"),
                             rs.getString("group_col"), rs.getString("pk_col"), rs.getString("code_col"),
                             rs.getString("prefix"), rs.getString("date_col"), (Integer) rs.getObject("page_size"),
-                            rs.getString("detail_key"), rs.getString("module_group"), byPanel.getOrDefault(code, List.of())));
+                            rs.getString("detail_key"), rs.getString("module_group"),
+                            rs.getString("config"), byPanel.getOrDefault(code, List.of())));
                 });
         caches.put(DataSourceRouter.current(), new Snapshot(out, System.currentTimeMillis()));
     }

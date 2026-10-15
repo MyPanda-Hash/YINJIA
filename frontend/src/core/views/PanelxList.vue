@@ -5601,10 +5601,16 @@ function applyShipPlanItems(items) {
  * 选检验项目 → 带入当前单据明细(2026-10-09 用户口径:「在组装成品检验处看到对应的检验项目,
  * 选择填写检验单的数据」)。
  *
- * 行为:把勾选的检验项目**追加**到当前明细页签行尾,每行只填 表区=检验项目 + 项目/标准要求/检验方法,
+ * 行为:把勾选的检验项目**追加**到当前明细页签行尾,每行只填 表区=类别 + 项目/检验要求/检验方法,
  * 实测数值与判定留空,由品质按**现有模板**逐格填;不自动保存(保存仍由用户点「保存」)。
  * 行由 newDetailRow(tabKey) 构造(带齐该页签各字段默认值),与「新增数据」完全同构
  * ⇒ 保存链路(labelsToCols/行表 upsert)一行都不用改。
+ *
+ * 2026-10-16 改口径(用户拍板「一个方案 = 一类项目:作为项目归属 + 带入横表时的『表区』名」):
+ *   · 类别优先取**方案的「检验类型」**(弹窗带入时贴到每行上,见 QcInspPlanDialog.confirmPick),
+ *     方案没填才回退项目自己的「检验内容」;
+ *   · 项目的「检验数量」= 该项目在制程检验单横表里的**格数**,同时落成列头「＋」的上限
+ *     (qc_proc_insp_detail.格数 / 格数上限 两个内部列,hidden 字段,值照存照取)。
  */
 function applyInspItems(items) {
   const b = blocks.value[0]
@@ -5614,6 +5620,9 @@ function applyInspItems(items) {
   // 明细列名(用于判断本面板是否支持「表区」/「检验要求」这类别名字段 —— 制程检验单用别名)
   const cols = new Set(b ? (activeTab(b).cols || []) : [])
   const has = (k) => cols.size === 0 || cols.has(k)
+  // 制程检验单是纸张横表(一个检验项目 = 一列):格数/格数上限 两个内部列不进列表列集,
+  // 故按面板代号判断(与 QcProcInspSheet 的挂载条件一致)。
+  const isProcSheet = panelCode.value === 'QC_PROC_INSP'
   // 2026-10-12 用户口径:「不同检验项目类别就能自动分格开来实现」
   //   项目的「检验内容」= 类别(A/B/C/D/E 那种);带入明细时把类别写进「表区」,
   //   报表/明细即可按类别分格显示。没有类别时回退旧口径 '检验项目'。
@@ -5624,19 +5633,30 @@ function applyInspItems(items) {
   const dupes = []
   const fresh = items || []
   for (const it of fresh) {
-    const category = String(it['检验内容'] || '').trim()
+    // 2026-10-16:类别优先取方案的「检验类型」(带入时贴上的),没填才回退项目自己的「检验内容」
+    const category = String(it['检验类型'] || it['检验内容'] || '').trim()
     const k = norm(category || '检验项目') + '|' + norm(it['项目名称'])
     if (seen.has(k)) { dupes.push(it['项目名称'] || ''); continue }   // 已带入过 ⇒ 跳过不重复加
     seen.add(k)
     const row = newDetailRow(tabKey)
     if (has('表区')) row['表区'] = category || '检验项目'
     if (has('检验项目')) row['检验项目'] = it['项目名称'] || ''
-    // 制程检验单的列名是「检验要求」,三类工序检验单是「标准要求」—— 两个都填,各自生效
-    if (has('标准要求')) row['标准要求'] = it['检验标准'] || ''
+    // 2026-10-16:四张检验单的列名已统一为「检验要求」——三张工序检验单原叫「标准要求」,
+    // 已由 migrate-insp-req-align-20261016.sql 正名对齐出货检验计划表的用词(控制标准及要求),
+    // 故此处只写 检验要求 一个键(旧的 标准要求 分支已随之删除)。
     if (has('检验要求')) row['检验要求'] = it['检验标准'] || ''
     if (it['检验方法'] && has('检验方法')) row['检验方法'] = it['检验方法']
     if (it['取样要求'] && has('抽检量')) row['抽检量'] = it['取样要求']
     if (it['计量单位'] && has('单位')) row['单位'] = it['计量单位']
+    // 检验数量 → 横表格数 + 上限(只对制程检验单这张横表;其它检验单是纵向明细,没有格的概念)
+    if (isProcSheet) {
+      const qty = Number(it['检验数量'])
+      if (Number.isFinite(qty) && qty > 0) {
+        const q = Math.round(qty)
+        row['格数上限'] = q
+        row['格数'] = Math.min(q, 10)   // 测量值列预置 10 个(用到几格激活几格),再多也没列可放
+      }
+    }
     // 顺序:按类别分组后同类相邻(便于人工核对),类别内保持接口返回的 序号 次序
     rows.push(row)
     n++
@@ -5785,6 +5805,42 @@ function emptyFieldValue(value) {
   return value === undefined || value === null || String(value).trim() === ''
 }
 
+/**
+ * 唯一键查重(2026-10-16,起点需求:工序档案「相同工序编码不允许出现重复」)。
+ *
+ * 声明来源 = 面板配置 `metadata.uniqueKeys`(后端由 `yj_panel.config` 下发,与 ButtonService
+ * `ensureArchiveUniqueKeys` 同一份声明):形如 `[['工序编码']]` 或 `[['仓库','仓位编码']]`,
+ * 组内列的组合取值不得在**存活行**里重复出现。
+ *
+ * 判据 = 已载入的全量行(档案是"一张虚拟单承载整档",行都在 cur.value.detail 里),
+ * 所以"把 A 行的编码改成和 B 行一样"当场就能拦下,不用等后端报错;
+ * 空值不参与(与后端同口径 —— 空值不算重复,必填由字段级 required 管)。
+ */
+function validateArchiveUniqueKeys() {
+  const keySets = cfgCache.value?.metadata?.uniqueKeys
+  if (!Array.isArray(keySets) || !keySets.length) return ''
+  const rows = allArchiveRows().filter((r) => String(r?.asp_cancel || 'N') !== 'Y')
+  for (const keys of keySets) {
+    if (!Array.isArray(keys) || !keys.length) continue
+    const seen = new Map()
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] || {}
+      const tuple = keys.map((k) => (row[k] === undefined || row[k] === null ? '' : String(row[k]).trim()))
+      if (tuple.some((v) => v === '')) continue
+      const key = tuple.join('\u0001')
+      if (seen.has(key)) {
+        return tt('{f}「{v}」重复（第 {a} 行与第 {b} 行），不允许重复')
+          .replace('{f}', keys.join('+'))
+          .replace('{v}', tuple.join(' / '))
+          .replace('{a}', String(seen.get(key) + 1))
+          .replace('{b}', String(i + 1))
+      }
+      seen.set(key, i)
+    }
+  }
+  return ''
+}
+
 function validateInlineDraft() {
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
@@ -5833,6 +5889,14 @@ function validateInlineDraft() {
 
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
+  // 唯一键查重(2026-10-16):「相同编码不允许重复」是**数据正确性**规则,不是"填没填全"——
+  // 所以它不受 skipValidation 影响,"保存为草稿"同样不放行(否则草稿先把重复码存进去,
+  // 数据库侧的过滤唯一索引会把整笔保存打回,报错还是 SQL 原文,用户看不懂)。
+  const dupUnique = validateArchiveUniqueKeys()
+  if (dupUnique) {
+    ElMessage.warning(dupUnique)
+    return false
+  }
   // ⚠ skipValidation 必须在这里真正生效(2026-09-20 修):
   //   参数早就声明了、调用方也传了(「保存为草稿」传 true),但函数体里**从来没读过它** ——
   //   于是草稿路径照样跑全量必填校验 ⇒ "保存为草稿"做不到"存一半"。

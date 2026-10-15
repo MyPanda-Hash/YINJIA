@@ -1,0 +1,145 @@
+=== views referencing insp detail tables ===
+view_name | definition
+(0 rows)
+
+=== views referencing 标准要求 ===
+view_name
+(0 rows)
+
+=== all views (names) ===
+name
+v_dispatch_detail
+v_dispatch_stats
+v_finish_in_detail
+v_finish_in_stats
+v_line_load
+v_manu_order_detail
+v_manu_order_stats
+v_manu_schedule
+v_material_out_detail
+v_material_out_stats
+v_purchase_in_detail
+v_purchase_in_stats
+v_sale_out_detail
+v_sale_out_stats
+v_sales_order_detail
+v_sales_order_stats
+v_stock_balance
+v_stock_ledger
+v_stock_movement
+v_stock_summary
+v_wo_next_process
+v_wo_process_board
+v_wo_process_progress
+v_wo_schedule
+VIEW_barcord
+View_BOM
+VIEW_CK
+View_CRK
+View_FKZE
+View_GX
+VIEW_inh
+VIEW_kucun
+View_llrk00
+View_llrk01
+View_llrk01A
+View_llrk02
+View_llrk02A
+View_llrk03
+View_llrk03A
+View_llrk04
+View_llrk04A
+View_llrk05
+View_llrk05A
+View_llrk06
+View_llrk06A
+View_llrk07
+View_llrk07A
+View_llrk08
+View_od_cost
+View_od_cost1
+View_od_cost2
+View_od_cost3
+View_od_cost4
+View_od_sqdchl
+View_OD_WLQTY1
+View_OD_WLQTY2
+View_OD_WLQTY3
+View_OD_WLQTY4
+View_OD_WLQTY41
+View_OD_WLQTY5
+View_OD_WLQTY6
+View_OD_WLQTY7
+View_OD_WLQTY9
+VIEW_odqty
+View_odqty1
+View_odqty2
+View_odqty3
+VIEW_order
+VIEW_outh
+VIEW_pandian
+View_pcqty
+VIEW_podyl
+VIEW_podyl1
+View_Porder
+VIEW_QTY
+VIEW_QTY1
+VIEW_QTY2
+VIEW_QTY3
+VIEW_RK
+View_SCGD
+View_SCX
+View_SKZE
+View_WB_WLQTY1
+View_WB_WLQTY2
+View_WB_WLQTY3
+View_WB_WLQTY9
+VIEW_zc
+View_ZZPQTY
+View_ZZPQTY0
+View_ZZPQTY1
+View_ZZPQTY2
+View_ZZPQTY3
+View_ZZPQTY4
+View_ZZPQTY5
+View_ZZPQTY6
+View_ZZPQTY7
+View_ZZPQTY8
+(97 rows)
+
+=== comments on qc_asm_insp_detail cols ===
+name | value
+id | null
+单据编号 | null
+行号 | null
+检验项目 | null
+标准要求 | null
+实测数值 | null
+判定 | null
+数量 | null
+处理方式 | null
+备注 | null
+asp_user1 | null
+asp_time1 | null
+asp_user2 | null
+asp_time2 | null
+asp_cancel | null
+表区 | 表区(分块键:检验项目=项目/标准/方法/实测/判定;数量判定=判定/数量/处理方式,组装成品分流用)
+检验方法 | 检验方法(表区=检验项目 时由检验项目档案带入)
+合格数量 | 合格数量(派生值，界面不再录入)：= 表头「检验数量」 − 本单明细「不合格数量」合计；由追溯「质检数据」段与组装成品检验单审核分流按此口径即时计算。未检验(检验数量为空或 ≤0)时不显示。2026-10-15 数据一致性修订。
+不合格数量 | 不合格数量(本检验项目在该批次/该工单行上的不合格数量;品质手填。汇总=本列求和;组装成品检验的不合格数转不良品处理单)
+(19 rows)
+
+=== remarks: yj_field alias for 标准要求 ===
+panel_code | col_name | label | alias | label_en | col_group | tab_key
+QC_MOLD_INSP | 标准要求 | 标准要求 | null | null | null | null
+QC_CUT_INSP | 标准要求 | 标准要求 | null | null | null | null
+QC_ASM_INSP | 标准要求 | 标准要求 | null | null | null | null
+QC_MOLD_INSP | 表区 | 表区 | null | null | null | null
+QC_MOLD_INSP | 检验方法 | 检验方法 | null | null | null | null
+QC_CUT_INSP | 表区 | 表区 | null | null | null | null
+QC_CUT_INSP | 检验方法 | 检验方法 | null | null | null | null
+QC_ASM_INSP | 表区 | 表区 | null | null | null | null
+QC_ASM_INSP | 检验方法 | 检验方法 | null | null | null | null
+(9 rows)
+

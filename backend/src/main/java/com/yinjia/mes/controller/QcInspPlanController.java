@@ -23,8 +23,11 @@ import java.util.Map;
  *
  * <p>落点是两张既有基础档案(此前一直是空表,不是新表):
  * <ul>
- *   <li>{@code bs_qc_plan} 检验方案(头)= 适用存货/类别 + 检验方式 + 抽检比例 + 取样规则 + 文件编码/执行标准;</li>
- *   <li>{@code bs_qc_item} 检验项目(行)= 项目编码/名称 + 检验内容/标准 + 判定规则 + 上下限 + 取样要求/检验方法 + 合格·不合格处置;
+ *   <li>{@code bs_qc_plan} 检验方案(头)= 适用存货/类别 + 检验方式 + 抽检比例 + 取样规则 + <b>检验类型</b>/执行标准;
+ *       <b>检验类型</b>(项目分类,如 外观检测/重量检测,2026-10-16 起)= 一个方案 = 一类项目,
+ *       带入检验单横表时作「表区」名;原「文件编码」已退场(yj_field 隐藏,值保留);</li>
+ *   <li>{@code bs_qc_item} 检验项目(行)= 项目编码/名称 + 检验内容/标准 + 判定规则 + 上下限 + 取样要求/检验方法 + 合格·不合格处置
+ *       + <b>检验数量</b>(可选,2026-10-16 起:带入后横表该列的初始格数,也是列头「＋」的上限);
  *       **方案编码**把它挂在某个方案下(方案 1..N 项目)。</li>
  * </ul>
  *
@@ -78,6 +81,9 @@ public class QcInspPlanController {
     /**
      * 方案列表:GET /plans?keyword=&all=1。
      * all=1 连**停用**方案一起下发并带 enabled(维护界面要显示灰显行并恢复启用);默认只给启用。
+     *
+     * <p>2026-10-16:下发字段由「文件编码」换成「检验类型」(用户口径「不需要绑定文件编码,
+     * 而是设定当前检验的类型」)—— 文件编码列还在库里(老方案的值原样留着),只是不再进界面。
      */
     @GetMapping("/plans")
     public ApiResult<List<Map<String, Object>>> plans(@RequestParam(required = false) String keyword,
@@ -88,7 +94,7 @@ public class QcInspPlanController {
                 "SELECT id, 方案编码, 方案名称, ISNULL(适用存货,N'') AS 适用存货,"
                         + " ISNULL(适用存货类别,N'') AS 适用存货类别, ISNULL(检验方式,N'') AS 检验方式,"
                         + " [抽检比例%] AS 抽检比例, ISNULL(取样规则,N'') AS 取样规则,"
-                        + " ISNULL(文件编码,N'') AS 文件编码, ISNULL(执行标准,N'') AS 执行标准,"
+                        + " ISNULL(检验类型,N'') AS 检验类型, ISNULL(执行标准,N'') AS 执行标准,"
                         + " ISNULL(备注,N'') AS 备注, ISNULL(停用,0) AS 停用,"
                         + " CASE WHEN ISNULL(停用,0)=1 THEN 0 ELSE 1 END AS enabled,"
                         + " (SELECT COUNT(*) FROM dbo.bs_qc_item i WHERE i.方案编码 = p.方案编码"
@@ -105,7 +111,7 @@ public class QcInspPlanController {
         return ApiResult.ok(jdbc.queryForList(sql.toString(), args.toArray()));
     }
 
-    /** 新增/修改方案:POST {id?, 方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, 抽检比例, 取样规则, 文件编码, 执行标准, 备注} */
+    /** 新增/修改方案:POST {id?, 方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, 抽检比例, 取样规则, 检验类型, 执行标准, 备注} */
     @PostMapping("/planSave")
     public ApiResult<Map<String, Object>> planSave(@RequestBody Map<String, Object> body) {
         requireAnyPanelView();
@@ -121,19 +127,21 @@ public class QcInspPlanController {
                 Integer.class, code, id == null ? -1L : id);
         if (dup != null && dup > 0) return ApiResult.error(400, "方案编码已存在:" + code);
 
+        // ⚠ 文件编码已退场(2026-10-16):INSERT 不再写它(留 NULL)、UPDATE 也不碰它
+        //   —— 老方案上已填的受控文件号原样留在库里,不因维护动作被清空。
         Object[] vals = {
                 code, name, nn(body.get("适用存货")), nn(body.get("适用存货类别")),
                 nv(body.get("检验方式"), "抽检"), dec(body.get("抽检比例")),
-                nn(body.get("取样规则")), nn(body.get("文件编码")), nn(body.get("执行标准")),
+                nn(body.get("取样规则")), nn(body.get("检验类型")), nn(body.get("执行标准")),
                 nn(body.get("备注")), user};
         if (id == null) {
             jdbc.update("INSERT INTO dbo.bs_qc_plan (方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, [抽检比例%],"
-                            + " 取样规则, 文件编码, 执行标准, 备注, 状态, asp_user1, asp_time1)"
+                            + " 取样规则, 检验类型, 执行标准, 备注, 状态, asp_user1, asp_time1)"
                             + " VALUES (?,?,?,?,?,?,?,?,?,?, N'启用', ?, SYSDATETIME())", vals);
             id = jdbc.queryForObject("SELECT MAX(id) FROM dbo.bs_qc_plan WHERE 方案编码=?", Long.class, code);
         } else {
             jdbc.update("UPDATE dbo.bs_qc_plan SET 方案编码=?, 方案名称=?, 适用存货=?, 适用存货类别=?, 检验方式=?,"
-                            + " [抽检比例%]=?, 取样规则=?, 文件编码=?, 执行标准=?, 备注=?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " [抽检比例%]=?, 取样规则=?, 检验类型=?, 执行标准=?, 备注=?, asp_user2=?, asp_time2=SYSDATETIME()"
                             + " WHERE id=?", vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
                     vals[8], vals[9], user, id);
         }
@@ -210,6 +218,7 @@ public class QcInspPlanController {
                 "SELECT id, ISNULL(方案编码,N'') AS 方案编码, ISNULL(序号,0) AS 序号,"
                         + " 项目编码, 项目名称, 检验内容, 检验标准, 数据类型, ISNULL(计量单位,N'') AS 计量单位,"
                         + " 判定规则, 标准下限, 标准上限, ISNULL(取样要求,N'') AS 取样要求,"
+                        + " 检验数量,"
                         + " ISNULL(检验方法,N'') AS 检验方法, ISNULL(合格处置,N'') AS 合格处置,"
                         + " ISNULL(不合格处置,N'') AS 不合格处置, ISNULL(备注,N'') AS 备注,"
                         + " ISNULL(停用,0) AS 停用, CASE WHEN ISNULL(停用,0)=1 THEN 0 ELSE 1 END AS enabled"
@@ -224,7 +233,7 @@ public class QcInspPlanController {
         return ApiResult.ok(jdbc.queryForList(sql.toString(), args.toArray()));
     }
 
-    /** 新增/修改检验项目:POST {id?, 方案编码, 序号, 项目编码, 项目名称, 检验内容, 检验标准, 数据类型, 计量单位, 判定规则, 标准下限, 标准上限, 取样要求, 检验方法, 合格处置, 不合格处置, 备注} */
+    /** 新增/修改检验项目:POST {id?, 方案编码, 序号, 项目编码, 项目名称, 检验内容, 检验标准, 数据类型, 计量单位, 判定规则, 标准下限, 标准上限, 取样要求, 检验数量, 检验方法, 合格处置, 不合格处置, 备注} */
     @PostMapping("/itemSave")
     public ApiResult<Map<String, Object>> itemSave(@RequestBody Map<String, Object> body) {
         requireAnyPanelView();
@@ -246,20 +255,20 @@ public class QcInspPlanController {
         if (dup != null && dup > 0) return ApiResult.error(400, "项目编码已存在:" + code);
         Object[] v = {nn(body.get("方案编码")), lngOrNull(body.get("序号")), code, name, content, standard, dataType,
                 nn(body.get("计量单位")), rule, dec(body.get("标准下限")), dec(body.get("标准上限")),
-                nn(body.get("取样要求")), nn(body.get("检验方法")), nn(body.get("合格处置")),
-                nn(body.get("不合格处置")), nn(body.get("备注"))};
+                nn(body.get("取样要求")), lngOrNull(body.get("检验数量")), nn(body.get("检验方法")),
+                nn(body.get("合格处置")), nn(body.get("不合格处置")), nn(body.get("备注"))};
         if (id == null) {
             jdbc.update("INSERT INTO dbo.bs_qc_item (方案编码, 序号, 项目编码, 项目名称, 检验内容, 检验标准, 数据类型,"
-                            + " 计量单位, 判定规则, 标准下限, 标准上限, 取样要求, 检验方法, 合格处置, 不合格处置, 备注,"
+                            + " 计量单位, 判定规则, 标准下限, 标准上限, 取样要求, 检验数量, 检验方法, 合格处置, 不合格处置, 备注,"
                             + " 状态, asp_user1, asp_time1)"
-                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, N'启用', ?, SYSDATETIME())",
-                    v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], user);
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, N'启用', ?, SYSDATETIME())",
+                    v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16], user);
             id = jdbc.queryForObject("SELECT MAX(id) FROM dbo.bs_qc_item WHERE 项目编码=?", Long.class, code);
         } else {
             jdbc.update("UPDATE dbo.bs_qc_item SET 方案编码=?, 序号=?, 项目编码=?, 项目名称=?, 检验内容=?, 检验标准=?,"
-                            + " 数据类型=?, 计量单位=?, 判定规则=?, 标准下限=?, 标准上限=?, 取样要求=?, 检验方法=?,"
+                            + " 数据类型=?, 计量单位=?, 判定规则=?, 标准下限=?, 标准上限=?, 取样要求=?, 检验数量=?, 检验方法=?,"
                             + " 合格处置=?, 不合格处置=?, 备注=?, asp_user2=?, asp_time2=SYSDATETIME() WHERE id=?",
-                    v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15],
+                    v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16],
                     user, id);
         }
         Map<String, Object> out = new LinkedHashMap<>();

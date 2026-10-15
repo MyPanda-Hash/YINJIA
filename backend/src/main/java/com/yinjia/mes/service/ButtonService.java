@@ -1129,6 +1129,11 @@ public class ButtonService {
             }
         }
         // 存档留痕(2026-09-22):先快照(改动行提交只快照提交行 ∪ 作废行;整档才全表),保存后比对出「修改记录」
+        // 唯一键预检(2026-10-16,声明在 yj_panel.config 的 "uniqueKeys" —— 如工序档案 OP 的 工序编码):
+        // 必须在**落库前**跑,重复即拦下;数据库侧的过滤唯一索引(ux_bs_op_code)是最后一道闸,
+        // 但它的报错是 SQL 原文(duplicate key),用户看不懂 —— 这一层负责给业务话术。
+        boolean absentMeansRemoved = archiveFullLoad && removeIds.isEmpty();
+        ensureArchiveUniqueKeys(def, items, removeIds, absentMeansRemoved);
         Map<Object, Map<String, String>> before = patchMode
                 ? archiveRowSnapshot(def, patchSnapshotIds(items, removeIds)) : archiveRowSnapshot(def);
         Set<Object> liveIds = new HashSet<>();
@@ -1176,6 +1181,116 @@ public class ButtonService {
             }
         }
         recordArchiveChange(def, before, items, liveIds, user, removedActually);
+        return out;
+    }
+
+    /**
+     * 档案**唯一键预检**(2026-10-16,起点需求:工序档案「相同工序编码不允许出现重复」)。
+     *
+     * <p>声明来源 = {@code yj_panel.config} 的 {@code "uniqueKeys"}(解析见
+     * {@link PanelRegistry.PanelDef#uniqueKeys})—— 所以"哪张面板哪几列唯一"是**元数据说了算**,
+     * 换面板/加一列都不用改这里(与"加面板=插行"同一条规矩)。
+     *
+     * <p>两道判:
+     * <ol>
+     *   <li>同一批提交里两行同码 —— 前端档案保存走"只提交改动行",所以这里只看得见改动行之间的重复;</li>
+     *   <li>与库里其它**存活**行撞码 —— 排除本次提交行、本次显式作废行;整档提交({@code 档案全量=true})
+     *       时还要排除"缺席即删除"的行,否则"把 A 行的码改成 B 行的码并顺手删掉 B"会被误判。</li>
+     * </ol>
+     *
+     * <p>口径:值按**去掉首尾空格的字符串**比(与 SQL Server 中文排序规则下的等值口径一致);
+     * 键里任一格为空的行不参与判定(空值不算"重复",必填由字段级 required 管)。
+     * 声明项在 yj_field 里找不到对应字段时**整组跳过**(元数据没登记就没法查,不拦业务)。
+     */
+    private void ensureArchiveUniqueKeys(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
+                                        List<Object> removeIds, boolean absentMeansRemoved) {
+        List<List<String>> keySets = def.uniqueKeys();
+        if (keySets.isEmpty() || items.isEmpty()) return;
+        String table = def.lineTable();
+        if (table == null || table.isBlank()) return;
+        boolean hasCancel = tableCols(table).contains("asp_cancel");
+        String pk = def.pkCol();
+
+        for (List<String> labels : keySets) {
+            List<PanelRegistry.FieldDef> fields = uniqueKeyFields(def, labels);
+            if (fields.isEmpty()) continue;
+            List<String> cols = fields.stream().map(PanelRegistry.FieldDef::col).toList();
+            String keyName = String.join("+", labels);
+
+            // ① 提交行之间
+            Map<String, List<String>> seen = new LinkedHashMap<>();
+            for (Map<String, Object> item : items) {
+                List<String> tuple = uniqueKeyTuple(item, labels);
+                if (tuple == null) continue;
+                if (seen.putIfAbsent(String.join("\u0001", tuple), tuple) != null) {
+                    throw new IllegalArgumentException(keyName + "「" + String.join(" / ", tuple)
+                            + "」重复提交,不允许重复");
+                }
+            }
+            if (seen.isEmpty()) continue;
+
+            // ② 与库里其它存活行撞码(按第一列 IN 收窄后,在 Java 侧比对整组键)
+            if (pk == null || pk.isBlank()) continue;
+            Set<String> excluded = new LinkedHashSet<>();
+            for (Object id : removeIds) if (id != null) excluded.add(String.valueOf(id).trim());
+            for (Map<String, Object> item : items) {
+                Object id = item.get("id");
+                if (id != null && !String.valueOf(id).isBlank()) excluded.add(String.valueOf(id).trim());
+            }
+            List<String> firstValues = new ArrayList<>(new LinkedHashSet<>(seen.values().stream().map(t -> t.get(0)).toList()));
+            StringBuilder sel = new StringBuilder("SELECT [").append(pk).append("] AS __pk");
+            for (String c : cols) sel.append(", [").append(c).append("]");
+            sel.append(" FROM ").append(table).append(" WHERE ");
+            if (hasCancel) sel.append("ISNULL([asp_cancel],'N') <> 'Y' AND ");
+            sel.append("[").append(cols.get(0)).append("] IN (");
+            String prefix = sel.toString();
+            int chunk = 500;
+            for (int i = 0; i < firstValues.size(); i += chunk) {
+                List<String> part = firstValues.subList(i, Math.min(firstValues.size(), i + chunk));
+                String sql = prefix + String.join(",", part.stream().map(x -> "?").toList()) + ")";
+                jdbc.query(sql, rs -> {
+                    Object rowId = rs.getObject("__pk");
+                    boolean excludedRow = rowId != null && excluded.contains(String.valueOf(rowId).trim());
+                    // 排除行(本次提交/本次作废);整档提交时"缺席行"本次就会被软删,也不算已存在
+                    if (excludedRow || absentMeansRemoved) return;
+                    List<String> tuple = new ArrayList<>(cols.size());
+                    for (String c : cols) {
+                        String v = rs.getString(c);
+                        if (v == null || v.isBlank()) return;
+                        tuple.add(v.trim());
+                    }
+                    if (seen.containsKey(String.join("\u0001", tuple))) {
+                        throw new IllegalArgumentException(keyName + "「" + String.join(" / ", tuple)
+                                + "」已存在,不允许重复(" + def.name() + "档案)");
+                    }
+                }, part.toArray());
+            }
+        }
+    }
+
+    /** 唯一键声明项 → 字段定义:标签(dataName)优先、列名兜底;任一项找不到 ⇒ 空表(=该组不校验) */
+    private static List<PanelRegistry.FieldDef> uniqueKeyFields(PanelRegistry.PanelDef def, List<String> labels) {
+        List<PanelRegistry.FieldDef> out = new ArrayList<>(labels.size());
+        for (String label : labels) {
+            PanelRegistry.FieldDef f = def.byLabel(label);
+            if (f == null) f = def.byCol(label);
+            if (f == null) return List.of();
+            out.add(f);
+        }
+        return out;
+    }
+
+    /**
+     * 一行数据的唯一键取值(前端 dataName=label,故按**标签**取);任一格为空 ⇒ null(不参与判重)。
+     * 声明里写的是列名而非标签时这里取不到值,判重退化为"只与库里撞码"一道 —— 声明请用标签。
+     */
+    private static List<String> uniqueKeyTuple(Map<String, Object> item, List<String> labels) {
+        List<String> out = new ArrayList<>(labels.size());
+        for (String label : labels) {
+            Object v = item.get(label);
+            if (v == null || String.valueOf(v).isBlank()) return null;
+            out.add(String.valueOf(v).trim());
+        }
         return out;
     }
 
