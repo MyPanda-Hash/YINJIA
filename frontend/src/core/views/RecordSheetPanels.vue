@@ -247,13 +247,19 @@
                   <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
                         @click.stop="openStdLib(stdLibOf(pair.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
-                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
+                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名。
+                     ⚠ **不能写成 `editable && pair.type === 'file'`**(2026-10-16 用户报障
+                     「产品信息表上传的附件保存之后不能查看」):普通用户「保存」后单据转「审批中」
+                     ⇒ editable=false ⇒ 整格不渲染,附件名退化成纯文本,连上传者本人都点不开。
+                     现在无条件渲染:可编辑=能上传/删除;只读=只能点开查看/下载(后端 requirePanelView 把关)。 -->
                 <FileAttachCell
-                  v-else-if="editable && pair.type === 'file'"
+                  v-else-if="pair.type === 'file'"
                   :panel-code="panelCode"
                   :doc-no="head['单据编号'] || ''"
                   :field-key="pair.key"
                   :model-value="head[pair.key] || ''"
+                  :can-edit="editable"
+                  hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
@@ -735,13 +741,19 @@
                   <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
                         @click.stop="openStdLib(stdLibOf(pair.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
-                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
+                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名。
+                     ⚠ **不能写成 `editable && pair.type === 'file'`**(2026-10-16 用户报障
+                     「产品信息表上传的附件保存之后不能查看」):普通用户「保存」后单据转「审批中」
+                     ⇒ editable=false ⇒ 整格不渲染,附件名退化成纯文本,连上传者本人都点不开。
+                     现在无条件渲染:可编辑=能上传/删除;只读=只能点开查看/下载(后端 requirePanelView 把关)。 -->
                 <FileAttachCell
-                  v-else-if="editable && pair.type === 'file'"
+                  v-else-if="pair.type === 'file'"
                   :panel-code="panelCode"
                   :doc-no="head['单据编号'] || ''"
                   :field-key="pair.key"
                   :model-value="head[pair.key] || ''"
+                  :can-edit="editable"
+                  hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />

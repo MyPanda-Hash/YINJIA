@@ -4,8 +4,13 @@
        ① 单列位:锚点=panelCode+docNo+fieldKey(recordSheetConfigs type:'file' 字段);
        ② 多列位(slots,如附件表 附件1..附件6):页面单格聚合展示,上传按序占用第一个
           空余列位(每列位 1 个文件),删除按行删——表设计 6 个字段占位,页面只有 1 个附件位。
-       打印(.no-print)只留文件名——纸张/导出 PDF 仅显示原文件名 -->
-  <div class="fac-cell">
+       打印(.no-print)只留文件名——纸张/导出 PDF 仅显示原文件名
+
+       ⚠ 可编辑与否只影响「能不能上传/删除」,**不影响能不能看**:2026-10-16 用户报障
+       「产品信息表上传的附件保存之后不能查看」—— 根因是调用方只在 editable 时才渲染本组件,
+       普通用户一保存(单据转审批中)附件名就退化成纯文本、谁都点不开。只读时同样要渲染
+       (canEdit=false),附件名仍可点击查看/下载。 -->
+  <div v-if="shouldShow" class="fac-cell">
     <div v-if="!files.length && legacyText" class="fac-legacy">{{ legacyText }}</div>
     <div class="fac-list">
       <span
@@ -47,6 +52,12 @@ const props = defineProps({
   values: { type: Object, default: null },
   /** 可编辑=允许上传/删除;已审核锁定单据只保留查看/下载 */
   canEdit: { type: Boolean, default: true },
+  /**
+   * 「空着就不占位」:只读(不能上传删除)且这个字段一个附件都没有、也没有历史文件名时整格不渲染。
+   * 用途:文书式纸张上把附件格无条件渲染后(见上方注释),没有附件的单据不该多出「暂无附件」一行。
+   * 可编辑时永远渲染(要露出「上传附件」入口)。
+   */
+  hideWhenEmpty: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'change'])
 
@@ -63,6 +74,9 @@ const legacyText = computed(() => {
   }
   return String(props.modelValue || '').trim()
 })
+/** 整格是否渲染:能上传时要露出入口;只读时只在真有东西(附件或历史文件名)时才占位。
+ *  ⚠ 必须声明在 legacyText **之后** —— 引用后声明的 const 会命中 TDZ(本仓已踩过多次) */
+const shouldShow = computed(() => !props.hideWhenEmpty || !!props.canEdit || files.value.length > 0 || !!legacyText.value)
 
 function fmtSize(n) {
   if (!n && n !== 0) return ''

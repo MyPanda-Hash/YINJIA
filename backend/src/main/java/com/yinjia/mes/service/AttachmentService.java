@@ -83,10 +83,12 @@ public class AttachmentService {
         return payload(panelCode, docNo, fieldKey);
     }
 
-    /** 下载/查看:按 id 取元数据与文件(路径仅由服务端生成的存储名解析)。 */
+    /** 下载/查看:按 id 取元数据与文件(路径仅由服务端生成的存储名解析)。
+     *  一并回传 panel_code —— 调用方据此做「有没有该面板查看权」的闸门
+     *  (用户口径 2026-10-16:「有查看这个面板权限的人就可以查看上传的附件」)。 */
     public Map<String, Object> loadForDownload(long id) {
         Map<String, Object> row = jdbc.queryForMap(
-                "SELECT file_name AS fileName, stored_name AS storedName, "
+                "SELECT panel_code AS panelCode, file_name AS fileName, stored_name AS storedName, "
                         + "content_type AS contentType FROM yj_attachment WHERE id=?", id);
         Path path = resolveStored(String.valueOf(row.get("storedName")));
         if (!Files.isReadable(path)) throw new IllegalArgumentException("附件文件不存在或已被删除");

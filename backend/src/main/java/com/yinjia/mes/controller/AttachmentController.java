@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.AttachmentService;
+import com.yinjia.mes.service.PanelPermissionService;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -28,15 +29,21 @@ import java.util.Map;
  * 单据头字段附件接口(/api/attachment,yj_attachment):
  * 上传(multipart 单文件)/列表/删除/下载查看。原文件名保留;头字段列由服务端同步为文件名列表。
  * 错误走既有约定:IllegalArgumentException→HTTP 400(ApiResult 体),不会触发前端登出。
+ *
+ * 查看权限(2026-10-16 用户口径「有查看这个面板权限的人就可以查看上传的附件」):
+ * 列表与下载按附件所属**面板的查看权**把关(requirePanelView:管理员恒过,角色可见 ∪ 参照目标 ∪ 同模块);
+ * 此前面板能打开、附件却可能点不开(前端只在可编辑时渲染附件格),现在两端对齐。
  */
 @RestController
 @RequestMapping("/api/attachment")
 public class AttachmentController {
 
     private final AttachmentService service;
+    private final PanelPermissionService perms;
 
-    public AttachmentController(AttachmentService service) {
+    public AttachmentController(AttachmentService service, PanelPermissionService perms) {
         this.service = service;
+        this.perms = perms;
     }
 
     /** 上传:POST multipart {file} + panelCode/docNo/field;返回 {files, names}。 */
@@ -49,11 +56,12 @@ public class AttachmentController {
         return ApiResult.ok(service.upload(panelCode, docNo, field, file, currentUsername(authentication)));
     }
 
-    /** 列表:GET ?panelCode&docNo&field。 */
+    /** 列表:GET ?panelCode&docNo&field(需该面板查看权)。 */
     @GetMapping("/list")
     public ApiResult<List<Map<String, Object>>> list(@RequestParam String panelCode,
                                                      @RequestParam String docNo,
                                                      @RequestParam String field) {
+        perms.requirePanelView(panelCode);
         return ApiResult.ok(service.list(panelCode, docNo, field));
     }
 
@@ -67,10 +75,12 @@ public class AttachmentController {
     }
 
     /** 下载/查看:GET /{id}/download —— 图片/PDF/文本 inline 浏览器直接看,其余附件形式下载;
-     *  文件名=原文件名(RFC 5987 UTF-8),浏览器另存时保留原名。 */
+     *  文件名=原文件名(RFC 5987 UTF-8),浏览器另存时保留原名。
+     *  权限:附件所属面板有查看权即可(不再只是"登录了就能按 id 拿文件")。 */
     @GetMapping("/{id}/download")
     public ResponseEntity<FileSystemResource> download(@PathVariable long id) {
         Map<String, Object> row = service.loadForDownload(id);
+        perms.requirePanelView(String.valueOf(row.get("panelCode")));
         String fileName = String.valueOf(row.get("fileName"));
         String contentType = row.get("contentType") == null
                 ? MediaType.APPLICATION_OCTET_STREAM_VALUE : String.valueOf(row.get("contentType"));

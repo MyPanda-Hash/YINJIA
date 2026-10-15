@@ -589,6 +589,7 @@
           :field-key="remarkAttach.key"
           :model-value="head[remarkAttach.key] || ''"
           :can-edit="attachCanEdit"
+          hide-when-empty
           @update:model-value="(v) => { head[remarkAttach.key] = v }"
         />
         <el-input
