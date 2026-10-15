@@ -884,11 +884,14 @@
             @current-change="(p) => (archPage = p)"
           />
         </div>
-        <!-- ══════════ 分区渲染(2026-10-16 恢复,检验单族):明细带「表区」列 ⇒ 按类别纵向分区 ══════════
+        <!-- ══════════ 分区渲染(2026-10-16 恢复,检验单族):明细带类别列(表区/检验类型) ⇒ 按类别纵向分区 ══════════
              用户口径:「不同检验项目类别就能自动分格开来实现」+「字母自动编 / 每区只显示本区内容」;
              成品检验单再加:「外观/尺寸/出货重量 三区**固定**,没有数据时也显示成截图那个形式」。
              每区 = 区标题(A.外观…) + 该区**自己的列头** + 该区的行 ⇒ 不同区列集可不同;
-             **固定组**哪怕一行都没有也出一块(区内给一个空行,点它即新增行、录入即落真行)。 -->
+             **固定组**哪怕一行都没有也出一块(区内给一个空行,点它即新增行、录入即落真行)。
+             🔴 2026-10-17:组装成品检验单(QC_ASM_INSP)**已退出分区**(见 SECTION_PANELS 注释)——
+               它的类别列正名为「检验类型」摆在明细第一列,三类检验项由生单时预铺成普通明细行;
+               这里只为成型/切炭两张工序检验单保留。 -->
         <template v-if="isSectioned(b)">
           <div v-for="sec in archSections(b)" :key="'sec-' + b.id + '-' + (sec.sector || 'none')" class="arch-section">
             <div class="arch-section-title">
@@ -1856,11 +1859,13 @@
          (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
          (bs_qc_plan + bs_qc_item),维护动作不往检验单写数据。
          2026-10-17 加**第二个只读来源**(组装成品检验单 QC_ASM_INSP 专属):「出货检验计划」——
-         按本单产品编码读 RD_INSP_PLAN 里已填的检验项目,勾选后同样「带入明细」,不碰标准库。 -->
+         按本单产品编码读 RD_INSP_PLAN 里已填的检验项目,勾选后同样「带入明细」,不碰标准库。
+         2026-10-18 该来源扩到**制程检验单 QC_PROC_INSP**(用户报障:制程检验单没填产品编码却看到
+         出货检验计划的行)。见 SHIP_PLAN_SOURCE_PANELS 与弹窗里的 shipMode。 -->
     <QcInspPlanDialog
       v-model="qcInspPlanVisible"
       :product-code="String(cur?.['产品编码'] || '')"
-      :ship-source="panelCode === 'QC_ASM_INSP'"
+      :ship-source="SHIP_PLAN_SOURCE_PANELS.includes(panelCode)"
       @pick="applyInspItems"
     />
     <!-- 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(工单号+工单行号唯一确定),
@@ -2235,6 +2240,12 @@ const fieldMgrVisible = ref(false)
 // 检验项目/检验方案(2026-10-09 合并口径):三类工序检验单工具栏「更多」组的**唯一**入口
 // (服务端把守 QC_ASM_INSP 可见性);弹窗两用:勾选「带入明细」+ 就地维护标准本身。
 const qcInspPlanVisible = ref(false)
+/**
+ * 弹窗里给出「出货检验计划」这个只读来源的面板(2026-10-17 组装成品检验单;2026-10-18 加制程检验单)。
+ * 其余面板只给「检验标准库」——**必须在这里收口**:全系统共用一个 PanelxList 实例(keep-alive),
+ * 少了这层门禁就会把上一个面板取到的计划行串到别的检验单弹窗里(见 QcInspPlanDialog.shipMode)。
+ */
+const SHIP_PLAN_SOURCE_PANELS = ['QC_ASM_INSP', 'QC_PROC_INSP']
 // 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(plang:工单号+工单行号唯一确定),
 // 选中即生成一张制程检验单草稿(服务端 QcProcInspController 幂等 + 把守 QC_PROC_INSP 可见性)。
 const woPickerVisible = ref(false)
@@ -4080,37 +4091,86 @@ function blockRows(b) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   检验单「按表区分区」渲染(2026-10-16 恢复 + 扩展)
+   检验单「按类别分区」渲染(2026-10-16 恢复 + 扩展;2026-10-17 组装成品检验单退出)
    ------------------------------------------------------------------------------
-   用户口径(成品检验单 QC_ASM_INSP):
+   用户口径(成品检验单 QC_ASM_INSP,2026-10-16):
      ·「当前的外观 尺寸 出货重量 这些都是当前固定需要检测的内容」
      ·「不要实现使用按钮的形式进行操作,根据当前的实现方式使用组件形式完成对默认情况下增加三个检验」
      ·「按三区实现,没有数据的时候显示和当前截图形式相当即可」
    ⇒ 形态 = 截图那种**纵向分区**:`A.外观` / `B.尺寸` / `C.出货重量` 各一块,
      每块 = 区标题 + **该区自己的列头** + 该区的行(一行一个检验项目)。
-   ⚠ 数据模型不变:仍是「一行 = 一个检验项目」(表区/检验项目/检验结果/测量值1..5/结果判断),
+   🔴 2026-10-17 用户口径把这条推翻了(截的就是这张三块分区):
+     「去除当前这个实现方式,直接使用明细行实现进行吧……将当前的表区修改为检验类型更加直观明显,
+      将检验类型放在明细行第一列,进行区分。」
+     ⇒ QC_ASM_INSP 退出 SECTION_PANELS(见下),类别列正名为「检验类型」摆明细第一列,
+       三类检验项由生单时按出货检验计划预铺;分区渲染只为成型/切炭保留。
+   ⚠ 数据模型不变:仍是「一行 = 一个检验项目」(类别/检验项目/检验结果/测量值1..5/结果判断),
      分区只是**呈现**;报表(QcAsmInspReportSupport)与取数照旧按行读。
    本实现复用 2026-10-13 `fde804ba`(制程检验单纵向分区)的辅助函数,并加两点:
-     ① 触发条件收敛到 SECTION_PANELS(免得影响其它带「表区」列的面板);
+     ① 触发条件收敛到 SECTION_PANELS(免得影响其它带类别列的面板);
      ② **固定组**:`yj_panel.config.fixedItems` 声明过的组,哪怕本单一行都没有也铺出来
         (区内先给一个空行,点它/在其中录入即落成真行 —— 照「没有数据时显示截图形式」的口径)。
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/** 走分区渲染的面板(检验单族):明细带「表区」列 ⇒ 按类别分区 */
-const SECTION_PANELS = ['QC_ASM_INSP', 'QC_MOLD_INSP', 'QC_CUT_INSP', 'QC_PROC_INSP', 'QC_FIRST_INSP']
+/**
+ * 走分区渲染的面板(检验单族):明细带类别列 ⇒ 按类别纵向分区。
+ *
+ * 🔴 2026-10-17 用户口径(截图 = 组装成品检验单的 A.外观 / B.尺寸 / C.出货重量 三块分区):
+ *   「去除当前这个实现方式,直接使用明细行实现进行吧……将当前的表区修改为检验类型更加直观明显,
+ *     将检验类型放在明细行第一列,进行区分。」
+ *   ⇒ **组装成品检验单 QC_ASM_INSP 退出分区渲染**:它的类别列正名为「检验类型」(物理列同名,
+ *     见 tools/migrate-asm-insp-type-rename-20261017.sql)、摆在明细**第一列**且可填;
+ *     外观/尺寸/出货重量 三类的检验项改由**生单时按出货检验计划预铺**成普通明细行
+ *     (后端 ButtonService.woInspGenerate → AsmInspItems),单上还有「取出货检验计划」按钮按需补。
+ *   其余四张不动:制程(QC_PROC_INSP)/首件(QC_FIRST_INSP)本来就由各自的纸张表接管(见模板上方),
+ *   成型(QC_MOLD_INSP)/切炭(QC_CUT_INSP)仍按原来的分区呈现,它们的类别列仍叫「表区」。
+ */
+const SECTION_PANELS = ['QC_MOLD_INSP', 'QC_CUT_INSP', 'QC_PROC_INSP', 'QC_FIRST_INSP']
 
 /**
- * 本面板是否走分区渲染:是检验单族 **且** 明细里有「表区」字段。
+ * 本面板明细里承载「类别」的那一列(**数据键**):组装成品检验单 = 检验类型(2026-10-17 正名),
+ * 其余检验单 = 表区。取不到(该页签根本没有类别列)返回空串。
+ *
+ * ⚠ 判据必须用**该页签全部明细字段**(含隐藏),不能用 activeTab(b).cols —— 后者只装 visible 列,
+ *   而这一列在多数单上是 **hidden=1/visible=0**(2026-10-17 取证:QC_ASM_INSP 原 表区 hidden=1 seq=170,
+ *   QC_FIRST_INSP 同款),用 cols 判会永远取不到 ⇒ 带入的行类别全空、打印分组随之丢失。
+ *   (与下面 applyShipPlanItems / applyInspItems 里 hasArea() 那条注释是同一个坑。)
+ */
+function areaKeyOf(tabKey) {
+  const fields = detailTabDefOf(tabKey)?.fields || []
+  if (fields.some((f) => f.dataName === '检验类型')) return '检验类型'
+  if (fields.some((f) => f.dataName === '表区')) return '表区'
+  return ''
+}
+
+/**
+ * 组装成品检验单的「检验类型」归一 —— 与后端 {@code AsmInspItems.typeOf} 是**同一条规则的两份实现**
+ * (一边 Java 一边 JS),改动必须两处同改:
+ *   含「外观」→ 外观;含「尺寸」→ 尺寸(重要尺寸/主要尺寸都算);含「重量」→ 出货重量(重量/净重都算);
+ *   归不上(性能/功能性测试…)⇒ **原样返回** —— 手动「取出货检验计划」是全量带入,那一类不该被改写。
+ * 为什么必须归一:前端的**判重键 = 类别 + 检验项目**,生单预铺写的是归一后的「尺寸/出货重量」,
+ * 计划带回的却是「重要尺寸/重量」—— 不归一就会被当成两条不同的行重复带进来。
+ */
+function normInspType(v) {
+  const s = String(v ?? '').trim()
+  if (!s) return ''
+  if (s.includes('外观')) return '外观'
+  if (s.includes('尺寸')) return '尺寸'
+  if (s.includes('重量')) return '出货重量'
+  return s
+}
+
+/**
+ * 本面板是否走分区渲染:是检验单族 **且** 明细里有类别列(表区 / 检验类型)。
  * ⚠ 判据必须用**该页签全部明细字段**(含隐藏),不能用 activeTab(b).cols ——
- *   后者只装 visible 列,而「表区」在本单是 **hidden=1/visible=0**(2026-10-17 取证:
- *   QC_ASM_INSP 的 表区 hidden=1 seq=170),用 cols 判会永远为假 ⇒ 分区根本不触发。
+ *   后者只装 visible 列,而类别列在多数单上是 **hidden=1/visible=0**(2026-10-17 取证:
+ *   QC_ASM_INSP 原 表区 hidden=1 seq=170),用 cols 判会永远为假 ⇒ 分区根本不触发。
  *   (与 applyShipPlanItems 里 hasArea() 那条注释是同一个坑。)
  */
 function isSectioned(b) {
   if (!SECTION_PANELS.includes(String(panelCode.value))) return false
   const tabKey = b ? activeTab(b).key : 'items'
-  const fields = detailTabDefOf(tabKey)?.fields || []
-  return fields.some((f) => f.dataName === '表区')
+  return areaKeyOf(tabKey) !== ''
 }
 
 /** 固定组声明(yj_panel.config 的 fixedItems,后端 metadata 下发) */
@@ -4119,12 +4179,13 @@ function fixedGroups() {
   return Array.isArray(list) ? list : []
 }
 
-/** 该面板明细里「表区」的出现顺序(去重,跳过空值) */
+/** 该面板明细里类别列(表区 / 检验类型)的出现顺序(去重,跳过空值) */
 function sectorOrder(b) {
+  const key = areaKeyOf(b ? activeTab(b).key : 'items')
   const out = []
   for (const r of archRows(b)) {
     if (r._placeholder) continue
-    const v = String(r['表区'] ?? '').trim()
+    const v = String(r[key] ?? '').trim()
     if (v && !out.includes(v)) out.push(v)
   }
   // 声明过的固定组补进顺序(没有数据的组也要排上)
@@ -4162,7 +4223,8 @@ function sectorLetter(b, sector) {
  *   (只返回视口内列 + 插占位列),分区视图列少、不需要虚拟化,用它会漏列并把 spacer 当成列。
  */
 function sectionCols(b) {
-  return (archCols(b) || []).filter((c) => c.prop && c.prop !== '表区' && c.prop !== '行号')
+  const key = areaKeyOf(b ? activeTab(b).key : 'items')
+  return (archCols(b) || []).filter((c) => c.prop && c.prop !== key && c.prop !== '行号')
 }
 
 /** 区标题下该区行内的序号(1、2、3…),用于「1.外径」这种显示 */
@@ -4176,13 +4238,14 @@ function sectionRowNo(rows, row) {
  */
 function archSections(b) {
   if (!isSectioned(b)) return []
+  const key = areaKeyOf(b ? activeTab(b).key : 'items')
   const all = pagedBlockRows(b)
   const order = sectorOrder(b)
   const byCat = new Map()
   const noCat = []
   for (const r of all) {
     if (r._placeholder) continue
-    const v = String(r['表区'] ?? '').trim()
+    const v = String(r[key] ?? '').trim()
     if (!v) { noCat.push(r); continue }
     if (!byCat.has(v)) byCat.set(v, [])
     byCat.get(v).push(r)
@@ -4210,8 +4273,8 @@ function archSections(b) {
     if (!rows.length) {
       const items = (decl?.items || []).map((x) => String(x).trim()).filter(Boolean)
       renderRows = items.length
-        ? items.map((it) => ({ _placeholder: true, 表区: s, 检验项目: it }))
-        : [{ _placeholder: true, 表区: s, 检验项目: '' }]
+        ? items.map((it) => ({ _placeholder: true, [key]: s, 检验项目: it }))
+        : [{ _placeholder: true, [key]: s, 检验项目: '' }]
     }
     out.push({
       sector: s,
@@ -4282,6 +4345,7 @@ function ensureFixedRows() {
   const tabKey = activeTab(b).key
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  const areaKey = areaKeyOf(tabKey)          // 类别列(表区 / 检验类型):按本面板实际有的那一列写
   const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
   let added = 0
   for (const g of groups) {
@@ -4294,9 +4358,9 @@ function ensureFixedRows() {
     const names = declaredItems.length ? declaredItems : [String(g.label || '').trim() || `按照${sector}检验项目填充`]
     for (const name of names) {
       if (!name) continue
-      if (rows.some((r) => norm(r['表区']) === norm(sector) && norm(r['检验项目']) === norm(name))) continue
+      if (rows.some((r) => norm(r[areaKey]) === norm(sector) && norm(r['检验项目']) === norm(name))) continue
       const row = newDetailRow(tabKey)
-      row['表区'] = sector
+      if (areaKey) row[areaKey] = sector
       row['检验项目'] = name
       rows.push(row)
       autoFixedKeys.add(fixedRowKey(sector, name))
@@ -4306,10 +4370,10 @@ function ensureFixedRows() {
   if (added) markInlineDirty()   // 让"有未保存改动"状态与界面一致(空行保存时会被剔除,不会落库)
 }
 
-/** 这一行填过东西没有(表区/检验项目/行号 等结构值不算;数值列默认 0 不算;是否列默认 false 不算) */
+/** 这一行填过东西没有(类别/检验项目/行号 等结构值不算;数值列默认 0 不算;是否列默认 false 不算) */
 function rowFilled(row) {
   for (const [k, v] of Object.entries(row || {})) {
-    if (k.startsWith('__') || k === '表区' || k === '检验项目' || k === '行号') continue
+    if (k.startsWith('__') || k === '表区' || k === '检验类型' || k === '检验项目' || k === '行号') continue
     if (v === undefined || v === null) continue
     const s = String(v).trim()
     if (s === '') continue
@@ -4326,7 +4390,7 @@ function stripBlankAutoRows(detail) {
   const out = {}
   for (const [k, arr] of Object.entries(detail || {})) {
     out[k] = Array.isArray(arr)
-      ? arr.filter((r) => !(autoFixedKeys.has(fixedRowKey(r['表区'], r['检验项目'])) && !rowFilled(r)))
+      ? arr.filter((r) => !(autoFixedKeys.has(fixedRowKey(r['检验类型'] ?? r['表区'], r['检验项目'])) && !rowFilled(r)))
       : arr
   }
   return out
@@ -6090,30 +6154,42 @@ function applyShipPlanItems(items) {
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
   const cols = new Set(b ? (activeTab(b).cols || []) : [])
   const has = (k) => cols.size === 0 || cols.has(k)
-  // ⚠「表区」是**隐藏列**(2026-10-17 取证:QC_ASM_INSP / QC_FIRST_INSP 的 表区 hidden=1,seq 170),
-  //   而 activeTab(b).cols 只装 visible 的列 ⇒ 走 has() 判断时它永远为假,带入的行表区全空,
-  //   打印时「外观 / 尺寸 / 重量」分组随之丢失(组装成品检验单报表按表区归组,见 QcAsmInspReportSupport)。
-  //   故表区单独按**该页签全部明细字段**(含隐藏)判断:它是报表分组键,不是给人看的列。
+  // 类别列:**本面板实际有的那一列** —— 组装成品检验单 = 检验类型(2026-10-17 正名,明细第一列),
+  // 其余四张检验单 = 表区(见 areaKeyOf)。
+  const areaKey = areaKeyOf(tabKey)
+  // ⚠ 这一列多数单上是**隐藏列**(2026-10-17 取证:QC_ASM_INSP 原 表区 hidden=1 seq=170;
+  //   QC_FIRST_INSP 同款),而 activeTab(b).cols 只装 visible 的列 ⇒ 走 has() 判断时它永远为假,
+  //   带入的行类别全空,打印时「外观 / 尺寸 / 重量」分组随之丢失(组装成品检验单报表按它归组,
+  //   见 QcAsmInspReportSupport)。故它单独按**该页签全部明细字段**(含隐藏)判断:
+  //   它是报表分组键,不是给人看的列。
   const dataCols = new Set((detailTabDefOf(tabKey)?.fields || []).map((f) => f.dataName))
   const hasArea = (k) => dataCols.size === 0 || dataCols.has(k)
-  // 后端已用这些键名下发(与 yj_field.label 对齐);本面板没有的列自动跳过
-  const KEYS = ['表区', '检验项目', '检验要求', '检验方法', '检查频率', '检验仪器', '不合格应对措施', '备注']
+  // 计划行 → 本单的类别值:组装成品检验单按三类(外观/尺寸/出货重量)归一(否则与生单预铺写出的值
+  // 对不上,判重会失效),其余面板原样;本面板没有类别列 ⇒ 空串(不写这一格)。
+  const catOf = (it) => {
+    if (!areaKey) return ''
+    if (areaKey === '检验类型') return normInspType(it['检验类型'] || it['表区'])
+    return String(it['表区'] ?? '')
+  }
+  // 后端已用这些键名下发(与 yj_field.label 对齐);本面板没有的列自动跳过(类别列单独处理)
+  const KEYS = ['检验项目', '检验要求', '检验方法', '检查频率', '检验仪器', '不合格应对措施', '备注']
   const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
-  // 明细里已经有的检验项目(判重复用):同名项目可能分属不同「表区」,故键 = 表区 + 检验项目
-  const seen = new Set(rows.map((r) => norm(r['表区']) + '|' + norm(r['检验项目'])).filter((k) => k !== '|'))
+  // 明细里已经有的检验项目(判重复用):同名项目可能分属不同类别,故键 = 类别 + 检验项目
+  const seen = new Set(rows.map((r) => norm(r[areaKey]) + '|' + norm(r['检验项目'])).filter((k) => k !== '|'))
   const dupes = []
   const fresh = []
   for (const it of items || []) {
-    const k = norm(it['表区']) + '|' + norm(it['检验项目'])
+    const k = norm(catOf(it)) + '|' + norm(it['检验项目'])
     if (seen.has(k)) dupes.push(it['检验项目'] || '')   // 已带入过 ⇒ 不再重复加
     else { seen.add(k); fresh.push(it) }
   }
   let n = 0
   for (const it of fresh) {
     const row = newDetailRow(tabKey)
+    const cat = catOf(it)
+    if (areaKey && cat && hasArea(areaKey)) row[areaKey] = cat   // 隐藏列也要写(报表分组键)
     for (const k of KEYS) {
-      // 表区:隐藏列也要写(它是报表分组键,见上面 hasArea 的注释)
-      if (!(k === '表区' ? hasArea(k) : has(k))) continue
+      if (!has(k)) continue
       const v = String(it[k] ?? '').trim()
       if (v) row[k] = v
     }
@@ -6129,17 +6205,21 @@ function applyShipPlanItems(items) {
 
 /* 2026-10-16 注:原先的「带入固定检验项」动作与 applyFixedItems/normItemName 已删 —— 用户口径
    「不要实现使用按钮的形式进行操作」,固定组/固定项改由明细区分区渲染(isSectioned/archSections)
-   默认铺出(固定项=预置空行,点行即落真行),故不再需要"点按钮补行"这条链路。 */
+   默认铺出(固定项=预置空行,点行即落真行),故不再需要"点按钮补行"这条链路。
+   2026-10-17 补充:QC_ASM_INSP 已退出分区渲染(SECTION_PANELS),它的三类检验项改为**生单时按出货
+   检验计划预铺**(后端 AsmInspItems)。下面的固定行机制仍为"声明过 fixedItems 且走分区的面板"保留
+   —— 当前库内只有 QC_ASM_INSP 声明过 fixedItems(报表仍按它永远铺三组:见 QcAsmInspReportSupport),
+   故这条自动补行链路现在是**空转**的;哪天给成型/切炭声明固定项,它照旧生效。 */
 /**
  * 选检验项目 → 带入当前单据明细(2026-10-09 用户口径:「在组装成品检验处看到对应的检验项目,
  * 选择填写检验单的数据」)。
  *
- * 行为:把勾选的检验项目**追加**到当前明细页签行尾,每行只填 表区=类别 + 项目/检验要求/检验方法,
+ * 行为:把勾选的检验项目**追加**到当前明细页签行尾,每行只填 类别(=检验类型/表区) + 项目/检验要求/检验方法,
  * 实测数值与判定留空,由品质按**现有模板**逐格填;不自动保存(保存仍由用户点「保存」)。
  * 行由 newDetailRow(tabKey) 构造(带齐该页签各字段默认值),与「新增数据」完全同构
  * ⇒ 保存链路(labelsToCols/行表 upsert)一行都不用改。
  *
- * 2026-10-16 改口径(用户拍板「一个方案 = 一类项目:作为项目归属 + 带入横表时的『表区』名」):
+ * 2026-10-16 改口径(用户拍板「一个方案 = 一类项目:作为项目归属 + 带入横表时的类别名」):
  *   · 类别优先取**方案的「检验类型」**(弹窗带入时贴到每行上,见 QcInspPlanDialog.confirmPick),
  *     方案没填才回退项目自己的「检验内容」;
  *   · 项目的「检验数量」= 该项目在制程检验单横表里的**格数**,同时落成列头「＋」的上限
@@ -6150,35 +6230,44 @@ function applyInspItems(items) {
   const tabKey = b ? activeTab(b).key : 'items'
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
-  // 明细列名(用于判断本面板是否支持「表区」/「检验要求」这类别名字段 —— 制程检验单用别名)
+  // 明细列名(用于判断本面板是否支持「检验要求」这类别名字段 —— 制程检验单用别名)
   const cols = new Set(b ? (activeTab(b).cols || []) : [])
   const has = (k) => cols.size === 0 || cols.has(k)
-  // ⚠「表区」是**隐藏列**(2026-10-17 取证:QC_ASM_INSP / QC_FIRST_INSP 的 表区 hidden=1,seq 170),
-  //   而 activeTab(b).cols 只装 visible 的列 ⇒ 走 has() 判断时它永远为假,带入的行表区全空,
-  //   打印时「外观 / 尺寸 / 重量」分组随之丢失(组装成品检验单报表按表区归组,见 QcAsmInspReportSupport)。
-  //   故表区单独按**该页签全部明细字段**(含隐藏)判断:它是报表分组键,不是给人看的列。
+  // 类别列:本面板实际有的那一列(组装成品检验单 = 检验类型;其余四张 = 表区,见 areaKeyOf)
+  const areaKey = areaKeyOf(tabKey)
+  // ⚠ 这一列多数单上是**隐藏列**(2026-10-17 取证:QC_ASM_INSP 原 表区 hidden=1 seq=170;
+  //   QC_FIRST_INSP 同款),而 activeTab(b).cols 只装 visible 的列 ⇒ 走 has() 判断时它永远为假,
+  //   带入的行类别全空,打印时「外观 / 尺寸 / 重量」分组随之丢失(组装成品检验单报表按它归组,
+  //   见 QcAsmInspReportSupport)。故它单独按**该页签全部明细字段**(含隐藏)判断:
+  //   它是报表分组键 / 明细第一列的区分列,不一定是给人看的列。
   const dataCols = new Set((detailTabDefOf(tabKey)?.fields || []).map((f) => f.dataName))
   const hasArea = (k) => dataCols.size === 0 || dataCols.has(k)
   // 制程检验单是纸张横表(一个检验项目 = 一列):格数/格数上限 两个内部列不进列表列集,
   // 故按面板代号判断(与 QcProcInspSheet 的挂载条件一致)。
   const isProcSheet = panelCode.value === 'QC_PROC_INSP'
   // 2026-10-12 用户口径:「不同检验项目类别就能自动分格开来实现」
-  //   项目的「检验内容」= 类别(A/B/C/D/E 那种);带入明细时把类别写进「表区」,
+  //   项目的「检验内容」= 类别(A/B/C/D/E 那种);带入明细时把类别写进类别列,
   //   报表/明细即可按类别分格显示。没有类别时回退旧口径 '检验项目'。
+  // 2026-10-17:组装成品检验单的类别列正名为「检验类型」,值按三类归一(与生单预铺同一套值,
+  //   否则同一条计划项会被判成两条重复带入)—— 见 normInspType。
   let n = 0
   const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
-  // 明细已有项目(判重复用):键 = 表区 + 检验项目。同名的两个项目分属不同类别时互不干扰
-  const seen = new Set(rows.map((r) => norm(r['表区']) + '|' + norm(r['检验项目'])).filter((k) => k !== '|'))
+  // 类别取值:方案贴着「检验类型」时优先用它,没填才回退项目自己的「检验内容」
+  const catOf = (it) => {
+    const raw = String(it['检验类型'] || it['检验内容'] || '').trim()
+    return areaKey === '检验类型' ? normInspType(raw) : raw
+  }
+  // 明细已有项目(判重复用):键 = 类别 + 检验项目。同名的两个项目分属不同类别时互不干扰
+  const seen = new Set(rows.map((r) => norm(r[areaKey]) + '|' + norm(r['检验项目'])).filter((k) => k !== '|'))
   const dupes = []
   const fresh = items || []
   for (const it of fresh) {
-    // 2026-10-16:类别优先取方案的「检验类型」(带入时贴上的),没填才回退项目自己的「检验内容」
-    const category = String(it['检验类型'] || it['检验内容'] || '').trim()
+    const category = catOf(it)
     const k = norm(category || '检验项目') + '|' + norm(it['项目名称'])
     if (seen.has(k)) { dupes.push(it['项目名称'] || ''); continue }   // 已带入过 ⇒ 跳过不重复加
     seen.add(k)
     const row = newDetailRow(tabKey)
-    if (hasArea('表区')) row['表区'] = category || '检验项目'
+    if (areaKey && hasArea(areaKey)) row[areaKey] = category || '检验项目'
     if (has('检验项目')) row['检验项目'] = it['项目名称'] || ''
     // 2026-10-16:四张检验单的列名已统一为「检验要求」——三张工序检验单原叫「标准要求」,
     // 已由 migrate-insp-req-align-20261016.sql 正名对齐出货检验计划表的用词(控制标准及要求),
@@ -6188,9 +6277,12 @@ function applyInspItems(items) {
     // 检查频率(2026-10-17):出货检验计划来源带的「检测频率」,四张检验单的明细都有这一列
     // (migrate-insp-req-align-20261016.sql 补的 检查频率),标准库来源没有就跳过。
     if (it['检查频率'] && has('检查频率')) row['检查频率'] = it['检查频率']
-    // 备注(2026-10-15):计划表那一列照原样带过来(本单有备注列才写)。「不合格应对措施」
-    // 只有计划表/制程检验单有,组装成品检验单没有这一列 ⇒ 按 has() 自动跳过。
+    // 备注(2026-10-15):计划表那一列照原样带过来(本单有备注列才写)。
     if (it['备注'] && has('备注')) row['备注'] = it['备注']
+    // 不合格应对措施(2026-10-18):计划表那一列也照原样带过来 —— 原注释写「只有计划表/制程检验单有」,
+    // 但这里一直漏写 ⇒ 制程检验单从弹窗「出货检验计划」来源带入时这一格是空的(走「取出货检验计划」
+    // 按钮那条路 applyShipPlanItems 有写)。组装成品检验单没有这一列 ⇒ 按 has() 自动跳过。
+    if (it['不合格应对措施'] && has('不合格应对措施')) row['不合格应对措施'] = it['不合格应对措施']
     if (it['取样要求'] && has('抽检量')) row['抽检量'] = it['取样要求']
     if (it['计量单位'] && has('单位')) row['单位'] = it['计量单位']
     // 检验数量 → 横表格数 + 上限(只对制程检验单这张横表;其它检验单是纵向明细,没有格的概念)
@@ -6209,7 +6301,7 @@ function applyInspItems(items) {
   if (n) {
     archPage.value = Math.ceil(rows.length / archPageSize.value)
     markInlineDirty()
-    const cats = [...new Set(rows.map((r) => r['表区']).filter(Boolean))]
+    const cats = [...new Set(rows.map((r) => r[areaKey]).filter(Boolean))]
     const dupTip = dupes.length ? `，${tt('跳过已带入')}${dupes.length}${tt('项(带入结果)')}` : ''
     ElMessage.success(cats.length > 1
       ? `${tt('已带入')} ${n} ${tt('行检验项目，按')} ${cats.length} ${tt('个类别分格')}${dupTip}`

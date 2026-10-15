@@ -19,6 +19,19 @@
 <template>
   <el-dialog :model-value="modelValue" :title="tt('检验项目/检验方案')" width="1200px" top="4vh" append-to-body
              destroy-on-close @update:model-value="(v) => emit('update:modelValue', v)" @open="load">
+    <!-- 来源切换(2026-10-17):用户口径「维护检验项目可以根据当前出货检验计划来获取」
+         —— 弹窗多一个**只读**来源:按本单「产品编码」读《出货检验计划表》RD_INSP_PLAN 里**已经填好**的
+         检验项目,勾选后带入本单明细。计划是单据事实、标准库是标准,两者各自独立:这个来源只读,
+         不改 bs_qc_item、也不改计划本身。默认仍是标准库,没开这个来源的面板连切换条都不显示。
+         2026-10-18 开到组装成品检验单 + 制程检验单(见 PanelxList SHIP_PLAN_SOURCE_PANELS)。 -->
+    <el-radio-group v-if="shipSource" v-model="source" size="small" class="qcplan-src" @change="onSourceChange">
+      <el-radio-button value="lib">{{ tt('检验标准库') }}</el-radio-button>
+      <el-radio-button value="ship">{{ tt('出货检验计划') }}</el-radio-button>
+    </el-radio-group>
+
+    <!-- 两块来源按 shipMode 分流(**不是**只看 source):面板没开这个来源时,哪怕 source 还停在
+         'ship'(组件被所有面板共用一个实例,见 shipMode 的注释)也一律回标准库,杜绝跨面板串数据。 -->
+    <template v-if="!shipMode">
     <div class="qcplan-tip">
       {{ tt('上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。') }}
       <br />
@@ -116,12 +129,53 @@
         </el-table-column>
       </el-table>
     </div>
+    </template>
+
+    <!-- ═══ 来源②:出货检验计划(只读,组装成品检验单 / 制程检验单) ═══ -->
+    <template v-else>
+      <div class="qcplan-tip">
+        {{ tt('下面列出本单产品对应的《出货检验计划表》里已经填好的检验项目（控制项目/控制标准及要求/控制方法/检测频率）。这里是只读来源：勾选后点「带入明细」写进本单，不会改动标准库、也不会改动计划本身；要改计划请到「研发管理 → 出货检验计划表」。') }}
+      </div>
+      <div class="qcplan-bar">
+        <b>{{ tt('出货检验计划') }}</b>
+        <span class="qcplan-sub">{{ tt('产品编码') }}：{{ shipCode || tt('（表头未填）') }}</span>
+        <span v-if="shipMeta.planNo" class="qcplan-pill">{{ tt('计划单号') }} {{ shipMeta.planNo }}</span>
+        <span v-if="shipMeta.version" class="qcplan-pill">{{ tt('版本号') }} {{ shipMeta.version }}</span>
+        <span class="qcplan-gap" />
+        <el-button size="small" :loading="shipLoading" :disabled="!shipCode" @click="loadShip">{{ tt('刷新') }}</el-button>
+      </div>
+      <!-- 列与《出货检验计划表》面板上**看得见的那几列**一一对齐(2026-10-15 用户口径
+           「可获取的内容就是当前出货检验计划里填写的内容」):序号/检验项目/检验要求/检验方法/
+           不合格应对措施/检查频率/备注。计划表里的隐藏列(检验类别、检验内容=表区、检验仪器)
+           不在界面上出现 —— 其中 表区 只在「带入明细」时按计划内容写到本单,不在这里展示。 -->
+      <el-table ref="shipTable" v-loading="shipLoading" :data="shipRows" size="small" border height="430"
+                row-key="__k" :empty-text="shipEmptyText"
+                @selection-change="(r) => (shipPicked = r)">
+        <el-table-column type="selection" width="42" reserve-selection />
+        <el-table-column :label="tt('序号')" prop="序号" width="70" />
+        <el-table-column :label="tt('检验项目')" prop="检验项目" width="150" show-overflow-tooltip />
+        <el-table-column :label="tt('检验要求')" prop="检验要求" min-width="230" show-overflow-tooltip />
+        <el-table-column :label="tt('检验方法')" prop="检验方法" min-width="230" show-overflow-tooltip />
+        <el-table-column :label="tt('不合格应对措施')" prop="不合格应对措施" min-width="180" show-overflow-tooltip />
+        <el-table-column :label="tt('检查频率')" prop="检查频率" width="140" show-overflow-tooltip />
+        <el-table-column :label="tt('备注')" prop="备注" min-width="130" show-overflow-tooltip />
+      </el-table>
+    </template>
 
     <!-- 合并口径(2026-10-09):勾选 → 带入明细;不带入也能当维护弹窗用 -->
     <template #footer>
-      <span class="qcplan-count">{{ tt('已选') }} {{ picked.length }} {{ tt('项') }}</span>
-      <el-button size="small" @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
-      <el-button size="small" type="primary" :disabled="!picked.length" @click="confirmPick">{{ tt('带入明细') }}</el-button>
+      <template v-if="shipMode">
+        <span class="qcplan-count">{{ tt('已选') }} {{ shipPicked.length }} {{ tt('项') }}</span>
+        <el-button size="small" @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
+        <el-button size="small" type="primary" :disabled="!shipPicked.length" @click="confirmPickShip">
+          {{ tt('带入明细') }}
+        </el-button>
+      </template>
+      <template v-else>
+        <span class="qcplan-count">{{ tt('已选') }} {{ picked.length }} {{ tt('项') }}</span>
+        <el-button size="small" @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
+        <el-button size="small" type="primary" :disabled="!picked.length" @click="confirmPick">{{ tt('带入明细') }}</el-button>
+      </template>
     </template>
 
     <!-- ═══ 方案表单 ═══ -->
@@ -270,11 +324,108 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 
-defineProps({ modelValue: { type: Boolean, default: false } })
+const props = defineProps({
+  modelValue: { type: Boolean, default: false },
+  /** 本单「产品编码」:出货检验计划来源按它取数(取不到就提示先填表头) */
+  productCode: { type: String, default: '' },
+  /** 是否给出「出货检验计划」这个只读来源(2026-10-17 先只开给组装成品检验单 QC_ASM_INSP;
+   *  2026-10-18 起制程检验单 QC_PROC_INSP 也开,见 PanelxList SHIP_PLAN_SOURCE_PANELS) */
+  shipSource: { type: Boolean, default: false },
+})
 const emit = defineEmits(['update:modelValue', 'changed', 'pick'])
 /** 勾选的项目行(带入当前单据用) */
 const picked = ref([])
 const itemTable = ref(null)
+
+// ────────── 来源②:出货检验计划(RD_INSP_PLAN,只读) ──────────
+const source = ref('lib')
+const shipRows = ref([])
+const shipPicked = ref([])
+const shipLoading = ref(false)
+const shipTable = ref(null)
+const shipMeta = ref({ planNo: '', title: '', version: '' })
+/**
+ * 本弹窗此刻该按「出货检验计划」来源渲染吗?= 面板开了这个来源 **且** 用户切到了它。
+ *
+ * ⚠ 少了 `props.shipSource` 这一半就会串数据:全系统所有面板共用**同一个** PanelxList 实例
+ *   (PortalLayout 的 keep-alive 按组件类型缓存,面板间切换不重建),本组件也就跟着复用,
+ *   `source`/`shipRows` 是组件内存状态 —— 在「成品检验单」切到出货检验计划取到数据后,换到没开
+ *   这个来源的面板再打开弹窗,它会顶着「产品编码（表头未填）」把上一次的计划行显示出来
+ *   (2026-10-18 报障:制程检验单没填产品编码却看到出货检验计划的行)。
+ */
+const shipMode = computed(() => props.shipSource && source.value === 'ship')
+const shipCode = computed(() => String(props.productCode || '').trim())
+const shipEmptyText = computed(() => (!shipCode.value
+  ? tt('本单还没填「产品编码」，先在表头填写后再取计划')
+  : (shipLoading.value ? '' : tt('该产品没有出货检验计划或计划里没有检验项目'))))
+/** 取数代次:每复位/每次新请求都 +1,晚到的响应凭它作废(换面板、切来源、连点刷新都会碰到) */
+let shipSeq = 0
+
+/** 清空计划来源的全部内存状态(切来源、换面板、关弹窗重开都要清干净,别把上一张单的行留下) */
+function resetShip() {
+  shipSeq++
+  shipRows.value = []
+  shipPicked.value = []
+  shipMeta.value = { planNo: '', title: '', version: '' }
+}
+
+function onSourceChange(v) {
+  if (v === 'ship') loadShip()
+}
+
+/**
+ * 按本单产品编码取《出货检验计划表》已填的检验项目(后端 /qc/inspPlan/fromShipPlan:
+ * 控制项目→检验项目、控制标准及要求→检验要求、控制方法→检验方法、检测频率→检查频率、
+ * 检验内容→表区)。**只读**,不写任何库表。
+ *
+ * 产品编码为空 ⇒ **不发请求、不留任何行**(表里只显示「本单还没填产品编码,先在表头填写后再取计划」),
+ * 后端同一口径(空编码返回 400「请先填写产品编码」),两边都不猜产品。
+ */
+async function loadShip() {
+  resetShip()
+  const code = shipCode.value
+  if (!code) return
+  const seq = ++shipSeq
+  shipLoading.value = true
+  try {
+    const r = await request.get(`${API}/fromShipPlan`, { params: { productCode: code } })
+    if (seq !== shipSeq) return          // 已被复位/后一次取数取代 ⇒ 丢弃这次结果
+    const d = r.data || {}
+    // row-key 必须唯一:同产品同名项目可能重复,故带上下标(纯视图用,不入库)
+    shipRows.value = (d.rows || []).map((x, i) => ({ ...x, __k: i }))
+    shipMeta.value = { planNo: d.planNo || '', title: d.title || '', version: d.version || '' }
+  } catch (e) {
+    if (seq !== shipSeq) return
+    err(e, '取出货检验计划失败')
+  } finally {
+    if (seq === shipSeq) shipLoading.value = false
+  }
+}
+
+/**
+ * 出货检验计划来源 → 带入明细。
+ * 归一成**标准库条目形状**再 emit('pick'),复用 PanelxList.applyInspItems 的带入链路
+ * (判重/写表区/写检查频率/成功话术都只有一份实现,不复制粘贴)。
+ */
+function confirmPickShip() {
+  if (!shipPicked.value.length) return
+  emit('pick', shipPicked.value.map((r) => ({
+    项目名称: r['检验项目'] || '',
+    // 类别:后端把计划表里**填了但界面隐藏**的「检验内容」(外观/重要尺寸/重量/性能)映射成 表区 / 检验类型,
+    // 它决定本单明细归到哪一类(组装成品检验单就是明细第一列「检验类型」,打印报表也按它归组),
+    // 故照样带过去 —— 本单没有这一列时 applyInspItems 会自己跳过;组装成品检验单还会按三类归一。
+    检验内容: r['表区'] || '',
+    检验标准: r['检验要求'] || '',
+    检验方法: r['检验方法'] || '',
+    检查频率: r['检查频率'] || '',
+    不合格应对措施: r['不合格应对措施'] || '',
+    检验仪器: r['检验仪器'] || '',
+    备注: r['备注'] || '',
+    来源: '出货检验计划',
+  })))
+  emit('update:modelValue', false)
+}
+
 function confirmPick() {
   if (!picked.value.length) return
   // 2026-10-16 拍板:带入时把**当前方案的「检验类型」**贴到每一行上 ——
@@ -360,7 +511,15 @@ async function loadItems() {
 function load() {
   // 每次打开先清空勾选:上一次「带入明细」留下的勾选若留着,「删除」会误伤那些行
   picked.value = []
+  shipPicked.value = []
+  shipTable.value?.clearSelection()
   loadPlans()
+  // 打开即复位来源与计划数据(2026-10-18):
+  //   · 面板开了「出货检验计划」来源 ⇒ 按**最新**表头产品编码重取一次(编码可能在弹窗外刚改过);
+  //     编码为空时 loadShip 自己会停在"不发请求"上,表里只剩提示语。
+  //   · 面板没开 ⇒ 来源拉回标准库 + 清掉上一个面板留下的计划行,否则会串到别的检验单上。
+  if (props.shipSource) loadShip()
+  else { source.value = 'lib'; resetShip() }
 }
 
 /** 方案行选中 → 加载它的项目 */
@@ -517,6 +676,9 @@ async function destroyItems() {
 
 <style scoped>
 .qcplan-tip { font-size: 12px; color: #909399; background: #f4f4f5; border-radius: 4px; padding: 6px 10px; margin-bottom: 10px; }
+/* 来源切换条(2026-10-17):标准库 / 出货检验计划 —— 两个来源性质不同(标准 vs 单据事实),
+   用按钮组明示"这是二选一",避免用户以为计划里的条目也能在这里编辑。 */
+.qcplan-src { margin-bottom: 10px; }
 .qcplan-sec { margin-bottom: 14px; }
 .qcplan-count { float: left; font-size: 12px; color: #909399; line-height: 32px; }
 /* 主从层级(2026-10-09 用户口径「上方为检验方案的表,下方为检验项目的表」):
