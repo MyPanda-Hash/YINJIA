@@ -516,7 +516,7 @@
             <span class="wh-dock-code">{{ w.code }}</span>
           </el-checkbox>
         </div>
-        <div class="wh-dock-tip">{{ tt('勾选仓库即查询;只能选一个;不勾选时列表为空') }}</div>
+        <div class="wh-dock-tip">{{ tt('勾选仓库即查询(单选);不勾选显示全部') }}</div>
       </aside>
       <!-- 顶部常驻提示(用户口径:取消月结后要一直有一串「还没上月月结」的提示) -->
       <div v-if="isStockDetail && mcNotice" class="mc-notice">
@@ -2730,10 +2730,9 @@ function onStockWhChange(v) {
 }
 
 // ---------- 库存明细:分仓库选择(与采购入库单「选单」弹窗同款的勾选列表,数据源 = 仓库档案 bs_wh)----------
-// 用户 2026-10-15 第五轮口径:① **勾选即查询**(没有查询按钮)② **只能勾一个**(单选)③ **没勾选就是空的**。
-// 实现:单选值 whDockSelected(=仓库编码,'' 表示未选);未选时给 condition._whCodes 一个**哨兵值**,
-//   后端按编码 IN 过滤自然返回 0 行(比"前端假装空列表"更诚实:数据面真的查不到东西)。
-const WH_DOCK_NONE = '__NONE__'
+// 用户 2026-10-15 第五/七轮口径:① **勾选即查询**(没有查询按钮)② **只能勾一个**(单选)
+// ③ 第七轮改成 **不勾选 = 显示全部**(此前是"不勾选为空",用户嫌每次都得先勾一次太麻烦)。
+// 实现:单选值 whDockSelected(=仓库编码,'' 表示未选);过滤条件在 load() 里**请求时派生**,不写进共享 condition。
 const isStockDetail = computed(() => String(panelCode.value) === 'STOCK_DETAIL')
 const whDockSelected = ref('')
 watch(isStockDetail, async (v) => {
@@ -7619,8 +7618,9 @@ async function load(clamping = false) {
     // 库存明细左栏「分仓库」的过滤条件**在请求时派生**,不写进共用的 condition ——
     //   condition 由各面板共享、切面板时会被 reset 清空(顺序一变就互相影响);
     //   2026-10-15 用户报「库存明细的查询会影响到库存状况表」就是这类跨面板串味。
-    //   未勾选 ⇒ 哨兵值 ⇒ 后端按编码 IN 天然返回 0 行(用户口径「没勾选就是空的」)。
-    if (isStockDetail.value) params.condition._whCodes = whDockSelected.value || WH_DOCK_NONE
+    //   用户 2026-10-15(第七轮):**不勾选 = 显示全部**(勾一次仓只是为了收窄,别让人每次都得先勾),
+    //   所以这里只在真选了仓库时才加条件;勾选即查询、单选由左栏控制。
+    if (isStockDetail.value && whDockSelected.value) params.condition._whCodes = whDockSelected.value
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
     if (fuzzyApplied.value?.valid) {
       Object.assign(params.condition, fuzzyApplied.value.condition || {})

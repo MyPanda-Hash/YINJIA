@@ -327,6 +327,7 @@ export default {
     '列': 'cols.',
     '库存状况表': 'Estado de Stock',
     '库存明细': 'Detalle de Inventario',
+    '勾选仓库即查询(单选);不勾选显示全部': 'Marcar un almacén consulta de inmediato (una sola opción); sin marcar se muestra todo',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Marcar un almacén consulta de inmediato; solo se puede elegir uno; sin marcar, la lista queda vacía',
     '月份': 'Mes',
     '月结状态': 'Estado del cierre',

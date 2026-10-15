@@ -78,7 +78,7 @@ console.log('[5] 明细列: ' + await ev(`(() => {
   return heads.join(',') + '  | 含结存单价?' + (heads.includes('结存单价') ? '是(❌ 用户要求摘掉)' : '否 ✅');
 })()`))
 
-console.log('[6] 未勾选时应为空 → 勾「恒亿仓」即查询(单选):')
+console.log('[6] 未勾选=显示全部 → 勾「恒亿仓」即查询(单选) → 再点取消=回到全部:')
 const count0 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
@@ -87,7 +87,7 @@ await ev(`(() => {
 })()`)
 await sleep(6000)
 const count1 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
-// 再点同一个 = 取消 ⇒ 应回到空
+// 再点同一个 = 取消 ⇒ 应回到全部(第七轮口径)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));
   const input = item && item.querySelector('input'); if (input) input.click();
@@ -95,7 +95,7 @@ await ev(`(() => {
 })()`)
 await sleep(5000)
 const count2 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
-console.log(`    未勾选=${count0}(应 0) → 勾恒亿仓=${count1}(应 612) → 再点取消=${count2}(应 0)`)
+console.log(`    未勾选=${count0}(应 1611 全部) → 勾恒亿仓=${count1}(应 612) → 再点取消=${count2}(应回到 1611)`)
 // 勾回来,供下面的展开断言使用
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('恒亿仓'));

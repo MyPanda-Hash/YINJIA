@@ -1113,6 +1113,7 @@ export default {
     '列': 'cols',
     '库存状况表': 'Stock Balance',
     '库存明细': 'Stock Detail',
+    '勾选仓库即查询(单选);不勾选显示全部': 'Checking a warehouse queries immediately (single choice); nothing checked shows all',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Checking a warehouse queries immediately; only one can be selected; nothing checked means an empty list',
     '月份': 'Month',
     '月结状态': 'Close Status',

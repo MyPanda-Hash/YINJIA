@@ -317,6 +317,7 @@ export default {
     '列': 'cột',
     '库存状况表': 'Tình trạng kho',
     '库存明细': 'Chi tiết tồn kho',
+    '勾选仓库即查询(单选);不勾选显示全部': 'Tích chọn kho là truy vấn ngay (chọn một); không chọn thì hiển thị tất cả',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Tích chọn kho là truy vấn ngay; chỉ chọn được một; không chọn thì danh sách trống',
     '月份': 'Tháng',
     '月结状态': 'Trạng thái kết chuyển',

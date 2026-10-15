@@ -330,6 +330,7 @@ export default {
     '列': 'Spalten',
     '库存状况表': 'Lagerbestand',
     '库存明细': 'Bestandsdetail',
+    '勾选仓库即查询(单选);不勾选显示全部': 'Lager ankreuzen sucht sofort (Einzelauswahl); ohne Auswahl wird alles angezeigt',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Lager ankreuzen sucht sofort; nur eines auswählbar; ohne Auswahl bleibt die Liste leer',
     '月份': 'Monat',
     '月结状态': 'Abschlussstatus',
