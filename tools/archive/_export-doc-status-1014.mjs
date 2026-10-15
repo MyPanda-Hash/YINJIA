@@ -61,10 +61,10 @@ import { readFileSync, appendFileSync } from 'node:fs'
 const rp = new URL('README.md', OUT)
 try {
   appendFileSync(rp, ['', '## 单据状态(必须一起导,否则界面显示草稿)', '',
-    '- 界面/流程状态**不是**物理列「单据状态」,而是**工作流派生** —— 真源表 `yj_doc_status`:',
-    '  `shr` 非空=已审核 / `pending='Y'`=审批中 / `canceled='Y'`=已作废 / `archived='Y'`=已完成 / `stopped='Y'`=已中止;都没有=草稿。',
+    "- 界面/流程状态**不是**物理列「单据状态」,而是**工作流派生** —— 真源表 `yj_doc_status`:",
+    "  `shr` 非空=已审核 / `pending=Y`=审批中 / `canceled=Y`=已作废 / `archived=Y`=已完成 / `stopped=Y`=已中止;都没有=草稿。",
     '- 本目录 `yj_doc_status.csv` 即这批单据的留痕(含 `派生状态` 列便于核对),导库时一并写入 `yj_doc_status`;',
-    '- 只导单据表不导留痕 ⇒ 同事侧一律显示"草稿"(与正式库表现不一致)。',
+    '- 只导单据表不导留痕 ⇒ 同事侧一律显示「草稿」(与正式库表现不一致)。',
     `- 本次留痕行数:${rows.length}(${Object.entries(byPanel).map(([p, n]) => p + ':' + n).join(' / ')})`].join('\n'), 'utf8')
 } catch (e) { console.log('README 追加失败:' + e.message) }
 console.log('[产物] tools/archive/_dump-out/kingdee-data-1014/yj_doc_status.csv')
