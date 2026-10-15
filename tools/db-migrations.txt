@@ -3156,3 +3156,12 @@ migrate-stock-flow-trace-cols-20261015.sql
 #   Java 侧 `是否来料检验` 的引用全在 bl_purchase_in(采购入库行,另一张表)。
 #   自检:列就位/旧列已走/定义 nvarchar(10) NULL/两处字段配置与服务器一致/译名各 ≥10/注明非空/列数 148。幂等;两账套均执行。
 migrate-bs-inv-inspection-align-20261015.sql
+
+# migrate-stock-detail-panel.sql — 库存报表新增第四张「库存明细」(STOCK_DETAIL):flat 直读结存表 kucun
+#   用户口径(2026-10-15):① 用 KUCUN 表做库存报表下的库存明细(不建视图、不 join 档案);
+#   ② 列 = 存货编码·仓库·批号·累计入库量·累计出库量·现存量·结存单价·更新时间(累计入/出照原样显示)。
+#   为什么直读 kucun:2026-10-14 期初导入(2004 行)只写 kucun 没写流水 ⇒ 流水口径的库存状况表合计为负
+#   (-323,341.826),kucun 现存量合计 +4,287,547.564 ⇒ 「现在有多少货」只有 kucun 答得出。
+#   配套:菜单(menus.js 库存报表组)+ 10 语言词条(locales/*.js)+ 面板/字段译名 + 全角色授权。
+#   自检:面板指向 kucun/字段 8 行且全是 kucun 真实列/查询区 3 明细 8/授权覆盖全部角色/译名各 ≥10 语言。幂等;两账套均执行。
+migrate-stock-detail-panel.sql

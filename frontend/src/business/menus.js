@@ -184,7 +184,7 @@ export const menuTree = [
         ],
       },
       {
-        // 库存报表(三张核心库存报表集中入口)
+        // 库存报表(四张核心库存报表集中入口)
         code: 'invReports',
         title: '库存报表',
         icon: 'DataAnalysis',
@@ -195,6 +195,10 @@ export const menuTree = [
           { code: 'stockLedger', title: '库存台账', path: '/panelx/list/STOCK_LEDGER', panelCode: 'STOCK_LEDGER', icon: 'Notebook' },
           // 收发存汇总表:按仓库+存货+期次聚合的期初/本期收入发出/期末(v_stock_summary)
           { code: 'stockSummary', title: '收发存汇总表', path: '/panelx/list/STOCK_SUMMARY', panelCode: 'STOCK_SUMMARY', icon: 'DataAnalysis' },
+          // 库存明细(2026-10-15):**直读结存表 kucun**(物料×仓库×批号一行:累计入库量/累计出库量/现存量/结存单价)。
+          // 与上面三张的区别:那三张读 v_stock_* 流水视图,2026-10-14 的金蝶期初(2004 行)只写进 kucun 没写流水,
+          // 流水口径合计为负 ⇒ 「现在还有多少货」只有这张答得出(见 tools/migrate-stock-detail-panel.sql 头注)。
+          { code: 'stockDetail', title: '库存明细', path: '/panelx/list/STOCK_DETAIL', panelCode: 'STOCK_DETAIL', icon: 'List' },
         ],
       },
     ],
