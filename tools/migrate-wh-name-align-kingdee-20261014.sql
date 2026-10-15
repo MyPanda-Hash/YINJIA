@@ -18,8 +18,16 @@ UPDATE bs_wh SET 仓库名称 = N'成品B仓'
  WHERE 仓库编码 = N'CP-02' AND 仓库名称 <> N'成品B仓';
 GO
 -- 自检:CP-02 必须叫「成品B仓」,且不能因此出现重名
+-- ⚠ 2026-10-15 修正:原断言写成 NOT EXISTS(编码=CP-02 AND 名称=成品B仓),
+--   在**档案里根本没有 CP-02 这一行**的环境会直接判失败
+--   (本地 HSDZ_MES / HSDZ_MES_TEST 正是如此:只有 CK-A/A2/C/D 与旧 CK01..07/WH-*;
+--    服务器备份里 CP-02=B仓 是存在的) ⇒ DbSync 永远到不了「执行 0、失败 0」。
+--   现改为**仅当 CP-02 这一行存在时**才要求它名字对齐:
+--   原意保留(有该行但名字没对齐 ⇒ 仍报错),压根没有该行 ⇒ 跳过不误报。
 DECLARE @bad int = 0;
-IF NOT EXISTS (SELECT 1 FROM bs_wh WHERE 仓库编码 = N'CP-02' AND 仓库名称 = N'成品B仓') SET @bad = @bad + 1;
+IF EXISTS (SELECT 1 FROM bs_wh WHERE 仓库编码 = N'CP-02')
+   AND NOT EXISTS (SELECT 1 FROM bs_wh WHERE 仓库编码 = N'CP-02' AND 仓库名称 = N'成品B仓')
+  SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM bs_wh WHERE 仓库名称 = N'成品B仓') > 1 SET @bad = @bad + 1;
 IF @bad > 0 RAISERROR(N'CP-02 仓库名称对齐自检失败(%d 项)', 16, 1, @bad);
 ELSE PRINT N'CP-02 仓库名称已对齐金蝶(成品B仓;幂等)';

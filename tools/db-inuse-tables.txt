@@ -216,12 +216,12 @@ table:dm_ck   # 仓库代码
 table:dm_gf   # 厂商代码
 table:dm_kh   # 客户代码
 table:gxgs   # 工序工时
-table:inh   # 进货单
+table:inh   # 入库流水
 table:kucun   # 库存资料
 table:mate   # BOM
 table:order_bs   # 订单明细
 table:order_bt   # 订单
-table:outh   # 出货单
+table:outh   # 出库流水
 table:plang   # 工单
 table:plang_pc   # 工单排产
 table:Porder   # 采购单
