@@ -94,14 +94,14 @@
     "method": "POST",
     "pc": "STOCK_BALANCE",
     "pd": "{\"panelCode\":\"STOCK_BALANCE\",\"condition\":{},\"pageNo\":1,\"pageSize\":50}",
-    "t0": 1792037529119,
-    "ms": 341
+    "t0": 1792037934233,
+    "ms": 310
    }
   ],
   "byPanel": {
    "/api/px/getPanelConfig?panelCode=STOCK_BALANCE|": {
     "n": 1,
-    "max": 58
+    "max": 83
    },
    "WH|{\"panelCode\":\"WH\",\"condition\":{},\"pageNo\":1,\"pageSize\":1,\"countOnly\":true}": {
     "n": 1,
@@ -109,15 +109,15 @@
    },
    "INV|{\"panelCode\":\"INV\",\"condition\":{},\"pageNo\":1,\"pageSize\":1,\"countOnly\":true}": {
     "n": 1,
-    "max": 15
-   },
-   "/api/report/templates?panelCode=STOCK_BALANCE|": {
-    "n": 1,
-    "max": 17
+    "max": 19
    },
    "/api/px/getPanelConfig?panelCode=WH|": {
     "n": 1,
-    "max": 11
+    "max": 18
+   },
+   "/api/report/templates?panelCode=STOCK_BALANCE|": {
+    "n": 1,
+    "max": 31
    },
    "WH|{\"panelCode\":\"WH\",\"condition\":{},\"keyword\":\"\",\"pageNo\":1,\"pageSize\":100}": {
     "n": 1,
@@ -125,7 +125,7 @@
    },
    "STOCK_BALANCE|{\"panelCode\":\"STOCK_BALANCE\",\"condition\":{},\"pageNo\":1,\"pageSize\":50}": {
     "n": 1,
-    "max": 341
+    "max": 310
    }
   }
  },
