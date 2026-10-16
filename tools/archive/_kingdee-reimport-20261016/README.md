@@ -103,6 +103,22 @@ java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar DbSync.java run migrate-st
 要消掉负结存得补导更早区间或期初单据;31 行 `INIT-*` 期初因 (仓库,物料) 键与被单据覆盖的键不重合,
 按守卫**原样保留**。
 
+## 补做「号池回登」(否则新单会重发已用编号)
+
+`FormNoService.next()` 是 `seq = MAX(RIGHT(dh,4)) FROM s_allno WHERE lb=前缀 AND ny=yyyy-MM ...` —— **只看号池自己**;
+`exists()` 也只查 `s_allno` + `inh`。导库没走应用的取号 ⇒ 号池停在被导数据之前,`新增` 会**发出库里已存在的号**。
+实测:本地 IJ 池末号 `IJ-2026-10-0010`,而库里已有 `IJ-2026-10-0011~0020`,造检验单时连撞 10 个重号。
+
+```powershell
+cd tools
+java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar DbSync.java run archive\_kingdee-reimport-20261016\backfill-formno-pool-imported.sql
+```
+
+口径与 `migrate-formno-style.sql` 的「历史横杠单号回登号池」一致:逐张单据头表取 `前缀-yyyy-MM-四位数字` 的行,
+号池里没有的**补登一行**(`asp_user1='import-backfill'`);只增不删(删了会重发号,项目铁律)。
+⚠ 紧凑格式(`前缀-yyyyMMdd-nnnnn`,如 `CGRK-20260901-03098`)与应用新格式天然隔离,**不需要**回登。
+回登后:`SL` 293 → 号池 293 行、`IJ` 补齐 0011~0020、`JYSJ`/`GD` 同步(工单 `GD-2026-10-0222`)。
+
 ## 回滚
 
 `rollback-HSDZ_MES.sql` / `rollback-HSDZ_MES_TEST.sql` —— 按本次真正插入的 id **逐表精确 DELETE**
