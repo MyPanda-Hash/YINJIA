@@ -115,8 +115,10 @@ try {
 
   // ── ② 取成型工艺清单:按列合并,已填数据保留 ───────────────────────────────
   const colsBefore = await ev(`document.querySelectorAll('.fi-sheet .fi-grid thead tr:nth-child(2) th.col-head').length`)
-  await setInput(`${cellOf('炭棒外径', 0)}.querySelector('input')`, '34.2')
-  await setInput(`${cellOf('炭棒外径', 1)}.querySelector('input')`, '34.4')
+  // ⚠ 2026-10-17:外径属「尺寸及重量」组,那一组只记 3#/4#(firstInspCols.GROUP_SAMPLES)
+  //   ⇒ 探针要往 3#/4# 填;改前误往 1#/2# 填,那一轮之后这两格已经不是录入格了。
+  await setInput(`${cellOf('炭棒外径', 2)}.querySelector('input')`, '34.2')
+  await setInput(`${cellOf('炭棒外径', 3)}.querySelector('input')`, '34.4')
   // 产品编号(表头第一格)→ 测试账套里有工艺清单的演示产品
   await ev(`(() => {
     const t = document.querySelector('.fi-sheet .fi-head')
@@ -133,10 +135,10 @@ try {
   const msg = await ev(`[...document.querySelectorAll('.el-message')].map((m) => (m.innerText || '').trim()).join(' | ')`)
   console.log(`  带入提示=${JSON.stringify(String(msg).slice(0, 120))}`)
   ok('② 点得到「取成型工艺清单」', clicked === true, String(clicked))
-  const v1 = await ev(`${cellOf('炭棒外径', 0)}?.querySelector('input')?.value`)
-  const v2 = await ev(`${cellOf('炭棒外径', 1)}?.querySelector('input')?.value`)
-  ok('② 带入后已填的实测数值**还在**(1# 34.2)', String(v1) === '34.2', `1#=${JSON.stringify(v1)}`)
-  ok('② 带入后已填的实测数值**还在**(2# 34.4)', String(v2) === '34.4', `2#=${JSON.stringify(v2)}`)
+  const v1 = await ev(`${cellOf('炭棒外径', 2)}?.querySelector('input')?.value`)
+  const v2 = await ev(`${cellOf('炭棒外径', 3)}?.querySelector('input')?.value`)
+  ok('② 带入后已填的实测数值**还在**(3# 34.2)', String(v1) === '34.2', `3#=${JSON.stringify(v1)}`)
+  ok('② 带入后已填的实测数值**还在**(4# 34.4)', String(v2) === '34.4', `4#=${JSON.stringify(v2)}`)
   const colsAfter = await ev(`document.querySelectorAll('.fi-sheet .fi-grid thead tr:nth-child(2) th.col-head').length`)
   ok('② 列数没翻倍(同名列是合并、不是又加一批)', Number(colsAfter) === Number(colsBefore),
     `带入前 ${colsBefore} 列 / 带入后 ${colsAfter} 列`)

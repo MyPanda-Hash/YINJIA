@@ -14,6 +14,7 @@ import {
   columnsOf, groupsOf, unitOfLabel, nextColumnKey, nextColumnLabel,
   rowsForColumn, addColumn, removeColumn, updateColumn, columnHasContent, ensureItems,
   seedDefaultColumns, DEFAULT_TEST_ITEMS, mergeFetchedColumns, ensureColumnRows,
+  samplesOfGroup, isFillableCell,
 } from './firstInspCols.js'
 
 const headOf = (items = []) => ({ 单据编号: 'SJ-T-1', detail: { items } })
@@ -300,4 +301,61 @@ test('ensureColumnRows 幂等:补齐过的列再补一次不长行', () => {
   items.splice(items.findIndex((x) => x['样品序号'] === '3#'), 1)
   assert.equal(ensureColumnRows(items, { key: 'X' }), 1)
   assert.equal(items.length, 9)
+})
+
+/* ── 「每个分组各记录 2 支样品」(2026-10-17;用户口径「当前为全部都在最上面两行可被填写,
+      而不是如图形式实现」)───────────────────────────────────────────────── */
+
+test('分组 → 样品对:四组各占一对,1#..8# 不重不漏', () => {
+  assert.deepEqual(samplesOfGroup('表观及脱粉'), [1, 2])
+  assert.deepEqual(samplesOfGroup('尺寸及重量'), [3, 4])
+  assert.deepEqual(samplesOfGroup('强度'), [5, 6])
+  assert.deepEqual(samplesOfGroup('浊度及压降'), [7, 8])
+  // 四组 × 2 支 恰好铺满纸面 1#..8#,一个样品都不重复、一个都不落
+  const all = GROUP_ORDER.flatMap((g) => samplesOfGroup(g))
+  assert.deepEqual([...all].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8])
+  assert.equal(new Set(all).size, 8)
+})
+
+test('可填判定:每列只在自己分组那一对样品行上可填(不是"只有 1#/2#")', () => {
+  // 尺寸及重量那四列的 8 个格:只有 3#/4# 可填 —— 这正是图片版式,
+  // 也是本轮修复点(改前它们在任何样品行上都不可填,8 个测试项目永远填不进去)
+  const size = DEFAULT_TEST_ITEMS.filter((d) => d.group === '尺寸及重量')
+  assert.equal(size.length, 4)
+  for (const d of size) {
+    const open = [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, d.group))
+    assert.deepEqual(open, [3, 4], `${d.label} 应只在 3#/4# 可填`)
+  }
+  // 强度 → 5#/6#;浊度及压降 → 7#/8#;表观及脱粉 → 1#/2#
+  const openOf = (g) => [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, g))
+  assert.deepEqual(openOf('强度'), [5, 6])
+  assert.deepEqual(openOf('浊度及压降'), [7, 8])
+  assert.deepEqual(openOf('表观及脱粉'), [1, 2])
+  // 跨组不能填:外径列在 1#/2# 上必须不可填(改前这里是"/"但界面照旧只给 1#/2#,
+  // 于是"能填的格"与"该填的格"完全错位)
+  assert.equal(isFillableCell(1, '尺寸及重量'), false)
+  assert.equal(isFillableCell(8, '尺寸及重量'), false)
+})
+
+test('每组正好 2 支可填:整张纸 4 组 × 2 支 × 本组列数', () => {
+  const items = DEFAULT_TEST_ITEMS
+  const openCells = items.reduce(
+    (n, d) => n + [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, d.group)).length, 0)
+  // 表观及脱粉 2 列 ×2 + 尺寸及重量 4 列 ×2 + 强度 2 列 ×2 + 浊度及压降 2 列 ×2 = 20
+  assert.equal(openCells, 20)
+  // 其余 60 格是打「/」的占位格
+  assert.equal(items.length * SAMPLE_COUNT - openCells, 60)
+})
+
+test('未知分组兜底:自定义组名仍可填(落到最后一对样品),不会整列变砖', () => {
+  assert.deepEqual(samplesOfGroup('我自定义的组'), [7, 8])
+  assert.equal(isFillableCell(7, '我自定义的组'), true)
+  assert.equal(isFillableCell(1, '我自定义的组'), false)
+  // 组名给空/undefined 也一样兜底,不抛
+  assert.deepEqual(samplesOfGroup(undefined), [7, 8])
+})
+
+test('样品序号按数字比:字符串「3」也算 3#(明细里的样品序号有字符串来源)', () => {
+  assert.equal(isFillableCell('3', '尺寸及重量'), true)
+  assert.equal(isFillableCell('1', '尺寸及重量'), false)
 })

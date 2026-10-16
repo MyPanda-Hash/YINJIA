@@ -10,7 +10,9 @@
                     第二级 = 测试项目(炭棒表观状态 / 炭棒外径mm / … )
                     左上角斜线格 = 「测试项目 ╲ 样品序号」
          标准行   : 每个测试项目该填的标准(来自《成型工艺清单》RD_MOLD_PROC)
-         数据区   : 1#..8# 八个样品,一格 = 该样品的该测试项目实测值
+         数据区   : 1#..8# 八个样品行,**每组各自占一对** —— 表观及脱粉 1#/2#、尺寸及重量 3#/4#、
+                    强度 5#/6#、浊度及压降 7#/8#(见 firstInspCols.GROUP_SAMPLES);
+                    本组那一对格子空白可填(并铺了底色),其余格打「/」= 本格无需填写
          相关要求 : 图片底部那 6 条(第 3/4/6 条按业务文案原样带出)
          表尾     : 检验结果 | 检验人
 
@@ -179,14 +181,15 @@
           </td>
           <td v-if="editable" class="col-op no-print"></td>
         </tr>
-        <!-- 数据区:1#..8#(⚠ 相关要求第 1 条:每个测试项目只记录 2 支样品 ⇒ 只有 1#/2# 可填,
-             3#..8# 打 `/` 且不可录;老单据里这几行已填过的值照原样显示,不吞数据) -->
+        <!-- 数据区:1#..8#(⚠ 相关要求第 1 条:**每个分组各记录 2 支样品**,一个样品行只服务一个分组:
+               表观及脱粉→1#/2#、尺寸及重量→3#/4#、强度→5#/6#、浊度及压降→7#/8#(见 firstInspCols.GROUP_SAMPLES)。
+               不属于本组的格打 `/` 且不可录;老单据里那些格已填过的值照原样显示,不吞数据) -->
         <tr v-for="sample in samples" :key="sample" class="sample-row">
           <th class="rowlabel">{{ sample }}#</th>
-          <td v-for="c in columns" :key="c.key" :class="{ 'is-check': isCheckCol(c) }">
-            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),同样只给 1#、2#。 -->
+          <td v-for="c in columns" :key="c.key" :class="[{ 'is-check': isCheckCol(c) }, zoneClass(sample, c)]">
+            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),按本组样品(1#/2#)给。 -->
             <template v-if="isCheckCol(c)">
-              <div v-if="editable && sample <= SAMPLE_LIMIT" class="fi-checks">
+              <div v-if="editable && fillable(sample, c)" class="fi-checks">
                 <span v-for="o in checkOptions(c)" :key="o" class="fi-check">
                   <span
                     class="fi-box"
@@ -200,14 +203,14 @@
                   >{{ tt(o) }}</span>
                 </span>
               </div>
-              <span v-else class="fi-checktext" :title="sample > SAMPLE_LIMIT ? tt('按相关要求：每个测试项目只记录 2 支样品（1#、2#）') : ''">
+              <span v-else class="fi-checktext" :title="fillable(sample, c) ? '' : sampleHint(c)">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
-            <!-- 其余列:文本录入格(1#/2#);3#..8# 只读 -->
+            <!-- 其余列:文本录入格(本组那两支样品);不属于本组的格只读打「/」 -->
             <template v-else>
               <el-input
-                v-if="editable && sample <= SAMPLE_LIMIT"
+                v-if="editable && fillable(sample, c)"
                 :model-value="cellText(sample, c)"
                 size="small"
                 class="fi-cell"
@@ -215,7 +218,7 @@
                 @update:model-value="v => setMeasured(sample, c, v)"
                 @change="() => normalizePrecision(sample, c)"
               />
-              <span v-else :title="sample > SAMPLE_LIMIT ? tt('按相关要求：每个测试项目只记录 2 支样品（1#、2#）') : ''">
+              <span v-else :title="fillable(sample, c) ? '' : sampleHint(c)">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
@@ -267,7 +270,7 @@ import { tt } from '@/i18n'
 import {
   columnsOf, groupsOf, addColumn, removeColumn, updateColumn,
   columnHasContent, ensureItems, ROW_STANDARD, ROW_SAMPLE, GROUP_ORDER,
-  seedDefaultColumns,
+  seedDefaultColumns, samplesOfGroup, isFillableCell,
 } from './firstInspCols.js'
 
 const props = defineProps({
@@ -316,10 +319,39 @@ const samples = [1, 2, 3, 4, 5, 6, 7, 8]
 /**
  * 相关要求第 1 条:「表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，
  *   炭棒强度测试2支样品，浊度及压降测试记录2支样品。」
- * ⇒ **每个测试项目都只记录 2 支样品**,纸面保留 1#..8# 八行(版式照图纸),但只有 1#/2# 可录,
- *   3#..8# 打 `/`(图片上那排斜杠就是这个意思);老单据里 3#..8# 已填过的值照原样只读显示,不吞数据。
+ * ⇒ **每个分组各记录 2 支样品**(不是"每个测试项目都记 1#/2#"):纸面保留 1#..8# 八行(版式照图纸),
+ *   一个样品行只服务一个分组 —— 表观及脱粉→1#/2#、尺寸及重量→3#/4#、强度→5#/6#、浊度及压降→7#/8#;
+ *   其余格子打 `/`(图片上那排斜杠就是这个意思);老单据里那些格已填过的值照原样只读显示,不吞数据。
+ *   映射在 core/qc/firstInspCols.js 的 GROUP_SAMPLES(单测钉住"四个组 × 2 支 = 1#..8# 不重不漏")。
+ *
+ * ⚠ 2026-10-17 修(用户口径「当前的首件检验单的表格应该是这种实现方式实现的,当前为全部都在最上面
+ *   两行可被填写,而不是如图形式实现」):原实现按"样品序号 ≤ 2"一刀切 ⇒ 尺寸及重量/强度/浊度及压降
+ *   三组在**任何**样品行上都不可录(8 个测试项目永远填不进去)。改为**按本列的分组**判可填。
  */
-const SAMPLE_LIMIT = 2
+/** 这一格可不可填:看**本列的分组**认样品,而不是看样品序号大小 */
+function fillable(sample, c) {
+  return isFillableCell(sample, c.group)
+}
+
+/** 不可填格的 title:说清本组该填哪两支样品(否则用户只看到一片「/」,不知道去哪填) */
+function sampleHint(c) {
+  return tt('按相关要求：本组测试只记录 2 支样品（{a}）')
+    .replace('{a}', samplesOfGroup(c.group).map((n) => `${n}#`).join('、'))
+}
+
+/**
+ * 纸面「可填区」底色 —— 图片上每一对样品行按分组铺了底色(它的作用就是标出"这格要填"):
+ *   表观及脱粉 1#/2#、强度 5#/6# = 淡黄;尺寸及重量 3#/4#、浊度及压降 7#/8# = 淡桃。
+ * 只标**本组自己那两行**,其余格保持白底(与图纸一致);只读态/打印件一样带(纸面本来就有)。
+ * 色值直接取自用户给的图片(主色统计:黄 #FFF3CA / 桃 #FCE4D3)。
+ */
+const ZONE_TINT = ['gz-y', 'gz-p', 'gz-y', 'gz-p']   // 与 GROUP_ORDER 一一对应
+function zoneClass(sample, c) {
+  if (!fillable(sample, c)) return ''
+  const i = GROUP_ORDER.indexOf(c.group)
+  // 自定义分组(组名不认识)按 samplesOfGroup 落到最后一对样品,底色随最后一组
+  return i >= 0 ? ZONE_TINT[i] : ZONE_TINT[ZONE_TINT.length - 1]
+}
 
 /**
  * 相关要求第 2 条:「…测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；
@@ -793,6 +825,14 @@ function toggleCheck(sample, c, option) {
 .sample-row td.is-check {
   text-align: left;
   padding: 4px 6px;
+}
+/* 「可填区」底色(照图片:每一对样品行按分组铺底,其余格白底打「/」)。
+   ⚠ 放在 .sample-row td.is-check 之后,表观/脱粉那些勾选格也要吃到底色。 */
+.sample-row td.gz-y {
+  background: #fff3ca;
+}
+.sample-row td.gz-p {
+  background: #fce4d3;
 }
 .fi-checks {
   display: flex;
