@@ -1,0 +1,186 @@
+=== ① bs_qc_plan(检验方案)结构 ===
+  列名 | 类型
+  id | int
+  方案编码 | nvarchar
+  方案名称 | nvarchar
+  适用存货 | nvarchar
+  适用存货类别 | nvarchar
+  检验方式 | nvarchar
+  抽检比例% | decimal
+  停用 | bit
+  备注 | nvarchar
+  状态 | nvarchar
+  asp_user1 | nvarchar
+  asp_time1 | datetime2
+  asp_user2 | nvarchar
+  asp_time2 | datetime2
+  asp_cancel | char
+  备用1 | nvarchar
+  备用2 | nvarchar
+  备用3 | nvarchar
+  备用4 | nvarchar
+  备用5 | nvarchar
+  备用6 | nvarchar
+  备用7 | nvarchar
+  备用8 | nvarchar
+  备用9 | nvarchar
+  备用10 | nvarchar
+  备用11 | nvarchar
+  备用12 | nvarchar
+  备用13 | nvarchar
+  备用14 | nvarchar
+  备用15 | nvarchar
+  备用16 | nvarchar
+  备用17 | nvarchar
+  备用18 | nvarchar
+  备用19 | nvarchar
+  备用20 | nvarchar
+  取样规则 | nvarchar
+  文件编码 | nvarchar
+  执行标准 | nvarchar
+  (38 行)
+
+=== ② bs_qc_plan 数据 ===
+  id | 方案编码 | 方案名称 | 适用存货 | 适用存货类别 | 检验方式 | 抽检比例% | 停用 | 备注 | 状态 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 取样规则 | 文件编码 | 执行标准
+  1 | QP-CAS18 | Y料成品检验方案(CAS-18) | Y料 | 功能料-颗粒 | 抽检 |  | false | 出自受控文件 YJ-Q-125 §6.2/§7.2;成品=目数(20目/325目筛分占比) | 启用 | migration | 2026-10-09 04:05:27.1389841 | admin | 2026-10-09 08:05:43.4159044 | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 每50kg成品取样1个，每个样品200g | YJ-Q-125 | YJ-Q-125 Y料原料及成品检验规范 A0
+  2 | QP-YCAS23 | Y料原料检验方案(Y-CAS-23) | Y-CAS-23 |  | 抽检 |  | false | 出自受控文件 YJ-Q-125 §6.1/§7.1;原料=性能(余氯去除率)+卫生安全(11项重金属) | 启用 | migration | 2026-10-09 04:05:27.1471595 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 每50kg原料取样1个，每个样品200g | YJ-Q-125 | YJ-Q-125 Y料原料及成品检验规范 A0
+  (2 行)
+
+=== ③ bs_qc_item(检验项目)结构 ===
+  列名 | 类型
+  id | int
+  项目编码 | nvarchar
+  项目名称 | nvarchar
+  检验内容 | nvarchar
+  检验标准 | nvarchar
+  数据类型 | nvarchar
+  计量单位 | nvarchar
+  判定规则 | nvarchar
+  标准下限 | decimal
+  标准上限 | decimal
+  停用 | bit
+  备注 | nvarchar
+  状态 | nvarchar
+  asp_user1 | nvarchar
+  asp_time1 | datetime2
+  asp_user2 | nvarchar
+  asp_time2 | datetime2
+  asp_cancel | char
+  备用1 | nvarchar
+  备用2 | nvarchar
+  备用3 | nvarchar
+  备用4 | nvarchar
+  备用5 | nvarchar
+  备用6 | nvarchar
+  备用7 | nvarchar
+  备用8 | nvarchar
+  备用9 | nvarchar
+  备用10 | nvarchar
+  备用11 | nvarchar
+  备用12 | nvarchar
+  备用13 | nvarchar
+  备用14 | nvarchar
+  备用15 | nvarchar
+  备用16 | nvarchar
+  备用17 | nvarchar
+  备用18 | nvarchar
+  备用19 | nvarchar
+  备用20 | nvarchar
+  方案编码 | nvarchar
+  序号 | int
+  取样要求 | nvarchar
+  检验方法 | nvarchar
+  合格处置 | nvarchar
+  不合格处置 | nvarchar
+  (44 行)
+
+=== ④ bs_qc_item 数据(前 40) ===
+  id | 项目编码 | 项目名称 | 检验内容 | 检验标准 | 数据类型 | 计量单位 | 判定规则 | 标准下限 | 标准上限 | 停用 | 备注 | 状态 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 方案编码 | 序号 | 取样要求 | 检验方法 | 合格处置 | 不合格处置
+  1 | FIN-MESH-P20 | 目数(+20目) | 目数 | +20目占比≤15% | 定量 | % | 上限判定 |  | 15.0000 | false | YJ-Q-125 §6.2 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-CAS18 | 10 | 称取100g | 1.称取100g Y料成品，从上到下依次放20目、325目筛网进行震动筛分5min；2.称量计算各区间占比。 | 入库 | 重新筛分
+  2 | FIN-MESH-M325 | 目数(-325目) | 目数 | -325目占比≤10% | 定量 | % | 上限判定 |  | 10.0000 | false | YJ-Q-125 §6.2 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-CAS18 | 20 | 称取100g | 1.称取100g Y料成品，从上到下依次放20目、325目筛网进行震动筛分5min；2.称量计算各区间占比。 | 入库 | 重新筛分
+  3 | RCV-PERF-CL | 性能(余氯去除率) | 性能 | 余氯去除率≥80% | 定量 | % | 下限判定 | 80.0000 |  | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 10 | 称取40g | 1.称取40g 原料封装小T筒，进出水端用海绵压实；2.纯水加次氯酸钠加标，余氯含量2±0.2ppm；3.流速2L/min，冲2min取样测试余氯去除率。 |  | 退货
+  4 | RCV-HEALTH-CD | 卫生安全(镉增加量) | 卫生安全 | 镉增加量≤0.0005mg/L | 定量 | mg/L | 上限判定 |  | 0.0005 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 20 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  5 | RCV-HEALTH-PB | 卫生安全(铅增加量) | 卫生安全 | 铅增加量≤0.001mg/L | 定量 | mg/L | 上限判定 |  | 0.0010 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 21 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  6 | RCV-HEALTH-CR | 卫生安全(铬增加量) | 卫生安全 | 铬增加量≤0.005mg/L | 定量 | mg/L | 上限判定 |  | 0.0050 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 22 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  7 | RCV-HEALTH-FE | 卫生安全(铁增加量) | 卫生安全 | 铁增加量≤0.06mg/L | 定量 | mg/L | 上限判定 |  | 0.0600 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 23 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  8 | RCV-HEALTH-MN | 卫生安全(锰增加量) | 卫生安全 | 锰增加量≤0.04mg/L | 定量 | mg/L | 上限判定 |  | 0.0400 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 24 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  9 | RCV-HEALTH-AL | 卫生安全(铝增加量) | 卫生安全 | 铝增加量≤0.02mg/L | 定量 | mg/L | 上限判定 |  | 0.0200 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 25 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  10 | RCV-HEALTH-CU | 卫生安全(铜增加量) | 卫生安全 | 铜增加量≤0.2mg/L | 定量 | mg/L | 上限判定 |  | 0.2000 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 26 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  11 | RCV-HEALTH-ZN | 卫生安全(锌增加量) | 卫生安全 | 锌增加量≤0.2mg/L | 定量 | mg/L | 上限判定 |  | 0.2000 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 27 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  12 | RCV-HEALTH-AG | 卫生安全(银增加量) | 卫生安全 | 银增加量≤0.005mg/L | 定量 | mg/L | 上限判定 |  | 0.0050 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 28 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  13 | RCV-HEALTH-AS | 卫生安全(砷增加量) | 卫生安全 | 砷增加量≤0.001mg/L | 定量 | mg/L | 上限判定 |  | 0.0010 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 29 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  14 | RCV-HEALTH-NI | 卫生安全(镍增加量) | 卫生安全 | 镍增加量≤0.002mg/L | 定量 | mg/L | 上限判定 |  | 0.0020 | false | YJ-Q-125 §6.1 | 启用 | migration | 2026-10-09 04:05:27.1512789 |  |  | N |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | QP-YCAS23 | 30 | 称取10g | 1.取10g来料，加入100ml浸泡液润洗两次，加100ml浸泡液浸泡24h±1h，中速滤纸过滤；2.用icp-ms测试离子含量。 |  | 退货
+  (14 行)
+
+=== ⑤ QC_PLAN / QC_ITEM 面板字段 ===
+  panel_code | place | seq | label | col_name | data_type
+  QC_ITEM | detail | 50 | 数据类型 | 数据类型 | 下拉框
+  QC_ITEM | detail | 70 | 判定规则 | 判定规则 | 下拉框
+  QC_ITEM | detail | 80 | 标准下限 | 标准下限 | 小数
+  QC_ITEM | detail | 90 | 标准上限 | 标准上限 | 小数
+  QC_ITEM | query,detail | 10 | 项目编码 | 项目编码 | 文本
+  QC_ITEM | query,detail | 20 | 项目名称 | 项目名称 | 文本
+  QC_ITEM | query,detail | 30 | 检验内容 | 检验内容 | 文本
+  QC_ITEM | query,detail | 40 | 检验标准 | 检验标准 | 文本
+  QC_ITEM | query,detail | 60 | 计量单位 | 计量单位 | 文本
+  QC_ITEM | query,detail | 100 | 停用 | 停用 | 是否
+  QC_ITEM | query,detail | 105 | 方案编码 | 方案编码 | 文本
+  QC_ITEM | query,detail | 108 | 序号 | 序号 | 文本
+  QC_ITEM | query,detail | 115 | 取样要求 | 取样要求 | 文本
+  QC_ITEM | query,detail | 125 | 检验方法 | 检验方法 | 文本
+  QC_ITEM | query,detail | 135 | 合格处置 | 合格处置 | 文本
+  QC_ITEM | query,detail | 145 | 不合格处置 | 不合格处置 | 文本
+  QC_PLAN | detail | 60 | 抽检比例% | 抽检比例% | 小数
+  QC_PLAN | query,detail | 10 | 方案编码 | 方案编码 | 文本
+  QC_PLAN | query,detail | 20 | 方案名称 | 方案名称 | 文本
+  QC_PLAN | query,detail | 30 | 适用存货 | 适用存货 | 参照
+  QC_PLAN | query,detail | 40 | 适用存货类别 | 适用存货类别 | 文本
+  QC_PLAN | query,detail | 50 | 检验方式 | 检验方式 | 下拉框
+  QC_PLAN | query,detail | 65 | 取样规则 | 取样规则 | 文本
+  QC_PLAN | query,detail | 68 | 文件编码 | 文件编码 | 文本
+  QC_PLAN | query,detail | 70 | 停用 | 停用 | 是否
+  QC_PLAN | query,detail | 72 | 执行标准 | 执行标准 | 文本
+  (26 行)
+
+=== ⑥ 检验单生成钩子涉及的工序映射(代码常量落库口径) ===
+  工序
+  成型
+  混料
+  切炭
+  组装
+  (4 行)
+
+=== ⑦ 三张检验单的头表列(看有无检验类别/首件标志) ===
+  列名
+  id
+  单据编号
+  单据日期
+  工单号
+  批次号
+  报工单号
+  工序
+  产品编码
+  产品名称
+  规格型号
+  生产线
+  生产车间
+  报工数量
+  检验数量
+  检验员
+  检验日期
+  总结论
+  处理方式
+  备注
+  审核人
+  审核时间
+  asp_user1
+  asp_time1
+  asp_user2
+  asp_time2
+  asp_cancel
+  单据状态
+  检验方案
+  文件编码
+  执行标准
+  工单行号
+  (31 行)

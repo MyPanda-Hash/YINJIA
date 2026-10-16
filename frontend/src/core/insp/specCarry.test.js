@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled,
-  headFromSpecDetail, specCarryRows, DEFAULT_NOT_APPROVED_TIP,
+  headFromSpecDetail, specCarryRows, detailRowsOf, carryProjectName, DEFAULT_NOT_APPROVED_TIP,
 } from './specCarry.js'
 
 /**
@@ -95,6 +95,55 @@ test('规格书一行都没有(或本单空)⇒ 不报变动(交给"没有可带
   assert.equal(specDrift([], plan(SPEC)).drifted, false)
   assert.equal(specDrift(SPEC, []).drifted, false)
   assert.equal(specDrift(null, null).drifted, false)
+})
+
+/* 2026-10-16(续二):带下去的名字规范化之后,两边名字形态不同了 ——
+   规格书 `强度·*抗压强度` vs 计划表 `*抗压强度`(规范名)/ `强度·*抗压强度`(改名前落库的行)。
+   对齐键取 `·` 的**末段**,三种形态一律算同一个检验项目 ⇒ 不许因此误报"规格书已变动"。 */
+test('对齐键 = 「组名·子项名」的末段:规范名与老整串都与规格书算同一项(不误报变动)', () => {
+  const specRows = [{ 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: 'M' }]
+  assert.equal(specDrift(specRows, [{ 控制项目: '*抗压强度', 控制标准及要求: '≥30kgf', 控制方法: 'M' }]).drifted, false,
+    '规范名(新带下来)')
+  assert.equal(specDrift(specRows, [{ 控制项目: '强度·*抗压强度', 控制标准及要求: '≥30kgf', 控制方法: 'M' }]).drifted, false,
+    '老整串(改名前落库的行,不重刷也照样对齐)')
+  assert.equal(specDrift([{ 检验项目: '*余氯去除性能·初始去除率', 检验要求: '≥98%', 检验方法: 'M' }],
+    [{ 控制项目: '*余氯去除性能·初始去除率', 控制标准及要求: '≥98%', 控制方法: 'M' }]).drifted, false, '组名是真信息的那种')
+})
+
+test('末段对齐不许把真变动盖掉(要求/方法变了照样报)', () => {
+  const d = specDrift([{ 检验项目: '强度·*抗压强度', 检验要求: '≥35kgf', 检验方法: 'M' }],
+    [{ 控制项目: '*抗压强度', 控制标准及要求: '≥30kgf', 控制方法: 'M' }])
+  assert.deepEqual(d.changed, [{ item: '强度·*抗压强度', fields: ['检验要求'] }])
+  assert.equal(d.drifted, true)
+})
+
+/* 2026-10-16:同名多行不许误报(实测 SD-2026-10-0010 —— `*炭棒尺寸` 3 行、`除余氯寿命` 2 行,
+   旧实现 Map 按名对齐、同名行互相盖掉 ⇒ 刚带完就弹「规格书已变动」)。 */
+test('同名多行(炭棒尺寸 外径/内径/长度)刚带完 ⇒ 不误报变动', () => {
+  const specRows = [
+    { 检验项目: '*炭棒尺寸', 检验要求: '外径：34.5±0.5mm', 检验方法: '游标卡尺' },
+    { 检验项目: '*炭棒尺寸', 检验要求: '内径：12.5±0.5mm', 检验方法: '游标卡尺' },
+    { 检验项目: '*炭棒尺寸', 检验要求: '长度：99±0.5mm', 检验方法: '游标卡尺' },
+  ]
+  const planRows = [
+    { 控制项目: '*炭棒尺寸', 控制标准及要求: '外径：34.5±0.5mm', 控制方法: '游标卡尺' },
+    { 控制项目: '*炭棒尺寸', 控制标准及要求: '内径：12.5±0.5mm', 控制方法: '游标卡尺' },
+    { 控制项目: '*炭棒尺寸', 控制标准及要求: '长度：99±0.5mm', 控制方法: '游标卡尺' },
+  ]
+  assert.deepEqual(specDrift(specRows, planRows), { added: [], removed: [], changed: [], drifted: false })
+  // 同名多行里真改了一行 ⇒ 照样报(报名字 + 哪一列)
+  planRows[1] = { 控制项目: '*炭棒尺寸', 控制标准及要求: '内径：13±0.5mm', 控制方法: '游标卡尺' }
+  assert.deepEqual(specDrift(specRows, planRows).changed, [{ item: '*炭棒尺寸', fields: ['检验要求'] }])
+})
+
+test('同名多行:本表少一行(与规格书不一致)照样报 —— 报的是"不一致",不是静默放过', () => {
+  const specRows = [
+    { 检验项目: '*炭棒尺寸', 检验要求: '外径：34.5±0.5mm', 检验方法: '游标卡尺' },
+    { 检验项目: '*炭棒尺寸', 检验要求: '内径：12.5±0.5mm', 检验方法: '游标卡尺' },
+  ]
+  const d = specDrift(specRows, [{ 控制项目: '*炭棒尺寸', 控制标准及要求: '外径：34.5±0.5mm', 控制方法: '游标卡尺' }])
+  assert.deepEqual(d.changed, [{ item: '*炭棒尺寸', fields: ['检验要求'] }])
+  assert.equal(d.drifted, true)
 })
 
 /* ── 跨面板复用(2026-10-13):组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」──────
@@ -236,6 +285,187 @@ test('映射项缺 to / matchProject ⇒ 跳过该项,不影响其它项', () =>
 test('认不出来的 parse 名字 ⇒ 跳过该项(不静默把整句塞进某个格)', () => {
   const out = headFromSpecDetail({ headFromDetail: [{ parse: 'nope', matchProject: '尺寸' }] }, SPEC_ROWS)
   assert.deepEqual(out, {})
+})
+
+/* ── 2026-10-16 修正:规格书里的项目名是「<组名>·<子项名>」+ `*`/`#` 装饰 ────────────────
+   用户报障(截图):「这是规格书的数据,这是成型工艺清单的数据,数据没有对应导入下方表格,
+   比如碳棒尺寸,压降,抗压强度,其他的未填写的估计也不会导入,要根据规格书的检验项目的名字来对
+   成型工艺清单的数据进行一个填写,外径的 +-0.5 这个就是公差数据」。
+
+   实测(test 账套 SD-2026-10-0010 的 检验要求 行,**逐字**):
+     #*压降                    → ≤20kpa
+     *炭棒尺寸                 → 长度：99±0.5mm / 内径：12.5±0.5mm / 外径：34.5±0.5mm(每行一条)
+     强度·（裸棒）              → 成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂
+     强度·*抗压强度             → ≥30kgf
+     *余氯去除性能·除余氯寿命    → 去除率≥50% / 寿命920L，全程加标
+     *余氯去除性能·初始去除率    → ≥98%
+   ⇒ 上面那份「裸名配置」('尺寸'/'压降'/'抗压强度'/'跌落强度')**一个都没匹配上**,
+     所以用户截图里 炭棒尺寸/压降/抗压强度 三块全空。容错就三件事:
+       ① 去掉 `*`/`#`(全角也认)与空白;② 按 `·` 拆 组名/子项,两边都算命中;
+       ③ 配置名是项目名的**子串**也算命中('抗压强度' ⊂ '强度·*抗压强度')。 */
+const REAL_MOLD_AFS = {
+  fromKey: '产品编号',
+  specDrift: false,
+  headFromDetail: [
+    { parse: 'drop', matchProject: ['跌落强度', '裸棒'] },
+    { to: '强度要求kgf', matchProject: ['抗压强度'] },
+    { to: '压降标准kpa', matchProject: ['压降'] },
+    { parse: 'dimension', matchProject: ['炭棒尺寸'] },
+  ],
+}
+const REAL_SPEC_ROWS = [
+  { 检验项目: '#*压降', 检验要求: '≤20kpa', 检验方法: '数显压力表' },
+  { 检验项目: '*炭棒尺寸', 检验要求: '长度：99±0.5mm', 检验方法: '游标卡尺' },
+  { 检验项目: '*炭棒尺寸', 检验要求: '内径：12.5±0.5mm', 检验方法: '游标卡尺' },
+  { 检验项目: '*炭棒尺寸', 检验要求: '外径：34.5±0.5mm', 检验方法: '游标卡尺' },
+  { 检验项目: '*余氯去除性能·除余氯寿命', 检验要求: '去除率≥50%', 检验方法: '……' },
+  { 检验项目: '*余氯去除性能·除余氯寿命', 检验要求: '寿命920L，全程加标', 检验方法: '……' },
+  { 检验项目: '*余氯去除性能·初始去除率', 检验要求: '≥98%', 检验方法: '……' },
+  { 检验项目: '强度·（裸棒）', 检验要求: '成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂', 检验方法: '……' },
+  { 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: '……' },
+]
+
+test('真实项目名(带 * #、「组名·子项」)能匹配上裸名配置 —— 这就是用户截图里那三块空白的原因', () => {
+  assert.deepEqual(headFromSpecDetail(REAL_MOLD_AFS, REAL_SPEC_ROWS), {
+    强度要求kgf: '≥30kgf',
+    压降标准kpa: '≤20kpa',
+    跌落要求: '成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂',
+    跌落高度cm: '60',
+    跌落次数: '3',
+    外径mm: '34.5',
+    外径公差: '±0.5',
+    内径mm: '12.5',
+    内径公差: '±0.5',
+  })
+})
+
+test('尺寸在规格书里是**每行一条** ⇒ 多行合并成四格(长度不落格)', () => {
+  const out = headFromSpecDetail(REAL_MOLD_AFS, REAL_SPEC_ROWS.filter((r) => r.检验项目 === '*炭棒尺寸'))
+  assert.deepEqual(out, { 外径mm: '34.5', 外径公差: '±0.5', 内径mm: '12.5', 内径公差: '±0.5' })
+  assert.equal('长度' in out, false)
+})
+
+test('「整体尺寸(外包无纺布)」不是炭棒尺寸 —— 候选里没有它就不许拿来填', () => {
+  const out = headFromSpecDetail(REAL_MOLD_AFS, [
+    { 检验项目: '*整体尺寸(外包无纺布)', 检验要求: '外径：46±0.5mm\n内径：9.5±0.5mm\n长度：23±0.5mm' },
+  ])
+  assert.deepEqual(out, {}, '拿外包尺寸填炭棒尺寸 = 静默错数(46 不是炭棒的 34.5)')
+})
+
+test('候选是数组:按优先级取,前一个没匹配上才用后一个', () => {
+  const onlyLibRow = [{ 检验项目: '强度·跌落强度', 检验要求: '成型强度：高度50cm,跌3次无断裂' }]
+  assert.equal(headFromSpecDetail(REAL_MOLD_AFS, onlyLibRow).跌落高度cm, '50')
+  const bareRow = [{ 检验项目: '强度·（裸棒）', 检验要求: '成品强度（一切二）：高度60cm，垂直跌落3次，炭棒无断裂' }]
+  assert.equal(headFromSpecDetail(REAL_MOLD_AFS, bareRow).跌落高度cm, '60')
+})
+
+test('旧口径一字不变:裸名对裸名、忽略空白、全角装饰也认', () => {
+  assert.deepEqual(headFromSpecDetail(MOLD_AFS, SPEC_ROWS), {
+    跌落要求: '1.2m 高度自由跌落无破损',
+    强度要求kgf: '≥ 300N 不破裂',
+    压降标准kpa: '≤25kPa',
+    外径mm: '20',
+    外径公差: '±0.5',
+    内径mm: '5',
+    内径公差: '±0.3',
+  })
+  assert.equal(headFromSpecDetail({ headFromDetail: [{ to: '压降标准kpa', matchProject: '压降' }] },
+    [{ 检验项目: '＊＃压降', 检验要求: '≤9kpa' }]).压降标准kpa, '≤9kpa')
+})
+
+/* ── 明细落点:序号兜底(2026-10-16 用户口径)──────────────────────────────────────
+   用户报障:「出货检验记录表前面缺失序号」(截图左侧那一列整列空白)。
+   根因:规格书明细的 `序号` **不落库**(那张纸的序号是按组现算的,rd_spec_doc_detail.序号 实测全 NULL),
+   而 detail 映射写的是 { to:'序号', from:'序号' } ⇒ 带过去的是空串。
+   口径:indexWhenEmpty 的落点拿**行号**(1..N)兜底;规格书自己带了序号就用它自己的。 */
+test('序号:规格书那格是空的 ⇒ 按行号 1..N 兜底(那一列不再是空白)', () => {
+  const afs = { detail: [{ to: '序号', from: '序号', indexWhenEmpty: true }, { to: '控制项目', from: '检验项目' }] }
+  const rows = [{ 序号: null, 检验项目: '强度·*抗压强度' }, { 序号: '', 检验项目: '*炭棒尺寸' }, { 序号: '9', 检验项目: '#*压降' }]
+  assert.deepEqual(detailRowsOf(afs, rows), [
+    { 序号: '1', 控制项目: '强度·*抗压强度' },
+    { 序号: '2', 控制项目: '*炭棒尺寸' },
+    { 序号: '9', 控制项目: '#*压降' },
+  ])
+})
+
+test('没写 indexWhenEmpty 的落点照旧:空就是空(别的链一个字节不变)', () => {
+  const afs = { detail: [{ to: '序号', from: '序号' }, { to: '控制项目', from: '检验项目' }] }
+  assert.deepEqual(detailRowsOf(afs, [{ 序号: null, 检验项目: '压降' }]), [{ 序号: '', 控制项目: '压降' }])
+})
+
+/* ── 2026-10-16(续):① 检验方法里那几个"测试参数"格 ② 序号改成与规格书同一口径的**组号** ──
+   用户口径:「接着做」——① 测试间距mm/压头下降速度/压降测试流速 也从规格书的**检验方法**抠
+   (实测 40 / 5 / 0.9);② 序号跟规格书一样"一个检验项目一个号"(炭棒尺寸 三行 = 3,3,3)。 */
+const PARAM_AFS = {
+  headFromDetail: [
+    { parse: 'testParams', from: '检验方法', matchProject: ['抗压强度'] },
+    { parse: 'testParams', from: '检验方法', matchProject: ['压降'] },
+  ],
+}
+const PARAM_ROWS = [
+  { 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: '将炭棒水平放置在仪器上，调整间距40mm，设置下压速度5mm/min，按测试键' },
+  { 检验项目: '#*压降', 检验要求: '≤20kpa', 检验方法: '测试用水纯水/超纯水，水温控制25±1℃，测试流速0.9L/min，通水10min后记录压差值' },
+]
+
+test('① 检验方法 → 测试间距mm / 压头下降速度 / 压降测试流速(from 指定取哪一列)', () => {
+  assert.deepEqual(headFromSpecDetail(PARAM_AFS, PARAM_ROWS),
+    { 测试间距mm: '40', 压头下降速度: '5', 压降测试流速: '0.9' })
+})
+
+test('① 检验方法里没有这些锚点词 ⇒ 一个格都不写(不猜)', () => {
+  assert.deepEqual(headFromSpecDetail(PARAM_AFS, [
+    { 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf', 检验方法: '按测试键读取最大力压力值' },
+  ]), {})
+  assert.deepEqual(headFromSpecDetail(PARAM_AFS, [{ 检验项目: '强度·*抗压强度', 检验要求: '≥30kgf' }]), {},
+    '连 检验方法 都没有 ⇒ 不写')
+})
+
+test('② 序号按**组号**兜底:同一个检验项目的多行同号,与规格书那张纸同一口径', () => {
+  const afs = { detailGroupFrom: '检验项目', detail: [{ to: '序号', from: '序号', indexWhenEmpty: 'group' }, { to: '控制项目', from: '检验项目' }] }
+  const rows = [
+    { 检验项目: '#*压降' },
+    { 检验项目: '*炭棒尺寸' }, { 检验项目: '*炭棒尺寸' }, { 检验项目: '*炭棒尺寸' },
+    { 检验项目: '*余氯去除性能·初始去除率' }, { 检验项目: '*余氯去除性能·除余氯寿命' },
+    { 检验项目: '强度·*抗压强度' }, { 检验项目: '强度·（裸棒）' },
+  ]
+  assert.deepEqual(detailRowsOf(afs, rows).map((r) => r['序号']), ['1', '2', '2', '2', '3', '3', '4', '4'],
+    '组号按首次出现次序;`组名·子项名` 的装饰与子项名不影响分组')
+})
+
+test('② 规格书自己带了序号 ⇒ 用它的(不覆盖已经落库的值)', () => {
+  const afs = { detailGroupFrom: '检验项目', detail: [{ to: '序号', from: '序号', indexWhenEmpty: 'group' }] }
+  assert.deepEqual(detailRowsOf(afs, [{ 序号: '7', 检验项目: 'a' }, { 序号: null, 检验项目: 'a' }]), [{ 序号: '7' }, { 序号: '1' }])
+})
+
+/* ── 2026-10-16(续二,用户选 A):**带下去的名字**规范化 —— 只去掉冗余的组名前缀,保住必检标记 ──
+   用户取舍:「A」= 只规范带下去的名字(`强度·*抗压强度` → `*抗压强度`),**不碰**标准库与历史单据。
+   为什么是"有条件"地去掉:组名有时是真信息 ——
+     · `强度·*抗压强度` → 组名已被子项名包含(强度 ⊂ 抗压强度)⇒ 冗余,去掉;
+     · `*余氯去除性能·初始去除率` → 去掉组名只剩「初始去除率」,看不出测的是哪个物质 ⇒ 保留整串;
+     · `强度·（裸棒）` → 子项是括号补语,脱离组名不成词 ⇒ 保留整串。 */
+test('带下去的名字:去掉冗余的组名前缀,保留 * / # 必检标记', () => {
+  assert.equal(carryProjectName('强度·*抗压强度'), '*抗压强度')
+  assert.equal(carryProjectName('强度·跌落强度'), '跌落强度')
+  assert.equal(carryProjectName(' 强度 · *抗压强度 '), '*抗压强度', '空白容错')
+})
+
+test('带下去的名字:组名是真信息 / 子项是括号补语 ⇒ 原样保留', () => {
+  assert.equal(carryProjectName('*余氯去除性能·初始去除率'), '*余氯去除性能·初始去除率')
+  assert.equal(carryProjectName('强度·（裸棒）'), '强度·（裸棒）')
+  assert.equal(carryProjectName('*炭棒尺寸'), '*炭棒尺寸', '没有 · 的名字一个字节都不动')
+  assert.equal(carryProjectName('#*压降'), '#*压降')
+  assert.equal(carryProjectName('碳棒尺寸·'), '碳棒尺寸·', '半截的组名不猜')
+  assert.equal(carryProjectName(''), '')
+  assert.equal(carryProjectName(null), '')
+})
+
+test('带下去的名字:配置里写 norm 才生效,没写的链一个字节不变', () => {
+  const withNorm = { detail: [{ to: '控制项目', from: '检验项目', norm: 'projectName' }] }
+  assert.deepEqual(detailRowsOf(withNorm, [{ 检验项目: '强度·*抗压强度' }]), [{ 控制项目: '*抗压强度' }])
+  const noNorm = { detail: [{ to: '控制项目', from: '检验项目' }] }
+  assert.deepEqual(detailRowsOf(noNorm, [{ 检验项目: '强度·*抗压强度' }]), [{ 控制项目: '强度·*抗压强度' }])
+  assert.deepEqual(detailRowsOf({ detail: [{ to: '控制项目', from: '检验项目', norm: 'nope' }] }, [{ 检验项目: '强度·*抗压强度' }]),
+    [{ 控制项目: '强度·*抗压强度' }], '认不出来的归一名字 ⇒ 原样写(不静默吞)')
 })
 
 /* ── 明细落点取哪一段行(2026-10-15:配方表那条 detailSource 分支已随口径变更撤掉)──────────

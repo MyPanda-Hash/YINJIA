@@ -109,8 +109,8 @@ public class ReportService {
     private final JdbcTemplate jdbc;
     private final Map<String, CompiledTemplate> compiled = new ConcurrentHashMap<>();
 
-    /** 编译缓存条目:DB 模板 update_at 变了即自动重编译(上传即生效免重启) */
-    private record CompiledTemplate(Timestamp updatedAt, JasperReport report) {}
+    /** 编译缓存条目:模板**正文哈希**变了即重编译(上传即生效免重启) */
+    private record CompiledTemplate(Timestamp updatedAt, int textHash, JasperReport report) {}
 
     public ReportService(PanelRegistry registry, QueryService queryService, JdbcTemplate jdbc) {
         this.registry = registry;
@@ -317,9 +317,21 @@ public class ReportService {
 
         JasperPrint print;
         try {
-            print = GENERIC_CODE.equals(tpl.code())
-                    ? fillGeneric(def, doc, docNo, rows)
-                    : JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo), new JRMapCollectionDataSource(rows));
+            if (GENERIC_CODE.equals(tpl.code())) {
+                print = fillGeneric(def, doc, docNo, rows);
+            } else if (QcAsmInspReportSupport.CODE.equals(tpl.code())) {
+                // 组装成品检验记录表(2026-10-16):**版式按当前明细里实际存在的检验项目动态生成** ——
+                // 检验项目来自出货检验计划表、每个产品不一样,故列不写死在 .jrxml 里(生成器见
+                // QcAsmInspReportSupport);这里只把「取数 → 矩阵 → 参数」喂给生成的报表。
+                print = fillQcAsmInsp(def, doc, docNo, rows);
+            } else {
+                // 主数据源 = 明细**全量**(一单一模板、逐行渲染)。制程检验记录表 2026-10-17 起也是
+                // 「一行一个检验项目」的纵向表(与面板纸张表同源),用 $F{检验要求}/$F{检验方法} 等逐行取;
+                // 早先那套「按表区归并成 外观结果/尺寸_1..5/重量_1..5 参数」的矩阵版式已作废,
+                // 相应参数产出与解析代码已同批删除(别再往模板里加那些参数名)。
+                print = JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo),
+                        new JRMapCollectionDataSource(rows));
+            }
         } catch (JRException e) {
             throw new IllegalArgumentException("报表填充失败：" + rootMessage(e));
         }
@@ -329,6 +341,24 @@ public class ReportService {
         } catch (JRException e) {
             throw new IllegalArgumentException("报表导出失败：" + rootMessage(e));
         }
+    }
+
+    /**
+     * 组装成品检验记录表填充(QC_ASM_INSP,2026-10-16):明细 → 矩阵(按「检验类型」分组、组内一个检验项目一列)
+     * → 动态生成的报表 + 参数。**列不写死**:当前明细里有什么检验项目就打什么(用户口径「不能固定死」)。
+     * 数据源只给一行(内容全走参数)—— Jasper 没有数据源就不渲染 detail 带,故必须给。
+     */
+    private JasperPrint fillQcAsmInsp(PanelRegistry.PanelDef def, Map<String, Object> doc, String docNo,
+                                      List<Map<String, ?>> rows) throws JRException {
+        Map<String, Object> head = headParams(doc, docNo);
+        // 固定检验项来自 yj_panel.config 的 "fixedItems"(如 外观组永远铺 端盖两头/管身两侧)——
+        // 声明式元数据,**报表是它今天的唯一消费者**(见 PanelDef.fixedItems);前端那份 metadata.fixedItems
+        // 只喂分区视图的占位行,而 QC_ASM_INSP 已退出 SECTION_PANELS,原「带入固定检验项」按钮也已删除。
+        QcAsmInspReportSupport.Matrix m = QcAsmInspReportSupport.matrix(
+                rows, str(doc.get("总结论")), def == null ? List.of() : def.fixedItems());
+        return JasperFillManager.fillReport(QcAsmInspReportSupport.report(m),
+                QcAsmInspReportSupport.params(m, head),
+                new JRMapCollectionDataSource(QcAsmInspReportSupport.dataRows()));
     }
 
     /**
@@ -484,6 +514,10 @@ public class ReportService {
         return params;
     }
 
+    private static String str(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
+    }
+
     /** 报表文件名(浏览器另存用):面板名-单据号.pdf;登记过精细模板的用模板名(销售订单-xxx.pdf) */
     public String fileName(String code, String docNo, String format) {
         return fileName(code, null, docNo, format);
@@ -527,15 +561,29 @@ public class ReportService {
         return false;
     }
 
-    /** 编译(带缓存):DB 模板按 update_at 失效重编(上传即生效);classpath 模板进程内一次 */
+    /**
+     * 编译(带缓存):模板**正文哈希**决定是否重编 —— 改库即生效,不必重启。
+     *
+     * <p>🔴 为什么不能只看 {@code update_at}(2026-10-17 实测踩坑):
+     * 手工 INSERT 的模板行 {@code update_at} 为 NULL,而旧判据是
+     * {@code c != null && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))} ⇒ 用缓存
+     * —— 进程一旦编译过一次(哪怕编译的是 classpath 旧模板),**此后改库永不生效**
+     * (实测:改库后导出仍是旧版式,xlsx 字节都不变;制程检验记录表改纵向表时撞到)。
+     * 现在以正文哈希为主判据:{@code jrxmlText} 变了 ⇒ 哈希变了 ⇒ 必重编;
+     * classpath 模板(jrxmlText = null,哈希 0)仍按"同进程内文件不会变"缓存,不额外开销。
+     */
     private JasperReport compile(ReportTemplate tpl) {
+        int hash = tpl.jrxmlText() == null ? 0 : tpl.jrxmlText().hashCode();
         CompiledTemplate c = compiled.get(tpl.code());
-        if (c != null && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))) return c.report();
+        if (c != null && c.textHash() == hash
+                && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))) {
+            return c.report();
+        }
         try {
             JasperReport report = tpl.jrxmlText() != null
                     ? JasperCompileManager.compileReport(new ByteArrayInputStream(tpl.jrxmlText().getBytes(StandardCharsets.UTF_8)))
                     : compileClasspath(tpl.file());
-            compiled.put(tpl.code(), new CompiledTemplate(tpl.updatedAt(), report));
+            compiled.put(tpl.code(), new CompiledTemplate(tpl.updatedAt(), hash, report));
             return report;
         } catch (JRException e) {
             throw new IllegalArgumentException("报表模板编译失败(" + tpl.code() + ")：" + rootMessage(e));

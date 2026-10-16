@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "backend": "native",
+  "rasterEngine": "pdfium",
+  "source": "saved",
+  "inputPath": "D:\\workspace\\yinjia\\tools\\archive\\_qc-proc\\proc-insp-v2.pdf",
+  "sourceSha256": "76fb1cdf32eea7dd38de60bddbb5841d2f96c4e25bf7ec86ce53ba19ce241f2b",
+  "dpi": 130,
+  "pageCount": 1,
+  "images": [
+    {
+      "index": 1,
+      "page": 1,
+      "path": "D:\\workspace\\yinjia\\tools\\archive\\_qc-proc\\_v2-render\\page-0001.png",
+      "width": 1521,
+      "height": 1075,
+      "rectangle": {
+        "x": 0,
+        "y": 0,
+        "width": 1122.6666666666667,
+        "height": 793.3333333333334
+      },
+      "byteLength": 86866
+    }
+  ],
+  "missingFonts": []
+}

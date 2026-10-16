@@ -355,6 +355,7 @@
                 :maxlength="row.max || 50"
                 :style="{ height: (row.h - 14) + 'px' }"
                 class="as-fill-input"
+                :placeholder="row.hint ? tt(row.hint) : ''"
                 @input="emit('dirty')"
               />
               <el-select
@@ -375,6 +376,7 @@
                 :maxlength="row.max || 2000"
                 class="as-fill-input as-fill-area"
                 resize="none"
+                :placeholder="row.hint ? tt(row.hint) : ''"
                 @input="emit('dirty')"
               />
               <AnnotatedText v-else class="as-ro-text" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
@@ -589,6 +591,7 @@
           :field-key="remarkAttach.key"
           :model-value="head[remarkAttach.key] || ''"
           :can-edit="attachCanEdit"
+          hide-when-empty
           @update:model-value="(v) => { head[remarkAttach.key] = v }"
         />
         <el-input

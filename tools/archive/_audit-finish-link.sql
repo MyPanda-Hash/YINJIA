@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT DB_NAME() db; SELECT f.[单据编号],f.[加工单号],f.[工单行号],f.[批次号],s.[报工单号],s.gldh,s.gd_id,s.post_no FROM bd_finish_in f LEFT JOIN scjl s ON s.gldh=f.[加工单号] AND ISNULL(s.asp_cancel,'N')<>'Y' WHERE ISNULL(f.asp_cancel,'N')<>'Y' ORDER BY f.[单据编号]; SELECT id,[报工单号],gldh,wgzt,asp_cancel,sl FROM scjl WHERE [报工单号]=N'BG-2026-10-0045';

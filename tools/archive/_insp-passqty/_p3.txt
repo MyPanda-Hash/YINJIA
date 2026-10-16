@@ -1,0 +1,66 @@
+=== ① FINISH_IN 单据 ===
+单据编号	单据日期	加工单号	业务类型	经手人	备注	
+-- 0 row(s)
+=== ② FINISH_IN 明细数量 ===
+单据编号	产品编码	产品名称	实收数量	批号	
+-- 0 row(s)
+
+=== ③ 组装检验单 → FINISH_IN 占用链 ===
+source_panel_code	source_form_no	target_panel_code	target_form_no	link_status	create_by	
+-- 0 row(s)
+
+=== ④ 报工审核钩子:audit 相关方法签名确认(QC_ASM_INSP 审核入口) ===
+ok	
+1	
+-- 1 row(s)
+
+=== ⑤ 五张组装检验单 x 明细行数 x 下游 ===
+单据编号	报工数量	检验数量	明细行数	不合格合计	处理方式	已产生入库	
+ZJ-2026-10-0010	160.0000	null	0	0.0000		0	
+ZJ-2026-10-0009	0.0000	null	0	0.0000		0	
+ZJ-2026-10-0008	421.0000	421.0000	3	0.0000	合格转库存(FI-2026-10-0002)	0	
+ZJ-2026-10-0007	0.0000	null	0	0.0000		0	
+ZJ-2026-10-0006	110.0000	null	2	0.0000		0	
+-- 5 row(s)
+
+=== ⑥ yj_doc_status: 组装检验单状态 ===
+panel_code	doc_no	shr	pending	canceled	stopped	
+QC_ASM_INSP	ZJ-2026-10-0010	null	N	N	null	
+QC_ASM_INSP	ZJ-2026-10-0009	null	N	Y	null	
+QC_ASM_INSP	ZJ-2026-10-0008	admin	N	N	null	
+QC_ASM_INSP	ZJ-2026-10-0007	null	N	Y	null	
+QC_ASM_INSP	ZJ-2026-10-0006	null	N	N	null	
+QC_ASM_INSP	ZJ-2026-10-0005	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0012	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0011	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0010	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0009	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0008	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0007	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0006	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0005	null	N	N	null	
+QC_CUT_INSP	QT-2026-10-0004	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0026	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0025	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0024	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0023	null	N	Y	null	
+QC_MOLD_INSP	CX-2026-10-0022	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0021	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0020	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0019	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0018	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0017	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0016	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0015	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0014	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0013	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0012	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0011	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0010	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0009	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0008	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0007	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0006	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0005	null	N	N	null	
+QC_MOLD_INSP	CX-2026-10-0004	null	N	N	null	
+-- 38 row(s)

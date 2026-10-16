@@ -1,0 +1,63 @@
+﻿=== ���ݿ�淶��� @ HSDZ_MES ===
+(����Ǽ�:table 46, panel 2, col 69, dupkey 97, count 3, skiplabel 27)
+
+[PASS] 01 �������Ϲ�(��������)
+[PASS] 02 �������ע��(��������)
+[FAIL] 03 ƴ��/Ӣ����������ע��(�� 10 ��;��������) ���� ʵ�� 10,������������ 0(����:ֻ���������)
+        bd_sale_out.customer_id
+        bd_sale_out.emp_id
+        bd_sale_out.contact_country_id
+        bd_sale_out.dispatcher_country_id
+        bd_sale_out.auditor_id
+        bd_sale_out.f_logistics_id
+        bd_sale_out.creator_id
+        bd_sale_out.modifier_id
+        bd_sale_out.delivery_type_id
+        bd_sale_out.setting_term_id
+[PASS] 04 ҵ�������������ļ���
+[PASS] 05 Ԫ����Ư��(�ֶβ��������ڶ�����)
+[PASS] 06 ���ָ�򲻴��ڵı�/��ͼ
+[FAIL] 07 ��ȫ�ظ����ֶεǼ��� ���� 6 ��
+        PURCHASE_IN.�����˱��� (header,seq 730)
+        PURCHASE_IN.���ʽ���� (header,seq 820)
+        PURCHASE_IN.�����˻����� (header,seq 840)
+        PURCHASE_IN.����˱��� (header,seq 780)
+        PURCHASE_IN.δ�����λ�� (header,seq 800)
+        PURCHASE_IN.�޸��˱��� (header,seq 750)
+[WARN] 08 ͬһ�ж��ǩ(���ݼ���Ψһ;�ѵǼ� 88 ��) ���� 48 ��
+        MANU_SCHEDULE.��Ʒ����
+        MANU_SCHEDULE.��Ʒ����
+        MANU_SCHEDULE.�������
+        MANU_SCHEDULE.��������
+        MANU_SCHEDULE.������
+        MANU_SCHEDULE.�������
+        MANU_SCHEDULE.�ƻ�������
+        MANU_SCHEDULE.�ӹ�����
+        MANU_SCHEDULE.����
+        MANU_SCHEDULE.���ڽ��ȶ�(��)
+        MANU_SCHEDULE.������
+        MANU_SCHEDULE.�ͻ�
+        ��(���� 36 ��)
+[FAIL] 09 ȱ en ����(��� 19 / �ֶα�ǩ 232) ���� ʵ�� 251,������������ 0(����:ֻ���������)
+        ���ȱ: 19 ��;�ֶα�ǩȱ: 232 ��
+        Z-G-C����
+        Z-HP-C����
+        ��װ����
+        ��������
+        �������
+        ������
+        ����������
+        ��������
+        ��������(��)
+        ������
+        ��ע1
+        ���ν����λ��
+        ��(���� 220 ��)
+        ����:tools/scripts/trigger-mt.ps1;�����ǩ�ǼǼ� ��5
+[PASS] 10 ����/��ʱ��(Ӧ����)
+[PASS] 11 ��10 �������޷Ǿۼ������ı�(�ִ� 0 �Ŵ��)
+[PASS] 12 Ǩ�����嵥 ? �ļ�һ��(�嵥 467 / �ļ� 484)
+[PASS] 13 ������ö���ȱ pk_col / asp_cancel(�򿪼� 500)
+
+=== ����: FAIL 3 / WARN 1 ===
+RESULT: FAIL-3

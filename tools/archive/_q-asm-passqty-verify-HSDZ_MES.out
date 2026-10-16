@@ -1,0 +1,31 @@
+列名|类型|精度|小数位|可空
+合格数量（入库）|decimal|18|4|1
+place|seq|col_name|label|data_type|visible|hidden|editable|required
+header|135|合格数量（入库）|合格数量（入库）|小数|1|0|1|1
+seq|col_name|data_type|required
+110|生产车间|文本|0
+120|报工数量|文本|0
+125|抽检总量|小数|0
+130|检验数量|文本|0
+130|处理方式|多行文本|0
+135|合格数量（入库）|小数|1
+140|检验员|文本|0
+145|检验时间|文本|0
+150|检验日期|文本|0
+locale|text
+de|Gutmenge (Einlagerung)
+en|Passed Qty (Inbound)
+es|Cantidad conforme (entrada)
+fr|Quantité conforme (entrée)
+ja|合格数量（入庫）
+ko|합격 수량(입고)
+ru|Годное количество (приход)
+th|จำนวนที่ผ่าน (รับเข้า)
+vi|Số lượng đạt (nhập kho)
+zh-TW|合格數量（入庫）
+列名|注明
+合格数量（入库）|合格数量（入库）(本单最终要进成品库的合格品数量:组装成品检验单**审核/审批通过**时按它生成产成品入库单草稿的实收数量 —— 0 不生成、空则拒绝审核;由品质在单头填写,必填。2026-10-17 新增:此前合格数由 检验数量−Σ不合格数量 派生)
+script_name|hash12|applied_at
+migrate-asm-insp-passqty-in-20261017.sql|aa48df390646|2026-10-15 17:12:37.3014509
+头表行数|已填行数
+11|0

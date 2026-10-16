@@ -37,6 +37,8 @@ public class PxController {
     private final UsageLogService usageLog;
     private final DevTaskService devTaskService;
     private final ButtonService buttons;
+    /** 产品开发概览(项目进度 ↔ 产品信息表 关联视图,2026-10-16) */
+    private final com.yinjia.mes.service.RdDevProductService rdDevProducts;
     private final PanelPermissionService perm;
     private final com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler;
     private final com.yinjia.mes.service.BatchService batchService;
@@ -49,6 +51,7 @@ public class PxController {
                         VoucherFlowService voucherFlowService,
                         PanelRegistry registry, UsageLogService usageLog,
                         DevTaskService devTaskService, ButtonService buttons,
+                        com.yinjia.mes.service.RdDevProductService rdDevProducts,
                         PanelPermissionService perm,
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
                         com.yinjia.mes.service.BatchService batchService,
@@ -61,6 +64,7 @@ public class PxController {
         this.usageLog = usageLog;
         this.devTaskService = devTaskService;
         this.buttons = buttons;
+        this.rdDevProducts = rdDevProducts;
         this.perm = perm;
         this.pushGenerateHandler = pushGenerateHandler;
         this.batchService = batchService;
@@ -536,6 +540,17 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {
         perm.requirePanelView("RD_PROGRESS");
         return ApiResult.ok(buttons.progressDataSheets(code));
+    }
+
+    /**
+     * 产品开发概览(2026-10-16):项目进度查询列表的「开发产品」按钮/状态 + 流程结构弹窗共用一份数据。
+     * 返回 { plans: {立项文档编号: {单据编号,状态}}, products: [{产品编号,产品名称,立项文档编号,状态,
+     * nodes:[{panel,label,docNo,状态,done,reaudited}],doneCount,allDone}] }。
+     */
+    @GetMapping("/rdDevOverview")
+    public ApiResult<Map<String, Object>> rdDevOverview() {
+        perm.requirePanelView("RD_PROGRESS");
+        return ApiResult.ok(rdDevProducts.overview());
     }
 
     @PostMapping("/queryFormDataList")

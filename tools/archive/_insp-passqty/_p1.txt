@@ -1,0 +1,137 @@
+=== ① yj_field: 合格/不合格/报工数量/检验数量 登记 ===
+panel_code	label	place	seq	visible	hidden	editable	data_type	
+QC_ASM_INSP	报工数量	header	120	1	0	1	文本	
+QC_CUT_INSP	报工数量	header	120	1	0	1	文本	
+QC_MOLD_INSP	报工数量	header	120	1	0	1	文本	
+QC_PROC_INSP	报工数量	header	150	1	1	1	文本	
+WO_REPORT	报工数量	query,detail	50	1	0	1	数值	
+WO_REPORT_LIST	报工数量	query,detail	50	1	0	0	数值	
+QC_ASM_INSP	不合格数量	detail	310	1	0	1	小数	
+QC_CUT_INSP	不合格数量	detail	310	1	0	1	小数	
+QC_INSP	不合格数量	detail	100	1	0	1	小数	
+QC_MOLD_INSP	不合格数量	detail	310	1	0	1	小数	
+DAY_REPORT	合格数量	query,detail	330	1	0	1	小数	
+QC_INSP	合格数量	detail	90	1	0	1	小数	
+QC_ASM_INSP	检验数量	header	130	1	0	1	文本	
+QC_CUT_INSP	检验数量	header	130	1	0	1	文本	
+QC_MOLD_INSP	检验数量	header	130	1	0	1	文本	
+QC_PROC_INSP	检验数量	header	170	1	1	1	文本	
+PURCHASE_IN	送检数量	detail	810	0	1	0	小数	
+QC_INSP	送检数量	detail	80	1	0	1	小数	
+QC_RETURN	送检数量	detail	85	1	0	0	小数	
+-- 19 row(s)
+
+=== ② 表头数量列现状(近 12 张) ===
+面板	单据编号	报工数量	检验数量	单据状态	工单号	工序	
+QC_ASM_INSP	ZJ-2026-10-0010	160.0000	null	null	GD-2026-10-0007	组装	
+QC_ASM_INSP	ZJ-2026-10-0009	null	null	null	null	null	
+QC_ASM_INSP	ZJ-2026-10-0008	421.0000	421.0000	null	GD-2026-10-0003	组装	
+QC_ASM_INSP	ZJ-2026-10-0007	null	null	null	null	null	
+QC_ASM_INSP	ZJ-2026-10-0006	110.0000	null	null	GD-2026-10-0002	组装	
+QC_ASM_INSP	ZJ-2026-10-0005	400.0000	null	null	MO-2026-09-0137	组装	
+QC_CUT_INSP	QT-2026-10-0012	161.0000	null	null	GD-2026-10-0007	切炭	
+QC_CUT_INSP	QT-2026-10-0011	null	null	null	null	null	
+QC_CUT_INSP	QT-2026-10-0010	421.0000	null	null	GD-2026-10-0003	切炭	
+QC_CUT_INSP	QT-2026-10-0009	421.0000	null	null	GD-2026-10-0003	切炭	
+QC_CUT_INSP	QT-2026-10-0008	100.0000	null	null	GD-2026-10-0002	切炭	
+QC_CUT_INSP	QT-2026-10-0007	10.0000	null	null	GD-2026-10-0002	切炭	
+QC_CUT_INSP	QT-2026-10-0006	40.0000	null	null	GD-2026-10-0002	切炭	
+QC_CUT_INSP	QT-2026-10-0005	40.0000	null	null	GD-2026-10-0002	切炭	
+QC_CUT_INSP	QT-2026-10-0004	400.0000	null	null	MO-2026-09-0137	切炭	
+QC_MOLD_INSP	CX-2026-10-0026	161.0000	null	null	GD-2026-10-0007	成型	
+QC_MOLD_INSP	CX-2026-10-0025	161.0000	null	null	GD-2026-10-0007	成型	
+QC_MOLD_INSP	CX-2026-10-0024	120.0000	null	null	GD-2026-10-0007	成型	
+QC_MOLD_INSP	CX-2026-10-0023	null	null	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0022	2947.0000	null	null	GD-2026-10-0003	成型	
+QC_MOLD_INSP	CX-2026-10-0021	2947.0000	null	null	GD-2026-10-0003	成型	
+QC_MOLD_INSP	CX-2026-10-0020	2947.0000	null	null	GD-2026-10-0003	成型	
+QC_MOLD_INSP	CX-2026-10-0019	421.0000	null	null	GD-2026-10-0003	成型	
+QC_MOLD_INSP	CX-2026-10-0018	421.0000	null	null	GD-2026-10-0003	成型	
+QC_MOLD_INSP	CX-2026-10-0017	56000.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0016	56000.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0015	8000.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0014	195.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0013	100.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0012	160.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0011	80.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0010	80.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0009	80.0000	null	null	GD-2026-10-0002	成型	
+QC_MOLD_INSP	CX-2026-10-0008	400.0000	null	null	MO-2026-09-0137	成型	
+QC_MOLD_INSP	CX-2026-10-0007	10.0000	null	null	MO-2026-09-0137	成型	
+QC_MOLD_INSP	CX-2026-10-0006	10.0000	null	null	MO-2026-09-0137	成型	
+QC_MOLD_INSP	CX-2026-10-0005	5.0000	null	null	MO-2026-09-0136	成型	
+QC_MOLD_INSP	CX-2026-10-0004	5.0000	null	null	MO-2026-09-0136	成型	
+-- 38 row(s)
+
+=== ③ 明细数量现状(未作废) ===
+面板	单据编号	检验项目	表区	合格数量	不合格数量	数量	
+QC_ASM_INSP	ZJ-2026-10-0006	成品检验	数量判定	0.0000	null	null	
+QC_ASM_INSP	ZJ-2026-10-0006	成品检验	数量判定	null	0.0000	null	
+QC_ASM_INSP	ZJ-2026-10-0008	成品检验	数量判定	421.0000	null	421.0000	
+QC_ASM_INSP	ZJ-2026-10-0008	成品检验	数量判定	null	0.0000	null	
+QC_ASM_INSP	ZJ-2026-10-0008	目数(+20目)	检验项目	null	null	null	
+QC_CUT_INSP	QT-2026-10-0004	外观	检验项目	null	null	null	
+QC_CUT_INSP	QT-2026-10-0006	外观	检验项目	null	null	null	
+QC_CUT_INSP	QT-2026-10-0008	外观	检验项目	null	null	null	
+QC_CUT_INSP	QT-2026-10-0010	外观	数量判定	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0008	外观	检验项目	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0011	外观	检验项目	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0013	外观	检验项目	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0014	外观	检验项目	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0017	外观	检验项目	null	null	null	
+QC_MOLD_INSP	CX-2026-10-0022	外观	数量判定	null	null	null	
+-- 15 row(s)
+
+=== ④ 一致性:合格(报工-Σ不合格) vs 检验数量 是否越界 ===
+面板	单据编号	报工数量	检验数量	不合格合计	合格派生	判定	
+QC_ASM_INSP	ZJ-2026-10-0010	160.0000	0.0000	null	null	未检验	
+QC_ASM_INSP	ZJ-2026-10-0009	0.0000	0.0000	null	null	未检验	
+QC_ASM_INSP	ZJ-2026-10-0008	421.0000	421.0000	0.0000	421.0000	ok	
+QC_ASM_INSP	ZJ-2026-10-0007	0.0000	0.0000	null	null	未检验	
+QC_ASM_INSP	ZJ-2026-10-0006	110.0000	0.0000	0.0000	110.0000	越界(合格>检验)	
+QC_CUT_INSP	QT-2026-10-0012	161.0000	0.0000	null	null	未检验	
+QC_CUT_INSP	QT-2026-10-0011	0.0000	0.0000	null	null	未检验	
+QC_CUT_INSP	QT-2026-10-0010	421.0000	0.0000	0.0000	421.0000	越界(合格>检验)	
+QC_CUT_INSP	QT-2026-10-0008	100.0000	0.0000	0.0000	100.0000	越界(合格>检验)	
+QC_CUT_INSP	QT-2026-10-0006	40.0000	0.0000	0.0000	40.0000	越界(合格>检验)	
+QC_CUT_INSP	QT-2026-10-0004	400.0000	0.0000	0.0000	400.0000	越界(合格>检验)	
+QC_MOLD_INSP	CX-2026-10-0026	161.0000	0.0000	null	null	未检验	
+QC_MOLD_INSP	CX-2026-10-0023	0.0000	0.0000	null	null	未检验	
+QC_MOLD_INSP	CX-2026-10-0022	2947.0000	0.0000	0.0000	2947.0000	越界(合格>检验)	
+QC_MOLD_INSP	CX-2026-10-0017	56000.0000	0.0000	0.0000	56000.0000	越界(合格>检验)	
+QC_MOLD_INSP	CX-2026-10-0014	195.0000	0.0000	0.0000	195.0000	越界(合格>检验)	
+QC_MOLD_INSP	CX-2026-10-0013	100.0000	0.0000	0.0000	100.0000	越界(合格>检验)	
+QC_MOLD_INSP	CX-2026-10-0011	80.0000	0.0000	0.0000	80.0000	越界(合格>检验)	
+QC_MOLD_INSP	CX-2026-10-0008	400.0000	0.0000	0.0000	400.0000	越界(合格>检验)	
+-- 19 row(s)
+
+=== ⑤ 清单外:三面板 yj_field 全量(近确认字段布局) ===
+panel_code	label	place	seq	visible	hidden	editable	required	data_type	
+QC_ASM_INSP	判定	detail	50	1	0	1	0	多行文本	
+QC_ASM_INSP	数量	detail	60	1	0	1	0	文本	
+QC_ASM_INSP	不合格数量	detail	310	1	0	1	0	小数	
+QC_ASM_INSP	报工数量	header	120	1	0	1	0	文本	
+QC_ASM_INSP	检验数量	header	130	1	0	1	0	文本	
+QC_ASM_INSP	总结论	query,header	160	1	0	1	0	文本	
+QC_CUT_INSP	判定	detail	240	1	0	1	0	多行文本	
+QC_CUT_INSP	数量	detail	250	1	0	1	0	文本	
+QC_CUT_INSP	不合格数量	detail	310	1	0	1	0	小数	
+QC_CUT_INSP	报工数量	header	120	1	0	1	0	文本	
+QC_CUT_INSP	检验数量	header	130	1	0	1	0	文本	
+QC_CUT_INSP	总结论	query,header	160	1	0	1	0	文本	
+QC_MOLD_INSP	判定	detail	240	1	0	1	0	多行文本	
+QC_MOLD_INSP	数量	detail	250	1	0	1	0	文本	
+QC_MOLD_INSP	不合格数量	detail	310	1	0	1	0	小数	
+QC_MOLD_INSP	报工数量	header	120	1	0	1	0	文本	
+QC_MOLD_INSP	检验数量	header	130	1	0	1	0	文本	
+QC_MOLD_INSP	总结论	query,header	160	1	0	1	0	文本	
+-- 18 row(s)
+
+=== ⑥ qc_asm_insp_head 下游(入库单) ===
+单据编号	报工数量	检验数量	工单号	
+ZJ-2026-10-0010	160.0000	null	GD-2026-10-0007	
+ZJ-2026-10-0009	null	null	null	
+ZJ-2026-10-0008	421.0000	421.0000	GD-2026-10-0003	
+ZJ-2026-10-0007	null	null	null	
+ZJ-2026-10-0006	110.0000	null	GD-2026-10-0002	
+-- 5 row(s)

@@ -25,7 +25,12 @@ export const approvalSheetCfg = {
     { num: '一', label: '客户名', key: '客户名', max: 0, h: 45, kind: 'input' },
     { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 133, kind: 'textarea' },
     { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 55, kind: 'textarea' },
-    { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 101, kind: 'textarea' },
+    // 2026-10-16 用户口径:「把尺寸格式示例：33*12*110 写进去背景提示词」——
+    // 这一格是**唯一手输规格的入口**,格式统一了产品的「产品整体尺寸」与「炭棒外径/内径/长度」
+    // 才能被「开发产品」按 外径*内径*长度 自动拆出来(见 @core/progress/devProduct.parseCarbonSize)。
+    // DocSheet 的 input/textarea 分支本批补上了 row.hint 占位词(此前只有 select 分支认 hint)。
+    { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 101, kind: 'textarea',
+      hint: '例：33*12*110（外径*内径*长度）' },
     { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 210, kind: 'textarea' },
     { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 94, kind: 'textarea' },
     { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 55, kind: 'textarea' },

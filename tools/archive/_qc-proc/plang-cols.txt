@@ -1,0 +1,14 @@
+=== 对象类型 ===
+bd_manu_order = USER_TABLE
+bl_manu_order = USER_TABLE
+plang = USER_TABLE
+plang_pc = USER_TABLE
+
+=== plang 列 ===
+comm | id | pl_no | pl_xc | scx | pl_man | pl_date | khdm | dm | mc | gg | gg2 | jldw | pl_sl | pl_sl2 | xq_sl | rk_sl | yl | dj | jine | cp_date | st_date | cp_date2 | rk_no | bz | ja | od_no | od_xc | lot_no | color | siz | ll_no | wb_no | lb | mjlx | BomId | ypl_sl | ll_no2 | remark | MoDId | llxz | cgrkdh | lldh | djlx | zl | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print | 打印人 | 打印时间 | 批次号 | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 源工单号 | 源工单行id | 拆分序号 | 根工单号 | 是否切单 | 工艺路线 | 当前工序 | 当前工序完工量 | 完工状态 | 完工时间 | 单位换算率 | 生产数量 | 
+
+=== plang_pc 列 ===
+comm | id | pl_no | pl_xc | scx | pl_man | pl_date | khdm | dm | mc | gg | gg2 | jldw | pl_sl | pl_sl2 | xq_sl | rk_sl | yl | dj | jine | cp_date | st_date | cp_date2 | rk_no | bz | ja | od_no | od_xc | lot_no | color | siz | ll_no | wb_no | lb | mjlx | BomId | jh_date | ll_no2 | remark | MoDId | llxz | cgrkdh | lldh | djlx | zl | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print | 批次号 | plang_id | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 
+
+=== 行数 ===
+plang=74 plang_pc=46 bd_manu_order=13

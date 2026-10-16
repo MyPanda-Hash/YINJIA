@@ -1,0 +1,71 @@
+=== ① qc_proc_insp 表清单 ===
+name	
+qc_proc_insp_detail	
+qc_proc_insp_head	
+-- 2 row(s)
+
+=== ② qc_proc_insp_head 数量列 ===
+TABLE_NAME	COLUMN_NAME	DATA_TYPE	
+qc_proc_insp_detail	不合格应对措施	nvarchar	
+qc_proc_insp_detail	不良数量	decimal	
+qc_proc_insp_head	报工数量	decimal	
+qc_proc_insp_head	抽检总量	decimal	
+qc_proc_insp_head	检验数量	decimal	
+-- 5 row(s)
+
+=== ③ QC_PROC_INSP yj_field 全量 ===
+col_name	label	place	seq	visible	hidden	editable	data_type	
+表区	表区	detail	10	1	0	1	文本	
+行号	行号	detail	20	1	0	0	整数	
+检验项目	检验项目	detail	30	1	0	1	文本	
+检验要求	检验要求	detail	40	1	0	1	文本	
+检验方法	检验方法	detail	50	1	0	1	文本	
+检查频率	检查频率	detail	52	1	0	1	下拉框	
+检验仪器	检验仪器	detail	55	1	0	1	文本	
+抽检量	抽检量	detail	60	1	0	1	小数	
+实测数值	实测数值	detail	70	1	0	1	文本	
+测量值1	测量值1	detail	75	1	0	1	小数	
+测量值2	测量值2	detail	76	1	0	1	小数	
+测量值3	测量值3	detail	77	1	0	1	小数	
+测量值4	测量值4	detail	78	1	0	1	小数	
+测量值5	测量值5	detail	79	1	0	1	小数	
+单项判定	单项判定	detail	80	1	0	1	文本	
+不合格应对措施	不合格应对措施	detail	90	1	0	1	文本	
+不良数量	不良数量	detail	95	1	0	1	小数	
+结果判断	结果判断	detail	100	1	0	1	文本	
+备注2	备注2	detail	125	1	0	1	文本	
+规格型号	规格型号	header	120	1	0	1	文本	
+生产线	生产线	header	130	1	1	1	文本	
+生产车间	生产车间	header	140	1	1	1	文本	
+报工数量	报工数量	header	150	1	1	1	文本	
+抽检总量	抽检总量	header	160	1	0	1	文本	
+检验数量	检验数量	header	170	1	1	1	文本	
+检验日期	检验日期	header	190	1	0	1	文本	
+检验方案	检验方案	header	210	1	0	1	文本	
+文件编码	文件编码	header	220	1	1	1	文本	
+执行标准	执行标准	header	230	1	1	1	文本	
+审核人	审核人	header	270	1	1	0	文本	
+审核时间	审核时间	header	280	1	1	0	文本	
+处理方式	处理方式	header,detail	240	1	1	1	文本	
+备注	备注	header,detail	250	1	0	1	文本	
+单据编号	单据编号	query,header	10	1	0	0	文本	
+单据日期	单据日期	query,header	20	1	0	1	文本	
+检验时间	检验时间	query,header	30	1	1	1	文本	
+工单行号	工单行号	query,header	35	1	1	0	整数	
+检验类别	检验类别	query,header	40	1	0	1	文本	
+工单号	工单号	query,header	50	1	0	1	文本	
+报工单号	报工单号	query,header	60	1	1	1	文本	
+工序	工序	query,header	70	1	0	1	文本	
+批次号	批次号	query,header	80	1	0	1	文本	
+客户名称	客户名称	query,header	90	1	0	1	文本	
+产品编码	产品编码	query,header	100	1	0	1	文本	
+产品名称	产品名称	query,header	110	1	0	1	文本	
+检验员	检验员	query,header	180	1	0	1	文本	
+总结论	总结论	query,header	200	1	0	1	文本	
+单据状态	单据状态	query,header	260	1	1	0	文本	
+-- 48 row(s)
+
+=== ④ qc_proc_insp_head 数据 ===
+单数	
+12	
+-- 1 row(s)

@@ -187,17 +187,35 @@ test('纸面表头与 PROGRESS_COLUMNS 逐列一致,空态 colspan 跟列数对�
   const src = readFileSync(new URL('../views/ProgressControlSheet.vue', import.meta.url), 'utf8')
   const thead = src.match(/<thead>([\s\S]*?)<\/thead>/)
   assert.ok(thead, '在 ProgressControlSheet.vue 里找不到 <thead> —— 组件结构变了,请同步更新本断言')
-  const headLabels = [...thead[1].matchAll(/<th[^>]*>\s*\{\{\s*tt\('([^']+)'\)\s*\}\}\s*<\/th>/g)].map((m) => m[1])
+  const headAll = [...thead[1].matchAll(/<th[^>]*>\s*\{\{\s*tt\('([^']+)'\)\s*\}\}\s*<\/th>/g)].map((m) => m[1])
+  /**
+   * **UI 专用列**(列头有中文文案,但不对应进度行的数据键):目前只有「产品开发」
+   *   (2026-10-16 用户口径加的按钮列 —— 该项目的产品开发流程/进度,数据来自 /px/rdDevOverview,
+   *    不是 rd_progress_detail 的字段)。
+   *   它们**不能**登记进 PROGRESS_COLUMNS:那张表同时是行读写 row[K[...]] 与 Excel 导入导出的列源,
+   *   登记进去会被当成"永远没有数据的空列"导出、导入时又往不存在的键上写。
+   *   新增此类列时:① 加到下面的白名单;② 空态 colspan 会随列数自动对齐(见下);
+   *   ③ 该列必须带 no-print(UI 按钮不该出现在打印纸面)。
+   */
+  const UI_ONLY_LABELS = ['产品开发']
+  for (const l of UI_ONLY_LABELS) {
+    if (headAll.includes(l)) {
+      assert.match(thead[1], new RegExp(`<th[^>]*class="[^"]*no-print[^"]*"[^>]*>\\s*\\{\\{\\s*tt\\('${l}'\\)`),
+        `UI 专用列「${l}」要带 no-print(打印纸面不该出现 UI 按钮列)`)
+    }
+  }
+  const headLabels = headAll.filter((l) => !UI_ONLY_LABELS.includes(l))
   assert.deepEqual(
     headLabels,
     PROGRESS_COLUMNS.map((c) => c.label),
     '纸面表头与 PROGRESS_COLUMNS 不一致(改一侧必须同步改另一侧)',
   )
-  // 空态那一行:`<td :colspan="editable ? N+1 : N"`(N = 业务列数;+1 = editable 时的操作列)
+  // 空态那一行:`<td :colspan="editable ? N+1 : N"`(N = 业务列数 + UI 专用列数;+1 = editable 时的操作列)
+  const uiCols = UI_ONLY_LABELS.filter((l) => headAll.includes(l)).length
   const col = src.match(/<td\s+:colspan="editable \? (\d+) : (\d+)"/)
   assert.ok(col, '找不到空态 colspan 表达式')
-  assert.equal(Number(col[1]), PROGRESS_COLUMNS.length + 1, 'editable 态 colspan 应为 业务列数+1')
-  assert.equal(Number(col[2]), PROGRESS_COLUMNS.length, '只读态 colspan 应等于业务列数')
+  assert.equal(Number(col[1]), PROGRESS_COLUMNS.length + uiCols + 1, 'editable 态 colspan 应为 业务列数+UI列数+1')
+  assert.equal(Number(col[2]), PROGRESS_COLUMNS.length + uiCols, '只读态 colspan 应等于 业务列数+UI列数')
 })
 
 function escapeRe(s) {

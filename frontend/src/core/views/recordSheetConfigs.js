@@ -57,11 +57,10 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
-// 配方表「物料种类」的词表:集中放在 core/mold/materialKinds.js(引擎认得的那几个档案类别,
-// 2026-10-15 补「折算物料」共五个),并由 materialKinds.test.js 钉住
-// "下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
-// ⚠ 必须相对路径:本文件被 node --test 直接 import(keys.test.js),`@/` 别名只有 Vite 认
-import { MATERIAL_KINDS } from '../mold/materialKinds.js'
+// ⚠ 配方表「物料种类」**不再是下拉**(2026-10-16 用户口径:「把填写框的物料种类的下拉框改为普通文本框」):
+//   词表 MATERIAL_KINDS(core/mold/materialKinds.js)仍归**配方计算弹窗**用 —— 那里它是"按类别收窄
+//   物料编号/物料名称候选"的前置筛选。页 2 这格的类别改由 手填物料编号 → 商品档案 带出
+//   (invCarry.pickInvKind → materialKinds.carryKindOf,只补空格且只补引擎认得的词)。
 
 // ═══════════ 被并入面板的原始配置(2026-09-11 并入工艺清单面板第 2 页签,菜单已下线)═══════════
 // RD_MOLD_FORMULA 仍按页引用到成型工艺面板(sections/dataTables/tailSections 上的 page 标明归属;
@@ -435,8 +434,15 @@ const RD_MOLD_FORMULA = {
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
       { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
-          { key: '物料种类', label: '物料种类', span: 2, type: 'select', options: MATERIAL_KINDS },
-          { key: '物料编号', label: '物料编号', span: 4 },
+          // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
+          // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
+          // 带出档案类别来承担(见 invCarry.pickInvKind;引擎认不出的类别一律不补)。
+          { key: '物料种类', label: '物料种类', span: 2 },
+          // 物料编号:商品档案**远程模糊筛选下拉**(2026-10-16 用户口径:「输入 Y 或者 003 时
+          // 模糊搜索到含这些数字字母的」,例 YJ-LL-003)。type='inv-code' 由 RecordSheetPanels 渲染成
+          // el-select(remote + filterable + allow-create):打字才联网、候选封顶 50、档案里没有的编码照旧能手打;
+          // 选中后仍走 onDetailTextCommit 把 物料名称/物料种类 一并带出。口径见 core/panel/invCarry.js。
+          { key: '物料编号', label: '物料编号', span: 4, type: 'inv-code' },
           { key: '物料名称', label: '物料名称', span: 3 },
           { key: '实际添加比例', label: '实际添加\n比例%' },
           { key: '单支物料含量', label: '单支\n物料含量g' },
@@ -1064,13 +1070,20 @@ export const recordSheetConfigs = {
      *   ② 「如果是尺寸,应该是把对应检测的**内径或者外径的公差**等数据填写进成型工艺清单的对应
      *      检测要求里面的数据表格里面」。
      *
-     * 映射(键一律用中文 label):
-     *   规格书 · 检验要求表区           成型工艺清单 · 检验要求区(真实数据格)
-     *     跌落强度                →      跌落要求
-     *     抗压强度                →      强度要求kgf
-     *     压降                    →      压降标准kpa
-     *     尺寸                    →      外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,
-     *                                    纯函数 + 单测在 core/insp/dimensionSpec.js;长度项不落格)
+     * 映射(键一律用中文 label;名字匹配的容错口径见 core/insp/specCarry.js 头注):
+     *   规格书 · 检验项目(**实测纸面写法**)      成型工艺清单 · 检验要求区(真实数据格)
+     *     强度 · *抗压强度 / *抗压强度      →      强度要求kgf
+     *     #*压降 / *压降                   →      压降标准kpa
+     *     强度 · （裸棒）/ 强度 · 跌落强度    →      跌落要求 + 跌落高度cm + 跌落次数(**整句解析**,
+     *                                            core/insp/dropSpec.js)
+     *     *炭棒尺寸(外径/内径/长度**每行一条**) →   外径mm / 外径公差 / 内径mm / 内径公差
+     *                                            (**多行合并解析**, core/insp/dimensionSpec.js;
+     *                                             长度项不落格 —— 本面板没有名义长度数据格)
+     *
+     * ⚠ **2026-10-16 报障修正**:规格书的项目名是 `<组名>·<子项名>` 且带 `*`/`#`(必检标记),
+     *   旧实现按**精确相等**匹配裸名 ⇒ 一个格都没匹配上(用户截图:炭棒尺寸/压降/抗压强度 全空)。
+     *   现在容错三步:去 `*`/`#` → 按 `·` 拆两边都算命中 → 子串包含也算。**候选名数组按优先级**取。
+     *   尺寸**只认「炭棒尺寸」**:绝不能拿 `*整体尺寸(外包无纺布)`(46±0.5,组装后的滤芯尺寸)兜底。
      *
      * ⚠ **2026-10-15 口径变更(用户原话)**:「这个需要改一下成型工艺清单的配方表的数据是在配方计算器
      *   里面填写数据然后填入单据的,**而不是带入的规格书的**」⇒ 原先这段里的
@@ -1094,10 +1107,16 @@ export const recordSheetConfigs = {
       endpoint: '/px/specByProductForMold',
       specDrift: false,
       headFromDetail: [
-        { to: '跌落要求', matchProject: '跌落强度' },
-        { to: '强度要求kgf', matchProject: '抗压强度' },
-        { to: '压降标准kpa', matchProject: '压降' },
-        { parse: 'dimension', matchProject: '尺寸' },
+        // 跌落:先认「跌落强度」(标准库里 强度 组下的子项名),用户那版规格书选的是「（裸棒）」
+        { parse: 'drop', matchProject: ['跌落强度', '裸棒'] },
+        { to: '强度要求kgf', matchProject: ['抗压强度'] },
+        { to: '压降标准kpa', matchProject: ['压降'] },
+        { parse: 'dimension', matchProject: ['炭棒尺寸'] },
+        // 2026-10-16(续,「接着做」):测试参数那三格不在 检验要求 里,而在**检验方法**那句话里 ——
+        // 实测 强度·*抗压强度 的方法「调整间距40mm,设置下压速度5mm/min」/ #*压降 的方法「测试流速0.9L/min」。
+        // 每个项目一条(不是一条带多个候选:候选是"择一",这里两行都要解析,故各写一条、结果合并)。
+        { parse: 'testParams', from: '检验方法', matchProject: ['抗压强度'] },
+        { parse: 'testParams', from: '检验方法', matchProject: ['压降'] },
       ],
     },
   },
@@ -1106,6 +1125,15 @@ export const recordSheetConfigs = {
   RD_PROD_INFO: {
     headMode: 'report',
     staticTitle: '产品信息表',
+    // 左上角大标题改成**「产品名称」填写框**(2026-10-16 用户口径):
+    //   「把产品信息表的左上角的产品信息表这个栏目改为产品名称的填写框,留出空白然后背景提示词为:产品名称,
+    //    然后可以在规格书等4张单据填写的时候通过产品编号进行一个引用,4张单据有产品名称的才引用,没有就不影响,
+    //    产品信息表忘记填写这个产品名称就高亮提醒」。
+    // 为什么放这儿:产品名称原先只在元数据里(纸面不出现),而它是下游 成型/组装工艺清单 靠「产品编号」
+    // 参照带回的源字段(buildRefMap 的同名带回)⇒ 放最显眼的位置 + required(见 migrate-prodinfo-name-required)。
+    // staticTitle 保留:只读态该字段为空时回落显示印死的表单名(老单据观感不变)。
+    titleKey: '产品名称',
+    titleKeyPh: '产品名称',
     // 报告头右侧信息块:**编辑人在上、单据日期在下**(用户口径:原来上下颠倒了)。
     // 设计纸面 B21:E23 右侧就是「编号：/ 编辑人 / 日期」竖排,编号即报告头右上角那一格。
     info: [
@@ -1120,6 +1148,13 @@ export const recordSheetConfigs = {
       //   右值**不能再写 vspan:3**(那会变 6 列超宽,纸面直接串行;本次自检工具抓到的就是这个)。
       //   只有"整行一个值"的行才用 标签1 + vspan3。
       { bar: '一、产品基本信息', rows: [
+        // 2026-10-16 项目管理 ↔ 产品信息表 关联:标明这张产品属于哪一次立项
+        // (项目唯一键 = 立项申请的「文档编号」)。参照源在元数据里(RD_APPROVAL.文档编号),
+        // 选立项单时同名字段(客户名/项目等级等)按 refMap 自动带回;
+        // 「项目进度查询」每行的 [项目编号]/[说明] 存的就是这个值 ⇒「开发产品」按钮按它配对。
+        { pairs: [
+          { label: '立项文档编号', key: '立项文档编号', type: 'text', vspan: 3 },
+        ]},
         { pairs: [
           { label: '产品编号', key: '产品编号', type: 'text' },
           { label: '客户项目名称', key: '客户项目名称', type: 'text' },
@@ -1141,15 +1176,18 @@ export const recordSheetConfigs = {
       //  免得"库里的元数据顺序"与"纸面顺序"两套口径。见 recordSheetConfigs.dims.test.js)
       // 三格用 pair.cells 铺开、各带 placeholder 提示词;旧的整串 [炭棒尺寸] 退化为历史列(不进纸面)
       // 注:产品名称/产品类别/产品类型/产品分类/下单数量 保留在元数据但不进纸面(兼容历史单据)
+      // 2026-10-16 用户口径:「把尺寸格式示例：33*12*110 写进去背景提示词」——
+      //   整体尺寸与炭棒三格统一按 **外径*内径*长度** 写;「开发产品」按项目带入时也是按这个格式拆的
+      //   (解析见 @core/progress/devProduct.parseCarbonSize)。
       { bar: '二、规格与尺寸', rows: [
         { pairs: [
-          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3 },
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3, ph: '例：33*12*110（外径*内径*长度）' },
         ]},
         { pairs: [
           { label: '炭棒尺寸', cells: [
-            { key: '炭棒外径', ph: '外径(mm)' },
-            { key: '炭棒内径', ph: '内径(mm)' },
-            { key: '炭棒长度', ph: '长度(mm)' },
+            { key: '炭棒外径', ph: '外径(mm) 如 33' },
+            { key: '炭棒内径', ph: '内径(mm) 如 12' },
+            { key: '炭棒长度', ph: '长度(mm) 如 110' },
           ], vspan: 3 },
         ]},
       ]},
@@ -1523,11 +1561,20 @@ export const recordSheetConfigs = {
         { to: '产品整体尺寸', from: '整体规格参数' },
       ],
       detail: [
-        { to: '序号', from: '序号' },
-        { to: '控制项目', from: '检验项目' },
+        // ⚠ 序号 **必须带 indexWhenEmpty**(2026-10-16 用户报障「出货检验记录表前面缺失序号」):
+        //   规格书明细的 `序号` 不落库(那张纸按组现算,rd_spec_doc_detail.序号 实测全 NULL),
+        //   直接搬只会得到一整列空白 ⇒ 源值为空时按**组号**兜底(与规格书那张纸同一口径:
+        //   一个检验项目一个号,炭棒尺寸 三行 = 3,3,3;分组列见 detailGroupFrom)。
+        { to: '序号', from: '序号', indexWhenEmpty: 'group' },
+        // 控制项目 ← 规格书的 检验项目,**带下去的名字走 carryProjectName 规范**(2026-10-16 用户选 A:
+        // 只去掉冗余的组名前缀、保住 * / # 必检标记:`强度·*抗压强度` → `*抗压强度`;
+        // 「组名是真信息」和「子项是括号补语」那两种原样保留,见该函数注释)。
+        { to: '控制项目', from: '检验项目', norm: 'projectName' },
         { to: '控制标准及要求', from: '检验要求' },
         { to: '控制方法', from: '检验方法' },
       ],
+      // 组号兜底的分组列:同一个检验项目(去 `*`/`#`、取 `·` 前段)的行共用一个序号
+      detailGroupFrom: '检验项目',
       defaults: {
         // 设计 F9 模板行的三段应对措施(与标准库各条目的 measure 同文)
         不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性',
@@ -1603,69 +1650,91 @@ export const recordSheetConfigs = {
    *      (服务端 ButtonService.gateChangeDetail 另有强制还原,界面只是先说清楚);
    *   ② 性质 / 变更文件 用 type:'checks' 复选格(存储是顿号分隔文本,不是新字段类型);
    *   ③ 签字/日期 由服务端盖章(填了「变更后内容」才盖),界面上同样只读。
+   *
+   * 行高与纸宽(2026-10-16 用户口径):
+   *   ①「把表头改为可自由编辑的模式而不是固定的,在没有填写数据的时候不要压这么扁,可以适当拉长」
+   *      ⇒ 逐行给 `h`(最小行高,内容多了仍自由撑开)、大填写区 `rows ≥ 2`;
+   *   ②「看起来怎么那么宽整张表,窄一点,最好是宽比长是 1:1.6」
+   *      ⇒ 网格由设计原宽 1963px **等比缩到 1242px**(×0.632),行高相应拉长,
+   *         使纸张观感接近竖版(实测渲染宽高比见提交说明 / 探针截图)。
+   *      纸宽改的是本配置的 grid 与表格列宽 w,不动设计原表(xlsx 仍是宽的,这里是"版式适配")。
+   *   `h`/`rows`/`ro` 由 RecordSheetPanels 的网格行渲染读取(见该组件同名注释)。
    */
   RD_CHANGE: {
     headMode: 'report',
     // 纸面大标题是**印死的表单名**(YJ-QR-130 的 B2),不是每张单各写各的 ⇒ 用 staticTitle
     // (titlePlaceholder 只在没有 staticTitle 时当输入框灰字占位,不落纸)
+    //
+    // ⚠ 2026-10-16(用户口径)「产品变更信息表的 KPC管控点申请单 这个栏改为可自主编辑的普通文本框,
+    //   背景提示词默认为现在的这个,未进行更改则默认背景提示词」⇒ 与产品信息表同一套机制:
+    //   titleKey 绑一个字段,编辑态是输入框(灰字提示词 = 现在的标题),值为空时纸上仍回落印
+    //   staticTitle(逐字同文)⇒ 不改的老单据观感一字不变。
+    //   字段由 tools/migrate-change-title-20261016.sql 建(rd_change_head.[标题] + yj_field 登记)。
     staticTitle: 'KPC管控点申请单',
+    titleKey: '标题',
+    titleKeyPh: 'KPC管控点申请单',
     titlePlaceholder: 'KPC管控点申请单',
-    grid: [175, 324, 698, 232, 332, 202],
+    grid: [111, 205, 441, 147, 210, 128],
     head: { title: 2, infoLabel: 1, infoValue: 1 },
     info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
     sections: [
       { bar: '一、基础信息', rows: [
-        { grid: [
+        { h: 74, grid: [
           { label: '文件编码' },
           { fixed: 'YJ-QR-130' },
           { label: '申请日期' },
           { key: '申请日期', span: 3 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { label: '申请部门' },
           { key: '申请部门', span: 2 },
           { label: '性质' },
           { key: '性质', type: 'checks', single: true, options: ['变更', '新增'], span: 2 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { label: '产品编码' },
           { key: '产品编号', span: 2 },
           { label: '申请人' },
+          // ⚠ 申请人**不能**做只读:本面板不在 docDefaults 的 LOCKED_PERSON 里,后端也没有自动填它
+          //   (只有 RD_APPROVAL 的「申请立项人」是流程自动写),yj_field 的 editable=0 与实际用法不符
+          //   —— 纸面保持可填,否则这格永远是空的。
           { key: '申请人', span: 2 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { label: '产品名称' },
           { key: '产品名称', span: 2 },
           { label: '单据编号' },
-          { key: '单据编号', span: 2 },
+          // 单据编号是「新增」时后端自动发的号,纸面上只该显示不该改
+          // (2026-10-16 用户口径「表头…这个字段怎么能修改了」——同格的 yj_field 本来就是 editable=0)
+          { key: '单据编号', span: 2, ro: true },
         ]},
         // 变更类型(2026-09-30 需求 sheet「变更」底部两行:严格变更=按上述六步流程 /
         // 快捷变更=冯总审批):数据键「变更类型」,落库列走备用列池的 备用1
         // (见 tools/migrate-rd-change-kind-2026-09-30.sql);快捷变更在后端
         // **禁止提交会签**(ButtonService.submitSignoff 明确拒绝),直接提交审批即可。
-        { grid: [
+        { h: 74, grid: [
           { label: '变更类型' },
           { key: '变更类型', type: 'select', span: 2 },
           { label: '需会签' },
           { key: '需会签', type: 'checks', single: true, options: ['是', '否'], span: 2 },
         ]},
         // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
-        { grid: [
+        { h: 74, grid: [
           { label: '会签人' },
           { key: '会签人', span: 5, ph: '多人用逗号分隔（账号）' },
         ]},
       ]},
       { bar: '二、变更/新增申请事由', rows: [
-        { grid: [
+        { h: 92, grid: [
           { label: '变更事由' },
-          { key: '变更事由', span: 5, area: true, ph: '本次要改什么、为什么改' },
+          { key: '变更事由', span: 5, area: true, rows: 2, ph: '本次要改什么、为什么改' },
         ]},
-        { grid: [
+        { h: 92, grid: [
           { label: '验证数据' },
-          { key: '验证数据', span: 5, area: true, ph: '支持本次变更的验证数据/试验结论' },
+          { key: '验证数据', span: 5, area: true, rows: 2, ph: '支持本次变更的验证数据/试验结论' },
         ]},
         // 四个受控文件的勾选(用户口径第②条):勾哪些,生效时就按哪些建下一版草稿
-        { grid: [
+        { h: 74, grid: [
           { label: '变更文件' },
           { key: '变更文件', type: 'checks', span: 5,
             options: ['成型工艺清单', '组装工艺清单', '规格书', '出货检验计划表'] },
@@ -1675,37 +1744,40 @@ export const recordSheetConfigs = {
     dataTables: [
       { page: 0, bar: '三、部门评审意见', fixedRows: true, lockKey: '部门', lockCols: ['变更后内容', '备注'],
         filterKey: '表区', filterVal: '部门评审意见',
+        // 数据表行的最小行高(2026-10-16 用户口径「没有填写数据的时候不要压这么扁」):
+        // 空表时每行只有 ~31px,与纸宽不成比例;纸宽同批由 1963 缩到 1242(见上方注释②)
+        rowH: 82,
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '部门', label: '部门', w: 175 },
-          { key: '变更后内容', label: '变更/新增申请内容', w: 1022, area: true },
-          { key: '签字', label: '签字', w: 232 },
-          { key: '日期', label: '日期', w: 534 },
+          { key: '部门', label: '部门', w: 111 },
+          { key: '变更后内容', label: '变更/新增申请内容', w: 635, area: true },
+          { key: '签字', label: '签字', w: 147 },
+          { key: '日期', label: '日期', w: 349 },
         ]},
     ],
     tailSections: [
       { page: 0, bar: '三.相关变更', rows: [
-        { grid: [
+        { h: 92, grid: [
           { label: '相关变更' },
-          { key: '相关变更', span: 5, area: true, ph: '与哪些文件/工序/在制品相关联' },
+          { key: '相关变更', span: 5, area: true, rows: 2, ph: '与哪些文件/工序/在制品相关联' },
         ]},
       ]},
       { page: 0, bar: '四、库存产品处理方式', rows: [
-        { grid: [
+        { h: 74, grid: [
           { label: '原料' },
           { label: '数量' },
           { key: '原料数量' },
           { label: '处理方式' },
           { key: '原料处理方式', type: 'select', span: 2 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { label: '半成品' },
           { label: '数量' },
           { key: '半成品数量' },
           { label: '处理方式' },
           { key: '半成品处理方式', type: 'select', span: 2 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { label: '成品' },
           { label: '数量' },
           { key: '成品数量' },
@@ -1714,27 +1786,27 @@ export const recordSheetConfigs = {
         ]},
       ]},
       { page: 0, bar: '五、其它', rows: [
-        { grid: [
+        { h: 74, grid: [
           { label: '文件管理人' },
           { key: '文件管理人', span: 2 },
           { label: '密级' },
           { key: '密级', type: 'select', span: 2 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { label: '文件使用范围' },
           { key: '文件使用范围', type: 'select', span: 2 },
           { label: '备注' },
           { key: '备注', span: 2 },
         ]},
       ]},
-      // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)
+      // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)——手签行也得留够高度
       { page: 0, bar: '批准', rows: [
-        { grid: [
+        { h: 74, grid: [
           { label: '批准', span: 2 },
           { label: '签字', span: 2 },
           { label: '日期', span: 2 },
         ]},
-        { grid: [
+        { h: 74, grid: [
           { span: 2 },
           { span: 2 },
           { span: 2 },
@@ -1743,128 +1815,11 @@ export const recordSheetConfigs = {
     ],
   },
 
-  /**
-   * 成品检验规范(QC_FIN_SPEC,2026-10-09)—— 8 份受控文件归纳成的**一个统一文档格式**:
-   *   YJ-Q-60 SMS / YJ-Q-62 载银抑菌料 A2 / 含锌粉 / YJ-Q-94 碱3料 / YJ-Q-89 碱4料 /
-   *   YJ-Q-130 钾长石 A0 / YJ-Q-129 方解石 A1 / YJ-Q-125 Y料 A0
-   * 骨架逐份一致(证据 tools/archive/_qcspec/_structure.txt):修订履历 → 签字栏 → 正文五段 →
-   *   检验项目(按「检验对象」分节) → 检验结果处理方式。
-   * 四页(数据由后端 migrate-qc-fin-spec.sql 落库,行表用 表区 分块 + 检验对象 区分子节):
-   *   页1 文件修订履历(showHead:false,纸面自成一张表头) / 页2 正文+签署 /
-   *   页3 检验项目(每行带「检验对象」=子节名) / 页4 检验结果处理方式。
-   * ⚠ 只新增,不动组装成品检验单与其它三张检验单。
-   */
-  QC_FIN_SPEC: {
-    headMode: 'report',
-    staticTitle: '成品检验规范',
-    grid: [130, 390, 130, 390],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
-    info: [
-      { label: '文件编号', key: '文件编号', type: 'text' },
-      { label: '发行日期', key: '发行日期', type: 'text' },
-      { label: '版本版次', key: '版本版次', type: 'text' },
-      { label: '管控状态', key: '管控状态', type: 'text' },
-    ],
-    pages: [
-      { title: '文件修订履历', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
-      { title: '正文', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
-      { title: '检验项目', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
-      { title: '处理方式', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
-    ],
-    sections: [
-      // 页2:关联工单信息 + 正文 1~5(可填文本) + 签字栏
-      { page: 1, bar: '关联信息', rows: [
-        { grid: [
-          { label: '工单号' }, { key: '工单号' },
-          { label: '批次号' }, { key: '批次号' },
-        ]},
-        { grid: [
-          { label: '产品编码' }, { key: '产品编码' },
-          { label: '产品名称' }, { key: '产品名称' },
-        ]},
-      ]},
-      { page: 1, bar: '正文', rows: [
-        // ⚠ vspan=3:键值对行的值格默认只占 **1 列**,4 列版式下右边会空一半(2026-10-09 用户实测报
-        //   「表格为什么不填满右边」)⇒ 值格跨满 label 之外的 3 列。
-        { pairs: [{ label: '1 目的', key: '目的', vspan: 3 }] },
-        { pairs: [{ label: '2 范围', key: '范围', vspan: 3 }] },
-        { pairs: [{ label: '3 职责和权限', key: '职责和权限', vspan: 3 }] },
-        { pairs: [{ label: '4 取样要求', key: '取样要求', vspan: 3 }] },
-        { pairs: [{ label: '5 工作程序', key: '工作程序', vspan: 3 }] },
-      ]},
-      // ⚠ 本页 grid 是 4 列 ⇒ 签字栏拆两行,别写成 6 格(会把「核准」挤出纸面)
-      { page: 1, bar: '签署', rows: [
-        { grid: [
-          { label: '制定' }, { key: '制定' },
-          { label: '审核' }, { key: '审核' },
-        ]},
-        { grid: [
-          { label: '核准' }, { key: '核准' },
-        ]},
-      ]},
-      // 页3/页4:同样的关联信息抬头(纸面每页都要能独立看懂)
-      { page: 2, bar: '关联信息', rows: [
-        { grid: [
-          { label: '工单号' }, { key: '工单号' },
-          { label: '产品名称' }, { key: '产品名称' },
-        ]},
-      ]},
-      { page: 3, bar: '关联信息', rows: [
-        { grid: [
-          { label: '工单号' }, { key: '工单号' },
-          { label: '产品名称' }, { key: '产品名称' },
-        ]},
-      ]},
-    ],
-    dataTables: [
-      // 页1 文件修订履历(照文档表头:版本 | 修订理由与内容简述 | 修订日期 | 拟定)
-      {
-        page: 0,
-        pageTitle: '文件修订履历',
-        filterKey: '表区', filterVal: '修订履历',
-        noVariant: true,
-        cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
-          { key: '行号', label: '序号', w: 70, align: 'center' },
-          { key: '版本', label: '版本', w: 120, align: 'center' },
-          { key: '修订理由与内容简述', label: '修订理由与内容简述', w: 460, area: true },
-          { key: '修订日期', label: '修订日期', w: 160, align: 'center' },
-          { key: '拟定', label: '拟定', w: 170 },
-        ],
-      },
-      // 页3 检验项目:「检验对象」= 子节名(原料(x)/成品(x)…),同一对象的行构成一节
-      {
-        page: 2,
-        bar: '6 检验项目（按检验对象分节）',
-        filterKey: '表区', filterVal: '检验项目',
-        noVariant: true,
-        cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
-          { key: '行号', label: '序号', w: 60, align: 'center' },
-          { key: '检验对象', label: '检验对象', w: 170 },
-          { key: '检验项目', label: '检验项目', w: 140 },
-          { key: '称料', label: '称料', w: 90, align: 'center' },
-          { key: '接受标准', label: '接受标准', w: 250, area: true },
-          { key: '检验方法', label: '检验方法', w: 330, area: true },
-        ],
-      },
-      // 页4 检验结果处理方式(与检验项目子节一一对应)
-      {
-        page: 3,
-        bar: '7 检验结果处理方式',
-        filterKey: '表区', filterVal: '处理方式',
-        noVariant: true,
-        cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
-          { key: '行号', label: '序号', w: 70, align: 'center' },
-          { key: '检验对象', label: '检验对象', w: 240 },
-          { key: '合格处置', label: '合格处置', w: 260 },
-          { key: '不合格处置', label: '不合格处置', w: 260 },
-          { key: '备注', label: '备注', w: 150 },
-        ],
-      },
-    ],
-  },
+  // 【已删除】QC_FIN_SPEC 成品检验规范(2026-10-09 建的「8 份受控文件归纳成的统一文档格式」四页纸面配置)
+  //   —— 2026-10-16 用户口径「删除当前成型检验单和切炭检验单,以及成品检验规范」,面板与
+  //   qc_fin_spec_head/_detail 已整体下架(tools/migrate-drop-qc-mold-cut-finspec-20261016.sql),
+  //   配置留着也无人取用(面板不存在 ⇒ 这条分支永远进不来),故随面板一并移除。
+  //   成品检验的纸面能力现由「组装成品检验单 QC_ASM_INSP」承接(报表 qc_asm_insp.jrxml)。
 
   // ───────────────────────────────────────────────────────────────────────────
   // 归档式(archive)面板 —— 与上面 17 张「纸面记录表」是**两套渲染路径**

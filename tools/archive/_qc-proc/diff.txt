@@ -1,0 +1,153 @@
+### A. 出货检验计划表 RD_INSP_PLAN 的字段(截图4「出货检验项目控制计划」)
+  place | seq | label | col_name | data_type
+  detail | 2 | 序号 | 序号 | 文本
+  detail | 5 | 检验类别 | 检验类别 | 下拉框
+  detail | 10 | 控制项目 | 控制项目 | 文本
+  detail | 20 | 质量控制内容 | 质量控制内容 | 文本
+  detail | 30 | 检测仪器 | 检测仪器 | 文本
+  detail | 40 | 控制标准及要求 | 控制标准及要求 | 文本
+  detail | 50 | 检验 | 检验 | 文本
+  detail | 60 | 不合格应对措施 | 不合格应对措施 | 文本
+  detail | 70 | 检测频率 | 检测频率 | 下拉框
+  detail | 80 | 取样方式 | 取样方式 | 文本
+  detail | 90 | 检验内容 | 检验内容 | 文本
+  detail | 100 | 控制方法 | 控制方法 | 文本
+  detail | 120 | 备注 | 备注 | 文本
+  header | 10 | 单据编号 | 单据编号 | 文本
+  header | 20 | 单据日期 | 单据日期 | 日期
+  header | 30 | 文档编号 | 文档编号 | 文本
+  header | 40 | 标题 | 标题 | 文本
+  header | 50 | 版本号 | 版本号 | 文本
+  header | 60 | 密级 | 密级 | 下拉框
+  header | 70 | 产品编号 | 产品编号 | 参照
+  header | 80 | 客户名 | 客户名 | 文本
+  header | 82 | 客户项目名称 | 客户项目名称 | 文本
+  header | 90 | 表单管理人 | 管理人 | 文本
+  header | 100 | 主要性能 | 主要性能 | 文本
+  header | 105 | 产品功能类别 | 产品功能类别 | 参照
+  header | 107 | 产品整体尺寸 | 产品整体尺寸 | 文本
+  header | 110 | 滤芯尺寸 | 滤芯尺寸 | 文本
+  header | 120 | 授权使用人 | 授权使用人 | 文本
+  header | 122 | 使用范围 | 使用范围 | 文本
+  header | 130 | 编写人 | 编写人 | 文本
+  header | 140 | 审核人 | 审核人 | 参照
+  header | 150 | 备注 | 备注 | 文本
+  header | 200 | 是否受控 | 备用1 | 文本
+  header | 205 | 受控日期 | 备用2 | 文本
+  query | 10 | 标题 | 标题 | 文本
+  query | 20 | 产品编号 | 产品编号 | 文本
+  query | 999 | 变更来源单号 | 变更来源单号 | 文本
+
+### B. 制程检验单 QC_PROC_INSP 的表头字段
+  seq | label | col_name | data_type
+  10 | 单据编号 | 单据编号 | 文本
+  20 | 单据日期 | 单据日期 | 文本
+  30 | 检验时间 | 检验时间 | 文本
+  40 | 检验类别 | 检验类别 | 文本
+  50 | 工单号 | 工单号 | 文本
+  60 | 报工单号 | 报工单号 | 文本
+  70 | 工序 | 工序 | 文本
+  80 | 批次号 | 批次号 | 文本
+  90 | 客户名称 | 客户名称 | 文本
+  100 | 产品编码 | 产品编码 | 文本
+  110 | 产品名称 | 产品名称 | 文本
+  120 | 规格型号 | 规格型号 | 文本
+  130 | 生产线 | 生产线 | 文本
+  140 | 生产车间 | 生产车间 | 文本
+  150 | 报工数量 | 报工数量 | 文本
+  160 | 抽检总量 | 抽检总量 | 文本
+  170 | 检验数量 | 检验数量 | 文本
+  180 | 检验员 | 检验员 | 文本
+  190 | 检验日期 | 检验日期 | 文本
+  200 | 总结论 | 总结论 | 文本
+  210 | 检验方案 | 检验方案 | 文本
+  220 | 文件编码 | 文件编码 | 文本
+  230 | 执行标准 | 执行标准 | 文本
+  240 | 处理方式 | 处理方式 | 文本
+  250 | 备注 | 备注 | 文本
+  260 | 单据状态 | 单据状态 | 文本
+  270 | 审核人 | 审核人 | 文本
+  280 | 审核时间 | 审核时间 | 文本
+
+### C. 制程检验单 QC_PROC_INSP 的明细字段
+  seq | label | col_name | data_type
+  10 | 表区 | 表区 | 文本
+  20 | 行号 | 行号 | 整数
+  30 | 检验项目 | 检验项目 | 文本
+  40 | 检验要求 | 检验要求 | 文本
+  50 | 检验方法 | 检验方法 | 文本
+  55 | 检验仪器 | 检验仪器 | 文本
+  60 | 抽检量 | 抽检量 | 小数
+  70 | 实测数值 | 实测数值 | 文本
+  75 | 测量值1 | 测量值1 | 小数
+  76 | 测量值2 | 测量值2 | 小数
+  77 | 测量值3 | 测量值3 | 小数
+  78 | 测量值4 | 测量值4 | 小数
+  79 | 测量值5 | 测量值5 | 小数
+  80 | 单项判定 | 单项判定 | 文本
+  90 | 不合格应对措施 | 不合格应对措施 | 文本
+  95 | 不良数量 | 不良数量 | 小数
+  100 | 结果判断 | 结果判断 | 文本
+  125 | 备注2 | 备注2 | 文本
+
+### D. 物理表 rd_insp_plan_detail 的列
+  col | type
+  id | int
+  单据编号 | nvarchar
+  控制项目 | nvarchar
+  质量控制内容 | nvarchar
+  检测仪器 | nvarchar
+  控制标准及要求 | nvarchar
+  检验 | nvarchar
+  不合格应对措施 | nvarchar
+  检测频率 | nvarchar
+  取样方式 | nvarchar
+  检验内容 | nvarchar
+  控制方法 | nvarchar
+  asp_user1 | nvarchar
+  asp_time1 | datetime2
+  asp_user2 | nvarchar
+  asp_time2 | datetime2
+  asp_cancel | char
+  检验类别 | nvarchar
+  序号 | nvarchar
+  备注 | nvarchar
+  备用1 | nvarchar
+  备用2 | nvarchar
+  备用3 | nvarchar
+  备用4 | nvarchar
+  备用5 | nvarchar
+  备用6 | nvarchar
+  备用7 | nvarchar
+  备用8 | nvarchar
+  备用9 | nvarchar
+  备用10 | nvarchar
+  备用11 | nvarchar
+  备用12 | nvarchar
+  备用13 | nvarchar
+  备用14 | nvarchar
+  备用15 | nvarchar
+  备用16 | nvarchar
+  备用17 | nvarchar
+  备用18 | nvarchar
+  备用19 | nvarchar
+  备用20 | nvarchar
+
+### F. 关键下拉/参照的字典
+  label | data_type | dict | refp | reff
+  检验类别 | 下拉框 | SELECT v FROM (VALUES (N'必测项'),(N'型式检验')) AS t(v) |  | 
+  检测频率 | 下拉框 | SELECT v FROM (VALUES (N'1PCS/一个生产批次'),(N'生产量*1%'),(N'型式检验')) AS t(v) |  | 
+  密级 | 下拉框 | SELECT v FROM (VALUES (N'保密'),(N'内部'),(N'公开')) AS t(v) |  | 
+  产品编号 | 参照 |  | RD_PROD_INFO | 产品编号
+  产品功能类别 | 参照 |  | RD_PROD_INFO | 产品功能类别
+  审核人 | 参照 |  | EMP | 员工名称
+
+### G. 制程检验单的关键下拉/参照
+  label | data_type | dict | refp
+
+### E. 数据量
+  t | n
+  rd_insp_plan_head | 0
+  rd_insp_plan_detail | 0
+  qc_proc_insp_head | 1
+  qc_proc_insp_detail | 11

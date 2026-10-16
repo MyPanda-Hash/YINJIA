@@ -1,0 +1,72 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-usage2.sql ==
+  | qc_mold_insp_head | 24 | 
+  | qc_mold_insp_detail | 20 | 
+  | qc_cut_insp_head | 9 | 
+  | qc_cut_insp_detail | 7 | 
+  | qc_fin_spec_head | 8 | 
+  | qc_fin_spec_detail | 20 | 
+  | QC_CUT_INSP | null | 9 | 
+  | QC_FIN_SPEC | null | 5 | 
+  | QC_FIN_SPEC | 草稿 | 3 | 
+  | QC_MOLD_INSP | null | 24 | 
+  | QC_MOLD_INSP | CX-2026-10-0027 | null | admin | 2026-10-15 13:24:18.9968992 | 
+  | QC_MOLD_INSP | CX-2026-10-0026 | null | admin | 2026-10-14 17:55:49.0499020 | 
+  | QC_MOLD_INSP | CX-2026-10-0025 | null | admin | 2026-10-14 15:44:24.8711524 | 
+  | QC_MOLD_INSP | CX-2026-10-0024 | null | admin | 2026-10-14 15:31:37.9590896 | 
+  | QC_MOLD_INSP | CX-2026-10-0023 | null | admin | 2026-10-10 18:01:07.7863148 | 
+  | QC_MOLD_INSP | CX-2026-10-0022 | null | admin | 2026-10-10 17:22:06.3469164 | 
+  | QC_MOLD_INSP | CX-2026-10-0021 | null | admin | 2026-10-10 17:20:46.4156002 | 
+  | QC_MOLD_INSP | CX-2026-10-0020 | null | admin | 2026-10-10 17:17:12.6054296 | 
+  | QC_CUT_INSP | QT-2026-10-0012 | null | admin | 2026-10-14 17:56:14.5927800 | 
+  | QC_CUT_INSP | QT-2026-10-0011 | null | admin | 2026-10-13 15:50:01.0358219 | 
+  | QC_CUT_INSP | QT-2026-10-0010 | null | admin | 2026-10-10 17:22:06.3635508 | 
+  | QC_CUT_INSP | QT-2026-10-0009 | null | admin | 2026-10-10 17:20:46.4512489 | 
+  | QC_CUT_INSP | QT-2026-10-0008 | null | admin | 2026-10-06 18:12:23.8510182 | 
+  | QC_CUT_INSP | QT-2026-10-0007 | null | admin | 2026-10-06 17:56:20.1185065 | 
+  | QC_CUT_INSP | QT-2026-10-0006 | null | admin | 2026-10-06 17:55:57.7267845 | 
+  | QC_CUT_INSP | QT-2026-10-0005 | null | admin | 2026-10-06 17:04:26.7582291 | 
+  | QC_FIN_SPEC | CPJY-2026-10-0006 | null | 成品检验规范 | admin | 2026-10-14 17:56:39.7062226 | 
+  | QC_FIN_SPEC | CPJY-2026-10-0005 | null | 成品检验规范 | admin | 2026-10-10 17:22:06.4256187 | 
+  | QC_FIN_SPEC | CPJY-DEMO-0001 | 草稿 | Y料原料及成品检验规范 | migration | 2026-10-10 15:05:23.1486927 | 
+  | QC_FIN_SPEC | CPJY-DEMO-0001 | 草稿 | Y料原料及成品检验规范 | migration | 2026-10-10 13:47:20.8257664 | 
+  | QC_FIN_SPEC | CPJY-2026-10-0004 | null | null | admin | 2026-10-09 17:20:20.5548512 | 
+  | QC_FIN_SPEC | CPJY-2026-10-0003 | null | null | admin | 2026-10-09 17:20:19.9857373 | 
+  | QC_FIN_SPEC | CPJY-2026-10-0002 | null | null | admin | 2026-10-09 17:20:17.2859716 | 
+  | QC_FIN_SPEC | CPJY-DEMO-0001 | 草稿 | Y料原料及成品检验规范 | migration | 2026-10-09 08:51:46.2967282 | 
+  | 成型检验单 | 弃审 | 2 | 2026-10-10 09:09:59.3616575 | 2026-10-10 09:16:11.5027810 | 
+  | 成品检验规范 | 删除 | 3 | 2026-10-09 09:20:15.3497544 | 2026-10-14 02:11:31.7841642 | 
+  | 成型检验单 | 删除 | 1 | 2026-10-10 10:01:11.0876401 | 2026-10-10 10:01:11.0876401 | 
+  | 成型检验单 | 审批通过 | 2 | 2026-10-10 09:09:27.2879370 | 2026-10-10 09:10:16.5839065 | 
+  | 成品检验规范 | 提交 | 4 | 2026-10-09 09:20:11.1661543 | 2026-10-09 09:20:20.5608558 | 
+  | 成型检验单 | 提交 | 5 | 2026-10-10 09:09:24.8148345 | 2026-10-15 05:24:19.0083524 | 
+  | 切炭检验单 | 提交 | 1 | 2026-10-13 07:50:01.0704395 | 2026-10-13 07:50:01.0704395 | 
+  | 成型检验单 | 提交审批 | 2 | 2026-10-10 09:09:24.9095483 | 2026-10-10 09:10:11.7243144 | 
+  | yj_usage_log_total | 2656 | 
+  | attachment | 0 | 
+  | form_approval | 6 | 
+  | report_column_settings | 0 | 
+  | doc_batch_src | 0 | 
+  | doc_batch_tgt | 0 | 
+  | CPJY | 6 | 2026-10-09 09:20:11.1100000 | 2026-10-14 09:56:39.6930000 | 
+  | CX | 27 | 2026-10-05 12:07:47.9770000 | 2026-10-15 05:24:18.9830000 | 
+  | QT | 12 | 2026-10-05 12:07:48.1700000 | 2026-10-14 09:56:14.5800000 | 
+  | df_qc_cut_insp_detail_cancel | DEFAULT_CONSTRAINT | 2026-10-05 12:01:19.26 | 
+  | df_qc_cut_insp_head_cancel | DEFAULT_CONSTRAINT | 2026-10-05 12:01:19.253 | 
+  | df_qc_fin_spec_detail_cancel | DEFAULT_CONSTRAINT | 2026-10-09 08:51:45.913 | 
+  | df_qc_fin_spec_head_cancel | DEFAULT_CONSTRAINT | 2026-10-09 08:51:45.903 | 
+  | df_qc_mold_insp_detail_cancel | DEFAULT_CONSTRAINT | 2026-10-05 12:01:19.24 | 
+  | df_qc_mold_insp_head_cancel | DEFAULT_CONSTRAINT | 2026-10-05 12:01:19.233 | 
+  | pk_qc_cut_insp_detail | PRIMARY_KEY_CONSTRAINT | 2026-10-05 12:01:19.26 | 
+  | pk_qc_cut_insp_head | PRIMARY_KEY_CONSTRAINT | 2026-10-05 12:01:19.25 | 
+  | pk_qc_fin_spec_detail | PRIMARY_KEY_CONSTRAINT | 2026-10-09 08:51:45.91 | 
+  | pk_qc_fin_spec_head | PRIMARY_KEY_CONSTRAINT | 2026-10-09 08:51:45.9 | 
+  | pk_qc_mold_insp_detail | PRIMARY_KEY_CONSTRAINT | 2026-10-05 12:01:19.24 | 
+  | pk_qc_mold_insp_head | PRIMARY_KEY_CONSTRAINT | 2026-10-05 12:01:19.233 | 
+  | qc_cut_insp_detail | USER_TABLE | 2026-10-15 03:38:56.637 | 
+  | qc_cut_insp_head | USER_TABLE | 2026-10-10 06:02:37.067 | 
+  | qc_fin_spec_detail | USER_TABLE | 2026-10-09 08:51:45.91 | 
+  | qc_fin_spec_head | USER_TABLE | 2026-10-09 08:51:45.883 | 
+  | qc_mold_insp_detail | USER_TABLE | 2026-10-15 03:38:56.617 | 
+  | qc_mold_insp_head | USER_TABLE | 2026-10-10 06:02:37.08 | 
+[OK] _q-usage2.sql (13 batches)

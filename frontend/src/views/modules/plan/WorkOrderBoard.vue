@@ -10,6 +10,10 @@
       <span class="wb-p">{{ tt('开工日期') }}
         <el-date-picker v-model="day" type="date" value-format="YYYY-MM-DD" style="width: 135px" @change="loadAll" />
       </span>
+      <!-- 刷新(2026-10-17 用户口径):本页此前只有切开工日期才会重新取数,而左侧骨架/明细/汇总
+           都依赖别处(快速排产排入、生产工单结案、报工)的写入 —— 加一个手动刷新按钮,
+           一次重取 骨架+按线明细+汇总条 三处(与快速排产页「刷新」同口径,只读查看,归「可见」动作)。 -->
+      <el-button size="small" :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
       <span class="wb-stats">
         {{ tt('待排产') }}（{{ s['待排产笔数'] ?? 0 }}{{ tt('笔') }}）；{{ tt('今日排产') }}（{{ s['今日排产']?.张数 ?? 0 }}{{ tt('张') }}/{{ num(s['今日排产']?.数量) }}{{ tt('件') }}）；{{ tt('总未完成量') }} {{ num(s['总未完成量']) }}
       </span>
@@ -55,13 +59,17 @@
               <el-radio-button value="全部">{{ tt('全部') }}</el-radio-button>
             </el-radio-group>
             <div class="wb-actions">
-              <el-button size="small" type="danger" plain :disabled="!checkedSched.length" @click="unclose">
+              <!-- 页面级权限(2026-10-16):本页挂页面面板 WORK_ORDER_BOARD
+                   (可见/查询/调拨/撤回调拨/取消结案/打印,词表见后端 PagePanelRegistry)。
+                   无该动作词的角色不显示按钮;后端按同一份 perms 复核(取消结案与打印
+                   与生产工单列表共用端点,故那边授予的同名词亦可放行 —— 见 requireButtonAny)。 -->
+              <el-button v-if="canDo('unclose')" size="small" type="danger" plain :disabled="!checkedSched.length" @click="unclose">
                 {{ tt('取消结案') }}（{{ checkedSched.length }}）
               </el-button>
               <el-button size="small" type="primary" plain :disabled="checkedSched.length !== 1" @click="openTrace">
                 {{ tt('追溯') }}
               </el-button>
-              <el-dropdown split-button size="small" type="success" plain :disabled="!checkedSched.length"
+              <el-dropdown v-if="canDo('print')" split-button size="small" type="success" plain :disabled="!checkedSched.length"
                            @click="printTask('成型生产任务单')" @command="printTask">
                 {{ tt('打印工单') }}（{{ checkedSched.length }}）
                 <template #dropdown>
@@ -69,10 +77,10 @@
                   <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
                 </template>
               </el-dropdown>
-              <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
+              <el-button v-if="canDo('transfer')" size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
                 {{ tt('调拨') }}（{{ checkedSched.length }}）
               </el-button>
-              <el-button size="small" plain :disabled="!checkedSched.length" @click="doTransferRevoke">
+              <el-button v-if="canDo('revoke')" size="small" plain :disabled="!checkedSched.length" @click="doTransferRevoke">
                 {{ tt('撤回调拨') }}
               </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
@@ -169,6 +177,15 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import { useUserStore } from '@/stores/user'
+import { canDo as canDoPerm } from '@core/auth/panelAccess'
+
+/**
+ * 页面级动作权限(2026-10-16):页面面板 WORK_ORDER_BOARD
+ * (可见/查询/调拨/撤回调拨/取消结案/打印;词表见后端 PagePanelRegistry)。
+ * 未授权的按钮不渲染;「追溯」是只读查看,归「可见」不另设动作。
+ */
+const permUser = useUserStore()
+const canDo = (word) => canDoPerm(permUser, 'WORK_ORDER_BOARD', word)
 
 const day = ref(new Date().toISOString().slice(0, 10))
 const lineSummary = ref([])
@@ -177,6 +194,8 @@ const scope = ref('未完工')
 const schedRows = ref([])
 const checkedSched = ref([])
 const s = ref({})
+/** 刷新按钮 loading(2026-10-17):loadAll 期间置真,避免连点 */
+const loading = ref(false)
 
 const raVisible = ref(false)
 const raLine = ref('')
@@ -248,7 +267,12 @@ async function loadStats() {
   } catch { /* 统计失败不阻断 */ }
 }
 
-function loadAll() { loadSummary(); loadScheduled(); loadStats() }
+function loadAll() {
+  // 刷新按钮的 loading(2026-10-17):三个请求各自内部吞异常(不阻断其余取数),
+  // 故 Promise.all 只会全部成功 ⇒ finally 收口即可。
+  loading.value = true
+  return Promise.all([loadSummary(), loadScheduled(), loadStats()]).finally(() => { loading.value = false })
+}
 
 function openReassign() {
   if (!checkedSched.value.length) return

@@ -1,0 +1,42 @@
+  <summary>
+    <band height="327">
+      <staticText><reportElement style="gridLabel" x="0" y="0" width="76" height="20"/><text><![CDATA[检验结论：]]></text></staticText>
+      <staticText><reportElement style="conclusion" x="76" y="0" width="60" height="20"/><text><![CDATA[合格]]></text></staticText>
+      <staticText><reportElement style="note" x="140" y="0" width="399" height="20"/><text><![CDATA[备注：测试环境：温度24℃  湿度：48 %；测试样本超过5个时，填写5个数据，记录数据时选择偏高离标准最远的数据进行记录]]></text></staticText>
+
+      <staticText><reportElement style="gridLabel" x="0" y="30" width="539" height="14"/><text><![CDATA[按《生活饮用水输配水设备及防护材料卫生安全评价规范》项目]]></text></staticText>
+      <staticText><reportElement style="th" x="0" y="46" width="359" height="16"/><text><![CDATA[卫生要求]]></text></staticText>
+      <staticText><reportElement style="th" x="359" y="46" width="180" height="16"/><text><![CDATA[结果]]></text></staticText>
+
+      <staticText><reportElement style="cellS" x="0" y="64" width="359" height="17"/><text><![CDATA[涌法度增加量（0.2NTU）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="64" width="180" height="17"/><text><![CDATA[0.12]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="81" width="359" height="17"/><text><![CDATA[膤和味：浸泡后水无异膠、异味]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="81" width="180" height="17"/><text><![CDATA[无]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="98" width="359" height="17"/><text><![CDATA[眨眼可见物：浸泡后水不产生任何眨眼可见的碎片杂物等]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="98" width="180" height="17"/><text><![CDATA[无]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="115" width="359" height="17"/><text><![CDATA[改变度（0.5）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="115" width="180" height="17"/><text><![CDATA[1.79]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="132" width="359" height="17"/><text><![CDATA[融解性总固体（20 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="132" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="149" width="359" height="17"/><text><![CDATA[耗氧量（以O2计）增加量（1 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="149" width="180" height="17"/><text><![CDATA[0.46]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="166" width="359" height="17"/><text><![CDATA[硇增加量（0.001 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="166" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="183" width="359" height="17"/><text><![CDATA[锌增加量（0.005 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="183" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="200" width="359" height="17"/><text><![CDATA[铝增加量（0.02 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="200" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="217" width="359" height="17"/><text><![CDATA[铀增加量（0.001 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="217" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="234" width="359" height="17"/><text><![CDATA[汞增加量（0.0001 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="234" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="251" width="359" height="17"/><text><![CDATA[铁增加量（0.06 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="251" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="268" width="359" height="17"/><text><![CDATA[锰增加量（0.02 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="268" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="285" width="359" height="17"/><text><![CDATA[铜增加量（0.2 mg/L）   /   锌增加量（0.2 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="285" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="302" width="359" height="17"/><text><![CDATA[总硬度增加量（按碳酸钙计 100 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="302" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+    </band>
+  </summary>

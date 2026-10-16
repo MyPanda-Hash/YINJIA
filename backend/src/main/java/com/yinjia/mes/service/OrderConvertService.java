@@ -55,6 +55,10 @@ public class OrderConvertService {
             " FROM bd_so_order o"
                     + " JOIN bl_so_order l ON l.[单据编号] = o.[单据编号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
                     + " LEFT JOIN bs_inv rv ON rv.[存货编码] = l.[存货编码] AND ISNULL(rv.asp_cancel,'N') <> 'Y'"
+                    // 工艺路线的单据状态(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」):
+                    // 结转列表要能看出"这行选的路线审没审"，故按 rv.工艺路线 关联 ROUTE 的状态行。
+                    // ⚠ 别名用 rs 不用 s —— s 已被上面 SO_ORDER 的状态 JOIN 占用(两处同别名会歧义)。
+                    + " LEFT JOIN yj_doc_status rs ON rs.panel_code = 'ROUTE' AND rs.doc_no = rv.[工艺路线]"
                     + " JOIN yj_doc_status s ON s.panel_code = 'SO_ORDER' AND s.doc_no = o.[单据编号]"
                     + "   AND s.shr IS NOT NULL"
                     // 严格「已审核」(2026-09-26 用户要求:结转页不出现已审核以外流程的数据)——
@@ -118,9 +122,17 @@ public class OrderConvertService {
                         + " ISNULL(l.[数量], 0) - ISNULL(m.linked, 0) AS 剩余数量,"
                         // 工单关联工艺路线(2026-10-05,用户口径「在订单结转处选择工序路线」):
                         // 预填 = 产品档案绑定(bs_inv.工艺路线) → 未绑定默认 GY-CB-STD;前端可逐行改,转单时原样带入工单
-                        + " ISNULL(rv.[工艺路线], N'') AS 工艺路线"
-                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD
-                        + " ORDER BY o.[单据日期], o.[单据编号], l.[id]",
+                        + " ISNULL(rv.[工艺路线], N'') AS 工艺路线,"
+                        // 工艺路线审核状态(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」):
+                        // 结转列表直接带上「该路线审没审」，前端把未审核的行标红/禁用转工单，
+                        // 省得用户填完数量点转单才被后端拦下。口径与 bs_route.审核状态 同源
+                        // (trg_yj_doc_status_route_audit:shr 非空 且 未作废/未中止/非删除/非修改中)。
+                        + " CASE WHEN ISNULL(rv.[工艺路线], N'') = N'' THEN N'未选择'"
+                        + "      WHEN rs.shr IS NOT NULL AND ISNULL(rs.canceled,'N')<>'Y'"
+                        + "        AND ISNULL(rs.stopped,'N')<>'Y' AND ISNULL(rs.deleting,'N')<>'Y'"
+                        + "        AND ISNULL(rs.modify_state,'N')<>'Y' THEN N'已审核'"
+                        + "      ELSE N'未审核' END AS 路线审核状态"
+                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD                        + " ORDER BY o.[单据日期], o.[单据编号], l.[id]",
                         // ⚠ 日期参数必须显式给空串:JDBC null 会让 `? = ''` 求值成 NULL(既非真也非假)
                         //   ⇒ 整个 WHERE 不成立 ⇒ **一行都查不出来**。2026-10-06 探针实测踩到并修正。
                         arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like);
@@ -209,6 +221,9 @@ public class OrderConvertService {
                 applyDateEdit(r, user);   // 交期修正先回写订单行 → createFromOrderLine 读行交期即为修正值(cp_date)
                 Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
                 // 未选工艺路线 = **不能转工单**(2026-10-05 用户口径:没有填写工艺路线应该提示并且不能转工单)
+                // 选了但**未审核**也**不能转**(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」)
+                //   —— 未审核的拒绝在 createFromOrderLine.requireRouteAudited 里(服务端唯一凭据)，
+                //      这里只做"未选"的前置提示，避免整批走完才报错。
                 String route = str(r.get("工艺路线"));
                 if (route == null || route.isBlank()) {
                     failed.add(soNo + "#" + lineId + ":未选择工艺路线,不能转工单");

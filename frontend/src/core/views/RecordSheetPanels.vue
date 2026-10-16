@@ -145,13 +145,21 @@
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
-            <el-input v-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
+          <!-- 大标题格。cfg.titleKey(2026-10-16 用户口径):这一格不用印死的表单名,而做成**字段输入框**
+               —— 产品信息表左上角原印「产品信息表」,改为「产品名称」填写框(留空 + 灰字提示词),
+               因为产品名称是下游 4 张文件靠「产品编号」参照带回的源头(见 PanelConfigService.buildRefMap)。
+               只读态显示该字段的值;值为空时回落到印死的表单名,老单据观感不变。
+               高亮:cfg.titleKey 也进 pageOfKeyIn(第 0 页),校验缺必填时这格会闪 rs-focus。 -->
+          <td class="rs-td rs-topic-cell" :class="{ 'rs-focus': cfg.titleKey && isFocus(cfg.titleKey) }"
+              :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
+            <el-input v-if="editable && cfg.titleKey" v-model="head[cfg.titleKey]" size="small" class="rs-topic-input"
+                      :placeholder="tt(cfg.titleKeyPh || cfg.titleKey)" @input="emit('dirty')" />
+            <el-input v-else-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
             <!-- 大标题:静态页标题(pages[i].staticTitle / cfg.staticTitle)**走 tt()** ——
                  规格书/成型工艺清单/组装/测试申请单这些静态标题在 locales 里都有译名,
                  而派生标题(titleFromKey 拼出来的如"开发性-测试申请单")是**数据+后缀**,
                  不能整串丢进 tt()(会机翻出一堆无意义词条),故只翻静态标题这一支。 -->
-            <span v-else class="rs-topic">{{ effStaticTitle ? tt(effStaticTitle) : (derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder)) }}</span>
+            <span v-else class="rs-topic">{{ (cfg.titleKey ? head[cfg.titleKey] : '') || (effStaticTitle ? tt(effStaticTitle) : (derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder))) }}</span>
           </td>
           <template v-if="infoSpan">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
@@ -247,13 +255,19 @@
                   <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
                         @click.stop="openStdLib(stdLibOf(pair.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
-                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
+                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名。
+                     ⚠ **不能写成 `editable && pair.type === 'file'`**(2026-10-16 用户报障
+                     「产品信息表上传的附件保存之后不能查看」):普通用户「保存」后单据转「审批中」
+                     ⇒ editable=false ⇒ 整格不渲染,附件名退化成纯文本,连上传者本人都点不开。
+                     现在无条件渲染:可编辑=能上传/删除;只读=只能点开查看/下载(后端 requirePanelView 把关)。 -->
                 <FileAttachCell
-                  v-else-if="editable && pair.type === 'file'"
+                  v-else-if="pair.type === 'file'"
                   :panel-code="panelCode"
                   :doc-no="head['单据编号'] || ''"
                   :field-key="pair.key"
                   :model-value="head[pair.key] || ''"
+                  :can-edit="editable"
+                  hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
@@ -264,8 +278,14 @@
           </tr>
 
           <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
-               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols -->
-          <tr v-else-if="row.grid">
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化), ro(只读展示)} 逐格铺 sec.cols
+               row.h = 该行**最小行高**(2026-10-16:产品变更申请单表头空白时被压得很扁,
+               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开)
+               cell.ro = 该格只读展示(2026-10-16 用户口径「表头…这个字段怎么能修改了」:
+               系统自己管的字段(单据编号/申请人之类)在纸面上不该给输入框 ——
+               yj_field.editable=0 不敢全库照用(产品信息表的产品编号/名称就靠纸面录入),
+               故由**配置逐格**声明,零波及面) -->
+          <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
@@ -303,8 +323,8 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
-                <template v-else-if="editable && c.key">
-                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                <template v-else-if="editable && c.key && !c.ro">
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
@@ -528,11 +548,17 @@
                 <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(effColLabel(c.key, c.label)) }}</th>
               </tr>
             </template>
-            <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑) -->
+            <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑)
+                 ⚠ 序号/组名两格**只能在组首行渲染**(2026-10-16 用户报障「检验项目下面和检验要求下面有空白格」):
+                 它们带 rowspan 占住整组,后续行若照样输出空 &lt;td&gt;,浏览器会把本行的 子项目/要求/方法/依据
+                 依次**右移两列**——于是子项目列、检验要求列看着空白,而「除余氯寿命」跑到检验方法列、
+                 「寿命920L，全程加标」跑到检验依据列。行首两格必须由 rowspan 覆盖,不能重复输出。 -->
             <template v-if="dt.design?.groupCol">
               <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design">
-                <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.groupFirst ? r.group.count : undefined">{{ r.groupFirst ? r.seq : '' }}</td>
-                <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.groupFirst ? r.group.count : undefined" :colspan="r.standalone ? 2 : 1">{{ r.groupFirst ? tt(r.group.label) : '' }}</td>
+                <template v-if="r.groupFirst">
+                  <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.group.count">{{ r.seq }}</td>
+                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">{{ tt(r.group.label) }}</td>
+                </template>
                 <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">{{ tt(r.sub || '') }}</td>
                 <td class="rs-td" :style="designTdStyle(dt, 'req')">
                   <el-input v-if="editable" v-model="r.row['检验要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
@@ -549,7 +575,7 @@
                 <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(r.row)">×</span></td>
               </tr>
             </template>
-            <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
+            <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }" :style="dt.rowH ? { height: dt.rowH + 'px' } : null">
               <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :class="{ 'rsp-locked': isLockedCell(dt, row, c) }" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 <el-input v-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
@@ -569,6 +595,39 @@
                 >
                   <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
                 </el-select>
+                <!-- 物料编号列(c.type='inv-code'):商品档案**远程模糊筛选**(2026-10-16 用户口径
+                     「输入 Y 或者 003 时模糊搜索到含这些数字字母的」,例 YJ-LL-003)。
+                     口径与配方计算弹窗同一套(见 core/panel/invCarry.js invSearchRequest):
+                       · 打字才联网(debounce 300ms),**空关键字一个请求都不发** —— 服务端 keyword 是
+                         「本面板所有字段 LIKE %kw%」的 OR,空关键字等于不过滤:档案分支不吃 pageSize,
+                         会把整份 bs_inv(生产上几千行×113 列)拉回来;
+                       · 候选 = invSearchOptions(编码+名称子串、大小写无关、去重、封顶 50 项),
+                         下拉里显示「编码 — 名称」,选中写进单据的是**编码**;
+                       · 用 el-autocomplete 而不是 el-select:输入框本身就是值 ⇒ **档案里没有的新编码
+                         照样能手打**(el-select + allow-create 实测会吞:EP 只在"创建项"被选中时才落值,
+                         手打后直接点别处 = 输入丢失;而"手打新编码"是必须保留的例外通道);
+                       · trigger-on-focus=false:点一下空格子不发请求(与"空关键字不发"同一条口径)。
+                     选中/手打后:onInvCodePick / onInvCodeChange → onDetailTextCommit 带出 物料名称+物料种类。 -->
+                <el-autocomplete
+                  v-else-if="cellEditable(dt, row, c) && c.type === 'inv-code'"
+                  v-model="row[c.key]"
+                  size="small"
+                  class="rs-c-in rs-inv-sel"
+                  :style="designInputStyle(dt)"
+                  value-key="value"
+                  :debounce="300"
+                  :trigger-on-focus="false"
+                  :fetch-suggestions="(q, cb) => fetchInvCodes(row, q, cb)"
+                  popper-class="rs-inv-popper"
+                  :title="invOptHint(row)"
+                  @select="(item) => onInvCodePick(row, c.key, item)"
+                  @change="onInvCodeChange(row, c.key)"
+                >
+                  <!-- 下拉里显示「编码 — 名称」(写进单据的仍是编码本身) -->
+                  <template #default="{ item }">
+                    <span class="rs-inv-opt">{{ item.label }}</span>
+                  </template>
+                </el-autocomplete>
                 <!-- 日期/时间列:控件种类由 **yj_field.data_type** 决定(不在这里写死列名),
                      口径见 core/panel/sheetDateCells.js —— 2026-10-07 起实验室 11 张记录表的
                      使用日期/测试日期/日期/期望完成日期/预计完成日期 都是「日期」,起止时间是「时间区间」。
@@ -735,13 +794,19 @@
                   <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
                         @click.stop="openStdLib(stdLibOf(pair.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
-                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
+                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名。
+                     ⚠ **不能写成 `editable && pair.type === 'file'`**(2026-10-16 用户报障
+                     「产品信息表上传的附件保存之后不能查看」):普通用户「保存」后单据转「审批中」
+                     ⇒ editable=false ⇒ 整格不渲染,附件名退化成纯文本,连上传者本人都点不开。
+                     现在无条件渲染:可编辑=能上传/删除;只读=只能点开查看/下载(后端 requirePanelView 把关)。 -->
                 <FileAttachCell
-                  v-else-if="editable && pair.type === 'file'"
+                  v-else-if="pair.type === 'file'"
                   :panel-code="panelCode"
                   :doc-no="head['单据编号'] || ''"
                   :field-key="pair.key"
                   :model-value="head[pair.key] || ''"
+                  :can-edit="editable"
+                  hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
@@ -752,8 +817,14 @@
           </tr>
 
           <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
-               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols -->
-          <tr v-else-if="row.grid">
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化), ro(只读展示)} 逐格铺 sec.cols
+               row.h = 该行**最小行高**(2026-10-16:产品变更申请单表头空白时被压得很扁,
+               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开)
+               cell.ro = 该格只读展示(2026-10-16 用户口径「表头…这个字段怎么能修改了」:
+               系统自己管的字段(单据编号/申请人之类)在纸面上不该给输入框 ——
+               yj_field.editable=0 不敢全库照用(产品信息表的产品编号/名称就靠纸面录入),
+               故由**配置逐格**声明,零波及面) -->
+          <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
@@ -791,8 +862,8 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
-                <template v-else-if="editable && c.key">
-                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                <template v-else-if="editable && c.key && !c.ro">
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
@@ -1238,7 +1309,7 @@ import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
@@ -1252,7 +1323,9 @@ import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/pane
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
-import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, pickInvCarry } from '@/core/panel/invCarry'
+import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
+// 商品档案候选生成(编码+名称子串匹配、去重、封顶 OPTION_CAP 项)—— 与配方计算弹窗同一套纯函数
+import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1310,12 +1383,14 @@ function setCellValue(row, c, picked) {
   emit('dirty')
 }
 
-// ---------- 明细「物料编号 ↔ 物料名称」按商品档案带出(2026-10-14) ----------
+// ---------- 明细「物料编号 ↔ 物料名称(+物料种类)」按商品档案带出(2026-10-14,2026-10-16 补种类) ----------
 // 用户报障「输入物料编号无法自动录入对应物料名称、输入物料名称无法自动录入对应物料编号」。
-// 这两列在 yj_field 里是**普通文本、没有参照**(ref_panel 为空),所以照参照那条路走不通,
+// 2026-10-16 用户口径:「手动填写物料编码应该带出对应的物料类别以及物料名称,把填写框的物料种类的
+// 下拉框改为普通文本框」—— 类别(物料种类)同样由这里带出,下拉已撤(见 recordSheetConfigs 配方表列)。
+// 这三列在 yj_field 里是**普通文本、没有参照**(ref_panel 为空),所以照参照那条路走不通,
 // 这里在**失焦/回车**(@change,不是 @input —— 否则每敲一个字发一次请求)按值查商品档案 INV。
 // 口径全在 core/panel/invCarry.js:唯一命中才带出,查不到/多条 ⇒ 静默不动(用户手输的编码可能还没建档)。
-// 生效范围由该明细表是否**同时**有这两列决定(库里只有成型工艺清单「配方表」两列齐全)。
+// 生效范围由该明细表是否**同时**有 物料编号/物料名称 两列决定(库里只有成型工艺清单「配方表」两列齐全)。
 const invCarryKeys = computed(() => {
   for (const dt of cfg.value?.dataTables || []) {
     const pair = invCarryPair(dt.cols)
@@ -1339,13 +1414,75 @@ async function onDetailTextCommit(row, key) {
       pageSize: 50,
     })
     const d = res?.data
-    const value = pickInvCarry(invRowsOf(d), key, typed)
-    if (!value) return // 查不到 / 多条命中 / 对侧为空 ⇒ 一个格都不动,也不提示
-    row[other] = value
+    const rows = invRowsOf(d)
+    const value = pickInvCarry(rows, key, typed)
+    // 物料种类:2026-10-16 增补 —— 用户口径「手动填写物料编码应该带出对应的物料类别以及物料名称」。
+    // 原先只写对侧那一格,于是页 2 那格里 物料名称 有值、物料种类 一直空着(用户截图即此)。
+    // 规则与对侧格不同:这格**人手填过就不动**(料位分组是工艺员的判断,见 pickInvKind 注释)。
+    const kind = pickInvKind(rows, key, typed, row['物料种类'])
+    if (!value && !kind) return // 查不到 / 多条命中 / 对侧为空 / 类别认不出 ⇒ 一个格都不动,也不提示
+    if (value) row[other] = value
+    if (kind) row['物料种类'] = kind
     emit('dirty')
   } catch (e) {
     /* 无权限/网络异常都按「档案里没有」处理:保持用户输入,不弹错(与参照链路同款兜底) */
   }
+}
+
+/* ── 物料编号:商品档案远程模糊筛选(2026-10-16 用户口径)────────────────────────
+   原话:「物料编号可以在填写的时候模糊筛选下拉显示提供选择,比如 YJ-LL-003,
+          可以在输入 Y 或者 003 时模糊搜索到含这些数字字母的」。
+   判据全在纯函数里(有单测):请求体 = invCarry.invSearchRequest(空关键字返回 null ⇒ 连请求都不发),
+   候选 = recipeRows.invSearchOptions(编码+名称子串、大小写无关、去重、封顶 OPTION_CAP 项)。这里只管接线。
+
+   控件选 el-autocomplete 而不是 el-select(2026-10-16 活体实测踩过):el-select + allow-create 在
+   "打一个档案里没有的新编码、然后直接点别处"时会**把输入丢掉**(EP 只在"创建项"被选中时才落值);
+   而"手打新编码"是这条链上必须保留的例外通道。autocomplete 的输入框本身**就是值**,候选只是建议。
+
+   命中总数按**行对象**存(Map<行对象, {matched}>,靠 invOptsTick 触发重渲染 —— 行对象是稳定引用,
+   行号键会在加行/删行后错位;配方计算弹窗是行号键,所以它加删行要 resetRowOptions)。 */
+const INV_OPTS = new Map()          // 行对象 → { matched } 命中总数(>OPTION_CAP 时挂在 title 上提示继续输入)
+const INV_PICKED = new Map()        // 行对象 → 刚从下拉里选中的值(随后的 blur change 不重复带出)
+const invOptsTick = ref(0)
+function setInvOpts(row, val) { INV_OPTS.set(row, val); invOptsTick.value++ }
+/** 候选被上限截断时的提示(挂在控件 title 上:继续输入就能缩小) */
+function invOptHint(row) {
+  void invOptsTick.value
+  const r = INV_OPTS.get(row)
+  return r && r.matched > OPTION_CAP
+    ? tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(r.matched))
+    : ''
+}
+/**
+ * 打字即筛:交给 el-autocomplete 的回调(它自己 debounce 300ms、自己管下拉开合与"加载中")。
+ * 空关键字直接回空数组(一个请求都不发);读不到档案也回空数组 —— 只剩手打,不阻断录入。
+ */
+async function fetchInvCodes(row, q, cb) {
+  const req = invSearchRequest(q)
+  if (!req) { cb([]); return }
+  try {
+    const res = await request.post('/px/queryFormDataList', req)
+    const hits = invSearchOptions(invRowsOf(res?.data), '物料编号', q)
+    setInvOpts(row, { matched: hits.matched })
+    cb(hits.options)          // [{ value: 编码, label: '编码 — 名称' }]
+  } catch (e) {
+    cb([])
+  }
+}
+/** 从下拉里选中:记下这次的值(紧随其后的 blur change 不必再查一次),并按档案带出对侧值 */
+function onInvCodePick(row, key, item) {
+  const picked = item?.value ?? item
+  if (picked !== undefined && picked !== null) row[key] = String(picked)
+  INV_PICKED.set(row, String(picked ?? '').trim())
+  emit('dirty')
+  onDetailTextCommit(row, key)
+}
+/** 手打/失焦:置脏;刚在下拉里选过的那次已经带出过,不重复查 */
+function onInvCodeChange(row, key) {
+  emit('dirty')
+  const v = String(row[key] ?? '').trim()
+  if (INV_PICKED.get(row) === v) { INV_PICKED.delete(row); return }
+  onDetailTextCommit(row, key)
 }
 
 /** 副标题下拉的选项:优先取字段元数据的 options(标准库字段即标准库条目),退回变体选项 */
@@ -2528,9 +2665,9 @@ async function autoFillFromSpec(code, afs) {
   // 明细落点的行 = 规格书本表区的行(payload.items)。原按 detailSource 取第二段的写法已随
   // 2026-10-15 口径变更撤掉(配方行改在配方计算弹窗里录);纯函数+单测在 core/insp/specCarry.js。
   const srcRows = detailMap.length ? specCarryRows(payload) : []
-  const filled = detailMap.length ? srcRows.map((r) => {
-    const row = {}
-    for (const m of detailMap) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
+  // ⚠ 行的构造走纯函数 detailRowsOf(有单测):它的 indexWhenEmpty 负责「规格书那格是空的就用行号兜底」
+  //   —— 规格书的 `序号` 不落库,直接搬会得到一整列空白(2026-10-16 用户报障,见该函数注释)。
+  const filled = detailMap.length ? detailRowsOf(afs, srcRows).map((row) => {
     if (dt?.filterKey) row[dt.filterKey] = dt.filterVal
     return row
   }) : []

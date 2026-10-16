@@ -175,17 +175,14 @@ public class WoReportService {
         //   (实测 GD-2026-10-0002:行2/3/4 = GY-2026-10-0003,行1/5/6/7/8 = GY-CB-STD)
         //   ⇒ 给行2 报工时拿的是行1 的路线,工序校验/不跳序判断全落在**别的行**的工序集上
         //   (正确工序被拒 / 错误工序被放行)。现改为取**本行**(工单行id → 批次兜底)的路线。
-        Long repRowId = resolveRowIdForReport(wo, rptBatch);
+        Long repRowId = wantRowId;
+        if (repRowId == null) {
+            throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能审核");
+        }
         List<String> rtRows = repRowId != null
                 ? jdbc.queryForList("SELECT ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?"
                         + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([工艺路线],N'')<>N''", String.class, repRowId)
                 : List.of();
-        if (rtRows.isEmpty()) {
-            // 行定位不到(历史单/没带批次):退回整单口径,与旧行为一致
-            rtRows = jdbc.queryForList(
-                    "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                            + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
-        }
         String route = rtRows.isEmpty() ? "" : rtRows.get(0);
         if (!route.isBlank()) {
             List<String> ops = jdbc.queryForList(
@@ -256,9 +253,9 @@ public class WoReportService {
             if (closed != null && closed > 0) throw new IllegalStateException("工单 " + wo + " 已结案,不能报工");
             throw new IllegalStateException("工单 " + wo + " 未排产,不能报工(先在快速排产排入产线)");
         }
-        // 工序维度封顶(2026-10-07 对齐"两把尺子"):口径 = **该工单行该道工序的计划量**
+        // 工序维度封顶:口径 = **该工单行该道工序的计划量**
         //   = 本行排产数量 × 该道自己的换算率(与快速排产弹窗、预排台账、转序判据同一口径)。
-        //   仅作"明显误输"软拦(> 计划量 10 倍);**允许超产**(现场真实产出)。
+        //   现场允许超产 1%;审核时校验「已审核累计 + 本次」不得超过计划量×1.01。
         //   老口径(首道 Σ×率、其后逐道累乘、按整单)只在拿不到行/路线时兜底(历史数据兼容)。
         double rowPl = num(t.get("pl_sl"));
         Object rowIdObj = t.get("plang_id");
@@ -282,15 +279,19 @@ public class WoReportService {
         // 已报量也按**该行**(锚 scjl.gd_id → plang_pc.plang_id;老数据按批次兜底)统计,与转序一致
         Double opSum = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
-                        + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + " WHERE s.gldh=? AND s.gxdm=? AND s.id<>? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
                         + "   AND (? IS NULL"
                         + "        OR EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
-                        + "        OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'') = ?))",
-                Double.class, wo, op, plangRowId, plangRowId, t.get("pc_batch"));
-        if (qty > cap * 10 + 0.0001) {
-            throw new IllegalStateException("报工数量 " + qty + " 明显异常(本行" + (rptBatch.isBlank() ? "" : "批次" + rptBatch + " ")
-                    + "工序[" + op + "]计划量 " + cap + ",已报 " + (opSum == null ? 0 : opSum)
-                    + ");如属超产请核对后分批报工");
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ?))",
+                Double.class, wo, op, rowId, plangRowId, plangRowId, t.get("pc_batch"));
+        double reported = opSum == null ? 0 : opSum;
+        double allowed = cap * 1.01d;
+        if (cap <= 0) {
+            throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能审核报工");
+        }
+        if (reported + qty > allowed + 0.0001d) {
+            throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]计划量 " + cap
+                    + ",允许至 " + allowed + ",已报 " + reported + ",本次 " + qty + ")");
         }
         // jc_no 产成品流水(产线--yyMMdd-8位,按 线+日 递增)
         String scx = String.valueOf(t.get("pc_scx"));
@@ -302,19 +303,31 @@ public class WoReportService {
         // 就地完成化:补镜像 + 锚定 + 完工状态(草稿行本来就在 scjl,不另插行)
         // 「工单行号」(2026-10-15):权威行键 gd_id 在此写定,行号随之落库 —— 界面直接显示"哪一行",
         //   同工单号多行/多批次时一眼可辨(此前只有批次号,同天多笔转单批次号相同则分不出)。
+        //
+        // 🔴 完工时间口径(2026-10-16 用户口径「完工明细里的完工时间要取**当时完成报工那一刻**的时间」):
+        //   wgsj 必须写**应用所在机器的本地墙钟** {@code LocalDateTime.now()},**不能再用 GETDATE()**。
+        //   根因:SQL Server 跑在 Docker 容器里时容器 TZ=UTC(实测 SYSDATETIMEOFFSET=+00:00),
+        //   GETDATE() 比北京时间慢 8 小时 ⇒ 完工明细上显示 09:5x,而现场是 17:5x。
+        //   实证(HSDZ_MES,报工单 BG-2026-10-0047):同一行 scjl.asp_time1=17:56:23(应用写入,本地)
+        //   而 scjl.wgsj=09:56:39(库写入,UTC),两者本应只差 16 秒。
+        //   列类型 scjl.wgsj=datetime,与 asp_time1/asp_time2 同类型,而 asp_time1 一向由
+        //   ButtonService 用 {@code LocalDateTime.now()} 绑定写入(库里就是本地墙钟)⇒ 同款写法在这里同样成立,
+        //   且本机与服务器(原生 SQL Server,库时钟=本地)两种环境的取值都正确。
+        //   asp_time2 同批同源(留痕时间与完工时刻必须是同一把钟)。
+        java.time.LocalDateTime doneAt = java.time.LocalDateTime.now();
         jdbc.update("UPDATE dbo.scjl SET"
                         + " comm=?, gd_id=?, tm=?, scx=?, scxmc=?, jbbh=?,"
                         + " wzdm=?, mc=?, gg=?, jldw=?, khdm=?, lot_no=?, pl_sl=?,"
                         + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?, [工单行号]=?,"
-                        + " wgzt=N'Y', wgsj=GETDATE(), jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
-                        + " asp_user2=?, asp_time2=GETDATE()"
+                        + " wgzt=N'Y', wgsj=?, jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
+                        + " asp_user2=?, asp_time2=?"
                         + " WHERE id=?",
                 t.get("comm"), t.get("pc_id"), wo, scx, scx,
                 t.get("pc_lb"),
                 t.get("dm"), t.get("mc"), t.get("gg"), t.get("jldw"), t.get("khdm"), t.get("lot_no"), t.get("pl_sl"),
                 t.get("od_no"), t.get("od_xc"), t.get("zl"), t.get("llxz"), t.get("djlx"), t.get("pc_batch"),
                 t.get("pl_xc"),
-                jcNo, user, user, rowId);
+                doneAt, jcNo, user, user, doneAt, rowId);
     }
 
     /**

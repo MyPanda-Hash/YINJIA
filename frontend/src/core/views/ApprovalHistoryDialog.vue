@@ -28,6 +28,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import request from '../request'
+import { tt } from '@/i18n'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -43,14 +44,23 @@ function close() {
   emit('update:modelValue', false)
 }
 
+// 动作/结果 → 显示文案。AUDIT = **直接审核**(2026-10-17 起后端 audit() 也写 yj_form_approval;
+// 此前只有 提交/通过/驳回/弃审 四种,直审的单据在「审批情况」里看不到审核记录)。
+// 走 tt():词条都在 locales 里(审核/弃审/提交审批/审批通过/审批驳回…),切英文即英文。
 function actionLabel(r) {
-  return { SUBMIT: '提交审批', APPROVE: '审批通过', REJECT: '审批驳回', UNAUDIT: '弃审' }[r.action] || r.action || '-'
+  return {
+    SUBMIT: tt('提交审批'), APPROVE: tt('审批通过'), REJECT: tt('审批驳回'),
+    AUDIT: tt('审核'), UNAUDIT: tt('弃审'),
+  }[r.action] || r.action || '-'
 }
 function resultLabel(r) {
-  return { PENDING: '审批中', APPROVED: '已通过', REJECTED: '已驳回' }[r.result] || r.result || '-'
+  // 弃审行的 result 后端写的是 PENDING(「这张单回到未通过」的旧口径),直接映射会显示「审批中」,
+  // 与动作「弃审」自相矛盾 —— 这里按动作纠偏(2026-10-17,直审留痕同批)。
+  if (r.action === 'UNAUDIT') return tt('已弃审')
+  return { PENDING: tt('审批中'), APPROVED: tt('已通过'), REJECTED: tt('已驳回') }[r.result] || r.result || '-'
 }
 function tagType(r) {
-  return { SUBMIT: 'info', APPROVE: 'success', REJECT: 'danger', UNAUDIT: 'warning' }[r.action] || 'info'
+  return { SUBMIT: 'info', APPROVE: 'success', REJECT: 'danger', AUDIT: 'success', UNAUDIT: 'warning' }[r.action] || 'info'
 }
 
 watch(

@@ -1,0 +1,41 @@
+
+<pageFooter>
+    <band height="52">
+      <line>
+        <reportElement x="0" y="0" width="539" height="1"/>
+        <graphicElement><pen lineWidth="0.5" lineColor="#8A8A8A"/></graphicElement>
+      </line>
+
+      <textField evaluationTime="Now">
+        <reportElement style="pager" x="0" y="6" width="120" height="12"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField evaluationTime="Report">
+        <reportElement style="pager" x="120" y="6" width="120" height="12"/>
+        <textFieldExpression><![CDATA[" / 共 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="pagerR" x="299" y="6" width="240" height="12"/>
+        <textFieldExpression><![CDATA["打印时间：" + ($P{打印时间} == null ? "" : $P{打印时间})]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="sign" x="0" y="24" width="180" height="16"/>
+        <textFieldExpression><![CDATA["检验员：________________"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="sign" x="180" y="24" width="180" height="16"/>
+        <textFieldExpression><![CDATA["审核：________________"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="sign" x="360" y="24" width="179" height="16"/>
+        <textFieldExpression><![CDATA["批准：________________"]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="footerNote" x="0" y="42" width="539" height="10"/>
+        <textFieldExpression><![CDATA["表单编号：YJ-QR-05/A1"]]></textFieldExpression>
+      </textField>
+    </band>
+  </pageFooter>
+

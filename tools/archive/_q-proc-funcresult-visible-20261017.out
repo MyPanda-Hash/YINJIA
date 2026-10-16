@@ -1,0 +1,8 @@
+
+=== HSDZ_MES ===
+{"panel_code":"QC_ASM_INSP","col_name":"产线常规功能性结果","label":"产线常规功能性结果","data_type":"文本","place":"detail","seq":140,"width":160,"editable":true,"required":false,"hidden":false,"visible":true,"id":17238}
+{"panel_code":"QC_PROC_INSP","col_name":"产线常规功能性结果","label":"产线常规功能性结果","data_type":"文本","place":"detail","seq":98,"width":140,"editable":true,"required":false,"hidden":false,"visible":true,"id":17282}
+
+=== HSDZ_MES_TEST ===
+{"panel_code":"QC_ASM_INSP","col_name":"产线常规功能性结果","label":"产线常规功能性结果","data_type":"文本","place":"detail","seq":200,"width":160,"editable":true,"required":false,"hidden":false,"visible":true,"id":9495}
+{"panel_code":"QC_PROC_INSP","col_name":"产线常规功能性结果","label":"产线常规功能性结果","data_type":"文本","place":"detail","seq":98,"width":140,"editable":true,"required":false,"hidden":false,"visible":true,"id":9539}

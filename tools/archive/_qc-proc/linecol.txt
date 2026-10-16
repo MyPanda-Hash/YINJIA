@@ -1,0 +1,51 @@
+=== QC_PROC_INSP 工单行号 的 yj_field 登记(不限 place) ===
+(未登记!)
+
+=== QC_PROC_INSP 全部 yj_field(label 列表) ===
+detail | 10 | 表区
+detail | 20 | 行号
+detail | 30 | 检验项目
+detail | 40 | 检验要求
+detail | 50 | 检验方法
+detail | 52 | 检查频率
+detail | 55 | 检验仪器
+detail | 60 | 抽检量
+detail | 70 | 实测数值
+detail | 75 | 测量值1
+detail | 76 | 测量值2
+detail | 77 | 测量值3
+detail | 78 | 测量值4
+detail | 79 | 测量值5
+detail | 80 | 单项判定
+detail | 90 | 不合格应对措施
+detail | 95 | 不良数量
+detail | 100 | 结果判断
+detail | 125 | 备注2
+header | 120 | 规格型号
+header | 130 | 生产线
+header | 140 | 生产车间
+header | 150 | 报工数量
+header | 160 | 抽检总量
+header | 170 | 检验数量
+header | 190 | 检验日期
+header | 210 | 检验方案
+header | 220 | 文件编码
+header | 230 | 执行标准
+header | 270 | 审核人
+header | 280 | 审核时间
+header,detail | 240 | 处理方式
+header,detail | 250 | 备注
+query,header | 10 | 单据编号
+query,header | 20 | 单据日期
+query,header | 30 | 检验时间
+query,header | 40 | 检验类别
+query,header | 50 | 工单号
+query,header | 60 | 报工单号
+query,header | 70 | 工序
+query,header | 80 | 批次号
+query,header | 90 | 客户名称
+query,header | 100 | 产品编码
+query,header | 110 | 产品名称
+query,header | 180 | 检验员
+query,header | 200 | 总结论
+query,header | 260 | 单据状态

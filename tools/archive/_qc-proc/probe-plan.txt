@@ -1,0 +1,97 @@
+=== ① rd_insp_plan_head 行数 + 是否有 YJ-RD001 ===
+  头表行数
+  0
+  (1 行)
+  ERR: Invalid column name '表单管理人'.
+
+=== ② rd_insp_plan_detail 行数 ===
+  行表行数
+  0
+  (1 行)
+
+=== ③ rd_insp_plan_detail 物理列 ===
+  列名 | 类型
+  id | int
+  单据编号 | nvarchar
+  控制项目 | nvarchar
+  质量控制内容 | nvarchar
+  检测仪器 | nvarchar
+  控制标准及要求 | nvarchar
+  检验 | nvarchar
+  不合格应对措施 | nvarchar
+  检测频率 | nvarchar
+  取样方式 | nvarchar
+  检验内容 | nvarchar
+  控制方法 | nvarchar
+  asp_user1 | nvarchar
+  asp_time1 | datetime2
+  asp_user2 | nvarchar
+  asp_time2 | datetime2
+  asp_cancel | char
+  检验类别 | nvarchar
+  序号 | nvarchar
+  备注 | nvarchar
+  备用1 | nvarchar
+  备用2 | nvarchar
+  备用3 | nvarchar
+  备用4 | nvarchar
+  备用5 | nvarchar
+  备用6 | nvarchar
+  备用7 | nvarchar
+  备用8 | nvarchar
+  备用9 | nvarchar
+  备用10 | nvarchar
+  备用11 | nvarchar
+  备用12 | nvarchar
+  备用13 | nvarchar
+  备用14 | nvarchar
+  备用15 | nvarchar
+  备用16 | nvarchar
+  备用17 | nvarchar
+  备用18 | nvarchar
+  备用19 | nvarchar
+  备用20 | nvarchar
+  (40 行)
+
+=== ④ RD_INSP_PLAN 明细字段的「下拉框」字典 SQL(检验类别/检测频率) ===
+  label | data_type | dict_sql
+  序号 | 文本 | 
+  检验类别 | 下拉框 | SELECT v FROM (VALUES (N'必测项'),(N'型式检验')) AS t(v)
+  控制项目 | 文本 | 
+  质量控制内容 | 文本 | 
+  检测仪器 | 文本 | 
+  控制标准及要求 | 文本 | 
+  检验 | 文本 | 
+  不合格应对措施 | 文本 | 
+  检测频率 | 下拉框 | SELECT v FROM (VALUES (N'1PCS/一个生产批次'),(N'生产量*1%'),(N'型式检验')) AS t(v)
+  取样方式 | 文本 | 
+  检验内容 | 文本 | 
+  控制方法 | 文本 | 
+  备注 | 文本 | 
+  (13 行)
+
+=== ⑤ 系统里是否有『出货检验』字样的面板 ===
+  panel_code | panel_name | mode | head_table | line_table
+  RD_INSP_PLAN | 出货检验计划表 | doc | rd_insp_plan_head | rd_insp_plan_detail
+  (1 行)
+
+=== ⑥ 三张工序检验单的「工序」取值(与制程检验表的关系) ===
+  工序 | n
+   | 1
+  成型 | 19
+  切炭 | 7
+   | 1
+  组装 | 3
+  (5 行)
+
+=== ⑦ bs_inv 里 C-84-02 / C-84-01 是否存在(截图里的产品编码) ===
+  存货编码 | 存货名称 | 规格型号 | 所属类别
+  C-84-01 | PP复合A级炭棒/滤芯 | 63*42*498.3 | 成品
+  C-84-02 | S阻垢炭棒/滤芯 | 64*35*498.3 | 成品
+  (2 行)
+
+=== ⑧ 产品编号 参照指向(RD_INSP_PLAN.产品编号) ===
+  label | ref_panel | ref_field | display_field
+  产品编号 |  |  | 
+  产品编号 | RD_PROD_INFO | 产品编号 | 产品名称
+  (2 行)

@@ -39,11 +39,22 @@ public class PanelPermissionService {
 
     /** 按钮名 → 所需权限(词内任一命中即放行;管理员恒过)。语义对齐权限配置界面的词表注释。 */
     private static final Map<String, String[]> BUTTON_PERMS;
-    /** 权限词 → 配置界面标签(错误提示用) */
-    private static final Map<String, String> PERM_LABEL = Map.of(
-            "view", "可见", "query", "查询单据", "add", "新增保存", "modify", "申请修改",
-            "modlog", "修改记录", "del", "删除申请", "export", "导出打印", "audit", "审批",
-            "field", "自定义字段", "warn", "预警配置");
+    /**
+     * 权限词 → 配置界面标签(错误提示用)。
+     * 后 11 个是**页面级虚拟面板**的专属动作词(2026-10-16,见 {@link PagePanelRegistry}),
+     * 与通用 12 项同表 —— 词 → 中文标签一一对应,前端矩阵列头也用同一批中文。
+     * ⚠ 2026-10-17 合并 origin/main:main 侧的 `warn`(库存预警数量配置,2026-10-15)并进同一张表;
+     *   超过 `Map.of` 的 10 对上限,故一律用 `Map.ofEntries`。
+     */
+    private static final Map<String, String> PERM_LABEL = Map.ofEntries(
+            Map.entry("view", "可见"), Map.entry("query", "查询单据"), Map.entry("add", "新增保存"),
+            Map.entry("modify", "申请修改"), Map.entry("modlog", "修改记录"), Map.entry("del", "删除申请"),
+            Map.entry("export", "导出打印"), Map.entry("audit", "审批"), Map.entry("field", "自定义字段"),
+            Map.entry("warn", "预警配置"),
+            Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
+            Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),
+            Map.entry("unclose", "取消结案"), Map.entry("print", "打印"), Map.entry("close", "结案"),
+            Map.entry("split", "切单"), Map.entry("picking", "转领料单"));
 
     static {
         Map<String, String[]> m = new HashMap<>();
@@ -124,24 +135,82 @@ public class PanelPermissionService {
                 "QC_JJF", "QC_SCP", "QC_LYB", "QC_SCY"}) {
             m.put(p + "|提交审批", SUBMIT_WORDS);
         }
+        // ── 页面级虚拟面板(2026-10-16):动作词按**页面特性**定义,编码/动作集见 PagePanelRegistry ──
+        // 键 = 「页面面板码|按钮名」,按钮名取前端实际使用的文案(与页面上的按钮文字一致,便于对照)。
+        m.put(PagePanelRegistry.ORDER_CONVERT + "|保存交期", new String[]{"date"});
+        m.put(PagePanelRegistry.ORDER_CONVERT + "|转工单", new String[]{"convert"});
+        m.put(PagePanelRegistry.SCHEDULE_BOARD + "|排产", new String[]{"assign"});
+        m.put(PagePanelRegistry.SCHEDULE_BOARD + "|预排线", new String[]{"assign"});
+        m.put(PagePanelRegistry.SCHEDULE_BOARD + "|撤销排产", new String[]{"unassign"});
+        m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|调拨", new String[]{"transfer"});
+        m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|撤回调拨", new String[]{"revoke"});
+        m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|取消结案", new String[]{"unclose"});
+        m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|打印", new String[]{"print"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|打印", new String[]{"print"});
+        // 生产工单列表:「结案/取消结案」是同一个按钮的两种取向,同挂 close 词;
+        // 工单排产看板上的「取消结案」是**另一个**动作(只撤结案不改结案)⇒ 挂 unclose 词。
+        // 两者共用一个端点(/px/workOrderList/close),故该端点按 requireButtonAny 取「任一命中」。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|结案", new String[]{"close"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|取消结案", new String[]{"close"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|切单", new String[]{"split"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|撤回切单", new String[]{"split"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|转领料单", new String[]{"picking"});
+        // 「排产」两个入口(快速排产页 / 生产工单页弹出的内嵌快速排产)同挂 assign 词:
+        // 页面面板各出一个「排产」格子,端点按 requireButtonAny 取任一命中 —— 即"排产权"可由任一处授予。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|排产", new String[]{"assign"});
+        // 预排线(工序路线逐道选线)是「排产」的提交动作,同一 assign 词,两个入口都要登记 ——
+        // 只登记 SCHEDULE_BOARD 会让"仅授了生产工单·排产"的角色在内嵌弹窗里被 403(requireButtonAny 逐面板找词)。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|预排线", new String[]{"assign"});
         BUTTON_PERMS_OVERRIDE = Map.copyOf(m);
+    }
+
+    /** 按钮 → 所需权限词(面板级覆盖优先);null = 未映射(未映射即放行,由 ButtonService 兜底) */
+    private static String[] needOf(String panelCode, String buttonName) {
+        String[] need = BUTTON_PERMS_OVERRIDE.get(panelCode + "|" + buttonName);
+        return need != null ? need : BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
+    }
+
+    /** 拒绝提示:把所需权限词翻成配置界面上的中文标签 */
+    private static String denyMessage(String[] need, String buttonName) {
+        StringBuilder labels = new StringBuilder();
+        for (String n : need) {
+            if (labels.length() > 0) labels.append("/");
+            labels.append(PERM_LABEL.getOrDefault(n, n));
+        }
+        return "当前角色无该面板「" + labels + "」权限，无法执行「" + buttonName + "」";
     }
 
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {
         String user = currentUserName();
         if (isAdmin(user)) return;
-        String[] need = BUTTON_PERMS_OVERRIDE.get(panelCode + "|" + buttonName);
-        if (need == null) need = BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
+        String[] need = needOf(panelCode, buttonName);
         if (need == null) return;
         Set<String> perms = permsOf(user).getOrDefault(panelCode, Set.of());
         for (String n : need) if (perms.contains(n)) return;
-        StringBuilder labels = new StringBuilder();
-        for (String n : need) {
-            if (labels.length() > 0) labels.append("/");
-            labels.append(PERM_LABEL.getOrDefault(n, n));
+        throw new AccessDeniedException(denyMessage(need, buttonName));
+    }
+
+    /**
+     * 按钮权限校验(**跨面板任一命中**)—— 2026-10-16 页面级面板用:
+     * 同一个动作可以由不同页面的入口授予,例如「排产」在快速排产页与生产工单页各有一个按钮;
+     * 「打印」在工单排产看板与生产工单列表各有一个;「结案」族由看板的 unclose 与列表的 close 共同覆盖。
+     * 任一面板命中即放行;全部未映射(没有任何面板定义过这个按钮)时按"未映射 = 放行"处理。
+     */
+    public void requireButtonAny(String[] panelCodes, String buttonName) {
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        Map<String, Set<String>> perms = permsOf(user);
+        String[] lastNeed = null;
+        for (String code : panelCodes) {
+            String[] need = needOf(code, buttonName);
+            if (need == null) continue;
+            lastNeed = need;
+            Set<String> s = perms.getOrDefault(code, Set.of());
+            for (String n : need) if (s.contains(n)) return;
         }
-        throw new AccessDeniedException("当前角色无该面板「" + labels + "」权限，无法执行「" + buttonName + "」");
+        if (lastNeed == null) return;
+        throw new AccessDeniedException(denyMessage(lastNeed, buttonName));
     }
 
     /**
@@ -167,6 +236,22 @@ public class PanelPermissionService {
         if (isAdmin(user)) return;
         if (readablePanels(user).contains(panelCode)) return;
         throw new AccessDeniedException("当前角色无该面板的查看权限：" + panelCode);
+    }
+
+    /**
+     * 面板查看权限校验(**任一命中**)—— 2026-10-16 页面级面板用:
+     * 有些读接口被多个页面共用(如 /px/scheduleBoard/stats 同时服务快速排产页、
+     * 工单排产看板、生产工单页),按单一面板硬拦会把别的页面的合法读取一并挡掉。
+     * 任一面板可见即放行;管理员恒过。
+     */
+    public void requirePanelViewAny(String... panelCodes) {
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        Set<String> readable = readablePanels(user);
+        for (String code : panelCodes) {
+            if (readable.contains(code)) return;
+        }
+        throw new AccessDeniedException("当前角色无该页面的查看权限：" + String.join(" / ", panelCodes));
     }
 
     /**

@@ -77,6 +77,10 @@
       <table class="ps-table">
         <thead>
           <tr>
+            <!-- 产品开发列(2026-10-16 用户口径「给项目进度查询加上一个『开发产品』按钮」):
+                 ⚠ 放**第一列** —— 这张表比屏幕宽、要横向滚动,实测放在 状态 之后会被挡在视口外,
+                 用户报「看不到产品开发按钮」(按钮本身是好的)。no-print:打印纸面不出现 UI 按钮列。 -->
+            <th class="c-dev no-print">{{ tt('产品开发') }}</th>
             <th class="c-level">{{ tt('项目定级') }}</th>
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
@@ -87,6 +91,9 @@
             <th class="c-progress">{{ tt('立项日期') }}</th>
             <th class="c-mile">{{ tt('预计完成日期') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
+            <!-- 产品开发列(2026-10-16 用户口径「给项目进度查询加上一个『开发产品』按钮」):
+                 单独一列放**真按钮**,不再是状态列里的一个小标签 —— 之前 11px 的标签被当成状态文字,
+                 用户实测报「看不到产品开发按钮」。状态列继续显示开发情况(开发 n/m / 已全部开发完毕)。 -->
             <th class="c-tester">{{ tt('测试情况') }}</th>
             <!-- 2026-10-09 用户口径:撤下「技术目标达成 / 是否市场转化 / 未转换原因」三列(纸面 14 → 11)。
                  唯一真源 = progressColumns.js 的 PROGRESS_COLUMNS(同批已删);
@@ -97,6 +104,23 @@
         </thead>
         <tbody>
           <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
+            <td class="c-dev no-print">
+              <!-- 「开发产品」按钮(用户口径):项目实施计划**已归档**才可点;未归档置灰并说明原因。
+                   点开 = 该项目的产品开发流程弹窗(每个产品四个文件走到哪一步/哪个没开始)。 -->
+              <el-button
+                v-if="!planArchivedOf(row)"
+                size="small"
+                disabled
+                :title="tt('项目实施计划归档后才能开发产品')"
+              >{{ tt('开发产品') }}</el-button>
+              <el-button
+                v-else
+                size="small"
+                :type="devStateOf(row).allDone ? 'success' : 'primary'"
+                @click.stop="openDevDialog(row)"
+              >{{ devStateText(row) }}</el-button>
+              <div v-if="devStateOf(row).count" class="ps-dev-tip">{{ tt('点击查看开发流程') }}</div>
+            </td>
             <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
               <!-- 2026-09-22 用户口径:项目等级不再手选 —— 由项目实施计划的「项目定级」自动带入
                    (后端 syncPlanToProgress 写入明细 [项目层级]),这里只读展示 + 按等级合并归类。
@@ -120,7 +144,7 @@
               <span v-else class="ps-cell-text ps-name-block">{{ row[K['项目名称']] || '' }}</span>
             </td>
             <td class="c-sub">
-              <el-input v-if="editable" v-model="row[K['子项目/尺寸']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row[K['子项目/尺寸']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" :placeholder="tt('例：33*12*110（外径*内径*长度）')" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['子项目/尺寸']] || '' }}</span>
             </td>
             <td class="c-remark">
@@ -166,6 +190,10 @@
                 @click="openStageDialog(row)"
               >{{ progressText(row) }}</span>
               <span v-else class="ps-cell-text">—</span>
+              <!-- 2026-10-16 用户口径:「原来的小按钮删掉,现在还在」——
+                   原先这里还挂了一行产品开发情况的小标签,与「产品开发」列的按钮重复
+                   (而且 11px 小字看着就像状态文字/小按钮)⇒ 整行撤掉,开发情况只由
+                   「产品开发」列那个按钮承载(未开发/未归档时它是置灰的,同样看得见)。 -->
             </td>
             <td class="c-tester">
               <el-input v-if="editable" v-model="row[K['测试情况']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
@@ -181,7 +209,7 @@
           <tr v-if="!items.length">
             <!-- 空态文案改用已有的「暂无数据」(10 个语言包均有译名);原「点击下方按钮新增」在撤掉
                  写入口后已不成立,换成新句子则要同步补 10 个语言包,收益不抵成本。 -->
-            <td :colspan="editable ? 12 : 11" class="ps-empty">{{ tt('暂无数据') }}</td>
+            <td :colspan="editable ? 13 : 12" class="ps-empty">{{ tt('暂无数据') }}</td>
           </tr>
         </tbody>
       </table>
@@ -284,6 +312,53 @@
         <el-button @click="stageDlgVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- ═══ 开发产品弹窗(2026-10-16 用户口径)═══
+         一个立项可以开发好几个产品(产品编号各不相同);这里显示每个产品的
+         「开发流程走到哪一步、哪一步还没开始」,全部四个文件都归档了才算开发完毕。
+         反审核(弃审)过的文件会标「已反审核待重走」,不算完成 —— 需要重新走流程。 -->
+    <el-dialog v-model="devDlgVisible" :title="tt('开发产品') + (devDlgRow ? ' · ' + (devDlgRow[K['项目名称']] || '') : '')" width="880px" append-to-body>
+      <div class="psd-head">
+        <span>{{ tt('立项文档编号') }}：<b>{{ devProjectKey || '—' }}</b></span>
+        <span v-if="devSpecText">{{ tt('子项目/尺寸') }}：{{ devSpecText }}</span>
+        <span v-if="!devProjectKey" class="psd-warn">{{ tt('该行没有项目编号，先在「项目编号」格里填立项申请的文档编号，才能和产品信息表配对') }}</span>
+      </div>
+
+      <template v-if="devProducts.length">
+        <div v-for="p in devProducts" :key="p.单据编号" class="ps-dev-card">
+          <div class="ps-dev-card-head">
+            <span class="ps-dev-code">{{ p.产品编号 }}</span>
+            <span class="ps-dev-name">{{ p.产品名称 || tt('（未填产品名称）') }}</span>
+            <span class="ps-status-tag" :class="p.allDone ? 'ok' : 'warn'">
+              {{ p.allDone ? tt('已全部开发完毕') : tt('已开发') + ' ' + p.doneCount + '/' + p.nodes.length }}
+            </span>
+            <el-button link type="primary" size="small" @click="openDoc('RD_PROD_INFO', p.单据编号)">{{ tt('打开产品信息表') }}</el-button>
+          </div>
+          <div class="ps-dev-flow">
+            <div v-for="n in p.nodes" :key="n.panel" class="ps-dev-node" :class="{ done: n.done, doing: n.doing, warn: n.reaudited }">
+              <div class="ps-dev-node-label">{{ tt(n.label) }}</div>
+              <div class="ps-dev-node-state">{{ tt(n.状态) }}</div>
+              <div v-if="n.reaudited" class="ps-dev-node-tip">{{ tt('已反审核待重走') }}</div>
+              <div v-else-if="!n.done" class="ps-dev-node-tip">{{ tt('未开始') }}</div>
+              <el-button v-if="n.docNo" link type="primary" size="small" @click="openDoc(n.panel, n.docNo)">{{ tt('打开') }}</el-button>
+            </div>
+          </div>
+        </div>
+      </template>
+      <div v-else class="psd-empty">{{ tt('该项目还没有可开发的产品，点下面「新增产品」开始') }}</div>
+
+      <!-- 新增产品:带出项目信息 → 跳到产品信息表继续填 -->
+      <div class="ps-dev-add">
+        <span class="ps-dlg-label">{{ tt('新增产品') }}</span>
+        <el-input v-model="newProd.code" size="default" style="width: 190px" maxlength="60" :placeholder="tt('产品编号（必填、不能重复）')" />
+        <el-input v-model="newProd.name" size="default" style="width: 240px" maxlength="200" :placeholder="tt('产品名称（可留空，稍后填）')" />
+        <el-button type="primary" :loading="newProdBusy" @click="createProduct">{{ tt('创建并打开') }}</el-button>
+        <span class="ps-dlg-tip">{{ tt('产品编号唯一：同一个立项可以开发多个产品，各用不同产品编号；创建后自动带出 项目名称→客户项目名称、规格→产品整体尺寸/炭棒尺寸。') }}</span>
+      </div>
+      <template #footer>
+        <el-button @click="devDlgVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -292,9 +367,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+import request from '@core/request'
 import { pickStages, stageRowState, statusLabel, STATUS_TOKENS, statusTone, summarizeStages } from '@core/progress/stageProgress'
 // xlsx 动态引入(~430KB 只在导入/导出时加载)
 import { PROGRESS_COLUMNS, readCell } from '@core/progress/progressColumns'
+import { parseCarbonSize, productsOfKey, devSummaryOf, prefillProduct } from '@core/progress/devProduct'
 
 /**
  * 界面显示名 → 落库数据键 的映射(唯一真源见 progressColumns.js)。
@@ -368,6 +445,117 @@ async function loadRefOptions() {
 }
 onMounted(loadRefOptions)
 watch(() => props.editable, (v) => { if (v) loadRefOptions() })
+
+// ═══════════════ 产品开发(项目管理 ↔ 产品信息表,2026-10-16 用户口径)═══════════════
+// 关联键 = 立项申请的「文档编号」:进度行把它存在 [项目编号](=[说明],见 ButtonService.syncPlanToProgress),
+// 产品信息表把它存在 [立项文档编号](2026-10-16 加列)。四个受控文件再按 [产品编号] 关联到产品。
+const devOverview = ref({ plans: {}, products: [] })
+const devDlgVisible = ref(false)
+const devDlgRow = ref(null)
+const newProd = ref({ code: '', name: '' })
+const newProdBusy = ref(false)
+
+async function loadDevOverview() {
+  try {
+    const res = await request.get('/px/rdDevOverview')
+    devOverview.value = res?.data || { plans: {}, products: [] }
+  } catch (e) {
+    devOverview.value = { plans: {}, products: [] } // 概览拿不到不影响进度表本体
+  }
+}
+onMounted(loadDevOverview)
+watch(() => props.head, (h) => { if (h) loadDevOverview() })
+
+/** 行 → 项目键(立项文档编号)。优先行的[项目编号],退回实施计划行的[文档编号]。 */
+function projectKeyOf(row) {
+  const own = String(row?.[K['项目编号']] || row?.['说明'] || '').trim()
+  if (own) return own
+  const plan = planOf(row)
+  return String(plan?.head?.['文档编号'] || '').trim()
+}
+/** 该项目下的产品(按立项文档编号配对) */
+function productsOf(row) {
+  return productsOfKey(devOverview.value.products, projectKeyOf(row))
+}
+/** 实施计划是否已归档:归档了才允许开发产品(用户口径)。
+ *  优先用行上的计划(项目名称关联),拿不到就看概览里的 plans(按文档编号)。 */
+function planArchivedOf(row) {
+  const st = String(planOf(row)?.head?.['单据状态'] || '').trim()
+  if (st) return st === '已归档' || st === '已审核'
+  const key = projectKeyOf(row)
+  const one = key ? devOverview.value.plans?.[key] : null
+  const st2 = String(one?.state || '').trim()
+  return st2 === '已归档' || st2 === '已审核'
+}
+/** 该行产品的整体开发情况(产品数 / 已完成节点数) */
+function devStateOf(row) {
+  return devSummaryOf(productsOf(row))
+}
+/** 状态列上的产品开发文案 */
+function devStateText(row) {
+  const s = devStateOf(row)
+  if (!s.count) return tt('开发产品')
+  if (s.allDone) return tt('已全部开发完毕')
+  return `${tt('开发产品')} ${s.done}/${s.nodes}`
+}
+function openDevDialog(row) {
+  devDlgRow.value = row
+  newProd.value = { code: '', name: '' }
+  devDlgVisible.value = true
+  loadDevOverview()
+}
+const devProjectKey = computed(() => projectKeyOf(devDlgRow.value))
+const devSpecText = computed(() => String(devDlgRow.value?.[K['子项目/尺寸']] || '').trim())
+const devProducts = computed(() => productsOf(devDlgRow.value).map((p) => ({
+  ...p,
+  nodes: (p.nodes || []).map((n) => ({ ...n, doing: ['审批中', '待二级审批', '会签中', '修改中'].includes(String(n.state || '')) })),
+})))
+
+/** 打开某个单据(产品信息表或四个受控文件):新页签 + ?docNo= 定位 */
+function openDoc(panelCode, docNo) {
+  const path = `/panelx/list/${panelCode}`
+  const url = `${path}?docNo=${encodeURIComponent(docNo)}`
+  if (typeof window !== 'undefined') window.open(`${window.location.origin}${window.location.pathname}#${url}`, '_blank')
+}
+
+/**
+ * 新增产品:按本项目预填一张产品信息表草稿并打开。
+ * 带出(用户口径):项目名称 → 客户项目名称;滤芯/炭棒规格或结构(=行的「子项目/尺寸」)→ 产品整体尺寸 + 炭棒尺寸;
+ * 另外把 立项文档编号 回填成关联键、产品负责人 带项目负责人。
+ * 「炭棒尺寸」的解析:能认出 外径*内径*长度(如 φ33×12×110 / 33*12*110)就填三格,认不出只填整体尺寸那一格。
+ */
+async function createProduct() {
+  const code = String(newProd.value.code || '').trim()
+  if (!code) return ElMessage.warning(tt('请先填产品编号'))
+  const key = devProjectKey.value
+  if (!key) return ElMessage.warning(tt('该行没有项目编号，无法关联到立项项目'))
+  if (productsOf(devDlgRow.value).some((p) => String(p['产品编号'] || '').trim() === code)) {
+    return ElMessage.warning(tt('该项目下已有这个产品编号，请换一个'))
+  }
+  newProdBusy.value = true
+  try {
+    const row = devDlgRow.value || {}
+    const formData = prefillProduct({
+      code,
+      name: newProd.value.name,
+      projectKey: key,
+      projectName: row[K['项目名称']],
+      spec: row[K['子项目/尺寸']],
+      owner: row[K['项目负责人']],
+    })
+    const res = await engine.callButton({ panelCode: 'RD_PROD_INFO', buttonName: '保存', formData, buttonParam: {} })
+    const no = res?.['编号'] || res?.['单据编号']
+    if (!no) throw new Error(tt('创建失败：未返回单据编号'))
+    ElMessage.success(`${tt('已创建产品信息表')} ${no}`)
+    devDlgVisible.value = false
+    await loadDevOverview()
+    openDoc('RD_PROD_INFO', no)
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('创建产品失败'))
+  } finally {
+    newProdBusy.value = false
+  }
+}
 
 // ---------- 状态列 = 阶段进度自动派生(只读) ----------
 /** 状态文案:逐词 tt() 组句,数字由界面拼(便于多语言) */
@@ -974,7 +1162,9 @@ defineExpose({ exportProgressExcel })
 .c-owner { min-width: 110px; }
 .c-progress { min-width: 110px; }
 .c-mile { min-width: 120px; }
-.c-status { min-width: 300px; }
+.c-status { min-width: 240px; }
+/* 产品开发列(2026-10-16 新增):放「开发产品」按钮 + 开发进度,按钮不换行 */
+.c-dev { min-width: 140px; text-align: center; white-space: nowrap; }
 .c-tester { min-width: 200px; }
 .c-approve { min-width: 90px; }
 .c-inspect { min-width: 90px; }
@@ -1041,6 +1231,29 @@ defineExpose({ exportProgressExcel })
 .psd-next { color: #1677ff; }
 .psd-table :deep(.el-table__cell) { font-size: 12px; }
 .psd-empty { padding: 18px 4px; color: #909399; font-size: 13px; }
+/* ---- 产品开发(「产品开发」列上的按钮 + 弹窗里的产品卡片与流程节点)---- */
+.psd-warn { color: #e6a23c; }
+.ps-dev-tip { margin-top: 2px; font-size: 11px; color: #a8abb2; }
+.ps-dev-card { border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
+.ps-dev-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.ps-dev-code { font-weight: 600; color: #0d5bd3; }
+.ps-dev-name { color: #303133; }
+.ps-dev-flow { display: flex; gap: 8px; flex-wrap: wrap; }
+.ps-dev-node {
+  flex: 1 1 150px;
+  min-width: 150px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: #fafbfc;
+}
+.ps-dev-node.done { border-style: solid; border-color: #7cc47c; background: #f4fbf4; }
+.ps-dev-node.doing { border-style: solid; border-color: #e6a23c; background: #fffaf2; }
+.ps-dev-node.warn { border-style: solid; border-color: #f0b3a8; background: #fff5f3; }
+.ps-dev-node-label { font-size: 12px; color: #303133; }
+.ps-dev-node-state { font-size: 12px; color: #606266; margin: 2px 0; }
+.ps-dev-node-tip { font-size: 11px; color: #a8abb2; }
+.ps-dev-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px dashed #dcdfe6; padding-top: 10px; margin-top: 6px; }
 .ps-addrow {
   display: inline-block;
   color: #0d5bd3;

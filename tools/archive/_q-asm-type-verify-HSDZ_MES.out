@@ -1,0 +1,52 @@
+表区列长|检验类型列长
+null|100
+seq|col_name|label|data_type|place|visible|hidden|editable|alias
+5|检验类型|检验类型|文本|detail|1|0|1|
+10|检验项目|检验项目|多行文本|detail|1|0|1|
+20|检验要求|检验要求|多行文本|detail|1|0|1|
+30|检验方法|检验方法|多行文本|detail|1|0|1|
+40|检验结果|检验结果|文本|detail|1|0|1|
+50|测量值1|测量值1|小数|detail|1|0|1|
+60|测量值2|测量值2|小数|detail|1|0|1|
+70|测量值3|测量值3|小数|detail|1|0|1|
+80|测量值4|测量值4|小数|detail|1|0|1|
+90|测量值5|测量值5|小数|detail|1|0|1|
+100|检查频率|检查频率|下拉框|detail|1|0|1|
+120|不合格数量|不合格数量|小数|detail|1|0|1|
+130|处理方式|处理方式|多行文本|header,detail|1|0|1|
+140|产线常规功能性结果|产线常规功能性结果|文本|detail|1|0|1|
+150|结果判断|结果判断|文本|detail|1|0|1|
+160|行号|行号|文本|detail|0|1|0|
+180|备注|备注|多行文本|header,detail|1|0|1|
+panel_code|n
+QC_CUT_INSP|1
+QC_FIN_SPEC|1
+QC_FIRST_INSP|1
+QC_MOLD_INSP|1
+QC_PROC_INSP|1
+RD_ASM_BOM|1
+RD_ASM_PROC|1
+RD_CHANGE|1
+RD_DOM_TEST|1
+RD_MOLD_PROC|1
+RD_SPEC_DOC|1
+总行数|有类型值
+7|7
+检验类型|行数
+检验项目|1
+数量判定|6
+列名|注明
+检验类型|检验类型(明细行所属的检验类别:外观 / 尺寸 / 出货重量 …,来源=出货检验计划表 RD_INSP_PLAN.检验内容;原名「表区」,2026-10-17 按用户口径正名并提到明细第一列。它同时是打印分组键:组装成品检验记录表(qc_asm_insp)按它把检验项目归到 外观/尺寸/重量 各段)
+script_name|hash12|applied_at
+migrate-asm-insp-type-rename-20261017.sql|f30409f892fe|2026-10-15 16:57:28.0853317
+locale|text
+de|Prüfart
+en|Inspection Type
+es|Tipo de inspección
+fr|Type d'inspection
+ja|検査タイプ
+ko|검사 유형
+ru|Тип проверки
+th|ประเภทการตรวจสอบ
+vi|Loại kiểm tra
+zh-TW|檢驗類型

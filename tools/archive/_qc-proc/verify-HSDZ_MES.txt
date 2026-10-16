@@ -1,0 +1,97 @@
+### 账套 HSDZ_MES
+
+① 表存在性 + 列数 + 中文注明
+  表名 | 列数 | 中文注明
+  qc_proc_insp_detail | 19 | 制程检验单行表(表区=外观/尺寸/重量/功能性测试 四组;尺寸与重量的实测数值可含多个抽样值,如 44.5/44.6/44.5/44.7/44.6)
+  qc_proc_insp_head | 35 | 制程检验单头表(2026-10-12:按《生产相关品质检验.xlsx》第3步制程检验建;报工审核可自动生成;检验类别区分 首件检验/制程检验)
+  (2 行)
+
+② 面板登记
+  panel_code | panel_name | mode | head_table | line_table | prefix | date_col | module_group
+  QC_PROC_INSP | 制程检验单 | doc | qc_proc_insp_head | qc_proc_insp_detail | ZC | 单据日期 | 生产制造
+  (1 行)
+
+③ 字段数(头/明细)
+  区 | 字段数
+  detail | 10
+  header | 28
+  (2 行)
+
+④ 头字段清单
+  seq | label | col_name | data_type | place
+  10 | 单据编号 | 单据编号 | 文本 | query,header
+  20 | 单据日期 | 单据日期 | 文本 | query,header
+  30 | 检验时间 | 检验时间 | 文本 | query,header
+  40 | 检验类别 | 检验类别 | 文本 | query,header
+  50 | 工单号 | 工单号 | 文本 | query,header
+  60 | 报工单号 | 报工单号 | 文本 | query,header
+  70 | 工序 | 工序 | 文本 | query,header
+  80 | 批次号 | 批次号 | 文本 | query,header
+  90 | 客户名称 | 客户名称 | 文本 | query,header
+  100 | 产品编码 | 产品编码 | 文本 | query,header
+  110 | 产品名称 | 产品名称 | 文本 | query,header
+  120 | 规格型号 | 规格型号 | 文本 | header
+  130 | 生产线 | 生产线 | 文本 | header
+  140 | 生产车间 | 生产车间 | 文本 | header
+  150 | 报工数量 | 报工数量 | 文本 | header
+  160 | 抽检总量 | 抽检总量 | 文本 | header
+  170 | 检验数量 | 检验数量 | 文本 | header
+  180 | 检验员 | 检验员 | 文本 | query,header
+  190 | 检验日期 | 检验日期 | 文本 | header
+  200 | 总结论 | 总结论 | 文本 | query,header
+  210 | 检验方案 | 检验方案 | 文本 | header
+  220 | 文件编码 | 文件编码 | 文本 | header
+  230 | 执行标准 | 执行标准 | 文本 | header
+  240 | 处理方式 | 处理方式 | 文本 | header,detail
+  250 | 备注 | 备注 | 文本 | header,detail
+  260 | 单据状态 | 单据状态 | 文本 | query,header
+  270 | 审核人 | 审核人 | 文本 | header
+  280 | 审核时间 | 审核时间 | 文本 | header
+  (28 行)
+
+⑤ 明细字段清单
+  seq | label | col_name | data_type | place
+  10 | 表区 | 表区 | 文本 | detail
+  20 | 行号 | 行号 | 整数 | detail
+  30 | 检验项目 | 检验项目 | 文本 | detail
+  40 | 检验要求 | 检验要求 | 文本 | detail
+  50 | 检验方法 | 检验方法 | 文本 | detail
+  60 | 抽检量 | 抽检量 | 小数 | detail
+  70 | 实测数值 | 实测数值 | 文本 | detail
+  80 | 单项判定 | 单项判定 | 文本 | detail
+  90 | 不合格应对措施 | 不合格应对措施 | 文本 | detail
+  100 | 结果判断 | 结果判断 | 文本 | detail
+  240 | 处理方式 | 处理方式 | 文本 | header,detail
+  250 | 备注 | 备注 | 文本 | header,detail
+  (12 行)
+
+⑥ 译名
+  scope | ref_key | locale | text
+  field | 表区 | en | 表区
+  field | 抽检总量 | en | Sample Total Qty
+  field | 单项判定 | en | Item Judgement
+  field | 检验类别 | en | 检验类别
+  field | 检验时间 | en | Inspection Time
+  field | 检验要求 | en | 检验要求
+  field | 检验要求 | de | Prüfanforderung
+  field | 检验要求 | es | Requisito de inspección
+  field | 检验要求 | fr | Exigence d'inspection
+  field | 检验要求 | ja | 検査要件
+  field | 检验要求 | ko | 검사 요구사항
+  field | 检验要求 | ru | Требование контроля
+  field | 检验要求 | th | ข้อกำหนดการตรวจสอบ
+  field | 检验要求 | vi | Yêu cầu kiểm tra
+  field | 检验要求 | zh-TW | 檢驗要求
+  field | 结果判断 | en | Result Judgement
+  panel | 制程检验单 | en | In-Process Inspection Sheet
+  (17 行)
+
+⑦ 角色授权行数
+  授权行数
+  7
+  (1 行)
+
+⑧ 单据数(应为 0)
+  头表 | 行表
+  0 | 0
+  (1 行)
