@@ -656,18 +656,12 @@ FIELD	header	690	批次键	批次键	整数	80	--H-									13149
 FIELD	header	700	单据状态_bill_status	单据状态_bill_status	文本	130	E-H-									13151
 FIELD	header	710	审核时间_audit_time	审核时间_audit_time	日期	130	E-H-									13153
 FIELD	header	730	创建人编码	创建人编码	文本	130	E-H-									13155
-FIELD	header	730	创建人编码	创建人编码	文本	130	E-H-									13157
 FIELD	header	750	修改人编码	修改人编码	文本	130	E-H-									13159
-FIELD	header	750	修改人编码	修改人编码	文本	130	E-H-									13161
 FIELD	header	760	审核人_auditor_name	审核人_auditor_name	文本	130	E-H-									13163
 FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									13165
-FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									13167
 FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									13169
-FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									13171
 FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									13173
-FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									13175
 FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									13177
-FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									13178
 FIELD	query,detail	10	存货编码	存货编码	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code		13012
 FIELD	query,header	10	单据日期	单据日期	日期	140	ER-V							Document Date		13013
 FIELD	query,header	20	单据编号	单据编号	文本	140	ER-V							Document Number		13014

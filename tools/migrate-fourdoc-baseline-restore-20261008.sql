@@ -17,8 +17,8 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 5f858bbc7d58(sha256 a62285aad7047523…)
- *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=34 · PURCHASE_IN=171(共 329 行)。
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 30ae6a770912(sha256 be3491ee1f3261a8…)
+ *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=34 · PURCHASE_IN=165(共 323 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
  *   生成器:tools/archive/_gen-fourdoc-restore.mjs(手改本文件无效,请改生成器重跑)。
@@ -43,7 +43,7 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-/* ---------- ⓪ 基线行集(2026-10-03 dump,329 行) ---------- */
+/* ---------- ⓪ 基线行集(2026-10-03 dump,323 行) ---------- */
 IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
 CREATE TABLE #base (
   ord           int           NOT NULL,
@@ -372,32 +372,26 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (143,N'PURCHASE_IN',N'源单日期',N'源单日期',N'日期',NULL,NULL,NULL,NULL,N'detail',720,120,1,0,1,NULL,0,NULL,NULL,NULL),
   (144,N'PURCHASE_IN',N'创建人编码',N'创建人编码',N'文本',NULL,NULL,NULL,NULL,N'header',730,130,1,0,1,NULL,0,NULL,NULL,NULL),
   (145,N'PURCHASE_IN',N'源单分录id',N'源单分录id',N'文本',NULL,NULL,NULL,NULL,N'detail',730,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (146,N'PURCHASE_IN',N'创建人编码',N'创建人编码',N'文本',NULL,NULL,NULL,NULL,N'header',730,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (147,N'PURCHASE_IN',N'分录结算状态',N'分录结算状态',N'文本',NULL,NULL,NULL,NULL,N'detail',740,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (148,N'PURCHASE_IN',N'修改人编码',N'修改人编码',N'文本',NULL,NULL,NULL,NULL,N'header',750,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (149,N'PURCHASE_IN',N'折扣率%',N'折扣率%',N'文本',NULL,NULL,NULL,NULL,N'detail',750,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (150,N'PURCHASE_IN',N'修改人编码',N'修改人编码',N'文本',NULL,NULL,NULL,NULL,N'header',750,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (151,N'PURCHASE_IN',N'成本视图',N'成本视图',N'文本',NULL,NULL,NULL,NULL,N'detail',760,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (152,N'PURCHASE_IN',N'审核人_auditor_name',N'审核人_auditor_name',N'文本',NULL,NULL,NULL,NULL,N'header',760,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (153,N'PURCHASE_IN',N'单位成本视图',N'单位成本视图',N'文本',NULL,NULL,NULL,NULL,N'detail',770,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (154,N'PURCHASE_IN',N'审核人编码',N'审核人编码',N'文本',NULL,NULL,NULL,NULL,N'header',780,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (155,N'PURCHASE_IN',N'退货数量',N'退货数量',N'文本',NULL,NULL,NULL,NULL,N'detail',780,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (156,N'PURCHASE_IN',N'审核人编码',N'审核人编码',N'文本',NULL,NULL,NULL,NULL,N'header',780,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (157,N'PURCHASE_IN',N'价税合计本位币',N'价税合计本位币',N'文本',NULL,NULL,NULL,NULL,N'detail',790,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (158,N'PURCHASE_IN',N'未结算金额本位币',N'未结算金额本位币',N'文本',NULL,NULL,NULL,NULL,N'header',800,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (159,N'PURCHASE_IN',N'是否赠品',N'是否赠品',N'文本',NULL,NULL,NULL,NULL,N'detail',800,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (160,N'PURCHASE_IN',N'未结算金额本位币',N'未结算金额本位币',N'文本',NULL,NULL,NULL,NULL,N'header',800,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (161,N'PURCHASE_IN',N'送检数量',N'送检数量',N'小数',NULL,NULL,NULL,NULL,N'detail',810,100,0,0,1,NULL,0,NULL,NULL,NULL),
-  (162,N'PURCHASE_IN',N'付款方式编码',N'付款方式编码',N'文本',NULL,NULL,NULL,NULL,N'header',820,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (163,N'PURCHASE_IN',N'部门名称',N'部门名称',N'文本',NULL,NULL,NULL,NULL,N'detail',820,120,0,0,1,NULL,0,N'Department Name',NULL,NULL),
-  (164,N'PURCHASE_IN',N'付款方式编码',N'付款方式编码',N'文本',NULL,NULL,NULL,NULL,N'header',820,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (165,N'PURCHASE_IN',N'生产日期',N'生产日期',N'日期',NULL,NULL,NULL,NULL,N'detail',830,110,0,0,1,NULL,0,NULL,NULL,NULL),
-  (166,N'PURCHASE_IN',N'付款账户编码',N'付款账户编码',N'文本',NULL,NULL,NULL,NULL,N'header',840,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (167,N'PURCHASE_IN',N'付款账户编码',N'付款账户编码',N'文本',NULL,NULL,NULL,NULL,N'header',840,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (168,N'PURCHASE_IN',N'仓库名称_sp_name',N'仓库名称_sp_name',N'文本',NULL,NULL,NULL,NULL,N'detail',840,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (169,N'PURCHASE_IN',N'换算率_conversion_rate',N'换算率_conversion_rate',N'文本',NULL,NULL,NULL,NULL,N'detail',850,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (170,N'PURCHASE_IN',N'本次结算金额本位币',N'本次结算金额本位币',N'文本',NULL,NULL,NULL,NULL,N'detail',860,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (171,N'PURCHASE_IN',N'备注',N'备注',N'文本',NULL,NULL,NULL,NULL,N'detail',870,200,0,0,0,NULL,1,NULL,NULL,NULL);
+  (146,N'PURCHASE_IN',N'分录结算状态',N'分录结算状态',N'文本',NULL,NULL,NULL,NULL,N'detail',740,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (147,N'PURCHASE_IN',N'修改人编码',N'修改人编码',N'文本',NULL,NULL,NULL,NULL,N'header',750,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (148,N'PURCHASE_IN',N'折扣率%',N'折扣率%',N'文本',NULL,NULL,NULL,NULL,N'detail',750,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (149,N'PURCHASE_IN',N'成本视图',N'成本视图',N'文本',NULL,NULL,NULL,NULL,N'detail',760,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (150,N'PURCHASE_IN',N'审核人_auditor_name',N'审核人_auditor_name',N'文本',NULL,NULL,NULL,NULL,N'header',760,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (151,N'PURCHASE_IN',N'单位成本视图',N'单位成本视图',N'文本',NULL,NULL,NULL,NULL,N'detail',770,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (152,N'PURCHASE_IN',N'审核人编码',N'审核人编码',N'文本',NULL,NULL,NULL,NULL,N'header',780,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (153,N'PURCHASE_IN',N'退货数量',N'退货数量',N'文本',NULL,NULL,NULL,NULL,N'detail',780,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (154,N'PURCHASE_IN',N'价税合计本位币',N'价税合计本位币',N'文本',NULL,NULL,NULL,NULL,N'detail',790,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (155,N'PURCHASE_IN',N'未结算金额本位币',N'未结算金额本位币',N'文本',NULL,NULL,NULL,NULL,N'header',800,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (156,N'PURCHASE_IN',N'是否赠品',N'是否赠品',N'文本',NULL,NULL,NULL,NULL,N'detail',800,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (157,N'PURCHASE_IN',N'送检数量',N'送检数量',N'小数',NULL,NULL,NULL,NULL,N'detail',810,100,0,0,1,NULL,0,NULL,NULL,NULL),
+  (158,N'PURCHASE_IN',N'付款方式编码',N'付款方式编码',N'文本',NULL,NULL,NULL,NULL,N'header',820,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (159,N'PURCHASE_IN',N'部门名称',N'部门名称',N'文本',NULL,NULL,NULL,NULL,N'detail',820,120,0,0,1,NULL,0,N'Department Name',NULL,NULL),
+  (160,N'PURCHASE_IN',N'生产日期',N'生产日期',N'日期',NULL,NULL,NULL,NULL,N'detail',830,110,0,0,1,NULL,0,NULL,NULL,NULL),
+  (161,N'PURCHASE_IN',N'付款账户编码',N'付款账户编码',N'文本',NULL,NULL,NULL,NULL,N'header',840,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (162,N'PURCHASE_IN',N'仓库名称_sp_name',N'仓库名称_sp_name',N'文本',NULL,NULL,NULL,NULL,N'detail',840,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (163,N'PURCHASE_IN',N'换算率_conversion_rate',N'换算率_conversion_rate',N'文本',NULL,NULL,NULL,NULL,N'detail',850,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (164,N'PURCHASE_IN',N'本次结算金额本位币',N'本次结算金额本位币',N'文本',NULL,NULL,NULL,NULL,N'detail',860,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (165,N'PURCHASE_IN',N'备注',N'备注',N'文本',NULL,NULL,NULL,NULL,N'detail',870,200,0,0,0,NULL,1,NULL,NULL,NULL);
 GO
 
 /* ---------- ① 差异行数 → ② 逐面板回正 → ③ 复核 → ④ 自检(单批次 + 单事务) ---------- */
