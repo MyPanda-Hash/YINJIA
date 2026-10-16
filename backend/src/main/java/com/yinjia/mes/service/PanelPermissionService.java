@@ -135,6 +135,17 @@ public class PanelPermissionService {
                 "QC_JJF", "QC_SCP", "QC_LYB", "QC_SCY"}) {
             m.put(p + "|提交审批", SUBMIT_WORDS);
         }
+        /*
+         * 四文件面板的「弃审」(2026-10-16 用户口径:「产品信息表分发下去的 4 类单据没有反审核,写错了改不了,
+         * 申请修改是否能用……」)。全局表把「弃审」归 audit ⇒ 文件责任人(角色「文件负责人」只有 add/modify)
+         * 连**前门**都进不来,实测报「当前角色无该面板「审批」权限,无法执行「弃审」」。
+         * 这里只放开前门(有该面板新增/申请修改/审批权的人都能走到后端),**真正的身份门禁仍在**
+         * ButtonService.requireApproverOrDevFileOwner:该文件责任人 ∪ 规格书被分发责任人 ∪ 产品总负责人
+         * ∪ 审批人 ∪ 管理员。实测非责任人(liulei)走完前门照样被后端拒 —— 不是"谁都能弃审"。
+         */
+        for (String p : new String[]{"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN"}) {
+            m.put(p + "|弃审", new String[]{"add", "modify", "audit"});
+        }
         // ── 页面级虚拟面板(2026-10-16):动作词按**页面特性**定义,编码/动作集见 PagePanelRegistry ──
         // 键 = 「页面面板码|按钮名」,按钮名取前端实际使用的文案(与页面上的按钮文字一致,便于对照)。
         m.put(PagePanelRegistry.ORDER_CONVERT + "|保存交期", new String[]{"date"});

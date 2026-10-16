@@ -69,6 +69,58 @@ test('RD_CHANGE 的数据表行也要有最小行高 rowH(空表时别压扁)', 
   assert.match(rec, /:style="dt\.rowH \? \{ height: dt\.rowH \+ 'px' \} : null"/, '数据表行渲染要读 dt.rowH')
 })
 
+// ── 表尾段(三.相关变更 / 四、库存产品处理方式 / 五、其它 / 批准)──
+/**
+ * 2026-10-16 用户口径:「这个产品变更申请表的这个位置的格子要大一点,现在有点窄了,
+ *   每个格子竖向加长到原来的 1.5 倍」。
+ *
+ * 实测根因(探针量活体 DOM):尾段走的是**简化渲染**(只认 {label,key} 单键行)——
+ *   RD_CHANGE 的 {h, grid:[…]} 行被渲成「一个空标签格 + 一个大格」,行高掉到**自然行高 31px**,
+ *   配置里的 h(74/92)从来没生效过。所以两件事必须同批:①渲染侧认 row.grid/row.h ②配置侧 h ×1.5。
+ */
+test('表尾段渲染必须认 row.grid 与 row.h(否则调 h 也不生效,行高永远 31px)', () => {
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /<tr v-for="\(row, ri\) in sec\.rows" :key="'tr' \+ ri" :style="row\.h \? \{ height: row\.h \+ 'px' \} : null">/,
+    '尾段行要读 row.h 设最小行高')
+  assert.match(rec, /<template v-if="row\.grid">[\s\S]{0,400}?v-for="\(c, ci\) in row\.grid"/,
+    '尾段要按 row.grid 逐格渲染(不能只认单键行)')
+  assert.match(rec, /v-else-if="editable && c\.key && !c\.ro"[\s\S]{0,300}?c\.area[\s\S]{0,200}?minRows: c\.rows/,
+    '尾段网格格要支持 area(c.rows 控制最小行数)')
+  // 旧式单键行(成型配方「配料要求」等)必须保留,别把别的面板带崩
+  assert.match(rec, /<td class="rs-td rs-label" :class="\{ 'rs-focus': isFocus\(row\.key\) \}">\{\{ tt\(row\.label\) \}\}<\/td>/,
+    '旧式 {label,key} 尾行仍要渲染')
+})
+
+test('RD_CHANGE 尾段行高 = 原始值与 ×1.5 的**中点**(用户两轮口径:先 ×1.5,再"太长了取中间值")', () => {
+  const tail = recordSheetConfigs.RD_CHANGE.tailSections || []
+  const byBar = Object.fromEntries(tail.map((s) => [s.bar, s]))
+  assert.ok(byBar['三.相关变更'], '尾段「三.相关变更」在')
+  assert.equal(byBar['三.相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
+  assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
+  for (const bar of ['四、库存产品处理方式', '五、其它', '批准']) {
+    const sec = byBar[bar]
+    assert.ok(sec, `尾段「${bar}」在`)
+    for (const r of sec.rows) assert.equal(r.h, 92, `${bar} 每行 h 应为 92(74 与 111 的中点)`)
+  }
+})
+
+test('「批准」段下方三格是**手签空白区**:只读、不给 key(用户口径「批注/签字/日期不能填写」)', () => {
+  const sec = (recordSheetConfigs.RD_CHANGE.tailSections || []).find((s) => s.bar === '批准')
+  assert.ok(sec, '批准段在')
+  const labelRow = sec.rows[0].grid
+  assert.deepEqual(labelRow.map((c) => c.label), ['批准', '签字', '日期'], '第一行是三个静态标签')
+  const signRow = sec.rows[1].grid
+  assert.equal(signRow.length, 3, '第二行三格手签区')
+  for (const c of signRow) {
+    assert.equal(c.key, undefined, '手签格**不能**带 key —— 带了就真能填了(纸面是留给手签的)')
+    assert.equal(c.ro, true, '手签格显式标 ro,意图写在配置里')
+  }
+  // 渲染侧:不带 key 的格必须落到只读文本(AnnotatedText),不能落进可编辑分支
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,600}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| c\.fixed \|\| ''"/,
+    '网格格:无 key/ro 时必须是只读文本,不能给输入控件')
+})
+
 test('网格行渲染必须读 row.h / c.rows(否则配置里的行高不生效)', () => {
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
   assert.match(rec, /<tr v-else-if="row\.grid" :style="row\.h \? \{ height: row\.h \+ 'px' \} : null">/,
@@ -79,10 +131,13 @@ test('网格行渲染必须读 row.h / c.rows(否则配置里的行高不生效)
 
 // ── 二、反审核(弃审):文书归档面板必须能放出该按钮,且已归档不算"不可点" ──
 test('文书归档面板放出「弃审」入口,置灰口径与后端一致(已审核/已归档/已生效)', () => {
-  assert.match(panelx, /const canUnauditHere = computed\(\(\) => isDocArchivePanel\.value[\s\S]{0,200}?canApproveHere\(\)\)/,
-    'canUnauditHere 必须存在:文书归档面板 + 已审核/已归档 + 有审批权')
-  assert.match(panelx, /v-if="canUnauditHere"[\s\S]{0,300}?pickModAction\('弃审'\)/,
-    '侧栏必须真的放出「弃审」按钮(此前只有标准流面板有,归档一族只能走申请修改闭环)')
+  // 2026-10-16 放宽:四文件面板另放给「本文件责任人」(devFileCanEditHere,与保存门禁同源)——
+  // 用户报障「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」。
+  assert.match(panelx, /const canUnauditHere = computed\(\(\) => isDocArchivePanel\.value[\s\S]{0,300}?canApproveHere\(\) \|\| devFileCanEditHere\.value\)/,
+    'canUnauditHere 必须存在:文书归档面板 + 已审核/已归档 + (有审批权 ∪ 本文件责任人)')
+  assert.match(panelx, /v-if="canUnauditHere \|\| \(hasApprovalBtns && canApproveHere\(\)\)"[\s\S]{0,400}?onSideAction\('弃审'\)/,
+    '侧栏必须真的放出「弃审」按钮(此前只有标准流面板有,归档一族只能走申请修改闭环);' +
+    '2026-10-16 侧栏整理后它沉到「⑤ 危险操作」段,动作入口由 pickModAction 改为 onSideAction(下拉已撤)')
   assert.match(panelx, /弃审: !current\.value \|\| !\['已审核', '已归档', '已生效'\]\.includes\(st\)/,
     '弃审置灰口径要覆盖已归档 —— 否则归档单上按钮永远点不动')
 })

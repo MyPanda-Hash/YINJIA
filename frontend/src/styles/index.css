@@ -202,6 +202,48 @@ body,
   margin-right: 0;
 }
 
+/* ===== 纸张工具条按钮（表头右侧的小入口）=====
+   2026-10-17 用户口径:「不要卡通图案…设计得简洁美观一些」——
+   原来是 emoji(📦 从物料清单引用 / 🧮 配方计算)与符号(✎ 字段编辑):彩色、随系统字体变、
+   跟纸面(黑白表格)完全不搭,打印还可能把图案印上去。
+   现统一为**一种中性小按钮**:白底 + 1px 描边 + 圆角 4 + 12px 字 + Element 线性图标(13px),
+   悬停转主题蓝(与纸面上的可点链接同一语言);三种功能只靠**图标 + 文字**区分,不再靠颜色与图案。
+   ⚠ 用 body 前缀压过组件 scoped 样式的权重,免得两处定义打架;打印一律不出现。 */
+body .rs-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background: #fff;
+  color: #5b6a7d;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color .15s ease, border-color .15s ease, background-color .15s ease;
+}
+body .rs-tool:hover {
+  color: #0d5bd3;
+  border-color: #a3c4ea;
+  background: #f6faff;
+}
+body .rs-tool:active {
+  background: #eef5ff;
+}
+body .rs-tool .el-icon {
+  font-size: 13px;
+  opacity: .9;
+}
+@media print {
+  .rs-tool {
+    display: none !important;
+  }
+}
+
 /* ===== 移动端全局（≤768px）===== */
 @media (max-width: 768px) {
   /* 弹窗宽度：覆盖 el-dialog 内联 --el-dialog-width（固定 420/440/560/760px 一律收窄） */

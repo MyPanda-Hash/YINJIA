@@ -67,7 +67,17 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
    表结构变更后重跑清单末尾两条命令刷新并随任务提交。
 2. **部署默认全量**:下次服务器部署走「全量恢复备份」路线(deploy/部署说明.md 二、A)——
    用本地库整体覆盖服务器。因此:
-   - 打部署备份**之前**,必须先清掉本地库里的测试数据
+   - **🔴 打包/出备份之前,必须确认「研发管理模块没有数据」**(2026-10-17 用户口径:「上传的时候,
+     研发管理的模块应该是没有数据的」)—— 研发区(RD_*)是演示与批量造数待得最多的地方,
+     全量恢复会把它们连审批留痕一起带进服务器正式账。自查(必须 `[PASS]`):
+     `cd tools` → `java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar verify\RdAreaEmptyAudit.java HSDZ_MES`
+     (逐张研发表列行数,非 0 会点名是哪几张、各多少行;顺手把 `HSDZ_MES_TEST` 也跑一遍最省心);
+     清理入口:`YINJIA_SQL_DB=HSDZ_MES_TEST java -cp lib\mssql-jdbc.jar DbSync.java run
+     cleanup-rd-testledger-20261016.sql`(该脚本自带库名硬闸门,只允许在测试账套执行)。
+     ⚠ 保留项别顺手清:`rd_sinter_tolerance`(烧结公差**标准库**)、`rd_sample_no_*`(已下架面板留档)、
+     `rd_dev_task_bak_*`、`yj_share_file`/`yj_share_file_cat`(共享文件库=真实资料)、号池 `s_allno`。
+     ⚠ 2026-09-21 部署包那版「只留演示数据(2 个演示产品 + 四文件 + 责任人已分发)」的口径**已被本口径取代**。
+   - 打部署备份**之前**,还必须清掉本地库里其余的测试数据
      (按 `migrate-golive-cleanup.sql` 模式,待产出),保证全量推上去的是干净账;
    - 备份必须在部署当时新打(`BACKUP DATABASE ... WITH FORMAT, INIT`),
      禁止拿 `deploy/` 里的历史 .bak 直接用;

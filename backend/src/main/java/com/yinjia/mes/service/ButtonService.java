@@ -332,6 +332,16 @@ public class ButtonService {
     }
 
     /**
+     * 新建单据的「版本」默认值(2026-10-16 用户口径:规格书「版本自动生成 V1.0」)。
+     *
+     * <p>⚠ 与 {@link #nextVersionNo}(「版本号」列,四文件面板的 `V<当天日期>-NN`)是**两套口径**:
+     * 规格书这一列叫「版本」,记的是产品版本号 V1.0/V2.0…,不是当天流水号。
+     * 只在**新建且该格为空**时写入 —— 已有单、以及产品变更单「建下一版草稿」(整单复制,
+     * 走 insertRow 不经这里)一律不覆盖,免得把别人推进的版本号抹回去。
+     */
+    private static final Map<String, String> NEW_DOC_VERSION = Map.of("RD_SPEC_DOC", "V1.0");
+
+    /**
      * 「版本号」建单自动带出:`V<当天日期>-<当日流水两位>`(如 V2026-10-15-01)。
      *
      * 用户口径(2026-10-16):「成型工艺清单的版本号应该要不一样,现在是按日期自动生成,但是同一日期是一样的,
@@ -365,8 +375,25 @@ public class ButtonService {
         }
     }
 
-    /** 单据保存:头字段并入每行(单表式)或分别写头表/行表(头行式);无编号=新建 */
-    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
+    /** 单据保存(外部入口):systemDraft=false —— 用户操作,门禁全过 */
+    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
+        return saveDoc(def, head, items, no, user, markSaved, false);
+    }
+
+    /**
+     * 单据保存本体。{@code systemDraft=true} = **引擎内部代建的草稿单**
+     * (2026-10-16 起唯一用途:产品信息表「分发责任人」后自动建规格书草稿)。
+     *
+     * <p>差别只有一处:跳过四文件面板的「未分发禁编 / 只放该文件责任人」门禁
+     * ({@link #ensureDevFileEditable})。理由:那条门禁防的是"**人**替别人开单"——
+     * 内部建单的操作人是分发人(二级审核人/管理员),而该文件的责任人另有其人,
+     * 按人判必然被拒;而这张草稿正是分发动作的产物,不是谁绕过界面开单。
+     * 其余校验(编号唯一/产品编号唯一/字段映射/状态行)一律照旧。
+     */
+    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                        List<Map<String, Object>> items, String no, String user,
+                                        boolean markSaved, boolean systemDraft) {
         boolean split = def.hasHeadTable();
         if (no == null) {
             if (items.isEmpty()) {
@@ -381,6 +408,11 @@ public class ButtonService {
                 // 同一天建第二张单版本号一模一样 ⇒ 必须加序列数,如 V2026-10-15-01。
                 String vno1 = nextVersionNo(table);
                 if (vno1 != null && !cols.containsKey("版本号")) cols.put("版本号", vno1);
+                // 「版本」默认值(2026-10-16 用户口径「版本自动生成 V1.0」):仅规格书,仅新建且该格为空
+                String vdef1 = NEW_DOC_VERSION.get(def.code());
+                if (vdef1 != null && !cols.containsKey("版本") && tableCols(table).contains("版本")) {
+                    cols.put("版本", vdef1);
+                }
                 // 空草稿也写入随表单提交的头字段(如 规格书种类):
                 // 规格书按类型页签过滤列表,不带分类的新单会从当前页签列表消失,导致"新增后无法填写"
                 for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
@@ -408,7 +440,8 @@ public class ButtonService {
                 // 该分支原来直接 return,于是"带产品编号 + 不带明细"的一次调用就能给**别人负责的已分发
                 // 产品**建出一张空白草稿(实测品质部账号建成 MP-xxxx)。UI 的「新增」不带产品编号,
                 // 正常建单不受影响;带产品编号建单=替别人开单,本就该拦。
-                if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
+                // ⚠ systemDraft=true(引擎内部代建,如分发责任人时自动建规格书草稿)跳过本条 —— 见 saveDoc 重载注释。
+                if (!systemDraft && DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
@@ -420,6 +453,12 @@ public class ButtonService {
             if (vno2 != null && def.byLabel("版本号") != null
                     && (head.get("版本号") == null || String.valueOf(head.get("版本号")).isBlank())) {
                 head.put("版本号", vno2);
+            }
+            // 「版本」默认值:同空白草稿分支口径(规格书 V1.0),仅新建且为空时写
+            String vdef2 = NEW_DOC_VERSION.get(def.code());
+            if (vdef2 != null && def.byLabel("版本") != null
+                    && (head.get("版本") == null || String.valueOf(head.get("版本")).isBlank())) {
+                head.put("版本", vdef2);
             }
             // 存在"创建时间"字段的单据新建时自动填入当前时间(金蝶同步单据字段,nvarchar 字符串口径;
             // save() 已剥离前端传入值,此处是唯一填入点;修改已有单不覆盖)
@@ -1693,8 +1732,14 @@ public class ButtonService {
 
     private Map<String, Object> unaudit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         // 审批权校验:与 审核 同口径,防"自审自弃"绕过审批权
-        requireApprover(def.code());
+        // ⚠ 2026-10-16 放宽(用户口径「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」):
+        //   四文件面板(规格书/成型工艺清单/组装工艺清单/出货检验计划表)除 审批人 ∪ 管理员 外,
+        //   **该文件责任人 ∪ 规格书被分发责任人 ∪ 产品总负责人**同样可弃审 —— 判据与保存门禁
+        //   {@link #ensureDevFileEditable} 完全同源(能改这张单的人就该能把它退回来改,
+        //   不必走「申请修改→管理员审批→改→再审批」两轮)。其余面板一字不动,仍是 requireApprover。
         String no = requireNo(formData);
+        if (DevTaskService.devPanelCodes().contains(def.code())) requireApproverOrDevFileOwner(def, no);
+        else requireApprover(def.code());
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
         // 产品变更申请单(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」):
@@ -1797,6 +1842,9 @@ public class ButtonService {
         // 组装成品检验**弃审** → 重算结案:检验不再是"已审核通过" ⇒ 该工单行应退回未结案
         //   (必须在 shr 清掉之后,口径同上方的 manuWriteback 注释)
         syncCloseAfterAsmInsp(def.code(), no, currentUserName());
+        // 2026-10-16 用户口径:产品信息表**被弃审**(退回草稿、重新走审核)同样会让四文件里的数据过期
+        // ⇒ 与「申请修改」同一条通知(recordApproval 已写 UNAUDIT 留痕,故放在它之后)。
+        if ("RD_PROD_INFO".equals(def.code())) notifyProdInfoChanged(no, currentUserName(), "弃审");
         return result(no, "草稿");
     }
 
@@ -1990,7 +2038,8 @@ public class ButtonService {
         Object pendingBy = row instanceof Map<?, ?> mp ? ((Map<?, ?>) mp).get("pending_by") : null;
         String submitter = pendingBy == null ? "" : String.valueOf(pendingBy);
         if (!isAdminUser(operator) && operator.equals(submitter))
-            throw new org.springframework.security.access.AccessDeniedException("审批人不能与提交人相同（编制与审批分离）");
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "审批人不能与提交人相同（编制与审批分离）：本单由 " + realNameOf(submitter) + "（" + submitter + "）提交，请由他人完成一级审批");
         String opinion = opinionOf(formData);
         // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
@@ -2001,7 +2050,7 @@ public class ButtonService {
                 if (l2.isEmpty()) throw new IllegalStateException("一级审批通过前必须选取二级审核人");
                 if (!isEnabledUser(l2)) throw new IllegalStateException("二级审核人账号不存在或已停用：" + l2);
                 if (!isAdminUser(operator) && l2.equals(submitter))
-                    throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）");
+                    throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）：本单由他提交，请另选一位账号");
             }
             // 竞态守卫:WHERE 带 pending='Y' 且节点=1,双击/并发只有一次生效
             int n = jdbc.update("UPDATE yj_doc_status SET approve_node = 2, l2_approver = ?, update_at = GETDATE()"
@@ -2238,6 +2287,27 @@ public class ButtonService {
     private void requireApprover(String panelCode) {
         if (!canApprove(currentUserName(), panelCode))
             throw new org.springframework.security.access.AccessDeniedException("当前用户无审批权限");
+    }
+
+    /**
+     * 四文件面板的**弃审**放行(2026-10-16 用户口径):审批权(∪管理员) **或** 该文件责任人。
+     *
+     * 为什么要放宽:产品信息表分发下去的 4 类单据(规格书 RD_SPEC_DOC / 成型工艺清单 RD_MOLD_PROC /
+     * 组装工艺清单 RD_ASM_PROC / 出货检验计划表 RD_INSP_PLAN)原先只有「有审批权的角色 ∪ 管理员」
+     * 能弃审,而权限表实测这些面板的审批权只在「研发审核」角色手里 ⇒ 文件责任人(柴善银/冯敏等)
+     * 写错了只能走「申请修改 → 管理员审批 → 改 → 提交审批 → 再审批」两轮,用户抱怨"写错了改不了"。
+     * 判据复用保存门禁的同一把闸门 {@link #devFileEditVerdict}(责任人 ∪ 规格书被分发责任人 ∪
+     * 产品总负责人 ∪ 管理员)—— 能改这张单的人就该能把它退回来改,口径不另起一套。
+     * 弃审本身仍会先落快照(snapshotOnUnaudit),留痕与申请修改路径同构。
+     */
+    private void requireApproverOrDevFileOwner(PanelRegistry.PanelDef def, String no) {
+        String user = currentUserName();
+        if (canApprove(user, def.code())) return;
+        DevFileEdit v = devFileEditVerdict(def, no, null, user);
+        if (v.applicable() && v.ok()) return;
+        String why = (v.reason() == null || v.reason().isBlank())
+                ? "只有该文件的责任人（或管理员）可以弃审" : v.reason();
+        throw new org.springframework.security.access.AccessDeniedException(why);
     }
 
     /** 审批判定:管理员恒可;普通用户按角色面板审批权(can_approve) */
@@ -5376,6 +5446,10 @@ public class ButtonService {
             }
         }
         Map<String, Object> out = devTaskService.dispatch(productCode, productName, no, user, supervisor, picks);
+        // 规格书草稿自动建单(2026-10-16 用户口径):分发完责任人,立刻按产品信息表把规格书第一页
+        // **真实写出来**当草稿,责任人接着补 —— 见 createSpecDraftFromProduct 的三条口径。
+        // 建不出来(已有规格书单/来源缺字段/异常)只回空串,不让整个分发失败。
+        String specDraftNo = createSpecDraftFromProduct(no, productCode, user);
         // 每个新指定的责任人(≠操作人)收 TASK_ASSIGNED 消息
         @SuppressWarnings("unchecked")
         Map<String, String> assigns = (Map<String, String>) out.getOrDefault("assigns", Map.of());
@@ -5403,7 +5477,97 @@ public class ButtonService {
         r.put("supervisor", out.get("supervisor"));
         r.put("supervisorName", out.get("supervisorName"));
         r.put("supervisorResolved", out.get("supervisorResolved"));
+        // 前端据此提示「已自动生成规格书草稿 SD-xxx（可继续补充）」
+        r.put("specDraftNo", specDraftNo);
         return r;
+    }
+
+    /**
+     * 产品信息表**分发责任人之后,自动建一张该产品的规格书草稿**(2026-10-16 用户口径)。
+     *
+     * <p>用户原话:「现在规格书的第一页没有自动引用产品信息表的数据,现在写一个规则,当产品信息表分发
+     * 对应单据责任人之后,自动创建一张对应产品信息表的规格书,数据自动对应填写,保存为草稿,
+     * 可继续对应补充完整,是真实填写过来而不是引用显示,导致其他的成型工艺清单等单据出现引用数据错误等」。
+     *
+     * <p>三条口径:
+     * <ol>
+     *   <li><b>幂等</b>:该产品**已有规格书单**(任何未作废的单,含草稿)就不再建 ——
+     *       改责任人反复分发不会攒出第二张;</li>
+     *   <li><b>真实写入</b>:值经与「保存为草稿」**同一条引擎路径**({@link #saveDoc} markSaved=false)
+     *       落到 {@code rd_spec_doc_head},不是参照显示 —— 下游(成型/组装工艺清单、出货检验计划表)
+     *       按 [产品编号] 找规格书取数,第一页空着它们就取不到东西;</li>
+     *   <li><b>只带对应得上的字段**(逐条显式列举,不做全表同名自动搬运):
+     *       <pre>
+     *       产品编号     ← 产品编号        (关联键,下游按它认产品)
+     *       名称         ← 产品名称        (规格书封面那一格)
+     *       产品类别     ← 产品类别
+     *       客户项目名称 ← 客户项目名称
+     *       客户料号     ← 客户料号
+     *       产品主要性能 ← 主要性能描述    (列名 特殊性能描述,数据键永不改)
+     *       整体规格参数 ← 产品整体尺寸 + 炭棒尺寸(外径/内径/长度) 合成说明文本
+     *       </pre>
+     *       不带 备注/责任人/审核人/日期 —— 那些是各自单据自己的口径,搬过去只会错。</li>
+     * </ol>
+     *
+     * @return 新建的规格书单据编号;未建(已存在 / 无来源 / 异常)一律回空串 ——
+     *         建不出来不该让"分发责任人"整个失败(消息与任务照常发)。
+     */
+    private String createSpecDraftFromProduct(String prodInfoNo, String productCode, String user) {
+        if (productCode == null || productCode.isBlank()) return "";
+        PanelRegistry.PanelDef specDef = registry.panel("RD_SPEC_DOC");
+        if (specDef == null) return "";
+        try {
+            Integer exist = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM rd_spec_doc_head h"
+                            + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.[单据编号]"
+                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
+                            + " AND h.[产品编号] = ?", Integer.class, productCode);
+            if (exist != null && exist > 0) return "";
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 * FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    prodInfoNo);
+            if (rows.isEmpty()) return "";
+            Map<String, Object> src = rows.get(0);
+            Map<String, Object> draft = new LinkedHashMap<>();
+            putIfVal(draft, "产品编号", src.get("产品编号"));
+            putIfVal(draft, "名称", src.get("产品名称"));
+            putIfVal(draft, "产品类别", src.get("产品类别"));
+            putIfVal(draft, "客户项目名称", src.get("客户项目名称"));
+            putIfVal(draft, "客户料号", src.get("客户料号"));
+            putIfVal(draft, "产品主要性能", src.get("特殊性能描述"));
+            putIfVal(draft, "整体规格参数", specSizeText(src));
+            if (draft.isEmpty()) return "";
+            Map<String, Object> r = saveDoc(specDef, draft, new ArrayList<>(), null, user, false, true);
+            return nz(r.get("编号"));
+        } catch (Exception e) {
+            log.warn("自动建规格书草稿失败(product={}): {}", productCode, e.getMessage());
+            return "";
+        }
+    }
+
+    /** 尺寸说明文本(规格书「整体规格参数」格):整体尺寸一行 + 炭棒尺寸一行,空值不拼 */
+    private String specSizeText(Map<String, Object> src) {
+        StringBuilder b = new StringBuilder();
+        String size = nz(src.get("产品整体尺寸"));
+        if (!size.isEmpty()) b.append("整体尺寸：").append(size);
+        String od = nz(src.get("炭棒外径"));
+        String id = nz(src.get("炭棒内径"));
+        String len = nz(src.get("炭棒长度"));
+        String carbon = (!od.isEmpty() || !id.isEmpty() || !len.isEmpty())
+                ? ("外径 " + od + " / 内径 " + id + " / 长度 " + len)
+                : nz(src.get("炭棒尺寸"));
+        if (!carbon.isEmpty()) {
+            if (b.length() > 0) b.append("\n");
+            b.append("炭棒尺寸：").append(carbon);
+        }
+        return b.toString();
+    }
+
+    /** 只在值非空时放入(空串/null 不进 head:与"用户没填"同义,别把空串写进库) */
+    private static void putIfVal(Map<String, Object> m, String key, Object v) {
+        if (v == null) return;
+        String s = String.valueOf(v).trim();
+        if (!s.isEmpty()) m.put(key, s);
     }
 
     /**
@@ -5505,6 +5669,239 @@ public class ButtonService {
         out.put("owner", v.owner());
         out.put("ownerName", v.ownerName());
         return out;
+    }
+
+    /**
+     * 引用规格书的三个面板(成型工艺清单/组装工艺清单/出货检验计划表)—— 漂移提示只对它们有意义。
+     * 规格书本身(RD_SPEC_DOC)与被引用方向相反,不入本集合。
+     */
+    private static final java.util.Set<String> SPEC_REF_PANELS = java.util.Set.of("RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN");
+
+    /**
+     * 「本单引用的规格书变了吗」判定(2026-10-16 用户口径):前端在单据靠上位置挂一条黄条提示。
+     *
+     * 用户原话:「有一些单据是引用的规格书的数据,要是规格书申请修改数据了,但是其他的引用数据的单据是
+     *   归档状态……应该有一个提示,提示说单据对应的规格书申请修改了数据,请及时核对,这些单据也可以
+     *   对应的反审核然后重新引用数据」。选定口径:①规格书**正在改**(修改申请中/修改中/被弃审回草稿)
+     *   → 提示;②规格书**改完且比本单新** → 也提示。
+     *
+     * 实现要点:
+     *   · 取数复用 {@link DevTaskService#specByProduct(String)}(它已经做了「产品编号 → 规格书单」解析
+     *     与「未审批完不给数据」的门禁):拿得到 ⇒ 规格书是定稿态,只需比时间;拿不到但 reason=not_approved
+     *     ⇒ 规格书存在但正处在非定稿态(修改申请中/修改中/草稿…),这正是用户说的第一种情况;
+     *   · 「比本单新」用 **yj_doc_status.update_at**(最后状态变动时间)比:
+     *     ⚠ 不能用 archived_at —— 那个是「**仅首次归档**写入」的口径(CASE 保首次,见 markArchived),
+     *     改完重新归档不会刷新它,拿它比时间永远比不出来(踩过这个口径)。
+     *   · 只读判定,不产生任何写副作用;取不到就返回 needCheck=false(宁可不提示,也不要假告警)。
+     */
+    public Map<String, Object> specDriftState(String panelCode, String docNo) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("applicable", SPEC_REF_PANELS.contains(panelCode));
+        out.put("needCheck", false);
+        out.put("specNo", "");
+        out.put("specStatus", "");
+        out.put("specChangedAt", "");
+        out.put("docChangedAt", "");
+        out.put("reason", "");
+        if (!SPEC_REF_PANELS.contains(panelCode) || docNo == null || docNo.isBlank()) return out;
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) { out.put("applicable", false); return out; }
+        String key = DevTaskService.productKeyOf(panelCode);
+        if (key == null) return out;
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String productCode = "";
+        try {
+            List<String> rows = jdbc.queryForList("SELECT TOP 1 [" + key + "] FROM " + table
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, docNo);
+            if (!rows.isEmpty() && rows.get(0) != null) productCode = rows.get(0).trim();
+        } catch (Exception e) {
+            return out;   // 取不到产品键(缺列等)⇒ 不提示,避免误伤
+        }
+        if (productCode.isEmpty()) return out;   // 历史单(无产品编号)豁免
+        Map<String, Object> spec;
+        try {
+            spec = devTaskService.specByProduct(productCode, null);
+        } catch (Exception e) {
+            return out;
+        }
+        String specNo = nz(spec.get("单据编号"));
+        String specStatus = nz(spec.get("状态"));
+        if (specNo.isEmpty()) {
+            // 没挑到定稿规格书:只有"存在但未定稿"才算漂移(修改申请中/修改中/被弃审回草稿…)
+            String blocked = nz(spec.get("规格书编号"));
+            String blockedStatus = nz(spec.get("规格书状态"));
+            if (!blocked.isEmpty() && "not_approved".equals(nz(spec.get("reason")))) {
+                out.put("needCheck", true);
+                out.put("specNo", blocked);
+                out.put("specStatus", blockedStatus);
+                out.put("reason", "spec_in_flux");
+                out.put("specChangedAt", statusUpdateAt("RD_SPEC_DOC", blocked));
+                out.put("docChangedAt", statusUpdateAt(panelCode, docNo));
+            }
+            return out;
+        }
+        String specAt = statusUpdateAt("RD_SPEC_DOC", specNo);
+        String docAt = statusUpdateAt(panelCode, docNo);
+        out.put("specNo", specNo);
+        out.put("specStatus", specStatus);
+        out.put("specChangedAt", specAt);
+        out.put("docChangedAt", docAt);
+        // 规格书定稿态:比"最后状态变动时间"——规格书比本单新 ⇒ 本单引用的可能已是旧数据
+        if (!specAt.isEmpty() && !docAt.isEmpty() && specAt.compareTo(docAt) > 0) {
+            out.put("needCheck", true);
+            out.put("reason", "spec_newer");
+        }
+        return out;
+    }
+
+    /** 单据状态行的最后变动时间(格式化 yyyy-MM-dd HH:mm:ss;取不到回空串) */
+    private String statusUpdateAt(String panelCode, String docNo) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 CONVERT(nvarchar(19), update_at, 120) FROM yj_doc_status"
+                            + " WHERE panel_code = ? AND doc_no = ?", String.class, panelCode, docNo);
+            return rows.isEmpty() || rows.get(0) == null ? "" : rows.get(0);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** {@link #str(Object)} 的空串版本(str() 对 空/空白 返回 null,拼串/判空前先过这一层) */
+    private static String nz(Object o) {
+        String s = str(o);
+        return s == null ? "" : s;
+    }
+
+    // ══════════ 产品信息表漂移:引用它的四文件该不该提示核对 ══════════
+
+    /**
+     * 引用**产品信息表**的四个面板(按 [产品编号] 关联)。产品信息表自身不入本集合(被引用方向相反)。
+     * 与 {@link #SPEC_REF_PANELS} 并列:那是"规格书变了",这是"产品信息表变了"。
+     */
+    private static final java.util.Set<String> PRODINFO_REF_PANELS = java.util.Set.of(
+            "RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN");
+
+    /**
+     * 「本单引用的产品信息表变了吗」判定(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,
+     *   那些引用产品信息表的怎么办?应该也做一个提示通知」)。
+     *
+     * <p>与规格书漂移 {@link #specDriftState} 同构,只是被引用方换成产品信息表:
+     * <ul>
+     *   <li>产品信息表**正在改**(修改申请中/修改中) → 提示核对(reason=prod_in_flux);</li>
+     *   <li>产品信息表**被弃审退回草稿**(有 UNAUDIT 留痕) → 提示核对(prod_reaudited)——它已不是定稿态;</li>
+     *   <li>产品信息表**改完重新归档且比本单新** → 提示核对(prod_newer)。比的是
+     *       yj_doc_status.update_at(**不是** archived_at —— 那个只在首次归档写入,见 specDriftState 同款踩坑注)。</li>
+     * </ul>
+     * 只读判定、无写副作用;取不到(无产品编号/未分发/表缺列)一律 needCheck=false:宁可不提示,也不假告警。
+     */
+    public Map<String, Object> prodInfoDriftState(String panelCode, String docNo) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("applicable", PRODINFO_REF_PANELS.contains(panelCode));
+        out.put("needCheck", false);
+        out.put("prodNo", "");
+        out.put("prodStatus", "");
+        out.put("productCode", "");
+        out.put("prodChangedAt", "");
+        out.put("docChangedAt", "");
+        out.put("reason", "");
+        if (!PRODINFO_REF_PANELS.contains(panelCode) || docNo == null || docNo.isBlank()) return out;
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) { out.put("applicable", false); return out; }
+        String key = DevTaskService.productKeyOf(panelCode);
+        if (key == null) return out;
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String productCode = "";
+        try {
+            List<String> rows = jdbc.queryForList("SELECT TOP 1 [" + key + "] FROM " + table
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, docNo);
+            if (!rows.isEmpty() && rows.get(0) != null) productCode = rows.get(0).trim();
+        } catch (Exception e) {
+            return out;   // 取不到产品键(缺列等)⇒ 不提示,避免误伤
+        }
+        if (productCode.isEmpty()) return out;   // 历史单(无产品编号)豁免
+        String prodNo = prodInfoNoOf(productCode);
+        if (prodNo.isEmpty()) return out;
+        String st = String.valueOf(docStatusOf("RD_PROD_INFO", prodNo).get("status"));
+        out.put("prodNo", prodNo);
+        out.put("prodStatus", st);
+        out.put("productCode", productCode);
+        out.put("prodChangedAt", statusUpdateAt("RD_PROD_INFO", prodNo));
+        out.put("docChangedAt", statusUpdateAt(panelCode, docNo));
+        if ("修改申请中".equals(st) || "修改中".equals(st)) {
+            out.put("needCheck", true);
+            out.put("reason", "prod_in_flux");
+            return out;
+        }
+        // 弃审回草稿:纸面还在、但已不是审核过的定稿(靠 UNAUDIT 留痕区分"新建的草稿"与"退回来的草稿")
+        if ("草稿".equals(st) && hasUnauditTrace("RD_PROD_INFO", prodNo)) {
+            out.put("needCheck", true);
+            out.put("reason", "prod_reaudited");
+            return out;
+        }
+        String pa = nz(out.get("prodChangedAt"));
+        String da = nz(out.get("docChangedAt"));
+        if (!pa.isEmpty() && !da.isEmpty() && pa.compareTo(da) > 0) {
+            out.put("needCheck", true);
+            out.put("reason", "prod_newer");
+        }
+        return out;
+    }
+
+    /** 某产品编号对应的产品信息表单据号(未作废/未作废单,取最新一张);取不到回空串 */
+    private String prodInfoNoOf(String productCode) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 h.[单据编号] FROM rd_prod_info_head h"
+                            + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_PROD_INFO' AND s.doc_no = h.[单据编号]"
+                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
+                            + " AND h.[产品编号] = ? ORDER BY h.id DESC", String.class, productCode);
+            return rows.isEmpty() || rows.get(0) == null ? "" : rows.get(0).trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** 该单是否有弃审留痕(⚠ 列名是 form_no,不是 doc_no —— 写错会被 catch 吞掉,标记恒 false) */
+    private boolean hasUnauditTrace(String panelCode, String docNo) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_form_approval WHERE panel_code = ? AND form_no = ? AND action = 'UNAUDIT'",
+                    Integer.class, panelCode, docNo);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 产品信息表进入「会被改」的两个状态时,**通知引用它的四文件责任人**核对数据
+     * (2026-10-16 用户口径「那些引用产品信息表的怎么办?应该也做一个提示通知」)。
+     *
+     * <p>收件人 = rd_dev_task 里该产品编号四个文件的负责人(排除操作人自己);
+     * 没分发过(查不到负责人)= 没人可通知,静默跳过 —— 不发空消息。
+     * 与页面上的黄条是**同一件事的两个层次**:黄条给"打开这张单的人",消息给"该管的这个人"。
+     */
+    private void notifyProdInfoChanged(String prodNo, String actor, String why) {
+        try {
+            List<String> codes = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL([产品编号],N'') FROM rd_prod_info_head WHERE 单据编号 = ?", String.class, prodNo);
+            String code = codes.isEmpty() ? "" : nz(codes.get(0));
+            if (code.isEmpty()) return;
+            List<String> owners = jdbc.queryForList(
+                    "SELECT DISTINCT [负责人] FROM rd_dev_task WHERE [产品编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL([负责人],N'') <> N''", String.class, code);
+            List<String> targets = new java.util.ArrayList<>();
+            for (String o : owners) {
+                String t = nz(o);
+                if (!t.isEmpty() && !t.equals(actor) && !targets.contains(t)) targets.add(t);
+            }
+            if (targets.isEmpty()) return;
+            messageService.send(targets, MessageService.PRODINFO_CHANGED, "RD_PROD_INFO", prodNo,
+                    Map.of("docNo", prodNo, "actor", nz(actor), "productCode", code, "why", nz(why)), actor);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("prodinfo changed notify failed: {}", e.getMessage());
+        }
     }
 
     /**
@@ -5673,6 +6070,10 @@ public class ButtonService {
         // 消息:申请修改 → 管理员(把原因一并带上,管理员不用打开单据就知道要改什么)
         notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.MODIFY_REQUESTED,
                 Map.of("docNo", no, "actor", user, "opinion", reason), user));
+        // 2026-10-16 用户口径「产品信息表要是申请修改,那些引用产品信息表的怎么办?应该也做一个提示通知」:
+        // 产品信息表是四文件的**数据源头**(产品编号/尺寸/客户项目名称…),它一进修改流程,
+        // 已经归档的四文件里那份数据就可能过期 ⇒ 通知四个文件的责任人回来核对(页面另有黄条同源提示)。
+        if ("RD_PROD_INFO".equals(def.code())) notifyProdInfoChanged(no, user, reason);
         return result(no, "修改申请中");
     }
 

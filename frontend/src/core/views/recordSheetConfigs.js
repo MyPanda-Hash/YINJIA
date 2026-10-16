@@ -1755,29 +1755,38 @@ export const recordSheetConfigs = {
           { key: '日期', label: '日期', w: 349 },
         ]},
     ],
+    // 尾段行高(2026-10-16 用户口径两轮):
+    //   ①「这个位置的格子要大一点…每个格子竖向加长到原来的1.5倍」→ 先按 ×1.5 调(92→138、74→111);
+    //   ②「太长了,改短一点取原来的和改后的中间值」→ 落在**原始值与 ×1.5 的中点**:
+    //      74 与 111 的中点 = 92;92 与 138 的中点 = 115。
+    //   ⚠ 同批修了**渲染侧**的真因:尾段原先走简化渲染,不认 row.grid/row.h,这些行被压成自然行高 31px
+    //     (见 RecordSheetPanels.vue「表尾网格行」注释)—— 不改那里,调 h 也不会生效。
+    //   ⚠ 「批准」段(批准/签字/日期 + 下方三格手签区)是**纸面手签区,不进单据**:
+    //     三个标签格是静态文字,下方三格不带 key ⇒ 渲染成只读文本格(实测可编辑态下 input/textarea 数 = 0),
+    //     打印出来就是留给领导手签的空白格。别给它们补 key,补了就真能填了。
     tailSections: [
       { page: 0, bar: '三.相关变更', rows: [
-        { h: 92, grid: [
+        { h: 115, grid: [
           { label: '相关变更' },
-          { key: '相关变更', span: 5, area: true, rows: 2, ph: '与哪些文件/工序/在制品相关联' },
+          { key: '相关变更', span: 5, area: true, rows: 3, ph: '与哪些文件/工序/在制品相关联' },
         ]},
       ]},
       { page: 0, bar: '四、库存产品处理方式', rows: [
-        { h: 74, grid: [
+        { h: 92, grid: [
           { label: '原料' },
           { label: '数量' },
           { key: '原料数量' },
           { label: '处理方式' },
           { key: '原料处理方式', type: 'select', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 92, grid: [
           { label: '半成品' },
           { label: '数量' },
           { key: '半成品数量' },
           { label: '处理方式' },
           { key: '半成品处理方式', type: 'select', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 92, grid: [
           { label: '成品' },
           { label: '数量' },
           { key: '成品数量' },
@@ -1786,13 +1795,13 @@ export const recordSheetConfigs = {
         ]},
       ]},
       { page: 0, bar: '五、其它', rows: [
-        { h: 74, grid: [
+        { h: 92, grid: [
           { label: '文件管理人' },
           { key: '文件管理人', span: 2 },
           { label: '密级' },
           { key: '密级', type: 'select', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 92, grid: [
           { label: '文件使用范围' },
           { key: '文件使用范围', type: 'select', span: 2 },
           { label: '备注' },
@@ -1801,15 +1810,16 @@ export const recordSheetConfigs = {
       ]},
       // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)——手签行也得留够高度
       { page: 0, bar: '批准', rows: [
-        { h: 74, grid: [
+        { h: 92, grid: [
           { label: '批准', span: 2 },
           { label: '签字', span: 2 },
           { label: '日期', span: 2 },
         ]},
-        { h: 74, grid: [
-          { span: 2 },
-          { span: 2 },
-          { span: 2 },
+        // 下方三格 = 手签空白区:**不带 key** ⇒ 纸面只读、按钮输入不进来(用户口径「不能填写」)
+        { h: 92, grid: [
+          { span: 2, ro: true },
+          { span: 2, ro: true },
+          { span: 2, ro: true },
         ]},
       ]},
     ],

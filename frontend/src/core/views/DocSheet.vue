@@ -8,7 +8,7 @@
        ④ 底部签名:signCells(蓝格标签 + 值区)
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="approval-sheet">
+  <div class="approval-sheet" :style="sheetStyle">
     <!-- ⛔ 终止审批横幅(项目实施计划:申请终止(阶段处)二级审批 立项人→管理员→落实;打印隐藏) -->
     <div v-if="panelCode === 'RD_PLAN' && term" class="as-term-banner no-print-term" :class="'term-' + term.state">
       <template v-if="term.state === 'T'">
@@ -346,7 +346,9 @@
           <div class="as-name">{{ tt(row.label) }}</div>
           <!-- 有 row.second 的行横向切成两段(实施计划第 8 行:负责人值区 | 编制日期),设计里有竖线分隔 -->
           <div class="as-fill" :class="{ 'as-fill-split': !!row.second }">
-            <div v-if="row.hint" class="as-hint">{{ tt(row.hint) }}</div>
+            <!-- 2026-10-16 用户口径:「我只需要背景提示词就行了，不要固定的提示词，这个已经是固定显示在里面了」
+                 —— row.hint 原先是**既当占位词、又渲染成这一行固定文字**(输入框/下拉里灰字 + 下面一行黑字,
+                 同一句话在格子里出现两次)。现在只留占位词:输入/文本域用 :placeholder,下拉用它当未选中提示。 -->
             <div class="as-fill-main">
               <el-input
                 v-if="editable && !signLocked(row) && row.kind === 'input'"
@@ -625,6 +627,7 @@ import { attachFieldOf } from '@core/panel/attachField.js'
 import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
+import { fixedSheetWidth } from './docSheetConfigs'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -657,6 +660,21 @@ const remarkAttach = computed(() => attachFieldOf(props.fields))
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
+
+/**
+ * 定死纸宽(2026-10-16 用户口径:「定死纸宽 1242」):纸宽表在 docSheetConfigs.FIXED_SHEET_W
+ *   (可单测),这里只负责套到纸面根节点上。
+ * 【为什么要一起写 flex:none】外层 PanelxList 的 `.approval-layout :deep(.approval-sheet){flex:1;
+ *   min-width:0}` 把纸面变成了弹性撑满(flex-basis 归 0、由 flex-grow 分配剩余空间)——
+ *   只写 width 完全不起作用(实测 1600 窗口 1172~1202px,随窗口变)。内联 `flex:none` 才能压过它。
+ * ⚠ 打印/导出不受影响:@media print 的 `body.approval-printing .approval-sheet{width:100%!important}`
+ *   带 !important,仍压过这里的内联样式。
+ * 其余文书式面板宽度为 0 ⇒ 不套内联样式,保持原有的自适应行为。
+ */
+const sheetStyle = computed(() => {
+  const w = fixedSheetWidth(props.panelCode)
+  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none' } : null
+})
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
@@ -1134,12 +1152,8 @@ defineExpose({ focusField })
   flex-direction: column;
   padding: 3px 6px;
 }
-.as-hint {
-  font-size: 14px;
-  color: #333;
-  line-height: 20px;
-  padding-left: 2px;
-}
+/* .as-hint(固定提示词那一行)已于 2026-10-16 随用户口径删除 —— row.hint 现在只当占位词。
+   探针 tools/archive/_probe-pm-flow.cjs 里读 .as-hint 的那一项是历史取证脚本,不再有对应元素。 */
 .as-fill-input {
   flex: 1;
 }
@@ -1723,8 +1737,7 @@ defineExpose({ focusField })
   /* 阶段框标识(阶段N/隐藏/显示全部)仅为编辑标识,导出/打印不出现 */
   body.approval-printing .as-phase-title,
   body.approval-printing .as-phase-toggle,
-  body.approval-printing .as-phase-restore,
-  body.approval-printing .as-hint {
+  body.approval-printing .as-phase-restore {
     display: none !important;
   }
   /* 「已完成」角标属于办理状态,不进导出件 */

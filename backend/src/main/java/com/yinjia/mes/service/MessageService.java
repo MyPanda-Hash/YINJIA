@@ -43,6 +43,8 @@ public class MessageService {
     public static final String DELETE_REQUESTED = "DELETE_REQUESTED";
     /** 消息码:规格书检验项目及标准已改 → 关联出货检验计划表的经办人+管理员(核对一致性提醒) */
     public static final String SPEC_ITEMS_CHANGED = "SPEC_ITEMS_CHANGED";
+    /** 消息码:产品信息表申请修改 / 被弃审(会变质)→ 引用它的四文件责任人(核对数据提醒,2026-10-16 用户口径) */
+    public static final String PRODINFO_CHANGED = "PRODINFO_CHANGED";
     /** 消息码:项目实施计划申请终止 → 立项人(一级审批) */
     public static final String TERM_REQUESTED = "TERM_REQUESTED";
     /** 消息码:立项人已同意终止 → 管理员(二级审批) */
