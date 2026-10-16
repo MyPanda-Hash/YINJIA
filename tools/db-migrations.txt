@@ -3724,6 +3724,8 @@ migrate-kucun-recalc-to-now-20261016.sql
 migrate-qc-insp-detail-restore-20261016.sql
 # migrate-doc-detail-uncancel-20261016.sql — 全库复效「单头有效、明细却全部作废」的单据明细(检验单 IJ-2026-10-0011 起 / 暂收单 SL-2026-10-0111~0119 等),逐表报数 + 复扫自检
 migrate-doc-detail-uncancel-20261016.sql
+# migrate-qc-item-plan-reseed-20261016.sql — 检验项目/检验方案受控主数据补播(2 方案 + 14 项目;部署包实测两表 0 行而原脚本已登记 ⇒ 单列一条幂等补播)
+migrate-qc-item-plan-reseed-20261016.sql
 # migrate-yj-field-dedup.sql — 清掉 yj_field 完全重复登记行(体检 07;6 处全在 PURCHASE_IN)⇒ 171→165 行,须同批刷新四单基线
 migrate-yj-field-dedup.sql
 # 以下 6 条为**已应用但漏登记**的历史脚本(体检 12):补登记,用 DbSync baseline 只登记不执行
