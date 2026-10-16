@@ -17,7 +17,7 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 35a6bfa373f7(sha256 64f5d36ee202b1c8…)
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 5f858bbc7d58(sha256 a62285aad7047523…)
  *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=34 · PURCHASE_IN=171(共 329 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
