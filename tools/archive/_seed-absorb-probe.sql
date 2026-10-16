@@ -16,9 +16,10 @@ DELETE FROM dbo.plang_pc WHERE pl_no = N'GD-TEST-ABSORB-01';
 DELETE FROM dbo.plang WHERE pl_no = N'GD-TEST-ABSORB-01';
 
 -- ① 工单行(排产数量 20;路线 GY-CB-STD 成型换算率 3 ⇒ 成型计划量 60,报 100 = 超产)
+--    scx 先给「1号机」= 首道排产线(已排产状态),转序后应变成切炭的计划线「2号机」
 INSERT INTO dbo.plang (comm, pl_no, pl_xc, pl_date, scx, khdm, dm, mc, gg, jldw, pl_sl, xq_sl, ja, od_no, od_xc,
                        [批次号], [工艺路线], asp_user1, asp_time1, asp_cancel)
-VALUES (N'0', N'GD-TEST-ABSORB-01', 1, GETDATE(), NULL, N'KH-TEST', N'CP-TEST', N'吸收探针产品', N'100×50', N'件',
+VALUES (N'0', N'GD-TEST-ABSORB-01', 1, GETDATE(), N'1号机', N'KH-TEST', N'CP-TEST', N'吸收探针产品', N'100×50', N'件',
         20, 20, N'N', N'SO-TEST', 1, N'20261017', N'GY-CB-STD', N'absorb-probe', GETDATE(), N'N');
 DECLARE @plang int = SCOPE_IDENTITY();
 

@@ -148,8 +148,17 @@ public class ScheduleBoardController {
     public ApiResult<List<Map<String, Object>>> scheduled(@RequestBody(required = false) Map<String, Object> body) {
         // 调用方只有工单排产看板(选中线的排产明细);快速排产页不调它 ⇒ 不放行 SCHEDULE_BOARD
         perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
-        return ApiResult.ok(service.scheduled(str(body == null ? null : body.get("生产线")),
-                str(body == null ? null : body.get("scope")), workshop()));
+        String line = str(body == null ? null : body.get("生产线"));
+        String scope = str(body == null ? null : body.get("scope"));
+        List<Map<String, Object>> rows = service.scheduled(line, scope, workshop());
+        // 🔴 2026-10-17 用户口径「不能做到当前数据满足就进入下一个工序吗?……让当前数据满足就进入,
+        //   而不是完成审核才进入」:明细里凡是「当前工序完工量 ≥ 当前工序计划量」的行,说明这一道已经做够,
+        //   当场按数据推进到下一道(判据 = 报工审核钩子**同一个方法**,见 ProcessTaskService.advanceSatisfied)。
+        //   推进过就重取一次明细 ⇒ 界面直接显示推进后的当前工序/产线,不用刷新两次。
+        if (processTask.advanceSatisfied(rows, currentUser())) {
+            rows = service.scheduled(line, scope, workshop());
+        }
+        return ApiResult.ok(rows);
     }
 
     /** 批量调线:勾选已排工单 → 目标生产线(停用线拒绝) */
