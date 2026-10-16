@@ -94,17 +94,22 @@ public class FlowBoardService {
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("name", def.name());
             if (def.isDoc()) {
-                int docs = count("SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'");
-                int audited = count("SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = ?"
-                        + " AND shr IS NOT NULL AND ISNULL(canceled,'N')<>'Y'", code);
-                int pending = count("SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = ?"
-                        + " AND pending = 'Y' AND ISNULL(canceled,'N')<>'Y'", code);
-                n.put("docs", docs);
-                n.put("audited", audited);
-                n.put("pending", pending);
-                n.put("draft", Math.max(0, docs - audited));
-                n.put("rows", count("SELECT COUNT(*) FROM " + def.lineTable() + " WHERE ISNULL(asp_cancel,'N')<>'Y'"));
+                n.put("docs", count("SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'"));
+                // 2026-10-16 性能专项:已审核/待审核原本是两条独立 SQL(每面板 2 次往返),
+                // 合并成一条按条件求和 —— 16 张单据面板就省下 16 次往返。
+                Map<String, Object> st = jdbc.queryForMap(
+                        "SELECT SUM(CASE WHEN shr IS NOT NULL THEN 1 ELSE 0 END) AS audited,"
+                                + " SUM(CASE WHEN pending = 'Y' THEN 1 ELSE 0 END) AS pending"
+                                + " FROM yj_doc_status WHERE panel_code = ? AND ISNULL(canceled,'N')<>'Y'", code);
+                n.put("audited", toInt(st.get("audited")));
+                n.put("pending", toInt(st.get("pending")));
+                n.put("draft", Math.max(0, toInt(n.get("docs")) - toInt(st.get("audited"))));
+                // ⚠ 单据面板默认不数明细行:解析规格(前端 flowSpec)里只有 WO_REPORT 用到它
+                //   (卡片上的「报工行」)—— 原先每张单据面板都白跑一次 COUNT(*),现在只保留这一张。
+                if ("WO_REPORT".equals(code)) {
+                    n.put("rows", count("SELECT COUNT(*) FROM " + def.lineTable() + " WHERE ISNULL(asp_cancel,'N')<>'Y'"));
+                }
             } else {
                 // flat 直读视图(库存报表/完工明细/报工记录):只有行数,没有单据状态
                 n.put("docs", null);
@@ -159,14 +164,21 @@ public class FlowBoardService {
         }
     }
 
-    /** 快速排产:复用既有服务(待排产笔数 / 今日排产 / 总未完成量) */
+    /**
+     * 快速排产:待排产笔数走 {@link ScheduleBoardService#poolCount}(只数数,不拉池内 405 行),
+     * 今日排产/总未完成量复用 {@link ScheduleBoardService#stats} —— 与排产页同一口径。
+     *
+     * <p>2026-10-16 性能专项:先前直接调 stats,而 stats 内部 `pending()` 会把整池行连同两个
+     * LEFT JOIN 拉回来只为了 `.size()`;本板每次刷新都白付一次(实测该池 969 ms → 建索引后 20 ms,
+     * 但笔数查询只要 2 ms)。
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> schedule() {
         try {
             Map<String, Object> s = scheduleBoard.stats(null);
             Map<String, Object> today = (Map<String, Object>) s.get("今日排产");
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("pool", s.get("待排产笔数"));
+            m.put("pool", scheduleBoard.poolCount(null));
             m.put("todayCnt", today == null ? 0 : today.get("张数"));
             m.put("todayQty", today == null ? 0 : today.get("数量"));
             m.put("wipQty", s.get("总未完成量"));
@@ -258,6 +270,11 @@ public class FlowBoardService {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    /** 同 n(),名字更贴读取语义(SUM 出来的 audited/pending 可能是 null) */
+    private static int toInt(Object o) {
+        return n(o);
     }
 
     private int count(String sql, Object... args) {

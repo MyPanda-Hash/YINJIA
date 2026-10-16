@@ -3741,3 +3741,5 @@ migrate-wlbom-menu-rollback-20261015.sql
 migrate-role-perm-words-20261016.sql
 # migrate-stock-detail-module-group-20261016.sql — 库存明细(STOCK_DETAIL)的 module_group 系统管理→库存核算(权限矩阵里不该出现导航没有的分组;自检全库 module_group 越界 0 处)
 migrate-stock-detail-module-group-20261016.sql
+# migrate-bsinv-invcode-index-20261016.sql — bs_inv(存货编码) 加非聚集索引:待排产池实测 969ms→20ms(47×);同一派生 JOIN 还在排产看板/工单列表/订单结转/流程管控,五处一起提速(理由与实测见脚本头注,符合《数据库规范》§2.4)
+migrate-bsinv-invcode-index-20261016.sql
