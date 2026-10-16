@@ -95,7 +95,7 @@ BEGIN
   SELECT N'RESULT: DEMO-FILES' AS chk, CAST(COUNT(*) AS nvarchar(10)) AS n FROM (
     SELECT 单据编号 FROM rd_mold_proc_head WHERE 产品编号 LIKE N'DEMO-%'
     UNION ALL SELECT 单据编号 FROM rd_asm_proc_head  WHERE 产品编号 LIKE N'DEMO-%'
-    UNION ALL SELECT 单据编号 FROM rd_spec_doc_head  WHERE 编号     LIKE N'DEMO-%'
+    UNION ALL SELECT 单据编号 FROM rd_spec_doc_head  WHERE 单据编号 LIKE N'DEMO-%'
     UNION ALL SELECT 单据编号 FROM rd_insp_plan_head WHERE 产品编号 LIKE N'DEMO-%') t;
   SELECT N'RESULT: DEMO-CHANGE' AS chk, CAST(COUNT(*) AS nvarchar(10)) AS n FROM rd_change_head WHERE 产品编号 LIKE N'DEMO-%';
   SELECT N'RESULT: DEMO-USERS' AS chk, CAST(COUNT(*) AS nvarchar(10)) AS n FROM yj_user WHERE username LIKE N'demo[_]%';
