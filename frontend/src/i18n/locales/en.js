@@ -3700,7 +3700,151 @@ export default {
     '分区已消失': 'Zone no longer exists',
     '大区': 'Area',
     '存储分区': 'Sub-zone',
-  
+
+    // ── 流程管控看板(2026-10-16):生产/库存两条链路的节点名 · 口径说明 · 状态词 ──
+    '生产过程': 'Production flow',
+    '库存流转': 'Inventory flow',
+    '当前卡点': 'Current blockers',
+    '数据时间': 'As of',
+    '各节点无积压:流程通畅': 'No backlog at any node: the flow is clear',
+    '看板口径:节点数字为该面板当前在办量(草稿/待审/在制),点卡片进入面板;红=阻断、橙=积压、绿=通畅、灰=无在办。':
+      'How to read: each node shows the open volume of that panel (draft / pending review / WIP); click a card to open the panel. Red = blocked, orange = backlog, green = clear, grey = nothing open.',
+    '阻断': 'Blocked',
+    '积压': 'Backlog',
+    '通畅': 'Clear',
+    '无在办': 'Nothing open',
+    '无数据': 'No data',
+    '生管泳道 · 接单与计划': 'Planning lane · orders & planning',
+    '领料与排产': 'Picking & scheduling',
+    '生产执行(五道工序:领料 · 报工)': 'Execution (five operations: picking · job reporting)',
+    '品质与入库': 'Quality & receipt',
+    '采购与收料': 'Purchasing & receiving',
+    '检验与判定': 'Inspection & verdict',
+    '入库 / 退货 / 特采': 'Receipt / return / concession',
+    '库存查询与预警(旁路)': 'Inventory queries & alerts (side lane)',
+    '销售订单 → 结转 → 工单 → 领料/排产 → 报工续序 → 检验 → 产成品入库':
+      'Sales order → convert → work order → picking/scheduling → job reporting → inspection → finished goods receipt',
+    '采购订单 → 暂收单 →(来料检验?)→ 检验/退货/特采 → 采购入库 → 转 ERP':
+      'Purchase order → receipt → (incoming inspection?) → inspection / return / concession → purchase receipt → ERP',
+    '订单进来后先结转成工单,才谈得上排产': 'Orders convert into work orders before scheduling can start',
+    '两条支路:要料的走领料单,要产线的走快速排产': 'Two branches: material goes through picking, capacity through quick scheduling',
+    '报工达标才切下一道预排线,全部达标才完工':
+      'The next pre-lined operation starts only when the current one meets its plan; all operations met means completed',
+    '检验合格数量 → 产成品入库单 → 仓库审核记账':
+      'Passed qty → finished goods receipt → warehouse approval posts it',
+    '暂收单按商品的「来料检验」字段决定走不走检验':
+      'The receipt routes to inspection based on the item flag "incoming inspection"',
+    '来料检验单审核后按合格数量 / 不合格数量分流':
+      'After approval the incoming inspection splits into passed / rejected qty',
+    '特采必须二级审批通过才放行进采购入库':
+      'A concession needs two-level approval before it can enter the purchase receipt',
+    '报表都是查询表;出库受预警数量拦截': 'All reports are query views; issues are blocked by the alert quantity',
+    'ERP 自动导入;订单行剩余 = 需求 − 已排产 − 已采购':
+      'Auto-imported from ERP; line remaining = demand − scheduled − purchased',
+    '选中工艺路线才能转成生产工单;行级占用链防重复转单':
+      'A routing must be chosen before converting into a work order; line-level links prevent double conversion',
+    '转工单直落参考库 plang,无需审核即入待排产池':
+      'Converting writes straight into plang; no approval needed before the pool',
+    '「转领料单」按工单行去重生成;只写单头,明细由仓库补填':
+      'Picking is generated per work-order line (deduplicated); header only, the warehouse fills the lines',
+    '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入':
+      'Pool = work-order lines with no line and not closed; pick a line (with load) and assign singly or in batch',
+    '选择工序 → 预排线(工序·工序序·计划产线·计划数量)':
+      'Pick operations → pre-line (operation · sequence · planned line · planned qty)',
+    '按开工日→交期把在制量均摊到每天,看哪条线压着活':
+      'Spreads WIP over the days between start and due date, showing which line is loaded',
+    '扫码领料 → 报工 → 审核通过;不过审不进下一道':
+      'Scan picking → report → approved; without approval it cannot move to the next operation',
+    '排线跑完(路线各道均达标)即完工': 'Finishing the line-up (every operation met) completes the order',
+    '续序轨迹:第一道未达标 = 当前该做的道':
+      'Sequence trail: the first operation not yet met is the one to work on',
+    '本批第一张报工审核后自动出草稿': 'The first approved job report of the batch creates a draft',
+    '成型工序产出检验数据:人工开单填写': 'Moulding output inspection data: opened and filled in manually',
+    '组装报工审核自动生成;表头「合格数量」必填':
+      'Created automatically when an assembly job report is approved; the header "passed qty" is required',
+    '检验不合格的数量转不良品处理单草稿': 'Rejected qty turns into a nonconforming handling draft',
+    '审核通过按表头「合格数量」生成草稿;仓库审核后记库存流水并回写工单':
+      'Approval creates a draft with the header "passed qty"; warehouse approval posts the stock ledger and writes back to the work order',
+    '采购订单生单 → 送料暂收单': 'The purchase order generates the temporary receipt',
+    '商品档案「来料检验 = 是」→ 走来料检验;= 否 → 直接采购入库':
+      'Item master "incoming inspection = yes" goes to incoming inspection; "no" goes straight to a purchase receipt',
+    '检验单每条明细对应一张数据记录': 'Each inspection line maps to one data record',
+    '检验项目/方案的占位台账,按目录取检验项':
+      'Placeholder ledger of inspection items and plans; items are taken from the catalogue',
+    '合格 → 采购入库单;不合格 → 退货单(特采=是,审批)':
+      'Passed → purchase receipt; rejected → return note (concession = yes, approved)',
+    '不合格数量退料;「特采 = 是」的行转特采流程':
+      'Rejected qty is returned; rows with "concession = yes" enter the concession flow',
+    '二级审批:通过后放行 → 采购入库单': 'Two-level approval: once passed it is released to the purchase receipt',
+    '审核通过后转 ERP;库存流水按批号记账':
+      'Pushed to ERP after approval; the stock ledger is posted by lot',
+    '库存状况/台账/收发存汇总/库存明细 = flat 直读查询表,不可编辑':
+      'Stock status / ledger / receipt-issue summary / inventory detail are flat read-only query views',
+    '出库后该批次余额 < 预警数量 ⇒ 审批被拦下(先在库存明细设预警数量)':
+      'If the batch balance after issue is below the alert quantity the approval is blocked (set the alert quantity in inventory detail first)',
+    '出库预警': 'Issue alert',
+    '低于预警': 'Below alert',
+    '已设预警': 'With alert set',
+    '负结存': 'Negative balance',
+    '库存报表(只读)': 'Inventory reports (read-only)',
+    '库存状况': 'Stock status',
+    '库存台账': 'Stock ledger',
+    '收发存汇总': 'Receipt-issue summary',
+    '库存明细行': 'Inventory detail rows',
+    '订单数': 'Orders',
+    '待结转行': 'Lines to convert',
+    '款数': 'Styles',
+    '下单数量': 'Ordered qty',
+    '最新下单': 'Latest order',
+    '未排产': 'Not scheduled',
+    '已排产': 'Scheduled',
+    '已排产行': 'Scheduled rows',
+    '已完工': 'Completed',
+    '排产数量': 'Scheduled qty',
+    '材料出库单': 'Material issue',
+    '待排产笔数': 'Waiting to schedule',
+    '今日排产(张)': 'Scheduled today (docs)',
+    '今日排产(量)': 'Scheduled today (qty)',
+    '在产线': 'On line',
+    '产线数': 'Lines',
+    '工单排产 / 预排线': 'Work order scheduling / pre-lining',
+    '在制未完成量': 'WIP unfinished qty',
+    '产线排产负荷': 'Line load',
+    '负荷行数': 'Load rows',
+    '工序报工单': 'Operation job report',
+    '报工单': 'Job reports',
+    '报工行': 'Report rows',
+    '待审核': 'Pending review',
+    '待审批': 'Pending approval',
+    '完工明细': 'Completion detail',
+    '完工行': 'Completed rows',
+    '报工记录': 'Job report log',
+    '记录行': 'Log rows',
+    '首件检验单': 'First article inspection',
+    '制程检验单(成型产出)': 'Process inspection (moulding output)',
+    '组装成品检验单': 'Assembly inspection',
+    '合格数量': 'Passed qty',
+    '不合格数量': 'Rejected qty',
+    '不合格品处理单(制程)': 'Nonconforming handling (process)',
+    '待处理草稿': 'Draft to handle',
+    '产成品入库单': 'Finished goods receipt',
+    '来料检验单': 'Incoming inspection',
+    '检验数据记录': 'Inspection data record',
+    '检验目录': 'Inspection catalogue',
+    '记录单': 'Records',
+    '目录单': 'Catalogue docs',
+    '采购入库单': 'Purchase receipt',
+    '暂收退料单': 'Return note',
+    '特采单': 'Concession request',
+    '单据数': 'Documents',
+    '草稿': 'Draft',
+    '已审核': 'Approved',
+    '来料检验分流': 'Incoming-inspection split',
+    '合格 / 不合格分流': 'Pass / reject split',
+    '检验合格 → 入库': 'Inspection passed → receipt',
+    '报工审核通过': 'Job report approved',
+    '转领料单 / 排产': 'To picking / schedule',
+
   },
 
 }

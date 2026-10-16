@@ -465,6 +465,11 @@
       </div>
     </template>
 
+    <!-- ===== 流程管控(2026-10-16:生产过程 + 库存流转的节点级链路视图)===== -->
+    <template v-else-if="mod === 'flow'">
+      <FlowBoard :data="flowData" :blocks="flowBlocks" :at="flowAt" @open="onFlowOpen" />
+    </template>
+
     <!-- ===== 质量 ===== -->
     <template v-else>
       <div class="dash-grid">
@@ -532,6 +537,7 @@ import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
 import SCapacityBars from './SCapacityBars.vue'
+import FlowBoard from './FlowBoard.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { pickQuickEntries } from '@core/dashboard/deskQuick'
@@ -583,6 +589,7 @@ const quickEntries = computed(() => pickQuickEntries(desk.value.quick, {
 // ---------- 看板模块 ----------
 const MODULES = [
   { key: 'overview', title: '概览', icon: 'DataBoard' },
+  { key: 'flow', title: '流程管控', icon: 'Share' },
   { key: 'rd', title: '研发管理', icon: 'MagicStick' },
   { key: 'prod', title: '生产', icon: 'Odometer' },
   { key: 'stock', title: '库存', icon: 'Box' },
@@ -590,6 +597,29 @@ const MODULES = [
   { key: 'quality', title: '质量', icon: 'Aim' },
 ]
 const mod = ref('overview')
+
+// ---------- 流程管控模块:两条链路(生产/库存)的节点在办量与卡点 ----------
+// 数据只来自 /dashboard/flow(FlowBoardService);链路排布在 @core/dashboard/flowSpec.js。
+// 与 rd 同款懒加载:切到该页签才算一次,不用把整桌面的 KPI/库存聚合跟着重跑。
+const flowData = ref(null)
+const flowBlocks = ref([])
+const flowAt = ref('')
+let flowLoaded = false
+async function loadFlow(force = false) {
+  if (flowLoaded && !force) return
+  try {
+    const r = await request.get('/dashboard/flow')
+    const d = r?.data || {}
+    flowData.value = d
+    flowBlocks.value = d.blocks || []
+    flowAt.value = d.at || ''
+    flowLoaded = true
+  } catch { /* 静默:看板不该因为一个接口失败而弹错 */ }
+}
+/** 流程卡片/卡点点击:与桌面其它卡片走同一跳转口径 */
+function onFlowOpen(path) {
+  if (path) router.push(path)
+}
 
 // ---------- 研发管理模块:修改申请动态 + 最新单据 + 面板档案本 ----------
 const rdData = ref({ modifyRequests: [], newDocs: [], panels: [] })
@@ -603,6 +633,7 @@ async function loadRd() {
 }
 watch(mod, (v) => {
   if (v === 'rd' && !rdLoaded) loadRd()
+  if (v === 'flow') loadFlow()
 }, { immediate: true })
 function goPanel(panelCode, docNo) {
   if (!panelCode) return
@@ -1923,7 +1954,10 @@ function go(path, title) {
   gap: 10px;
   flex-wrap: wrap;
 }
-.mod-bar .mod-tabs { flex: 0 1 auto; }
+/* 2026-10-16 修:`.mod-tabs` 自己写了 `width:max-content` + `overflow-x:auto`,但没给上限 ——
+   加第 7 个页签(流程管控)后它在 375 宽下宽 596px,把整页顶出 22px 横向滚动(实测)。
+   补 min-width:0 + max-width:100%:盒子被容器夹住后,它自己的 overflow-x 才开始真正横滚。 */
+.mod-bar .mod-tabs { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .range-bar {
   display: flex;
   align-items: center;
