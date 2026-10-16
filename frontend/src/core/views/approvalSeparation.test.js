@@ -28,6 +28,28 @@ test('提交人从哪来：后端在「审批中」的单据上下发 `提交人
     '前端判据全靠这个键；后端不发了，前端闸门会静默失效（回到"点了才知道"）')
 })
 
+// ── 2026-10-16 用户二次报障:「产品信息表保存之后不见审批按钮」──
+/**
+ * 上一版把「能不能真的批」当成「显不显示」的判据 ⇒ **提交人自己**看到一片空白,
+ * 以为流程坏了(用户报障原话)。既有口径是「置灰 + 说清原因」,不是藏起来。这里把两者钉开:
+ *   显示 = 有没有资格;能不能点 = isDisabled。
+ */
+test('审批按钮「显示」只看资格,不因"我是提交人"就消失(否则用户以为流程坏了)', () => {
+  assert.match(panelx, /const approvalBtnsVisible = computed\(\(\) => \(isQcL2Panel\.value\s*\n\s*\? canApproveQcL2Here\.value\s*\n\s*: \(canApproveHere\(\) \|\| l2ApproverNow\.value\)\)\)/,
+    '资格 = 审批权 ∪ 被一级选定的二级审核人(QC 两级走原口径)')
+  assert.match(panelx, /<template v-if="approvalBtnsVisible">/, '模板要按资格渲染按钮组')
+  assert.ok(!/approvalActionReady/.test(panelx), '旧的"能不能真的批"判据不该再留在模板里(会把人藏没)')
+  assert.match(panelx, /:class="\{ disabled: isDisabled\('审批通过'\) \}"\s*\n\s*:title="isDisabled\('审批通过'\) \? disabledReason\('审批通过'\) : ''"/,
+    '提交人自己仍要**看得见但置灰**,并把原因挂在 title 上')
+})
+
+test('轮不到我处理时:侧栏说清"在等谁",不留空白', () => {
+  assert.match(panelx, /<div v-else class="as-side-hint">\{\{ tt\(approvalWaitingTip\) \}\}<\/div>/)
+  assert.match(panelx, /const approvalWaitingTip = computed\(\(\) => \(curDocStatus\.value === '待二级审批'/)
+  assert.match(en, /'本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）':/)
+  assert.match(en, /'本单在二级签核：由一级选定的二级审核人（或管理员）签核':/)
+})
+
 test('提交人（非管理员）点一级「审批通过」必须置灰，且只在「审批中」这一档生效', () => {
   const body = panelx.match(/审批通过: [\s\S]{0,400}?\n\s*审批驳回:/)
   assert.ok(body, '找不到 isDisabled 里的 审批通过 判定')

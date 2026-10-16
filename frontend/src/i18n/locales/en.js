@@ -2808,6 +2808,11 @@ export default {
     '已自动生成规格书草稿 {no}，是否现在打开继续补充？': 'Spec sheet draft {no} was created automatically. Open it now to continue?',
     '规格书草稿': 'Spec sheet draft',
     '稍后': 'Later',
+    /* ── 审批按钮:轮不到我处理时的等待说明(2026-10-16 用户报障「不见审批按钮」) ── */
+    '本单在二级签核：由一级选定的二级审核人（或管理员）签核':
+      'This document is at the second-level sign-off: the second-level approver picked by the first level (or an admin) signs it',
+    '本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）':
+      'This document has been submitted for approval and is waiting for the first-level approver (the submitter cannot approve their own document)',
     '本单引用的产品信息表 {no} 正在修改（{st}），请及时核对数据':
       'The product info sheet {no} referenced by this document is being modified ({st}); please verify the data',
     '本单引用的产品信息表 {no} 已被反审核退回草稿，请核对数据':

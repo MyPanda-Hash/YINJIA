@@ -371,10 +371,23 @@
                 <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
               </template>
               <template v-if="IN_APPROVAL.includes(curDocStatus)">
-                <template v-if="isQcL2Panel ? canApproveQcL2Here : approvalActionReady">
-                  <div class="as-side-btn primary" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt(approveBtnLabel) }}</div>
-                  <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tt(rejectBtnLabel) }}</div>
+                <template v-if="approvalBtnsVisible">
+                  <div
+                    class="as-side-btn primary"
+                    :class="{ disabled: isDisabled('审批通过') }"
+                    :title="isDisabled('审批通过') ? disabledReason('审批通过') : ''"
+                    @click="onSideAction('审批通过')"
+                  >{{ tt(approveBtnLabel) }}</div>
+                  <div
+                    class="as-side-btn"
+                    :class="{ disabled: isDisabled('审批驳回') }"
+                    :title="isDisabled('审批驳回') ? disabledReason('审批驳回') : ''"
+                    @click="onSideAction('审批驳回')"
+                  >{{ tt(rejectBtnLabel) }}</div>
                 </template>
+                <!-- 轮不到我处理:不藏成"什么都没有"(用户会以为流程坏了),也不给点了必被拒的按钮,
+                     只把"现在在等谁"说出来 —— 见 approvalBtnsVisible 注释 -->
+                <div v-else class="as-side-hint">{{ tt(approvalWaitingTip) }}</div>
               </template>
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程(审批本身走上面的统一审批块)。
@@ -3880,13 +3893,20 @@ const sheetSideGroups = computed(() => approvalSideGroups.value
 const hasFieldAdmin = computed(() => !String(panelCode.value).startsWith('RD_')
   && approvalSideGroups.value.some((g) => actsOf(g).includes('字段管理')))
 /**
- * 一级审批通过是否给当前用户:审批中 = 有审批权 且 不是本单提交人本人;
- * 待二级审批 = 被一级选中的二级审核人本人(l2ApproverNow,被选中即授权)。
- * 与后端 ButtonService.approveApproval 的两道门禁(requireApprover + 编制与审批分离)逐条同源。
+ * 审批按钮**显不显示**(2026-10-16 用户报障「产品信息表保存之后不见审批按钮」):
+ *   ⚠ 口径修正 —— 上一版这里判的是"**能不能**真的批"(提交人自己、无审批权者一律不渲染),
+ *   结果是**提交人自己**看到一片空白,以为流程坏了。既有口径(approvalSeparation.test.js)写得很清楚:
+ *   「置灰 + 说清原因」,**不是藏起来**。故:
+ *     · 显示 = 有没有**资格**(有审批权 ∪ 被一级选定的二级审核人;QC 两级仍走原口径);
+ *     · 能不能点 = 交给 isDisabled(提交人自己的一级「审批通过」仍置灰,悬停给出那句话)。
  */
-const approvalActionReady = computed(() => curDocStatus.value === '待二级审批'
-  ? l2ApproverNow.value
-  : (canApproveHere() && !iAmCurSubmitter.value))
+const approvalBtnsVisible = computed(() => (isQcL2Panel.value
+  ? canApproveQcL2Here.value
+  : (canApproveHere() || l2ApproverNow.value)))
+/** 轮不到我审批时的侧栏说明(宁可说"在等谁",也别让用户对着空侧栏猜是不是卡住了) */
+const approvalWaitingTip = computed(() => (curDocStatus.value === '待二级审批'
+  ? '本单在二级签核：由一级选定的二级审核人（或管理员）签核'
+  : '本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）'))
 /** 审批通过按钮文案:QC 两级面板走原「审批通过/批准通过」,RD_PROD_INFO 二级节点明确叫「二级签核」 */
 const approveBtnLabel = computed(() => (isQcL2Panel.value
   ? qcL2ApproveLabel()
