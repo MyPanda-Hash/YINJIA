@@ -2781,6 +2781,9 @@ migrate-finish-in-wo-line-20261015.sql
 #   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
 migrate-scjl-wo-line-20261015.sql
 
+# migrate-wo-mold-recipe-link.sql(本任务):生产工单行绑定已审核成型工艺清单配方；混料获取时保存配方快照、混料数量、配料比和计划用量。两账套幂等执行。
+migrate-wo-mold-recipe-link.sql
+
 # migrate-material-out-wo-line-query-col-20261015.sql(2026-10-15):材料出库单(领料单)**列表**补「工单行号」列
 #   —— 纯元数据、零改表:把 MATERIAL_OUT 的「工单行号」place 由 `header` 改为 `query,header`。
 #   背景(用户口径「工单号+工单行号 就为当前的一个新的单的模式」):转领料单已按该口径出单
