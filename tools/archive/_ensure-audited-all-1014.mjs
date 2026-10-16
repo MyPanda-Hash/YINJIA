@@ -18,7 +18,9 @@ const argv = process.argv.slice(2)
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d }
 const FROM = arg('from', '2026-09-01')
 const DRY = argv.includes('--dry')
-const BASE = 'http://127.0.0.1:8090'
+const BASE = arg('base', 'http://127.0.0.1:8090')   // 历史回填时指向带 -Dmes.hist.backfill=true 的实例(如 8091)
+// 落库人标记:拉取脚本原写「金蝶拉取」,2026-10-16 起改名「试运行」(提交 2297296d)⇒ 参数化,默认按新名
+const MARKER = arg('marker', '试运行')
 
 // 面板 → 头表(只处理金蝶同步进来的、日期在区间内的)
 const PANELS = [
@@ -45,7 +47,7 @@ for (const [panel, table, name] of PANELS) {
            ELSE N'草稿' END AS st
     FROM ${table} o
     LEFT JOIN yj_doc_status s ON s.panel_code = '${panel}' AND s.doc_no = o.单据编号
-    WHERE o.asp_user1 = N'金蝶拉取' AND o.单据日期 >= '${FROM}'`)
+    WHERE o.asp_user1 = N'${MARKER}' AND o.单据日期 >= '${FROM}'`)
   const draft = rows.filter((r) => r.st === '草稿')
   const pending = rows.filter((r) => r.st === '审批中')
   work.push({ panel, name, total: rows.length, draft, pending })
