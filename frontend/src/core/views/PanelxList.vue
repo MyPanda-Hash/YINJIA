@@ -177,7 +177,12 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+        <!-- 纸面滚动容器(2026-10-16):立项申请/项目实施计划**定死纸宽 1242px**(DocSheet 的
+             FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
+             (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
+        <div v-else class="sheet-scroll">
+          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+        </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
@@ -8840,6 +8845,15 @@ onUnmounted(() => {
   align-items: flex-start;
   min-height: 560px;
   padding-right: 0;
+}
+/* 纸面滚动容器(2026-10-16):只包 DocSheet 一系(它的纸宽可能被定死 1242px)。
+   定宽纸在窄窗会宽过容器 ⇒ 让**纸面区自己**横向滚动,右侧 176px 操作栏照常贴在最右,
+   不跟着纸一起被推出视口。弹性宽的纸(其余面板)永远不溢出,这个容器对它们等于没加。 */
+.approval-layout > .sheet-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .approval-layout :deep(.approval-sheet),
 .approval-layout :deep(.progress-sheet),

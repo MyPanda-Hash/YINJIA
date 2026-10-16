@@ -8,7 +8,7 @@
        ④ 底部签名:signCells(蓝格标签 + 值区)
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="approval-sheet">
+  <div class="approval-sheet" :style="sheetStyle">
     <!-- ⛔ 终止审批横幅(项目实施计划:申请终止(阶段处)二级审批 立项人→管理员→落实;打印隐藏) -->
     <div v-if="panelCode === 'RD_PLAN' && term" class="as-term-banner no-print-term" :class="'term-' + term.state">
       <template v-if="term.state === 'T'">
@@ -625,6 +625,7 @@ import { attachFieldOf } from '@core/panel/attachField.js'
 import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
+import { fixedSheetWidth } from './docSheetConfigs'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -657,6 +658,21 @@ const remarkAttach = computed(() => attachFieldOf(props.fields))
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
+
+/**
+ * 定死纸宽(2026-10-16 用户口径:「定死纸宽 1242」):纸宽表在 docSheetConfigs.FIXED_SHEET_W
+ *   (可单测),这里只负责套到纸面根节点上。
+ * 【为什么要一起写 flex:none】外层 PanelxList 的 `.approval-layout :deep(.approval-sheet){flex:1;
+ *   min-width:0}` 把纸面变成了弹性撑满(flex-basis 归 0、由 flex-grow 分配剩余空间)——
+ *   只写 width 完全不起作用(实测 1600 窗口 1172~1202px,随窗口变)。内联 `flex:none` 才能压过它。
+ * ⚠ 打印/导出不受影响:@media print 的 `body.approval-printing .approval-sheet{width:100%!important}`
+ *   带 !important,仍压过这里的内联样式。
+ * 其余文书式面板宽度为 0 ⇒ 不套内联样式,保持原有的自适应行为。
+ */
+const sheetStyle = computed(() => {
+  const w = fixedSheetWidth(props.panelCode)
+  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none' } : null
+})
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')

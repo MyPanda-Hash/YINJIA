@@ -30,7 +30,9 @@ const MEASURE = `JSON.stringify((() => {
     route: location.pathname + location.search,
     win: window.innerWidth,
     layout: box(q('.approval-layout')),
+    scrollBox: box(q('.approval-layout > .sheet-scroll')),
     sidebar: box(q('.approval-side')),
+    sideRightEdge: (() => { const s = q('.approval-side'); return s ? Math.round(s.getBoundingClientRect().right) : null })(),
     sheet: box(sheet),
     sheetClass: sheet ? sheet.className : null,
     bodyEl: box(sheet && (sheet.querySelector('.as-body') || sheet.querySelector('.as-table'))),
@@ -95,6 +97,19 @@ localStorage.setItem('mes_login_date','2026-10-16'); 'ok'`)
     }
     await send('Emulation.clearDeviceMetricsOverride')
     await sleep(500)
+
+    // 落图证据(1600 窗口):肉眼看纸宽是否真的与窗口无关、版式没被压扁
+    for (const [code, file] of [['RD_APPROVAL', 'rd-approval-1242.png'], ['RD_PLAN', 'rd-plan-1242.png']]) {
+      await send('Page.navigate', { url: URL_ + '/#/panelx/list/' + code }); await sleep(8000)
+      await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1100, deviceScaleFactor: 1, mobile: false })
+      await sleep(900)
+      const shot = (await send('Page.captureScreenshot', { format: 'png' })).result?.data
+      if (shot) {
+        const out = path.join(__dirname, file)
+        fs.writeFileSync(out, Buffer.from(shot, 'base64'))
+        console.log('  截图 →', out)
+      }
+    }
 
     await send('Page.navigate', { url: URL_ + '/#/panelx/list/RD_PLAN' }); await sleep(9000)
     for (const w of [1280, 1440, 1600, 1920]) {
