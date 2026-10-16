@@ -1,0 +1,14 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _probe-wo0220-report.sql ==
+  | == scjl 行(该工单) == | 
+  | == scjl 该工单按期汇总(仅已完工未作废) == | 
+  | == plang 行(该工单) == | 
+  | 426 | xc=1 | 批次号=20261014 | 需求xq_sl=160 | 排产pl_sl=160 | 入库rk_sl=0 | ja=N | 工艺路线=GY-CB-STD | 当前工序=(空) | 当前工序完工量=-1.0000 | 完工状态=(空) | scx=(空) | 生产数量=-1.0000 | 单位换算率=-1.0000 | 
+  | 427 | xc=2 | 批次号=20261014 | 需求xq_sl=60 | 排产pl_sl=60 | 入库rk_sl=0 | ja=N | 工艺路线=GY-CB-STD | 当前工序=(空) | 当前工序完工量=-1.0000 | 完工状态=(空) | scx=(空) | 生产数量=-1.0000 | 单位换算率=-1.0000 | 
+  | == plang_pc 行(该工单) == | 
+  | == wo_progress 行(该工单) == | 
+  | id || 单据编号 || 工序 || 计划数量 || 完成数量 || 备注 || asp_user1 || asp_time1 || asp_user2 || asp_time2 || asp_cancel || 备用1 || 备用2 || 备用3 || 备用4 || 备用5 || 备用6 || 备用7 || 备用8 || 备用9 || 备用10 || 备用11 || 备用12 || 备用13 || 备用14 || 备用15 || 备用16 || 备用17 || 备用18 || 备用19 || 备用20 || 工单行id || 批次号 || 工序序 || 生产车间 || 生产线 || 状态 || 优先级 || 排序号 || 计划完工日期 || 产品编码 || 产品名称 || 规格型号 | 
+  | == yj_usage_log 列 == | 
+  | id, user_name, real_name, event_type, panel_name, action_name, doc_no, ip, created_at, 工单行号 | 
+  | == yj_usage_log 该工单最近 10 条 == | 
+[OK] _probe-wo0220-report.sql (1 batches)
