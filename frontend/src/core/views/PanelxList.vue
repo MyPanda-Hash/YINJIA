@@ -1762,10 +1762,12 @@
     <el-dialog v-model="l2PickVisible" :title="tt('选取二级审核人')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('一级审批通过后，由该审核人完成二级签核；二级通过即归档，随后由其分发责任人。') }}</div>
+        <div v-if="l2PickHiddenSubmitter" class="mod-log-meta" style="margin-bottom:8px">{{ tt('已按「编制与审批分离」排除提交人（提交人不能当二级审核人）：') }}{{ l2PickHiddenName }}</div>
+        <div v-if="l2PickError" class="dq-error">{{ l2PickError }}</div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('二级审核人') }}</span>
           <el-select v-model="l2PickUser" style="flex:1" filterable :placeholder="tt('请选择二级审核人')">
-            <el-option v-for="u in l2PickUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+            <el-option v-for="u in l2PickOptions" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
           </el-select>
         </div>
         <div class="dq-row" style="align-items:flex-start">
@@ -2848,6 +2850,27 @@ function canApproveHere() {
   const ap = user.approvePanels || []
   return user.isAdmin || ap.includes('*') || ap.includes(String(panelCode.value))
 }
+
+/**
+ * 「编制与审批分离」前端闸门(2026-10-16 用户报障「用 cp 账号签核出错,还是显示选取二级审核人」)。
+ *
+ * 实测根因(测试账套 PI-2026-10-0021,提交人=cp 且 cp 有 RD_PROD_INFO 审批权):
+ *   cp 点了「审批通过」→ 弹出「选取二级审核人」→ 确认 → 后端 403
+ *   「审批人不能与提交人相同（编制与审批分离）」(ButtonService:1815),
+ *   **一级审批没落地**(yj_form_approval 里只有 SUBMIT,没有 APPROVE_L1)⇒ 单据仍在「审批中」,
+ *   cp 再点时弹的还是**一级**那个选人框;加上报错后弹窗不关闭 ⇒ 用户理解成"分发给 cp 成功了,
+ *   还是弹这个框"。同一坑还有第二个:选人框里把提交人自己列成候选,后端必然拒(ButtonService:1826)。
+ *
+ * 本单提交人 = yj_doc_status.pending_by,后端在「审批中」的单据上下发成 `提交人` 键
+ * (QueryService.loadDocs:508-510)。这里只做**展示层**拦截(置灰 + 说清原因 + 候选剔除),
+ * 服务端门禁一条不改、仍是最终裁决。管理员豁免(与后端同款:保存即归档本就是等价权力)。
+ */
+const curSubmitter = computed(() => String(cur.value?.['提交人'] || '').trim())
+const iAmCurSubmitter = computed(() => {
+  const s = curSubmitter.value
+  if (!s || user.isAdmin) return false
+  return s === String(user.userName || user.account || '')
+})
 
 // ---------- 文件面板查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间 ----------
 const docQueryVisible = ref(false)
@@ -5150,11 +5173,25 @@ const l2PickUser = ref('')
 const l2PickOpinion = ref('')
 const l2PickUsers = ref([])
 const l2PickDocNo = ref('')
+/** 弹窗内联报错:失败时把后端原话留在框里(此前只弹 toast,框不关,用户以为"又让我选人") */
+const l2PickError = ref('')
+/** 被排除的提交人账号(非管理员时提交人不能当二级审核人,后端 ButtonService:1826 必拒) */
+const l2PickHiddenSubmitter = ref('')
+const l2PickHiddenName = computed(() => {
+  const u = l2PickUsers.value.find((x) => String(x.username) === l2PickHiddenSubmitter.value)
+  return u ? `${u.realName || ''}（${u.username}）` : l2PickHiddenSubmitter.value
+})
+/** 候选 = 全部启用账号 − 提交人(管理员不剔:后端对管理员豁免) */
+const l2PickOptions = computed(() => {
+  const hide = l2PickHiddenSubmitter.value
+  return hide ? l2PickUsers.value.filter((u) => String(u.username) !== hide) : l2PickUsers.value
+})
 /** 一级审批通过入口:产品信息表的一级节点必须先选二级审核人,其余面板/二级节点走原确认框 */
 async function openL2Pick(no) {
   l2PickDocNo.value = no
   l2PickUser.value = ''
   l2PickOpinion.value = ''
+  l2PickError.value = ''
   if (!l2PickUsers.value.length) {
     try {
       l2PickUsers.value = (await engine.rdDevUsers()) || []
@@ -5163,12 +5200,14 @@ async function openL2Pick(no) {
       return
     }
   }
+  l2PickHiddenSubmitter.value = (!user.isAdmin && curSubmitter.value) ? curSubmitter.value : ''
   l2PickVisible.value = true
 }
 async function confirmL2Pick() {
   if (!l2PickUser.value) return ElMessage.warning(tt('请选取二级审核人'))
   if (l2PickBusy.value) return
   l2PickBusy.value = true
+  l2PickError.value = ''
   try {
     await engine.callButton({
       panelCode: 'RD_PROD_INFO', buttonName: '审批通过',
@@ -5179,7 +5218,10 @@ async function confirmL2Pick() {
     l2PickVisible.value = false
     await load()
   } catch (e) {
-    ElMessage.error(engine.errMsg(e) || '审批失败')
+    // 框**不关**(用户可改选重试),但把原因留在框里 —— 之前只有 3 秒 toast,框还在原地,
+    // 用户看到的就是"还是弹这个选取二级审核人的框"
+    l2PickError.value = String(engine.errMsg(e) || tt('审批失败'))
+    ElMessage.error(l2PickError.value)
   } finally {
     l2PickBusy.value = false
   }
@@ -6904,7 +6946,10 @@ function isDisabled(action) {
     修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     审批情况: false,
     提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
-    审批通过: !current.value || !IN_APPROVAL.includes(st),
+    审批通过: !current.value || !IN_APPROVAL.includes(st)
+      // 编制与审批分离:提交人不能点**一级**审批通过(后端必拒)。只管「审批中」这一档 ——
+      // 「待二级审批」时如果被一级选成了二级审核人,本人签核是允许的(后端 approveSecond 只认 l2_approver)。
+      || (st === '审批中' && iAmCurSubmitter.value),
     审批驳回: !current.value || !IN_APPROVAL.includes(st),
    驳回审批: !current.value || !IN_APPROVAL.includes(st),
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
@@ -6970,6 +7015,10 @@ function disabledReason(action) {
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路),与状态无关
   if ((cfgCache.value?.metadata?.disabledActions || []).includes(action)) return tt('该动作当前没有可用的来源单据')
+  // 编制与审批分离:提交人自己点一级「审批通过」= 后端必拒(实测 403),这里把原因说在他点之前
+  if (action === '审批通过' && st === '审批中' && iAmCurSubmitter.value) {
+    return tt('本单由你提交：按「编制与审批分离」不能审批自己提交的单，请由他人完成一级审批')
+  }
   // 生单按钮统一仅已审核可用(与上面「生成XX」同一句口径)
   if (action.startsWith('生成')) return tt('单据状态') + '：' + stText + '，' + tt('仅已审核可生单')
   return tt('单据状态') + '：' + stText + '，' + '「' + tt(action) + '」' + tt('不可用')
@@ -8794,6 +8843,18 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+/* 弹窗内联报错(2026-10-16):审批类弹窗失败时把后端原话留在框里 —— 只弹 toast 的话,
+   框还在屏幕上,用户会以为"又弹了一次让我选人" */
+.dq-error {
+  padding: 6px 10px;
+  border: 1px solid #f3c1c1;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12.5px;
+  line-height: 1.6;
+  word-break: break-all;
 }
 .dq-row {
   display: flex;

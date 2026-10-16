@@ -1813,7 +1813,8 @@ public class ButtonService {
         Object pendingBy = row instanceof Map<?, ?> mp ? ((Map<?, ?>) mp).get("pending_by") : null;
         String submitter = pendingBy == null ? "" : String.valueOf(pendingBy);
         if (!isAdminUser(operator) && operator.equals(submitter))
-            throw new org.springframework.security.access.AccessDeniedException("审批人不能与提交人相同（编制与审批分离）");
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "审批人不能与提交人相同（编制与审批分离）：本单由 " + realNameOf(submitter) + "（" + submitter + "）提交，请由他人完成一级审批");
         String opinion = opinionOf(formData);
         // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
@@ -1824,7 +1825,7 @@ public class ButtonService {
                 if (l2.isEmpty()) throw new IllegalStateException("一级审批通过前必须选取二级审核人");
                 if (!isEnabledUser(l2)) throw new IllegalStateException("二级审核人账号不存在或已停用：" + l2);
                 if (!isAdminUser(operator) && l2.equals(submitter))
-                    throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）");
+                    throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）：本单由他提交，请另选一位账号");
             }
             // 竞态守卫:WHERE 带 pending='Y' 且节点=1,双击/并发只有一次生效
             int n = jdbc.update("UPDATE yj_doc_status SET approve_node = 2, l2_approver = ?, update_at = GETDATE()"
