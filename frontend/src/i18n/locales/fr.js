@@ -63,6 +63,7 @@ export default {
     "生产工单行加载失败": "Échec du chargement des lignes d’ordre de fabrication",
     "选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。": "Choisissez une ligne d’ordre de fabrication (n° d’ordre + n° de ligne l’identifient) pour créer un brouillon de fiche de contrôle de process ; les lignes déjà pourvues sont signalées, un nouveau choix ne crée pas de doublon.",
     "按相关要求：本组测试只记录 2 支样品（{a}）": "Selon les exigences : ce groupe ne consigne que 2 échantillons ({a})",
+    "拖动调整「标准」行的行高": "Faites glisser pour ajuster la hauteur de la ligne « Standard »",
     "已按成型工艺清单": "Repris depuis la fiche de process de moulage",
     '待超级管理员批准': 'En attente d\'approbation du super-administrateur',
     '单据已批准': 'Document approuvé',

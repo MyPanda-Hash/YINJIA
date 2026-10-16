@@ -63,6 +63,7 @@ export default {
     "生产工单行加载失败": "No se pudieron cargar las líneas de orden de producción",
     "选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。": "Elija una línea de orden de producción (n.º de orden + n.º de línea la identifican de forma única) para crear un borrador de hoja de inspección de proceso; las líneas que ya tienen hoja se marcan y volver a elegirlas no duplica.",
     "按相关要求：本组测试只记录 2 支样品（{a}）": "Según los requisitos: este grupo registra solo 2 muestras ({a})",
+    "拖动调整「标准」行的行高": "Arrastre para ajustar la altura de la fila «Estándar»",
     "已按成型工艺清单": "Tomado de la hoja de proceso de moldeo",
     '待超级管理员批准': 'Pendiente de aprobación del superadministrador',
     '单据已批准': 'Documento aprobado',

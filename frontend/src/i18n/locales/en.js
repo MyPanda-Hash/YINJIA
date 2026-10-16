@@ -69,6 +69,7 @@ export default {
     "生产工单行加载失败": "Failed to load production work-order lines",
     "选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。": "Pick a production work-order line (work order no. + line no. uniquely identify it) to create a process inspection draft; lines that already have a sheet are marked, re-picking will not create a duplicate.",
     "按相关要求：本组测试只记录 2 支样品（{a}）": "Per the requirements: this group records only 2 samples ({a})",
+    "拖动调整「标准」行的行高": "Drag to adjust the height of the \"Standard\" row",
     "已按成型工艺清单": "Fetched from molding process sheet",
     "炭棒成型车间首件检验记录表": "Carbon Rod Molding Workshop First Article Inspection Record",
     "产品型号": "Product Model",

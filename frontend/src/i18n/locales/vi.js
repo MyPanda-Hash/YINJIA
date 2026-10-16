@@ -63,6 +63,7 @@ export default {
     "生产工单行加载失败": "Tải dòng lệnh sản xuất thất bại",
     "选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。": "Chọn một dòng lệnh sản xuất (số lệnh + số dòng xác định duy nhất) để tạo bản nháp phiếu kiểm tra công đoạn; dòng đã có phiếu sẽ được đánh dấu, chọn lại không tạo trùng.",
     "按相关要求：本组测试只记录 2 支样品（{a}）": "Theo yêu cầu: nhóm này chỉ ghi 2 mẫu ({a})",
+    "拖动调整「标准」行的行高": "Kéo để điều chỉnh chiều cao hàng 「Tiêu chuẩn」",
     "已按成型工艺清单": "Đã lấy theo phiếu công nghệ tạo hình",
     '待超级管理员批准': 'Chờ quản trị viên cấp cao phê duyệt',
     '单据已批准': 'Chứng từ đã được phê duyệt',

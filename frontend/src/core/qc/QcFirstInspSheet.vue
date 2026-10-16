@@ -164,8 +164,14 @@
         </tr>
       </thead>
       <tbody>
-        <!-- 标准行:来自《成型工艺清单》;可改(工艺清单没维护时品质自己补) -->
-        <tr class="standard-row">
+        <!-- 标准行:来自《成型工艺清单》;可改(工艺清单没维护时品质自己补)
+             ⚠ 拖动下标(用户口径 2026-10-17「这个拖动下标应该跟着当前的这个表格框的右下角走」):
+               原生 textarea 的抓手贴在**文本域**右下角,而同行里别的格内容更高时,文本域只占格子上半截
+               ⇒ 抓手悬在半空(实测底差最大 64px,截图红框就是这个)。改为:关掉原生抓手(resize:none),
+               在**每个格子的右下角**自绘一个 `.fi-rowgrip`,锚在 td 上 ⇒ 永远跟着本格右下角走;
+               往下拖 = 本行加高(stdRowH,px),文本域 min-height 同步跟上(写字区一起变大)。
+               表格里百分比高度解析不了(实测 height:100% 在 td 里一律算成 auto),所以只用 px。 -->
+        <tr class="standard-row" :class="{ 'has-std-h': !!stdRowH && editable }" :style="stdRowStyle">
           <th class="rowlabel">{{ tt('标准') }}</th>
           <td v-for="c in columns" :key="c.key">
             <el-input
@@ -178,6 +184,12 @@
               @update:model-value="v => setStandard(c, v)"
             />
             <span v-else class="fi-stdtext">{{ c.standard || '/' }}</span>
+            <span
+              v-if="editable"
+              class="fi-rowgrip no-print"
+              :title="tt('拖动调整「标准」行的行高')"
+              @mousedown.prevent="startRowResize"
+            ></span>
           </td>
           <td v-if="editable" class="col-op no-print"></td>
         </tr>
@@ -264,7 +276,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import {
@@ -504,6 +516,53 @@ function setStandard(c, v) {
   bump.value++
   emit('dirty')
 }
+
+/**
+ * 「标准」行的可调行高(拖动下标拖出来的,**纯版面偏好、不入库** —— 刷新即回到"按内容自适应")。
+ *
+ * 用户口径(2026-10-17):「这个拖动下标应该跟着当前的这个表格框的右下角走」——
+ * 原实现用的是 textarea 原生抓手,它贴在**文本域**右下角;同行里别的格内容更高时,
+ * 文本域只占格子上半截,抓手就悬在半空(实测底差最大 64px)。
+ *
+ * 修法:原生抓手关掉(`resize: none`),自绘 `.fi-rowgrip` 锚在**每个 td 的右下角**;
+ * 拖动改这里的 stdRowH,行 `height` 与文本域 `min-height` 一起跟着走。
+ * ⚠ 只用 px:表格里**百分比高度解析不了**(实测:`height:100%` 在 td 里一律算成 auto,
+ *   给 tr 显式 px 高度也救不回来),所以撑满格子这件事只能靠算出来的 px。
+ * ⚠ 行 `height` 在表格里是**最小值** —— 标准文字更高时仍是内容说了算(打印照样完整),
+ *   往下拖只会在内容之上再留出空间。
+ */
+const stdRowH = ref(0)        // 0 = 不干预,按内容自适应(初始态与改前完全一致)
+const GRIP_MIN_H = 32         // 行高下限,别让人拖成一条线
+const STD_CELL_PAD = 12       // .fi-grid td 的上下 padding(5+5)+ 边框余量:文本域要减掉它才不撑破格
+const stdRowStyle = computed(() => {
+  if (!props.editable || !stdRowH.value) return null
+  return { height: `${stdRowH.value}px`, '--fi-std-h': `${Math.max(24, stdRowH.value - STD_CELL_PAD)}px` }
+})
+
+/** 按住格子右下角的拖动下标 → 上下拖动改本行行高(松手即止,拖不出去) */
+let gripDrag = null
+function startRowResize(e) {
+  if (!props.editable) return
+  const tr = e.currentTarget?.closest?.('tr')
+  const startY = e.clientY
+  // 首次拖动以**当前实际行高**为起点,避免"一按就跳"
+  const startH = stdRowH.value || Math.round(tr?.getBoundingClientRect?.().height || GRIP_MIN_H)
+  const move = (ev) => { stdRowH.value = Math.max(GRIP_MIN_H, Math.round(startH + (ev.clientY - startY))) }
+  const up = () => {
+    window.removeEventListener('mousemove', move)
+    window.removeEventListener('mouseup', up)
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    gripDrag = null
+  }
+  gripDrag = { up }
+  // 拖动期间禁掉文本选中与光标跳变(与 DocSelectRail 的 resizer 同一套做法)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+  window.addEventListener('mousemove', move)
+  window.addEventListener('mouseup', up)
+}
+onBeforeUnmount(() => gripDrag?.up())
 function renameColumn(c, v) {
   const label = String(v ?? '')
   updateColumn(props.head, c.key, { label })
@@ -810,6 +869,42 @@ function toggleCheck(sample, c, option) {
   background: #f7f7f7;
   vertical-align: top;
   min-height: 40px;
+  /* 自绘的拖动下标锚在**本格**右下角(见 .fi-rowgrip),必须有定位上下文 */
+  position: relative;
+}
+/* 标准行的拖动下标(2026-10-17 用户口径「这个拖动下标应该跟着当前的这个表格框的右下角走」):
+   ① 关掉 textarea 原生抓手 —— 它贴在**文本域**右下角,同行别的格更高时就悬在半空(实测底差 64px);
+   ② 拖过行高后(has-std-h),把文本域撑到格底,写字区跟着一起变大。
+   ⚠ Element Plus 的 autosize 会把 min-height **内联**写到 textarea 上(按 minRows 算出来),
+     所以"撑满格子"这条只能用 !important 才盖得住 —— 故**只在用户拖过行高时**启用,
+     默认态(has-std-h 不在)一个字都不干预,与改前的 autosize 行为完全一致。
+   ⚠ 只用 px:表格里**百分比高度解析不了**(实测 height:100% 在 td 里一律算成 auto)。 */
+.standard-row .fi-cell :deep(.el-textarea__inner) {
+  resize: none;
+}
+.standard-row.has-std-h .fi-cell :deep(.el-textarea__inner) {
+  min-height: var(--fi-std-h) !important;
+}
+.fi-rowgrip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: ns-resize;
+  /* 与原生抓手同款的三道斜线(只在右下角那半格显形) */
+  background-image: repeating-linear-gradient(-45deg, #a9a9a9 0 1px, transparent 1px 4px);
+  -webkit-mask-image: linear-gradient(-45deg, #000 0 52%, transparent 52%);
+  mask-image: linear-gradient(-45deg, #000 0 52%, transparent 52%);
+}
+.fi-rowgrip:hover {
+  background-image: repeating-linear-gradient(-45deg, #1f5fa8 0 1px, transparent 1px 4px);
+}
+/* 打印/导出不带拖动下标(它不是纸面上的东西) */
+@media print {
+  .fi-rowgrip {
+    display: none !important;
+  }
 }
 .fi-stdtext {
   display: inline-block;

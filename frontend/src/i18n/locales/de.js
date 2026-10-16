@@ -63,6 +63,7 @@ export default {
     "生产工单行加载失败": "Fertigungsauftragszeilen konnten nicht geladen werden",
     "选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。": "Wählen Sie eine Fertigungsauftragszeile (Auftragsnummer + Zeilennummer eindeutig): Es wird ein Entwurf des Prozessprüfblatts erstellt; bereits vorhandene Zeilen sind markiert, erneute Auswahl erzeugt kein Duplikat.",
     "按相关要求：本组测试只记录 2 支样品（{a}）": "Laut Vorgabe: diese Gruppe erfasst nur 2 Proben ({a})",
+    "拖动调整「标准」行的行高": "Ziehen, um die Höhe der Zeile „Standard“ anzupassen",
     "已按成型工艺清单": "Aus dem Formprozessblatt übernommen",
     '待超级管理员批准': 'Wartet auf Genehmigung des Superadministrators',
     '单据已批准': 'Dokument genehmigt',
