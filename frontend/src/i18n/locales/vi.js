@@ -1120,8 +1120,6 @@ export default {
     '日期范围': 'Khoảng ngày',
     '确认排产': 'Xác nhận lịch sản xuất',
     '请选择生产线': 'Chọn dây chuyền sản xuất',
-    '生产工单明细表': 'Chi tiết lệnh sản xuất',
-    '生产工单统计表': 'Thống kê lệnh sản xuất',
     '工序派工单': 'Phiếu điều phối công đoạn',
     '委外加工单': 'Phiếu gia công',
     '员工': 'Nhân viên',

@@ -159,13 +159,15 @@ test('生产制造的明细/统计表挂在所属业务对象下(与销售管理
   // 2026-10-16:生产计划域的四个看板页面(订单结转/生产工单/快速排产/工单排产)新增了
   // **页面级虚拟面板码**(权限化,定义见后端 PagePanelRegistry),故也进入本断言 ——
   // 顺序即 menus.js 里的菜单顺序,改菜单必须同步这里。
+  // 2026-10-17:生产工单明细表/统计表(MANU_ORDER_DETAIL/MANU_ORDER_STATS)**下架**
+  //   —— 载体视图读的是正式库 0 行的 bd_manu_order/bl_manu_order,打开即空表,且从未被打开过
+  //   (migrate-drop-manu-order-report-panels-20261017.sql),故从本断言里移除。
   assert.deepEqual((group('plan').children || []).map((c) => c.panelCode).filter(Boolean),
-    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD',
-      'LINE_LOAD', 'MANU_ORDER_DETAIL', 'MANU_ORDER_STATS'])
-  // 两张生产工单报表各出现一次:防并域时重复挂载或漏挂
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'])
+  // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
   const all = JSON.stringify(mfg)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {
-    assert.equal(all.split(`"${p}"`).length - 1, 1, `${p} 应在生产制造菜单里恰好出现一次`)
+    assert.equal(all.split(`"${p}"`).length - 1, 0, `${p} 已下架,不该再出现在生产制造菜单里`)
   }
 })
 

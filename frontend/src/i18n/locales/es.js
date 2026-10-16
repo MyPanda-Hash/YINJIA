@@ -1130,8 +1130,6 @@ export default {
     '日期范围': 'Rango de fechas',
     '确认排产': 'Confirmar programación',
     '请选择生产线': 'Seleccione una línea de producción',
-    '生产工单明细表': 'Detalle de orden de fabricación',
-    '生产工单统计表': 'Estadísticas de orden de fabricación',
     '工序派工单': 'Asignación de operación',
     '委外加工单': 'Orden de subcontratación',
     '员工': 'Empleado',

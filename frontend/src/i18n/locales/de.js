@@ -1130,8 +1130,6 @@ export default {
     '日期范围': 'Datumsbereich',
     '确认排产': 'Planung bestätigen',
     '请选择生产线': 'Fertigungslinie wählen',
-    '生产工单明细表': 'Fertigungsauftrag – Details',
-    '生产工单统计表': 'Fertigungsauftrag – Statistik',
     '工序派工单': 'Arbeitsgang-Dispo',
     '委外加工单': 'Fremdvergabe-Auftrag',
     '员工': 'Mitarbeiter',

@@ -2124,8 +2124,6 @@ export default {
     '日期范围': 'Date Range',
     '确认排产': 'Confirm Schedule',
     '请选择生产线': 'Select a production line',
-    '生产工单明细表': 'Production WO Detail List',
-    '生产工单统计表': 'Production WO Statistics',
     '工序派工单': 'Operation dispatch',
     '委外加工单': 'Outsourcing order',
     '委外发料单': 'Outsourcing issue',
