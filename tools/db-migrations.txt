@@ -3737,3 +3737,5 @@ migrate-mold-feed-stdlib-20261013.sql
 migrate-rd-sheet-ref-tidy-20261013.sql
 migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
+# migrate-role-perm-words-20261016.sql — 角色面板权限词表归位(组织架构矩阵可勾的词 = 引擎真读的词):edit→modify、delete→del、删 price/review/adjust,研发审核补 audit,can_approve 收敛为 perms 派生值
+migrate-role-perm-words-20261016.sql
