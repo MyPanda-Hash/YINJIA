@@ -386,6 +386,16 @@ export async function rdDevFileEdit(panelCode, docNo) {
 }
 
 /**
+ * 「本单引用的规格书变了吗」判定(2026-10-16 用户口径)—— 只对引用方有意义:
+ * 成型工艺清单 / 组装工艺清单 / 出货检验计划表(规格书是数据源,方向相反)。
+ * { applicable, needCheck, specNo, specStatus, specChangedAt, docChangedAt, reason }
+ * reason: spec_in_flux(规格书正在改/被弃审回草稿) | spec_newer(规格书改完且比本单新)。
+ */
+export async function rdSpecDrift(panelCode, docNo) {
+  return unwrap(await request.get('/px/rdDev/specDrift', { params: { panelCode, docNo } }))
+}
+
+/**
  * 四个下游面板的「待开发单据」(侧栏按钮 + 红点数字的唯一真源):
  * { panelCode, pendingCount, rows:[{ 单据编号, 产品编号, 产品名称, 状态, 下游单据编号 }] }
  * ⚠ rows 已由后端按「当前登录人是该面板负责人」过滤 ⇒ rows.length>0 就等于"我被分发到了这个面板",

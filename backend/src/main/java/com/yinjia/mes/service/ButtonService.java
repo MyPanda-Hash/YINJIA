@@ -1523,8 +1523,14 @@ public class ButtonService {
 
     private Map<String, Object> unaudit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         // 审批权校验:与 审核 同口径,防"自审自弃"绕过审批权
-        requireApprover(def.code());
+        // ⚠ 2026-10-16 放宽(用户口径「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」):
+        //   四文件面板(规格书/成型工艺清单/组装工艺清单/出货检验计划表)除 审批人 ∪ 管理员 外,
+        //   **该文件责任人 ∪ 规格书被分发责任人 ∪ 产品总负责人**同样可弃审 —— 判据与保存门禁
+        //   {@link #ensureDevFileEditable} 完全同源(能改这张单的人就该能把它退回来改,
+        //   不必走「申请修改→管理员审批→改→再审批」两轮)。其余面板一字不动,仍是 requireApprover。
         String no = requireNo(formData);
+        if (DevTaskService.devPanelCodes().contains(def.code())) requireApproverOrDevFileOwner(def, no);
+        else requireApprover(def.code());
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
         // 产品变更申请单(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」):
@@ -2062,6 +2068,27 @@ public class ButtonService {
     private void requireApprover(String panelCode) {
         if (!canApprove(currentUserName(), panelCode))
             throw new org.springframework.security.access.AccessDeniedException("当前用户无审批权限");
+    }
+
+    /**
+     * 四文件面板的**弃审**放行(2026-10-16 用户口径):审批权(∪管理员) **或** 该文件责任人。
+     *
+     * 为什么要放宽:产品信息表分发下去的 4 类单据(规格书 RD_SPEC_DOC / 成型工艺清单 RD_MOLD_PROC /
+     * 组装工艺清单 RD_ASM_PROC / 出货检验计划表 RD_INSP_PLAN)原先只有「有审批权的角色 ∪ 管理员」
+     * 能弃审,而权限表实测这些面板的审批权只在「研发审核」角色手里 ⇒ 文件责任人(柴善银/冯敏等)
+     * 写错了只能走「申请修改 → 管理员审批 → 改 → 提交审批 → 再审批」两轮,用户抱怨"写错了改不了"。
+     * 判据复用保存门禁的同一把闸门 {@link #devFileEditVerdict}(责任人 ∪ 规格书被分发责任人 ∪
+     * 产品总负责人 ∪ 管理员)—— 能改这张单的人就该能把它退回来改,口径不另起一套。
+     * 弃审本身仍会先落快照(snapshotOnUnaudit),留痕与申请修改路径同构。
+     */
+    private void requireApproverOrDevFileOwner(PanelRegistry.PanelDef def, String no) {
+        String user = currentUserName();
+        if (canApprove(user, def.code())) return;
+        DevFileEdit v = devFileEditVerdict(def, no, null, user);
+        if (v.applicable() && v.ok()) return;
+        String why = (v.reason() == null || v.reason().isBlank())
+                ? "只有该文件的责任人（或管理员）可以弃审" : v.reason();
+        throw new org.springframework.security.access.AccessDeniedException(why);
     }
 
     /** 审批判定:管理员恒可;普通用户按角色面板审批权(can_approve) */
@@ -5171,6 +5198,107 @@ public class ButtonService {
         out.put("owner", v.owner());
         out.put("ownerName", v.ownerName());
         return out;
+    }
+
+    /**
+     * 引用规格书的三个面板(成型工艺清单/组装工艺清单/出货检验计划表)—— 漂移提示只对它们有意义。
+     * 规格书本身(RD_SPEC_DOC)与被引用方向相反,不入本集合。
+     */
+    private static final java.util.Set<String> SPEC_REF_PANELS = java.util.Set.of("RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN");
+
+    /**
+     * 「本单引用的规格书变了吗」判定(2026-10-16 用户口径):前端在单据靠上位置挂一条黄条提示。
+     *
+     * 用户原话:「有一些单据是引用的规格书的数据,要是规格书申请修改数据了,但是其他的引用数据的单据是
+     *   归档状态……应该有一个提示,提示说单据对应的规格书申请修改了数据,请及时核对,这些单据也可以
+     *   对应的反审核然后重新引用数据」。选定口径:①规格书**正在改**(修改申请中/修改中/被弃审回草稿)
+     *   → 提示;②规格书**改完且比本单新** → 也提示。
+     *
+     * 实现要点:
+     *   · 取数复用 {@link DevTaskService#specByProduct(String)}(它已经做了「产品编号 → 规格书单」解析
+     *     与「未审批完不给数据」的门禁):拿得到 ⇒ 规格书是定稿态,只需比时间;拿不到但 reason=not_approved
+     *     ⇒ 规格书存在但正处在非定稿态(修改申请中/修改中/草稿…),这正是用户说的第一种情况;
+     *   · 「比本单新」用 **yj_doc_status.update_at**(最后状态变动时间)比:
+     *     ⚠ 不能用 archived_at —— 那个是「**仅首次归档**写入」的口径(CASE 保首次,见 markArchived),
+     *     改完重新归档不会刷新它,拿它比时间永远比不出来(踩过这个口径)。
+     *   · 只读判定,不产生任何写副作用;取不到就返回 needCheck=false(宁可不提示,也不要假告警)。
+     */
+    public Map<String, Object> specDriftState(String panelCode, String docNo) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("applicable", SPEC_REF_PANELS.contains(panelCode));
+        out.put("needCheck", false);
+        out.put("specNo", "");
+        out.put("specStatus", "");
+        out.put("specChangedAt", "");
+        out.put("docChangedAt", "");
+        out.put("reason", "");
+        if (!SPEC_REF_PANELS.contains(panelCode) || docNo == null || docNo.isBlank()) return out;
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) { out.put("applicable", false); return out; }
+        String key = DevTaskService.productKeyOf(panelCode);
+        if (key == null) return out;
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String productCode = "";
+        try {
+            List<String> rows = jdbc.queryForList("SELECT TOP 1 [" + key + "] FROM " + table
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, docNo);
+            if (!rows.isEmpty() && rows.get(0) != null) productCode = rows.get(0).trim();
+        } catch (Exception e) {
+            return out;   // 取不到产品键(缺列等)⇒ 不提示,避免误伤
+        }
+        if (productCode.isEmpty()) return out;   // 历史单(无产品编号)豁免
+        Map<String, Object> spec;
+        try {
+            spec = devTaskService.specByProduct(productCode, null);
+        } catch (Exception e) {
+            return out;
+        }
+        String specNo = nz(spec.get("单据编号"));
+        String specStatus = nz(spec.get("状态"));
+        if (specNo.isEmpty()) {
+            // 没挑到定稿规格书:只有"存在但未定稿"才算漂移(修改申请中/修改中/被弃审回草稿…)
+            String blocked = nz(spec.get("规格书编号"));
+            String blockedStatus = nz(spec.get("规格书状态"));
+            if (!blocked.isEmpty() && "not_approved".equals(nz(spec.get("reason")))) {
+                out.put("needCheck", true);
+                out.put("specNo", blocked);
+                out.put("specStatus", blockedStatus);
+                out.put("reason", "spec_in_flux");
+                out.put("specChangedAt", statusUpdateAt("RD_SPEC_DOC", blocked));
+                out.put("docChangedAt", statusUpdateAt(panelCode, docNo));
+            }
+            return out;
+        }
+        String specAt = statusUpdateAt("RD_SPEC_DOC", specNo);
+        String docAt = statusUpdateAt(panelCode, docNo);
+        out.put("specNo", specNo);
+        out.put("specStatus", specStatus);
+        out.put("specChangedAt", specAt);
+        out.put("docChangedAt", docAt);
+        // 规格书定稿态:比"最后状态变动时间"——规格书比本单新 ⇒ 本单引用的可能已是旧数据
+        if (!specAt.isEmpty() && !docAt.isEmpty() && specAt.compareTo(docAt) > 0) {
+            out.put("needCheck", true);
+            out.put("reason", "spec_newer");
+        }
+        return out;
+    }
+
+    /** 单据状态行的最后变动时间(格式化 yyyy-MM-dd HH:mm:ss;取不到回空串) */
+    private String statusUpdateAt(String panelCode, String docNo) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 CONVERT(nvarchar(19), update_at, 120) FROM yj_doc_status"
+                            + " WHERE panel_code = ? AND doc_no = ?", String.class, panelCode, docNo);
+            return rows.isEmpty() || rows.get(0) == null ? "" : rows.get(0);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** {@link #str(Object)} 的空串版本(str() 对 空/空白 返回 null,拼串/判空前先过这一层) */
+    private static String nz(Object o) {
+        String s = str(o);
+        return s == null ? "" : s;
     }
 
     /**

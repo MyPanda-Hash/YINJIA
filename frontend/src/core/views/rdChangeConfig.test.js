@@ -79,8 +79,10 @@ test('网格行渲染必须读 row.h / c.rows(否则配置里的行高不生效)
 
 // ── 二、反审核(弃审):文书归档面板必须能放出该按钮,且已归档不算"不可点" ──
 test('文书归档面板放出「弃审」入口,置灰口径与后端一致(已审核/已归档/已生效)', () => {
-  assert.match(panelx, /const canUnauditHere = computed\(\(\) => isDocArchivePanel\.value[\s\S]{0,200}?canApproveHere\(\)\)/,
-    'canUnauditHere 必须存在:文书归档面板 + 已审核/已归档 + 有审批权')
+  // 2026-10-16 放宽:四文件面板另放给「本文件责任人」(devFileCanEditHere,与保存门禁同源)——
+  // 用户报障「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」。
+  assert.match(panelx, /const canUnauditHere = computed\(\(\) => isDocArchivePanel\.value[\s\S]{0,300}?canApproveHere\(\) \|\| devFileCanEditHere\.value\)/,
+    'canUnauditHere 必须存在:文书归档面板 + 已审核/已归档 + (有审批权 ∪ 本文件责任人)')
   assert.match(panelx, /v-if="canUnauditHere"[\s\S]{0,300}?pickModAction\('弃审'\)/,
     '侧栏必须真的放出「弃审」按钮(此前只有标准流面板有,归档一族只能走申请修改闭环)')
   assert.match(panelx, /弃审: !current\.value \|\| !\['已审核', '已归档', '已生效'\]\.includes\(st\)/,

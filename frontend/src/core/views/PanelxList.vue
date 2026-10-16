@@ -168,15 +168,26 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度) -->
-        <RecordSheetPanels
-          v-else-if="isRecordSheetPanel"
-          ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
-          :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
-          @dirty="markInlineDirty"
-          @refresh-config="onFieldEditRefresh"
-        />
+        <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度)。
+             ⚠ 四文件里的三张引用方(成型工艺清单/组装工艺清单/出货检验计划表)都落在这里 ⇒
+             「本单引用的规格书变了」黄条挂在本分支容器内(2026-10-16 用户口径)。 -->
+        <div v-else-if="isRecordSheetPanel" class="sheet-scroll">
+          <div v-if="specDrift" class="spec-drift-banner">
+            <span class="sdb-tag">{{ tt('规格书已变动') }}</span>
+            <span class="sdb-txt">
+              <template v-if="specDrift.reason === 'spec_in_flux'">{{ tt('本单引用的规格书 {no} 正在修改（{st}），请及时核对数据').replace('{no}', String(specDrift.specNo || '')).replace('{st}', tt(String(specDrift.specStatus || ''))) }}</template>
+              <template v-else>{{ tt('本单引用的规格书 {no} 已更新（{t}），请及时核对数据').replace('{no}', String(specDrift.specNo || '')).replace('{t}', String(specDrift.specChangedAt || '')) }}</template>
+              <span class="sdb-hint">{{ tt('如数据已变：点侧栏「弃审」退回草稿 → 再点「按规格书带入」取最新数据') }}</span>
+            </span>
+          </div>
+          <RecordSheetPanels
+            ref="approvalSheetRef"
+            :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
+            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
+            @dirty="markInlineDirty"
+            @refresh-config="onFieldEditRefresh"
+          />
+        </div>
         <!-- 纸面滚动容器(2026-10-16):立项申请/项目实施计划**定死纸宽 1242px**(DocSheet 的
              FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
@@ -3470,10 +3481,16 @@ const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocSt
  * 侧栏「弃审」(反审核)是否放出 —— 用户口径 2026-10-16「加上可反审核的机制,方便申请修改」。
  * 文书归档面板 + 已审核/已归档 + 有审批权(∪管理员)。与后端 ButtonService.unaudit 同口径:
  * 它要求 requireApprover,且对归档一族先落快照 ⇒ 反审核后直接改、保存即重新归档,修改记录照样留痕。
+ *
+ * ⚠ 2026-10-16 放宽(同日用户报障「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」):
+ *   四文件面板(规格书/成型工艺清单/组装工艺清单/出货检验计划表)另放 **该文件责任人** ——
+ *   判据直接用 `/px/rdDev/fileEdit` 下发的 canEdit(与保存门禁同一真源,责任人∪规格书被分发责任人∪
+ *   总负责人∪管理员),后端 unaudit 同批放宽为 requireApproverOrDevFileOwner。其余面板一字不动。
  */
+const devFileCanEditHere = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === true))
 const canUnauditHere = computed(() => isDocArchivePanel.value
   && ['已审核', '已归档'].includes(curDocStatus.value)
-  && canApproveHere())
+  && (canApproveHere() || devFileCanEditHere.value))
 
 // ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
 // 服务端 ensureDevFileEditable 早就拦住了非责任人,但界面不置灰:用户能改、能点保存,点完才被拒。
@@ -3496,6 +3513,30 @@ async function loadDevFileGate() {
 const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
+
+// ── 「本单引用的规格书变了」提示(2026-10-16 用户口径)──
+// 用户原话:「有一些单据是引用的规格书的数据,要是规格书申请修改数据了,但是其他的引用数据的单据是
+//   归档状态……应该有一个提示,提示说单据对应的规格书申请修改了数据,请及时核对,这些单据也可以
+//   对应的反审核然后重新引用数据」。
+// 只对**引用方**成立:成型工艺清单/组装工艺清单/出货检验计划表(规格书是数据源,方向相反,不入列)。
+// 判定全在服务端 /px/rdDev/specDrift(规格书正在改 或 改完且比本单新),前端只负责显示与引导:
+// 提示里直接告诉用户"点弃审退回草稿再重新引用"——四文件面板的弃审已同批放给责任人(canUnauditHere)。
+const SPEC_REF_PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN']
+const specDrift = ref(null)
+async function loadSpecDrift() {
+  if (!SPEC_REF_PANELS.includes(String(panelCode.value))) { specDrift.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { specDrift.value = null; return }
+  try {
+    const r = await engine.rdSpecDrift(panelCode.value, no)
+    // 竞态守卫:期间切了单据/面板就丢弃这次结果(与 loadDevFileGate 同款)
+    if (String(cur.value?.['单据编号'] || '') !== no) return
+    specDrift.value = r && r.applicable && r.needCheck ? r : null
+  } catch {
+    // 取不到就不提示(辅助信息,不打扰用户、不影响页面其它功能)
+    specDrift.value = null
+  }
+}
 
 // ── 待开发单据(2026-10-10):四个下游面板侧的「我被分发了多少张产品信息表待开发」──
 // 真源 = 后端 /px/rdDev/pendingDocs(已按 rd_dev_task 的负责人过滤)⇒ 前端不自己判权限:
@@ -4137,7 +4178,7 @@ const rdFlowUsers = ref([])
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs() }, { immediate: true })
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift() }, { immediate: true })
 
 /* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
    判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
@@ -8916,6 +8957,34 @@ onUnmounted(() => {
   overflow-x: auto;
   overflow-y: hidden;
 }
+/* 「本单引用的规格书变了」黄条(2026-10-16 用户口径):挂在纸面上方,不遮挡纸面。
+   文案里直接给出下一步(弃审 → 重新引用),用户不用猜。 */
+.spec-drift-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border: 1px solid #f0d9a0;
+  border-left: 3px solid #e6a23c;
+  border-radius: 4px;
+  background: #fdf6e3;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #7a5b16;
+}
+.spec-drift-banner .sdb-tag {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: #e6a23c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.spec-drift-banner .sdb-txt { min-width: 0; }
+.spec-drift-banner .sdb-hint { display: block; color: #9a7b2e; }
 .approval-layout :deep(.approval-sheet),
 .approval-layout :deep(.progress-sheet),
 .approval-layout :deep(.catalog-sheet),

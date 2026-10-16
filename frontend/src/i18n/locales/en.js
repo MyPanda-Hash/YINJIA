@@ -2784,6 +2784,14 @@ export default {
     '请选择二级审核人': 'Select a second-level approver',
     '确认审批通过': 'Confirm Approval',
     '已转交二级审核人': 'Handed over to the second-level approver',
+    /* ── 规格书漂移提示(2026-10-16:引用单据上提示"本单引用的规格书改了") ── */
+    '规格书已变动': 'Spec changed',
+    '本单引用的规格书 {no} 正在修改（{st}），请及时核对数据':
+      'The spec sheet {no} referenced by this document is being modified ({st}); please verify the data',
+    '本单引用的规格书 {no} 已更新（{t}），请及时核对数据':
+      'The spec sheet {no} referenced by this document has been updated ({t}); please verify the data',
+    '如数据已变：点侧栏「弃审」退回草稿 → 再点「按规格书带入」取最新数据':
+      'If the data has changed: click "Unaudit" in the sidebar to return to draft, then click "Pull from spec sheet" to reload the latest data',
     /* ── 编制与审批分离(2026-10-16:提交人不能自己点一级审批通过) ── */
     '本单由你提交：按「编制与审批分离」不能审批自己提交的单，请由他人完成一级审批':
       'You submitted this document: per maker-checker separation you cannot approve your own submission — ask someone else to do the first-level approval',
