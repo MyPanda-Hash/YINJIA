@@ -3,7 +3,7 @@
  *
  * 用户口径:「这个是针对当前的首件检验单的相关要求内容,查看一下下面所述的各项要求并实现。」
  * 纸面《相关要求》6 条 → 系统落地后的界面断言(全程在**内存里的新草稿**上做,不点保存、不落库):
- *   ① 2 支样品:1#/2# 可录,3#..8# 打 `/` 且**没有录入控件**(每个测试项目只记录 2 支样品);
+ *   ① 可填范围:前两列(勾选式)保持原样只记 1#/2#,其余列(含新增列)1#..8# 八行全可填;
  *   ② 精度:炭棒外径(内外径/长度/重量同规则)输入 12.34 → 失焦取整成 12.3;挤压强度/压降 33.33 原样保留;
  *   ③ 浊度 + 压降 同单 ⇒ 纸张上出现「先测初始浊度,再测压降」的测试顺序提示;
  *   ④ 勾上「严重粘模（脱皮）」⇒ 弹红色警示 + 纸张顶部常驻红色横幅(取消勾选后横幅消失);
@@ -68,22 +68,34 @@ try {
   await ev(`(() => { const x=document.querySelector('.el-dialog__headerbtn'); if(x){x.click()} return 'ok' })()`)
   await sleep(900)
 
-  // ── ① 2 支样品:3#..8# 没有录入控件、打 `/` ────────────────────────────────
+  // ── ① 可填范围:前两列(勾选式)保持原样只记 1#/2#,其余列(含新增列)八行全可填 ────
+  //    ⚠ 2026-10-17 两度改口径:先是"每个测试项目都只记 1#/2#",再是"四个分组各绑一对样品行",
+  //      最终用户口径 =「让当前各个表格都能填写即可,前两列保持原样即可」+「后面新增的列也一样」。
+  //      判据唯一真源:core/qc/firstInspCols.js 的 isFillableCell。
   const rows = await ev(`(() => [...document.querySelectorAll('.fi-sheet .fi-grid tbody tr.sample-row')].map((tr) => ({
       label: (tr.querySelector('th')?.innerText || '').trim(),
-      inputs: tr.querySelectorAll('td input').length,
-      texts: [...tr.querySelectorAll('td')].map((td) => (td.innerText || '').trim()),
+      // 可填 = 有文本录入格 或 有勾选项(前两列是勾选式,里面没有 input)
+      // ⚠ 末列是操作列 td.col-op(可编辑时的「＋/×」),不算测试项目格,要去掉
+      opens: [...tr.querySelectorAll('td:not(.col-op)')].map((td) => (td.querySelector('input') || td.querySelector('.fi-checks')) ? 1 : 0),
+      texts: [...tr.querySelectorAll('td:not(.col-op)')].map((td) => (td.innerText || '').trim()),
     })))()`)
-  console.log(`  样品行=${JSON.stringify(rows.map((r) => ({ 行: r.label, 控件: r.inputs })))}`)
+  console.log(`  各样品行可填格=${JSON.stringify((rows || []).map((r) => ({ 行: r.label, 可填: r.opens.join('') })))}`)
   ok('① 八个样品行都在(版式照图纸)', Array.isArray(rows) && rows.length === 8, String(rows?.length))
-  ok('① 1#/2# 有录入控件', rows?.[0]?.inputs > 0 && rows?.[1]?.inputs > 0,
-    `1#=${rows?.[0]?.inputs} 2#=${rows?.[1]?.inputs}`)
-  ok('① 3#..8# 一律没有录入控件(每个测试项目只记录 2 支样品)',
-    (rows || []).slice(2).every((r) => r.inputs === 0),
-    JSON.stringify((rows || []).slice(2).map((r) => r.inputs)))
-  ok('① 3#..8# 空格外显示 `/`',
-    (rows || []).slice(2).every((r) => r.texts.every((t) => t === '' || t === '/')),
-    JSON.stringify((rows || []).slice(2).map((r) => r.texts)))
+  // 列序 = 表观/脱粉(前两列,勾选式) | 外径/内径/长度/重量/跌落/挤压强度/浊度/压降(其余 8 列)
+  const WANT_OPEN = [
+    '1111111111', '1111111111',   // 1#/2#:十列全可填
+    '0011111111', '0011111111',   // 3#/4#:只有前两列不可填(保持原样)
+    '0011111111', '0011111111',   // 5#/6#
+    '0011111111', '0011111111',   // 7#/8#
+  ]
+  ok('① 前两列保持原样(只 1#/2#)、其余列八行全可填',
+    JSON.stringify((rows || []).map((r) => r.opens.join(''))) === JSON.stringify(WANT_OPEN),
+    JSON.stringify((rows || []).map((r) => r.opens.join(''))))
+  ok('① 不可填的格一律打 `/`(现在只剩前两列的 3#..8#)',
+    (rows || []).every((r) => r.texts.every((t, i) => (r.opens[i] ? t === '' || /☑|□/.test(t) : t === '/'))),
+    JSON.stringify((rows || []).map((r) => r.texts)))
+  const slashCount = (rows || []).reduce((n, r) => n + r.texts.filter((t) => t === '/').length, 0)
+  ok('① 整张纸的「/」占位格 = 前两列 × 3#..8# = 12 个', slashCount === 12, `实际 ${slashCount}`)
 
   // ── ② 精度:外径 12.34 → 12.3;挤压强度 33.33 原样 ─────────────────────────
   const setCell = async (colName, rowIdx, v) => ev(`(() => {
@@ -112,17 +124,17 @@ try {
     const inp = cell.querySelector('input')
     return inp ? inp.value : (cell.innerText || '').trim()
   })()`)
-  const w1 = await setCell('炭棒外径', 0, '12.34')
+  const w1 = await setCell('炭棒外径', 2, '12.34')   // 2#..8# 任一行都行(现在八行全可填),取 3#
   await sleep(600)
-  const v1 = await readCell('炭棒外径', 0)
+  const v1 = await readCell('炭棒外径', 2)
   console.log(`  外径 12.34 → ${JSON.stringify(v1)} (${JSON.stringify(w1)})`)
   ok('② 内外径/长度/重量:超过 1 位小数被取整(12.34 → 12.3)', String(v1) === '12.3', String(v1))
   const toast = await ev(`(document.querySelector('.el-message')?.innerText || '')`)
   ok('② 取整时给了提示', /取整|小数点/.test(String(toast)), String(toast).slice(0, 80))
 
-  const w2 = await setCell('挤压强度', 0, '33.33')
+  const w2 = await setCell('挤压强度', 4, '33.33')   // 取 5#(行号 0-based 4)
   await sleep(500)
-  const v2 = await readCell('挤压强度', 0)
+  const v2 = await readCell('挤压强度', 4)
   console.log(`  挤压强度 33.33 → ${JSON.stringify(v2)} (${JSON.stringify(w2)})`)
   ok('② 挤压强度/压降:按表显数据记录(33.33 原样保留)', String(v2) === '33.33', String(v2))
 

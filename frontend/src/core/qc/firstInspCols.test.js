@@ -14,6 +14,7 @@ import {
   columnsOf, groupsOf, unitOfLabel, nextColumnKey, nextColumnLabel,
   rowsForColumn, addColumn, removeColumn, updateColumn, columnHasContent, ensureItems,
   seedDefaultColumns, DEFAULT_TEST_ITEMS, mergeFetchedColumns, ensureColumnRows,
+  isFillableCell, isCheckColumn, columnHeadText,
 } from './firstInspCols.js'
 
 const headOf = (items = []) => ({ 单据编号: 'SJ-T-1', detail: { items } })
@@ -300,4 +301,66 @@ test('ensureColumnRows 幂等:补齐过的列再补一次不长行', () => {
   items.splice(items.findIndex((x) => x['样品序号'] === '3#'), 1)
   assert.equal(ensureColumnRows(items, { key: 'X' }), 1)
   assert.equal(items.length, 9)
+})
+
+/* ── 可填范围(2026-10-17 最终口径:用户「让当前各个表格都能填写即可,**前两列保持原样**即可」,
+      追问后补充「以及后面新增的列也一样」)────────────────────────────────────
+      · 前两列(表观状态/脱粉情况,勾选式)= 保持原样:只记 1#/2#;
+      · 其余所有测试项目列(**含以后新增的列**)= 1#..8# 八行全可填。 */
+
+const DEFAULT_COLS = DEFAULT_TEST_ITEMS.map((d) => ({ key: d.key, label: d.label, group: d.group }))
+const openRows = (col) => [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, col))
+
+test('前两列保持原样:勾选式那两列只记 1#/2#', () => {
+  const checks = DEFAULT_COLS.filter(isCheckColumn)
+  assert.deepEqual(checks.map((c) => c.key), ['appearance', 'depowder'], '纸面前两列就是勾选式那两列')
+  for (const c of checks) assert.deepEqual(openRows(c), [1, 2], `${c.label} 只应 1#/2# 可填`)
+})
+
+test('其余列(含新增列)1#..8# 八行全可填', () => {
+  const others = DEFAULT_COLS.filter((c) => !isCheckColumn(c))
+  assert.equal(others.length, 8, '图纸上除前两列外还有 8 列')
+  for (const c of others) {
+    assert.deepEqual(openRows(c), [1, 2, 3, 4, 5, 6, 7, 8], `${c.label} 应八行全可填`)
+  }
+  // 以后新增的列(group 默认落最后一组)也一样 —— 这正是用户补的那句「以及后面新增的列也一样」
+  const added = { key: '新测试项目', label: '新测试项目', group: '浊度及压降' }
+  assert.equal(isCheckColumn(added), false)
+  assert.deepEqual(openRows(added), [1, 2, 3, 4, 5, 6, 7, 8])
+})
+
+test('可填格总数:前两列 2×2 + 其余 8 列 × 8 行 = 68;占位格只剩前两列的 3#..8# 共 12', () => {
+  const total = DEFAULT_COLS.reduce((n, c) => n + openRows(c).length, 0)
+  assert.equal(total, 2 * 2 + 8 * 8)
+  assert.equal(total, 68)
+  assert.equal(DEFAULT_COLS.length * SAMPLE_COUNT - total, 12, '占位格 = 前两列 × 3#..8#')
+})
+
+test('勾选式列的识别口径:按列名认(改名后仍认得出),key 兜底,普通列不误判', () => {
+  assert.equal(isCheckColumn({ label: '炭棒表观状态' }), true)
+  assert.equal(isCheckColumn({ label: '外观粘模情况' }), true)
+  assert.equal(isCheckColumn({ label: '脱粉' }), true)
+  assert.equal(isCheckColumn({ key: 'depowder', label: '（空）' }), true)
+  assert.equal(isCheckColumn({ label: '炭棒外径' }), false)
+  assert.equal(isCheckColumn({ label: '新测试项目' }), false)
+  assert.equal(isCheckColumn(null), false)
+})
+
+test('样品序号按数字比:字符串「3」也算 3#(明细里的样品序号有字符串来源)', () => {
+  assert.equal(isFillableCell('3', { label: '炭棒外径' }), true)
+  assert.equal(isFillableCell('3', { label: '炭棒表观状态' }), false)
+  // 越界序号一律不可填(不抛)
+  assert.equal(isFillableCell(0, { label: '炭棒外径' }), false)
+  assert.equal(isFillableCell(9, { label: '炭棒外径' }), false)
+  assert.equal(isFillableCell('', { label: '炭棒外径' }), false)
+})
+
+/* ── 列头显示文字(2026-10-17:单位不重复) ───────────────────────────── */
+
+test('列头文字:列名里已含单位的不再后缀括号(浊度NTU 不写成 浊度NTU(NTU))', () => {
+  assert.equal(columnHeadText({ label: '炭棒外径', unit: 'mm' }), '炭棒外径(mm)')
+  assert.equal(columnHeadText({ label: '浊度NTU', unit: 'NTU' }), '浊度NTU')
+  assert.equal(columnHeadText({ label: '压降kPa', unit: 'kPa' }), '压降kPa')
+  assert.equal(columnHeadText({ label: '跌落', unit: '' }), '跌落')
+  assert.equal(columnHeadText(null), '')
 })

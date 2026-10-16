@@ -22,6 +22,8 @@ const FROM = arg('from', '2026-09-01')
 const LIMIT = Number(arg('limit', '0')) || 0
 const TAG = DB === 'HSDZ_MES' ? 'prod' : 'test'
 const FACTORY = DB === 'HSDZ_MES' ? undefined : 'YJ_TEST'   // 登录工厂:正式库=默认,测试库=YJ_TEST
+// 落库人标记:拉取脚本原写「金蝶拉取」,2026-10-16 起改名「试运行」(提交 2297296d)⇒ 参数化,默认按新名
+const MARKER = arg('marker', '试运行')
 
 // 顺序 = 入账先后(入库先于出库)
 const PANELS = [
@@ -42,7 +44,7 @@ const pool = await mssql.connect({
 const jobs = []
 for (const p of PANELS) {
   const rows = (await pool.request().query(
-    `SELECT 单据编号, 单据日期 FROM ${p.head} WHERE asp_user1 = N'金蝶拉取' AND 单据日期 >= '${FROM}'`)).recordset
+    `SELECT 单据编号, 单据日期 FROM ${p.head} WHERE asp_user1 = N'${MARKER}' AND 单据日期 >= '${FROM}'`)).recordset
   for (const r of rows) jobs.push({ ...p, no: r.单据编号, date: String(r.单据日期).slice(0, 10) })
 }
 jobs.sort((a, b) => (a.date === b.date ? (a.kind === b.kind ? a.no.localeCompare(b.no) : (a.kind === 'in' ? -1 : 1)) : a.date.localeCompare(b.date)))

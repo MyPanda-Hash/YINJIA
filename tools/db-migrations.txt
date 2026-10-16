@@ -2781,6 +2781,9 @@ migrate-finish-in-wo-line-20261015.sql
 #   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
 migrate-scjl-wo-line-20261015.sql
 
+# migrate-wo-mold-recipe-link.sql(本任务):生产工单行绑定已审核成型工艺清单配方；混料获取时保存配方快照、混料数量、配料比和计划用量。两账套幂等执行。
+migrate-wo-mold-recipe-link.sql
+
 # migrate-material-out-wo-line-query-col-20261015.sql(2026-10-15):材料出库单(领料单)**列表**补「工单行号」列
 #   —— 纯元数据、零改表:把 MATERIAL_OUT 的「工单行号」place 由 `header` 改为 `query,header`。
 #   背景(用户口径「工单号+工单行号 就为当前的一个新的单的模式」):转领料单已按该口径出单
@@ -3113,15 +3116,26 @@ migrate-wh-name-align-kingdee-20261014.sql
 # ── 2026-10-15 inh/outh 补 11 个「扫码溯源」追溯列(把服务器手工加的列反向同步成正式脚本) ──
 #   用户口径:服务器上已经手工加过这些列 ⇒ 反向同步成仓库里的正式迁移脚本 + 补中文注明;
 #   **类型照服务器现状、不"顺手优化"**(余下 3 个 *ID 列在服务器上就是 float,不是 int;工单那列例外,见下)。
-#   对照库 = 服务器备份 yjmes2.bak(源库 HSDZ_MES,2026-10-15 09:52)还原出的 YJMES2_SRV_1015 实测:
+#   对照库 = 服务器备份 yjmes2.bak(源库 HSDZ_MES,2026-10-15 09:52)还原出的 **HSDZ_MES_YJ2** 实测
+#     (⚠ 2026-10-17 更正:09:52 那份还原出来的是 `HSDZ_MES_YJ2`;叫 `HSDZ_MES_SRV1015` 的是 10-15 23:15 那份
+#      用户手工完整备份 —— 依据 msdb.dbo.restorehistory;旧注释写成 "YJMES2_SRV_1015" 是归属笔误):
 #     inh 58 列 vs 本地 47(+11)/ outh 59 vs 48(+11),且两表的这 11 列**定义逐列完全一致**:
 #     asp_user3 nvarchar(20) / asp_time3 datetime2 / 订单号·采购单号·工单号·委外单号 nvarchar(24) /
 #     订单ID·采购ID·委外ID **float**(服务器如此) / 审核 nvarchar(2);全部 NULL 可空。
-#   ⚠ 2026-10-15 用户后续要求(**有意偏离服务器现状**,已两账套 sp_rename+ALTER 先行改好,脚本负责收敛):
-#     服务器那列是 `工单ID float` ⇒ 本脚本用 **`工单项次` int**(与来源单据头 bd_finish_in / bd_material_out
-#     的 `工单行号` int 对齐);列注明 =「工单项次(= 来源单据头的「工单行号」,与「工单号」共同定位工单明细行;
-#     两列合起来才是唯一键)」。`审核` 列注明按用户口径 =「审核标记:审核=Y / 没审核=N」
-#     (脚本早期"服务器无 Y/N 证据 ⇒ 不采纳"的写法已更正)。其余 3 个 *ID 仍照服务器保持 float。
+#   ⚠ 2026-10-15 用户后续要求(**有意偏离服务器**,已两账套 sp_rename+ALTER 先行改好,脚本负责收敛):
+#     09:52 快照里那列叫 `工单ID` float(53) DEFAULT((0)) ⇒ 本脚本改用 **`工单项次` int**(与来源单据头
+#     bd_finish_in / bd_material_out 的 `工单行号` int 对齐);列注明 =「工单项次(= 来源单据头的「工单行号」,
+#     与「工单号」共同定位工单明细行;两列合起来才是唯一键)」。`审核` 列注明按用户口径 =
+#     「审核标记:审核=Y / 没审核=N」(脚本早期"服务器无 Y/N 证据 ⇒ 不采纳"的写法已更正)。
+#     其余 3 个 *ID 仍照服务器保持 float。
+#   ⚠ 2026-10-17 复核(用户口径「本地 `工单项次` int 是有意偏离,不能回退」;取证 tools/archive/_woline-id-rename-20261017/):
+#     **服务器列名后来也改成了 `工单项次`** —— 10-15 23:15 快照(HSDZ_MES_SRV1015)实测 `工单项次` float(8) DEFAULT((0))、
+#     39 行全 0 ⇒ 「服务器叫 工单ID」只对 09:52 那个时点成立。**当前两侧只剩两条差异,且都是有意偏离**:
+#     ① 类型 int vs float(53);② 无默认值 vs DEFAULT((0))。**"列名不一致"这个问题已经不存在。**
+#     同批影响面取证(两账套 `HSDZ_MES`/`HSDZ_MES_TEST` + 快照):该列 `yj_panel` 绑定 0 行(不是任何面板的载体表)/
+#     `yj_field` 登记 0 行 / `yj_report_template` 0 行 / `sys.sql_modules` 引用 0 个 / 数据 100% NULL(inh 165·128 行)/
+#     后端唯一写方 `StockFlowService.flowCols()` 不含它 ⇒ **改名与改类型对当前实现影响 = 0**
+#     (逐项判据见 docs/design/inh-outh加字段与扫码溯源评估.md §12)。
 #     幂等收敛:两表各一段三段式块 —— 老环境(已按旧方案建了 工单ID float)⇒ 改名 + 纠 int;
 #     新环境(什么都没有)⇒ 直接建 int;已是目标态 ⇒ 三段全 no-op。
 #   ⚠ 三处长度与"草案"不一致,一律以 sys.columns 实测为准:asp_user3=20(不是 40)、四个单号=24(不是 48)、审核=2(不是 4)。
@@ -3616,6 +3630,90 @@ migrate-drop-qc-mold-cut-finspec-20261016.sql
 #   自检含「旧列/旧登记/旧译名绝迹 + 新列/10 语言译名/注明齐全 + 行数与已填行数守恒」。
 migrate-asm-insp-passqty-rename-20261017.sql
 
+# ── 2026-10-17 服务器端「配置改动」反向同步(只同步配置,**不动任何业务数据**) ──
+#   来源:生产服务器 ECS-38508784 的手工完整备份 db\HSDZ_MES-manual-20261015-231541.bak
+#     (2026-10-15 23:15,用户 2026-10-17 提供)。处置:还原成临时库 HSDZ_MES_SRV1015 →
+#     tools/archive/_q-srv-vs-local-20261017.mjs(分类对比)+ _q-srv-vs-local-detail-20261017.mjs(逐条归属)
+#     → _gen-srv-config-sync-20261017.mjs 生成本脚本 → 本次入库。
+#   比对结论(全量):表 14 张服务器独有(6 遗留 + 2 张服务器手工 bak + 6 张本地已下架的检验单表)、
+#     列 187 处属性差异(绝大多数是**本地更严/更宽**:可空→NOT NULL 64、长度加宽 54、默认值本地未带 37、
+#     nvarchar→char 11…属本地约定,**不是**服务器新改动)、视图 9 个同名定义不同(本地更晚)、
+#     数据 28,026 行服务器独有(真实业务/主数据 —— 本次**按用户口径不同步**)。
+#   ⇒ 真·服务器配置缺口只有两处,即本脚本:
+#   ① yj_field **33 行**:服务器上把「备用列」登记成了有意义的自定义标签(col_name LIKE '备用%'
+#      而 label 不是备用名),本地该面板还在、也没有同 label 的行:
+#      QC_INSP_REQ 备用101=外径3(1)+ QC_INSP_REQ_SERIES 备用1..12/121..124/161..174 = 检验方法1..7/
+#      检验标准1..7(30)+ RD_ALKALINE 备用2/3=累积流量/累积流量（L）(2)。
+#      自动排除 19 行(本地已有同 label 行 ⇒ 改名或别处已登记)与 106 行(面板已下架)。
+#   ② yj_translation **37 行**:服务器独有的译名里 ref_key 在本地**还有引用**的 ——
+#      field 35 条 en(18 条是本地面板本来就在用却缺 en 的标签:供应商名称/生产订单数量/计划开工日/
+#      混料计划/混料未完成/成型计划/成型未完成/切炭计划/切炭未完成/组装计划/组装未完成/装箱计划/
+#      装箱未完成/开产量/生产状态/日产能/小时产能/排产班组;另 17 条正是 ① 那批备用列标签的 en:
+#      外径3/检验方法1..7/检验标准1..7/累积流量/累积流量（L）)
+#      + panel 2 条 en(产品变更申请单/生产线);排除 41 条孤儿译名(对应字段/面板本地已不存在)
+#      与 5 条已下架面板名译名。
+#      ⚠ ①→② 有**顺序耦合**:17 条译名在补字段之前会被判成"孤儿译名"而漏掉(第一版就漏了,
+#        补完字段立刻重现为真缺口)⇒ 生成器判"字段还在不在用"时把 ① 正要新增的 label 也算进去。
+#   幂等(两条 INSERT 均带 NOT EXISTS 守卫,按业务键判重);自检核对 ≥33/≥37 行;两账套均执行
+#   (各「[OK] 4 batches」,复跑 0 行新增)。
+#   执行前两账套已各打快照:db\HSDZ_MES-pre-srvsync-20261017.bak / HSDZ_MES_TEST-pre-srvsync-20261017.bak。
+migrate-srv-config-sync-20261017.sql
+
+# —— 2026-10-17 服务器快照回补:6 张经典 HSDZ 遗留表(建表 + 表级中文注明)——
+#   用户口径:「当前服务器快照缺失的表需要补充回到当前的数据库内,数据也按照服务器快照完成恢复」。
+#   与快照库 HSDZ_MES_SRV1015 逐表比对,正式库缺 14 张,分三类:
+#     ① 6 张经典遗留(**本脚本**):dm_langue / gscs / permission / s_commdata / s_sys / s_xtcs;
+#     ② 6 张 2026-10-16 主动下架的检验单(qc_mold_insp_*/qc_cut_insp_*/qc_fin_spec_*;另案,不在本脚本);
+#     ③ 2 张 *_bak_ 备份表(mate_bak_20261013 / rd_dev_task_bak_20261013;**不补** ——
+#        AGENTS.md 第 10 组棘轮基线为 0,体检 10 号项「备份/临时表」补了立刻 FAIL)。
+#   ① 这 6 张在后端源码里只出现在注释中(「对齐 HSDZ permission.GROP」),运行期零引用 ⇒ 不改任何行为。
+#   ⚠ 数据(**7,936 行**)不写进本脚本:其中 s_commdata.JSZ 是真实手机号、gscs 是公司电话,
+#     按 AGENTS.md「敏感信息不入库」不得进 git;改由 tools/archive/_migration-gap-20261017/
+#     _restore-legacy-data.sql 从快照库一次性回灌(DB_ID 守卫 + 空表守卫,幂等;故意不进本清单)。
+#   登记:tools/db-inuse-tables.txt(快照回补节) + tools/db-legacy-whitelist.txt(冻结表 6 条)。
+migrate-legacy-restore-20261017.sql
+
+# —— 2026-10-17 9 张遗留表的列中文说明补齐(57 列)——
+#   用户口径:「把这些描述按照原来的描述补齐这 9 张表」。
+#   实况:dm_langue / gscs / permission / s_commdata / s_sys / s_xtcs / inh / outh / scjl
+#   的列注明覆盖数与服务器快照**逐表相等**,但两边都还有 57 列**完全没有注明** ⇒ 这才是要补的:
+#     dm_langue 10 / gscs 19 / permission 5 / s_commdata 1 / s_xtcs 1 / inh 8 / outh 12 / scjl 1。
+#   取值口径(严格按优先级,不臆造):① 全库同名列已有原文 → 照抄;② 拼音可确解 → 给中文义
+#   (gscs 的 gsmc/gsdh/tpwz/xpsm1/xpsm2 有该表唯一一行的**取值佐证**;tm_* 一组按
+#   条码长度/高度/左右间距/上下间距/上边距/左边距 释义);③ 取值为空且无确解的 6 列
+#   (gsgs/gszg/xpzs/msbdh/sczg/rem)如实标注「语义待业务确认」,不编造。
+#   全部 NOT EXISTS 守卫(已有注明一个字不动);自检断言 9 张表无注明列数 = 0。两账套均执行。
+#   ⚠ 本脚本要求排在上面 migrate-legacy-restore 之后;后者的自检已放宽为「注明数不足才 FAIL」
+#     (原为等号,补完会误判),见 _GenLegacyDdl.java 的说明。
+migrate-legacy-comments-fill-20261017.sql
+
+# —— 2026-10-17 scjl.jbbh 类型对齐服务器快照:text → nvarchar(250) ——
+#   与快照库 HSDZ_MES_SRV1015 逐列比对,scjl 的 100 列里**只有 jbbh 有类型差异**
+#   (本地 text / 服务器 nvarchar(250));根因是本地这张表 2026-10-03 由
+#   migrate-legacy-plang-scjl-tables.sql 按参考库结构补建,用的是旧定义 text。
+#   ⚠ text 已弃用,且不能参与 = / ORDER BY / DISTINCT / EXISTS / EXCEPT / UNION。
+#   改法:text 不能直接 ALTER COLUMN ⇒ 加新列 → CAST 搬数据 → 删旧列 → sp_rename 改名 → 补回注明「班别」。
+#   安全性(实测):jbbh 无 yj_field 引用、无视图/存储过程引用(引用 scjl 的 4 个视图都不含它)、
+#   无外键/索引/默认约束 ⇒ 对面板与报表零影响。幂等(已是 nvarchar 则跳过)。两账套均执行。
+migrate-scjl-jbbh-nvarchar-20261017.sql
+
+# —— 2026-10-17 下架「生产工单明细表 MANU_ORDER_DETAIL / 生产工单统计表 MANU_ORDER_STATS」2 张报表面板 ——
+#   用户口径:「完成上面的任务后检查当前生产工单明细标和生产工单统计表,查看当前这两个表是否没有作用,
+#   不存在作用的话删除掉就可以,帮我查看一下。」
+#   判定“没有作用”的四条取证(全部 2026-10-17 实测):
+#     ① 正式库 bd_manu_order / bl_manu_order 各 0 行 ⇒ 两个载体视图 v_manu_order_detail/stats 0 行
+#        ⇒ 打开就是空表;真实工单走 plang(429 行)+ 订单结转 + 自建工单列表页。
+#     ② yj_usage_log 全库 7633 行里这两个面板一次都没被打开过(放宽到「%明细表%/%统计表%」也是 0)。
+#     ③ 后端 backend/src/main/java 全仓 grep 这两个面板码与视图名 = 0 处(面板是元数据驱动的)。
+#     ④ sys.sql_expression_dependencies 里引用这两个视图的主体 = 0;无外键;无报表模板;
+#        yj_attachment/yj_doc_status/yj_form_approval/report_column_settings/yj_plan_term 命中 0 行。
+#   删:视图 2 + yj_panel 2 + yj_field 34 + yj_role_panel 6 + yj_translation(面板名)18。
+#   ⚠ **不动物理表** bd_manu_order/bl_manu_order(仍在册,MANU_ORDER 面板的四个处理器还在用);
+#     也不动 yj_usage_log 与 s_allno。回退抓手 tools/archive/_manu-order-report-panels-20261017/
+#     (restore-prod.sql / restore-test.sql,由 _gen-manu-order-panels-restore.mjs 连库现读生成)。
+#   配套前端:menus.js 摘掉两项 + menus.test.js 期望数组同步 + BusinessOverview.vue 报表清单摘两条。
+#   两账套均执行到「[OK] 12 batches」,自检(视图/面板/字段/授权/译名全 0 且两张物理表仍在)通过。
+migrate-drop-manu-order-report-panels-20261017.sql
 #   实测未来日期来自单张 XSCK-20270901-00001(2027-09-01),让「最新期次」误取到它。只改视图口径,不动业务数据。
 # 期次桶收敛已并入 canonical 脚本 migrate-inv-accounting.sql(改字节触发重跑重建视图),不再单列脚本。
 # migrate-stock-views-restore-20261016.sql — 事故修复:恢复 v_stock_ledger/v_stock_summary(摘掉已下架表的委外分支 + 期次桶收敛;canonical 脚本字节不动)

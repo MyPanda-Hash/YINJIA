@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.ExternalReportAbsorbService;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
@@ -45,13 +46,17 @@ public class ScheduleBoardController {
     private final WorkOrderTransferService transferService;
     /** 工序—产线预排(2026-10-05):排产即按路线预排全程计划线 */
     private final ProcessTaskService processTask;
+    /** 手机端/外部报工吸收(2026-10-17):外部直写 scjl 的完工行 → 补镜像 + 推进 + 转序 */
+    private final ExternalReportAbsorbService absorbService;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
-                                   WorkOrderTransferService transferService, ProcessTaskService processTask) {
+                                   WorkOrderTransferService transferService, ProcessTaskService processTask,
+                                   ExternalReportAbsorbService absorbService) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
         this.processTask = processTask;
+        this.absorbService = absorbService;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -143,8 +148,17 @@ public class ScheduleBoardController {
     public ApiResult<List<Map<String, Object>>> scheduled(@RequestBody(required = false) Map<String, Object> body) {
         // 调用方只有工单排产看板(选中线的排产明细);快速排产页不调它 ⇒ 不放行 SCHEDULE_BOARD
         perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
-        return ApiResult.ok(service.scheduled(str(body == null ? null : body.get("生产线")),
-                str(body == null ? null : body.get("scope")), workshop()));
+        String line = str(body == null ? null : body.get("生产线"));
+        String scope = str(body == null ? null : body.get("scope"));
+        List<Map<String, Object>> rows = service.scheduled(line, scope, workshop());
+        // 🔴 2026-10-17 用户口径「不能做到当前数据满足就进入下一个工序吗?……让当前数据满足就进入,
+        //   而不是完成审核才进入」:明细里凡是「当前工序完工量 ≥ 当前工序计划量」的行,说明这一道已经做够,
+        //   当场按数据推进到下一道(判据 = 报工审核钩子**同一个方法**,见 ProcessTaskService.advanceSatisfied)。
+        //   推进过就重取一次明细 ⇒ 界面直接显示推进后的当前工序/产线,不用刷新两次。
+        if (processTask.advanceSatisfied(rows, currentUser())) {
+            rows = service.scheduled(line, scope, workshop());
+        }
+        return ApiResult.ok(rows);
     }
 
     /** 批量调线:勾选已排工单 → 目标生产线(停用线拒绝) */
@@ -221,6 +235,30 @@ public class ScheduleBoardController {
         perm.requireButtonAny(PRINT_ENTRIES, "打印");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.printStamp(rows, currentUser()));
+    }
+
+    /**
+     * **手机端报工吸收**(2026-10-17):把外部(参考库 PDA/手机扫码)直写 {@code scjl} 的完工行
+     * 按 MES 报工审核的同一套后果补齐 —— 补排产镜像(产线/班组/批次/客户/产品…)、
+     * 推进 {@code plang.当前工序/完工状态}、**转序派线**(前道完工 → 切到下一道的预排线)。
+     *
+     * <p>为什么需要:手机端报工不生成 MES 工序报工单 ⇒ 不走审核 ⇒ 转序钩子从未执行,
+     * 于是看板算得出完工量、工单却卡在当前线不动。定时任务
+     * ({@link com.yinjia.mes.service.ExternalReportAbsorbScheduler},默认每分钟)会自动跑,
+     * 本端点用于**立即生效 / 手工补跑**(返回逐行明细:锚到哪一行、补了哪些镜像、转序结果或跳过原因)。
+     */
+    @PostMapping("/absorbMobile")
+    public ApiResult<Map<String, Object>> absorbMobile(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.SCHEDULE_BOARD, PagePanelRegistry.WORK_ORDER_LIST,
+                PagePanelRegistry.WORK_ORDER_BOARD);
+        Integer days = null;
+        Object d = body == null ? null : body.get("days");
+        if (d instanceof Number n) days = n.intValue();
+        else if (d != null && !String.valueOf(d).isBlank()) {
+            try { days = Integer.valueOf(String.valueOf(d).trim()); } catch (NumberFormatException ignore) { /* 非法值用默认 */ }
+        }
+        // 手工调用一律 force=true:人是显式来补跑的,不该被"本进程已吸收过"的记忆挡掉
+        return ApiResult.ok(absorbService.absorb(days, currentUser(), true));
     }
 
     private static String currentUser() {

@@ -15,7 +15,7 @@ SELECT N'RESULT: DEMO-PROD-INFO ' + CAST(COUNT(*) AS varchar(10)) FROM rd_prod_i
 SELECT N'RESULT: DEMO-FILES ' + CAST(COUNT(*) AS varchar(10)) FROM (
   SELECT 单据编号 FROM rd_mold_proc_head WHERE 产品编号 LIKE N'DEMO-%'
   UNION ALL SELECT 单据编号 FROM rd_asm_proc_head  WHERE 产品编号 LIKE N'DEMO-%'
-  UNION ALL SELECT 单据编号 FROM rd_spec_doc_head  WHERE 编号     LIKE N'DEMO-%'
+  UNION ALL SELECT 单据编号 FROM rd_spec_doc_head  WHERE 单据编号 LIKE N'DEMO-%'
   UNION ALL SELECT 单据编号 FROM rd_insp_plan_head WHERE 产品编号 LIKE N'DEMO-%') t;
 SELECT N'RESULT: DEMO-CHANGE ' + CAST(COUNT(*) AS varchar(10)) FROM rd_change_head WHERE 产品编号 LIKE N'DEMO-%';
 SELECT N'RESULT: DEMO-USERS ' + CAST(COUNT(*) AS varchar(10)) FROM yj_user WHERE username LIKE N'demo[_]%';

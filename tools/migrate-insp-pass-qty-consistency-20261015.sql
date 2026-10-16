@@ -99,7 +99,15 @@ GO
 /* ---------- 自检 ---------- */
 DECLARE @bad int = 0;
 
-/* (a) 三张明细表的「合格数量」注明必须是新口径(含「检验数量」字样) */
+/* (a) 三张明细表的「合格数量」注明必须是新口径(含「检验数量」字样)
+   ⚠ 2026-10-17 修:期望张数改成**动态** —— 三张工序检验单(qc_mold/qc_cut/qc_asm)已于
+   2026-10-16 下架(DROP),表都不在了还硬要"3 张" ⇒ 本脚本永远 FAIL ⇒
+   DbSync 在此中止、其后迁移不再执行(正式库曾因此在 migrate-stock-report-dup-fields 之后
+   连丢 13 条迁移)。现在只按**仍存在且有该列**的表张数比对:全下架时期望 0 ⇒ 自洽。 */
+DECLARE @expDetail int;
+SELECT @expDetail = COUNT(*) FROM sys.tables t
+ WHERE t.name IN (N'qc_mold_insp_detail', N'qc_cut_insp_detail', N'qc_asm_insp_detail')
+   AND COL_LENGTH(N'dbo.' + t.name, N'合格数量') IS NOT NULL;
 DECLARE @okDetail int;
 SELECT @okDetail = COUNT(*) FROM sys.extended_properties ep
   JOIN sys.tables t ON t.object_id = ep.major_id
@@ -107,13 +115,17 @@ SELECT @okDetail = COUNT(*) FROM sys.extended_properties ep
  WHERE t.name IN (N'qc_mold_insp_detail', N'qc_cut_insp_detail', N'qc_asm_insp_detail')
    AND c.name = N'合格数量' AND ep.name = N'MS_Description'
    AND CAST(ep.value AS nvarchar(max)) LIKE N'%检验数量%';
-IF @okDetail <> 3
+IF @okDetail <> @expDetail
 BEGIN
     SET @bad = @bad + 1;
-    PRINT N'  ! 明细表「合格数量」注明未刷新的张数 = ' + CAST(@okDetail AS nvarchar(10)) + N'（应为 3）';
+    PRINT N'  ! 明细表「合格数量」注明未刷新的张数 = ' + CAST(@okDetail AS nvarchar(10)) + N'（应为 ' + CAST(@expDetail AS nvarchar(10)) + N'）';
 END
 
-/* (b) 三张头表的「检验数量」注明必须已标注为基数 */
+/* (b) 三张头表的「检验数量」注明必须已标注为基数(同样按仍存在的表张数动态比对) */
+DECLARE @expHead int;
+SELECT @expHead = COUNT(*) FROM sys.tables t
+ WHERE t.name IN (N'qc_mold_insp_head', N'qc_cut_insp_head', N'qc_asm_insp_head')
+   AND COL_LENGTH(N'dbo.' + t.name, N'检验数量') IS NOT NULL;
 DECLARE @okHead int;
 SELECT @okHead = COUNT(*) FROM sys.extended_properties ep
   JOIN sys.tables t ON t.object_id = ep.major_id
@@ -121,16 +133,16 @@ SELECT @okHead = COUNT(*) FROM sys.extended_properties ep
  WHERE t.name IN (N'qc_mold_insp_head', N'qc_cut_insp_head', N'qc_asm_insp_head')
    AND c.name = N'检验数量' AND ep.name = N'MS_Description'
    AND CAST(ep.value AS nvarchar(max)) LIKE N'%基数%';
-IF @okHead <> 3
+IF @okHead <> @expHead
 BEGIN
     SET @bad = @bad + 1;
-    PRINT N'  ! 头表「检验数量」注明未标注为基数的张数 = ' + CAST(@okHead AS nvarchar(10)) + N'（应为 3）';
+    PRINT N'  ! 头表「检验数量」注明未标注为基数的张数 = ' + CAST(@okHead AS nvarchar(10)) + N'（应为 ' + CAST(@expHead AS nvarchar(10)) + N'）';
 END
 
-/* (c) 物理列必须还在(数据一致性只是改口径，不删历史列) */
-IF COL_LENGTH(N'dbo.qc_mold_insp_detail', N'合格数量') IS NULL SET @bad = @bad + 1;
-IF COL_LENGTH(N'dbo.qc_cut_insp_detail',  N'合格数量') IS NULL SET @bad = @bad + 1;
-IF COL_LENGTH(N'dbo.qc_asm_insp_detail',  N'合格数量') IS NULL SET @bad = @bad + 1;
+/* (c) 物理列必须在(数据一致性只是改口径,不删历史列)—— 同样只在**表还在**时才算不符 */
+IF OBJECT_ID(N'dbo.qc_mold_insp_detail', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.qc_mold_insp_detail', N'合格数量') IS NULL SET @bad = @bad + 1;
+IF OBJECT_ID(N'dbo.qc_cut_insp_detail',  N'U') IS NOT NULL AND COL_LENGTH(N'dbo.qc_cut_insp_detail',  N'合格数量') IS NULL SET @bad = @bad + 1;
+IF OBJECT_ID(N'dbo.qc_asm_insp_detail',  N'U') IS NOT NULL AND COL_LENGTH(N'dbo.qc_asm_insp_detail',  N'合格数量') IS NULL SET @bad = @bad + 1;
 
 /* (d) 🔴 守卫:来料检验单 qc_insp_detail 的「合格数量」列**必须原样还在** ——
        同名不同义(送检数量 = 合格 + 不合格，采购链靠它算入库)，不许误伤 */

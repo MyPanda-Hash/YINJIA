@@ -324,6 +324,10 @@ public class ReportService {
                 // 检验项目来自出货检验计划表、每个产品不一样,故列不写死在 .jrxml 里(生成器见
                 // QcAsmInspReportSupport);这里只把「取数 → 矩阵 → 参数」喂给生成的报表。
                 print = fillQcAsmInsp(def, doc, docNo, rows);
+            } else if (QcFirstInspReportSupport.CODE.equals(tpl.code())) {
+                // 炭棒成型车间首件检验记录表(2026-10-17):同样是**动态列**的矩阵,
+                // 版式与面板纸张(QcFirstInspSheet.vue)、它的 Excel 导出同源;生成器见 QcFirstInspReportSupport。
+                print = fillQcFirstInsp(doc, docNo, rows);
             } else {
                 // 主数据源 = 明细**全量**(一单一模板、逐行渲染)。制程检验记录表 2026-10-17 起也是
                 // 「一行一个检验项目」的纵向表(与面板纸张表同源),用 $F{检验要求}/$F{检验方法} 等逐行取;
@@ -359,6 +363,21 @@ public class ReportService {
         return JasperFillManager.fillReport(QcAsmInspReportSupport.report(m),
                 QcAsmInspReportSupport.params(m, head),
                 new JRMapCollectionDataSource(QcAsmInspReportSupport.dataRows()));
+    }
+
+    /**
+     * 炭棒成型车间首件检验记录表填充(QC_FIRST_INSP,2026-10-17):明细 → 矩阵(按「项目分组」分组、
+     * 组内一个测试项目一列、1#..8# 八个样品行)→ 动态生成的报表 + 参数。**列不写死**:
+     * 面板支持「新增测试项目 = 新增一列」,当前明细里有什么列就打什么列(用户口径「就是当前报表的 excel 表」)。
+     * 数据源只给一行(内容全走参数)—— Jasper 没有数据源就不渲染 detail 带,故必须给。
+     */
+    private JasperPrint fillQcFirstInsp(Map<String, Object> doc, String docNo,
+                                        List<Map<String, ?>> rows) throws JRException {
+        Map<String, Object> head = headParams(doc, docNo);
+        QcFirstInspReportSupport.Matrix m = QcFirstInspReportSupport.matrix(rows, head);
+        return JasperFillManager.fillReport(QcFirstInspReportSupport.report(m),
+                QcFirstInspReportSupport.params(m, head),
+                new JRMapCollectionDataSource(QcFirstInspReportSupport.dataRows()));
     }
 
     /**

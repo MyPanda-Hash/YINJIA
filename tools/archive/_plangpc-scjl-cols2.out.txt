@@ -1,0 +1,73 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _probe-plangpc-scjl-cols2.sql ==
+  | scjl #36 | zfjl | float | 需求数量 | 
+  | scjl #37 | other | float | 其他 | 
+  | scjl #38 | jc_no | nvarchar(30) | 进厂编号 | 
+  | scjl #39 | cp_no | nvarchar(30) | 产品编号 | 
+  | scjl #40 | gd_ph | nvarchar(30) | 工单盘号 | 
+  | scjl #41 | lx | nvarchar(100) | 挂具名称 | 
+  | scjl #42 | wj | nvarchar(30) | 每挂数量 | 
+  | scjl #43 | htys | nvarchar(250) | 不良原因 | 
+  | scjl #44 | cpcz | nvarchar(250) | 产品材质 | 
+  | scjl #45 | sx | nvarchar(250) | 纱型 | 
+  | scjl #46 | jm | nvarchar(30) | 计米 | 
+  | scjl #47 | sjd | nvarchar(250) | 松紧度 | 
+  | scjl #49 | zsdd | nvarchar(250) | 报废原因 | 
+  | scjl #50 | cplsh | nvarchar(130) | 产成品流水号 | 
+  | scjl #51 | pl_sl | float | 排产数量 | 
+  | scjl #52 | pp | nvarchar(30) | 客户PO | 
+  | scjl #53 | khdm | nvarchar(40) | 客户代码 | 
+  | scjl #54 | ddwsl | float | 多单位数量 | 
+  | scjl #55 | jh_date | datetime | 订单交期 | 
+  | scjl #56 | od_no | nvarchar(24) | 订单号 | 
+  | scjl #57 | od_xc | float | 订单表身ID | 
+  | scjl #58 | ywymc | nvarchar(20) | 业务员名称 | 
+  | scjl #59 | gsje | float | 工时金额 | 
+  | scjl #60 | llxz | nvarchar(30) | 来料性质 | 
+  | scjl #61 | cgrkdh | nvarchar(30) | 采购入库单号 | 
+  | scjl #62 | lldh | nvarchar(30) | 来料单号 | 
+  | scjl #63 | djlx | nvarchar(30) | 单据类型 | 
+  | scjl #64 | zl | float | 重量 | 
+  | scjl #65 | sl2 | float | 盘数 | 
+  | scjl #66 | sl3 | float | 每盘数量 | 
+  | scjl #67 | asp_user1 | nvarchar(20) | 创建人 | 
+  | scjl #68 | asp_time1 | datetime | 创建时间 | 
+  | scjl #69 | asp_user2 | nvarchar(20) | 最后修改人 | 
+  | scjl #70 | asp_time2 | datetime | 最后修改时间 | 
+  | scjl #94 | 备用15 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | scjl #95 | 备用16 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | scjl #96 | 备用17 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | scjl #97 | 备用18 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | scjl #98 | 备用19 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | scjl #99 | 备用20 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | scjl #100 | 工单行号 | int | 工单行号(生产工单行,与 plang.pl_xc 同义;冗余展示列 —— 权威行键仍是 gd_id=plang_pc.id,两者由 plang_pc.plang_id 对应) | 
+  | scjl #101 | jbbh | nvarchar(250) | 班别 | 
+  | plang_pc #51 | asp_time3 | datetime | 审核时间 | 
+  | plang_pc #52 | asp_cancel | varchar(1) | 删除标记 | 
+  | plang_pc #53 | asp_user4 | nvarchar(20) | 删除人 | 
+  | plang_pc #54 | asp_time4 | datetime | 删除时间 | 
+  | plang_pc #55 | asp_print | int | 打印次数 | 
+  | plang_pc #56 | 批次号 | nvarchar(12) | 批次号(与 plang.批次号 同口径:转单日期 yyyyMMdd,同日多次转单 -2/-3) | 
+  | plang_pc #57 | plang_id | int | 工单行锚(plang.id;批次号纯日期化后行级关联主键——同天多笔转单同批次号,靠本列区分) | 
+  | plang_pc #58 | 备用1 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #59 | 备用2 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #60 | 备用3 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #61 | 备用4 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #62 | 备用5 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #63 | 备用6 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #64 | 备用7 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #65 | 备用8 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #66 | 备用9 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #67 | 备用10 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #68 | 备用11 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #69 | 备用12 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #70 | 备用13 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #71 | 备用14 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #72 | 备用15 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #73 | 备用16 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #74 | 备用17 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #75 | 备用18 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #76 | 备用19 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | plang_pc #77 | 备用20 | nvarchar(500) | 预留扩展字段(未绑定) | 
+  | == 列数 == | plang=90 plang_pc=77 scjl=100 | 
+[OK] _probe-plangpc-scjl-cols2.sql (1 batches)

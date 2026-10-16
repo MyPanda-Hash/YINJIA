@@ -29,7 +29,7 @@ const argv = process.argv.slice(2)
 const arg = (name, dflt) => { const i = argv.indexOf('--' + name); return i >= 0 ? argv[i + 1] : dflt }
 const DB = arg('db', 'HSDZ_MES_TEST')
 const FROM = arg('from', '2026-09-01')
-const TO = arg('to', new Date().toISOString().slice(0, 10))
+const TO = arg('to', new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))  // 本机本地日期(UTC 口径会在 早上把"今天"算成昨天)
 const LIMIT = Number(arg('limit', '0')) || 0
 const ONLY = arg('types', '') ? arg('types').split(',') : null
 const TAG = DB === 'HSDZ_MES' ? 'prod' : 'test'
@@ -176,6 +176,9 @@ const pool = await mssql.connect({
  *    当数值转会超 JS 安全整数、mssql 直接报「Value must be between ±9007199254740991」(实测踩到)。 */
 const colsOf = async (t) => (await pool.request().query(
   `SELECT c.name, ty.name AS typ, c.max_length FROM sys.columns c JOIN sys.types ty ON ty.user_type_id = c.user_type_id WHERE c.object_id = OBJECT_ID('dbo.${t}')`)).recordset
+/** 必填列(NOT NULL、非自增、无默认值):这些列金蝶不给值时脚本必须兜底,否则该单必然插不进去 */
+const reqColsOf = async (t) => (await pool.request().query(
+  `SELECT c.name FROM sys.columns c LEFT JOIN sys.default_constraints dc ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE c.object_id = OBJECT_ID('dbo.${t}') AND c.is_nullable = 0 AND c.is_identity = 0 AND dc.object_id IS NULL`)).recordset.map((r) => r.name)
 const NUMERIC = new Set(['decimal', 'numeric', 'int', 'bigint', 'smallint', 'tinyint', 'float', 'real', 'money', 'smallmoney', 'bit'])
 let truncated = 0
 /** 按目标列型/列宽落值。字符串超宽**截断并计数** —— 否则一条超长值会让**整单**失败
@@ -207,6 +210,16 @@ for (const t of TYPES) {
   const lMap = t.lineMap.filter(([, c]) => lineCols.has(c))
   const missing = [...t.headMap, ...t.lineMap].filter(([, c]) => !headCols.has(c) && !lineCols.has(c)).map(([, c]) => c)
   if (missing.length) say(`- ⚠ ${t.kdName}:映射里有目标表不存在的列,已跳过 —— ${[...new Set(missing)].join(', ')}`)
+
+  // 必填列预检(2026-10-16):NOT NULL/非自增/无默认 的列若既不在映射目标、也不在兜底名单里 ⇒ 提前报出来。
+  // 不预检的话表现是「逐单静默失败」(本次实测:采购订单 187/187 全挂在 币种 上,日志只看得见前 3 条)。
+  {
+    const FIXED = ['单据编号', '单据状态', '是否已转ERP', 'ERP单号', '转ERP操作人', '转ERP时间', 'asp_user1', 'asp_time1', 'asp_cancel']
+    const FILLABLE = ['币种', '汇率', '业务类型', '结算客户']
+    const gapH = (await reqColsOf(t.head)).filter((c) => !new Set([...hMap.map((x) => x[1]), ...FIXED, ...FILLABLE]).has(c))
+    const gapL = (await reqColsOf(t.line)).filter((c) => !new Set([...lMap.map((x) => x[1]), ...FIXED]).has(c))
+    if (gapH.length || gapL.length) say(`- ⚠ ${t.kdName}:必填列未覆盖 —— 头[${gapH.join(', ') || '无'}] 行[${gapL.join(', ') || '无'}]`)
+  }
 
   // ① 列表(按支持的时间键过滤;客户端再按单据日期精筛)
   const base = `/jdy/v2/scm/${t.kd}`
@@ -241,6 +254,17 @@ for (const t of TYPES) {
       if (headCols.has('asp_user1')) head['asp_user1'] = '试运行'
       if (headCols.has('asp_time1')) head['asp_time1'] = new Date()
       if (headCols.has('asp_cancel')) head['asp_cancel'] = 'N'
+      // 必填列兜底(2026-10-16):金蝶这几个接口不回「币种名称/业务类型名称」,而本地列 NOT NULL 无默认
+      //   (bd_pu_order/bd_purchase_in 的 币种·汇率;bd_purchase_in/bd_sale_out/bd_material_out/bd_finish_in
+      //    的 业务类型;bd_sale_out 的 结算客户)—— 不兜底则逐单 INSERT 失败。
+      // 口径:币种恒「人民币」(与同步器一致,deploy/README.md §7);汇率取金蝶 exchange_rate,缺则 1;
+      //   业务类型金蝶该接口只回 trans_type 码、无名称 ⇒ 空串(与本地既有采购入库单该列一致);
+      //   结算客户金蝶出库单不回 ⇒ 取「客户」。
+      const fill = (col, v) => { if (headCols.has(col) && (head[col] === undefined || head[col] === null || head[col] === '')) head[col] = v }
+      fill('币种', '人民币')
+      fill('汇率', N(d.exchange_rate) ?? 1)
+      fill('业务类型', '')
+      fill('结算客户', head['客户'])
       for (const k of Object.keys(head)) if (head[k] === undefined) delete head[k]
 
       const lines = (d.material_entity || []).map((m) => {
@@ -283,9 +307,10 @@ say('')
 say(`**合计**:成功拉取 ${grandOk} 张单据 / ${grandLine} 条明细,失败 ${grandFail} 张。`)
 
 mkdirSync(new URL('./_dump-out/', import.meta.url), { recursive: true })
-writeFileSync(new URL(`./_dump-out/kingdee-pull-${TAG}-1014.md`, import.meta.url), report.join('\n'), 'utf8')
+const RUNSTAMP = TO.replace(/-/g, '').slice(4)   // 报告名带运行日期(MMDD),不覆盖上一轮留档
+writeFileSync(new URL(`./_dump-out/kingdee-pull-${TAG}-${RUNSTAMP}.md`, import.meta.url), report.join('\n'), 'utf8')
 await pool.close()
-console.log(`\n[产物] tools/archive/_dump-out/kingdee-pull-${TAG}-1014.md`)
+console.log(`\n[产物] tools/archive/_dump-out/kingdee-pull-${TAG}-${RUNSTAMP}.md`)
 
 
 

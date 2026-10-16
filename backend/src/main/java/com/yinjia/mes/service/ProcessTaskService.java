@@ -840,16 +840,35 @@ public class ProcessTaskService {
     }
 
     /**
-     * **转序落实**(报工**审核**后调用;2026-10-07 恢复 2026-10-05 口径):找台账里状态=**计划**的第一道:
-     *   · 转序条件 = **前一道已完工**(该道已审核报工量 ≥ 换算后计划量)**且本道尚未开工**(报工量=0);
-     *   · 计划线为空 → 只提示"请人工派线",不动作;
-     *   · 计划线 = 当前线 → 只提示"沿用当前线";
-     *   · 否则写 plang.scx = 计划线 + 台账置「已落实/实际线/落实时间」+ 轨迹 wo_transfer_log(原因「转序自动派线」)。
+     * **转序落实(达标即转序)** —— 判据只看**数据**,不再依赖"报工单审核"这个动作。
      *
-     * <p>未预排的工单行(台账为空)不做任何自动补线 —— 人工排线口径下由使用者重新排产(回执里给提示)。
+     * <p>🔴 2026-10-17 用户口径(原话):「不能做到当前数据满足就进入下一个工序吗?完成对这个钩子的判定修改,
+     * 让当前数据满足就进入,而不是完成审核才进入」。
+     * 原实现的判据本身没问题(前道已审完工量 ≥ 该道计划量),但**唯一的调用点是报工单审核钩子** ——
+     * 手机端(参考库 PDA)直写 {@code scjl}、不产生报工单 ⇒ 这个钩子一次都没跑过 ⇒
+     * 台账永远停在"首道已落实"、看板「当前工序」永远显示首道、工单也就永远进不了下一个预排。
+     *
+     * <p>现规则(对**这一工单行**的预排台账 {@code wo_process_line} 逐道走):
+     * <ol>
+     *   <li>该道「已审核报工量 ≥ 该道计划数量」= **已达标** ⇒ 台账置「已落实」+ 补实际生产线;</li>
+     *   <li>第一道**未达标**的 = **当前该做的道**:台账还是「计划」⇒ 置「已落实」,
+     *       并按它的「计划生产线」把工单切过去(写 {@code plang.scx} + {@code plang_pc.scx} + 轨迹
+     *       {@code wo_transfer_log});计划线为空 ⇒ 只提示"请人工派线",**不瞎切**;</li>
+     *   <li>计划线 == 当前线 ⇒ 记「沿用当前线」,**照样把该道置「已落实」**
+     *       —— 不落实的话看板的「当前工序」会一直停在上一道,这正是"工单没有进入下一个预排产处";</li>
+     *   <li>整条路线都达标 ⇒ 不动(生产完工由 {@link #syncWorkOrderState} 判)。</li>
+     * </ol>
+     * 幂等:已是「已落实」的道不再重复处理;轨迹只在**真的换线**时写一条。
+     *
+     * <p>调用方(判据同一个方法,区别只在"什么时候来看一眼"):
+     * <ul>
+     *   <li>① 报工单审核/审批钩子 —— {@code ButtonService.runWoAuditHooks};</li>
+     *   <li>② **看板/列表加载**({@link #advanceSatisfied}) —— 数据满足当场就进入下一道;</li>
+     *   <li>③ 手机端/外部报工吸收({@code ExternalReportAbsorbService})及其定时任务。</li>
+     * </ul>
      *
      * <p>⚠ 唯一键 = **工单号 + 工单行号**(2026-10-07 用户口径):转序只切**被报工的那一行**的线,
-     * 同工单其它行原样不动;报工量也按该行统计(锚 scjl.gd_id → plang_pc.plang_id)。
+     * 同工单其它行原样不动;报工量也按该行统计(锚 {@code scjl.gd_id → plang_pc.plang_id})。
      */
     @Transactional
     public Map<String, Object> applyNextProcess(String plNo, Long lineId, String user) {
@@ -867,46 +886,106 @@ public class ProcessTaskService {
         final Long row = rowId;
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
-                        + " ISNULL(计划数量,0) AS 计划数量, ISNULL(状态,N'计划') AS 状态"
+                        + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(计划数量,0) AS 计划数量,"
+                        + " ISNULL(状态,N'计划') AS 状态"
                         + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
                         + "   AND (工单行id=? OR 工单行id IS NULL)"
                         + " ORDER BY ISNULL(工序序,999), id", no, row);
         if (rows.isEmpty()) { out.put("提示", "该工单行没有预排线(请在快速排产里排线)"); return out; }
-        Map<String, Object> next = null;
-        double prevDone = -1, prevPlan = -1;
-        for (Map<String, Object> r : rows) {
-            String op = String.valueOf(r.get("工序")).trim();
-            double d = reportedQty(no, row, op);
-            // 转序条件:本道尚未开工,且(首道 或 前一道已完工)
-            if ("计划".equals(String.valueOf(r.get("状态"))) && d <= 0
-                    && (prevDone < 0 || (prevPlan > 0 && prevDone + 0.0001 >= prevPlan))) { next = r; break; }
-            prevDone = d;
-            prevPlan = num(r.get("计划数量"));
-        }
-        if (next == null) return out;
-        String op = String.valueOf(next.get("工序")).trim();
-        String plan = String.valueOf(next.get("计划生产线")).trim();
-        out.put("工序", op);
-        if (plan.isEmpty()) { out.put("提示", "下一道(" + op + ")未预排线,请人工派线"); return out; }
         List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE id=?", String.class, row);
         String cur = cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
-        if (plan.equals(cur)) { out.put("提示", "下一道(" + op + ")沿用当前线"); return out; }
-        // 只切**这一行**的线(plang + 排产镜像 plang_pc;同工单其它行不动)
-        jdbc.update("UPDATE dbo.plang SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", plan, user, row);
-        jdbc.update("UPDATE dbo.plang_pc SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE plang_id=?", plan, user, row);
-        jdbc.update("UPDATE dbo.wo_process_line SET 实际生产线=?, 状态=N'已落实', 落实时间=GETDATE(),"
-                + " asp_user2=?, asp_time2=GETDATE() WHERE id=?", plan, user, next.get("id"));
-        // 轨迹(列名对齐 wo_transfer_log):转序=自动派线,可查可撤;plang_id 锚到具体工单行
-        try {
-            jdbc.update("INSERT INTO dbo.wo_transfer_log (pl_no, plang_id, 从生产线, 从车间, 到生产线, 到车间, 数量, 原因,"
-                            + " asp_cancel, asp_user1, asp_time1, asp_time2)"
-                            + " VALUES (?,?,?,?,?,?,?,N'转序自动派线',N'N',?,GETDATE(),GETDATE())",
-                    no, row, cur, shopOfLine(cur), plan, shopOfLine(plan), num(next.get("计划数量")), user);
-        } catch (Exception ignore) { /* 轨迹写入失败不阻断转序 */ }
-        out.put("工单行id", row);
-        out.put("从生产线", cur);
-        out.put("到生产线", plan);
+        int steps = 0;
+        for (Map<String, Object> r : rows) {
+            String op = String.valueOf(r.get("工序")).trim();
+            double plan = num(r.get("计划数量"));
+            double d = reportedQty(no, row, op);
+            String st = String.valueOf(r.get("状态"));
+            // ① 该道已达标(已审完工量 ≥ 该道计划量)⇒ 台账落实(补实际生产线),继续看下一道
+            if (plan > 0 && d + 0.0001 >= plan) {
+                if (!"已落实".equals(st)) {
+                    jdbc.update("UPDATE dbo.wo_process_line SET 状态=N'已落实',"
+                                    + " 实际生产线=COALESCE(NULLIF(实际生产线,N''), NULLIF(计划生产线,N''), NULLIF(?,N'')),"
+                                    + " 落实时间=COALESCE(落实时间,GETDATE()), asp_user2=?, asp_time2=GETDATE()"
+                                    + " WHERE id=?",
+                            cur, user, r.get("id"));
+                    steps++;
+                }
+                continue;
+            }
+            // ② 第一道未达标 = 当前该做的道
+            String planLine = String.valueOf(r.get("计划生产线")).trim();
+            out.put("工序", op);
+            out.put("工单行id", row);
+            out.put("完工量", d);
+            out.put("计划量", plan);
+            if (planLine.isEmpty()) {
+                out.put("提示", "下一道(" + op + ")未预排线,请人工派线");
+                return out;
+            }
+            if (!planLine.equals(cur)) {
+                // 只切**这一行**的线(plang + 排产镜像 plang_pc;同工单其它行不动)
+                jdbc.update("UPDATE dbo.plang SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", planLine, user, row);
+                jdbc.update("UPDATE dbo.plang_pc SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE plang_id=?", planLine, user, row);
+                // 轨迹(列名对齐 wo_transfer_log):转序=自动派线,可查可撤;plang_id 锚到具体工单行
+                try {
+                    jdbc.update("INSERT INTO dbo.wo_transfer_log (pl_no, plang_id, 从生产线, 从车间, 到生产线, 到车间, 数量, 原因,"
+                                    + " asp_cancel, asp_user1, asp_time1, asp_time2)"
+                                    + " VALUES (?,?,?,?,?,?,?,N'转序自动派线',N'N',?,GETDATE(),GETDATE())",
+                            no, row, cur, shopOfLine(cur), planLine, shopOfLine(planLine), plan, user);
+                } catch (Exception ignore) { /* 轨迹写入失败不阻断转序 */ }
+                out.put("从生产线", cur);
+                out.put("到生产线", planLine);
+            } else {
+                out.put("提示", "下一道(" + op + ")沿用当前线");
+            }
+            // 当前道落实(含"沿用当前线":不落实会导致看板当前工序一直停在上一道)
+            jdbc.update("UPDATE dbo.wo_process_line SET 状态=N'已落实', 实际生产线=?,"
+                            + " 落实时间=COALESCE(落实时间,GETDATE()), asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                    planLine, user, r.get("id"));
+            steps++;
+            out.put("推进道数", steps);
+            return out;
+        }
+        out.put("提示", "路线各道均已达标");
+        out.put("推进道数", steps);
         return out;
+    }
+
+    /**
+     * **看板/列表的「达标即转序」入口**(2026-10-17 用户口径「数据满足就进入下一个工序」)。
+     *
+     * <p>入参是**已经查出来的**明细行(看板 {@code /px/scheduleBoard/scheduled} 的返回行),
+     * 其中「当前工序完工量 ≥ 当前工序计划量」的行 = 这一道已经做够了 ⇒ 当场按数据推进到下一道
+     * (判据与报工审核钩子**同一个** {@link #applyNextProcess})。
+     * 这样即使报工来自手机端(没有报工单、没人点审核),**只要有人看一眼看板,工单就进入下一个预排**。
+     *
+     * @return 是否发生了推进 —— 调用方据此**重新取一次明细**,让界面直接显示推进后的当前工序/产线
+     */
+    @Transactional
+    public boolean advanceSatisfied(List<Map<String, Object>> rows, String user) {
+        if (rows == null || rows.isEmpty()) return false;
+        boolean changed = false;
+        for (Map<String, Object> r : rows) {
+            String state = r.get("生产状态") == null ? "" : String.valueOf(r.get("生产状态")).trim();
+            if ("完工".equals(state) || "已结案".equals(state)) continue;   // 已完工/结案的行不再动
+            double plan = num(r.get("当前工序计划量"));
+            double done = num(r.get("当前工序完工量"));
+            if (plan <= 0 || done + 0.0001 < plan) continue;                // 这一道还没做够
+            Object rid = r.get("行id");
+            String wo = str(r.get("加工单号"));
+            if (wo == null || !(rid instanceof Number n)) continue;
+            try {
+                Map<String, Object> adv = applyNextProcess(wo, n.longValue(), user);
+                if (adv != null && str(adv.get("工序")) != null) changed = true;
+                // 顺手把工单行的**状态列**也算一遍(当前工序/当前工序完工量/完工状态) ——
+                //   只转序不重算的话,plang.当前工序 会一直空着,生产工单列表的回落值也就看不到进度。
+                syncWorkOrderState(wo, n.longValue(), user);
+            } catch (Exception e) {
+                // 单行推进失败不影响看板加载(下一轮/下次刷新会再试)
+                log.warn("[达标即转序] 工单={} 行id={} 推进失败:{}", wo, rid, e.getMessage());
+            }
+        }
+        return changed;
     }
 
     /**

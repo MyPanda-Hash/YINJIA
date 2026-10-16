@@ -41,7 +41,19 @@
 SET NOCOUNT ON;
 GO
 
-/* ═══ A) 同面板同 label 重复行:删掉 place 不含 query 的重复行,保留带 query 的原行 ═══ */
+/* ═══ A) 同面板同 label 重复行:删掉 place 不含 query 的重复行,保留**最早那一行** ═══
+ * ⚠ 2026-10-17 修(此守卫曾把整条迁移链卡死):原判据是 `g.place LIKE N'%query%'`,
+ *   即"只有更早那一行带 query 才删"。而**正式库 HSDZ_MES** 的重复是另一种形态 ——
+ *   收敛脚本按 (panel_code, col_name, place) 三元组判"不存在",而这三张报表面板原始行的
+ *   place 是合并值 'query,detail' ⇒ 判不存在 ⇒ 把**整批字段**又插了一遍,后插的那批
+ *   place 一律只剩 'detail'(实测 STOCK_LEDGER 50 行 = 29 原始 + 21 后插,
+ *   STOCK_SUMMARY 36 = 19 + 17),于是 A 一条都没删(A=0)⇒ 自检 ③(字段数 9/29/19)不过
+ *   ⇒ **DbSync 在此中止,其后 13 条迁移在正式库一条都没跑** ——
+ *   测试账套有 yj_doc_annotation、RD_CHANGE.标题、RD_APPROVAL.附件1、RD_PROD_INFO.立项文档编号,
+ *   正式库全没有(两账套就此分叉)。
+ *   去掉该条后判据变成"存在更早的同名行就删本行":既覆盖原场景(留带 query 的原行),
+ *   也覆盖正式场景(两份都只有 detail ⇒ 留 id 最小的原始行,它才带 seq 与参照绑定)。
+ *   `f.place NOT LIKE N'%query%'` 保留 ⇒ 带 query 的原行(查询弹窗条件 + 参照绑定)永不删。 */
 DECLARE @delA int = 0;
 DELETE f
 FROM yj_field f
@@ -49,7 +61,6 @@ JOIN yj_field g
   ON g.panel_code = f.panel_code
  AND g.label      = f.label
  AND g.id         < f.id
- AND g.place LIKE N'%query%'
 WHERE f.panel_code IN (N'STOCK_BALANCE', N'STOCK_LEDGER', N'STOCK_SUMMARY')
   AND f.place NOT LIKE N'%query%';
 SET @delA = @@ROWCOUNT;
