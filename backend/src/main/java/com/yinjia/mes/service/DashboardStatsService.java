@@ -159,7 +159,17 @@ public class DashboardStatsService {
         }
         kpis.put("draftTotal", draftTotal);
         kpis.put("auditTotal", auditTotal);
-        kpis.put("approvePending", 0);
+        // ── 待审批(2026-10-16 修:此前是 `put("approvePending", 0)` **硬编码 0** 的死指标)──
+        // 概览「待审批」卡此前永远显示 0,而库里明明有 pending='Y' 的单据(实测 3 条),
+        // 用户口径「看板数据不够真实」正是这一类:指标接上了数据才有意义。
+        // ⚠ 口径 = **时点待办**,不按区间过滤(切到"上月"也要看得见今天要审的活);
+        //    已作废的不算。与之配套的单据状态机真源 = yj_doc_status.pending。
+        try {
+            kpis.put("approvePending", count("SELECT COUNT(*) FROM yj_doc_status"
+                    + " WHERE pending = 'Y' AND ISNULL(canceled,'N') <> 'Y'"));
+        } catch (Exception e) {
+            kpis.put("approvePending", 0);
+        }
         return kpis;
     }
 

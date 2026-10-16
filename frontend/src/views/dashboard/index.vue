@@ -337,7 +337,9 @@
           <div class="chart-box"><SLine :data="prod.trend7" /></div>
         </div>
         <div class="card col-4">
-          <div class="card-title">{{ tt('五工序报工完成率') }}<span class="chart-sub">{{ tt('按报工记录统计（%）') }}</span></div>
+          <!-- 标题不带工序数(2026-10-16):原写死「五工序」,而炭棒标准路线(GY-CB-STD)库里只有
+               成型→切炭→组装 3 道 ⇒ 图上永远只有 3 根柱,验收时对不上。改按实际路线出几道显示几道。 -->
+          <div class="card-title">{{ tt('工序报工完成率') }}<span class="chart-sub">{{ tt('按报工记录统计（%）') }}</span></div>
           <div class="chart-box"><SBars :data="prod.stageRates" :colors="['#116a5b', '#3b8978', '#d79a2b', '#b94d3f', '#537786']" /></div>
         </div>
         <div class="card col-8">
