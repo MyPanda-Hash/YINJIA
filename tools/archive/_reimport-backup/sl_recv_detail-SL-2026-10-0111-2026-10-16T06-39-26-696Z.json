@@ -1,0 +1,8 @@
+{
+  "table": "sl_recv_detail",
+  "key": "单据编号",
+  "no": "SL-2026-10-0111",
+  "db": "HSDZ_MES",
+  "at": "2026-10-16T06:39:29.459Z",
+  "raw": "[connected] Microsoft SQL Server 15.00.2000 as yinjia\r\n== _probe.sql ==\r\n  | 500 | SL-2026-10-0111 | Y-S-T | 硫酸氧钛 | 123334-00-9 工业级93% | null | 1000.0000 | null | null | 48.0000 | null | 48000.0000 | null | null | null | null | null | null | null | null | 0.0000 | null | null | null | null | null | admin | 2026-10-14 21:40:57.0607324 | restore:20261016 | 2026-10-16 14:35:31.7770000 | N | 1 | kg | YFHX-20261012 | null | null | null | null | null | null | 0.0000 | null | null | null | null | 0.0000 | 48.0000 | 48000.0000 | null | 2026-10-12 | 0.0000 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | \r\n[OK] _probe.sql (1 batches)\r\n"
+}
