@@ -259,7 +259,7 @@
       <tbody>
         <tr><td :colspan="dtColSpan" class="rs-sectionbar">
           {{ tt('3.数据记录表') }}
-          <span v-if="editable" class="rs-fieldedit" :title="tt('可改列名(别名)与显隐,全用户共享')" @click="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+          <span v-if="editable" class="rs-tool no-print" :title="tt('可改列名(别名)与显隐,全用户共享')" @click="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
         </td></tr>
         <tr class="rs-grp">
           <th v-if="!dtHidden('冲水时间')" class="rs-th" rowspan="2">{{ dtLabel('冲水时间') }}</th>
@@ -659,14 +659,7 @@ function removeRow(i) {
   font-style: italic;
   font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
 }
-/* 字段编辑:区块条右侧入口 + 弹窗列表 */
-.rs-fieldedit {
-  float: right;
-  color: #e6a23c;
-  cursor: pointer;
-  font-size: 12px;
-}
-.rs-fieldedit:hover { text-decoration: underline; }
+/* 字段编辑入口样式已并入全局 .rs-tool(2026-10-17 纸面小入口统一成一种样式,见 styles/index.css) */
 .fe-list {
   max-height: 420px;
   overflow-y: auto;

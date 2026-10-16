@@ -202,9 +202,12 @@
                  2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
                  —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
                     按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
-            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
-                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
-            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+            <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
+                  :title="tt('从物料清单引用(选父件,导入其全部子件)')"
+                  @click.stop="openMaterialPick(materialPickAt(sec))">
+              <el-icon><Collection /></el-icon>{{ tt('从物料清单引用') }}
+            </span>
+            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
 
@@ -502,7 +505,9 @@
                 <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
-                  <span v-if="dt.recipeCalc && editable" class="rs-lib-btn" style="color:#409eff;border-color:#a0cfff" @click.stop="openRecipeCalc(dt)">🧮 {{ tt('配方计算') }}</span>
+                  <span v-if="dt.recipeCalc && editable" class="rs-tool no-print" @click.stop="openRecipeCalc(dt)">
+                    <el-icon><Odometer /></el-icon>{{ tt('配方计算') }}
+                  </span>
                   <!-- 手动导入规格书数据(组装BOM表 ← 规格书「1.关键物料列表」):
                        自动带入之外留的手动入口 —— 未提交审批之前可以反复尝试、规格书后补通过后重试。
                        按钮文案来自配置(autoFillSpec.manual),只有配了它的表才出现。 -->
@@ -518,7 +523,7 @@
                     :title="specDriftText"
                     @click.stop="autoFillFromSpec(props.head[cfg.autoFillSpec.fromKey], cfg.autoFillSpec)"
                   >⚠ {{ specDriftText }}</span>
-                  <span v-if="di === fieldEditAt" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+                  <span v-if="di === fieldEditAt" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
                 </span>
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
@@ -741,9 +746,12 @@
                  2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
                  —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
                     按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
-            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
-                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
-            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+            <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
+                  :title="tt('从物料清单引用(选父件,导入其全部子件)')"
+                  @click.stop="openMaterialPick(materialPickAt(sec))">
+              <el-icon><Collection /></el-icon>{{ tt('从物料清单引用') }}
+            </span>
+            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
 
@@ -3758,19 +3766,8 @@ function chartOf(dt) {
   flex: none;
 }
 
-/* 字段编辑按钮(数据表区块条右侧,单据外围) */
-.rs-field-edit-btn {
-  color: #e6a23c;
-  cursor: pointer;
-  font-size: 12px;
-  border: 1px solid #e6a23c;
-  border-radius: 3px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
-.rs-field-edit-btn:hover {
-  background: #fdf6ec;
-}
+/* 字段编辑按钮样式已并入全局 .rs-tool(2026-10-17 三个纸面小入口统一成一种样式,见 styles/index.css) */
+
 .sec-lib-list {
   max-height: 320px;
   overflow: auto;
@@ -4401,7 +4398,7 @@ function chartOf(dt) {
   body.approval-printing .rs-add,
   body.approval-printing .rs-op-add,
   body.approval-printing .rs-op-del,
-  body.approval-printing .rs-field-edit-btn,
+  body.approval-printing .rs-tool,
   body.approval-printing .rsp-lib-pick,
   body.approval-printing .rs-lib-btn,
   /* 产品开发状态角标(未开发/已开发)属界面辅助信息,打印/导出不出现 */
