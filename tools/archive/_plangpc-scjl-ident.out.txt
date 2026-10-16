@@ -1,0 +1,12 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _probe-plangpc-scjl-ident.sql ==
+  | IDENT_CURRENT | plang=1131 (max_id=429) | plang_pc=578 (max_id=576) | scjl=1084 (max_id=79) | 
+  | == plang 批次号分布(前 8) == | 
+  | 20261014 × 429 | 
+  | == plang 工单号前缀分布 == | 
+  | GD × 429 | 
+  | == plang_pc / scjl 行是否只覆盖 GD-2026-10-0007 == | 
+  | plang_pc: GD-2026-10-0007 | scjl: (空 gldh), GD-2026-10-0007 | 
+  | == yj_schema_log 列 == | 
+  | script_name, content_hash, applied_at | 
+[OK] _probe-plangpc-scjl-ident.sql (1 batches)

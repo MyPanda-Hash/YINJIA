@@ -1,0 +1,28 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _probe-plangpc-scjl-link.sql ==
+  | == plang 规模 == | count=429 min_id=1 max_id=429 | 
+  | == plang_pc 全部行(2 行) == | 
+  | 576 | plang_id=1128 | pl_no=GD-2026-10-0007 | pl_xc=2 | scx=1号机 | pl_sl=60 | 批次号=20261014 | pl_date=2026-10-14 13:29:22 | 关联工单行存在? N(悬空!) | 
+  | 575 | plang_id=1127 | pl_no=GD-2026-10-0007 | pl_xc=1 | scx=装箱1(老厂) | pl_sl=160 | 批次号=20261014 | pl_date=2026-10-14 07:28:57 | 关联工单行存在? N(悬空!) | 
+  | == plang_pc.plang_id 悬空清单 == | 
+  | 575 | plang_id=1127 | GD-2026-10-0007 | 
+  | 576 | plang_id=1128 | GD-2026-10-0007 | 
+  | == plang_pc 按 comm+pl_no+pl_xc 能否命中 plang(冗余键口径) == | 
+  | 576 | GD-2026-10-0007 | xc=2 | 命中行数=0 | 命中 plang.id=- | 
+  | 575 | GD-2026-10-0007 | xc=1 | 命中行数=1 | 命中 plang.id=10 | 
+  | == GD-2026-10-0007 在 plang 里的行 == | 
+  | 10 | GD-2026-10-0007 | xc=1 | 批次号=20261014 | scx=- | pl_sl=500 | asp_cancel=N | 工艺路线=GY-CB-STD | 
+  | == scjl 全部行(4 行) == | 
+  | 79 | 报工单号=BG-2026-10-0047 | gldh=GD-2026-10-0007 | gd_id=575 | 工单行号=1 | gxdm=组装 | sl=160 | wgzt=Y | 批次号=20261014 | scx=装箱1(老厂) | delmark=0 | gd_id 命中 plang_pc? Y | 
+  | 78 | 报工单号=BG-2026-10-0046 | gldh=GD-2026-10-0007 | gd_id=575 | 工单行号=1 | gxdm=切炭 | sl=161 | wgzt=Y | 批次号=20261014 | scx=1号车间 | delmark=0 | gd_id 命中 plang_pc? Y | 
+  | 77 | 报工单号=BG-2026-10-0045 | gldh=- | gd_id=0 | 工单行号=-1 | gxdm=- | sl=0 | wgzt=- | 批次号=- | scx=- | delmark=0 | gd_id 命中 plang_pc? N(孤儿) | 
+  | 76 | 报工单号=BG-2026-10-0044 | gldh=GD-2026-10-0007 | gd_id=575 | 工单行号=1 | gxdm=成型 | sl=161 | wgzt=Y | 批次号=20261014 | scx=1号车间 | delmark=0 | gd_id 命中 plang_pc? Y | 
+  | == scjl.gldh 在 plang 里的命中(整单口径) == | 
+  | (空) | plang 行数=0 | 
+  | GD-2026-10-0007 | plang 行数=1 | 
+  | == scjl 与 plang_pc 同名字段值是否一致(按 gd_id=pc.id) == | 
+  | 79 | 批次号 s=20261014 pc=20261014 | scx s=装箱1(老厂) pc=装箱1(老厂) | pl_sl s=160 pc=160 | 工单行号 s=1 pc.pl_xc=1 | 
+  | 78 | 批次号 s=20261014 pc=20261014 | scx s=1号车间 pc=装箱1(老厂) | pl_sl s=160 pc=160 | 工单行号 s=1 pc.pl_xc=1 | 
+  | 77 | 批次号 s=- pc=- | scx s=- pc=- | pl_sl s=0 pc=0 | 工单行号 s=-1 pc.pl_xc=0 | 
+  | 76 | 批次号 s=20261014 pc=20261014 | scx s=1号车间 pc=装箱1(老厂) | pl_sl s=160 pc=160 | 工单行号 s=1 pc.pl_xc=1 | 
+[OK] _probe-plangpc-scjl-link.sql (1 batches)
