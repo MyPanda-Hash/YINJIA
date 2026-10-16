@@ -2801,6 +2801,13 @@ export default {
       'If the data has changed: click "Unaudit" in the sidebar to return to draft, then click "Pull from spec sheet" to reload the latest data',
     /* ── 产品信息表漂移提示(2026-10-16:引用产品信息表的四文件上提示"产品信息表改了") ── */
     '产品信息表已变动': 'Product info changed',
+    /* ── 分发责任人后自动建规格书草稿(2026-10-16) ── */
+    '已分发 {n} 个文件的责任人': 'Assigned owners for {n} files',
+    '已自动生成规格书草稿 {no}（数据已按产品信息表填好，可继续补充）':
+      'A spec sheet draft {no} was created automatically (filled from the product info sheet; keep completing it)',
+    '已自动生成规格书草稿 {no}，是否现在打开继续补充？': 'Spec sheet draft {no} was created automatically. Open it now to continue?',
+    '规格书草稿': 'Spec sheet draft',
+    '稍后': 'Later',
     '本单引用的产品信息表 {no} 正在修改（{st}），请及时核对数据':
       'The product info sheet {no} referenced by this document is being modified ({st}); please verify the data',
     '本单引用的产品信息表 {no} 已被反审核退回草稿，请核对数据':

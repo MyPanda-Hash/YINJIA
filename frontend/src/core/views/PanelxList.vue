@@ -3737,10 +3737,23 @@ async function confirmDevAssign() {
       formData: { 编号: devAssignDocNo.value, 分发责任人 }, buttonParam: {},
     })
     const n = Object.keys(res?.assigns || {}).length
-    ElMessage.success(`已分发 ${n} 个文件的责任人`)
+    // 2026-10-16 用户口径:分发责任人之后后端会**自动建一张规格书草稿**(第一页按产品信息表真实写入)。
+    // 这里把单号说出来并给一个直达入口 —— 否则用户以为"分发完就没事了",回头还得自己找那张草稿。
+    const sp = String(res?.specDraftNo || '')
+    ElMessage.success(tt('已分发 {n} 个文件的责任人').replace('{n}', String(n))
+      + (sp ? '；' + tt('已自动生成规格书草稿 {no}（数据已按产品信息表填好，可继续补充）').replace('{no}', sp) : ''))
     devAssignVisible.value = false
     await loadDevDispatchState()
     await load()
+    if (sp) {
+      try {
+        await ElMessageBox.confirm(
+          tt('已自动生成规格书草稿 {no}，是否现在打开继续补充？').replace('{no}', sp),
+          tt('规格书草稿'), { confirmButtonText: tt('打开'), cancelButtonText: tt('稍后') })
+        // 深链到规格书面板并定位这张草稿(该面板支持 ?docNo=,见 applyDocNoQuery)
+        router.push({ path: '/panelx/list/RD_SPEC_DOC', query: { docNo: sp } })
+      } catch { /* 选「稍后」:单子已在规格书列表里,自己开即可 */ }
+    }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '分发失败')
   } finally {

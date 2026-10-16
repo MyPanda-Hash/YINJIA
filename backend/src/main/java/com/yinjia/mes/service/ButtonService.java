@@ -365,8 +365,25 @@ public class ButtonService {
         }
     }
 
-    /** 单据保存:头字段并入每行(单表式)或分别写头表/行表(头行式);无编号=新建 */
-    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
+    /** 单据保存(外部入口):systemDraft=false —— 用户操作,门禁全过 */
+    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
+        return saveDoc(def, head, items, no, user, markSaved, false);
+    }
+
+    /**
+     * 单据保存本体。{@code systemDraft=true} = **引擎内部代建的草稿单**
+     * (2026-10-16 起唯一用途:产品信息表「分发责任人」后自动建规格书草稿)。
+     *
+     * <p>差别只有一处:跳过四文件面板的「未分发禁编 / 只放该文件责任人」门禁
+     * ({@link #ensureDevFileEditable})。理由:那条门禁防的是"**人**替别人开单"——
+     * 内部建单的操作人是分发人(二级审核人/管理员),而该文件的责任人另有其人,
+     * 按人判必然被拒;而这张草稿正是分发动作的产物,不是谁绕过界面开单。
+     * 其余校验(编号唯一/产品编号唯一/字段映射/状态行)一律照旧。
+     */
+    private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                        List<Map<String, Object>> items, String no, String user,
+                                        boolean markSaved, boolean systemDraft) {
         boolean split = def.hasHeadTable();
         if (no == null) {
             if (items.isEmpty()) {
@@ -408,7 +425,8 @@ public class ButtonService {
                 // 该分支原来直接 return,于是"带产品编号 + 不带明细"的一次调用就能给**别人负责的已分发
                 // 产品**建出一张空白草稿(实测品质部账号建成 MP-xxxx)。UI 的「新增」不带产品编号,
                 // 正常建单不受影响;带产品编号建单=替别人开单,本就该拦。
-                if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
+                // ⚠ systemDraft=true(引擎内部代建,如分发责任人时自动建规格书草稿)跳过本条 —— 见 saveDoc 重载注释。
+                if (!systemDraft && DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
@@ -5072,6 +5090,10 @@ public class ButtonService {
             }
         }
         Map<String, Object> out = devTaskService.dispatch(productCode, productName, no, user, supervisor, picks);
+        // 规格书草稿自动建单(2026-10-16 用户口径):分发完责任人,立刻按产品信息表把规格书第一页
+        // **真实写出来**当草稿,责任人接着补 —— 见 createSpecDraftFromProduct 的三条口径。
+        // 建不出来(已有规格书单/来源缺字段/异常)只回空串,不让整个分发失败。
+        String specDraftNo = createSpecDraftFromProduct(no, productCode, user);
         // 每个新指定的责任人(≠操作人)收 TASK_ASSIGNED 消息
         @SuppressWarnings("unchecked")
         Map<String, String> assigns = (Map<String, String>) out.getOrDefault("assigns", Map.of());
@@ -5099,7 +5121,97 @@ public class ButtonService {
         r.put("supervisor", out.get("supervisor"));
         r.put("supervisorName", out.get("supervisorName"));
         r.put("supervisorResolved", out.get("supervisorResolved"));
+        // 前端据此提示「已自动生成规格书草稿 SD-xxx（可继续补充）」
+        r.put("specDraftNo", specDraftNo);
         return r;
+    }
+
+    /**
+     * 产品信息表**分发责任人之后,自动建一张该产品的规格书草稿**(2026-10-16 用户口径)。
+     *
+     * <p>用户原话:「现在规格书的第一页没有自动引用产品信息表的数据,现在写一个规则,当产品信息表分发
+     * 对应单据责任人之后,自动创建一张对应产品信息表的规格书,数据自动对应填写,保存为草稿,
+     * 可继续对应补充完整,是真实填写过来而不是引用显示,导致其他的成型工艺清单等单据出现引用数据错误等」。
+     *
+     * <p>三条口径:
+     * <ol>
+     *   <li><b>幂等</b>:该产品**已有规格书单**(任何未作废的单,含草稿)就不再建 ——
+     *       改责任人反复分发不会攒出第二张;</li>
+     *   <li><b>真实写入</b>:值经与「保存为草稿」**同一条引擎路径**({@link #saveDoc} markSaved=false)
+     *       落到 {@code rd_spec_doc_head},不是参照显示 —— 下游(成型/组装工艺清单、出货检验计划表)
+     *       按 [产品编号] 找规格书取数,第一页空着它们就取不到东西;</li>
+     *   <li><b>只带对应得上的字段**(逐条显式列举,不做全表同名自动搬运):
+     *       <pre>
+     *       产品编号     ← 产品编号        (关联键,下游按它认产品)
+     *       名称         ← 产品名称        (规格书封面那一格)
+     *       产品类别     ← 产品类别
+     *       客户项目名称 ← 客户项目名称
+     *       客户料号     ← 客户料号
+     *       产品主要性能 ← 主要性能描述    (列名 特殊性能描述,数据键永不改)
+     *       整体规格参数 ← 产品整体尺寸 + 炭棒尺寸(外径/内径/长度) 合成说明文本
+     *       </pre>
+     *       不带 备注/责任人/审核人/日期 —— 那些是各自单据自己的口径,搬过去只会错。</li>
+     * </ol>
+     *
+     * @return 新建的规格书单据编号;未建(已存在 / 无来源 / 异常)一律回空串 ——
+     *         建不出来不该让"分发责任人"整个失败(消息与任务照常发)。
+     */
+    private String createSpecDraftFromProduct(String prodInfoNo, String productCode, String user) {
+        if (productCode == null || productCode.isBlank()) return "";
+        PanelRegistry.PanelDef specDef = registry.panel("RD_SPEC_DOC");
+        if (specDef == null) return "";
+        try {
+            Integer exist = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM rd_spec_doc_head h"
+                            + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.[单据编号]"
+                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
+                            + " AND h.[产品编号] = ?", Integer.class, productCode);
+            if (exist != null && exist > 0) return "";
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 * FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    prodInfoNo);
+            if (rows.isEmpty()) return "";
+            Map<String, Object> src = rows.get(0);
+            Map<String, Object> draft = new LinkedHashMap<>();
+            putIfVal(draft, "产品编号", src.get("产品编号"));
+            putIfVal(draft, "名称", src.get("产品名称"));
+            putIfVal(draft, "产品类别", src.get("产品类别"));
+            putIfVal(draft, "客户项目名称", src.get("客户项目名称"));
+            putIfVal(draft, "客户料号", src.get("客户料号"));
+            putIfVal(draft, "产品主要性能", src.get("特殊性能描述"));
+            putIfVal(draft, "整体规格参数", specSizeText(src));
+            if (draft.isEmpty()) return "";
+            Map<String, Object> r = saveDoc(specDef, draft, new ArrayList<>(), null, user, false, true);
+            return nz(r.get("编号"));
+        } catch (Exception e) {
+            log.warn("自动建规格书草稿失败(product={}): {}", productCode, e.getMessage());
+            return "";
+        }
+    }
+
+    /** 尺寸说明文本(规格书「整体规格参数」格):整体尺寸一行 + 炭棒尺寸一行,空值不拼 */
+    private String specSizeText(Map<String, Object> src) {
+        StringBuilder b = new StringBuilder();
+        String size = nz(src.get("产品整体尺寸"));
+        if (!size.isEmpty()) b.append("整体尺寸：").append(size);
+        String od = nz(src.get("炭棒外径"));
+        String id = nz(src.get("炭棒内径"));
+        String len = nz(src.get("炭棒长度"));
+        String carbon = (!od.isEmpty() || !id.isEmpty() || !len.isEmpty())
+                ? ("外径 " + od + " / 内径 " + id + " / 长度 " + len)
+                : nz(src.get("炭棒尺寸"));
+        if (!carbon.isEmpty()) {
+            if (b.length() > 0) b.append("\n");
+            b.append("炭棒尺寸：").append(carbon);
+        }
+        return b.toString();
+    }
+
+    /** 只在值非空时放入(空串/null 不进 head:与"用户没填"同义,别把空串写进库) */
+    private static void putIfVal(Map<String, Object> m, String key, Object v) {
+        if (v == null) return;
+        String s = String.valueOf(v).trim();
+        if (!s.isEmpty()) m.put(key, s);
     }
 
     /**
