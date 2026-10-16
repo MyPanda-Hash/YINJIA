@@ -94,33 +94,35 @@ test('③ 标准行取自列对象;空标准照纸面写 `/`', () => {
   assert.equal(withStd.aoa[withStd.marks.stdRow][1], '外径:34.5±0.5')
 })
 
-test('④ 八个样品行:每组只在自己那一对样品行上有值,其余格写 `/`', () => {
+test('④ 八个样品行:可填范围与纸面同源(前两列只 1#/2#,其余列八行全可填)', () => {
   const { items, columns } = fixture()
-  // 每组各填一格(表观@2#、外径@4#、跌落@6#、浊度@8#)
   const put = (key, sample, v) => {
     const row = items.find((r) => r['检验列'] === key && r['样品序号'] === `${sample}#`)
     row['实测数值'] = v
   }
   put('appearance', 2, '无粘模（均匀）')
-  put('outer', 4, '34.2')
-  put('drop', 6, '5')
-  put('turbidity', 8, '1.1')
-  const { aoa, marks } = buildFirstInspExport({ columns, items, marks: null })
-  // 找列序号
+  put('outer', 1, '34.1')      // 外径在 1# 也能填(改前这里写的是 `/`)
+  put('outer', 8, '34.8')      // 8# 也能填
+  put('drop', 5, '5')
+  put('turbidity', 7, '1.1')
+  const { aoa, marks } = buildFirstInspExport({ columns, items })
   const idx = (key) => columns.findIndex((c) => c.key === key) + 1
   const rowOf = (s) => aoa[marks.dataStart + s - 1]
   for (let s = 1; s <= 8; s++) assert.equal(rowOf(s)[0], `${s}#`)
   assert.equal(rowOf(2)[idx('appearance')], '无粘模（均匀）')
-  assert.equal(rowOf(4)[idx('outer')], '34.2')
-  assert.equal(rowOf(6)[idx('drop')], '5')
-  assert.equal(rowOf(8)[idx('turbidity')], '1.1')
-  // 非本组的格一律 `/`(与纸面同源:isFillableCell)
-  assert.equal(rowOf(1)[idx('outer')], BLANK, '1# 的外径格纸面上是 /')
-  assert.equal(rowOf(8)[idx('outer')], BLANK)
-  assert.equal(rowOf(3)[idx('appearance')], BLANK)
-  assert.equal(rowOf(5)[idx('turbidity')], BLANK)
-  // 本组那一对两行都可填:2# 之外 1# 也在表观组
-  assert.equal(rowOf(1)[idx('appearance')], '', '1# 表观格可填,没值就是空(不是 /)')
+  assert.equal(rowOf(1)[idx('outer')], '34.1')
+  assert.equal(rowOf(8)[idx('outer')], '34.8')
+  assert.equal(rowOf(5)[idx('drop')], '5')
+  assert.equal(rowOf(7)[idx('turbidity')], '1.1')
+  // 前两列**保持原样**:3#..8# 仍打 `/`
+  for (const s of [3, 4, 5, 6, 7, 8]) {
+    assert.equal(rowOf(s)[idx('appearance')], BLANK, `${s}# 的表观状态格照纸面是 /`)
+    assert.equal(rowOf(s)[idx('depowder')], BLANK, `${s}# 的脱粉情况格照纸面是 /`)
+  }
+  // 其余列八行全可填:没值就是空(不是 `/`)
+  for (const s of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    assert.notEqual(rowOf(s)[idx('length')], BLANK, `${s}# 的炭棒长度格应可填(空,不是 /)`)
+  }
 })
 
 test('⑤ 相关要求逐条一行且横向合并;表尾两组都在', () => {
@@ -158,7 +160,7 @@ test('⑥b 列数变化时合并不跑偏(单列/空列都兜得住)', () => {
   for (const m of none.merges) assert.ok(m.e.c <= 1, JSON.stringify(m))
 })
 
-test('⑦ 自定义分组/自定义列也照同一规则(未知分组落最后一对样品)', () => {
+test('⑦ 自定义分组/自定义列:不是勾选式列 ⇒ 八行全可填', () => {
   const cols = [{ key: 'x', label: '自定项', group: '我的组', unit: '', standard: 'S' }]
   const items = [1, 2, 3, 4, 5, 6, 7, 8].map((s) => ({
     行类型: '样品', 样品序号: `${s}#`, 检验列: 'x', 检验项目: '自定项', 项目分组: '我的组',
@@ -166,6 +168,23 @@ test('⑦ 自定义分组/自定义列也照同一规则(未知分组落最后�
   }))
   const { aoa, marks } = buildFirstInspExport({ columns: cols, items, requirements: [] })
   assert.equal(aoa[marks.groupRow][1], '我的组')
-  assert.equal(aoa[marks.dataStart + 6][1], 'v7', '7# 是自定义组的可填行')
-  assert.equal(aoa[marks.dataStart + 0][1], BLANK, '1# 不是')
+  assert.equal(aoa[marks.dataStart + 6][1], 'v7', '7# 有值就落上去')
+  assert.equal(aoa[marks.dataStart + 0][1], '', '1# 也可填(空,不是 `/`)')
+  for (let s = 0; s < 8; s++) {
+    assert.notEqual(aoa[marks.dataStart + s][1], BLANK, `${s + 1}# 应可填`)
+  }
+})
+
+test('⑦b 新增的勾选式列(改名成"表观状态")也照原样:只 1#/2#,其余打 `/`', () => {
+  const cols = [{ key: 'extra', label: '炭棒表观状态', group: '浊度及压降', unit: '', standard: '/' }]
+  const items = [1, 2, 3, 4, 5, 6, 7, 8].map((s) => ({
+    行类型: '样品', 样品序号: `${s}#`, 检验列: 'extra', 检验项目: '炭棒表观状态', 项目分组: '浊度及压降',
+    标准: '', 实测数值: s <= 2 ? `v${s}` : '', 结果判断: '', 行号: s,
+  }))
+  const { aoa, marks } = buildFirstInspExport({ columns: cols, items, requirements: [] })
+  assert.equal(aoa[marks.dataStart + 0][1], 'v1')
+  assert.equal(aoa[marks.dataStart + 1][1], 'v2')
+  for (let s = 3; s <= 8; s++) {
+    assert.equal(aoa[marks.dataStart + s - 1][1], BLANK, `${s}# 该列照纸面打 /`)
+  }
 })

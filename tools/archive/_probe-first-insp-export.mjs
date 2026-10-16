@@ -222,18 +222,20 @@ try {
         !flat.includes('行类型') && !flat.includes('检验列'), '')
       ok('③b 合并区不空(两层表头/抬头/要求行靠它成版式)', (ws['!merges'] || []).length >= 8,
         String((ws['!merges'] || []).length))
-      // 非本组的格照纸面写 `/`:3# 的"炭棒表观状态"格应为 /
+      // 可填范围与纸面同源:前两列保持原样(3#..8# 打 `/`),其余列八行全可填(空,不是 `/`)
       const hdr = aoa.findIndex((r) => String(r[0]).includes('测试项目'))
-      const groupRow = hdr, itemRow = hdr + 1
+      const itemRow = hdr + 1
       const colOf = (name) => (aoa[itemRow] || []).findIndex((x) => String(x).includes(name))
       const appCol = colOf('炭棒表观状态')
       const outerCol = colOf('炭棒外径')
       const rowOfS = (s) => aoa.findIndex((r) => String(r[0]) === `${s}#`)
-      ok('③b 非本组的格照纸面写 `/`(3# 的表观状态格)',
+      ok('③b 前两列保持原样:3# 的表观状态格照纸面写 `/`',
         String(aoa[rowOfS(3)]?.[appCol] || '') === '/', JSON.stringify(aoa[rowOfS(3)]?.[appCol]))
-      ok('③b 本组的格是可填空格(3# 的外径格)', String(aoa[rowOfS(3)]?.[outerCol] ?? '') === '',
+      ok('③b 其余列八行全可填:3# 的外径格是可填空格', String(aoa[rowOfS(3)]?.[outerCol] ?? '') === '',
         JSON.stringify(aoa[rowOfS(3)]?.[outerCol]))
-      void groupRow
+      ok('③b 改前不可填的 1#/8# 外径格现在也是可填空格(不是 `/`)',
+        String(aoa[rowOfS(1)]?.[outerCol] ?? '') === '' && String(aoa[rowOfS(8)]?.[outerCol] ?? '') === '',
+        JSON.stringify([aoa[rowOfS(1)]?.[outerCol], aoa[rowOfS(8)]?.[outerCol]]))
     } catch (e) {
       ok('③b 能把导出的 xlsx 解出来核对版式', false, String(e?.message || e))
     }

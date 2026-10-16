@@ -223,11 +223,10 @@ try {
   })()`)
   ok('④ 勾选后该格显示已勾选项', ticked.ok && /☑/.test(tickVal), tickVal)
 
-  // ④d 按图片:勾选格只出现在**本列所属分组**的那一对样品行上,其余行打 / (相关要求第 1 条:
-  //     四个分组各记录 2 支 —— 表观及脱粉 1#/2#、尺寸及重量 3#/4#、强度 5#/6#、浊度及压降 7#/8#)。
-  //     ⚠ 2026-10-17 改:原断言是"表观/脱粉列永远只在 1#/2#"。探针后面把**新加的那一列**改名成了
-  //       「炭棒表观状态」,它的分组还留在默认的「浊度及压降」⇒ 它那 3 个勾选格理应落在 7#/8#。
-  //       所以判据要看**列所在的分组**,不是列名。
+  // ④d 勾选式列的可填范围(2026-10-17 现行口径):勾选式那个样式由**列名**认(改名成「炭棒表观状态」
+  //     的新列也走勾选式),而它的样品范围恒为 **1#/2#** —— 与列所在的分组**无关**。
+  //     ⚠ 这段断言随口径改过两回:最初是"表观/脱粉列永远只在 1#/2#",后来改成"按分组绑对(7#/8#)",
+  //       现在回到"勾选式列恒只 1#/2#"(其余列八行全可填 —— 见 firstInspCols.isFillableCell)。
   const perSample = await ev(`(() => {
     const s = document.querySelector('.fi-sheet')
     return [...s.querySelectorAll('.sample-row')].map((tr) => (tr.querySelectorAll('.fi-checks .fi-box').length))
@@ -235,24 +234,20 @@ try {
   console.log(`  各样品行的勾选格数=${JSON.stringify(perSample)}`)
   const misPlaced = await ev(`(() => {
     const s = document.querySelector('.fi-sheet')
-    // 列头第二级第 ci 个 = 表体第 ci 个 td;分组取列头里那个下拉的选中值
-    const groups = [...s.querySelectorAll('.fi-grid thead tr:nth-child(2) th.col-head')]
-      .map((th) => (th.querySelector('.fi-colgroup')?.innerText || '').split('\\n')[0].trim())
-    const PAIR = { '表观及脱粉': [0, 1], '尺寸及重量': [2, 3], '强度': [4, 5], '浊度及压降': [6, 7] }
     const bad = []
     ;[...s.querySelectorAll('.sample-row')].forEach((tr, ri) => {
       [...tr.querySelectorAll('td:not(.col-op)')].forEach((td, ci) => {
-        if (!td.querySelector('.fi-checks')) return
-        const pair = PAIR[groups[ci]]
-        if (!pair || !pair.includes(ri)) bad.push((ri + 1) + '#@列' + ci + '(' + groups[ci] + ')')
+        // 勾选格只允许出现在 1#/2#(0-based 0/1)
+        if (td.querySelector('.fi-checks') && ri > 1) bad.push((ri + 1) + '#@列' + ci)
       })
     })
     return bad
   })()`)
-  ok('④ 勾选格只出现在**本列所属分组**的那一对样品行上',
+  ok('④ 勾选格只出现在 1#/2#(勾选式列的样品范围恒为 1#/2#,与所在分组无关)',
     Array.isArray(misPlaced) && misPlaced.length === 0, JSON.stringify(misPlaced))
   ok('④ 表观及脱粉那两列(1#/2#)仍是勾选式、其余样品行没有勾选格',
-    perSample.length === 8 && perSample[0] > 0 && perSample[1] > 0, JSON.stringify(perSample))
+    perSample.length === 8 && perSample[0] > 0 && perSample[1] > 0 && perSample.slice(2).every((n) => n === 0),
+    JSON.stringify(perSample))
 
   // ④c 分组可选:把「炭棒表观状态」那列挪到「表观及脱粉」组,表头第一级应出现该分组
   const groupBefore = await ev(`[...document.querySelectorAll('.fi-sheet .fi-grid thead .group')].map(e => (e.innerText||'').trim())`)

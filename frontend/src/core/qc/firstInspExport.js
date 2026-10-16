@@ -114,13 +114,14 @@ export function buildFirstInspExport({
   colsIn.forEach((col, i) => { stdLine[i + 1] = text(col.standard) || BLANK })
   push(stdLine)
 
-  // ── 1#..8# 样品行:只在本组那一对样品行上填值,其余格照纸面写 `/` ──
+  // ── 1#..8# 样品行:可填范围与屏幕/纸面**同源**(isFillableCell) ──
+  //    前两列(勾选式)只记 1#/2#,其余格照纸面写 `/`;其余所有列(含以后新增的列)八行全可填
   const dataStart = aoa.length
   for (const s of [1, 2, 3, 4, 5, 6, 7, 8]) {
     const line = new Array(N).fill('')
     line[0] = `${s}#`
     colsIn.forEach((col, i) => {
-      line[i + 1] = isFillableCell(s, col.group) ? text(measuredOf(items, s, col.key)) : BLANK
+      line[i + 1] = isFillableCell(s, col) ? text(measuredOf(items, s, col.key)) : BLANK
     })
     push(line)
   }

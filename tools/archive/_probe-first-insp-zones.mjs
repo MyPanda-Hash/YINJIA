@@ -1,17 +1,19 @@
 /*
- * _probe-first-insp-zones.mjs — 首件检验单「每个分组各记录 2 支样品」的端到端验收(2026-10-17)
+ * _probe-first-insp-zones.mjs — 首件检验单「可填范围」的端到端验收(2026-10-17)
  *
- * 【用户口径】「当前的首件检验单的表格应该是这种实现方式实现的,当前为全部都在最上面两行可被填写,
- *   而不是如图形式实现」—— 图片版式:四个分组各占**自己那一对**样品行,本组的格子空白可填(带底色),
- *   其余格打「/」。改前整张纸只有 1#/2# 的表观·脱粉两格能录,尺寸/强度/浊度三组**永远填不进去**。
+ * 【用户口径·最终版】「让当前各个表格都能填写即可,**前两列保持原样**即可」,
+ *   追问后补充「**以及后面新增的列也一样**」——
+ *   · 前两列(炭棒表观状态 / 炭棒脱粉情况,勾选式):保持原样,只记 1#/2#,3#..8# 打「/」;
+ *   · 其余所有测试项目列(图纸 8 列 + 表头「＋」新增的列):**1#..8# 八行全部可填**。
+ *   (更早那版"四个分组各绑一对样品行"已作废,别再照着它改。)
  *
  * 【验什么】
- *   ① 10 个测试项目的可填样品行 = 本组那一对(表观及脱粉 1#/2#、尺寸及重量 3#/4#、强度 5#/6#、
- *      浊度及压降 7#/8#),其余格一律「/」;
- *   ② 可填区底色照图片(表观·强度 = #FFF3CA;尺寸·浊度 = #FCE4D3),非本组格白底;
- *   ③ 不可填格的 title 说清"本组该填哪两支"(3#/4# …),不能只留一片「/」让人猜;
- *   ④ **真落库**:填 5 个格(跨四个分组)保存后,库里恰好这 5 行有实测数值、且样品序号与分组对得上;
- *   ⑤ 无未捕获异常。
+ *   ① 前两列只 1#/2# 可填(且仍是勾选式)、3#..8# 照旧「/」;
+ *   ② 其余 8 列 1#..8# **每一格都是录入格**、没有「/」占位;
+ *   ③ 底色只留在前两列 1#/2#(其余列八行全可填 ⇒ 再铺底色就是无意义装饰);
+ *   ④ **新增一列也一样**(点表头「＋」后新列同样八行全可填);
+ *   ⑤ **真落库**:特意往**改前不可填**的格(外径 1#/8#)填值,保存后库里这几行对得上;
+ *   ⑥ 无未捕获异常。
  *
  * ⚠ 全在**测试账套** HSDZ_MES_TEST(factory=YJ_TEST)上跑:会建一张草稿,跑完硬删。
  * 用法: node tools/archive/_probe-first-insp-zones.mjs [base] [--shot 前缀]
@@ -31,18 +33,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const ok = (m, c, x = '') => { c ? (pass++, console.log('  [PASS] ' + m)) : (fail++, console.log('  [FAIL] ' + m + (x ? '  ' + x : ''))) }
 
-/** 图片上的 10 个测试项目 → 本组那一对样品行(0-based:1# = 0)。
- *  第三项 = 数据键(检验列):库里存的是 key,列名只是显示 —— 核对落库要按 key。 */
-const EXPECT = [
-  ['炭棒表观状态', [0, 1], 'appearance'], ['炭棒脱粉情况', [0, 1], 'depowder'],
-  ['炭棒外径', [2, 3], 'outer'], ['炭棒内径', [2, 3], 'inner'],
-  ['炭棒长度', [2, 3], 'length'], ['炭棒重量', [2, 3], 'weight'],
-  ['跌落', [4, 5], 'drop'], ['挤压强度', [4, 5], 'compress'],
-  ['浊度NTU', [6, 7], 'turbidity'], ['压降kPa', [6, 7], 'pressure'],
+/** 图纸上 10 个测试项目 —— 前两列是勾选式(保持原样),其余 8 列可填范围全开。
+ *  第二项 = 数据键(检验列):库里存的是 key,列名只是显示 —— 核对落库要按 key。 */
+const CHECK_COLS = [['炭棒表观状态', 'appearance'], ['炭棒脱粉情况', 'depowder']]
+const OTHER_COLS = [
+  ['炭棒外径', 'outer'], ['炭棒内径', 'inner'], ['炭棒长度', 'length'], ['炭棒重量', 'weight'],
+  ['跌落', 'drop'], ['挤压强度', 'compress'], ['浊度NTU', 'turbidity'], ['压降kPa', 'pressure'],
 ]
-/** 底色(图片主色):表观及脱粉/强度 = 淡黄;尺寸及重量/浊度及压降 = 淡桃 */
+const ALL_COLS = [...CHECK_COLS, ...OTHER_COLS]
+/** 前两列「保持原样」的样品范围;其余列 1#..8# 全开 */
+const CHECK_ROWS = [0, 1]
+/** 前两列可填格的底色(图片主色:淡黄) */
 const TINT_Y = 'rgb(255, 243, 202)'
-const TINT_P = 'rgb(252, 228, 211)'
 
 const mssql = createRequire('D:/workspace/yinjia/deploy/package.json')('mssql')
 const pool = await new mssql.ConnectionPool({
@@ -139,52 +141,78 @@ try {
   ok('① 草稿铺满图纸 10 列', Number(cols) === 10, `${cols} 列`)
 
   // ── ① / ② / ③ 逐列逐行核「哪一格可填 + 底色 + 提示」─────────────────────
-  const grid = await ev(`(() => {
+  const readGrid = () => ev(`(() => {
     const heads = [...document.querySelectorAll('.fi-sheet .fi-grid thead tr:nth-child(2) th.col-head')]
     const names = heads.map((th) => (th.querySelector('input')?.value || th.innerText || '').trim())
     const rows = [...document.querySelectorAll('.fi-sheet .fi-grid tbody tr.sample-row')]
     return {
       names,
-      cells: rows.map((tr) => [...tr.querySelectorAll('td')].map((td) => ({
+      cells: rows.map((tr) => [...tr.querySelectorAll('td:not(.col-op)')].map((td) => ({
         open: !!td.querySelector('input') || !!td.querySelector('.fi-checks'),
+        checks: !!td.querySelector('.fi-checks'),
         text: (td.innerText || '').trim(),
         title: td.querySelector('span')?.getAttribute('title') || '',
         bg: getComputedStyle(td).backgroundColor,
       }))),
     }
   })()`)
+  const grid = await readGrid()
   console.log(`  纸面列名=${JSON.stringify(grid?.names)}`)
+  const ci = (name) => (grid?.names || []).findIndex((n) => n.includes(name))
 
-  for (const [name, want] of EXPECT) {    const ci = (grid?.names || []).findIndex((n) => n.includes(name))
-    if (ci < 0) { ok(`① ${name} 列存在`, false, JSON.stringify(grid?.names)); continue }
-    const open = grid.cells.map((row, i) => (row[ci]?.open ? i : -1)).filter((i) => i >= 0)
-    ok(`① 「${name}」可填行 = ${want.map((i) => `${i + 1}#`).join('/')}`,
-      JSON.stringify(open) === JSON.stringify(want),
-      `实际 ${open.map((i) => `${i + 1}#`).join('/') || '（无）'}`)
-    const blanks = grid.cells.map((row, i) => (!row[ci]?.open && row[ci]?.text !== '/' ? i : -1)).filter((i) => i >= 0)
-    ok(`① 「${name}」其余格是「/」占位`, blanks.length === 0,
-      `异常行 ${blanks.map((i) => `${i + 1}#(${grid.cells[i][ci]?.text})`).join(' ')}`)
-    // ③ 提示话术:把本组那两支样品说出来
-    const hint = grid.cells.find((row) => row[ci] && !row[ci].open)?.[ci]?.title || ''
-    ok(`③ 「${name}」不可填格的 title 指明本组样品`,
-      hint.includes(want.map((i) => `${i + 1}#`).join('、')),
-      `title=${JSON.stringify(hint)}`)
+  for (const [name] of CHECK_COLS) {
+    const c = ci(name)
+    if (c < 0) { ok(`① 「${name}」列存在`, false, JSON.stringify(grid?.names)); continue }
+    const open = grid.cells.map((row, i) => (row[c]?.open ? i : -1)).filter((i) => i >= 0)
+    ok(`① 前两列「${name}」**保持原样**:只 1#/2# 可填`,
+      JSON.stringify(open) === JSON.stringify(CHECK_ROWS), `实际 ${open.map((i) => `${i + 1}#`).join('/') || '（无）'}`)
+    const bad = grid.cells.map((row, i) => (!row[c]?.open && row[c]?.text !== '/' ? i : -1)).filter((i) => i >= 0)
+    ok(`① 「${name}」3#..8# 照旧打「/」`, bad.length === 0,
+      `异常行 ${bad.map((i) => `${i + 1}#(${grid.cells[i][c]?.text})`).join(' ')}`)
+    ok(`① 「${name}」是勾选式(1#/2# 里是勾选项而不是输入框)`,
+      grid.cells[0][c]?.checks === true && grid.cells[1][c]?.checks === true,
+      JSON.stringify([grid.cells[0][c]?.checks, grid.cells[1][c]?.checks]))
+    const hint = grid.cells[2]?.[c]?.title || ''
+    ok(`③ 「${name}」不可填格的 title 说明只记 1#、2#`, hint.includes('1#、2#'), `title=${JSON.stringify(hint)}`)
   }
 
-  // ② 底色:照图片的四段色带
-  for (const [name, rowIdx, tint, what] of [
-    ['炭棒表观状态', 0, TINT_Y, '表观及脱粉 1#'],
-    ['炭棒外径', 2, TINT_P, '尺寸及重量 3#'],
-    ['跌落', 4, TINT_Y, '强度 5#'],
-    ['浊度NTU', 6, TINT_P, '浊度及压降 7#'],
+  for (const [name] of OTHER_COLS) {
+    const c = ci(name)
+    if (c < 0) { ok(`② 「${name}」列存在`, false, JSON.stringify(grid?.names)); continue }
+    const open = grid.cells.map((row, i) => (row[c]?.open ? i : -1)).filter((i) => i >= 0)
+    ok(`② 「${name}」1#..8# 八行**全部可填**`, JSON.stringify(open) === JSON.stringify([0, 1, 2, 3, 4, 5, 6, 7]),
+      `实际 ${open.map((i) => `${i + 1}#`).join('/') || '（无）'}`)
+    const slash = grid.cells.map((row, i) => (row[c]?.text === '/' ? i : -1)).filter((i) => i >= 0)
+    ok(`② 「${name}」没有「/」占位格了`, slash.length === 0,
+      `仍打斜杠的行 ${slash.map((i) => `${i + 1}#`).join(' ')}`)
+  }
+
+  // ② 底色:只留前两列 1#/2#(现在只有它们还有"可填/不可填"之分)
+  for (const [name, rowIdx, want, what] of [
+    ['炭棒表观状态', 0, TINT_Y, '前两列 1#'],
+    ['炭棒脱粉情况', 1, TINT_Y, '前两列 2#'],
+    ['炭棒表观状态', 2, null, '前两列 3#(不可填 ⇒ 不铺底)'],
+    ['炭棒外径', 0, null, '其余列 1#(全可填 ⇒ 不铺底)'],
+    ['炭棒外径', 3, null, '其余列 4#'],
   ]) {
     const info = await ev(cellInfo(name, rowIdx))
-    ok(`② ${what} 可填格底色 = 图片色 ${tint}`, info?.bg === tint, `实际 ${info?.bg}`)
+    const isWhite = ['rgb(255, 255, 255)', 'rgba(0, 0, 0, 0)'].includes(String(info?.bg))
+    ok(`② ${what} 底色${want ? ' = 图片色 ' + want : '为白底'}`,
+      want ? info?.bg === want : isWhite, `实际 ${info?.bg}`)
   }
-  const offZone = await ev(cellInfo('炭棒外径', 0))
-  // td 不设底色 = 透明,纸上就是 .fi-sheet 的白底(与图纸一致)
-  ok('② 非本组的格保持白底(外径 @1#)', ['rgb(255, 255, 255)', 'rgba(0, 0, 0, 0)'].includes(String(offZone?.bg)),
-    `实际 ${offZone?.bg}`)
+
+  // ③ 新增的列也一样(用户补充口径「以及后面新增的列也一样」)
+  await ev(`(() => { const b=document.querySelector('.fi-sheet .fi-addcol'); if(b) b.click(); return 'ok' })()`)
+  await sleep(900)
+  const grid2 = await readGrid()
+  const addedIdx = grid2.cells[0].length - 1
+  const addedName = grid2.names[addedIdx]
+  const addedOpen = grid2.cells.map((row, i) => (row[addedIdx]?.open ? i : -1)).filter((i) => i >= 0)
+  ok(`③ 新增列「${addedName}」也是 1#..8# 八行全可填`,
+    JSON.stringify(addedOpen) === JSON.stringify([0, 1, 2, 3, 4, 5, 6, 7]),
+    `实际 ${addedOpen.map((i) => `${i + 1}#`).join('/') || '（无）'}`)
+  ok('③ 新增列出现在表头(说明确实加上了)', !!addedName && grid2.names.length === grid.names.length + 1,
+    `${grid.names.length} → ${grid2.names.length}`)
 
   const shotIdx = process.argv.indexOf('--shot')
   const shoot = async (suffix) => {
@@ -227,37 +255,32 @@ try {
   created = (mkMsg.match(/SJ-[0-9A-Za-z-]+/) || [''])[0] || junk.slice().sort().at(-1) || ''
   ok('④ 建出一张首件检验单草稿', !!created, `新增 ${JSON.stringify(junk)}`)
 
-  // 落库前先在**真单**上再核一遍「列 → 本组那两支样品」的对应(工艺清单带进来的列也该守同一条规则)
-  const realGrid = await ev(`(() => {
-    const heads = [...document.querySelectorAll('.fi-sheet .fi-grid thead tr:nth-child(2) th.col-head')]
-    return heads.map((th) => ({
-      name: (th.querySelector('input')?.value || th.innerText || '').trim(),
-      group: (th.querySelector('.fi-colgroup')?.innerText || '').split('\\n')[0].trim(),
-    }))
-  })()`)
-  const colsByGroup = {}
-  for (const c of realGrid || []) (colsByGroup[c.group] = colsByGroup[c.group] || []).push(c.name)
-  const PAIR = { '表观及脱粉': [1, 2], '尺寸及重量': [3, 4], '强度': [5, 6], '浊度及压降': [7, 8] }
-  const openOfGroup = (g) => ev(`(() => {
-    const heads = [...document.querySelectorAll('.fi-sheet .fi-grid thead tr:nth-child(2) th.col-head')]
-    const idx = heads.findIndex((th) => (th.querySelector('.fi-colgroup')?.innerText || '').split('\\n')[0].trim() === ${JSON.stringify(g)})
-    if (idx < 0) return null
-    return [...document.querySelectorAll('.fi-sheet .fi-grid tbody tr.sample-row')]
-      .map((tr, i) => ([...tr.querySelectorAll('td')][idx]?.querySelector('input, .fi-checks') ? i + 1 : -1))
-      .filter((i) => i > 0)
-  })()`)
-  for (const [g, pair] of Object.entries(PAIR)) {
-    const open = await openOfGroup(g)
-    if (!open) continue
-    ok(`④ 真单「${g}」可填行 = ${pair.join('/')}#`, JSON.stringify(open) === JSON.stringify(pair), `实际 ${open.join('/')}#`)
+  // 落库前先在**真单**上再核一遍可填范围(工艺清单带进来的列也该守同一条规则)
+  const realGrid = await readGrid()
+  const rci = (name) => (realGrid?.names || []).findIndex((n) => n.includes(name))
+  for (const [name] of CHECK_COLS) {
+    const c = rci(name)
+    if (c < 0) continue
+    const open = realGrid.cells.map((row, i) => (row[c]?.open ? i : -1)).filter((i) => i >= 0)
+    ok(`④ 真单前两列「${name}」只 1#/2# 可填`, JSON.stringify(open) === JSON.stringify(CHECK_ROWS),
+      `实际 ${open.map((i) => `${i + 1}#`).join('/')}`)
+  }
+  for (const [name] of OTHER_COLS) {
+    const c = rci(name)
+    if (c < 0) continue
+    const open = realGrid.cells.map((row, i) => (row[c]?.open ? i : -1)).filter((i) => i >= 0)
+    ok(`④ 真单「${name}」八行全可填`, JSON.stringify(open) === JSON.stringify([0, 1, 2, 3, 4, 5, 6, 7]),
+      `实际 ${open.map((i) => `${i + 1}#`).join('/')}`)
   }
 
-  // 四个分组各填一格(表观那列是勾选式)—— 一项 = [列名, 数据键, 样品行, 值, 勾选项]
+  // 落库抽样:特意挑**改前不可填**的行(外径 1#/8#)+ 前两列(勾选)+ 其余两列
+  //   一项 = [列名, 数据键, 样品行(0-based), 值, 勾选项]
   const FILL = [
     ['炭棒表观状态', 'appearance', 1, null, '无粘模（均匀）'],
-    ['炭棒外径', 'outer', 3, '34.2'],
-    ['跌落', 'drop', 5, '5'],
-    ['浊度NTU', 'turbidity', 7, '1.1'],
+    ['炭棒外径', 'outer', 0, '34.1'],
+    ['炭棒外径', 'outer', 7, '34.8'],
+    ['跌落', 'drop', 4, '5'],
+    ['浊度NTU', 'turbidity', 6, '1.1'],
   ]
   for (const [name, , rowIdx, v, check] of FILL) {
     if (check) {
@@ -300,7 +323,7 @@ try {
     console.log(`  库内明细 ${all.length} 行;有实测数值的 ${rows.length} 行`)
     const got = rows.map((r) => `${r.检验列}@${r.样品序号}=${r.实测数值}`).sort()
     const want = FILL.map(([, key, i, v, c]) => `${key}@${i + 1}#=${c || v}`).sort()
-    ok('④ 填的 4 格落在**本组那两支样品**上(不串行)', JSON.stringify(got) === JSON.stringify(want),
+    ok('④ 填的 5 格都按 key@样品序号 落库(含改前不可填的 1#/8#)', JSON.stringify(got) === JSON.stringify(want),
       `\n        库内=${JSON.stringify(got)}\n        期望=${JSON.stringify(want)}`)
   } else {
     ok('④ 能取到新单号(便于清场)', false, mkMsg.slice(0, 120))
@@ -317,5 +340,5 @@ try {
   }
   await pool.close()
 }
-console.log(`\n== 首件检验单「每组各 2 支样品」:${pass} PASS / ${fail} FAIL ==`)
+console.log(`\n== 首件检验单可填范围(前两列保持原样 / 其余列八行全可填):${pass} PASS / ${fail} FAIL ==`)
 process.exit(fail ? 1 : 0)

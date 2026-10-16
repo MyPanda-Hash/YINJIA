@@ -195,14 +195,14 @@
           </td>
           <td v-if="editable" class="col-op no-print"></td>
         </tr>
-        <!-- 数据区:1#..8#(⚠ 相关要求第 1 条:**每个分组各记录 2 支样品**,一个样品行只服务一个分组:
-               表观及脱粉→1#/2#、尺寸及重量→3#/4#、强度→5#/6#、浊度及压降→7#/8#(见 firstInspCols.GROUP_SAMPLES)。
-               不属于本组的格打 `/` 且不可录;老单据里那些格已填过的值照原样显示,不吞数据) -->
+        <!-- 数据区:1#..8#(⚠ 可填范围见 firstInspCols.isFillableCell —— **前两列保持原样**(勾选式、
+               只记 1#/2#,3#..8# 打 `/`),**其余所有测试项目列(含表头「＋」新增的列)1#..8# 八行全可填**。
+               老单据里那些不可填的格若已填过值,照原样显示,不吞数据) -->
         <tr v-for="sample in samples" :key="sample" class="sample-row">
           <th class="rowlabel">{{ sample }}#</th>
-          <td v-for="c in columns" :key="c.key" :class="[{ 'is-check': isCheckCol(c) }, zoneClass(sample, c)]">
-            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),按本组样品(1#/2#)给。 -->
-            <template v-if="isCheckCol(c)">
+          <td v-for="c in columns" :key="c.key" :class="[{ 'is-check': isCheckColumn(c) }, zoneClass(sample, c)]">
+            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),只给 1#/2#(前两列保持原样)。 -->
+            <template v-if="isCheckColumn(c)">
               <div v-if="editable && fillable(sample, c)" class="fi-checks">
                 <span v-for="o in checkOptions(c)" :key="o" class="fi-check">
                   <span
@@ -217,7 +217,7 @@
                   >{{ tt(o) }}</span>
                 </span>
               </div>
-              <span v-else class="fi-checktext" :title="fillable(sample, c) ? '' : sampleHint(c)">
+              <span v-else class="fi-checktext" :title="fillable(sample, c) ? '' : sampleHint()">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
@@ -232,7 +232,7 @@
                 @update:model-value="v => setMeasured(sample, c, v)"
                 @change="() => normalizePrecision(sample, c)"
               />
-              <span v-else :title="fillable(sample, c) ? '' : sampleHint(c)">
+              <span v-else :title="fillable(sample, c) ? '' : sampleHint()">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
@@ -279,7 +279,7 @@ import { tt } from '@/i18n'
 import {
   columnsOf, groupsOf, addColumn, removeColumn, updateColumn,
   columnHasContent, ensureItems, ROW_STANDARD, ROW_SAMPLE, GROUP_ORDER,
-  seedDefaultColumns, samplesOfGroup, isFillableCell, columnHeadText,
+  seedDefaultColumns, isFillableCell, columnHeadText, isCheckColumn, CHECK_SAMPLE_ROWS,
 } from './firstInspCols.js'
 import { buildFirstInspExport } from './firstInspExport.js'
 
@@ -327,40 +327,33 @@ const groups = computed(() => groupsOf(columns.value))
 const groupCols = (g) => columns.value.filter((c) => c.group === g)
 const samples = [1, 2, 3, 4, 5, 6, 7, 8]
 /**
- * 相关要求第 1 条:「表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，
- *   炭棒强度测试2支样品，浊度及压降测试记录2支样品。」
- * ⇒ **每个分组各记录 2 支样品**(不是"每个测试项目都记 1#/2#"):纸面保留 1#..8# 八行(版式照图纸),
- *   一个样品行只服务一个分组 —— 表观及脱粉→1#/2#、尺寸及重量→3#/4#、强度→5#/6#、浊度及压降→7#/8#;
- *   其余格子打 `/`(图片上那排斜杠就是这个意思);老单据里那些格已填过的值照原样只读显示,不吞数据。
- *   映射在 core/qc/firstInspCols.js 的 GROUP_SAMPLES(单测钉住"四个组 × 2 支 = 1#..8# 不重不漏")。
+ * 可填范围(用户口径 2026-10-17):「让当前各个表格都能填写即可,**前两列保持原样**即可」,
+ * 追问后补充「**以及后面新增的列也一样**」——
+ *   · 前两列(炭棒表观状态 / 炭棒脱粉情况,勾选式):**保持原样** —— 只记 1#/2#,3#..8# 打 `/`;
+ *   · 其余所有测试项目列(图纸上的 8 列 + 表头「＋」新增的列):**1#..8# 八行全部可填**。
+ * 判据在 core/qc/firstInspCols.js 的 isFillableCell(单测钉住"前两列只有 1#/2#、其余列 8 行全开")。
  *
- * ⚠ 2026-10-17 修(用户口径「当前的首件检验单的表格应该是这种实现方式实现的,当前为全部都在最上面
- *   两行可被填写,而不是如图形式实现」):原实现按"样品序号 ≤ 2"一刀切 ⇒ 尺寸及重量/强度/浊度及压降
- *   三组在**任何**样品行上都不可录(8 个测试项目永远填不进去)。改为**按本列的分组**判可填。
+ * ⚠ 更早(同日上午)曾按图纸把四个分组各绑一对样品行(尺寸→3#/4#、强度→5#/6#、浊度→7#/8#),
+ *   已被本口径取代 —— 现在**只剩"前两列只填 1#/2#"这一条限制**。
  */
-/** 这一格可不可填:看**本列的分组**认样品,而不是看样品序号大小 */
 function fillable(sample, c) {
-  return isFillableCell(sample, c.group)
+  return isFillableCell(sample, c)
 }
 
-/** 不可填格的 title:说清本组该填哪两支样品(否则用户只看到一片「/」,不知道去哪填) */
-function sampleHint(c) {
+/** 不可填格的 title:说清本列该填哪两支样品(否则用户只看到一片「/」,不知道去哪填) */
+function sampleHint() {
   return tt('按相关要求：本组测试只记录 2 支样品（{a}）')
-    .replace('{a}', samplesOfGroup(c.group).map((n) => `${n}#`).join('、'))
+    .replace('{a}', CHECK_SAMPLE_ROWS.map((n) => `${n}#`).join('、'))
 }
 
 /**
- * 纸面「可填区」底色 —— 图片上每一对样品行按分组铺了底色(它的作用就是标出"这格要填"):
- *   表观及脱粉 1#/2#、强度 5#/6# = 淡黄;尺寸及重量 3#/4#、浊度及压降 7#/8# = 淡桃。
- * 只标**本组自己那两行**,其余格保持白底(与图纸一致);只读态/打印件一样带(纸面本来就有)。
- * 色值直接取自用户给的图片(主色统计:黄 #FFF3CA / 桃 #FCE4D3)。
+ * 纸面「可填区」底色 —— 图片上前两列铺了底色,作用就是标出"这格要填"。
+ * 现在**只有前两列还有"可填/不可填"之分**(1#/2# 可填),所以底色也只留在那两列上:
+ * 其余列 8 行全可填,再铺底色就成了没有含义的装饰。只读态/打印件一样带(纸面本来就有)。
+ * 色值取自用户给的图片(主色统计:黄 #FFF3CA)。
  */
-const ZONE_TINT = ['gz-y', 'gz-p', 'gz-y', 'gz-p']   // 与 GROUP_ORDER 一一对应
 function zoneClass(sample, c) {
-  if (!fillable(sample, c)) return ''
-  const i = GROUP_ORDER.indexOf(c.group)
-  // 自定义分组(组名不认识)按 samplesOfGroup 落到最后一对样品,底色随最后一组
-  return i >= 0 ? ZONE_TINT[i] : ZONE_TINT[ZONE_TINT.length - 1]
+  return isCheckColumn(c) && fillable(sample, c) ? 'gz-y' : ''
 }
 
 /**
@@ -644,15 +637,12 @@ async function removeCol(c) {
   emit('dirty')
 }
 
-/* ── 表观及脱粉两列:勾选式(图片上是"无粘模(均匀)/轻微粘模(粗糙)/严重粘模(脱皮)"这类) ── */
-const CHECK_COLS = ['appearance', 'depowder']
+/* ── 表观及脱粉两列:勾选式(图片上是"无粘模(均匀)/轻微粘模(粗糙)/严重粘模(脱皮)"这类) ──
+   ⚠ 「哪一列算勾选式」的判据不在这里 —— 它在 core/qc/firstInspCols.js 的 isCheckColumn,
+     因为**可填范围**也依赖它(前两列只填 1#/2#),两处必须同源。 */
 const CHECK_OPTIONS = {
   appearance: ['无粘模（均匀）', '轻微粘模（粗糙）', '严重粘模（脱皮）'],
   depowder: ['无明显脱粉', '轻微脱粉', '严重脱粉'],
-}
-function isCheckCol(c) {
-  // 按列名认(自定义列不误判),key 只作兜底
-  return /表观状态|表观|粘模/.test(c.label) || /脱粉/.test(c.label) || CHECK_COLS.includes(c.key)
 }
 function checkOptions(c) {
   if (/脱粉/.test(c.label) || c.key === 'depowder') return CHECK_OPTIONS.depowder
@@ -977,13 +967,10 @@ defineExpose({ exportFirstInspExcel })
   text-align: left;
   padding: 4px 6px;
 }
-/* 「可填区」底色(照图片:每一对样品行按分组铺底,其余格白底打「/」)。
-   ⚠ 放在 .sample-row td.is-check 之后,表观/脱粉那些勾选格也要吃到底色。 */
+/* 「可填区」底色(照图片,只留前两列 1#/2# —— 现在只有它们还有"可填/不可填"之分)。
+   ⚠ 放在 .sample-row td.is-check 之后,那些勾选格才吃得到底色。 */
 .sample-row td.gz-y {
   background: #fff3ca;
-}
-.sample-row td.gz-p {
-  background: #fce4d3;
 }
 .fi-checks {
   display: flex;

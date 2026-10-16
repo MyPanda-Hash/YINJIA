@@ -14,7 +14,7 @@ import {
   columnsOf, groupsOf, unitOfLabel, nextColumnKey, nextColumnLabel,
   rowsForColumn, addColumn, removeColumn, updateColumn, columnHasContent, ensureItems,
   seedDefaultColumns, DEFAULT_TEST_ITEMS, mergeFetchedColumns, ensureColumnRows,
-  samplesOfGroup, isFillableCell, columnHeadText,
+  isFillableCell, isCheckColumn, columnHeadText,
 } from './firstInspCols.js'
 
 const headOf = (items = []) => ({ 单据编号: 'SJ-T-1', detail: { items } })
@@ -303,61 +303,56 @@ test('ensureColumnRows 幂等:补齐过的列再补一次不长行', () => {
   assert.equal(items.length, 9)
 })
 
-/* ── 「每个分组各记录 2 支样品」(2026-10-17;用户口径「当前为全部都在最上面两行可被填写,
-      而不是如图形式实现」)───────────────────────────────────────────────── */
+/* ── 可填范围(2026-10-17 最终口径:用户「让当前各个表格都能填写即可,**前两列保持原样**即可」,
+      追问后补充「以及后面新增的列也一样」)────────────────────────────────────
+      · 前两列(表观状态/脱粉情况,勾选式)= 保持原样:只记 1#/2#;
+      · 其余所有测试项目列(**含以后新增的列**)= 1#..8# 八行全可填。 */
 
-test('分组 → 样品对:四组各占一对,1#..8# 不重不漏', () => {
-  assert.deepEqual(samplesOfGroup('表观及脱粉'), [1, 2])
-  assert.deepEqual(samplesOfGroup('尺寸及重量'), [3, 4])
-  assert.deepEqual(samplesOfGroup('强度'), [5, 6])
-  assert.deepEqual(samplesOfGroup('浊度及压降'), [7, 8])
-  // 四组 × 2 支 恰好铺满纸面 1#..8#,一个样品都不重复、一个都不落
-  const all = GROUP_ORDER.flatMap((g) => samplesOfGroup(g))
-  assert.deepEqual([...all].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8])
-  assert.equal(new Set(all).size, 8)
+const DEFAULT_COLS = DEFAULT_TEST_ITEMS.map((d) => ({ key: d.key, label: d.label, group: d.group }))
+const openRows = (col) => [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, col))
+
+test('前两列保持原样:勾选式那两列只记 1#/2#', () => {
+  const checks = DEFAULT_COLS.filter(isCheckColumn)
+  assert.deepEqual(checks.map((c) => c.key), ['appearance', 'depowder'], '纸面前两列就是勾选式那两列')
+  for (const c of checks) assert.deepEqual(openRows(c), [1, 2], `${c.label} 只应 1#/2# 可填`)
 })
 
-test('可填判定:每列只在自己分组那一对样品行上可填(不是"只有 1#/2#")', () => {
-  // 尺寸及重量那四列的 8 个格:只有 3#/4# 可填 —— 这正是图片版式,
-  // 也是本轮修复点(改前它们在任何样品行上都不可填,8 个测试项目永远填不进去)
-  const size = DEFAULT_TEST_ITEMS.filter((d) => d.group === '尺寸及重量')
-  assert.equal(size.length, 4)
-  for (const d of size) {
-    const open = [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, d.group))
-    assert.deepEqual(open, [3, 4], `${d.label} 应只在 3#/4# 可填`)
+test('其余列(含新增列)1#..8# 八行全可填', () => {
+  const others = DEFAULT_COLS.filter((c) => !isCheckColumn(c))
+  assert.equal(others.length, 8, '图纸上除前两列外还有 8 列')
+  for (const c of others) {
+    assert.deepEqual(openRows(c), [1, 2, 3, 4, 5, 6, 7, 8], `${c.label} 应八行全可填`)
   }
-  // 强度 → 5#/6#;浊度及压降 → 7#/8#;表观及脱粉 → 1#/2#
-  const openOf = (g) => [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, g))
-  assert.deepEqual(openOf('强度'), [5, 6])
-  assert.deepEqual(openOf('浊度及压降'), [7, 8])
-  assert.deepEqual(openOf('表观及脱粉'), [1, 2])
-  // 跨组不能填:外径列在 1#/2# 上必须不可填(改前这里是"/"但界面照旧只给 1#/2#,
-  // 于是"能填的格"与"该填的格"完全错位)
-  assert.equal(isFillableCell(1, '尺寸及重量'), false)
-  assert.equal(isFillableCell(8, '尺寸及重量'), false)
+  // 以后新增的列(group 默认落最后一组)也一样 —— 这正是用户补的那句「以及后面新增的列也一样」
+  const added = { key: '新测试项目', label: '新测试项目', group: '浊度及压降' }
+  assert.equal(isCheckColumn(added), false)
+  assert.deepEqual(openRows(added), [1, 2, 3, 4, 5, 6, 7, 8])
 })
 
-test('每组正好 2 支可填:整张纸 4 组 × 2 支 × 本组列数', () => {
-  const items = DEFAULT_TEST_ITEMS
-  const openCells = items.reduce(
-    (n, d) => n + [1, 2, 3, 4, 5, 6, 7, 8].filter((s) => isFillableCell(s, d.group)).length, 0)
-  // 表观及脱粉 2 列 ×2 + 尺寸及重量 4 列 ×2 + 强度 2 列 ×2 + 浊度及压降 2 列 ×2 = 20
-  assert.equal(openCells, 20)
-  // 其余 60 格是打「/」的占位格
-  assert.equal(items.length * SAMPLE_COUNT - openCells, 60)
+test('可填格总数:前两列 2×2 + 其余 8 列 × 8 行 = 68;占位格只剩前两列的 3#..8# 共 12', () => {
+  const total = DEFAULT_COLS.reduce((n, c) => n + openRows(c).length, 0)
+  assert.equal(total, 2 * 2 + 8 * 8)
+  assert.equal(total, 68)
+  assert.equal(DEFAULT_COLS.length * SAMPLE_COUNT - total, 12, '占位格 = 前两列 × 3#..8#')
 })
 
-test('未知分组兜底:自定义组名仍可填(落到最后一对样品),不会整列变砖', () => {
-  assert.deepEqual(samplesOfGroup('我自定义的组'), [7, 8])
-  assert.equal(isFillableCell(7, '我自定义的组'), true)
-  assert.equal(isFillableCell(1, '我自定义的组'), false)
-  // 组名给空/undefined 也一样兜底,不抛
-  assert.deepEqual(samplesOfGroup(undefined), [7, 8])
+test('勾选式列的识别口径:按列名认(改名后仍认得出),key 兜底,普通列不误判', () => {
+  assert.equal(isCheckColumn({ label: '炭棒表观状态' }), true)
+  assert.equal(isCheckColumn({ label: '外观粘模情况' }), true)
+  assert.equal(isCheckColumn({ label: '脱粉' }), true)
+  assert.equal(isCheckColumn({ key: 'depowder', label: '（空）' }), true)
+  assert.equal(isCheckColumn({ label: '炭棒外径' }), false)
+  assert.equal(isCheckColumn({ label: '新测试项目' }), false)
+  assert.equal(isCheckColumn(null), false)
 })
 
 test('样品序号按数字比:字符串「3」也算 3#(明细里的样品序号有字符串来源)', () => {
-  assert.equal(isFillableCell('3', '尺寸及重量'), true)
-  assert.equal(isFillableCell('1', '尺寸及重量'), false)
+  assert.equal(isFillableCell('3', { label: '炭棒外径' }), true)
+  assert.equal(isFillableCell('3', { label: '炭棒表观状态' }), false)
+  // 越界序号一律不可填(不抛)
+  assert.equal(isFillableCell(0, { label: '炭棒外径' }), false)
+  assert.equal(isFillableCell(9, { label: '炭棒外径' }), false)
+  assert.equal(isFillableCell('', { label: '炭棒外径' }), false)
 })
 
 /* ── 列头显示文字(2026-10-17:单位不重复) ───────────────────────────── */

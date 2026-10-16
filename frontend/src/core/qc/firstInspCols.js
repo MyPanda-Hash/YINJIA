@@ -19,44 +19,41 @@ export const SAMPLE_COUNT = 8
 export const GROUP_ORDER = ['表观及脱粉', '尺寸及重量', '强度', '浊度及压降']
 
 /**
- * 每个分组**各自**记录 2 支样品 —— 相关要求第 1 条:
- *   「表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，
- *     炭棒强度测试2支样品，浊度及压降测试记录2支样品。」
- * ⇒ 四组 × 每组 2 支 = 纸面 1#..8# 八行,**一个样品行只服务一个分组**:
- *     表观及脱粉 → 1#/2#   尺寸及重量 → 3#/4#   强度 → 5#/6#   浊度及压降 → 7#/8#
- *   这正是图片的版式:每个分组自己那两行是**空白可填**的,其余格子一律打「/」(本格无需填写)。
+ * 「表观及脱粉」那两列(勾选式)的识别口径 —— **按列名认**(自定义列不误判),key 只作兜底。
+ * 组件(渲染勾选式 / 画底色)、可填判据、Excel 导出**共用这一个函数**,别在别处再写一份正则。
+ */
+export const CHECK_COL_KEYS = ['appearance', 'depowder']
+
+/** 这一列是不是「表观及脱粉」那种勾选式列(炭棒表观状态 / 炭棒脱粉情况,即纸面前两列) */
+export function isCheckColumn(col) {
+  const label = String(col?.label ?? '')
+  const key = String(col?.key ?? '')
+  return /表观状态|表观|粘模/.test(label) || /脱粉/.test(label) || CHECK_COL_KEYS.includes(key)
+}
+
+/**
+ * 勾选式那两列(前两列)的样品范围:**仍是 1#/2#**。
  *
- * ⚠ 2026-10-17 修:原实现把这条读成"每个测试项目都只记录 1#/2#" ⇒ 尺寸及重量/强度/浊度及压降
- *   三组在**任何**样品行上都不可录(整张纸只有 1#/2# 的表观·脱粉两格能填,其余 8×8 全是「/」),
- *   那 8 个测试项目实际上永远填不进去。该轮用户口径:
- *   「当前的首件检验单的表格应该是这种实现方式实现的,当前为全部都在最上面两行可被填写,
- *     而不是如图形式实现」。
+ * 用户口径(2026-10-17):「让当前各个表格都能填写即可,**前两列保持原样**即可」,
+ *                       追问后补充「**以及后面新增的列也一样**」——
+ * 即:除前两列外的所有测试项目列(图纸上的 8 列 + 以后用表头「＋」新增的列),
+ * **1#..8# 八行全部可填**;前两列维持勾选式、只记 1#/2#,与改前完全一致。
+ *
+ * ⚠ 更早(同日上午)曾按图纸把四个分组各绑一对样品行(表观→1#/2#、尺寸→3#/4#、强度→5#/6#、
+ *   浊度→7#/8#),那一版已被本口径取代 —— 现在**只剩"前两列只填 1#/2#"这一条限制**。
  */
-export const GROUP_SAMPLES = {
-  '表观及脱粉': [1, 2],
-  '尺寸及重量': [3, 4],
-  '强度': [5, 6],
-  '浊度及压降': [7, 8],
-}
+export const CHECK_SAMPLE_ROWS = [1, 2]
 
 /**
- * 某分组用哪两支样品。未知分组(用户自定义的分组名)落到最后一对 —— 自定义列照旧可填,
- * 不会因为"组名不认识"变成一整列填不进去。
- * @param {string} group 项目分组
- * @returns {number[]} 样品序号(1..8)
+ * 这一格(样品行 × 列)能不能填。
+ * 组件渲染、提示话术、底色标记、Excel 导出**共用**这一个判据(别再各写一份样品范围)。
+ * @param {number|string} sample 样品序号(1..8)
+ * @param {{label?:string,key?:string}} col 测试项目列
  */
-export function samplesOfGroup(group) {
-  return GROUP_SAMPLES[group] || GROUP_SAMPLES[GROUP_ORDER[GROUP_ORDER.length - 1]]
-}
-
-/**
- * 这一格(样品行 × 分组)要不要填:true = 纸面空白可录;false = 打「/」的占位格。
- * 组件、提示话术、底色标记**共用**这一个判据(别再各写一份样品范围)。
- * @param {number} sample 样品序号(1..8)
- * @param {string} group 该项目分组
- */
-export function isFillableCell(sample, group) {
-  return samplesOfGroup(group).includes(Number(sample))
+export function isFillableCell(sample, col) {
+  const n = Number(sample)
+  if (!Number.isFinite(n) || n < 1 || n > SAMPLE_COUNT) return false
+  return isCheckColumn(col) ? CHECK_SAMPLE_ROWS.includes(n) : true
 }
 
 /** 明细行类型:标准行 / 样品行 */
