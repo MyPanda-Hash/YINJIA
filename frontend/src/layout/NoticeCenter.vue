@@ -131,6 +131,9 @@ const MSG_TPL = {
   DELETE_REQUESTED: { title: '新的删除申请', body: '{actor} 申请删除「{panelName} {docNo}」，等待您审批。' },
   // 规格书检验项目及标准变更 → 关联出货检验计划表核对(2026-09-11;仅变更提醒,不比对内容)
   SPEC_ITEMS_CHANGED: { title: '规格书检验项目已更新', body: '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。' },
+  // 产品信息表申请修改/被弃审 → 引用它的四文件责任人核对(2026-10-16 用户口径
+  // 「产品信息表要是申请修改怎么办,那些引用产品信息表的怎么办?应该也做一个提示通知」)
+  PRODINFO_CHANGED: { title: '产品信息表已变动', body: '产品「{productCode}」的产品信息表（{docNo}）已由 {actor} 进入「{why}」，您负责的引用单据里那份数据可能已过期，请打开对应单据核对（单据上也有同款黄条提示）。' },
   // 审批结果通知(2026-09-12 补齐):删除/修改申请的审批结果此前不通知,申请人全靠自查
   DELETE_APPROVED: { title: '删除申请已通过', body: '您申请删除的「{panelName} {docNo}」已由 {actor} 同意，单据已作废。意见：{opinion}' },
   DELETE_REJECTED: { title: '删除申请被驳回', body: '您申请删除的「{panelName} {docNo}」被 {actor} 驳回，单据保持原状态。意见：{opinion}' },

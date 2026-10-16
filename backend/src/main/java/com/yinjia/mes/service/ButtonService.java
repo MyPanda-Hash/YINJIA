@@ -1627,6 +1627,9 @@ public class ButtonService {
         // 组装成品检验**弃审** → 重算结案:检验不再是"已审核通过" ⇒ 该工单行应退回未结案
         //   (必须在 shr 清掉之后,口径同上方的 manuWriteback 注释)
         syncCloseAfterAsmInsp(def.code(), no, currentUserName());
+        // 2026-10-16 用户口径:产品信息表**被弃审**(退回草稿、重新走审核)同样会让四文件里的数据过期
+        // ⇒ 与「申请修改」同一条通知(recordApproval 已写 UNAUDIT 留痕,故放在它之后)。
+        if ("RD_PROD_INFO".equals(def.code())) notifyProdInfoChanged(no, currentUserName(), "弃审");
         return result(no, "草稿");
     }
 
@@ -5301,6 +5304,138 @@ public class ButtonService {
         return s == null ? "" : s;
     }
 
+    // ══════════ 产品信息表漂移:引用它的四文件该不该提示核对 ══════════
+
+    /**
+     * 引用**产品信息表**的四个面板(按 [产品编号] 关联)。产品信息表自身不入本集合(被引用方向相反)。
+     * 与 {@link #SPEC_REF_PANELS} 并列:那是"规格书变了",这是"产品信息表变了"。
+     */
+    private static final java.util.Set<String> PRODINFO_REF_PANELS = java.util.Set.of(
+            "RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN");
+
+    /**
+     * 「本单引用的产品信息表变了吗」判定(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,
+     *   那些引用产品信息表的怎么办?应该也做一个提示通知」)。
+     *
+     * <p>与规格书漂移 {@link #specDriftState} 同构,只是被引用方换成产品信息表:
+     * <ul>
+     *   <li>产品信息表**正在改**(修改申请中/修改中) → 提示核对(reason=prod_in_flux);</li>
+     *   <li>产品信息表**被弃审退回草稿**(有 UNAUDIT 留痕) → 提示核对(prod_reaudited)——它已不是定稿态;</li>
+     *   <li>产品信息表**改完重新归档且比本单新** → 提示核对(prod_newer)。比的是
+     *       yj_doc_status.update_at(**不是** archived_at —— 那个只在首次归档写入,见 specDriftState 同款踩坑注)。</li>
+     * </ul>
+     * 只读判定、无写副作用;取不到(无产品编号/未分发/表缺列)一律 needCheck=false:宁可不提示,也不假告警。
+     */
+    public Map<String, Object> prodInfoDriftState(String panelCode, String docNo) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("applicable", PRODINFO_REF_PANELS.contains(panelCode));
+        out.put("needCheck", false);
+        out.put("prodNo", "");
+        out.put("prodStatus", "");
+        out.put("productCode", "");
+        out.put("prodChangedAt", "");
+        out.put("docChangedAt", "");
+        out.put("reason", "");
+        if (!PRODINFO_REF_PANELS.contains(panelCode) || docNo == null || docNo.isBlank()) return out;
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) { out.put("applicable", false); return out; }
+        String key = DevTaskService.productKeyOf(panelCode);
+        if (key == null) return out;
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String productCode = "";
+        try {
+            List<String> rows = jdbc.queryForList("SELECT TOP 1 [" + key + "] FROM " + table
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, docNo);
+            if (!rows.isEmpty() && rows.get(0) != null) productCode = rows.get(0).trim();
+        } catch (Exception e) {
+            return out;   // 取不到产品键(缺列等)⇒ 不提示,避免误伤
+        }
+        if (productCode.isEmpty()) return out;   // 历史单(无产品编号)豁免
+        String prodNo = prodInfoNoOf(productCode);
+        if (prodNo.isEmpty()) return out;
+        String st = String.valueOf(docStatusOf("RD_PROD_INFO", prodNo).get("status"));
+        out.put("prodNo", prodNo);
+        out.put("prodStatus", st);
+        out.put("productCode", productCode);
+        out.put("prodChangedAt", statusUpdateAt("RD_PROD_INFO", prodNo));
+        out.put("docChangedAt", statusUpdateAt(panelCode, docNo));
+        if ("修改申请中".equals(st) || "修改中".equals(st)) {
+            out.put("needCheck", true);
+            out.put("reason", "prod_in_flux");
+            return out;
+        }
+        // 弃审回草稿:纸面还在、但已不是审核过的定稿(靠 UNAUDIT 留痕区分"新建的草稿"与"退回来的草稿")
+        if ("草稿".equals(st) && hasUnauditTrace("RD_PROD_INFO", prodNo)) {
+            out.put("needCheck", true);
+            out.put("reason", "prod_reaudited");
+            return out;
+        }
+        String pa = nz(out.get("prodChangedAt"));
+        String da = nz(out.get("docChangedAt"));
+        if (!pa.isEmpty() && !da.isEmpty() && pa.compareTo(da) > 0) {
+            out.put("needCheck", true);
+            out.put("reason", "prod_newer");
+        }
+        return out;
+    }
+
+    /** 某产品编号对应的产品信息表单据号(未作废/未作废单,取最新一张);取不到回空串 */
+    private String prodInfoNoOf(String productCode) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 h.[单据编号] FROM rd_prod_info_head h"
+                            + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_PROD_INFO' AND s.doc_no = h.[单据编号]"
+                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
+                            + " AND h.[产品编号] = ? ORDER BY h.id DESC", String.class, productCode);
+            return rows.isEmpty() || rows.get(0) == null ? "" : rows.get(0).trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** 该单是否有弃审留痕(⚠ 列名是 form_no,不是 doc_no —— 写错会被 catch 吞掉,标记恒 false) */
+    private boolean hasUnauditTrace(String panelCode, String docNo) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_form_approval WHERE panel_code = ? AND form_no = ? AND action = 'UNAUDIT'",
+                    Integer.class, panelCode, docNo);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 产品信息表进入「会被改」的两个状态时,**通知引用它的四文件责任人**核对数据
+     * (2026-10-16 用户口径「那些引用产品信息表的怎么办?应该也做一个提示通知」)。
+     *
+     * <p>收件人 = rd_dev_task 里该产品编号四个文件的负责人(排除操作人自己);
+     * 没分发过(查不到负责人)= 没人可通知,静默跳过 —— 不发空消息。
+     * 与页面上的黄条是**同一件事的两个层次**:黄条给"打开这张单的人",消息给"该管的这个人"。
+     */
+    private void notifyProdInfoChanged(String prodNo, String actor, String why) {
+        try {
+            List<String> codes = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL([产品编号],N'') FROM rd_prod_info_head WHERE 单据编号 = ?", String.class, prodNo);
+            String code = codes.isEmpty() ? "" : nz(codes.get(0));
+            if (code.isEmpty()) return;
+            List<String> owners = jdbc.queryForList(
+                    "SELECT DISTINCT [负责人] FROM rd_dev_task WHERE [产品编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL([负责人],N'') <> N''", String.class, code);
+            List<String> targets = new java.util.ArrayList<>();
+            for (String o : owners) {
+                String t = nz(o);
+                if (!t.isEmpty() && !t.equals(actor) && !targets.contains(t)) targets.add(t);
+            }
+            if (targets.isEmpty()) return;
+            messageService.send(targets, MessageService.PRODINFO_CHANGED, "RD_PROD_INFO", prodNo,
+                    Map.of("docNo", prodNo, "actor", nz(actor), "productCode", code, "why", nz(why)), actor);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("prodinfo changed notify failed: {}", e.getMessage());
+        }
+    }
+
     /**
      * 规格书分发(2026-09-12 两级分发第二级,当日改口径:不按种类建单,分发=把已有单据分给人)。
      * formData = {编号: 产品信息表单据编号, assigns: [{编号: 规格书单据编号, 责任人: 账号}]}。
@@ -5467,6 +5602,10 @@ public class ButtonService {
         // 消息:申请修改 → 管理员(把原因一并带上,管理员不用打开单据就知道要改什么)
         notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.MODIFY_REQUESTED,
                 Map.of("docNo", no, "actor", user, "opinion", reason), user));
+        // 2026-10-16 用户口径「产品信息表要是申请修改,那些引用产品信息表的怎么办?应该也做一个提示通知」:
+        // 产品信息表是四文件的**数据源头**(产品编号/尺寸/客户项目名称…),它一进修改流程,
+        // 已经归档的四文件里那份数据就可能过期 ⇒ 通知四个文件的责任人回来核对(页面另有黄条同源提示)。
+        if ("RD_PROD_INFO".equals(def.code())) notifyProdInfoChanged(no, user, reason);
         return result(no, "修改申请中");
     }
 

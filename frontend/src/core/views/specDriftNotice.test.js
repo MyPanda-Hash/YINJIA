@@ -67,8 +67,8 @@ test('端点 + 前端 API + 前端加载时机', () => {
   assert.match(controller, /@GetMapping\("\/rdDev\/specDrift"\)[\s\S]{0,200}?buttons\.specDriftState\(panelCode, docNo\)/)
   assert.match(engine, /export async function rdSpecDrift\(panelCode, docNo\)/)
   assert.match(panelx, /const SPEC_REF_PANELS = \['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
-  assert.match(panelx, /loadRdFlowState\(\); loadPendingDocs\(\); loadSpecDrift\(\) \}/,
-    '切单据的 watch 里必须带上 loadSpecDrift —— 否则黄条永远不出现')
+  assert.match(panelx, /loadRdFlowState\(\); loadPendingDocs\(\); loadSpecDrift\(\); loadProdDrift\(\) \}/,
+    '切单据的 watch 里必须带上 loadSpecDrift/loadProdDrift —— 否则黄条永远不出现')
 })
 
 // ── 三、黄条与弃审入口(界面层) ──
@@ -91,4 +91,45 @@ test('新增 UI 文案都有多语言词条(en 至少)', () => {
     "'如数据已变：点侧栏「弃审」退回草稿 → 再点「按规格书带入」取最新数据':"]) {
     assert.ok(en.includes(k), `en.js 缺词条：${k}`)
   }
+})
+
+// ── 四、产品信息表漂移(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,那些引用产品信息表的
+//        怎么办?应该也做一个提示通知」)—— 与规格书那条同构,两个层次:页面黄条 + 消息中心通知 ──
+test('产品信息表漂移:四个引用方(含规格书本身)按产品编号关联', () => {
+  assert.match(buttons, /PRODINFO_REF_PANELS = java\.util\.Set\.of\(\s*\n?\s*"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN"\)/)
+  assert.match(buttons, /out\.put\("applicable", PRODINFO_REF_PANELS\.contains\(panelCode\)\)/)
+  assert.match(buttons, /out\.put\("reason", "prod_in_flux"\)/, '正在改(修改申请中/修改中)⇒ prod_in_flux')
+  assert.match(buttons, /out\.put\("reason", "prod_reaudited"\)/, '被弃审退回草稿 ⇒ prod_reaudited(靠 UNAUDIT 留痕区分新建草稿)')
+  assert.match(buttons, /prodAt[\s\S]{0,120}?compareTo\(docAt\) > 0[\s\S]{0,120}?out\.put\("reason", "prod_newer"\)|pa\.compareTo\(da\) > 0[\s\S]{0,160}?out\.put\("reason", "prod_newer"\)/)
+  assert.match(buttons, /CONVERT\(nvarchar\(19\), update_at, 120\)/, '比时间仍走 update_at(不能用 archived_at)')
+  assert.match(buttons, /WHERE panel_code = \? AND form_no = \? AND action = 'UNAUDIT'/,
+    '弃审留痕的列名是 form_no(写 doc_no 会被 catch 吞掉,标记恒 false)')
+})
+
+test('产品信息表漂移:端点 + 前端 API + 黄条三档文案 + 词条', () => {
+  assert.match(controller, /@GetMapping\("\/rdDev\/prodInfoDrift"\)[\s\S]{0,200}?buttons\.prodInfoDriftState\(panelCode, docNo\)/)
+  assert.match(engine, /export async function rdProdInfoDrift\(panelCode, docNo\)/)
+  assert.match(panelx, /const PRODINFO_REF_PANELS = \['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
+  assert.match(panelx, /<div v-if="prodDrift" class="spec-drift-banner">/)
+  assert.match(panelx, /本单引用的产品信息表 \{no\} 正在修改（\{st\}），请及时核对数据/)
+  assert.match(panelx, /本单引用的产品信息表 \{no\} 已被反审核退回草稿，请核对数据/)
+  assert.match(panelx, /本单引用的产品信息表 \{no\} 已更新（\{t\}），请及时核对数据/)
+  for (const k of ["'产品信息表已变动':", "'本单引用的产品信息表 {no} 正在修改（{st}），请及时核对数据':",
+    "'本单引用的产品信息表 {no} 已被反审核退回草稿，请核对数据':",
+    "'本单引用的产品信息表 {no} 已更新（{t}），请及时核对数据':",
+    "'如数据已变：点侧栏「弃审」退回草稿 → 重新按产品信息表核对后再归档':"]) {
+    assert.ok(en.includes(k), `en.js 缺词条：${k}`)
+  }
+})
+
+test('产品信息表漂移:申请修改 / 弃审两条路都要通知四文件责任人(消息中心)', () => {
+  assert.match(buttons, /MessageService\.PRODINFO_CHANGED/, '消息码要有出处')
+  assert.match(buttons, /if \("RD_PROD_INFO"\.equals\(def\.code\(\)\)\) notifyProdInfoChanged\(no, user, reason\);/,
+    '申请修改路径要发通知')
+  assert.match(buttons, /if \("RD_PROD_INFO"\.equals\(def\.code\(\)\)\) notifyProdInfoChanged\(no, currentUserName\(\), "弃审"\);/,
+    '弃审路径要发通知(放在 recordApproval(UNAUDIT) 之后,漂移判定靠这条留痕)')
+  assert.match(buttons, /SELECT DISTINCT \[负责人\] FROM rd_dev_task WHERE \[产品编号\] = \?/,
+    '收件人 = 该产品四个文件的负责人(rd_dev_task)')
+  const notice = readFileSync(new URL('../../layout/NoticeCenter.vue', import.meta.url), 'utf8')
+  assert.match(notice, /PRODINFO_CHANGED: \{ title: '产品信息表已变动'/, '消息中心要有模板,否则渲染成通用「业务消息」')
 })

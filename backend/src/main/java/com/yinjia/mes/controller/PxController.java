@@ -216,6 +216,19 @@ public class PxController {
         return devTaskService.productCodeOfDocNo(docNo);
     }
 
+    /**
+     * 引用单据上的「本单引用的产品信息表变了」提示(2026-10-16 用户口径)。
+     *
+     * <p>用户原话:「产品信息表要是申请修改怎么办,那些引用产品信息表的怎么办?应该也做一个提示通知」。
+     * 只对四个引用方(规格书/成型工艺清单/组装工艺清单/出货检验计划表)适用,按 [产品编号] 关联;
+     * 判定与取数全在 {@link com.yinjia.mes.service.ButtonService#prodInfoDriftState}(纯只读,无写副作用)。
+     */
+    @GetMapping("/rdDev/prodInfoDrift")
+    public ApiResult<Map<String, Object>> rdDevProdInfoDrift(@RequestParam String panelCode, @RequestParam String docNo) {
+        perm.requirePanelView(panelCode);
+        return ApiResult.ok(buttons.prodInfoDriftState(panelCode, docNo));
+    }
+
     /** 产品开发:已下发产品的开发矩阵 */
     @GetMapping("/rdDev/board")
     public ApiResult<List<Map<String, Object>>> rdDevBoard() {

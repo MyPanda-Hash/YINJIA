@@ -180,6 +180,18 @@
               <span class="sdb-hint">{{ tt('如数据已变：点侧栏「弃审」退回草稿 → 再点「按规格书带入」取最新数据') }}</span>
             </span>
           </div>
+          <!-- 「本单引用的产品信息表变了」黄条(2026-10-16 用户口径)—— 与上面规格书那条同款式、同位置:
+               四文件(规格书/成型工艺清单/组装工艺清单/出货检验计划表)都是按 [产品编号] 引用产品信息表的,
+               产品信息表一进修改流程(或被弃审),这四张单里的数据就可能过期。判定在服务端,前端只显示。 -->
+          <div v-if="prodDrift" class="spec-drift-banner">
+            <span class="sdb-tag">{{ tt('产品信息表已变动') }}</span>
+            <span class="sdb-txt">
+              <template v-if="prodDrift.reason === 'prod_in_flux'">{{ tt('本单引用的产品信息表 {no} 正在修改（{st}），请及时核对数据').replace('{no}', String(prodDrift.prodNo || '')).replace('{st}', tt(String(prodDrift.prodStatus || ''))) }}</template>
+              <template v-else-if="prodDrift.reason === 'prod_reaudited'">{{ tt('本单引用的产品信息表 {no} 已被反审核退回草稿，请核对数据').replace('{no}', String(prodDrift.prodNo || '')) }}</template>
+              <template v-else>{{ tt('本单引用的产品信息表 {no} 已更新（{t}），请及时核对数据').replace('{no}', String(prodDrift.prodNo || '')).replace('{t}', String(prodDrift.prodChangedAt || '')) }}</template>
+              <span class="sdb-hint">{{ tt('如数据已变：点侧栏「弃审」退回草稿 → 重新按产品信息表核对后再归档') }}</span>
+            </span>
+          </div>
           <RecordSheetPanels
             ref="approvalSheetRef"
             :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
@@ -3548,8 +3560,29 @@ async function loadSpecDrift() {
   }
 }
 
-// ── 待开发单据(2026-10-10):四个下游面板侧的「我被分发了多少张产品信息表待开发」──
-// 真源 = 后端 /px/rdDev/pendingDocs(已按 rd_dev_task 的负责人过滤)⇒ 前端不自己判权限:
+// 产品信息表漂移(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,那些引用产品信息表的怎么办?
+//   应该也做一个提示通知」)—— 与上面规格书漂移同构,被引用方换成**产品信息表**:
+//   产品信息表是四文件的数据源头(产品编号/尺寸/客户项目名称…),它一进修改流程或被人弃审,
+//   已经归档的四文件里那份数据就可能过期 ⇒ 在单据靠上位置挂一条黄条,引导用户弃审后重新引用。
+//   判定全在服务端 /px/rdDev/prodInfoDrift(正在改 / 被弃审退回草稿 / 改完且比本单新),前端只显示。
+const PRODINFO_REF_PANELS = ['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN']
+const prodDrift = ref(null)
+async function loadProdDrift() {
+  if (!PRODINFO_REF_PANELS.includes(String(panelCode.value))) { prodDrift.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { prodDrift.value = null; return }
+  try {
+    const r = await engine.rdProdInfoDrift(panelCode.value, no)
+    // 竞态守卫:期间切了单据/面板就丢弃这次结果(与 loadSpecDrift 同款)
+    if (String(cur.value?.['单据编号'] || '') !== no) return
+    prodDrift.value = r && r.applicable && r.needCheck ? r : null
+  } catch {
+    // 取不到就不提示(辅助信息,不打扰用户、不影响页面其它功能)
+    prodDrift.value = null
+  }
+}
+
+// ── 待开发单据(2026-10-10):四个下游面板侧的「我被分发了多少张产品信息表待开发」──// 真源 = 后端 /px/rdDev/pendingDocs(已按 rd_dev_task 的负责人过滤)⇒ 前端不自己判权限:
 //   · 按钮显隐 判据 = rows.length > 0(我被分发到了这个面板)
 //   · 红点数字 判据 = pendingCount(rows 里「未开发」的条数),为 0 时红点整块不渲染
 // 请求失败静默降级(清空即可,不弹错误 —— 这个入口是辅助性的,不能打扰用户/影响页面其它功能)。
@@ -3827,8 +3860,12 @@ const sheetSideGroups = computed(() => approvalSideGroups.value
   .map((g) => ({ ...g, actions: actsOf(g).filter((a) => a !== '字段管理'
     && !(!draftEditable.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
   .filter((g) => (g.actions || []).length))
-/** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里) */
-const hasFieldAdmin = computed(() => approvalSideGroups.value.some((g) => actsOf(g).includes('字段管理')))
+/** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里)。
+ *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
+ *    研发管理(RD_*)整块不放该入口(它的动态字段走正式迁移/纸面配置,不吃备用列池这条路);
+ *    其它模块(品质/供应链/基础档案)保持原样。服务端能力与权限一行未动,只是研发区不放出按钮。 */
+const hasFieldAdmin = computed(() => !String(panelCode.value).startsWith('RD_')
+  && approvalSideGroups.value.some((g) => actsOf(g).includes('字段管理')))
 /**
  * 一级审批通过是否给当前用户:审批中 = 有审批权 且 不是本单提交人本人;
  * 待二级审批 = 被一级选中的二级审核人本人(l2ApproverNow,被选中即授权)。
@@ -4215,7 +4252,7 @@ const rdFlowUsers = ref([])
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift() }, { immediate: true })
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift(); loadProdDrift() }, { immediate: true })
 
 /* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
    判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
