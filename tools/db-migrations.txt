@@ -3726,6 +3726,8 @@ migrate-qc-insp-detail-restore-20261016.sql
 migrate-doc-detail-uncancel-20261016.sql
 # migrate-qc-item-plan-reseed-20261016.sql — 检验项目/检验方案受控主数据补播(2 方案 + 14 项目;部署包实测两表 0 行而原脚本已登记 ⇒ 单列一条幂等补播)
 migrate-qc-item-plan-reseed-20261016.sql
+# migrate-arch-detail-key-canonical-20261016.sql — 档案面板明细键对齐规范键 LOWER(panel_code)(本地 29 个面板是旧别名而服务器已是规范键;只动这 29 个,避免制造新漂移)
+migrate-arch-detail-key-canonical-20261016.sql
 # migrate-yj-field-dedup.sql — 清掉 yj_field 完全重复登记行(体检 07;6 处全在 PURCHASE_IN)⇒ 171→165 行,须同批刷新四单基线
 migrate-yj-field-dedup.sql
 # 以下 6 条为**已应用但漏登记**的历史脚本(体检 12):补登记,用 DbSync baseline 只登记不执行
