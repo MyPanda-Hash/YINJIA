@@ -3622,6 +3622,8 @@ migrate-asm-insp-passqty-rename-20261017.sql
 migrate-stock-views-restore-20261016.sql
 # migrate-kucun-recalc-to-now-20261016.sql — kucun 按流水重算到今日(与月结 reconcileKucun 同语句,截止点=明天;供四表对账用)
 migrate-kucun-recalc-to-now-20261016.sql
+# migrate-qc-insp-detail-restore-20261016.sql — 恢复被批量作废的来料检验单明细(IJ-2026-10-0011 起 10 单 12 行,单头有效、明细被误作废;asp_user2=restore 可回退)
+migrate-qc-insp-detail-restore-20261016.sql
 # migrate-yj-field-dedup.sql — 清掉 yj_field 完全重复登记行(体检 07;6 处全在 PURCHASE_IN)⇒ 171→165 行,须同批刷新四单基线
 migrate-yj-field-dedup.sql
 # 以下 6 条为**已应用但漏登记**的历史脚本(体检 12):补登记,用 DbSync baseline 只登记不执行
