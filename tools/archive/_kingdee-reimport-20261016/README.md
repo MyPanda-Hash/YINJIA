@@ -60,6 +60,49 @@ node tools\archive\_kingdee-reimport-20261016\_q-kingdee-import-verify.mjs
 OTHER_IN 14 / OTHER_OUT 79 / QC_RECV 293 / QC_INSP 11 / QC_INSP_REC 30`。
 ⚠ `SALE_OUT` 头表 415 行而列表 413 —— 差的 2 张是 `yj_doc_status.canceled='Y'`(**已作废,列表不列**),不是漏导。
 
+## 补做「库存过账」(用户报:桌面库存只显示 1 条入库、出库一条没有)
+
+**根因不是导入漏数据,而是导库绕过了应用**:库存流水(`inh`/`outh`)只由应用的**过账动作**写入
+(`StockLedgerService`/`StockFlowService`,审核时同事务写 kucun + 流水),而桌面「库存」卡片
+(`DashboardStatsService.stock()`)**正是读 `inh`/`outh`**。导库后单据与状态都在(界面显示「已审核」),
+但流水一条没写 ⇒ 卡片里 `inh` 只剩 31 行期初、`outh` **0 行**。
+
+处理(两账套各一次):
+
+```powershell
+cd tools
+# ① 给已审核单据补写流水(src=1 采购入库 / 2 产成品入库 / 3 其他入库 / 5 销售出库 / 6 材料出库 / 7 其他出库)
+java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar DbSync.java run archive\_kingdee-reimport-20261016\backfill-stock-flow-imported.sql
+# ② 按流水重建 kucun 结存缓存
+java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar DbSync.java run migrate-stock-flow-kucun-resync.sql
+# ③ 全量重算移动加权成本物化表(面板「库存台账」→ 工具栏「重算成本」的等价调用)
+```
+
+⚠ 现成的 `migrate-stock-flow-history-backfill.sql` **已过期、跑不了**:它的 src=4/8 两段引用
+`bl_outsource_in` / `bl_outsource_issue`,这两张表随委外面板 2026-10-08 下架已删 ⇒ 整脚本以
+「对象名 'bl_outsource_in' 无效」中止。`backfill-stock-flow-imported.sql` 即其**现存 6 段**的等价替换
+(逐列口径照抄,含 ③ 撤期初的同一守卫;已登记的迁移一律不改,改字节会被 DbSync 按哈希判为重跑)。
+
+结果(两账套一致):
+
+| 项 | 补前 | 补后 |
+|---|---|---|
+| `inh` 入库流水 | 31 行(全为期初 src=0) | 1,702 行(期初 31 + 采购入库 849 + 产成品 806 + 其他入 16) |
+| `outh` 出库流水 | **0 行** | 3,317 行(销售出库 1,110 + 材料出库 2,093 + 其他出库 114;2 行已作废已排除) |
+| `kucun` 结存 | 31 行 / 余量 7,011 | 996 行(单据口径) |
+| `inv_cost_ledger` | 31 行 | 5,019 行(重算成本 5,019 行) |
+
+桌面卡片与三张报表(接口实测,两账套相同):
+**入库 559 单 / 出库 979 单 / 明细 5,019 行**;
+`STOCK_LEDGER 5,019 · STOCK_BALANCE 1,366 · STOCK_STATUS 996 · STOCK_SUMMARY 1,781`。
+核对脚本:`node tools\archive\_kingdee-reimport-20261016\_q-stock-flow-verify.mjs`
+
+⚠ **已知副作用(需知情)**:`kucun` 里出现 **315 行负结存** —— 这批单是「金蝶拉取 + 2026-09-01 起」的
+**子集**,本地没有对应的期初/更早入库单据(如销售出库的成品在 MES 里没有入库来源),
+属数据不完整而非脚本引入(项目原注释早已记录同类现象「114 个分区只出无进」)。
+要消掉负结存得补导更早区间或期初单据;31 行 `INIT-*` 期初因 (仓库,物料) 键与被单据覆盖的键不重合,
+按守卫**原样保留**。
+
 ## 回滚
 
 `rollback-HSDZ_MES.sql` / `rollback-HSDZ_MES_TEST.sql` —— 按本次真正插入的 id **逐表精确 DELETE**
