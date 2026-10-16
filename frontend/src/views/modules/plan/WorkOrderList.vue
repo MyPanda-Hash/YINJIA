@@ -19,17 +19,21 @@
     </div>
 
     <!-- 按钮条(2026-09-28 用户拍板:生产工单=纯汇总视图——数据只由订单结转产生,排产唯一入口=快速排产;
-         撤排产按钮防中间节点误操作;保留 查询/筛选/打印/结案留痕) -->
+         撤排产按钮防中间节点误操作;保留 查询/筛选/打印/结案留痕)
+         页面级权限(2026-10-16):本页挂页面面板 WORK_ORDER_LIST
+         (可见/查询/打印/结案/切单/转领料单/导出/排产;词表见后端 PagePanelRegistry),
+         无该动作词的角色不显示按钮 —— 此前本页连列表接口都没有校验(登录即可读全部工单/客户/数量)。 -->
     <div class="wol-btns">
-      <el-button size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
-      <el-button size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
+      <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
+      <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
-      <el-button size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
-      <!-- 工单排产弹窗(2026-10-05 用户口径):**一次只排一行**(勾多行会提示"请只勾选一张工单",与切单同范式) -->
-      <el-button size="small" type="success" plain :disabled="!checked.length && !currentRow" @click="openSchedule">{{ tt('排产') }}</el-button>
-      <el-button size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
-      <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
+      <el-button v-if="canDo('split')" size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
+      <!-- 工单排产弹窗(2026-10-05 用户口径):**一次只排一行**(勾多行会提示"请只勾选一张工单",与切单同范式);
+           「排产」与快速排产页同一个动作词 assign —— 两处任一授予即可(与后端 requireButtonAny 同口径) -->
+      <el-button v-if="canSchedule" size="small" type="success" plain :disabled="!checked.length && !currentRow" @click="openSchedule">{{ tt('排产') }}</el-button>
+      <el-button v-if="canDo('split')" size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
+      <el-dropdown v-if="canDo('print')" split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
                    :disabled="!checked.length && !currentRow">
         {{ tt('打印工单') }}
         <template #dropdown>
@@ -37,8 +41,8 @@
           <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
         </template>
       </el-dropdown>
-      <el-button size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
-      <el-button size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
+      <el-button v-if="canDo('picking')" size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
+      <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
     </div>
 
@@ -154,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -164,6 +168,17 @@ import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
+import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
+
+/**
+ * 页面级动作权限(2026-10-16):页面面板 WORK_ORDER_LIST
+ * (可见/查询/打印/结案/切单/转领料单/导出/排产;词表见后端 PagePanelRegistry)。
+ * 「排产」与快速排产页共用 assign 词 —— 两处任一授予即可(后端 requireButtonAny 同口径)。
+ * 「查找/刷新/追溯」是只读查看,归「可见」,不另设动作。
+ */
+const permUser = useUserStore()
+const canDo = (word) => canDoPerm(permUser, 'WORK_ORDER_LIST', word)
+const canSchedule = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'SCHEDULE_BOARD'], 'assign'))
 
 /** 转领料单生成后跳「材料出库单」用(与其它页 gotoPanel 同一范式:tabs.open + router.push) */
 const router = useRouter()
@@ -509,6 +524,21 @@ onMounted(() => {
     dateTo.value = dayStr(0)
   }
   load(); loadLines()
+})
+
+/**
+ * 切回本页签时**重新取数**(2026-10-14,与「快速排产」页同一口径 —— 两处必须一致)。
+ *
+ * 根因:`PortalLayout` 的 `<router-view>` 外有 `<keep-alive>`,本页被缓存 ⇒ 在「快速排产」排产/撤销后
+ * 切回本页,列表仍显示上一次的产线/生产状态(本页的「排产」是弹窗内嵌快速排产,关弹窗会 load,
+ * 但**别人改的**排产状态不会自动反映)。现每次切回都重拉列表。
+ *
+ * ⚠ 只认**切回**(首次 activate 跳过):首次挂载已由 onMounted 取数。
+ */
+let firstActivate = true
+onActivated(() => {
+  if (firstActivate) { firstActivate = false; return }
+  load()
 })
 </script>
 

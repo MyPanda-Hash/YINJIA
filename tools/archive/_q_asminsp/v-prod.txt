@@ -1,0 +1,37 @@
+########## HSDZ_MES ##########
+=== 三张明细表:检验要求/检查频率 列在?旧列名残留? ===
+tbl | 检验要求 | 检查频率 | 标准要求旧列
+qc_mold_insp_detail | 有 | 有 | 已清
+qc_cut_insp_detail | 有 | 有 | 已清
+qc_asm_insp_detail | 有 | 有 | 已清
+(3 rows)
+
+=== yj_field:三张单的 检验要求/检查频率 行 ===
+panel_code | col_name | data_type | place | seq | width | editable | visible | hidden
+QC_ASM_INSP | 检验要求 | 多行文本 | detail | 20 | 180 | 1 | 1 | 0
+QC_ASM_INSP | 检查频率 | 下拉框 | detail | 45 | 110 | 1 | 1 | 0
+QC_CUT_INSP | 检验要求 | 多行文本 | detail | 220 | 180 | 1 | 1 | 0
+QC_CUT_INSP | 检查频率 | 下拉框 | detail | 236 | 110 | 1 | 1 | 0
+QC_MOLD_INSP | 检验要求 | 多行文本 | detail | 220 | 180 | 1 | 1 | 0
+QC_MOLD_INSP | 检查频率 | 下拉框 | detail | 236 | 110 | 1 | 1 | 0
+(6 rows)
+
+=== 列级注明 ===
+tbl | col | value
+qc_asm_insp_detail | 检查频率 | 检查频率(来源=出货检验计划表 RD_INSP_PLAN.检测频率;取值 1PCS/一个生产批次 · 生产量*1% · 型式检验)
+qc_asm_insp_detail | 检验要求 | 检验要求(来源=出货检验计划表 RD_INSP_PLAN.控制标准及要求;2026-10-16 由「标准要求」正名对齐,长文本)
+qc_cut_insp_detail | 检查频率 | 检查频率(来源=出货检验计划表 RD_INSP_PLAN.检测频率;取值 1PCS/一个生产批次 · 生产量*1% · 型式检验)
+qc_cut_insp_detail | 检验要求 | 检验要求(来源=出货检验计划表 RD_INSP_PLAN.控制标准及要求;2026-10-16 由「标准要求」正名对齐,长文本)
+qc_mold_insp_detail | 检查频率 | 检查频率(来源=出货检验计划表 RD_INSP_PLAN.检测频率;取值 1PCS/一个生产批次 · 生产量*1% · 型式检验)
+qc_mold_insp_detail | 检验要求 | 检验要求(来源=出货检验计划表 RD_INSP_PLAN.控制标准及要求;2026-10-16 由「标准要求」正名对齐,长文本)
+(6 rows)
+
+=== 译名(en)与全语言计数 ===
+ref_key | 语言数 | en
+检查频率 | 10 | Check Frequency
+检验要求 | 10 | Inspection Requirement
+(2 rows)
+
+=== 明细行数(改名未丢数据) ===
+[ERR] Invalid column name '标准要求'.
+

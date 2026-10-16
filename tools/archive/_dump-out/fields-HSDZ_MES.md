@@ -510,177 +510,171 @@ COL	qc_return_detail	特采	bit(1)	NOT NULL	特采:勾选=该行做特采(让步
 
 ===== PURCHASE_IN =====
 -- yj_field (place, seq)
-FIELD	detail	20	存货名称	存货名称	参照	140	ER-V		INV	存货名称	存货名称			Inventory Name		12683
-FIELD	detail	30	规格型号	规格型号	文本	140	E--V							Specification		12684
-FIELD	detail	40	实收数量	实收数量	小数	110	ER-V							Actual received quantity		12687
-FIELD	detail	50	计量单位	计量单位	下拉框	140	ER-V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement		12689
-FIELD	detail	60	实收数量2	实收数量2	小数	110	E--V							Paid-in quantity 2		12691
-FIELD	detail	70	计量单位2	计量单位2	下拉框	140	E--V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement 2		12692
-FIELD	detail	80	单价	单价	小数	110	ER-V							Unit Price		12695
-FIELD	detail	90	金额	金额	小数	110	E--V							Amount		12696
-FIELD	detail	100	税率%	税率%	小数	110	E--V						SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)	Tax rate%		12698
-FIELD	detail	110	含税单价	含税单价	小数	110	E--V							Unit price including tax		12700
-FIELD	detail	120	含税金额	含税金额	小数	110	E--V							Incl. tax amt		12702
-FIELD	detail	130	批号	批号	文本	120	E-H-							Lot No.		12704
-FIELD	detail	140	是否来料检验	是否来料检验	下拉框	90	---V						SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)			12706
-FIELD	detail	150	特采	特采	下拉框	90	---V						SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)			12708
-FIELD	detail	160	行号	行号	文本	120	E-H-							Line No.		12710
-FIELD	detail	170	现存量	现存量	小数	110	E--V							Current inventory		12712
-FIELD	detail	180	商品id	商品id	文本	120	E-H-									12715
-FIELD	detail	190	仓库	仓库	参照	140	ER-V		WH	仓库名称	仓库名称					12717
-FIELD	detail	195	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin		12718
-FIELD	detail	200	商品是否多单位	商品是否多单位	文本	120	E-H-									12720
-FIELD	detail	210	商品是否序列号	商品是否序列号	文本	120	E-H-									12721
-FIELD	detail	220	商品是否辅助属性	商品是否辅助属性	文本	120	E-H-									12724
-FIELD	detail	230	商品是否保质期	商品是否保质期	文本	120	E-H-									12726
-FIELD	detail	240	商品是否批次	商品是否批次	文本	120	E-H-									12728
-FIELD	detail	250	仓库id	仓库id	文本	120	E-H-									12730
-FIELD	detail	260	仓库启用仓位管理	仓库启用仓位管理	文本	120	E-H-									12732
-FIELD	detail	270	仓位id	仓位id	文本	120	E-H-									12734
-FIELD	detail	290	采购订单行号	源单行号	文本	110	E--V									12736
-FIELD	detail	300	辅助属性id	辅助属性id	文本	120	E-H-									12738
-FIELD	detail	310	批次号	批次号	文本	150	---V									12741
-FIELD	detail	320	辅助属性名称	辅助属性名称	文本	120	E-H-									12742
-FIELD	detail	330	辅助属性编码	辅助属性编码	文本	120	E-H-									12744
-FIELD	detail	340	辅助属性1id	辅助属性1id	文本	120	E-H-									12747
-FIELD	detail	350	辅助属性1名称	辅助属性1名称	文本	120	E-H-									12749
-FIELD	detail	360	辅助属性1编码	辅助属性1编码	文本	120	E-H-									12751
-FIELD	detail	370	辅助属性2id	辅助属性2id	文本	120	E-H-									12753
-FIELD	detail	380	辅助属性2名称	辅助属性2名称	文本	120	E-H-									12755
-FIELD	detail	390	辅助属性2编码	辅助属性2编码	文本	120	E-H-									12757
-FIELD	detail	400	辅助属性3id	辅助属性3id	文本	120	E-H-									12759
-FIELD	detail	410	辅助属性3名称	辅助属性3名称	文本	120	E-H-									12761
-FIELD	detail	420	辅助属性3编码	辅助属性3编码	文本	120	E-H-									12763
-FIELD	detail	430	条形码	条形码	文本	120	E-H-									12765
-FIELD	detail	440	产地	产地	文本	120	E-H-									12767
-FIELD	detail	450	注册证号	注册证号	文本	120	E-H-									12769
-FIELD	detail	460	生产许可证	生产许可证	文本	120	E-H-									12771
-FIELD	detail	470	保质期到期日	保质期到期日	日期	120	E-H-									12773
-FIELD	detail	480	有效期至	有效期至	文本	120	E-H-									12775
-FIELD	detail	490	保质期类型	保质期类型	文本	120	E-H-									12777
-FIELD	detail	500	保质期	保质期	文本	120	E-H-									12779
-FIELD	detail	510	序列号清单	序列号清单	文本	120	E-H-									12781
-FIELD	detail	520	序列号流转ID	序列号流转ID	文本	120	E-H-									12783
-FIELD	detail	530	基本单位id	基本单位id	文本	120	E-H-									12785
-FIELD	detail	540	基本单位名称	基本单位名称	文本	120	E-H-									12787
-FIELD	detail	550	基本单位编码	基本单位编码	文本	120	E-H-									12789
-FIELD	detail	560	单位id	单位id	文本	120	E-H-									12791
-FIELD	detail	570	单位编码	单位编码	文本	120	E-H-									12793
-FIELD	detail	580	辅助单位id	辅助单位id	文本	120	E-H-									12795
-FIELD	detail	590	辅助单位编码	辅助单位编码	文本	120	E-H-									12797
-FIELD	detail	600	换算率2	换算率2	文本	120	E-H-									12799
-FIELD	detail	610	基本数量	基本数量	文本	120	E-H-									12801
-FIELD	detail	620	库存基本数量	库存基本数量	文本	120	E-H-									12803
-FIELD	detail	630	默认浮动数量	默认浮动数量	文本	120	E-H-									12805
-FIELD	detail	640	辅助换算系数	辅助换算系数	文本	120	E-H-									12807
-FIELD	detail	650	换算系数	换算系数	文本	120	E-H-									12809
-FIELD	detail	660	折扣额	折扣额	文本	120	E-H-									12811
-FIELD	detail	670	源单编号	源单编号	文本	120	E-H-									12813
-FIELD	detail	680	源单类型id	源单类型id	文本	120	E-H-									12815
-FIELD	detail	690	源单类型名称	源单类型名称	文本	120	E-H-									12816
-FIELD	detail	700	源单类型编码	源单类型编码	文本	120	E-H-									12818
-FIELD	detail	710	源单内部id	源单内部id	文本	120	E-H-									12820
-FIELD	detail	720	源单日期	源单日期	日期	120	E-H-									12822
-FIELD	detail	730	源单分录id	源单分录id	文本	120	E-H-									12824
-FIELD	detail	740	分录结算状态	分录结算状态	文本	120	E-H-									12826
-FIELD	detail	750	折扣率%	折扣率%	文本	120	E-H-									12828
-FIELD	detail	760	成本视图	成本视图	文本	120	E-H-									12830
-FIELD	detail	770	单位成本视图	单位成本视图	文本	120	E-H-									12832
-FIELD	detail	780	退货数量	退货数量	文本	120	E-H-									12834
-FIELD	detail	790	价税合计本位币	价税合计本位币	文本	120	E-H-									12836
-FIELD	detail	800	是否赠品	是否赠品	文本	120	E-H-									12838
-FIELD	detail	810	送检数量	送检数量	小数	100	--H-									12840
-FIELD	detail	820	部门名称	部门名称	文本	120	--H-							Department Name		12842
-FIELD	detail	830	生产日期	生产日期	日期	110	--H-									12844
-FIELD	detail	840	仓库名称_sp_name	仓库名称_sp_name	文本	120	E-H-									12847
-FIELD	detail	850	换算率_conversion_rate	换算率_conversion_rate	文本	120	E-H-									12848
-FIELD	detail	860	本次结算金额本位币	本次结算金额本位币	文本	120	E-H-									12849
-FIELD	detail	870	备注	备注	文本	200	---V									12850
-FIELD	header	40	汇率	汇率	小数	110	E--V							Exchange rate		12686
-FIELD	header	90	附件1	附件1	附件	220	E--V									12697
-FIELD	header	100	附件2	附件2	附件	220	E--V									12699
-FIELD	header	110	附件3	附件3	附件	220	E--V									12701
-FIELD	header	120	附件4	附件4	附件	220	E--V									12703
-FIELD	header	130	附件5	附件5	附件	220	E--V									12705
-FIELD	header	140	附件6	附件6	附件	220	E--V									12707
-FIELD	header	160	采购订单号	采购订单号	文本	140	E--V							Purchase Order Number		12711
-FIELD	header	180	创建时间	创建时间	日期	130	E--V							Created at		12714
-FIELD	header	200	单据关闭状态	单据关闭状态	文本	130	E-H-									12719
-FIELD	header	220	经手人编码	经手人编码	文本	130	E-H-							Handler code		12723
-FIELD	header	230	交货方式	交货方式	文本	130	E--V									12725
-FIELD	header	240	交货方式编码	交货方式编码	文本	130	E-H-									12727
-FIELD	header	250	结算状态	结算状态	文本	130	E--V									12729
-FIELD	header	260	修改时间	修改时间	日期	130	E-H-									12731
-FIELD	header	270	创建人	创建人	文本	130	E-H-									12733
-FIELD	header	280	修改人	修改人	文本	130	E-H-									12735
-FIELD	header	300	ERP单号	ERP单号	文本	120	---V									12739
-FIELD	header	310	转ERP操作人	转ERP操作人	文本	100	---V									12740
-FIELD	header	320	转ERP时间	转ERP时间	日期	130	---V									12743
-FIELD	header	330	是否已转ERP	是否已转ERP	文本	80	--H-									12745
-FIELD	header	340	部门	部门	参照	130	E-H-		DEPT	部门名称	部门名称			Department		12746
-FIELD	header	350	部门编码	部门编码	参照	130	E-H-		DEPT	部门编码	部门名称			Department Code		12748
-FIELD	header	360	客户	客户	文本	130	E-H-							Customer		12750
-FIELD	header	370	客户编码	客户编码	文本	130	E-H-							Customer Code		12752
-FIELD	header	380	联系人电话	联系人电话	文本	130	E--V									12754
-FIELD	header	390	联系人国家名称	联系人国家名称	文本	130	E-H-									12756
-FIELD	header	400	联系人国家编码	联系人国家编码	文本	130	E-H-									12758
-FIELD	header	410	联系人省份名称	联系人省份名称	文本	130	E-H-									12760
-FIELD	header	420	联系人省份编码	联系人省份编码	文本	130	E-H-									12762
-FIELD	header	430	联系人市区名称	联系人市区名称	文本	130	E-H-									12764
-FIELD	header	440	联系人市区编码	联系人市区编码	文本	130	E-H-									12766
-FIELD	header	450	联系人区县名称	联系人区县名称	文本	130	E-H-									12768
-FIELD	header	460	联系人区县编码	联系人区县编码	文本	130	E-H-									12770
-FIELD	header	470	联系地址	联系地址	文本	130	E-H-									12772
-FIELD	header	480	付款方式	付款方式	文本	130	E-H-							Payment Method		12774
-FIELD	header	490	预付金额	预付金额	文本	130	E-H-									12776
-FIELD	header	500	付款账户	付款账户	文本	130	E-H-									12778
-FIELD	header	510	保险金额	保险金额	文本	130	E-H-									12780
-FIELD	header	520	到期日	到期日	日期	130	E--V									12782
-FIELD	header	530	结算期限编码	结算期限编码	文本	130	E-H-									12784
-FIELD	header	540	结算期限	结算期限	文本	130	E-H-									12786
-FIELD	header	550	发货人	发货人	文本	130	E-H-							Shipper		12788
-FIELD	header	560	发货电话	发货电话	文本	130	E-H-									12790
-FIELD	header	570	发货地址	发货地址	文本	130	E-H-									12792
-FIELD	header	580	发货国家名称	发货国家名称	文本	130	E-H-									12794
-FIELD	header	590	发货国家编码	发货国家编码	文本	130	E-H-									12796
-FIELD	header	600	发货省份名称	发货省份名称	文本	130	E-H-									12798
-FIELD	header	610	发货省份编码	发货省份编码	文本	130	E-H-									12800
-FIELD	header	620	发货市区名称	发货市区名称	文本	130	E-H-									12802
-FIELD	header	630	发货市区编码	发货市区编码	文本	130	E-H-									12804
-FIELD	header	640	发货区县名称	发货区县名称	文本	130	E-H-									12806
-FIELD	header	650	发货区县编码	发货区县编码	文本	130	E-H-									12808
-FIELD	header	660	仓库编码	仓库编码	参照	130	E-H-		WH	仓库编码	仓库名称			Warehouse Code		12810
-FIELD	header	670	仓位	仓位	文本	130	E-H-									12812
-FIELD	header	680	仓位编码	仓位编码	文本	130	E-H-									12814
-FIELD	header	690	批次键	批次键	整数	80	--H-									12817
-FIELD	header	700	单据状态_bill_status	单据状态_bill_status	文本	130	E-H-									12819
-FIELD	header	710	审核时间_audit_time	审核时间_audit_time	日期	130	E-H-									12821
-FIELD	header	730	创建人编码	创建人编码	文本	130	E-H-									12823
-FIELD	header	730	创建人编码	创建人编码	文本	130	E-H-									12825
-FIELD	header	750	修改人编码	修改人编码	文本	130	E-H-									12827
-FIELD	header	750	修改人编码	修改人编码	文本	130	E-H-									12829
-FIELD	header	760	审核人_auditor_name	审核人_auditor_name	文本	130	E-H-									12831
-FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									12833
-FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									12835
-FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									12837
-FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									12839
-FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									12841
-FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									12843
-FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									12845
-FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									12846
-FIELD	query,detail	10	存货编码	存货编码	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code		12680
-FIELD	query,header	10	单据日期	单据日期	日期	140	ER-V							Document Date		12681
-FIELD	query,header	20	单据编号	单据编号	文本	140	ER-V							Document Number		12682
-FIELD	query,header	30	入库类别	入库类别	下拉框	110	E--V						SELECT v FROM (VALUES (N'采购入库'),(N'其他入库')) AS t(v)	In type		12685
-FIELD	query,header	50	供应商编码	供应商编码	参照	140	E--V		GFDA	dm	mc			Vendor code		12688
-FIELD	query,header	60	供应商	供应商	参照	140	ER-V		GFDA	mc	mc			Vendor		12690
-FIELD	query,header	70	匹配来源单号	匹配来源单号	文本	130	E-H-							Matched source no.		12693
-FIELD	query,header	80	经手人	经手人	参照	140	E--V		EMP	员工名称	员工名称			Person in charge		12694
-FIELD	query,header	150	验货人	验货人	参照	100	E-H-		EMP	员工名称	员工名称			Inspector		12709
-FIELD	query,header	170	来源单据	来源单据	文本	110	E-H-							Source doc		12713
-FIELD	query,header	190	来源单号	来源单号	文本	120	E-H-							Source no.		12716
-FIELD	query,header	210	销售订单号	销售订单号	文本	130	E-H-							Sales order no.		12722
-FIELD	query,header	290	批次号	批次号	文本	160	---V									12737
+FIELD	detail	20	存货名称	存货名称	参照	140	ER-V		INV	存货名称	存货名称			Inventory Name		13015
+FIELD	detail	30	规格型号	规格型号	文本	140	E--V							Specification		13016
+FIELD	detail	40	实收数量	实收数量	小数	110	ER-V							Actual received quantity		13019
+FIELD	detail	50	计量单位	计量单位	下拉框	140	ER-V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement		13021
+FIELD	detail	60	实收数量2	实收数量2	小数	110	E--V							Paid-in quantity 2		13023
+FIELD	detail	70	计量单位2	计量单位2	下拉框	140	E--V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement 2		13024
+FIELD	detail	80	单价	单价	小数	110	ER-V							Unit Price		13027
+FIELD	detail	90	金额	金额	小数	110	E--V							Amount		13028
+FIELD	detail	100	税率%	税率%	小数	110	E--V						SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)	Tax rate%		13030
+FIELD	detail	110	含税单价	含税单价	小数	110	E--V							Unit price including tax		13032
+FIELD	detail	120	含税金额	含税金额	小数	110	E--V							Incl. tax amt		13034
+FIELD	detail	130	批号	批号	文本	120	E-H-							Lot No.		13036
+FIELD	detail	140	是否来料检验	是否来料检验	下拉框	90	---V						SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)			13038
+FIELD	detail	150	特采	特采	下拉框	90	---V						SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)			13040
+FIELD	detail	160	行号	行号	文本	120	E-H-							Line No.		13042
+FIELD	detail	170	现存量	现存量	小数	110	E--V							Current inventory		13044
+FIELD	detail	180	商品id	商品id	文本	120	E-H-									13047
+FIELD	detail	190	仓库	仓库	参照	140	ER-V		WH	仓库名称	仓库名称					13049
+FIELD	detail	195	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin		13050
+FIELD	detail	200	商品是否多单位	商品是否多单位	文本	120	E-H-									13052
+FIELD	detail	210	商品是否序列号	商品是否序列号	文本	120	E-H-									13053
+FIELD	detail	220	商品是否辅助属性	商品是否辅助属性	文本	120	E-H-									13056
+FIELD	detail	230	商品是否保质期	商品是否保质期	文本	120	E-H-									13058
+FIELD	detail	240	商品是否批次	商品是否批次	文本	120	E-H-									13060
+FIELD	detail	250	仓库id	仓库id	文本	120	E-H-									13062
+FIELD	detail	260	仓库启用仓位管理	仓库启用仓位管理	文本	120	E-H-									13064
+FIELD	detail	270	仓位id	仓位id	文本	120	E-H-									13066
+FIELD	detail	290	采购订单行号	源单行号	文本	110	E--V									13068
+FIELD	detail	300	辅助属性id	辅助属性id	文本	120	E-H-									13070
+FIELD	detail	310	批次号	批次号	文本	150	---V									13073
+FIELD	detail	320	辅助属性名称	辅助属性名称	文本	120	E-H-									13074
+FIELD	detail	330	辅助属性编码	辅助属性编码	文本	120	E-H-									13076
+FIELD	detail	340	辅助属性1id	辅助属性1id	文本	120	E-H-									13079
+FIELD	detail	350	辅助属性1名称	辅助属性1名称	文本	120	E-H-									13081
+FIELD	detail	360	辅助属性1编码	辅助属性1编码	文本	120	E-H-									13083
+FIELD	detail	370	辅助属性2id	辅助属性2id	文本	120	E-H-									13085
+FIELD	detail	380	辅助属性2名称	辅助属性2名称	文本	120	E-H-									13087
+FIELD	detail	390	辅助属性2编码	辅助属性2编码	文本	120	E-H-									13089
+FIELD	detail	400	辅助属性3id	辅助属性3id	文本	120	E-H-									13091
+FIELD	detail	410	辅助属性3名称	辅助属性3名称	文本	120	E-H-									13093
+FIELD	detail	420	辅助属性3编码	辅助属性3编码	文本	120	E-H-									13095
+FIELD	detail	430	条形码	条形码	文本	120	E-H-									13097
+FIELD	detail	440	产地	产地	文本	120	E-H-									13099
+FIELD	detail	450	注册证号	注册证号	文本	120	E-H-									13101
+FIELD	detail	460	生产许可证	生产许可证	文本	120	E-H-									13103
+FIELD	detail	470	保质期到期日	保质期到期日	日期	120	E-H-									13105
+FIELD	detail	480	有效期至	有效期至	文本	120	E-H-									13107
+FIELD	detail	490	保质期类型	保质期类型	文本	120	E-H-									13109
+FIELD	detail	500	保质期	保质期	文本	120	E-H-									13111
+FIELD	detail	510	序列号清单	序列号清单	文本	120	E-H-									13113
+FIELD	detail	520	序列号流转ID	序列号流转ID	文本	120	E-H-									13115
+FIELD	detail	530	基本单位id	基本单位id	文本	120	E-H-									13117
+FIELD	detail	540	基本单位名称	基本单位名称	文本	120	E-H-									13119
+FIELD	detail	550	基本单位编码	基本单位编码	文本	120	E-H-									13121
+FIELD	detail	560	单位id	单位id	文本	120	E-H-									13123
+FIELD	detail	570	单位编码	单位编码	文本	120	E-H-									13125
+FIELD	detail	580	辅助单位id	辅助单位id	文本	120	E-H-									13127
+FIELD	detail	590	辅助单位编码	辅助单位编码	文本	120	E-H-									13129
+FIELD	detail	600	换算率2	换算率2	文本	120	E-H-									13131
+FIELD	detail	610	基本数量	基本数量	文本	120	E-H-									13133
+FIELD	detail	620	库存基本数量	库存基本数量	文本	120	E-H-									13135
+FIELD	detail	630	默认浮动数量	默认浮动数量	文本	120	E-H-									13137
+FIELD	detail	640	辅助换算系数	辅助换算系数	文本	120	E-H-									13139
+FIELD	detail	650	换算系数	换算系数	文本	120	E-H-									13141
+FIELD	detail	660	折扣额	折扣额	文本	120	E-H-									13143
+FIELD	detail	670	源单编号	源单编号	文本	120	E-H-									13145
+FIELD	detail	680	源单类型id	源单类型id	文本	120	E-H-									13147
+FIELD	detail	690	源单类型名称	源单类型名称	文本	120	E-H-									13148
+FIELD	detail	700	源单类型编码	源单类型编码	文本	120	E-H-									13150
+FIELD	detail	710	源单内部id	源单内部id	文本	120	E-H-									13152
+FIELD	detail	720	源单日期	源单日期	日期	120	E-H-									13154
+FIELD	detail	730	源单分录id	源单分录id	文本	120	E-H-									13156
+FIELD	detail	740	分录结算状态	分录结算状态	文本	120	E-H-									13158
+FIELD	detail	750	折扣率%	折扣率%	文本	120	E-H-									13160
+FIELD	detail	760	成本视图	成本视图	文本	120	E-H-									13162
+FIELD	detail	770	单位成本视图	单位成本视图	文本	120	E-H-									13164
+FIELD	detail	780	退货数量	退货数量	文本	120	E-H-									13166
+FIELD	detail	790	价税合计本位币	价税合计本位币	文本	120	E-H-									13168
+FIELD	detail	800	是否赠品	是否赠品	文本	120	E-H-									13170
+FIELD	detail	810	送检数量	送检数量	小数	100	--H-									13172
+FIELD	detail	820	部门名称	部门名称	文本	120	--H-							Department Name		13174
+FIELD	detail	830	生产日期	生产日期	日期	110	--H-									13176
+FIELD	detail	840	仓库名称_sp_name	仓库名称_sp_name	文本	120	E-H-									13179
+FIELD	detail	850	换算率_conversion_rate	换算率_conversion_rate	文本	120	E-H-									13180
+FIELD	detail	860	本次结算金额本位币	本次结算金额本位币	文本	120	E-H-									13181
+FIELD	detail	870	备注	备注	文本	200	---V									13182
+FIELD	header	40	汇率	汇率	小数	110	E--V							Exchange rate		13018
+FIELD	header	90	附件1	附件1	附件	220	E--V									13029
+FIELD	header	100	附件2	附件2	附件	220	E--V									13031
+FIELD	header	110	附件3	附件3	附件	220	E--V									13033
+FIELD	header	120	附件4	附件4	附件	220	E--V									13035
+FIELD	header	130	附件5	附件5	附件	220	E--V									13037
+FIELD	header	140	附件6	附件6	附件	220	E--V									13039
+FIELD	header	160	采购订单号	采购订单号	文本	140	E--V							Purchase Order Number		13043
+FIELD	header	180	创建时间	创建时间	日期	130	E--V							Created at		13046
+FIELD	header	200	单据关闭状态	单据关闭状态	文本	130	E-H-									13051
+FIELD	header	220	经手人编码	经手人编码	文本	130	E-H-							Handler code		13055
+FIELD	header	230	交货方式	交货方式	文本	130	E--V									13057
+FIELD	header	240	交货方式编码	交货方式编码	文本	130	E-H-									13059
+FIELD	header	250	结算状态	结算状态	文本	130	E--V									13061
+FIELD	header	260	修改时间	修改时间	日期	130	E-H-									13063
+FIELD	header	270	创建人	创建人	文本	130	E-H-									13065
+FIELD	header	280	修改人	修改人	文本	130	E-H-									13067
+FIELD	header	300	ERP单号	ERP单号	文本	120	---V									13071
+FIELD	header	310	转ERP操作人	转ERP操作人	文本	100	---V									13072
+FIELD	header	320	转ERP时间	转ERP时间	日期	130	---V									13075
+FIELD	header	330	是否已转ERP	是否已转ERP	文本	80	--H-									13077
+FIELD	header	340	部门	部门	参照	130	E-H-		DEPT	部门名称	部门名称			Department		13078
+FIELD	header	350	部门编码	部门编码	参照	130	E-H-		DEPT	部门编码	部门名称			Department Code		13080
+FIELD	header	360	客户	客户	文本	130	E-H-							Customer		13082
+FIELD	header	370	客户编码	客户编码	文本	130	E-H-							Customer Code		13084
+FIELD	header	380	联系人电话	联系人电话	文本	130	E--V									13086
+FIELD	header	390	联系人国家名称	联系人国家名称	文本	130	E-H-									13088
+FIELD	header	400	联系人国家编码	联系人国家编码	文本	130	E-H-									13090
+FIELD	header	410	联系人省份名称	联系人省份名称	文本	130	E-H-									13092
+FIELD	header	420	联系人省份编码	联系人省份编码	文本	130	E-H-									13094
+FIELD	header	430	联系人市区名称	联系人市区名称	文本	130	E-H-									13096
+FIELD	header	440	联系人市区编码	联系人市区编码	文本	130	E-H-									13098
+FIELD	header	450	联系人区县名称	联系人区县名称	文本	130	E-H-									13100
+FIELD	header	460	联系人区县编码	联系人区县编码	文本	130	E-H-									13102
+FIELD	header	470	联系地址	联系地址	文本	130	E-H-									13104
+FIELD	header	480	付款方式	付款方式	文本	130	E-H-							Payment Method		13106
+FIELD	header	490	预付金额	预付金额	文本	130	E-H-									13108
+FIELD	header	500	付款账户	付款账户	文本	130	E-H-									13110
+FIELD	header	510	保险金额	保险金额	文本	130	E-H-									13112
+FIELD	header	520	到期日	到期日	日期	130	E--V									13114
+FIELD	header	530	结算期限编码	结算期限编码	文本	130	E-H-									13116
+FIELD	header	540	结算期限	结算期限	文本	130	E-H-									13118
+FIELD	header	550	发货人	发货人	文本	130	E-H-							Shipper		13120
+FIELD	header	560	发货电话	发货电话	文本	130	E-H-									13122
+FIELD	header	570	发货地址	发货地址	文本	130	E-H-									13124
+FIELD	header	580	发货国家名称	发货国家名称	文本	130	E-H-									13126
+FIELD	header	590	发货国家编码	发货国家编码	文本	130	E-H-									13128
+FIELD	header	600	发货省份名称	发货省份名称	文本	130	E-H-									13130
+FIELD	header	610	发货省份编码	发货省份编码	文本	130	E-H-									13132
+FIELD	header	620	发货市区名称	发货市区名称	文本	130	E-H-									13134
+FIELD	header	630	发货市区编码	发货市区编码	文本	130	E-H-									13136
+FIELD	header	640	发货区县名称	发货区县名称	文本	130	E-H-									13138
+FIELD	header	650	发货区县编码	发货区县编码	文本	130	E-H-									13140
+FIELD	header	660	仓库编码	仓库编码	参照	130	E-H-		WH	仓库编码	仓库名称			Warehouse Code		13142
+FIELD	header	670	仓位	仓位	文本	130	E-H-									13144
+FIELD	header	680	仓位编码	仓位编码	文本	130	E-H-									13146
+FIELD	header	690	批次键	批次键	整数	80	--H-									13149
+FIELD	header	700	单据状态_bill_status	单据状态_bill_status	文本	130	E-H-									13151
+FIELD	header	710	审核时间_audit_time	审核时间_audit_time	日期	130	E-H-									13153
+FIELD	header	730	创建人编码	创建人编码	文本	130	E-H-									13155
+FIELD	header	750	修改人编码	修改人编码	文本	130	E-H-									13159
+FIELD	header	760	审核人_auditor_name	审核人_auditor_name	文本	130	E-H-									13163
+FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									13165
+FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									13169
+FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									13173
+FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									13177
+FIELD	query,detail	10	存货编码	存货编码	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code		13012
+FIELD	query,header	10	单据日期	单据日期	日期	140	ER-V							Document Date		13013
+FIELD	query,header	20	单据编号	单据编号	文本	140	ER-V							Document Number		13014
+FIELD	query,header	30	入库类别	入库类别	下拉框	110	E--V						SELECT v FROM (VALUES (N'采购入库'),(N'其他入库')) AS t(v)	In type		13017
+FIELD	query,header	50	供应商编码	供应商编码	参照	140	E--V		GFDA	dm	mc			Vendor code		13020
+FIELD	query,header	60	供应商	供应商	参照	140	ER-V		GFDA	mc	mc			Vendor		13022
+FIELD	query,header	70	匹配来源单号	匹配来源单号	文本	130	E-H-							Matched source no.		13025
+FIELD	query,header	80	经手人	经手人	参照	140	E--V		EMP	员工名称	员工名称			Person in charge		13026
+FIELD	query,header	150	验货人	验货人	参照	100	E-H-		EMP	员工名称	员工名称			Inspector		13041
+FIELD	query,header	170	来源单据	来源单据	文本	110	E-H-							Source doc		13045
+FIELD	query,header	190	来源单号	来源单号	文本	120	E-H-							Source no.		13048
+FIELD	query,header	210	销售订单号	销售订单号	文本	130	E-H-							Sales order no.		13054
+FIELD	query,header	290	批次号	批次号	文本	160	---V									13069
 -- config.json -> (空;运行时配置由 PanelConfigService 现算)
 COL	bd_purchase_in	id	int(4)	NOT NULL	
 COL	bd_purchase_in	单据日期	date(3)	null	

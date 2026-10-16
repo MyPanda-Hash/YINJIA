@@ -1,0 +1,7 @@
+<staticText><reportElement style="th" x="0" y="0" width="26" height="20"/><text><![CDATA[序号]]></text></staticText>
+      <staticText><reportElement style="th" x="26" y="0" width="76" height="20"/><text><![CDATA[检验项目]]></text></staticText>
+      <staticText><reportElement style="th" x="102" y="0" width="190" height="20"/><text><![CDATA[检验要求]]></text></staticText>
+      <staticText><reportElement style="th" x="292" y="0" width="66" height="20"/><text><![CDATA[抽样标准]]></text></staticText>
+      <staticText><reportElement style="th" x="358" y="0" width="40" height="20"/><text><![CDATA[抽检量]]></text></staticText>
+      <staticText><reportElement style="th" x="398" y="0" width="110" height="20"/><text><![CDATA[结果]]></text></staticText>
+      <staticText><reportElement style="th" x="508" y="0" width="31" height="20"/><text><![CDATA[判定]]></text></staticText>

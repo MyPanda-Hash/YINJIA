@@ -1,0 +1,234 @@
+{
+  "base": "http://127.0.0.1:8090",
+  "steps": [
+    {
+      "step": "① 结构",
+      "docNo": null,
+      "leftTable": true,
+      "leftHeads": [
+        "检验时间",
+        "客户名称",
+        "产品编码",
+        "型号（mm）",
+        "批号",
+        "抽检总量"
+      ],
+      "verdict": true,
+      "oldDetailTable": false,
+      "addSection": true,
+      "blocks": [
+        {
+          "title": "A.外观 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "外观-端盖两头",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "外观-端盖两头",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "外观-端盖两头",
+              "cells": "1",
+              "step": 2
+            }
+          ],
+          "bodyRows": 1,
+          "cellsInFirstRow": 3
+        },
+        {
+          "title": "B.重量 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "出货重量",
+              "cells": "5",
+              "step": 2
+            },
+            {
+              "name": "出货重量",
+              "cells": "5",
+              "step": 2
+            },
+            {
+              "name": "出货重量",
+              "cells": "5",
+              "step": 2
+            }
+          ],
+          "bodyRows": 5,
+          "cellsInFirstRow": 3
+        },
+        {
+          "title": "C.性能 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "余氯去除率",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "余氯去除率",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "余氯去除率",
+              "cells": "1",
+              "step": 2
+            }
+          ],
+          "bodyRows": 1,
+          "cellsInFirstRow": 3
+        },
+        {
+          "title": "D.重要尺寸 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "尺寸-外径",
+              "cells": "5",
+              "step": 2
+            },
+            {
+              "name": "尺寸-外径",
+              "cells": "5",
+              "step": 2
+            }
+          ],
+          "bodyRows": 5,
+          "cellsInFirstRow": 2
+        }
+      ]
+    },
+    {
+      "step": "② 块内加列",
+      "clicked": true,
+      "before": "3,3,3,2",
+      "after": "4,3,3,2"
+    },
+    {
+      "step": "③ 减格",
+      "clicked": true,
+      "name": "出货重量",
+      "before": "1,1,1,1,5,5,5,1,1,1,5,5",
+      "after": "1,1,1,1,4,5,5,1,1,1,5,5"
+    },
+    {
+      "step": "④ 加列后结构",
+      "docNo": null,
+      "leftTable": true,
+      "leftHeads": [
+        "检验时间",
+        "客户名称",
+        "产品编码",
+        "型号（mm）",
+        "批号",
+        "抽检总量"
+      ],
+      "verdict": true,
+      "oldDetailTable": false,
+      "addSection": true,
+      "blocks": [
+        {
+          "title": "A.外观 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "外观-端盖两头",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "外观-端盖两头",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "外观-端盖两头",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "",
+              "cells": "1",
+              "step": 2
+            }
+          ],
+          "bodyRows": 1,
+          "cellsInFirstRow": 4
+        },
+        {
+          "title": "B.重量 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "出货重量",
+              "cells": "4",
+              "step": 2
+            },
+            {
+              "name": "出货重量",
+              "cells": "5",
+              "step": 2
+            },
+            {
+              "name": "出货重量",
+              "cells": "5",
+              "step": 2
+            }
+          ],
+          "bodyRows": 5,
+          "cellsInFirstRow": 3
+        },
+        {
+          "title": "C.性能 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "余氯去除率",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "余氯去除率",
+              "cells": "1",
+              "step": 2
+            },
+            {
+              "name": "余氯去除率",
+              "cells": "1",
+              "step": 2
+            }
+          ],
+          "bodyRows": 1,
+          "cellsInFirstRow": 3
+        },
+        {
+          "title": "D.重要尺寸 ＋×",
+          "label": "按照检验项目填充",
+          "cols": [
+            {
+              "name": "尺寸-外径",
+              "cells": "5",
+              "step": 2
+            },
+            {
+              "name": "尺寸-外径",
+              "cells": "5",
+              "step": 2
+            }
+          ],
+          "bodyRows": 5,
+          "cellsInFirstRow": 2
+        }
+      ]
+    }
+  ],
+  "exceptions": []
+}

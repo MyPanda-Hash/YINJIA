@@ -70,3 +70,53 @@ export function canConfigWarn(user, panelCode) {
   const list = Array.isArray(user.warnPanels) ? user.warnPanels : []
   return list.includes('*') || list.includes(code)
 }
+
+/**
+ * 页面级虚拟面板(2026-10-16):订单结转 / 快速排产 / 工单排产 / 生产工单列表。
+ *
+ * 这四个界面是**看板页面**而不是单据面板 —— 数据来自 plang / plang_pc / bl_so_order,
+ * 没有 yj_panel 行,按钮也不走面板元数据(yj_button),所以动作权限不走 visiblePanels,
+ * 而是由后端 AuthController 单独下发 `pagePerms`(code → perms csv,词表见
+ * 后端 `PagePanelRegistry`,每个页面的动作集按该页特性裁剪)。
+ *
+ * 与后端真闸门同源:PanelPermissionService.requirePanelView / requireButton(同一份
+ * yj_role_panel.perms)。前端只做**入口显隐** —— 拿不到权限一律不放行
+ * (宁可少显示按钮,也别让用户点出一个 403)。
+ */
+export const PAGE_PANELS = Object.freeze({
+  ORDER_CONVERT: 'ORDER_CONVERT',
+  SCHEDULE_BOARD: 'SCHEDULE_BOARD',
+  WORK_ORDER_BOARD: 'WORK_ORDER_BOARD',
+  WORK_ORDER_LIST: 'WORK_ORDER_LIST',
+})
+
+/**
+ * 「当前账号在某页面面板上能不能执行某个动作」的纯判定。
+ *
+ * @param {{isAdmin?:boolean, pagePerms?:Record<string,string>}|null|undefined} user
+ * @param {string} panelCode 页面面板码(见 PAGE_PANELS)
+ * @param {string} word 动作词(view/query/convert/assign/…;见后端 PagePanelRegistry)
+ * @returns {boolean}
+ */
+export function canDo(user, panelCode, word) {
+  const code = String(panelCode ?? '').trim()
+  const w = String(word ?? '').trim()
+  if (!code || !w) return false
+  if (!user) return false
+  if (user.isAdmin === true) return true
+  const map = user.pagePerms
+  const csv = map && typeof map === 'object' ? map[code] : ''
+  if (!csv) return false
+  if (String(csv).trim() === '*') return true
+  return String(csv).split(',').some((p) => p.trim() === w)
+}
+
+/**
+ * 「任一页面上持有该动作词」—— 对应后端 requireButtonAny:
+ * 同一动作有两个入口时(如「排产」在快速排产页与生产工单页各一个按钮),
+ * 任一处授予即可;两处都没授则为 false。
+ */
+export function canDoAny(user, panelCodes, word) {
+  const list = Array.isArray(panelCodes) ? panelCodes : []
+  return list.some((code) => canDo(user, code, word))
+}

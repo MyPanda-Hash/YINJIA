@@ -1,0 +1,37 @@
+  <pageFooter>
+    <band height="30">
+      <textField>
+        <reportElement style="pager" x="0" y="0" width="200" height="12"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="pagerR" x="558" y="0" width="200" height="12"/>
+        <textFieldExpression><![CDATA["打印时间：" + $P{打印时间}]]></textFieldExpression>
+      </textField>
+      <staticText>
+        <reportElement style="sign" x="0" y="14" width="60" height="14"/>
+        <text><![CDATA[检验员：]]></text>
+      </staticText>
+      <textField isBlankWhenNull="true">
+        <reportElement style="sign" x="60" y="14" width="130" height="14"/>
+        <textFieldExpression><![CDATA[$P{检验员}]]></textFieldExpression>
+      </textField>
+      <staticText>
+        <reportElement style="sign" x="260" y="14" width="50" height="14"/>
+        <text><![CDATA[审核：]]></text>
+      </staticText>
+      <textField isBlankWhenNull="true">
+        <reportElement style="sign" x="310" y="14" width="130" height="14"/>
+        <textFieldExpression><![CDATA[$P{审核人}]]></textFieldExpression>
+      </textField>
+      <staticText>
+        <reportElement style="sign" x="500" y="14" width="50" height="14"/>
+        <text><![CDATA[批准：]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="sign" x="550" y="14" width="208" height="14"/>
+        <text><![CDATA[]]></text>
+      </staticText>
+    </band>
+  </pageFooter>
+</jasperReport>

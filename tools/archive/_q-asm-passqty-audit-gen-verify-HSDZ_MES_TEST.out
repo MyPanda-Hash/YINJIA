@@ -1,0 +1,9 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-asm-passqty-audit-gen-verify.sql ==
+  | ZJ-2026-10-0085 | 已审核 | admin | 3071.0000 | 合格转库存(FI-2026-10-0012) | 
+  | ZJ-2026-10-0085 | FI-2026-10-0012 | ACTIVE | admin | 2026-10-15 19:00:16.1630000 | 
+  | FI-2026-10-0012 | 2026-10-16 | GD-2026-10-0001 | 1 | 20261016 | 产成品入库 | B仓 | admin | 组装成品检验单 ZJ-2026-10-0085 合格数量 3071 转库存 | N | 
+  | FI-2026-10-0012 | T270 | X烧结炭棒/滤芯 | 37*12*153 | 3071.0000 | 支 | B仓 | null | 3071.0000 | OK | 
+  | 0 | 
+  | 0 | 0 | 0 | 10 | 
+[OK] _q-asm-passqty-audit-gen-verify.sql (7 batches)

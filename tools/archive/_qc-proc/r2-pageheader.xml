@@ -1,0 +1,4 @@
+  <!-- 页眉:公司/标题/元信息已移到 title band(否则会重复渲染两遍) -->
+  <pageHeader>
+    <band height="1"/>
+  </pageHeader>

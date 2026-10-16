@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
 import com.yinjia.mes.service.ProcessTaskService;
@@ -16,11 +17,28 @@ import java.util.Map;
 
 /**
  * 排产工作台(实现总结 V1.0 §5):待排产池/统计/批量排入/撤销排产/今日已排产。
- * 权限:查询=MANU_ORDER 可见;排入与撤销=MANU_ORDER 编辑权(挂"保存"词表)。
+ *
+ * <p>权限(2026-10-16 改挂**页面面板**,原为借 MANU_ORDER 的 view + 保存):
+ * 见 {@link PagePanelRegistry}。本控制器同时服务三个页面,故读端点按「任一命中」放行、
+ * 写端点按各自页面的动作词判定:
+ * <ul>
+ *   <li>快速排产 SCHEDULE_BOARD:/pending /today(池只属本页)、/assign /preplan(排产)、/unassign(撤销排产);</li>
+ *   <li>工单排产看板 WORK_ORDER_BOARD:/linesSummary /scheduled /workshops,以及 /transfer(调拨)、
+ *       /transferRevoke(撤回调拨)、/printStamp(打印);</li>
+ *   <li>生产工单列表 WORK_ORDER_LIST:内嵌快速排产弹窗会调 /pending /today /stats /routeSteps /preplan
+ *       ⇒ 这些读端点与「排产」动作对它一并放行。</li>
+ * </ul>
  */
 @RestController
 @RequestMapping("/api/px/scheduleBoard")
 public class ScheduleBoardController {
+
+    /** 「排产」两个入口:快速排产页自带按钮 + 生产工单页弹出的内嵌快速排产(动作词同为 assign) */
+    private static final String[] SCHEDULING_ENTRIES = {
+            PagePanelRegistry.SCHEDULE_BOARD, PagePanelRegistry.WORK_ORDER_LIST};
+    /** 打印生产任务单的两个入口:工单排产看板 + 生产工单列表 */
+    private static final String[] PRINT_ENTRIES = {
+            PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST};
 
     private final ScheduleBoardService service;
     private final PanelPermissionService perm;
@@ -41,7 +59,7 @@ public class ScheduleBoardController {
      *  (曾为多选加过的 `限定行id` 列表通道已按用户口径回退)。 */
     @PostMapping("/pending")
     public ApiResult<List<Map<String, Object>>> pending(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(PagePanelRegistry.SCHEDULE_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(service.pending(str(body == null ? null : body.get("keyword")),
                 str(body == null ? null : body.get("客户")), workshop()));
     }
@@ -49,7 +67,8 @@ public class ScheduleBoardController {
     /** 统计:待排产/今日排产/总未完成 + 产线下拉(带当日负荷/日产能) + 班组下拉;按登录账号车间收敛 */
     @PostMapping("/stats")
     public ApiResult<Map<String, Object>> stats() {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(PagePanelRegistry.SCHEDULE_BOARD, PagePanelRegistry.WORK_ORDER_BOARD,
+                PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(service.stats(workshop()));
     }
 
@@ -57,8 +76,8 @@ public class ScheduleBoardController {
     @PostMapping("/assign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> assign(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(SCHEDULING_ENTRIES);
+        perm.requireButtonAny(SCHEDULING_ENTRIES, "排产");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.assign(rows, currentUser()));
     }
@@ -69,7 +88,7 @@ public class ScheduleBoardController {
      */
     @PostMapping("/routeSteps")
     public ApiResult<Map<String, Object>> routeSteps(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(SCHEDULING_ENTRIES);
         String no = str(body.get("加工单号"));
         Object id = body.get("行id");
         Long lineId = id == null || String.valueOf(id).isBlank() ? null : Long.valueOf(String.valueOf(id));
@@ -80,25 +99,31 @@ public class ScheduleBoardController {
      * 工序路线排线提交(2026-10-07):**排产 + 预排全程线** —— 首道线写 plang.scx / plang_pc(复用现有排产口径),
      * 全路线写台账 wo_process_line;前道报工完工后自动转序到下一道的计划线。
      * 撤销排产会**同时作废台账**(避免"没排产却有计划线")。
+     *
+     * <p>排产数量(2026-10-16 用户口径「实现排产数」):由排产员人工给定(参考库 pl_sl 口径「默认=需求数量、可改」),
+     * 空 = 沿用该行现值、现值为 0 时取需求数量(旧口径「空=全排」)。
      */
     @PostMapping("/preplan")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> preplan(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(SCHEDULING_ENTRIES);
+        perm.requireButtonAny(SCHEDULING_ENTRIES, "预排线");
         String no = str(body.get("加工单号"));
         Object id = body.get("行id");
         Long lineId = id == null || String.valueOf(id).isBlank() ? null : Long.valueOf(String.valueOf(id));
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.getOrDefault("步骤", List.of());
-        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), currentUser()));
+        Object qty = body.get("排产数量");
+        Double planQty = qty == null || String.valueOf(qty).isBlank() || "null".equals(String.valueOf(qty))
+                ? null : Double.valueOf(String.valueOf(qty));
+        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), planQty, currentUser()));
     }
 
     /** 撤销排产回池(换线=撤销+重排);有报工/入库不可撤销 */
     @PostMapping("/unassign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> unassign(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(PagePanelRegistry.SCHEDULE_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButton(PagePanelRegistry.SCHEDULE_BOARD, "撤销排产");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.unassign(rows, currentUser()));
     }
@@ -107,14 +132,17 @@ public class ScheduleBoardController {
      *  开线状态字段已随开线管理下线移除,2026-09-24 用户拍板);9.29 批次③:车间账号只出本车间的线 */
     @PostMapping("/linesSummary")
     public ApiResult<List<Map<String, Object>>> linesSummary(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        // 调用方只有工单排产看板(左侧骨架)与生产工单列表(产线下拉)—— 快速排产页不调它,
+        // 故**不放行 SCHEDULE_BOARD**(收紧:拿"快速排产"权限的人不该读到别的页面的骨架数据)。
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(service.linesSummary(str(body == null ? null : body.get("开工日期")), workshop()));
     }
 
     /** 选中线 的排产明细(scope=未完工/已完工/全部);9.29 批次③:车间账号只认本车间的产线 */
     @PostMapping("/scheduled")
     public ApiResult<List<Map<String, Object>>> scheduled(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        // 调用方只有工单排产看板(选中线的排产明细);快速排产页不调它 ⇒ 不放行 SCHEDULE_BOARD
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
         return ApiResult.ok(service.scheduled(str(body == null ? null : body.get("生产线")),
                 str(body == null ? null : body.get("scope")), workshop()));
     }
@@ -123,8 +151,8 @@ public class ScheduleBoardController {
     @PostMapping("/reassign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> reassign(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "调拨");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.reassign(rows, str(body.get("目标生产线")), currentUser()));
     }
@@ -136,7 +164,8 @@ public class ScheduleBoardController {
     /** 车间下拉(启用产线的车间 + 该车间产线数;调拨弹窗用) */
     @PostMapping("/workshops")
     public ApiResult<List<Map<String, Object>>> workshops() {
-        perm.requirePanelView("MANU_ORDER");
+        // 调用方:工单排产看板(调拨弹窗车间下拉)+ 组织架构(管理员,恒过);快速排产页不调它
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(transferService.workshops());
     }
 
@@ -144,8 +173,8 @@ public class ScheduleBoardController {
     @PostMapping("/transfer")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> transfer(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "调拨");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(transferService.transfer(rows, str(body.get("目标生产线")), str(body.get("目标车间")),
                 str(body.get("原因")), currentUser()));
@@ -155,8 +184,8 @@ public class ScheduleBoardController {
     @PostMapping("/transferRevoke")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> transferRevoke(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "撤回调拨");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(transferService.revoke(rows, currentUser()));
     }
@@ -164,7 +193,7 @@ public class ScheduleBoardController {
     /** 今日已排产(mode=today)/全部已排产(mode=all);9.29 批次③:按登录账号车间收敛 */
     @PostMapping("/today")
     public ApiResult<List<Map<String, Object>>> today(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(PagePanelRegistry.SCHEDULE_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(service.today(str(body == null ? null : body.get("mode")),
                 str(body == null ? null : body.get("keyword")), workshop()));
     }
@@ -172,7 +201,9 @@ public class ScheduleBoardController {
     /** 工单追溯:头+时间线+排产/完工/入库+**质检段(三类工序检验单 + 应检/已检/缺检/结论汇总)**+领料+父子/调拨/家族 */
     @PostMapping("/trace")
     public ApiResult<Map<String, Object>> trace(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        // 追溯弹窗(WorkOrderTraceDialog)挂在工单排产看板与生产工单列表两处;
+        // MANU_ORDER 保留为放行来源 —— 生产工单面板(RD 前的旧入口)也共用本组件。
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD, "MANU_ORDER");
         return ApiResult.ok(service.trace(str(body.get("工单号")), longOf(body.get("工单行id") != null ? body.get("工单行id") : body.get("行id"))));
     }
 
@@ -186,8 +217,8 @@ public class ScheduleBoardController {
     @PostMapping("/printStamp")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> printStamp(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "打印");
+        perm.requirePanelViewAny(PRINT_ENTRIES);
+        perm.requireButtonAny(PRINT_ENTRIES, "打印");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.printStamp(rows, currentUser()));
     }

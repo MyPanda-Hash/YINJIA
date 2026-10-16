@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  组装成品检验记录表 —— **骨架模板**(QC_ASM_INSP,2026-10-16)
+  ============================================================================
+  用户口径:「为当前的组装成品检验的导出报表格式为如图所示(检验时间|客户名称|产品编码|型号(mm)|批号|
+    抽检总量|外观|尺寸|出货重量|结果判断),需要能真实获取明细表中的数据,针对当前不同项目获取格式实现」
+    「需要能实现根据当前存在什么检验项目就打印出什么项目的实现,因为当前报表形式不能固定死」。
+
+  ⚠ 本文件**只有 styles + 标题 + 页脚** —— **故意不带 <columnHeader>/<detail>**:
+    检验项目来自出货检验计划表、每个产品不一样,而 JR 6.x 的 reportElement 的 x/y/width/height
+    只能是整数常量(运行期换列会被 XSD 拒)⇒ 表头两行与数据行由
+    `QcAsmInspReportSupport` 按**当前明细里实际存在的表区/检验项目**生成后,拼在本骨架的
+    <title>…<pageFooter> 之间再编译(切法与 GenericReportSupport.compileMaster 同款)。
+    ⚠ 别在这里加 <detail>/<columnHeader> —— 会与生成的段重复而编译失败。
+
+  参数契约(由生成器声明,这里不写):检验时间/客户名称/产品编码/规格型号/批次号/抽检总量/结果判断/
+    打印时间 + 每列列名 N1..Nn + 每格格值 V{r}_{c}。
+  ⚠ columnWidth 必须 = pageWidth − 左右边距(1191 − 30×2 = 1131),否则表体会被截。
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="qc_asm_insp" language="java" columnCount="1"
+              pageWidth="1191" pageHeight="842" orientation="Landscape"
+              columnWidth="1131" leftMargin="30" rightMargin="30" topMargin="24" bottomMargin="24"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="b8e4d2a9-63f1-4c07-8d25-9e1a7b3c0f51">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <!-- ======================= 样式(与 so_order / qc_proc_insp 同套) ======================= -->
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <style name="cell" style="base" hAlign="Left" vAlign="Middle">
+    <box padding="2">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
+  <style name="cellC" style="cell" hAlign="Center"/>
+  <style name="th" style="cellC" fontSize="8" isBold="true" mode="Opaque" backcolor="#EFEFEF"/>
+  <style name="thGroup" style="th" fontSize="9" backcolor="#DCE6F1"/>
+  <style name="company" style="base" fontSize="16" isBold="true" hAlign="Center" vAlign="Bottom"/>
+  <style name="docTitle" style="base" fontSize="15" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="pager" style="base" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+
+  <!-- ======================= 标题 ======================= -->
+  <title>
+    <band height="46">
+      <staticText>
+        <reportElement style="company" x="0" y="0" width="1131" height="24"/>
+        <text><![CDATA[惠州市银嘉环保科技有限公司]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="docTitle" x="0" y="24" width="1131" height="22"/>
+        <text><![CDATA[组装成品检验记录表]]></text>
+      </staticText>
+    </band>
+  </title>
+
+  <!-- ======================= 页脚 ======================= -->
+  <pageFooter>
+    <band height="20">
+      <textField>
+        <reportElement style="pager" x="0" y="0" width="200" height="14"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="pagerR" x="931" y="0" width="200" height="14"/>
+        <textFieldExpression><![CDATA["打印时间：" + $P{打印时间}]]></textFieldExpression>
+      </textField>
+    </band>
+  </pageFooter>
+</jasperReport>

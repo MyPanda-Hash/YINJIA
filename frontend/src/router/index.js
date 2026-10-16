@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { canViewPanel } from '@core/auth/panelAccess'
 import { flatMenus } from '@/business/menus'
 
 const ModuleView = () => import('@/views/modules/ModuleView.vue')
@@ -26,14 +27,16 @@ const routes = [
       { path: 'scm/serialNumber', component: () => import('@/views/scm/SerialNumber.vue'), meta: { title: '序列号管理', code: 'serialNumber' } },
       // 共享文件库(研发管理·全公司共享资料):panelCode=RD_SHARE_FILE 带权限,故不进 flatMenus 自动路由,显式注册
       { path: 'rd/shareFile', component: () => import('@/views/rd/ShareFileCenter.vue'), meta: { title: '共享文件库', code: 'rdShareFile' } },
-      // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;panelCode 无,按 SO_ORDER 授权,不进 flatMenus 自动路由
-      { path: 'prod/plan/orderConvert', component: () => import('@/views/modules/plan/OrderConvert.vue'), meta: { title: '订单结转', code: 'orderConvert' } },
-      // 排产工作台(实现总结 V1.0 §5):待排产池→排线→撤销;按 MANU_ORDER 授权,不进 flatMenus 自动路由
-      { path: 'prod/plan/scheduleBoard', component: () => import('@/views/modules/plan/ScheduleBoard.vue'), meta: { title: '快速排产', code: 'scheduleBoard' } },
-      // 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板):产线×班别骨架+按线查看运行中工单;按 MANU_ORDER 授权,不进 flatMenus 自动路由
-      { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard' } },
+      // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;不进 flatMenus 自动路由。
+      // 2026-10-16 权限化:四处看板页面各挂**页面级虚拟面板码**(定义见后端 PagePanelRegistry),
+      // meta.panelCode 供下方守卫拦「直接敲 URL」——菜单隐藏挡不住手输地址。
+      { path: 'prod/plan/orderConvert', component: () => import('@/views/modules/plan/OrderConvert.vue'), meta: { title: '订单结转', code: 'orderConvert', panelCode: 'ORDER_CONVERT' } },
+      // 排产工作台(实现总结 V1.0 §5):待排产池→排线→撤销
+      { path: 'prod/plan/scheduleBoard', component: () => import('@/views/modules/plan/ScheduleBoard.vue'), meta: { title: '快速排产', code: 'scheduleBoard', panelCode: 'SCHEDULE_BOARD' } },
+      // 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板):产线骨架+按线查看运行中工单
+      { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
-      { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList' } },
+      { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
@@ -59,6 +62,10 @@ router.beforeEach((to) => {
   if (to.path !== '/login' && !user.isLogin) return '/login'
   if (to.meta.requireAdmin && !user.isAdmin) return '/dashboard'
   if (to.path === '/login' && user.isLogin) return '/dashboard'
+  // 页面级面板守卫(2026-10-16):直接敲 URL 也要拦 —— 菜单隐藏只是显示层,
+  // 订单结转/快速排产/工单排产/生产工单四个看板页面此前没有面板码,任何人都能直连。
+  // 口径与菜单 LeftNav(filterMenuTree)、后端 requirePanelView 同源(visiblePanels)。
+  if (to.meta.panelCode && user.isLogin && !canViewPanel(user, to.meta.panelCode)) return '/dashboard'
   // 我的桌面权限化:无可见权限时落到第一个可见面板(直接敲 /dashboard 也跳走)
   if (to.path === '/dashboard' && user.isLogin && !user.isAdmin
       && !(user.visiblePanels || []).includes('DASHBOARD')) {

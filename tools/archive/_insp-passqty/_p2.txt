@@ -1,0 +1,56 @@
+=== ① 头/明细 数量列 物理类型 ===
+TABLE_NAME	COLUMN_NAME	DATA_TYPE	CHARACTER_MAXIMUM_LENGTH	IS_NULLABLE	
+qc_asm_insp_detail	不合格数量	decimal	null	YES	
+qc_asm_insp_detail	合格数量	decimal	null	YES	
+qc_asm_insp_detail	数量	decimal	null	YES	
+qc_asm_insp_head	报工数量	decimal	null	YES	
+qc_asm_insp_head	检验数量	decimal	null	YES	
+qc_cut_insp_detail	不合格数量	decimal	null	YES	
+qc_cut_insp_detail	合格数量	decimal	null	YES	
+qc_cut_insp_detail	数量	decimal	null	YES	
+qc_cut_insp_head	报工数量	decimal	null	YES	
+qc_cut_insp_head	检验数量	decimal	null	YES	
+qc_mold_insp_detail	不合格数量	decimal	null	YES	
+qc_mold_insp_detail	合格数量	decimal	null	YES	
+qc_mold_insp_detail	数量	decimal	null	YES	
+qc_mold_insp_head	报工数量	decimal	null	YES	
+qc_mold_insp_head	检验数量	decimal	null	YES	
+-- 15 row(s)
+
+=== ② 检验数量 取值分布(NULL / 0 / >0) ===
+面板	单数	空	零	有值	
+QC_ASM_INSP	5	4	4	1	
+QC_CUT_INSP	6	6	6	0	
+QC_MOLD_INSP	8	8	8	0	
+-- 3 row(s)
+
+=== ③ 译名覆盖:field/结论相关 ===
+scope	ref_key	locale	text	source	
+field	不合格数量	en	Fail Qty	manual	
+field	合格数量	en	Pass Qty	manual	
+field	检验数量	en	Inspection Qty	manual	
+field	判定	en	Judgement	manual	
+field	送检数量	de	Zur Prüfung gesendete Menge	manual	
+field	送检数量	en	Sent for Inspection Qty	manual	
+field	送检数量	es	Cant. enviada a inspección	manual	
+field	送检数量	fr	Qté envoyée au contrôle	manual	
+field	送检数量	ja	検査提出数量	manual	
+field	送检数量	ko	검사 제출 수량	manual	
+field	送检数量	ru	Кол-во на проверку	manual	
+field	送检数量	th	จำนวนส่งตรวจ	manual	
+field	送检数量	vi	SL gửi kiểm tra	manual	
+field	送检数量	zh-TW	送檢數量	manual	
+field	总结论	de	Gesamtergebnis	manual	
+field	总结论	en	Overall Result	manual	
+field	总结论	es	Resultado general	manual	
+field	总结论	fr	Résultat global	manual	
+field	总结论	ja	総合結論	manual	
+field	总结论	ko	종합 결론	manual	
+field	总结论	ru	Общий результат	manual	
+field	总结论	th	ผลสรุป	manual	
+field	总结论	vi	Kết luận chung	manual	
+-- 23 row(s)
+
+=== ④ yj_translation 里是否已有 未检验/全部合格/缺检/存在不合格 ===
+scope	ref_key	locale	text	source	
+-- 0 row(s)

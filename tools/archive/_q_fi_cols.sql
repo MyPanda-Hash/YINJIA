@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT name FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.qc_first_insp_head') ORDER BY column_id;

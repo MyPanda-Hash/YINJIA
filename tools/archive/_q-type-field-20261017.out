@@ -1,0 +1,61 @@
+panel_code|col_name|label|alias|data_type|dict_sql|place|seq|visible|hidden|editable
+QC_INSP|检验类型|检验类型|null|下拉框|SELECT v FROM (VALUES (N'全检'),(N'抽检'),(N'免检')) AS t(v)|header|160|1|0|1
+QC_PLAN|检验类型|检验类型|null|文本||query,detail|68|1|0|1
+scope|ref_key|locale|text|source
+field|检验类型|de|Prüfart|manual
+field|检验类型|en|Inspection Type|manual
+field|检验类型|es|Tipo de inspección|manual
+field|检验类型|fr|Type d'inspection|manual
+field|检验类型|ja|検査タイプ|manual
+field|检验类型|ko|검사 유형|manual
+field|检验类型|ru|Тип проверки|manual
+field|检验类型|th|ประเภทการตรวจสอบ|manual
+field|检验类型|vi|Loại kiểm tra|manual
+field|检验类型|zh-TW|檢驗類型|manual
+panel_code|col_name|label|data_type|dict_sql
+QC_ASM_INSP|检查频率|检查频率|下拉框|SELECT v FROM (VALUES (N'1PCS/一个生产批次'),(N'生产量*1%'),(N'型式检验')) AS t(v)
+QC_INSP|处置方式|处置方式|下拉框|SELECT v FROM (VALUES (N'入库'),(N'退货'),(N'让步入库')) AS t(v)
+QC_INSP|检验类型|检验类型|下拉框|SELECT v FROM (VALUES (N'全检'),(N'抽检'),(N'免检')) AS t(v)
+QC_INSP|总结论|总结论|下拉框|SELECT v FROM (VALUES (N'合格'),(N'不合格'),(N'让步接收')) AS t(v)
+QC_MOLD_INSP|检查频率|检查频率|下拉框|SELECT v FROM (VALUES (N'1PCS/一个生产批次'),(N'生产量*1%'),(N'型式检验')) AS t(v)
+QC_PROC_INSP|检查频率|检查频率|下拉框|SELECT v FROM (VALUES (N'1PCS/一个生产批次'),(N'生产量*1%'),(N'型式检验')) AS t(v)
+panel_code|config
+QC_ASM_INSP|{"fixedItems":[{"group":"外观","items":["端盖两头","管身两侧"]},{"group":"尺寸","items":[],"label":"按照尺寸检验项目填充"},{"group":"出货重量","items":[],"label":"按照重量检验项目填充"}]}
+total_rows|blank_area
+5|0
+name|type_desc
+column_id|name|type|max_length
+1|id|bigint|8
+2|单据编号|nvarchar|100
+3|单据日期|date|3
+4|工单号|nvarchar|100
+5|批次号|nvarchar|100
+6|报工单号|nvarchar|100
+7|工序|nvarchar|100
+8|产品编码|nvarchar|100
+9|产品名称|nvarchar|400
+10|规格型号|nvarchar|400
+11|生产线|nvarchar|100
+12|生产车间|nvarchar|100
+13|报工数量|decimal|9
+14|检验数量|decimal|9
+15|检验员|nvarchar|100
+16|检验日期|date|3
+17|总结论|nvarchar|40
+18|处理方式|nvarchar|100
+19|备注|nvarchar|1000
+20|审核人|nvarchar|100
+21|审核时间|datetime2|8
+22|asp_user1|nvarchar|100
+23|asp_time1|datetime2|8
+24|asp_user2|nvarchar|100
+25|asp_time2|datetime2|8
+26|asp_cancel|nvarchar|2
+27|单据状态|nvarchar|40
+28|检验方案|nvarchar|400
+29|文件编码|nvarchar|100
+30|执行标准|nvarchar|400
+31|工单行号|int|4
+32|客户名称|nvarchar|400
+33|检验时间|nvarchar|60
+34|抽检总量|decimal|9

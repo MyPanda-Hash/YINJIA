@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT 'kucun' AS t, name FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.kucun') UNION ALL SELECT 'bs_line_capacity', name FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bs_line_capacity') UNION ALL SELECT 'outh', name FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.outh') ORDER BY t, name;

@@ -161,6 +161,7 @@ public class ManuWritebackService {
             String noList = String.join(",", nos);
             jdbc.update("UPDATE dbo.plang SET ll_no2 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     noList.isEmpty() ? null : noList, user, row.get("id"));
+            WorkOrderScheduleRecord.sync(jdbc, row.get("id"), user);
         }
     }
 

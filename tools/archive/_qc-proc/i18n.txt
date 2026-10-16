@@ -1,0 +1,20 @@
+### 新增标签 en 译名核对
+  OK  制程检验单 -> field / In-Process Inspection Sheet
+  OK  制程检验记录表 -> report / In-Process Inspection Record
+  OK  表区 -> field / Section
+  OK  检验要求 -> field / Inspection Requirement
+  OK  单项判定 -> field / Item Judgement
+  OK  抽检总量 -> field / Sample Total Qty
+  OK  结果判断 -> field / Result Judgement
+  OK  检验时间 -> field / Inspection Time
+  OK  检验类别 -> field / Inspection Type
+  OK  检验方法 -> field / Inspection Method
+  OK  不合格应对措施 -> field / Nonconformance Action
+  OK  首件检验 -> field / First Article Inspection
+  OK  制程检验 -> field / In-Process Inspection
+  OK  外观 -> field / Appearance
+  OK  尺寸 -> field / Dimensions
+  OK  重量 -> field / Weight
+  OK  功能性测试 -> field / Functional Test
+
+缺失=0 / 17

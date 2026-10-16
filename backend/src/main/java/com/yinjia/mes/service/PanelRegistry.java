@@ -45,7 +45,7 @@ public class PanelRegistry {
     public record PanelDef(String code, String name, String nameEn, String category, String mode,
                            String lineTable, String headTable, String groupCol,
                            String pkCol, String codeCol, String prefix, String dateCol,
-                           Integer pageSize, String detailKey, String moduleGroup,
+                           Integer pageSize, String detailKey, String moduleGroup, String config,
                            List<FieldDef> fields) {
         public boolean isDoc() { return "doc".equals(mode); }
         public boolean hasHeadTable() { return headTable != null && !headTable.isBlank(); }
@@ -56,6 +56,123 @@ public class PanelRegistry {
         /** 明细页签键(与接口返回 detail.<key> 一致;缺省 items) */
         public String tabKey() {
             return detailKey == null || detailKey.isBlank() ? "items" : detailKey;
+        }
+
+        private static final com.fasterxml.jackson.databind.ObjectMapper CONFIG_JSON =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+
+        /** 固定检验项声明的一条:一个**固定表区组** + 组内固定项(可为空) + 组列名(可空⇒按组名自动生成) */
+        public record FixedGroup(String group, List<String> items, String label) {
+            /** 组列名(报表上那一列的列名):声明了就用声明的,否则「按照<组名>检验项目填充」 */
+            public String columnLabel() {
+                if (label != null && !label.isBlank()) return label.trim();
+                if ("检验项目".equals(group)) return "检验项目";
+                return "按照" + group + "检验项目填充";
+            }
+        }
+
+        /**
+         * **固定检验项/固定组声明**(yj_panel.config 的 {@code "fixedItems"},2026-10-16 起):
+         * <pre>{"fixedItems":[
+         *   {"group":"外观",     "items":["端盖两头","管身两侧"]},
+         *   {"group":"尺寸",     "items":[], "label":"按照尺寸检验项目填充"},
+         *   {"group":"出货重量", "items":[], "label":"按照重量检验项目填充"}]}</pre>
+         *
+         * <p>背景(用户 2026-10-16 口径:「当前的外观/尺寸/出货重量 这些都是当前固定需要检测的内容,
+         * 可以使用什么方法让这些能固定填写的同时能够被读取到呢?」):
+         * <ul>
+         *   <li>声明了 {@code group} ⇒ 该组是**固定组**:报表**永远铺出这一组**(哪怕本单没有该组的数据),
+         *       组内列 = 固定项列(如 端盖两头/管身两侧)+ **一个组列**(列名 {@link FixedGroup#columnLabel()},
+         *       装该组其余项目的值,整组一列多格 —— 用户拍板「照截图」);</li>
+         *   <li>{@code items} 里的项目名 = **固定项**,报表里各占一列,没有数据也留空格子;</li>
+         *   <li>前端「带入固定检验项」按钮据此把缺的固定项落成真明细行(表区=组名、检验项目=项目名);
+         *       某个固定组一行都没有时,再落一行**占位行**(检验项目 = 组列名)供品质直接手填 ——
+         *       「固定填写」与「能被读取」靠的就是这些真行(读取口径 = 表区 + 归一化项目名)。</li>
+         * </ul>
+         *
+         * <p>声明式,与 {@link #uniqueKeys()} 同一条规矩:加/改固定组或固定项 = 改这一行 JSON,
+         * **不加代码、不动表结构**。解析失败时返回空表(宁可不铺固定项,也不能让面板打不开)。
+         */
+        public List<FixedGroup> fixedItems() {
+            if (config == null || !config.contains("fixedItems")) return List.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("fixedItems");
+                if (!node.isArray()) return List.of();
+                List<FixedGroup> out = new ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode e : node) {
+                    String group = e.path("group").asText("").trim();
+                    if (group.isEmpty()) continue;
+                    List<String> items = new ArrayList<>();
+                    for (com.fasterxml.jackson.databind.JsonNode it : e.path("items")) {
+                        if (it.isTextual() && !it.asText().isBlank()) items.add(it.asText().trim());
+                    }
+                    out.add(new FixedGroup(group, List.copyOf(items), e.path("label").asText("")));
+                }
+                return List.copyOf(out);
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[FIXED_ITEMS] 面板 {} 的 yj_panel.config 解析失败(固定检验项按空处理): {}",
+                                code, ex.getMessage());
+                return List.of();
+            }
+        }
+
+        /**
+         * 检验项目名归一化(固定项与数据行**同名判定**用):去掉 {@code 表区-} 前缀与首尾空白。
+         * 例:数据里是「外观-端盖两头」(出货检验计划表按「表区-项目名」落库),固定项写成「端盖两头」
+         * ⇒ 两边都要能对上,否则固定列永远空着、数据列又重复一列。
+         */
+        public static String normItem(String name) {
+            if (name == null) return "";
+            String s = name.trim();
+            int dash = s.indexOf('-');
+            if (dash > 0 && dash < s.length() - 1) {
+                String prefix = s.substring(0, dash);
+                if ("外观".equals(prefix) || "尺寸".equals(prefix) || "重要尺寸".equals(prefix)
+                        || "主要尺寸".equals(prefix) || "重量".equals(prefix) || "出货重量".equals(prefix)
+                        || "性能".equals(prefix) || "功能性测试".equals(prefix)) {
+                    s = s.substring(dash + 1).trim();
+                }
+            }
+            return s;
+        }
+
+        /**
+         * **唯一键声明**(yj_panel.config 的 {@code "uniqueKeys"},2026-10-16 起):
+         * 每个元素是一组「组内列不得重复出现同一取值」的字段标签(数据键=中文 label)。
+         * 写法:{@code {"uniqueKeys":["工序编码"]}}(单列)或
+         * {@code {"uniqueKeys":[["仓库","仓位编码"]]}}(组合键);两种可混用。
+         *
+         * <p>用途:全是**声明式**的 —— ButtonService.saveArchive 据此在落库前预检
+         * (给业务话术),PanelConfigService 把同一份声明下发给前端做保存前即时查重。
+         * 哪张面板哪几列唯一由元数据说了算,**不加代码**(与"加面板=插行"同一条规矩)。
+         *
+         * <p>解析失败(手写 config 写坏)时返回空表并在日志里骂一句:宁可不拦业务,
+         * 也不能因为一段配置让整个面板存不进去 —— 数据库侧的过滤唯一索引仍是最后一道闸。
+         */
+        public List<List<String>> uniqueKeys() {
+            if (config == null || !config.contains("uniqueKeys")) return List.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("uniqueKeys");
+                if (!node.isArray()) return List.of();
+                List<List<String>> out = new ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode e : node) {
+                    List<String> keys = new ArrayList<>();
+                    if (e.isArray()) {
+                        for (com.fasterxml.jackson.databind.JsonNode k : e) {
+                            if (k.isTextual() && !k.asText().isBlank()) keys.add(k.asText().trim());
+                        }
+                    } else if (e.isTextual() && !e.asText().isBlank()) {
+                        keys.add(e.asText().trim());
+                    }
+                    if (!keys.isEmpty()) out.add(List.copyOf(keys));
+                }
+                return List.copyOf(out);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[uniqueKeys] 面板 {} 的 config 不是合法 JSON,唯一性预检跳过:{}", code, config);
+                return List.of();
+            }
         }
         /** 模块分组(对齐 HSDZ permission.GROP;缺省 其他) */
         public String moduleName() {
@@ -103,14 +220,15 @@ public class PanelRegistry {
                             rs.getString("tab_key")));
                 });
         Map<String, PanelDef> out = new HashMap<>();
-        jdbc.query("SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group FROM yj_panel",
+        jdbc.query("SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group, config FROM yj_panel",
                 rs -> {
                     String code = rs.getString("panel_code");
                     out.put(code, new PanelDef(code, rs.getString("panel_name"), rs.getString("panel_name_en"), rs.getString("category"),
                             rs.getString("mode"), rs.getString("line_table"), rs.getString("head_table"),
                             rs.getString("group_col"), rs.getString("pk_col"), rs.getString("code_col"),
                             rs.getString("prefix"), rs.getString("date_col"), (Integer) rs.getObject("page_size"),
-                            rs.getString("detail_key"), rs.getString("module_group"), byPanel.getOrDefault(code, List.of())));
+                            rs.getString("detail_key"), rs.getString("module_group"),
+                            rs.getString("config"), byPanel.getOrDefault(code, List.of())));
                 });
         caches.put(DataSourceRouter.current(), new Snapshot(out, System.currentTimeMillis()));
     }

@@ -1,0 +1,11 @@
+panel_code|col_name|place|seq|visible|hidden
+QC_ASM_INSP|表区|detail|170|0|1
+QC_ASM_INSP|检查频率|detail|100|1|0
+QC_CUT_INSP|表区|detail|190|1|0
+QC_CUT_INSP|检查频率|detail|228|1|0
+QC_FIRST_INSP|表区|detail|170|0|1
+QC_FIRST_INSP|检查频率|detail|100|1|0
+QC_MOLD_INSP|表区|detail|190|1|0
+QC_MOLD_INSP|检查频率|detail|228|1|0
+QC_PROC_INSP|表区|detail|10|1|0
+QC_PROC_INSP|检查频率|detail|52|1|0

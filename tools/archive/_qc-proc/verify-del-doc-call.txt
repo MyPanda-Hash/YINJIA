@@ -1,0 +1,5 @@
+① 制程检验单现有单据(看状态决定删除单据是否可作废):
+   ZC-2026-10-0002 | 单据状态=草稿 | 总结论=(空)
+   ZC-2026-10-0001 | 单据状态=草稿 | 总结论=合格
+② deleteForms(不存在单号) status=200 体={"code":200,"message":"success","data":null}
+③ 权限口径:PanelPermissionService 已登记 删除单据 → add/modify/del(源码 line 67)

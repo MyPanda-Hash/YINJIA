@@ -1,0 +1,13 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-precount2.sql ==
+  | yj_panel | 3 | 
+  | yj_field | 118 | 
+  | yj_role_panel | 14 | 
+  | yj_doc_status | 144 | 
+  | form_flow_link | 63 | 
+  | yj_form_approval | 0 | 
+  | yj_translation(panel名) | 3 | 
+  | yj_translation(字段标签) | 266 | 
+  | TOTAL_yj_panel | 128 | 
+  | TOTAL_yj_field | 4065 | 
+[OK] _q-precount2.sql (2 batches)

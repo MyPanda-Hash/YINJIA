@@ -1,0 +1,18 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-verify.sql ==
+  | yj_panel 残留 | 0 | 
+  | yj_field 残留 | 0 | 
+  | yj_role_panel 残留 | 0 | 
+  | yj_doc_status 残留 | 0 | 
+  | form_flow_link 残留 | 0 | 
+  | yj_form_approval 残留 | 0 | 
+  | 物理对象残留 | 0 | 
+  | 面板总数 | 125 | 
+  | 字段总数 | 3947 | 
+  | 制程品质保留三张 | 3 | 
+  | 质量单据保留七张 | 7 | 
+  | 悬空 ref_panel | 0 | 
+  | 指向不存在表/视图的面板 | 0 | 
+  | 对象仍引用被删表 | 0 | 
+  | schema_log | migrate-drop-qc-mold-cut-finspec-20261016.sql | 3362ff8e8ac783729f7744294bc8f2df946ba67f204f0aa3dabeda40cbda96a5 | 2026-10-15 18:05:20.5370713 | 
+[OK] _q-verify.sql (1 batches)

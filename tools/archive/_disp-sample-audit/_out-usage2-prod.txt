@@ -1,0 +1,63 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-usage2.sql ==
+  | SP | 1 | 2026-09-22 06:19:06.2430000 | 2026-09-22 06:19:06.2430000 | 
+  | s_allno_total | 538 | 
+  | 1 | SP-2026-09-0001 | null | null | null | 2026-09-22 | null | null | null | null | null | 草稿 | null | null | admin | 2026-09-22 14:19:06.2538615 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | bd_outsource_order | 委外供应商 | 
+  | bl_dispatch | 派工加工状态 | 
+  | bl_dispatch | 派工数量 | 
+  | bl_dispatch | 委外供应商 | 
+  | bl_dispatch | 已派工数量 | 
+  | bl_outsource_order | 委外单价 | 
+  | bs_inv | 委外价 | 
+  | bs_inv_price | 委外价 | 
+  | bs_inv_price | 最高委外价 | 
+  | bs_route | 是否连续委外 | 
+  | bs_route | 委外供应商 | 
+  | bd_dispatch | 0 | 
+  | bl_dispatch | 0 | 
+  | bd_outsource_order | 0 | 
+  | bl_outsource_order | 0 | 
+  | DAY_REPORT | 生产日报表 | 生产管理 | doc | 生产制造 | 
+  | DISPATCH | 工序派工单 | 生产制造 | doc | 生产制造 | 
+  | EQUIP_CHECK | 设备点检记录 | 生产管理 | doc | 生产制造 | 
+  | FEED_CONFIRM | 投料确认单 | 生产管理 | doc | 生产制造 | 
+  | GRAN_RECORD | 造粒记录 | 生产管理 | doc | 生产制造 | 
+  | LINE_LOAD | 产线排产负荷 | 报表 | flat | 生产制造 | 
+  | MAINT_PLAN | 保养计划 | 生产管理 | doc | 生产制造 | 
+  | MANU_ORDER | 生产工单 | 生产制造 | doc | 生产制造 | 
+  | MANU_ORDER_DETAIL | 生产工单明细表 | 报表 | flat | 生产制造 | 
+  | MANU_ORDER_STATS | 生产工单统计表 | 报表 | flat | 生产制造 | 
+  | MANU_SCHEDULE | 生产排产 | 报表 | flat | 生产制造 | 
+  | MIX_RECORD | 物料混合记录 | 生产管理 | doc | 生产制造 | 
+  | PACK_CONFIRM | 封箱确认 | 生产管理 | doc | 生产制造 | 
+  | PROD_ABN | 生产异常处理单 | 基础档案 | archive | 生产制造 | 
+  | QC_ASM_INSP | 组装成品检验单 | 生产管理 | doc | 生产制造 | 
+  | QC_CUT_INSP | 切炭检验单 | 生产管理 | doc | 生产制造 | 
+  | QC_FIRST_INSP | 首件检验单 | 生产管理 | doc | 生产制造 | 
+  | QC_MOLD_INSP | 成型检验单 | 生产管理 | doc | 生产制造 | 
+  | QC_PROC_INSP | 制程检验单 | 生产管理 | doc | 生产制造 | 
+  | SAMPLE_REQ | 样品申请单 | 生产管理 | doc | 生产制造 | 
+  | WH_RECORD | 无黑处理登记 | 生产管理 | doc | 生产制造 | 
+  | WO_COMPLETION_LIST | 完工明细 | 报表 | flat | 生产制造 | 
+  | WO_ORDER | 生产工单(旧版) | 生产管理 | doc | 生产制造 | 
+  | WO_PROGRESS | 工单工序进度 | 报表 | flat | 生产制造 | 
+  | WO_REPORT | 工序报工单 | 生产管理 | doc | 生产制造 | 
+  | WO_REPORT_LIST | 报工记录 | 报表 | flat | 生产制造 | 
+  | WO_SCHEDULE | 排单计划 | 报表 | flat | 生产制造 | 
+  | 生产制造 | 27 | 
+  | 研发管理 | 25 | 
+  | 基础设置 | 25 | 
+  | 库存核算 | 14 | 
+  | 品质管理 | 13 | 
+  | 基础档案 | 5 | 
+  | 基础资料 | 4 | 
+  | 智能供应链 | 4 | 
+  | 系统管理 | 3 | 
+  | 新生产 | 2 | 
+  | 订单管理 | 2 | 
+  | (null) | 1 | 
+  | 采购管理 | 1 | 
+  | 生产管理 | 1 | 
+  | 委外加工 | 1 | 
+[OK] _q-usage2.sql (8 batches)

@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.OrderConvertService;
+import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +17,11 @@ import java.util.Map;
  * 订单结转·发单工作台(《订单结转实现方案-V1.0》):
  * 待结转行(剩余=需求−已排产−已采购)/汇总/转工单(落参考库 plang)。
  * 转采购单已移除(2026-09-26 用户拍板:结转只转工单)。
- * 权限:查询类 SO_ORDER 可见;转单类 SO_ORDER 编辑权(add/modify)。
+ *
+ * <p>权限(2026-10-16 改为**本页自己的页面面板**,原为借 SO_ORDER 的 view + 保存):
+ * 见 {@link com.yinjia.mes.service.PagePanelRegistry#ORDER_CONVERT} ——
+ * 可见 view / 查询 query / 修改交期 date / 转工单 convert。
+ * 页面此前没有面板码 ⇒ 菜单对所有人可见、组织架构里无从勾选。
  */
 @RestController
 @RequestMapping("/api/px/orderConvert")
@@ -37,14 +42,14 @@ public class OrderConvertController {
      */
     @PostMapping("/pending")
     public ApiResult<List<Map<String, Object>>> pending(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("SO_ORDER");
+        perm.requirePanelView(PagePanelRegistry.ORDER_CONVERT);
         return ApiResult.ok(service.pending(str(body, "keyword"), str(body, "dateFrom"), str(body, "dateTo")));
     }
 
     /** 顶部汇总条:未结转(全量)/今日结转(笔数/款数/数量) + 当前数据笔数(当前日期口径) + 最新下单日期(默认锚点) */
     @PostMapping("/stats")
     public ApiResult<Map<String, Object>> stats(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("SO_ORDER");
+        perm.requirePanelView(PagePanelRegistry.ORDER_CONVERT);
         return ApiResult.ok(service.stats(str(body, "keyword"), str(body, "dateFrom"), str(body, "dateTo")));
     }
 
@@ -52,8 +57,8 @@ public class OrderConvertController {
     @PostMapping("/saveDates")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> saveDates(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("SO_ORDER");
-        perm.requireButton("SO_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.ORDER_CONVERT);
+        perm.requireButton(PagePanelRegistry.ORDER_CONVERT, "保存交期");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.saveDates(rows, currentUser()));
     }
@@ -62,8 +67,8 @@ public class OrderConvertController {
     @PostMapping("/toManu")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> toManu(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("SO_ORDER");
-        perm.requireButton("SO_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.ORDER_CONVERT);
+        perm.requireButton(PagePanelRegistry.ORDER_CONVERT, "转工单");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.toManu(rows, currentUser()));
     }

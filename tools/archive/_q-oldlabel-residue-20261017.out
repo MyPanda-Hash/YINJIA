@@ -1,0 +1,105 @@
+########## HSDZ_MES ##########
+
+--- OLD 旧标签全库残留计数(yj_field/yj_translation/yj_report_template/yj_panel.config/yj_field.alias) ---
+{"yj_field_hits":0,"yj_translation_hits":0,"report_hits":0,"panel_config_hits":0,"phys_col_hits":0}
+
+--- OLD 旧译名任意 scope 残留(应 0) ---
+(0 行)
+
+--- NEW 新标签译名逐 key × locale ---
+{"ref_key":"产线常规功能性结果","locale":"de","text":"Ergebnis der Routinetests"}
+{"ref_key":"产线常规功能性结果","locale":"en","text":"Line Routine Functional Result"}
+{"ref_key":"产线常规功能性结果","locale":"es","text":"Resultado funcional de rutina"}
+{"ref_key":"产线常规功能性结果","locale":"fr","text":"Résultat fonctionnel de routine"}
+{"ref_key":"产线常规功能性结果","locale":"ja","text":"生産ライン定常機能結果"}
+{"ref_key":"产线常规功能性结果","locale":"ko","text":"라인 정규 기능 결과"}
+{"ref_key":"产线常规功能性结果","locale":"ru","text":"Результат штатного функционального теста"}
+{"ref_key":"产线常规功能性结果","locale":"th","text":"ผลทดสอบการทำงานตามปกติ"}
+{"ref_key":"产线常规功能性结果","locale":"vi","text":"Kết quả chức năng thường quy"}
+{"ref_key":"产线常规功能性结果","locale":"zh-TW","text":"產線常規功能性結果"}
+{"ref_key":"抽检总量","locale":"en","text":"Sample Total Qty"}
+{"ref_key":"合格数量","locale":"de","text":"Gutmenge"}
+{"ref_key":"合格数量","locale":"en","text":"Pass Qty"}
+{"ref_key":"合格数量","locale":"es","text":"Cantidad conforme"}
+{"ref_key":"合格数量","locale":"fr","text":"Quantité conforme"}
+{"ref_key":"合格数量","locale":"ja","text":"合格数量"}
+{"ref_key":"合格数量","locale":"ko","text":"합격 수량"}
+{"ref_key":"合格数量","locale":"ru","text":"Годное количество"}
+{"ref_key":"合格数量","locale":"th","text":"จำนวนที่ผ่าน"}
+{"ref_key":"合格数量","locale":"vi","text":"Số lượng đạt"}
+{"ref_key":"合格数量","locale":"zh-TW","text":"合格數量"}
+{"ref_key":"检验结果","locale":"en","text":"Inspection Result"}
+{"ref_key":"检验类型","locale":"de","text":"Prüfart"}
+{"ref_key":"检验类型","locale":"en","text":"Inspection Type"}
+{"ref_key":"检验类型","locale":"es","text":"Tipo de inspección"}
+{"ref_key":"检验类型","locale":"fr","text":"Type d'inspection"}
+{"ref_key":"检验类型","locale":"ja","text":"検査タイプ"}
+{"ref_key":"检验类型","locale":"ko","text":"검사 유형"}
+{"ref_key":"检验类型","locale":"ru","text":"Тип проверки"}
+{"ref_key":"检验类型","locale":"th","text":"ประเภทการตรวจสอบ"}
+{"ref_key":"检验类型","locale":"vi","text":"Loại kiểm tra"}
+{"ref_key":"检验类型","locale":"zh-TW","text":"檢驗類型"}
+{"ref_key":"检验时间","locale":"en","text":"Inspection Time"}
+{"ref_key":"结果判断","locale":"en","text":"Result Judgement"}
+
+--- NEW 新标签译名语言数汇总 ---
+{"ref_key":"产线常规功能性结果","locales":10,"has_en":1}
+{"ref_key":"抽检总量","locales":1,"has_en":1}
+{"ref_key":"合格数量","locales":10,"has_en":1}
+{"ref_key":"检验结果","locales":1,"has_en":1}
+{"ref_key":"检验类型","locales":10,"has_en":1}
+{"ref_key":"检验时间","locales":1,"has_en":1}
+{"ref_key":"结果判断","locales":1,"has_en":1}
+
+########## HSDZ_MES_TEST ##########
+
+--- OLD 旧标签全库残留计数(yj_field/yj_translation/yj_report_template/yj_panel.config/yj_field.alias) ---
+{"yj_field_hits":0,"yj_translation_hits":0,"report_hits":0,"panel_config_hits":0,"phys_col_hits":0}
+
+--- OLD 旧译名任意 scope 残留(应 0) ---
+(0 行)
+
+--- NEW 新标签译名逐 key × locale ---
+{"ref_key":"产线常规功能性结果","locale":"de","text":"Ergebnis der Routinetests"}
+{"ref_key":"产线常规功能性结果","locale":"en","text":"Line Routine Functional Result"}
+{"ref_key":"产线常规功能性结果","locale":"es","text":"Resultado funcional de rutina"}
+{"ref_key":"产线常规功能性结果","locale":"fr","text":"Résultat fonctionnel de routine"}
+{"ref_key":"产线常规功能性结果","locale":"ja","text":"生産ライン定常機能結果"}
+{"ref_key":"产线常规功能性结果","locale":"ko","text":"라인 정규 기능 결과"}
+{"ref_key":"产线常规功能性结果","locale":"ru","text":"Результат штатного функционального теста"}
+{"ref_key":"产线常规功能性结果","locale":"th","text":"ผลทดสอบการทำงานตามปกติ"}
+{"ref_key":"产线常规功能性结果","locale":"vi","text":"Kết quả chức năng thường quy"}
+{"ref_key":"产线常规功能性结果","locale":"zh-TW","text":"產線常規功能性結果"}
+{"ref_key":"抽检总量","locale":"en","text":"Sample Total Qty"}
+{"ref_key":"合格数量","locale":"de","text":"Gutmenge"}
+{"ref_key":"合格数量","locale":"en","text":"Pass Qty"}
+{"ref_key":"合格数量","locale":"es","text":"Cantidad conforme"}
+{"ref_key":"合格数量","locale":"fr","text":"Quantité conforme"}
+{"ref_key":"合格数量","locale":"ja","text":"合格数量"}
+{"ref_key":"合格数量","locale":"ko","text":"합격 수량"}
+{"ref_key":"合格数量","locale":"ru","text":"Годное количество"}
+{"ref_key":"合格数量","locale":"th","text":"จำนวนที่ผ่าน"}
+{"ref_key":"合格数量","locale":"vi","text":"Số lượng đạt"}
+{"ref_key":"合格数量","locale":"zh-TW","text":"合格數量"}
+{"ref_key":"检验结果","locale":"en","text":"Inspection Result"}
+{"ref_key":"检验类型","locale":"de","text":"Prüfart"}
+{"ref_key":"检验类型","locale":"en","text":"Inspection Type"}
+{"ref_key":"检验类型","locale":"es","text":"Tipo de inspección"}
+{"ref_key":"检验类型","locale":"fr","text":"Type d'inspection"}
+{"ref_key":"检验类型","locale":"ja","text":"検査タイプ"}
+{"ref_key":"检验类型","locale":"ko","text":"검사 유형"}
+{"ref_key":"检验类型","locale":"ru","text":"Тип проверки"}
+{"ref_key":"检验类型","locale":"th","text":"ประเภทการตรวจสอบ"}
+{"ref_key":"检验类型","locale":"vi","text":"Loại kiểm tra"}
+{"ref_key":"检验类型","locale":"zh-TW","text":"檢驗類型"}
+{"ref_key":"检验时间","locale":"en","text":"Inspection Time"}
+{"ref_key":"结果判断","locale":"en","text":"Result Judgement"}
+
+--- NEW 新标签译名语言数汇总 ---
+{"ref_key":"产线常规功能性结果","locales":10,"has_en":1}
+{"ref_key":"抽检总量","locales":1,"has_en":1}
+{"ref_key":"合格数量","locales":10,"has_en":1}
+{"ref_key":"检验结果","locales":1,"has_en":1}
+{"ref_key":"检验类型","locales":10,"has_en":1}
+{"ref_key":"检验时间","locales":1,"has_en":1}
+{"ref_key":"结果判断","locales":1,"has_en":1}
