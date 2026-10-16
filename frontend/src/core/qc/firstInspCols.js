@@ -155,6 +155,19 @@ export function unitOfLabel(label) {
 }
 
 /**
+ * 列头的**显示文字**:列名 + 单位,但单位不重复 ——
+ * 图纸上「浊度NTU」「压降kPa」这类列名里**已经带了单位**,再后缀一个括号就成了
+ * 「浊度NTU(NTU)」(纸面/打印/Excel 导出三处都会现形,实测抓到)。
+ * @param {{label?:string,unit?:string}} col
+ */
+export function columnHeadText(col) {
+  const label = String(col?.label ?? '')
+  const unit = String(col?.unit ?? '')
+  if (!unit) return label
+  return label.toLowerCase().includes(unit.toLowerCase()) ? label : `${label}(${unit})`
+}
+
+/**
  * 新列的数据键:测试项目名(用户填什么就是什么,便于列表页看懂)。
  * 同名时补 -2/-3…(不改已存在的列)。
  * @param {Array<object>} cols 现有列

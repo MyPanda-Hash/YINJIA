@@ -1,0 +1,171 @@
+/**
+ * firstInspExport.test.js — 首件检验单「导出当前这张纸」的版式单测。
+ *
+ * 钉住用户口径(2026-10-17「让当前的 excel 可以导出当前这个报表页面」)下的六条:
+ *   ① 大标题/副标题各占一行且横向合并全宽;
+ *   ② 两层表头:第一级分组跨本组各列、第二级测试项目,左上角斜线格纵向合并两行;
+ *   ③ 标准行取值与列同源;
+ *   ④ 1#..8# 八个样品行,**每组只在自己那一对样品行上有值**、其余格写 `/`(与纸面同源);
+ *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人 都在;
+ *   ⑥ 所有合并区**都不越界**(行列号都在 aoa 范围内)。
+ */
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { buildFirstInspExport, BLANK } from './firstInspExport.js'
+import { columnsOf, groupsOf, DEFAULT_TEST_ITEMS } from './firstInspCols.js'
+
+/** 按图纸的 10 列 + 长表明细造一份最简输入(与后端 FirstInspItems 的行键一致) */
+function fixture() {
+  const items = []
+  let no = 0
+  for (const d of DEFAULT_TEST_ITEMS) {
+    items.push({ 表区: '首件检验', 行类型: '标准', 样品序号: '标准', 检验列: d.key, 检验项目: d.label, 项目分组: d.group, 标准: d.standard, 实测数值: '', 结果判断: '', 行号: ++no })
+    for (let s = 1; s <= 8; s++) {
+      items.push({ 表区: '首件检验', 行类型: '样品', 样品序号: `${s}#`, 检验列: d.key, 检验项目: d.label, 项目分组: d.group, 标准: '', 实测数值: '', 结果判断: '', 行号: ++no })
+    }
+  }
+  const raw = columnsOf(items)
+  const columns = groupsOf(raw).flatMap((g) => raw.filter((c) => c.group === g))
+  return { items, columns }
+}
+
+const build = (over = {}) => {
+  const { items, columns } = fixture()
+  return {
+    items, columns,
+    ...buildFirstInspExport({
+      title: '炭棒成型车间首件检验记录表',
+      subtitle: '惠州市银嘉环保科技有限公司　单据编号：SJ-T-1',
+      headPairs: [
+        [{ label: '产品编号', value: '111' }, { label: '产品型号', value: 'X-1' }],
+        [{ label: '生产日期', value: '2026-10-17' }, { label: '组别', value: '一楼' }],
+      ],
+      columns,
+      items,
+      requirements: ['要求一', '要求二', '要求三', '要求四', '要求五', '要求六'],
+      foot: { resultLabel: '检验结果', result: '合格', byLabel: '检验人', by: '张三' },
+      ...over,
+    }),
+  }
+}
+
+test('① 大标题与副标题各占一行且横向合并全宽', () => {
+  const { aoa, merges, marks } = build()
+  const N = marks.colCount
+  assert.equal(N, 11, '1 个行标签列 + 图纸 10 个测试项目列')
+  assert.equal(aoa[0][0], '炭棒成型车间首件检验记录表')
+  assert.match(String(aoa[1][0]), /SJ-T-1/)
+  assert.deepEqual(merges.find((m) => m.s.r === 0), { s: { r: 0, c: 0 }, e: { r: 0, c: N - 1 } })
+  assert.deepEqual(merges.find((m) => m.s.r === 1), { s: { r: 1, c: 0 }, e: { r: 1, c: N - 1 } })
+})
+
+test('② 两层表头:分组跨本组各列、测试项目逐个、左上角斜线格纵跨两行', () => {
+  const { aoa, merges, marks } = build()
+  const { groupRow, itemRow } = marks
+  assert.equal(aoa[groupRow][0], '测试项目 ╲ 样品序号')
+  assert.equal(aoa[groupRow][1], '表观及脱粉')
+  assert.equal(aoa[groupRow][3], '尺寸及重量')
+  assert.equal(aoa[groupRow][7], '强度')
+  assert.equal(aoa[groupRow][9], '浊度及压降')
+  // 分组跨列:表观及脱粉 2 列、尺寸及重量 4 列、强度 2 列、浊度及压降 2 列
+  const gm = (c) => merges.find((m) => m.s.r === groupRow && m.s.c === c)
+  assert.deepEqual(gm(1), { s: { r: groupRow, c: 1 }, e: { r: groupRow, c: 2 } })
+  assert.deepEqual(gm(3), { s: { r: groupRow, c: 3 }, e: { r: groupRow, c: 6 } })
+  assert.deepEqual(gm(7), { s: { r: groupRow, c: 7 }, e: { r: groupRow, c: 8 } })
+  assert.deepEqual(gm(9), { s: { r: groupRow, c: 9 }, e: { r: groupRow, c: 10 } })
+  // 第二级 = 测试项目(带单位的拼单位;**列名里已含单位的不再重复后缀**)
+  assert.equal(aoa[itemRow][1], '炭棒表观状态')
+  assert.equal(aoa[itemRow][3], '炭棒外径(mm)')
+  assert.equal(aoa[itemRow][9], '浊度NTU', '列名里已有 NTU ⇒ 不再写成 浊度NTU(NTU)')
+  assert.equal(aoa[itemRow][10], '压降kPa', '列名里已有 kPa ⇒ 不再写成 压降kPa(kPa)')
+  // 左上角纵跨两层表头
+  assert.deepEqual(merges.find((m) => m.s.r === groupRow && m.s.c === 0 && m.e.r === itemRow),
+    { s: { r: groupRow, c: 0 }, e: { r: itemRow, c: 0 } })
+})
+
+test('③ 标准行取自列对象;空标准照纸面写 `/`', () => {
+  const { aoa, marks } = build()
+  assert.equal(aoa[marks.stdRow][0], '标准')
+  assert.equal(aoa[marks.stdRow][1], BLANK, '表观状态的标准纸面上就是 /')
+  // ⚠ 纸张对"标准为空"的统一口径就是 **写 `/`**(只读态渲染 `{{ c.standard || '/' }}`),
+  //   导出与纸面同源 ⇒ 这里也是 `/`,不是空白
+  assert.equal(aoa[marks.stdRow][3], BLANK, '外径标准为空时照纸面写 /')
+  const withStd = build({ columns: [{ key: 'outer', label: '炭棒外径', group: '尺寸及重量', unit: 'mm', standard: '外径:34.5±0.5' }] })
+  assert.equal(withStd.aoa[withStd.marks.stdRow][1], '外径:34.5±0.5')
+})
+
+test('④ 八个样品行:每组只在自己那一对样品行上有值,其余格写 `/`', () => {
+  const { items, columns } = fixture()
+  // 每组各填一格(表观@2#、外径@4#、跌落@6#、浊度@8#)
+  const put = (key, sample, v) => {
+    const row = items.find((r) => r['检验列'] === key && r['样品序号'] === `${sample}#`)
+    row['实测数值'] = v
+  }
+  put('appearance', 2, '无粘模（均匀）')
+  put('outer', 4, '34.2')
+  put('drop', 6, '5')
+  put('turbidity', 8, '1.1')
+  const { aoa, marks } = buildFirstInspExport({ columns, items, marks: null })
+  // 找列序号
+  const idx = (key) => columns.findIndex((c) => c.key === key) + 1
+  const rowOf = (s) => aoa[marks.dataStart + s - 1]
+  for (let s = 1; s <= 8; s++) assert.equal(rowOf(s)[0], `${s}#`)
+  assert.equal(rowOf(2)[idx('appearance')], '无粘模（均匀）')
+  assert.equal(rowOf(4)[idx('outer')], '34.2')
+  assert.equal(rowOf(6)[idx('drop')], '5')
+  assert.equal(rowOf(8)[idx('turbidity')], '1.1')
+  // 非本组的格一律 `/`(与纸面同源:isFillableCell)
+  assert.equal(rowOf(1)[idx('outer')], BLANK, '1# 的外径格纸面上是 /')
+  assert.equal(rowOf(8)[idx('outer')], BLANK)
+  assert.equal(rowOf(3)[idx('appearance')], BLANK)
+  assert.equal(rowOf(5)[idx('turbidity')], BLANK)
+  // 本组那一对两行都可填:2# 之外 1# 也在表观组
+  assert.equal(rowOf(1)[idx('appearance')], '', '1# 表观格可填,没值就是空(不是 /)')
+})
+
+test('⑤ 相关要求逐条一行且横向合并;表尾两组都在', () => {
+  const { aoa, merges, marks } = build()
+  assert.equal(aoa[marks.reqTitleRow][0], '相关要求：')
+  assert.equal(marks.reqRows.length, 6)
+  assert.equal(aoa[marks.reqRows[0]][0], '要求一')
+  assert.equal(aoa[marks.reqRows[5]][0], '要求六')
+  for (const r of marks.reqRows) {
+    assert.ok(merges.some((m) => m.s.r === r && m.s.c === 0 && m.e.c === marks.colCount - 1), `第 ${r} 行要合并全宽`)
+  }
+  const foot = aoa[marks.footRow]
+  assert.equal(foot[0], '检验结果')
+  assert.equal(foot[1], '合格')
+  assert.equal(foot[Math.max(2, Math.floor(marks.colCount / 2))], '检验人')
+  assert.equal(foot[Math.max(2, Math.floor(marks.colCount / 2)) + 1], '张三')
+})
+
+test('⑥ 所有合并区都在 aoa 范围内(不越界)', () => {
+  const { aoa, merges } = build()
+  const rows = aoa.length
+  for (const m of merges) {
+    assert.ok(m.s.r >= 0 && m.e.r >= m.s.r && m.e.r < rows, `行越界: ${JSON.stringify(m)}`)
+    assert.ok(m.s.c >= 0 && m.e.c >= m.s.c, `列倒挂: ${JSON.stringify(m)}`)
+    assert.ok(m.e.c <= (aoa[m.s.r] || []).length - 1 || m.e.c <= 10, `列越界: ${JSON.stringify(m)}`)
+  }
+})
+
+test('⑥b 列数变化时合并不跑偏(单列/空列都兜得住)', () => {
+  const one = build({ columns: [{ key: 'a', label: 'A', group: '强度', unit: '' }] })
+  assert.equal(one.marks.colCount, 2)
+  for (const m of one.merges) assert.ok(m.e.c <= 1, JSON.stringify(m))
+  const none = buildFirstInspExport({ columns: [], items: [], requirements: [] })
+  assert.equal(none.marks.colCount, 2, '一列都没有也要有合法的最小宽度')
+  for (const m of none.merges) assert.ok(m.e.c <= 1, JSON.stringify(m))
+})
+
+test('⑦ 自定义分组/自定义列也照同一规则(未知分组落最后一对样品)', () => {
+  const cols = [{ key: 'x', label: '自定项', group: '我的组', unit: '', standard: 'S' }]
+  const items = [1, 2, 3, 4, 5, 6, 7, 8].map((s) => ({
+    行类型: '样品', 样品序号: `${s}#`, 检验列: 'x', 检验项目: '自定项', 项目分组: '我的组',
+    标准: '', 实测数值: s === 7 ? 'v7' : '', 结果判断: '', 行号: s,
+  }))
+  const { aoa, marks } = buildFirstInspExport({ columns: cols, items, requirements: [] })
+  assert.equal(aoa[marks.groupRow][1], '我的组')
+  assert.equal(aoa[marks.dataStart + 6][1], 'v7', '7# 是自定义组的可填行')
+  assert.equal(aoa[marks.dataStart + 0][1], BLANK, '1# 不是')
+})

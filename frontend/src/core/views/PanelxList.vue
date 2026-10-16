@@ -1644,9 +1644,16 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 文书面板导出:格式选择(打印按钮独立,导出走这里:PDF/Excel) ═══ -->
-    <el-dialog v-model="exportFmtVisible" :title="tt('选择导出格式')" width="380px" append-to-body>
+    <!-- ═══ 文书面板导出:格式选择(打印预览 / PDF / Excel;打印为独立按钮不经过这里) ═══ -->
+    <el-dialog v-model="exportFmtVisible" :title="tt('选择导出格式')" width="420px" append-to-body>
       <div class="efmt-list">
+        <div class="efmt-item" @click="previewSheetPdf">
+          <span class="efmt-ico">🖨</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('打印预览') }}</div>
+            <div class="efmt-desc">{{ tt('在新窗口内打开这张纸的 PDF，可直接打印或另存为 PDF') }}</div>
+          </div>
+        </div>
         <div class="efmt-item" @click="exportSheetPdf">
           <span class="efmt-ico">📄</span>
           <div class="efmt-txt">
@@ -1658,7 +1665,7 @@
           <span class="efmt-ico">📊</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('导出 Excel（.xlsx）') }}</div>
-            <div class="efmt-desc">{{ tt('头字段键值 + 各明细页签全字段全数据，不受纸张限制') }}</div>
+            <div class="efmt-desc">{{ sheetExcelDesc }}</div>
           </div>
         </div>
       </div>
@@ -6035,26 +6042,45 @@ function onSideAction(a) {
   onButton(a)
 }
 
-// ── 文书面板导出:格式选择(PDF / Excel);打印为独立按钮不经过这里 ──
+// ── 文书面板导出:格式选择(打印预览 / PDF / Excel);打印为独立按钮不经过这里 ──
 const exportFmtVisible = ref(false)
-/** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机。
- *  页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
- *  无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
- *  宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
- *  根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
- *  里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。 */
-async function exportSheetPdf() {
-  exportFmtVisible.value = false
-  // $el 在 dev 下可能是 fragment 注释锚点(组件含多个 append-to-body 弹窗)——不是元素时按纸张根类名兜底
+/**
+ * 「导出 Excel」在**本文书面板**到底导什么 —— 三种口径,弹窗里如实说明(别一句话糊到底):
+ *   · 纸面版式   : 检验单类(QC_PROC_INSP / QC_FIRST_INSP),导出的就是这张纸(纯函数 + 单测);
+ *   · 控制列表版式: RD_PROGRESS / QC_CATALOG,按纸面列定义导全部行;
+ *   · 头字段+全明细: 其余文书面板(exportSheetExcel 的通用分支)。
+ */
+const sheetExcelDesc = computed(() => {
+  const code = String(panelCode.value)
+  if (code === 'QC_PROC_INSP' || code === 'QC_FIRST_INSP') return tt('导出当前这张纸，版式与纸面一致')
+  if (code === 'RD_PROGRESS' || code === 'QC_CATALOG') return tt('按纸面列定义导出全部行')
+  return tt('头字段键值 + 各明细页签全字段全数据，不受纸张限制')
+})
+/**
+ * 把当前文书纸面截成 PDF(返回 blob + 文件名)—— **导出 PDF 与打印预览共用这一份实现**。
+ *
+ * 页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
+ * 无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
+ * 宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
+ * 根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
+ * 里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。
+ *
+ * ⚠ $el 在 dev 下可能是 fragment **注释锚点**(模板顶部的注释块、组件内的 append-to-body 弹窗
+ *   都会把单根变多根,§5.5 B1)⇒ 判不出元素时按纸张根**类名**兜底;
+ *   兜底名单必须把**每种纸张的根类名**都列全 —— 2026-10-17 实测漏了 `.fi-sheet`,
+ *   于是首件检验单点「导出 PDF」直接报「未找到可导出的单据」。
+ */
+async function buildSheetPdfBlob() {
   const el0 = approvalSheetRef.value?.$el
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
-    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, .approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet')
-  if (!el || !(el instanceof HTMLElement)) return ElMessage.warning(tt('未找到可导出的单据'))
-  const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
+    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
+    + '.approval-layout .qr-sheet')
+  if (!el || !(el instanceof HTMLElement)) return null
+  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
+  await nextTick()
   let holder = null
   try {
-    const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
-    await nextTick()
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
     const w0 = Math.max(el.scrollWidth, el.offsetWidth)
     holder = document.createElement('div')
@@ -6074,7 +6100,7 @@ async function exportSheetPdf() {
       backgroundColor: '#ffffff',
       width: w0,
       height: h0,
-      // 隐藏编辑态元素(字段编辑/标准库/终止横幅等),与打印口径一致
+      // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
     // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
@@ -6085,24 +6111,67 @@ async function exportSheetPdf() {
     const pdf = new jsPDF({ orientation: pw > ph ? 'l' : 'p', unit: 'mm', format: [pw, ph], compress: true })
     pdf.addImage(dataUrl, 'PNG', 0, 0, pw, ph)
     const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
-    pdf.save(`${panelName.value}-${no || '导出'}.pdf`)
+    return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
+  } finally {
+    if (holder) holder.remove()
+  }
+}
+/** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机 */
+async function exportSheetPdf() {
+  exportFmtVisible.value = false
+  const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+  try {
+    const r = await buildSheetPdfBlob()
+    if (!r) { ElMessage.warning(tt('未找到可导出的单据')); return }
+    const url = URL.createObjectURL(r.blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = r.name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
     ElMessage.success(tt('已导出') + ' PDF')
   } catch (e) {
     console.error('pdf-export failed', e)
     ElMessage.error(tt('导出失败'))
   } finally {
-    if (holder) holder.remove()
+    loadingMsg.close()
+  }
+}
+/**
+ * 打印预览:生成**与导出 PDF 同一份**纸张 PDF,在新窗口打开 —— 浏览器 PDF 阅读器自带
+ * 打印/缩放/另存为,所见即所得(用户口径「打印预览也需要实现」)。
+ * ⚠ 窗口必须**同步**先开(否则 await 之后被浏览器当弹窗拦截),拿到 blob 再指向它。
+ */
+async function previewSheetPdf() {
+  exportFmtVisible.value = false
+  const win = window.open('', '_blank')
+  const loadingMsg = ElMessage({ message: tt('正在生成打印预览…'), duration: 0 })
+  try {
+    const r = await buildSheetPdfBlob()
+    if (!r) { if (win) win.close(); ElMessage.warning(tt('未找到可导出的单据')); return }
+    const url = URL.createObjectURL(r.blob)
+    if (win) win.location.href = url
+    else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+    setTimeout(() => URL.revokeObjectURL(url), 120000)
+  } catch (e) {
+    if (win) win.close()
+    console.error('pdf-preview failed', e)
+    ElMessage.error(tt('导出失败'))
+  } finally {
     loadingMsg.close()
   }
 }
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {
   exportFmtVisible.value = false
-  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录 / 制程检验单纸面)
+  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录 / 制程检验单 / 首件检验单纸面)
   const catalogExporter = {
     RD_PROGRESS: 'exportProgressExcel',
     QC_CATALOG: 'exportCatalogExcel',
     QC_PROC_INSP: 'exportProcInspExcel',
+    QC_FIRST_INSP: 'exportFirstInspExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value

@@ -24,7 +24,7 @@
        ⚠ 表观及脱粉那两列**不是数字格**(图片里是"无粘模/轻微粘模/严重粘模"这种勾选),
          这里按可勾的选项渲染;其余列是文本录入格(图片里那些 "/" 是"本格无需填写"的占位)。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="fi-sheet">
+  <div class="fi-sheet" :class="{ 'is-editing': editable }">
     <!-- 相关要求(纸面底部那 6 条)里**必须让人看见**的两条,做成纸张顶部提醒条 —— 只读态也显示,
          打印/导出一样带出来(它们本身就是要贴在单上的处置要求):
            · 第 6 条 C-95 客户相关产品:脱模后立马进行首件检验(判据 = 表头「客户代码」,出单时从工单带入);
@@ -138,6 +138,9 @@
         <tr>
           <template v-for="g in groups" :key="'h-' + g">
             <th v-for="c in groupCols(g)" :key="c.key" class="col-head">
+              <!-- 列名的**文字**版本:只读态直接用它;可编辑态屏上让位给下面的改名输入框,
+                   但**打印时显形** —— el-input 是单行控件,列一窄文字就被裁成「炭棒表」这种残词 -->
+              <span class="fi-colhead-text">{{ columnHeadText(c) }}</span>
               <template v-if="editable">
                 <el-input
                   :model-value="c.label"
@@ -158,7 +161,6 @@
                 </el-select>
                 <span class="fi-coldel no-print" :title="tt('删除本列')" @click="removeCol(c)">×</span>
               </template>
-              <template v-else>{{ c.label }}<small v-if="c.unit">({{ c.unit }})</small></template>
             </th>
           </template>
         </tr>
@@ -249,16 +251,11 @@
     </table>
     </div>
 
-    <!-- ⑤ 相关要求(图片底部 6 条) -->
+    <!-- ⑤ 相关要求(图片底部 6 条;模板与 Excel 导出**共用** REQUIREMENTS 这一份,别两处各写一遍) -->
     <div class="fi-requirements">
       <b>{{ tt('相关要求') }}：</b>
       <ol>
-        <li>{{ tt('表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，炭棒强度测试2支样品，浊度及压降测试记录2支样品。') }}</li>
-        <li>{{ tt('鉴于胚棒为初步测量确认，测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；挤压强度及压降按表显数据记录。') }}</li>
-        <li>{{ tt('检测标准依据炭棒工艺配方管控清单（如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试）。') }}</li>
-        <li>{{ tt('炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。') }}</li>
-        <li>{{ tt('测试样品需保留至本班次生产完成。') }}</li>
-        <li>{{ tt('C-95客户相关产品脱模后立马进行首件检验。') }}</li>
+        <li v-for="(r, i) in REQUIREMENTS" :key="i">{{ tt(r) }}</li>
       </ol>
     </div>
 
@@ -282,8 +279,9 @@ import { tt } from '@/i18n'
 import {
   columnsOf, groupsOf, addColumn, removeColumn, updateColumn,
   columnHasContent, ensureItems, ROW_STANDARD, ROW_SAMPLE, GROUP_ORDER,
-  seedDefaultColumns, samplesOfGroup, isFillableCell,
+  seedDefaultColumns, samplesOfGroup, isFillableCell, columnHeadText,
 } from './firstInspCols.js'
+import { buildFirstInspExport } from './firstInspExport.js'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -435,6 +433,51 @@ const gridMinWidth = computed(() => {
   const cols = Math.max(1, columns.value.length)
   return `${96 + cols * COL_MIN_WIDTH + (props.editable ? 40 : 0)}px`
 })
+
+/**
+ * 纸面《相关要求》6 条 —— **模板与 Excel 导出共用这一份**(别两处各写一遍,否则改文案必漏一处)。
+ * 纸面事实文案,不入 tt() 的源串;渲染与导出时逐条过 tt()。
+ */
+const REQUIREMENTS = [
+  '表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，炭棒强度测试2支样品，浊度及压降测试记录2支样品。',
+  '鉴于胚棒为初步测量确认，测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；挤压强度及压降按表显数据记录。',
+  '检测标准依据炭棒工艺配方管控清单（如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试）。',
+  '炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。',
+  '测试样品需保留至本班次生产完成。',
+  'C-95客户相关产品脱模后立马进行首件检验。',
+]
+
+/**
+ * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(《炭棒成型车间首件检验记录表》),
+ * 不是列表页那套"头字段键值 + 全明细"的数据导出。
+ * 版式(标题/抬头/两层表头/标准行/1#..8# 矩阵/相关要求/表尾)由 core/qc/firstInspExport.js 给
+ * (纯函数 + 单测),这里只做 xlsx 的 aoa_to_sheet + 列宽 + 合并 + writeFile(照 QcProcInspSheet 的写法)。
+ * 入口:面板右侧「文档输出 → 导出」→「导出 Excel(.xlsx)」(PanelxList.exportSheetExcel 按面板码路由到本函数)。
+ */
+async function exportFirstInspExcel() {
+  const XLSX = await import('xlsx')
+  const head = props.head || {}
+  const no = String(head['单据编号'] || head['编号'] || '')
+  const name = tt('炭棒成型车间首件检验记录表')
+  const { aoa, cols, merges } = buildFirstInspExport({
+    title: name,
+    subtitle: `惠州市银嘉环保科技有限公司　　${tt('单据编号')}：${no}　　${tt('单据状态')}：${tt(String(head['单据状态'] || ''))}`,
+    headPairs: HEAD_FIELDS.map((f) => ({ label: tt(f.label), value: headText(f) })),
+    columns: columns.value,
+    items: items.value,
+    requirements: REQUIREMENTS.map((r) => tt(r)),
+    foot: {
+      resultLabel: tt('检验结果'), result: String(head['总结论'] || ''),
+      byLabel: tt('检验人'), by: String(head['检验员'] || ''),
+    },
+  })
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = cols
+  ws['!merges'] = merges
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 28))
+  XLSX.writeFile(wb, `${name}-${no || '导出'}.xlsx`)
+}
 
 /**
  * 纸张右上信息三格(图片上那三行)。数据键 = yj_field 的 col_name(与后端列同名)。
@@ -635,6 +678,9 @@ function toggleCheck(sample, c, option) {
     ).catch(() => { /* 关掉即可,不阻断录入 */ })
   }
 }
+
+/** 「导出 Excel」入口(PanelxList.exportSheetExcel 按面板码 QC_FIRST_INSP 路由到它) */
+defineExpose({ exportFirstInspExcel })
 </script>
 
 <style scoped>
@@ -799,6 +845,16 @@ function toggleCheck(sample, c, option) {
   box-shadow: none;
   background: transparent;
   padding: 0 2px;
+}
+/* 列名的**文字**版本(见模板注释):可编辑态屏上藏起来、打印时显形。
+   ⚠ 必须先有这条默认显示规则 —— 只读态(不可编辑)就是靠它把列名画出来的。 */
+.fi-colhead-text {
+  display: inline;
+  word-break: break-word;
+  line-height: 1.25;
+}
+.fi-sheet.is-editing .fi-colhead-text {
+  display: none;
 }
 .fi-colname :deep(.el-input__wrapper:hover) {
   box-shadow: 0 0 0 1px #b7c7dd inset;
@@ -1020,5 +1076,128 @@ function toggleCheck(sample, c, option) {
 .fi-foot td:nth-child(3) {
   width: 96px;
   text-align: center;
+}
+</style>
+
+<!-- 打印整张:只保留纸张(与检验数据记录表 / 检验目录 / 项目进度查询同口径)。
+     ⚠ 2026-10-17 修 —— 此前本组件**没有**这段:公共打印样式(见 DocSheet.vue 的非 scoped 块)
+       把 `body.approval-printing .portal` 整体 `visibility: hidden`,再逐个 whitelist 纸张根类名
+       (`.approval-sheet` / `.progress-sheet` / `.catalog-sheet` / `.qc-rec-sheet` / `.rsp-sheet`),
+       而 `.fi-sheet` **不在名单里** ⇒ 点「打印」出来是一张**空白页**
+       (实测 `getComputedStyle(.fi-sheet).visibility === 'hidden'`)。
+     ⚠ 列多时的屏上行为是"表格按 min-width 撑开 + 外层横向滚动";打印必须把它缩回纸宽,
+       否则右半张被裁掉。@page 用**具名页** `fi-wide` 只给本纸张用横向 A4,不影响别的纸张。 -->
+<style>
+@media print {
+  body.approval-printing .portal {
+    visibility: hidden;
+  }
+  body.approval-printing .topbar,
+  body.approval-printing .func-zone,
+  body.approval-printing .tabsbar,
+  body.approval-printing .help-panel,
+  body.approval-printing .nav-mask,
+  body.approval-printing .approval-side,
+  body.approval-printing .tools {
+    display: none !important;
+  }
+  body.approval-printing .portal-body,
+  body.approval-printing .portal-main,
+  body.approval-printing .portal-content,
+  body.approval-printing .panelx-list,
+  body.approval-printing .approval-layout {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+  }
+  body.approval-printing .fi-sheet {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 1px solid #8a8a8a !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body.approval-printing .fi-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* 屏上靠 min-width 撑开 + 横向滚动;打印要把表格收回纸宽,否则右半张被裁 */
+  body.approval-printing .fi-grid-scroll {
+    overflow: visible !important;
+  }
+  body.approval-printing .fi-grid {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  /* 纸面缩到一页(与检验目录/项目进度查询同一套口径:10px + 1px 内边距 + 允许换行) */
+  body.approval-printing .fi-head th,
+  body.approval-printing .fi-head td,
+  body.approval-printing .fi-grid th,
+  body.approval-printing .fi-grid td,
+  body.approval-printing .fi-foot th,
+  body.approval-printing .fi-foot td {
+    font-size: 10px !important;
+    padding: 1px 2px !important;
+    height: auto !important;
+    line-height: 1.3 !important;
+    word-break: break-all !important;
+  }
+  body.approval-printing .fi-title {
+    font-size: 20px !important;
+  }
+  body.approval-printing .fi-grid .el-input__inner,
+  body.approval-printing .fi-grid .el-textarea__inner,
+  body.approval-printing .fi-head .el-input__inner,
+  body.approval-printing .fi-check,
+  body.approval-printing .fi-stdtext {
+    font-size: 10px !important;
+  }
+  body.approval-printing .fi-check {
+    line-height: 1.3 !important;
+  }
+  /* 列名用**文字版**画(输入框是单行控件,列一窄就被裁成「炭棒表」这种残词) */
+  body.approval-printing .col-head .fi-colhead-text {
+    display: inline !important;
+  }
+  body.approval-printing .col-head .fi-colname,
+  body.approval-printing .col-head .fi-colgroup {
+    display: none !important;
+  }
+  /* 占位提示词("请选择"/"选择日期")不该印在纸上。
+     ⚠ el-select 的"请选择"**不是** input placeholder,而是 `.el-select__placeholder.is-transparent`
+       (选中值那一个没有 is-transparent —— 只藏 placeholder,别把真值一起藏了,实测两种态都抓过)。 */
+  body.approval-printing .fi-sheet input::placeholder,
+  body.approval-printing .fi-sheet textarea::placeholder {
+    color: transparent !important;
+  }
+  body.approval-printing .fi-sheet .el-select__placeholder.is-transparent {
+    visibility: hidden !important;
+  }
+  /* 弹窗(append-to-body,不在 .portal 里)**不跟着 .portal 一起隐藏** ⇒ 开着弹窗按打印会把它印上去 */
+  body.approval-printing .el-overlay,
+  body.approval-printing .el-message-box__wrapper,
+  body.approval-printing .el-message {
+    display: none !important;
+  }
+  /* 编辑态控件不该出现在纸面上(拖动下标/加列/删列/分组下拉/操作列) */
+  body.approval-printing .fi-rowgrip,
+  body.approval-printing .fi-addcol,
+  body.approval-printing .fi-coldel,
+  body.approval-printing .fi-colgroup,
+  body.approval-printing .col-op {
+    display: none !important;
+  }
+  @page {
+    margin: 8mm;
+  }
 }
 </style>

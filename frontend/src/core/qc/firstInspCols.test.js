@@ -14,7 +14,7 @@ import {
   columnsOf, groupsOf, unitOfLabel, nextColumnKey, nextColumnLabel,
   rowsForColumn, addColumn, removeColumn, updateColumn, columnHasContent, ensureItems,
   seedDefaultColumns, DEFAULT_TEST_ITEMS, mergeFetchedColumns, ensureColumnRows,
-  samplesOfGroup, isFillableCell,
+  samplesOfGroup, isFillableCell, columnHeadText,
 } from './firstInspCols.js'
 
 const headOf = (items = []) => ({ 单据编号: 'SJ-T-1', detail: { items } })
@@ -358,4 +358,14 @@ test('未知分组兜底:自定义组名仍可填(落到最后一对样品),不�
 test('样品序号按数字比:字符串「3」也算 3#(明细里的样品序号有字符串来源)', () => {
   assert.equal(isFillableCell('3', '尺寸及重量'), true)
   assert.equal(isFillableCell('1', '尺寸及重量'), false)
+})
+
+/* ── 列头显示文字(2026-10-17:单位不重复) ───────────────────────────── */
+
+test('列头文字:列名里已含单位的不再后缀括号(浊度NTU 不写成 浊度NTU(NTU))', () => {
+  assert.equal(columnHeadText({ label: '炭棒外径', unit: 'mm' }), '炭棒外径(mm)')
+  assert.equal(columnHeadText({ label: '浊度NTU', unit: 'NTU' }), '浊度NTU')
+  assert.equal(columnHeadText({ label: '压降kPa', unit: 'kPa' }), '压降kPa')
+  assert.equal(columnHeadText({ label: '跌落', unit: '' }), '跌落')
+  assert.equal(columnHeadText(null), '')
 })
