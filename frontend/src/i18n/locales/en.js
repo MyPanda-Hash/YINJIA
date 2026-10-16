@@ -147,6 +147,13 @@ export default {
     '单据预览': 'Document Preview',
     '单据操作': 'Document Operation',
     '文档输出': 'Document output',
+    // 侧栏整理(2026-10-16):分段序号 + 二级签核
+    '① 查找': '1. Search',
+    '② 本单操作': '2. This document',
+    '③ 流程': '3. Workflow',
+    '④ 文档输出': '4. Document output',
+    '⑤ 危险操作': '5. Danger zone',
+    '二级签核': 'Second-level sign-off',
     '点击修改预警数量，留空使用默认阈值50': 'Click to modify the alert quantity and leave it blank to use the default threshold of 50',
     '数据记录表单据': 'Data Record Table Document',
     '该项目暂无数据记录表单据（数据记录表按文档编号关联立项申请，请确认已按该项目编号填写）': 'There is no data record form document for this project (the data record form is associated with the project application by the document number, please confirm that it has been filled in by the project number)',

@@ -83,8 +83,9 @@ test('文书归档面板放出「弃审」入口,置灰口径与后端一致(已
   // 用户报障「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」。
   assert.match(panelx, /const canUnauditHere = computed\(\(\) => isDocArchivePanel\.value[\s\S]{0,300}?canApproveHere\(\) \|\| devFileCanEditHere\.value\)/,
     'canUnauditHere 必须存在:文书归档面板 + 已审核/已归档 + (有审批权 ∪ 本文件责任人)')
-  assert.match(panelx, /v-if="canUnauditHere"[\s\S]{0,300}?pickModAction\('弃审'\)/,
-    '侧栏必须真的放出「弃审」按钮(此前只有标准流面板有,归档一族只能走申请修改闭环)')
+  assert.match(panelx, /v-if="canUnauditHere \|\| \(hasApprovalBtns && canApproveHere\(\)\)"[\s\S]{0,400}?onSideAction\('弃审'\)/,
+    '侧栏必须真的放出「弃审」按钮(此前只有标准流面板有,归档一族只能走申请修改闭环);' +
+    '2026-10-16 侧栏整理后它沉到「⑤ 危险操作」段,动作入口由 pickModAction 改为 onSideAction(下拉已撤)')
   assert.match(panelx, /弃审: !current\.value \|\| !\['已审核', '已归档', '已生效'\]\.includes\(st\)/,
     '弃审置灰口径要覆盖已归档 —— 否则归档单上按钮永远点不动')
 })
