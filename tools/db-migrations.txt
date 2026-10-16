@@ -3733,3 +3733,7 @@ migrate-mold-feed-stdlib-20261013.sql
 migrate-rd-sheet-ref-tidy-20261013.sql
 migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
+# migrate-first-insp-audit-trail-20261018.sql — 首件检验单开直接审核(用户口径「为当前的首件检验单增加审核功能,参照制程检验单」):
+#   存量已审核单据补 AUDIT 留痕(yj_form_approval);只针对 QC_FIRST_INSP、幂等 + 自检。
+#   取证:两账套此前面板无审核入口 ⇒ 补录 0 行(属预期);修法代码侧 = PanelxList.DIRECT_AUDIT_PANELS + 纸面/报表「审核人」格。
+migrate-first-insp-audit-trail-20261018.sql

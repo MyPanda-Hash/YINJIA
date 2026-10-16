@@ -407,8 +407,9 @@
                 <div v-else class="as-side-hint">{{ tt(approvalWaitingTip) }}</div>
               </template>
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
-              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」):
-                   工序检验单一族(当前只放制程检验单,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
+              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」;
+                   2026-10-18 首件检验单同口径放开):
+                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
                    也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
                    有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
                    ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
@@ -3671,8 +3672,17 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  * 权限:**仅管理员**。2026-09-22「直审收权」后,前端审批组不再给非管理员直审入口,后端
  * ButtonService.audit() 也硬拒非管理员(「其他角色请走提交审批」)——这里与后端同口径,
  * 否则非管理员点了只会拿到 403。要给某个检验单放开:把面板码加进本名单即可。
+ *
+ * ⚠ 2026-10-18(用户口径「为当前的首件检验单增加审核功能,审核功能实现参照当前的制程检验单」):
+ *   首件检验单(QC_FIRST_INSP)与制程检验单同属工序检验单一族(同样是报工驱动的检验记录、
+ *   既不进两级审批的 8 张质量单据、也没有审批流)⇒ 同一口径放开。放开即同时获得:
+ *   ① 侧栏「审核 / 弃审」(仅管理员);② 直审留痕(后端 ButtonService.audit() → yj_form_approval
+ *   的 AUDIT/APPROVED 行)⇒ 侧栏「审批情况」查得到谁审的/什么时候/审核意见;
+ *   ③ 审核后单据锁定(单据状态=已审核 ⇒ draftEditable 为假、纸面只读);
+ *   ④ 纸面/列表/服务端报表的「审核人」格由 QueryService 虚拟字段(取 yj_doc_status.shr)自动显示。
+ *   存量已直审单据的 AUDIT 行由 tools/migrate-first-insp-audit-trail-20261018.sql 补录。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP']
+const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))

@@ -1,0 +1,13 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _q-state.sql ==
+  | QC_FIRST_INSP | 首件检验单 | doc | qc_first_insp_detail | qc_first_insp_head | 单据编号 | 单据编号 | null | 
+  | QC_PROC_INSP | 制程检验单 | doc | qc_proc_insp_detail | qc_proc_insp_head | 单据编号 | 单据编号 | null | 
+  | QC_FIRST_INSP | 7 | N | view,query,add,modify,modlog,del,export | 
+  | QC_PROC_INSP | 7 | N | view,query,add,modify,modlog,del,export | 
+  | QC_FIRST_INSP | 草稿 | 127 | 
+  | QC_PROC_INSP | 已作废 | 18 | 
+  | QC_PROC_INSP | 草稿 | 9 | 
+  | QC_PROC_INSP | AUDIT | APPROVED | 5 | 
+  | QC_PROC_INSP | UNAUDIT | PENDING | 10 | 
+  | 27 | 127 | 180 | 
+[OK] _q-state.sql (1 batches)
