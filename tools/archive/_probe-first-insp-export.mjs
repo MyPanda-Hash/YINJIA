@@ -128,6 +128,27 @@ try {
     .map((e) => (e.innerText || '').trim()).filter(Boolean))()`)
   for (const t of ['打印', '导出报表', '导出']) ok(`① 侧栏有「${t}」`, (acts || []).includes(t), JSON.stringify(acts))
 
+  // ── ①b 服务端报表模板(用户口径「打印样式需要实现就是当前报表的 excel 表」=「导出报表」里那张模板) ──
+  //    这一条走**界面**(用户点的是这里);接口侧的核验在 _probe-first-insp-report.mjs
+  await clickByText('导出报表')
+  await sleep(1800)
+  const rpt = await ev(`(() => {
+    const dlgs = [...document.querySelectorAll('.el-dialog')].filter((d) => d.getBoundingClientRect().height > 0)
+    const d = dlgs[dlgs.length - 1]
+    return { text: (d?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 240),
+      items: [...document.querySelectorAll('.efmt-item .efmt-name')].filter((e) => e.getBoundingClientRect().height > 0)
+        .map((e) => (e.innerText || '').trim()) }
+  })()`)
+  console.log(`  导出报表弹窗=${JSON.stringify(rpt?.text)}`)
+  ok('①b 该面板已挂上专用报表模板(弹窗里是「炭棒成型车间首件检验记录表」,不再是 generic 通用模板)',
+    /炭棒成型车间首件检验记录表/.test(String(rpt?.text)) && !/暂无报表模板/.test(String(rpt?.text)),
+    JSON.stringify(rpt?.text))
+  ok('①b 弹窗里有 打印预览 / 导出 PDF / 导出 Excel 三项',
+    ['打印预览', '导出 PDF', '导出 Excel'].every((t) => (rpt?.items || []).some((x) => x.includes(t))),
+    JSON.stringify(rpt?.items))
+  await ev(`(() => { const b=[...document.querySelectorAll('.el-dialog__footer button')].find((x)=>(x.innerText||'').trim()==='取消'); if(b) b.click(); return 'ok' })()`)
+  await sleep(700)
+
   // ── 安装下载/打印钩子(留住 Blob 本体,便于把 xlsx 解出来核对版式) ──
   await ev(`(() => {
     window.__blobs = []; window.__raw = []; window.__printed = 0; window.__opened = 0

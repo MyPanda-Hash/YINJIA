@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  炭棒成型车间首件检验记录表 —— **骨架模板**(QC_FIRST_INSP,2026-10-17)
+  ============================================================================
+  用户口径:「打印样式需要实现就是当前报表的excel表,当前制程检验单已经存在实现。」
+  ⇒ 「文档输出 → 导出报表」的服务端报表要按**面板上这张纸**出(与它的 Excel 导出同版式),
+     参照制程检验单(qc_proc_insp)/组装成品检验单(qc_asm_insp)的既有实现。
+  改前:本面板没有专用模板,ReportService 回落 generic 通用模板 ⇒ 导出来是 14 页 / 415 行的
+     「序号/检验项目/检验要求/检验方法」字段流水,与这张纸毫无关系。
+
+  ⚠ 本文件**只有 styles + 标准 .jrxml 的固定段** —— 表头(两级)与 1#..8# 样品行由
+    `QcFirstInspReportSupport` 按**当前明细里实际存在的测试项目**生成后拼进来再编译
+    (首件检验单的面板支持"新增测试项目 = 新增一列",列不能写死;JR 6.x 的 reportElement
+     的 x/y/width/height 只能是整数常量,运行期换列会被 XSD 拒)。
+     ⇒ **别在这里加 <columnHeader>/<detail>**,会与生成段重复而编译失败。
+
+  段位(严格按 XSD 顺序 title → columnHeader → detail → pageFooter → summary):
+    <title>     公司抬头 + 大标题 + 抬头四对(产品编号/产品型号/生产日期/组别,值走 $P{})
+    (生成段)    <columnHeader> 两级表头   <detail> 标准行 + 1#..8# 样品行
+    <summary>   《相关要求》6 条(纸面固定文案) + 表尾(检验结果/检验人,值走 $P{})
+    <pageFooter> 页码 + 打印时间
+
+  参数契约(由生成器声明,这里只用到固定几个):
+    产品编号 / 产品型号 / 生产日期 / 组别 / 总结论 / 检验员 / 打印时间
+    + 生成的:表头列名 N1..Nn、标准 STD1..STDn、每格 V{样品}_{列}
+  ⚠ columnWidth 必须 = pageWidth − 左右边距(842 − 30×2 = 782),否则表体会被截。
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="qc_first_insp" language="java" columnCount="1"
+              pageWidth="842" pageHeight="595"
+              columnWidth="782" leftMargin="30" rightMargin="30" topMargin="24" bottomMargin="24"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="c9f5e3b1-74a2-4d18-8e36-af2b8c4d1e62">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <!-- ======================= 样式(与 so_order / qc_proc_insp / qc_asm_insp 同套) ======================= -->
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <style name="cell" style="base" hAlign="Left" vAlign="Middle">
+    <box padding="2">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
+  <style name="cellC" style="cell" hAlign="Center"/>
+  <style name="cellL" style="cell" hAlign="Left"/>
+  <style name="small" style="cell" fontSize="7"/>
+  <style name="smallC" style="small" hAlign="Center"/>
+  <style name="th" style="cellC" fontSize="8" isBold="true" mode="Opaque" backcolor="#EFEFEF"/>
+  <style name="thGroup" style="th" fontSize="9" backcolor="#E0E0E0"/>
+  <!-- 左上角斜线格:两行字分开画(右上=测试项目、左下=样品序号),拼出纸面那条斜线的观感 -->
+  <style name="cornerA" style="th" hAlign="Right"/>
+  <style name="cornerB" style="th" hAlign="Left"/>
+  <style name="company" style="base" fontSize="16" isBold="true" hAlign="Center" vAlign="Bottom"/>
+  <style name="docTitle" style="base" fontSize="15" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="metaL" style="cell" fontSize="8" isBold="true" mode="Opaque" backcolor="#F2F2F2"/>
+  <style name="metaV" style="cell" fontSize="8"/>
+  <style name="req" style="base" fontSize="8" vAlign="Middle"/>
+  <style name="pager" style="base" fontSize="8" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+
+  <!-- ======================= 标题 + 抬头四对(值走参数,不随明细重复) ======================= -->
+  <title>
+    <band height="86">
+      <staticText>
+        <reportElement style="company" x="0" y="0" width="782" height="22"/>
+        <text><![CDATA[惠州市银嘉环保科技有限公司]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="docTitle" x="0" y="22" width="782" height="20"/>
+        <text><![CDATA[炭棒成型车间首件检验记录表]]></text>
+      </staticText>
+      <!-- 抬头四对:每行 2 组「标签|值」;标签 98pt、值 293pt(合计 782) -->
+      <staticText><reportElement style="metaL" x="0" y="46" width="98" height="16"/><text><![CDATA[产品编号]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="98" y="46" width="293" height="16"/>
+        <textFieldExpression><![CDATA[$P{产品编号}]]></textFieldExpression></textField>
+      <staticText><reportElement style="metaL" x="391" y="46" width="98" height="16"/><text><![CDATA[产品型号]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="489" y="46" width="293" height="16"/>
+        <textFieldExpression><![CDATA[$P{产品型号}]]></textFieldExpression></textField>
+      <staticText><reportElement style="metaL" x="0" y="64" width="98" height="16"/><text><![CDATA[生产日期]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="98" y="64" width="293" height="16"/>
+        <textFieldExpression><![CDATA[$P{生产日期}]]></textFieldExpression></textField>
+      <staticText><reportElement style="metaL" x="391" y="64" width="98" height="16"/><text><![CDATA[组别]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="489" y="64" width="293" height="16"/>
+        <textFieldExpression><![CDATA[$P{组别}]]></textFieldExpression></textField>
+    </band>
+  </title>
+
+  <!-- ======================= 页脚 ======================= -->
+  <pageFooter>
+    <band height="18">
+      <textField><reportElement style="pager" x="0" y="0" width="200" height="13"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression></textField>
+      <textField isBlankWhenNull="true"><reportElement style="pagerR" x="582" y="0" width="200" height="13"/>
+        <textFieldExpression><![CDATA["打印时间：" + $P{打印时间}]]></textFieldExpression></textField>
+    </band>
+  </pageFooter>
+
+  <!-- ======================= 相关要求 6 条(纸面固定文案)+ 表尾 =======================
+       ⚠ 文案与面板 QcFirstInspSheet.vue 的 REQUIREMENTS 常量**逐字一致**(改一处必须同步另一处)。
+       8pt 下 782pt 宽一行约容 97 个汉字,这 6 条最长的一条约 66 字 ⇒ 各占一行不折行(已核)。 -->
+  <summary>
+    <band height="126">
+      <staticText><reportElement style="req" x="0" y="0" width="782" height="14"/><text><![CDATA[相关要求：]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="14" width="782" height="14"/><text><![CDATA[1. 表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，炭棒强度测试2支样品，浊度及压降测试记录2支样品。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="28" width="782" height="14"/><text><![CDATA[2. 鉴于胚棒为初步测量确认，测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；挤压强度及压降按表显数据记录。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="42" width="782" height="14"/><text><![CDATA[3. 检测标准依据炭棒工艺配方管控清单（如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试）。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="56" width="782" height="14"/><text><![CDATA[4. 炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="70" width="782" height="14"/><text><![CDATA[5. 测试样品需保留至本班次生产完成。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="84" width="782" height="14"/><text><![CDATA[6. C-95客户相关产品脱模后立马进行首件检验。]]></text></staticText>
+      <!-- 表尾:检验结果 | 检验人(与面板表尾同口径) -->
+      <staticText><reportElement style="metaL" x="0" y="102" width="98" height="20"/><text><![CDATA[检验结果]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="98" y="102" width="391" height="20"/>
+        <textFieldExpression><![CDATA[$P{总结论}]]></textFieldExpression></textField>
+      <staticText><reportElement style="metaL" x="489" y="102" width="98" height="20"/><text><![CDATA[检验人]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="587" y="102" width="195" height="20"/>
+        <textFieldExpression><![CDATA[$P{检验员}]]></textFieldExpression></textField>
+    </band>
+  </summary>
+</jasperReport>

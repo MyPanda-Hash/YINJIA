@@ -125,9 +125,11 @@ frontend/.build-tmp/
 # ⚠ 历史上已入库的 png 保持原样(已跟踪文件不受本规则影响,不会被动删);
 #   将来确有需要入库的图,显式 `git add -f <路径>` 并在提交信息里说明理由。
 *.png
-# 探针产出的 PDF 同理(打印管线取证产物,如 _probe-first-insp-export.mjs --printpdf):
-# 只留本地作证据,不入库。真正要交付的 PDF 请显式 `git add -f`。
+# 探针产出的 PDF / Excel 同理(打印与报表管线的取证产物,如
+# _probe-first-insp-export.mjs --printpdf、_probe-first-insp-report.mjs --xlsx):
+# 只留本地作证据,不入库。真正要交付的文件请显式 `git add -f`。
 _*.pdf
+_*.xlsx
 
 # ── javac 落在仓库里的 .class 一律不入库(2026-10-17 审查增)────────────
 # `java -cp tools/lib/mssql-jdbc.jar tools/xxx.java` 这类单文件源码启动会在**源码旁边**留下 .class
