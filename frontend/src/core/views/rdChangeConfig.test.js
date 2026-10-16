@@ -91,17 +91,34 @@ test('表尾段渲染必须认 row.grid 与 row.h(否则调 h 也不生效,行�
     '旧式 {label,key} 尾行仍要渲染')
 })
 
-test('RD_CHANGE 尾段每行 h = 原值 ×1.5(92→138 / 74→111),大填写区 rows 2→3', () => {
+test('RD_CHANGE 尾段行高 = 原始值与 ×1.5 的**中点**(用户两轮口径:先 ×1.5,再"太长了取中间值")', () => {
   const tail = recordSheetConfigs.RD_CHANGE.tailSections || []
   const byBar = Object.fromEntries(tail.map((s) => [s.bar, s]))
   assert.ok(byBar['三.相关变更'], '尾段「三.相关变更」在')
-  assert.equal(byBar['三.相关变更'].rows[0].h, 138, '相关变更行高 92 ×1.5 = 138')
-  assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 2 行 ×1.5 = 3 行')
+  assert.equal(byBar['三.相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
+  assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
   for (const bar of ['四、库存产品处理方式', '五、其它', '批准']) {
     const sec = byBar[bar]
     assert.ok(sec, `尾段「${bar}」在`)
-    for (const r of sec.rows) assert.equal(r.h, 111, `${bar} 每行 h 应为 111(74 ×1.5)`)
+    for (const r of sec.rows) assert.equal(r.h, 92, `${bar} 每行 h 应为 92(74 与 111 的中点)`)
   }
+})
+
+test('「批准」段下方三格是**手签空白区**:只读、不给 key(用户口径「批注/签字/日期不能填写」)', () => {
+  const sec = (recordSheetConfigs.RD_CHANGE.tailSections || []).find((s) => s.bar === '批准')
+  assert.ok(sec, '批准段在')
+  const labelRow = sec.rows[0].grid
+  assert.deepEqual(labelRow.map((c) => c.label), ['批准', '签字', '日期'], '第一行是三个静态标签')
+  const signRow = sec.rows[1].grid
+  assert.equal(signRow.length, 3, '第二行三格手签区')
+  for (const c of signRow) {
+    assert.equal(c.key, undefined, '手签格**不能**带 key —— 带了就真能填了(纸面是留给手签的)')
+    assert.equal(c.ro, true, '手签格显式标 ro,意图写在配置里')
+  }
+  // 渲染侧:不带 key 的格必须落到只读文本(AnnotatedText),不能落进可编辑分支
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,600}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| c\.fixed \|\| ''"/,
+    '网格格:无 key/ro 时必须是只读文本,不能给输入控件')
 })
 
 test('网格行渲染必须读 row.h / c.rows(否则配置里的行高不生效)', () => {
