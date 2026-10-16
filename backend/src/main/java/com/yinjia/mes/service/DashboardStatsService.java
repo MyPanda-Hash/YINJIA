@@ -39,24 +39,96 @@ public class DashboardStatsService {
     }
 
     public Map<String, Object> stats() {
+        return stats(null, null);
+    }
+
+    /**
+     * 看板统计(2026-10-16 起支持时间区间):所有模块的**单据/事件口径**都按 [from, to] 过滤,
+     * 趋势按区间分桶(≤31 天按天、更长按周)。不传或传坏值时默认「近 30 天(含今天)」。
+     * ⚠ 时点值不随区间变(库存现存量、档案数、单据累计量),前端在卡片上标注「截至 to」。
+     */
+    public Map<String, Object> stats(String from, String to) {
+        Range r = Range.of(from, to);
         Map<String, Object> out = new HashMap<>();
-        out.put("kpis", kpis());
+        out.put("range", Map.of("from", r.from().toString(), "to", r.to().toString(), "days", r.days(), "bucket", r.weekly() ? "week" : "day"));
+        out.put("kpis", kpis(r));
         out.put("archives", archives());
         out.put("docStats", docStats());
         out.put("todos", List.of());
-        out.put("latest", latestActivities());
-        out.put("progress", progress());
-        out.put("production", production());
-        out.put("stock", stock());
-        out.put("sales", sales());
-        out.put("quality", quality());
-        out.put("rd", rd());
+        out.put("latest", latestActivities(r));
+        out.put("progress", progress(r));
+        out.put("production", production(r));
+        out.put("stock", stock(r));
+        out.put("sales", sales(r));
+        out.put("quality", quality(r));
+        out.put("rd", rd(r));
         return out;
+    }
+
+    /**
+     * 看板时间区间(闭区间,含首尾)。非法/缺省 ⇒ 近 30 天;上限 366 天(再长就按周分桶,查询量恒定)。
+     */
+    public record Range(LocalDate from, LocalDate to) {
+        public static Range of(String f, String t) {
+            LocalDate to = parseDate(t);
+            LocalDate from = parseDate(f);
+            if (to == null) to = LocalDate.now();
+            if (from == null) from = to.minusDays(29);
+            if (from.isAfter(to)) { LocalDate x = from; from = to; to = x; }
+            if (java.time.temporal.ChronoUnit.DAYS.between(from, to) > 365) from = to.minusDays(365);
+            return new Range(from, to);
+        }
+
+        int days() {
+            return (int) java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1;
+        }
+
+        /** SQL 上界(开区间):单据日期 < toExclusive 即「含 to 当天」 */
+        public String toExclusive() {
+            return to.plusDays(1).toString();
+        }
+
+        public String fromStr() {
+            return from.toString();
+        }
+
+        public String toStr() {
+            return to.toString();
+        }
+
+        /** >31 天改按周分桶(周一为桶首),避免长区间把图表打成一片糊 */
+        public boolean weekly() {
+            return days() > 31;
+        }
+
+        /** 趋势桶键(升序):日桶=yyyy-MM-dd;周桶=该周周一 yyyy-MM-dd */
+        List<String> buckets() {
+            List<String> out = new ArrayList<>();
+            if (weekly()) {
+                LocalDate d = from.minusDays(from.getDayOfWeek().getValue() - 1L);
+                while (!d.isAfter(to)) { out.add(d.toString()); d = d.plusWeeks(1); }
+            } else {
+                for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) out.add(d.toString());
+            }
+            return out;
+        }
+
+        /** 某天落在哪个桶(与 buckets() 同口径) */
+        String bucketOf(LocalDate d) {
+            if (!weekly()) return d.toString();
+            return d.minusDays(d.getDayOfWeek().getValue() - 1L).toString();
+        }
+
+        /** 桶标签:日=10/16;周=10/14 起 */
+        String label(String key) {
+            LocalDate d = LocalDate.parse(key);
+            return weekly() ? d.format(DateTimeFormatter.ofPattern("M/d")) + " 起" : d.format(DateTimeFormatter.ofPattern("M/d"));
+        }
     }
 
     // ---------- 概览 KPI / 档案 / 单据流量 ----------
 
-    private Map<String, Object> kpis() {
+    private Map<String, Object> kpis(Range r) {
         Map<String, Object> kpis = new HashMap<>();
         // ── 生产口径统一到 plang(2026-10-15 修)────────────────────────────────
         // 修前:moActive = Σ(所有面板的「草稿」) = 48;moTotal = Σ(MANU*/WO_* 面板的草稿+已审核) = 0
@@ -66,8 +138,9 @@ public class DashboardStatsService {
         //   而卡上那句「25 单生产中」其实是对的 —— 它来自 prod.statusDist,查的是 plang。
         //   真实工单只有 plang 一处(25 张在产)⇒ 三数统一由 plang 派生,保证 在产+已完工=总数。
         try {
-            int moTotal = count("SELECT COUNT(*) FROM plang");
-            int moDone = count("SELECT COUNT(*) FROM plang WHERE rk_no IS NOT NULL AND rk_no <> ''");
+            // 2026-10-16 区间化:工单按 pl_date(下达日)落在 [from, to] 内统计
+            int moTotal = count("SELECT COUNT(*) FROM plang WHERE pl_date >= ? AND pl_date < ?", r.fromStr(), r.toExclusive());
+            int moDone = count("SELECT COUNT(*) FROM plang WHERE rk_no IS NOT NULL AND rk_no <> '' AND pl_date >= ? AND pl_date < ?", r.fromStr(), r.toExclusive());
             kpis.put("moTotal", moTotal);
             kpis.put("moDone", moDone);
             kpis.put("moActive", Math.max(0, moTotal - moDone));
@@ -99,19 +172,20 @@ public class DashboardStatsService {
      * 时间统一转成字符串下发:前端 compactTime() 按"长度 ≥ 16 的字符串"切 MM-DD HH:mm,
      *   若下发 epoch 数字会原样显示成一串毫秒。
      */
-    private List<Map<String, Object>> latestActivities() {
+    private List<Map<String, Object>> latestActivities(Range r) {
         try {
             List<Map<String, Object>> out = new ArrayList<>();
-            for (Map<String, Object> r : jdbc.queryForList(
+            for (Map<String, Object> r0 : jdbc.queryForList(
                     "SELECT TOP 6 doc_no, panel_code, shr, shsj FROM yj_doc_status"
                             + " WHERE shsj IS NOT NULL AND ISNULL(canceled,'N')<>'Y' AND ISNULL(panel_code,'')<>''"
-                            + " ORDER BY shsj DESC")) {
+                            + " AND shsj >= ? AND shsj < ?"
+                            + " ORDER BY shsj DESC", r.fromStr(), r.toExclusive())) {
                 Map<String, Object> e = new LinkedHashMap<>();
-                e.put("编号", String.valueOf(r.get("doc_no")));
-                e.put("panel", String.valueOf(r.get("panel_code")));
+                e.put("编号", String.valueOf(r0.get("doc_no")));
+                e.put("panel", String.valueOf(r0.get("panel_code")));
                 e.put("状态", "已审核");
-                e.put("时间", r.get("shsj") == null ? null : String.valueOf(r.get("shsj")));
-                e.put("操作人", r.get("shr") == null ? "" : String.valueOf(r.get("shr")));
+                e.put("时间", r0.get("shsj") == null ? null : String.valueOf(r0.get("shsj")));
+                e.put("操作人", r0.get("shr") == null ? "" : String.valueOf(r0.get("shr")));
                 out.add(e);
             }
             return out;
@@ -153,11 +227,12 @@ public class DashboardStatsService {
         return docStats;
     }
 
-    /** 进行中工单(概览工单队列):在产 plang 最近 3 行 */
-    private List<Map<String, Object>> progress() {
+    /** 进行中工单(概览工单队列):区间内下达且未完工的 plang 最近 3 行 */
+    private List<Map<String, Object>> progress(Range r) {
         try {
             return jdbc.queryForList("SELECT TOP 3 pl_no AS [编号], mc AS [产品], scx AS [车间], pl_sl AS [数量]"
-                    + " FROM plang WHERE (rk_no IS NULL OR rk_no = '') ORDER BY id DESC");
+                    + " FROM plang WHERE (rk_no IS NULL OR rk_no = '') AND pl_date >= ? AND pl_date < ?"
+                    + " ORDER BY id DESC", r.fromStr(), r.toExclusive());
         } catch (Exception e) {
             return List.of();
         }
@@ -165,22 +240,22 @@ public class DashboardStatsService {
 
     // ---------- 生产 ----------
 
-    private Map<String, Object> production() {
+    private Map<String, Object> production(Range r) {
         Map<String, Object> prod = new HashMap<>();
         try {
-            int done = count("SELECT COUNT(*) FROM plang WHERE rk_no IS NOT NULL AND rk_no <> ''");
-            int all = count("SELECT COUNT(*) FROM plang");
+            int done = count("SELECT COUNT(*) FROM plang WHERE rk_no IS NOT NULL AND rk_no <> '' AND pl_date >= ? AND pl_date < ?", r.fromStr(), r.toExclusive());
+            int all = count("SELECT COUNT(*) FROM plang WHERE pl_date >= ? AND pl_date < ?", r.fromStr(), r.toExclusive());
             prod.put("statusDist", List.of(
                     Map.of("name", "已完工", "value", done),
                     Map.of("name", "生产中", "value", Math.max(0, all - done))));
             prod.put("workshopDist", nameValue("SELECT scx AS k, COUNT(*) AS v FROM plang"
-                    + " WHERE ISNULL(scx,'') <> '' GROUP BY scx ORDER BY COUNT(*) DESC"));
-            prod.put("trend7", dateTrend("plang", "pl_date", "cp_date"));
+                    + " WHERE ISNULL(scx,'') <> '' AND pl_date >= ? AND pl_date < ? GROUP BY scx ORDER BY COUNT(*) DESC", r.fromStr(), r.toExclusive()));
+            prod.put("trend7", dateTrend(r, "plang", "pl_date", "cp_date"));
             // 工单数据截止日(2026-10-15):近 7 天趋势全 0 时,卡片要能说明"不是图坏了,
             // 是工单数据本身就停在某天" —— 实测本机 plang 的日期都在 2026-08。
             List<Map<String, Object>> lastRow = jdbc.queryForList("SELECT CONVERT(varchar(10), MAX(pl_date), 23) AS d FROM plang");
             prod.put("lastDate", lastRow.isEmpty() ? null : lastRow.get(0).get("d"));
-            prod.put("stageRates", stageRates());
+            prod.put("stageRates", stageRates(r));
             prod.put("bomTree", List.of());
         } catch (Exception e) {
             prod.put("statusDist", List.of());
@@ -302,19 +377,21 @@ public class DashboardStatsService {
         }
     }
 
-    /** 五工序(混料/成型/切炭/组装/装箱)报工完成率:scjl.gxdm 分组,完工=wgzt 已填;未报工工序不出条 */
-    private List<Map<String, Object>> stageRates() {
+    /** 五工序(混料/成型/切炭/组装/装箱)报工完成率:scjl.gxdm 分组,完工=wgzt 已填;未报工工序不出条(按区间) */
+    private List<Map<String, Object>> stageRates(Range r) {
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT gxdm AS k, COUNT(*) AS total, SUM(CASE WHEN wgzt IS NOT NULL AND wgzt <> '' THEN 1 ELSE 0 END) AS done"
-                            + " FROM scjl WHERE ISNULL(gxdm,'') <> '' AND ISNULL(delmark,0) = 0 GROUP BY gxdm ORDER BY gxdm");
+                            + " FROM scjl WHERE ISNULL(gxdm,'') <> '' AND ISNULL(delmark,0) = 0"
+                            + " AND sc_date >= ? AND sc_date < ?"
+                            + " GROUP BY gxdm ORDER BY gxdm", r.fromStr(), r.toExclusive());
             List<Map<String, Object>> out = new ArrayList<>();
-            for (Map<String, Object> r : rows) {
-                int total = toInt(r.get("total"));
-                int done = toInt(r.get("done"));
+            for (Map<String, Object> rr : rows) {
+                int total = toInt(rr.get("total"));
+                int done = toInt(rr.get("done"));
                 if (total <= 0) continue;
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("name", String.valueOf(r.get("k")));
+                m.put("name", String.valueOf(rr.get("k")));
                 m.put("value", Math.round(done * 100.0 / total));
                 m.put("meta", done + "/" + total);
                 out.add(m);
@@ -327,38 +404,34 @@ public class DashboardStatsService {
 
     // ---------- 库存 ----------
 
-    private Map<String, Object> stock() {
+    private Map<String, Object> stock(Range r) {
         Map<String, Object> stock = new HashMap<>();
         try {
-            // 2026-09-30:inh/outh 已由遗留纺织表重建为 MES 库存流水表,旧列名(inh_no/in_date/outh_no/out_date)
-            // 不存在了 —— 继续读旧列名会抛「列名无效」被下面 catch 吞掉,库存卡片因此静默退化为空。
-            // 语义完全一致,只是列名中文化:单数=COUNT(DISTINCT 单据编号),行数=COUNT(*),趋势按 单据日期。
-            int inDocs = count("SELECT COUNT(DISTINCT 单据编号) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y'");
-            int outDocs = count("SELECT COUNT(DISTINCT 单据编号) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y'");
-            int inLines = count("SELECT COUNT(*) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y'");
-            int outLines = count("SELECT COUNT(*) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y'");
+            // 2026-10-16 区间化:单据量/明细行/趋势都按 inh/outh.单据日期 落在 [from,to) 内统计;
+            // 「现存量 TOP」是**时点值**(截至 to),不随区间变 —— 卡片上标注 asOf。
+            int inDocs = count("SELECT COUNT(DISTINCT 单据编号) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?", r.fromStr(), r.toExclusive());
+            int outDocs = count("SELECT COUNT(DISTINCT 单据编号) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?", r.fromStr(), r.toExclusive());
+            int inLines = count("SELECT COUNT(*) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?", r.fromStr(), r.toExclusive());
+            int outLines = count("SELECT COUNT(*) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?", r.fromStr(), r.toExclusive());
             stock.put("totalIn", inDocs);
             stock.put("totalOut", outDocs);
             stock.put("totalLines", inLines + outLines);
+            stock.put("asOf", r.toStr());
             List<Map<String, Object>> panels = new ArrayList<>();
             panels.add(row("panelName", "入库", "count", inDocs, "lines", inLines));
             panels.add(row("panelName", "出库", "count", outDocs, "lines", outLines));
             stock.put("panels", panels);
-            // 近 7 天出入库:入库=added,出库=done(两条物理表按各自日期计数,Java 补零)
+            // 区间内出入库趋势(替代原「近 7 天」硬窗口)
             Map<String, int[]> byDay = new LinkedHashMap<>();
-            List<String> days = lastDays(7);
+            List<String> days = r.buckets();
             for (String d : days) byDay.put(d, new int[2]);
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
-                    + " FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(varchar(10), 单据日期, 23)")) {
-                int[] slot = byDay.get(String.valueOf(r.get("d")));
-                if (slot != null) slot[0] = toInt(r.get("v"));
-            }
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
-                    + " FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(varchar(10), 单据日期, 23)")) {
-                int[] slot = byDay.get(String.valueOf(r.get("d")));
-                if (slot != null) slot[1] = toInt(r.get("v"));
-            }
-            stock.put("trend7", toTrend(days, byDay));
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+                    + " FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
+                    + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0, r.fromStr(), r.toExclusive());
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+                    + " FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
+                    + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 1, r.fromStr(), r.toExclusive());
+            stock.put("trend7", toTrend(r, byDay));
             // 2026-10-10:「现存量 TOP 物料」改绑库存状况表(STOCK_BALANCE / v_stock_balance)。
             // 旧口径读遗留快照表 kucun(kucun-resync 过程写入,asp_time2 停在 2026-10-08),
             // 且按 wzdm 物料代码分组 —— 卡片显示的是代码、且数据不随出入库实时变。
@@ -379,34 +452,40 @@ public class DashboardStatsService {
 
     // ---------- 销售 ----------
 
-    private Map<String, Object> sales() {
+    private Map<String, Object> sales(Range r) {
         Map<String, Object> sales = new HashMap<>();
+        // 2026-10-16 区间化:头表按 单据日期 过滤;行表(bl_so_order)无日期列,用 EXISTS 关联头表。
+        String lineDate = " AND EXISTS (SELECT 1 FROM bd_so_order h WHERE h.单据编号 = bl_so_order.单据编号"
+                + " AND h.单据日期 >= ? AND h.单据日期 < ?)";
+        Object[] a = new Object[]{r.fromStr(), r.toExclusive()};
         try {
-            sales.put("total", count("SELECT COUNT(*) FROM bd_so_order WHERE ISNULL(asp_cancel,'N')<>'Y'"));
-            sales.put("amount", sum("SELECT ISNULL(SUM(金额),0) FROM bl_so_order WHERE ISNULL(asp_cancel,'N')<>'Y'"));
+            sales.put("total", count("SELECT COUNT(*) FROM bd_so_order WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?", a));
+            sales.put("amount", sum("SELECT ISNULL(SUM(金额),0) FROM bl_so_order WHERE ISNULL(asp_cancel,'N')<>'Y'" + lineDate, a));
             sales.put("byStatus", nameValue("SELECT 单据状态 AS k, COUNT(*) AS v FROM bd_so_order"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(单据状态,'')<>'' GROUP BY 单据状态 ORDER BY COUNT(*) DESC"));
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(单据状态,'')<>'' AND 单据日期 >= ? AND 单据日期 < ? GROUP BY 单据状态 ORDER BY COUNT(*) DESC", a));
             sales.put("byCustomer", nameValue("SELECT TOP 6 客户 AS k, COUNT(*) AS v FROM bd_so_order"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(客户,'')<>'' GROUP BY 客户 ORDER BY COUNT(*) DESC"));
-            sales.put("trend7", soTrend(7));
-            sales.put("trend30", soTrend(30));
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(客户,'')<>'' AND 单据日期 >= ? AND 单据日期 < ? GROUP BY 客户 ORDER BY COUNT(*) DESC", a));
+            sales.put("trend7", soTrend(r));
+            sales.put("trend30", soTrend(r));
             sales.put("topProducts", nameValue("SELECT TOP 8 存货名称 AS k, SUM(ISNULL(数量,0)) AS v FROM bl_so_order"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货名称,'')<>'' GROUP BY 存货名称 ORDER BY SUM(ISNULL(数量,0)) DESC"));
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货名称,'')<>''" + lineDate + " GROUP BY 存货名称 ORDER BY SUM(ISNULL(数量,0)) DESC", a));
             // ── 2026-10-15 补「金额维度」与「口径对得上」 ────────────────────────────
             // ⚠ 原设计只有 TOP6 且过滤掉客户为空的行 ⇒ 甜甜圈中心 98 而 KPI 写 335,用户以为丢单。
             //   新增的 customerShare* 把 TOP6 之外的聚合成「其它」、空客户单列「未填客户」,
             //   **各片合计恒等于全量**(订单数口径=total,金额口径=amount),与 KPI 永远对得上。
             sales.put("customerShare", customerShare(
                     "SELECT CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END AS k,"
-                            + " COUNT(*) AS v FROM bd_so_order h WHERE ISNULL(h.asp_cancel,'N')<>'Y' GROUP BY"
+                            + " COUNT(*) AS v FROM bd_so_order h WHERE ISNULL(h.asp_cancel,'N')<>'Y'"
+                            + " AND h.单据日期 >= '" + r.fromStr() + "' AND h.单据日期 < '" + r.toExclusive() + "' GROUP BY"
                             + " CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END"));
             sales.put("customerShareAmount", customerShare(
                     "SELECT CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END AS k,"
                             + " SUM(ISNULL(l.金额,0)) AS v FROM bd_so_order h JOIN bl_so_order l ON l.单据编号 = h.单据编号"
-                            + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' GROUP BY"
+                            + " WHERE ISNULL(h.asp_cancel,'N')<>'Y'"
+                            + " AND h.单据日期 >= '" + r.fromStr() + "' AND h.单据日期 < '" + r.toExclusive() + "' GROUP BY"
                             + " CASE WHEN ISNULL(RTRIM(h.客户),N'')=N'' THEN N'__BLANK__' ELSE RTRIM(h.客户) END"));
             sales.put("topProductsAmount", nameValue("SELECT TOP 8 存货名称 AS k, SUM(ISNULL(金额,0)) AS v FROM bl_so_order"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货名称,'')<>'' GROUP BY 存货名称 ORDER BY SUM(ISNULL(金额,0)) DESC"));
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货名称,'')<>''" + lineDate + " GROUP BY 存货名称 ORDER BY SUM(ISNULL(金额,0)) DESC", a));
         } catch (Exception e) {
             sales.put("byStatus", List.of());
             sales.put("byCustomer", List.of());
@@ -461,33 +540,36 @@ public class DashboardStatsService {
         return v instanceof Number n ? n.doubleValue() : 0;
     }
 
-    /** 销售近 N 天双序列:added=单据日期(新增),done=yj_doc_status.shsj(审核)按日 */
-    private List<Map<String, Object>> soTrend(int days) {
-        List<String> dayList = lastDays(days);
-        int back = Math.max(0, days - 1);
+    /** 销售趋势(区间内):added=单据日期(新增),done=yj_doc_status.shsj(审核)按桶 */
+    private List<Map<String, Object>> soTrend(Range r) {
+        List<String> days = r.buckets();
         Map<String, int[]> byDay = new LinkedHashMap<>();
-        for (String d : dayList) byDay.put(d, new int[2]);
-        fillTrend(byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
-                + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-" + back + ",CONVERT(date,GETDATE()))"
-                + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0);
-        fillTrend(byDay, "SELECT CONVERT(varchar(10), s.shsj, 23) AS d, COUNT(*) AS v FROM yj_doc_status s"
+        for (String d : days) byDay.put(d, new int[2]);
+        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
+                + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
+                + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0, r.fromStr(), r.toExclusive());
+        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), s.shsj, 23) AS d, COUNT(*) AS v FROM yj_doc_status s"
                 + " JOIN bd_so_order h ON h.单据编号 = s.doc_no AND ISNULL(h.asp_cancel,'N')<>'Y'"
-                + " WHERE s.panel_code = 'SO_ORDER' AND s.shsj IS NOT NULL AND s.shsj >= DATEADD(day,-" + back + ",CONVERT(date,GETDATE()))"
-                + " GROUP BY CONVERT(varchar(10), s.shsj, 23)", 1);
-        return toTrend(dayList, byDay);
+                + " WHERE s.panel_code = 'SO_ORDER' AND s.shsj IS NOT NULL AND s.shsj >= ? AND s.shsj < ?"
+                + " GROUP BY CONVERT(varchar(10), s.shsj, 23)", 1, r.fromStr(), r.toExclusive());
+        return toTrend(r, byDay);
     }
 
     // ---------- 质量 ----------
 
-    private Map<String, Object> quality() {
+    private Map<String, Object> quality(Range r) {
         Map<String, Object> quality = new HashMap<>();
         try {
             // ⚠ 列名口径(2026-10-15 修正):明细的数量列在面板上叫「送检数量」、不良列叫「不合格数量」——
             //   2026-09-20 改过名(PanelConfigService.java:1148 / ButtonService.java:830),本方法当时漏改,
             //   仍在 SUM(数量) / SUM(不良数量),而这两列**没有 yj_field**(面板无从录入)⇒ 看板恒 0。
-            int total = sum("SELECT ISNULL(SUM(ISNULL(送检数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
-            int pass = sum("SELECT ISNULL(SUM(ISNULL(合格数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
-            int bad = sum("SELECT ISNULL(SUM(ISNULL(不合格数量,0)),0) FROM qc_insp_detail WHERE ISNULL(asp_cancel,'N')<>'Y'").intValue();
+            // 2026-10-16 区间化:按表头 qc_insp.单据日期 落在 [from,to) 内统计。
+            String joined = " FROM qc_insp_detail d JOIN qc_insp h ON h.单据编号 = d.单据编号"
+                    + " WHERE ISNULL(d.asp_cancel,'N')<>'Y' AND h.单据日期 >= ? AND h.单据日期 < ?";
+            Object[] a = new Object[]{r.fromStr(), r.toExclusive()};
+            int total = sum("SELECT ISNULL(SUM(ISNULL(d.送检数量,0)),0)" + joined, a).intValue();
+            int pass = sum("SELECT ISNULL(SUM(ISNULL(d.合格数量,0)),0)" + joined, a).intValue();
+            int bad = sum("SELECT ISNULL(SUM(ISNULL(d.不合格数量,0)),0)" + joined, a).intValue();
             quality.put("total", total);
             quality.put("pass", pass);
             // 非合格数由后端下发:前端原用 total−pass,而 total 是另一列的口径,一旦两列不同源就会出负数
@@ -502,19 +584,19 @@ public class DashboardStatsService {
             //   明细的「日期」列是 nvarchar(40) 且 hidden=1(面板看不见、靠链路带),既取不到值,
             //   拿字符串跟日期比还会隐式转换报错 ⇒ 整段掉进 catch 静默全 0。
             Map<String, int[]> byDay = new LinkedHashMap<>();
-            List<String> days = lastDays(7);
+            List<String> days = r.buckets();
             for (String d : days) byDay.put(d, new int[2]);
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), h.单据日期, 23) AS d"
+            fillSentOk(r, byDay, "SELECT CONVERT(varchar(10), h.单据日期, 23) AS d"
                     + ", SUM(ISNULL(d.送检数量,0)) AS sent, SUM(ISNULL(d.合格数量,0)) AS ok"
                     + " FROM qc_insp_detail d JOIN qc_insp h ON h.单据编号 = d.单据编号"
-                    + " WHERE ISNULL(d.asp_cancel,'N')<>'Y' AND h.单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
-                    + " GROUP BY CONVERT(varchar(10), h.单据日期, 23)")) {
-                int[] slot = byDay.get(String.valueOf(r.get("d")));
-                if (slot != null) { slot[0] = toInt(r.get("sent")); slot[1] = toInt(r.get("ok")); }
-            }
-            quality.put("trend7", toTrend(days, byDay));
-            quality.put("defectItems", nameValue("SELECT TOP 8 物料名称 AS k, SUM(ISNULL(不合格数量,0)) AS v FROM qc_insp_detail"
-                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(不合格数量,0) > 0 GROUP BY 物料名称 ORDER BY SUM(ISNULL(不合格数量,0)) DESC"));
+                    + " WHERE ISNULL(d.asp_cancel,'N')<>'Y' AND h.单据日期 >= ? AND h.单据日期 < ?"
+                    + " GROUP BY CONVERT(varchar(10), h.单据日期, 23)", r.fromStr(), r.toExclusive());
+            quality.put("trend7", toTrend(r, byDay));
+            quality.put("defectItems", nameValue("SELECT TOP 8 d.物料名称 AS k, SUM(ISNULL(d.不合格数量,0)) AS v FROM qc_insp_detail d"
+                    + " JOIN qc_insp h ON h.单据编号 = d.单据编号"
+                    + " WHERE ISNULL(d.asp_cancel,'N')<>'Y' AND ISNULL(d.不合格数量,0) > 0"
+                    + " AND h.单据日期 >= ? AND h.单据日期 < ? GROUP BY d.物料名称 ORDER BY SUM(ISNULL(d.不合格数量,0)) DESC",
+                    r.fromStr(), r.toExclusive()));
         } catch (Exception e) {
             quality.put("total", 0);
             quality.put("pass", 0);
@@ -529,23 +611,24 @@ public class DashboardStatsService {
 
     // ---------- 研发 ----------
 
-    /** 研发模块:实施计划阶段进度分布 + 近 30 天新增趋势(面板单据量由前端从 docStats 过滤 rd_ 前缀) */
-    private Map<String, Object> rd() {
+    /** 研发模块:实施计划阶段进度分布 + 区间内新增趋势(面板单据量由前端从 docStats 过滤 rd_ 前缀) */
+    private Map<String, Object> rd(Range r) {
         Map<String, Object> rd = new HashMap<>();
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT * FROM rd_plan WHERE ISNULL(asp_cancel,'N')<>'Y'");
+                    "SELECT * FROM rd_plan WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND asp_time1 >= ? AND asp_time1 < ?", r.fromStr(), r.toExclusive());
             int notStarted = 0, doing = 0, overdue = 0, finished = 0;
             LocalDate today = LocalDate.now();
-            for (Map<String, Object> r : rows) {
+            for (Map<String, Object> rr : rows) {
                 int planned = 0, done = 0, late = 0;
                 for (int n = 1; n <= 10; n++) {
-                    String plan = str(r.get("阶段" + n + "_计划内容"));
+                    String plan = str(rr.get("阶段" + n + "_计划内容"));
                     if (plan == null || plan.isBlank()) continue;
                     planned++;
-                    String actual = str(r.get("阶段" + n + "_实际完成"));
+                    String actual = str(rr.get("阶段" + n + "_实际完成"));
                     if (actual != null && !actual.isBlank()) { done++; continue; }
-                    LocalDate due = parseDate(str(r.get("阶段" + n + "_计划完成")));
+                    LocalDate due = parseDate(str(rr.get("阶段" + n + "_计划完成")));
                     if (due != null && due.isBefore(today)) late++;
                 }
                 if (planned == 0) continue;
@@ -560,17 +643,14 @@ public class DashboardStatsService {
             stageDist.add(Map.of("name", "逾期", "value", overdue));
             stageDist.add(Map.of("name", "全部完成", "value", finished));
             rd.put("stageDist", stageDist);
-            // 近 30 天实施计划新增(asp_time1 创建时间)
+            // 区间内实施计划新增(asp_time1 创建时间)
             Map<String, int[]> byDay = new LinkedHashMap<>();
-            List<String> days = lastDays(30);
+            List<String> days = r.buckets();
             for (String d : days) byDay.put(d, new int[2]);
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), asp_time1, 23) AS d, COUNT(*) AS v"
-                    + " FROM rd_plan WHERE ISNULL(asp_cancel,'N')<>'Y' AND asp_time1 >= DATEADD(day,-29,CONVERT(date,GETDATE()))"
-                    + " GROUP BY CONVERT(varchar(10), asp_time1, 23)")) {
-                int[] slot = byDay.get(String.valueOf(r.get("d")));
-                if (slot != null) slot[0] = toInt(r.get("v"));
-            }
-            rd.put("trend30", toTrend(days, byDay));
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), asp_time1, 23) AS d, COUNT(*) AS v"
+                    + " FROM rd_plan WHERE ISNULL(asp_cancel,'N')<>'Y' AND asp_time1 >= ? AND asp_time1 < ?"
+                    + " GROUP BY CONVERT(varchar(10), asp_time1, 23)", 0, r.fromStr(), r.toExclusive());
+            rd.put("trend30", toTrend(r, byDay));
         } catch (Exception e) {
             rd.put("stageDist", List.of());
             rd.put("trend30", List.of());
@@ -580,18 +660,18 @@ public class DashboardStatsService {
 
     // ---------- 工具 ----------
 
-    private int count(String sql) {
+    private int count(String sql, Object... args) {
         try {
-            Integer v = jdbc.queryForObject(sql, Integer.class);
+            Integer v = jdbc.queryForObject(sql, Integer.class, args);
             return v == null ? 0 : v;
         } catch (Exception e) {
             return 0;
         }
     }
 
-    private Number sum(String sql) {
+    private Number sum(String sql, Object... args) {
         try {
-            Number v = jdbc.queryForObject(sql, Number.class);
+            Number v = jdbc.queryForObject(sql, Number.class, args);
             return v == null ? 0 : v;
         } catch (Exception e) {
             return 0;
@@ -602,9 +682,9 @@ public class DashboardStatsService {
      * 通用 [{name,value}] 聚合(k 列为名,v 列为值,已按调用方排序)。
      * 可选 m 列作为 meta(SBars 行 title 提示用,如物料编码);缺列不影响其它调用方。
      */
-    private List<Map<String, Object>> nameValue(String sql) {
+    private List<Map<String, Object>> nameValue(String sql, Object... args) {
         try {
-            List<Map<String, Object>> rows = jdbc.queryForList(sql);
+            List<Map<String, Object>> rows = jdbc.queryForList(sql, args);
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> r : rows) {
                 Map<String, Object> item = new LinkedHashMap<>();
@@ -619,48 +699,54 @@ public class DashboardStatsService {
         }
     }
 
-    /** 单表近 7 天双序列趋势:added = addedCol 当日行数,done = doneCol 非空当日行数(可为 null) */
-    private List<Map<String, Object>> dateTrend(String table, String addedCol, String doneCol) {
-        List<String> days = lastDays(7);
+    /** 单表区间双序列趋势:added = addedCol 落在区间内的行数,done = doneCol 非空且落在区间内的行数 */
+    private List<Map<String, Object>> dateTrend(Range r, String table, String addedCol, String doneCol) {
+        List<String> days = r.buckets();
         Map<String, int[]> byDay = new LinkedHashMap<>();
         for (String d : days) byDay.put(d, new int[2]);
         String cancel = table.startsWith("bd_") || table.startsWith("bl_") || table.startsWith("qc_") || table.startsWith("rd_")
                 ? " WHERE ISNULL(asp_cancel,'N')<>'Y'" : "";
-        fillTrend(byDay, "SELECT CONVERT(varchar(10), " + addedCol + ", 23) AS d, COUNT(*) AS v FROM " + table
-                + cancel + (cancel.isEmpty() ? " WHERE " : " AND ") + addedCol + " >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
-                + " GROUP BY CONVERT(varchar(10), " + addedCol + ", 23)", 0);
+        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), " + addedCol + ", 23) AS d, COUNT(*) AS v FROM " + table
+                + cancel + (cancel.isEmpty() ? " WHERE " : " AND ") + addedCol + " >= ? AND " + addedCol + " < ?"
+                + " GROUP BY CONVERT(varchar(10), " + addedCol + ", 23)", 0, r.fromStr(), r.toExclusive());
         if (doneCol != null) {
-            fillTrend(byDay, "SELECT CONVERT(varchar(10), " + doneCol + ", 23) AS d, COUNT(*) AS v FROM " + table
-                    + cancel + (cancel.isEmpty() ? " WHERE " : " AND ") + doneCol + " IS NOT NULL AND " + doneCol + " >= DATEADD(day,-6,CONVERT(date,GETDATE()))"
-                    + " GROUP BY CONVERT(varchar(10), " + doneCol + ", 23)", 1);
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), " + doneCol + ", 23) AS d, COUNT(*) AS v FROM " + table
+                    + cancel + (cancel.isEmpty() ? " WHERE " : " AND ") + doneCol + " IS NOT NULL AND " + doneCol + " >= ? AND " + doneCol + " < ?"
+                    + " GROUP BY CONVERT(varchar(10), " + doneCol + ", 23)", 1, r.fromStr(), r.toExclusive());
         }
-        return toTrend(days, byDay);
+        return toTrend(r, byDay);
     }
 
-    private void fillTrend(Map<String, int[]> byDay, String sql, int slotIndex) {
+    /** 逐日结果按区间桶汇总(v 列);日桶=当天,周桶=该周周一 */
+    private void fillTrend(Range r, Map<String, int[]> byDay, String sql, int slotIndex, Object... args) {
         try {
-            for (Map<String, Object> r : jdbc.queryForList(sql)) {
-                int[] slot = byDay.get(String.valueOf(r.get("d")));
-                if (slot != null) slot[slotIndex] = toInt(r.get("v"));
+            for (Map<String, Object> row : jdbc.queryForList(sql, args)) {
+                String d = String.valueOf(row.get("d"));
+                int[] slot = byDay.get(r.bucketOf(LocalDate.parse(d)));
+                if (slot != null) slot[slotIndex] += toInt(row.get("v"));
             }
         } catch (Exception ignored) {
         }
     }
 
-    private static List<String> lastDays(int n) {
-        List<String> days = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-        for (int i = n - 1; i >= 0; i--) days.add(today.minusDays(i).toString());
-        return days;
+    /** 逐日结果按区间桶汇总(sent/ok 两列,检验趋势用) */
+    private void fillSentOk(Range r, Map<String, int[]> byDay, String sql, Object... args) {
+        try {
+            for (Map<String, Object> row : jdbc.queryForList(sql, args)) {
+                int[] slot = byDay.get(r.bucketOf(LocalDate.parse(String.valueOf(row.get("d")))));
+                if (slot != null) { slot[0] += toInt(row.get("sent")); slot[1] += toInt(row.get("ok")); }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
-    private static List<Map<String, Object>> toTrend(List<String> days, Map<String, int[]> byDay) {
-        DateTimeFormatter shortMonth = DateTimeFormatter.ofPattern("M/d");
+    /** 桶键 → 图表点(date=桶标签,added/done=双序列值) */
+    private static List<Map<String, Object>> toTrend(Range r, Map<String, int[]> byDay) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (String d : days) {
+        for (String d : r.buckets()) {
             int[] v = byDay.getOrDefault(d, new int[2]);
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("date", LocalDate.parse(d).format(shortMonth));
+            m.put("date", r.label(d));
             m.put("added", v[0]);
             m.put("done", v[1]);
             out.add(m);

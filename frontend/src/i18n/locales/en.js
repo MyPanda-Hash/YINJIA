@@ -3628,6 +3628,19 @@ export default {
     '加载失败': 'Failed to load',
     '重试': 'Retry',
 
+    // 看板时间区间(2026-10-16 用户需求「所有看板加时间区间」)
+    '今日': 'Today',
+    '近 30 天': 'Last 30 days',
+    '按天': 'daily',
+    '按周': 'weekly',
+    '出入库趋势': 'Inbound / outbound trend',
+    '订单趋势': 'Sales order trend',
+    '送检 / 合格趋势': 'Inspected / passed trend',
+    '区间新增 / 完工': 'New / completed in range',
+    '区间内无新增或完工': 'No new or completed work orders in this range',
+    '工单生命周期与区间执行脉冲': 'Work order lifecycle and execution pulse in range',
+    '截至': 'as of',
+
     // 档案面板保存误删护栏(2026-10-03:商品面板带筛选保存一次软删 3873 行)
     '当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除':
       'The list is filtered — this save updates the loaded rows only; rows not shown will not be deleted',

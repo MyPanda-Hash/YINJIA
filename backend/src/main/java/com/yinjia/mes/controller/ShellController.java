@@ -86,15 +86,20 @@ public class ShellController {
                 }));
     }
 
-    /** 我的桌面·研发管理:修改申请动态(待审批) + 各文件面板最新单据 + 档案本面板清单 */
+    /** 我的桌面·研发管理:修改申请动态(待审批) + 各文件面板最新单据 + 档案本面板清单(2026-10-16 起支持区间) */
     @GetMapping("/dashboard/rd")
-    public ApiResult<Map<String, Object>> rdBoard() {
+    public ApiResult<Map<String, Object>> rdBoard(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        DashboardStatsService.Range range = DashboardStatsService.Range.of(from, to);
+        String f = range.fromStr(), t = range.toExclusive();
         Map<String, Object> out = new HashMap<>();
         List<Map<String, Object>> mods = new ArrayList<>();
         try {
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT TOP 20 panel_code, doc_no, modify_req_by, modify_req_at FROM yj_doc_status"
-                            + " WHERE ISNULL(modify_state,'') = 'R' AND ISNULL(canceled,'N') <> 'Y' ORDER BY modify_req_at DESC")) {
+                            + " WHERE ISNULL(modify_state,'') = 'R' AND ISNULL(canceled,'N') <> 'Y'"
+                            + " AND modify_req_at >= ? AND modify_req_at < ? ORDER BY modify_req_at DESC", f, t)) {
                 Map<String, Object> m = new HashMap<>();
                 m.put("panelCode", r.get("panel_code"));
                 m.put("panelName", panelNameOf(String.valueOf(r.get("panel_code"))));
@@ -117,7 +122,8 @@ public class ShellController {
                 newDocs.addAll(jdbc.queryForList(
                         "SELECT TOP 5 '" + def.code() + "' AS panelCode, N'" + def.name().replace("'", "''") + "' AS panelName"
                                 + ", t.[" + def.groupCol() + "] AS docNo, t.asp_user1 AS creator, t.asp_time1 AS at"
-                                + " FROM " + def.headTable() + " t WHERE ISNULL(t.asp_cancel,'N') <> 'Y' ORDER BY t.asp_time1 DESC"));
+                                + " FROM " + def.headTable() + " t WHERE ISNULL(t.asp_cancel,'N') <> 'Y'"
+                                + " AND t.asp_time1 >= ? AND t.asp_time1 < ? ORDER BY t.asp_time1 DESC", f, t));
             } catch (Exception ignored) {
             }
         }
@@ -164,10 +170,13 @@ public class ShellController {
     }
 
     @GetMapping("/dashboard/stats")
-    public ApiResult<Map<String, Object>> dashboard() {
+    public ApiResult<Map<String, Object>> dashboard(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
         // 2026-09-28 聚合下沉 DashboardStatsService(代码规范 A2:SQL 只在 service);
         // 各模块图表数据(生产/库存/销售/质量/研发)由 service 一次返回,Controller 只转发。
-        return ApiResult.ok(dashboardStats.stats());
+        // 2026-10-16:加时间区间 from/to(yyyy-MM-dd,闭区间;缺省=近 30 天),各模块单据口径按区间过滤。
+        return ApiResult.ok(dashboardStats.stats(from, to));
     }
 
     /**

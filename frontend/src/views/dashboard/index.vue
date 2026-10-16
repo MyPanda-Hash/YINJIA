@@ -23,19 +23,47 @@
       </div>
     </div>
 
-    <!-- 看板模块切换 -->
-    <div class="mod-tabs">
-      <button
-        v-for="m in MODULES"
-        :key="m.key"
-        type="button"
-        class="mod-tab"
-        :class="{ on: mod === m.key }"
-        :aria-pressed="mod === m.key"
-        @click="mod = m.key"
-      >
-        <el-icon><component :is="m.icon" /></el-icon>{{ tt(m.title) }}
-      </button>
+    <!-- 看板模块切换 + 时间区间(2026-10-16:所有模块按所选区间取数) -->
+    <div class="mod-bar">
+      <div class="mod-tabs">
+        <button
+          v-for="m in MODULES"
+          :key="m.key"
+          type="button"
+          class="mod-tab"
+          :class="{ on: mod === m.key }"
+          :aria-pressed="mod === m.key"
+          @click="mod = m.key"
+        >
+          <el-icon><component :is="m.icon" /></el-icon>{{ tt(m.title) }}
+        </button>
+      </div>
+      <div class="range-bar">
+        <span class="range-ic" aria-hidden="true"><el-icon><Calendar /></el-icon></span>
+        <button
+          v-for="p in RANGE_PRESETS"
+          :key="p.key"
+          type="button"
+          class="range-chip"
+          :class="{ on: presetKey === p.key }"
+          :aria-pressed="presetKey === p.key"
+          @click="applyPreset(p.key)"
+        >{{ tt(p.label) }}</button>
+        <el-date-picker
+          v-model="rangePick"
+          type="daterange"
+          unlink-panels
+          value-format="YYYY-MM-DD"
+          size="small"
+          class="range-picker"
+          :start-placeholder="tt('开始日期')"
+          :end-placeholder="tt('结束日期')"
+          :clearable="false"
+          @change="onRangePick"
+        />
+        <span class="range-text" :title="tt('数据区间')">{{ rangeLabelText }}</span>
+        <span class="range-bucket">{{ tt(bucketText) }}</span>
+      </div>
     </div>
 
     <!-- ===== 概览 ===== -->
@@ -80,7 +108,7 @@
           <div class="panel-heading">
             <div>
               <div class="card-title">{{ tt('生产执行核心') }}</div>
-              <p>{{ tt('工单生命周期与近 7 天执行脉冲') }}</p>
+              <p>{{ tt('工单生命周期与区间执行脉冲') }}</p>
             </div>
             <div class="live-chip"><i></i>LIVE · {{ lastUpdatedText }}</div>
           </div>
@@ -113,11 +141,11 @@
             <div class="execution-detail">
               <div class="trend-head">
                 <span>{{ tt('新增 / 完工趋势') }}</span>
-                <span>{{ tt('近 7 天') }}</span>
+                <span>{{ rangeLabelText }}</span>
               </div>
               <SLine v-if="(prod.trend7 || []).length && !prodTrendAllZero" :data="prod.trend7" compact />
               <div v-else class="empty compact-empty trend-empty">
-                <span>{{ tt('近 7 天无新增或完工') }}</span>
+                <span>{{ tt('区间内无新增或完工') }}</span>
                 <em v-if="prod.lastDate">{{ tt('数据截至') }} {{ prod.lastDate }}</em>
               </div>
               <div class="order-queue">
@@ -305,7 +333,7 @@
           <div class="chart-box"><SDonut :data="prod.workshopDist" :sub="tt('加工单')" /></div>
         </div>
         <div class="card col-4">
-          <div class="card-title">{{ tt('近 7 天新增 / 完工') }}</div>
+          <div class="card-title">{{ tt('区间新增 / 完工') }}<span class="chart-sub">{{ rangeLabelText }}</span></div>
           <div class="chart-box"><SLine :data="prod.trend7" /></div>
         </div>
         <div class="card col-4">
@@ -337,7 +365,7 @@
           <div class="chart-box"><SBars :data="stockLines" :colors="['#537786', '#116a5b', '#d79a2b', '#7a8b84', '#3b8978', '#9c7650']" /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('近 7 天出入库趋势') }}</div>
+          <div class="card-title">{{ tt('出入库趋势') }}<span class="chart-sub">{{ rangeLabelText }} · {{ tt(bucketText) }}</span></div>
           <div class="chart-box"><SLine :data="stock.trend7" :legend-a="tt('入库')" :legend-b="tt('出库')" /></div>
         </div>
         <div class="card col-6">
@@ -371,7 +399,7 @@
           <div class="chart-box"><SBars :data="sales.byStatus" show-pct /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('近 30 天订单趋势') }}</div>
+          <div class="card-title">{{ tt('订单趋势') }}<span class="chart-sub">{{ rangeLabelText }} · {{ tt(bucketText) }}</span></div>
           <div class="chart-box"><SLine :data="sales.trend30" :legend-a="tt('新增')" :legend-b="tt('已审核')" /></div>
         </div>
         <div class="card col-6">
@@ -431,7 +459,7 @@
           <div class="chart-box"><SBars :data="rd.stageDist" show-pct :colors="['#8a9a92', '#116a5b', '#b94d3f', '#3b8978']" /></div>
         </div>
         <div class="card col-4">
-          <div class="card-title">{{ tt('实施计划新增趋势') }}<span class="chart-sub">{{ tt('近 30 天') }}</span></div>
+          <div class="card-title">{{ tt('实施计划新增趋势') }}<span class="chart-sub">{{ rangeLabelText }}</span></div>
           <div class="chart-box"><SLine :data="rd.trend30" :legend-a="tt('新增')" :legend-b="tt('累计内')" /></div>
         </div>
       </div>
@@ -453,7 +481,7 @@
           <div class="chart-box"><SBars :data="quality.byResult" show-pct /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('近 7 天送检 / 合格') }}</div>
+          <div class="card-title">{{ tt('送检 / 合格趋势') }}<span class="chart-sub">{{ rangeLabelText }} · {{ tt(bucketText) }}</span></div>
           <div class="chart-box"><SLine :data="quality.trend7" :legend-a="tt('送检')" :legend-b="tt('合格')" /></div>
         </div>
         <div class="card col-6">
@@ -507,12 +535,41 @@ import SCapacityBars from './SCapacityBars.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { pickQuickEntries } from '@core/dashboard/deskQuick'
+import {
+  PRESETS as RANGE_PRESETS, bucketLabel, defaultRange, matchPreset, normalizeRange,
+  presetRange, rangeLabel, rangeQuery,
+} from '@core/dashboard/dateRange'
 import { tt } from '@/i18n'
 
 const user = useUserStore()
 const tabs = useTabsStore()
 const app = useAppStore()
 const router = useRouter()
+
+/**
+ * 看板时间区间(2026-10-16 用户需求「给所有的看板都加上时间区间」):
+ * 6 个模块的**单据口径**都按所选区间取数;默认近 30 天。
+ * 快捷项 / 自定义区间都走同一份纯函数(@core/dashboard/dateRange),口径与后端 Range 对齐。
+ */
+const range = ref(defaultRange())
+const rangePick = ref([range.value.from, range.value.to])
+const presetKey = ref('last30')
+const rangeLabelText = computed(() => rangeLabel(range.value))
+const bucketText = computed(() => bucketLabel(range.value))
+function applyRange(r) {
+  range.value = r
+  rangePick.value = [r.from, r.to]
+  presetKey.value = matchPreset(r)
+  load()
+  if (rdLoaded) loadRd()
+}
+function applyPreset(key) {
+  applyRange(presetRange(key))
+}
+function onRangePick(v) {
+  if (!Array.isArray(v) || v.length !== 2) return
+  applyRange(normalizeRange({ from: v[0], to: v[1] }))
+}
 
 const desk = computed(() => app.deskSettings)
 
@@ -539,7 +596,7 @@ const rdData = ref({ modifyRequests: [], newDocs: [], panels: [] })
 let rdLoaded = false
 async function loadRd() {
   try {
-    const r = await request.get('/dashboard/rd')
+    const r = await request.get('/dashboard/rd', { params: rangeQuery(range.value) })
     if (r?.data) rdData.value = r.data
     rdLoaded = true
   } catch { /* 静默 */ }
@@ -641,7 +698,7 @@ async function load() {
   if (loadingStats.value) return
   loadingStats.value = true
   try {
-    const r = await request.get('/dashboard/stats')
+    const r = await request.get('/dashboard/stats', { params: rangeQuery(range.value) })
     if (r?.data) {
       stats.value = { ...stats.value, ...r.data }
       lastUpdated.value = new Date()
@@ -1856,6 +1913,66 @@ function go(path, title) {
   color: var(--t-primary);
   background: var(--t-hover-bg);
   font-weight: 600;
+}
+
+/* ── 时间区间条(2026-10-16):与模块切换同一行,窄屏折行 ── */
+.mod-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mod-bar .mod-tabs { flex: 0 1 auto; }
+.range-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 34px;
+}
+.range-ic {
+  display: inline-flex;
+  align-items: center;
+  color: var(--t-text-3);
+  margin-right: 2px;
+}
+.range-chip {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--t-text-2);
+  background: var(--t-card-bg);
+  border: 1px solid var(--t-border);
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.range-chip:hover { border-color: var(--t-primary); color: var(--t-primary); }
+.range-chip.on {
+  color: var(--t-primary);
+  border-color: var(--t-primary);
+  background: var(--t-hover-bg);
+  font-weight: 600;
+}
+.range-picker { width: 240px; }
+.range-text {
+  font-size: 12px;
+  color: var(--t-text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.range-bucket {
+  font-size: 11px;
+  color: var(--t-text-3);
+  border: 1px solid var(--t-border-light);
+  border-radius: 10px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .range-picker { width: 100%; }
+  .range-text { order: 9; }
 }
 
 /* 统一网格：12 列，排列有致 */
