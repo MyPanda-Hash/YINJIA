@@ -1042,7 +1042,7 @@
     <!-- ═══ 打印专用版式(屏幕隐藏,打印时经 body.doc-printing 激活):宽明细单据 A4 纸面优化层——
          表头紧凑四列网格 + table-layout:fixed 百分比列宽 + 宽表列合并(名称/型号、合格/不良)
          + thead 跨页自动重复;@page 横向/纵向由 prepareDocPrint 动态注入 ═══ -->
-    <div v-if="docPrintEnabled" class="doc-print" aria-hidden="true">
+    <div v-if="docPrintRendered" class="doc-print" aria-hidden="true">
       <div class="dp-title">{{ tt(panelName) }}</div>
       <div class="dp-head">
         <div v-for="f in docPrintHead" :key="headerFieldKey(f)" class="dp-pair">
@@ -6452,8 +6452,7 @@ const docPrintRows = computed(() => {
   if (!b) return []
   return blockRows(b).filter((r) => !r._placeholder)
 })
-// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不合格数量)
-// ⚠ 按**字段标签**匹配,而「不良数量」2026-09-20 起叫「不合格数量」且该标签全库无面板注册 ⇒ 旧写法永不生效
+// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不合格数量)// ⚠ 按**字段标签**匹配,而「不良数量」2026-09-20 起叫「不合格数量」且该标签全库无面板注册 ⇒ 旧写法永不生效
 const DOC_PRINT_MERGE_PAIRS = [['物料名称', '型号'], ['合格数量', '不合格数量']]
 /** 列宽基准(按中文列名关键词,与界面语言无关);打印前归一化为百分比 */
 function dpBaseW(prop) {
@@ -6497,6 +6496,30 @@ const docPrintCols = computed(() => {
   for (const c of out) c.pct = Math.round((c.base / total) * 1000) / 10
   return out
 })
+/**
+ * 打印层**按需渲染**(2026-10-16 性能专项,用户口径「商品这个页面打开也会卡一下」)。
+ *
+ * 病根:`.doc-print` 是"屏幕恒隐藏、打印时才显示"的 A4 版式层,但它**一直**在 DOM 里。
+ * 商品档案(INV)是存档面板,`blockRows` = 全部 3,917 行 ⇒ 一打开就白建
+ * 3,942 行 × 59 列 ≈ **23.1 万个 DOM 节点**(实测主线程长任务 667 ms / 最长 485 ms,
+ * 打开到出数据 2.4 s;而 el-table 自己只渲染 25 行)。打印时那 23 万个节点才有用。
+ *
+ * 改法:**按行数分流**——
+ *   · 行数 ≤ {@link DOC_PRINT_EAGER_MAX}(普通单据面板,几行到几十行):照旧常驻渲染,
+ *     Ctrl+P / 浏览器菜单打印 / 按钮打印**三条路径的行为一个字节都不变**;
+ *   · 行数超过阈值(档案面板,动辄几千行):默认不渲染,由打印入口先 `await` 渲染好再打印
+ *     (见 ensureDocPrintLayer + 打印按钮 + Ctrl+P 拦截),打印输出的行/列**逐字一致**。
+ */
+const DOC_PRINT_EAGER_MAX = 300
+const docPrintReady = ref(false)
+const docPrintLazy = computed(() => docPrintRows.value.length > DOC_PRINT_EAGER_MAX)
+const docPrintRendered = computed(() => docPrintEnabled.value && (!docPrintLazy.value || docPrintReady.value))
+/** 打印前确保打印层已在 DOM 里(懒渲染面板);等了 nextTick 才算真的挂上 */
+async function ensureDocPrintLayer() {
+  if (!docPrintEnabled.value || docPrintRendered.value) return
+  docPrintReady.value = true
+  await nextTick()
+}
 /** 打印前置:挂 body 样式 + 注入 @page 规则(列数≥8 横向,否则纵向;@page 不响应类选择器,只能动态注入) */
 function prepareDocPrint() {
   document.body.classList.add('doc-printing')
@@ -6511,12 +6534,27 @@ function prepareDocPrint() {
     ? '@page { size: A4 landscape; margin: 9mm 8mm; }'
     : '@page { size: A4 portrait; margin: 12mm 10mm; }'
 }
-function onBeforePrintDoc() {
-  // Ctrl+P 直打印也要走打印版式(beforeprint 在快照前同步触发)
-  if (docPrintEnabled.value) prepareDocPrint()
-}
+/** 打印收尾:卸掉 body 样式,并把懒渲染的打印层收回去(避免它一直挂在 DOM 里占内存) */
 function onAfterPrintDoc() {
   document.body.classList.remove('doc-printing')
+  if (docPrintLazy.value) docPrintReady.value = false
+}
+/**
+ * Ctrl/Cmd+P 拦截:懒渲染面板要先把打印层挂上再交回给浏览器。
+ * 打印层已就绪(普通单据面板)时不拦截 —— 原样走浏览器原生 Ctrl+P → beforeprint 里 prepareDocPrint。
+ */
+function onDocPrintKey(e) {
+  if (!(e.ctrlKey || e.metaKey) || String(e.key || '').toLowerCase() !== 'p') return
+  if (!docPrintLazy.value || docPrintReady.value) return
+  e.preventDefault()
+  ensureDocPrintLayer().then(() => { prepareDocPrint(); window.print() })
+}
+function onBeforePrintDoc() {
+  // Ctrl+P 直打印也要走打印版式(beforeprint 在快照前同步触发);
+  // 懒渲染面板若走到这里(例如浏览器菜单打印),尽力把层挂上 —— 挂不上时打印的是屏幕版式,
+  // 不丢数据、只是版式退化,且下面的 keydown 拦截已覆盖常规 Ctrl+P 路径。
+  if (docPrintEnabled.value && docPrintLazy.value && !docPrintReady.value) docPrintReady.value = true
+  if (docPrintEnabled.value) prepareDocPrint()
 }
 
 // ══════════ 对外正式报表(后端 JasperReports 模板;IT 做版式,业务只选单据/格式) ══════════
@@ -8621,7 +8659,11 @@ async function onButton(action) {
     return
   }
   if (action === '打印' || action === '预览') {
-    if (docPrintEnabled.value) prepareDocPrint()
+    if (docPrintEnabled.value) {
+      // 档案面板的打印层是懒渲染的:先等它挂进 DOM 再调打印(否则打出来是屏幕版式)
+      await ensureDocPrintLayer()
+      prepareDocPrint()
+    }
     window.print()
     return
   }
@@ -9533,6 +9575,8 @@ onMounted(() => {
   // 单据打印版式:Ctrl+P 直打印同样走 .doc-print 层;打印结束还原屏幕
   window.addEventListener('beforeprint', onBeforePrintDoc)
   window.addEventListener('afterprint', onAfterPrintDoc)
+  // 懒渲染打印层的 Ctrl+P 拦截(见 onDocPrintKey:已就绪时不拦截)
+  window.addEventListener('keydown', onDocPrintKey)
   if (invalidPanel.value) {
     router.replace('/panelx/list/MANU_ORDER')
     return
@@ -9576,6 +9620,7 @@ onUnmounted(() => {
   document.removeEventListener('contextmenu', closeCtx)
   window.removeEventListener('beforeprint', onBeforePrintDoc)
   window.removeEventListener('afterprint', onAfterPrintDoc)
+  window.removeEventListener('keydown', onDocPrintKey)
   document.body.classList.remove('doc-printing')
 })
 </script>
