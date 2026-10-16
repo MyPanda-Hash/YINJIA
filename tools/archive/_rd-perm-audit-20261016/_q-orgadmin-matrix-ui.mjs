@@ -88,8 +88,17 @@ await sleep(3000)
 check('选中角色行后权限矩阵进入配置态', !!picked, `角色行「${picked}」`)
 
 /* 展开「研发管理」分组(默认折叠) */
-const groups = await evaluate(`Array.from(document.querySelectorAll('.perm-collapse .el-collapse-item')).map((it, i) => ({ i, t: (it.querySelector('.g-title')?.textContent || '').trim() }))`)
-console.log('  · 模块分组:', (groups || []).map((g) => g.t).join(' | '))
+const groups = await evaluate(`Array.from(document.querySelectorAll('.perm-collapse .el-collapse-item')).map((it, i) => ({ i, t: (it.querySelector('.g-title')?.textContent || '').trim(), n: (it.querySelector('.g-count')?.textContent || '').trim() }))`)
+const GNAMES = (groups || []).map((g) => g.t)
+console.log('  · 模块分组:', (groups || []).map((g) => g.t + '(' + g.n + ')').join(' | '))
+
+/* 分组必须全是导航一级模块(2026-10-16 用户口径:「要按照模块来收纳面板」)——
+   导航一级 = frontend/src/business/menus.js 的 6 个 + 我的桌面;野分组(基础设置/系统管理)一律 FAIL */
+const NAV_MODULES = ['我的桌面', '研发管理', '智能供应链', '生产制造', '品质管理', '财务管理', '设备管理', '基础档案']
+const stray = GNAMES.filter((n) => !NAV_MODULES.includes(n))
+check('矩阵分组全部是导航一级模块(无「基础设置/系统管理」这类野分组)', stray.length === 0, stray.join(',') || '无')
+await shot('2-orgadmin-groups-collapsed.png')
+
 const rdIdx = (groups || []).find((g) => g.t === '研发管理')?.i
 check('权限矩阵里存在「研发管理」分组', rdIdx !== undefined, `第 ${rdIdx} 组`)
 if (rdIdx !== undefined) {

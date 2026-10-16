@@ -3739,3 +3739,5 @@ migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
 # migrate-role-perm-words-20261016.sql — 角色面板权限词表归位(组织架构矩阵可勾的词 = 引擎真读的词):edit→modify、delete→del、删 price/review/adjust,研发审核补 audit,can_approve 收敛为 perms 派生值
 migrate-role-perm-words-20261016.sql
+# migrate-stock-detail-module-group-20261016.sql — 库存明细(STOCK_DETAIL)的 module_group 系统管理→库存核算(权限矩阵里不该出现导航没有的分组;自检全库 module_group 越界 0 处)
+migrate-stock-detail-module-group-20261016.sql

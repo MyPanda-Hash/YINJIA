@@ -65,6 +65,21 @@ public class ReportService {
      * 订单管理/委外加工/库存核算…)**同时**保留在原列用于读权限放行(PanelPermissionService.readablePanels
      * 按同模块放行),但对外展示(权限矩阵分组、报表口径)统一归并到**导航一级模块名**。
      * 只做单向投影:不改库、不改原列语义,故读放行与报表排除口径均不受影响。
+     *
+     * <p>2026-10-16 补两条(用户口径「要按照模块来收纳面板,现在多了一个基础设置和系统管理」):
+     * 权限矩阵里冒出了**导航里没有的两个分组** ——
+     * <ul>
+     *   <li>`基础设置`(25 张:部门/员工/存货/工序/计量单位/仓库/仓位/工艺路线…):这是 2026-08 从
+     *       light-mes 迁基础资料时按「基础设置模块」写进去的 module_group,而导航里这些面板全在
+     *       **基础档案**(基础数据/物料及价格/生产/财务 四个二级栏)。⇒ 归并到 `基础档案`。</li>
+     *   <li>`系统管理`:本列**唯一成员是 STOCK_DETAIL(库存明细)** —— 它的来源是
+     *       `migrate-panel-modules.sql` 那句 `module_group IS NULL ⇒ 系统管理` 的兜底值被写死;
+     *       而库存明细在导航里是 **智能供应链 → 库存报表** 的第 5 张(与 STOCK_BALANCE/LEDGER/
+     *       STATUS/SUMMARY 同栏)。⇒ **库侧**把它改回 `库存核算`(见
+     *       `tools/migrate-stock-detail-module-group-20261016.sql`),与四张同族报表同组;
+     *       这里**刻意不把 `系统管理` 整值投影到某个业务模块** —— 那样将来真出现系统管理类面板
+     *       会被错塞进业务模块,宁可让它在矩阵里显形。</li>
+     * </ul>
      */
     private static final Map<String, String> NAV_GROUP = Map.ofEntries(
             Map.entry("智能供应链", "智能供应链"),
@@ -81,6 +96,7 @@ public class ReportService {
             Map.entry("基础档案", "基础档案"),
             Map.entry("基础资料", "基础档案"),
             Map.entry("基础数据", "基础档案"),
+            Map.entry("基础设置", "基础档案"),
             Map.entry("物料及价格", "基础档案"),
             Map.entry("设备管理", "设备管理"),
             Map.entry("财务管理", "财务管理"),
