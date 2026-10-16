@@ -42,6 +42,12 @@ const MEASURE = `JSON.stringify((() => {
     firstRowWidths: rows,
     status: (q('.doc-status') || {}).textContent || '',
     no: (q('.as-no, .as-docno') || {}).textContent || '',
+    // row.hint 只当占位词(2026-10-16 用户口径):固定提示行 .as-hint 必须为 0;占位词应有
+    hintEls: document.querySelectorAll('.approval-sheet .as-hint').length,
+    specCol: (() => {
+      const ta = q('.approval-sheet textarea[placeholder], .approval-sheet input[placeholder]')
+      return ta ? { placeholder: ta.getAttribute('placeholder'), value: ta.value || '' } : null
+    })(),
   }
 })())`
 

@@ -145,3 +145,21 @@ test('项目实施计划行高按设计磅值换算（1pt = 4/3 px）', () => {
   }
   assert.equal(planSheetCfg.rows.length, Object.keys(want).length, '行数应与设计 8 行一致')
 })
+
+// ── row.hint 只当占位词，不再另渲染一行固定文字（用户口径 2026-10-16）────────────
+// 用户原话：「我只需要背景提示词就行了，不要固定的提示词，这个已经是固定显示在里面了」
+// 改前：`例：33*12*110（外径*内径*长度）` 在「滤芯/炭棒规格或结构」格子里**出现两次**
+//   —— 输入框内灰色占位词 + 其下方一行 #333 固定文字（`.as-hint`）。
+test('row.hint 只做占位词：不再渲染 .as-hint 固定提示行', () => {
+  const src = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  assert.ok(!/class="as-hint"/.test(src), '模板里不应再有 .as-hint 那一行（hint 与占位词重复显示）')
+  assert.ok(!/^\.as-hint\s*\{/m.test(src), '.as-hint 样式随之删除（否则留死代码）')
+  // 占位词三条路必须在：input / select / textarea
+  assert.ok((src.match(/:placeholder="row\.hint \? tt\(row\.hint\)/g) || []).length >= 2,
+    'input 与 textarea 都要把 hint 当占位词')
+  assert.match(src, /:placeholder="row\.hint \? tt\(row\.hint\) : tt\('请选择'\)"/, 'select 未选中时也要显示 hint')
+  // 两句提示词本身别被顺手删掉（用户要的就是这个"背景提示词"）
+  const spec = approvalSheetCfg.rows.find((r) => r.label === '滤芯/炭棒规格或结构')
+  assert.equal(spec.hint, '例：33*12*110（外径*内径*长度）')
+  assert.equal(planSheetCfg.rows.find((r) => r.label === '项目定级').hint, '必填')
+})

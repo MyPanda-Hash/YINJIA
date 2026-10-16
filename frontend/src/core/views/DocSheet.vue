@@ -346,7 +346,9 @@
           <div class="as-name">{{ tt(row.label) }}</div>
           <!-- 有 row.second 的行横向切成两段(实施计划第 8 行:负责人值区 | 编制日期),设计里有竖线分隔 -->
           <div class="as-fill" :class="{ 'as-fill-split': !!row.second }">
-            <div v-if="row.hint" class="as-hint">{{ tt(row.hint) }}</div>
+            <!-- 2026-10-16 用户口径:「我只需要背景提示词就行了，不要固定的提示词，这个已经是固定显示在里面了」
+                 —— row.hint 原先是**既当占位词、又渲染成这一行固定文字**(输入框/下拉里灰字 + 下面一行黑字,
+                 同一句话在格子里出现两次)。现在只留占位词:输入/文本域用 :placeholder,下拉用它当未选中提示。 -->
             <div class="as-fill-main">
               <el-input
                 v-if="editable && !signLocked(row) && row.kind === 'input'"
@@ -1150,12 +1152,8 @@ defineExpose({ focusField })
   flex-direction: column;
   padding: 3px 6px;
 }
-.as-hint {
-  font-size: 14px;
-  color: #333;
-  line-height: 20px;
-  padding-left: 2px;
-}
+/* .as-hint(固定提示词那一行)已于 2026-10-16 随用户口径删除 —— row.hint 现在只当占位词。
+   探针 tools/archive/_probe-pm-flow.cjs 里读 .as-hint 的那一项是历史取证脚本,不再有对应元素。 */
 .as-fill-input {
   flex: 1;
 }
@@ -1739,8 +1737,7 @@ defineExpose({ focusField })
   /* 阶段框标识(阶段N/隐藏/显示全部)仅为编辑标识,导出/打印不出现 */
   body.approval-printing .as-phase-title,
   body.approval-printing .as-phase-toggle,
-  body.approval-printing .as-phase-restore,
-  body.approval-printing .as-hint {
+  body.approval-printing .as-phase-restore {
     display: none !important;
   }
   /* 「已完成」角标属于办理状态,不进导出件 */
