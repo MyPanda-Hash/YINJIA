@@ -27,15 +27,20 @@
 /* ============ A0. 同批修正:清掉初版留下的 `检验数量` 行表列 ============
  * 本脚本初版把上限列命名为 `检验数量`(与头表业务列同名),正式名定为 `格数上限`;
  * 初版只在本机两账套跑过、该列全为空,故此处仅在「列存在且全空」时清掉(幂等;有值则不动)。
- * ⚠ 2026-10-17 修:整段必须走**动态 SQL**。原来把 `WHERE 检验数量 IS NOT NULL` 直接写在
- *   `IF COL_LENGTH(...) IS NOT NULL AND NOT EXISTS (SELECT …)` 里 —— T-SQL 是**整批编译**,
- *   列不存在时该 SELECT 依然编译失败(`Invalid column name '检验数量'`),COL_LENGTH 守卫拦不住;
- *   而正式库该列早被初版删掉 ⇒ 本脚本内容一变要重跑就必失败 ⇒ 链断(其后迁移不再执行)。 */
+ *
+ * ⚠ 2026-10-17 修(正式库 HSDZ_MES 实测「列名 '检验数量' 无效」整脚本中止):
+ *   原写法把 `检验数量` **静态**写在 `NOT EXISTS (SELECT 1 FROM … WHERE 检验数量 IS NOT NULL)` 里,
+ *   而正式库这张表**从未有过**这一列(初版只在本机跑过、且是为别的列名)⇒ 整批判译时就报列名无效,
+ *   `IF COL_LENGTH(…) IS NOT NULL` 那层保护**根本救不了**(编译先于求值)。
+ *   改法:存在性判断与取值都走动态 SQL(`sp_executesql`),列不存在时本批正常跳过。
+ *   教训:迁移脚本里引用"可能不存在的列"必须用动态 SQL 或 sys.columns 判断,不能只靠 COL_LENGTH 包一层。 */
 IF COL_LENGTH(N'dbo.qc_proc_insp_detail', N'检验数量') IS NOT NULL
 BEGIN
-  DECLARE @sqlA0 nvarchar(max) = N'IF NOT EXISTS (SELECT 1 FROM dbo.qc_proc_insp_detail WHERE 检验数量 IS NOT NULL) '
-                               + N'ALTER TABLE dbo.qc_proc_insp_detail DROP COLUMN 检验数量;';
-  EXEC sp_executesql @sqlA0;
+  DECLARE @qcPlanQtyEmpty int = 0;
+  EXEC sp_executesql
+    N'SELECT @e = CASE WHEN EXISTS (SELECT 1 FROM dbo.qc_proc_insp_detail WHERE 检验数量 IS NOT NULL) THEN 0 ELSE 1 END',
+    N'@e int OUTPUT', @e = @qcPlanQtyEmpty OUTPUT;
+  IF @qcPlanQtyEmpty = 1 EXEC(N'ALTER TABLE dbo.qc_proc_insp_detail DROP COLUMN 检验数量;');
 END
 GO
 

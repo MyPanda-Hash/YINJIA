@@ -202,9 +202,12 @@
                  2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
                  —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
                     按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
-            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
-                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
-            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+            <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
+                  :title="tt('从物料清单引用(选父件,导入其全部子件)')"
+                  @click.stop="openMaterialPick(materialPickAt(sec))">
+              <el-icon><Collection /></el-icon>{{ tt('从物料清单引用') }}
+            </span>
+            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
 
@@ -502,7 +505,9 @@
                 <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
-                  <span v-if="dt.recipeCalc && editable" class="rs-lib-btn" style="color:#409eff;border-color:#a0cfff" @click.stop="openRecipeCalc(dt)">🧮 {{ tt('配方计算') }}</span>
+                  <span v-if="dt.recipeCalc && editable" class="rs-tool no-print" @click.stop="openRecipeCalc(dt)">
+                    <el-icon><Odometer /></el-icon>{{ tt('配方计算') }}
+                  </span>
                   <!-- 手动导入规格书数据(组装BOM表 ← 规格书「1.关键物料列表」):
                        自动带入之外留的手动入口 —— 未提交审批之前可以反复尝试、规格书后补通过后重试。
                        按钮文案来自配置(autoFillSpec.manual),只有配了它的表才出现。 -->
@@ -518,7 +523,7 @@
                     :title="specDriftText"
                     @click.stop="autoFillFromSpec(props.head[cfg.autoFillSpec.fromKey], cfg.autoFillSpec)"
                   >⚠ {{ specDriftText }}</span>
-                  <span v-if="di === fieldEditAt" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+                  <span v-if="di === fieldEditAt" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
                 </span>
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
@@ -741,9 +746,12 @@
                  2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
                  —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
                     按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
-            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
-                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
-            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+            <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
+                  :title="tt('从物料清单引用(选父件,导入其全部子件)')"
+                  @click.stop="openMaterialPick(materialPickAt(sec))">
+              <el-icon><Collection /></el-icon>{{ tt('从物料清单引用') }}
+            </span>
+            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
 
@@ -1000,13 +1008,56 @@
       <colgroup><col v-for="(w, i) in effGrid" :key="'tc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
-        <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri">
-          <td class="rs-td rs-label" :class="{ 'rs-focus': isFocus(row.key) }">{{ tt(row.label) }}</td>
-          <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
-            <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
-            <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-            <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
-          </td>
+        <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri" :style="row.h ? { height: row.h + 'px' } : null">
+          <!-- 表尾**网格行**(2026-10-16 用户报障「产品变更申请表这个位置的格子有点窄,竖向加长到 1.5 倍」)——
+               尾段原先只认旧式 { label, key } 单键行:RD_CHANGE 那种 { h, grid:[…] } 会被渲染成
+               「一个空标签格(row.label 为 undefined)+ 一个大格(head[undefined])」,高度掉到自然行高
+               (实测 31px),配置里写的 h(74/92) 完全不起作用 —— 用户看到的"扁格子"就是这个。
+               现补齐与 sections **同款**的网格渲染(逐格 label/值/area/select/checks/file + row.h 最小行高);
+               旧式单键行仍走下面那支(成型配方「配料要求」等面板一字不动)。
+               ⚠ 与上面 sections 的网格行是**同一套格语义**,改一边要同步另一边(源契约测试已钉)。 -->
+          <template v-if="row.grid">
+            <template v-for="(c, ci) in row.grid" :key="'tg' + ci">
+              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
+                <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+              </td>
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+                <template v-if="editable && c.type === 'select'">
+                  <el-select v-model="head[c.key]" size="small" :clearable="false"
+                             :placeholder="c.ph ? tt(c.ph) : ''"
+                             :filterable="!!stdLibOf(c.key)" :allow-create="!!stdLibOf(c.key)" default-first-option
+                             @change="emit('dirty')">
+                    <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <span v-if="stdLibOf(c.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(c.key))">⧉ {{ tt('标准库维护') }}</span>
+                </template>
+                <template v-else-if="editable && c.type === 'checks'">
+                  <span class="rs-checks">
+                    <el-checkbox
+                      v-for="o in (c.options || [])"
+                      :key="o"
+                      :model-value="checkList(head[c.key]).includes(o)"
+                      @change="toggleCheck(c.key, o, !!c.single)"
+                    >{{ tt(o) }}</el-checkbox>
+                  </span>
+                </template>
+                <template v-else-if="editable && c.key && !c.ro">
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                </template>
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+              </td>
+            </template>
+          </template>
+          <template v-else>
+            <td class="rs-td rs-label" :class="{ 'rs-focus': isFocus(row.key) }">{{ tt(row.label) }}</td>
+            <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
+              <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.rows || 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+              <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
+            </td>
+          </template>
         </tr>
       </tbody>
     </table>
@@ -3715,19 +3766,8 @@ function chartOf(dt) {
   flex: none;
 }
 
-/* 字段编辑按钮(数据表区块条右侧,单据外围) */
-.rs-field-edit-btn {
-  color: #e6a23c;
-  cursor: pointer;
-  font-size: 12px;
-  border: 1px solid #e6a23c;
-  border-radius: 3px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
-.rs-field-edit-btn:hover {
-  background: #fdf6ec;
-}
+/* 字段编辑按钮样式已并入全局 .rs-tool(2026-10-17 三个纸面小入口统一成一种样式,见 styles/index.css) */
+
 .sec-lib-list {
   max-height: 320px;
   overflow: auto;
@@ -4358,7 +4398,7 @@ function chartOf(dt) {
   body.approval-printing .rs-add,
   body.approval-printing .rs-op-add,
   body.approval-printing .rs-op-del,
-  body.approval-printing .rs-field-edit-btn,
+  body.approval-printing .rs-tool,
   body.approval-printing .rsp-lib-pick,
   body.approval-printing .rs-lib-btn,
   /* 产品开发状态角标(未开发/已开发)属界面辅助信息,打印/导出不出现 */

@@ -197,9 +197,36 @@ public class PxController {
         return ApiResult.ok(buttons.devFileEditState(panelCode, docNo));
     }
 
+    /**
+     * 引用单据上的「本单引用的规格书变了」提示(2026-10-16 用户口径)。
+     *
+     * <p>用户原话:「有一些单据是引用的规格书的数据,要是规格书申请修改数据了,但是其他的引用数据的
+     * 单据是归档状态……应该有一个提示,提示说单据对应的规格书申请修改了数据,请及时核对,这些单据
+     * 也可以对应的反审核然后重新引用数据」。只对引用方(成型工艺清单/组装工艺清单/出货检验计划表)适用;
+     * 判定与取数全在 {@link com.yinjia.mes.service.ButtonService#specDriftState}(纯只读,无写副作用)。
+     */
+    @GetMapping("/rdDev/specDrift")
+    public ApiResult<Map<String, Object>> rdDevSpecDrift(@RequestParam String panelCode, @RequestParam String docNo) {
+        perm.requirePanelView(panelCode);
+        return ApiResult.ok(buttons.specDriftState(panelCode, docNo));
+    }
+
     /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) —— 数据在 DevTaskService */
     private String productCodeOf(String docNo) {
         return devTaskService.productCodeOfDocNo(docNo);
+    }
+
+    /**
+     * 引用单据上的「本单引用的产品信息表变了」提示(2026-10-16 用户口径)。
+     *
+     * <p>用户原话:「产品信息表要是申请修改怎么办,那些引用产品信息表的怎么办?应该也做一个提示通知」。
+     * 只对四个引用方(规格书/成型工艺清单/组装工艺清单/出货检验计划表)适用,按 [产品编号] 关联;
+     * 判定与取数全在 {@link com.yinjia.mes.service.ButtonService#prodInfoDriftState}(纯只读,无写副作用)。
+     */
+    @GetMapping("/rdDev/prodInfoDrift")
+    public ApiResult<Map<String, Object>> rdDevProdInfoDrift(@RequestParam String panelCode, @RequestParam String docNo) {
+        perm.requirePanelView(panelCode);
+        return ApiResult.ok(buttons.prodInfoDriftState(panelCode, docNo));
     }
 
     /** 产品开发:已下发产品的开发矩阵 */

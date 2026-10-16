@@ -239,6 +239,13 @@ export default {
     '单据预览': 'Document Preview',
     '单据操作': 'Document Operation',
     '文档输出': 'Document output',
+    // 侧栏整理(2026-10-16):分段序号 + 二级签核
+    '① 查找': '1. Search',
+    '② 本单操作': '2. This document',
+    '③ 流程': '3. Workflow',
+    '④ 文档输出': '4. Document output',
+    '⑤ 危险操作': '5. Danger zone',
+    '二级签核': 'Second-level sign-off',
     '点击修改预警数量，留空使用默认阈值50': 'Click to modify the alert quantity and leave it blank to use the default threshold of 50',
     '数据记录表单据': 'Data Record Table Document',
     '该项目暂无数据记录表单据（数据记录表按文档编号关联立项申请，请确认已按该项目编号填写）': 'There is no data record form document for this project (the data record form is associated with the project application by the document number, please confirm that it has been filled in by the project number)',
@@ -3013,6 +3020,43 @@ export default {
     '请选择二级审核人': 'Select a second-level approver',
     '确认审批通过': 'Confirm Approval',
     '已转交二级审核人': 'Handed over to the second-level approver',
+    /* ── 规格书漂移提示(2026-10-16:引用单据上提示"本单引用的规格书改了") ── */
+    '规格书已变动': 'Spec changed',
+    '本单引用的规格书 {no} 正在修改（{st}），请及时核对数据':
+      'The spec sheet {no} referenced by this document is being modified ({st}); please verify the data',
+    '本单引用的规格书 {no} 已更新（{t}），请及时核对数据':
+      'The spec sheet {no} referenced by this document has been updated ({t}); please verify the data',
+    '如数据已变：点侧栏「弃审」退回草稿 → 再点「按规格书带入」取最新数据':
+      'If the data has changed: click "Unaudit" in the sidebar to return to draft, then click "Pull from spec sheet" to reload the latest data',
+    /* ── 产品信息表漂移提示(2026-10-16:引用产品信息表的四文件上提示"产品信息表改了") ── */
+    '产品信息表已变动': 'Product info changed',
+    /* ── 分发责任人后自动建规格书草稿(2026-10-16) ── */
+    '已分发 {n} 个文件的责任人': 'Assigned owners for {n} files',
+    '已自动生成规格书草稿 {no}（数据已按产品信息表填好，可继续补充）':
+      'A spec sheet draft {no} was created automatically (filled from the product info sheet; keep completing it)',
+    '已自动生成规格书草稿 {no}，是否现在打开继续补充？': 'Spec sheet draft {no} was created automatically. Open it now to continue?',
+    '规格书草稿': 'Spec sheet draft',
+    '稍后': 'Later',
+    /* ── 审批按钮:轮不到我处理时的等待说明(2026-10-16 用户报障「不见审批按钮」) ── */
+    '本单在二级签核：由一级选定的二级审核人（或管理员）签核':
+      'This document is at the second-level sign-off: the second-level approver picked by the first level (or an admin) signs it',
+    '本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）':
+      'This document has been submitted for approval and is waiting for the first-level approver (the submitter cannot approve their own document)',
+    '本单引用的产品信息表 {no} 正在修改（{st}），请及时核对数据':
+      'The product info sheet {no} referenced by this document is being modified ({st}); please verify the data',
+    '本单引用的产品信息表 {no} 已被反审核退回草稿，请核对数据':
+      'The product info sheet {no} referenced by this document was un-audited back to draft; please verify the data',
+    '本单引用的产品信息表 {no} 已更新（{t}），请及时核对数据':
+      'The product info sheet {no} referenced by this document has been updated ({t}); please verify the data',
+    '如数据已变：点侧栏「弃审」退回草稿 → 重新按产品信息表核对后再归档':
+      'If the data has changed: click "Unaudit" in the sidebar to return to draft, verify against the product info sheet, then archive again',
+    '产品「{productCode}」的产品信息表（{docNo}）已由 {actor} 进入「{why}」，您负责的引用单据里那份数据可能已过期，请打开对应单据核对（单据上也有同款黄条提示）。':
+      'The product info sheet ({docNo}) of product "{productCode}" was moved into "{why}" by {actor}. The data in the documents you own may be outdated; please open and verify them (the document also shows a yellow banner).',
+    /* ── 编制与审批分离(2026-10-16:提交人不能自己点一级审批通过) ── */
+    '本单由你提交：按「编制与审批分离」不能审批自己提交的单，请由他人完成一级审批':
+      'You submitted this document: per maker-checker separation you cannot approve your own submission — ask someone else to do the first-level approval',
+    '已按「编制与审批分离」排除提交人（提交人不能当二级审核人）：':
+      'Excluded the submitter per maker-checker separation (the submitter cannot be the second-level approver): ',
     '把四个下游文件各自分给责任人': 'Assign an owner to each of the four downstream documents',
     '仅二级审核人或管理员可分发责任人': 'Only the second-level approver or an admin can dispatch owners',
     '仅已归档的产品信息表可分发责任人': 'Only an archived product info sheet can dispatch owners',

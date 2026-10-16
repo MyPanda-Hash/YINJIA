@@ -3711,3 +3711,22 @@ migrate-scjl-jbbh-nvarchar-20261017.sql
 #   配套前端:menus.js 摘掉两项 + menus.test.js 期望数组同步 + BusinessOverview.vue 报表清单摘两条。
 #   两账套均执行到「[OK] 12 batches」,自检(视图/面板/字段/授权/译名全 0 且两张物理表仍在)通过。
 migrate-drop-manu-order-report-panels-20261017.sql
+#   实测未来日期来自单张 XSCK-20270901-00001(2027-09-01),让「最新期次」误取到它。只改视图口径,不动业务数据。
+# 期次桶收敛已并入 canonical 脚本 migrate-inv-accounting.sql(改字节触发重跑重建视图),不再单列脚本。
+# migrate-stock-views-restore-20261016.sql — 事故修复:恢复 v_stock_ledger/v_stock_summary(摘掉已下架表的委外分支 + 期次桶收敛;canonical 脚本字节不动)
+migrate-stock-views-restore-20261016.sql
+# migrate-kucun-recalc-to-now-20261016.sql — kucun 按流水重算到今日(与月结 reconcileKucun 同语句,截止点=明天;供四表对账用)
+migrate-kucun-recalc-to-now-20261016.sql
+# migrate-qc-insp-detail-restore-20261016.sql — 恢复被批量作废的来料检验单明细(IJ-2026-10-0011 起 10 单 12 行,单头有效、明细被误作废;asp_user2=restore 可回退)
+migrate-qc-insp-detail-restore-20261016.sql
+# migrate-doc-detail-uncancel-20261016.sql — 全库复效「单头有效、明细却全部作废」的单据明细(检验单 IJ-2026-10-0011 起 / 暂收单 SL-2026-10-0111~0119 等),逐表报数 + 复扫自检
+migrate-doc-detail-uncancel-20261016.sql
+# migrate-yj-field-dedup.sql — 清掉 yj_field 完全重复登记行(体检 07;6 处全在 PURCHASE_IN)⇒ 171→165 行,须同批刷新四单基线
+migrate-yj-field-dedup.sql
+# 以下 6 条为**已应用但漏登记**的历史脚本(体检 12):补登记,用 DbSync baseline 只登记不执行
+migrate-cleanup-test-wo-gd2026100008.sql
+migrate-insp-plan-prodno-ref-20261013.sql
+migrate-mold-feed-stdlib-20261013.sql
+migrate-rd-sheet-ref-tidy-20261013.sql
+migrate-specdoc-required-off-20261013.sql
+migrate-wlbom-menu-rollback-20261015.sql

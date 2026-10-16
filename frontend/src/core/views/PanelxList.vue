@@ -185,16 +185,44 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度) -->
-        <RecordSheetPanels
-          v-else-if="isRecordSheetPanel"
-          ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
-          :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
-          @dirty="markInlineDirty"
-          @refresh-config="onFieldEditRefresh"
-        />
-        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+        <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度)。
+             ⚠ 四文件里的三张引用方(成型工艺清单/组装工艺清单/出货检验计划表)都落在这里 ⇒
+             「本单引用的规格书变了」黄条挂在本分支容器内(2026-10-16 用户口径)。 -->
+        <div v-else-if="isRecordSheetPanel" class="sheet-scroll">
+          <div v-if="specDrift" class="spec-drift-banner">
+            <span class="sdb-tag">{{ tt('规格书已变动') }}</span>
+            <span class="sdb-txt">
+              <template v-if="specDrift.reason === 'spec_in_flux'">{{ tt('本单引用的规格书 {no} 正在修改（{st}），请及时核对数据').replace('{no}', String(specDrift.specNo || '')).replace('{st}', tt(String(specDrift.specStatus || ''))) }}</template>
+              <template v-else>{{ tt('本单引用的规格书 {no} 已更新（{t}），请及时核对数据').replace('{no}', String(specDrift.specNo || '')).replace('{t}', String(specDrift.specChangedAt || '')) }}</template>
+              <span class="sdb-hint">{{ tt('如数据已变：点侧栏「弃审」退回草稿 → 再点「按规格书带入」取最新数据') }}</span>
+            </span>
+          </div>
+          <!-- 「本单引用的产品信息表变了」黄条(2026-10-16 用户口径)—— 与上面规格书那条同款式、同位置:
+               四文件(规格书/成型工艺清单/组装工艺清单/出货检验计划表)都是按 [产品编号] 引用产品信息表的,
+               产品信息表一进修改流程(或被弃审),这四张单里的数据就可能过期。判定在服务端,前端只显示。 -->
+          <div v-if="prodDrift" class="spec-drift-banner">
+            <span class="sdb-tag">{{ tt('产品信息表已变动') }}</span>
+            <span class="sdb-txt">
+              <template v-if="prodDrift.reason === 'prod_in_flux'">{{ tt('本单引用的产品信息表 {no} 正在修改（{st}），请及时核对数据').replace('{no}', String(prodDrift.prodNo || '')).replace('{st}', tt(String(prodDrift.prodStatus || ''))) }}</template>
+              <template v-else-if="prodDrift.reason === 'prod_reaudited'">{{ tt('本单引用的产品信息表 {no} 已被反审核退回草稿，请核对数据').replace('{no}', String(prodDrift.prodNo || '')) }}</template>
+              <template v-else>{{ tt('本单引用的产品信息表 {no} 已更新（{t}），请及时核对数据').replace('{no}', String(prodDrift.prodNo || '')).replace('{t}', String(prodDrift.prodChangedAt || '')) }}</template>
+              <span class="sdb-hint">{{ tt('如数据已变：点侧栏「弃审」退回草稿 → 重新按产品信息表核对后再归档') }}</span>
+            </span>
+          </div>
+          <RecordSheetPanels
+            ref="approvalSheetRef"
+            :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
+            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
+            @dirty="markInlineDirty"
+            @refresh-config="onFieldEditRefresh"
+          />
+        </div>
+        <!-- 纸面滚动容器(2026-10-16):立项申请/项目实施计划**定死纸宽 1242px**(DocSheet 的
+             FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
+             (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
+        <div v-else class="sheet-scroll">
+          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+        </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
@@ -296,7 +324,7 @@
               </div>
             </div>
             <div v-else class="as-side-btns">
-              <div class="as-side-section">{{ tt('查找') }}</div>
+              <div class="as-side-section">{{ tt('① 查找') }}</div>
               <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
                    ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
               <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
@@ -306,23 +334,31 @@
               <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
                    矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
               <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
-              <div class="as-side-section">{{ tt('单据操作') }}</div>
-              <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
-              <div class="as-side-del danger" v-if="isApprovalDoc">
-                <div class="as-side-btn-row">
-                  <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
-                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
-                </div>
-                <!-- 删除申请中:申请提交后无人审批会卡死(不可编辑也无审批入口)——发起人本人或审批人可撤回 -->
-                <div v-if="curDocStatus === '删除申请中'" class="as-side-btn" @click="pickDelAction('撤回删除申请')">{{ tt('撤回删除申请') }}</div>
-                <div v-if="openDelMenu" class="as-side-menu" @click.stop>
-                  <div class="as-side-menu-item danger" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
-                  <template v-if="canApproveHere()">
-                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
-                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
-                  </template>
-                </div>
-              </div>
+
+              <!-- ② 本单操作(2026-10-16 用户口径「侧边栏按钮放得有点乱,整理一下」)——
+                   **位置固定、内容随状态换**:这一段永远只放"本单这一步该做什么"。
+                     草稿   = 新增 / 保存(主,实心) / 保存为草稿
+                     修改中 = 提交审批(主) / 保存 / 保存为草稿
+                     审批中 = 审批通过(主) / 审批驳回 / 审批情况   ← 旧版藏在「申请修改 ▼」下拉里,用户找不到
+                     已归档 = 申请修改(主) / 修改记录
+                   通用动作(新增/保存/保存为草稿…)来自面板元数据的工具栏动作组(sheetSideGroups);
+                   **判据一条没改** —— 能不能点仍由 isDisabled(状态×身份) 与服务端门禁决定,这里只调位置与主次。
+                   危险动作(删除/撤回/弃审)一律下沉到 ⑤ 危险操作,不再夹在中间。 -->
+              <div class="as-side-section">{{ tt('② 本单操作') }}</div>
+              <template v-for="(g, gi) in sheetSideGroups" :key="'sg' + gi">
+                <div
+                  class="as-side-btn"
+                  :class="{ primary: btnName(g) === '保存' && curDocStatus === '草稿', disabled: isDisabled(btnName(g)) }"
+                  @click="onSideAction(btnName(g))"
+                >{{ tt(btnName(g)) }}</div>
+                <div
+                  v-for="a in dropItems(g)"
+                  :key="a"
+                  class="as-side-btn sub"
+                  :class="{ disabled: isDisabled(a) }"
+                  @click="onSideAction(a)"
+                >{{ tt(a) }}</div>
+              </template>
               <!-- 四个受控文件:非该文件责任人只读时,把"责任人是谁"写在侧栏(否则用户只会觉得点不动)。
                    2026-10-16 用户报障「一填写保存规格书就提示报错」——真正卡点是本单的**产品编号**
                    在分发记录里查不到(实测多为 产品编号 被手改成别的值,如把封面「编号」填成 111),
@@ -339,98 +375,85 @@
                 <div>{{ tt('责任人') }}：{{ specDocAssign.ownerName || specDocAssign.owner }}<span v-if="specAssignBlocked">（{{ tt('只读') }}）</span></div>
                 <div>{{ tt('总负责人') }}：{{ specDocAssign.supervisorName || specDocAssign.supervisor || tt('未落实') }}</div>
               </div>
-              <!-- 审批组:品质单据等标准流文书面板(草稿需显式提交审批;审批通过/驳回需审批权限;审批情况公开) -->
-              <!-- 审批组:标准流文书面板(品质单据等)+ 检验数据记录(QC_INSP_REC,用户口径要求有审批按钮) -->
-              <template v-if="hasApprovalBtns">
+              <!-- 审批闭环(2026-10-16 侧栏整理:从「申请修改 ▼」下拉与 hasApprovalBtns 特例里**提出来**,独立成一段)
+                   —— 门禁逐条与原来一致,只是不再按面板藏:
+                     · 提交审批:仅标准流文书面板(QC_INSP_REC / RD_DOM_TEST / 品质单据)需要显式提交 ——
+                       归档一族是「保存=送审(普通用户)/归档(管理员)」,没有这一步;
+                     · 审批通过 / 审批驳回:状态∈{审批中,待二级审批} + 有审批权者(管理员 ∪ 角色勾了审核反审核);
+                       一级节点排除提交人本人(服务端 ButtonService 编制与审批分离必拒,这里提前禁用并说明原因);
+                       二级节点只认被一级选中的二级审核人(l2ApproverNow,被选中即授权,不依赖角色审批权);
+                     · 主按钮 = 审批通过(实心):它就是"本单这一步"的动作。
+                   弃审 → ⑤ 危险操作。 -->
+              <template v-if="hasApprovalBtns && ['草稿', '修改中'].includes(curDocStatus)">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
-                <!-- 质量单据两级审批(2026-10-04):一级「审批通过」(有该面板审核反审核权的角色∪管理员)、
-                     二级「批准通过」(超级管理员);两级各点一次,按钮按节点显隐。均调后端「审批通过」按钮,
-                     节点由后端 approve_node 判定 —— 前端只负责显隐与文案 -->
-                <template v-if="isQcL2Panel">
-                  <template v-if="canApproveQcL2Here">
-                    <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ qcL2ApproveLabel() }}</div>
-                    <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ qcL2RejectLabel() }}</div>
-                  </template>
-                  <div v-if="canApproveHere()" class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
-                </template>
-                <template v-else-if="canApproveHere()">
-                  <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
-                  <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
-                  <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
-                </template>
-                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               </template>
+              <template v-if="IN_APPROVAL.includes(curDocStatus)">
+                <template v-if="approvalBtnsVisible">
+                  <div
+                    class="as-side-btn primary"
+                    :class="{ disabled: isDisabled('审批通过') }"
+                    :title="isDisabled('审批通过') ? disabledReason('审批通过') : ''"
+                    @click="onSideAction('审批通过')"
+                  >{{ tt(approveBtnLabel) }}</div>
+                  <div
+                    class="as-side-btn"
+                    :class="{ disabled: isDisabled('审批驳回') }"
+                    :title="isDisabled('审批驳回') ? disabledReason('审批驳回') : ''"
+                    @click="onSideAction('审批驳回')"
+                  >{{ tt(rejectBtnLabel) }}</div>
+                </template>
+                <!-- 轮不到我处理:不藏成"什么都没有"(用户会以为流程坏了),也不给点了必被拒的按钮,
+                     只把"现在在等谁"说出来 —— 见 approvalBtnsVisible 注释 -->
+                <div v-else class="as-side-hint">{{ tt(approvalWaitingTip) }}</div>
+              </template>
+              <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」):
                    工序检验单一族(当前只放制程检验单,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
                    也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
-                   有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。 -->
+                   有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
+                   ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
+                     上面统一审批块已经有一条同名弱化条目(同一个动作、同一个只读历史弹窗)。 -->
               <template v-if="canDirectAuditHere">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('审核') }" @click="onSideAction('审核')">{{ tt('审核') }}</div>
                 <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
-                <!-- 审核记录(审批情况):读 yj_form_approval 全留痕 —— 2026-10-17 起后端 audit() 也写这张表,
-                     此前直审不留痕,这里只会是空的。只读视图、不限单据状态、谁都能看(与其它面板同口径)。 -->
-                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               </template>
-              <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程 + 审批(冯总=admin)。
+              <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程(审批本身走上面的统一审批块)。
                    状态链 草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
-                   显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签,
-                   审批权口径与其它面板一致(canApproveHere)。服务端每步都再校验一次身份。 -->
+                   显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签。服务端每步都再校验一次身份。
+                   2026-10-16 侧栏整理:本块的「审批通过/审批驳回/审批情况」删掉 —— 已并入统一审批块,不再重复渲染。 -->
               <template v-if="isChangePanel">
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] === '是' && isChangeInitiator"
-                     class="as-side-btn" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
+                     class="as-side-btn primary" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
                 <template v-if="curDocStatus === '会签中'">
-                  <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
+                  <div v-if="iAmChangeSigner" class="as-side-btn primary" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
                   <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签驳回')">{{ tt('会签驳回') }}</div>
-                  <div v-if="isChangeInitiator" class="as-side-btn" @click="onSideAction('撤回会签')">{{ tt('撤回会签') }}</div>
+                  <div v-if="isChangeInitiator" class="as-side-btn sub" @click="onSideAction('撤回会签')">{{ tt('撤回会签') }}</div>
                 </template>
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] !== '是' && isChangeInitiator"
-                     class="as-side-btn" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
-                <template v-if="IN_APPROVAL.includes(curDocStatus) && canApproveHere()">
-                  <div class="as-side-btn" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
-                  <div class="as-side-btn" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
-                </template>
-                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
+                     class="as-side-btn primary" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
               </template>
-              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改申请中出「撤回修改申请」;修改记录弹窗(滚动3条) -->
-              <div class="as-side-del" v-if="isDocArchivePanel">
-                <div class="as-side-btn-row">
-                  <div class="as-side-btn" style="flex: 1" :class="{ disabled: !canModifyReq }" @click="pickModAction('申请修改')">{{ tt('申请修改') }}</div>
-                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openModMenu = !openModMenu">▼</div>
-                </div>
-                <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
-                <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
-                <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
-                <!-- 反审核(弃审)—— 用户口径 2026-10-16「加上可反审核的机制,方便申请修改」:
-                     文书归档面板在「已审核/已归档」时,走「申请修改→管理员审批→修改→再归档」闭环太重;
-                     有审批权的人(∪管理员)可直接反审核退回草稿,改完保存即重新归档。
-                     后端 ButtonService.unaudit 对归档一族**先落快照**(snapshotOnUnaudit),
-                     所以修改记录照样逐条留痕,不丢审计。服务端另有 requireApprover 强制,此处同口径显隐。 -->
-                <div
-                  v-if="canUnauditHere"
-                  class="as-side-btn"
-                  :title="tt('反审核：退回草稿后可直接修改，保存时再归档（修改记录照样留痕）')"
-                  @click="pickModAction('弃审')"
-                >{{ tt('弃审') }}</div>
-                <div v-if="openModMenu" class="as-side-menu flip-up" @click.stop>
-                  <template v-if="canApproveHere() || l2ApproverNow">
-                    <template v-if="curDocStatus === '修改申请中'">
-                      <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
-                      <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
-                    </template>
-                    <!-- 两级审批(2026-09-20):一级节点(审批中)由审批人处理;二级节点(待二级审批)
-                         由一级选定的二级审核人处理 —— 被选中即授权,不依赖角色 can_approve -->
-                    <template v-else-if="IN_APPROVAL.includes(curDocStatus) && (curDocStatus === '待二级审批' ? l2ApproverNow : canApproveHere())">
-                      <div class="as-side-menu-item" @click="pickModAction('审批通过')">{{ tt('审批通过') }}</div>
-                      <div class="as-side-menu-item" @click="pickModAction('审批驳回')">{{ tt('审批驳回') }}</div>
-                    </template>
-                  </template>
-                  <div class="as-side-menu-item" @click="pickModAction('审批情况')">{{ tt('审批情况') }}</div>
-                </div>
-              </div>
+              <!-- 申请修改(归档后改数据,2026-10-16 侧栏整理)——
+                   原来是「申请修改 ▼」下拉,**审批通过/审批驳回/审批情况全藏在下拉里**(用户口径「不好找」)。
+                   现在:申请修改 = 已审核/已归档 时的**主按钮**(实心);修改申请中的审批与撤回各自成条,不再折叠。
+                   撤回修改申请/弃审 → ⑤ 危险操作。 -->
+              <div
+                v-if="isDocArchivePanel && ['已审核', '已归档'].includes(curDocStatus)"
+                class="as-side-btn"
+                :class="{ primary: canModifyReq, disabled: !canModifyReq }"
+                @click="onSideAction('申请修改')"
+              >{{ tt('申请修改') }}</div>
+              <div v-if="isDocArchivePanel && curDocStatus === '修改中'" class="as-side-btn primary" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
+              <template v-if="isDocArchivePanel && curDocStatus === '修改申请中' && (canApproveHere() || l2ApproverNow)">
+                <div class="as-side-btn primary" @click="onSideAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
+                <div class="as-side-btn" @click="onSideAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
+              </template>
               <div class="as-side-btn" v-if="isModLogPanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
-              <!-- 文档输出分节标题与它的两个按钮已下移到本侧栏末尾(2026-10-09 归位):
-                   它原先夹在「项目定级/分发…」与工具栏动作组**之前**,把新增/保存/审批这些
-                   动作按钮全归到了「文档输出」标题下面 ⇒ 用户报的"按钮分类混乱"。 -->
+              <!-- ③ 流程(2026-10-16 侧栏整理):本面板的**业务流转**按钮单独成段,与通用动作彻底分开。
+                   数字 1/2/3 = 业务顺序(立项:定级 → 分发对接人 → 确认责任人;产品信息表:分发责任人 → 规格书分发),
+                   已完成的显示当前值(如「项目定级 · 二级」「分发对接人 · 系统管理员」)。
+                   ⚠ 显隐与置灰仍全部来自后端(rdApprovalFlowState / canGradeProject / canDevDispatch…),一条判据没改。 -->
+              <div v-if="panelCode === 'RD_APPROVAL' || panelCode === 'RD_PROD_INFO' || (isDevFilePanel && pendingDocs.rows.length)"
+                   class="as-side-section">{{ tt('③ 流程') }}</div>
               <!-- 项目定级(2026-09-21):立项申请审核通过后,由审核人给项目定级;已定级显示当前等级,可再改 -->
               <div
                 class="as-side-btn"
@@ -439,7 +462,7 @@
                 :title="canGradeProject ? tt('给该项目定级(一/二/三/四级)')
                   : (['已审核', '已归档'].includes(curDocStatus) ? tt('仅审批人（或管理员）可项目定级') : tt('仅已审核或已归档的立项申请可项目定级'))"
                 @click="openGrade"
-              >{{ tt('项目定级') }}{{ cur && cur['项目等级'] ? '·' + cur['项目等级'] : '' }}</div>
+              ><span class="as-side-step">1</span>{{ tt('项目定级') }}{{ cur && cur['项目等级'] ? '·' + cur['项目等级'] : '' }}</div>
               <!-- 分发对接人 / 确认责任人(2026-10-08 研发流程图③④):
                    定级完成后,由审批人**从账号列表选一个账号**作为本项目的「对接人」;
                    对接人登录后签核,再**从账号列表选人**确认「项目责任人」。
@@ -453,7 +476,7 @@
                   : (!isRdSettled ? tt('仅已审核或已归档的立项申请可分发给对接人')
                     : (!rdFlow.level ? tt('请先完成项目定级，再分发对接人') : tt('仅审批人（或管理员）可分发给对接人')))"
                 @click="openLiaison"
-              >{{ tt('分发对接人') }}{{ rdFlow.liaisonName ? '·' + rdFlow.liaisonName : '' }}</div>
+              ><span class="as-side-step">2</span>{{ tt('分发对接人') }}{{ rdFlow.liaisonName ? '·' + rdFlow.liaisonName : '' }}</div>
               <div
                 class="as-side-btn"
                 v-if="panelCode === 'RD_APPROVAL'"
@@ -462,7 +485,7 @@
                   : (!isRdSettled ? tt('仅已审核或已归档的立项申请可确认责任人')
                     : (!rdFlow.liaison ? tt('请先分发对接人，再由对接人确认项目责任人') : tt('仅本单对接人或管理员可确认项目责任人')))"
                 @click="openOwner"
-              >{{ tt('确认责任人') }}{{ rdFlow.ownerName ? '·' + rdFlow.ownerName : '' }}</div>
+              ><span class="as-side-step">3</span>{{ tt('确认责任人') }}{{ rdFlow.ownerName ? '·' + rdFlow.ownerName : '' }}</div>
               <!-- 分发责任人(2026-09-20;原名「产品开发下发」):仅产品信息表;
                    已归档 **且 二级审核人 ∪ 管理员** 才可点;已分发后按钮变「改责任人」(分发后随时可改) -->
               <div
@@ -473,7 +496,7 @@
                   : (canDevDispatch ? tt('把四个下游文件各自分给责任人')
                     : (curDocStatus === '已归档' ? tt('仅二级审核人或管理员可分发责任人') : tt('仅已归档的产品信息表可分发责任人')))"
                 @click="onDevDispatch"
-              >{{ devDispatch.dispatched ? tt('改责任人') : tt('分发责任人') }}</div>
+              ><span class="as-side-step">1</span>{{ devDispatch.dispatched ? tt('改责任人') : tt('分发责任人') }}</div>
               <!-- 规格书两级分发(第二级):已下发产品出现;仅总负责人/管理员可用,负责人未落实(挂起)时置灰 -->
               <div
                 class="as-side-btn"
@@ -482,7 +505,7 @@
                 :title="canSpecDispatch ? tt('把该产品的规格书单据分发给责任人填写')
                   : (devDispatch.supervisorResolved ? tt('仅总负责人或管理员可分发规格书') : tt('产品信息表「责任人」未匹配到启用账号，任务挂起'))"
                 @click="openSpecAssign"
-              >{{ tt('规格书分发') }}</div>
+              ><span class="as-side-step">2</span>{{ tt('规格书分发') }}</div>
               <!-- 待开发单据(2026-10-10):四个下游面板(规格书/成型工艺清单/组装工艺清单/出货检验计划表)
                    各自一个按钮,**只有被分发到该面板的人**才看得到 —— 显隐判据是 pendingDocs.rows.length>0,
                    它由后端 /px/rdDev/pendingDocs 按 rd_dev_task 的负责人过滤后下发,前端不自己算权限。
@@ -492,25 +515,13 @@
                 class="as-side-btn has-badge"
                 @click="openPendingDocs"
               >{{ tt('待开发单据') }}<span v-if="pendingDocs.pendingCount > 0" class="pending-docs-badge">{{ pendingDocs.pendingCount }}</span></div>
-              <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
-                <div
-                  class="as-side-btn"
-                  :class="{ disabled: isDisabled(btnName(g)) }"
-                  @click="onSideAction(btnName(g))"
-                >{{ tt(btnName(g)) }}</div>
-                <div
-                  v-for="a in dropItems(g)"
-                  :key="a"
-                  class="as-side-btn sub"
-                  :class="{ disabled: isDisabled(a) }"
-                  @click="onSideAction(a)"
-                >{{ tt(a) }}</div>
-              </template>
+              <!-- 工具栏动作组已在「② 本单操作」段渲染(2026-10-16 侧栏整理:不再落在流程按钮之后) -->
               <!-- ── 文档输出(2026-10-09 归位) ──
                    只有真正"出文档"的两个按钮留在这里;其余(项目定级 / 分发对接人 / 确认责任人 /
                    分发责任人 / 规格书分发 / 以及上面的工具栏动作组 新增·选单·保存·删除·审批·生单·刷新·更多)
                    一律归「单据操作」。此前本标题夹在它们**之前**,把它们全归到了「文档输出」下面。 -->
-              <div class="as-side-section">{{ tt('文档输出') }}</div>
+              <!-- ④ 文档输出(2026-10-09 归位;2026-10-16 侧栏整理加序号) -->
+              <div class="as-side-section">{{ tt('④ 文档输出') }}</div>
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
@@ -548,6 +559,45 @@
                   {{ tt(annMode === 'pen' ? '在纸面上划选要标注的文字，再选颜色' : '点击已标注的文字即可擦除') }}
                 </div>
               </template>
+              <!-- 字段管理:配置类动作(动态字段 / 备用列池),不属于"本单操作" ⇒ 归到输出段末尾,弱化显示 -->
+              <div v-if="hasFieldAdmin" class="as-side-btn sub" @click="onSideAction('字段管理')">{{ tt('字段管理') }}</div>
+
+              <!-- ⑤ 危险操作(2026-10-16 侧栏整理):破坏性 / 中断性动作统一沉底 + 红色描边 ——
+                   原先「删除」在段首、弃审夹在中间,容易误触也难找。
+                   判据一条没改:删除走 isApprovalDoc;撤回删除/修改申请只在自己那个申请态出现;
+                   弃审走 canUnauditHere(已审核·已归档 + 审批权或四文件责任人,与后端 unaudit 同口径);
+                   QC/标准流面板沿用原「有审批权就给按钮、按状态置灰」的显隐口径。 -->
+              <div v-if="isApprovalDoc || curDocStatus === '修改申请中' || canUnauditHere || (hasApprovalBtns && canApproveHere())"
+                   class="as-side-section">{{ tt('⑤ 危险操作') }}</div>
+              <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口)。
+                   菜单贴底 ⇒ flip-up 向上展开(否则超出侧栏可视区)。 -->
+              <div class="as-side-del danger" v-if="isApprovalDoc">
+                <div class="as-side-btn-row">
+                  <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
+                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
+                </div>
+                <div v-if="curDocStatus === '删除申请中'" class="as-side-btn" @click="pickDelAction('撤回删除申请')">{{ tt('撤回删除申请') }}</div>
+                <div v-if="openDelMenu" class="as-side-menu flip-up" @click.stop>
+                  <div class="as-side-menu-item danger" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
+                  <template v-if="canApproveHere()">
+                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+                  </template>
+                </div>
+              </div>
+              <!-- 修改申请中:卡死时由发起人本人或审批人撤回 -->
+              <div v-if="isDocArchivePanel && curDocStatus === '修改申请中'" class="as-side-btn" @click="onSideAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
+              <!-- 反审核(弃审)—— 用户口径 2026-10-16「加上可反审核的机制,方便申请修改」:
+                   文书归档面板在「已审核/已归档」时,走「申请修改→管理员审批→修改→再归档」闭环太重;
+                   有审批权的人(∪管理员,四文件面板另放该文件责任人)可直接反审核退回草稿,改完保存即重新归档。
+                   后端 ButtonService.unaudit 对归档一族**先落快照**(snapshotOnUnaudit),修改记录照样逐条留痕。 -->
+              <div
+                v-if="canUnauditHere || (hasApprovalBtns && canApproveHere())"
+                class="as-side-btn"
+                :class="{ disabled: isDisabled('弃审') }"
+                :title="tt('反审核：退回草稿后可直接修改，保存时再归档（修改记录照样留痕）')"
+                @click="onSideAction('弃审')"
+              >{{ tt('弃审') }}</div>
             </div>
           </template>
         </div>
@@ -1885,10 +1935,12 @@
     <el-dialog v-model="l2PickVisible" :title="tt('选取二级审核人')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('一级审批通过后，由该审核人完成二级签核；二级通过即归档，随后由其分发责任人。') }}</div>
+        <div v-if="l2PickHiddenSubmitter" class="mod-log-meta" style="margin-bottom:8px">{{ tt('已按「编制与审批分离」排除提交人（提交人不能当二级审核人）：') }}{{ l2PickHiddenName }}</div>
+        <div v-if="l2PickError" class="dq-error">{{ l2PickError }}</div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('二级审核人') }}</span>
           <el-select v-model="l2PickUser" style="flex:1" filterable :placeholder="tt('请选择二级审核人')">
-            <el-option v-for="u in l2PickUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+            <el-option v-for="u in l2PickOptions" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
           </el-select>
         </div>
         <div class="dq-row" style="align-items:flex-start">
@@ -3003,6 +3055,27 @@ function canApproveHere() {
   return user.isAdmin || ap.includes('*') || ap.includes(String(panelCode.value))
 }
 
+/**
+ * 「编制与审批分离」前端闸门(2026-10-16 用户报障「用 cp 账号签核出错,还是显示选取二级审核人」)。
+ *
+ * 实测根因(测试账套 PI-2026-10-0021,提交人=cp 且 cp 有 RD_PROD_INFO 审批权):
+ *   cp 点了「审批通过」→ 弹出「选取二级审核人」→ 确认 → 后端 403
+ *   「审批人不能与提交人相同（编制与审批分离）」(ButtonService:1815),
+ *   **一级审批没落地**(yj_form_approval 里只有 SUBMIT,没有 APPROVE_L1)⇒ 单据仍在「审批中」,
+ *   cp 再点时弹的还是**一级**那个选人框;加上报错后弹窗不关闭 ⇒ 用户理解成"分发给 cp 成功了,
+ *   还是弹这个框"。同一坑还有第二个:选人框里把提交人自己列成候选,后端必然拒(ButtonService:1826)。
+ *
+ * 本单提交人 = yj_doc_status.pending_by,后端在「审批中」的单据上下发成 `提交人` 键
+ * (QueryService.loadDocs:508-510)。这里只做**展示层**拦截(置灰 + 说清原因 + 候选剔除),
+ * 服务端门禁一条不改、仍是最终裁决。管理员豁免(与后端同款:保存即归档本就是等价权力)。
+ */
+const curSubmitter = computed(() => String(cur.value?.['提交人'] || '').trim())
+const iAmCurSubmitter = computed(() => {
+  const s = curSubmitter.value
+  if (!s || user.isAdmin) return false
+  return s === String(user.userName || user.account || '')
+})
+
 // ---------- 文件面板查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间 ----------
 const docQueryVisible = ref(false)
 const docQueryNo = ref('')
@@ -3614,10 +3687,16 @@ const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocSt
  * 侧栏「弃审」(反审核)是否放出 —— 用户口径 2026-10-16「加上可反审核的机制,方便申请修改」。
  * 文书归档面板 + 已审核/已归档 + 有审批权(∪管理员)。与后端 ButtonService.unaudit 同口径:
  * 它要求 requireApprover,且对归档一族先落快照 ⇒ 反审核后直接改、保存即重新归档,修改记录照样留痕。
+ *
+ * ⚠ 2026-10-16 放宽(同日用户报障「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」):
+ *   四文件面板(规格书/成型工艺清单/组装工艺清单/出货检验计划表)另放 **该文件责任人** ——
+ *   判据直接用 `/px/rdDev/fileEdit` 下发的 canEdit(与保存门禁同一真源,责任人∪规格书被分发责任人∪
+ *   总负责人∪管理员),后端 unaudit 同批放宽为 requireApproverOrDevFileOwner。其余面板一字不动。
  */
+const devFileCanEditHere = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === true))
 const canUnauditHere = computed(() => isDocArchivePanel.value
   && ['已审核', '已归档'].includes(curDocStatus.value)
-  && canApproveHere())
+  && (canApproveHere() || devFileCanEditHere.value))
 
 // ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
 // 服务端 ensureDevFileEditable 早就拦住了非责任人,但界面不置灰:用户能改、能点保存,点完才被拒。
@@ -3641,8 +3720,53 @@ const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
 
-// ── 待开发单据(2026-10-10):四个下游面板侧的「我被分发了多少张产品信息表待开发」──
-// 真源 = 后端 /px/rdDev/pendingDocs(已按 rd_dev_task 的负责人过滤)⇒ 前端不自己判权限:
+// ── 「本单引用的规格书变了」提示(2026-10-16 用户口径)──
+// 用户原话:「有一些单据是引用的规格书的数据,要是规格书申请修改数据了,但是其他的引用数据的单据是
+//   归档状态……应该有一个提示,提示说单据对应的规格书申请修改了数据,请及时核对,这些单据也可以
+//   对应的反审核然后重新引用数据」。
+// 只对**引用方**成立:成型工艺清单/组装工艺清单/出货检验计划表(规格书是数据源,方向相反,不入列)。
+// 判定全在服务端 /px/rdDev/specDrift(规格书正在改 或 改完且比本单新),前端只负责显示与引导:
+// 提示里直接告诉用户"点弃审退回草稿再重新引用"——四文件面板的弃审已同批放给责任人(canUnauditHere)。
+const SPEC_REF_PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN']
+const specDrift = ref(null)
+async function loadSpecDrift() {
+  if (!SPEC_REF_PANELS.includes(String(panelCode.value))) { specDrift.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { specDrift.value = null; return }
+  try {
+    const r = await engine.rdSpecDrift(panelCode.value, no)
+    // 竞态守卫:期间切了单据/面板就丢弃这次结果(与 loadDevFileGate 同款)
+    if (String(cur.value?.['单据编号'] || '') !== no) return
+    specDrift.value = r && r.applicable && r.needCheck ? r : null
+  } catch {
+    // 取不到就不提示(辅助信息,不打扰用户、不影响页面其它功能)
+    specDrift.value = null
+  }
+}
+
+// 产品信息表漂移(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,那些引用产品信息表的怎么办?
+//   应该也做一个提示通知」)—— 与上面规格书漂移同构,被引用方换成**产品信息表**:
+//   产品信息表是四文件的数据源头(产品编号/尺寸/客户项目名称…),它一进修改流程或被人弃审,
+//   已经归档的四文件里那份数据就可能过期 ⇒ 在单据靠上位置挂一条黄条,引导用户弃审后重新引用。
+//   判定全在服务端 /px/rdDev/prodInfoDrift(正在改 / 被弃审退回草稿 / 改完且比本单新),前端只显示。
+const PRODINFO_REF_PANELS = ['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN']
+const prodDrift = ref(null)
+async function loadProdDrift() {
+  if (!PRODINFO_REF_PANELS.includes(String(panelCode.value))) { prodDrift.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { prodDrift.value = null; return }
+  try {
+    const r = await engine.rdProdInfoDrift(panelCode.value, no)
+    // 竞态守卫:期间切了单据/面板就丢弃这次结果(与 loadSpecDrift 同款)
+    if (String(cur.value?.['单据编号'] || '') !== no) return
+    prodDrift.value = r && r.applicable && r.needCheck ? r : null
+  } catch {
+    // 取不到就不提示(辅助信息,不打扰用户、不影响页面其它功能)
+    prodDrift.value = null
+  }
+}
+
+// ── 待开发单据(2026-10-10):四个下游面板侧的「我被分发了多少张产品信息表待开发」──// 真源 = 后端 /px/rdDev/pendingDocs(已按 rd_dev_task 的负责人过滤)⇒ 前端不自己判权限:
 //   · 按钮显隐 判据 = rows.length > 0(我被分发到了这个面板)
 //   · 红点数字 判据 = pendingCount(rows 里「未开发」的条数),为 0 时红点整块不渲染
 // 请求失败静默降级(清空即可,不弹错误 —— 这个入口是辅助性的,不能打扰用户/影响页面其它功能)。
@@ -3797,10 +3921,23 @@ async function confirmDevAssign() {
       formData: { 编号: devAssignDocNo.value, 分发责任人 }, buttonParam: {},
     })
     const n = Object.keys(res?.assigns || {}).length
-    ElMessage.success(`已分发 ${n} 个文件的责任人`)
+    // 2026-10-16 用户口径:分发责任人之后后端会**自动建一张规格书草稿**(第一页按产品信息表真实写入)。
+    // 这里把单号说出来并给一个直达入口 —— 否则用户以为"分发完就没事了",回头还得自己找那张草稿。
+    const sp = String(res?.specDraftNo || '')
+    ElMessage.success(tt('已分发 {n} 个文件的责任人').replace('{n}', String(n))
+      + (sp ? '；' + tt('已自动生成规格书草稿 {no}（数据已按产品信息表填好，可继续补充）').replace('{no}', sp) : ''))
     devAssignVisible.value = false
     await loadDevDispatchState()
     await load()
+    if (sp) {
+      try {
+        await ElMessageBox.confirm(
+          tt('已自动生成规格书草稿 {no}，是否现在打开继续补充？').replace('{no}', sp),
+          tt('规格书草稿'), { confirmButtonText: tt('打开'), cancelButtonText: tt('稍后') })
+        // 深链到规格书面板并定位这张草稿(该面板支持 ?docNo=,见 applyDocNoQuery)
+        router.push({ path: '/panelx/list/RD_SPEC_DOC', query: { docNo: sp } })
+      } catch { /* 选「稍后」:单子已在规格书列表里,自己开即可 */ }
+    }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '分发失败')
   } finally {
@@ -3909,6 +4046,44 @@ const approvalSideGroups = computed(() => toolbarGroups.value
       && !(singleDocMode.value && (a === '新增' || a === '新增流程' || a === '新建'))),
   }))
   .filter((g) => (g.actions || []).length && !(g.actions || []).includes('删除')))
+
+// ══════════ 侧栏整理(2026-10-16 用户口径「侧边栏按钮放得有点乱,整理一下」)══════════
+// 目标:①位置固定(每个状态在同一个格子里换主按钮,不用满侧栏找) ②审批提出来不再藏下拉
+//   ③流程按钮独立成段并编号 ④危险动作沉底。**只重排与调主次,判据一条不改**(服务端门禁仍是唯一裁决)。
+/** ② 本单操作:工具栏动作组去掉「字段管理」(配置类动作归 ④ 文档输出末尾),其余原样。
+ *  另:单据不可编辑时(审批中/已归档…「保存/保存为草稿」必然是灰的)直接撤掉,腾出位置给本单的主按钮 ——
+ *  这是纯展示层取舍,动作本身没被删:状态回到草稿/修改中时它们自动回来。 */
+const sheetSideGroups = computed(() => approvalSideGroups.value
+  .map((g) => ({ ...g, actions: actsOf(g).filter((a) => a !== '字段管理'
+    && !(!draftEditable.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
+  .filter((g) => (g.actions || []).length))
+/** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里)。
+ *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
+ *    研发管理(RD_*)整块不放该入口(它的动态字段走正式迁移/纸面配置,不吃备用列池这条路);
+ *    其它模块(品质/供应链/基础档案)保持原样。服务端能力与权限一行未动,只是研发区不放出按钮。 */
+const hasFieldAdmin = computed(() => !String(panelCode.value).startsWith('RD_')
+  && approvalSideGroups.value.some((g) => actsOf(g).includes('字段管理')))
+/**
+ * 审批按钮**显不显示**(2026-10-16 用户报障「产品信息表保存之后不见审批按钮」):
+ *   ⚠ 口径修正 —— 上一版这里判的是"**能不能**真的批"(提交人自己、无审批权者一律不渲染),
+ *   结果是**提交人自己**看到一片空白,以为流程坏了。既有口径(approvalSeparation.test.js)写得很清楚:
+ *   「置灰 + 说清原因」,**不是藏起来**。故:
+ *     · 显示 = 有没有**资格**(有审批权 ∪ 被一级选定的二级审核人;QC 两级仍走原口径);
+ *     · 能不能点 = 交给 isDisabled(提交人自己的一级「审批通过」仍置灰,悬停给出那句话)。
+ */
+const approvalBtnsVisible = computed(() => (isQcL2Panel.value
+  ? canApproveQcL2Here.value
+  : (canApproveHere() || l2ApproverNow.value)))
+/** 轮不到我审批时的侧栏说明(宁可说"在等谁",也别让用户对着空侧栏猜是不是卡住了) */
+const approvalWaitingTip = computed(() => (curDocStatus.value === '待二级审批'
+  ? '本单在二级签核：由一级选定的二级审核人（或管理员）签核'
+  : '本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）'))
+/** 审批通过按钮文案:QC 两级面板走原「审批通过/批准通过」,RD_PROD_INFO 二级节点明确叫「二级签核」 */
+const approveBtnLabel = computed(() => (isQcL2Panel.value
+  ? qcL2ApproveLabel()
+  : (curDocStatus.value === '待二级审批' ? '二级签核' : '审批通过')))
+/** 审批驳回按钮文案:QC 两级面板「一级驳回/二级驳回」;其余「审批驳回」 */
+const rejectBtnLabel = computed(() => (isQcL2Panel.value ? qcL2RejectLabel() : '审批驳回'))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
   const names = cfgCache.value?.metadata?.panelPageDto?.formPages?.[0]?.fieldNames
@@ -4286,6 +4461,8 @@ const rdFlowUsers = ref([])
 //   (生产包里是 `Cannot access 'Rl' before initialization`,见 tools/archive/_probe-panel-runtime-errors.mjs)。
 //   异常被 Vue 吞掉、页面照常渲染,所以一直没被业务发现,但它让**首次进入**研发面板时 rdFlow 状态为空
 //   (切一次面板才对)。移到 loadRdFlowState 定义之后注册(见下方同名 watch),语义不变。
+//   ⚠ 合并(2026-10-17):下方那条 watch 的加载清单里已含 loadSpecDrift()/loadProdDrift()
+//     (规格书漂移 + 产品信息表漂移两条黄条),改动清单时两处注释一起看。
 
 /* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
    判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
@@ -5755,11 +5932,25 @@ const l2PickUser = ref('')
 const l2PickOpinion = ref('')
 const l2PickUsers = ref([])
 const l2PickDocNo = ref('')
+/** 弹窗内联报错:失败时把后端原话留在框里(此前只弹 toast,框不关,用户以为"又让我选人") */
+const l2PickError = ref('')
+/** 被排除的提交人账号(非管理员时提交人不能当二级审核人,后端 ButtonService:1826 必拒) */
+const l2PickHiddenSubmitter = ref('')
+const l2PickHiddenName = computed(() => {
+  const u = l2PickUsers.value.find((x) => String(x.username) === l2PickHiddenSubmitter.value)
+  return u ? `${u.realName || ''}（${u.username}）` : l2PickHiddenSubmitter.value
+})
+/** 候选 = 全部启用账号 − 提交人(管理员不剔:后端对管理员豁免) */
+const l2PickOptions = computed(() => {
+  const hide = l2PickHiddenSubmitter.value
+  return hide ? l2PickUsers.value.filter((u) => String(u.username) !== hide) : l2PickUsers.value
+})
 /** 一级审批通过入口:产品信息表的一级节点必须先选二级审核人,其余面板/二级节点走原确认框 */
 async function openL2Pick(no) {
   l2PickDocNo.value = no
   l2PickUser.value = ''
   l2PickOpinion.value = ''
+  l2PickError.value = ''
   if (!l2PickUsers.value.length) {
     try {
       l2PickUsers.value = (await engine.rdDevUsers()) || []
@@ -5768,12 +5959,14 @@ async function openL2Pick(no) {
       return
     }
   }
+  l2PickHiddenSubmitter.value = (!user.isAdmin && curSubmitter.value) ? curSubmitter.value : ''
   l2PickVisible.value = true
 }
 async function confirmL2Pick() {
   if (!l2PickUser.value) return ElMessage.warning(tt('请选取二级审核人'))
   if (l2PickBusy.value) return
   l2PickBusy.value = true
+  l2PickError.value = ''
   try {
     await engine.callButton({
       panelCode: 'RD_PROD_INFO', buttonName: '审批通过',
@@ -5784,7 +5977,10 @@ async function confirmL2Pick() {
     l2PickVisible.value = false
     await load()
   } catch (e) {
-    ElMessage.error(engine.errMsg(e) || '审批失败')
+    // 框**不关**(用户可改选重试),但把原因留在框里 —— 之前只有 3 秒 toast,框还在原地,
+    // 用户看到的就是"还是弹这个选取二级审核人的框"
+    l2PickError.value = String(engine.errMsg(e) || tt('审批失败'))
+    ElMessage.error(l2PickError.value)
   } finally {
     l2PickBusy.value = false
   }
@@ -5924,15 +6120,19 @@ async function loadRdFlowState() {
 }
 
 /**
- * 产品开发下发按钮状态 / 规格书分配状态(编辑闸门)/ 研发文件闸门 / 立项流程状态
+ * 产品开发下发按钮状态 / 规格书分配状态(编辑闸门)/ 研发文件闸门 / 立项流程状态 /
+ * 待开发单据(侧栏红点)/ 规格书漂移黄条 / 产品信息表漂移黄条
  * —— 面板或当前单据一变就刷新。
  *
  * ⚠ 注册点必须在 `loadRdFlowState`(及其读的 `rdFlow`)定义**之后**:本 watch 是 immediate,
  *   setup 期同步执行回调;放在前面会让首次进入时抛
  *   `ReferenceError: Cannot access 'rdFlow' before initialization`(见 3485 行处的说明)。
+ * ⚠ 合并 2026-10-17:远端把本 watch 整体搬到这里时,清单里还没有本地的三条
+ *   (loadPendingDocs / loadSpecDrift / loadProdDrift)—— 合并后必须补回,
+ *   否则「待开发单据」红点与两条漂移黄条**再也不会加载**(页面看着没事,功能静默失效)。
  */
 watch(() => [panelCode.value, cur.value?.['单据编号']],
-  () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState() },
+  () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift(); loadProdDrift() },
   { immediate: true })
 
 /** 懒加载启用账号清单(两个弹窗共用;接口挂 RD_APPROVAL 查看权,与 /rdDev/users 的 RD_PROD_INFO 权分开) */
@@ -7815,7 +8015,10 @@ function isDisabled(action) {
     修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     审批情况: false,
     提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
-    审批通过: !current.value || !IN_APPROVAL.includes(st),
+    审批通过: !current.value || !IN_APPROVAL.includes(st)
+      // 编制与审批分离:提交人不能点**一级**审批通过(后端必拒)。只管「审批中」这一档 ——
+      // 「待二级审批」时如果被一级选成了二级审核人,本人签核是允许的(后端 approveSecond 只认 l2_approver)。
+      || (st === '审批中' && iAmCurSubmitter.value),
     审批驳回: !current.value || !IN_APPROVAL.includes(st),
    驳回审批: !current.value || !IN_APPROVAL.includes(st),
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
@@ -7881,6 +8084,10 @@ function disabledReason(action) {
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路),与状态无关
   if ((cfgCache.value?.metadata?.disabledActions || []).includes(action)) return tt('该动作当前没有可用的来源单据')
+  // 编制与审批分离:提交人自己点一级「审批通过」= 后端必拒(实测 403),这里把原因说在他点之前
+  if (action === '审批通过' && st === '审批中' && iAmCurSubmitter.value) {
+    return tt('本单由你提交：按「编制与审批分离」不能审批自己提交的单，请由他人完成一级审批')
+  }
   // 生单按钮统一仅已审核可用(与上面「生成XX」同一句口径)
   if (action.startsWith('生成')) return tt('单据状态') + '：' + stText + '，' + tt('仅已审核可生单')
   return tt('单据状态') + '：' + stText + '，' + '「' + tt(action) + '」' + tt('不可用')
@@ -9789,6 +9996,18 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 14px;
 }
+/* 弹窗内联报错(2026-10-16):审批类弹窗失败时把后端原话留在框里 —— 只弹 toast 的话,
+   框还在屏幕上,用户会以为"又弹了一次让我选人" */
+.dq-error {
+  padding: 6px 10px;
+  border: 1px solid #f3c1c1;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12.5px;
+  line-height: 1.6;
+  word-break: break-all;
+}
 .dq-row {
   display: flex;
   align-items: center;
@@ -9840,6 +10059,43 @@ onUnmounted(() => {
   min-height: 560px;
   padding-right: 0;
 }
+/* 纸面滚动容器(2026-10-16):只包 DocSheet 一系(它的纸宽可能被定死 1242px)。
+   定宽纸在窄窗会宽过容器 ⇒ 让**纸面区自己**横向滚动,右侧 176px 操作栏照常贴在最右,
+   不跟着纸一起被推出视口。弹性宽的纸(其余面板)永远不溢出,这个容器对它们等于没加。 */
+.approval-layout > .sheet-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* 「本单引用的规格书变了」黄条(2026-10-16 用户口径):挂在纸面上方,不遮挡纸面。
+   文案里直接给出下一步(弃审 → 重新引用),用户不用猜。 */
+.spec-drift-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border: 1px solid #f0d9a0;
+  border-left: 3px solid #e6a23c;
+  border-radius: 4px;
+  background: #fdf6e3;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #7a5b16;
+}
+.spec-drift-banner .sdb-tag {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: #e6a23c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.spec-drift-banner .sdb-txt { min-width: 0; }
+.spec-drift-banner .sdb-hint { display: block; color: #9a7b2e; }
 .approval-layout :deep(.approval-sheet),
 .approval-layout :deep(.progress-sheet),
 .approval-layout :deep(.catalog-sheet),
@@ -11218,6 +11474,28 @@ onUnmounted(() => {
   background: #46688f;
   border-color: #46688f;
   color: #fff;
+}
+/* 主按钮 + 置灰同时命中时,以置灰为准(否则 main 样式后定义会盖掉 disabled 的观感) */
+.as-side-btn.primary.disabled,
+.as-side-btn.primary.disabled:hover {
+  background: #f2f4f7;
+  border-color: #e6eaef;
+  color: #b8bfc9;
+}
+/* ③ 流程段:步骤序号徽标(1/2/3 = 业务顺序,见侧栏「③ 流程」) */
+.as-side-step {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #eef3fa;
+  color: #3d5a80;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  vertical-align: 1px;
 }
 .as-side-del.danger .as-side-btn {
   color: #a85c5c;

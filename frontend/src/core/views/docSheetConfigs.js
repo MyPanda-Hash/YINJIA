@@ -11,6 +11,22 @@
  *            因控件不得被裁切,DocSheet 对「单字段行/多子区行/阶段框行」一律按 min-height 渲染。
  * 依据与不变量见同目录 docSheetConfigs.test.js(标题/下拉口径/备注区/第 8 行/行高)
  */
+/**
+ * 定死纸宽的文书面板(2026-10-16 用户口径:「定死纸宽 1242」)。
+ * 【为什么必须显式定宽】本文件的面板走 DocSheet.vue,纸面 CSS 是 `width:940px; max-width:100%`,
+ *   而外层 PanelxList 的 `.approval-layout :deep(.approval-sheet){flex:1;min-width:0}` 把它变成
+ *   **弹性撑满**(flex-basis 归 0,由 flex-grow 分配剩余空间)⇒ 实测 1600 窗口下纸宽 1172~1202px、
+ *   随窗口变;只写 width 一句都不生效。
+ * 1242 = 产品变更申请单收窄后的纸宽(用户指定的口径),这两张纸与它对齐。
+ * 单位 px,值是**纸**(.approval-sheet)的宽,不含右侧 176px 操作栏。
+ */
+export const FIXED_SHEET_W = { RD_APPROVAL: 1242, RD_PLAN: 1242 }
+
+/** 该面板的定死纸宽(px);0 = 保持自适应弹性宽(其余文书面板) */
+export function fixedSheetWidth(panelCode) {
+  return FIXED_SHEET_W[String(panelCode || '')] || 0
+}
+
 export const approvalSheetCfg = {
   titlePart1: '立项申请表',
   titlePart2: '二三四级项目',

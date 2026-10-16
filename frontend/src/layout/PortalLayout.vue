@@ -13,10 +13,10 @@
                  按页签路径给 key ⇒ 每个页签一份实例与状态(未保存内容、当前单据、页签内滚动位置),
                  页签关掉这个 key 也随之释放。键用 path(不是 fullPath):同一页签内换单据走 ?code=,
                  仍是同一个页签、同一份实例(单据内切换由面板自己的守卫处理)。
-                 🔴 注释必须留在 <keep-alive> **外面**(2026-10-17 修):dev 编译**保留模板注释**,而
-                 KeepAlive 的单子节点校验数的是 node.children —— 注释也算一个 ⇒
-                 `[plugin:vite:vue] <KeepAlive> expects exactly one child component.`
-                 (生产构建会剥掉注释,所以 `npm run build` 一直不报,只有 vite dev 报)。 -->
+                 ⚠ **这段注释必须在 <keep-alive> 外面**:dev 模式的编译器要求 keep-alive
+                 **恰好一个子元素**(compiler-core postTransformElement:`node.children.length > 1`
+                 即报错 X_KEEP_ALIVE_INVALID_CHILDREN),而注释也算一个 child ——
+                 放进里面会把整页顶成 vite 错误遮罩(生产构建只警告,所以构建期看不出来)。 -->
             <keep-alive :max="20">
               <component :is="Component" :key="route.path" />
             </keep-alive>
