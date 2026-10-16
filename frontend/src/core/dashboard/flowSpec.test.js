@@ -81,6 +81,18 @@ test('取数与展示:点路径取值、null 落「—」、整数千分位、�
   assert.equal(m.subs[0].text, '—', '待审核为 null ⇒ —')
 })
 
+test('空数据首屏不崩:data=null 时每个节点都能取指标且分级为 na', () => {
+  // 2026-10-16 回归钉:视图在接口回来之前先渲染一帧(data=null),
+  // 早先某个 text 处理器写了 d.special.x ⇒ render 抛 TypeError ⇒ 整块看板空白(vite dev 上实测)。
+  for (const n of allNodes()) {
+    const m = metricsOf(n, null)
+    assert.equal(m.main.text, '—', `${n.key} 主数字应为 —`)
+    for (const s of m.subs) assert.equal(s.text, '—', `${n.key} 的「${s.label}」应为 —`)
+    assert.equal(levelOf(n, null), 'na', `${n.key} 应为无数据`)
+  }
+  assert.equal(chainSummary(CHAINS[0], null).total > 0, true)
+})
+
 test('链路汇总能点出阻断节点(顶部卡点条之外的链路级提示)', () => {
   const data = {
     nodes: { SO_ORDER: { docs: 5, pending: 0 } },

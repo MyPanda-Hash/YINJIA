@@ -48,7 +48,7 @@ export const CHAINS = [
             subs: [
               { label: '款数', ref: 'special.convert.styles' },
               { label: '下单数量', ref: 'special.convert.qty' },
-              { label: '最新下单', text: (d) => text(d.special?.convert?.latest) },
+              { label: '最新下单', text: (d) => text(d?.special?.convert?.latest) },
             ],
             warn: ['special.convert.pendingRows'],
             note: '选中工艺路线才能转成生产工单;行级占用链防重复转单',
@@ -337,13 +337,20 @@ export function fmtNum(v) {
   return Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
 
-/** 一个节点要显示的指标(主数字 + 副行),值统一在这里落成「数字或 —」 */
+/** 一个节点要显示的指标(主数字 + 副行),值统一在这里落成「数字或 —」。
+ *  ⚠ 必须容忍 data 为 null:视图在接口回来之前就会先渲染一帧(data=null),
+ *  2026-10-16 实测「vite dev 上整块空白」就是这个 —— 某节点的 text 处理器写了 `d.special.x`
+ *  而 d 是 null ⇒ render 抛 TypeError ⇒ FlowBoard 整块不渲染(8090 恰好抢在渲染前拿到数据,才没暴露)。
+ *  故两层兜底:① 调用方传 `data || {}`;② 处理器抛错也不拖垮整块看板(落「—」)。 */
 export function metricsOf(node, data) {
-  const mainVal = get(data, node.main.ref)
+  const d = data || {}
+  const mainVal = get(d, node.main.ref)
   const main = { label: node.main.label, value: mainVal, text: mainVal == null ? '—' : fmtNum(mainVal) }
   const subs = (node.subs || []).map((s) => {
-    if (s.text) return { label: s.label, text: s.text(data) }
-    const v = get(data, s.ref)
+    if (s.text) {
+      try { return { label: s.label, text: s.text(d) } } catch { return { label: s.label, text: '—' } }
+    }
+    const v = get(d, s.ref)
     return { label: s.label, text: v == null ? '—' : fmtNum(v) }
   })
   return { main, subs }
