@@ -25,6 +25,7 @@
  *   且粉料超过 5 行会告警 —— 但根子上要靠"物料种类填对"或后续加一列显式料位号来根治。
  */
 import { SLOT_COUNT, POWDER_SLOTS, GLUE_SLOTS, CONVERTED_SLOTS, DEFAULT_LENGTH_TOL } from './recipeConstants.js'
+import { detailRowsOf } from '../panel/detailRows.js'
 
 export const SLOT_GROUPS = { POWDER: '粉料', GLUE: '胶粉', CONVERTED: '折算料' }
 
@@ -247,16 +248,17 @@ export function parseLengthRange(text) {
 
 /**
  * 档案面板查询结果 → 行数组。
- * ⚠ 档案面板返回**主从结构**(list[0].detail.items[]),平铺数组也兜住;停用的行剔除 ——
- * 否则工艺员会在弹窗里选到一个已经停用的模具。
+ * ⚠ 档案面板返回**主从结构**(list[0].detail[<key>][]) —— **键不是恒为 items**:
+ *   档案面板键 = LOWER(panel_code)(服务器实测 INV → `detail.inv`;本地库 tab_key 为空才退化成 items)
+ *   ⇒ 写死 `detail.items` 会在服务器上恒空。走 detailRows.js 的统一判据。
+ *   停用的行剔除 —— 否则工艺员会在弹窗里选到一个已经停用的模具。
  */
 export function sinterRowsFromQuery(data) {
   const d = (data && data.data !== undefined) ? data.data : data
   const list = Array.isArray(d) ? d : (d?.list || d?.rows || [])
   const rows = []
   list.forEach((m) => {
-    const items = m?.detail?.items || m?.detail?.children
-    if (Array.isArray(items)) rows.push(...items)
+    if (m && typeof m === 'object' && m.detail && typeof m.detail === 'object') rows.push(...detailRowsOf(m))
     else if (m && typeof m === 'object') rows.push(m)
   })
   const isOff = (v) => v === true || v === 1 || v === '1' || v === 'Y' || v === '是' || String(v ?? '').trim() === 'True'

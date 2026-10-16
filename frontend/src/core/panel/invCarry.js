@@ -18,6 +18,7 @@
  */
 // ⚠ 必须相对路径带扩展名:`@/` 别名只有 Vite 认,本模块被 node --test 直接 import(invCarry.test.js)
 import { carryKindOf } from '../mold/materialKinds.js'
+import { detailRowsOf } from './detailRows.js'
 
 /** 明细列 → 商品档案列(match = 拿用户输入去比的那列,out = 要带出来的那列,
  *  kind = 带出「物料种类」的档案列;没这列的面板不受影响) */
@@ -62,16 +63,21 @@ export function invCarryPair(cols) {
 
 /**
  * 商品档案查询响应 → 档案行数组。
- * 档案面板走 QueryService.queryArchive:返回「一张虚拟单」`{list:[{detail:{items:[rows]}}]}`;
+ * 档案面板走 QueryService.queryArchive:返回「一张虚拟单」`{list:[{detail:{<key>:[rows]}}]}`;
  * 这里连平表形状一起认,认不出来返回 []。
+ *
+ * ⚠ **明细键不是恒为 items**(2026-10-16 服务器报障「配方计算的筛选没有出数据」的根因):
+ *   档案面板的键 = `yj_panel.detail_key` = **LOWER(panel_code)** —— 服务器实测 INV → `detail.inv`
+ *   (3,898 行挂在那儿),而本地开发库该面板 `yj_field.tab_key` 为空、退化成 `items`,
+ *   于是写死 `detail.items` 的实现在本地一切正常、**上线就恒空**。
+ *   统一走 detailRows.js(优先 items → detail 里第一个数组值 → 兜底 LOWER(panel_code))。
  */
 export function invRowsOf(res) {
   const list = Array.isArray(res) ? res : (res && Array.isArray(res.list) ? res.list : [])
   const out = []
   for (const r of list) {
     if (!r) continue
-    const items = r.detail && r.detail.items
-    if (Array.isArray(items)) out.push(...items.filter(Boolean))
+    if (r.detail && typeof r.detail === 'object') out.push(...detailRowsOf(r, INV_PANEL.toLowerCase()))
     else out.push(r)
   }
   return out
