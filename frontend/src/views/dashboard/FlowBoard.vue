@@ -54,7 +54,7 @@
         </div>
         <div class="fb-row">
           <template v-for="(node, ni) in lane.nodes" :key="node.key">
-            <span v-if="ni" class="fb-arrow" aria-hidden="true">→</span>
+            <span v-if="ni" class="fb-link" aria-hidden="true"><i class="fb-link-line"></i><i class="fb-link-head"></i></span>
             <button
               type="button"
               class="fb-node"
@@ -80,7 +80,7 @@
           </template>
         </div>
         <div v-if="li < chain.lanes.length - 1" class="fb-down" aria-hidden="true">
-          <span class="fb-down-line"></span>
+          <span class="fb-vlink"><i class="fb-vline"></i><i class="fb-vhead"></i></span>
           <span class="fb-down-tag">{{ tt(downTag(chain.key, li)) }}</span>
         </div>
       </div>
@@ -158,8 +158,22 @@ function go(path, panelCode) {
 .fb-lane-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .fb-lane-name { font-size: 13px; font-weight: 600; color: #48566b; }
 .fb-lane-hint { font-size: 12px; color: #a3aab6; }
-.fb-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
-.fb-arrow { align-self: center; color: #b9c2cf; font-size: 14px; }
+
+/* 泳道底轨 + 节点 + 连线:2026-10-16 用户口径「线条太细了,看不太清楚」——
+   原来是 1px 灰发丝加一个浅灰「→」字符;改成 3px 底轨贯通整条泳道 + 3px 连线 + 实心箭头,
+   并按链路着色(生产=蓝 / 库存=绿),节点卡压在轨道之上。 */
+.fb-row { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.fb-row::before {
+  content: ''; position: absolute; left: 2px; right: 2px; top: 50%;
+  height: 3px; margin-top: -1px; border-radius: 2px; background: #eef2f8;
+}
+.tone-stock .fb-row::before { background: #edf7f2; }
+.fb-link { position: relative; z-index: 1; display: inline-flex; align-items: center; align-self: center; flex: 0 0 auto; }
+.fb-link-line { display: block; width: 22px; height: 3px; border-radius: 2px; background: #8ea6c8; }
+.fb-link-head { display: block; width: 0; height: 0; margin-left: -1px;
+  border-left: 10px solid #7d97bd; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.tone-stock .fb-link-line { background: #86c2a4; }
+.tone-stock .fb-link-head { border-left-color: #6fb894; }
 
 /* 节点卡:左侧状态色条 + 主数字 */
 .fb-node {
@@ -171,7 +185,7 @@ function go(path, panelCode) {
   transition: border-color .15s, box-shadow .15s, transform .15s;
 }
 .fb-node:hover { border-color: #409eff; box-shadow: 0 2px 10px rgba(64, 158, 255, .16); transform: translateY(-1px); }
-.fb-node-rail { position: absolute; left: 6px; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: #d8dee8; }
+.fb-node-rail { position: absolute; left: 5px; top: 8px; bottom: 8px; width: 4px; border-radius: 2px; background: #cbd3e0; }
 .fb-node.lv-block .fb-node-rail { background: #f56c6c; }
 .fb-node.lv-warn .fb-node-rail { background: #e6a23c; }
 .fb-node.lv-ok .fb-node-rail { background: #67c23a; }
@@ -190,18 +204,27 @@ function go(path, panelCode) {
 .fb-sub em { font-style: normal; color: #a3aab6; margin-right: 3px; }
 .fb-sub b { font-weight: 600; color: #48566b; font-variant-numeric: tabular-nums; }
 
-/* 泳道之间的流转说明 */
-.fb-down { display: flex; align-items: center; gap: 8px; margin: 8px 0 0 12px; }
-.fb-down-line { width: 1px; height: 16px; background: #d7dde7; }
-.fb-down-tag { font-size: 11px; color: #7a8494; background: #f4f7fb; border-radius: 10px; padding: 2px 8px; }
+/* 泳道之间的流转说明:3px 竖线 + 实心下箭头 + 带边线的标签(原来 1px 发丝几乎看不见) */
+.fb-down { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px 16px; }
+.fb-vlink { display: inline-flex; flex-direction: column; align-items: center; }
+.fb-vline { width: 3px; height: 14px; border-radius: 2px; background: #8ea6c8; }
+.fb-vhead { width: 0; height: 0; border-top: 10px solid #7d97bd; border-left: 7px solid transparent; border-right: 7px solid transparent; }
+.tone-stock .fb-vline { background: #86c2a4; }
+.tone-stock .fb-vhead { border-top-color: #6fb894; }
+.fb-down-tag {
+  font-size: 12px; font-weight: 600; color: #55647c;
+  background: #f2f6fb; border: 1px solid #dde5f0; border-radius: 12px; padding: 3px 10px;
+}
+.tone-stock .fb-down-tag { background: #f1faf5; border-color: #d6ecdf; color: #4f6f5e; }
 
 .fb-foot { margin: 2px 4px 6px; font-size: 12px; color: #a3aab6; line-height: 1.6; }
 
-/* 窄屏:节点竖排,箭头转 90°(375 / 768 走查:不出现横向滚动) */
+/* 窄屏:节点竖排,连线转 90°(375 / 768 走查:不出现横向滚动) */
 @media (max-width: 768px) {
   .fb-row { flex-direction: column; }
+  .fb-row::before { display: none; }          /* 竖排时底轨没有意义(横线会穿过卡片) */
   .fb-node { max-width: none; flex: 1 1 auto; }
-  .fb-arrow { transform: rotate(90deg); align-self: flex-start; margin-left: 14px; }
+  .fb-link { transform: rotate(90deg); align-self: flex-start; margin: 2px 0 2px 22px; }
   .fb-legend { margin-left: 0; }
 }
 </style>
