@@ -332,6 +332,16 @@ public class ButtonService {
     }
 
     /**
+     * 新建单据的「版本」默认值(2026-10-16 用户口径:规格书「版本自动生成 V1.0」)。
+     *
+     * <p>⚠ 与 {@link #nextVersionNo}(「版本号」列,四文件面板的 `V<当天日期>-NN`)是**两套口径**:
+     * 规格书这一列叫「版本」,记的是产品版本号 V1.0/V2.0…,不是当天流水号。
+     * 只在**新建且该格为空**时写入 —— 已有单、以及产品变更单「建下一版草稿」(整单复制,
+     * 走 insertRow 不经这里)一律不覆盖,免得把别人推进的版本号抹回去。
+     */
+    private static final Map<String, String> NEW_DOC_VERSION = Map.of("RD_SPEC_DOC", "V1.0");
+
+    /**
      * 「版本号」建单自动带出:`V<当天日期>-<当日流水两位>`(如 V2026-10-15-01)。
      *
      * 用户口径(2026-10-16):「成型工艺清单的版本号应该要不一样,现在是按日期自动生成,但是同一日期是一样的,
@@ -398,6 +408,11 @@ public class ButtonService {
                 // 同一天建第二张单版本号一模一样 ⇒ 必须加序列数,如 V2026-10-15-01。
                 String vno1 = nextVersionNo(table);
                 if (vno1 != null && !cols.containsKey("版本号")) cols.put("版本号", vno1);
+                // 「版本」默认值(2026-10-16 用户口径「版本自动生成 V1.0」):仅规格书,仅新建且该格为空
+                String vdef1 = NEW_DOC_VERSION.get(def.code());
+                if (vdef1 != null && !cols.containsKey("版本") && tableCols(table).contains("版本")) {
+                    cols.put("版本", vdef1);
+                }
                 // 空草稿也写入随表单提交的头字段(如 规格书种类):
                 // 规格书按类型页签过滤列表,不带分类的新单会从当前页签列表消失,导致"新增后无法填写"
                 for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
@@ -438,6 +453,12 @@ public class ButtonService {
             if (vno2 != null && def.byLabel("版本号") != null
                     && (head.get("版本号") == null || String.valueOf(head.get("版本号")).isBlank())) {
                 head.put("版本号", vno2);
+            }
+            // 「版本」默认值:同空白草稿分支口径(规格书 V1.0),仅新建且为空时写
+            String vdef2 = NEW_DOC_VERSION.get(def.code());
+            if (vdef2 != null && def.byLabel("版本") != null
+                    && (head.get("版本") == null || String.valueOf(head.get("版本")).isBlank())) {
+                head.put("版本", vdef2);
             }
             // 存在"创建时间"字段的单据新建时自动填入当前时间(金蝶同步单据字段,nvarchar 字符串口径;
             // save() 已剥离前端传入值,此处是唯一填入点;修改已有单不覆盖)

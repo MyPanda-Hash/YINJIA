@@ -73,3 +73,25 @@ test('新增 UI 文案都有多语言词条(en 至少)', () => {
     assert.ok(en.includes(k), `en.js 缺词条：${k}`)
   }
 })
+
+// ── 2026-10-16 用户补充口径两则 ──
+const panelConfig = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/PanelConfigService.java', import.meta.url), 'utf8')
+
+test('主要性能描述 ↔ 产品主要性能 走参照同义词(两侧标签不同,同名映射带不过去)', () => {
+  assert.match(panelConfig, /Map\.entry\("主要性能描述", List\.of\("产品主要性能"\)\)/,
+    '规格书选产品编号时要把「主要性能描述」(列名 特殊性能描述)带进「产品主要性能」')
+  // 依赖前提:两侧字段真的存在(标签口径) —— 防止有人改 yj_field.label 后这条静默失效
+  assert.match(buttons, /putIfVal\(draft, "产品主要性能", src\.get\("特殊性能描述"\)\)/,
+    '自动建草稿那条路也按同一对应关系带值')
+})
+
+test('新建规格书的「版本」自动生成 V1.0(仅新建且为空时写)', () => {
+  assert.match(buttons, /NEW_DOC_VERSION = Map\.of\("RD_SPEC_DOC", "V1\.0"\)/, '默认值表要有规格书')
+  assert.match(buttons, /String vdef1 = NEW_DOC_VERSION\.get\(def\.code\(\)\);[\s\S]{0,220}?cols\.put\("版本", vdef1\);/,
+    '空白草稿分支要写(自动建规格书草稿走的正是这一支)')
+  assert.match(buttons, /String vdef2 = NEW_DOC_VERSION\.get\(def\.code\(\)\);[\s\S]{0,260}?def\.byLabel\("版本"\) != null[\s\S]{0,200}?head\.put\("版本", vdef2\);/,
+    '带明细新建分支同口径')
+  // 不能覆盖已有版本(变更单「建下一版」是整单复制,不该被抹回 V1.0)
+  assert.ok(!/UPDATE\s+\w+\s+SET\s+\[?版本\]?\s*=/.test(buttons), '不该有"UPDATE 版本"这种回写')
+  assert.match(buttons, /if \(vdef1 != null && !cols\.containsKey\("版本"\)/, '只在没有值时写')
+})
