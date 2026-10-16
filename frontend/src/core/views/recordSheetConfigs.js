@@ -1755,29 +1755,33 @@ export const recordSheetConfigs = {
           { key: '日期', label: '日期', w: 349 },
         ]},
     ],
+    // 尾段(2026-10-16 用户口径「产品变更申请表这个位置的格子要大一点…每个格子竖向加长到原来的1.5倍」):
+    //   段内每行 h 一律 ×1.5(92→138、74→111),长文本格 minRows 2→3。
+    //   ⚠ 同批修了**渲染侧**的真因:尾段原先走简化渲染,不认 row.grid/row.h,这些行被压成自然行高 31px
+    //     (见 RecordSheetPanels.vue「表尾网格行」注释)—— 不改那里,调 h 也不会生效。
     tailSections: [
       { page: 0, bar: '三.相关变更', rows: [
-        { h: 92, grid: [
+        { h: 138, grid: [
           { label: '相关变更' },
-          { key: '相关变更', span: 5, area: true, rows: 2, ph: '与哪些文件/工序/在制品相关联' },
+          { key: '相关变更', span: 5, area: true, rows: 3, ph: '与哪些文件/工序/在制品相关联' },
         ]},
       ]},
       { page: 0, bar: '四、库存产品处理方式', rows: [
-        { h: 74, grid: [
+        { h: 111, grid: [
           { label: '原料' },
           { label: '数量' },
           { key: '原料数量' },
           { label: '处理方式' },
           { key: '原料处理方式', type: 'select', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 111, grid: [
           { label: '半成品' },
           { label: '数量' },
           { key: '半成品数量' },
           { label: '处理方式' },
           { key: '半成品处理方式', type: 'select', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 111, grid: [
           { label: '成品' },
           { label: '数量' },
           { key: '成品数量' },
@@ -1786,13 +1790,13 @@ export const recordSheetConfigs = {
         ]},
       ]},
       { page: 0, bar: '五、其它', rows: [
-        { h: 74, grid: [
+        { h: 111, grid: [
           { label: '文件管理人' },
           { key: '文件管理人', span: 2 },
           { label: '密级' },
           { key: '密级', type: 'select', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 111, grid: [
           { label: '文件使用范围' },
           { key: '文件使用范围', type: 'select', span: 2 },
           { label: '备注' },
@@ -1801,12 +1805,12 @@ export const recordSheetConfigs = {
       ]},
       // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)——手签行也得留够高度
       { page: 0, bar: '批准', rows: [
-        { h: 74, grid: [
+        { h: 111, grid: [
           { label: '批准', span: 2 },
           { label: '签字', span: 2 },
           { label: '日期', span: 2 },
         ]},
-        { h: 74, grid: [
+        { h: 111, grid: [
           { span: 2 },
           { span: 2 },
           { span: 2 },

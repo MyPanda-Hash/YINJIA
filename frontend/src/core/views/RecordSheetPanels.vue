@@ -1000,13 +1000,56 @@
       <colgroup><col v-for="(w, i) in effGrid" :key="'tc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
-        <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri">
-          <td class="rs-td rs-label" :class="{ 'rs-focus': isFocus(row.key) }">{{ tt(row.label) }}</td>
-          <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
-            <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
-            <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-            <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
-          </td>
+        <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri" :style="row.h ? { height: row.h + 'px' } : null">
+          <!-- 表尾**网格行**(2026-10-16 用户报障「产品变更申请表这个位置的格子有点窄,竖向加长到 1.5 倍」)——
+               尾段原先只认旧式 { label, key } 单键行:RD_CHANGE 那种 { h, grid:[…] } 会被渲染成
+               「一个空标签格(row.label 为 undefined)+ 一个大格(head[undefined])」,高度掉到自然行高
+               (实测 31px),配置里写的 h(74/92) 完全不起作用 —— 用户看到的"扁格子"就是这个。
+               现补齐与 sections **同款**的网格渲染(逐格 label/值/area/select/checks/file + row.h 最小行高);
+               旧式单键行仍走下面那支(成型配方「配料要求」等面板一字不动)。
+               ⚠ 与上面 sections 的网格行是**同一套格语义**,改一边要同步另一边(源契约测试已钉)。 -->
+          <template v-if="row.grid">
+            <template v-for="(c, ci) in row.grid" :key="'tg' + ci">
+              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
+                <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+              </td>
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+                <template v-if="editable && c.type === 'select'">
+                  <el-select v-model="head[c.key]" size="small" :clearable="false"
+                             :placeholder="c.ph ? tt(c.ph) : ''"
+                             :filterable="!!stdLibOf(c.key)" :allow-create="!!stdLibOf(c.key)" default-first-option
+                             @change="emit('dirty')">
+                    <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <span v-if="stdLibOf(c.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(c.key))">⧉ {{ tt('标准库维护') }}</span>
+                </template>
+                <template v-else-if="editable && c.type === 'checks'">
+                  <span class="rs-checks">
+                    <el-checkbox
+                      v-for="o in (c.options || [])"
+                      :key="o"
+                      :model-value="checkList(head[c.key]).includes(o)"
+                      @change="toggleCheck(c.key, o, !!c.single)"
+                    >{{ tt(o) }}</el-checkbox>
+                  </span>
+                </template>
+                <template v-else-if="editable && c.key && !c.ro">
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                </template>
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+              </td>
+            </template>
+          </template>
+          <template v-else>
+            <td class="rs-td rs-label" :class="{ 'rs-focus': isFocus(row.key) }">{{ tt(row.label) }}</td>
+            <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
+              <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.rows || 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+              <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
+            </td>
+          </template>
         </tr>
       </tbody>
     </table>

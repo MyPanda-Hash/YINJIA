@@ -69,6 +69,41 @@ test('RD_CHANGE 的数据表行也要有最小行高 rowH(空表时别压扁)', 
   assert.match(rec, /:style="dt\.rowH \? \{ height: dt\.rowH \+ 'px' \} : null"/, '数据表行渲染要读 dt.rowH')
 })
 
+// ── 表尾段(三.相关变更 / 四、库存产品处理方式 / 五、其它 / 批准)──
+/**
+ * 2026-10-16 用户口径:「这个产品变更申请表的这个位置的格子要大一点,现在有点窄了,
+ *   每个格子竖向加长到原来的 1.5 倍」。
+ *
+ * 实测根因(探针量活体 DOM):尾段走的是**简化渲染**(只认 {label,key} 单键行)——
+ *   RD_CHANGE 的 {h, grid:[…]} 行被渲成「一个空标签格 + 一个大格」,行高掉到**自然行高 31px**,
+ *   配置里的 h(74/92)从来没生效过。所以两件事必须同批:①渲染侧认 row.grid/row.h ②配置侧 h ×1.5。
+ */
+test('表尾段渲染必须认 row.grid 与 row.h(否则调 h 也不生效,行高永远 31px)', () => {
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /<tr v-for="\(row, ri\) in sec\.rows" :key="'tr' \+ ri" :style="row\.h \? \{ height: row\.h \+ 'px' \} : null">/,
+    '尾段行要读 row.h 设最小行高')
+  assert.match(rec, /<template v-if="row\.grid">[\s\S]{0,400}?v-for="\(c, ci\) in row\.grid"/,
+    '尾段要按 row.grid 逐格渲染(不能只认单键行)')
+  assert.match(rec, /v-else-if="editable && c\.key && !c\.ro"[\s\S]{0,300}?c\.area[\s\S]{0,200}?minRows: c\.rows/,
+    '尾段网格格要支持 area(c.rows 控制最小行数)')
+  // 旧式单键行(成型配方「配料要求」等)必须保留,别把别的面板带崩
+  assert.match(rec, /<td class="rs-td rs-label" :class="\{ 'rs-focus': isFocus\(row\.key\) \}">\{\{ tt\(row\.label\) \}\}<\/td>/,
+    '旧式 {label,key} 尾行仍要渲染')
+})
+
+test('RD_CHANGE 尾段每行 h = 原值 ×1.5(92→138 / 74→111),大填写区 rows 2→3', () => {
+  const tail = recordSheetConfigs.RD_CHANGE.tailSections || []
+  const byBar = Object.fromEntries(tail.map((s) => [s.bar, s]))
+  assert.ok(byBar['三.相关变更'], '尾段「三.相关变更」在')
+  assert.equal(byBar['三.相关变更'].rows[0].h, 138, '相关变更行高 92 ×1.5 = 138')
+  assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 2 行 ×1.5 = 3 行')
+  for (const bar of ['四、库存产品处理方式', '五、其它', '批准']) {
+    const sec = byBar[bar]
+    assert.ok(sec, `尾段「${bar}」在`)
+    for (const r of sec.rows) assert.equal(r.h, 111, `${bar} 每行 h 应为 111(74 ×1.5)`)
+  }
+})
+
 test('网格行渲染必须读 row.h / c.rows(否则配置里的行高不生效)', () => {
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
   assert.match(rec, /<tr v-else-if="row\.grid" :style="row\.h \? \{ height: row\.h \+ 'px' \} : null">/,
