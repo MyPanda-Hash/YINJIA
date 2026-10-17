@@ -1,0 +1,61 @@
+==============================================================
+上传前手机端安全闸门   本地 = HSDZ_MES   参照 = HSDZ_MES_SRV1017
+==============================================================
+ 
+===== ② 手机端相关表行集对比(服务器独有行 = 覆盖后会丢;本地独有行 = 覆盖后会多) =====
+表|本地行|服务器行|服务器独有(会丢)|本地独有(会多)|备注
+-|---|----|---------|--------|--
+bd_pu_order|187|187|116|116|NULL
+bd_so_order|273|273|165|165|NULL
+bl_pu_order|438|438|282|282|NULL
+bl_so_order|514|514|300|300|NULL
+dm_langue|16|17|2|1|NULL
+outh|3318|3318|1|1|NULL
+s_allno|580|580|1|1|NULL
+yj_doc_status|2236|2236|9|9|NULL
+yj_role_panel|335|335|6|6|NULL
+bs_inv|3898|3898|0|0|NULL
+form_flow_link|1253|1253|0|0|NULL
+inh|1703|1703|0|0|NULL
+permission|1548|1548|0|0|NULL
+plang|429|429|0|0|The data type ntext cannot be used as an operand to the UNION, INTERSECT or EXCEPT operators because it is not comparable.
+plang_pc|3|3|0|0|The data type ntext cannot be used as an operand to the UNION, INTERSECT or EXCEPT operators because it is not comparable.
+scjl|6|6|0|0|NULL
+wo_process_line|27|27|0|0|NULL
+wo_transfer_log|7|7|0|0|NULL
+yj_user|5|5|0|0|NULL
+ 
+===== ③ 身份种子核对(种子 ≤ 表内最大 id 会导致 PDA 插入撞主键) =====
+表|标识列|本地种子|本地最大id|服务器种子|判定
+-|---|----|------|-----|--
+bl_pu_order|id|5309|5187|5592|本地种子<服务器(信息)
+dm_langue|id|16|16|17|本地种子<服务器(信息)
+outh|id|8070|8070|8075|本地种子<服务器(信息)
+rd_approval|id|1028|0|1029|本地种子<服务器(信息)
+rd_dev_task|id|1014|0|1018|本地种子<服务器(信息)
+rd_plan|id|6|0|7|本地种子<服务器(信息)
+rd_prod_info_head|id|1008|0|1009|本地种子<服务器(信息)
+rd_progress|id|6|0|7|本地种子<服务器(信息)
+rd_progress_detail|id|1240|0|1241|本地种子<服务器(信息)
+rd_spec_doc_detail|id|1|0|17|本地种子<服务器(信息)
+rd_spec_doc_head|id|2|0|3|本地种子<服务器(信息)
+yj_attachment|id|2018|0|2020|本地种子<服务器(信息)
+yj_message|id|3727|3727|3730|本地种子<服务器(信息)
+yj_role_panel|id|2289|2289|2292|本地种子<服务器(信息)
+yj_usage_log|id|228415|228415|228453|本地种子<服务器(信息)
+ 
+===== ④ 手机端关键配置与服务器是否一致 =====
+项|一致账号数|本地账号数|服务器账号数
+-|-----|-----|------
+yj_user 手机绑定|5|5|5
+项|本地|服务器|内容不一致行
+-|--|---|------
+permission 权限行|1548|1548|0
+项|本地|服务器|本地缺
+-|--|---|---
+yj_role_panel 角色1025|29|29|0
+Warning: Null value is eliminated by an aggregate or other SET operation.
+ 
+--------------------------------------------------------------
+RESULT: MOBILE-GATE-WARN  会丢 11 行手机端相关数据;种子落后 0 张表
+--------------------------------------------------------------
