@@ -3747,3 +3747,5 @@ migrate-bsinv-invcode-index-20261016.sql
 #   migrate-insp-measure5 插回;SL_RECV 1 是 2026-09-20 改编码时漏搬的「计量单位」)。
 #   不动 yj_translation(标签仍被 QC_PROC_INSP/QC_ASM_INSP 共用)、不动 yj_usage_log。幂等;两账套均执行。
 migrate-drop-orphan-fields-20261017.sql
+# 补 3 个缺 en 译名的字段标签(备注1 / 交期紧迫度 / 已报工),取值与前端 en.js 一致(体检 09 项)。幂等;两账套。
+i18n-field-labels-gap-20261017.sql
