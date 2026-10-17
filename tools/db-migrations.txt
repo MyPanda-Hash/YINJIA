@@ -3743,3 +3743,7 @@ migrate-role-perm-words-20261016.sql
 migrate-stock-detail-module-group-20261016.sql
 # migrate-bsinv-invcode-index-20261016.sql — bs_inv(存货编码) 加非聚集索引:待排产池实测 969ms→20ms(47×);同一派生 JOIN 还在排产看板/工单列表/订单结转/流程管控,五处一起提速(理由与实测见脚本头注,符合《数据库规范》§2.4)
 migrate-bsinv-invcode-index-20261016.sql
+# 已下架面板残留的孤儿 yj_field 清 13 行(QC_MOLD_INSP 6 / QC_CUT_INSP 6 由下架后重放的
+#   migrate-insp-measure5 插回;SL_RECV 1 是 2026-09-20 改编码时漏搬的「计量单位」)。
+#   不动 yj_translation(标签仍被 QC_PROC_INSP/QC_ASM_INSP 共用)、不动 yj_usage_log。幂等;两账套均执行。
+migrate-drop-orphan-fields-20261017.sql
