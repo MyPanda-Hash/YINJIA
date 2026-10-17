@@ -280,6 +280,34 @@
 
 > 若要把上表里 `bd_/bl_` 的同步快照也拉平:在本地跑一次金蝶同步即可(会写本地库,先备份)。
 
+### 10.1 这次同步对本地到底改了多少(用施工前备份逐表核出来的)
+
+把施工前备份还原成旁库 `HSDZ_MES_PRESYNC1017`,与现在的 `HSDZ_MES` 逐表做双向 `EXCEPT`
+(`sql/22` / `raw/23`),**不是估算,是实测**:
+
+| 指标 | 数值 |
+|---|---|
+| 全库总行数 | 111,180 → **111,293**(净增 **113 行**,占 0.10%) |
+| 被改动的表 | **20 张**(其余 203 张逐行完全没动) |
+| 新增行 | 139 行(其中真正新增业务数据:20 张销售订单 + 42 行明细 + 14 条检验项目 + 2 套方案 + 26 条单据状态 + 13 条审批 + 12 个号码 + 生产实绩 7 行 + 特采单 1 张) |
+| 被覆盖更新的行 | 451 行(**全部是属性列**:`yj_doc_status` 审核/关闭状态 274、`bs_inv` 外部指纹等 106、`outh` 审核+作废 14、`yj_role_panel` 52、`yj_user` 2、`permission` 1、`qc_return*` 2) |
+| 删除的行 | **仅 49 行**,且只在 `yj_role_panel` 角色 1025 的授权上(55 → 29,按服务器收窄) |
+| 新增结构 | **仅 2 个默认约束**(`DF_inh_asp_cancel` / `DF_outh_asp_cancel`) |
+| 删表 / 删列 / 改列类型 | **0** |
+
+**没有做整库覆盖**:没有 `DROP DATABASE`、没有把快照还原到 `HSDZ_MES` 上;上面这 113 行增量 + 451 行属性覆盖 + 49 行授权收缩就是全部影响。
+
+**回滚方式**(任选):
+```sql
+-- 整库回到施工前
+ALTER DATABASE HSDZ_MES SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+RESTORE DATABASE HSDZ_MES FROM DISK='/var/opt/mssql/data/HSDZ_MES-pre-srv1017-sync-20261017.bak'
+WITH MOVE 'ASPSMT' TO '/var/opt/mssql/data/HSDZ_MES.mdf',
+     MOVE 'ASPSMT_log' TO '/var/opt/mssql/data/HSDZ_MES_log.ldf', REPLACE, RECOVERY;
+ALTER DATABASE HSDZ_MES SET MULTI_USER;
+```
+> 若只想回退其中一项(例如角色 1025 的授权),从 `HSDZ_MES_PRESYNC1017` 单表回灌即可,不必整库还原。
+
 ---
 
 ## 11. 附:本次留下的环境
