@@ -1,0 +1,46 @@
+==============================================================
+服务器快照 → 本地库同步:  源 = HSDZ_MES_SRV1017   目标 = HSDZ_MES_TEST
+==============================================================
+ 新增默认约束 DF_inh_asp_cancel = (N'N')
+ 新增默认约束 DF_outh_asp_cancel = (N'N')
+ yj_user 手机绑定字段更新 3 行
+ permission 更新 1 行
+ permission 补行 1 行
+ yj_role_panel(1025) 删除服务器已取消的授权 0 行
+ yj_role_panel(1025) 更新 0 行
+ yj_role_panel(1025) 补行 29 行
+ yj_doc_status 补登记(保 id)1891 条
+ yj_doc_status 补登记(id 冲突走自增)0 条
+ yj_doc_status 审核/关闭状态更新 110 条
+ yj_form_approval 补留痕 4997 条
+ form_flow_link 补行 1188 条
+ bd_so_order 补行 88 行
+ bl_so_order 补行 163 行
+ bs_qc_plan 补行 0 行
+ bs_qc_item 补行 0 行
+ qc_tc_in 补行 7 行
+ scjl 补行 2 行
+ wo_process_line 补行 0 行
+ wo_transfer_log 补行 7 行
+ plang_pc 补行 3 行
+ s_allno 补号码 580 个
+ bs_inv 属性同步 0 行
+ outh 审核字段同步 0 行
+ qc_return 同步 4 行
+ qc_return_detail 同步 9 行
+ yj_role_panel(1025) 与服务器一致
+ yj_doc_status 无缺失
+ bd_so_order 无缺失
+ bs_qc_plan 无缺失
+ bs_qc_item 无缺失
+ s_allno 无缺失
+ scjl 无缺失
+ wo_process_line 无缺失
+ wo_transfer_log 无缺失
+ plang_pc 无缺失
+ permission 无缺失
+ yj_form_approval 无缺失
+ asp_cancel 默认约束取值正确
+--------------------------------------------------------------
+RESULT: SYNC-OK  (本脚本范围内的服务器侧修改已全部落到 HSDZ_MES_TEST)
+--------------------------------------------------------------
