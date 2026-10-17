@@ -1,0 +1,23 @@
+=== 1) 约束按类型清点(服务器 SRV1017 / 本地 HSDZ_MES) ===
+类型|服务器|本地
+--|---|--
+PK|224|224
+UQ(唯一约束)|10|10
+CK(检查约束)|1|1
+DF(默认约束)|687|685
+FK(外键)|0|0
+唯一索引(非约束)|176|176
+全部索引(非堆)|320|320
+=== 2) 显式命名(is_system_named=0)的约束:按「名称+所属表」双向比 ===
+项|条数
+-|--
+显式命名约束:服务器独有|2
+显式命名约束:本地独有|0
+Msg 4104, Level 16, State 1, Server 7e136db97189, Line 48
+The multi-part identifier "nl.k" could not be bound.
+Msg 4104, Level 16, State 1, Server 7e136db97189, Line 48
+The multi-part identifier "ns.k" could not be bound.
+Msg 4104, Level 16, State 1, Server 7e136db97189, Line 48
+The multi-part identifier "ns.k" could not be bound.
+Msg 4104, Level 16, State 1, Server 7e136db97189, Line 48
+The multi-part identifier "nl.k" could not be bound.

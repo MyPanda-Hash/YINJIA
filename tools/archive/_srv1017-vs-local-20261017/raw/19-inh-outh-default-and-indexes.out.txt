@@ -1,0 +1,15 @@
+表|值为中文引号的行|值为N的行|总行
+-|--------|-----|--
+inh|0|1703|1703
+outh|0|3310|3318
+=== inh/outh 上的索引及其过滤条件 ===
+表|索引|唯一|过滤条件|键列
+-|--|--|----|--
+inh|IX_inh_单据编号|0|(无过滤)|单据编号
+inh|IX_inh_三键|0|(无过滤)|物料编码,仓库编码,批号
+inh|PK_inh|1|(无过滤)|id
+inh|UX_inh_src_rid|1|([rid] IS NOT NULL)|src,rid
+outh|IX_outh_单据编号|0|(无过滤)|单据编号
+outh|IX_outh_三键|0|(无过滤)|物料编码,仓库编码,批号
+outh|PK_outh|1|(无过滤)|id
+outh|UX_outh_src_rid|1|([rid] IS NOT NULL)|src,rid

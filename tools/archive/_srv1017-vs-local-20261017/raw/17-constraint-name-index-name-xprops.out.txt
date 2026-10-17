@@ -1,0 +1,55 @@
+=== 3) 索引名称:按「表|索引名」双向比(含自动生成的 PK/UQ 索引名) ===
+项|条数
+-|--
+索引名 服务器独有|0
+索引名 本地独有|0
+归属|索引
+--|--
+=== 4) 扩展属性 MS_Description 双向比 ===
+项|服务器|本地
+-|---|--
+表级 MS_Description|232|232
+列级 MS_Description|9573|9573
+项|条数
+-|--
+扩展属性 服务器独有|0
+扩展属性 本地独有|0
+归属|属性
+--|--
+=== 5) 近期迁移脚本里点名的约束/索引,两库是否都在(逐条点名) ===
+对象名|类型|服务器|本地
+---|--|---|--
+df_bs_op_asp_cancel|默认约束|无|无
+DF_yj_doc_batch_st|默认约束|有|有
+DF_yjd_pending|默认约束|有|有
+ix_s_allno_lb_ny|索引|有|有
+IX_yj_doc_annotation_doc|索引|有|有
+ix_yja_doc|索引|有|有
+ix_yjfa_doc|索引|有|有
+PK_dm_langue|主键|有|有
+PK_gscs|主键|有|有
+PK_permission|主键|有|有
+PK_s_commdata|主键|有|有
+PK_s_sys|主键|有|有
+PK_s_xtcs|主键|有|有
+ux_bd_pu_order_ext_id|索引|有|有
+ux_bd_so_order_ext_id|索引|有|有
+ux_bs_customer_group_ext_id|索引|有|有
+ux_bs_inv_ext_id|索引|有|有
+ux_bs_line_capacity_line|索引|无|无
+ux_bs_line_open|索引|无|无
+ux_bs_op_code|索引|有|有
+ux_bs_op_code2|索引|无|无
+ux_bs_prod_line|索引|有|有
+ux_bs_settle_type_ext_id|索引|有|有
+ux_dm_gf_ext_id|索引|有|有
+ux_dm_kh_ext_id|索引|有|有
+UX_inh_src_rid|索引|有|有
+UX_outh_src_rid|索引|有|有
+ux_prod_abn_no|索引|有|有
+ux_rd_dev_task_prod_panel|索引|有|有
+ux_rd_spec_assign_doc|索引|有|有
+ux_sf_no|索引|有|有
+ux_yj_change_dept|索引|有|有
+UX_yj_doc_batch_active|索引|有|有
+ux_yj_doc_batch_no_active|索引|无|无
