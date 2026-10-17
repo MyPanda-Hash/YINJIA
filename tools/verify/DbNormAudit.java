@@ -476,7 +476,27 @@ public class DbNormAudit {
                 "migrate-wo-process-line-drop.sql",
                 "migrate-field-multiline-text-rollback-20261015.sql",
                 "cleanup-kucun-resync-marker.sql",
-                "cleanup-probe-residue-roles.sql");
+                "cleanup-probe-residue-roles.sql",
+                // 2026-10-17 补登(体检 12 项剩 6 处未登记,逐个定性后仍走链外):
+                //   cleanup-empty-draft-docs-20261016.sql —— 一次性数据保洁(清 3 张「单头在、明细零行」空草稿),
+                //     不是结构/元数据演进;登记后每套环境多跑一次无意义 DELETE。
+                //   cleanup-rd-testledger-20261016.sql —— 测试账套研发区一次性清库,脚本自带库名硬闸门
+                //     (只允许 HSDZ_MES_TEST 执行),属环境专用动作。
+                //   cleanup-user-accounts-sync-20261016.sql —— 本地账号与部署包对齐(只留 5 个账号);
+                //     登记 = 让 DbSync 在所有环境盲删账号,服务器上的账号与本地不同源,绝不能自动跑。
+                //   seed-demo-wo-report.sql —— 给《MES管理系统-界面截图.docx》补演示数据(报工记录 7 行);
+                //     登记会把演示行灌进正式账。
+                //   seed-rd-progress-head-20261016.sql —— 服务器报障后只补「项目进度查询」一张单的头
+                //     (不带明细),属针对性补数;登记会让新环境凭空多出一张单。
+                //   migrate-wlbom-menu-to-basedata-20261015.sql —— **已被同批 rollback 撤回且做法无效**
+                //     (左侧导航是前端 menus.js 硬编码,改 yj_panel.category/module_group 不生效;
+                //      见 migrate-wlbom-menu-rollback-20261015.sql 头注)。一登记 DbSync 就会把这两列改回错值。
+                "cleanup-empty-draft-docs-20261016.sql",
+                "cleanup-rd-testledger-20261016.sql",
+                "cleanup-user-accounts-sync-20261016.sql",
+                "seed-demo-wo-report.sql",
+                "seed-rd-progress-head-20261016.sql",
+                "migrate-wlbom-menu-to-basedata-20261015.sql");
         List<String> bad = new ArrayList<>();
         for (String f : onDisk) {
             if (listed.contains(f) || allowOffChain.contains(f) || f.startsWith("_")) continue;
