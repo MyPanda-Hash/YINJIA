@@ -39,7 +39,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(171 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(173 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -211,6 +211,8 @@ table:wo_progress   # 工单工序进度(报工审核按工序累计完成数量
 table:wo_transfer_log   # 工单调拨轨迹(9.29 批次②:从/到 生产线·车间 + 数量 + 原因 + 撤销标记)
 table:wo_split_log   # 切单操作日志(9.29 批次①:谁/何时/从哪单切出多少/生成哪张子单/是否撤回)
 table:wo_process_line   # 工序—产线预排台账(2026-10-07:一行=一工单行×一工序;计划生产线=排产时人工按工艺路线逐道选定,实际生产线=报工完工转序时落实;撤销排产按行作废)
+table:wo_mixing_head     # 生产工单混料配方快照头表(工单行绑定配方、混料数量、版本)
+table:wo_mixing_detail   # 生产工单混料配方快照行表(物料、配料比、单支含量、计划用量)
 
 # ---- 经典 HSDZ 遗留但仍在用(15 张;改动前须评估面板影响,新功能禁止再用) ----
 table:dm_ck   # 仓库代码
@@ -246,7 +248,7 @@ table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_ha
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
-# 合计 212 张在册 + 3 张例外保留 = 215 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 合计 214 张在册 + 3 张例外保留 = 217 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
 # 2026-10-17 快照回补 6 张经典 HSDZ 遗留表(dm_langue/gscs/permission/s_commdata/s_sys/s_xtcs)——
 #   在册 212 → **218**,+ 例外 3 = **221 张**(库内实点数已核对);冻结登记见 db-legacy-whitelist.txt。
 # 2026-10-16 下架「成型检验单 QC_MOLD_INSP / 切炭检验单 QC_CUT_INSP / 成品检验规范 QC_FIN_SPEC」3 张面板,

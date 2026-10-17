@@ -42,6 +42,7 @@
         </template>
       </el-dropdown>
       <el-button v-if="canDo('picking')" size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
+      <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
     </div>
@@ -95,6 +96,9 @@
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
       <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
+      <el-table-column :label="tt('成型配方')" width="170" show-overflow-tooltip>
+        <template #default="{ row }">{{ row['成型配方单号'] || '-' }}{{ row['成型配方版本'] ? ` / ${row['成型配方版本']}` : '' }}</template>
+      </el-table-column>
       <el-table-column :label="tt('打印人')" prop="打印人" width="90" />
       <el-table-column :label="tt('打印时间')" prop="打印时间" width="140" />
       <el-table-column :label="tt('当前工序')" width="100" sortable prop="当前工序">
@@ -130,6 +134,32 @@
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
+
+    <!-- 获取当前工单行的研发配方并保存投料快照 -->
+    <el-dialog v-model="mixingVisible" :title="tt('获取混料配方')" width="760px" append-to-body :close-on-click-modal="false">
+      <div v-if="mixingData" class="wol-split">
+        <div class="wol-split-row"><span>{{ tt('工单号') }} / {{ tt('工单行号') }}</span><b>{{ mixingData['工单号'] }} #{{ mixingData['工单行号'] }}</b></div>
+        <div class="wol-split-row"><span>{{ tt('产品名称') }}</span><span>{{ mixingData['产品名称'] }} ({{ mixingData['产品编号'] }})</span></div>
+        <div class="wol-split-row"><span>{{ tt('配方单号') }}</span><span>{{ mixingData['配方单号'] }} / {{ mixingData['配方版本'] || '-' }} ({{ tt(mixingData['配方状态']) }})</span></div>
+        <div class="wol-split-row"><span>{{ tt('混料数量') }} ({{ tt('支') }})</span>
+          <el-input-number v-model="mixingQty" :min="0.0001" :precision="4" :controls="false" size="small" style="width:180px" @change="previewMixing" />
+        </div>
+        <el-table :data="mixingData['配方行'] || []" size="small" border max-height="360">
+          <el-table-column prop="序号" :label="tt('序号')" width="60" />
+          <el-table-column prop="物料种类" :label="tt('物料种类')" width="105" />
+          <el-table-column prop="物料编号" :label="tt('物料编号')" width="125" />
+          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="140" />
+          <el-table-column :label="tt('配料比')" width="100" align="right"><template #default="{ row }">{{ row['配料比'] == null ? '-' : (Number(row['配料比']) * 100).toFixed(3) + '%' }}</template></el-table-column>
+          <el-table-column prop="单支物料含量" :label="tt('单支物料含量')" width="120" align="right" />
+          <el-table-column prop="计划用量" :label="tt('计划用量')" width="120" align="right" />
+        </el-table>
+        <div v-if="mixingData['已有快照']" class="wol-split-tip">{{ tt('该工单行已有混料配方快照；确认后将以当前研发配方重新获取。') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="mixingVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="mixingLoading" @click="saveMixingRecipe">{{ tt('确认获取') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -208,6 +238,11 @@ const splitLoading = ref(false)
 const splitInfo = ref(null)
 const splitQty = ref(0)
 const splitInherit = ref(true)
+const mixingVisible = ref(false)
+const mixingLoading = ref(false)
+const mixingData = ref(null)
+const mixingTarget = ref(null)
+const mixingQty = ref(0)
 /** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
 const traceVisible = ref(false)
 const traceNo = ref('')
@@ -432,6 +467,43 @@ function splitTarget() {
     return null
   }
   return list[0]
+}
+
+function openMixingRecipe() {
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
+  const list = alive.length ? alive : (cur ? [cur] : [])
+  if (list.length !== 1) { ElMessage.warning(list.length ? tt('请只勾选一张工单') : tt('请先勾选一张工单')); return }
+  mixingTarget.value = list[0]
+  mixingQty.value = Number(list[0].排产数量 || list[0].需求数量 || 0)
+  previewMixing()
+}
+
+async function previewMixing() {
+  if (!mixingTarget.value) return
+  try {
+    const r = mixingTarget.value
+    const res = await request.post('/px/workOrderList/recipe', {
+      工单号: r.工单号, 行id: r.行id, 混料数量: Number(mixingQty.value || 0),
+    })
+    mixingData.value = res.data || null
+    mixingVisible.value = true
+  } catch (e) { err(e, '配方读取失败') }
+}
+
+async function saveMixingRecipe() {
+  if (!mixingTarget.value || !(Number(mixingQty.value) > 0)) { ElMessage.warning(tt('混料数量必须大于0')); return }
+  mixingLoading.value = true
+  try {
+    const r = mixingTarget.value
+    const res = await request.post('/px/workOrderList/mixing', {
+      工单号: r.工单号, 行id: r.行id, 混料数量: Number(mixingQty.value),
+    })
+    mixingData.value = res.data || mixingData.value
+    ElMessage.success(`${tt('混料配方获取成功')}：${mixingData.value?.['配方单号'] || ''}`)
+    mixingVisible.value = false
+    await load()
+  } catch (e) { err(e, '混料配方获取失败') } finally { mixingLoading.value = false }
 }
 
 async function openSplit() {

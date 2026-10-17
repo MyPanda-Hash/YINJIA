@@ -163,6 +163,7 @@ public class WorkOrderListController {
                         + "     AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc))"
                         + "     AND l.link_status = 'ACTIVE'), 0) AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
+                        + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
                         + " FROM dbo.plang p"
@@ -322,6 +323,35 @@ public class WorkOrderListController {
         perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "转领料单");
         Map<String, Object> b = body == null ? Map.of() : body;
         return ApiResult.ok(pickingService.toPicking(castRows(b.get("rows")), currentUser()));
+    }
+
+    /** 当前工单行读取已发布的成型配方。 */
+    @PostMapping("/workOrderList/recipe")
+    public ApiResult<Map<String, Object>> recipe(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        return ApiResult.ok(recipeService.get(str(body.get("工单号")), longOf(body.get("行id")), doubleOf(body.get("混料数量"))));
+    }
+
+    /** 获取混料配方：保存工单行级配方快照、混料数量、配料比与计划用量。 */
+    @PostMapping("/workOrderList/mixing")
+    public ApiResult<Map<String, Object>> bindMixing(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "获取混料配方");
+        return ApiResult.ok(recipeService.bind(str(body.get("工单号")), longOf(body.get("行id")),
+                doubleOf(body.get("混料数量")), currentUser()));
+    }
+
+    private static Long longOf(Object o) {
+        if (o instanceof Number n) return n.longValue();
+        if (o == null || String.valueOf(o).isBlank()) return null;
+        try { return Long.valueOf(String.valueOf(o).trim()); } catch (NumberFormatException ignore) { return null; }
+    }
+
+    private static Double doubleOf(Object o) {
+        if (o instanceof Number n) return n.doubleValue();
+        if (o == null || String.valueOf(o).isBlank()) return null;
+        try { return Double.valueOf(String.valueOf(o).trim()); }
+        catch (NumberFormatException e) { throw new IllegalArgumentException("混料数量必须为数字"); }
     }
 
     @SuppressWarnings("unchecked")

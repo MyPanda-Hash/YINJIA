@@ -73,6 +73,7 @@ public final class PagePanelRegistry {
             {"close",   "结案"},
             {"split",   "切单"},
             {"picking", "转领料单"},
+            {"recipe",  "获取混料配方"},
             {"export",  "导出"},
             {"assign",  "排产"},
     };

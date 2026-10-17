@@ -54,7 +54,7 @@ public class PanelPermissionService {
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),
             Map.entry("unclose", "取消结案"), Map.entry("print", "打印"), Map.entry("close", "结案"),
-            Map.entry("split", "切单"), Map.entry("picking", "转领料单"));
+            Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"));
 
     static {
         Map<String, String[]> m = new HashMap<>();
@@ -166,6 +166,7 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|切单", new String[]{"split"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|撤回切单", new String[]{"split"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|转领料单", new String[]{"picking"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|获取混料配方", new String[]{"recipe"});
         // 「排产」两个入口(快速排产页 / 生产工单页弹出的内嵌快速排产)同挂 assign 词:
         // 页面面板各出一个「排产」格子,端点按 requireButtonAny 取任一命中 —— 即"排产权"可由任一处授予。
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|排产", new String[]{"assign"});

@@ -4,7 +4,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -75,15 +74,11 @@ public class WorkOrderRecipeService {
                         + " WHERE id=? AND pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
                 formula.no(), formula.version(), LocalDateTime.now(), safeUser(user), row.id(), row.workOrderNo());
 
-        int headCount = jdbc.update("INSERT INTO dbo.wo_mixing_head"
+        Long headId = jdbc.queryForObject("INSERT INTO dbo.wo_mixing_head"
                         + "([工单号],[工单行id],[工单行号],[配方单号],[配方版本],[产品编号],[产品名称],[混料数量],[单位],[状态],[asp_user1],[asp_time1])"
-                        + " VALUES (?,?,?,?,?,?,?,?,N'支',N'有效',?,?)",
-                row.workOrderNo(), row.id(), row.lineNo(), formula.no(), formula.version(), row.productCode(),
+                        + " OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,?,?,N'支',N'有效',?,?)",
+                Long.class, row.workOrderNo(), row.id(), row.lineNo(), formula.no(), formula.version(), row.productCode(),
                 row.productName(), mixingQty, safeUser(user), LocalDateTime.now());
-        if (headCount != 1) throw new IllegalStateException("混料配方快照头保存失败");
-        Long headId = jdbc.queryForObject("SELECT TOP 1 id FROM dbo.wo_mixing_head"
-                        + " WHERE 工单号=? AND 工单行id=? AND 配方单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " ORDER BY id DESC", Long.class, row.workOrderNo(), row.id(), formula.no());
         if (headId == null) throw new IllegalStateException("未取到混料配方快照编号");
 
         List<Map<String, Object>> resultItems = new ArrayList<>();
@@ -174,8 +169,12 @@ public class WorkOrderRecipeService {
             if (code.isBlank() && name.isBlank()) continue;
             String actual = text(r.get("实际添加比例"));
             String design = text(r.get("设计添加量"));
-            Double ratio = parseRatio(actual.isBlank() ? design : actual);
+            // 配料比是研发配方计算后的「实际添加比例」；绝不回退读「设计添加量」，
+            // 后者在折算物料行表示克/支，混作比例会使投料量失真。
+            Double ratio = parseRatio(actual);
             Double content = parseNumber(text(r.get("单支物料含量")));
+            if (ratio == null) throw new IllegalStateException("配方行 " + text(r.get("序号")) + " 缺少有效实际添加比例,请先重新计算并保存配方");
+            if (content == null) throw new IllegalStateException("配方行 " + text(r.get("序号")) + " 缺少有效单支物料含量,不能计算混料用量");
             items.add(new FormulaItem(text(r.get("序号")), text(r.get("物料种类")), code, name,
                     ratio, content, design));
         }

@@ -40,12 +40,12 @@ BEGIN
         [产品名称] nvarchar(200) NULL,
         [混料数量] decimal(18,4) NOT NULL,
         [单位] nvarchar(20) NULL CONSTRAINT [DF_wo_mixing_head_单位] DEFAULT (N'支'),
-        [状态] nvarchar(10) NOT NULL CONSTRAINT [DF_wo_mixing_head_状态] DEFAULT (N'有效'),
+        [状态] nvarchar(10) NULL,
         [asp_user1] nvarchar(40) NULL,
         [asp_time1] datetime2 NULL CONSTRAINT [DF_wo_mixing_head_asp_time1] DEFAULT (SYSDATETIME()),
         [asp_user2] nvarchar(40) NULL,
         [asp_time2] datetime2 NULL,
-        [asp_cancel] char(1) NULL CONSTRAINT [DF_wo_mixing_head_asp_cancel] DEFAULT ('N')
+        [asp_cancel] nvarchar(1) NULL CONSTRAINT [DF_wo_mixing_head_asp_cancel] DEFAULT (N'N')
     );
 END;
 IF OBJECT_ID(N'dbo.wo_mixing_detail', N'U') IS NULL
@@ -71,7 +71,7 @@ BEGIN
         [asp_time1] datetime2 NULL CONSTRAINT [DF_wo_mixing_detail_asp_time1] DEFAULT (SYSDATETIME()),
         [asp_user2] nvarchar(40) NULL,
         [asp_time2] datetime2 NULL,
-        [asp_cancel] char(1) NULL CONSTRAINT [DF_wo_mixing_detail_asp_cancel] DEFAULT ('N')
+        [asp_cancel] nvarchar(1) NULL CONSTRAINT [DF_wo_mixing_detail_asp_cancel] DEFAULT (N'N')
     );
 END;
 GO
@@ -108,7 +108,7 @@ OPEN c; FETCH NEXT FROM c INTO @table,@column,@desc;
 WHILE @@FETCH_STATUS=0
 BEGIN
     IF COL_LENGTH(N'dbo.' + @table, @column) IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id=OBJECT_ID(N'dbo.'+@table) AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.'+@table),@column,'ColumnId') AND name=N'MS_Description')
+       AND NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.'+@table) AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.'+@table),@column,'ColumnId') AND name=N'MS_Description')
         EXEC sp_addextendedproperty N'MS_Description', @desc, N'SCHEMA', N'dbo', N'TABLE', @table, N'COLUMN', @column;
     FETCH NEXT FROM c INTO @table,@column,@desc;
 END
@@ -116,9 +116,9 @@ CLOSE c; DEALLOCATE c;
 GO
 
 /* plang 关键列注明 */
-IF COL_LENGTH(N'dbo.plang',N'成型配方单号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id=OBJECT_ID(N'dbo.plang') AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.plang'),N'成型配方单号','ColumnId') AND name=N'MS_Description')
+IF COL_LENGTH(N'dbo.plang',N'成型配方单号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.plang') AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.plang'),N'成型配方单号','ColumnId') AND name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'当前生产工单行绑定的成型配方单号', N'SCHEMA', N'dbo', N'TABLE', N'plang', N'COLUMN', N'成型配方单号';
-IF COL_LENGTH(N'dbo.plang',N'成型配方版本') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id=OBJECT_ID(N'dbo.plang') AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.plang'),N'成型配方版本','ColumnId') AND name=N'MS_Description')
+IF COL_LENGTH(N'dbo.plang',N'成型配方版本') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE class=1 AND major_id=OBJECT_ID(N'dbo.plang') AND minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.plang'),N'成型配方版本','ColumnId') AND name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'当前生产工单行绑定的成型配方版本', N'SCHEMA', N'dbo', N'TABLE', N'plang', N'COLUMN', N'成型配方版本';
 GO
 
