@@ -276,7 +276,7 @@
 | `yj_schema_log` | 本地多 `migrate-insp-gate-option-20261016.sql` | 同上(该脚本仍未提交 git) |
 | `yj_attachment` 2 行 | 附件元数据 | **文件本体不在 .bak 里**,单搬行会产生死链 |
 | `yj_message` / `yj_usage_log` / `dm_langue` | 站内消息 / 使用日志 / 登录会话 | 纯日志噪声 |
-| `yj_doc_status` 9 条、`yj_role_panel` 6 行、`s_allno` 1 行 | 内容级差异(id 走自增的那 1 条、被 UPDATE 保留原 id 的 3 行等) | 业务键与取值均已一致,仅 id 分配不同 |
+| `yj_doc_status` 9 条、`yj_role_panel` 6 行、`s_allno` 1 行、`outh` 1 行 | 内容级差异(id 走自增的那 1 条、被 UPDATE 保留原 id 的 3 行等) | 业务键与取值均已一致,仅 id 分配/个别时间列不同 |
 
 > 若要把上表里 `bd_/bl_` 的同步快照也拉平:在本地跑一次金蝶同步即可(会写本地库,先备份)。
 
