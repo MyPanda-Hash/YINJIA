@@ -407,7 +407,13 @@ public class DbNormAudit {
         List<String> bad = new ArrayList<>();
         try (Statement st = c.createStatement();
              ResultSet rs = st.executeQuery("SELECT name FROM sys.tables ORDER BY name")) {
-            while (rs.next()) if (isBackup(rs.getString(1))) bad.add(rs.getString(1));
+            while (rs.next()) {
+                String n = rs.getString(1);
+                // table: 冻结登记 = **明确保留**,不算待清理(与 01/02/03/04 的 wl("table") 口径一致)。
+                // 先例:rd_dev_task_bak_20261013 —— AGENTS.md「保留项别顺手清:rd_dev_task_bak_*」,
+                // 它是研发任务的改前快照,业务上要留档;若按备份表一律判罚,规则与口径互相打架。
+                if (isBackup(n) && !wl("table").contains(n)) bad.add(n);
+            }
         }
         ratchet("10", "备份/临时表(应清零)", bad.size(), join(bad, 6));
     }
