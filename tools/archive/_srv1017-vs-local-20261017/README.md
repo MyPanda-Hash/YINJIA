@@ -317,3 +317,43 @@ ALTER DATABASE HSDZ_MES SET MULTI_USER;
   施工前本地备份:`D:\sql\data\HSDZ_MES-pre-srv1017-sync-20261017.bak`。
 - 证据:`raw/`(原始输出)、`sql/`(可重跑脚本,`20-` 是落地脚本);仓库既有工具:`tools/DbSchemaDiff.java`、`tools/archive/_YjFieldAlign.java`。
 - 约束专项复核(第二轮,回应「是不是有新增约束」):`sql/16`~`sql/19` 与 `raw/16`~`raw/19` —— 约束按 5 类清点、显式命名约束按名称双向比、索引名双向比、`MS_Description` 扩展属性双向比、"10-16 之后动过的对象"逐条并排、`inh`/`outh` 默认约束与索引过滤条件。
+
+---
+
+## 12. 全量表结构指纹核对(223 张表逐表逐事实)—— `sql/24`、`raw/24`
+
+不依赖任何"抽样":把两库的**全部结构事实**摊平成字符串集合,逐条双向 `EXCEPT`,
+再按表把该表所有结构事实聚成 MD5 指纹比对。
+
+| 结构事实类别 | 服务器快照 | 本地 `HSDZ_MES` | 差异 |
+|---|---|---|---|
+| 列 COL(类型/长度/精度/小数位/可空/标识/seed/increment/排序规则/**默认值**/计算列/rowguidcol/sparse/column_set) | 10,199 | 10,199 | **2** |
+| 索引 IDX(名字/类型/唯一/主键/唯一约束/键列含升降序/包含列/筛选条件/禁用/填充因子) | 320 | 320 | 0 |
+| 主键·唯一约束 PKUQ(名字/类型/列) | 233 | 233 | 0 |
+| 检查约束 CK(名字/定义/禁用/可信) | 1 | 1 | 0 |
+| 默认约束 DF(名字/列/定义/系统命名) | 687 | 687 | **2** |
+| 触发器 TRG(名字/定义哈希/禁用/INSTEAD OF) | 1 | 1 | 0 |
+| 视图 VIEW(名字/定义哈希/SCHEMABINDING/列数) | 101 | 101 | 0 |
+| 用户统计 STAT(名字/列/筛选) | 7 | 7 | 0 |
+| 扩展属性 XPROP(MS_Description 等:类/对象/列/名字/取值) | 9,964 | 9,964 | 0 |
+
+**按表指纹:223 / 223 张表两侧都存在,其中 221 张指纹完全一致**;不一致的 2 张 =
+`dbo.inh` / `dbo.outh`,唯一原因是同一条默认约束的**取值**不同:
+
+| 表.列 | 约束名 | 服务器快照 | 本地 `HSDZ_MES` |
+|---|---|---|---|
+| `dbo.inh.asp_cancel` | `DF_inh_asp_cancel` | `(N'‘N’')` ← 中文引号(笔误) | `(N'N')` |
+| `dbo.outh.asp_cancel` | `DF_outh_asp_cancel` | `(N'‘N’')` ← 中文引号(笔误) | `(N'N')` |
+
+> 结论口径:**除这 2 条默认约束的「取值」外,223 张表的结构(列/索引/主键/唯一/检查/默认/触发器/统计/扩展属性)与服务器快照 100% 一致**。
+> 这 2 处是本次同步**有意修正**的(服务器那份会把 `‘N’` 写进 `asp_cancel`,按 `asp_cancel='N'` 过滤会漏行)。
+>
+> 要"与服务器逐字节一致"就执行方向 A(把笔误搬回本地,不推荐):
+> ```sql
+> ALTER TABLE dbo.inh  DROP CONSTRAINT DF_inh_asp_cancel;
+> ALTER TABLE dbo.inh  ADD  CONSTRAINT DF_inh_asp_cancel DEFAULT (N'‘N’') FOR asp_cancel;
+> ALTER TABLE dbo.outh DROP CONSTRAINT DF_outh_asp_cancel;
+> ALTER TABLE dbo.outh ADD  CONSTRAINT DF_outh_asp_cancel DEFAULT (N'‘N’') FOR asp_cancel;
+> ```
+> 方向 B(推荐):在服务器执行 `sql/20-sync-server-to-local.sql` 的 ① 段 —— 脚本会自动识别
+> 中文引号并改回 `(N'N')`,两库一起变成正确值。
