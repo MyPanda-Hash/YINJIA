@@ -1,7 +1,7 @@
 {
- "at": "2026-10-14T11:44:40.766Z",
+ "at": "2026-10-15T22:41:02.068Z",
  "startDate": "2026-09-01",
- "endDate": "2026-10-14",
+ "endDate": "2026-10-15",
  "totals": {
   "/jdy/v2/scm/pur_order": {
    "all": 2243,
@@ -9,39 +9,39 @@
    "modifyInRange": 195
   },
   "/jdy/v2/scm/sal_order": {
-   "all": 3949,
-   "createInRange": 253,
-   "modifyInRange": 275
+   "all": 3961,
+   "createInRange": 265,
+   "modifyInRange": 287
   },
   "/jdy/v2/scm/pur_inbound": {
-   "all": 3382,
-   "createInRange": 314,
-   "modifyInRange": 517
+   "all": 3389,
+   "createInRange": 321,
+   "modifyInRange": 524
   },
   "/jdy/v2/scm/sal_out_bound": {
-   "all": 5209,
-   "createInRange": 401,
-   "modifyInRange": 418
+   "all": 5211,
+   "createInRange": 403,
+   "modifyInRange": 420
   },
   "/jdy/v2/scm/inv_pick": {
-   "all": 4981,
-   "createInRange": 4981,
-   "modifyInRange": 487
+   "all": 4992,
+   "createInRange": 4992,
+   "modifyInRange": 498
   },
   "/jdy/v2/scm/inv_product": {
-   "all": 2882,
-   "createInRange": 2882,
-   "modifyInRange": 236
+   "all": 2887,
+   "createInRange": 2887,
+   "modifyInRange": 241
   },
   "/jdy/v2/scm/inv_other_in": {
-   "all": 81,
-   "createInRange": 14,
-   "modifyInRange": 14
+   "all": 79,
+   "createInRange": 12,
+   "modifyInRange": 12
   },
   "/jdy/v2/scm/inv_other_out": {
-   "all": 1150,
-   "createInRange": 80,
-   "modifyInRange": 80
+   "all": 1151,
+   "createInRange": 81,
+   "modifyInRange": 81
   }
  }
 }

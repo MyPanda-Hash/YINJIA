@@ -1042,7 +1042,7 @@
     <!-- ═══ 打印专用版式(屏幕隐藏,打印时经 body.doc-printing 激活):宽明细单据 A4 纸面优化层——
          表头紧凑四列网格 + table-layout:fixed 百分比列宽 + 宽表列合并(名称/型号、合格/不良)
          + thead 跨页自动重复;@page 横向/纵向由 prepareDocPrint 动态注入 ═══ -->
-    <div v-if="docPrintEnabled" class="doc-print" aria-hidden="true">
+    <div v-if="docPrintRendered" class="doc-print" aria-hidden="true">
       <div class="dp-title">{{ tt(panelName) }}</div>
       <div class="dp-head">
         <div v-for="f in docPrintHead" :key="headerFieldKey(f)" class="dp-pair">
@@ -1694,9 +1694,16 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 文书面板导出:格式选择(打印按钮独立,导出走这里:PDF/Excel) ═══ -->
-    <el-dialog v-model="exportFmtVisible" :title="tt('选择导出格式')" width="380px" append-to-body>
+    <!-- ═══ 文书面板导出:格式选择(打印预览 / PDF / Excel;打印为独立按钮不经过这里) ═══ -->
+    <el-dialog v-model="exportFmtVisible" :title="tt('选择导出格式')" width="420px" append-to-body>
       <div class="efmt-list">
+        <div class="efmt-item" @click="previewSheetPdf">
+          <span class="efmt-ico">🖨</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('打印预览') }}</div>
+            <div class="efmt-desc">{{ tt('在新窗口内打开这张纸的 PDF，可直接打印或另存为 PDF') }}</div>
+          </div>
+        </div>
         <div class="efmt-item" @click="exportSheetPdf">
           <span class="efmt-ico">📄</span>
           <div class="efmt-txt">
@@ -1708,7 +1715,7 @@
           <span class="efmt-ico">📊</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('导出 Excel（.xlsx）') }}</div>
-            <div class="efmt-desc">{{ tt('头字段键值 + 各明细页签全字段全数据，不受纸张限制') }}</div>
+            <div class="efmt-desc">{{ sheetExcelDesc }}</div>
           </div>
         </div>
       </div>
@@ -6239,26 +6246,45 @@ function onSideAction(a) {
   onButton(a)
 }
 
-// ── 文书面板导出:格式选择(PDF / Excel);打印为独立按钮不经过这里 ──
+// ── 文书面板导出:格式选择(打印预览 / PDF / Excel);打印为独立按钮不经过这里 ──
 const exportFmtVisible = ref(false)
-/** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机。
- *  页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
- *  无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
- *  宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
- *  根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
- *  里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。 */
-async function exportSheetPdf() {
-  exportFmtVisible.value = false
-  // $el 在 dev 下可能是 fragment 注释锚点(组件含多个 append-to-body 弹窗)——不是元素时按纸张根类名兜底
+/**
+ * 「导出 Excel」在**本文书面板**到底导什么 —— 三种口径,弹窗里如实说明(别一句话糊到底):
+ *   · 纸面版式   : 检验单类(QC_PROC_INSP / QC_FIRST_INSP),导出的就是这张纸(纯函数 + 单测);
+ *   · 控制列表版式: RD_PROGRESS / QC_CATALOG,按纸面列定义导全部行;
+ *   · 头字段+全明细: 其余文书面板(exportSheetExcel 的通用分支)。
+ */
+const sheetExcelDesc = computed(() => {
+  const code = String(panelCode.value)
+  if (code === 'QC_PROC_INSP' || code === 'QC_FIRST_INSP') return tt('导出当前这张纸，版式与纸面一致')
+  if (code === 'RD_PROGRESS' || code === 'QC_CATALOG') return tt('按纸面列定义导出全部行')
+  return tt('头字段键值 + 各明细页签全字段全数据，不受纸张限制')
+})
+/**
+ * 把当前文书纸面截成 PDF(返回 blob + 文件名)—— **导出 PDF 与打印预览共用这一份实现**。
+ *
+ * 页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
+ * 无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
+ * 宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
+ * 根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
+ * 里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。
+ *
+ * ⚠ $el 在 dev 下可能是 fragment **注释锚点**(模板顶部的注释块、组件内的 append-to-body 弹窗
+ *   都会把单根变多根,§5.5 B1)⇒ 判不出元素时按纸张根**类名**兜底;
+ *   兜底名单必须把**每种纸张的根类名**都列全 —— 2026-10-17 实测漏了 `.fi-sheet`,
+ *   于是首件检验单点「导出 PDF」直接报「未找到可导出的单据」。
+ */
+async function buildSheetPdfBlob() {
   const el0 = approvalSheetRef.value?.$el
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
-    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, .approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet')
-  if (!el || !(el instanceof HTMLElement)) return ElMessage.warning(tt('未找到可导出的单据'))
-  const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
+    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
+    + '.approval-layout .qr-sheet')
+  if (!el || !(el instanceof HTMLElement)) return null
+  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
+  await nextTick()
   let holder = null
   try {
-    const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
-    await nextTick()
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
     const w0 = Math.max(el.scrollWidth, el.offsetWidth)
     holder = document.createElement('div')
@@ -6278,7 +6304,7 @@ async function exportSheetPdf() {
       backgroundColor: '#ffffff',
       width: w0,
       height: h0,
-      // 隐藏编辑态元素(字段编辑/标准库/终止横幅等),与打印口径一致
+      // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
     // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
@@ -6289,24 +6315,67 @@ async function exportSheetPdf() {
     const pdf = new jsPDF({ orientation: pw > ph ? 'l' : 'p', unit: 'mm', format: [pw, ph], compress: true })
     pdf.addImage(dataUrl, 'PNG', 0, 0, pw, ph)
     const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
-    pdf.save(`${panelName.value}-${no || '导出'}.pdf`)
+    return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
+  } finally {
+    if (holder) holder.remove()
+  }
+}
+/** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机 */
+async function exportSheetPdf() {
+  exportFmtVisible.value = false
+  const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+  try {
+    const r = await buildSheetPdfBlob()
+    if (!r) { ElMessage.warning(tt('未找到可导出的单据')); return }
+    const url = URL.createObjectURL(r.blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = r.name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
     ElMessage.success(tt('已导出') + ' PDF')
   } catch (e) {
     console.error('pdf-export failed', e)
     ElMessage.error(tt('导出失败'))
   } finally {
-    if (holder) holder.remove()
+    loadingMsg.close()
+  }
+}
+/**
+ * 打印预览:生成**与导出 PDF 同一份**纸张 PDF,在新窗口打开 —— 浏览器 PDF 阅读器自带
+ * 打印/缩放/另存为,所见即所得(用户口径「打印预览也需要实现」)。
+ * ⚠ 窗口必须**同步**先开(否则 await 之后被浏览器当弹窗拦截),拿到 blob 再指向它。
+ */
+async function previewSheetPdf() {
+  exportFmtVisible.value = false
+  const win = window.open('', '_blank')
+  const loadingMsg = ElMessage({ message: tt('正在生成打印预览…'), duration: 0 })
+  try {
+    const r = await buildSheetPdfBlob()
+    if (!r) { if (win) win.close(); ElMessage.warning(tt('未找到可导出的单据')); return }
+    const url = URL.createObjectURL(r.blob)
+    if (win) win.location.href = url
+    else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+    setTimeout(() => URL.revokeObjectURL(url), 120000)
+  } catch (e) {
+    if (win) win.close()
+    console.error('pdf-preview failed', e)
+    ElMessage.error(tt('导出失败'))
+  } finally {
     loadingMsg.close()
   }
 }
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {
   exportFmtVisible.value = false
-  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录 / 制程检验单纸面)
+  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录 / 制程检验单 / 首件检验单纸面)
   const catalogExporter = {
     RD_PROGRESS: 'exportProgressExcel',
     QC_CATALOG: 'exportCatalogExcel',
     QC_PROC_INSP: 'exportProcInspExcel',
+    QC_FIRST_INSP: 'exportFirstInspExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value
@@ -6387,8 +6456,7 @@ const docPrintRows = computed(() => {
   if (!b) return []
   return blockRows(b).filter((r) => !r._placeholder)
 })
-// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不合格数量)
-// ⚠ 按**字段标签**匹配,而「不良数量」2026-09-20 起叫「不合格数量」且该标签全库无面板注册 ⇒ 旧写法永不生效
+// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不合格数量)// ⚠ 按**字段标签**匹配,而「不良数量」2026-09-20 起叫「不合格数量」且该标签全库无面板注册 ⇒ 旧写法永不生效
 const DOC_PRINT_MERGE_PAIRS = [['物料名称', '型号'], ['合格数量', '不合格数量']]
 /** 列宽基准(按中文列名关键词,与界面语言无关);打印前归一化为百分比 */
 function dpBaseW(prop) {
@@ -6432,6 +6500,30 @@ const docPrintCols = computed(() => {
   for (const c of out) c.pct = Math.round((c.base / total) * 1000) / 10
   return out
 })
+/**
+ * 打印层**按需渲染**(2026-10-16 性能专项,用户口径「商品这个页面打开也会卡一下」)。
+ *
+ * 病根:`.doc-print` 是"屏幕恒隐藏、打印时才显示"的 A4 版式层,但它**一直**在 DOM 里。
+ * 商品档案(INV)是存档面板,`blockRows` = 全部 3,917 行 ⇒ 一打开就白建
+ * 3,942 行 × 59 列 ≈ **23.1 万个 DOM 节点**(实测主线程长任务 667 ms / 最长 485 ms,
+ * 打开到出数据 2.4 s;而 el-table 自己只渲染 25 行)。打印时那 23 万个节点才有用。
+ *
+ * 改法:**按行数分流**——
+ *   · 行数 ≤ {@link DOC_PRINT_EAGER_MAX}(普通单据面板,几行到几十行):照旧常驻渲染,
+ *     Ctrl+P / 浏览器菜单打印 / 按钮打印**三条路径的行为一个字节都不变**;
+ *   · 行数超过阈值(档案面板,动辄几千行):默认不渲染,由打印入口先 `await` 渲染好再打印
+ *     (见 ensureDocPrintLayer + 打印按钮 + Ctrl+P 拦截),打印输出的行/列**逐字一致**。
+ */
+const DOC_PRINT_EAGER_MAX = 300
+const docPrintReady = ref(false)
+const docPrintLazy = computed(() => docPrintRows.value.length > DOC_PRINT_EAGER_MAX)
+const docPrintRendered = computed(() => docPrintEnabled.value && (!docPrintLazy.value || docPrintReady.value))
+/** 打印前确保打印层已在 DOM 里(懒渲染面板);等了 nextTick 才算真的挂上 */
+async function ensureDocPrintLayer() {
+  if (!docPrintEnabled.value || docPrintRendered.value) return
+  docPrintReady.value = true
+  await nextTick()
+}
 /** 打印前置:挂 body 样式 + 注入 @page 规则(列数≥8 横向,否则纵向;@page 不响应类选择器,只能动态注入) */
 function prepareDocPrint() {
   document.body.classList.add('doc-printing')
@@ -6446,12 +6538,27 @@ function prepareDocPrint() {
     ? '@page { size: A4 landscape; margin: 9mm 8mm; }'
     : '@page { size: A4 portrait; margin: 12mm 10mm; }'
 }
-function onBeforePrintDoc() {
-  // Ctrl+P 直打印也要走打印版式(beforeprint 在快照前同步触发)
-  if (docPrintEnabled.value) prepareDocPrint()
-}
+/** 打印收尾:卸掉 body 样式,并把懒渲染的打印层收回去(避免它一直挂在 DOM 里占内存) */
 function onAfterPrintDoc() {
   document.body.classList.remove('doc-printing')
+  if (docPrintLazy.value) docPrintReady.value = false
+}
+/**
+ * Ctrl/Cmd+P 拦截:懒渲染面板要先把打印层挂上再交回给浏览器。
+ * 打印层已就绪(普通单据面板)时不拦截 —— 原样走浏览器原生 Ctrl+P → beforeprint 里 prepareDocPrint。
+ */
+function onDocPrintKey(e) {
+  if (!(e.ctrlKey || e.metaKey) || String(e.key || '').toLowerCase() !== 'p') return
+  if (!docPrintLazy.value || docPrintReady.value) return
+  e.preventDefault()
+  ensureDocPrintLayer().then(() => { prepareDocPrint(); window.print() })
+}
+function onBeforePrintDoc() {
+  // Ctrl+P 直打印也要走打印版式(beforeprint 在快照前同步触发);
+  // 懒渲染面板若走到这里(例如浏览器菜单打印),尽力把层挂上 —— 挂不上时打印的是屏幕版式,
+  // 不丢数据、只是版式退化,且下面的 keydown 拦截已覆盖常规 Ctrl+P 路径。
+  if (docPrintEnabled.value && docPrintLazy.value && !docPrintReady.value) docPrintReady.value = true
+  if (docPrintEnabled.value) prepareDocPrint()
 }
 
 // ══════════ 对外正式报表(后端 JasperReports 模板;IT 做版式,业务只选单据/格式) ══════════
@@ -8572,7 +8679,11 @@ async function onButton(action) {
     return
   }
   if (action === '打印' || action === '预览') {
-    if (docPrintEnabled.value) prepareDocPrint()
+    if (docPrintEnabled.value) {
+      // 档案面板的打印层是懒渲染的:先等它挂进 DOM 再调打印(否则打出来是屏幕版式)
+      await ensureDocPrintLayer()
+      prepareDocPrint()
+    }
     window.print()
     return
   }
@@ -9484,6 +9595,8 @@ onMounted(() => {
   // 单据打印版式:Ctrl+P 直打印同样走 .doc-print 层;打印结束还原屏幕
   window.addEventListener('beforeprint', onBeforePrintDoc)
   window.addEventListener('afterprint', onAfterPrintDoc)
+  // 懒渲染打印层的 Ctrl+P 拦截(见 onDocPrintKey:已就绪时不拦截)
+  window.addEventListener('keydown', onDocPrintKey)
   if (invalidPanel.value) {
     router.replace('/panelx/list/MANU_ORDER')
     return
@@ -9527,6 +9640,7 @@ onUnmounted(() => {
   document.removeEventListener('contextmenu', closeCtx)
   window.removeEventListener('beforeprint', onBeforePrintDoc)
   window.removeEventListener('afterprint', onAfterPrintDoc)
+  window.removeEventListener('keydown', onDocPrintKey)
   document.body.classList.remove('doc-printing')
 })
 </script>

@@ -1,0 +1,75 @@
+表 | 本地正式库 | 服务器快照
+-----------------
+dm_langue | 有 | 有
+gscs | 有 | 有
+permission | 有 | 有
+s_commdata | 有 | 有
+s_sys | 有 | 有
+s_xtcs | 有 | 有
+inh | 有 | 有
+outh | 有 | 有
+scjl | 有 | 有
+out | 无 | 无
+类别 | 表 | 列 | 本地定义 | 快照定义 | 差异点
+------------------------------
+③定义不同 | inh | asp_cancel | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | inh | 采购ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | inh | 订单ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | inh | 工单项次 | int(4) | float(8) | 类型,长度,精度(10.0→53.0),默认值(无→((0)))
+③定义不同 | inh | 审核 | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | inh | 委外ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | outh | asp_cancel | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | outh | 采购ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | outh | 订单ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | outh | 工单项次 | int(4) | float(8) | 类型,长度,精度(10.0→53.0),默认值(无→((0)))
+③定义不同 | outh | 审核 | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | outh | 委外ID | float(8) | float(8) | 默认值(无→((0)))
+表 | 本地列数 | 快照列数 | 判定
+--------------------
+dm_langue | 22 | 22 | 列数相同
+gscs | 55 | 55 | 列数相同
+inh | 58 | 58 | 列数相同
+outh | 59 | 59 | 列数相同
+permission | 18 | 18 | 列数相同
+s_commdata | 28 | 28 | 列数相同
+s_sys | 46 | 46 | 列数相同
+s_xtcs | 17 | 17 | 列数相同
+scjl | 100 | 100 | 列数相同
+库 | 表 | 索引名 | 类型 | 主键 | 唯一
+--------------------------
+本地 | dm_langue | PK_dm_langue | CLUSTERED | 1 | 1
+快照 | dm_langue | PK_dm_langue | CLUSTERED | 1 | 1
+本地 | gscs | PK_gscs | CLUSTERED | 1 | 1
+快照 | gscs | PK_gscs | CLUSTERED | 1 | 1
+本地 | inh | IX_inh_单据编号 | NONCLUSTERED | 0 | 0
+快照 | inh | IX_inh_单据编号 | NONCLUSTERED | 0 | 0
+本地 | inh | IX_inh_三键 | NONCLUSTERED | 0 | 0
+快照 | inh | IX_inh_三键 | NONCLUSTERED | 0 | 0
+本地 | inh | PK_inh | CLUSTERED | 1 | 1
+快照 | inh | PK_inh | CLUSTERED | 1 | 1
+本地 | inh | UX_inh_src_rid | NONCLUSTERED | 0 | 1
+快照 | inh | UX_inh_src_rid | NONCLUSTERED | 0 | 1
+本地 | outh | IX_outh_单据编号 | NONCLUSTERED | 0 | 0
+快照 | outh | IX_outh_单据编号 | NONCLUSTERED | 0 | 0
+本地 | outh | IX_outh_三键 | NONCLUSTERED | 0 | 0
+快照 | outh | IX_outh_三键 | NONCLUSTERED | 0 | 0
+本地 | outh | PK_outh | CLUSTERED | 1 | 1
+快照 | outh | PK_outh | CLUSTERED | 1 | 1
+本地 | outh | UX_outh_src_rid | NONCLUSTERED | 0 | 1
+快照 | outh | UX_outh_src_rid | NONCLUSTERED | 0 | 1
+本地 | permission | PK_permission | CLUSTERED | 1 | 1
+快照 | permission | PK_permission | CLUSTERED | 1 | 1
+本地 | s_commdata | comm | NONCLUSTERED | 0 | 0
+快照 | s_commdata | comm | NONCLUSTERED | 0 | 0
+本地 | s_commdata | jsz | NONCLUSTERED | 0 | 0
+快照 | s_commdata | jsz | NONCLUSTERED | 0 | 0
+快照 | s_commdata | PK__s_commda__3214EC27C3DB5918 | CLUSTERED | 1 | 1
+本地 | s_commdata | PK_s_commdata | CLUSTERED | 1 | 1
+本地 | s_commdata | xc | NONCLUSTERED | 0 | 0
+快照 | s_commdata | xc | NONCLUSTERED | 0 | 0
+本地 | s_sys | PK_s_sys | CLUSTERED | 1 | 1
+快照 | s_sys | PK_s_sys | CLUSTERED | 1 | 1
+本地 | s_xtcs | PK_s_xtcs | CLUSTERED | 1 | 1
+快照 | s_xtcs | PK_s_xtcs | CLUSTERED | 1 | 1
+本地 | scjl | PK_scjl | CLUSTERED | 1 | 1
+快照 | scjl | PK_scjl | CLUSTERED | 1 | 1

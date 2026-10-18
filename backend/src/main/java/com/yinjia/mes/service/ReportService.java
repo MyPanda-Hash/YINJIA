@@ -65,6 +65,21 @@ public class ReportService {
      * 订单管理/委外加工/库存核算…)**同时**保留在原列用于读权限放行(PanelPermissionService.readablePanels
      * 按同模块放行),但对外展示(权限矩阵分组、报表口径)统一归并到**导航一级模块名**。
      * 只做单向投影:不改库、不改原列语义,故读放行与报表排除口径均不受影响。
+     *
+     * <p>2026-10-16 补两条(用户口径「要按照模块来收纳面板,现在多了一个基础设置和系统管理」):
+     * 权限矩阵里冒出了**导航里没有的两个分组** ——
+     * <ul>
+     *   <li>`基础设置`(25 张:部门/员工/存货/工序/计量单位/仓库/仓位/工艺路线…):这是 2026-08 从
+     *       light-mes 迁基础资料时按「基础设置模块」写进去的 module_group,而导航里这些面板全在
+     *       **基础档案**(基础数据/物料及价格/生产/财务 四个二级栏)。⇒ 归并到 `基础档案`。</li>
+     *   <li>`系统管理`:本列**唯一成员是 STOCK_DETAIL(库存明细)** —— 它的来源是
+     *       `migrate-panel-modules.sql` 那句 `module_group IS NULL ⇒ 系统管理` 的兜底值被写死;
+     *       而库存明细在导航里是 **智能供应链 → 库存报表** 的第 5 张(与 STOCK_BALANCE/LEDGER/
+     *       STATUS/SUMMARY 同栏)。⇒ **库侧**把它改回 `库存核算`(见
+     *       `tools/migrate-stock-detail-module-group-20261016.sql`),与四张同族报表同组;
+     *       这里**刻意不把 `系统管理` 整值投影到某个业务模块** —— 那样将来真出现系统管理类面板
+     *       会被错塞进业务模块,宁可让它在矩阵里显形。</li>
+     * </ul>
      */
     private static final Map<String, String> NAV_GROUP = Map.ofEntries(
             Map.entry("智能供应链", "智能供应链"),
@@ -78,9 +93,13 @@ public class ReportService {
             Map.entry("委外加工", "生产制造"),
             Map.entry("品质管理", "品质管理"),
             Map.entry("研发管理", "研发管理"),
+            // 数据建模(2026-10-18 新增的一级目录:字段管理 / 数据字典 / ERP导入日志)—— 归并到自身:
+            // 权限矩阵里就该是**一个**「数据建模」分组,不再散落到「系统管理」或其他栏。
+            Map.entry("数据建模", "数据建模"),
             Map.entry("基础档案", "基础档案"),
             Map.entry("基础资料", "基础档案"),
             Map.entry("基础数据", "基础档案"),
+            Map.entry("基础设置", "基础档案"),
             Map.entry("物料及价格", "基础档案"),
             Map.entry("设备管理", "设备管理"),
             Map.entry("财务管理", "财务管理"),
@@ -324,6 +343,10 @@ public class ReportService {
                 // 检验项目来自出货检验计划表、每个产品不一样,故列不写死在 .jrxml 里(生成器见
                 // QcAsmInspReportSupport);这里只把「取数 → 矩阵 → 参数」喂给生成的报表。
                 print = fillQcAsmInsp(def, doc, docNo, rows);
+            } else if (QcFirstInspReportSupport.CODE.equals(tpl.code())) {
+                // 炭棒成型车间首件检验记录表(2026-10-17):同样是**动态列**的矩阵,
+                // 版式与面板纸张(QcFirstInspSheet.vue)、它的 Excel 导出同源;生成器见 QcFirstInspReportSupport。
+                print = fillQcFirstInsp(doc, docNo, rows);
             } else {
                 // 主数据源 = 明细**全量**(一单一模板、逐行渲染)。制程检验记录表 2026-10-17 起也是
                 // 「一行一个检验项目」的纵向表(与面板纸张表同源),用 $F{检验要求}/$F{检验方法} 等逐行取;
@@ -359,6 +382,21 @@ public class ReportService {
         return JasperFillManager.fillReport(QcAsmInspReportSupport.report(m),
                 QcAsmInspReportSupport.params(m, head),
                 new JRMapCollectionDataSource(QcAsmInspReportSupport.dataRows()));
+    }
+
+    /**
+     * 炭棒成型车间首件检验记录表填充(QC_FIRST_INSP,2026-10-17):明细 → 矩阵(按「项目分组」分组、
+     * 组内一个测试项目一列、1#..8# 八个样品行)→ 动态生成的报表 + 参数。**列不写死**:
+     * 面板支持「新增测试项目 = 新增一列」,当前明细里有什么列就打什么列(用户口径「就是当前报表的 excel 表」)。
+     * 数据源只给一行(内容全走参数)—— Jasper 没有数据源就不渲染 detail 带,故必须给。
+     */
+    private JasperPrint fillQcFirstInsp(Map<String, Object> doc, String docNo,
+                                        List<Map<String, ?>> rows) throws JRException {
+        Map<String, Object> head = headParams(doc, docNo);
+        QcFirstInspReportSupport.Matrix m = QcFirstInspReportSupport.matrix(rows, head);
+        return JasperFillManager.fillReport(QcFirstInspReportSupport.report(m),
+                QcFirstInspReportSupport.params(m, head),
+                new JRMapCollectionDataSource(QcFirstInspReportSupport.dataRows()));
     }
 
     /**

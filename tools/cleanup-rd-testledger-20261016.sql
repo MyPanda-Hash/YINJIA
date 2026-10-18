@@ -63,13 +63,17 @@ DELETE FROM yj_usage_log WHERE doc_no IN (
     UNION ALL SELECT [单据编号] FROM rd_sample_no_head
 );
 
-/* ── ② 单据状态 / 审批痕迹 / 修改记录 / 批注 / 附件 / 终止申请 / 流转链接(按面板) ── */
+/* ── ② 单据状态 / 审批痕迹 / 修改记录 / 批注 / 附件 / 终止申请 / 流转链接 / 单据消息(按面板) ── */
 DELETE FROM yj_attachment     WHERE panel_code LIKE N'RD%';
 DELETE FROM yj_doc_annotation WHERE panel_code LIKE N'RD%';
 DELETE FROM yj_doc_status     WHERE panel_code LIKE N'RD%';
 DELETE FROM yj_form_approval  WHERE panel_code LIKE N'RD%';
 DELETE FROM yj_doc_modify_log WHERE panel_code LIKE N'RD%';
 DELETE FROM yj_plan_term      WHERE panel_code LIKE N'RD%';
+-- 2026-10-16 补:研发单据消息。判据与 verify/RdAreaEmptyAudit.java ② 同源(该表列名叫 面板编码,不是 panel_code);
+-- 原先漏了这张表 ⇒ 闸门会 FAIL 在这一项(实测 15 行:DEMO-CHG-001 / PI-2026-09-0084 / CHG-2026-09-0030 /
+-- MP-* / AP-* / IP-* / SD-* 那批演示单发出的消息)。
+DELETE FROM yj_message       WHERE 面板编码 LIKE N'RD%';
 DELETE FROM form_flow_link    WHERE source_panel_code LIKE N'RD%' OR target_panel_code LIKE N'RD%';
 GO
 
@@ -111,6 +115,7 @@ DECLARE @left int = (
     + (SELECT COUNT(*) FROM yj_doc_annotation WHERE panel_code LIKE N'RD%')
     + (SELECT COUNT(*) FROM yj_attachment     WHERE panel_code LIKE N'RD%')
     + (SELECT COUNT(*) FROM yj_plan_term      WHERE panel_code LIKE N'RD%')
+    + (SELECT COUNT(*) FROM yj_message        WHERE 面板编码 LIKE N'RD%')
     + (SELECT COUNT(*) FROM form_flow_link    WHERE source_panel_code LIKE N'RD%' OR target_panel_code LIKE N'RD%')
     + (SELECT COUNT(*) FROM rd_dev_task)
     + (SELECT COUNT(*) FROM rd_approval)         + (SELECT COUNT(*) FROM rd_approval_detail)

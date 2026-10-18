@@ -33,6 +33,16 @@ public class StockWarnService {
 
     private final JdbcTemplate jdbc;
 
+    /**
+     * 历史回填模式:与 {@code StockLedgerService.HIST_BACKFILL} **同一开关**(JVM 参数
+     * {@code -Dmes.hist.backfill=true};默认关闭,日常录单/审核一个字都不变)。
+     *
+     * <p>为什么需要:本闸门是 2026-10-15 第十六轮新加的,当时漏了这个旁路 ⇒ 用历史回填模式补录
+     * 金蝶历史单据时,前三道库存闸门已放开,却卡在这道「出库后余额 &lt; 预警数量」上。
+     * 又因为预警数量默认值是 <b>0</b>(见类注释),它等价于「不许负结存」——正是回填要放开的。
+     */
+    private static final boolean HIST_BACKFILL = "true".equalsIgnoreCase(System.getProperty("mes.hist.backfill"));
+
     public StockWarnService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -135,7 +145,7 @@ public class StockWarnService {
         BigDecimal bal = rows.isEmpty() ? BigDecimal.ZERO : dec(rows.get(0).get("yl"));
         BigDecimal warn = rows.isEmpty() ? BigDecimal.ZERO : dec(rows.get(0).get("warn"));
         BigDecimal after = bal.subtract(done);
-        if (after.compareTo(warn) < 0) {
+        if (!HIST_BACKFILL && after.compareTo(warn) < 0) {
             throw new IllegalStateException("单据 " + no + " 出库审批失败:存货 " + wzdm + " / 仓库 " + ckdm
                     + " / 批次号 " + (l.isEmpty() ? "(无批次号)" : l)
                     + " 出库后余额 " + plain(after) + " 低于预警数量 " + plain(warn)

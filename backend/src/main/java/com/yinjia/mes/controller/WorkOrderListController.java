@@ -4,6 +4,7 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.WorkOrderPickingService;
+import com.yinjia.mes.service.WorkOrderRecipeService;
 import com.yinjia.mes.service.WorkOrderSplitService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,13 +49,16 @@ public class WorkOrderListController {
     private final WorkOrderSplitService splitService;
     /** 转领料单(业务规则在 service,Controller 只做参数校验与转发 —— 代码规范 A2) */
     private final WorkOrderPickingService pickingService;
+    /** 成型配方绑定与混料快照(按工单行) */
+    private final WorkOrderRecipeService recipeService;
 
     public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
-                                   WorkOrderPickingService pickingService) {
+                                   WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
         this.pickingService = pickingService;
+        this.recipeService = recipeService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */

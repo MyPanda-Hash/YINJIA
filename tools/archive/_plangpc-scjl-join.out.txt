@@ -1,0 +1,13 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _probe-plangpc-scjl-join.sql ==
+  | ① 看板口径 comm+pl_no+pl_xc | 命中行数=1 | 
+  | ② plang_pc.plang_id = plang.id | 命中行数=0 | 
+  | ③ 报工审核锚定(plang_id 链) | 命中行数=0 | 
+  | ④ 报工→工单行(gd_id 链) | scjl 行数=3 其中能解到 plang 行的=0 | 
+  | ⑤ 工单号+批次号兜底 | plang 命中行数=1(≠1 时兜底失效) | 
+  | ⑥ 三表字段对照 | 
+  | 79 报工单=BG-2026-10-0047 || pl_sl: scjl=160 plang_pc=160 plang=500 || scx: scjl=装箱1(老厂) plang_pc=装箱1(老厂) plang=- || 批次号: scjl=20261014 plang_pc=20261014 plang=20261014 | 
+  | 78 报工单=BG-2026-10-0046 || pl_sl: scjl=160 plang_pc=160 plang=500 || scx: scjl=1号车间 plang_pc=装箱1(老厂) plang=- || 批次号: scjl=20261014 plang_pc=20261014 plang=20261014 | 
+  | 77 报工单=BG-2026-10-0045 || pl_sl: scjl=0 plang_pc=0 plang=0 || scx: scjl=- plang_pc=- plang=- || 批次号: scjl=- plang_pc=- plang=- | 
+  | 76 报工单=BG-2026-10-0044 || pl_sl: scjl=160 plang_pc=160 plang=500 || scx: scjl=1号车间 plang_pc=装箱1(老厂) plang=- || 批次号: scjl=20261014 plang_pc=20261014 plang=20261014 | 
+[OK] _probe-plangpc-scjl-join.sql (1 batches)

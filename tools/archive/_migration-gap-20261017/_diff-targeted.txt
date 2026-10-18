@@ -1,0 +1,217 @@
+表 | 本地正式库 | 服务器快照
+-----------------
+dm_langue | 有 | 有
+gscs | 有 | 有
+permission | 有 | 有
+s_commdata | 有 | 有
+s_sys | 有 | 有
+s_xtcs | 有 | 有
+inh | 有 | 有
+outh | 有 | 有
+scjl | 有 | 有
+out | 无 | 无
+类别 | 表 | 列 | 本地定义 | 快照定义 | 差异点
+------------------------------
+③定义不同 | dm_langue | asp_cancel | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_print | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_time1 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_time2 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_time3 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_time4 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_user1 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_user2 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_user3 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | dm_langue | asp_user4 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | dm_langue | frm | nvarchar(40) | nvarchar(40) | 中文注明(无→有)
+③定义不同 | dm_langue | lb_wi | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | asp_cancel | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | gscs | asp_print | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | asp_time1 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | gscs | asp_time2 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | gscs | asp_time3 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | gscs | asp_time4 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | gscs | asp_user1 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | gscs | asp_user2 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | gscs | asp_user3 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | gscs | asp_user4 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | gscs | beginday | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | gscs | comm | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | gscs | comqty | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | djzk | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | gscs | endday | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | gscs | fkc | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | gscs | ghf | float(8) | float(8) | 中文注明(无→有)
+③定义不同 | gscs | hg | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | hzb | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | jsfs | nvarchar(5) | nvarchar(5) | 中文注明(无→有)
+③定义不同 | gscs | kjjm | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | gscs | maxrecord | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | mobqty | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | mybs | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | mysj | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | gscs | pfwj | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | gscs | pos_dj | nvarchar(2) | nvarchar(2) | 中文注明(无→有)
+③定义不同 | gscs | rem1 | nvarchar(200) | nvarchar(200) | 中文注明(无→有)
+③定义不同 | gscs | sf | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | gscs | ver | nvarchar(5) | nvarchar(5) | 中文注明(无→有)
+③定义不同 | gscs | web | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | gscs | xpbt | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | gscs | ysfh | nvarchar(10) | nvarchar(10) | 中文注明(无→有)
+③定义不同 | gscs | yspy | nvarchar(10) | nvarchar(10) | 中文注明(无→有)
+③定义不同 | gscs | ysys | nvarchar(10) | nvarchar(10) | 中文注明(无→有)
+③定义不同 | gscs | zzb | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | inh | asp_cancel | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | inh | 采购ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | inh | 订单ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | inh | 工单项次 | int(4) | float(8) | 类型,长度,精度(10.0→53.0),默认值(无→((0)))
+③定义不同 | inh | 审核 | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | inh | 委外ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | outh | asp_cancel | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | outh | 采购ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | outh | 订单ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | outh | 工单项次 | int(4) | float(8) | 类型,长度,精度(10.0→53.0),默认值(无→((0)))
+③定义不同 | outh | 审核 | nvarchar(2) | nvarchar(2) | 默认值(无→(N'N'))
+③定义不同 | outh | 委外ID | float(8) | float(8) | 默认值(无→((0)))
+③定义不同 | permission | asp_cancel | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | permission | asp_print | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | permission | asp_time1 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | permission | asp_time2 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | permission | asp_time3 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | permission | asp_time4 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | permission | asp_user1 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | permission | asp_user2 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | permission | asp_user3 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | permission | asp_user4 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | permission | COMM | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | permission | GROP | nvarchar(40) | nvarchar(40) | 中文注明(无→有)
+③定义不同 | permission | REMARK | nvarchar(200) | nvarchar(200) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_cancel | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_print | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_time1 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_time2 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_time3 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_time4 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_user1 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_user2 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_user3 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | asp_user4 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | COMM | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | s_commdata | CTMC | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | s_commdata | DSFS | tinyint(1) | tinyint(1) | 中文注明(无→有)
+③定义不同 | s_commdata | FCSJ | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_commdata | FSZ | nvarchar(18) | nvarchar(18) | 中文注明(无→有)
+③定义不同 | s_commdata | JBXX | nvarchar(100) | nvarchar(100) | 中文注明(无→有)
+③定义不同 | s_commdata | JSZ | nvarchar(18) NOT NULL | nvarchar(18) NOT NULL | 中文注明(无→有)
+③定义不同 | s_commdata | KEY | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | KEYZ | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | REMARK | nvarchar(255) | nvarchar(255) | 中文注明(无→有)
+③定义不同 | s_commdata | SYWJ | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_commdata | SZSJ | datetime2(8) NOT NULL | datetime2(8) NOT NULL | 中文注明(无→有)
+③定义不同 | s_commdata | TXF | tinyint(1) | tinyint(1) | 中文注明(无→有)
+③定义不同 | s_commdata | XC | int(4) NOT NULL | int(4) NOT NULL | 中文注明(无→有)
+③定义不同 | s_commdata | YDF | tinyint(1) | tinyint(1) | 中文注明(无→有)
+③定义不同 | s_commdata | YDSJ | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_commdata | ZDYXX | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | asp_cancel | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | s_sys | asp_print | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | asp_time1 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_sys | asp_time2 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_sys | asp_time3 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_sys | asp_time4 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_sys | asp_user1 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_sys | asp_user2 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_sys | asp_user3 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_sys | asp_user4 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_sys | BZ | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | CHS | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | CHT | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | COMM | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | s_sys | control | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | Cur_Lang | nvarchar(10) | nvarchar(10) | 中文注明(无→有)
+③定义不同 | s_sys | DISP_ORDER | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | DISP_YN | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | ENG | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | FILE_STR | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | s_sys | FLIE_NA | nvarchar(150) | nvarchar(150) | 中文注明(无→有)
+③定义不同 | s_sys | GMF | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | s_sys | GROP | nvarchar(40) | nvarchar(40) | 中文注明(无→有)
+③定义不同 | s_sys | HEAD_YN | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | ID | int(4) NOT NULL | int(4) NOT NULL | 中文注明(无→有)
+③定义不同 | s_sys | ISDATE | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | ISDOUBLE | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | KEY_YN | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | LANKD | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | LB_HI | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | LB_LEFT | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | LB_LEN | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | LB_TAB | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | LB_TOP | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | LB_TYPE | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_sys | LB_VALUE | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_sys | LB_WI | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_sys | LB_YN | nchar(2) | nchar(1) | 长度,中文注明(无→有)
+③定义不同 | s_sys | Listna | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | MC | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | s_sys | OTH | nvarchar(250) | nvarchar(250) | 中文注明(无→有)
+③定义不同 | s_sys | REMARK | nvarchar(255) | nvarchar(255) | 中文注明(无→有)
+③定义不同 | s_sys | SYSMENUNO | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | s_sys | USERNA | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | s_sys | VER | nvarchar(5) | nvarchar(5) | 中文注明(无→有)
+③定义不同 | s_sys | XC | int(4) NOT NULL | int(4) NOT NULL | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_cancel | nvarchar(1) | nvarchar(1) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_print | int(4) | int(4) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_time1 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_time2 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_time3 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_time4 | datetime2(8) | datetime2(8) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_user1 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_user2 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_user3 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_xtcs | asp_user4 | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_xtcs | bz | nvarchar(255) | nvarchar(255) | 中文注明(无→有)
+③定义不同 | s_xtcs | comm | nvarchar(20) NOT NULL | nvarchar(20) NOT NULL | 中文注明(无→有)
+③定义不同 | s_xtcs | dm | nvarchar(15) | nvarchar(15) | 中文注明(无→有)
+③定义不同 | s_xtcs | mc | nvarchar(20) | nvarchar(20) | 中文注明(无→有)
+③定义不同 | s_xtcs | sm | nvarchar(50) | nvarchar(50) | 中文注明(无→有)
+③定义不同 | s_xtcs | value | nvarchar(30) | nvarchar(30) | 中文注明(无→有)
+③定义不同 | scjl | jbbh | text(16) | nvarchar(250) | 类型,长度
+表 | 本地列数 | 快照列数 | 判定
+--------------------
+dm_langue | 22 | 22 | 列数相同
+gscs | 55 | 55 | 列数相同
+inh | 58 | 58 | 列数相同
+outh | 59 | 59 | 列数相同
+permission | 18 | 18 | 列数相同
+s_commdata | 28 | 28 | 列数相同
+s_sys | 46 | 46 | 列数相同
+s_xtcs | 17 | 17 | 列数相同
+scjl | 100 | 100 | 列数相同
+库 | 表 | 索引名 | 类型 | 主键 | 唯一
+--------------------------
+快照 | dm_langue | PK_dm_langue | CLUSTERED | 1 | 1
+快照 | gscs | PK_gscs | CLUSTERED | 1 | 1
+本地 | inh | IX_inh_单据编号 | NONCLUSTERED | 0 | 0
+快照 | inh | IX_inh_单据编号 | NONCLUSTERED | 0 | 0
+本地 | inh | IX_inh_三键 | NONCLUSTERED | 0 | 0
+快照 | inh | IX_inh_三键 | NONCLUSTERED | 0 | 0
+本地 | inh | PK_inh | CLUSTERED | 1 | 1
+快照 | inh | PK_inh | CLUSTERED | 1 | 1
+本地 | inh | UX_inh_src_rid | NONCLUSTERED | 0 | 1
+快照 | inh | UX_inh_src_rid | NONCLUSTERED | 0 | 1
+本地 | outh | IX_outh_单据编号 | NONCLUSTERED | 0 | 0
+快照 | outh | IX_outh_单据编号 | NONCLUSTERED | 0 | 0
+本地 | outh | IX_outh_三键 | NONCLUSTERED | 0 | 0
+快照 | outh | IX_outh_三键 | NONCLUSTERED | 0 | 0
+本地 | outh | PK_outh | CLUSTERED | 1 | 1
+快照 | outh | PK_outh | CLUSTERED | 1 | 1
+本地 | outh | UX_outh_src_rid | NONCLUSTERED | 0 | 1
+快照 | outh | UX_outh_src_rid | NONCLUSTERED | 0 | 1
+快照 | permission | PK_permission | CLUSTERED | 1 | 1
+快照 | s_commdata | comm | NONCLUSTERED | 0 | 0
+快照 | s_commdata | jsz | NONCLUSTERED | 0 | 0
+快照 | s_commdata | PK__s_commda__3214EC27C3DB5918 | CLUSTERED | 1 | 1
+快照 | s_commdata | xc | NONCLUSTERED | 0 | 0
+快照 | s_sys | PK_s_sys | CLUSTERED | 1 | 1
+快照 | s_xtcs | PK_s_xtcs | CLUSTERED | 1 | 1
+本地 | scjl | PK_scjl | CLUSTERED | 1 | 1
+快照 | scjl | PK_scjl | CLUSTERED | 1 | 1

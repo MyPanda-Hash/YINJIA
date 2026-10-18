@@ -140,6 +140,25 @@ public class ScheduleBoardService {
     }
 
     /**
+     * 待排产池**只数数**(2026-10-16 性能专项):看板类调用方只要笔数,不需要行数据。
+     *
+     * <p>为什么单开一个方法而不是复用 {@link #pending}:pending 会把 405 行连同两个 LEFT JOIN
+     * (客户档案 + bs_inv「重点管控」派生聚合)全查回来再 {@code size()} —— 实测 969 ms 里
+     * 绝大部分耗在这里(索引补上后仍有 20 ms 且白拉 405 行 × 16 列)。
+     * 本方法只走**同一条 WHERE**(逐字同源,防口径漂移),不带任何 JOIN 与排序列。
+     *
+     * <p>车间账号(workshop 非空)看不到待排产池(池内行没有产线 ⇒ 无车间判据),与 pending 同口径返回 0。
+     */
+    public int poolCount(String workshop) {
+        if (workshop != null && !workshop.isBlank()) return 0;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.plang p"
+                        + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + "   AND ISNULL(p.scx, N'') = N''", Integer.class);
+        return n == null ? 0 : n;
+    }
+
+    /**
      * 解析关键字里的「**工单号#行号**」标识形式(用户口径 2026-10-15:「工单号+工单行号确定当前唯一工单」)。
      *
      * <p>支持 {@code MO-2026-10-0004#2}、全角 {@code ＃}、以及 {@code #} 两侧有空格;
@@ -176,7 +195,11 @@ public class ScheduleBoardService {
      */
     public Map<String, Object> stats(String workshop) {
         String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
-        List<Map<String, Object>> pool = pending("", "", ws);
+        // 2026-10-16 性能专项:这里原本 `List<Map> pool = pending("","",ws)` 只为下面取 `pool.size()`,
+        // 却把整池 405 行连同两个 LEFT JOIN(客户档案 + bs_inv「重点管控」派生聚合)全查回来 ——
+        // 实测该次调用占 /px/scheduleBoard/stats 的绝大部分(969 ms,补 bs_inv 索引后 20 ms)。
+        // 笔数改走 poolCount(同一条 WHERE,无 JOIN 无排序,2 ms),【返回字段一个没变】。
+        int poolCount = poolCount(ws);
         Map<String, Object> today = jdbc.queryForMap(
                 // 张数 = 今日排产**工单行数**(按行计数,2026-10-15;原 DISTINCT pl_no 是整单口径)
                 "SELECT COUNT(*) AS cnt, ISNULL(SUM(p.pl_sl),0) AS qty"
@@ -199,7 +222,7 @@ public class ScheduleBoardService {
                 "SELECT 班组名称 FROM bs_team WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY 班组编码", String.class);
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("待排产笔数", pool.size());
+        out.put("待排产笔数", poolCount);
         Map<String, Object> t = new LinkedHashMap<>();
         t.put("张数", today.get("cnt"));
         t.put("数量", today.get("qty"));

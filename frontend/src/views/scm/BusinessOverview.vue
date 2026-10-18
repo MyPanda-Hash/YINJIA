@@ -143,9 +143,11 @@ const modules = [
     reports: [
       { code: 'MANU_ORDER_EXEC', label: '生产工单执行表' }, { code: 'MANU_ORDER_TRACKER', label: '生产工单跟踪工具' },
       { code: 'MANU_ORDER_PRODUCT_DETAIL', label: '生产工单产成品明细表' }, { code: 'MANU_ORDER_MATERIAL_DETAIL', label: '生产工单材料明细表' },
-      { code: 'MANU_ORDER_DETAIL', label: '生产工单明细表' }, { code: 'PROC_DETAIL', label: '工序明细表' },
+      // 2026-10-17 下架:生产工单明细表(MANU_ORDER_DETAIL)/生产工单统计表(MANU_ORDER_STATS)
+      // —— 载体视图读的是正式库 0 行的 bd_manu_order/bl_manu_order,打开即空表、也从未被打开过。
+      { code: 'PROC_DETAIL', label: '工序明细表' },
       { code: 'MANU_ORDER_PRODUCT_STATS', label: '生产工单产成品统计表' }, { code: 'MANU_ORDER_MATERIAL_STATS', label: '生产工单材料统计表' },
-      { code: 'MANU_ORDER_STATS', label: '生产工单统计表' }, { code: 'MANU_PROC_STATS', label: '工序统计表' },
+      { code: 'MANU_PROC_STATS', label: '工序统计表' },
       { code: 'PROC_STATS', label: '工序统计表(车间)' }, { code: 'SALARY_STATS', label: '工资统计表' },
     ],
   },

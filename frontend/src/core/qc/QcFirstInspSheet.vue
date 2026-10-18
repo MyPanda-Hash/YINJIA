@@ -10,7 +10,9 @@
                     第二级 = 测试项目(炭棒表观状态 / 炭棒外径mm / … )
                     左上角斜线格 = 「测试项目 ╲ 样品序号」
          标准行   : 每个测试项目该填的标准(来自《成型工艺清单》RD_MOLD_PROC)
-         数据区   : 1#..8# 八个样品,一格 = 该样品的该测试项目实测值
+         数据区   : 1#..8# 八个样品行,**每组各自占一对** —— 表观及脱粉 1#/2#、尺寸及重量 3#/4#、
+                    强度 5#/6#、浊度及压降 7#/8#(见 firstInspCols.GROUP_SAMPLES);
+                    本组那一对格子空白可填(并铺了底色),其余格打「/」= 本格无需填写
          相关要求 : 图片底部那 6 条(第 3/4/6 条按业务文案原样带出)
          表尾     : 检验结果 | 检验人
 
@@ -22,7 +24,7 @@
        ⚠ 表观及脱粉那两列**不是数字格**(图片里是"无粘模/轻微粘模/严重粘模"这种勾选),
          这里按可勾的选项渲染;其余列是文本录入格(图片里那些 "/" 是"本格无需填写"的占位)。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="fi-sheet">
+  <div class="fi-sheet" :class="{ 'is-editing': editable }">
     <!-- 相关要求(纸面底部那 6 条)里**必须让人看见**的两条,做成纸张顶部提醒条 —— 只读态也显示,
          打印/导出一样带出来(它们本身就是要贴在单上的处置要求):
            · 第 6 条 C-95 客户相关产品:脱模后立马进行首件检验(判据 = 表头「客户代码」,出单时从工单带入);
@@ -136,6 +138,9 @@
         <tr>
           <template v-for="g in groups" :key="'h-' + g">
             <th v-for="c in groupCols(g)" :key="c.key" class="col-head">
+              <!-- 列名的**文字**版本:只读态直接用它;可编辑态屏上让位给下面的改名输入框,
+                   但**打印时显形** —— el-input 是单行控件,列一窄文字就被裁成「炭棒表」这种残词 -->
+              <span class="fi-colhead-text">{{ columnHeadText(c) }}</span>
               <template v-if="editable">
                 <el-input
                   :model-value="c.label"
@@ -156,14 +161,19 @@
                 </el-select>
                 <span class="fi-coldel no-print" :title="tt('删除本列')" @click="removeCol(c)">×</span>
               </template>
-              <template v-else>{{ c.label }}<small v-if="c.unit">({{ c.unit }})</small></template>
             </th>
           </template>
         </tr>
       </thead>
       <tbody>
-        <!-- 标准行:来自《成型工艺清单》;可改(工艺清单没维护时品质自己补) -->
-        <tr class="standard-row">
+        <!-- 标准行:来自《成型工艺清单》;可改(工艺清单没维护时品质自己补)
+             ⚠ 拖动下标(用户口径 2026-10-17「这个拖动下标应该跟着当前的这个表格框的右下角走」):
+               原生 textarea 的抓手贴在**文本域**右下角,而同行里别的格内容更高时,文本域只占格子上半截
+               ⇒ 抓手悬在半空(实测底差最大 64px,截图红框就是这个)。改为:关掉原生抓手(resize:none),
+               在**每个格子的右下角**自绘一个 `.fi-rowgrip`,锚在 td 上 ⇒ 永远跟着本格右下角走;
+               往下拖 = 本行加高(stdRowH,px),文本域 min-height 同步跟上(写字区一起变大)。
+               表格里百分比高度解析不了(实测 height:100% 在 td 里一律算成 auto),所以只用 px。 -->
+        <tr class="standard-row" :class="{ 'has-std-h': !!stdRowH && editable }" :style="stdRowStyle">
           <th class="rowlabel">{{ tt('标准') }}</th>
           <td v-for="c in columns" :key="c.key">
             <el-input
@@ -176,17 +186,24 @@
               @update:model-value="v => setStandard(c, v)"
             />
             <span v-else class="fi-stdtext">{{ c.standard || '/' }}</span>
+            <span
+              v-if="editable"
+              class="fi-rowgrip no-print"
+              :title="tt('拖动调整「标准」行的行高')"
+              @mousedown.prevent="startRowResize"
+            ></span>
           </td>
           <td v-if="editable" class="col-op no-print"></td>
         </tr>
-        <!-- 数据区:1#..8#(⚠ 相关要求第 1 条:每个测试项目只记录 2 支样品 ⇒ 只有 1#/2# 可填,
-             3#..8# 打 `/` 且不可录;老单据里这几行已填过的值照原样显示,不吞数据) -->
+        <!-- 数据区:1#..8#(⚠ 可填范围见 firstInspCols.isFillableCell —— **前两列保持原样**(勾选式、
+               只记 1#/2#,3#..8# 打 `/`),**其余所有测试项目列(含表头「＋」新增的列)1#..8# 八行全可填**。
+               老单据里那些不可填的格若已填过值,照原样显示,不吞数据) -->
         <tr v-for="sample in samples" :key="sample" class="sample-row">
           <th class="rowlabel">{{ sample }}#</th>
-          <td v-for="c in columns" :key="c.key" :class="{ 'is-check': isCheckCol(c) }">
-            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),同样只给 1#、2#。 -->
-            <template v-if="isCheckCol(c)">
-              <div v-if="editable && sample <= SAMPLE_LIMIT" class="fi-checks">
+          <td v-for="c in columns" :key="c.key" :class="[{ 'is-check': isCheckColumn(c) }, zoneClass(sample, c)]">
+            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),只给 1#/2#(前两列保持原样)。 -->
+            <template v-if="isCheckColumn(c)">
+              <div v-if="editable && fillable(sample, c)" class="fi-checks">
                 <span v-for="o in checkOptions(c)" :key="o" class="fi-check">
                   <span
                     class="fi-box"
@@ -200,14 +217,14 @@
                   >{{ tt(o) }}</span>
                 </span>
               </div>
-              <span v-else class="fi-checktext" :title="sample > SAMPLE_LIMIT ? tt('按相关要求：每个测试项目只记录 2 支样品（1#、2#）') : ''">
+              <span v-else class="fi-checktext" :title="fillable(sample, c) ? '' : sampleHint()">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
-            <!-- 其余列:文本录入格(1#/2#);3#..8# 只读 -->
+            <!-- 其余列:文本录入格(本组那两支样品);不属于本组的格只读打「/」 -->
             <template v-else>
               <el-input
-                v-if="editable && sample <= SAMPLE_LIMIT"
+                v-if="editable && fillable(sample, c)"
                 :model-value="cellText(sample, c)"
                 size="small"
                 class="fi-cell"
@@ -215,7 +232,7 @@
                 @update:model-value="v => setMeasured(sample, c, v)"
                 @change="() => normalizePrecision(sample, c)"
               />
-              <span v-else :title="sample > SAMPLE_LIMIT ? tt('按相关要求：每个测试项目只记录 2 支样品（1#、2#）') : ''">
+              <span v-else :title="fillable(sample, c) ? '' : sampleHint()">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
@@ -234,16 +251,11 @@
     </table>
     </div>
 
-    <!-- ⑤ 相关要求(图片底部 6 条) -->
+    <!-- ⑤ 相关要求(图片底部 6 条;模板与 Excel 导出**共用** REQUIREMENTS 这一份,别两处各写一遍) -->
     <div class="fi-requirements">
       <b>{{ tt('相关要求') }}：</b>
       <ol>
-        <li>{{ tt('表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，炭棒强度测试2支样品，浊度及压降测试记录2支样品。') }}</li>
-        <li>{{ tt('鉴于胚棒为初步测量确认，测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；挤压强度及压降按表显数据记录。') }}</li>
-        <li>{{ tt('检测标准依据炭棒工艺配方管控清单（如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试）。') }}</li>
-        <li>{{ tt('炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。') }}</li>
-        <li>{{ tt('测试样品需保留至本班次生产完成。') }}</li>
-        <li>{{ tt('C-95客户相关产品脱模后立马进行首件检验。') }}</li>
+        <li v-for="(r, i) in REQUIREMENTS" :key="i">{{ tt(r) }}</li>
       </ol>
     </div>
 
@@ -261,14 +273,15 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import {
   columnsOf, groupsOf, addColumn, removeColumn, updateColumn,
   columnHasContent, ensureItems, ROW_STANDARD, ROW_SAMPLE, GROUP_ORDER,
-  seedDefaultColumns,
+  seedDefaultColumns, isFillableCell, columnHeadText, isCheckColumn, CHECK_SAMPLE_ROWS,
 } from './firstInspCols.js'
+import { buildFirstInspExport } from './firstInspExport.js'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -314,12 +327,34 @@ const groups = computed(() => groupsOf(columns.value))
 const groupCols = (g) => columns.value.filter((c) => c.group === g)
 const samples = [1, 2, 3, 4, 5, 6, 7, 8]
 /**
- * 相关要求第 1 条:「表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，
- *   炭棒强度测试2支样品，浊度及压降测试记录2支样品。」
- * ⇒ **每个测试项目都只记录 2 支样品**,纸面保留 1#..8# 八行(版式照图纸),但只有 1#/2# 可录,
- *   3#..8# 打 `/`(图片上那排斜杠就是这个意思);老单据里 3#..8# 已填过的值照原样只读显示,不吞数据。
+ * 可填范围(用户口径 2026-10-17):「让当前各个表格都能填写即可,**前两列保持原样**即可」,
+ * 追问后补充「**以及后面新增的列也一样**」——
+ *   · 前两列(炭棒表观状态 / 炭棒脱粉情况,勾选式):**保持原样** —— 只记 1#/2#,3#..8# 打 `/`;
+ *   · 其余所有测试项目列(图纸上的 8 列 + 表头「＋」新增的列):**1#..8# 八行全部可填**。
+ * 判据在 core/qc/firstInspCols.js 的 isFillableCell(单测钉住"前两列只有 1#/2#、其余列 8 行全开")。
+ *
+ * ⚠ 更早(同日上午)曾按图纸把四个分组各绑一对样品行(尺寸→3#/4#、强度→5#/6#、浊度→7#/8#),
+ *   已被本口径取代 —— 现在**只剩"前两列只填 1#/2#"这一条限制**。
  */
-const SAMPLE_LIMIT = 2
+function fillable(sample, c) {
+  return isFillableCell(sample, c)
+}
+
+/** 不可填格的 title:说清本列该填哪两支样品(否则用户只看到一片「/」,不知道去哪填) */
+function sampleHint() {
+  return tt('按相关要求：本组测试只记录 2 支样品（{a}）')
+    .replace('{a}', CHECK_SAMPLE_ROWS.map((n) => `${n}#`).join('、'))
+}
+
+/**
+ * 纸面「可填区」底色 —— 图片上前两列铺了底色,作用就是标出"这格要填"。
+ * 现在**只有前两列还有"可填/不可填"之分**(1#/2# 可填),所以底色也只留在那两列上:
+ * 其余列 8 行全可填,再铺底色就成了没有含义的装饰。只读态/打印件一样带(纸面本来就有)。
+ * 色值取自用户给的图片(主色统计:黄 #FFF3CA)。
+ */
+function zoneClass(sample, c) {
+  return isCheckColumn(c) && fillable(sample, c) ? 'gz-y' : ''
+}
 
 /**
  * 相关要求第 2 条:「…测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；
@@ -391,6 +426,51 @@ const gridMinWidth = computed(() => {
   const cols = Math.max(1, columns.value.length)
   return `${96 + cols * COL_MIN_WIDTH + (props.editable ? 40 : 0)}px`
 })
+
+/**
+ * 纸面《相关要求》6 条 —— **模板与 Excel 导出共用这一份**(别两处各写一遍,否则改文案必漏一处)。
+ * 纸面事实文案,不入 tt() 的源串;渲染与导出时逐条过 tt()。
+ */
+const REQUIREMENTS = [
+  '表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，炭棒强度测试2支样品，浊度及压降测试记录2支样品。',
+  '鉴于胚棒为初步测量确认，测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；挤压强度及压降按表显数据记录。',
+  '检测标准依据炭棒工艺配方管控清单（如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试）。',
+  '炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。',
+  '测试样品需保留至本班次生产完成。',
+  'C-95客户相关产品脱模后立马进行首件检验。',
+]
+
+/**
+ * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(《炭棒成型车间首件检验记录表》),
+ * 不是列表页那套"头字段键值 + 全明细"的数据导出。
+ * 版式(标题/抬头/两层表头/标准行/1#..8# 矩阵/相关要求/表尾)由 core/qc/firstInspExport.js 给
+ * (纯函数 + 单测),这里只做 xlsx 的 aoa_to_sheet + 列宽 + 合并 + writeFile(照 QcProcInspSheet 的写法)。
+ * 入口:面板右侧「文档输出 → 导出」→「导出 Excel(.xlsx)」(PanelxList.exportSheetExcel 按面板码路由到本函数)。
+ */
+async function exportFirstInspExcel() {
+  const XLSX = await import('xlsx')
+  const head = props.head || {}
+  const no = String(head['单据编号'] || head['编号'] || '')
+  const name = tt('炭棒成型车间首件检验记录表')
+  const { aoa, cols, merges } = buildFirstInspExport({
+    title: name,
+    subtitle: `惠州市银嘉环保科技有限公司　　${tt('单据编号')}：${no}　　${tt('单据状态')}：${tt(String(head['单据状态'] || ''))}`,
+    headPairs: HEAD_FIELDS.map((f) => ({ label: tt(f.label), value: headText(f) })),
+    columns: columns.value,
+    items: items.value,
+    requirements: REQUIREMENTS.map((r) => tt(r)),
+    foot: {
+      resultLabel: tt('检验结果'), result: String(head['总结论'] || ''),
+      byLabel: tt('检验人'), by: String(head['检验员'] || ''),
+    },
+  })
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = cols
+  ws['!merges'] = merges
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 28))
+  XLSX.writeFile(wb, `${name}-${no || '导出'}.xlsx`)
+}
 
 /**
  * 纸张右上信息三格(图片上那三行)。数据键 = yj_field 的 col_name(与后端列同名)。
@@ -472,6 +552,53 @@ function setStandard(c, v) {
   bump.value++
   emit('dirty')
 }
+
+/**
+ * 「标准」行的可调行高(拖动下标拖出来的,**纯版面偏好、不入库** —— 刷新即回到"按内容自适应")。
+ *
+ * 用户口径(2026-10-17):「这个拖动下标应该跟着当前的这个表格框的右下角走」——
+ * 原实现用的是 textarea 原生抓手,它贴在**文本域**右下角;同行里别的格内容更高时,
+ * 文本域只占格子上半截,抓手就悬在半空(实测底差最大 64px)。
+ *
+ * 修法:原生抓手关掉(`resize: none`),自绘 `.fi-rowgrip` 锚在**每个 td 的右下角**;
+ * 拖动改这里的 stdRowH,行 `height` 与文本域 `min-height` 一起跟着走。
+ * ⚠ 只用 px:表格里**百分比高度解析不了**(实测:`height:100%` 在 td 里一律算成 auto,
+ *   给 tr 显式 px 高度也救不回来),所以撑满格子这件事只能靠算出来的 px。
+ * ⚠ 行 `height` 在表格里是**最小值** —— 标准文字更高时仍是内容说了算(打印照样完整),
+ *   往下拖只会在内容之上再留出空间。
+ */
+const stdRowH = ref(0)        // 0 = 不干预,按内容自适应(初始态与改前完全一致)
+const GRIP_MIN_H = 32         // 行高下限,别让人拖成一条线
+const STD_CELL_PAD = 12       // .fi-grid td 的上下 padding(5+5)+ 边框余量:文本域要减掉它才不撑破格
+const stdRowStyle = computed(() => {
+  if (!props.editable || !stdRowH.value) return null
+  return { height: `${stdRowH.value}px`, '--fi-std-h': `${Math.max(24, stdRowH.value - STD_CELL_PAD)}px` }
+})
+
+/** 按住格子右下角的拖动下标 → 上下拖动改本行行高(松手即止,拖不出去) */
+let gripDrag = null
+function startRowResize(e) {
+  if (!props.editable) return
+  const tr = e.currentTarget?.closest?.('tr')
+  const startY = e.clientY
+  // 首次拖动以**当前实际行高**为起点,避免"一按就跳"
+  const startH = stdRowH.value || Math.round(tr?.getBoundingClientRect?.().height || GRIP_MIN_H)
+  const move = (ev) => { stdRowH.value = Math.max(GRIP_MIN_H, Math.round(startH + (ev.clientY - startY))) }
+  const up = () => {
+    window.removeEventListener('mousemove', move)
+    window.removeEventListener('mouseup', up)
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    gripDrag = null
+  }
+  gripDrag = { up }
+  // 拖动期间禁掉文本选中与光标跳变(与 DocSelectRail 的 resizer 同一套做法)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+  window.addEventListener('mousemove', move)
+  window.addEventListener('mouseup', up)
+}
+onBeforeUnmount(() => gripDrag?.up())
 function renameColumn(c, v) {
   const label = String(v ?? '')
   updateColumn(props.head, c.key, { label })
@@ -510,15 +637,12 @@ async function removeCol(c) {
   emit('dirty')
 }
 
-/* ── 表观及脱粉两列:勾选式(图片上是"无粘模(均匀)/轻微粘模(粗糙)/严重粘模(脱皮)"这类) ── */
-const CHECK_COLS = ['appearance', 'depowder']
+/* ── 表观及脱粉两列:勾选式(图片上是"无粘模(均匀)/轻微粘模(粗糙)/严重粘模(脱皮)"这类) ──
+   ⚠ 「哪一列算勾选式」的判据不在这里 —— 它在 core/qc/firstInspCols.js 的 isCheckColumn,
+     因为**可填范围**也依赖它(前两列只填 1#/2#),两处必须同源。 */
 const CHECK_OPTIONS = {
   appearance: ['无粘模（均匀）', '轻微粘模（粗糙）', '严重粘模（脱皮）'],
   depowder: ['无明显脱粉', '轻微脱粉', '严重脱粉'],
-}
-function isCheckCol(c) {
-  // 按列名认(自定义列不误判),key 只作兜底
-  return /表观状态|表观|粘模/.test(c.label) || /脱粉/.test(c.label) || CHECK_COLS.includes(c.key)
 }
 function checkOptions(c) {
   if (/脱粉/.test(c.label) || c.key === 'depowder') return CHECK_OPTIONS.depowder
@@ -544,6 +668,9 @@ function toggleCheck(sample, c, option) {
     ).catch(() => { /* 关掉即可,不阻断录入 */ })
   }
 }
+
+/** 「导出 Excel」入口(PanelxList.exportSheetExcel 按面板码 QC_FIRST_INSP 路由到它) */
+defineExpose({ exportFirstInspExcel })
 </script>
 
 <style scoped>
@@ -709,6 +836,16 @@ function toggleCheck(sample, c, option) {
   background: transparent;
   padding: 0 2px;
 }
+/* 列名的**文字**版本(见模板注释):可编辑态屏上藏起来、打印时显形。
+   ⚠ 必须先有这条默认显示规则 —— 只读态(不可编辑)就是靠它把列名画出来的。 */
+.fi-colhead-text {
+  display: inline;
+  word-break: break-word;
+  line-height: 1.25;
+}
+.fi-sheet.is-editing .fi-colhead-text {
+  display: none;
+}
 .fi-colname :deep(.el-input__wrapper:hover) {
   box-shadow: 0 0 0 1px #b7c7dd inset;
 }
@@ -778,6 +915,42 @@ function toggleCheck(sample, c, option) {
   background: #f7f7f7;
   vertical-align: top;
   min-height: 40px;
+  /* 自绘的拖动下标锚在**本格**右下角(见 .fi-rowgrip),必须有定位上下文 */
+  position: relative;
+}
+/* 标准行的拖动下标(2026-10-17 用户口径「这个拖动下标应该跟着当前的这个表格框的右下角走」):
+   ① 关掉 textarea 原生抓手 —— 它贴在**文本域**右下角,同行别的格更高时就悬在半空(实测底差 64px);
+   ② 拖过行高后(has-std-h),把文本域撑到格底,写字区跟着一起变大。
+   ⚠ Element Plus 的 autosize 会把 min-height **内联**写到 textarea 上(按 minRows 算出来),
+     所以"撑满格子"这条只能用 !important 才盖得住 —— 故**只在用户拖过行高时**启用,
+     默认态(has-std-h 不在)一个字都不干预,与改前的 autosize 行为完全一致。
+   ⚠ 只用 px:表格里**百分比高度解析不了**(实测 height:100% 在 td 里一律算成 auto)。 */
+.standard-row .fi-cell :deep(.el-textarea__inner) {
+  resize: none;
+}
+.standard-row.has-std-h .fi-cell :deep(.el-textarea__inner) {
+  min-height: var(--fi-std-h) !important;
+}
+.fi-rowgrip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: ns-resize;
+  /* 与原生抓手同款的三道斜线(只在右下角那半格显形) */
+  background-image: repeating-linear-gradient(-45deg, #a9a9a9 0 1px, transparent 1px 4px);
+  -webkit-mask-image: linear-gradient(-45deg, #000 0 52%, transparent 52%);
+  mask-image: linear-gradient(-45deg, #000 0 52%, transparent 52%);
+}
+.fi-rowgrip:hover {
+  background-image: repeating-linear-gradient(-45deg, #1f5fa8 0 1px, transparent 1px 4px);
+}
+/* 打印/导出不带拖动下标(它不是纸面上的东西) */
+@media print {
+  .fi-rowgrip {
+    display: none !important;
+  }
 }
 .fi-stdtext {
   display: inline-block;
@@ -793,6 +966,11 @@ function toggleCheck(sample, c, option) {
 .sample-row td.is-check {
   text-align: left;
   padding: 4px 6px;
+}
+/* 「可填区」底色(照图片,只留前两列 1#/2# —— 现在只有它们还有"可填/不可填"之分)。
+   ⚠ 放在 .sample-row td.is-check 之后,那些勾选格才吃得到底色。 */
+.sample-row td.gz-y {
+  background: #fff3ca;
 }
 .fi-checks {
   display: flex;
@@ -885,5 +1063,128 @@ function toggleCheck(sample, c, option) {
 .fi-foot td:nth-child(3) {
   width: 96px;
   text-align: center;
+}
+</style>
+
+<!-- 打印整张:只保留纸张(与检验数据记录表 / 检验目录 / 项目进度查询同口径)。
+     ⚠ 2026-10-17 修 —— 此前本组件**没有**这段:公共打印样式(见 DocSheet.vue 的非 scoped 块)
+       把 `body.approval-printing .portal` 整体 `visibility: hidden`,再逐个 whitelist 纸张根类名
+       (`.approval-sheet` / `.progress-sheet` / `.catalog-sheet` / `.qc-rec-sheet` / `.rsp-sheet`),
+       而 `.fi-sheet` **不在名单里** ⇒ 点「打印」出来是一张**空白页**
+       (实测 `getComputedStyle(.fi-sheet).visibility === 'hidden'`)。
+     ⚠ 列多时的屏上行为是"表格按 min-width 撑开 + 外层横向滚动";打印必须把它缩回纸宽,
+       否则右半张被裁掉。@page 用**具名页** `fi-wide` 只给本纸张用横向 A4,不影响别的纸张。 -->
+<style>
+@media print {
+  body.approval-printing .portal {
+    visibility: hidden;
+  }
+  body.approval-printing .topbar,
+  body.approval-printing .func-zone,
+  body.approval-printing .tabsbar,
+  body.approval-printing .help-panel,
+  body.approval-printing .nav-mask,
+  body.approval-printing .approval-side,
+  body.approval-printing .tools {
+    display: none !important;
+  }
+  body.approval-printing .portal-body,
+  body.approval-printing .portal-main,
+  body.approval-printing .portal-content,
+  body.approval-printing .panelx-list,
+  body.approval-printing .approval-layout {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+  }
+  body.approval-printing .fi-sheet {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 1px solid #8a8a8a !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body.approval-printing .fi-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* 屏上靠 min-width 撑开 + 横向滚动;打印要把表格收回纸宽,否则右半张被裁 */
+  body.approval-printing .fi-grid-scroll {
+    overflow: visible !important;
+  }
+  body.approval-printing .fi-grid {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  /* 纸面缩到一页(与检验目录/项目进度查询同一套口径:10px + 1px 内边距 + 允许换行) */
+  body.approval-printing .fi-head th,
+  body.approval-printing .fi-head td,
+  body.approval-printing .fi-grid th,
+  body.approval-printing .fi-grid td,
+  body.approval-printing .fi-foot th,
+  body.approval-printing .fi-foot td {
+    font-size: 10px !important;
+    padding: 1px 2px !important;
+    height: auto !important;
+    line-height: 1.3 !important;
+    word-break: break-all !important;
+  }
+  body.approval-printing .fi-title {
+    font-size: 20px !important;
+  }
+  body.approval-printing .fi-grid .el-input__inner,
+  body.approval-printing .fi-grid .el-textarea__inner,
+  body.approval-printing .fi-head .el-input__inner,
+  body.approval-printing .fi-check,
+  body.approval-printing .fi-stdtext {
+    font-size: 10px !important;
+  }
+  body.approval-printing .fi-check {
+    line-height: 1.3 !important;
+  }
+  /* 列名用**文字版**画(输入框是单行控件,列一窄就被裁成「炭棒表」这种残词) */
+  body.approval-printing .col-head .fi-colhead-text {
+    display: inline !important;
+  }
+  body.approval-printing .col-head .fi-colname,
+  body.approval-printing .col-head .fi-colgroup {
+    display: none !important;
+  }
+  /* 占位提示词("请选择"/"选择日期")不该印在纸上。
+     ⚠ el-select 的"请选择"**不是** input placeholder,而是 `.el-select__placeholder.is-transparent`
+       (选中值那一个没有 is-transparent —— 只藏 placeholder,别把真值一起藏了,实测两种态都抓过)。 */
+  body.approval-printing .fi-sheet input::placeholder,
+  body.approval-printing .fi-sheet textarea::placeholder {
+    color: transparent !important;
+  }
+  body.approval-printing .fi-sheet .el-select__placeholder.is-transparent {
+    visibility: hidden !important;
+  }
+  /* 弹窗(append-to-body,不在 .portal 里)**不跟着 .portal 一起隐藏** ⇒ 开着弹窗按打印会把它印上去 */
+  body.approval-printing .el-overlay,
+  body.approval-printing .el-message-box__wrapper,
+  body.approval-printing .el-message {
+    display: none !important;
+  }
+  /* 编辑态控件不该出现在纸面上(拖动下标/加列/删列/分组下拉/操作列) */
+  body.approval-printing .fi-rowgrip,
+  body.approval-printing .fi-addcol,
+  body.approval-printing .fi-coldel,
+  body.approval-printing .fi-colgroup,
+  body.approval-printing .col-op {
+    display: none !important;
+  }
+  @page {
+    margin: 8mm;
+  }
 }
 </style>

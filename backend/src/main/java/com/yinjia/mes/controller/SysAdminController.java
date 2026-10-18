@@ -129,21 +129,45 @@ public class SysAdminController {
 
     // ============ 角色面板授权 ============
 
-    // ============ 角色面板操作权限(13 项:12 项 + 预警配置) ============
+    // ============ 角色面板操作权限(11 项:引擎真读的词) ============
 
-    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 13 项(field 2026-10-09 / warn 2026-10-15 追加) */
+    /**
+     * 全部操作权限定义(顺序=前端列顺序)——通用面板 11 项。
+     *
+     * <p>🔴 **2026-10-16 词表归位(用户口径:组织架构里研发管理模块角色可配置的权限与面板功能对不上)**:
+     * 本表原先给的是 `edit 修改 / delete 删除 / price 价格金额 / review 复核反审核 / adjust 调价`
+     * —— 而**引擎一个都不认**。服务端按钮闸门 {@link com.yinjia.mes.service.PanelPermissionService}
+     * 只读 `modify 申请修改 / del 删除申请 / modlog 修改记录`(见该文件 BUTTON_PERMS 与 PERM_LABEL)。
+     * 后果(2026-10-16 实测,证据 `tools/archive/_rd-perm-audit-20261016/`):
+     * <ul>
+     *   <li>非文书类面板(生产工单/请购/品质单据/RD_PROGRESS/RD_CHANGE 等)**永远授不出**
+     *       「申请修改/删除申请」——界面上只有 edit/delete 可勾,而引擎只看 modify/del ⇒ 勾了也 403;</li>
+     *   <li>库里 18 行存着 `edit`、18 行存着 `delete`、各 15 行存着 `price/review/adjust`
+     *       —— 这些格子**在矩阵里根本没有列**(通用集没有列头、文件集也没有)⇒ 组织架构界面看不见、
+     *       点不掉,却一直待在库里;</li>
+     *   <li>反向错位同样存在:库里几十张面板(含采购入库/销售出库/品质一族/其他出入库)已授
+     *       `modify/modlog/del`,而通用矩阵只下发 edit/delete/**根本没有这三列**
+     *       ⇒ RD_CHANGE 就是典型:库里 `modify,modlog,del` 是真的、界面上却是空白格子;</li>
+     *   <li>`price/review/adjust` 全库**零消费者**(任何代码都不读这三个词),纯摆设。</li>
+     * </ul>
+     * 归位口径:本表 = 引擎真读的词,一概念一词,与 PanelPermissionService.PERM_LABEL 同源
+     * (标签逐字取该表,前端列头与后端 403 提示说同一句话)。`edit/delete` 的职责移交
+     * `modify/del`(共享文件库 ShareFileService/Controller 的 `add|edit` / `add|edit|delete`
+     * 判定同批改为 `add|modify` / `add|modify|del`);`price/review/adjust` 直接撤销。
+     * 数据侧由 `tools/migrate-role-perm-words-20261016.sql` 回正(edit→modify、delete→del、删三词)。
+     */
     public static final String[][] PERMISSION_ACTIONS = {
             {"view",    "可见"},
-            {"query",   "查询"},
-            {"add",     "新增"},
-            {"edit",    "修改"},
-            {"delete",  "删除"},
-            {"export",  "导出EXCEL"},
+            {"query",   "查询单据"},
+            {"add",     "新增保存"},
+            // 申请修改 = 走「申请修改 → 管理员审批 → 改 → 提交审批」的修改闭环(modify 词)。
+            // 旧表里的 "edit 修改" 就是这个动作的另一个名字,引擎不认 edit,故统一到 modify。
+            {"modify",  "申请修改"},
+            {"modlog",  "修改记录"},
+            {"del",     "删除申请"},
+            {"export",  "导出打印"},
             {"print",   "打印预览"},
-            {"audit",   "审核反审核"},
-            {"price",   "价格金额"},
-            {"review",  "复核反审核"},
-            {"adjust",  "调价"},
+            {"audit",   "审批"},
             // 自定义字段(动态字段/备用列池)配置权(2026-10-09 用户口径):
             // 原先该动作只有超级管理员能做(is_admin 硬判),现在与其余操作同格 ——
             // 在「角色与面板权限」里给哪个面板勾上,该角色就能配那个面板的自定义字段。
@@ -156,8 +180,12 @@ public class SysAdminController {
             {"warn",    "预警配置"},
     };
 
-    /** 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
-     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族/自定义字段),非通用 12 项 */
+    /**
+     * 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
+     * 申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族/自定义字段)。
+     * 相对通用 11 项只少 `print`(文书式面板没有打印按钮)与 `warn`(不涉及库存预警阈值)
+     * —— **子集关系**由 `frontend/src/core/auth/permWordDrift.test.js` 钉住,防止再分叉出第二套词。
+     */
     public static final String[][] FILE_PANEL_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询单据"},

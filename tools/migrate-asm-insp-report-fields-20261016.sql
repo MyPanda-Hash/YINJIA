@@ -105,11 +105,17 @@ IF COL_LENGTH(N'dbo.qc_asm_insp_detail', N'实测数值') IS NULL SET @bad = @ba
 IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'QC_ASM_INSP' AND col_name IN (N'数量', N'实测数值')) SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'QC_ASM_INSP' AND col_name = N'检验时间' AND visible = 1) SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'QC_ASM_INSP' AND col_name = N'抽检总量' AND visible = 1) SET @bad = @bad + 1;
-/* C2. 其它三张检验单的 实测数值 必须原样保留;数量 在成型/切炭上保留(制程检验单本就没有「数量」字段) */
+/* C2. 其它检验单的 实测数值 必须原样保留;数量 在成型/切炭上保留(制程检验单本就没有「数量」字段)
+   ⚠ 2026-10-17 修:期望张数按**仍在册的面板**动态算 —— QC_MOLD_INSP / QC_CUT_INSP 两面板
+   已随 qc_mold/qc_cut 两表在链上更靠后的 migrate-drop-qc-mold-cut-finspec-20261016.sql 下架,
+   写死 3/2 会让本脚本「内容一变就要重跑」时必然 FAIL ⇒ 链断、其后迁移不执行。 */
+DECLARE @expMv int = (SELECT COUNT(*) FROM yj_panel
+                       WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_PROC_INSP'));
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_PROC_INSP')
-      AND col_name = N'实测数值') < 3 SET @bad = @bad + 1;
+      AND col_name = N'实测数值') < @expMv SET @bad = @bad + 1;
+DECLARE @expQty int = (SELECT COUNT(*) FROM yj_panel WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP'));
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP')
-      AND col_name = N'数量') < 2 SET @bad = @bad + 1;
+      AND col_name = N'数量') < @expQty SET @bad = @bad + 1;
 /* C3. 明细可见列不撞号 */
 IF EXISTS (SELECT 1 FROM yj_field x JOIN yj_field y
              ON y.panel_code = x.panel_code AND y.seq = x.seq AND y.id <> x.id

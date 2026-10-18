@@ -1,0 +1,390 @@
+# yj_role_panel 原样取证 —— HSDZ_MES_TEST(PROBE 输出,勿手改)
+# 生成:2026-10-16T09:40:05.240Z
+
+## 角色
+id=1 code=admin name=管理员 is_admin=Y
+id=2 code=user name=普通用户 is_admin=N
+id=4 code=rd_review name=研发审核 is_admin=N
+id=5 code=rd_file_owner name=文件负责人 is_admin=N
+
+## ① 研发域 RD_* 逐格原样(panel|role|perms|can_approve)
+```
+RD_ALKALINE	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_ALKALINE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_ALKALINE	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_ANTIBACT	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_ANTIBACT	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_ANTIBACT	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_APPROVAL	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_APPROVAL	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_APPROVAL	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_ASM_BOM	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_ASM_BOM	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_ASM_BOM	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_ASM_PROC	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_ASM_PROC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_ASM_PROC	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_CHANGE	普通用户(user)	view,query,add,modify,modlog,del,export,print	ca=N
+RD_CHANGE	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	ca=Y
+RD_CHANGE	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export,print	ca=N
+RD_DOM_TEST	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_DOM_TEST	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_DOM_TEST	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_DROP_PREC	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_DROP_PREC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_DROP_PREC	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_EQUIP_USE	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_EQUIP_USE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_EQUIP_USE	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_FILTER_EFF	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_FILTER_EFF	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_FILTER_EFF	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_INSP_PLAN	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_INSP_PLAN	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_INSP_PLAN	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_INSTR_USE	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_INSTR_USE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_INSTR_USE	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_MINERAL	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_MINERAL	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_MINERAL	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_MOLD_FORMULA	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_MOLD_FORMULA	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_MOLD_FORMULA	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_MOLD_PROC	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_MOLD_PROC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_MOLD_PROC	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_PLAN	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_PLAN	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_PLAN	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_PROD_DOCLIST	管理员(admin)	view,query,export,print	ca=N
+RD_PROD_DOCLIST	普通用户(user)	view,query,export,print	ca=N
+RD_PROD_DOCLIST	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	ca=Y
+RD_PROD_DOCLIST	文件负责人(rd_file_owner)	view,query,export,print	ca=N
+RD_PROD_INFO	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_PROD_INFO	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_PROD_INFO	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_PROGRESS	普通用户(user)	view,query,add,modify,del,export,print	ca=N
+RD_PROGRESS	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	ca=Y
+RD_PROGRESS	文件负责人(rd_file_owner)	view,query,add,modify,del,export,print	ca=N
+RD_RO_PROTECT	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_RO_PROTECT	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_RO_PROTECT	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_SCALE	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_SCALE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_SCALE	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_SHARE_FILE	管理员(admin)	view,query	ca=N
+RD_SHARE_FILE	普通用户(user)	view,query	ca=N
+RD_SHARE_FILE	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	ca=Y
+RD_SHARE_FILE	文件负责人(rd_file_owner)	view,query	ca=N
+RD_SOAK	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_SOAK	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_SOAK	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_SPEC_DOC	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_SPEC_DOC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_SPEC_DOC	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+RD_SPIKE_WATER	普通用户(user)	view,query,add,modify,modlog,del,export	ca=N
+RD_SPIKE_WATER	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	ca=Y
+RD_SPIKE_WATER	文件负责人(rd_file_owner)	view,query,add,modify,modlog,del,export	ca=N
+```
+行数=77
+
+## ② 各角色的授权规模
+- 管理员(admin): 行=52 非空=52 can_approve=Y=0
+- 普通用户(user): 行=83 非空=83 can_approve=Y=4
+- 研发审核(rd_review): 行=83 非空=83 can_approve=Y=29
+- 文件负责人(rd_file_owner): 行=77 非空=77 can_approve=Y=4
+
+## ③ 角色两两差集(非管理员的三个角色;字段=面板,值=perms 不同才列出)
+- 普通用户(user) vs 研发审核(rd_review):授权规模 83 / 83,**逐格差异 25 处**
+    RD_DROP_PREC: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_INSTR_USE: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_PROD_INFO: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_ASM_PROC: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_MOLD_PROC: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_INSP_PLAN: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_SPEC_DOC: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_DOM_TEST: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_PROGRESS: [view,query,add,modify,del,export,print] vs [view,query,add,modify,del,export,print,audit,field]
+    RD_MINERAL: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_SPIKE_WATER: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_PLAN: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_RO_PROTECT: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_ALKALINE: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_APPROVAL: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_EQUIP_USE: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_MOLD_FORMULA: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_SCALE: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_ANTIBACT: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_SOAK: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_FILTER_EFF: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_ASM_BOM: [view,query,add,modify,modlog,del,export] vs [view,query,add,modify,modlog,del,export,audit,field]
+    RD_SHARE_FILE: [view,query] vs [view,query,add,modify,del,export,print,audit,field]
+    RD_PROD_DOCLIST: [view,query,export,print] vs [view,query,add,modify,del,export,print,audit,field]
+    RD_CHANGE: [view,query,add,modify,modlog,del,export,print] vs [view,query,add,modify,del,export,print,audit,field]
+- 普通用户(user) vs 文件负责人(rd_file_owner):授权规模 83 / 77,**逐格差异 6 处**
+    OTHER_IN: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_IN_DETAIL: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_IN_STATS: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_OUT: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_OUT_DETAIL: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_OUT_STATS: [view,query,add,modify,modlog,del,export] vs [(无行)]
+- 研发审核(rd_review) vs 文件负责人(rd_file_owner):授权规模 83 / 77,**逐格差异 31 处**
+    RD_INSTR_USE: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_PROD_INFO: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_SHARE_FILE: [view,query,add,modify,del,export,print,audit,field] vs [view,query]
+    RD_DOM_TEST: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_MINERAL: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_PLAN: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_RO_PROTECT: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_MOLD_FORMULA: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_ANTIBACT: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_SOAK: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_ASM_BOM: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_PROD_DOCLIST: [view,query,add,modify,del,export,print,audit,field] vs [view,query,export,print]
+    RD_DROP_PREC: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_ASM_PROC: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_MOLD_PROC: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_INSP_PLAN: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_SPEC_DOC: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_PROGRESS: [view,query,add,modify,del,export,print,audit,field] vs [view,query,add,modify,del,export,print]
+    RD_SPIKE_WATER: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_ALKALINE: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_APPROVAL: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_EQUIP_USE: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_CHANGE: [view,query,add,modify,del,export,print,audit,field] vs [view,query,add,modify,modlog,del,export,print]
+    RD_SCALE: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    RD_FILTER_EFF: [view,query,add,modify,modlog,del,export,audit,field] vs [view,query,add,modify,modlog,del,export]
+    OTHER_IN: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_OUT_DETAIL: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_IN_DETAIL: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_OUT_STATS: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_OUT: [view,query,add,modify,modlog,del,export] vs [(无行)]
+    OTHER_IN_STATS: [view,query,add,modify,modlog,del,export] vs [(无行)]
+
+## ④ 全库授权里出现的词频(引擎认的词打 ✅)
+- view ✅ × 301
+- query ✅ × 301
+- export ✅ × 274
+- add ✅ × 203
+- modify ✅ × 203
+- del ✅ × 194
+- modlog ✅ × 173
+- print ✅ × 97
+- audit ✅ × 37
+- field ✅ × 25
+- assign ✅ × 8
+- date ✅ × 4
+- convert ✅ × 4
+- unassign ✅ × 4
+- transfer ✅ × 4
+- revoke ✅ × 4
+- unclose ✅ × 4
+- close ✅ × 4
+- split ✅ × 4
+- picking ✅ × 4
+
+## ⑥ 两道审批门错位清点(核心证据)
+门A = ButtonService.canApprove  读 yj_role_panel.can_approve('Y')  → 决定后端 requireApprover 放行 + 前端 approvePanels 显不显示审批按钮
+门B = PanelPermissionService.requireButton('审核'/'审批通过'/...) 读 perms 含 audit → 在 Controller 入口先拦
+
+- **can_approve='Y' 但 perms 无 audit(前门必 403,前端却显示审批按钮)**:0 处
+- **perms 含 audit 但 can_approve='N'(前门放行、审批按钮不显示 / requireApprover 拦)**:0 处
+
+## ⑦ 全部 can_approve='Y' 逐行(不分域)
+DISPATCH	普通用户(user)	view,query,add,modify,del,export,print,audit	audit词=有
+DISPATCH	研发审核(rd_review)	view,query,add,modify,del,export,print,audit	audit词=有
+DISPATCH	文件负责人(rd_file_owner)	view,query,add,modify,del,export,print,audit	audit词=有
+MANU_ORDER	普通用户(user)	view,query,add,modify,del,export,print,audit	audit词=有
+MANU_ORDER	研发审核(rd_review)	view,query,add,modify,del,export,print,audit	audit词=有
+MANU_ORDER	文件负责人(rd_file_owner)	view,query,add,modify,del,export,print,audit	audit词=有
+OUTSOURCE_ORDER	普通用户(user)	view,query,add,modify,del,export,print,audit	audit词=有
+OUTSOURCE_ORDER	研发审核(rd_review)	view,query,add,modify,del,export,print,audit	audit词=有
+OUTSOURCE_ORDER	文件负责人(rd_file_owner)	view,query,add,modify,del,export,print,audit	audit词=有
+RD_ALKALINE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_ANTIBACT	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_APPROVAL	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_ASM_BOM	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_ASM_PROC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_CHANGE	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	audit词=有
+RD_DOM_TEST	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_DROP_PREC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_EQUIP_USE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_FILTER_EFF	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_INSP_PLAN	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_INSTR_USE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_MINERAL	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_MOLD_FORMULA	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_MOLD_PROC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_PLAN	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_PROD_DOCLIST	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	audit词=有
+RD_PROD_INFO	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_PROGRESS	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	audit词=有
+RD_RO_PROTECT	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_SCALE	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_SHARE_FILE	研发审核(rd_review)	view,query,add,modify,del,export,print,audit,field	audit词=有
+RD_SOAK	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_SPEC_DOC	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+RD_SPIKE_WATER	研发审核(rd_review)	view,query,add,modify,modlog,del,export,audit,field	audit词=有
+ROUTE	普通用户(user)	view,query,add,modify,del,export,print,audit	audit词=有
+ROUTE	研发审核(rd_review)	view,query,add,modify,del,export,print,audit	audit词=有
+ROUTE	文件负责人(rd_file_owner)	view,query,add,modify,del,export,print,audit	audit词=有
+
+## ⑤ 矩阵勾不到却已授权的词(按面板实际下发的动作集判定)
+DISPATCH@普通用户(user): 矩阵里没有列的词 [modify,del]
+DISPATCH@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+DISPATCH@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,del]
+FINISH_IN@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+FINISH_IN@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+FINISH_IN@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+FINISH_IN@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+LINE_LOAD@普通用户(user): 矩阵里没有列的词 [modify]
+LINE_LOAD@研发审核(rd_review): 矩阵里没有列的词 [modify]
+LINE_LOAD@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify]
+MANU_ORDER@普通用户(user): 矩阵里没有列的词 [modify,del]
+MANU_ORDER@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+MANU_ORDER@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,del]
+MATERIAL_OUT@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+MATERIAL_OUT@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+MATERIAL_OUT@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+MATERIAL_OUT@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+OP_TIME@普通用户(user): 矩阵里没有列的词 [modify,del]
+OP_TIME@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+OP_TIME@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,del]
+ORDER_CONVERT@管理员(admin): 矩阵里没有列的词 [query]
+ORDER_CONVERT@普通用户(user): 矩阵里没有列的词 [query]
+ORDER_CONVERT@研发审核(rd_review): 矩阵里没有列的词 [query]
+ORDER_CONVERT@文件负责人(rd_file_owner): 矩阵里没有列的词 [query]
+OTHER_IN@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN@undefined: 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_DETAIL@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_DETAIL@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_DETAIL@undefined: 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_DETAIL@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_STATS@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_STATS@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_STATS@undefined: 矩阵里没有列的词 [modify,modlog,del]
+OTHER_IN_STATS@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT@undefined: 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_DETAIL@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_DETAIL@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_DETAIL@undefined: 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_DETAIL@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_STATS@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_STATS@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_STATS@undefined: 矩阵里没有列的词 [modify,modlog,del]
+OTHER_OUT_STATS@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+OUTSOURCE_ORDER@普通用户(user): 矩阵里没有列的词 [modify,del]
+OUTSOURCE_ORDER@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+OUTSOURCE_ORDER@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,del]
+PROD_ABN@普通用户(user): 矩阵里没有列的词 [modify]
+PROD_ABN@研发审核(rd_review): 矩阵里没有列的词 [modify]
+PROD_ABN@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify]
+PROD_LINE@普通用户(user): 矩阵里没有列的词 [modify]
+PROD_LINE@研发审核(rd_review): 矩阵里没有列的词 [modify]
+PROD_LINE@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify]
+PU_ORDER@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+PU_ORDER@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+PU_ORDER@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+PU_ORDER@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+PURCHASE_IN@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+PURCHASE_IN@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+PURCHASE_IN@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+PURCHASE_IN@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_ASM_INSP@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_ASM_INSP@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_ASM_INSP@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_ASM_INSP@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHC@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHC@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHC@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHC@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHG@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHG@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHG@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHG@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHZ@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHZ@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHZ@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_BHZ@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_FIRST_INSP@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_FIRST_INSP@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_FIRST_INSP@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_FIRST_INSP@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP_REC@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP_REC@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP_REC@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_INSP_REC@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_JJF@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_JJF@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_JJF@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_JJF@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_LYB@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_LYB@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_LYB@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_LYB@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_PROC_INSP@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_PROC_INSP@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_PROC_INSP@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_PROC_INSP@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_RECV@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_RECV@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_RECV@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_RECV@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_RETURN@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_RETURN@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_RETURN@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_RETURN@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCP@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCP@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCP@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCP@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCY@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCY@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCY@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_SCY@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+QC_TC_IN@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+QC_TC_IN@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+QC_TC_IN@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+QC_TC_IN@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+RD_CHANGE@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+RD_CHANGE@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+RD_CHANGE@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+RD_PROD_DOCLIST@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+RD_PROGRESS@普通用户(user): 矩阵里没有列的词 [modify,del]
+RD_PROGRESS@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+RD_PROGRESS@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,del]
+RD_SHARE_FILE@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+ROUTE@普通用户(user): 矩阵里没有列的词 [modify,del]
+ROUTE@研发审核(rd_review): 矩阵里没有列的词 [modify,del]
+ROUTE@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,del]
+SALE_OUT@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+SALE_OUT@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+SALE_OUT@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+SALE_OUT@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+SCHEDULE_BOARD@管理员(admin): 矩阵里没有列的词 [query]
+SCHEDULE_BOARD@普通用户(user): 矩阵里没有列的词 [query]
+SCHEDULE_BOARD@研发审核(rd_review): 矩阵里没有列的词 [query]
+SCHEDULE_BOARD@文件负责人(rd_file_owner): 矩阵里没有列的词 [query]
+SO_ORDER@管理员(admin): 矩阵里没有列的词 [modify,modlog,del]
+SO_ORDER@普通用户(user): 矩阵里没有列的词 [modify,modlog,del]
+SO_ORDER@研发审核(rd_review): 矩阵里没有列的词 [modify,modlog,del]
+SO_ORDER@文件负责人(rd_file_owner): 矩阵里没有列的词 [modify,modlog,del]
+WORK_ORDER_BOARD@管理员(admin): 矩阵里没有列的词 [query]
+WORK_ORDER_BOARD@普通用户(user): 矩阵里没有列的词 [query]
+WORK_ORDER_BOARD@研发审核(rd_review): 矩阵里没有列的词 [query]
+WORK_ORDER_BOARD@文件负责人(rd_file_owner): 矩阵里没有列的词 [query]
+WORK_ORDER_LIST@管理员(admin): 矩阵里没有列的词 [query,export]
+WORK_ORDER_LIST@普通用户(user): 矩阵里没有列的词 [query,export]
+WORK_ORDER_LIST@研发审核(rd_review): 矩阵里没有列的词 [query,export]
+WORK_ORDER_LIST@文件负责人(rd_file_owner): 矩阵里没有列的词 [query,export]
+共 156 处

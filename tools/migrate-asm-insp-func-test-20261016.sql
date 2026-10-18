@@ -137,21 +137,25 @@ IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_ASM_INSP' AND visible 
       AND ((col_name = N'客户名称' AND place LIKE N'%header%')
         OR (col_name = N'产线常规功能性结果' AND place = N'detail')
         OR (col_name = N'结果判断' AND place = N'detail'))) < 3 SET @bad = @bad + 1;
-/* E3. 次序:检验要求 < 检验方法 < 产线常规功能性结果 < 结果判断 < 检查频率 < 实测数值 < 判定 */
-IF NOT EXISTS (SELECT 1 FROM yj_field a, yj_field b, yj_field c, yj_field d, yj_field e, yj_field f
+/* E3. 次序:检验要求 < 检验方法 < 产线常规功能性结果 < 结果判断
+   ⚠ 2026-10-17 修:原断言还要求 …< 实测数值 < 判定,而**本脚本之后**的
+   migrate-asm-insp-report-fields-20261016.sql 明确 `DELETE … col_name IN (数量, 实测数值)`,
+   组装成品检验单的整表次序又由更靠后的 migrate-asm-insp-verdict-rename-20261016.sql 统一
+   (产线常规功能性结果=200 / 结果判断=210)。所以只要本脚本内容一变就被判「重新执行」,
+   而它按旧布局断言必然不过 ⇒ DbSync 中止、其后迁移全不执行。
+   现在只断言**本脚本自己插入的那几列**之间的相对次序(在 35/40 与 200/210 两种布局下都成立)。 */
+IF NOT EXISTS (SELECT 1 FROM yj_field a, yj_field b, yj_field c, yj_field d
                 WHERE a.panel_code = N'QC_ASM_INSP' AND a.col_name = N'检验要求'
                   AND b.panel_code = N'QC_ASM_INSP' AND b.col_name = N'检验方法'
                   AND c.panel_code = N'QC_ASM_INSP' AND c.col_name = N'产线常规功能性结果'
                   AND d.panel_code = N'QC_ASM_INSP' AND d.col_name = N'结果判断'
-                  AND e.panel_code = N'QC_ASM_INSP' AND e.col_name = N'实测数值'
-                  AND f.panel_code = N'QC_ASM_INSP' AND f.col_name = N'判定'
-                  AND a.seq < b.seq AND b.seq < c.seq AND c.seq < d.seq AND d.seq < e.seq AND e.seq < f.seq)
+                  AND a.seq < b.seq AND b.seq < c.seq AND c.seq < d.seq)
   SET @bad = @bad + 1;
-/* E4. 明细可见列不撞号(同 seq 只能按 id 兜底排序 ⇒ 次序不可控) */
-IF EXISTS (SELECT 1 FROM yj_field x JOIN yj_field y
-             ON y.panel_code = x.panel_code AND y.seq = x.seq AND y.id <> x.id
-            WHERE x.panel_code = N'QC_ASM_INSP' AND x.visible = 1 AND x.place LIKE N'%detail%'
-              AND y.visible = 1 AND y.place LIKE N'%detail%') SET @bad = @bad + 1;
+/* E4. 本脚本插入的两列不得**彼此**撞号(同 seq 只能按 id 兜底排序 ⇒ 次序不可控)。
+   ⚠ 2026-10-17:不再对整表断言 —— 本脚本所处时点 检验结果 恰在 seq 40,而 结果判断 也插在 40,
+   整表断言必然失败(重跑即卡链);全表次序由上面提到的 verdict-rename 脚本统一后自然无撞号。 */
+IF (SELECT COUNT(DISTINCT seq) FROM yj_field
+      WHERE panel_code = N'QC_ASM_INSP' AND col_name IN (N'产线常规功能性结果', N'结果判断')) <> 2 SET @bad = @bad + 1;
 /* E5. 注明与译名 */
 IF (SELECT COUNT(*) FROM sys.extended_properties ep
      WHERE ep.name = N'MS_Description' AND ep.class = 1

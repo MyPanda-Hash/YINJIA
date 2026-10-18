@@ -1,0 +1,69 @@
+表 | 列 | 类型 | 长 | 快照同名列原有描述 | 本地同名列原有描述
+--------------------------------------
+dm_langue | comm | nvarchar | 20 | 公司 | 公司
+dm_langue | id | int | 4 | ID | ID
+dm_langue | type | nvarchar | 200 |  | 
+dm_langue | xc | int | 4 | 项次 | 项次
+dm_langue | lb_hi | int | 4 | 高度 | 高度
+dm_langue | chs | nvarchar | 255 | 简体 | 简体
+dm_langue | cht | nvarchar | 255 | 繁体 | 繁体
+dm_langue | eng | nvarchar | 255 | 英文 | 英文
+dm_langue | oth | nvarchar | 255 | 其他 | 其他
+dm_langue | bz | nvarchar | 255 | 备注 | 备注
+gscs | id | int | 4 | ID | ID
+gscs | gsmc | nvarchar | 50 |  | 
+gscs | gsdh | nvarchar | 50 |  | 
+gscs | tpwz | nvarchar | 50 |  | 
+gscs | xpsm1 | nvarchar | 50 |  | 
+gscs | xpsm2 | nvarchar | 50 |  | 
+gscs | bz | nvarchar | 50 | 备注 | 备注
+gscs | tm_cd | float | 8 |  | 
+gscs | tm_gd | float | 8 |  | 
+gscs | tm_zyjj | float | 8 |  | 
+gscs | tm_sxjj | float | 8 |  | 
+gscs | tm_sbj | float | 8 |  | 
+gscs | tm_zbj | float | 8 |  | 
+gscs | rem | nvarchar | 200 |  | 
+gscs | gsgs | nvarchar | 20 |  | 
+gscs | gszg | nvarchar | 20 |  | 
+gscs | xpzs | nvarchar | 1 |  | 
+gscs | msbdh | nvarchar | 20 |  | 
+gscs | sczg | nvarchar | 50 |  | 
+inh | id | bigint | 8 | ID | ID
+inh | 物料名称 | nvarchar | 200 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 物料名称
+inh | 规格型号 | nvarchar | 200 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 规格型号
+inh | 计量单位 | nvarchar | 20 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+inh | 仓库名称 | nvarchar | 100 | 仓库名称(金蝶stock_name,销售订单行同步扩展列) | 仓库名称(金蝶stock_name,销售订单行同步扩展列)
+inh | 单价 | decimal | 9 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 单价
+inh | 往来单位 | nvarchar | 200 |  | 
+inh | 经手人 | nvarchar | 50 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+outh | id | bigint | 8 | ID | ID
+outh | 单据编号 | nvarchar | 50 | 单号(面板字段列) | 单号(面板字段列)
+outh | 单据类型 | nvarchar | 50 | 单据类型(参考库 plang_pc.djlx;如 自制/委外/返工) | 单据类型(参考库 plang_pc.djlx;如 自制/委外/返工)
+outh | 单据日期 | datetime | 8 | 单据日期(空白草稿自动填当天) | 单据日期(空白草稿自动填当天)
+outh | 物料编码 | nvarchar | 50 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+outh | 物料名称 | nvarchar | 200 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 物料名称
+outh | 规格型号 | nvarchar | 200 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 规格型号
+outh | 计量单位 | nvarchar | 20 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+outh | 仓库编码 | nvarchar | 50 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+outh | 仓库名称 | nvarchar | 100 | 仓库名称(金蝶stock_name,销售订单行同步扩展列) | 仓库名称(金蝶stock_name,销售订单行同步扩展列)
+outh | 往来单位 | nvarchar | 200 |  | 
+outh | 经手人 | nvarchar | 50 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+permission | ID | int | 4 | ID | ID
+permission | USERID | nvarchar | 20 | 用户ID | 用户ID
+permission | MODULE1 | nvarchar | 20 |  | 
+permission | RW | nvarchar | 10 |  | 
+permission | MODULE_NA | nvarchar | 20 |  | 
+s_commdata | ID | int | 4 | ID | ID
+s_xtcs | id | int | 4 | ID | ID
+scjl | id | int | 4 | ID | ID
+表 | 缺注明列数
+---------
+dm_langue | 10
+gscs | 19
+inh | 8
+outh | 12
+permission | 5
+s_commdata | 1
+s_xtcs | 1
+scjl | 1

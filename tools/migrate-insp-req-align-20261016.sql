@@ -67,7 +67,14 @@ DECLARE curB CURSOR LOCAL FAST_FORWARD FOR
 OPEN curB FETCH NEXT FROM curB INTO @t2;
 WHILE @@FETCH_STATUS = 0
 BEGIN
-  IF COL_LENGTH(N'dbo.' + @t2, N'检查频率') IS NULL
+  /* ⚠ 2026-10-17 加表存在性守卫(此前把整条迁移链卡死):qc_mold_insp_detail / qc_cut_insp_detail
+     已被**链上更靠后**的 migrate-drop-qc-mold-cut-finspec-20261016.sql 下架。本脚本只要
+     内容哈希一变就会被 DbSync 判为「变更,重新执行」,而少了这道守卫就会去 ALTER 一张
+     不存在的表 ⇒ `Cannot find the object "dbo.qc_mold_insp_detail"` ⇒ 中止 ⇒
+     其后迁移全部不执行(正式库曾因此在库存报表那支之后连丢 13 条)。asm 表仍在,照常补列。 */
+  IF OBJECT_ID(N'dbo.' + @t2, N'U') IS NULL
+    PRINT N'[SKIP] ' + @t2 + N' 不存在(已下架,跳过补列)';
+  ELSE IF COL_LENGTH(N'dbo.' + @t2, N'检查频率') IS NULL
   BEGIN
     EXEC(N'ALTER TABLE dbo.' + @t2 + N' ADD 检查频率 nvarchar(50) NULL');
     PRINT N'[OK] ' + @t2 + N'.检查频率 已加';
@@ -144,6 +151,9 @@ CLOSE curE DEALLOCATE curE;
 GO
 
 /* ══════════════════ F. 自检 ══════════════════ */
+/* ⚠ 2026-10-17:期望值由写死的 3 张表/3 个面板改成**按仍存在的对象动态算** ——
+   qc_mold/qc_cut 两表与 QC_MOLD_INSP/QC_CUT_INSP 两面板已被链上更靠后的
+   migrate-drop-qc-mold-cut-finspec-20261016.sql 下架,写死 3/6 会让本脚本重跑时永远 FAIL。 */
 DECLARE @bad int = 0;
 DECLARE @pairs TABLE (tb sysname, cl sysname);
 INSERT INTO @pairs VALUES
@@ -151,34 +161,50 @@ INSERT INTO @pairs VALUES
  (N'qc_cut_insp_detail',  N'检验要求'), (N'qc_cut_insp_detail',  N'检查频率'),
  (N'qc_asm_insp_detail',  N'检验要求'), (N'qc_asm_insp_detail',  N'检查频率');
 
-/* F1. 三张表两列都在(检验要求/检查频率);且旧列名 标准要求 已不存在 */
-IF EXISTS (SELECT 1 FROM @pairs p WHERE COL_LENGTH(N'dbo.' + p.tb, p.cl) IS NULL) SET @bad = @bad + 1;
-IF EXISTS (SELECT 1 FROM (VALUES (N'qc_mold_insp_detail'), (N'qc_cut_insp_detail'), (N'qc_asm_insp_detail')) AS t(v)
-            WHERE COL_LENGTH(N'dbo.' + v, N'标准要求') IS NOT NULL) SET @bad = @bad + 1;
-/* F2. yj_field:检验要求(place 含 detail)与 检查频率(detail)各 3 行;旧列名 0 行 */
+DECLARE @expTable int = (SELECT COUNT(*) FROM @pairs p WHERE OBJECT_ID(N'dbo.' + p.tb, N'U') IS NOT NULL);
+DECLARE @expNote  int = (SELECT COUNT(*) FROM @pairs p WHERE COL_LENGTH(N'dbo.' + p.tb, p.cl) IS NOT NULL);
+DECLARE @expPanel int = (SELECT COUNT(*) FROM yj_panel
+                          WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP'));
+
+/* F1. **仍存在**的表里两列都在(检验要求/检查频率);且旧列名 标准要求 已不存在 */
+IF EXISTS (SELECT 1 FROM @pairs p WHERE OBJECT_ID(N'dbo.' + p.tb, N'U') IS NOT NULL
+             AND COL_LENGTH(N'dbo.' + p.tb, p.cl) IS NULL) SET @bad = @bad + 1;
+IF EXISTS (SELECT 1 FROM @pairs p WHERE OBJECT_ID(N'dbo.' + p.tb, N'U') IS NOT NULL
+             AND COL_LENGTH(N'dbo.' + p.tb, N'标准要求') IS NOT NULL) SET @bad = @bad + 1;
+/* F2. yj_field:检验要求(place 含 detail)与 检查频率(detail)各 @expPanel 行;旧列名 0 行 */
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP')
-      AND col_name = N'检验要求' AND place LIKE N'%detail%') < 3 SET @bad = @bad + 1;
+      AND col_name = N'检验要求' AND place LIKE N'%detail%') < @expPanel SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP')
-      AND col_name = N'检查频率' AND place = N'detail') < 3 SET @bad = @bad + 1;
+      AND col_name = N'检查频率' AND place = N'detail') < @expPanel SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP')
       AND col_name = N'标准要求') > 0 SET @bad = @bad + 1;
 /* F3. 检查频率 必须带下拉字典(与制程检验单同源) */
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP')
-      AND col_name = N'检查频率' AND data_type = N'下拉框' AND ISNULL(dict_sql, N'') <> N'') < 3 SET @bad = @bad + 1;
-/* F4. 列级注明齐(三张表 × 两列 = 6 条) */
+      AND col_name = N'检查频率' AND data_type = N'下拉框' AND ISNULL(dict_sql, N'') <> N'') < @expPanel SET @bad = @bad + 1;
+/* F4. 列级注明齐(仍存在的表 × 两列) */
 IF (SELECT COUNT(*) FROM sys.extended_properties ep
       JOIN @pairs p ON ep.major_id = OBJECT_ID(N'dbo.' + p.tb)
                    AND ep.minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.' + p.tb), p.cl, 'ColumnId')
-     WHERE ep.name = N'MS_Description' AND ep.class = 1 AND ep.minor_id > 0) < 6 SET @bad = @bad + 1;
+     WHERE ep.name = N'MS_Description' AND ep.class = 1 AND ep.minor_id > 0) < @expNote SET @bad = @bad + 1;
 /* F5. en 译名在 */
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'field' AND ref_key = N'检验要求' AND locale = N'en') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'field' AND ref_key = N'检查频率' AND locale = N'en') SET @bad = @bad + 1;
-/* F6. 空库提示(不做失败判定):三张明细表都 0 行时改名"看不出效果",提醒别误判 */
-IF (SELECT COUNT(*) FROM qc_asm_insp_detail) = 0 AND (SELECT COUNT(*) FROM qc_mold_insp_detail) = 0
-   AND (SELECT COUNT(*) FROM qc_cut_insp_detail) = 0
-   PRINT N'[WARN] 三张明细表当前均为 0 行(空库属正常,不做失败判定)';
+/* F6. 空库提示(不做失败判定;表已下架则免测 —— 用动态 SQL 避免引用不存在的表) */
+IF @expTable > 0
+BEGIN
+  DECLARE @sqlF6 nvarchar(max) = N'';
+  SELECT @sqlF6 = @sqlF6 + N'IF (SELECT COUNT(*) FROM dbo.' + p.tb + N') = 0 '
+    FROM @pairs p WHERE OBJECT_ID(N'dbo.' + p.tb, N'U') IS NOT NULL;
+  IF @sqlF6 <> N''
+  BEGIN
+    SET @sqlF6 = @sqlF6 + N'PRINT N''[WARN] 明细表当前均为 0 行(空库属正常,不做失败判定)''';
+    EXEC sp_executesql @sqlF6;
+  END
+END
 
+PRINT N'[自检] 仍存在的表 ' + CAST(@expTable AS nvarchar(10)) + N' / 列注明应齐 ' + CAST(@expNote AS nvarchar(10))
+    + N' 条 / 仍在册面板 ' + CAST(@expPanel AS nvarchar(10)) + N' 个;不符项 ' + CAST(@bad AS nvarchar(10)) + N' 条';
 IF @bad > 0 RAISERROR(N'工序检验单「检验要求/检查频率」对齐迁移自检失败(列/字段/字典/注明/译名)', 16, 1);
-ELSE PRINT N'检验要求/检查频率 就绪:三张工序检验单(成型/切炭/组装成品)列改名+补列+yj_field+注明+译名,'
+ELSE PRINT N'检验要求/检查频率 就绪:工序检验单列改名+补列+yj_field+注明+译名,'
         + N'与出货检验计划表 RD_INSP_PLAN 的 控制标准及要求/控制方法/检测频率 一一对应';
 GO

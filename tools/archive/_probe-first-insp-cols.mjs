@@ -223,14 +223,29 @@ try {
   })()`)
   ok('④ 勾选后该格显示已勾选项', ticked.ok && /☑/.test(tickVal), tickVal)
 
-  // ④d 按图片:表观/脱粉两列只给 1#、2# 勾选项,3#..8# 打 / (相关要求第 1 条).
+  // ④d 勾选式列的可填范围(2026-10-17 现行口径):勾选式那个样式由**列名**认(改名成「炭棒表观状态」
+  //     的新列也走勾选式),而它的样品范围恒为 **1#/2#** —— 与列所在的分组**无关**。
+  //     ⚠ 这段断言随口径改过两回:最初是"表观/脱粉列永远只在 1#/2#",后来改成"按分组绑对(7#/8#)",
+  //       现在回到"勾选式列恒只 1#/2#"(其余列八行全可填 —— 见 firstInspCols.isFillableCell)。
   const perSample = await ev(`(() => {
     const s = document.querySelector('.fi-sheet')
-    const rows = [...s.querySelectorAll('.sample-row')]
-    return rows.map((tr) => (tr.querySelectorAll('.fi-checks .fi-box').length))
+    return [...s.querySelectorAll('.sample-row')].map((tr) => (tr.querySelectorAll('.fi-checks .fi-box').length))
   })()`)
   console.log(`  各样品行的勾选格数=${JSON.stringify(perSample)}`)
-  ok('④ 表观/脱粉只给 1#、2# 勾选项(3#..8# 是 /)',
+  const misPlaced = await ev(`(() => {
+    const s = document.querySelector('.fi-sheet')
+    const bad = []
+    ;[...s.querySelectorAll('.sample-row')].forEach((tr, ri) => {
+      [...tr.querySelectorAll('td:not(.col-op)')].forEach((td, ci) => {
+        // 勾选格只允许出现在 1#/2#(0-based 0/1)
+        if (td.querySelector('.fi-checks') && ri > 1) bad.push((ri + 1) + '#@列' + ci)
+      })
+    })
+    return bad
+  })()`)
+  ok('④ 勾选格只出现在 1#/2#(勾选式列的样品范围恒为 1#/2#,与所在分组无关)',
+    Array.isArray(misPlaced) && misPlaced.length === 0, JSON.stringify(misPlaced))
+  ok('④ 表观及脱粉那两列(1#/2#)仍是勾选式、其余样品行没有勾选格',
     perSample.length === 8 && perSample[0] > 0 && perSample[1] > 0 && perSample.slice(2).every((n) => n === 0),
     JSON.stringify(perSample))
 

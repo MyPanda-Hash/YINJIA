@@ -13,10 +13,36 @@ import { invSearchOptions } from '../mold/recipeRows.js'
 //     · 对照时按 trim 后的**全等**比 —— 后端 condition 对普通文本走 LIKE,前端必须自己收紧。
 
 const archiveRes = (rows) => ({ totalSize: rows.length, list: [{ 编号: '商品', detail: { items: rows } }] })
+/** 服务器的真实形状:档案面板明细键 = LOWER(panel_code) —— INV 挂在 detail.inv 下(2026-10-16 实测) */
+const serverArchiveRes = (rows) => ({ totalSize: rows.length, list: [{ 编号: '商品', 状态: '启用', 单据状态: '已审核', detail: { inv: rows } }] })
 
 test('档案响应(archive 单单据契约)拍平成行', () => {
   const rows = invRowsOf(archiveRes([{ 存货编码: 'M-001', 存货名称: '炭棒' }]))
   assert.deepEqual(rows, [{ 存货编码: 'M-001', 存货名称: '炭棒' }])
+})
+
+/**
+ * 2026-10-16 服务器报障「成型工艺清单 → 配方计算 → 物料编号筛选没有出数据」的钉子。
+ * 根因:`invRowsOf` 写死 `detail.items`,而**档案面板的明细键 = LOWER(panel_code)**
+ *   —— 服务器 INV 的键是 `inv`(本地库 tab_key 为空才退化成 items,所以本地一切正常、上线恒空)。
+ * 生产证据:服务器 `/px/queryFormDataList {panelCode:'INV', keyword:''}` → totalSize 3898、
+ *   detail 下的键是 `inv`、`detail.items` 不存在 ⇒ 旧实现把**包装体**当行,存货编码取不到 ⇒ 零候选。
+ */
+test('服务器形状:明细键是 detail.inv(不是 items)也必须拍平成行', () => {
+  const rows = invRowsOf(serverArchiveRes([
+    { 存货编码: 'YJ-KBL-021', 存货名称: '折叠棉', 所属类别: '炭粉' },
+    { 存货编码: 'YJ-XH-002', 存货名称: '鑫恒酸洗', 所属类别: '功能料-粉末' },
+  ]))
+  assert.equal(rows.length, 2, 'detail.inv 下的行必须被拍平(旧实现返回 1 个包装体 ⇒ 零候选)')
+  assert.equal(rows[0]['存货编码'], 'YJ-KBL-021')
+  // 带出与「按种类收窄」两条链都要能用(它们吃 invRowsOf 的产物)
+  assert.equal(pickInvCarry(rows, '物料编号', 'YJ-KBL-021'), '折叠棉')
+  assert.equal(pickInvKind(rows, '物料编号', 'YJ-KBL-021', ''), '炭粉')
+})
+
+test('任何 detail 键(键名不认识时)也认得出来:取第一个数组值', () => {
+  const rows = invRowsOf({ list: [{ detail: { 随便什么键: [{ 存货编码: 'A-1' }] } }] })
+  assert.deepEqual(rows, [{ 存货编码: 'A-1' }])
 })
 
 test('档案响应形状不认识时返回空数组(不炸)', () => {

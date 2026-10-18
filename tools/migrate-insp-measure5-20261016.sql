@@ -37,6 +37,16 @@ DECLARE curA CURSOR LOCAL FAST_FORWARD FOR
 OPEN curA FETCH NEXT FROM curA INTO @t;
 WHILE @@FETCH_STATUS = 0
 BEGIN
+  /* ⚠ 2026-10-17 加表存在性守卫(与 migrate-insp-req-align-20261016.sql 同因):
+     qc_mold/qc_cut 已被链上更靠后的 migrate-drop-qc-mold-cut-finspec-20261016.sql 下架;
+     本脚本哈希一变就会被判「变更,重新执行」,少了这道守卫就会 ALTER 不存在的表
+     ⇒ Cannot find the object ⇒ DbSync 中止、其后迁移全不执行。 */
+  IF OBJECT_ID(N'dbo.' + @t, N'U') IS NULL
+  BEGIN
+    PRINT N'[SKIP] ' + @t + N' 不存在(已下架,跳过加列)';
+    FETCH NEXT FROM curA INTO @t;
+    CONTINUE;
+  END
   SET @i = 1;
   WHILE @i <= 5
   BEGIN
@@ -142,13 +152,24 @@ CLOSE curD DEALLOCATE curD;
 GO
 
 /* ══════════════════ E. 自检 ══════════════════ */
+/* ⚠ 2026-10-17:期望值按**仍存在的对象**动态算(qc_mold/qc_cut 两表与其面板已下架,
+   写死 3 表/15 条会让本脚本重跑时永远 FAIL —— 与 migrate-insp-req-align 同因)。 */
 DECLARE @bad int = 0, @m int, @cc sysname, @tb2 sysname;
-/* E1. 三张表 × 5 列都在 */
+DECLARE @expTable int = (SELECT COUNT(*) FROM (VALUES (N'qc_mold_insp_detail'), (N'qc_cut_insp_detail'), (N'qc_asm_insp_detail')) AS t(v)
+                          WHERE OBJECT_ID(N'dbo.' + v, N'U') IS NOT NULL);
+DECLARE @expPanel int = (SELECT COUNT(*) FROM yj_panel
+                          WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP'));
+/* E1. 仍存在的表 × 5 列都在 */
 DECLARE curE CURSOR LOCAL FAST_FORWARD FOR
   SELECT v FROM (VALUES (N'qc_mold_insp_detail'), (N'qc_cut_insp_detail'), (N'qc_asm_insp_detail')) AS t(v);
 OPEN curE FETCH NEXT FROM curE INTO @tb2;
 WHILE @@FETCH_STATUS = 0
 BEGIN
+  IF OBJECT_ID(N'dbo.' + @tb2, N'U') IS NULL
+  BEGIN
+    FETCH NEXT FROM curE INTO @tb2;
+    CONTINUE;
+  END
   SET @m = 1;
   WHILE @m <= 5
   BEGIN
@@ -159,14 +180,14 @@ BEGIN
   FETCH NEXT FROM curE INTO @tb2;
 END
 CLOSE curE DEALLOCATE curE;
-/* E2. yj_field:三张单各有 5 个 测量值N(detail、小数、可见) */
+/* E2. yj_field:仍存在单据各 5 个 测量值N(detail、小数、可见) */
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code IN (N'QC_MOLD_INSP', N'QC_CUT_INSP', N'QC_ASM_INSP')
-      AND col_name LIKE N'测量值%' AND place = N'detail' AND data_type = N'小数' AND visible = 1) < 15 SET @bad = @bad + 1;
-/* E3. 列级注明 15 条 */
+      AND col_name LIKE N'测量值%' AND place = N'detail' AND data_type = N'小数' AND visible = 1) < @expPanel * 5 SET @bad = @bad + 1;
+/* E3. 列级注明 = 仍存在的表 × 5 */
 IF (SELECT COUNT(*) FROM sys.extended_properties ep
      WHERE ep.name = N'MS_Description' AND ep.class = 1 AND ep.minor_id > 0
        AND OBJECT_NAME(ep.major_id) IN (N'qc_mold_insp_detail', N'qc_cut_insp_detail', N'qc_asm_insp_detail')
-       AND COL_NAME(ep.major_id, ep.minor_id) LIKE N'测量值%') < 15 SET @bad = @bad + 1;
+       AND COL_NAME(ep.major_id, ep.minor_id) LIKE N'测量值%') < @expTable * 5 SET @bad = @bad + 1;
 /* E4. 列序/不撞号:测量值1 在 实测数值 之后;且 5 格的 seq 在**本面板内唯一**
        (同 seq 只能按 id 兜底排序 ⇒ 撞号等于次序不可控,必须为 0) */
 IF EXISTS (SELECT 1 FROM yj_field m JOIN yj_field r ON r.panel_code = m.panel_code AND r.col_name = N'实测数值'

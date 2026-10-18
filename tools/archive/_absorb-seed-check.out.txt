@@ -1,0 +1,23 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _probe-absorb-seed-check.sql ==
+  | HSDZ_MES_TEST | 
+  | == bs_route(GY-CB-STD) == | 
+  | 成型 序=1 率=3.0000 | 
+  | 切炭 序=2 率=1.0000 | 
+  | 组装 序=3 率=1.0000 | 
+  | == bs_prod_line(前 6 条启用) == | 
+  | 1号车间 | 车间=成型 | 
+  | 1号机 | 车间=成型 | 
+  | 2号车间 | 车间=成型 | 
+  | 2号机 | 车间=成型 | 
+  | 3号车间 | 车间=成型 | 
+  | 3号机 | 车间=成型 | 
+  | == wo_process_line 列 == | 
+  | id, 工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线, 计划数量, 计划完工日期, 状态, 落实时间, 备注, asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel | 
+  | == 测试库里 plang 行数 / 最大 id == | 
+  | plang=38 maxid=61 | 
+  | == 测试库里 scjl 行数 / 最大 id == | 
+  | scjl=108 maxid=253 | 
+  | == 测试库里是否已有本次验证用行(幂等检查) == | 
+  | plang=0 scjl=0 | 
+[OK] _probe-absorb-seed-check.sql (1 batches)

@@ -265,11 +265,13 @@ export const menuTree = [
           { code: 'lineLoad', title: '产线排产负荷', path: '/panelx/list/LINE_LOAD', panelCode: 'LINE_LOAD', icon: 'DataLine' },
           // 2026-10-14 工单齐套表 WO_KIT 菜单下线:唯一数据源 v_wo_kit(基于自建物料的齐套视图)已随
           // MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 视图 v_wo_kit / 面板 BOM、WO_KIT 同批下架)。
-          // 2026-10-14 用户口径「明细表和统计表不做大类区分,跟其他模块方式一样」:生产工单的两张明细/统计表
-          // 归到本业务域(不再单列「明细表」「统计表」二级大类),与 智能供应链·销售管理「销售订单 →
-          // 销售订单明细表 → 销售订单统计表」的域内摆法一致。
-          { code: 'manuDetail', title: '生产工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
-          { code: 'manuStats', title: '生产工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
+          // 2026-10-17 生产工单明细表/统计表(MANU_ORDER_DETAIL / MANU_ORDER_STATS)**下架**:
+          //   两者是经典遗留那对表的报表面板(v_manu_order_detail / v_manu_order_stats ← bd_manu_order +
+          //   bl_manu_order),而那两张表在正式库 **0 行** ⇒ 打开就是空表;真实工单走 plang + 订单结转 +
+          //   自建工单列表页。取证:yj_usage_log 全库 7633 行里这两个面板 **一次都没被打开过**、
+          //   后端 Java **零引用**、无任何视图/过程依赖这两个视图。
+          //   ⇒ 视图 + 面板元数据 + 菜单项整体下架(migrate-drop-manu-order-report-panels-20261017.sql;
+          //   底表 bd_manu_order/bl_manu_order **保留** —— MANU_ORDER 面板的处理器仍在用)。
         ],
       },
       {
