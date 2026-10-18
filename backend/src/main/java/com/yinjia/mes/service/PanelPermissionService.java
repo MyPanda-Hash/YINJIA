@@ -173,6 +173,9 @@ public class PanelPermissionService {
         // 预排线(工序路线逐道选线)是「排产」的提交动作,同一 assign 词,两个入口都要登记 ——
         // 只登记 SCHEDULE_BOARD 会让"仅授了生产工单·排产"的角色在内嵌弹窗里被 403(requireButtonAny 逐面板找词)。
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|预排线", new String[]{"assign"});
+        // ERP 集成配置清单(2026-10-18 用户口径「除管理员只可看不可编辑」):写配置**不挂权限词**,
+        // 由 ErpIntegController 直接 requireAdmin();同时登记进 ADMIN_ONLY_PANELS 做纵深防御
+        // (将来若给该页加按钮,非管理员的写动作仍会被 requireButton 的 admin 闸门拦住)。
         BUTTON_PERMS_OVERRIDE = Map.copyOf(m);
     }
 
@@ -410,8 +413,12 @@ public class PanelPermissionService {
      *   <li>ZDGL 数据字典:全站下拉的字典内容(数据结构的一部分)。</li>
      * </ul>
      * 判定在**服务端**(不靠菜单藏),管理员恒过。
+     *
+     * 2026-10-18 追加 ERP_INTEG(「ERP集成配置清单」):用户口径「保证这个面板除管理员只可看不可编辑」——
+     * 三张集成配置表(接口/字段映射/设备绑定)写的是全公司共用的对接口径,非管理员只读;
+     * 读仍按 yj_role_panel 的 view 授权走(菜单可见即可看)。
      */
-    public static final Set<String> ADMIN_ONLY_PANELS = Set.of("FIELDMGR", "ZDGL");
+    public static final Set<String> ADMIN_ONLY_PANELS = Set.of("FIELDMGR", "ZDGL", "ERP_INTEG");
 
     /**
      * **只读**(连管理员也不给写)的面板(2026-10-18 用户口径:

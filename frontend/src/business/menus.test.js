@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { menuTree } from './menus.js'
+import { menuTree, filterMenuTree } from './menus.js'
 
 /** 研发管理二级目录:按研发流程分组(项目管理 / 测试记录 / 产品文件 / 共享文件) */
-test('完工明细为生产执行下的独立通用列表', () => {
-  const exec = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'exec')
-  const entry = exec.children.find((n) => n.panelCode === 'WO_COMPLETION_LIST')
+test('完工明细为生产过程下的独立通用列表', () => {
+  const proc = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'prodProcess')
+  const entry = proc.children.find((n) => n.panelCode === 'WO_COMPLETION_LIST')
   assert.equal(entry?.title, '完工明细')
   assert.equal(entry?.path, '/panelx/list/WO_COMPLETION_LIST')
 })
@@ -66,6 +66,30 @@ test('二级目录里不再出现"叶子项与分组混排"', () => {
 })
 
 /**
+ * 2026-10-18 用户口径:「为采购订单补齐,采购订单明细表与采购订单统计表」。
+ * 照「销售管理」同款三段式:单据 → 明细表 → 统计表。
+ * 面板与视图由 tools/migrate-pu-order-detail-stats-20261018.sql 建,这里钉住**菜单入口**不丢。
+ */
+test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同款三段式)', () => {
+  const scm = menuTree.find((n) => n.code === 'scm')
+  const purchase = (scm.children || []).find((c) => c.code === 'purchase')
+  assert.ok(purchase, '应有 采购管理 分组')
+  // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理)
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats'])
+  const codesOf = (node) => {
+    if (Array.isArray(node)) return node.flatMap(codesOf)
+    if (!node || typeof node !== 'object') return []
+    return (node.panelCode ? [node.panelCode] : []).concat(codesOf(node.children))
+  }
+  assert.deepEqual(codesOf(purchase), ['PU_ORDER', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS'])
+  // 两个报表都要能点进去(path 指向 panelx 列表),且标题就是「统计表」口径
+  const leaf = (p) => (purchase.children || []).flatMap((c) => c.children || []).find((x) => x.panelCode === p)
+  assert.equal(leaf('PU_ORDER_DETAIL').path, '/panelx/list/PU_ORDER_DETAIL')
+  assert.equal(leaf('PU_ORDER_STATS').path, '/panelx/list/PU_ORDER_STATS')
+  assert.equal(leaf('PU_ORDER_STATS').title, '采购订单统计表')
+})
+
+/**
  * 2026-10-14 用户拍板:MES 自建「物料清单(BOM)」功能整体删除
  * (数据库 DROP TABLE bs_bom / DROP VIEW v_wo_kit,面板 BOM、BOM_FWD、BOM_REV、WO_KIT 同批下架)。
  * 菜单是被删的第一层入口 —— 这里钉住"不得从别处溜回导航",否则用户点进去就是空表/报错。
@@ -118,17 +142,39 @@ test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () =>
  * 终态 = 二级只剩 6 个业务域,4 张明细/统计面板按业务对象并入 生产计划 / 经典单据。
  * 2026-10-16:样品管理 / 经典单据 两组随其仅有的 5 个叶子整体下架 ⇒ 6 → 4 个业务域。
  */
-test('生产制造二级目录 = 4 个业务域(拍平「生产管理」空壳层 + 取消「明细表/统计表」大类 + 摘两组)', () => {
+test('生产制造二级目录 = 3 个业务域(生产执行+生产记录合并为生产过程)', () => {
   const mfg = menuTree.find((n) => n.code === 'mfg')
   assert.deepEqual((mfg.children || []).map((c) => c.code),
-    ['plan', 'exec', 'records', 'device'])
+    ['plan', 'prodProcess', 'device'])
   assert.deepEqual((mfg.children || []).map((c) => c.title),
-    ['生产计划', '生产执行', '生产记录', '设备维护'])
+    ['生产计划', '生产过程', '设备维护'])
+  // 合并后不得再留旧的「生产执行」「生产记录」两个分组
+  assert.ok(!(mfg.children || []).some((c) => c.code === 'exec'), '不应再有 exec 分组')
+  assert.ok(!(mfg.children || []).some((c) => c.code === 'records'), '不应再有 records 分组')
+  assert.ok(!(mfg.children || []).some((c) => c.title === '生产执行' || c.title === '生产记录'),
+    '不应再有「生产执行」「生产记录」分组')
   // 空壳层 / 类型大类都不得回来
   assert.ok(!(mfg.children || []).some((c) => c.code === 'prod'), '不应再有 prod 空壳层')
   assert.ok(!(mfg.children || []).some((c) => c.title === '生产管理'), '不应再有「生产管理」空壳层')
   assert.ok(!(mfg.children || []).some((c) => c.title === '明细表' || c.title === '统计表'),
     '明细表/统计表不应再是二级大类')
+})
+
+/**
+ * 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」。
+ * 合并只改菜单分组,**10 个面板入口与顺序保持原样**:原生产执行 4 项在前、原生产记录 6 项在后。
+ * 顺序被钉住是为了防止合并时不小心丢项或重排(用户按现有位置找菜单)。
+ */
+test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不变', () => {
+  const proc = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'prodProcess')
+  assert.deepEqual((proc.children || []).map((c) => c.panelCode), [
+    'WO_REPORT', 'WO_REPORT_LIST', 'WO_COMPLETION_LIST', 'PROD_ABN',
+    'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
+  ])
+  assert.deepEqual((proc.children || []).map((c) => c.title), [
+    '工序报工单', '报工记录', '完工明细', '生产异常处理单',
+    '生产日报表', '投料确认单', '物料混合记录', '造粒记录', '无黑处理登记', '封箱确认',
+  ])
 })
 
 /**
@@ -171,9 +217,21 @@ test('生产制造的明细/统计表挂在所属业务对象下(与销售管理
   }
 })
 
+// 2026-10-18:数采平台(dc)的二级项是**页面级叶子**——三页是 Vue 页面,不是 yj_panel 面板,
+//   因此没有 panelCode、也不该再套一层分组。这里不是"放宽断言",而是对它单独钉更严的口子:
+//   必须带 /dc/ 路由前缀、不带 panelCode/operationName、code 与 path 一一对应。
+const PAGE_LEAF_GROUPS = new Set(['dc'])
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
   for (const g of menuTree) {
-    if (!g.children || !g.children.length) continue // 我的桌面/财务管理/设备管理 等暂无二级
+    if (!g.children || !g.children.length) continue // 我的桌面 等暂无二级
+    if (PAGE_LEAF_GROUPS.has(g.code)) {
+      for (const c of g.children) {
+        assert.ok(typeof c.path === 'string' && c.path.startsWith('/dc/'), `${g.title} > ${c.title} 应是 /dc/ 下的页面级路由`)
+        assert.equal(c.panelCode, undefined, `${g.title} > ${c.title} 是页面,不该带面板编码`)
+        assert.equal(c.children, undefined, `${g.title} > ${c.title} 是页面级叶子,不该再套分组`)
+      }
+      continue
+    }
     for (const c of g.children) {
       assert.ok(Array.isArray(c.children) && c.children.length > 0, `${g.title} > ${c.title} 应是"带面板的分组"`)
     }
@@ -210,10 +268,17 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
     return self.concat(codesOf(node.children))
   }
   const invCodes = codesOf(inv)
-  // 库存核算 8 张单据 + 明细 6 + 统计 6 + 报表 4 + 条码管理 3 = 27 张面板,一张不少、不重复
-  assert.equal(invCodes.length, 27, `库存管理应有 27 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 27, '库存管理内不应有重复面板')
+  // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,一张不少、不重复
+  // 2026-10-18:新增调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表
+  //   ⇒ 库存核算 8→10、明细 6→8、统计 6→8,合计 27→33
+  assert.equal(invCodes.length, 33, `库存管理应有 33 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 33, '库存管理内不应有重复面板')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在库存管理')
+  // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
+  for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
+                   'STOCKTAKE', 'STOCKTAKE_DETAIL', 'STOCKTAKE_STATS']) {
+    assert.ok(invCodes.includes(p), `库存管理下应有 ${p} 入口`)
+  }
   const scmCodes = codesOf(scm)
   for (const p of invCodes) {
     assert.ok(!scmCodes.includes(p), `${p} 已在库存管理下,不应再从智能供应链暴露`)
@@ -221,29 +286,36 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
 })
 
 /**
- * 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
- * 只改**显示标题**:一级 code 仍是 'base'(路由/展开态/页签/权限都不按标题走)。
+ * 2026-10-18 用户口径:「将基础档案改名为系统管理平台」;同日第二轮:「把现在系统管理平台里面的面板
+ * 全部挪到数据建模,然后把这个做成入口写到系统管理平台里面」(顶栏用户下拉那几项收成一页)。
+ * 终态 = 一级目录 code 仍是 'base'(路由/展开态/页签/权限都不按标题走),但**不挂任何业务面板**,
+ *       只剩一个「系统功能」分组:系统管理(入口页 sys/console) / 组织架构 / 使用权限查看。
  */
-test('基础档案 → 系统管理平台(只改标题,code 与二级分组不动)', () => {
+test('系统管理平台(base)= 只做系统功能入口,业务面板分组已整体迁出', () => {
   const base = menuTree.find((n) => n.code === 'base')
   assert.equal(base.title, '系统管理平台')
-  assert.deepEqual((base.children || []).map((c) => c.code), ['bdata', 'bmat', 'bprod', 'bfin'])
+  assert.deepEqual((base.children || []).map((c) => c.code), ['sysFunc'])
+  const sysFunc = base.children[0]
+  assert.equal(sysFunc.title, '系统功能')
+  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage'])
+  // 组织架构 / 使用权限查看 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
+  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
+  // 整枝一个面板都不许挂(否则就是两处各挂一份)
+  assert.equal(JSON.stringify(base).split('"panelCode"').length - 1, 0, '系统管理平台里不应再有面板入口')
 })
 
 /**
- * 2026-10-18 用户口径:「写一个数据建模目录下面的面板有:字段管理面板、把 ERP导入日志从系统管理迁移到
- * 数据建模、还有写个数据字典」。
- * 终态 = 一级目录「数据建模」(dm) → 字段管理(FIELDMGR,新面板) / 数据字典(ZDGL) / ERP导入日志(ERPLG);
- *       「系统管理平台」不再直接挂这两个面板(防两边各挂一份)。
+ * 2026-10-18 第二轮落点:原「基础数据/物料及价格/生产/财务」四组 32 张面板整组进「数据建模」。
+ * 菜单侧只挂出其中一部分(库存状况 STOCK_STATUS / 往来单位 PARTNER 早在 2026-09-17 就下线;
+ * 客户分组 CUSGRP / 物料分组 MATGRP / 供应商分组 SUPGRP / 检验项目 QC_ITEM / 检验计划 QC_PLAN /
+ * 烧结公差 RD_SINTER_TOL 与明细面板 ERPLG_ROW 本就没有菜单项),
+ * 故 27 = 字段管理 + 数据字典 + 迁来的 25 张。
+ * ⚠ 「ERP导入日志 ERPLG」已按 2026-10-18 后续口径迁到一级目录「ERP系统集成」,不再计入数据建模。
  */
-test('数据建模 = 一级目录,含 字段管理 / 数据字典 / ERP导入日志', () => {
+test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每张只挂一次)', () => {
   const dm = menuTree.find((n) => n.code === 'dm')
-  assert.ok(dm, '应有一级目录 数据建模(dm)')
-  assert.equal(dm.title, '数据建模')
-  assert.deepEqual((dm.children || []).map((c) => c.title), ['字段管理', '数据字典', 'ERP集成'])
-
   const codesOf = (node) => {
     if (Array.isArray(node)) return node.flatMap(codesOf)
     if (!node || typeof node !== 'object') return []
@@ -251,16 +323,89 @@ test('数据建模 = 一级目录,含 字段管理 / 数据字典 / ERP导入日
     return self.concat(codesOf(node.children))
   }
   const dmCodes = codesOf(dm)
-  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG']) {
+  const moved = ['DEPT', 'EMP', 'WH', 'WHLOC', 'KHDA', 'GFDA', 'REGION', 'PROJ', 'UOM',
+    'INV', 'WLBOM', 'INV_PRICE', 'EQUIP', 'TEAM', 'WC', 'PROD_LINE', 'OP', 'ROUTE', 'OP_TIME',
+    'REJECT', 'FIN_TAX', 'SETTLE', 'CUR', 'FIN_EXP', 'FIN_ACC']
+  for (const code of moved) {
+    assert.ok(dmCodes.includes(code), `系统管理平台迁来的面板 ${code} 应在数据建模下`)
+  }
+  assert.equal(dmCodes.length, 27, `数据建模应有 27 张面板入口,实际 ${dmCodes.length}`)
+  assert.equal(new Set(dmCodes).size, 27, '数据建模内不应有重复面板')
+  const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
+  assert.equal(baseCodes.length, 0, '系统管理平台不应再挂任何面板')
+})
+
+/**
+ * adminOnly 叶子(没 panelCode 却带 path)以前会被 filterMenuTree 的 if (n.path) 当"有权限"放行,
+ * 非管理员因此能在侧边栏点到组织架构/使用权限查看。这里钉住修正后的行为。
+ */
+test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可见', () => {
+  const base = menuTree.find((n) => n.code === 'base')
+  const vis = () => []
+  const filtered = filterMenuTree([base], vis(), false)[0]
+  const codes = (filtered?.children || []).flatMap((g) => (g.children || []).map((c) => c.code))
+  assert.ok(codes.includes('sysConsole'), '非管理员应仍能用「系统管理」入口页')
+  assert.ok(!codes.includes('sysOrg'), '非管理员不应看到组织架构')
+  assert.ok(!codes.includes('sysUsage'), '非管理员不应看到使用权限查看')
+  const admin = filterMenuTree([base], vis(), true)[0]
+  const adminCodes = (admin.children || []).flatMap((g) => (g.children || []).map((c) => c.code))
+  assert.deepEqual(adminCodes, ['sysConsole', 'sysOrg', 'sysUsage'])
+})
+
+/**
+ * 2026-10-18 用户口径(第二版):「在系统左侧菜单写一个 erp 系统集成的目录,目录下把 erp 导入日志
+ * 移动到他下方;再写一个 erp 集成配置清单…」。
+ * 终态 = 一级目录「ERP系统集成」(erpInteg) → ERP集成配置清单(ERP_INTEG,页面级虚拟面板) / ERP导入日志(ERPLG);
+ *       数据建模只保留 字段管理 / 数据字典;系统管理平台两份都不得再挂(防两边各挂一份)。
+ */
+test('ERP系统集成 = 一级目录,含 配置清单 / ERP导入日志', () => {
+  const erp = menuTree.find((n) => n.code === 'erpInteg')
+  assert.ok(erp, '应有一级目录 ERP系统集成(erpInteg)')
+  assert.equal(erp.title, 'ERP系统集成')
+  // 二级是「集成管理」分组(导航层级同构:一级下面不出现裸叶子),两个面板都挂在该组下
+  const grp = (erp.children || [])[0]
+  assert.ok(grp?.children?.length, 'ERP系统集成 下应是「带面板的分组」')
+  assert.deepEqual((grp.children || []).map((c) => c.panelCode), ['ERP_INTEG', 'ERPLG'])
+  assert.equal(grp.children[0].path, '/erp/integConfig')
+
+  // 数据建模 = 字段管理 / 数据字典 + 系统管理平台迁来的四组(ERP集成分组已随用户口径迁出)
+  const dm = menuTree.find((n) => n.code === 'dm')
+  assert.deepEqual((dm.children || []).map((c) => c.title),
+    ['字段管理', '数据字典', '基础数据', '物料及价格', '生产', '财务'])
+  // 系统管理平台迁来的 32 张面板必须真的挂在数据建模下(与 merge 前本地口径一致)
+  const dmPanels = (() => {
+    const acc = []
+    const walk = (n) => { if (Array.isArray(n)) return n.forEach(walk); if (!n || typeof n !== 'object') return; if (n.panelCode) acc.push(n.panelCode); (n.children || []).forEach(walk) }
+    walk(dm)
+    return acc
+  })()
+  for (const p of ['DEPT', 'EMP', 'WH', 'INV', 'PROD_LINE', 'FIN_ACC']) {
+    assert.ok(dmPanels.includes(p), `数据建模下应有 ${p}`)
+  }
+
+  const codesOf = (node) => {
+    if (Array.isArray(node)) return node.flatMap(codesOf)
+    if (!node || typeof node !== 'object') return []
+    const self = node.panelCode ? [node.panelCode] : []
+    return self.concat(codesOf(node.children))
+  }
+  const erpCodes = codesOf(erp)
+  for (const p of ['ERP_INTEG', 'ERPLG']) {
+    assert.ok(erpCodes.includes(p), `ERP系统集成下应有 ${p}`)
+  }
+  const dmCodes = codesOf(dm)
+  for (const p of ['FIELDMGR', 'ZDGL']) {
     assert.ok(dmCodes.includes(p), `数据建模下应有 ${p}`)
   }
+  assert.ok(!dmCodes.includes('ERPLG'), 'ERPLG 已迁到 ERP系统集成,数据建模里不应再有入口')
   // 迁移而非复制:系统管理平台里不得再出现这两个面板
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
-  assert.ok(!baseCodes.includes('ZDGL'), 'ZDGL 已迁到数据建模,系统管理平台里不应再有入口')
-  assert.ok(!baseCodes.includes('ERPLG'), 'ERPLG 已迁到数据建模,系统管理平台里不应再有入口')
+  for (const p of ['ZDGL', 'ERPLG']) {
+    assert.ok(!baseCodes.includes(p), `${p} 已迁出,系统管理平台里不应再有入口`)
+  }
   // 整棵树里每张面板只挂一次
   const all = codesOf(menuTree)
-  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG']) {
+  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG', 'ERP_INTEG']) {
     assert.equal(all.filter((c) => c === p).length, 1, `${p} 在整个菜单树里应恰好出现一次`)
   }
 })

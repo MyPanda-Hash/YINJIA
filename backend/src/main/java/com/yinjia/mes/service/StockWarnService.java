@@ -31,6 +31,8 @@ import java.util.Map;
 @Service
 public class StockWarnService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StockWarnService.class);
+
     private final JdbcTemplate jdbc;
 
     /**
@@ -129,6 +131,14 @@ public class StockWarnService {
     /**
      * **出库审批闸门**:出库后该批次余额 &lt; 预警数量 ⇒ 抛异常(事务回滚、审批失败并提示)。
      *
+     * <p>⚠ <b>2026-10-18 修口径不一致</b>:{@code StockLedgerService} 加了 {@code LOT_STRICT=false}
+     * (验收期不按批次核销,扣减按 (物料,仓库) 汇总),**但本闸门仍按批号查余额** ⇒
+     * 汇总侧判定"仓里有货、可以出",本类却查到"该批号行余额 0"直接拦死。
+     * 实测复现:调拨单 YCD-20260908-00001(YJ-AJ-016-1 / CK00006 / 无批号,需出 10827,
+     * kucun 该键就是 10827)被误报「当前余额 0」。
+     * 现改为<b>与扣减同口径</b>:按 (物料,仓库) 合计判断,预警数量也取该键下最大预警值
+     * (批次级预警在汇总口径下无法逐一对应,取最大是保守取法)。
+     *
      * @param acc 同一单据内的累计器(键 = 物料|仓库|批号):一张出库单可能多行打同一个批次,
      *            必须**累计**后再比,否则每行都按"当前余额 − 本行数量"算会漏判。
      */
@@ -144,6 +154,19 @@ public class StockWarnService {
                         + " WHERE wzdm = ? AND ckdm = ? AND ISNULL(RTRIM(lot_no), N'') = ?", wzdm, ckdm, l);
         BigDecimal bal = rows.isEmpty() ? BigDecimal.ZERO : dec(rows.get(0).get("yl"));
         BigDecimal warn = rows.isEmpty() ? BigDecimal.ZERO : dec(rows.get(0).get("warn"));
+        // 汇总口径:该批号行自己没货时,用 (物料,仓库) 合计兜底 —— 与 applyOutAggregated 的扣减口径一致
+        if (bal.signum() <= 0) {
+            List<Map<String, Object>> agg = jdbc.queryForList(
+                    "SELECT CAST(ISNULL(SUM(CASE WHEN ISNULL(yl,0) > 0 THEN yl ELSE 0 END), 0) AS decimal(18,4)) AS avail,"
+                            + " CAST(ISNULL(MAX(预警数量), 0) AS decimal(18,4)) AS warn"
+                            + " FROM kucun WHERE wzdm = ? AND ckdm = ? AND ISNULL(asp_cancel,'N') <> 'Y'", wzdm, ckdm);
+            if (!agg.isEmpty()) {                BigDecimal avail = dec(agg.get(0).get("avail"));
+                if (avail.signum() > 0) {
+                    bal = avail;
+                    warn = dec(agg.get(0).get("warn"));
+                }
+            }
+        }
         BigDecimal after = bal.subtract(done);
         if (!HIST_BACKFILL && after.compareTo(warn) < 0) {
             throw new IllegalStateException("单据 " + no + " 出库审批失败:存货 " + wzdm + " / 仓库 " + ckdm

@@ -53,15 +53,20 @@ for (const p of ['FIELDMGR', 'ZDGL']) {
   check(allowed(r), `${p} 管理员可查询(totalSize=${r.data?.totalSize ?? '-'})`)
 }
 
-console.log(`--- 非管理员(${USER}):字段管理 / 数据字典 必须被拒 ---`)
+console.log(`--- 非管理员(${USER}):数据建模「可只读看、不可写」 ---`)
 let token = null
 try { token = await login(USER, PASS) } catch (e) { console.log('SKIP  ', e.message); }
 if (token) {
+  // 口径(2026-10-18 用户拍板,以远端为准):非管理员对 FIELDMGR/ZDGL **可只读查看**,
+  // 增删改一律 403(服务端 requireAdminOnlyWritable);对应授权行来自
+  // tools/migrate-role-grant-dm-readonly-20261018.sql(所有非管理员角色 × 4 张 = view,query)。
   for (const p of ['FIELDMGR', 'ZDGL']) {
     const r = await call('/px/queryFormDataList', { panelCode: p, keyword: '', condition: {}, pageNo: 1, pageSize: 5 }, token)
-    check(denied(r), `${p} 非管理员读取被拒(${String(r.message).slice(0, 60)})`)
-    const cfg = await call(`/px/getPanelConfig?panelCode=${p}`, null, token)
-    check(denied(cfg), `${p} 非管理员取配置被拒(${String(cfg.message).slice(0, 50)})`)
+    check(allowed(r), `${p} 非管理员可只读查看(totalSize=${r.data?.totalSize ?? '-'})`)
+    for (const btn of ['新增', '保存', '删除']) {
+      const w = await call('/px/callButton', { panelCode: p, buttonName: btn, formData: { 编号: p, detail: { items: [] } }, buttonParam: {} }, token)
+      check(denied(w), `${p} 非管理员「${btn}」被拒(${String(w.message).slice(0, 40)})`)
+    }
   }
   // 对照组:该账号本来就有权看的采购入库单(证据见 README)
   const ctl = await call('/px/queryFormDataList', { panelCode: 'PURCHASE_IN', keyword: '', condition: {}, pageNo: 1, pageSize: 5 }, token)

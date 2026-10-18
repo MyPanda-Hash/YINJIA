@@ -129,7 +129,22 @@ export const menuTree = [
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
             ],
           },
-
+          // 2026-10-18 用户口径「为采购订单补齐,采购订单明细表与采购订单统计表」——
+          // 照「销售管理」同款三段式(单据 → 明细表 → 统计表)把采购订单补全:
+          //   · 明细表 PU_ORDER_DETAIL:头×行逐行展开(v_pu_order_detail);
+          //   · 统计表 PU_ORDER_STATS :按 供应商 × 物料 聚合(v_pu_order_stats,「订单数」=不同单据数)。
+          // 两者都是 flat 只读报表,不改任何业务表、不动采购订单面板本身
+          // (tools/migrate-pu-order-detail-stats-20261018.sql)。
+          {
+            code: 'detail', title: '明细表', children: [
+              { code: 'puDetail', title: '采购订单明细表', path: '/panelx/list/PU_ORDER_DETAIL', panelCode: 'PU_ORDER_DETAIL', icon: 'List' },
+            ],
+          },
+          {
+            code: 'stats', title: '统计表', children: [
+              { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
+            ],
+          },
         ],
       },
     ],
@@ -164,6 +179,11 @@ export const menuTree = [
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
+              // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
+              // (调拨=仓库间移库双腿过账;盘点=按实盘差异调平)。面板/表/视图见
+              // tools/migrate-transfer-stocktake-20261018.sql,记账见 StockLedgerService.applyTransfer/applyStocktake。
+              { code: 'transfer', title: '调拨单', path: '/panelx/list/TRANSFER', icon: 'Switch', panelCode: 'TRANSFER', operationName: '新增' },
+              { code: 'stocktake', title: '盘点单', path: '/panelx/list/STOCKTAKE', icon: 'DocumentChecked', panelCode: 'STOCKTAKE', operationName: '新增' },
             ],
           },
         ],
@@ -180,6 +200,9 @@ export const menuTree = [
           { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          // 2026-10-18 新增:调拨单/盘点单明细表(视图 v_transfer_detail / v_stocktake_detail)
+          { code: 'transferDetail', title: '调拨单明细表', path: '/panelx/list/TRANSFER_DETAIL', panelCode: 'TRANSFER_DETAIL', icon: 'List' },
+          { code: 'stocktakeDetail', title: '盘点单明细表', path: '/panelx/list/STOCKTAKE_DETAIL', panelCode: 'STOCKTAKE_DETAIL', icon: 'List' },
         ],
       },
       {
@@ -194,6 +217,9 @@ export const menuTree = [
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
+          // 2026-10-18 新增:调拨单/盘点单统计表(视图 v_transfer_stats / v_stocktake_stats)
+          { code: 'transferStats', title: '调拨单统计表', path: '/panelx/list/TRANSFER_STATS', panelCode: 'TRANSFER_STATS', icon: 'Histogram' },
+          { code: 'stocktakeStats', title: '盘点单统计表', path: '/panelx/list/STOCKTAKE_STATS', panelCode: 'STOCKTAKE_STATS', icon: 'Histogram' },
         ],
       },
       {
@@ -245,8 +271,11 @@ export const menuTree = [
     //    所属业务对象下(如 智能供应链·销售管理:销售订单 → 销售订单明细表 → 销售订单统计表)。
     // 现终态:二级只剩 6 个业务域(生产计划/生产执行/生产记录/设备维护/样品管理/经典单据),
     // 4 张明细/统计面板按业务对象并入 生产计划 / 经典单据;LeftNav 的 mfg 特判已删除,全部模块走同一条通用分支。
-    // 2026-10-16 再收敛:样品管理 / 经典单据 两组随其仅有的 5 个叶子一并下架 ⇒ 现为 4 个业务域
-    // (生产计划/生产执行/生产记录/设备维护),详见下方该两组的摘除注释。
+    // 2026-10-16 再收敛:样品管理 / 经典单据 两组随其仅有的 5 个叶子一并下架 ⇒ 现为 3 个业务域
+    // (生产计划 / 生产过程 / 设备维护),详见下方该两组的摘除注释。
+    // 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」:
+    //   原「生产执行」「生产记录」两个二级目录合并为「生产过程」一组(10 张面板入口原样保留,
+    //   执行 4 项在前、记录 6 项在后)⇒ 4 个业务域变 3 个。只动菜单分组,面板/路由/权限零改动。
     children: [
       {
         // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
@@ -292,18 +321,20 @@ export const menuTree = [
         ],
       },
       {
-        // 生产执行(五道工序:领料/报工)
-        code: 'exec', title: '生产执行', children: [
+        // 生产过程(2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」)
+        // 合并前是两个并列二级目录:
+        //   生产执行(五道工序:领料/报工)= 工序报工单 / 报工记录 / 完工明细 / 生产异常处理单
+        //   生产记录(29份真实单据·家族面板)= 生产日报表 / 投料确认单 / 物料混合记录 / 造粒记录 / 无黑处理登记 / 封箱确认
+        // 合并只动菜单分组:**10 个面板入口、面板码、路径、顺序一律不变**(执行 4 项在前、记录 6 项在后),
+        // 所以路由/权限/面板元数据零改动,可随时按本段注释回滚成两组。
+        code: 'prodProcess', title: '生产过程', icon: 'Notebook', children: [
+          // ── 原「生产执行」4 项 ──
           { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
           { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
           { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
           // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
           { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
-        ],
-      },
-      {
-        // 生产记录(29份真实单据·家族面板)
-        code: 'records', title: '生产记录', icon: 'Notebook', children: [
+          // ── 原「生产记录」6 项 ──
           { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
           { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
           { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
@@ -431,13 +462,13 @@ export const menuTree = [
       },
     ],
   },
-  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典 / ERP导入日志。
+  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。
   //   · 字段管理(FIELDMGR):直接以 yj_field 元数据表为数据源的新面板 —— 全系统字段模型在一屏可见、
   //     可按面板筛、可就地改(顺序/列宽/必填/隐藏/字典SQL…),保存走通用档案保存的「只提交改动行」;
   //   · 数据字典(ZDGL):原在 系统管理平台·基础数据,按用户口径「还有写个数据字典」随本栏目一并摆到这里
   //     (面板/表/权限行一个字节没动,只换导航位置);
-  //   · ERP导入日志(ERPLG):用户口径「把 ERP导入日志从系统管理迁移到数据建模里面去」,
-  //     yj_panel.category/module_group 已同批改为「数据建模」(tools/migrate-dm-fields-center-20261018.sql)。
+  //   · ERP导入日志(ERPLG)已于 2026-10-18 再次迁出:随用户口径移到新的一级目录「ERP系统集成」
+  //     (yj_panel.category/module_group 同批改为「ERP系统集成」,见 tools/migrate-erp-integ-config-20261018.sql)。
   {
     code: 'dm',
     title: '数据建模',
@@ -459,29 +490,9 @@ export const menuTree = [
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
         ],
       },
-      {
-        code: 'dmErp',
-        title: 'ERP集成',
-        icon: 'Connection',
-        children: [
-          // 批次级日志(erp_imp_log);行级明细面板 ERPLG_ROW 不另设入口 —— 从批次行进入即可
-          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
-        ],
-      },
-    ],
-  },
-  // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
-  //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
-  //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
-  //   (财务类面板本就走「系统管理平台 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
-  // 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
-  //   **只改显示标题**,一级目录 code 仍为 'base'(路由/展开态/页签/权限都不按标题走);
-  //   二级分组(基础数据/物料及价格/生产/财务)与面板一个没动。
-  {
-    code: 'base',
-    title: '系统管理平台',
-    icon: 'Setting',
-    children: [
+      // 2026-10-18 用户口径「把现在系统管理平台里面的面板全部挪到数据建模」:原「系统管理平台」的
+      //   基础数据 / 物料及价格 / 生产 / 财务 四组(32 张面板)**整组搬到这里**,分组 code 不变
+      //   (yj_panel.module_group 同批改为「数据建模」⇒ 权限矩阵里这 32 张也归到本模块组)。
       {
         code: 'bdata',
         title: '基础数据',
@@ -558,6 +569,74 @@ export const menuTree = [
       },
     ],
   },
+  // 2026-10-18 用户口径:「在系统左侧菜单写一个 erp 系统集成的目录,目录下把 erp 导入日志移动到他下方。
+  //   再写一个 erp 集成配置清单,分为导入与转出两种面板,每个面板再分类,把 api 接口、对应的设备、
+  //   字段间的映射,做成一个可视化、可以统一配置编辑的面板。」
+  //   · ERP集成配置清单 = 页面级虚拟面板 ERP_INTEG(自定义视图 views/erp/ErpIntegConfig.vue,
+  //     数据源 erp_integ_api/_field/_device 三张配置表;不插 yj_panel 行,授权落 yj_role_panel);
+  //   · ERP导入日志 = 原「数据建模 / ERP集成」下的 ERPLG(批次级),行级明细 ERPLG_ROW 从批次行进入。
+  {
+    code: 'erpInteg',
+    title: 'ERP系统集成',
+    icon: 'Connection',
+    children: [
+      // 二级必须是「带面板的分组」(导航层级同构:不出现裸叶子,见 menus.test.js)
+      {
+        code: 'erpManage',
+        title: '集成管理',
+        icon: 'SetUp',
+        children: [
+          { code: 'erpIntegCfg', title: 'ERP集成配置清单', path: '/erp/integConfig', icon: 'SetUp', panelCode: 'ERP_INTEG' },
+          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
+        ],
+      },
+    ],
+  },
+  // 2026-10-18 新增「数采平台」:面向后续硬件(电子秤已确定,先补看板/扫码枪等)接入的配置与监控入口。
+  //   三个页面都是**页面级叶子**(不是 yj_panel 面板 ⇒ 无 panelCode/operationName),
+  //   路由在 router/index.js 显式注册,并已从 flatMenus 自动路由里排除;菜单侧不参与面板权限过滤。
+  {
+    code: 'dc',
+    title: '数采平台',
+    icon: 'Cpu',
+    children: [
+      { code: 'dcConfig', title: '设备配置管理', path: '/dc/config', icon: 'SetUp' },
+      { code: 'dcMonitor', title: '数据监控', path: '/dc/monitor', icon: 'Monitor' },
+      { code: 'dcStats', title: '状态统计', path: '/dc/stats', icon: 'DataAnalysis' },
+    ],
+  },
+  // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
+  //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
+  //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
+  //   (财务类面板本就走「系统管理平台 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
+  // 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
+  //   **只改显示标题**,一级目录 code 仍为 'base'(路由/展开态/页签/权限都不按标题走)。
+  //   同日第二轮:原二级分组(基础数据/物料及价格/生产/财务)共 32 张面板整组移到「数据建模」,
+  //   本目录只剩「系统功能」一组入口 —— 详见下方 sysFunc 注释。
+  {
+    code: 'base',
+    title: '系统管理平台',
+    icon: 'Setting',
+    children: [
+      {
+        // 2026-10-18 用户口径:「把现在系统管理平台里面的面板全部挪到数据建模,然后把这个做成入口写到系统管理平台里面」
+        //   ⇒ 原四组(基础数据/物料及价格/生产/财务)共 32 张面板**整组**移到一级目录「数据建模」
+        //   (menus.js dm 末尾,分组 code 与原题目一个没改;yj_panel.module_group 同批改为「数据建模」,
+        //   见 tools/migrate-sysadmin-panels-to-dm-20261018.sql)。
+        //   本目录不再挂任何业务面板,只做**系统功能入口**(顶栏用户下拉里那几个系统功能都收在这一页);
+        //   组织架构/使用权限查看 = 管理员专属(adminOnly ⇒ filterMenuTree 只对 isAdmin 放行,
+        //   路由侧 meta.requireAdmin 双保险)。
+        code: 'sysFunc',
+        title: '系统功能',
+        icon: 'Monitor',
+        children: [
+          { code: 'sysConsole', title: '系统管理', path: '/sys/console', icon: 'Monitor' },
+          { code: 'sysOrg', title: '组织架构', path: '/sys/org', icon: 'OfficeBuilding', adminOnly: true },
+          { code: 'sysUsage', title: '使用权限查看', path: '/sys/usage', icon: 'View', adminOnly: true },
+        ],
+      },
+    ],
+  },
 ]
 
 function walk(node, fn) {
@@ -602,6 +681,9 @@ export function filterMenuTree(tree, visiblePanels, isAdmin) {
   const filterNode = (nodes) => {
     const out = []
     for (const n of nodes) {
+      // adminOnly:整枝只对管理员可见(如「系统功能 → 组织架构 / 使用权限查看」)。
+      //   这类叶子没有 panelCode 却带 path,原来会在下面那条 if (n.path) 里被判成有权而放行。
+      if (n.adminOnly) continue
       if (n.panelCode) {
         if (vis.includes(n.panelCode)) out.push({ ...n })
         continue

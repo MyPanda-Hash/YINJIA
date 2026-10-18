@@ -147,6 +147,8 @@ public class ScheduleBoardService {
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND " + NOT_CLOSED + ""
                         + "   AND ISNULL(p.scx, N'') = N''"
+                        // 2026-10-18:已完工的行不进待排产池(与 flowSpec/生产工单桶同口径)
+                        + "   AND NOT (" + DONE_ROW + ")"
                         // 关键字:单号用 noLike(标识形式时已剥掉 #行号 部分);批次号也参与(它基本等同于一行的身份)
                         + "   AND (? = '' OR p.pl_no LIKE ? OR p.od_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ?"
                         + "        OR ISNULL(dk.mc,'') LIKE ? OR ISNULL(p.[批次号],N'') LIKE ?)"
@@ -174,7 +176,9 @@ public class ScheduleBoardService {
         Integer n = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM dbo.plang p"
                         + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
-                        + "   AND ISNULL(p.scx, N'') = N''", Integer.class);
+                        + "   AND ISNULL(p.scx, N'') = N''"
+                        // 2026-10-18:与 pending 逐字同源(已完工不计入待排产)
+                        + "   AND NOT (" + DONE_ROW + ")", Integer.class);
         return n == null ? 0 : n;
     }
 

@@ -57,6 +57,8 @@ table:bd_purchase_in   # 采购入库单头表(审核过账kucun入库)
 table:bd_sale_out   # 销售出库单头表(审核过账kucun出库)
 table:bd_so_order   # 销售订单头表(星辰ERP同步)
 table:bd_stock_close   # 库存月结头表(2026-10-15):一行 = 一个已月结/已取消的期间;结转行写进 inh(单据类型=月结结转),本表只记状态与合计
+table:bd_stocktake   # 盘点单头表(2026-10-18:实盘调平,审核按 kucun 现值算差异并回写明细;盘盈入流水/盘亏出流水;单号前缀 PD)
+table:bd_transfer   # 调拨单头表(2026-10-18:仓库间移库,审核=调出仓出库+调入仓入库双腿过账 kucun,弃审对称冲回;单号前缀 DB)
 table:bd_tax_type   # 税别档案
 table:bl_dispatch   # 工序派工单行表(中文列,服务器口径;含生产车间列供统计视图分组)
 table:bl_finish_in   # 产成品入库单行表(负数量=红字冲回)
@@ -71,6 +73,8 @@ table:bl_pu_label   # 采购订单材料码打印单**行**表(本批次号下�
 table:bl_purchase_in   # 采购入库单行表(批号三键入库)
 table:bl_sale_out   # 销售出库单行表(批号三键出库)
 table:bl_so_order   # 销售订单行表(星辰ERP同步)
+table:bl_stocktake   # 盘点单行表(2026-10-18:账面数量/差异数量由审核回写留档,实盘数量为唯一人工输入)
+table:bl_transfer   # 调拨单行表(2026-10-18:一行一个存货+批号,调出仓库/调入仓库逐行指定)
 table:bl_stock_close   # 库存月结行表(2026-10-15):一行 = 一个 (物料,仓库,批号) 的期初/入库/出库/结存快照,供报表展开明细
 table:bs_currency   # 币别档案(金蝶云·星辰 currency 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)
 table:bs_customer_group   # 客户分类档案(金蝶云·星辰 customer_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)
@@ -102,6 +106,9 @@ table:day_report_detail   # 生产日报表行表(姓名/时间/产品/数量/�
 table:equip_check   # 设备点检记录头表
 table:equip_check_detail   # 设备点检记录行表(检查内容/方法/标准/结果/解决措施)
 table:erp_imp_log   # ERP导入日志(金蝶星辰数据导入批次)
+table:erp_integ_api   # ERP集成接口配置(2026-10-18):一张接口一行 = 方向(导入/转出)+分类(基础资料/单据/设备)+接口地址+对应MES面板+启用/排序;界面=ERP系统集成·ERP集成配置清单
+table:erp_integ_device   # ERP集成设备绑定(2026-10-18):接口×设备(设备编码取 bs_equip),带用途(产量采集/点检对象/保养对象/数据来源)
+table:erp_integ_field   # ERP集成字段映射(2026-10-18):一行 = MES字段/常量 → 金蝶接口字段,带映射层级/转换规则/必填
 table:feed_confirm   # 投料确认单头表(阶段:溶解/合成/A液/B液/浆体)
 table:feed_confirm_detail   # 投料确认单行表(投料成分/理论/实际)
 table:form_flow_link   # 单据流链接表(上游生单→下游单据占用,link_status=ACTIVE|RELEASED)
@@ -266,3 +273,13 @@ table:dm_key   # 各种软件接口Key值表
 # 2026-10-07 补登:rd_asm_bom_head/_detail、rd_mold_formula_head/_detail(2026-09-11 菜单并入后审计漏网);
 # 已清理 244 张(RENAME_*/_bak_*/tmp_*/t1/t2 + pr_* 已下架面板表 + 无引用遗留表),清单见
 # tools/migrate-drop-unused-tables.sql 与 tools/archive/_table-audit/drop-tables.txt。
+
+# ---- 数采平台(2026-10-18 新增 7 张;migrate-dc-platform-20261018.sql) ----
+# 在册 218 + 7 = 225 张, + 例外 3 = 228 张。
+table:bs_dc_gateway   # 数采网关台账(协议/地址/在线状态/最近心跳)
+table:bs_dc_device   # 数采设备台账(电子秤/扫码枪/看板/PLC;网关绑定/数采工程/组态/调试状态)
+table:bs_dc_point   # 数采采集点(设备下的采集变量:地址/单位/量程/采集周期)
+table:bs_dc_rule   # 数采规则(定时采集/变化上报/阈值报警)
+table:bs_dc_sample   # 数采采集流水(网关上报的实时数据,只增不改)
+table:bs_dc_alarm   # 数采报警记录(阈值超限等 + 处理留痕)
+table:bs_dc_status_log   # 数采在线状态日志(在线率统计依据)

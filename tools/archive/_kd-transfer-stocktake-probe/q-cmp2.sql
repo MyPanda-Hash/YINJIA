@@ -1,0 +1,7 @@
+﻿SET NOCOUNT ON;
+PRINT '=== 当前 kucun 按批号类别 ===';
+SELECT CASE WHEN lot_no IS NULL THEN 'NULL' WHEN lot_no='PC0000' THEN 'PC0000' ELSE 'REAL' END cat, COUNT(*) n FROM kucun GROUP BY CASE WHEN lot_no IS NULL THEN 'NULL' WHEN lot_no='PC0000' THEN 'PC0000' ELSE 'REAL' END;
+PRINT '=== 备份 kucun 按批号类别 ===';
+SELECT CASE WHEN lot_no IS NULL THEN 'NULL' WHEN lot_no='PC0000' THEN 'PC0000' ELSE 'REAL' END cat, COUNT(*) n FROM kucun_bak_20261018 GROUP BY CASE WHEN lot_no IS NULL THEN 'NULL' WHEN lot_no='PC0000' THEN 'PC0000' ELSE 'REAL' END;
+PRINT '=== 当前总量 vs 备份总量 ===';
+SELECT (SELECT SUM(yl) FROM kucun) 当前合计, (SELECT SUM(yl) FROM kucun_bak_20261018) 备份合计;

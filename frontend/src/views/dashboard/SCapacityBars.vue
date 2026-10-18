@@ -21,6 +21,8 @@
         </button>
       </div>
       <span class="cap-sub" :title="subText">{{ subText }}</span>
+      <!-- 设置上限(2026-10-18 用户口径):改的是产线档案 bs_prod_line.日产能,与档案面板双向同一列 -->
+      <button v-if="canEdit" type="button" class="cap-config" @click="openLimits">{{ tt('设置上限') }}</button>
     </div>
 
     <div v-if="loading && !scaled.rows.length" class="chart-empty">{{ tt('加载中') }}…</div>
@@ -67,6 +69,40 @@
         <span class="lg-k"><i class="lg-dot over"></i>&gt;100%</span>
       </div>
     </template>
+
+    <!-- 设置上限弹窗:只改日产能,本周期上限按当前周期天数实时折算(与图表同口径) -->
+    <el-dialog v-model="dlgVisible" :title="tt('设置上限')" width="680px" top="8vh" append-to-body destroy-on-close>
+      <div class="cap-dlg-tip">
+        {{ tt('上限 = 日产能 × 周期天数（日 1 / 周 7 / 月按当月自然日 / 年按当年自然日）。保存后立即写入「产线档案」，在档案里改日产能，这里也会跟着变。') }}
+      </div>
+      <div v-loading="dlgLoading" class="cap-dlg-body">
+        <el-table v-if="lines.length" :data="lines" size="small" height="360" border>
+          <el-table-column :label="tt('产线')" prop="line" min-width="120" show-overflow-tooltip />
+          <el-table-column :label="tt('日产能')" width="150">
+            <template #default="{ row }">
+              <el-input-number
+                v-model="row.daily"
+                :min="0"
+                :step="1000"
+                :precision="0"
+                size="small"
+                controls-position="right"
+                style="width: 118px"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('本周期上限')" width="150" align="right"
+                           class-name="cap-period-col" label-class-name="cap-period-col">
+            <template #default="{ row }">{{ fmtCompact(Math.round((Number(row.daily) || 0) * periodDays)) }}</template>
+          </el-table-column>
+        </el-table>
+        <div v-else-if="!dlgLoading" class="chart-empty">{{ tt('暂无数据') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="dlgVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="saveLimits">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -85,9 +121,12 @@
  * 且竖向柱能并排表达「实际 vs 上限」这组对照(横向条只能叠两层)。
  */
 import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { CAPACITY_PERIODS, capacitySubText, fmtCompact, scaleCapacity } from '@core/dashboard/capacityBars'
+import { canDo } from '@core/auth/panelAccess'
+import { useUserStore } from '@/stores/user'
 
 const periods = CAPACITY_PERIODS
 const period = ref(periods[0].key)
@@ -96,6 +135,21 @@ const loading = ref(false)
 const err = ref(false)
 /** 连点 tab 时丢弃过期响应(慢的那个后到会把新周期的数据画上去) */
 let seq = 0
+
+// ── 设置上限(2026-10-18):直接读写产线档案 bs_prod_line.日产能,与面板双向同源 ──
+const user = useUserStore()
+/** 与「产线档案」面板编辑同权限口径(修改动作词 modify;管理员恒过) */
+const canEdit = computed(() => canDo(user, 'PROD_LINE', 'modify'))
+const dlgVisible = ref(false)
+const dlgLoading = ref(false)
+const saving = ref(false)
+/** 弹窗行:[{ line, daily }](daily 是数字,绑定 el-input-number) */
+const lines = ref([])
+/** 当前周期的天数(后端 capacity 返回;用于本周期上限的即时折算,与图表同口径) */
+const periodDays = computed(() => {
+  const d = Number(payload.value?.days)
+  return Number.isFinite(d) && d > 0 ? d : 1
+})
 
 const scaled = computed(() => scaleCapacity(payload.value.rows || []))
 
@@ -150,6 +204,39 @@ async function fetchCapacity(mine) {
   const r = await request.get('/dashboard/capacity', { params: { period: period.value } })
   if (mine !== seq) return undefined
   return r?.data || { rows: [] }
+}
+
+/** 打开「设置上限」:取启用产线的日产能(与图表上限同一张表) */
+async function openLimits() {
+  dlgVisible.value = true
+  dlgLoading.value = true
+  lines.value = []
+  try {
+    const r = await request.get('/dashboard/capacity-lines')
+    lines.value = (r?.data || []).map((x) => ({ line: x.line, daily: Number(x.daily) || 0 }))
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || e?.message || tt('加载失败'))
+    dlgVisible.value = false
+  } finally {
+    dlgLoading.value = false
+  }
+}
+
+/** 保存 = 批量写回 bs_prod_line.日产能;成功后重取图表,档案面板那边看到的就是新值 */
+async function saveLimits() {
+  saving.value = true
+  try {
+    const items = lines.value.map((r) => ({ line: r.line, daily: Number(r.daily) || 0 }))
+    const r = await request.put('/dashboard/capacity-lines', items)
+    const n = r?.data?.updated
+    ElMessage.success(`${tt('产能上限已保存')}${n == null ? '' : '（' + n + '）'}`)
+    dlgVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || e?.message || tt('保存失败'))
+  } finally {
+    saving.value = false
+  }
 }
 
 onMounted(load)
@@ -208,6 +295,41 @@ onMounted(load)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 「设置上限」:与周期分段控件同重量级的描边按钮,靠右,不抢图表注意力 */
+.cap-config {
+  margin-left: auto;
+  border: 1px solid var(--t-border-light);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--t-text-2);
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.cap-config:hover {
+  border-color: #116a5b;
+  color: #116a5b;
+}
+.cap-config:focus-visible {
+  outline: 2px solid #116a5b;
+  outline-offset: 1px;
+}
+.cap-dlg-tip {
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--t-text-3);
+}
+.cap-dlg-body {
+  min-height: 140px;
+}
+/* 手机:隐藏「本周期上限」列,免得多出一截横向滚动(日产能照常可改) */
+@media (max-width: 768px) {
+  :deep(.cap-period-col) {
+    display: none;
+  }
 }
 .cap-plot {
   position: relative;

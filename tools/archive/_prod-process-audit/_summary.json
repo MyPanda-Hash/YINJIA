@@ -1,0 +1,152 @@
+[
+  {
+    "code": "WO_REPORT",
+    "title": "工序报工单",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "WO_REPORT_LIST",
+    "title": "报工记录",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "WO_COMPLETION_LIST",
+    "title": "完工明细",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "PROD_ABN",
+    "title": "生产异常处理单",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "DAY_REPORT",
+    "title": "生产日报表",
+    "rows": 5,
+    "tables": 1,
+    "heads": 16,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "FEED_CONFIRM",
+    "title": "投料确认单",
+    "rows": 5,
+    "tables": 1,
+    "heads": 7,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "MIX_RECORD",
+    "title": "物料混合记录",
+    "rows": 5,
+    "tables": 1,
+    "heads": 5,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "GRAN_RECORD",
+    "title": "造粒记录",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "WH_RECORD",
+    "title": "无黑处理登记",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  },
+  {
+    "code": "PACK_CONFIRM",
+    "title": "封箱确认",
+    "rows": 0,
+    "tables": 0,
+    "heads": 0,
+    "formItems": 0,
+    "formDialog": false,
+    "tabs": [],
+    "btns": [
+      "3",
+      "99+",
+      "查询"
+    ]
+  }
+]

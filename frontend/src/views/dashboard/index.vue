@@ -202,7 +202,8 @@
             <div class="quality-facts">
               <div><span>{{ tt('检验明细') }}</span><strong>{{ quality.total || 0 }}</strong></div>
               <div><span>{{ tt('非合格 / 待判') }}</span><strong class="danger-text">{{ qualityExceptions }}</strong></div>
-              <div><span>{{ tt('流程待办') }}</span><strong>{{ todos.length }}</strong></div>
+              <!-- title 里只放真实单据号(业务事实,不翻译):pending 单据来自 /dashboard/stats 的 todos -->
+              <div><span>{{ tt('流程待办') }}</span><strong :title="todoTip">{{ todos.length }}</strong></div>
             </div>
           </div>
 
@@ -348,6 +349,10 @@
           <div class="card-title">{{ tt('产能对比') }}</div>
           <div class="chart-box"><SCapacityBars /></div>
         </div>
+        <!-- 生产单据入口(2026-10-18 用户口径):生产计划只保留 订单结转/生产工单/快速排产/工单排产/
+             产线排产负荷 —— 真单据只有「生产工单」(plang),其余 4 项由后端给成页面入口按钮;
+             不再汇总生产记录/设备维护那批 doc 面板(用户口径「其他的面板的单据几乎不看」)。 -->
+        <DocEntry class="col-12" module="prod" source="prod-orders" @open="onDocOpen" />
       </div>
     </template>
 
@@ -376,6 +381,7 @@
             <SBars :data="stock.topItems" scroll :colors="['#537786', '#116a5b', '#3b8978', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" />
           </div>
         </div>
+        <DocEntry class="col-12" module="stock" @open="onDocOpen" />
       </div>
     </template>
 
@@ -414,6 +420,7 @@
           </div>
           <div class="chart-box"><SBars :data="salesProducts" label-width="146px" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
         </div>
+        <DocEntry class="col-12" module="sales" @open="onDocOpen" />
       </div>
     </template>
 
@@ -431,17 +438,10 @@
             </button>
           </div>
         </section>
-        <section class="card rd-feed">
-          <div class="card-head"><h3>{{ tt('最新单据') }}</h3><span class="rd-sub">{{ tt('各面板最近新增') }}</span></div>
-          <div v-if="!rdData.newDocs.length" class="rd-empty">{{ tt('暂无单据') }}</div>
-          <div v-else class="rd-list">
-            <button v-for="(d, i) in rdData.newDocs" :key="i" type="button" class="rd-item" @click="goPanel(d.panelCode, d.docNo)">
-              <span class="rd-badge new">{{ tt('新增') }}</span>
-              <span class="rd-txt" :title="`${tt(d.panelName)} ${d.docNo}`">{{ tt(d.panelName) }} {{ d.docNo }}</span>
-              <span class="rd-meta">{{ d.creator || '-' }} · {{ fmtRdTime(d.at) }}</span>
-            </button>
-          </div>
-        </section>
+        <!-- 单据入口(2026-10-18):研发页原本的「最新单据」就是同一件事(各面板最近新增、点行跳面板),
+             用户要求五个模块都有「单据入口」⇒ 这里直接换成本模块单据入口卡(最近 7 张,单列紧凑),
+             不再并列两张"最新单据"卡片。compact 见 DocEntry.vue。 -->
+        <DocEntry class="rd-feed" module="rd" compact @open="onDocOpen" />
         <section class="card rd-archive">
           <div class="card-head"><h3>{{ tt('面板档案本') }}</h3><span class="rd-sub">{{ tt('像翻档案一样查阅各面板文件') }}</span></div>
           <div class="rd-chips">
@@ -475,7 +475,7 @@
     <!-- ===== 质量 ===== -->
     <template v-else>
       <div class="dash-grid">
-        <div class="card metric-card col-3"><div class="kpi-num tone-steel">{{ quality.total }}</div><div class="kpi-title">{{ tt('检验明细总数') }}</div></div>
+        <div class="card metric-card col-3"><div class="kpi-num tone-steel">{{ quality.total }}</div><div class="kpi-title">{{ tt('送检数量合计') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-primary">{{ quality.pass }}</div><div class="kpi-title">{{ tt('合格数') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-danger">{{ quality.bad }}</div><div class="kpi-title">{{ tt('非合格数') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-warning">{{ quality.passRate }}%</div><div class="kpi-title">{{ tt('合格率') }}</div></div>
@@ -495,6 +495,7 @@
           <div class="card-title">{{ tt('不良物料分布') }}</div>
           <div class="chart-box"><SBars :data="quality.defectItems" :colors="['#b94d3f', '#d79a2b', '#9c7650', '#537786', '#708575', '#8a9a92']" /></div>
         </div>
+        <DocEntry class="col-12" module="quality" @open="onDocOpen" />
       </div>
     </template>
 
@@ -540,6 +541,7 @@ import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
 import SCapacityBars from './SCapacityBars.vue'
 import FlowBoard from './FlowBoard.vue'
+import DocEntry from './DocEntry.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { pickQuickEntries } from '@core/dashboard/deskQuick'
@@ -640,6 +642,10 @@ watch(mod, (v) => {
 function goPanel(panelCode, docNo) {
   if (!panelCode) return
   router.push({ path: `/panelx/list/${panelCode}`, query: docNo ? { focus: docNo } : {} })
+}
+/** 模块「单据入口」点了某张单:与研发「最新单据」/流程卡片同一跳转口径 */
+function onDocOpen(d) {
+  if (d) goPanel(d.panelCode, d.docNo)
 }
 function fmtRdTime(t) {
   if (!t) return ''
@@ -832,6 +838,8 @@ onBeforeUnmount(() => {
 
 // ---------- 概览数据 ----------
 const todos = computed(() => stats.value.todos || [])
+/** 待办悬停提示:逐个列出真实待审批单据号(空则不给 title,避免悬停出空气泡) */
+const todoTip = computed(() => todos.value.map((t) => t.docNo).filter(Boolean).join('\n'))
 const docStats = computed(() => stats.value.docStats || [])
 /** 单据流量:有量的排前面(降序),空面板垫底,最多 9 行 —— 30 个面板全摊开只是噪音 */
 const docVolume = computed(() => {
@@ -2224,6 +2232,18 @@ function go(path, title) {
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 14px;
+}
+/* 研发页栅格随屏宽收栏(2026-10-18):原只写死 3 栏 —— 375 宽时每格仅 ~109px,
+   卡片内容横向溢出(单据入口卡实测 scrollWidth > clientWidth)。中屏 2 栏、手机单栏。 */
+@media (max-width: 1100px) {
+  .rd-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .rd-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .card-head {
   display: flex;

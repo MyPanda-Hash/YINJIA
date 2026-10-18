@@ -1,0 +1,10 @@
+﻿SET NOCOUNT ON;
+DECLARE @cols nvarchar(max);
+SELECT @cols = STUFF((SELECT ',' + QUOTENAME(name) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.kucun') AND is_identity=0 ORDER BY column_id FOR XML PATH('')),1,1,'');
+BEGIN TRAN;
+DELETE FROM kucun;
+EXEC('INSERT INTO kucun (' + @cols + ') SELECT ' + @cols + ' FROM kucun_bak_20261018');
+COMMIT;
+SELECT (SELECT COUNT(*) FROM kucun) 行数, (SELECT SUM(yl) FROM kucun) 合计;
+PRINT '=== inh 月结结转行(月结刚生成的) ===';
+SELECT 单据编号, COUNT(*) n, SUM(数量) q FROM inh WHERE 单据类型=N'月结结转' GROUP BY 单据编号;

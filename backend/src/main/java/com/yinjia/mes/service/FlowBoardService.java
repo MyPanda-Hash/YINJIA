@@ -94,14 +94,21 @@ public class FlowBoardService {
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("name", def.name());
             if (def.isDoc()) {
-                n.put("docs", count("SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'"));
-                // 2026-10-16 性能专项:已审核/待审核原本是两条独立 SQL(每面板 2 次往返),
-                // 合并成一条按条件求和 —— 16 张单据面板就省下 16 次往返。
+                String col = def.groupCol();
+                if (table == null || col == null || table.isBlank() || col.isBlank()
+                        || !table.matches("[\\p{L}\\p{N}_]+") || !col.matches("[\\p{L}\\p{N}_]+")) return null;
+                n.put("docs", count("SELECT COUNT(DISTINCT [" + col + "]) FROM " + table
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(RTRIM([" + col + "]),'')<>''"));
+                // 已审核/待审核(2026-10-18 修正):只数**头表里还在的单据**,并按下单号去重。
+                //   原先直接数 yj_doc_status 留痕 —— 已删除的历史单(PURCHASE_IN 19 张、
+                //   QC_INSP_REC 12 张)仍算已审核 ⇒ 节点出现「单数 313 / 已审核 332 / 草稿 0」这种
+                //   三个数对不上的自相矛盾,与桌面「单据流量」卡同一 bug。
                 Map<String, Object> st = jdbc.queryForMap(
-                        "SELECT SUM(CASE WHEN shr IS NOT NULL THEN 1 ELSE 0 END) AS audited,"
-                                + " SUM(CASE WHEN pending = 'Y' THEN 1 ELSE 0 END) AS pending"
-                                + " FROM yj_doc_status WHERE panel_code = ? AND ISNULL(canceled,'N')<>'Y'", code);
+                        "SELECT COUNT(DISTINCT CASE WHEN s.shr IS NOT NULL THEN s.doc_no END) AS audited,"
+                                + " COUNT(DISTINCT CASE WHEN s.pending = 'Y' THEN s.doc_no END) AS pending"
+                                + " FROM yj_doc_status s WHERE s.panel_code = ? AND ISNULL(s.canceled,'N')<>'Y'"
+                                + " AND EXISTS(SELECT 1 FROM " + table + " h WHERE h.[" + col + "]=s.doc_no"
+                                + " AND ISNULL(h.asp_cancel,'N')<>'Y')", code);
                 n.put("audited", toInt(st.get("audited")));
                 n.put("pending", toInt(st.get("pending")));
                 n.put("draft", Math.max(0, toInt(n.get("docs")) - toInt(st.get("audited"))));
@@ -129,16 +136,27 @@ public class FlowBoardService {
 
     // ───────────────────────── 页面级节点 ─────────────────────────
 
-    /** 生产工单(plang 单轨):总行数 / 未排产 / 已排产在制 / 已完工(+ 待入库) */
+    /**
+     * 生产工单(plang 单轨):总行数 / 未排产 / 已排产在制 / 已完工 / **已结案**(2026-10-18 补)。
+     *
+     * <p>四个桶互斥且合计 = 总行数:未排产(产线空·未结案·未完工) + 已排产(有产线·未完工)
+     * + 已完工(完工状态=生产完工/已完工) + 已结案(ja=T/Y)。改前少了「已结案」一栏,
+     * 429 = 393+9+4 差 23/24 行,看起来像漏算;同时把「完工但没排产线」的历史行从待排产里剔掉
+     * (原先那 1 行既算未排产又算已完工)。
+     */
     private Map<String, Object> workOrder() {
         try {
             Map<String, Object> m = new LinkedHashMap<>();
             String base = " FROM plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y'";
+            String done = "ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工')";
+            String closed = "ISNULL(p.ja,'N') IN ('T','Y')";
             m.put("rows", count("SELECT COUNT(*)" + base));
-            m.put("unassigned", count("SELECT COUNT(*)" + base + " AND ISNULL(p.scx,N'')=N'' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"));
-            m.put("assigned", count("SELECT COUNT(*)" + base + " AND ISNULL(p.scx,N'')<>N'' AND NOT ("
-                    + "ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工'))"));
-            m.put("done", count("SELECT COUNT(*)" + base + " AND ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工')"));
+            m.put("unassigned", count("SELECT COUNT(*)" + base + " AND ISNULL(p.scx,N'')=N''"
+                    + " AND NOT (" + closed + ") AND NOT (" + done + ")"));
+            m.put("assigned", count("SELECT COUNT(*)" + base + " AND ISNULL(p.scx,N'')<>N''"
+                    + " AND NOT (" + done + ")"));
+            m.put("done", count("SELECT COUNT(*)" + base + " AND " + done));
+            m.put("closed", count("SELECT COUNT(*)" + base + " AND " + closed));
             m.put("qty", sum("SELECT SUM(ISNULL(p.pl_sl,0))" + base));
             m.put("doneQty", sum("SELECT SUM(ISNULL(p.rk_sl,0))" + base));
             return m;
@@ -190,14 +208,21 @@ public class FlowBoardService {
         }
     }
 
-    /** 出库预警:结余低于该批次预警数量的库存行(出库审核会被 StockWarnService 拦下) */
+    /**
+     * 出库预警 / 负库存:统一到库存页面同一张视图 **v_stock_balance**(2026-10-18 用户口径
+     * 「统一到同一视图 v_stock_balance」)。
+     *
+     * <p>改前读遗留批次表 kucun(现存量 315 行负) 而库存页读 v_stock_balance(780 行负),
+     * 同一块看板两个「负库存」数对不上。现两者同源;预警数量由视图从 kucun 按 仓库+存货 聚合
+     * (MAX,实测同组合阈值唯一,见 migrate-stock-balance-warn-20261018.sql)。
+     */
     private Map<String, Object> warn() {
         try {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("below", count("SELECT COUNT(*) FROM kucun WHERE ISNULL([预警数量],0) > 0"
-                    + " AND ISNULL(yl,0) < ISNULL([预警数量],0)"));
-            m.put("thresholded", count("SELECT COUNT(*) FROM kucun WHERE ISNULL([预警数量],0) > 0"));
-            m.put("negative", count("SELECT COUNT(*) FROM kucun WHERE ISNULL(yl,0) < 0"));
+            m.put("below", count("SELECT COUNT(*) FROM v_stock_balance"
+                    + " WHERE ISNULL(预警数量,0) > 0 AND ISNULL(现存量,0) < 预警数量"));
+            m.put("thresholded", count("SELECT COUNT(*) FROM v_stock_balance WHERE ISNULL(预警数量,0) > 0"));
+            m.put("negative", count("SELECT COUNT(*) FROM v_stock_balance WHERE ISNULL(现存量,0) < 0"));
             return m;
         } catch (Exception e) {
             return null;

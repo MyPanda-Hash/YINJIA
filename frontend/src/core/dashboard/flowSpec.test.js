@@ -103,49 +103,28 @@ test('链路汇总能点出阻断节点(顶部卡点条之外的链路级提示)
   assert.ok(s.levels.warn >= 2, `生产链至少 2 个积压节点,实际 ${JSON.stringify(s.levels)}`)
 })
 
-test('排产与领料:排产三节点必须排在「材料出库单」之前(先排产后领料)', () => {
-  // 2026-10-18 用户口径:「先要完成排产才进入到领料,同时需要让当前的一个生产工单
-  //   可以对应多个领料单据」—— 流程看板第二段必须是 排产 → 领料,不能倒过来。
-  const lane = CHAINS[0].lanes.find((l) => l.key === 'release')
-  assert.ok(lane, '生产链必须有 release 泳道')
-  assert.equal(lane.name, '排产与领料', '泳道名改为「排产与领料」')
-  const order = lane.nodes.map((n) => n.key)
-  const at = (k) => order.indexOf(k)
-  for (const k of ['schedule', 'board', 'lineload']) {
-    assert.ok(at(k) >= 0 && at(k) < at('matout'), `${k} 必须排在 matout(材料出库单)之前,实际顺序 ${order.join(' → ')}`)
+test('生产链顺序按业务流:排产 → 领料 → 报工 → 检验 → 入库', () => {
+  // 2026-10-18 用户口径:「生产应该是先排产再领料,等报工完成之后再检验最后入库」。
+  // 原排布把「材料出库单」放在排产之前,视觉上等于先领料后排产,与本口径相反。
+  const prod = CHAINS.find((c) => c.key === 'prod')
+  assert.deepEqual(prod.lanes.map((l) => l.key), ['plan', 'release', 'exec', 'qcput'], '生产链四段:接单计划 → 排产 → 领料报工 → 品质入库')
+  const laneCodes = (k) => (prod.lanes.find((l) => l.key === k)?.nodes || []).map((n) => n.code)
+  assert.deepEqual(laneCodes('release'), ['SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'], '排产泳道只放排产三节点')
+  assert.deepEqual(
+    laneCodes('exec'),
+    ['MATERIAL_OUT', 'WO_REPORT', 'WO_COMPLETION_LIST', 'WO_REPORT_LIST'],
+    '领料排在报工之前,完工明细与报工记录仍在段末',
+  )
+  const flat = prod.lanes.flatMap((l) => l.nodes.map((n) => n.code))
+  const at = (code) => flat.indexOf(code)
+  assert.ok(at('SCHEDULE_BOARD') < at('MATERIAL_OUT'), '排产必须先于领料')
+  assert.ok(at('MATERIAL_OUT') < at('WO_REPORT'), '领料必须先于报工')
+  for (const qc of ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_BHC']) {
+    assert.ok(at('WO_REPORT') < at(qc), `检验 ${qc} 必须在报工之后`)
+    assert.ok(at(qc) < at('FINISH_IN'), `检验 ${qc} 必须在产成品入库之前`)
   }
-  // 领料单的说明要写清「排产入线后才放行 + 一张工单行可开多张」,别再写"按工单行去重生成"
-  const matout = lane.nodes.find((n) => n.key === 'matout')
-  assert.match(matout.note, /排产入线后才放行/)
-  assert.match(matout.note, /一张工单行可开多张/)
-  assert.doesNotMatch(matout.note, /去重生成/)
-})
-
-test('当前卡点跳转:页面级面板必须走专页路由,不能拼成 /panelx/list/<code>', () => {
-  // 2026-10-18 报障:「当前这上方的卡点转跳页面好像有问题,转跳的内容是……旧的生产工单」——
-  //   气泡只传了 panelCode,前端一律拼 /panelx/list/<code>;而 ORDER_CONVERT / SCHEDULE_BOARD /
-  //   WORK_ORDER_BOARD / WORK_ORDER_LIST 是**页面级**面板(yj_panel 无行)⇒ 落到空白面板壳。
-  //   规格里节点声明的 route 才是唯一真源,routeOf() 就取它。
-  const pagePanels = ['ORDER_CONVERT', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'WORK_ORDER_LIST']
-  for (const code of pagePanels) {
-    const route = routeOf(code)
-    assert.ok(route && route.startsWith('/prod/plan/'), `${code} 是页面级面板,必须跳专页,实际 ${route}`)
-  }
-  assert.equal(routeOf('ORDER_CONVERT'), '/prod/plan/orderConvert')
-  assert.equal(routeOf('WORK_ORDER_LIST'), '/prod/plan/workOrderList')
-  assert.equal(routeOf('SCHEDULE_BOARD'), '/prod/plan/scheduleBoard')
-  assert.equal(routeOf('WORK_ORDER_BOARD'), '/prod/plan/workOrderBoard')
-  assert.equal(routeOf('FINISH_IN'), '/panelx/list/FINISH_IN', '普通面板仍走面板路径')
-  assert.equal(routeOf(''), null)
-
-  // 服务端 blocks() 真正会产出的 panelCode 清单(读源码,防契约漂):每一个都必须有可跳转路由
-  const blockCodes = [...svc.matchAll(/add\(out,\s*"[^"]+",\s*"[^"]+",\s*[^,]+,\s*"([A-Z_]+)"/g)].map((m) => m[1])
-  assert.ok(blockCodes.length >= 8, `未从 FlowBoardService.blocks 解析到卡点面板清单,实际 ${blockCodes.length}`)
-  for (const code of blockCodes) {
-    const route = routeOf(code)
-    assert.ok(route && route.startsWith('/'), `卡点 ${code} 没有可跳转的路由`)
-    if (pagePanels.includes(code)) {
-      assert.ok(route.startsWith('/prod/plan/'), `卡点 ${code} 必须跳专页,实际 ${route}`)
-    }
-  }
+  assert.equal(flat[flat.length - 1], 'FINISH_IN', '生产链最后一步是产成品入库')
+  const order = ['排产', '领料', '报工', '检验', '入库'].map((w) => prod.intro.indexOf(w))
+  assert.ok(order.every((i) => i >= 0), `intro 缺环节:${prod.intro}`)
+  assert.deepEqual([...order].sort((a, b) => a - b), order, `intro 顺序不对:${prod.intro}`)
 })

@@ -1,0 +1,15 @@
+﻿SET NOCOUNT ON;
+DECLARE @nos TABLE (no nvarchar(50) PRIMARY KEY);
+INSERT INTO @nos VALUES (N'DB-2026-10-0001'),(N'PD-2026-10-0001');
+DELETE FROM inh WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM outh WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bl_transfer WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bd_transfer WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bl_stocktake WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bd_stocktake WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM yj_doc_status WHERE doc_no IN (SELECT no FROM @nos);
+DELETE FROM yj_usage_log WHERE doc_no IN (SELECT no FROM @nos);
+DELETE FROM yj_form_approval WHERE form_no IN (SELECT no FROM @nos);
+DELETE FROM s_allno WHERE dh IN (SELECT no FROM @nos);
+PRINT '正式库剩余单据:';
+SELECT [单据编号] FROM bd_transfer UNION ALL SELECT [单据编号] FROM bd_stocktake;

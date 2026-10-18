@@ -2,15 +2,10 @@
  * flowSpec.js —— 「流程管控」看板的**声明式链路规格**(2026-10-16)
  *
  * 用户口径:「我的桌面缺失对生产过程和库存的一个流程管理视图,可以根据图片以及下面文字设计一个
- * 对生产过程和库存的流程管控」+ 两张链路的逐步说明(生产:销售订单→订单结转→生产工单→排产→
- * 领料→产线→报工→续序/完工→检验→产成品入库;库存:采购订单→暂收单→(来料检验?)→来料检验单→
+ * 对生产过程和库存的流程管控」+ 两张链路的逐步说明(生产:销售订单→订单结转→生产工单→排产→领料→
+ * 报工→续序/完工→检验→产成品入库;2026-10-18 用户口径复核:先排产再领料、报工完成才检验、最后入库;库存:采购订单→暂收单→(来料检验?)→来料检验单→
  * 检验数据记录+检验目录→合格→采购入库 / 不合格→退货单(特采)→特采单(二级审批)→采购入库;
  * 库存报表是查询表;出库有预警,低于预警无法审核)。
- *
- * ⚠ 2026-10-18 口径调整(用户:「先要完成排产才进入到领料,同时需要让当前的一个生产工单
- *   可以对应多个领料单据」):生产链**第二条泳道**由「领料与排产」改为「**排产与领料**」——
- *   快速排产 → 工单排产/预排线 → 产线排产负荷 → **材料出库单**;
- *   排产入线(scx 非空)+ 排产数量>0 才放行转领料,且一张工单行可开多张(见 WorkOrderPickingService)。
  *
  * 本文件只放**数据**:节点放第几条泳道、主数字读哪个口径、什么条件算积压/阻断、点了跳哪。
  * 图形与取数全部由此驱动 ——
@@ -32,7 +27,7 @@ export const CHAINS = [
     key: 'prod',
     name: '生产过程',
     tone: 'prod',
-    intro: '销售订单 → 结转 → 工单 → 排产 → 领料 → 报工续序 → 检验 → 产成品入库',
+    intro: '销售订单 → 结转 → 工单 → 排产 → 领料 → 报工 → 检验 → 产成品入库',
     lanes: [
       {
         key: 'plan', name: '生管泳道 · 接单与计划', hint: '订单进来后先结转成工单,才谈得上排产',
@@ -64,6 +59,7 @@ export const CHAINS = [
             subs: [
               { label: '已排产', ref: 'special.workorder.assigned' },
               { label: '已完工', ref: 'special.workorder.done' },
+              { label: '已结案', ref: 'special.workorder.closed' },
               { label: '排产数量', ref: 'special.workorder.qty' },
             ],
             warn: ['special.workorder.unassigned'],
@@ -72,7 +68,8 @@ export const CHAINS = [
         ],
       },
       {
-        key: 'release', name: '排产与领料', hint: '先排产(选产线入线)→ 再领料:排产完成才放行转领料,一张工单可开多张领料单',
+        // 2026-10-18 用户口径「先排产再领料」:排产单独立段,领料后移到执行段开头
+        key: 'release', name: '排产与预排线', hint: '先定产线与开工日:排进产线后仓库才有工单行可转领料单',
         nodes: [
           {
             key: 'schedule', name: '快速排产', code: 'SCHEDULE_BOARD', route: '/prod/plan/scheduleBoard',
@@ -100,6 +97,11 @@ export const CHAINS = [
             subs: [{ label: '产线数', ref: 'special.schedule.lines' }],
             note: '按开工日→交期把在制量均摊到每天,看哪条线压着活',
           },
+        ],
+      },
+      {
+        key: 'exec', name: '领料与报工', hint: '排产后按工单转领料单 → 扫码领料 → 报工 → 审核通过才进检验',
+        nodes: [
           {
             key: 'matout', name: '材料出库单', code: 'MATERIAL_OUT', route: '/panelx/list/MATERIAL_OUT',
             main: { label: '单据数', ref: 'nodes.MATERIAL_OUT.docs' },
@@ -108,13 +110,8 @@ export const CHAINS = [
               { label: '待审批', ref: 'nodes.MATERIAL_OUT.pending' },
             ],
             warn: ['nodes.MATERIAL_OUT.draft'],
-            note: '排产入线后才放行「转领料单」;一张工单行可开多张,只写单头,明细由仓库补填',
+            note: '排定产线后「转领料单」按工单行去重生成;只写单头,明细由仓库补填',
           },
-        ],
-      },
-      {
-        key: 'exec', name: '生产执行(五道工序:领料 · 报工)', hint: '报工达标才切下一道预排线,全部达标才完工',
-        nodes: [
           {
             key: 'woreport', name: '工序报工单', code: 'WO_REPORT', route: '/panelx/list/WO_REPORT',
             main: { label: '报工单', ref: 'nodes.WO_REPORT.docs' },
@@ -138,7 +135,7 @@ export const CHAINS = [
         ],
       },
       {
-        key: 'qcput', name: '品质与入库', hint: '检验合格数量 → 产成品入库单 → 仓库审核记账',
+        key: 'qcput', name: '品质与入库', hint: '报工完成后才检验:检验合格数量 → 产成品入库单 → 仓库审核记账',
         nodes: [
           {
             key: 'firstinsp', name: '首件检验单', code: 'QC_FIRST_INSP', route: '/panelx/list/QC_FIRST_INSP',

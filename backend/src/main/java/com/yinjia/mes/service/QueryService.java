@@ -507,18 +507,17 @@ public class QueryService {
                     Object cellAuditor = doc.get("审核人");
                     if (cellAuditor == null || String.valueOf(cellAuditor).isBlank()) {
                         doc.put("审核人", st.get("shr"));
-                        doc.put("审核时间", st.get("shsj"));
+                        doc.put("审核时间", auditTimeText(st.get("shsj")));
                     }
                 } else {
                     doc.put("审核人", st.get("shr"));
-                    doc.put("审核时间", st.get("shsj"));
+                    doc.put("审核时间", auditTimeText(st.get("shsj")));
                 }
                 doc.put("审批状态", "已通过");
             } else if ("审批中".equals(statusText)) {
                 doc.put("审批状态", "审批中");
                 doc.put("提交人", st.get("pending_by"));
-                Object pat = st.get("pending_at");
-                doc.put("提交时间", pat == null ? "" : pat);
+                doc.put("提交时间", auditTimeText(st.get("pending_at")));
             }
             docs.add(doc);
         }
@@ -742,6 +741,30 @@ public class QueryService {
             return v;
         }
         return v;
+    }
+
+    /**
+     * 审核时间 / 提交时间(yj_doc_status.shsj / pending_at)→ **本地墙钟文本**,再下发前端。
+     *
+     * 为什么要单独一个方法(2026-10-18 用户报障「审核时间显示时区偏 8 小时」):
+     *   这两个值**不是 yj_field 里的字段**,而是由 yj_doc_status 合成出来的虚拟字段,
+     *   走 `rowToLabels` 那条路(→ {@link #dateWallText})—— 而 dateWallText 是按 data_type
+     *   判断的('日期'/'日期时间'/'时间'),虚拟字段根本没有 data_type ⇒ 原样返回 Timestamp,
+     *   Jackson 按 UTC 序列化成 `2026-10-18T08:08:21.573+00:00`,而库里存的是本地墙钟 16:08。
+     *   ⇒ 与 dateWallText 同口径转成 'yyyy-MM-dd HH:mm:ss'(列表底栏/表单/打印都按字面显示)。
+     */
+    static String auditTimeText(Object v) {
+        if (v == null) return null;
+        try {
+            if (v instanceof java.sql.Timestamp ts) return ts.toLocalDateTime().format(DT_FMT);
+            if (v instanceof java.sql.Date d) return d.toLocalDate().atStartOfDay().format(DT_FMT);
+            if (v instanceof java.time.LocalDateTime d) return d.format(DT_FMT);
+            if (v instanceof java.time.LocalDate d) return d.atStartOfDay().format(DT_FMT);
+            if (v instanceof java.util.Date d) return new java.sql.Timestamp(d.getTime()).toLocalDateTime().format(DT_FMT);
+        } catch (RuntimeException e) {
+            return String.valueOf(v);
+        }
+        return String.valueOf(v);
     }
 
     private static final java.time.format.DateTimeFormatter D_FMT =

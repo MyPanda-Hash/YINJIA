@@ -5,14 +5,14 @@
          现在:每条 = 线型色块(实线/虚线) + 名称 + **最新值**,颜色与线型双重对应。 -->
     <div v-if="data.length" class="line-top">
       <span v-if="!compact" class="ctx-max">{{ tt('峰值') }} {{ peakText }}</span>
-      <span class="line-legend">
+      <span class="line-legend" :title="tt('图例数字 = 区间合计')">
         <span class="lg-k">
           <i class="lg-chip" :style="{ background: colorA }"></i>{{ legendA }}
-          <b class="lg-num" :style="{ color: colorA }">{{ last.added }}</b>
+          <b class="lg-num" :style="{ color: colorA }">{{ sum.added }}</b>
         </span>
         <span class="lg-k">
           <i class="lg-chip dashed" :style="{ '--c': colorB }"></i>{{ legendB }}
-          <b class="lg-num" :style="{ color: colorB }">{{ last.done }}</b>
+          <b class="lg-num" :style="{ color: colorB }">{{ sum.done }}</b>
         </span>
       </span>
     </div>
@@ -33,7 +33,7 @@
 <script setup>
 import { computed } from 'vue'
 import { tt } from '@/i18n'
-import { thinLabels, lastValues } from './chartLabels.js'
+import { thinLabels, sumValues } from './chartLabels.js'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
@@ -79,9 +79,8 @@ const peakText = computed(() => {
   const d = props.data[peakIdxA.value]
   return d ? `${d.date} · ${d.added || 0}` : ''
 })
-const lastA = computed(() => xysA.value[xysA.value.length - 1] || null)
-/** 两条序列的最新读数 —— 图例里直接显示,免去"追着线看最后一天是多少" */
-const last = computed(() => lastValues(props.data))
+/** 图例数字 = 区间合计(2026-10-18 用户报「显示 0」:原取最后一天,今天没业务就恒为 0) */
+const sum = computed(() => sumValues(props.data))
 /** X 轴标签抽稀(逻辑见 chartLabels.js,有单测):首尾必含、与折线等距点位对齐 */
 const xLabels = computed(() => thinLabels(props.data, props.maxLabels))
 </script>

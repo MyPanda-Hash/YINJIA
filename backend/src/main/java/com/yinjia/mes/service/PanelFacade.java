@@ -63,7 +63,7 @@ public class PanelFacade {
         out.put("detail", detailOf(cfg));
         out.put("buttonGroups", configService.groupsOfConfig(cfg));
         out.put("panelName", def.name());
-        out.put("selectConfig", new HashMap<>());
+        out.put("selectConfig", selectConfigOf(cfg));
         return out;
     }
 
@@ -89,8 +89,21 @@ public class PanelFacade {
         out.put("detailData", detailObj == null ? new HashMap<>() : detailObj);
         out.put("buttonGroups", configService.groupsOfConfig(cfg));
         out.put("panelName", def.name());
-        out.put("selectConfig", new HashMap<>());
+        out.put("selectConfig", selectConfigOf(cfg));
         return out;
+    }
+
+    /**
+     * 选单配置(2026-10-18 修):这两个描述符方法此前都**硬写空 HashMap** ——
+     * 前端 `selectConfigFor()` 拿到 `{}` 后(JS 里空对象是 truthy,被当成"有配置")继续往下走,
+     * `cfg.source` 是 undefined ⇒ 查询来源面板时一律报「来源单据加载失败」,**选单按钮等于点不动**。
+     * 配置本身在 {@link PanelConfigService#getPanelConfig} 里早已算好并放在 selectConfig 键上,
+     * 这里透传即可 —— 修在门面层,所有带选单的面板(采购入库单/生产工单/调拨单/盘点单…)一起恢复。
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> selectConfigOf(Map<String, Object> cfg) {
+        Object sc = cfg.get("selectConfig");
+        return sc instanceof Map<?, ?> m ? (Map<String, Object>) m : new HashMap<>();
     }
 
     @SuppressWarnings("unchecked")
