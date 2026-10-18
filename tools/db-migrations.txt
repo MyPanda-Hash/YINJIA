@@ -3737,6 +3737,11 @@ migrate-wlbom-menu-rollback-20261015.sql
 #   存量已审核单据补 AUDIT 留痕(yj_form_approval);只针对 QC_FIRST_INSP、幂等 + 自检。
 #   取证:两账套此前面板无审核入口 ⇒ 补录 0 行(属预期);修法代码侧 = PanelxList.DIRECT_AUDIT_PANELS + 纸面/报表「审核人」格。
 migrate-first-insp-audit-trail-20261018.sql
+# migrate-insp-gate-option-20261016.sql — 检验单生成门禁(成型完成)的**强度档位**写进 yj_panel.config:
+#   inspGate = off|warn|block(默认 block)、inspGateLegacy = pass|block(默认 pass);
+#   追加在既有 config 之后(不覆盖 fixedItems 等),已含该键则整行跳过(幂等);两账套均执行。
+#   读法见 WoInspGate.loadPolicy(字符串匹配,兼容级别 100 无 JSON 函数);改档位只需 UPDATE 该键,不必发版。
+migrate-insp-gate-option-20261016.sql
 # migrate-panel-line-table-20261018.sql — 造粒记录/无黑处理登记/封箱确认三个单表式 doc 面板补行表指针:
 #   yj_panel.line_table 为空 ⇒ QueryService.loadDocs 拼出 `FROM null t`(S0001/156,打开单据/列表/保存全 500);
 #   三张 *_detail 早已存在且恒空,只差元数据指针。纯 UPDATE(幂等)+ 自检「全库 doc 无『有头无行』」,两账套均执行。
