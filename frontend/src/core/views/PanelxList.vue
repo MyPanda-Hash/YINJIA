@@ -672,6 +672,26 @@
         @expand-change="onMcExpand"
       >
         <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
+        <!-- 报表面板的勾选列(2026-10-18,条码管理三面板):报表模式走的是这张表,不经过 blocks,
+             所以勾选列必须在这里单独出一列 —— 行键 = metadata.qrLabelKey(条码面板=「码内容」,一批一码),
+             勾选后工具栏「打印标签」按所选行出纸,并到 yj_barcode_label_log 留痕 -->
+        <el-table-column v-if="qrKey" width="40" fixed="left" align="center">
+          <template #header>
+            <el-checkbox
+              :model-value="qrReportAllChecked"
+              :indeterminate="qrReportSomeChecked"
+              :title="tt('本页全选')"
+              @change="(v) => qrToggleReportPage(v)"
+            />
+          </template>
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="qrSel.has(qrRowKey(row))"
+              :disabled="!qrRowKey(row)"
+              @change="() => qrToggleRow(row)"
+            />
+          </template>
+        </el-table-column>
         <!-- 库存月结明细(2026-10-15):展开该 (物料,仓库,批号) 在「上月」的全部单据 —— **一张表**,
              不按 入库/出库/结转 分组(用户口径:看「单据类型」就行);月结结转行显示成「2026-09月结」;
              数量带方向(入库正/出库负)⇒ 整串单据的合计就是该月净变动 -->
@@ -2120,7 +2140,7 @@
       </template>
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
-    <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
+    <QrLabelDialog v-model="qrVisible" :labels="qrLabels" :title="qrDialogTitle" :tip="qrDialogTip" />
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
 
@@ -4350,8 +4370,9 @@ function openQrLabels() {
  * 出纸沿用 QrLabelDialog(二维码 + 卡面 + 浏览器打印),服务端只落**留痕**(谁/何时/哪个码/哪张单)。
  */
 async function openBarcodeLabels() {
+  // 报表(flat)面板:数据在 reportList(当前页);单据面板才走 blocks
   const b = blocks.value.find((x) => x.isMain) || blocks.value[0]
-  const pageRows = b ? qrVisibleRows(b) : []
+  const pageRows = reportMode.value ? reportList.value : (b ? qrVisibleRows(b) : [])
   const picked = qrSel.value.size ? pageRows.filter((r) => qrSel.value.has(qrRowKey(r))) : pageRows
   const labels = barcodeLabelsOf(panelCode.value, picked)
   if (!labels.length) {
@@ -5297,6 +5318,16 @@ function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首�
 // 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
 // (仓位编码按仓内唯一,同码多仓不串选)。 ═══
 const qrSel = ref(new Set())
+/** 条码三面板的标签弹窗标题/提示(2026-10-18):组件默认是"材料二维码标签 + 物料编码|批号@数量",
+ *  在成品/半成品页显示会误导 ⇒ 按面板给标题;非条码面板(暂收单等)留空走组件默认。 */
+const qrDialogTitle = computed(() => {
+  if (!BARCODE_PANELS.includes(panelCode.value)) return ''
+  return tt(panelCode.value === 'BARCODE_FIN' ? '成品仓条码标签'
+    : panelCode.value === 'BARCODE_WIP' ? '半成品仓条码标签' : '材料仓条码标签')
+})
+const qrDialogTip = computed(() => (BARCODE_PANELS.includes(panelCode.value)
+  ? tt('二维码 = 码内容(编码|批号,一批一码);勾选一行出一张标签,可多选')
+  : ''))
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
 function qrRowKey(row) {
@@ -5313,6 +5344,22 @@ function qrRowKey(row) {
   const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
   return scope ? `${scope}\u0001${k}` : k
 }
+/** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
+const qrReportAllChecked = computed(() =>
+  reportList.value.length > 0 && reportList.value.every((r) => qrSel.value.has(qrRowKey(r))))
+const qrReportSomeChecked = computed(() =>
+  !qrReportAllChecked.value && reportList.value.some((r) => qrSel.value.has(qrRowKey(r))))
+function qrToggleReportPage(on) {
+  const s = new Set(qrSel.value)
+  for (const r of reportList.value) {
+    const k = qrRowKey(r)
+    if (!k) continue
+    if (on) s.add(k)
+    else s.delete(k)
+  }
+  qrSel.value = s
+}
+
 function qrToggleRow(row) {
   const k = qrRowKey(row)
   if (!k) return

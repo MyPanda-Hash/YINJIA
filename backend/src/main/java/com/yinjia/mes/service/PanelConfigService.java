@@ -296,7 +296,9 @@ public class PanelConfigService {
             // 条码三面板:打印标签(2026-10-18)——前端本地出纸(二维码+卡面),服务端只记留痕。
             // 单动作单组:前端按组渲染成一颗可见按钮(塞进「更多」会变下拉,用户找不到)。
             if (BARCODE_PANELS.contains(def.code())) {
-                buttonGroups.add(group("标签", List.of("打印标签")));
+                // 组名=动作名:工具栏单动作组把**组名**渲染成按钮文字("标签"会让人以为是筛选,
+                // 实测 2026-10-18 用户看不到"打印标签"),故组名直接叫「打印标签」。
+                buttonGroups.add(group("打印标签", List.of("打印标签")));
             }
             // 库存三报表的金额列读 inv_cost_ledger(移动加权成本),口径=物化值,需可手工重算:
             // 审核钩子覆盖走 ButtonService 的审核,但金蝶同步等旁路写入不经过审核动作。

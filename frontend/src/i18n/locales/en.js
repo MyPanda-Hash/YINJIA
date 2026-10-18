@@ -1486,6 +1486,10 @@ export default {
     '打印': 'Print',
     '材料二维码标签': 'Material QR Labels',
     '打印标签': 'Print Labels',
+    '材料仓条码标签': 'Material warehouse barcode label',
+    '半成品仓条码标签': 'WIP warehouse barcode label',
+    '成品仓条码标签': 'Finished goods barcode label',
+    '二维码 = 码内容(编码|批号,一批一码);勾选一行出一张标签,可多选': 'QR = barcode text (code|batch, one batch one code); one label per selected row, multi-select supported',
     // 2026-10-18 条码管理三面板:工具栏「标签」组与留痕提示
     '标签': 'Labels',
     '当前页没有可打印的条码行': 'No printable barcode rows on this page',
