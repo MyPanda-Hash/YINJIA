@@ -102,3 +102,21 @@ test('链路汇总能点出阻断节点(顶部卡点条之外的链路级提示)
   assert.ok(s.total > 0)
   assert.ok(s.levels.warn >= 2, `生产链至少 2 个积压节点,实际 ${JSON.stringify(s.levels)}`)
 })
+
+test('排产与领料:排产三节点必须排在「材料出库单」之前(先排产后领料)', () => {
+  // 2026-10-18 用户口径:「先要完成排产才进入到领料,同时需要让当前的一个生产工单
+  //   可以对应多个领料单据」—— 流程看板第二段必须是 排产 → 领料,不能倒过来。
+  const lane = CHAINS[0].lanes.find((l) => l.key === 'release')
+  assert.ok(lane, '生产链必须有 release 泳道')
+  assert.equal(lane.name, '排产与领料', '泳道名改为「排产与领料」')
+  const order = lane.nodes.map((n) => n.key)
+  const at = (k) => order.indexOf(k)
+  for (const k of ['schedule', 'board', 'lineload']) {
+    assert.ok(at(k) >= 0 && at(k) < at('matout'), `${k} 必须排在 matout(材料出库单)之前,实际顺序 ${order.join(' → ')}`)
+  }
+  // 领料单的说明要写清「排产入线后才放行 + 一张工单行可开多张」,别再写"按工单行去重生成"
+  const matout = lane.nodes.find((n) => n.key === 'matout')
+  assert.match(matout.note, /排产入线后才放行/)
+  assert.match(matout.note, /一张工单行可开多张/)
+  assert.doesNotMatch(matout.note, /去重生成/)
+})

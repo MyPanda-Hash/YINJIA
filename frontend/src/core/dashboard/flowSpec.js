@@ -2,10 +2,15 @@
  * flowSpec.js —— 「流程管控」看板的**声明式链路规格**(2026-10-16)
  *
  * 用户口径:「我的桌面缺失对生产过程和库存的一个流程管理视图,可以根据图片以及下面文字设计一个
- * 对生产过程和库存的流程管控」+ 两张链路的逐步说明(生产:销售订单→订单结转→生产工单→领料/排产→
- * 产线→报工→续序/完工→检验→产成品入库;库存:采购订单→暂收单→(来料检验?)→来料检验单→
+ * 对生产过程和库存的流程管控」+ 两张链路的逐步说明(生产:销售订单→订单结转→生产工单→排产→
+ * 领料→产线→报工→续序/完工→检验→产成品入库;库存:采购订单→暂收单→(来料检验?)→来料检验单→
  * 检验数据记录+检验目录→合格→采购入库 / 不合格→退货单(特采)→特采单(二级审批)→采购入库;
  * 库存报表是查询表;出库有预警,低于预警无法审核)。
+ *
+ * ⚠ 2026-10-18 口径调整(用户:「先要完成排产才进入到领料,同时需要让当前的一个生产工单
+ *   可以对应多个领料单据」):生产链**第二条泳道**由「领料与排产」改为「**排产与领料**」——
+ *   快速排产 → 工单排产/预排线 → 产线排产负荷 → **材料出库单**;
+ *   排产入线(scx 非空)+ 排产数量>0 才放行转领料,且一张工单行可开多张(见 WorkOrderPickingService)。
  *
  * 本文件只放**数据**:节点放第几条泳道、主数字读哪个口径、什么条件算积压/阻断、点了跳哪。
  * 图形与取数全部由此驱动 ——
@@ -27,7 +32,7 @@ export const CHAINS = [
     key: 'prod',
     name: '生产过程',
     tone: 'prod',
-    intro: '销售订单 → 结转 → 工单 → 领料/排产 → 报工续序 → 检验 → 产成品入库',
+    intro: '销售订单 → 结转 → 工单 → 排产 → 领料 → 报工续序 → 检验 → 产成品入库',
     lanes: [
       {
         key: 'plan', name: '生管泳道 · 接单与计划', hint: '订单进来后先结转成工单,才谈得上排产',
@@ -67,18 +72,8 @@ export const CHAINS = [
         ],
       },
       {
-        key: 'release', name: '领料与排产', hint: '两条支路:要料的走领料单,要产线的走快速排产',
+        key: 'release', name: '排产与领料', hint: '先排产(选产线入线)→ 再领料:排产完成才放行转领料,一张工单可开多张领料单',
         nodes: [
-          {
-            key: 'matout', name: '材料出库单', code: 'MATERIAL_OUT', route: '/panelx/list/MATERIAL_OUT',
-            main: { label: '单据数', ref: 'nodes.MATERIAL_OUT.docs' },
-            subs: [
-              { label: '草稿', ref: 'nodes.MATERIAL_OUT.draft' },
-              { label: '待审批', ref: 'nodes.MATERIAL_OUT.pending' },
-            ],
-            warn: ['nodes.MATERIAL_OUT.draft'],
-            note: '「转领料单」按工单行去重生成;只写单头,明细由仓库补填',
-          },
           {
             key: 'schedule', name: '快速排产', code: 'SCHEDULE_BOARD', route: '/prod/plan/scheduleBoard',
             main: { label: '待排产笔数', ref: 'special.schedule.pool' },
@@ -88,7 +83,7 @@ export const CHAINS = [
               { label: '在产线', ref: 'special.schedule.lines' },
             ],
             warn: ['special.schedule.pool'],
-            note: '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入',
+            note: '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入;排产入线是领料的前置条件',
           },
           {
             key: 'board', name: '工单排产 / 预排线', code: 'WORK_ORDER_BOARD', route: '/prod/plan/workOrderBoard',
@@ -104,6 +99,16 @@ export const CHAINS = [
             main: { label: '负荷行数', ref: 'nodes.LINE_LOAD.rows' },
             subs: [{ label: '产线数', ref: 'special.schedule.lines' }],
             note: '按开工日→交期把在制量均摊到每天,看哪条线压着活',
+          },
+          {
+            key: 'matout', name: '材料出库单', code: 'MATERIAL_OUT', route: '/panelx/list/MATERIAL_OUT',
+            main: { label: '单据数', ref: 'nodes.MATERIAL_OUT.docs' },
+            subs: [
+              { label: '草稿', ref: 'nodes.MATERIAL_OUT.draft' },
+              { label: '待审批', ref: 'nodes.MATERIAL_OUT.pending' },
+            ],
+            warn: ['nodes.MATERIAL_OUT.draft'],
+            note: '排产入线后才放行「转领料单」;一张工单行可开多张,只写单头,明细由仓库补填',
           },
         ],
       },

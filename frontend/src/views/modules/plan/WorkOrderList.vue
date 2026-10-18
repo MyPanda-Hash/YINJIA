@@ -98,7 +98,8 @@
       <el-table-column :label="tt('转单数量')" prop="排产数量" width="95" align="right" />
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
       <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
-      <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
+      <!-- 领料单号(2026-10-18):一张工单可对应多张领料单,列里是逗号分隔的全部已审核单号 —— 加宽便于直接看 -->
+      <el-table-column :label="tt('领料单号')" prop="领料单号" width="200" show-overflow-tooltip />
       <el-table-column :label="tt('成型配方')" width="170" show-overflow-tooltip>
         <template #default="{ row }">{{ row['成型配方单号'] || '-' }}{{ row['成型配方版本'] ? ` / ${row['成型配方版本']}` : '' }}</template>
       </el-table-column>
@@ -445,14 +446,17 @@ async function doPrintTask(mode) {
  * 转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单,打印入口不再保留)。
  * 勾选工单行 → 逐个生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号 + **工单行号**
  * (审核出库后后端 ManuWritebackService 按行回写工单「领料单号」,本页该列随之逐行点亮)。
+ * ⚠ **先排产后领料**(用户口径 2026-10-18:「先要完成排产才进入到领料」):
+ *   勾选行必须已排入产线(生产线非空)且排产数量>0;本页先挡一道给出可读提示,
+ *   后端 WorkOrderPickingService 同口径再兜一层(并发撤销排产也拦得住)。
  * ⚠ **标识 = 工单号 + 工单行号**(用户口径 2026-10-15:「就是当前的工单号加工单行号作为标识,
  *   每个独立进行」+「工单号+工单行号 就为当前的**一个新的单**的模式」):
- *   **一个标识 ⇒ 一张新领料单**;plang 里同一标识可能有多个物理行(同订单行分批转单,批次号不同),
- *   按用户口径它们是同一个标识 ⇒ 只转一张(故计数/去重都用 (工单号,工单行号),**不是** 行id)。
+ *   一批勾选里同一标识只转一张(plang 里同一标识可能有多个物理行——同订单行分批转单,批次号不同);
+ *   **再次点击=再开一张**:2026-10-18 用户口径「一个生产工单可以对应多个领料单据」,
+ *   同一工单行可同时存在多张草稿,不再有「已有未审核领料单」的拦截。
  * ⚠ **明细留空**:MES 自建 BOM 已下架(2026-10-04),配方/工艺清单表全空、遗留 mate 是光缆旧数据,
  *   系统内没有可自动展开的材料来源 ⇒ 材料行由仓库在材料出库单面板按实发补填。
- * 后端守卫:未排产(排产数量 0)/已结案 不给转;该标识已有未审核领料单时拒绝
- *   (见 WorkOrderPickingService,守卫按 (加工单号,工单行号) 判)。
+ * 后端守卫:未排产(产线空或排产数量 0)/已结案 不给转(见 WorkOrderPickingService)。
  */
 async function toPicking() {
   // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
@@ -460,6 +464,15 @@ async function toPicking() {
   if (!alive.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
   // 计数按**标识**去重(标识 = 工单号 + 工单行号;同标识的多物理行只算一个、只转一张)
   const keys = [...new Set(alive.map((r) => `${r.工单号}#${r.工单行号}`))]
+  // 排产前置(2026-10-18):未排入产线 / 排产数量 0 的行直接点名拦下 —— 别等后端逐行回执
+  const unscheduled = keys.filter((k) => {
+    const r = alive.find((x) => `${x.工单号}#${x.工单行号}` === k)
+    return !String(r?.['生产线'] || '').trim() || Number(r?.['排产数量'] || 0) <= 0
+  })
+  if (unscheduled.length) {
+    ElMessage.warning(`${tt('以下工单行未排产(未排入产线),请先在「快速排产」排入产线后再转领料单')}:${unscheduled.join('、')}`)
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `${tt('确认为选中的')} ${keys.length} ${tt('个工单行转领料单')}?`,
@@ -472,7 +485,7 @@ async function toPicking() {
     })
     const d = res.data || {}
     const list = d['单号清单'] || []
-    ElMessage.success(`${tt('已生成领料单')} ${list.join('、')}（${tt('材料明细请在材料出库单里补填,审核后自动回写工单领料单号')}）`)
+    ElMessage.success(`${tt('已生成领料单')} ${list.join('、')}（${tt('材料明细请在材料出库单里补填,审核后自动回写工单领料单号')};${tt('同一工单行可继续再转多张')}）`)
     if ((d['失败行'] || []).length) ElMessage.warning(`${tt('未转成功')}：${d['失败行'].join('; ')}`)
     load()
     // 生成后可直接去材料出库单补材料明细(不强制:也可稍后自己进面板)

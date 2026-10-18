@@ -3632,6 +3632,10 @@ export default {
     '个工单行转领料单': 'work order line(s)?',
     '已生成领料单': 'Pick lists created',
     '材料明细请在材料出库单里补填,审核后自动回写工单领料单号': 'Add the material lines in the material issue slip; the picking no. is written back to the WO after audit',
+    '同一工单行可继续再转多张': 'The same work-order line can have more pick lists',
+    // 2026-10-18 先排产后领料(用户口径):未排入产线的行直接点名拦下,先给出可读提示
+    '以下工单行未排产(未排入产线),请先在「快速排产」排入产线后再转领料单':
+      'These work-order lines are not scheduled (no production line yet); assign a line in Quick Scheduling before creating pick lists',
     '未转成功': 'Not converted',
     '领料单已生成,现在去「材料出库单」补材料明细吗?': 'Pick list(s) created. Open the material issue slip to add material lines now?',
     '去补明细': 'Add lines',
@@ -3768,19 +3772,20 @@ export default {
     '无在办': 'Nothing open',
     '无数据': 'No data',
     '生管泳道 · 接单与计划': 'Planning lane · orders & planning',
-    '领料与排产': 'Picking & scheduling',
+    '排产与领料': 'Scheduling & picking',
     '生产执行(五道工序:领料 · 报工)': 'Execution (five operations: picking · job reporting)',
     '品质与入库': 'Quality & receipt',
     '采购与收料': 'Purchasing & receiving',
     '检验与判定': 'Inspection & verdict',
     '入库 / 退货 / 特采': 'Receipt / return / concession',
     '库存查询与预警(旁路)': 'Inventory queries & alerts (side lane)',
-    '销售订单 → 结转 → 工单 → 领料/排产 → 报工续序 → 检验 → 产成品入库':
-      'Sales order → convert → work order → picking/scheduling → job reporting → inspection → finished goods receipt',
+    '销售订单 → 结转 → 工单 → 排产 → 领料 → 报工续序 → 检验 → 产成品入库':
+      'Sales order → convert → work order → scheduling → picking → job reporting → inspection → finished goods receipt',
     '采购订单 → 暂收单 →(来料检验?)→ 检验/退货/特采 → 采购入库 → 转 ERP':
       'Purchase order → receipt → (incoming inspection?) → inspection / return / concession → purchase receipt → ERP',
     '订单进来后先结转成工单,才谈得上排产': 'Orders convert into work orders before scheduling can start',
-    '两条支路:要料的走领料单,要产线的走快速排产': 'Two branches: material goes through picking, capacity through quick scheduling',
+    '先排产(选产线入线)→ 再领料:排产完成才放行转领料,一张工单可开多张领料单':
+      'Schedule first (assign a line), then pick: picking is released only after scheduling, and one work order may have several pick lists',
     '报工达标才切下一道预排线,全部达标才完工':
       'The next pre-lined operation starts only when the current one meets its plan; all operations met means completed',
     '检验合格数量 → 产成品入库单 → 仓库审核记账':
@@ -3798,10 +3803,10 @@ export default {
       'A routing must be chosen before converting into a work order; line-level links prevent double conversion',
     '转工单直落参考库 plang,无需审核即入待排产池':
       'Converting writes straight into plang; no approval needed before the pool',
-    '「转领料单」按工单行去重生成;只写单头,明细由仓库补填':
-      'Picking is generated per work-order line (deduplicated); header only, the warehouse fills the lines',
-    '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入':
-      'Pool = work-order lines with no line and not closed; pick a line (with load) and assign singly or in batch',
+    '排产入线后才放行「转领料单」;一张工单行可开多张,只写单头,明细由仓库补填':
+      'Picking is released only after the line is assigned; one work-order line may have several pick lists — header only, the warehouse fills the lines',
+    '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入;排产入线是领料的前置条件':
+      'Pool = work-order lines with no line and not closed; pick a line (with load) and assign singly or in batch — scheduling is the prerequisite for picking',
     '选择工序 → 预排线(工序·工序序·计划产线·计划数量)':
       'Pick operations → pre-line (operation · sequence · planned line · planned qty)',
     '按开工日→交期把在制量均摊到每天,看哪条线压着活':
@@ -3896,7 +3901,7 @@ export default {
     '合格 / 不合格分流': 'Pass / reject split',
     '检验合格 → 入库': 'Inspection passed → receipt',
     '报工审核通过': 'Job report approved',
-    '转领料单 / 排产': 'To picking / schedule',
+    '排产完成 → 转领料单': 'Scheduled → create pick list',
 
   },
 

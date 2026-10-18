@@ -131,26 +131,30 @@ public class ManuWritebackService {
      * 行标识 = **工单号 + 工单行号**(用户口径 2026-10-15:「工单号加工单行号作为标识,每个独立进行」)。
      * 领料单头带 工单行号(= plang.pl_xc)⇒ 该行号的领料单号只写**该行号**的 ll_no2(工单列表逐行点亮);
      * 工单行号 空/0 的老单(手工建的 / 粒度修正前生成的)按**工单级**兜底写该单全部行 —— 旧行为不变。
-     * 重算式:某行没有任何已审核领料单 → 清空(弃审对称回收);每行各取最近 3 张。
+     * 重算式:某行没有任何已审核领料单 → 清空(弃审对称回收)。
+     *
+     * <p>**一张工单可开多张领料单**(用户口径 2026-10-18)—— 该行的单号**不再截 3 张**:
+     * 全部已审核单号按单号倒序(新→旧)写入 ll_no2;
+     * ⚠ 列宽 nvarchar(400)(migrate-material-out-multi-pick-20261018.sql 已同批加宽:
+     * plang 原 60、镜像表 plang_pc 原 30),装不下时保留**最近的若干张**,不截半截单号。
      */
     private void refreshPickList(String contract, String user) {
         List<Map<String, Object>> docs = jdbc.queryForList(
-                "SELECT TOP 50 h.[单据编号] AS no, ISNULL(h.[工单行号], 0) AS xc FROM bd_material_out h"
+                "SELECT TOP 200 h.[单据编号] AS no, ISNULL(h.[工单行号], 0) AS xc FROM bd_material_out h"
                         + " JOIN yj_doc_status s ON s.panel_code = 'MATERIAL_OUT' AND s.doc_no = h.[单据编号]"
                         + " WHERE h.[加工单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
                         + " AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y'"
                         + " ORDER BY h.[单据编号] DESC", contract);
-        Map<Integer, List<String>> byXc = new LinkedHashMap<>();   // 工单行号 -> 该行最近 3 张单号
+        Map<Integer, List<String>> byXc = new LinkedHashMap<>();   // 工单行号 -> 该行全部已审核单号(新→旧)
         List<String> general = new ArrayList<>();                  // 工单级(无行号)老单
         for (Map<String, Object> d : docs) {
             String no = String.valueOf(d.get("no"));
             int xc = (int) numOr(d.get("xc"));
             if (xc == 0) {
-                if (general.size() < 3) general.add(no);
+                general.add(no);
                 continue;
             }
-            List<String> l = byXc.computeIfAbsent(xc, k -> new ArrayList<>());
-            if (l.size() < 3) l.add(no);
+            byXc.computeIfAbsent(xc, k -> new ArrayList<>()).add(no);
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, ISNULL(pl_xc, 0) AS xc FROM dbo.plang WHERE pl_no = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
@@ -158,11 +162,27 @@ public class ManuWritebackService {
         for (Map<String, Object> row : rows) {
             List<String> nos = byXc.get((int) numOr(row.get("xc")));
             if (nos == null || nos.isEmpty()) nos = general;   // 该行没有专属领料单 ⇒ 工单级老单兜底
-            String noList = String.join(",", nos);
+            String noList = joinNos(nos);
             jdbc.update("UPDATE dbo.plang SET ll_no2 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     noList.isEmpty() ? null : noList, user, row.get("id"));
             WorkOrderScheduleRecord.sync(jdbc, row.get("id"), user);
         }
+    }
+
+    /** ll_no2 列宽(nvarchar(400))—— 预留 8 字符余量,装不下就只保留最近几张,不写半截单号 */
+    private static final int LL_NO2_MAX = 400;
+
+    /** 单号清单(新→旧)按列宽拼成 "CL-…,CL-…";超出列宽时保留最近的若干张 */
+    private static String joinNos(List<String> nos) {
+        StringBuilder sb = new StringBuilder();
+        for (String no : nos) {
+            if (no == null || no.isBlank()) continue;
+            int add = (sb.length() == 0 ? 0 : 1) + no.length();
+            if (sb.length() + add > LL_NO2_MAX - 8) break;
+            if (sb.length() > 0) sb.append(',');
+            sb.append(no);
+        }
+        return sb.toString();
     }
 
     private static double numOr(Object o) {
