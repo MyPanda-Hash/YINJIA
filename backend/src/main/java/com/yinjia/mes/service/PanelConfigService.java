@@ -692,7 +692,28 @@ public class PanelConfigService {
             List<Map<String, String>> refMap = buildRefMap(def, f);
             if (!refMap.isEmpty()) m.put("refMap", refMap);
         }
+        // 面板名称(2026-10-18,数据建模·字段管理 FIELDMGR):数据来自 yj_field 自身,而 yj_field 里
+        // **没有面板名称这一列** —— 名称是 panel_code 的关联显示名。故按"同名物理列不存在"判定为
+        // **派生列**:下发 profile=panel,由 QueryService 按 codeCol(面板编码) LEFT JOIN yj_panel 带出。
+        // 判定标准是"这张表上确实没有这一列"(sys.columns),没有任何面板靠约定名起作用;
+        // 表/列不存在时 profile 不下发 ⇒ 行为与改造前一致。
+        if (derivedPanelName(def, f)) m.put("profile", "panel");
         return m;
+    }
+
+    /** 该字段是否为「面板名称」派生列(表上没有同名物理列,且字段名恰为 面板名称) */
+    private boolean derivedPanelName(PanelRegistry.PanelDef def, PanelRegistry.FieldDef f) {
+        if (!"面板名称".equals(f.label())) return false;
+        String table = def.lineTable();
+        if (table == null || table.isBlank() || def.codeCol() == null || def.codeCol().isBlank()) return false;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                    Integer.class, "dbo." + table, f.col());
+            return n != null && n == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
