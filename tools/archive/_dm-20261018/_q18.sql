@@ -1,0 +1,11 @@
+﻿SET NOCOUNT ON;
+PRINT 'sys.tables';
+SELECT COUNT(*) n FROM sys.tables;
+PRINT 'sys.objects U 名字含 qc';
+SELECT COUNT(*) n FROM sys.objects WHERE type='U' AND name LIKE 'qc_%';
+PRINT 'yj_panel 数量';
+SELECT COUNT(*) n FROM yj_panel;
+PRINT 'QC_PROC_INSP 面板';
+SELECT COUNT(*) n FROM yj_panel WHERE panel_code='QC_PROC_INSP';
+PRINT 'bs_qc_plan 存在?';
+SELECT OBJECT_ID('dbo.bs_qc_plan') oid;

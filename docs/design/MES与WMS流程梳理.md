@@ -96,12 +96,20 @@
 - 例：`QC_INSP` 的 `module_group='智能供应链'`、`category='采购管理'`，菜单却在**品质管理·来料品质**；
   `QC_MOLD_INSP` 的 `module_group='生产制造'`，菜单却在**品质管理·制程品质**；
   库存明细/统计/报表 11 张面板 `module_group='库存核算'`（`category='报表'`），菜单却分在三个二级域。
-- `module_group` 是**历史碎值**（共 14 种：采购管理/订单管理/基础设置/基础资料/基础数据/生产管理/
-  委外加工/库存核算/品质管理/研发管理/基础档案…），保留用途是**读权限放行**
+- `module_group` 是**历史碎值**（15 种上下：采购管理/订单管理/基础设置/基础资料/基础数据/生产管理/
+  委外加工/库存核算/库存报表/销售管理/物料及价格/品质管理/研发管理/基础档案/其他…），保留用途是**读权限放行**
   (`PanelPermissionService.readablePanels` 按同模块放行)；对外展示由 `ReportService.NAV_GROUP`
-  单向投影到 7 个一级域名。
-- 最近一次动它的是 `tools/fix-stock-report-module-group.sql`(2026-10-10 写、2026-10-14 10:27 执行)：
-  4 张库存报表的 `module_group` 原为乱码 `????`(3F003F003F003F00)，已写回「库存核算」。
+  单向投影到导航一级模块（`NAV_GROUP_ORDER`）。投影后**实际只会出现 6 组**：
+  我的桌面 / 研发管理 / 智能供应链 / 生产制造 / 品质管理 / 基础档案 —— 与 `frontend/src/business/menus.js`
+  的 6 个一级模块一一对应。
+  ⚠ **归并表漏一个值,权限矩阵里就会冒出一个导航没有的野分组**（2026-10-16 用户报障
+  「要按照模块来收纳面板，现在多了一个基础设置和系统管理」即此:`基础设置`=25 张基础资料面板漏登记、
+  `系统管理`=库存明细那句 `module_group IS NULL ⇒ 系统管理` 的兜底值被写死）。
+  闸门:`node tools/verify/perm-groups.cjs`（分组名必须全是导航一级模块 + 不重不漏 + 总数 135）;
+  修见 `tools/migrate-stock-detail-module-group-20261016.sql` 与 `ReportService.NAV_GROUP` 的注释。
+- 最近两次动它:`tools/fix-stock-report-module-group.sql`（2026-10-10 写、2026-10-14 10:27 执行）把
+  4 张库存报表的 `module_group` 从乱码 `????`(3F003F003F003F00) 写回「库存核算」；
+  2026-10-16 同族第 5 张 STOCK_DETAIL（库存明细）从「系统管理」写回「库存核算」。
 
 ---
 

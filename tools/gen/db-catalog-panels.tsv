@@ -1,43 +1,45 @@
 panel_code	panel_name	category	mode	line_table	head_table	group_col	pk_col	code_col	prefix	date_col	page_size	detail_key	module_group	config	config_at	panel_name_en
+BARCODE_FIN	成品仓条码管理	报表	flat	v_barcode_finished			id			单据日期	50	items	库存核算			Finished Goods Warehouse Barcode
+BARCODE_MAT	材料仓条码管理	报表	flat	v_barcode_material			id			单据日期	50	items	库存核算			Material Warehouse Barcode
+BARCODE_WIP	半成品仓条码管理	报表	flat	v_barcode_wip			id			生产日期	50	items	生产制造			WIP Warehouse Barcode
 CGD	采购单	单据	doc	Porder		od_no	id		CH	od_date	20	items	订单管理			Purchase Order
-CUR	币别	基础设置	archive	bs_currency			id	编码			50	items	基础设置			Currency
-CUSGRP	客户分类	基础设置	archive	bs_customer_group			id	编码			50	items	基础设置			Customer Group
+CUR	币别	基础设置	archive	bs_currency			id	编码			50	cur	基础设置			Currency
+CUSGRP	客户分类	基础设置	archive	bs_customer_group			id	编码			50	cusgrp	基础设置			Customer Group
 DAY_REPORT	生产日报表	生产管理	doc	day_report_detail	day_report	单据编号	id	单据编号	RB	单据日期	20	items	生产制造			
-DEPT	部门	基础设置	archive	bs_dept			id				50	depts	基础设置			Department
+DEPT	部门	基础设置	archive	bs_dept			id				50	dept	基础设置			Department
 DISPATCH	工序派工单	生产制造	doc	bl_dispatch	bd_dispatch	单据编号	id	单据编号	PG	单据日期	50	items	生产制造			Process Dispatch Sheet
 DISPATCH_DETAIL	工序派工单明细表	报表	flat	v_dispatch_detail			id				25	items	生产制造			
 DISPATCH_STATS	工序派工单统计表	报表	flat	v_dispatch_stats			id				50	items	生产制造			
-EMP	职员	基础设置	archive	bs_emp			id				50	employees	基础设置			Employee
-EQUIP	设备	基础设置	archive	bs_equip			id				50	equips	基础设置			Equipment
+EMP	职员	基础设置	archive	bs_emp			id				50	emp	基础设置			Employee
+EQUIP	设备	基础设置	archive	bs_equip			id				50	equip	基础设置			Equipment
 EQUIP_CHECK	设备点检记录	生产管理	doc	equip_check_detail	equip_check	单据编号	id	单据编号	DJ	年月	20	items	生产制造			
-ERPLG	ERP导入日志	基础设置	archive	erp_imp_log			id	批次号		导入时间	50	items	基础档案			ERP Import Log
-ERPLG_ROW	ERP导入明细	基础设置	flat	erp_imp_row			id	批次号			50	items	基础档案			ERP Import Rows
+ERPLG	ERP导入日志	数据建模	archive	erp_imp_log			id	批次号		导入时间	50	erplg	数据建模			ERP Import Log
+ERPLG_ROW	ERP导入明细	数据建模	flat	erp_imp_row			id	批次号			50	items	数据建模			ERP Import Rows
 FEED_CONFIRM	投料确认单	生产管理	doc	feed_confirm_detail	feed_confirm	单据编号	id	单据编号	TR	单据日期	20	items	生产制造			
-FIN_ACC	会计科目	基础设置	archive	bd_account			id				50	accounts	基础档案			
-FIN_EXP	费用类别	基础设置	archive	bd_expense_type			id				50	expenses	基础档案			
-FIN_TAX	税别资料	基础设置	archive	bd_tax_type			id				50	taxes	基础档案			
+FIELDMGR	字段管理	数据建模	archive	yj_field			id	panel_code		id	50	items	数据建模			Field Management
+FIN_ACC	会计科目	基础设置	archive	bd_account			id				50	fin_acc	基础档案			
+FIN_EXP	费用类别	基础设置	archive	bd_expense_type			id				50	fin_exp	基础档案			
+FIN_TAX	税别资料	基础设置	archive	bd_tax_type			id				50	fin_tax	基础档案			
 FINISH_IN	产成品入库单	库存核算	doc	bl_finish_in	bd_finish_in	单据编号	id	单据编号	FI	单据日期	50	items	库存核算			Finished Goods Receipt Form
 FINISH_IN_DETAIL	产成品入库单明细表	报表	flat	v_finish_in_detail			id				50	items	库存核算			Details of Finished Goods Warehouse-in Doc
 FINISH_IN_STATS	产成品入库单统计表	报表	flat	v_finish_in_stats			id				50	items	库存核算			Finished Goods Receipt Statistics Table
 GFDA	供应商	基础档案	archive	dm_gf			id	dm			50	gfda	基础资料			Supplier
 GRAN_RECORD	造粒记录	生产管理	doc	gran_record_detail	gran_record	单据编号	id	单据编号	LZ	单据日期	20	items	生产制造			
-INV	商品	基础设置	archive	bs_inv			id				25	items	基础设置			Material
-INV_PRICE	存货价格本	基础设置	archive	bs_inv_price			id				50	prices	基础设置			Inventory price list
+INV	商品	基础设置	archive	bs_inv			id				25	inv	基础设置			Material
+INV_PRICE	存货价格本	基础设置	archive	bs_inv_price			id				50	inv_price	基础设置			Inventory price list
 KHDA	客户	基础档案	archive	dm_kh			id	dm			25	khda	基础资料			Customer
 KHDD	客户订单	单据	doc	order_bs	order_bt	od_no	id		OD	od_date	20	items	订单管理			Customer Order
 LINE_LOAD	产线排产负荷	生产制造	flat	v_line_load			id				50	items	生产制造			
 MAINT_PLAN	保养计划	生产管理	doc	maint_plan_detail	maint_plan	单据编号	id	单据编号	BY		20	items	生产制造			
 MANU_ORDER	生产工单	生产制造	doc	bl_manu_order	bd_manu_order	合同号	id	合同号	GD	单据日期	50	products	生产制造			Production Work Order
-MANU_ORDER_DETAIL	生产工单明细表	报表	flat	v_manu_order_detail			id				50	items	生产制造			Production WO Detail List
-MANU_ORDER_STATS	生产工单统计表	报表	flat	v_manu_order_stats			id				50	items	生产制造			Production WO Statistics
 MANU_SCHEDULE	生产排产	生产制造	flat	v_manu_schedule			id				25	items	生产制造			
 MATERIAL_OUT	材料出库单	库存核算	doc	bl_material_out	bd_material_out	单据编号	id	单据编号	CL	单据日期	50	items	库存核算			Material Issue Slip
 MATERIAL_OUT_DETAIL	材料出库单明细表	报表	flat	v_material_out_detail			id				50	items	库存核算			Material Warehouse-out Doc Details
 MATERIAL_OUT_STATS	材料出库单统计表	报表	flat	v_material_out_stats			id				50	items	库存核算			Materials Issue Form Statistics Table
-MATGRP	商品分类	基础设置	archive	bs_material_group			id	编码			50	items	基础设置			Material Group
+MATGRP	商品分类	基础设置	archive	bs_material_group			id	编码			50	matgrp	基础设置			Material Group
 MIX_RECORD	物料混合记录	生产管理	doc	mix_record_detail	mix_record	单据编号	id	单据编号	HH	单据日期	20	items	生产制造			
-OP	工序	基础设置	archive	bs_op			id				50	operations	基础设置			Operation
-OP_TIME	工序工时	基础档案	archive	gxgs			id				50	opTime	基础设置			
+OP	工序	基础设置	archive	bs_op			id				50	op	基础设置	{"uniqueKeys":["工序编码"]}		Operation
+OP_TIME	工序工时	基础档案	archive	gxgs			id				50	op_time	基础设置			
 OTHER_IN	其他入库单	库存核算	doc	bl_other_in	bd_other_in	单据编号	id	单据编号	OI	单据日期	50	items	库存核算			Other inbound delivery notes
 OTHER_IN_DETAIL	其他入库单明细表	报表	flat	v_other_in_detail			id				50	items	库存核算			
 OTHER_IN_STATS	其他入库单统计表	报表	flat	v_other_in_stats			id				50	items	库存核算			
@@ -46,30 +48,29 @@ OTHER_OUT_DETAIL	其他出库单明细表	报表	flat	v_other_out_detail			id			
 OTHER_OUT_STATS	其他出库单统计表	报表	flat	v_other_out_stats			id				50	items	库存核算			
 OUTSOURCE_ORDER	委外加工单	委外加工	doc	bl_outsource_order	bd_outsource_order	单据编号	id	单据编号	WW	单据日期	50	products	委外加工			subcontracting document
 PACK_CONFIRM	封箱确认	生产管理	doc	pack_confirm_detail	pack_confirm	单据编号	id	单据编号	FX	装箱日期	20	items	生产制造			
-PARTNER	往来单位	基础设置	archive	bs_partner			id				50	items	基础设置			Business partner
-PROD_ABN	生产异常处理单	生产制造	archive	bd_prod_abn			id	单据编号	YC	单据日期	50	items	生产制造			
-PROD_LINE	生产线	基础资料	archive	bs_prod_line			id	生产线			50	items	基础资料			
-PROJ	项目	基础设置	archive	bs_proj			id				50	projects	基础设置			Project
+PARTNER	往来单位	基础设置	archive	bs_partner			id				50	partner	基础设置			Business partner
+PROD_ABN	生产异常处理单	生产制造	archive	bd_prod_abn			id	单据编号	YC	单据日期	50	prod_abn	生产制造			
+PROD_LINE	生产线	基础资料	archive	bs_prod_line			id	生产线			50	prod_line	基础资料			
+PROJ	项目	基础设置	archive	bs_proj			id				50	proj	基础设置			Project
 PU_ORDER	采购订单	采购管理	doc	bl_pu_order	bd_pu_order	单据编号	id	单据编号	PO	单据日期	50	items	采购管理			Purchase Order
 PURCHASE_IN	采购入库单	库存核算	doc	bl_purchase_in	bd_purchase_in	单据编号	id	单据编号	PI	单据日期	50	items	库存核算			Purchase Receiving Order
 PURCHASE_IN_DETAIL	采购入库单明细表	报表	flat	v_purchase_in_detail			id				50	items	库存核算			Purchase receipt document details
 PURCHASE_IN_STATS	采购入库单统计表	报表	flat	v_purchase_in_stats			id				50	items	库存核算			Purchase receipt document statistics
-QC_ASM_INSP	组装成品检验单	生产管理	doc	qc_asm_insp_detail	qc_asm_insp_head	单据编号	id	单据编号	ZJ	单据日期	20	items	生产制造			
+QC_ASM_INSP	组装成品检验单	生产管理	doc	qc_asm_insp_detail	qc_asm_insp_head	单据编号	id	单据编号	ZJ	单据日期	20	items	生产制造	{"fixedItems":[{"group":"外观","items":["端盖两头","管身两侧"]},{"group":"尺寸","items":[],"label":"按照尺寸检验项目填充"},{"group":"出货重量","items":[],"label":"按照重量检验项目填充"}]}		
 QC_BHC	不合格品处理单(制程)	单据	doc	qc_bhc_detail	qc_bhc	单据编号	id	单据编号	BHC	单据日期	20	items	品质管理			
 QC_BHG	不合格报告(制程)	单据	doc	qc_bhg_detail	qc_bhg	单据编号	id	单据编号	BHG	单据日期	20	items	品质管理			
 QC_BHZ	不合格品处理单(自制物料)	单据	doc	qc_bhz_detail	qc_bhz	单据编号	id	单据编号	BHZ	单据日期	20	items	品质管理			
 QC_CATALOG	检验目录	单据	doc	qc_catalog_detail	qc_catalog	单据编号	id	单据编号	JYML	单据日期	20	items	品质管理	{"singleDoc":true}		Inspection Catalog
-QC_CUT_INSP	切炭检验单	生产管理	doc	qc_cut_insp_detail	qc_cut_insp_head	单据编号	id	单据编号	QT	单据日期	20	items	生产制造			
-QC_FIN_SPEC	成品检验规范	品质管理	doc	qc_fin_spec_detail	qc_fin_spec_head	单据编号	id	单据编号	CPJY	单据日期	20	items	品质管理			
+QC_FIRST_INSP	首件检验单	生产管理	doc	qc_first_insp_detail	qc_first_insp_head	单据编号	id	单据编号	SJ	单据日期	20	items	生产制造			
 QC_INSP	检验单	采购管理	doc	qc_insp_detail	qc_insp	单据编号	id	单据编号	IJ	单据日期	20	items	智能供应链			Inspection Sheet
 QC_INSP_REC	检验数据记录	单据	doc	qc_insp_rec_detail	qc_insp_rec	单据编号	id	单据编号	JYSJ	单据日期	20	items	品质管理			Inspection Data Record
 QC_INSP_REQ	来料检验要求	档案	archive	qc_insp_req			id				50	items	品质管理			Incoming Inspection Requirements
 QC_INSP_REQ_SERIES	来料检验要求(系列)	基础档案	archive	qc_insp_req_series			id				100	qc_insp_req_series	品质管理			Incoming Inspection Requirements (Series)
-QC_ITEM	检验项目	基础设置	archive	bs_qc_item			id				50	items	基础设置			Inspection item
+QC_ITEM	检验项目	基础设置	archive	bs_qc_item			id				50	qc_item	基础设置			Inspection item
 QC_JJF	紧急放行申请单	单据	doc	qc_jjf_detail	qc_jjf	单据编号	id	单据编号	JJF	单据日期	20	items	品质管理			
 QC_LYB	来料异常分析报告	单据	doc	qc_lyb_detail	qc_lyb	单据编号	id	单据编号	LYB	单据日期	20	items	品质管理			
-QC_MOLD_INSP	成型检验单	生产管理	doc	qc_mold_insp_detail	qc_mold_insp_head	单据编号	id	单据编号	CX	单据日期	20	items	生产制造			
-QC_PLAN	检验方案	基础设置	archive	bs_qc_plan			id				50	items	基础设置			Inspection plan
+QC_PLAN	检验方案	基础设置	archive	bs_qc_plan			id				50	qc_plan	基础设置			Inspection plan
+QC_PROC_INSP	制程检验单	生产管理	doc	qc_proc_insp_detail	qc_proc_insp_head	单据编号	id	单据编号	ZC	单据日期	20	items	生产制造			
 QC_RECV	送料暂收单	库存核算	doc	sl_recv_detail	sl_recv	单据编号	id	单据编号	SL	单据日期	20	items	库存核算			Temporary Material Receipt
 QC_RETURN	暂收退料单	采购管理	doc	qc_return_detail	qc_return	单据编号	id	单据编号	TH	单据日期	20	items	库存核算			Temporary Receipt Return
 QC_SCP	试产材料使用申请单	单据	doc	qc_scp_detail	qc_scp	单据编号	id	单据编号	SCP	单据日期	20	items	品质管理			
@@ -96,13 +97,13 @@ RD_PROD_INFO	产品信息表	单据	doc	rd_prod_info_detail	rd_prod_info_head	�
 RD_PROGRESS	项目进度查询	单据	doc	rd_progress_detail	rd_progress	单据编号	id	单据编号	LXJ	单据日期	20	items	研发管理	{"singleDoc":true}		
 RD_RO_PROTECT	RO保护	单据	doc	rd_ro_protect_detail	rd_ro_protect_head	单据编号	id	单据编号	RO	单据日期	20	items	研发管理			RO Protection
 RD_SCALE	阻垢性能	单据	doc	rd_scale_detail	rd_scale_head	单据编号	id	单据编号	SC	单据日期	20	items	研发管理			Scale Inhibition
-RD_SHARE_FILE	共享文件库	研发管理	archive	yj_share_file	yj_share_file	文件编号	id	文件编号		上传时间	20	items	研发管理			Shared Files
+RD_SHARE_FILE	共享文件库	研发管理	archive	yj_share_file	yj_share_file	文件编号	id	文件编号		上传时间	20	rd_share_file	研发管理			Shared Files
 RD_SINTER_TOL	烧结尺寸表	基础设置	archive	rd_sinter_tolerance			id	型号			25	items	基础设置			Sintering Size Table
 RD_SOAK	浸泡安全	单据	doc	rd_soak_detail	rd_soak_head	单据编号	id	单据编号	SK	单据日期	20	items	研发管理			Soaking Safety
 RD_SPEC_DOC	规格书	单据	doc	rd_spec_doc_detail	rd_spec_doc_head	单据编号	id	单据编号	SD	单据日期	20	items	研发管理			
 RD_SPIKE_WATER	加标水配置记录表	单据	doc	rd_spike_water_detail	rd_spike_water_head	单据编号	id	单据编号	SW	单据日期	20	items	研发管理			
-REGION	地区	基础设置	archive	bs_region			id				50	regions	基础设置			Region
-REJECT	不合格原因	基础设置	archive	bs_reject			id				50	rejects	基础设置			Reject reason
+REGION	地区	基础设置	archive	bs_region			id				50	region	基础设置			Region
+REJECT	不合格原因	基础设置	archive	bs_reject			id				50	reject	基础设置			Reject reason
 ROUTE	工艺路线	基础设置	doc	bs_route		工艺路线编码	id	工艺路线编码	GY		50	items	基础设置			Routing
 SALE_OUT	销售出库单	库存核算	doc	bl_sale_out	bd_sale_out	单据编号	id	单据编号	SO	单据日期	50	items	库存核算			Sales Delivery Note
 SALE_OUT_DETAIL	销售出库单明细表	报表	flat	v_sale_out_detail			id				50	items	库存核算			Sales issue document details
@@ -110,21 +111,22 @@ SALE_OUT_STATS	销售出库单统计表	报表	flat	v_sale_out_stats			id				50	
 SALES_ORDER_DETAIL	销售订单明细表	报表	flat	v_sales_order_detail			id				50	items	智能供应链			Sales Order Details
 SALES_ORDER_STATS	销售订单统计表	报表	flat	v_sales_order_stats			id				50	items	智能供应链			Sales Order Statistics
 SAMPLE_REQ	样品申请单	生产管理	doc	sample_req_detail	sample_req	单据编号	id	单据编号	SP	下单日期	20	items	生产制造			
-SETTLE	结算方式	基础设置	archive	bs_settle_type			id	名称			50	items	基础设置			Settlement Method
+SETTLE	结算方式	基础设置	archive	bs_settle_type			id	名称			50	settle	基础设置			Settlement Method
 SO_ORDER	销售订单	智能供应链	doc	bl_so_order	bd_so_order	单据编号	id	单据编号	SO	单据日期	50	items	智能供应链			Sales Order
 STOCK_BALANCE	库存状况表	报表	flat	v_stock_balance			id				50		库存核算			Stock Balance
-STOCK_DETAIL	库存明细	报表	flat	v_stock_kucun			id			更新时间	50	items	系统管理			Stock Detail
+STOCK_DETAIL	库存明细	报表	flat	v_stock_kucun			id			更新时间	50	items	库存核算			Stock Detail
 STOCK_LEDGER	库存台账	报表	flat	v_stock_ledger			id				50		库存核算			Stock Ledger
 STOCK_STATUS	库存状况	报表	flat	kucun			id				50		库存核算			Stock Status
 STOCK_SUMMARY	收发存汇总表	报表	flat	v_stock_summary			id				50		库存核算			In-Out-Balance Summary
-SUPGRP	供应商分类	基础设置	archive	bs_supplier_group			id	编码			50	items	基础设置			Supplier Group
-TEAM	班组	基础设置	archive	bs_team			id				50	items	基础设置			Team
-UOM	计量单位	基础设置	archive	bs_uom			id				50	uoms	基础设置			UOM
-WC	工作中心	基础设置	archive	bs_wc			id				25	workcenters	基础设置			Work center
-WH	仓库	基础设置	archive	bs_wh			id				50	stores	基础设置			Warehouse
+SUPGRP	供应商分类	基础设置	archive	bs_supplier_group			id	编码			50	supgrp	基础设置			Supplier Group
+TEAM	班组	基础设置	archive	bs_team			id				50	team	基础设置			Team
+UOM	计量单位	基础设置	archive	bs_uom			id				50	uom	基础设置			UOM
+WC	工作中心	基础设置	archive	bs_wc			id				25	wc	基础设置			Work center
+WH	仓库	基础设置	archive	bs_wh			id				50	wh	基础设置			Warehouse
 WH_RECORD	无黑处理登记	生产管理	doc	wh_record_detail	wh_record	单据编号	id	单据编号	WB	单据日期	20	items	生产制造			
 WHLOC	仓位	基础档案	archive	bs_wh_loc			id				100	locations	基础设置			Storage Location
 WLBOM	物料清单	单据	doc	mate		m_no	id		WL	m_date	20	items	生产管理			Material BOM
+WO_COMPLETION_LIST	完工明细	报表	flat	v_wo_completion_detail			id				100	items	生产制造			Completion Details
 WO_ORDER	生产工单(旧版)	生产管理	doc	wo_progress	wo_order	单据编号	id	单据编号	GD	单据日期	20	items	生产制造			Production WO (legacy)
 WO_PROGRESS	工单工序进度	生产管理	flat	wo_progress			id				50	items	生产制造			
 WO_REPORT	工序报工单	生产管理	doc	scjl		报工单号	id	报工单号	BG	单据日期	20	items	生产制造			

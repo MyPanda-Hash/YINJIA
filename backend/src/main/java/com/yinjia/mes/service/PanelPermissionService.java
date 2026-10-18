@@ -194,6 +194,8 @@ public class PanelPermissionService {
 
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {
+        requireAdminOnlyWritable(panelCode, buttonName); // 数据建模元数据面板:写操作仅管理员(浏览动作放行)
+        requireReadonlyAllowed(panelCode, buttonName); // ERP集成:只读面板不许任何写动作
         String user = currentUserName();
         if (isAdmin(user)) return;
         String[] need = needOf(panelCode, buttonName);
@@ -210,6 +212,10 @@ public class PanelPermissionService {
      * 任一面板命中即放行;全部未映射(没有任何面板定义过这个按钮)时按"未映射 = 放行"处理。
      */
     public void requireButtonAny(String[] panelCodes, String buttonName) {
+        for (String code : panelCodes) {
+            requireAdminOnlyWritable(code, buttonName);
+            requireReadonlyAllowed(code, buttonName);
+        }
         String user = currentUserName();
         if (isAdmin(user)) return;
         Map<String, Set<String>> perms = permsOf(user);
@@ -244,6 +250,8 @@ public class PanelPermissionService {
     }
 
     /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */    public void requirePanelView(String panelCode) {
+        // 2026-10-18 用户口径变更:数据建模(FIELDMGR/ZDGL)对非管理员**开放只读**(授权 view,query),
+        // 读入口不再按"管理员专属"硬拦 —— 写操作仍由 requireAdminOnlyWritable 拦住。
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (readablePanels(user).contains(panelCode)) return;
@@ -257,6 +265,7 @@ public class PanelPermissionService {
      * 任一面板可见即放行;管理员恒过。
      */
     public void requirePanelViewAny(String... panelCodes) {
+        // 同上:读入口按 view 授权判定,不再按管理员专属硬拦
         String user = currentUserName();
         if (isAdmin(user)) return;
         Set<String> readable = readablePanels(user);
@@ -278,6 +287,7 @@ public class PanelPermissionService {
      * 拿不到业务数据,但属于不该开放的面板元数据面。
      */
     public void requirePanelRead(String panelCode) {
+        // 同上:元数据读取按 view 授权判定
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (panelCode == null || panelCode.isBlank()) throw new AccessDeniedException("面板编码不能为空");
@@ -390,6 +400,67 @@ public class PanelPermissionService {
 
     /** 「预警配置」权限词(与 SysAdminController.PERMISSION_ACTIONS 的 warn 同源) */
     public static final String PERM_WARN = "warn";
+
+    /**
+     * **写操作仅管理员**的面板(2026-10-18 用户口径:「字段管理和数据字典要是管理员才有权限」;
+     * 同日追加「给非管理员开只读」⇒ 读放开、写仍专属管理员,见 requireAdminOnlyWritable)
+     * —— 数据建模栏目里的两张元数据面板:
+     * <ul>
+     *   <li>FIELDMGR 字段管理:直接读写 yj_field 元数据(A 字段模型),普通角色不该看见;</li>
+     *   <li>ZDGL 数据字典:全站下拉的字典内容(数据结构的一部分)。</li>
+     * </ul>
+     * 判定在**服务端**(不靠菜单藏),管理员恒过。
+     */
+    public static final Set<String> ADMIN_ONLY_PANELS = Set.of("FIELDMGR", "ZDGL");
+
+    /**
+     * **只读**(连管理员也不给写)的面板(2026-10-18 用户口径:
+     * 「ERP集成不可以进行任何人为操作,不可以新增保存删除」)。
+     * 数据是金蝶接口同步写进来的(erp_imp_log / erp_imp_row 由同步程序落库),
+     * 人在界面上只能看:任何会改数据的按钮(新增/保存/删除/导入…)一律拒绝。
+     */
+    public static final Set<String> READONLY_PANELS = Set.of("ERPLG", "ERPLG_ROW");
+
+    /** 只读放行的按钮 = 纯浏览动作(查询/刷新/导出打印/表格调整这类只看不改的)。
+     *  ⚠ 不含「复制到剪贴板/从剪贴板粘贴」:后者会往单元格里写值(粘完若再点保存就落库),
+     *  在只读面板上一律不给。前端 PanelxList.READONLY_ACTIONS 是同一份白名单。 */
+    private static final Set<String> READONLY_ALLOWED_BUTTONS = Set.of(
+            "刷新", "查找", "查询", "表格调整", "表头调整", "导出", "打印", "审批情况", "修改记录",
+            "刷新数据", "导出报表", "定位");
+
+    /**
+     * 只读面板的写操作闸门:命中 READONLY_PANELS 且按钮不在只读白名单里 ⇒ 一律 403。
+     * 白名单之外的按钮名一律拦(默认拒绝),新增按钮/新面板不需要回来登记 —— 宁可多拦,不可漏放。
+     */
+    public void requireReadonlyAllowed(String panelCode, String buttonName) {
+        if (panelCode == null || !READONLY_PANELS.contains(panelCode)) return;
+        if (buttonName != null && READONLY_ALLOWED_BUTTONS.contains(buttonName)) return;
+        throw new AccessDeniedException("「" + panelCode + "」由金蝶同步写入,界面只读:不允许「"
+                + (buttonName == null || buttonName.isBlank() ? "(未命名动作)" : buttonName) + "」");
+    }
+
+    /**
+     * 管理员专属面板的**写**闸门(2026-10-18 口径演进):
+     *   原口径「字段管理和数据字典要是管理员才有权限」= 连看都不给;用户随后要求「给非管理员开只读」,
+     *   于是拆成两半 —— **读**按面板 view 授权(readablePanels),**写**仍只认管理员。
+     *   纯浏览动作(查询/刷新/导出/打印/定位/表格调整/表头调整/导出报表/审批情况/修改记录)放行,
+     *   其余(新增/保存/删除/导入/批量修改…)一律 403。
+     */
+    public void requireAdminOnlyWritable(String panelCode, String buttonName) {
+        if (panelCode == null || !ADMIN_ONLY_PANELS.contains(panelCode.trim())) return;
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        if (buttonName != null && READONLY_ALLOWED_BUTTONS.contains(buttonName)) return;
+        throw new AccessDeniedException("「" + panelCode + "」的写操作仅管理员可执行(其他角色只读)");
+    }
+
+    /** 面板是否仅管理员可访问(见 {@link #ADMIN_ONLY_PANELS}) —— 保留给"完全不可见"的入口(当前无调用) */
+    public void requirePanelNotAdminOnly(String panelCode) {
+        if (panelCode == null || !ADMIN_ONLY_PANELS.contains(panelCode.trim())) return;
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        throw new AccessDeniedException("「" + panelCode + "」仅管理员可访问");
+    }
 
     /**
      * **库存明细**预警数量配置权校验(2026-10-15 用户改口径,机制同 {@link #requireFieldConfig}):

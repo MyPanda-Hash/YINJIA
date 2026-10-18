@@ -15,14 +15,10 @@
  *
  * 2026-10-16 增补「物料种类」(用户口径:手填物料编码要带出**物料类别**和物料名称):
  *   原先只写对侧那一格 ⇒ 页 2 配方表的 物料种类 一直空着。带出规则见 pickInvKind。
- *
- * 2026-10-16 修复「档案明细键写死 detail.items」(上线后按种类筛出来恒 0 个候选的真正根因):
- *   见 invRowsOf 注释 —— 本模块的桩数据形状骗过了单测,判据改走 core/panel/detailRows.js。
  */
 // ⚠ 必须相对路径带扩展名:`@/` 别名只有 Vite 认,本模块被 node --test 直接 import(invCarry.test.js)
 import { carryKindOf } from '../mold/materialKinds.js'
-// 明细键的唯一判据(INV 是 detail.inv,不是 detail.items)—— 见 invRowsOf 注释
-import { detailKeyOf } from './detailRows.js'
+import { detailRowsOf } from './detailRows.js'
 
 /** 明细列 → 商品档案列(match = 拿用户输入去比的那列,out = 要带出来的那列,
  *  kind = 带出「物料种类」的档案列;没这列的面板不受影响) */
@@ -67,32 +63,21 @@ export function invCarryPair(cols) {
 
 /**
  * 商品档案查询响应 → 档案行数组。
- * 档案面板走 QueryService.queryArchive:返回「一张虚拟单」`{list:[{detail:<detail_key>:[rows]}]}`;
+ * 档案面板走 QueryService.queryArchive:返回「一张虚拟单」`{list:[{detail:{<key>:[rows]}}]}`;
  * 这里连平表形状一起认,认不出来返回 []。
  *
- * ⚠ 明细键**不是**恒为 `items`(2026-10-16 用户报障的真实根因):`QueryService.queryArchive` 写的是
- *   `detail.<PanelDef.tabKey()>`,而档案面板的 tabKey = `yj_panel.detail_key` =
- *   `LOWER(panel_code)`(`migrate-arch-single-doc.sql`)⇒ INV 是 `detail.inv`、EMP 是 `detail.emp`。
- *   本文件原先写死 `detail.items` ⇒ 商品档案 3898 行**一行都拍不出来**(只剩那张虚拟单被当成一行),
- *   界面表现 = 配方计算弹窗按「物料种类」收窄后「没有候选」、页 2 配方表 物料编号 模糊筛零候选;
- *   而单测桩数据恰好写成 `detail.items` ⇒ 本地测试全绿也照样漏(实测 `detail.inv[3898]`,旧逻辑拍平 1 行)。
- *   故改走**唯一判据** `core/panel/detailRows.js`(优先 items,否则取 detail 里第一个数组值)。
- *
- * 形状口径:
- *   · detail 里存着数组(不论键名) ⇒ 用它,**哪怕它是空数组**(单据本身不是行,不能当兜底);
- *   · 没有 detail/没有任何数组(detail 缺失、平表虚拟单、裸行数组) ⇒ 那个对象自己就是一行。
- *
- * @param {*} res 接口响应体(或 res.data)
- * @param {string} [fallbackKey] detail 结构识别不出时按哪个键找(商品档案 = 'inv')
+ * ⚠ **明细键不是恒为 items**(2026-10-16 服务器报障「配方计算的筛选没有出数据」的根因):
+ *   档案面板的键 = `yj_panel.detail_key` = **LOWER(panel_code)** —— 服务器实测 INV → `detail.inv`
+ *   (3,898 行挂在那儿),而本地开发库该面板 `yj_field.tab_key` 为空、退化成 `items`,
+ *   于是写死 `detail.items` 的实现在本地一切正常、**上线就恒空**。
+ *   统一走 detailRows.js(优先 items → detail 里第一个数组值 → 兜底 LOWER(panel_code))。
  */
-export function invRowsOf(res, fallbackKey = 'inv') {
+export function invRowsOf(res) {
   const list = Array.isArray(res) ? res : (res && Array.isArray(res.list) ? res.list : [])
   const out = []
   for (const r of list) {
     if (!r) continue
-    const key = detailKeyOf(r, fallbackKey)
-    const rows = r.detail && Array.isArray(r.detail[key]) ? r.detail[key] : null
-    if (rows) out.push(...rows.filter(Boolean))
+    if (r.detail && typeof r.detail === 'object') out.push(...detailRowsOf(r, INV_PANEL.toLowerCase()))
     else out.push(r)
   }
   return out

@@ -97,8 +97,8 @@ public class QueryService {
         // 响应体与前端渲染量;面板配置(page_size=50)就是期望值,任何客户端要更多都夹回该值。
         pageSize = Math.min(Math.max(pageSize, 1), flatPageCap(def));
         String hint = recompileOnRead(def.lineTable()) ? " OPTION (RECOMPILE)" : "";
-        String cols = selectCols(def, def.fields());
-        StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
+        String cols = selectCols(def, def.fields(), null);
+        StringBuilder where = new StringBuilder("WHERE ").append(cancelFilter(def.lineTable()));
         List<Object> args = new ArrayList<>();
         // 台账/库存状况(级联面板)的 仓库/存货 条件:参照绑定编码(migrate-ledger-code-filter.sql),
         // 条件值=编码 → 在视图编码列上**精确等值**。不走通用 LIKE:编码互为子串
@@ -283,13 +283,20 @@ public class QueryService {
     private Map<String, Object> queryArchive(PanelRegistry.PanelDef def, String keyword,
                                              Map<String, Object> condition, Map<String, String> l2c,
                                              int pageNo, int pageSize, boolean countOnly) {
-        String cols = selectCols(def, def.fields());
-        StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
+        // 派生列「面板名称」(2026-10-18,仅数据建模·字段管理):yj_field 里没有这一列,
+        // 名称是 panel_code 的关联显示名 ⇒ 按 codeCol 关联 yj_panel 带出(判定见 PanelConfigService.derivedPanelName)
+        String panelNameField = derivedPanelNameLabel(def);
+        String cols = selectCols(def, def.fields(), panelNameField);
+        String from = def.lineTable() + " t";
+        if (panelNameField != null) {
+            from += " LEFT JOIN yj_panel pn ON pn.panel_code = t.[" + def.codeCol() + "]";
+        }
+        StringBuilder where = new StringBuilder("WHERE ").append(cancelFilter(def.lineTable()));
         List<Object> args = new ArrayList<>();
         appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
 
         Integer total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where, Integer.class, args.toArray());
+                "SELECT COUNT(*) FROM " + from + " " + where, Integer.class, args.toArray());
 
         // 只要「共 N 条」:档案模式本就全量返回(见方法上方注释),对参照取数(如商品档案 INV
         // 3,874 行 × 75 列 = 4.1 MB)白拉一遍是最贵的一处,countOnly 时到此为止。
@@ -301,7 +308,9 @@ public class QueryService {
         }
 
         // 全量返回(上限 ARCH_LOAD_CAP):保存语义为"缺席行=已删除",必须保证明细完整
-        String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t " + where
+        String sql = "SELECT t.id AS __id, " + cols
+                + (panelNameField != null ? ", pn.panel_name AS [" + panelNameField + "]" : "")
+                + " FROM " + from + " " + where
                 + " ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT " + ARCH_LOAD_CAP + " ROWS ONLY";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
 
@@ -336,7 +345,7 @@ public class QueryService {
         String g = def.groupCol();
         List<PanelRegistry.FieldDef> docCols = split ? def.fieldsAt("header") : def.fields();
 
-        StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
+        StringBuilder where = new StringBuilder("WHERE ").append(cancelFilter(def.lineTable()));
         List<Object> args = new ArrayList<>();
         // 高级筛选(2026-09-24 用户要求,对齐旧系统 列表查询):单据面板同样服务端逐条 AND 过滤——
         // 全表过滤(分页 totalSize 与导出一致),不再只做前端当前页过滤。
@@ -445,9 +454,9 @@ public class QueryService {
 
         // 明细行(行表):单表式选全部字段列,头行式选明细列
         List<PanelRegistry.FieldDef> lineCols = split ? def.fieldsAt("detail") : def.fields();
-        String lineSql = "SELECT t.id AS __id, t.[" + g + "] AS __no, " + selectCols(def, lineCols)
+        String lineSql = "SELECT t.id AS __id, t.[" + g + "] AS __no, " + selectCols(def, lineCols, null)
                 + " FROM " + def.lineTable() + " t WHERE t.[" + g + "] IN (" + in + ")"
-                + " AND ISNULL(t.asp_cancel,'N')<>'Y' ORDER BY t.[" + g + "], t.id";
+                + " AND " + cancelFilter(def.lineTable()) + " ORDER BY t.[" + g + "], t.id";
         List<Map<String, Object>> lineRows = jdbc.queryForList(lineSql, docNos.toArray());
 
         Map<String, List<Map<String, Object>>> byDoc = new LinkedHashMap<>();
@@ -460,7 +469,7 @@ public class QueryService {
         // 头表(头行式)
         Map<String, Map<String, Object>> headRows = new HashMap<>();
         if (split) {
-            String headSql = "SELECT t.id AS __id, t.[" + g + "] AS __no, " + selectCols(def, def.fieldsAt("header"))
+            String headSql = "SELECT t.id AS __id, t.[" + g + "] AS __no, " + selectCols(def, def.fieldsAt("header"), null)
                     + " FROM " + def.headTable() + " t WHERE t.[" + g + "] IN (" + in + ")";
             for (Map<String, Object> r : jdbc.queryForList(headSql, docNos.toArray())) {
                 headRows.put(String.valueOf(r.get("__no")), r);
@@ -602,10 +611,71 @@ public class QueryService {
 
     // ============ 公共 ============
 
-    /** 生成 SELECT 列(col AS 中文标签);列名含特殊字符(%、.、空格等)必须方括号包裹 */
-    private String selectCols(PanelRegistry.PanelDef def, List<PanelRegistry.FieldDef> fields) {
+    /**
+     * 派生列「面板名称」的标签(该面板有这一字段且表上没有同名物理列时返回其 label,否则 null)。
+     * 目前唯一使用者 = 数据建模 · 字段管理 FIELDMGR(yj_field 没有面板名称列,按 panel_code 关联 yj_panel)。
+     */
+    private String derivedPanelNameLabel(PanelRegistry.PanelDef def) {
+        if (def == null || def.codeCol() == null || def.codeCol().isBlank()) return null;
+        PanelRegistry.FieldDef f = def.byLabel("面板名称");
+        if (f == null) return null;
+        if (tableHasColumn(def.lineTable(), f.col())) return null;
+        return f.label();
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Boolean> HAS_COL_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 表上是否有该物理列(按 表|列 缓存) */
+    private boolean tableHasColumn(String table, String col) {
+        if (table == null || table.isBlank() || col == null || col.isBlank()) return false;
+        return HAS_COL_CACHE.computeIfAbsent(table + "|" + col, k -> {
+            try {
+                Integer n = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                        Integer.class, "dbo." + table, col);
+                return n != null && n > 0;
+            } catch (Exception e) {
+                return true;
+            }
+        });
+    }
+
+    /**
+     * 表上有没有 作废标记列 {@code asp_cancel}(结果按表名缓存;启动后表结构不会变)。
+     *
+     * <p>为什么会有"没有"的表(2026-10-18,字段管理 FIELDMGR 上线时实测 500):
+     * 单据/档案/平表三种取数都以 {@code WHERE ISNULL(t.asp_cancel,'N')<>'Y'} 开头 —— 这是全站默认
+     * **软删除**口径,业务表(bs_/bd_/bl_/视图)都有这一列。但**元数据表本身**不一定有:
+     * {@code yj_field} 就没有 asp_cancel(字段下线走 retireExtField,不是打标记),
+     * 于是一打开「数据建模 · 字段管理」就是「列名 'asp_cancel' 无效」。
+     * 数据模板(RowSource/convenience 视图)也可能没有 ⇒ 一律按表结构判定,有才过滤。
+     */
+    private String cancelFilter(String table) {
+        if (table == null || table.isBlank()) return "1=1";
+        boolean has = CANCEL_COL_CACHE.computeIfAbsent(table, tb -> {
+            try {
+                Integer n = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = N'asp_cancel'",
+                        Integer.class, "dbo." + tb);
+                return n != null && n > 0;
+            } catch (Exception e) {
+                return true;   // 查不出来就按"有"处理(与历史行为一致)
+            }
+        });
+        return has ? "ISNULL(t.asp_cancel,'N')<>'Y'" : "1=1";
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Boolean> CANCEL_COL_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 生成 SELECT 列(col AS 中文标签);列名含特殊字符(%、.、空格等)必须方括号包裹。
+     *  derived = 派生列标签(表上没有物理列,由 JOIN 带出):这里跳过,由调用方按自己的关联补 SELECT。
+     *  不跳过就会连成 `t.[panel_name] AS [面板名称]` ⇒ 列名无效(2026-10-18 实测)。 */
+    private String selectCols(PanelRegistry.PanelDef def, List<PanelRegistry.FieldDef> fields, String derived) {
         StringBuilder sb = new StringBuilder();
         for (PanelRegistry.FieldDef f : fields) {
+            if (derived != null && derived.equals(f.label())) continue;
             if (sb.length() > 0) sb.append(", ");
             sb.append("t.[").append(f.col()).append("] AS [").append(f.label()).append("]");
         }

@@ -1,5 +1,5 @@
 // YINJIA-MES 菜单:面板以 HSDZ_MES yj_panel 注册表为准
-// 模块:智能供应链 / 生产制造 / 研发管理 / 基础档案
+// 模块:智能供应链 / 库存管理 / 生产制造 / 品质管理 / 研发管理 / 系统管理平台(原「基础档案」,2026-10-18 改名)
 export const menuTree = [
   {
     code: 'dashboard',
@@ -132,6 +132,19 @@ export const menuTree = [
 
         ],
       },
+    ],
+  },
+  // 2026-10-18 用户口径:「智能供应链里面的 库存核算/库存明细/库存统计/库存报表,单独提出来
+  //   写在一个和智能供应链同一级下的目录(新建为)库存管理」。
+  //   ⇒ 四个分组**原样整体搬移**(面板编码、路径、权限行、图标、组内叶子顺序都一个字节没动),
+  //     只是在导航树上从「智能供应链」的二级提到了**同级的独立一级目录**。
+  //   ⚠ 组 code(invAcct/invDetail/invStats/invReports)与叶子 code 保持原值 —— 页签恢复(stores/tabs)、
+  //     左栏展开记忆、`数据字典`/面板权限里按 code 的引用都不受影响;智能供应链随之只剩 销售管理 / 采购管理。
+  {
+    code: 'inv',
+    title: '库存管理',
+    icon: 'Box',
+    children: [
       {
         code: 'invAcct',
         title: '库存核算',
@@ -199,6 +212,23 @@ export const menuTree = [
           // 与上面三张的区别:那三张读 v_stock_* 流水视图,2026-10-14 的金蝶期初(2004 行)只写进 kucun 没写流水,
           // 流水口径合计为负 ⇒ 「现在还有多少货」只有这张答得出(见 tools/migrate-stock-detail-panel.sql 头注)。
           { code: 'stockDetail', title: '库存明细', path: '/panelx/list/STOCK_DETAIL', panelCode: 'STOCK_DETAIL', icon: 'List' },
+        ],
+      },
+      {
+        // 条码管理(2026-10-18):《【附件一】智慧工厂系统明细清单》WMS 的三条「条码管理」。
+        // 形态 = 三个**只读报表面板**(flat,一批一码/批次码),不是扫码作业:
+        //   材料仓 ← 采购入库单 头行(材料入库的正式单据)
+        //   半成品仓 ← 报工派生(scjl 工序=成型/切炭;**未进库存**,面板列里明写数据来源)
+        //   成品仓 ← 产成品入库单 头行
+        // 码内容 = 编码|批号。箱码/托盘码/序列号与「扫码出入库过账」属下一阶段(需扫码页 + 端点),
+        // 现状与缺口见 docs/design/智慧工厂清单差距分析.md §1.8/1.9/1.10。
+        code: 'barcode',
+        title: '条码管理',
+        icon: 'Grid',
+        children: [
+          { code: 'barcodeMat', title: '材料仓条码管理', path: '/panelx/list/BARCODE_MAT', panelCode: 'BARCODE_MAT', icon: 'Tickets' },
+          { code: 'barcodeWip', title: '半成品仓条码管理', path: '/panelx/list/BARCODE_WIP', panelCode: 'BARCODE_WIP', icon: 'Box' },
+          { code: 'barcodeFin', title: '成品仓条码管理', path: '/panelx/list/BARCODE_FIN', panelCode: 'BARCODE_FIN', icon: 'Finished' },
         ],
       },
     ],
@@ -401,13 +431,55 @@ export const menuTree = [
       },
     ],
   },
+  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典 / ERP导入日志。
+  //   · 字段管理(FIELDMGR):直接以 yj_field 元数据表为数据源的新面板 —— 全系统字段模型在一屏可见、
+  //     可按面板筛、可就地改(顺序/列宽/必填/隐藏/字典SQL…),保存走通用档案保存的「只提交改动行」;
+  //   · 数据字典(ZDGL):原在 系统管理平台·基础数据,按用户口径「还有写个数据字典」随本栏目一并摆到这里
+  //     (面板/表/权限行一个字节没动,只换导航位置);
+  //   · ERP导入日志(ERPLG):用户口径「把 ERP导入日志从系统管理迁移到数据建模里面去」,
+  //     yj_panel.category/module_group 已同批改为「数据建模」(tools/migrate-dm-fields-center-20261018.sql)。
+  {
+    code: 'dm',
+    title: '数据建模',
+    icon: 'SetUp',
+    children: [
+      {
+        code: 'dmFields',
+        title: '字段管理',
+        icon: 'Grid',
+        children: [
+          { code: 'fieldMgr', title: '字段管理', path: '/panelx/list/FIELDMGR', icon: 'Grid', panelCode: 'FIELDMGR', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'dmDict',
+        title: '数据字典',
+        icon: 'Collection',
+        children: [
+          { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'dmErp',
+        title: 'ERP集成',
+        icon: 'Connection',
+        children: [
+          // 批次级日志(erp_imp_log);行级明细面板 ERPLG_ROW 不另设入口 —— 从批次行进入即可
+          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
+        ],
+      },
+    ],
+  },
   // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
   //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
   //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
-  //   (财务类面板本就走「基础档案 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
+  //   (财务类面板本就走「系统管理平台 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
+  // 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
+  //   **只改显示标题**,一级目录 code 仍为 'base'(路由/展开态/页签/权限都不按标题走);
+  //   二级分组(基础数据/物料及价格/生产/财务)与面板一个没动。
   {
     code: 'base',
-    title: '基础档案',
+    title: '系统管理平台',
     icon: 'Setting',
     children: [
       {
@@ -417,8 +489,8 @@ export const menuTree = [
         children: [
           { code: 'dept', title: '部门', path: '/panelx/list/DEPT', icon: 'OfficeBuilding', panelCode: 'DEPT', operationName: '新增流程' },
           { code: 'employee', title: '职员', path: '/panelx/list/EMP', icon: 'User', panelCode: 'EMP', operationName: '新增流程' },
-          { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
-          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
+          // 2026-10-18 迁出:「数据字典 ZDGL」「ERP导入日志 ERPLG」按用户口径移到一级目录「数据建模」
+          //   (面板/表/权限行都不动,只换导航位置与 yj_panel.category)。
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
           // 仓位(2026-09-28 建为「库位」,2026-10-08 正名「仓位」对齐金蝶):仓库下货位档案,一仓多仓位、一仓位一仓;
           // 支持与商品同款「二维码标签」勾选即打
@@ -426,7 +498,7 @@ export const menuTree = [
           { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
           { code: 'gfda', title: '供应商', path: '/panelx/list/GFDA', icon: 'OfficeBuilding', panelCode: 'GFDA', operationName: '新增流程' },
           // 客户/供应商分类不占导航:从 客户/供应商 面板工具栏「分类管理」进入(金蝶同款交互)
-          // 2026-09-17 下线:库存状况(STOCK_STATUS,旧kucun台账面板,报表口径由智能供应链·库存报表承接)、
+          // 2026-09-17 下线:库存状况(STOCK_STATUS,旧kucun台账面板,报表口径由「库存管理·库存报表」承接)、
           // 往来单位(PARTNER,客户/供应商已独立档案)——菜单移除,面板配置保留(放开本注释即恢复)
           // { code: 'stockStatus', title: '库存状况', path: '/panelx/list/STOCK_STATUS', icon: 'Histogram', panelCode: 'STOCK_STATUS' },
           // { code: 'partner', title: '往来单位', path: '/panelx/list/PARTNER', icon: 'OfficeBuilding', panelCode: 'PARTNER', operationName: '新增流程' },

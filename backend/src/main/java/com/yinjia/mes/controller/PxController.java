@@ -43,6 +43,8 @@ public class PxController {
     private final com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler;
     private final com.yinjia.mes.service.BatchService batchService;
     private final com.yinjia.mes.service.PuLabelService puLabel;
+    /** 条码标签打印留痕(材料/半成品/成品条码面板,2026-10-18) */
+    private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -55,7 +57,8 @@ public class PxController {
                         PanelPermissionService perm,
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
                         com.yinjia.mes.service.BatchService batchService,
-                        com.yinjia.mes.service.PuLabelService puLabel) {
+                        com.yinjia.mes.service.PuLabelService puLabel,
+                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -69,6 +72,34 @@ public class PxController {
         this.pushGenerateHandler = pushGenerateHandler;
         this.batchService = batchService;
         this.puLabel = puLabel;
+        this.barcodeLabel = barcodeLabel;
+    }
+
+    // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============
+    /**
+     * 打印标签:前端本地出纸(二维码 + 卡面,内容全在列表行里),本端点只落**留痕**
+     * —— 谁、什么时候、打了哪个码、哪张单据。重打会再记一行(只增不改,便于对账)。
+     *
+     * <p>权限:按目标面板的「打印」词(三个条码面板的权限行照库存台账复制,含 print)。
+     * <p>面板白名单在 {@link com.yinjia.mes.service.BarcodeLabelService#PANELS},与迁移脚本的 yj_panel 一致。
+     */
+    @PostMapping("/barcode/print")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> barcodePrint(@RequestBody Map<String, Object> body) {
+        String panel = body.get("panelCode") == null ? "" : String.valueOf(body.get("panelCode")).trim();
+        if (!com.yinjia.mes.service.BarcodeLabelService.PANELS.contains(panel)) {
+            return ApiResult.fail(400, "该面板不支持打印标签: " + panel);
+        }
+        perm.requireButton(panel, "打印");
+        Object raw = body.getOrDefault("items", List.of());
+        List<Map<String, Object>> items = raw instanceof List ? (List<Map<String, Object>>) raw : List.of();
+        String user = SecurityContextHolder.getContext().getAuthentication() == null ? null
+                : SecurityContextHolder.getContext().getAuthentication().getName();
+        try {
+            return ApiResult.ok(barcodeLabel.log(panel, items, user));
+        } catch (IllegalArgumentException e) {
+            return ApiResult.fail(400, e.getMessage());
+        }
     }
 
     // ============ 采购订单材料码打印(供应商自行打码,2026-10-04) ============

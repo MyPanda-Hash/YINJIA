@@ -54,7 +54,7 @@ public class ShareFileController {
 
     @PostMapping("/categories")
     public ApiResult<Void> addCategory(@RequestBody Map<String, Object> body, Authentication auth) {
-        perms.requireAnyPerm(ShareFileService.PANEL, "新增", "add", "edit");
+        perms.requireAnyPerm(ShareFileService.PANEL, "新增", "add", "modify");
         service.addCategory(intOrNull(body.get("parentId")), str(body.get("name")),
                 intOrNull(body.get("seq")), currentUsername(auth));
         return ApiResult.ok(null);
@@ -62,7 +62,7 @@ public class ShareFileController {
 
     @PostMapping("/categories/{id}/update")
     public ApiResult<Void> updateCategory(@PathVariable int id, @RequestBody Map<String, Object> body, Authentication auth) {
-        perms.requireAnyPerm(ShareFileService.PANEL, "修改", "add", "edit");
+        perms.requireAnyPerm(ShareFileService.PANEL, "修改", "add", "modify");
         service.updateCategory(id, intOrNull(body.get("parentId")), str(body.get("name")),
                 intOrNull(body.get("seq")), currentUsername(auth));
         return ApiResult.ok(null);
@@ -70,7 +70,7 @@ public class ShareFileController {
 
     @DeleteMapping("/categories/{id}")
     public ApiResult<Void> deleteCategory(@PathVariable int id) {
-        perms.requireAnyPerm(ShareFileService.PANEL, "删除", "add", "edit");
+        perms.requireAnyPerm(ShareFileService.PANEL, "删除", "add", "modify");
         service.deleteCategory(id);
         return ApiResult.ok(null);
     }
@@ -97,7 +97,7 @@ public class ShareFileController {
                                                  @RequestParam(required = false) String keywords,
                                                  @RequestParam(required = false) String remark,
                                                  Authentication auth) throws IOException {
-        perms.requireAnyPerm(ShareFileService.PANEL, "新增", "add", "edit");
+        perms.requireAnyPerm(ShareFileService.PANEL, "新增", "add", "modify");
         return ApiResult.ok(service.upload(catId, name, version, effectiveDate, expiryDate,
                 keywords, remark, file, currentUsername(auth)));
     }
@@ -106,7 +106,7 @@ public class ShareFileController {
     @PostMapping("/{id}/update")
     public ApiResult<Map<String, Object>> update(@PathVariable long id, @RequestBody Map<String, Object> body,
                                                  Authentication auth) {
-        perms.requireAnyPerm(ShareFileService.PANEL, "修改", "add", "edit");
+        perms.requireAnyPerm(ShareFileService.PANEL, "修改", "add", "modify");
         return ApiResult.ok(service.update(id, intOrNull(body.get("catId")), str(body.get("name")),
                 str(body.get("version")), str(body.get("effectiveDate")), str(body.get("expiryDate")),
                 str(body.get("keywords")), str(body.get("remark")), currentUsername(auth)));
@@ -117,13 +117,13 @@ public class ShareFileController {
     public ApiResult<Map<String, Object>> replaceFile(@PathVariable long id,
                                                       @RequestPart("file") MultipartFile file,
                                                       Authentication auth) throws IOException {
-        perms.requireAnyPerm(ShareFileService.PANEL, "修改", "add", "edit");
+        perms.requireAnyPerm(ShareFileService.PANEL, "修改", "add", "modify");
         return ApiResult.ok(service.replaceFile(id, file, currentUsername(auth)));
     }
 
     @DeleteMapping("/{id}")
     public ApiResult<Void> delete(@PathVariable long id, Authentication auth) throws IOException {
-        perms.requireAnyPerm(ShareFileService.PANEL, "删除", "add", "edit", "delete");
+        perms.requireAnyPerm(ShareFileService.PANEL, "删除", "add", "modify", "del");
         service.delete(id, currentUsername(auth));
         return ApiResult.ok(null);
     }

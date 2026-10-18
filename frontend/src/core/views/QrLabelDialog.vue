@@ -11,6 +11,10 @@
           <div class="qr-label-line strong">{{ lb.code }}</div>
           <div class="qr-label-line">{{ lb.name }}</div>
           <div v-if="lb.lot" class="qr-label-line">LOT {{ lb.lot }}</div>
+          <!-- 仓库/供应商/仓位(2026-10-18):**有值才显示** —— 半成品三者皆无、成品无供应商、材料无仓位(实测全空) -->
+          <div v-if="lb.warehouse" class="qr-label-line">{{ tt('仓库') }} {{ lb.warehouse }}</div>
+          <div v-if="lb.supplier" class="qr-label-line">{{ tt('供应商') }} {{ lb.supplier }}</div>
+          <div v-if="lb.bin" class="qr-label-line">{{ tt('仓位') }} {{ lb.bin }}</div>
           <div class="qr-label-line dim">{{ lb.qty }} {{ lb.unit }} · {{ lb.doc }}</div>
         </div>
       </div>
@@ -57,9 +61,12 @@ async function renderQr() {
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 function print() {
+  // 空值不出行:批号空不写 LOT;仓库/供应商/仓位没有就不印(2026-10-18 用户口径)
+  const lineOf = (label, val) => (val ? `<div class="l">${esc(label)} ${esc(val)}</div>` : '')
   const cards = props.labels.filter((l) => l.qr).map((l) => `<div class="card"><img src="${l.qr}"/>
     <div class="info"><div class="l strong">${esc(l.code)}</div><div class="l">${esc(l.name)}</div>
-    <div class="l">LOT ${esc(l.lot)}</div><div class="l dim">${esc(l.qty)} ${esc(l.unit)} · ${esc(l.doc)}</div></div></div>`).join('')
+    ${lineOf('LOT', l.lot)}${lineOf(tt('仓库'), l.warehouse)}${lineOf(tt('供应商'), l.supplier)}${lineOf(tt('仓位'), l.bin)}
+    <div class="l dim">${esc(l.qty)} ${esc(l.unit)} · ${esc(l.doc)}</div></div></div>`).join('')
   const w = window.open('', '_blank', 'width=820,height=640')
   if (!w) return
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>材料二维码标签</title><style>'

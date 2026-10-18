@@ -293,6 +293,13 @@ public class PanelConfigService {
                 buttonGroups.add(group("统一预警", List.of("统一预警")));
             }
             buttonGroups.add(group("打印", List.of("打印", "预览", "导出")));
+            // 条码三面板:打印标签(2026-10-18)——前端本地出纸(二维码+卡面),服务端只记留痕。
+            // 单动作单组:前端按组渲染成一颗可见按钮(塞进「更多」会变下拉,用户找不到)。
+            if (BARCODE_PANELS.contains(def.code())) {
+                // 组名=动作名:工具栏单动作组把**组名**渲染成按钮文字("标签"会让人以为是筛选,
+                // 实测 2026-10-18 用户看不到"打印标签"),故组名直接叫「打印标签」。
+                buttonGroups.add(group("打印标签", List.of("打印标签")));
+            }
             // 库存三报表的金额列读 inv_cost_ledger(移动加权成本),口径=物化值,需可手工重算:
             // 审核钩子覆盖走 ButtonService 的审核,但金蝶同步等旁路写入不经过审核动作。
             // 插在 表格调整 之前——其后的「表头调整」是按 表格调整 的位置注入的,不能打乱。
@@ -525,6 +532,12 @@ public class PanelConfigService {
             }
         }
         metadata.put("buttonGroups", buttonGroups);
+        // 条码三面板(2026-10-18):勾选列行键 =「码内容」(一批一码 ⇒ 一码一行,跨页保留),
+        // 前端据此把勾选行交给 QrLabelDialog 本地出纸;打印留痕走 /px/barcode/print。
+        if (BARCODE_PANELS.contains(def.code())) {
+            metadata.put("qrLabelKey", "码内容");
+            metadata.put("qrLabelKind", "barcode");
+        }
         // 固定检验项声明(yj_panel.config 的 "fixedItems")下发给前端 —— **现役唯一消费者是报表**
         // (ReportService.fillQcAsmInsp → QcAsmInspReportSupport:声明过的组永远铺出来);
         // 前端那份 metadata 供**分区视图**铺固定项占位行(PanelxList.ensureFixedRows),而 QC_ASM_INSP
@@ -692,7 +705,28 @@ public class PanelConfigService {
             List<Map<String, String>> refMap = buildRefMap(def, f);
             if (!refMap.isEmpty()) m.put("refMap", refMap);
         }
+        // 面板名称(2026-10-18,数据建模·字段管理 FIELDMGR):数据来自 yj_field 自身,而 yj_field 里
+        // **没有面板名称这一列** —— 名称是 panel_code 的关联显示名。故按"同名物理列不存在"判定为
+        // **派生列**:下发 profile=panel,由 QueryService 按 codeCol(面板编码) LEFT JOIN yj_panel 带出。
+        // 判定标准是"这张表上确实没有这一列"(sys.columns),没有任何面板靠约定名起作用;
+        // 表/列不存在时 profile 不下发 ⇒ 行为与改造前一致。
+        if (derivedPanelName(def, f)) m.put("profile", "panel");
         return m;
+    }
+
+    /** 该字段是否为「面板名称」派生列(表上没有同名物理列,且字段名恰为 面板名称) */
+    private boolean derivedPanelName(PanelRegistry.PanelDef def, PanelRegistry.FieldDef f) {
+        if (!"面板名称".equals(f.label())) return false;
+        String table = def.lineTable();
+        if (table == null || table.isBlank() || def.codeCol() == null || def.codeCol().isBlank()) return false;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                    Integer.class, "dbo." + table, f.col());
+            return n != null && n == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
@@ -885,6 +919,15 @@ public class PanelConfigService {
 
     /** 支持「库存月结」三按钮的面板(与 ButtonService.MONTH_CLOSE_PANELS 同集合)。 */
     private static final List<String> MONTH_CLOSE_PANELS = List.of("STOCK_DETAIL");
+
+    /**
+     * 条码管理三面板(2026-10-18,附件一 WMS 三条「条码管理」):只读 flat 报表,数据在
+     * v_barcode_material / v_barcode_wip / v_barcode_finished 三个视图里。
+     * 工具栏多一颗「打印标签」(前端本地出纸)+ 勾选列(行键=码内容),打印留痕落 yj_barcode_label_log
+     * (端点 /px/barcode/print,见 BarcodeLabelService)。
+     */
+    private static final java.util.Set<String> BARCODE_PANELS =
+            java.util.Set.of("BARCODE_MAT", "BARCODE_WIP", "BARCODE_FIN");
 
     /**
      * 平表面板「更多」组的动作清单。

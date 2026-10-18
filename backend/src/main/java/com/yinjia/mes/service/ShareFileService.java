@@ -36,13 +36,17 @@ public class ShareFileService {
         this.perms = perms;
     }
 
-    /** 前端按钮门禁:能否上传/改(含分类维护)、能否删除。管理员恒真。 */
+    /** 前端按钮门禁:能否上传/改(含分类维护)、能否删除。管理员恒真。
+     *  ⚠ 2026-10-16 词表归位:本处原先读 `edit` / `delete` —— 那是**引擎另两个词的同义词**
+     *  (PanelPermissionService 只认 modify/del),也是组织架构矩阵里唯一还在用 edit/delete 的地方。
+     *  矩阵词表统一到引擎词后,这里跟着改读 `modify` / `del`
+     *  (配套数据迁移 tools/migrate-role-perm-words-20261016.sql:edit→modify、delete→del)。 */
     public Map<String, Object> permOfCurrentUser() {
         Map<String, Object> out = new LinkedHashMap<>();
-        boolean canUpload = perms.hasAnyPerm(PANEL, "add", "edit");
+        boolean canUpload = perms.hasAnyPerm(PANEL, "add", "modify");
         out.put("canUpload", canUpload);
         out.put("canMaintain", canUpload);
-        out.put("canDelete", perms.hasAnyPerm(PANEL, "add", "edit", "delete"));
+        out.put("canDelete", perms.hasAnyPerm(PANEL, "add", "modify", "del"));
         return out;
     }
 

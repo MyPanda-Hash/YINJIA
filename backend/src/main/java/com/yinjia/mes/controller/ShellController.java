@@ -4,6 +4,7 @@ import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DashboardStatsService;
+import com.yinjia.mes.service.FlowBoardService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.QrBatchService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,13 +27,14 @@ public class ShellController {
     private final JdbcTemplate jdbc;
     private final QrBatchService qrBatch;
     private final DashboardStatsService dashboardStats;
+    private final FlowBoardService flowBoard;
     private final String factoryName;
     private final String testFactoryName;
     /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开)。见 factories() 注释。 */
     private final boolean testLedgerEnabled;
 
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch,
-                           DashboardStatsService dashboardStats,
+                           DashboardStatsService dashboardStats, FlowBoardService flowBoard,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.factory-name:YINJIA-MES}") String factoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
@@ -40,6 +42,7 @@ public class ShellController {
         this.jdbc = jdbc;
         this.qrBatch = qrBatch;
         this.dashboardStats = dashboardStats;
+        this.flowBoard = flowBoard;
         this.factoryName = factoryName;
         this.testFactoryName = testFactoryName;
         this.testLedgerEnabled = testLedgerEnabled;
@@ -86,15 +89,20 @@ public class ShellController {
                 }));
     }
 
-    /** 我的桌面·研发管理:修改申请动态(待审批) + 各文件面板最新单据 + 档案本面板清单 */
+    /** 我的桌面·研发管理:修改申请动态(待审批) + 各文件面板最新单据 + 档案本面板清单(2026-10-16 起支持区间) */
     @GetMapping("/dashboard/rd")
-    public ApiResult<Map<String, Object>> rdBoard() {
+    public ApiResult<Map<String, Object>> rdBoard(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        DashboardStatsService.Range range = DashboardStatsService.Range.of(from, to);
+        String f = range.fromStr(), t = range.toExclusive();
         Map<String, Object> out = new HashMap<>();
         List<Map<String, Object>> mods = new ArrayList<>();
         try {
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT TOP 20 panel_code, doc_no, modify_req_by, modify_req_at FROM yj_doc_status"
-                            + " WHERE ISNULL(modify_state,'') = 'R' AND ISNULL(canceled,'N') <> 'Y' ORDER BY modify_req_at DESC")) {
+                            + " WHERE ISNULL(modify_state,'') = 'R' AND ISNULL(canceled,'N') <> 'Y'"
+                            + " AND modify_req_at >= ? AND modify_req_at < ? ORDER BY modify_req_at DESC", f, t)) {
                 Map<String, Object> m = new HashMap<>();
                 m.put("panelCode", r.get("panel_code"));
                 m.put("panelName", panelNameOf(String.valueOf(r.get("panel_code"))));
@@ -117,7 +125,8 @@ public class ShellController {
                 newDocs.addAll(jdbc.queryForList(
                         "SELECT TOP 5 '" + def.code() + "' AS panelCode, N'" + def.name().replace("'", "''") + "' AS panelName"
                                 + ", t.[" + def.groupCol() + "] AS docNo, t.asp_user1 AS creator, t.asp_time1 AS at"
-                                + " FROM " + def.headTable() + " t WHERE ISNULL(t.asp_cancel,'N') <> 'Y' ORDER BY t.asp_time1 DESC"));
+                                + " FROM " + def.headTable() + " t WHERE ISNULL(t.asp_cancel,'N') <> 'Y'"
+                                + " AND t.asp_time1 >= ? AND t.asp_time1 < ? ORDER BY t.asp_time1 DESC", f, t));
             } catch (Exception ignored) {
             }
         }
@@ -164,10 +173,13 @@ public class ShellController {
     }
 
     @GetMapping("/dashboard/stats")
-    public ApiResult<Map<String, Object>> dashboard() {
+    public ApiResult<Map<String, Object>> dashboard(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
         // 2026-09-28 聚合下沉 DashboardStatsService(代码规范 A2:SQL 只在 service);
         // 各模块图表数据(生产/库存/销售/质量/研发)由 service 一次返回,Controller 只转发。
-        return ApiResult.ok(dashboardStats.stats());
+        // 2026-10-16:加时间区间 from/to(yyyy-MM-dd,闭区间;缺省=近 30 天),各模块单据口径按区间过滤。
+        return ApiResult.ok(dashboardStats.stats(from, to));
     }
 
     /**
@@ -181,5 +193,18 @@ public class ShellController {
     public ApiResult<Map<String, Object>> dashboardCapacity(
             @RequestParam(name = "period", defaultValue = "day") String period) {
         return ApiResult.ok(dashboardStats.capacity(period));
+    }
+
+    /**
+     * 流程管控(2026-10-16):桌面新页签「流程管控」的**节点口径数据** ——
+     * 生产链(销售订单→结转→工单→排产→报工→检验→产成品入库)与
+     * 库存链(采购订单→暂收→来料检验/特采/退货→采购入库)每个节点当前有几张单、卡在哪一步。
+     *
+     * <p>图形与链路排布不走服务端:前端 {@code views/dashboard/flowSpec.js} 的声明式规格决定,
+     * 本端点只保证"数准"且与既有服务同口径(见 {@link com.yinjia.mes.service.FlowBoardService})。
+     */
+    @GetMapping("/dashboard/flow")
+    public ApiResult<Map<String, Object>> dashboardFlow() {
+        return ApiResult.ok(flowBoard.flow());
     }
 }

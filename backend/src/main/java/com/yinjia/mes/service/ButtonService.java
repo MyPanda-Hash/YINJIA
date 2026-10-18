@@ -391,6 +391,56 @@ public class ButtonService {
      * 按人判必然被拒;而这张草稿正是分发动作的产物,不是谁绕过界面开单。
      * 其余校验(编号唯一/产品编号唯一/字段映射/状态行)一律照旧。
      */
+    /** 批号按「日期+3位流水」自动补号的面板(用户 2026-10-18 口径:新加的真实数据按日期+流水) */
+    private static final java.util.Set<String> BATCH_NO_PANELS =
+            java.util.Set.of("PURCHASE_IN", "FINISH_IN");
+
+    /**
+     * 该面板里「批号」这个数据键叫什么 label —— **按物理列解析,不写死标签**。
+     *
+     * <p>踩坑记录(2026-10-18):正式库 PURCHASE_IN 的标签是「批号」,而测试库(旧快照)同面板是
+     * 「批次号」(物理列都是 {@code 批号})⇒ 写死 "批号" 时测试库 byLabel 取不到,补号静默失效。
+     * 故按「候选标签 → 物理列 = 批号」动态取,两账套/多面板都成立。
+     */
+    private static String batchLabelOf(PanelRegistry.PanelDef def) {
+        for (String cand : new String[]{"批号", "批次号"}) {
+            PanelRegistry.FieldDef f = def.byLabel(cand);
+            if (f != null && "批号".equals(f.col())) return cand;
+        }
+        return null;
+    }
+
+    /**
+     * 入库明细批号补号(2026-10-18 用户口径:新加的真实数据按日期+3位流水)。
+     *
+     * <p>只做三件事:①只在采购入库单/产成品入库单;②只补空值与金蝶默认占位 {@code PC0000};
+     * ③基准日 = 表头「单据日期」(补录历史单也拿单据日,不是"今天")。
+     * 已有真实批号(如报工/工单带下来的 20261014)一律跳过,绝不覆盖。
+     */
+    private void ensureBatchNoByDate(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                     List<Map<String, Object>> items) {
+        if (!BATCH_NO_PANELS.contains(def.code()) || items == null || items.isEmpty()) return;
+        String label = batchLabelOf(def);
+        if (label == null) return;
+        java.time.LocalDate day = docDayOf(head);
+        for (Map<String, Object> it : items) {
+            if (it == null) continue;
+            String cur = it.get(label) == null ? "" : String.valueOf(it.get(label)).trim();
+            if (!cur.isEmpty() && !"PC0000".equalsIgnoreCase(cur)) continue;
+            it.put(label, lotSeqService.next(day));
+        }
+    }
+
+    /** 表头「单据日期」→ LocalDate(取不到或格式不符则用今天;日期列可能是 date 或 文本两种口径)。 */
+    private static java.time.LocalDate docDayOf(Map<String, Object> head) {
+        Object v = head == null ? null : head.get("单据日期");
+        String s = v == null ? "" : String.valueOf(v).trim();
+        if (s.length() >= 10) {
+            try { return java.time.LocalDate.parse(s.substring(0, 10)); } catch (Exception ignored) { }
+        }
+        return java.time.LocalDate.now();
+    }
+
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user,
                                         boolean markSaved, boolean systemDraft) {
@@ -534,6 +584,10 @@ public class ButtonService {
             ensureChangeDeptRows(def, no, user);
             gateChangeDetail(def, items, no, user);
         }
+        // 批号按「日期+3位流水」补号(用户 2026-10-18 口径「后面新加的真实数据就按日期加三位流水来」):
+        // 采购入库单 / 产成品入库单的明细批号为空或金蝶默认占位 PC0000 时,保存即取号写入;
+        // 已有真实批号一律不动 —— 号池 yj_lot_seq 按日重置(见 LotSeqService),基准日取单据日期。
+        ensureBatchNoByDate(def, head, items);
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);
@@ -1288,6 +1342,10 @@ public class ButtonService {
         for (Map<String, Object> item : items) {
             Object id = item.get("id");
             Map<String, Object> cols = labelsToCols(def.fields(), item);
+            // 派生列不回写(2026-10-18,数据建模·字段管理 FIELDMGR):「面板名称」是 panel_code 关联 yj_panel
+            // 带出的显示值,表上根本没有这一列 —— 不清掉就会 INSERT/UPDATE 报「列名无效」。
+            // 判定是通用的:该表没有同名的物理列 ⇒ 该字段只读派生(见 QueryService.derivedPanelNameLabel)。
+            cols.keySet().removeIf(c -> !tableCols(def.lineTable()).contains(c));
             if (id != null && !String.valueOf(id).isBlank()) {
                 liveIds.add(id);
                 updateRow(def.lineTable(), def.pkCol(), id, cols, user);
@@ -1300,7 +1358,13 @@ public class ButtonService {
         // 都没声明(旧客户端)则一行不删,只把"本会被删的行数"回给前端提示 —— 见方法头误删护栏
         Map<String, Object> out = result(def.name(), "启用");
         Set<Object> removedActually = new LinkedHashSet<>();
-        if (!removeIds.isEmpty()) {
+        // 2026-10-18:源表可能没有 asp_cancel(数据建模·字段管理的数据源 yj_field 就没有)——
+        // 这类表**不做软删**(字段下线走 retireExtField,是显式动作,不是"保存时缺席")。
+        // 有该列的业务档案表行为一字未改。
+        boolean canSoftDelete = tableCols(def.lineTable()).contains("asp_cancel");
+        if (!canSoftDelete) {
+            // 没作废列:只 upsert,不做任何"缺席=删除"推断
+        } else if (!removeIds.isEmpty()) {
             for (Object id : removeIds) {
                 int n = jdbc.update("UPDATE " + def.lineTable()
                         + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE " + def.pkCol()
@@ -1510,8 +1574,10 @@ public class ButtonService {
     private Object insertRow(String table, Map<String, Object> cols, String user) {
         if (cols.isEmpty()) return null;
         fillRequiredDefaults(table, cols);
-        cols.put("asp_user1", user);
-        cols.put("asp_time1", LocalDateTime.now());
+        // 审计列按表结构补(同 updateRow 的 2026-10-18 说明)
+        Set<String> physical = tableCols(table);
+        if (physical.isEmpty() || physical.contains("asp_user1")) cols.put("asp_user1", user);
+        if (physical.isEmpty() || physical.contains("asp_time1")) cols.put("asp_time1", LocalDateTime.now());
         // 列名含特殊字符(%、.等)必须方括号包裹
         String names = String.join(",", cols.keySet().stream().map(c -> "[" + c + "]").toList());
         String marks = String.join(",", cols.values().stream().map(x -> "?").toList());
@@ -1584,8 +1650,12 @@ public class ButtonService {
         if (cols.isEmpty()) return;
         dropNullsOnNotNull(table, cols);
         if (cols.isEmpty()) return;
-        cols.put("asp_user2", user);
-        cols.put("asp_time2", LocalDateTime.now());
+        // 审计列按表结构补(2026-10-18):数据建模·字段管理(FIELDMGR)的数据源 yj_field 只有 asp_user1/
+        // asp_time1,没有 asp_user2/asp_time2 ⇒ 盲写会报「列名 'asp_user2' 无效」。业务表都有这两列,
+        // 故此判定不改变既有面板的任何行为。
+        Set<String> physical = tableCols(table);
+        if (physical.isEmpty() || physical.contains("asp_user2")) cols.put("asp_user2", user);
+        if (physical.isEmpty() || physical.contains("asp_time2")) cols.put("asp_time2", LocalDateTime.now());
         StringBuilder set = new StringBuilder();
         List<Object> args = new ArrayList<>();
         for (Map.Entry<String, Object> e : cols.entrySet()) {
@@ -1748,8 +1818,15 @@ public class ButtonService {
         // DOC_ARCHIVE_PANELS 里(既没有「申请修改」),而本方法又把状态卡在"已审核/已归档",
         // 于是生效之后整张单再也动不了(调研 2026-09-30 实测确认)。
         boolean changeEffective = CHANGE_PANEL.equals(def.code()) && "已生效".equals(status);
-        if (!"已审核".equals(status) && !"已归档".equals(status) && !changeEffective)
-            throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 2026-10-18 用户口径(把「弃审」与「申请修改」融合):按钮只有一个「弃审」,
+        //   **但归档单必须先走申请修改并经管理员审批(状态进入「修改中」)才允许弃审** ——
+        //   不再允许对「已归档」直接反审核(旧行为靠 snapshotOnUnaudit 事后补快照,
+        //   现在是"先审批、再弃审",审批链与改动原因在弃审之前就已留痕)。
+        boolean modifying = "修改中".equals(status);
+        if ("已归档".equals(status))
+            throw new IllegalStateException("该单据已归档:请先「申请修改」并经管理员审批(状态变为修改中)后再弃审");
+        if (!"已审核".equals(status) && !modifying && !changeEffective)
+            throw new IllegalStateException("仅已审核/修改中状态可弃审(已归档请先申请修改)");
         // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
         // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
@@ -6151,21 +6228,29 @@ public class ButtonService {
     }
 
     /** 存档前快照(同上);{@code onlyIds} 非空时只快照这些行 —— 改动行提交只需比对本次涉及的行,
-     *  不必对几千行的大档案做全表 × 全字段扫描(2026-10-03 商品档案改动行提交配套优化)。 */
+     *  不必对几千行的大档案做全表 × 全字段扫描(2026-10-03 商品档案改动行提交配套优化)。
+     *
+     *  <p>2026-10-18:源表可能**没有 asp_cancel 列**(数据建模·字段管理 FIELDMGR 的数据源就是 yj_field 本身),
+     *  以前这里硬写 ISNULL(asp_cancel,'N') ⇒ 一保存就「列名 'asp_cancel' 无效」;
+     *  同方法里的字段列表也只取**表上真实存在的列**(派生列如「面板名称」不是物理列)。 */
     private Map<Object, Map<String, String>> archiveRowSnapshot(PanelRegistry.PanelDef def, Collection<Object> onlyIds) {
         Map<Object, Map<String, String>> out = new LinkedHashMap<>();
         if (def.isDoc() || def.lineTable() == null || def.fields().isEmpty()) return out;
         if (onlyIds != null && onlyIds.isEmpty()) return out;
+        Set<String> physical = tableCols(def.lineTable());
         LinkedHashSet<String> cols = new LinkedHashSet<>();
-        for (PanelRegistry.FieldDef f : def.fields()) if (f.col() != null) cols.add(f.col());
+        for (PanelRegistry.FieldDef f : def.fields()) {
+            if (f.col() != null && (physical.isEmpty() || physical.contains(f.col()))) cols.add(f.col());
+        }
         StringBuilder sql = new StringBuilder("SELECT ").append(def.pkCol());
         for (String c : cols) sql.append(", [").append(c).append("]");
-        sql.append(" FROM ").append(def.lineTable()).append(" WHERE ISNULL(asp_cancel,'N')<>'Y'");
+        sql.append(" FROM ").append(def.lineTable());
+        if (physical.contains("asp_cancel")) sql.append(" WHERE ISNULL(asp_cancel,'N')<>'Y'");
         List<Object> args = List.of();
         if (onlyIds != null) {
             List<Object> ids = onlyIds.stream().filter(java.util.Objects::nonNull).toList();
             if (ids.isEmpty()) return out;
-            sql.append(" AND ").append(def.pkCol()).append(" IN (")
+            sql.append(physical.contains("asp_cancel") ? " AND " : " WHERE ").append(def.pkCol()).append(" IN (")
                     .append(String.join(",", java.util.Collections.nCopies(ids.size(), "?"))).append(")");
             args = ids;
         }
