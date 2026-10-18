@@ -3804,3 +3804,15 @@ migrate-dc-platform-20261018.sql
 #   /api/dc/heartbeat 推数据,设备没有登录账号 ⇒ 这两条路径 permitAll + 请求头 X-DC-Key 必须等于
 #   所绑定网关的 api_key;未绑网关或密钥为空的设备一律拒绝(与「绑定网关」检查项同一口径)。幂等;两账套。
 migrate-dc-gateway-apikey-20261018.sql
+# 生产过程(用户 2026-10-18「完善生产过程里面的单据…有一些功能也不完善」)第一步:补字段关联。
+#   10 张单据的工单号/产品/物料/工序/生产线/人员此前**全是裸输入框**(参照 0~1 个),与工单/存货/工序档案零关联。
+#   本次只改 yj_field 配置 38 个字段:工序→OP、生产线→PROD_LINE、产品/物料→INV、人员→EMP(连带 data_type 改「参照」,
+#   否则前端不渲染参照控件),工单号改 dict_sql 从 plang 取(工单是页面级列表,不是 yj_panel,无法用 ref_panel),
+#   并修正 PROD_ABN.工单号 原错配 MANU_ORDER.合同号(该表 0 行 ⇒ 下拉永远空)。白名单 + 行数守卫,幂等;两账套。
+migrate-proc-process-refs-20261018.sql
+# 生产过程第二步:7 张空白单据补样例数据(用户 2026-10-18「有一些单据还是空的」)。
+#   生产日报表/投料确认单/物料混合记录/造粒记录/无黑处理登记/封箱确认/生产异常处理单头表全 0 行,
+#   各铺 1 张格式真实、值取自库内真实档案(bs_inv/bs_emp/bs_op/plang)的样例单据,状态=草稿;
+#   顺带修 feed_confirm_detail/mix_record_detail 各 1 行孤儿明细(补单据头而非删除)。
+#   ⚠ 样例数据:全量部署前用 tools/archive/_prod-process-audit/_cleanup-samples.sql 清理。幂等;两账套。
+migrate-proc-process-samples-20261018.sql
