@@ -9,14 +9,14 @@ PASS  cleanCondition 保留 `_` 控制键
 PASS  登录正式账套
 PASS  STOCK_LEDGER 仍走进入即弹查询弹窗
 PASS  STOCK_LEDGER 查询字段=仓库/存货(参照)  · 仓库→WH,存货→INV
-FAIL  STOCK_LEDGER 按编码精确收窄(明细不串仓/不串存货)  · 样本=成品B仓(CP-02)/PP复合阻垢炭棒/滤芯(A-48-19) 合计=2 明细=0 合成=2 越界=0/0
-FAIL  STOCK_LEDGER 只送名称也能查出明细(名称口径:按名称精确等值,不串仓)  · 只送名称 明细=0(含同名异码)vs 带编码明细=0
+PASS  STOCK_LEDGER 按编码精确收窄(明细不串仓/不串存货)  · 样本=成品B仓(CP-02)/PP复合阻垢炭棒/滤芯(A-48-19) 合计=75 明细=50 合成=1 越界=0/0
+PASS  STOCK_LEDGER 只送名称也能查出明细(名称口径:按名称精确等值,不串仓)  · 只送名称 totalSize=122 首页明细=50(含同名异码) vs 带编码 totalSize=75 首页明细=50
 PASS  STOCK_LEDGER 日期段生效(2099 空区间 ⇒ 明细 0 行)  · 合计=2 明细=0 合成=2
 PASS  台账空区间仍带期初/期末两合成行  · 合成行=期初结存/期末结存
 PASS  STOCK_SUMMARY 仍走进入即弹查询弹窗
 PASS  STOCK_SUMMARY 查询字段=仓库/存货(参照)  · 仓库→WH,存货→INV
 PASS  STOCK_SUMMARY 按编码精确收窄(明细不串仓/不串存货)  · 样本=成品B仓(CP-02)/PP复合阻垢炭棒/滤芯(A-48-19) 合计=2 明细=2 合成=0 越界=0/0
-PASS  STOCK_SUMMARY 只送名称也能查出明细(名称口径:按名称精确等值,不串仓)  · 只送名称 明细=13(含同名异码)vs 带编码明细=2
+PASS  STOCK_SUMMARY 只送名称也能查出明细(名称口径:按名称精确等值,不串仓)  · 只送名称 totalSize=13 首页明细=13(含同名异码) vs 带编码 totalSize=2 首页明细=2
 PASS  STOCK_SUMMARY 日期段生效(2099 空区间 ⇒ 明细 0 行)  · 合计=0 明细=0 合成=0
 
-[FAIL] 20 项,失败 2 项 · 输出已写 D:\YINJIA-main\tools\archive\_stockreport-dialog-1020\v-gate.out
+[PASS] 20 项,失败 0 项 · 输出已写 D:\YINJIA-main\tools\archive\_stockreport-dialog-1020\v-gate.out

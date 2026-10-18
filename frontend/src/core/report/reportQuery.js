@@ -46,15 +46,34 @@ export function reportQueryDialogOn(panelCode, metadataFlag) {
 
 /**
  * 现在该不该自动弹条件弹窗。
+ *
+ * 判定顺序(任一不满足即不弹):
+ *   ① 面板走弹窗门(enabled);
+ *   ② 面板号有效(空/undefined = 已离开面板);
+ *   ③ 本面板本轮**还没自动弹过**(alreadyAutoOpened = 进了这个面板已经弹过一次);
+ *   ④ 还没成功查询过(hasApplied);
+ *   ⑤ 弹窗当前没开着(dialogVisible)。
+ *
+ * ⚠ ③ 是 2026-10-20 第二轮补的,专治一个**竞态**:
+ *   用户点 ✕ 关掉弹窗 ⇒ `onQueryDialogClose` 里 `router.push('/dashboard')`;
+ *   而路由切换是异步的,在它落地之前若还有一次 `load()`(关闭/切面板/其他 watcher 触发),
+ *   此刻 panelCode 仍是旧值、hasApplied 仍是 false、dialogVisible 已经是 false ⇒
+ *   门又被放行,**弹窗当场自己弹回来**,并且随面板失活变成一个关不掉的"孤儿弹窗"
+ *   —— 用户在界面上看到的就是「点了关闭又弹出来」/「进别的报表还压着一个」。
+ *   有了 ③,「自动弹」严格绑定成**每个面板每次进入最多一次**,与 load() 被调用多少次无关;
+ *   用户主动点工具栏「查询」走的是 openQueryDialog(),不经过本函数,不受影响。
+ *
  * @param {object} s
- * @param {boolean} s.enabled        面板是否走弹窗门(见 reportQueryDialogOn)
- * @param {boolean} s.hasApplied     本面板本轮是否已成功查询过一次(即 rqdDone)
- * @param {boolean} s.dialogVisible  弹窗当前是否已打开
- * @param {string}  s.panelCode      当前面板号(空/undefined = 已离开面板,一律不弹)
+ * @param {boolean} s.enabled            面板是否走弹窗门(见 reportQueryDialogOn)
+ * @param {boolean} s.hasApplied         本面板本轮是否已成功查询过一次(即 rqdDone)
+ * @param {boolean} s.dialogVisible      弹窗当前是否已打开
+ * @param {boolean} s.alreadyAutoOpened  本面板本轮是否已经自动弹过一次
+ * @param {string}  s.panelCode          当前面板号(空/undefined = 已离开面板,一律不弹)
  */
 export function shouldAutoOpenReportQuery(s = {}) {
   if (!s.enabled) return false
   if (!s.panelCode || s.panelCode === 'undefined') return false
+  if (s.alreadyAutoOpened) return false // 见上方 ③:每次进入只自动弹一次,免疫并发 load 竞态
   if (s.hasApplied) return false
   if (s.dialogVisible) return false // 已在弹窗里:再开一次就是「重复弹窗」
   return true

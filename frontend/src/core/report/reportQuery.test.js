@@ -32,6 +32,20 @@ test('首次进入弹一次;弹窗开着时再调 load 不能再弹(重复弹窗
   assert.equal(shouldAutoOpenReportQuery({ ...base, dialogVisible: true }), false)
 })
 
+test('每个面板每次进入只自动弹一次:关掉之后并发 load 不能把弹窗顶回来(竞态防线)', () => {
+  // 复现 2026-10-20 实机竞态的判定序列:✕ 关闭 ⇒ router.push 还没落地 ⇒ 又来一次 load
+  const st = { enabled: true, panelCode: 'STOCK_LEDGER', hasApplied: false, dialogVisible: false, alreadyAutoOpened: false }
+  assert.equal(shouldAutoOpenReportQuery(st), true, '① 进入:弹')
+  // 用户点 ✕:弹窗关掉,但 hasApplied 仍是 false、panelCode 仍是旧值
+  const afterClose = { ...st, dialogVisible: false, alreadyAutoOpened: true }
+  assert.equal(shouldAutoOpenReportQuery(afterClose), false, '② 关掉后那次晚到的 load 不许再弹(否则就是"关了又弹")')
+  // 连来三次也一样
+  assert.equal(shouldAutoOpenReportQuery({ ...afterClose }), false)
+  assert.equal(shouldAutoOpenReportQuery({ ...afterClose }), false)
+  // 重新进入本面板(panelCode 变化 ⇒ 重置 alreadyAutoOpened)⇒ 再弹一次
+  assert.equal(shouldAutoOpenReportQuery({ ...afterClose, alreadyAutoOpened: false }), true, '③ 重新进入可以再弹')
+})
+
 test('已经成功查询过一次(票已记)后,任何 load 都不再弹', () => {
   const base = { enabled: true, panelCode: 'STOCK_SUMMARY', hasApplied: true, dialogVisible: false }
   assert.equal(shouldAutoOpenReportQuery(base), false)

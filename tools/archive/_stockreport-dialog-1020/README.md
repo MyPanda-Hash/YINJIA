@@ -54,12 +54,16 @@
 | `_v-gate.mjs` / `v-gate.out` | **回归闸**:20 项 —— 纯函数门控 + 两面板配置 + 编码/名称双口径取数 + 日期段 + 台账合成行 |
 | `_v-dialog-flow.mjs` / `v-dialog-flow.out` | **时序回归**:14 项 —— 首次弹一次 / 弹窗开着不重开 / 查过不再弹 / 工具栏查询 / 切面板重置 |
 | `_run-gate.mjs` | 把上面几个闸**同进程**跑一遍并以 UTF-8 落盘(PowerShell 的 `>` 会写成 UTF-16 乱码) |
-| `_check-sfc.mjs` | 无构建工具时的 SFC 静态核(script 语法 + 模板引用名清单) |
-| `_build-staged.mjs` | 用 `@vue/compiler-sfc` **in-process** 编译 PanelxList 的 script/template(沙箱里 esbuild 一律 `spawn EPERM`,`vite build` 跑不了;这是能拿到的等价证明) |
-| `_shot-stock-reports-1020.mjs` / `_probe-dialog-1020.mjs` | CDP 实拍/实点脚本(**本机沙箱内 Edge 起不来**:`mojo platform_channel Check failed: 拒绝访问 (0x5)`;在正常终端跑才有用) |
-| `_WhoHolds.cs` | 8090 端口占用者反查(P/Invoke `GetExtendedTcpTable`;本机 `Get-Process`/`Get-CimInstance` 在受限环境里看不见那个 java 进程) |
+| `_v-ui-e2e.mjs` / `v-ui-e2e.out` | **端到端 UI 闸**:14 项(真浏览器 + 真后端)。进入/✕/重进/工具栏 的弹窗数,必填拦截,抓 `queryFormDataList` 请求体证明条件真发出去,查询后出行 |
+| `_repack-jar.mjs` | 一条命令:dist → static → `jar uf` → 自检(lib 条数/新 chunk/index.html)。**必须在服务停止后跑** |
+| `_check-sfc.mjs` | SFC 静态核:①script 语法 ②模板引用名 ③**script 里的 `X.value` 是否有声明** |
+| `_build-staged.mjs` | 用 `@vue/compiler-sfc` **in-process** 编译 PanelxList 的 script/template |
+| `_probe-ui-1020.mjs` / `_diag-*.mjs` | 定向诊断(控制台报错捕获、overlay 样式链、查询后弹窗状态、重复弹窗归属) |
+| `_shot-stock-reports-1020.mjs` / `_probe-dialog-1020.mjs` | CDP 实拍/实点脚本 |
+| `_WhoHolds.cs` | 8090 端口占用者反查(P/Invoke `GetExtendedTcpTable`) |
 | `_stop-prod.bat` | 透传 `start-prod.ps1 -Stop` 的包装(隔离它偶发控制台缓冲区异常) |
-| `重启系统-换新后端.bat` | **一键重启**:停实例 → 等 jar 句柄 → 换 build.jar → 启动 → 跑回归(双击即可,须在你自己的桌面会话里跑) |
+| `重启系统-换新后端.bat` | 一键重启(停实例 → 等 jar 句柄 → 换 jar → 启动 → 跑回归);本轮已用它同样的步骤手工完成 |
+| `e2e-*.png` | 端到端实拍:进入(1 个弹窗+默认日期)/ 关掉后 / 台账查询 11 行 / 汇总查询 50 行 |
 
 复跑:
 
@@ -85,45 +89,52 @@ java -cp lib\mssql-jdbc.jar archive\_stockreport-dialog-1020\_QVerify.java HSDZ_
 | SQL 口径自检 `_QVerify.java`(两账套) | 编码精确 = 73 行、名称精确 = 120 行、**旧 bug 现场 = 0 行** |
 | 接口回归闸 `_v-gate.mjs`(打的是**正在跑的旧 jar**) | 台账两项 **FAIL**(旧 class 就是 bug 本身);汇总全 PASS;前端门控 8 项全 PASS |
 
-**跑不了的平台能力**(都已在探测里确认,不是"没做"):
+### 部署状态:✅ 已重启上线(2026-10-20 第二轮)
 
-* 无头 Edge:`[FATAL] mojo platform_channel Check failed: 拒绝访问 (0x5)`(沙箱不给 mojo 命名管道)⇒ 截图/点按脚本
-  `_shot-stock-reports-1020.mjs`、`_probe-dialog-1020.mjs` 只能留档,需在正常终端跑;
-* `vite build` / `npm run build`:esbuild 必须 spawn 子进程 ⇒ `spawn EPERM`(npm.ps1 也被执行策略挡);
-* 杀 8090 那个 java 进程:`Stop-Process`/`taskkill` 均 `Access denied`(只能看见端口占用者 pid)。
+本轮拿到了 danger-full-access,**重启与前端构建都已完成**:
 
-### 部署状态:新后端 class 已就绪,但**没换上**(需在你自己的终端重启一次)
+| 步骤 | 结果 |
+|---|---|
+| 杀掉旧实例 | `taskkill /PID 32464 /T /F` → SUCCESS(上一轮 `Access denied` 已不复现) |
+| 换 back-end class | 用 `-parameters` 重编(**必须**,否则 Spring 起不来)后打回 jar |
+| 前端构建 | `vite build` 成功(esbuild 可 spawn 了) |
+| 前端入包 | `frontend/dist` → `backend/src/main/resources/static` → `jar uf`(`_repack-jar.mjs` 一条命令) |
+| 重启 | `start-prod.ps1` → 8090 HTTP 200 |
 
-8090 上跑的仍是**旧 class 的旧 jar**(所以接口回归里台账那两项还会 FAIL,`_probe-ledger-filter.mjs`
-的口径也没变)。新 class 已编好并打进 `backend/target/yinjia-mes-backend-0.1.0.build.jar`
-(BOOT-INF/lib 128 条 / static 160 条 = 与原 jar 同构,只多换了 `BOOT-INF/classes/com/**`;
-**static 一个字节没动**,本次改动的只有后端)。
+> ⚠ **踩到并已修复的一个构建坑**:手工 `javac` 编 class 时**必须带 `-parameters`**
+> (maven-compiler-plugin 由 spring-boot-starter-parent 默认开启)。漏了它 ⇒ Spring 启动即失败:
+> `Parameter 0 of method dataSource ... required a single bean, but 3 were found`
+> (构造器参数名丢失,`@Qualifier` 失效)。编译命令:
+> `javac -parameters -encoding UTF-8 --release 25 -cp <target/cp.txt> -d <out> <sources>`
 
-> 🔴 为什么没直接重启:本会话是**受限沙箱**,对 8090 那个 java 进程(pid 32464)
-> `Stop-Process`/`taskkill` 一律 `Access denied`(脚本报「已停止」但进程仍在,端口仍被占);
-> `start-prod.ps1` 因此判定「已在运行」直接跳过启动 —— 沙箱里的"重启"对它是无效的。
-> 你桌面会话里跑同一个脚本**有权限**,所以下面这个一键批处理是可靠路径。
-
-**双击即完成重启**(停止 → 等 jar 句柄释放 → build.jar 换成正式 jar → 启动 → 自动跑回归):
-
-```
-tools\archive\_stockreport-dialog-1020\重启系统-换新后端.bat
-```
-
-它等价于手跑这三步:
+一键重打(停服务 → 构建静态 → 打 jar → 自检):
 
 ```powershell
 cd D:\YINJIA-main
-powershell -ExecutionPolicy Bypass -File tools\scripts\start-prod.ps1 -Stop
-cd backend\target
-powershell -Command "Move-Item yinjia-mes-backend-0.1.0.jar yinjia-mes-backend-0.1.0.jar.orig1020 -Force; Move-Item yinjia-mes-backend-0.1.0.build.jar yinjia-mes-backend-0.1.0.jar"
-cd ..\..
+Get-Process java | Stop-Process -Force          # 必须先停,jar 被占用
+cd frontend; node node_modules\vite\bin\vite.js build; cd ..
+$env:JAVA_HOME='C:\Users\Lenovo\.jdks\temurin-25.0.4.1'
+node tools/archive/_stockreport-dialog-1020/_repack-jar.mjs
 powershell -ExecutionPolicy Bypass -File tools\scripts\start-prod.ps1
-node tools/archive/_stockreport-dialog-1020\_v-gate.mjs      # 期望 20/20 PASS(台账两项转绿)
 ```
 
-> 换错了想回退:`backend\target\yinjia-mes-backend-0.1.0.jar.orig1020` 就是旧 jar,
-> 停实例后改名回去即可。
+### 最终验证结果(全部 PASS)
 
-前端静态产物(`frontend/src` → `backend/src/main/resources/static`)仍需在正常终端 `cd frontend; npm run build`
-完成(本机 `vite build` 起不来),要么按 AGENTS.md 同步进 jar,要么直接用 5173 开发服务器看效果。
+| 层次 | 脚本 | 结果 |
+|---|---|---|
+| 纯函数单测 | `frontend/src/core/report/reportQuery.test.js` | **8/8** |
+| 门控时序 | `_v-dialog-flow.mjs` | **14/14** |
+| 接口口径 | `_v-gate.mjs`(两面板配置 + 编码/名称双口径 + 日期段 + 合成行) | **20/20** |
+| 端到端 UI | `_v-ui-e2e.mjs`(真浏览器 + 真后端) | **14/14** |
+
+端到端实测到的关键事实(截图见 `e2e-*.png`):
+
+* 进入台账:**1 个**弹窗,单据日期默认 `2026-10-01 ~ 2026-10-18`;
+* 点 ✕:弹窗关闭、不再自动弹回;
+* 重新进入:**1 个**(不是 0 也不是 2);
+* 弹窗开着时点工具栏「查询」:不叠加第二个;
+* 未选仓库/存货就点「查询」:**被必填校验拦下**,不发请求(产品该有的行为);
+* 按方案填好条件后点「查询」:请求体 =
+  `{"仓库":"成品B仓","存货":"PP复合阻垢炭棒/滤芯","_whCode":"CP-02","_itemCode":"A-48-19","开始日期":"2026-10-01","结束日期":"2026-10-18"}`,
+  列表 = **11 行(期初结存 + 9 条流水 + 期末结存)** —— 修复前这里只有期初/期末两行;
+* 收发存汇总:1 个弹窗 + 默认日期段 + 查询出 50 行。

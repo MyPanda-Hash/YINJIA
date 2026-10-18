@@ -60,10 +60,15 @@ const query = async (body) => {
   if (!r?.data) throw new Error(JSON.stringify(r).slice(0, 200))
   return r.data
 }
-/** 台账合成行(期初结存/期末结存)不是流水,口径上恒随查询出现 */
-const SYNTH = new Set(['期初结存', '期末结存'])
-const detailRows = (rows) => rows.filter((r) => !SYNTH.has(String(r['单据类型'] || '')))
-const synthRows = (rows) => rows.filter((r) => SYNTH.has(String(r['单据类型'] || '')))
+/**
+ * 台账「合成行」的判据 = **没有仓库编码/存货编码**。
+ * 不能只看 `单据类型` —— 台账里还有**真实流水行**的单据类型就叫「期初结存」
+ * (金蝶期初导入的 migration 行,_QGaps.java 实测 id=5 仓=CK00003 日期=1900-01-01 类型=期初结存)。
+ * QueryService#ledgerRow 造的两条合成行只有 单据类型 + 期初/期末三列,编码列是空的。
+ */
+const isSynth = (r) => !String(r['仓库编码'] || '').trim() && !String(r['存货编码'] || '').trim()
+const detailRows = (rows) => rows.filter((r) => !isSynth(r))
+const synthRows = (rows) => rows.filter((r) => isSynth(r))
 
 for (const code of ['STOCK_LEDGER', 'STOCK_SUMMARY']) {
   const cfg = await (await fetch(`${host}/api/px/getPanelConfig?panelCode=${code}`, { headers: H })).json()
@@ -95,15 +100,18 @@ for (const code of ['STOCK_LEDGER', 'STOCK_SUMMARY']) {
     `样本=${whName}(${whCode})/${itemName}(${itemCode}) 合计=${hit.totalSize} 明细=${det.length} 合成=${synthRows(hit.list).length} 越界=${offWh}/${offItem}`)
 
   // 名称位放名称(不再夹编码):台账这一路以前恒 0 行明细(名称被当编码比)。
-  // 修好后它**会命中同名的其它存货编码**(台账名称列 = 档案存货名,同仓同名实测 3 个码,
+  // 修好后它**会命中同名的其它存货编码**(台账名称列 = 档案存货名,同仓同名实测 12 个码,
   // 见 _QNameCollide.java)—— 这是"名称口径"的既定代价:结果必须 ⊆ 该名称的全部码,且**不得为空**;
   // 弹窗走的是编码(上一项),单码单一性靠它。
+  //
+  // ⚠ 比的是 **totalSize**(全量命中数)而不是首页明细行数:两个查询都被 flatPageCap 夹到
+  //   pageSize=50(报表三张的服务端硬上限),首页明细数只是"截断后还剩几行",拿来比大小没有意义。
   const byNameOnly = await query({ panelCode: code, pageNo: 1, pageSize: 200,
     condition: cleanCondition({ 仓库: whName, 存货: itemName, 开始日期: '1900-01-01', 结束日期: '2099-12-31' }) })
   const dn = detailRows(byNameOnly.list)
-  const nameOk = dn.length >= det.length && dn.length > 0
+  const nameOk = byNameOnly.totalSize >= hit.totalSize && dn.length > 0
   ok(`${code} 只送名称也能查出明细(名称口径:按名称精确等值,不串仓)`, nameOk,
-    `只送名称 明细=${dn.length}(含同名异码)vs 带编码明细=${det.length}`)
+    `只送名称 totalSize=${byNameOnly.totalSize} 首页明细=${dn.length}(含同名异码) vs 带编码 totalSize=${hit.totalSize} 首页明细=${det.length}`)
 
   // 日期段:2099 年没有任何流水 ⇒ 明细必须 0 行(台账只剩期初/期末两条合成行)
   const empty = await query({ panelCode: code, pageNo: 1, pageSize: 200,

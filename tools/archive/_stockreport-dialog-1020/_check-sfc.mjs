@@ -77,6 +77,24 @@ for (const v of template.matchAll(/v-for="\s*(?:\(([^)]*)\)|([A-Za-z_$][\w$]*))\
   const names = (v[1] || v[2] || '').split(',').map((s) => s.trim()).filter(Boolean)
   names.forEach((n) => locals.add(n))
 }
+// 插槽作用域变量:`v-slot="x"` / `#default="{ row, col, cell }"` / `v-slot:footer="{ ... }"`
+for (const v of template.matchAll(/(?:v-slot(?::[\w.-]+)?|#[\w.-]+)="\s*(?:\{([^}]*)\}|([A-Za-z_$][\w$]*))\s*"/g)) {
+  if (v[2]) locals.add(v[2].trim())
+  if (v[1]) {
+    for (const part of v[1].split(',')) {
+      const n = part.trim().split(':').pop().replace(/=.*$/, '').trim()
+      if (/^[A-Za-z_$][\w$]*$/.test(n)) locals.add(n)
+    }
+  }
+}
+// 表达式里的箭头函数参数:`e => …` / `(a, b) => …`
+for (const a of template.matchAll(/(?:\(([^()]*)\)|([A-Za-z_$][\w$]*))\s*=>/g)) {
+  const src = a[1] || a[2] || ''
+  for (const part of src.split(',')) {
+    const n = part.trim().replace(/[={}[\]]/g, '').trim()
+    if (/^[A-Za-z_$][\w$]*$/.test(n)) locals.add(n)
+  }
+}
 // 插值 / 指令表达式里的名字
 const exprs = []
 for (const x of template.matchAll(/\{\{([\s\S]*?)\}\}/g)) exprs.push(x[1])
@@ -90,18 +108,64 @@ for (const e of exprs) {
     .replace(/\.\s*[A-Za-z_$][\w$]*/g, '')
     .replace(/\?\.[A-Za-z_$][\w$]*/g, '')
     .replace(/\b[A-Za-z_$][\w$]*\s*:/g, '') // 对象字面量键
-  for (const id of cleaned.matchAll(/(?<![.\w$])[A-Za-z_$][\w$]*(?!\s*\()/g)) {
+  // ⚠ 匹配必须**先取完整标识符,再在 JS 里看后一个字符**。
+  //   原写法 `[A-Za-z_$][\w$]*(?!\s*\()` 有回溯缺陷:遇到 `openQueryRef(` 时,
+  //   正则会把匹配退成 `openQueryRe`(因为这样 `(?!\s*\()` 就能通过)⇒ 报出一堆
+  //   `openQueryRe`/`headerFieldKe` 这种**假阳性**,把真问题淹了(2026-10-20 实测)。
+  for (const id of cleaned.matchAll(/(?<![.\w$])[A-Za-z_$][\w$]*/g)) {
     const n = id[0]
+    const after = cleaned.slice(id.index + n.length)
+    if (/^\s*\(/.test(after)) continue      // 函数调用:名字来自 script 或全局,不是模板变量
     if (BUILTIN.has(n) || declared.has(n) || locals.has(n)) continue
-    // 后面紧跟 -> 的可能是箭头参数,已由 locals 处理;这里只记名字
     missing.add(n)
   }
 }
+missing.delete('$event') // Vue 模板内置
 if (missing.size) {
-  console.error('[WARN] ② 模板里出现了 script 未声明的名字(需人工确认是否误报):', [...missing].sort().join(', '))
+  console.error('[FAIL] ② 模板里引用了 script 未声明的名字:', [...missing].sort().join(', '))
+  process.exitCode = 1
 } else {
   console.log('[OK] ② 模板引用名均在 script 中声明')
 }
 
-// ③ 标签配平粗检(只数自定义组件与常见块级标签的开关数)
+// ③ script 体里的 `X.value`(ref 访问):X 必须是本文件声明过的。
+//    2026-10-20 实测教训:把 `ledgerWhOptions` 写成 `ledgerRefOptions` ⇒ 台账一进面板就
+//    `ReferenceError: ledgerRefOptions is not defined`,整页渲染中断(弹窗/列表全空),
+//    而 `vite build` 与模板检查**都不会报**。这条专门兜住这类"名字写错"。
+const scriptNoStr = script
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .replace(/(^|[^:])\/\/[^\n]*/gm, '$1 ')
+  .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+  .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+// ⚠ 模板字符串**不做剥离**:`/`(?:[^`\\$]|\\.|\$(?!\{))*`/g` 在含大量 `${}` 的 SFC 上会失配,
+//   实测一次吃掉 181k 字符(206,735 → 25,276),把要查的代码段整段吞掉 ⇒ 检查恒过(2026-10-20 实测)。
+//   代价:模板字符串**内部**的文字也会被当成代码扫;`X.value` 出现在字符串里的情况极少,可接受。
+// 函数参数 / catch 变量 / for-of 循环变量也算"本地名"(`(o) => o.value`、`(option) => option.value`)
+const scriptLocals = new Set()
+const addParamList = (list) => {
+  for (const part of String(list || '').split(',')) {
+    const n = part.trim().replace(/[={}[\].]/g, '').replace(/^\.\.\./, '').split(/\s*=\s*/)[0].trim()
+    if (/^[A-Za-z_$][\w$]*$/.test(n)) scriptLocals.add(n)
+  }
+}
+for (const m of scriptNoStr.matchAll(/\(([^()]*)\)\s*=>/g)) addParamList(m[1])
+for (const m of scriptNoStr.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*=>/g)) scriptLocals.add(m[1])
+for (const m of scriptNoStr.matchAll(/function\s*[A-Za-z_$]*\s*\(([^)]*)\)/g)) addParamList(m[1])
+for (const m of scriptNoStr.matchAll(/catch\s*\(\s*([A-Za-z_$][\w$]*)/g)) scriptLocals.add(m[1])
+for (const m of scriptNoStr.matchAll(/for\s*\(\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) scriptLocals.add(m[1])
+for (const m of scriptNoStr.matchAll(/for\s*\(\s*(?:const|let|var)\s*\[([^\]]*)\]/g)) addParamList(m[1])
+
+const badRefs = new Set()
+for (const m of scriptNoStr.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\.value\b/g)) {
+  const n = m[1]
+  if (BUILTIN.has(n) || declared.has(n) || scriptLocals.has(n)) continue
+  badRefs.add(n)
+}
+if (badRefs.size) {
+  console.error('[FAIL] ③ script 里访问了未声明的 ref:', [...badRefs].sort().join(', '))
+  process.exitCode = 1
+} else {
+  console.log('[OK] ③ script 里的 ref 访问都有声明')
+}
+
 console.log(`[INFO] script ${script.length} 字符,模板 ${template.length} 字符,声明名 ${declared.size} 个`)

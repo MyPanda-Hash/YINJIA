@@ -1,0 +1,33 @@
+--- 1) 首次进入台账 ---
+  t=1s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=2s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=3s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=4s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=5s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=6s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=7s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=8s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=9s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=10s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+--- 2) 点 ✕ 关闭 ---
+  t=1s {"hash":"#/dashboard","q":0,"rows":0,"range":[]}
+  t=2s {"hash":"#/dashboard","q":0,"rows":0,"range":[]}
+  t=3s {"hash":"#/dashboard","q":0,"rows":0,"range":[]}
+  t=4s {"hash":"#/dashboard","q":0,"rows":0,"range":[]}
+  t=5s {"hash":"#/dashboard","q":0,"rows":0,"range":[]}
+--- 3) 重新进入台账(step C)---
+  t=1s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=2s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=3s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=4s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=5s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=6s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=7s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=8s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=9s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=10s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=11s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=12s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=13s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  t=14s {"hash":"#/panelx/list/STOCK_LEDGER","q":1,"rows":0,"range":["2026-10-01","2026-10-18"]}
+  JS 报错: []

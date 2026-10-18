@@ -1506,7 +1506,11 @@
         <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
+    <!-- ⚠ v-if="panelAlive"(2026-10-20 第二轮):keep-alive 下每个页签一份 PanelxList 实例,
+         面板切走后实例仍活着、弹窗又是 append-to-body(挂在 body 上),
+         一旦"离开时弹窗还开着",它就会以**孤儿弹窗**的形式压在别的页面上(实测进汇总页
+         会看到两个「查询」弹窗:一个是台账那份遗留的)。面板号没了就直接不渲染,从结构上堵死。 -->
+    <el-dialog v-if="panelAlive" v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
         <span class="plan-label">{{ tt('查询方案') }}</span>
@@ -2331,7 +2335,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
@@ -2903,6 +2907,15 @@ const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过�
 const rqdRange = ref([])   // 单据日期区间 [开始, 结束](YYYY-MM-DD)
 // 弹窗门「正在自动开」重入闸:load() 可能与别的 load() 并发(切面板双触发),两个都过门时会弹两次。
 const rqdOpening = ref(false)
+/** 本面板本轮**是否已经自动弹过一次**(2026-10-20 第二轮):
+ *  自动弹严格绑定「每次进入面板最多一次」,不随 load() 被调用多少次变化。
+ *  专治一个竞态:点 ✕ 关闭 ⇒ onQueryDialogClose 里 router.push 还是异步的,在它落地前若有
+ *  一次 load()(panelCode 仍是旧值、hasApplied 仍 false、dialogVisible 已 false)⇒ 门又放行,
+ *  弹窗当场自己弹回来,随后随面板失活变成关不掉的「孤儿弹窗」。 */
+const rqdAutoOpened = ref(false)
+/** 面板还活着(=路由上确有面板号)。查询弹窗用 v-if 绑它:面板切走后不再渲染,
+ *  从结构上杜绝"孤儿弹窗"(append-to-body + keep-alive 会让遗留弹窗压在别的页面上)。 */
+const panelAlive = computed(() => !!panelCode.value && panelCode.value !== 'undefined')
 /** 台账/汇总的「单据日期」区间为空时的默认值(本月初 → 今天):首次进弹窗自动带出,
  *  否则用户每次都要先点两次日期才能查(T+ 报表同款默认区间)。 */
 function ensureReportRange() {
@@ -5792,6 +5805,7 @@ watch(panelCode, scheduleColExpand)
 watch(panelCode, () => {
   rqdDone.value = false
   rqdOpening.value = false // 切面板即取消"正在自动开":否则回来时会被上一轮的闸挡在弹窗外面
+  rqdAutoOpened.value = false // 「每次进入自动弹一次」:换面板/回到本面板都重新允许
   rqdRange.value = []
   ledgerWhOptions.value = []
   ledgerItemOptions.value = []
@@ -7990,12 +8004,18 @@ function openReportQueryIfNeeded(fresh = false) {
     panelCode: String(panelCode.value || ''),
     hasApplied: rqdDone.value,
     dialogVisible: queryDialogVisible.value,
+    alreadyAutoOpened: rqdAutoOpened.value,
   }) || rqdOpening.value) return false
   rqdOpening.value = true
+  rqdAutoOpened.value = true // 每次进入面板最多自动弹一次(见 ref 注释:防"关了又弹"的竞态)
   if (fresh) openQueryDialog()
   // 日期段必填:没填过就给「本月初 → 今天」,否则用户得先点两次日期才查得动(T+ 报表同款)
   ensureReportRange()
-  if (isCascadePanel.value && !ledgerRefOptions.value.length) loadLedgerRefOptions()
+  // 级联面板(台账/状况表):联动选项还没拉过就补一次(供弹窗里 仓库↔存货 互相收窄/置灰)。
+  // ⚠ 2026-10-20 修:这里原写成 `ledgerRefOptions`(不存在的名字)⇒ 台账一进面板就抛
+  //   ReferenceError: ledgerRefOptions is not defined,整页渲染中断(实测弹窗与列表全空)。
+  //   两个选项 ref 的真名是 ledgerWhOptions / ledgerItemOptions;任一为空即视为"没拉过"。
+  if (isCascadePanel.value && !ledgerWhOptions.value.length && !ledgerItemOptions.value.length) loadLedgerRefOptions()
   queryDialogVisible.value = true
   return true
 }
@@ -9822,6 +9842,9 @@ watch(
     // (那边只挂 panelCode,本 watch 还含 operationName,故这里补一份,避免"换面板了票还在")。
     rqdDone.value = false
     rqdOpening.value = false
+    rqdAutoOpened.value = false
+    // ⚠ 离开面板(code 为空)在上面就 return 了 —— 这是**故意的**:rqdAutoOpened 保持 true,
+    //   于是 router.push('/dashboard') 落地前那次晚到的 load() 不会再把弹窗顶回来(见 ref 注释)。
     qrSel.value = new Set() // 二维码标签勾选集随面板清空(行键属于上一个档案)
     resetDictModes()
     resetTableSorts() // 切面板清排序(同一面板内保留:切单据/翻页/查询都在)
@@ -9971,6 +9994,26 @@ onDeactivated(() => {
   scanVisible.value = false
   maintainVisible.value = false
   selVisible.value = false
+  // 切离期间把「自动弹窗」彻底封住(2026-10-20 第二轮):
+  //   此刻 onQueryDialogClose 里的 router.push 可能还没落地,panelCode 仍是旧值、
+  //   hasApplied 仍是 false —— 若这段时间来一次 load(),门就会放行,弹窗当场弹回来,
+  //   然后随本实例失活变成压在别的页面上的孤儿弹窗。rqdAutoOpened=true 让它绝对不开。
+  rqdOpening.value = false
+  rqdAutoOpened.value = true
+})
+
+/** keep-alive 切回本页签:重新允许「进入自动弹一次」。
+ *  为什么必须有它:切离时上面把 rqdAutoOpened 置了 true,而 panelCode 引用的是同一个
+ *  路由参数(回到同一路径时值可能没变),`watch(panelCode)` 未必触发 ⇒ 不重置就再也弹不出来
+ *  (实测 step C:重新进入台账 dialogs=0)。
+ *  ⚠ 还必须在**确保配置就绪之后**再判(`await loadCrg()`):激活时 cfgCache 常已被切面板的
+ *  watcher 清成 null,直接调门会因为 metadata.reportQueryDialog 读不到而静默不开。 */
+onActivated(async () => {
+  if (!panelAlive.value) return
+  rqdOpening.value = false
+  rqdAutoOpened.value = false
+  try { await loadCrg() } catch { /* 配置拉不到就不弹,load() 稍后仍会走同一条门 */ }
+  openReportQueryIfNeeded(false)
 })
 
 onUnmounted(() => {

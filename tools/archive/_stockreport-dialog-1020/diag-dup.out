@@ -1,0 +1,5 @@
+=== 步骤1:进入台账 → 关掉 → 进汇总(复现 F 的两弹窗)===
+LAY1: {"total":1,"visibleQuery":1,"info":[{"i":0,"uid":null,"hasActive":false,"labels":["单据日期*","模糊搜索","仓库*","存货*"],"dateVals":["2026-10-01","2026-10-18"],"rect":[136,447,760]}],"hash":"#/panelx/list/STOCK_LEDGER","rows":0}
+LAY2(关后): {"total":1,"visibleQuery":1,"info":[{"i":0,"uid":null,"hasActive":false,"labels":["单据日期*","模糊搜索","仓库","存货"],"dateVals":["",""],"rect":[136,447,760]}],"hash":"#/dashboard","rows":0}
+SUM1: {"total":2,"visibleQuery":2,"info":[{"i":0,"uid":null,"hasActive":false,"labels":[],"dateVals":[],"rect":[136,447,760]},{"i":1,"uid":null,"hasActive":false,"labels":["单据日期*","模糊搜索","仓库","存货"],"dateVals":["2026-10-01","2026-10-18"],"rect":[136,447,760]}],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0}
+SUM2(+4s): {"total":2,"visibleQuery":2,"info":[{"i":0,"uid":null,"hasActive":false,"labels":[],"dateVals":[],"rect":[136,447,760]},{"i":1,"uid":null,"hasActive":false,"labels":["单据日期*","模糊搜索","仓库","存货"],"dateVals":["2026-10-01","2026-10-18"],"rect":[136,447,760]}],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0}
