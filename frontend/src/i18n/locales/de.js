@@ -1980,6 +1980,8 @@ export default {
     '请填写开始日期与结束日期': 'Bitte geben Sie das Start-und Enddatum ein',
     '至': 'Zu',
     '请填写单据日期': 'Bitte füllen Sie das Datum der Qual aus',
+    '生效中': 'Aktiv',
+    '期次': 'Periode',
     '库存台账需选择一个仓库和一种存货': 'Das Inventar konto muss ein Lager und eine Art Inventar auswählen',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Das Folgende sind die Dokumente, die überprüft und nicht an ERP übertragen wurden. Klicken Sie nach dem Aktivieren auf "ERP-Übertragung starten".',
     '开始转ERP': 'ERP starten',

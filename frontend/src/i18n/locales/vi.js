@@ -1985,6 +1985,8 @@ export default {
     '请填写开始日期与结束日期': 'Vui lòng điền vào ngày bắt đầu và ngày kết thúc',
     '至': 'Đến',
     '请填写单据日期': 'Vui lòng điền ngày nhận',
+    '生效中': 'Đang áp dụng',
+    '期次': 'Kỳ',
     '库存台账需选择一个仓库和一种存货': 'Sổ cái kiểm kê cần chọn kho và kho',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Sau đây là các tài liệu đã được xem xét và chưa được chuyển sang ERP, hãy kiểm tra và nhấp vào "Bắt đầu chuyển đổi ERP"',
     '开始转ERP': 'Bắt đầu chuyển sang ERP',

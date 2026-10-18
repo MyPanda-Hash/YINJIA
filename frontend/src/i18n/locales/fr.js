@@ -1980,6 +1980,8 @@ export default {
     '请填写开始日期与结束日期': 'Veuillez remplir la date de début et la date de fin',
     '至': 'À',
     '请填写单据日期': 'Veuillez remplir la date du document',
+    '生效中': 'En vigueur',
+    '期次': 'Période',
     '库存台账需选择一个仓库和一种存货': 'Le compte d\'inventaire doit choisir un entrepôt et un type d\'inventaire',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Voici les documents qui ont été examinés et qui n\'ont pas été transférés à l\'ERP. Après vérification, cliquez sur "Démarrer le transfert vers l\'ERP"',
     '开始转ERP': 'Commencer à tourner ERP',

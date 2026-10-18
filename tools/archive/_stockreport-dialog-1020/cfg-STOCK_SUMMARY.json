@@ -1,0 +1,305 @@
+{
+  "metadata": {
+    "panelCode": "STOCK_SUMMARY",
+    "panelName": "收发存汇总表",
+    "panelCategory": "报表",
+    "reportQueryDialog": true,
+    "singleDoc": false,
+    "autoCodeField": null,
+    "docArchive": false,
+    "panelState": {
+      "dataName": "单据状态",
+      "defaultOptions": [
+        "草稿",
+        "已审核",
+        "已完成",
+        "审批中",
+        "已中止",
+        "已作废"
+      ],
+      "dataType": "STRING"
+    },
+    "panelButtons": [],
+    "buttonGroups": [
+      {
+        "name": "查询",
+        "actions": [
+          "查询",
+          "刷新"
+        ]
+      },
+      {
+        "name": "打印",
+        "actions": [
+          "打印",
+          "预览",
+          "导出"
+        ]
+      },
+      {
+        "name": "更多",
+        "actions": [
+          "发送邮件",
+          "重算成本",
+          "表格调整",
+          "表头调整",
+          "字段管理",
+          "退出"
+        ]
+      }
+    ],
+    "panelPageDto": {
+      "tablePages": [
+        {
+          "tableName": "收发存汇总表列表",
+          "pageSize": 50,
+          "queryFields": [
+            {
+              "dataName": "仓库",
+              "dataType": "参照",
+              "width": 110,
+              "readonly": true,
+              "refPanel": "WH",
+              "refField": "仓库名称",
+              "displayField": "仓库名称"
+            },
+            {
+              "dataName": "存货",
+              "dataType": "参照",
+              "width": 180,
+              "readonly": true,
+              "refPanel": "INV",
+              "refField": "存货名称",
+              "displayField": "存货名称"
+            }
+          ],
+          "gridTabs": [
+            {
+              "label": "收发存汇总表",
+              "rowSource": "items",
+              "columns": [
+                "仓库编码",
+                "仓库",
+                "存货编码",
+                "存货",
+                "期次",
+                "规格型号",
+                "主单位",
+                "期初数量",
+                "期初平均单价",
+                "期初金额",
+                "本期入库数量",
+                "入库平均单价",
+                "本期入库金额",
+                "本期出库数量",
+                "出库平均单价",
+                "本期出库金额",
+                "期末结存数量",
+                "期末平均单价",
+                "期末结存金额"
+              ],
+              "columnGroups": [
+                {
+                  "label": "期初结存",
+                  "columns": [
+                    "期初数量",
+                    "期初平均单价",
+                    "期初金额"
+                  ]
+                },
+                {
+                  "label": "本期入库",
+                  "columns": [
+                    "本期入库数量",
+                    "入库平均单价",
+                    "本期入库金额"
+                  ]
+                },
+                {
+                  "label": "本期出库",
+                  "columns": [
+                    "本期出库数量",
+                    "出库平均单价",
+                    "本期出库金额"
+                  ]
+                },
+                {
+                  "label": "期末结存",
+                  "columns": [
+                    "期末结存数量",
+                    "期末平均单价",
+                    "期末结存金额"
+                  ]
+                }
+              ]
+            }
+          ],
+          "topBarBtn": [],
+          "rowOperationBarBtn": [],
+          "events": []
+        }
+      ]
+    },
+    "formPages": [
+      {
+        "formName": "收发存汇总表",
+        "fieldNames": "",
+        "bottomOperationBarBtn": [],
+        "events": []
+      }
+    ]
+  },
+  "dataSchema": {
+    "fields": []
+  },
+  "detail": {
+    "tabs": [
+      {
+        "key": "items",
+        "label": "明细",
+        "fields": [
+          {
+            "dataName": "仓库编码",
+            "dataType": "文本",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "仓库",
+            "dataType": "参照",
+            "width": 110,
+            "readonly": true,
+            "refPanel": "WH",
+            "refField": "仓库名称",
+            "displayField": "仓库名称",
+            "isRequired": false
+          },
+          {
+            "dataName": "存货编码",
+            "dataType": "文本",
+            "width": 110,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "存货",
+            "dataType": "参照",
+            "width": 180,
+            "readonly": true,
+            "refPanel": "INV",
+            "refField": "存货名称",
+            "displayField": "存货名称",
+            "isRequired": false
+          },
+          {
+            "dataName": "期次",
+            "dataType": "文本",
+            "width": 80,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "规格型号",
+            "dataType": "文本",
+            "width": 130,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "主单位",
+            "dataType": "文本",
+            "width": 70,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期初数量",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期初平均单价",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期初金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "本期入库数量",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "入库平均单价",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "本期入库金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "本期出库数量",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "出库平均单价",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "本期出库金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期末结存数量",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期末平均单价",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期末结存金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          }
+        ],
+        "isRequired": true
+      }
+    ]
+  }
+}

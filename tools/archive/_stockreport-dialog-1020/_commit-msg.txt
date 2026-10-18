@@ -1,0 +1,26 @@
+fix: 库存台账/收发存汇总 重复弹窗 + 查询口径(名称当编码比导致台账只剩期初/期末两行)
+
+用户报障(2026-10-20)：「库存台账和收发存汇总表出现重复弹窗和查询问题」。
+
+① 重复弹窗(前端门控)
+   原判据 reportQueryDialog && !rqdDone 不认「弹窗本来就开着」,而 load() 在一轮里被十几处调用
+   (切面板双触发/刷新/列设置保存后…),两条并行 load 都能过门 ⇒ 弹窗被重开;且 load() 调的是
+   会重置条件草稿的 openQueryDialog() ⇒ 用户看到「弹窗关了又弹、刚选的仓库/存货没了」。
+   · 新增纯函数 core/report/reportQuery.js(shouldAutoOpenReportQuery 含 dialogVisible、
+     validateReportQuery、defaultReportRange、cleanCondition)+ 7 条单测
+   · PanelxList:自动入口统一 openReportQueryIfNeeded(含 rqdOpening 重入闸),load() 只让弹窗
+     「亮着」不重置草稿;工具栏「查询」在弹窗开着时不重开
+   · 弹窗顶部显示「生效中」条件;日期段空时默认「本月初→今天」(T+ 报表同款)
+   · 新文案「生效中」「期次」补 10 语言
+
+② 查询只出期初/期末两行(后端口径)
+   QueryService#queryFlat 对台账/状况表写死 RTRIM(t.[仓库编码]) = 仓库值(把弹窗里的**名称**当编码比)
+   ⇒ 明细恒 0 行;配套 _whCode 过滤又要求 l2c 含「仓库编码」而台账该字段 place=detail ⇒ 一次没生效。
+   · 名称/编码判据收敛为 appendWhItemFilter:编码优先(_whCode/_itemCode)→ 名称位若本身是编码也认
+     → 否则名称精确等值(绝不 LIKE,子串会串仓);台账/状况表/汇总同一口径
+   · 台账期初/期末合成行按同一口径取匹配值/匹配列(此前连合成行的数都算成 0)
+
+验证:纯函数单测 7/7;门控时序 _v-dialog-flow.mjs 14/14;SFC(script+template)编译通过;
+     后端全量 javac 通过;SQL 口径 _QVerify.java 两账套(编码=73 / 名称=120 / 旧 bug 现场=0)。
+取证与复跑:tools/archive/_stockreport-dialog-1020/README.md
+(8090 上仍是旧 class 的旧 jar:本环境杀不掉该进程,新 class 已打进 build.jar,切换步骤见 README §三)

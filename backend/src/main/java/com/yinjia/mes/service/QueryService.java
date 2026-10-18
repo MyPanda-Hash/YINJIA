@@ -100,28 +100,10 @@ public class QueryService {
         String cols = selectCols(def, def.fields(), null);
         StringBuilder where = new StringBuilder("WHERE ").append(cancelFilter(def.lineTable()));
         List<Object> args = new ArrayList<>();
-        // 台账/库存状况(级联面板)的 仓库/存货 条件:参照绑定编码(migrate-ledger-code-filter.sql),
-        // 条件值=编码 → 在视图编码列上**精确等值**。不走通用 LIKE:编码互为子串
-        // (YJ-SX-004 / YJ-SX-004-1),LIKE 会把多个存货并进同一张台账,破坏「一仓一存货」单一性。
-        Map<String, Object> cond = condition;
-        if ("STOCK_LEDGER".equals(def.code()) || "STOCK_BALANCE".equals(def.code())) {
-            Object wh = condition == null ? null : condition.get("仓库");
-            Object it = condition == null ? null : condition.get("存货");
-            if ((wh != null && !String.valueOf(wh).isBlank()) || (it != null && !String.valueOf(it).isBlank())) {
-                cond = new LinkedHashMap<>(condition);
-                if (wh != null && !String.valueOf(wh).isBlank()) {
-                    where.append(" AND RTRIM(t.[仓库编码]) = ?");
-                    args.add(String.valueOf(wh).trim());
-                }
-                if (it != null && !String.valueOf(it).isBlank()) {
-                    where.append(" AND RTRIM(t.[存货编码]) = ?");
-                    args.add(String.valueOf(it).trim());
-                }
-                cond.remove("仓库");
-                cond.remove("存货");
-            }
-        }
-        appendDirectFilters(def, def.lineTable(), where, args, keyword, cond, l2c, "t");
+        // 台账/库存状况(级联面板)的 仓库/存货 条件:一律交给 appendDirectFilters 的「编码优先、退化名称」
+        // 口径(见其长注释)。**这里不再把名称位当编码比** —— 2026-10-20 事故就是这里写死了
+        // `RTRIM(t.[仓库编码]) = 仓库值`,而弹窗里放的是名称 ⇒ 台账查询恒 0 行明细(只剩期初/期末两行)。
+        appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
         appendAdvFilters(advFilters, where, args, l2c, "t");
 
         Integer total = jdbc.queryForObject(
@@ -174,22 +156,29 @@ public class QueryService {
         // 台账三段式合成行(见上方 ledgerSynthetic 判定):期初=查询段起点前的累计,期末=期初+段内净额。
         // 依赖弹窗必填的 仓库/存货/日期段。
         if (ledgerSynthetic) {
-            String wh = strOf(condition.get("仓库"));
-            String item = strOf(condition.get("存货"));
+            // 仓库/存货的匹配值:与明细同一口径(有编码用编码,没编码才用名称;名称位放的是编码也认)。
+            // 2026-10-20 前这里写死 `RTRIM(仓库编码)=condition['仓库']`,而弹窗里放名称 ⇒
+            // 期初/期末也按"名称=编码"算成 0(于是用户看到「只有两行且数都是 0」)。
+            String whV = ledgerKey(condition, "仓库");
+            String itemV = ledgerKey(condition, "存货");
+            boolean byCodeWh = ledgerKeyIsCode(def, condition, "仓库");
+            boolean byCodeItem = ledgerKeyIsCode(def, condition, "存货");
+            String whCond = byCodeWh ? "RTRIM(仓库编码)=?" : "RTRIM(仓库)=?";
+            String itemCond = byCodeItem ? "RTRIM(存货编码)=?" : "RTRIM(存货)=?";
             String ds = strOf(condition.get("开始日期"));
             String de = strOf(condition.get("结束日期"));
             // 期初 = 段起点前累计(视图中限 单据日期<=de 的行,取 <ds 部分;用视图暴露的收入/发出列)
-            // 仓库/存货=编码(参照绑定编码),按编码列精确匹配 —— 名称重名(「端盖」24码)会并流
             Map<String, Object> opening = jdbc.queryForMap(
                     "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
                             + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
-                            + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 <= ?" + hint,
-                    ds, ds, wh, item, de);
+                            + " FROM v_stock_ledger WHERE " + whCond + " AND " + itemCond + " AND 单据日期 <= ?" + hint,
+                    ds, ds, whV, itemV, de);
             double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
             Map<String, Object> netm = jdbc.queryForMap(
                     "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
-                            + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
-                    wh, item, ds, de);
+                            + " FROM v_stock_ledger WHERE " + whCond + " AND " + itemCond
+                            + " AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
+                    whV, itemV, ds, de);
             double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
             int lastPage = (int) Math.ceil(totalOut / (double) pageSize);
             if (pageNo == 1) list.add(0, ledgerRow("期初结存", oq, oa, null, null));
@@ -200,6 +189,24 @@ public class QueryService {
         out.put("totalSize", totalOut);
         out.put("list", list);
         return out;
+    }
+
+    /** 台账合成行用的匹配值(编码优先;没编码才用名称位) */
+    private String ledgerKey(Map<String, Object> condition, String dim) {
+        String code = strOf(condition.get("仓库".equals(dim) ? "_whCode" : "_itemCode"));
+        if (!code.isEmpty()) return code;
+        return strOf(condition.get(dim));
+    }
+
+    /** 台账合成行的匹配值是不是编码(决定 WHERE 里比编码列还是名称列) */
+    private boolean ledgerKeyIsCode(PanelRegistry.PanelDef def, Map<String, Object> condition, String dim) {
+        String code = strOf(condition.get("仓库".equals(dim) ? "_whCode" : "_itemCode"));
+        if (!code.isEmpty()) return true;
+        String name = strOf(condition.get(dim));
+        if (name.isEmpty()) return true;
+        String col = def.labelToCol().get(dim);
+        String codeCol = "仓库".equals(dim) ? "仓库编码" : "存货编码";
+        return col == null || looksLikeCodeOf(col, name, "v_stock_ledger", codeCol).test();
     }
 
     /**
@@ -785,16 +792,23 @@ public class QueryService {
                 where.append(" AND ").append(alias).append(".[ckdm] = ?");
                 args.add(String.valueOf(ck).trim());
             }
-            // 台账/状况表按编码绑定(2026-09-28,与 _ckdm 同理):查询弹窗选仓库/存货后前端送
-            // _whCode/_itemCode(编码是稳定键:名称会重名/改名/带尾空格,等值匹配名称在这些场景误杀)。
-            // 有码时下方通用循环里的同名条件(仓库/存货)跳过——名称仅作弹窗回显,不参与过滤。
-            // 面板没有对应编码列时不生效(l2c 无该标签),名称条件照常兜底。
+            // 仓库/存货:名称(业务字段) 还是 编码(控制键)?
+            //
+            // 口径(2026-10-20 定,统一台账/库存状况/收发存汇总):
+            //   ① 控制键 `_whCode`/`_itemCode` 是**编码**的权威来源(查询弹窗选参照时绑定编码);
+            //   ② 没有控制键时,名称位里若放的**本身就是编码**也认(参照回填/查询方案里可能是码);
+            //   ③ 其余情况按**名称精确等值**(参照字段从不做 LIKE —— 子串会串仓:「成品仓」会命中「半成品仓」,
+            //      台账实测 93 行 = 34 + 59,按仓分户的口径直接失真)。
+            //
+            // ⚠ 事故(2026-10-20 用户报「库存台账查询只剩期初/期末两行」):
+            //   原实现把 `condition['仓库']/['存货']` **一律当编码**比(`RTRIM(t.[仓库编码]) = 值`),
+            //   而弹窗里这两格放的是**名称**(弹窗回显 + 参照 label)⇒ 名称拿去和编码比 ⇒ 恒 0 行,
+            //   只剩两行合成行;更糟的是配套的 `_whCode` 分支有前置条件
+            //   `l2c.containsKey("仓库编码")`,而台账的「仓库编码」字段 place=detail、不进查询字段表
+            //   ⇒ l2c 里没有这个标签 ⇒ **编码过滤一次都没生效过**(见 tools/archive/_stockreport-dialog-1020/)。
+            //   现在把名称/编码判据收敛成上面一条:编码优先、退化名称,两块面板同一口径。
             Object whCode = condition.get("_whCode");
-            boolean byWhCode = whCode != null && !String.valueOf(whCode).isBlank() && l2c.containsKey("仓库编码");
-            if (byWhCode) {
-                where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("仓库编码")).append("]) = ?");
-                args.add(String.valueOf(whCode).trim());
-            }
+            String whName = strOf(condition.get("仓库"));
             // 多仓库过滤(2026-10-15,库存明细左侧「分仓库选择」):`_whCodes` = 逗号分隔的仓库编码列表 ⇒ IN(...)。
             // 为什么单独一个键:通用条件一次只表达一个值(名称/编码),而左侧列表是多选;
             //   沿用 `_` 前缀的「控制键」口径(与 _ckdm/_whCode/_itemCode 同族),不污染业务字段名。
@@ -814,14 +828,18 @@ public class QueryService {
                     where.append(" AND RTRIM(").append(alias).append(".[").append(whCol).append("]) IN (")
                             .append(String.join(",", java.util.Collections.nCopies(codes.size(), "?"))).append(")");
                     args.addAll(codes);
+                    whName = null; // 已按编码 IN 过滤,名称条件不再叠加
                 }
             }
             Object itemCode = condition.get("_itemCode");
-            boolean byItemCode = itemCode != null && !String.valueOf(itemCode).isBlank() && l2c.containsKey("存货编码");
-            if (byItemCode) {
-                where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("存货编码")).append("]) = ?");
-                args.add(String.valueOf(itemCode).trim());
-            }
+            String itemName = strOf(condition.get("存货"));
+            // `_` 开头的是控制键(已在上面各自处理),不进下面的通用循环,免得被当字段名 LIKE
+            String whColForName = l2c.get("仓库");
+            String itemColForName = l2c.get("存货");
+            appendWhItemFilter(where, args, alias, table, "仓库编码", whColForName, strOf(whCode), whName);
+            appendWhItemFilter(where, args, alias, table, "存货编码", itemColForName, strOf(itemCode), itemName);
+            boolean byWh = strOf(whCode).length() > 0 || !whName.isEmpty();
+            boolean byItem = strOf(itemCode).length() > 0 || !itemName.isEmpty();
             // 报表日期段(查询弹窗):开始/结束日期 → 区间过滤。
             // 有 期次 列(收发存汇总)按月(yyyy-MM)闭区间;否则有 单据日期 列(库存台账)按全日期闭区间。
             // 这两个键不进通用 LIKE,下方的 l2c 兜底也会因无列名而跳过。
@@ -840,18 +858,20 @@ public class QueryService {
                 args.add(byMonth && v.length() > 7 ? v.substring(0, 7) : v);
             }
             for (Map.Entry<String, Object> e : condition.entrySet()) {
-                String col = l2c.get(e.getKey());
+                String key = e.getKey();
+                if (key != null && key.startsWith("_")) continue; // 控制键(_whCode/_itemCode/_whCodes/_ckdm/_docNo…)
+                String col = l2c.get(key);
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
-                if ("开始日期".equals(e.getKey()) || "结束日期".equals(e.getKey())) continue; // 已按期次区间处理
-                // 已按编码过滤的维度跳过其名称条件(前端仍回显名称,但不参与过滤——防改名/重名误杀)
-                if (byWhCode && "仓库".equals(e.getKey())) continue;
-                if (byItemCode && "存货".equals(e.getKey())) continue;
+                if ("开始日期".equals(key) || "结束日期".equals(key)) continue; // 已按期次区间处理
+                // 仓库/存货已由 appendWhItemFilter 按「编码优先、退化名称」处理完毕(前端仍回显名称,不重复叠加)
+                if ("仓库".equals(key) && byWh) continue;
+                if ("存货".equals(key) && byItem) continue;
                 // 参照字段(2026-09-24):查询值来自档案参照/联动下拉,是「一个精确实体」而非关键字 → 等值匹配。
                 // LIKE 子串会串仓:仓库「成品仓」会同时命中「半成品仓」、「不良品仓」命中「原料不良品仓」
                 // (库存台账实测:查 成品仓 返回 93 行 = 成品仓 34 + 半成品仓 59,台账按仓分户的口径直接失真)。
                 // 文本字段保持模糊;RTRIM 防 nchar/手工导入尾随空格(与台账联动选项同款口径)。
-                PanelRegistry.FieldDef fd = def.byLabel(e.getKey());
+                PanelRegistry.FieldDef fd = def.byLabel(key);
                 if (fd != null && "参照".equals(fd.dataType())) {
                     where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
                     args.add(String.valueOf(v).trim());
@@ -873,6 +893,73 @@ public class QueryService {
                 args.addAll(kargs);
             }
         }
+    }
+
+    /**
+     * 「仓库 / 存货」这一维的过滤条件:编码优先、退化名称(口径见 {@link #appendDirectFilters} 的长注释)。
+     *
+     * <ul>
+     *   <li>有编码 ⇒ {@code RTRIM(仓库编码) = 编码}(唯一,不受重名/改名影响);</li>
+     *   <li>没编码但有名称 ⇒ 名称位若**本身就是编码**则按编码比(参照回填/查询方案里存的是码),
+     *       否则 {@code RTRIM(仓库) = 名称} 精确等值(绝不 LIKE:子串会串仓);</li>
+     *   <li>码列名/名列名任一缺失 → 退到另一侧,都缺就不过滤(与历史"面板没有对应列时不生效"一致)。</li>
+     * </ul>
+     *
+     * @param codeCol 编码列名(可为 null = 该面板没有编码列)
+     * @param nameCol 名称列名(可为 null)
+     * @param code    控制键里的编码(空串 = 没有)
+     * @param name    名称位里的值(null/空 = 没有)
+     */
+    private void appendWhItemFilter(StringBuilder where, List<Object> args, String alias, String table,
+                                    String codeCol, String nameCol, String code, String name) {
+        String c = code == null ? "" : code.trim();
+        String n = name == null ? "" : name.trim();
+        if (!c.isEmpty() && codeCol != null) {
+            where.append(" AND RTRIM(").append(alias).append(".[").append(codeCol).append("]) = ?");
+            args.add(c);
+            return;
+        }
+        if (n.isEmpty()) return;
+        if (codeCol != null && looksLikeCodeOf(nameCol, n, table, codeCol).test) {
+            // 名称位放的其实是编码(参照回填/查询方案):按编码比
+            where.append(" AND RTRIM(").append(alias).append(".[").append(codeCol).append("]) = ?");
+            args.add(n);
+            return;
+        }
+        if (nameCol != null) {
+            where.append(" AND RTRIM(").append(alias).append(".[").append(nameCol).append("]) = ?");
+            args.add(n);
+        } else if (codeCol != null) {
+            // 面板只有编码列:名称位仍按编码兜底(历史行为,不回归成"查不出")
+            where.append(" AND RTRIM(").append(alias).append(".[").append(codeCol).append("]) = ?");
+            args.add(n);
+        }
+    }
+
+    /** 「这个值是不是编码」的轻判据:名称列里查不到这个值 ⇒ 当编码看。
+     *  结果按 (表, 列, 值) 缓存 60s —— 参照回填/查询方案会反复带同一个值。 */
+    private record CodeLike(boolean test, long at) { }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, CodeLike> CODE_LIKE_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private CodeLike looksLikeCodeOf(String nameCol, String value, String table, String codeCol) {
+        if (nameCol == null || codeCol == null || table == null) return new CodeLike(false, 0);
+        String key = table + "|" + nameCol + "|" + codeCol + "|" + value;
+        CodeLike hit = CODE_LIKE_CACHE.get(key);
+        long now = System.currentTimeMillis();
+        if (hit != null && now - hit.at() < 60_000) return hit;
+        boolean isCode;
+        try {
+            Integer nan = jdbc.queryForObject("SELECT COUNT(*) FROM (SELECT TOP 1 1 AS x FROM " + table
+                    + " WHERE RTRIM([" + nameCol + "]) = ?) z", Integer.class, value);
+            isCode = nan == null || nan == 0;
+        } catch (Exception ex) {
+            isCode = false; // 判断不了就按名称走(历史口径),不至于把查询打挂
+        }
+        CodeLike fresh = new CodeLike(isCode, now);
+        CODE_LIKE_CACHE.put(key, fresh);
+        return fresh;
     }
 
     /**

@@ -1528,6 +1528,13 @@
         <el-button size="small" @click="planManageVisible = true">{{ tt('方案维护') }}</el-button>
       </div>
       <div class="query-dialog-fields">
+        <!-- 生效中条件(2026-10-20):已查过一次又被(工具栏「查询」/后台刷新)打开时,先把**正在生效**的
+             条件原样显示在顶部。用户口径的"查询问题"之一就是「弹窗关掉重开,刚才选的条件没了」——
+             其实是草稿被重置,而生效条件一直在 condition 里。这里让两边都看得见,取消即回到生效状态。 -->
+        <div v-if="reportQueryDialog && rqdDone" class="query-active-cond">
+          <span class="query-active-label">{{ tt('生效中') }}</span>
+          <span class="query-active-text">{{ activeQuerySummary }}</span>
+        </div>
         <!-- 查询弹窗面板(T+):单个「单据日期」区间控件(日期段必填的统一入口) -->
         <div v-if="reportQueryDialog" class="query-dialog-field">
           <label class="req-label">{{ tt('单据日期') }}<span class="req-star">*</span></label>
@@ -2350,6 +2357,15 @@ import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
+// 库存报表「查询弹窗」门(台账/收发存汇总):要不要弹 / 开之前重置什么 / 必填校验,全部是纯函数
+// (2026-10-20 修「重复弹窗 + 查询异常」—— 弹窗门此前只按"查过没有"判,弹窗开着时后台再调 load 会重开一次)
+import {
+  cleanCondition as cleanReportCondition,
+  defaultReportRange,
+  reportQueryDialogOn,
+  shouldAutoOpenReportQuery,
+  validateReportQuery,
+} from '@core/report/reportQuery'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
@@ -2866,7 +2882,13 @@ const reportMode = computed(() => cfgCache.value?.metadata?.report === true || c
 // ── 报表查询弹窗(T+ 同款,收发存汇总/库存台账):与「查询」按钮共用同一个弹窗 ──
 // 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
 // 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
-const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
+// ⚠ 2026-10-20:判定口径抽到 @core/report/reportQuery(纯函数 + 单测),本文件只保留"照着做"。
+//   事故:「进入即弹」的门原先只按 `reportQueryDialog && !rqdDone` 判,而 load() 在一轮生命周期里
+//   会被十几处调用(切面板双触发 / 刷新 / 弹窗关闭后…),弹窗**正开着**时没有任何拦截 ⇒
+//   弹窗被重开一次(用户看到"重复弹窗"),且重开时 draft 已被清、条件看起来"丢了"。
+//   现在:门 = shouldAutoOpenReportQuery(...)(含 dialogVisible);自动入口统一走
+//   openReportQueryIfNeeded(只有 fresh=true 才重置条件,load/刷新只让弹窗"亮着",不碰用户填的东西)。
+const reportQueryDialog = computed(() => reportQueryDialogOn(panelCode.value, cfgCache.value?.metadata?.reportQueryDialog))
 // 级联查询面板(台账/库存状况):仓库/存货走基础资料参照(WH/INV,绑定编码)+「档案∩有流水」联动收窄;
 // 台账 仓库/存货 必填(单一仓库的一种存货=仓库编码+存货编码唯一);库存状况表选填(快照,无日期)
 const isCascadePanel = computed(() => ['STOCK_LEDGER', 'STOCK_BALANCE'].includes(panelCode.value))
@@ -2879,6 +2901,15 @@ const reportKeyword = ref('')
 const activeAdvFilters = ref([])
 const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
 const rqdRange = ref([])   // 单据日期区间 [开始, 结束](YYYY-MM-DD)
+// 弹窗门「正在自动开」重入闸:load() 可能与别的 load() 并发(切面板双触发),两个都过门时会弹两次。
+const rqdOpening = ref(false)
+/** 台账/汇总的「单据日期」区间为空时的默认值(本月初 → 今天):首次进弹窗自动带出,
+ *  否则用户每次都要先点两次日期才能查(T+ 报表同款默认区间)。 */
+function ensureReportRange() {
+  if (!reportQueryDialog.value) return
+  const [ds, de] = rqdRange.value || []
+  if (!ds || !de) rqdRange.value = defaultReportRange()
+}
 /** 台账:仓库/存货必填(单选一个仓库的一种存货);汇总:仅单据日期必填 */
 function rqdFieldRequired(field) {
   if (!reportQueryDialog.value) return false
@@ -2959,6 +2990,7 @@ function dialogFieldHint(field) {
 }
 /** 弹窗关闭:查询弹窗面板在未完成过一次查询时,关闭(✕/取消)即退出页面(对齐 T+ 报表交互) */
 function onQueryDialogClose() {
+  rqdOpening.value = false // 关掉即解除"正在自动开",否则退页后回来自动开会被自己的闸挡住
   if (reportQueryDialog.value && !rqdDone.value) router.push('/dashboard')
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
@@ -3017,6 +3049,20 @@ const reportPeriod = computed(() => {
   if (start) return `${start} 起`
   if (end) return `截至 ${end}`
   return tt('当前业务数据')
+})
+/** 「生效中」条件的一行人话:弹窗重开时给用户看清**当前列表到底按什么在查**
+ *  (与正在编辑的草稿区分开 —— 取消弹窗不会改变任何已生效的条件)。 */
+const activeQuerySummary = computed(() => {
+  const parts = []
+  const range = reportPeriod.value
+  if (range) parts.push(`${tt('单据日期')} ${range}`)
+  for (const key of ['仓库', '存货', '期次']) {
+    const v = condition[key]
+    if (v !== undefined && v !== null && String(v) !== '') parts.push(`${tt(key)} ${v}`)
+  }
+  if (activeAdvFilters.value.length) parts.push(`${tt('高级筛选')}×${activeAdvFilters.value.length}`)
+  if (reportKeyword.value.trim()) parts.push(`${tt('模糊搜索')} ${reportKeyword.value.trim()}`)
+  return parts.join(' · ') || '-'
 })
 const reportColumns = computed(() => gridTabs.value[0]?.columns || [])
 // ── 报表表头筛选与排序补丁:栏目显隐 / 表头筛选 / 升降序 / 后端持久化 ──
@@ -5745,6 +5791,7 @@ watch(panelCode, scheduleColExpand)
 // 查询弹窗面板(收发存/台账):切换面板重置(重新进入需再过条件弹窗)
 watch(panelCode, () => {
   rqdDone.value = false
+  rqdOpening.value = false // 切面板即取消"正在自动开":否则回来时会被上一轮的闸挡在弹窗外面
   rqdRange.value = []
   ledgerWhOptions.value = []
   ledgerItemOptions.value = []
@@ -7913,6 +7960,7 @@ function qType(qr) {
   return 'input'
 }
 
+/** 用户主动开弹窗(工具栏「查询」按钮 + 页脚「查询」):条件回填 + 区间回填 + 联动选项重拉 */
 function openQueryDialog() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.assign(queryDraft, condition)
@@ -7922,6 +7970,34 @@ function openQueryDialog() {
   }
   if (isCascadePanel.value) loadLedgerRefOptions()
   queryDialogVisible.value = true
+}
+
+/**
+ * 弹窗门(唯一自动入口:首次进入面板 / 切换回来)。判据全部来自 @core/report/reportQuery,
+ * **本文件不许再写第二处 if**(2026-10-20 事故就是这么来的)。
+ *
+ * 与 openQueryDialog 的分工:
+ *   · load() / 刷新 / 后台重登只调本函数让弹窗"亮着",**绝不碰用户已填的条件** ——
+ *     重复弹窗的直观感受就是"弹窗关了又弹、刚才填的仓库存货没了";
+ *   · 只有用户主动点「查询」按钮或首次进入本面板,才重置条件并带默认日期区间。
+ *
+ * @param {boolean} fresh true = 首次进入本面板(重置条件草稿 + 默认区间);false = 仅仅补弹窗
+ * @returns {boolean} 是否真的开了弹窗(调用方据此跳过列表取数)
+ */
+function openReportQueryIfNeeded(fresh = false) {
+  if (!shouldAutoOpenReportQuery({
+    enabled: reportQueryDialog.value,
+    panelCode: String(panelCode.value || ''),
+    hasApplied: rqdDone.value,
+    dialogVisible: queryDialogVisible.value,
+  }) || rqdOpening.value) return false
+  rqdOpening.value = true
+  if (fresh) openQueryDialog()
+  // 日期段必填:没填过就给「本月初 → 今天」,否则用户得先点两次日期才查得动(T+ 报表同款)
+  ensureReportRange()
+  if (isCascadePanel.value && !ledgerRefOptions.value.length) loadLedgerRefOptions()
+  queryDialogVisible.value = true
+  return true
 }
 
 function openQueryRef(qr, context = 'page') {
@@ -7985,29 +8061,36 @@ function onQueryRefConfirm(rows) {
 
 function applyHeaderQuery() {
   // 查询弹窗面板:单据日期(区间)必填;台账加验 仓库/存货 必填(单一仓库的一种存货)
+  // 判据在 @core/report/reportQuery.validateReportQuery(单测钉死),这里只映射提示文案。
   if (reportQueryDialog.value) {
-    const [ds, de] = rqdRange.value || []
-    if (!ds || !de) {
-      ElMessage.warning(tt('请填写单据日期'))
+    const v = validateReportQuery({
+      panelCode: panelCode.value,
+      range: rqdRange.value,
+      wh: queryDraft['仓库'],
+      item: queryDraft['存货'],
+    })
+    if (!v.ok) {
+      ElMessage.warning(v.reason === 'whItem'
+        ? tt('库存台账需选择一个仓库和一种存货')
+        : tt('请填写单据日期'))
       return
     }
-    if (panelCode.value === 'STOCK_LEDGER' && (!queryDraft['仓库'] || !queryDraft['存货'])) {
-      ElMessage.warning(tt('库存台账需选择一个仓库和一种存货'))
-      return
-    }
+    // 区间落到条件上:后端按 期次(汇总)/单据日期(台账) 闭区间过滤,见 QueryService
+    const [ds, de] = rqdRange.value
     queryDraft['开始日期'] = ds
     queryDraft['结束日期'] = de
   }
   Object.keys(condition).forEach((key) => delete condition[key])
-  for (const [key, value] of Object.entries(queryDraft)) {
-    if (value !== undefined && value !== null && String(value) !== '') condition[key] = value
-  }
+  // 控制键(`_whCode`/`_itemCode`/`_whCodes`…)必须原样带上:它们是台账按**编码**精确过滤的唯一来源,
+  // 而 cleanCondition 只负责去空值(不再顺手丢掉 `_` 开头 —— 否则台账查出来永远是"期初+期末两行")。
+  for (const [key, value] of Object.entries(cleanReportCondition(queryDraft))) condition[key] = value
   // 高级筛选定格为「生效中」:报表/单据面板随本次查询 POST 给后端全表过滤(分页/导出口径一致;
   // 单据面板 2026-09-24 起同样服务端化);档案面板仍是前端过滤。
   // 日期范围(起/止)在此并入(ge/le 两条),不占可见条件行。
   const act = (list) => list.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
   activeAdvFilters.value = act(effectiveAdvFilters.value)
-  rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页)
+  rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页;后台 load 也不再自动弹窗)
+  rqdOpening.value = false
   queryDialogVisible.value = false
   search()
 }
@@ -8122,6 +8205,7 @@ function resetHeaderQuery() {
   reportKeyword.value = ''
   query.keyword = ''
   queryDialogVisible.value = false
+  rqdOpening.value = false
   search()
 }
 
@@ -8819,7 +8903,16 @@ async function onButton(action) {
     return
   }
   if (action === '查询' || action === '查找') {
-    // 查询弹窗面板(T+ 收发存/台账 + 库存状况):查询按钮重开条件弹窗,而非直接刷新
+    // 查询弹窗面板(T+ 收发存/台账 + 库存状况):查询按钮重开条件弹窗,而非直接刷新。
+    // 台账/汇总(2026-10-20):弹窗**正开着** = 用户就在用它,不重开(重复弹窗);否则一律开条件弹窗 ——
+    //   这是用户主动要的,不受"已查过一次"的票限制(票只挡自动弹窗,不挡按钮)。
+    if (reportQueryDialog.value) {
+      if (queryDialogVisible.value) return
+      if (openReportQueryIfNeeded(true)) return
+      openQueryDialog()
+      ensureReportRange()
+      return
+    }
     if (queryInDialogOnly.value) { openQueryDialog(); return }
     search()
     return
@@ -9515,11 +9608,15 @@ async function load(clamping = false) {
     return
   }
   await loadCrg() // 配置先行(弹窗门依赖 metadata.reportQueryDialog)
-  if (reportQueryDialog.value && !rqdDone.value) {
+  // 库存报表弹窗门(台账/收发存汇总):没查过就先把条件弹窗亮着,并跳过列表取数。
+  // ⚠ 2026-10-20 重写:原判据 `reportQueryDialog && !rqdDone` 不认"弹窗已经开着" ——
+  //   load() 在一轮里会被十几处调用(切面板双触发 / 刷新 / 弹窗关闭后…),于是弹窗会被重开,
+  //   表现为「重复弹窗」,且重开时条件草稿已被清掉(用户观感=查询条件丢了)。
+  //   现在只认 openReportQueryIfNeeded():它已含 dialogVisible + 重入闸,且**不重置**用户已填条件。
+  if (openReportQueryIfNeeded(false)) {
     loading.value = false
     list.value = []
     total.value = 0
-    openQueryDialog() // 与「查询」按钮同一个弹窗(格式一致)
     return
   }
   loading.value = true
@@ -9720,6 +9817,11 @@ watch(
     list.value = []
     total.value = 0
     cfgCache.value = null
+    // 弹窗门随面板重置(2026-10-20):台账/汇总「进入即弹条件弹窗」的口径是**每个面板各一次**。
+    // 见下方「查询弹窗面板(收发存/台账):切换面板重置」那条 watch —— 两处必须同步
+    // (那边只挂 panelCode,本 watch 还含 operationName,故这里补一份,避免"换面板了票还在")。
+    rqdDone.value = false
+    rqdOpening.value = false
     qrSel.value = new Set() // 二维码标签勾选集随面板清空(行键属于上一个档案)
     resetDictModes()
     resetTableSorts() // 切面板清排序(同一面板内保留:切单据/翻页/查询都在)
@@ -10746,6 +10848,28 @@ onUnmounted(() => {
   padding: 2px 4px 4px;
 }
 /* 高级筛选(查询弹窗):条件构建器 */
+/* 生效中条件(台账/汇总弹窗重开时):和正在编辑的草稿区分开,避免"条件丢了"的错觉 */
+.query-active-cond {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(17, 106, 91, 0.06);
+  border-left: 3px solid #116a5b;
+  font-size: 12px;
+  color: #4b5563;
+  word-break: break-all;
+}
+.query-active-label {
+  flex: none;
+  font-weight: 600;
+  color: #116a5b;
+}
+.query-active-text {
+  line-height: 1.6;
+}
 .query-plan-bar {
   display: flex;
   align-items: center;

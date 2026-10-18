@@ -1,0 +1,388 @@
+{
+  "metadata": {
+    "panelCode": "STOCK_LEDGER",
+    "panelName": "库存台账",
+    "panelCategory": "报表",
+    "reportQueryDialog": true,
+    "singleDoc": false,
+    "autoCodeField": null,
+    "docArchive": false,
+    "panelState": {
+      "dataName": "单据状态",
+      "defaultOptions": [
+        "草稿",
+        "已审核",
+        "已完成",
+        "审批中",
+        "已中止",
+        "已作废"
+      ],
+      "dataType": "STRING"
+    },
+    "panelButtons": [],
+    "buttonGroups": [
+      {
+        "name": "查询",
+        "actions": [
+          "查询",
+          "刷新"
+        ]
+      },
+      {
+        "name": "打印",
+        "actions": [
+          "打印",
+          "预览",
+          "导出"
+        ]
+      },
+      {
+        "name": "更多",
+        "actions": [
+          "发送邮件",
+          "重算成本",
+          "表格调整",
+          "表头调整",
+          "字段管理",
+          "退出"
+        ]
+      }
+    ],
+    "panelPageDto": {
+      "tablePages": [
+        {
+          "tableName": "库存台账列表",
+          "pageSize": 50,
+          "queryFields": [
+            {
+              "dataName": "仓库",
+              "dataType": "参照",
+              "width": 110,
+              "readonly": true,
+              "refPanel": "WH",
+              "refField": "仓库编码",
+              "displayField": "仓库名称"
+            },
+            {
+              "dataName": "存货",
+              "dataType": "参照",
+              "width": 180,
+              "readonly": true,
+              "refPanel": "INV",
+              "refField": "存货编码",
+              "displayField": "存货名称"
+            }
+          ],
+          "gridTabs": [
+            {
+              "label": "库存台账",
+              "rowSource": "items",
+              "columns": [
+                "仓库编码",
+                "仓库",
+                "存货编码",
+                "存货",
+                "规格型号",
+                "计量单位",
+                "批次号",
+                "单据日期",
+                "单据类型",
+                "单据编号",
+                "业务类型",
+                "往来单位",
+                "往来单位编码",
+                "经手人",
+                "收入数量",
+                "收入单价",
+                "收入金额",
+                "含税金额",
+                "税额",
+                "发出数量",
+                "发出单价",
+                "发出金额",
+                "发出单据金额",
+                "期初数量",
+                "期初平均单价",
+                "期初金额",
+                "期末数量",
+                "期末平均单价",
+                "期末金额"
+              ],
+              "columnGroups": [
+                {
+                  "label": "收入",
+                  "columns": [
+                    "收入数量",
+                    "收入单价",
+                    "收入金额",
+                    "含税金额",
+                    "税额"
+                  ]
+                },
+                {
+                  "label": "发出",
+                  "columns": [
+                    "发出数量",
+                    "发出单价",
+                    "发出金额",
+                    "发出单据金额"
+                  ]
+                },
+                {
+                  "label": "期初结存",
+                  "columns": [
+                    "期初数量",
+                    "期初平均单价",
+                    "期初金额"
+                  ]
+                },
+                {
+                  "label": "期末结存",
+                  "columns": [
+                    "期末数量",
+                    "期末平均单价",
+                    "期末金额"
+                  ]
+                }
+              ]
+            }
+          ],
+          "topBarBtn": [],
+          "rowOperationBarBtn": [],
+          "events": []
+        }
+      ]
+    },
+    "formPages": [
+      {
+        "formName": "库存台账",
+        "fieldNames": "",
+        "bottomOperationBarBtn": [],
+        "events": []
+      }
+    ]
+  },
+  "dataSchema": {
+    "fields": []
+  },
+  "detail": {
+    "tabs": [
+      {
+        "key": "items",
+        "label": "明细",
+        "fields": [
+          {
+            "dataName": "仓库编码",
+            "dataType": "文本",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "仓库",
+            "dataType": "参照",
+            "width": 110,
+            "readonly": true,
+            "refPanel": "WH",
+            "refField": "仓库编码",
+            "displayField": "仓库名称",
+            "isRequired": true
+          },
+          {
+            "dataName": "存货编码",
+            "dataType": "文本",
+            "width": 110,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "存货",
+            "dataType": "参照",
+            "width": 180,
+            "readonly": true,
+            "refPanel": "INV",
+            "refField": "存货编码",
+            "displayField": "存货名称",
+            "isRequired": true
+          },
+          {
+            "dataName": "规格型号",
+            "dataType": "文本",
+            "width": 130,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "计量单位",
+            "dataType": "文本",
+            "width": 70,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "批次号",
+            "dataType": "文本",
+            "width": 110,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "单据日期",
+            "dataType": "日期",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "单据类型",
+            "dataType": "文本",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "单据编号",
+            "dataType": "文本",
+            "width": 130,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "业务类型",
+            "dataType": "文本",
+            "width": 70,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "往来单位",
+            "dataType": "文本",
+            "width": 160,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "往来单位编码",
+            "dataType": "文本",
+            "width": 120,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "经手人",
+            "dataType": "文本",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "收入数量",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "收入单价",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "收入金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "含税金额",
+            "dataType": "小数",
+            "width": 110,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "税额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "发出数量",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "发出单价",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "发出金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "发出单据金额",
+            "dataType": "小数",
+            "width": 110,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期初数量",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期初平均单价",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期初金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期末数量",
+            "dataType": "小数",
+            "width": 90,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期末平均单价",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          },
+          {
+            "dataName": "期末金额",
+            "dataType": "小数",
+            "width": 100,
+            "readonly": true,
+            "isRequired": false
+          }
+        ],
+        "isRequired": true
+      }
+    ]
+  }
+}
