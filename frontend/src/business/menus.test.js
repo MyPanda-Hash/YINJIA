@@ -179,6 +179,57 @@ test('导航层级同构:一级模块的二级目录一律是"带面板的分组
 })
 
 /**
+ * 2026-10-18 用户口径:「智能供应链里面的库存核算,库存明细,库存统计和库存报表。单独提出来写在一个
+ * 和智能供应链同一级下的目录下(新建为)库存管理」。
+ * 终态 = 「库存管理」是与「智能供应链」同级的**独立一级目录**,四个分组整体搬过去(顺序不变);
+ *       「智能供应链」只剩 销售管理 / 采购管理。
+ * 判定口径 = 面板编码集合:同一张面板不得在两个一级目录里各挂一次,也不得从「智能供应链」溜回来。
+ */
+test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
+  const topCodes = menuTree.map((n) => n.code)
+  assert.ok(topCodes.includes('inv'), '应有一级目录 库存管理(inv)')
+  const inv = menuTree.find((n) => n.code === 'inv')
+  assert.equal(inv.title, '库存管理')
+  const scm = menuTree.find((n) => n.code === 'scm')
+  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, '库存管理紧随智能供应链(同级)')
+
+  // 四个分组:code 保持原值(权限/页签/展开记忆都按 code 走),顺序 = 核算 → 明细 → 统计 → 报表
+  assert.deepEqual((inv.children || []).map((c) => c.code), ['invAcct', 'invDetail', 'invStats', 'invReports'])
+  assert.deepEqual((inv.children || []).map((c) => c.title), ['库存核算', '库存明细', '库存统计', '库存报表'])
+
+  // 智能供应链:四个库存分组一个都不该留下
+  assert.deepEqual((scm.children || []).map((c) => c.code), ['sales', 'purchase'])
+
+  const codesOf = (node) => {
+    if (Array.isArray(node)) return node.flatMap(codesOf)
+    if (!node || typeof node !== 'object') return []
+    const self = node.panelCode ? [node.panelCode] : []
+    return self.concat(codesOf(node.children))
+  }
+  const invCodes = codesOf(inv)
+  // 库存核算 8 张单据 + 明细 6 + 统计 6 + 报表 4 = 24 张面板,一张不少、不重复
+  assert.equal(invCodes.length, 24, `库存管理应有 24 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 24, '库存管理内不应有重复面板')
+  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在库存管理')
+  const scmCodes = codesOf(scm)
+  for (const p of invCodes) {
+    assert.ok(!scmCodes.includes(p), `${p} 已在库存管理下,不应再从智能供应链暴露`)
+  }
+})
+
+/**
+ * 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
+ * 只改**显示标题**:一级 code 仍是 'base'(路由/展开态/页签/权限都不按标题走)。
+ */
+test('基础档案 → 系统管理平台(只改标题,code 与二级分组不动)', () => {
+  const base = menuTree.find((n) => n.code === 'base')
+  assert.equal(base.title, '系统管理平台')
+  assert.deepEqual((base.children || []).map((c) => c.code), ['bdata', 'bmat', 'bprod', 'bfin'])
+  const topTitles = menuTree.map((n) => n.title)
+  assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
+})
+
+/**
  * 2026-10-16 用户口径:「删除当前成型检验单和切炭检验单,以及成品检验规范。」
  * 走的是**重路线**(与上一批 5 张只摘菜单不同):面板元数据、译名、报工自动出单钩子与物理表
  * (qc_mold_insp_head/_detail、qc_cut_insp_head/_detail、qc_fin_spec_head/_detail)全部删除,

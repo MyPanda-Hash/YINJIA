@@ -1392,6 +1392,8 @@ export default {
     '设备使用登记表': 'Registre d\'Utilisation Équipement',
     '仪器使用记录表': 'Registre d\'Utilisation Instrument',
     '基础档案': 'Données de Base',
+    '系统管理平台': 'Plateforme de gestion du système',
+    '库存管理': 'Gestion des stocks',
     '隐藏': 'Caché',
     '阶段': 'Phase',
     '显示全部': 'Afficher tout',

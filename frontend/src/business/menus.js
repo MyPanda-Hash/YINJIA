@@ -1,5 +1,5 @@
 // YINJIA-MES 菜单:面板以 HSDZ_MES yj_panel 注册表为准
-// 模块:智能供应链 / 生产制造 / 研发管理 / 基础档案
+// 模块:智能供应链 / 库存管理 / 生产制造 / 品质管理 / 研发管理 / 系统管理平台(原「基础档案」,2026-10-18 改名)
 export const menuTree = [
   {
     code: 'dashboard',
@@ -132,6 +132,19 @@ export const menuTree = [
 
         ],
       },
+    ],
+  },
+  // 2026-10-18 用户口径:「智能供应链里面的 库存核算/库存明细/库存统计/库存报表,单独提出来
+  //   写在一个和智能供应链同一级下的目录(新建为)库存管理」。
+  //   ⇒ 四个分组**原样整体搬移**(面板编码、路径、权限行、图标、组内叶子顺序都一个字节没动),
+  //     只是在导航树上从「智能供应链」的二级提到了**同级的独立一级目录**。
+  //   ⚠ 组 code(invAcct/invDetail/invStats/invReports)与叶子 code 保持原值 —— 页签恢复(stores/tabs)、
+  //     左栏展开记忆、`数据字典`/面板权限里按 code 的引用都不受影响;智能供应链随之只剩 销售管理 / 采购管理。
+  {
+    code: 'inv',
+    title: '库存管理',
+    icon: 'Box',
+    children: [
       {
         code: 'invAcct',
         title: '库存核算',
@@ -402,10 +415,13 @@ export const menuTree = [
   // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
   //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
   //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
-  //   (财务类面板本就走「基础档案 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
+  //   (财务类面板本就走「系统管理平台 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
+  // 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
+  //   **只改显示标题**,一级目录 code 仍为 'base'(路由/展开态/页签/权限都不按标题走);
+  //   二级分组(基础数据/物料及价格/生产/财务)与面板一个没动。
   {
     code: 'base',
-    title: '基础档案',
+    title: '系统管理平台',
     icon: 'Setting',
     children: [
       {
@@ -424,7 +440,7 @@ export const menuTree = [
           { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
           { code: 'gfda', title: '供应商', path: '/panelx/list/GFDA', icon: 'OfficeBuilding', panelCode: 'GFDA', operationName: '新增流程' },
           // 客户/供应商分类不占导航:从 客户/供应商 面板工具栏「分类管理」进入(金蝶同款交互)
-          // 2026-09-17 下线:库存状况(STOCK_STATUS,旧kucun台账面板,报表口径由智能供应链·库存报表承接)、
+          // 2026-09-17 下线:库存状况(STOCK_STATUS,旧kucun台账面板,报表口径由「库存管理·库存报表」承接)、
           // 往来单位(PARTNER,客户/供应商已独立档案)——菜单移除,面板配置保留(放开本注释即恢复)
           // { code: 'stockStatus', title: '库存状况', path: '/panelx/list/STOCK_STATUS', icon: 'Histogram', panelCode: 'STOCK_STATUS' },
           // { code: 'partner', title: '往来单位', path: '/panelx/list/PARTNER', icon: 'OfficeBuilding', panelCode: 'PARTNER', operationName: '新增流程' },

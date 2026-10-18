@@ -1392,6 +1392,8 @@ export default {
     '设备使用登记表': 'Gerätenutzung',
     '仪器使用记录表': 'Instrumentennutzung',
     '基础档案': 'Stammdaten',
+    '系统管理平台': 'Systemverwaltungsplattform',
+    '库存管理': 'Lagerverwaltung',
     '隐藏': 'Ausblenden',
     '阶段': 'Bühne',
     '显示全部': 'Alle anzeigen',
