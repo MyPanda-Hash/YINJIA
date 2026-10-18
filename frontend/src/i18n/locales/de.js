@@ -1,7 +1,14 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
-    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
+    '结案回正': 'Abschluss zurücksetzen',
+    '没有需要回正的结案行': 'Keine Aufträge zum Zurücksetzen',
+    '把外部程序误写成「已结案」的工单改回未结案': 'Aufträge wieder öffnen, die ein externes Programm fälschlich abgeschlossen hat',
+    '已回正': 'Zurückgesetzt',
+    '行': 'Zeile(n)',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
+    '结案异常': 'Anomaler Abschluss',
+    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Die Zeile ist abgeschlossen, erfüllt aber die MES-Abschlussregel nicht (Zugang ≥ geplant + freigegebene Fertigwarenprüfung Montage) — meist durch direkte DB-Schreibzugriffe des Mini-Programms/Altysstems. Mit „Abschluss-Prüfung“ kontrollieren und zurücksetzen.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Prüfstandard-Bibliothek',
     '出货检验计划': 'Versandprüfplan',
     '计划单号': 'Plannummer',
@@ -56,6 +63,22 @@ export default {
     "生成首件检验单失败": "Erstmusterprüfblatt konnte nicht erstellt werden",
     "选生产工单": "Fertigungsauftrag wählen",
     "生成制程检验单失败": "Prozessprüfblatt konnte nicht erstellt werden",
+    "预警放行": "Warnen, zulassen",
+    "强制开单": "Erstellung erzwingen",
+    "强制开单原因": "Grund für die erzwungene Erstellung",
+    "请填写强制开单原因": "Bitte den Grund für die erzwungene Erstellung angeben",
+    "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "Der Formgebungsvorgang dieser Auftragszeile wurde noch nicht gemeldet. Prüfblatt trotzdem erstellen?",
+    "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Nur Auftragszeilen mit gemeldeter Formgebung können ein Prüfblatt erstellen; ausgegraute Zeilen nennen den Grund.",
+    "成型完工量": "Formgebung fertig",
+    "成型计划量": "Formgebung geplant",
+    "可开单": "Beleg möglich",
+    "免门禁": "Keine Sperre",
+    "存量放行": "Altbestand erlaubt",
+    "成型未报工": "Formgebung nicht gemeldet",
+    "该工单行暂不能生成检验单": "Für diese Auftragszeile kann noch kein Prüfblatt erstellt werden",
+    "该生产工单行的成型工序尚未报工（成型完工量 0），暂不能生成检验单": "Der Formgebungsvorgang dieser Auftragszeile wurde noch nicht gemeldet (fertige Menge 0); derzeit kann kein Prüfblatt erstellt werden",
+    "该工单未绑工艺路线或路线里没有「成型」工序，本单免门禁": "Dieser Auftrag hat keinen Arbeitsplan oder der Plan enthält keinen Vorgang „Formgebung“; die Sperre gilt nicht",
+    "该生产工单行还没有任何已审核报工（存量数据），按现状放行": "Für diese Auftragszeile gibt es noch keine freigegebene Rückmeldung (Altbestand); sie wird unverändert durchgelassen",
     "未生成制程检验单": "Es wurde kein Prozessprüfblatt erstellt",
     "该工单行已有制程检验单": "Für diese Auftragszeile gibt es bereits ein Prozessprüfblatt",
     "已生成制程检验单": "Prozessprüfblatt erstellt",

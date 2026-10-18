@@ -1,7 +1,14 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
-    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
+    '结案回正': 'Hoàn tác đóng lệnh',
+    '没有需要回正的结案行': 'Không có lệnh nào cần hoàn tác',
+    '把外部程序误写成「已结案」的工单改回未结案': 'Mở lại các lệnh bị chương trình ngoài đóng nhầm',
+    '已回正': 'Đã hoàn tác',
+    '行': 'dòng',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
+    '结案异常': 'Đóng lệnh bất thường',
+    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Dòng này đã đóng nhưng không thỏa điều kiện đóng của MES (nhập kho ≥ kế hoạch + phiếu kiểm thành phẩm lắp ráp đã duyệt) — thường do mini-program/hệ thống cũ ghi trực tiếp vào CSDL. Kiểm tra bằng «Rà soát đóng lệnh» rồi sửa lại.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Thư viện tiêu chuẩn kiểm tra',
     '出货检验计划': 'Kế hoạch kiểm tra xuất hàng',
     '计划单号': 'Số kế hoạch',
@@ -56,6 +63,22 @@ export default {
     "生成首件检验单失败": "Tạo phiếu kiểm tra chi tiết đầu tiên thất bại",
     "选生产工单": "Chọn lệnh sản xuất",
     "生成制程检验单失败": "Tạo phiếu kiểm tra công đoạn thất bại",
+    "预警放行": "Cảnh báo và cho qua",
+    "强制开单": "Buộc tạo",
+    "强制开单原因": "Lý do buộc tạo",
+    "请填写强制开单原因": "Vui lòng nhập lý do buộc tạo",
+    "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "Công đoạn tạo hình của dòng lệnh này chưa được báo cáo. Vẫn tạo phiếu kiểm tra?",
+    "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Chỉ dòng lệnh đã báo cáo công đoạn tạo hình mới tạo được phiếu kiểm tra; dòng bị làm mờ sẽ ghi rõ lý do.",
+    "成型完工量": "SL tạo hình hoàn thành",
+    "成型计划量": "SL tạo hình kế hoạch",
+    "可开单": "Có thể tạo",
+    "免门禁": "Miễn kiểm soát",
+    "存量放行": "Dữ liệu cũ",
+    "成型未报工": "Chưa báo cáo tạo hình",
+    "该工单行暂不能生成检验单": "Dòng lệnh này hiện chưa thể tạo phiếu kiểm tra",
+    "该生产工单行的成型工序尚未报工（成型完工量 0），暂不能生成检验单": "Công đoạn tạo hình của dòng lệnh này chưa được báo cáo (số lượng hoàn thành 0), hiện chưa thể tạo phiếu kiểm tra",
+    "该工单未绑工艺路线或路线里没有「成型」工序，本单免门禁": "Lệnh này chưa gắn quy trình công nghệ hoặc quy trình không có công đoạn «Tạo hình»; không áp dụng kiểm soát",
+    "该生产工单行还没有任何已审核报工（存量数据），按现状放行": "Dòng lệnh này chưa có báo cáo công việc nào được duyệt (dữ liệu cũ), tạm cho qua",
     "未生成制程检验单": "Chưa tạo phiếu kiểm tra công đoạn",
     "该工单行已有制程检验单": "Dòng lệnh này đã có phiếu kiểm tra công đoạn",
     "已生成制程检验单": "Đã tạo phiếu kiểm tra công đoạn",

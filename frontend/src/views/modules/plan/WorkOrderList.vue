@@ -26,6 +26,9 @@
     <div class="wol-btns">
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
+      <!-- 结案回正(2026-10-18):把「手机端小程序/参考库直连库误写成已结案」的行改回未结案。
+           判据=MES 自己的结案口径(入库≥排产 + 组装成品检验已审核),只动不满足条件的行。 -->
+      <el-button v-if="canDo('close')" size="small" type="danger" plain @click="onCloseHeal">{{ tt('结案回正') }}</el-button>
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button v-if="canDo('split')" size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
@@ -117,9 +120,17 @@
           <span :class="{ 'wol-closed': row.生产状态 === '完工' }">{{ tt(row.生产状态) }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="tt('结案')" width="70" fixed="right">
+      <el-table-column :label="tt('结案')" width="96" fixed="right">
         <template #default="{ row }">
           <span :class="{ 'wol-closed': row.结案 === 'Y' }">{{ row.结案 === 'Y' ? tt('已结案') : '-' }}</span>
+          <!-- 结案异常(2026-10-18):ja 是外部程序也能直接写的列(手机端小程序/参考库直连库)。
+               后端按 MES 自己的结案口径(入库≥排产 + 组装成品检验已审核)反查,不成立的 ja=Y 标出来,
+               免得"外部误结案"被当成 MES 的结案。 -->
+          <el-tooltip v-if="row.结案异常 === 'Y'"
+                      :content="tt('该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正')"
+                      placement="top">
+            <el-tag size="small" type="danger" effect="plain" style="margin-left:4px">{{ tt('结案异常') }}</el-tag>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -332,6 +343,30 @@ function applyLineMeta() {
 
 // 排产写入口已撤(2026-09-28 用户拍板):生产工单=纯汇总视图,数据只由订单结转产生;
 // 排产/改数量/换线 → 一律走「快速排产」唯一入口(/px/scheduleBoard/assign)。
+
+/** 结案回正(2026-10-18):外部程序(手机端小程序/参考库)直连库把工单写成已结案时,一键改回未结案。
+ *  先体检(只读)拿到行数再确认;判据与后端 WorkOrderCloseGuard 同一份,只动"入库<排产且没有已审检验单"的行。 */
+async function onCloseHeal() {
+  let n = 0
+  try {
+    const audit = await request.post('/px/workOrderList/closeAudit', {})
+    if (audit.status !== 200) return
+    n = (audit.data || []).length
+  } catch (e) { err(e, '结案体检失败'); return }
+  if (!n) { ElMessage.success(tt('没有需要回正的结案行')); return }
+  try {
+    await ElMessageBox.confirm(
+      `${tt('把外部程序误写成「已结案」的工单改回未结案')}（${n} ${tt('行')}）?`,
+      tt('结案回正'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
+  } catch { return }
+  try {
+    const res = await request.post('/px/workOrderList/closeHeal', {})
+    if (res.status === 200) {
+      ElMessage.success(`${tt('已回正')} ${res.data?.['回正行数'] ?? 0} ${tt('行')}`)
+      load()
+    }
+  } catch (e) { err(e, '结案回正失败') }
+}
 
 async function onClose(close) {
   const nos = [...new Set(checked.value.map((r) => r.工单号))]

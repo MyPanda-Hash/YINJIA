@@ -51,14 +51,18 @@ public class WorkOrderListController {
     private final WorkOrderPickingService pickingService;
     /** 成型配方绑定与混料快照(按工单行) */
     private final WorkOrderRecipeService recipeService;
+    /** 结案守卫:反查/回正「外部程序误写成已结案」的行(判据与 ProcessTaskService.syncCloseState 同源) */
+    private final com.yinjia.mes.service.WorkOrderCloseGuard closeGuard;
 
     public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
-                                   WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService) {
+                                   WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService,
+                                   com.yinjia.mes.service.WorkOrderCloseGuard closeGuard) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
         this.pickingService = pickingService;
         this.recipeService = recipeService;
+        this.closeGuard = closeGuard;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -81,7 +85,22 @@ public class WorkOrderListController {
         String label() { return no + (xc == null ? "" : "#" + xc) + (batch == null || batch.isBlank() ? "" : "/" + batch); }
     }
 
+    /**
+     * 生产工单列表。
+     *
+     * <p>🔴 2026-10-18 加 {@code READ_UNCOMMITTED}(= 这条查询里的表都按 NOLOCK 读):
+     * 手机端小程序/参考库是**直连同一个库**写 plang/scjl 的,那边事务没提交时行锁一直在;
+     * 本查询是全表扫 + 每行相关子查询,**只要任意一行被锁就整页停住**(实测卡 42.7 秒,
+     * 连接串加了 lockTimeout=8000 之后是 8 秒报错,但仍然是"点不开")。
+     * 列表是**纯只读展示页**,读到别人未提交的中间值(最多一秒)远比"整页转圈"可接受;
+     * 写操作(排产/结案/转领料)仍走默认隔离级别,不受影响。
+     * ⚠ 这是隔离级别的**局部**设置(Spring 在事务结束后会把连接还原),
+     * 不会影响小程序自己的连接,也不需要改库开关。
+     */
     @PostMapping("/workOrderList")
+    @org.springframework.transaction.annotation.Transactional(
+            readOnly = true,
+            isolation = org.springframework.transaction.annotation.Isolation.READ_UNCOMMITTED)
     public ApiResult<List<Map<String, Object>>> list(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
         Map<String, Object> b = body == null ? Map.of() : body;
@@ -122,7 +141,25 @@ public class WorkOrderListController {
                         + " ISNULL(p.[源工单行id], 0) AS 源工单行id,"
                         // 血缘(会议口径第二版):根工单号(多级按根聚合)+ 是否切单(一眼区分原单/子单)
                         + " ISNULL(p.[根工单号], N'') AS 根工单号, ISNULL(p.[是否切单], N'N') AS 是否切单,"
-                        + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                        // 结案(2026-10-18 改判据):plang.ja 手机端/参考库也能直写 ⇒ 不再裸信 ja,
+                        //   统一用 PlangClose:ja=Y **且** 入库≥排产(或参考库时代号段)。只读判定,不写任何数据。
+                        + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案,"
+                        // 结案异常(2026-10-18,用户报障「扫码报工后其余工单全部变成已结案」):
+                        //   本页「已结案」只认 plang.ja;而 ja 是**外部程序也能直接写**的列
+                        //   (手机端小程序/参考库直连同一个库)。MES 自己的结案一定带两件事:
+                        //   ① 入库 ≥ 排产 ② 有一张**已审核**的组装成品检验单(口径见 ProcessTaskService.syncCloseState)。
+                        //   ⇒ ja=Y 但这两条不成立的行,标记为「结案异常」,让现场一眼看出"这不是正常结案",
+                        //   而不是把账算到 MES 头上。(MES 自己的结案动作另有 yj_usage_log 留痕可查。)
+                        + " CASE WHEN p.ja IN (N'T', N'Y')"
+                        + "   AND NOT (ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0))"
+                        + "   AND NOT EXISTS (SELECT 1 FROM dbo.qc_asm_insp_head h"
+                        + "        JOIN dbo.yj_doc_status ds ON ds.panel_code = N'QC_ASM_INSP' AND ds.doc_no = h.[单据编号]"
+                        + "        WHERE h.[工单号] = p.pl_no AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                        + "          AND ds.shr IS NOT NULL AND ISNULL(ds.canceled,'N') <> 'Y' AND ISNULL(ds.stopped,'N') <> 'Y'"
+                        + "          AND (ISNULL(h.[工单行号],0) = ISNULL(p.pl_xc,0)"
+                        + "               OR (ISNULL(h.[工单行号],0) = 0 AND ISNULL(h.[批次号],N'') <> N''"
+                        + "                   AND ISNULL(h.[批次号],N'') = ISNULL(p.[批次号],N''))))"
+                        + "   THEN N'Y' ELSE N'N' END AS 结案异常,"
                         // 完工状态(2026-10-15):生产状态的「完工」用它判,不再只看入库 ——
                         //   全部报工达标即 完工状态='生产完工' ⇒ 员工看到「完工」;结案另看 ja(需组装成品检验+入库)
                         + " ISNULL(p.[完工状态], N'') AS 完工状态,"
@@ -284,6 +321,50 @@ public class WorkOrderListController {
     }
 
     /** 批量调线端点已移除(2026-09-26 用户拍板:生产工单=纯查询+打印,不作为快速排产任务) */
+
+    /**
+     * **结案体检(只读)** —— 2026-10-18,用户报障「扫码报工后其余工单全部变成已结案」。
+     *
+     * <p>为什么需要它:生产工单页的「已结案」只认 {@code plang.ja},而这张表是
+     * **手机端小程序/参考库直连写入**的 —— 也就是说 ja 可以被 MES 以外的程序改掉,
+     * MES 既没有留痕也无从区分。查证时只能看到"全变已结案",没有任何线索指向是谁写的。
+     *
+     * <p>本端点按 MES 自己的结案口径反查异常行:
+     * 「ja ∈ (T,Y) 但 (入库 &lt; 排产 或 没有已审核的组装成品检验单)」。
+     * 这些行不可能是 MES 正常结出来的(见 {@code ProcessTaskService.syncCloseState}),
+     * 只能是外部写入/历史遗留 ⇒ 列出来给现场核对,再由
+     * {@code tools/migrate-plang-ja-foreign-close-repair-20261018.sql} 决定是否回正。
+     *
+     * <p>只读,不写任何数据;权限 = 生产工单页可见。
+     */
+    @PostMapping("/workOrderList/closeAudit")
+    public ApiResult<List<Map<String, Object>>> closeAudit() {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        return ApiResult.ok(closeGuard.findAnomalies(0));
+    }
+
+    /**
+     * **结案回正**(手动,2026-10-18):把「外部程序误写成已结案」的行改回未结案。
+     *
+     * <p>与体检端点同一份判据({@link com.yinjia.mes.service.WorkOrderCloseGuard}),区别只是**真写库**:
+     * {@code ja='N'} + {@code asp_user2=操作人} 留痕,并把每条回正写进后端日志
+     * ({@code [结案自愈]} 前缀)。用于现场核对完清单后一键处理,不必再手工跑 SQL。
+     *
+     * <p>权限 = 生产工单页「结案」动作词(能结案的人才能回正)。参数 {@code {"rows":[{"工单号":..,"工单行号":..}]}}
+     * 可只回正指定行;不传 = 回正全部异常行(单次上限 200)。
+     */
+    @PostMapping("/workOrderList/closeHeal")
+    public ApiResult<Map<String, Object>> closeHeal(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(CLOSE_ENTRIES, "结案");
+        String user = currentUser();
+        List<String> healed = closeGuard.heal(user, 0);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("回正行数", healed.size());
+        out.put("回正清单", healed);
+        out.put("提示", healed.isEmpty() ? "没有需要回正的结案行" : "已回正为未结案（原 ja 由外部程序写入,已留痕 asp_user2）");
+        return ApiResult.ok(out);
+    }
 
     // ══════════ 工单切单(9.29 生产管理批次 ①,2026-10-05):切出子工单 / 撤回切单 ══════════
     // 入口=生产工单列表(生产线界面)勾选在产工单;口径与守卫见 WorkOrderSplitService。

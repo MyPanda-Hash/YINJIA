@@ -238,7 +238,7 @@ public class WoReportService {
                             + " FROM dbo.plang_pc pc"
                             + " JOIN dbo.plang p ON pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                             + " WHERE pc.pl_no = ? AND ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
-                            + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                            + "   AND " + PlangClose.notClosed("p") + ""
                             + "   AND (? IS NULL OR p.id = ?)"                       // ① 本单锚定的行(已有 gd_id / 带行号)
                             + "   AND (? = N'' OR ISNULL(pc.[批次号],N'') = ?)"      // ② 批次
                             + " ORDER BY p.pl_xc, pc.[批次号], p.id",
@@ -247,8 +247,10 @@ public class WoReportService {
             Integer exists = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, wo);
             if (exists == null || exists == 0) throw new IllegalStateException("工单不存在:" + wo);
+            // 结案判定同样走 PlangClose(ja=Y 且 入库≥排产,或参考库号段)—— 外部程序乱写 ja 不挡报工
             Integer closed = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(ja,'N') IN ('T','Y')",
+                    "SELECT COUNT(*) FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' AND "
+                            + PlangClose.closed("p"),
                     Integer.class, wo);
             if (closed != null && closed > 0) throw new IllegalStateException("工单 " + wo + " 已结案,不能报工");
             throw new IllegalStateException("工单 " + wo + " 未排产,不能报工(先在快速排产排入产线)");

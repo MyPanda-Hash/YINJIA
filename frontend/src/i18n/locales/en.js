@@ -45,7 +45,12 @@ export default {
     logout: 'Sign out',
   },
   biz: {
-    // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
+    // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
+    '结案回正': 'Reopen closed',
+    '没有需要回正的结案行': 'No work orders need reopening',
+    '把外部程序误写成「已结案」的工单改回未结案': 'Reopen work orders that external programs wrongly marked closed',
+    '已回正': 'Reopened',
+    '行': 'row(s)',    // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
     "首件检验单": "First Article Inspection Sheet",
     "取成型工艺清单": "Fetch from Molding Process Sheet",
     "该产品没有成型工艺清单": "No molding process sheet for this product",
@@ -62,6 +67,22 @@ export default {
     "生成首件检验单失败": "Failed to create the first-article inspection sheet",
     "选生产工单": "Pick production work order",
     "生成制程检验单失败": "Failed to create the process inspection sheet",
+    "预警放行": "Warn & allow",
+    "强制开单": "Force create",
+    "强制开单原因": "Reason for forcing",
+    "请填写强制开单原因": "Please enter the reason for forcing",
+    "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "The molding operation of this work-order line has not been reported. Create the inspection sheet anyway?",
+    "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Only work-order lines whose molding operation has been reported can create an inspection sheet; greyed lines state the reason.",
+    "成型完工量": "Molding completed qty",
+    "成型计划量": "Molding planned qty",
+    "可开单": "Can create",
+    "免门禁": "No gate",
+    "存量放行": "Legacy pass",
+    "成型未报工": "Molding not reported",
+    "该工单行暂不能生成检验单": "This work-order line cannot create an inspection sheet yet",
+    "该生产工单行的成型工序尚未报工（成型完工量 0），暂不能生成检验单": "The molding operation of this work-order line has not been reported yet (molding completed qty 0), so no inspection sheet can be created for now",
+    "该工单未绑工艺路线或路线里没有「成型」工序，本单免门禁": "This work order has no routing, or the routing has no \"Molding\" operation; the gate does not apply",
+    "该生产工单行还没有任何已审核报工（存量数据），按现状放行": "This work-order line has no audited work report yet (legacy data) and is let through as-is",
     "未生成制程检验单": "No process inspection sheet was created",
     "该工单行已有制程检验单": "This work-order line already has a process inspection sheet",
     "已生成制程检验单": "Process inspection sheet created",
@@ -511,6 +532,10 @@ export default {
     '已结案': 'Closed',
     '结案人': 'Closed By',
     '结案时间': 'Closed At',
+    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
+    '结案异常': 'Closed?',
+    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正':
+      'This line is marked closed but does not meet the MES closing rule (stock-in ≥ scheduled qty AND the assembly finished-goods inspection approved) — usually caused by the mobile mini-program / legacy system writing the database directly. Check it with "Close audit" and correct it.',
     '打印人': 'Printed By',
     '打印时间': 'Printed At',
     '打印次数': 'Print Count',

@@ -55,9 +55,16 @@ public class ExternalReportAbsorbService {
     /** 默认只吸收最近 N 天(不回放历史账,避免动到老数据) */
     public static final int DEFAULT_DAYS = 3;
     private static final int MAX_DAYS = 90;
+    /**
+     * 单次最多处理多少行(2026-10-18):定时任务每分钟一跑,一次处理几百行会把一个 tick 拉成分钟级,
+     * 期间锁一直握着 ⇒ 前端查询跟着等。超出的留到下一分钟(候选行按 id 升序,先来先处理,不会饿死)。
+     */
+    private static final int MAX_ROWS_PER_TICK = 100;
 
     private final JdbcTemplate jdbc;
     private final ProcessTaskService processTask;
+    /** 逐行事务(REQUIRES_NEW):一行一个事务,避免长事务跨行持锁,见 {@link #absorb(Integer, String, boolean)} */
+    private final org.springframework.transaction.support.TransactionTemplate rowTx;
 
     /**
      * 已成功吸收过的 {@code scjl.id}(**进程内**记忆)。
@@ -76,9 +83,14 @@ public class ExternalReportAbsorbService {
                 }
             });
 
-    public ExternalReportAbsorbService(JdbcTemplate jdbc, ProcessTaskService processTask) {
+    public ExternalReportAbsorbService(JdbcTemplate jdbc, ProcessTaskService processTask,
+                                       org.springframework.transaction.PlatformTransactionManager txManager) {
         this.jdbc = jdbc;
         this.processTask = processTask;
+        this.rowTx = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        this.rowTx.setPropagationBehavior(
+                org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.rowTx.setTimeout(30);   // 单行 30s 上限:再慢也不许把 tick 拖死
     }
 
     /**
@@ -108,7 +120,6 @@ public class ExternalReportAbsorbService {
                     + " ORDER BY s.id";
 
     /** 扫描并吸收(定时任务与手动端点共用);返回汇总 + 逐行明细 */
-    @Transactional
     public Map<String, Object> absorb(Integer days, String user) {
         return absorb(days, user, false);
     }
@@ -116,20 +127,43 @@ public class ExternalReportAbsorbService {
     /**
      * @param force true = 忽略"已吸收"记忆、全部重算(手工端点用:人是显式来补跑的);
      *              false = 跳过本进程已成功吸收过的行(定时任务用)
+     *
+     * <p>🔴 **2026-10-18 改成「逐行独立事务」**(原:整个 {@code absorb} 一个 {@code @Transactional})。
+     * 原因(用户报障「手机端报工后前端卡住,只能重新进入系统」):
+     * 手机端小程序/参考库是**直连同一个库**写 {@code plang/scjl} 的,吸收过程要读写同一批行;
+     * 原来一个事务跨「候选行」全程持有行锁 ——
+     * ① 只要有一行被外部程序锁住(对方事务没提交),整个任务连同上一次的事务一起**无限等锁**
+     *    (驱动默认 lockTimeout=-1),挂着的锁又把 MES 的列表查询一起钉死;
+     * ② 一行出错会把整批回滚,下一分钟从头再来,永远卡同一行。
+     * 现在:每行一个 REQUIRES_NEW 事务;锁等待超时(连接串 lockTimeout=8000)只跳过该行、下轮重试;
+     * 单行失败不影响其它行;单次最多处理 {@link #MAX_ROWS_PER_TICK} 行,避免一个 tick 干太久。
      */
-    @Transactional
     public Map<String, Object> absorb(Integer days, String user, boolean force) {
         int d = days == null || days <= 0 ? DEFAULT_DAYS : Math.min(days, MAX_DAYS);
         String u = user == null || user.isBlank() ? "system(手机端报工吸收)" : user;
         List<Map<String, Object>> rows = jdbc.queryForList(CANDIDATE_SQL, d);
         List<Map<String, Object>> detail = new ArrayList<>();
-        int done = 0, skipped = 0, failed = 0, cached = 0;
+        int done = 0, skipped = 0, failed = 0, cached = 0, truncated = 0, locked = 0;
         for (Map<String, Object> r : rows) {
             long scjlId = ((Number) r.get("scjl_id")).longValue();
             if (!force && absorbedIds.contains(scjlId)) { cached++; continue; }
+            if (done + failed + locked >= MAX_ROWS_PER_TICK) { truncated++; continue; }
             Map<String, Object> one;
             try {
-                one = absorbOne(r, u);
+                // 每行独立事务:成功/失败都不牵连其它行,也不长时间占锁
+                one = rowTx.execute(status -> absorbOne(r, u));
+                if (one == null) one = new LinkedHashMap<>();
+            } catch (org.springframework.dao.PessimisticLockingFailureException le) {
+                // 锁等待超时(CannotAcquireLockException 是它的子类,SQL Server 1222)
+                one = new LinkedHashMap<>();
+                one.put("scjl_id", r.get("scjl_id"));
+                one.put("工单号", r.get("工单号"));
+                one.put("工序", r.get("工序"));
+                one.put("已吸收", false);
+                one.put("原因", "该行正被其它程序锁定（等锁超时，下轮自动重试）");
+                locked++;
+                log.info("[手机端报工吸收] scjl.id={} 工单={} 等锁超时,本次跳过 ({}):{}",
+                        r.get("scjl_id"), r.get("工单号"), r.get("工序"), le.getMessage());
             } catch (Exception e) {
                 one = new LinkedHashMap<>();
                 one.put("scjl_id", r.get("scjl_id"));
@@ -144,7 +178,7 @@ public class ExternalReportAbsorbService {
                 done++;
                 absorbedIds.add(scjlId);
             } else if (String.valueOf(one.get("原因")).startsWith("吸收失败")) failed++;
-            else skipped++;
+            else if (!String.valueOf(one.get("原因")).startsWith("该行正被其它程序锁定")) skipped++;
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("扫描天数", d);
@@ -152,8 +186,14 @@ public class ExternalReportAbsorbService {
         out.put("已吸收", done);
         out.put("已吸收(跳过重算)", cached);
         out.put("跳过", skipped);
+        out.put("等锁跳过", locked);
         out.put("失败", failed);
+        out.put("本次上限外未处理", truncated);
         out.put("明细", detail);
+        if (locked > 0) {
+            log.warn("[手机端报工吸收] 本轮有 {} 行因等锁超时跳过(外部程序占着数据行);"
+                    + "若持续出现,说明手机端/参考库那边有长事务未提交", locked);
+        }
         return out;
     }
 
@@ -184,14 +224,26 @@ public class ExternalReportAbsorbService {
             one.put("原因", "该工单行没有排产记录(plang_pc 缺行),无法补产线/批次 —— 请先排产");
             return one;
         }
-        // 已结案的工单行不推进(与「报工审核」同口径:结案单不能再报工/转序)
+        // 已结案的工单行不推进(与「报工审核」同口径:结案单不能再报工/转序)。
+        // ⚠ 2026-10-18:判据改走 {@link PlangClose} —— ja 是外部程序也能直写的列,
+        //   被外部乱写成 Y(入库却是 0)的行不该因此"吸收不动"(那会让现场觉得扫码没反应)。
         String ja = t.get("ja") == null ? "N" : String.valueOf(t.get("ja")).trim();
-        if ("T".equals(ja) || "Y".equals(ja)) {
+        double plSl = t.get("pl_sl") == null ? 0 : ((Number) t.get("pl_sl")).doubleValue();
+        double rkSl = t.get("rk_sl") == null ? 0 : ((Number) t.get("rk_sl")).doubleValue();
+        String woNo = t.get("pl_no") == null ? "" : String.valueOf(t.get("pl_no"));
+        boolean closed = ("T".equals(ja) || "Y".equals(ja))
+                && ((plSl > 0 && rkSl >= plSl) || woNo.startsWith("GD2608"));
+        if (closed) {
             one.put("已吸收", false);
             one.put("原因", "该工单行已结案,不吸收(历史账不动)");
             return one;
         }
         mirrorFillEmpty(scjlId, t, wo, user);
+        // 产线值体检(2026-10-18):手机端会把**非产线值**写进 scjl.scx —— 实测正式库
+        //   GD-2026-10-0220 的两行手机报工 scx='0'(像是把公司代码写进来了),而补镜像只补空值,
+        //   错值会一直留着 ⇒ 入库判仓/产线报表按它取就取错。这里只在「现值不是有效产线」时纠正。
+        String lineFix = repairInvalidLine(scjlId, t);
+        if (lineFix != null) one.put("产线纠正", lineFix);
         // 补「工单行产线」:手机端(参考库)排产只把线写进 plang_pc,**plang.scx 常常是空的** ——
         //   而转序/调拨看的是 plang.scx(当前线):空值会导致转序轨迹的「从生产线」为空、
         //   看板「按线筛选」与工单列表产线两处口径不一致。这里按排产行的线补齐(**只补空值**,
@@ -211,6 +263,47 @@ public class ExternalReportAbsorbService {
         one.put("已吸收", true);
         log.info("[手机端报工吸收] scjl.id={} 工单={} 行id={} 工序={} → 已推进{}", scjlId, wo, rowId, r.get("工序"), next);
         return one;
+    }
+
+    /**
+     * **产线值体检/纠正**(2026-10-18)。
+     *
+     * <p>为什么需要:手机端(小程序/参考库)在报工行上写的 {@code scx} 不一定是我们产线档案里的值 ——
+     * 实测正式库 GD-2026-10-0220 的两行手机报工写的是 {@code scx='0'}(看着像把公司代码写进了产线列)。
+     * 吸收的补镜像**只补空值**,所以这种错值会一路留着,而入库判仓/产线报表正是按 {@code scx} 取数。
+     *
+     * <p>口径(保守,只纠**明显无效**的值):
+     * <ol>
+     *   <li>空值 → 交给 {@link #mirrorFillEmpty} 补,这里不动;</li>
+     *   <li>值在 {@code bs_prod_line.生产线} 里(未作废)→ 合法,不动;</li>
+     *   <li>不在档案里 + 排产行有合法产线 → 改成排产线(并同步 {@code scxmc}),记入回执;</li>
+     *   <li>不在档案里 + 排产行也没有合法产线 → **不猜**,原样留着(只会在回执里看到"产线非法")。</li>
+     * </ol>
+     * @return 纠正后的产线值;不需要纠正时返回 null
+     */
+    private String repairInvalidLine(long scjlId, Map<String, Object> t) {
+        List<String> cur = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.scjl WHERE id=?", String.class, scjlId);
+        String now = cur.isEmpty() || cur.get(0) == null ? "" : cur.get(0).trim();
+        if (now.isEmpty()) return null;
+        if (lineExists(now)) return null;
+        String pcLine = t.get("pc_scx") == null ? "" : String.valueOf(t.get("pc_scx")).trim();
+        if (pcLine.isEmpty() || !lineExists(pcLine)) {
+            log.info("[手机端报工吸收] scjl.id={} 产线值「{}」不在产线档案里,且排产行无合法产线 ⇒ 不猜,原样保留", scjlId, now);
+            return null;
+        }
+        jdbc.update("UPDATE dbo.scjl SET scx=?, scxmc=?, asp_time2=GETDATE() WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                pcLine, pcLine, scjlId);
+        log.info("[手机端报工吸收] scjl.id={} 产线值「{}」不是有效产线 ⇒ 按排产线改为「{}」", scjlId, now, pcLine);
+        return pcLine;
+    }
+
+    /** 产线档案里是否有这条线(未作废且未停用仍算有效,停用线不纠成它) */
+    private boolean lineExists(String line) {
+        if (line == null || line.isBlank()) return false;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.bs_prod_line WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                Integer.class, line.trim());
+        return n != null && n > 0;
     }
 
     /**
@@ -252,6 +345,7 @@ public class ExternalReportAbsorbService {
                         + " ISNULL(pc.lb,N'') AS pc_lb, ISNULL(p.comm,N'') AS comm, ISNULL(p.dm,N'') AS dm,"
                         + " ISNULL(p.mc,N'') AS mc, ISNULL(p.gg,N'') AS gg, ISNULL(p.jldw,N'') AS jldw,"
                         + " ISNULL(p.khdm,N'') AS khdm, ISNULL(p.lot_no,N'') AS lot_no, ISNULL(p.pl_sl,0) AS pl_sl,"
+                        + " ISNULL(p.rk_sl,0) AS rk_sl, ISNULL(p.pl_no,N'') AS pl_no,"
                         + " ISNULL(p.od_no,N'') AS od_no, p.od_xc, ISNULL(p.zl,0) AS zl, ISNULL(p.llxz,N'') AS llxz,"
                         + " ISNULL(p.djlx,N'') AS djlx, p.pl_xc AS pl_xc, ISNULL(p.ja,N'N') AS ja"
                         + " FROM dbo.plang_pc pc JOIN dbo.plang p ON pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"

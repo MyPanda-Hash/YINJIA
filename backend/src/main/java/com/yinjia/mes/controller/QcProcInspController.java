@@ -4,6 +4,8 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.WoInspGateGuard;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,13 +51,16 @@ public class QcProcInspController {
     private final PanelPermissionService perm;
     private final PanelRegistry registry;
     private final ButtonService buttonService;
+    private final WoInspGateGuard gate;
 
     public QcProcInspController(JdbcTemplate jdbc, PanelPermissionService perm,
-                               PanelRegistry registry, ButtonService buttonService) {
+                               PanelRegistry registry, ButtonService buttonService,
+                               WoInspGateGuard gate) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.registry = registry;
         this.buttonService = buttonService;
+        this.gate = gate;
     }
 
     /** 可选的生产工单行(未作废、未结案;ja Y/T 皆属结案口径,见 ManuCloseHandler 注释)。 */
@@ -69,7 +74,7 @@ public class QcProcInspController {
         int page = Math.max(1, pageNo);
 
         StringBuilder where = new StringBuilder(" WHERE ISNULL(p.asp_cancel,'N')<>'Y'"
-                + " AND ISNULL(p.ja,'N') NOT IN (N'Y',N'T')");
+                + " AND " + com.yinjia.mes.service.PlangClose.notClosed("p") + "");
         List<Object> args = new ArrayList<>();
         if (!kw.isEmpty()) {
             where.append(" AND (p.pl_no LIKE ? OR ISNULL(p.dm,'') LIKE ? OR ISNULL(p.mc,'') LIKE ?)");
@@ -85,11 +90,11 @@ public class QcProcInspController {
         pageArgs.add((page - 1) * size);
         pageArgs.add(size);
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
+                "SELECT p.id AS 行id, p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
                         + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.[批次号],N'') AS 批次号,"
                         + " ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量,"
-                        + " ISNULL(p.khdm,N'') AS 客户,"
+                        + " ISNULL(p.khdm,N'') AS 客户, ISNULL(p.[工艺路线],N'') AS 工艺路线,"
                         // 该行已有的存活制程检验单(列表上直接标「已建单」,并供幂等提示)
                         + " ISNULL((SELECT TOP 1 h.[单据编号] FROM dbo." + HEAD_TABLE + " h"
                         + "          WHERE h.[工单号]=p.pl_no AND h.[工单行号]=p.pl_xc"
@@ -99,9 +104,14 @@ public class QcProcInspController {
                         + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
                 pageArgs.toArray());
 
+        // 门禁(2026-10-19 用户口径「成型完成后的生产工单才能生成检验单」):判据/话术/留痕都在
+        // WoInspGate + WoInspGateGuard 一处,与首件检验单、以及两个自动出单钩子共用同一份实现。
+        gate.decorate(rows);
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("list", rows);
         out.put("totalSize", total == null ? 0 : total);
+        out.put("gate", gate.meta(PANEL));      // 门禁档位 + 当前用户能否强制开单(弹窗顶部提示用)
         return ApiResult.ok(out);
     }
 
@@ -115,20 +125,27 @@ public class QcProcInspController {
      */
     @PostMapping("/fromWoLine")
     @Transactional
-    public ApiResult<Map<String, Object>> fromWoLine(@RequestBody Map<String, Object> body) {
+    public ApiResult<Map<String, Object>> fromWoLine(@RequestBody Map<String, Object> body,
+                                                    HttpServletRequest request) {
         perm.requirePanelView(PANEL);
         String woNo = str(body.get("工单号"));
         Integer xc = intOf(body.get("工单行号"));
         if (woNo.isEmpty() || xc == null) return ApiResult.error(400, "请先选择生产工单行(工单号 + 工单行号)");
 
         List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT TOP 1 pl_no, pl_xc, ISNULL(dm,N'') AS dm, ISNULL(mc,N'') AS mc, ISNULL(gg,N'') AS gg,"
-                        + " ISNULL([批次号],N'') AS lot, ISNULL(scx,N'') AS scx"
-                        + " FROM dbo.plang"
-                        + " WHERE pl_no=? AND pl_xc=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + "   AND ISNULL(ja,'N') NOT IN (N'Y',N'T')", woNo, xc);
+                "SELECT TOP 1 p.pl_no, p.pl_xc, ISNULL(p.dm,N'') AS dm, ISNULL(p.mc,N'') AS mc, ISNULL(p.gg,N'') AS gg,"
+                        + " ISNULL(p.[批次号],N'') AS lot, ISNULL(p.scx,N'') AS scx"
+                        + " FROM dbo.plang p"
+                        + " WHERE p.pl_no=? AND p.pl_xc=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   AND " + com.yinjia.mes.service.PlangClose.notClosed("p"), woNo, xc);
         if (lines.isEmpty()) return ApiResult.error(400, "该生产工单行不存在、已作废或已结案：" + woNo + " #" + xc);
         Map<String, Object> line = lines.get(0);
+
+        // 门禁(2026-10-19 用户口径「成型完成后的生产工单才能生成检验单」):
+        //   前端虽已置灰,这里**再硬校验一次** —— 直连接口/绕过界面同样拦得住。
+        //   强度档位(off/warn/block)、预警留痕、管理员强制开单都在 WoInspGateGuard 一处。
+        WoInspGateGuard.Decision d = gate.enforce(PANEL, woNo, xc, body, clientIp(request));
+        if (!d.allowed()) return ApiResult.error(d.code(), d.error());
 
         // 幂等:已有存活单直接返回
         List<String> exist = jdbc.queryForList(
@@ -190,5 +207,12 @@ public class QcProcInspController {
     private static String currentUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         return auth == null || auth.getName() == null || auth.getName().isBlank() ? "system" : auth.getName();
+    }
+
+    /** 调用方 IP(门禁留痕用;与 PxController 同一写法) */
+    private static String clientIp(HttpServletRequest request) {
+        String fwd = request.getHeader("X-Forwarded-For");
+        if (fwd != null && !fwd.isBlank()) return fwd.split(",")[0].trim();
+        return request.getRemoteAddr();
     }
 }

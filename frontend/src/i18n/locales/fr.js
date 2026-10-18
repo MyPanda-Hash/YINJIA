@@ -1,7 +1,14 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
-    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
+    '结案回正': 'Annuler clôture',
+    '没有需要回正的结案行': 'Aucun ordre à rouvrir',
+    '把外部程序误写成「已结案」的工单改回未结案': 'Rouvrir les ordres clôturés à tort par un programme externe',
+    '已回正': 'Rouverts',
+    '行': 'ligne(s)',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
+    '结案异常': 'Clôture anormale',
+    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Cette ligne est clôturée mais ne respecte pas la règle de clôture MES (entrée ≥ planifié + inspection produit fini assemblage approuvée) — généralement dû au mini-programme/système hérité écrivant directement en base. Vérifiez via « Audit de clôture » puis corrigez.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Bibliothèque des normes d\'inspection',
     '出货检验计划': 'Plan d\'inspection d\'expédition',
     '计划单号': 'N° de plan',
@@ -56,6 +63,22 @@ export default {
     "生成首件检验单失败": "Échec de création de la fiche de contrôle de première pièce",
     "选生产工单": "Choisir un ordre de fabrication",
     "生成制程检验单失败": "Échec de création de la fiche de contrôle de process",
+    "预警放行": "Avertir et autoriser",
+    "强制开单": "Forcer la création",
+    "强制开单原因": "Motif du forçage",
+    "请填写强制开单原因": "Veuillez saisir le motif du forçage",
+    "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "L'opération de moulage de cette ligne d'ordre n'est pas déclarée. Créer la fiche quand même ?",
+    "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Seules les lignes d'ordre dont l'opération de moulage est déclarée peuvent créer une fiche de contrôle ; les lignes grisées indiquent la raison.",
+    "成型完工量": "Quantité moulée",
+    "成型计划量": "Quantité planifiée",
+    "可开单": "Créable",
+    "免门禁": "Sans contrôle",
+    "存量放行": "Données existantes",
+    "成型未报工": "Moulage non déclaré",
+    "该工单行暂不能生成检验单": "Cette ligne d'ordre ne peut pas encore créer de fiche de contrôle",
+    "该生产工单行的成型工序尚未报工（成型完工量 0），暂不能生成检验单": "L'opération de moulage de cette ligne d'ordre n'est pas encore déclarée (quantité moulée 0) ; la fiche ne peut pas être créée pour l'instant",
+    "该工单未绑工艺路线或路线里没有「成型」工序，本单免门禁": "Cet ordre n'a pas de gamme, ou la gamme ne contient pas l'opération « Moulage » ; le contrôle ne s'applique pas",
+    "该生产工单行还没有任何已审核报工（存量数据），按现状放行": "Cette ligne d'ordre n'a encore aucune déclaration approuvée (données existantes) ; elle est laissée passer en l'état",
     "未生成制程检验单": "Aucune fiche de contrôle de process n’a été créée",
     "该工单行已有制程检验单": "Cette ligne d’ordre a déjà une fiche de contrôle de process",
     "已生成制程检验单": "Fiche de contrôle de process créée",
