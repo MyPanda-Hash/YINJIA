@@ -1506,7 +1506,14 @@
         <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
+    <!-- ⚠ 不加 append-to-body(2026-10-18 库存台账「重复弹窗」):PortalLayout 用
+         `<component :is="Component" :key="route.path">` + keep-alive ⇒ 每个面板路径一份实例;
+         而「库存台账 STOCK_LEDGER」「收发存汇总 STOCK_SUMMARY」都是 metadata.reportQueryDialog 面板,
+         进页面各自自动弹这个「查询」窗。append-to-body 会把遮罩挂到 body,**脱离 keep-alive 实例**,
+         实例失活时 onDeactivated 置 queryDialogVisible=false 也收不走它 ⇒ 切换面板后两份
+         rgba(0,0,0,.5) 遮罩叠在一起(实测 z-index 2115/2121 同时可见),背景发黑、像弹了两层窗。
+         留在组件内渲染,遮罩就随实例一起隐藏。 -->
+    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
         <span class="plan-label">{{ tt('查询方案') }}</span>
