@@ -1,0 +1,6 @@
+﻿chore: 前端静态产物同步(合并 origin/main 9 提交后按合并源码重建)
+
+vite build 产物(111 个 asset,入口 index-CnNP5tlo.js)同步进 backend/src/main/resources/static。
+
+沿用本仓既有做法:合并时 static 冲突一律先取远端让合并落地,
+再按合并后的源码重建覆盖,保证静态产物与源码一致。
