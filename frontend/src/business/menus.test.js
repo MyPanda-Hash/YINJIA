@@ -264,16 +264,24 @@ test('基础档案 → 系统管理平台(只改标题,code 与二级分组不�
 })
 
 /**
- * 2026-10-18 用户口径:「写一个数据建模目录下面的面板有:字段管理面板、把 ERP导入日志从系统管理迁移到
- * 数据建模、还有写个数据字典」。
- * 终态 = 一级目录「数据建模」(dm) → 字段管理(FIELDMGR,新面板) / 数据字典(ZDGL) / ERP导入日志(ERPLG);
- *       「系统管理平台」不再直接挂这两个面板(防两边各挂一份)。
+ * 2026-10-18 用户口径(第二版):「在系统左侧菜单写一个 erp 系统集成的目录,目录下把 erp 导入日志
+ * 移动到他下方;再写一个 erp 集成配置清单…」。
+ * 终态 = 一级目录「ERP系统集成」(erpInteg) → ERP集成配置清单(ERP_INTEG,页面级虚拟面板) / ERP导入日志(ERPLG);
+ *       数据建模只保留 字段管理 / 数据字典;系统管理平台两份都不得再挂(防两边各挂一份)。
  */
-test('数据建模 = 一级目录,含 字段管理 / 数据字典 / ERP导入日志', () => {
+test('ERP系统集成 = 一级目录,含 配置清单 / ERP导入日志', () => {
+  const erp = menuTree.find((n) => n.code === 'erpInteg')
+  assert.ok(erp, '应有一级目录 ERP系统集成(erpInteg)')
+  assert.equal(erp.title, 'ERP系统集成')
+  // 二级是「集成管理」分组(导航层级同构:一级下面不出现裸叶子),两个面板都挂在该组下
+  const grp = (erp.children || [])[0]
+  assert.ok(grp?.children?.length, 'ERP系统集成 下应是「带面板的分组」')
+  assert.deepEqual((grp.children || []).map((c) => c.panelCode), ['ERP_INTEG', 'ERPLG'])
+  assert.equal(grp.children[0].path, '/erp/integConfig')
+
+  // 数据建模只剩 字段管理 / 数据字典(ERP集成分组已随用户口径迁出)
   const dm = menuTree.find((n) => n.code === 'dm')
-  assert.ok(dm, '应有一级目录 数据建模(dm)')
-  assert.equal(dm.title, '数据建模')
-  assert.deepEqual((dm.children || []).map((c) => c.title), ['字段管理', '数据字典', 'ERP集成'])
+  assert.deepEqual((dm.children || []).map((c) => c.title), ['字段管理', '数据字典'])
 
   const codesOf = (node) => {
     if (Array.isArray(node)) return node.flatMap(codesOf)
@@ -281,17 +289,23 @@ test('数据建模 = 一级目录,含 字段管理 / 数据字典 / ERP导入日
     const self = node.panelCode ? [node.panelCode] : []
     return self.concat(codesOf(node.children))
   }
+  const erpCodes = codesOf(erp)
+  for (const p of ['ERP_INTEG', 'ERPLG']) {
+    assert.ok(erpCodes.includes(p), `ERP系统集成下应有 ${p}`)
+  }
   const dmCodes = codesOf(dm)
-  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG']) {
+  for (const p of ['FIELDMGR', 'ZDGL']) {
     assert.ok(dmCodes.includes(p), `数据建模下应有 ${p}`)
   }
+  assert.ok(!dmCodes.includes('ERPLG'), 'ERPLG 已迁到 ERP系统集成,数据建模里不应再有入口')
   // 迁移而非复制:系统管理平台里不得再出现这两个面板
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
-  assert.ok(!baseCodes.includes('ZDGL'), 'ZDGL 已迁到数据建模,系统管理平台里不应再有入口')
-  assert.ok(!baseCodes.includes('ERPLG'), 'ERPLG 已迁到数据建模,系统管理平台里不应再有入口')
+  for (const p of ['ZDGL', 'ERPLG']) {
+    assert.ok(!baseCodes.includes(p), `${p} 已迁出,系统管理平台里不应再有入口`)
+  }
   // 整棵树里每张面板只挂一次
   const all = codesOf(menuTree)
-  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG']) {
+  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG', 'ERP_INTEG']) {
     assert.equal(all.filter((c) => c === p).length, 1, `${p} 在整个菜单树里应恰好出现一次`)
   }
 })

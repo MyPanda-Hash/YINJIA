@@ -42,6 +42,13 @@ public final class PagePanelRegistry {
     public static final String WORK_ORDER_BOARD = "WORK_ORDER_BOARD";
     /** 生产工单(列表页):工单查询 + 结案/切单/转领料单/打印/导出,并可原地弹出快速排产排入 */
     public static final String WORK_ORDER_LIST = "WORK_ORDER_LIST";
+    /**
+     * ERP 集成配置清单(2026-10-18):导入 / 转出两向 × 分类的接口、设备、字段映射统一配置页。
+     * 数据源是三张配置表(erp_integ_api / _field / _device),**不是** yj_panel 单据面板,
+     * 故同样按页面级虚拟面板登记 —— 授权落 yj_role_panel,页面菜单按 panelCode 显隐。
+     * 动作只有两个:view(看配置)+ save(改配置);本页不含单据动作。
+     */
+    public static final String ERP_INTEG = "ERP_INTEG";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -78,12 +85,23 @@ public final class PagePanelRegistry {
             {"assign",  "排产"},
     };
 
+    /**
+     * ERP 集成配置清单:只有「看」和「改配置」两件事。
+     * 配置保存写的是接口/映射/设备绑定三张配置表(全公司共用一份),故单列 save 词,
+     * 不借用 add/modify(那两个词在单据面板上表示"新增/申请修改单据",语义不同)。
+     */
+    private static final String[][] ERP_INTEG_ACTIONS = {
+            {"view", "可见"},
+            {"save", "配置保存"},
+    };
+
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
             new PagePanelDef(ORDER_CONVERT, "订单结转", "生产制造", ORDER_CONVERT_ACTIONS),
             new PagePanelDef(SCHEDULE_BOARD, "快速排产", "生产制造", SCHEDULE_BOARD_ACTIONS),
             new PagePanelDef(WORK_ORDER_BOARD, "工单排产", "生产制造", WORK_ORDER_BOARD_ACTIONS),
-            new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产制造", WORK_ORDER_LIST_ACTIONS));
+            new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产制造", WORK_ORDER_LIST_ACTIONS),
+            new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

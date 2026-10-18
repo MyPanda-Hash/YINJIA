@@ -457,13 +457,13 @@ export const menuTree = [
       },
     ],
   },
-  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典 / ERP导入日志。
+  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。
   //   · 字段管理(FIELDMGR):直接以 yj_field 元数据表为数据源的新面板 —— 全系统字段模型在一屏可见、
   //     可按面板筛、可就地改(顺序/列宽/必填/隐藏/字典SQL…),保存走通用档案保存的「只提交改动行」;
   //   · 数据字典(ZDGL):原在 系统管理平台·基础数据,按用户口径「还有写个数据字典」随本栏目一并摆到这里
   //     (面板/表/权限行一个字节没动,只换导航位置);
-  //   · ERP导入日志(ERPLG):用户口径「把 ERP导入日志从系统管理迁移到数据建模里面去」,
-  //     yj_panel.category/module_group 已同批改为「数据建模」(tools/migrate-dm-fields-center-20261018.sql)。
+  //   · ERP导入日志(ERPLG)已于 2026-10-18 再次迁出:随用户口径移到新的一级目录「ERP系统集成」
+  //     (yj_panel.category/module_group 同批改为「ERP系统集成」,见 tools/migrate-erp-integ-config-20261018.sql)。
   {
     code: 'dm',
     title: '数据建模',
@@ -485,12 +485,26 @@ export const menuTree = [
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
         ],
       },
+    ],
+  },
+  // 2026-10-18 用户口径:「在系统左侧菜单写一个 erp 系统集成的目录,目录下把 erp 导入日志移动到他下方。
+  //   再写一个 erp 集成配置清单,分为导入与转出两种面板,每个面板再分类,把 api 接口、对应的设备、
+  //   字段间的映射,做成一个可视化、可以统一配置编辑的面板。」
+  //   · ERP集成配置清单 = 页面级虚拟面板 ERP_INTEG(自定义视图 views/erp/ErpIntegConfig.vue,
+  //     数据源 erp_integ_api/_field/_device 三张配置表;不插 yj_panel 行,授权落 yj_role_panel);
+  //   · ERP导入日志 = 原「数据建模 / ERP集成」下的 ERPLG(批次级),行级明细 ERPLG_ROW 从批次行进入。
+  {
+    code: 'erpInteg',
+    title: 'ERP系统集成',
+    icon: 'Connection',
+    children: [
+      // 二级必须是「带面板的分组」(导航层级同构:不出现裸叶子,见 menus.test.js)
       {
-        code: 'dmErp',
-        title: 'ERP集成',
-        icon: 'Connection',
+        code: 'erpManage',
+        title: '集成管理',
+        icon: 'SetUp',
         children: [
-          // 批次级日志(erp_imp_log);行级明细面板 ERPLG_ROW 不另设入口 —— 从批次行进入即可
+          { code: 'erpIntegCfg', title: 'ERP集成配置清单', path: '/erp/integConfig', icon: 'SetUp', panelCode: 'ERP_INTEG' },
           { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
         ],
       },
