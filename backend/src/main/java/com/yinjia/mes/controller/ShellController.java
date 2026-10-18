@@ -6,9 +6,12 @@ import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DashboardStatsService;
 import com.yinjia.mes.service.FlowBoardService;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.QrBatchService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +31,7 @@ public class ShellController {
     private final QrBatchService qrBatch;
     private final DashboardStatsService dashboardStats;
     private final FlowBoardService flowBoard;
+    private final PanelPermissionService panelPermission;
     private final String factoryName;
     private final String testFactoryName;
     /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开)。见 factories() 注释。 */
@@ -35,6 +39,7 @@ public class ShellController {
 
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch,
                            DashboardStatsService dashboardStats, FlowBoardService flowBoard,
+                           PanelPermissionService panelPermission,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.factory-name:YINJIA-MES}") String factoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
@@ -43,6 +48,7 @@ public class ShellController {
         this.qrBatch = qrBatch;
         this.dashboardStats = dashboardStats;
         this.flowBoard = flowBoard;
+        this.panelPermission = panelPermission;
         this.factoryName = factoryName;
         this.testFactoryName = testFactoryName;
         this.testLedgerEnabled = testLedgerEnabled;
@@ -370,6 +376,33 @@ public class ShellController {
     public ApiResult<Map<String, Object>> dashboardCapacity(
             @RequestParam(name = "period", defaultValue = "day") String period) {
         return ApiResult.ok(dashboardStats.capacity(period));
+    }
+
+    /**
+     * 产能对比卡「设置上限」(2026-10-18 用户口径:「加上一个可以在这里设置产能上限的功能,
+     * 调整之后对应的会对面板进行一个修改,是双向的一个修改功能」)。
+     *
+     * <p>写的就是「产线档案」PROD_LINE 面板的 bs_prod_line.日产能 —— 不另存副本:
+     * 卡片改 ⇒ 档案面板看到新值;档案面板改 ⇒ 卡片下次取数就是新值。
+     * 权限与档案面板编辑同口径(读=view,写=modify;管理员恒过)。
+     */
+    @GetMapping("/dashboard/capacity-lines")
+    public ApiResult<List<Map<String, Object>>> capacityLines() {
+        panelPermission.requireAnyPerm("PROD_LINE", "查看产线档案", "view");
+        return ApiResult.ok(dashboardStats.capacityLines());
+    }
+
+    /** 批量写回日产能;返回实际更新行数(停用/已删除的产线不匹配 = 不计入) */
+    @PutMapping("/dashboard/capacity-lines")
+    public ApiResult<Map<String, Object>> saveCapacityLines(
+            @RequestBody List<Map<String, Object>> items) {
+        panelPermission.requireAnyPerm("PROD_LINE", "修改", "modify");
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String user = auth == null || auth.getName() == null || auth.getName().isBlank() ? "system" : auth.getName();
+        int updated = dashboardStats.saveDailyCapacity(items, user);
+        Map<String, Object> out = new HashMap<>();
+        out.put("updated", updated);
+        return ApiResult.ok(out);
     }
 
     /**

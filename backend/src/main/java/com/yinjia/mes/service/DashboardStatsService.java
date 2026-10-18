@@ -309,7 +309,54 @@ public class DashboardStatsService {
     }
 
     /**
+     * 产线日产能清单(桌面「产能对比」→「设置上限」弹窗,2026-10-18)。
+     *
+     * <p>与 {@link #capacity} 的上限**同一张表同一口径**(bs_prod_line.日产能 + 启用过滤),
+     * 所以弹窗改完立刻回读图表就是新值;反过来在「产线档案」面板改了日产能,图表下次取数也是新值
+     * —— 双向同步靠的是「同一个数据源」,不另建副本、不做二次推送。
+     */
+    public List<Map<String, Object>> capacityLines() {
+        try {
+            return jdbc.queryForList(
+                    "SELECT RTRIM(生产线) AS line, ISNULL(日产能,0) AS daily FROM bs_prod_line"
+                            + " WHERE ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL(生产线,'') <> '' ORDER BY RTRIM(生产线)");
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /**
+     * 批量写回日产(2026-10-18 用户口径:「调整之后对应的会对面板进行一个修改,是双向的修改功能」)。
+     * 只改启用产线,顺带留痕 asp_user2/asp_time2(与档案面板保存同列),返回实际更新行数。
+     *
+     * @param items [{line: 产线名, daily: 日产能}, …]
+     * @param user  当前登录账号(写入 asp_user2)
+     */
+    public int saveDailyCapacity(List<Map<String, Object>> items, String user) {
+        if (items == null || items.isEmpty()) return 0;
+        int updated = 0;
+        for (Map<String, Object> it : items) {
+            String line = it.get("line") == null ? "" : String.valueOf(it.get("line")).trim();
+            if (line.isEmpty()) continue;
+            double daily;
+            try {
+                daily = Double.parseDouble(String.valueOf(it.get("daily")).trim());
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("日产能不是数字:" + line);
+            }
+            if (daily < 0) throw new IllegalArgumentException("日产能不能为负数:" + line);
+            updated += jdbc.update(
+                    "UPDATE bs_prod_line SET 日产能=?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE RTRIM(生产线)=? AND ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    daily, user, line);
+        }
+        return updated;
+    }
+
+    /**
      * 产能对比(2026-10-08 用户需求:日产能对比可以切周/月/年,按产线做竖向双柱对比):
+     *
      *  - 上限 = bs_prod_line.日产能 × 周期天数(PROD_LINE 面板可维护;周=7、月=当月自然日、年=年自然日);
      *  - 产出 = scjl 周期内报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
      *  - 周期口径 = **最近有报工的那个周期**:锚点日取今天(今天有报工)否则最近一个有报工日,

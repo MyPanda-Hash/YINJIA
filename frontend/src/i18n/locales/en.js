@@ -3658,6 +3658,13 @@ export default {
     '年产能': 'Yearly capacity',
     '实际产出': 'Actual output',
     '产能上限': 'Capacity limit',
+    /* 产能对比卡「设置上限」(2026-10-18):直接写产线档案 PROD_LINE 的日产能,双向同源 */
+    '设置上限': 'Set Capacity Limit',
+    '产线': 'Line',
+    '本周期上限': 'Limit this period',
+    '产能上限已保存': 'Capacity limits saved',
+    '上限 = 日产能 × 周期天数（日 1 / 周 7 / 月按当月自然日 / 年按当年自然日）。保存后立即写入「产线档案」，在档案里改日产能，这里也会跟着变。':
+      'Limit = daily capacity × days in the period (1 / 7 / calendar days of the month / calendar days of the year). Saving writes straight to Production Lines; editing daily capacity there updates this card as well.',
     '数据区间': 'Range',
     '上限 = 日产能 ×': 'Limit = daily capacity ×',
     '上限 = 日产能 × 当月自然日': 'Limit = daily capacity × calendar days of the month',
