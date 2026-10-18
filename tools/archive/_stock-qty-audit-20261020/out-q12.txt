@@ -1,0 +1,9 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q12-config.sql ==
+  | STOCK_BALANCE | null | 
+  | STOCK_DETAIL | null | 
+  | STOCK_PICK | null | 
+  | STOCK_STATUS | null | 
+  | STOCKTAKE | null | 
+  | TRANSFER | null | 
+[OK] _q12-config.sql (1 batches)

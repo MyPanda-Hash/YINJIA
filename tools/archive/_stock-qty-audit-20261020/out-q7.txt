@@ -1,0 +1,69 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q7-viewdefs.sql ==
+  | v_stock_balance | CREATE   VIEW dbo.v_stock_balance AS
+SELECT ROW_NUMBER() OVER (ORDER BY m.仓库, m.存货编码, m.存货) AS id,
+       m.仓库编码, m.仓库, m.存货编码, m.存货, m.规格型号, m.主计量,
+       SUM(m.数量*m.sign) AS 现存量,
+       CASE WHEN SUM(m.数量*m.sign)<>0 THEN SUM(m.金额*m.sign)/SUM(m.数量*m.sign) ELSE 0 END AS 结存单价,
+       SUM(m.金额*m.sign) AS 结存金额,
+       ISNULL(MAX(k.预警数量),0) AS 预警数量,
+       CAST('N' AS char(1)) AS asp_cancel
+FROM (
+  -- 在库:现存量按 仓库键+存货 聚合;金额 = 收入金额 − 移动加权发出成本(取自物化表)
+  SELECT m.仓库键, m.仓库编码, m.仓库, m.存货编码, m.存货, m.规格型号, m.计量单位 AS 主计量,
+         m.收入数量 - m.发出数量 AS 数量,
+         m.收入金额 - ISNULL(c.发出成本金额,0) AS 金额, 1 AS sign
+  FROM dbo.v_stock_movement m
+  LEFT JOIN dbo.inv_cost_ledger c ON c.src = m.src AND c.rid = m.rid
+) m
+-- 预警数量:遗留批次表 kucun 按 仓库+存货 聚合(同一组合阈值唯一;无阈值的行补 0)
+LEFT JOIN (
+  SELECT RTRIM(wzdm) AS 存货编码, RTRIM(ckdm) AS 仓库编码, MAX(ISNULL(预警数量,0)) AS 预警数量
+  FROM dbo.kucun
+  WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(预警数量,0) > 0
+  GROUP BY RTRIM(wzdm), RTRIM(ckdm)
+) k ON k.存货编码 = m.存货编码 AND k.仓库编码 = m.仓库编码
+-- 与成本分区键同口径(含 仓库键):否则同编码不同名称写法会被拆成两行,与成本口径不一致
+GROUP BY m.仓库键, m.仓库编码, m.仓库, m.存货编码, m.存货, m.规格型号, m.主计量; | 
+  | v_stock_kucun | CREATE   VIEW dbo.v_stock_kucun AS
+SELECT ROW_NUMBER() OVER (ORDER BY m.仓库编码, m.存货编码) AS id,
+       m.仓库编码, m.仓库名称, m.存货编码, m.存货名称, m.规格型号,
+       m.累计入库量, m.累计出库量, m.现存量, m.更新时间,
+       CAST('N' AS nvarchar(1)) AS asp_cancel
+FROM (
+  SELECT k.ckdm AS 仓库编码, ISNULL(w.仓库名称, N'') AS 仓库名称, k.wzdm AS 存货编码,
+         ISNULL(i.存货名称, N'') AS 存货名称, ISNULL(i.规格型号, N'') AS 规格型号,
+         CAST(SUM(ISNULL(k.rkl, 0)) AS decimal(18,4)) AS 累计入库量,
+         CAST(SUM(ISNULL(k.ckl, 0)) AS decimal(18,4)) AS 累计出库量,
+         CAST(SUM(ISNULL(k.yl, 0)) AS decimal(18,4)) AS 现存量,
+         MAX(k.update_date) AS 更新时间
+  FROM dbo.kucun k
+  OUTER APPLY (SELECT TOP 1 x.仓库名称 FROM dbo.bs_wh x WHERE x.仓库编码 = k.ckdm ORDER BY x.id) w
+  OUTER APPLY (SELECT TOP 1 x.存货名称, x.规格型号 FROM dbo.bs_inv x WHERE x.存货编码 = k.wzdm) i
+  WHERE ISNULL(k.asp_cancel, 'N') <> 'Y'
+  GROUP BY k.ckdm, k.wzdm, w.仓库名称, i.存货名称, i.规格型号
+  HAVING CAST(SUM(ISNULL(k.yl, 0)) AS decimal(18,4)) <> 0
+) m; | 
+  | v_stock_pick | /* ════════════ ② 库存选货视图 v_stock_pick(批号级可用量) ════════════
+   · 粒度严格 = kucun 的三键(物料,仓库,批号),与审核过账落库的键**完全一致**;
+   · 只出「现存量 > 0」的行(盘点若也要盘 0 行,把 WHERE 的 yl>0 去掉即可,当前口径=只挑有货的);
+   · 档案取单一值:bs_inv 的「存货编码」实测有 1 组重复(3874 行 / 3873 码)、bs_wh 无重复,
+     故一律用 OUTER APPLY TOP 1 —— LEFT JOIN 会让同一个 kucun 行被翻倍(v_stock_movement 同类坑)。 */
+CREATE   VIEW dbo.v_stock_pick AS
+SELECT ROW_NUMBER() OVER (ORDER BY k.ckdm, k.wzdm, k.lot_no) AS id,
+       CAST('N' AS nvarchar(1)) AS asp_cancel,
+       k.wzdm AS [存货编码],
+       ISNULL(i.[存货名称], k.wzdm) AS [存货名称],
+       i.[规格型号] AS [规格型号],
+       i.[计量单位] AS [计量单位],
+       k.ckdm AS [仓库编码],
+       ISNULL(w.[仓库名称], k.ckdm) AS [仓库],
+       NULLIF(RTRIM(k.lot_no), N'') AS [批号],
+       CAST(ISNULL(k.yl, 0) AS decimal(18,4)) AS [现存量],
+       CAST(ISNULL(k.price, 0) AS decimal(18,4)) AS [结存单价],
+       k.update_date AS [更新时间]
+FROM dbo.kucun k
+OUTER APPLY (SELECT TOP 1 x.[存货名称], x.[规格型号], x.[计量单位] FROM dbo.bs_inv x WHERE x.[存货编码] = k.wzdm ORDER BY x.id) i
+OUTER APPLY (SELECT TOP 1 y.[仓库名称] FROM dbo.bs_wh y WHERE y.[仓库编码] = k.ckdm ORDER BY y.id) w
+WHERE ISNULL(k.asp_cancel, N'N') <> N'Y' AND ISNULL(k.yl, 0) > 0; | 
+[OK] _q7-viewdefs.sql (1 batches)
