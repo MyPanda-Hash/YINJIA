@@ -79,6 +79,7 @@ public class AuthController {
             user.put("realName", u.get("real_name"));
             user.put("roleCode", admin ? "admin" : "user");
             user.put("isAdmin", admin);
+            user.put("roles", rolesOf(u.get("role_id")));
             user.put("factory", factory);
             user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
             // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
@@ -170,6 +171,7 @@ public class AuthController {
         user.put("realName", u.get("real_name"));
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
+        user.put("roles", rolesOf(u.get("role_id")));
         // 账套(工厂):取自本次请求的线程上下文 —— JwtAuthFilter 按令牌声明设置的,就是"这个请求正在查哪个库"。
         // 2026-09-22 补:原先这里不含 factory,前端启动时用本响应覆盖 mes_user,
         // 会把登录时带进来的 factory 抹掉,顶栏账套名只能靠可能陈旧的 localStorage 缓存 —— 又是"显示与实查不一致"的老坑。
@@ -180,6 +182,15 @@ public class AuthController {
         user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
         user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
         return user;
+    }
+
+    /** 角色名(2026-10-18 补)。顶栏「账号信息」弹窗与新的系统管理平台入口页都显示「角色」,
+     *  前端读的是 userInfo.roles —— 而登录与 currentUser **两个响应里从来没有下发过这个键**,
+     *  于是这一行永远显示「未分配」(误导:看起来像账号没有角色)。
+     *  这里按 yj_user.role_id 取 yj_role.role_name;仍返回 List 以兼容前端 roles.join('、')。 */
+    private List<String> rolesOf(Object roleId) {
+        if (roleId == null) return List.of();
+        return jdbc.query("SELECT role_name FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
     }
 
     /** 可见面板(角色口径):管理员=全部("*");普通用户=yj_role_panel 中勾了可见(view)的面板码。

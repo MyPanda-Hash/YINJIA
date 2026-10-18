@@ -6,9 +6,12 @@ import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DashboardStatsService;
 import com.yinjia.mes.service.FlowBoardService;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.QrBatchService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +31,7 @@ public class ShellController {
     private final QrBatchService qrBatch;
     private final DashboardStatsService dashboardStats;
     private final FlowBoardService flowBoard;
+    private final PanelPermissionService panelPermission;
     private final String factoryName;
     private final String testFactoryName;
     /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开)。见 factories() 注释。 */
@@ -35,6 +39,7 @@ public class ShellController {
 
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch,
                            DashboardStatsService dashboardStats, FlowBoardService flowBoard,
+                           PanelPermissionService panelPermission,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.factory-name:YINJIA-MES}") String factoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
@@ -43,6 +48,7 @@ public class ShellController {
         this.qrBatch = qrBatch;
         this.dashboardStats = dashboardStats;
         this.flowBoard = flowBoard;
+        this.panelPermission = panelPermission;
         this.factoryName = factoryName;
         this.testFactoryName = testFactoryName;
         this.testLedgerEnabled = testLedgerEnabled;
@@ -137,6 +143,183 @@ public class ShellController {
         return ApiResult.ok(out);
     }
 
+    /*
+     * ── 我的桌面·模块「单据入口」(2026-10-18 用户口径:「研发/生产/质量/库存/销售 这几个模块
+     *    加上一个单据入口,可以通过点击单据入口跳转对应单据面板,就显示最新的 7 张单据」)──
+     *
+     * 口径(为什么这么取):
+     *  1. 单据面板 = yj_panel.mode='doc' 且有 head_table —— 与 /dashboard/rd 的「最新单据」同一类,
+     *     但不复用 ButtonService.DOC_ARCHIVE_PANELS:那个集合是**研发文书归档**登记表(RD_*),
+     *     库存/生产/品质的单据根本不入册,拿它筛会一张都出不来。
+     *  2. 模块归属 = yj_panel.module_group(研发管理/生产制造/库存管理/品质管理 恰好与桌面五个
+     *     模块一一对应);**销售模块例外**:「智能供应链」这组把 采购单(CGD)/采购订单(PU_ORDER)
+     *     与 销售订单(SO_ORDER)/客户订单(KHDD) 混在一起,按分组取会把采购单混进销售桌面
+     *     ⇒ 销售显式点名这两张面板。销售出库单(SALE_OUT)归「库存管理」,不在此列。
+     *  3. 按当前用户可见面板过滤(管理员 = *,普通用户 = 角色勾了 view 的面板)—— 桌面别当越权入口。
+     *  4. 每面板取 TOP n 再合并排序取 n 条:某一张面板刷得勤也不会把其它面板挤没。
+     */
+    /** 模块键 → yj_panel.module_group */
+    private static final Map<String, String> MODULE_GROUP = Map.of(
+            "rd", "研发管理", "prod", "生产制造", "stock", "库存管理", "quality", "品质管理");
+    /** 模块键 → 显式面板码(见上面第 2 条:分组混装的模块只能点名) */
+    private static final Map<String, List<String>> MODULE_PANELS = Map.of(
+            "sales", List.of("SO_ORDER", "KHDD"));
+
+    /** 桌面模块「单据入口」:该模块单据面板最近 N 张单据 + 面板清单
+     *  @param panel 可选面板码(2026-10-18 用户口径「加上可选面板,筛选的是对应面板的最新的 7 张数据」):
+     *               空 = 本模块全部单据面板汇总;非空 = 只出该面板的最近 N 张。
+     *               ⚠ panels 清单**不随 panel 收窄** —— 前端下拉要一直能列出本模块全部单据面板,
+     *               否则选了第一张后面板选项就没了。 */
+    @GetMapping("/dashboard/module-docs")
+    public ApiResult<Map<String, Object>> moduleDocs(@RequestParam String module,
+                                                     @RequestParam(defaultValue = "7") int limit,
+                                                     @RequestParam(required = false) String panel) {
+        String mod = module == null ? "" : module.trim();
+        List<String> pinned = MODULE_PANELS.get(mod);
+        String group = MODULE_GROUP.get(mod);
+        if (pinned == null && group == null) throw new IllegalArgumentException("未知模块:" + module);
+        int n = Math.max(1, Math.min(limit, 50));
+        List<String> visible = currentVisiblePanels();
+        boolean all = visible.contains("*");
+        List<Map<String, Object>> panels = new ArrayList<>();
+        List<Map<String, Object>> docs = new ArrayList<>();
+        for (PanelRegistry.PanelDef def : registry.all()) {
+            if (!def.isDoc() || !def.hasHeadTable()) continue;
+            if (pinned != null ? !pinned.contains(def.code()) : !group.equals(def.moduleName())) continue;
+            if (!all && !visible.contains(def.code())) continue;
+            String docCol = def.groupCol();
+            String head = def.headTable();
+            // 表名/列名来自元数据,照样做一次白名单校验:拼进 SQL 的标识符不接受别的字符。
+            // ⚠ 必须放行中文字段名:本项目 group_col 绝大多数就是中文列(单据编号/合同号/报工单号…),
+            //   早期只写 [A-Za-z0-9_] 会把四组单据面板全被 continue 掉(2026-10-18 实测:库存/生产/
+            //   品质/研发 全 0 条,只有 group_col 恰为英文 od_no 的客户订单出得来)。
+            if (docCol == null || docCol.isBlank() || head == null || !head.matches("[\\p{L}\\p{N}_]+")
+                    || !docCol.matches("[\\p{L}\\p{N}_]+")) {
+                continue;
+            }
+            Map<String, Object> p = new HashMap<>();
+            p.put("code", def.code());
+            p.put("name", def.name());
+            panels.add(p);
+            // 面板筛选只作用于单据列表(见方法头:panels 必须保持全量)
+            if (panel != null && !panel.isBlank() && !panel.trim().equals(def.code())) continue;
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(
+                        // 时间在 SQL 里格式化成墙钟字符串(2026-10-18):直接回 Timestamp 会被 Jackson
+                        // 按 UTC 序列化成 "…T04:28"(库里 12:28),桌面卡片整整差 8 小时。
+                        "SELECT TOP " + n + " t.[" + docCol + "] AS docNo, t.asp_user1 AS creator"
+                                + ", CONVERT(varchar(19), t.asp_time1, 120) AS at"
+                                + " FROM " + head + " t WHERE ISNULL(t.asp_cancel,'N') <> 'Y'"
+                                + " AND t.asp_time1 IS NOT NULL ORDER BY t.asp_time1 DESC")) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("panelCode", def.code());
+                    m.put("panelName", def.name());
+                    m.put("docNo", r.get("docNo"));
+                    m.put("creator", r.get("creator"));
+                    m.put("at", r.get("at"));
+                    docs.add(m);
+                }
+            } catch (Exception ignored) {
+                // 单面板查询失败(表缺列/结构陈旧)不影响其它面板
+            }
+        }
+        docs.sort((a, b) -> String.valueOf(b.get("at")).compareTo(String.valueOf(a.get("at"))));
+        Map<String, Object> out = new HashMap<>();
+        out.put("module", mod);
+        out.put("panels", panels);
+        out.put("docs", docs.size() > n ? new ArrayList<>(docs.subList(0, n)) : docs);
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 桌面·生产模块单据入口(2026-10-18 用户口径:「生产模块把这几个面板写进去就行(订单结转/生产工单/
+     * 快速排产/工单排产/产线排产负荷),其他的面板的单据几乎不看」)。
+     *
+     * <p>为什么不能走 {@link #moduleDocs}:生产计划这 5 项里只有「生产工单」有真实单据,而工单数据在
+     * **plang**(外系统直接写入,429 行;工单号 pl_no / 行号 pl_xc / 产品 mc / 日期 pl_date),
+     * yj_panel 里 13 张生产单据面板的头表在正式库全空。其余 4 项是页面级虚拟面板
+     * (ORDER_CONVERT/SCHEDULE_BOARD/WORK_ORDER_BOARD,无 yj_panel 行)或负荷视图(LINE_LOAD),
+     * 没有"最近 N 张单据"可言 ⇒ 只当页面入口按钮。
+     *
+     * <p>口径:
+     * <ul>
+     *   <li>docs = plang 最近 N 个**工单号**(同工单多行按 pl_no 去重,取该单首行),附定位路径
+     *       `/prod/plan/workOrderList?keyword=<工单号>`(该页 2026-10-18 起支持 URL 预置关键词);</li>
+     *   <li>links = 4 个页面入口,按当前用户 yj_role_panel 的 view 权限过滤(管理员 = 全给);</li>
+     *   <li>工单列表可见性同样按 WORK_ORDER_LIST 的 view 判定 —— 桌面不当越权入口。</li>
+     * </ul>
+     */
+    @GetMapping("/dashboard/prod-orders")
+    public ApiResult<Map<String, Object>> prodOrders(@RequestParam(defaultValue = "7") int limit) {
+        int n = Math.max(1, Math.min(limit, 50));
+        List<String> visible = currentVisiblePanels();
+        boolean all = visible.contains("*");
+        List<Map<String, Object>> docs = new ArrayList<>();
+        if (all || visible.contains("WORK_ORDER_LIST")) {
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(
+                        // pl_date 同样在 SQL 里转墙钟字符串(不回 Timestamp,见 module-docs 同款注释)
+                        "SELECT TOP " + n + " t.pl_no, t.mc, t.pl_sl, t.pl_date FROM ("
+                                + " SELECT pl_no, mc, pl_sl, CONVERT(varchar(19), pl_date, 120) AS pl_date,"
+                                + " ROW_NUMBER() OVER (PARTITION BY pl_no ORDER BY pl_xc) rn"
+                                + " FROM plang WHERE pl_no IS NOT NULL) t WHERE t.rn = 1"
+                                + " ORDER BY t.pl_date DESC, t.pl_no DESC")) {
+                    String no = String.valueOf(r.get("pl_no"));
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("panelCode", "WORK_ORDER_LIST");
+                    m.put("panelName", "生产工单");
+                    m.put("docNo", no);
+                    m.put("note", r.get("mc"));
+                    m.put("at", r.get("pl_date"));
+                    m.put("path", "/prod/plan/workOrderList?keyword="
+                            + java.net.URLEncoder.encode(no, java.nio.charset.StandardCharsets.UTF_8));
+                    docs.add(m);
+                }
+            } catch (Exception ignored) {
+                // plang 不在(新库/结构未同步)时给空列表,卡片显示「暂无单据」而不是 500
+            }
+        }
+        // 生产计划 4 个页面入口(顺序与菜单一致);标题走前端 tt(),这里只给中文原文
+        String[][] pages = {
+                {"ORDER_CONVERT", "订单结转", "/prod/plan/orderConvert"},
+                {"SCHEDULE_BOARD", "快速排产", "/prod/plan/scheduleBoard"},
+                {"WORK_ORDER_BOARD", "工单排产", "/prod/plan/workOrderBoard"},
+                {"LINE_LOAD", "产线排产负荷", "/panelx/list/LINE_LOAD"},
+        };
+        List<Map<String, Object>> links = new ArrayList<>();
+        for (String[] p : pages) {
+            if (!all && !visible.contains(p[0])) continue;
+            Map<String, Object> m = new HashMap<>();
+            m.put("code", p[0]);
+            m.put("title", p[1]);
+            m.put("path", p[2]);
+            links.add(m);
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("docs", docs);
+        out.put("links", links);
+        return ApiResult.ok(out);
+    }
+
+    /** 当前用户可见面板:管理员 = *,普通用户 = 角色勾了 view 的面板(与 PortalNotificationService 同口径) */
+    private List<String> currentVisiblePanels() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String user = auth == null ? null : auth.getName();
+        if (user == null) return List.of();
+        try {
+            List<Integer> admin = jdbc.query(
+                    "SELECT CASE WHEN is_admin = 'Y' THEN 1 ELSE 0 END FROM yj_user WHERE username = ?",
+                    (rs, i) -> rs.getInt(1), user);
+            if (!admin.isEmpty() && admin.get(0) == 1) return List.of("*");
+            return jdbc.query(
+                    "SELECT rp.panel_code FROM yj_role_panel rp JOIN yj_user u ON u.role_id = rp.role_id"
+                            + " WHERE u.username = ? AND rp.perms LIKE '%view%'",
+                    (rs, i) -> rs.getString(1), user);
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
     private String panelNameOf(String code) {
         try {
             PanelRegistry.PanelDef d = registry.panel(code);
@@ -193,6 +376,33 @@ public class ShellController {
     public ApiResult<Map<String, Object>> dashboardCapacity(
             @RequestParam(name = "period", defaultValue = "day") String period) {
         return ApiResult.ok(dashboardStats.capacity(period));
+    }
+
+    /**
+     * 产能对比卡「设置上限」(2026-10-18 用户口径:「加上一个可以在这里设置产能上限的功能,
+     * 调整之后对应的会对面板进行一个修改,是双向的一个修改功能」)。
+     *
+     * <p>写的就是「产线档案」PROD_LINE 面板的 bs_prod_line.日产能 —— 不另存副本:
+     * 卡片改 ⇒ 档案面板看到新值;档案面板改 ⇒ 卡片下次取数就是新值。
+     * 权限与档案面板编辑同口径(读=view,写=modify;管理员恒过)。
+     */
+    @GetMapping("/dashboard/capacity-lines")
+    public ApiResult<List<Map<String, Object>>> capacityLines() {
+        panelPermission.requireAnyPerm("PROD_LINE", "查看产线档案", "view");
+        return ApiResult.ok(dashboardStats.capacityLines());
+    }
+
+    /** 批量写回日产能;返回实际更新行数(停用/已删除的产线不匹配 = 不计入) */
+    @PutMapping("/dashboard/capacity-lines")
+    public ApiResult<Map<String, Object>> saveCapacityLines(
+            @RequestBody List<Map<String, Object>> items) {
+        panelPermission.requireAnyPerm("PROD_LINE", "修改", "modify");
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String user = auth == null || auth.getName() == null || auth.getName().isBlank() ? "system" : auth.getName();
+        int updated = dashboardStats.saveDailyCapacity(items, user);
+        Map<String, Object> out = new HashMap<>();
+        out.put("updated", updated);
+        return ApiResult.ok(out);
     }
 
     /**

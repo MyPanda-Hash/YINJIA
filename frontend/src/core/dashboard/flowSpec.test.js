@@ -102,3 +102,29 @@ test('链路汇总能点出阻断节点(顶部卡点条之外的链路级提示)
   assert.ok(s.total > 0)
   assert.ok(s.levels.warn >= 2, `生产链至少 2 个积压节点,实际 ${JSON.stringify(s.levels)}`)
 })
+
+test('生产链顺序按业务流:排产 → 领料 → 报工 → 检验 → 入库', () => {
+  // 2026-10-18 用户口径:「生产应该是先排产再领料,等报工完成之后再检验最后入库」。
+  // 原排布把「材料出库单」放在排产之前,视觉上等于先领料后排产,与本口径相反。
+  const prod = CHAINS.find((c) => c.key === 'prod')
+  assert.deepEqual(prod.lanes.map((l) => l.key), ['plan', 'release', 'exec', 'qcput'], '生产链四段:接单计划 → 排产 → 领料报工 → 品质入库')
+  const laneCodes = (k) => (prod.lanes.find((l) => l.key === k)?.nodes || []).map((n) => n.code)
+  assert.deepEqual(laneCodes('release'), ['SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'], '排产泳道只放排产三节点')
+  assert.deepEqual(
+    laneCodes('exec'),
+    ['MATERIAL_OUT', 'WO_REPORT', 'WO_COMPLETION_LIST', 'WO_REPORT_LIST'],
+    '领料排在报工之前,完工明细与报工记录仍在段末',
+  )
+  const flat = prod.lanes.flatMap((l) => l.nodes.map((n) => n.code))
+  const at = (code) => flat.indexOf(code)
+  assert.ok(at('SCHEDULE_BOARD') < at('MATERIAL_OUT'), '排产必须先于领料')
+  assert.ok(at('MATERIAL_OUT') < at('WO_REPORT'), '领料必须先于报工')
+  for (const qc of ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_BHC']) {
+    assert.ok(at('WO_REPORT') < at(qc), `检验 ${qc} 必须在报工之后`)
+    assert.ok(at(qc) < at('FINISH_IN'), `检验 ${qc} 必须在产成品入库之前`)
+  }
+  assert.equal(flat[flat.length - 1], 'FINISH_IN', '生产链最后一步是产成品入库')
+  const order = ['排产', '领料', '报工', '检验', '入库'].map((w) => prod.intro.indexOf(w))
+  assert.ok(order.every((i) => i >= 0), `intro 缺环节:${prod.intro}`)
+  assert.deepEqual([...order].sort((a, b) => a - b), order, `intro 顺序不对:${prod.intro}`)
+})

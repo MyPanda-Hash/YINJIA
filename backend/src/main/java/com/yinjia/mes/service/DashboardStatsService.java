@@ -15,7 +15,9 @@ import java.util.Map;
  * 桌面(我的桌面)统计聚合:一次返回各模块图表数据。
  *
  * 分层口径(2026-09-28,SQL 全部收敛在 service —— 代码规范 A2,不再往 ShellController 堆 SQL):
- *  - 生产 = 参考库 plang(工单行):完工=rk_no 已填 / 在产=其余;车间=scx;趋势=pl_date(新增)/cp_date(完工);
+ *  - 生产 = 参考库 plang(工单行):完工=rk_no 已填 / 在产=其余;车间=scx;
+ *    趋势=pl_date(新增)/ **cp_date2(实际完工日:入库回写)** —— cp_date 是**计划完工/交期**,
+ *    2026-10-18 之前趋势把交期当完工,图上「完工 221」而状态分布只有 3 张完工,用户看着自相矛盾;
  *    工序完成率 = scjl 报工(gxdm 工序 × wgzt 完工)——未报工工序不出条,空数据=空态。
  *  - 库存 = inh/outh 两物理表(入库/出库):单数=DISTINCT 单号,行数=明细行;
  *    现存量 TOP = v_stock_balance(库存状况表)按 存货编码+存货 跨仓库 SUM,全量下发由前端滚动展示;
@@ -54,7 +56,7 @@ public class DashboardStatsService {
         out.put("kpis", kpis(r));
         out.put("archives", archives());
         out.put("docStats", docStats());
-        out.put("todos", List.of());
+        out.put("todos", todos());
         out.put("latest", latestActivities(r));
         out.put("progress", progress(r));
         out.put("production", production(r));
@@ -204,9 +206,41 @@ public class DashboardStatsService {
         }
     }
 
+    /**
+     * 流程待办(2026-10-18):此前 out.put("todos", List.of()) 恒空,前端「流程待办」卡永远 0。
+     * 真实口径 = yj_doc_status 里 pending='Y' 且未作废的单据(与 kpis() 的 approvePending 同源),
+     * 面板名由 PanelRegistry 反查(查不到就回显面板码)。
+     */
+    private List<Map<String, Object>> todos() {
+        try {
+            Map<String, String> panelNames = new HashMap<>();
+            for (PanelRegistry.PanelDef def : registry.all()) panelNames.put(def.code(), def.name());
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> r0 : jdbc.queryForList(
+                    "SELECT TOP 50 doc_no, panel_code, pending_by, pending_at FROM yj_doc_status"
+                            + " WHERE pending = 'Y' AND ISNULL(canceled,'N')<>'Y'"
+                            + " ORDER BY CASE WHEN pending_at IS NULL THEN 1 ELSE 0 END, pending_at DESC")) {
+                String code = r0.get("panel_code") == null ? "" : String.valueOf(r0.get("panel_code"));
+                Map<String, Object> e = new LinkedHashMap<>();
+                e.put("panelCode", code);
+                e.put("panelName", panelNames.getOrDefault(code, code));
+                e.put("docNo", r0.get("doc_no") == null ? "" : String.valueOf(r0.get("doc_no")));
+                e.put("state", "待审批");
+                e.put("pendingBy", r0.get("pending_by") == null ? "" : String.valueOf(r0.get("pending_by")));
+                e.put("pendingAt", r0.get("pending_at") == null ? null : String.valueOf(r0.get("pending_at")));
+                out.add(e);
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
     private Map<String, Object> archives() {
         Map<String, Object> archives = new HashMap<>();
-        archives.put("invItems", count("SELECT COUNT(DISTINCT m_no) FROM mate WHERE ISNULL(asp_cancel,'N')<>'Y'"));
+        // 2026-10-18 修正:此前取 mate(mate 是 BOM 表,实测只有 1 行)⇒ 档案卡「物料」永远显示 1。
+        // 真实存货档案 = bs_inv(面板 INV),与用户在「存货」面板看到的行数同源。
+        archives.put("invItems", count("SELECT COUNT(*) FROM bs_inv WHERE ISNULL(asp_cancel,'N')<>'Y'"));
         archives.put("deptCount", count("SELECT COUNT(*) FROM yj_dept"));
         archives.put("whCount", count("SELECT COUNT(*) FROM bs_wh WHERE ISNULL(asp_cancel,'N')<>'Y'"));
         return archives;
@@ -218,10 +252,21 @@ public class DashboardStatsService {
             for (PanelRegistry.PanelDef def : registry.all()) {
                 if (!def.isDoc()) continue;
                 String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
-                int docs = count("SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'");
-                int audited = count("SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = '" + def.code().replace("'", "''")
-                        + "' AND shr IS NOT NULL AND ISNULL(canceled,'N')<>'Y'");
+                String col = def.groupCol();
+                // 表名/列名来自元数据,拼 SQL 前做白名单(中文列名照常放行);不合规就跳过这张面板
+                if (table == null || col == null || table.isBlank() || col.isBlank()
+                        || !table.matches("[\\p{L}\\p{N}_]+") || !col.matches("[\\p{L}\\p{N}_]+")) continue;
+                // 单数去掉空单号:COUNT(DISTINCT '') 会把「一堆空单号」算成 1 张单(WO_REPORT 实测 7 行空号)
+                int docs = count("SELECT COUNT(DISTINCT [" + col + "]) FROM " + table
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(RTRIM([" + col + "]),'')<>''");
+                // 已审核(2026-10-18 修正):必须只数**头表里还在的单据**。
+                //   原先直接数 yj_doc_status 留痕行 —— 删掉的历史单(实测 PURCHASE_IN 19 张、
+                //   QC_INSP_REC 12 张)仍被算作已审核 ⇒ 面板「草稿 = 单数 − 已审核」出负数
+                //   (PURCHASE_IN 313 − 332 = −19),单据流量卡与流程看板上自相矛盾。
+                int audited = count("SELECT COUNT(DISTINCT s.doc_no) FROM yj_doc_status s"
+                        + " WHERE s.panel_code = ? AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y'"
+                        + " AND EXISTS(SELECT 1 FROM " + table + " h WHERE h.[" + col + "]=s.doc_no"
+                        + " AND ISNULL(h.asp_cancel,'N')<>'Y')", def.code());
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("panelName", def.name());
                 row.put("panelCode", def.code());
@@ -260,26 +305,74 @@ public class DashboardStatsService {
                     Map.of("name", "生产中", "value", Math.max(0, all - done))));
             prod.put("workshopDist", nameValue("SELECT scx AS k, COUNT(*) AS v FROM plang"
                     + " WHERE ISNULL(scx,'') <> '' AND pl_date >= ? AND pl_date < ? GROUP BY scx ORDER BY COUNT(*) DESC", r.fromStr(), r.toExclusive()));
-            prod.put("trend7", dateTrend(r, "plang", "pl_date", "cp_date"));
+            // 完工序列(2026-10-18 修正):用 **cp_date2(首次入库当日,实际完工)**。
+            //   cp_date 是计划完工/交期(全表 429 行都有值),拿它当完工会让趋势算出 221 张完工,
+            //   而状态分布(按 rk_no)只有 3 张 —— 同一张卡上两个「完工」互相打脸。
+            prod.put("trend7", dateTrend(r, "plang", "pl_date", "cp_date2"));
             // 工单数据截止日(2026-10-15):近 7 天趋势全 0 时,卡片要能说明"不是图坏了,
             // 是工单数据本身就停在某天" —— 实测本机 plang 的日期都在 2026-08。
             List<Map<String, Object>> lastRow = jdbc.queryForList("SELECT CONVERT(varchar(10), MAX(pl_date), 23) AS d FROM plang");
             prod.put("lastDate", lastRow.isEmpty() ? null : lastRow.get(0).get("d"));
             prod.put("stageRates", stageRates(r));
-            prod.put("bomTree", List.of());
         } catch (Exception e) {
             prod.put("statusDist", List.of());
             prod.put("workshopDist", List.of());
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
-            prod.put("bomTree", List.of());
             prod.put("lastDate", null);
         }
         return prod;
     }
 
     /**
+     * 产线日产能清单(桌面「产能对比」→「设置上限」弹窗,2026-10-18)。
+     *
+     * <p>与 {@link #capacity} 的上限**同一张表同一口径**(bs_prod_line.日产能 + 启用过滤),
+     * 所以弹窗改完立刻回读图表就是新值;反过来在「产线档案」面板改了日产能,图表下次取数也是新值
+     * —— 双向同步靠的是「同一个数据源」,不另建副本、不做二次推送。
+     */
+    public List<Map<String, Object>> capacityLines() {
+        try {
+            return jdbc.queryForList(
+                    "SELECT RTRIM(生产线) AS line, ISNULL(日产能,0) AS daily FROM bs_prod_line"
+                            + " WHERE ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL(生产线,'') <> '' ORDER BY RTRIM(生产线)");
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /**
+     * 批量写回日产(2026-10-18 用户口径:「调整之后对应的会对面板进行一个修改,是双向的修改功能」)。
+     * 只改启用产线,顺带留痕 asp_user2/asp_time2(与档案面板保存同列),返回实际更新行数。
+     *
+     * @param items [{line: 产线名, daily: 日产能}, …]
+     * @param user  当前登录账号(写入 asp_user2)
+     */
+    public int saveDailyCapacity(List<Map<String, Object>> items, String user) {
+        if (items == null || items.isEmpty()) return 0;
+        int updated = 0;
+        for (Map<String, Object> it : items) {
+            String line = it.get("line") == null ? "" : String.valueOf(it.get("line")).trim();
+            if (line.isEmpty()) continue;
+            double daily;
+            try {
+                daily = Double.parseDouble(String.valueOf(it.get("daily")).trim());
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("日产能不是数字:" + line);
+            }
+            if (daily < 0) throw new IllegalArgumentException("日产能不能为负数:" + line);
+            updated += jdbc.update(
+                    "UPDATE bs_prod_line SET 日产能=?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE RTRIM(生产线)=? AND ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    daily, user, line);
+        }
+        return updated;
+    }
+
+    /**
      * 产能对比(2026-10-08 用户需求:日产能对比可以切周/月/年,按产线做竖向双柱对比):
+     *
      *  - 上限 = bs_prod_line.日产能 × 周期天数(PROD_LINE 面板可维护;周=7、月=当月自然日、年=年自然日);
      *  - 产出 = scjl 周期内报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
      *  - 周期口径 = **最近有报工的那个周期**:锚点日取今天(今天有报工)否则最近一个有报工日,
@@ -432,13 +525,16 @@ public class DashboardStatsService {
             panels.add(row("panelName", "出库", "count", outDocs, "lines", outLines));
             stock.put("panels", panels);
             // 区间内出入库趋势(替代原「近 7 天」硬窗口)
+            // 2026-10-18 用户口径「改成按单据数」:曲线按**单据数**画(每日 DISTINCT 单据编号),
+            // 与上面的「入库单量/出库单量」KPI 同口径;明细行数另有「各单据明细行数」一张卡。
+            // 改前用 COUNT(*) 画的是明细行(883/1841),图例与 KPI(306/552)对不上。
             Map<String, int[]> byDay = new LinkedHashMap<>();
             List<String> days = r.buckets();
             for (String d : days) byDay.put(d, new int[2]);
-            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(DISTINCT 单据编号) AS v"
                     + " FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                     + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0, r.fromStr(), r.toExclusive());
-            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(DISTINCT 单据编号) AS v"
                     + " FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                     + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 1, r.fromStr(), r.toExclusive());
             stock.put("trend7", toTrend(r, byDay));
@@ -550,7 +646,15 @@ public class DashboardStatsService {
         return v instanceof Number n ? n.doubleValue() : 0;
     }
 
-    /** 销售趋势(区间内):added=单据日期(新增),done=yj_doc_status.shsj(审核)按桶 */
+    /**
+     * 销售趋势(区间内),added=单据日期(新增),done=**同一批订单里状态为已审核的**。
+     *
+     * <p>2026-10-18 用户口径「统一」:原先 done 按 yj_doc_status.shsj(审核动作时间)分桶,
+     * 区间内算出 141 件审核动作,而 KPI「已审核订单」= 124(区间内创建且已审核) —— 同一页两个
+     * 「已审核」数不同。现统一到**单据日期**这一条时间轴:两条线都只数区间内创建的订单,
+     * done 再叠加"已审核"条件 ⇒ 日/合计与 KPI 完全一致(当前数据 added=done=124)。
+     * 审核动作时间维度不再用于看板(工单/单据详情页仍有审核留痕)。
+     */
     private List<Map<String, Object>> soTrend(Range r) {
         List<String> days = r.buckets();
         Map<String, int[]> byDay = new LinkedHashMap<>();
@@ -558,10 +662,9 @@ public class DashboardStatsService {
         fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
                 + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                 + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0, r.fromStr(), r.toExclusive());
-        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), s.shsj, 23) AS d, COUNT(*) AS v FROM yj_doc_status s"
-                + " JOIN bd_so_order h ON h.单据编号 = s.doc_no AND ISNULL(h.asp_cancel,'N')<>'Y'"
-                + " WHERE s.panel_code = 'SO_ORDER' AND s.shsj IS NOT NULL AND s.shsj >= ? AND s.shsj < ?"
-                + " GROUP BY CONVERT(varchar(10), s.shsj, 23)", 1, r.fromStr(), r.toExclusive());
+        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
+                + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据状态 = N'已审核' AND 单据日期 >= ? AND 单据日期 < ?"
+                + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 1, r.fromStr(), r.toExclusive());
         return toTrend(r, byDay);
     }
 

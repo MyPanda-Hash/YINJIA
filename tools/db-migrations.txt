@@ -3797,6 +3797,35 @@ migrate-role-grant-dm-readonly-20261018.sql
 #     两列合起来才是唯一键)」。`审核` 列注明按用户口径 =「审核标记:审核=Y / 没审核=N」
 #     (脚本早期"服务器无 Y/N 证据 ⇒ 不采纳"的写法已更正)。其余 3 个 *ID 仍照服务器保持 float。
 migrate-dm-fields-center-20261018.sql
+# 系统管理平台 32 张业务面板迁入「数据建模」(用户 2026-10-18「把面板全部挪到数据建模,系统管理平台做成入口」):
+#   module_group 系统管理平台→数据建模(32 张);权限无回归(role 1/2/4/5 原本对 32 张已 view);
+#   导航侧 menus.js 同步搬迁 + 系统管理平台只留 /sys/console 入口页。⚠ 必须排在本行之前那些脚本之后。幂等;两账套。
+migrate-sysadmin-panels-to-dm-20261018.sql
+# 数采平台(用户 2026-10-18「把数采平台管理模块加进系统,方便后续硬件接入」):建 bs_dc_gateway/
+#   bs_dc_device/bs_dc_point/bs_dc_rule/bs_dc_sample/bs_dc_alarm/bs_dc_status_log 7 张表 + 中文注明,
+#   只登记真实台账设备(电子秤 DZ-001 / 扫码枪 FX-001 / 车间看板 KB-001),不造采样与报警数据;
+#   采样只能由硬件经 POST /api/dc/ingest 写入。幂等;两账套。
+migrate-dc-platform-20261018.sql
+# 数采网关接入密钥 bs_dc_gateway.api_key(2026-10-18 补):硬件经 POST /api/dc/ingest 与
+#   /api/dc/heartbeat 推数据,设备没有登录账号 ⇒ 这两条路径 permitAll + 请求头 X-DC-Key 必须等于
+#   所绑定网关的 api_key;未绑网关或密钥为空的设备一律拒绝(与「绑定网关」检查项同一口径)。幂等;两账套。
+migrate-dc-gateway-apikey-20261018.sql
+# 生产过程(用户 2026-10-18「完善生产过程里面的单据…有一些功能也不完善」)第一步:补字段关联。
+#   10 张单据的工单号/产品/物料/工序/生产线/人员此前**全是裸输入框**(参照 0~1 个),与工单/存货/工序档案零关联。
+#   本次只改 yj_field 配置 38 个字段:工序→OP、生产线→PROD_LINE、产品/物料→INV、人员→EMP(连带 data_type 改「参照」,
+#   否则前端不渲染参照控件),工单号改 dict_sql 从 plang 取(工单是页面级列表,不是 yj_panel,无法用 ref_panel),
+#   并修正 PROD_ABN.工单号 原错配 MANU_ORDER.合同号(该表 0 行 ⇒ 下拉永远空)。白名单 + 行数守卫,幂等;两账套。
+migrate-proc-process-refs-20261018.sql
+# 生产过程第二步:7 张空白单据补样例数据(用户 2026-10-18「有一些单据还是空的」)。
+#   生产日报表/投料确认单/物料混合记录/造粒记录/无黑处理登记/封箱确认/生产异常处理单头表全 0 行,
+#   各铺 1 张格式真实、值取自库内真实档案(bs_inv/bs_emp/bs_op/plang)的样例单据,状态=草稿;
+#   顺带修 feed_confirm_detail/mix_record_detail 各 1 行孤儿明细(补单据头而非删除)。
+#   ⚠ 样例数据:全量部署前用 tools/archive/_prod-process-audit/_cleanup-samples.sql 清理。幂等;两账套。
+migrate-proc-process-samples-20261018.sql
+# 库存现存量与预警统一(2026-10-18 用户口径「统一到同一视图 v_stock_balance」):
+#   v_stock_balance 增列 预警数量(kucun 按 仓库编码+存货编码 聚合 MAX);流程看板负库存/预警改读本视图。
+#   幂等(CREATE OR ALTER VIEW);两账套。⚠ kucun 批次级阈值与出库审批闸门 StockWarnService 不动。
+migrate-stock-balance-warn-20261018.sql
 # 合并补入(2026-10-18):本地未推送的 5 条迁移(远端清单里没有),保持本地原有顺序
 # ============================================================
 # migrate-first-insp-audit-trail-20261018.sql — 首件检验单开直接审核(用户口径「为当前的首件检验单增加审核功能,参照制程检验单」):

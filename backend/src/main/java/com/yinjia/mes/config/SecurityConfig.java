@@ -37,6 +37,9 @@ public class SecurityConfig {
                                 "/favicon.ico", "/favicon.svg", "/favicon.png",
                                 "/apple-touch-icon.png", "/robots.txt").permitAll()
                         .requestMatchers("/api/auth/login", "/api/base/factory/list", "/api/locale/list", "/api/locale/dict").permitAll()
+                        // 数采平台硬件侧(2026-10-18):电子秤/网关没有登录账号,鉴权靠请求头
+                        // X-DC-Key = 所绑网关的 api_key,在 DcService.requireGatewayKey 里校验
+                        .requestMatchers("/api/dc/ingest", "/api/dc/heartbeat").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(h -> h
