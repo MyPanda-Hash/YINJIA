@@ -82,25 +82,29 @@ function plan() {
   for (let dayOffset = 2; dayOffset >= 0; dayOffset--) {
     const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOffset)
     const y = ymd(day)
-    // 白班 08:00–11:30、13:00–16:30,每 12 分钟一次
+    // 白班 08:00–11:30、13:00–16:30 —— 间隔 6~17 分钟随机(2026-10-18 用户口径
+    // 「数据的数值和时间要稍微错开」:均匀 12 分钟一枪一眼就能看出是机器铺的)
     for (const [h0, h1] of [[8, 11], [13, 16]]) {
-      for (let h = h0; h <= h1; h++) {
-        for (let m = 0; m < 60; m += 12) {
-          const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, Math.floor(rand() * 50))
-          if (at > today) continue
+      const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h0, 5, 0)
+      const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h1, 55, 59)
+      let at = new Date(start.getTime() + Math.floor(rand() * 240000))
+      while (at <= end) {
+        if (at <= today) {
           const mat = MATERIALS[Math.floor(rand() * MATERIALS.length)]
           const seq = 1 + Math.floor(rand() * 400)
-          scans.push({ at, code: `${mat}-${y}-${pad(seq, 3)}` })
+          scans.push({ at: new Date(at), code: `${mat}-${y}-${pad(seq, 3)}` })
         }
+        at = new Date(at.getTime() + (6 + Math.floor(rand() * 11)) * 60000 + Math.floor(rand() * 50) * 1000)
       }
     }
-    // 每小时一条读码率(白班 9 个点)
+    // 读码率:每小时一条,但时刻错开几分钟;10-17 上午 10 点那次掉到 93.5(造一条可解释的预警),
+    // 其余 95.6~99.9 随机波动,偶尔再来一次小坑(96→95.8),避免一路平坦
     for (let h = 8; h <= 16; h++) {
-      const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, 55, 0)
+      const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, 40 + Math.floor(rand() * 19), Math.floor(rand() * 59))
       if (at > today) continue
-      // 10-17 上午 10 点掉一次(造一条可解释的预警),其余 96.0~99.6
       const dip = dayOffset === 1 && h === 10
-      const v = dip ? 93.5 : Number((96 + rand() * 3.6).toFixed(1))
+      const soften = !dip && rand() < 0.22
+      const v = dip ? 93.5 : Number((soften ? 95.6 + rand() * 0.8 : 96.2 + rand() * 3.7).toFixed(1))
       rates.push({ at, v })
     }
   }
