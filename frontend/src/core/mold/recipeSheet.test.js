@@ -117,6 +117,10 @@ test('档案面板的主从响应要拍平,停用的行不参与(否则工艺员
   const rows = sinterRowsFromQuery(raw)
   assert.equal(rows.length, 2)
   assert.deepEqual(rows.map((r) => r.型号), ['57*30', '60*45'])
+  // 明细键不写死 items:档案面板的键是 yj_panel.detail_key(RD_SINTER_TOL 恰为 items,
+  // 但存在 INV→detail.inv / EMP→detail.emp 这类)⇒ 换个键名同样要认得出来
+  const keyed = { totalSize: 1, list: [{ 编号: '烧结尺寸表', detail: { sinter: [sinterRow()] } }] }
+  assert.equal(sinterRowsFromQuery(keyed).length, 1)
   // 也兼容"平铺数组"形状,避免换个接口就静默变空
   assert.equal(sinterRowsFromQuery([sinterRow()]).length, 1)
   assert.equal(sinterRowsFromQuery(null).length, 0)

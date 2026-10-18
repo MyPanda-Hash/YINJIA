@@ -407,8 +407,9 @@
                 <div v-else class="as-side-hint">{{ tt(approvalWaitingTip) }}</div>
               </template>
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
-              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」):
-                   工序检验单一族(当前只放制程检验单,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
+              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」;
+                   2026-10-18 首件检验单同口径放开):
+                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
                    也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
                    有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
                    ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
@@ -3712,8 +3713,17 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  * 权限:**仅管理员**。2026-09-22「直审收权」后,前端审批组不再给非管理员直审入口,后端
  * ButtonService.audit() 也硬拒非管理员(「其他角色请走提交审批」)——这里与后端同口径,
  * 否则非管理员点了只会拿到 403。要给某个检验单放开:把面板码加进本名单即可。
+ *
+ * ⚠ 2026-10-18(用户口径「为当前的首件检验单增加审核功能,审核功能实现参照当前的制程检验单」):
+ *   首件检验单(QC_FIRST_INSP)与制程检验单同属工序检验单一族(同样是报工驱动的检验记录、
+ *   既不进两级审批的 8 张质量单据、也没有审批流)⇒ 同一口径放开。放开即同时获得:
+ *   ① 侧栏「审核 / 弃审」(仅管理员);② 直审留痕(后端 ButtonService.audit() → yj_form_approval
+ *   的 AUDIT/APPROVED 行)⇒ 侧栏「审批情况」查得到谁审的/什么时候/审核意见;
+ *   ③ 审核后单据锁定(单据状态=已审核 ⇒ draftEditable 为假、纸面只读);
+ *   ④ 纸面/列表/服务端报表的「审核人」格由 QueryService 虚拟字段(取 yj_doc_status.shr)自动显示。
+ *   存量已直审单据的 AUDIT 行由 tools/migrate-first-insp-audit-trail-20261018.sql 补录。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP']
+const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -4683,6 +4693,14 @@ const DOC_RAIL_PANELS = {
   // ERP单 复用上面 ERP_TAG_COL(两单的 ERP单号/是否已转ERP 均在 yj_field 且随行下发,实测均已转)。
   OTHER_IN: ['供应商', ERP_TAG_COL],
   OTHER_OUT: ['部门', '经手人', ERP_TAG_COL],
+  // 调拨单/盘点单(2026-10-18 用户口径「功能和界面要和出入库单对齐,图片上的也要有」):
+  // 与其余出入库单同款左「XX单选择」栏(单号 | 日期 | 中间列 | 审核状态),中间列按语义挑:
+  //   TRANSFER  → 部门 | 经手人 :调出/调入仓与数量在明细上,左栏看不出归属,故给"哪个部门谁办的";
+  //   STOCKTAKE → 盘点类型 | 盘点人 :全盘/抽盘 + 谁盘的(仓库在明细行上,不是单头)。
+  // 两单的 ERP 留位列暂不进左栏:转ERP 未接(见 migrate-transfer-stocktake-align-20261018.sql §六),
+  // 恒显示「未转」会误导用户以为同步失败。
+  TRANSFER: ['部门', '经手人'],
+  STOCKTAKE: ['盘点类型', '盘点人'],
 }
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
@@ -5362,7 +5380,7 @@ function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首�
 // ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
 // 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
 // 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
-// (仓位编码按仓内唯一,同码多仓不串选)。 ═══
+// (仓位编码按仓内唯一,同码多仓不串选;2026-10-18 库层过滤唯一索引兜底)。 ═══
 const qrSel = ref(new Set())
 /** 条码三面板的标签弹窗标题/提示(2026-10-18):组件默认是"材料二维码标签 + 物料编码|批号@数量",
  *  在成品/半成品页显示会误导 ⇒ 按面板给标题;非条码面板(暂收单等)留空走组件默认。 */
@@ -9104,7 +9122,7 @@ async function onButton(action) {
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
     // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
     // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):同款勾选即打,
-    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位地址@仓位编码;
+    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位编码(2026-10-18 去地址段);
     // 勾选行键=仓库+仓位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
     const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value

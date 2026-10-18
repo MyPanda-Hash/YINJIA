@@ -989,21 +989,16 @@ public class ProcessTaskService {
     }
 
     /**
-     * 该**工单行**该道工序的已审核报工量(转序判据):
-     *   优先按 scjl.gd_id → plang_pc.plang_id 锚到行;老数据没有 gd_id 时退回按(工单号+批次号)匹配该行。
-     * <p>⚠ 2026-10-16:「未锚定」判据统一为 {@code ISNULL(gd_id,0)=0} —— {@code scjl.gd_id} 的默认约束是
-     * {@code ((0))} 且可空 ⇒ 未锚定有 NULL / 0 两种写法,只判 NULL 会漏掉 0 的那批,
-     * 于是同一条报工在「完工数据」段算得到、在「工序进度/转序」算不到(两段数量对不上)。
+     * 该**工单行**该道工序的已审核报工量(转序判据) —— **取数已下沉到 {@link WoInspGate#reportedQty}**
+     * (2026-10-16 判据统一)。原来这里只有两级锚定(`pc.plang_id` + 「`gd_id=0` 时按批次」),
+     * 在**悬空** `plang_pc` 上两个分支都落空:实测 `GD-2026-10-0007#1` 有 161 件成型报工,
+     * 这里算出来是 0,而检验单门禁算出 161 ⇒ 「工序进度」与「门禁」对同一事实给出相反答案。
+     * 统一后三处(工序进度 / 转序 / 检验单门禁)**永远同源**。
+     * <p>⚠ 保留的小口径:{@code scjl.gd_id} 的默认约束是 {@code ((0))} 且可空,故「未锚定」要判
+     * {@code ISNULL(gd_id,0)=0}(只判 NULL 会漏掉写 0 的那批)——这一条已在 WoInspGate 里实现。
      */
     private double reportedQty(String plNo, Long rowId, String op) {
-        Double d = jdbc.queryForObject(
-                "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
-                        + " LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
-                        + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                        + "   AND (pc.plang_id=? OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
-                        + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))",
-                Double.class, plNo, op, rowId, rowId);
-        return d == null ? 0 : d;
+        return WoInspGate.reportedQty(jdbc, plNo, rowId, op);
     }
 
     /** 产线所属车间(取不到返回 null) */

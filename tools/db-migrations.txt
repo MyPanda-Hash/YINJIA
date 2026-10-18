@@ -3737,6 +3737,12 @@ migrate-rd-sheet-ref-tidy-20261013.sql
 migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
 # migrate-role-perm-words-20261016.sql — 角色面板权限词表归位(组织架构矩阵可勾的词 = 引擎真读的词):edit→modify、delete→del、删 price/review/adjust,研发审核补 audit,can_approve 收敛为 perms 派生值
+# migrate-role-perm-mg-cleanup-20261018.sql — 角色词表/面板分组的**数据清障**(本机首次执行时暴露):
+#   ① 探针遗留角色(AUTO_ROLE*,perms 写成 [view, query, add, edit])⇒ 让下面 migrate-role-perm-words-20261016.sql
+#      的「全库词表越界 0」自检永远不过、整段回滚;② STOCK_STATUS 的 module_group 为 NULL/仓库管理、
+#      DISPATCH_* 为「新生产」⇒ 让 migrate-stock-detail-module-group-20261016.sql 的自检同样不过。
+#   本脚本只把这些脏值归到合法值(幂等),不改任何迁移判据;两账套均执行。
+migrate-role-perm-mg-cleanup-20261018.sql
 migrate-role-perm-words-20261016.sql
 # migrate-stock-detail-module-group-20261016.sql — 库存明细(STOCK_DETAIL)的 module_group 系统管理→库存核算(权限矩阵里不该出现导航没有的分组;自检全库 module_group 越界 0 处)
 migrate-stock-detail-module-group-20261016.sql
@@ -3820,3 +3826,78 @@ migrate-proc-process-samples-20261018.sql
 #   v_stock_balance 增列 预警数量(kucun 按 仓库编码+存货编码 聚合 MAX);流程看板负库存/预警改读本视图。
 #   幂等(CREATE OR ALTER VIEW);两账套。⚠ kucun 批次级阈值与出库审批闸门 StockWarnService 不动。
 migrate-stock-balance-warn-20261018.sql
+# 合并补入(2026-10-18):本地未推送的 5 条迁移(远端清单里没有),保持本地原有顺序
+# ============================================================
+# migrate-first-insp-audit-trail-20261018.sql — 首件检验单开直接审核(用户口径「为当前的首件检验单增加审核功能,参照制程检验单」):
+#   存量已审核单据补 AUDIT 留痕(yj_form_approval);只针对 QC_FIRST_INSP、幂等 + 自检。
+#   取证:两账套此前面板无审核入口 ⇒ 补录 0 行(属预期);修法代码侧 = PanelxList.DIRECT_AUDIT_PANELS + 纸面/报表「审核人」格。
+migrate-first-insp-audit-trail-20261018.sql
+# migrate-insp-gate-option-20261016.sql — 检验单生成门禁(成型完成)的**强度档位**写进 yj_panel.config:
+#   inspGate = off|warn|block(默认 block)、inspGateLegacy = pass|block(默认 pass);
+#   追加在既有 config 之后(不覆盖 fixedItems 等),已含该键则整行跳过(幂等);两账套均执行。
+#   读法见 WoInspGate.loadPolicy(字符串匹配,兼容级别 100 无 JSON 函数);改档位只需 UPDATE 该键,不必发版。
+migrate-insp-gate-option-20261016.sql
+# migrate-panel-line-table-20261018.sql — 造粒记录/无黑处理登记/封箱确认三个单表式 doc 面板补行表指针:
+#   yj_panel.line_table 为空 ⇒ QueryService.loadDocs 拼出 `FROM null t`(S0001/156,打开单据/列表/保存全 500);
+#   三张 *_detail 早已存在且恒空,只差元数据指针。纯 UPDATE(幂等)+ 自检「全库 doc 无『有头无行』」,两账套均执行。
+migrate-panel-line-table-20261018.sql
+# migrate-record-sheets-head-detail-20261018.sql — 造粒记录/无黑处理登记/封箱确认 三张「记录表」改「表头 + 明细」:
+#   纸面(r6/r23/r25)是「一行一条记录」的台账,此前全部业务字段挂表头 ⇒ 表单明细页签 0 列、列表页 A 区不渲染(用户「看不到明细表」)。
+#   明细表补 15/7/5 个业务列 + 字段 place 由 header 改 detail + 表头只留 5 个 + 头表业务列 DROP(无数据/无引用)+ 清 2 张探针空单;幂等 + 自检。
+migrate-record-sheets-head-detail-20261018.sql
+# migrate-whloc-unique-20261018.sql — 仓位档案(WHLOC/bs_wh_loc)仓内唯一:仓库编码+仓位编码
+#   用户口径(2026-10-18):不需要全局唯一,只要求「当前仓库编码 + 仓位编码」唯一;仓位地址含中文且会漂,
+#   二维码由 仓库编码@仓位地址@仓位编码 改为 仓库编码@仓位编码(前端 print-formats.locationCardQrText)。
+#   ① asp_cancel NULL→N 并置 NOT NULL(过滤索引只认 'N');② 预检存活重复/空仓库/空仓位编码,有则 RAISERROR 停;
+#   ③ 过滤唯一索引 ux_bs_wh_loc_wh_code(仓库编码,仓位编码) WHERE asp_cancel='N';④ yj_panel.config 写
+#   uniqueKeys=[["仓库","仓位编码"]](后端保存预检 + 前端即时查重同源);⑤ 自检重复=0/索引在/config 已声明。
+#   两账套均执行;既有正式库 684 行、测试库 683 行流程内均无存活重复。
+migrate-whloc-unique-20261018.sql
+
+
+# migrate-plang-ja-foreign-close-repair-20261018.sql — 「外部程序把工单批量写成已结案」的**回正脚本**(默认 dry-run)
+#   判据=ja=Y 且不满足「入库≥排产 + 组装成品检验已审核」;@apply=0 只打印候选清单(@apply 改 1 才 UPDATE)。
+#   登记进链只为「清单↔文件一致」体检过关;dry-run 执行不写任何数据,可安全随链运行。
+migrate-plang-ja-foreign-close-repair-20261018.sql
+
+# migrate-enable-rcsi-20261018.sql — 库级开关 READ_COMMITTED_SNAPSHOT(RCSI)**默认 dry-run**
+#   @apply=0 只查现状(不做 ALTER);改 1 需在无人时段单独执行(会短暂独占库)。
+#   登记进链只为体检「清单↔文件一致」过关;默认执行是零改动的。
+migrate-pu-order-detail-stats-20261018.sql
+
+# migrate-transfer-stocktake-20261018.sql — 库存核算补「调拨单 TRANSFER / 盘点单 STOCKTAKE」三件套
+#   建表 bd_/bl_transfer + bd_/bl_stocktake(含 MS_Description)、4 视图(明细/统计)、6 面板、
+#   字段/九语译名/角色授权;幂等,两账套均执行。记账见 StockLedgerService.applyTransfer/applyStocktake。
+migrate-transfer-stocktake-20261018.sql
+
+# migrate-erp-integ-config-20261018.sql — ERP系统集成:集成配置三张表 + 种子(接口/字段映射/设备绑定)
+#   建表 erp_integ_api / erp_integ_field / erp_integ_device(含 MS_Description 与三个索引)、
+#   ERPLG/ERPLG_ROW 归入 module_group「ERP系统集成」、23 条接口(导入 11 / 转出 12)+ 165 行字段映射 +
+#   14 行设备绑定(bs_equip)+ 中/英/日/繁等译名;幂等,两账套均执行。界面=ERP系统集成·ERP集成配置清单。
+migrate-erp-integ-config-20261018.sql
+
+# migrate-erp-integ-readonly-20261018.sql — ERP集成配置清单:非管理员仅可见(写永属管理员)
+#   给所有非管理员角色补 yj_role_panel(panel_code=ERP_INTEG, perms='view');不授任何写词
+#   (写闸门在 ErpIntegController.requireAdmin,非管理员 403)。幂等,两账套各跑一次。
+migrate-erp-integ-readonly-20261018.sql
+
+# migrate-transfer-stocktake-align-20261018.sql — 调拨单/盘点单与出入库单对齐(第二批)
+#   头表补 附件1..6 + ERP 留位四列 + 调拨原因/盘点类型/盘点人/复核人;新建 v_stock_pick 库存选货视图
+#   与面板 STOCK_PICK(选单来源);字段/译名/授权同批。幂等,两账套均执行。
+migrate-transfer-stocktake-align-20261018.sql
+
+# migrate-transfer-stocktake-bin-20261018.sql — 调拨单/盘点单补库位(仓位)字段
+#   bl_transfer +调出/调入仓位编码、bl_stocktake +仓位编码;字段参照 WHLOC 并按仓库级联(仓库=$仓库);
+#   4 视图重建带出仓位列。⚠ kucun/流水无仓位维度 ⇒ 仓位只作单据留痕(与采购入库单同口径)。
+migrate-transfer-stocktake-bin-20261018.sql
+
+# migrate-pc0000-to-null-20261019.sql — PC0000(金蝶默认占位批号)归一为「无批号」(NULL)
+#   用户口径 2026-10-19:「pc0000全部改为无批号,出库也可以对有批次号的出库,验收阶段先不管批次号」。
+#   金蝶对未启用批次管理的商品统一填 PC0000,MES 把它当真实批号参与 kucun 三键分账 ⇒
+#   PC0000 行只出不进、结存为负(实测批次负结存 534 行)。
+#   归一后 PC0000 ≡ 无批号 ≡ lot_no IS NULL,与金蝶语义一致;同键(物料,仓库)的 PC0000 行与
+#   无批号行先合并再置 NULL,保证 kucun 三键唯一、余量合计逐分不变。
+#   🔴 方向与 migrate-lot-normalize-blank-to-pc0000.sql(空→PC0000)**相反**,是有意的口径反转,
+#      勿重跑旧脚本(会抵消本脚本)。
+#   幂等(RTRIM 命中不到 NULL)。两账套均已执行。
+migrate-pc0000-to-null-20261019.sql

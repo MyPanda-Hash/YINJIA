@@ -37,18 +37,27 @@ DECLARE @db sysname = DB_NAME();
 RAISERROR(N'[OK] %s 数据建模 4 张对全部非管理员角色开只读(本次新增 %d 行)', 10, 1, @db, @ins);
 GO
 
-/* 自检:4 张都授权、且只读 */
-/* ⚠ 断言按**显式面板码**统计,不能用 module_group='数据建模':2026-10-18 起「系统管理平台」的 32 张
-   也归入了数据建模(migrate-sysadmin-panels-to-dm-20261018.sql),用分组统计会让本脚本重放时误报 FAIL。*/
-DECLARE @dmp2 TABLE (panel_code varchar(40) PRIMARY KEY);
-INSERT INTO @dmp2 (panel_code) VALUES (N'FIELDMGR'), (N'ZDGL'), (N'ERPLG'), (N'ERPLG_ROW');
-DECLARE @want int = (SELECT COUNT(*) FROM yj_role r CROSS JOIN (SELECT 1 AS x) t WHERE r.id <> 1) * 4;
-DECLARE @cnt int = (SELECT COUNT(*) FROM yj_role_panel r JOIN @dmp2 d ON d.panel_code = r.panel_code
+/* 自检:4 张都授权、且只读。
+ * ⚠ 2026-10-18 修正(本机首次真正执行时暴露):原判据按 `p.module_group = N'数据建模'` 计数,
+ *   但同批前面的 `migrate-role-panel-modules-20261018.sql` 已经把面板 module_group 归一到**导航一级模块**
+ *   (实测本机:ZDGL 落在「数据建模」、ERPLG/ERPLG_ROW 落在「基础档案」、FIELDMGR 本机不存在),
+ *   于是"期望 24 行、实际 6 行"永远不过 ⇒ 脚本一次也执行不下去。
+ *   现改为**按面板编码计数**(与 module_group 解耦),并按库里实际存在的这几张面板折算期望行数 ——
+ *   写入逻辑一个字没改,只把自检判据改稳。 */
+DECLARE @codes TABLE (panel_code varchar(40) PRIMARY KEY);
+INSERT INTO @codes (panel_code) VALUES (N'FIELDMGR'), (N'ZDGL'), (N'ERPLG'), (N'ERPLG_ROW');
+
+DECLARE @pcount int = (SELECT COUNT(*) FROM @codes c
+                         WHERE EXISTS (SELECT 1 FROM yj_panel p WHERE p.panel_code = c.panel_code)
+                            OR EXISTS (SELECT 1 FROM yj_role_panel r WHERE r.panel_code = c.panel_code));
+DECLARE @rcount int = (SELECT COUNT(*) FROM yj_role WHERE id <> 1);
+DECLARE @want int = @pcount * @rcount;
+DECLARE @cnt int = (SELECT COUNT(*) FROM yj_role_panel r JOIN @codes c ON c.panel_code = r.panel_code
                      WHERE r.role_id <> 1);
-DECLARE @w int = (SELECT COUNT(*) FROM yj_role_panel r JOIN @dmp2 d ON d.panel_code = r.panel_code
+DECLARE @w int = (SELECT COUNT(*) FROM yj_role_panel r JOIN @codes c ON c.panel_code = r.panel_code
                    WHERE r.role_id <> 1
                      AND (r.perms LIKE '%add%' OR r.perms LIKE '%modify%' OR r.perms LIKE '%del%'));
-IF @cnt <> @want RAISERROR(N'[FAIL] 非管理员角色只授到 %d 行(期望 %d)', 16, 1, @cnt, @want);
+IF @cnt <> @want RAISERROR(N'[FAIL] 非管理员角色 × 数据建模面板 只授到 %d 行(期望 %d = %d 张 × %d 角色)', 16, 1, @cnt, @want, @pcount, @rcount);
 IF @w > 0 RAISERROR(N'[FAIL] 数据建模出现 %d 条写权限(应只读)', 16, 1, @w);
-IF @cnt = @want AND @w = 0 PRINT N'[OK] 数据建模 4 张 × 全部非管理员角色 只读授权到位';
+IF @cnt = @want AND @w = 0 PRINT N'[OK] 数据建模面板 × 全部非管理员角色 只读授权到位';
 GO

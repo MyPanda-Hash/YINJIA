@@ -41,16 +41,29 @@ public class ScheduleBoardService {
     private static final String DONE_ROW = "ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工')";
 
     /**
+     * **「已结案 / 未结案」的唯一口径**(2026-10-18):{@link PlangClose}。
+     *
+     * <p>起因:{@code plang.ja} 手机端小程序/参考库也能直写,现场出现过「扫码报工后其余工单全部变成已结案」
+     * —— 而 MES 自己的结案一定"入库 ≥ 排产"且写 {@code yj_usage_log}。裸信 ja 会让待排产池、
+     * 产线负荷、看板把这类行当成已结案而"消失"。
+     * 现统一按 {@link PlangClose#closed(String)} 判定(**只读**):ja=Y 且(入库≥排产 或 参考库时代号段)。
+     * 一个字都不写外部程序的数据 ⇒ 不影响小程序自身。
+     */
+    private static final String CLOSED = PlangClose.closed("p");
+    /** 「未结案」= NOT {@link #CLOSED} */
+    private static final String NOT_CLOSED = PlangClose.notClosed("p");
+
+    /**
      * **生产状态唯一定义**(2026-10-16 收口):显示列与「未完工 / 已完工」页签筛选**必须同源**。
      * <ol>
-     *   <li>ja ∈ (T,Y) ⇒ 已结案;</li>
+     *   <li>{@link #CLOSED} ⇒ 已结案;</li>
      *   <li>{@link #DONE_ROW} ⇒ 完工(全部报工达标即完工,**不等入库**);</li>
      *   <li>有入库 ⇒ 在产;否则 未完工。</li>
      * </ol>
      * ⚠ 原 `st` 子查询用的是「入库 ≥ 排产」口径 ⇒ 报工全完但还没入库的行**列里显示「完工」、
      * 却被筛进「未完工」页签**(「已完工」页签恒 0 行)——就是用户报障的那个现象。
      */
-    private static final String ST_EXPR = "CASE WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案'"
+    private static final String ST_EXPR = "CASE WHEN " + CLOSED + " THEN N'已结案'"
             + " WHEN " + DONE_ROW + " THEN N'完工'"
             + " WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END";
 
@@ -125,7 +138,7 @@ public class ScheduleBoardService {
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                                                 + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
-                        + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND " + NOT_CLOSED + ""
                         + "   AND ISNULL(p.scx, N'') = N''"
                         // 2026-10-18:已完工的行不进待排产池(与 flowSpec/生产工单桶同口径)
                         + "   AND NOT (" + DONE_ROW + ")"
@@ -215,7 +228,7 @@ public class ScheduleBoardService {
         Double undone = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0)),0)"
                         + " FROM dbo.plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
-                        + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + "   AND " + NOT_CLOSED + ""
                         // 已完工的行不算"未完成量"(2026-10-16 同上:完工即这条线没活;按行判)
                         + "   AND NOT (" + DONE_ROW + ")"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
@@ -274,7 +287,7 @@ public class ScheduleBoardService {
                         + "             WHEN CAST(p.cp_date AS date) > DATEADD(day,13,CAST(GETDATE() AS date)) THEN DATEADD(day,13,CAST(GETDATE() AS date))"
                         + "             ELSE CAST(p.cp_date AS date) END) + 1) END) AS 今日负荷"
                         + "   FROM dbo.plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
-                        + "     AND ISNULL(p.ja,'N') NOT IN ('T','Y') AND ISNULL(p.pl_sl,0) > 0"
+                        + "     AND " + NOT_CLOSED + " AND ISNULL(p.pl_sl,0) > 0"
                         // 已完工的行不占产线负荷(2026-10-16:完工=这条线没活了;按工单行判)
                         + "     AND NOT (" + DONE_ROW + ")"
                         + " GROUP BY p.scx) ld"
@@ -316,12 +329,18 @@ public class ScheduleBoardService {
                 Map<String, Object> head;
                 try {
                     head = rowId != null
-                            ? jdbc.queryForMap("SELECT id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl, ISNULL(pl_sl,0) AS pl_sl FROM dbo.plang WHERE id=?", rowId)
-                            : jdbc.queryForMap("SELECT TOP 1 id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl, ISNULL(pl_sl,0) AS pl_sl FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')=N'' ORDER BY id", no);
+                            ? jdbc.queryForMap("SELECT p.id, p.pl_xc, ISNULL(p.[批次号],N'') AS pc_batch, ISNULL(p.scx,N'') AS scx,"
+                                    + " CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END AS 已结案标志,"
+                                    + " ISNULL(p.xq_sl,0) AS xq_sl, ISNULL(p.pl_sl,0) AS pl_sl FROM dbo.plang p WHERE p.id=?", rowId)
+                            : jdbc.queryForMap("SELECT TOP 1 p.id, p.pl_xc, ISNULL(p.[批次号],N'') AS pc_batch, ISNULL(p.scx,N'') AS scx,"
+                                    + " CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END AS 已结案标志,"
+                                    + " ISNULL(p.xq_sl,0) AS xq_sl, ISNULL(p.pl_sl,0) AS pl_sl FROM dbo.plang p"
+                                    + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')=N'' ORDER BY p.id", no);
                 } catch (org.springframework.dao.EmptyResultDataAccessException e) {
                     throw new IllegalStateException("工单不存在:" + no);
                 }
-                if ("T".equals(String.valueOf(head.get("ja"))) || "Y".equals(String.valueOf(head.get("ja"))))
+                // 结案判定走 PlangClose(ja=Y 且 入库≥排产,或参考库号段)—— 外部程序乱写 ja 不再挡住排产
+                if (Num.of(head.get("已结案标志")) > 0)
                     throw new IllegalStateException("已结案,不能排产");
                 if (!"".equals(String.valueOf(head.get("scx"))))
                     throw new IllegalStateException("已排产(产线=" + head.get("scx") + "),不能重复排入;换线请先撤销");
@@ -396,7 +415,8 @@ public class ScheduleBoardService {
                           + " + ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
                           + "   WHERE s.gldh=p.pl_no AND ISNULL(s.gd_id,0)=0 AND ISNULL(s.asp_cancel,'N')<>'Y'"
                           + "     AND ISNULL(s.[批次号],N'')=ISNULL(p.[批次号],N'')),0)";
-                String headSql = "SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(rk_sl,0) AS rk_sl,"
+                String headSql = "SELECT p.id, ISNULL(p.pl_xc,0) AS pl_xc, ISNULL(p.scx,N'') AS scx, ISNULL(p.rk_sl,0) AS rk_sl,"
+                        + " CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END AS 已结案标志,"
                         + " (" + reportedExpr + ") AS 已报工"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + "   AND (? IS NULL OR p.id=?)";
@@ -407,7 +427,7 @@ public class ScheduleBoardService {
                 boolean any = false;
                 String blockReason = null;
                 for (Map<String, Object> h : heads) {
-                    if ("T".equals(String.valueOf(h.get("ja"))) || "Y".equals(String.valueOf(h.get("ja")))) {
+                    if (Num.of(h.get("已结案标志")) > 0) {
                         blockReason = "已结案,不能撤销"; break;
                     }
                     if (Num.of(h.get("已报工")) > 0) { blockReason = "已有报工进度,不能撤销排产(追溯链已建立)"; break; }
@@ -479,7 +499,7 @@ public class ScheduleBoardService {
                         + "   ORDER BY ISNULL(x.工序序,999) FOR XML PATH('')),1,3,N'')) AS 计划线"
                         + " FROM dbo.plang p"
                         + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') <> N''"
-                        + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + "   AND " + NOT_CLOSED + ""
                         + (all ? "" : " AND CONVERT(varchar(10), p.asp_time2, 120) = CONVERT(varchar(10), GETDATE(), 120)")
                         + "   AND (? = '' OR p.pl_no LIKE ? OR p.scx LIKE ? OR p.dm LIKE ? OR p.mc LIKE ?"
                         + "        OR ISNULL(p.[批次号],N'') LIKE ?)"
@@ -520,7 +540,7 @@ public class ScheduleBoardService {
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
                         + "   AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
-                        + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + "   AND " + NOT_CLOSED + ""
                         // 已完工 ⇒ 这条线没活了(末道组装完工后无处转序,否则永久挂账)
                         + "   AND NOT (" + DONE_ROW + ")"
                         + " GROUP BY pc.scx");
@@ -618,7 +638,7 @@ public class ScheduleBoardService {
                         + " (SELECT STUFF((SELECT N' → ' + x.工序 + N':' + ISNULL(NULLIF(x.计划生产线,N''),N'待定')"
                         + "   FROM dbo.wo_process_line x WHERE x.工单号=p.pl_no AND ISNULL(x.asp_cancel,'N')<>N'Y'"
                         + "   ORDER BY ISNULL(x.工序序,999) FOR XML PATH('')),1,3,N'')) AS 计划线,"
-                        + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                        + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案,"
                         + " N'' AS 结案人, CAST(NULL AS datetime) AS 结案时间,"
                         + " ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
                         + " ISNULL(p.asp_print,0) AS 打印次数,"
@@ -704,7 +724,7 @@ public class ScheduleBoardService {
                             + " (SELECT STUFF((SELECT N' → ' + x.工序 + N':' + ISNULL(NULLIF(x.计划生产线,N''),N'待定')"
                             + "   FROM dbo.wo_process_line x WHERE x.工单号=p.pl_no AND ISNULL(x.asp_cancel,'N')<>N'Y'"
                             + "   ORDER BY ISNULL(x.工序序,999) FOR XML PATH('')),1,3,N'')) AS 计划线,"
-                        + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                        + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案,"
                             + " N'' AS 结案人, CONVERT(varchar(16), NULL, 120) AS 结案时间,"
                             + " ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
                             + " ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
@@ -764,7 +784,7 @@ public class ScheduleBoardService {
                             + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                             + " ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
                             + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.lot_no,N'') AS 批号,"
-                            + " CASE WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'Y' ELSE N'N' END AS 结案"
+                            + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案"
                             + " FROM dbo.plang p WHERE p.pl_no=? AND p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'",
                     doc, rowId);
             if (!rr.isEmpty()) curRow = rr.get(0);
@@ -858,7 +878,7 @@ public class ScheduleBoardService {
                         + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"
-                        + " CASE WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案'"
+                        + " CASE WHEN " + CLOSED + " THEN N'已结案'"
                         + "      WHEN ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工') THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(pc.lb,N'') AS 排产班组, ISNULL(pc.pl_man,N'') AS 操作员,"
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
@@ -1290,10 +1310,10 @@ public class ScheduleBoardService {
                 Integer closed = row == null
                         ? jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                                        + " AND ISNULL(p.ja,'N') IN ('T','Y')", Integer.class, no)
+                                        + " AND " + CLOSED + "", Integer.class, no)
                         : jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM dbo.plang p WHERE p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                                        + " AND ISNULL(p.ja,'N') IN ('T','Y')", Integer.class, row);
+                                        + " AND " + CLOSED + "", Integer.class, row);
                 if (closed != null && closed > 0) throw new IllegalStateException("已结案,不能调线");
                 int n = row == null
                         ? jdbc.update("UPDATE pc SET pc.scx=?, pc.asp_user2=?, pc.asp_time2=GETDATE()"

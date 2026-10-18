@@ -25,6 +25,9 @@
         ? tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成首件检验单草稿（明细按成型工艺清单预铺）；已建单的行会标出来，重复选择不会重复建单。')
         : tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。') }}
     </div>
+    <!-- 门禁(2026-10-19,用户口径「成型完成后的生产工单才能生成检验单」):判据来自后端 WoInspGate,
+         与自动出单钩子共用同一份实现;这里只做体验层——置灰 + 写明原因,真正的拦截在后端(422)。 -->
+    <div class="wopick-gate">{{ tt('只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。') }}</div>
 
     <div class="wopick-bar">
       <el-input v-model="keyword" :placeholder="tt('工单号 / 产品编码 / 产品名称')" clearable style="width: 280px"
@@ -33,7 +36,7 @@
     </div>
 
     <el-table v-loading="loading" :data="rows" size="small" border height="380" highlight-current-row
-              @current-change="(r) => (cur = r)" @row-dblclick="confirm">
+              :row-class-name="rowClass" @current-change="onCurrent" @row-dblclick="confirm">
       <el-table-column :label="tt('工单号')" prop="工单号" width="150" />
       <el-table-column :label="tt('工单行号')" prop="工单行号" width="80" align="right" />
       <el-table-column :label="tt('产品编码')" prop="产品编码" width="110" />
@@ -42,6 +45,21 @@
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
       <el-table-column :label="tt('生产线')" prop="生产线" width="100" />
       <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
+      <el-table-column :label="tt('成型完工量')" prop="成型完工量" width="100" align="right" />
+      <el-table-column :label="tt('成型计划量')" prop="成型计划量" width="100" align="right" />
+      <el-table-column :label="tt('可开单')" width="130">
+        <template #default="{ row }">
+          <el-tooltip v-if="row['预警放行']" :content="tt(row['不能开单原因'])" placement="top">
+            <el-tag size="small" type="warning">{{ tt('预警放行') }}</el-tag>
+          </el-tooltip>
+          <el-tag v-else-if="row['可开单']" size="small" type="success">
+            {{ row['免门禁'] ? tt('免门禁') : (row['存量放行'] ? tt('存量放行') : tt('可开单')) }}
+          </el-tag>
+          <el-tooltip v-else :content="tt(row['不能开单原因'])" placement="top">
+            <el-tag size="small" type="info">{{ tt('成型未报工') }}</el-tag>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('客户')" prop="客户" width="80" />
       <el-table-column :label="tt('已建单号')" prop="已建单号" width="140">
         <template #default="{ row }">
@@ -51,6 +69,8 @@
       </el-table-column>
     </el-table>
 
+    <div v-if="blockedReason" class="wopick-warn">{{ blockedReason }}</div>
+
     <div class="wopick-page">
       <el-pagination layout="total, prev, pager, next" :total="total" :current-page="pageNo"
                      :page-size="pageSize" @current-change="load" />
@@ -58,14 +78,17 @@
 
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
-      <el-button type="primary" :loading="saving" :disabled="!cur" @click="confirm">{{ tt('确定') }}</el-button>
+      <!-- 强制开单(2026-10-16):门禁拦截行的**人工通道**(行业口径:金蝶/畅捷通都保留"下推补生成",
+           留通道 = 特殊场景不必改库)。仅当后端下发「可强制开单」时出现;必须填原因,写 yj_usage_log 留痕。 -->
+      <el-button v-if="canForce" type="warning" :loading="saving" @click="forceCreate">{{ tt('强制开单') }}</el-button>
+      <el-button type="primary" :loading="saving" :disabled="!cur || !canConfirm" @click="confirm">{{ tt('确定') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 
@@ -88,6 +111,26 @@ const pageSize = 20
 const loading = ref(false)
 const saving = ref(false)
 const cur = ref(null)
+/** 门禁元信息(后端下发):{门禁档位, 存量拦截, 可强制开单} */
+const gateMeta = ref({})
+
+/** 选中行的拦截原因(门禁不通过时显示在表格下方);tt() 走词典/机翻,后端中文话术同样能出英文 */
+const blockedReason = computed(() => (cur.value && !cur.value['可开单'] ? tt(String(cur.value['不能开单原因'] || '')) : ''))
+/** 只有后端说「可开单」的行才允许确定(后端 fromWoLine 还会再硬校验一次,返回 422) */
+const canConfirm = computed(() => !!(cur.value && cur.value['可开单']))
+/** 拦截行 + 当前用户有「强制开单」权限(管理员恒过) ⇒ 出人工通道按钮 */
+const canForce = computed(() => !!(cur.value && cur.value['可开单'] === false && gateMeta.value['可强制开单']))
+
+function rowClass({ row }) {
+  return row && row['可开单'] === false && !gateMeta.value['可强制开单'] ? 'wopick-blocked' : ''
+}
+
+function onCurrent(r) {
+  cur.value = r
+  if (r && r['可开单'] === false && !gateMeta.value['可强制开单']) {
+    ElMessage.warning(tt(String(r['不能开单原因'] || '该工单行暂不能生成检验单')))
+  }
+}
 
 async function load(page) {
   pageNo.value = page || 1
@@ -99,6 +142,7 @@ async function load(page) {
     })
     rows.value = res.data?.list || []
     total.value = res.data?.totalSize || 0
+    gateMeta.value = res.data?.gate || {}
   } catch (error) {
     ElMessage.error(error?.message || tt('生产工单行加载失败'))
   } finally {
@@ -106,13 +150,50 @@ async function load(page) {
   }
 }
 
+/** 确定:warn 档(后端判为「预警放行」)先弹确认 —— 现场知道自己在绕过什么,后端同时写留痕 */
 async function confirm() {
+  if (!cur.value) return
+  if (!canConfirm.value) {
+    return ElMessage.warning(tt(String(cur.value['不能开单原因'] || '该工单行暂不能生成检验单')))
+  }
+  if (cur.value['预警放行']) {
+    try {
+      await ElMessageBox.confirm(tt('该工单行的成型工序尚未报工，确认仍要生成检验单吗？'), tt('预警放行'),
+        { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
+    } catch {
+      return
+    }
+  }
+  return submit({})
+}
+
+/** 强制开单:仅管理员/持权用户;必须填原因(后端还会再校验权限,403 兜底) */
+async function forceCreate() {
+  if (!cur.value || !canForce.value) return
+  let reason = ''
+  try {
+    const r = await ElMessageBox.prompt(tt('强制开单原因'), tt('强制开单'), {
+      inputPlaceholder: tt('强制开单原因'),
+      type: 'warning',
+      confirmButtonText: tt('确定'),
+      cancelButtonText: tt('取消'),
+      inputValidator: (v) => (v && String(v).trim() ? true : tt('请填写强制开单原因')),
+    })
+    reason = String(r.value || '').trim()
+  } catch {
+    return
+  }
+  return submit({ 强制开单: true, 强制开单原因: reason })
+}
+
+async function submit(extra) {
   if (!cur.value) return
   saving.value = true
   try {
     const res = await request.post(`${base.value}/fromWoLine`, {
       工单号: cur.value['工单号'],
       工单行号: cur.value['工单行号'],
+      ...extra,
     })
     emit('update:modelValue', false)
     emit('picked', res.data || {})
@@ -126,6 +207,9 @@ async function confirm() {
 
 <style scoped>
 .wopick-tip { margin-bottom: 8px; color: #606266; font-size: 12px; line-height: 1.6; }
+.wopick-gate { margin-bottom: 8px; color: #e6a23c; font-size: 12px; line-height: 1.6; }
 .wopick-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+.wopick-warn { margin-top: 8px; color: #f56c6c; font-size: 12px; }
 .wopick-page { margin-top: 8px; display: flex; justify-content: flex-end; }
+:deep(.wopick-blocked) { color: #a8abb2; background: #fafafa; }
 </style>

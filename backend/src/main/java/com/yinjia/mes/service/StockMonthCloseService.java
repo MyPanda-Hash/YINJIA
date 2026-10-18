@@ -579,9 +579,17 @@ public class StockMonthCloseService {
         out.put("月结快照", "已月结".equals(prevState) && !snap.isEmpty() ? snap.get(0) : null);
 
         List<Map<String, Object>> rows = new ArrayList<>();
+        // 上月部分的行(2026-10-20 用户问「为什么有些行有单据、有些行没有」)—— 两种来源都取,再按
+        //   「单据编号 + 批号」去重,免得同一张结转单被陈列两遍:
+        //   ① 上月**已月结** ⇒ 用那张月结结转单代表上月(它是结转行,落在当月 1 号);
+        //   ② 不管月结与否,都补上**上月原始单据**(入库正、出库负)——
+        //      只取①会漏掉两种键:【本月才有**新批号**】的(上月没这个批号,自然没有它的结转行);
+        //      **上月期末结存 = 0** 的(月结按口径"为 0 不写结转行",这批货月末发完、本月又补货出库)。
+        //      只取②也不对:已月结时原始单据已被结转行取代,再铺一遍等于让上月动了两回。
+        //      故:已月结 → ①+②;未月结/已取消 → 只有②(第三轮口径:取消后要看到原始单据)。
+        Set<String> seen = new HashSet<>();
         if ("已月结".equals(prevState)) {
-            // 上月已月结 ⇒ 用那张月结单据代表它(它是结转行,落在当月 1 号)
-            rows.addAll(jdbc.queryForList(
+            for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
                             + "  CONVERT(nvarchar(7), DATEADD(month, -1, 单据日期), 120) + N'月结' AS 单据类型,"
                             + "  ISNULL(单据编号, N'') AS 单据编号, ISNULL(批号, N'') AS 批号, 数量,"
@@ -590,10 +598,13 @@ public class StockMonthCloseService {
                             + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
                             + (lotArg == null ? "" : "  AND ISNULL(RTRIM(批号),N'') = ?"),
                     lotArg == null ? new Object[]{CARRY_TYPE, carryNo(prev), w, c}
-                                   : new Object[]{CARRY_TYPE, carryNo(prev), w, c, lotArg}));
-        } else {
-            // 上月未月结/已取消 ⇒ 陈列上月的原始单据(入库正、出库负)
-            rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
+                                   : new Object[]{CARRY_TYPE, carryNo(prev), w, c, lotArg})) {
+                rows.add(r);
+                seen.add(r.get("单据编号") + "\u0001" + r.get("批号"));
+            }
+        }
+        for (Map<String, Object> r : flowRows(prevStart, prevEndEx, w, c, lotArg)) {
+            if (seen.add(r.get("单据编号") + "\u0001" + r.get("批号"))) rows.add(r);
         }
         // **当月单据要展开**(用户 2026-10-15 第十二轮:「当月单据要有…10 月的数据要展开」)——
         //   展开 = 上月的结转行(余额来源;它的"期初数量"= 上上个月如 8 月的月末结转)
@@ -618,6 +629,7 @@ public class StockMonthCloseService {
      *
      * @param lot 批号;**null = 不限批号**(报表按 (仓库,存货) 归类后的展开口径,所有批次一起陈列);
      *            传具体值 = 只取该批。SQL 片段按需拼接,参数顺序随之变化(入库段 + 出库段各一套)。
+     * @param endEx 右开边界(「单据日期 &lt; endEx」),调用方传**下月 1 号**,月末最后一天的流水因此包含在内。
      */
     private List<Map<String, Object>> flowRows(LocalDate start, LocalDate endEx, String w, String c, String lot) {
         String lotFilter = lot == null ? "" : "  AND ISNULL(RTRIM(批号),N'') = ?";

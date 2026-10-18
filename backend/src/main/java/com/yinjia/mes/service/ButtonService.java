@@ -3146,6 +3146,19 @@ public class ButtonService {
                 if (prow != null && prow.get("pl_xc") != null) ownXc = ((Number) prow.get("pl_xc")).intValue();
             }
             if (ownXc != null && ownXc != 0) head.put("工单行号", ownXc);
+            // 门禁(2026-10-19):成型未完成的工单行不出工序检验单 —— 与首件/制程两个手工入口
+            //   共用 {@link WoInspGate} 的同一份判据与同一句话术(禁止各写一份)。
+            //   正常路径下组装报工本身就有「不得跳序」校验(前道成型必须先有已审核报工),
+            //   这里主要防**手机端/外部直写 scjl** 那条绕过路径(ExternalReportAbsorbService)。
+            //   注意:闸不过只**跳过出单**,绝不阻断报工审核本身。
+            if (ownXc != null && ownXc != 0) {
+                WoInspGate.Status gate = WoInspGate.check(jdbc, String.valueOf(r.get("工单号")), ownXc);
+                if (!gate.allowed()) {
+                    log.info("[工序检验] 报工 {} 工单 {}(行 {})成型尚未报工 ⇒ 暂不出 {} 检验单",
+                            repNo, r.get("工单号"), ownXc, target);
+                    continue;
+                }
+            }
             head.put("报工单号", repNo);
             head.put("工序", op);
             if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
@@ -3224,17 +3237,23 @@ public class ButtonService {
         int xc = ownXc == null ? 0 : ownXc;
         long plangRowId = prow == null || prow.get("id") == null ? 0L : ((Number) prow.get("id")).longValue();
 
-        // 本批是否已有更早的已审核报工(同 WoReportService 的行锚口径:先 gd_id→plang_id,再回退批次)
-        Integer prior = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM dbo.scjl s"
-                        + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                        + "   AND s.id<>?"
-                        + "   AND (? = 0"
-                        + "        OR ISNULL(s.[工单行号],0) = ?"
-                        + "        OR (? > 0 AND EXISTS (SELECT 1 FROM dbo.plang_pc pc"
-                        + "                              WHERE pc.id = s.gd_id AND pc.plang_id = ?)))",
-                Integer.class, wo, curId, xc, xc, plangRowId, plangRowId);
-        if (prior != null && prior > 0) return;                   // 本批已有更早的已审核报工 ⇒ 首件已过
+        // 🔴 2026-10-19 用户口径(原话):「当前首件检验单、制程检验单、组装成品检验单都需要实现当前完成了进行,
+        //   **成型完成后的生产工单才能生成这个首件检验单**,当前实现的所有生产工单都能生成检验单据,
+        //   修改当前的实现逻辑」。判据 = {@link WoInspGate}(与另外两个入口、以及组装那张单共用同一份实现)。
+        //   与《银嘉MES总流程 V1.2》品质泳道一致:图上规则是「成型报工 → 成型质检数据」,
+        //   首件检验单就是成型那道工序的质检数据。
+        //
+        //   ⚠ 这里**换掉了原来的判据**(原:「本(工单号,批次号,工单行号)没有更早的已审核报工」),
+        //   原因有二:
+        //     ① 原判据**与工序无关** —— 第一张报工落在「混料」时就会出错单,与流程图相反;
+        //     ② 原判据一旦成立就永久成立:路线补上混料后,成型报工审核时会被"混料报得更早"挡掉 ⇒
+        //        **首件检验单永远出不来**。现改为「成型已完成 + 本行还没有存活首件单」,
+        //        于是任何一张报工审核时只要成型已完成且还没出过单,就补出来(自动补单通道)。
+        WoInspGate.Status gate = xc > 0 ? WoInspGate.check(jdbc, wo, xc) : WoInspGate.pass();
+        if (!gate.allowed()) {
+            log.info("[首件检验] 报工 {} 工单 {}(行 {})成型尚未报工 ⇒ 暂不出首件检验单", repNo, wo, xc);
+            return;
+        }
 
         Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM dbo." + FIRST_INSP_HEAD
                         + " WHERE 工单号=? AND ISNULL(工单行号,0)=?"

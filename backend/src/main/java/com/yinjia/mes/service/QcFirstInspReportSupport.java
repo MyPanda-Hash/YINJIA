@@ -55,7 +55,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *   │   1#   │无粘模…│无明显…│  /   │  /   │  /   │  /   │  /   │  /   │  /   │  /   │
  *   │  …8#   │  …                                                                  │
  *   └────────┴──────────────────────────────────────────────────────────────────────┘
- *   相关要求 6 条 + 检验结果 / 检验人                                  ← 骨架 summary
+ *   相关要求 6 条 + 检验结果 / 检验人 / 审核人                        ← 骨架 summary
+ *   (审核人 2026-10-18 补:首件检验单同批开了直接审核,值走参数取自 yj_doc_status.shr)
  * </pre>
  *
  * <h3>可填格口径(与面板、Excel 导出**逐字同源**)</h3>
@@ -223,7 +224,7 @@ public final class QcFirstInspReportSupport {
 
         // ---- 参数段:固定几个(骨架要用)+ 生成的列名/标准/格值 ----
         StringBuilder params = new StringBuilder();
-        for (String p : new String[]{"产品编号", "产品型号", "生产日期", "组别", "总结论", "检验员", "打印时间"}) {
+        for (String p : new String[]{"产品编号", "产品型号", "生产日期", "组别", "总结论", "检验员", "审核人", "打印时间"}) {
             params.append(param(p, "java.lang.String"));
         }
         for (int c = 1; c <= n; c++) {
@@ -371,12 +372,15 @@ public final class QcFirstInspReportSupport {
 
     // ============================================================ 填充参数
 
-    /** 报表参数(ReportService 填充用):抬头四对 + 总结论/检验员 + 列名/标准/每格格值 + 打印时间 */
+    /** 报表参数(ReportService 填充用):抬头四对 + 总结论/检验员/审核人 + 列名/标准/每格格值 + 打印时间 */
     public static Map<String, Object> params(Matrix m, Map<String, Object> head) {
         Map<String, Object> p = new LinkedHashMap<>();
         for (HeadPair hp : m.headPairs()) p.put(hp.label(), hp.value());
         p.put("总结论", m.result());
         p.put("检验员", m.inspector());
+        // 审核人(2026-10-18):**不是本表物理列** —— ReportService.headParams 下发的是单据的虚拟字段
+        // 「审核人」(QueryService 对非两级审批面板用 yj_doc_status.shr 覆盖),未审核/取不到时给空串。
+        p.put("审核人", head == null ? "" : text(head.get("审核人")));
         p.put("打印时间", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         List<Col> cols = m.flatCols();
         for (int c = 1; c <= cols.size(); c++) {

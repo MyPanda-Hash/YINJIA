@@ -710,6 +710,8 @@ const editable = computed(() => !isEdit.value || status.value === '草稿' || st
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
   'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
+  // 2026-10-18 调拨单/盘点单:与出入库单对齐——留存根/签字单等佐证材料,审核后也要能补
+  'TRANSFER', 'STOCKTAKE',
 ])
 const attachEditable = computed(() => {
   if (editable.value) return true

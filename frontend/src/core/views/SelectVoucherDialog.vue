@@ -405,6 +405,37 @@ async function generateMergedSelection(config, sources) {
   return { panel: props.panelCode, no: result['编号'], sourceNo: ranges.map((r) => r.source['编号'] || r.source['单据编号']).join('、') }
 }
 
+// ── 平表来源(库存选货)生单(对齐 T+ 选单语义,2026-10-18) ──
+/**
+ * 把勾选的**库存行**合成一张新单:表头走 headerMap(平表来源没有可映射的表头字段,通常为空),
+ * 明细按 detailMap(源列 → 本面板列)逐行映射。
+ *
+ * 与单据来源的差别只有两点:① 没有"来源单号"可回填、不写 form_flow_link 占用(货不是单据);
+ * ② 一次勾选只生成**一张**单(多行明细),不是"一张来源单对应一张目标单"。
+ */
+async function generateFromFlatRows(config, rows) {
+  let targetKey = config.targetDetailKey || config.detailKey || 'items'
+  let targetDefaults = {}
+  try {
+    const tc = await engine.getPanelConfig(props.panelCode)
+    const targetTab = tc?.detail?.tabs?.find((tab) => tab.key === targetKey) || tc?.detail?.tabs?.[0]
+    targetKey = targetTab?.key || targetKey
+    targetDefaults = Object.fromEntries((targetTab?.fields || []).filter((f) => f.defaultValue !== undefined).map((f) => [f.dataName, f.defaultValue]))
+  } catch { /* 取不到就用默认键名 */ }
+  const head = {}
+  for (const map of config.headerMap || []) head[map.to] = selVal(rows[0], map.from)
+  const items = rows.map((r) => {
+    const target = { ...targetDefaults }
+    for (const map of config.detailMap || []) target[map.to] = r[map.from] ?? target[map.to] ?? ''
+    return target
+  })
+  const result = await engine.callButton({
+    panelCode: props.panelCode, buttonName: '保存',
+    formData: { ...head, detail: { [targetKey]: items } }, buttonParam: {},
+  })
+  return result?.['编号'] ? { panel: props.panelCode, no: result['编号'], sourceNo: '' } : null
+}
+
 async function generate() {
   const config = props.config
   const sources = selectedSourceRows()
@@ -414,7 +445,14 @@ async function generate() {
   generating.value = true
   const generated = []
   try {
-    if (config.outsourceFlow && config.cardinality === 'MANY_TO_ONE' && sources.length > 1) {
+    // 平表来源(2026-10-18,库存选货):勾选的**不是单据**而是库存行(没有单号),
+    // 语义 = 「按这些库存行开一张新单」—— 与「从暂收单开一张入库单」同构。
+    // 原逐张循环靠 source['编号']||source['单据编号'] 定位来源单,平表行两者都没有 ⇒ 全被 continue,
+    // 最后只报「未生成任何单据」(实测)。故单开一条通道。
+    if (config.masterDetail === false && !config.generateButton && !config.batchFlow) {
+      const one = await generateFromFlatRows(config, sources)
+      if (one) generated.push(one)
+    } else if (config.outsourceFlow && config.cardinality === 'MANY_TO_ONE' && sources.length > 1) {
       generated.push(await generateMergedSelection(config, sources))
     } else for (const source of sources) {
       const no = source['编号'] || source['单据编号'] || ''

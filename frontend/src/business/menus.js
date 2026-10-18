@@ -129,7 +129,22 @@ export const menuTree = [
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
             ],
           },
-
+          // 2026-10-18 用户口径「为采购订单补齐,采购订单明细表与采购订单统计表」——
+          // 照「销售管理」同款三段式(单据 → 明细表 → 统计表)把采购订单补全:
+          //   · 明细表 PU_ORDER_DETAIL:头×行逐行展开(v_pu_order_detail);
+          //   · 统计表 PU_ORDER_STATS :按 供应商 × 物料 聚合(v_pu_order_stats,「订单数」=不同单据数)。
+          // 两者都是 flat 只读报表,不改任何业务表、不动采购订单面板本身
+          // (tools/migrate-pu-order-detail-stats-20261018.sql)。
+          {
+            code: 'detail', title: '明细表', children: [
+              { code: 'puDetail', title: '采购订单明细表', path: '/panelx/list/PU_ORDER_DETAIL', panelCode: 'PU_ORDER_DETAIL', icon: 'List' },
+            ],
+          },
+          {
+            code: 'stats', title: '统计表', children: [
+              { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
+            ],
+          },
         ],
       },
     ],
@@ -164,6 +179,11 @@ export const menuTree = [
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
+              // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
+              // (调拨=仓库间移库双腿过账;盘点=按实盘差异调平)。面板/表/视图见
+              // tools/migrate-transfer-stocktake-20261018.sql,记账见 StockLedgerService.applyTransfer/applyStocktake。
+              { code: 'transfer', title: '调拨单', path: '/panelx/list/TRANSFER', icon: 'Switch', panelCode: 'TRANSFER', operationName: '新增' },
+              { code: 'stocktake', title: '盘点单', path: '/panelx/list/STOCKTAKE', icon: 'DocumentChecked', panelCode: 'STOCKTAKE', operationName: '新增' },
             ],
           },
         ],
@@ -180,6 +200,9 @@ export const menuTree = [
           { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          // 2026-10-18 新增:调拨单/盘点单明细表(视图 v_transfer_detail / v_stocktake_detail)
+          { code: 'transferDetail', title: '调拨单明细表', path: '/panelx/list/TRANSFER_DETAIL', panelCode: 'TRANSFER_DETAIL', icon: 'List' },
+          { code: 'stocktakeDetail', title: '盘点单明细表', path: '/panelx/list/STOCKTAKE_DETAIL', panelCode: 'STOCKTAKE_DETAIL', icon: 'List' },
         ],
       },
       {
@@ -194,6 +217,9 @@ export const menuTree = [
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
+          // 2026-10-18 新增:调拨单/盘点单统计表(视图 v_transfer_stats / v_stocktake_stats)
+          { code: 'transferStats', title: '调拨单统计表', path: '/panelx/list/TRANSFER_STATS', panelCode: 'TRANSFER_STATS', icon: 'Histogram' },
+          { code: 'stocktakeStats', title: '盘点单统计表', path: '/panelx/list/STOCKTAKE_STATS', panelCode: 'STOCKTAKE_STATS', icon: 'Histogram' },
         ],
       },
       {
@@ -436,13 +462,13 @@ export const menuTree = [
       },
     ],
   },
-  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典 / ERP导入日志。
+  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。
   //   · 字段管理(FIELDMGR):直接以 yj_field 元数据表为数据源的新面板 —— 全系统字段模型在一屏可见、
   //     可按面板筛、可就地改(顺序/列宽/必填/隐藏/字典SQL…),保存走通用档案保存的「只提交改动行」;
   //   · 数据字典(ZDGL):原在 系统管理平台·基础数据,按用户口径「还有写个数据字典」随本栏目一并摆到这里
   //     (面板/表/权限行一个字节没动,只换导航位置);
-  //   · ERP导入日志(ERPLG):用户口径「把 ERP导入日志从系统管理迁移到数据建模里面去」,
-  //     yj_panel.category/module_group 已同批改为「数据建模」(tools/migrate-dm-fields-center-20261018.sql)。
+  //   · ERP导入日志(ERPLG)已于 2026-10-18 再次迁出:随用户口径移到新的一级目录「ERP系统集成」
+  //     (yj_panel.category/module_group 同批改为「ERP系统集成」,见 tools/migrate-erp-integ-config-20261018.sql)。
   {
     code: 'dm',
     title: '数据建模',
@@ -462,15 +488,6 @@ export const menuTree = [
         icon: 'Collection',
         children: [
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
-        ],
-      },
-      {
-        code: 'dmErp',
-        title: 'ERP集成',
-        icon: 'Connection',
-        children: [
-          // 批次级日志(erp_imp_log);行级明细面板 ERPLG_ROW 不另设入口 —— 从批次行进入即可
-          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
         ],
       },
       // 2026-10-18 用户口径「把现在系统管理平台里面的面板全部挪到数据建模」:原「系统管理平台」的
@@ -548,6 +565,29 @@ export const menuTree = [
           { code: 'cur', title: '币别', path: '/panelx/list/CUR', icon: 'Money', panelCode: 'CUR', operationName: '新增流程' },
           { code: 'finExp', title: '费用类别', path: '/panelx/list/FIN_EXP', icon: 'Wallet', panelCode: 'FIN_EXP', operationName: '新增流程' },
           { code: 'finAcc', title: '会计科目', path: '/panelx/list/FIN_ACC', icon: 'Notebook', panelCode: 'FIN_ACC', operationName: '新增流程' },
+        ],
+      },
+    ],
+  },
+  // 2026-10-18 用户口径:「在系统左侧菜单写一个 erp 系统集成的目录,目录下把 erp 导入日志移动到他下方。
+  //   再写一个 erp 集成配置清单,分为导入与转出两种面板,每个面板再分类,把 api 接口、对应的设备、
+  //   字段间的映射,做成一个可视化、可以统一配置编辑的面板。」
+  //   · ERP集成配置清单 = 页面级虚拟面板 ERP_INTEG(自定义视图 views/erp/ErpIntegConfig.vue,
+  //     数据源 erp_integ_api/_field/_device 三张配置表;不插 yj_panel 行,授权落 yj_role_panel);
+  //   · ERP导入日志 = 原「数据建模 / ERP集成」下的 ERPLG(批次级),行级明细 ERPLG_ROW 从批次行进入。
+  {
+    code: 'erpInteg',
+    title: 'ERP系统集成',
+    icon: 'Connection',
+    children: [
+      // 二级必须是「带面板的分组」(导航层级同构:不出现裸叶子,见 menus.test.js)
+      {
+        code: 'erpManage',
+        title: '集成管理',
+        icon: 'SetUp',
+        children: [
+          { code: 'erpIntegCfg', title: 'ERP集成配置清单', path: '/erp/integConfig', icon: 'SetUp', panelCode: 'ERP_INTEG' },
+          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
         ],
       },
     ],

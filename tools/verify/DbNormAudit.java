@@ -172,9 +172,12 @@ public class DbNormAudit {
     }
 
     // ---------- 检查项 ----------
-    /** 01 表命名:白名单之外的表必须用规范前缀 */
+    /** 01 表命名:白名单之外的表必须用规范前缀(见 docs/development/数据库规范.md §1.1) */
     static void check01TableNaming(Connection c) throws Exception {
-        Set<String> legal = Set.of("yj_", "bs_", "bd_", "bl_", "rd_", "qc_", "wo_");
+        // 2026-10-18 补 erp_:ERP 集成/同步配置与通道。此前 erp_imp_log/erp_imp_row 靠冻结白名单过关,
+        // 新增「ERP集成配置清单」三张配置表(erp_integ_api/_field/_device)后按规范把该前缀正式收编
+        // —— 配置类表,业务单据不得引用(规范 §1.1 已登记)。
+        Set<String> legal = Set.of("yj_", "bs_", "bd_", "bl_", "rd_", "qc_", "wo_", "erp_");
         List<String> bad = new ArrayList<>();
         try (Statement st = c.createStatement();
              ResultSet rs = st.executeQuery("SELECT name FROM sys.tables ORDER BY name")) {

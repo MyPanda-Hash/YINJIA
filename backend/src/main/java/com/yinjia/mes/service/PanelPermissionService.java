@@ -54,7 +54,7 @@ public class PanelPermissionService {
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),
             Map.entry("unclose", "取消结案"), Map.entry("print", "打印"), Map.entry("close", "结案"),
-            Map.entry("split", "切单"), Map.entry("picking", "转领料单"));
+            Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"));
 
     static {
         Map<String, String[]> m = new HashMap<>();
@@ -166,12 +166,16 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|切单", new String[]{"split"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|撤回切单", new String[]{"split"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|转领料单", new String[]{"picking"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|获取混料配方", new String[]{"recipe"});
         // 「排产」两个入口(快速排产页 / 生产工单页弹出的内嵌快速排产)同挂 assign 词:
         // 页面面板各出一个「排产」格子,端点按 requireButtonAny 取任一命中 —— 即"排产权"可由任一处授予。
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|排产", new String[]{"assign"});
         // 预排线(工序路线逐道选线)是「排产」的提交动作,同一 assign 词,两个入口都要登记 ——
         // 只登记 SCHEDULE_BOARD 会让"仅授了生产工单·排产"的角色在内嵌弹窗里被 403(requireButtonAny 逐面板找词)。
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|预排线", new String[]{"assign"});
+        // ERP 集成配置清单(2026-10-18 用户口径「除管理员只可看不可编辑」):写配置**不挂权限词**,
+        // 由 ErpIntegController 直接 requireAdmin();同时登记进 ADMIN_ONLY_PANELS 做纵深防御
+        // (将来若给该页加按钮,非管理员的写动作仍会被 requireButton 的 admin 闸门拦住)。
         BUTTON_PERMS_OVERRIDE = Map.copyOf(m);
     }
 
@@ -409,8 +413,12 @@ public class PanelPermissionService {
      *   <li>ZDGL 数据字典:全站下拉的字典内容(数据结构的一部分)。</li>
      * </ul>
      * 判定在**服务端**(不靠菜单藏),管理员恒过。
+     *
+     * 2026-10-18 追加 ERP_INTEG(「ERP集成配置清单」):用户口径「保证这个面板除管理员只可看不可编辑」——
+     * 三张集成配置表(接口/字段映射/设备绑定)写的是全公司共用的对接口径,非管理员只读;
+     * 读仍按 yj_role_panel 的 view 授权走(菜单可见即可看)。
      */
-    public static final Set<String> ADMIN_ONLY_PANELS = Set.of("FIELDMGR", "ZDGL");
+    public static final Set<String> ADMIN_ONLY_PANELS = Set.of("FIELDMGR", "ZDGL", "ERP_INTEG");
 
     /**
      * **只读**(连管理员也不给写)的面板(2026-10-18 用户口径:
