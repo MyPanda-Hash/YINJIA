@@ -183,19 +183,59 @@ rb.push(`GO`)
 if (!fs.existsSync(RB_FILE)) fs.writeFileSync(RB_FILE, rb.join('\n') + '\n', 'utf8')
 console.log(`\n  回滚脚本: ${RB_FILE}`)
 
-/* 明细模板(与库里既有首件单同形:标准行 行号0 + 样品行 行号n) */
-const ITEMS = [
-  { 项目: '炭棒外径', 要求: '按规格型号,公差 ±0.5mm', 方法: '游标卡尺测量', 值: '符合' },
-  { 项目: '炭棒长度', 要求: '按规格型号,公差 ±0.5mm', 方法: '游标卡尺测量', 值: '符合' },
-  { 项目: '炭棒重量', 要求: '按产品标准', 方法: '电子秤称量', 值: '符合' },
-  { 项目: '外观', 要求: '无破损、无压痕、无裂纹、无脏污', 方法: '目视全检', 值: '合格' },
-  { 项目: '跌落强度', 要求: '50cm 自由跌落 3 次无断裂', 方法: '跌落试验', 值: '合格' },
+/* 明细模板 —— **必须与纸面模型一致**(2026-10-18 返工:上一版只写"检验项目",纸面上样品格全空)
+ *  · 首件:长表 = 行类型 × 样品序号 × 检验列(10 列 × (1 标准 + 8 样品)),列键/分组同
+ *    frontend/src/core/qc/firstInspCols.js 的 DEFAULT_TEST_ITEMS;
+ *  · 制程:纵向表,一行一个检验项目(检验要求 | 检验方法 | 产线常规功能性结果 | 结果判断)。
+ *  同一份形状也用于回炉修复 —— tools/archive/_wo-flow-20261018/_fix-insp-detail.mjs */
+const FIRST_ITEMS = [
+  { key: 'appearance', label: '炭棒表观状态', group: '表观及脱粉', standard: '/', check: true },
+  { key: 'depowder', label: '炭棒脱粉情况', group: '表观及脱粉', standard: '/', check: true },
+  { key: 'outer', label: '炭棒外径', group: '尺寸及重量', standard: '按规格型号，公差 ±0.5mm', base: 34.2, step: 0.05, digits: 2 },
+  { key: 'inner', label: '炭棒内径', group: '尺寸及重量', standard: '按规格型号，公差 ±0.5mm', base: 12.6, step: 0.02, digits: 2 },
+  { key: 'length', label: '炭棒长度', group: '尺寸及重量', standard: '按规格型号，公差 ±0.5mm', base: 108.5, step: 0.1, digits: 1 },
+  { key: 'weight', label: '炭棒重量(g)', group: '尺寸及重量', standard: '按产品标准', base: 47.8, step: 0.05, digits: 2 },
+  { key: 'drop', label: '跌落', group: '强度', standard: '50cm 自由跌落 3 次无断裂', text: '合格' },
+  { key: 'compress', label: '挤压强度', group: '强度', standard: '≥30kgf', base: 38.5, step: 0.2, digits: 1 },
+  { key: 'turbidity', label: '浊度NTU', group: '浊度及压降', standard: '/', base: 0.8, step: 0.05, digits: 2 },
+  { key: 'pressure', label: '压降kPa', group: '浊度及压降', standard: '≤20kpa', base: 8.2, step: 0.1, digits: 1 },
 ]
+const CHECK_SAMPLES = [1, 2]
 const PROC_ITEMS = [
-  { 项目: '成型压力', 要求: '按成型工艺参数', 方法: '设备仪表读取', 值: '符合' },
-  { 项目: '成型温度', 要求: '按成型工艺参数', 方法: '设备仪表读取', 值: '符合' },
-  { 项目: '外观抽检', 要求: '无破损、无裂纹', 方法: '目视抽检', 值: '合格' },
+  { 项目: '外观', 要求: '无破损、无裂纹、无脏污', 方法: '目视全检' },
+  { 项目: '尺寸-外径', 要求: '按规格型号，公差 ±0.5mm', 方法: '游标卡尺测量' },
+  { 项目: '尺寸-长度', 要求: '按规格型号，公差 ±0.5mm', 方法: '游标卡尺测量' },
+  { 项目: '重量', 要求: '按产品标准', 方法: '电子秤称量' },
+  { 项目: '成型压力', 要求: '按成型工艺参数', 方法: '设备仪表读取' },
+  { 项目: '成型温度', 要求: '按成型工艺参数', 方法: '设备仪表读取' },
 ]
+
+/** 首件明细:10 列 × (1 标准 + 8 样品) 的 VALUES 元组 */
+function firstDetailTuples(no) {
+  const out = []
+  let n = 0
+  for (const it of FIRST_ITEMS) {
+    n++
+    out.push(`(${qn(no)}, N'首件检验', ${n}, ${qn(it.key)}, ${qn(it.label)}, ${qn(it.group)}, N'标准', N'标准',
+      ${qn(it.standard)}, NULL, NULL, NULL, N'${MARK}', SYSDATETIME(), N'N')`)
+    for (let s = 1; s <= 8; s++) {
+      n++
+      let val = null
+      if (it.check) val = CHECK_SAMPLES.includes(s) ? '√' : null
+      else if (it.text) val = it.text
+      else val = (it.base + (s - 1) * it.step).toFixed(it.digits)
+      out.push(`(${qn(no)}, N'首件检验', ${n}, ${qn(it.key)}, ${qn(it.label)}, ${qn(it.group)}, N'样品', N'${s}#',
+        NULL, ${val == null ? 'NULL' : qn(val)}, ${val == null ? 'NULL' : qn('合格')}, ${val == null ? 'NULL' : 1}, N'${MARK}', SYSDATETIME(), N'N')`)
+    }
+  }
+  return out
+}
+
+/** 制程明细:一行一项(纵向表) */
+function procDetailTuples(no) {
+  return PROC_ITEMS.map((it, i) => `(${qn(no)}, N'制程检验', ${i + 1}, ${qn(it.项目)}, ${qn(it.要求)}, ${qn(it.方法)},
+    1, ${qn('符合')}, N'合格', N'合格', 0, N'每2小时', N'${MARK}', SYSDATETIME(), N'N')`)
+}
 
 /* ───────────────────────── 执行 ───────────────────────── */
 /* 幂等:逐行判「首件缺 / 制程缺」,缺哪张补哪张 ⇒ 可直接增量重跑(不像前两批要 --cleanup) */
@@ -222,18 +262,11 @@ try {
         ${qn(r.lot)}, ${qn(r.dm)}, ${qn(r.mc)}, ${qn(r.gg)}, ${qn(p.line)}, ${qn(p.ws)}, ${qty}, ${qty},
         ${qn(p.worker)}, CONVERT(date,'${dateStr}'), N'合格', ${qn(dateStr)}, N'合格转序',
         N'${MARK}', SYSDATETIME(), N'admin', ${dt(at)}, N'N')`)
-    for (let k = 0; k < ITEMS.length; k++) {
-      const it = ITEMS[k]
-      await req().query(`
-        INSERT INTO dbo.qc_first_insp_detail (单据编号, 表区, 行号, 检验项目, 检验要求, 检验方法, 检查频率,
-          行类型, asp_user1, asp_time1, asp_cancel)
-        VALUES (${qn(p.sjNo)}, N'首件检验', 0, ${qn(it.项目)}, ${qn(it.要求)}, ${qn(it.方法)}, N'首件/每批',
-          N'标准', N'${MARK}', SYSDATETIME(), N'N')`)
-      await req().query(`
-        INSERT INTO dbo.qc_first_insp_detail (单据编号, 表区, 行号, 检验项目, 检验要求, 检验方法, 实测数值,
-          结果判断, 数量, 不合格数量, 行类型, asp_user1, asp_time1, asp_cancel)
-        VALUES (${qn(p.sjNo)}, N'首件检验', ${k + 1}, ${qn(it.项目)}, ${qn(it.要求)}, ${qn(it.方法)}, ${qn(it.值)},
-          N'合格', 1, 0, N'样品', N'${MARK}', SYSDATETIME(), N'N')`)
+    const ft = firstDetailTuples(p.sjNo)
+    for (let i = 0; i < ft.length; i += 30) {
+      await req().query(`INSERT INTO dbo.qc_first_insp_detail
+        ([单据编号], [表区], [行号], [检验列], [检验项目], [项目分组], [行类型], [样品序号], [标准], [实测数值], [结果判断], [数量], asp_user1, asp_time1, asp_cancel)
+        VALUES ${ft.slice(i, i + 30).join(',')}`)
     }
     await req().query(`INSERT INTO dbo.yj_doc_status (panel_code, doc_no, shr, shsj, canceled, pending, update_at, saved, archived, deleting)
       VALUES (N'QC_FIRST_INSP', ${qn(p.sjNo)}, ${qn(p.worker)}, ${dt(at)}, N'N', N'N', SYSDATETIME(), N'Y', N'N', N'N')`)
@@ -251,19 +284,9 @@ try {
         ${qn(r.成型报工单)}, N'成型', ${qn(r.lot)}, ${qn(r.dm)}, ${qn(r.mc)}, ${qn(r.gg)}, ${qn(p.line)},
         ${qn(p.ws)}, ${qty}, ${qty}, ${qty}, ${qn(p.worker)}, CONVERT(date,'${dateStr}'), N'合格', N'合格转序',
         N'${MARK}', SYSDATETIME(), N'admin', ${dt(at)}, N'N')`)
-    for (let k = 0; k < PROC_ITEMS.length; k++) {
-      const it = PROC_ITEMS[k]
-      await req().query(`
-        INSERT INTO dbo.qc_proc_insp_detail (单据编号, 表区, 行号, 检验项目, 检验要求, 检验方法, 抽检量,
-          实测数值, 结果判断, 单项判定, 检查频率, asp_user1, asp_time1, asp_cancel)
-        VALUES (${qn(p.zcNo)}, N'制程检验', 0, ${qn(it.项目)}, ${qn(it.要求)}, ${qn(it.方法)}, 0,
-          NULL, NULL, NULL, N'每2小时', N'${MARK}', SYSDATETIME(), N'N')`)
-      await req().query(`
-        INSERT INTO dbo.qc_proc_insp_detail (单据编号, 表区, 行号, 检验项目, 检验要求, 检验方法, 抽检量,
-          实测数值, 结果判断, 单项判定, 不良数量, asp_user1, asp_time1, asp_cancel)
-        VALUES (${qn(p.zcNo)}, N'制程检验', ${k + 1}, ${qn(it.项目)}, ${qn(it.要求)}, ${qn(it.方法)}, 1,
-          ${qn(it.值)}, N'合格', N'合格', 0, N'${MARK}', SYSDATETIME(), N'N')`)
-    }
+    await req().query(`INSERT INTO dbo.qc_proc_insp_detail
+      ([单据编号], [表区], [行号], [检验项目], [检验要求], [检验方法], [抽检量], [产线常规功能性结果], [结果判断], [单项判定], [不良数量], [检查频率], asp_user1, asp_time1, asp_cancel)
+      VALUES ${procDetailTuples(p.zcNo).join(',')}`)
     await req().query(`INSERT INTO dbo.yj_doc_status (panel_code, doc_no, shr, shsj, canceled, pending, update_at, saved, archived, deleting)
       VALUES (N'QC_PROC_INSP', ${qn(p.zcNo)}, ${qn(p.worker)}, ${dt(at)}, N'N', N'N', SYSDATETIME(), N'Y', N'N', N'N')`)
     await req().query(`INSERT INTO dbo.s_allno (comm, dh, lb, ny, asp_user1, asp_time1, asp_cancel)
