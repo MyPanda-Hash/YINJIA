@@ -264,3 +264,13 @@ table:dm_key   # 各种软件接口Key值表
 # 2026-10-07 补登:rd_asm_bom_head/_detail、rd_mold_formula_head/_detail(2026-09-11 菜单并入后审计漏网);
 # 已清理 244 张(RENAME_*/_bak_*/tmp_*/t1/t2 + pr_* 已下架面板表 + 无引用遗留表),清单见
 # tools/migrate-drop-unused-tables.sql 与 tools/archive/_table-audit/drop-tables.txt。
+
+# ---- 数采平台(2026-10-18 新增 7 张;migrate-dc-platform-20261018.sql) ----
+# 在册 218 + 7 = 225 张, + 例外 3 = 228 张。
+table:bs_dc_gateway   # 数采网关台账(协议/地址/在线状态/最近心跳)
+table:bs_dc_device   # 数采设备台账(电子秤/扫码枪/看板/PLC;网关绑定/数采工程/组态/调试状态)
+table:bs_dc_point   # 数采采集点(设备下的采集变量:地址/单位/量程/采集周期)
+table:bs_dc_rule   # 数采规则(定时采集/变化上报/阈值报警)
+table:bs_dc_sample   # 数采采集流水(网关上报的实时数据,只增不改)
+table:bs_dc_alarm   # 数采报警记录(阈值超限等 + 处理留痕)
+table:bs_dc_status_log   # 数采在线状态日志(在线率统计依据)

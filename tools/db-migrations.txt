@@ -3795,3 +3795,12 @@ migrate-dm-fields-center-20261018.sql
 #   module_group 系统管理平台→数据建模(32 张);权限无回归(role 1/2/4/5 原本对 32 张已 view);
 #   导航侧 menus.js 同步搬迁 + 系统管理平台只留 /sys/console 入口页。⚠ 必须排在本行之前那些脚本之后。幂等;两账套。
 migrate-sysadmin-panels-to-dm-20261018.sql
+# 数采平台(用户 2026-10-18「把数采平台管理模块加进系统,方便后续硬件接入」):建 bs_dc_gateway/
+#   bs_dc_device/bs_dc_point/bs_dc_rule/bs_dc_sample/bs_dc_alarm/bs_dc_status_log 7 张表 + 中文注明,
+#   只登记真实台账设备(电子秤 DZ-001 / 扫码枪 FX-001 / 车间看板 KB-001),不造采样与报警数据;
+#   采样只能由硬件经 POST /api/dc/ingest 写入。幂等;两账套。
+migrate-dc-platform-20261018.sql
+# 数采网关接入密钥 bs_dc_gateway.api_key(2026-10-18 补):硬件经 POST /api/dc/ingest 与
+#   /api/dc/heartbeat 推数据,设备没有登录账号 ⇒ 这两条路径 permitAll + 请求头 X-DC-Key 必须等于
+#   所绑定网关的 api_key;未绑网关或密钥为空的设备一律拒绝(与「绑定网关」检查项同一口径)。幂等;两账套。
+migrate-dc-gateway-apikey-20261018.sql

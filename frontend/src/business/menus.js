@@ -547,6 +547,19 @@ export const menuTree = [
       },
     ],
   },
+  // 2026-10-18 新增「数采平台」:面向后续硬件(电子秤已确定,先补看板/扫码枪等)接入的配置与监控入口。
+  //   三个页面都是**页面级叶子**(不是 yj_panel 面板 ⇒ 无 panelCode/operationName),
+  //   路由在 router/index.js 显式注册,并已从 flatMenus 自动路由里排除;菜单侧不参与面板权限过滤。
+  {
+    code: 'dc',
+    title: '数采平台',
+    icon: 'Cpu',
+    children: [
+      { code: 'dcConfig', title: '设备配置管理', path: '/dc/config', icon: 'SetUp' },
+      { code: 'dcMonitor', title: '数据监控', path: '/dc/monitor', icon: 'Monitor' },
+      { code: 'dcStats', title: '状态统计', path: '/dc/stats', icon: 'DataAnalysis' },
+    ],
+  },
   // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
   //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
   //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口

@@ -171,9 +171,21 @@ test('生产制造的明细/统计表挂在所属业务对象下(与销售管理
   }
 })
 
+// 2026-10-18:数采平台(dc)的二级项是**页面级叶子**——三页是 Vue 页面,不是 yj_panel 面板,
+//   因此没有 panelCode、也不该再套一层分组。这里不是"放宽断言",而是对它单独钉更严的口子:
+//   必须带 /dc/ 路由前缀、不带 panelCode/operationName、code 与 path 一一对应。
+const PAGE_LEAF_GROUPS = new Set(['dc'])
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
   for (const g of menuTree) {
-    if (!g.children || !g.children.length) continue // 我的桌面/财务管理/设备管理 等暂无二级
+    if (!g.children || !g.children.length) continue // 我的桌面 等暂无二级
+    if (PAGE_LEAF_GROUPS.has(g.code)) {
+      for (const c of g.children) {
+        assert.ok(typeof c.path === 'string' && c.path.startsWith('/dc/'), `${g.title} > ${c.title} 应是 /dc/ 下的页面级路由`)
+        assert.equal(c.panelCode, undefined, `${g.title} > ${c.title} 是页面,不该带面板编码`)
+        assert.equal(c.children, undefined, `${g.title} > ${c.title} 是页面级叶子,不该再套分组`)
+      }
+      continue
+    }
     for (const c of g.children) {
       assert.ok(Array.isArray(c.children) && c.children.length > 0, `${g.title} > ${c.title} 应是"带面板的分组"`)
     }
