@@ -161,7 +161,9 @@ ${sst.map((s) => `<si><t xml:space="preserve">${esc(s)}</t></si>`).join('')}
 
 // ───────────── 读期初数据 ─────────────
 const load = (f) => JSON.parse(readFileSync(new URL(f, OUT), 'utf8'))
-const A = load('./opening-A-0831.json')
+// ⚠ 期初必须用**带批号**的那份:不带批号的版本会让全部期初落在"无批号行",
+//   与 MES 的 PC0000 口径永远对不上(实测负结存 785 → 带批号后 535)
+const A = load('./opening-A-0831-lot.json')
 const B = load('./opening-B-0901.json')
 
 // MES 侧对照:当前结存 + 9/1后流水净额
@@ -231,8 +233,9 @@ function writeOne(file, title, subtitle, list) {
   console.log(`  ✅ ${file}  ${list.length} 行 / 合计 ${total.toFixed(2)} / 负值 ${neg} 行`)
 }
 
-writeOne('期初-A-0831.xlsx', '金蝶 2026-08-31 结存(方案A)',
-  '直接取金蝶 point_date=2026-08-31 的时点库存;与现存量接口口径自洽(今天=1374/1374 一致)。', A)
+writeOne('期初-A-0831.xlsx', '金蝶 2026-08-31 结存(方案A · 带批号)',
+  '取金蝶 point_date=2026-08-31 的时点库存,且 include_batch_kf_period=true(按批次拆行)。'
+  + '⚠ 不传 include_batch_kf_period 时该接口 batch_no 恒空,期初会全部落在"无批号行",与 MES 的 PC0000 口径对不上。', A)
 writeOne('期初-B-0901.xlsx', '金蝶 2026-09-01 期初(方案B)',
   '倒挤:金蝶当前现存量 − 金蝶 2026-09-01 起的真实收发净额。与 MES 9/1 后单据直接衔接。', B)
 

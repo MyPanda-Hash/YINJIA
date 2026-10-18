@@ -44,6 +44,23 @@ public class StockLedgerService {
     private static final boolean HIST_BACKFILL = "true".equalsIgnoreCase(System.getProperty("mes.hist.backfill"));
 
     /**
+     * 出库是否按批号核销(2026-10-19 用户口径:**否**)。
+     *
+     * <p><b>【上线前改写】</b>见 {@code docs/development/上线前必验-库存批次追溯.md}。
+     * 用户 2026-10-19 拍板:「材料出库先不按批次号了」—— 验收期先不按批次追溯,
+     * 保证无批次(金蝶默认占位 {@code PC0000})的货也能正常出库。
+     *
+     * <p>为什么必须这么改:金蝶对未启用批次管理的商品统一填默认批号 {@code PC0000},
+     * 而 MES 采购入库按真实批号(如 {@code SX-20260901})记账 ⇒ 领料扣 {@code PC0000} 时那一行
+     * 永远只出不进,kucun 里出现大量「按批号为负、按物料为正」的假负数
+     * (实测 470 行负结存,按 (物料,仓库) 汇总后真缺货只有 2 组)。
+     *
+     * <p>切回按批号核销(正式上线当天):把本常量改成 {@code true} 即可,
+     * 届时必须同时满足该文档 §五 的四条验收标准。
+     */
+    private static final boolean LOT_STRICT = false;
+
+    /**
      * 是否参与记账的面板。
      *
      * <p>2026-10-08:OTHER_IN / OUTSOURCE_IN / OTHER_OUT / OUTSOURCE_ISSUE 四张面板整体下架
@@ -476,9 +493,16 @@ public class StockLedgerService {
      *                   没有批号的 kucun 行(lot_no IS NULL)同样得能被调到。
      *                   关掉它不影响"出到哪一行":lot 为 null 时下面的 NULL 安全匹配仍命中
      *                   `lot_no IS NULL` 那一条,不会串到别的批次。
+     * @since 2026-10-19 {@link #LOT_STRICT}=false(验收期不按批次核销)时,本参数不再拦批号;
+     *        扣减改为按 (物料, 仓库) 汇总核销,见 {@link #applyOutAggregated}。
      */
     private void applyOut(String code, String ckdm, String lot, double qty, String user, boolean forward, boolean requireLot) {
-        if (requireLot && lot == null && forward && !HIST_BACKFILL) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
+        if (requireLot && lot == null && forward && !HIST_BACKFILL && LOT_STRICT)
+            throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
+        if (!LOT_STRICT) {
+            applyOutAggregated(code, ckdm, lot, qty, user, forward);
+            return;
+        }
         double sign = forward ? 1 : -1;
         int n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
                         + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
@@ -501,6 +525,129 @@ public class StockLedgerService {
                     ? "现存量不足(物料 " + code + " 批 " + lot + " 出库后余额将变 " + yl + "),不能出库"
                     : "冲回将使现存量异常(物料 " + code + " 批 " + lot + " 余额 " + yl + "),不可弃审");
         }
+    }
+
+    /**
+     * 出库过账(**验收期口径**:不按批号核销,2026-10-19)。
+     *
+     * <p>与 {@link #applyOut(String,String,String,double,String,boolean,boolean)} 的旧口径区别只有一个:
+     * <b>余额守卫与扣减都按 (物料, 仓库) 汇总</b>,不再要求「该批号行自己」有余额。
+     *
+     * <h3>怎么扣</h3>
+     * <ol>
+     *   <li>先扣**本行批号那一行**(有就扣它,保持流水与结存尽量同批);</li>
+     *   <li>不够的部分,按结存**从大到小**依次扣同物料同仓的其它批次 ——
+     *       等于"这仓里这个物料还有货就能出",与金蝶「同一物料在仓里合计够」的口径一致;</li>
+     *   <li>全部扣完仍不足 ⇒ **超出的部分记到本行批号那一行**,让它变负 ——
+     *       这样总账(按物料合计)仍然准确,而负数会如实暴露"真缺货",不会被悄悄摊平。</li>
+     * </ol>
+     *
+     * <p>弃审对称反做:按同样的顺序把数量加回去(先用本行批号,再补其它行)。
+     * 注意这是**近似对称** —— 若审核后又发生了别的出入库,加回时落点可能与当初不同,
+     * 但 (物料, 仓库) 总余额一定精确复原。上线切回批号核销后此问题消失。
+     *
+     * <p>⚠ <b>【上线前改写】</b>:正式上线当天把 {@link #LOT_STRICT} 改回 {@code true},
+     * 本方法即不再被调用。详见 {@code docs/development/上线前必验-库存批次追溯.md}。
+     */
+    private void applyOutAggregated(String code, String ckdm, String lot, double qty, String user, boolean forward) {
+        // 同物料同仓的全部结存行(含本行),按结存从大到小;排除 0 与负行(负行不参与"可供扣减")
+        List<Map<String, Object>> hold = jdbc.queryForList(
+                "SELECT id, lot_no, yl FROM kucun WHERE wzdm = ? AND ckdm = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY CASE WHEN ISNULL(yl,0) > 0 THEN 0 ELSE 1 END, ISNULL(yl,0) DESC, id",
+                code, ckdm);
+        double avail = 0d;
+        for (Map<String, Object> h : hold) {
+            double b = num(h.get("yl"));
+            if (b > 0) avail += b;
+        }
+        // 本行批号对应的台账行(用于"优先扣自己那一批"与超出的落点)
+        Long ownId = null;
+        for (Map<String, Object> h : hold) {
+            String l = h.get("lot_no") == null ? null : String.valueOf(h.get("lot_no")).trim();
+            String cur = lot == null ? null : lot.trim();
+            if (l == null ? cur == null || cur.isEmpty() : l.equals(cur)) { ownId = ((Number) h.get("id")).longValue(); break; }
+        }
+
+        if (forward) {
+            // 守卫:汇总余额不足则拒绝(负数由红字冲回单承担,不在这里硬扣)
+            if (!HIST_BACKFILL && avail + 0.0001 < qty) {
+                Double ownBal = bal(code, ckdm, lot);
+                throw new IllegalStateException("现存量不足(物料 " + code + " 仓 " + ckdm + " 可用合计 "
+                        + round4(avail) + ",本次出库 " + round4(qty)
+                        + ";本批号 " + (lot == null ? "(无)" : lot) + " 余额 " + (ownBal == null ? 0 : round4(ownBal))
+                        + "),不能出库");
+            }
+            double remain = qty;
+            // ① 本行批号优先
+            if (ownId != null) {
+                double take = Math.min(remain, Math.max(0d, ownBalOf(hold, ownId)));
+                if (take > 0) { deduct(ownId, take, user); remain -= take; }
+            }
+            // ② 其余批次,从大到小
+            for (Map<String, Object> h : hold) {
+                if (remain <= 0.0001) break;
+                Long id = ((Number) h.get("id")).longValue();
+                if (ownId != null && id.equals(ownId)) continue;
+                double b = num(h.get("yl"));
+                if (b <= 0) continue;
+                double take = Math.min(remain, b);
+                if (take > 0) { deduct(id, take, user); remain -= take; }
+            }
+            // ③ 仍不足:超出部分记到本行批号那一行(它可能是负的,也可能不存在 → 建行)
+            if (remain > 0.0001) {
+                if (ownId != null) deduct(ownId, remain, user);
+                else insertThenDeduct(code, ckdm, lot, remain, user);
+            }
+        } else {
+            // 弃审:按同样顺序加回
+            double remain = qty;
+            if (ownId != null) { deduct(ownId, -qty, user); remain = 0; }
+            if (remain > 0.0001) {
+                for (Map<String, Object> h : hold) {
+                    if (remain <= 0.0001) break;
+                    Double b = bal(code, ckdm, h.get("lot_no") == null ? null : String.valueOf(h.get("lot_no")));
+                    if (b == null || b <= 0) continue;
+                    double take = Math.min(remain, b);
+                    deduct(((Number) h.get("id")).longValue(), -take, user);
+                    remain -= take;
+                }
+                if (remain > 0.0001) insertThenDeduct(code, ckdm, lot, -remain, user);
+            }
+        }
+    }
+
+    /** 取某行在 hold 结果集里的结存 */
+    private static double ownBalOf(List<Map<String, Object>> hold, Long id) {
+        for (Map<String, Object> h : hold) if (((Number) h.get("id")).longValue() == id) return num(h.get("yl"));
+        return 0d;
+    }
+
+    /** 对某台账行做扣减(take>0)或加回(take<0) */
+    private void deduct(Long id, double take, String user) {
+        jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
+                + " asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?", take, take, user, id);
+    }
+
+    /** 该批号台账行不存在:先建一行 0 结存,再按 take 增减 */
+    private void insertThenDeduct(String code, String ckdm, String lot, double take, String user) {
+        jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, ckl, yl, asp_user1, asp_time1, asp_cancel)"
+                + " VALUES (?, ?, ?, GETDATE(), 0, 0, 0, ?, GETDATE(), 'N')", code, ckdm, lot, "stock:" + user);
+        jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
+                        + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
+                        + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
+                take, take, user, code, ckdm, lot, lot);
+    }
+
+    private static double round4(double v) { return Math.round(v * 10000d) / 10000d; }
+
+    /**
+     * 总量守卫:该 (物料, 仓库) 的**可出库总量**(只算正结存行)。
+     * 供外部(如面板保存时的"现存量提取")按汇总口径提示,不参与过账。
+     */
+    public double availableQty(String code, String ckdm) {
+        List<Double> l = jdbc.queryForList("SELECT ISNULL(SUM(yl),0) FROM kucun WHERE wzdm = ? AND ckdm = ?"
+                + " AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(yl,0) > 0", Double.class, code, ckdm);
+        return l.isEmpty() || l.get(0) == null ? 0d : l.get(0);
     }
 
     private Double bal(String code, String ckdm, String lot) {
