@@ -3856,3 +3856,8 @@ migrate-erp-integ-readonly-20261018.sql
 #   头表补 附件1..6 + ERP 留位四列 + 调拨原因/盘点类型/盘点人/复核人;新建 v_stock_pick 库存选货视图
 #   与面板 STOCK_PICK(选单来源);字段/译名/授权同批。幂等,两账套均执行。
 migrate-transfer-stocktake-align-20261018.sql
+
+# migrate-transfer-stocktake-bin-20261018.sql — 调拨单/盘点单补库位(仓位)字段
+#   bl_transfer +调出/调入仓位编码、bl_stocktake +仓位编码;字段参照 WHLOC 并按仓库级联(仓库=$仓库);
+#   4 视图重建带出仓位列。⚠ kucun/流水无仓位维度 ⇒ 仓位只作单据留痕(与采购入库单同口径)。
+migrate-transfer-stocktake-bin-20261018.sql

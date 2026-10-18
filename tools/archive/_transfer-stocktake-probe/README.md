@@ -46,7 +46,6 @@ java -cp lib\mssql-jdbc.jar archive\_transfer-stocktake-e2e\SeedDemoDocs.java YJ
 正式库 `DB-2026-10-0001`(调拨 20 单位 华北工控仓→车间仓)/ `PD-2026-10-0001`(抽盘盘盈 8)。
 
 ## 三、界面取证(第二批「与出入库单对齐」)
-
 ```
 node tools/archive/_transfer-stocktake-probe/_ui-align.mjs
 ```
@@ -58,6 +57,26 @@ node tools/archive/_transfer-stocktake-probe/_ui-align.mjs
 
 ⚠ 探针会把测试单留在库里,跑完按 `q-clean-probe.sql` 的思路按单号清理(保留 `…-0001`)。
 
+## 三·五、库位(仓位)+ 全流程验收(第三批)
+
+用户口径:「两个单据都少了库位字段,并且要把字段关联做好,即使是测试也要是系统的真实数据。
+而且整个流程都要验收,模拟真实操作可能出现的各种真实情况。」
+
+```bash
+cd tools
+# 全流程验收(两账套各 50/50 PASS;数据全部取真实档案,跑完自清理)
+java -cp lib\mssql-jdbc.jar archive\_transfer-stocktake-e2e\AcceptTransferStocktake.java YJ      HSDZ_MES
+java -cp lib\mssql-jdbc.jar archive\_transfer-stocktake-e2e\AcceptTransferStocktake.java YJ_TEST HSDZ_MES_TEST
+```
+
+覆盖:保存草稿→改单→审核→两腿守恒→已审核不可改/不可重复审核/不可删除→弃审回滚→改量重审→草稿删除;
+盘盈/盘亏/账实相符/同单两行同物料/实盘为空/弃审清空;
+负向:同仓、数量空、超存量、仓库不存在、仓位不存在、**跨仓仓位**、**该仓有仓位档案却没填**、
+**调出仓位填成目标仓**、**仓位已停用**(临时置停用再还原)。
+
+库位字段配置(`q-bin-fields.sql` 可复核):`调出仓位`/`调入仓位`/`仓位` → 参照 `WHLOC.仓位编码`,
+`ref_filter=仓库=$对应仓库`(与 `PURCHASE_IN.仓位` 逐字同款)。
+⚠ `kucun`/流水**没有仓位维度**,仓位是单据留痕、不参与结存(与采购入库单同口径)。
 ## 四、辅助取证脚本
 
 | 文件 | 用途 |

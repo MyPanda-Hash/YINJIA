@@ -43,7 +43,7 @@ public class SeedDemoDocs {
 
         login();
 
-        // ── 挑一行有货的库存(物料,仓库,批号),调出到另一个仓库 ──
+        // ── 挑一行有货的库存(物料,仓库,批号),调出到一个**有真实仓位档案**的仓库 ──
         Map<String, Object> src = one(
                 "SELECT TOP 1 k.wzdm, k.ckdm, k.lot_no, k.yl, k.price, i.[存货名称], i.[规格型号], i.[计量单位]"
                         + " FROM kucun k OUTER APPLY (SELECT TOP 1 x.[存货名称], x.[规格型号], x.[计量单位] FROM bs_inv x WHERE x.[存货编码]=k.wzdm ORDER BY x.id) i"
@@ -53,12 +53,20 @@ public class SeedDemoDocs {
         if (src == null) throw new IllegalStateException("没有可用库存(yl>=50 且有批号),无法播种");
         String item = str(src.get("wzdm")), lot = str(src.get("lot_no")), srcWh = str(src.get("ckdm"));
         String srcWhName = str(one("SELECT TOP 1 [仓库名称] FROM bs_wh WHERE [仓库编码]=?", srcWh).get("仓库名称"));
-        String dstWh = str(one("SELECT TOP 1 [仓库编码] FROM bs_wh WHERE [仓库编码]<>? AND ISNULL([状态],N'启用')=N'启用' ORDER BY id", srcWh).get("仓库编码"));
-        String dstWhName = str(one("SELECT TOP 1 [仓库名称] FROM bs_wh WHERE [仓库编码]=?", dstWh).get("仓库名称"));
+        // 调入仓:必须是**已有真实仓位档案**的仓,这样演示单能带出真实库位(2026-10-18 第三批口径)
+        Map<String, Object> dst = one(
+                "SELECT TOP 1 w.[仓库编码] AS c, w.[仓库名称] AS n FROM bs_wh w"
+                        + " WHERE w.[仓库编码] <> ? AND ISNULL(w.[状态],N'启用')=N'启用'"
+                        + "   AND EXISTS (SELECT 1 FROM bs_wh_loc l WHERE l.[仓库]=w.[仓库名称] AND ISNULL(l.[停用],0)=0 AND ISNULL(l.[asp_cancel],'N')<>'Y')"
+                        + " ORDER BY (SELECT COUNT(*) FROM bs_wh_loc l WHERE l.[仓库]=w.[仓库名称]) DESC", srcWh);
+        if (dst == null) throw new IllegalStateException("没有带仓位档案的仓库,无法演示库位");
+        String dstWh = str(dst.get("c")), dstWhName = str(dst.get("n"));
+        String bin = str(one("SELECT TOP 1 [仓位编码] AS b FROM bs_wh_loc WHERE [仓库]=? AND ISNULL([停用],0)=0 AND ISNULL([asp_cancel],'N')<>'Y' ORDER BY [仓位编码]",
+                dstWhName).get("b"));
         double before = dbl(one("SELECT ISNULL(yl,0) AS y FROM kucun WHERE wzdm=? AND ckdm=? AND lot_no=?", item, srcWh, lot).get("y"));
-        System.out.printf("素材:%s / 批号 %s / %s(%.1f)→ %s%n", item, lot, srcWhName, before, dstWhName);
+        System.out.printf("素材:%s / 批号 %s / %s(%.1f)→ %s · 仓位 %s%n", item, lot, srcWhName, before, dstWhName, bin);
 
-        // ── ① 调拨单:20 个单位从 srcWh 调到 dstWh,审核 ──
+        // ── ① 调拨单:20 个单位移库到目标仓的真实仓位,审核 ──
         Map<String, Object> line = new LinkedHashMap<>();
         line.put("序号", 1);
         line.put("存货编码", item);
@@ -70,6 +78,7 @@ public class SeedDemoDocs {
         line.put("调出仓库编码", srcWh);
         line.put("调入仓库", dstWhName);
         line.put("调入仓库编码", dstWh);
+        line.put("调入仓位", bin);
         line.put("数量", 20);
         line.put("单价", src.get("price"));
         line.put("金额", 0);
@@ -77,16 +86,16 @@ public class SeedDemoDocs {
         String transferNo = createDoc("TRANSFER", Map.of(
                 "单据日期", java.time.LocalDate.now().toString(),
                 "业务类型", "调拨",
-                "调拨原因", "车间领用备料,由成品仓移至车间仓(演示数据)",
+                "调拨原因", "车间领用备料,由原料仓移至车间周转仓(演示数据)",
                 "备注", "演示单:调拨单审核即双腿过账 kucun(调出仓-20 / 调入仓+20),公司总库存不变"), line);
         audit("TRANSFER", transferNo);
         double srcAfter = dbl(one("SELECT ISNULL(yl,0) AS y FROM kucun WHERE wzdm=? AND ckdm=? AND lot_no=?", item, srcWh, lot).get("y"));
         double dstAfter = dbl(one("SELECT ISNULL(yl,0) AS y FROM kucun WHERE wzdm=? AND ckdm=? AND lot_no=?", item, dstWh, lot).get("y"));
         System.out.printf("  调拨单 %s 已审核:调出仓 %.1f → %.1f,调入仓 → %.1f%n", transferNo, before, srcAfter, dstAfter);
 
-        // ── ② 盘点单:对调出仓做一次单行抽盘,实盘 = 账面 + 8(盘盈),审核 ──
-        double bookBefore = srcAfter;
-        double actual = bookBefore + 8;
+        // ── ② 盘点单:对刚调入的仓做一次单行抽盘,实盘 = 账面 − 2(盘亏),仓位带真实库位 ──
+        double bookBefore = dstAfter;
+        double actual = bookBefore - 2;
         Map<String, Object> sline = new LinkedHashMap<>();
         sline.put("序号", 1);
         sline.put("存货编码", item);
@@ -94,8 +103,9 @@ public class SeedDemoDocs {
         sline.put("规格型号", str(src.get("规格型号")));
         sline.put("计量单位", str(src.get("计量单位")));
         sline.put("批号", lot);
-        sline.put("仓库", srcWhName);
-        sline.put("仓库编码", srcWh);
+        sline.put("仓库", dstWhName);
+        sline.put("仓库编码", dstWh);
+        sline.put("仓位", bin);
         sline.put("实盘数量", actual);
         sline.put("明细备注", "月末抽盘(演示单)");
         String takeNo = createDoc("STOCKTAKE", Map.of(
@@ -105,7 +115,7 @@ public class SeedDemoDocs {
                 "盘点人", "admin",
                 "备注", "演示单:盘点单审核按实盘差异调平 kucun(盘盈则入库、盘亏则出库)"), sline);
         audit("STOCKTAKE", takeNo);
-        double takeAfter = dbl(one("SELECT ISNULL(yl,0) AS y FROM kucun WHERE wzdm=? AND ckdm=? AND lot_no=?", item, srcWh, lot).get("y"));
+        double takeAfter = dbl(one("SELECT ISNULL(yl,0) AS y FROM kucun WHERE wzdm=? AND ckdm=? AND lot_no=?", item, dstWh, lot).get("y"));
         System.out.printf("  盘点单 %s 已审核:账面 %.1f → 现存量 %.1f(实盘 %.1f)%n", takeNo, bookBefore, takeAfter, actual);
         System.out.println("  结论:" + (Math.abs(takeAfter - actual) < 0.0001 ? "盘点后库存 == 实盘数量 ✔" : "盘点后库存 != 实盘 ✘"));
         System.out.println("\n保留单据:调拨单 " + transferNo + " / 盘点单 " + takeNo);

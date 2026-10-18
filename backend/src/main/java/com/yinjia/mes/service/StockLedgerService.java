@@ -165,7 +165,9 @@ public class StockLedgerService {
             if (forward) throw new IllegalStateException("调拨单 " + no + " 无明细行,不能记账");
             return;                                   // 弃审时无明细行 = 审核时也没记过账,直接放过
         }
-        for (Map<String, Object> r : rows) {
+        for (int idx = 0; idx < rows.size(); idx++) {
+            Map<String, Object> r = rows.get(idx);
+            int lineNo = idx + 1;
             String code = str(r.get("code"));
             String lot = str(r.get("lot"));
             double qty = num(r.get("qty"));
@@ -188,6 +190,12 @@ public class StockLedgerService {
             if (outCkdm.equalsIgnoreCase(inCkdm)) {
                 throw new IllegalStateException("调拨单 " + no + " 存在「调出仓库 = 调入仓库」的明细行(均为 "
                         + outWh[1] + "),同仓调拨没有意义,请改成一个不同的调入仓库");
+            }
+            // 库位校验(2026-10-18):进/出两个仓位各自必须属于对应的仓库。只在**审核**时卡
+            // (弃审是历史单回退,不该因为当年没填仓位而卡住)。
+            if (forward) {
+                ensureBinValid(no, lineNo, code, outWh[1], outCkdm, r.get("调出仓位"), "调出");
+                ensureBinValid(no, lineNo, code, inWh[1], inCkdm, r.get("调入仓位"), "调入");
             }
             // 入库腿的单价:优先行上填的,其次调出仓该批次的结存单价(kucun.price),都没有按 0 ——
             // 为什么必须给个数:流水 inh.金额 若为 NULL,v_stock_movement 收入金额即 NULL,
@@ -237,7 +245,9 @@ public class StockLedgerService {
             if (forward) throw new IllegalStateException("盘点单 " + no + " 无明细行,不能记账");
             return;
         }
-        for (Map<String, Object> r : rows) {
+        for (int idx = 0; idx < rows.size(); idx++) {
+            Map<String, Object> r = rows.get(idx);
+            int lineNo = idx + 1;
             String code = str(r.get("code"));
             String lot = str(r.get("lot"));
             Object rid = r.get("rid");
@@ -250,6 +260,9 @@ public class StockLedgerService {
             String ckdm = wh[0];
             r.put("仓库编码", ckdm);
             r.put("仓库名称", wh[1]);
+            // 库位校验(2026-10-18):该仓有仓位档案/已启用仓位管理 ⇒ 仓位必填;填了就必须属于本仓。
+            // 只在审核时卡(弃审是历史单回退,不因当年没填仓位而卡住)。
+            if (forward) ensureBinValid(no, lineNo, code, wh[1], ckdm, r.get("仓位"), "");
             // 单价:行上(只读,审核前为空) → 结存单价 → 0。理由同调拨(流水金额不能留 NULL)
             Double price = priceOf(r.get("price"));
             if (price == null) price = kucunPrice(code, ckdm, lot);
@@ -302,25 +315,110 @@ public class StockLedgerService {
         return jdbc.queryForList(
                 "SELECT l.[存货编码] AS code, l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price, l.[金额] AS 金额,"
                         + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
-                        + " l.[调出仓库] AS 调出仓库, l.[调出仓库编码] AS 调出仓库编码,"
-                        + " l.[调入仓库] AS 调入仓库, l.[调入仓库编码] AS 调入仓库编码,"
+                        + " l.[调出仓库] AS 调出仓库, l.[调出仓库编码] AS 调出仓库编码, l.[调出仓位编码] AS 调出仓位,"
+                        + " l.[调入仓库] AS 调入仓库, l.[调入仓库编码] AS 调入仓库编码, l.[调入仓位编码] AS 调入仓位,"
                         + " N'调拨单' AS 单据类型, h.[单据日期] AS 单据日期, h.[经手人] AS 经手人,"
                         + " NULL AS 往来单位"
                         + " FROM bl_transfer l LEFT JOIN bd_transfer h ON h.[单据编号] = l.[单据编号]"
-                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'"
+                        + " ORDER BY ISNULL(l.[序号], 0), l.id", no);
     }
 
-    /** 盘点单明细(多带 账面数量/实盘数量/差异数量 三列:审核要算差异、弃审要按留档反做)。 */
+    /** 盘点单明细(多带 仓位/账面数量/实盘数量/差异数量:审核要算差异、弃审要按留档反做)。 */
     private List<Map<String, Object>> loadStocktakeRows(String no) {
         return jdbc.queryForList(
                 "SELECT l.[存货编码] AS code, l.[批号] AS lot, l.[仓库] AS 行仓库, l.[仓库编码] AS 行仓库编码,"
+                        + " l.[仓位编码] AS 仓位,"
                         + " l.[账面数量] AS 账面数量, l.[实盘数量] AS 实盘数量, l.[差异数量] AS 差异数量,"
                         + " l.[单价] AS price, l.[金额] AS 金额,"
                         + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
                         + " N'盘点单' AS 单据类型, h.[单据日期] AS 单据日期, h.[经手人] AS 经手人,"
                         + " NULL AS 往来单位"
                         + " FROM bl_stocktake l LEFT JOIN bd_stocktake h ON h.[单据编号] = l.[单据编号]"
-                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'"
+                        + " ORDER BY ISNULL(l.[序号], 0), l.id", no);
+    }
+
+    // ══════════════════ 库位(仓位)校验:2026-10-18 ══════════════════
+
+    /**
+     * 校验一条明细行的仓位,不合法直接抛错(整笔回滚)。
+     *
+     * <h3>为什么在**审核**时校验,而不是只靠保存时</h3>
+     * 保存时的「仓位逐仓必填」({@code ButtonService.ensureBinRequiredFilled})是**通用弱校验**:
+     * 它只看 `bs_wh.启用仓位管理` 这一个开关,而且只校验"载荷里带了该键"的行(局部提交会跳过)。
+     * 库位是**账实口径的一部分**,必须在真正落账那一刻卡住 —— 所以这里再加一道强校验:
+     *
+     * <ol>
+     *   <li><b>填了就必须对</b>:必须是**该仓库**名下、未停用、未作废的仓位。
+     *       跨仓(拿 A 仓的仓位填 B 仓)、不存在、已停用 —— 一律拒绝。这条与仓库开不开仓位管理无关;</li>
+     *   <li><b>该管就必须填</b>:该仓库**已维护仓位档案**(bs_wh_loc 有行)或 `bs_wh.启用仓位管理=1`
+     *       ⇒ 仓位必填。比只看开关严一点,理由:某个仓一旦维护了仓位,业务上就是要按位管理,
+     *       空着等于让库位字段形同虚设;</li>
+     *   <li><b>不管就可以空</b>:仓库既没仓位档案也没启用仓位管理(系统现状:华北工控仓 346 行库存、
+     *       仓位档案 0 条)⇒ 允许留空,审核照常。</li>
+     * </ol>
+     *
+     * <p>⚠ 仓位的**记账边界**:`kucun`/`inh`/`outh` 只有 (物料, 仓库, 批号) 三键,**没有仓位维度**,
+     * 所以仓位是**单据留痕**,不参与结存 —— 与采购入库单/销售出库单完全同口径(实测 964 行 0 行填过)。
+     *
+     * @param role 该仓位在本行的角色(「调出」/「调入」/空),只用于报错话术
+     */
+    private void ensureBinValid(String no, int lineNo, String itemCode, String whName, String whCkdm,
+                                Object binValue, String role) {
+        String bin = str(binValue);
+        boolean manageByBin = warehouseManagesBin(whCkdm, whName);
+        if (bin == null) {
+            if (manageByBin) {
+                throw new IllegalStateException(no + " 第 " + lineNo + " 行(存货 " + itemCode + ")的["
+                        + (role.isEmpty() ? "仓位" : role + "仓位") + "]不能为空:仓库「"
+                        + (whName != null ? whName : whCkdm) + "」已维护仓位档案/已启用仓位管理,必须指定库位");
+            }
+            return;                                  // 该仓不管仓位:允许留空
+        }
+        List<Map<String, Object>> hit = jdbc.queryForList(
+                "SELECT TOP 1 l.[仓位编码] AS bin, l.[停用] AS stopped FROM bs_wh_loc l"
+                        + " WHERE RTRIM(l.[仓位编码]) = RTRIM(?)"
+                        + "   AND (RTRIM(ISNULL(l.[仓库编码], N'')) = RTRIM(?) OR RTRIM(ISNULL(l.[仓库], N'')) = RTRIM(?))"
+                        + "   AND ISNULL(l.[asp_cancel], N'N') <> N'Y'"
+                        + " ORDER BY l.id",
+                bin, whCkdm == null ? "" : whCkdm, whName == null ? "" : whName);
+        String label = role.isEmpty() ? "仓位" : role + "仓位";
+        if (hit.isEmpty()) {
+            throw new IllegalStateException(no + " 第 " + lineNo + " 行(存货 " + itemCode + ")的[" + label
+                    + "]「" + bin + "」不属于仓库「" + (whName != null ? whName : whCkdm)
+                    + "」,或该仓位已作废 —— 请重新选择");
+        }
+        Object stopped = hit.get(0).get("stopped");
+        if (stopped != null && (Boolean.TRUE.equals(stopped) || "1".equals(String.valueOf(stopped))
+                || "true".equalsIgnoreCase(String.valueOf(stopped)))) {
+            throw new IllegalStateException(no + " 第 " + lineNo + " 行(存货 " + itemCode + ")的[" + label
+                    + "]「" + bin + "」已停用,不能使用");
+        }
+    }
+
+    /**
+     * 该仓库是否"按仓位管理":有仓位档案(bs_wh_loc)或 bs_wh.启用仓位管理=1。
+     * 仓库档案查不到(编码/名称都不匹配)⇒ 按档案判断不了,退回"有没有仓位档案"这一条;
+     * 取不到就当**不要求**,宁可少拦也不误报(与 ButtonService.warehouseNeedsBin 同取向)。
+     */
+    private boolean warehouseManagesBin(String whCkdm, String whName) {
+        try {
+            Integer cnt = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM bs_wh_loc l"
+                            + " WHERE (RTRIM(ISNULL(l.[仓库编码], N'')) = RTRIM(?) OR RTRIM(ISNULL(l.[仓库], N'')) = RTRIM(?))"
+                            + "   AND ISNULL(l.[asp_cancel], N'N') <> N'Y'",
+                    Integer.class, whCkdm == null ? "" : whCkdm, whName == null ? "" : whName);
+            if (cnt != null && cnt > 0) return true;
+            Boolean flag = jdbc.queryForObject(
+                    "SELECT TOP 1 CONVERT(bit, ISNULL([启用仓位管理], 0)) FROM bs_wh"
+                            + " WHERE (RTRIM([仓库编码]) = RTRIM(?) OR RTRIM([仓库名称]) = RTRIM(?))"
+                            + "   AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    Boolean.class, whCkdm == null ? "" : whCkdm, whName == null ? "" : whName);
+            return Boolean.TRUE.equals(flag);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** 数值解析(null/空串/非数字 → null,与 {@link #num} 的"null→0"不同:这里要区分"没填"和"填了 0")。 */
