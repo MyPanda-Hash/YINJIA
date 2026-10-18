@@ -376,6 +376,7 @@ public class DcPlatformService {
         // 窗口末端不能越过“现在”:否则今天剩余的小时会被算成在线/离线时长(实测 14:18 上线却报在线 9.7h)
         if (winEnd.isAfter(now)) winEnd = now;
         if (winStart.isAfter(winEnd)) winStart = winEnd;
+        // 窗口宽度只用于提示(Bring 已知时长口径后在线率的分母不再是窗口,见 foldUsage)
         long winMs = Math.max(1L, Duration.between(winStart, winEnd).toMillis());
 
         List<Map<String, Object>> devices = jdbc.queryForList("""
@@ -394,6 +395,32 @@ public class DcPlatformService {
         for (Map<String, Object> log : logs) {
             logsByDevice.computeIfAbsent(intValue(log.get("device_id")), k -> new ArrayList<>()).add(log);
         }
+        // 没有状态日志时的兜底起点:该设备第一条采集流水的时刻(有上报就说明它那时是活的)
+        Map<Integer, LocalDateTime> firstSampleByDevice = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList("""
+                SELECT device_id, MIN(collect_at) AS first_at
+                  FROM bs_dc_sample
+                 WHERE ISNULL(asp_cancel, 'N') <> 'Y'
+                 GROUP BY device_id
+                """)) {
+            firstSampleByDevice.put(intValue(row.get("device_id")), toLocal(row.get("first_at")));
+        }
+        // 「这台设备第一次有痕迹」的时刻 = 首条状态日志 / 首条流水里更早的那个。
+        // 趋势图在此时刻之前不计该设备,避免把「还没接入的那些天」画成离线。
+        Map<Integer, LocalDateTime> knownStartByDevice = new HashMap<>();
+        for (Map.Entry<Integer, LocalDateTime> e : firstSampleByDevice.entrySet()) {
+            if (e.getValue() != null) knownStartByDevice.put(e.getKey(), e.getValue());
+        }
+        for (Map.Entry<Integer, List<Map<String, Object>>> e : logsByDevice.entrySet()) {
+            LocalDateTime first = null;
+            for (Map<String, Object> log : e.getValue()) {
+                LocalDateTime at = toLocal(log.get("changed_at"));
+                if (at != null && (first == null || at.isBefore(first))) first = at;
+            }
+            if (first == null) continue;
+            LocalDateTime prev = knownStartByDevice.get(e.getKey());
+            if (prev == null || first.isBefore(prev)) knownStartByDevice.put(e.getKey(), first);
+        }
         Map<Integer, Integer> alarmCount = new HashMap<>();
         for (Map<String, Object> row : jdbc.queryForList("""
                 SELECT device_id, COUNT(1) AS cnt
@@ -405,6 +432,7 @@ public class DcPlatformService {
         }
 
         int enabledTotal = 0;
+        int connectedTotal = 0;
         int onlineNow = 0;
         int offlineNow = 0;
         int disabled = 0;
@@ -415,25 +443,52 @@ public class DcPlatformService {
             boolean enabled = "Y".equalsIgnoreCase(str(row.get("enabled")));
             boolean online = enabled && isOnlineNow(row);
             String current = !enabled ? "disabled" : (online ? "online" : "offline");
+            // 是否接入过:有状态日志或有过上报。未接入的设备不进在线率分母(2026-10-18 用户口径)
+            boolean connectedNow = !((logsByDevice.get(id) == null || logsByDevice.get(id).isEmpty())
+                    && toLocal(row.get("last_seen_at")) == null);
             if (enabled) {
                 enabledTotal++;
+                if (connectedNow) connectedTotal++;
                 if (online) onlineNow++; else offlineNow++;
                 activeDevices.add(row);
             } else {
                 disabled++;
             }
-            long[] usage = foldUsage(logsByDevice.get(id), winStart, winEnd);
+            List<Map<String, Object>> devLogs = logsByDevice.get(id);
+            // 从未接入(没有状态日志、也没有任何上报)⇒ 时长/在线率一律 null,界面显示「-」,
+            // 不再把「设备还不存在的那段时间」算成离线 29 天(2026-10-18 用户口径)
+            boolean neverConnected = (devLogs == null || devLogs.isEmpty()) && toLocal(row.get("last_seen_at")) == null;
             Map<String, Object> d = new LinkedHashMap<>();
             d.put("deviceId", id);
             d.put("deviceCode", str(row.get("code")));
             d.put("deviceName", str(row.get("name")));
             d.put("deviceType", str(row.get("device_type")));
             d.put("currentStatus", current);
-            d.put("onlineSeconds", Math.round(usage[0] / 1000.0));
-            d.put("offlineSeconds", Math.round(usage[1] / 1000.0));
-            d.put("onlineRate", round1(usage[0] * 100.0 / winMs));
+            d.put("connected", !neverConnected);
+            if (neverConnected) {
+                d.put("onlineSeconds", null);
+                d.put("offlineSeconds", null);
+                d.put("onlineRate", null);
+                d.put("statusChanges", 0);
+            } else {
+                long[] usage = foldUsage(devLogs, winStart, winEnd);
+                // 兜底:有上报但没留下状态日志(例如设备状态一直是 online,没发生「离线→在线」切换)
+                // ⇒ 以第一条流水的时刻为已知起点、按在线计,避免时长全 0 而状态却显示在线
+                if (usage[0] + usage[1] == 0) {
+                    LocalDateTime first = firstSampleByDevice.get(id);
+                    if (first != null && first.isBefore(winEnd)) {
+                        LocalDateTime start = first.isBefore(winStart) ? winStart : first;
+                        usage = new long[]{Duration.between(start, winEnd).toMillis(), 0L, 0L};
+                    }
+                }
+                long knownMs = usage[0] + usage[1];
+                d.put("onlineSeconds", Math.round(usage[0] / 1000.0));
+                d.put("offlineSeconds", Math.round(usage[1] / 1000.0));
+                // 在线率只在「已知时长」上算(设备首次上线之前不计入分母)
+                d.put("onlineRate", knownMs <= 0 ? null : round1(usage[0] * 100.0 / knownMs));
+                d.put("statusChanges", usage[2]);
+            }
             d.put("alarmCount", alarmCount.getOrDefault(id, 0));
-            d.put("statusChanges", usage[2]);
             byDevice.add(d);
         }
 
@@ -442,7 +497,8 @@ public class DcPlatformService {
         summary.put("disabledTotal", disabled);
         summary.put("onlineNow", onlineNow);
         summary.put("offlineNow", offlineNow);
-        summary.put("onlineRate", enabledTotal == 0 ? null : round1(onlineNow * 100.0 / enabledTotal));
+        summary.put("connectedTotal", connectedTotal);
+        summary.put("onlineRate", connectedTotal == 0 ? null : round1(onlineNow * 100.0 / connectedTotal));
 
         List<Map<String, Object>> trend = new ArrayList<>();
         for (LocalDate day = fromDate; !day.isAfter(toDate); day = day.plusDays(1)) {
@@ -451,7 +507,20 @@ public class DcPlatformService {
             int online = 0;
             int offline = 0;
             for (Map<String, Object> row : activeDevices) {
-                String st = statusAt(logsByDevice.get(intValue(row.get("id"))), snapshot);
+                int did = intValue(row.get("id"));
+                LocalDateTime known = knownStartByDevice.get(did);
+                // 还没接入 / 那天还不存在 ⇒ 不进趋势(不算在线也不记离线)
+                if (known == null || snapshot.isBefore(known)) continue;
+                List<Map<String, Object>> devLogs = logsByDevice.get(did);
+                String st;
+                if (devLogs == null || devLogs.isEmpty()) {
+                    // 没有状态日志:在「首条上报 ~ 最近上报 + 离线窗口」之间算在线,窗口之后算离线
+                    LocalDateTime lastSeen = toLocal(row.get("last_seen_at"));
+                    long win = offlineWindow(row);
+                    st = (lastSeen == null || snapshot.isAfter(lastSeen.plusSeconds(win))) ? "offline" : "online";
+                } else {
+                    st = statusAt(devLogs, snapshot);
+                }
                 if ("online".equalsIgnoreCase(st)) online++; else offline++;
             }
             Map<String, Object> t = new LinkedHashMap<>();
@@ -496,28 +565,41 @@ public class DcPlatformService {
         return out;
     }
 
-    /** 折叠某设备在窗口内的在线/离线时长(毫秒)+ 状态变化次数;窗口起点前的最后状态作为初始态。 */
+    /**
+     * 折叠某设备在窗口内的在线/离线时长(毫秒)+ 状态变化次数。
+     * 口径(2026-10-18 修正):**只统计有状态日志之后的时间**;
+     * 设备第一次上线之前那段「还不存在」的时间不计为离线,否则一台当天接入的设备
+     * 会显示「离线 29 天」。完全没有日志 ⇒ 返回 {0,0,0},由调用方判为「从未接入」。
+     */
     private static long[] foldUsage(List<Map<String, Object>> logs, LocalDateTime winStart, LocalDateTime winEnd) {
+        if (logs == null || logs.isEmpty()) return new long[]{0L, 0L, 0L};
         long onlineMs = 0L;
         long offlineMs = 0L;
-        long changes = logs == null ? 0L : logs.size();
-        String state = "offline";
-        LocalDateTime cursor = winStart;
-        if (logs != null) {
-            for (Map<String, Object> log : logs) {
-                LocalDateTime at = toLocal(log.get("changed_at"));
-                if (at == null) continue;
-                if (!at.isAfter(winStart)) {
-                    state = str(log.get("status"));
-                    continue;
-                }
-                if (at.isAfter(winEnd)) break;
-                long seg = Math.max(0L, Duration.between(cursor, at).toMillis());
-                if ("online".equalsIgnoreCase(state)) onlineMs += seg; else offlineMs += seg;
+        long changes = logs.size();
+        String state = null;
+        LocalDateTime cursor = null;
+        for (Map<String, Object> log : logs) {
+            LocalDateTime at = toLocal(log.get("changed_at"));
+            if (at == null) continue;
+            if (!at.isAfter(winStart)) {
+                // 窗口开始前就有的状态:窗口起点即已知,从 winStart 起算
+                state = str(log.get("status"));
+                cursor = winStart;
+                continue;
+            }
+            if (at.isAfter(winEnd)) break;
+            if (state == null) {
+                // 第一条日志落在窗口内 —— 它之前的时间未知,从这一刻开始算
                 state = str(log.get("status"));
                 cursor = at;
+                continue;
             }
+            long seg = Math.max(0L, Duration.between(cursor, at).toMillis());
+            if ("online".equalsIgnoreCase(state)) onlineMs += seg; else offlineMs += seg;
+            state = str(log.get("status"));
+            cursor = at;
         }
+        if (state == null) return new long[]{0L, 0L, 0L};
         long tail = Math.max(0L, Duration.between(cursor, winEnd).toMillis());
         if ("online".equalsIgnoreCase(state)) onlineMs += tail; else offlineMs += tail;
         return new long[]{onlineMs, offlineMs, changes};
