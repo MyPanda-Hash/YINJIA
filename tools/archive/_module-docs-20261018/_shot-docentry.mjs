@@ -61,6 +61,24 @@ async function main() {
       return f
     }
 
+    const shotEl = async (sel, name, w, h) => {
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 500 })
+      await sleep(600)
+      await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (e) e.scrollIntoView({ block: 'center' }); return 1 })()`)
+      await sleep(500)
+      const raw = await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return 'null'; const r = e.getBoundingClientRect(); return JSON.stringify({ x: r.left, y: r.top + window.scrollY, width: r.width, height: r.height }) })()`)
+      if (!raw || raw === 'null') return null
+      const rect = JSON.parse(raw)
+      const r2 = await cdp.send('Page.captureScreenshot', {
+        format: 'png', captureBeyondViewport: true, fromSurface: true,
+        clip: { x: Math.max(0, rect.x), y: Math.max(0, rect.y), width: rect.width, height: rect.height, scale: 1 },
+      })
+      const f2 = path.join(OUT, name + '.png')
+      fs.writeFileSync(f2, Buffer.from(r2.result.data, 'base64'))
+      console.log('   截图', path.basename(f2), Math.round(rect.width) + 'x' + Math.round(rect.height))
+      return f2
+    }
+
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false })
     await cdp.send('Page.navigate', { url: `${BASE}/#/login` })
     await waitFor(`document.querySelectorAll('.login-form input').length >= 2`, 25000)
@@ -98,7 +116,8 @@ async function main() {
       { key: 'stock', tab: '库存', expect: true },
       { key: 'sales', tab: '销售', expect: true },
       { key: 'quality', tab: '质量', expect: true },
-      { key: 'rd', tab: '研发管理', expect: false },   // 研发页已有「最新单据」,按决策未加卡
+      // 研发页(2026-10-18 补):原「最新单据」卡换成本模块单据入口(compact 单列),与其它四模块同一口径
+      { key: 'rd', tab: '研发管理', expect: true, empty: false },
     ]
     const results = []
     for (const m2 of MODULES) {
@@ -135,7 +154,20 @@ async function main() {
       if (cards[0] && cards[0].rows.length) console.log('    前 2 行: ' + JSON.stringify(cards[0].rows.slice(0, 2)))
       await ev(`(() => { const c = document.querySelector('.doc-entry'); if (c) c.scrollIntoView({ block: 'center' }); return 1 })()`)
       await shot('docentry-' + m2.key + '-1440', 1440, 1000)
+      await shotEl('.doc-entry', 'card-' + m2.key + '-1440', 1440, 1000)
+      // 768(平板)也过一遍:研发页栅格 2026-10-18 由写死 3 栏改为随屏宽收栏,这里留证据
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 1000, deviceScaleFactor: 1, mobile: false })
+      await sleep(700)
+      await ev(`(() => { const c = document.querySelector('.doc-entry'); if (c) c.scrollIntoView({ block: 'center' }); return 1 })()`)
+      await sleep(400)
+      await shot('docentry-' + m2.key + '-768', 768, 1000)
+      const of768 = await ev(`(() => {
+        const c = document.querySelector('.doc-entry'); const de = document.documentElement
+        return { card: c ? c.scrollWidth > c.clientWidth + 1 : null, s: de.scrollWidth, cw: de.clientWidth }
+      })()`)
+      console.log('    [768] ' + JSON.stringify(of768))
       await shot('docentry-' + m2.key + '-375', 375, 1400)
+      await shotEl('.doc-entry', 'card-' + m2.key + '-375', 375, 1400)
       const of375 = await ev(`(() => {
         const c = document.querySelector('.doc-entry'); const de = document.documentElement
         return { card: c ? c.scrollWidth > c.clientWidth + 1 : null, s: de.scrollWidth, cw: de.clientWidth }
@@ -147,32 +179,46 @@ async function main() {
       }
       console.log('    [375] ' + JSON.stringify(of375))
       const okRow = m2.empty ? (has && rows === 0) : (has && rows > 0)
-      results.push({ m: m2, ok: m2.expect ? okRow : !has, cards, rows, of375 })
+      results.push({ m: m2, ok: m2.expect ? okRow : !has, cards, rows, of375, of768 })
     }
 
-    // 点击验证:在「库存」(有真实单据)点第一张单据 → 应跳到对应单据面板
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false })
-    await sleep(800)
-    await ev(`(() => { const tabs = [...document.querySelectorAll('.mod-tab')]
-      const t = tabs.find((b) => b.textContent.indexOf('库存') >= 0); if (t) t.click(); return 1 })()`)
-    await waitFor(`document.querySelectorAll('.doc-entry .doc-item').length > 0`, 9000)
-    await sleep(600)
-    const before = await ev('location.hash')
-    const firstNo = await ev(`(() => { const b = document.querySelector('.doc-entry .doc-item'); return b ? b.textContent.replace(/\s+/g, ' ').trim() : '' })()`)
-    await ev(`(() => { const b = document.querySelector('.doc-entry .doc-item'); if (!b) return 0; b.click(); return 1 })()`)
-    await sleep(4500)
-    const after = await ev('location.hash')
-    console.log('[click] 第一张单据=' + firstNo)
-    console.log('[click] before=' + before + ' after=' + after)
-    await shot('docentry-after-click', 1440, 1000)
-    const clickedOk = after !== before && String(after).indexOf('panel') >= 0
+    // 点击验证(2026-10-18 补):五个模块逐个点第一张单据 → 必须跳到 /panelx/list/<panelCode>
+    // 生产当前无单据 ⇒ 该模块记录 skipped(空态由上面的 empty 断言覆盖),不算失败。
+    const clickResults = []
+    for (const m2 of MODULES) {
+      await ev(`(location.hash = '#/dashboard', 'ok')`)
+      await waitFor(`document.querySelectorAll('.mod-tab').length > 0`, 15000)
+      await sleep(700)
+      await ev(`(() => { const tabs = [...document.querySelectorAll('.mod-tab')]
+        const t = tabs.find((b) => b.textContent.replace(/\\s+/g, '').indexOf(${JSON.stringify(m2.tab)}) >= 0)
+        if (t) t.click(); return 1 })()`)
+      const hasRow = await waitFor(`document.querySelectorAll('.doc-entry .doc-item').length > 0`, 12000)
+      if (!hasRow) {
+        console.log('[click] ' + m2.key + ' 无单据行 ⇒ skipped')
+        clickResults.push({ key: m2.key, ok: m2.empty === true, skipped: true })
+        continue
+      }
+      await sleep(400)
+      const before = await ev('location.hash')
+      const firstNo = await ev(`(() => { const b = document.querySelector('.doc-entry .doc-item'); return b ? b.textContent.replace(/\\s+/g, ' ').trim() : '' })()`)
+      await ev(`(() => { const b = document.querySelector('.doc-entry .doc-item'); if (!b) return 0; b.click(); return 1 })()`)
+      const routed = await waitFor(`location.hash.indexOf('/panelx/list/') >= 0`, 9000)
+      await sleep(1600)
+      const after = await ev('location.hash')
+      const ok = routed && after !== before
+      console.log('[click] ' + m2.key + ' 「' + firstNo.split('›')[0].trim() + '」 → ' + after + (ok ? '' : '  ← FAIL'))
+      await shot('docentry-click-' + m2.key, 1440, 1000)
+      clickResults.push({ key: m2.key, ok })
+    }
+    const clickedOk = clickResults.filter((r) => !r.skipped).every((r) => r.ok)
 
     console.log('[net] ' + JSON.stringify(netLog))
     const bad = results.filter((r) => !r.ok)
     console.log('[summary] ' + results.map((r) => r.m.key + '=' + (r.ok ? 'OK' : 'FAIL')).join(' ') +
       ' click=' + (clickedOk ? 'OK' : 'FAIL'))
-    const pass = bad.length === 0 && clickedOk && !results.some((r) => r.of375 && r.of375.card)
-    console.log(pass ? '[PASS] 四模块单据入口渲染 + 最近 7 张单据 + 点击跳转 + 卡片无横向溢出' : '[FAIL] 见上面各项')
+    const pass = bad.length === 0 && clickedOk &&
+      !results.some((r) => (r.of375 && r.of375.card) || (r.of768 && r.of768.card))
+    console.log(pass ? '[PASS] 五模块单据入口渲染 + 最近 7 张单据 + 点击跳转 + 卡片无横向溢出' : '[FAIL] 见上面各项')
   } finally {
     try { cdp && cdp.close() } catch { /* ignore */ }
     try { cdp && cdp.close() } catch { /* ignore */ }

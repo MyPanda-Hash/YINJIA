@@ -12,7 +12,7 @@
     <div v-if="loading" class="doc-empty">{{ tt('加载中…') }}</div>
     <div v-else-if="!docs.length" class="doc-empty">{{ tt('暂无单据') }}</div>
     <template v-else>
-      <div class="doc-list">
+      <div class="doc-list" :class="{ compact }">
         <button
           v-for="d in docs"
           :key="d.panelCode + ':' + d.docNo"
@@ -41,6 +41,9 @@ const props = defineProps({
   module: { type: String, required: true },
   // 取几张:默认 7(用户口径「显示最新的 7 张单据」)
   limit: { type: Number, default: 7 },
+  // 窄卡片(研发页塞在 3 栏栅格的一格里,宽约 430px):列表改单列、徽标与单号收窄,
+  // 否则两列时 badge+单号的最小宽度之和会超出格子
+  compact: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open'])
 
@@ -116,6 +119,16 @@ onMounted(load)
   .doc-list {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+/* 窄卡片单列(研发页 3 栏栅格里的那一格) */
+.doc-list.compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+.doc-list.compact .doc-badge {
+  max-width: 104px;
+}
+.doc-list.compact .doc-no {
+  max-width: 170px;
 }
 .doc-item {
   display: flex;

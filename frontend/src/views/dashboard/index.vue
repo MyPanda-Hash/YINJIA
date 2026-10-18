@@ -435,17 +435,10 @@
             </button>
           </div>
         </section>
-        <section class="card rd-feed">
-          <div class="card-head"><h3>{{ tt('最新单据') }}</h3><span class="rd-sub">{{ tt('各面板最近新增') }}</span></div>
-          <div v-if="!rdData.newDocs.length" class="rd-empty">{{ tt('暂无单据') }}</div>
-          <div v-else class="rd-list">
-            <button v-for="(d, i) in rdData.newDocs" :key="i" type="button" class="rd-item" @click="goPanel(d.panelCode, d.docNo)">
-              <span class="rd-badge new">{{ tt('新增') }}</span>
-              <span class="rd-txt" :title="`${tt(d.panelName)} ${d.docNo}`">{{ tt(d.panelName) }} {{ d.docNo }}</span>
-              <span class="rd-meta">{{ d.creator || '-' }} · {{ fmtRdTime(d.at) }}</span>
-            </button>
-          </div>
-        </section>
+        <!-- 单据入口(2026-10-18):研发页原本的「最新单据」就是同一件事(各面板最近新增、点行跳面板),
+             用户要求五个模块都有「单据入口」⇒ 这里直接换成本模块单据入口卡(最近 7 张,单列紧凑),
+             不再并列两张"最新单据"卡片。compact 见 DocEntry.vue。 -->
+        <DocEntry class="rd-feed" module="rd" compact @open="onDocOpen" />
         <section class="card rd-archive">
           <div class="card-head"><h3>{{ tt('面板档案本') }}</h3><span class="rd-sub">{{ tt('像翻档案一样查阅各面板文件') }}</span></div>
           <div class="rd-chips">
@@ -2236,6 +2229,18 @@ function go(path, title) {
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 14px;
+}
+/* 研发页栅格随屏宽收栏(2026-10-18):原只写死 3 栏 —— 375 宽时每格仅 ~109px,
+   卡片内容横向溢出(单据入口卡实测 scrollWidth > clientWidth)。中屏 2 栏、手机单栏。 */
+@media (max-width: 1100px) {
+  .rd-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .rd-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .card-head {
   display: flex;
