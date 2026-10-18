@@ -245,8 +245,11 @@ export const menuTree = [
     //    所属业务对象下(如 智能供应链·销售管理:销售订单 → 销售订单明细表 → 销售订单统计表)。
     // 现终态:二级只剩 6 个业务域(生产计划/生产执行/生产记录/设备维护/样品管理/经典单据),
     // 4 张明细/统计面板按业务对象并入 生产计划 / 经典单据;LeftNav 的 mfg 特判已删除,全部模块走同一条通用分支。
-    // 2026-10-16 再收敛:样品管理 / 经典单据 两组随其仅有的 5 个叶子一并下架 ⇒ 现为 4 个业务域
-    // (生产计划/生产执行/生产记录/设备维护),详见下方该两组的摘除注释。
+    // 2026-10-16 再收敛:样品管理 / 经典单据 两组随其仅有的 5 个叶子一并下架 ⇒ 现为 3 个业务域
+    // (生产计划 / 生产过程 / 设备维护),详见下方该两组的摘除注释。
+    // 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」:
+    //   原「生产执行」「生产记录」两个二级目录合并为「生产过程」一组(10 张面板入口原样保留,
+    //   执行 4 项在前、记录 6 项在后)⇒ 4 个业务域变 3 个。只动菜单分组,面板/路由/权限零改动。
     children: [
       {
         // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
@@ -292,18 +295,20 @@ export const menuTree = [
         ],
       },
       {
-        // 生产执行(五道工序:领料/报工)
-        code: 'exec', title: '生产执行', children: [
+        // 生产过程(2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」)
+        // 合并前是两个并列二级目录:
+        //   生产执行(五道工序:领料/报工)= 工序报工单 / 报工记录 / 完工明细 / 生产异常处理单
+        //   生产记录(29份真实单据·家族面板)= 生产日报表 / 投料确认单 / 物料混合记录 / 造粒记录 / 无黑处理登记 / 封箱确认
+        // 合并只动菜单分组:**10 个面板入口、面板码、路径、顺序一律不变**(执行 4 项在前、记录 6 项在后),
+        // 所以路由/权限/面板元数据零改动,可随时按本段注释回滚成两组。
+        code: 'prodProcess', title: '生产过程', icon: 'Notebook', children: [
+          // ── 原「生产执行」4 项 ──
           { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
           { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
           { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
           // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
           { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
-        ],
-      },
-      {
-        // 生产记录(29份真实单据·家族面板)
-        code: 'records', title: '生产记录', icon: 'Notebook', children: [
+          // ── 原「生产记录」6 项 ──
           { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
           { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
           { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },

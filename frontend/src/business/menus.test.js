@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import { menuTree, filterMenuTree } from './menus.js'
 
 /** 研发管理二级目录:按研发流程分组(项目管理 / 测试记录 / 产品文件 / 共享文件) */
-test('完工明细为生产执行下的独立通用列表', () => {
-  const exec = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'exec')
-  const entry = exec.children.find((n) => n.panelCode === 'WO_COMPLETION_LIST')
+test('完工明细为生产过程下的独立通用列表', () => {
+  const proc = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'prodProcess')
+  const entry = proc.children.find((n) => n.panelCode === 'WO_COMPLETION_LIST')
   assert.equal(entry?.title, '完工明细')
   assert.equal(entry?.path, '/panelx/list/WO_COMPLETION_LIST')
 })
@@ -118,17 +118,39 @@ test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () =>
  * 终态 = 二级只剩 6 个业务域,4 张明细/统计面板按业务对象并入 生产计划 / 经典单据。
  * 2026-10-16:样品管理 / 经典单据 两组随其仅有的 5 个叶子整体下架 ⇒ 6 → 4 个业务域。
  */
-test('生产制造二级目录 = 4 个业务域(拍平「生产管理」空壳层 + 取消「明细表/统计表」大类 + 摘两组)', () => {
+test('生产制造二级目录 = 3 个业务域(生产执行+生产记录合并为生产过程)', () => {
   const mfg = menuTree.find((n) => n.code === 'mfg')
   assert.deepEqual((mfg.children || []).map((c) => c.code),
-    ['plan', 'exec', 'records', 'device'])
+    ['plan', 'prodProcess', 'device'])
   assert.deepEqual((mfg.children || []).map((c) => c.title),
-    ['生产计划', '生产执行', '生产记录', '设备维护'])
+    ['生产计划', '生产过程', '设备维护'])
+  // 合并后不得再留旧的「生产执行」「生产记录」两个分组
+  assert.ok(!(mfg.children || []).some((c) => c.code === 'exec'), '不应再有 exec 分组')
+  assert.ok(!(mfg.children || []).some((c) => c.code === 'records'), '不应再有 records 分组')
+  assert.ok(!(mfg.children || []).some((c) => c.title === '生产执行' || c.title === '生产记录'),
+    '不应再有「生产执行」「生产记录」分组')
   // 空壳层 / 类型大类都不得回来
   assert.ok(!(mfg.children || []).some((c) => c.code === 'prod'), '不应再有 prod 空壳层')
   assert.ok(!(mfg.children || []).some((c) => c.title === '生产管理'), '不应再有「生产管理」空壳层')
   assert.ok(!(mfg.children || []).some((c) => c.title === '明细表' || c.title === '统计表'),
     '明细表/统计表不应再是二级大类')
+})
+
+/**
+ * 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」。
+ * 合并只改菜单分组,**10 个面板入口与顺序保持原样**:原生产执行 4 项在前、原生产记录 6 项在后。
+ * 顺序被钉住是为了防止合并时不小心丢项或重排(用户按现有位置找菜单)。
+ */
+test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不变', () => {
+  const proc = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'prodProcess')
+  assert.deepEqual((proc.children || []).map((c) => c.panelCode), [
+    'WO_REPORT', 'WO_REPORT_LIST', 'WO_COMPLETION_LIST', 'PROD_ABN',
+    'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
+  ])
+  assert.deepEqual((proc.children || []).map((c) => c.title), [
+    '工序报工单', '报工记录', '完工明细', '生产异常处理单',
+    '生产日报表', '投料确认单', '物料混合记录', '造粒记录', '无黑处理登记', '封箱确认',
+  ])
 })
 
 /**
