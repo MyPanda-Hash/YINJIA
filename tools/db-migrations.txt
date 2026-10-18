@@ -3935,3 +3935,10 @@ migrate-emp-import-20261019.sql
 #   看板(DashboardStatsService.quality)直接 SUM 明细的送检/合格/不合格数量,故自动一致。
 #   幂等:qc_insp.asp_user2='qc-realize-20261018' 为完成标记;两账套均执行。
 migrate-qc-insp-realize-20261018.sql
+# 清 11 张真实来料检验单的残留审核状态(用户 2026-10-18「把 yj_doc_status 里这 11 条清掉」):
+#   IJ-2026-09-0152 / IJ-2026-10-0011~0020 是「暂收单审核→自动生成检验单」的真实单,qc_insp.单据状态
+#   本就是草稿,但 yj_doc_status 里各有一条残留记录(shr=admin、shsj 有值)⇒ 界面「审核状态」列与印章
+#   显示「已审核」,与表内状态打架、单据走不了流程。只清 panel_code='QC_INSP' 且单号在白名单内的行。
+#   实测 yj_form_approval 命中 0 条(无审批留痕要清);form_flow_link 的流转链不动。
+#   守卫:11 张必须仍为草稿(业务审过就拒绝)、命中行数必须正好 11。幂等;两账套均执行。
+migrate-qc-insp-clear-11-docstatus-20261018.sql
