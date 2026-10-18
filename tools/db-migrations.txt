@@ -3840,3 +3840,9 @@ migrate-pu-order-detail-stats-20261018.sql
 #   建表 bd_/bl_transfer + bd_/bl_stocktake(含 MS_Description)、4 视图(明细/统计)、6 面板、
 #   字段/九语译名/角色授权;幂等,两账套均执行。记账见 StockLedgerService.applyTransfer/applyStocktake。
 migrate-transfer-stocktake-20261018.sql
+
+# migrate-erp-integ-config-20261018.sql — ERP系统集成:集成配置三张表 + 种子(接口/字段映射/设备绑定)
+#   建表 erp_integ_api / erp_integ_field / erp_integ_device(含 MS_Description 与三个索引)、
+#   ERPLG/ERPLG_ROW 归入 module_group「ERP系统集成」、23 条接口(导入 11 / 转出 12)+ 165 行字段映射 +
+#   14 行设备绑定(bs_equip)+ 中/英/日/繁等译名;幂等,两账套均执行。界面=ERP系统集成·ERP集成配置清单。
+migrate-erp-integ-config-20261018.sql

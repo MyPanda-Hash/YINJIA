@@ -106,6 +106,9 @@ table:day_report_detail   # 生产日报表行表(姓名/时间/产品/数量/�
 table:equip_check   # 设备点检记录头表
 table:equip_check_detail   # 设备点检记录行表(检查内容/方法/标准/结果/解决措施)
 table:erp_imp_log   # ERP导入日志(金蝶星辰数据导入批次)
+table:erp_integ_api   # ERP集成接口配置(2026-10-18):一张接口一行 = 方向(导入/转出)+分类(基础资料/单据/设备)+接口地址+对应MES面板+启用/排序;界面=ERP系统集成·ERP集成配置清单
+table:erp_integ_device   # ERP集成设备绑定(2026-10-18):接口×设备(设备编码取 bs_equip),带用途(产量采集/点检对象/保养对象/数据来源)
+table:erp_integ_field   # ERP集成字段映射(2026-10-18):一行 = MES字段/常量 → 金蝶接口字段,带映射层级/转换规则/必填
 table:feed_confirm   # 投料确认单头表(阶段:溶解/合成/A液/B液/浆体)
 table:feed_confirm_detail   # 投料确认单行表(投料成分/理论/实际)
 table:form_flow_link   # 单据流链接表(上游生单→下游单据占用,link_status=ACTIVE|RELEASED)
