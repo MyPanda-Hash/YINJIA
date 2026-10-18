@@ -3875,6 +3875,21 @@ export default {
     '报工审核通过': 'Job report approved',
     '转领料单 / 排产': 'To picking / schedule',
 
+    /* ── 系统管理平台 /sys/console(2026-10-18 改版:该一级目录降级为系统功能入口页) ── */
+    '系统功能': 'System Functions',
+    '系统管理': 'System Admin',
+    '账号信息': 'Account Info',
+    '显示设置': 'Display Settings',
+    '管理员功能': 'Admin Functions',
+    '请填写完整': 'Please fill in all fields',
+    '新密码至少 6 位': 'New password must be at least 6 characters',
+    '两次输入的新密码不一致': 'The two new passwords do not match',
+    '密码修改成功，请用新密码重新登录': 'Password changed, please sign in again',
+    '修改密码失败': 'Failed to change password',
+    '已刷新': 'Refreshed',
+    '刷新失败': 'Refresh failed',
+    '改密后请用新密码重新登录。': 'Sign in again with the new password after changing it.',
+    '部门/账号/角色与面板权限；全公司使用留痕。': 'Departments, accounts, roles & panel permissions; company-wide usage trail.',
   },
 
 }

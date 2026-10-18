@@ -38,11 +38,15 @@ RAISERROR(N'[OK] %s 数据建模 4 张对全部非管理员角色开只读(本�
 GO
 
 /* 自检:4 张都授权、且只读 */
+/* ⚠ 断言按**显式面板码**统计,不能用 module_group='数据建模':2026-10-18 起「系统管理平台」的 32 张
+   也归入了数据建模(migrate-sysadmin-panels-to-dm-20261018.sql),用分组统计会让本脚本重放时误报 FAIL。*/
+DECLARE @dmp2 TABLE (panel_code varchar(40) PRIMARY KEY);
+INSERT INTO @dmp2 (panel_code) VALUES (N'FIELDMGR'), (N'ZDGL'), (N'ERPLG'), (N'ERPLG_ROW');
 DECLARE @want int = (SELECT COUNT(*) FROM yj_role r CROSS JOIN (SELECT 1 AS x) t WHERE r.id <> 1) * 4;
-DECLARE @cnt int = (SELECT COUNT(*) FROM yj_role_panel r JOIN yj_panel p ON p.panel_code = r.panel_code
-                     WHERE r.role_id <> 1 AND p.module_group = N'数据建模');
-DECLARE @w int = (SELECT COUNT(*) FROM yj_role_panel r JOIN yj_panel p ON p.panel_code = r.panel_code
-                   WHERE r.role_id <> 1 AND p.module_group = N'数据建模'
+DECLARE @cnt int = (SELECT COUNT(*) FROM yj_role_panel r JOIN @dmp2 d ON d.panel_code = r.panel_code
+                     WHERE r.role_id <> 1);
+DECLARE @w int = (SELECT COUNT(*) FROM yj_role_panel r JOIN @dmp2 d ON d.panel_code = r.panel_code
+                   WHERE r.role_id <> 1
                      AND (r.perms LIKE '%add%' OR r.perms LIKE '%modify%' OR r.perms LIKE '%del%'));
 IF @cnt <> @want RAISERROR(N'[FAIL] 非管理员角色只授到 %d 行(期望 %d)', 16, 1, @cnt, @want);
 IF @w > 0 RAISERROR(N'[FAIL] 数据建模出现 %d 条写权限(应只读)', 16, 1, @w);

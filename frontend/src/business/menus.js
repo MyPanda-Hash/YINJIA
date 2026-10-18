@@ -468,20 +468,9 @@ export const menuTree = [
           { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
         ],
       },
-    ],
-  },
-  // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
-  //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
-  //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
-  //   (财务类面板本就走「系统管理平台 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
-  // 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
-  //   **只改显示标题**,一级目录 code 仍为 'base'(路由/展开态/页签/权限都不按标题走);
-  //   二级分组(基础数据/物料及价格/生产/财务)与面板一个没动。
-  {
-    code: 'base',
-    title: '系统管理平台',
-    icon: 'Setting',
-    children: [
+      // 2026-10-18 用户口径「把现在系统管理平台里面的面板全部挪到数据建模」:原「系统管理平台」的
+      //   基础数据 / 物料及价格 / 生产 / 财务 四组(32 张面板)**整组搬到这里**,分组 code 不变
+      //   (yj_panel.module_group 同批改为「数据建模」⇒ 权限矩阵里这 32 张也归到本模块组)。
       {
         code: 'bdata',
         title: '基础数据',
@@ -558,6 +547,38 @@ export const menuTree = [
       },
     ],
   },
+  // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
+  //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
+  //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
+  //   (财务类面板本就走「系统管理平台 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
+  // 2026-10-18 用户口径:「将基础档案改名为系统管理平台」。
+  //   **只改显示标题**,一级目录 code 仍为 'base'(路由/展开态/页签/权限都不按标题走)。
+  //   同日第二轮:原二级分组(基础数据/物料及价格/生产/财务)共 32 张面板整组移到「数据建模」,
+  //   本目录只剩「系统功能」一组入口 —— 详见下方 sysFunc 注释。
+  {
+    code: 'base',
+    title: '系统管理平台',
+    icon: 'Setting',
+    children: [
+      {
+        // 2026-10-18 用户口径:「把现在系统管理平台里面的面板全部挪到数据建模,然后把这个做成入口写到系统管理平台里面」
+        //   ⇒ 原四组(基础数据/物料及价格/生产/财务)共 32 张面板**整组**移到一级目录「数据建模」
+        //   (menus.js dm 末尾,分组 code 与原题目一个没改;yj_panel.module_group 同批改为「数据建模」,
+        //   见 tools/migrate-sysadmin-panels-to-dm-20261018.sql)。
+        //   本目录不再挂任何业务面板,只做**系统功能入口**(顶栏用户下拉里那几个系统功能都收在这一页);
+        //   组织架构/使用权限查看 = 管理员专属(adminOnly ⇒ filterMenuTree 只对 isAdmin 放行,
+        //   路由侧 meta.requireAdmin 双保险)。
+        code: 'sysFunc',
+        title: '系统功能',
+        icon: 'Monitor',
+        children: [
+          { code: 'sysConsole', title: '系统管理', path: '/sys/console', icon: 'Monitor' },
+          { code: 'sysOrg', title: '组织架构', path: '/sys/org', icon: 'OfficeBuilding', adminOnly: true },
+          { code: 'sysUsage', title: '使用权限查看', path: '/sys/usage', icon: 'View', adminOnly: true },
+        ],
+      },
+    ],
+  },
 ]
 
 function walk(node, fn) {
@@ -602,6 +623,9 @@ export function filterMenuTree(tree, visiblePanels, isAdmin) {
   const filterNode = (nodes) => {
     const out = []
     for (const n of nodes) {
+      // adminOnly:整枝只对管理员可见(如「系统功能 → 组织架构 / 使用权限查看」)。
+      //   这类叶子没有 panelCode 却带 path,原来会在下面那条 if (n.path) 里被判成有权而放行。
+      if (n.adminOnly) continue
       if (n.panelCode) {
         if (vis.includes(n.panelCode)) out.push({ ...n })
         continue
