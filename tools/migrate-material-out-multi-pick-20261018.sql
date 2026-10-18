@@ -52,10 +52,11 @@ ELSE
 GO
 
 /* ② 中文注明:一张工单行可有多张领料单,单号以英文逗号分隔 */
-IF EXISTS (SELECT 1 FROM sys.extended_properties
-           WHERE major_id = OBJECT_ID(N'dbo.plang')
-             AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.plang'), N'll_no2', 'ColumnId')
-             AND name = N'MS_Description')
+IF EXISTS (SELECT 1 FROM sys.extended_properties ep
+           WHERE ep.class = 1
+             AND ep.major_id = OBJECT_ID(N'dbo.plang')
+             AND ep.minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.plang'), N'll_no2', 'ColumnId')
+             AND ep.name = N'MS_Description')
 BEGIN
     EXEC sys.sp_updateextendedproperty
          @name = N'MS_Description',

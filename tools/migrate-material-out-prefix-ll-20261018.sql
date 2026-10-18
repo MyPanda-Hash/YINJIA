@@ -49,9 +49,22 @@ IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = N'MATERIAL_OUT' AND pre
 IF (SELECT COUNT(*) FROM yj_panel WHERE ISNULL(prefix, N'') = N'LL') <> 1
     THROW 50005, N'[自检] 前缀为 LL 的面板不止 MATERIAL_OUT 一个(或为零),异常,已中断。', 1;
 
-/* ── 自检 3:历史单号必须原样未动(数据只读校验,不改任何行) ─────────── */
-IF NOT EXISTS (SELECT 1 FROM bd_material_out WHERE 单据编号 LIKE N'CL-%-____')
-    THROW 50006, N'[自检] 未找到任何历史 CL- 单号 —— 与预期不符(应保留 423 张),请人工核对。', 1;
+/* ── 自检 3:历史单号只读校验(空库/新库不得因此中断整条迁移链) ───────────
+   ⚠ 不能写成 THROW:DbInit 在**空库**上重放本脚本时 bd_material_out 是 0 行,
+     硬 THROW 会把全量初始化打断(重建测试库 = 本脚本必跑)。
+   口径:有 CL- 历史号 ⇒ 打出台数(证明本脚本没动它们);
+        没有(空库/新库/已清理) ⇒ 只 PRINT 提示,不中断。 */
+DECLARE @clHist int = 0;
+IF OBJECT_ID(N'dbo.bd_material_out', N'U') IS NOT NULL
+    SELECT @clHist = COUNT(*) FROM dbo.bd_material_out
+     WHERE 单据编号 LIKE N'CL-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]';
+
+IF OBJECT_ID(N'dbo.bd_material_out', N'U') IS NULL
+    PRINT N'[提示] bd_material_out 不存在,跳过历史单号校验。';
+ELSE IF @clHist = 0
+    PRINT N'[提示] 本库没有 CL- 历史单号(空库/新库/已清理),跳过历史号保留校验。';
+ELSE
+    PRINT N'[自检] 历史 CL- 单号保留 ' + CAST(@clHist AS nvarchar(10)) + N' 张。';
 
 PRINT N'migrate-material-out-prefix-ll-20261018 完成:'
     + N' MATERIAL_OUT.prefix = LL(本次改动行数 ' + CAST(@changed AS nvarchar(10)) + N');'
