@@ -66,6 +66,30 @@ test('二级目录里不再出现"叶子项与分组混排"', () => {
 })
 
 /**
+ * 2026-10-18 用户口径:「为采购订单补齐,采购订单明细表与采购订单统计表」。
+ * 照「销售管理」同款三段式:单据 → 明细表 → 统计表。
+ * 面板与视图由 tools/migrate-pu-order-detail-stats-20261018.sql 建,这里钉住**菜单入口**不丢。
+ */
+test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同款三段式)', () => {
+  const scm = menuTree.find((n) => n.code === 'scm')
+  const purchase = (scm.children || []).find((c) => c.code === 'purchase')
+  assert.ok(purchase, '应有 采购管理 分组')
+  // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理)
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats'])
+  const codesOf = (node) => {
+    if (Array.isArray(node)) return node.flatMap(codesOf)
+    if (!node || typeof node !== 'object') return []
+    return (node.panelCode ? [node.panelCode] : []).concat(codesOf(node.children))
+  }
+  assert.deepEqual(codesOf(purchase), ['PU_ORDER', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS'])
+  // 两个报表都要能点进去(path 指向 panelx 列表),且标题就是「统计表」口径
+  const leaf = (p) => (purchase.children || []).flatMap((c) => c.children || []).find((x) => x.panelCode === p)
+  assert.equal(leaf('PU_ORDER_DETAIL').path, '/panelx/list/PU_ORDER_DETAIL')
+  assert.equal(leaf('PU_ORDER_STATS').path, '/panelx/list/PU_ORDER_STATS')
+  assert.equal(leaf('PU_ORDER_STATS').title, '采购订单统计表')
+})
+
+/**
  * 2026-10-14 用户拍板:MES 自建「物料清单(BOM)」功能整体删除
  * (数据库 DROP TABLE bs_bom / DROP VIEW v_wo_kit,面板 BOM、BOM_FWD、BOM_REV、WO_KIT 同批下架)。
  * 菜单是被删的第一层入口 —— 这里钉住"不得从别处溜回导航",否则用户点进去就是空表/报错。

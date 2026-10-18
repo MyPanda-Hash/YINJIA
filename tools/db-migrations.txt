@@ -3750,3 +3750,5 @@ migrate-bsinv-invcode-index-20261016.sql
 #     两列合起来才是唯一键)」。`审核` 列注明按用户口径 =「审核标记:审核=Y / 没审核=N」
 #     (脚本早期"服务器无 Y/N 证据 ⇒ 不采纳"的写法已更正)。其余 3 个 *ID 仍照服务器保持 float。
 migrate-dm-fields-center-20261018.sql
+
+migrate-pu-order-detail-stats-20261018.sql

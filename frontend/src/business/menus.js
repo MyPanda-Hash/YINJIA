@@ -129,7 +129,22 @@ export const menuTree = [
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
             ],
           },
-
+          // 2026-10-18 用户口径「为采购订单补齐,采购订单明细表与采购订单统计表」——
+          // 照「销售管理」同款三段式(单据 → 明细表 → 统计表)把采购订单补全:
+          //   · 明细表 PU_ORDER_DETAIL:头×行逐行展开(v_pu_order_detail);
+          //   · 统计表 PU_ORDER_STATS :按 供应商 × 物料 聚合(v_pu_order_stats,「订单数」=不同单据数)。
+          // 两者都是 flat 只读报表,不改任何业务表、不动采购订单面板本身
+          // (tools/migrate-pu-order-detail-stats-20261018.sql)。
+          {
+            code: 'detail', title: '明细表', children: [
+              { code: 'puDetail', title: '采购订单明细表', path: '/panelx/list/PU_ORDER_DETAIL', panelCode: 'PU_ORDER_DETAIL', icon: 'List' },
+            ],
+          },
+          {
+            code: 'stats', title: '统计表', children: [
+              { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
+            ],
+          },
         ],
       },
     ],
