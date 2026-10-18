@@ -105,13 +105,20 @@ IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'PU_ORDER_DETAIL')
 INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col,
                       code_col, prefix, date_col, page_size, detail_key, module_group, panel_name_en)
 VALUES ('PU_ORDER_DETAIL', N'采购订单明细表', N'报表', N'flat', N'v_pu_order_detail', NULL, NULL, N'id',
-        NULL, NULL, N'单据日期', 50, N'items', N'采购管理', N'Purchase Order Detail');
+        NULL, NULL, N'单据日期', 50, N'items', N'智能供应链', N'Purchase Order Detail');
 
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'PU_ORDER_STATS')
 INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col,
                       code_col, prefix, date_col, page_size, detail_key, module_group, panel_name_en)
 VALUES ('PU_ORDER_STATS', N'采购订单统计表', N'报表', N'flat', N'v_pu_order_stats', NULL, NULL, N'id',
-        NULL, NULL, NULL, 50, N'items', N'采购管理', N'Purchase Order Summary');
+        NULL, NULL, NULL, 50, N'items', N'智能供应链', N'Purchase Order Statistics');
+
+/* module_group 幂等收口(2026-10-18):首版写的是旧口径「采购管理」,而导航改版后
+ * 权限矩阵的分组 = 导航**一级模块**,migrate-role-panel-modules-20261018.sql 的自检会把
+ * 「采购管理/库存核算/基础资料…」这类历史碎值判为失败(正是本组这两张新面板把它卡住)。
+ * 值取 = 采购订单 PU_ORDER 所在的一级模块「智能供应链」,与销售订单明细/统计同族同组。 */
+UPDATE yj_panel SET module_group = N'智能供应链'
+ WHERE panel_code IN ('PU_ORDER_DETAIL', 'PU_ORDER_STATS') AND ISNULL(module_group, N'') <> N'智能供应链';
 
 /* ─────────────── C2. 字段登记(列名与视图一致;类型按语义给定,能合计的给小数) ─────────────── */
 DECLARE @f TABLE (panel varchar(40), col_name sysname, label nvarchar(120), data_type nvarchar(40),

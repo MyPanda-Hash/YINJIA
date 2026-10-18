@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  后端落盘日志(2026-10-18 新增)。
+
+  为什么必须加(用户报障「手机端报工后前端卡住,只能重进」):
+    服务器上 start.bat 是把 java 输出直接打到控制台窗口的,**没有重定向到文件**——
+    出事时现场一句日志都拿不到(用户导出的日志包里 MES 只有 10-06/10-07 的旧文件,
+    README 里也写明「MES 后端目前没有一直在写的运行日志文件」)。没有日志就只能靠猜,
+    这正是这次排查绕远路的原因。
+
+  口径:
+    · 控制台照旧(运维/现场习惯看窗口);
+    · 同时按天滚动写 logs/backend.log,单文件 100MB、保留 30 天、总量上限 2GB;
+    · 目录可用环境变量 YINJIA_LOG_DIR 覆盖(默认相对启动目录的 logs/);
+    · 慢请求(>2s,见 SlowRequestLogger)也走同一条落盘链路。
+-->
+<configuration>
+    <property name="LOG_DIR" value="${YINJIA_LOG_DIR:-logs}"/>
+    <property name="PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{40} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/backend.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/backend.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 业务日志(本仓库自己的包)= INFO;框架降到 WARN,避免把排查用的信号淹掉 -->
+    <logger name="com.yinjia.mes" level="INFO"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

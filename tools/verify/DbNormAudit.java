@@ -269,7 +269,7 @@ public class DbNormAudit {
      *  为什么较真:明细报表面板的取数 SQL 只 FROM line_table,那里缺列 = 该面板打开即 500。 */
     static void check05MetaDrift(Connection c) throws Exception {
         String sql = """
-            SELECT RTRIM(f.panel_code), f.col_name, RTRIM(f.place), ISNULL(p.line_table,''), ISNULL(p.head_table,'')
+            SELECT RTRIM(f.panel_code), f.col_name, RTRIM(f.place), ISNULL(p.line_table,''), ISNULL(p.head_table,''), ISNULL(f.label,'')
             FROM yj_field f LEFT JOIN yj_panel p ON RTRIM(p.panel_code) = RTRIM(f.panel_code)
             WHERE f.col_name IS NOT NULL
             ORDER BY 1, f.seq""";
@@ -277,7 +277,7 @@ public class DbNormAudit {
         try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
                 String panel = rs.getString(1), col = rs.getString(2), place = rs.getString(3);
-                String line = rs.getString(4), head = rs.getString(5);
+                String line = rs.getString(4), head = rs.getString(5), label = rs.getString(6);
                 if (wl("panel").contains(panel)) continue;
                 boolean hasHeader = place.contains("header") && !head.isEmpty();
                 boolean hasDetail = place.contains("detail");
@@ -285,6 +285,9 @@ public class DbNormAudit {
                 if (hasHeader) ok = hasCol(c, head, col);
                 else if (hasDetail) ok = hasCol(c, line, col);
                 else ok = hasCol(c, line, col) || hasCol(c, head, col);
+                // 引擎**派生列**豁免(2026-10-18):「面板名称」不是物理列,由 QueryService 按 codeCol
+                // LEFT JOIN yj_panel 带出(判定见 PanelConfigService.derivedPanelName);报错的是体检,不是面板。
+                if (!ok && "panel_name".equalsIgnoreCase(col) && "面板名称".equals(label)) ok = true;
                 if (!ok) bad.add(panel + "." + col + "(" + place + " → " + (hasHeader ? head : line) + ")");
             }
         }
@@ -314,7 +317,9 @@ public class DbNormAudit {
                 if (wl("panel").contains(panel)) continue;
                 List<String> miss = new ArrayList<>();
                 if (!pk.isEmpty() && !hasCol(c, line, pk)) miss.add(pk);
-                if (!hasCol(c, line, "asp_cancel")) miss.add("asp_cancel");
+                // asp_cancel 自 2026-10-18 起**不再硬要求**:引擎按表探测(QueryService.aspCancelCond
+                // → 表无该列时用 1=1),因为「数据建模·字段管理」(FIELDMGR,line_table=yj_field 这种
+                // 元数据表)本来就没有软删列。仍缺 pk_col 才是真 500(引擎每处都拼 t.<pk_col>)。
                 if (!miss.isEmpty()) bad.add(panel + " → " + line + " 缺 " + String.join("+", miss));
             }
         }
@@ -407,7 +412,13 @@ public class DbNormAudit {
         List<String> bad = new ArrayList<>();
         try (Statement st = c.createStatement();
              ResultSet rs = st.executeQuery("SELECT name FROM sys.tables ORDER BY name")) {
-            while (rs.next()) if (isBackup(rs.getString(1))) bad.add(rs.getString(1));
+            while (rs.next()) {
+                String n = rs.getString(1);
+                // table: 冻结登记 = **明确保留**,不算待清理(与 01/02/03/04 的 wl("table") 口径一致)。
+                // 先例:rd_dev_task_bak_20261013 —— AGENTS.md「保留项别顺手清:rd_dev_task_bak_*」,
+                // 它是研发任务的改前快照,业务上要留档;若按备份表一律判罚,规则与口径互相打架。
+                if (isBackup(n) && !wl("table").contains(n)) bad.add(n);
+            }
         }
         ratchet("10", "备份/临时表(应清零)", bad.size(), join(bad, 6));
     }
@@ -476,7 +487,27 @@ public class DbNormAudit {
                 "migrate-wo-process-line-drop.sql",
                 "migrate-field-multiline-text-rollback-20261015.sql",
                 "cleanup-kucun-resync-marker.sql",
-                "cleanup-probe-residue-roles.sql");
+                "cleanup-probe-residue-roles.sql",
+                // 2026-10-17 补登(体检 12 项剩 6 处未登记,逐个定性后仍走链外):
+                //   cleanup-empty-draft-docs-20261016.sql —— 一次性数据保洁(清 3 张「单头在、明细零行」空草稿),
+                //     不是结构/元数据演进;登记后每套环境多跑一次无意义 DELETE。
+                //   cleanup-rd-testledger-20261016.sql —— 测试账套研发区一次性清库,脚本自带库名硬闸门
+                //     (只允许 HSDZ_MES_TEST 执行),属环境专用动作。
+                //   cleanup-user-accounts-sync-20261016.sql —— 本地账号与部署包对齐(只留 5 个账号);
+                //     登记 = 让 DbSync 在所有环境盲删账号,服务器上的账号与本地不同源,绝不能自动跑。
+                //   seed-demo-wo-report.sql —— 给《MES管理系统-界面截图.docx》补演示数据(报工记录 7 行);
+                //     登记会把演示行灌进正式账。
+                //   seed-rd-progress-head-20261016.sql —— 服务器报障后只补「项目进度查询」一张单的头
+                //     (不带明细),属针对性补数;登记会让新环境凭空多出一张单。
+                //   migrate-wlbom-menu-to-basedata-20261015.sql —— **已被同批 rollback 撤回且做法无效**
+                //     (左侧导航是前端 menus.js 硬编码,改 yj_panel.category/module_group 不生效;
+                //      见 migrate-wlbom-menu-rollback-20261015.sql 头注)。一登记 DbSync 就会把这两列改回错值。
+                "cleanup-empty-draft-docs-20261016.sql",
+                "cleanup-rd-testledger-20261016.sql",
+                "cleanup-user-accounts-sync-20261016.sql",
+                "seed-demo-wo-report.sql",
+                "seed-rd-progress-head-20261016.sql",
+                "migrate-wlbom-menu-to-basedata-20261015.sql");
         List<String> bad = new ArrayList<>();
         for (String f : onDisk) {
             if (listed.contains(f) || allowOffChain.contains(f) || f.startsWith("_")) continue;

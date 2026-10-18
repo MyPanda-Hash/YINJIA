@@ -1,0 +1,38 @@
+===== 1) 各类结构事实条数(服务器快照 / 本地) =====
+类别|服务器|本地
+--|---|--
+CK|1|1
+COL|10199|10199
+DF|687|687
+IDX|320|320
+PKUQ|233|233
+STAT|7|7
+TRG|1|1
+VIEW|101|101
+XPROP|9964|9964
+===== 2) 逐条差异:服务器有本地没有 =====
+类别|结构事实
+--|----
+COL|dbo.inh.asp_cancel|nvarchar|4|0|0|1|0|-|-|Chinese_PRC_CI_AS|(N'‘N’')|-|0|0|0|0
+COL|dbo.outh.asp_cancel|nvarchar|4|0|0|1|0|-|-|Chinese_PRC_CI_AS|(N'‘N’')|-|0|0|0|0
+DF|dbo.inh|DF_inh_asp_cancel|asp_cancel|(N'‘N’')|0
+DF|dbo.outh|DF_outh_asp_cancel|asp_cancel|(N'‘N’')|0
+===== 3) 逐条差异:本地有服务器没有 =====
+类别|结构事实
+--|----
+COL|dbo.inh.asp_cancel|nvarchar|4|0|0|1|0|-|-|Chinese_PRC_CI_AS|(N'N')|-|0|0|0|0
+COL|dbo.outh.asp_cancel|nvarchar|4|0|0|1|0|-|-|Chinese_PRC_CI_AS|(N'N')|-|0|0|0|0
+DF|dbo.inh|DF_inh_asp_cancel|asp_cancel|(N'N')|0
+DF|dbo.outh|DF_outh_asp_cancel|asp_cancel|(N'N')|0
+===== 4) 按表指纹:结构性不一致的表 =====
+表|差异
+-|--
+dbo.inh|指纹不同
+dbo.outh|指纹不同
+===== 5) 指纹一致的表数 =====
+服务器表数|本地表数|指纹一致表数
+-----|----|------
+223|223|221
+--------------------------------------------------------------
+RESULT: 结构事实差异 8 条;结构指纹不同的表 2 张
+--------------------------------------------------------------

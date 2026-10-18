@@ -407,8 +407,9 @@
                 <div v-else class="as-side-hint">{{ tt(approvalWaitingTip) }}</div>
               </template>
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
-              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」):
-                   工序检验单一族(当前只放制程检验单,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
+              <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」;
+                   2026-10-18 首件检验单同口径放开):
+                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
                    也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
                    有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
                    ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
@@ -432,14 +433,13 @@
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] !== '是' && isChangeInitiator"
                      class="as-side-btn primary" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
               </template>
-              <!-- 申请修改(归档后改数据,2026-10-16 侧栏整理)——
-                   原来是「申请修改 ▼」下拉,**审批通过/审批驳回/审批情况全藏在下拉里**(用户口径「不好找」)。
-                   现在:申请修改 = 已审核/已归档 时的**主按钮**(实心);修改申请中的审批与撤回各自成条,不再折叠。
-                   撤回修改申请/弃审 → ⑤ 危险操作。 -->
+              <!-- 申请修改:2026-10-18 起**融合进「弃审」** —— 用户口径「把这两个融合,按钮名写为弃审,
+                   也是需要申请修改审批之后才可以弃审」:
+                   已归档单据点「弃审」= 先填修改原因发起申请修改;管理员审批通过(进入修改中)后再点弃审才真正退回草稿。
+                   故侧栏不再单独放「申请修改」;修改申请中的审批/撤回与修改中的提交审批仍各自成条。 -->
               <div
-                v-if="isDocArchivePanel && ['已审核', '已归档'].includes(curDocStatus)"
+                v-if="false"
                 class="as-side-btn"
-                :class="{ primary: canModifyReq, disabled: !canModifyReq }"
                 @click="onSideAction('申请修改')"
               >{{ tt('申请修改') }}</div>
               <div v-if="isDocArchivePanel && curDocStatus === '修改中'" class="as-side-btn primary" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
@@ -595,7 +595,7 @@
                 v-if="canUnauditHere || (hasApprovalBtns && canApproveHere())"
                 class="as-side-btn"
                 :class="{ disabled: isDisabled('弃审') }"
-                :title="tt('反审核：退回草稿后可直接修改，保存时再归档（修改记录照样留痕）')"
+                :title="tt('弃审：已审核直接退回草稿；已归档需先申请修改并经审批(修改中)后才可弃审')"
                 @click="onSideAction('弃审')"
               >{{ tt('弃审') }}</div>
             </div>
@@ -672,6 +672,26 @@
         @expand-change="onMcExpand"
       >
         <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
+        <!-- 报表面板的勾选列(2026-10-18,条码管理三面板):报表模式走的是这张表,不经过 blocks,
+             所以勾选列必须在这里单独出一列 —— 行键 = metadata.qrLabelKey(条码面板=「码内容」,一批一码),
+             勾选后工具栏「打印标签」按所选行出纸,并到 yj_barcode_label_log 留痕 -->
+        <el-table-column v-if="qrKey" width="40" fixed="left" align="center">
+          <template #header>
+            <el-checkbox
+              :model-value="qrReportAllChecked"
+              :indeterminate="qrReportSomeChecked"
+              :title="tt('本页全选')"
+              @change="(v) => qrToggleReportPage(v)"
+            />
+          </template>
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="qrSel.has(qrRowKey(row))"
+              :disabled="!qrRowKey(row)"
+              @change="() => qrToggleRow(row)"
+            />
+          </template>
+        </el-table-column>
         <!-- 库存月结明细(2026-10-15):展开该 (物料,仓库,批号) 在「上月」的全部单据 —— **一张表**,
              不按 入库/出库/结转 分组(用户口径:看「单据类型」就行);月结结转行显示成「2026-09月结」;
              数量带方向(入库正/出库负)⇒ 整串单据的合计就是该月净变动 -->
@@ -816,6 +836,11 @@
                      —— 不做 warn 词判定,服务端按 add/modify 在 /px/callButton 侧校验。 -->
                 <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
               </template>
+              <!-- 条码面板的单号列:点击弹窗(复制编号 / 查看对应单据;跳转受面板查看权限限制) -->
+              <span v-else-if="barcodeDocProp && column.prop === barcodeDocProp"
+                    class="doc-no-link"
+                    :title="tt('点击查看或复制编号')"
+                    @click.stop="openDocNoDialog(row, column.prop)">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -2120,7 +2145,23 @@
       </template>
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
-    <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
+    <QrLabelDialog v-model="qrVisible" :labels="qrLabels" :title="qrDialogTitle" :tip="qrDialogTip" />
+    <!-- 单号弹窗(条码三面板):复制编号 / 查看对应单据 —— 后者受**面板查看权限**限制,无权限置灰不跳 -->
+    <el-dialog v-model="docNoDlg.visible" :title="tt('单据编号')" width="420px" append-to-body>
+      <div class="doc-no-dlg-row">
+        <span class="doc-no-dlg-label">{{ tt('编号') }}</span>
+        <span class="doc-no-dlg-value">{{ docNoDlg.no }}</span>
+      </div>
+      <div class="doc-no-dlg-row">
+        <span class="doc-no-dlg-label">{{ tt('来源') }}</span>
+        <span class="doc-no-dlg-value">{{ tt(docNoDlg.title) }}</span>
+      </div>
+      <div v-if="!docNoDlg.allowed" class="doc-no-dlg-tip">{{ tt('无查看该面板的权限') }}:{{ tt(docNoDlg.title) }}</div>
+      <template #footer>
+        <el-button @click="copyDocNo">{{ tt('复制编号') }}</el-button>
+        <el-button type="primary" :disabled="!docNoDlg.allowed" @click="gotoDocNo">{{ tt('查看单据') }}</el-button>
+      </template>
+    </el-dialog>
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
 
@@ -2313,8 +2354,9 @@ import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
-import { canConfigFields, canConfigWarn } from '@core/auth/panelAccess'
+import { canConfigFields, canConfigWarn, canViewPanel } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
+import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
 import BatchSendDialog from './BatchSendDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
@@ -3671,8 +3713,17 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  * 权限:**仅管理员**。2026-09-22「直审收权」后,前端审批组不再给非管理员直审入口,后端
  * ButtonService.audit() 也硬拒非管理员(「其他角色请走提交审批」)——这里与后端同口径,
  * 否则非管理员点了只会拿到 403。要给某个检验单放开:把面板码加进本名单即可。
+ *
+ * ⚠ 2026-10-18(用户口径「为当前的首件检验单增加审核功能,审核功能实现参照当前的制程检验单」):
+ *   首件检验单(QC_FIRST_INSP)与制程检验单同属工序检验单一族(同样是报工驱动的检验记录、
+ *   既不进两级审批的 8 张质量单据、也没有审批流)⇒ 同一口径放开。放开即同时获得:
+ *   ① 侧栏「审核 / 弃审」(仅管理员);② 直审留痕(后端 ButtonService.audit() → yj_form_approval
+ *   的 AUDIT/APPROVED 行)⇒ 侧栏「审批情况」查得到谁审的/什么时候/审核意见;
+ *   ③ 审核后单据锁定(单据状态=已审核 ⇒ draftEditable 为假、纸面只读);
+ *   ④ 纸面/列表/服务端报表的「审核人」格由 QueryService 虚拟字段(取 yj_doc_status.shr)自动显示。
+ *   存量已直审单据的 AUDIT 行由 tools/migrate-first-insp-audit-trail-20261018.sql 补录。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP']
+const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -3694,8 +3745,9 @@ const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocSt
  *   总负责人∪管理员),后端 unaudit 同批放宽为 requireApproverOrDevFileOwner。其余面板一字不动。
  */
 const devFileCanEditHere = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === true))
+// 2026-10-18:已归档也要放出(点它就是"先申请修改");「修改中」= 申请修改已获批,可直接弃审
 const canUnauditHere = computed(() => isDocArchivePanel.value
-  && ['已审核', '已归档'].includes(curDocStatus.value)
+  && ['已审核', '已归档', '修改中'].includes(curDocStatus.value)
   && (canApproveHere() || devFileCanEditHere.value))
 
 // ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
@@ -4209,12 +4261,33 @@ const queryDialogFields = computed(() => {
   return fields.filter((field) => headerFieldKey(field) !== '备注')
     // 台账/库存状况的 仓库/存货 也走通用渲染:参照双模(仓库 6 行下拉/存货 3838 行弹窗)+ 联动收窄提示
 })
+/**
+ * 只读面板清单(与服务端 PanelPermissionService.READONLY_PANELS 同源)。
+ * 新增只读面板时两处一起改;服务端是权威闸门(默认拒绝),这里漏改只会多显示几个按钮。
+ *
+ * 2026-10-18 合并修正:这对常量原先声明在文件后段(约第 8220 行),而 draftEditable(约 4259 行)
+ * 与按钮过滤都引用它 ⇒ 任何 **setup 期提前求值**(watch immediate / HMR 重算)都会抛
+ * Cannot access 'READONLY_PANELS' before initialization(合并后 dev 控制台连报 4 次,实测)。
+ * 常量一律前置,消灭 TDZ。
+ */
+const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW']
+/**
+ * 写操作仅管理员的面板(与服务端 PanelPermissionService.ADMIN_ONLY_PANELS 同源)。
+ * 2026-10-18:原先"连看都不给",用户追加"给非管理员开只读" ⇒ 非管理员进这两张面板时
+ * 工具栏只留浏览动作、网格不进编辑态;写操作仍由服务端 requireAdminOnlyWritable 拦(403)。
+ */
+const ADMIN_ONLY_PANELS = ['FIELDMGR', 'ZDGL']
+/** 只读面板保留下来的纯浏览动作(与后端白名单一致) */
+const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录']
+
 const draftEditable = computed(() => {
   if (reportMode.value) return false
   // ERP集成只读(2026-10-18 用户口径「不可以进行任何人为操作,不可以新增保存删除」):
   // 放在最前 —— 这两个面板的数据由金蝶接口同步写入,界面不给任何内联编辑/加行/粘贴的值入口。
   // 服务端同口径闸门 = PanelPermissionService.requireReadonlyAllowed(连管理员也不给写)。
   if (READONLY_PANELS.includes(panelCode.value)) return false
+  // 管理员专属面板:非管理员只读(网格不进编辑态)
+  if (ADMIN_ONLY_PANELS.includes(panelCode.value) && user.isAdmin !== true) return false
   // 规格书已分配:非 责任人∪总负责人∪管理员 只读(服务端三个入口同口径强制,这里提前置灰)
   if (specAssignBlocked.value) return false
   // 四个受控文件:非该文件责任人只读(判定来自服务端,与保存门禁同一真源)
@@ -4344,6 +4417,37 @@ function openQrLabels() {
     return
   }
   qrVisible.value = true
+}
+
+/**
+ * 条码管理三面板(材料/半成品/成品,2026-10-18)的「打印标签」:
+ * 勾选行优先(跨页保留),没有勾选就打印**当前页** —— 三个面板都是 flat 只读报表,没有"当前单据"可挂,
+ * 所以不能用暂收单那套 current.detail 取数。标签内容由 barcodeLabel.js 纯函数映射(单测钉住列名);
+ * 出纸沿用 QrLabelDialog(二维码 + 卡面 + 浏览器打印),服务端只落**留痕**(谁/何时/哪个码/哪张单)。
+ */
+async function openBarcodeLabels() {
+  // 报表(flat)面板:数据在 reportList(当前页);单据面板才走 blocks
+  const b = blocks.value.find((x) => x.isMain) || blocks.value[0]
+  const pageRows = reportMode.value ? reportList.value : (b ? qrVisibleRows(b) : [])
+  const picked = qrSel.value.size ? pageRows.filter((r) => qrSel.value.has(qrRowKey(r))) : pageRows
+  const labels = barcodeLabelsOf(panelCode.value, picked)
+  if (!labels.length) {
+    ElMessage.warning(tt('当前页没有可打印的条码行'))
+    return
+  }
+  try {
+    await request.post('/px/barcode/print', {
+      panelCode: panelCode.value,
+      items: labels.map((l) => ({ code: l.code, doc: l.doc, qty: l.qty })),
+    })
+  } catch (e) {
+    // 留痕失败就不出纸:否则纸上有码、系统里查不到 —— 与"打印必须可追溯"的口径相反
+    ElMessage.error(tt('打印留痕登记失败') + ':' + (e?.response?.data?.message || e?.message || ''))
+    return
+  }
+  qrLabels.value = labels
+  qrVisible.value = true
+  ElMessage.success(tt('已登记打印 {n} 张').replace('{n}', labels.length))
 }
 
 function selectConfigFor(action = '选单') {
@@ -5268,8 +5372,18 @@ function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首�
 // ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
 // 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
 // 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
-// (仓位编码按仓内唯一,同码多仓不串选)。 ═══
+// (仓位编码按仓内唯一,同码多仓不串选;2026-10-18 库层过滤唯一索引兜底)。 ═══
 const qrSel = ref(new Set())
+/** 条码三面板的标签弹窗标题/提示(2026-10-18):组件默认是"材料二维码标签 + 物料编码|批号@数量",
+ *  在成品/半成品页显示会误导 ⇒ 按面板给标题;非条码面板(暂收单等)留空走组件默认。 */
+const qrDialogTitle = computed(() => {
+  if (!BARCODE_PANELS.includes(panelCode.value)) return ''
+  return tt(panelCode.value === 'BARCODE_FIN' ? '成品仓条码标签'
+    : panelCode.value === 'BARCODE_WIP' ? '半成品仓条码标签' : '材料仓条码标签')
+})
+const qrDialogTip = computed(() => (BARCODE_PANELS.includes(panelCode.value)
+  ? tt('二维码 = 码内容(编码|批号,一批一码);勾选一行出一张标签,可多选')
+  : ''))
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
 function qrRowKey(row) {
@@ -5286,6 +5400,87 @@ function qrRowKey(row) {
   const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
   return scope ? `${scope}\u0001${k}` : k
 }
+/**
+ * 条码三面板:点「单据编号/报工单号」→ 弹窗(复制编号 / 查看对应单据)。
+ *
+ * 为什么单独做:条码面板是只读报表,行上的编号只证明"码从哪来",用户要么复制去别处查,
+ * 要么直接跳过去看那张单。跳转**必须过面板权限**(canViewPanel,与导航/桌面/产品文件列表同一口径):
+ * 没该面板查看权的人,弹窗里「查看单据」置灰且不发路由,避免"用报表当跳板绕过授权"。
+ */
+const BARCODE_DOC_SRC = {
+  BARCODE_MAT: { panel: 'PURCHASE_IN', prop: '单据编号', title: '采购入库单' },
+  BARCODE_WIP: { panel: 'WO_REPORT', prop: '报工单号', title: '工序报工单' },
+  BARCODE_FIN: { panel: 'FINISH_IN', prop: '单据编号', title: '产成品入库单' },
+}
+const barcodeDocSrc = computed(() => BARCODE_DOC_SRC[String(panelCode.value)] || null)
+/** 该列是否渲染成可点的单号(只有码来源那一列) */
+const barcodeDocProp = computed(() => barcodeDocSrc.value?.prop || '')
+const docNoDlg = ref({ visible: false, no: '', panel: '', title: '', allowed: false })
+
+function openDocNoDialog(row, prop) {
+  const src = barcodeDocSrc.value
+  if (!src || prop !== src.prop) return
+  const no = String(row?.[prop] ?? '').trim()
+  if (!no) return
+  docNoDlg.value = {
+    visible: true,
+    no,
+    panel: src.panel,
+    title: src.title,
+    allowed: canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, src.panel),
+  }
+}
+
+/** 复制编号:优先 Clipboard API(headless/无权限时回退到 textarea + execCommand) */
+async function copyDocNo() {
+  const no = docNoDlg.value.no
+  if (!no) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(no)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = no
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    ElMessage.success(tt('编号已复制'))
+  } catch (e) {
+    ElMessage.error(tt('复制失败') + ':' + (e?.message || ''))
+  }
+}
+
+/** 查看单据:无权限只提示不跳;有权限带 ?focus=单号 直接定位到那张单 */
+function gotoDocNo() {
+  const { no, panel, title, allowed } = docNoDlg.value
+  if (!allowed) {
+    ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(title))
+    return
+  }
+  docNoDlg.value.visible = false
+  router.push({ path: '/panelx/list/' + panel, query: no ? { focus: no } : {} })
+}
+
+/** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
+const qrReportAllChecked = computed(() =>
+  reportList.value.length > 0 && reportList.value.every((r) => qrSel.value.has(qrRowKey(r))))
+const qrReportSomeChecked = computed(() =>
+  !qrReportAllChecked.value && reportList.value.some((r) => qrSel.value.has(qrRowKey(r))))
+function qrToggleReportPage(on) {
+  const s = new Set(qrSel.value)
+  for (const r of reportList.value) {
+    const k = qrRowKey(r)
+    if (!k) continue
+    if (on) s.add(k)
+    else s.delete(k)
+  }
+  qrSel.value = s
+}
+
 function qrToggleRow(row) {
   const k = qrRowKey(row)
   if (!k) return
@@ -8046,16 +8241,16 @@ async function loadCrg() {
       .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a)) }))
       .filter((g) => (g.actions || []).length > 0)
   }
+  // 管理员专属面板(字段管理/数据字典):非管理员只剩浏览动作,避免"点了才报 403"
+  if (ADMIN_ONLY_PANELS.includes(panelCode.value) && user.isAdmin !== true) {
+    groups.value = groups.value
+      .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a)) }))
+      .filter((g) => (g.actions || []).length > 0)
+  }
   return cfg
 }
 
-/**
- * 只读面板清单(与服务端 PanelPermissionService.READONLY_PANELS 同源)。
- * 新增只读面板时两处一起改;服务端是权威闸门(默认拒绝),这里漏改只会多显示几个按钮。
- */
-const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW']
-/** 只读面板保留下来的纯浏览动作(与后端白名单一致) */
-const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录']
+
 
 function isDisabled(action) {
   const st = current.value?.['单据状态']
@@ -8480,8 +8675,12 @@ async function onButton(action) {
     openBatchErp()
     return
   }
-  // 材料二维码标签打印(品检分流链):本地拦截,数据源=当前暂收单明细行
+  // 打印标签:条码管理三面板(flat 报表)走 barcode 分支;其余(暂收单)仍是材料码标签
   if (action === '打印标签') {
+    if (BARCODE_PANELS.includes(panelCode.value)) {
+      await openBarcodeLabels()
+      return
+    }
     openQrLabels()
     return
   }
@@ -8915,7 +9114,7 @@ async function onButton(action) {
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
     // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
     // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):同款勾选即打,
-    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位地址@仓位编码;
+    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位编码(2026-10-18 去地址段);
     // 勾选行键=仓库+仓位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
     const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value
@@ -9032,6 +9231,8 @@ async function onButton(action) {
   }
   // 人工审核：确认弹窗 + 审核意见（选填）；审核人取当前登录人（后端从 JWT 取）
   let auditOpinion = ''
+  // 「申请修改」的修改原因(2026-09-30);2026-10-18 起「弃审」在归档态也会写它(融合后由弃审发起申请)
+  let modifyReason = ''
   if (action === '审核') {
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     // 已审核过的单据不允许再次审核，也不允许补填审批意见
@@ -9048,19 +9249,46 @@ async function onButton(action) {
       return
     }
   } else if (action === '弃审') {
+    // 2026-10-18 用户口径:把「弃审」与「申请修改」融合成一个「弃审」按钮 ——
+    //   · 已审核 / 修改中:直接弃审(修改中 = 申请修改已获批);
+    //   · 已归档:不允许直接弃审,先让用户填「修改原因」发起申请修改,管理员批到「修改中」后再点弃审。
+    //   (此前前端写死 !===='已审核' 直接弹「仅已审核状态可弃审」,把归档单挡在门外,与后端不一致)
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-    if (current.value['单据状态'] !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
-    try {
-      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
-    } catch (e) {
-      return
+    const st = String(current.value['单据状态'] || '')
+    if (st === '已归档') {
+      const noMod = current.value['编号'] || current.value['单据编号'] || ''
+      try {
+        const { value } = await ElMessageBox.prompt(
+          tt('单据：{no} 已归档。归档单据需先「申请修改」并经管理员审批(进入修改中)后才能弃审。\n请填写修改原因，现在就发起申请：').replace('{no}', noMod),
+          tt('申请修改'),
+          {
+            confirmButtonText: tt('提交修改申请'),
+            cancelButtonText: tt('取消'),
+            inputType: 'textarea',
+            inputPlaceholder: tt('修改原因（必填）'),
+            inputValidator: (v) => (v && v.trim() ? true : tt('修改原因不能为空')),
+          }
+        )
+        modifyReason = (value || '').trim()
+        if (!modifyReason) return
+        action = '申请修改'
+      } catch (e) {
+        return
+      }
+    } else if (!['已审核', '修改中', '已生效'].includes(st)) {
+      return ElMessage.warning(tt('仅已审核或修改中状态可弃审'))
+    } else {
+      try {
+        await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
+      } catch (e) {
+        return
+      }
     }
   }
   try {
     // 审批流：提交审批/审批通过（确认+意见）、审批驳回（意见必填）、审批情况（历史弹窗）
     let approvalOpinion = ''
-    // 「申请修改」的修改原因(2026-09-30 需求:数据记录表「修改:只需填写修改原因」)
-    let modifyReason = ''
+    // (modifyReason 已在函数上方统一声明 —— 2026-10-18 弃审在归档态会先发起申请修改)
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)
@@ -9677,6 +9905,13 @@ onUnmounted(() => {
   gap: 4px;
   flex-wrap: wrap;
 }
+/* 单号链(条码面板):看起来是链接,但只开弹窗 —— 真跳转要过面板权限,不在这里直连 */
+.doc-no-link { color: var(--el-color-primary); cursor: pointer; text-decoration: underline dotted; }
+.doc-no-link:hover { color: var(--el-color-primary-light-3); }
+.doc-no-dlg-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
+.doc-no-dlg-label { width: 48px; color: var(--el-text-color-secondary); flex: none; }
+.doc-no-dlg-value { word-break: break-all; }
+.doc-no-dlg-tip { margin-top: 10px; color: var(--el-color-warning); font-size: 12px; }
 .toolbar-query-btn {
   display: inline-flex;
   align-items: center;

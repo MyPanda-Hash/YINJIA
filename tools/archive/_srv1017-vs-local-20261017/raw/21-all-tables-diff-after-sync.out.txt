@@ -1,0 +1,37 @@
+===== 1. 行数/内容有差异的表 (srv_only=服务器有本地无, loc_only=本地有服务器无) =====
+表 服务器行数 本地行数 服务器独有行 本地独有行 备注
+- ----- ---- ------ ----- --
+dbo.bd_pu_order 187 187 116 116 NULL
+dbo.bd_so_order 273 273 165 165 NULL
+dbo.bl_pu_order 438 438 282 282 NULL
+dbo.bl_so_order 514 514 300 300 NULL
+dbo.dm_langue 17 16 2 1 NULL
+dbo.inv_cost_ledger 5021 5021 5021 5021 NULL
+dbo.outh 3318 3318 8 8 NULL
+dbo.plang 429 429 NULL NULL The data type ntext cannot be used as an operand to the UNION, INTERSECT or EXCEPT operators because it is not comparable.
+dbo.plang_pc 3 3 NULL NULL The data type ntext cannot be used as an operand to the UNION, INTERSECT or EXCEPT operators because it is not comparable.
+dbo.rd_approval 1 0 1 0 NULL
+dbo.rd_dev_task 4 0 4 0 NULL
+dbo.rd_mold_proc_head 1 1 1 1 NULL
+dbo.rd_plan 1 0 1 0 NULL
+dbo.rd_prod_info_head 1 0 1 0 NULL
+dbo.rd_progress 1 0 1 0 NULL
+dbo.rd_progress_detail 1 0 1 0 NULL
+dbo.rd_spec_doc_detail 17 0 17 0 NULL
+dbo.rd_spec_doc_head 1 0 1 0 NULL
+dbo.s_allno 580 580 1 1 NULL
+dbo.yj_attachment 2 0 2 0 NULL
+dbo.yj_doc_status 2236 2236 9 9 NULL
+dbo.yj_message 3713 3710 3 0 NULL
+dbo.yj_panel 130 130 3 3 NULL
+dbo.yj_role_panel 335 335 6 6 NULL
+dbo.yj_schema_log 577 578 0 1 NULL
+dbo.yj_usage_log 7699 7661 42 4 NULL
+===== 2. 完全一致的表数量 =====
+一致表数
+----
+199
+===== 3. 总计 =====
+总表数 服务器总行 本地总行
+--- ----- ----
+223 111363 111293

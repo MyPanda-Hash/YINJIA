@@ -31,7 +31,12 @@ spring:
       max-request-size: 21MB
       file-size-threshold: 10MB
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES;encrypt=false;trustServerCertificate=true;loginTimeout=10
+    # lockTimeout(2026-10-18):**锁等待上限**,驱动默认 -1 = 无限等。
+    #   根因(实测见 docs/development/扫码报工卡住-根因与处置.md):手机端小程序/参考库是**直连同一个库**
+    #   写 plang/scjl 的;那边只要有一个事务没提交,MES 的列表查询扫到被锁的行就会一直挂住
+    #   (实测锁 1 行 ⇒ /api/px/workOrderList 卡 42.7 秒,直到对方释放),前端表现就是「转圈、只能重进」。
+    #   设 8s ⇒ 最多等 8s 就抛锁超时,由 GlobalExceptionHandler 翻成可读提示(503),不再把界面钉死。
+    url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES;encrypt=false;trustServerCertificate=true;loginTimeout=10;lockTimeout=8000
     username: yinjia
     password: Yinjia@2026
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
@@ -51,8 +56,16 @@ yinjia:
   #       · 启动参数:java -jar app.jar --yinjia.enable-test-ledger=false
   #       · 环境变量:set YINJIA_ENABLETESTLEDGER=false   (Spring 宽松绑定,大小写/连字符不敏感)
   enable-test-ledger: true
+  workorder:
+    # 结案自愈(2026-10-18):plang.ja 是外部程序(手机端小程序/参考库)也能直写的列,
+    #   现场出现过「扫码报工后其余工单全部变成已结案」。MES 自己的结案必须「入库≥排产 + 组装成品检验已审核」
+    #   且一定写 yj_usage_log ⇒ 没有留痕的 ja=Y 就是外部写的。
+    #   true  = 每分钟巡检,发现这类行直接改回 ja=N(逐行留痕 asp_user2=system(结案自愈),日志 [结案自愈]);
+    #   false = 只巡检、只 WARN 日志,不动数据(默认,先让现场把口径认下来)。
+    ja-selfheal-enabled: false
+    ja-selfheal-cron: "20 * * * * *"
   test-datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES_TEST;encrypt=false;trustServerCertificate=true;loginTimeout=10
+    url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES_TEST;encrypt=false;trustServerCertificate=true;loginTimeout=10;lockTimeout=8000
     username: yinjia
     password: Yinjia@2026
   jwt:

@@ -259,7 +259,12 @@
       </ol>
     </div>
 
-    <!-- ⑥ 表尾:检验结果 | 检验人 -->
+    <!-- ⑥ 表尾:检验结果 | 检验人 | 审核人
+         ⚠ 2026-10-18 补「审核人」(用户口径「为当前的首件检验单增加审核功能,审核功能实现参照当前的
+           制程检验单」):制程那张纸的表尾是「检验人 | 审核人」(QcProcInspSheet.vue),首件同口径。
+           取值 = head['审核人'],**不是本表物理列** —— 后端 QueryService 按「非两级审批面板」把
+           yj_doc_status.shr/shsj 覆盖到虚拟字段 审核人/审核时间(保存时 ButtonService 又会把这两个键
+           从 body 里摘掉,不会误写列)。故这里恒只读,审核后自动显形。 -->
     <table class="fi-foot"><tbody><tr>
       <th>{{ tt('检验结果') }}</th>
       <td>
@@ -268,6 +273,8 @@
       </td>
       <th>{{ tt('检验人') }}</th>
       <td>{{ head['检验员'] || '' }}</td>
+      <th>{{ tt('审核人') }}</th>
+      <td>{{ head['审核人'] || '' }}</td>
     </tr></tbody></table>
   </div>
 </template>
@@ -462,6 +469,8 @@ async function exportFirstInspExcel() {
     foot: {
       resultLabel: tt('检验结果'), result: String(head['总结论'] || ''),
       byLabel: tt('检验人'), by: String(head['检验员'] || ''),
+      // 审核人(2026-10-18):虚拟字段,后端取自 yj_doc_status.shr —— 与纸面/服务端报表表尾同口径
+      auditorLabel: tt('审核人'), auditor: String(head['审核人'] || ''),
     },
   })
   const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -1053,16 +1062,18 @@ defineExpose({ exportFirstInspExcel })
   margin: 2px 0 0 20px;
   padding: 0;
 }
+/* 表尾:三组「标签 96px + 值列」(检验结果 | 检验人 | 审核人,2026-10-18 补第三组);
+   标签格定宽(表格 table-layout:fixed),三个值列平分剩余宽度 —— 与纸面/服务端报表同口径 */
 .fi-foot th {
   width: 96px;
+}
+.fi-foot th:nth-child(3),
+.fi-foot th:nth-child(5) {
+  text-align: center;
 }
 .fi-foot td {
   text-align: left;
   height: 38px;
-}
-.fi-foot td:nth-child(3) {
-  width: 96px;
-  text-align: center;
 }
 </style>
 

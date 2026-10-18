@@ -26,6 +26,9 @@
     <div class="wol-btns">
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
+      <!-- 结案回正(2026-10-18):把「手机端小程序/参考库直连库误写成已结案」的行改回未结案。
+           判据=MES 自己的结案口径(入库≥排产 + 组装成品检验已审核),只动不满足条件的行。 -->
+      <el-button v-if="canDo('close')" size="small" type="danger" plain @click="onCloseHeal">{{ tt('结案回正') }}</el-button>
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button v-if="canDo('split')" size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
@@ -42,6 +45,7 @@
         </template>
       </el-dropdown>
       <el-button v-if="canDo('picking')" size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
+      <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
     </div>
@@ -95,6 +99,9 @@
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
       <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
+      <el-table-column :label="tt('成型配方')" width="170" show-overflow-tooltip>
+        <template #default="{ row }">{{ row['成型配方单号'] || '-' }}{{ row['成型配方版本'] ? ` / ${row['成型配方版本']}` : '' }}</template>
+      </el-table-column>
       <el-table-column :label="tt('打印人')" prop="打印人" width="90" />
       <el-table-column :label="tt('打印时间')" prop="打印时间" width="140" />
       <el-table-column :label="tt('当前工序')" width="100" sortable prop="当前工序">
@@ -113,9 +120,17 @@
           <span :class="{ 'wol-closed': row.生产状态 === '完工' }">{{ tt(row.生产状态) }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="tt('结案')" width="70" fixed="right">
+      <el-table-column :label="tt('结案')" width="96" fixed="right">
         <template #default="{ row }">
           <span :class="{ 'wol-closed': row.结案 === 'Y' }">{{ row.结案 === 'Y' ? tt('已结案') : '-' }}</span>
+          <!-- 结案异常(2026-10-18):ja 是外部程序也能直接写的列(手机端小程序/参考库直连库)。
+               后端按 MES 自己的结案口径(入库≥排产 + 组装成品检验已审核)反查,不成立的 ja=Y 标出来,
+               免得"外部误结案"被当成 MES 的结案。 -->
+          <el-tooltip v-if="row.结案异常 === 'Y'"
+                      :content="tt('该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正')"
+                      placement="top">
+            <el-tag size="small" type="danger" effect="plain" style="margin-left:4px">{{ tt('结案异常') }}</el-tag>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -130,6 +145,32 @@
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
+
+    <!-- 获取当前工单行的研发配方并保存投料快照 -->
+    <el-dialog v-model="mixingVisible" :title="tt('获取混料配方')" width="760px" append-to-body :close-on-click-modal="false">
+      <div v-if="mixingData" class="wol-split">
+        <div class="wol-split-row"><span>{{ tt('工单号') }} / {{ tt('工单行号') }}</span><b>{{ mixingData['工单号'] }} #{{ mixingData['工单行号'] }}</b></div>
+        <div class="wol-split-row"><span>{{ tt('产品名称') }}</span><span>{{ mixingData['产品名称'] }} ({{ mixingData['产品编号'] }})</span></div>
+        <div class="wol-split-row"><span>{{ tt('配方单号') }}</span><span>{{ mixingData['配方单号'] }} / {{ mixingData['配方版本'] || '-' }} ({{ tt(mixingData['配方状态']) }})</span></div>
+        <div class="wol-split-row"><span>{{ tt('混料数量') }} ({{ tt('支') }})</span>
+          <el-input-number v-model="mixingQty" :min="0.0001" :precision="4" :controls="false" size="small" style="width:180px" @change="previewMixing" />
+        </div>
+        <el-table :data="mixingData['配方行'] || []" size="small" border max-height="360">
+          <el-table-column prop="序号" :label="tt('序号')" width="60" />
+          <el-table-column prop="物料种类" :label="tt('物料种类')" width="105" />
+          <el-table-column prop="物料编号" :label="tt('物料编号')" width="125" />
+          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="140" />
+          <el-table-column :label="tt('配料比')" width="100" align="right"><template #default="{ row }">{{ row['配料比'] == null ? '-' : (Number(row['配料比']) * 100).toFixed(3) + '%' }}</template></el-table-column>
+          <el-table-column prop="单支物料含量" :label="tt('单支物料含量')" width="120" align="right" />
+          <el-table-column prop="计划用量" :label="tt('计划用量')" width="120" align="right" />
+        </el-table>
+        <div v-if="mixingData['已有快照']" class="wol-split-tip">{{ tt('该工单行已有混料配方快照；确认后将以当前研发配方重新获取。') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="mixingVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="mixingLoading" @click="saveMixingRecipe">{{ tt('确认获取') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -208,6 +249,11 @@ const splitLoading = ref(false)
 const splitInfo = ref(null)
 const splitQty = ref(0)
 const splitInherit = ref(true)
+const mixingVisible = ref(false)
+const mixingLoading = ref(false)
+const mixingData = ref(null)
+const mixingTarget = ref(null)
+const mixingQty = ref(0)
 /** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
 const traceVisible = ref(false)
 const traceNo = ref('')
@@ -297,6 +343,30 @@ function applyLineMeta() {
 
 // 排产写入口已撤(2026-09-28 用户拍板):生产工单=纯汇总视图,数据只由订单结转产生;
 // 排产/改数量/换线 → 一律走「快速排产」唯一入口(/px/scheduleBoard/assign)。
+
+/** 结案回正(2026-10-18):外部程序(手机端小程序/参考库)直连库把工单写成已结案时,一键改回未结案。
+ *  先体检(只读)拿到行数再确认;判据与后端 WorkOrderCloseGuard 同一份,只动"入库<排产且没有已审检验单"的行。 */
+async function onCloseHeal() {
+  let n = 0
+  try {
+    const audit = await request.post('/px/workOrderList/closeAudit', {})
+    if (audit.status !== 200) return
+    n = (audit.data || []).length
+  } catch (e) { err(e, '结案体检失败'); return }
+  if (!n) { ElMessage.success(tt('没有需要回正的结案行')); return }
+  try {
+    await ElMessageBox.confirm(
+      `${tt('把外部程序误写成「已结案」的工单改回未结案')}（${n} ${tt('行')}）?`,
+      tt('结案回正'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
+  } catch { return }
+  try {
+    const res = await request.post('/px/workOrderList/closeHeal', {})
+    if (res.status === 200) {
+      ElMessage.success(`${tt('已回正')} ${res.data?.['回正行数'] ?? 0} ${tt('行')}`)
+      load()
+    }
+  } catch (e) { err(e, '结案回正失败') }
+}
 
 async function onClose(close) {
   const nos = [...new Set(checked.value.map((r) => r.工单号))]
@@ -432,6 +502,43 @@ function splitTarget() {
     return null
   }
   return list[0]
+}
+
+function openMixingRecipe() {
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
+  const list = alive.length ? alive : (cur ? [cur] : [])
+  if (list.length !== 1) { ElMessage.warning(list.length ? tt('请只勾选一张工单') : tt('请先勾选一张工单')); return }
+  mixingTarget.value = list[0]
+  mixingQty.value = Number(list[0].排产数量 || list[0].需求数量 || 0)
+  previewMixing()
+}
+
+async function previewMixing() {
+  if (!mixingTarget.value) return
+  try {
+    const r = mixingTarget.value
+    const res = await request.post('/px/workOrderList/recipe', {
+      工单号: r.工单号, 行id: r.行id, 混料数量: Number(mixingQty.value || 0),
+    })
+    mixingData.value = res.data || null
+    mixingVisible.value = true
+  } catch (e) { err(e, '配方读取失败') }
+}
+
+async function saveMixingRecipe() {
+  if (!mixingTarget.value || !(Number(mixingQty.value) > 0)) { ElMessage.warning(tt('混料数量必须大于0')); return }
+  mixingLoading.value = true
+  try {
+    const r = mixingTarget.value
+    const res = await request.post('/px/workOrderList/mixing', {
+      工单号: r.工单号, 行id: r.行id, 混料数量: Number(mixingQty.value),
+    })
+    mixingData.value = res.data || mixingData.value
+    ElMessage.success(`${tt('混料配方获取成功')}：${mixingData.value?.['配方单号'] || ''}`)
+    mixingVisible.value = false
+    await load()
+  } catch (e) { err(e, '混料配方获取失败') } finally { mixingLoading.value = false }
 }
 
 async function openSplit() {

@@ -21,7 +21,8 @@
  *   → 标准行(来自《成型工艺清单》)
  *   → 1#..8# 八个样品行:**每组只在自己那一对样品行上有值**,其余格照纸面写 `/`
  *   → 相关要求 6 条
- *   → 表尾:检验结果 | 检验人
+ *   → 表尾:检验结果 | 检验人 | 审核人(审核人 2026-10-18 随「首件检验单开直接审核」补,
+ *          与服务端报表 reports/qc_first_insp.jrxml 的表尾同口径)
  */
 import {
   groupsOf, isFillableCell, columnHeadText, ROW_STANDARD, ROW_SAMPLE,
@@ -43,7 +44,8 @@ const LABEL_COL_WCH = 14
  * @param {Array<object>} p.columns 测试项目列(**已按分组排好**,与纸面列序一致)
  * @param {Array<object>} p.items   明细行(长表:行类型/样品序号/检验列/标准/实测数值)
  * @param {string[]} p.requirements 纸面《相关要求》6 条(已翻译的文本)
- * @param {{resultLabel?:string,result?:string,byLabel?:string,by?:string}} p.foot 表尾
+ * @param {{resultLabel?:string,result?:string,byLabel?:string,by?:string,
+ *          auditorLabel?:string,auditor?:string}} p.foot 表尾(检验结果 | 检验人 | 审核人;审核人 2026-10-18 补)
  * @returns {{aoa:Array<Array<any>>, cols:Array<{wch:number}>, merges:Array<object>, marks:object}}
  */
 export function buildFirstInspExport({
@@ -138,17 +140,27 @@ export function buildFirstInspExport({
     reqRows.push(row)
   }
 
-  // ── 表尾:检验结果 | 检验人 ──
+  // ── 表尾:检验结果 | 检验人 | 审核人 ──
+  //    ⚠ 2026-10-18 补「审核人」:首件检验单与制程检验单同批开了**直接审核**(见 PanelxList 的
+  //      DIRECT_AUDIT_PANELS),制程那张纸的表尾就是「检验人 | 审核人」——首件这张纸要同口径,
+  //      否则审完打印出来看不出谁审的(值取 head.审核人,后端取自 yj_doc_status.shr)。
+  //      三段等分(每段至少 2 列);N 太小时顺延,不覆盖前一段(极端情况行会比 N 略长,不影响 xlsx)。
   push([])
   const footRow = aoa.length
-  const mid = Math.max(2, Math.floor(N / 2))
+  const pairW = Math.max(2, Math.floor(N / 3))
+  const b1 = 0
+  const b2 = pairW
+  const b3 = Math.max(b2 + 2, Math.min(N - 2, pairW * 2))
   const footLine = new Array(N).fill('')
-  footLine[0] = text(foot.resultLabel) || '检验结果'
-  footLine[1] = text(foot.result)
-  if (mid - 1 > 1) merges.push({ s: { r: footRow, c: 1 }, e: { r: footRow, c: mid - 1 } })
-  footLine[mid] = text(foot.byLabel) || '检验人'
-  footLine[mid + 1] = text(foot.by)
-  if (N - 1 > mid + 1) merges.push({ s: { r: footRow, c: mid + 1 }, e: { r: footRow, c: N - 1 } })
+  footLine[b1] = text(foot.resultLabel) || '检验结果'
+  footLine[b1 + 1] = text(foot.result)
+  if (b2 - 1 > b1 + 1) merges.push({ s: { r: footRow, c: b1 + 1 }, e: { r: footRow, c: b2 - 1 } })
+  footLine[b2] = text(foot.byLabel) || '检验人'
+  footLine[b2 + 1] = text(foot.by)
+  if (b3 - 1 > b2 + 1) merges.push({ s: { r: footRow, c: b2 + 1 }, e: { r: footRow, c: b3 - 1 } })
+  footLine[b3] = text(foot.auditorLabel) || '审核人'
+  footLine[b3 + 1] = text(foot.auditor)
+  if (N - 1 > b3 + 1) merges.push({ s: { r: footRow, c: b3 + 1 }, e: { r: footRow, c: N - 1 } })
   push(footLine)
 
   return {

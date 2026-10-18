@@ -3737,11 +3737,58 @@ migrate-rd-sheet-ref-tidy-20261013.sql
 migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
 # migrate-role-perm-words-20261016.sql — 角色面板权限词表归位(组织架构矩阵可勾的词 = 引擎真读的词):edit→modify、delete→del、删 price/review/adjust,研发审核补 audit,can_approve 收敛为 perms 派生值
+# migrate-role-perm-mg-cleanup-20261018.sql — 角色词表/面板分组的**数据清障**(本机首次执行时暴露):
+#   ① 探针遗留角色(AUTO_ROLE*,perms 写成 [view, query, add, edit])⇒ 让下面 migrate-role-perm-words-20261016.sql
+#      的「全库词表越界 0」自检永远不过、整段回滚;② STOCK_STATUS 的 module_group 为 NULL/仓库管理、
+#      DISPATCH_* 为「新生产」⇒ 让 migrate-stock-detail-module-group-20261016.sql 的自检同样不过。
+#   本脚本只把这些脏值归到合法值(幂等),不改任何迁移判据;两账套均执行。
+migrate-role-perm-mg-cleanup-20261018.sql
 migrate-role-perm-words-20261016.sql
 # migrate-stock-detail-module-group-20261016.sql — 库存明细(STOCK_DETAIL)的 module_group 系统管理→库存核算(权限矩阵里不该出现导航没有的分组;自检全库 module_group 越界 0 处)
 migrate-stock-detail-module-group-20261016.sql
 # migrate-bsinv-invcode-index-20261016.sql — bs_inv(存货编码) 加非聚集索引:待排产池实测 969ms→20ms(47×);同一派生 JOIN 还在排产看板/工单列表/订单结转/流程管控,五处一起提速(理由与实测见脚本头注,符合《数据库规范》§2.4)
 migrate-bsinv-invcode-index-20261016.sql
+# 已下架面板残留的孤儿 yj_field 清 13 行(QC_MOLD_INSP 6 / QC_CUT_INSP 6 由下架后重放的
+#   migrate-insp-measure5 插回;SL_RECV 1 是 2026-09-20 改编码时漏搬的「计量单位」)。
+#   不动 yj_translation(标签仍被 QC_PROC_INSP/QC_ASM_INSP 共用)、不动 yj_usage_log。幂等;两账套均执行。
+migrate-drop-orphan-fields-20261017.sql
+# 补 3 个缺 en 译名的字段标签(备注1 / 交期紧迫度 / 已报工),取值与前端 en.js 一致(体检 09 项)。幂等;两账套。
+i18n-field-labels-gap-20261017.sql
+# 49 个金蝶接口镜像列补 MS_Description 中文注明(bd_purchase_in 27 / bd_sale_out 21 / bl_purchase_in 1;
+#   生成器把 _id/_for/edit_pay/attachments 归为默认隐藏 ⇒ 界面不显示但要说得清是什么;体检 03 项)。幂等;两账套。
+migrate-iface-column-comments-20261017.sql
+# WMS 三个「条码管理」面板(材料仓/半成品仓/成品仓,一批一码):3 个只读视图 + 3 个 flat 面板 + 字段/权限/译名。
+#   半成品走「报工派生视图」(scjl 工序=成型/切炭),明确标注未进库存;材料仓按 bs_wh.仓库名称 动态取材料仓。幂等;两账套。
+migrate-barcode-panels-20261018.sql
+# 条码面板补强:① 金蝶仓库→MES 仓库映射表 yj_erp_wh_map(CK00006/YCL-01→WH-CL 材料仓)
+#   ② 打印留痕表 yj_barcode_label_log ③ 视图补列(材料:仓库映射/映射状态;成品:批号状态=正常/默认PC0000/缺失)
+#   ④ 面板字段 19/15/16。幂等;两账套均执行。
+migrate-barcode-label-wh-map-20261018.sql
+# 条码面板批号改「日期型」口径(用户 2026-10-18「批号是用日期来表示」):批号=yyyyMMdd+3 位流水
+#   (同日同料会撞码,实测材料 194 组/成品 119 组),原始批号另列保留(PC0000/空),半成品批号来源=报工单。幂等;两账套。
+migrate-barcode-batch-by-date-20261018.sql
+# 半成品条码面板补「原始批号」列(用户 2026-10-18「把原始批号也补上」):材料/成品已有,半成品补上
+#   (原始批号=报工 lot_no 原值,与「批号来源=报工单」一起看可辨是否兜底)。半成品 16→17 列。幂等;两账套。
+migrate-barcode-wip-original-batch-20261018.sql
+# 条码面板去掉「原始批号」、批号来源去掉"(原 …)"(用户 2026-10-18:历史补数与将来的真实批号同一口径=日期+3位流水,
+#   无需区分原值/补值)。材料 21→20 / 半成品 17→16 / 成品 17→16 列;来源仅 日期+流水 / 入库单 / 报工单。幂等;两账套。
+migrate-barcode-drop-original-batch-20261018.sql
+# 标签可带 仓库/供应商/仓位(有值才显示;用户 2026-10-18):材料视图补「仓位」列(21 列),
+#   材料有供应商、仓库经映射=材料仓(仓位 850 行全空 ⇒ 标签该行不显示);成品只有仓库名;半成品三者皆无。幂等;两账套。
+migrate-barcode-label-wh-fields-20261018.sql
+# 补建 3 个金蝶外部仓的 MES 仓库档案(恒亿仓/华北工控仓/成品B仓 → WH-HY/WH-HBGK/WH-CPB):
+#   文档侧存金蝶仓名、结算按名称在 bs_wh 解析,档案缺失会让这类单据弃审整笔回滚报「仓库档案不存在」。幂等;两账套。
+migrate-barcode-wh-archive-fix-20261018.sql
+# 补「字典SQL」en 译名(远端 FIELDMGR 新标签;体检 09 棘轮基线 0)。幂等;两账套。
+i18n-field-labels-gap-20261018.sql
+# 面板 module_group 归一到当前导航一级模块(智能供应链/库存管理/生产制造/品质管理/研发管理/数据建模/系统管理平台),
+#   69 张改动;历史碎值(库存核算/基础设置/基础资料/订单管理…)清零 ⇒ 权限矩阵分组 = 菜单一级模块。幂等;两账套。
+migrate-role-panel-modules-20261018.sql
+# 角色面板权限:补齐「该角色本模块已有授权 ⇒ 同模块本就放行」的面板行(view,query),**不扩权**;
+#   数据建模(字段管理/数据字典/ERP导入日志)对普通用户保持 0 行。幂等;两账套。
+migrate-role-grant-fill-20261018.sql
+# 数据建模 4 张(字段管理/数据字典/ERP导入日志/ERP导入明细)对「普通用户」开只读 view,query(用户 2026-10-18 同意)。幂等;两账套。
+migrate-role-grant-dm-readonly-20261018.sql
 # YINJIA-MES 数据库迁移清单(唯一权威顺序,按行序执行)
 #   对照库 = 服务器备份 yjmes2.bak(源库 HSDZ_MES,2026-10-15 09:52)还原出的 YJMES2_SRV_1015 实测:
 #   ⚠ 2026-10-15 用户后续要求(**有意偏离服务器现状**,已两账套 sp_rename+ALTER 先行改好,脚本负责收敛):
@@ -3750,5 +3797,41 @@ migrate-bsinv-invcode-index-20261016.sql
 #     两列合起来才是唯一键)」。`审核` 列注明按用户口径 =「审核标记:审核=Y / 没审核=N」
 #     (脚本早期"服务器无 Y/N 证据 ⇒ 不采纳"的写法已更正)。其余 3 个 *ID 仍照服务器保持 float。
 migrate-dm-fields-center-20261018.sql
+# 合并补入(2026-10-18):本地未推送的 5 条迁移(远端清单里没有),保持本地原有顺序
+# ============================================================
+# migrate-first-insp-audit-trail-20261018.sql — 首件检验单开直接审核(用户口径「为当前的首件检验单增加审核功能,参照制程检验单」):
+#   存量已审核单据补 AUDIT 留痕(yj_form_approval);只针对 QC_FIRST_INSP、幂等 + 自检。
+#   取证:两账套此前面板无审核入口 ⇒ 补录 0 行(属预期);修法代码侧 = PanelxList.DIRECT_AUDIT_PANELS + 纸面/报表「审核人」格。
+migrate-first-insp-audit-trail-20261018.sql
+# migrate-insp-gate-option-20261016.sql — 检验单生成门禁(成型完成)的**强度档位**写进 yj_panel.config:
+#   inspGate = off|warn|block(默认 block)、inspGateLegacy = pass|block(默认 pass);
+#   追加在既有 config 之后(不覆盖 fixedItems 等),已含该键则整行跳过(幂等);两账套均执行。
+#   读法见 WoInspGate.loadPolicy(字符串匹配,兼容级别 100 无 JSON 函数);改档位只需 UPDATE 该键,不必发版。
+migrate-insp-gate-option-20261016.sql
+# migrate-panel-line-table-20261018.sql — 造粒记录/无黑处理登记/封箱确认三个单表式 doc 面板补行表指针:
+#   yj_panel.line_table 为空 ⇒ QueryService.loadDocs 拼出 `FROM null t`(S0001/156,打开单据/列表/保存全 500);
+#   三张 *_detail 早已存在且恒空,只差元数据指针。纯 UPDATE(幂等)+ 自检「全库 doc 无『有头无行』」,两账套均执行。
+migrate-panel-line-table-20261018.sql
+# migrate-record-sheets-head-detail-20261018.sql — 造粒记录/无黑处理登记/封箱确认 三张「记录表」改「表头 + 明细」:
+#   纸面(r6/r23/r25)是「一行一条记录」的台账,此前全部业务字段挂表头 ⇒ 表单明细页签 0 列、列表页 A 区不渲染(用户「看不到明细表」)。
+#   明细表补 15/7/5 个业务列 + 字段 place 由 header 改 detail + 表头只留 5 个 + 头表业务列 DROP(无数据/无引用)+ 清 2 张探针空单;幂等 + 自检。
+migrate-record-sheets-head-detail-20261018.sql
+# migrate-whloc-unique-20261018.sql — 仓位档案(WHLOC/bs_wh_loc)仓内唯一:仓库编码+仓位编码
+#   用户口径(2026-10-18):不需要全局唯一,只要求「当前仓库编码 + 仓位编码」唯一;仓位地址含中文且会漂,
+#   二维码由 仓库编码@仓位地址@仓位编码 改为 仓库编码@仓位编码(前端 print-formats.locationCardQrText)。
+#   ① asp_cancel NULL→N 并置 NOT NULL(过滤索引只认 'N');② 预检存活重复/空仓库/空仓位编码,有则 RAISERROR 停;
+#   ③ 过滤唯一索引 ux_bs_wh_loc_wh_code(仓库编码,仓位编码) WHERE asp_cancel='N';④ yj_panel.config 写
+#   uniqueKeys=[["仓库","仓位编码"]](后端保存预检 + 前端即时查重同源);⑤ 自检重复=0/索引在/config 已声明。
+#   两账套均执行;既有正式库 684 行、测试库 683 行流程内均无存活重复。
+migrate-whloc-unique-20261018.sql
 
+
+# migrate-plang-ja-foreign-close-repair-20261018.sql — 「外部程序把工单批量写成已结案」的**回正脚本**(默认 dry-run)
+#   判据=ja=Y 且不满足「入库≥排产 + 组装成品检验已审核」;@apply=0 只打印候选清单(@apply 改 1 才 UPDATE)。
+#   登记进链只为「清单↔文件一致」体检过关;dry-run 执行不写任何数据,可安全随链运行。
+migrate-plang-ja-foreign-close-repair-20261018.sql
+
+# migrate-enable-rcsi-20261018.sql — 库级开关 READ_COMMITTED_SNAPSHOT(RCSI)**默认 dry-run**
+#   @apply=0 只查现状(不做 ALTER);改 1 需在无人时段单独执行(会短暂独占库)。
+#   登记进链只为体检「清单↔文件一致」过关;默认执行是零改动的。
 migrate-pu-order-detail-stats-20261018.sql

@@ -6,7 +6,8 @@
  *   ② 两层表头:第一级分组跨本组各列、第二级测试项目,左上角斜线格纵向合并两行;
  *   ③ 标准行取值与列同源;
  *   ④ 1#..8# 八个样品行,**每组只在自己那一对样品行上有值**、其余格写 `/`(与纸面同源);
- *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人 都在;
+ *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人|审核人 三组都在(审核人 2026-10-18 补,
+ *      随首件检验单开直接审核);
  *   ⑥ 所有合并区**都不越界**(行列号都在 aoa 范围内)。
  */
 import { test } from 'node:test'
@@ -43,7 +44,11 @@ const build = (over = {}) => {
       columns,
       items,
       requirements: ['要求一', '要求二', '要求三', '要求四', '要求五', '要求六'],
-      foot: { resultLabel: '检验结果', result: '合格', byLabel: '检验人', by: '张三' },
+      foot: {
+        resultLabel: '检验结果', result: '合格',
+        byLabel: '检验人', by: '张三',
+        auditorLabel: '审核人', auditor: '李四',
+      },
       ...over,
     }),
   }
@@ -125,7 +130,7 @@ test('④ 八个样品行:可填范围与纸面同源(前两列只 1#/2#,其余�
   }
 })
 
-test('⑤ 相关要求逐条一行且横向合并;表尾两组都在', () => {
+test('⑤ 相关要求逐条一行且横向合并;表尾三组(检验结果|检验人|审核人)都在', () => {
   const { aoa, merges, marks } = build()
   assert.equal(aoa[marks.reqTitleRow][0], '相关要求：')
   assert.equal(marks.reqRows.length, 6)
@@ -134,11 +139,16 @@ test('⑤ 相关要求逐条一行且横向合并;表尾两组都在', () => {
   for (const r of marks.reqRows) {
     assert.ok(merges.some((m) => m.s.r === r && m.s.c === 0 && m.e.c === marks.colCount - 1), `第 ${r} 行要合并全宽`)
   }
+  // 表尾三段等分(2026-10-18 起三段:N=11 ⇒ 每段 3 列:0|1-2、3|4-5、6|7-10)
+  const N = marks.colCount
+  const pairW = Math.max(2, Math.floor(N / 3))
   const foot = aoa[marks.footRow]
   assert.equal(foot[0], '检验结果')
   assert.equal(foot[1], '合格')
-  assert.equal(foot[Math.max(2, Math.floor(marks.colCount / 2))], '检验人')
-  assert.equal(foot[Math.max(2, Math.floor(marks.colCount / 2)) + 1], '张三')
+  assert.equal(foot[pairW], '检验人')
+  assert.equal(foot[pairW + 1], '张三')
+  assert.equal(foot[pairW * 2], '审核人')
+  assert.equal(foot[pairW * 2 + 1], '李四')
 })
 
 test('⑥ 所有合并区都在 aoa 范围内(不越界)', () => {

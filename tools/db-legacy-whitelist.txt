@@ -275,3 +275,9 @@ skiplabel:P-E/kg
 skiplabel:PH\n8.5±0.25
 skiplabel:QQ
 skiplabel:TDS（mg/L）200-500mg/L
+
+# ---- 明确保留的备份表(2026-10-17 补) ----
+# rd_dev_task_bak_20261013:研发任务的**改前快照**,AGENTS.md 写明「保留项别顺手清:rd_dev_task_bak_*」。
+#   DbNormAudit 10 项原先把一切 *bak* 表都算「应清零」,与这条口径打架 ⇒ check10 改为尊重 table: 登记。
+#   (mate_bak_20261013 是 mate/WLBOM 的时点副本,不在保留项内 —— 它该删,删之前 10 项仍会 FAIL 点名。)
+table:rd_dev_task_bak_20261013

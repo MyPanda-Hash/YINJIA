@@ -219,9 +219,10 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
   const scm = menuTree.find((n) => n.code === 'scm')
   assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, '库存管理紧随智能供应链(同级)')
 
-  // 四个分组:code 保持原值(权限/页签/展开记忆都按 code 走),顺序 = 核算 → 明细 → 统计 → 报表
-  assert.deepEqual((inv.children || []).map((c) => c.code), ['invAcct', 'invDetail', 'invStats', 'invReports'])
-  assert.deepEqual((inv.children || []).map((c) => c.title), ['库存核算', '库存明细', '库存统计', '库存报表'])
+  // 五个分组:code 保持原值(权限/页签/展开记忆都按 code 走),顺序 = 核算 → 明细 → 统计 → 报表 → 条码管理
+  // (条码管理 2026-10-18 并入库存管理:它与库存报表同属 WMS 域,合并在「库存管理」下比留在智能供应链更顺)
+  assert.deepEqual((inv.children || []).map((c) => c.code), ['invAcct', 'invDetail', 'invStats', 'invReports', 'barcode'])
+  assert.deepEqual((inv.children || []).map((c) => c.title), ['库存核算', '库存明细', '库存统计', '库存报表', '条码管理'])
 
   // 智能供应链:四个库存分组一个都不该留下
   assert.deepEqual((scm.children || []).map((c) => c.code), ['sales', 'purchase'])
@@ -233,9 +234,9 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
     return self.concat(codesOf(node.children))
   }
   const invCodes = codesOf(inv)
-  // 库存核算 8 张单据 + 明细 6 + 统计 6 + 报表 4 = 24 张面板,一张不少、不重复
-  assert.equal(invCodes.length, 24, `库存管理应有 24 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 24, '库存管理内不应有重复面板')
+  // 库存核算 8 张单据 + 明细 6 + 统计 6 + 报表 4 + 条码管理 3 = 27 张面板,一张不少、不重复
+  assert.equal(invCodes.length, 27, `库存管理应有 27 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 27, '库存管理内不应有重复面板')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在库存管理')
   const scmCodes = codesOf(scm)
   for (const p of invCodes) {
@@ -309,4 +310,24 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
   assert.deepEqual((group('process').children || []).map((c) => c.panelCode),
     ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP'])
   assert.equal((group('qcDoc').children || []).length, 7)
+})
+
+/**
+ * 2026-10-18 用户口径(附件一 WMS 三条「条码管理」):三个只读报表面板,一批一码,
+ * 半成品先走「报工数据派生视图」。这里钉住入口与形态:
+ *   · 三个 panelCode 必须在导航里且各自独立(不能挤成一张面板);
+ *   · 走的必须是通用面板路由 /panelx/list/<code>(后端 flat 面板,前端零页面)。
+ */
+test('条码管理组(库存管理下):材料/半成品/成品 三个只读面板', () => {
+  const inv = menuTree.find((n) => n.code === 'inv')
+  const bc = (inv.children || []).find((c) => c.code === 'barcode')
+  assert.ok(bc, '库存管理下应有「条码管理」分组')
+  assert.equal(bc.title, '条码管理')
+  assert.deepEqual((bc.children || []).map((c) => c.panelCode),
+    ['BARCODE_MAT', 'BARCODE_WIP', 'BARCODE_FIN'])
+  assert.deepEqual((bc.children || []).map((c) => c.title),
+    ['材料仓条码管理', '半成品仓条码管理', '成品仓条码管理'])
+  for (const leaf of bc.children || []) {
+    assert.equal(leaf.path, '/panelx/list/' + leaf.panelCode)
+  }
 })

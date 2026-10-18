@@ -391,6 +391,56 @@ public class ButtonService {
      * 按人判必然被拒;而这张草稿正是分发动作的产物,不是谁绕过界面开单。
      * 其余校验(编号唯一/产品编号唯一/字段映射/状态行)一律照旧。
      */
+    /** 批号按「日期+3位流水」自动补号的面板(用户 2026-10-18 口径:新加的真实数据按日期+流水) */
+    private static final java.util.Set<String> BATCH_NO_PANELS =
+            java.util.Set.of("PURCHASE_IN", "FINISH_IN");
+
+    /**
+     * 该面板里「批号」这个数据键叫什么 label —— **按物理列解析,不写死标签**。
+     *
+     * <p>踩坑记录(2026-10-18):正式库 PURCHASE_IN 的标签是「批号」,而测试库(旧快照)同面板是
+     * 「批次号」(物理列都是 {@code 批号})⇒ 写死 "批号" 时测试库 byLabel 取不到,补号静默失效。
+     * 故按「候选标签 → 物理列 = 批号」动态取,两账套/多面板都成立。
+     */
+    private static String batchLabelOf(PanelRegistry.PanelDef def) {
+        for (String cand : new String[]{"批号", "批次号"}) {
+            PanelRegistry.FieldDef f = def.byLabel(cand);
+            if (f != null && "批号".equals(f.col())) return cand;
+        }
+        return null;
+    }
+
+    /**
+     * 入库明细批号补号(2026-10-18 用户口径:新加的真实数据按日期+3位流水)。
+     *
+     * <p>只做三件事:①只在采购入库单/产成品入库单;②只补空值与金蝶默认占位 {@code PC0000};
+     * ③基准日 = 表头「单据日期」(补录历史单也拿单据日,不是"今天")。
+     * 已有真实批号(如报工/工单带下来的 20261014)一律跳过,绝不覆盖。
+     */
+    private void ensureBatchNoByDate(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                     List<Map<String, Object>> items) {
+        if (!BATCH_NO_PANELS.contains(def.code()) || items == null || items.isEmpty()) return;
+        String label = batchLabelOf(def);
+        if (label == null) return;
+        java.time.LocalDate day = docDayOf(head);
+        for (Map<String, Object> it : items) {
+            if (it == null) continue;
+            String cur = it.get(label) == null ? "" : String.valueOf(it.get(label)).trim();
+            if (!cur.isEmpty() && !"PC0000".equalsIgnoreCase(cur)) continue;
+            it.put(label, lotSeqService.next(day));
+        }
+    }
+
+    /** 表头「单据日期」→ LocalDate(取不到或格式不符则用今天;日期列可能是 date 或 文本两种口径)。 */
+    private static java.time.LocalDate docDayOf(Map<String, Object> head) {
+        Object v = head == null ? null : head.get("单据日期");
+        String s = v == null ? "" : String.valueOf(v).trim();
+        if (s.length() >= 10) {
+            try { return java.time.LocalDate.parse(s.substring(0, 10)); } catch (Exception ignored) { }
+        }
+        return java.time.LocalDate.now();
+    }
+
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user,
                                         boolean markSaved, boolean systemDraft) {
@@ -534,6 +584,10 @@ public class ButtonService {
             ensureChangeDeptRows(def, no, user);
             gateChangeDetail(def, items, no, user);
         }
+        // 批号按「日期+3位流水」补号(用户 2026-10-18 口径「后面新加的真实数据就按日期加三位流水来」):
+        // 采购入库单 / 产成品入库单的明细批号为空或金蝶默认占位 PC0000 时,保存即取号写入;
+        // 已有真实批号一律不动 —— 号池 yj_lot_seq 按日重置(见 LotSeqService),基准日取单据日期。
+        ensureBatchNoByDate(def, head, items);
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);
@@ -1764,8 +1818,15 @@ public class ButtonService {
         // DOC_ARCHIVE_PANELS 里(既没有「申请修改」),而本方法又把状态卡在"已审核/已归档",
         // 于是生效之后整张单再也动不了(调研 2026-09-30 实测确认)。
         boolean changeEffective = CHANGE_PANEL.equals(def.code()) && "已生效".equals(status);
-        if (!"已审核".equals(status) && !"已归档".equals(status) && !changeEffective)
-            throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 2026-10-18 用户口径(把「弃审」与「申请修改」融合):按钮只有一个「弃审」,
+        //   **但归档单必须先走申请修改并经管理员审批(状态进入「修改中」)才允许弃审** ——
+        //   不再允许对「已归档」直接反审核(旧行为靠 snapshotOnUnaudit 事后补快照,
+        //   现在是"先审批、再弃审",审批链与改动原因在弃审之前就已留痕)。
+        boolean modifying = "修改中".equals(status);
+        if ("已归档".equals(status))
+            throw new IllegalStateException("该单据已归档:请先「申请修改」并经管理员审批(状态变为修改中)后再弃审");
+        if (!"已审核".equals(status) && !modifying && !changeEffective)
+            throw new IllegalStateException("仅已审核/修改中状态可弃审(已归档请先申请修改)");
         // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
         // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
@@ -3085,6 +3146,19 @@ public class ButtonService {
                 if (prow != null && prow.get("pl_xc") != null) ownXc = ((Number) prow.get("pl_xc")).intValue();
             }
             if (ownXc != null && ownXc != 0) head.put("工单行号", ownXc);
+            // 门禁(2026-10-19):成型未完成的工单行不出工序检验单 —— 与首件/制程两个手工入口
+            //   共用 {@link WoInspGate} 的同一份判据与同一句话术(禁止各写一份)。
+            //   正常路径下组装报工本身就有「不得跳序」校验(前道成型必须先有已审核报工),
+            //   这里主要防**手机端/外部直写 scjl** 那条绕过路径(ExternalReportAbsorbService)。
+            //   注意:闸不过只**跳过出单**,绝不阻断报工审核本身。
+            if (ownXc != null && ownXc != 0) {
+                WoInspGate.Status gate = WoInspGate.check(jdbc, String.valueOf(r.get("工单号")), ownXc);
+                if (!gate.allowed()) {
+                    log.info("[工序检验] 报工 {} 工单 {}(行 {})成型尚未报工 ⇒ 暂不出 {} 检验单",
+                            repNo, r.get("工单号"), ownXc, target);
+                    continue;
+                }
+            }
             head.put("报工单号", repNo);
             head.put("工序", op);
             if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
@@ -3163,17 +3237,23 @@ public class ButtonService {
         int xc = ownXc == null ? 0 : ownXc;
         long plangRowId = prow == null || prow.get("id") == null ? 0L : ((Number) prow.get("id")).longValue();
 
-        // 本批是否已有更早的已审核报工(同 WoReportService 的行锚口径:先 gd_id→plang_id,再回退批次)
-        Integer prior = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM dbo.scjl s"
-                        + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                        + "   AND s.id<>?"
-                        + "   AND (? = 0"
-                        + "        OR ISNULL(s.[工单行号],0) = ?"
-                        + "        OR (? > 0 AND EXISTS (SELECT 1 FROM dbo.plang_pc pc"
-                        + "                              WHERE pc.id = s.gd_id AND pc.plang_id = ?)))",
-                Integer.class, wo, curId, xc, xc, plangRowId, plangRowId);
-        if (prior != null && prior > 0) return;                   // 本批已有更早的已审核报工 ⇒ 首件已过
+        // 🔴 2026-10-19 用户口径(原话):「当前首件检验单、制程检验单、组装成品检验单都需要实现当前完成了进行,
+        //   **成型完成后的生产工单才能生成这个首件检验单**,当前实现的所有生产工单都能生成检验单据,
+        //   修改当前的实现逻辑」。判据 = {@link WoInspGate}(与另外两个入口、以及组装那张单共用同一份实现)。
+        //   与《银嘉MES总流程 V1.2》品质泳道一致:图上规则是「成型报工 → 成型质检数据」,
+        //   首件检验单就是成型那道工序的质检数据。
+        //
+        //   ⚠ 这里**换掉了原来的判据**(原:「本(工单号,批次号,工单行号)没有更早的已审核报工」),
+        //   原因有二:
+        //     ① 原判据**与工序无关** —— 第一张报工落在「混料」时就会出错单,与流程图相反;
+        //     ② 原判据一旦成立就永久成立:路线补上混料后,成型报工审核时会被"混料报得更早"挡掉 ⇒
+        //        **首件检验单永远出不来**。现改为「成型已完成 + 本行还没有存活首件单」,
+        //        于是任何一张报工审核时只要成型已完成且还没出过单,就补出来(自动补单通道)。
+        WoInspGate.Status gate = xc > 0 ? WoInspGate.check(jdbc, wo, xc) : WoInspGate.pass();
+        if (!gate.allowed()) {
+            log.info("[首件检验] 报工 {} 工单 {}(行 {})成型尚未报工 ⇒ 暂不出首件检验单", repNo, wo, xc);
+            return;
+        }
 
         Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM dbo." + FIRST_INSP_HEAD
                         + " WHERE 工单号=? AND ISNULL(工单行号,0)=?"

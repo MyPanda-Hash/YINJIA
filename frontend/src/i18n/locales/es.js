@@ -1,7 +1,14 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
-    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
+    '结案回正': 'Revertir cierre',
+    '没有需要回正的结案行': 'No hay órdenes por revertir',
+    '把外部程序误写成「已结案」的工单改回未结案': 'Reabrir órdenes marcadas como cerradas por error por un programa externo',
+    '已回正': 'Revertidas',
+    '行': 'fila(s)',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
+    '结案异常': 'Cierre anómalo',
+    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Esta línea está cerrada pero no cumple la regla de cierre de MES (entrada ≥ planificado + inspección de producto terminado de ensamble aprobada) — normalmente lo causa el mini-programa/legacy escribiendo directo en la base. Revíselo con «Auditoría de cierre» y corríjalo.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Biblioteca de estándares de inspección',
     '出货检验计划': 'Plan de inspección de envío',
     '计划单号': 'N.º de plan',
@@ -56,6 +63,22 @@ export default {
     "生成首件检验单失败": "No se pudo crear la hoja de inspección de primera pieza",
     "选生产工单": "Elegir orden de producción",
     "生成制程检验单失败": "No se pudo crear la hoja de inspección de proceso",
+    "预警放行": "Avisar y permitir",
+    "强制开单": "Forzar creación",
+    "强制开单原因": "Motivo de la creación forzada",
+    "请填写强制开单原因": "Introduzca el motivo de la creación forzada",
+    "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "La operación de moldeo de esta línea aún no se ha reportado. ¿Crear la hoja de todos modos?",
+    "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Solo las líneas de orden cuya operación de moldeo esté reportada pueden crear la hoja de inspección; las líneas en gris indican el motivo.",
+    "成型完工量": "Cantidad de moldeo completada",
+    "成型计划量": "Cantidad de moldeo planificada",
+    "可开单": "Se puede crear",
+    "免门禁": "Sin restricción",
+    "存量放行": "Datos existentes",
+    "成型未报工": "Moldeo sin reportar",
+    "该工单行暂不能生成检验单": "Esta línea de orden aún no puede crear una hoja de inspección",
+    "该生产工单行的成型工序尚未报工（成型完工量 0），暂不能生成检验单": "La operación de moldeo de esta línea de orden aún no se ha reportado (cantidad completada 0); por ahora no se puede crear la hoja",
+    "该工单未绑工艺路线或路线里没有「成型」工序，本单免门禁": "Esta orden no tiene ruta, o la ruta no incluye la operación «Moldeo»; la restricción no aplica",
+    "该生产工单行还没有任何已审核报工（存量数据），按现状放行": "Esta línea de orden aún no tiene ningún reporte de trabajo aprobado (datos existentes); se deja pasar tal cual",
     "未生成制程检验单": "No se creó la hoja de inspección de proceso",
     "该工单行已有制程检验单": "Esta línea de orden ya tiene hoja de inspección de proceso",
     "已生成制程检验单": "Hoja de inspección de proceso creada",

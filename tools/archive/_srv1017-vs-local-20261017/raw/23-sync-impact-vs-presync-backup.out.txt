@@ -1,0 +1,32 @@
+===== 本次同步实际改动(现在 - 施工前) =====
+表|施工前行数|现在行数|净增行|新增或变更行|删除或被改行|备注
+-|-----|----|---|------|------|--
+dbo.yj_doc_status|2210|2236|26|300|274|NULL
+dbo.bs_inv|3898|3898|0|106|106|NULL
+dbo.bl_so_order|472|514|42|42|0|NULL
+dbo.yj_role_panel|361|335|-26|26|52|NULL
+dbo.bd_so_order|253|273|20|20|0|NULL
+dbo.outh|3318|3318|0|14|14|NULL
+dbo.bs_qc_item|0|14|14|14|0|NULL
+dbo.yj_form_approval|4984|4997|13|13|0|NULL
+dbo.s_allno|568|580|12|12|0|NULL
+dbo.wo_process_line|24|27|3|3|0|NULL
+dbo.yj_user|5|5|0|2|2|NULL
+dbo.permission|1547|1548|1|2|1|NULL
+dbo.bs_qc_plan|0|2|2|2|0|NULL
+dbo.scjl|4|6|2|2|0|NULL
+dbo.qc_return|5|5|0|1|1|NULL
+dbo.qc_return_detail|15|15|0|1|1|NULL
+dbo.qc_tc_in|9|10|1|1|0|NULL
+dbo.wo_transfer_log|6|7|1|1|0|NULL
+dbo.form_flow_link|1252|1253|1|1|0|NULL
+dbo.plang|429|429|0|NULL|NULL|The data type ntext cannot be used as an operand to the UNION, INTERSECT or EXCEPT operators because it is not comparable.
+dbo.plang_pc|2|3|1|NULL|NULL|The data type ntext cannot be used as an operand to the UNION, INTERSECT or EXCEPT operators because it is not comparable.
+===== 汇总 =====
+被改动表数|新增或变更行合计|删除或被覆盖行合计
+-----|--------|---------
+21|563|451
+===== 全库总行数对比 =====
+现在|施工前
+--|---
+111293|111180
