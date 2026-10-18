@@ -47,6 +47,21 @@ async function main() {
   })()`)
   console.log('PICKED', picked)
   console.log('GROUPS', groups)
+  // 展开全部分组 + 把矩阵滚到视口内(否则截图停在部门/用户区)
+  await ev(`(function(){
+    var hs = document.querySelectorAll('.el-collapse-item__header')
+    var closed = Array.prototype.filter.call(hs, function(h){ return h.className.indexOf('is-active') < 0 })
+    closed.forEach(function(h){ h.click() })
+    return closed.length
+  })()`)
+  await sleep(2500)
+  await ev(`(function(){
+    var hs = document.querySelectorAll('.el-collapse-item__header')
+    if (!hs.length) return 'none'
+    hs[2] ? hs[2].scrollIntoView({ block: 'start' }) : hs[0].scrollIntoView({ block: 'start' })
+    return 'scrolled'
+  })()`)
+  await sleep(1500)
   const cdpShot = await send('Page.captureScreenshot', { format: 'png' })
   fs.writeFileSync(path.join(OUT, '_perm-matrix.png'), Buffer.from(cdpShot.result.data, 'base64'))
   console.log('ERRS', JSON.stringify(errs.slice(0, 3)))
