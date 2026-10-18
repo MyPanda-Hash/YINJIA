@@ -1,7 +1,7 @@
 kind	schema	name	desc	rows	colcount
-VIEW	dbo	v_barcode_finished	成品仓条码台账(一批一码:产品编码|批号;源 产成品入库单 头行)	null	18
-VIEW	dbo	v_barcode_material	材料仓条码台账(一批一码:存货编码|批号;源 采购入库单 头行)	null	21
-VIEW	dbo	v_barcode_wip	半成品仓条码台账(报工派生:scjl 工序=成型/切炭;未进库存,仅展示)	null	17
+VIEW	dbo	v_barcode_finished	成品仓条码台账(批号=日期+3位流水;原批号另列保留;源 产成品入库单 头行)	null	19
+VIEW	dbo	v_barcode_material	材料仓条码台账(批号=日期+3位流水;原批号另列保留;源 采购入库单 头行)	null	23
+VIEW	dbo	v_barcode_wip	半成品仓条码台账(报工派生:scjl 工序=成型/切炭;批号取自报工 lot_no,日期型;未进库存,仅展示)	null	18
 VIEW	dbo	v_dispatch_detail		null	38
 VIEW	dbo	v_dispatch_stats		null	12
 VIEW	dbo	v_finish_in_detail		null	25
@@ -308,7 +308,7 @@ TABLE	dbo	yj_doc_modify_log	归档单修改记录(修改前后差异快照与审
 TABLE	dbo	yj_doc_status	单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)	2416	31
 TABLE	dbo	yj_erp_wh_map	金蝶(ERP)仓库编码 → MES 仓库编码 映射(条码/库存面板按此把外部仓归到 MES 仓;改口径只改数据)	2	7
 TABLE	dbo	yj_ext_bind_log	动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)	72	8
-TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	4196	21
+TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	4200	21
 TABLE	dbo	yj_form_approval	审批记录表（提交/通过/驳回/弃审全留痕）	12	9
 TABLE	dbo	yj_locale	语言表(启用语言清单,插行即出现语言切换器)	10	5
 TABLE	dbo	yj_lot_seq	批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)	0	2
@@ -318,10 +318,10 @@ TABLE	dbo	yj_plan_term	计划条款表(阶段中止/恢复申请:stage/reason/st
 TABLE	dbo	yj_report_template	报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)	2	11
 TABLE	dbo	yj_role	角色表(角色编码/名称/is_admin)	4	5
 TABLE	dbo	yj_role_panel	角色-面板授权表(perms动作词表含view等,can_approve=审批权)	313	5
-TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	569	3
+TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	570	3
 TABLE	dbo	yj_share_file	共享文件表(研发管理·全公司共享资料:标准/测试报告/认证报告;1行=1份文件,文件本体存yj_attachment,权限=指定人上传改删、其余仅查阅)	0	37
 TABLE	dbo	yj_share_file_cat	共享文件分类表(树形 parent_id,研发管理·共享文件模块;分类可增减,有文件或子分类时禁删)	13	8
 TABLE	dbo	yj_std_lib	标准库(lib_code+item_code 内容片段,供文书面板引用)	181	11
-TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	41023	8
-TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	3083	10
+TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	41025	8
+TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	3085	10
 TABLE	dbo	yj_user	用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)	5	27

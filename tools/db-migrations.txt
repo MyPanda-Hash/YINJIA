@@ -3759,3 +3759,6 @@ migrate-barcode-panels-20261018.sql
 #   ② 打印留痕表 yj_barcode_label_log ③ 视图补列(材料:仓库映射/映射状态;成品:批号状态=正常/默认PC0000/缺失)
 #   ④ 面板字段 19/15/16。幂等;两账套均执行。
 migrate-barcode-label-wh-map-20261018.sql
+# 条码面板批号改「日期型」口径(用户 2026-10-18「批号是用日期来表示」):批号=yyyyMMdd+3 位流水
+#   (同日同料会撞码,实测材料 194 组/成品 119 组),原始批号另列保留(PC0000/空),半成品批号来源=报工单。幂等;两账套。
+migrate-barcode-batch-by-date-20261018.sql
