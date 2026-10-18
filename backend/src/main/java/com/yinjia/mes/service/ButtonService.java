@@ -391,6 +391,56 @@ public class ButtonService {
      * 按人判必然被拒;而这张草稿正是分发动作的产物,不是谁绕过界面开单。
      * 其余校验(编号唯一/产品编号唯一/字段映射/状态行)一律照旧。
      */
+    /** 批号按「日期+3位流水」自动补号的面板(用户 2026-10-18 口径:新加的真实数据按日期+流水) */
+    private static final java.util.Set<String> BATCH_NO_PANELS =
+            java.util.Set.of("PURCHASE_IN", "FINISH_IN");
+
+    /**
+     * 该面板里「批号」这个数据键叫什么 label —— **按物理列解析,不写死标签**。
+     *
+     * <p>踩坑记录(2026-10-18):正式库 PURCHASE_IN 的标签是「批号」,而测试库(旧快照)同面板是
+     * 「批次号」(物理列都是 {@code 批号})⇒ 写死 "批号" 时测试库 byLabel 取不到,补号静默失效。
+     * 故按「候选标签 → 物理列 = 批号」动态取,两账套/多面板都成立。
+     */
+    private static String batchLabelOf(PanelRegistry.PanelDef def) {
+        for (String cand : new String[]{"批号", "批次号"}) {
+            PanelRegistry.FieldDef f = def.byLabel(cand);
+            if (f != null && "批号".equals(f.col())) return cand;
+        }
+        return null;
+    }
+
+    /**
+     * 入库明细批号补号(2026-10-18 用户口径:新加的真实数据按日期+3位流水)。
+     *
+     * <p>只做三件事:①只在采购入库单/产成品入库单;②只补空值与金蝶默认占位 {@code PC0000};
+     * ③基准日 = 表头「单据日期」(补录历史单也拿单据日,不是"今天")。
+     * 已有真实批号(如报工/工单带下来的 20261014)一律跳过,绝不覆盖。
+     */
+    private void ensureBatchNoByDate(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                     List<Map<String, Object>> items) {
+        if (!BATCH_NO_PANELS.contains(def.code()) || items == null || items.isEmpty()) return;
+        String label = batchLabelOf(def);
+        if (label == null) return;
+        java.time.LocalDate day = docDayOf(head);
+        for (Map<String, Object> it : items) {
+            if (it == null) continue;
+            String cur = it.get(label) == null ? "" : String.valueOf(it.get(label)).trim();
+            if (!cur.isEmpty() && !"PC0000".equalsIgnoreCase(cur)) continue;
+            it.put(label, lotSeqService.next(day));
+        }
+    }
+
+    /** 表头「单据日期」→ LocalDate(取不到或格式不符则用今天;日期列可能是 date 或 文本两种口径)。 */
+    private static java.time.LocalDate docDayOf(Map<String, Object> head) {
+        Object v = head == null ? null : head.get("单据日期");
+        String s = v == null ? "" : String.valueOf(v).trim();
+        if (s.length() >= 10) {
+            try { return java.time.LocalDate.parse(s.substring(0, 10)); } catch (Exception ignored) { }
+        }
+        return java.time.LocalDate.now();
+    }
+
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user,
                                         boolean markSaved, boolean systemDraft) {
@@ -534,6 +584,10 @@ public class ButtonService {
             ensureChangeDeptRows(def, no, user);
             gateChangeDetail(def, items, no, user);
         }
+        // 批号按「日期+3位流水」补号(用户 2026-10-18 口径「后面新加的真实数据就按日期加三位流水来」):
+        // 采购入库单 / 产成品入库单的明细批号为空或金蝶默认占位 PC0000 时,保存即取号写入;
+        // 已有真实批号一律不动 —— 号池 yj_lot_seq 按日重置(见 LotSeqService),基准日取单据日期。
+        ensureBatchNoByDate(def, head, items);
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);

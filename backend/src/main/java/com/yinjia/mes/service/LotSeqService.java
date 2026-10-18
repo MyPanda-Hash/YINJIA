@@ -26,9 +26,20 @@ public class LotSeqService {
     }
 
     /** 取当天下一个批号(yyyymmddNNN)。 */
-    @Transactional
     public String next() {
-        String day = LocalDate.now().format(DAY);
+        return next(LocalDate.now());
+    }
+
+    /**
+     * 取指定日期的下一个批号(yyyymmddNNN)。
+     *
+     * <p>为什么要带日期:采购入库单/产成品入库单的批号按**单据日期**取号(用户 2026-10-18 口径
+     * 「新加的真实数据就按日期加三位流水来」),而这些单据的单据日期可以是补录的历史日期 ——
+     * 一律用今天取号会写出与单据日期不符的批号。
+     */
+    @Transactional
+    public String next(LocalDate day0) {
+        String day = (day0 == null ? LocalDate.now() : day0).format(DAY);
         try {
             jdbc.update("IF NOT EXISTS (SELECT 1 FROM yj_lot_seq WHERE 日期 = ?) INSERT INTO yj_lot_seq (日期, 当前流水) VALUES (?, 0)", day, day);
         } catch (DuplicateKeyException race) {
