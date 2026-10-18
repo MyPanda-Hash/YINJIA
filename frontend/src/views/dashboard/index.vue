@@ -349,6 +349,7 @@
           <div class="card-title">{{ tt('产能对比') }}</div>
           <div class="chart-box"><SCapacityBars /></div>
         </div>
+        <DocEntry class="col-12" module="prod" @open="onDocOpen" />
       </div>
     </template>
 
@@ -377,6 +378,7 @@
             <SBars :data="stock.topItems" scroll :colors="['#537786', '#116a5b', '#3b8978', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" />
           </div>
         </div>
+        <DocEntry class="col-12" module="stock" @open="onDocOpen" />
       </div>
     </template>
 
@@ -415,6 +417,7 @@
           </div>
           <div class="chart-box"><SBars :data="salesProducts" label-width="146px" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
         </div>
+        <DocEntry class="col-12" module="sales" @open="onDocOpen" />
       </div>
     </template>
 
@@ -496,6 +499,7 @@
           <div class="card-title">{{ tt('不良物料分布') }}</div>
           <div class="chart-box"><SBars :data="quality.defectItems" :colors="['#b94d3f', '#d79a2b', '#9c7650', '#537786', '#708575', '#8a9a92']" /></div>
         </div>
+        <DocEntry class="col-12" module="quality" @open="onDocOpen" />
       </div>
     </template>
 
@@ -541,6 +545,7 @@ import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
 import SCapacityBars from './SCapacityBars.vue'
 import FlowBoard from './FlowBoard.vue'
+import DocEntry from './DocEntry.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { pickQuickEntries } from '@core/dashboard/deskQuick'
@@ -641,6 +646,10 @@ watch(mod, (v) => {
 function goPanel(panelCode, docNo) {
   if (!panelCode) return
   router.push({ path: `/panelx/list/${panelCode}`, query: docNo ? { focus: docNo } : {} })
+}
+/** 模块「单据入口」点了某张单:与研发「最新单据」/流程卡片同一跳转口径 */
+function onDocOpen(d) {
+  if (d) goPanel(d.panelCode, d.docNo)
 }
 function fmtRdTime(t) {
   if (!t) return ''
