@@ -1,17 +1,20 @@
 /**
- * _repack-jar.mjs — 把 frontend/dist 同步进 backend static 并重新打包 fat jar(一次成型)
+ * _repack-jar.mjs — 把 frontend/dist 同步进 backend static 并打进 fat jar(一条命令 + 自检)
  *
- * 为什么需要:本机没有 mvn(且沙箱里 maven 起不来),`jar uf` 手工拼又容易漏(2026-10-20 实测:
- * 只用 javac 编 class 而**没带 -parameters** ⇒ Spring 起不来 `expected single matching bean but found 3`;
- * 只换 static 又得保证 BOOT-INF/lib 不动)。这里把三步固定成一条命令,并加自检:
- *   ① dist → backend/src/main/resources/static(先清 assets,避免旧 hash 文件残留)
- *   ② 以**现有 jar** 为底,只覆盖 BOOT-INF/classes/static(前端)
- *   ③ 若给了 --classes 目录,再把编译好的 class 一起覆盖(**必须**是带 -parameters 的产物)
- *   ④ 自检:BOOT-INF/lib 条数不变、static/index.html 存在、新 PanelxList chunk 在包里
- *
- * 用法:
+ * 用法(必须**先停服务**,jar 被占用时 jar 命令会失败):
+ *   cd D:\YINJIA-main\frontend && node node_modules\vite\bin\vite.js build && cd ..
  *   node tools/archive/_stockreport-dialog-1020/_repack-jar.mjs
  *   node tools/archive/_stockreport-dialog-1020/_repack-jar.mjs --classes backend/target/_cc2
+ *
+ * 🔴 两条踩过的红线(2026-10-20 实测,别再试):
+ *   1. **不能用 `jar cfm` 重打整包**:`jar` 会重新压缩所有条目,而 Spring Boot 的
+ *      BOOT-INF/lib/*.jar 必须是 **STORED**(不压缩)才能被嵌套 ClassLoader 读取;
+ *      重打后启动直接 `NoClassDefFoundError: org/springframework/security/crypto/password/PasswordEncoder`。
+ *   2. **不能用 ZipArchive(Update) 删条目**:会把 fat jar 写坏
+ *      (`java.util.zip.ZipException: invalid entry size`)。
+ *   ⇒ 只用 `jar uf`(只增不删)。代价是每重建一次多留一份旧 hash 的 chunk,
+ *     但这**不影响正确性**(index.html 只引用当次构建的 hash);
+ *     要彻底瘦身请在**有 maven** 的环境 `mvn package` 重打。
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -28,13 +31,13 @@ const JAREXE = join(process.env.JAVA_HOME || 'C:\\Users\\Lenovo\\.jdks\\temurin-
 const classDirArg = process.argv.indexOf('--classes')
 const classDir = classDirArg > 0 ? join(ROOT, process.argv[classDirArg + 1]) : null
 
-const run = (args) => {
-  const r = spawnSync(JAREXE, args, { encoding: 'utf8' })
+// 支持 cwd:`jar xf` 是解到**当前工作目录**的(早先漏传把整个 jar 解到了仓库根,事后手工清)
+const run = (args, cwd) => {
+  const r = spawnSync(JAREXE, args, { encoding: 'utf8', cwd: cwd || undefined })
   if (r.status !== 0) { console.error('[FAIL]', JAREXE, args.join(' '), '\n', r.stderr || r.stdout); process.exit(1) }
   return r.stdout || ''
 }
-// ⚠ Windows 下 `jar tf` 是 CRLF 输出:不按 \r?\n 切 + trim,条目会带 '\r',
-//   `e === 'BOOT-INF/classes/static/index.html'` 恒 false ⇒ 自检假失败(2026-10-20 实测)。
+// ⚠ Windows 下 `jar tf` 是 CRLF 输出:不按 \r?\n 切 + trim,条目会带 '\r' ⇒ 自检假失败
 const listJar = () => run(['tf', JAR]).split(/\r?\n/).map((e) => e.trim()).filter(Boolean)
 
 if (!existsSync(JAR)) { console.error('[FAIL] jar 不存在:', JAR); process.exit(1) }
@@ -44,10 +47,9 @@ if (!existsSync(join(DIST, 'index.html'))) { console.error('[FAIL] 先跑 vite b
 const libBefore = listJar().filter((e) => e.startsWith('BOOT-INF/lib/')).length
 rmSync(join(STATIC, 'assets'), { recursive: true, force: true })
 cpSync(DIST, STATIC, { recursive: true })
-const assets = readdirSync(join(STATIC, 'assets')).length
-console.log(`[1/4] dist -> static:assets ${assets} 个文件`)
+console.log(`[1/4] dist -> static:assets ${readdirSync(join(STATIC, 'assets')).length} 个文件`)
 
-// ② 组装 stage
+// ② 组装 stage(只放要覆盖的 classes 子树)
 rmSync(STAGE, { recursive: true, force: true })
 mkdirSync(join(STAGE, 'BOOT-INF', 'classes'), { recursive: true })
 cpSync(STATIC, join(STAGE, 'BOOT-INF', 'classes', 'static'), { recursive: true })
@@ -59,7 +61,7 @@ if (classDir) {
   console.log('[2/4] 只覆盖前端 static(未给 --classes)')
 }
 
-// ③ jar uf
+// ③ jar uf(只增不删,嵌套 jar 一个字节不动)
 run(['uf', JAR, '-C', STAGE, 'BOOT-INF'])
 console.log('[3/4] jar uf 完成')
 
@@ -69,7 +71,8 @@ const libAfter = entries.filter((e) => e.startsWith('BOOT-INF/lib/')).length
 const hasIndex = entries.some((e) => e === 'BOOT-INF/classes/static/index.html')
 const newChunk = readdirSync(join(STATIC, 'assets')).find((f) => f.startsWith('PanelxList-') && f.endsWith('.js'))
 const hasChunk = entries.some((e) => e.endsWith('static/assets/' + newChunk))
+const chunkCount = entries.filter((e) => /static\/assets\/PanelxList-[^/]+\.js$/.test(e)).length
 const size = statSync(JAR).size
-console.log(`[4/4] 自检: lib ${libBefore} -> ${libAfter} | index.html ${hasIndex} | ${newChunk} ${hasChunk} | jar ${size} 字节`)
+console.log(`[4/4] 自检: lib ${libBefore} -> ${libAfter} | index.html ${hasIndex} | ${newChunk} ${hasChunk} | 包里 PanelxList chunk ${chunkCount} 份 | ${(size / 1048576).toFixed(1)} MB`)
 if (libAfter !== libBefore || !hasIndex || !hasChunk) { console.error('[FAIL] 自检未过'); process.exit(1) }
-console.log('[PASS] jar 已更新(static 与 class 均为最新)')
+console.log(`[PASS] jar 已更新${chunkCount > 1 ? `(注:包内还有 ${chunkCount - 1} 份历史 chunk,不影响正确性;瘦身请用 mvn package)` : ''}`)

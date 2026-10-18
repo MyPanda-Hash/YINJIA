@@ -1506,11 +1506,16 @@
         <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
-    <!-- ⚠ v-if="panelAlive"(2026-10-20 第二轮):keep-alive 下每个页签一份 PanelxList 实例,
-         面板切走后实例仍活着、弹窗又是 append-to-body(挂在 body 上),
-         一旦"离开时弹窗还开着",它就会以**孤儿弹窗**的形式压在别的页面上(实测进汇总页
-         会看到两个「查询」弹窗:一个是台账那份遗留的)。面板号没了就直接不渲染,从结构上堵死。 -->
-    <el-dialog v-if="panelAlive" v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
+    <!-- ⚠ v-if="panelAlive" + **不 append 到 body**(2026-10-20 第三轮,用户报「还是两次」的根因):
+         keep-alive 下每个页签一份 PanelxList 实例;弹窗原先 `append-to-body` 挂到 <body>,
+         而**失活的实例不会再渲染** ⇒ onDeactivated 里 `queryDialogVisible=false` 对它已经
+         teleport 出去的 DOM 不生效 —— 弹窗原样留在屏幕上。于是「台账弹窗开着 → 点收发存汇总」
+         会出现**两个「查询」弹窗**(实测标题 ["查询","查询"])。
+         去掉 append-to-body 后弹窗 DOM 在组件自己的子树里,keep-alive 失活时整棵子树被移走,
+         自然不可见(不依赖任何重渲染)。裁切方面无影响:Element Plus 的 .el-overlay 是
+         position:fixed,而 .portal-content 的 overflow:auto 不裁剪 fixed 定位元素
+         (链路里也没有 transform/filter/perspective)。 -->
+    <el-dialog v-if="panelAlive" v-model="queryDialogVisible" :title="tt('查询')" width="760px" destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
         <span class="plan-label">{{ tt('查询方案') }}</span>
@@ -2913,9 +2918,15 @@ const rqdOpening = ref(false)
  *  一次 load()(panelCode 仍是旧值、hasApplied 仍 false、dialogVisible 已 false)⇒ 门又放行,
  *  弹窗当场自己弹回来,随后随面板失活变成关不掉的「孤儿弹窗」。 */
 const rqdAutoOpened = ref(false)
-/** 面板还活着(=路由上确有面板号)。查询弹窗用 v-if 绑它:面板切走后不再渲染,
- *  从结构上杜绝"孤儿弹窗"(append-to-body + keep-alive 会让遗留弹窗压在别的页面上)。 */
-const panelAlive = computed(() => !!panelCode.value && panelCode.value !== 'undefined')
+/** 本实例当前是否处于**激活**状态(keep-alive 语义:本页签就是前台)。
+ *  为什么不用 `panelCode` 判:那是路由派生值,**所有缓存实例共享** —— 台账实例停在汇总页上时,
+ *  它读到的也是 'STOCK_SUMMARY',拿它当"我在不在前台"必然错(第一版就是这么错的)。
+ *  也不能在 setup 里快照路由参数:首次创建时参数还没就绪,快照会拿到空串 ⇒ 弹窗永远不渲染
+ *  (实测首次进入 0 个弹窗)。⇒ 只能靠 onActivated/onDeactivated 维护的**实例私有**标志。 */
+const instanceActive = ref(false)
+/** 面板还活着(=本实例是前台页签)。查询弹窗用 v-if 绑它,配合"不 append 到 body":
+ *  失活实例的弹窗 DOM 留在自己的子树里,随 keep-alive 一起被移走 ⇒ 不会压在别的页面上。 */
+const panelAlive = computed(() => instanceActive.value)
 /** 台账/汇总的「单据日期」区间为空时的默认值(本月初 → 今天):首次进弹窗自动带出,
  *  否则用户每次都要先点两次日期才能查(T+ 报表同款默认区间)。 */
 function ensureReportRange() {
@@ -9962,6 +9973,8 @@ onMounted(() => {
     router.replace('/panelx/list/MANU_ORDER')
     return
   }
+  // 本实例是当前前台页签(keep-alive 下 onActivated 也会置一次;这里兜住"不在 keep-alive 里"的场景)
+  instanceActive.value = true
   // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
   applyDocNoQuery()
   load()
@@ -10000,6 +10013,7 @@ onDeactivated(() => {
   //   然后随本实例失活变成压在别的页面上的孤儿弹窗。rqdAutoOpened=true 让它绝对不开。
   rqdOpening.value = false
   rqdAutoOpened.value = true
+  instanceActive.value = false // 实例私有:本页签已不是前台(查询弹窗 v-if 靠它)
 })
 
 /** keep-alive 切回本页签:重新允许「进入自动弹一次」。
@@ -10009,7 +10023,7 @@ onDeactivated(() => {
  *  ⚠ 还必须在**确保配置就绪之后**再判(`await loadCrg()`):激活时 cfgCache 常已被切面板的
  *  watcher 清成 null,直接调门会因为 metadata.reportQueryDialog 读不到而静默不开。 */
 onActivated(async () => {
-  if (!panelAlive.value) return
+  instanceActive.value = true // 先立"我回到前台"——弹窗 v-if 才能渲染出来
   rqdOpening.value = false
   rqdAutoOpened.value = false
   try { await loadCrg() } catch { /* 配置拉不到就不弹,load() 稍后仍会走同一条门 */ }
