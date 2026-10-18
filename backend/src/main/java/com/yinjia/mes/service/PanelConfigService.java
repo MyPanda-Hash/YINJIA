@@ -1158,10 +1158,36 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
+            // 调拨单(2026-10-18 新增,面板/表/视图见 tools/migrate-transfer-stocktake-20261018.sql):
+            // 仓库间移库,审核 = 调出仓出库 + 调入仓入库双腿过账 kucun(StockLedgerService.applyTransfer)。
+            // 没有上游选单/下游生单(调拨是独立作业),故不放「选单」「生单」两组 —— 省略比放个恒灰占位干净。
+            // 「修改」组放在保存之后(与采购入库单同序),用于已存在的草稿单进入可编辑状态。
+            java.util.Map.entry("TRANSFER", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"导入", "导入"})),
+            // 盘点单(2026-10-18 新增):实盘调平,审核时按 kucun 现值算差异并回写明细
+            // (StockLedgerService.applyStocktake);账实相符的行不产生流水。
+            // 同样没有上游/下游单据。差异数量/账面数量由审核回写,故「修改」只放开草稿期。
+            java.util.Map.entry("STOCKTAKE", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 委外三单:OUTSOURCE_IN / OUTSOURCE_ISSUE 于 2026-10-08 下架(面板+表+视图+菜单),
             // 只留 委外加工单 OUTSOURCE_ORDER(其「生成委外发料单」动作随之改为通用「生单」占位)。
-            java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),
-            // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
+            java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),            // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
             java.util.Map.entry("MANU_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选销售订单"},

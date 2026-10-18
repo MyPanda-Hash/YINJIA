@@ -3835,3 +3835,8 @@ migrate-plang-ja-foreign-close-repair-20261018.sql
 #   @apply=0 只查现状(不做 ALTER);改 1 需在无人时段单独执行(会短暂独占库)。
 #   登记进链只为体检「清单↔文件一致」过关;默认执行是零改动的。
 migrate-pu-order-detail-stats-20261018.sql
+
+# migrate-transfer-stocktake-20261018.sql — 库存核算补「调拨单 TRANSFER / 盘点单 STOCKTAKE」三件套
+#   建表 bd_/bl_transfer + bd_/bl_stocktake(含 MS_Description)、4 视图(明细/统计)、6 面板、
+#   字段/九语译名/角色授权;幂等,两账套均执行。记账见 StockLedgerService.applyTransfer/applyStocktake。
+migrate-transfer-stocktake-20261018.sql

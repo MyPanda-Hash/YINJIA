@@ -234,10 +234,17 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
     return self.concat(codesOf(node.children))
   }
   const invCodes = codesOf(inv)
-  // 库存核算 8 张单据 + 明细 6 + 统计 6 + 报表 4 + 条码管理 3 = 27 张面板,一张不少、不重复
-  assert.equal(invCodes.length, 27, `库存管理应有 27 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 27, '库存管理内不应有重复面板')
+  // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,一张不少、不重复
+  // 2026-10-18:新增调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表
+  //   ⇒ 库存核算 8→10、明细 6→8、统计 6→8,合计 27→33
+  assert.equal(invCodes.length, 33, `库存管理应有 33 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 33, '库存管理内不应有重复面板')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在库存管理')
+  // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
+  for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
+                   'STOCKTAKE', 'STOCKTAKE_DETAIL', 'STOCKTAKE_STATS']) {
+    assert.ok(invCodes.includes(p), `库存管理下应有 ${p} 入口`)
+  }
   const scmCodes = codesOf(scm)
   for (const p of invCodes) {
     assert.ok(!scmCodes.includes(p), `${p} 已在库存管理下,不应再从智能供应链暴露`)

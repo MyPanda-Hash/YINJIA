@@ -1,0 +1,10 @@
+﻿SET NOCOUNT ON;
+PRINT '=== 调拨/盘点头行状态 ===';
+SELECT [单据编号], asp_cancel FROM bd_transfer ORDER BY id;
+SELECT [单据编号], asp_cancel FROM bd_stocktake ORDER BY id;
+PRINT '=== yj_doc_status ===';
+SELECT panel_code, doc_no, canceled, saved FROM yj_doc_status WHERE panel_code IN ('TRANSFER','STOCKTAKE') ORDER BY panel_code, doc_no;
+PRINT '=== kucun 零结存行剩余 ===';
+SELECT COUNT(*) AS zero_rows FROM kucun WHERE ISNULL(rkl,0)=0 AND ISNULL(ckl,0)=0 AND ISNULL(yl,0)=0 AND ISNULL(asp_cancel,'N')<>'Y';
+PRINT '=== kucun 总数 / 有预警数量的行 ===';
+SELECT COUNT(*) AS total, SUM(CASE WHEN ISNULL([预警数量],0) <> 0 THEN 1 ELSE 0 END) AS warn_nonzero FROM kucun WHERE ISNULL(asp_cancel,'N')<>'Y';

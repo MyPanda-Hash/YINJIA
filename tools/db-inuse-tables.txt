@@ -57,6 +57,8 @@ table:bd_purchase_in   # 采购入库单头表(审核过账kucun入库)
 table:bd_sale_out   # 销售出库单头表(审核过账kucun出库)
 table:bd_so_order   # 销售订单头表(星辰ERP同步)
 table:bd_stock_close   # 库存月结头表(2026-10-15):一行 = 一个已月结/已取消的期间;结转行写进 inh(单据类型=月结结转),本表只记状态与合计
+table:bd_stocktake   # 盘点单头表(2026-10-18:实盘调平,审核按 kucun 现值算差异并回写明细;盘盈入流水/盘亏出流水;单号前缀 PD)
+table:bd_transfer   # 调拨单头表(2026-10-18:仓库间移库,审核=调出仓出库+调入仓入库双腿过账 kucun,弃审对称冲回;单号前缀 DB)
 table:bd_tax_type   # 税别档案
 table:bl_dispatch   # 工序派工单行表(中文列,服务器口径;含生产车间列供统计视图分组)
 table:bl_finish_in   # 产成品入库单行表(负数量=红字冲回)
@@ -71,6 +73,8 @@ table:bl_pu_label   # 采购订单材料码打印单**行**表(本批次号下�
 table:bl_purchase_in   # 采购入库单行表(批号三键入库)
 table:bl_sale_out   # 销售出库单行表(批号三键出库)
 table:bl_so_order   # 销售订单行表(星辰ERP同步)
+table:bl_stocktake   # 盘点单行表(2026-10-18:账面数量/差异数量由审核回写留档,实盘数量为唯一人工输入)
+table:bl_transfer   # 调拨单行表(2026-10-18:一行一个存货+批号,调出仓库/调入仓库逐行指定)
 table:bl_stock_close   # 库存月结行表(2026-10-15):一行 = 一个 (物料,仓库,批号) 的期初/入库/出库/结存快照,供报表展开明细
 table:bs_currency   # 币别档案(金蝶云·星辰 currency 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)
 table:bs_customer_group   # 客户分类档案(金蝶云·星辰 customer_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)

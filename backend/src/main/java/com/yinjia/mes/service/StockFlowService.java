@@ -66,8 +66,19 @@ public class StockFlowService {
         };
     }
 
+    // ── 调拨 / 盘点段号(2026-10-18,源 tools/migrate-transfer-stocktake-20261018.sql 头注) ──
+    // 4(委外入库)/8(委外发料)是已下架委外段的保留号,按既有口径**不回收**,新段顺延编号:
+    //   9  调拨入库 / 10 调拨出库 / 11 盘点盘盈 / 12 盘点盘亏
+    // 一张调拨单的一行会产生**两条流水**(9 与 10),rid 相同、src 不同 ⇒ 不撞 UX_*_src_rid 唯一索引;
+    // 盘点行的盘盈/盘亏互斥,同样各占一段。
+    // v_stock_movement 无需改动:它按 src 透传、业务类型只分 入库/出库,新段自动进台账/收发存/成本重算。
+    static final int SRC_TRANSFER_IN = 9;
+    static final int SRC_TRANSFER_OUT = 10;
+    static final int SRC_STOCKTAKE_IN = 11;
+    static final int SRC_STOCKTAKE_OUT = 12;
+
     /**
-     * 写流水。
+     * 写流水(单方向面板:采购入库/产成品入库/其他入库/销售出库/材料出库/其他出库)。
      *
      * @param rows 已由 StockLedgerService.loadRows 取好的单据行(键:code/lot/qty/price/金额/
      *             name/spec/uom/rid/单据类型/单据日期/往来单位/经手人/含税金额/税额;后两个键只有
@@ -80,8 +91,87 @@ public class StockFlowService {
         int inS = inSrc(panelCode), outS = outSrc(panelCode);
         if (inS < 0 && outS < 0) return 0;
         if (rows == null || rows.isEmpty()) return 0;
-        boolean inbound = inS > 0;
-        int src = inbound ? inS : outS;
+        return post(inS > 0 ? inS : outS, inS > 0, no, rows, forward, user, true);
+    }
+
+    /**
+     * **调拨单流水**:一行 → 两条(调出仓 outh src=10 + 调入仓 inh src=9)。
+     *
+     * <p>为什么必须两条而不是"净额不动不记流水":流水是库存的唯一真源,仓库间移库改变的是**每个仓库**
+     * 的结存(公司总量不变)。只记一条或一条不记 ⇒ 库存台账/收发存汇总/成本重算全部看不见这次移动,
+     * 调出仓的货凭空消失、调入仓的货凭空出现。
+     *
+     * <p>调用方(StockLedgerService.applyTransfer)已在**同一事务**里把两条腿的 kucun 都改完,
+     * 这里只负责把同样的两腿写进流水;任一步抛错整笔回滚。
+     *
+     * @param rows 已解析仓库的行(键含 调出仓库编码/调出仓库/调入仓库编码/调入仓库 与回填的 仓库编码/仓库名称)
+     */
+    public int postTransferFlow(String no, List<Map<String, Object>> rows, boolean forward, String user) {
+        if (rows == null || rows.isEmpty()) return 0;
+        List<Map<String, Object>> outRows = new ArrayList<>(rows.size());
+        List<Map<String, Object>> inRows = new ArrayList<>(rows.size());
+        for (Map<String, Object> r : rows) {
+            if (num(r.get("qty")) == 0) continue;                    // 零行两腿都不记
+            String outCode = str(r.get("调出仓库编码")), inCode = str(r.get("调入仓库编码"));
+            if (outCode == null || inCode == null) continue;          // 仓库没解析出来 = 该行没动过 kucun
+            // 出库腿:仓库覆盖成调出仓;出库按结存成本计价 ⇒ 单价不传(price 置 null,与其他出库段同口径)
+            Map<String, Object> o = new LinkedHashMap<>(r);
+            o.put("仓库编码", outCode);
+            o.put("仓库名称", str(r.get("调出仓库")));
+            o.put("price", null);
+            outRows.add(o);
+            // 入库腿:仓库覆盖成调入仓;入库要带单价/金额(否则成本重算把这次移库当成 0 金额收入)
+            Map<String, Object> i = new LinkedHashMap<>(r);
+            i.put("仓库编码", inCode);
+            i.put("仓库名称", str(r.get("调入仓库")));
+            inRows.add(i);
+        }
+        // 出库腿走预警闸门(与其余出库同口径);入库腿不设闸门(入库只会让余额变大)
+        int n = post(SRC_TRANSFER_OUT, false, no, outRows, forward, user, true);
+        n += post(SRC_TRANSFER_IN, true, no, inRows, forward, user, false);
+        return n;
+    }
+
+    /**
+     * **盘点单流水**:按行上的「差异数量」分成盘盈(inh src=11)/ 盘亏(outh src=12)两批。
+     *
+     * <p>为什么要拆两批而不是"带符号一条":inh/outh 是两张表,而差异的正负决定它在哪张表里;
+     * 且盘点行的方向在弃审后重审时**可能翻转**(比如上次盘盈 5、这次实盘改成盘亏 3),
+     * 那时会分别在两张表各留一条 —— 已冲销的那条是 asp_cancel='Y',不会被读口径算进去。
+     *
+     * @param rows 已解析仓库、且已把「差异数量」算好写回行上的明细行
+     */
+    public int postStocktakeFlow(String no, List<Map<String, Object>> rows, boolean forward, String user) {
+        if (rows == null || rows.isEmpty()) return 0;
+        List<Map<String, Object>> gains = new ArrayList<>();
+        List<Map<String, Object>> losses = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            String code = str(r.get("仓库编码"));
+            if (code == null) continue;                               // 仓库没解析出来 = 该行没动过 kucun
+            double diff = num(r.get("差异数量"));
+            if (diff == 0) continue;                                  // 账实相符:不记流水
+            Map<String, Object> c = new LinkedHashMap<>(r);
+            c.put("qty", Math.abs(diff));
+            (diff > 0 ? gains : losses).add(c);
+        }
+        // 两边都不设预警闸门:盘亏是"把账调到实盘",按定义不该被预警数量挡住;
+        // 盘盈只会让余额变大,本就没有闸门。
+        int n = post(SRC_STOCKTAKE_IN, true, no, gains, forward, user, false);
+        n += post(SRC_STOCKTAKE_OUT, false, no, losses, forward, user, false);
+        return n;
+    }
+
+    /**
+     * 写一批流水的公共实现(插入 / 复活 / 红冲 + 幂等)。
+     *
+     * @param src       段号(见上方常量)
+     * @param inbound   true 写 inh / false 写 outh
+     * @param checkWarn 是否过「出库后余额 &lt; 预警数量」闸门(只对 outbound 生效);
+     *                  调拨出库=true、盘点盘亏=false(理由见各调用点)
+     */
+    private int post(int src, boolean inbound, String no, List<Map<String, Object>> rows,
+                     boolean forward, String user, boolean checkWarn) {
+        if (rows == null || rows.isEmpty()) return 0;
         String tbl = inbound ? "inh" : "outh";
         int n = 0;
         // 出库审批闸门(用户 2026-10-15 第十六轮):出库后该批次余额 < 预警数量 ⇒ 抛异常 ⇒ 事务回滚、审批失败并提示。
@@ -94,14 +184,10 @@ public class StockFlowService {
             double qty = num(r.get("qty"));
             if (qty == 0) continue;                          // 零行不过账,也不记流水
             // 出库审批闸门(用户第十六轮):**首次审核(insert)与弃审后重审(revive)都要过闸** ——
-            //   放在幂等查询之前,别只在 insert 分支校验(否则"弃审→把预警调高→重审"能绕过)。
-            if (forward && !inbound) {
-                warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
-                        java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
-            }
-            // 出库审批闸门(用户第十六轮):**首次审核(insert)与弃审后重审(revive)都要过闸** ——
             //   放在幂等查询**之前**,否则"弃审 → 调预警 → 重审"能绕过校验。
-            if (forward && !inbound) {
+            // 2026-10-18:加 checkWarn 开关(调拨出库=true / 盘点盘亏=false,理由见各调用点);
+            //   顺带合并了原文件里**同一段被贴了两遍**的重复代码(两次调用会把 warnAcc 重复累计,见 warnAcc.merge)。
+            if (forward && !inbound && checkWarn) {
                 warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
                         java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
             }
@@ -122,7 +208,7 @@ public class StockFlowService {
             if (!forward) continue;                          // 没记过流水,弃审时无流水可冲
             n += insert(tbl, inbound, r, no, user, src, rid);
         }
-        if (n > 0) log.info("[库存流水] {} {} {} {} 行(src={})", panelCode, no, forward ? "写入" : "红冲", n, src);
+        if (n > 0) log.info("[库存流水] {} {} {} {} 行(src={})", tbl, no, forward ? "写入" : "红冲", n, src);
         return n;
     }
 

@@ -179,6 +179,11 @@ export const menuTree = [
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
+              // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
+              // (调拨=仓库间移库双腿过账;盘点=按实盘差异调平)。面板/表/视图见
+              // tools/migrate-transfer-stocktake-20261018.sql,记账见 StockLedgerService.applyTransfer/applyStocktake。
+              { code: 'transfer', title: '调拨单', path: '/panelx/list/TRANSFER', icon: 'Switch', panelCode: 'TRANSFER', operationName: '新增' },
+              { code: 'stocktake', title: '盘点单', path: '/panelx/list/STOCKTAKE', icon: 'DocumentChecked', panelCode: 'STOCKTAKE', operationName: '新增' },
             ],
           },
         ],
@@ -195,6 +200,9 @@ export const menuTree = [
           { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          // 2026-10-18 新增:调拨单/盘点单明细表(视图 v_transfer_detail / v_stocktake_detail)
+          { code: 'transferDetail', title: '调拨单明细表', path: '/panelx/list/TRANSFER_DETAIL', panelCode: 'TRANSFER_DETAIL', icon: 'List' },
+          { code: 'stocktakeDetail', title: '盘点单明细表', path: '/panelx/list/STOCKTAKE_DETAIL', panelCode: 'STOCKTAKE_DETAIL', icon: 'List' },
         ],
       },
       {
@@ -209,6 +217,9 @@ export const menuTree = [
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
+          // 2026-10-18 新增:调拨单/盘点单统计表(视图 v_transfer_stats / v_stocktake_stats)
+          { code: 'transferStats', title: '调拨单统计表', path: '/panelx/list/TRANSFER_STATS', panelCode: 'TRANSFER_STATS', icon: 'Histogram' },
+          { code: 'stocktakeStats', title: '盘点单统计表', path: '/panelx/list/STOCKTAKE_STATS', panelCode: 'STOCKTAKE_STATS', icon: 'Histogram' },
         ],
       },
       {

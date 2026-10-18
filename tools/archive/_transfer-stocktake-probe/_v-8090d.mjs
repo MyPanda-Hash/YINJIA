@@ -1,0 +1,8 @@
+﻿const html = await (await fetch('http://127.0.0.1:8090/index.html')).text()
+const m = html.match(/src="([^"]*index[^"]*\.js)"/)
+console.log('入口 chunk: ' + (m ? m[1] : '(未找到)'))
+const js = await (await fetch('http://127.0.0.1:8090' + m[1])).text()
+const hit = js.includes('panelx/list/TRANSFER') && js.includes('panelx/list/STOCKTAKE')
+console.log('服务端已下发新菜单(TRANSFER/STOCKTAKE 路由): ' + (hit ? 'YES' : 'NO'))
+const chunks = [...js.matchAll(/["'](\.\/[A-Za-z0-9_.-]+\.js)["']/g)].map((x) => x[1])
+console.log('入口内联 chunk 数: ' + chunks.length)

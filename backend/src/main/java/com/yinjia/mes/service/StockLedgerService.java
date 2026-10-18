@@ -51,10 +51,15 @@ public class StockLedgerService {
      * <p>2026-10-14:**恢复 其他入库单 / 其他出库单 记账**(用户口径「要恢复库存记账」)——
      * 两面板已按金蝶字段重建(含行表 仓库/仓库编码/批号 与头表 部门/经手人),流水段号沿用既有口径
      * (3=其他入库 / 7=其他出库,见 StockFlowService)。委外两张复核后仍未使用,保持下架。
+     * <p>2026-10-18:**新增调拨单 TRANSFER 与盘点单 STOCKTAKE**(用户口径「为我的库存核算写一个
+     * 调拨单和盘点单,确保单据能正常使用和修改 kucun」)—— 两者记账形态与「单方向」出入库不同:
+     * 调拨一条明细要动**两个仓库**、盘点要按**实盘差异**正负分方向,故不走 {@link #apply} 的
+     * inbound/outbound 二分,而是各自 {@link #applyTransfer} / {@link #applyStocktake}。
      */
     public static boolean postsStock(String panelCode) {
         return switch (panelCode) {
-            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "MATERIAL_OUT", "SALE_OUT", "OTHER_OUT" -> true;
+            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "MATERIAL_OUT", "SALE_OUT", "OTHER_OUT",
+                 "TRANSFER", "STOCKTAKE" -> true;
             default -> false;
         };
     }
@@ -62,13 +67,21 @@ public class StockLedgerService {
     /** 审核 → 过账(入库 + / 出库 −)。 */
     public void postIn(String panelCode, String no, String user) {
         if (!postsStock(panelCode)) return;
-        apply(panelCode, no, user, true);
+        switch (panelCode) {
+            case "TRANSFER" -> applyTransfer(no, user, true);
+            case "STOCKTAKE" -> applyStocktake(no, user, true);
+            default -> apply(panelCode, no, user, true);
+        }
     }
 
     /** 弃审 → 冲回。 */
     public void unpostIn(String panelCode, String no, String user) {
         if (!postsStock(panelCode)) return;
-        apply(panelCode, no, user, false);
+        switch (panelCode) {
+            case "TRANSFER" -> applyTransfer(no, user, false);
+            case "STOCKTAKE" -> applyStocktake(no, user, false);
+            default -> apply(panelCode, no, user, false);
+        }
     }
 
     private void apply(String panelCode, String no, String user, boolean forward) {
@@ -126,6 +139,199 @@ public class StockLedgerService {
         stockFlow.postFlow(panelCode, no, rows, forward, user);
     }
 
+    // ══════════════════════════ 调拨单(TRANSFER):一条明细两腿过账 ══════════════════════════
+
+    /**
+     * 调拨过账 / 冲回。
+     *
+     * <h3>口径</h3>
+     * <ul>
+     *   <li>一条明细 = **两条腿**:调出仓 {@link #applyOut} + 调入仓 {@link #applyIn},同物料、同批号、
+     *       同数量、**同一事务**。任一条腿失败整笔回滚 ⇒ 不会出现"调出仓扣了、调入仓没进"的半截账;</li>
+     *   <li>公司总库存不变,仓库间库存守恒 —— 这也是验收口径:调拨前后 Σ kucun.yl 必须逐字相等;</li>
+     *   <li>弃审 = 两腿对称反做(出库腿加回、入库腿扣掉)。不按当时余额重算,直接用行上的数量,
+     *       故"调拨后又发生了别的出入库"也不会冲错;</li>
+     *   <li>不强制批号(见 {@link #applyOut(String,String,String,double,String,boolean,boolean)}):
+     *       无批号的 kucun 行同样可以移库。</li>
+     * </ul>
+     *
+     * <h3>为什么调出仓与调入仓不能相同</h3>
+     * 同仓调拨在账上等于什么也没做,但会留下两条流水、两条成本记录 —— 纯噪声,且用户几乎总是选错。
+     * 直接拒绝并提示,比"静默通过、事后在台账里发现两条对冲流水"好。
+     */
+    private void applyTransfer(String no, String user, boolean forward) {
+        List<Map<String, Object>> rows = loadTransferRows(no);
+        if (rows.isEmpty()) {
+            if (forward) throw new IllegalStateException("调拨单 " + no + " 无明细行,不能记账");
+            return;                                   // 弃审时无明细行 = 审核时也没记过账,直接放过
+        }
+        for (Map<String, Object> r : rows) {
+            String code = str(r.get("code"));
+            String lot = str(r.get("lot"));
+            double qty = num(r.get("qty"));
+            if (code == null) throw new IllegalStateException("存在缺少[存货编码]的明细行,不能记账");
+            if (qty == 0) continue;                   // 零行不动账
+            String[] outWh = resolveWhPair(str(r.get("调出仓库编码")), str(r.get("调出仓库")));
+            String[] inWh = resolveWhPair(str(r.get("调入仓库编码")), str(r.get("调入仓库")));
+            if (outWh == null || inWh == null) {
+                String miss = outWh == null ? str(r.get("调出仓库")) : str(r.get("调入仓库"));
+                throw new IllegalStateException("仓库档案不存在:[" + (miss == null ? "空" : miss)
+                        + "],请先在基础档案-仓库中建立");
+            }
+            String outCkdm = outWh[0], inCkdm = inWh[0];
+            if (outCkdm.equalsIgnoreCase(inCkdm)) {
+                throw new IllegalStateException("调拨单 " + no + " 存在「调出仓库 = 调入仓库」的明细行(均为 "
+                        + outWh[1] + "),同仓调拨没有意义,请改成一个不同的调入仓库");
+            }
+            // 入库腿的单价:优先行上填的,其次调出仓该批次的结存单价(kucun.price),都没有按 0 ——
+            // 为什么必须给个数:流水 inh.金额 若为 NULL,v_stock_movement 收入金额即 NULL,
+            // 成本重算会 ISNULL(收入金额,0) 把这次移库当 0 元收入,调入仓的金额凭空蒸发。
+            Double linePrice = priceOf(r.get("price"));
+            Double inPrice = linePrice != null ? linePrice : kucunPrice(code, outCkdm, lot);
+            if (inPrice == null) inPrice = 0d;
+            r.put("调入单价", inPrice);
+            r.put("调入金额", inPrice * qty);
+            r.put("调出仓库编码", outCkdm);
+            r.put("调出仓库", outWh[1]);
+            r.put("调入仓库编码", inCkdm);
+            r.put("调入仓库", inWh[1]);
+            // 调出腿:出库(requireLot=false —— 调拨不是扫码领料,不强制批号)
+            applyOut(code, outCkdm, lot, qty, user, forward, false);
+            // 调入腿:入库。qty 为负时 applyIn 内部按红字处理(负数量 = 反向移库)
+            applyIn(code, inCkdm, lot, qty, inPrice, user, forward);
+        }
+        // 两腿流水:调出仓 outh(src=10) + 调入仓 inh(src=9),同一 rid、不同 src ⇒ 幂等索引不冲突
+        stockFlow.postTransferFlow(no, rows, forward, user);
+    }
+
+    // ══════════════════════════ 盘点单(STOCKTAKE):按实盘差异调平 ══════════════════════════
+
+    /**
+     * 盘点过账 / 冲回。
+     *
+     * <h3>审核(forward)</h3>
+     * <ol>
+     *   <li>逐行按 (物料, 仓库, 批号) 读 kucun 现值当「账面数量」;<b>实盘数量</b>为唯一人工输入;</li>
+     *   <li>差异 = 实盘 − 账面。差异 &gt; 0 走入库(盘盈,inh src=11)、&lt; 0 走出库(盘亏,outh src=12);</li>
+     *   <li>把 账面数量/差异数量 **回写到明细行留档** —— 界面这两列只读,值以审核时刻为准;</li>
+     *   <li>结果是「盘点后该行库存 == 实盘数量」,与盘点前库存是多少无关(盘前刚好等于实盘则差异 0、不记流水)。</li>
+     * </ol>
+     *
+     * <h3>弃审(backward)</h3>
+     * 用行上**已留档的 差异数量** 对称反做,再清空这两列(它们是由审核派生的值,留着会让草稿显示过期数字)。
+     * 不清的话,重审时会按新实盘重算并覆盖,但界面上"改单期间"看到的是上一次审核的结果,容易被误读。
+     *
+     * <h3>为什么不设预警闸门</h3>
+     * 盘亏金额是"把账调到实盘"的必然结果,按定义不该被「低于预警数量」挡住 —— 否则盘点单永远审不了。
+     * 现存量非负守卫仍在(applyOut 内含),所以不会盘成负库存。
+     */
+    private void applyStocktake(String no, String user, boolean forward) {
+        List<Map<String, Object>> rows = loadStocktakeRows(no);
+        if (rows.isEmpty()) {
+            if (forward) throw new IllegalStateException("盘点单 " + no + " 无明细行,不能记账");
+            return;
+        }
+        for (Map<String, Object> r : rows) {
+            String code = str(r.get("code"));
+            String lot = str(r.get("lot"));
+            Object rid = r.get("rid");
+            if (code == null) throw new IllegalStateException("存在缺少[存货编码]的明细行,不能记账");
+            String[] wh = resolveWhPair(str(r.get("行仓库编码")), str(r.get("行仓库")));
+            if (wh == null) {
+                throw new IllegalStateException("仓库档案不存在:[" + (str(r.get("行仓库")) == null ? "空" : str(r.get("行仓库")))
+                        + "],请先在基础档案-仓库中建立");
+            }
+            String ckdm = wh[0];
+            r.put("仓库编码", ckdm);
+            r.put("仓库名称", wh[1]);
+            // 单价:行上(只读,审核前为空) → 结存单价 → 0。理由同调拨(流水金额不能留 NULL)
+            Double price = priceOf(r.get("price"));
+            if (price == null) price = kucunPrice(code, ckdm, lot);
+            if (price == null) price = 0d;
+            r.put("price", price);
+
+            double current;   // 账面数量
+            double diff;      // 差异数量 = 实盘 − 账面
+            if (forward) {
+                Double actual = priceOf(r.get("实盘数量"));      // 复用:数值解析口径一致
+                if (actual == null) {
+                    throw new IllegalStateException("盘点单 " + no + " 存在未填[实盘数量]的明细行(存货 "
+                            + code + "),不能审核");
+                }
+                Double bal = bal(code, ckdm, lot);
+                current = bal == null ? 0d : bal;
+                diff = actual - current;
+                // 回写留档(界面只读列;弃审时按它反做,见方法头注)
+                if (rid != null) {
+                    jdbc.update("UPDATE bl_stocktake SET 账面数量 = ?, 差异数量 = ?, 金额 = ? WHERE id = ?",
+                            java.math.BigDecimal.valueOf(current), java.math.BigDecimal.valueOf(diff),
+                            java.math.BigDecimal.valueOf(price * actual), rid);
+                }
+                r.put("账面数量", current);
+                r.put("差异数量", diff);
+                r.put("金额", price * actual);
+            } else {
+                // 弃审:按留档的差异反做(此时行上 差异数量 就是审核时写进去的那个值)
+                Double recorded = priceOf(r.get("差异数量"));
+                diff = recorded == null ? 0d : recorded;
+                r.put("差异数量", diff);
+                if (rid != null) {
+                    jdbc.update("UPDATE bl_stocktake SET 账面数量 = NULL, 差异数量 = NULL, 金额 = NULL WHERE id = ?", rid);
+                }
+            }
+            if (Math.abs(diff) < 0.000001) continue;         // 账实相符:不动库存、不记流水
+            if (diff > 0) {
+                // 盘盈:入库。弃审时 applyIn(forward=false) 会把这次入库扣回去
+                applyIn(code, ckdm, lot, diff, price, user, forward);
+            } else {
+                // 盘亏:出库(数量取绝对值)。弃审时 applyOut(forward=false) 会把扣掉的加回来
+                applyOut(code, ckdm, lot, -diff, user, forward, false);
+            }
+        }
+        stockFlow.postStocktakeFlow(no, rows, forward, user);
+    }
+
+    /** 调拨单明细(键与其它单据行同一套:code/lot/qty/price/金额/rid/name/spec/uom/单据类型/单据日期/经手人)。 */
+    private List<Map<String, Object>> loadTransferRows(String no) {
+        return jdbc.queryForList(
+                "SELECT l.[存货编码] AS code, l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price, l.[金额] AS 金额,"
+                        + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                        + " l.[调出仓库] AS 调出仓库, l.[调出仓库编码] AS 调出仓库编码,"
+                        + " l.[调入仓库] AS 调入仓库, l.[调入仓库编码] AS 调入仓库编码,"
+                        + " N'调拨单' AS 单据类型, h.[单据日期] AS 单据日期, h.[经手人] AS 经手人,"
+                        + " NULL AS 往来单位"
+                        + " FROM bl_transfer l LEFT JOIN bd_transfer h ON h.[单据编号] = l.[单据编号]"
+                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+    }
+
+    /** 盘点单明细(多带 账面数量/实盘数量/差异数量 三列:审核要算差异、弃审要按留档反做)。 */
+    private List<Map<String, Object>> loadStocktakeRows(String no) {
+        return jdbc.queryForList(
+                "SELECT l.[存货编码] AS code, l.[批号] AS lot, l.[仓库] AS 行仓库, l.[仓库编码] AS 行仓库编码,"
+                        + " l.[账面数量] AS 账面数量, l.[实盘数量] AS 实盘数量, l.[差异数量] AS 差异数量,"
+                        + " l.[单价] AS price, l.[金额] AS 金额,"
+                        + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                        + " N'盘点单' AS 单据类型, h.[单据日期] AS 单据日期, h.[经手人] AS 经手人,"
+                        + " NULL AS 往来单位"
+                        + " FROM bl_stocktake l LEFT JOIN bd_stocktake h ON h.[单据编号] = l.[单据编号]"
+                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+    }
+
+    /** 数值解析(null/空串/非数字 → null,与 {@link #num} 的"null→0"不同:这里要区分"没填"和"填了 0")。 */
+    private static Double priceOf(Object o) {
+        if (o == null) return null;
+        String s = String.valueOf(o).trim();
+        if (s.isEmpty()) return null;
+        try { return Double.parseDouble(s); } catch (NumberFormatException e) { return null; }
+    }
+
+    /** 该 (物料,仓库,批号) 的结存单价(kucun.price);无该行 → null。 */
+    private Double kucunPrice(String code, String ckdm, String lot) {
+        List<Double> l = jdbc.queryForList("SELECT price FROM kucun WHERE wzdm = ? AND ckdm = ?"
+                + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)", Double.class, code, ckdm, lot, lot);
+        return l.isEmpty() ? null : l.get(0);
+    }
+
     /** @return 冲回时命中的台账行数(0=没冲到,供备选批号兜底);过账(前进)时无意义 */
     private int applyIn(String code, String ckdm, String lot, double qty, Double price, String user, boolean forward) {
         double sign = forward ? 1 : -1;
@@ -154,7 +360,21 @@ public class StockLedgerService {
     }
 
     private void applyOut(String code, String ckdm, String lot, double qty, String user, boolean forward) {
-        if (lot == null && forward && !HIST_BACKFILL) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
+        applyOut(code, ckdm, lot, qty, user, forward, true);
+    }
+
+    /**
+     * 出库过账。
+     *
+     * @param requireLot 是否强制要求批号(默认 true)。2026-10-18 新增:调拨/盘点**不要求** ——
+     *                   那条「出库行缺少批号请扫码」的守卫是给材料出库(扫码领料)设的,
+     *                   调拨是非批号管理的货也要能移库、盘点是按 (物料,仓库,批号) 行调平,
+     *                   没有批号的 kucun 行(lot_no IS NULL)同样得能被调到。
+     *                   关掉它不影响"出到哪一行":lot 为 null 时下面的 NULL 安全匹配仍命中
+     *                   `lot_no IS NULL` 那一条,不会串到别的批次。
+     */
+    private void applyOut(String code, String ckdm, String lot, double qty, String user, boolean forward, boolean requireLot) {
+        if (requireLot && lot == null && forward && !HIST_BACKFILL) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
         double sign = forward ? 1 : -1;
         int n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
                         + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
@@ -303,22 +523,31 @@ public class StockLedgerService {
      *  2026-09-30:解析结果**回填到行上**(仓库编码/仓库名称),供流水表(inh/outh)写入 ——
      *  流水与 kucun 必须同键,而单据行上的仓库列只是解析输入(可能是别名、可能只有名称没编码)。 */
     private String resolveWh(String whCode, String whName, Map<String, Object> row) {
+        String[] pair = resolveWhPair(whCode, whName);
+        if (pair == null) return null;
+        row.put("仓库编码", pair[0]);
+        row.put("仓库名称", pair[1]);
+        return pair[0];
+    }
+
+    /**
+     * 仓库解析的**纯函数形态**(2026-10-18):返回 {仓库编码, 仓库名称},解析不到返回 null。
+     *
+     * <p>为什么不复用 {@link #resolveWh}:它把结果写死在行上的 `仓库编码`/`仓库名称` 两个键里,
+     * 而调拨单一行要解析**两个**仓库(调出/调入),写同一对键会互相覆盖。
+     * 逻辑与 resolveWh 逐字相同(编码优先、名称兜底),两边不许各改一半 —— resolveWh 现在就是本方法的薄包装。
+     */
+    private String[] resolveWhPair(String whCode, String whName) {
         if (whCode != null && !whCode.isBlank()) {
             List<Map<String, Object>> hit = jdbc.queryForList(
                     "SELECT [仓库编码] AS ckdm, [仓库名称] AS ckmc FROM bs_wh WHERE [仓库编码] = ? AND ISNULL([状态], N'启用') = N'启用'",
                     whCode.trim());
             if (!hit.isEmpty()) {
-                row.put("仓库编码", firstNonBlank(str(hit.get(0).get("ckdm")), whCode.trim()));
-                row.put("仓库名称", str(hit.get(0).get("ckmc")));
-                return String.valueOf(row.get("仓库编码"));
+                return new String[]{str(hit.get(0).get("ckdm")), str(hit.get(0).get("ckmc"))};
             }
         }
         String byName = resolveCkdm(whName);
-        if (byName != null) {
-            row.put("仓库编码", byName);
-            row.put("仓库名称", str(whName));
-        }
-        return byName;
+        return byName == null ? null : new String[]{byName, str(whName)};
     }
 
     /** 仓库名称 → 编码(bs_wh)。 */
