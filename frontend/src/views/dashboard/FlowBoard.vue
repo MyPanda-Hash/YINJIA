@@ -105,7 +105,7 @@ const emit = defineEmits(['open'])
 
 /** 泳道之间的流转说明(设计图上的箭头文字) */
 const DOWN_TAGS = {
-  prod: ['转领料单 / 排产', '报工审核通过', '检验合格 → 入库'],
+  prod: ['工单进待排产池', '定产线后转领料单', '报工审核通过 → 检验'],
   stock: ['来料检验分流', '合格 / 不合格分流'],
 }
 function downTag(chainKey, li) {
