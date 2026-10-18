@@ -112,7 +112,9 @@ async function main() {
 
     // 桌面是 tab 切换渲染,默认只挂「概览」那一支 —— 必须逐模块点 tab 才能看到各模块的 .doc-entry
     const MODULES = [
-      { key: 'prod', tab: '生产', expect: true, empty: true },   // 生产制造 13 张单据头表全空 ⇒ 正确表现是「暂无单据」
+      // 生产(2026-10-18 用户口径):只保留生产计划 —— 生产工单(plang)最近 7 张 + 4 个页面入口按钮,
+      // 不再汇总生产记录/设备维护那批空表;有数据后点工单应进 /prod/plan/workOrderList?keyword=<工单号>
+      { key: 'prod', tab: '生产', expect: true, clickPath: '/prod/plan/workOrderList', keywordToSearch: true },
       { key: 'stock', tab: '库存', expect: true },
       { key: 'sales', tab: '销售', expect: true },
       { key: 'quality', tab: '质量', expect: true },
@@ -141,6 +143,7 @@ async function main() {
         sub: (c.querySelector('.doc-sub') || {}).textContent || '',
         count: (c.querySelector('.doc-count') || {}).textContent || '',
         rows: [...c.querySelectorAll('.doc-item')].map((b) => b.innerText.replace(/\s+/g, ' ').trim()),
+        links: [...c.querySelectorAll('.doc-link')].map((b) => b.textContent.trim()),
         empty: (c.querySelector('.doc-empty') || {}).textContent || '',
         width: Math.round(c.getBoundingClientRect().width),
         overflow: c.scrollWidth > c.clientWidth + 1,
@@ -148,9 +151,11 @@ async function main() {
       const cards = JSON.parse(cardsRaw || '[]')
       const rows = cards.reduce((n, c) => n + c.rows.length, 0)
       const has = cards.length > 0
+      const links = cards[0] ? cards[0].links : []
       console.log('[' + m2.key + '] cards=' + cards.length + ' rows=' + rows + ' ' +
         (cards[0] ? (cards[0].title.trim() + ' / ' + cards[0].sub.trim() + ' / ' + cards[0].count.trim()) : '(无卡片)') +
         (cards[0] && cards[0].empty ? ' 空态=' + cards[0].empty.trim() : ''))
+      if (links.length) console.log('    页面入口: ' + JSON.stringify(links))
       if (cards[0] && cards[0].rows.length) console.log('    前 2 行: ' + JSON.stringify(cards[0].rows.slice(0, 2)))
       await ev(`(() => { const c = document.querySelector('.doc-entry'); if (c) c.scrollIntoView({ block: 'center' }); return 1 })()`)
       await shot('docentry-' + m2.key + '-1440', 1440, 1000)
@@ -179,7 +184,9 @@ async function main() {
       }
       console.log('    [375] ' + JSON.stringify(of375))
       const okRow = m2.empty ? (has && rows === 0) : (has && rows > 0)
-      results.push({ m: m2, ok: m2.expect ? okRow : !has, cards, rows, of375, of768 })
+      // 生产卡固定 4 个页面入口(订单结转/快速排产/工单排产/产线排产负荷);其余模块不该出现入口条
+      const okLinks = m2.key === 'prod' ? links.length === 4 : links.length === 0
+      results.push({ m: m2, ok: m2.expect ? (okRow && okLinks) : !has, cards, rows, links, of375, of768 })
     }
 
     // ── 可选面板筛选(2026-10-18 用户口径):库存卡选「销售出库单」→ 请求带 panel=SALE_OUT、
@@ -227,8 +234,9 @@ async function main() {
       ' badges=' + JSON.stringify(ap.badges) + ' count=' + ap.count + (panelOk ? '' : '  ← FAIL'))
     await shot('docentry-panel-filter', 1440, 1000)
 
-    // 点击验证(2026-10-18 补):五个模块逐个点第一张单据 → 必须跳到 /panelx/list/<panelCode>
-    // 生产当前无单据 ⇒ 该模块记录 skipped(空态由上面的 empty 断言覆盖),不算失败。
+      // 点击验证(2026-10-18 补):有单据行的模块逐个点第一张单据 → 必须落到对应页面
+      //   生产:plang 工单 → /prod/plan/workOrderList,且关键词框被预置为该工单号
+      //   其余:→ /panelx/list/<panelCode>
     const clickResults = []
     for (const m2 of MODULES) {
       await ev(`(location.hash = '#/dashboard', 'ok')`)
@@ -246,11 +254,20 @@ async function main() {
       await sleep(400)
       const before = await ev('location.hash')
       const firstNo = await ev(`(() => { const b = document.querySelector('.doc-entry .doc-item'); return b ? b.textContent.replace(/\\s+/g, ' ').trim() : '' })()`)
+      const docNo = await ev(`(() => { const n = document.querySelector('.doc-entry .doc-item .doc-no'); return n ? n.textContent.trim() : '' })()`)
       await ev(`(() => { const b = document.querySelector('.doc-entry .doc-item'); if (!b) return 0; b.click(); return 1 })()`)
-      const routed = await waitFor(`location.hash.indexOf('/panelx/list/') >= 0`, 9000)
-      await sleep(1600)
+      const expectPath = m2.clickPath || '/panelx/list/'
+      const routed = await waitFor(`location.hash.indexOf(${JSON.stringify(expectPath)}) >= 0`, 9000)
+      await sleep(1800)
       const after = await ev('location.hash')
-      const ok = routed && after !== before
+      let kwOk = true
+      if (m2.keywordToSearch) {
+        const kw = await ev(`(() => { const i = [...document.querySelectorAll('input')]
+          .find((x) => (x.getAttribute('placeholder') || '').indexOf('输入查询条件') >= 0); return i ? i.value : '' })()`)
+        kwOk = String(kw) === String(docNo)
+        console.log('    关键词框=' + JSON.stringify(kw) + ' 期望=' + JSON.stringify(docNo))
+      }
+      const ok = routed && after !== before && kwOk
       console.log('[click] ' + m2.key + ' 「' + firstNo.split('›')[0].trim() + '」 → ' + after + (ok ? '' : '  ← FAIL'))
       await shot('docentry-click-' + m2.key, 1440, 1000)
       clickResults.push({ key: m2.key, ok })

@@ -92,5 +92,21 @@ for (const mod of ['rd', 'prod', 'stock', 'sales', 'quality']) {
   console.log(`[${ok ? 'OK' : 'FAIL'}] 未知面板: HTTP ${r.status}, docs=${(d.docs || []).length}, panels=${(d.panels || []).length}`)
 }
 
+// 生产单据入口(2026-10-18 用户口径):plang 最近 7 张工单(按工单号去重、倒序)+ 4 个页面入口
+{
+  const r = await get('/api/dashboard/prod-orders?limit=7', token)
+  const d = r.json?.data || {}
+  const docs = d.docs || []
+  const links = d.links || []
+  const desc = docs.every((x, i) => i === 0 || String(docs[i - 1].at) >= String(x.at))
+  const unique = new Set(docs.map((x) => x.docNo)).size === docs.length
+  const pathOk = docs.every((x) => String(x.path || '').indexOf('/prod/plan/workOrderList?keyword=') === 0)
+  const ok = r.status === 200 && docs.length > 0 && docs.length <= 7 && desc && unique && pathOk && links.length === 4
+  if (!ok) bad++
+  console.log(`[${ok ? 'OK' : 'FAIL'}] prod-orders: ${docs.length} 张工单, 去重=${unique}, 倒序=${desc}, ` +
+    `定位路径=${pathOk}, 页面入口=${links.length}(${links.map((l) => l.title).join('/')})`)
+  for (const x of docs.slice(0, 3)) console.log(`      ${String(x.at).slice(0, 16)}  ${x.docNo}  ${x.note || '-'}`)
+}
+
 console.log(bad === 0 ? '[PASS] 五模块单据入口全部符合预期' : `[FAIL] ${bad} 个模块不符合预期`)
 process.exit(bad === 0 ? 0 : 2)

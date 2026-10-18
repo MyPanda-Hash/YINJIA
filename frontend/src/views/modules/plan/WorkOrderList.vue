@@ -159,7 +159,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -182,7 +182,24 @@ const canSchedule = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'SCHED
 
 /** 转领料单生成后跳「材料出库单」用(与其它页 gotoPanel 同一范式:tabs.open + router.push) */
 const router = useRouter()
+const route = useRoute()
 const tabs = useTabsStore()
+
+/**
+ * 从我的桌面「单据入口」点最近工单跳进来(2026-10-18):/prod/plan/workOrderList?keyword=<工单号>
+ * 把关键词填进单框搜索,并**清空日期窗** —— 默认只查最近 15 天,而入口列的是最近 7 张工单,
+ * 若目标工单早于窗口(或别人先改过日期)就会"跳进来却看不到那张单"。
+ */
+function applyRouteKeyword() {
+  const kw = String(route.query.keyword ?? '').trim()
+  if (!kw) return false
+  qText.value = kw
+  dateFrom.value = ''
+  dateTo.value = ''
+  // 用完即摘(?focus 同款口径):keep-alive 再次切回时不该被旧关键词复写
+  router.replace({ path: route.path, query: { ...route.query, keyword: undefined } })
+  return true
+}
 
 const rows = ref([])
 const checked = ref([])
@@ -518,8 +535,9 @@ function dayStr(n) {
 }
 
 onMounted(() => {
-  // 默认只取最近 15 天(可在日期框上清空 → 全量);已填过值(如热更重挂)不覆盖用户输入
-  if (!dateFrom.value && !dateTo.value) {
+  // 从桌面「单据入口」带 keyword 进来优先(否则按默认 15 天窗口取数)
+  if (!applyRouteKeyword() && !dateFrom.value && !dateTo.value) {
+    // 已填过值(如热更重挂)不覆盖用户输入
     dateFrom.value = dayStr(-(DEFAULT_WINDOW_DAYS - 1))
     dateTo.value = dayStr(0)
   }
@@ -538,6 +556,9 @@ onMounted(() => {
 let firstActivate = true
 onActivated(() => {
   if (firstActivate) { firstActivate = false; return }
+  // 桌面入口再次跳进来(路由 keyword 变了)也要落到那笔单:keep-alive 缓存下 onMounted 不会再跑
+  const routed = applyRouteKeyword()
+  if (routed) { load(); loadLines(); return }
   load()
 })
 </script>

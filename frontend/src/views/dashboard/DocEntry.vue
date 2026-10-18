@@ -8,8 +8,10 @@
       <h3>{{ tt('单据入口') }}</h3>
       <span class="doc-sub">{{ tt('最近 7 张单据') }}</span>
       <!-- 可选面板(2026-10-18 用户口径):默认「全部面板」= 本模块汇总;选某张面板 ⇒ 只出该面板最近 7 张。
-           选项来自后端返回的 panels(接口保证 panels 不随 panel 收窄),clearable 可退回全部。 -->
+           选项来自后端返回的 panels(接口保证 panels 不随 panel 收窄),clearable 可退回全部。
+           source='prod-orders' 时只有生产工单一个数据源,不放下拉。 -->
       <el-select
+        v-if="source === 'module-docs'"
         v-model="selectedPanel"
         class="doc-filter"
         size="small"
@@ -21,32 +23,37 @@
       >
         <el-option v-for="p in panels" :key="p.code" :label="tt(p.name)" :value="p.code" />
       </el-select>
-      <span v-if="panels.length" class="doc-count">{{ panels.length }} {{ tt('个单据面板') }}</span>
+      <span v-if="source === 'module-docs' && panels.length" class="doc-count">{{ panels.length }} {{ tt('个单据面板') }}</span>
     </div>
     <div v-if="loading" class="doc-empty">{{ tt('加载中…') }}</div>
     <div v-else-if="!docs.length" class="doc-empty">{{ tt('暂无单据') }}</div>
-    <template v-else>
-      <div class="doc-list" :class="{ compact }">
-        <button
-          v-for="d in docs"
-          :key="d.panelCode + ':' + d.docNo"
-          type="button"
-          class="doc-item"
-          :title="tt(d.panelName) + ' ' + d.docNo"
-          @click="emit('open', d)"
-        >
-          <span class="doc-badge">{{ tt(d.panelName) }}</span>
-          <span class="doc-no">{{ d.docNo || '-' }}</span>
-          <span class="doc-meta">{{ d.creator || '-' }} · {{ fmtTime(d.at) }}</span>
-          <span class="doc-go" aria-hidden="true">›</span>
-        </button>
-      </div>
-    </template>
+    <div v-else class="doc-list" :class="{ compact }">
+      <button
+        v-for="d in docs"
+        :key="d.panelCode + ':' + d.docNo"
+        type="button"
+        class="doc-item"
+        :title="tt(d.panelName) + ' ' + d.docNo"
+        @click="onOpen(d)"
+      >
+        <span class="doc-badge">{{ tt(d.panelName) }}</span>
+        <span class="doc-no">{{ d.docNo || '-' }}</span>
+        <span class="doc-meta">{{ metaOf(d) }}</span>
+        <span class="doc-go" aria-hidden="true">›</span>
+      </button>
+    </div>
+    <!-- 页面入口(2026-10-18):生产计划下的 订单结转/快速排产/工单排产/产线排产负荷 是操作页面,
+         没有"单据"可列(见后端 /dashboard/prod-orders 注释)⇒ 以按钮形式给出,点了直接进页面。 -->
+    <div v-if="links.length" class="doc-links">
+      <span class="doc-links-title">{{ tt('页面入口') }}</span>
+      <button v-for="l in links" :key="l.code" type="button" class="doc-link" @click="router.push(l.path)">{{ tt(l.title) }}</button>
+    </div>
   </section>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 
@@ -58,11 +65,18 @@ const props = defineProps({
   // 窄卡片(研发页塞在 3 栏栅格的一格里,宽约 430px):列表改单列、徽标与单号收窄,
   // 否则两列时 badge+单号的最小宽度之和会超出格子
   compact: { type: Boolean, default: false },
+  // 数据源(2026-10-18):
+  //  module-docs(默认)= /dashboard/module-docs,按 yj_panel 单据面板取;
+  //  prod-orders      = /dashboard/prod-orders,生产工单(plang)最近 N 张 + 4 个页面入口按钮
+  //                     —— 生产计划那几项真实单据不在 yj_panel 单据面板里,口径见后端注释。
+  source: { type: String, default: 'module-docs' },
 })
 const emit = defineEmits(['open'])
 
+const router = useRouter()
 const docs = ref([])
 const panels = ref([])
+const links = ref([])
 const loading = ref(true)
 /** 选中的单据面板码;空 = 全部面板(后端不带 panel 参数) */
 const selectedPanel = ref('')
@@ -74,9 +88,29 @@ function fmtTime(t) {
   return s.length > 16 ? s.slice(0, 16) : s
 }
 
+/** 行内副信息:生产工单给「产品名 · 时间」(无制单人),其它面板沿用「制单人 · 时间」 */
+function metaOf(d) {
+  if (d.note) return d.note + ' · ' + fmtTime(d.at)
+  return (d.creator || '-') + ' · ' + fmtTime(d.at)
+}
+
+/** 点一行:带 path 的由本组件直接路由(生产工单 → 列表页带 keyword 定位);否则交给宿主(桌面)统一跳面板 */
+function onOpen(d) {
+  if (d && d.path) { router.push(d.path); return }
+  emit('open', d)
+}
+
 async function load() {
   loading.value = true
   try {
+    if (props.source === 'prod-orders') {
+      const r = await request.get('/dashboard/prod-orders', { params: { limit: props.limit } })
+      const d = r?.data || {}
+      docs.value = d.docs || []
+      links.value = d.links || []
+      panels.value = []
+      return
+    }
     const params = { module: props.module, limit: props.limit }
     if (selectedPanel.value) params.panel = selectedPanel.value
     const r = await request.get('/dashboard/module-docs', { params })
@@ -87,6 +121,7 @@ async function load() {
     // 静默:桌面不该因为一个入口接口失败而弹错(与 loadRd/loadFlow 同口径)
     docs.value = []
     panels.value = []
+    links.value = []
   } finally {
     loading.value = false
   }
@@ -237,5 +272,36 @@ onMounted(load)
   font-size: 13px;
   color: #9ca3af;
   text-align: center;
+}
+/* 页面入口按钮(生产计划那 4 个操作页):与行内按钮区分开,做成描边小胶囊 */
+.doc-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eef1f4;
+}
+.doc-links-title {
+  font-size: 12px;
+  color: #9ca3af;
+}
+.doc-link {
+  padding: 2px 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  color: #1f6f61;
+}
+.doc-link:hover {
+  border-color: #116a5b;
+  background: #f0f6ff;
+}
+.doc-link:focus-visible {
+  outline: 2px solid var(--t-primary, #116a5b);
+  outline-offset: 1px;
 }
 </style>

@@ -199,7 +199,10 @@ public class ShellController {
             if (panel != null && !panel.isBlank() && !panel.trim().equals(def.code())) continue;
             try {
                 for (Map<String, Object> r : jdbc.queryForList(
-                        "SELECT TOP " + n + " t.[" + docCol + "] AS docNo, t.asp_user1 AS creator, t.asp_time1 AS at"
+                        // 时间在 SQL 里格式化成墙钟字符串(2026-10-18):直接回 Timestamp 会被 Jackson
+                        // 按 UTC 序列化成 "…T04:28"(库里 12:28),桌面卡片整整差 8 小时。
+                        "SELECT TOP " + n + " t.[" + docCol + "] AS docNo, t.asp_user1 AS creator"
+                                + ", CONVERT(varchar(19), t.asp_time1, 120) AS at"
                                 + " FROM " + head + " t WHERE ISNULL(t.asp_cancel,'N') <> 'Y'"
                                 + " AND t.asp_time1 IS NOT NULL ORDER BY t.asp_time1 DESC")) {
                     Map<String, Object> m = new HashMap<>();
@@ -219,6 +222,76 @@ public class ShellController {
         out.put("module", mod);
         out.put("panels", panels);
         out.put("docs", docs.size() > n ? new ArrayList<>(docs.subList(0, n)) : docs);
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 桌面·生产模块单据入口(2026-10-18 用户口径:「生产模块把这几个面板写进去就行(订单结转/生产工单/
+     * 快速排产/工单排产/产线排产负荷),其他的面板的单据几乎不看」)。
+     *
+     * <p>为什么不能走 {@link #moduleDocs}:生产计划这 5 项里只有「生产工单」有真实单据,而工单数据在
+     * **plang**(外系统直接写入,429 行;工单号 pl_no / 行号 pl_xc / 产品 mc / 日期 pl_date),
+     * yj_panel 里 13 张生产单据面板的头表在正式库全空。其余 4 项是页面级虚拟面板
+     * (ORDER_CONVERT/SCHEDULE_BOARD/WORK_ORDER_BOARD,无 yj_panel 行)或负荷视图(LINE_LOAD),
+     * 没有"最近 N 张单据"可言 ⇒ 只当页面入口按钮。
+     *
+     * <p>口径:
+     * <ul>
+     *   <li>docs = plang 最近 N 个**工单号**(同工单多行按 pl_no 去重,取该单首行),附定位路径
+     *       `/prod/plan/workOrderList?keyword=<工单号>`(该页 2026-10-18 起支持 URL 预置关键词);</li>
+     *   <li>links = 4 个页面入口,按当前用户 yj_role_panel 的 view 权限过滤(管理员 = 全给);</li>
+     *   <li>工单列表可见性同样按 WORK_ORDER_LIST 的 view 判定 —— 桌面不当越权入口。</li>
+     * </ul>
+     */
+    @GetMapping("/dashboard/prod-orders")
+    public ApiResult<Map<String, Object>> prodOrders(@RequestParam(defaultValue = "7") int limit) {
+        int n = Math.max(1, Math.min(limit, 50));
+        List<String> visible = currentVisiblePanels();
+        boolean all = visible.contains("*");
+        List<Map<String, Object>> docs = new ArrayList<>();
+        if (all || visible.contains("WORK_ORDER_LIST")) {
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(
+                        // pl_date 同样在 SQL 里转墙钟字符串(不回 Timestamp,见 module-docs 同款注释)
+                        "SELECT TOP " + n + " t.pl_no, t.mc, t.pl_sl, t.pl_date FROM ("
+                                + " SELECT pl_no, mc, pl_sl, CONVERT(varchar(19), pl_date, 120) AS pl_date,"
+                                + " ROW_NUMBER() OVER (PARTITION BY pl_no ORDER BY pl_xc) rn"
+                                + " FROM plang WHERE pl_no IS NOT NULL) t WHERE t.rn = 1"
+                                + " ORDER BY t.pl_date DESC, t.pl_no DESC")) {
+                    String no = String.valueOf(r.get("pl_no"));
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("panelCode", "WORK_ORDER_LIST");
+                    m.put("panelName", "生产工单");
+                    m.put("docNo", no);
+                    m.put("note", r.get("mc"));
+                    m.put("at", r.get("pl_date"));
+                    m.put("path", "/prod/plan/workOrderList?keyword="
+                            + java.net.URLEncoder.encode(no, java.nio.charset.StandardCharsets.UTF_8));
+                    docs.add(m);
+                }
+            } catch (Exception ignored) {
+                // plang 不在(新库/结构未同步)时给空列表,卡片显示「暂无单据」而不是 500
+            }
+        }
+        // 生产计划 4 个页面入口(顺序与菜单一致);标题走前端 tt(),这里只给中文原文
+        String[][] pages = {
+                {"ORDER_CONVERT", "订单结转", "/prod/plan/orderConvert"},
+                {"SCHEDULE_BOARD", "快速排产", "/prod/plan/scheduleBoard"},
+                {"WORK_ORDER_BOARD", "工单排产", "/prod/plan/workOrderBoard"},
+                {"LINE_LOAD", "产线排产负荷", "/panelx/list/LINE_LOAD"},
+        };
+        List<Map<String, Object>> links = new ArrayList<>();
+        for (String[] p : pages) {
+            if (!all && !visible.contains(p[0])) continue;
+            Map<String, Object> m = new HashMap<>();
+            m.put("code", p[0]);
+            m.put("title", p[1]);
+            m.put("path", p[2]);
+            links.add(m);
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("docs", docs);
+        out.put("links", links);
         return ApiResult.ok(out);
     }
 

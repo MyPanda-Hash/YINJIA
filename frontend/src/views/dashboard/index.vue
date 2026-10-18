@@ -349,7 +349,10 @@
           <div class="card-title">{{ tt('产能对比') }}</div>
           <div class="chart-box"><SCapacityBars /></div>
         </div>
-        <DocEntry class="col-12" module="prod" @open="onDocOpen" />
+        <!-- 生产单据入口(2026-10-18 用户口径):生产计划只保留 订单结转/生产工单/快速排产/工单排产/
+             产线排产负荷 —— 真单据只有「生产工单」(plang),其余 4 项由后端给成页面入口按钮;
+             不再汇总生产记录/设备维护那批 doc 面板(用户口径「其他的面板的单据几乎不看」)。 -->
+        <DocEntry class="col-12" module="prod" source="prod-orders" @open="onDocOpen" />
       </div>
     </template>
 
