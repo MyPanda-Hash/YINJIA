@@ -77,6 +77,33 @@ node archive/_wo-flow-20261018/_seed-wo-flow.mjs --db HSDZ_MES --cleanup --apply
 - 时区:`mssql` 默认 `useUTC=true`,本脚本显式 `useUTC:false` + 用 `CONVERT(varchar(10), pl_date)` 取日期,
   否则 22:00 的 `pl_date` 会漂到次日(报工日期/批次号跟着错一天)。
 
+## 后续补丁:领料数据(2026-10-18 第二轮,用户报「一个个都没有领料数据」)
+
+第一轮只推工单链,**没有写领料**。用户随后要求补上,并明确「当前没有相关 BOM,写一下数据就行」。
+
+`_seed-wo-picking.mjs` 对**已结案**工单行补一张**已审核**的材料出库单(领料单):
+
+| 项 | 落点 / 口径 |
+|---|---|
+| 单头 | `bd_material_out`:`加工单号=工单号`、`工单行号=plang.pl_xc`、业务类型=材料出库、出库类别=直接领料、仓库=A仓(原料辅料仓)、单据状态=已审核、前缀 **CL** |
+| 明细 | `bl_material_out` × 3:**主料**(同产品裸棒,优先 `编码+**TB`,其次同规格裸棒)、**辅料**(无纺布,按张计)、**包材**(纸箱,按 1/50 折算) |
+| 数量 | 主料 = 排产 × 1.02(含损耗);辅料 = 排产;纸箱 = ceil(排产/50) |
+| 审核 | `yj_doc_status(panel_code='MATERIAL_OUT', shr 非空)` ⇒ `ManuWritebackService.refreshPickList` 认它是已审核领料 |
+| 回写 | `plang.ll_no2 = CL-…`(生产工单列表「领料单号」列 / 排产看板同源) |
+
+- **只挑按支/张/个/条/套/PCS 计的物料**;卷/kg/米的折算依赖 BOM,没有 BOM 就不猜;
+- 已有**已审核**领料单的工单行跳过(草稿不挡:用户当天点「转领料单」留下的 CL-2026-10-0035 仍是草稿,已另补一张正式单);
+- 结果:`HSDZ_MES` 418/418 行有领料单号(418 张单 / 1254 行明细);`HSDZ_MES_TEST` 26/26(26 张 / 78 行)。
+
+```powershell
+cd tools
+node archive/_wo-flow-20261018/_seed-wo-picking.mjs --db HSDZ_MES --apply
+node archive/_wo-flow-20261018/_seed-wo-picking.mjs --db HSDZ_MES --verify
+node archive/_wo-flow-20261018/_seed-wo-picking.mjs --db HSDZ_MES --cleanup --apply   # 回滚(rollback-picking-<DB>.sql)
+```
+
+⚠ 与第一轮一致:**未记库存流水**,材料库存不因这批领料减少。
+
 ## 部署注意
 
 这批是**为了让生产工单跑完整流程而补的业务数据**(不是演示账号那类假数据),按 AGENTS
