@@ -1,0 +1,9 @@
+chore: 前端静态产物同步(合并 origin/main 后按合并源码重建)
+
+vite build 产物(111 个 asset,入口 index-DtM_e4rQ.js)同步进 backend/src/main/resources/static。
+
+为什么要重建:合并时 static 下 131 个生成产物全部 rename/rename 冲突(两侧各自重建过),
+先统一取远端版本让合并完成,再按**合并后的源码**重新构建覆盖 —— 保证静态产物与源码一致
+(这是本仓既有做法:见 6ac3d235 / 5cb19fdb / ef4d75df 等同类提交)。
+
+产物校验:index.html 引用的 5 个 asset 全部存在;PanelxList-oQAGHslY.js 在包内。
