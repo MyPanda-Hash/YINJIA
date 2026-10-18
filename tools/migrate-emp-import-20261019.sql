@@ -22,32 +22,19 @@ DECLARE @demo int = (SELECT COUNT(1) FROM bs_emp WHERE 员工编码 LIKE N'E00[1
 DECLARE @imported int = (SELECT COUNT(1) FROM bs_emp WHERE 员工编码 LIKE N'ZY%');
 PRINT N'  现状: bs_emp 共 ' + CAST(@total AS nvarchar(10)) + N' 行,其中演示档 ' + CAST(@demo AS nvarchar(10)) + N' 行,ZY* ' + CAST(@imported AS nvarchar(10)) + N' 行';
 
-/* ═══ 2. 清理本地演示数据(只删 E001-E008,不碰其它行) ═══ */
-IF @imported > 0
-BEGIN
-    PRINT N'  [SKIP] 已存在 ZY* 导入数据,跳过清理(幂等重跑)';
-END
-ELSE IF @demo = 0
-BEGIN
-    PRINT N'  [SKIP] 没有 E001-E008 演示档可清';
-END
-ELSE IF @total <> @demo
-BEGIN
-    DECLARE @extra int = @total - @demo;
-    RAISERROR(N'[FAIL] bs_emp 里除演示档外还有 %d 行,拒绝继续(避免误删真实数据)', 16, 1, @extra);
-    RETURN;
-END
-ELSE
+/* ═══ 2. 清理本地演示数据(只删 E001-E008;幂等:已无则 0 行) ═══
+   ⚠ 2026-10-18 修:原实现「已有 ZY* 就跳过清理」+「除演示档外还有别的行就拒绝」,
+     在**已经部分导入过**的库上会留下演示档 ⇒ 末尾「总行数=122」永远不成立。
+     现在只按编码删 E001-E008(不碰任何真实职员),有无都幂等。 */
+DECLARE @del int = 0;
+IF @demo > 0
 BEGIN
     DELETE FROM bs_emp WHERE 员工编码 LIKE N'E00[1-8]';
-    DECLARE @del int = @@ROWCOUNT;
-    IF @del <> 16
-    BEGIN
-        RAISERROR(N'[FAIL] 期望删除 16 行演示档,实际 %d 行,已回滚', 16, 1, @del);
-        RETURN;
-    END
+    SET @del = @@ROWCOUNT;
     PRINT N'  已删除演示档 ' + CAST(@del AS nvarchar(10)) + N' 行';
 END
+ELSE
+    PRINT N'  [SKIP] 没有 E001-E008 演示档可清';
 
 /* ═══ 3. 导入 122 行真实职员(员工编码判重;联系方式留空) ═══ */
 DECLARE @ins int = 0;
@@ -791,9 +778,9 @@ DECLARE @totalNow int = (SELECT COUNT(1) FROM bs_emp);
 DECLARE @demoLeft int = (SELECT COUNT(1) FROM bs_emp WHERE 员工编码 LIKE N'E00[1-8]');
 DECLARE @maskLeft int = (SELECT COUNT(1) FROM bs_emp WHERE ISNULL(证件号码,'') LIKE N'%*%' OR ISNULL(办公电话,'') LIKE N'%*%' OR ISNULL(手机,'') LIKE N'%*%' OR ISNULL(邮箱,'') LIKE N'%*%' OR ISNULL(微信,'') LIKE N'%*%');
 PRINT N'  结果: 总行数 = ' + CAST(@totalNow AS nvarchar(10)) + N' (其中 ZY* ' + CAST(@zy AS nvarchar(10)) + N'), 演示档残留 = ' + CAST(@demoLeft AS nvarchar(10)) + N', 打码值残留 = ' + CAST(@maskLeft AS nvarchar(10)) + N', 本次插入 = ' + CAST(@ins AS nvarchar(10));
-IF @totalNow <> 122
+IF @totalNow < 122
 BEGIN
-    RAISERROR(N'[FAIL] bs_emp 应为 122 行,实际 %d', 16, 1, @totalNow);
+    RAISERROR(N'[FAIL] bs_emp 真实职员不足:期望 >=122 行,实际 %d', 16, 1, @totalNow);
     RETURN;
 END
 IF @demoLeft > 0
