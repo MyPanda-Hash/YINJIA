@@ -48,7 +48,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>调用方(四处共用同一判据,禁止各写一份):{@code QcProcInspController}、
  * {@code QcFirstInspController} 的 {@code woLines/fromWoLine},以及
- * {@code ButtonService.woInspGenerate / firstInspGenerate} 两个自动出单钩子。</p>
+ * {@code ButtonService.woInspGenerate} 报工审核出单钩子(判据与单头组装在 {@link QcInspAutoService};
+ * 手机端直写走 {@code ExternalReportAbsorbService} → 同一个 build)。</p>
  */
 public final class WoInspGate {
 
@@ -119,6 +120,35 @@ public final class WoInspGate {
     /** 存量行在「存量也拦」口径下的话术 */
     public static final String REASON_LEGACY_BLOCKED =
             "该生产工单行还没有任何已审核报工（存量数据），按当前门禁口径不能生成检验单";
+
+    /**
+     * **「选生产工单」列表的准入条件**(2026-10-18 用户口径:
+     * 「当前选取的生产工单应该至少排产完成型才能出现」)。
+     *
+     * <p>现状:首件/制程两个手工入口的 {@code woLines} 把**全部未作废未结案工单行**都列出来
+     * (正式库实测 424 行,其中只有 1 行排过产)⇒ 现场要在几百行里找人。这里加最低门槛:</p>
+     * <ol>
+     *   <li>{@code plang.scx} 非空 = **已排产入线**;</li>
+     *   <li>若该工单行有预排台账({@code wo_process_line}),还要求**「成型」那道已排**(台账存在且未作废);
+     *       完全没有台账的行(快速排产只写 {@code plang}/{@code plang_pc} 的路径)按「已排产」放行 ——
+     *       成型是标准路线首道,排产即已排成型。</li>
+     * </ol>
+     *
+     * <p>门禁(成型是否已报工)仍由 {@link #check} 逐行判定并在弹窗里标灰,不在这里过滤 ——
+     * 否则「排产了但还没报工」的行会整行消失,现场看不到"差什么"。</p>
+     *
+     * @param alias 外层 {@code dbo.plang} 的别名(调用方固定传 {@code "p"})
+     */
+    public static String pickable(String alias) {
+        String p = alias == null || alias.isBlank() ? "p" : alias;
+        return " AND ISNULL(" + p + ".scx,N'') <> N''"
+                + " AND (EXISTS (SELECT 1 FROM dbo.wo_process_line l"
+                + "              WHERE l.工单号=" + p + ".pl_no AND l.工单行id=" + p + ".id"
+                + "                AND l.工序=N'成型' AND ISNULL(l.asp_cancel,'N')<>'Y')"
+                + "      OR NOT EXISTS (SELECT 1 FROM dbo.wo_process_line l2"
+                + "                     WHERE l2.工单号=" + p + ".pl_no AND l2.工单行id=" + p + ".id"
+                + "                       AND ISNULL(l2.asp_cancel,'N')<>'Y'))";
+    }
 
     // ────────────────────────────── 强度配置 ──────────────────────────────
 

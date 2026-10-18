@@ -1,0 +1,33 @@
+/* rollback-picking-HSDZ_MES_TEST.sql —— 回滚 wo-pick-20261018 生产领料补数 */
+SET NOCOUNT ON;
+DELETE FROM dbo.yj_doc_status WHERE panel_code=N'MATERIAL_OUT' AND doc_no IN (SELECT [单据编号] FROM dbo.bd_material_out WHERE asp_user1=N'wo-pick-20261018');
+DELETE FROM dbo.bl_material_out WHERE asp_user1=N'wo-pick-20261018';
+DELETE FROM dbo.bd_material_out WHERE asp_user1=N'wo-pick-20261018';
+DELETE FROM dbo.s_allno WHERE asp_user1=N'wo-pick-20261018';
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=3;   -- GD2608190001#1
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=4;   -- GD2608190002#1
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=5;   -- GD2608190003#1
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=6;   -- GD2608190004#1
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=7;   -- GD2608190005#1
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=8;   -- GD2608190006#1
+UPDATE dbo.plang SET ll_no2=N'LL2608190001' WHERE id=9;   -- GD2608190007#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=11;   -- GD2608190009#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=13;   -- GD2608260001#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=14;   -- GD2608260002#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=15;   -- GD2608260003#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=16;   -- GD2608260004#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=17;   -- GD2608260005#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=18;   -- GD2608260006#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=19;   -- GD2608260007#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=20;   -- GD2608260008#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=21;   -- GD2608260009#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260003' WHERE id=22;   -- GD2608260010#1
+UPDATE dbo.plang SET ll_no2=N'LL2608260002' WHERE id=24;   -- GD2608260012#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=28;   -- MO-2026-09-0006#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=29;   -- MO-2026-09-0006#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=30;   -- MO-2026-09-0006#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=33;   -- MO-2026-09-0006#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=31;   -- MO-2026-09-0007#1
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=32;   -- MO-2026-09-0007#2
+UPDATE dbo.plang SET ll_no2=NULL WHERE id=36;   -- MO-2026-09-0007#2
+GO

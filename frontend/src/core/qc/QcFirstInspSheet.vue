@@ -415,7 +415,7 @@ const stopLineNotice = computed(() => {
 
 /**
  * 相关要求第 6 条:「C-95客户相关产品脱模后立马进行首件检验。」
- * C-95 是**客户代码**(dm_kh.dm;出单时从工单行带入 head['客户代码'],见 ButtonService.firstInspGenerate);
+ * C-95 是**客户代码**(dm_kh.dm;出单时从工单行带入 head['客户代码'],见 QcInspAutoService);
  * 老单据 / 手工建的单只有客户名称或产品编码时,退而在这几个字段里找 "C-95"/"C95"(词边界,别误命中 ABC95)。
  */
 const C95_KEYS = ['客户代码', '客户名称', '产品编码', '产品名称', '规格型号']

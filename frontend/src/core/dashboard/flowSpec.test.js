@@ -9,7 +9,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { CHAINS, LEVEL_TEXT, allNodes, chainSummary, fmtNum, get, levelOf, metricsOf } from './flowSpec.js'
+import { CHAINS, LEVEL_TEXT, allNodes, chainSummary, fmtNum, get, levelOf, metricsOf, routeOf } from './flowSpec.js'
 
 const svc = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/FlowBoardService.java', import.meta.url), 'utf8')
 

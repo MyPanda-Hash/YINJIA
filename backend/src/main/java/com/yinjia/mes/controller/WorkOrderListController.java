@@ -26,8 +26,9 @@ import java.util.Map;
  * ②/printStamp 打印生产任务单留痕(plang.asp_print+1、打印人/打印时间;修复原版从 scheduled('') 取数
  *   永远匹配不到已排产工单的缺陷——现直接打印列表勾选行,不再回查排产明细);
  * ③/close 结案/取消结案(plang.ja,参考库 T/Y 归一为 Y/N);
- * ④/toPicking 转领料单(2026-10-07:原「打印领料单」改为转单)——按工单号生成「材料出库单(领料单)」
- *   草稿,业务规则见 {@link WorkOrderPickingService}。
+ * ④/toPicking 转领料单(2026-10-07:原「打印领料单」改为转单)——**先排产后领料**(2026-10-18):
+ *   该工单行必须已排入产线(scx 非空)且排产数量 &gt; 0 才放行;按工单行生成「材料出库单(领料单)」草稿,
+ *   同一工单行**可开多张**(再次点击 = 再开一张),业务规则见 {@link WorkOrderPickingService}。
  * 定位(2026-09-26 用户拍板):生产工单=**纯查询+打印**,不作为快速排产任务——/reassign 批量调线已移除。
  *
  * <p>权限(2026-10-16 补):本页此前是四页里**唯一连读都没拦**的 —— 菜单无 panelCode(任何登录账号可见)、
@@ -395,9 +396,11 @@ public class WorkOrderListController {
 
     // ══════════ 转领料单(2026-10-07:列表按钮由「打印领料单」改来)══════════
     // 勾选工单 → 生成「材料出库单(领料单)」草稿(加工单号=工单号,明细留空由仓库补);
-    // 审核出库后 ManuWritebackService 自动回写工单「领料单号」。口径与守卫见 WorkOrderPickingService。
+    // 前置:**该行已排入产线且排产数量>0**(2026-10-18「先排产后领料」);
+    // 一张工单行可开多张(每次点击新建一张,不再拦"已有未审核草稿")。
+    // 审核出库后 ManuWritebackService 把该行全部领料单号回写工单「领料单号」。守卫见 WorkOrderPickingService。
 
-    /** 转领料单:按工单号去重逐张生成草稿;回执含 单号清单/失败行,前端据此提示并可跳材料出库单 */
+    /** 转领料单:按「工单号+工单行号」逐行生成草稿(同一行可反复生成多张);回执含 单号清单/失败行 */
     @PostMapping("/workOrderList/toPicking")
     public ApiResult<Map<String, Object>> toPicking(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);

@@ -68,17 +68,24 @@ public class ScheduleBoardService {
             + " WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END";
 
     /**
-     * 工序检验单:面板 → 头表(工单追溯「质检段」用)。
+     * 工序检验单:面板 → 头表 + 明细的不合格列 + 追溯里显示的类别。
      * 表**同构**(头/行结构一致,建表见 {@code tools/migrate-qc-process-insp.sql}),
-     * 故同一段 SQL 换表名即可全查;出单口径见 {@code ButtonService.WO_INSP_PANEL}
-     * (报工审核自动出单,混料/装箱不出单)。取值全部来自本类常量,无拼接注入面。
-     * <p>2026-10-16 用户口径「删除当前成型检验单和切炭检验单」⇒ 两张已整体下架,本表只剩组装成品检验单。</p>
+     * 故同一段 SQL 换表名即可全查;出单口径见 {@code QcInspAutoService.OP_PANELS}:
+     * 成型 ⇒ 首件 {@code QC_FIRST_INSP} + 制程 {@code QC_PROC_INSP};组装 ⇒ 组装成品 {@code QC_ASM_INSP}。
+     * <p>2026-10-18(用户口径「追溯内没有首件检验单之类的数据」):此前只登记组装成品,
+     * 首件/制程两张单在追溯里根本查不到 ⇒ 三张全部登记,按 {@code 工单行号} 逐行收敛。
+     * <p>⚠ 明细的「不合格」列**不同名**:首件/组装成品是 {@code 不合格数量},制程是 {@code 不良数量}
+     * (2026-10-18 实测 INFORMATION_SCHEMA)⇒ 每张表各带自己的列名,禁止写死。
      */
-    private static final Map<String, String> INSP_HEAD = Map.of(
-            "QC_ASM_INSP", "qc_asm_insp_head");
+    private record InspSpec(String headTable, String ngColumn, String label) {}
 
-    /** 应检工序(2026-10-16 收敛):只剩组装 —— 与 {@code ButtonService.WO_INSP_PANEL} 同源 */
-    private static final List<String> INSP_OPS = List.of("组装");
+    private static final Map<String, InspSpec> INSP_HEAD = Map.of(
+            "QC_FIRST_INSP", new InspSpec("qc_first_insp_head", "不合格数量", "首件检验"),
+            "QC_PROC_INSP", new InspSpec("qc_proc_insp_head", "不良数量", "制程检验"),
+            "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "组装成品检验"));
+
+    /** 应检工序:成型(首件+制程)、组装(组装成品)—— 与 {@code QcInspAutoService.OP_PANELS} 同源 */
+    private static final List<String> INSP_OPS = List.of("成型", "组装");
 
     public ScheduleBoardService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -1001,14 +1008,17 @@ public class ScheduleBoardService {
                 qcRowArgs.addAll(rowReps);
             }
         }
-        for (Map.Entry<String, String> e : INSP_HEAD.entrySet()) {
+        for (Map.Entry<String, InspSpec> e : INSP_HEAD.entrySet()) {
             String panel = e.getKey();
-            String tbl = e.getValue();                       // 本类常量取值,无注入面
+            InspSpec spec = e.getValue();
+            String tbl = spec.headTable();                   // 本类常量取值,无注入面
+            String ngCol = spec.ngColumn();                  // 同上(制程明细是「不良数量」)
             List<Object> qcArgs = new ArrayList<>();
             qcArgs.add(panel); qcArgs.add(panel); qcArgs.add(doc);
             qcArgs.addAll(qcRowArgs);
             qc.addAll(jdbc.queryForList(
-                    "SELECT h.单据编号 AS 检验单号, ISNULL(h.工序,N'') AS 工序,"
+                    "SELECT h.单据编号 AS 检验单号, N'" + spec.label() + "' AS 检验类型,"
+                            + " ISNULL(h.工序,N'') AS 工序,"
                             + " CONVERT(varchar(10), h.单据日期, 120) AS 检验日期,"
                             + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
                             + "      WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
@@ -1041,7 +1051,7 @@ public class ScheduleBoardService {
                             //   原来按明细的「判定=合格/不合格」再取「数量」求和 —— 依赖生单时**预铺**的
                             //   合格/不合格两行;现在生单不再预填明细,改为一律 **对明细列 合格数量/不合格数量 求和**。
                             //   品质在明细里按检验项目填几行都行,汇总天然是各行合计。
-                            + "      SUM(ISNULL(不合格数量,0)) AS 不合格数量"
+                            + "      SUM(ISNULL(" + ngCol + ",0)) AS 不合格数量"
                             // ↑ 只汇总「不合格数量」:合格数量改为 表头**检验数量** − 本值
                             //   (2026-10-15 数据一致性修订,详见外层 CASE:未检验不得显示合格数)
                             + "    FROM dbo." + tbl.replace("_head", "_detail")
@@ -1050,9 +1060,16 @@ public class ScheduleBoardService {
                             + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND h.工单号=?" + qcRowCond,
                     qcArgs.toArray()));
         }
-        qc.sort((a, b) -> String.valueOf(a.get("检验单号")).compareTo(String.valueOf(b.get("检验单号"))));
-        // 汇总(「对上」用):应检 = 组装(与出单口径同源;成型/切炭两张检验单 2026-10-16 已下架,
-        // 不再算应检);已检 = 存活检验单上出现的工序;缺检 = 应检 − 已检。
+        // 排序:按 首件 → 制程 → 组装成品 的工序顺序,同类型再按单号(2026-10-18 三张单一起进追溯)
+        List<String> typeOrder = List.of("首件检验", "制程检验", "组装成品检验");
+        qc.sort((a, b) -> {
+            int ia = typeOrder.indexOf(String.valueOf(a.get("检验类型")));
+            int ib = typeOrder.indexOf(String.valueOf(b.get("检验类型")));
+            if (ia != ib) return Integer.compare(ia < 0 ? 99 : ia, ib < 0 ? 99 : ib);
+            return String.valueOf(a.get("检验单号")).compareTo(String.valueOf(b.get("检验单号")));
+        });
+        // 汇总(「对上」用):应检 = 成型(首件+制程)/组装(组装成品),与 QcInspAutoService.OP_PANELS 同源;
+        // 已检 = 存活检验单上出现的工序;缺检 = 应检 − 已检。
         // 合格/不合格取各单派生值求和(未检验的合格数为 NULL，Num.of 按 0 计)。
         LinkedHashSet<String> doneOps = new LinkedHashSet<>();
         double passQty = 0, ngQty = 0, inspQty = 0;

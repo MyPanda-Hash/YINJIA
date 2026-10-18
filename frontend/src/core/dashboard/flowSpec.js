@@ -80,7 +80,7 @@ export const CHAINS = [
               { label: '在产线', ref: 'special.schedule.lines' },
             ],
             warn: ['special.schedule.pool'],
-            note: '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入',
+            note: '池 = 产线库空且未结案的工单行;选产线(带负荷)→ 单笔/批量排入;排产入线是领料的前置条件',
           },
           {
             key: 'board', name: '工单排产 / 预排线', code: 'WORK_ORDER_BOARD', route: '/prod/plan/workOrderBoard',
@@ -145,7 +145,7 @@ export const CHAINS = [
               { label: '草稿', ref: 'nodes.QC_FIRST_INSP.draft' },
             ],
             block: ['nodes.QC_FIRST_INSP.pending'],
-            note: '本批第一张报工审核后自动出草稿',
+            note: '成型累计报工达计划量后自动出草稿',
           },
           {
             key: 'procinsp', name: '制程检验单(成型产出)', code: 'QC_PROC_INSP', route: '/panelx/list/QC_PROC_INSP',
@@ -157,7 +157,7 @@ export const CHAINS = [
             ],
             block: ['nodes.QC_PROC_INSP.pending'],
             warn: ['nodes.QC_PROC_INSP.ngQty'],
-            note: '成型工序产出检验数据:人工开单填写',
+            note: '成型达计划量自动出草稿(也可人工开单)',
           },
           {
             key: 'asminsp', name: '组装成品检验单', code: 'QC_ASM_INSP', route: '/panelx/list/QC_ASM_INSP',
@@ -169,7 +169,7 @@ export const CHAINS = [
             ],
             block: ['nodes.QC_ASM_INSP.pending'],
             warn: ['nodes.QC_ASM_INSP.ngQty'],
-            note: '组装报工审核自动生成;表头「合格数量」必填',
+            note: '组装累计报工达计划量后自动生成;表头「合格数量」必填',
           },
           {
             key: 'ngtreat', name: '不合格品处理单(制程)', code: 'QC_BHC', route: '/panelx/list/QC_BHC',
@@ -388,4 +388,21 @@ export function chainSummary(chain, data) {
 /** 全部节点扁平清单(测试与「节点总数」断言用) */
 export function allNodes() {
   return CHAINS.flatMap((c) => c.lanes.flatMap((l) => l.nodes))
+}
+
+/**
+ * 面板/页面编码 → 前端路由(**节点声明的 route 是唯一真源**)。
+ *
+ * 为什么不能一律按 `/panelx/list/<code>` 跳:四个**页面级**面板
+ * ORDER_CONVERT / SCHEDULE_BOARD / WORK_ORDER_BOARD / WORK_ORDER_LIST 在 `yj_panel` 里
+ * **没有行**(它们是专页,不是泛化面板引擎的载体)⇒ 按面板路径跳会落到一个空白的面板壳
+ * (空工具栏 + 「第 0 张」),2026-10-18 用户报障:「当前这上方的卡点转跳页面好像有问题,
+ * 转跳的内容是……旧的生产工单」正是这一路。
+ *
+ * 兜底:规格里没有的编码(理论上不会发生,节点清单已覆盖全部卡点)仍退回面板路径。
+ */
+export function routeOf(code) {
+  if (!code) return null
+  const hit = allNodes().find((n) => n.code === code)
+  return hit?.route || `/panelx/list/${code}`
 }

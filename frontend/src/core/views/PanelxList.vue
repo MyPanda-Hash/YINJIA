@@ -7301,7 +7301,7 @@ function addInlineDetailRow(b) {
  * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
  * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
  */
-function openPickedProcInsp(res) {
+async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
   const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
@@ -7311,13 +7311,43 @@ function openPickedProcInsp(res) {
     ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
     : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
   if (target === panelCode.value) {
-    load()                       // 同面板:新草稿按创建时间倒序排在第一张
+    // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
+    //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。
+    //   脏单时 guardPageAction 只弹三态窗并返回,真正的切单在 onLeaveChoice 里执行。
+    await guardPageAction(async () => {
+      await openDocByNo(no)
+      // 命中已审核的旧单时表单是只读的(用户会以为"填不进去"),明确提示先弃审
+      if (String(cur.value?.['单据状态'] || '') === '已审核') {
+        ElMessage.info(tt('该检验单已审核，如需修改请先点「弃审」退回草稿'))
+      }
+    })
     return
   }
   const targetPath = `/panelx/list/${target}`
   tabs.close(route.path)
-  router.push(targetPath)
   tabs.open({ path: targetPath, title: target })
+  // 跨面板同样要**打开那张单**(不是只落到列表):目标页用 ?docNo= 定位(applyDocNoQuery 既有机制)
+  router.push({ path: targetPath, query: { docNo: no } })
+}
+
+/**
+ * 在同一面板内把当前单据切到指定单号(2026-10-18)。
+ *
+ * <p>先按当前筛选刷新并找;找不到(被关键字/条件挡掉)再按 `_docNo` 定位一次,
+ * 定位完**立刻撤掉该条件**,避免筛选粘住后续的查询/刷新。</p>
+ */
+async function openDocByNo(no) {
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  let i = list.value.findIndex((r) => String(r['单据编号'] || r['编号'] || '') === String(no))
+  if (i < 0) {
+    condition['_docNo'] = String(no)
+    await load()
+    delete condition['_docNo']
+    i = list.value.findIndex((r) => String(r['单据编号'] || r['编号'] || '') === String(no))
+  }
+  curIdx.value = i >= 0 ? i : 0
 }
 
 /**

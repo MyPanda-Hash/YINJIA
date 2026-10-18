@@ -68,6 +68,16 @@ const router = createRouter({
   routes,
 })
 
+// 路由懒加载失败(部署后旧 chunk 404 / 网络瞬断)→ 自动重载一次(2026-10-18)。
+// 不处理的话:点菜单后组件永远加载不出来,界面一直停在加载态(现场看到的"转圈")。
+// 重载函数由 main.js 挂在 window 上(60 秒节流 + _r 破缓存),这里只负责识别错误类型。
+router.onError((err) => {
+  const msg = String((err && err.message) || '')
+  if (/dynamically imported module|Importing a module script failed|Loading chunk .* failed/i.test(msg)) {
+    if (typeof window !== 'undefined' && window.__MES_RELOAD_ONCE__) window.__MES_RELOAD_ONCE__('route chunk: ' + msg)
+  }
+})
+
 router.beforeEach((to) => {
   document.title = `${to.meta.title || ''} · YINJIA-MES`
   const user = useUserStore()
