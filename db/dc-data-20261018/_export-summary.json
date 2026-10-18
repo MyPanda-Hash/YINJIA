@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-10-18T10:00:48.678Z",
+  "database": "HSDZ_MES",
+  "counts": {
+    "gateways": 2,
+    "devices": 4,
+    "points": 4,
+    "rules": 3,
+    "samples": 853,
+    "alarms": 8,
+    "statusLogs": 0
+  },
+  "apiKeysChecked": 3,
+  "apiKeyLeak": 0,
+  "sheets": [
+    "概览",
+    "网关台账",
+    "设备台账",
+    "采集点",
+    "数采规则",
+    "采集流水",
+    "报警记录",
+    "在线状态日志",
+    "数据说明"
+  ],
+  "file": "数采平台数据-20261018.xlsx",
+  "failed": []
+}
