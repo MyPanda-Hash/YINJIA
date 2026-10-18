@@ -3643,6 +3643,8 @@ export default {
     '近 30 天': 'last 30 days',
     '累计内': 'In window',
     '峰值': 'Peak',
+    /* 图例数字口径(2026-10-18):原为「最新一天读数」,当天无业务恒为 0 ⇒ 改区间合计 */
+    '图例数字 = 区间合计': 'Legend numbers = totals for the range',
 
     // 单天产能对比(2026-09-28:产出/日产能上限)
     '单天产能对比': 'Daily capacity vs limit',

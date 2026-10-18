@@ -1,13 +1,15 @@
 /**
- * chartLabels.test.js —— 折线图 X 轴抽稀与末点读数
+ * chartLabels.test.js —— 折线图 X 轴抽稀与图例读数
  *
  * 钉子(2026-10-15 用户报「近 30 天趋势不够清晰」):
  *   30 个点全画标签会糊成一片;抽稀必须**首尾都在**(否则看不出区间),
  *   且取点位置要和折线的等距点位对齐(否则标签与线错位,比不抽还难看)。
+ * 2026-10-18 用户报「图例显示 0」:图例数字原取**最后一天**读数,今天没业务就恒为 0
+ *   (图上明明有曲线) ⇒ 改成区间合计,钉子见文件末尾。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { thinLabels, lastValues } from './chartLabels.js'
+import { thinLabels, sumValues } from './chartLabels.js'
 
 const series = (n) => Array.from({ length: n }, (_, i) => ({ date: `${i + 1}日`, added: i, done: n - i }))
 
@@ -54,12 +56,12 @@ test('空数据 / 单点不炸', () => {
   assert.equal(thinLabels(series(1), 8).length, 1)
 })
 
-test('lastValues:取最后一点的 added/done(图例里显示"最新值")', () => {
-  const d = [{ date: 'a', added: 3, done: 1 }, { date: 'b', added: 7, done: 4 }]
-  assert.deepEqual(lastValues(d), { added: 7, done: 4 })
+test('sumValues:图例显示区间合计(最后一天为 0 也不影响合计)', () => {
+  const d = [{ date: 'a', added: 3, done: 1 }, { date: 'b', added: 7, done: 4 }, { date: 'c', added: 0, done: 0 }]
+  assert.deepEqual(sumValues(d), { added: 10, done: 5 })
 })
 
-test('lastValues:空数据按 0,不返回 undefined', () => {
-  assert.deepEqual(lastValues([]), { added: 0, done: 0 })
-  assert.deepEqual(lastValues(null), { added: 0, done: 0 })
+test('sumValues:空数据按 0,不返回 undefined', () => {
+  assert.deepEqual(sumValues([]), { added: 0, done: 0 })
+  assert.deepEqual(sumValues(null), { added: 0, done: 0 })
 })

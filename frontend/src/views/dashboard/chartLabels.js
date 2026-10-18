@@ -26,8 +26,18 @@ export function thinLabels(data, maxLabels = 8) {
   return out
 }
 
-/** 两条序列在最后一点的读数(图例里直接展示"最新值",不必再追图) */
-export function lastValues(data) {
-  const last = (data || [])[(data || []).length - 1] || {}
-  return { added: Number(last.added || 0), done: Number(last.done || 0) }
+/**
+ * 两条序列在整个区间的合计(图例数字)。
+ *
+ * 2026-10-18 改口径:原先是"最后一点的读数"(lastValues) —— 近 30 天窗口的最后一天
+ * 往往就是今天,当天还没业务 ⇒ 图例恒显示 0,而图上明明有曲线,用户报「这些显示有问题」。
+ * 现在取**区间合计**,与卡片标题上的区间口径一致(峰值仍取 added 的最大一天)。
+ */
+export function sumValues(data) {
+  const out = { added: 0, done: 0 }
+  for (const d of data || []) {
+    out.added += Number(d.added) || 0
+    out.done += Number(d.done) || 0
+  }
+  return out
 }
