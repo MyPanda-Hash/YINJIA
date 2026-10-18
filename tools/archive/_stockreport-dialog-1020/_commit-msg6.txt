@@ -1,0 +1,10 @@
+chore: 前端静态产物同步(去 append-to-body 的查询弹窗 + instanceActive 门控)
+
+vite build 产物同步进 backend/src/main/resources/static,并已打进 8090 正在运行的 jar。
+
+本轮前端变化:
+· 查询弹窗去掉 append-to-body(keep-alive 失活时弹窗随子树一起移走,杜绝孤儿弹窗)
+· panelAlive 改用实例私有的 instanceActive(onActivated/onDeactivated 维护)
+· onMounted 兜底置 instanceActive
+
+产物校验:index.html 引用的 asset 均存在;PanelxList-uvp7UMu3.js 在包内;BOOT-INF/lib 128 条不变。
