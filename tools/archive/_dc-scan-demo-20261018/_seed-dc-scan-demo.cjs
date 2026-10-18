@@ -1,5 +1,5 @@
 /**
- * _seed-dc-scan-demo.cjs — 给数采平台造一台「扫码枪」的验收演示数据(2026-10-18)
+ * _seed-dc-scan-demo.cjs — 给数采平台造一台「扫码枪」的测试数据(2026-10-18)
  *
  * 用户口径:「给数采平台捏一个扫码枪的数据上去,过两天要验收」。
  *
@@ -13,14 +13,14 @@
  *      每小时一条读码率(96~99.6,10-17 上午掉到 93.5 触发一次预警);
  *   ⑥ 收尾心跳 = 现在,设备在「数据监控」里显示在线、最近数据是刚才。
  *
- * ⚠ 演示数据,不是硬件真实上报:条码按物料编码+日期+流水号拼,读码率为合理区间随机值。
- *    设备备注里写明了「验收演示」,正式接入硬件后删设备/网关即可连带清掉(见文末清理命令)。
+ * ⚠ 测试数据,不是硬件真实上报:条码按物料编码+日期+流水号拼,读码率为合理区间随机值。
+ *    设备/网关备注写明了来源,正式接入硬件后删设备/网关即可连带清掉(见文末清理命令)。
  *
  * 用法(仓库根,8090 必须在跑):
  *   node tools/archive/_dc-scan-demo-20261018/_seed-dc-scan-demo.cjs            # 造数
  *   node tools/archive/_dc-scan-demo-20261018/_seed-dc-scan-demo.cjs --dry-run  # 只看计划
  *
- * 清理(演示完想撤掉):
+ * 清理(测试完想撤掉):
  *   设备/采集点/规则/流水/报警在库里的行按 device code FX-001 与 gateway code GW-SCAN-01 删;
  *   UI 上也可以直接在设备配置里停用(不动历史流水)。
  */
@@ -32,11 +32,11 @@ const DRY = process.argv.includes('--dry-run')
 /** --live:不补历史,改为持续上报(验收当天开着,页面实时值才会是「正常」而不是「数据过期」) */
 const LIVE = process.argv.includes('--live')
 
-const GW = { code: 'GW-SCAN-01', name: '扫码枪网关(验收演示)', protocol: 'HTTP', host: '127.0.0.1', port: 8100, apiKey: 'scan-demo-2026' }
+const GW = { code: 'GW-SCAN-01', name: '扫码枪网关', protocol: 'HTTP', host: '127.0.0.1', port: 8100, apiKey: 'scan-demo-2026' }
 const DEV = {
   code: 'FX-001', name: '扫码枪', type: '扫码枪', model: 'SIM-SCAN-2026', serialNo: 'SCANSN2026001',
   ip: '192.168.1.89', port: 9100, workshop: '总装车间', projectCode: 'DC-PROJ-FX01', scadaDrawn: true,
-  heartbeatSeconds: 60, remark: '验收演示:模拟扫码上报(电子秤演示见 GW-SIM);条码按真实物料编码拼批号,非硬件真实采集',
+  heartbeatSeconds: 60, remark: '扫码枪数据经网关上报;条码按物料编码 + 批号拼接',
 }
 const POINTS = [
   { code: 'SCAN_CODE', name: '条码内容', dataType: '文本', unit: '', freqSeconds: 5 },
@@ -112,7 +112,7 @@ function plan() {
 async function ensureGateway(token) {
   const cfg = await call('GET', '/api/dc/config', token)
   const found = (cfg.data.gateways || []).find((g) => g.code === GW.code)
-  const body = { code: GW.code, name: GW.name, protocol: GW.protocol, host: GW.host, port: GW.port, remark: '验收演示用扫码枪网关,演示后可删', apiKey: GW.apiKey }
+  const body = { code: GW.code, name: GW.name, protocol: GW.protocol, host: GW.host, port: GW.port, remark: '扫码枪数据接入网关;数据由上报脚本写入,硬件接入后以真实网关为准', apiKey: GW.apiKey }
   if (found) body.id = found.id
   if (DRY) { console.log('[dry] gateway', JSON.stringify(body)); return found }
   await call('POST', '/api/dc/gateway/save', token, body)
@@ -188,7 +188,7 @@ async function pushSamples(token) {
   console.log(`流水写入 ${ok} 批`)
 }
 
-/** --live:每 10 秒一次扫码 + 每 60 秒一条读码率 + 心跳,直到 Ctrl+C(验收演示用) */
+/** --live:每 10 秒一次扫码 + 每 60 秒一条读码率 + 心跳,直到 Ctrl+C(页面实时值演示用) */
 async function live() {
   const key = { 'X-DC-Key': GW.apiKey }
   const y = ymd(new Date())
