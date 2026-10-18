@@ -3845,3 +3845,10 @@ migrate-enable-rcsi-20261018.sql
 #   ③ bd_material_out(加工单号,工单行号) 非唯一索引(转领料守卫/回写/工单追溯的过滤键)。
 #   纯加宽 + 加索引,不改行数据;幂等可重跑;末尾自检列宽/索引,两账套均执行。
 migrate-material-out-multi-pick-20261018.sql
+
+# migrate-material-out-prefix-ll-20261018.sql — 生产领料(材料出库单)前缀 CL → LL(2026-10-18 用户口径
+#   「就改生产的就行,格式按照系统原来的,就改个前缀」,依据《单据编号.txt》生产领料 LL)
+#   只改 yj_panel.prefix 一行;格式仍 前缀-yyyy-MM-NNNN;历史 CL-/SCLL- 与金蝶侧一概不动;
+#   号池 CL 记录保留,新 LL 序列从 0001 起。幂等 + 三道守卫 + 三条自检;两账套均执行。
+#   撤回:UPDATE yj_panel SET prefix=N'CL' WHERE panel_code=N'MATERIAL_OUT';
+migrate-material-out-prefix-ll-20261018.sql
