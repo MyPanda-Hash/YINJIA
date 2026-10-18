@@ -1486,6 +1486,11 @@ export default {
     '打印': 'Print',
     '材料二维码标签': 'Material QR Labels',
     '打印标签': 'Print Labels',
+    // 2026-10-18 条码管理三面板:工具栏「标签」组与留痕提示
+    '标签': 'Labels',
+    '当前页没有可打印的条码行': 'No printable barcode rows on this page',
+    '打印留痕登记失败': 'Failed to record the print log',
+    '已登记打印 {n} 张': 'Recorded {n} label(s)',
     '打印产品二维码': 'Print Product QR',
     '同步阶段进度': 'Sync Stage Progress',
     '已同步': 'Synced',

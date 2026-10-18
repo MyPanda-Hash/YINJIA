@@ -2315,6 +2315,7 @@ import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@
 import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { canConfigFields, canConfigWarn } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
+import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
 import BatchSendDialog from './BatchSendDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
@@ -4340,6 +4341,36 @@ function openQrLabels() {
     return
   }
   qrVisible.value = true
+}
+
+/**
+ * 条码管理三面板(材料/半成品/成品,2026-10-18)的「打印标签」:
+ * 勾选行优先(跨页保留),没有勾选就打印**当前页** —— 三个面板都是 flat 只读报表,没有"当前单据"可挂,
+ * 所以不能用暂收单那套 current.detail 取数。标签内容由 barcodeLabel.js 纯函数映射(单测钉住列名);
+ * 出纸沿用 QrLabelDialog(二维码 + 卡面 + 浏览器打印),服务端只落**留痕**(谁/何时/哪个码/哪张单)。
+ */
+async function openBarcodeLabels() {
+  const b = blocks.value.find((x) => x.isMain) || blocks.value[0]
+  const pageRows = b ? qrVisibleRows(b) : []
+  const picked = qrSel.value.size ? pageRows.filter((r) => qrSel.value.has(qrRowKey(r))) : pageRows
+  const labels = barcodeLabelsOf(panelCode.value, picked)
+  if (!labels.length) {
+    ElMessage.warning(tt('当前页没有可打印的条码行'))
+    return
+  }
+  try {
+    await request.post('/px/barcode/print', {
+      panelCode: panelCode.value,
+      items: labels.map((l) => ({ code: l.code, doc: l.doc, qty: l.qty })),
+    })
+  } catch (e) {
+    // 留痕失败就不出纸:否则纸上有码、系统里查不到 —— 与"打印必须可追溯"的口径相反
+    ElMessage.error(tt('打印留痕登记失败') + ':' + (e?.response?.data?.message || e?.message || ''))
+    return
+  }
+  qrLabels.value = labels
+  qrVisible.value = true
+  ElMessage.success(tt('已登记打印 {n} 张').replace('{n}', labels.length))
 }
 
 function selectConfigFor(action = '选单') {
@@ -8460,8 +8491,12 @@ async function onButton(action) {
     openBatchErp()
     return
   }
-  // 材料二维码标签打印(品检分流链):本地拦截,数据源=当前暂收单明细行
+  // 打印标签:条码管理三面板(flat 报表)走 barcode 分支;其余(暂收单)仍是材料码标签
   if (action === '打印标签') {
+    if (BARCODE_PANELS.includes(panelCode.value)) {
+      await openBarcodeLabels()
+      return
+    }
     openQrLabels()
     return
   }

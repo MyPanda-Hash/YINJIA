@@ -3755,3 +3755,7 @@ migrate-iface-column-comments-20261017.sql
 # WMS 三个「条码管理」面板(材料仓/半成品仓/成品仓,一批一码):3 个只读视图 + 3 个 flat 面板 + 字段/权限/译名。
 #   半成品走「报工派生视图」(scjl 工序=成型/切炭),明确标注未进库存;材料仓按 bs_wh.仓库名称 动态取材料仓。幂等;两账套。
 migrate-barcode-panels-20261018.sql
+# 条码面板补强:① 金蝶仓库→MES 仓库映射表 yj_erp_wh_map(CK00006/YCL-01→WH-CL 材料仓)
+#   ② 打印留痕表 yj_barcode_label_log ③ 视图补列(材料:仓库映射/映射状态;成品:批号状态=正常/默认PC0000/缺失)
+#   ④ 面板字段 19/15/16。幂等;两账套均执行。
+migrate-barcode-label-wh-map-20261018.sql
