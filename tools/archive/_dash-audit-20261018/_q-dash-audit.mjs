@@ -60,8 +60,9 @@ check(Number(st.totalIn) + Number(st.totalOut) === panelCount, '库存:入库+�
   `${st.totalIn}+${st.totalOut} / ${panelCount}`)
 check(Number(st.totalLines) === panelLines, '库存:明细行合计 = 面板行数合计',
   `${st.totalLines} / ${panelLines}`)
-check(sum(st.trend7, 'added') + sum(st.trend7, 'done') === Number(st.totalLines),
-  '库存:趋势合计 = 明细行合计', `${sum(st.trend7, 'added') + sum(st.trend7, 'done')} / ${st.totalLines}`)
+check(sum(st.trend7, 'added') === Number(st.totalIn) && sum(st.trend7, 'done') === Number(st.totalOut),
+  '库存:趋势按单据数(入库/出库合计 = 单量)',
+  `${sum(st.trend7, 'added')}/${st.totalIn} · ${sum(st.trend7, 'done')}/${st.totalOut}`)
 const topVals = (st.topItems || []).map((x) => Number(x.value) || 0)
 check(topVals.every((v, i) => i === 0 || v <= topVals[i - 1]), '库存:现存量 TOP 降序')
 
@@ -75,6 +76,8 @@ const salesAudited = (sa.byStatus || []).find((x) => x.name === '已审核')?.va
 check(Number(salesAudited) <= Number(sa.total), '销售:已审核 ≤ 订单数', `${salesAudited} / ${sa.total}`)
 check(sum(sa.trend7, 'added') === Number(sa.total), '销售:趋势新增合计 = 订单数',
   `${sum(sa.trend7, 'added')} / ${sa.total}`)
+check(sum(sa.trend7, 'done') === Number(salesAudited), '销售:趋势已审核合计 = 已审核订单(口径已统一)',
+  `${sum(sa.trend7, 'done')} / ${salesAudited}`)
 
 // ── 质量 ──
 const q = d.quality || {}
@@ -96,6 +99,17 @@ for (const [code, n] of Object.entries(flow.nodes || {})) {
   }
 }
 check(true, '流程看板:所有单据节点 已审核 ≤ 单数 且 草稿 ≥ 0')
+const wo = flow.special?.workorder || {}
+if (wo.rows != null) {
+  const buckets = Number(wo.unassigned) + Number(wo.assigned) + Number(wo.done) + Number(wo.closed)
+  check(buckets === Number(wo.rows), '流程看板:生产工单四桶合计 = 总行数(含已结案)',
+    `${wo.unassigned}+${wo.assigned}+${wo.done}+${wo.closed} / ${wo.rows}`)
+}
+const warn = flow.special?.warn || {}
+if (warn.negative != null) {
+  check(Number(warn.negative) >= 0 && Number(warn.below) <= Number(warn.thresholded),
+    '流程看板:负库存/预警同源 v_stock_balance', `负 ${warn.negative} · 预警 ${warn.below}/${warn.thresholded}`)
+}
 
 // ── 研发 / 待办 ──
 const rd = d.rd || {}

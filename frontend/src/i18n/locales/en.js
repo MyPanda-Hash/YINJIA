@@ -1973,6 +1973,8 @@ export default {
     '订单状态分布': 'Order status distribution',
     '订单': 'orders',
     '检验明细总数': 'Inspection records',
+    /* 2026-10-18:该 KPI 显示的是 SUM(送检数量),不是明细条数 —— 标题按真口径改名 */
+    '送检数量合计': 'Total qty submitted',
     '合格数': 'Passed',
     '非合格数': 'Failed',
     '合格率': 'Pass rate',

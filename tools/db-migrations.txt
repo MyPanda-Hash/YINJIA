@@ -3816,3 +3816,7 @@ migrate-proc-process-refs-20261018.sql
 #   顺带修 feed_confirm_detail/mix_record_detail 各 1 行孤儿明细(补单据头而非删除)。
 #   ⚠ 样例数据:全量部署前用 tools/archive/_prod-process-audit/_cleanup-samples.sql 清理。幂等;两账套。
 migrate-proc-process-samples-20261018.sql
+# 库存现存量与预警统一(2026-10-18 用户口径「统一到同一视图 v_stock_balance」):
+#   v_stock_balance 增列 预警数量(kucun 按 仓库编码+存货编码 聚合 MAX);流程看板负库存/预警改读本视图。
+#   幂等(CREATE OR ALTER VIEW);两账套。⚠ kucun 批次级阈值与出库审批闸门 StockWarnService 不动。
+migrate-stock-balance-warn-20261018.sql

@@ -59,6 +59,7 @@ export const CHAINS = [
             subs: [
               { label: '已排产', ref: 'special.workorder.assigned' },
               { label: '已完工', ref: 'special.workorder.done' },
+              { label: '已结案', ref: 'special.workorder.closed' },
               { label: '排产数量', ref: 'special.workorder.qty' },
             ],
             warn: ['special.workorder.unassigned'],

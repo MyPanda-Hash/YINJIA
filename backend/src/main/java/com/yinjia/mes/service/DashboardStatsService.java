@@ -525,13 +525,16 @@ public class DashboardStatsService {
             panels.add(row("panelName", "出库", "count", outDocs, "lines", outLines));
             stock.put("panels", panels);
             // 区间内出入库趋势(替代原「近 7 天」硬窗口)
+            // 2026-10-18 用户口径「改成按单据数」:曲线按**单据数**画(每日 DISTINCT 单据编号),
+            // 与上面的「入库单量/出库单量」KPI 同口径;明细行数另有「各单据明细行数」一张卡。
+            // 改前用 COUNT(*) 画的是明细行(883/1841),图例与 KPI(306/552)对不上。
             Map<String, int[]> byDay = new LinkedHashMap<>();
             List<String> days = r.buckets();
             for (String d : days) byDay.put(d, new int[2]);
-            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(DISTINCT 单据编号) AS v"
                     + " FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                     + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0, r.fromStr(), r.toExclusive());
-            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+            fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(DISTINCT 单据编号) AS v"
                     + " FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                     + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 1, r.fromStr(), r.toExclusive());
             stock.put("trend7", toTrend(r, byDay));
@@ -643,7 +646,15 @@ public class DashboardStatsService {
         return v instanceof Number n ? n.doubleValue() : 0;
     }
 
-    /** 销售趋势(区间内):added=单据日期(新增),done=yj_doc_status.shsj(审核)按桶 */
+    /**
+     * 销售趋势(区间内),added=单据日期(新增),done=**同一批订单里状态为已审核的**。
+     *
+     * <p>2026-10-18 用户口径「统一」:原先 done 按 yj_doc_status.shsj(审核动作时间)分桶,
+     * 区间内算出 141 件审核动作,而 KPI「已审核订单」= 124(区间内创建且已审核) —— 同一页两个
+     * 「已审核」数不同。现统一到**单据日期**这一条时间轴:两条线都只数区间内创建的订单,
+     * done 再叠加"已审核"条件 ⇒ 日/合计与 KPI 完全一致(当前数据 added=done=124)。
+     * 审核动作时间维度不再用于看板(工单/单据详情页仍有审核留痕)。
+     */
     private List<Map<String, Object>> soTrend(Range r) {
         List<String> days = r.buckets();
         Map<String, int[]> byDay = new LinkedHashMap<>();
@@ -651,10 +662,9 @@ public class DashboardStatsService {
         fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
                 + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                 + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 0, r.fromStr(), r.toExclusive());
-        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), s.shsj, 23) AS d, COUNT(*) AS v FROM yj_doc_status s"
-                + " JOIN bd_so_order h ON h.单据编号 = s.doc_no AND ISNULL(h.asp_cancel,'N')<>'Y'"
-                + " WHERE s.panel_code = 'SO_ORDER' AND s.shsj IS NOT NULL AND s.shsj >= ? AND s.shsj < ?"
-                + " GROUP BY CONVERT(varchar(10), s.shsj, 23)", 1, r.fromStr(), r.toExclusive());
+        fillTrend(r, byDay, "SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v FROM bd_so_order"
+                + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据状态 = N'已审核' AND 单据日期 >= ? AND 单据日期 < ?"
+                + " GROUP BY CONVERT(varchar(10), 单据日期, 23)", 1, r.fromStr(), r.toExclusive());
         return toTrend(r, byDay);
     }
 

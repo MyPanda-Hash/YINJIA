@@ -475,7 +475,7 @@
     <!-- ===== 质量 ===== -->
     <template v-else>
       <div class="dash-grid">
-        <div class="card metric-card col-3"><div class="kpi-num tone-steel">{{ quality.total }}</div><div class="kpi-title">{{ tt('检验明细总数') }}</div></div>
+        <div class="card metric-card col-3"><div class="kpi-num tone-steel">{{ quality.total }}</div><div class="kpi-title">{{ tt('送检数量合计') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-primary">{{ quality.pass }}</div><div class="kpi-title">{{ tt('合格数') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-danger">{{ quality.bad }}</div><div class="kpi-title">{{ tt('非合格数') }}</div></div>
         <div class="card metric-card col-3"><div class="kpi-num tone-warning">{{ quality.passRate }}%</div><div class="kpi-title">{{ tt('合格率') }}</div></div>
