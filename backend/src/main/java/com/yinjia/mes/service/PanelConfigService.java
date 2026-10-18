@@ -1164,23 +1164,30 @@ public class PanelConfigService {
             // 「修改」组放在保存之后(与采购入库单同序),用于已存在的草稿单进入可编辑状态。
             java.util.Map.entry("TRANSFER", List.of(
                     new String[]{"新增", "新增"},
+                    // 选单(2026-10-18):来源 = 库存选货 STOCK_PICK(见 SELECT_FLOWS)。
+                    // ⚠ actions[0] 必须是字面量「选单」—— 前端 selectConfigFor 只认它,写成「选库存」
+                    //   主按钮会回落成「演示环境暂未实现」。
+                    new String[]{"选单", "选单", "选库存"},
                     new String[]{"修改", "修改"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
             // 盘点单(2026-10-18 新增):实盘调平,审核时按 kucun 现值算差异并回写明细
             // (StockLedgerService.applyStocktake);账实相符的行不产生流水。
-            // 同样没有上游/下游单据。差异数量/账面数量由审核回写,故「修改」只放开草稿期。
+            // 同样没有上游/下游单据;选单来源 = 库存选货(挑要盘的货,带出账面数量)。
             java.util.Map.entry("STOCKTAKE", List.of(
                     new String[]{"新增", "新增"},
+                    new String[]{"选单", "选单", "选库存"},
                     new String[]{"修改", "修改"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
@@ -1276,6 +1283,13 @@ public class PanelConfigService {
    //   ⚠ 这两条是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
    , java.util.Map.entry("OTHER_IN", "PU_ORDER")
    , java.util.Map.entry("OTHER_OUT", "MANU_ORDER")
+            // 2026-10-18 调拨单/盘点单:来源不是单据,而是**库存可用量**(批号级 kucun 视图 v_stock_pick)。
+            // 用户口径「功能和界面要和出入库单对齐」—— 出入库单的「选单」挑的是上游单据,这两张单挑的是"货",
+            // 所以来源登记成平表面板 STOCK_PICK(只读、无菜单入口、仅作选单来源)。
+            // ⚠ 为什么不用现成的 STOCK_DETAIL:它按 (仓库,存货) **跨批号聚合**,选出来的行没有批号,
+            //   而 kucun 是三键(物料,仓库,批号) ⇒ 落不到正确结存行,审核会报「台账无该批库存」。
+   , java.util.Map.entry("TRANSFER", "STOCK_PICK")
+   , java.util.Map.entry("STOCKTAKE", "STOCK_PICK")
             // 2026-09-30:原最后两条 RKD/CKD(采购单(旧)→入库单(旧) / 客户订单(旧)→出库单(旧))
             // 随 RKD/CKD 面板元数据一并删除 —— 这两个纺织遗留面板的 yj_field 按旧列名登记,
             // inh/outh 重建后已永久失效(菜单侧也从未挂载),保留映射只会让「选单」指向不存在的面板。
@@ -1420,6 +1434,96 @@ public class PanelConfigService {
         return out;
     }
 
+    /**
+     * 平表来源的「选货」配置(2026-10-18)。目前唯一用户 = 调拨单/盘点单 ← 库存选货 STOCK_PICK。
+     *
+     * <p>与单据来源的区别(不是风格差异,是语义差异):
+     * <ul>
+     *   <li>没有单号、没有「已审核」前提 —— 库存行本身就是事实,不存在待审状态
+     *       (前端仍会塞一个 `单据状态:'已审核'` 条件,QueryService 对没有该列的面板会跳过它);</li>
+     *   <li>没有表头/表体两层 —— 选中即明细行,故 {@code masterDetail=false};</li>
+     *   <li>不需要「来源单号」回填,也不写 form_flow_link 占用(货不是单据,没有占用概念)。</li>
+     * </ul>
+     *
+     * <p>列与映射:先按「存货/仓库/批号/数量」的固定顺序给列,再补其余可见列(上限 8);
+     * 行映射 = 同名优先 + {@link #STOCK_PICK_ALIAS} 的面板专属换名(如 仓库 → 调出仓库)。
+     */
+    private Map<String, Object> buildStockPickConfig(PanelRegistry.PanelDef def, PanelRegistry.PanelDef src,
+                                                     String sourceCode) {
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>();
+        String srcName = src.displayName(false);
+        // 标题:面板名「库存选货」直接拼会得到「选库存选货」,先去尾部「选货/选择/清单」再拼 ⇒「选库存」
+        String baseName = srcName;
+        for (String sfx : List.of("选货", "选择", "清单")) {
+            if (baseName.endsWith(sfx) && baseName.length() > sfx.length()) {
+                baseName = baseName.substring(0, baseName.length() - sfx.length());
+                break;
+            }
+        }
+        cfg.put("source", sourceCode);
+        cfg.put("title", "选" + baseName);
+        cfg.put("tip", "勾选库存行后点「确定」,物料/仓库/批号将带入当前单据的明细行(数量需自己填)。");
+        cfg.put("masterDetail", false);
+        cfg.put("detailKey", src.tabKey());
+        cfg.put("targetDetailKey", def.tabKey());
+        cfg.put("condition", Map.of());
+        cfg.put("headerMap", List.of());
+
+        List<Map<String, Object>> qf = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : src.fieldsAt("query")) {
+            if (qf.size() >= 6) break;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("dataName", f.label());
+            m.put("dataType", f.dataType());
+            if (f.isRef()) {
+                m.put("refPanel", f.refPanel());
+                m.put("refField", refLabelOf(f.refPanel(), f.refField()));
+                m.put("displayField", refLabelOf(f.refPanel(), f.displayField()));
+            }
+            qf.add(m);
+        }
+        cfg.put("queryFields", qf);
+
+        // 列:固定优先级在前,其余可见列顺延(上限 8,与单据选单同)
+        List<String> cols = new ArrayList<>();
+        for (String want : List.of("存货编码", "存货名称", "规格型号", "仓库", "批号", "现存量")) {
+            if (src.byLabel(want) != null && !cols.contains(want)) cols.add(want);
+        }
+        for (PanelRegistry.FieldDef f : src.fieldsAt("detail")) {
+            if (cols.size() >= 8) break;
+            if (f.hidden() || !f.visible()) continue;
+            if (!cols.contains(f.label())) cols.add(f.label());
+        }
+        cfg.put("columns", cols);
+
+        // 行映射
+        java.util.Set<String> targetDets = new java.util.HashSet<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("detail")) targetDets.add(f.label());
+        Map<String, String> alias = STOCK_PICK_ALIAS.getOrDefault(def.code(), Map.of());
+        List<Map<String, String>> dmap = new ArrayList<>();
+        java.util.Set<String> mappedTo = new java.util.HashSet<>();
+        for (PanelRegistry.FieldDef f : src.fieldsAt("detail")) {
+            String from = f.label();
+            String to = targetDets.contains(from) ? from : alias.get(from);
+            if (to == null || !targetDets.contains(to) || !mappedTo.add(to)) continue;
+            dmap.add(Map.of("from", from, "to", to));
+        }
+        cfg.put("detailMap", dmap);
+        return cfg;
+    }
+
+    /**
+     * 库存选货的**面板专属换名**(源列 → 本面板列)。同名能对上的不必登记。
+     *
+     * <p>为什么不复用 {@code FLOW_DETAIL_SYNONYMS}:那张表是**全局**的(不按链路键控),
+     * 往里加「仓库→调出仓库」「现存量→账面数量」会影响所有链路;而这两个换名只对这两张单成立。
+     */
+    private static final Map<String, Map<String, String>> STOCK_PICK_ALIAS = Map.of(
+            // 调拨单:选中的仓库是**调出仓**;结存单价带进单价(金额随后台按 单价×数量 落流水)
+            "TRANSFER", Map.of("仓库", "调出仓库", "仓库编码", "调出仓库编码", "结存单价", "单价"),
+            // 盘点单:选中行的现存量就是**账面数量**(审核时会按 kucun 现值重算并覆盖,这里只是让界面先看得见)
+            "STOCKTAKE", Map.of("现存量", "账面数量", "结存单价", "单价"));
+
     /** 生成 selectConfig(查询字段/表头表体列/头行映射全自动:同名优先 + 同义词补充)。 */
     private Map<String, Object> buildSelectConfig(PanelRegistry.PanelDef def) {
         return buildSelectConfig(def, SELECT_FLOWS.get(def.code()));
@@ -1430,6 +1534,9 @@ public class PanelConfigService {
         if (sourceCode == null) return null;
         try {
             PanelRegistry.PanelDef src = registry.panel(sourceCode);
+            // 平表来源(库存选货,2026-10-18):下面那套是**按单据**写的(groupCol / 表头 / 来源单号),
+            // 对 flat 来源会生成空表头 + 指向不存在列的单号映射 ⇒ 单独走「平表选货」配置。
+            if (!src.isDoc()) return buildStockPickConfig(def, src, sourceCode);
             String srcName = src.displayName(false);
             String noLabel = src.byCol(src.groupCol()) == null ? "单据编号" : src.byCol(src.groupCol()).label();
 

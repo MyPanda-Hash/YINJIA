@@ -170,7 +170,13 @@ public class StockLedgerService {
             String lot = str(r.get("lot"));
             double qty = num(r.get("qty"));
             if (code == null) throw new IllegalStateException("存在缺少[存货编码]的明细行,不能记账");
-            if (qty == 0) continue;                   // 零行不动账
+            // 零行:其余单据是"跳过"(历史上有红字冲回单留 0 行),但调拨单**没有数量就没有意义** ——
+            // 选单带入后用户忘填数量是常见操作,静默跳过会让人以为"审核成功了却没动库存",故直接拒绝。
+            if (qty == 0) {
+                if (forward) throw new IllegalStateException("调拨单 " + no + " 存在[数量]为空或 0 的明细行(存货 "
+                        + code + "),请填好数量再审核");
+                continue;
+            }
             String[] outWh = resolveWhPair(str(r.get("调出仓库编码")), str(r.get("调出仓库")));
             String[] inWh = resolveWhPair(str(r.get("调入仓库编码")), str(r.get("调入仓库")));
             if (outWh == null || inWh == null) {

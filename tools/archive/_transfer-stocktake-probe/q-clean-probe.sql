@@ -1,0 +1,11 @@
+﻿SET NOCOUNT ON;
+DECLARE @nos TABLE (no nvarchar(50) PRIMARY KEY);
+INSERT INTO @nos VALUES (N'DB-2026-10-0002'),(N'PD-2026-10-0002');
+DELETE FROM bl_transfer WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bd_transfer WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bl_stocktake WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM bd_stocktake WHERE 单据编号 IN (SELECT no FROM @nos);
+DELETE FROM yj_doc_status WHERE panel_code IN ('TRANSFER','STOCKTAKE') AND doc_no IN (SELECT no FROM @nos);
+DELETE FROM yj_usage_log WHERE doc_no IN (SELECT no FROM @nos);
+DELETE FROM s_allno WHERE dh IN (SELECT no FROM @nos);
+SELECT ([单据编号]) AS no, asp_cancel FROM bd_transfer UNION ALL SELECT [单据编号], asp_cancel FROM bd_stocktake;

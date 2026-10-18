@@ -3851,3 +3851,8 @@ migrate-erp-integ-config-20261018.sql
 #   给所有非管理员角色补 yj_role_panel(panel_code=ERP_INTEG, perms='view');不授任何写词
 #   (写闸门在 ErpIntegController.requireAdmin,非管理员 403)。幂等,两账套各跑一次。
 migrate-erp-integ-readonly-20261018.sql
+
+# migrate-transfer-stocktake-align-20261018.sql — 调拨单/盘点单与出入库单对齐(第二批)
+#   头表补 附件1..6 + ERP 留位四列 + 调拨原因/盘点类型/盘点人/复核人;新建 v_stock_pick 库存选货视图
+#   与面板 STOCK_PICK(选单来源);字段/译名/授权同批。幂等,两账套均执行。
+migrate-transfer-stocktake-align-20261018.sql

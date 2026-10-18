@@ -1,0 +1,11 @@
+﻿SET NOCOUNT ON;
+PRINT '=== bs_inv 关键列 ===';
+SELECT c.name FROM sys.columns c WHERE c.object_id=OBJECT_ID('dbo.bs_inv') AND c.name IN (N'存货编码',N'存货名称',N'规格型号',N'计量单位',N'主计量单位',N'状态') ORDER BY c.name;
+PRINT '=== bs_inv 存货编码 唯一? ===';
+SELECT COUNT(*) AS total, COUNT(DISTINCT [存货编码]) AS distinct_codes FROM bs_inv;
+PRINT '=== bs_wh 仓库编码 唯一? ===';
+SELECT COUNT(*) AS total, COUNT(DISTINCT [仓库编码]) AS distinct_codes FROM bs_wh;
+PRINT '=== STOCK_DETAIL 面板字段 ===';
+SELECT seq, label, data_type, place, visible FROM yj_field WHERE panel_code='STOCK_DETAIL' ORDER BY seq;
+PRINT '=== kucun 行数 / 有量行 ===';
+SELECT COUNT(*) AS rows_all, SUM(CASE WHEN ISNULL(yl,0)>0 THEN 1 ELSE 0 END) AS rows_pos FROM kucun WHERE ISNULL(asp_cancel,'N')<>'Y';
