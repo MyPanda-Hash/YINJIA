@@ -434,7 +434,7 @@ public class DcService {
                 m.put("deviceType", r.get("device_type"));
                 m.put("online", isOnline(r));
                 m.put("effectiveStatus", effectiveStatus(r));
-                m.put("lastSeenAt", r.get("last_seen_at"));
+                m.put("lastSeenAt", wallClock(r.get("last_seen_at")));
                 m.put("points", new ArrayList<Map<String, Object>>());
                 m.put("alarmOpen", 0);
                 return m;
@@ -750,6 +750,13 @@ public class DcService {
                  WHERE id = ?
                 """, java.sql.Timestamp.valueOf(at), java.sql.Timestamp.valueOf(at), deviceId);
         if (!"online".equalsIgnoreCase(prev)) logStatus(deviceId, "online", at, reason);
+        // 网关随设备上报刷新(2026-10-18):原先只有设备在线、网关永远显示「离线 / 最近上报 -」,
+        // 设备卡片与网关表自相矛盾。上报经过网关才到得了 MES,故同一时刻把网关也标在线。
+        jdbc.update("""
+                UPDATE bs_dc_gateway SET status = N'online', last_seen_at = ?,
+                       asp_user2 = N'ingest', asp_time2 = SYSDATETIME()
+                 WHERE id = (SELECT gateway_id FROM bs_dc_device WHERE id = ?) AND ISNULL(asp_cancel,'N') <> 'Y'
+                """, java.sql.Timestamp.valueOf(at), deviceId);
     }
 
     private void logStatus(int deviceId, String status, LocalDateTime at, String reason) {
@@ -796,6 +803,12 @@ public class DcService {
 
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /** 时间列按本地墙钟字符串下发(Timestamp 直传会被序列化成 UTC,界面早 8 小时)。 */
+    private static String wallClock(Object o) {
+        LocalDateTime t = toLocal(o);
+        return t == null ? null : t.withNano(0).toString();
     }
 
     private static boolean blank(Object o) {
