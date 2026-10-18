@@ -202,7 +202,8 @@
             <div class="quality-facts">
               <div><span>{{ tt('检验明细') }}</span><strong>{{ quality.total || 0 }}</strong></div>
               <div><span>{{ tt('非合格 / 待判') }}</span><strong class="danger-text">{{ qualityExceptions }}</strong></div>
-              <div><span>{{ tt('流程待办') }}</span><strong>{{ todos.length }}</strong></div>
+              <!-- title 里只放真实单据号(业务事实,不翻译):pending 单据来自 /dashboard/stats 的 todos -->
+              <div><span>{{ tt('流程待办') }}</span><strong :title="todoTip">{{ todos.length }}</strong></div>
             </div>
           </div>
 
@@ -832,6 +833,8 @@ onBeforeUnmount(() => {
 
 // ---------- 概览数据 ----------
 const todos = computed(() => stats.value.todos || [])
+/** 待办悬停提示:逐个列出真实待审批单据号(空则不给 title,避免悬停出空气泡) */
+const todoTip = computed(() => todos.value.map((t) => t.docNo).filter(Boolean).join('\n'))
 const docStats = computed(() => stats.value.docStats || [])
 /** 单据流量:有量的排前面(降序),空面板垫底,最多 9 行 —— 30 个面板全摊开只是噪音 */
 const docVolume = computed(() => {

@@ -54,7 +54,7 @@ public class DashboardStatsService {
         out.put("kpis", kpis(r));
         out.put("archives", archives());
         out.put("docStats", docStats());
-        out.put("todos", List.of());
+        out.put("todos", todos());
         out.put("latest", latestActivities(r));
         out.put("progress", progress(r));
         out.put("production", production(r));
@@ -204,9 +204,41 @@ public class DashboardStatsService {
         }
     }
 
+    /**
+     * 流程待办(2026-10-18):此前 out.put("todos", List.of()) 恒空,前端「流程待办」卡永远 0。
+     * 真实口径 = yj_doc_status 里 pending='Y' 且未作废的单据(与 kpis() 的 approvePending 同源),
+     * 面板名由 PanelRegistry 反查(查不到就回显面板码)。
+     */
+    private List<Map<String, Object>> todos() {
+        try {
+            Map<String, String> panelNames = new HashMap<>();
+            for (PanelRegistry.PanelDef def : registry.all()) panelNames.put(def.code(), def.name());
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map<String, Object> r0 : jdbc.queryForList(
+                    "SELECT TOP 50 doc_no, panel_code, pending_by, pending_at FROM yj_doc_status"
+                            + " WHERE pending = 'Y' AND ISNULL(canceled,'N')<>'Y'"
+                            + " ORDER BY CASE WHEN pending_at IS NULL THEN 1 ELSE 0 END, pending_at DESC")) {
+                String code = r0.get("panel_code") == null ? "" : String.valueOf(r0.get("panel_code"));
+                Map<String, Object> e = new LinkedHashMap<>();
+                e.put("panelCode", code);
+                e.put("panelName", panelNames.getOrDefault(code, code));
+                e.put("docNo", r0.get("doc_no") == null ? "" : String.valueOf(r0.get("doc_no")));
+                e.put("state", "待审批");
+                e.put("pendingBy", r0.get("pending_by") == null ? "" : String.valueOf(r0.get("pending_by")));
+                e.put("pendingAt", r0.get("pending_at") == null ? null : String.valueOf(r0.get("pending_at")));
+                out.add(e);
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
     private Map<String, Object> archives() {
         Map<String, Object> archives = new HashMap<>();
-        archives.put("invItems", count("SELECT COUNT(DISTINCT m_no) FROM mate WHERE ISNULL(asp_cancel,'N')<>'Y'"));
+        // 2026-10-18 修正:此前取 mate(mate 是 BOM 表,实测只有 1 行)⇒ 档案卡「物料」永远显示 1。
+        // 真实存货档案 = bs_inv(面板 INV),与用户在「存货」面板看到的行数同源。
+        archives.put("invItems", count("SELECT COUNT(*) FROM bs_inv WHERE ISNULL(asp_cancel,'N')<>'Y'"));
         archives.put("deptCount", count("SELECT COUNT(*) FROM yj_dept"));
         archives.put("whCount", count("SELECT COUNT(*) FROM bs_wh WHERE ISNULL(asp_cancel,'N')<>'Y'"));
         return archives;
@@ -266,13 +298,11 @@ public class DashboardStatsService {
             List<Map<String, Object>> lastRow = jdbc.queryForList("SELECT CONVERT(varchar(10), MAX(pl_date), 23) AS d FROM plang");
             prod.put("lastDate", lastRow.isEmpty() ? null : lastRow.get(0).get("d"));
             prod.put("stageRates", stageRates(r));
-            prod.put("bomTree", List.of());
         } catch (Exception e) {
             prod.put("statusDist", List.of());
             prod.put("workshopDist", List.of());
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
-            prod.put("bomTree", List.of());
             prod.put("lastDate", null);
         }
         return prod;
