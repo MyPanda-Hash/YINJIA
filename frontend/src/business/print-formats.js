@@ -62,15 +62,30 @@ const fmtNum = (v) => {
   return v == null || v === '' || Number.isNaN(n) ? '' : String(n)
 }
 
-/** 新窗口打开打印(自动调起 print 对话框);宽表横向由各自 @page 控制 */
+/**
+ * 新窗口打开打印(自动调起 print 对话框);宽表横向由各自 @page 控制。
+ *
+ * 🔴 2026-10-18 改两处(现场「打印完工单后浏览器卡死」):
+ *   ① **复用同一个打印窗口**(固定窗口名 `yj-print`):原来每次打印都 `window.open('_blank')` 且**从不关闭**,
+ *      打一张就多一个带整页文档 + 二维码图片的窗口;一天下来几十个窗口把内存吃满,浏览器就会整体卡死
+ *      (表现为点什么都无响应、白屏,只能关标签)。现在第二次打印**复用**那个窗口。
+ *   ② **打完自动关**:`onafterprint` 里 300ms 后 `close()`(用户点「取消」也会触发 afterprint,不会留垃圾窗口)。
+ *      若浏览器不允许脚本关自己打开的窗口,`close()` 静默失败,不影响打印本身。
+ */
 function openPrintWindow(title, bodyHtml) {
-  const w = window.open('', '_blank', 'width=1100,height=780')
+  const w = window.open('', 'yj-print', 'width=1100,height=780')
   if (!w) return false
+  try { w.focus() } catch { /* 某些浏览器禁止 focus,忽略 */ }
+  // 复用已存在的窗口时要先清空,否则 document.write 会追加到旧内容后面
+  try { w.document.open() } catch { /* ignore */ }
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>'
     + '@page{size:A4 portrait;margin:10mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111;font-size:12px}'
     + '</style></head><body>' + bodyHtml
-    + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print()},200)}</scr' + 'ipt></body></html>')
+    + '<scr' + 'ipt>'
+    + 'window.onload=function(){setTimeout(function(){try{window.print()}catch(e){}},200)};'
+    + 'window.onafterprint=function(){setTimeout(function(){try{window.close()}catch(e){}},300)};'
+    + '</scr' + 'ipt></body></html>')
   w.document.close()
   return true
 }

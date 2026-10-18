@@ -67,8 +67,11 @@ function print() {
     <div class="info"><div class="l strong">${esc(l.code)}</div><div class="l">${esc(l.name)}</div>
     ${lineOf('LOT', l.lot)}${lineOf(tt('仓库'), l.warehouse)}${lineOf(tt('供应商'), l.supplier)}${lineOf(tt('仓位'), l.bin)}
     <div class="l dim">${esc(l.qty)} ${esc(l.unit)} · ${esc(l.doc)}</div></div></div>`).join('')
-  const w = window.open('', '_blank', 'width=820,height=640')
+  // 2026-10-18:复用同一个打印窗口 + 打完自动关(原来每次新开一个窗口且从不关闭,
+  //   打一次标签就多一个带整页图片的窗口,久了把浏览器拖死 —— 现场「打印后卡死」的嫌疑之一)
+  const w = window.open('', 'yj-print-qr', 'width=820,height=640')
   if (!w) return
+  try { w.document.open() } catch { /* ignore */ }
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>材料二维码标签</title><style>'
     + 'body{font-family:system-ui,"Microsoft YaHei",sans-serif;margin:14px;color:#222}'
     + '.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}'
@@ -79,7 +82,10 @@ function print() {
     + '.strong{font-weight:600;font-size:14px}.dim{color:#666}'
     + '@page{margin:8mm}'
     + '</style></head><body><div class="grid">' + cards + '</div>'
-    + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print()},150)}</scr' + 'ipt></body></html>')
+    + '<scr' + 'ipt>'
+    + 'window.onload=function(){setTimeout(function(){try{window.print()}catch(e){}},150)};'
+    + 'window.onafterprint=function(){setTimeout(function(){try{window.close()}catch(e){}},300)};'
+    + '</scr' + 'ipt></body></html>')
   w.document.close()
 }
 </script>
