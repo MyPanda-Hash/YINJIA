@@ -27,11 +27,14 @@ IF NOT EXISTS (SELECT 1 FROM day_report WHERE 单据编号 = N'RB-2026-10-0001')
 BEGIN
     INSERT INTO day_report (单据编号, 单据日期, 车间, 出勤人数, 填表人, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
     VALUES (N'RB-2026-10-0001', N'2026-10-18', N'成型车间', 12, N'张伟', N'成型段白班生产日报', N'草稿', @u, @t, 'N');
+    SET @made = @made + 1;
+END
+IF NOT EXISTS (SELECT 1 FROM day_report_detail WHERE 单据编号 = N'RB-2026-10-0001')
+BEGIN
     INSERT INTO day_report_detail (单据编号, 姓名, 时间, 产品编码, 产品名称, 规格, 单位, 数量, 工作内容, 灌料重每支, 物料总用量, 报废, 料头料尾重量, 工序内容, 合格数量, 损失时间, 原因, asp_user1, asp_time1, asp_cancel)
     VALUES
       (N'RB-2026-10-0001', N'李娜', N'2026-10-18', N'A-32-01', N'S阻垢炭棒/滤芯', N'φ32×120', N'支', 1200, N'成型', 42.5000, 51000.0000, 12, 8.5000, N'成型', 1188, N'0.5h', N'换模', @u, @t, 'N'),
       (N'RB-2026-10-0001', N'王芳', N'2026-10-18', N'A-32-01', N'S阻垢炭棒/滤芯', N'φ32×120', N'支', 1150, N'成型', 42.0000, 48300.0000, 8, 7.0000, N'成型', 1142, N'-', N'-', @u, @t, 'N');
-    SET @made = @made + 1;
 END
 
 /* ═══ 2. 投料确认单 TR-2026-10-0001 ═══ */
@@ -39,11 +42,14 @@ IF NOT EXISTS (SELECT 1 FROM feed_confirm WHERE 单据编号 = N'TR-2026-10-0001
 BEGIN
     INSERT INTO feed_confirm (单据编号, 单据日期, 物料名称, 批号, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
     VALUES (N'TR-2026-10-0001', N'2026-10-18', N'S阻垢炭棒/滤芯', N'20261018', N'阻垢粉体线投料', N'草稿', @u, @t, 'N');
+    SET @made = @made + 1;
+END
+IF NOT EXISTS (SELECT 1 FROM feed_confirm_detail WHERE 单据编号 = N'TR-2026-10-0001')
+BEGIN
     INSERT INTO feed_confirm_detail (单据编号, 投料成分, 阶段, 理论数量, 实际重量, 投料人, 是否确认, 确认人, asp_user1, asp_time1, asp_cancel)
     VALUES
       (N'TR-2026-10-0001', N'活性炭粉', N'溶解', 500.0000, 498.6000, N'张伟', N'是', N'李娜', @u, @t, 'N'),
       (N'TR-2026-10-0001', N'纯水',     N'合成', 200.0000, 201.2000, N'李娜', N'是', N'王芳', @u, @t, 'N');
-    SET @made = @made + 1;
 END
 
 /* ═══ 3. 物料混合记录 HH-2026-10-0001 ═══ */
@@ -51,43 +57,60 @@ IF NOT EXISTS (SELECT 1 FROM mix_record WHERE 单据编号 = N'HH-2026-10-0001')
 BEGIN
     INSERT INTO mix_record (单据编号, 单据日期, 物料编码, 物料名称, 生产批次, 操作人, 核对人, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
     VALUES (N'HH-2026-10-0001', N'2026-10-18', N'A-32-01', N'S阻垢炭棒/滤芯', N'20261018', N'张伟', N'李娜', N'二次混合', N'草稿', @u, @t, 'N');
+    SET @made = @made + 1;
+END
+IF NOT EXISTS (SELECT 1 FROM mix_record_detail WHERE 单据编号 = N'HH-2026-10-0001')
+BEGIN
     INSERT INTO mix_record_detail (单据编号, 混合次序, 投料时间, 物料单批次, 重量, 混合时间, asp_user1, asp_time1, asp_cancel)
     VALUES
       (N'HH-2026-10-0001', N'第一次', N'2026-10-18 08:30', N'20261018', 250.0000, 15.00, @u, @t, 'N'),
       (N'HH-2026-10-0001', N'第二次', N'2026-10-18 09:00', N'20261018', 248.5000, 20.00, @u, @t, 'N');
-    SET @made = @made + 1;
 END
 
-/* ═══ 4. 造粒记录 LZ-2026-10-0001(单表·无明细) ═══ */
+/* ═══ 4. 造粒记录 LZ-2026-10-0001(头 + 明细:工艺参数在 gran_record_detail) ═══ */
 IF NOT EXISTS (SELECT 1 FROM gran_record WHERE 单据编号 = N'LZ-2026-10-0001')
 BEGIN
-    INSERT INTO gran_record (单据编号, 单据日期, 物料名称, 生产批次, ZHP_C批次, ZG_C批次, 活性粉, 温度, 湿度,
-                             PE用量, 纯水用量, 捏合时间, 吹扫时间, 测试时间, 水分含量, 取样测试人, 操作员, 备注,
-                             单据状态, asp_user1, asp_time1, asp_cancel)
-    VALUES (N'LZ-2026-10-0001', N'2026-10-18', N'S阻垢炭棒/滤芯', N'20261018', N'ZHP-20261018', N'ZG-20261018',
-            N'活性炭粉A', 85.50, 45.00, 12.5000, 200.0000, N'25分钟', N'10分钟', N'15分钟', 12.50,
-            N'李娜', N'张伟', N'造粒过程参数记录', N'草稿', @u, @t, 'N');
+    INSERT INTO gran_record (单据编号, 单据日期, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
+    VALUES (N'LZ-2026-10-0001', N'2026-10-18', N'造粒过程参数记录', N'草稿', @u, @t, 'N');
     SET @made = @made + 1;
 END
+IF NOT EXISTS (SELECT 1 FROM gran_record_detail WHERE 单据编号 = N'LZ-2026-10-0001')
+BEGIN
+    INSERT INTO gran_record_detail (单据编号, 物料名称, 生产批次, ZHP_C批次, ZG_C批次, 活性粉, 温度, 湿度,
+                                    PE用量, 纯水用量, 捏合时间, 吹扫时间, 测试时间, 水分含量, 取样测试人, 操作员,
+                                    asp_user1, asp_time1, asp_cancel)
+    VALUES (N'LZ-2026-10-0001', N'S阻垢炭棒/滤芯', N'20261018', N'ZHP-20261018', N'ZG-20261018',
+            N'活性炭粉A', 85.50, 45.00, 12.5000, 200.0000, N'25分钟', N'10分钟', N'15分钟', 12.50,
+            N'李娜', N'张伟', @u, @t, 'N');
+END
 
-/* ═══ 5. 无黑处理登记 WB-2026-10-0001(单表·无明细) ═══ */
+/* ═══ 5. 无黑处理登记 WB-2026-10-0001(头 + 明细:尺寸/重量在 wh_record_detail) ═══ */
 IF NOT EXISTS (SELECT 1 FROM wh_record WHERE 单据编号 = N'WB-2026-10-0001')
 BEGIN
-    INSERT INTO wh_record (单据编号, 单据日期, 成型日期, 产品编号, 尺寸, 加湿前重量, 加湿后重量,
-                           无黑时间, 取样时间, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
-    VALUES (N'WB-2026-10-0001', N'2026-10-18', N'2026-10-17', N'A-32-01', N'φ32×120',
-            125.5000, 131.2000, N'2026-10-18 09:30', N'2026-10-18 09:45', N'加湿防黑处理', N'草稿', @u, @t, 'N');
+    INSERT INTO wh_record (单据编号, 单据日期, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
+    VALUES (N'WB-2026-10-0001', N'2026-10-18', N'加湿防黑处理', N'草稿', @u, @t, 'N');
     SET @made = @made + 1;
 END
+IF NOT EXISTS (SELECT 1 FROM wh_record_detail WHERE 单据编号 = N'WB-2026-10-0001')
+BEGIN
+    INSERT INTO wh_record_detail (单据编号, 成型日期, 产品编号, 尺寸, 加湿前重量, 加湿后重量,
+                                  无黑时间, 取样时间, asp_user1, asp_time1, asp_cancel)
+    VALUES (N'WB-2026-10-0001', N'2026-10-17', N'A-32-01', N'φ32×120', 125.5000, 131.2000,
+            N'2026-10-18 09:30', N'2026-10-18 09:45', @u, @t, 'N');
+END
 
-/* ═══ 6. 封箱确认 FX-2026-10-0001(单表·无明细) ═══ */
+/* ═══ 6. 封箱确认 FX-2026-10-0001(头 + 明细:装箱信息在 pack_confirm_detail) ═══ */
 IF NOT EXISTS (SELECT 1 FROM pack_confirm WHERE 单据编号 = N'FX-2026-10-0001')
 BEGIN
-    INSERT INTO pack_confirm (单据编号, 装箱日期, 产品编号, 装箱数量, 装箱人, 确认人, 主管签名, 备注,
-                              单据状态, asp_user1, asp_time1, asp_cancel)
-    VALUES (N'FX-2026-10-0001', N'2026-10-18', N'A-32-01', N'120', N'王芳', N'李娜', N'张伟',
-            N'装箱 10 箱×12 支', N'草稿', @u, @t, 'N');
+    INSERT INTO pack_confirm (单据编号, 装箱日期, 备注, 单据状态, asp_user1, asp_time1, asp_cancel)
+    VALUES (N'FX-2026-10-0001', N'2026-10-18', N'装箱 10 箱×12 支', N'草稿', @u, @t, 'N');
     SET @made = @made + 1;
+END
+IF NOT EXISTS (SELECT 1 FROM pack_confirm_detail WHERE 单据编号 = N'FX-2026-10-0001')
+BEGIN
+    INSERT INTO pack_confirm_detail (单据编号, 产品编号, 装箱数量, 装箱人, 确认人, 主管签名,
+                                     asp_user1, asp_time1, asp_cancel)
+    VALUES (N'FX-2026-10-0001', N'A-32-01', N'120', N'王芳', N'李娜', N'张伟', @u, @t, 'N');
 END
 
 /* ═══ 7. 生产异常处理单 YC-2026-10-0001(参照真实工单 GD2608260013) ═══ */
@@ -149,6 +172,9 @@ DECLARE @emptyDetail nvarchar(200) = N'';
 IF NOT EXISTS (SELECT 1 FROM day_report_detail   WHERE 单据编号 = N'RB-2026-10-0001') SET @emptyDetail += N' day_report_detail';
 IF NOT EXISTS (SELECT 1 FROM feed_confirm_detail WHERE 单据编号 = N'TR-2026-10-0001') SET @emptyDetail += N' feed_confirm_detail';
 IF NOT EXISTS (SELECT 1 FROM mix_record_detail   WHERE 单据编号 = N'HH-2026-10-0001') SET @emptyDetail += N' mix_record_detail';
+IF NOT EXISTS (SELECT 1 FROM gran_record_detail  WHERE 单据编号 = N'LZ-2026-10-0001') SET @emptyDetail += N' gran_record_detail';
+IF NOT EXISTS (SELECT 1 FROM wh_record_detail    WHERE 单据编号 = N'WB-2026-10-0001') SET @emptyDetail += N' wh_record_detail';
+IF NOT EXISTS (SELECT 1 FROM pack_confirm_detail WHERE 单据编号 = N'FX-2026-10-0001') SET @emptyDetail += N' pack_confirm_detail';
 IF LEN(@emptyDetail) > 0
 BEGIN
     RAISERROR(N'[FAIL] 这些明细表没有数据:%s', 16, 1, @emptyDetail);
