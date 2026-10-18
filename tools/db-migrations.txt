@@ -3846,3 +3846,8 @@ migrate-transfer-stocktake-20261018.sql
 #   ERPLG/ERPLG_ROW 归入 module_group「ERP系统集成」、23 条接口(导入 11 / 转出 12)+ 165 行字段映射 +
 #   14 行设备绑定(bs_equip)+ 中/英/日/繁等译名;幂等,两账套均执行。界面=ERP系统集成·ERP集成配置清单。
 migrate-erp-integ-config-20261018.sql
+
+# migrate-erp-integ-readonly-20261018.sql — ERP集成配置清单:非管理员仅可见(写永属管理员)
+#   给所有非管理员角色补 yj_role_panel(panel_code=ERP_INTEG, perms='view');不授任何写词
+#   (写闸门在 ErpIntegController.requireAdmin,非管理员 403)。幂等,两账套各跑一次。
+migrate-erp-integ-readonly-20261018.sql
