@@ -1,0 +1,26 @@
+fix: 补回 qc_insp_detail 漏加 4 列(迁移链被卡住,挡住其后脚本)
+
+2026-10-20 用合并后的代码重启,启动时 DB 增量同步报:
+  [SQL失败] 列名 '品质复核人' 无效  → migrate-qc-insp-realize-20261018.sql 中止,其后脚本未执行
+
+根因不在那个脚本,而在更早的 migrate-qc-3docs-rebuild.sql 第 211 行:
+  一批 13 列 ADD 全挂在**单个探针列 `箱数`** 上(`IF COL_LENGTH(...,'箱数') IS NULL ALTER TABLE ... ADD ...`)。
+本库 `箱数` 早已存在 ⇒ 探针为假 ⇒ 整批跳过 ⇒ 其中 4 列从未创建:
+  [抽样方案] [品质复核人] [品质复核时间] [业务员]
+(实测两账套 qc_insp_detail 都是 59 列,这 4 列都不在。)
+
+为什么不改历史脚本:DbSync 按内容哈希判定「已执行」,改任一字节都会让它下次被重跑,
+而那条脚本含 DROP/CREATE TABLE 级动作,重放风险远大于收益。
+⇒ 新增 tools/migrate-qc-insp-detail-missing-cols-20261020.sql(**逐列幂等** + MS_Description + 自检),
+   并登记在 db-migrations.txt 中 **migrate-qc-insp-realize-20261018.sql 之前**
+   (否则新库/全量部署仍会先在 realize 处炸)。
+
+两账套结果:
+· HSDZ_MES:执行 3 / 失败 0;qc_insp_detail 63 列;11 张真实单残留审核状态 = 0
+· HSDZ_MES_TEST:同样是陈旧快照且缺 IJ-2026-09-0152,而 clear-11-docstatus 的守卫与自检
+  硬要求 11 张都在 ⇒ 该库无论如何都会中止。按「测试库陈旧不逐张补」的纪律做了**最小等效**:
+  对实际存在的 10 张清掉 yj_doc_status 残留,并只给这一条登记哈希(_FixTestDbQcStatus.java,
+  带「只允许测试库」硬闸门);随后同步 0 执行 / 0 失败。
+
+验证:四单回归闸 [PASS](qc_insp_detail 现 63 列,文档 59 列,多出 4 列未登记即不显示);
+端到端 UI 14/14、接口口径 20/20、门控时序 14/14、纯函数 8/8;面板切换「两个弹窗」次数 = 0。

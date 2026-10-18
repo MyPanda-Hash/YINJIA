@@ -3934,6 +3934,14 @@ migrate-emp-import-20261019.sql
 #   archived='Y'+archived_at、yj_form_approval 留 AUDIT/APPROVED 痕。
 #   看板(DashboardStatsService.quality)直接 SUM 明细的送检/合格/不合格数量,故自动一致。
 #   幂等:qc_insp.asp_user2='qc-realize-20261018' 为完成标记;两账套均执行。
+# migrate-qc-insp-detail-missing-cols-20261020.sql — 补回 qc_insp_detail 漏加的 4 列
+#   病根:migrate-qc-3docs-rebuild.sql 第 211 行把 13 列 ADD 挂在**单个探针列 箱数**上,
+#   而本库 箱数 早已存在 ⇒ 整批跳过 ⇒ [抽样方案]/[品质复核人]/[品质复核时间]/[业务员] 四列从未创建。
+#   症状:下一个脚本 migrate-qc-insp-realize-20261018.sql 写演示明细时报「列名 '品质复核人' 无效」,
+#   迁移链在此中止(2026-10-20 启动实测)。改历史脚本会让 DbSync 按哈希重放那条含 DROP/CREATE 的脚本,
+#   风险大 ⇒ 另起这个逐列幂等的修复脚本,并**排在 realize 之前**(否则新库全量部署会先在 realize 处炸)。
+#   自检:4 列齐备、缺列项 0。幂等;两账套均执行。
+migrate-qc-insp-detail-missing-cols-20261020.sql
 migrate-qc-insp-realize-20261018.sql
 # 清 11 张真实来料检验单的残留审核状态(用户 2026-10-18「把 yj_doc_status 里这 11 条清掉」):
 #   IJ-2026-09-0152 / IJ-2026-10-0011~0020 是「暂收单审核→自动生成检验单」的真实单,qc_insp.单据状态
