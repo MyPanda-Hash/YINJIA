@@ -132,7 +132,11 @@ public class OrderConvertService {
                         + "        AND ISNULL(rs.stopped,'N')<>'Y' AND ISNULL(rs.deleting,'N')<>'Y'"
                         + "        AND ISNULL(rs.modify_state,'N')<>'Y' THEN N'已审核'"
                         + "      ELSE N'未审核' END AS 路线审核状态"
-                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD                        + " ORDER BY o.[单据日期], o.[单据编号], l.[id]",
+                        // 排序(2026-10-18 用户口径「新的在上、旧的在下面」):此前按单据日期升序,
+                        // 新单据沉在列表底部;现改**日期倒序 → 单据编号倒序 → 行id 升序**
+                        // (同一张单内行号仍从上到下,不因倒序把 1/2/3 行翻过来)。
+                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD
+                        + " ORDER BY o.[单据日期] DESC, o.[单据编号] DESC, l.[id]",
                         // ⚠ 日期参数必须显式给空串:JDBC null 会让 `? = ''` 求值成 NULL(既非真也非假)
                         //   ⇒ 整个 WHERE 不成立 ⇒ **一行都查不出来**。2026-10-06 探针实测踩到并修正。
                         arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like);

@@ -410,6 +410,8 @@ async function doTransferRevoke() {
 //    新增/选单;若日后要恢复自动带料,需先有新的用料来源(如金蝶 BOM 接口)。
 //    **2026-10-07 补**:生产工单列表页新增「转领料单」(WorkOrderList.vue + /px/workOrderList/toPicking,
 //    由原「打印领料单」改来)——只转单头(加工单号=工单号)、明细仍由仓库在材料出库单里补,故本页不重复造入口。
+//    **2026-10-18 补**:口径改为「先排产后领料」——本页(排产)是领料的前置:转领料单要求该工单行
+//    已排入产线(scx 非空)且排产数量>0;同一工单行可开多张领料单(见 WorkOrderPickingService)。
 
 onMounted(() => {
   loadAll()

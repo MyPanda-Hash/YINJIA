@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-10-18T17:58:04",
+  "range": {
+    "from": "2026-09-19",
+    "to": "2026-10-18",
+    "bucket": "day",
+    "days": 30
+  },
+  "quality": {
+    "total": 758500,
+    "pass": 732165,
+    "bad": 26335,
+    "passRate": 97
+  },
+  "sheets": [
+    "质量概览",
+    "检验结果分布",
+    "送检合格趋势",
+    "不合格物料TOP",
+    "数据说明"
+  ],
+  "trendPoints": 30,
+  "defectItems": 7,
+  "file": "我的桌面质量数据-20261018.xlsx",
+  "failed": []
+}

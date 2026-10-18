@@ -95,14 +95,16 @@
           </el-table-column>
           <el-table-column :label="tt('在线率')" width="140">
             <template #default="{ row }">
-              <el-progress :percentage="pct(row.onlineRate)" :stroke-width="10" />
+              <!-- 从未接入的设备(无状态日志)时长与在线率都是未知,显示「-」而不是 0%(2026-10-18 用户口径) -->
+              <span v-if="row.onlineRate === null || row.onlineRate === undefined" class="dc-muted">-</span>
+              <el-progress v-else :percentage="pct(row.onlineRate)" :stroke-width="10" />
             </template>
           </el-table-column>
           <el-table-column :label="tt('在线时长')" width="130">
-            <template #default="{ row }"><span class="dc-muted">{{ fmtDur(row.onlineSeconds) }}</span></template>
+            <template #default="{ row }"><span class="dc-muted">{{ fmtDur(row.onlineSeconds, row.connected !== false) }}</span></template>
           </el-table-column>
           <el-table-column :label="tt('离线时长')" width="130">
-            <template #default="{ row }"><span class="dc-muted">{{ fmtDur(row.offlineSeconds) }}</span></template>
+            <template #default="{ row }"><span class="dc-muted">{{ fmtDur(row.offlineSeconds, row.connected !== false) }}</span></template>
           </el-table-column>
           <el-table-column :label="tt('报警次数')" width="92" align="right">
             <template #default="{ row }"><span class="dc-muted">{{ row.alarmCount ?? 0 }}</span></template>
@@ -191,7 +193,7 @@ const kpiCards = computed(() => {
   const offline = num(s.offlineNow, Math.max(0, total - online))
   const rate = num(s.onlineRate, 0)
   return [
-    { key: 'rate', label: '在线率', value: rateText(rate), unit: '%', tone: rate >= 90 ? 'ok' : rate >= 60 ? 'warn' : 'bad', hint: '区间内在线时长占比' },
+    { key: 'rate', label: '在线率', value: rateText(rate), unit: '%', tone: rate >= 90 ? 'ok' : rate >= 60 ? 'warn' : 'bad', hint: '已接入设备在线占比' },
     { key: 'online', label: '在线设备', value: online, unit: '', tone: 'ok', hint: '当前在线' },
     { key: 'offline', label: '离线设备', value: offline, unit: '', tone: offline > 0 ? 'warn' : 'neutral', hint: '当前离线（含未接入）' },
     { key: 'alarm', label: '报警数', value: alarmTotal.value, unit: '', tone: alarmTotal.value > 0 ? 'bad' : 'neutral', hint: '区间内报警总数' },
@@ -226,9 +228,11 @@ function levelWidth(count) {
   const w = max > 0 ? Math.round((num(count, 0) / max) * 100) : 0
   return Math.max(2, w) + '%'
 }
-function fmtDur(v) {
+/** showZero=true:已知时长为 0 时显示 0(已接入设备);false(未接入)显示 '-' */
+function fmtDur(v, showZero = false) {
   const n = Number(v)
-  if (!Number.isFinite(n) || n <= 0) return '-'
+  if (!Number.isFinite(n)) return '-'
+  if (n <= 0) return showZero ? '0' : '-'
   const d = Math.floor(n / 86400)
   const h = Math.floor((n % 86400) / 3600)
   const m = Math.floor((n % 3600) / 60)

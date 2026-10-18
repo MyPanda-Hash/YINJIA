@@ -32,11 +32,18 @@ import java.util.Map;
  * (日期/业务类型/出库类别/加工单号/工单行号/来源单/车间/领用人),材料行由仓库在材料出库单面板按实发补,
  * 补完审核即回写工单 —— 不做"猜材料"的自动展开。
  *
- * <p><b>防重复</b>(两层,均可自愈,均**按行**):
- * ① 占用链 {@code form_flow_link}(PLANG→MATERIAL_OUT,ACTIVE,{@code source_line_key = 工单号#行id})
- * —— 删除/作废下游草稿时 {@code ButtonService} 自动置 RELEASED,来源行随即放开;
- * ② 存量兜底:该**行**已有未审核领料单时拒绝(含手工建的;**工单级**单据即工单行号空/0 时视为占整单)。
- * 已审核的**不拦**(分批领料是真实场景,回写侧按「每行最近已审核最多 3 张」汇总)。
+ * <p><b>前置:先排产,再领料</b>(用户口径 2026-10-18:「先要完成排产才进入到领料」)——
+ * 该工单行必须**已排入产线**({@code plang.scx} 非空)**且排产数量 &gt; 0**,未排产一律拒绝并提示先去
+ * 「快速排产」排入产线;已结案的也不给转。流程看板同口径:
+ * 快速排产 → 工单排产/预排线 → 产线排产负荷 → 材料出库单(见 {@code flowSpec.js})。
+ *
+ * <p><b>一张工单可开多张领料单</b>(用户口径 2026-10-18:「一个生产工单可以对应多个领料单据」)——
+ * 同一**工单行**可以**同时**存在多张未审核草稿:每次点「转领料单」都新增一张,
+ * 不再有「该工单行已有未审核领料单,请先审核或删除」的拦截(2026-10-09~10-17 的旧口径)。
+ * 占用链仍**每张单**落一条 {@code form_flow_link}(PLANG→MATERIAL_OUT,{@code source_line_key = 工单号#行号})
+ * 供追溯与删除/作废时置 RELEASED,但它**不再是"转过就不能再转"的闸门**;
+ * 备注写明这是该工单行的第几张。回写侧把该行**全部**已审核领料单号汇总进 {@code plang.ll_no2}
+ * (列已加宽到 400,见 {@code migrate-material-out-multi-pick-20261018.sql})。
  *
  * <p>⚠ **不加 {@code @Transactional}**(沿用 2026-09-26 toManu 的教训):外层事务与
  * {@code buttonService.save} 自带的事务嵌套时,某一行失败会把共享事务标 rollback-only,
@@ -87,14 +94,15 @@ public class WorkOrderPickingService {
      *
      * <p>用户口径(2026-10-15):「就是当前的**工单号加工单行号**作为标识,**每个独立进行**」
      * + 「工单号+工单行号 就为当前的**一个新的单**的模式」——
-     * 去重键 = (工单号, 工单行号),**不是** plang.id。同一标识勾几次都只转一张
-     * (plang 里可能有多个物理行共用同一 (工单号,行号),按用户口径它们是**同一个标识** ⇒ 同一张单)。
+     * 去重键 = (工单号, 工单行号),**不是** plang.id:同一批勾选里多个物理行共用同一 (工单号,行号) 时
+     * 只转一张(plang 里同订单行分批转单会有多行);**再次点按钮=再开一张**——
+     * 2026-10-18 用户口径「一个生产工单可以对应多个领料单据」,已审核草稿不再拦第二次。
      *
      * @return {转领料单张数, 单号清单:["工单号#行号→领料单号"], 失败行, gotoPanel}
      */
     public Map<String, Object> toPicking(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转领料单的工单");
-        // 去重键 = 工单号 + 工单行号(用户口径:这就是行标识 ⇒ 一张新单)
+        // 去重键 = 工单号 + 工单行号(用户口径:这就是行标识 ⇒ 一批里只开一张;再点=再开一张)
         LinkedHashMap<String, Line> lines = new LinkedHashMap<>();
         List<String> failed = new ArrayList<>();
         for (Map<String, Object> r : rows) {
@@ -152,6 +160,13 @@ public class WorkOrderPickingService {
         Map<String, Object> h = hit.get(0);
         String ja = str(h.get("ja"));
         if ("T".equals(ja) || "Y".equals(ja)) throw new IllegalStateException("已结案,不能转领料单");
+        // 排产前置(2026-10-18 用户口径「先要完成排产才进入到领料」):
+        //   ① 必须已排入产线(scx 非空)—— 撤销排产后 scx 会被清空,这里随之拦住;
+        //   ② 排产数量必须 > 0(旧守卫保留:撤销排产/历史脏数据可能留下数量,单独兜底)。
+        // 两条合起来 = 「排产完成」,与快速排产 assign() 写入的列一致。
+        if (str(h.get("scx")) == null) {
+            throw new IllegalStateException("未排产(未排入产线),请先在「快速排产」把该工单行排入产线后再转领料单");
+        }
         if (num(h.get("pl_sl")) <= 0) throw new IllegalStateException("排产数量为 0(未排产),不能转领料单");
         // 该标识下全部批次(去重、保序):同标识多物理行时写进备注,避免只体现一个批次
         List<String> bs = new ArrayList<>();
@@ -166,61 +181,19 @@ public class WorkOrderPickingService {
 
     /** 单个**工单行标识**(工单号+工单行号)转领料单(守卫 → 组装单头 → 落占用链;返回新领料单号) */
     private String pickOne(Line ln, String user) {
-        // 1) 防重复①:本标识生成过且**草稿还在** —— 占用链按**行标识**判(source_line_key = 工单号#行号)。
-        //    🔴 2026-10-15 修(用户报障「转领料单还是不能根据工单号+工单行号进行」):原判据只看
-        //      link_status='ACTIVE',**不看目标单的存活状态** —— 于是 2026-10-09 粒度修正**之前**生成的
-        //      整单级领料单(给该工单**每一行**都落了一条链)在**审核之后链仍是 ACTIVE**
-        //      (form_flow_link 只在下游删除/作废时才置 RELEASED,审核不置)
-        //      ⇒ 只要该工单历史上转过一次且审核了,之后**每一行**都被永久挡住,
-        //        提示还写着"请先删除该草稿后再转"—— 而那单早已审核,根本删不掉(死锁)。
-        //      实测 GD-2026-10-0002:CL-2026-10-0004(整单级/已审核)的 7 条链全 ACTIVE,
-        //        行1~行7 一律 409「该工单行已生成领料单 CL-2026-10-0004」。
-        //    本类口径本来就写明「**已审核的不拦**(分批领料是真实场景)」—— 故此处只拦**活草稿**:
-        //      目标单未审核、未作废、未软删。判据与下面 guard② 完全一致(两处守卫同口径)。
-        //    ⚠ 源行键用 ln.key()(= 工单号#行号):与去重键同口径,一个标识一条链。
-        //      2026-10-09~10-15 之间写下的旧链用的是 plang.id(工单号#行id),不再命中 ——
-        //      但这不影响正确性:下面 guard② 按 (加工单号,工单行号) 兜底,老链的活草稿照样拦得住。
-        List<String> linked = jdbc.queryForList(
-                "SELECT l.target_form_no FROM form_flow_link l"
-                        + " WHERE l.source_panel_code = ? AND l.source_line_key = ?"
-                        + "   AND l.target_panel_code = ? AND l.link_status = 'ACTIVE'"
-                        // 目标单存在且未软删
-                        + "   AND EXISTS (SELECT 1 FROM bd_material_out h WHERE h.[单据编号] = l.target_form_no"
-                        + "        AND ISNULL(h.asp_cancel,'N') <> 'Y')"
-                        // 目标单未审核(= 活草稿)
-                        + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
-                        + "        AND s.doc_no = l.target_form_no AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y')"
-                        // 目标单未作废
-                        + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status c WHERE c.panel_code = ?"
-                        + "        AND c.doc_no = l.target_form_no AND ISNULL(c.canceled,'N') = 'Y')",
-                String.class, SOURCE_PANEL, ln.key(), TARGET_PANEL, TARGET_PANEL, TARGET_PANEL);
-        if (!linked.isEmpty()) {
-            throw new IllegalStateException("该工单行已有未审核领料单草稿 " + linked.get(0) + ",请先审核或删除后再转");
-        }
-        // 2) 防重复②:存量未审核领料单兜底(含手工建的)—— **按 工单号 + 工单行号** 判。
-        //    用户口径(2026-10-15):「工单号 + 工单行号 作为标识,每个独立进行」——
-        //    故行号就是行身份,不比 plang.id;同一行号下若有多个 plang 物理行,按用户口径它们是**同一行**。
-        //    工单行号 空/0 = 工单级单据(没有行信息),视为占整单,所有行都不放行。
-        // ⚠ 参数按分支**逐个列出**(与类内既有 queryForList(sql, String.class, ?…) 同形):
-        //   把 Object[] 直接喂给可变参数位会被重载解析挑成 queryForList(String, Object…)
-        //   ⇒ 编译期报「List<Map> 不能转 List<String>」(2026-10-09 实测踩到)。
-        String pendSql = "SELECT TOP 1 h.[单据编号] FROM bd_material_out h"
-                + " WHERE h.[加工单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
-                + "   AND (ISNULL(h.[工单行号], 0) = 0 OR h.[工单行号] = ?)"
-                // ⚠ 已作废的草稿**不算存量**:删除即作废(yj_doc_status.canceled='Y'),
-                //   少了这一条,「删掉草稿再重转」会被自己刚删的单挡住(2026-10-07 界面探针实测踩到)。
-                + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status c WHERE c.panel_code = ?"
-                + "     AND c.doc_no = h.[单据编号] AND ISNULL(c.canceled,'N') = 'Y')"
-                // 未审核 = 不存在「已审核(s.shr 非空)且未作废」的状态行
-                + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
-                + "     AND s.doc_no = h.[单据编号] AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y')"
-                + " ORDER BY h.[单据编号] DESC";
-        List<String> pending = jdbc.queryForList(pendSql, String.class, ln.no(), ln.xc(), TARGET_PANEL, TARGET_PANEL);
-        if (!pending.isEmpty()) {
-            throw new IllegalStateException("该工单行已有未审核领料单 " + pending.get(0) + ",请先审核或删除后再转");
-        }
+        // 1) 这是该工单行的第几张(草稿 + 已审核都算;作废/软删不算)。
+        //    2026-10-18 用户口径「一个生产工单可以对应多个领料单据」:**每次转单都新建一张**;
+        //    原来的两道「已有未审核领料单 ⇒ 拒绝」守卫(占用链查活草稿 / 存量未审核兜底)按该口径移除 ——
+        //    它们本意是防重复转单,现在由「备注写明第几张 + 仓库按实发补明细」承担辨识,不再挡第二次。
+        Integer cnt = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT h.[单据编号]) FROM bd_material_out h"
+                        + " LEFT JOIN yj_doc_status c ON c.panel_code = ? AND c.doc_no = h.[单据编号]"
+                        + " WHERE h.[加工单号] = ? AND ISNULL(h.[工单行号], 0) = ?"
+                        + "   AND ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(c.canceled,'N') <> 'Y'",
+                Integer.class, TARGET_PANEL, ln.no(), ln.xc());
+        int seq = (cnt == null ? 0 : cnt) + 1;
 
-        // 3) 单头:与旧「转领料」同口径(单据日期=今天、业务类型=材料出库、出库类别=直接领料、
+        // 2) 单头:与旧「转领料」同口径(单据日期=今天、业务类型=材料出库、出库类别=直接领料、
         //    车间=产线档案属性 2026-09-23 口径)+ 来源单信息 + **工单行号**(2026-10-09 粒度修正的锚)。
         //    ⚠ 不预填「仓库」:档案里没有旧代码写死的「材料仓」(实为不存在的仓库),领用哪个仓
         //      取决于实发材料(原料仓/辅料仓),留给仓库选;同理明细行也由仓库补。
@@ -236,19 +209,20 @@ public class WorkOrderPickingService {
         String workshop = workshopOf(ln.scx());
         if (workshop != null) head.put("生产车间", workshop);
         head.put("领用人", realName(user));
-        //    备注带**全部批次**(同标识多物理行时),否则只体现一个批次,界面上分不清。
-        head.put("备注", "生产工单转领料单(工单行 " + ln.xc()
+        //    备注带**第几张** + 全部批次(同标识多物理行时),界面上才分得清这是同一工单行的第几张单。
+        head.put("备注", "生产工单转领料单(工单行 " + ln.xc() + ",第 " + seq + " 张"
                 + (ln.batches() == null || ln.batches().isBlank() ? "" : ",批次 " + ln.batches())
                 + ",排产 " + round4(ln.plSl()) + ");材料明细由仓库补填");
 
-        // 4) 建草稿:明细留空 —— ButtonService.save 的"空白草稿"分支只写单头(号池取号 CL-…/草稿态)
+        // 3) 建草稿:明细留空 —— ButtonService.save 的"空白草稿"分支只写单头(号池取号 CL-…/草稿态)
         Map<String, Object> formData = new LinkedHashMap<>(head);
         formData.put("detail", Map.of("items", List.of()));
         Map<String, Object> saved = buttonService.save(registry.panel(TARGET_PANEL), formData, false);
         String newNo = String.valueOf(saved.get("编号"));
 
-        // 5) 占用链:**一个行标识一条链**(源行键 = 工单号#行号,与去重键同口径);目标暂无行 ⇒ targetLineKey=null。
-        //    下游草稿删除/作废时 ButtonService 会把 link 置 RELEASED,本按钮随之重新可点(零回滚代码)。
+        // 4) 占用链:每张单一条链(源行键 = 工单号#行号,**同一行可有多条** —— 一单多张领料);
+        //    目标暂无行 ⇒ targetLineKey=null。下游草稿删除/作废时 ButtonService 按 target_form_no
+        //    把**该张单**的链置 RELEASED,不影响同一工单行下其它领料单。
         voucherFlow.linkLine(SOURCE_PANEL, ln.no(), ln.key(), ln.dm(), ln.plSl(),
                 TARGET_PANEL, newNo, null, null);
         return newNo;

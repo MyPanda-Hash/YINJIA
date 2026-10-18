@@ -24,6 +24,9 @@ if (sOpen < 0 || tOpen < 0) { console.error('[FATAL] 不是标准 SFC'); process
 
 const script = src.slice(src.indexOf('>', sOpen) + 1, sClose)
 const template = src.slice(tOpen + '<template>'.length, tClose)
+  // ⚠ 先剥掉 HTML 注释:注释里的字样(如 <component :is= 里的 Component)不是模板引用,
+  //   不剥会报假阳性(2026-10-20 合并时踩到)。
+  .replace(/<!--[\s\S]*?-->/g, ' ')
 
 // ① script 语法:转成 CommonJS 供 vm.Script 解析(动态 import() 不受影响)
 const forCheck = script.replace(/^\s*import\s+[^;]*?from\s+['"][^'"]+['"]\s*$/gm, '')

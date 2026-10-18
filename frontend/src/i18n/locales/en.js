@@ -50,6 +50,8 @@ export default {
     "取成型工艺清单": "Fetch from Molding Process Sheet",
     "该产品没有成型工艺清单": "No molding process sheet for this product",
     "取成型工艺清单失败": "Failed to fetch the molding process sheet",
+    "只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。": "Only work-order lines that have reached scheduling (moulding scheduled) are listed; lines without a moulding report are greyed out with the reason.",
+    "该检验单已审核，如需修改请先点「弃审」退回草稿": "This inspection sheet is already approved. To modify it, click 'Unaudit' to return it to draft.",
     "按相关要求：内外径、长度及重量保留小数点后1位": "Per the requirements: inner/outer diameter, length and weight keep 1 decimal place",
     "按相关要求：内外径、长度及重量保留小数点后1位（已取整：{a} → {b}）": "Per the requirements: inner/outer diameter, length and weight keep 1 decimal place (rounded: {a} → {b})",
     "按表显数据记录（不取整）": "Record the value shown on the meter (no rounding)",
@@ -568,6 +570,11 @@ export default {
     // 还没检验就不显示合格数、不再误报「全部合格」)
     '未检验': 'Not inspected yet',
     '三类工序检验单由报工审核自动生成；混料/装箱不出检验单': 'The three process inspection sheets are auto-created on work-report approval; mixing and packing produce none',
+    // ---- 工单追溯·质检段补首件/制程(2026-10-18)----
+    '成型出首件检验单与制程检验单，组装出组装成品检验单；切炭/混料/装箱不出检验单': 'Molding produces the first-article and in-process inspection sheets; assembly produces the finished-goods inspection sheet; cutting, mixing and packing produce none',
+    '首件检验': 'First-article inspection',
+    '制程检验': 'In-process inspection',
+    '组装成品检验': 'Assembly finished-goods inspection',
     // ---- 检验项目/检验方案维护弹窗(QcInspPlanDialog,2026-10-09)----
     '检验项目维护': 'Inspection Items',
     '检验项目/检验方案维护': 'Inspection Items / Plans',
@@ -3619,6 +3626,10 @@ export default {
     '个工单行转领料单': 'work order line(s)?',
     '已生成领料单': 'Pick lists created',
     '材料明细请在材料出库单里补填,审核后自动回写工单领料单号': 'Add the material lines in the material issue slip; the picking no. is written back to the WO after audit',
+    '同一工单行可继续再转多张': 'The same work-order line can have more pick lists',
+    // 2026-10-18 先排产后领料(用户口径):未排入产线的行直接点名拦下,先给出可读提示
+    '以下工单行未排产(未排入产线),请先在「快速排产」排入产线后再转领料单':
+      'These work-order lines are not scheduled (no production line yet); assign a line in Quick Scheduling before creating pick lists',
     '未转成功': 'Not converted',
     '领料单已生成,现在去「材料出库单」补材料明细吗?': 'Pick list(s) created. Open the material issue slip to add material lines now?',
     '去补明细': 'Add lines',
@@ -3808,10 +3819,12 @@ export default {
     '排线跑完(路线各道均达标)即完工': 'Finishing the line-up (every operation met) completes the order',
     '续序轨迹:第一道未达标 = 当前该做的道':
       'Sequence trail: the first operation not yet met is the one to work on',
-    '本批第一张报工审核后自动出草稿': 'The first approved job report of the batch creates a draft',
-    '成型工序产出检验数据:人工开单填写': 'Moulding output inspection data: opened and filled in manually',
-    '组装报工审核自动生成;表头「合格数量」必填':
-      'Created automatically when an assembly job report is approved; the header "passed qty" is required',
+    '成型累计报工达计划量后自动出草稿':
+      'A draft is created automatically once moulding reported qty reaches the planned qty',
+    '成型达计划量自动出草稿(也可人工开单)':
+      'A draft is created automatically when moulding reaches the planned qty (manual creation also allowed)',
+    '组装累计报工达计划量后自动生成;表头「合格数量」必填':
+      'Created automatically once assembly reported qty reaches the planned qty; the header "passed qty" is required',
     '检验不合格的数量转不良品处理单草稿': 'Rejected qty turns into a nonconforming handling draft',
     '审核通过按表头「合格数量」生成草稿;仓库审核后记库存流水并回写工单':
       'Approval creates a draft with the header "passed qty"; warehouse approval posts the stock ledger and writes back to the work order',

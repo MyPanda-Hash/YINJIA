@@ -1506,15 +1506,15 @@
         <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
-    <!-- ⚠ v-if="panelAlive" + **不 append 到 body**(2026-10-20 第三轮,用户报「还是两次」的根因):
-         keep-alive 下每个页签一份 PanelxList 实例;弹窗原先 `append-to-body` 挂到 <body>,
-         而**失活的实例不会再渲染** ⇒ onDeactivated 里 `queryDialogVisible=false` 对它已经
-         teleport 出去的 DOM 不生效 —— 弹窗原样留在屏幕上。于是「台账弹窗开着 → 点收发存汇总」
-         会出现**两个「查询」弹窗**(实测标题 ["查询","查询"])。
-         去掉 append-to-body 后弹窗 DOM 在组件自己的子树里,keep-alive 失活时整棵子树被移走,
-         自然不可见(不依赖任何重渲染)。裁切方面无影响:Element Plus 的 .el-overlay 是
-         position:fixed,而 .portal-content 的 overflow:auto 不裁剪 fixed 定位元素
-         (链路里也没有 transform/filter/perspective)。 -->
+    <!-- ⚠ 不加 append-to-body + v-if="panelAlive"(2026-10-20 合并两处同源修复):
+         根因:PortalLayout 用 `<component :is="Component" :key="route.path">` + keep-alive ⇒ 每个面板
+         路径一份实例;而「库存台账」「收发存汇总」都是 metadata.reportQueryDialog 面板,进页面各自
+         自动弹这个「查询」窗。append-to-body 会把遮罩挂到 body,**脱离 keep-alive 实例**,
+         实例失活时 onDeactivated 置 queryDialogVisible=false 也收不走它(失活实例不再渲染)
+         ⇒ 切换面板后两份遮罩叠在一起(实测 标题 ["查询","查询"] / z-index 2115、2121 同时可见),
+         背景发黑、像弹了两层窗。留在组件内渲染,遮罩就随实例一起隐藏。
+         本地额外保留 `v-if="panelAlive"`(实例私有的 instanceActive)作为双保险 ——
+         万一将来谁把 append-to-body 加回来,失活实例也不会渲染自己的弹窗。 -->
     <el-dialog v-if="panelAlive" v-model="queryDialogVisible" :title="tt('查询')" width="760px" destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
@@ -7373,7 +7373,7 @@ function addInlineDetailRow(b) {
  * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
  * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
  */
-function openPickedProcInsp(res) {
+async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
   const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
@@ -7383,13 +7383,43 @@ function openPickedProcInsp(res) {
     ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
     : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
   if (target === panelCode.value) {
-    load()                       // 同面板:新草稿按创建时间倒序排在第一张
+    // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
+    //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。
+    //   脏单时 guardPageAction 只弹三态窗并返回,真正的切单在 onLeaveChoice 里执行。
+    await guardPageAction(async () => {
+      await openDocByNo(no)
+      // 命中已审核的旧单时表单是只读的(用户会以为"填不进去"),明确提示先弃审
+      if (String(cur.value?.['单据状态'] || '') === '已审核') {
+        ElMessage.info(tt('该检验单已审核，如需修改请先点「弃审」退回草稿'))
+      }
+    })
     return
   }
   const targetPath = `/panelx/list/${target}`
   tabs.close(route.path)
-  router.push(targetPath)
   tabs.open({ path: targetPath, title: target })
+  // 跨面板同样要**打开那张单**(不是只落到列表):目标页用 ?docNo= 定位(applyDocNoQuery 既有机制)
+  router.push({ path: targetPath, query: { docNo: no } })
+}
+
+/**
+ * 在同一面板内把当前单据切到指定单号(2026-10-18)。
+ *
+ * <p>先按当前筛选刷新并找;找不到(被关键字/条件挡掉)再按 `_docNo` 定位一次,
+ * 定位完**立刻撤掉该条件**,避免筛选粘住后续的查询/刷新。</p>
+ */
+async function openDocByNo(no) {
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  let i = list.value.findIndex((r) => String(r['单据编号'] || r['编号'] || '') === String(no))
+  if (i < 0) {
+    condition['_docNo'] = String(no)
+    await load()
+    delete condition['_docNo']
+    i = list.value.findIndex((r) => String(r['单据编号'] || r['编号'] || '') === String(no))
+  }
+  curIdx.value = i >= 0 ? i : 0
 }
 
 /**

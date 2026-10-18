@@ -140,7 +140,7 @@ flowchart TD
     BG -->|"审核：切炭『直销数量』>0 自动建单并审核"| FI["产成品入库单 FINISH_IN ★动库存"]
     QA -->|"审核：合格数 = 报工数 − Σ不合格数"| FI
     QA -->|"审核：组装"| FS["成品检验规范 QC_FIN_SPEC"]
-    MO -->|"转领料单(按 工单号#行号)"| CLI["材料出库单 MATERIAL_OUT ★动库存"]
+    MO -->|"转领料单(排产入线后,按 工单号#行号,可多张)"| CLI["材料出库单 MATERIAL_OUT ★动库存"]
     CLI --> KC3["kucun + outh 流水(src=6)"]
     FI --> KC4["kucun + inh 流水(src=2)"]
   end
@@ -165,7 +165,7 @@ flowchart TD
 | 5 | 生产执行(五道工序) | 工序报工单 `WO_REPORT` | 数据落**单表 `scjl`**(按 报工单号；`gd_id`→`plang_pc.id` 锚定工单行)，审核写 `wgzt='Y'`+`wgsj` | 【已验证】`WoReportService` |
 | 6 | 工序质检 | 报工单审核 | 自动生成 `QC_MOLD_INSP`(成型)/`QC_CUT_INSP`(切炭)/`QC_ASM_INSP`(组装成品)草稿；混料、装箱**不出**检验单；组装另生成 `QC_FIN_SPEC` | 【已验证】`ButtonService.woInspGenerate`；测试库有 3 条 ACTIVE 占用链 |
 | 7 | 成品入库 | 切炭报工「直销数量」>0 → 自动建 `FINISH_IN` **并审核入账**；组装成品检验审核 → 建 `FINISH_IN` **草稿**(留给仓库审) | 两条路径都写 `加工单号`+`工单行号`+`批次号` | 【已验证】`dualOutFinishIn` / `asmInspToStock` |
-| 8 | 领料出库 | 生产工单列表「转领料单」(勾行) | `WorkOrderPickingService` 按 **工单号#工单行号** 建 `MATERIAL_OUT` **只转单头**，材料行由仓库按实发补 | 【已验证】代码；无 BOM 可用(自建 BOM 2026-10-04 下架) |
+| 8 | 领料出库 | 生产工单列表「转领料单」(勾行) | `WorkOrderPickingService` 按 **工单号#工单行号** 建 `MATERIAL_OUT` **只转单头**，材料行由仓库按实发补；**前置=该行已排产入线**(2026-10-18)，同一工单行**可开多张**，审核后 `ll_no2` 回写该行全部单号 | 【已验证】代码；无 BOM 可用(自建 BOM 2026-10-04 下架) |
 | 9 | 材料入库(采购链) | 采购订单 → 送料暂收单 → (检验 / 免检) → 采购入库单 | 见 §3；真正入库过账在 `PURCHASE_IN` 审核 | 【已验证】 |
 | 10 | 出货 | 销售订单 → 销售出库单(生单/选单) | `SALE_OUT` 审核出库过账 | 【已验证】 |
 | 11 | 回传 ERP | 采购入库单 / 销售出库单 / 材料出库单 的「转ERP / 批量转ERP」 | `KingdeePushService`：`PURCHASE_IN→/jdy/v2/scm/pur_inbound`、`SALE_OUT→sal_out_bound`、`MATERIAL_OUT→inv_pick`(金蝶「生产领料单」)；**产成品入库单无转ERP按钮** | 【已验证】`KingdeePushService` + `PANDA_BUTTONS` |
@@ -201,7 +201,7 @@ flowchart TD
 | 生产工单 `MANU_ORDER` | 生成产成品入库单 | `FINISH_IN` | 通用 |
 | **送料暂收单 `QC_RECV`** | **生成检验或入库单** | 按行分流到 `QC_INSP` / `PURCHASE_IN` | **`QcRecvGenerateHandler`**：按 `bs_inv` 的检验标志逐行判，两组各出一张草稿 |
 | 来料检验单 `QC_INSP` | 生成采购入库单 / 生成暂收退回单 | 按钮组里保留，但**实际生单在审核钩子**里 | 见 §3.3 |
-| 生产工单列表页 | 转领料单 | `MATERIAL_OUT`(仅单头) | `WorkOrderPickingService`，标识=工单号#行号 |
+| 生产工单列表页 | 转领料单 | `MATERIAL_OUT`(仅单头) | `WorkOrderPickingService`，标识=工单号#行号；**先排产后领料**(要求 scx 非空 + 排产数量>0)，同一工单行**可开多张**(2026-10-18) |
 
 **已下架的生单链（不可用，别再引用）**：`WO_ORDER|生成领料单`→材料出库单(随 BOM 2026-10-04 下架)、
 `生产工单|生成采购申请`→请购单(同上)、`请购单|生成采购订单`、`采购订单|生成采购入库单`(免检直达，2026-09-22 取消)、
