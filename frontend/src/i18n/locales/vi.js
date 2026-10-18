@@ -69,6 +69,7 @@ export default {
     "请填写强制开单原因": "Vui lòng nhập lý do buộc tạo",
     "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "Công đoạn tạo hình của dòng lệnh này chưa được báo cáo. Vẫn tạo phiếu kiểm tra?",
     "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Chỉ dòng lệnh đã báo cáo công đoạn tạo hình mới tạo được phiếu kiểm tra; dòng bị làm mờ sẽ ghi rõ lý do.",
+    "只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。": "Chỉ hiển thị các dòng lệnh đã được lập kế hoạch (đã lập kế hoạch tạo hình); các dòng chưa báo cáo tạo hình sẽ bị làm mờ kèm lý do.",
     "成型完工量": "SL tạo hình hoàn thành",
     "成型计划量": "SL tạo hình kế hoạch",
     "可开单": "Có thể tạo",

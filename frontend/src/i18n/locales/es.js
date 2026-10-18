@@ -69,6 +69,7 @@ export default {
     "请填写强制开单原因": "Introduzca el motivo de la creación forzada",
     "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "La operación de moldeo de esta línea aún no se ha reportado. ¿Crear la hoja de todos modos?",
     "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Solo las líneas de orden cuya operación de moldeo esté reportada pueden crear la hoja de inspección; las líneas en gris indican el motivo.",
+    "只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。": "Solo se muestran las líneas de orden ya programadas (moldeo programado); las líneas sin reporte de moldeo aparecen en gris con el motivo.",
     "成型完工量": "Cantidad de moldeo completada",
     "成型计划量": "Cantidad de moldeo planificada",
     "可开单": "Se puede crear",

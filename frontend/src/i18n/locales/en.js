@@ -73,6 +73,7 @@ export default {
     "取成型工艺清单": "Fetch from Molding Process Sheet",
     "该产品没有成型工艺清单": "No molding process sheet for this product",
     "取成型工艺清单失败": "Failed to fetch the molding process sheet",
+    "只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。": "Only work-order lines that have reached scheduling (moulding scheduled) are listed; lines without a moulding report are greyed out with the reason.",
     "按相关要求：内外径、长度及重量保留小数点后1位": "Per the requirements: inner/outer diameter, length and weight keep 1 decimal place",
     "按相关要求：内外径、长度及重量保留小数点后1位（已取整：{a} → {b}）": "Per the requirements: inner/outer diameter, length and weight keep 1 decimal place (rounded: {a} → {b})",
     "按表显数据记录（不取整）": "Record the value shown on the meter (no rounding)",

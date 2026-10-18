@@ -80,7 +80,11 @@ public class QcFirstInspController {
         return ApiResult.ok(out);
     }
 
-    /** 可选的生产工单行(未作废、未结案;ja Y/T 皆属结案口径)。与制程检验单同一套取数口径。 */
+    /**
+     * 可选的生产工单行:**已排产入线**、未作废、未结案(ja Y/T 皆属结案口径);
+     * 有预排台账的行还要求成型那道已排(见 {@link com.yinjia.mes.service.WoInspGate#pickable})。
+     * 与制程检验单同一套取数口径。
+     */
     @GetMapping("/woLines")
     public ApiResult<Map<String, Object>> woLines(@RequestParam(required = false) String keyword,
                                                   @RequestParam(defaultValue = "1") int pageNo,
@@ -90,8 +94,11 @@ public class QcFirstInspController {
         int size = Math.max(1, Math.min(200, pageSize));
         int page = Math.max(1, pageNo);
 
+        // 只列「至少排产完成」的工单行(2026-10-18 用户口径;条件与制程检验单共用
+        // WoInspGate.pickable —— 两个入口禁止各写一份)。
         StringBuilder where = new StringBuilder(" WHERE ISNULL(p.asp_cancel,'N')<>'Y'"
-                + " AND " + com.yinjia.mes.service.PlangClose.notClosed("p") + "");
+                + " AND " + com.yinjia.mes.service.PlangClose.notClosed("p") + ""
+                + com.yinjia.mes.service.WoInspGate.pickable("p"));
         List<Object> args = new ArrayList<>();
         if (!kw.isEmpty()) {
             where.append(" AND (p.pl_no LIKE ? OR ISNULL(p.dm,'') LIKE ? OR ISNULL(p.mc,'') LIKE ?)");
