@@ -32,7 +32,9 @@ import java.util.Map;
  * <h3>它做什么</h3>
  * 扫描 {@code scjl} 里「外部直写」的完工行 → <b>不做审核、不校验封顶</b>(数据已是既成事实,
  * 超产也照收)→ ① 定位工单行(三级锚)② 补镜像(**只补空值**,不覆盖手机端已写内容)→
- * ③ 推进 {@code plang.当前工序/完工状态} → ④ 走与报工审核**完全相同**的转序派线。
+ * ③ 推进 {@code plang.当前工序/完工状态} → ④ 走与报工审核**完全相同**的转序派线 →
+ * ⑤ **按报工量出检验单**(2026-10-18):该工序累计已报工 ≥ 该道计划量即生成对应检验单草稿
+ * (成型 → 首件 + 制程;组装 → 组装成品),见 {@link QcInspAutoService}。
  *
  * <h3>幂等</h3>
  * 无需标记表:补镜像只补空值;状态推进是重算;转序按台账状态机(计划→已落实)推进,
@@ -63,6 +65,8 @@ public class ExternalReportAbsorbService {
 
     private final JdbcTemplate jdbc;
     private final ProcessTaskService processTask;
+    /** 检验单数据驱动出单(成型/组装累计报工达计划量即出草稿;2026-10-18) */
+    private final ButtonService buttonService;
     /** 逐行事务(REQUIRES_NEW):一行一个事务,避免长事务跨行持锁,见 {@link #absorb(Integer, String, boolean)} */
     private final org.springframework.transaction.support.TransactionTemplate rowTx;
 
@@ -84,9 +88,11 @@ public class ExternalReportAbsorbService {
             });
 
     public ExternalReportAbsorbService(JdbcTemplate jdbc, ProcessTaskService processTask,
+                                       ButtonService buttonService,
                                        org.springframework.transaction.PlatformTransactionManager txManager) {
         this.jdbc = jdbc;
         this.processTask = processTask;
+        this.buttonService = buttonService;
         this.rowTx = new org.springframework.transaction.support.TransactionTemplate(txManager);
         this.rowTx.setPropagationBehavior(
                 org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -177,6 +183,16 @@ public class ExternalReportAbsorbService {
             if (Boolean.TRUE.equals(one.get("已吸收"))) {
                 done++;
                 absorbedIds.add(scjlId);
+                // 检验单(2026-10-18 用户口径「只要报工数量达到要求就进入下一步」):
+                //   在本行吸收事务**提交之后**再出单 —— 判据/单头组装在 QcInspAutoService,
+                //   同一条数据既喂转序也喂检验单。失败只记回执,不推翻已提交的吸收。
+                try {
+                    one.put("检验单", buttonService.generateInspFromReportRow(scjlId, u));
+                } catch (Exception e) {
+                    one.put("检验单", "生成失败:" + e.getMessage());
+                    log.warn("[手机端报工吸收] scjl.id={} 检验单生成失败(吸收已保留):{}",
+                            scjlId, e.getMessage());
+                }
             } else if (String.valueOf(one.get("原因")).startsWith("吸收失败")) failed++;
             else if (!String.valueOf(one.get("原因")).startsWith("该行正被其它程序锁定")) skipped++;
         }

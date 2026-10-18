@@ -3816,10 +3816,12 @@ export default {
     '排线跑完(路线各道均达标)即完工': 'Finishing the line-up (every operation met) completes the order',
     '续序轨迹:第一道未达标 = 当前该做的道':
       'Sequence trail: the first operation not yet met is the one to work on',
-    '本批第一张报工审核后自动出草稿': 'The first approved job report of the batch creates a draft',
-    '成型工序产出检验数据:人工开单填写': 'Moulding output inspection data: opened and filled in manually',
-    '组装报工审核自动生成;表头「合格数量」必填':
-      'Created automatically when an assembly job report is approved; the header "passed qty" is required',
+    '成型累计报工达计划量后自动出草稿':
+      'A draft is created automatically once moulding reported qty reaches the planned qty',
+    '成型达计划量自动出草稿(也可人工开单)':
+      'A draft is created automatically when moulding reaches the planned qty (manual creation also allowed)',
+    '组装累计报工达计划量后自动生成;表头「合格数量」必填':
+      'Created automatically once assembly reported qty reaches the planned qty; the header "passed qty" is required',
     '检验不合格的数量转不良品处理单草稿': 'Rejected qty turns into a nonconforming handling draft',
     '审核通过按表头「合格数量」生成草稿;仓库审核后记库存流水并回写工单':
       'Approval creates a draft with the header "passed qty"; warehouse approval posts the stock ledger and writes back to the work order',

@@ -16,7 +16,7 @@ import java.util.Map;
  * <p><b>链路</b>(与用户口径一字不差地照做):
  * <ol>
  *   <li>首件检验单**绑工单号**(+工单行号)——出单时照抄报工单,见
- *       {@code ButtonService.firstInspGenerate};</li>
+ *       {@code QcInspAutoService}(成型达计划量自动出单,报工审核与手机端吸收共用);</li>
  *   <li>生产批号是**完工那一刻**定下来的 —— 见 {@link ProcessTaskService} 的
  *       {@code assignProductionBatch}(工单行首次进入 {@code 完工状态='生产完工'} 时
  *       写 {@code plang.批次号}(空则取当天 yyyyMMdd),并同步到排产行/工序任务/报工行);</li>

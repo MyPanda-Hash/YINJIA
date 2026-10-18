@@ -27,8 +27,8 @@ import java.util.Map;
  * 首件检验单(QC_FIRST_INSP)专用入口。
  *
  * <p><b>① 取成型工艺清单</b>(2026-10-15 用户口径「检验方式参考成型工艺清单内的检验要求进行编写」):
- * 报工审核自动出单时已经按《成型工艺清单》RD_MOLD_PROC 预铺过检验项目(见
- * {@code ButtonService.firstInspGenerate});本接口是**同一个来源的手动入口** —— 工艺清单当时还没维护、
+ * 自动出单(成型达计划量)时已经按《成型工艺清单》RD_MOLD_PROC 预铺过检验项目(见
+ * {@code QcInspAutoService});本接口是**同一个来源的手动入口** —— 工艺清单当时还没维护、
  * 或者后来改了,品质在单上按产品编码重新带入一次即可。
  * 字段映射与 {@link FirstInspItems} 同一份实现(不复制粘贴);查不到不算错:返回 200 +
  * 按图纸恒铺的 10 列 + {@code moldProcNo=null},由前端给「该产品没有成型工艺清单」的话术。</p>
@@ -134,8 +134,8 @@ public class QcFirstInspController {
 
     /**
      * 按生产工单行生成一张首件检验单**草稿**:表头带 工单号/工单行号/产品/批次/产线/客户,
-     * 明细按《成型工艺清单》(RD_MOLD_PROC)预铺 —— 与报工审核自动出单(ButtonService.firstInspGenerate)
-     * 同一份实现,故手工建的单与自动出的单长得一样。
+     * 明细按《成型工艺清单》(RD_MOLD_PROC)预铺 —— 与自动出单(QcInspAutoService)同一份实现,
+     * 故手工建的单与自动出的单长得一样。
      *
      * <p><b>生产日期刻意留空</b>:按 2026-10-16 第二轮口径,它由「工单第一批完工」时回填
      * (见 {@code FirstInspBackfill}),出单时不写死今天。</p>

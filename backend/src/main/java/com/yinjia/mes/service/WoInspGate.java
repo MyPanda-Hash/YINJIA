@@ -48,7 +48,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>调用方(四处共用同一判据,禁止各写一份):{@code QcProcInspController}、
  * {@code QcFirstInspController} 的 {@code woLines/fromWoLine},以及
- * {@code ButtonService.woInspGenerate / firstInspGenerate} 两个自动出单钩子。</p>
+ * {@code ButtonService.woInspGenerate} 报工审核出单钩子(判据与单头组装在 {@link QcInspAutoService};
+ * 手机端直写走 {@code ExternalReportAbsorbService} → 同一个 build)。</p>
  */
 public final class WoInspGate {
 

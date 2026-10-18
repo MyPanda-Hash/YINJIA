@@ -148,7 +148,7 @@ export const CHAINS = [
               { label: '草稿', ref: 'nodes.QC_FIRST_INSP.draft' },
             ],
             block: ['nodes.QC_FIRST_INSP.pending'],
-            note: '本批第一张报工审核后自动出草稿',
+            note: '成型累计报工达计划量后自动出草稿',
           },
           {
             key: 'procinsp', name: '制程检验单(成型产出)', code: 'QC_PROC_INSP', route: '/panelx/list/QC_PROC_INSP',
@@ -160,7 +160,7 @@ export const CHAINS = [
             ],
             block: ['nodes.QC_PROC_INSP.pending'],
             warn: ['nodes.QC_PROC_INSP.ngQty'],
-            note: '成型工序产出检验数据:人工开单填写',
+            note: '成型达计划量自动出草稿(也可人工开单)',
           },
           {
             key: 'asminsp', name: '组装成品检验单', code: 'QC_ASM_INSP', route: '/panelx/list/QC_ASM_INSP',
@@ -172,7 +172,7 @@ export const CHAINS = [
             ],
             block: ['nodes.QC_ASM_INSP.pending'],
             warn: ['nodes.QC_ASM_INSP.ngQty'],
-            note: '组装报工审核自动生成;表头「合格数量」必填',
+            note: '组装累计报工达计划量后自动生成;表头「合格数量」必填',
           },
           {
             key: 'ngtreat', name: '不合格品处理单(制程)', code: 'QC_BHC', route: '/panelx/list/QC_BHC',
