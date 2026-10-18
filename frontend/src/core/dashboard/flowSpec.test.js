@@ -9,7 +9,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { CHAINS, LEVEL_TEXT, allNodes, chainSummary, fmtNum, get, levelOf, metricsOf } from './flowSpec.js'
+import { CHAINS, LEVEL_TEXT, allNodes, chainSummary, fmtNum, get, levelOf, metricsOf, routeOf } from './flowSpec.js'
 
 const svc = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/FlowBoardService.java', import.meta.url), 'utf8')
 
@@ -119,4 +119,33 @@ test('排产与领料:排产三节点必须排在「材料出库单」之前(先
   assert.match(matout.note, /排产入线后才放行/)
   assert.match(matout.note, /一张工单行可开多张/)
   assert.doesNotMatch(matout.note, /去重生成/)
+})
+
+test('当前卡点跳转:页面级面板必须走专页路由,不能拼成 /panelx/list/<code>', () => {
+  // 2026-10-18 报障:「当前这上方的卡点转跳页面好像有问题,转跳的内容是……旧的生产工单」——
+  //   气泡只传了 panelCode,前端一律拼 /panelx/list/<code>;而 ORDER_CONVERT / SCHEDULE_BOARD /
+  //   WORK_ORDER_BOARD / WORK_ORDER_LIST 是**页面级**面板(yj_panel 无行)⇒ 落到空白面板壳。
+  //   规格里节点声明的 route 才是唯一真源,routeOf() 就取它。
+  const pagePanels = ['ORDER_CONVERT', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'WORK_ORDER_LIST']
+  for (const code of pagePanels) {
+    const route = routeOf(code)
+    assert.ok(route && route.startsWith('/prod/plan/'), `${code} 是页面级面板,必须跳专页,实际 ${route}`)
+  }
+  assert.equal(routeOf('ORDER_CONVERT'), '/prod/plan/orderConvert')
+  assert.equal(routeOf('WORK_ORDER_LIST'), '/prod/plan/workOrderList')
+  assert.equal(routeOf('SCHEDULE_BOARD'), '/prod/plan/scheduleBoard')
+  assert.equal(routeOf('WORK_ORDER_BOARD'), '/prod/plan/workOrderBoard')
+  assert.equal(routeOf('FINISH_IN'), '/panelx/list/FINISH_IN', '普通面板仍走面板路径')
+  assert.equal(routeOf(''), null)
+
+  // 服务端 blocks() 真正会产出的 panelCode 清单(读源码,防契约漂):每一个都必须有可跳转路由
+  const blockCodes = [...svc.matchAll(/add\(out,\s*"[^"]+",\s*"[^"]+",\s*[^,]+,\s*"([A-Z_]+)"/g)].map((m) => m[1])
+  assert.ok(blockCodes.length >= 8, `未从 FlowBoardService.blocks 解析到卡点面板清单,实际 ${blockCodes.length}`)
+  for (const code of blockCodes) {
+    const route = routeOf(code)
+    assert.ok(route && route.startsWith('/'), `卡点 ${code} 没有可跳转的路由`)
+    if (pagePanels.includes(code)) {
+      assert.ok(route.startsWith('/prod/plan/'), `卡点 ${code} 必须跳专页,实际 ${route}`)
+    }
+  }
 })

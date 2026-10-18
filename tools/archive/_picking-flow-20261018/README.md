@@ -27,6 +27,19 @@
 
 ⇒ 迁移脚本必须**两张表一起加宽**(实测证据:`_q-column-widths.sql`)。
 
+## 追加修复(同日,用户报障「当前卡点转跳」)
+
+用户口径:**「当前这上方的卡点转跳页面好像有问题,转跳的内容是图2的内容,应该是转到旧的生产工单内容了」**。
+
+根因:看板顶部「当前卡点」气泡的点击只传 `panelCode`,前端一律拼 `/panelx/list/<code>`;
+而 **ORDER_CONVERT / SCHEDULE_BOARD / WORK_ORDER_BOARD / WORK_ORDER_LIST 是页面级面板**
+(`yj_panel` 里没有行,它们是专页)⇒ 落到一个空白的面板壳(工具栏 + 「第 0 张」,即用户图 2)。
+
+修法:新增 `routeOf(code)`(**节点声明的 `route` 是唯一真源**),气泡与泳道节点统一走它;
+兜底仍退回面板路径。钉子在 `flowSpec.test.js`「当前卡点跳转」一条(还会读
+`FlowBoardService.blocks` 的源码把 panelCode 清单扫出来逐个校验,防以后新增卡点漏配)。
+取证:`_probe-flow-block-jump.mjs` —— 5173 与 8090 各 **15/15**。
+
 ## 验证结果
 
 | 探针 | 结果 | 说明 |
@@ -34,8 +47,9 @@
 | `_api-picking-flow.mjs` | **13/13** | 未排产行 409 且提示点明;已排产行连转两张 `CL-2026-10-0070/0071`;单头 加工单号/工单行号/备注「第 N 张」全对 |
 | `_api-audit-picks.mjs` + `_q-verify-ll-no2.sql` | 通过 | 两张探针单审核后 `plang.ll_no2 = plang_pc.ll_no2 = "CL-2026-10-0071,CL-2026-10-0070"`(31 字符) |
 | `_api-cleanup-picks.mjs` | 通过 | 弃审 + 删除后回写重算回空(测试账套已清理干净) |
-| `_probe-flow-board.mjs` | **8/8** | 5173 实渲染:泳道名 = 排产与领料;节点顺序 = 快速排产 → 工单排产/预排线 → 产线排产负荷 → 材料出库单;箭头文案与节点说明;截图 `flow-board.png` |
-| `frontend` 单测 | 8/8 | `node --test src/core/dashboard/flowSpec.test.js`(新增「排产三节点必须在材料出库单之前」) |
+| `_probe-flow-board.mjs` | **8/8** | 5173/8090 实渲染:泳道名 = 排产与领料;节点顺序 = 快速排产 → 工单排产/预排线 → 产线排产负荷 → 材料出库单;箭头文案与节点说明;截图 `flow-board.png` |
+| `_probe-flow-block-jump.mjs` | **15/15**(5173/8090 各一遍) | 四个卡点气泡分别落到 `/prod/plan/orderConvert`、`/prod/plan/scheduleBoard`、`/prod/plan/workOrderList`、`/panelx/list/FINISH_IN`,且目标页根节点在(不是空白面板壳) |
+| `frontend` 单测 | 9/9 | `node --test src/core/dashboard/flowSpec.test.js`(新增「排产三节点必须在材料出库单之前」「当前卡点跳转走专页路由」) |
 | `DbSync` | 两账套均「执行 1、失败 0」,复跑「执行 0」 | 正式 `HSDZ_MES` + 测试 `HSDZ_MES_TEST` |
 
 ## 怎么重跑
@@ -44,8 +58,9 @@
 # 接口(只写测试账套;--cleanup 传了才删探针单)
 node tools/archive/_picking-flow-20261018/_api-picking-flow.mjs [--cleanup]
 
-# 界面(需 5173 + 8090 都在跑)
+# 界面(需 5173 + 8090 都在跑;MES_UI 可切实例)
 node tools/archive/_picking-flow-20261018/_probe-flow-board.mjs
+MES_UI=http://127.0.0.1:8090 node tools/archive/_picking-flow-20261018/_probe-flow-block-jump.mjs
 
 # 审核/回写实测(会改测试账套数据,结束后用 cleanup 收拾)
 node tools/archive/_picking-flow-20261018/_api-audit-picks.mjs CL-2026-10-00xx …

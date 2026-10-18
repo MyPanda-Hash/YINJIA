@@ -13,7 +13,9 @@
 -->
 <template>
   <div class="flow-board">
-    <!-- ① 当前卡点:按量降序,点一下直达面板 -->
+    <!-- ① 当前卡点:按量降序,点一下直达该页面/面板
+         ⚠ 跳转路由必须走 routeOf():ORDER_CONVERT/SCHEDULE_BOARD/WORK_ORDER_BOARD/WORK_ORDER_LIST
+           是**页面级**面板(yj_panel 无行),按 /panelx/list/<code> 跳会落进空白面板壳。 -->
     <section class="card fb-blocks" :class="{ empty: !blocks.length }">
       <div class="fb-head">
         <span class="fb-title">{{ tt('当前卡点') }}</span>
@@ -28,7 +30,7 @@
           class="fb-chip"
           :class="b.level === 'block' ? 'is-block' : 'is-warn'"
           :title="tt(b.hint)"
-          @click="go(b.panelCode)"
+          @click="go(routeOf(b.panelCode), b.panelCode)"
         >
           <span class="fb-chip-dot" aria-hidden="true"></span>
           <span class="fb-chip-name">{{ tt(b.name) }}</span>
@@ -93,7 +95,7 @@
 </template>
 
 <script setup>
-import { CHAINS, LEVEL_TEXT, fmtNum, levelOf, metricsOf } from '@core/dashboard/flowSpec'
+import { CHAINS, LEVEL_TEXT, fmtNum, levelOf, metricsOf, routeOf } from '@core/dashboard/flowSpec'
 import { tt } from '@/i18n'
 
 const props = defineProps({
