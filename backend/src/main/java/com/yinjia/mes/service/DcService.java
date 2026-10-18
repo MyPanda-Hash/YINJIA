@@ -434,7 +434,7 @@ public class DcService {
                 m.put("deviceType", r.get("device_type"));
                 m.put("online", isOnline(r));
                 m.put("effectiveStatus", effectiveStatus(r));
-                m.put("lastSeenAt", r.get("last_seen_at"));
+                m.put("lastSeenAt", wallClock(r.get("last_seen_at")));
                 m.put("points", new ArrayList<Map<String, Object>>());
                 m.put("alarmOpen", 0);
                 return m;
@@ -796,6 +796,12 @@ public class DcService {
 
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /** 时间列按本地墙钟字符串下发(Timestamp 直传会被序列化成 UTC,界面早 8 小时)。 */
+    private static String wallClock(Object o) {
+        LocalDateTime t = toLocal(o);
+        return t == null ? null : t.withNano(0).toString();
     }
 
     private static boolean blank(Object o) {

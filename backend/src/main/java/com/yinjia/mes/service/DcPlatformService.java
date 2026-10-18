@@ -102,7 +102,9 @@ public class DcPlatformService {
         d.put("enabled", "Y".equalsIgnoreCase(str(row.get("enabled"))));
         d.put("online", Boolean.TRUE.equals(row.get("online")));
         d.put("status", str(row.get("effectiveStatus")));
-        d.put("lastSeenAt", row.get("last_seen_at"));
+        // 墙钟字符串(2026-10-18):直传 java.sql.Timestamp 会被序列化成 UTC(界面显示早 8 小时),
+        // 与采集点 at / serverTime 的本地墙钟口径统一
+        d.put("lastSeenAt", wallClock(row.get("last_seen_at")));
         d.put("checks", row.get("checks"));
         d.put("configured", Boolean.TRUE.equals(row.get("configured")));
         d.put("progress", Math.round(done * 100f / total));
@@ -129,7 +131,7 @@ public class DcPlatformService {
         g.put("remark", str(row.get("remark")));
         g.put("status", "online".equalsIgnoreCase(str(row.get("status"))));
         g.put("enabled", "Y".equalsIgnoreCase(str(row.get("enabled"))));
-        g.put("lastSeenAt", row.get("last_seen_at"));
+        g.put("lastSeenAt", wallClock(row.get("last_seen_at")));
         g.put("keySet", intValue(row.get("key_set")) > 0);
         g.put("deviceCount", intValue(row.get("device_count")));
         return g;
@@ -263,7 +265,7 @@ public class DcPlatformService {
             v.put("online", Boolean.TRUE.equals(row.get("online")));
             v.put("status", str(row.get("effectiveStatus")));
             v.put("progress", Math.round(intValue(row.get("doneCount")) * 100f / total));
-            v.put("lastSeenAt", row.get("last_seen_at"));
+            v.put("lastSeenAt", wallClock(row.get("last_seen_at")));
             v.put("alarmOpen", intValue(row.get("alarm_open")));
             devices.add(v);
             rawById.put(id, row);
@@ -677,5 +679,16 @@ public class DcPlatformService {
         } catch (RuntimeException ex) {
             return null;
         }
+    }
+
+    /**
+     * 时间列统一按**本地墙钟字符串**下发(2026-10-18):直接 put 查询出来的
+     * java.sql.Timestamp 会被 Jackson 序列化成 UTC 带 +00:00,前端原样显示就早 8 小时
+     * (实测「最近上报 2026-10-18 08:52」而上报时间其实是 16:52)。采集点 at、serverTime
+     * 一直是墙钟串,这里对齐同一口径。
+     */
+    private static String wallClock(Object v) {
+        LocalDateTime t = toLocal(v);
+        return t == null ? null : t.withNano(0).toString();
     }
 }
