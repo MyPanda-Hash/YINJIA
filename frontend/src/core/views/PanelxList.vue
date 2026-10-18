@@ -836,6 +836,11 @@
                      —— 不做 warn 词判定,服务端按 add/modify 在 /px/callButton 侧校验。 -->
                 <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
               </template>
+              <!-- 条码面板的单号列:点击弹窗(复制编号 / 查看对应单据;跳转受面板查看权限限制) -->
+              <span v-else-if="barcodeDocProp && column.prop === barcodeDocProp"
+                    class="doc-no-link"
+                    :title="tt('点击查看或复制编号')"
+                    @click.stop="openDocNoDialog(row, column.prop)">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -2141,6 +2146,22 @@
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <QrLabelDialog v-model="qrVisible" :labels="qrLabels" :title="qrDialogTitle" :tip="qrDialogTip" />
+    <!-- 单号弹窗(条码三面板):复制编号 / 查看对应单据 —— 后者受**面板查看权限**限制,无权限置灰不跳 -->
+    <el-dialog v-model="docNoDlg.visible" :title="tt('单据编号')" width="420px" append-to-body>
+      <div class="doc-no-dlg-row">
+        <span class="doc-no-dlg-label">{{ tt('编号') }}</span>
+        <span class="doc-no-dlg-value">{{ docNoDlg.no }}</span>
+      </div>
+      <div class="doc-no-dlg-row">
+        <span class="doc-no-dlg-label">{{ tt('来源') }}</span>
+        <span class="doc-no-dlg-value">{{ tt(docNoDlg.title) }}</span>
+      </div>
+      <div v-if="!docNoDlg.allowed" class="doc-no-dlg-tip">{{ tt('无查看该面板的权限') }}:{{ tt(docNoDlg.title) }}</div>
+      <template #footer>
+        <el-button @click="copyDocNo">{{ tt('复制编号') }}</el-button>
+        <el-button type="primary" :disabled="!docNoDlg.allowed" @click="gotoDocNo">{{ tt('查看单据') }}</el-button>
+      </template>
+    </el-dialog>
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
 
@@ -2333,7 +2354,7 @@ import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
-import { canConfigFields, canConfigWarn } from '@core/auth/panelAccess'
+import { canConfigFields, canConfigWarn, canViewPanel } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
@@ -5344,6 +5365,71 @@ function qrRowKey(row) {
   const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
   return scope ? `${scope}\u0001${k}` : k
 }
+/**
+ * 条码三面板:点「单据编号/报工单号」→ 弹窗(复制编号 / 查看对应单据)。
+ *
+ * 为什么单独做:条码面板是只读报表,行上的编号只证明"码从哪来",用户要么复制去别处查,
+ * 要么直接跳过去看那张单。跳转**必须过面板权限**(canViewPanel,与导航/桌面/产品文件列表同一口径):
+ * 没该面板查看权的人,弹窗里「查看单据」置灰且不发路由,避免"用报表当跳板绕过授权"。
+ */
+const BARCODE_DOC_SRC = {
+  BARCODE_MAT: { panel: 'PURCHASE_IN', prop: '单据编号', title: '采购入库单' },
+  BARCODE_WIP: { panel: 'WO_REPORT', prop: '报工单号', title: '工序报工单' },
+  BARCODE_FIN: { panel: 'FINISH_IN', prop: '单据编号', title: '产成品入库单' },
+}
+const barcodeDocSrc = computed(() => BARCODE_DOC_SRC[String(panelCode.value)] || null)
+/** 该列是否渲染成可点的单号(只有码来源那一列) */
+const barcodeDocProp = computed(() => barcodeDocSrc.value?.prop || '')
+const docNoDlg = ref({ visible: false, no: '', panel: '', title: '', allowed: false })
+
+function openDocNoDialog(row, prop) {
+  const src = barcodeDocSrc.value
+  if (!src || prop !== src.prop) return
+  const no = String(row?.[prop] ?? '').trim()
+  if (!no) return
+  docNoDlg.value = {
+    visible: true,
+    no,
+    panel: src.panel,
+    title: src.title,
+    allowed: canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, src.panel),
+  }
+}
+
+/** 复制编号:优先 Clipboard API(headless/无权限时回退到 textarea + execCommand) */
+async function copyDocNo() {
+  const no = docNoDlg.value.no
+  if (!no) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(no)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = no
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    ElMessage.success(tt('编号已复制'))
+  } catch (e) {
+    ElMessage.error(tt('复制失败') + ':' + (e?.message || ''))
+  }
+}
+
+/** 查看单据:无权限只提示不跳;有权限带 ?focus=单号 直接定位到那张单 */
+function gotoDocNo() {
+  const { no, panel, title, allowed } = docNoDlg.value
+  if (!allowed) {
+    ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(title))
+    return
+  }
+  docNoDlg.value.visible = false
+  router.push({ path: '/panelx/list/' + panel, query: no ? { focus: no } : {} })
+}
+
 /** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
 const qrReportAllChecked = computed(() =>
   reportList.value.length > 0 && reportList.value.every((r) => qrSel.value.has(qrRowKey(r))))
@@ -9739,6 +9825,13 @@ onUnmounted(() => {
   gap: 4px;
   flex-wrap: wrap;
 }
+/* 单号链(条码面板):看起来是链接,但只开弹窗 —— 真跳转要过面板权限,不在这里直连 */
+.doc-no-link { color: var(--el-color-primary); cursor: pointer; text-decoration: underline dotted; }
+.doc-no-link:hover { color: var(--el-color-primary-light-3); }
+.doc-no-dlg-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
+.doc-no-dlg-label { width: 48px; color: var(--el-text-color-secondary); flex: none; }
+.doc-no-dlg-value { word-break: break-all; }
+.doc-no-dlg-tip { margin-top: 10px; color: var(--el-color-warning); font-size: 12px; }
 .toolbar-query-btn {
   display: inline-flex;
   align-items: center;
