@@ -593,6 +593,11 @@ export default {
     // 还没检验就不显示合格数、不再误报「全部合格」)
     '未检验': 'Not inspected yet',
     '三类工序检验单由报工审核自动生成；混料/装箱不出检验单': 'The three process inspection sheets are auto-created on work-report approval; mixing and packing produce none',
+    // ---- 工单追溯·质检段补首件/制程(2026-10-18)----
+    '成型出首件检验单与制程检验单，组装出组装成品检验单；切炭/混料/装箱不出检验单': 'Molding produces the first-article and in-process inspection sheets; assembly produces the finished-goods inspection sheet; cutting, mixing and packing produce none',
+    '首件检验': 'First-article inspection',
+    '制程检验': 'In-process inspection',
+    '组装成品检验': 'Assembly finished-goods inspection',
     // ---- 检验项目/检验方案维护弹窗(QcInspPlanDialog,2026-10-09)----
     '检验项目维护': 'Inspection Items',
     '检验项目/检验方案维护': 'Inspection Items / Plans',

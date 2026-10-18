@@ -164,6 +164,7 @@
         </div>
         <el-table :data="trace['质检数据'] || []" size="small" border max-height="200" :empty-text="tt('暂无检验单')">
           <el-table-column :label="tt('检验单号')" prop="检验单号" width="150" />
+          <el-table-column :label="tt('检验类型')" prop="检验类型" width="110" />
           <el-table-column :label="tt('工序')" prop="工序" width="80" />
           <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
           <el-table-column :label="tt('总结论')" prop="总结论" width="90" />
@@ -179,7 +180,7 @@
           <el-table-column :label="tt('下游单号')" prop="下游单号" width="140" show-overflow-tooltip />
         </el-table>
         <div class="wb-trace-sub">
-          {{ tt('三类工序检验单由报工审核自动生成；混料/装箱不出检验单') }}
+          {{ tt('成型出首件检验单与制程检验单，组装出组装成品检验单；切炭/混料/装箱不出检验单') }}
         </div>
       </div>
 
