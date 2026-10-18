@@ -82,27 +82,31 @@ public class ReportService {
      * </ul>
      */
     private static final Map<String, String> NAV_GROUP = Map.ofEntries(
+            // 一级模块自身(与 menus.js 一级目录同名;库侧 module_group 已由
+            // migrate-role-panel-modules-20261018.sql 归一,这里保留历史别名兜底)
             Map.entry("智能供应链", "智能供应链"),
-            Map.entry("库存核算", "智能供应链"),
-            Map.entry("库存报表", "智能供应链"),
+            Map.entry("库存管理", "库存管理"),
+            Map.entry("生产制造", "生产制造"),
+            Map.entry("品质管理", "品质管理"),
+            Map.entry("研发管理", "研发管理"),
+            Map.entry("数据建模", "数据建模"),
+            Map.entry("系统管理平台", "系统管理平台"),
+            // 历史碎值 → 现值(2026-10-18 导航改版:库存三组独立成「库存管理」、基础档案改名「系统管理平台」)
+            Map.entry("库存核算", "库存管理"),
+            Map.entry("库存报表", "库存管理"),
+            Map.entry("条码管理", "库存管理"),
             Map.entry("采购管理", "智能供应链"),
             Map.entry("订单管理", "智能供应链"),
             Map.entry("销售管理", "智能供应链"),
-            Map.entry("生产制造", "生产制造"),
             Map.entry("生产管理", "生产制造"),
             Map.entry("委外加工", "生产制造"),
-            Map.entry("品质管理", "品质管理"),
-            Map.entry("研发管理", "研发管理"),
-            // 数据建模(2026-10-18 新增的一级目录:字段管理 / 数据字典 / ERP导入日志)—— 归并到自身:
-            // 权限矩阵里就该是**一个**「数据建模」分组,不再散落到「系统管理」或其他栏。
-            Map.entry("数据建模", "数据建模"),
-            Map.entry("基础档案", "基础档案"),
-            Map.entry("基础资料", "基础档案"),
-            Map.entry("基础数据", "基础档案"),
-            Map.entry("基础设置", "基础档案"),
-            Map.entry("物料及价格", "基础档案"),
-            Map.entry("设备管理", "设备管理"),
-            Map.entry("财务管理", "财务管理"),
+            Map.entry("基础档案", "系统管理平台"),
+            Map.entry("基础资料", "系统管理平台"),
+            Map.entry("基础数据", "系统管理平台"),
+            Map.entry("基础设置", "系统管理平台"),
+            Map.entry("物料及价格", "系统管理平台"),
+            Map.entry("财务管理", "系统管理平台"),
+            Map.entry("设备管理", "系统管理平台"),
             Map.entry("我的桌面", "我的桌面"),
             Map.entry("其他", "其他"));
     /**
@@ -238,7 +242,7 @@ public class ReportService {
 
     /** 导航一级模块展示顺序(权限矩阵按此排序,未登记模块排在末尾)。 */
     public static final List<String> NAV_GROUP_ORDER = List.of(
-            "我的桌面", "研发管理", "智能供应链", "生产制造", "品质管理", "财务管理", "设备管理", "基础档案", "其他");
+            "我的桌面", "研发管理", "智能供应链", "库存管理", "生产制造", "品质管理", "数据建模", "系统管理平台", "其他");
 
     /** 通用模板条目(面板名做报表名,文件名也更可读) */
     private ReportTemplate genericTemplate(String panelCode) {
