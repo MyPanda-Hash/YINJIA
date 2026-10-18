@@ -412,6 +412,45 @@ export const menuTree = [
       },
     ],
   },
+  // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典 / ERP导入日志。
+  //   · 字段管理(FIELDMGR):直接以 yj_field 元数据表为数据源的新面板 —— 全系统字段模型在一屏可见、
+  //     可按面板筛、可就地改(顺序/列宽/必填/隐藏/字典SQL…),保存走通用档案保存的「只提交改动行」;
+  //   · 数据字典(ZDGL):原在 系统管理平台·基础数据,按用户口径「还有写个数据字典」随本栏目一并摆到这里
+  //     (面板/表/权限行一个字节没动,只换导航位置);
+  //   · ERP导入日志(ERPLG):用户口径「把 ERP导入日志从系统管理迁移到数据建模里面去」,
+  //     yj_panel.category/module_group 已同批改为「数据建模」(tools/migrate-dm-fields-center-20261018.sql)。
+  {
+    code: 'dm',
+    title: '数据建模',
+    icon: 'SetUp',
+    children: [
+      {
+        code: 'dmFields',
+        title: '字段管理',
+        icon: 'Grid',
+        children: [
+          { code: 'fieldMgr', title: '字段管理', path: '/panelx/list/FIELDMGR', icon: 'Grid', panelCode: 'FIELDMGR', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'dmDict',
+        title: '数据字典',
+        icon: 'Collection',
+        children: [
+          { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'dmErp',
+        title: 'ERP集成',
+        icon: 'Connection',
+        children: [
+          // 批次级日志(erp_imp_log);行级明细面板 ERPLG_ROW 不另设入口 —— 从批次行进入即可
+          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
+        ],
+      },
+    ],
+  },
   // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
   //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
   //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
@@ -431,8 +470,8 @@ export const menuTree = [
         children: [
           { code: 'dept', title: '部门', path: '/panelx/list/DEPT', icon: 'OfficeBuilding', panelCode: 'DEPT', operationName: '新增流程' },
           { code: 'employee', title: '职员', path: '/panelx/list/EMP', icon: 'User', panelCode: 'EMP', operationName: '新增流程' },
-          { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
-          { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
+          // 2026-10-18 迁出:「数据字典 ZDGL」「ERP导入日志 ERPLG」按用户口径移到一级目录「数据建模」
+          //   (面板/表/权限行都不动,只换导航位置与 yj_panel.category)。
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
           // 仓位(2026-09-28 建为「库位」,2026-10-08 正名「仓位」对齐金蝶):仓库下货位档案,一仓多仓位、一仓位一仓;
           // 支持与商品同款「二维码标签」勾选即打

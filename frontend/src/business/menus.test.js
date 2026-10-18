@@ -230,6 +230,39 @@ test('基础档案 → 系统管理平台(只改标题,code 与二级分组不�
 })
 
 /**
+ * 2026-10-18 用户口径:「写一个数据建模目录下面的面板有:字段管理面板、把 ERP导入日志从系统管理迁移到
+ * 数据建模、还有写个数据字典」。
+ * 终态 = 一级目录「数据建模」(dm) → 字段管理(FIELDMGR,新面板) / 数据字典(ZDGL) / ERP导入日志(ERPLG);
+ *       「系统管理平台」不再直接挂这两个面板(防两边各挂一份)。
+ */
+test('数据建模 = 一级目录,含 字段管理 / 数据字典 / ERP导入日志', () => {
+  const dm = menuTree.find((n) => n.code === 'dm')
+  assert.ok(dm, '应有一级目录 数据建模(dm)')
+  assert.equal(dm.title, '数据建模')
+  assert.deepEqual((dm.children || []).map((c) => c.title), ['字段管理', '数据字典', 'ERP集成'])
+
+  const codesOf = (node) => {
+    if (Array.isArray(node)) return node.flatMap(codesOf)
+    if (!node || typeof node !== 'object') return []
+    const self = node.panelCode ? [node.panelCode] : []
+    return self.concat(codesOf(node.children))
+  }
+  const dmCodes = codesOf(dm)
+  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG']) {
+    assert.ok(dmCodes.includes(p), `数据建模下应有 ${p}`)
+  }
+  // 迁移而非复制:系统管理平台里不得再出现这两个面板
+  const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
+  assert.ok(!baseCodes.includes('ZDGL'), 'ZDGL 已迁到数据建模,系统管理平台里不应再有入口')
+  assert.ok(!baseCodes.includes('ERPLG'), 'ERPLG 已迁到数据建模,系统管理平台里不应再有入口')
+  // 整棵树里每张面板只挂一次
+  const all = codesOf(menuTree)
+  for (const p of ['FIELDMGR', 'ZDGL', 'ERPLG']) {
+    assert.equal(all.filter((c) => c === p).length, 1, `${p} 在整个菜单树里应恰好出现一次`)
+  }
+})
+
+/**
  * 2026-10-16 用户口径:「删除当前成型检验单和切炭检验单,以及成品检验规范。」
  * 走的是**重路线**(与上一批 5 张只摘菜单不同):面板元数据、译名、报工自动出单钩子与物理表
  * (qc_mold_insp_head/_detail、qc_cut_insp_head/_detail、qc_fin_spec_head/_detail)全部删除,
