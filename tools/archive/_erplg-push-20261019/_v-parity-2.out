@@ -1,0 +1,5 @@
+﻿库               日志行     明细行     批次id错挂
+HSDZ_MES      9        45       0
+HSDZ_MES_TEST 9        45       0
+
+RESULT: ERPLG-PUSH PARITY-OK (两账套 9 批 / 45 明细 逐列一致,批次id 无错挂)
