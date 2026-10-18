@@ -574,6 +574,74 @@ export async function upsertArchive(doc, mssql, pool, mapped, fp) {
 }
 
 // ---------- 主流程 ----------
+
+/**
+ * 把本次同步的「一个类型」写成一行 ERP 导入日志(erp_imp_log + 最多 5 条样本行 erp_imp_row)。
+ * 「数据建模 → ERP系统集成 → ERP导入日志」(面板 ERPLG)读的就是这两张表。
+ *
+ * 为什么加(2026-10-18 用户报「ERP导入日志无数据」):这两张表建好以来**只有人工补数脚本写过**
+ * (`tools/archive/_dm-20261018/_seed-erplg-from-kingdee.mjs`),同步程序从不落库 ⇒ 界面永远空。
+ * 现在每次**真的写库**后补一条批次 + 样本行,让「导入历史」跟着同步自己长出来。
+ *
+ * 只在 inserted+updated > 0 时记(调用点判断):计划任务 5 分钟跑一次的增量若无变化也记,一天
+ * 就是 288 条 × 类型数,日志会被刷屏 —— 无变化的「全跳过」不落记录。
+ *
+ * 批次号前缀 **SYNC-** 与人工补数的 IMP- 区分,可单独回退:
+ *   DELETE FROM erp_imp_log WHERE 批次号 LIKE 'SYNC-%';  (明细表同款)
+ * 日志写失败只告警不抛:它是旁路记录,不能因为日志表出问题把同步整批回滚。
+ */
+async function writeImportLog({ mssql, pool, doc, total, inserted, updated, failed, skipped, samples, cfg, modeLabel }) {
+  const now = new Date();
+  const p2 = (n) => String(n).padStart(2, '0');
+  const stamp = String(now.getFullYear()).slice(2) + p2(now.getMonth() + 1) + p2(now.getDate())
+    + p2(now.getHours()) + p2(now.getMinutes()) + p2(now.getSeconds());
+  const batchNo = `SYNC-${stamp}-${doc.code}`.slice(0, 30);
+  const target = doc.archive ? doc.table : doc.headTable;
+  const okCount = inserted + updated;
+  const status = failed > 0 ? '部分失败' : '已入库';
+  const remark = `金蝶 ${cfg.kingdee.domain || ''} · ${doc.listPath} · ${modeLabel}`
+    + `${skipped ? ` · 无变化/跳过 ${skipped}` : ''}`;
+  const fileName = `${doc.label}-${batchNo}.jsonl`;
+
+  const req = new mssql.Request(pool);
+  req.input('no', mssql.NVarChar(30), batchNo);
+  req.input('type', mssql.NVarChar(20), String(doc.label || doc.code).slice(0, 20));
+  req.input('file', mssql.NVarChar(260), fileName);
+  req.input('total', mssql.Int, total);
+  req.input('ok', mssql.Int, okCount);
+  req.input('fail', mssql.Int, failed);
+  req.input('skip', mssql.Int, skipped);
+  req.input('status', mssql.NVarChar(10), status);
+  req.input('by', mssql.NVarChar(50), '金蝶同步');
+  req.input('at', mssql.DateTime2, now);
+  req.input('remark', mssql.NVarChar(500), remark.slice(0, 500));
+  const r = await req.query(`
+    INSERT INTO erp_imp_log (批次号,导入类型,文件名,总行数,成功数,失败数,跳过数,状态,操作人,导入时间,备注,asp_user1,asp_time1,asp_cancel)
+    VALUES (@no,@type,@file,@total,@ok,@fail,@skip,@status,@by,@at,@remark,N'jdy-sync',GETDATE(),'N');
+    SELECT CAST(SCOPE_IDENTITY() AS int) AS id;`);
+  const batchId = r.recordset[0].id;
+
+  let rowNo = 0;
+  for (const s of samples) {
+    rowNo++;
+    const req2 = new mssql.Request(pool);
+    req2.input('bid', mssql.Int, batchId);
+    req2.input('no', mssql.NVarChar(30), batchNo);
+    req2.input('line', mssql.Int, rowNo);
+    req2.input('src', mssql.NVarChar(50), String(s.srcNo || '').slice(0, 50));
+    req2.input('json', mssql.NVarChar(mssql.MAX), String(s.json || '').slice(0, 20000));
+    req2.input('parse', mssql.NVarChar(10), 'OK');
+    req2.input('tbl', mssql.NVarChar(50), target);
+    req2.input('key', mssql.NVarChar(100), String(s.targetKey || '').slice(0, 100));
+    req2.input('pst', mssql.NVarChar(10), '已入库');
+    req2.input('by', mssql.NVarChar(100), 'jdy-sync');
+    await req2.query(`
+      INSERT INTO erp_imp_row (批次id,批次号,行号,源单号,原始JSON,解析状态,目标表,目标键,处理状态,asp_user1,asp_time1,asp_cancel)
+      VALUES (@bid,@no,@line,@src,@json,@parse,@tbl,@key,@pst,@by,GETDATE(),'N')`);
+  }
+  return { batchNo, batchId, rows: rowNo };
+}
+
 export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [] }) {
   configPath = configPath || join(HERE, 'config.json');
   if (!existsSync(configPath)) {
@@ -834,6 +902,27 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       }
       log(`【${doc.label}】完成:新增 ${inserted},更新 ${updated},失败 ${failed}${noCode ? `,缺编码跳过 ${noCode}` : ''}${dup ? `,并发让行 ${dup}` : ''}`);
       totalIn += inserted; totalUp += updated; totalFail += failed;
+      // ERP 导入日志:本类型**确有写入**才记一条批次(全跳过/全失败的不落,免得计划任务刷屏)。
+      // 旁路记录,写不进去只告警,不影响本次同步结果。
+      if (!dryRun && inserted + updated > 0) {
+        try {
+          const samples = changedRows.slice(0, 5).map((row) => ({
+            srcNo: doc.archive ? (row.number || row.id) : row.bill_no,
+            targetKey: doc.archive ? String(row.id) : String(row.bill_no || ''),
+            json: JSON.stringify(row),
+          }));
+          const rec = await writeImportLog({
+            mssql, pool, doc, cfg, modeLabel,
+            total: rows.length,
+            inserted, updated, failed,
+            skipped: skipped + noCode + dup,
+            samples,
+          });
+          log(`【${doc.label}】ERP导入日志: ${rec.batchNo}(样本明细 ${rec.rows} 行)`);
+        } catch (e) {
+          log(`⚠ 【${doc.label}】ERP导入日志写入失败(不影响同步): ${e.message}`);
+        }
+      }
     }
   } finally {
     if (pool) await pool.close();

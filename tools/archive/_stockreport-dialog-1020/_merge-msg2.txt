@@ -1,0 +1,8 @@
+merge: 合并 origin/main(9 提交)到本地
+
+远端这一批(另一个会话)含:金蝶同步自动写 ERP 导入日志、打印窗口复用并自动关闭、
+计划任务启动器 node 路径探测,以及两次前端静态产物重建。
+
+冲突:无(本次 git 自动合并干净)。
+合并后验证:vite build 通过(PanelxList-YGzj4Y18.js);后端全量 javac(-parameters)通过,189 个 class。
+随后按合并源码重建 static,单独 chore 提交。
