@@ -287,7 +287,8 @@
           </div>
           <el-table v-if="fieldRows.length" :data="fieldRows" size="small" border class="map-table" empty-text="">
             <el-table-column :label="tt('序号')" width="60" align="center">
-              <template #default="{ $index }"><span class="mono">{{ ($index + 1) * 10 }}</span></template>
+              <!-- 序号 = 行在表里的位置,连续 1、2、3…(2026-10-18 用户口径「序号有错误」) -->
+              <template #default="{ $index }"><span class="mono">{{ $index + 1 }}</span></template>
             </el-table-column>
             <el-table-column :label="tt('映射层级')" width="110">
               <template #default="{ row }">
@@ -604,7 +605,7 @@ async function saveFields() {
     await request.post('/erp/integ/fields', {
       接口编码: it.接口编码,
       rows: fieldRows.value.map((r, i) => ({
-        序号: (i + 1) * 10,
+        序号: i + 1,
         映射层级: r.映射层级 || '表头',
         MES字段: r.MES字段,
         ERP字段: r.ERP字段,

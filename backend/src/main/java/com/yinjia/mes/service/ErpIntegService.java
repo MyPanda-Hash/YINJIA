@@ -185,7 +185,7 @@ public class ErpIntegService {
         jdbc.update("DELETE FROM erp_integ_api WHERE [接口编码] = ?", code);
     }
 
-    /** 整表替换某接口的字段映射(界面保存时提交全部行,顺序即 序号) */
+    /** 整表替换某接口的字段映射(界面保存时提交全部行,顺序即 序号 = 1、2、3… 连续,与界面显示同口径) */
     @Transactional
     public void saveFields(String code, List<Map<String, Object>> rows) {
         requireItem(code);
@@ -199,7 +199,8 @@ public class ErpIntegService {
             String mes = str(r.get("MES字段"));
             String erp = str(r.get("ERP字段"));
             if (mes.isEmpty() && erp.isEmpty()) continue;
-            seq += 10;
+            // 2026-10-18 用户口径「序号有错误」:序号 = 行在界面上的位置,连续 1..n(不再是 10/20/30 跳号)
+            seq += 1;
             jdbc.update("INSERT INTO erp_integ_field ([接口编码], [方向], [序号], [映射层级], [MES字段], [ERP字段],"
                             + " [转换规则], [是否必填], [启用], [备注], asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel)"
                             + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,N'N')",

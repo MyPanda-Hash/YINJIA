@@ -15,6 +15,8 @@
 --      金蝶侧未开通或未实测的接口一律 启用=0 + 说明里写明原因(不假装能用);
 --   D. 设备绑定:从 bs_equip 现存 6 台设备(SB001..SB006)按用途绑定(报工采集 / 点检对象 / 保养对象);
 --   E. 多语言词条(yj_translation:panel + field),口径见 AGENTS.md「多语言强制规范」。
+--   F. 字段映射「序号」口径 = **每个接口内连续 1、2、3…**(2026-10-18 用户口径「序号有错误,修改一下」;
+--      早先种子是 10/20/30 跳号,界面与库里一起改成连续编号;D2 步对存量行重排,幂等)。
 --
 -- 执行:tools\DbSync(两账套 HSDZ_MES → HSDZ_MES_TEST 各跑一次)
 -- 回退:DELETE FROM erp_integ_device; DELETE FROM erp_integ_field; DELETE FROM erp_integ_api;
@@ -188,194 +190,194 @@ DECLARE @f TABLE (
 );
 INSERT INTO @f VALUES
 -- ── 转出 · 采购订单 ──
-(N'EXP_PU_ORDER', 10, N'表头', N'单据编号', N'bill_no', N'直传', 1, 1, N'沿用 MES 编号(YJ-…),金蝶侧同号,下游入库单按号挂源单'),
-(N'EXP_PU_ORDER', 20, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N'yyyy-MM-dd'),
-(N'EXP_PU_ORDER', 30, N'表头', N'供应商编码', N'supplier_number', N'直传', 1, 1, N'空则金蝶拒单;取 bs_supplier.供应商编码'),
-(N'EXP_PU_ORDER', 40, N'表头', N'备注', N'remark', N'直传', 0, 1, N'推送时自动追加 [MES:单号] 便于双向追溯'),
-(N'EXP_PU_ORDER', 50, N'明细', N'物料编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_PU_ORDER', 60, N'明细', N'物料编码', N'material_id', N'档案解析', 0, 1, N'按金蝶商品档案换 ID;挂源单/重推时必须与源单分录一致'),
-(N'EXP_PU_ORDER', 70, N'明细', N'数量', N'qty', N'数值转字符串', 1, 1, N'采购订单接口 proto 校验收字符串'),
-(N'EXP_PU_ORDER', 80, N'明细', N'单价', N'price', N'数值转字符串', 1, 1, N'同上'),
-(N'EXP_PU_ORDER', 90, N'明细', N'税率%', N'cess', N'数值转字符串', 0, 1, N'为 0 不推'),
-(N'EXP_PU_ORDER', 100, N'明细', N'规格型号', N'material_model', N'直传', 0, 1, N'订单接口收该键(入库/产品入库接口忽略)'),
-(N'EXP_PU_ORDER', 110, N'明细', N'单位', N'unit_id', N'档案解析', 1, 1, N'按当前账套 measure_unit 换 ID,跨账套 ID 不通用'),
+(N'EXP_PU_ORDER', 1, N'表头', N'单据编号', N'bill_no', N'直传', 1, 1, N'沿用 MES 编号(YJ-…),金蝶侧同号,下游入库单按号挂源单'),
+(N'EXP_PU_ORDER', 2, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N'yyyy-MM-dd'),
+(N'EXP_PU_ORDER', 3, N'表头', N'供应商编码', N'supplier_number', N'直传', 1, 1, N'空则金蝶拒单;取 bs_supplier.供应商编码'),
+(N'EXP_PU_ORDER', 4, N'表头', N'备注', N'remark', N'直传', 0, 1, N'推送时自动追加 [MES:单号] 便于双向追溯'),
+(N'EXP_PU_ORDER', 5, N'明细', N'物料编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_PU_ORDER', 6, N'明细', N'物料编码', N'material_id', N'档案解析', 0, 1, N'按金蝶商品档案换 ID;挂源单/重推时必须与源单分录一致'),
+(N'EXP_PU_ORDER', 7, N'明细', N'数量', N'qty', N'数值转字符串', 1, 1, N'采购订单接口 proto 校验收字符串'),
+(N'EXP_PU_ORDER', 8, N'明细', N'单价', N'price', N'数值转字符串', 1, 1, N'同上'),
+(N'EXP_PU_ORDER', 9, N'明细', N'税率%', N'cess', N'数值转字符串', 0, 1, N'为 0 不推'),
+(N'EXP_PU_ORDER', 10, N'明细', N'规格型号', N'material_model', N'直传', 0, 1, N'订单接口收该键(入库/产品入库接口忽略)'),
+(N'EXP_PU_ORDER', 11, N'明细', N'单位', N'unit_id', N'档案解析', 1, 1, N'按当前账套 measure_unit 换 ID,跨账套 ID 不通用'),
 
 -- ── 转出 · 采购入库单 ──
-(N'EXP_PUR_IN', 10, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'EXP_PUR_IN', 20, N'表头', N'业务类型', N'trans_type', N'常量', 1, 1, N'固定 2(入库单);采购订单/生产领料/产品入库无此项'),
-(N'EXP_PUR_IN', 30, N'表头', N'供应商编码', N'supplier_number', N'直传', 1, 1, N''),
-(N'EXP_PUR_IN', 40, N'表头', N'备注', N'remark', N'直传', 0, 1, N'追加 [MES:单号]'),
-(N'EXP_PUR_IN', 50, N'表头', N'采购订单号', N'src_bill_no', N'档案解析', 0, 1, N'仅当订单在金蝶解析到才推整组源单;否则不挂来源单并提示'),
-(N'EXP_PUR_IN', 60, N'表头', N'(常量)', N'src_bill_type_id', N'常量', 0, 1, N'固定 pur_bill_order,缺它金蝶会静默忽略源单引用'),
-(N'EXP_PUR_IN', 70, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_PUR_IN', 80, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N'挂来源单时必须有,否则整单被拒'),
-(N'EXP_PUR_IN', 90, N'明细', N'实收数量', N'qty', N'直传', 1, 1, N''),
-(N'EXP_PUR_IN', 100, N'明细', N'单价', N'price', N'直传', 0, 1, N''),
-(N'EXP_PUR_IN', 110, N'明细', N'税率%', N'cess', N'直传', 0, 1, N'为 0 不推'),
-(N'EXP_PUR_IN', 120, N'明细', N'规格型号', N'material_model', N'直传', 0, 1, N''),
-(N'EXP_PUR_IN', 130, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N'无对应 ID 直接报错(不静默错单位)'),
-(N'EXP_PUR_IN', 140, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N'行级 → 头级 → 默认正品仓 CK00001'),
-(N'EXP_PUR_IN', 150, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N'金蝶保存只认 stock_id,必须带'),
-(N'EXP_PUR_IN', 160, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
-(N'EXP_PUR_IN', 170, N'明细', N'采购订单行号', N'src_seq', N'直传', 0, 1, N'订单确有该分录才推,否则整单被拒'),
-(N'EXP_PUR_IN', 180, N'明细', N'采购订单行号', N'src_entry_id', N'档案解析', 0, 1, N'按订单分录换金蝶 entry id'),
+(N'EXP_PUR_IN', 1, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'EXP_PUR_IN', 2, N'表头', N'业务类型', N'trans_type', N'常量', 1, 1, N'固定 2(入库单);采购订单/生产领料/产品入库无此项'),
+(N'EXP_PUR_IN', 3, N'表头', N'供应商编码', N'supplier_number', N'直传', 1, 1, N''),
+(N'EXP_PUR_IN', 4, N'表头', N'备注', N'remark', N'直传', 0, 1, N'追加 [MES:单号]'),
+(N'EXP_PUR_IN', 5, N'表头', N'采购订单号', N'src_bill_no', N'档案解析', 0, 1, N'仅当订单在金蝶解析到才推整组源单;否则不挂来源单并提示'),
+(N'EXP_PUR_IN', 6, N'表头', N'(常量)', N'src_bill_type_id', N'常量', 0, 1, N'固定 pur_bill_order,缺它金蝶会静默忽略源单引用'),
+(N'EXP_PUR_IN', 7, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_PUR_IN', 8, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N'挂来源单时必须有,否则整单被拒'),
+(N'EXP_PUR_IN', 9, N'明细', N'实收数量', N'qty', N'直传', 1, 1, N''),
+(N'EXP_PUR_IN', 10, N'明细', N'单价', N'price', N'直传', 0, 1, N''),
+(N'EXP_PUR_IN', 11, N'明细', N'税率%', N'cess', N'直传', 0, 1, N'为 0 不推'),
+(N'EXP_PUR_IN', 12, N'明细', N'规格型号', N'material_model', N'直传', 0, 1, N''),
+(N'EXP_PUR_IN', 13, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N'无对应 ID 直接报错(不静默错单位)'),
+(N'EXP_PUR_IN', 14, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N'行级 → 头级 → 默认正品仓 CK00001'),
+(N'EXP_PUR_IN', 15, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N'金蝶保存只认 stock_id,必须带'),
+(N'EXP_PUR_IN', 16, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
+(N'EXP_PUR_IN', 17, N'明细', N'采购订单行号', N'src_seq', N'直传', 0, 1, N'订单确有该分录才推,否则整单被拒'),
+(N'EXP_PUR_IN', 18, N'明细', N'采购订单行号', N'src_entry_id', N'档案解析', 0, 1, N'按订单分录换金蝶 entry id'),
 
 -- ── 转出 · 销售出库单 ──
-(N'EXP_SALE_OUT', 10, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'EXP_SALE_OUT', 20, N'表头', N'业务类型', N'trans_type', N'常量', 1, 1, N'固定 2'),
-(N'EXP_SALE_OUT', 30, N'表头', N'客户编码', N'customer_number', N'直传', 1, 1, N''),
-(N'EXP_SALE_OUT', 40, N'表头', N'备注', N'remark', N'直传', 0, 1, N'追加 [MES:单号]'),
-(N'EXP_SALE_OUT', 50, N'表头', N'销售订单号', N'src_bill_no', N'档案解析', 0, 1, N'解析到订单才挂来源单'),
-(N'EXP_SALE_OUT', 60, N'表头', N'(常量)', N'src_bill_type_id', N'常量', 0, 1, N'固定 sal_bill_order(销售订单)'),
-(N'EXP_SALE_OUT', 70, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_SALE_OUT', 80, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N''),
-(N'EXP_SALE_OUT', 90, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
-(N'EXP_SALE_OUT', 100, N'明细', N'售价', N'price', N'直传', 0, 1, N''),
-(N'EXP_SALE_OUT', 110, N'明细', N'税率%', N'cess', N'直传', 0, 1, N'为 0 不推'),
-(N'EXP_SALE_OUT', 120, N'明细', N'规格型号', N'material_model', N'直传', 0, 1, N''),
-(N'EXP_SALE_OUT', 130, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
-(N'EXP_SALE_OUT', 140, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
-(N'EXP_SALE_OUT', 150, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
-(N'EXP_SALE_OUT', 160, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
-(N'EXP_SALE_OUT', 170, N'明细', N'销售订单行号', N'src_seq', N'直传', 0, 1, N''),
-(N'EXP_SALE_OUT', 180, N'明细', N'销售订单行号', N'src_entry_id', N'档案解析', 0, 1, N''),
+(N'EXP_SALE_OUT', 1, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'EXP_SALE_OUT', 2, N'表头', N'业务类型', N'trans_type', N'常量', 1, 1, N'固定 2'),
+(N'EXP_SALE_OUT', 3, N'表头', N'客户编码', N'customer_number', N'直传', 1, 1, N''),
+(N'EXP_SALE_OUT', 4, N'表头', N'备注', N'remark', N'直传', 0, 1, N'追加 [MES:单号]'),
+(N'EXP_SALE_OUT', 5, N'表头', N'销售订单号', N'src_bill_no', N'档案解析', 0, 1, N'解析到订单才挂来源单'),
+(N'EXP_SALE_OUT', 6, N'表头', N'(常量)', N'src_bill_type_id', N'常量', 0, 1, N'固定 sal_bill_order(销售订单)'),
+(N'EXP_SALE_OUT', 7, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_SALE_OUT', 8, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N''),
+(N'EXP_SALE_OUT', 9, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
+(N'EXP_SALE_OUT', 10, N'明细', N'售价', N'price', N'直传', 0, 1, N''),
+(N'EXP_SALE_OUT', 11, N'明细', N'税率%', N'cess', N'直传', 0, 1, N'为 0 不推'),
+(N'EXP_SALE_OUT', 12, N'明细', N'规格型号', N'material_model', N'直传', 0, 1, N''),
+(N'EXP_SALE_OUT', 13, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
+(N'EXP_SALE_OUT', 14, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
+(N'EXP_SALE_OUT', 15, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
+(N'EXP_SALE_OUT', 16, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
+(N'EXP_SALE_OUT', 17, N'明细', N'销售订单行号', N'src_seq', N'直传', 0, 1, N''),
+(N'EXP_SALE_OUT', 18, N'明细', N'销售订单行号', N'src_entry_id', N'档案解析', 0, 1, N''),
 
 -- ── 转出 · 材料出库单(生产领料单) ──
-(N'EXP_MAT_OUT', 10, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'EXP_MAT_OUT', 20, N'表头', N'生产车间', N'dept_number', N'档案解析', 0, 1, N'取部门名称换编码;解析不到不阻断'),
-(N'EXP_MAT_OUT', 30, N'表头', N'领用人', N'emp_number', N'档案解析', 0, 1, N''),
-(N'EXP_MAT_OUT', 40, N'表头', N'领用人', N'emp_id', N'档案解析', 0, 1, N'inv_pick 只认 emp_id,emp_number 被忽略'),
-(N'EXP_MAT_OUT', 50, N'表头', N'领料类型', N'pick_type', N'直传', 0, 1, N'真实账套恒 1'),
-(N'EXP_MAT_OUT', 60, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
-(N'EXP_MAT_OUT', 70, N'明细', N'材料编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_MAT_OUT', 80, N'明细', N'材料编码', N'material_id', N'档案解析', 0, 1, N''),
-(N'EXP_MAT_OUT', 90, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
-(N'EXP_MAT_OUT', 100, N'明细', N'单价', N'price', N'直传', 0, 1, N''),
-(N'EXP_MAT_OUT', 110, N'明细', N'成本', N'cost', N'直传', 0, 1, N'有值才推'),
-(N'EXP_MAT_OUT', 120, N'明细', N'单位成本', N'unit_cost', N'直传', 0, 1, N'有值才推'),
-(N'EXP_MAT_OUT', 130, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
-(N'EXP_MAT_OUT', 140, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
-(N'EXP_MAT_OUT', 150, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
-(N'EXP_MAT_OUT', 160, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
-(N'EXP_MAT_OUT', 170, N'明细', N'明细备注', N'comment', N'直传', 0, 1, N''),
+(N'EXP_MAT_OUT', 1, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'EXP_MAT_OUT', 2, N'表头', N'生产车间', N'dept_number', N'档案解析', 0, 1, N'取部门名称换编码;解析不到不阻断'),
+(N'EXP_MAT_OUT', 3, N'表头', N'领用人', N'emp_number', N'档案解析', 0, 1, N''),
+(N'EXP_MAT_OUT', 4, N'表头', N'领用人', N'emp_id', N'档案解析', 0, 1, N'inv_pick 只认 emp_id,emp_number 被忽略'),
+(N'EXP_MAT_OUT', 5, N'表头', N'领料类型', N'pick_type', N'直传', 0, 1, N'真实账套恒 1'),
+(N'EXP_MAT_OUT', 6, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
+(N'EXP_MAT_OUT', 7, N'明细', N'材料编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_MAT_OUT', 8, N'明细', N'材料编码', N'material_id', N'档案解析', 0, 1, N''),
+(N'EXP_MAT_OUT', 9, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
+(N'EXP_MAT_OUT', 10, N'明细', N'单价', N'price', N'直传', 0, 1, N''),
+(N'EXP_MAT_OUT', 11, N'明细', N'成本', N'cost', N'直传', 0, 1, N'有值才推'),
+(N'EXP_MAT_OUT', 12, N'明细', N'单位成本', N'unit_cost', N'直传', 0, 1, N'有值才推'),
+(N'EXP_MAT_OUT', 13, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
+(N'EXP_MAT_OUT', 14, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
+(N'EXP_MAT_OUT', 15, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
+(N'EXP_MAT_OUT', 16, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
+(N'EXP_MAT_OUT', 17, N'明细', N'明细备注', N'comment', N'直传', 0, 1, N''),
 
 -- ── 转出 · 产品入库单 ──
-(N'EXP_FINISH_IN', 10, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'EXP_FINISH_IN', 20, N'表头', N'生产车间', N'dept_number', N'档案解析', 0, 1, N'取 部门编码 → 生产车间 顺序解析'),
-(N'EXP_FINISH_IN', 30, N'表头', N'生产车间', N'dept_id', N'档案解析', 0, 1, N''),
-(N'EXP_FINISH_IN', 40, N'表头', N'经手人', N'emp_number', N'档案解析', 0, 1, N''),
-(N'EXP_FINISH_IN', 50, N'表头', N'经手人', N'emp_id', N'档案解析', 0, 1, N''),
-(N'EXP_FINISH_IN', 60, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
-(N'EXP_FINISH_IN', 70, N'明细', N'产品编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_FINISH_IN', 80, N'明细', N'产品编码', N'material_id', N'档案解析', 0, 1, N''),
-(N'EXP_FINISH_IN', 90, N'明细', N'实收数量', N'qty', N'数值转字符串', 1, 1, N'产品入库数量族必须传字符串'),
-(N'EXP_FINISH_IN', 100, N'明细', N'(行号)', N'seq', N'常量', 0, 1, N'按明细行顺序 1..n'),
-(N'EXP_FINISH_IN', 110, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
-(N'EXP_FINISH_IN', 120, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
-(N'EXP_FINISH_IN', 130, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
-(N'EXP_FINISH_IN', 140, N'明细', N'批次号', N'batch_no', N'直传', 0, 1, N'行上批号为空时退回表头批次号'),
-(N'EXP_FINISH_IN', 150, N'明细', N'备注', N'comment', N'直传', 0, 1, N''),
+(N'EXP_FINISH_IN', 1, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'EXP_FINISH_IN', 2, N'表头', N'生产车间', N'dept_number', N'档案解析', 0, 1, N'取 部门编码 → 生产车间 顺序解析'),
+(N'EXP_FINISH_IN', 3, N'表头', N'生产车间', N'dept_id', N'档案解析', 0, 1, N''),
+(N'EXP_FINISH_IN', 4, N'表头', N'经手人', N'emp_number', N'档案解析', 0, 1, N''),
+(N'EXP_FINISH_IN', 5, N'表头', N'经手人', N'emp_id', N'档案解析', 0, 1, N''),
+(N'EXP_FINISH_IN', 6, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
+(N'EXP_FINISH_IN', 7, N'明细', N'产品编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_FINISH_IN', 8, N'明细', N'产品编码', N'material_id', N'档案解析', 0, 1, N''),
+(N'EXP_FINISH_IN', 9, N'明细', N'实收数量', N'qty', N'数值转字符串', 1, 1, N'产品入库数量族必须传字符串'),
+(N'EXP_FINISH_IN', 10, N'明细', N'(行号)', N'seq', N'常量', 0, 1, N'按明细行顺序 1..n'),
+(N'EXP_FINISH_IN', 11, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
+(N'EXP_FINISH_IN', 12, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
+(N'EXP_FINISH_IN', 13, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
+(N'EXP_FINISH_IN', 14, N'明细', N'批次号', N'batch_no', N'直传', 0, 1, N'行上批号为空时退回表头批次号'),
+(N'EXP_FINISH_IN', 15, N'明细', N'备注', N'comment', N'直传', 0, 1, N''),
 
 -- ── 转出 · 其他入库单 ──
-(N'EXP_OTHER_IN', 10, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'EXP_OTHER_IN', 20, N'表头', N'业务类型id', N'trans_type_id', N'常量', 1, 1, N'必填;空则回落账套默认 12(金蝶无业务类型档案接口)'),
-(N'EXP_OTHER_IN', 30, N'表头', N'供应商编码', N'supplier_number', N'直传', 0, 1, N'空则按供应商名称回查 bs_supplier'),
-(N'EXP_OTHER_IN', 40, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
-(N'EXP_OTHER_IN', 50, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_OTHER_IN', 60, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_IN', 70, N'明细', N'数量', N'qty', N'数值转字符串', 1, 1, N'与其他入库同族口径'),
-(N'EXP_OTHER_IN', 80, N'明细', N'(行号)', N'seq', N'常量', 0, 1, N''),
-(N'EXP_OTHER_IN', 90, N'明细', N'成本', N'cost', N'直传', 0, 1, N'有值才推'),
-(N'EXP_OTHER_IN', 100, N'明细', N'单位成本', N'unit_cost', N'直传', 0, 1, N'有值才推'),
-(N'EXP_OTHER_IN', 110, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
-(N'EXP_OTHER_IN', 120, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
-(N'EXP_OTHER_IN', 130, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_IN', 140, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
+(N'EXP_OTHER_IN', 1, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'EXP_OTHER_IN', 2, N'表头', N'业务类型id', N'trans_type_id', N'常量', 1, 1, N'必填;空则回落账套默认 12(金蝶无业务类型档案接口)'),
+(N'EXP_OTHER_IN', 3, N'表头', N'供应商编码', N'supplier_number', N'直传', 0, 1, N'空则按供应商名称回查 bs_supplier'),
+(N'EXP_OTHER_IN', 4, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
+(N'EXP_OTHER_IN', 5, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_OTHER_IN', 6, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_IN', 7, N'明细', N'数量', N'qty', N'数值转字符串', 1, 1, N'与其他入库同族口径'),
+(N'EXP_OTHER_IN', 8, N'明细', N'(行号)', N'seq', N'常量', 0, 1, N''),
+(N'EXP_OTHER_IN', 9, N'明细', N'成本', N'cost', N'直传', 0, 1, N'有值才推'),
+(N'EXP_OTHER_IN', 10, N'明细', N'单位成本', N'unit_cost', N'直传', 0, 1, N'有值才推'),
+(N'EXP_OTHER_IN', 11, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
+(N'EXP_OTHER_IN', 12, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
+(N'EXP_OTHER_IN', 13, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_IN', 14, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
 
 -- ── 转出 · 其他出库单 ──
-(N'EXP_OTHER_OUT', 10, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'EXP_OTHER_OUT', 20, N'表头', N'业务类型id', N'trans_type_id', N'常量', 1, 1, N'必填;空则回落账套默认 13'),
-(N'EXP_OTHER_OUT', 30, N'表头', N'部门编码', N'dept_number', N'档案解析', 0, 1, N'空则按部门名称回查 bs_dept'),
-(N'EXP_OTHER_OUT', 40, N'表头', N'部门编码', N'dept_id', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_OUT', 50, N'表头', N'经手人编码', N'emp_number', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_OUT', 60, N'表头', N'经手人编码', N'emp_id', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_OUT', 70, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
-(N'EXP_OTHER_OUT', 80, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
-(N'EXP_OTHER_OUT', 90, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_OUT', 100, N'明细', N'数量', N'qty', N'数值转字符串', 1, 1, N''),
-(N'EXP_OTHER_OUT', 110, N'明细', N'(行号)', N'seq', N'常量', 0, 1, N''),
-(N'EXP_OTHER_OUT', 120, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
-(N'EXP_OTHER_OUT', 130, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
-(N'EXP_OTHER_OUT', 140, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
-(N'EXP_OTHER_OUT', 150, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
+(N'EXP_OTHER_OUT', 1, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'EXP_OTHER_OUT', 2, N'表头', N'业务类型id', N'trans_type_id', N'常量', 1, 1, N'必填;空则回落账套默认 13'),
+(N'EXP_OTHER_OUT', 3, N'表头', N'部门编码', N'dept_number', N'档案解析', 0, 1, N'空则按部门名称回查 bs_dept'),
+(N'EXP_OTHER_OUT', 4, N'表头', N'部门编码', N'dept_id', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_OUT', 5, N'表头', N'经手人编码', N'emp_number', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_OUT', 6, N'表头', N'经手人编码', N'emp_id', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_OUT', 7, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
+(N'EXP_OTHER_OUT', 8, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
+(N'EXP_OTHER_OUT', 9, N'明细', N'存货编码', N'material_id', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_OUT', 10, N'明细', N'数量', N'qty', N'数值转字符串', 1, 1, N''),
+(N'EXP_OTHER_OUT', 11, N'明细', N'(行号)', N'seq', N'常量', 0, 1, N''),
+(N'EXP_OTHER_OUT', 12, N'明细', N'计量单位', N'unit_id', N'档案解析', 1, 1, N''),
+(N'EXP_OTHER_OUT', 13, N'明细', N'仓库编码', N'stock_number', N'直传', 0, 1, N''),
+(N'EXP_OTHER_OUT', 14, N'明细', N'仓库编码', N'stock_id', N'档案解析', 0, 1, N''),
+(N'EXP_OTHER_OUT', 15, N'明细', N'批号', N'batch_no', N'直传', 0, 1, N''),
 
 -- ── 导入 · 商品档案 ──
-(N'IMP_MATERIAL', 10, N'档案', N'存货编码', N'material_number', N'直传', 1, 1, N'业务键:按编码 upsert'),
-(N'IMP_MATERIAL', 20, N'档案', N'存货名称', N'name', N'直传', 1, 1, N''),
-(N'IMP_MATERIAL', 30, N'档案', N'规格型号', N'model', N'直传', 0, 1, N''),
-(N'IMP_MATERIAL', 40, N'档案', N'条形码', N'barcode', N'直传', 0, 1, N''),
+(N'IMP_MATERIAL', 1, N'档案', N'存货编码', N'material_number', N'直传', 1, 1, N'业务键:按编码 upsert'),
+(N'IMP_MATERIAL', 2, N'档案', N'存货名称', N'name', N'直传', 1, 1, N''),
+(N'IMP_MATERIAL', 3, N'档案', N'规格型号', N'model', N'直传', 0, 1, N''),
+(N'IMP_MATERIAL', 4, N'档案', N'条形码', N'barcode', N'直传', 0, 1, N''),
 -- ── 导入 · 仓库档案 ──
-(N'IMP_STORE', 10, N'档案', N'仓库编码', N'number', N'直传', 1, 1, N''),
-(N'IMP_STORE', 20, N'档案', N'仓库名称', N'name', N'直传', 1, 1, N''),
-(N'IMP_STORE', 30, N'档案', N'仓库地址', N'address', N'直传', 0, 1, N''),
+(N'IMP_STORE', 1, N'档案', N'仓库编码', N'number', N'直传', 1, 1, N''),
+(N'IMP_STORE', 2, N'档案', N'仓库名称', N'name', N'直传', 1, 1, N''),
+(N'IMP_STORE', 3, N'档案', N'仓库地址', N'address', N'直传', 0, 1, N''),
 -- ── 导入 · 计量单位 ──
-(N'IMP_UOM', 10, N'档案', N'计量单位编码', N'number', N'直传', 1, 1, N''),
-(N'IMP_UOM', 20, N'档案', N'计量单位名称', N'name', N'直传', 1, 1, N''),
-(N'IMP_UOM', 30, N'档案', N'换算率', N'rate', N'直传', 0, 1, N''),
+(N'IMP_UOM', 1, N'档案', N'计量单位编码', N'number', N'直传', 1, 1, N''),
+(N'IMP_UOM', 2, N'档案', N'计量单位名称', N'name', N'直传', 1, 1, N''),
+(N'IMP_UOM', 3, N'档案', N'换算率', N'rate', N'直传', 0, 1, N''),
 -- ── 导入 · 职员 ──
-(N'IMP_EMP', 10, N'档案', N'员工编码', N'number', N'直传', 1, 1, N''),
-(N'IMP_EMP', 20, N'档案', N'员工名称', N'name', N'直传', 1, 1, N''),
-(N'IMP_EMP', 30, N'档案', N'所属部门', N'dept_number', N'档案解析', 0, 1, N'按部门编码回查 bs_dept'),
+(N'IMP_EMP', 1, N'档案', N'员工编码', N'number', N'直传', 1, 1, N''),
+(N'IMP_EMP', 2, N'档案', N'员工名称', N'name', N'直传', 1, 1, N''),
+(N'IMP_EMP', 3, N'档案', N'所属部门', N'dept_number', N'档案解析', 0, 1, N'按部门编码回查 bs_dept'),
 -- ── 导入 · 部门 ──
-(N'IMP_DEPT', 10, N'档案', N'部门编码', N'number', N'直传', 1, 1, N''),
-(N'IMP_DEPT', 20, N'档案', N'部门名称', N'name', N'直传', 1, 1, N''),
-(N'IMP_DEPT', 30, N'档案', N'上级部门', N'parent_number', N'直传', 0, 1, N''),
+(N'IMP_DEPT', 1, N'档案', N'部门编码', N'number', N'直传', 1, 1, N''),
+(N'IMP_DEPT', 2, N'档案', N'部门名称', N'name', N'直传', 1, 1, N''),
+(N'IMP_DEPT', 3, N'档案', N'上级部门', N'parent_number', N'直传', 0, 1, N''),
 -- ── 导入 · 采购订单 ──
-(N'IMP_PU_ORDER', 10, N'表头', N'单据编号', N'bill_no', N'直传', 1, 1, N'金蝶 bill_no → MES 单据编号(同号,转出挂源单靠它)'),
-(N'IMP_PU_ORDER', 20, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'IMP_PU_ORDER', 30, N'表头', N'供应商编码', N'supplier_number', N'直传', 1, 1, N''),
-(N'IMP_PU_ORDER', 40, N'表头', N'备注', N'remark', N'直传', 0, 1, N'剥掉 [MES:…] 追溯后缀'),
-(N'IMP_PU_ORDER', 50, N'明细', N'物料编码', N'material_number', N'直传', 1, 1, N''),
-(N'IMP_PU_ORDER', 60, N'明细', N'物料名称', N'material_name', N'直传', 0, 1, N''),
-(N'IMP_PU_ORDER', 70, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
-(N'IMP_PU_ORDER', 80, N'明细', N'单价', N'price', N'直传', 0, 1, N''),
-(N'IMP_PU_ORDER', 90, N'明细', N'单位', N'unit_name', N'直传', 0, 1, N''),
+(N'IMP_PU_ORDER', 1, N'表头', N'单据编号', N'bill_no', N'直传', 1, 1, N'金蝶 bill_no → MES 单据编号(同号,转出挂源单靠它)'),
+(N'IMP_PU_ORDER', 2, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'IMP_PU_ORDER', 3, N'表头', N'供应商编码', N'supplier_number', N'直传', 1, 1, N''),
+(N'IMP_PU_ORDER', 4, N'表头', N'备注', N'remark', N'直传', 0, 1, N'剥掉 [MES:…] 追溯后缀'),
+(N'IMP_PU_ORDER', 5, N'明细', N'物料编码', N'material_number', N'直传', 1, 1, N''),
+(N'IMP_PU_ORDER', 6, N'明细', N'物料名称', N'material_name', N'直传', 0, 1, N''),
+(N'IMP_PU_ORDER', 7, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
+(N'IMP_PU_ORDER', 8, N'明细', N'单价', N'price', N'直传', 0, 1, N''),
+(N'IMP_PU_ORDER', 9, N'明细', N'单位', N'unit_name', N'直传', 0, 1, N''),
 -- ── 导入 · 销售订单 ──
-(N'IMP_SO_ORDER', 10, N'表头', N'单据编号', N'bill_no', N'直传', 1, 1, N''),
-(N'IMP_SO_ORDER', 20, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
-(N'IMP_SO_ORDER', 30, N'表头', N'客户编码', N'customer_number', N'直传', 1, 1, N''),
-(N'IMP_SO_ORDER', 40, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
-(N'IMP_SO_ORDER', 50, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
-(N'IMP_SO_ORDER', 60, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
-(N'IMP_SO_ORDER', 70, N'明细', N'售价', N'price', N'直传', 0, 1, N''),
-(N'IMP_SO_ORDER', 80, N'明细', N'计量单位', N'unit_name', N'直传', 0, 1, N''),
+(N'IMP_SO_ORDER', 1, N'表头', N'单据编号', N'bill_no', N'直传', 1, 1, N''),
+(N'IMP_SO_ORDER', 2, N'表头', N'单据日期', N'bill_date', N'日期格式化', 1, 1, N''),
+(N'IMP_SO_ORDER', 3, N'表头', N'客户编码', N'customer_number', N'直传', 1, 1, N''),
+(N'IMP_SO_ORDER', 4, N'表头', N'备注', N'remark', N'直传', 0, 1, N''),
+(N'IMP_SO_ORDER', 5, N'明细', N'存货编码', N'material_number', N'直传', 1, 1, N''),
+(N'IMP_SO_ORDER', 6, N'明细', N'数量', N'qty', N'直传', 1, 1, N''),
+(N'IMP_SO_ORDER', 7, N'明细', N'售价', N'price', N'直传', 0, 1, N''),
+(N'IMP_SO_ORDER', 8, N'明细', N'计量单位', N'unit_name', N'直传', 0, 1, N''),
 -- ── 导入 · 设备台账 / 保养计划(待开通) ──
-(N'IMP_EQUIP', 10, N'档案', N'设备编码', N'number', N'直传', 1, 1, N'待金蝶侧开通设备模块后核对'),
-(N'IMP_EQUIP', 20, N'档案', N'设备名称', N'name', N'直传', 1, 1, N''),
-(N'IMP_EQUIP', 30, N'档案', N'设备型号', N'model', N'直传', 0, 1, N''),
-(N'IMP_EQUIP', 40, N'档案', N'所属部门', N'dept_number', N'档案解析', 0, 1, N''),
-(N'IMP_MAINT', 10, N'表头', N'设备编码', N'equip_number', N'直传', 1, 1, N'保养对象;与「设备绑定」页签同源'),
-(N'IMP_MAINT', 20, N'表头', N'计划日期', N'plan_date', N'日期格式化', 0, 1, N''),
+(N'IMP_EQUIP', 1, N'档案', N'设备编码', N'number', N'直传', 1, 1, N'待金蝶侧开通设备模块后核对'),
+(N'IMP_EQUIP', 2, N'档案', N'设备名称', N'name', N'直传', 1, 1, N''),
+(N'IMP_EQUIP', 3, N'档案', N'设备型号', N'model', N'直传', 0, 1, N''),
+(N'IMP_EQUIP', 4, N'档案', N'所属部门', N'dept_number', N'档案解析', 0, 1, N''),
+(N'IMP_MAINT', 1, N'表头', N'设备编码', N'equip_number', N'直传', 1, 1, N'保养对象;与「设备绑定」页签同源'),
+(N'IMP_MAINT', 2, N'表头', N'计划日期', N'plan_date', N'日期格式化', 0, 1, N''),
 -- ── 转出 · 基础资料(规划) ──
-(N'EXP_SUPPLIER', 10, N'档案', N'供应商编码', N'number', N'直传', 1, 0, N'规划中,启用前需账套实测'),
-(N'EXP_SUPPLIER', 20, N'档案', N'供应商名称', N'name', N'直传', 1, 0, N''),
-(N'EXP_SUPPLIER', 30, N'档案', N'开票税号', N'tax_no', N'直传', 0, 0, N''),
-(N'EXP_CUSTOMER', 10, N'档案', N'客户编码', N'number', N'直传', 1, 0, N'规划中'),
-(N'EXP_CUSTOMER', 20, N'档案', N'客户名称', N'name', N'直传', 1, 0, N''),
-(N'EXP_CUSTOMER', 30, N'档案', N'电话', N'phone', N'直传', 0, 0, N''),
-(N'EXP_MATERIAL', 10, N'档案', N'存货编码', N'number', N'直传', 1, 0, N'规划中'),
-(N'EXP_MATERIAL', 20, N'档案', N'存货名称', N'name', N'直传', 1, 0, N''),
-(N'EXP_MATERIAL', 30, N'档案', N'规格型号', N'model', N'直传', 0, 0, N''),
-(N'EXP_MATERIAL', 40, N'档案', N'计量单位', N'unit_name', N'直传', 0, 0, N''),
+(N'EXP_SUPPLIER', 1, N'档案', N'供应商编码', N'number', N'直传', 1, 0, N'规划中,启用前需账套实测'),
+(N'EXP_SUPPLIER', 2, N'档案', N'供应商名称', N'name', N'直传', 1, 0, N''),
+(N'EXP_SUPPLIER', 3, N'档案', N'开票税号', N'tax_no', N'直传', 0, 0, N''),
+(N'EXP_CUSTOMER', 1, N'档案', N'客户编码', N'number', N'直传', 1, 0, N'规划中'),
+(N'EXP_CUSTOMER', 2, N'档案', N'客户名称', N'name', N'直传', 1, 0, N''),
+(N'EXP_CUSTOMER', 3, N'档案', N'电话', N'phone', N'直传', 0, 0, N''),
+(N'EXP_MATERIAL', 1, N'档案', N'存货编码', N'number', N'直传', 1, 0, N'规划中'),
+(N'EXP_MATERIAL', 2, N'档案', N'存货名称', N'name', N'直传', 1, 0, N''),
+(N'EXP_MATERIAL', 3, N'档案', N'规格型号', N'model', N'直传', 0, 0, N''),
+(N'EXP_MATERIAL', 4, N'档案', N'计量单位', N'unit_name', N'直传', 0, 0, N''),
 -- ── 转出 · 设备(待开通) ──
-(N'EXP_WO_REPORT', 10, N'表头', N'设备编码', N'equip_number', N'直传', 1, 0, N'设备采集的产量汇总键'),
-(N'EXP_WO_REPORT', 20, N'表头', N'报工日期', N'date', N'日期格式化', 1, 0, N''),
-(N'EXP_WO_REPORT', 30, N'明细', N'工单号', N'src_bill_no', N'直传', 1, 0, N''),
-(N'EXP_WO_REPORT', 40, N'明细', N'工序编码', N'process_number', N'直传', 0, 0, N''),
-(N'EXP_WO_REPORT', 50, N'明细', N'报工数量', N'qty', N'直传', 1, 0, N''),
-(N'EXP_EQUIP_CHECK', 10, N'表头', N'设备编码', N'equip_number', N'直传', 1, 0, N''),
-(N'EXP_EQUIP_CHECK', 20, N'表头', N'点检日期', N'date', N'日期格式化', 1, 0, N''),
-(N'EXP_EQUIP_CHECK', 30, N'表头', N'点检结果', N'result', N'直传', 0, 0, N'');
+(N'EXP_WO_REPORT', 1, N'表头', N'设备编码', N'equip_number', N'直传', 1, 0, N'设备采集的产量汇总键'),
+(N'EXP_WO_REPORT', 2, N'表头', N'报工日期', N'date', N'日期格式化', 1, 0, N''),
+(N'EXP_WO_REPORT', 3, N'明细', N'工单号', N'src_bill_no', N'直传', 1, 0, N''),
+(N'EXP_WO_REPORT', 4, N'明细', N'工序编码', N'process_number', N'直传', 0, 0, N''),
+(N'EXP_WO_REPORT', 5, N'明细', N'报工数量', N'qty', N'直传', 1, 0, N''),
+(N'EXP_EQUIP_CHECK', 1, N'表头', N'设备编码', N'equip_number', N'直传', 1, 0, N''),
+(N'EXP_EQUIP_CHECK', 2, N'表头', N'点检日期', N'date', N'日期格式化', 1, 0, N''),
+(N'EXP_EQUIP_CHECK', 3, N'表头', N'点检结果', N'result', N'直传', 0, 0, N'');
 
 INSERT INTO erp_integ_field ([接口编码], [方向], [序号], [映射层级], [MES字段], [ERP字段], [转换规则],
                              [是否必填], [启用], [备注],
@@ -386,8 +388,21 @@ SELECT f.[接口编码], ISNULL(a.[方向], N''), f.[序号], f.[映射层级], 
   FROM @f f
   LEFT JOIN erp_integ_api a ON a.[接口编码] = f.[接口编码]
  WHERE NOT EXISTS (SELECT 1 FROM erp_integ_field x
-                    WHERE x.[接口编码] = f.[接口编码] AND x.[序号] = f.[序号] AND x.[ERP字段] = f.[ERP字段]);
+                    WHERE x.[接口编码] = f.[接口编码] AND x.[MES字段] = f.[MES字段]
+                      AND x.[ERP字段] = f.[ERP字段]
+                      AND ISNULL(x.[映射层级], N'') = ISNULL(f.[映射层级], N''));
 PRINT N'  D. 字段映射种子';
+
+-- D2. 序号口径 = **每个接口内连续 1..n**(2026-10-18 用户口径「序号有错误,修改一下」):
+--   早先种子用 10/20/30 跳号,界面与库里都按跳号显示;现统一改成 1、2、3… 连续编号。
+--   本步对**全部**行重排(含用户后加的),幂等 —— 已经是 1..n 时 UPDATE 0 行。
+;WITH n AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY [接口编码] ORDER BY [序号], id) AS rn
+      FROM erp_integ_field WHERE ISNULL(asp_cancel, N'N') <> N'Y')
+UPDATE f SET [序号] = n.rn
+  FROM erp_integ_field f JOIN n ON n.id = f.id
+ WHERE f.[序号] <> n.rn;
+PRINT N'  D2. 字段映射序号重排为 1..n';
 GO
 
 /* ══════════════════════ E. 设备绑定种子(设备以 bs_equip 现存 6 台为准) ══════════════════════ */
@@ -491,7 +506,7 @@ PRINT N'  F. 多语言词条';
 GO
 
 /* ══════════════════════ 自检 ══════════════════════ */
-DECLARE @apiN int, @impN int, @expN int, @fieldN int, @devN int, @missingDev int;
+DECLARE @apiN int, @impN int, @expN int, @fieldN int, @devN int, @missingDev int, @badSeq int;
 SELECT @apiN = COUNT(*), @impN = SUM(CASE WHEN 方向 = N'导入' THEN 1 ELSE 0 END),
        @expN = SUM(CASE WHEN 方向 = N'转出' THEN 1 ELSE 0 END)
   FROM erp_integ_api WHERE ISNULL(asp_cancel, N'N') <> N'Y';
@@ -500,9 +515,14 @@ SELECT @devN = COUNT(*) FROM erp_integ_device WHERE ISNULL(asp_cancel, N'N') <> 
 SELECT @missingDev = COUNT(*) FROM erp_integ_device d
  WHERE ISNULL(d.asp_cancel, N'N') <> N'Y'
    AND NOT EXISTS (SELECT 1 FROM bs_equip e WHERE e.设备编码 = d.设备编码);
+-- 序号口径(2026-10-18):每个接口内必须**连续 1..n**(min=1、max=行数、无重复);不满足即报错
+SELECT @badSeq = COUNT(*) FROM (
+    SELECT [接口编码] FROM erp_integ_field WHERE ISNULL(asp_cancel, N'N') <> N'Y'
+     GROUP BY [接口编码]
+    HAVING MIN([序号]) <> 1 OR MAX([序号]) <> COUNT(*) OR COUNT(DISTINCT [序号]) <> COUNT(*)) t;
 SELECT @apiN AS 接口数, @impN AS 导入数, @expN AS 转出数, @fieldN AS 字段映射数,
-       @devN AS 设备绑定数, @missingDev AS 设备档案缺失数;
-IF @apiN <> 23 OR @fieldN < 150 OR @missingDev <> 0
-    RAISERROR(N'ERP集成配置种子不完整(期望 23 个接口 / ≥150 行映射 / 设备档案全命中)', 16, 1);
+       @devN AS 设备绑定数, @missingDev AS 设备档案缺失数, @badSeq AS 序号不连续接口数;
+IF @apiN <> 23 OR @fieldN < 150 OR @missingDev <> 0 OR @badSeq <> 0
+    RAISERROR(N'ERP集成配置种子不完整(期望 23 个接口 / ≥150 行映射 / 设备档案全命中 / 序号连续 1..n)', 16, 1);
 PRINT N'== migrate-erp-integ-config-20261018 完成 ==';
 GO

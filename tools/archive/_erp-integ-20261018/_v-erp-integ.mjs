@@ -69,6 +69,14 @@ check((purIn?.fields || []).some((f) => f.ERP字段 === 'material_number'), 'EXP
 check((purIn?.fields || []).some((f) => f.ERP字段 === 'stock_id'), 'EXP_PUR_IN 有 stock_id 映射(金蝶只认 stock_id)')
 check((purIn?.fields || []).some((f) => f.ERP字段 === 'src_seq'), 'EXP_PUR_IN 有 src_seq(来源单行号)映射')
 
+// 序号口径(2026-10-18 用户口径「序号有错误」):每个接口内必须 1、2、3… 连续
+const badSeq = []
+for (const it of items) {
+  const seqs = (it.fields || []).map((f) => Number(f.序号)).sort((a, b) => a - b)
+  if (seqs.some((v, i) => v !== i + 1)) badSeq.push(`${it.接口编码}(${seqs.join(',')})`)
+}
+check(badSeq.length === 0, `字段映射序号 = 每个接口 1..n 连续${badSeq.length ? ';异常: ' + badSeq.slice(0, 3).join(' / ') : ''}`)
+
 const meta = await json('GET', '/erp/integ/meta', null, token)
 check(meta.status === 200 && (meta.j.data.devices || []).length === 6,
   `设备档案下拉 ${(meta.j.data.devices || []).length} 台(期望 6,去重未停用)`)
@@ -103,6 +111,8 @@ await json('POST', '/erp/integ/devices', {
 let c2 = await json('GET', '/erp/integ/config', null, token)
 const tmp2 = (c2.j.data.items || []).find((i) => i.接口编码 === TMP)
 check((tmp2?.fields || []).length === 2, `保存字段映射 2 行 → 读回 ${(tmp2?.fields || []).length} 行`)
+check(JSON.stringify((tmp2?.fields || []).map((f) => Number(f.序号))) === '[1,2]',
+  `保存后序号读回 = ${JSON.stringify((tmp2?.fields || []).map((f) => f.序号))}(期望 [1,2],连续 1..n)`)
 check((tmp2?.devices || []).length === 1 && tmp2.devices[0].设备编码 === 'SB001',
   `保存设备绑定 1 台 → 读回 ${JSON.stringify((tmp2?.devices || []).map((d) => d.设备编码))}`)
 check((tmp2?.devices || [])[0]?.设备名称 === '锯床-01', `设备名称按档案带出 = ${tmp2?.devices?.[0]?.设备名称}`)
@@ -156,6 +166,10 @@ try {
   check(cards > 0, `导入页签接口卡片 ${cards} 张`)
   const mapRows = await raw(`document.querySelectorAll('.map-table .el-table__body tr.el-table__row').length`)
   check(mapRows > 0, `字段映射表渲染 ${mapRows} 行`)
+  // 界面序号列 = 1、2、3…(与库里同口径)
+  const uiSeqs = (await raw(`[...document.querySelectorAll('.map-table .el-table__body tr.el-table__row')].map(tr => tr.querySelector('td .cell')?.innerText.trim())`)) || []
+  check(uiSeqs.length > 0 && JSON.stringify(uiSeqs) === JSON.stringify(uiSeqs.map((_, i) => String(i + 1))),
+    `界面序号列 = 1..n(实际 ${JSON.stringify(uiSeqs.slice(0, 6))}…)`)
   const devRows = await raw(`document.querySelectorAll('.dev-table .el-table__body tr.el-table__row').length`)
   console.log(`      当前接口已绑定设备行数 = ${devRows}`)
   const shot1 = await send('Page.captureScreenshot', { format: 'png' })
