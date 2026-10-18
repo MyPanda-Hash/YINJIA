@@ -164,7 +164,10 @@
         </div>
         <el-table :data="trace['质检数据'] || []" size="small" border max-height="200" :empty-text="tt('暂无检验单')">
           <el-table-column :label="tt('检验单号')" prop="检验单号" width="150" />
-          <el-table-column :label="tt('检验类型')" prop="检验类型" width="110" />
+          <el-table-column :label="tt('检验类型')" prop="检验类型" width="110">
+            <!-- 值来自后端(首件检验/制程检验/组装成品检验),必须走 tt():en/ja 等语言下同列显示译名 -->
+            <template #default="{ row }">{{ row['检验类型'] ? tt(row['检验类型']) : '-' }}</template>
+          </el-table-column>
           <el-table-column :label="tt('工序')" prop="工序" width="80" />
           <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
           <el-table-column :label="tt('总结论')" prop="总结论" width="90" />
