@@ -2624,6 +2624,11 @@ export default {
     '设备使用登记表': 'Equipment Usage Log',
     '仪器使用记录表': 'Instrument Usage Log',
     '基础档案': 'Master Data',
+    '系统管理平台': 'System Management Platform',
+    '库存管理': 'Inventory Management',
+    '数据建模': 'Data Modeling',
+    '字段管理': 'Field Management',
+    'ERP集成': 'ERP Integration',
     /* ── 实验室使用记录表 4 面板(RecordSheetPanels plain 版式)静态词条 ── */
     '测试设备使用登记表': 'Test Equipment Usage Log',
     '实验室仪器使用记录表': 'Lab Instrument Usage Log',

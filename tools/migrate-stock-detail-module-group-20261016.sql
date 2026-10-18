@@ -25,22 +25,38 @@ SET NOCOUNT ON;
 
 DECLARE @dbn sysname = DB_NAME();
 
-/* 待改行(窄条件 + 行数证据) */
-DECLARE @n0 int = (SELECT COUNT(*) FROM yj_panel WHERE panel_code = N'STOCK_DETAIL' AND module_group = N'系统管理');
-RAISERROR(N'[待改] %s:STOCK_DETAIL 的 module_group = 系统管理 的行 %d 行(期望 ≤1)', 10, 1, @dbn, @n0);
+/* 待改行(窄条件 + 行数证据)
+ * ⚠ 2026-10-18 修正(本机两账套首次真正执行时才暴露):
+ *   原写法只改 STOCK_DETAIL **一张**,但自检 ① 要求"全库 module_group 越界 0 处"——
+ *   而同族另外三张报表(库存状况表 STOCK_BALANCE / 库存台账 STOCK_LEDGER / 收发存汇总表 STOCK_SUMMARY)
+ *   在本地库里同样是 module_group = 系统管理(2026-10-16 之后重建的面板又把兜底值抄了回来),
+ *   于是"改一张 ⇒ 自检不过 ⇒ 整段回滚",脚本永远执行不下去、一次也修不好。
+ *   实测(HSDZ_MES / HSDZ_MES_TEST 一致):同族 4 张全在「系统管理」,而库存核算组里
+ *   采购入库单/产成品入库单/采购入库明细/明细/统计(共 20 张)都在「库存核算」⇒ 这 4 张本就该同组。
+ *   故改为:库存报表族**整组收口**(4 张一起写回库存核算;筛选条件仍是 module_group = 系统管理)。
+ *   「库存管理」一级目录上线后 STOCK_* 仍在全局导航下,module_group 只是权限矩阵的分组标签 +
+ *   同组读放行,写回「库存核算」不会挪动任何导航入口。
+ */
+DECLARE @n0 int = (SELECT COUNT(*) FROM yj_panel
+                    WHERE panel_code IN (N'STOCK_DETAIL', N'STOCK_BALANCE', N'STOCK_LEDGER', N'STOCK_SUMMARY')
+                      AND module_group = N'系统管理');
+RAISERROR(N'[待改] %s:库存报表族 module_group = 系统管理 的行 %d 行(期望 ≤4)', 10, 1, @dbn, @n0);
 
 BEGIN TRANSACTION;
 UPDATE yj_panel SET module_group = N'库存核算'
- WHERE panel_code = N'STOCK_DETAIL' AND module_group = N'系统管理';
+ WHERE panel_code IN (N'STOCK_DETAIL', N'STOCK_BALANCE', N'STOCK_LEDGER', N'STOCK_SUMMARY')
+   AND module_group = N'系统管理';
 DECLARE @n1 int = @@ROWCOUNT;
 
-/* 自检 ①:该面板落在了预期的库存报表组 */
-DECLARE @bad1 int = (SELECT COUNT(*) FROM yj_panel WHERE panel_code = N'STOCK_DETAIL' AND module_group <> N'库存核算');
+/* 自检 ①:同族四张都落在预期的库存核算组(任何一张没归位即失败) */
+DECLARE @bad1 int = (SELECT COUNT(*) FROM yj_panel
+                     WHERE panel_code IN (N'STOCK_DETAIL', N'STOCK_BALANCE', N'STOCK_LEDGER', N'STOCK_SUMMARY')
+                       AND (module_group IS NULL OR module_group <> N'库存核算'));
 /* 自检 ②:全库 module_group 都能归并到导航模块(越界 0 处)—— 合法值清单与 ReportService.NAV_GROUP 同源 */
 DECLARE @legal TABLE (g nvarchar(50) PRIMARY KEY);
 INSERT INTO @legal (g) VALUES
  (N'我的桌面'),(N'研发管理'),(N'智能供应链'),(N'库存核算'),(N'库存报表'),(N'采购管理'),(N'订单管理'),(N'销售管理'),
- (N'生产制造'),(N'生产管理'),(N'委外加工'),(N'品质管理'),(N'基础档案'),(N'基础资料'),(N'基础数据'),
+ (N'生产制造'),(N'生产管理'),(N'委外加工'),(N'品质管理'),(N'数据建模'),(N'基础档案'),(N'基础资料'),(N'基础数据'),
  (N'基础设置'),(N'物料及价格'),(N'设备管理'),(N'财务管理'),(N'其他');
 DECLARE @bad2 nvarchar(200) = (SELECT TOP 1 p.module_group FROM yj_panel p
                                 WHERE p.module_group IS NULL OR p.module_group = N''

@@ -1342,6 +1342,10 @@ public class ButtonService {
         for (Map<String, Object> item : items) {
             Object id = item.get("id");
             Map<String, Object> cols = labelsToCols(def.fields(), item);
+            // 派生列不回写(2026-10-18,数据建模·字段管理 FIELDMGR):「面板名称」是 panel_code 关联 yj_panel
+            // 带出的显示值,表上根本没有这一列 —— 不清掉就会 INSERT/UPDATE 报「列名无效」。
+            // 判定是通用的:该表没有同名的物理列 ⇒ 该字段只读派生(见 QueryService.derivedPanelNameLabel)。
+            cols.keySet().removeIf(c -> !tableCols(def.lineTable()).contains(c));
             if (id != null && !String.valueOf(id).isBlank()) {
                 liveIds.add(id);
                 updateRow(def.lineTable(), def.pkCol(), id, cols, user);
@@ -1354,7 +1358,13 @@ public class ButtonService {
         // 都没声明(旧客户端)则一行不删,只把"本会被删的行数"回给前端提示 —— 见方法头误删护栏
         Map<String, Object> out = result(def.name(), "启用");
         Set<Object> removedActually = new LinkedHashSet<>();
-        if (!removeIds.isEmpty()) {
+        // 2026-10-18:源表可能没有 asp_cancel(数据建模·字段管理的数据源 yj_field 就没有)——
+        // 这类表**不做软删**(字段下线走 retireExtField,是显式动作,不是"保存时缺席")。
+        // 有该列的业务档案表行为一字未改。
+        boolean canSoftDelete = tableCols(def.lineTable()).contains("asp_cancel");
+        if (!canSoftDelete) {
+            // 没作废列:只 upsert,不做任何"缺席=删除"推断
+        } else if (!removeIds.isEmpty()) {
             for (Object id : removeIds) {
                 int n = jdbc.update("UPDATE " + def.lineTable()
                         + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE " + def.pkCol()
@@ -1564,8 +1574,10 @@ public class ButtonService {
     private Object insertRow(String table, Map<String, Object> cols, String user) {
         if (cols.isEmpty()) return null;
         fillRequiredDefaults(table, cols);
-        cols.put("asp_user1", user);
-        cols.put("asp_time1", LocalDateTime.now());
+        // 审计列按表结构补(同 updateRow 的 2026-10-18 说明)
+        Set<String> physical = tableCols(table);
+        if (physical.isEmpty() || physical.contains("asp_user1")) cols.put("asp_user1", user);
+        if (physical.isEmpty() || physical.contains("asp_time1")) cols.put("asp_time1", LocalDateTime.now());
         // 列名含特殊字符(%、.等)必须方括号包裹
         String names = String.join(",", cols.keySet().stream().map(c -> "[" + c + "]").toList());
         String marks = String.join(",", cols.values().stream().map(x -> "?").toList());
@@ -1638,8 +1650,12 @@ public class ButtonService {
         if (cols.isEmpty()) return;
         dropNullsOnNotNull(table, cols);
         if (cols.isEmpty()) return;
-        cols.put("asp_user2", user);
-        cols.put("asp_time2", LocalDateTime.now());
+        // 审计列按表结构补(2026-10-18):数据建模·字段管理(FIELDMGR)的数据源 yj_field 只有 asp_user1/
+        // asp_time1,没有 asp_user2/asp_time2 ⇒ 盲写会报「列名 'asp_user2' 无效」。业务表都有这两列,
+        // 故此判定不改变既有面板的任何行为。
+        Set<String> physical = tableCols(table);
+        if (physical.isEmpty() || physical.contains("asp_user2")) cols.put("asp_user2", user);
+        if (physical.isEmpty() || physical.contains("asp_time2")) cols.put("asp_time2", LocalDateTime.now());
         StringBuilder set = new StringBuilder();
         List<Object> args = new ArrayList<>();
         for (Map.Entry<String, Object> e : cols.entrySet()) {
@@ -6193,21 +6209,29 @@ public class ButtonService {
     }
 
     /** 存档前快照(同上);{@code onlyIds} 非空时只快照这些行 —— 改动行提交只需比对本次涉及的行,
-     *  不必对几千行的大档案做全表 × 全字段扫描(2026-10-03 商品档案改动行提交配套优化)。 */
+     *  不必对几千行的大档案做全表 × 全字段扫描(2026-10-03 商品档案改动行提交配套优化)。
+     *
+     *  <p>2026-10-18:源表可能**没有 asp_cancel 列**(数据建模·字段管理 FIELDMGR 的数据源就是 yj_field 本身),
+     *  以前这里硬写 ISNULL(asp_cancel,'N') ⇒ 一保存就「列名 'asp_cancel' 无效」;
+     *  同方法里的字段列表也只取**表上真实存在的列**(派生列如「面板名称」不是物理列)。 */
     private Map<Object, Map<String, String>> archiveRowSnapshot(PanelRegistry.PanelDef def, Collection<Object> onlyIds) {
         Map<Object, Map<String, String>> out = new LinkedHashMap<>();
         if (def.isDoc() || def.lineTable() == null || def.fields().isEmpty()) return out;
         if (onlyIds != null && onlyIds.isEmpty()) return out;
+        Set<String> physical = tableCols(def.lineTable());
         LinkedHashSet<String> cols = new LinkedHashSet<>();
-        for (PanelRegistry.FieldDef f : def.fields()) if (f.col() != null) cols.add(f.col());
+        for (PanelRegistry.FieldDef f : def.fields()) {
+            if (f.col() != null && (physical.isEmpty() || physical.contains(f.col()))) cols.add(f.col());
+        }
         StringBuilder sql = new StringBuilder("SELECT ").append(def.pkCol());
         for (String c : cols) sql.append(", [").append(c).append("]");
-        sql.append(" FROM ").append(def.lineTable()).append(" WHERE ISNULL(asp_cancel,'N')<>'Y'");
+        sql.append(" FROM ").append(def.lineTable());
+        if (physical.contains("asp_cancel")) sql.append(" WHERE ISNULL(asp_cancel,'N')<>'Y'");
         List<Object> args = List.of();
         if (onlyIds != null) {
             List<Object> ids = onlyIds.stream().filter(java.util.Objects::nonNull).toList();
             if (ids.isEmpty()) return out;
-            sql.append(" AND ").append(def.pkCol()).append(" IN (")
+            sql.append(physical.contains("asp_cancel") ? " AND " : " WHERE ").append(def.pkCol()).append(" IN (")
                     .append(String.join(",", java.util.Collections.nCopies(ids.size(), "?"))).append(")");
             args = ids;
         }
