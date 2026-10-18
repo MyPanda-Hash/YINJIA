@@ -193,7 +193,7 @@ public class PanelPermissionService {
 
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {
-        requirePanelNotAdminOnly(panelCode);          // 数据建模元数据面板:仅管理员
+        requireAdminOnlyWritable(panelCode, buttonName); // 数据建模元数据面板:写操作仅管理员(浏览动作放行)
         requireReadonlyAllowed(panelCode, buttonName); // ERP集成:只读面板不许任何写动作
         String user = currentUserName();
         if (isAdmin(user)) return;
@@ -212,7 +212,7 @@ public class PanelPermissionService {
      */
     public void requireButtonAny(String[] panelCodes, String buttonName) {
         for (String code : panelCodes) {
-            requirePanelNotAdminOnly(code);
+            requireAdminOnlyWritable(code, buttonName);
             requireReadonlyAllowed(code, buttonName);
         }
         String user = currentUserName();
@@ -249,7 +249,8 @@ public class PanelPermissionService {
     }
 
     /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */    public void requirePanelView(String panelCode) {
-        requirePanelNotAdminOnly(panelCode);
+        // 2026-10-18 用户口径变更:数据建模(FIELDMGR/ZDGL)对非管理员**开放只读**(授权 view,query),
+        // 读入口不再按"管理员专属"硬拦 —— 写操作仍由 requireAdminOnlyWritable 拦住。
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (readablePanels(user).contains(panelCode)) return;
@@ -263,7 +264,7 @@ public class PanelPermissionService {
      * 任一面板可见即放行;管理员恒过。
      */
     public void requirePanelViewAny(String... panelCodes) {
-        for (String code : panelCodes) requirePanelNotAdminOnly(code);
+        // 同上:读入口按 view 授权判定,不再按管理员专属硬拦
         String user = currentUserName();
         if (isAdmin(user)) return;
         Set<String> readable = readablePanels(user);
@@ -285,7 +286,7 @@ public class PanelPermissionService {
      * 拿不到业务数据,但属于不该开放的面板元数据面。
      */
     public void requirePanelRead(String panelCode) {
-        requirePanelNotAdminOnly(panelCode);
+        // 同上:元数据读取按 view 授权判定
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (panelCode == null || panelCode.isBlank()) throw new AccessDeniedException("面板编码不能为空");
@@ -400,7 +401,8 @@ public class PanelPermissionService {
     public static final String PERM_WARN = "warn";
 
     /**
-     * **仅管理员可见**的面板(2026-10-18 用户口径:「字段管理和数据字典要是管理员才有权限」)
+     * **写操作仅管理员**的面板(2026-10-18 用户口径:「字段管理和数据字典要是管理员才有权限」;
+     * 同日追加「给非管理员开只读」⇒ 读放开、写仍专属管理员,见 requireAdminOnlyWritable)
      * —— 数据建模栏目里的两张元数据面板:
      * <ul>
      *   <li>FIELDMGR 字段管理:直接读写 yj_field 元数据(A 字段模型),普通角色不该看见;</li>
@@ -436,7 +438,22 @@ public class PanelPermissionService {
                 + (buttonName == null || buttonName.isBlank() ? "(未命名动作)" : buttonName) + "」");
     }
 
-    /** 面板是否仅管理员可访问(见 {@link #ADMIN_ONLY_PANELS}) */
+    /**
+     * 管理员专属面板的**写**闸门(2026-10-18 口径演进):
+     *   原口径「字段管理和数据字典要是管理员才有权限」= 连看都不给;用户随后要求「给非管理员开只读」,
+     *   于是拆成两半 —— **读**按面板 view 授权(readablePanels),**写**仍只认管理员。
+     *   纯浏览动作(查询/刷新/导出/打印/定位/表格调整/表头调整/导出报表/审批情况/修改记录)放行,
+     *   其余(新增/保存/删除/导入/批量修改…)一律 403。
+     */
+    public void requireAdminOnlyWritable(String panelCode, String buttonName) {
+        if (panelCode == null || !ADMIN_ONLY_PANELS.contains(panelCode.trim())) return;
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        if (buttonName != null && READONLY_ALLOWED_BUTTONS.contains(buttonName)) return;
+        throw new AccessDeniedException("「" + panelCode + "」的写操作仅管理员可执行(其他角色只读)");
+    }
+
+    /** 面板是否仅管理员可访问(见 {@link #ADMIN_ONLY_PANELS}) —— 保留给"完全不可见"的入口(当前无调用) */
     public void requirePanelNotAdminOnly(String panelCode) {
         if (panelCode == null || !ADMIN_ONLY_PANELS.contains(panelCode.trim())) return;
         String user = currentUserName();

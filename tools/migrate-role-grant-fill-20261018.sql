@@ -28,12 +28,17 @@ DECLARE @db sysname = DB_NAME();
 RAISERROR(N'[OK] %s 补齐授权行 %d 条(仅限该角色本模块已有授权的面板,不扩权)', 10, 1, @db, @inserted);
 GO
 
-/* 自检:不允许把「本模块零授权」的面板补进来 —— 抽查 普通用户 × 数据建模 必须仍为 0 行 */
+/* 自检:本脚本不得把「本模块零授权」的面板补进来。
+   ⚠ 2026-10-18 追加口径:用户后来同意给普通用户开数据建模的**只读**入口(见
+   migrate-role-grant-dm-readonly-20261018.sql),所以这里不再断言"0 行",
+   改为断言"数据建模对普通用户只许只读词,不许 add/modify/del/save 等写词"。 */
 DECLARE @leak int = (SELECT COUNT(*) FROM yj_role_panel r
                       JOIN yj_panel p ON p.panel_code = r.panel_code
-                     WHERE r.role_id = 2 AND p.module_group = N'数据建模');
-IF @leak > 0 RAISERROR(N'[FAIL] 普通用户被补进了数据建模的 %d 张面板(应为 0)', 16, 1, @leak);
-ELSE PRINT N'[OK] 数据建模仍仅管理员可配(普通用户 0 行)';
+                     WHERE r.role_id = 2 AND p.module_group = N'数据建模'
+                       AND (r.perms LIKE '%add%' OR r.perms LIKE '%modify%' OR r.perms LIKE '%del%'
+                            OR r.perms LIKE '%audit%' OR r.perms LIKE '%save%'));
+IF @leak > 0 RAISERROR(N'[FAIL] 普通用户在数据建模拿到 %d 条写权限(应只读)', 16, 1, @leak);
+ELSE PRINT N'[OK] 数据建模对普通用户只读(无写词)';
 GO
 
 SELECT CONCAT('剩余无授权面板 ', CAST(COUNT(*) AS varchar)) FROM yj_panel p

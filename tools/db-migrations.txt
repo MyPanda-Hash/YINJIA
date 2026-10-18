@@ -3781,6 +3781,8 @@ migrate-role-panel-modules-20261018.sql
 # 角色面板权限:补齐「该角色本模块已有授权 ⇒ 同模块本就放行」的面板行(view,query),**不扩权**;
 #   数据建模(字段管理/数据字典/ERP导入日志)对普通用户保持 0 行。幂等;两账套。
 migrate-role-grant-fill-20261018.sql
+# 数据建模 4 张(字段管理/数据字典/ERP导入日志/ERP导入明细)对「普通用户」开只读 view,query(用户 2026-10-18 同意)。幂等;两账套。
+migrate-role-grant-dm-readonly-20261018.sql
 # YINJIA-MES 数据库迁移清单(唯一权威顺序,按行序执行)
 #   对照库 = 服务器备份 yjmes2.bak(源库 HSDZ_MES,2026-10-15 09:52)还原出的 YJMES2_SRV_1015 实测:
 #   ⚠ 2026-10-15 用户后续要求(**有意偏离服务器现状**,已两账套 sp_rename+ALTER 先行改好,脚本负责收敛):

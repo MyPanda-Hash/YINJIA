@@ -4261,6 +4261,12 @@ const queryDialogFields = computed(() => {
  * 常量一律前置,消灭 TDZ。
  */
 const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW']
+/**
+ * 写操作仅管理员的面板(与服务端 PanelPermissionService.ADMIN_ONLY_PANELS 同源)。
+ * 2026-10-18:原先"连看都不给",用户追加"给非管理员开只读" ⇒ 非管理员进这两张面板时
+ * 工具栏只留浏览动作、网格不进编辑态;写操作仍由服务端 requireAdminOnlyWritable 拦(403)。
+ */
+const ADMIN_ONLY_PANELS = ['FIELDMGR', 'ZDGL']
 /** 只读面板保留下来的纯浏览动作(与后端白名单一致) */
 const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录']
 
@@ -4270,6 +4276,8 @@ const draftEditable = computed(() => {
   // 放在最前 —— 这两个面板的数据由金蝶接口同步写入,界面不给任何内联编辑/加行/粘贴的值入口。
   // 服务端同口径闸门 = PanelPermissionService.requireReadonlyAllowed(连管理员也不给写)。
   if (READONLY_PANELS.includes(panelCode.value)) return false
+  // 管理员专属面板:非管理员只读(网格不进编辑态)
+  if (ADMIN_ONLY_PANELS.includes(panelCode.value) && user.isAdmin !== true) return false
   // 规格书已分配:非 责任人∪总负责人∪管理员 只读(服务端三个入口同口径强制,这里提前置灰)
   if (specAssignBlocked.value) return false
   // 四个受控文件:非该文件责任人只读(判定来自服务端,与保存门禁同一真源)
@@ -8219,6 +8227,12 @@ async function loadCrg() {
   // 这些面板的数据由金蝶接口同步写入,界面只留纯浏览动作。服务端同口径闸门 =
   // PanelPermissionService.requireReadonlyAllowed(连管理员也不给写),这里只是把按钮摘掉,不留"点了才报错"。
   if (READONLY_PANELS.includes(panelCode.value)) {
+    groups.value = groups.value
+      .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a)) }))
+      .filter((g) => (g.actions || []).length > 0)
+  }
+  // 管理员专属面板(字段管理/数据字典):非管理员只剩浏览动作,避免"点了才报 403"
+  if (ADMIN_ONLY_PANELS.includes(panelCode.value) && user.isAdmin !== true) {
     groups.value = groups.value
       .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a)) }))
       .filter((g) => (g.actions || []).length > 0)
