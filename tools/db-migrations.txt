@@ -3861,3 +3861,14 @@ migrate-transfer-stocktake-align-20261018.sql
 #   bl_transfer +调出/调入仓位编码、bl_stocktake +仓位编码;字段参照 WHLOC 并按仓库级联(仓库=$仓库);
 #   4 视图重建带出仓位列。⚠ kucun/流水无仓位维度 ⇒ 仓位只作单据留痕(与采购入库单同口径)。
 migrate-transfer-stocktake-bin-20261018.sql
+
+# migrate-pc0000-to-null-20261019.sql — PC0000(金蝶默认占位批号)归一为「无批号」(NULL)
+#   用户口径 2026-10-19:「pc0000全部改为无批号,出库也可以对有批次号的出库,验收阶段先不管批次号」。
+#   金蝶对未启用批次管理的商品统一填 PC0000,MES 把它当真实批号参与 kucun 三键分账 ⇒
+#   PC0000 行只出不进、结存为负(实测批次负结存 534 行)。
+#   归一后 PC0000 ≡ 无批号 ≡ lot_no IS NULL,与金蝶语义一致;同键(物料,仓库)的 PC0000 行与
+#   无批号行先合并再置 NULL,保证 kucun 三键唯一、余量合计逐分不变。
+#   🔴 方向与 migrate-lot-normalize-blank-to-pc0000.sql(空→PC0000)**相反**,是有意的口径反转,
+#      勿重跑旧脚本(会抵消本脚本)。
+#   幂等(RTRIM 命中不到 NULL)。两账套均已执行。
+migrate-pc0000-to-null-20261019.sql

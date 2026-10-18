@@ -163,8 +163,11 @@ ${sst.map((s) => `<si><t xml:space="preserve">${esc(s)}</t></si>`).join('')}
 const load = (f) => JSON.parse(readFileSync(new URL(f, OUT), 'utf8'))
 // ⚠ 期初必须用**带批号**的那份:不带批号的版本会让全部期初落在"无批号行",
 //   与 MES 的 PC0000 口径永远对不上(实测负结存 785 → 带批号后 535)
-const A = load('./opening-A-0831-lot.json')
-const B = load('./opening-B-0901.json')
+// ⚠ 2026-10-19 起 PC0000 已在库里归一为「无批号」(migrate-pc0000-to-null-20261019.sql),
+//   故导出 Excel 时同步把 PC0000 显示成空 —— 否则表与实际库存口径不一致。
+const normalizeLot = (r) => ({ ...r, lot: (!r.lot || r.lot.toUpperCase() === 'PC0000') ? null : r.lot })
+const A = load('./opening-A-0831-lot.json').map(normalizeLot)
+const B = load('./opening-B-0901.json').map(normalizeLot)
 
 // MES 侧对照:当前结存 + 9/1后流水净额
 const pool = await mssql.connect({ server: '127.0.0.1', port: 1433, database: 'HSDZ_MES', user: 'yinjia',
