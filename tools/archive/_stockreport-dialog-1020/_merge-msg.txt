@@ -1,0 +1,15 @@
+merge: 合并 origin/main(57 提交)到本地 11 提交
+
+冲突处理:
+· frontend/src/core/views/PanelxList.vue(唯一源码冲突):两侧对同一根因做了**同一处修复**
+  —— 查询弹窗不再 append-to-body(远端 2026-10-18 已修「遮罩叠两层」,本地 2026-10-20 独立
+  复现并修出同样结论)。合并保留两边的说明 + 本地额外的 `v-if="panelAlive"`(实例私有
+  instanceActive)作为双保险:将来谁把 append-to-body 加回来,失活实例也不会渲染自己的弹窗。
+· backend/src/main/resources/static/**(131 个生成产物冲突,全是 rename/rename):
+  一律取远端版本,随后按**合并后的源码**重新 vite build 再覆盖(单独 chore 提交)。
+
+合并后验证:
+· SFC 静态核 ①②③ 全过(顺手修了检查器:模板扫描前先剥 HTML 注释,否则注释里的
+  `<component :is=` 会被当成未声明引用报假阳性)
+· vite build 通过(PanelxList-oQAGHslY.js)
+· 后端全量 javac(-parameters)通过,189 个 class

@@ -1,0 +1,14 @@
+
+########## 库存台账 STOCK_LEDGER ##########
+① 进入面板: {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_LEDGER","rows":0,"messages":[]}
+② 点「取消」(not-found) 后: {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_LEDGER","rows":0,"messages":[]}
+③ 再进入 {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_LEDGER","rows":0,"messages":[]} → 点✕(no-dialog) 后: {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_LEDGER","rows":0,"messages":[]}
+④ 再进入 {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_LEDGER","rows":0,"messages":[]} → 填日期(no-dialog) → 点查询(not-found): {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_LEDGER","rows":0,"messages":[]}
+   本次查询期间 px 请求: []
+
+########## 收发存汇总表 STOCK_SUMMARY ##########
+① 进入面板: {"overlays":0,"dialogs":1,"titles":["查询"],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0,"messages":[]}
+② 点「取消」(clicked) 后: {"overlays":0,"dialogs":2,"titles":["查询","查询"],"hash":"#/dashboard","rows":0,"messages":[]}
+③ 再进入 {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0,"messages":[]} → 点✕(no-dialog) 后: {"overlays":0,"dialogs":0,"titles":[],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0,"messages":[]}
+④ 再进入 {"overlays":0,"dialogs":2,"titles":["查询","查询"],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0,"messages":[]} → 填日期(no-range-inputs) → 点查询(clicked): {"overlays":0,"dialogs":2,"titles":["查询","查询"],"hash":"#/panelx/list/STOCK_SUMMARY","rows":0,"messages":[]}
+   本次查询期间 px 请求: ["/api/px/getPanelConfig?panelCode=STOCK_SUMMARY","/api/px/queryFormDataList","/api/px/queryFormDataList","/api/px/queryFormDataList","/api/px/queryFormDataList"]

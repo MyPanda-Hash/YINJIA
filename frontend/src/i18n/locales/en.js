@@ -1468,6 +1468,8 @@ export default {
     '单据日期': 'Doc Date',
     '至': 'to',
     '请填写单据日期': 'Doc date range is required',
+    '生效中': 'Active',
+    '期次': 'Period',
     '库存台账需选择一个仓库和一种存货': 'Stock Ledger requires one warehouse and one item',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Approved but not pushed documents. Check items then click Start Push.',
     '开始转ERP': 'Start Push',

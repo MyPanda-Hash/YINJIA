@@ -1,0 +1,13 @@
+chore: 前端静态产物同步(vite build → backend static,含本轮弹窗修复)
+
+npm run build(vite 6.4.3)产物同步进 backend/src/main/resources/static,
+并已随 _repack-jar.mjs 打进 8090 正在运行的 jar。
+
+本次前端包含:
+· core/report/reportQuery.js 新增 alreadyAutoOpened(每次进入只自动弹一次)
+· PanelxList 查询弹窗 v-if="panelAlive"(杜绝 keep-alive 孤儿弹窗)
+· onActivated/onDeactivated 成对管门
+· 弹窗顶部「生效中」条件行 + 日期段默认「本月初→今天」
+
+产物校验:index.html 引用的 5 个 asset 全部存在;PanelxList-CG9EQGP6.js 在包内;
+jar 自检 BOOT-INF/lib 128 条不变。

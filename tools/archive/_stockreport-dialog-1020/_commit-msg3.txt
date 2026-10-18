@@ -1,0 +1,30 @@
+fix: 库存台账/收发存汇总「关了又弹」竞态 + keep-alive 孤儿弹窗(第二轮)
+
+接 253f4377。第一轮把弹窗门抽成纯函数后,真机(无头 Edge + 真后端)又跑出两个新问题:
+
+① 关闭后弹窗自己弹回来(竞态)
+   点 ✕ → onQueryDialogClose 里 router.push('/dashboard') 是异步的;在它落地前若还有一次
+   load(),此刻 panelCode 仍是旧值、hasApplied 仍 false、dialogVisible 已 false ⇒ 门又放行,
+   弹窗当场弹回来。
+   · 新增 rqdAutoOpened:「自动弹」严格绑定「每个面板每次进入最多一次」,与 load() 调几次无关
+   · shouldAutoOpenReportQuery 增加 alreadyAutoOpened 参数 + 单测「竞态防线」
+
+② 孤儿弹窗压在别的页面(keep-alive + append-to-body)
+   切走后实例还活着、弹窗挂在 body 上 ⇒ 进汇总页能看到两个「查询」。
+   · 查询弹窗加 v-if="panelAlive"(路由上确有面板号才渲染)—— 结构性杜绝
+   · onDeactivated 封门(rqdAutoOpened=true),onActivated 重开(先 await loadCrg() 再判,
+     否则激活时 cfgCache 还是 null,闸看不到 metadata.reportQueryDialog)
+
+③ 一并修掉的工程问题
+   · 上一轮把 ledgerWhOptions 误写成 ledgerRefOptions ⇒ 台账一进面板 ReferenceError、整页空白;
+     vite build 与模板检查都不报。_check-sfc.mjs 增加「script 里 X.value 必须有声明」检查,
+     并修掉它自己那个吃掉 18 万字符的模板字符串正则(否则检查恒过)
+   · 新增 _repack-jar.mjs(停服务前提):dist→static→jar uf→自检,替代手工拼 jar
+   · 手工 javac 必须带 -parameters,否则 Spring 起不来(见文档 L6)
+
+验证(全部 PASS,服务已重启上线):
+   纯函数单测 8/8 · 门控时序 14/14 · 接口口径 20/20 · 端到端 UI 14/14
+   端到端实测:进入台账 1 个弹窗+默认日期段;✕ 关掉不再弹回;重进仍是 1 个;
+   工具栏查询不叠加;未选仓位存货被必填拦截;按方案查询 → 请求体带齐
+   仓库/存货/编码/日期段,列表 11 行(期初+9 流水+期末) —— 修复前只有 2 行。
+   截图见 tools/archive/_stockreport-dialog-1020/e2e-*.png
