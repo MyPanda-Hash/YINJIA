@@ -13,9 +13,10 @@ DISPATCH_STATS	工序派工单统计表	报表	flat	v_dispatch_stats			id				50	
 EMP	职员	基础设置	archive	bs_emp			id				50	emp	基础设置			Employee
 EQUIP	设备	基础设置	archive	bs_equip			id				50	equip	基础设置			Equipment
 EQUIP_CHECK	设备点检记录	生产管理	doc	equip_check_detail	equip_check	单据编号	id	单据编号	DJ	年月	20	items	生产制造			
-ERPLG	ERP导入日志	基础设置	archive	erp_imp_log			id	批次号		导入时间	50	erplg	基础档案			ERP Import Log
-ERPLG_ROW	ERP导入明细	基础设置	flat	erp_imp_row			id	批次号			50	items	基础档案			ERP Import Rows
+ERPLG	ERP导入日志	数据建模	archive	erp_imp_log			id	批次号		导入时间	50	erplg	数据建模			ERP Import Log
+ERPLG_ROW	ERP导入明细	数据建模	flat	erp_imp_row			id	批次号			50	items	数据建模			ERP Import Rows
 FEED_CONFIRM	投料确认单	生产管理	doc	feed_confirm_detail	feed_confirm	单据编号	id	单据编号	TR	单据日期	20	items	生产制造			
+FIELDMGR	字段管理	数据建模	archive	yj_field			id	panel_code		id	50	items	数据建模			Field Management
 FIN_ACC	会计科目	基础设置	archive	bd_account			id				50	fin_acc	基础档案			
 FIN_EXP	费用类别	基础设置	archive	bd_expense_type			id				50	fin_exp	基础档案			
 FIN_TAX	税别资料	基础设置	archive	bd_tax_type			id				50	fin_tax	基础档案			

@@ -4251,6 +4251,19 @@ const queryDialogFields = computed(() => {
   return fields.filter((field) => headerFieldKey(field) !== '备注')
     // 台账/库存状况的 仓库/存货 也走通用渲染:参照双模(仓库 6 行下拉/存货 3838 行弹窗)+ 联动收窄提示
 })
+/**
+ * 只读面板清单(与服务端 PanelPermissionService.READONLY_PANELS 同源)。
+ * 新增只读面板时两处一起改;服务端是权威闸门(默认拒绝),这里漏改只会多显示几个按钮。
+ *
+ * 2026-10-18 合并修正:这对常量原先声明在文件后段(约第 8220 行),而 draftEditable(约 4259 行)
+ * 与按钮过滤都引用它 ⇒ 任何 **setup 期提前求值**(watch immediate / HMR 重算)都会抛
+ * Cannot access 'READONLY_PANELS' before initialization(合并后 dev 控制台连报 4 次,实测)。
+ * 常量一律前置,消灭 TDZ。
+ */
+const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW']
+/** 只读面板保留下来的纯浏览动作(与后端白名单一致) */
+const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录']
+
 const draftEditable = computed(() => {
   if (reportMode.value) return false
   // ERP集成只读(2026-10-18 用户口径「不可以进行任何人为操作,不可以新增保存删除」):
@@ -8213,13 +8226,7 @@ async function loadCrg() {
   return cfg
 }
 
-/**
- * 只读面板清单(与服务端 PanelPermissionService.READONLY_PANELS 同源)。
- * 新增只读面板时两处一起改;服务端是权威闸门(默认拒绝),这里漏改只会多显示几个按钮。
- */
-const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW']
-/** 只读面板保留下来的纯浏览动作(与后端白名单一致) */
-const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录']
+
 
 function isDisabled(action) {
   const st = current.value?.['单据状态']

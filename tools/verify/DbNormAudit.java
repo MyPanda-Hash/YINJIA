@@ -269,7 +269,7 @@ public class DbNormAudit {
      *  为什么较真:明细报表面板的取数 SQL 只 FROM line_table,那里缺列 = 该面板打开即 500。 */
     static void check05MetaDrift(Connection c) throws Exception {
         String sql = """
-            SELECT RTRIM(f.panel_code), f.col_name, RTRIM(f.place), ISNULL(p.line_table,''), ISNULL(p.head_table,'')
+            SELECT RTRIM(f.panel_code), f.col_name, RTRIM(f.place), ISNULL(p.line_table,''), ISNULL(p.head_table,''), ISNULL(f.label,'')
             FROM yj_field f LEFT JOIN yj_panel p ON RTRIM(p.panel_code) = RTRIM(f.panel_code)
             WHERE f.col_name IS NOT NULL
             ORDER BY 1, f.seq""";
@@ -277,7 +277,7 @@ public class DbNormAudit {
         try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
                 String panel = rs.getString(1), col = rs.getString(2), place = rs.getString(3);
-                String line = rs.getString(4), head = rs.getString(5);
+                String line = rs.getString(4), head = rs.getString(5), label = rs.getString(6);
                 if (wl("panel").contains(panel)) continue;
                 boolean hasHeader = place.contains("header") && !head.isEmpty();
                 boolean hasDetail = place.contains("detail");
@@ -285,6 +285,9 @@ public class DbNormAudit {
                 if (hasHeader) ok = hasCol(c, head, col);
                 else if (hasDetail) ok = hasCol(c, line, col);
                 else ok = hasCol(c, line, col) || hasCol(c, head, col);
+                // 引擎**派生列**豁免(2026-10-18):「面板名称」不是物理列,由 QueryService 按 codeCol
+                // LEFT JOIN yj_panel 带出(判定见 PanelConfigService.derivedPanelName);报错的是体检,不是面板。
+                if (!ok && "panel_name".equalsIgnoreCase(col) && "面板名称".equals(label)) ok = true;
                 if (!ok) bad.add(panel + "." + col + "(" + place + " → " + (hasHeader ? head : line) + ")");
             }
         }
@@ -314,7 +317,9 @@ public class DbNormAudit {
                 if (wl("panel").contains(panel)) continue;
                 List<String> miss = new ArrayList<>();
                 if (!pk.isEmpty() && !hasCol(c, line, pk)) miss.add(pk);
-                if (!hasCol(c, line, "asp_cancel")) miss.add("asp_cancel");
+                // asp_cancel 自 2026-10-18 起**不再硬要求**:引擎按表探测(QueryService.aspCancelCond
+                // → 表无该列时用 1=1),因为「数据建模·字段管理」(FIELDMGR,line_table=yj_field 这种
+                // 元数据表)本来就没有软删列。仍缺 pk_col 才是真 500(引擎每处都拼 t.<pk_col>)。
                 if (!miss.isEmpty()) bad.add(panel + " → " + line + " 缺 " + String.join("+", miss));
             }
         }
