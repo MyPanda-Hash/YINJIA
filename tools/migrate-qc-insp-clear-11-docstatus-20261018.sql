@@ -81,7 +81,9 @@ BEGIN
     RAISERROR(N'[FAIL] 应仍为 11 张草稿,实际 %d', 16, 1, @stillDraft);
     RETURN;
 END
-IF @archived <> 90
+-- 90 张演示单只在远程库有;本地库没有它们时 @archived=0 属正常(11 张真实单不受影响),
+-- 只有「既不是 0 也不是 90」才视为动了别的单,需排查。
+IF @archived NOT IN (0, 90)
 BEGIN
     RAISERROR(N'[FAIL] 90 张已归档的检验单受了影响(现 %d 张),不要提交,先排查', 16, 1, @archived);
     RETURN;

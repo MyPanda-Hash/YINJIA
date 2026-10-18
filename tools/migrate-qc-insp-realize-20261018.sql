@@ -33,6 +33,13 @@ END
 
 /* ═══ 1. 守卫:目标必须正好 90 张,且 11 张真实单(有暂收单号)不在其中 ═══ */
 DECLARE @targets int = (SELECT COUNT(1) FROM qc_insp WHERE CONVERT(varchar(10), asp_time1, 23) = '2026-10-16' AND ISNULL(暂收单号,'') = '' AND ISNULL(asp_cancel,'N') <> 'Y');
+-- 2026-10-18:本地库只有 11 张真实单、没有这批 90 张演示单 ⇒ 空集视为「无需完善」而不是失败
+-- (远程库有 90 张时照旧走下面的严格校验;部分缺失仍 FAIL,不会掩盖异常)
+IF @targets = 0
+BEGIN
+    PRINT N'  [SKIP] 本库没有 2026-10-16 的演示检验单(90 张),无需完善(空集=幂等)';
+    RETURN;
+END
 IF @targets <> 90
 BEGIN
     RAISERROR(N'[FAIL] 目标单据应为 90 张,实际 %d 张,先核对口径', 16, 1, @targets);
