@@ -3741,3 +3741,7 @@ migrate-first-insp-audit-trail-20261018.sql
 #   yj_panel.line_table 为空 ⇒ QueryService.loadDocs 拼出 `FROM null t`(S0001/156,打开单据/列表/保存全 500);
 #   三张 *_detail 早已存在且恒空,只差元数据指针。纯 UPDATE(幂等)+ 自检「全库 doc 无『有头无行』」,两账套均执行。
 migrate-panel-line-table-20261018.sql
+# migrate-record-sheets-head-detail-20261018.sql — 造粒记录/无黑处理登记/封箱确认 三张「记录表」改「表头 + 明细」:
+#   纸面(r6/r23/r25)是「一行一条记录」的台账,此前全部业务字段挂表头 ⇒ 表单明细页签 0 列、列表页 A 区不渲染(用户「看不到明细表」)。
+#   明细表补 15/7/5 个业务列 + 字段 place 由 header 改 detail + 表头只留 5 个 + 头表业务列 DROP(无数据/无引用)+ 清 2 张探针空单;幂等 + 自检。
+migrate-record-sheets-head-detail-20261018.sql
