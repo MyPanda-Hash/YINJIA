@@ -182,6 +182,51 @@ async function main() {
       results.push({ m: m2, ok: m2.expect ? okRow : !has, cards, rows, of375, of768 })
     }
 
+    // ── 可选面板筛选(2026-10-18 用户口径):库存卡选「销售出库单」→ 请求带 panel=SALE_OUT、
+    //    列表只剩该面板、面板总数不变。默认列表恰好全是「其他出库单」,故选一张不同的面板才验得出筛选生效。
+    //    ⚠ Element Plus 2.x 的点开热区是 .el-select__wrapper(点根节点 .doc-filter 不展开);
+    //      下拉项在 teleport 到 body 的 popper 里,offsetParent 为 null,不能拿它筛可见项。
+    await ev(`(location.hash = '#/dashboard', 'ok')`)
+    await waitFor(`document.querySelectorAll('.mod-tab').length > 0`, 15000)
+    await sleep(700)
+    await ev(`(() => { const tabs = [...document.querySelectorAll('.mod-tab')]
+      const t = tabs.find((b) => b.textContent.replace(/\\s+/g, '').indexOf('库存') >= 0)
+      if (t) t.click(); return 1 })()`)
+    await waitFor(`document.querySelectorAll('.doc-entry .doc-item').length > 0`, 12000)
+    await sleep(400)
+    const countBefore = await ev(`(() => { const c = document.querySelector('.doc-entry'); const n = c && c.querySelector('.doc-count'); return n ? n.textContent.trim() : '' })()`)
+    await ev(`(() => { const c = document.querySelector('.doc-entry'); if (c) c.scrollIntoView({ block: 'center' })
+      const w = document.querySelector('.doc-entry .doc-filter .el-select__wrapper') || document.querySelector('.doc-entry .doc-filter')
+      if (!w) return 'no-select'; w.click(); return 'ok' })()`)
+    await sleep(700)
+    const pickLabel = await ev(`(() => {
+      const items = [...document.querySelectorAll('.el-select-dropdown__item')]
+        .filter((e) => e.getBoundingClientRect().width > 0)
+      const t = items.find((e) => e.textContent.trim() === '销售出库单')
+      if (!t) return 'not-found:' + items.map((e) => e.textContent.trim()).join('|')
+      t.click(); return t.textContent.trim()
+    })()`)
+    console.log('[panel] 选择面板=' + pickLabel)
+    let panelUrl = ''
+    for (let i = 0; i < 40; i++) {
+      panelUrl = netLog.filter((x) => x.indexOf('panel=') >= 0).slice(-1)[0] || ''
+      if (/panel=SALE_OUT/.test(panelUrl)) break
+      await sleep(250)
+    }
+    await sleep(1200)
+    const ap = JSON.parse(await ev(`JSON.stringify({
+      rows: [...document.querySelectorAll('.doc-entry .doc-item')].length,
+      badges: [...new Set([...document.querySelectorAll('.doc-entry .doc-badge')].map((e) => e.textContent.trim()))],
+      count: (document.querySelector('.doc-entry .doc-count') || {}).textContent || ''
+    })`) || '{}')
+    const panelOk = !!panelUrl && /panel=SALE_OUT/.test(panelUrl) &&
+      ap.rows > 0 && ap.rows <= 7 &&
+      (ap.badges || []).length === 1 && ap.badges[0] === '销售出库单' &&
+      String(ap.count).trim() === String(countBefore).trim()
+    console.log('[panel] ' + (panelUrl || '(无请求)') + ' rows=' + ap.rows +
+      ' badges=' + JSON.stringify(ap.badges) + ' count=' + ap.count + (panelOk ? '' : '  ← FAIL'))
+    await shot('docentry-panel-filter', 1440, 1000)
+
     // 点击验证(2026-10-18 补):五个模块逐个点第一张单据 → 必须跳到 /panelx/list/<panelCode>
     // 生产当前无单据 ⇒ 该模块记录 skipped(空态由上面的 empty 断言覆盖),不算失败。
     const clickResults = []
@@ -216,9 +261,9 @@ async function main() {
     const bad = results.filter((r) => !r.ok)
     console.log('[summary] ' + results.map((r) => r.m.key + '=' + (r.ok ? 'OK' : 'FAIL')).join(' ') +
       ' click=' + (clickedOk ? 'OK' : 'FAIL'))
-    const pass = bad.length === 0 && clickedOk &&
+    const pass = bad.length === 0 && clickedOk && panelOk &&
       !results.some((r) => (r.of375 && r.of375.card) || (r.of768 && r.of768.card))
-    console.log(pass ? '[PASS] 五模块单据入口渲染 + 最近 7 张单据 + 点击跳转 + 卡片无横向溢出' : '[FAIL] 见上面各项')
+    console.log(pass ? '[PASS] 五模块单据入口渲染 + 可选面板筛选 + 最近 7 张单据 + 点击跳转 + 卡片无横向溢出' : '[FAIL] 见上面各项')
   } finally {
     try { cdp && cdp.close() } catch { /* ignore */ }
     try { cdp && cdp.close() } catch { /* ignore */ }

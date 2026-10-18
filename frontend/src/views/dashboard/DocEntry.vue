@@ -4,9 +4,23 @@
        根元素刻意是 section.card —— 父组件(桌面)的 .card / .col-12 是 scoped 样式,子组件根节点
        会继承父作用域 id,所以卡片外观与栅格宽度都沿用桌面那一套,不另起一套卡片皮肤。 -->
   <section class="card doc-entry">
-    <div class="doc-head">
+    <div class="doc-head" :class="{ compact }">
       <h3>{{ tt('单据入口') }}</h3>
       <span class="doc-sub">{{ tt('最近 7 张单据') }}</span>
+      <!-- 可选面板(2026-10-18 用户口径):默认「全部面板」= 本模块汇总;选某张面板 ⇒ 只出该面板最近 7 张。
+           选项来自后端返回的 panels(接口保证 panels 不随 panel 收窄),clearable 可退回全部。 -->
+      <el-select
+        v-model="selectedPanel"
+        class="doc-filter"
+        size="small"
+        clearable
+        filterable
+        :placeholder="tt('全部面板')"
+        :aria-label="tt('全部面板')"
+        @change="load"
+      >
+        <el-option v-for="p in panels" :key="p.code" :label="tt(p.name)" :value="p.code" />
+      </el-select>
       <span v-if="panels.length" class="doc-count">{{ panels.length }} {{ tt('个单据面板') }}</span>
     </div>
     <div v-if="loading" class="doc-empty">{{ tt('加载中…') }}</div>
@@ -50,6 +64,8 @@ const emit = defineEmits(['open'])
 const docs = ref([])
 const panels = ref([])
 const loading = ref(true)
+/** 选中的单据面板码;空 = 全部面板(后端不带 panel 参数) */
+const selectedPanel = ref('')
 
 /** 时间显示口径与研发「最新单据」一致:yyyy-MM-dd HH:mm,秒与 T 都截掉 */
 function fmtTime(t) {
@@ -61,7 +77,9 @@ function fmtTime(t) {
 async function load() {
   loading.value = true
   try {
-    const r = await request.get('/dashboard/module-docs', { params: { module: props.module, limit: props.limit } })
+    const params = { module: props.module, limit: props.limit }
+    if (selectedPanel.value) params.panel = selectedPanel.value
+    const r = await request.get('/dashboard/module-docs', { params })
     const d = r?.data || {}
     docs.value = d.docs || []
     panels.value = d.panels || []
@@ -80,7 +98,7 @@ onMounted(load)
 <style scoped>
 .doc-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -106,9 +124,36 @@ onMounted(load)
   color: #9ca3af;
 }
 .doc-count {
-  margin-left: auto;
+  margin-left: 8px;
   font-size: 12px;
   color: #9ca3af;
+}
+/* 可选面板下拉:靠右;compact(研发页 ~400px 卡)时收窄并让出副标题的位置 */
+.doc-filter {
+  flex: none;
+  width: 190px;
+  margin-left: auto;
+}
+.doc-head.compact .doc-sub {
+  display: none;
+}
+.doc-head.compact .doc-filter {
+  width: 140px;
+}
+/* 手机(≤768):标题/副标题/计数一行,面板下拉整体换到下一行并拉满(190px 固定宽在 355px 卡里必溢出) */
+@media (max-width: 768px) {
+  .doc-head {
+    flex-wrap: wrap;
+  }
+  .doc-filter,
+  .doc-head.compact .doc-filter {
+    order: 5;
+    width: 100%;
+    margin-left: 0;
+  }
+  .doc-count {
+    margin-left: auto;
+  }
 }
 .doc-list {
   display: grid;

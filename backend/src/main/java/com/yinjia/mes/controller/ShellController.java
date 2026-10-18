@@ -159,10 +159,15 @@ public class ShellController {
     private static final Map<String, List<String>> MODULE_PANELS = Map.of(
             "sales", List.of("SO_ORDER", "KHDD"));
 
-    /** 桌面模块「单据入口」:该模块单据面板最近 N 张单据 + 面板清单 */
+    /** 桌面模块「单据入口」:该模块单据面板最近 N 张单据 + 面板清单
+     *  @param panel 可选面板码(2026-10-18 用户口径「加上可选面板,筛选的是对应面板的最新的 7 张数据」):
+     *               空 = 本模块全部单据面板汇总;非空 = 只出该面板的最近 N 张。
+     *               ⚠ panels 清单**不随 panel 收窄** —— 前端下拉要一直能列出本模块全部单据面板,
+     *               否则选了第一张后面板选项就没了。 */
     @GetMapping("/dashboard/module-docs")
     public ApiResult<Map<String, Object>> moduleDocs(@RequestParam String module,
-                                                     @RequestParam(defaultValue = "7") int limit) {
+                                                     @RequestParam(defaultValue = "7") int limit,
+                                                     @RequestParam(required = false) String panel) {
         String mod = module == null ? "" : module.trim();
         List<String> pinned = MODULE_PANELS.get(mod);
         String group = MODULE_GROUP.get(mod);
@@ -190,6 +195,8 @@ public class ShellController {
             p.put("code", def.code());
             p.put("name", def.name());
             panels.add(p);
+            // 面板筛选只作用于单据列表(见方法头:panels 必须保持全量)
+            if (panel != null && !panel.isBlank() && !panel.trim().equals(def.code())) continue;
             try {
                 for (Map<String, Object> r : jdbc.queryForList(
                         "SELECT TOP " + n + " t.[" + docCol + "] AS docNo, t.asp_user1 AS creator, t.asp_time1 AS at"

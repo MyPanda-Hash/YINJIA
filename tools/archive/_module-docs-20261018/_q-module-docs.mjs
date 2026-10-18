@@ -65,5 +65,32 @@ for (const mod of ['rd', 'prod', 'stock', 'sales', 'quality']) {
     console.log(`      ${String(x.at).slice(0, 16)}  ${x.panelName}  ${x.docNo}  ${x.creator || '-'}`)
   }
 }
+// ── 可选面板筛选(2026-10-18 用户口径「加上可选面板,筛选的是对应面板的最新的 7 张数据」)──
+// 断言三件事:①doc 全属该面板;②条数 ≤7 且倒序;③panels 清单**不随 panel 收窄**(下拉要一直列全)
+for (const mod of ['rd', 'prod', 'stock', 'sales', 'quality']) {
+  const full = await get('/api/dashboard/module-docs?module=' + mod + '&limit=7', token)
+  const fp = full.json?.data?.panels || []
+  if (!fp.length) { console.log(`[SKIP] ${mod}: 无单据面板`); continue }
+  const code = fp[0].code
+  const one = await get(`/api/dashboard/module-docs?module=${mod}&limit=7&panel=${encodeURIComponent(code)}`, token)
+  const d = one.json?.data || {}
+  const docs = d.docs || []
+  const allSame = docs.every((x) => x.panelCode === code)
+  const desc = docs.every((x, i) => i === 0 || String(docs[i - 1].at) >= String(x.at))
+  const panelsWhole = (d.panels || []).length === fp.length
+  const ok = one.status === 200 && allSame && desc && docs.length <= 7 && panelsWhole
+  if (!ok) bad++
+  console.log(`[${ok ? 'OK' : 'FAIL'}] ${mod} panel=${code}: ${docs.length} 张, 全属该面板=${allSame}, ` +
+    `panels 全量=${panelsWhole}(${(d.panels || []).length}/${fp.length}), 倒序=${desc}`)
+}
+// 未知面板:空列表但不能把 panels 一起清掉,也不能 500
+{
+  const r = await get('/api/dashboard/module-docs?module=stock&limit=7&panel=NO_SUCH_PANEL', token)
+  const d = r.json?.data || {}
+  const ok = r.status === 200 && (d.docs || []).length === 0 && (d.panels || []).length > 0
+  if (!ok) bad++
+  console.log(`[${ok ? 'OK' : 'FAIL'}] 未知面板: HTTP ${r.status}, docs=${(d.docs || []).length}, panels=${(d.panels || []).length}`)
+}
+
 console.log(bad === 0 ? '[PASS] 五模块单据入口全部符合预期' : `[FAIL] ${bad} 个模块不符合预期`)
 process.exit(bad === 0 ? 0 : 2)

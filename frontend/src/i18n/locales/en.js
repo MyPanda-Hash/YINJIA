@@ -2730,6 +2730,7 @@ export default {
     '单据入口': 'Documents',
     '最近 7 张单据': 'Latest 7 documents',
     '个单据面板': 'document panels',
+    '全部面板': 'All panels',
     /* ── 五道工序 ── */
     '五道工序': '5 Operations',
     '工序报工': 'Stage Reporting',
