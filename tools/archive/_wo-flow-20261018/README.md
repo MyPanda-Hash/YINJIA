@@ -104,6 +104,37 @@ node archive/_wo-flow-20261018/_seed-wo-picking.mjs --db HSDZ_MES --cleanup --ap
 
 ⚠ 与第一轮一致:**未记库存流水**,材料库存不因这批领料减少。
 
+## 后续补丁:首件/制程检验单(2026-10-18 第三轮,用户报「只有组装成品检验单」)
+
+引擎的**工序 → 检验单**映射(`QcInspAutoService.OP_PANELS`)是:
+
+| 工序累计达计划量 | 出的检验单 |
+|---|---|
+| 成型 | **首件检验单 `QC_FIRST_INSP`(SJ)** + **制程检验单 `QC_PROC_INSP`(ZC)** |
+| 组装 | 组装成品检验单 `QC_ASM_INSP`(ZJ) |
+| 切炭/混料/装箱 | 不出单(2026-10-16 已下架) |
+
+第一轮只造了 ZJ(它是**结案判据**,所以先做),SJ/ZC 漏了。`_seed-wo-insp.mjs` 按同一映射补齐:
+
+| 项 | 首件检验单 | 制程检验单 |
+|---|---|---|
+| 单头 | `qc_first_insp_head`:工单号/工单行号/**报工单号(成型)**/工序=成型/批次号/生产线(成型线)/报工数量/检验数量/生产日期/总结论=合格 | `qc_proc_insp_head`:检验类别=制程检验/工序=成型/抽检总量/检验数量/总结论=合格 |
+| 明细 | `qc_first_insp_detail`:5 项 × (标准行 行号0 + 样品行 行号n),样品行结果判断=合格 | `qc_proc_insp_detail`:3 项 × (标准行 + 实测行),单项判定=合格 |
+| 审核 | `yj_doc_status(shr 非空)` ⇒ 面板显示「已审核/已通过」 | 同左 |
+
+- **幂等** = 唯一键 `(工单号, 工单行号)` × 面板(与引擎 `existsLive` 同口径),缺哪张补哪张,可直接增量重跑;
+- 测试账存在同 `(工单号,工单行号)` 多物理行(`MO-2026-09-0006#1` ×4),JOIN 报工会**笛卡尔膨胀**(4×4),
+  故按行标识聚合后再出单;
+- 结果:`HSDZ_MES` 首件 418 / 制程 417(1 行原本已有制程单,只补首件),已结案行缺单 **0/0/0**;
+  `HSDZ_MES_TEST` 首件 22 / 制程 22(26 个已结案物理行归并成 22 个行标识),缺单 **0/0/0**。
+
+```powershell
+cd tools
+node archive/_wo-flow-20261018/_seed-wo-insp.mjs --db HSDZ_MES --apply     # 增量补,缺哪张补哪张
+node archive/_wo-flow-20261018/_seed-wo-insp.mjs --db HSDZ_MES --verify    # 三类检验单缺单数应全 0
+node archive/_wo-flow-20261018/_seed-wo-insp.mjs --db HSDZ_MES --cleanup --apply
+```
+
 ## 部署注意
 
 这批是**为了让生产工单跑完整流程而补的业务数据**(不是演示账号那类假数据),按 AGENTS
