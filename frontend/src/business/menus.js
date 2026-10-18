@@ -255,6 +255,11 @@ export const menuTree = [
           { code: 'barcodeMat', title: '材料仓条码管理', path: '/panelx/list/BARCODE_MAT', panelCode: 'BARCODE_MAT', icon: 'Tickets' },
           { code: 'barcodeWip', title: '半成品仓条码管理', path: '/panelx/list/BARCODE_WIP', panelCode: 'BARCODE_WIP', icon: 'Box' },
           { code: 'barcodeFin', title: '成品仓条码管理', path: '/panelx/list/BARCODE_FIN', panelCode: 'BARCODE_FIN', icon: 'Finished' },
+          // 扫码领料(2026-10-18 用户口径:「根据这个规则或设定在条码管理里面通过标签进行操作」):
+          // 页面级(无 panelCode),扫标签码 `存货编码|批号` → 按批号查 v_stock_pick 可用量 → 组单。
+          // 存在的理由:材料出库单里选商品看的是(物料,仓库)聚合口径,常显示「没有库存」;
+          // 仓库实际发料关心的是批号级可用量,而标签里正好带着批号。
+          { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', icon: 'FullScreen' },
         ],
       },
     ],
