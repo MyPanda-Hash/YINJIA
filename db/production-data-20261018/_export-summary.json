@@ -1,0 +1,101 @@
+{
+  "generatedAt": "2026-10-18T10:17:24.931Z",
+  "source": "http://36.140.66.163:8090",
+  "factory": "YJ",
+  "panels": [
+    {
+      "panel": "WO_REPORT",
+      "name": "工序报工单",
+      "documents": 1261,
+      "rows": 1262,
+      "columns": 18,
+      "kb": 213.2,
+      "file": "工序报工单-WO_REPORT.csv"
+    },
+    {
+      "panel": "WO_REPORT_LIST",
+      "name": "报工记录",
+      "documents": 1263,
+      "rows": 1263,
+      "columns": 12,
+      "kb": 136.3,
+      "file": "报工记录-WO_REPORT_LIST.csv"
+    },
+    {
+      "panel": "WO_COMPLETION_LIST",
+      "name": "完工明细",
+      "documents": 1262,
+      "rows": 1262,
+      "columns": 16,
+      "kb": 206.7,
+      "file": "完工明细-WO_COMPLETION_LIST.csv"
+    },
+    {
+      "panel": "PROD_ABN",
+      "name": "生产异常处理单",
+      "documents": 1,
+      "rows": 1,
+      "columns": 20,
+      "kb": 0.5,
+      "file": "生产异常处理单-PROD_ABN.csv"
+    },
+    {
+      "panel": "DAY_REPORT",
+      "name": "生产日报表",
+      "documents": 1,
+      "rows": 2,
+      "columns": 25,
+      "kb": 0.7,
+      "file": "生产日报表-DAY_REPORT.csv"
+    },
+    {
+      "panel": "FEED_CONFIRM",
+      "name": "投料确认单",
+      "documents": 1,
+      "rows": 2,
+      "columns": 15,
+      "kb": 0.5,
+      "file": "投料确认单-FEED_CONFIRM.csv"
+    },
+    {
+      "panel": "MIX_RECORD",
+      "name": "物料混合记录",
+      "documents": 1,
+      "rows": 2,
+      "columns": 16,
+      "kb": 0.5,
+      "file": "物料混合记录-MIX_RECORD.csv"
+    },
+    {
+      "panel": "GRAN_RECORD",
+      "name": "造粒记录",
+      "documents": 1,
+      "rows": 1,
+      "columns": 20,
+      "kb": 0.4,
+      "file": "造粒记录-GRAN_RECORD.csv"
+    },
+    {
+      "panel": "WH_RECORD",
+      "name": "无黑处理登记",
+      "documents": 2,
+      "rows": 2,
+      "columns": 13,
+      "kb": 0.4,
+      "file": "无黑处理登记-WH_RECORD.csv"
+    },
+    {
+      "panel": "PACK_CONFIRM",
+      "name": "封箱确认",
+      "documents": 1,
+      "rows": 1,
+      "columns": 11,
+      "kb": 0.2,
+      "file": "封箱确认-PACK_CONFIRM.csv"
+    }
+  ],
+  "totals": {
+    "documents": 3794,
+    "rows": 3798
+  }
+}
