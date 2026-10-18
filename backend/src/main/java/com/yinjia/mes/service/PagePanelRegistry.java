@@ -86,13 +86,15 @@ public final class PagePanelRegistry {
     };
 
     /**
-     * ERP 集成配置清单:只有「看」和「改配置」两件事。
-     * 配置保存写的是接口/映射/设备绑定三张配置表(全公司共用一份),故单列 save 词,
-     * 不借用 add/modify(那两个词在单据面板上表示"新增/申请修改单据",语义不同)。
+     * ERP 集成配置清单:只有「可见」一个授权词。
+     *
+     * <p>2026-10-18 用户口径「保证这个面板除管理员只可看不可编辑」——
+     * **写配置不再走权限词**(矩阵里也不再给非管理员任何写格子),
+     * 而是由 {@code ErpIntegController} 直接 {@code perm.requireAdmin()}:管理员恒可改,
+     * 非管理员即使被授权"可见"也只能看,连 save 词都授不出去。
      */
     private static final String[][] ERP_INTEG_ACTIONS = {
             {"view", "可见"},
-            {"save", "配置保存"},
     };
 
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */

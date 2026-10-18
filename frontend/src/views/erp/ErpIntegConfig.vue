@@ -88,7 +88,7 @@
       <section class="ei-list">
         <div class="ei-list-head">
           <span class="ei-list-title">{{ tt(activeCat) }} · {{ tt(direction) }}</span>
-          <el-button size="small" type="primary" plain :icon="Plus" @click="newItem">{{ tt('新增接口') }}</el-button>
+          <el-button v-if="!readonly" size="small" type="primary" plain :icon="Plus" @click="newItem">{{ tt('新增接口') }}</el-button>
         </div>
         <div class="ei-cards">
           <div
@@ -130,8 +130,10 @@
           <div class="dh-left">
             <span class="dh-title">{{ current.接口名称 || tt('未命名接口') }}</span>
             <span class="dh-code mono">{{ current.接口编码 || tt('编码待填') }}</span>
+            <!-- 2026-10-18 用户口径:除管理员只可看不可编辑 -->
+            <el-tag v-if="readonly" size="small" type="info">{{ tt('只读(仅管理员可编辑)') }}</el-tag>
           </div>
-          <div class="dh-right">
+          <div v-if="!readonly" class="dh-right">
             <el-button v-if="current._draft" size="small" @click="dropDraft">{{ tt('放弃') }}</el-button>
             <el-button v-else size="small" type="danger" plain :icon="Delete" @click="removeItem">{{ tt('删除接口') }}</el-button>
           </div>
@@ -141,12 +143,12 @@
         <div class="ei-block">
           <div class="block-head">
             <span class="block-title"><i class="bar"></i>{{ tt('接口信息') }}</span>
-            <el-button size="small" type="primary" :loading="savingItem" @click="saveItem">{{ tt('保存接口') }}</el-button>
+            <el-button v-if="!readonly" size="small" type="primary" :loading="savingItem" @click="saveItem">{{ tt('保存接口') }}</el-button>
           </div>
           <div class="form-grid">
             <label class="fi">
               <span class="fi-label">{{ tt('接口名称') }}<em>*</em></span>
-              <el-input v-model="current.接口名称" size="small" :placeholder="tt('如:采购入库单转出')" />
+              <el-input v-model="current.接口名称" size="small" :disabled="readonly" :placeholder="tt('如:采购入库单转出')" />
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('接口编码') }}<em>*</em></span>
@@ -154,33 +156,33 @@
                 v-model="current.接口编码"
                 size="small"
                 class="mono"
-                :disabled="!current._draft"
+                :disabled="readonly || !current._draft"
                 :placeholder="tt('唯一键,如 EXP_PUR_IN')"
               />
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('分类') }}</span>
-              <el-select v-model="current.分类" size="small">
+              <el-select v-model="current.分类" size="small" :disabled="readonly">
                 <el-option v-for="c in categories" :key="c" :label="tt(c)" :value="c" />
               </el-select>
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('提供方') }}</span>
-              <el-input v-model="current.提供方" size="small" :placeholder="tt('金蝶云星辰')" />
+              <el-input v-model="current.提供方" size="small" :disabled="readonly" :placeholder="tt('金蝶云星辰')" />
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('请求方式') }}</span>
-              <el-select v-model="current.请求方式" size="small">
+              <el-select v-model="current.请求方式" size="small" :disabled="readonly">
                 <el-option v-for="m in methods" :key="m" :label="m" :value="m" />
               </el-select>
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('触发方式') }}</span>
-              <el-input v-model="current.触发方式" size="small" :placeholder="tt('转ERP按钮 / 定时同步 / 手动')" />
+              <el-input v-model="current.触发方式" size="small" :disabled="readonly" :placeholder="tt('转ERP按钮 / 定时同步 / 手动')" />
             </label>
             <label class="fi wide">
               <span class="fi-label">{{ tt('接口地址') }}</span>
-              <el-input v-model="current.接口地址" size="small" class="mono" :placeholder="tt('/jdy/v2/scm/pur_inbound')" />
+              <el-input v-model="current.接口地址" size="small" class="mono" :disabled="readonly" :placeholder="tt('/jdy/v2/scm/pur_inbound')" />
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('对应面板') }}</span>
@@ -189,6 +191,7 @@
                 size="small"
                 filterable
                 clearable
+                :disabled="readonly"
                 :placeholder="tt('MES 面板编码')"
                 @change="loadPanelFields"
               >
@@ -202,19 +205,19 @@
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('目标对象') }}</span>
-              <el-input v-model="current.目标对象" size="small" :placeholder="tt('金蝶侧单据/档案名')" />
+              <el-input v-model="current.目标对象" size="small" :disabled="readonly" :placeholder="tt('金蝶侧单据/档案名')" />
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('排序') }}</span>
-              <el-input-number v-model="current.排序" size="small" :min="0" :step="10" controls-position="right" />
+              <el-input-number v-model="current.排序" size="small" :min="0" :step="10" :disabled="readonly" controls-position="right" />
             </label>
             <label class="fi">
               <span class="fi-label">{{ tt('启用') }}</span>
-              <el-switch v-model="current.启用" :active-text="tt('启用')" :inactive-text="tt('停用')" inline-prompt />
+              <el-switch v-model="current.启用" :disabled="readonly" :active-text="tt('启用')" :inactive-text="tt('停用')" inline-prompt />
             </label>
             <label class="fi wide">
               <span class="fi-label">{{ tt('说明') }}</span>
-              <el-input v-model="current.说明" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" />
+              <el-input v-model="current.说明" size="small" type="textarea" :disabled="readonly" :autosize="{ minRows: 1, maxRows: 3 }" />
             </label>
           </div>
         </div>
@@ -226,7 +229,7 @@
               <i class="bar"></i>{{ tt('对应设备') }}
               <em class="block-hint">{{ tt('这条接口的数据来自哪些设备 / 作用于哪些设备') }} · {{ deviceRows.length }} {{ tt('台设备') }}</em>
             </span>
-            <el-button size="small" type="primary" :loading="savingDevices" @click="saveDevices">{{ tt('保存设备') }}</el-button>
+            <el-button v-if="!readonly" size="small" type="primary" :loading="savingDevices" @click="saveDevices">{{ tt('保存设备') }}</el-button>
           </div>
           <div class="dev-toolbar">
             <el-select
@@ -235,6 +238,7 @@
               filterable
               clearable
               class="dev-picker"
+              :disabled="readonly"
               :placeholder="tt('从设备档案(bs_equip)选择设备')"
               @change="addDevice"
             >
@@ -255,15 +259,15 @@
             <el-table-column :label="tt('设备名称')" width="140" prop="设备名称" />
             <el-table-column :label="tt('设备用途')" width="140">
               <template #default="{ row }">
-                <el-select v-model="row.设备用途" size="small" filterable allow-create default-first-option>
+                <el-select v-model="row.设备用途" size="small" :disabled="readonly" filterable allow-create default-first-option>
                   <el-option v-for="u in deviceRoles" :key="u" :label="tt(u)" :value="u" />
                 </el-select>
               </template>
             </el-table-column>
             <el-table-column :label="tt('备注')" min-width="200">
-              <template #default="{ row }"><el-input v-model="row.备注" size="small" /></template>
+              <template #default="{ row }"><el-input v-model="row.备注" size="small" :disabled="readonly" /></template>
             </el-table-column>
-            <el-table-column :label="tt('操作')" width="70" align="center">
+            <el-table-column v-if="!readonly" :label="tt('操作')" width="70" align="center">
               <template #default="{ $index }">
                 <el-button link type="danger" size="small" @click="deviceRows.splice($index, 1)">{{ tt('移除') }}</el-button>
               </template>
@@ -277,14 +281,10 @@
           <div class="block-head">
             <span class="block-title">
               <i class="bar"></i>{{ tt('字段映射') }}
-              <em class="block-hint">{{ tt('一行 = 一个 MES 字段/常量 → 金蝶接口字段') }} · {{ tt('必填') }} {{ requiredCount }} / {{ fieldRows.length }} · {{ tt('MES 字段下拉 = 对应面板的字段') }}</em>
+              <em class="block-hint">{{ tt('一行 = 一个 MES 字段/常量 → 金蝶接口字段') }} · {{ tt('必填') }} {{ requiredCount }} / {{ fieldRows.length }}</em>
             </span>
-            <div class="block-actions">
-              <!-- 「按面板字段带出」从工具栏移到**空表态**里(2026-10-18 用户口径:
-                   「为什么要区分按面板字段带出这个按钮,来显示前后不同字段」)——
-                   映射行 = 对端真正需要的键(商品档案 4 行 / 面板却有 58 个字段),
-                   一键铺全会把已有映射冲成一屏待补行,看起来像"字段变了"。
-                   故只在**还没有任何映射行**时提供"一次铺出",已有映射时不再出现,由「新增一行」逐条加。 -->
+            <div v-if="!readonly" class="block-actions">
+              <el-button size="small" @click="fillFromPanel">{{ tt('按面板字段带出') }}</el-button>
               <el-button size="small" @click="addFieldRow">{{ tt('新增一行') }}</el-button>
               <el-button size="small" type="primary" :loading="savingFields" @click="saveFields">{{ tt('保存映射') }}</el-button>
             </div>
@@ -296,7 +296,7 @@
             </el-table-column>
             <el-table-column :label="tt('映射层级')" width="110">
               <template #default="{ row }">
-                <el-select v-model="row.映射层级" size="small">
+                <el-select v-model="row.映射层级" size="small" :disabled="readonly">
                   <el-option v-for="lv in levels" :key="lv" :label="tt(lv)" :value="lv" />
                 </el-select>
               </template>
@@ -310,6 +310,7 @@
                   allow-create
                   default-first-option
                   :reserve-keyword="false"
+                  :disabled="readonly"
                   :placeholder="tt('选择面板字段或直接输入常量')"
                 >
                   <el-option v-for="f in panelFieldOptions" :key="f.字段名" :label="f.字段名" :value="f.字段名" />
@@ -319,26 +320,26 @@
             <el-table-column :label="'→'" width="42" align="center" class-name="arrow-col" />
             <el-table-column :label="tt('ERP字段')" min-width="170">
               <template #default="{ row }">
-                <el-input v-model="row.ERP字段" size="small" class="mono" :placeholder="tt('如 material_number')" />
+                <el-input v-model="row.ERP字段" size="small" class="mono" :disabled="readonly" :placeholder="tt('如 material_number')" />
               </template>
             </el-table-column>
             <el-table-column :label="tt('转换规则')" width="132">
               <template #default="{ row }">
-                <el-select v-model="row.转换规则" size="small" filterable allow-create default-first-option>
+                <el-select v-model="row.转换规则" size="small" :disabled="readonly" filterable allow-create default-first-option>
                   <el-option v-for="tf in transforms" :key="tf" :label="tt(tf)" :value="tf" />
                 </el-select>
               </template>
             </el-table-column>
             <el-table-column :label="tt('必填')" width="64" align="center">
-              <template #default="{ row }"><el-switch v-model="row.是否必填" size="small" /></template>
+              <template #default="{ row }"><el-switch v-model="row.是否必填" size="small" :disabled="readonly" /></template>
             </el-table-column>
             <el-table-column :label="tt('启用')" width="64" align="center">
-              <template #default="{ row }"><el-switch v-model="row.启用" size="small" /></template>
+              <template #default="{ row }"><el-switch v-model="row.启用" size="small" :disabled="readonly" /></template>
             </el-table-column>
             <el-table-column :label="tt('备注')" min-width="190">
-              <template #default="{ row }"><el-input v-model="row.备注" size="small" /></template>
+              <template #default="{ row }"><el-input v-model="row.备注" size="small" :disabled="readonly" /></template>
             </el-table-column>
-            <el-table-column :label="tt('操作')" width="104" align="center" fixed="right">
+            <el-table-column v-if="!readonly" :label="tt('操作')" width="104" align="center" fixed="right">
               <template #default="{ $index }">
                 <el-button link size="small" :disabled="$index === 0" @click="moveField($index, -1)">↑</el-button>
                 <el-button link size="small" :disabled="$index === fieldRows.length - 1" @click="moveField($index, 1)">↓</el-button>
@@ -346,19 +347,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <div v-if="!fieldRows.length" class="ei-empty small">
-            <div>{{ tt('还没有字段映射。') }}</div>
-            <div class="ei-empty-act">
-              <el-button
-                v-if="current?.对应面板 && panelFieldOptions.length"
-                link
-                type="primary"
-                size="small"
-                @click="fillFromPanel"
-              >{{ tt('从面板字段一次铺出') }}({{ panelFieldOptions.length }})</el-button>
-              <span v-else>{{ tt('先在「接口信息」里选好对应面板,再点「新增一行」逐条填。') }}</span>
-            </div>
-          </div>
+          <div v-if="!fieldRows.length" class="ei-empty small">{{ tt('还没有字段映射,点「按面板字段带出」自动铺一行一字段。') }}</div>
         </div>
       </section>
 
@@ -375,6 +364,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Plus, Refresh } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { tt } from '@/i18n'
+import { useUserStore } from '@/stores/user'
+
+/* 2026-10-18 用户口径:「保证这个面板除管理员只可看不可编辑」——
+ *   前端只负责"看得见但点不动"(按钮隐藏/控件 disabled + 弹提示);
+ *   真正的闸门在服务端:ErpIntegController 的写接口一律 perm.requireAdmin()(非管理员 403),
+ *   故即使有人绕过界面直接打接口也改不了配置。 */
+const user = useUserStore()
+const readonly = computed(() => !user.isAdmin)
 
 /* ── 常量 ── */
 const methods = ['GET', 'POST']
@@ -513,7 +510,15 @@ function selectItem(it) {
   loadPanelFields()
 }
 
+/** 只读闸门(前端):非管理员点任何写动作直接拦下,并说明"仅管理员可编辑" */
+function denyReadonly() {
+  if (!readonly.value) return false
+  ElMessage.warning(tt('只读模式:仅管理员可编辑配置'))
+  return true
+}
+
 function newItem() {
+  if (denyReadonly()) return
   const seq = Math.max(0, ...items.value.filter((i) => i.方向 === direction.value).map((i) => Number(i.排序) || 0)) + 10
   const draft = {
     _key: `__new_${Date.now()}`,
@@ -551,7 +556,7 @@ async function dropDraft() {
 /* ── 保存 ── */
 async function saveItem() {
   const it = current.value
-  if (!it) return
+  if (!it || denyReadonly()) return
   if (!String(it.接口编码 || '').trim()) return ElMessage.warning(tt('请填写接口编码'))
   if (!String(it.接口名称 || '').trim()) return ElMessage.warning(tt('请填写接口名称'))
   savingItem.value = true
@@ -592,7 +597,7 @@ function selectByCode(code) {
 
 async function removeItem() {
   const it = current.value
-  if (!it) return
+  if (!it || denyReadonly()) return
   try {
     await ElMessageBox.confirm(
       tt('删除接口「{name}」？其字段映射与设备绑定会一并删除。').replace('{name}', it.接口名称 || it.接口编码),
@@ -614,7 +619,7 @@ async function removeItem() {
 
 async function saveFields() {
   const it = current.value
-  if (!it) return
+  if (!it || denyReadonly()) return
   if (it._draft) return ElMessage.warning(tt('请先保存接口信息,再保存字段映射'))
   savingFields.value = true
   try {
@@ -642,7 +647,7 @@ async function saveFields() {
 
 async function saveDevices() {
   const it = current.value
-  if (!it) return
+  if (!it || denyReadonly()) return
   if (it._draft) return ElMessage.warning(tt('请先保存接口信息,再保存设备绑定'))
   savingDevices.value = true
   try {
@@ -665,10 +670,12 @@ async function saveDevices() {
 
 /* ── 字段 / 设备行操作 ── */
 function addFieldRow() {
+  if (denyReadonly()) return
   fieldRows.value.push({ 映射层级: '表头', MES字段: '', ERP字段: '', 转换规则: '直传', 是否必填: false, 启用: true, 备注: '' })
 }
 
 function moveField(index, delta) {
+  if (denyReadonly()) return
   const to = index + delta
   if (to < 0 || to >= fieldRows.value.length) return
   const arr = fieldRows.value
@@ -677,6 +684,7 @@ function moveField(index, delta) {
 
 /** 按当前面板的字段清单铺映射(已有同名 MES 字段的行不重复) */
 function fillFromPanel() {
+  if (denyReadonly()) return
   const it = current.value
   if (!it?.对应面板) return ElMessage.warning(tt('先在「接口信息」里选好对应面板'))
   if (!panelFieldOptions.value.length) return ElMessage.warning(tt('该面板没有可带出的字段'))
@@ -695,6 +703,7 @@ function deviceBound(code) {
 }
 
 function addDevice(code) {
+  if (denyReadonly()) return
   if (!code) return
   deviceToAdd.value = ''
   if (deviceBound(code)) return
@@ -948,7 +957,6 @@ onMounted(async () => {
   color: var(--t-text-3);
 }
 .ei-empty.small { padding: 10px 0; }
-.ei-empty-act { margin-top: 4px; }
 
 /* 窄屏(≤1280)压一压左两栏,保证编辑区不被挤没 */
 @media (max-width: 1360px) {

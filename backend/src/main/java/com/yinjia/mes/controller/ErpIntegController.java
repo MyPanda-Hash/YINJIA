@@ -20,9 +20,14 @@ import java.util.Map;
  * <p>权限锚点 = 页面级虚拟面板 {@link PagePanelRegistry#ERP_INTEG}(与订单结转等看板同一套机制,
  * 不插 yj_panel 行,授权落 yj_role_panel):
  * <ul>
- *   <li>读(配置/元数据/面板字段)= {@code view} 词;</li>
- *   <li>写(存接口 / 存字段映射 / 存设备绑定 / 删接口)= 页面动作 {@code save}(配置保存)。</li>
+ *   <li>读(配置/元数据/面板字段)= 该面板 {@code view} 词(组织架构里勾「可见」即可看);</li>
+ *   <li>写(存接口 / 存字段映射 / 存设备绑定 / 删接口)= **仅管理员**
+ *       (2026-10-18 用户口径「保证这个面板除管理员只可看不可编辑」)。</li>
  * </ul>
+ *
+ * <p>⚠ 写闸门**不挂权限词**,直接 {@code perm.requireAdmin()}:矩阵里该页面只有一个「可见」格子,
+ * 非管理员无论如何都授不出写权限;`ERP_INTEG` 同时登记在
+ * {@code PanelPermissionService.ADMIN_ONLY_PANELS} 做纵深防御。
  *
  * <p>⚠ 本控制器**只读写三张配置表**,不推送金蝶、不动业务表;真正的推送仍在
  * {@code ButtonService.转ERP → KingdeePushService}。
@@ -65,14 +70,14 @@ public class ErpIntegController {
 
     @PostMapping("/item")
     public ApiResult<Void> saveItem(@RequestBody Map<String, Object> body) {
-        perm.requireButton(PAGE, "保存配置");
+        perm.requireAdmin(); // 除管理员只可看不可编辑
         service.saveItem(body);
         return ApiResult.ok(null);
     }
 
     @PostMapping("/item/delete")
     public ApiResult<Void> deleteItem(@RequestBody Map<String, Object> body) {
-        perm.requireButton(PAGE, "保存配置");
+        perm.requireAdmin();
         service.deleteItem(body.get("接口编码") == null ? "" : String.valueOf(body.get("接口编码")));
         return ApiResult.ok(null);
     }
@@ -81,7 +86,7 @@ public class ErpIntegController {
     @PostMapping("/fields")
     @SuppressWarnings("unchecked")
     public ApiResult<Void> saveFields(@RequestBody Map<String, Object> body) {
-        perm.requireButton(PAGE, "保存配置");
+        perm.requireAdmin();
         String code = body.get("接口编码") == null ? "" : String.valueOf(body.get("接口编码"));
         Object rows = body.getOrDefault("rows", List.of());
         service.saveFields(code, (List<Map<String, Object>>) rows);
@@ -92,7 +97,7 @@ public class ErpIntegController {
     @PostMapping("/devices")
     @SuppressWarnings("unchecked")
     public ApiResult<Void> saveDevices(@RequestBody Map<String, Object> body) {
-        perm.requireButton(PAGE, "保存配置");
+        perm.requireAdmin();
         String code = body.get("接口编码") == null ? "" : String.valueOf(body.get("接口编码"));
         Object rows = body.getOrDefault("rows", List.of());
         service.saveDevices(code, (List<Map<String, Object>>) rows);

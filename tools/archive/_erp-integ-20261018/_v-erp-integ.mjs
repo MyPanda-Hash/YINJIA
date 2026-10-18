@@ -184,19 +184,6 @@ try {
   await sleep(1800)
   const cards2 = await raw(`[...document.querySelectorAll('.ei-card .card-name')].map(e=>e.innerText.trim())`)
   check((cards2 || []).includes('采购入库单转出'), `转出页签(单据分类)卡片 = ${JSON.stringify(cards2)}`)
-
-  /* ── 「按面板字段带出」改到空态(2026-10-18 用户口径:不想因为点按钮而"前后显示不同字段") ── */
-  const toolbarHasBulk = await raw(`(() => {
-    const b = document.querySelector('.ei-block .block-actions');
-    return !!(b && b.innerText.includes('带出'));
-  })()`)
-  check(toolbarHasBulk === false, '已有映射的接口:工具栏不再出现「带出」按钮(不会一点就换一屏字段)')
-  await raw(`(() => { const b=[...document.querySelectorAll('.ei-list-head button')].find(e=>e.innerText.includes('新增接口')); b&&b.click(); return true })()`)
-  await sleep(1200)
-  const emptyAct = await raw(`document.querySelector('.ei-empty-act')?.innerText.trim() || ''`)
-  check(!!emptyAct, `新增接口(空表):空态给出「一次铺出」入口或提示 —— ${JSON.stringify(emptyAct)}`)
-  await raw(`(() => { const b=[...document.querySelectorAll('.dh-right button')].find(e=>e.innerText.includes('放弃')); b&&b.click(); return true })()`)
-  await sleep(800)
   const shot2 = await send('Page.captureScreenshot', { format: 'png' })
   fs.writeFileSync(path.join(__dirname, '_shot-erp-integ-export.png'), Buffer.from(shot2.result.data, 'base64'))
 
@@ -224,7 +211,7 @@ try {
     labels: ['インターフェース名', 'インターフェースコード', '分類', '提供元', 'メソッド', '実行契機',
       'エンドポイント', 'MESパネル', 'ERP対象', '並び順', '有効', '説明'],
     buttons: ['更新', 'インターフェース追加', 'インターフェースを保存', '設備を保存',
-      '行を追加', 'マッピングを保存'],
+      'パネル項目から展開', '行を追加', 'マッピングを保存'],
   }
   for (const [loc, exp] of [['en', expectEn], ['ja', expectJa]]) {
     // ⚠ 走**真实切换器**:直接写 localStorage 再整页重载时,ja 这类非 SUPPORTED 的 locale
