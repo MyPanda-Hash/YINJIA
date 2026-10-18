@@ -3901,12 +3901,3 @@ migrate-transfer-stocktake-bin-20261018.sql
 #      勿重跑旧脚本(会抵消本脚本)。
 #   幂等(RTRIM 命中不到 NULL)。两账套均已执行。
 migrate-pc0000-to-null-20261019.sql
-
-# migrate-erplg-cloud-push-20261019.sql — ERP导入日志 9 个批次补录推到云端(幂等)
-#   2026-10-18 补录的 IMP-20261018-001..009(商品/仓库/计量单位/部门/职员/客户/供应商 + 采购/销售订单,
-#   合计 10710 行;erp_imp_row 45 行原始 JSON 凭据)当时是本机脚本直写库、没进迁移链 ⇒ 云端服务器 ERPLG 至今 0 行。
-#   本脚本把同样 9 批做成幂等补录:日志表按 [批次号]、行表按 ([批次号],[行号]) 判定,重跑 0 新增;
-#   只写 erp_imp_log / erp_imp_row;两表不在则整段 SKIP;尾部 RAISERROR(10) 打 RESULT 行数自检(期望 9 / 45)。
-#   回退:DELETE FROM erp_imp_row/erp_imp_log WHERE [批次号] LIKE 'IMP-%';
-#   两账套均已执行;取证 tools/archive/_erplg-push-20261019/(生成器 + 两账套逐列一致性校验)。
-migrate-erplg-cloud-push-20261019.sql
