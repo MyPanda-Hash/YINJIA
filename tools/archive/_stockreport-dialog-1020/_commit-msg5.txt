@@ -1,0 +1,26 @@
+fix: 台账弹窗开着时切面板出现两个「查询」弹窗(keep-alive 失活实例的孤儿弹窗)
+
+用户反馈「还是会出现两次弹窗」。真浏览器按真实路径复现成功:
+台账弹窗开着 → 点/跳到收发存汇总 ⇒ 屏幕上并排两个「查询」(标题 ["查询","查询"]),
+切回来也一直是两个。
+
+根因(两处叠加):
+① 弹窗用了 append-to-body,挂在 <body> 上;而 keep-alive 的**失活实例不会再渲染**,
+   所以 onDeactivated 里 `queryDialogVisible=false` 对它已经 teleport 出去的 DOM 不生效。
+② 上一轮的 `panelAlive` 用的是 `panelCode`(路由派生值,所有缓存实例共享)——
+   台账实例停在汇总页上读到的也是 'STOCK_SUMMARY',判断恒为真,拦不住。
+
+修法(结构性,不依赖重渲染):
+· 查询弹窗去掉 append-to-body ⇒ DOM 留在组件自己的子树里,keep-alive 失活时整棵子树被移走;
+· `panelAlive` 改用 onActivated/onDeactivated 维护的**实例私有** `instanceActive`
+  (不能在 setup 里快照路由参数:首次创建时参数还没就绪,会拿到空串 ⇒ 弹窗永不渲染,实测踩过);
+· onMounted 也置一次 instanceActive,兜住"不在 keep-alive 里"的场景。
+
+顺带修的工程问题:
+· _repack-jar.mjs 重写:只用 `jar uf`。试过 `jar cfm` 重打整包 ⇒ 嵌套 jar 被重压缩,
+  启动 NoClassDefFoundError: PasswordEncoder;试过 ZipArchive(Update) 删条目 ⇒ fat jar 写坏
+  (invalid entry size)。两条都写进脚本头部注释,别再试。
+· 解包类命令一律显式传 cwd(`jar xf` 解到当前工作目录,早先漏传把整个 jar 解到了仓库根)。
+
+验证:纯函数 8/8 · 门控时序 14/14 · 接口口径 20/20 · 端到端 UI 14/14 ·
+      面板切换回归:出现两个弹窗的次数 = 0(修复前稳定复现 2 个)

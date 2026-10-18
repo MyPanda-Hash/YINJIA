@@ -1,0 +1,16 @@
+PASS  ① 首次进入弹一次  · opens=1
+PASS  ①b 弹窗门返回值让 load 跳过取数
+PASS  ② 弹窗开着时后台第一次再 load 不弹  · opens=1
+PASS  ②b 连来三次也不弹(切面板双触发/刷新/列设置保存后)  · opens=1
+PASS  ②c 用户填的条件不会因为后台 load 被清(草稿不经 openQueryDialog)
+PASS  ④ 工具栏「查询」在弹窗开着时不重开  · opens=1
+PASS  ③ 点查询后记票
+PASS  ③b 查过之后 load 不再弹(不重复弹窗)  · opens=1
+PASS  ④b 查过之后点工具栏「查询」= 再弹条件弹窗(不是重复,是用户主动要)  · opens=2
+PASS  ④c 查过一次后取消弹窗不退页  · leaving=undefined
+PASS  ⑤ 没查过就关弹窗 ⇒ 退页
+PASS  ⑤b 再进来重新弹一次(票随面板重置)  · opens=2
+PASS  ⑥ 切到汇总:汇总自己还要弹一次  · opens=2
+PASS  ⑥b 切回台账:重新弹一次(不与汇总的票串味)  · opens=3
+
+[PASS] 14 项,失败 0 项

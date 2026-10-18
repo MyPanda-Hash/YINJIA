@@ -1,0 +1,12 @@
+
+########## STOCK_LEDGER ##########
+① 进入面板: total=0 visible=0 hash=#/panelx/list/STOCK_LEDGER rows=0
+   细节: []
+   控制台错误: ["EXC: ReferenceError: ledgerRefOptions is not defined"]
+   日期段默认值: null
+
+########## STOCK_SUMMARY ##########
+① 进入面板: total=1 visible=1 hash=#/panelx/list/STOCK_SUMMARY rows=0
+   细节: [{"i":0,"title":"查询","selfDisplay":"block","selfVisibility":"visible","offsetParentNull":false,"overlayDisplay":"block","overlayZ":"2111","parentIsBody":false}]
+   控制台错误: (无)
+   日期段默认值: ["2026-10-01","2026-10-18"]

@@ -1,0 +1,55 @@
+A 进入台账后:[
+ {
+  "i": 0,
+  "walk": [
+   {
+    "tag": "div.el-dialog.header-query-dialog",
+    "display": "block",
+    "visibility": "visible",
+    "opacity": "1",
+    "inline": "--el-dialog-width: 760px;",
+    "connected": true,
+    "inBody": false
+   },
+   {
+    "tag": "div.el-overlay-dialog",
+    "display": "block",
+    "visibility": "visible",
+    "opacity": "1",
+    "inline": "",
+    "connected": true,
+    "inBody": false
+   },
+   {
+    "tag": "div.el-overlay.el-modal-dialog",
+    "display": "block",
+    "visibility": "visible",
+    "opacity": "1",
+    "inline": "z-index: 2068;",
+    "connected": true,
+    "inBody": true
+   },
+   {
+    "tag": "body.el-popup-parent--hidden",
+    "display": "block",
+    "visibility": "visible",
+    "opacity": "1",
+    "inline": "",
+    "connected": true,
+    "inBody": false
+   },
+   {
+    "tag": "html.",
+    "display": "block",
+    "visibility": "visible",
+    "opacity": "1",
+    "inline": "",
+    "connected": true,
+    "inBody": false
+   }
+  ]
+ }
+]
+B 点✕ +1.5s:[]
+C +4.5s:[]
+C hash=#/dashboard
