@@ -103,6 +103,9 @@
         } catch (e) { /* 兜底里再出错就不管了 */ }
       }
       window.addEventListener('error', function (e) {
+        // 良性告警:Element Plus / 布局组件高频触发,浏览器自身会重排,不是页面故障 ——
+        // 不拦截的话每次都会在页面上画一个红色「页面脚本异常」,反而吓人(2026-10-18 实测)。
+        if (/ResizeObserver loop/i.test(String(e.message || ''))) return
         // 资源(script/link/img)加载失败:event.target 是元素本身
         var t = e.target
         if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
