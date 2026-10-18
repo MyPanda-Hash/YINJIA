@@ -1,0 +1,45 @@
+db: 修复迁移链阻塞(migrate-sysadmin-panels-to-dm 自检失效,挡住其后 5 个迁移)
+
+用户报障(2026-10-20):start-prod.ps1 启动时的增量同步在
+migrate-sysadmin-panels-to-dm-20261018.sql 上失败。
+
+【根因】
+该脚本自检写死「数据建模 = 36 张、既有 4 张(FIELDMGR/ZDGL/ERPLG/ERPLG_ROW)全在数据建模」。
+而同日的 migrate-erp-integ-config-20261018.sql 已把 ERPLG/ERPLG_ROW 改归「ERP系统集成」
+⇒ 实际 34 张 ⇒ 自检恒失败。DbSync 遇失败即 break ⇒ 它后面的 5 个迁移永远轮不到:
+  migrate-dc-platform / migrate-dc-gateway-apikey / migrate-proc-process-refs /
+  migrate-proc-process-samples / migrate-stock-balance-warn
+且该脚本从未成功登记 yj_schema_log ⇒ 每次启动都重跑、每次都红。
+
+【实测损失】
+· bs_dc_* 7 张表全缺 ⇒ POST /api/dc/stats 直接 500(数采平台页面开着就报错)
+· bs_dc_gateway.api_key 缺 ⇒ 网关 /api/dc/ingest、/api/dc/heartbeat 不可用
+· v_stock_balance.预警数量 列缺
+· 生产过程中 10 张单据的参照/下拉配置未刷
+
+【修复】
+1) 自检改成:系统管理平台=0 + 既有 4 张一张不丢(落在「数据建模」或「ERP系统集成」都算)
+   + 迁入的 32 张仍在「数据建模」 —— 对两账套、对 ERP 迁移是否已跑都成立。
+2) 顺带修 RAISERROR 用法:替换参数只能是常量/变量,写 `@a + @b` 或 `DB_NAME()` 会报
+   「附近有语法错误」,改为先算进变量。
+3) 补跑时又暴出:migrate-proc-process-refs 要求 10 张面板全在,而 WO_COMPLETION_LIST
+   (完工明细)+ 视图 v_wo_completion_detail + 15 字段 + 4 授权在两账套都不存在
+   ⇒ 用 migrate-wo-completion-list.sql + -flat-report.sql 原样重建(前端菜单/flowSpec
+   仍在引用它,属既有缺口)。
+4) 样例数据(7 张演示单据)不进正式库:登记为已执行但不插入(上线纪律),
+   测试库因 mix_record_detail 缺「物料名称」列同样登记;
+   登记脚本 archive/_sysadmin-dm-migrate-1020/_baseline-samples.sql(含解除办法)。
+
+【验证(两账套)】
+· 链对账:未登记脚本 = 0(此前 6 → 0)
+· DbSync sync:执行 0 / 跳过 584 / 失败 0(启动时不再红)
+· /api/dc/stats 500 → 200;getPanelConfig?WO_COMPLETION_LIST 返回 15 列
+· v_stock_balance.预警数量 可查(1573 行)
+· DbNormAudit 仍 FAIL 6 / WARN 1,逐条与改动前同(01 命名 PASS、02 表注释 PASS、
+  06/07/11/13 PASS)⇒ 新建 7 表未进任何问题名单
+
+【取证】tools/archive/_sysadmin-dm-migrate-1020/(链对账、面板分组、登记时间、影响面、缺表定位)
+【文档】数据库表清单.md:§二 手工补登 7 张 bs_dc_* + 维护记录 v3.45
+        (未重跑生成器 —— 它会覆盖 45 条手写维护记录)
+【遗留】体检 12 项把 migrate-enable-rcsi-20261018.sql 报「未登记」,实测是**故意不进链**
+        的库级开关(清单里有说明),属体检脚本待补的例外,非本任务引入。
