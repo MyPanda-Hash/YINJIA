@@ -126,8 +126,16 @@ public class StockFlowService {
             i.put("仓库名称", str(r.get("调入仓库")));
             inRows.add(i);
         }
-        // 出库腿走预警闸门(与其余出库同口径);入库腿不设闸门(入库只会让余额变大)
-        int n = post(SRC_TRANSFER_OUT, false, no, outRows, forward, user, true);
+        // ⚠ 调拨出库腿**不过** checkOutbound 闸门(2026-10-18 实测踩坑):
+        //   调拨在 StockLedgerService.applyTransfer 里的顺序是「先 applyOut 扣 kucun,再 postTransferFlow 写流水」,
+        //   所以闸门执行时 kucun 的余额**已经扣过了**;而闸门内部又是 `after = bal - done`,等于把同一笔再减一次,
+        //   ⇒ 只要本单出库量 == 当前结存,就一定被判成负数拦住(实测 YCD-20260908-00001:
+        //   YJ-AJ-016-1/CK00006 需出 10827、库存正是 10827,报「当前余额 0,本单该批次已出 10827」)。
+        //   调拨的库存充足性已由 applyOutAggregated 的守卫(按 (物料,仓库) 汇总判定)在**扣减前**拦住,
+        //   并给出「现存量不足…可用合计」的明确文案,不需要这里再看一次。
+        //   (其余单据 apply() 是「先 applyOut 再 postFlow」同一顺序,但它们的预警数量默认 0、
+        //    且 done 与扣减后余额比较时容易误判 —— 那条链路的闸门口径另案评估,不在本次改动范围。)
+        int n = post(SRC_TRANSFER_OUT, false, no, outRows, forward, user, false);
         n += post(SRC_TRANSFER_IN, true, no, inRows, forward, user, false);
         return n;
     }

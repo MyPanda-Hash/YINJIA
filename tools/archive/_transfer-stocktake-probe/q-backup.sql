@@ -1,0 +1,13 @@
+﻿SET NOCOUNT ON;
+PRINT '=== 备份 kucun 与 9月结转行 ===';
+IF OBJECT_ID('tempdb..#x') IS NOT NULL DROP TABLE #x;
+IF OBJECT_ID('dbo.kucun_bak_20261018') IS NOT NULL DROP TABLE dbo.kucun_bak_20261018;
+SELECT * INTO dbo.kucun_bak_20261018 FROM kucun;
+SELECT COUNT(*) AS 备份行数 FROM dbo.kucun_bak_20261018;
+IF OBJECT_ID('dbo.inh_jz202609_bak') IS NOT NULL DROP TABLE dbo.inh_jz202609_bak;
+SELECT * INTO dbo.inh_jz202609_bak FROM inh WHERE 单据编号=N'JZ-202609';
+SELECT COUNT(*) AS 结转行备份 FROM dbo.inh_jz202609_bak;
+IF OBJECT_ID('dbo.bd_stock_close_bak_20261018') IS NOT NULL DROP TABLE dbo.bd_stock_close_bak_20261018;
+SELECT * INTO dbo.bd_stock_close_bak_20261018 FROM bd_stock_close;
+PRINT '=== 当前 9月 结存合计 ===';
+SELECT SUM(yl) AS yl合计, SUM(rkl) AS rkl合计, SUM(ckl) AS ckl合计 FROM kucun;

@@ -1,0 +1,9 @@
+﻿SET NOCOUNT ON;
+PRINT '=== 确认 PC0000 在 MES 中确实不存在 ===';
+SELECT COUNT(*) AS kucun_pc0000 FROM kucun WHERE RTRIM(lot_no)=N'PC0000';
+SELECT COUNT(*) AS inh_pc0000 FROM inh WHERE RTRIM(批号)=N'PC0000';
+PRINT '=== YJ-YKRS-007 / YCL-01 真实批号可用量 ===';
+SELECT ISNULL(lot_no,N'(NULL)') lot, yl FROM kucun WHERE wzdm=N'YJ-YKRS-007' AND ckdm=N'YCL-01' ORDER BY yl DESC;
+PRINT '=== 两行无货确认 ===';
+SELECT N'YJ-DK-001/CK00005' AS k, SUM(yl) 合计 FROM kucun WHERE wzdm=N'YJ-DK-001' AND ckdm=N'CK00005'
+UNION ALL SELECT N'YJ-SX-062/CK00006', SUM(yl) FROM kucun WHERE wzdm=N'YJ-SX-062' AND ckdm=N'CK00006';
