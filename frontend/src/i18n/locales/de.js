@@ -70,6 +70,7 @@ export default {
     "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "Der Formgebungsvorgang dieser Auftragszeile wurde noch nicht gemeldet. Prüfblatt trotzdem erstellen?",
     "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Nur Auftragszeilen mit gemeldeter Formgebung können ein Prüfblatt erstellen; ausgegraute Zeilen nennen den Grund.",
     "只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。": "Es werden nur bereits eingeplante Auftragszeilen (Formgebung eingeplant) angezeigt; Zeilen ohne Formgebungsmeldung sind ausgegraut und nennen den Grund.",
+    "该检验单已审核，如需修改请先点「弃审」退回草稿": "Dieses Prüfblatt ist bereits freigegeben. Zum Ändern bitte „Freigabe zurückziehen“ anklicken, um es in den Entwurf zurückzusetzen.",
     "成型完工量": "Formgebung fertig",
     "成型计划量": "Formgebung geplant",
     "可开单": "Beleg möglich",

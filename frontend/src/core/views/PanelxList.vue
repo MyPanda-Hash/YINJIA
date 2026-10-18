@@ -7293,7 +7293,7 @@ function addInlineDetailRow(b) {
  * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
  * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
  */
-function openPickedProcInsp(res) {
+async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
   const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
@@ -7306,7 +7306,11 @@ function openPickedProcInsp(res) {
     // 🔴 2026-10-18 用户报障「选取的工单无法填入进这个检验单内」:
     //   原实现只 `load()` 刷新列表,**没有把页面切到那张单** —— 屏幕上仍是原来的单(或刚点「新增」
     //   留下的空行),看起来就像"选了没反应/没填进去"。这里按单号把 `cur` 定位到目标单。
-    openDocByNo(no)
+    await openDocByNo(no)
+    // 命中已审核的旧单时表单是只读的(用户会以为"填不进去"),明确提示先弃审
+    if (String(cur.value?.['单据状态'] || '') === '已审核') {
+      ElMessage.info(tt('该检验单已审核，如需修改请先点「弃审」退回草稿'))
+    }
     return
   }
   const targetPath = `/panelx/list/${target}`

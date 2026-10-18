@@ -70,6 +70,7 @@ export default {
     "该工单行的成型工序尚未报工，确认仍要生成检验单吗？": "L'opération de moulage de cette ligne d'ordre n'est pas déclarée. Créer la fiche quand même ?",
     "只有完成成型报工的工单行才能生成检验单；置灰的行会写明原因。": "Seules les lignes d'ordre dont l'opération de moulage est déclarée peuvent créer une fiche de contrôle ; les lignes grisées indiquent la raison.",
     "只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。": "Seules les lignes d’ordre déjà planifiées (moulage planifié) sont affichées ; les lignes sans déclaration de moulage sont grisées avec le motif.",
+    "该检验单已审核，如需修改请先点「弃审」退回草稿": "Cette fiche de contrôle est déjà approuvée. Pour la modifier, cliquez sur « Annuler l'approbation » pour la remettre en brouillon.",
     "成型完工量": "Quantité moulée",
     "成型计划量": "Quantité planifiée",
     "可开单": "Créable",
