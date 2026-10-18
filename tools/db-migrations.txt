@@ -3737,6 +3737,12 @@ migrate-rd-sheet-ref-tidy-20261013.sql
 migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
 # migrate-role-perm-words-20261016.sql — 角色面板权限词表归位(组织架构矩阵可勾的词 = 引擎真读的词):edit→modify、delete→del、删 price/review/adjust,研发审核补 audit,can_approve 收敛为 perms 派生值
+# migrate-role-perm-mg-cleanup-20261018.sql — 角色词表/面板分组的**数据清障**(本机首次执行时暴露):
+#   ① 探针遗留角色(AUTO_ROLE*,perms 写成 [view, query, add, edit])⇒ 让下面 migrate-role-perm-words-20261016.sql
+#      的「全库词表越界 0」自检永远不过、整段回滚;② STOCK_STATUS 的 module_group 为 NULL/仓库管理、
+#      DISPATCH_* 为「新生产」⇒ 让 migrate-stock-detail-module-group-20261016.sql 的自检同样不过。
+#   本脚本只把这些脏值归到合法值(幂等),不改任何迁移判据;两账套均执行。
+migrate-role-perm-mg-cleanup-20261018.sql
 migrate-role-perm-words-20261016.sql
 # migrate-stock-detail-module-group-20261016.sql — 库存明细(STOCK_DETAIL)的 module_group 系统管理→库存核算(权限矩阵里不该出现导航没有的分组;自检全库 module_group 越界 0 处)
 migrate-stock-detail-module-group-20261016.sql
@@ -3820,3 +3826,14 @@ migrate-record-sheets-head-detail-20261018.sql
 #   uniqueKeys=[["仓库","仓位编码"]](后端保存预检 + 前端即时查重同源);⑤ 自检重复=0/索引在/config 已声明。
 #   两账套均执行;既有正式库 684 行、测试库 683 行流程内均无存活重复。
 migrate-whloc-unique-20261018.sql
+
+
+# migrate-plang-ja-foreign-close-repair-20261018.sql — 「外部程序把工单批量写成已结案」的**回正脚本**(默认 dry-run)
+#   判据=ja=Y 且不满足「入库≥排产 + 组装成品检验已审核」;@apply=0 只打印候选清单(@apply 改 1 才 UPDATE)。
+#   登记进链只为「清单↔文件一致」体检过关;dry-run 执行不写任何数据,可安全随链运行。
+migrate-plang-ja-foreign-close-repair-20261018.sql
+
+# migrate-enable-rcsi-20261018.sql — 库级开关 READ_COMMITTED_SNAPSHOT(RCSI)**默认 dry-run**
+#   @apply=0 只查现状(不做 ALTER);改 1 需在无人时段单独执行(会短暂独占库)。
+#   登记进链只为体检「清单↔文件一致」过关;默认执行是零改动的。
+migrate-enable-rcsi-20261018.sql
