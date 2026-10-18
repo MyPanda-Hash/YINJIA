@@ -25,6 +25,46 @@ test('档案响应形状不认识时返回空数组(不炸)', () => {
   assert.deepEqual(invRowsOf({ list: [] }), [])
 })
 
+// ⚠ 上面那支夹具是"合成形状"(detail.items),而**真实接口**对档案面板发的是
+//   detail.<detail_key>(`QueryService.queryArchive` 写 `detail.<PanelDef.tabKey()>`,
+//   档案面板 tabKey = LOWER(panel_code) ⇒ INV→detail.inv、EMP→detail.emp)。
+//   本次事故正是被夹具形状骗过去的:实测本机 8090 /px/queryFormDataList(panelCode=INV)
+//   返回 detail.inv[3898 行],旧逻辑(写死 detail.items)拍出来只有 1 行 = 那张虚拟单自己。
+const archiveResReal = (rows, key = 'inv') => ({ totalSize: rows.length, list: [{ 编号: '商品档案', detail: { [key]: rows } }] })
+
+test('真实形状:明细挂在 detail.<panel_code>(INV→detail.inv)也必须拍平', () => {
+  const rows = invRowsOf(archiveResReal([
+    { 存货编码: 'YJ-YKRS-001', 存货名称: '英克瑞斯椰壳炭', 所属类别: '炭粉' },
+    { 存货编码: 'M-001', 存货名称: '炭棒', 所属类别: '折算物料' },
+  ]))
+  assert.equal(rows.length, 2)
+  assert.deepEqual(rows.map((r) => r['存货编码']), ['YJ-YKRS-001', 'M-001'])
+})
+
+test('键名不挑:detail 里第一个数组值的键都认得(EMP→emp、WHLOC→locations)', () => {
+  assert.equal(invRowsOf({ list: [{ detail: { emp: [{ 存货编码: 'E1' }] } }] }).length, 1)
+  assert.equal(invRowsOf({ list: [{ detail: { locations: [{ 存货编码: 'L1' }] } }] }).length, 1)
+})
+
+test('detail 里那个键在、但是空数组 ⇒ 一行都没有(虚拟单本身不算行)', () => {
+  assert.deepEqual(invRowsOf({ list: [{ 编号: '商品档案', detail: { inv: [] } }] }), [])
+})
+
+test('没有 detail 的平表/裸行数组照旧当行(修复不丢兜底)', () => {
+  assert.equal(invRowsOf({ list: [{ 存货编码: 'X1' }] }).length, 1)
+  assert.equal(invRowsOf([{ 存货编码: 'Y1' }]).length, 1)
+})
+
+test('真实形状下「按种类收窄」能出候选(本次报障的端到端判据)', () => {
+  const rows = invRowsOf(archiveResReal([
+    { 存货编码: 'YJ-YKRS-001', 所属类别: '炭粉' },
+    { 存货编码: 'YJ-GF-001', 所属类别: '胶粉' },
+  ]))
+  const hits = rows.filter((r) => String(r['所属类别'] ?? '').trim() === '炭粉')
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0]['存货编码'], 'YJ-YKRS-001')
+})
+
 test('物料编号 → 物料名称:唯一命中才带出', () => {
   const rows = invRowsOf(archiveRes([
     { 存货编码: 'M-001', 存货名称: '炭棒' },
