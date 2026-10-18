@@ -59,6 +59,7 @@
 | `_shot-stock-reports-1020.mjs` / `_probe-dialog-1020.mjs` | CDP 实拍/实点脚本(**本机沙箱内 Edge 起不来**:`mojo platform_channel Check failed: 拒绝访问 (0x5)`;在正常终端跑才有用) |
 | `_WhoHolds.cs` | 8090 端口占用者反查(P/Invoke `GetExtendedTcpTable`;本机 `Get-Process`/`Get-CimInstance` 在受限环境里看不见那个 java 进程) |
 | `_stop-prod.bat` | 透传 `start-prod.ps1 -Stop` 的包装(隔离它偶发控制台缓冲区异常) |
+| `重启系统-换新后端.bat` | **一键重启**:停实例 → 等 jar 句柄 → 换 build.jar → 启动 → 跑回归(双击即可,须在你自己的桌面会话里跑) |
 
 复跑:
 
@@ -91,23 +92,38 @@ java -cp lib\mssql-jdbc.jar archive\_stockreport-dialog-1020\_QVerify.java HSDZ_
 * `vite build` / `npm run build`:esbuild 必须 spawn 子进程 ⇒ `spawn EPERM`(npm.ps1 也被执行策略挡);
 * 杀 8090 那个 java 进程:`Stop-Process`/`taskkill` 均 `Access denied`(只能看见端口占用者 pid)。
 
-### 部署状态:新后端 class 已就绪,但**没换上**
+### 部署状态:新后端 class 已就绪,但**没换上**(需在你自己的终端重启一次)
 
-8090 上跑的仍是**旧 class 的旧 jar**(所以接口回归里台账那两项还会 FAIL)。新 class 已编好并打进
-`backend/target/yinjia-mes-backend-0.1.0.build.jar`(BOOT-INF/lib 128 条 / static 160 条 = 与原 jar 同构,
-只多换了 `BOOT-INF/classes/com/**`;**static 一个字节没动**,改动的只有后端)。
+8090 上跑的仍是**旧 class 的旧 jar**(所以接口回归里台账那两项还会 FAIL,`_probe-ledger-filter.mjs`
+的口径也没变)。新 class 已编好并打进 `backend/target/yinjia-mes-backend-0.1.0.build.jar`
+(BOOT-INF/lib 128 条 / static 160 条 = 与原 jar 同构,只多换了 `BOOT-INF/classes/com/**`;
+**static 一个字节没动**,本次改动的只有后端)。
 
-**在正常终端跑这三步即可上线**:
+> 🔴 为什么没直接重启:本会话是**受限沙箱**,对 8090 那个 java 进程(pid 32464)
+> `Stop-Process`/`taskkill` 一律 `Access denied`(脚本报「已停止」但进程仍在,端口仍被占);
+> `start-prod.ps1` 因此判定「已在运行」直接跳过启动 —— 沙箱里的"重启"对它是无效的。
+> 你桌面会话里跑同一个脚本**有权限**,所以下面这个一键批处理是可靠路径。
+
+**双击即完成重启**(停止 → 等 jar 句柄释放 → build.jar 换成正式 jar → 启动 → 自动跑回归):
+
+```
+tools\archive\_stockreport-dialog-1020\重启系统-换新后端.bat
+```
+
+它等价于手跑这三步:
 
 ```powershell
 cd D:\YINJIA-main
 powershell -ExecutionPolicy Bypass -File tools\scripts\start-prod.ps1 -Stop
 cd backend\target
-powershell -Command "Move-Item yinjia-mes-backend-0.1.0.jar yinjia-mes-backend-0.1.0.jar.orig1018 -Force; Move-Item yinjia-mes-backend-0.1.0.build.jar yinjia-mes-backend-0.1.0.jar"
+powershell -Command "Move-Item yinjia-mes-backend-0.1.0.jar yinjia-mes-backend-0.1.0.jar.orig1020 -Force; Move-Item yinjia-mes-backend-0.1.0.build.jar yinjia-mes-backend-0.1.0.jar"
 cd ..\..
 powershell -ExecutionPolicy Bypass -File tools\scripts\start-prod.ps1
-node tools/archive/_stockreport-dialog-1020/_v-gate.mjs      # 期望 20/20 PASS(台账两项转绿)
+node tools/archive/_stockreport-dialog-1020\_v-gate.mjs      # 期望 20/20 PASS(台账两项转绿)
 ```
+
+> 换错了想回退:`backend\target\yinjia-mes-backend-0.1.0.jar.orig1020` 就是旧 jar,
+> 停实例后改名回去即可。
 
 前端静态产物(`frontend/src` → `backend/src/main/resources/static`)仍需在正常终端 `cd frontend; npm run build`
 完成(本机 `vite build` 起不来),要么按 AGENTS.md 同步进 jar,要么直接用 5173 开发服务器看效果。
