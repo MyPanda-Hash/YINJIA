@@ -3752,3 +3752,6 @@ i18n-field-labels-gap-20261017.sql
 # 49 个金蝶接口镜像列补 MS_Description 中文注明(bd_purchase_in 27 / bd_sale_out 21 / bl_purchase_in 1;
 #   生成器把 _id/_for/edit_pay/attachments 归为默认隐藏 ⇒ 界面不显示但要说得清是什么;体检 03 项)。幂等;两账套。
 migrate-iface-column-comments-20261017.sql
+# WMS 三个「条码管理」面板(材料仓/半成品仓/成品仓,一批一码):3 个只读视图 + 3 个 flat 面板 + 字段/权限/译名。
+#   半成品走「报工派生视图」(scjl 工序=成型/切炭),明确标注未进库存;材料仓按 bs_wh.仓库名称 动态取材料仓。幂等;两账套。
+migrate-barcode-panels-20261018.sql

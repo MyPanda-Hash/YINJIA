@@ -201,6 +201,23 @@ export const menuTree = [
           { code: 'stockDetail', title: '库存明细', path: '/panelx/list/STOCK_DETAIL', panelCode: 'STOCK_DETAIL', icon: 'List' },
         ],
       },
+      {
+        // 条码管理(2026-10-18):《【附件一】智慧工厂系统明细清单》WMS 的三条「条码管理」。
+        // 形态 = 三个**只读报表面板**(flat,一批一码/批次码),不是扫码作业:
+        //   材料仓 ← 采购入库单 头行(材料入库的正式单据)
+        //   半成品仓 ← 报工派生(scjl 工序=成型/切炭;**未进库存**,面板列里明写数据来源)
+        //   成品仓 ← 产成品入库单 头行
+        // 码内容 = 编码|批号。箱码/托盘码/序列号与「扫码出入库过账」属下一阶段(需扫码页 + 端点),
+        // 现状与缺口见 docs/design/智慧工厂清单差距分析.md §1.8/1.9/1.10。
+        code: 'barcode',
+        title: '条码管理',
+        icon: 'Grid',
+        children: [
+          { code: 'barcodeMat', title: '材料仓条码管理', path: '/panelx/list/BARCODE_MAT', panelCode: 'BARCODE_MAT', icon: 'Tickets' },
+          { code: 'barcodeWip', title: '半成品仓条码管理', path: '/panelx/list/BARCODE_WIP', panelCode: 'BARCODE_WIP', icon: 'Box' },
+          { code: 'barcodeFin', title: '成品仓条码管理', path: '/panelx/list/BARCODE_FIN', panelCode: 'BARCODE_FIN', icon: 'Finished' },
+        ],
+      },
     ],
   },
   {

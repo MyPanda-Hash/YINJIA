@@ -1379,6 +1379,11 @@ export default {
     '列': 'cols',
     '库存状况表': 'Stock Balance',
     '库存明细': 'Stock Detail',
+    // 2026-10-18 附件一 WMS 三条「条码管理」(三个 flat 面板;字段标签的译名在 yj_translation 里)
+    '条码管理': 'Barcode Management',
+    '材料仓条码管理': 'Material Warehouse Barcode',
+    '半成品仓条码管理': 'WIP Warehouse Barcode',
+    '成品仓条码管理': 'Finished Goods Warehouse Barcode',
     '将对全部数据设置': 'Will apply to all data',
     '将对所选仓库的全部数据设置': 'Will apply to all data in the selected warehouse',
     '无「预警配置」权限': 'No "Warning Config" permission',

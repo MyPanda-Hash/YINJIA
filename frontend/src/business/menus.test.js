@@ -202,3 +202,23 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
     ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP'])
   assert.equal((group('qcDoc').children || []).length, 7)
 })
+
+/**
+ * 2026-10-18 用户口径(附件一 WMS 三条「条码管理」):三个只读报表面板,一批一码,
+ * 半成品先走「报工数据派生视图」。这里钉住入口与形态:
+ *   · 三个 panelCode 必须在导航里且各自独立(不能挤成一张面板);
+ *   · 走的必须是通用面板路由 /panelx/list/<code>(后端 flat 面板,前端零页面)。
+ */
+test('智能供应链新增「条码管理」组:材料/半成品/成品 三个只读面板', () => {
+  const scm = menuTree.find((n) => n.code === 'scm')
+  const bc = (scm.children || []).find((c) => c.code === 'barcode')
+  assert.ok(bc, '智能供应链下应有「条码管理」分组')
+  assert.equal(bc.title, '条码管理')
+  assert.deepEqual((bc.children || []).map((c) => c.panelCode),
+    ['BARCODE_MAT', 'BARCODE_WIP', 'BARCODE_FIN'])
+  assert.deepEqual((bc.children || []).map((c) => c.title),
+    ['材料仓条码管理', '半成品仓条码管理', '成品仓条码管理'])
+  for (const leaf of bc.children || []) {
+    assert.equal(leaf.path, '/panelx/list/' + leaf.panelCode)
+  }
+})
