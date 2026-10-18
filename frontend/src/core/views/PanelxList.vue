@@ -7303,14 +7303,16 @@ async function openPickedProcInsp(res) {
     ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
     : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
   if (target === panelCode.value) {
-    // 🔴 2026-10-18 用户报障「选取的工单无法填入进这个检验单内」:
-    //   原实现只 `load()` 刷新列表,**没有把页面切到那张单** —— 屏幕上仍是原来的单(或刚点「新增」
-    //   留下的空行),看起来就像"选了没反应/没填进去"。这里按单号把 `cur` 定位到目标单。
-    await openDocByNo(no)
-    // 命中已审核的旧单时表单是只读的(用户会以为"填不进去"),明确提示先弃审
-    if (String(cur.value?.['单据状态'] || '') === '已审核') {
-      ElMessage.info(tt('该检验单已审核，如需修改请先点「弃审」退回草稿'))
-    }
+    // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
+    //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。
+    //   脏单时 guardPageAction 只弹三态窗并返回,真正的切单在 onLeaveChoice 里执行。
+    await guardPageAction(async () => {
+      await openDocByNo(no)
+      // 命中已审核的旧单时表单是只读的(用户会以为"填不进去"),明确提示先弃审
+      if (String(cur.value?.['单据状态'] || '') === '已审核') {
+        ElMessage.info(tt('该检验单已审核，如需修改请先点「弃审」退回草稿'))
+      }
+    })
     return
   }
   const targetPath = `/panelx/list/${target}`
