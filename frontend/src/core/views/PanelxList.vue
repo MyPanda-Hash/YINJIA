@@ -5274,7 +5274,7 @@ function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首�
 // ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
 // 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
 // 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
-// (仓位编码按仓内唯一,同码多仓不串选)。 ═══
+// (仓位编码按仓内唯一,同码多仓不串选;2026-10-18 库层过滤唯一索引兜底)。 ═══
 const qrSel = ref(new Set())
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
@@ -8863,7 +8863,7 @@ async function onButton(action) {
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
     // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
     // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):同款勾选即打,
-    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位地址@仓位编码;
+    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位编码(2026-10-18 去地址段);
     // 勾选行键=仓库+仓位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
     const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value

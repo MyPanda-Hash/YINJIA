@@ -155,7 +155,7 @@ TABLE	dbo	bs_team	班组档案	10	34
 TABLE	dbo	bs_uom	计量单位档案	16	46
 TABLE	dbo	bs_wc	工作中心档案	17	42
 TABLE	dbo	bs_wh	仓库档案(仓库编码/名称,库存台账仓库真源)	22	53
-TABLE	dbo	bs_wh_loc	仓位档案(仓库内货位主数据:仓库/仓库编码/仓位编码/仓位地址;一仓多仓位、一仓位一仓;仓库列存仓库名称参照 bs_wh;仓位二维码标签内容=仓库编码@仓位地址@仓位编码。2026-10-08 由「库位档案」正名为「仓位档案」对齐金蝶 sp_number/sp_name)	679	39
+TABLE	dbo	bs_wh_loc	仓位档案(仓库内货位主数据:仓库/仓库编码/仓位编码/仓位地址;一仓多仓位、一仓位一仓;仓库列存仓库名称参照 bs_wh;仓位二维码标签内容=仓库编码@仓位编码(2026-10-18 去地址段);仓库编码+仓位编码仓内唯一(ux_bs_wh_loc_wh_code)。2026-10-08 由「库位档案」正名为「仓位档案」对齐金蝶 sp_number/sp_name)	684	39
 TABLE	dbo	day_report	生产日报表头表(自制物料/成型/切炭/组装四车间合一)	0	35
 TABLE	dbo	day_report_detail	生产日报表行表(姓名/时间/产品/数量/报废等)	0	44
 TABLE	dbo	dm_ck	仓库代码	22	42

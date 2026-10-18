@@ -106,7 +106,7 @@ public class PanelConfigService {
         // 二维码=公司代码@物料编码[@批号];printProductCards 本地生成,原 /report/qr-label 暂留可回滚。
         // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):与商品同款勾选即打形态,
         // 卡面=仓位字段(仓库/仓位地址/仓位编码,不含商品字段),
-        // 二维码=仓库编码@仓位地址@仓位编码(printLocationCards);行键=仓库+仓位编码 复合(同码多仓不串选)。
+        // 二维码=仓库编码@仓位编码(2026-10-18 去地址段,printLocationCards);行键=仓库+仓位编码 复合(同码多仓不串选)。
         boolean qrLabel = "INV".equals(def.code()) || "WHLOC".equals(def.code());
         if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
@@ -205,7 +205,7 @@ public class PanelConfigService {
             if ("WHLOC".equals(def.code())) {
                 // 仓位标签勾选行键=仓库+仓位编码 复合(仓位编码按仓内唯一,同码多仓不串选)
                 metadata.put("qrLabelScopeKey", "仓库");
-                // 前端分发:whloc → printLocationCards(仓位标识卡,二维码=仓库编码@仓位地址@仓位编码)
+                // 前端分发:whloc → printLocationCards(仓位标识卡,二维码=仓库编码@仓位编码)
                 metadata.put("qrLabelKind", "whloc");
             }
         }
