@@ -1,5 +1,6 @@
 import request from '@core/request'
 import { unwrap, unwrapStrict, errMsg } from '@core/panel-engine'
+import { fetchAllRows } from './pagedQuery.js'
 
 // 通用层函数继续对外导出（保持既有调用方兼容）
 export { unwrap, unwrapStrict, errMsg }
@@ -435,6 +436,11 @@ export async function rdFlowUsers() {
 /**
  * 按库存状况表口径回填明细现存量：有仓库取仓库库存，无仓库取全部仓库合计。
  * 选择存货后即时调用，避免引用存货档案中的静态值。
+ *
+ * ⚠ 2026-10-18 修「商品面板里显示没有库存」:原实现写死 `pageNo:1, pageSize:500`,
+ *   只取库存状况表**第一页**。正式库 `v_stock_balance` 实测 **1366 行** ⇒ 501 行之后的
+ *   存货永远匹配不到、现存量回填成 0,用户看到的就是「没有库存」。
+ *   现在走 `fetchAllRows` 翻页拉全(规则与边界用例见 pagedQuery.js / engine.test.js)。
  */
 export async function fillCurrentStock(rows) {
   // YINJIA-MES:HSDZ 字段键(物料代码/物料名称)与 light-mes 键一并识别
@@ -444,8 +450,8 @@ export async function fillCurrentStock(rows) {
         || row['存货名称'] || row['产品名称'] || row['材料名称'] || row['物料名称'])
   ))
   if (!targets.length) return 0
-  const result = await queryFormDataList({ panelCode: 'STOCK_STATUS', condition: {}, pageNo: 1, pageSize: 500 })
-  const stockRows = result.list || []
+  const stockRows = await fetchAllRows((pageNo, pageSize) =>
+    queryFormDataList({ panelCode: 'STOCK_STATUS', condition: {}, pageNo, pageSize }))
   for (const row of targets) {
     const code = String(row['存货编码'] || row['产品编码'] || row['材料编码'] || row['物料代码'] || '').trim()
     const name = String(row['存货名称'] || row['产品名称'] || row['材料名称'] || row['物料名称'] || row['存货'] || '').trim()
