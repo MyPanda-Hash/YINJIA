@@ -94,14 +94,21 @@ public class FlowBoardService {
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("name", def.name());
             if (def.isDoc()) {
-                n.put("docs", count("SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'"));
-                // 2026-10-16 性能专项:已审核/待审核原本是两条独立 SQL(每面板 2 次往返),
-                // 合并成一条按条件求和 —— 16 张单据面板就省下 16 次往返。
+                String col = def.groupCol();
+                if (table == null || col == null || table.isBlank() || col.isBlank()
+                        || !table.matches("[\\p{L}\\p{N}_]+") || !col.matches("[\\p{L}\\p{N}_]+")) return null;
+                n.put("docs", count("SELECT COUNT(DISTINCT [" + col + "]) FROM " + table
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(RTRIM([" + col + "]),'')<>''"));
+                // 已审核/待审核(2026-10-18 修正):只数**头表里还在的单据**,并按下单号去重。
+                //   原先直接数 yj_doc_status 留痕 —— 已删除的历史单(PURCHASE_IN 19 张、
+                //   QC_INSP_REC 12 张)仍算已审核 ⇒ 节点出现「单数 313 / 已审核 332 / 草稿 0」这种
+                //   三个数对不上的自相矛盾,与桌面「单据流量」卡同一 bug。
                 Map<String, Object> st = jdbc.queryForMap(
-                        "SELECT SUM(CASE WHEN shr IS NOT NULL THEN 1 ELSE 0 END) AS audited,"
-                                + " SUM(CASE WHEN pending = 'Y' THEN 1 ELSE 0 END) AS pending"
-                                + " FROM yj_doc_status WHERE panel_code = ? AND ISNULL(canceled,'N')<>'Y'", code);
+                        "SELECT COUNT(DISTINCT CASE WHEN s.shr IS NOT NULL THEN s.doc_no END) AS audited,"
+                                + " COUNT(DISTINCT CASE WHEN s.pending = 'Y' THEN s.doc_no END) AS pending"
+                                + " FROM yj_doc_status s WHERE s.panel_code = ? AND ISNULL(s.canceled,'N')<>'Y'"
+                                + " AND EXISTS(SELECT 1 FROM " + table + " h WHERE h.[" + col + "]=s.doc_no"
+                                + " AND ISNULL(h.asp_cancel,'N')<>'Y')", code);
                 n.put("audited", toInt(st.get("audited")));
                 n.put("pending", toInt(st.get("pending")));
                 n.put("draft", Math.max(0, toInt(n.get("docs")) - toInt(st.get("audited"))));

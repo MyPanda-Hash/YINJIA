@@ -15,7 +15,9 @@ import java.util.Map;
  * 桌面(我的桌面)统计聚合:一次返回各模块图表数据。
  *
  * 分层口径(2026-09-28,SQL 全部收敛在 service —— 代码规范 A2,不再往 ShellController 堆 SQL):
- *  - 生产 = 参考库 plang(工单行):完工=rk_no 已填 / 在产=其余;车间=scx;趋势=pl_date(新增)/cp_date(完工);
+ *  - 生产 = 参考库 plang(工单行):完工=rk_no 已填 / 在产=其余;车间=scx;
+ *    趋势=pl_date(新增)/ **cp_date2(实际完工日:入库回写)** —— cp_date 是**计划完工/交期**,
+ *    2026-10-18 之前趋势把交期当完工,图上「完工 221」而状态分布只有 3 张完工,用户看着自相矛盾;
  *    工序完成率 = scjl 报工(gxdm 工序 × wgzt 完工)——未报工工序不出条,空数据=空态。
  *  - 库存 = inh/outh 两物理表(入库/出库):单数=DISTINCT 单号,行数=明细行;
  *    现存量 TOP = v_stock_balance(库存状况表)按 存货编码+存货 跨仓库 SUM,全量下发由前端滚动展示;
@@ -250,10 +252,21 @@ public class DashboardStatsService {
             for (PanelRegistry.PanelDef def : registry.all()) {
                 if (!def.isDoc()) continue;
                 String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
-                int docs = count("SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'");
-                int audited = count("SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = '" + def.code().replace("'", "''")
-                        + "' AND shr IS NOT NULL AND ISNULL(canceled,'N')<>'Y'");
+                String col = def.groupCol();
+                // 表名/列名来自元数据,拼 SQL 前做白名单(中文列名照常放行);不合规就跳过这张面板
+                if (table == null || col == null || table.isBlank() || col.isBlank()
+                        || !table.matches("[\\p{L}\\p{N}_]+") || !col.matches("[\\p{L}\\p{N}_]+")) continue;
+                // 单数去掉空单号:COUNT(DISTINCT '') 会把「一堆空单号」算成 1 张单(WO_REPORT 实测 7 行空号)
+                int docs = count("SELECT COUNT(DISTINCT [" + col + "]) FROM " + table
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(RTRIM([" + col + "]),'')<>''");
+                // 已审核(2026-10-18 修正):必须只数**头表里还在的单据**。
+                //   原先直接数 yj_doc_status 留痕行 —— 删掉的历史单(实测 PURCHASE_IN 19 张、
+                //   QC_INSP_REC 12 张)仍被算作已审核 ⇒ 面板「草稿 = 单数 − 已审核」出负数
+                //   (PURCHASE_IN 313 − 332 = −19),单据流量卡与流程看板上自相矛盾。
+                int audited = count("SELECT COUNT(DISTINCT s.doc_no) FROM yj_doc_status s"
+                        + " WHERE s.panel_code = ? AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y'"
+                        + " AND EXISTS(SELECT 1 FROM " + table + " h WHERE h.[" + col + "]=s.doc_no"
+                        + " AND ISNULL(h.asp_cancel,'N')<>'Y')", def.code());
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("panelName", def.name());
                 row.put("panelCode", def.code());
@@ -292,7 +305,10 @@ public class DashboardStatsService {
                     Map.of("name", "生产中", "value", Math.max(0, all - done))));
             prod.put("workshopDist", nameValue("SELECT scx AS k, COUNT(*) AS v FROM plang"
                     + " WHERE ISNULL(scx,'') <> '' AND pl_date >= ? AND pl_date < ? GROUP BY scx ORDER BY COUNT(*) DESC", r.fromStr(), r.toExclusive()));
-            prod.put("trend7", dateTrend(r, "plang", "pl_date", "cp_date"));
+            // 完工序列(2026-10-18 修正):用 **cp_date2(首次入库当日,实际完工)**。
+            //   cp_date 是计划完工/交期(全表 429 行都有值),拿它当完工会让趋势算出 221 张完工,
+            //   而状态分布(按 rk_no)只有 3 张 —— 同一张卡上两个「完工」互相打脸。
+            prod.put("trend7", dateTrend(r, "plang", "pl_date", "cp_date2"));
             // 工单数据截止日(2026-10-15):近 7 天趋势全 0 时,卡片要能说明"不是图坏了,
             // 是工单数据本身就停在某天" —— 实测本机 plang 的日期都在 2026-08。
             List<Map<String, Object>> lastRow = jdbc.queryForList("SELECT CONVERT(varchar(10), MAX(pl_date), 23) AS d FROM plang");
