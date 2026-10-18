@@ -20,24 +20,34 @@ test('材料仓:名称取存货名称、数量取「数量」、单据取单据�
   assert.equal(lb.doc, 'CGRK-20261014-03414 2026-10-14')
 })
 
-test('半成品:数量取「报工数量」、单据取报工单号+生产日期', () => {
-  const lb = barcodeLabelOf('BARCODE_WIP', {
-    码内容: 'A-32-26|20261014', 产品名称: 'A-32-26', 规格型号: '', 批号: '20261014',
-    报工数量: 20, 计量单位: '支', 报工单号: 'BG-2026-10-0003', 生产日期: '2026-10-14',
+test('材料仓标签:带仓库(映射后)/供应商;仓位列存在但值为空 ⇒ 空串(标签不显示)', () => {
+  const lb = barcodeLabelOf('BARCODE_MAT', {
+    码内容: 'YJ-TS-033|20261014001', 存货名称: 'PP棉', 数量: 1, 批号: '20261014001',
+    仓库映射: '材料仓', 供应商: '深圳市陶氏水处理设备技术开发有限公司', 仓位: '',
   })
-  assert.equal(lb.qty, 20)
-  assert.equal(lb.doc, 'BG-2026-10-0003 2026-10-14')
-  assert.equal(lb.name, 'A-32-26')
+  assert.equal(lb.warehouse, '材料仓')
+  assert.equal(lb.supplier, '深圳市陶氏水处理设备技术开发有限公司')
+  assert.equal(lb.bin, '', '没有仓位数据 → 空串,标签模板据此不渲染')
 })
 
-test('成品:数量取「实收数量」;批号为空时标签不带 LOT、码内容只剩产品编码', () => {
+test('成品仓标签:只有仓库名;供应商与仓库一律空串', () => {
   const lb = barcodeLabelOf('BARCODE_FIN', {
-    码内容: 'TS45', 产品名称: 'TS45', 批号: '', 实收数量: 123,
-    计量单位: '支', 单据编号: 'CPRK-20261014-00005', 单据日期: '2026-10-14',
+    码内容: 'TS45|20261014001', 产品名称: 'TS45', 批号: '20261014001', 实收数量: 123,
+    计量单位: 'kg', 单据编号: 'CPRK-20261014-00005', 单据日期: '2026-10-14', 仓库名称: '恒亿仓',
   })
-  assert.equal(lb.code, 'TS45')
-  assert.equal(lb.lot, '', '空批号不编造')
-  assert.equal(lb.qty, 123)
+  assert.equal(lb.warehouse, '恒亿仓')
+  assert.equal(lb.supplier, '')
+  assert.equal(lb.bin, '')
+})
+
+test('半成品仓标签:仓库/供应商/仓位都没有(报工派生)→ 全空串', () => {
+  const lb = barcodeLabelOf('BARCODE_WIP', {
+    码内容: 'S022-4|20261014', 产品名称: 'A+级烧结炭棒/滤芯', 批号: '20261014',
+    报工数量: 160, 计量单位: '支', 报工单号: 'BG-2026-10-0001', 生产日期: '2026-10-16',
+  })
+  assert.equal(lb.warehouse, '')
+  assert.equal(lb.supplier, '')
+  assert.equal(lb.bin, '')
 })
 
 test('空码行返回 null;批量映射丢弃空码并保持顺序', () => {
