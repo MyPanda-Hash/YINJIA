@@ -3635,3 +3635,4 @@ migrate-mold-feed-stdlib-20261013.sql
 migrate-rd-sheet-ref-tidy-20261013.sql
 migrate-specdoc-required-off-20261013.sql
 migrate-wlbom-menu-rollback-20261015.sql
+migrate-dm-fields-center-20261018.sql

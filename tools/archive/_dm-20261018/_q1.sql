@@ -1,0 +1,13 @@
+﻿SET NOCOUNT ON;
+PRINT '=== 1. ERPLG 面板 ===';
+SELECT panel_code, panel_name, category, mode, line_table, module_group, page_size FROM yj_panel WHERE panel_code IN ('ERPLG','ERPLG_ROW','ZDGL');
+PRINT '=== 2. ERPLG 字段 ===';
+SELECT f.panel_code, f.col_name, f.label, f.data_type, LEFT(ISNULL(f.dict_sql,''),60) dict, f.place, f.seq, f.visible, f.hidden FROM yj_field f WHERE f.panel_code IN ('ERPLG','ERPLG_ROW') ORDER BY f.panel_code, f.seq;
+PRINT '=== 3. erp_imp_log 行数/列 ===';
+SELECT COUNT(*) AS 行数 FROM erp_imp_log;
+SELECT c.name, t.name AS 类型, c.max_length FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID('dbo.erp_imp_log') ORDER BY c.column_id;
+PRINT '=== 4. ZDGL 面板与字段 ===';
+SELECT f.label, f.data_type, LEFT(ISNULL(f.dict_sql,''),50) dict, f.place, f.seq FROM yj_field f WHERE f.panel_code='ZDGL' ORDER BY f.seq;
+SELECT COUNT(*) AS zdgl行数 FROM zdgl;
+PRINT '=== 5. dm_gx 字典行数 ===';
+SELECT COUNT(*) AS dm_gx行数 FROM dm_gx;

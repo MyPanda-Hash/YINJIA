@@ -1,0 +1,2 @@
+﻿SET NOCOUNT ON;
+SELECT TOP 2 * FROM bs_dict;

@@ -51,7 +51,15 @@ GO
 IF COL_LENGTH(N'dbo.bs_qc_item', N'检验数量') IS NULL
   ALTER TABLE dbo.bs_qc_item ADD 检验数量 int NULL;
 GO
-IF COL_LENGTH(N'dbo.qc_proc_insp_detail', N'格数上限') IS NULL
+/* ⚠ 2026-10-18 再修(「制程检验单」这条线在 HSDZ_MES 已整条不存在):用户口径「本机没有这个功能了」,
+ *   制程检验单面板 QC_PROC_INSP 与 qc_proc_insp_head/_detail 两张表在正式账套**都没有**
+ *   (2026-10-12 创建后于 2026-10-16 整体下线,见 migrate-drop-qc-mold-cut-finspec-20261016.sql),
+ *   而本脚本的 ALTER / sp_addextendedproperty 是**静态**表名 ⇒ 整批编译就报「找不到对象 qc_proc_insp_detail」,
+ *   把同批的 bs_qc_plan / bs_qc_item 两处真改动一起堵死(DbSync 报「失败 1」,后续脚本全部不执行)。
+ *   改法(同 A0 那条教训):凡引用 qc_proc_insp_detail / QC_PROC_INSP 的地方一律走动态 SQL 或 sys.* 判断,
+ *   表不存在即整段跳过 —— 脚本在「有这张表的库」上行为与原来完全一致。 */
+IF OBJECT_ID(N'dbo.qc_proc_insp_detail', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.qc_proc_insp_detail', N'格数上限') IS NULL
   ALTER TABLE dbo.qc_proc_insp_detail ADD 格数上限 int NULL;
 GO
 
@@ -72,10 +80,12 @@ IF NOT EXISTS (SELECT 1 FROM sys.extended_properties
        N'本检验项目的检验数量(可选;几个样品/几次)= 带入检验单后横表该列的初始格数,也是列头「＋」的上限;空 = 不设上限',
        N'SCHEMA', N'dbo', N'TABLE', N'bs_qc_item', N'COLUMN', N'检验数量';
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.extended_properties
-                WHERE major_id = OBJECT_ID(N'dbo.qc_proc_insp_detail')
-                  AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.qc_proc_insp_detail'), N'格数上限', 'ColumnId')
-                  AND name = N'MS_Description' AND class = 1)
+-- 2026-10-18:表不存在时整段跳过(动态 SQL;见上方 A1 注释)
+IF OBJECT_ID(N'dbo.qc_proc_insp_detail', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.extended_properties
+                    WHERE major_id = OBJECT_ID(N'dbo.qc_proc_insp_detail')
+                      AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.qc_proc_insp_detail'), N'格数上限', 'ColumnId')
+                      AND name = N'MS_Description' AND class = 1)
   EXEC sp_addextendedproperty N'MS_Description',
        N'本检验项目在本单上允许的格数上限(源自检验方案的「检验数量」;空 = 不设上限)。格数会随列头 ＋/− 变,故上限单独存',
        N'SCHEMA', N'dbo', N'TABLE', N'qc_proc_insp_detail', N'COLUMN', N'格数上限';
@@ -104,8 +114,10 @@ ELSE
          seq = 118, width = 90, editable = 1, required = 0, hidden = 0, visible = 1
    WHERE panel_code = N'QC_ITEM' AND col_name = N'检验数量';
 
-/* C4. QC_PROC_INSP 行表「格数上限」—— 照 格数 口径:hidden=1/visible=0(值照存照取,不进列表列) */
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'QC_PROC_INSP' AND col_name = N'格数上限')
+/* C4. QC_PROC_INSP 行表「格数上限」—— 照 格数 口径:hidden=1/visible=0(值照存照取,不进列表列)
+ *     2026-10-18:该面板已整体下线 ⇒ 只在该面板/表仍存在的库上登记(见 A1 注释) */
+IF OBJECT_ID(N'dbo.qc_proc_insp_detail', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'QC_PROC_INSP' AND col_name = N'格数上限')
   INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible)
   VALUES (N'QC_PROC_INSP', N'格数上限', N'格数上限', N'整数', N'detail', 87, 60, 1, 0, 1, 0);
 GO
@@ -154,22 +166,25 @@ UPDATE dbo.bs_qc_item
  * E3. 方案的检验类型**刻意不回填**(空 = 带入时回退按项目自己的「检验内容」分类,老数据行为不变)。 */
 
 /* ============ F. 自检 ============ */
+/* 2026-10-18:格数上限那三项(#3/#6/#9)以「该表是否存在」为前提 —— 表已下线的库上不算失败,
+ * 否则正式账套会永远带着一条红色自检(与真实的 bs_qc_plan/bs_qc_item 结果混在一起看不出真假)。 */
 DECLARE @bad int = 0;
+DECLARE @hasProcDetail bit = CASE WHEN OBJECT_ID(N'dbo.qc_proc_insp_detail', N'U') IS NOT NULL THEN 1 ELSE 0 END;
 IF COL_LENGTH(N'dbo.bs_qc_plan', N'检验类型') IS NULL SET @bad = @bad + 1;
 IF COL_LENGTH(N'dbo.bs_qc_item', N'检验数量') IS NULL SET @bad = @bad + 1;
-IF COL_LENGTH(N'dbo.qc_proc_insp_detail', N'格数上限') IS NULL SET @bad = @bad + 1;
+IF @hasProcDetail = 1 AND COL_LENGTH(N'dbo.qc_proc_insp_detail', N'格数上限') IS NULL SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.bs_qc_plan')
       AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.bs_qc_plan'), N'检验类型', 'ColumnId')
       AND name = N'MS_Description') = 0 SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.bs_qc_item')
       AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.bs_qc_item'), N'检验数量', 'ColumnId')
       AND name = N'MS_Description') = 0 SET @bad = @bad + 1;
-IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.qc_proc_insp_detail')
+IF @hasProcDetail = 1 AND (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.qc_proc_insp_detail')
       AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.qc_proc_insp_detail'), N'格数上限', 'ColumnId')
       AND name = N'MS_Description') = 0 SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_PLAN' AND col_name = N'检验类型') <> 1 SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_ITEM' AND col_name = N'检验数量') <> 1 SET @bad = @bad + 1;
-IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_PROC_INSP' AND col_name = N'格数上限') <> 1 SET @bad = @bad + 1;
+IF @hasProcDetail = 1 AND (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_PROC_INSP' AND col_name = N'格数上限') <> 1 SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_PLAN' AND col_name = N'文件编码' AND visible = 1) <> 0 SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_translation WHERE scope = N'field' AND ref_key = N'检验类型' AND locale = N'en') = 0 SET @bad = @bad + 1;
 IF (SELECT COUNT(*) FROM yj_translation WHERE scope = N'field' AND ref_key = N'检验数量' AND locale = N'en') = 0 SET @bad = @bad + 1;
