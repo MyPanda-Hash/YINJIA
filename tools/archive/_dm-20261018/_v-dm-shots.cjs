@@ -44,6 +44,9 @@ async function main() {
       const text = await raw(`document.body.innerText.replace(/\\s+/g,' ')`)
       const heads = await raw(`[...document.querySelectorAll('.el-table__header th .cell')].map(e=>e.innerText.trim()).filter(Boolean).slice(0,14)`)
       const rows = await raw(`document.querySelectorAll('.el-table__body tr.el-table__row').length`)
+      // 工具栏按钮(2026-10-18 起 ERP集成只读):只读面板应当只剩 查询/刷新/导出/打印 这类
+      const toolbar = await raw(`[...document.querySelectorAll('.el-button, .tool-btn, button')].map(e=>e.innerText.trim()).filter(Boolean).slice(0,20)`)
+      console.log(`[${code}] 工具栏按钮: ${JSON.stringify(toolbar)}`)
       console.log(`[${code}] 列头: ${JSON.stringify(heads)}`)
       console.log(`[${code}] 渲染行数: ${rows}`)
       console.log(`[${code}] 文本片段: ${String(text).slice(0, 260)}`)
