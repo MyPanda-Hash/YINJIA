@@ -432,14 +432,13 @@
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] !== '是' && isChangeInitiator"
                      class="as-side-btn primary" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
               </template>
-              <!-- 申请修改(归档后改数据,2026-10-16 侧栏整理)——
-                   原来是「申请修改 ▼」下拉,**审批通过/审批驳回/审批情况全藏在下拉里**(用户口径「不好找」)。
-                   现在:申请修改 = 已审核/已归档 时的**主按钮**(实心);修改申请中的审批与撤回各自成条,不再折叠。
-                   撤回修改申请/弃审 → ⑤ 危险操作。 -->
+              <!-- 申请修改:2026-10-18 起**融合进「弃审」** —— 用户口径「把这两个融合,按钮名写为弃审,
+                   也是需要申请修改审批之后才可以弃审」:
+                   已归档单据点「弃审」= 先填修改原因发起申请修改;管理员审批通过(进入修改中)后再点弃审才真正退回草稿。
+                   故侧栏不再单独放「申请修改」;修改申请中的审批/撤回与修改中的提交审批仍各自成条。 -->
               <div
-                v-if="isDocArchivePanel && ['已审核', '已归档'].includes(curDocStatus)"
+                v-if="false"
                 class="as-side-btn"
-                :class="{ primary: canModifyReq, disabled: !canModifyReq }"
                 @click="onSideAction('申请修改')"
               >{{ tt('申请修改') }}</div>
               <div v-if="isDocArchivePanel && curDocStatus === '修改中'" class="as-side-btn primary" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
@@ -595,7 +594,7 @@
                 v-if="canUnauditHere || (hasApprovalBtns && canApproveHere())"
                 class="as-side-btn"
                 :class="{ disabled: isDisabled('弃审') }"
-                :title="tt('反审核：退回草稿后可直接修改，保存时再归档（修改记录照样留痕）')"
+                :title="tt('弃审：已审核直接退回草稿；已归档需先申请修改并经审批(修改中)后才可弃审')"
                 @click="onSideAction('弃审')"
               >{{ tt('弃审') }}</div>
             </div>
@@ -3736,8 +3735,9 @@ const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocSt
  *   总负责人∪管理员),后端 unaudit 同批放宽为 requireApproverOrDevFileOwner。其余面板一字不动。
  */
 const devFileCanEditHere = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === true))
+// 2026-10-18:已归档也要放出(点它就是"先申请修改");「修改中」= 申请修改已获批,可直接弃审
 const canUnauditHere = computed(() => isDocArchivePanel.value
-  && ['已审核', '已归档'].includes(curDocStatus.value)
+  && ['已审核', '已归档', '修改中'].includes(curDocStatus.value)
   && (canApproveHere() || devFileCanEditHere.value))
 
 // ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
@@ -9180,6 +9180,8 @@ async function onButton(action) {
   }
   // 人工审核：确认弹窗 + 审核意见（选填）；审核人取当前登录人（后端从 JWT 取）
   let auditOpinion = ''
+  // 「申请修改」的修改原因(2026-09-30);2026-10-18 起「弃审」在归档态也会写它(融合后由弃审发起申请)
+  let modifyReason = ''
   if (action === '审核') {
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     // 已审核过的单据不允许再次审核，也不允许补填审批意见
@@ -9196,19 +9198,46 @@ async function onButton(action) {
       return
     }
   } else if (action === '弃审') {
+    // 2026-10-18 用户口径:把「弃审」与「申请修改」融合成一个「弃审」按钮 ——
+    //   · 已审核 / 修改中:直接弃审(修改中 = 申请修改已获批);
+    //   · 已归档:不允许直接弃审,先让用户填「修改原因」发起申请修改,管理员批到「修改中」后再点弃审。
+    //   (此前前端写死 !===='已审核' 直接弹「仅已审核状态可弃审」,把归档单挡在门外,与后端不一致)
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-    if (current.value['单据状态'] !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
-    try {
-      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
-    } catch (e) {
-      return
+    const st = String(current.value['单据状态'] || '')
+    if (st === '已归档') {
+      const noMod = current.value['编号'] || current.value['单据编号'] || ''
+      try {
+        const { value } = await ElMessageBox.prompt(
+          tt('单据：{no} 已归档。归档单据需先「申请修改」并经管理员审批(进入修改中)后才能弃审。\n请填写修改原因，现在就发起申请：').replace('{no}', noMod),
+          tt('申请修改'),
+          {
+            confirmButtonText: tt('提交修改申请'),
+            cancelButtonText: tt('取消'),
+            inputType: 'textarea',
+            inputPlaceholder: tt('修改原因（必填）'),
+            inputValidator: (v) => (v && v.trim() ? true : tt('修改原因不能为空')),
+          }
+        )
+        modifyReason = (value || '').trim()
+        if (!modifyReason) return
+        action = '申请修改'
+      } catch (e) {
+        return
+      }
+    } else if (!['已审核', '修改中', '已生效'].includes(st)) {
+      return ElMessage.warning(tt('仅已审核或修改中状态可弃审'))
+    } else {
+      try {
+        await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
+      } catch (e) {
+        return
+      }
     }
   }
   try {
     // 审批流：提交审批/审批通过（确认+意见）、审批驳回（意见必填）、审批情况（历史弹窗）
     let approvalOpinion = ''
-    // 「申请修改」的修改原因(2026-09-30 需求:数据记录表「修改:只需填写修改原因」)
-    let modifyReason = ''
+    // (modifyReason 已在函数上方统一声明 —— 2026-10-18 弃审在归档态会先发起申请修改)
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)

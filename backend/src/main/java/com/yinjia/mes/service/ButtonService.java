@@ -1802,8 +1802,15 @@ public class ButtonService {
         // DOC_ARCHIVE_PANELS 里(既没有「申请修改」),而本方法又把状态卡在"已审核/已归档",
         // 于是生效之后整张单再也动不了(调研 2026-09-30 实测确认)。
         boolean changeEffective = CHANGE_PANEL.equals(def.code()) && "已生效".equals(status);
-        if (!"已审核".equals(status) && !"已归档".equals(status) && !changeEffective)
-            throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 2026-10-18 用户口径(把「弃审」与「申请修改」融合):按钮只有一个「弃审」,
+        //   **但归档单必须先走申请修改并经管理员审批(状态进入「修改中」)才允许弃审** ——
+        //   不再允许对「已归档」直接反审核(旧行为靠 snapshotOnUnaudit 事后补快照,
+        //   现在是"先审批、再弃审",审批链与改动原因在弃审之前就已留痕)。
+        boolean modifying = "修改中".equals(status);
+        if ("已归档".equals(status))
+            throw new IllegalStateException("该单据已归档:请先「申请修改」并经管理员审批(状态变为修改中)后再弃审");
+        if (!"已审核".equals(status) && !modifying && !changeEffective)
+            throw new IllegalStateException("仅已审核/修改中状态可弃审(已归档请先申请修改)");
         // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
         // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
