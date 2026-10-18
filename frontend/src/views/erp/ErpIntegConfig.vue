@@ -277,10 +277,14 @@
           <div class="block-head">
             <span class="block-title">
               <i class="bar"></i>{{ tt('字段映射') }}
-              <em class="block-hint">{{ tt('一行 = 一个 MES 字段/常量 → 金蝶接口字段') }} · {{ tt('必填') }} {{ requiredCount }} / {{ fieldRows.length }}</em>
+              <em class="block-hint">{{ tt('一行 = 一个 MES 字段/常量 → 金蝶接口字段') }} · {{ tt('必填') }} {{ requiredCount }} / {{ fieldRows.length }} · {{ tt('MES 字段下拉 = 对应面板的字段') }}</em>
             </span>
             <div class="block-actions">
-              <el-button size="small" @click="fillFromPanel">{{ tt('按面板字段带出') }}</el-button>
+              <!-- 「按面板字段带出」从工具栏移到**空表态**里(2026-10-18 用户口径:
+                   「为什么要区分按面板字段带出这个按钮,来显示前后不同字段」)——
+                   映射行 = 对端真正需要的键(商品档案 4 行 / 面板却有 58 个字段),
+                   一键铺全会把已有映射冲成一屏待补行,看起来像"字段变了"。
+                   故只在**还没有任何映射行**时提供"一次铺出",已有映射时不再出现,由「新增一行」逐条加。 -->
               <el-button size="small" @click="addFieldRow">{{ tt('新增一行') }}</el-button>
               <el-button size="small" type="primary" :loading="savingFields" @click="saveFields">{{ tt('保存映射') }}</el-button>
             </div>
@@ -342,7 +346,19 @@
               </template>
             </el-table-column>
           </el-table>
-          <div v-if="!fieldRows.length" class="ei-empty small">{{ tt('还没有字段映射,点「按面板字段带出」自动铺一行一字段。') }}</div>
+          <div v-if="!fieldRows.length" class="ei-empty small">
+            <div>{{ tt('还没有字段映射。') }}</div>
+            <div class="ei-empty-act">
+              <el-button
+                v-if="current?.对应面板 && panelFieldOptions.length"
+                link
+                type="primary"
+                size="small"
+                @click="fillFromPanel"
+              >{{ tt('从面板字段一次铺出') }}({{ panelFieldOptions.length }})</el-button>
+              <span v-else>{{ tt('先在「接口信息」里选好对应面板,再点「新增一行」逐条填。') }}</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -932,6 +948,7 @@ onMounted(async () => {
   color: var(--t-text-3);
 }
 .ei-empty.small { padding: 10px 0; }
+.ei-empty-act { margin-top: 4px; }
 
 /* 窄屏(≤1280)压一压左两栏,保证编辑区不被挤没 */
 @media (max-width: 1360px) {
