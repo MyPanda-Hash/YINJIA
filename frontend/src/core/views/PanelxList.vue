@@ -7303,13 +7303,37 @@ function openPickedProcInsp(res) {
     ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
     : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
   if (target === panelCode.value) {
-    load()                       // 同面板:新草稿按创建时间倒序排在第一张
+    // 🔴 2026-10-18 用户报障「选取的工单无法填入进这个检验单内」:
+    //   原实现只 `load()` 刷新列表,**没有把页面切到那张单** —— 屏幕上仍是原来的单(或刚点「新增」
+    //   留下的空行),看起来就像"选了没反应/没填进去"。这里按单号把 `cur` 定位到目标单。
+    openDocByNo(no)
     return
   }
   const targetPath = `/panelx/list/${target}`
   tabs.close(route.path)
-  router.push(targetPath)
   tabs.open({ path: targetPath, title: target })
+  // 跨面板同样要**打开那张单**(不是只落到列表):目标页用 ?docNo= 定位(applyDocNoQuery 既有机制)
+  router.push({ path: targetPath, query: { docNo: no } })
+}
+
+/**
+ * 在同一面板内把当前单据切到指定单号(2026-10-18)。
+ *
+ * <p>先按当前筛选刷新并找;找不到(被关键字/条件挡掉)再按 `_docNo` 定位一次,
+ * 定位完**立刻撤掉该条件**,避免筛选粘住后续的查询/刷新。</p>
+ */
+async function openDocByNo(no) {
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  let i = list.value.findIndex((r) => String(r['单据编号'] || r['编号'] || '') === String(no))
+  if (i < 0) {
+    condition['_docNo'] = String(no)
+    await load()
+    delete condition['_docNo']
+    i = list.value.findIndex((r) => String(r['单据编号'] || r['编号'] || '') === String(no))
+  }
+  curIdx.value = i >= 0 ? i : 0
 }
 
 /**
