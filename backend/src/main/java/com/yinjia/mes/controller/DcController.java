@@ -46,6 +46,16 @@ public class DcController {
     private final PanelPermissionService perm;
     /** 文本上报口复用它的单点写入(采样/在线/越限报警同一条链路,不另写一份) */
     private final com.yinjia.mes.service.DcService dc;
+    /**
+     * 文本口节流(2026-10-19 用户口径「1 秒抓一次,空重量不抓」):
+     * deviceCode → 上次写入的时间戳(ms)。秤开连续发送后会 5~10Hz 地发,不节流会把流水刷爆。
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> LAST_TEXT_WRITE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    /** 最小写入间隔(ms)—— 1 秒一条 */
+    private static final long TEXT_MIN_INTERVAL_MS = 1000L;
+    /** 空重量阈值(kg):≤ 这个值视为空秤,不记流水(留 5g 容差,避免零点漂移也算"有重量") */
+    private static final double TEXT_MIN_WEIGHT_KG = 0.005;
 
     public DcController(DcPlatformService dcPlatform, PanelPermissionService perm,
                         com.yinjia.mes.service.DcService dc) {
@@ -234,6 +244,31 @@ public class DcController {
         Double kg = parseWeightText(raw);
         if (kg == null) throw new IllegalArgumentException("报文里没解析出重量：" + raw);
         String pt = !str(pointCode).isEmpty() ? str(pointCode) : (!str(point).isEmpty() ? str(point) : "W01");
+        // 闸①:空重量不记(用户口径「空重量不抓」)
+        //   ⚠ 但仍刷新一次在线心跳:秤开着连续发送、台面一直空着时,若连心跳都不刷,
+        //     设备会被判「离线」(3 分钟阈值),看着像是断线,其实是"空秤不记流水"。
+        if (Math.abs(kg) <= TEXT_MIN_WEIGHT_KG) {
+            try { dc.heartbeat(new java.util.HashMap<>(java.util.Map.of("deviceCode", dev)),
+                    request.getHeader("X-DC-Key")); } catch (RuntimeException ignored) { }
+            java.util.Map<String, Object> skip = new java.util.LinkedHashMap<>();
+            skip.put("deviceCode", dev);
+            skip.put("weight", kg);
+            skip.put("raw", raw.length() > 120 ? raw.substring(0, 120) : raw);
+            skip.put("skipped", "空重量(≤" + TEXT_MIN_WEIGHT_KG + "kg)不记流水");
+            return ok(skip);
+        }
+        // 闸②:同一设备 1 秒最多一条(用户口径「1 秒抓一次」;秤连续发送时其余帧丢弃)
+        long nowMs = System.currentTimeMillis();
+        Long prev = LAST_TEXT_WRITE.get(dev);
+        if (prev != null && nowMs - prev < TEXT_MIN_INTERVAL_MS) {
+            java.util.Map<String, Object> skip = new java.util.LinkedHashMap<>();
+            skip.put("deviceCode", dev);
+            skip.put("weight", kg);
+            skip.put("raw", raw.length() > 120 ? raw.substring(0, 120) : raw);
+            skip.put("skipped", "距上次写入不足 " + TEXT_MIN_INTERVAL_MS + "ms,丢弃该帧");
+            return ok(skip);
+        }
+        LAST_TEXT_WRITE.put(dev, nowMs);
         java.util.Map<String, Object> one = new java.util.LinkedHashMap<>();
         one.put("deviceCode", dev);
         one.put("pointCode", pt);
