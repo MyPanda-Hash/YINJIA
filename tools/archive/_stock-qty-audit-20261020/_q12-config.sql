@@ -1,0 +1,3 @@
+SET NOCOUNT ON;
+SELECT panel_code, CAST(config AS nvarchar(max)) AS cfg
+FROM yj_panel WHERE panel_code IN ('STOCK_STATUS','STOCK_BALANCE','STOCK_DETAIL','STOCK_PICK','STOCKTAKE','TRANSFER');

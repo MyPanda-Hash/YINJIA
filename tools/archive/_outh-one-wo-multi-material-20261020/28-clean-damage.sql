@@ -1,0 +1,4 @@
+﻿SET NOCOUNT ON;
+DELETE FROM dbo.outh WHERE src = 6 AND 单据编号 = N'SCLL-20260902-00011' AND asp_time1 >= '2026-10-19';
+SELECT @@ROWCOUNT AS 删除探针多写的行;
+SELECT COUNT(*) AS 该单剩余行 FROM dbo.outh WHERE src = 6 AND 单据编号 = N'SCLL-20260902-00011';

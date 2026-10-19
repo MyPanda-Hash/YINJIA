@@ -1,0 +1,17 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q9-qtyfields.sql ==
+  | 0 | 0 | 0 | 0.0000 | 0.0000 | 
+  | 2138 | 0 | 0 | null | 
+  | inh | 4850 | 209 | 0 | 
+  | outh | 3427 | 0 | 0 | 
+  | bl_finish_in | 实收数量 | 808 | 0 | 0 | 1.0000 | 
+  | bl_material_out | 数量 | 2098 | 0 | 0 | 0.5000 | 
+  | bl_other_in | 数量 | 16 | 0 | 0 | 24.0000 | 
+  | bl_other_out | 数量 | 114 | 0 | 0 | 1.0000 | 
+  | bl_purchase_in | 实收数量 | 964 | 0 | 1 | 0.0000 | 
+  | bl_sale_out | 数量 | 1198 | 0 | 0 | 0.6000 | 
+  | bl_stocktake | 实盘数量 | 1 | 0 | 0 | 18.0000 | 
+  | bl_stocktake | 账面数量 | 1 | 0 | 0 | 20.0000 | 
+  | bl_transfer | 数量 | 14 | 0 | 0 | 20.0000 | 
+  | 0 | null | 
+[OK] _q9-qtyfields.sql (1 batches)

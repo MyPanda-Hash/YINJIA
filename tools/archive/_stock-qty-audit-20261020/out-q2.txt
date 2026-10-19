@@ -1,0 +1,71 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q2-cols.sql ==
+  | dbo | bl_finish_in | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_finish_in | USER_TABLE | 现存量说明 | nvarchar | 0 | 0 | 
+  | dbo | bl_manu_order | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_material_out | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_material_out | USER_TABLE | 现存量说明 | nvarchar | 0 | 0 | 
+  | dbo | bl_outsource_order | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_pu_order | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_pu_order | USER_TABLE | 现存量说明 | nvarchar | 0 | 0 | 
+  | dbo | bl_purchase_in | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_purchase_in | USER_TABLE | 现存量说明 | nvarchar | 0 | 0 | 
+  | dbo | bl_sale_out | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | bl_sale_out | USER_TABLE | 现存量说明 | nvarchar | 0 | 0 | 
+  | dbo | bl_so_order | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | sl_recv_detail | USER_TABLE | 现存量 | decimal | 18 | 4 | 
+  | dbo | v_sales_order_detail | VIEW | 现存量 | decimal | 18 | 4 | 
+  | dbo | v_stock_balance | VIEW | 现存量 | decimal | 38 | 4 | 
+  | dbo | v_stock_kucun | VIEW | 现存量 | decimal | 18 | 4 | 
+  | dbo | v_stock_pick | VIEW | 现存量 | decimal | 18 | 4 | 
+  | _bak_pc0000_20261018_inh | 数量 | decimal | 18 | 4 | 
+  | _bak_pc0000_20261018_kucun | rkl | float | 53 | 0 | 
+  | _bak_pc0000_20261018_kucun | ckl | float | 53 | 0 | 
+  | _bak_pc0000_20261018_kucun | yl | float | 53 | 0 | 
+  | _bak_pc0000_20261018_kucun | 预警数量 | decimal | 18 | 4 | 
+  | _bak_pc0000_20261018_outh | 数量 | decimal | 18 | 4 | 
+  | _bak_pc0000_baseline | 余量 | decimal | 18 | 4 | 
+  | bd_manu_order | 需求数量 | decimal | 18 | 4 | 
+  | bd_manu_order | 排产数量 | decimal | 18 | 4 | 
+  | bd_manu_order | 入库数量 | decimal | 18 | 4 | 
+  | bd_manu_order | 余量 | decimal | 18 | 4 | 
+  | bd_prod_abn | 影响数量 | decimal | 18 | 4 | 
+  | bd_sale_out | 商品数量 | nvarchar | 0 | 0 | 
+  | bd_so_order | 商品数量 | nvarchar | 0 | 0 | 
+  | bd_stock_close | 结存合计 | decimal | 18 | 4 | 
+  | bl_dispatch | 计划数量 | float | 53 | 0 | 
+  | bl_dispatch | 已派工数量 | float | 53 | 0 | 
+  | bl_dispatch | 派工数量 | float | 53 | 0 | 
+  | bl_dispatch | 累计汇报数量 | float | 53 | 0 | 
+  | bl_finish_in | 实收数量 | decimal | 18 | 4 | 
+  | bl_finish_in | 现存量 | decimal | 18 | 4 | 
+  | bl_finish_in | 现存量说明 | nvarchar | 0 | 0 | 
+  | bl_finish_in | 库存数量 | nvarchar | 0 | 0 | 
+  | bl_manu_order | 数量 | decimal | 18 | 4 | 
+  | bl_manu_order | 齐套数量(主) | decimal | 18 | 4 | 
+  | bl_manu_order | 可用量 | decimal | 18 | 4 | 
+  | bl_manu_order | 现存量 | decimal | 18 | 4 | 
+  | bl_manu_order | 需求数量 | decimal | 18 | 4 | 
+  | bl_manu_order | 排产数量 | decimal | 18 | 4 | 
+  | bl_manu_order | 入库数量 | decimal | 18 | 4 | 
+  | bl_manu_order | 余量 | decimal | 18 | 4 | 
+  | bl_manu_order | 每箱数量 | decimal | 18 | 4 | 
+  | bl_material_out | 数量 | decimal | 18 | 4 | 
+  | bl_material_out | 现存量 | decimal | 18 | 4 | 
+  | bl_material_out | 现存量说明 | nvarchar | 0 | 0 | 
+  | bl_material_out | 库存数量 | nvarchar | 0 | 0 | 
+  | bl_material_out | 基本数量 | nvarchar | 0 | 0 | 
+  | bl_material_out | 库存基本数量 | nvarchar | 0 | 0 | 
+  | bl_material_out | 辅助数量 | nvarchar | 0 | 0 | 
+  | bl_material_out | 默认浮动数量 | nvarchar | 0 | 0 | 
+  | bl_other_in | 数量 | decimal | 18 | 4 | 
+  | bl_other_in | 辅助数量 | decimal | 18 | 4 | 
+  | bl_other_in | 库存数量 | nvarchar | 0 | 0 | 
+  | bl_other_out | 数量 | decimal | 18 | 4 | 
+  | bl_other_out | 辅助数量 | decimal | 18 | 4 | 
+  | bl_other_out | 库存数量 | nvarchar | 0 | 0 | 
+  | bl_outsource_order | 数量 | decimal | 18 | 4 | 
+  | bl_outsource_order | 现存量 | decimal | 18 | 4 | 
+  | bl_pu_label | 打印数量 | decimal | 18 | 4 | 
+  | bl_pu_order | 数量 | decimal | 18 | 4 | 
+[OK] _q2-cols.sql (1 batches)

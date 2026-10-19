@@ -1,0 +1,9 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q15-truncate.sql ==
+java : [SQL FAIL] ��?���������﷨����
+所在位置 行:1 字符: 338
++ ... uncate.sql; java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar Sql ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([SQL FAIL] ��?���������﷨����:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

@@ -1,0 +1,4 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q21-uom.sql ==
+  | 0 | null | 
+[OK] _q21-uom.sql (1 batches)

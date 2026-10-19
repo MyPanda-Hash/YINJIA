@@ -1,0 +1,6 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q13-compare.sql ==
+  | 1431 | 1558 | 1431 | 0 | 127 | 0 | 
+  | 127 | 0.0000 | 
+  | 0 | null | 
+[OK] _q13-compare.sql (1 batches)
