@@ -144,6 +144,9 @@ public class ButtonService {
             // 对接人签核时确认「项目责任人」(再选一个账号,流程图④)——责任人按参照带给实施计划
             case "分发对接人" -> dispatchLiaison(def, formData);
             case "确认责任人" -> confirmProjectOwner(def, formData);
+            // 立项申请流程第 4 步(2026-10-19 用户口径「责任人只需要确认收到就可以开始填写项目实施计划了」):
+            // 由被确认的项目责任人本人点「责任人确认收到」,确认后才能填 RD_PLAN
+            case "责任人确认收到" -> confirmOwnerReceipt(def, formData);
             // 产品信息表:归档后由二级审核人把四个下游文件的**责任人**分发下去(2026-09-20;
             // 原名「产品开发」= 只写任务行不带分工,保留兼容)
             case "产品开发", "分发责任人" -> dispatchDev(def, formData);
@@ -274,6 +277,14 @@ public class ButtonService {
         if ("RD_APPROVAL".equals(def.code())) {
             body.remove("对接人");
             body.remove("项目责任人");
+            // 2026-10-19:责任人确认收到由按钮写,保存不收
+            body.remove("责任人确认");
+            body.remove("确认收到时间");
+        }
+        // 项目实施计划(2026-10-19 用户口径):立项上的项目责任人**确认收到之后**才允许填单。
+        // 门禁按单据头「文档编号」所指的立项申请判定;自由新建(不引用立项)的老路不拦。
+        if ("RD_PLAN".equals(def.code())) {
+            ensurePlanOwnerAcked(blankSafe(noObj), formData);
         }
         // 质量单据(2026-10-04,特采单 + 质量单据一族):纸面「编制/审核/批准」三格由审批流自动落值
         // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
@@ -1889,14 +1900,37 @@ public class ButtonService {
                 + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?",
                 CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
+        // 修改态收尾(2026-10-19):弃审 = 退回草稿重新走流程,但「申请修改→审批通过」留下的
+        // modify_state='Y' 原先没清 —— 状态推导里「修改中」优先级高于草稿,弃审后单据仍显示「修改中」,
+        // 用户口径「立项申请反审核,需要重新走流程」看到的就是停在修改中。这里一并清掉。
+        jdbc.update("UPDATE yj_doc_status SET modify_state = NULL, update_at = GETDATE()"
+                + " WHERE panel_code = ? AND doc_no = ? AND ISNULL(modify_state, N'') <> N''", def.code(), no);
         // 立项申请弃审回草稿(2026-10-08 流程图:反审核后重新走流程):对接人/项目责任人/项目等级
         // 随审核结果一起作废,否则回草稿的单还挂着上一轮的人和级。
         // ⚠ 2026-10-09 补「项目等级」:定级已改成"确定后不能改"(见 applyGrade),不清级的话
         //   弃审重审后**永远定不了级** —— applyGrade 直接拒、审批通过带等级也被拒 ⇒ 单子卡在审批中。
         //   (子 agent 跑矩阵时实测到这个死锁,根因就是这里少清一列。)
         if ("RD_APPROVAL".equals(def.code())) {
-            jdbc.update("UPDATE rd_approval SET 备用1 = NULL, 备用2 = NULL, 项目等级 = NULL"
+            // 2026-10-19:再加上「责任人确认收到」(备用3/备用4)—— 用户口径「立项申请反审核,需要重新走流程」
+            jdbc.update("UPDATE rd_approval SET 备用1 = NULL, 备用2 = NULL, 备用3 = NULL, 备用4 = NULL, 项目等级 = NULL"
                     + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+            // 「对应的项目实施计划也跟着反审核」:按 文档编号 = 本立项单号 找到挂着的实施计划,
+            // 已审核/已归档的一并退回草稿(清 shr/shsj/archived),并各自留一条联动弃审痕迹。
+            for (Map<String, Object> p : jdbc.queryForList("""
+                    SELECT p.单据编号, s.shr
+                      FROM rd_plan p
+                      JOIN yj_doc_status s ON s.panel_code = N'RD_PLAN' AND s.doc_no = p.单据编号
+                     WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.文档编号, N'') = ?
+                       AND ISNULL(s.shr, N'') <> N''
+                    """, no)) {
+                String planNo = String.valueOf(p.get("单据编号"));
+                jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
+                        + " WHERE panel_code = N'RD_PLAN' AND doc_no = ?", planNo);
+                recordApproval("RD_PLAN", planNo, "UNAUDIT", "PENDING",
+                        "立项申请 " + no + " 弃审联动:项目实施计划一并反审核");
+            }
+            // 实施计划退回后把进度汇总(rd_progress)与计划同步一次(幂等),避免进度里还挂着已退单的数据
+            try { syncAllPlansToProgress(); } catch (Exception e) { log.warn("[立项弃审联动] 同步进度失败:{}", e.getMessage()); }
         }
         // 质量单据:弃审回草稿,纸面「审核/批准」两格随审批作废清空 + 两级节点标记复位
         // (编制格保留 —— 谁编的单没变;重新提交时会按新的提交人刷新)
@@ -4847,10 +4881,71 @@ public class ButtonService {
     // 字段 editable=0 + save() 对这两个键显式剥离 ⇒ 只能由这两个按钮写,前端直改无效(防自封责任人)。
 
     /** 立项申请头一行(项目等级 + 两个流程账号;流程门禁与出参共用) */
+    /** 立项申请表头流程字段(定级/对接人/项目责任人/责任人确认/确认时间) */
     private Map<String, Object> approvalHeadOf(String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP 1 项目等级, 备用1, 备用2 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT TOP 1 项目等级, 备用1, 备用2, 备用3, 备用4 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         return rows.isEmpty() ? Map.of() : rows.get(0);
+    }
+
+    /**
+     * 责任人确认收到(2026-10-19 用户口径:流程第 4 步)。
+     *
+     * <p>前序:定级(审批通过) → 分发对接人 → 对接人签核并选「项目责任人」(备用2)。
+     * 本步由**被选中的项目责任人本人**(∪ 管理员兜底)点一下「确认收到」——
+     * 不是重新选人、也没意见栏,就一个确认动作;写 备用3 = 确认人账号、备用4 = 确认时刻,
+     * 并留一条 OWNER_ACK 审批痕迹。
+     *
+     * <p>下游门禁:确认之后才允许在「项目实施计划 RD_PLAN」填单(见 ensurePlanOwnerAcked)。
+     * 一人只能确认一次;要重来只能立项弃审(弃审会连 备用3/04 一起清空)。
+     */
+    private Map<String, Object> confirmOwnerReceipt(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可确认收到");
+        String user = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的立项申请可确认收到(当前:" + status + ")");
+        Map<String, Object> head = approvalHeadOf(no);
+        String owner = blankSafe(head.get("备用2"));
+        if (owner.isEmpty()) throw new IllegalStateException("请先由对接人确认项目责任人,再由责任人确认收到");
+        if (!(user.equals(owner) && isEnabledUser(owner)) && !isAdminUser(user))
+            throw new org.springframework.security.access.AccessDeniedException("仅本单项目责任人（" + realNameOf(owner) + "）或管理员可确认收到");
+        String ack = blankSafe(head.get("备用3"));
+        if (!ack.isEmpty())
+            throw new IllegalStateException("责任人已确认收到（" + realNameOf(ack) + "，" + blankSafe(head.get("备用4"))
+                    + "）;要重新走流程请先弃审");
+        String at = java.time.LocalDateTime.now().withNano(0).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        int n = jdbc.update("UPDATE rd_approval SET 备用3 = ?, 备用4 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                owner, at, no);
+        if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
+        recordApproval(def.code(), no, "OWNER_ACK", "CONFIRMED", "责任人确认收到：" + realNameOf(owner) + "（" + owner + "）");
+        Map<String, Object> r = result(no, status);
+        r.put("责任人确认", owner);
+        r.put("确认收到时间", at);
+        return r;
+    }
+
+    /**
+     * 项目实施计划的填写门禁(2026-10-19):单据头「文档编号」参照的是立项申请时,
+     * 必须立项上已完成「责任人确认收到」(备用3 非空)才允许保存 ——
+     * 用户口径「责任人只需要确认收到就可以开始填写项目实施计划了」。
+     * 没填文档编号的老单(自由新建)不拦。
+     */
+    private void ensurePlanOwnerAcked(String docNo, Map<String, Object> formData) {
+        String ref = blankSafe(pickOf(formData, "文档编号"));
+        if (ref.isEmpty() && !docNo.isEmpty()) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(文档编号, N'') AS 文档编号 FROM rd_plan WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+            ref = rows.isEmpty() ? "" : blankSafe(rows.get(0).get("文档编号"));
+        }
+        if (ref.isEmpty()) return;
+        List<Map<String, Object>> ap = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(备用3, N'') AS ack FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", ref);
+        if (ap.isEmpty()) return; // 参照的不是现存立项(老数据),不拦
+        if (blankSafe(ap.get(0).get("ack")).isEmpty())
+            throw new IllegalStateException("立项申请 " + ref + " 的项目责任人还没有确认收到,请先让责任人在立项申请上点「责任人确认收到」,再填写项目实施计划");
     }
 
     /**
@@ -4950,8 +5045,11 @@ public class ButtonService {
         out.put("liaisonName", "");
         out.put("owner", "");
         out.put("ownerName", "");
+        out.put("ownerAck", "");
+        out.put("ownerAckAt", "");
         out.put("canDispatchLiaison", false);
         out.put("canConfirmOwner", false);
+        out.put("canConfirmReceipt", false);
         try {
             String no = blankSafe(docNo);
             if (no.isEmpty()) return out;
@@ -4968,11 +5066,18 @@ public class ButtonService {
             out.put("liaisonName", liaison.isEmpty() ? "" : realNameOf(liaison));
             out.put("owner", owner);
             out.put("ownerName", owner.isEmpty() ? "" : realNameOf(owner));
+            // 2026-10-19:流程第 4 步「责任人确认收到」(备用3 = 确认人账号,备用4 = 确认时刻)
+            String ownerAck = blankSafe(head.get("备用3"));
+            out.put("ownerAck", ownerAck);
+            out.put("ownerAckAt", blankSafe(head.get("备用4")));
             // 2026-10-09:三条门禁与上面的服务端判定**逐条同源**(界面让点/后端拒绝的错配必须为零)
             out.put("canGradeProject", settled && level.isEmpty() && rdApproverOf(no).equals(user));
             out.put("canDispatchLiaison", settled && !level.isEmpty() && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
             out.put("canConfirmOwner", settled && !liaison.isEmpty() && owner.isEmpty()
                     && ((user.equals(liaison) && isEnabledUser(liaison)) || isAdminUser(user)));
+            // 第 4 步:责任人本人(账号仍启用)∪ 管理员
+            out.put("canConfirmReceipt", settled && !owner.isEmpty() && ownerAck.isEmpty()
+                    && ((user.equals(owner) && isEnabledUser(owner)) || isAdminUser(user)));
         } catch (Exception e) {
             log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
         }

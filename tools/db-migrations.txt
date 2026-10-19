@@ -3955,3 +3955,9 @@ migrate-qc-insp-clear-11-docstatus-20261018.sql
 #   同类「方法」列都是 1000~2000(rd_drop_prec_head.测试方法 2000 / rd_dom_test_detail.方法 1000),
 #   本列属建表时口径错配。加宽到 nvarchar(2000),与同表「控制标准及要求」对齐;只放宽不收紧,幂等。
 migrate-rd-insp-plan-widen-control-method-20261019.sql
+
+# —— 2026-10-19 立项申请流程补「责任人确认收到」(用户口径:管理员审批定级 → 分发对接人 → 对接人签核并选责任人 →
+#   责任人确认收到后才能填项目实施计划;立项反审核要重新走流程,对应项目实施计划也跟着反审核) ——
+#   不建表:rd_approval 备用列池的 备用3 =「责任人确认」、备用4 =「确认收到时间」(hidden=1,流程程序读写),
+#   两字段登记 + 中文注明 + 10 语言译名。
+migrate-rd-owner-receipt-20261019.sql
