@@ -68,7 +68,8 @@ public class WorkOrderCloseGuardScheduler {
                     String sample = anomalies.stream().limit(5)
                             .map(r -> r.get("工单号") + "#" + r.get("工单行号"))
                             .reduce((a, b) -> a + "," + b).orElse("");
-                    log.warn("[结案巡检] 发现 {} 行「外部写入的已结案」(不满足 入库≥排产 + 组装成品检验已审核):"
+                    log.warn("[结案巡检] 发现 {} 行「外部写入的已结案」(入库 < 排产 ⇒ 不可能是 MES 结的,"
+                                    + "判据见 PlangClose.anomaly):"
                                     + " {} … 开关 ja-selfheal-enabled=false,本轮只报告不回正(可点「结案回正」或开开关)",
                             anomalies.size(), sample);
                     lastWarnAt = now;

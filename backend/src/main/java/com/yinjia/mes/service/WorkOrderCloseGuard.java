@@ -21,16 +21,17 @@ import java.util.Map;
  * **都要求「入库 ≥ 排产 + 组装成品检验已审核」并且都会留痕**;事发当天 {@code yj_usage_log}
  * 里一条「结案」都没有 ⇒ 那批 {@code ja='Y'} 只可能来自库外。
  *
- * <p>MES 的反应有两条路:① 改判据(所有读 {@code ja} 的地方都加条件)—— 改动面大、易漏;
- * ② **不信任外部写进来的 ja,发现不合法就回正** —— 就是本类。
- * 采用 ②:读的地方一行不用改,外部写坏的值在几分钟内被改回 {@code 'N'},并留痕可查。
+ * <p>MES 的反应有两条路:① 改判据(所有读 {@code ja} 的地方都加条件);② **不信任外部写进来的 ja,
+ * 发现不合法就回正** —— 就是本类。2026-10-19 起两条都做了(读侧收口见 {@link PlangClose#anomaly})。
  *
  * <h3>什么算「不合法」(与 MES 自己的结案口径完全一致)</h3>
  * <pre>
- *   合法结案 = 入库数量 ≥ 排产数量(>0) 且 有一张「已审核」的组装成品检验单(行号或批次对齐)
+ *   合法结案 = 入库数量 ≥ 排产数量(>0)              ← MES 两条结案路径(手工/自动)都要求它
  * </pre>
- * 不满足却 {@code ja ∈ ('T','Y')} ⇒ 异常。判定与 {@code WorkOrderListController.closeAudit}、
- * {@code tools/migrate-plang-ja-foreign-close-repair-20261018.sql} **同一份口径**。
+ * <p>⚠ 2026-10-19 收窄:不再要求"有已审组装成品检验单"。原因 —— ①人工结案{@code
+ * WorkOrderListController.close} 本来就只要求入库达标,拿检验单当条件会把**正经的手工结案**判成异常、
+ * 开着自愈时还会被自动回正;②旧判据与列表页的判据不等价(实测页面 19 行 / 体检 38 行)。
+ * 判据的唯一来源是 {@link PlangClose#anomaly(String)}。
  *
  * <h3>为什么默认「只报不动」(开关)</h3>
  * 回正是**写生产数据**的动作,而且会与外部程序"互搏"(它写 Y、我们改 N)。
@@ -49,9 +50,6 @@ public class WorkOrderCloseGuard {
 
     private static final Logger log = LoggerFactory.getLogger(WorkOrderCloseGuard.class);
 
-    /** 参考库时代的历史单号段:当年真结的单,口径上不动(与 20261015 迁移脚本一致) */
-    private static final String LEGACY_PREFIX = "GD2608";
-
     /** 单次回正上限:宁可多巡几轮,也不要一口气改几百行 */
     private static final int MAX_HEAL_PER_RUN = 200;
 
@@ -61,23 +59,18 @@ public class WorkOrderCloseGuard {
         this.jdbc = jdbc;
     }
 
-    /** 结案判定(合法结案)的 SQL 片段,与 {@code ProcessTaskService.syncCloseState} 同口径 */
-    private static final String CLOSE_OK =
-            "(ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
-                    + " AND EXISTS (SELECT 1 FROM dbo.qc_asm_insp_head h"
-                    + "   JOIN dbo.yj_doc_status ds ON ds.panel_code = N'QC_ASM_INSP' AND ds.doc_no = h.[单据编号]"
-                    + "   WHERE h.[工单号] = p.pl_no AND ISNULL(h.asp_cancel,'N') <> 'Y'"
-                    + "     AND ds.shr IS NOT NULL AND ISNULL(ds.canceled,'N') <> 'Y' AND ISNULL(ds.stopped,'N') <> 'Y'"
-                    + "     AND (ISNULL(h.[工单行号],0) = ISNULL(p.pl_xc,0)"
-                    + "          OR (ISNULL(h.[工单行号],0) = 0 AND ISNULL(h.[批次号],N'') <> N''"
-                    + "              AND ISNULL(h.[批次号],N'') = ISNULL(p.[批次号],N'')))))";
-
-    /** 异常结案(ja=Y 但按 MES 口径不该结) */
+    /**
+     * **异常结案**(2026-10-19 收口):{@code ja} 写着结案,但按 {@link PlangClose} 的口径没结案。
+     *
+     * <p>口径 = 「入库 ≥ 排产(>0)」,GD2608* 历史单豁免 —— **不再要求"有已审组装成品检验单"**。
+     * 原因:①人工结案(生产工单页「结案」按钮)本来就不要求检验单,拿它当条件会把正经的手工结案
+     * 标成异常,开着自愈时还会被自动回正;②旧写法与列表页的判据不等价(实测页面 19 行 / 体检 38 行),
+     * 点「结案回正」会改掉页面没标红的行。
+     *
+     * <p>判据的唯一来源是 {@link PlangClose#anomaly(String)},列表/体检/回正/自愈四处共用。
+     */
     private static final String ANOMALY_WHERE =
-            " WHERE ISNULL(p.asp_cancel,'N') <> 'Y'"
-                    + "   AND ISNULL(p.ja,'N') IN (N'T', N'Y')"
-                    + "   AND NOT " + CLOSE_OK
-                    + "   AND p.pl_no NOT LIKE N'" + LEGACY_PREFIX + "%'";
+            " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND " + PlangClose.anomaly("p");
 
     /**
      * 列出异常结案行(只读)。字段与「结案体检」端点一致,给现场核对用。

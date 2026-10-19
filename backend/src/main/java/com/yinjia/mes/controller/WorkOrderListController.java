@@ -145,22 +145,15 @@ public class WorkOrderListController {
                         // 结案(2026-10-18 改判据):plang.ja 手机端/参考库也能直写 ⇒ 不再裸信 ja,
                         //   统一用 PlangClose:ja=Y **且** 入库≥排产(或参考库时代号段)。只读判定,不写任何数据。
                         + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案,"
-                        // 结案异常(2026-10-18,用户报障「扫码报工后其余工单全部变成已结案」):
-                        //   本页「已结案」只认 plang.ja;而 ja 是**外部程序也能直接写**的列
-                        //   (手机端小程序/参考库直连同一个库)。MES 自己的结案一定带两件事:
-                        //   ① 入库 ≥ 排产 ② 有一张**已审核**的组装成品检验单(口径见 ProcessTaskService.syncCloseState)。
-                        //   ⇒ ja=Y 但这两条不成立的行,标记为「结案异常」,让现场一眼看出"这不是正常结案",
-                        //   而不是把账算到 MES 头上。(MES 自己的结案动作另有 yj_usage_log 留痕可查。)
-                        + " CASE WHEN p.ja IN (N'T', N'Y')"
-                        + "   AND NOT (ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0))"
-                        + "   AND NOT EXISTS (SELECT 1 FROM dbo.qc_asm_insp_head h"
-                        + "        JOIN dbo.yj_doc_status ds ON ds.panel_code = N'QC_ASM_INSP' AND ds.doc_no = h.[单据编号]"
-                        + "        WHERE h.[工单号] = p.pl_no AND ISNULL(h.asp_cancel,'N') <> 'Y'"
-                        + "          AND ds.shr IS NOT NULL AND ISNULL(ds.canceled,'N') <> 'Y' AND ISNULL(ds.stopped,'N') <> 'Y'"
-                        + "          AND (ISNULL(h.[工单行号],0) = ISNULL(p.pl_xc,0)"
-                        + "               OR (ISNULL(h.[工单行号],0) = 0 AND ISNULL(h.[批次号],N'') <> N''"
-                        + "                   AND ISNULL(h.[批次号],N'') = ISNULL(p.[批次号],N''))))"
-                        + "   THEN N'Y' ELSE N'N' END AS 结案异常,"
+                        // 结案异常(2026-10-18 加,2026-10-19 收口):
+                        //   本页「已结案」只认 PlangClose;而 ja 是**外部程序也能直接写**的列
+                        //   (手机端小程序/参考库直连同一个库)。MES 两条结案路径(页面「结案」按钮、
+                        //   ProcessTaskService.syncCloseState)**都要求「入库 ≥ 排产(>0)」** ⇒
+                        //   ja=Y 但入库没达标的行,一定不是 MES 结的,标「结案异常」让现场一眼看出。
+                        //   ⚠ 旧判据额外要求"没有已审组装成品检验",与体检端点(WorkOrderCloseGuard)不等价:
+                        //     实测正式库页面标红 19 行、体检 38 行,点「结案回正」会改掉页面没标红的 19 行。
+                        //     现统一走 PlangClose.anomalyFlag(与"已结案"同源,见该类注释)。
+                        + " " + com.yinjia.mes.service.PlangClose.anomalyFlag("p") + " AS 结案异常,"
                         // 完工状态(2026-10-15):生产状态的「完工」用它判,不再只看入库 ——
                         //   全部报工达标即 完工状态='生产完工' ⇒ 员工看到「完工」;结案另看 ja(需组装成品检验+入库)
                         + " ISNULL(p.[完工状态], N'') AS 完工状态,"
@@ -302,10 +295,14 @@ public class WorkOrderListController {
                                 + ";入库完成后系统自动/手工结案)");
                     }
                 }
-                int n = jdbc.update("UPDATE dbo.plang SET ja = ? WHERE comm=? AND pl_no=? AND pl_xc=?"
+                // 2026-10-19:结案/取消结案**同时盖 asp_user2/asp_time2** ‑‑ 此前只写 yj_usage_log,
+                //   导致"这行到底谁结的"在 plang 上看不出来(巡检/体检只能靠 yj_usage_log 反查)。
+                //   不改任何判定,只是把留痕补全。
+                int n = jdbc.update("UPDATE dbo.plang SET ja = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                                + " WHERE comm=? AND pl_no=? AND pl_xc=?"
                                 + " AND ((? = N'' AND [批次号] IS NULL) OR [批次号] = ?)"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
-                        close ? "Y" : "N", k.comm(), k.no(), k.xc(), k.batch(), k.batch());
+                        close ? "Y" : "N", user, k.comm(), k.no(), k.xc(), k.batch(), k.batch());
                 if (n == 0) throw new IllegalStateException("plang 中未找到");
                 logUsage(user, close ? "结案" : "取消结案", k.no(), k.xc());
                 done.add(k.label());
