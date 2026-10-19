@@ -4021,3 +4021,10 @@ migrate-clean-demo-wo-collision-20261019.sql
 #   否则状态推导里「修改申请中」优先级高于「已作废」仍会显示修改申请中)。留痕 asp_user2='删除(修改申请中)'。
 #   ⚠ 这是给"卡在修改申请中删不掉"的单据留的出口;正常单据请走「删除申请 → 审批」流程。
 migrate-delete-qc-insp-modifying-20261019.sql
+
+# migrate-purge-unclosed-wo-20261019.sql(2026-10-19):清掉「未完工/未结案」工单行及其残留单据(默认 dry-run)
+#   背景:用户口径「把未完工未能结案的数据都删除吧」——2026-10-19 参考库/小程序直写的未排产/未入库行,
+#   留着只会继续和真单抢号。范围严格取「未作废 且 ja 不在 T/Y」,逐行锚 id(不按单号整单删);
+#   级联作废 plang / plang_pc / scjl(报工) / wo_progress(进度) / 组装成品检验单 / 产成品入库单,
+#   占用链改 link_status='CANCELLED'。⚠ 号池 s_allno 只增不删(删号=重发号,项目铁律),本脚本不动它。
+migrate-purge-unclosed-wo-20261019.sql
