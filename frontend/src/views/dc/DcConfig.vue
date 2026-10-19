@@ -411,7 +411,11 @@ const CHECKS = [
   { key: 'rule', label: '配置数采规则' },
   { key: 'debug', label: '数据调试' },
 ]
-const DEVICE_TYPES = ['电子秤', '看板', '扫码枪', '温湿度计', 'PLC', '其他']
+// 设备类型候选(可选可输入)。2026-10-19 补生产设备口径:联网设备台账按「注塑机/机械手/干燥机/
+//   加工设备/产线/检测设备/隔音设施/包装设备/公用设备/办公终端」归类导入(见
+//   tools/migrate-dc-device-import-20261019.sql),候选项同步,人工新增时不用手敲。
+const DEVICE_TYPES = ['电子秤', '看板', '扫码枪', '温湿度计', 'PLC', '注塑机', '机械手', '干燥机',
+  '加工设备', '产线', '检测设备', '隔音设施', '包装设备', '公用设备', '办公终端', '其他']
 const GATEWAY_PROTOCOLS = ['MODBUS-TCP', 'MODBUS-RTU', 'MQTT', 'HTTP', 'OPC-UA', '串口/RS485']
 
 const loading = ref(false)

@@ -3987,3 +3987,12 @@ migrate-insp-freq-stdlib-20261019.sql
 #         并回退 inv_cost_ledger 主键与两个视图(见 migrate-stock-views-restore-20261016.sql /
 #         migrate-stock-balance-warn-20261018.sql 的定义)。
 migrate-stock-flow-src-rid-grain-20261020.sql
+#
+# ---- 2026-10-19 数采设备台账导入(测试账套) ----
+#   用户口径:「根据这里面的数据，把是否联网是的设备的数据整理出来，加入系统的测试账套里面的
+#   数采平台的设备数据里面」(数据源 副本副本生产设备列表统计(2026)(1).xls，联网=是 35 行/129 台)。
+#   按台展开 129 条 bs_dc_device 台账(编码 LW-001..LW-129)，状态 offline、不造采样值；按 code 幂等。
+#   ⚠ 脚本自带库名闸门:只在 HSDZ_MES_TEST 写入，其它库上下文 PRINT 一行后 RETURN(正式库 no-op)。
+#   生成器:tools/archive/_dc-device-import-20261019/gen_import.py(改口径重跑生成器，不手改 SQL)。
+migrate-dc-device-import-20261019.sql
+#
