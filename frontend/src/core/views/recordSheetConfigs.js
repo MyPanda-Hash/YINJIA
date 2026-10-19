@@ -1513,6 +1513,14 @@ export const recordSheetConfigs = {
     headMode: 'report',
     docNoDefault: 'YJ-QR-88',
     titlePlaceholder: '出货检验项目控制计划',
+    // 大标题格做成「标题」字段输入框(2026-10-19 用户报障「出货检验计划表出现标题不能为空,
+    //   但是未提示哪一个数据未填」)。
+    //   真因:yj_field 里「标题」是 required=1(header),但本配置既没 titleKey、sections 的 pairs 里
+    //   也没有「标题」(整份配置里「标题」二字出现 0 次) ⇒ ①大标题格走静态分支,用户没有输入口;
+    //   ②保存校验必填永远失败;③pageOfKeyIn 找不到页 ⇒ focusField 返回 false,连高亮定位都没有。
+    //   口径照 RD_CHANGE(立项申请)那条已验收的做法:titleKey 绑「标题」,提示词 = 原静态标题文案。
+    titleKey: '标题',
+    titleKeyPh: '出货检验项目控制计划',
     // 信息栏 = 设计 G3:H4 两格。设计 G5:H7 的 使用范围/版本号 **不在这里** ——
     // 它们在设计里与 产品编号/产品功能类别 同行,所以归 sections 的表头三行(见下)。
     info: [
