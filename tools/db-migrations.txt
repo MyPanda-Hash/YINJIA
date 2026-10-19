@@ -3950,3 +3950,8 @@ migrate-qc-insp-realize-20261018.sql
 #   实测 yj_form_approval 命中 0 条(无审批留痕要清);form_flow_link 的流转链不动。
 #   守卫:11 张必须仍为草稿(业务审过就拒绝)、命中行数必须正好 11。幂等;两账套均执行。
 migrate-qc-insp-clear-11-docstatus-20261018.sql
+# 2026-10-19 出货检验计划表保存报「将截断字符串或二进制数据」(用户报障)。
+#   TF460 定位:rd_insp_plan_detail.控制方法 是 nvarchar(100),而「检验方法」列实际存整段操作步骤(110+ 字)。
+#   同类「方法」列都是 1000~2000(rd_drop_prec_head.测试方法 2000 / rd_dom_test_detail.方法 1000),
+#   本列属建表时口径错配。加宽到 nvarchar(2000),与同表「控制标准及要求」对齐;只放宽不收紧,幂等。
+migrate-rd-insp-plan-widen-control-method-20261019.sql
