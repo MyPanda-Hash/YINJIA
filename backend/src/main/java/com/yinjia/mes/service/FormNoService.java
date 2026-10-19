@@ -37,6 +37,21 @@ public class FormNoService {
      *  这里只是兜底(号池落后且某张表读不到时才会逐号扫)。 */
     private static final int MAX_SKIP = 10000;
 
+    /**
+     * 编号写在**非面板表**里的来源 —— {@code yj_panel} 覆盖不到,必须在这里单列一行。
+     *
+     * <p>**生产工单 GD**:工单号是参考库表 {@code plang.pl_no}(手机端小程序/参考库**直连同一个库**
+     * 写入),而面板 {@code MANU_ORDER} 读的是 {@code bd_manu_order}(后来才起的新表,只有零星行)。
+     * 只按面板算 max 会把 plang 里 437 张既有工单(到 {@code GD-2026-10-0222})全当不存在 ⇒
+     * 新工单继续发已存在的号,撞上旧工单的行(2026-10-19 用户报障「生产工单的号池问题没有解决」;
+     * 当时 s_allno 的 GD 段停在 0015、plang 已到 0222,就是这条漏网)。
+     *
+     * <p>格式:{前缀, 表, 列}。新增同类来源(外部系统直写的单据表)在这里补一行即可。
+     */
+    private static final java.util.List<String[]> NUMBER_SOURCES = java.util.List.<String[]>of(
+            new String[]{"GD", "plang", "pl_no"}
+    );
+
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
 
@@ -139,15 +154,20 @@ public class FormNoService {
     }
 
     /**
-     * 前缀 → 单号所在的(表, 列)。来源是面板元数据 yj_panel(前缀的唯一权威):
-     * 头行式单据的单号在**头表**,单表式在**行表**;同一前缀可能挂多个面板(如 PI 采购入库/产线入库),
-     * 全部纳入。元数据有 30s 缓存(PanelRegistry),这里不额外缓存 —— 新加面板能立刻生效。
+     * 前缀 → 单号所在的(表, 列)。两个来源:
+     * ① 面板元数据 yj_panel —— 头行式单据的单号在**头表**,单表式在**行表**;
+     *    同一前缀可能挂多个面板(如 PI 采购入库/产线入库),全部纳入;
+     * ② {@link #NUMBER_SOURCES} —— **不在面板里**的历史/外部表(生产工单 plang)。
+     * 元数据有 30s 缓存(PanelRegistry),这里不额外缓存 —— 新加面板能立刻生效。
      */
     private List<String[]> docTables(String prefix) {
         List<String[]> out = new ArrayList<>();
         // 没有前缀的面板(理论上不存在:yj_panel.mode='doc' 都有前缀)不该把取号打断 ——
         // 退回"只查号池+inh"的老口径,而不是 NPE。
         if (prefix == null || prefix.isBlank()) return out;
+        for (String[] src : NUMBER_SOURCES) {
+            if (prefix.equals(src[0])) out.add(new String[]{src[1], src[2]});
+        }
         for (PanelRegistry.PanelDef def : registry.all()) {
             if (def.prefix() == null || !prefix.equals(def.prefix())) continue;
             String col = def.groupCol();

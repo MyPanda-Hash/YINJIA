@@ -119,6 +119,20 @@ END
 CLOSE cur2 DEALLOCATE cur2;
 PRINT N'  [合计] 回登号池 ' + CAST(@total AS nvarchar(10)) + N' 个单号';
 
+PRINT N'== 二之二、号池回登(非面板来源:生产工单 plang.pl_no) ==';
+-- 工单号写在**参考库表 plang**(手机端小程序/参考库直连同一个库写入),面板 MANU_ORDER 读的是
+-- bd_manu_order(后来才起的新表)⇒ 上面"逐面板"循环覆盖不到 plang。2026-10-19 实测:
+-- plang 已到 GD-2026-10-0222,而号池 GD 段停在 0015 ⇒ 新工单继续撞既有工单(用户报「生产工单的号池没解决」)。
+IF OBJECT_ID('plang') IS NOT NULL AND COL_LENGTH('plang', 'pl_no') IS NOT NULL
+BEGIN
+    INSERT INTO s_allno (comm, dh, lb, ny, asp_user1, asp_time1, asp_cancel)
+    SELECT DISTINCT '0', p.pl_no, 'GD', SUBSTRING(p.pl_no, 4, 7), 'formno-sync', GETDATE(), 'N'
+      FROM plang p
+     WHERE RTRIM(p.pl_no) LIKE 'GD-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]'
+       AND NOT EXISTS (SELECT 1 FROM s_allno s WHERE s.dh = p.pl_no);
+    PRINT N'  [回登] GD (plang.pl_no) : ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 个号';
+END
+
 PRINT N'== 三、自检 ==';
 -- 重号只对**单据面板**较真(mode='doc'):单据单号由号池发,重号=本次事故;
 -- 档案面板(工艺路线 GY-*、物料清单等)的编码是**人工录**的,历史重号不属本事故,不能因此判 FAIL。
@@ -178,6 +192,19 @@ BEGIN
     FETCH NEXT FROM cur3 INTO @p, @t, @cc, @mode, @head;
 END
 CLOSE cur3 DEALLOCATE cur3;
+
+-- 非面板来源(生产工单 plang)也要回登干净
+IF OBJECT_ID('plang') IS NOT NULL AND COL_LENGTH('plang', 'pl_no') IS NOT NULL
+BEGIN
+    DECLARE @pm int = (SELECT COUNT(*) FROM plang p
+                        WHERE RTRIM(p.pl_no) LIKE 'GD-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]'
+                          AND NOT EXISTS (SELECT 1 FROM s_allno s WHERE s.dh = p.pl_no));
+    IF @pm > 0
+    BEGIN
+        SET @badMiss = @badMiss + @pm;
+        PRINT N'  [FAIL] GD (plang.pl_no) 仍有 ' + CAST(@pm AS nvarchar(10)) + N' 个号没回登';
+    END
+END
 
 DECLARE @dbn sysname = DB_NAME();
 IF @badDup = 0 AND @badMiss = 0
