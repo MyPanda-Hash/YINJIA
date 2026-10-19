@@ -3958,6 +3958,22 @@ migrate-qc-insp-realize-20261018.sql
 #   实测 yj_form_approval 命中 0 条(无审批留痕要清);form_flow_link 的流转链不动。
 #   守卫:11 张必须仍为草稿(业务审过就拒绝)、命中行数必须正好 11。幂等;两账套均执行。
 migrate-qc-insp-clear-11-docstatus-20261018.sql
+# 2026-10-19 出货检验计划表保存报「将截断字符串或二进制数据」(用户报障)。
+#   TF460 定位:rd_insp_plan_detail.控制方法 是 nvarchar(100),而「检验方法」列实际存整段操作步骤(110+ 字)。
+#   同类「方法」列都是 1000~2000(rd_drop_prec_head.测试方法 2000 / rd_dom_test_detail.方法 1000),
+#   本列属建表时口径错配。加宽到 nvarchar(2000),与同表「控制标准及要求」对齐;只放宽不收紧,幂等。
+migrate-rd-insp-plan-widen-control-method-20261019.sql
+
+# —— 2026-10-19 立项申请流程补「责任人确认收到」(用户口径:管理员审批定级 → 分发对接人 → 对接人签核并选责任人 →
+#   责任人确认收到后才能填项目实施计划;立项反审核要重新走流程,对应项目实施计划也跟着反审核) ——
+#   不建表:rd_approval 备用列池的 备用3 =「责任人确认」、备用4 =「确认收到时间」(hidden=1,流程程序读写),
+#   两字段登记 + 中文注明 + 10 语言译名。
+migrate-rd-owner-receipt-20261019.sql
+
+# —— 2026-10-19 「检查频率」改为下拉标准库(用户口径:可通过标准库维护下拉内容) ——
+#   不建表:复用 yj_std_lib(库编码 INSP_FREQ)+ 把 4 个面板的 检查频率/检测频率 字段 data_type 改成「标准库」;
+#   前端列配置 type:select + stdLib:INSP_FREQ,表头 ⌄ 可增删改条目(改库不影响已录入单据)。
+migrate-insp-freq-stdlib-20261019.sql
 
 # migrate-stock-flow-src-rid-grain-20261020.sql — 库存流水唯一键放细:(src,rid) → (src,rid,物料编码,批号)
 #   用户 2026-10-20 报障原话「你们限定了一个工单只能领一次料…把你们设定的哪个唯一性拿掉就彻底解决了」

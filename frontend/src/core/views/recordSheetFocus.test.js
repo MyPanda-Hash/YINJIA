@@ -103,3 +103,20 @@ test('missingKeyFromMessage: 只认「<字段名>不能为空」,别的错误文
   // 前缀匹配(后端有「...不能为空(该仓库已启用仓位管理)」这种尾巴)
   assert.equal(missingKeyFromMessage('明细第 3 行仓位不能为空(该仓库已启用仓位管理)'), '仓位')
 })
+
+/**
+ * 用户报障(2026-10-19):「出货检验计划表出现标题不能为空,但是未提示哪一个数据未填」。
+ *
+ * 真因不是提示文案,是**「标题」在纸面上根本没渲染**:RD_INSP_PLAN 的 recordSheetConfigs
+ * 里 `titleKey` 没配(整份配置里「标题」二字出现 0 次),而 yj_field 里「标题」required=1。
+ * 于是:①大标题格走静态分支,用户没有输入口;②保存校验必填永远失败;
+ *      ③pageOfKeyIn 找不到页 ⇒ focusField 返回 false ⇒ 连高亮定位也没有。
+ * 正确口径照 RD_CHANGE(立项申请):大标题格做成字段输入框,`titleKey = '标题'`。
+ * 这条测试钉住「必填的大标题必须在纸面上可填、可定位」这一事实。
+ */
+test('RD_INSP_PLAN: 标题是必填字段,纸面必须给输入口且能定位(否则永远报「标题不能为空」)', () => {
+  const cfg = recordSheetConfigs.RD_INSP_PLAN
+  assert.equal(cfg.titleKey, '标题', '大标题格要绑「标题」字段(同 RD_CHANGE 口径)')
+  assert.ok(cfg.titleKeyPh, '要有背景提示词,否则空标题时用户看不出这里是填标题的地方')
+  assert.equal(pageOfKeyIn(cfg, '标题'), 0, '「标题」必须能定位到第 0 页(校验失败时要高亮它)')
+})

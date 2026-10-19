@@ -337,10 +337,35 @@ public class DcPlatformService {
         int open = 0;
         for (Map<String, Object> a : alarms) if (!ALARM_HANDLED.equals(str(a.get("state")))) open++;
 
+        // 最新 10 条流水(2026-10-19 用户口径「实时数据改为显示最新 10 条」):
+        // 连续发送模式下每秒一条,只看"当前值"会漏掉取放过程,列最近 10 条看得清变化。
+        List<Map<String, Object>> samples = new ArrayList<>();
+        if (target != null) {
+            for (Map<String, Object> r : jdbc.queryForList("""
+                    SELECT TOP 10 s.id, s.point_id, s.value_num, s.value_text, s.quality, s.collect_at,
+                           ISNULL(p.code, N'') AS point_code, ISNULL(p.name, N'') AS point_name, ISNULL(p.unit, N'') AS unit
+                      FROM bs_dc_sample s
+                      LEFT JOIN bs_dc_point p ON p.id = s.point_id
+                     WHERE s.device_id = ? AND ISNULL(s.asp_cancel, 'N') <> 'Y'
+                     ORDER BY s.id DESC
+                    """, target)) {
+                Map<String, Object> x = new LinkedHashMap<>();
+                x.put("id", r.get("id"));
+                x.put("pointCode", str(r.get("point_code")));
+                x.put("pointName", str(r.get("point_name")));
+                x.put("valueText", str(r.get("value_text")).isEmpty() ? plain(r.get("value_num")) : str(r.get("value_text")));
+                x.put("unit", str(r.get("unit")));
+                x.put("quality", str(r.get("quality")));
+                x.put("at", wallClock(r.get("collect_at")));
+                samples.add(x);
+            }
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("deviceId", target);
         out.put("devices", devices);
         out.put("points", points);
+        out.put("samples", samples);
         out.put("alarms", alarms);
         out.put("alarmOpen", open);
         out.put("serverTime", LocalDateTime.now().withNano(0).toString());

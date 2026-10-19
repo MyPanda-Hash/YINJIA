@@ -45,7 +45,10 @@
                      (tools/migrate-rd-specdoc-prodno-2026-09-30.sql),旧键从此只表示单据标识。 -->
               <div v-if="coverDocNoKey" class="rsp-cover-docno"
                    :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">
-                <span class="rsp-cover-docno-lb">{{ tt('编号：') }}</span>
+                <!-- 标识文案跟键走(2026-10-19 用户口径「产品规格书右上角的编号名称改为产品编号」):
+                     规格书这个格绑的是 coverDocNoKey='产品编号',却一直印「编号：」—— 用户看到的
+                     就是「编号： 00011」,读不出这是产品编号。绑编号/文档编号的面板仍显示「编号：」。 -->
+                <span class="rsp-cover-docno-lb">{{ tt(coverDocNoKey === '产品编号' ? '产品编号：' : '编号：') }}</span>
                 <el-input v-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
                           :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :maxlength="60" @input="emit('dirty')" />
                 <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
@@ -332,6 +335,13 @@
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
                 </template>
+                <!-- 变更文件(只读态/审批后):勾选的文件渲染成**跳转入口**(2026-10-19 用户口径:
+                     勾了哪些,审批后按本单「产品编号」给出对应文件的入口;点击开页签并按 docNo 定位)。
+                     只读态才出现;编辑态仍是上面的复选框。 -->
+                <span v-else-if="!editable && c.type === 'checks' && c.link && checkList(head[c.key]).length" class="rs-file-links no-print">
+                  <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
+                             @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
+                </span>
                 <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
@@ -544,7 +554,7 @@
             <template v-else>
               <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
                 <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}</th>
+                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}<span v-if="editable && libOfCol(g.key)" class="rs-lib-pick" :title="tt('维护该列的标准库下拉内容')" @click.stop="openStdLib(libOfCol(g.key))">⌄</span></th>
                   <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
                 </template>
                 <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
@@ -598,7 +608,7 @@
                   :style="designInputStyle(dt)"
                   @change="emit('dirty')"
                 >
-                  <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
+                  <el-option v-for="o in colOptions(c)" :key="o" :label="tt(o)" :value="o" />
                 </el-select>
                 <!-- 物料编号列(c.type='inv-code'):商品档案**远程模糊筛选**(2026-10-16 用户口径
                      「输入 Y 或者 003 时模糊搜索到含这些数字字母的」,例 YJ-LL-003)。
@@ -876,6 +886,13 @@
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
                 </template>
+                <!-- 变更文件(只读态/审批后):勾选的文件渲染成**跳转入口**(2026-10-19 用户口径:
+                     勾了哪些,审批后按本单「产品编号」给出对应文件的入口;点击开页签并按 docNo 定位)。
+                     只读态才出现;编辑态仍是上面的复选框。 -->
+                <span v-else-if="!editable && c.type === 'checks' && c.link && checkList(head[c.key]).length" class="rs-file-links no-print">
+                  <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
+                             @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
+                </span>
                 <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
@@ -1046,6 +1063,13 @@
                   <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                 </template>
+                <!-- 变更文件(只读态/审批后):勾选的文件渲染成**跳转入口**(2026-10-19 用户口径:
+                     勾了哪些,审批后按本单「产品编号」给出对应文件的入口;点击开页签并按 docNo 定位)。
+                     只读态才出现;编辑态仍是上面的复选框。 -->
+                <span v-else-if="!editable && c.type === 'checks' && c.link && checkList(head[c.key]).length" class="rs-file-links no-print">
+                  <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
+                             @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
+                </span>
                 <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
@@ -1362,10 +1386,10 @@ import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
+import StdLibManager from './StdLibManager.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
 import AnnotatedText from './AnnotatedText.vue'
-import StdLibManager from './StdLibManager.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
 // 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
@@ -1378,6 +1402,43 @@ import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickIn
 // 商品档案候选生成(编码+名称子串匹配、去重、封顶 OPTION_CAP 项)—— 与配方计算弹窗同一套纯函数
 import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
 
+/** 标准库型下拉列(2026-10-19:出货检验计划表的「检查频率」)——options 来自 yj_std_lib,可在弹窗里维护 */
+const stdLibOpts = ref({})   // { libCode: [content, ...] }(复用下方既有 stdLibVisible/stdLibCode)
+const STD_LIB_CODES = ['INSP_FREQ']
+
+function colOptions(c) {
+  if (c && c.stdLib && stdLibOpts.value[c.stdLib]) return stdLibOpts.value[c.stdLib]
+  return (c && c.options) || []
+}
+
+/** 该列绑定的标准库编码(表头 ⌄ 维护入口用) */
+function libOfCol(key) {
+  const t = recordSheetConfigs[props.panelCode]
+  if (!t) return ''
+  for (const dt of t.dataTables || []) {
+    const hit = (dt.cols || []).find((c) => c.key === key && c.stdLib)
+    if (hit) return hit.stdLib
+  }
+  return ''
+}
+
+async function loadStdLibs() {
+  for (const lib of STD_LIB_CODES) {
+    try {
+      const res = await request.get('/stdlib/list', { params: { lib, all: 1 } })
+      const rows = (res?.data ?? res ?? []).filter((r) => r.enabled !== 0 && r.enabled !== false)
+      const opts = []
+      for (const r of rows) {
+        const v = typeof r.content === 'string' ? r.content.trim() : ''
+        if (v && !opts.includes(v)) opts.push(v)
+      }
+      stdLibOpts.value = { ...stdLibOpts.value, [lib]: opts }
+    } catch (e) {
+      /* 标准库不可用时退化为空候选(仍可手输,allow-create) */
+    }
+  }
+}
+
 const props = defineProps({
   head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
@@ -1389,7 +1450,9 @@ const props = defineProps({
   myDeptRows: { type: Array, default: () => [] },
   deptLockAll: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty', 'refresh-config'])
+// open-file:变更文件勾选项的跳转入口(2026-10-19)。本组件只管"查出该文件对应哪张单",
+// 真正开页签交给 PanelxList(它持有 tabs store 与面板元数据)。
+const emit = defineEmits(['dirty', 'refresh-config', 'open-file'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 // 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
@@ -1561,6 +1624,7 @@ function openStdLib(lib) {
 /** 标准库条目变了:刷新字段选项,新增/改名立刻反映到下拉(不影响已录入单据的文本) */
 function onStdLibChanged() {
   emit('refresh-config')
+  loadStdLibs()   // 2026-10-19:标准库型下拉列(检查频率)立刻用上新条目
 }
 
 // ── 多页结构(规格书 / 成型工艺清单+成型配方 / 组装工艺清单+组装BOM表):页签切换,各区块按 page 归属渲染 ──
@@ -1850,7 +1914,7 @@ function materialPickAt(sec) {
     d.materialPick && !d.bar && d.tablesAfterBar === sec.bar && pageOf(d) === pageOf(sec)) || null
 }
 
-watch(() => props.panelCode, () => { activePage.value = 0 })
+watch(() => props.panelCode, () => { activePage.value = 0; loadStdLibs() }, { immediate: true })
 
 // ── 表尾静态表(cfg.tailTables)与只读台账页(pages[i].ledger) ──
 /** 本页要渲染的静态附表(设计纸面上的固定附录;不落库、不进单据) */
@@ -1913,6 +1977,41 @@ watch(
  */
 function checkList(v) {
   return String(v ?? '').split(/[、,，;；\s]+/).map((s) => s.trim()).filter(Boolean)
+}
+
+/**
+ * 勾选的文件 → 跳转入口(2026-10-19 用户口径:「勾选哪些面板,保存审批之后就会根据选择的
+ *  产品编号出现对应的文件跳转入口」)。
+ *
+ * 做法:只读态点某个已勾选项 → 用本单「产品编号」去该面板查单据(doc 面板列表行自带单据编号)
+ *   → emit('open-file') 交给 PanelxList 开页签(带 ?docNo= 定位到那张单)。
+ *   **查不到就说不查不到**,不跳一张空列表让用户自己找。
+ *   面板映射来自 recordSheetConfigs 里该格的 `link`(见 RD_CHANGE 的「变更文件」)。
+ */
+async function openLinkedFile(c, label) {
+  const panel = c && c.link ? c.link[label] : ''
+  if (!panel) return
+  const prodNo = String(props.head['产品编号'] || '').trim()
+  if (!prodNo) {
+    ElMessage.warning(tt('本单还没有产品编号，无法定位对应的文件'))
+    return
+  }
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: panel, condition: { 产品编号: prodNo }, pageNo: 1, pageSize: 5,
+    })
+    const list = (res && res.data && res.data.list) || []
+    const no = list.length
+      ? String(list[0]['单据编号'] || list[0]['编号'] || list[0]['文档编号'] || '')
+      : ''
+    if (!no) {
+      ElMessage.warning(tt('该产品还没有「{file}」，请先新建').replace('{file}', tt(label)))
+      return
+    }
+    emit('open-file', { panel, docNo: no, label })
+  } catch (e) {
+    ElMessage.error(tt('打开文件失败'))
+  }
 }
 
 /** 勾选态 → 文本(顿号分隔;不勾就写空串 —— 注意本引擎"空串=不改动",要清空得靠后端还原口径) */
@@ -4357,6 +4456,10 @@ function chartOf(dt) {
   font-size: 13px;
   fill: #98a4b3;
 }
+
+/* 标准库型列的表头维护入口(2026-10-19 检查频率下拉) */
+.rs-lib-pick { margin-left: 4px; color: #2f6bff; cursor: pointer; font-weight: 700; }
+.rs-lib-pick:hover { text-decoration: underline; }
 </style>
 
 <!-- 打印/导出整张文书:只保留文书纸张,隐藏布局菜单/侧栏/其它页面元素 -->
