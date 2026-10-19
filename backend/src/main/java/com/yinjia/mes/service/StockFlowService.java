@@ -20,7 +20,17 @@ import java.util.Map;
  * 两者由 StockLedgerService 在**同一事务**内先后调用(apply 里改完 kucun 之后),
  * 一旦有一边失败,整笔回滚,不会出现"结存动了流水没动"。
  *
- * 幂等:(src, rid) 上有唯一索引 —— 同一单据行重复审核不重复记流水。
+ * 幂等/身份:唯一索引的粒度 = **(src, rid, 物料编码, 批号)**;本类定位"自己那一行"用的是
+ * **(src, rid, 物料编码)**(少一维,理由见 {@link #ROW_KEY_SQL})。2026-10-20 之前身份只有 (src, rid),
+ * 即「一条来源行只准一条流水」—— 用户报障「一个工单只能领一次料」就是这条太粗的键撞出来的
+ * (扫码领料小程序按**工单**写 rid,一个工单有多种物料 ⇒ 第二件物料即 error 2601)。
+ * 放宽后:一个工单 N 种物料 ⇒ N 行;而同一单据行同一物料重复审核仍然只一行。
+ *
+ * <p>⚠ 为什么本类三条语句(存在性判断 / 弃审 / 复活)**都要带物料**:
+ * rid 这个列在不同写入方之间语义并不统一 —— MES 写 {@code bl_*.id}(单据明细行),
+ * 扫码领料小程序写工单/工单行 id。只按 (src,rid) 定位,一旦两个号段撞上,
+ * 就会把**别人写的**流水当成自己的:审核时误判"已记过"而跳记、弃审时把别人的行一起红冲。
+ *
  * 弃审 = 软删(asp_cancel='Y')保留痕迹,不物理删除;弃审后**重新审核**是把那条流水"复活"
  * (改回 'N' 并刷新单据侧字段),而不是新插一行 —— 否则结存加回去了、流水还挂着红冲,
  * 「结存 == Σ流水」必然对不上。
@@ -29,6 +39,22 @@ import java.util.Map;
 public class StockFlowService {
 
     private static final Logger log = LoggerFactory.getLogger(StockFlowService.class);
+
+    /**
+     * 流水行身份的剩余键(sql 片段,紧跟在 {@code WHERE src = ? AND rid = ?} 之后,唯一的 ? 是 物料编码)。
+     *
+     * <p><b>为什么只带物料、不带批号</b>(2026-10-20 实测教训):唯一索引的粒度是
+     * {@code (src, rid, 物料编码, 批号)}(允许同工单同物料多批次),但**代码定位那一行时只看物料** ——
+     * 批号会随时间漂移:MES 2026-10-15 起给无批次物料统一补默认批号 {@code PC0000},
+     * 于是 10-14 之前落库的流水 {@code 批号=NULL},单据行今天解析出来却是 {@code PC0000}。
+     * 若代码也按批号精确匹配,弃审/重审就会「找不到自己那行」⇒ 弃审什么都不冲、重审再插一行,
+     * 同一单据**双倍扣账**(测试账套实测:SCLL-20260902-00011 由 11 行变 22 行)。
+     * 故:索引按 4 键放开(给别家写入方留空间),代码按 (src, rid, 物料编码) 定位(容得下批号漂移)。
+     *
+     * <p>而**必须带物料**的原因:rid 在 MES 与扫码领料小程序之间语义不统一(单据行 id vs 工单 id),
+     * 号段撞上时只按 (src,rid) 查会把别人写的行当成自己的(误判"已记过"而跳记 / 弃审误红冲别人的料)。
+     */
+    private static final String ROW_KEY_SQL = " AND ISNULL(物料编码, N'') = ISNULL(?, N'')";
 
     private final JdbcTemplate jdbc;
     private final StockWarnService warn;
@@ -199,17 +225,23 @@ public class StockFlowService {
                 warn.checkOutbound(no, str(r.get("code")), str(r.get("仓库编码")), str(r.get("lot")),
                         java.math.BigDecimal.valueOf(num(r.get("qty"))), warnAcc);
             }
-            // 幂等:先查 (src, rid) 是否已记过(唯一索引兜底),再决定 插 / 复活 / 红冲
+            // 幂等:先查**(src, rid, 物料编码)**是否已记过(索引是同粒度的 4 键超集,兜底),再决定 插 / 复活 / 红冲。
+            //   必须带上物料:rid 在 MES 与扫码领料小程序之间语义不统一(单据行 id vs 工单 id),
+            //   只按 (src,rid) 查会把别人的行当成自己的(误判已记过而跳记 / 弃审误红冲别人的料)。
+            //   不带批号:批号会漂移(默认批号 PC0000),理由见 ROW_KEY_SQL 注释。
+            String code = str(r.get("code"));
             List<String> cancelFlag = jdbc.queryForList(
-                    "SELECT ISNULL(asp_cancel, 'N') FROM " + tbl + " WHERE src = ? AND rid = ?", String.class, src, rid);
+                    "SELECT ISNULL(asp_cancel, 'N') FROM " + tbl + " WHERE src = ? AND rid = ?" + ROW_KEY_SQL,
+                    String.class, src, rid, code);
             if (!cancelFlag.isEmpty()) {
                 boolean cancelled = "Y".equalsIgnoreCase(cancelFlag.get(0));
                 if (forward && cancelled) {
-                    n += revive(tbl, inbound, r, no, user, src, rid);
+                    n += revive(tbl, inbound, r, no, user, src, rid, code);
                 } else if (!forward && !cancelled) {
                     // 弃审:软删(asp_cancel='Y')保留痕迹;不物理删除
                     n += jdbc.update("UPDATE " + tbl + " SET asp_cancel = 'Y', asp_user4 = ?, asp_time4 = GETDATE()"
-                            + " WHERE src = ? AND rid = ? AND ISNULL(asp_cancel,'N') <> 'Y'", user, src, rid);
+                            + " WHERE src = ? AND rid = ?" + ROW_KEY_SQL + " AND ISNULL(asp_cancel,'N') <> 'Y'",
+                            user, src, rid, code);
                 }
                 continue;                                    // 已记过(未弃审的重复审核)/ 已冲过:不重复写
             }
@@ -236,8 +268,9 @@ public class StockFlowService {
         return jdbc.update("INSERT INTO " + tbl + " (" + cn + ") VALUES (" + qm + ")", args.toArray());
     }
 
-    /** 弃审后重新审核:复活那条流水并刷新单据侧字段(弃审到重审之间单据可能被改过)。 */
-    private int revive(String tbl, boolean inbound, Map<String, Object> r, String no, String user, int src, Object rid) {
+    /** 弃审后重新审核:复活那条流水并刷新单据侧字段(弃审到重审之间单据可能被改过,批号也会跟着变)。 */
+    private int revive(String tbl, boolean inbound, Map<String, Object> r, String no, String user,
+                       int src, Object rid, String code) {
         StringBuilder set = new StringBuilder(
                 "asp_cancel = 'N', asp_user4 = NULL, asp_time4 = NULL, asp_user1 = ?, asp_time1 = GETDATE()");
         List<Object> args = new ArrayList<>(List.of(user));
@@ -247,7 +280,8 @@ public class StockFlowService {
         }
         args.add(src);
         args.add(rid);
-        return jdbc.update("UPDATE " + tbl + " SET " + set + " WHERE src = ? AND rid = ?", args.toArray());
+        args.add(code);
+        return jdbc.update("UPDATE " + tbl + " SET " + set + " WHERE src = ? AND rid = ?" + ROW_KEY_SQL, args.toArray());
     }
 
     /**
