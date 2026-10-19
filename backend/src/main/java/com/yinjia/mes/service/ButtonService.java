@@ -140,6 +140,10 @@ public class ButtonService {
             // 立项申请:审核通过(已审核/已归档)后由审核人给项目定级(2026-09-21 用户口径)——
             // 等级是后续立项(实施计划)与进度流程的属性,按参照自动带给下游 项目定级
             case "项目定级" -> gradeProject(def, formData);
+            // 2026-10-19 用户口径「把定级和分发对接人合在一起,改为一个按钮,名字叫定级分发,
+            // 可以在定级的同时分发责任人」—— 一个动作写 项目等级 + 对接人(备用1)。
+            // 旧的「项目定级」「分发对接人」两个按钮保留(老单补步骤仍可用),侧栏不再露出。
+            case "定级分发" -> gradeAndDispatch(def, formData);
             // 立项申请:定级后由审核人指定「对接人」(选一个账号,2026-10-08 研发流程图③);
             // 对接人签核时确认「项目责任人」(再选一个账号,流程图④)——责任人按参照带给实施计划
             case "分发对接人" -> dispatchLiaison(def, formData);
@@ -4921,10 +4925,55 @@ public class ButtonService {
                 owner, at, no);
         if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
         recordApproval(def.code(), no, "OWNER_ACK", "CONFIRMED", "责任人确认收到：" + realNameOf(owner) + "（" + owner + "）");
+        // 2026-10-19 用户口径「确认收到之后,自动新增填写相关信息到项目实施计划里面,也可以通过立项申请的编号来关联」:
+        // 确认收到即按立项单号落一张 RD_PLAN 草稿(文档编号 = 立项单号),把定级/责任人/日期带过去;
+        // 已有挂着的实施计划则不重复建,直接把单号回给前端。
+        String planNo = "";
+        try {
+            planNo = ensurePlanForApproval(no);
+        } catch (Exception e) {
+            log.warn("[立项→实施计划] 自动建单失败 docNo={}: {}", no, e.getMessage());
+        }
         Map<String, Object> r = result(no, status);
         r.put("责任人确认", owner);
         r.put("确认收到时间", at);
+        if (!planNo.isEmpty()) r.put("实施计划编号", planNo);
         return r;
+    }
+
+    /**
+     * 立项 → 项目实施计划的自动建单(2026-10-19)。
+     * 幂等:已存在 文档编号 = 立项单号 的实施计划(未作废)直接返回它的编号;
+     * 否则走现役保存通道 {@link #save} 建一张草稿(取号/状态行/默认值全走同一套)。
+     */
+    private String ensurePlanForApproval(String approvalNo) {
+        List<Map<String, Object>> exists = jdbc.queryForList(
+                "SELECT TOP 1 单据编号 FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(文档编号, N'') = ? ORDER BY 单据编号 DESC",
+                approvalNo);
+        if (!exists.isEmpty()) return str(exists.get(0).get("单据编号"));
+        Map<String, Object> ap = jdbc.queryForList(
+                "SELECT TOP 1 项目等级, 备用1, 备用2, ISNULL(机型及应用位置, N'') AS 机型, ISNULL(客户名, N'') AS 客户名 "
+                        + "FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", approvalNo)
+                .stream().findFirst().orElse(Map.of());
+        String level = blankSafe(ap.get("项目等级"));
+        String owner = blankSafe(ap.get("备用2"));
+        String name = blankSafe(ap.get("机型"));
+        if (name.isEmpty()) name = approvalNo;
+        String today = java.time.LocalDate.now().toString();
+        Map<String, Object> form = new LinkedHashMap<>();
+        form.put("单据日期", today);
+        form.put("文档编号", approvalNo);
+        form.put("项目名称", name);
+        if (!level.isEmpty()) form.put("项目定级", level);
+        if (!owner.isEmpty()) form.put("负责人", owner);
+        form.put("编制日期", today);
+        Map<String, Object> saved = save(registry.panel("RD_PLAN"), form, true);
+        String no = str(saved.get("编号"));
+        if (no.isEmpty()) return "";
+        recordApproval("RD_PLAN", no, "AUTO_PLAN", "CREATED",
+                "立项申请 " + approvalNo + " 的责任人确认收到后自动建单(文档编号关联、" + (level.isEmpty() ? "未定级" : level + "、") + "负责人 " + owner + ")");
+        log.info("[立项→实施计划] {} 自动建单 {}", approvalNo, no);
+        return no;
     }
 
     /**
@@ -4949,7 +4998,46 @@ public class ButtonService {
     }
 
     /**
-     * 分发对接人(2026-10-08 流程图③):定级完成后,由该面板**审批人**(∪ 管理员)从账号里指定一个对接人。
+     * 定级分发(2026-10-19):把原「项目定级」与「分发对接人」合成一个动作。
+     * 载荷:项目等级(一/二/三/四级) + 对接人(账号)。
+     * 门禁:仅审批人(∪ 管理员);仅已审核/已归档;等级与对接人**都必须尚未设置**(各只能定一次,
+     * 要改只能弃审回草稿重走流程 —— 与 2026-10-09 的「定了不能改」口径一致)。
+     */
+    private Map<String, Object> gradeAndDispatch(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可定级分发");
+        requireApprover(def.code());
+        String user = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的立项申请可定级分发(当前:" + status + ")");
+        Map<String, Object> head = approvalHeadOf(no);
+        if (!blankSafe(head.get("项目等级")).isEmpty())
+            throw new IllegalStateException("本单已定级(" + blankSafe(head.get("项目等级")) + "),不能重复定级;要改请先弃审");
+        if (!blankSafe(head.get("备用1")).isEmpty())
+            throw new IllegalStateException("对接人已分发给 " + realNameOf(blankSafe(head.get("备用1"))) + ",不能重复分发;要换人请先弃审");
+        String level = pickOf(formData, "项目等级");
+        if (level.isEmpty()) throw new IllegalStateException("请选择项目等级");
+        String liaison = pickOf(formData, "对接人");
+        if (liaison.isEmpty()) throw new IllegalStateException("请选择对接人账号");
+        if (!isEnabledUser(liaison)) throw new IllegalStateException("对接人账号不存在或已停用：" + liaison);
+        applyGrade(def.code(), no, level, user);
+        jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", liaison, no);
+        String name = realNameOf(liaison);
+        recordApproval(def.code(), no, "GRADE_DISPATCH", "DONE", "定级分发：" + level + " / 对接人 " + name + "（" + liaison + "）");
+        if (!liaison.equals(user)) {
+            notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
+                    Map.of("level", level, "actor", user), user));
+        }
+        Map<String, Object> r = result(no, status);
+        r.put("项目等级", level);
+        r.put("对接人", liaison);
+        r.put("对接人姓名", name);
+        return r;
+    }
+
+    /** 分发对接人(2026-10-08 流程图③):定级完成后,由该面板**审批人**(∪ 管理员)从账号里指定一个对接人。
      * 载荷「对接人」= 账号(必须存在且启用);写 rd_approval.备用1 + 一条 LIAISON 留痕;
      * 被指定的对接人收 LIAISON_ASSIGNED 消息(操作人本人除外)。
      * 幂等:可随时改对接人(改一次留一条痕)。
@@ -5078,6 +5166,8 @@ public class ButtonService {
             // 第 4 步:责任人本人(账号仍启用)∪ 管理员
             out.put("canConfirmReceipt", settled && !owner.isEmpty() && ownerAck.isEmpty()
                     && ((user.equals(owner) && isEnabledUser(owner)) || isAdminUser(user)));
+            // 2026-10-19:定级与分发对接人合并成一个动作(侧栏只露「定级分发」)
+            out.put("canGradeDispatch", settled && level.isEmpty() && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
         } catch (Exception e) {
             log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
         }
