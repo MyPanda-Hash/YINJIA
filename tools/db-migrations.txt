@@ -493,7 +493,7 @@ i18n-rd-progress-18cols.sql
 
 # —— 2026-09-18 研发管理最新设计 Phase 3(产品文件 6 面板配置对齐 + 数据键不变量防线)——
 # ⚠⚠ 铁律(2026-09-18 实测确立,违反即静默丢值):
-#   后端 QueryService.selectCols 用 	.[col_name] AS [label] 出列、rowToLabels 按 **label** 建行模型,
+#   后端 QueryService.selectCols 用 t.[col_name] AS [label] 出列、rowToLabels 按 **label** 建行模型,
 #   保存链 labelsToCols 再用 label 反查 col_name 落库 ⇒ **配置里的数据键必须等于该字段当前的 label**。
 #   等价地:**改 label 就是改数据键**,必须同步改 recordSheetConfigs.js 的 key,否则该列取不到值(整列空白)
 #   且保存时被静默丢弃。本轮据此回退了 3 处 label 改名(物料名/更改原因/更改内容)与 1 处(内孔要求),
