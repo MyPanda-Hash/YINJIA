@@ -3970,3 +3970,13 @@ migrate-qc-insp-clear-11-docstatus-20261018.sql
 #         并回退 inv_cost_ledger 主键与两个视图(见 migrate-stock-views-restore-20261016.sql /
 #         migrate-stock-balance-warn-20261018.sql 的定义)。
 migrate-stock-flow-src-rid-grain-20261020.sql
+
+# migrate-formno-pool-sync-20261019.sql — 单号重发事故(新增出来一张「已审核」单)的数据修复
+#   送料暂收单/来料检验单点「新增」→ 新草稿拿到库里**已存在**的单号(SL-2026-10-0032 等),
+#   同一单号共用 yj_doc_status(shr=admin)⇒ 新单一出生就是已审核、保存 409。根因:取号只看 s_allno,
+#   而 9 月导库的单号没回登号池(库里 SL 到 0130、池只到 0006)。
+#   代码侧已修(FormNoService 取号基准 = max(号池末号, 各业务表同前缀同月最大号),候选号再逐个比对
+#   号池 + inh + 本前缀业务表);本脚本补数据:①删事故留下的空白占位头行(只删全字段为空的重号行);
+#   ②号池回登(逐面板补登库里已有、池里没有的 前缀-yyyy-MM-nnnn 单号,只增不删)。
+#   幂等;末尾自检「空白重号=0 且未回登=0」否则 RAISERROR FAIL。两账套都要执行。
+migrate-formno-pool-sync-20261019.sql
