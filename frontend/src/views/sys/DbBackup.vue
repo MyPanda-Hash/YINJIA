@@ -28,7 +28,7 @@
           <span class="bk-card-title">{{ tt('自动备份') }}</span>
           <span class="bk-card-sub">{{ tt('到点由后台自动备份一次，每天一次') }}</span>
         </div>
-        <el-form :model="form" label-width="104px" class="bk-form" @submit.prevent>
+        <el-form :model="form" label-width="auto" class="bk-form" @submit.prevent>
           <el-form-item :label="tt('启用自动备份')">
             <el-switch v-model="form.autoEnabled" />
             <span class="bk-inline-tip">{{ form.autoEnabled ? tt('已启用') : tt('未启用') }}</span>
@@ -95,21 +95,21 @@
         <el-table-column :label="tt('开始时间')" width="160">
           <template #default="{ row }">{{ fmt(row.started_at) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('方式')" width="76">
+        <el-table-column :label="tt('方式')" width="92">
           <template #default="{ row }">{{ tt(row.run_type) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('结果')" width="76">
+        <el-table-column :label="tt('结果')" width="96">
           <template #default="{ row }">
             <el-tag size="small" :type="row.status === '成功' ? 'success' : 'danger'">{{ tt(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('大小')" width="94">
+        <el-table-column :label="tt('大小')" width="96">
           <template #default="{ row }">{{ sizeText(row.file_size_kb) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('耗时')" width="94">
+        <el-table-column :label="tt('耗时')" width="96">
           <template #default="{ row }">{{ elapsed(row.elapsed_ms) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('操作人')" width="90" prop="operator" />
+        <el-table-column :label="tt('操作人')" width="96" prop="operator" />
         <el-table-column :label="tt('备份文件')" min-width="260" show-overflow-tooltip>
           <template #default="{ row }">{{ row.file_path || '-' }}</template>
         </el-table-column>
@@ -267,7 +267,7 @@ onMounted(load)
 .bk-card-sub { font-size: 12px; color: #909399; }
 .bk-form { max-width: 560px; }
 .bk-form :deep(.el-form-item) { margin-bottom: 12px; }
-.bk-form :deep(.el-form-item__label) { color: #6b7280; }
+.bk-form :deep(.el-form-item__label) { color: #6b7280; white-space: nowrap; }
 .bk-inline-tip { margin-left: 10px; font-size: 12px; color: #909399; }
 .bk-hint { margin-top: 8px; font-size: 12px; color: #909399; line-height: 1.6; }
 .bk-hint-strong { color: #1c4f8a; }
