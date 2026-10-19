@@ -117,7 +117,10 @@ test('「批准」段下方三格是**手签空白区**:只读、不给 key(用�
   }
   // 渲染侧:不带 key 的格必须落到只读文本(AnnotatedText),不能落进可编辑分支
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
-  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,600}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| c\.fixed \|\| ''"/,
+  // 窗口 600 → 1200(2026-10-19):`editable && c.key` 与末尾只读渲染之间**多插了一支**
+  //   「变更文件只读态 → 跳转入口」的分支(见 openLinkedFile),原 600 字符窗口装不下。
+  //   断言意图不变:这条可编辑分支之后**必须**落到 AnnotatedText 只读渲染,不能没有出口。
+  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,1200}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| c\.fixed \|\| ''"/,
     '网格格:无 key/ro 时必须是只读文本,不能给输入控件')
 })
 

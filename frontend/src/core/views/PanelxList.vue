@@ -215,6 +215,7 @@
             :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
+            @open-file="onOpenLinkedFile"
           />
         </div>
         <!-- 纸面滚动容器(2026-10-16):立项申请/项目实施计划**定死纸宽 1242px**(DocSheet 的
@@ -3926,6 +3927,21 @@ function openPendingDoc(row) {
   pendingDocsVisible.value = false
   tabs.open({ path: base, title: 'RD_PROD_INFO' })
   router.push({ path: base, query: { docNo: no } })
+}
+
+/**
+ * 变更文件的跳转入口(2026-10-19 用户口径:「勾选哪些面板,保存审批之后就会根据选择的
+ *  产品编号出现对应的文件跳转入口」)。
+ *
+ * 分工:RecordSheetPanels 在只读态(审批后)把勾选项渲染成入口,点击时用本单「产品编号」去
+ *   该面板查出对应单据号 → emit('open-file') 到这里。这里只负责开页签并定位,写法照
+ *   openPendingDoc(先 tabs.open 再 router.push 带 docNo,列表页据此把那张单滚到眼前)。
+ */
+function onOpenLinkedFile({ panel, docNo } = {}) {
+  if (!panel) return
+  const base = `/panelx/list/${panel}`
+  tabs.open({ path: base, title: panel })
+  router.push({ path: base, query: docNo ? { docNo } : {} })
 }
 
 // ── 分发责任人(2026-09-20;原名「产品开发下发」2026-09-09)──
