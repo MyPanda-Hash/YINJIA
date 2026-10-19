@@ -4,11 +4,13 @@
    用户口径(2026-10-19):「再把现在的已经备份的记录改为每个月备份的，我要用这个去演示」
 
    做什么:
-   - 清掉测试账套里现存的几条调试记录(今天手点出来的 4 条:3 手动 + 1 自动);
-   - 按「每月 N 日 02:00 自动备份」的口径,补 **10 期**历史(2026-01-01 … 2026-10-01),
-     每期一行 `run_type=自动 / status=成功 / operator=system`,文件名沿用真实命名规则
-     `HSDZ_MES_TEST_auto_yyyyMMdd-020000.bak`,大小/耗时给这个库的真实量级(≈71~73 MB / 200~400 ms)。
-   - 保留本月已有一期 ⇒ 自动任务判定「本月已备过」,演示期间不会突然再跑一次(不会冒出第 11 行)。
+   - 清掉测试账套里现存的调试记录(今天手点出来的那几条);
+   - 按「每月 N 日 02:00 自动备份」的口径补历史,每期一行
+     `run_type=自动 / status=成功 / operator=system`,文件名沿用真实命名规则
+     `HSDZ_MES_TEST_auto_yyyyMMdd-020000.bak`,大小/耗时给这个库的真实量级(≈67~72 MB / 200~350 ms);
+   - **期数口径(2026-10-19 用户两轮)**:先要「每月一次」→ 10 期;**再收窄为「只需要 8 月到 10 月」**
+     ⇒ 现为 **3 期**(2026-08-01 / 09-01 / 10-01)。要改期数只动下面 @seed 的月份即可。
+   - 保留本月(10-01)一期 ⇒ 自动任务判定「本月已备过」,演示期间不会突然再跑一次(不会多冒一行)。
 
    安全边界:
    - **只在 HSDZ_MES_TEST 执行**(正式账套不许有演示数据;库名不符直接 RETURN);
@@ -32,12 +34,10 @@ END
 DECLARE @before int = (SELECT COUNT(*) FROM dbo.yj_backup_log);
 DELETE FROM dbo.yj_backup_log;
 
-/* 每月 1 日 02:00 的 10 期历史(2026-01 ~ 2026-10);大小/耗时按实测 71~73 MB / 200~400 ms 给 */
+/* 每月 1 日 02:00 的历史 —— 只要 8/9/10 三个月(用户 2026-10-19「只需要8月到10月」) */
 DECLARE @seed TABLE (m int, kb bigint, ms int);
 INSERT INTO @seed (m, kb, ms) VALUES
- (1, 68214, 268), (2, 68930, 254), (3, 69512, 301), (4, 70146, 233),
- (5, 70880, 287), (6, 71240, 219), (7, 71702, 342), (8, 72118, 261),
- (9, 72466, 244), (10, 72824, 205);
+ (8, 72118, 261), (9, 72466, 244), (10, 72824, 205);
 
 DECLARE @m int, @kb bigint, @ms int, @at datetime2, @stamp nvarchar(20), @path nvarchar(400), @msg nvarchar(600);
 DECLARE cur CURSOR FAST_FORWARD LOCAL FOR SELECT m, kb, ms FROM @seed ORDER BY m;
@@ -60,8 +60,12 @@ CLOSE cur; DEALLOCATE cur;
 DECLARE @after int = (SELECT COUNT(*) FROM dbo.yj_backup_log);
 DECLARE @auto int = (SELECT COUNT(*) FROM dbo.yj_backup_log WHERE run_type = N'自动' AND status = N'成功');
 DECLARE @mon int = (SELECT COUNT(DISTINCT CONVERT(char(7), started_at, 120)) FROM dbo.yj_backup_log);
-IF @after <> 10 OR @auto <> 10 OR @mon <> 10
-  RAISERROR(N'[FAIL] 演示记录应为 10 期/10 自动/10 个月,实际 %d/%d/%d', 16, 1, @after, @auto, @mon);
-RAISERROR(N'[OK] 备份记录已改为每月一次:清掉 %d 条旧记录,写入 10 期(2026-01-01 ~ 2026-10-01,每月 1 日 02:00)',
+DECLARE @first nvarchar(10) = (SELECT CONVERT(char(7), MIN(started_at), 120) FROM dbo.yj_backup_log);
+DECLARE @last nvarchar(10) = (SELECT CONVERT(char(7), MAX(started_at), 120) FROM dbo.yj_backup_log);
+IF @after <> 3 OR @auto <> 3 OR @mon <> 3
+  RAISERROR(N'[FAIL] 演示记录应为 3 期/3 自动/3 个月,实际 %d/%d/%d', 16, 1, @after, @auto, @mon);
+IF @first <> '2026-08' OR @last <> '2026-10'
+  RAISERROR(N'[FAIL] 演示记录区间应为 2026-08~2026-10,实际 %s~%s(需求:只需要 8 月到 10 月)', 16, 1, @first, @last);
+RAISERROR(N'[OK] 备份记录已改为每月一次:清掉 %d 条旧记录,写入 3 期(2026-08-01 / 09-01 / 10-01,每月 1 日 02:00)',
           10, 1, @before) WITH NOWAIT;
 GO

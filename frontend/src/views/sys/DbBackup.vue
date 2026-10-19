@@ -94,8 +94,8 @@
         <span class="bk-card-title">{{ tt('备份记录') }}</span>
         <span class="bk-card-sub">{{ tt('最近 50 次（只增不改，可核对“什么时候备过、备到哪”）') }}</span>
       </div>
-      <!-- 高度取 400:每月一次时一屏能看到 10 期记录(演示/复盘时不用滚动) -->
-      <el-table :data="logs" v-loading="loading" border stripe size="small" height="400" empty-text="暂无备份记录">
+      <!-- max-height:记录少时按内容高度收拢,记录多时到 400 出滚动(演示 3 期时不留大片空白) -->
+      <el-table :data="logs" v-loading="loading" border stripe size="small" max-height="400" empty-text="暂无备份记录">
         <el-table-column :label="tt('开始时间')" width="160">
           <template #default="{ row }">{{ fmt(row.started_at) }}</template>
         </el-table-column>
