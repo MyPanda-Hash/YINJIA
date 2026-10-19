@@ -4054,3 +4054,11 @@ migrate-db-backup-20261019.sql
 #   TRIGGER_NESTLEVEL()>1 防递归;静默纠正(不抛错,避免打断手机端报工事务)。
 #   回滚:DROP TRIGGER dbo.trg_plang_ja_guard;
 migrate-plang-ja-guard-trigger-20261020.sql
+#
+# ---- 2026-10-19 数据库自动备份:每天 → 每月一次 ----
+#   用户口径:「里面显示的数据库备份记录改为每个月一次」。
+#   新增参数 db_backup.auto_day(每月几号,1~28,默认 1);auto_enabled/auto_time 的 remark 同步改口径。
+#   判定:启用 + 现在 ≥ 本月「auto_day 日 auto_time」+ 本月没有成功自动备份 ⇒ 跑一次(一个月最多一次)。
+#   为什么不改 migrate-db-backup-20261019.sql 的字节:改字节会让 DbSync 按内容哈希重跑整条历史脚本。
+#   幂等;两账套均执行。
+migrate-db-backup-monthly-20261019.sql
