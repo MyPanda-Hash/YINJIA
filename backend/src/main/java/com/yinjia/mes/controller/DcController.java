@@ -44,10 +44,14 @@ public class DcController {
 
     private final DcPlatformService dcPlatform;
     private final PanelPermissionService perm;
+    /** 文本上报口复用它的单点写入(采样/在线/越限报警同一条链路,不另写一份) */
+    private final com.yinjia.mes.service.DcService dc;
 
-    public DcController(DcPlatformService dcPlatform, PanelPermissionService perm) {
+    public DcController(DcPlatformService dcPlatform, PanelPermissionService perm,
+                        com.yinjia.mes.service.DcService dc) {
         this.dcPlatform = dcPlatform;
         this.perm = perm;
+        this.dc = dc;
     }
 
     // ───────────────────────────── ① 设备配置管理 ─────────────────────────────
@@ -186,6 +190,86 @@ public class DcController {
     public Map<String, Object> ingest(@RequestBody(required = false) Map<String, Object> body,
                                       @RequestHeader(value = "X-DC-Key", required = false) String key) {
         return ok(dcPlatform.ingestBatch(body == null ? Map.of() : body, key));
+    }
+
+    /**
+     * **文本上报口**(2026-10-19):给「W111 无线透传模块」这类只能把串口原始串发出来的硬件用 ——
+     * 它拼不出 MES 要求的 JSON({deviceCode, values[]}),但能发 GET/POST 的 url + 自定义头。
+     *
+     * <p>支持的取数位置(任填一种即可,按顺序):
+     * <ol>
+     *   <li>查询串 {@code data} / {@code v} / {@code value};</li>
+     *   <li>POST 正文(模块 HTPC 模式下一般为串口帧原文);</li>
+     *   <li>整个请求行(模块 GET 模式可能把串口数据拼在 URL 后面)。</li>
+     * </ol>
+     * 设备号取 {@code device} / {@code deviceCode} 查询参数,或请求头 {@code X-DC-Device}(默认 DZ-001);
+     * 鉴权与 JSON 口一致:{@code X-DC-Key} 必须等于该设备所绑网关的 api_key。
+     *
+     * <p>重量解析口径与现场实测一致:先按「净重6位紧跟皮重6位 + kg」(如 {@code +000.39000.00kg}),
+     * 再退回「第一个带小数的数」(兼容 ST,GS / wn+00.52kg 等机型)。
+     */
+    @org.springframework.web.bind.annotation.RequestMapping(value = "/ingest/text",
+            method = { org.springframework.web.bind.annotation.RequestMethod.GET,
+                       org.springframework.web.bind.annotation.RequestMethod.POST })
+    public Map<String, Object> ingestText(@RequestParam(required = false) String device,
+                                          @RequestParam(required = false) String deviceCode,
+                                          @RequestParam(required = false) String data,
+                                          @RequestParam(required = false) String v,
+                                          @RequestParam(required = false) String value,
+                                          @RequestParam(required = false) String point,
+                                          @RequestParam(required = false) String pointCode,
+                                          jakarta.servlet.http.HttpServletRequest request) {
+        String dev = str(device);
+        if (dev.isEmpty()) dev = str(deviceCode);
+        if (dev.isEmpty()) dev = str(request.getHeader("X-DC-Device"));
+        if (dev.isEmpty()) dev = "DZ-001";
+        String raw = !str(data).isEmpty() ? str(data) : !str(v).isEmpty() ? str(v) : str(value);
+        if (raw.isEmpty()) {
+            try {
+                raw = new String(request.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            } catch (java.io.IOException ignored) { /* 读不到正文就退回请求行 */ }
+        }
+        if (raw.isBlank()) raw = request.getQueryString() == null ? "" : request.getQueryString();
+        if (raw.isBlank()) raw = request.getRequestURI();
+        Double kg = parseWeightText(raw);
+        if (kg == null) throw new IllegalArgumentException("报文里没解析出重量：" + raw);
+        String pt = !str(pointCode).isEmpty() ? str(pointCode) : (!str(point).isEmpty() ? str(point) : "W01");
+        java.util.Map<String, Object> one = new java.util.LinkedHashMap<>();
+        one.put("deviceCode", dev);
+        one.put("pointCode", pt);
+        one.put("value", kg);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("deviceCode", dev);
+        out.put("weight", kg);
+        out.put("raw", raw.length() > 120 ? raw.substring(0, 120) : raw);
+        out.put("result", dc.ingest(one, request.getHeader("X-DC-Key")));
+        return ok(out);
+    }
+
+    /**
+     * 串口帧里的重量:先按「符号+净重(1~2位小数) + 皮重(可选) + kg」精确匹配(现场 +000.39000.00kg),
+     * 否则退回通用规则(第一个带小数点的数,或末尾整数)。
+     */
+    private static Double parseWeightText(String raw) {
+        String s = raw == null ? "" : raw.replace('\r', ' ').replace('\n', ' ').trim();
+        // ① 现场格式:+000.39000.00kg(净重紧跟皮重,中间无分隔符)
+        java.util.regex.Matcher exact = java.util.regex.Pattern
+                .compile("([+-]?\\d{1,4}\\.\\d{1,2})(?:[+-]?\\d{1,4}\\.\\d{1,2})?\\s*(?:kg|KG|g|G)?")
+                .matcher(s);
+        if (exact.find()) {
+            try { return Double.parseDouble(exact.group(1)); } catch (NumberFormatException ignored) { }
+        }
+        // ② 通用:第一个带小数点的数(ST,GS,+ 0.520kg / wn+00.520kg)
+        java.util.regex.Matcher any = java.util.regex.Pattern.compile("(-?\\d{1,4}\\.\\d{1,3})").matcher(s);
+        if (any.find()) {
+            try { return Double.parseDouble(any.group(1)); } catch (NumberFormatException ignored) { }
+        }
+        // ③ 兜底:末尾整数(如 "+12kg")
+        java.util.regex.Matcher whole = java.util.regex.Pattern.compile("(-?\\d{1,4})\\s*(?:kg|KG|g|G)?\\s*$").matcher(s);
+        if (whole.find()) {
+            try { return Double.parseDouble(whole.group(1)); } catch (NumberFormatException ignored) { }
+        }
+        return null;
     }
 
     /** 硬件心跳:{deviceCode};刷新在线状态(在线/离线切换会写 bs_dc_status_log)。 */
