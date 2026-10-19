@@ -4014,3 +4014,10 @@ migrate-formno-pool-sync-20261019.sql
 #   @scope=ALL_DEMO 才是清全部 418 行(需 @confirmAll=1 + 先备份)。
 #   ⚠ 作废(asp_cancel='Y')而非物理删除:留痕 asp_user2='清理演示撞号(旧单)',可回滚。
 migrate-clean-demo-wo-collision-20261019.sql
+
+# migrate-delete-qc-insp-modifying-20261019.sql(2026-10-19):删除停在「修改申请中」的来料检验单(默认 dry-run)
+#   现场:IJ-2026-10-0002 已审核后又申请修改(yj_doc_status.modify_state='R'),界面上已审核单不允许直接删除。
+#   处置=作废三处:qc_insp 头 + qc_insp_detail 明细 + yj_doc_status(canceled='Y' 并清 modify_state/pending,
+#   否则状态推导里「修改申请中」优先级高于「已作废」仍会显示修改申请中)。留痕 asp_user2='删除(修改申请中)'。
+#   ⚠ 这是给"卡在修改申请中删不掉"的单据留的出口;正常单据请走「删除申请 → 审批」流程。
+migrate-delete-qc-insp-modifying-20261019.sql
