@@ -3150,6 +3150,11 @@ export default {
     '项目定级失败': 'Project grading failed',
     /* ── 责任人确认收到(2026-10-19 立项流程第 4 步) ── */
     '责任人确认收到': 'Owner Received',
+    '对接人签核': 'Liaison sign-off',
+    '责任人': 'Owner',
+    '对接人签核时选择本项目的责任人；责任人确认收到后，由他到「项目实施计划」填写对应单据。': 'When the liaison signs off, they pick the project owner. After the owner confirms receipt, they fill in the implementation plan.',
+    '对接人签核：签核并选择本项目的责任人（项目负责人）': 'Liaison sign-off: sign and pick the project owner',
+    '仅本单对接人或管理员可签核': "Only this document's liaison or an admin can sign off",
     '责任人已确认收到': 'Owner already confirmed receipt',
     '请先确认项目责任人，再由责任人确认收到': 'Confirm the project owner first, then the owner confirms receipt',
     '仅本单项目责任人或管理员可确认收到': 'Only the project owner or an admin can confirm receipt',

@@ -482,11 +482,11 @@
                 class="as-side-btn"
                 v-if="panelCode === 'RD_APPROVAL'"
                 :class="{ disabled: !rdFlow.canConfirmOwner }"
-                :title="rdFlow.canConfirmOwner ? tt('对接人签核：确认本项目的项目责任人（项目负责人）')
+                :title="rdFlow.canConfirmOwner ? tt('对接人签核：签核并选择本项目的责任人（项目负责人）')
                   : (!isRdSettled ? tt('仅已审核或已归档的立项申请可确认责任人')
-                    : (!rdFlow.liaison ? tt('请先分发对接人，再由对接人确认项目责任人') : tt('仅本单对接人或管理员可确认项目责任人')))"
+                    : (!rdFlow.liaison ? tt('请先分发对接人，再由对接人确认项目责任人') : tt('仅本单对接人或管理员可签核')))"
                 @click="openOwner"
-              ><span class="as-side-step">3</span>{{ tt('确认责任人') }}{{ rdFlow.ownerName ? '·' + rdFlow.ownerName : '' }}</div>
+              ><span class="as-side-step">3</span>{{ tt('对接人签核') }}{{ rdFlow.ownerName ? '·' + tt('责任人') + ' ' + rdFlow.ownerName : (rdFlow.liaisonName ? '·' + rdFlow.liaisonName : '') }}</div>
               <!-- 责任人确认收到(2026-10-19 用户口径:流程第 4 步)
                    「对接人签核然后选择责任人,责任人只需要确认收到就可以开始填写项目实施计划了」。
                    ⚠ 显隐/置灰全部来自后端 canConfirmReceipt(责任人本人 ∪ 管理员),确认后才放开 RD_PLAN 填单。 -->
@@ -2048,9 +2048,9 @@
 
     <!-- 确认责任人弹窗(2026-10-08 研发流程图④):对接人签核 + 选定项目责任人。
          被选中的责任人姓名会随「文档编号」参照带到项目实施计划的「负责人」格。 -->
-    <el-dialog v-model="ownerVisible" :title="tt('确认责任人')" width="460px" append-to-body>
+    <el-dialog v-model="ownerVisible" :title="tt('对接人签核')" width="460px" append-to-body>
       <div class="dq-form">
-        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('对接人签核：确认本项目的责任人；确认后由他到「项目实施计划」填写对应单据。') }}</div>
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('对接人签核时选择本项目的责任人；责任人确认收到后，由他到「项目实施计划」填写对应单据。') }}</div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('项目责任人') }}</span>
           <el-select v-model="ownerUser" style="flex:1" filterable clearable :placeholder="tt('请选择项目责任人账号')">
