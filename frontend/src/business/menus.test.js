@@ -439,16 +439,23 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
  *   · 三个 panelCode 必须在导航里且各自独立(不能挤成一张面板);
  *   · 走的必须是通用面板路由 /panelx/list/<code>(后端 flat 面板,前端零页面)。
  */
-test('条码管理组(库存管理下):材料/半成品/成品 三个只读面板', () => {
+test('条码管理组(库存管理下):材料/半成品/成品 三个只读面板 + 扫码领料入口', () => {
   const inv = menuTree.find((n) => n.code === 'inv')
   const bc = (inv.children || []).find((c) => c.code === 'barcode')
   assert.ok(bc, '库存管理下应有「条码管理」分组')
   assert.equal(bc.title, '条码管理')
-  assert.deepEqual((bc.children || []).map((c) => c.panelCode),
+  // 2026-10-18 追加第四个叶子「扫码领料」(页面级,无 panelCode):
+  // 面板断言只看带 panelCode 的叶子 ⇒ 库存管理 33 张面板的计数不受影响。
+  const panelLeaves = (bc.children || []).filter((c) => c.panelCode)
+  assert.deepEqual(panelLeaves.map((c) => c.panelCode),
     ['BARCODE_MAT', 'BARCODE_WIP', 'BARCODE_FIN'])
-  assert.deepEqual((bc.children || []).map((c) => c.title),
+  assert.deepEqual(panelLeaves.map((c) => c.title),
     ['材料仓条码管理', '半成品仓条码管理', '成品仓条码管理'])
-  for (const leaf of bc.children || []) {
+  for (const leaf of panelLeaves) {
     assert.equal(leaf.path, '/panelx/list/' + leaf.panelCode)
   }
+  const scanPick = (bc.children || []).find((c) => c.code === 'barcodeScanPick')
+  assert.ok(scanPick, '条码管理下应有「扫码领料」入口')
+  assert.equal(scanPick.path, '/scm/scanPick')
+  assert.equal(scanPick.title, '扫码领料')
 })

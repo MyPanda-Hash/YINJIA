@@ -45,6 +45,31 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 扫码领料(条码管理 → 扫码领料,2026-10-18)----
+    "扫码领料": "Scan to Issue",
+    "扫标签（存货编码|批号）→ 核对批号级可用量 → 加入清单 → 生成材料出库单草稿":
+      "Scan a label (item code|batch) → check batch-level availability → add to list → create a material issue draft",
+    "扫描或输入条码（存货编码|批号）": "Scan or type a barcode (item code|batch)",
+    "请扫描或输入条码": "Please scan or type a barcode",
+    "条码格式不对：应为「存货编码|批号」": "Invalid barcode format: expected \"item code|batch\"",
+    "这个不是条码管理里的标签（码内容应为 存货编码|批号）":
+      "This is not a label from Barcode Management (content should be item code|batch)",
+    "这批货目前没有可用库存（按批号查）": "No available stock for this batch",
+    "该批号可用量为 0": "Available quantity for this batch is 0",
+    "领用数量要大于 0": "Quantity must be greater than 0",
+    "领用数量超过了该批号的可用量": "Quantity exceeds the available quantity of this batch",
+    "查询可用量失败": "Failed to query availability",
+    "本次领用": "Issue quantity",
+    "加入清单": "Add to list",
+    "领料清单": "Issue list",
+    "还没有扫码加入的物料": "No items scanned yet",
+    "无批次": "No batch",
+    "移除": "Remove",
+    "清空": "Clear",
+    "生成材料出库单": "Create Material Issue Draft",
+    "已生成材料出库单草稿，请到材料出库单里审核":
+      "Material issue draft created — review it in Material Issue",
+    "生成材料出库单失败": "Failed to create the material issue draft",
     // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
     "首件检验单": "First Article Inspection Sheet",
     "取成型工艺清单": "Fetch from Molding Process Sheet",
