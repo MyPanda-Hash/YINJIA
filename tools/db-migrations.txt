@@ -4045,3 +4045,12 @@ migrate-dc-device-import-20261019.sql
 #   自检:表/列/参数齐全 + 列级中文注明齐全。幂等;两账套均执行。
 #   配套:DbBackupService / DbBackupScheduler / SysBackupController + frontend /sys/backup
 migrate-db-backup-20261019.sql
+
+# migrate-plang-ja-guard-trigger-20261020.sql(2026-10-20):**阻止**外部程序把工单写成已结案 —— plang 结案守卫触发器
+#   用户口径「以后手机端报工不要导致结案现象」。手机端直连库写 plang.ja,此前的防线是
+#   ①读侧收口(PlangClose)②每分钟自愈 —— 都是"事后"。触发器在 INSERT/UPDATE 的**同一事务**里
+#   把「入库<排产 却 ja∈(T,Y)」改回 N ⇒ 假结案从源头不产生,红标不再出现;不依赖 MES 进程。
+#   判据与 PlangClose.anomaly / 列表「结案异常」/ 巡检 / 回正脚本同一份;GD2608* 历史单豁免;
+#   TRIGGER_NESTLEVEL()>1 防递归;静默纠正(不抛错,避免打断手机端报工事务)。
+#   回滚:DROP TRIGGER dbo.trg_plang_ja_guard;
+migrate-plang-ja-guard-trigger-20261020.sql
