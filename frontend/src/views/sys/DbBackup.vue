@@ -26,17 +26,20 @@
       <section class="bk-card">
         <div class="bk-card-head">
           <span class="bk-card-title">{{ tt('自动备份') }}</span>
-          <span class="bk-card-sub">{{ tt('到点由后台自动备份一次，每天一次') }}</span>
+          <span class="bk-card-sub">{{ tt('到点由后台自动备份一次，每月一次') }}</span>
         </div>
         <el-form :model="form" label-width="auto" class="bk-form" @submit.prevent>
           <el-form-item :label="tt('启用自动备份')">
             <el-switch v-model="form.autoEnabled" />
             <span class="bk-inline-tip">{{ form.autoEnabled ? tt('已启用') : tt('未启用') }}</span>
           </el-form-item>
-          <el-form-item :label="tt('备份时间')">
-            <el-time-picker v-model="form.autoTime" value-format="HH:mm" format="HH:mm"
+          <el-form-item :label="tt('备份周期')">
+            <el-select v-model="form.autoDay" :disabled="!form.autoEnabled" style="width: 128px">
+              <el-option v-for="d in 28" :key="d" :label="tt('每月') + ' ' + d + ' ' + tt('日')" :value="d" />
+            </el-select>
+            <el-time-picker v-model="form.autoTime" value-format="HH:mm" format="HH:mm" class="bk-time"
               :disabled="!form.autoEnabled" :placeholder="tt('选择时间')" style="width: 132px" />
-            <span class="bk-inline-tip">{{ tt('服务器本地时间') }}</span>
+            <span class="bk-inline-tip">{{ tt('服务器本地时间；1~28 号，避月末') }}</span>
           </el-form-item>
           <el-form-item :label="tt('保留份数')">
             <el-input-number v-model="form.keepFiles" :min="0" :max="365" :step="1" controls-position="right" style="width: 132px" />
@@ -134,11 +137,13 @@ const overview = ref({})
 const logs = ref([])
 const last = ref(null)
 
-const form = reactive({ autoEnabled: false, autoTime: '02:00', keepFiles: 14, dir: '' })
+// 自动备份 = 每月一次(用户 2026-10-19:「显示的数据库备份记录改为每个月一次」)
+const form = reactive({ autoEnabled: false, autoDay: 1, autoTime: '02:00', keepFiles: 14, dir: '' })
 
 function applySetting(s) {
   if (!s) return
   form.autoEnabled = !!s.autoEnabled
+  form.autoDay = Number(s.autoDay ?? 1)
   form.autoTime = s.autoTime || '02:00'
   form.keepFiles = Number(s.keepFiles ?? 14)
   form.dir = s.dir || ''
@@ -165,6 +170,7 @@ async function save() {
   try {
     const r = await request.post('/sys/backup/save', {
       autoEnabled: form.autoEnabled,
+      autoDay: form.autoDay,
       autoTime: form.autoTime,
       keepFiles: form.keepFiles,
       dir: form.dir,
@@ -269,6 +275,7 @@ onMounted(load)
 .bk-form :deep(.el-form-item) { margin-bottom: 12px; }
 .bk-form :deep(.el-form-item__label) { color: #6b7280; white-space: nowrap; }
 .bk-inline-tip { margin-left: 10px; font-size: 12px; color: #909399; }
+.bk-time { margin-left: 8px; }
 .bk-hint { margin-top: 8px; font-size: 12px; color: #909399; line-height: 1.6; }
 .bk-hint-strong { color: #1c4f8a; }
 .bk-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }

@@ -54,10 +54,12 @@ public class DbBackupService {
     private static final DateTimeFormatter READABLE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private static final String KEY_ENABLED = "db_backup.auto_enabled";
+    private static final String KEY_DAY = "db_backup.auto_day";
     private static final String KEY_TIME = "db_backup.auto_time";
     private static final String KEY_KEEP = "db_backup.keep_files";
     private static final String KEY_DIR = "db_backup.dir";
 
+    private static final int DEFAULT_DAY = 1;
     private static final String DEFAULT_TIME = "02:00";
     private static final int DEFAULT_KEEP = 14;
     private static final String DEFAULT_DIR = "C:\\SQLBackup\\YINJIA-MES";
@@ -94,6 +96,7 @@ public class DbBackupService {
     public Map<String, Object> settings() {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("autoEnabled", "Y".equalsIgnoreCase(option(KEY_ENABLED, "N")));
+        out.put("autoDay", autoDay());
         out.put("autoTime", normalizeTime(option(KEY_TIME, DEFAULT_TIME)));
         out.put("keepFiles", keepFiles());
         out.put("dir", option(KEY_DIR, DEFAULT_DIR));
@@ -103,6 +106,17 @@ public class DbBackupService {
     /** 自动备份时间(HH:mm → LocalTime;脏值退回 02:00) */
     public LocalTime autoTime() {
         return LocalTime.parse(normalizeTime(option(KEY_TIME, DEFAULT_TIME)));
+    }
+
+    /** 每月几号自动备份(1~28;脏值退回 1 号) */
+    public int autoDay() {
+        String v = option(KEY_DAY, String.valueOf(DEFAULT_DAY));
+        try {
+            int d = Integer.parseInt(v.trim());
+            return d >= 1 && d <= 28 ? d : DEFAULT_DAY;
+        } catch (NumberFormatException e) {
+            return DEFAULT_DAY;
+        }
     }
 
     public boolean autoEnabled() {
@@ -123,6 +137,7 @@ public class DbBackupService {
     /**
      * 保存自动备份设置。校验口径:
      * <ul>
+     *   <li>每月几号 1~28(避开月末:29~31 号在 2 月不存在,取"当月最后一天"会把日期漂移);</li>
      *   <li>时间必须是 HH:mm(允许 H:mm,统一存成 HH:mm);</li>
      *   <li>保留份数 0~365(0 = 不自动清理);</li>
      *   <li>目录必填、必须是本机绝对路径(带盘符或 UNC),且能建出来 —— 建不出来直接报错,
@@ -134,6 +149,13 @@ public class DbBackupService {
         if (body == null) body = Map.of();
         String time = normalizeTime(str(body.get("autoTime")));
         if (!isTime(time)) throw new IllegalArgumentException("自动备份时间格式应为 HH:mm,例如 02:00");
+        int day;
+        try {
+            day = Integer.parseInt(str(body.get("autoDay")).trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("每月备份日期应为整数(1~28)");
+        }
+        if (day < 1 || day > 28) throw new IllegalArgumentException("每月备份日期应在 1~28 号之间");
         int keep;
         try {
             keep = Integer.parseInt(str(body.get("keepFiles")).trim());
@@ -154,11 +176,12 @@ public class DbBackupService {
         }
         boolean enabled = boolOf(body.get("autoEnabled"));
         putOption(KEY_ENABLED, enabled ? "Y" : "N", user);
+        putOption(KEY_DAY, String.valueOf(day), user);
         putOption(KEY_TIME, time, user);
         putOption(KEY_KEEP, String.valueOf(keep), user);
         putOption(KEY_DIR, dir, user);
-        log.info("[数据库备份] 设置已保存:自动备份={} 时间={} 保留={} 份 目录={} 操作人={}",
-                enabled ? "开" : "关", time, keep, dir, user);
+        log.info("[数据库备份] 设置已保存:自动备份={} 每月 {} 日 {} 保留={} 份 目录={} 操作人={}",
+                enabled ? "开" : "关", day, time, keep, dir, user);
         return settings();
     }
 
@@ -225,27 +248,39 @@ public class DbBackupService {
     }
 
     /**
-     * 自动备份调度入口:判断「启用 + 到点 + 今天还没自动备过」三者同时成立才跑。
+     * 自动备份调度入口(**每月一次**,2026-10-19 用户口径「显示的数据库备份记录改为每个月一次」):
+     * 「启用 + 本月该时刻已到 + 本月还没成功自动备过」三者同时成立才跑。
      * 由 {@link DbBackupScheduler} 每 60 秒调用一次(不自己开线程)。
      */
     public Map<String, Object> autoTick() {
         if (!autoEnabled()) return null;
         LocalDateTime now = LocalDateTime.now();
-        if (now.toLocalTime().isBefore(autoTime())) return null;
-        if (autoDoneToday()) return null;
-        log.info("[数据库备份] 到达自动备份时间 {},开始自动备份", autoTime());
+        LocalDateTime target = monthlyTarget(now.toLocalDate());
+        if (now.isBefore(target)) return null;
+        if (autoDoneThisMonth()) return null;
+        log.info("[数据库备份] 到达本月自动备份时间(每月 {} 日 {}),开始自动备份",
+                autoDay(), normalizeTime(option(KEY_TIME, DEFAULT_TIME)));
         return run("自动", "system");
     }
 
-    /** 今天是否已经自动备份成功过(同一天只备一次;失败的下次 tick 会重试) */
-    public boolean autoDoneToday() {
+    /**
+     * 本月应备时刻:每月 {@code autoDay} 日的 {@code autoTime}。
+     * 该月没有这一天(2 月 30 日等)⇒ 取当月最后一天 —— 月份一律 1~28 之外也兜得住。
+     */
+    private LocalDateTime monthlyTarget(LocalDate today) {
+        int day = Math.min(autoDay(), today.lengthOfMonth());
+        return today.withDayOfMonth(day).atTime(autoTime());
+    }
+
+    /** 本月是否已经自动备份成功过(每月只备一次;失败的下次 tick 会重试) */
+    public boolean autoDoneThisMonth() {
         try {
             Integer n = jdbc.queryForObject(
                     "SELECT COUNT(1) FROM yj_backup_log WHERE run_type = N'自动' AND status = N'成功' AND started_at >= ?",
-                    Integer.class, LocalDate.now().atStartOfDay());
+                    Integer.class, LocalDate.now().withDayOfMonth(1).atStartOfDay());
             return n != null && n > 0;
         } catch (Exception e) {
-            log.warn("[数据库备份] 查今日自动备份记录失败:{}", e.getMessage());
+            log.warn("[数据库备份] 查本月自动备份记录失败:{}", e.getMessage());
             return false;
         }
     }
@@ -366,12 +401,12 @@ public class DbBackupService {
         }
     }
 
-    /** 下一次自动备份时刻(未启用返回 null):今天该时刻未到且今天还没备过 ⇒ 今天,否则明天 */
+    /** 下一次自动备份时刻(未启用返回 null):本月该时刻未到且本月还没备过 ⇒ 本月,否则下月 */
     private String nextAutoHint() {
         if (!autoEnabled()) return null;
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime next = now.toLocalDate().atTime(autoTime());
-        if (!next.isAfter(now) || autoDoneToday()) next = next.plusDays(1);
+        LocalDateTime next = monthlyTarget(now.toLocalDate());
+        if (!next.isAfter(now) || autoDoneThisMonth()) next = monthlyTarget(now.toLocalDate().plusMonths(1));
         return READABLE.format(next);
     }
 

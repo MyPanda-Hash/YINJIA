@@ -3989,7 +3989,11 @@ export default {
     '自动备份按账套各自生效：本页设置只作用于当前账套；正式账套与测试账套各备各的，文件按库名区分。':
       'Automatic backup is per ledger: settings here apply to the current ledger only. Production and test ledgers back up separately, and files are distinguished by database name.',
     '自动备份': 'Automatic Backup',
-    '到点由后台自动备份一次，每天一次': 'One automatic backup per day at the configured time',
+    '到点由后台自动备份一次，每月一次': 'One automatic backup per month on the configured day',
+    '备份周期': 'Schedule',
+    '每月': 'Every month, day',
+    '日': 'day',
+    '服务器本地时间；1~28 号，避月末': 'Server local time; days 1–28 to avoid month-end gaps',
     '启用自动备份': 'Enable Automatic Backup',
     '未启用': 'Disabled',
     '备份时间': 'Backup Time',
