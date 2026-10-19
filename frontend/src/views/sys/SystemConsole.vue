@@ -68,8 +68,10 @@
         <div class="entry-row">
           <el-button size="small" @click="go('/sys/org')">{{ tt('组织架构') }}</el-button>
           <el-button size="small" @click="go('/sys/usage')">{{ tt('使用权限查看') }}</el-button>
+          <!-- 数据安全(2026-10-19):数据库主动备份 / 自动备份时间设置 -->
+          <el-button size="small" @click="go('/sys/backup')">{{ tt('数据备份') }}</el-button>
         </div>
-        <div class="card-tip">{{ tt('部门/账号/角色与面板权限；全公司使用留痕。') }}</div>
+        <div class="card-tip">{{ tt('部门/账号/角色与面板权限；全公司使用留痕；数据库备份与恢复留痕。') }}</div>
       </section>
     </div>
 

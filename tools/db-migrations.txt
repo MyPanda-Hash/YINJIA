@@ -3996,3 +3996,11 @@ migrate-stock-flow-src-rid-grain-20261020.sql
 #   生成器:tools/archive/_dc-device-import-20261019/gen_import.py(改口径重跑生成器，不手改 SQL)。
 migrate-dc-device-import-20261019.sql
 #
+# ---- 2026-10-19 数据安全:数据库备份(主动/自动) ----
+#   用户口径:「再给系统的系统管理模块加一个面板，面板是可以设置系统的数据库数据的主动备份和
+#   自动备份的时间的，是系统的一个数据安全的一个功能」。
+#   建 yj_backup_log(备份留痕，只增不改)+ yj_app_setting 增 4 个 db_backup.* 参数(自动备份默认关闭)
+#   + 幂等补 db_backupoperator 权限给应用账号 yinjia(失败只告警，服务器上用 sysadmin 补)。
+#   自检:表/列/参数齐全 + 列级中文注明齐全。幂等;两账套均执行。
+#   配套:DbBackupService / DbBackupScheduler / SysBackupController + frontend /sys/backup
+migrate-db-backup-20261019.sql
