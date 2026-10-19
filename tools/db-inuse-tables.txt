@@ -11,10 +11,11 @@
 #   dm_key=含明文接口密钥的历史资产(单独处置)。系统自带 dtproperties(is_ms_shipped=1)不在登记范围。
 # 格式:table:<表名>   # 中文说明
 
-# ---- 引擎元数据与运行时(yj_*,28 张;结构由代码与迁移脚本固定,不加自定义字段备用列) ----
-table:yj_app_setting   # 系统参数表(键值对:收料超送比例等运行期可调口径,见 remark)
+# ---- 引擎元数据与运行时(yj_*,29 张;结构由代码与迁移脚本固定,不加自定义字段备用列) ----
+table:yj_app_setting   # 系统参数表(键值对:收料超送比例等运行期可调口径,见 remark;2026-10-19 增 db_backup.auto_enabled/auto_time/keep_files/dir 四个数据库备份参数)
 table:yj_archive_change_log   # 档案式面板修改记录(每次存档留一条:操作人/时间/行变化摘要/字段级变化;只增不改)
 table:yj_attachment   # 单据附件表(panel_code+doc_no+field_key定位,文件名/存储名/大小/类型)
+table:yj_backup_log   # 数据库备份留痕:一次备份一行(手动/自动、成功/失败、文件名/大小/耗时/原因;只增不改)—— 系统管理平台·数据安全面板的「备份记录」数据源
 table:yj_barcode_label_log   # 条码标签打印留痕(材料/半成品/成品条码面板:一张标签一行=谁/何时/哪个码/哪张单据;只增不改)
 table:yj_change_dept   # 产品变更申请单部门映射:纸面「部门评审意见」的部门行(YJ-QR-130 的 7 个部门)↔ 系统部门 yj_dept.id —— 账号按 yj_user.dept_id 命中本表即可填写对应部门行(管理员豁免)
 table:yj_dept   # 部门表(多级,parentId)

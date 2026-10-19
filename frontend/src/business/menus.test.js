@@ -297,9 +297,10 @@ test('系统管理平台(base)= 只做系统功能入口,业务面板分组已�
   assert.deepEqual((base.children || []).map((c) => c.code), ['sysFunc'])
   const sysFunc = base.children[0]
   assert.equal(sysFunc.title, '系统功能')
-  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage'])
-  // 组织架构 / 使用权限查看 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
-  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage'])
+  // 2026-10-19 追加「数据备份」(sysBackup,管理员专属的数据安全页:数据库主动/自动备份)
+  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'])
+  // 组织架构 / 使用权限查看 / 数据备份 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
+  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
   // 整枝一个面板都不许挂(否则就是两处各挂一份)
@@ -347,9 +348,11 @@ test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可�
   assert.ok(codes.includes('sysConsole'), '非管理员应仍能用「系统管理」入口页')
   assert.ok(!codes.includes('sysOrg'), '非管理员不应看到组织架构')
   assert.ok(!codes.includes('sysUsage'), '非管理员不应看到使用权限查看')
+  assert.ok(!codes.includes('sysBackup'), '非管理员不应看到数据备份(备份文件=全库数据拷贝)')
   const admin = filterMenuTree([base], vis(), true)[0]
   const adminCodes = (admin.children || []).flatMap((g) => (g.children || []).map((c) => c.code))
-  assert.deepEqual(adminCodes, ['sysConsole', 'sysOrg', 'sysUsage'])
+  // 2026-10-19:数据安全 · 数据库备份(sysBackup)接在系统功能组末尾,管理员专属
+  assert.deepEqual(adminCodes, ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'])
 })
 
 /**

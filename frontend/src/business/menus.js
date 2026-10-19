@@ -638,6 +638,10 @@ export const menuTree = [
           { code: 'sysConsole', title: '系统管理', path: '/sys/console', icon: 'Monitor' },
           { code: 'sysOrg', title: '组织架构', path: '/sys/org', icon: 'OfficeBuilding', adminOnly: true },
           { code: 'sysUsage', title: '使用权限查看', path: '/sys/usage', icon: 'View', adminOnly: true },
+          // 数据安全 · 数据库备份(2026-10-19 用户口径「系统管理模块加一个面板,设置数据库数据的
+          //   主动备份和自动备份的时间」):自动备份开关/时间/保留份数/备份目录 + 立即备份 + 备份记录。
+          //   管理员专属(adminOnly),页面见 views/sys/DbBackup.vue。
+          { code: 'sysBackup', title: '数据备份', path: '/sys/backup', icon: 'Download', adminOnly: true },
         ],
       },
     ],
