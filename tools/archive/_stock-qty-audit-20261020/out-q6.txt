@@ -1,0 +1,29 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q6-docstock.sql ==
+  | bl_finish_in | 808 | 807 | 0 | 1 | 0.0000 | 0.0000 | 
+  | bl_manu_order | 37 | 0 | 0 | 19 | 0.0000 | 1600.0000 | 
+  | bl_material_out | 2098 | 2094 | 0 | 0 | 300.0000 | 4200.0000 | 
+  | bl_outsource_order | 12 | 8 | 0 | 4 | 0.0000 | 0.0000 | 
+  | bl_pu_order | 4717 | 0 | 18 | 1599 | -9009.0000 | 102425.0000 | 
+  | bl_purchase_in | 964 | 113 | 0 | 329 | 0.0000 | 25000.0000 | 
+  | bl_sale_out | 1198 | 108 | 11 | 72 | -4800.0000 | 45000.0000 | 
+  | bl_so_order | 496 | 12 | 0 | 108 | 0.0000 | 25938.0000 | 
+  | sl_recv_detail | 498 | 71 | 0 | 206 | 0.0000 | 37416.0000 | 
+  | bl_other_in | 库存数量 | 16 | 45 | 
+  | bl_other_out | 库存数量 | 114 | 999 | 
+  | bl_finish_in | 库存数量 | 807 | 9912 | 
+  | bl_material_out | 辅助数量 | 0 | null | 
+  | bl_material_out | 基本数量 | 0 | null | 
+  | bl_material_out | 库存基本数量 | 0 | null | 
+  | bl_material_out | 库存数量 | 2094 | 9990 | 
+  | bl_material_out | 默认浮动数量 | 0 | null | 
+  | bl_pu_order | 基本库存数量 | 0 | null | 
+  | bl_pu_order | 基本数量 | 0 | null | 
+  | bl_purchase_in | 基本数量 | 0 | null | 
+  | bl_purchase_in | 库存基本数量 | 0 | null | 
+  | bl_purchase_in | 默认浮动数量 | 0 | null | 
+  | bl_sale_out | 基本数量 | 6 | 894 | 
+  | bl_sale_out | 库存基本数量 | 6 | 0 | 
+  | bl_so_order | 基本库存数量 | 0 | null | 
+  | bl_so_order | 基本数量 | 0 | null | 
+[OK] _q6-docstock.sql (1 batches)

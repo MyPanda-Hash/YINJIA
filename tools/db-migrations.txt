@@ -3966,3 +3966,24 @@ migrate-rd-owner-receipt-20261019.sql
 #   不建表:复用 yj_std_lib(库编码 INSP_FREQ)+ 把 4 个面板的 检查频率/检测频率 字段 data_type 改成「标准库」;
 #   前端列配置 type:select + stdLib:INSP_FREQ,表头 ⌄ 可增删改条目(改库不影响已录入单据)。
 migrate-insp-freq-stdlib-20261019.sql
+
+
+# migrate-stock-flow-src-rid-grain-20261020.sql — 库存流水唯一键放细:(src,rid) → (src,rid,物料编码,批号)
+#   用户 2026-10-20 报障原话「你们限定了一个工单只能领一次料…把你们设定的哪个唯一性拿掉就彻底解决了」
+#   「一个工单是可以扫多个物料的,一个工单因为有多个物料组合」;现场报错 error 2601 UX_outh_src_rid 重复键 (6,1711)。
+#   病根:扫码领料小程序按**工单/工单行**写 outh.rid,同一工单的多种物料共用一条来源行,
+#   而唯一键当时只有 (src,rid) ⇒ 第二件物料必撞键(MES 自己的写入按 bl_*.id,一行一物料,所以没暴露)。
+#   改法(放细,而不是整条拿掉 —— 唯一索引是「结存 == Σ流水」的最后一道保险):
+#     ① outh / inh 唯一索引 UX_*_src_rid → (src,rid,物料编码,批号) WHERE rid IS NOT NULL;
+#     ② inv_cost_ledger 主键同步放到 4 键(否则同一 (src,rid) 多行时「重算成本」直接 2627;
+#        键长 1048B > 聚簇键 900B 上限 ⇒ PK 改非聚簇,表退化为堆,~5000 行无影响);
+#     ③ v_stock_ledger / v_stock_balance 的 JOIN 补 存货编码 + 批号(不补会行数翻倍、成本金额重复计入);
+#     ④ 代码 StockFlowService.post 的存在性判断/弃审/复活改为按 (src,rid,物料编码) 定位
+#        —— 只带物料、不带批号:批号会漂移(2026-10-15 起无批次物料统一补 PC0000),按批号精确匹配会
+#        找不到自己那行 ⇒ 弃审不冲、重审再插一行 = 双倍扣账(测试账套实测 11 行变 22 行)。
+#   自检:4 项(两个唯一索引 / 主键 / 两个视图 JOIN)全 [PASS]。幂等;两账套均执行。
+#   取证与验收探针:tools/archive/_outh-one-wo-multi-material-20261020/
+#   撤回:CREATE UNIQUE INDEX UX_outh_src_rid ON dbo.outh (src,rid) WHERE rid IS NOT NULL(inh 同);
+#         并回退 inv_cost_ledger 主键与两个视图(见 migrate-stock-views-restore-20261016.sql /
+#         migrate-stock-balance-warn-20261018.sql 的定义)。
+migrate-stock-flow-src-rid-grain-20261020.sql

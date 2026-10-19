@@ -1,0 +1,33 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q11-fields.sql ==
+  | wzdm | 存货编码 | 文本 | query,detail | 1 | null | 1 | 0 | null | null | 
+  | wzdm | 存货 | 文本 | detail | 2 | null | 1 | 0 | null | null | 
+  | ckdm | 仓库 | 文本 | query,detail | 3 | null | 1 | 0 | null | null | 
+  | lot_no | 批次号 | 文本 | query,detail | 4 | null | 1 | 0 | null | null | 
+  | khdm | 客户代码 | 文本 | query,detail | 5 | null | 1 | 0 | null | null | 
+  | rkl | 累计入库量 | 小数 | detail | 6 | null | 1 | 0 | null | null | 
+  | ckl | 累计出库量 | 小数 | detail | 7 | null | 1 | 0 | null | null | 
+  | yl | 现存量(主) | 小数 | detail | 8 | null | 1 | 0 | null | null | 
+  | yl2 | 辅助结余 | 小数 | detail | 9 | null | 1 | 0 | null | null | 
+  | 预警数量 | 预警数量 | 小数 | detail | 9 | 100 | 1 | 0 | null | null | 
+  | in_date | 入库日期 | 日期 | detail | 10 | null | 1 | 0 | null | null | 
+  | 仓库编码 | 仓库编码 | 参照 | query,detail | 10 | 1 | 0 | 
+  | 仓库名称 | 仓库名称 | 文本 | detail | 20 | 1 | 0 | 
+  | 存货编码 | 存货编码 | 参照 | query,detail | 30 | 1 | 0 | 
+  | 存货名称 | 存货名称 | 文本 | detail | 40 | 1 | 0 | 
+  | 规格型号 | 规格型号 | 文本 | detail | 50 | 1 | 0 | 
+  | 累计入库量 | 累计入库量 | 小数 | detail | 60 | 1 | 0 | 
+  | 累计出库量 | 累计出库量 | 小数 | detail | 70 | 1 | 0 | 
+  | 现存量 | 现存量 | 小数 | detail | 80 | 1 | 0 | 
+  | 更新时间 | 更新时间 | 日期时间 | detail | 90 | 1 | 0 | 
+  | 存货编码 | 存货编码 | 参照 | query,detail | 10 | 1 | 0 | 
+  | 存货名称 | 存货名称 | 文本 | query,detail | 20 | 1 | 0 | 
+  | 规格型号 | 规格型号 | 文本 | detail | 30 | 1 | 0 | 
+  | 仓库 | 仓库 | 参照 | query,detail | 40 | 1 | 0 | 
+  | 仓库编码 | 仓库编码 | 文本 | detail | 42 | 1 | 0 | 
+  | 批号 | 批号 | 文本 | query,detail | 50 | 1 | 0 | 
+  | 计量单位 | 计量单位 | 文本 | detail | 60 | 1 | 0 | 
+  | 现存量 | 现存量 | 小数 | detail | 70 | 1 | 0 | 
+  | 结存单价 | 结存单价 | 小数 | detail | 80 | 1 | 0 | 
+  | 更新时间 | 更新时间 | 日期时间 | detail | 90 | 1 | 0 | 
+[OK] _q11-fields.sql (1 batches)

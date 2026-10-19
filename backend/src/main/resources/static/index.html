@@ -12,6 +12,7 @@
   <style>
     html { background: #f0f2f3; }
     html.login-bg { background: #15241f; }
+<<<<<<< HEAD
   </style>
   <script>
     ;(function () {
@@ -22,6 +23,18 @@
     })()
   </script>
   <script type="module" crossorigin src="/assets/index-DvIKtPgG.js"></script>
+=======
+  </style>
+  <script>
+    ;(function () {
+      var h = (location.hash || '').toLowerCase()
+      if (h.indexOf('/login') >= 0 || (!h && sessionStorage.getItem('mes_at_login') === '1')) {
+        document.documentElement.classList.add('login-bg')
+      }
+    })()
+  </script>
+  <script type="module" crossorigin src="/assets/index-kX85VA2L.js"></script>
+>>>>>>> origin/main
   <link rel="modulepreload" crossorigin href="/assets/vue-vendor-CWVaElZN.js">
   <link rel="modulepreload" crossorigin href="/assets/element-icons-BOmlxDLf.js">
   <link rel="modulepreload" crossorigin href="/assets/element-plus-DiwYDqUo.js">
@@ -150,6 +163,6 @@
         if (btn) { btn.style.display = 'inline-block'; btn.onclick = hardReload }
       }, 12000)
     })()
-  </script>
+  </script>
 </body>
 </html>
