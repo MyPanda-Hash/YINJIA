@@ -45,18 +45,21 @@ const show = (tag, r) => console.log(`${tag} → ${r.status} ${JSON.stringify(r.
   NO = docNo
   console.log('   实际单号:', NO)
   show('② 提交审批', await btn('RD_APPROVAL', '提交审批', { 编号: NO }))
-  // 用户口径「冯总审核及定级」= 审批通过 + 定级同一动作(2026-10-08)
-  show('③ 审批通过并定级', await btn('RD_APPROVAL', '审批通过', { 编号: NO, 项目等级: '三级', 审核意见: 'E2E 流程验证' }))
-  show('④ 分发对接人', await btn('RD_APPROVAL', '分发对接人', { 编号: NO, 对接人: LIAISON }))
+  show('③ 审批通过', await btn('RD_APPROVAL', '审批通过', { 编号: NO, 审核意见: 'E2E 流程验证' }))
+  // 2026-10-19:定级与分发对接人合并成一个按钮
+  show('④ 定级分发(等级+对接人)', await btn('RD_APPROVAL', '定级分发', { 编号: NO, 项目等级: '三级', 对接人: LIAISON }))
   show('⑤ 确认责任人', await btn('RD_APPROVAL', '确认责任人', { 编号: NO, 项目责任人: OWNER }))
 
-  const plan = { 单据编号: 'LXB-E2E-' + NO.slice(-6), 单据日期: '2026-10-19', 文档编号: NO, 项目名称: '立项流程E2E', 项目定级: '三级', 负责人: OWNER }
-  show('⑥ 未确认就保存实施计划(应被拦)', await btn('RD_PLAN', '保存', plan))
-  show('⑦ 责任人确认收到', await btn('RD_APPROVAL', '责任人确认收到', { 编号: NO }))
-  const saved = await btn('RD_PLAN', '保存', plan)
-  show('⑧ 确认后保存实施计划(应成功)', saved)
-  const planNo = String(saved.body?.data?.编号 || plan.单据编号)
-  show('⑨ 实施计划审核', await btn('RD_PLAN', '审核', { 编号: planNo }))
+  const plan = { 单据日期: '2026-10-19', 文档编号: NO, 项目名称: '手工建单门禁E2E', 项目定级: '三级', 负责人: OWNER }
+  show('⑥ 未确认就手工保存实施计划(应被拦)', await btn('RD_PLAN', '保存', plan))
+  const ack = await btn('RD_APPROVAL', '责任人确认收到', { 编号: NO })
+  show('⑦ 责任人确认收到(应自动建实施计划)', ack)
+  const planNo = String(ack.body?.data?.实施计划编号 || '')
+  console.log('   自动建单号:', planNo || '(无)')
+  const chk = await H('/api/px/queryFormDataList?panelCode=RD_PLAN&pageNo=1&pageSize=50', null)
+  const autoPlan = (chk.body?.data?.rows || []).find((r) => String(r['单据编号']) === planNo)
+  console.log('   自动单内容:', JSON.stringify({ 文档编号: autoPlan?.['文档编号'], 项目名称: autoPlan?.['项目名称'], 项目定级: autoPlan?.['项目定级'], 负责人: autoPlan?.['负责人'], 状态: autoPlan?.['单据状态'] }))
+  show('⑧ 实施计划审核', await btn('RD_PLAN', '审核', { 编号: planNo }))
   // 立项审批通过即归档;按 2026-10-18 的口径,归档单要先「申请修改」并经管理员审批(→修改中)才能弃审
   show('⑩ 立项申请修改', await btn('RD_APPROVAL', '申请修改', { 编号: NO, 修改原因: 'E2E:验证反审核联动' }))
   show('⑪ 修改审批通过', await btn('RD_APPROVAL', '修改审批通过', { 编号: NO }))

@@ -62,7 +62,7 @@ async function main() {
     console.log('[open]', opened)
     await sleep(2500)
     const steps = await ev(`(() => [...document.querySelectorAll('.as-side-btn')]
-      .filter(e => /项目定级|分发对接人|对接人签核|确认责任人|责任人确认收到/.test(e.textContent))
+      .filter(e => /定级分发|项目定级|分发对接人|对接人签核|确认责任人|责任人确认收到/.test(e.textContent))
       .map(e => ({ text: e.textContent.trim(), disabled: e.classList.contains('disabled'), title: e.getAttribute('title') })))()`)
     console.log('[流程四步]', JSON.stringify(steps, null, 1))
     await ev(`(() => { const s=document.querySelector('.as-side-section'); if (s) s.scrollIntoView({block:'center'}); return 1 })()`)
