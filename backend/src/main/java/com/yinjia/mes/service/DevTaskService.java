@@ -447,9 +447,33 @@ public class DevTaskService {
             row.put("totalCount", DEV_PANELS.size());
             row.put("overall", done >= DEV_PANELS.size() ? STATUS_DONE
                     : (done + doing > 0 ? STATUS_DOING : STATUS_NONE));
+            // 产品负责人(2026-10-19 用户口径:「产品文件列表的产品负责人填写对应的产品编号的
+            //   规格书的负责人」)—— 此前 board() 压根没这个键,列表那一列一直是空的。
+            row.put("产品负责人", specOwnerNameOf(productCode));
             out.add(row);
         }
         return out;
+    }
+
+    /**
+     * 产品文件列表「产品负责人」= 该产品**规格书的负责人**(2026-10-19 用户口径)。
+     *
+     * 取法:rd_dev_task 里 目标面板=RD_SPEC_DOC 那行的负责人(存的是账号) → 转姓名显示;
+     *   未分发/挂起(没有那一行或负责人为空)时退回产品信息表的总负责人(supervisorOf),
+     *   再没有就空串 —— 不让这一列因为分发缺失而整片空白。
+     */
+    private String specOwnerNameOf(String productCode) {
+        try {
+            String acc = jdbc.queryForObject(
+                    "SELECT TOP 1 负责人 FROM rd_dev_task WHERE 产品编号 = ? AND 目标面板 = 'RD_SPEC_DOC'"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y' AND 负责人 IS NOT NULL ORDER BY id DESC",
+                    String.class, productCode);
+            if (acc != null && !acc.isBlank()) return realNameOf(acc);
+        } catch (Exception e) {
+            log.warn("[RD_PROD_DOCLIST] 取规格书负责人失败 product={}: {}", productCode, e.getMessage());
+        }
+        String sup = supervisorOf(productCode);
+        return sup == null ? "" : realNameOf(sup);
     }
 
     /** 产品信息表侧边栏「产品开发」按钮状态:disabled / dispatched / ready;

@@ -45,6 +45,8 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 产品规格书封面右上角编号标识(2026-10-19)----
+    "产品编号：": "Product No.:",
     // ---- 扫码领料(条码管理 → 扫码领料,2026-10-18)----
     "扫码领料": "Scan to Issue",
     "扫标签（存货编码|批号）→ 核对批号级可用量 → 加入清单 → 生成材料出库单草稿":
@@ -3146,6 +3148,18 @@ export default {
     '定级说明（选填）': 'Grading note (optional)',
     '项目已定级：': 'Project graded: ',
     '项目定级失败': 'Project grading failed',
+    /* ── 责任人确认收到(2026-10-19 立项流程第 4 步) ── */
+    '责任人确认收到': 'Owner Received',
+    '责任人已确认收到': 'Owner already confirmed receipt',
+    '请先确认项目责任人，再由责任人确认收到': 'Confirm the project owner first, then the owner confirms receipt',
+    '仅本单项目责任人或管理员可确认收到': 'Only the project owner or an admin can confirm receipt',
+    '责任人确认收到后，即可到「项目实施计划」填写单据': 'After the owner confirms receipt, the implementation plan can be filled in',
+    '确认收到后即可填写项目实施计划；若立项需要变动，反审核会把项目实施计划一并退回草稿。': 'Once receipt is confirmed, the implementation plan can be filled in. If the initiation needs changes, unauditing it also returns the implementation plan to draft.',
+    '已确认': 'Confirmed',
+    '确认收到': 'Confirm receipt',
+    '已确认收到': 'Receipt confirmed',
+    '确认收到失败': 'Failed to confirm receipt',
+    '仅已审核或已归档的立项申请可确认收到': 'Only approved or archived project applications can be confirmed',
     '给该项目定级(一/二/三/四级)': 'Grade this project (Level 1-4)',
     '仅审批人（或管理员）可项目定级': 'Only an approver (or admin) can grade the project',
     '仅已审核或已归档的立项申请可项目定级': 'Only approved or archived project applications can be graded',

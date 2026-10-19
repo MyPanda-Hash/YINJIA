@@ -487,6 +487,16 @@
                     : (!rdFlow.liaison ? tt('请先分发对接人，再由对接人确认项目责任人') : tt('仅本单对接人或管理员可确认项目责任人')))"
                 @click="openOwner"
               ><span class="as-side-step">3</span>{{ tt('确认责任人') }}{{ rdFlow.ownerName ? '·' + rdFlow.ownerName : '' }}</div>
+              <!-- 责任人确认收到(2026-10-19 用户口径:流程第 4 步)
+                   「对接人签核然后选择责任人,责任人只需要确认收到就可以开始填写项目实施计划了」。
+                   ⚠ 显隐/置灰全部来自后端 canConfirmReceipt(责任人本人 ∪ 管理员),确认后才放开 RD_PLAN 填单。 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_APPROVAL'"
+                :class="{ disabled: !rdFlow.canConfirmReceipt }"
+                :title="receiptTip"
+                @click="openReceipt"
+              ><span class="as-side-step">4</span>{{ tt('责任人确认收到') }}{{ rdFlow.ownerAck ? '·' + tt('已确认') : '' }}</div>
               <!-- 分发责任人(2026-09-20;原名「产品开发下发」):仅产品信息表;
                    已归档 **且 二级审核人 ∪ 管理员** 才可点;已分发后按钮变「改责任人」(分发后随时可改) -->
               <div
@@ -2052,6 +2062,23 @@
       <template #footer>
         <el-button @click="ownerVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" :loading="ownerBusy" @click="confirmOwner">{{ tt('签核并确认') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 责任人确认收到弹窗(2026-10-19 用户口径:流程第 4 步)——
+         责任人本人点一下即可,不选人、不填意见;确认后放开「项目实施计划」填单。 -->
+    <el-dialog v-model="receiptVisible" :title="tt('责任人确认收到')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('确认收到后即可填写项目实施计划；若立项需要变动，反审核会把项目实施计划一并退回草稿。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('项目责任人') }}</span>
+          <span>{{ rdFlow.ownerName || rdFlow.owner || tt('（未确认）') }}</span>
+        </div>
+        <div class="mod-log-meta">{{ tt('项目等级') }}：{{ rdFlow.level || tt('（未定级）') }} · {{ tt('对接人') }}：{{ rdFlow.liaisonName || rdFlow.liaison || tt('（未分发）') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="receiptVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="receiptBusy" @click="confirmReceipt">{{ tt('确认收到') }}</el-button>
       </template>
     </el-dialog>
 
@@ -4646,7 +4673,9 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 const RD_FLOW_PANEL = 'RD_APPROVAL'
 const rdFlow = reactive({
   status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
-  canDispatchLiaison: false, canConfirmOwner: false,
+  // 2026-10-19 流程第 4 步:责任人确认收到(后端 rdApprovalFlowState 的唯一真源)
+  ownerAck: '', ownerAckAt: '',
+  canDispatchLiaison: false, canConfirmOwner: false, canConfirmReceipt: false,
 })
 /** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
 const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
@@ -6395,7 +6424,8 @@ const ownerUser = ref('')
 function clearRdFlow() {
   Object.assign(rdFlow, {
     status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
-    canDispatchLiaison: false, canConfirmOwner: false,
+    ownerAck: '', ownerAckAt: '',
+    canDispatchLiaison: false, canConfirmOwner: false, canConfirmReceipt: false,
   })
 }
 
@@ -6410,7 +6440,9 @@ async function loadRdFlowState() {
       status: r?.status || '', level: r?.level || '',
       liaison: r?.liaison || '', liaisonName: r?.liaisonName || '',
       owner: r?.owner || '', ownerName: r?.ownerName || '',
+      ownerAck: r?.ownerAck || '', ownerAckAt: r?.ownerAckAt || '',
       canDispatchLiaison: !!r?.canDispatchLiaison, canConfirmOwner: !!r?.canConfirmOwner,
+      canConfirmReceipt: !!r?.canConfirmReceipt,
     })
   } catch (e) {
     // 端点不可用(旧后端)或网络失败 ⇒ 全部置灰,不阻断打开单据(保存/审批仍走各自门禁)
@@ -6495,6 +6527,43 @@ async function confirmOwner() {
     ElMessage.error(engine.errMsg(e) || tt('确认项目责任人失败'))
   } finally {
     ownerBusy.value = false
+  }
+}
+
+// ---------- 责任人确认收到(2026-10-19 流程第 4 步) ----------
+const receiptVisible = ref(false)
+const receiptBusy = ref(false)
+
+/** 第 4 步按钮的提示文案(嵌套三元塞在模板里会撑爆解析,统一在这里算) */
+const receiptTip = computed(() => {
+  if (rdFlow.canConfirmReceipt) return tt('责任人确认收到后，即可到「项目实施计划」填写单据')
+  if (rdFlow.ownerAck) return tt('责任人已确认收到')
+  if (!isRdSettled) return tt('仅已审核或已归档的立项申请可确认收到')
+  if (!rdFlow.owner) return tt('请先确认项目责任人，再由责任人确认收到')
+  return tt('仅本单项目责任人或管理员可确认收到')
+})
+
+function openReceipt() {
+  if (!rdFlow.canConfirmReceipt) return
+  receiptVisible.value = true
+}
+
+async function confirmReceipt() {
+  if (receiptBusy.value) return
+  receiptBusy.value = true
+  try {
+    const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    await engine.callButton({
+      panelCode: RD_FLOW_PANEL, buttonName: '责任人确认收到',
+      formData: { 编号: no }, buttonParam: {},
+    })
+    ElMessage.success(tt('已确认收到'))
+    receiptVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('确认收到失败'))
+  } finally {
+    receiptBusy.value = false
   }
 }
 
@@ -9514,23 +9583,29 @@ async function onButton(action) {
       //   「申请修改 → 管理员批 → 改 → 提交审批 → 管理员批 → 再归档」闭环原样不动。
       // 原因随 formData 的「修改原因」键发到后端(PanelxList 此前对申请修改**没有任何输入框**,
       // 后端 modifyRequest 拿到的原因因此恒为空串)。
-      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-      const noMod = current.value['编号'] || current.value['单据编号'] || ''
-      try {
-        const { value } = await ElMessageBox.prompt(
-          tt('单据：{no}（当前状态：{st}）\n请写明本次要修改什么、为什么改').replace('{no}', noMod).replace('{st}', current.value['单据状态'] || ''),
-          tt('申请修改确认'),
-          {
-            confirmButtonText: tt('提交修改申请'),
-            cancelButtonText: tt('取消'),
-            inputType: 'textarea',
-            inputPlaceholder: tt('修改原因（必填）'),
-            inputValidator: (v) => (v && v.trim() ? true : tt('修改原因不能为空')),
-          }
-        )
-        modifyReason = value || ''
-      } catch (e) {
-        return
+      //
+      // ⚠ 2026-10-19 修「点击弃审会弹两次窗」:已归档单据点「弃审」时,上面那段弃审分支
+      //   已经弹过一次「申请修改」并收集到 modifyReason(然后把 action 改成 '申请修改') ——
+      //   这里若再弹一次,用户就得填两遍、且第一遍白填。所以**原因已有时直接跳过弹窗**。
+      if (!modifyReason) {
+        if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+        const noMod = current.value['编号'] || current.value['单据编号'] || ''
+        try {
+          const { value } = await ElMessageBox.prompt(
+            tt('单据：{no}（当前状态：{st}）\n请写明本次要修改什么、为什么改').replace('{no}', noMod).replace('{st}', current.value['单据状态'] || ''),
+            tt('申请修改确认'),
+            {
+              confirmButtonText: tt('提交修改申请'),
+              cancelButtonText: tt('取消'),
+              inputType: 'textarea',
+              inputPlaceholder: tt('修改原因（必填）'),
+              inputValidator: (v) => (v && v.trim() ? true : tt('修改原因不能为空')),
+            }
+          )
+          modifyReason = value || ''
+        } catch (e) {
+          return
+        }
       }
     } else if (action === '审批驳回') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))

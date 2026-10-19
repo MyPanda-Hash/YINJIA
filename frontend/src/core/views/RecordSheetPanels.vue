@@ -45,7 +45,10 @@
                      (tools/migrate-rd-specdoc-prodno-2026-09-30.sql),旧键从此只表示单据标识。 -->
               <div v-if="coverDocNoKey" class="rsp-cover-docno"
                    :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">
-                <span class="rsp-cover-docno-lb">{{ tt('编号：') }}</span>
+                <!-- 标识文案跟键走(2026-10-19 用户口径「产品规格书右上角的编号名称改为产品编号」):
+                     规格书这个格绑的是 coverDocNoKey='产品编号',却一直印「编号：」—— 用户看到的
+                     就是「编号： 00011」,读不出这是产品编号。绑编号/文档编号的面板仍显示「编号：」。 -->
+                <span class="rsp-cover-docno-lb">{{ tt(coverDocNoKey === '产品编号' ? '产品编号：' : '编号：') }}</span>
                 <el-input v-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
                           :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :maxlength="60" @input="emit('dirty')" />
                 <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
