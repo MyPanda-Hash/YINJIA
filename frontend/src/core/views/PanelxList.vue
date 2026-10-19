@@ -4356,15 +4356,19 @@ const queryDialogFields = computed(() => {
  * Cannot access 'READONLY_PANELS' before initialization(合并后 dev 控制台连报 4 次,实测)。
  * 常量一律前置,消灭 TDZ。
  */
-const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW']
+const READONLY_PANELS = ['ERPLG', 'ERPLG_ROW', 'RD_PROGRESS']
 /**
  * 写操作仅管理员的面板(与服务端 PanelPermissionService.ADMIN_ONLY_PANELS 同源)。
  * 2026-10-18:原先"连看都不给",用户追加"给非管理员开只读" ⇒ 非管理员进这两张面板时
  * 工具栏只留浏览动作、网格不进编辑态;写操作仍由服务端 requireAdminOnlyWritable 拦(403)。
  */
 const ADMIN_ONLY_PANELS = ['FIELDMGR', 'ZDGL']
-/** 只读面板保留下来的纯浏览动作(与后端白名单一致) */
-const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录']
+/**
+ * 只读面板保留下来的动作(与后端 PanelPermissionService.READONLY_ALLOWED_BUTTONS 一致)。
+ * 「同步进度」是**按源单据重算**(不是人工编数据),既是 RD_PROGRESS 的补数据入口,
+ * 也是删除联动的触发点 ⇒ 只读面板上也保留(2026-10-19 用户口径「项目进度查询改为仅查询面板」)。
+ */
+const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录', '同步进度']
 
 const draftEditable = computed(() => {
   if (reportMode.value) return false

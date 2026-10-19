@@ -4241,6 +4241,76 @@ public class ButtonService {
     private static final int RES_SKIPPED = 0, RES_INSERTED = 1, RES_UPDATED = 2;
 
     /**
+     * 确保「项目进度查询」那张汇总单存在,返回单据编号(建不出来返回 null)。
+     *
+     * 背景(2026-10-19 用户报障「服务器上项目实施计划保存但是不上项目进度查询面板」):
+     *   RD_PROGRESS 是**单单据**面板(所有项目行都挂在一张单下),原同步逻辑要求这张单
+     *   **已经存在**才往里导;服务器上它一直是 0 张 ⇒ 实施计划保存多少次都导不进去。
+     *   现在没有就自动建一张,单号走号池(prefix=LXJ,与手工建单同一套 FormNoService),
+     *   文档编号沿用设计固定值 YJ-XS002(与既有的 LXJ2609040100 那张同值)。
+     *   幂等:已有单据直接返回,不会重复建。
+     */
+    private String ensureProgressDoc() {
+        List<Map<String, Object>> exists = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] FROM rd_progress WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [单据编号] DESC");
+        if (!exists.isEmpty()) return str(exists.get(0).get("单据编号"));
+        try {
+            String no = formNoService.next("LXJ", currentUserName());
+            jdbc.update("INSERT INTO rd_progress ([单据编号],[单据日期],[文档编号],[项目层级],asp_user1,asp_time1)"
+                            + " VALUES (?,?,?,?,?,GETDATE())",
+                    no, java.time.LocalDate.now().toString(), "YJ-XS002", "一级", currentUserName());
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .info("[RD_PLAN→RD_PROGRESS] 已自动建立项目进度查询汇总单 {}", no);
+            return no;
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("[RD_PLAN→RD_PROGRESS] 建立汇总单失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 清理孤儿进度行 —— 删除联动(2026-10-19 用户口径:
+     *   「只有对应的立项申请和项目实施计划删掉,才把对应的项目进度查询的对应数据删掉」)。
+     *
+     * 关联键:进度行的 [说明] / [项目编号] 存的是实施计划的**文档编号**(两列同值,见 syncPlanToProgress 注释)。
+     * 判定:该文档编号在「未作废的实施计划」与「未作废的立项申请」里**都**找不到 ⇒ 这行没有源单据了,标记作废。
+     *   (两个源任一还在就不动它 —— 与用户"两个都删掉才删"的表述一致。)
+     * 用 asp_cancel='Y' 软删,与全库口径一致,可回溯;幂等。
+     */
+    private int pruneProgressRows() {
+        try {
+            int n = jdbc.update("UPDATE rd_progress_detail SET asp_cancel = 'Y'"
+                    + " WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                    + " AND ("
+                    // ① 源单据没了:该项目编号在未作废的「实施计划」「立项申请」里都不存在了
+                    + "   (ISNULL([说明], N'') <> '' AND [说明] NOT IN ("
+                    + "       SELECT [文档编号] FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                    + "         AND ISNULL([文档编号],'') <> ''"
+                    + "       UNION"
+                    + "       SELECT [文档编号] FROM rd_approval WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                    + "         AND ISNULL([文档编号],'') <> ''"
+                    + "   ))"
+                    // ② 或:所属进度单本身已作废/不存在(换过汇总单后的旧行)
+                    //     ⇒ 否则旧行会以"源单据还在"逃过 ①,变成挂在死单上的孤儿
+                    //     (2026-10-19 模拟服务器空库时实测:旧单 LXJ2609040100 软删了,它的行还活着)。
+                    + "   OR NOT EXISTS (SELECT 1 FROM rd_progress p"
+                    + "     WHERE p.[单据编号] = rd_progress_detail.[单据编号]"
+                    + "       AND ISNULL(p.asp_cancel,'N') <> 'Y')"
+                    + " )");
+            if (n > 0) {
+                org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                        .info("[RD_PLAN→RD_PROGRESS] 清理孤儿进度行 {} 行(源单据已删 / 所属汇总单已作废)", n);
+            }
+            return n;
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("[RD_PLAN→RD_PROGRESS] 清理孤儿行失败(不影响同步): {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
      * 全量实时导入:把全部(非作废)项目实施计划同步进「项目进度查询」那唯一一张单据。
      * 幂等,可反复调用;每次实施计划保存/审核/阶段完成都由它兜底,保证"归档了就一定在进度查询里"。
      */
@@ -4271,6 +4341,9 @@ public class ButtonService {
         out.put("四级测试单", four.get("单据数"));
         out.put("四级新增行", four.get("新增行"));
         out.put("四级更新行", four.get("更新行"));
+        // 删除联动(2026-10-19 用户口径):源单据(实施计划/立项申请)都删掉的,
+        // 对应的进度行也随这一轮同步清掉;两个源任一还在就不动。
+        out.put("清理孤儿行", pruneProgressRows());
         return out;
     }
 
@@ -4419,15 +4492,17 @@ public class ButtonService {
         else if (doneStages >= totalStages) status = "全部完成(" + doneStages + "/" + totalStages + ")";
         else status = "进行中(完成" + doneStages + "/" + totalStages + ",至阶段" + lastDoneStage + ")";
 
-        // 项目进度查询是"单单据面板":永远只往那一张单据里导
-        List<Map<String, Object>> targets = jdbc.queryForList(
-                "SELECT TOP 1 [单据编号] FROM rd_progress WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [单据编号] DESC");
-        if (targets.isEmpty()) {
+        // 项目进度查询是"单单据面板":永远只往那一张单据里导。
+        // ⚠ 2026-10-19 修(用户报障「服务器上项目实施计划保存但是不上项目进度查询面板」):
+        //   原实现在这里"没有进度单就跳过",而服务器上 rd_progress 一直是 **0 张** ⇒
+        //   实施计划怎么保存都导不进去,日志只留一行 warn(粗看像同步没实现)。
+        //   改成:没有就**自动建那张汇总单**(单号走号池 LXJ,文档编号沿用设计值 YJ-XS002)。
+        String progressNo = ensureProgressDoc();
+        if (progressNo == null) {
             org.slf4j.LoggerFactory.getLogger(ButtonService.class)
-                    .warn("[RD_PLAN→RD_PROGRESS] 没有可用的项目进度查询单据,跳过导入 项目={}", projectName);
+                    .warn("[RD_PLAN→RD_PROGRESS] 无法建立项目进度查询汇总单,跳过导入 项目={}", projectName);
             return RES_SKIPPED;
         }
-        String progressNo = str(targets.get(0).get("单据编号"));
 
         String planDocNo = str(plan.get("文档编号"));            // ← 项目编号(每张计划不同)
         // 2026-10-09 用户口径:项目定级取**立项申请的等级**(定级在立项上做、且定了不能改);

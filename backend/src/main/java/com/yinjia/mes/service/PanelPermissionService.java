@@ -421,19 +421,27 @@ public class PanelPermissionService {
     public static final Set<String> ADMIN_ONLY_PANELS = Set.of("FIELDMGR", "ZDGL", "ERP_INTEG");
 
     /**
-     * **只读**(连管理员也不给写)的面板(2026-10-18 用户口径:
-     * 「ERP集成不可以进行任何人为操作,不可以新增保存删除」)。
-     * 数据是金蝶接口同步写进来的(erp_imp_log / erp_imp_row 由同步程序落库),
-     * 人在界面上只能看:任何会改数据的按钮(新增/保存/删除/导入…)一律拒绝。
+     * **只读**(连管理员也不给写)的面板 —— 数据全部由系统自动写入,人在界面上只能看。
+     * <ul>
+     *   <li>ERPLG / ERPLG_ROW:金蝶接口同步落库(2026-10-18 用户口径「ERP集成不可以进行任何人为操作」);</li>
+     *   <li>RD_PROGRESS(项目进度查询):**纯查询面板**(2026-10-19 用户口径「把项目进度查询面板改为
+     *       仅查询面板,只有对应的立项申请和项目实施计划删掉才把对应的项目进度查询数据删掉」)。
+     *       数据由 ButtonService.syncAllPlansToProgress 从「项目实施计划 + 立项申请」汇总写入,
+     *       删除也只随源单据消失而自动清理(pruneProgressRows),人工不得新增/保存/删除。</li>
+     * </ul>
      */
-    public static final Set<String> READONLY_PANELS = Set.of("ERPLG", "ERPLG_ROW");
+    public static final Set<String> READONLY_PANELS = Set.of("ERPLG", "ERPLG_ROW", "RD_PROGRESS");
 
-    /** 只读放行的按钮 = 纯浏览动作(查询/刷新/导出打印/表格调整这类只看不改的)。
+    /** 只读面板里**允许**的按钮 = 纯浏览动作(查询/刷新/导出打印/表格调整这类只看不改的)。
      *  ⚠ 不含「复制到剪贴板/从剪贴板粘贴」:后者会往单元格里写值(粘完若再点保存就落库),
      *  在只读面板上一律不给。前端 PanelxList.READONLY_ACTIONS 是同一份白名单。 */
     private static final Set<String> READONLY_ALLOWED_BUTTONS = Set.of(
             "刷新", "查找", "查询", "表格调整", "表头调整", "导出", "打印", "审批情况", "修改记录",
-            "刷新数据", "导出报表", "定位");
+            "刷新数据", "导出报表", "定位",
+            // 「同步进度」不是人工编数据,而是**按源单据重算**(ButtonService.syncAllPlansToProgress:
+            // 只从「项目实施计划 + 立项申请」汇总,并清理源单据已删的孤儿行)。它同时也是
+            // RD_PROGRESS 数据修复/补数据的唯一入口,运维要用 ⇒ 在只读面板上放行。
+            "同步进度");
 
     /**
      * 只读面板的写操作闸门:命中 READONLY_PANELS 且按钮不在只读白名单里 ⇒ 一律 403。
@@ -442,7 +450,8 @@ public class PanelPermissionService {
     public void requireReadonlyAllowed(String panelCode, String buttonName) {
         if (panelCode == null || !READONLY_PANELS.contains(panelCode)) return;
         if (buttonName != null && READONLY_ALLOWED_BUTTONS.contains(buttonName)) return;
-        throw new AccessDeniedException("「" + panelCode + "」由金蝶同步写入,界面只读:不允许「"
+        // 文案里不再写死"金蝶同步" —— 现在这套闸门同时管 RD_PROGRESS(由实施计划汇总写入)。
+        throw new AccessDeniedException("「" + panelCode + "」的数据由系统自动汇总写入,界面只读:不允许「"
                 + (buttonName == null || buttonName.isBlank() ? "(未命名动作)" : buttonName) + "」");
     }
 
