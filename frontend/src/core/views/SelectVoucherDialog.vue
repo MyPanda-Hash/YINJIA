@@ -112,7 +112,8 @@
           <span v-if="selectedCount" class="sv-selected-count">{{ tt('已选') }} {{ selectedCount }} {{ tt('行') }}</span>
         </div>
         <div class="sv-op-center">
-          <el-pagination small layout="total, prev, pager, next" :total="total" :page-size="pageSize" :current-page="pageNo" @current-change="load" />
+          <!-- size="small" 取代布尔 small(2026-10-19):布尔值在 Element Plus 3.0 会废弃 -->
+          <el-pagination size="small" layout="total, prev, pager, next" :total="total" :page-size="pageSize" :current-page="pageNo" @current-change="load" />
         </div>
         <div class="sv-op-right">
           <el-button @click="close">{{ tt('取消') }}</el-button>
