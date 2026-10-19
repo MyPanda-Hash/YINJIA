@@ -554,7 +554,7 @@
             <template v-else>
               <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
                 <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}</th>
+                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}<span v-if="editable && libOfCol(g.key)" class="rs-lib-pick" :title="tt('维护该列的标准库下拉内容')" @click.stop="openStdLib(libOfCol(g.key))">⌄</span></th>
                   <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
                 </template>
                 <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
@@ -608,7 +608,7 @@
                   :style="designInputStyle(dt)"
                   @change="emit('dirty')"
                 >
-                  <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
+                  <el-option v-for="o in colOptions(c)" :key="o" :label="tt(o)" :value="o" />
                 </el-select>
                 <!-- 物料编号列(c.type='inv-code'):商品档案**远程模糊筛选**(2026-10-16 用户口径
                      「输入 Y 或者 003 时模糊搜索到含这些数字字母的」,例 YJ-LL-003)。
@@ -1386,10 +1386,10 @@ import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
+import StdLibManager from './StdLibManager.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
 import AnnotatedText from './AnnotatedText.vue'
-import StdLibManager from './StdLibManager.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
 // 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
@@ -1401,6 +1401,43 @@ import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
 // 商品档案候选生成(编码+名称子串匹配、去重、封顶 OPTION_CAP 项)—— 与配方计算弹窗同一套纯函数
 import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
+
+/** 标准库型下拉列(2026-10-19:出货检验计划表的「检查频率」)——options 来自 yj_std_lib,可在弹窗里维护 */
+const stdLibOpts = ref({})   // { libCode: [content, ...] }(复用下方既有 stdLibVisible/stdLibCode)
+const STD_LIB_CODES = ['INSP_FREQ']
+
+function colOptions(c) {
+  if (c && c.stdLib && stdLibOpts.value[c.stdLib]) return stdLibOpts.value[c.stdLib]
+  return (c && c.options) || []
+}
+
+/** 该列绑定的标准库编码(表头 ⌄ 维护入口用) */
+function libOfCol(key) {
+  const t = recordSheetConfigs[props.panelCode]
+  if (!t) return ''
+  for (const dt of t.dataTables || []) {
+    const hit = (dt.cols || []).find((c) => c.key === key && c.stdLib)
+    if (hit) return hit.stdLib
+  }
+  return ''
+}
+
+async function loadStdLibs() {
+  for (const lib of STD_LIB_CODES) {
+    try {
+      const res = await request.get('/stdlib/list', { params: { lib, all: 1 } })
+      const rows = (res?.data ?? res ?? []).filter((r) => r.enabled !== 0 && r.enabled !== false)
+      const opts = []
+      for (const r of rows) {
+        const v = typeof r.content === 'string' ? r.content.trim() : ''
+        if (v && !opts.includes(v)) opts.push(v)
+      }
+      stdLibOpts.value = { ...stdLibOpts.value, [lib]: opts }
+    } catch (e) {
+      /* 标准库不可用时退化为空候选(仍可手输,allow-create) */
+    }
+  }
+}
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1587,6 +1624,7 @@ function openStdLib(lib) {
 /** 标准库条目变了:刷新字段选项,新增/改名立刻反映到下拉(不影响已录入单据的文本) */
 function onStdLibChanged() {
   emit('refresh-config')
+  loadStdLibs()   // 2026-10-19:标准库型下拉列(检查频率)立刻用上新条目
 }
 
 // ── 多页结构(规格书 / 成型工艺清单+成型配方 / 组装工艺清单+组装BOM表):页签切换,各区块按 page 归属渲染 ──
@@ -1876,7 +1914,7 @@ function materialPickAt(sec) {
     d.materialPick && !d.bar && d.tablesAfterBar === sec.bar && pageOf(d) === pageOf(sec)) || null
 }
 
-watch(() => props.panelCode, () => { activePage.value = 0 })
+watch(() => props.panelCode, () => { activePage.value = 0; loadStdLibs() }, { immediate: true })
 
 // ── 表尾静态表(cfg.tailTables)与只读台账页(pages[i].ledger) ──
 /** 本页要渲染的静态附表(设计纸面上的固定附录;不落库、不进单据) */
@@ -4418,6 +4456,10 @@ function chartOf(dt) {
   font-size: 13px;
   fill: #98a4b3;
 }
+
+/* 标准库型列的表头维护入口(2026-10-19 检查频率下拉) */
+.rs-lib-pick { margin-left: 4px; color: #2f6bff; cursor: pointer; font-weight: 700; }
+.rs-lib-pick:hover { text-decoration: underline; }
 </style>
 
 <!-- 打印/导出整张文书:只保留文书纸张,隐藏布局菜单/侧栏/其它页面元素 -->

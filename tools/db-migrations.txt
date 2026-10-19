@@ -3961,3 +3961,8 @@ migrate-rd-insp-plan-widen-control-method-20261019.sql
 #   不建表:rd_approval 备用列池的 备用3 =「责任人确认」、备用4 =「确认收到时间」(hidden=1,流程程序读写),
 #   两字段登记 + 中文注明 + 10 语言译名。
 migrate-rd-owner-receipt-20261019.sql
+
+# —— 2026-10-19 「检查频率」改为下拉标准库(用户口径:可通过标准库维护下拉内容) ——
+#   不建表:复用 yj_std_lib(库编码 INSP_FREQ)+ 把 4 个面板的 检查频率/检测频率 字段 data_type 改成「标准库」;
+#   前端列配置 type:select + stdLib:INSP_FREQ,表头 ⌄ 可增删改条目(改库不影响已录入单据)。
+migrate-insp-freq-stdlib-20261019.sql

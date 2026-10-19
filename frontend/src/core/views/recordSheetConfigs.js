@@ -1632,7 +1632,9 @@ export const recordSheetConfigs = {
         { key: '控制标准及要求', label: '检验要求', w: 144, area: true },
         { key: '控制方法', label: '检验方法', w: 144, area: true },
         { key: '不合格应对措施', label: '不合格应对措施', w: 294, area: true },
-        { key: '检测频率', label: '检查频率', w: 165 },
+        // 2026-10-19 用户口径:「检查频率字段改为下拉标准库,可通过标准库维护下拉内容」——
+        //   type=select 走下拉,stdLib 指 yj_std_lib 的库编码(列头 ⌄ 可维护条目,改库不影响已录入单据)
+        { key: '检测频率', label: '检查频率', w: 165, type: 'select', stdLib: 'INSP_FREQ' },
         { key: '备注', label: '备注', w: 152 },
         // 6 个不上纸的列:hiddenCol 只管**渲染**(值照常逐格往返 —— 保存链路按 yj_field 走,与 cols 无关)。
         // 上面 5 个非序号列 + 这 6 列正好是标准库 insp.plan 的规范字段(toCanonical/toInspRow 一一对应),
