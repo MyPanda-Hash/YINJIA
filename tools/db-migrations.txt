@@ -3988,3 +3988,12 @@ migrate-stock-flow-src-rid-grain-20261020.sql
 #   ②号池回登(逐面板补登库里已有、池里没有的 前缀-yyyy-MM-nnnn 单号,只增不删)。
 #   幂等;末尾自检「空白重号=0 且未回登=0」否则 RAISERROR FAIL。两账套都要执行。
 migrate-formno-pool-sync-20261019.sql
+
+# migrate-clean-demo-wo-collision-20261019.sql(2026-10-19):「同号双客户」清理 —— 作废 2026-10-18 演示造数
+#   遗留在 plang 的旧工单行 + 配套演示单据(默认 dry-run,@apply=0)。
+#   现场:GD-2026-10-0014~0023 这 10 个工单号下各有两组客户的行(旧组=批次20261014/入库=排产/结案=Y/
+#   建单人 wo-flow-20261018;新组=10-19 参考库/小程序新写入),工单号+行号不再唯一 ⇒ 报工/入库/检验/结案串账
+#   (实测新组有 19 行"蹭"到旧组的已审组装成品检验单)。按 COLLISION 范围清 31 行 + 31 入库单 + 31 检验单;
+#   @scope=ALL_DEMO 才是清全部 418 行(需 @confirmAll=1 + 先备份)。
+#   ⚠ 作废(asp_cancel='Y')而非物理删除:留痕 asp_user2='清理演示撞号(旧单)',可回滚。
+migrate-clean-demo-wo-collision-20261019.sql
