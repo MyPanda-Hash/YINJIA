@@ -1,7 +1,9 @@
 import axios from 'axios'
+import { apiBase } from '@/business/appConfig'
 
 const request = axios.create({
-  baseURL: '/api',
+  // App(Capacitor 壳)里没有 Vite 代理,必须打后端绝对地址;浏览器里仍走同源 /api。
+  baseURL: apiBase() + '/api',
   timeout: 15000,
 })
 

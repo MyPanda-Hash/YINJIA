@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  network_security_config.xml — 允许 App 访问明文 HTTP 后端(2026-10-21)
+
+  为什么需要:Android 9(API 28)+ 默认禁止 cleartext HTTP。后端是
+  http://36.140.66.163:8090(无 HTTPS、无备案域名),不放开就一律
+  "CLEARTEXT communication not permitted"。
+
+  口径:只对本项目后端 IP 放开明文,其余域仍走系统默认(更安全);
+  换服务器时在这里加 domain。上 HTTPS 后可整段删掉。
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">36.140.66.163</domain>
+        <!-- 厂内网调试用(换内网 IP 时改这里) -->
+        <domain includeSubdomains="false">192.168.1.100</domain>
+    </domain-config>
+</network-security-config>

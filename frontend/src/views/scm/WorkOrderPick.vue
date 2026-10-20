@@ -17,6 +17,10 @@
             :placeholder="tt('扫描/输入工单二维码')"
             @keyup.enter="onScanWorkOrder"
           />
+          <!-- App 内才有相机扫码按钮;浏览器里摄像头受 HTTPS 限制,隐藏 -->
+          <button v-if="nativeScan" class="wop-btn cam" :disabled="scanning" @click="scanWorkOrderCamera">
+            {{ scanning ? tt('扫码中…') : tt('相机扫码') }}
+          </button>
           <button class="wop-btn primary" :disabled="loadingWo" @click="onScanWorkOrder">
             {{ loadingWo ? tt('查询中…') : tt('确定') }}
           </button>
@@ -87,6 +91,9 @@
             :placeholder="tt('扫描/输入物料条码')"
             @keyup.enter="onScanMaterial"
           />
+          <button v-if="nativeScan" class="wop-btn cam" :disabled="scanning" @click="scanMaterialCamera">
+            {{ scanning ? tt('扫码中…') : tt('相机扫码') }}
+          </button>
           <button class="wop-btn" :disabled="!activeLine" @click="useScaleForActive">
             {{ tt('取秤') }}
           </button>
@@ -132,6 +139,11 @@ import {
   pickProgress,
 } from '@/business/workOrderPick'
 import request from '@/core/request'
+import { scanOnce, hasNativeScan } from '@/business/nativeScan'
+
+/** App(Capacitor 壳)内才显示「相机扫码」按钮 —— 浏览器摄像头受 HTTPS 限制 */
+const nativeScan = hasNativeScan()
+const scanning = ref(false)
 
 const woInputRef = ref(null)
 const matInputRef = ref(null)
@@ -164,6 +176,29 @@ function fmt(n) {
   const v = Number(n)
   if (!Number.isFinite(v)) return '0'
   return String(Math.round(v * 10000) / 10000)
+}
+
+/** 相机扫工单码(App 内):拿到码文本后填进输入框,复用同一套查询逻辑 */
+async function scanWorkOrderCamera() {
+  woError.value = ''
+  scanning.value = true
+  try {
+    const r = await scanOnce({ formats: ['QR_CODE', 'CODE_128', 'CODE_39'] })
+    if (!r.ok) {
+      const map = {
+        cancelled: '',
+        denied: tt('未授予相机权限,请在系统设置里开启后重试'),
+        'not-native': tt('当前环境不支持相机扫码'),
+        empty: tt('没有扫到内容'),
+      }
+      if (r.reason !== 'cancelled') woError.value = map[r.reason] || (tt('扫码失败:') + (r.message || ''))
+      return
+    }
+    woInput.value = r.text
+    await onScanWorkOrder()
+  } finally {
+    scanning.value = false
+  }
 }
 
 /** 扫工单码 → 查工单行(plang)+ 该产品的 BOM(mate) */
@@ -229,6 +264,30 @@ async function loadBom(productCode, planQty) {
   const res = await request.get('/px/woPick/bom', { params: { productCode } })
   const bom = (res && (res.list || res.data?.list)) || []
   lines.value = expandBom(bom, planQty)
+}
+
+/** 相机扫物料码(App 内):拿到码文本后填进输入框,复用同一套匹配逻辑 */
+async function scanMaterialCamera() {
+  matError.value = ''
+  matOk.value = ''
+  scanning.value = true
+  try {
+    const r = await scanOnce({ formats: ['CODE_128', 'CODE_39', 'EAN_13', 'QR_CODE'] })
+    if (!r.ok) {
+      const map = {
+        cancelled: '',
+        denied: tt('未授予相机权限,请在系统设置里开启后重试'),
+        'not-native': tt('当前环境不支持相机扫码'),
+        empty: tt('没有扫到内容'),
+      }
+      if (r.reason !== 'cancelled') matError.value = map[r.reason] || (tt('扫码失败:') + (r.message || ''))
+      return
+    }
+    matInput.value = r.text
+    await onScanMaterial()
+  } finally {
+    scanning.value = false
+  }
 }
 
 /** 扫物料码 → 找到对应行 → 用当前秤值提交本笔 */
@@ -479,6 +538,11 @@ onBeforeUnmount(() => {
   color: #374151;
   cursor: pointer;
   white-space: nowrap;
+}
+.wop-btn.cam {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1c4f8a;
 }
 .wop-btn.primary {
   background: #1c4f8a;
