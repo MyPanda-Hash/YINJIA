@@ -65,6 +65,29 @@ async function expected(factory) {
     ORDER BY p.pl_no, p.pl_xc`)
   return rows.map((r) => `${String(r.wo).trim()}#${r.xc}`)
 }
+
+/** 与后端 PlangStatus 同一套判据的生产状态(独立写一遍,用来对照接口下发值) */
+async function expectedStatus(factory) {
+  const rows = await q(factory, `
+    SELECT p.pl_no AS wo, p.pl_xc AS xc,
+      CASE WHEN ISNULL(p.scx,N'')=N'' THEN N'未排产'
+           WHEN (ISNULL(p.ja,'N') IN (N'T',N'Y')
+                 AND ((ISNULL(p.pl_sl,0)>0 AND ISNULL(p.rk_sl,0)>=ISNULL(p.pl_sl,0)) OR p.pl_no LIKE N'GD2608%'))
+                THEN N'已结案'
+           WHEN ISNULL(p.[完工状态],N'') IN (N'生产完工',N'已完工')
+             OR (ISNULL(p.pl_sl,0)>0 AND ISNULL(p.rk_sl,0)>=ISNULL(p.pl_sl,0)) THEN N'完工'
+           WHEN ISNULL(p.rk_sl,0)>0 THEN N'在产' ELSE N'未完工' END AS st
+    FROM dbo.plang p
+    WHERE ISNULL(p.asp_cancel,'N')<>'Y'
+      AND NOT (ISNULL(p.ja,'N') IN (N'T',N'Y')
+               AND ((ISNULL(p.pl_sl,0)>0 AND ISNULL(p.rk_sl,0)>=ISNULL(p.pl_sl,0)) OR p.pl_no LIKE N'GD2608%'))
+      AND NOT (ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工'))
+      AND NOT EXISTS (SELECT 1 FROM dbo.qc_first_insp_head h
+                      WHERE h.[工单号]=p.pl_no AND h.[工单行号]=p.pl_xc AND ISNULL(h.asp_cancel,'N')<>'Y')`)
+  const m = {}
+  for (const r of rows) m[`${String(r.wo).trim()}#${r.xc}`] = String(r.st).trim()
+  return m
+}
 async function completedRows(factory) {
   return (await q(factory, `
     SELECT p.pl_no AS wo, p.pl_xc AS xc FROM dbo.plang p
@@ -99,6 +122,16 @@ for (const factory of ['YJ', 'YJ_TEST']) {
   ok(`${factory} 不含已完工行`, got.every((k) => !done.has(k)), got.filter((k) => done.has(k)).join(','))
   const picked = new Set(await pickedRows(factory))
   ok(`${factory} 不含已有首件单的行`, got.every((k) => !picked.has(k)), got.filter((k) => picked.has(k)).join(','))
+
+  // 生产状态(2026-10-20 追加):与生产工单列表同口径,且本列表里不可能是「完工/已结案」
+  const stExp = await expectedStatus(factory)
+  const stGot = {}
+  for (const r of list) stGot[`${String(r['工单号']).trim()}#${r['工单行号']}`] = String(r['生产状态'] || '')
+  const stMismatch = got.filter((k) => stGot[k] !== stExp[k]).map((k) => `${k}: 接口=${stGot[k]} 库=${stExp[k]}`)
+  ok(`${factory} 生产状态与生产工单列表同口径`, stMismatch.length === 0, stMismatch.join(' | '))
+  ok(`${factory} 生产状态不会是「完工/已结案」`, got.every((k) => !['完工', '已结案'].includes(stGot[k])),
+    got.filter((k) => ['完工', '已结案'].includes(stGot[k])).join(','))
+  console.log(`  生产状态: ${got.map((k) => `${k}=${stGot[k]}`).join(', ')}`)
 
   // ③ 制程回归:门禁仍在
   const proc = await get(tk, '/api/qc/procInsp/woLines?pageNo=1&pageSize=200')

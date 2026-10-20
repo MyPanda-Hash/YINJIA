@@ -14,7 +14,8 @@
         报工完成流程才产生。就是当前检验单能选取工单,未完工的工单就可以选取,但是已经完成的就不需要
         能被选取,已经被当前的检验单选取的也不能被再次选取。」⇒
           · 首件这边**不再有成型报工门禁**:服务端只回「未完工 + 未被本单占用」的行,每行都可选,
-            故成型完工量/成型计划量/可开单/已建单号四列**只在制程模式显示**,首件模式改显示「完工状态」;
+            故成型完工量/成型计划量/可开单/已建单号四列**只在制程模式显示**,首件模式改显示「生产状态」
+            (与「生产工单」列表同一套判据:未排产/在产/未完工;完工与已结案的行不会出现在本列表);
           · 制程检验单保持原样(已排产 + 成型报工门禁 + 强制开单通道)。
 
      ⚠ 文件名保留历史名(QcProcInsp…):改名要动 PanelxList 的 import 与模板,收益只是好看;
@@ -74,10 +75,14 @@
           </el-tooltip>
         </template>
       </el-table-column>
-      <!-- 首件模式:未完工的工单行才列出来(后端已过滤),这里给现场看「未开工 / 在制」 -->
-      <el-table-column v-if="isFirst" :label="tt('完工状态')" width="100">
+      <!-- 首件模式:未完工的工单行才列出来(后端已过滤)。这里放「生产状态」而不是裸的「完工状态」——
+           口径与「生产工单」列表同一套(PlangStatus):未排产/在产/未完工;完工与已结案的行根本不会出现。
+           (2026-10-20 用户报障:库里 完工状态 为空时这里兜底显示「未开工」,与生产工单列表的「未排产」对不上) -->
+      <el-table-column v-if="isFirst" :label="tt('生产状态')" width="100">
         <template #default="{ row }">
-          <el-tag size="small" type="info">{{ row['完工状态'] || tt('未开工') }}</el-tag>
+          <el-tag size="small" :type="prodStatusType(row['生产状态'])">
+            {{ tt(row['生产状态'] || '未完工') }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column :label="tt('客户')" prop="客户" width="80" />
@@ -144,6 +149,16 @@ const canForce = computed(() => !!(cur.value && cur.value['可开单'] === false
 
 function rowClass({ row }) {
   return row && row['可开单'] === false && !gateMeta.value['可强制开单'] ? 'wopick-blocked' : ''
+}
+
+/**
+ * 首件模式的「生产状态」标签色(值由后端 PlangStatus 按生产工单列表口径算好):
+ * 在产=橙、完工=绿(理论不会出现)、其余(未排产/未完工)=灰。
+ */
+function prodStatusType(state) {
+  if (state === '在产') return 'warning'
+  if (state === '完工') return 'success'
+  return 'info'
 }
 
 function onCurrent(r) {

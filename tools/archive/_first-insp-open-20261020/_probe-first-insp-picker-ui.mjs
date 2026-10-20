@@ -114,7 +114,7 @@ try {
   ok('② 没有「成型完工量/成型计划量/可开单/已建单号」',
     !heads.includes('成型完工量') && !heads.includes('成型计划量') && !heads.includes('可开单') && !heads.includes('已建单号'),
     JSON.stringify(heads))
-  ok(`② 有「完工状态」列(${LOCALE})`, LOCALE === 'zh-CN' ? heads.includes('完工状态') : heads.some((h) => !/[一-龥]/.test(h) && /status|state|完成/i.test(h)), JSON.stringify(heads))
+  ok(`② 有「生产状态」列(${LOCALE})`, LOCALE === 'zh-CN' ? heads.includes('生产状态') : heads.some((h) => !/[一-龥]/.test(h) && /status/i.test(h)), JSON.stringify(heads))
 
   // ③ 行数与内容
   const rows = Number(await ev(`document.querySelectorAll('.el-dialog .el-table__body tbody tr').length`))
@@ -122,10 +122,17 @@ try {
   ok('③ 行数 = 库里「未完工 + 未被占用」', rows === expRows.length, `界面 ${rows} / 库 ${expRows.length}`)
   const greyRows = Number(await ev(`document.querySelectorAll('.el-dialog .el-table__body tbody tr.wopick-blocked').length`))
   ok('③ 没有置灰行(每行都可选)', greyRows === 0, `置灰 ${greyRows} 行`)
-  const statusTags = (await ev(`[...document.querySelectorAll('.el-dialog .el-table__body tbody tr')]
-    .map((tr) => [...tr.querySelectorAll('td')].map((td) => (td.innerText || '').trim()))`)) || []
-  ok('③ 每行的「完工状态」不是已完工/已结案',
-    statusTags.every((cells) => !cells.includes('生产完工') && !cells.includes('已完工')), JSON.stringify(statusTags).slice(0, 300))
+  // 生产状态(2026-10-20):取值必须落在「未排产/在产/未完工」三态里 —— 本列表按定义不含完工/已结案
+  const stCol = heads.indexOf(LOCALE === 'zh-CN' ? '生产状态' : heads.find((h) => /status/i.test(h) && !/[一-龥]/.test(h)))
+  const stVals = (await ev(`[...document.querySelectorAll('.el-dialog .el-table__body tbody tr')]
+    .map((tr) => ([...tr.querySelectorAll('td')][${stCol}]?.innerText || '').trim())`)) || []
+  console.log(`  生产状态列=${JSON.stringify(stVals)}`)
+  // ⚠ 英文允许同义写法:静态语言包是一份、后端词典/机翻是另一份(merge 后可能用后者的措辞),
+  //   这里只要求「已翻译 + 落在未完工三态里」,不锁死具体用词。
+  const ST_OK = LOCALE === 'zh-CN'
+    ? ['未排产', '在产', '未完工']
+    : ['Not scheduled', 'In production', 'Not finished', 'Unfinished', 'Scheduled']
+  ok(`③ 生产状态落在「未排产/在产/未完工」(${LOCALE})`, stVals.length > 0 && stVals.every((v) => ST_OK.includes(v)), JSON.stringify(stVals))
 
   // ④ 选中第一行 → 建单
   const first = String(await ev(`(document.querySelector('.el-dialog .el-table__body tbody tr td')?.innerText || '').trim()`))
@@ -172,7 +179,7 @@ try {
   ok('⑥ 制程弹窗仍能打开', procOpened === true)
   ok('⑥ 制程列头仍有「成型完工量/成型计划量/可开单/已建单号」',
     ['成型完工量', '成型计划量', '可开单', '已建单号'].every((h) => procHeads.includes(h)), JSON.stringify(procHeads))
-  ok('⑥ 制程列头**没有**「完工状态」(那是首件独有的新列)', !procHeads.includes('完工状态'), JSON.stringify(procHeads))
+  ok('⑥ 制程列头**没有**「生产状态」(那是首件独有的新列)', !procHeads.includes('生产状态'), JSON.stringify(procHeads))
   }
 
   ok('⑤ 无未捕获的运行时异常', errs.length === 0, errs.join(' | '))

@@ -137,9 +137,12 @@ public class QcFirstInspController {
                         + " ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
                         + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.[批次号],N'') AS 批次号,"
                         + " ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量,"
                         + " ISNULL(p.khdm,N'') AS 客户,"
-                        // 未完工的判据列(列表上给现场看「未开工 / 在制 / 空」)
+                        // 生产状态的原料(2026-10-20):完工状态 + 结案 + 产线 + 排产/入库,
+                        // 由 PlangStatus 按**生产工单列表同一套判据**拼成「未排产/已结案/完工/在产/未完工」
                         + " ISNULL(p.[完工状态],N'') AS 完工状态,"
+                        + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案,"
                         // 工艺路线:本单已不做门禁,但 {@link WoInspGate#checkPage} 判「路线里有没有成型这道」
                         // 要用它 —— 留着,`UNGATED_PANELS` 一旦去掉 QC_FIRST_INSP,门禁能原样复算(回滚只改一行)
                         + " ISNULL(p.[工艺路线],N'') AS 工艺路线"
@@ -151,6 +154,12 @@ public class QcFirstInspController {
         // 门禁(2026-10-20):首件检验单已退出成型报工门禁 ⇒ 这里只负责把「可开单=true」等共享键补齐,
         // 不再逐行判成型报工(开关在 WoInspGate.UNGATED_PANELS 一处,与制程检验单共用同一份实现)。
         gate.decorate(PANEL, rows);
+        // 生产状态(2026-10-20 用户报障「为什么会显示未开工」):不再由前端把**空**的完工状态兜底成
+        // 「未开工」,而是与生产工单列表同源算出来(PlangStatus)—— 没排上线就是「未排产」,
+        // 有报工/入库才是「在产」,已完工/已结案的行根本不会出现在本列表。
+        for (Map<String, Object> r : rows) {
+            r.put("生产状态", com.yinjia.mes.service.PlangStatus.of(r));
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("list", rows);
