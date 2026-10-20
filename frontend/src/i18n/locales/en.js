@@ -3079,6 +3079,10 @@ export default {
     '显示': 'Show',
     '留空=沿用原名;修改全局生效(所有用户共享)': 'Empty = keep original; changes are global (shared by all users)',
     /* ── 物料清单引用 ── */
+    '搜索物料编码/名称': 'Search material code/name',
+    '物料清单里还没有数据': 'No BOM documents yet',
+    '共 {n} 张物料清单、{m} 个子件；勾选物料清单后点「导入」，整单子件追加到本表明细':
+      '{n} BOM documents, {m} components. Check the BOMs you want, then Import to append all their components.',
     '从物料清单引用': 'Pick from Materials',
     '搜索物料名/编号/规格': 'Search name / code / spec',
     '物料名': 'Material Name',

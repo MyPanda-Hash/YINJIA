@@ -1320,23 +1320,28 @@
          选择之后就带入对应的明细内容,数量对应标准用量,备注有内容就也引用」⇒
          列名按用户的话改成 物料编码/物料代号/物料名称(数据键仍是 WLBOM 的 子件代码/
          物料代码/子件名称,对应关系见 openMaterialPick 的注释),并把备注一起带进去。 -->
-    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="860px" append-to-body>
+    <!-- ⚠ 2026-10-21 返工:弹窗原先把**所有物料清单的子件平铺**成一张列表(24 行,
+         每行带一个「物料代号」标明它属于哪张 BOM),用户看不懂也不符合他的作业口径:
+         「我要的是选物料编码 S032-3 / 单据日期 / 物料代码 / 物料名称,**然后带入**
+           YJ-YKRS-007 … YJ-XWR-014 … YJ-JPL-067 …」
+         ⇒ 改成**先选物料清单单(表头)**,确认后把该单的全部子件整批带进明细。
+         列与数据键:物料编码=WLBOM 表头 物料编码(m_no) / 物料代码=物料代码(wzdm1) /
+         物料名称=物料名称(wzmc1);子件仍随行挂在 __kids 上供导入时展开。 -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="820px" append-to-body>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
-        <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索子件代码/名称')" clearable style="width:260px" @input="filterMatPick" />
+        <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索物料编码/名称')" clearable style="width:260px" @input="filterMatPick" />
         <span style="color:#909399;font-size:12px">{{ tt('数据源：物料清单') }}</span>
       </div>
       <el-table :data="matPickFiltered" size="small" border max-height="420" row-key="__k"
                 @selection-change="(sel) => (matPickChecked = sel)">
         <el-table-column type="selection" width="42" />
-        <el-table-column prop="子件代码" :label="tt('物料编码')" width="136" />
-        <!-- 物料代号 := 物料清单表头「物料代码」(mate.wzdm1)。mate 里没有"物料代号"列,
-             这是唯一语义对得上的现有列:同一条子件行上它还标明了该子件属于哪张物料清单。
-             详见 openMaterialPick 的注释(为什么不是 备用列)。 -->
-        <el-table-column prop="物料代码" :label="tt('物料代号')" width="118" show-overflow-tooltip />
-        <el-table-column prop="子件名称" :label="tt('物料名称')" min-width="170" show-overflow-tooltip />
-        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="标准用量" :label="tt('标准用量')" width="90" align="right" />
-        <el-table-column prop="备注" :label="tt('备注')" min-width="130" show-overflow-tooltip />
+        <el-table-column prop="物料编码" :label="tt('物料编码')" width="140" />
+        <el-table-column prop="单据日期" :label="tt('单据日期')" width="120" />
+        <el-table-column prop="物料代码" :label="tt('物料代码')" width="120" show-overflow-tooltip />
+        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="180" show-overflow-tooltip />
+        <el-table-column :label="tt('子件数')" width="80" align="right">
+          <template #default="{ row }">{{ (row.__kids || []).length }}</template>
+        </el-table-column>
       </el-table>
       <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
       <template #footer>
@@ -3196,9 +3201,12 @@ const matPickFiltered = ref([])
 const matPickChecked = ref([])
 const matPickKeyword = ref('')
 const matPickTargetDt = ref(null)
-const matPickHint = computed(() => (matPickRows.value.length
-  ? tt('共 {n} 个子件，勾选后点「导入」追加到本表明细').replace('{n}', matPickRows.value.length)
-  : tt('物料清单里还没有子件')))
+const matPickHint = computed(() => {
+  if (!matPickRows.value.length) return tt('物料清单里还没有数据')
+  const totalKids = matPickRows.value.reduce((n, m) => n + (m.__kids || []).length, 0)
+  return tt('共 {n} 张物料清单、{m} 个子件；勾选物料清单后点「导入」，整单子件追加到本表明细')
+    .replace('{n}', matPickRows.value.length).replace('{m}', totalKids)
+})
 /**
  * 弹窗列 ↔ 数据键的对应(2026-10-21 用户口径「弹窗显示物料清单里面的物料编码、物料代号、
  *   物料名称」):
@@ -3225,17 +3233,22 @@ async function openMaterialPick(dt) {
   matPickVisible.value = true
   try {
     const res = await request.post('/px/queryFormDataList', { panelCode: 'WLBOM', condition: {}, pageNo: 1, pageSize: 500 })
-    const masters = res?.data?.list || res?.data?.rows || res?.data || []
-    const all = []
-    if (Array.isArray(masters)) {
-      for (const m of masters) {
-        // WLBOM 是单单据面板 ⇒ 行在 detail.items;children 是旧 BOM 主从面板的形状,留着兜底
-        const kids = m?.detail?.items || m?.detail?.children || []
-        if (Array.isArray(kids)) all.push(...kids)
+    const masters = res?.data?.list || res?.data?.rows || res?.data?.data || []
+    // ⚠ 2026-10-21 返工:弹窗列 = **物料清单单(表头)**,不是平铺的子件。
+    //   用户口径「我要的是选物料编码 S032-3 / 单据日期 / 物料代码 / 物料名称,然后带入 YJ-YKRS-007 …」
+    //   ⇒ 每个表头行把子件挂在 __kids 上,确认时整单展开。
+    //   WLBOM 是单据面板,子件在 detail.items(children 是旧 BOM 主从形状,留作兜底)。
+    matPickRows.value = (Array.isArray(masters) ? masters : []).map((m, i) => {
+      const kids = m?.detail?.items || m?.detail?.children || []
+      return {
+        __k: `${m?.['物料编码'] || ''}#${i}`,
+        __kids: Array.isArray(kids) ? kids : [],
+        物料编码: m?.['物料编码'] || '',
+        单据日期: m?.['单据日期'] || '',
+        物料代码: m?.['物料代码'] || m?.['物料编码'] || '',
+        物料名称: m?.['物料名称'] || '',
       }
-    }
-    // __k 只给 el-table 当 row-key(过滤后仍保持勾选),不是单据字段 ⇒ 落库前不进行模型
-    matPickRows.value = all.map((r, i) => ({ ...r, __k: `${r['子件代码'] || ''}#${i}` }))
+    })
     matPickFiltered.value = matPickRows.value
   } catch (e) {
     matPickRows.value = []
@@ -3247,8 +3260,8 @@ function filterMatPick() {
   const kw = (matPickKeyword.value || '').trim().toLowerCase()
   if (!kw) { matPickFiltered.value = matPickRows.value; return }
   matPickFiltered.value = matPickRows.value.filter((r) =>
-    String(r['子件代码'] || '').toLowerCase().includes(kw) ||
-    String(r['子件名称'] || '').toLowerCase().includes(kw) ||
+    String(r['物料编码'] || '').toLowerCase().includes(kw) ||
+    String(r['物料名称'] || '').toLowerCase().includes(kw) ||
     String(r['物料代码'] || '').toLowerCase().includes(kw)
   )
 }
@@ -3269,31 +3282,35 @@ function confirmMaterialPick() {
   const existCodes = new Set(rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean))
   let added = 0
   let skipped = 0
-  for (const r of matPickChecked.value) {
-    const code = String(r['子件代码'] || '').trim()
-    if (!code) continue
-    if (existCodes.has(code)) { skipped++; continue }
-    // ⚠ 落行**直接复用表格自带的 addRow**(而不是自己 touch().push):
-    //   addRow 是界面上「＋」走的同一条路,经活体验证确实能出行(2026-10-13 对照实验:
-    //   点 ＋ 13 行 → 14 行);而本函数先前自己 push 时,提示「已导入 1 行」却不出行 ——
-    //   同样操作、同样 touch(),唯一区别只在"谁调用的",故改为共用同一条已验证的落行路径,
-    //   避免两条路径再次漂移(这处已经因此踩过一次)。
-    addRow(dt)
-    const rows = rowsOf(dt)
-    const row = rows[rows.length - 1]
-    if (!row) continue
-    // 序号:按**本表区**已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
-    if (colKeys.has('序号')) row['序号'] = String(rows.length)
-    if (colKeys.has('物料编码')) row['物料编码'] = code
-    if (colKeys.has('物料名称')) row['物料名称'] = r['子件名称'] || ''
-    if (colKeys.has('规格参数')) row['规格参数'] = r['规格型号'] || ''
-    if (colKeys.has('数量')) row['数量'] = r['标准用量'] ?? ''
-    if (colKeys.has('备注')) {
-      const bz = String(r['备注'] ?? '').trim()
-      row['备注'] = bz
+  // ⚠ 2026-10-21 返工:勾的是**物料清单单**,这里要把它整单的子件(__kids)展开逐行落。
+  for (const master of matPickChecked.value) {
+    const kids = Array.isArray(master.__kids) ? master.__kids : []
+    for (const r of kids) {
+      const code = String(r['子件代码'] || '').trim()
+      if (!code) continue
+      if (existCodes.has(code)) { skipped++; continue }
+      // ⚠ 落行**直接复用表格自带的 addRow**(而不是自己 touch().push):
+      //   addRow 是界面上「＋」走的同一条路,经活体验证确实能出行(2026-10-13 对照实验:
+      //   点 ＋ 13 行 → 14 行);而本函数先前自己 push 时,提示「已导入 1 行」却不出行 ——
+      //   同样操作、同样 touch(),唯一区别只在"谁调用的",故改为共用同一条已验证的落行路径,
+      //   避免两条路径再次漂移(这处已经因此踩过一次)。
+      addRow(dt)
+      const rows = rowsOf(dt)
+      const row = rows[rows.length - 1]
+      if (!row) continue
+      // 序号:按**本表区**已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
+      if (colKeys.has('序号')) row['序号'] = String(rows.length)
+      if (colKeys.has('物料编码')) row['物料编码'] = code
+      if (colKeys.has('物料名称')) row['物料名称'] = r['子件名称'] || ''
+      if (colKeys.has('规格参数')) row['规格参数'] = r['规格型号'] || ''
+      if (colKeys.has('数量')) row['数量'] = r['标准用量'] ?? ''
+      if (colKeys.has('备注')) {
+        const bz = String(r['备注'] ?? '').trim()
+        row['备注'] = bz
+      }
+      existCodes.add(code)
+      added++
     }
-    existCodes.add(code)
-    added++
   }
   matPickChecked.value = []
   matPickVisible.value = false
