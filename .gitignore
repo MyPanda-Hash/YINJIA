@@ -148,3 +148,7 @@ _*.xlsx
 # 解包残留、以及会话调试脚本(如 head_*.java)。原先**没有任何规则覆盖它** ——
 # `git add -A` 会把 619MB 全扫进来(实测 `git check-ignore -v .tmp/cp.txt` 退出码 1 = 未忽略)。
 .tmp/
+# ── 安卓壳(2026-10-20):构建产物 / 签名文件不入库,源码与构建脚本入库 ──
+android/build/
+android/dist/
+android/debug.keystore

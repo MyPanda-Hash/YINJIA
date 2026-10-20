@@ -24,7 +24,11 @@
 <template>
   <div class="mp">
     <div class="mp-top">
-      <span class="mp-title">{{ tt('生产领料') }}</span>
+      <div class="mp-head">
+        <span class="mp-title">{{ tt('生产领料') }}</span>
+        <!-- 安卓 App 里显示当前接口号(服务器地址),网页版不显示 -->
+        <span v-if="baseUrl" class="mp-base" :title="baseUrl">{{ baseUrl }}</span>
+      </div>
       <span class="mp-sub">{{ tt('扫工单 → 扫物料 → 先进先出拆批') }}</span>
     </div>
 
@@ -51,6 +55,8 @@
           @keyup.enter="loadWo"
         />
         <el-button size="large" :loading="woLoading" @click="loadWo">{{ tt('查询') }}</el-button>
+        <!-- 安卓 App 里才有原生相机(桥见 android/app/src/.../MainActivity.java);网页版不显示 -->
+        <el-button v-if="nativeScan" size="large" @click="scanInto('wo')">{{ tt('扫码') }}</el-button>
       </div>
 
       <div v-if="woCandidates.length" class="mp-cand">
@@ -99,6 +105,9 @@
         />
         <el-button size="large" :loading="matLoading" :disabled="!wo || woBlocked" @click="probeMaterial">
           {{ tt('查询') }}
+        </el-button>
+        <el-button v-if="nativeScan" size="large" :disabled="!wo || woBlocked" @click="scanInto('mat')">
+          {{ tt('扫码') }}
         </el-button>
       </div>
 
@@ -179,7 +188,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, nextTick, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -221,7 +230,49 @@ const canAdd = computed(() => {
   return !!mat.value && need > 0 && alloc.value.length > 0 && !shortage.value
 })
 
-onMounted(() => nextTick(() => woInput.value?.focus?.()))
+/** 安卓 App 注入的原生桥(见 android/app/src/com/yinjia/mes/app/MainActivity.java):
+ *  有 window.YjNative.scan 才显示「扫码」按钮 —— 网页版没有相机(http 不是安全上下文),
+ *  所以扫码能力只存在于 App 内;网页版仍然可以手输或用扫码枪。 */
+const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
+/** 这次扫码是扫给「工单」还是「物料」——原生页返回时用它决定填哪个输入框 */
+let scanTarget = null
+
+function scanInto(target) {
+  scanTarget = target
+  try {
+    window.YjNative.scan()
+  } catch (e) {
+    scanTarget = null
+    errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+  }
+}
+
+onMounted(() => {
+  nextTick(() => woInput.value?.focus?.())
+  // 原生扫码页返回时由 MainActivity 调这个函数(全局挂载,App 内才有意义)
+  window.__yjScanResult = (code, ok) => {
+    if (!ok || !code) { scanTarget = null; return }
+    // 顶部原生「扫码」按钮不指定目标:没选工单就先当工单,选了工单就当年物料
+    const target = scanTarget || (wo.value ? 'mat' : 'wo')
+    scanTarget = null
+    const text = String(code).trim()
+    if (target === 'wo') {
+      woText.value = text
+      loadWo()
+    } else {
+      matText.value = text
+      probeMaterial()
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  try { delete window.__yjScanResult } catch (e) { /* ignore */ }
+  scanTarget = null
+})
 
 watch(lines, () => { errText.value = '' })
 
@@ -442,6 +493,12 @@ async function submit() {
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .mp-title { font-size: 16px; font-weight: 600; }
+/* App 内显示接口号(服务器地址);省略号截断,长地址不撑破标题栏 */
+.mp-head { display: flex; flex-direction: column; min-width: 0; }
+.mp-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .mp-sub { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
 
 .mp-card {
