@@ -81,7 +81,16 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
     if (!node || typeof node !== 'object') return []
     return (node.panelCode ? [node.panelCode] : []).concat(codesOf(node.children))
   }
-  assert.deepEqual(codesOf(purchase), ['PU_ORDER', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS'])
+  // 2026-10-19《10.19 问题》第 3 条:特采单(QC_TC_IN)从 品质管理 > 来料品质 搬到 采购管理 > 单据,
+  // 排在采购订单之后(同组叶子顺序即菜单顺序)。
+  assert.deepEqual(codesOf(purchase), ['PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS'])
+  // 特采单只能有一个入口,且不得再挂在 品质管理 下
+  const qc = menuTree.find((n) => n.code === 'qc')
+  const qcCodes = JSON.stringify(qc)
+  assert.ok(!qcCodes.includes('QC_TC_IN'), '品质管理下不应再挂特采单')
+  const tcinLeaf = (purchase.children || []).flatMap((c) => c.children || []).find((x) => x.panelCode === 'QC_TC_IN')
+  assert.equal(tcinLeaf.title, '特采单')
+  assert.equal(tcinLeaf.path, '/panelx/list/QC_TC_IN')
   // 两个报表都要能点进去(path 指向 panelx 列表),且标题就是「统计表」口径
   const leaf = (p) => (purchase.children || []).flatMap((c) => c.children || []).find((x) => x.panelCode === p)
   assert.equal(leaf('PU_ORDER_DETAIL').path, '/panelx/list/PU_ORDER_DETAIL')

@@ -2319,7 +2319,7 @@ export default {
     '已送合计': 'Total livré',
     '待编号': 'N° en attente',
     '{n} 批待编号': '{n} lot(s) sans n°',
-    '生单时按供应商编码与当天日期生成': 'Généré depuis le code fournisseur et la date du jour à la création du document',
+    '生单时按当天日期生成': 'Généré depuis la date du jour à la création du document',
     '随单头批次号一致,不可修改': "Identique au numéro de lot de l'en-tête ; non modifiable",
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Seules les lignes cochées sont générées ; max = qté commandée × (1 + taux) − livré + retourné (sur-livraison max 50 %)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = interdit ; max 50 %, quota basé sur la quantité commandée)',

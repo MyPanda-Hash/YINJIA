@@ -1,0 +1,45 @@
+==> ﻿SELECT TOP 20 m.name FROM sys.columns m WHERE m.object_id=OBJECT_ID('dbo.yj_field') ORDER BY m.column_id
+[ERR] “﻿”附近有语法错误。
+==> SELECT panel_code, seq, label, place, visible, hidden, required, editable, ref_panel, ref_field, col_name FROM yj_field WHERE panel_code IN ('QC_TC_IN') ORDER BY seq, id
+panel_code | seq | label | place | visible | hidden | required | editable | ref_panel | ref_field | col_name
+------------------------------------------------------------------------------------------------------------
+QC_TC_IN | 10 | 单据编号 | query,header | true | false | true | false |  |  | 单据编号
+QC_TC_IN | 20 | 单据日期 | query,header | true | false | true | true |  |  | 单据日期
+QC_TC_IN | 30 | 供应商 | query,header | true | false | false | true | GFDA | mc | 供应商
+QC_TC_IN | 40 | 采购单号 | query,header | true | false | false | true | PU_ORDER | 单据编号 | 采购单号
+QC_TC_IN | 50 | 产品名称 | header | true | false | false | true |  |  | 产品名称
+QC_TC_IN | 60 | 总数量 | header | true | false | false | true |  |  | 总数量
+QC_TC_IN | 65 | 计量单位 | header | false | true | false | false |  |  | 计量单位
+QC_TC_IN | 70 | 不合格品数量 | header | true | false | false | true |  |  | 不合格品数量
+QC_TC_IN | 80 | 不合格品比例 | header | true | false | false | true |  |  | 不合格品比例
+QC_TC_IN | 90 | 不良说明 | header | true | false | false | true |  |  | 不良说明
+QC_TC_IN | 100 | 严重程度 | query,header | true | false | false | true |  |  | 严重程度
+QC_TC_IN | 110 | 特采理由 | header | true | false | false | true |  |  | 特采理由
+QC_TC_IN | 120 | 产品开发部性能意见 | header | true | false | false | true |  |  | 产品开发部性能意见
+QC_TC_IN | 130 | 产品开发部工艺意见 | header | true | false | false | true |  |  | 产品开发部工艺意见
+QC_TC_IN | 140 | 品质部意见 | header | true | false | false | true |  |  | 品质部意见
+QC_TC_IN | 150 | 销售部意见 | header | true | false | false | true |  |  | 销售部意见
+QC_TC_IN | 160 | 研发意见 | header | true | false | false | true |  |  | 研发意见
+QC_TC_IN | 170 | 最终处理结果 | query,header | true | false | false | true |  |  | 最终处理结果
+QC_TC_IN | 180 | 备注 | header | true | false | false | true |  |  | 备注
+QC_TC_IN | 190 | 单据状态 | query,header | true | false | false | false |  |  | 单据状态
+QC_TC_IN | 200 | 审核人 | header | true | false | false | false | EMP | 员工名称 | 审核人
+QC_TC_IN | 210 | 审核时间 | header | true | false | false | false |  |  | 审核时间
+QC_TC_IN | 212 | 审批人 | header | true | false | false | false |  |  | 审批人
+QC_TC_IN | 213 | 审批时间 | header | true | false | false | false |  |  | 审批时间
+QC_TC_IN | 215 | 文档编号 | header | true | true | false | true |  |  | 文档编号
+QC_TC_IN | 220 | 编制人 | header | true | false | false | false |  |  | 编制人
+QC_TC_IN | 230 | 特采理由日期 | header | true | true | false | true |  |  | 特采理由日期
+QC_TC_IN | 231 | 产品开发部签名 | header | true | true | false | true |  |  | 产品开发部签名
+QC_TC_IN | 232 | 产品开发部日期 | header | true | true | false | true |  |  | 产品开发部日期
+QC_TC_IN | 233 | 品质部签名 | header | true | true | false | true |  |  | 品质部签名
+QC_TC_IN | 234 | 品质部日期 | header | true | true | false | true |  |  | 品质部日期
+QC_TC_IN | 235 | 销售部签名 | header | true | true | false | true |  |  | 销售部签名
+QC_TC_IN | 236 | 销售部日期 | header | true | true | false | true |  |  | 销售部日期
+QC_TC_IN | 237 | 研发签名 | header | true | true | false | true |  |  | 研发签名
+QC_TC_IN | 238 | 研发日期 | header | true | true | false | true |  |  | 研发日期
+QC_TC_IN | 900 | 批次键 | header | false | true | false | false |  |  | 批次键
+QC_TC_IN | 901 | 批次号 | header | false | true | false | false |  |  | 批次号
+QC_TC_IN | 902 | 检验单号 | header | false | true | false | false |  |  | 检验单号
+QC_TC_IN | 903 | 暂收退料单号 | header | false | true | false | false |  |  | 暂收退料单号
+(39 行)

@@ -1,0 +1,16 @@
+==> SELECT t.name AS 表名, COUNT(c.column_id) AS 列数 FROM sys.tables t JOIN sys.columns c ON c.object_id=t.object_id WHERE t.name IN ('qc_insp_rec','qc_tc_in','qc_return','sl_recv','bd_purchase_in','bd_pu_label','yj_doc_batch') GROUP BY t.name ORDER BY t.name
+表名 | 列数
+----------
+bd_pu_label | 15
+bd_purchase_in | 182
+qc_insp_rec | 43
+qc_return | 48
+qc_tc_in | 72
+sl_recv | 54
+yj_doc_batch | 13
+(7 行)
+==> SELECT name FROM sys.tables WHERE name IN ('qc_insp_rec')
+name
+----------
+qc_insp_rec
+(1 行)

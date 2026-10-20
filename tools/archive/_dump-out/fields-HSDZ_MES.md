@@ -1,8 +1,8 @@
 # dump db=HSDZ_MES
-PANEL	PURCHASE_IN	采购入库单	Purchase Receiving Order	库存核算	doc	bd_purchase_in	bl_purchase_in	单据编号	单据日期	PI	50	items	库存核算
-PANEL	QC_INSP	来料检验单	null	采购管理	doc	qc_insp	qc_insp_detail	单据编号	单据日期	IJ	20	items	智能供应链
-PANEL	QC_RECV	送料暂收单	Temporary Material Receipt	库存核算	doc	sl_recv	sl_recv_detail	单据编号	单据日期	SL	20	items	库存核算
-PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail	单据编号	单据日期	TH	20	items	库存核算
+PANEL	PURCHASE_IN	采购入库单	Purchase Receiving Order	库存核算	doc	bd_purchase_in	bl_purchase_in	单据编号	单据日期	PI	50	items	库存管理
+PANEL	QC_INSP	来料检验单	null	采购管理	doc	qc_insp	qc_insp_detail	单据编号	单据日期	IJ	20	items	品质管理
+PANEL	QC_RECV	送料暂收单	Temporary Material Receipt	库存核算	doc	sl_recv	sl_recv_detail	单据编号	单据日期	SL	20	items	库存管理
+PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail	单据编号	单据日期	TH	20	items	库存管理
 
 ===== QC_RECV =====
 -- yj_field (place, seq)
@@ -104,7 +104,7 @@ COL	sl_recv	asp_user2	nvarchar(100)	null
 COL	sl_recv	asp_time2	datetime2(8)	null	
 COL	sl_recv	asp_cancel	char(1)	null	
 COL	sl_recv	采购订单号	nvarchar(1000)	null	来源采购订单号(链路带入,转ERP 用)
-COL	sl_recv	批次号	nvarchar(100)	null	送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回)
+COL	sl_recv	批次号	nvarchar(100)	null	送料批次号:**纯日期 yyyyMMdd**(如 20261019;2026-10-19 用户口径「改回采用日期的方式,不再是供应商+日期」)。采购订单→送料暂收单生单那一刻写入,下游检验/入库/退回逐站继承;同一天所有批次共号(不唯一、不带序号);仅本单草稿态单头可人工改,审核后整链只读;明细行随单头一致。历史号(如 XH-20261019 / YJ-…)原样保留
 COL	sl_recv	来料性质	nvarchar(100)	null	来料性质(免检/检验、来料/退料的分流依据;参照库品检系字段)
 COL	sl_recv	仓库	nvarchar(200)	null	仓库(暂收目标仓,参照仓库档案 WH,存仓库名称)
 COL	sl_recv	金额	decimal(9)	null	金额(头汇总,未税金额合计)
@@ -293,7 +293,7 @@ COL	qc_insp	附件3	nvarchar(1000)	null	单据附件列位(与送料暂收单同
 COL	qc_insp	附件4	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
 COL	qc_insp	附件5	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
 COL	qc_insp	附件6	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
-COL	qc_insp	批次号	nvarchar(100)	null	送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回)
+COL	qc_insp	批次号	nvarchar(100)	null	送料批次号:**纯日期 yyyyMMdd**(如 20261019;2026-10-19 口径,不再拼供应商编码),由暂收单生单时定稿并逐站继承;明细行随单头一致,只读
 COL	qc_insp	检验编号	nvarchar(120)	null	检验编号(单据级检验流水号,与单据编号 IJ 分离;参照库品检系同名字段)
 COL	qc_insp	执行标准	nvarchar(400)	null	执行标准(检验依据文本;检验方案 QC_PLAN 缺失时的兜底)
 COL	qc_insp	检验类型	nvarchar(100)	null	检验类型(全检/抽检/免检;与检验方案的检验方式语义重叠,可留空)
@@ -378,6 +378,10 @@ COL	qc_insp_detail	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_insp_detail	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_insp_detail	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_insp_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
+COL	qc_insp_detail	抽样方案	nvarchar(200)	null	抽样方案(来料检验抽检规则,如 GB/T 2828.1 一般检验水平 II)
+COL	qc_insp_detail	品质复核人	nvarchar(100)	null	品质复核人(参照职员档案 EMP,检验完成后复核签字的责任人)
+COL	qc_insp_detail	品质复核时间	nvarchar(60)	null	品质复核时间(本地墙钟,与品质复核人成对)
+COL	qc_insp_detail	业务员	nvarchar(100)	null	业务员(供应商侧对接的业务人员,参照职员档案 EMP)
 
 ===== QC_RETURN =====
 -- yj_field (place, seq)
@@ -404,6 +408,10 @@ FIELD	header	170	附件3	附件3	附件	220	E--V									9539
 FIELD	header	180	附件4	附件4	附件	220	E--V									9540
 FIELD	header	190	附件5	附件5	附件	220	E--V									9541
 FIELD	header	200	附件6	附件6	附件	220	E--V									9542
+FIELD	header	300	ERP单号	ERP单号	文本	130	---V									13835
+FIELD	header	310	是否已转ERP	是否已转ERP	文本	130	---V									13836
+FIELD	header	320	转ERP操作人	转ERP操作人	文本	130	---V									13837
+FIELD	header	330	转ERP时间	转ERP时间	文本	130	---V									13838
 FIELD	header,detail	140	备注	备注	文本	220	E--V							Remark		1791
 FIELD	query,detail	20	物料编码	物料编码	参照	120	ER-V		INV	存货编码	存货名称			Material Code		1795
 FIELD	query,detail	110	不良原因	不良原因	参照	150	E--V		REJECT	不合格原因	不合格原因					7653
@@ -441,7 +449,7 @@ COL	qc_return	附件3	nvarchar(1000)	null	单据附件列位(与送料暂收单�
 COL	qc_return	附件4	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
 COL	qc_return	附件5	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
 COL	qc_return	附件6	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
-COL	qc_return	批次号	nvarchar(100)	null	送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回)
+COL	qc_return	批次号	nvarchar(100)	null	送料批次号:**纯日期 yyyyMMdd**(如 20261019;2026-10-19 口径,不再拼供应商编码),随链继承;历史号原样保留
 COL	qc_return	退货类型	nvarchar(100)	null	退货类型(退供应商/报废/让步接收;与来料检验单行「处置方式」闭环)
 COL	qc_return	仓库	nvarchar(200)	null	仓库(退回出库仓,参照仓库档案 WH,存仓库名称)
 COL	qc_return	备用1	nvarchar(1000)	null	预留扩展字段(未绑定)
@@ -464,6 +472,10 @@ COL	qc_return	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
+COL	qc_return	是否已转ERP	nvarchar(40)	null	是否已转ERP:否/是。暂收退料单审核后点「转ERP」推金蝶采购退货单(pur_ret)成功置「是」;弃审自动清回「否」(2026-10-19 接入)
+COL	qc_return	ERP单号	nvarchar(200)	null	ERP单号:转ERP 成功后回写的**金蝶采购退货单单号**(金蝶自动编号,如 CJTH-…);弃审清空(2026-10-19 接入)
+COL	qc_return	转ERP操作人	nvarchar(200)	null	转ERP操作人:执行「转ERP」的账号;弃审清空(2026-10-19 接入)
+COL	qc_return	转ERP时间	nvarchar(120)	null	转ERP时间:转ERP 成功的时刻(yyyy-MM-dd HH:mm:ss 文本,与其余 7 张已接转ERP的单据同格式);弃审清空(2026-10-19 接入)
 COL	qc_return_detail	id	int(4)	NOT NULL	
 COL	qc_return_detail	单据编号	nvarchar(120)	NOT NULL	单号(面板字段列)
 COL	qc_return_detail	物料编码	nvarchar(200)	null	
@@ -807,7 +819,7 @@ COL	bd_purchase_in	附件3	nvarchar(1000)	null	单据附件列位(与送料暂�
 COL	bd_purchase_in	附件4	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
 COL	bd_purchase_in	附件5	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
 COL	bd_purchase_in	附件6	nvarchar(1000)	null	单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
-COL	bd_purchase_in	批次号	nvarchar(100)	null	送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回)
+COL	bd_purchase_in	批次号	nvarchar(100)	null	送料批次号:**纯日期 yyyyMMdd**(如 20261019;2026-10-19 口径,不再拼供应商编码),随链继承;历史号原样保留
 COL	bd_purchase_in	批次键	int(4)	null	批次键:批次台账 yj_doc_batch.id;采购入库单审核时凭它取号并回填全链批次号
 COL	bd_purchase_in	单据状态_bill_status	nvarchar(1000)	null	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
 COL	bd_purchase_in	supplier_id	nvarchar(1000)	null	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选

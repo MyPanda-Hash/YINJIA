@@ -267,7 +267,8 @@ public class PushGenerateHandler implements PanelActionHandler {
     /**
      * 分批送料对话框的行状态:每行 订单量 / 已送 / 已退回(回冲) / 剩余 / 可送上限,
      * 并附 该订单已有批次清单(含历史"待编号"批次)与**本次将写入的批次号**。
-     * 2026-10-04 口径:批次号在**生单那一刻**定稿(供应商编码去 YJ- 前缀 + - + 当天 yyyyMMdd),
+     * 2026-10-19 口径:批次号在**生单那一刻**定稿(**纯日期 yyyyMMdd**,如 20261019;
+     * 2026-10-04 的"供应商编码 + 日期"已被用户否掉),
      * 故这里能预告 —— 来源单已有号时用它的,否则按同一公式现算(与 generateBatch 完全同源,
      * 前端据此在弹窗里显示"本批批次号",不必等生单完再看)。
      */
@@ -427,7 +428,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 本批批次号(生单即定号;与 generateBatch 同一公式 —— 来源单已有号则继承)
         String srcBatch = str(src.get("批次号"));
         out.put("nextBatchNo", srcBatch.isEmpty()
-                ? BatchService.buildBatchNo(supplierCodeOf(src, Map.of()), java.time.LocalDate.now())
+                ? BatchService.buildBatchNo(java.time.LocalDate.now())
                 : srcBatch);
         out.put("batches", batchService.batches(sourcePanel, sourceNo)); // 有效批次(ACTIVE 已编号 + 历史 PENDING)
         out.put("lines", rows);
@@ -439,9 +440,9 @@ public class PushGenerateHandler implements PanelActionHandler {
      * - qtyByLineKey 为空 = 所有"还有剩余"的行按剩余量全部送出(推式按钮直接点、或选单一次性送完);
      * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 可送上限(= 订单数量×(1+超送比例)−已送+已退回,
      *   **按全部数量算**,2026-09-22 口径;超送比例最高 50%) / 至少一行;
-     * - **批次号在生单这一刻就写**(2026-10-04 用户口径,取代"入库审核取号 + 回填全链"):
-     *   链路头一跳(采购订单→送料暂收单)= 按「供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd」取号
-     *   (如 YJ-TX、2026-09-10 ⇒ TX-20260910,见 BatchService.buildBatchNo);
+     * - **批次号在生单这一刻就写**(2026-10-04 口径「生单即定号」;号本身按 2026-10-19 用户口径改回纯日期):
+     *   链路头一跳(采购订单→送料暂收单)= 按「**当天 yyyyMMdd**」取号(如 2026-10-19 ⇒ 20261019,
+     *   见 BatchService.buildBatchNo;改版前的"供应商编码 + 日期"如 `WR-20261019` 已作废);
      *   **这一跳允许在生单对话框里人工改号**(batchNoOverride,用户口径「在生单时批次号就可以修改」);
      *   下游各跳(暂收→检验、暂收/检验→入库、检验→退回)= **继承来源单头上的号**,不重新取号、
      *   也不接受覆盖(继承优先,避免下游把上游的号改飘);
@@ -607,11 +608,10 @@ public class PushGenerateHandler implements PanelActionHandler {
         //   否则本跳就是链路头一跳 → 新登记一行 ACTIVE 台账,把该行 id 当键逐站带下去;
         // · 批次号:来源单已有号(下游各跳)→ 原样继承(**忽略**传进来的覆盖值,不让下游把上游的号改飘);
         //   来源单没号(链路头一跳)→ ① 对话框里人工填的 batchNoOverride(用户口径「生单时就能改」)
-        //   → ② 都空则按「供应商编码去掉 YJ- 前缀 + - + 当天」现取一个(编码为空退回纯日期)。
+        //   → ② 都空则按「**当天日期 yyyyMMdd**」现取一个(2026-10-19 用户口径:批次号改回纯日期,
+        //        不再是"供应商编码 + 日期";改版前供应商 YJ-WR 会取成 `WR-20261019`,现在只有 `20261019`)。
         //   单头与全部明细行写**同一个号** —— 用户口径「头与下面的明细项目批次号一致」,
         //   且不再需要"入库审核时逆流回填上游"(该机制已删除)。
-        // 注:供应商编码要**先看来源单头、再看目标单头**(链路各单异名,映射可能刚把
-        //     供应商编码→供应商代码 写进 targetHead),故这段必须排在 targetHead 之后。
         Object srcKeyObj = head.get("批次键");
         Integer inheritKey = srcKeyObj instanceof Number n ? n.intValue()
                 : (srcKeyObj == null || String.valueOf(srcKeyObj).isBlank() ? null
@@ -638,7 +638,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 throw new IllegalArgumentException("批次号过长(最多 " + BATCH_NO_MAX + " 个字符):" + manual);
             }
             batchNo = manual.isEmpty()
-                    ? BatchService.buildBatchNo(supplierCodeOf(head, targetHead), java.time.LocalDate.now())
+                    ? BatchService.buildBatchNo(java.time.LocalDate.now())
                     : manual;
         }
         int batchId = inheritKey != null ? inheritKey
@@ -735,21 +735,6 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     /** 非空字符串(去空白);null → 空串 */
     private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
-
-    /**
-     * 供应商编码:来源单头优先(链路上游已带),退回**目标单头映射后的值** ——
-     * 链路各单异名(暂收/检验/退回叫「供应商代码」,采购入库叫「供应商编码」),
-     * 而 PU_ORDER→QC_RECV 的映射正是 供应商编码 → 供应商代码,故两处都要看。
-     */
-    private static String supplierCodeOf(Map<String, Object> srcHead, Map<String, Object> tgtHead) {
-        for (Map<String, Object> m : List.of(srcHead, tgtHead)) {
-            for (String k : List.of("供应商编码", "供应商代码")) {
-                String v = str(m.get(k));
-                if (!v.isEmpty()) return v;
-            }
-        }
-        return "";
-    }
 
     /**
      * 只在目标面板**注册了该字段**时才写入(未注册的键会被通用保存静默丢弃,先判一下更直观)。

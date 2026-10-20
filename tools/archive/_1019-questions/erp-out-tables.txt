@@ -1,0 +1,111 @@
+==> SET NOCOUNT ON;
+[-1 行受影响]
+==> PRINT '=== 供应商/仓库/物料 档案表名 ==='
+[-1 行受影响]
+==> SELECT name FROM sys.tables WHERE name IN (N'bs_supplier', N'bs_wh', N'bs_inv', N'bs_uom', N'bs_dept', N'bs_emp', N'bs_material') OR name LIKE N'%supplier%' OR name LIKE N'bs_%' ORDER BY name;
+name
+----------
+bs_currency
+bs_customer_group
+bs_dc_alarm
+bs_dc_device
+bs_dc_gateway
+bs_dc_point
+bs_dc_rule
+bs_dc_sample
+bs_dc_status_log
+bs_dept
+bs_dict
+bs_emp
+bs_equip
+bs_inv
+bs_inv_price
+bs_line_capacity
+bs_material_group
+bs_op
+bs_partner
+bs_prod_line
+bs_proj
+bs_qc_item
+bs_qc_plan
+bs_region
+bs_reject
+bs_route
+bs_settle_type
+bs_supplier_group
+bs_team
+bs_uom
+bs_wc
+bs_wh
+bs_wh_loc
+(33 行)
+==> PRINT '=== qc_recv 头全列 ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.qc_recv') ORDER BY column_id;
+name
+----------
+(0 行)
+==> PRINT '=== qc_insp 头全列 ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.qc_insp') ORDER BY column_id;
+name
+----------
+id
+单据编号
+单据日期
+暂收单号
+供应商
+检验员
+检验日期
+检验方案
+总结论
+备注
+单据状态
+审核人
+审核时间
+审批人
+审批时间
+asp_user1
+asp_time1
+asp_user2
+asp_time2
+asp_cancel
+业务员
+供应商代码
+部门
+部门名称
+数量
+采购订单号
+附件1
+附件2
+附件3
+附件4
+附件5
+附件6
+批次号
+检验编号
+执行标准
+检验类型
+批次键
+备用1
+备用2
+备用3
+备用4
+备用5
+备用6
+备用7
+备用8
+备用9
+备用10
+备用11
+备用12
+备用13
+备用14
+备用15
+备用16
+备用17
+备用18
+备用19
+备用20
+部门编码
+(58 行)

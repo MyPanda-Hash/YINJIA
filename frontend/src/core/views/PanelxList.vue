@@ -124,7 +124,19 @@
     </div>
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
-      <div class="approval-layout">
+      <div class="approval-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
+        <!-- 左「单据选择」栏(2026-10-19 用户口径:「特采单与质量单据下面的单据都需要增加一个和来料检验单一样的选择」):
+             纸面分支原先没有左栏,只能靠右栏「上一张/下一张」翻 —— 这批文书式单据(特采单/质量单据一族)
+             张数多、还要看审核状态,故把网格分支那套 DocSelectRail **原样搬进来**(同一份 railBind,
+             同一套选行/翻页/模糊搜索守卫),布局上作为 .approval-layout 的第一个 flex 项。 -->
+        <DocSelectRail
+          v-if="docRailCfg"
+          v-bind="railBind"
+          @select="onRailSelect"
+          @toggle="railCollapsed = !railCollapsed"
+          @page="onRailPage"
+          @search="onRailSearch"
+        />
         <!-- 项目进度查询(RD_PROGRESS)= 汇总查看面板:数据由「项目实施计划归档 / 立项申请」自动导入,
              人工不再往里写 ⇒ **单元格恒只读**(:editable 硬编码 false,2026-10-09 用户口径「去掉自己写入功能」)。
              单据生命周期按钮(保存/审批)不受影响:draftEditable 未动,「⟳ 同步阶段进度」重跑自动导入后仍可保存入库。
@@ -874,15 +886,7 @@
       <div class="doc-rail-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
         <DocSelectRail
           v-if="docRailCfg"
-          :title="docRailCfg.title"
-          :columns="docRailCfg.columns"
-          :rows="list"
-          :current-no="railCurNo"
-          :collapsed="railCollapsed"
-          :total="total"
-          :page-no="query.pageNo"
-          :page-size="query.pageSize"
-          :keyword="query.keyword"
+          v-bind="railBind"
           @select="onRailSelect"
           @toggle="railCollapsed = !railCollapsed"
           @page="onRailPage"
@@ -4381,6 +4385,10 @@ const draftEditable = computed(() => {
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
   'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT', 'RD_APPROVAL',
+  // 2026-10-19 用户口径(10.19 问题第 4 条「特采单上面也要可以传附件」):
+  // 特采单是文书式纸面(DocSheet),附件位由 qc_tc_in.附件1..6 + yj_field(dataType=附件) 驱动;
+  // 这里放行"已审核也能补附件"(让步接收的评审资料常在各部会签后才补齐),与其余单据同口径。
+  'QC_TC_IN',
 ])
 const attachEditable = computed(() => {
   if (draftEditable.value) return true
@@ -4403,8 +4411,8 @@ const batchChainPanel = computed(() => (cfgCache.value?.dataSchema?.fields || []
   .some((f) => (f.dataName || f.label) === '批次号'))
 /**
  * 明细行「批次号」是否锁定(2026-10-04 批次号口径):
- * 批次号在**生单那一刻**由服务端定稿(供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,
- * 如 YJ-TX ⇒ TX-20260910),并沿 暂收 → 检验 → 入库 逐站继承;明细行一律**随单头一致**
+ * 批次号在**生单那一刻**由服务端定稿(2026-10-19 用户口径:**纯日期 yyyyMMdd**,如 20261019;
+ * 改版前是"供应商编码去掉 YJ- 前缀 + `-` + 日期"),并沿 暂收 → 检验 → 入库 逐站继承;明细行一律**随单头一致**
  * (后端 BatchService.syncBatchNo 每次保存/审核都按单头覆盖写全部明细行)。
  * 因此明细格只读:可改的只有送料暂收单草稿态的**单头**批次号。
  *
@@ -4444,7 +4452,7 @@ async function needBatchDialog(target) {
 function onBatchGenerated({ panel, no, batchNo, silent }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
   if (!targetPanel) return
-  // 批次号在**生单那一刻**已由服务端定稿(供应商编码去 YJ- 前缀 + 当天日期),这里直接把真号回显给用户。
+  // 批次号在**生单那一刻**已由服务端定稿(2026-10-19 起 = 纯日期 yyyyMMdd),这里直接把真号回显给用户。
   // 分批送料对话框自己会把"生成了几张、各是什么号"说清(silent=true,含按批次号分组的多张情形),此处不重复。
   if (!silent) {
     ElMessage.success(batchNo
@@ -4671,10 +4679,10 @@ watch(
 )
 
 // 采购入库单批次号(2026-10-04 口径变更):批次号不再由前端「按单据日期预设」——
-// 它由**服务端在生单那一刻**定稿(供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,如 YJ-TX ⇒ TX-20260910),
+// 它由**服务端在生单那一刻**定稿(2026-10-19 起 = **纯日期 yyyyMMdd**,如 20261019),
 // 并沿 暂收 → 检验 → 入库 逐站继承;BatchService.syncBatchNo 在每次保存/审核时把单头值同步到全部明细行。
 // 因此这里**不再需要**「单据日期 → 批次号」联动(旧的 applyDocDefaults/syncBatchNoWithDocDate 调用已删除):
-// 前端再预设一个纯日期的号,只会与生单继承来的号打架(格式也不同)。
+// 前端再预设一个号,只会与生单继承来的号打架。
 
 watch(cur, (v) => {
   current.value = v
@@ -4727,7 +4735,9 @@ const ERP_TAG_COL = {
 const DOC_RAIL_PANELS = {
   QC_RECV: ['供应商', '采购订单号', '批次号'],   // 送料暂收单(2026-09-20 面板编码由 SL_RECV 改;原「部门」列实测 12 单仅 1 单有值,按链路可见性换成采购订单号,再加批次号)
   QC_INSP: ['供应商', '采购订单号', '批次号'],   // 来料检验单(「部门」11 单全空,换采购订单号;批次号随链带入)
-  QC_RETURN: ['供应商', '检验单号', '批次号'],   // 暂收退料单(qc_return 无「部门」列,恒空;检验单号可直接追到检验单)
+  // 暂收退料单(2026-10-19 接入转ERP ⇒ 左栏补「ERP单」派生列,与其余五张出入库单同款):
+  // ERP单号/是否已转ERP 两列由本批迁移给 qc_return 加上并登记 yj_field,随行下发 ⇒ 直接派生。
+  QC_RETURN: ['供应商', '检验单号', '批次号', ERP_TAG_COL],
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
   SO_ORDER: ['客户'],            // 销售订单(对齐采购订单:中间列只留往来单位,采购=供应商/销售=客户)
   PURCHASE_IN: ['供应商', '批次号', ERP_TAG_COL], // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态;2026-09-20 加批次号)
@@ -4771,6 +4781,26 @@ const DOC_RAIL_PANELS = {
   // 恒显示「未转」会误导用户以为同步失败。
   TRANSFER: ['部门', '经手人'],
   STOCKTAKE: ['盘点类型', '盘点人'],
+  // ── 2026-10-19 用户口径(task 7 of 10.19问题单)──
+  // 「带左侧选择单据目录(包括状态显示)。特采单与质量单据下面的单据都需要增加一个和来料检验单一样的选择。」
+  // ⇒ 特采单(QC_TC_IN)与「品质管理·质量单据」一族补齐同款左栏(单号 | 日期 | 中间列 | 审核状态)。
+  // 中间列一律挑**该面板表头里真实有值**的字段(这些面板都是文书式/纸面,表头字段少、空列等于没配):
+  //   QC_TC_IN → 供应商 | 采购单号 :特采单就挂在某供应商某张采购订单进来料上;
+  //   QC_BHG   → 客户名称 | 产品名称 :不合格报告(制程)是客户×产品的分析;
+  //   QC_BHC   → 客户名称 | 产品编码 :不合格品处理单(制程)同族;
+  //   QC_BHZ   → 物料编码 | 物料批次 :不合格品处理单(自制物料)没有客户,按物料+批次定位;
+  //   QC_JJF   → 物料编码 | 批次号   :紧急放行按物料批次放行;
+  //   QC_SCP   → 物料编码 | 物料批次 :试产材料使用申请同族;
+  //   QC_LYB   → 供应商   | 物料编码 :来料异常分析报告是供应商来料问题;
+  //   QC_SCY   → 产品/物料编码      :生产异常分析报告只按产品/物料定位(表头无客户/供应商)。
+  QC_TC_IN: ['供应商', '采购单号'],
+  QC_BHG: ['客户名称', '产品名称'],
+  QC_BHC: ['客户名称', '产品编码'],
+  QC_BHZ: ['物料编码', '物料批次'],
+  QC_JJF: ['物料编码', '批次号'],
+  QC_SCP: ['物料编码', '物料批次'],
+  QC_LYB: ['供应商', '物料编码'],
+  QC_SCY: ['产品/物料编码'],
 }
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
@@ -4797,6 +4827,22 @@ const railCurNo = computed(() => {
   const c = cur.value || {}
   return String(c['编号'] || c['单据编号'] || c['单号'] || '')
 })
+/**
+ * 左栏的**绑定集合**(一处定义、两处渲染:网格单据卡片 / 文书式纸面 approval-layout)。
+ * 2026-10-19(task 7):特采单与质量单据一族是**纸面(approval-layout)分支**,原来那里根本没有左栏 ——
+ * 把 props 收敛成对象后两个分支 `v-bind` 同一份,避免复制一份 props 出来后两边漂移。
+ */
+const railBind = computed(() => ({
+  title: docRailCfg.value ? docRailCfg.value.title : '',
+  columns: docRailCfg.value ? docRailCfg.value.columns : null,
+  rows: list.value,
+  currentNo: railCurNo.value,
+  collapsed: railCollapsed.value,
+  total: total.value,
+  pageNo: query.pageNo,
+  pageSize: query.pageSize,
+  keyword: query.keyword,
+}))
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })
 }
@@ -10555,6 +10601,14 @@ onUnmounted(() => {
   align-items: flex-start;
   min-height: 560px;
   padding-right: 0;
+}
+/* 文书式纸面上的左「单据选择」栏(2026-10-19,task 7):
+   DocSelectRail 自带定宽(width 内联 px)与右侧拖拽调宽条 ⇒ 这里只声明"不参与伸缩",
+   免得 flex 把 320px 的栏压扁;纸面区仍是 flex:1(见下方 .approval-layout > .sheet-scroll),
+   右侧操作栏(.approval-side)位置不变。 */
+.approval-layout > .doc-select-rail {
+  flex: none;
+  margin-right: 8px;
 }
 /* 纸面滚动容器(2026-10-16):只包 DocSheet 一系(它的纸宽可能被定死 1242px)。
    定宽纸在窄窗会宽过容器 ⇒ 让**纸面区自己**横向滚动,右侧 176px 操作栏照常贴在最右,

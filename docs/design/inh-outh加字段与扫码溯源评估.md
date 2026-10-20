@@ -146,7 +146,7 @@
 
 | 环节 | 批号规则 | 代码位置 |
 |---|---|---|
-| 采购订单 → 送料暂收单 | **生单那一刻取号** = 供应商编码去 `YJ-` + `-` + `yyyyMMdd`，写头+全行 | `BatchService.buildBatchNo` / `PushGenerateHandler.generateBatch` |
+| 采购订单 → 送料暂收单 | **生单那一刻取号** = **纯日期 `yyyyMMdd`**(2026-10-19 用户口径;此前是"供应商编码去 `YJ-` + `-` + 日期",已作废)，写头+全行 | `BatchService.buildBatchNo` / `PushGenerateHandler.generateBatch` |
 | 暂收 → 检验 → 采购入库 | 靠 `{"批次号","批次号"}` **同名映射逐站继承** + 保存/审核时 `syncBatchNo` 头行自洽 | `PanelConfigService:1162,1201,1215`；`ButtonService:458,1390,1789` |
 | 过账进台账 | 批号取 **批次号优先、行批号兜底**（采购入库行的「批号」在元数据里是 `hidden=1`） | `StockLedgerService:223` |
 | **生产侧（另一套号池）** | `plang.批次号` = 转单日期 `yyyyMMdd`；`plang.lot_no`（产品批号）= `LotSeqService` 的 `yyyymmdd+3` —— **两者与原料批次号无关** | `QuickScheduleService:117-119` |

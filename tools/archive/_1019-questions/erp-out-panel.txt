@@ -1,0 +1,43 @@
+==> SET NOCOUNT ON;
+[-1 行受影响]
+==> PRINT '=== yj_panel 列 ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.yj_panel') ORDER BY column_id;
+name
+----------
+panel_code
+panel_name
+category
+mode
+line_table
+head_table
+group_col
+pk_col
+code_col
+prefix
+date_col
+page_size
+detail_key
+module_group
+config
+config_at
+panel_name_en
+(17 行)
+==> PRINT '=== GFDA / QC_RETURN 面板表映射 ==='
+[-1 行受影响]
+==> SELECT * FROM dbo.yj_panel WHERE panel_code IN ('GFDA', 'QC_RETURN');
+panel_code | panel_name | category | mode | line_table | head_table | group_col | pk_col | code_col | prefix | date_col | page_size | detail_key | module_group | config | config_at | panel_name_en
+------------------------------------------------------------------------------------------------------------------------
+GFDA | 供应商 | 基础档案 | archive | dm_gf |  |  | id | dm |  |  | 50 | gfda | 数据建模 |  |  | Vendor Archive
+QC_RETURN | 暂收退回单 | 采购管理 | doc | qc_return_detail | qc_return | 单据编号 | id | 单据编号 | TH | 单据日期 | 20 | items | 库存管理 |  |  | 
+(2 行)
+==> PRINT '=== 供应商相关表(含 供应商编码 列) ==='
+[-1 行受影响]
+==> SELECT OBJECT_NAME(c.object_id) AS 表, c.name AS 列 FROM sys.columns c WHERE c.name IN (N'供应商编码', N'供应商名称') AND OBJECTPROPERTY(c.object_id, 'IsUserTable') = 1 ORDER BY 表, 列;
+表 | 列
+----------
+bd_other_in | 供应商编码
+bd_pu_label | 供应商编码
+bd_pu_order | 供应商编码
+bd_purchase_in | 供应商编码
+(4 行)

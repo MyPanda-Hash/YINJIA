@@ -1,0 +1,26 @@
+SET NOCOUNT ON;
+GO
+PRINT '=== 按明细单位分组:单据数 / 已审核单据数 ==='
+GO
+SELECT d.计量单位,
+       COUNT(DISTINCT d.单据编号) AS 单据数,
+       COUNT(DISTINCT CASE WHEN s.shr IS NOT NULL THEN d.单据编号 END) AS 已审核单据数
+FROM qc_return_detail d
+LEFT JOIN yj_doc_status s ON s.panel_code = 'QC_RETURN' AND s.doc_no = d.单据编号
+GROUP BY d.计量单位 ORDER BY 单据数 DESC;
+GO
+PRINT '=== 已审核且单位=kg 的候选单(实推首选) ==='
+GO
+SELECT TOP 10 h.单据编号, h.供应商, h.仓库, h.批次号,
+       (SELECT TOP 3 d.物料编码 + N'/' + d.计量单位 + N'/' + CAST(d.退货数量 AS nvarchar(20)) + N'/' + ISNULL(d.批次号, N'(无批号)')
+        FROM qc_return_detail d WHERE d.单据编号 = h.单据编号 AND ISNULL(d.asp_cancel,'N') <> 'Y'
+        FOR XML PATH(''), TYPE).value('.', 'nvarchar(max)') AS 明细摘要
+FROM qc_return h
+INNER JOIN yj_doc_status s ON s.panel_code = 'QC_RETURN' AND s.doc_no = h.单据编号 AND s.shr IS NOT NULL
+WHERE EXISTS (SELECT 1 FROM qc_return_detail d WHERE d.单据编号 = h.单据编号 AND d.计量单位 = N'kg')
+ORDER BY h.单据编号 DESC;
+GO
+PRINT '=== HSDZ_MES_TEST 存储过程/触发器对 qc_return 的依赖(有无自动生成影像) ==='
+GO
+SELECT name, type_desc FROM sys.objects WHERE type IN ('P','TR') AND OBJECT_DEFINITION(object_id) LIKE '%qc_return%';
+GO

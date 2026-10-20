@@ -103,12 +103,12 @@ public class QcCatalogService {
             if (existId != null) {
                 // 已生成过:复用其检验数据记录单号(仍存活才复用,否则新建)
                 String oldRec = str(firstValue("SELECT 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", existId));
-                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, qty, unit, inspDate, curBatch, user);
+                recNo = recExists(oldRec) ? oldRec : createInspRecord(inspNo, invName, invCode, qty, unit, inspDate, curBatch, user);
                 jdbc.update("UPDATE qc_catalog_detail SET 检测物料类别=?, 物料名称=?, 数量=?, 计量单位=?, 批次号=?, 检验数据记录单号=?,"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                         nv(category), nv(invName), nv(qty), nv(unit), nv(curBatch), nv(recNo), user, existId);
             } else {
-                recNo = createInspRecord(invName, invCode, qty, unit, inspDate, curBatch, user);
+                recNo = createInspRecord(inspNo, invName, invCode, qty, unit, inspDate, curBatch, user);
                 // 列序:…,计量单位,检验状态,是否合格,检验单号,检验数据记录单号,asp_user1,asp_time1
                 // ⇒ 检验状态=ST_DOING(正在检验中)、是否合格=NULL(未判定) —— 原实现把 NULL 写在检验状态位、
                 //    且少一个 ?(10 占位 vs 11 参数)致 "index 11 out of range"(2026-09-24 修,口径同存量数据)
@@ -180,20 +180,22 @@ public class QcCatalogService {
      * 逐站继承到检验单,故本报告建出来就带号 —— 不再有"等采购入库审核回填"这一说
      * (旧 {@code refreshBatchNosFromInsp} 收尾已删除)。
      *
+     * @param inspNo  来源来料检验单号(**2026-10-19 新增**:报告纸上要能一键跳回这张检验单 ——
+     *                用户口径 task 6「检验报告右边带来料检验单单号的链接」;空串/空表不写)
      * @param batchNo 检验单头上的批次号(为空则落 NULL,不写空串)
      */
-    private String createInspRecord(String invName, String invCode, String qty, String unit,
+    private String createInspRecord(String inspNo, String invName, String invCode, String qty, String unit,
                                     String inspDate, String batchNo, String user) {
         String no = formNoService.next(REC_PREFIX, user);
         String date = LocalDate.now().toString();
         // 来料数量 = 数量+单位拼合(用户口径:合在一起);计量单位列仅作链路(界面隐藏)
-        // 列序:单据编号,单据日期,物料名称,物料编码,物料批次,检验日期,来料数量,计量单位,文件编码,检验依据,检验人,表单审核人,asp_user1,asp_time1
-        // ⇒ 12 个 ? 对应 11 个业务参数 + user(asp_user1);原实现少一个 ? 致 "index 12 out of range"(2026-09-24 修)
+        // 列序:单据编号,单据日期,物料名称,物料编码,物料批次,检验日期,来料数量,计量单位,文件编码,检验依据,检验人,表单审核人,来料检验单号,asp_user1,asp_time1
+        // ⇒ 15 个 ? 对应 12 个业务参数 + user(asp_user1);原实现少一个 ? 致 "index 12 out of range"(2026-09-24 修)
         jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量, 计量单位,"
-                + " 文件编码, 检验依据, 检验人, 表单审核人, asp_user1, asp_time1)"
-                + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
+                + " 文件编码, 检验依据, 检验人, 表单审核人, 来料检验单号, asp_user1, asp_time1)"
+                + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
                 no, date, nv(invName), nv(invCode), nv(batchNo), nv(inspDate.isBlank() ? date : inspDate), nv(qty), nv(unit),
-                REC_DOC_CODE, REC_BASIS, user, REC_REVIEWER, user);
+                REC_DOC_CODE, REC_BASIS, user, REC_REVIEWER, nv(inspNo), user);
         mergeStatus(REC_PANEL, no, user, true);
         return no;
     }

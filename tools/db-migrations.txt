@@ -3970,3 +3970,39 @@ migrate-qc-insp-clear-11-docstatus-20261018.sql
 #         并回退 inv_cost_ledger 主键与两个视图(见 migrate-stock-views-restore-20261016.sql /
 #         migrate-stock-balance-warn-20261018.sql 的定义)。
 migrate-stock-flow-src-rid-grain-20261020.sql
+# migrate-batch-no-pure-date-20261019.sql — 批次号改回**纯日期 yyyyMMdd**(2026-10-19《10.19 问题》第 1 条)
+#   用户口径「批次号改回采用日期的方式,不再是供应商+日期,就是 WR- 后面的数据」⇒ 2026-10-04 的
+#   「供应商编码去 YJ- 前缀 + - + 日期」(如 XH-20261019)作废,新号 = 20261019(同一天共号)。
+#   只改六处列的 MS_Description(sl_recv/qc_insp/qc_return/bd_purchase_in.批次号、bd_pu_label.批次号、
+#   yj_doc_batch.batch_no)+ 自检;不动任何业务数据,历史旧号原样保留。配套代码见同批 BatchService 等。
+#   两账套均执行,幂等。
+migrate-batch-no-pure-date-20261019.sql
+
+# migrate-qc-insp-rec-verdict-dropdown-20261019.sql — 检验结论改下拉框(特采/合格/不合格 + 可自定义补充)
+#   2026-10-19《10.19 问题》第 2 条。QC_INSP_REC 的「检验结论」两行(query/header)由 文本 → 下拉框,
+#   字典 = 特采/合格/不合格;「自定义补充」由前端 el-select allow-create 承担(值落 nvarchar,天然可存)。
+#   只改元数据。两账套均执行,幂等。
+migrate-qc-insp-rec-verdict-dropdown-20261019.sql
+
+# migrate-qc-doc-links-20261019.sql — 品质单据之间两条单号链接(第 5/6 条)
+#   报告 qc_insp_rec 加 来料检验单号(第 6 条:检验报告右边带来料检验单单号链接);
+#   特采单 qc_tc_in 加 检验数据记录单号(第 5 条:品质部意见要带检验数据记录单号的链接,可跳转)。
+#   两列 + 两行隐藏 yj_field + 来料检验单号 en 译名 + 历史回填(报告←检验目录行、特采单←检验目录行)。
+#   两账套均执行,幂等(只填空值)。
+migrate-qc-doc-links-20261019.sql
+
+# migrate-qc-tc-in-move-attach-20261019.sql — 特采单归采购管理 + 可上传附件(第 3/4 条)
+#   ① 导航真源在前端 menus.js(品质管理>来料品质 → 智能供应链>采购管理>单据),本脚本把 yj_panel 的
+#      module_group/category 对齐成 智能供应链/采购管理(权限树/桌面模块计数/读放行集合同一口径);
+#   ② qc_tc_in 补 附件1..附件6 六列(nvarchar(1000),与出入库单同名同型)+ 列注明 + 6 行 yj_field
+#      (data_type=附件)⇒ 文书式面板 DocSheet 自动挂 FileAttachCell(上传/查看/删除)。
+#   面板编码/表/前缀 TCI/权限行一个字节未动。两账套均执行,幂等。
+migrate-qc-tc-in-move-attach-20261019.sql
+# migrate-qcreturn-erp-20261019.sql — 暂收退料单接「转ERP」(金蝶采购退货单 pur_ret)
+#   2026-10-19《10.19 问题》第 8 条。① qc_return 补 ERP 留位四列(是否已转ERP/ERP单号/转ERP操作人/转ERP时间)
+#   + 列注明 —— **缺这四列转ERP 一推就报「列名无效」**;② 4 行 yj_field(只读可见,左栏「ERP单」派生列要用);
+#   ③ 四标签 en 译名兜底;④ erp_integ_api/erp_integ_field 补 EXP_QRETURN + 11 行字段映射(集成配置清单可见);
+#   ⑤ 自检。接口 = POST /jdy/v2/scm/pur_ret(采购退货单 pur_bill_outbound),不推 src_* 源单组。
+#   ⚠ QC_RETURN 是采购链四单之一 ⇒ 同批重跑 tools/archive/_gen-fourdoc-restore.mjs + FourDocAudit 必须 PASS。
+#   两账套均执行,幂等。
+migrate-qcreturn-erp-20261019.sql

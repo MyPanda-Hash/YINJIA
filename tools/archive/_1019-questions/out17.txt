@@ -1,0 +1,37 @@
+==> SELECT c.name, c.is_nullable, dc.definition AS 默认值 FROM sys.columns c LEFT JOIN sys.default_constraints dc ON dc.parent_object_id=c.object_id AND dc.parent_column_id=c.column_id WHERE c.object_id=OBJECT_ID('dbo.yj_field') ORDER BY c.column_id
+name | is_nullable | 默认值
+------------------------
+id | false | 
+panel_code | false | 
+col_name | false | 
+label | false | 
+data_type | false | (N'文本')
+dict_sql | true | 
+ref_panel | true | 
+ref_field | true | 
+display_field | true | 
+place | false | ('detail')
+seq | false | ((0))
+width | true | 
+editable | false | ((1))
+required | false | ((0))
+hidden | false | ((0))
+alias | true | 
+visible | false | ((1))
+label_en | true | 
+col_group | true | 
+ref_filter | true | 
+tab_key | true | 
+(21 行)
+==> SELECT c.name, c.is_nullable, dc.definition AS 默认值 FROM sys.columns c LEFT JOIN sys.default_constraints dc ON dc.parent_object_id=c.object_id AND dc.parent_column_id=c.column_id WHERE c.object_id=OBJECT_ID('dbo.yj_translation') ORDER BY c.column_id
+name | is_nullable | 默认值
+------------------------
+id | false | 
+scope | false | 
+ref_key | false | 
+locale | false | 
+text | false | 
+source | false | ('manual')
+created_at | false | (sysdatetime())
+updated_at | false | (sysdatetime())
+(8 行)

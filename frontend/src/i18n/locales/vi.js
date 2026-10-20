@@ -2324,7 +2324,7 @@ export default {
     '已送合计': 'Tổng đã giao',
     '待编号': 'Chờ số',
     '{n} 批待编号': '{n} lô chờ số',
-    '生单时按供应商编码与当天日期生成': 'Được tạo từ mã nhà cung cấp và ngày hiện tại khi lập chứng từ',
+    '生单时按当天日期生成': 'Được tạo từ ngày hiện tại khi lập chứng từ',
     '随单头批次号一致,不可修改': 'Trùng số lô của phần đầu; không sửa được',
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Chỉ tạo các dòng đã chọn; mức tối đa = số lượng đặt × (1 + tỷ lệ) − đã giao + đã trả (tối đa 50%)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = không cho phép; tối đa 50%, hạn mức theo số lượng đặt)',

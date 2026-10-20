@@ -268,7 +268,13 @@ export const qcSheetCfgs = {
         { label: '性能', key: '产品开发部性能意见', max: 250, rows: 1, flex: 101 },
         { label: '工艺', key: '产品开发部工艺意见', max: 250, rows: 1, flex: 124 },
       ] },
-      { kind: 'dept', label: '品质部意见', h: 124, nameW: 170, signKey: '品质部签名', dateKey: '品质部日期', subs: [{ key: '品质部意见', max: 250, rows: 1, flex: 1 }] },
+      // 品质部意见(2026-10-19 用户口径 task 5:「品质部意见生成特采要带检验数据记录单号的链接,可以跳转」):
+      // 小字标题后面挂一条**可点的检验数据记录单号**(link.key = 头字段「检验数据记录单号」,
+      // 由 ButtonService.returnAutoSpecialAccept 在生成特采单时按 检验单号+物料名称 从检验目录行带出;
+      // 号为空(手工特采/老单)时链接整条不渲染)。渲染与跳转在 DocSheet 的 docLinkNo/gotoLink。
+      { kind: 'dept', label: '品质部意见', h: 124, nameW: 170, signKey: '品质部签名', dateKey: '品质部日期',
+        link: { key: '检验数据记录单号', panel: 'QC_INSP_REC', label: '检验数据记录' },
+        subs: [{ key: '品质部意见', max: 250, rows: 1, flex: 1 }] },
       { kind: 'dept', label: '销售部意见', h: 122, nameW: 170, signKey: '销售部签名', dateKey: '销售部日期', subs: [{ key: '销售部意见', max: 250, rows: 1, flex: 1 }] },
       { kind: 'dept', label: '研发意见', h: 92, nameW: 170, signKey: '研发签名', dateKey: '研发日期', subs: [{ key: '研发意见', max: 250, rows: 1, flex: 1 }] },
       // 原图:先一条整宽标题带,再一行整宽勾选(正常使用/管控使用/挑选使用,左起均匀铺开)

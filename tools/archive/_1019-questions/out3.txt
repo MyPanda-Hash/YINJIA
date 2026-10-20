@@ -1,0 +1,31 @@
+==> SELECT panel_code, panel_name, category, module_group, mode, head_table, line_table, prefix FROM yj_panel WHERE panel_code LIKE 'QC%' OR module_group LIKE '%采购%' OR category LIKE '%采购%' OR category LIKE '%品质%' OR module_group LIKE '%品质%' ORDER BY module_group, category, seq
+[ERR] 列名 'seq' 无效。
+==> SELECT DISTINCT category, module_group FROM yj_panel ORDER BY module_group, category
+category | module_group
+-----------------------
+ERP系统集成 | ERP系统集成
+报表 | 库存管理
+采购管理 | 库存管理
+库存核算 | 库存管理
+采购管理 | 品质管理
+单据 | 品质管理
+基础档案 | 品质管理
+品质管理 | 品质管理
+生产管理 | 品质管理
+报表 | 生产制造
+单据 | 生产制造
+生产管理 | 生产制造
+生产制造 | 生产制造
+委外加工 | 生产制造
+单据 | 数据建模
+基础档案 | 数据建模
+基础设置 | 数据建模
+基础资料 | 数据建模
+数据建模 | 数据建模
+单据 | 研发管理
+研发管理 | 研发管理
+报表 | 智能供应链
+采购管理 | 智能供应链
+单据 | 智能供应链
+智能供应链 | 智能供应链
+(25 行)

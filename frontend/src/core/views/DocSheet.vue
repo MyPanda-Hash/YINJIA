@@ -301,6 +301,13 @@
                 <span v-if="sub.checks" class="q-checks deco">
                   <span v-for="o in sub.checks" :key="o" class="q-check">□ {{ tt(o) }}</span>
                 </span>
+                <!-- 关联单据链接(2026-10-19 用户口径 task 5:「品质部意见生成特采要带检验数据记录单号的链接,
+                     可以跳转」):config 的部门意见行可配 link={key,panel,label},号在库里有值就渲染成可点链接,
+                     点它切到目标面板并定位(router.push + ?docNo=,与检验目录的 ↗ 同款);打印不出现。 -->
+                <span v-if="row.link && docLinkNo(row)" class="q-doclink no-print"
+                      :title="tt('跳转到该单据')" @click.stop="gotoLink(row)">
+                  ⧉ {{ tt(row.link.label || '关联单据') }} {{ docLinkNo(row) }}
+                </span>
                 <span v-if="!config.deptSignBottom" class="q-dept-sign">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
               </div>
               <el-input
@@ -626,6 +633,7 @@ import FileAttachCell from './FileAttachCell.vue'
 import { attachFieldOf } from '@core/panel/attachField.js'
 import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { useRouter } from 'vue-router'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
 import { fixedSheetWidth } from './docSheetConfigs'
 
@@ -660,6 +668,23 @@ const remarkAttach = computed(() => attachFieldOf(props.fields))
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
+const router = useRouter()
+
+/* ── 关联单据链接(2026-10-19 用户口径 task 5)──
+   config 的「部门意见」行可带 link={key,panel,label}:key = 存号的头字段(如 检验数据记录单号),
+   panel = 目标面板编码(如 QC_INSP_REC)。号有值才渲染链接(空的就干脆不出现,别占纸面);
+   跳转口径与检验目录的「↗ 跳转到该检验单」一致 —— /panelx/list/{面板}?docNo={单号} 定位。 */
+function docLinkNo(row) {
+  const key = row && row.link ? row.link.key : ''
+  if (!key) return ''
+  const v = props.head ? props.head[key] : ''
+  return v === undefined || v === null ? '' : String(v).trim()
+}
+function gotoLink(row) {
+  const no = docLinkNo(row)
+  if (!no || !row.link || !row.link.panel) return
+  router.push({ path: `/panelx/list/${row.link.panel}`, query: { docNo: no } })
+}
 
 /**
  * 定死纸宽(2026-10-16 用户口径:「定死纸宽 1242」):纸宽表在 docSheetConfigs.FIXED_SHEET_W
@@ -1602,6 +1627,18 @@ defineExpose({ focusField })
 .q-dept-sign {
   margin-left: auto;
   color: #333;
+}
+/* 部门意见行里的关联单据链接(2026-10-19 task 5:品质部意见 → 检验数据记录单号):
+   跟在子区标题后面,蓝色可点;打印默认隐藏(带 .no-print)。 */
+.q-doclink {
+  color: #1f5fa8;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.q-doclink:hover {
+  text-decoration: underline;
 }
 /* 签名行落子区最下一行(原图);填写区 flex:1 撑开,margin-top:auto 兜底。
    flex 行布局容纳可填的 签名/年/月/日 输入框(不给 signKey/dateKey 时是纯文本,排布不变) */

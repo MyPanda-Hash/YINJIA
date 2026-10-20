@@ -1,0 +1,64 @@
+==> SELECT TOP 40 m.name AS 表名, c.name AS 列名 FROM sys.columns c JOIN sys.objects m ON m.object_id=c.object_id WHERE m.name='yj_panel' ORDER BY c.column_id
+表名 | 列名
+----------
+yj_panel | panel_code
+yj_panel | panel_name
+yj_panel | category
+yj_panel | mode
+yj_panel | line_table
+yj_panel | head_table
+yj_panel | group_col
+yj_panel | pk_col
+yj_panel | code_col
+yj_panel | prefix
+yj_panel | date_col
+yj_panel | page_size
+yj_panel | detail_key
+yj_panel | module_group
+yj_panel | config
+yj_panel | config_at
+yj_panel | panel_name_en
+(17 行)
+==> SELECT TOP 100 name FROM sys.objects WHERE type IN ('U') AND name LIKE '%supplier%' ORDER BY name
+name
+----------
+bs_supplier_group
+(1 行)
+==> SELECT name FROM sys.objects WHERE type IN ('U') AND name LIKE 'qc_%' ORDER BY name
+name
+----------
+qc_asm_insp_detail
+qc_asm_insp_head
+qc_bhc
+qc_bhc_detail
+qc_bhg
+qc_bhg_detail
+qc_bhz
+qc_bhz_detail
+qc_catalog
+qc_catalog_detail
+qc_cut_insp_detail
+qc_cut_insp_head
+qc_fin_spec_detail
+qc_fin_spec_head
+qc_insp
+qc_insp_detail
+qc_insp_rec
+qc_insp_rec_detail
+qc_insp_req
+qc_insp_req_series
+qc_jjf
+qc_jjf_detail
+qc_lyb
+qc_lyb_detail
+qc_mold_insp_detail
+qc_mold_insp_head
+qc_return
+qc_return_detail
+qc_scp
+qc_scp_detail
+qc_scy
+qc_scy_detail
+qc_tc_in
+qc_tc_in_detail
+(34 行)

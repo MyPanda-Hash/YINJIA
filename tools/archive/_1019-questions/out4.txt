@@ -1,0 +1,187 @@
+==> SELECT name FROM sys.objects WHERE type='U' AND name LIKE 'yj_%' ORDER BY name
+name
+----------
+yj_app_setting
+yj_archive_change_log
+yj_attachment
+yj_barcode_label_log
+yj_change_dept
+yj_dept
+yj_doc_annotation
+yj_doc_batch
+yj_doc_modify_log
+yj_doc_status
+yj_erp_wh_map
+yj_ext_bind_log
+yj_field
+yj_form_approval
+yj_locale
+yj_lot_seq
+yj_message
+yj_panel
+yj_plan_term
+yj_report_template
+yj_role
+yj_role_panel
+yj_schema_log
+yj_share_file
+yj_share_file_cat
+yj_std_lib
+yj_translation
+yj_usage_log
+yj_user
+(29 行)
+==> SELECT TOP 40 * FROM yj_panel WHERE panel_code='QC_TC_IN'
+panel_code | panel_name | category | mode | line_table | head_table | group_col | pk_col | code_col | prefix | date_col | page_size | detail_key | module_group | config | config_at | panel_name_en
+------------------------------------------------------------------------------------------------------------------------
+QC_TC_IN | 特采单 | 单据 | doc | qc_tc_in_detail | qc_tc_in | 单据编号 | id | 单据编号 | TCI | 单据日期 | 20 | items | 品质管理 |  |  | Incoming Special Procurement
+(1 行)
+==> SELECT TOP 200 panel_code, panel_name, module_group, category FROM yj_panel ORDER BY module_group, category, panel_code
+panel_code | panel_name | module_group | category
+-------------------------------------------------
+ERPLG | ERP导入日志 | ERP系统集成 | ERP系统集成
+ERPLG_ROW | ERP导入明细 | ERP系统集成 | ERP系统集成
+BARCODE_FIN | 成品仓条码管理 | 库存管理 | 报表
+BARCODE_MAT | 材料仓条码管理 | 库存管理 | 报表
+BARCODE_WIP | 半成品仓条码管理 | 库存管理 | 报表
+FINISH_IN_DETAIL | 产成品入库单明细表 | 库存管理 | 报表
+FINISH_IN_STATS | 产成品入库单统计表 | 库存管理 | 报表
+MATERIAL_OUT_DETAIL | 材料出库单明细表 | 库存管理 | 报表
+MATERIAL_OUT_STATS | 材料出库单统计表 | 库存管理 | 报表
+OTHER_IN_DETAIL | 其他入库单明细表 | 库存管理 | 报表
+OTHER_IN_STATS | 其他入库单统计表 | 库存管理 | 报表
+OTHER_OUT_DETAIL | 其他出库单明细表 | 库存管理 | 报表
+OTHER_OUT_STATS | 其他出库单统计表 | 库存管理 | 报表
+PURCHASE_IN_DETAIL | 采购入库单明细表 | 库存管理 | 报表
+PURCHASE_IN_STATS | 采购入库单统计表 | 库存管理 | 报表
+SALE_OUT_DETAIL | 销售出库单明细表 | 库存管理 | 报表
+SALE_OUT_STATS | 销售出库单统计表 | 库存管理 | 报表
+STOCK_BALANCE | 库存状况表 | 库存管理 | 报表
+STOCK_DETAIL | 库存明细 | 库存管理 | 报表
+STOCK_LEDGER | 库存台账 | 库存管理 | 报表
+STOCK_PICK | 库存选货 | 库存管理 | 报表
+STOCK_STATUS | 库存状况 | 库存管理 | 报表
+STOCK_SUMMARY | 收发存汇总表 | 库存管理 | 报表
+STOCKTAKE_DETAIL | 盘点单明细表 | 库存管理 | 报表
+STOCKTAKE_STATS | 盘点单统计表 | 库存管理 | 报表
+TRANSFER_DETAIL | 调拨单明细表 | 库存管理 | 报表
+TRANSFER_STATS | 调拨单统计表 | 库存管理 | 报表
+QC_RETURN | 暂收退回单 | 库存管理 | 采购管理
+FINISH_IN | 产成品入库单 | 库存管理 | 库存核算
+MATERIAL_OUT | 材料出库单 | 库存管理 | 库存核算
+OTHER_IN | 其他入库单 | 库存管理 | 库存核算
+OTHER_OUT | 其他出库单 | 库存管理 | 库存核算
+PURCHASE_IN | 采购入库单 | 库存管理 | 库存核算
+QC_RECV | 送料暂收单 | 库存管理 | 库存核算
+SALE_OUT | 销售出库单 | 库存管理 | 库存核算
+STOCKTAKE | 盘点单 | 库存管理 | 库存核算
+TRANSFER | 调拨单 | 库存管理 | 库存核算
+QC_INSP | 来料检验单 | 品质管理 | 采购管理
+QC_BHC | 不合格品处理单(制程) | 品质管理 | 单据
+QC_BHG | 不合格报告(制程) | 品质管理 | 单据
+QC_BHZ | 不合格品处理单(自制物料) | 品质管理 | 单据
+QC_CATALOG | 检验目录 | 品质管理 | 单据
+QC_INSP_REC | 检验数据记录 | 品质管理 | 单据
+QC_JJF | 紧急放行申请单 | 品质管理 | 单据
+QC_LYB | 来料异常分析报告 | 品质管理 | 单据
+QC_SCP | 试产材料使用申请单 | 品质管理 | 单据
+QC_SCY | 生产异常分析报告 | 品质管理 | 单据
+QC_TC_IN | 特采单 | 品质管理 | 单据
+QC_INSP_REQ | 来料检验要求 | 品质管理 | 基础档案
+QC_INSP_REQ_SERIES | 来料检验要求(系列) | 品质管理 | 基础档案
+QC_FIN_SPEC | 成品检验规范 | 品质管理 | 品质管理
+QC_ASM_INSP | 组装成品检验单 | 品质管理 | 生产管理
+DISPATCH_DETAIL | 工序派工单明细表 | 生产制造 | 报表
+DISPATCH_STATS | 工序派工单统计表 | 生产制造 | 报表
+WO_COMPLETION_LIST | 完工明细 | 生产制造 | 报表
+WO_PROGRESS | 工单工序进度 | 生产制造 | 报表
+WO_REPORT_LIST | 报工记录 | 生产制造 | 报表
+WO_SCHEDULE | 排单计划 | 生产制造 | 报表
+DISPATCH | 工序派工单 | 生产制造 | 单据
+DAY_REPORT | 生产日报表 | 生产制造 | 生产管理
+EQUIP_CHECK | 设备点检记录 | 生产制造 | 生产管理
+FEED_CONFIRM | 投料确认单 | 生产制造 | 生产管理
+GRAN_RECORD | 造粒记录 | 生产制造 | 生产管理
+MAINT_PLAN | 保养计划 | 生产制造 | 生产管理
+MIX_RECORD | 物料混合记录 | 生产制造 | 生产管理
+PACK_CONFIRM | 封箱确认 | 生产制造 | 生产管理
+QC_CUT_INSP | 切炭检验单 | 生产制造 | 生产管理
+QC_MOLD_INSP | 成型检验单 | 生产制造 | 生产管理
+SAMPLE_REQ | 样品申请单 | 生产制造 | 生产管理
+WH_RECORD | 无黑处理登记 | 生产制造 | 生产管理
+WO_ORDER | 生产工单(旧版) | 生产制造 | 生产管理
+WO_REPORT | 工序报工单 | 生产制造 | 生产管理
+LINE_CAP | 产线产能 | 生产制造 | 生产制造
+LINE_LOAD | 产线排产负荷 | 生产制造 | 生产制造
+MANU_ORDER | 生产工单 | 生产制造 | 生产制造
+MANU_SCHEDULE | 生产排产 | 生产制造 | 生产制造
+PROD_ABN | 生产异常处理单 | 生产制造 | 生产制造
+OUTSOURCE_ORDER | 委外加工单 | 生产制造 | 委外加工
+WLBOM | 物料清单 | 数据建模 | 单据
+CUR | 币别 | 数据建模 | 基础档案
+CUSGRP | 客户分类 | 数据建模 | 基础档案
+DEPT | 部门 | 数据建模 | 基础档案
+EMP | 职员 | 数据建模 | 基础档案
+EQUIP | 设备 | 数据建模 | 基础档案
+FIN_ACC | 会计科目 | 数据建模 | 基础档案
+FIN_EXP | 费用类别 | 数据建模 | 基础档案
+FIN_TAX | 税别资料 | 数据建模 | 基础档案
+GFDA | 供应商 | 数据建模 | 基础档案
+INV | 商品 | 数据建模 | 基础档案
+INV_PRICE | 存货价格本 | 数据建模 | 基础档案
+KHDA | 客户 | 数据建模 | 基础档案
+MATGRP | 商品分类 | 数据建模 | 基础档案
+OP | 工序 | 数据建模 | 基础档案
+OP_TIME | 工序工时 | 数据建模 | 基础档案
+PARTNER | 往来单位 | 数据建模 | 基础档案
+PROJ | 项目 | 数据建模 | 基础档案
+QC_ITEM | 检验项目 | 数据建模 | 基础档案
+QC_PLAN | 检验方案 | 数据建模 | 基础档案
+REGION | 地区 | 数据建模 | 基础档案
+REJECT | 不合格原因 | 数据建模 | 基础档案
+ROUTE | 工艺路线 | 数据建模 | 基础档案
+SETTLE | 结算方式 | 数据建模 | 基础档案
+SUPGRP | 供应商分类 | 数据建模 | 基础档案
+TEAM | 班组 | 数据建模 | 基础档案
+UOM | 计量单位 | 数据建模 | 基础档案
+WC | 工作中心 | 数据建模 | 基础档案
+WH | 仓库 | 数据建模 | 基础档案
+WHLOC | 仓位 | 数据建模 | 基础档案
+ZDGL | 数据字典 | 数据建模 | 基础档案
+RD_SINTER_TOL | 烧结尺寸表 | 数据建模 | 基础设置
+PROD_LINE | 生产线 | 数据建模 | 基础资料
+FIELDMGR | 字段管理 | 数据建模 | 数据建模
+RD_ALKALINE | 碱性 | 研发管理 | 单据
+RD_ANTIBACT | 抑菌 | 研发管理 | 单据
+RD_APPROVAL | 立项申请 | 研发管理 | 单据
+RD_ASM_BOM | 组装BOM表 | 研发管理 | 单据
+RD_ASM_PROC | 组装工艺清单 | 研发管理 | 单据
+RD_CHANGE | 产品变更申请单 | 研发管理 | 单据
+RD_DOM_TEST | 测试申请单 | 研发管理 | 单据
+RD_DROP_PREC | 压降精度 | 研发管理 | 单据
+RD_EQUIP_USE | 设备使用登记表 | 研发管理 | 单据
+RD_FILTER_EFF | 功能性滤效 | 研发管理 | 单据
+RD_INSP_PLAN | 出货检验计划表 | 研发管理 | 单据
+RD_INSTR_USE | 仪器使用记录表 | 研发管理 | 单据
+RD_MINERAL | 矿化 | 研发管理 | 单据
+RD_MOLD_FORMULA | 成型配方 | 研发管理 | 单据
+RD_MOLD_PROC | 成型工艺清单 | 研发管理 | 单据
+RD_PLAN | 项目实施计划 | 研发管理 | 单据
+RD_PROD_DOCLIST | 产品文件列表 | 研发管理 | 单据
+RD_PROD_INFO | 产品信息表 | 研发管理 | 单据
+RD_PROGRESS | 项目进度查询 | 研发管理 | 单据
+RD_RO_PROTECT | RO保护 | 研发管理 | 单据
+RD_SCALE | 阻垢性能 | 研发管理 | 单据
+RD_SOAK | 浸泡安全 | 研发管理 | 单据
+RD_SPEC_DOC | 规格书 | 研发管理 | 单据
+RD_SPIKE_WATER | 加标水配置记录表 | 研发管理 | 单据
+RD_SHARE_FILE | 共享文件库 | 研发管理 | 研发管理
+PU_ORDER_DETAIL | 采购订单明细表 | 智能供应链 | 报表
+PU_ORDER_STATS | 采购订单统计表 | 智能供应链 | 报表
+SALES_ORDER_DETAIL | 销售订单明细表 | 智能供应链 | 报表
+SALES_ORDER_STATS | 销售订单统计表 | 智能供应链 | 报表
+PU_ORDER | 采购订单 | 智能供应链 | 采购管理
+CGD | 采购单 | 智能供应链 | 单据
+KHDD | 客户订单 | 智能供应链 | 单据
+SO_ORDER | 销售订单 | 智能供应链 | 智能供应链
+(145 行)

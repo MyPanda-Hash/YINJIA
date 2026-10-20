@@ -1,7 +1,8 @@
 <template>
   <!-- 打印材料码(2026-10-04 用户口径「在打印材料的时候弹出一个弹窗,可以填写打印的批次号(按之前的格式预填)
        与勾选需要打印的行号和他的数量」):
-        批次号默认 = 供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd(服务端算,与生单同一公式),**可改**;
+        批次号默认 = **当天日期 yyyyMMdd**(服务端算,与生单同一公式;2026-10-19 用户口径:
+        改回纯日期,不再拼供应商编码),**可改**;
         勾行 + 填本次打印数量(上限 = 该行头寸 − 其它打印记录已预约的量);
         ⚠ **一次只打一行**(追加口径「打印需要是每次一行,不能多行否则作废就全部作废了」):
         选行用**单选**、一次一张打印单 ⇒ 作废只影响这一行;要打第二行就再打开一次弹窗。
@@ -23,7 +24,7 @@
         <span class="mlq-chip mlq-batch">
           {{ tt('批次号') }}:
           <el-input v-model="batchNo" size="small" class="mlq-batch-inp" maxlength="100" clearable
-            :placeholder="tt('生单时按供应商编码与当天日期生成')" />
+            :placeholder="tt('生单时按当天日期生成')" />
           <el-button v-if="batchNo !== data.prefBatchNo" link type="primary" size="small"
             @click="batchNo = data.prefBatchNo">{{ tt('恢复默认') }}</el-button>
         </span>

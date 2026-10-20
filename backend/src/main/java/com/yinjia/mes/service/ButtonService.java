@@ -612,7 +612,7 @@ public class ButtonService {
         }
         // 批次号自洽(2026-10-04 口径:生单即定号,不再有入库审核回填):
         // 链路四单(送料暂收/来料检验/暂收退回/采购入库)保存后立刻把**单头**批次号同步到全部明细行,
-        // 并在缺号时按「供应商编码去掉 YJ- 前缀 + - + 当天」取号 —— 用户口径:
+        // 并在缺号时按「**当天 yyyyMMdd**」取号(2026-10-19 用户口径:批次号改回纯日期,不再拼供应商编码) —— 用户口径:
         // 「单头可改(暂收单草稿态),下面的明细项目与单头一致,审批后一律不可改」。
         // 明细列在 yj_field 里是 editable=0(见 tools/migrate-batch-no-on-generate.sql),
         // 行上的号只由这一处维护;非批次面板/无该列时内部直接返回,不做任何写入。
@@ -1907,13 +1907,16 @@ public class ButtonService {
         }
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         // 产品入库单 / 其他入库单 / 其他出库单 2026-10-14 接入转ERP,同批纳入本联动
-        if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT").contains(def.code())) {
+        // 暂收退料单 2026-10-19 接入(《10.19 问题》第 8 条),同样纳入
+        if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
+                "QC_RETURN").contains(def.code())) {
             String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
                     : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
                     : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out"
                     : "FINISH_IN".equals(def.code()) ? "bd_finish_in"
                     : "OTHER_IN".equals(def.code()) ? "bd_other_in"
-                    : "OTHER_OUT".equals(def.code()) ? "bd_other_out" : "bd_sale_out";
+                    : "OTHER_OUT".equals(def.code()) ? "bd_other_out"
+                    : "QC_RETURN".equals(def.code()) ? "qc_return" : "bd_sale_out";
             jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
@@ -3766,6 +3769,13 @@ public class ButtonService {
             head.put("总数量", trimZero(tot) + (uom == null ? "" : String.valueOf(uom)));
             if (inspNo != null) head.put("检验单号", inspNo);           // 隐藏链路列:再上一站,采购入库单取数靠它
             head.put("暂收退料单号", no);                                // 隐藏链路列:本行的来源单据
+            // 检验数据记录单号(2026-10-19 用户口径 task 5:「品质部意见生成特采要带检验数据记录单号的链接,
+            // 可以跳转」)? 品质部在特采单上写意见时要能一键翻到那张检验报告(YJ-QR-96)。
+            // 真源 = 检验目录行(qc_catalog_detail:检验单号 + 物料编码 → 检验数据记录单号),
+            // 由 QcCatalogService.syncFromInspection 在检验单生单时就写好;取不到(手工补的报告、
+            // 目录行被取消)就留空 —— 纸面不显示链接,不阻断生单。
+            String recNo = specialAcceptRecNo(inspNo, str(r.get("物料编码")));
+            if (!recNo.isEmpty()) head.put("检验数据记录单号", recNo);
             if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
             if (ih.get("批次号") != null) head.put("批次号", ih.get("批次号"));
             head.put("备注", "特采行:物料编码=" + r.get("物料编码") + ",规格型号=" + r.get("规格型号")
@@ -3778,6 +3788,29 @@ public class ButtonService {
                             + " VALUES ('QC_RETURN', ?, ?, 'QC_TC_IN', ?, NULL, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
                     no, lineKey, tcNo, r.get("物料编码"),
                     r.get("送检数量"), tot, ih.get("批次号"), ih.get("批次键"), user);
+        }
+    }
+
+    /**
+     * 该 (检验单号, 物料编码) 对应的**检验数据记录单号**(检验报告 YJ-QR-96 的单号)。
+     *
+     * <p>用途(2026-10-19 用户口径 task 5):特采单「品质部意见」区要挂一条**可点击的检验数据记录单号**,
+     * 点它跳到那张检验报告;生特采时就把号带上,不必让人再自己去检验目录里翻。
+     * 真源是检验目录行 {@code qc_catalog_detail}(由 {@code QcCatalogService.syncFromInspection}
+     * 在检验单生单时写好:检验单号 + 物料编码 → 检验数据记录单号)。
+     * 查不到(手工补的报告 / 目录行被取消 / 老链路没有目录行)返回空串 —— 调用方据此不写该字段,
+     * 纸面上就不出现链接,不阻断生单。表/列缺失也按"没有"处理(迁移未跑的环境不会因此 500)。
+     */
+    private String specialAcceptRecNo(String inspNo, String invCode) {
+        if (inspNo == null || inspNo.isBlank() || invCode == null || invCode.isBlank()) return "";
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 检验数据记录单号 FROM qc_catalog_detail"
+                            + " WHERE 检验单号 = ? AND 物料编码 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL(检验数据记录单号,N'') <> N'' ORDER BY id DESC", inspNo, invCode);
+            return rows.isEmpty() ? "" : str(rows.get(0).get("检验数据记录单号"));
+        } catch (org.springframework.dao.DataAccessException ignore) {
+            return "";
         }
     }
 
@@ -4577,17 +4610,21 @@ public class ButtonService {
     }
 
     private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT").contains(def.code()))
-            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库支持转ERP");
+        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
+                // 2026-10-19《10.19 问题》第 8 条:暂收退料单接转ERP(金蝶「采购退货单」pur_ret)
+                "QC_RETURN").contains(def.code()))
+            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
         String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
                 : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
                 : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out"
                 : "FINISH_IN".equals(def.code()) ? "bd_finish_in"
                 : "OTHER_IN".equals(def.code()) ? "bd_other_in"
-                : "OTHER_OUT".equals(def.code()) ? "bd_other_out" : "bd_sale_out";
+                : "OTHER_OUT".equals(def.code()) ? "bd_other_out"
+                : "QC_RETURN".equals(def.code()) ? "qc_return" : "bd_sale_out";
         // 材料出库单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
         // 产品入库单(2026-10-14 接入转ERP)是生产完工入库,同样无 客户/供应商 列,往来单位取「经手人」
         // 其他入库单=供应商往来;其他出库单=内部领用,往来单位取「经手人」
+        // 暂收退料单=退给供应商,头上有「供应商」(名称)列 ⇒ 走默认「供应商」
         String partnerCol = "SALE_OUT".equals(def.code()) ? "客户"
                 : "MATERIAL_OUT".equals(def.code()) ? "领用人"
                 : "FINISH_IN".equals(def.code()) || "OTHER_OUT".equals(def.code()) ? "经手人" : "供应商";
@@ -4604,10 +4641,11 @@ public class ButtonService {
         return out;
     }
 
-    /** 转ERP:已审核+未转过的采购入库/销售出库/材料出库/产品入库/其他入库/其他出库 → 推金蝶,回写ERP单号 */
+    /** 转ERP:已审核+未转过的采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单 → 推金蝶,回写ERP单号 */
     private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT").contains(def.code()))
-            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库支持转ERP");
+        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
+                "QC_RETURN").contains(def.code()))
+            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
         String docNo = String.valueOf(formData.getOrDefault("编号", formData.getOrDefault("单据编号", "")));
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
         String operator = currentUserName();

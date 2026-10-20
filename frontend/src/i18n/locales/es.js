@@ -2319,7 +2319,7 @@ export default {
     '已送合计': 'Total entregado',
     '待编号': 'N.º pendiente',
     '{n} 批待编号': '{n} lote(s) sin n.º',
-    '生单时按供应商编码与当天日期生成': 'Se genera con el código de proveedor y la fecha del día al crear el documento',
+    '生单时按当天日期生成': 'Se genera con la fecha del día al crear el documento',
     '随单头批次号一致,不可修改': 'Igual al n.º de lote de la cabecera; no editable',
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Solo se generan las líneas marcadas; máximo = cantidad pedida × (1 + ratio) − entregado + devuelto (sobreentrega máx. 50 %)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = no permitido; máx. 50 %, cupo según cantidad pedida)',

@@ -1,0 +1,91 @@
+==> SELECT ref_key, locale, text FROM yj_translation WHERE scope='field' AND ref_key LIKE N'附件%' ORDER BY ref_key
+ref_key | locale | text
+-----------------------
+附件 | en | Attachments
+附件 | ja | 添付ファイル
+附件 | ko | 첨부파일
+附件 | de | Anhänge
+附件 | fr | Pièces jointes
+附件 | es | Adjuntos
+附件 | ru | Вложения
+附件 | vi | Tệp đính kèm
+附件 | th | ไฟล์แนบ
+附件 | zh-TW | 附件
+附件1 | ja | 添付ファイル1
+附件1 | en | Attachment 1
+附件1 | ko | 첨부파일 1
+附件1 | de | Anhang 1
+附件1 | fr | Pièce jointe 1
+附件1 | es | Adjunto 1
+附件1 | ru | Вложение 1
+附件1 | vi | Tệp đính kèm 1
+附件1 | th | ไฟล์แนบ 1
+附件1 | zh-TW | 附件1
+附件2 | ko | 첨부파일 2
+附件2 | de | Anhang 2
+附件2 | fr | Pièce jointe 2
+附件2 | es | Adjunto 2
+附件2 | ru | Вложение 2
+附件2 | vi | Tệp đính kèm 2
+附件2 | th | ไฟล์แนบ 2
+附件2 | zh-TW | 附件2
+附件2 | en | Attachment 2
+附件2 | ja | 添付ファイル2
+附件3 | ja | 添付ファイル3
+附件3 | en | Attachment 3
+附件3 | ko | 첨부파일 3
+附件3 | de | Anhang 3
+附件3 | fr | Pièce jointe 3
+附件3 | es | Adjunto 3
+附件3 | ru | Вложение 3
+附件3 | vi | Tệp đính kèm 3
+附件3 | th | ไฟล์แนบ 3
+附件3 | zh-TW | 附件3
+附件4 | ko | 첨부파일 4
+附件4 | de | Anhang 4
+附件4 | fr | Pièce jointe 4
+附件4 | es | Adjunto 4
+附件4 | ru | Вложение 4
+附件4 | vi | Tệp đính kèm 4
+附件4 | th | ไฟล์แนบ 4
+附件4 | zh-TW | 附件4
+附件4 | en | Attachment 4
+附件4 | ja | 添付ファイル4
+附件5 | ja | 添付ファイル5
+附件5 | en | Attachment 5
+附件5 | ko | 첨부파일 5
+附件5 | de | Anhang 5
+附件5 | fr | Pièce jointe 5
+附件5 | es | Adjunto 5
+附件5 | ru | Вложение 5
+附件5 | vi | Tệp đính kèm 5
+附件5 | th | ไฟล์แนบ 5
+附件5 | zh-TW | 附件5
+附件6 | ko | 첨부파일 6
+附件6 | de | Anhang 6
+附件6 | fr | Pièce jointe 6
+附件6 | es | Adjunto 6
+附件6 | ru | Вложение 6
+附件6 | vi | Tệp đính kèm 6
+附件6 | th | ไฟล์แนบ 6
+附件6 | zh-TW | 附件6
+附件6 | en | Attachment 6
+附件6 | ja | 添付ファイル6
+附件地址 | en | Attachments Url
+附件个数 | en | Attachments
+(72 行)
+==> SELECT COUNT(DISTINCT f.label) AS 缺en标签数 FROM yj_field f WHERE ISNULL(f.visible,1)=1 AND NOT EXISTS (SELECT 1 FROM yj_translation t WHERE t.scope='field' AND t.ref_key=f.label AND t.locale='en')
+缺en标签数
+----------
+193
+(1 行)
+==> SELECT f.panel_code, f.label FROM yj_field f WHERE f.panel_code='QC_TC_IN' AND f.label LIKE N'附件%'
+panel_code | label
+------------------
+QC_TC_IN | 附件1
+QC_TC_IN | 附件2
+QC_TC_IN | 附件3
+QC_TC_IN | 附件4
+QC_TC_IN | 附件5
+QC_TC_IN | 附件6
+(6 行)

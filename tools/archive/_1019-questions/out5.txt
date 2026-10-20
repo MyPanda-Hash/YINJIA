@@ -1,0 +1,18 @@
+==> SELECT panel_code, seq, label, place, visible, hidden, required, editable, ref_panel, ref_field, col_name, [type], options FROM yj_field WHERE panel_code IN ('QC_TC_IN') ORDER BY seq, id
+[ERR] 列名 'type' 无效。
+==> SELECT panel_code, COUNT(*) AS 字段数 FROM yj_field WHERE panel_code IN ('QC_TC_IN','QC_INSP','QC_INSP_REC','QC_BHG','QC_BHC','QC_BHZ','QC_JJF','QC_SCP','QC_LYB','QC_SCY','QC_RETURN','QC_RECV') GROUP BY panel_code
+panel_code | 字段数
+----------------
+QC_BHC | 29
+QC_BHG | 24
+QC_BHZ | 25
+QC_INSP | 54
+QC_INSP_REC | 26
+QC_JJF | 21
+QC_LYB | 21
+QC_RECV | 70
+QC_RETURN | 34
+QC_SCP | 19
+QC_SCY | 19
+QC_TC_IN | 39
+(12 行)
