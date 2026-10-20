@@ -46,10 +46,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * **默认宽松、可收紧,且不靠发版**。读 config 用字符串匹配(库兼容级别 100 无 JSON 函数,
  * 与 {@code PanelConfigService.panelSingleDoc} 同一写法)。</p>
  *
- * <p>调用方(四处共用同一判据,禁止各写一份):{@code QcProcInspController}、
+ * <p>调用方(共用同一判据,禁止各写一份):{@code QcProcInspController}、
  * {@code QcFirstInspController} 的 {@code woLines/fromWoLine},以及
  * {@code ButtonService.woInspGenerate} 报工审核出单钩子(判据与单头组装在 {@link QcInspAutoService};
  * 手机端直写走 {@code ExternalReportAbsorbService} → 同一个 build)。</p>
+ *
+ * <p><b>2026-10-20 口径变更</b>:首件检验单**退出**这道门禁({@link #UNGATED_PANELS})——
+ * 用户口径「首件检验单需要关联当前的生产工单即可,不需要实现成型报工完成流程才产生」。
+ * 首件改成按「未完工 + 未被本单占用」选工单,见 {@code QcFirstInspController.woLines};
+ * 制程/组装成品两张单不变。</p>
  */
 public final class WoInspGate {
 
@@ -89,6 +94,32 @@ public final class WoInspGate {
     /** 强度配置的读取面:三张检验单任一在 `yj_panel.config` 里写了 `inspGate` 即生效(取第一个非空的,顺序固定) */
     private static final String[] GATE_PANELS = {"QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP"};
 
+    /**
+     * **不做成型报工门禁的面板**(2026-10-20 用户口径变更)。
+     *
+     * <p>用户原话:「查看当前系统内的首件检验单的实现,当前是被流程卡死,不完成成型报工就不能产生当前
+     * 的首件检验单,当前直接实现对这个 —— 首件检验单需要关联当前的生产工单即可,不需要实现成型报工
+     * 完成流程才产生。就是当前检验单能选取工单,未完工的工单就可以选取,但是已经完成的就不需要能被
+     * 选取,已经被当前的检验单选取的也不能被再次选取。」</p>
+     *
+     * <p>⇒ **首件检验单退出「成型已报工」门禁**:准入条件改成「未完工 + 该工单行还没有存活的首件检验单」
+     * (见 {@code QcFirstInspController.woLines})。制程检验单、组装成品检验单仍按原口径。</p>
+     *
+     * <p>为什么开关留在这一个类里、而不把首件那边的调用删干净:判据、强度档位、留痕、强制开单是一整套
+     * 深模块,两个控制器的调用点保持同一形状;将来首件若要重新收紧,改这一行即可,不用回控制器重建调用。
+     * {@link #CALIBER} 管「算不算完成」,本名单管「这一张单受不受管」。门禁**强度**配置
+     * ({@code yj_panel.config} 的 {@code inspGate})对首件从此不再起作用。</p>
+     */
+    private static final Set<String> UNGATED_PANELS = Set.of("QC_FIRST_INSP");
+
+    /**
+     * 该面板的成型报工门禁是否生效。
+     * @param panelCode 目标单据面板编码(传 null 视为"受管",不改变既有口径)
+     */
+    public static boolean gated(String panelCode) {
+        return panelCode == null || !UNGATED_PANELS.contains(panelCode);
+    }
+
     /** 配置缓存(按账套;TTL 与 PanelRegistry 一致,改配置最多 30s 生效,免得每次开单都读一次元数据) */
     private static final long POLICY_TTL_MS = 30_000;
     private static final Map<String, Object[]> POLICY_CACHE = new ConcurrentHashMap<>();   // [Policy, loadedAt]
@@ -125,7 +156,11 @@ public final class WoInspGate {
      * **「选生产工单」列表的准入条件**(2026-10-18 用户口径:
      * 「当前选取的生产工单应该至少排产完成型才能出现」)。
      *
-     * <p>现状:首件/制程两个手工入口的 {@code woLines} 把**全部未作废未结案工单行**都列出来
+     * <p>⚠ 2026-10-20 起**只有制程检验单**用它 —— 首件检验单退出这道门槛,改成「未完工 + 未被本单占用」
+     * (用户口径「未完工的工单就可以选取,已经完成的就不需要能被选取」),见
+     * {@code QcFirstInspController.woLines}。</p>
+     *
+     * <p>现状:制程检验单的手工入口把**全部未作废未结案工单行**都列出来
      * (正式库实测 424 行,其中只有 1 行排过产)⇒ 现场要在几百行里找人。这里加最低门槛:</p>
      * <ol>
      *   <li>{@code plang.scx} 非空 = **已排产入线**;</li>

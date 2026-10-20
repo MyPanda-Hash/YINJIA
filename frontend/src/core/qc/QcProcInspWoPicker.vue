@@ -10,6 +10,14 @@
                             (表头多带客户代码/客户名称,明细按《成型工艺清单》预铺 —— 与报工审核
                              自动出单同源,故手工建的与自动出的长得一样)。
 
+     🔴 2026-10-20 口径(首件检验单):用户口径「首件检验单需要关联当前的生产工单即可,不需要实现成型
+        报工完成流程才产生。就是当前检验单能选取工单,未完工的工单就可以选取,但是已经完成的就不需要
+        能被选取,已经被当前的检验单选取的也不能被再次选取。」⇒
+          · 首件这边**不再有成型报工门禁**:服务端只回「未完工 + 未被本单占用」的行,每行都可选,
+            故成型完工量/成型计划量/可开单/已建单号四列**只在制程模式显示**,首件模式改显示「生产状态」
+            (与「生产工单」列表同一套判据:未排产/在产/未完工;完工与已结案的行不会出现在本列表);
+          · 制程检验单保持原样(已排产 + 成型报工门禁 + 强制开单通道)。
+
      ⚠ 文件名保留历史名(QcProcInsp…):改名要动 PanelxList 的 import 与模板,收益只是好看;
        调用方一处(mode 由 PanelxList 按当前面板给)。
 
@@ -22,14 +30,18 @@
              destroy-on-close @update:model-value="(v) => emit('update:modelValue', v)" @open="load(1)">
     <div class="wopick-tip">
       {{ isFirst
-        ? tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成首件检验单草稿（明细按成型工艺清单预铺）；已建单的行会标出来，重复选择不会重复建单。')
+        ? tt('选择一条未完工的生产工单行（工单号 + 工单行号唯一确定）生成首件检验单草稿（明细按成型工艺清单预铺）。')
         : tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。') }}
     </div>
-    <!-- 列表门槛(2026-10-18,用户口径「选取的生产工单应该至少排产完成[成]型才能出现」):
+    <!-- 列表门槛(制程,2026-10-18 用户口径「选取的生产工单应该至少排产完成[成]型才能出现」):
          后端 woLines 只回**已排产入线**(有预排台账的还要求成型那道已排)的工单行,见 WoInspGate.pickable。
          门禁(2026-10-19「成型完成后的生产工单才能生成检验单」)仍逐行判定:置灰 + 写明原因,
-         真正的拦截在后端(422)。 -->
-    <div class="wopick-gate">{{ tt('只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。') }}</div>
+         真正的拦截在后端(422)。
+         🔴 2026-10-20:首件检验单**已退出**这道门禁(用户口径「未完工的工单就可以选取」)——
+         服务端只回未完工、且还没有首件检验单的工单行,每行都可选。 -->
+    <div class="wopick-gate">{{ isFirst
+      ? tt('只列未完工的工单行；已完工、已结案或已有首件检验单的工单行不再列出。')
+      : tt('只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。') }}</div>
 
     <div class="wopick-bar">
       <el-input v-model="keyword" :placeholder="tt('工单号 / 产品编码 / 产品名称')" clearable style="width: 280px"
@@ -47,9 +59,10 @@
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
       <el-table-column :label="tt('生产线')" prop="生产线" width="100" />
       <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
-      <el-table-column :label="tt('成型完工量')" prop="成型完工量" width="100" align="right" />
-      <el-table-column :label="tt('成型计划量')" prop="成型计划量" width="100" align="right" />
-      <el-table-column :label="tt('可开单')" width="130">
+      <!-- 门禁三列只对制程检验单有意义(首件已退出成型报工门禁,每行都可选,见文件头 2026-10-20) -->
+      <el-table-column v-if="!isFirst" :label="tt('成型完工量')" prop="成型完工量" width="100" align="right" />
+      <el-table-column v-if="!isFirst" :label="tt('成型计划量')" prop="成型计划量" width="100" align="right" />
+      <el-table-column v-if="!isFirst" :label="tt('可开单')" width="130">
         <template #default="{ row }">
           <el-tooltip v-if="row['预警放行']" :content="tt(row['不能开单原因'])" placement="top">
             <el-tag size="small" type="warning">{{ tt('预警放行') }}</el-tag>
@@ -62,8 +75,19 @@
           </el-tooltip>
         </template>
       </el-table-column>
+      <!-- 首件模式:未完工的工单行才列出来(后端已过滤)。这里放「生产状态」而不是裸的「完工状态」——
+           口径与「生产工单」列表同一套(PlangStatus):未排产/在产/未完工;完工与已结案的行根本不会出现。
+           (2026-10-20 用户报障:库里 完工状态 为空时这里兜底显示「未开工」,与生产工单列表的「未排产」对不上) -->
+      <el-table-column v-if="isFirst" :label="tt('生产状态')" width="100">
+        <template #default="{ row }">
+          <el-tag size="small" :type="prodStatusType(row['生产状态'])">
+            {{ tt(row['生产状态'] || '未完工') }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('客户')" prop="客户" width="80" />
-      <el-table-column :label="tt('已建单号')" prop="已建单号" width="140">
+      <!-- 已建单号:制程仍按原样标出来;首件那边「已有首件单」的行后端直接不列(用户口径:不能再选取) -->
+      <el-table-column v-if="!isFirst" :label="tt('已建单号')" prop="已建单号" width="140">
         <template #default="{ row }">
           <el-tag v-if="row['已建单号']" size="small" type="info">{{ row['已建单号'] }}</el-tag>
           <span v-else>{{ '-' }}</span>
@@ -125,6 +149,16 @@ const canForce = computed(() => !!(cur.value && cur.value['可开单'] === false
 
 function rowClass({ row }) {
   return row && row['可开单'] === false && !gateMeta.value['可强制开单'] ? 'wopick-blocked' : ''
+}
+
+/**
+ * 首件模式的「生产状态」标签色(值由后端 PlangStatus 按生产工单列表口径算好):
+ * 在产=橙、完工=绿(理论不会出现)、其余(未排产/未完工)=灰。
+ */
+function prodStatusType(state) {
+  if (state === '在产') return 'warning'
+  if (state === '完工') return 'success'
+  return 'info'
 }
 
 function onCurrent(r) {

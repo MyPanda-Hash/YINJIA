@@ -112,7 +112,8 @@ public class QcProcInspController {
 
         // 门禁(2026-10-19 用户口径「成型完成后的生产工单才能生成检验单」):判据/话术/留痕都在
         // WoInspGate + WoInspGateGuard 一处,与首件检验单、以及两个自动出单钩子共用同一份实现。
-        gate.decorate(rows);
+        // (2026-10-20:首件检验单已退出这道门禁,制程检验单不变。)
+        gate.decorate(PANEL, rows);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("list", rows);

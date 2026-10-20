@@ -219,19 +219,12 @@ public class WorkOrderListController {
         //   · 在产  = 有入库但未达标;未完工 = 无入库;未排产 = 无产线。
         //   ⚠ 原口径「完工 = 入库≥排产」把"生产做完了"(完工)和"货入完库了"混在一个词里,
         //     用户报障「全部报工完成后不会变为完工,会变为已结案」即由此而来。
+        //   2026-10-20:判定收口到 {@link com.yinjia.mes.service.PlangStatus} —— 首件检验单「选生产工单」
+        //     显示同一列(用户报障:库里 完工状态 为 NULL 时那边兜底显示「未开工」,与本页「未排产」对不上)
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
-            double sched = ((Number) r.getOrDefault("排产数量", 0)).doubleValue();
-            double in = ((Number) r.getOrDefault("入库数量", 0)).doubleValue();
-            String line = String.valueOf(r.getOrDefault("生产线", ""));
-            boolean closed = "Y".equals(String.valueOf(r.getOrDefault("结案", "N")));
-            String doneState = String.valueOf(r.getOrDefault("完工状态", ""));
-            boolean prodDone = "生产完工".equals(doneState) || "已完工".equals(doneState);
-            m.put("生产状态", line.isBlank() ? "未排产"
-                    : closed ? "已结案"
-                    : (prodDone || (sched > 0 && in >= sched)) ? "完工"
-                    : (in > 0 ? "在产" : "未完工"));
+            m.put("生产状态", com.yinjia.mes.service.PlangStatus.of(m));
             out.add(m);
         }
         return ApiResult.ok(out);

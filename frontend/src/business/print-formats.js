@@ -7,7 +7,8 @@
  *     ③b 仓位标识卡(2026-09-28 建为「库位标识卡」,2026-10-08 正名):同款 75×100mm,
  *        卡面=仓库/仓位地址/仓位编码,二维码=仓库编码@仓位编码(2026-10-18 去地址段);
  *   ④ 生产任务单(打印工单,2026-09-24):横向 A4 一表多行+行尾二维码=公司代码@工单号@1000+行号(2026-10-09 规则改版,woQrText)。
- * 打印通道:新窗口 HTML + window.print()(同 QrLabelDialog,绕开 jsPDF §5.5 坑);
+ * 打印通道:**页面内打印层 + window.print()**(`@core/panel/printChannel`,2026-10-20 全系统统一;
+ *   旧「新窗口 HTML + 子窗口 print」已删除 —— 同源弹窗与主页面共用渲染进程,打印预览一卡就整页卡死);
  * 版面文字(公司抬头/注意事项/需方联系/生产任务单表头)为固定版式常量,改文案只动本文件。
  * 业务单据为纸面事实格式,不入 tt() 翻译层(ADR-0001)。
  * 纸面「总　计」的位数与明细一致(2026-10-03 用户口径,见 @core/panel/sumTotals):
@@ -20,6 +21,9 @@ import * as QRCodeMod from 'qrcode'
 //   测试可见的模块一律用相对路径;只走打包链路的模块才用别名。
 //   另外 node ESM 必须写**扩展名**(Vite 可省),所以是 '../core/panel/sumTotals.js'。
 import { sumKeepScale } from '../core/panel/sumTotals.js'
+// 打印通道(2026-10-20):与面板单据打印同一条路 —— 主页面打印层 + window.print(),不弹窗。
+// 与 sumTotals 同理写相对路径 + 扩展名:`node --test` 直接加载本文件时不认 Vite 别名。
+import { printInPage } from '../core/panel/printChannel.js'
 
 /** qrcode 库兼容取用:CJS 互操作下 toDataURL 可能挂在 .default 上 */
 function qrLib() {
@@ -62,90 +66,12 @@ const fmtNum = (v) => {
   return v == null || v === '' || Number.isNaN(n) ? '' : String(n)
 }
 
-/**
- * **在主页面上打印一段独立 HTML**(2026-10-19):不弹窗、不 document.write、不在子窗口里自动 print。
- *
- * 为什么加它(现场「打印工单后整页卡死,刷新也无效,只能关标签」):
- *   弹窗打印那条路(`openPrintWindow`)会把主页面一起拖死 —— 同源弹窗与主页面**共用一个渲染进程**,
- *   打印预览/虚拟机打印机(WPS 虚拟 PDF)一卡,主页面跟着僵死,刷新仍是同一个进程 ⇒ 救不回来。
- *   而**面板单据打印**走的是"主页面打印层 + window.print()"(PanelxList.ensureDocPrintLayer),
- *   现场天天打、从来没卡过 ⇒ 把工单任务单也切到同一条路。
- *
- * 做法:把单据 HTML 塞进 body 末尾一个隐藏容器,打印时用 `@media print` 把**其它内容全部隐藏**,
- *   `window.print()` 之后清理(`afterprint` 或 60 秒兜底)。
- *   屏幕上看不到这一层(`@media screen{display:none}`),打印时只剩它。
- */
-function printInPage(title, bodyHtml) {
-  const HOST = 'yj-print-host'
-  const CSS = 'yj-print-host-css'
-  const cleanup = () => {
-    const h = document.getElementById(HOST)
-    if (h) h.remove()
-    const c = document.getElementById(CSS)
-    if (c) c.remove()
-    if (title) document.title = prevTitle
-    window.removeEventListener('afterprint', cleanup)
-  }
-  const prevTitle = document.title
-  try {
-    cleanup()   // 上一次残留(打印中途关掉之类)
-    const host = document.createElement('div')
-    host.id = HOST
-    host.innerHTML = bodyHtml
-    document.body.appendChild(host)
-    const style = document.createElement('style')
-    style.id = CSS
-    style.textContent = '@media screen{#yj-print-host{display:none!important}}'
-      + '@media print{body>*:not(#yj-print-host){display:none!important}'
-      + 'html,body{background:#fff!important;margin:0!important;padding:0!important}'
-      + '#yj-print-host{display:block!important}}'
-    document.head.appendChild(style)
-    window.addEventListener('afterprint', cleanup)
-    if (title) document.title = title
-    // 等一帧让样式/图片生效再拉起打印(否则偶发空白页)
-    requestAnimationFrame(() => {
-      try { window.print() } catch { cleanup() }
-    })
-    // 兜底:某些浏览器不触发 afterprint(定时器 unref 掉,避免单测/Node 环境挂住进程)
-    const t = setTimeout(cleanup, 60000)
-    if (t && typeof t.unref === 'function') t.unref()
-    return true
-  } catch (e) {
-    cleanup()
-    console.warn('[print-formats] 页面内打印失败:', e?.message || e)
-    return false
-  }
-}
+/** 出纸失败的统一提示(页面内打印不再依赖"允许弹出窗口",只可能被浏览器禁掉打印对话框) */
+const PRINT_FAIL_MSG = '打印失败:浏览器阻止了打印,请允许本页面弹出打印对话框'
 
-/**
- * 新窗口打开打印(自动调起 print 对话框);宽表横向由各自 @page 控制。
- *
- * 🔴 2026-10-18 改两处(现场「打印完工单后浏览器卡死」):
- *   ① **复用同一个打印窗口**(固定窗口名 `yj-print`):原来每次打印都 `window.open('_blank')` 且**从不关闭**,
- *      打一张就多一个带整页文档 + 二维码图片的窗口;一天下来几十个窗口把内存吃满,浏览器就会整体卡死
- *      (表现为点什么都无响应、白屏,只能关标签)。现在第二次打印**复用**那个窗口。
- *   ② **打完自动关**:`onafterprint` 里 300ms 后 `close()`(用户点「取消」也会触发 afterprint,不会留垃圾窗口)。
- *      若浏览器不允许脚本关自己打开的窗口,`close()` 静默失败,不影响打印本身。
- * ⚠ 2026-10-19:「打印工单」已改走 {@link printInPage}(弹窗这条路在现场会把主页面一起拖死);
- *   本函数仍保留给其它单据(采购订单/退货单/标识卡)使用。
- */
-function openPrintWindow(title, bodyHtml) {
-  const w = window.open('', 'yj-print', 'width=1100,height=780')
-  if (!w) return false
-  try { w.focus() } catch { /* 某些浏览器禁止 focus,忽略 */ }
-  // 复用已存在的窗口时要先清空,否则 document.write 会追加到旧内容后面
-  try { w.document.open() } catch { /* ignore */ }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>'
-    + '@page{size:A4 portrait;margin:10mm}'
-    + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111;font-size:12px}'
-    + '</style></head><body>' + bodyHtml
-    + '<scr' + 'ipt>'
-    + 'window.onload=function(){setTimeout(function(){try{window.print()}catch(e){}},200)};'
-    + 'window.onafterprint=function(){setTimeout(function(){try{window.close()}catch(e){}},300)};'
-    + '</scr' + 'ipt></body></html>')
-  w.document.close()
-  return true
-}
+// ⚠ 2026-10-20:旧的子窗口打印函数(`openPrintWindow`)已**整段删除** ——
+//   原因与替代见 `../core/panel/printChannel.js` 头部;本文件一律 printInPage(...),
+//   **不要再往回加 window.open 打印**(单测里没有 window.open,写回去立刻 TypeError)。
 
 /**
  * 生产任务单三模板(2026-09-27 用户截图版式,生产工单列表/工单排产看板共用):
@@ -214,7 +140,7 @@ export async function printWorkTaskSheet(title, rows, opts = {}) {
   // 🔴 2026-10-19:改走**页面内打印**(与面板单据打印同一条路),不再弹窗。
   //   现场实测:打印工单(哪怕只有 1 张)后整页僵死、刷新无效、只能关标签 —— 弹窗与主页面共用渲染进程,
   //   打印预览/虚拟打印机一卡就一起死。页面内打印走 window.print(),和"打单据"完全一致。
-  if (!printInPage(title, body)) { alert('打印失败:浏览器阻止了打印,请允许本页面弹出打印对话框'); return false }
+  if (!printInPage(title, body)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }
 
@@ -292,7 +218,7 @@ export function printPuOrder(doc, lines) {
     + '</tbody></table>'
     + PU_NOTES_HTML
     + PU_SIGN_HTML
-  if (!openPrintWindow('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert('浏览器拦截了打印窗口,请允许弹出窗口')
+  if (!printInPage('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
 }
 
 /**
@@ -333,7 +259,7 @@ export function printPuOrderNoAmount(doc, lines) {
     + '</tbody></table>'
     + PU_NOTES_HTML
     + PU_SIGN_HTML
-  if (!openPrintWindow('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert('浏览器拦截了打印窗口,请允许弹出窗口')
+  if (!printInPage('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
 }
 
 /**
@@ -381,7 +307,7 @@ export function printQcReturn(doc, lines) {
     + '</tr></thead><tbody>' + trs + '</tbody></table>'
     + '<div class="memo">说明：货物数量及规格请当面点清验收。</div>'
     + '<div class="sign"><span>总经理：</span><span>财务：</span><span>采购：</span><span>仓管：</span><span>供应商：</span></div>'
-  if (!openPrintWindow('退货单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert('浏览器拦截了打印窗口,请允许弹出窗口')
+  if (!printInPage('退货单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
 }
 
 /**
@@ -435,7 +361,7 @@ export async function printProductCards(rows) {
       + '</div>')
   }
   const body = '<style>' + pageCss + cardCss + '</style>' + trs.join('')
-  if (!openPrintWindow('产品标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+  if (!printInPage('产品标识卡', body)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }
 
@@ -483,7 +409,7 @@ export async function printLocationCards(rows) {
       + '</div>')
   }
   const body = '<style>' + pageCss + cardCss + '</style>' + trs.join('')
-  if (!openPrintWindow('仓位标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+  if (!printInPage('仓位标识卡', body)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }
 
@@ -492,7 +418,7 @@ export async function printLocationCards(rows) {
  * 二维码内容=公司代码@工单号@(1000+工单行号)(woQrText,2026-10-09 规则改版;扫码报工/领料入口口径)。
  * @param rows [{加工单号,公司代码?,工单行号?,客户,产品名称,批号,规格型号,重点管控,客户PO,排产数量,每箱数量,箱数,计划完工日期,备注,生产线}]
  * @param opts {line?:string, preparedBy?:string}
- * @return Promise<boolean> true=已送出打印(窗口未被拦截)
+ * @return Promise<boolean> true=已交给浏览器打印(页面内打印层,不弹窗)
  */
 export async function printProductionTask(rows, opts = {}) {
   const list = (Array.isArray(rows) ? rows : []).filter((r) => r && r['加工单号'])
@@ -536,6 +462,6 @@ export async function printProductionTask(rows, opts = {}) {
     + '<table><thead><tr>'
     + COMPANY.woColumns.map((h) => `<th>${esc(h)}</th>`).join('')
     + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
-  if (!openPrintWindow(COMPANY.woTitle, body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+  if (!printInPage(COMPANY.woTitle, body)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }

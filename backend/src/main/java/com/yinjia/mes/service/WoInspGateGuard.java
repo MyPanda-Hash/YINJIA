@@ -21,6 +21,9 @@ import java.util.Map;
  * <p><b>强制开单</b>:拦截行允许越闸,但必须 ① 填原因 ② 具备该面板的「强制开单」权限词(管理员恒过,
  * 与 {@link PanelPermissionService#hasAnyPerm} 同源 —— 将来要放给品质主管,只需在权限矩阵里勾一个词)。
  * 行业依据:金蝶/畅捷通都保留「下推补生成」这类人工通道,**留手工通道 = 特殊场景不必改库**。</p>
+ *
+ * <p><b>2026-10-20</b>:首件检验单退出本门禁({@link WoInspGate#gated}) ⇒ 本类的
+ * {@link #enforce}/{@link #decorate} 对它直接放行/标「可开单」,不再判成型报工。</p>
  */
 @Service
 public class WoInspGateGuard {
@@ -59,6 +62,9 @@ public class WoInspGateGuard {
      * @param ip   调用方 IP(留痕用;传空串也能记)
      */
     public Decision enforce(String panelCode, String wo, Integer xc, Map<String, Object> body, String ip) {
+        // 2026-10-20:首件检验单不受本门禁约束(用户口径「只关联生产工单即可,不需要成型报工完成」)
+        //   ⇒ 直接放行。判据名单在 WoInspGate.UNGATED_PANELS 一处,调用方形状保持不变。
+        if (!WoInspGate.gated(panelCode)) return new Decision(true, 0, "", WoInspGate.pass());
         WoInspGate.Status st = WoInspGate.check(jdbc, wo, xc);
         if (st.allowed() && !st.warn()) return new Decision(true, 0, "", st);
 
@@ -86,9 +92,25 @@ public class WoInspGateGuard {
     /**
      * 把门禁结论落到弹窗列表的每一行(两个控制器共用;字段名即前端读取的键)。
      * <p>⚠ 入参 rows 必须带 {@code 行id/工单号/工单行号/批次号/工艺路线/排产数量}(两个控制器的取数已如此)。
+     *
+     * <p>2026-10-20:不受门禁的面板(首件检验单)不再逐行判,统一给「可开单 = true」等中性值 ——
+     * 共享的选单弹窗照旧读这几个键,只是永远不为灰。准入过滤(未完工/未被占用)在各自控制器的取数里。
      */
-    public void decorate(List<Map<String, Object>> rows) {
+    public void decorate(String panelCode, List<Map<String, Object>> rows) {
         if (rows == null || rows.isEmpty()) return;
+        if (!WoInspGate.gated(panelCode)) {
+            for (Map<String, Object> r : rows) {
+                r.put("成型完工量", 0);
+                r.put("成型计划量", 0);
+                r.put("可开单", true);
+                r.put("预警放行", false);
+                r.put("免门禁", false);
+                r.put("存量放行", false);
+                r.put("门禁档位", "");
+                r.put("不能开单原因", "");
+            }
+            return;
+        }
         Map<String, WoInspGate.Status> gate = WoInspGate.checkPage(jdbc, rows);
         for (Map<String, Object> r : rows) {
             WoInspGate.Status st = gate.get(WoInspGate.key(str(r.get("工单号")), intOf(r.get("工单行号"))));
@@ -103,13 +125,15 @@ public class WoInspGateGuard {
         }
     }
 
-    /** 账位/档位信息(前端顶部提示用):门禁档位 + 该用户能否强制开单 */
+    /** 账位/档位信息(前端顶部提示用):门禁档位 + 该用户能否强制开单 + 本面板是否受门禁 */
     public Map<String, Object> meta(String panelCode) {
         Map<String, Object> out = new LinkedHashMap<>();
+        boolean on = WoInspGate.gated(panelCode);
         WoInspGate.Policy pol = WoInspGate.policy(jdbc);
-        out.put("门禁档位", pol.mode().name());
-        out.put("存量拦截", pol.legacyBlock());
-        out.put("可强制开单", perm.hasAnyPerm(panelCode, PERM_FORCE));
+        out.put("门禁生效", on);
+        out.put("门禁档位", on ? pol.mode().name() : "");
+        out.put("存量拦截", on && pol.legacyBlock());
+        out.put("可强制开单", on && perm.hasAnyPerm(panelCode, PERM_FORCE));
         return out;
     }
 
