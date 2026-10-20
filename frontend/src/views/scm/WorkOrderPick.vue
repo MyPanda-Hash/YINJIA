@@ -1,97 +1,104 @@
-<!-- WorkOrderPick.vue — 工单扫码领料(手机端):扫工单码 → BOM 清单 → 扫物料码 → 秤取数 → 提交(2026-10-21) -->
+<!-- WorkOrderPick.vue — 工单扫码领料(手机/电脑双栏自适应):扫工单码 → BOM 清单 → 扫物料码 → 秤取数 → 提交(2026-10-21) -->
 <template>
   <div class="wop-page">
-    <!-- ① 扫工单 -->
     <div class="wop-head">
       <div class="wop-title">{{ tt('工单扫码领料') }}</div>
       <div class="wop-sub">{{ tt('扫工单码 → 按 BOM 列出该领的料 → 逐项扫码取秤 → 整单提交') }}</div>
     </div>
 
-    <div class="wop-scanbar">
-      <input
-        ref="woInputRef"
-        v-model="woInput"
-        class="wop-input"
-        :placeholder="tt('扫描/输入工单二维码')"
-        @keyup.enter="onScanWorkOrder"
-      />
-      <button class="wop-btn primary" :disabled="loadingWo" @click="onScanWorkOrder">
-        {{ loadingWo ? tt('查询中…') : tt('确定') }}
-      </button>
-    </div>
-
-    <div v-if="woError" class="wop-err">{{ woError }}</div>
-
-    <!-- ② 工单内容 -->
-    <div v-if="order" class="wop-card">
-      <div class="wop-card-head">
-        <span class="wop-order-no">{{ order.orderNo }}</span>
-        <span v-if="order.lineNo" class="wop-line-tag">{{ tt('行号') }} {{ order.lineNo }}</span>
-      </div>
-      <div class="wop-kv">
-        <span class="k">{{ tt('产品编码') }}</span><span class="v">{{ order.productCode || '-' }}</span>
-        <span class="k">{{ tt('产品名称') }}</span><span class="v">{{ order.productName || '-' }}</span>
-        <span class="k">{{ tt('生产线') }}</span><span class="v">{{ order.line || '-' }}</span>
-        <span class="k">{{ tt('排产数量') }}</span><span class="v strong">{{ fmt(order.planQty) }}</span>
-      </div>
-    </div>
-
-    <!-- ③ 秤状态 -->
-    <div v-if="order" class="wop-scale" :class="{ live: scaleOk, dead: !scaleOk }">
-      <span class="wop-scale-label">{{ tt('台车电子秤') }}</span>
-      <span class="wop-scale-val">{{ scaleText }}</span>
-      <span class="wop-scale-hint">{{ scaleHint }}</span>
-    </div>
-
-    <!-- ④ BOM 领料清单 -->
-    <div v-if="order" class="wop-list">
-      <div class="wop-list-head">
-        <span>{{ tt('领料清单') }}</span>
-        <span class="wop-prog">{{ progress.done }} / {{ progress.total }}</span>
-      </div>
-      <div v-if="!lines.length" class="wop-empty">
-        {{ tt('该产品还没有物料清单(BOM),请先在「物料清单」面板录入。') }}
-      </div>
-      <div
-        v-for="(l, i) in lines"
-        :key="l.code + i"
-        class="wop-row"
-        :class="{ active: activeIdx === i, done: l.picked > 0, over: l.remain < 0 }"
-        @click="activeIdx = i"
-      >
-        <div class="wop-row-main">
-          <span class="wop-code">{{ l.code }}</span>
-          <span class="wop-name">{{ l.name || '-' }}</span>
+    <div class="wop-grid">
+      <!-- 左栏:工单 + 秤 -->
+      <div class="wop-col-left">
+        <div class="wop-scanbar">
+          <input
+            ref="woInputRef"
+            v-model="woInput"
+            class="wop-input"
+            :placeholder="tt('扫描/输入工单二维码')"
+            @keyup.enter="onScanWorkOrder"
+          />
+          <button class="wop-btn primary" :disabled="loadingWo" @click="onScanWorkOrder">
+            {{ loadingWo ? tt('查询中…') : tt('确定') }}
+          </button>
         </div>
-        <div class="wop-row-qty">
-          <span class="wop-q">{{ tt('应领') }} {{ fmt(l.required) }} {{ l.uom }}</span>
-          <span class="wop-q picked">{{ tt('已领') }} {{ fmt(l.picked) }}</span>
-          <span class="wop-q remain" :class="{ neg: l.remain < 0 }">
-            {{ tt('待领') }} {{ fmt(l.remain) }}
-          </span>
+
+        <div v-if="woError" class="wop-err">{{ woError }}</div>
+
+        <!-- ② 工单内容 -->
+        <div v-if="order" class="wop-card">
+          <div class="wop-card-head">
+            <span class="wop-order-no">{{ order.orderNo }}</span>
+            <span v-if="order.lineNo" class="wop-line-tag">{{ tt('行号') }} {{ order.lineNo }}</span>
+          </div>
+          <div class="wop-kv">
+            <span class="k">{{ tt('产品编码') }}</span><span class="v">{{ order.productCode || '-' }}</span>
+            <span class="k">{{ tt('产品名称') }}</span><span class="v">{{ order.productName || '-' }}</span>
+            <span class="k">{{ tt('生产线') }}</span><span class="v">{{ order.line || '-' }}</span>
+            <span class="k">{{ tt('排产数量') }}</span><span class="v strong">{{ fmt(order.planQty) }}</span>
+          </div>
+        </div>
+
+        <!-- ③ 秤状态 -->
+        <div v-if="order" class="wop-scale" :class="{ live: scaleOk, dead: !scaleOk }">
+          <span class="wop-scale-label">{{ tt('台车电子秤') }}</span>
+          <span class="wop-scale-val">{{ scaleText }}</span>
+          <span class="wop-scale-hint">{{ scaleHint }}</span>
         </div>
       </div>
-    </div>
 
-    <!-- ⑤ 扫物料 -->
-    <div v-if="order && lines.length" class="wop-scanbar">
-      <input
-        ref="matInputRef"
-        v-model="matInput"
-        class="wop-input"
-        :placeholder="tt('扫描/输入物料条码')"
-        @keyup.enter="onScanMaterial"
-      />
-      <button class="wop-btn" :disabled="!activeLine" @click="useScaleForActive">
-        {{ tt('取秤') }}
-      </button>
-      <button class="wop-btn primary" :disabled="!activeLine" @click="submitOne">
-        {{ tt('提交本笔') }}
-      </button>
-    </div>
+      <!-- 右栏:领料清单 + 扫码 + 提交 -->
+      <div class="wop-col-right">
+        <!-- ④ BOM 领料清单 -->
+        <div v-if="order" class="wop-list">
+          <div class="wop-list-head">
+            <span>{{ tt('领料清单') }}</span>
+            <span class="wop-prog">{{ progress.done }} / {{ progress.total }}</span>
+          </div>
+          <div v-if="!lines.length" class="wop-empty">
+            {{ tt('该产品还没有物料清单(BOM),请先在「物料清单」面板录入。') }}
+          </div>
+          <div
+            v-for="(l, i) in lines"
+            :key="l.code + i"
+            class="wop-row"
+            :class="{ active: activeIdx === i, done: l.picked > 0, over: l.remain < 0 }"
+            @click="activeIdx = i"
+          >
+            <div class="wop-row-main">
+              <span class="wop-code">{{ l.code }}</span>
+              <span class="wop-name">{{ l.name || '-' }}</span>
+            </div>
+            <div class="wop-row-qty">
+              <span class="wop-q">{{ tt('应领') }} {{ fmt(l.required) }} {{ l.uom }}</span>
+              <span class="wop-q picked">{{ tt('已领') }} {{ fmt(l.picked) }}</span>
+              <span class="wop-q remain" :class="{ neg: l.remain < 0 }">
+                {{ tt('待领') }} {{ fmt(l.remain) }}
+              </span>
+            </div>
+          </div>
+        </div>
 
-    <div v-if="matError" class="wop-err">{{ matError }}</div>
-    <div v-if="matOk" class="wop-ok">{{ matOk }}</div>
+        <!-- ⑤ 扫物料 -->
+        <div v-if="order && lines.length" class="wop-scanbar">
+          <input
+            ref="matInputRef"
+            v-model="matInput"
+            class="wop-input"
+            :placeholder="tt('扫描/输入物料条码')"
+            @keyup.enter="onScanMaterial"
+          />
+          <button class="wop-btn" :disabled="!activeLine" @click="useScaleForActive">
+            {{ tt('取秤') }}
+          </button>
+          <button class="wop-btn primary" :disabled="!activeLine" @click="submitOne">
+            {{ tt('提交本笔') }}
+          </button>
+        </div>
+
+        <div v-if="matError" class="wop-err">{{ matError }}</div>
+        <div v-if="matOk" class="wop-ok">{{ matOk }}</div>
+      </div>
+    </div>
 
     <!-- ⑥ 整单提交 -->
     <div v-if="order && lines.length" class="wop-foot">
@@ -400,15 +407,35 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .wop-page {
-  padding: 10px 12px 90px;
+  padding: 16px 20px 24px;
   background: #f5f6f8;
   min-height: 100%;
   box-sizing: border-box;
-  max-width: 640px;
-  margin: 0 auto;
+}
+/* 宽屏双栏:左=工单+秤(固定宽),右=领料清单+扫码(自适应)。
+   2026-10-21 修:原先是单列 max-width:640px,在 2549px 的电脑屏上缩成中间一条窄带,
+   两侧大片留白 —— 用户报「电脑上看是这样子」。手机(<=900px)仍单列。 */
+.wop-grid {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.wop-col-left,
+.wop-col-right {
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .wop-page {
+    padding: 10px 12px 90px;
+  }
+  .wop-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
 }
 .wop-head {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .wop-title {
   font-size: 17px;
@@ -551,6 +578,19 @@ onBeforeUnmount(() => {
   overflow: hidden;
   margin-bottom: 10px;
 }
+/* 宽屏:清单单独滚动,避免几百行把扫码框和提交栏顶出屏幕 */
+@media (min-width: 901px) {
+  .wop-list {
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+  }
+  .wop-list-head {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+  }
+}
 .wop-list-head {
   display: flex;
   justify-content: space-between;
@@ -646,15 +686,12 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 .wop-foot {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  margin-top: 16px;
+  padding: 12px 14px;
   background: #fff;
-  border-top: 1px solid #e5e7eb;
-  max-width: 640px;
-  margin: 0 auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .wop-foot-info {
   display: flex;
@@ -665,5 +702,20 @@ onBeforeUnmount(() => {
 }
 .wop-foot-warn {
   color: #b45309;
+}
+/* 手机(<=900px):提交栏固定在屏幕底部,便于单手操作;宽屏则跟内容流走,不做固定 */
+@media (max-width: 900px) {
+  .wop-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
 }
 </style>
