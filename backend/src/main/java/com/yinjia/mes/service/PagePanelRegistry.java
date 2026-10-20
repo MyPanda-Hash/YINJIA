@@ -57,6 +57,13 @@ public final class PagePanelRegistry {
     public static final String DC_STATS = "DC_STATS";
     /** 库存管理(现 WMS管理系统)·条码管理 → 扫码领料(2026-10-20) */
     public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
+    /**
+     * 研发管理·项目管理 → 项目流程管控(2026-10-20 用户口径):
+     * 按立项申请单号查这条项目在「立项申请 → 定级分发 → 责任人确认 → 实施计划 → 审批归档 → 进度查询」
+     * 里走到哪一步、卡在谁手上。Vue 页面,数据现算(rd_approval/rd_plan/yj_doc_status/yj_form_approval),
+     * **不是** yj_panel 单据面板 ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
+     */
+    public static final String PROJECT_FLOW = "PROJECT_FLOW";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -137,6 +144,15 @@ public final class PagePanelRegistry {
             {"pick",  "生成领料单"},
     };
 
+    /**
+     * 项目流程管控(2026-10-20):**只读**盯单页 —— 查流程走到哪一步、卡在谁手上。
+     * 页面本身不写任何单据(要补审批/定级/确认都回原面板操作),故动作只有可见 + 查询。
+     */
+    private static final String[][] PROJECT_FLOW_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+    };
+
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
             // 2026-10-20 导航改版:「生产制造」一级目录拆掉,这四个看板所属分组合并为「生产计划」
@@ -150,7 +166,9 @@ public final class PagePanelRegistry {
             new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
-            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理系统", BARCODE_SCAN_PICK_ACTIONS));
+            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理系统", BARCODE_SCAN_PICK_ACTIONS),
+            // 2026-10-20:研发管理·项目管理 → 项目流程管控(归「研发管理」组,与菜单一级目录一致)
+            new PagePanelDef(PROJECT_FLOW, "项目流程管控", "研发管理", PROJECT_FLOW_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

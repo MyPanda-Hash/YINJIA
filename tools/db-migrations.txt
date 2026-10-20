@@ -4072,3 +4072,9 @@ migrate-db-backup-monthly-20261019.sql
 #   ② 权限矩阵补 4 个页面级面板授权(DC_CONFIG/DC_MONITOR/DC_STATS/BARCODE_SCAN_PICK)+ en 译名。
 #   自检:旧分组清零、生产过程≥10、设备维护 2 张、每角色 4 码齐全、译名 4 条。幂等;两账套均执行。
 migrate-menu-restructure-wms-20261020.sql
+# 2026-10-20 研发管理·项目管理新增「项目流程管控」页面(页面级虚拟面板 PROJECT_FLOW):
+#   用户口径「填完立项申请提交审批后不知道文件到哪个流程了……通过立项申请表的编号查流程走到哪里」。
+#   不建表:数据现算(rd_approval / rd_plan / rd_progress_detail / yj_doc_status / yj_form_approval)。
+#   ① 现有全部角色补 yj_role_panel 授权(view,query) ② 面板名 en 译名。
+#   自检:PROJECT_FLOW 授权行 ≥ 角色数、en 译名 1 条。幂等;两账套均执行。
+migrate-rd-project-flow-20261020.sql

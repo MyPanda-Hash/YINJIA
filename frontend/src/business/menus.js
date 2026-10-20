@@ -20,6 +20,10 @@ export const menuTree = [
           { code: 'rdApproval', title: '立项申请', path: '/panelx/list/RD_APPROVAL', icon: 'DocumentAdd', panelCode: 'RD_APPROVAL', operationName: '新增流程' },
           { code: 'rdPlan', title: '项目实施计划', path: '/panelx/list/RD_PLAN', icon: 'Calendar', panelCode: 'RD_PLAN', operationName: '新增流程' },
           { code: 'rdProgress', title: '项目进度查询', path: '/panelx/list/RD_PROGRESS', icon: 'DataLine', panelCode: 'RD_PROGRESS' },
+          // 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个
+          //   项目流程管控,通过立项申请表的编号查流程走到哪里」。只读盯单页(页面级虚拟面板 PROJECT_FLOW,
+          //   定义见后端 PagePanelRegistry),按立项单号把 10 个环节逐条判出来:卡在谁手上、停留几天。
+          { code: 'rdFlow', title: '项目流程管控', path: '/rd/projectFlow', icon: 'Connection', panelCode: 'PROJECT_FLOW' },
         ],
       },
       {

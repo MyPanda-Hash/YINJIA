@@ -19,8 +19,15 @@ test('研发管理四个二级分组,顺序=项目管理/测试记录/产品文�
   assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '测试记录', '产品文件', '共享文件'])
 })
 
-test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询', () => {
-  assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS'])
+/**
+ * 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个项目流程管控,
+ *   通过立项申请表的编号查流程走到哪里」。⇒ 项目管理组多一张只读盯单页 PROJECT_FLOW(排最后)。
+ */
+test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询 → 项目流程管控', () => {
+  assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'PROJECT_FLOW'])
+  const flow = group('rdProject').children.find((c) => c.panelCode === 'PROJECT_FLOW')
+  assert.equal(flow.title, '项目流程管控')
+  assert.equal(flow.path, '/rd/projectFlow', '页面级虚拟面板走专用路由,不是 /panelx/list')
 })
 
 test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 张', () => {
@@ -123,13 +130,15 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
  * 2026-09-18:新增 产品文件列表 与 样品编号表(设计对照的 2 张新面板)⇒ 21 → 23 张。
  * 2026-09-21:新增 产品变更申请单 RD_CHANGE ⇒ 23 → 24 张。
  * 2026-09-30:下架 样品编号表 RD_SAMPLE_NO(用户口径「样品编号表删掉」)⇒ 24 → 23 张。
+ * 2026-10-20:新增 项目流程管控 PROJECT_FLOW(只读盯单页)⇒ 23 → 24 张。
  * 计数断言保留价值:防止面板被误删/误加而不自知。
  */
-test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () => {
+test('研发管理 24 个面板一个不少(含新增 项目流程管控)', () => {
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 23)
-  assert.equal(new Set(codes).size, 23)
+  assert.equal(codes.length, 24)
+  assert.equal(new Set(codes).size, 24)
+  assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
 })
 
 /**

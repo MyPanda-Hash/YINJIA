@@ -45,6 +45,8 @@ public class PxController {
     private final com.yinjia.mes.service.PuLabelService puLabel;
     /** 条码标签打印留痕(材料/半成品/成品条码面板,2026-10-18) */
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
+    /** 研发「项目流程管控」只读取数(2026-10-20) */
+    private final com.yinjia.mes.service.RdProjectFlowService rdFlow;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -58,7 +60,8 @@ public class PxController {
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
-                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel) {
+                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
+                        com.yinjia.mes.service.RdProjectFlowService rdFlow) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -73,6 +76,7 @@ public class PxController {
         this.batchService = batchService;
         this.puLabel = puLabel;
         this.barcodeLabel = barcodeLabel;
+        this.rdFlow = rdFlow;
     }
 
     // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============
@@ -598,6 +602,24 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {
         perm.requirePanelView("RD_PROGRESS");
         return ApiResult.ok(buttons.progressDataSheets(code));
+    }
+
+    /**
+     * 研发「项目流程管控」(2026-10-20 用户口径):按立项申请单号查这条项目走到哪一步。
+     * 入参 keyword = 立项单号(可只输片段;空 = 全部在册立项),出参见
+     * {@link com.yinjia.mes.service.RdProjectFlowService#query}——环节判定在前端
+     * {@code core/rd/flowStages.js} 里做(纯函数,单测钉边界)。
+     * 权限:页面级虚拟面板 PROJECT_FLOW 的「可见」词。
+     */
+    @GetMapping("/rdFlow")
+    public ApiResult<Map<String, Object>> rdFlow(@RequestParam(required = false) String keyword) {
+        perm.requirePanelView("PROJECT_FLOW");
+        return ApiResult.ok(rdFlowService().query(keyword));
+    }
+
+    /** 项目流程管控取数服务(直接注入字段,便于本类构造器保持短) */
+    private com.yinjia.mes.service.RdProjectFlowService rdFlowService() {
+        return rdFlow;
     }
 
     /**
