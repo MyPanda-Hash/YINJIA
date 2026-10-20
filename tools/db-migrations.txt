@@ -4139,3 +4139,8 @@ migrate-dc-config-rename-20261020.sql
 #   工单扫码领料逐笔留痕表 wo_pick_scan_log(只增不改);扫码明细装不进 yj_usage_log 的粗粒度结构。
 #   两账套都执行。
 migrate-wo-pick-scan-log-20261021.sql
+
+# 2026-10-21 用户口径「产品信息表的功能类别下拉做成一个标准库，可以进行填写维护」。
+#   复用现成「数据字典」面板(ZDGL / bs_dict)，只把字段 dict_sql 指向它并搬入原有 3 个选项。
+#   两账套都执行。
+migrate-prod-func-type-stdlib-20261021.sql
