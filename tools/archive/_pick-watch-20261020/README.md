@@ -80,3 +80,26 @@ watch-pick.bat sessions
 
 `sysadmin`(服务器上用 `sqlcmd -E` 以管理员身份跑即可)才能建服务器级事件会话;
 若报「没有 ALTER ANY EVENT SESSION 权限」,换管理员身份开 cmd 再跑。
+
+
+## 七、追加:抓「某个客户端到底执行了什么语句」(2026-10-20 13:2x)
+
+现场发现:`sys.dm_exec_sessions` 里出现 **`sa` / `.Net SqlClient Data Provider` / 主机 `172.16.0.13` / 库 `HSDZ_MES`**
+(最后请求 13:22:39、13:23:11)—— 即外部客户端连的**是这台库、这个库名**。
+但错误抓取(`yj_pick_watch`)里**只有 SSIS 服务的 18456 噪声**,没有它的任何报错
+⇒ 它的语句没失败 ⇒ 极可能"查了一下库存就结束,根本没发 INSERT"。
+
+所以要看语句,不只看错误:
+
+| 文件 | 作用 |
+|---|---|
+| `_xe_trace_start.sql` | 建并启动 `yj_pick_trace`:抓 `sql_batch_completed` / `rpc_completed`(带 sql_text/主机/客户端/登录/row_count) |
+| `_xe_trace_read.sql` | 按主机过滤读出来(文件顶部 `@host`,默认 `172_16_0_13`) |
+
+判读:
+- 看到 `SELECT ... FROM kucun/v_stock_pick WHERE 批号 = ...` 且 `row_count = 0`,后面**没有 INSERT**
+  ⇒ 确诊:条码批号与 `kucun` 实际批号对不上,小程序端判定"没库存",压根不写库;
+- 看到 INSERT 但不报错 ⇒ 它写的是别的表/别的库(看 SQL 原文里的表名与库);
+- 一条语句都没有 ⇒ 它连上来只是心跳。
+
+语法坑(已在本机 SQL Server 2019 验证):多个 `ADD EVENT` 之间要有逗号,但 `ADD TARGET` 前**不能**有逗号。
