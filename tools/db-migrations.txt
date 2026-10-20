@@ -4134,3 +4134,8 @@ migrate-dc-prod-ready-20261020.sql
 #   DC_CONFIG 是页面级虚拟面板(无 yj_panel 行),库里只有 yj_translation 一条译名改键;
 #   面板名本体在 menus.js / router / DcConfig.vue / PagePanelRegistry,同批代码改动。
 migrate-dc-config-rename-20261020.sql
+
+# 2026-10-21 用户口径「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」。
+#   工单扫码领料逐笔留痕表 wo_pick_scan_log(只增不改);扫码明细装不进 yj_usage_log 的粗粒度结构。
+#   两账套都执行。
+migrate-wo-pick-scan-log-20261021.sql

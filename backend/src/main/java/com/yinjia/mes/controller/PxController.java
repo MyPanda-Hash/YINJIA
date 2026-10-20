@@ -47,6 +47,10 @@ public class PxController {
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
     /** 研发「项目流程管控」只读取数(2026-10-20) */
     private final com.yinjia.mes.service.RdProjectFlowService rdFlow;
+    /** 工单扫码领料取数(2026-10-21):工单行 plang + BOM mate,两张表都不是注册面板 */
+    private final com.yinjia.mes.service.WorkOrderPickService woPick;
+    /** 工单扫码领料的逐笔留痕(2026-10-21):扫了哪些料/各多少/什么时候 */
+    private final com.yinjia.mes.service.WoPickScanLogService woPickLog;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -61,7 +65,9 @@ public class PxController {
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
                         com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
-                        com.yinjia.mes.service.RdProjectFlowService rdFlow) {
+                        com.yinjia.mes.service.RdProjectFlowService rdFlow,
+                        com.yinjia.mes.service.WorkOrderPickService woPick,
+                        com.yinjia.mes.service.WoPickScanLogService woPickLog) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -77,6 +83,104 @@ public class PxController {
         this.puLabel = puLabel;
         this.barcodeLabel = barcodeLabel;
         this.rdFlow = rdFlow;
+        this.woPick = woPick;
+        this.woPickLog = woPickLog;
+    }
+
+    // ============ 工单扫码领料取数(2026-10-21,手机端) ============
+    /**
+     * 按工单码取工单行。
+     *
+     * <p>前端扫工单二维码(格式 {@code 公司代码@工单号@(1000+行号)},见 print-formats.woQrText)
+     * 后调本端点拿工单内容(产品/产线/排产数量)。工单落在 {@code plang},它不是注册面板,
+     * 走不了 {@code queryFormDataList},故单列一个只读端点。
+     *
+     * @param orderNo 工单号(必填)
+     * @param lineNo  工单行号;不传或 &lt;=0 表示整单全部行
+     */
+    @GetMapping("/woPick/lines")
+    public Map<String, Object> woPickLines(@RequestParam String orderNo,
+                                           @RequestParam(required = false) Integer lineNo) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", woPick.workOrderLines(orderNo, lineNo == null ? 0 : lineNo));
+        return out;
+    }
+
+    /**
+     * 按产品编码取 BOM 明细(该工单要领哪些料)。
+     *
+     * <p>数据源 = {@code mate}(WLBOM 物料清单面板的底层表)。
+     * 返回空列表表示该产品还没录 BOM —— 前端提示去「物料清单」面板录入,
+     * 而不是静默显示空清单(2026-10-21 实测:金蝶侧 BOM 接口 count=0,
+     * MES 自建 bs_bom 已下架,mate 只剩 T382 一个产品 ⇒ 必须先补数据)。
+     *
+     * @param productCode 产品编码
+     */
+    @GetMapping("/woPick/bom")
+    public Map<String, Object> woPickBom(@RequestParam String productCode) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", woPick.bomOf(productCode));
+        return out;
+    }
+
+    /**
+     * 扫码留痕:记一笔「谁、何时、哪张工单哪一行、扫了哪个物料、多少数量、秤读数」。
+     *
+     * <p>用户口径(2026-10-21):「要监控 App 使用情况,因为这个取数上报的要能看到他们的操作情况」
+     * + 「还要记『扫了哪些料、各多少、什么时候』」。
+     *
+     * <p>前端每完成一次扫码(含「取秤」按行记量)调一次;提交时再调 {@code /woPick/attachDoc}
+     * 把领料单号补上。写入失败不影响作业(服务内部吞异常只打日志)。
+     *
+     * <p>请求体字段:woNo / woLine / productCode / materialCode / materialName / qty / unit /
+     * scaleValue / scaleDevice / scaleAt / scanType / scanSource / clientType / clientInfo / remark
+     */
+    @PostMapping("/woPick/scanLog")
+    public ApiResult<Void> woPickScanLog(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        String user = currentUser();
+        woPickLog.record(body, user, clientIp(request));
+        return ApiResult.ok(null);
+    }
+
+    /**
+     * 整单提交后,把本次作业扫过的行补上领料单号(按单据回查)。
+     *
+     * @param body docNo / woNo / woLine
+     */
+    @PostMapping("/woPick/attachDoc")
+    public Map<String, Object> woPickAttachDoc(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        String woNo = String.valueOf(body.getOrDefault("woNo", ""));
+        int woLine = body.get("woLine") instanceof Number n ? n.intValue() : 0;
+        int n = woPickLog.attachDocNo(docNo, woNo, woLine, currentUser());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("updated", n);
+        return out;
+    }
+
+    /**
+     * 扫码流水查询(「扫码领料记录」面板数据源)。
+     *
+     * @param woNo 工单号(模糊)
+     * @param user 操作人(模糊)
+     * @param materialCode 物料编码/名称(模糊)
+     * @param start 起始日期 yyyy-MM-dd
+     * @param end 结束日期 yyyy-MM-dd
+     */
+    @GetMapping("/woPick/scanLogs")
+    public Map<String, Object> woPickScanLogs(@RequestParam(required = false) String woNo,
+                                              @RequestParam(required = false) String user,
+                                              @RequestParam(required = false) String materialCode,
+                                              @RequestParam(required = false) String start,
+                                              @RequestParam(required = false) String end,
+                                              @RequestParam(defaultValue = "1") int page,
+                                              @RequestParam(defaultValue = "50") int size) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        return woPickLog.query(woNo, user, materialCode, start, end, page, size);
     }
 
     // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============

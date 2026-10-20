@@ -58,6 +58,13 @@ public final class PagePanelRegistry {
     /** 库存管理(现 WMS管理)·条码管理 → 扫码领料(2026-10-20) */
     public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
     /**
+     * WMS管理·条码管理 → 工单扫码领料(2026-10-21,手机端)。
+     * 扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码 → 自动抓台车电子秤数量 → 整单提交生成材料出库单。
+     * 数据侧走既有面板(PLANG 查工单 / WLBOM 查 BOM / MATERIAL_OUT 生单),
+     * 页面本身是 Vue ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
+     */
+    public static final String WORK_ORDER_PICK = "WORK_ORDER_PICK";
+    /**
      * 研发管理·项目管理 → 项目流程管控(2026-10-20 用户口径):
      * 按立项申请单号查这条项目在「立项申请 → 定级分发 → 责任人确认 → 实施计划 → 审批归档 → 进度查询」
      * 里走到哪一步、卡在谁手上。Vue 页面,数据现算(rd_approval/rd_plan/yj_doc_status/yj_form_approval),
@@ -145,6 +152,24 @@ public final class PagePanelRegistry {
     };
 
     /**
+     * 工单扫码领料(2026-10-21,手机端):扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码
+     * → 自动抓台车电子秤数量 → 整单提交生成材料出库单。
+     *
+     * <p>数据侧全部走既有面板引擎:工单查 {@code PLANG}、BOM 查 {@code WLBOM}(mate)、
+     * 生单走 {@code MATERIAL_OUT};秤值取数采平台 {@code /api/dc/monitor}。
+     * 这里登记的只是**页面本身**的可见/查询/生单权,让它在「角色与面板权限」里能勾 ——
+     * 与 {@link #BARCODE_SCAN_PICK} 同一套做法。
+     *
+     * <p>与「扫码领料」的区别:那张按**物料**找库存(扫到哪领到哪),这张按**工单**找用料
+     * (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
+     */
+    private static final String[][] WORK_ORDER_PICK_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"pick",  "生成领料单"},
+    };
+
+    /**
      * 项目流程管控(2026-10-20):**只读**盯单页 —— 查流程走到哪一步、卡在谁手上。
      * 页面本身不写任何单据(要补审批/定级/确认都回原面板操作),故动作只有可见 + 查询。
      */
@@ -167,6 +192,8 @@ public final class PagePanelRegistry {
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
             new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理", BARCODE_SCAN_PICK_ACTIONS),
+            // 2026-10-21:工单扫码领料(手机端,按工单+BOM 作业)
+            new PagePanelDef(WORK_ORDER_PICK, "工单扫码领料", "WMS管理", WORK_ORDER_PICK_ACTIONS),
             // 2026-10-20:研发管理·项目管理 → 项目流程管控(归「研发管理」组,与菜单一级目录一致)
             new PagePanelDef(PROJECT_FLOW, "项目流程管控", "研发管理", PROJECT_FLOW_ACTIONS));
 

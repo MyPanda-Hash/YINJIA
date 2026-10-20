@@ -271,6 +271,14 @@ export const menuTree = [
           // 存在的理由:材料出库单里选商品看的是(物料,仓库)聚合口径,常显示「没有库存」;
           // 仓库实际发料关心的是批号级可用量,而标签里正好带着批号。
           { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', panelCode: 'BARCODE_SCAN_PICK', icon: 'FullScreen' },
+          // 工单扫码领料(2026-10-21 用户口径):「扫那个工单码,上面显示出来工单内容,中间显示这个工单要领
+          // 哪些料(按 BOM),一项项扫物料码,自动抓台车电子秤数量,点提交保存一笔;整单领完整单提交」。
+          // 与上面「扫码领料」的区别:那张是**按物料找库存**(扫到哪领到哪),这张是**按工单找用料**
+          // (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
+          { code: 'workOrderPick', title: '工单扫码领料', path: '/scm/workOrderPick', panelCode: 'WORK_ORDER_PICK', icon: 'DocumentChecked' },
+          // 扫码领料记录(2026-10-21 用户口径:「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」):
+          // 只读查询页,数据源 wo_pick_scan_log。权限沿用 WORK_ORDER_PICK(同一作业的作业与留痕)。
+          { code: 'pickScanLog', title: '扫码领料记录', path: '/scm/pickScanLog', panelCode: 'WORK_ORDER_PICK', icon: 'Tickets' },
         ],
       },
     ],

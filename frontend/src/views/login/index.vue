@@ -135,21 +135,42 @@
 
         <footer class="login-footer">
           <span>LIGHT MES · 2026</span>
+          <!-- App 内的服务器地址入口(2026-10-21):原先只能在扫码页改,但那个页要登录后才进得去
+               —— 服务器配错就永远进不了、也就永远改不了(死锁)。这里做成连不上时点一下就能改。 -->
+          <span v-if="nativeScan" class="footer-srv" @click="openServer">{{ serverLabel }}</span>
           <span
             class="footer-status"
             :class="{ 'is-error': !factoryLoading && !user.factories.length }"
+            :title="nativeScan ? tt('点这里可设置服务器地址') : ''"
+            @click="nativeScan && openServer()"
           >
             <span class="status-dot"></span>
             {{ factoryLoading ? tt('正在连接服务') : user.factories.length ? tt('服务连接正常') : tt('服务连接异常') }}
           </span>
         </footer>
+
+        <!-- 服务器地址弹窗(App 内) -->
+        <div v-if="srvVisible" class="srv-mask" @click.self="srvVisible = false">
+          <div class="srv-dlg">
+            <div class="srv-title">{{ tt('服务器地址') }}</div>
+            <div class="srv-tip">
+              {{ tt('填后端的完整地址,含 http:// 与端口。手机需与服务器在同一网络。') }}
+            </div>
+            <input v-model="srvInput" class="srv-input" :placeholder="tt('如 http://192.168.0.238:8090')" />
+            <div class="srv-acts">
+              <button class="srv-btn" @click="srvVisible = false">{{ tt('取消') }}</button>
+              <button class="srv-btn" @click="resetServer">{{ tt('恢复默认') }}</button>
+              <button class="srv-btn primary" @click="saveServer">{{ tt('保存并重载') }}</button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
@@ -162,11 +183,39 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
+import { apiOrigin, setApiOrigin } from '@/business/appConfig'
+import { hasNativeScan } from '@/business/nativeScan'
 // 背景图 2026-09-28 转 WebP(1967KB→111KB,q80 视觉无损;原图已删)
 import manufacturingImage from '@/assets/login-manufacturing.webp'
 
 const REMEMBERED_ACCOUNT_KEY = 'mes_login_account'
 const router = useRouter()
+
+// ---- App 内的服务器地址设置(2026-10-21):服务器配错时靠这里救回来 ----
+const nativeScan = hasNativeScan()
+const srvVisible = ref(false)
+const srvInput = ref('')
+/** 按钮显示 host:port,省地方 */
+const serverLabel = computed(() => String(apiOrigin()).replace(/^https?:\/\//i, ''))
+
+function openServer() {
+  srvInput.value = apiOrigin()
+  srvVisible.value = true
+}
+
+function saveServer() {
+  const v = String(srvInput.value || '').trim()
+  if (v && !/^https?:\/\//i.test(v)) return
+  setApiOrigin(v)
+  srvVisible.value = false
+  location.reload()
+}
+
+function resetServer() {
+  setApiOrigin('')
+  srvVisible.value = false
+  location.reload()
+}
 const user = useUserStore()
 const localeStore = useLocaleStore()
 localeStore.loadAvailable?.()
@@ -558,6 +607,85 @@ onMounted(async () => {
   font-size: 17px;
 }
 
+.footer-srv {
+  font-size: 11px;
+  color: #1c4f8a;
+  cursor: pointer;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  border-radius: 10px;
+  padding: 1px 8px;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.srv-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 16px;
+}
+.srv-dlg {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+}
+.srv-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+.srv-tip {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.srv-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-sizing: border-box;
+  outline: none;
+}
+.srv-input:focus {
+  border-color: #1c4f8a;
+  box-shadow: 0 0 0 2px rgba(28, 79, 138, 0.12);
+}
+.srv-acts {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.srv-btn {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+.srv-btn.primary {
+  background: #1c4f8a;
+  border-color: #1c4f8a;
+  color: #fff;
+}
 .login-footer {
   display: flex;
   align-items: center;

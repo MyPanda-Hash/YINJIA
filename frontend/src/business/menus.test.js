@@ -301,9 +301,13 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,另加 2026-10-20
   //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
   //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
-  assert.equal(invCodes.length, 34, `WMS管理应有 34 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 34, 'WMS管理内不应有重复面板')
+  // 2026-10-21 再加「工单扫码领料」的页面级面板码 WORK_ORDER_PICK(按工单+BOM 作业)⇒ 35。
+  // 同批「扫码领料记录」也挂 WORK_ORDER_PICK(同一作业的留痕查询,不另开权限码)⇒ 菜单项多一条
+  // 但**面板码不重复** —— 下面 new Set 的断言仍然成立,这正是共用面板码的预期。
+  assert.equal(invCodes.length, 36, `WMS管理应有 36 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 35, 'WMS管理内不应有重复面板(扫码领料记录与工单扫码领料共用 WORK_ORDER_PICK)')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
+  assert.ok(invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料应挂页面级面板码(2026-10-21)')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')
   // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
   for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
@@ -503,4 +507,11 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   assert.equal(scanPick.path, '/scm/scanPick')
   assert.equal(scanPick.panelCode, 'BARCODE_SCAN_PICK', '扫码领料应挂页面级面板码(2026-10-20)')
   assert.equal(scanPick.title, '扫码领料')
+  // 工单扫码领料(2026-10-21):与上面「扫码领料」并列,但作业口径不同 —— 这张按工单+BOM,
+  // 那张按物料找库存。两者都必须有各自的页面级面板码,否则权限矩阵里勾不到。
+  const woPick = (bc.children || []).find((c) => c.code === 'workOrderPick')
+  assert.ok(woPick, '条码管理下应有「工单扫码领料」入口')
+  assert.equal(woPick.path, '/scm/workOrderPick')
+  assert.equal(woPick.panelCode, 'WORK_ORDER_PICK')
+  assert.equal(woPick.title, '工单扫码领料')
 })
