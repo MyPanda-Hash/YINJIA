@@ -79,7 +79,10 @@ public class WorkOrderTransferService {
                 if (heads.isEmpty()) throw new IllegalStateException("工单不存在或已作废");
                 List<String> moved = new ArrayList<>();
                 for (Map<String, Object> h : heads) {
-                    if ("T".equals(String.valueOf(h.get("ja"))) || "Y".equals(String.valueOf(h.get("ja"))))
+                    // 已结案守卫(2026-10-19 收口):按 PlangClose 判 —— 外部程序把 ja 写成 Y 而入库=0 时,
+                    //   旧写法会报「已结案,不能调拨」把调拨整条挡住。
+                    if (com.yinjia.mes.service.PlangClose.isClosed(str(h.get("ja")), Num.of(h.get("pl_sl")),
+                            Num.of(h.get("rk_sl")), str(h.get("pl_no"))))
                         throw new IllegalStateException("已结案,不能调拨");
                     String from = str(h.get("scx"));
                     if (from == null) throw new IllegalStateException("该工单未排产,无需调拨(请先在快速排产排入产线)");
@@ -143,15 +146,17 @@ public class WorkOrderTransferService {
                 Long plangId = longOf(lg.get("plang_id"));
                 List<Map<String, Object>> heads;
                 if (plangId != null) {
-                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", plangId);
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(pl_no,N'') AS pl_no, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", plangId);
                 } else if (xc != null) {
-                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(pl_no,N'') AS pl_no, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
                 } else {
-                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(pl_no,N'') AS pl_no, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
                 }
                 if (heads.isEmpty()) throw new IllegalStateException("工单行已不存在或已作废");
                 for (Map<String, Object> h : heads) {
-                    if ("T".equals(String.valueOf(h.get("ja"))) || "Y".equals(String.valueOf(h.get("ja"))))
+                    // 已结案守卫(2026-10-19 收口,同调拨):外部误写 ja=Y 不再挡住撤回。
+                    if (com.yinjia.mes.service.PlangClose.isClosed(str(h.get("ja")), Num.of(h.get("pl_sl")),
+                            Num.of(h.get("rk_sl")), str(h.get("pl_no"))))
                         throw new IllegalStateException("已结案,不能撤回调拨");
                     String cur = str(h.get("scx"));
                     String to = str(lg.get("到生产线"));
@@ -190,7 +195,7 @@ public class WorkOrderTransferService {
         if (rowId != null) {
             return jdbc.queryForList(
                     "SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(scx,N'') AS scx,"
-                            + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
+                            + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
                             + " WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", rowId);
         }
         // 没给行id:按 (工单号 + 工单行号) 精确到行(行号也没给才退整单/批次)
@@ -198,12 +203,12 @@ public class WorkOrderTransferService {
         if (xc != null) {
             return jdbc.queryForList(
                     "SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(scx,N'') AS scx,"
-                            + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
+                            + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
                             + " WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
         }
         String batch = str(r.get("批次号"));
         String sql = "SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(scx,N'') AS scx,"
-                + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
+                + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
                 + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'";
         return batch == null ? jdbc.queryForList(sql, no)
                 : jdbc.queryForList(sql + " AND ISNULL([批次号],N'')=?", no, batch);

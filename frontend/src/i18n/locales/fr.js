@@ -8,7 +8,8 @@ export default {
     '已回正': 'Rouverts',
     '行': 'ligne(s)',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
     '结案异常': 'Clôture anormale',
-    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Cette ligne est clôturée mais ne respecte pas la règle de clôture MES (entrée ≥ planifié + inspection produit fini assemblage approuvée) — généralement dû au mini-programme/système hérité écrivant directement en base. Vérifiez via « Audit de clôture » puis corrigez.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    '该行写着已结案，但入库数量没达到排产数量 —— MES 的两条结案路径都要求入库≥排产，所以这行不是 MES 结的（通常是手机端小程序/参考库直连写库）。可用「结案回正」一键改回未结案':
+      'Cette ligne est clôturée, mais la quantité entrée n\'atteint pas la quantité planifiée. Les deux voies de clôture MES exigent entrée ≥ planifié : cette ligne n\'a donc pas été clôturée par MES (généralement écrite directement en base par le mini-programme ou le système hérité). Utilisez « Annuler clôture » pour la rouvrir.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Bibliothèque des normes d\'inspection',
     '出货检验计划': 'Plan d\'inspection d\'expédition',
     '计划单号': 'N° de plan',

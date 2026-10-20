@@ -63,6 +63,61 @@ const fmtNum = (v) => {
 }
 
 /**
+ * **在主页面上打印一段独立 HTML**(2026-10-19):不弹窗、不 document.write、不在子窗口里自动 print。
+ *
+ * 为什么加它(现场「打印工单后整页卡死,刷新也无效,只能关标签」):
+ *   弹窗打印那条路(`openPrintWindow`)会把主页面一起拖死 —— 同源弹窗与主页面**共用一个渲染进程**,
+ *   打印预览/虚拟机打印机(WPS 虚拟 PDF)一卡,主页面跟着僵死,刷新仍是同一个进程 ⇒ 救不回来。
+ *   而**面板单据打印**走的是"主页面打印层 + window.print()"(PanelxList.ensureDocPrintLayer),
+ *   现场天天打、从来没卡过 ⇒ 把工单任务单也切到同一条路。
+ *
+ * 做法:把单据 HTML 塞进 body 末尾一个隐藏容器,打印时用 `@media print` 把**其它内容全部隐藏**,
+ *   `window.print()` 之后清理(`afterprint` 或 60 秒兜底)。
+ *   屏幕上看不到这一层(`@media screen{display:none}`),打印时只剩它。
+ */
+function printInPage(title, bodyHtml) {
+  const HOST = 'yj-print-host'
+  const CSS = 'yj-print-host-css'
+  const cleanup = () => {
+    const h = document.getElementById(HOST)
+    if (h) h.remove()
+    const c = document.getElementById(CSS)
+    if (c) c.remove()
+    if (title) document.title = prevTitle
+    window.removeEventListener('afterprint', cleanup)
+  }
+  const prevTitle = document.title
+  try {
+    cleanup()   // 上一次残留(打印中途关掉之类)
+    const host = document.createElement('div')
+    host.id = HOST
+    host.innerHTML = bodyHtml
+    document.body.appendChild(host)
+    const style = document.createElement('style')
+    style.id = CSS
+    style.textContent = '@media screen{#yj-print-host{display:none!important}}'
+      + '@media print{body>*:not(#yj-print-host){display:none!important}'
+      + 'html,body{background:#fff!important;margin:0!important;padding:0!important}'
+      + '#yj-print-host{display:block!important}}'
+    document.head.appendChild(style)
+    window.addEventListener('afterprint', cleanup)
+    if (title) document.title = title
+    // 等一帧让样式/图片生效再拉起打印(否则偶发空白页)
+    requestAnimationFrame(() => {
+      try { window.print() } catch { cleanup() }
+    })
+    // 兜底:某些浏览器不触发 afterprint(定时器 unref 掉,避免单测/Node 环境挂住进程)
+    const t = setTimeout(cleanup, 60000)
+    if (t && typeof t.unref === 'function') t.unref()
+    return true
+  } catch (e) {
+    cleanup()
+    console.warn('[print-formats] 页面内打印失败:', e?.message || e)
+    return false
+  }
+}
+
+/**
  * 新窗口打开打印(自动调起 print 对话框);宽表横向由各自 @page 控制。
  *
  * 🔴 2026-10-18 改两处(现场「打印完工单后浏览器卡死」):
@@ -71,6 +126,8 @@ const fmtNum = (v) => {
  *      (表现为点什么都无响应、白屏,只能关标签)。现在第二次打印**复用**那个窗口。
  *   ② **打完自动关**:`onafterprint` 里 300ms 后 `close()`(用户点「取消」也会触发 afterprint,不会留垃圾窗口)。
  *      若浏览器不允许脚本关自己打开的窗口,`close()` 静默失败,不影响打印本身。
+ * ⚠ 2026-10-19:「打印工单」已改走 {@link printInPage}(弹窗这条路在现场会把主页面一起拖死);
+ *   本函数仍保留给其它单据(采购订单/退货单/标识卡)使用。
  */
 function openPrintWindow(title, bodyHtml) {
   const w = window.open('', 'yj-print', 'width=1100,height=780')
@@ -154,7 +211,10 @@ export async function printWorkTaskSheet(title, rows, opts = {}) {
     + '<span class="t">' + esc(title) + '</span>'
     + '<span class="s">' + esc(COMPANY.woPreparedBy) + ': ' + esc(user) + '　' + esc(stamp) + '</span></div>'
     + '<table><thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
-  if (!openPrintWindow(title, body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+  // 🔴 2026-10-19:改走**页面内打印**(与面板单据打印同一条路),不再弹窗。
+  //   现场实测:打印工单(哪怕只有 1 张)后整页僵死、刷新无效、只能关标签 —— 弹窗与主页面共用渲染进程,
+  //   打印预览/虚拟打印机一卡就一起死。页面内打印走 window.print(),和"打单据"完全一致。
+  if (!printInPage(title, body)) { alert('打印失败:浏览器阻止了打印,请允许本页面弹出打印对话框'); return false }
   return true
 }
 

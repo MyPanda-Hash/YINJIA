@@ -241,15 +241,15 @@ public class ExternalReportAbsorbService {
             return one;
         }
         // 已结案的工单行不推进(与「报工审核」同口径:结案单不能再报工/转序)。
-        // ⚠ 2026-10-18:判据改走 {@link PlangClose} —— ja 是外部程序也能直写的列,
+        // ⚠ 2026-10-18 起判据走 {@link PlangClose} —— ja 是外部程序也能直写的列,
         //   被外部乱写成 Y(入库却是 0)的行不该因此"吸收不动"(那会让现场觉得扫码没反应)。
+        //   2026-10-19:内联重写的口径改为**直接调** PlangClose.isClosed(原先是复制一份表达式,
+        //   口径一改这里就会漂 —— 全仓库只保留一份判定)。
         String ja = t.get("ja") == null ? "N" : String.valueOf(t.get("ja")).trim();
         double plSl = t.get("pl_sl") == null ? 0 : ((Number) t.get("pl_sl")).doubleValue();
         double rkSl = t.get("rk_sl") == null ? 0 : ((Number) t.get("rk_sl")).doubleValue();
         String woNo = t.get("pl_no") == null ? "" : String.valueOf(t.get("pl_no"));
-        boolean closed = ("T".equals(ja) || "Y".equals(ja))
-                && ((plSl > 0 && rkSl >= plSl) || woNo.startsWith("GD2608"));
-        if (closed) {
+        if (PlangClose.isClosed(ja, plSl, rkSl, woNo)) {
             one.put("已吸收", false);
             one.put("原因", "该工单行已结案,不吸收(历史账不动)");
             return one;

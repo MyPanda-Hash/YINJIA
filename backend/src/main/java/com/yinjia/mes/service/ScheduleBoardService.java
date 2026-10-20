@@ -175,7 +175,8 @@ public class ScheduleBoardService {
         if (workshop != null && !workshop.isBlank()) return 0;
         Integer n = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM dbo.plang p"
-                        + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        // 2026-10-19 收口:与 pending 同源(此前裸读 ja ⇒ 外部误写 Y 让「待排产笔数」比列表少)
+                        + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND " + NOT_CLOSED
                         + "   AND ISNULL(p.scx, N'') = N''"
                         // 2026-10-18:与 pending 逐字同源(已完工不计入待排产)
                         + "   AND NOT (" + DONE_ROW + ")", Integer.class);
@@ -736,7 +737,9 @@ public class ScheduleBoardService {
                             + " ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
                             + " ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
                             + " ISNULL(p.asp_print,0) AS 打印次数,"
-                            + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'已结案'"
+                            // 2026-10-19 收口:单据状态与同页「结案」列必须同源(此前裸读 ja,
+                            //   外部误写 Y 时页头显示"已结案"、下面「结案」列却是 N,自相矛盾)
+                            + " CASE WHEN " + CLOSED + " THEN N'已结案'"
                             + "      WHEN ISNULL(p.scx,N'') <> N'' THEN N'已排产' ELSE N'未排产' END AS 单据状态,"
                             + " ISNULL(p.asp_user1,N'') AS 创建人, CONVERT(varchar(16), p.asp_time1, 120) AS 创建时间"
                             + " FROM dbo.plang p"
@@ -756,8 +759,9 @@ public class ScheduleBoardService {
                         + " ISNULL(SUM(ISNULL(xq_sl,0)),0) AS 需求数量, ISNULL(SUM(ISNULL(rk_sl,0)),0) AS 入库数量,"
                         + " COUNT(DISTINCT NULLIF(ISNULL(scx,N''), N'')) AS 产线数,"
                         + " MAX(NULLIF(ISNULL(scx,N''), N'')) AS 任一产线,"
-                        + " SUM(CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN 1 ELSE 0 END) AS 结案行数"
-                        + " FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", doc);
+                        // 2026-10-19 收口:结案行数改走 CLOSED(与列表「结案」列同源),不再裸读 ja
+                        + " SUM(CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END) AS 结案行数"
+                        + " FROM dbo.plang p WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", doc);
         head.put("行数", agg.get("行数"));
         head.put("排产数量", agg.get("排产数量"));
         head.put("需求数量", agg.get("需求数量"));
@@ -1108,15 +1112,15 @@ public class ScheduleBoardService {
                 ? jdbc.queryForList(
                         "SELECT pl_no AS 工单号, pl_xc AS 工单行号, ISNULL([批次号],N'') AS 批次号,"
                                 + " ISNULL(pl_sl,0) AS 排产数量, [拆分序号] AS 拆分序号,"
-                                + " CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN N'已结案' ELSE N'在产' END AS 状态"
-                                + " FROM dbo.plang WHERE [源工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                                + " CASE WHEN " + CLOSED + " THEN N'已结案' ELSE N'在产' END AS 状态"
+                                + " FROM dbo.plang p WHERE [源工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
                                 + "   AND ([源工单行id]=? OR [源工单行id] IS NULL)"
                                 + " ORDER BY ISNULL([拆分序号],0), pl_no", doc, rowId)
                 : jdbc.queryForList(
                         "SELECT pl_no AS 工单号, pl_xc AS 工单行号, ISNULL([批次号],N'') AS 批次号,"
                                 + " ISNULL(pl_sl,0) AS 排产数量, [拆分序号] AS 拆分序号,"
-                                + " CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN N'已结案' ELSE N'在产' END AS 状态"
-                                + " FROM dbo.plang WHERE [源工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                                + " CASE WHEN " + CLOSED + " THEN N'已结案' ELSE N'在产' END AS 状态"
+                                + " FROM dbo.plang p WHERE [源工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
                                 + " ORDER BY ISNULL([拆分序号],0), pl_no", doc);
         // 父单:按行追溯时**必须**是本行的源工单行(源工单行id = 本行 id);不带行id 才退回"本单首个父单"
         List<Map<String, Object>> parentsOf = byRow
@@ -1179,7 +1183,9 @@ public class ScheduleBoardService {
                         + "   ISNULL([是否切单],N'N') AS 是否切单, [拆分序号] AS 拆分序号,"
                         + "   ISNULL([源工单号],N'') AS 源工单号, ISNULL([根工单号],N'') AS 根工单号,"
                         + "   ISNULL(pl_sl,0) AS 计划数量, ISNULL(rk_sl,0) AS 入库数量, ISNULL(scx,N'') AS 生产线,"
-                        + "   CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN N'已结案' ELSE N'在产' END AS 状态"
+                        // fam 是 p.* 的递归 CTE ⇒ 用 fam 当别名照样能走 PlangClose(2026-10-19 收口)
+                        + "   CASE WHEN " + com.yinjia.mes.service.PlangClose.closed("fam")
+                        + "        THEN N'已结案' ELSE N'在产' END AS 状态"
                         + " FROM fam ORDER BY ISNULL([是否切单],N'N'), pl_no, pl_xc", famRowId);
         String rootNo = family.isEmpty() ? doc : String.valueOf(
                 family.stream().filter(x -> "N".equals(String.valueOf(x.get("是否切单")))).findFirst()

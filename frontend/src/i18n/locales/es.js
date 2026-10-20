@@ -8,7 +8,8 @@ export default {
     '已回正': 'Revertidas',
     '行': 'fila(s)',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
     '结案异常': 'Cierre anómalo',
-    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Esta línea está cerrada pero no cumple la regla de cierre de MES (entrada ≥ planificado + inspección de producto terminado de ensamble aprobada) — normalmente lo causa el mini-programa/legacy escribiendo directo en la base. Revíselo con «Auditoría de cierre» y corríjalo.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    '该行写着已结案，但入库数量没达到排产数量 —— MES 的两条结案路径都要求入库≥排产，所以这行不是 MES 结的（通常是手机端小程序/参考库直连写库）。可用「结案回正」一键改回未结案':
+      'Esta fila figura cerrada, pero la cantidad ingresada no alcanza la planificada. Las dos vías de cierre de MES exigen ingreso ≥ planificado, así que esta fila no la cerró MES (normalmente la escribe directamente el mini-programa o el sistema heredado). Use «Revertir cierre» para volver a abierta.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Biblioteca de estándares de inspección',
     '出货检验计划': 'Plan de inspección de envío',
     '计划单号': 'N.º de plan',

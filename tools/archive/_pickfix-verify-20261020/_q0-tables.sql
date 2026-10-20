@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT panel_code, panel_name, head_table, line_table FROM yj_panel WHERE panel_code IN (N'MATERIAL_OUT',N'STOCK_BALANCE',N'STOCK_LEDGER',N'STOCK_DETAIL',N'STOCK_PICK',N'PURCHASE_IN',N'FINISH_IN',N'SALE_OUT');

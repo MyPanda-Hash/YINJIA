@@ -4256,8 +4256,8 @@ export default {
     '把外部程序误写成「已结案」的工单改回未结案': 'Reopen work orders that external programs wrongly marked closed',
     '已回正': 'Reopened',
     '结案异常': 'Closed?',
-    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正':
-      'This line is marked closed but does not meet the MES closing rule (stock-in ≥ scheduled qty AND the assembly finished-goods inspection approved) — usually caused by the mobile mini-program / legacy system writing the database directly. Check it with Close audit and correct it.',
+    '该行写着已结案，但入库数量没达到排产数量 —— MES 的两条结案路径都要求入库≥排产，所以这行不是 MES 结的（通常是手机端小程序/参考库直连写库）。可用「结案回正」一键改回未结案':
+      'This row is marked closed, but the received quantity has not reached the planned quantity. Both MES closing paths require received ≥ planned, so this row was not closed by MES (usually written straight into the database by the mobile mini-program / legacy system). Use "Revert closing" to reopen it.',
     '获取混料配方': 'Get Mixing Formula',
     '混料数量': 'Mixing Quantity',
     '配料比': 'Mix Ratio',

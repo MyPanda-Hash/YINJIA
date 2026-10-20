@@ -493,7 +493,7 @@ i18n-rd-progress-18cols.sql
 
 # —— 2026-09-18 研发管理最新设计 Phase 3(产品文件 6 面板配置对齐 + 数据键不变量防线)——
 # ⚠⚠ 铁律(2026-09-18 实测确立,违反即静默丢值):
-#   后端 QueryService.selectCols 用 	.[col_name] AS [label] 出列、rowToLabels 按 **label** 建行模型,
+#   后端 QueryService.selectCols 用 t.[col_name] AS [label] 出列、rowToLabels 按 **label** 建行模型,
 #   保存链 labelsToCols 再用 label 反查 col_name 落库 ⇒ **配置里的数据键必须等于该字段当前的 label**。
 #   等价地:**改 label 就是改数据键**,必须同步改 recordSheetConfigs.js 的 key,否则该列取不到值(整列空白)
 #   且保存时被静默丢弃。本轮据此回退了 3 处 label 改名(物料名/更改原因/更改内容)与 1 处(内孔要求),
@@ -2793,6 +2793,14 @@ migrate-wo-mold-recipe-link.sql
 #   幂等;两账套均执行。
 migrate-material-out-wo-line-query-col-20261015.sql
 
+# 🔴 【2026-10-19 已退役,不再随链执行 —— 见 tools/archive/_retired-migrations-20261019/README.md】
+#   退役原因:脚本第 110 行把 ja 判成 `排产>0 AND (全道报工达标 OR 入库>=排产) ⇒ 'Y'` ——
+#   这正是 2026-10-15 已被代码删除的旧口径「报工达标即结案」,而且**不看组装成品检验单**。
+#   留在链里 = 一旦 DbSync 重放(改字节/补登记/重建账套),就会批量把"报工做完了但没入库"的行
+#   写成已结案,正是 2026-10-18~19 现场「扫码报工后其余工单全变已结案 / 页面全是结案异常」的同一现象。
+#   口令:它写过的行带 asp_user2='migration' 指纹,可据此取证(2026-10-19 正式库体检未发现该指纹)。
+#   若将来还需要"按报工回填状态",请另写脚本:只回填 当前工序/完工状态 三列,**不得写 ja**。
+#
 # migrate-plang-row-state-backfill-20261015.sql(2026-10-15):按「工单号+工单行号」**逐行重算** plang 工序状态
 #   (修正历史整单口径写下的脏缓存)。用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
 #   流程追溯都这样实现,都需要这两个进行确定」。
@@ -2806,7 +2814,7 @@ migrate-material-out-wo-line-query-col-20261015.sql
 #   完工状态=全道达标或本行入库达标→生产完工 / 有报工→在制 / 否则未开工;ja 随之(生产完工→Y,
 #   从生产完工退回且原已结案→N)。⚠ 只重算这四列派生缓存,不碰单据/报工/库存数据。
 #   自检:不应再有"无报工却在制"的行。幂等(重跑结果一致);两账套均执行。
-migrate-plang-row-state-backfill-20261015.sql
+#   (文件已移至 tools/archive/_retired-migrations-20261019/,保留原文备查)
 
 # migrate-wo-insp-wo-line-20261015.sql(2026-10-15):三张工序检验单(成型/切炭/组装)表头补「工单行号」
 #   + 字段注册 + 译名 + 存量回填。用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
@@ -3967,7 +3975,6 @@ migrate-rd-owner-receipt-20261019.sql
 #   前端列配置 type:select + stdLib:INSP_FREQ,表头 ⌄ 可增删改条目(改库不影响已录入单据)。
 migrate-insp-freq-stdlib-20261019.sql
 
-
 # migrate-stock-flow-src-rid-grain-20261020.sql — 库存流水唯一键放细:(src,rid) → (src,rid,物料编码,批号)
 #   用户 2026-10-20 报障原话「你们限定了一个工单只能领一次料…把你们设定的哪个唯一性拿掉就彻底解决了」
 #   「一个工单是可以扫多个物料的,一个工单因为有多个物料组合」;现场报错 error 2601 UX_outh_src_rid 重复键 (6,1711)。
@@ -3987,6 +3994,40 @@ migrate-insp-freq-stdlib-20261019.sql
 #         并回退 inv_cost_ledger 主键与两个视图(见 migrate-stock-views-restore-20261016.sql /
 #         migrate-stock-balance-warn-20261018.sql 的定义)。
 migrate-stock-flow-src-rid-grain-20261020.sql
+
+# migrate-formno-pool-sync-20261019.sql — 单号重发事故(新增出来一张「已审核」单)的数据修复
+#   送料暂收单/来料检验单点「新增」→ 新草稿拿到库里**已存在**的单号(SL-2026-10-0032 等),
+#   同一单号共用 yj_doc_status(shr=admin)⇒ 新单一出生就是已审核、保存 409。根因:取号只看 s_allno,
+#   而 9 月导库的单号没回登号池(库里 SL 到 0130、池只到 0006)。
+#   代码侧已修(FormNoService 取号基准 = max(号池末号, 各业务表同前缀同月最大号),候选号再逐个比对
+#   号池 + inh + 本前缀业务表);本脚本补数据:①删事故留下的空白占位头行(只删全字段为空的重号行);
+#   ②号池回登(逐面板补登库里已有、池里没有的 前缀-yyyy-MM-nnnn 单号,只增不删)。
+#   幂等;末尾自检「空白重号=0 且未回登=0」否则 RAISERROR FAIL。两账套都要执行。
+migrate-formno-pool-sync-20261019.sql
+
+# migrate-clean-demo-wo-collision-20261019.sql(2026-10-19):「演示造数 + 同号双客户」清理 —— 一次覆盖 9 张表
+#   (plang / plang_pc / bd_finish_in / bl_finish_in / qc_asm_insp_head / qc_asm_insp_detail / scjl /
+#    wo_progress / s_allno),默认 dry-run(@apply=0)。
+#   现场:GD-2026-10-0014~0023 这 10 个工单号下各有两组客户的行(旧组=批次20261014/入库=排产/结案=Y/
+#   建单人 wo-flow-20261018;新组=10-19 参考库/小程序新写入),工单号+行号不再唯一 ⇒ 报工/入库/检验/结案串账
+#   (实测新组有 19 行"蹭"到旧组的已审组装成品检验单)。按 COLLISION 范围清 31 行 + 31 入库单 + 31 检验单;
+#   @scope=ALL_DEMO 才是清全部 418 行(需 @confirmAll=1 + 先备份)。
+#   ⚠ 作废(asp_cancel='Y')而非物理删除:留痕 asp_user2='清理演示撞号(旧单)',可回滚。
+migrate-clean-demo-wo-collision-20261019.sql
+
+# migrate-delete-qc-insp-modifying-20261019.sql(2026-10-19):删除停在「修改申请中」的来料检验单(默认 dry-run)
+#   现场:IJ-2026-10-0002 已审核后又申请修改(yj_doc_status.modify_state='R'),界面上已审核单不允许直接删除。
+#   处置=作废三处:qc_insp 头 + qc_insp_detail 明细 + yj_doc_status(canceled='Y' 并清 modify_state/pending,
+#   否则状态推导里「修改申请中」优先级高于「已作废」仍会显示修改申请中)。留痕 asp_user2='删除(修改申请中)'。
+#   ⚠ 这是给"卡在修改申请中删不掉"的单据留的出口;正常单据请走「删除申请 → 审批」流程。
+migrate-delete-qc-insp-modifying-20261019.sql
+
+# migrate-purge-unclosed-wo-20261019.sql(2026-10-19):清掉「未完工/未结案」工单行及其残留单据(默认 dry-run)
+#   背景:用户口径「把未完工未能结案的数据都删除吧」——2026-10-19 参考库/小程序直写的未排产/未入库行,
+#   留着只会继续和真单抢号。范围严格取「未作废 且 ja 不在 T/Y」,逐行锚 id(不按单号整单删);
+#   级联作废 plang / plang_pc / scjl(报工) / wo_progress(进度) / 组装成品检验单 / 产成品入库单,
+#   占用链改 link_status='CANCELLED'。⚠ 号池 s_allno 只增不删(删号=重发号,项目铁律),本脚本不动它。
+migrate-purge-unclosed-wo-20261019.sql
 #
 # ---- 2026-10-19 数采设备台账导入(测试账套) ----
 #   用户口径:「根据这里面的数据，把是否联网是的设备的数据整理出来，加入系统的测试账套里面的
@@ -4004,6 +4045,15 @@ migrate-dc-device-import-20261019.sql
 #   自检:表/列/参数齐全 + 列级中文注明齐全。幂等;两账套均执行。
 #   配套:DbBackupService / DbBackupScheduler / SysBackupController + frontend /sys/backup
 migrate-db-backup-20261019.sql
+
+# migrate-plang-ja-guard-trigger-20261020.sql(2026-10-20):**阻止**外部程序把工单写成已结案 —— plang 结案守卫触发器
+#   用户口径「以后手机端报工不要导致结案现象」。手机端直连库写 plang.ja,此前的防线是
+#   ①读侧收口(PlangClose)②每分钟自愈 —— 都是"事后"。触发器在 INSERT/UPDATE 的**同一事务**里
+#   把「入库<排产 却 ja∈(T,Y)」改回 N ⇒ 假结案从源头不产生,红标不再出现;不依赖 MES 进程。
+#   判据与 PlangClose.anomaly / 列表「结案异常」/ 巡检 / 回正脚本同一份;GD2608* 历史单豁免;
+#   TRIGGER_NESTLEVEL()>1 防递归;静默纠正(不抛错,避免打断手机端报工事务)。
+#   回滚:DROP TRIGGER dbo.trg_plang_ja_guard;
+migrate-plang-ja-guard-trigger-20261020.sql
 #
 # ---- 2026-10-19 数据库自动备份:每天 → 每月一次 ----
 #   用户口径:「里面显示的数据库备份记录改为每个月一次」。

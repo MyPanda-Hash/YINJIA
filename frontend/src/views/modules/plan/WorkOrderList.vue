@@ -75,8 +75,9 @@
       <el-table-column :label="tt('公司代码')" prop="公司代码" width="90" show-overflow-tooltip />
       <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip>
         <template #default="{ row }">
-          <!-- 点工单号 = 打开工单排产的追溯(=工单详情:工序进度+时间线+血缘) -->
-          <el-link type="primary" :underline="false" @click="openTrace(row)">{{ row['工单号'] }}</el-link>
+          <!-- 点工单号 = 打开工单排产的追溯(=工单详情:工序进度+时间线+血缘)
+               underline 用字符串值(2026-10-19):布尔值在 Element Plus 3.0 会废弃,控制台会刷弃用警告 -->
+          <el-link type="primary" underline="never" @click="openTrace(row)">{{ row['工单号'] }}</el-link>
         </template>
       </el-table-column>
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
@@ -124,11 +125,11 @@
       <el-table-column :label="tt('结案')" width="96" fixed="right">
         <template #default="{ row }">
           <span :class="{ 'wol-closed': row.结案 === 'Y' }">{{ row.结案 === 'Y' ? tt('已结案') : '-' }}</span>
-          <!-- 结案异常(2026-10-18):ja 是外部程序也能直接写的列(手机端小程序/参考库直连库)。
-               后端按 MES 自己的结案口径(入库≥排产 + 组装成品检验已审核)反查,不成立的 ja=Y 标出来,
-               免得"外部误结案"被当成 MES 的结案。 -->
+          <!-- 结案异常(2026-10-18 加,2026-10-19 收口):ja 是外部程序也能直接写的列(手机端小程序/参考库直连库)。
+               判据 = 「入库<排产」—— MES 两条结案路径(手工结案/自动结案)都要求入库≥排产,
+               所以入库没达标却写着结案的,一定是库外写的。与后端 PlangClose.anomaly / closeAudit / 巡检同源。 -->
           <el-tooltip v-if="row.结案异常 === 'Y'"
-                      :content="tt('该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正')"
+                      :content="tt('该行写着已结案，但入库数量没达到排产数量 —— MES 的两条结案路径都要求入库≥排产，所以这行不是 MES 结的（通常是手机端小程序/参考库直连写库）。可用「结案回正」一键改回未结案')"
                       placement="top">
             <el-tag size="small" type="danger" effect="plain" style="margin-left:4px">{{ tt('结案异常') }}</el-tag>
           </el-tooltip>

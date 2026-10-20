@@ -137,8 +137,20 @@ public class QuickScheduleService {
         }
         // 生产工单前缀 MO → GD(2026-10-05 用户口径「修改生产工单」):只影响新单号,历史单号不变;
         // 取号流水在 s_allno(按 前缀+年月 独立序列),不与旧前缀混号。
-        if (plNo == null || plNo.isBlank()) plNo = formNo.next("GD", user);
+        boolean reuseNo = plNo != null && !plNo.isBlank();
+        if (!reuseNo) plNo = formNo.next("GD", user);
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
+        // 🔴 2026-10-19 修(用户报障「号池又错了 —— 转出来的工单和已有单撞号」):
+        //   **同一张销售订单的第二行**转工单时,上面按 od_no 复用了工单号(设计如此:一张订单一个工单号),
+        //   但行号仍取**订单行自己的 行号** —— 而 bl_so_order.行号 实测存在重复(两行都是 1),
+        //   于是插出一条 (工单号, 行号) 完全相同的行(实测 GD-2026-10-0023 出现两条 #1,
+        //   一条来自 LZW-20261016-01 行 9724、一条来自行 9727,客户/物料/数量都一样)。
+        //   修法:复用已有工单号时,**行号一律取该工单号下的 MAX(pl_xc)+1**(物理上不可能再撞)。
+        if (reuseNo) {
+            Integer maxXc = jdbc.queryForObject(
+                    "SELECT ISNULL(MAX(ISNULL(pl_xc,0)),0) FROM dbo.plang WHERE pl_no=?", Integer.class, plNo);
+            lineNo = (maxXc == null ? 0 : maxXc) + 1;
+        }
         String batch = null; // 生产批次在工单行首次生产完工时生成
         String due = str(line.get("交货日期"));
         // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),不再是排产数量

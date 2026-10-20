@@ -148,18 +148,23 @@ public class WorkOrderPickingService {
         List<Map<String, Object>> hit = jdbc.queryForList(
                 "SELECT id, pl_no, ISNULL(pl_xc, 0) AS xc, ISNULL([批次号], N'') AS batch,"
                         + " ISNULL(dm, N'') AS dm, ISNULL(scx, N'') AS scx, ISNULL(pl_sl, 0) AS pl_sl,"
-                        + " ISNULL(ja, N'N') AS ja"
-                        + " FROM dbo.plang WHERE pl_no = ? AND ISNULL(pl_xc,0) = ?"
+                        + " ISNULL(rk_sl, 0) AS rk_sl, ISNULL(ja, N'N') AS ja"
+                        + " FROM dbo.plang p WHERE pl_no = ? AND ISNULL(pl_xc,0) = ?"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'"
                         // 代表行优先:① 勾选行本身 ② 已排产(pl_sl>0) ③ 未结案 ④ id 小
                         + " ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END,"
                         + "          CASE WHEN ISNULL(pl_sl,0) > 0 THEN 0 ELSE 1 END,"
-                        + "          CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN 1 ELSE 0 END, id",
+                        + "          CASE WHEN " + com.yinjia.mes.service.PlangClose.closed("p")
+                        + "               THEN 1 ELSE 0 END, id",
                 no, xc, id == null ? -1L : id);
         if (hit.isEmpty()) throw new IllegalStateException("工单行不存在或已作废(工单号 " + no + " 行号 " + xc + ")");
         Map<String, Object> h = hit.get(0);
-        String ja = str(h.get("ja"));
-        if ("T".equals(ja) || "Y".equals(ja)) throw new IllegalStateException("已结案,不能转领料单");
+        // 已结案守卫(2026-10-19 收口):不再裸读 ja —— 外部程序把 ja 写成 Y(入库=0)时,
+        //   旧写法会报「已结案,不能转领料单」把领料链整条挡住(正式库实测 38 行假结案)。
+        //   口径与 生产工单列表/体检/巡检 同源:见 PlangClose。
+        if (com.yinjia.mes.service.PlangClose.isClosed(str(h.get("ja")), num(h.get("pl_sl")),
+                num(h.get("rk_sl")), String.valueOf(h.get("pl_no"))))
+            throw new IllegalStateException("已结案,不能转领料单");
         // 排产前置(2026-10-18 用户口径「先要完成排产才进入到领料」):
         //   ① 必须已排入产线(scx 非空)—— 撤销排产后 scx 会被清空,这里随之拦住;
         //   ② 排产数量必须 > 0(旧守卫保留:撤销排产/历史脏数据可能留下数量,单独兜底)。

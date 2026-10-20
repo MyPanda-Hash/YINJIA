@@ -137,7 +137,8 @@
     </div>
 
     <div class="oc-pager">
-      <el-pagination small background layout="total, sizes, prev, pager, next, jumper"
+      <!-- size="small" 取代布尔 small(2026-10-19):布尔值在 Element Plus 3.0 会废弃 -->
+      <el-pagination size="small" background layout="total, sizes, prev, pager, next, jumper"
                      :total="rows.length" v-model:current-page="pageNo" v-model:page-size="pageSize"
                      :page-sizes="[50, 100, 200, 500]" />
     </div>

@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT * FROM sl_recv WHERE id IN (222, 570);
