@@ -161,6 +161,10 @@ const scaleVal = ref(0)
 const scaleAt = ref(null)
 const scaleOk = ref(false)
 const prevScale = ref(null)
+/** 秤设备编码(留痕用:区分是哪台台车秤报的数) */
+const scaleDeviceCode = ref('')
+/** 本次扫码来源(相机/手输),扫码完成后清空 */
+const lastScanSource = ref('')
 let scaleTimer = null
 
 const activeLine = computed(() => (activeIdx.value >= 0 ? lines.value[activeIdx.value] : null))
@@ -284,6 +288,7 @@ async function scanMaterialCamera() {
       return
     }
     matInput.value = r.text
+    lastScanSource.value = '相机'
     await onScanMaterial()
   } finally {
     scanning.value = false
@@ -322,6 +327,15 @@ async function onScanMaterial() {
     return
   }
   matOk.value = `${p.code} +${fmt(qty)} ${r.line.uom || ''}`
+  // 逐笔留痕(2026-10-21):扫了哪些料、各多少、什么时候 —— 用户要能监控作业情况
+  reportScan({
+    materialCode: p.code,
+    materialName: r.line.name,
+    qty,
+    unit: r.line.uom,
+    scanSource: lastScanSource.value || '手输',
+  })
+  lastScanSource.value = ''
   matInput.value = ''
   await nextTick()
   matInputRef.value && matInputRef.value.focus()
@@ -341,7 +355,79 @@ async function useScaleForActive() {
     return
   }
   const r = applyScan(lines.value, { code: activeLine.value.code }, qty)
-  if (r.ok) matOk.value = `${activeLine.value.code} +${fmt(qty)}`
+  if (r.ok) {
+    matOk.value = `${activeLine.value.code} +${fmt(qty)}`
+    reportScan({
+      materialCode: activeLine.value.code,
+      materialName: activeLine.value.name,
+      qty,
+      unit: activeLine.value.uom,
+      scanSource: '取秤',
+    })
+  }
+}
+
+/**
+ * 上报一笔扫码留痕(2026-10-21)。
+ *
+ * 用户口径:「要监控 App 使用情况,因为这个取数上报的要能看到他们的操作情况」
+ * + 「还要记『扫了哪些料、各多少、什么时候』」。
+ *
+ * 口径:
+ *   · **不阻塞作业** —— 上报是 fire-and-forget,失败只 console.warn,不弹错给现场;
+ *   · clientType 区分 App / Web(App 内用原生相机扫码,网页里是扫码枪或手输);
+ *   · scaleValue 只有「取秤」或扫码时取到稳定值才有,手输数量时为空(便于查"谁没走秤")。
+ *
+ * @param {{ materialCode:string, materialName:string, qty:number, unit:string, scanSource:string }} p
+ */
+function reportScan(p) {
+  if (!order.value) return
+  const body = {
+    woNo: order.value.orderNo,
+    woLine: order.value.lineNo,
+    productCode: order.value.productCode,
+    materialCode: p.materialCode,
+    materialName: p.materialName || '',
+    qty: p.qty,
+    unit: p.unit || '',
+    scaleValue: p.scanSource === '取秤' || p.scanSource === '相机' ? p.qty : null,
+    scaleDevice: scaleDeviceCode.value || '',
+    scaleAt: scaleAt.value || null,
+    scanType: '物料',
+    scanSource: p.scanSource || '',
+    clientType: nativeScan ? 'App' : 'Web',
+    clientInfo: clientInfo(),
+    remark: '',
+  }
+  request.post('/px/woPick/scanLog', body).catch((e) => {
+    // 留痕失败不打扰现场,只在控制台留痕(便于排查)
+    console.warn('[woPick] 扫码留痕上报失败:', (e && e.message) || e)
+  })
+}
+
+/**
+ * 从 callButton 的返回里取新单号。
+ *
+ * 后端 ButtonService.save 的回执把单号放在 "编号" 键(多处一致,见 ButtonService.java:2392/2986/6569),
+ * 兼容 docNo / 单据编号 两种历史写法。
+ */
+function docNoOf(res) {
+  if (!res || typeof res !== 'object') return ''
+  const r = res.data && typeof res.data === 'object' ? res.data : res
+  return String(r['编号'] || r.docNo || r['单据编号'] || '').trim()
+}
+
+/** 设备/版本标识:App 内带平台信息,网页带 UA 摘要(便于区分是哪台手机/哪台电脑) */
+function clientInfo() {
+  try {
+    const ua = String(navigator.userAgent || '')
+    const cap = typeof window !== 'undefined' ? window.Capacitor : null
+    const plat = cap && typeof cap.getPlatform === 'function' ? cap.getPlatform() : ''
+    const tag = plat ? `App/${plat}` : 'Web'
+    return (tag + ' ' + ua).slice(0, 200)
+  } catch {
+    return ''
+  }
 }
 
 /**
@@ -362,6 +448,9 @@ function scaleReadingOf(res) {
     || points.find((p) => String(p.unit || '') === 'kg')
     || points[0]
   if (!w) return null
+  // 记下秤设备编码(留痕用:事后能查是哪台台车秤报的数)
+  if (d.deviceCode) scaleDeviceCode.value = String(d.deviceCode)
+  else if (w.deviceCode) scaleDeviceCode.value = String(w.deviceCode)
   const v = w.valueNum != null ? Number(w.valueNum) : Number(w.valueText)
   return {
     value: v,
@@ -436,7 +525,16 @@ async function submitAll() {
       warehouse: order.value.warehouse || '',
       lines: lines.value,
     })
-    await callButton({ panelCode: 'MATERIAL_OUT', buttonName: '保存', formData: form, buttonParam: {} })
+    const saved = await callButton({ panelCode: 'MATERIAL_OUT', buttonName: '保存', formData: form, buttonParam: {} })
+    // 把本次作业扫过的行补上领料单号(便于按单据回查);失败不打扰现场
+    const newDocNo = docNoOf(saved) || form.单据编号 || ''
+    if (newDocNo) {
+      request.post('/px/woPick/attachDoc', {
+        docNo: newDocNo,
+        woNo: order.value.orderNo,
+        woLine: order.value.lineNo,
+      }).catch(() => {})
+    }
     ElMessage.success(tt('整单提交成功,已生成材料出库单'))
     // 提交后清空,便于扫下一张工单
     order.value = null

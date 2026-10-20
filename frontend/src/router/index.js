@@ -47,6 +47,9 @@ const routes = [
       // 自动抓台车电子秤数量 → 整单提交生成材料出库单。页面级虚拟面板 WORK_ORDER_PICK
       // (定义见后端 PagePanelRegistry),理由与数据源见 views/scm/WorkOrderPick.vue 头注释。
       { path: 'scm/workOrderPick', component: () => import('@/views/scm/WorkOrderPick.vue'), meta: { title: '工单扫码领料', code: 'workOrderPick', panelCode: 'WORK_ORDER_PICK' } },
+      // 扫码领料记录(2026-10-21):工单扫码领料的逐笔留痕查询 —— 谁/何时/哪张工单/哪个物料/多少。
+      // 数据源 wo_pick_scan_log(只增不改),接口 GET /px/woPick/scanLogs。只读页面。
+      { path: 'scm/pickScanLog', component: () => import('@/views/scm/PickScanLog.vue'), meta: { title: '扫码领料记录', code: 'pickScanLog', panelCode: 'WORK_ORDER_PICK' } },
       // ERP系统集成 · ERP集成配置清单(2026-10-18):导入/转出两向 × 分类的接口/设备/字段映射统一配置页。
       // 页面级虚拟面板 ERP_INTEG(定义见后端 PagePanelRegistry),菜单项带 panelCode ⇒ 不进 flatMenus 自动路由。
       { path: 'erp/integConfig', component: () => import('@/views/erp/ErpIntegConfig.vue'), meta: { title: 'ERP集成配置清单', code: 'erpIntegCfg', panelCode: 'ERP_INTEG' } },

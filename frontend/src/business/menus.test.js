@@ -302,8 +302,10 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
   //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
   // 2026-10-21 再加「工单扫码领料」的页面级面板码 WORK_ORDER_PICK(按工单+BOM 作业)⇒ 35。
-  assert.equal(invCodes.length, 35, `WMS管理应有 35 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 35, 'WMS管理内不应有重复面板')
+  // 同批「扫码领料记录」也挂 WORK_ORDER_PICK(同一作业的留痕查询,不另开权限码)⇒ 菜单项多一条
+  // 但**面板码不重复** —— 下面 new Set 的断言仍然成立,这正是共用面板码的预期。
+  assert.equal(invCodes.length, 36, `WMS管理应有 36 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 35, 'WMS管理内不应有重复面板(扫码领料记录与工单扫码领料共用 WORK_ORDER_PICK)')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
   assert.ok(invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料应挂页面级面板码(2026-10-21)')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')
