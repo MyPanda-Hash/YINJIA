@@ -318,6 +318,11 @@ export const menuTree = [
           // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
           // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
           { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', panelCode: 'WORK_ORDER_BOARD', icon: 'Histogram' },
+          // 生产领料(2026-10-20 用户口径「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」):
+          //   扫工单(带出产品/产线/排产数量)→ 逐件扫原材料 → 按批号日期先进先出自动拆批 → 生成材料出库单草稿。
+          //   与「条码管理 → 扫码领料」的区别:那条是仓管按标签(存货编码|批号)领料,这条是车间/生管按**工单**领料。
+          //   同一份页面两端共用:电脑端本菜单(桌面壳内双栏),手机端 `/m/pick`(独立布局,无 tab/侧栏)。
+          { code: 'prodPick', title: '生产领料', path: '/prod/plan/prodPick', panelCode: 'PROD_PICK', icon: 'ShoppingCart' },
           // 工序任务(路线驱动,A 项 2026-10-05)菜单已按用户口径**撤下**(「把工序任务删除掉算了」,
           // 2026-10-05):工单详情只看"走到哪一步"(按报工统计),不再维护工序任务队列。
           // 页面组件/后端接口/表结构按可撤回要求保留但不再挂菜单;要恢复只需把下面一行注释去掉。

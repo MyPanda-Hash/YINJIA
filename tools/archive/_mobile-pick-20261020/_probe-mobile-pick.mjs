@@ -22,6 +22,10 @@ const UI = (process.argv[2] || 'http://127.0.0.1:5173').replace(/\/$/, '')
 const WO = process.argv[3] || 'GD-2026-10-0222'
 const MAT = process.argv[4] || 'A-32-01'
 const QTY = process.argv[5] || '2'
+// 2026-10-20:同一个组件两端共用 —— 手机端 /#/m/pick(独立布局)· 电脑端 /#/prod/plan/prodPick(桌面壳内双栏)
+const ROUTE = process.env.PROBE_ROUTE || '/#/m/pick'
+const W = Number(process.env.PROBE_W || 375)
+const H = Number(process.env.PROBE_H || 900)
 const PORT = 9411
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -34,7 +38,7 @@ const lg = await (await fetch(apiBase + '/api/auth/login', {
 if (!lg?.data?.token) throw new Error('登录失败: ' + JSON.stringify(lg).slice(0, 200))
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-mpick-'))
-const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=375,900',
+const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=' + W + ',' + H,
   `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
 await sleep(2500)
 let tab
@@ -51,11 +55,11 @@ const send = (method, params = {}) => new Promise((res) => { const id = ++seq; p
 const ev = async (x) => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true }))?.result?.result?.value
 
 await send('Page.enable'); await send('Runtime.enable'); await send('DOM.enable')
-await send('Emulation.setDeviceMetricsOverride', { width: 375, height: 900, deviceScaleFactor: 2, mobile: true })
+await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 2, mobile: W < 600 })
 await send('Page.navigate', { url: `${UI}/#/login` }); await sleep(1800)
 await ev(`localStorage.setItem('mes_token', ${JSON.stringify(lg.data.token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(lg.data.user))}); 'ok'`)
 await send('Page.navigate', { url: 'about:blank' }); await sleep(300)
-await send('Page.navigate', { url: `${UI}/#/m/pick` }); await sleep(4500)
+await send('Page.navigate', { url: UI + ROUTE }); await sleep(4500)
 
 const out = []
 const ok = (name, pass, detail = '') => { out.push({ name, pass, detail }); console.log(`${pass ? '  ✔' : '  ✘'} ${name}${detail ? '  ' + detail : ''}`) }
@@ -67,9 +71,21 @@ const layout = JSON.parse(await ev(`JSON.stringify({
   body: document.body.scrollWidth,
   title: document.querySelector('.mp-title')?.textContent || '',
   cards: document.querySelectorAll('.mp-card').length,
+  cols: getComputedStyle(document.querySelector('.mp-body') || document.body).display,
+  leftW: Math.round((document.querySelector('.mp-left')?.getBoundingClientRect().width) || 0),
+  rightW: Math.round((document.querySelector('.mp-right')?.getBoundingClientRect().width) || 0),
+  footPos: getComputedStyle(document.querySelector('.mp-foot') || document.body).position,
+  menuHasPick: Array.from(document.querySelectorAll('.leftnav, .mobile-nav')).some(n => (n.textContent || '').includes('生产领料')),
 })`))
-ok('页面已渲染(.mp-title)', layout.title.length > 0, JSON.stringify(layout))
-ok('375 宽无横向滚动', layout.doc <= layout.win && layout.body <= layout.win, `doc=${layout.doc} win=${layout.win}`)
+ok('页面已渲染(.mp-title=' + layout.title + ')', layout.title.length > 0, `cards=${layout.cards}`)
+ok(`${W} 宽无横向滚动`, layout.doc <= layout.win && layout.body <= layout.win, `doc=${layout.doc} win=${layout.win}`)
+if (W >= 900) {
+  ok('电脑端双栏(grid)且左右都有宽度', layout.cols === 'grid' && layout.leftW > 0 && layout.rightW > 0, JSON.stringify({ cols: layout.cols, leftW: layout.leftW, rightW: layout.rightW }))
+  ok('电脑端底栏不再 fixed(留在内容流里)', layout.footPos !== 'fixed', layout.footPos)
+  ok('左侧菜单能看到「生产领料」', layout.menuHasPick === true, String(layout.menuHasPick))
+} else {
+  ok('手机端单列 + 吸底栏', layout.cols === 'block' && layout.footPos === 'fixed', JSON.stringify({ cols: layout.cols, footPos: layout.footPos }))
+}
 
 // ② 工单
 const setInput = async (sel, val) => ev(`(() => {
@@ -168,7 +184,8 @@ if (process.argv.includes('--submit')) {
 
 
 const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
-const file = path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020', 'mobile-pick-375.png')
+const file = path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020',
+  ROUTE.includes('/m/pick') ? 'mobile-pick-375.png' : 'prod-pick-desktop.png')
 fs.writeFileSync(file, Buffer.from(shot.result.data, 'base64'))
 console.log(`\n截图: ${file}`)
 

@@ -25,10 +25,12 @@
   <div class="mp">
     <div class="mp-top">
       <span class="mp-back" @click="goBack">‹</span>
-      <span class="mp-title">{{ tt('扫码领料') }}</span>
-      <span class="mp-sub">{{ tt('移动端') }}</span>
+      <span class="mp-title">{{ tt('生产领料') }}</span>
+      <span class="mp-sub">{{ tt('扫工单 → 扫物料 → 先进先出拆批') }}</span>
     </div>
 
+    <div class="mp-body">
+      <div class="mp-left">
     <!-- ① 工单 -->
     <section class="mp-card">
       <div class="mp-sec">
@@ -125,6 +127,10 @@
     </section>
 
     <!-- ③ 清单 -->
+      </div><!-- /mp-left -->
+
+      <div class="mp-right">
+    <!-- ③ 清单 -->
     <section class="mp-card">
       <div class="mp-sec">
         <span>{{ tt('领料清单') }}</span>
@@ -145,6 +151,8 @@
     </section>
 
     <div v-if="errText" class="mp-err">{{ errText }}</div>
+      </div><!-- /mp-right -->
+    </div><!-- /mp-body -->
 
     <div class="mp-foot">
       <el-button size="large" :disabled="!lines.length" @click="reset">{{ tt('清空') }}</el-button>
@@ -498,4 +506,29 @@ async function submit() {
 .mp-foot :deep(.el-button) { flex: 1; height: 46px; margin: 0; }
 
 .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ── 电脑端(2026-10-20 用户口径「写成面版,电脑端也能操作」)──
+   同一份页面:窄屏 = 单列 + 吸底栏(手机);≥900px = 双栏 + 常驻底栏(桌面壳内)。
+   左栏是录入(工单/物料),右栏是清单 —— 桌面上一屏能同时看到「扫进去的」和「已加入的」。 */
+@media (min-width: 900px) {
+  .mp { max-width: 1180px; padding-bottom: 16px; }
+  .mp-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+    gap: 12px;
+    align-items: start;
+    padding-top: 10px;
+  }
+  .mp-left, .mp-right { min-width: 0; }
+  .mp-right { position: sticky; top: 12px; }
+  .mp-card { margin: 0 0 12px; }
+  .mp-foot {
+    position: static;
+    margin: 0 12px 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+  }
+  .mp-back { display: none; }   /* 桌面有左侧导航,不需要返回箭头 */
+}
 </style>

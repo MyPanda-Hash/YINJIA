@@ -64,6 +64,10 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
+      // 生产领料(2026-10-20,用户口径「写成面版,电脑端也能操作,名字叫生产领料,放在生产计划里」):
+      //   与手机端 /m/pick **同一份组件**,桌面壳内双栏(左:工单+物料录入 / 右:领料清单)。
+      //   走 MES 自己的单据链:生成材料出库单草稿 → 审核 → 写 outh 流水,库存与单据同时正确。
+      { path: 'prod/plan/prodPick', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()

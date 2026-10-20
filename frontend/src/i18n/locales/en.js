@@ -4367,6 +4367,9 @@ export default {
     '唯一键,如 EXP_PUR_IN': 'Unique key, e.g. EXP_PUR_IN',
     'MES 面板编码': 'MES panel code',
     '金蝶侧单据/档案名': 'Kingdee document / archive name',
+    // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
+    '生产领料': 'Production Picking',
+    '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',
     // ── 移动端扫码领料(2026-10-20):/m/pick 独立移动页 ──
     '移动端': 'Mobile',
     '扫工单码或输入工单号': 'Scan work order code or enter work order no.',

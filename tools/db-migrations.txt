@@ -4108,3 +4108,12 @@ migrate-db-backup-monthly-20261019.sql
 #   ② 权限矩阵补 4 个页面级面板授权(DC_CONFIG/DC_MONITOR/DC_STATS/BARCODE_SCAN_PICK)+ en 译名。
 #   自检:旧分组清零、生产过程≥10、设备维护 2 张、每角色 4 码齐全、译名 4 条。幂等;两账套均执行。
 migrate-menu-restructure-wms-20261020.sql
+# migrate-prod-pick-panel-20261020.sql — 生产领料 页面级虚拟面板(PROD_PICK):角色授权 + 面板译名
+#   用户 2026-10-20「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」。
+#   ① 不往 yj_panel 插行(空面板会污染报表/选单/字段配置的下游),按先例登记为**页面级虚拟面板**
+#      (PagePanelRegistry.PROD_PICK,模块=生产计划);本脚本给所有角色补 yj_role_panel(view,query,pick),
+#      真正落库仍受 MATERIAL_OUT 权限约束(生成的是它的草稿)。
+#   ② 面板名「生产领料」en 译名(多语言红线);yj_translation scope='panel'。
+#   自检:缺授权角色 0 / 译名 1 条 = [PASS]。幂等;两账套均执行。
+#   页面:电脑端 /prod/plan/prodPick(桌面壳内双栏)· 手机端 /m/pick(独立布局),同一份组件。
+migrate-prod-pick-panel-20261020.sql

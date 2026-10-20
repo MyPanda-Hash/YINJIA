@@ -57,6 +57,17 @@ public final class PagePanelRegistry {
     public static final String DC_STATS = "DC_STATS";
     /** 库存管理(现 WMS管理系统)·条码管理 → 扫码领料(2026-10-20) */
     public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
+    /**
+     * 生产计划 → 生产领料(2026-10-20,用户口径「把他写成面版,这样我也可以选择在电脑端操作,
+     * 名字叫生产领料在生产计划里面」)。
+     *
+     * <p>与 {@link #BARCODE_SCAN_PICK} 的关系:那条是「扫标签(存货编码|批号)按批号领料」的**仓管视角**;
+     * 这条是**车间/生管视角**:先扫工单(带出产品/产线/排产数量),再逐件扫原材料、按
+     * 「批号日期先进先出」自动拆批,一次生成一张材料出库单草稿(带 加工单号+工单行号)。
+     * 同一份页面代码(`MobilePick.vue`)两端共用:手机走 `/m/pick`(独立布局),电脑走
+     * `/prod/plan/prodPick`(桌面壳内,双栏)。数据侧仍走通用面板引擎 + 审核过账,**没有新表**。
+     */
+    public static final String PROD_PICK = "PROD_PICK";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -137,6 +148,16 @@ public final class PagePanelRegistry {
             {"pick",  "生成领料单"},
     };
 
+    /**
+     * 生产领料(2026-10-20):扫工单 → 逐件扫原材料 → 先进先出拆批 → 生成材料出库单草稿。
+     * 页面自身只需 可见/查询/生成领料单;真正的写入与过账仍受 MATERIAL_OUT 面板权限约束。
+     */
+    private static final String[][] PROD_PICK_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"pick",  "生成领料单"},
+    };
+
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
             // 2026-10-20 导航改版:「生产制造」一级目录拆掉,这四个看板所属分组合并为「生产计划」
@@ -145,6 +166,8 @@ public final class PagePanelRegistry {
             new PagePanelDef(SCHEDULE_BOARD, "快速排产", "生产计划", SCHEDULE_BOARD_ACTIONS),
             new PagePanelDef(WORK_ORDER_BOARD, "工单排产", "生产计划", WORK_ORDER_BOARD_ACTIONS),
             new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产计划", WORK_ORDER_LIST_ACTIONS),
+            // 2026-10-20 用户口径「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」
+            new PagePanelDef(PROD_PICK, "生产领料", "生产计划", PROD_PICK_ACTIONS),
             new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS),
             // 2026-10-20 补登:数采平台三页 + 扫码领料(此前菜单里无面板码 ⇒ 矩阵里缺这几个)
             new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),
