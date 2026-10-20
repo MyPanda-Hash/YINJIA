@@ -4114,3 +4114,6 @@ migrate-menu-restructure-wms-20261020.sql
 #   ① 现有全部角色补 yj_role_panel 授权(view,query) ② 面板名 en 译名。
 #   自检:PROJECT_FLOW 授权行 ≥ 角色数、en 译名 1 条。幂等;两账套均执行。
 migrate-rd-project-flow-20261020.sql
+# 2026-10-20 用户口径「把WMS管理系统改为WMS管理」:yj_panel.module_group 分组显示值改名。
+#   两账套各 35 张;代码侧 menus.js / PagePanelRegistry / ReportService / i18n 同批改。
+migrate-wms-group-rename-20261020.sql

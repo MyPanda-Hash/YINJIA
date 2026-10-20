@@ -1420,7 +1420,7 @@ export default {
     '基础档案': 'Datos Maestros',
     '系统管理平台': 'Plataforma de gestión del sistema',
     '库存管理': 'Gestión de inventario',
-    'WMS管理系统': 'Gestión WMS',
+    'WMS管理': 'Gestión WMS',
     '生产计划': 'Planificación de producción',
     '生产过程': 'Proceso productivo',
     '设备维护': 'Mantenimiento de equipos',

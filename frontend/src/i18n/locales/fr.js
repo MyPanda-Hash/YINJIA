@@ -1420,7 +1420,7 @@ export default {
     '基础档案': 'Données de Base',
     '系统管理平台': 'Plateforme de gestion du système',
     '库存管理': 'Gestion des stocks',
-    'WMS管理系统': 'Gestion WMS',
+    'WMS管理': 'Gestion WMS',
     '生产计划': 'Planification de production',
     '生产过程': 'Processus de production',
     '设备维护': 'Maintenance des équipements',

@@ -55,7 +55,7 @@ public final class PagePanelRegistry {
     public static final String DC_MONITOR = "DC_MONITOR";
     /** 数采平台·状态统计(2026-10-20) */
     public static final String DC_STATS = "DC_STATS";
-    /** 库存管理(现 WMS管理系统)·条码管理 → 扫码领料(2026-10-20) */
+    /** 库存管理(现 WMS管理)·条码管理 → 扫码领料(2026-10-20) */
     public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
     /**
      * 研发管理·项目管理 → 项目流程管控(2026-10-20 用户口径):
@@ -166,7 +166,7 @@ public final class PagePanelRegistry {
             new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
-            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理系统", BARCODE_SCAN_PICK_ACTIONS),
+            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理", BARCODE_SCAN_PICK_ACTIONS),
             // 2026-10-20:研发管理·项目管理 → 项目流程管控(归「研发管理」组,与菜单一级目录一致)
             new PagePanelDef(PROJECT_FLOW, "项目流程管控", "研发管理", PROJECT_FLOW_ACTIONS));
 

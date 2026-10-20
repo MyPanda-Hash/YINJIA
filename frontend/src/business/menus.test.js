@@ -275,13 +275,13 @@ test('导航层级同构:一级模块的二级目录一律是"带面板的分组
  *       「智能供应链」只剩 销售管理 / 采购管理。
  * 判定口径 = 面板编码集合:同一张面板不得在两个一级目录里各挂一次,也不得从「智能供应链」溜回来。
  */
-test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
+test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
   const topCodes = menuTree.map((n) => n.code)
-  assert.ok(topCodes.includes('inv'), '应有一级目录 WMS管理系统(inv)')
+  assert.ok(topCodes.includes('inv'), '应有一级目录 WMS管理(inv)')
   const inv = menuTree.find((n) => n.code === 'inv')
-  assert.equal(inv.title, 'WMS管理系统')
+  assert.equal(inv.title, 'WMS管理')
   const scm = menuTree.find((n) => n.code === 'scm')
-  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, 'WMS管理系统紧随智能供应链(同级)')
+  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, 'WMS管理紧随智能供应链(同级)')
 
   // 五个分组:code 保持原值(权限/页签/展开记忆都按 code 走),顺序 = 核算 → 明细 → 统计 → 报表 → 条码管理
   // (条码管理 2026-10-18 并入库存管理:它与库存报表同属 WMS 域,合并在「库存管理」下比留在智能供应链更顺)
@@ -301,18 +301,18 @@ test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算
   // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,另加 2026-10-20
   //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
   //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
-  assert.equal(invCodes.length, 34, `WMS管理系统应有 34 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 34, 'WMS管理系统内不应有重复面板')
+  assert.equal(invCodes.length, 34, `WMS管理应有 34 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 34, 'WMS管理内不应有重复面板')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
-  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理系统')
+  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')
   // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
   for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
                    'STOCKTAKE', 'STOCKTAKE_DETAIL', 'STOCKTAKE_STATS']) {
-    assert.ok(invCodes.includes(p), `WMS管理系统下应有 ${p} 入口`)
+    assert.ok(invCodes.includes(p), `WMS管理下应有 ${p} 入口`)
   }
   const scmCodes = codesOf(scm)
   for (const p of invCodes) {
-    assert.ok(!scmCodes.includes(p), `${p} 已在WMS管理系统下,不应再从智能供应链暴露`)
+    assert.ok(!scmCodes.includes(p), `${p} 已在WMS管理下,不应再从智能供应链暴露`)
   }
 })
 

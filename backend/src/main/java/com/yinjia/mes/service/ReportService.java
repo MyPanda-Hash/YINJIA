@@ -85,11 +85,11 @@ public class ReportService {
             // 一级模块自身(与 menus.js 一级目录同名;库侧 module_group 已由
             // migrate-role-panel-modules-20261018.sql 归一,这里保留历史别名兜底)
             Map.entry("智能供应链", "智能供应链"),
-            // 2026-10-20 导航改版:「库存管理」改名「WMS管理系统」(库侧 module_group 同批改);
+            // 2026-10-20 导航改版:「库存管理」改名「WMS管理」(库侧 module_group 同批改);
             //   「生产制造」拆成两个一级目录「生产计划」/「生产过程」,「设备维护」移进「系统管理平台」。
             //   旧值全部保留为别名,防止其它环境/旧快照库的分组落到「其他」。
-            Map.entry("WMS管理系统", "WMS管理系统"),
-            Map.entry("库存管理", "WMS管理系统"),
+            Map.entry("WMS管理", "WMS管理"),
+            Map.entry("库存管理", "WMS管理"),
             Map.entry("生产计划", "生产计划"),
             Map.entry("生产过程", "生产过程"),
             Map.entry("生产制造", "生产计划"),
@@ -104,9 +104,9 @@ public class ReportService {
             // 基础资料面板再次归口 —— 库侧 migrate-sysadmin-panels-to-dm-20261018.sql 已把
             // module_group 整批改成「数据建模」(一级目录「系统管理平台」降级为系统功能入口页),
             // 故这里同步指向「数据建模」,否则矩阵会多出一个空分组。
-            Map.entry("库存核算", "WMS管理系统"),
-            Map.entry("库存报表", "WMS管理系统"),
-            Map.entry("条码管理", "WMS管理系统"),
+            Map.entry("库存核算", "WMS管理"),
+            Map.entry("库存报表", "WMS管理"),
+            Map.entry("条码管理", "WMS管理"),
             Map.entry("采购管理", "智能供应链"),
             Map.entry("订单管理", "智能供应链"),
             Map.entry("销售管理", "智能供应链"),
@@ -254,7 +254,7 @@ public class ReportService {
 
     /** 导航一级模块展示顺序(权限矩阵按此排序,未登记模块排在末尾)。 */
     public static final List<String> NAV_GROUP_ORDER = List.of(
-            "我的桌面", "研发管理", "智能供应链", "WMS管理系统", "生产计划", "生产过程",
+            "我的桌面", "研发管理", "智能供应链", "WMS管理", "生产计划", "生产过程",
             "品质管理", "数据建模", "系统管理平台", "数采平台", "ERP系统集成", "其他");
 
     /** 通用模板条目(面板名做报表名,文件名也更可读) */

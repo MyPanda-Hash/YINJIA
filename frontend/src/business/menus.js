@@ -165,10 +165,10 @@ export const menuTree = [
   //     左栏展开记忆、`数据字典`/面板权限里按 code 的引用都不受影响;智能供应链随之只剩 销售管理 / 采购管理。
   {
     code: 'inv',
-    // 2026-10-20 用户口径「把库存管理名字改为 WMS管理系统」:只改显示标题,
+    // 2026-10-20 用户口径「把库存管理名字改为 WMS管理」:只改显示标题,
     // 一级目录 code 仍是 'inv'(路由/展开态/页签/权限词都不按标题走),
     // 权限矩阵的分组名由后端 ReportService.navGroup + yj_panel.module_group 同步改。
-    title: 'WMS管理系统',
+    title: 'WMS管理',
     icon: 'Box',
     children: [
       {

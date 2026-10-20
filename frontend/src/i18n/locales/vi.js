@@ -1410,7 +1410,7 @@ export default {
     '基础档案': 'Dữ liệu nền',
     '系统管理平台': 'Nền tảng quản lý hệ thống',
     '库存管理': 'Quản lý tồn kho',
-    'WMS管理系统': 'Quản lý WMS',
+    'WMS管理': 'Quản lý WMS',
     '生产计划': 'Kế hoạch sản xuất',
     '生产过程': 'Quy trình sản xuất',
     '设备维护': 'Bảo trì thiết bị',
