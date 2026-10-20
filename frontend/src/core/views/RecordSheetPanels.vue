@@ -1327,13 +1327,34 @@
          ⇒ 改成**先选物料清单单(表头)**,确认后把该单的全部子件整批带进明细。
          列与数据键:物料编码=WLBOM 表头 物料编码(m_no) / 物料代码=物料代码(wzdm1) /
          物料名称=物料名称(wzmc1);子件仍随行挂在 __kids 上供导入时展开。 -->
-    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="820px" append-to-body>
+    <!-- ⚠ 2026-10-21 第二次返工:弹窗改成**可展开行** ——
+         用户口径「勾选就会展开子件内容,也可以点击收起来」。
+         做法:type="expand" + expand-row-keys 受控 ⇒ 勾选即自动展开该单的子件、
+         取消勾选即收起;同时 @expand-change 把手动点箭头的结果同步回 keys,
+         所以「点一下能收起来」也成立(两种操作不打架)。 -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="860px" append-to-body>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
         <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索物料编码/名称')" clearable style="width:260px" @input="filterMatPick" />
         <span style="color:#909399;font-size:12px">{{ tt('数据源：物料清单') }}</span>
       </div>
-      <el-table :data="matPickFiltered" size="small" border max-height="420" row-key="__k"
-                @selection-change="(sel) => (matPickChecked = sel)">
+      <el-table :data="matPickFiltered" size="small" border max-height="430" row-key="__k"
+                :expand-row-keys="matPickExpandKeys"
+                @selection-change="onMatPickSelection"
+                @expand-change="onMatPickExpand">
+        <!-- 展开区:该物料清单的全部子件(只读预览,导入仍以勾选为准) -->
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="mp-kids">
+              <el-table :data="row.__kids || []" size="small" border>
+                <el-table-column prop="子件代码" :label="tt('物料编码')" width="150" />
+                <el-table-column prop="子件名称" :label="tt('物料名称')" min-width="190" show-overflow-tooltip />
+                <el-table-column prop="子件单位" :label="tt('单位')" width="70" />
+                <el-table-column prop="标准用量" :label="tt('标准用量')" width="96" align="right" />
+                <el-table-column prop="备注" :label="tt('备注')" min-width="130" show-overflow-tooltip />
+              </el-table>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column type="selection" width="42" />
         <el-table-column prop="物料编码" :label="tt('物料编码')" width="140" />
         <el-table-column prop="单据日期" :label="tt('单据日期')" width="120" />
@@ -3201,6 +3222,24 @@ const matPickFiltered = ref([])
 const matPickChecked = ref([])
 const matPickKeyword = ref('')
 const matPickTargetDt = ref(null)
+/** 展开中的行 key(= 已勾选那张单的 __k);受控给 el-table 的 expand-row-keys */
+const matPickExpandKeys = ref([])
+/**
+ * 勾选变化:同步「已勾选」与「已展开」——
+ * 用户口径「勾选就会展开子件内容,也可以点击收起来」⇒ 勾上即展开、取消勾选即收起。
+ */
+function onMatPickSelection(sel) {
+  matPickChecked.value = sel || []
+  matPickExpandKeys.value = (sel || []).map((r) => r.__k)
+}
+/**
+ * 手动点展开箭头:把 el-table 的最新展开集合同步回受控 keys。
+ * 没有这一步,受控 expand-row-keys 会把用户的手动收起/展开立刻顶回去
+ * (点箭头收不起来),那就不满足「也可以点击收起来」。
+ */
+function onMatPickExpand(_row, expanded) {
+  if (Array.isArray(expanded)) matPickExpandKeys.value = expanded.map((r) => r.__k)
+}
 const matPickHint = computed(() => {
   if (!matPickRows.value.length) return tt('物料清单里还没有数据')
   const totalKids = matPickRows.value.reduce((n, m) => n + (m.__kids || []).length, 0)
@@ -3230,6 +3269,7 @@ async function openMaterialPick(dt) {
   matPickChecked.value = []
   matPickRows.value = []
   matPickFiltered.value = []
+  matPickExpandKeys.value = []
   matPickVisible.value = true
   try {
     const res = await request.post('/px/queryFormDataList', { panelCode: 'WLBOM', condition: {}, pageNo: 1, pageSize: 500 })
@@ -3313,6 +3353,7 @@ function confirmMaterialPick() {
     }
   }
   matPickChecked.value = []
+  matPickExpandKeys.value = []
   matPickVisible.value = false
   emit('dirty')
   ElMessage.success(tt('已导入 {n} 行').replace('{n}', added)
@@ -4613,6 +4654,10 @@ function chartOf(dt) {
 }
 
 /* ═══ 标准库勾选按钮 ═══ */
+.mp-kids {
+  padding: 4px 8px 4px 32px;
+  background: #fafbfc;
+}
 .rs-lib-btn {
   font-size: 12px;
   color: #0d5bd3;
