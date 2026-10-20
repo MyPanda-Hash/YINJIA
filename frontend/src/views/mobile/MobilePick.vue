@@ -24,7 +24,6 @@
 <template>
   <div class="mp">
     <div class="mp-top">
-      <span class="mp-back" @click="goBack">‹</span>
       <span class="mp-title">{{ tt('生产领料') }}</span>
       <span class="mp-sub">{{ tt('扫工单 → 扫物料 → 先进先出拆批') }}</span>
     </div>
@@ -171,14 +170,11 @@
 
 <script setup>
 import { computed, onMounted, nextTick, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { queryFormDataList, callButton, errMsg } from '@/business/engine'
 import { allocateFifo, sumAvailable, buildMaterialOutForm } from '@/business/scanPick'
-
-const router = useRouter()
 
 const woInput = ref(null)
 const matInput = ref(null)
@@ -216,11 +212,6 @@ const canAdd = computed(() => {
 onMounted(() => nextTick(() => woInput.value?.focus?.()))
 
 watch(lines, () => { errText.value = '' })
-
-function goBack() {
-  if (window.history.length > 1) router.back()
-  else router.push('/dashboard')
-}
 
 /** 工单:扫到/输入工单号 → 精确命中优先,否则列出候选 */
 async function loadWo() {
@@ -388,15 +379,19 @@ async function submit() {
 </script>
 
 <style scoped>
-/* 375 宽为基准:不横向滚动;命中区 ≥44px;数量右对齐(等宽数字);无装饰动画 */
+/* 手机 375 宽为基准:不横向滚动;命中区 ≥44px;数量右对齐(等宽数字);无装饰动画。
+   2026-10-20 第二轮:地址统一到 /panelx/list/PROD_PICK(桌面壳内),所以页脚不再用 position:fixed
+  (会压住壳层内容),改成 flex 列 + margin-top:auto —— 内容短时贴底、内容长时随页面滚。 */
 .mp {
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  max-width: 560px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 0 0 92px;
+  padding: 0 0 16px;
   background: var(--el-bg-color-page);
-  min-height: 100vh;
+  min-height: calc(100vh - 130px);
 }
 .mp * { box-sizing: border-box; }
 
@@ -412,7 +407,6 @@ async function submit() {
   background: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
-.mp-back { width: 32px; font-size: 24px; line-height: 1; color: var(--el-text-color-regular); cursor: pointer; }
 .mp-title { font-size: 16px; font-weight: 600; }
 .mp-sub { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
 
@@ -499,19 +493,18 @@ async function submit() {
 }
 
 .mp-foot {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-  display: flex; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-  background: var(--el-bg-color); border-top: 1px solid var(--el-border-color-lighter);
+  display: flex; gap: 10px; margin: 12px 12px 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  margin-top: auto;
+  background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
 }
 .mp-foot :deep(.el-button) { flex: 1; height: 46px; margin: 0; }
 
 .num { font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ── 电脑端(2026-10-20 用户口径「写成面版,电脑端也能操作」)──
-   同一份页面:窄屏 = 单列 + 吸底栏(手机);≥900px = 双栏 + 常驻底栏(桌面壳内)。
-   左栏是录入(工单/物料),右栏是清单 —— 桌面上一屏能同时看到「扫进去的」和「已加入的」。 */
+   同一份页面同一地址:窄屏 = 单列;≥900px = 双栏(左:工单/物料录入,右:领料清单),
+   一屏能同时看到「扫进去的」和「已加入的」。 */
 @media (min-width: 900px) {
-  .mp { max-width: 1180px; padding-bottom: 16px; }
   .mp-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
@@ -522,13 +515,5 @@ async function submit() {
   .mp-left, .mp-right { min-width: 0; }
   .mp-right { position: sticky; top: 12px; }
   .mp-card { margin: 0 0 12px; }
-  .mp-foot {
-    position: static;
-    margin: 0 12px 16px;
-    padding: 10px 12px;
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 8px;
-  }
-  .mp-back { display: none; }   /* 桌面有左侧导航,不需要返回箭头 */
 }
 </style>

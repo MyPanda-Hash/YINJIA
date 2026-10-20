@@ -9,12 +9,11 @@ const PanelxForm = () => import('@core/views/PanelxForm.vue')
 
 const routes = [
   { path: '/login', component: () => import('@/views/login/index.vue'), meta: { title: '登录' } },
-  // 移动端扫码领料(2026-10-20):**独立入口** `/m/pick`,不套桌面 PortalLayout ——
-  //   tab 栏/侧边导航在手机上只是干扰(规范见 docs/design/补充设计-V2.0.md §4.4)。
-  //   走 MES 自己的单据链:扫工单→扫物料→填数量→生成材料出库单草稿→审核→写流水,
-  //   替代小程序直连库写 outh(那样没有单据、金蝶推不上去、追溯与回写都断)。
-  //   本期先用手输/扫码枪;摄像头扫码要 HTTPS 安全上下文,等域名上线再接。
-  { path: '/m/pick', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '扫码领料' } },
+  // 生产领料 · 旧地址兼容(2026-10-20 第二轮:用户要求「两个写成一体的、地址要一致,
+  //   在 panelx/list 目录下」⇒ 正式地址统一为 `/panelx/list/PROD_PICK`,与本文件里那条路由同一份组件)。
+  //   这里只保留重定向,避免手机收藏/以前发的链接失效。
+  { path: '/m/pick', redirect: '/panelx/list/PROD_PICK', meta: { title: '生产领料' } },
+  { path: '/prod/plan/prodPick', redirect: '/panelx/list/PROD_PICK', meta: { title: '生产领料' } },
   {
     path: '/',
     component: () => import('@/layout/PortalLayout.vue'),
@@ -64,10 +63,14 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
-      // 生产领料(2026-10-20,用户口径「写成面版,电脑端也能操作,名字叫生产领料,放在生产计划里」):
-      //   与手机端 /m/pick **同一份组件**,桌面壳内双栏(左:工单+物料录入 / 右:领料清单)。
-      //   走 MES 自己的单据链:生成材料出库单草稿 → 审核 → 写 outh 流水,库存与单据同时正确。
-      { path: 'prod/plan/prodPick', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
+      // 生产领料(2026-10-20):**地址统一到面板目录** —— 用户口径「两个要写成一体的,地址要一致,
+      //   最好是在 panelx/list 的目录下方」。
+      //   它仍然是**页面级虚拟面板**(PROD_PICK,定义见 PagePanelRegistry,不是 yj_panel 的单据表),
+      //   但地址走标准面板形态 `/panelx/list/PROD_PICK`;因为是专用页面而不是通用 PanelxList,
+      //   这条**必须排在下面 `panelx/list/:panelCode` 之前**(静态路径优先于参数路径)。
+      //   电脑端与手机端同一地址:窄屏单列 + 吸底栏,≥900px 双栏(同一份组件自适应)。
+      //   旧的 `/prod/plan/prodPick`、`/m/pick` 保留为重定向,老链接/收藏不失效。
+      { path: 'panelx/list/PROD_PICK', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()

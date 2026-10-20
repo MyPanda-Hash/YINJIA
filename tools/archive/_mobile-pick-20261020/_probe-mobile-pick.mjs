@@ -76,6 +76,7 @@ const layout = JSON.parse(await ev(`JSON.stringify({
   rightW: Math.round((document.querySelector('.mp-right')?.getBoundingClientRect().width) || 0),
   footPos: getComputedStyle(document.querySelector('.mp-foot') || document.body).position,
   menuHasPick: Array.from(document.querySelectorAll('.leftnav, .mobile-nav')).some(n => (n.textContent || '').includes('生产领料')),
+  isPanelShell: !!document.querySelector('.pl-toolbar, .panelx-toolbar') && !document.querySelector('.mp'),
 })`))
 ok('页面已渲染(.mp-title=' + layout.title + ')', layout.title.length > 0, `cards=${layout.cards}`)
 ok(`${W} 宽无横向滚动`, layout.doc <= layout.win && layout.body <= layout.win, `doc=${layout.doc} win=${layout.win}`)
@@ -84,7 +85,9 @@ if (W >= 900) {
   ok('电脑端底栏不再 fixed(留在内容流里)', layout.footPos !== 'fixed', layout.footPos)
   ok('左侧菜单能看到「生产领料」', layout.menuHasPick === true, String(layout.menuHasPick))
 } else {
-  ok('手机端单列 + 吸底栏', layout.cols === 'block' && layout.footPos === 'fixed', JSON.stringify({ cols: layout.cols, footPos: layout.footPos }))
+  // 统一地址后:手机端也是桌面壳(有顶栏/抽屉导航),页脚改成 flex 贴底(不再 position:fixed)
+  ok('手机端单列 + 页脚在内容流里贴底', layout.cols === 'block' && layout.footPos !== 'fixed', JSON.stringify({ cols: layout.cols, footPos: layout.footPos }))
+  ok('推入面板目录地址后仍在生产领料页(不是通用面板壳)', layout.isPanelShell === false, String(layout.isPanelShell))
 }
 
 // ② 工单
@@ -185,7 +188,7 @@ if (process.argv.includes('--submit')) {
 
 const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
 const file = path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020',
-  ROUTE.includes('/m/pick') ? 'mobile-pick-375.png' : 'prod-pick-desktop.png')
+  W < 600 ? 'mobile-pick-375.png' : 'prod-pick-desktop.png')
 fs.writeFileSync(file, Buffer.from(shot.result.data, 'base64'))
 console.log(`\n截图: ${file}`)
 
