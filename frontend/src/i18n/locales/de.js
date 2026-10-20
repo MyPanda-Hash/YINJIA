@@ -444,7 +444,7 @@ export default {
     '上月无出入库单据': 'Im Vormonat keine Zu-/Abgangsbelege',
     '上月期末结存为 0,无结转行': 'Der Endbestand des Vormonats war 0, daher keine Übertragszeile',
     '上月未月结,以下陈列该月原始单据': 'Der Vormonat ist nicht abgeschlossen; unten stehen die Originalbelege jenes Monats',
-    '已月结:有结转行的批次只显示月结结转,月末结存为 0 的批次保留上月原始单据': 'Abgeschlossen: Chargen mit Vortragszeile zeigen nur diese; Chargen mit Endbestand 0 behalten ihre Originalbelege',
+    '已月结:上月只显示月结(月末结存为 0 的批次显示 0,不写结转行);上月原始单据请在库存台账按日期查看': 'Abgeschlossen: Der Vormonat wird nur durch die Vortragszeile dargestellt (Chargen mit Endbestand 0 zeigen 0, ohne Vortragszeile); Originalbelege im Lagerbuch nach Datum',
     '上月月结已取消,以下陈列该月原始单据': 'Der Vormonatsabschluss wurde aufgehoben; unten stehen die Originalbelege jenes Monats',
     '勾选仓库即查询(单选);不勾选显示全部': 'Lager ankreuzen sucht sofort (Einzelauswahl); ohne Auswahl wird alles angezeigt',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Lager ankreuzen sucht sofort; nur eines auswählbar; ohne Auswahl bleibt die Liste leer',

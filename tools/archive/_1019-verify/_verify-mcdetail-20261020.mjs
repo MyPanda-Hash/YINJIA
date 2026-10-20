@@ -48,6 +48,11 @@ async function main() {
   const carriedLots = new Set(rows.filter(isCarry).map((r) => String(r['批号'] ?? '').trim()))
   ok(carriedLots.size > 0, '本月存在结算转行(上月确实已月结)', `${carriedLots.size} 个批号`)
 
+  // ⓪(2026-10-20 第二版口径)已月结 ⇒ **任何**批号都不再陈列上月原始单据(含"月末结存 0、没写结转行"的批次)
+  const anyPrev = rows.filter((r) => !isCarry(r) && String(r['月份'] || '').trim() === prev)
+  ok(anyPrev.length === 0, '已月结:上月原始单据一律不再陈列(全部由「月结」一行代表)',
+    anyPrev.length ? anyPrev.map((r) => r['单据编号']).join(',') : '0 张')
+
   // ① 有结转行的批号:不应再出现上月(prev)原始单据
   const dupPrev = rows.filter((r) => !isCarry(r) && carriedLots.has(String(r['批号'] ?? '').trim())
     && String(r['月份'] || '').trim() === prev)

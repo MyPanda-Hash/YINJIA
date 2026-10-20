@@ -579,22 +579,25 @@ public class StockMonthCloseService {
         out.put("月结快照", "已月结".equals(prevState) && !snap.isEmpty() ? snap.get(0) : null);
 
         List<Map<String, Object>> rows = new ArrayList<>();
-        // 上月部分的行 —— 按**批号**分别处理,不能整段一刀切:
-        //   ① 上月**已月结** ⇒ 用那张月结结转单代表上月(它是结转行,落在当月 1 号,数量 = 上月末结存);
-        //   ② 上月原始单据(入库正、出库负)只补**没有被结转行代表**的那些批号 ——
-        //      月结按口径「期末结存为 0 ⇒ 不写结转行」,这类批号(月末发完、本月又补货)以及
-        //      「本月才出现的新批号」都没有结转行,不补原始单据就看不见它们了。
-        //
-        // 🔴 2026-10-20 用户报障:「库存明细有问题,月结后为什么还会有 9 月份的单据」
-        //   根因就是①②**同时铺了**(旧写法已月结时把上月原始单据也整段加回来):同一批货算了两回 ——
-        //   实测 Y-XC-2040 / YCL-01 / XC-20260908:采购入库 +300(09-08)+ 月结结转 +300(10-01)
-        //   = 展开余额 600,而该批 9 月末结存只有 300;月初的 400、-200 各批同理翻倍。
-        //   ⇒ 判据落在**批号**上:该批号有结转行 ⇒ 上月原始单据一律不再陈列(结转行就是它的代表);
-        //     没有结转行 ⇒ 照常陈列原始单据。未月结/已取消 ⇒ 只有原始单据(第三轮口径:取消后要看原始单据)。
+        // 上月部分的行 —— **已月结时一律只陈列「月结」,绝不再铺上月原始单据**。
+        // 为什么要一刀切(2026-10-20 用户两次追问「月结后为什么还会有 9 月份的单据」「为什么有些批次有结转行、
+        // 有些没有」后定的口径):
+        //   · 月结按钮是把**全部键**月结掉的(实测 bl_stock_close 2026-09 = 2137 个键),差异只在"有没有余额":
+        //     1697 个键月末有余额 ⇒ 有结转行;440 个键月末结存 = 0 ⇒ 按 2026-10-15 口径
+        //     「该批次号的数据月结后数量为 0,就是删除这个批次号」**不写结转行**;
+        //   · 结转行 = 期初 + 本期净额 = 月末结存,是唯一正确的"上月余额"。而上月原始单据**只有净额、没有期初** ——
+        //     拿它当余额必然算错:实测 YJ-SX-003-1 @ CK00006 无批号(期初 20030 + 入 0 − 出 20030 = 结存 0),
+        //     若陈列它的 9 月单据,展开余额会是 −20030,比"翻倍"还离谱。
+        //   ⇒ 已月结:上月 = 结转行(有则用它,数量 = 结存);没有结转行的批次补一行「YYYY-MM月结」数量 = 月结结存
+        //      (即 0)—— 批次照样在明细里看得见,只是余额显示为 0,不会凭空冒出一堆 9 月单据。
+        //   ⇒ 未月结 / 已取消:口径不变,照旧陈列该月原始单据(第三轮用户口径:取消后要能看原始单据)。
+        //   ⚠ 月结之后才补录的上月单据不在这里兜底 —— 那属于"月结要重做"(取消月结 → 重新月结),
+        //     陈列出来只会让余额再错一次;查那几笔请走「库存台账 / 出入库单据」按日期看。
         Set<String> seen = new HashSet<>();
-        Set<String> carriedLots = new HashSet<>();   // 已被结转行代表的批号
-        java.sql.Timestamp closeTs = null;           // 上月月结时刻(区分"已被结转涵盖"与"月结后才补录")
-        if ("已月结".equals(prevState)) {
+        Set<String> carriedLots = new HashSet<>();                 // 已有结转行的批号
+        Map<String, java.math.BigDecimal> closeEnd = new HashMap<>(); // 批号 → 月结结存数量(零余额批次兜底显示用)
+        boolean closed = "已月结".equals(prevState);
+        if (closed) {
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
                             + "  CONVERT(nvarchar(7), DATEADD(month, -1, 单据日期), 120) + N'月结' AS 单据类型,"
@@ -609,19 +612,33 @@ public class StockMonthCloseService {
                 seen.add(r.get("单据编号") + "\u0001" + r.get("批号"));
                 carriedLots.add(lotKeyOf(r));
             }
-            List<Map<String, Object>> cl = jdbc.queryForList(
-                    "SELECT 月结时间 FROM bd_stock_close WHERE 期间 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", prev);
-            if (!cl.isEmpty() && cl.get(0).get("月结时间") instanceof java.sql.Timestamp ts) closeTs = ts;
-        }
-        for (Map<String, Object> r : flowRows(prevStart, prevEndEx, w, c, lotArg)) {
-            if (carriedLots.contains(lotKeyOf(r))) {
-                // 该批已被结转行代表 ⇒ 上月原始单据不再陈列(否则同一批货算两回:入库 + 出库/结转 翻倍)。
-                // 但**月结之后才补录**的上月单据结转行里没有它,照旧陈列(否则这笔货凭空消失、反而查不到)。
-                Object wt = r.get("写入时间");
-                boolean backfilledAfterClose = closeTs != null && wt instanceof java.sql.Timestamp wts && wts.after(closeTs);
-                if (!backfilledAfterClose) continue;
+            // 月结行表的结存(批号 → 结存数量):给"月末结存 = 0、因此没写结转行"的批次兜底
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT ISNULL(RTRIM(批号),N'') AS 批号, 结存数量 FROM bl_stock_close"
+                            + " WHERE 期间 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
+                            + (lotArg == null ? "" : "  AND ISNULL(RTRIM(批号),N'') = ?"),
+                    lotArg == null ? new Object[]{prev, w, c} : new Object[]{prev, w, c, lotArg})) {
+                Object end = r.get("结存数量");
+                closeEnd.put(lotKeyOf(r), end instanceof java.math.BigDecimal b ? b : java.math.BigDecimal.ZERO);
             }
-            if (seen.add(r.get("单据编号") + "\u0001" + r.get("批号"))) rows.add(r);
+            // 上月有流水、却没有结转行的批次(月末结存 = 0)⇒ 补一行"月结 0",不铺原始单据
+            for (String lotKey : prevFlowLots(prevStart, prevEndEx, w, c, lotArg)) {
+                if (carriedLots.contains(lotKey)) continue;
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("月份", prev);
+                r.put("单据日期", curStart.toString());
+                r.put("单据类型", prev + "月结");
+                r.put("单据编号", "");          // 该批次没写结转行(月末结存 0),单号留空
+                r.put("批号", lotKey);
+                r.put("数量", closeEnd.getOrDefault(lotKey, java.math.BigDecimal.ZERO));
+                r.put("往来单位", "");
+                r.put("经手人", "");
+                rows.add(r);
+                seen.add("\u0001" + lotKey);
+            }
+        } else {
+            rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
         }
         // **当月单据要展开**(用户 2026-10-15 第十二轮:「当月单据要有…10 月的数据要展开」)——
         //   展开 = 上月的结转行(余额来源;它的"期初数量"= 上上个月如 8 月的月末结转)
@@ -638,6 +655,19 @@ public class StockMonthCloseService {
                 .thenComparing(r -> String.valueOf(r.get("单据编号"))));
         out.put("预警", warn.warnMap(w, c));   // {批号 → 预警数量}(展开区按批次号设置/显示用)
         out.put("单据明细", rows);
+        return out;
+    }
+
+    /**
+     * 该 (物料, 仓库[, 批号]) 在某期间内**有流水**的批号集合(去重,保序)。
+     *
+     * <p>用途:已月结时,月结按口径「期末结存为 0 ⇒ 不写结转行」,这些**没有结转行**的批号
+     * 若不补一行就整个从展开明细里消失了(用户会问"我的货去哪了");调用方据此补一行数量 = 月结结存(即 0)的
+     * 「YYYY-MM月结」占位行 —— 批次照样看得见,但不铺原始单据(原始单据只有净额、没有期初,拿来当余额必错)。
+     */
+    private Set<String> prevFlowLots(java.time.LocalDate start, java.time.LocalDate endEx, String w, String c, String lot) {
+        Set<String> out = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> r : flowRows(start, endEx, w, c, lot)) out.add(lotKeyOf(r));
         return out;
     }
 

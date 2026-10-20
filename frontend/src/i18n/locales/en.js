@@ -1452,7 +1452,7 @@ export default {
     '上月无出入库单据': 'No inbound/outbound documents last month',
     '上月期末结存为 0,无结转行': 'Closing balance of last month was 0, so there is no carry-forward row',
     '上月未月结,以下陈列该月原始单据': 'Last month is not closed; the original documents of that month are listed below',
-    '已月结:有结转行的批次只显示月结结转,月末结存为 0 的批次保留上月原始单据': 'Closed: batches with a carry-forward row show only that row; batches whose closing balance was 0 keep their original documents',
+    '已月结:上月只显示月结(月末结存为 0 的批次显示 0,不写结转行);上月原始单据请在库存台账按日期查看': 'Closed: last month is represented by the closing row only (batches with a zero closing balance show 0 and have no carry-forward row); see the stock ledger by date for original documents',
     '上月月结已取消,以下陈列该月原始单据': 'Last month close was cancelled; the original documents of that month are listed below',
     '勾选仓库即查询(单选);不勾选显示全部': 'Checking a warehouse queries immediately (single choice); nothing checked shows all',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Checking a warehouse queries immediately; only one can be selected; nothing checked means an empty list',

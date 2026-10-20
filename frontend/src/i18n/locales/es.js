@@ -441,7 +441,7 @@ export default {
     '上月无出入库单据': 'No hay documentos de entrada/salida el mes anterior',
     '上月期末结存为 0,无结转行': 'El saldo final del mes anterior fue 0, no hay línea de arrastre',
     '上月未月结,以下陈列该月原始单据': 'El mes anterior no está cerrado; abajo se listan los documentos originales de ese mes',
-    '已月结:有结转行的批次只显示月结结转,月末结存为 0 的批次保留上月原始单据': 'Cerrado: los lotes con asiento de traspaso muestran solo ese asiento; los de saldo final 0 conservan sus documentos originales',
+    '已月结:上月只显示月结(月末结存为 0 的批次显示 0,不写结转行);上月原始单据请在库存台账按日期查看': 'Cerrado: el mes anterior se representa solo con el asiento de traspaso (los lotes con saldo final 0 muestran 0 y no tienen asiento); consulte el libro de inventario por fecha para los documentos originales',
     '上月月结已取消,以下陈列该月原始单据': 'El cierre del mes anterior fue cancelado; abajo se listan los documentos originales de ese mes',
     '勾选仓库即查询(单选);不勾选显示全部': 'Marcar un almacén consulta de inmediato (una sola opción); sin marcar se muestra todo',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Marcar un almacén consulta de inmediato; solo se puede elegir uno; sin marcar, la lista queda vacía',
