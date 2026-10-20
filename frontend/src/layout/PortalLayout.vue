@@ -78,6 +78,12 @@ watch(
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* 顶部安全区(2026-10-21):手机挖孔屏/刘海屏的状态栏、摄像头会盖住 TopBar,
+     导致「顶部被卡住、按钮点不动」。inset-top 在挖孔屏上约 24~48px,桌面恒为 0。
+     用 padding 而不是 margin:整块布局仍在视口内,不会多出滚动条。
+     前提是 index.html 的 viewport 带 viewport-fit=cover,否则 env() 恒为 0。 */
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: border-box;
 }
 .portal-body {
   flex: 1;
