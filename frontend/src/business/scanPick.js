@@ -97,18 +97,125 @@ export function buildMaterialOutForm(lines, head = {}) {
     计量单位: String(l.uom || '').trim(),
     批次号: String(l.batch || '').trim(),
     仓库: String(l.warehouse || head.warehouse || '').trim(),
+    仓库编码: String(l.warehouseCode || head.warehouseCode || '').trim(),
+    // 仓位(2026-10-20):库存账只有 物料+仓库+批号 三级,没有仓位 ——
+    //   仓位按「仓库的默认仓位」带出(bs_wh_loc.是否默认),只是单据记录,不参与扣减。
+    仓位编码: String(l.binCode || '').trim(),
+    仓位名称: String(l.bin || '').trim(),
     数量: Number(l.qty),
     单价: Number(l.price) || 0,
     金额: Math.round((Number(l.qty) || 0) * (Number(l.price) || 0) * 10000) / 10000,
     明细备注: '扫码领料',
   }))
-  return {
+  const form = {
     单据日期: today,
     单据编号: '',            // 后端生成
     业务类型: '生产领料',
     仓库: String(head.warehouse || '').trim(),
     单据状态: '草稿',
-    备注: '条码扫码领料',
+    备注: '扫码领料(移动端)',
     detail: { items },
   }
+  // 工单键(2026-10-20):不带这两列 ⇒ 工单追溯「领料数据」段与 plang.ll_no2 回写都认不出来。
+  if (String(head.woNo || '').trim()) form.加工单号 = String(head.woNo).trim()
+  if (head.woLine !== undefined && head.woLine !== null && String(head.woLine).trim() !== '') {
+    form.工单行号 = Number(head.woLine) || String(head.woLine).trim()
+  }
+  if (String(head.picker || '').trim()) form.领用人 = String(head.picker).trim()
+  return form
+}
+
+/**
+ * 从批号里取「批号日期」(FIFO 的第一排序键)。
+ *
+ * 现场批号有几种形态:`SX-20260907`、`GL-20260917`、`20261014001`、`TL00210`、`PC0000`、空。
+ * 只认**连续的 8 位年月日**(允许 `-`/`/`/`.` 分隔),取不到就返回空串 ——
+ * 取不到时由调用方退化到 `入库日期`,再退化到批号字典序(**绝不猜**)。
+ *
+ * @param {string} lot 批号
+ * @returns {string} `YYYY-MM-DD` 或 `''`
+ */
+export function batchDate(lot) {
+  const s = String(lot == null ? '' : lot).trim()
+  const m = s.match(/(\d{4})[-/.]?(\d{2})[-/.]?(\d{2})/)
+  if (!m) return ''
+  const mm = Number(m[2])
+  const dd = Number(m[3])
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return ''
+  return `${m[1]}-${m[2]}-${m[3]}`
+}
+
+/**
+ * 已排序的先进先出顺序:批号日期在前先出 → 取不到日期按入库日期 → 再按批号 → 再按仓库。
+ * @param {any[]} rows v_stock_pick 的行(可多物料/多批号/多仓)
+ */
+export function fifoSort(rows) {
+  const key = (r) => batchDate(r['批号']) || String(r['入库日期'] || '').trim()
+  return (Array.isArray(rows) ? rows : [])
+    .map((r, i) => ({ r, i, d: key(r) }))
+    .sort((a, b) => {
+      if (a.d && b.d && a.d !== b.d) return a.d < b.d ? -1 : 1
+      if (a.d && !b.d) return -1
+      if (!a.d && b.d) return 1
+      const la = String(a.r['批号'] || '').trim()
+      const lb = String(b.r['批号'] || '').trim()
+      if (la !== lb) return la < lb ? -1 : 1
+      const wa = String(a.r['仓库编码'] || '').trim()
+      const wb = String(b.r['仓库编码'] || '').trim()
+      if (wa !== wb) return wa < wb ? -1 : 1
+      return a.i - b.i
+    })
+    .map((x) => x.r)
+}
+
+/** 可用量合计(口径:只看 物料 + 仓库,不看批号 —— 用户 2026-10-20 口径) */
+export function sumAvailable(rows) {
+  return round4((Array.isArray(rows) ? rows : []).reduce((s, r) => s + (Number(r['现存量']) || 0), 0))
+}
+
+/**
+ * 按先进先出把「本次领用量」拆到各批次上。
+ *
+ * 用户口径(2026-10-20):「条码的批号就按照批号日期预填,日期在前就先扣,如果不够就扣下一日期
+ * 批次号的数量,再生成下一条明细」⇒ 一次领用可能产出**多条明细行**,每条一个批号。
+ *
+ * 不预占、不互斥:同一批号可被多张草稿重复领,真正的拦截在**审核**那一刻
+ * (`StockLedgerService.applyOut` 现存量不足直接抛错)。
+ *
+ * @param {any[]} rows 同一物料的 v_stock_pick 行(可含多仓;按 FIFO 依次扣)
+ * @param {number} need 本次要领的数量
+ * @returns {{lines: any[], allocated: number, shortage: number}}
+ */
+export function allocateFifo(rows, need) {
+  const want = round4(Number(need) || 0)
+  if (want <= 0) return { lines: [], allocated: 0, shortage: 0 }
+  const lines = []
+  let left = want
+  for (const r of fifoSort(rows)) {
+    if (left <= 0) break
+    const avail = round4(Number(r['现存量']) || 0)
+    if (avail <= 0) continue
+    const take = round4(Math.min(avail, left))
+    lines.push({
+      code: String(r['存货编码'] || '').trim(),
+      name: String(r['存货名称'] || '').trim(),
+      uom: String(r['计量单位'] || '').trim(),
+      spec: String(r['规格型号'] || '').trim(),
+      batch: String(r['批号'] || '').trim(),
+      warehouse: String(r['仓库'] || r['仓库编码'] || '').trim(),
+      warehouseCode: String(r['仓库编码'] || '').trim(),
+      qty: take,
+      price: Number(r['结存单价']) || 0,
+      batchDate: batchDate(r['批号']),
+    })
+    left = round4(left - take)
+  }
+  return { lines, allocated: round4(want - left), shortage: left > 0 ? left : 0 }
+}
+
+/** 四位小数取整(与后端 decimal(18,4) 同口径,避免 0.1+0.2 的浮点尾差) */
+function round4(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v)) return 0
+  return Math.round(v * 10000) / 10000
 }

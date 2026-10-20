@@ -9,6 +9,12 @@ const PanelxForm = () => import('@core/views/PanelxForm.vue')
 
 const routes = [
   { path: '/login', component: () => import('@/views/login/index.vue'), meta: { title: '登录' } },
+  // 移动端扫码领料(2026-10-20):**独立入口** `/m/pick`,不套桌面 PortalLayout ——
+  //   tab 栏/侧边导航在手机上只是干扰(规范见 docs/design/补充设计-V2.0.md §4.4)。
+  //   走 MES 自己的单据链:扫工单→扫物料→填数量→生成材料出库单草稿→审核→写流水,
+  //   替代小程序直连库写 outh(那样没有单据、金蝶推不上去、追溯与回写都断)。
+  //   本期先用手输/扫码枪;摄像头扫码要 HTTPS 安全上下文,等域名上线再接。
+  { path: '/m/pick', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '扫码领料' } },
   {
     path: '/',
     component: () => import('@/layout/PortalLayout.vue'),
