@@ -103,3 +103,38 @@ watch-pick.bat sessions
 - 一条语句都没有 ⇒ 它连上来只是心跳。
 
 语法坑(已在本机 SQL Server 2019 验证):多个 `ADD EVENT` 之间要有逗号,但 `ADD TARGET` 前**不能**有逗号。
+
+
+## 八、结论(2026-10-20 13:27 抓到现场语句后)
+
+**不是唯一键、不是权限、不是连错库。真相:小程序的工单来源是 `plang_pc`(只含**已排产**的工单行),
+而用户测的 GD-2026-10-0223 行1 `plang.scx` 是 NULL(未排产)⇒ `plang_pc` 里没有它 ⇒ 小程序捞不到工单,
+**从头到尾没有一条 INSERT**(trace 里只有 SELECT),所以既没有报错也没有流水。**
+
+证据(`_xe_trace_read` 抓到的原文 + 库内核对):
+
+| 项 | 数值 |
+|---|---|
+| 小程序查工单 | `SELECT ... FROM plang_pc ... WHERE pl_no='GD-2026-10-0223' AND pl_xc=1` → **0 行** |
+| `plang` | 466 行,其中已排产 425、未排产 41 |
+| `plang_pc` | 427 行;**"已排产但不在 plang_pc" = 0**(即 plang_pc ≈ 已排产集合) |
+| GD-2026-10-0223 行1 | `scx = NULL`,且是当时**唯一**一张未排产的有效工单行 |
+| 全段 trace | **0 条 INSERT / UPDATE**(只有 SELECT 与权限查询) |
+
+**修法**:在 MES「快速排产」里把 GD-2026-10-0223 行1 排进产线(MES 排产同时写 `plang.scx` 与 `plang_pc`)。
+核对 SQL:
+
+```sql
+SELECT (SELECT COUNT(*) FROM plang_pc WHERE pl_no=N'GD-2026-10-0223' AND pl_xc=1) AS 在plang_pc,
+       (SELECT COUNT(*) FROM plang WHERE pl_no=N'GD-2026-10-0223' AND pl_xc=1 AND ISNULL(scx,N'')<>N'') AS 已排产
+```
+
+### 附带发现的两个"小程序侧"坑(排产后会接着咬人)
+
+1. **库存口径 NULL vs 空串**:小程序查 `SELECT Sum(yl) FROM kucun WHERE wzdm=? AND lot_no=''`;
+   库里 `kucun` 1479 行中 **542 行批号是 NULL、空串 0 行** ⇒ 无批号物料求和恒为 NULL("没库存"),
+   占全部物料的 37%。正确写法 `AND ISNULL(lot_no,'')=''`。
+2. **"今日已领"列表永远空**:小程序按 `单据类型='生 产领料'` 过滤,而 `outh.单据类型` 实际是
+   `材料出库单 / 销售出库单 / 其他出库单`(三档,无"生 产领料")⇒ 即使领料成功,它自己的列表也看不到。
+
+> 另注:小程序用 `sa` 直连、全部 `WITH(NOLOCK)`,建议后续换成最小权限账号。
