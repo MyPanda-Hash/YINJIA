@@ -128,6 +128,11 @@ public class RdProjectFlowService {
                 if (!pd.isEmpty()) progressDocNo = pd;
             }
             p.put("plans", planOut);
+            // 老单据兜底(2026-10-20 用户问「旧单据会不会查不到」):
+            //   实施计划的『文档编号』若是手填机型/留空,按单号就关联不上 ⇒ 这里把「项目名称相同」或
+            //   「文档编号为空」的候选计划捞出来(最多 3 张),页面会提示"疑似计划 LXB-…,请把文档编号填成
+            //   本立项单号"。只读提示,不改任何数据。
+            if (planOut.isEmpty()) p.put("planCandidates", planCandidates(str(r.get("projectName"))));
             String progressKey = progressDocNo.isEmpty() ? no : progressDocNo;
             List<String> progRows = progressByDocNo.getOrDefault(progressKey, List.of());
             if (progRows.isEmpty() && !docNo.isEmpty()) progRows = progressByDocNo.getOrDefault(docNo, List.of());
@@ -248,8 +253,28 @@ public class RdProjectFlowService {
         }
     }
 
-    /** 账号 → 姓名(前端拼「姓名（账号）」;含全部出现的账号) */
-    private Map<String, String> namesOf(List<Map<String, Object>> approvals,
+    /**
+     * 疑似关联断链的实施计划(老单据兜底):『文档编号』为空,或项目名称与立项的「机型及应用位置」相同。
+     * 只用于页面提示"单子其实存在,只是没按单号关联",不改数据。
+     */
+    private List<Map<String, Object>> planCandidates(String projectName) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (projectName.isEmpty()) {
+            out.addAll(jdbc.queryForList(
+                    "SELECT TOP 3 [单据编号] AS no, ISNULL([文档编号],N'') AS docNo, ISNULL([项目名称],N'') AS projectName"
+                            + "  FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([文档编号],N'') = N''"
+                            + " ORDER BY id DESC"));
+            return out;
+        }
+        out.addAll(jdbc.queryForList(
+                "SELECT TOP 3 [单据编号] AS no, ISNULL([文档编号],N'') AS docNo, ISNULL([项目名称],N'') AS projectName"
+                        + "  FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                        + "   AND ([项目名称] = ? OR ISNULL([文档编号],N'') = N'') ORDER BY id DESC",
+                projectName));
+        return out;
+    }
+
+    /** 账号 → 姓名(前端拼「姓名（账号）」;含全部出现的账号) */    private Map<String, String> namesOf(List<Map<String, Object>> approvals,
                                         Map<String, Map<String, Object>> apStatus,
                                         Map<String, List<Map<String, Object>>> plans,
                                         Map<String, Map<String, Object>> planStatus) {

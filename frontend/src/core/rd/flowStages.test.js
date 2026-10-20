@@ -264,6 +264,31 @@ test('⑭ 状态没落库但后序已完成(实测 HSDZ_MES LXA-2026-10-0011):�
   assert.equal(withTrail.doneCount, 10)
 })
 
+test('⑮ 旧单据:实施计划的『文档编号』没填立项单号时,给出"疑似计划"而不是一句"尚未建单"', () => {
+  const f = buildFlow(ap({
+    level: '三级', liaison: 'cp', owner: 'cp', ownerAck: 'cp', ownerAckAt: '2026-10-19 11:00:00',
+    approvalStatus: st({ shr: 'admin', shsj: '2026-10-19 10:00:00' }),
+    plans: [],
+    planCandidates: [{ no: 'LXB-2026-10-0009', docNo: '' }, { no: 'LXB-2026-10-0010', docNo: '手填机型' }],
+    trail: [t('APPROVE', '2026-10-19 10:00:00', 'admin'), t('OWNER_ACK', '2026-10-19 11:00:00', 'cp')],
+  }), { cp: '陈秀丽' }, NOW)
+  assert.equal(f.currentKey, 'planFill')
+  const detail = stepOf(f, 'planFill').detail
+  assert.match(detail, /疑似计划/)
+  assert.match(detail, /LXB-2026-10-0009/)
+  assert.match(detail, /LXB-2026-10-0010/)
+  assert.match(detail, /LXA-2026-10-0100/, '要告诉用户把文档编号填成哪个立项单号')
+})
+
+test('⑯ 最老的单据(除单号外什么都缺)不抛异常,按 1/10 如实显示', () => {
+  const f = buildFlow({ approvalNo: 'LXA-2025-01-0001' }, {}, NOW)
+  assert.equal(Array.isArray(f.steps), true)
+  assert.equal(f.steps.length, 10)
+  assert.equal(f.currentKey, 'applySubmit')
+  assert.equal(f.doneCount, 1)
+  assert.equal(f.stuckDays, 0, '没有任何时间 → 停留 0 天,不显示 NaN')
+})
+
 test('⑬ 停留天数按"最后一次动作"算,不是按建档时间', () => {
   const f = buildFlow(fullProject({
     plans: [{

@@ -170,11 +170,19 @@ export function buildFlow(p, names = {}, now = '') {
   // ⑦ 填写项目实施计划:建单 ≠ 填完,阶段内容一个都没填仍算"没开始填"
   const planned = plan ? Number(plan.plannedStages || 0) : 0
   const planNo = plan ? s(plan.no) : ''
+  // 老单据兜底(2026-10-20 用户问「旧单据会不会查不到」):实施计划的『文档编号』若是手填/留空,
+  // 单据编号就对不上立项单号 ⇒ 这里列出「项目名称相同」的候选计划,让用户知道单子其实存在、只是没关联。
+  const candidates = plan ? [] : (ap.planCandidates || [])
+  const candidateText = candidates.length
+    ? candidates.slice(0, 3).map((c) => `${s(c.no)}${s(c.docNo) ? `（文档编号 ${s(c.docNo)}）` : '（文档编号空）'}`).join('、')
+    : ''
   put('planFill', !!plan && planned > 0, {
     at: plan ? plan.updatedAt : '',
     actor: plan ? person(plan.createdBy, names) : '',
     detail: !plan
-      ? '责任人确认收到后系统自动建计划草稿；尚未建单'
+      ? (candidateText
+        ? `未按『文档编号』关联到立项单号；疑似计划 ${candidateText} —— 请到实施计划把『文档编号』填成 ${s(ap.approvalNo)}`
+        : '责任人确认收到后系统自动建计划草稿；尚未建单')
       : planned > 0
         ? `计划 ${planNo}：已填 ${planned} 个阶段${Number(plan.doneStages || 0) > 0 ? `（已完成 ${plan.doneStages}）` : ''}`
         : `计划 ${planNo} 已建单，阶段内容还没填`,
