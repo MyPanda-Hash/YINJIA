@@ -1,0 +1,3 @@
+﻿SET NOCOUNT ON;
+DELETE FROM dbo.plang WHERE pl_no = N'GD-TEST-UNSCH';
+SELECT COUNT(*) AS 残留探针工单 FROM dbo.plang WHERE pl_no IN (N'GD-TEST-UNSCH', N'GD-TEST-MP01');

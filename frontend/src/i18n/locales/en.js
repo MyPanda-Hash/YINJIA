@@ -4367,6 +4367,8 @@ export default {
     '唯一键,如 EXP_PUR_IN': 'Unique key, e.g. EXP_PUR_IN',
     'MES 面板编码': 'MES panel code',
     '金蝶侧单据/档案名': 'Kingdee document / archive name',
+    '该工单未排产(排产数量为 0),不能领料:请先到「快速排产」把该工单行排入产线,再回来扫码领料': 'This work order is not scheduled yet (scheduled qty = 0), so material cannot be picked. Schedule that line in Quick Scheduling first.',
+    '没有找到该工单:请核对工单号(已作废的单查不到)': 'Work order not found — check the number (cancelled orders are not searchable).',
     // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
     '生产领料': 'Production Picking',
     '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',

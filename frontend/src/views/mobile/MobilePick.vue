@@ -28,13 +28,18 @@
       <span class="mp-sub">{{ tt('扫工单 → 扫物料 → 先进先出拆批') }}</span>
     </div>
 
+    <!-- 提示条置顶(2026-10-20):原先错误信息落在右栏底部,手机上根本看不见 ⇒
+         「未排产扫进来后按钮是灰的、也没提示」。现在任何拦截原因都在顶部一眼可见。 -->
+    <div v-if="errText" class="mp-err mp-err-top">{{ errText }}</div>
+
     <div class="mp-body">
       <div class="mp-left">
     <!-- ① 工单 -->
     <section class="mp-card">
       <div class="mp-sec">
         <span>{{ tt('生产工单') }}</span>
-        <span v-if="wo" class="mp-sec-ok">{{ tt('已选') }}</span>
+        <span v-if="wo && !woBlocked" class="mp-sec-ok">{{ tt('已选') }}</span>
+        <span v-if="wo && woBlocked" class="mp-sec-warn">{{ tt('未排产') }}</span>
       </div>
       <div class="mp-row">
         <el-input
@@ -57,23 +62,30 @@
           @click="pickWo(c)"
         >
           <span class="mp-cand-no">{{ c.工单号 }}<i>#{{ c.工单行号 }}</i></span>
-          <span class="mp-cand-p">{{ c.产品名称 || c.物料编码 }}</span>
+          <span class="mp-cand-p">{{ c.物料编码 }} · {{ c.产品名称 }}</span>
+          <span class="mp-cand-qty" :class="{ warn: Number(c.排产数量) <= 0 }">
+            {{ Number(c.排产数量) > 0 ? fmt(c.排产数量) : tt('未排产') }}
+          </span>
         </div>
       </div>
 
       <div v-if="wo" class="mp-wo">
-        <div class="mp-wo-no">{{ wo.工单号 }}<span class="mp-tag">#{{ wo.工单行号 }}</span></div>
-        <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ wo.产品名称 || wo.物料编码 || '—' }}</b></div>
+        <div class="mp-wo-no">
+          {{ wo.工单号 }}<span class="mp-tag">#{{ wo.工单行号 }}</span>
+          <span v-if="woBlocked" class="mp-tag mp-tag-warn">{{ tt('未排产') }}</span>
+        </div>
+        <div class="mp-kv"><span>{{ tt('物料编码') }}</span><b class="mono">{{ wo.物料编码 || '—' }}</b></div>
+        <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ wo.产品名称 || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('规格') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
-        <div class="mp-kv"><span>{{ tt('排产数量') }}</span><b class="num">{{ fmt(wo.排产数量) }}</b></div>
+        <div class="mp-kv"><span>{{ tt('排产数量') }}</span><b class="num" :class="{ warn: woBlocked }">{{ fmt(wo.排产数量) }}</b></div>
         <div class="mp-kv"><span>{{ tt('已开领料单') }}</span><b>{{ wo.领料单号 || tt('无') }}</b></div>
       </div>
       <div v-if="!wo" class="mp-hint">{{ tt('先扫工单码:领料会挂到该工单行上,审核后回写领料单号') }}</div>
     </section>
 
     <!-- ② 物料 -->
-    <section class="mp-card" :class="{ dim: !wo }">
+    <section class="mp-card" :class="{ dim: !wo || woBlocked }">
       <div class="mp-sec">{{ tt('领用物料') }}</div>
       <div class="mp-row">
         <el-input
@@ -82,10 +94,10 @@
           :placeholder="tt('扫物料码或输入物料编码')"
           size="large"
           clearable
-          :disabled="!wo"
+          :disabled="!wo || woBlocked"
           @keyup.enter="probeMaterial"
         />
-        <el-button size="large" :loading="matLoading" :disabled="!wo" @click="probeMaterial">
+        <el-button size="large" :loading="matLoading" :disabled="!wo || woBlocked" @click="probeMaterial">
           {{ tt('查询') }}
         </el-button>
       </div>
@@ -125,11 +137,10 @@
       </template>
     </section>
 
-    <!-- ③ 清单 -->
       </div><!-- /mp-left -->
 
       <div class="mp-right">
-    <!-- ③ 清单 -->
+    <!-- ③ 领料清单 -->
     <section class="mp-card">
       <div class="mp-sec">
         <span>{{ tt('领料清单') }}</span>
@@ -149,7 +160,6 @@
       </div>
     </section>
 
-    <div v-if="errText" class="mp-err">{{ errText }}</div>
       </div><!-- /mp-right -->
     </div><!-- /mp-body -->
 
@@ -159,7 +169,7 @@
         type="primary"
         size="large"
         :loading="saving"
-        :disabled="!lines.length || !wo"
+        :disabled="!lines.length || !wo || woBlocked"
         @click="submit"
       >
         {{ tt('生成材料出库单') }}
@@ -182,6 +192,8 @@ const woText = ref('')
 const wo = ref(null)
 const woCandidates = ref([])
 const woLoading = ref(false)
+/** 工单未排产(排产数量 ≤ 0)⇒ 不允许领料;卡片照常显示(让人看得到是哪张单),但物料区与提交禁用 */
+const woBlocked = ref(false)
 
 const matText = ref('')
 const mat = ref(null)
@@ -227,7 +239,7 @@ async function loadWo() {
     const res = await request.post('/px/workOrderList', { keyword: kw })
     const rows = Array.isArray(res.data) ? res.data : []
     if (!rows.length) {
-      errText.value = tt('该工单不存在或未排产')
+      errText.value = tt('没有找到该工单:请核对工单号(已作废的单查不到)')
       return
     }
     const exact = rows.filter((r) => String(r.工单号 || '').trim() === kw)
@@ -241,14 +253,27 @@ async function loadWo() {
   }
 }
 
+/**
+ * 选中工单行。
+ *
+ * 2026-10-20 口径:**未排产(排产数量 ≤ 0)的工单不能领料**,而且必须**当场把原因写在最显眼处** ——
+ * 之前是直接 return 不选中,结果「按钮是灰的、页面上没有任何提示」,现场只会说"提交不了"。
+ * 现在:卡片照常显示(能看见工单号/物料编码/产品/排产数量 = 0 和红色「未排产」标),
+ * 物料区与提交按钮禁用,顶部提示条写明去「快速排产」把该工单行排入产线。
+ */
 function pickWo(row) {
-  if (Number(row.排产数量) <= 0) {
-    errText.value = tt('该工单未排产(排产数量为 0),请先快速排产')
-    return
-  }
+  const planned = Number(row.排产数量) || 0
   wo.value = row
   woText.value = String(row.工单号 || '').trim()
   woCandidates.value = []
+  woBlocked.value = planned <= 0
+  mat.value = null
+  qty.value = 0
+  matText.value = ''
+  if (woBlocked.value) {
+    errText.value = tt('该工单未排产(排产数量为 0),不能领料:请先到「快速排产」把该工单行排入产线,再回来扫码领料')
+    return
+  }
   errText.value = ''
   nextTick(() => matInput.value?.focus?.())
 }
@@ -356,6 +381,11 @@ function reset() {
 /** 生成材料出库单草稿(带 加工单号 + 工单行号:追溯与回写都靠这两列) */
 async function submit() {
   if (!wo.value || !lines.value.length) return
+  // 兜底:未排产的工单不允许生成领料草稿(按钮本该是灰的,这里再拦一次并把原因写到顶部)
+  if (woBlocked.value) {
+    errText.value = tt('该工单未排产(排产数量为 0),不能领料:请先到「快速排产」把该工单行排入产线,再回来扫码领料')
+    return
+  }
   saving.value = true
   try {
     const wh = lines.value.every((l) => (l.warehouseCode || l.warehouse) === (lines.value[0].warehouseCode || lines.value[0].warehouse))
@@ -491,6 +521,16 @@ async function submit() {
 .mp-line-qty { flex: none; min-width: 72px; text-align: right; font-size: 14px; }
 .mp-line-del { flex: none; padding: 0 4px; font-size: 13px; color: var(--el-color-danger); cursor: pointer; }
 
+/* 提示条置顶(见模板注释):顶部一眼可见,不随右栏滚动跑掉 */
+.mp-err-top { margin: 10px 12px 0; }
+/* 未排产:红色小标 + 排产数量标红,卡片照常显示,让人看清是哪张单 */
+.mp-sec-warn { font-size: 11px; font-weight: 400; color: var(--el-color-danger); }
+.mp-tag-warn { background: var(--el-color-danger-light-9); color: var(--el-color-danger); }
+.mp-kv > b.warn { color: var(--el-color-danger); }
+.mp-cand-qty { flex: none; font-size: 12px; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.mp-cand-qty.warn { color: var(--el-color-danger); }
+/* 编码类字段用等宽,长编码更好核对 */
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; font-size: 12px; }
 .mp-err {
   margin: 10px 12px 0; padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5;
   background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2);

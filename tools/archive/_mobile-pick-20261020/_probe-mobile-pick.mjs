@@ -122,6 +122,32 @@ const woCard = JSON.parse(await ev(`JSON.stringify({
   rows: document.querySelectorAll('.mp-kv').length,
 })`))
 ok('扫工单 → 工单卡出现', woCard.text.includes(WO) && woCard.rows >= 4, JSON.stringify(woCard).slice(0, 160))
+ok('工单卡含「物料编码」行', /物料编码/.test(woCard.text), woCard.text.split('\n').slice(0, 6).join(' / ').slice(0, 100))
+
+// ②b 未排产分支(--unsched):卡片照常显示,但顶部有提示、物料区与提交禁用
+if (process.argv.includes('--unsched')) {
+  const st = JSON.parse(await ev(`JSON.stringify({
+    err: document.querySelector('.mp-err')?.textContent || '',
+    warnTag: !!document.querySelector('.mp-tag-warn'),
+    matDisabled: (() => {
+      const els = document.querySelectorAll('.mp-card .el-input__inner');
+      const el = els[els.length - 1];
+      return el ? el.disabled : null;
+    })(),
+    footDisabled: Array.from(document.querySelectorAll('.mp-foot button')).map((b) => b.disabled),
+  })`))
+  ok('未排产 → 顶部提示条点名原因', /未排产/.test(st.err), st.err.slice(0, 80))
+  ok('未排产 → 工单卡打「未排产」标', st.warnTag === true, String(st.warnTag))
+  ok('未排产 → 物料输入禁用', st.matDisabled === true, String(st.matDisabled))
+  ok('未排产 → 提交按钮禁用', st.footDisabled.length > 0 && st.footDisabled.every(Boolean), JSON.stringify(st.footDisabled))
+
+  const shot0 = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  fs.writeFileSync(path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020', 'unscheduled-blocked.png'), Buffer.from(shot0.result.data, 'base64'))
+  const pass0 = out.filter((x) => x.pass).length
+  console.log(`\n=== ${pass0}/${out.length} 通过 ===`)
+  try { edge.kill() } catch {}
+  process.exit(pass0 === out.length ? 0 : 1)
+}
 
 // ③ 物料
 const inputs = await ev(`document.querySelectorAll('.mp-card .el-input__inner').length`)
