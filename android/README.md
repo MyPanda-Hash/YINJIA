@@ -82,15 +82,34 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 | 返回键 | WebView 能后退就后退,退到底再退出 App |
 | 权限 | 仅 INTERNET / CAMERA / VIBRATE / ACCESS_NETWORK_STATE;相机在首次扫码时动态申请 |
 
-## 6. 已验证
+## 6. 验证状态(2026-10-20)
+
+### 6.1 已完成(不需要手机就能验的,全绿)
 
 | 项 | 结果 |
 |---|---|
 | 构建 | `aapt2 + javac + d8(36.1.0)+ zipalign + apksigner` 全绿,产出 **244.7 KB** APK |
 | 包信息 | `package=com.yinjia.mes.app`,`minSdk=24`(Android 7.0+),`targetSdk=34`,label=`银嘉MES`,launcher=`MainActivity` |
-| 签名/对齐 | `apksigner verify` 通过;`zipalign 4` 通过 |
+| 签名/对齐 | `apksigner verify` 通过(证书 `CN=Yinjia MES Debug`);`zipalign 4` 通过 |
 | 权限 | INTERNET / ACCESS_NETWORK_STATE / CAMERA / VIBRATE |
-| 真机 | **未测**(本机无手机连接;`adb devices` 为空)—— 装到手机后请回一句,我按真机结果再调 |
+| 明文 http | APK 内 manifest 实测 `usesCleartextTraffic=0xffffffff`(true)、`networkSecurityConfig=@0x7f060000` 已挂上 |
+| dex 内容 | **317 个类** = 26 个自有类(`MainActivity` / `ScanActivity` / `Bridge` / `R.*`)+ 291 个 ZXing 类,数量与预期一致 |
+| JS 桥契约 | 两侧逐字对得上:原生 `addJavascriptInterface(new Bridge(), "YjNative")` + `window.__yjScanResult(...)`;网页 `window.YjNative.scan/getBaseUrl` + `window.__yjScanResult = (code, ok) => …` |
+| 网页回归 | 390 宽探针 **10/10**(加了扫码按钮后网页版行为不变:检测不到桥就不显示按钮) |
+| 安装脚本 | `android\install.ps1` 冒烟通过:能找到 APK、能进入「等设备」循环、无设备时给出人话提示 |
+
+### 6.2 待办:真机验证(本机做不了)
+
+`adb devices` 为空;SDK 里**没有 AVD、没有系统镜像、也没有 cmdline-tools**(`sdkmanager` 不可用),
+所以这台机器上无法自主起模拟器安装。需要**任一条**:
+
+| 做法 | 怎么做 |
+|---|---|
+| **A. 插手机(最直接)** | 手机开「USB 调试」→ 连电脑 → `powershell -ExecutionPolicy Bypass -File android\install.ps1`(会等设备连上再装) |
+| **B. 让我起模拟器** | 需要先下载系统镜像(约 1.0~1.3 GB,x86_64 API 34)+ 补 cmdline-tools;模拟器**没有真实相机**,只能验「启动 / 接口号保存 / 网页加载 / 表单流程」,验不了扫码取景 |
+| **C. 先不动** | 包已在 `android/dist/`,等人到位再装;代码与文档已冻结 |
+
+真机装好后要看的三件事:① 能否登录(接口号填对);② 「扫工单」取景方向是否正常(横/倒就调 `ScanActivity` 的 `setDisplayOrientation` 与预览尺寸);③ 扫出来的码是否落进正确的输入框(工单/物料)。
 
 ## 7. 已知限制 / 下一步
 
