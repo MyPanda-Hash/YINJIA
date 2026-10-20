@@ -34,7 +34,9 @@
 
       <!-- 表头（3 列） -->
       <div v-loading="loading" class="fields udl-fields">
-        <div v-for="r in visibleFormMeta" :key="r.code" class="field">
+        <!-- data-code = 字段数据键:校验失败时靠它把缺必填的那一栏滚到视野里并高亮
+             (2026-10-19 用户报「出货检验计划表提示标题不能为空,但不知道填哪」) -->
+        <div v-for="r in visibleFormMeta" :key="r.code" class="field" :data-code="r.code">
           <label :title="tt(r.name)">{{ tt(r.name) }}<span v-if="r.isNotNull" class="req">*</span></label>
           <el-input v-if="isText(r)" v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" :placeholder="tt(r.name)" />
           <el-input-number
@@ -1089,9 +1091,39 @@ function summarize({ columns }, tab) {
 
 // ---------- 校验 / 加载 / 按钮 ----------
 
+/**
+ * 校验失败时把「缺必填」的那一栏滚到视野中央并闪烁(2026-10-19 用户报障:
+ *   「出货检验计划表出现标题不能为空,但是未提示哪一个数据未填」)。
+ *
+ * 背景:PanelxList 早就给列表页做过同类定位(见其 focusMissingField / 文书类 focusField),
+ * 但**表单页(PanelxForm)一直只返回文案**、不做定位 —— 而 RD_INSP_PLAN 这类面板的表单
+ * 有 18 个字段、「标题」又在最上面一排,用户看到提示不知道指的是哪一栏。
+ *
+ * 定位纯属锦上添花:**拿不到 DOM 就静默跳过**,绝不改变校验结果、提示文案或保存流程。
+ * @param {string} code 字段数据键(= form 的键,中文)
+ */
+function focusMissingField(code) {
+  if (!code) return
+  nextTick(() => {
+    try {
+      const hit = Array.from(document.querySelectorAll('.fields .field'))
+        .find((el) => el.dataset && el.dataset.code === code)
+      if (!hit) return
+      hit.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      hit.classList.add('field-blink')
+      setTimeout(() => hit.classList.remove('field-blink'), 3200)
+      // 顺带把焦点放到那一栏的输入框里,键盘用户直接能打字
+      const inp = hit.querySelector('input, textarea')
+      if (inp && !inp.disabled) inp.focus({ preventScroll: true })
+    } catch { /* 定位失败不影响校验 */ }
+  })
+}
+
 function validate() {
   for (const r of visibleMeta.value) {
     if (r.isNotNull && (form[r.code] === undefined || form[r.code] === null || String(form[r.code]).trim() === '')) {
+      // 先定位再返回提示:用户才看得到要填哪一栏(定位失败无副作用)
+      focusMissingField(r.code)
       return `${r.name}不能为空`
     }
   }
@@ -1482,6 +1514,17 @@ watch(() => [panelCode.value, code.value], () => {
 </script>
 
 <style scoped>
+/* 校验缺必填时的闪烁高亮(2026-10-19 出货检验计划表「标题不能为空」定位用)。
+   与 DataRecordSheet / DocSheet / RecordSheetPanels 各自的 .field-blink 同一观感;
+   这里必须**单独定义** —— scoped 样式不会跨组件继承。 */
+.field-blink {
+  animation: pxfBlink 1.1s ease-in-out 2;
+  border-radius: 4px;
+}
+@keyframes pxfBlink {
+  0%, 100% { background: transparent; }
+  50% { background: var(--el-color-warning-light-7, #fdf6ec); box-shadow: 0 0 0 2px var(--el-color-warning-light-5, #f5dab1); }
+}
 /* 「多行文本」字段类型的观感:**保持单行输入框的原样**(默认边框/底色/聚焦高亮一律不动),
    只把高度、行高、内边距调成和能力一致,内容超长时自动撑高折行。
    ⚠ 不要写 `border:0 / background:transparent / box-shadow:none` —— 2026-10-15 实测踩到:

@@ -96,6 +96,42 @@
           </div>
         </section>
 
+        <!-- 最新 10 条流水(2026-10-19 用户口径):连续发送下每秒一条,看得到取放过程 -->
+        <section v-if="current" class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">{{ tt('最新 10 条数据') }}</h3>
+            <span class="dc-card-tip">{{ tt('每 5 分钟清理一次，只保留每个采集点的最新记录') }}</span>
+          </div>
+          <el-table
+            v-if="samples.length"
+            :data="samples"
+            border
+            size="small"
+            class="dc-table"
+            :empty-text="tt('暂无数据')"
+          >
+            <el-table-column :label="tt('序号')" width="64" align="center">
+              <template #default="{ $index }"><span class="dc-muted">{{ $index + 1 }}</span></template>
+            </el-table-column>
+            <el-table-column :label="tt('采集点')" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="dc-code">{{ row.pointCode || '-' }}</span>
+                <span v-if="row.pointName" class="dc-muted"> · {{ row.pointName }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('数值')" min-width="110" align="right">
+              <template #default="{ row }"><strong class="dc-value">{{ row.valueText ?? '-' }}</strong></template>
+            </el-table-column>
+            <el-table-column :label="tt('单位')" width="80">
+              <template #default="{ row }"><span class="dc-muted">{{ row.unit || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column :label="tt('采集时间')" width="180">
+              <template #default="{ row }"><span class="dc-muted">{{ fmtAt(row.at) }}</span></template>
+            </el-table-column>
+          </el-table>
+          <div v-else class="dc-empty"><span>{{ tt('该设备暂无采集数据') }}</span></div>
+        </section>
+
         <section v-if="current" class="dc-card">
           <div class="dc-card-head">
             <h3 class="dc-card-title">{{ tt('报警记录') }}</h3>
@@ -210,6 +246,7 @@ const router = useRouter()
 const loading = ref(false)
 const devices = ref([])
 const points = ref([])
+const samples = ref([])
 const alarms = ref([])
 const selectedId = ref(null)
 const handleDialog = ref(false)
@@ -242,6 +279,7 @@ async function load(showToast) {
     const data = await apiGetDcMonitor(selectedId.value ?? undefined)
     devices.value = Array.isArray(data?.devices) ? data.devices : []
     points.value = Array.isArray(data?.points) ? data.points : []
+    samples.value = Array.isArray(data?.samples) ? data.samples : []
     alarms.value = Array.isArray(data?.alarms) ? data.alarms : []
     if (selectedId.value !== null && !devices.value.some((d) => d.id === selectedId.value)) {
       selectedId.value = devices.value.length ? devices.value[0].id : null
@@ -250,6 +288,7 @@ async function load(showToast) {
     if (showToast) ElMessage.success(tt('已刷新'))
   } catch (e) {
     points.value = []
+    samples.value = []
     alarms.value = []
     ElMessage.error(e?.response?.data?.message || e?.message || tt('加载监控数据失败'))
   } finally {

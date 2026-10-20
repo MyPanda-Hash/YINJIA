@@ -161,7 +161,10 @@ export const menuTree = [
   //     左栏展开记忆、`数据字典`/面板权限里按 code 的引用都不受影响;智能供应链随之只剩 销售管理 / 采购管理。
   {
     code: 'inv',
-    title: '库存管理',
+    // 2026-10-20 用户口径「把库存管理名字改为 WMS管理系统」:只改显示标题,
+    // 一级目录 code 仍是 'inv'(路由/展开态/页签/权限词都不按标题走),
+    // 权限矩阵的分组名由后端 ReportService.navGroup + yj_panel.module_group 同步改。
+    title: 'WMS管理系统',
     icon: 'Box',
     children: [
       {
@@ -263,15 +266,20 @@ export const menuTree = [
           // 页面级(无 panelCode),扫标签码 `存货编码|批号` → 按批号查 v_stock_pick 可用量 → 组单。
           // 存在的理由:材料出库单里选商品看的是(物料,仓库)聚合口径,常显示「没有库存」;
           // 仓库实际发料关心的是批号级可用量,而标签里正好带着批号。
-          { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', icon: 'FullScreen' },
+          { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', panelCode: 'BARCODE_SCAN_PICK', icon: 'FullScreen' },
         ],
       },
     ],
   },
+  // 2026-10-20 用户口径:「把生产制造的生产计划和生产过程提成一级目录,生产制造这个一级目录不要了;
+  //   把设备维护挪到系统管理平台」—— 原一级目录「生产制造」(mfg)拆掉:
+  //   生产计划 / 生产过程 各升为一级目录,设备维护整组移到「系统管理平台」。
+  //   只动菜单分组:面板码 / 路由 / 权限词 / 面板元数据一个不改(权限矩阵分组由后端
+  //   ReportService.navGroup + yj_panel.module_group 同步,见 migrate-menu-restructure-wms-20261020.sql)。
   {
-    code: 'mfg',
-    title: '生产制造',
-    icon: 'Odometer',
+    code: 'plan',
+    title: '生产计划',
+    icon: 'Calendar',
     // 2026-10-14 两次归一(用户口径「和其他模块的侧边栏不一样,要求相同实现方式」+「明细表和统计表不做大类区分」):
     // ① 原先这里多包了一层空壳二级目录「生产管理」(它自己不含面板,真正的业务域在它下面),
     //    后果:侧栏点开「生产制造」只列出一个二级项「生产管理」,而 智能供应链/品质管理/基础档案
@@ -286,10 +294,8 @@ export const menuTree = [
     //   原「生产执行」「生产记录」两个二级目录合并为「生产过程」一组(10 张面板入口原样保留,
     //   执行 4 项在前、记录 6 项在后)⇒ 4 个业务域变 3 个。只动菜单分组,面板/路由/权限零改动。
     children: [
-      {
-        // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
-        code: 'plan', title: '生产计划', children: [
-          // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
+      // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套 —— 原「生产制造」下的二级目录,2026-10-20 升为一级
+      // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
           // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
           // 2026-10-16 权限化:这四个看板页面此前**没有 panelCode** —— 而 filterMenuTree 对
           // 「无 panelCode 的叶子」一律放行 ⇒ 任何登录账号都能看到并进入。现挂页面级虚拟面板码
@@ -327,38 +333,38 @@ export const menuTree = [
           //   后端 Java **零引用**、无任何视图/过程依赖这两个视图。
           //   ⇒ 视图 + 面板元数据 + 菜单项整体下架(migrate-drop-manu-order-report-panels-20261017.sql;
           //   底表 bd_manu_order/bl_manu_order **保留** —— MANU_ORDER 面板的处理器仍在用)。
-        ],
-      },
-      {
-        // 生产过程(2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」)
-        // 合并前是两个并列二级目录:
-        //   生产执行(五道工序:领料/报工)= 工序报工单 / 报工记录 / 完工明细 / 生产异常处理单
-        //   生产记录(29份真实单据·家族面板)= 生产日报表 / 投料确认单 / 物料混合记录 / 造粒记录 / 无黑处理登记 / 封箱确认
-        // 合并只动菜单分组:**10 个面板入口、面板码、路径、顺序一律不变**(执行 4 项在前、记录 6 项在后),
-        // 所以路由/权限/面板元数据零改动,可随时按本段注释回滚成两组。
-        code: 'prodProcess', title: '生产过程', icon: 'Notebook', children: [
-          // ── 原「生产执行」4 项 ──
-          { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
-          { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
-          { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
-          // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
-          { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
-          // ── 原「生产记录」6 项 ──
-          { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
-          { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
-          { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
-          { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
-          { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
-          { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
-        ],
-      },
-      {
-        code: 'device', title: '设备维护', children: [
-          { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
-          { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
-        ],
-      },
-      // ══════════ 2026-10-16 下架:「样品管理」「经典单据」两组整体摘除 ══════════
+    ],
+  },
+  // 生产过程(2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」;
+  //   2026-10-20 用户口径「把生产制造的生产计划和生产过程提成一级目录」⇒ 本组升为一级目录)
+  // 合并前是两个并列二级目录:
+  //   生产执行(五道工序:领料/报工)= 工序报工单 / 报工记录 / 完工明细 / 生产异常处理单
+  //   生产记录(29份真实单据·家族面板)= 生产日报表 / 投料确认单 / 物料混合记录 / 造粒记录 / 无黑处理登记 / 封箱确认
+  // 合并只动菜单分组:**10 个面板入口、面板码、路径、顺序一律不变**(执行 4 项在前、记录 6 项在后),
+  // 所以路由/权限/面板元数据零改动,可随时按本段注释回滚成两组。
+  {
+    code: 'prodProcess',
+    title: '生产过程',
+    icon: 'Notebook',
+    children: [
+      // ── 原「生产执行」4 项 ──
+      { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
+      { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
+      { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
+      // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
+      { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
+      // ── 原「生产记录」6 项 ──
+      { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
+      { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
+      { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
+      { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
+      { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
+      { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
+    ],
+  },
+  // 设备维护(点检记录 / 保养计划)2026-10-20 用户口径「把设备维护挪到系统管理平台」
+  //   ⇒ 整组移到 base.children(见文件下方「系统管理平台」段),本处不再保留。
+  // ══════════ 2026-10-16 下架:「样品管理」「经典单据」两组整体摘除 ══════════
       // 用户口径:「去除当前这两个菜单内的单据」。被摘的 5 个叶子 =
       //   样品管理:样品申请单 SAMPLE_REQ
       //   经典单据:工序派工单 DISPATCH / 委外加工单 OUTSOURCE_ORDER /
@@ -390,8 +396,6 @@ export const menuTree = [
       //     { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
       //   ],
       // },
-    ],
-  },
   {
     code: 'qc',
     title: '品质管理',
@@ -609,9 +613,9 @@ export const menuTree = [
     title: '数采平台',
     icon: 'Cpu',
     children: [
-      { code: 'dcConfig', title: '设备配置管理', path: '/dc/config', icon: 'SetUp' },
-      { code: 'dcMonitor', title: '数据监控', path: '/dc/monitor', icon: 'Monitor' },
-      { code: 'dcStats', title: '状态统计', path: '/dc/stats', icon: 'DataAnalysis' },
+      { code: 'dcConfig', title: '设备配置管理', path: '/dc/config', panelCode: 'DC_CONFIG', icon: 'SetUp' },
+      { code: 'dcMonitor', title: '数据监控', path: '/dc/monitor', panelCode: 'DC_MONITOR', icon: 'Monitor' },
+      { code: 'dcStats', title: '状态统计', path: '/dc/stats', panelCode: 'DC_STATS', icon: 'DataAnalysis' },
     ],
   },
   // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
@@ -642,6 +646,22 @@ export const menuTree = [
           { code: 'sysConsole', title: '系统管理', path: '/sys/console', icon: 'Monitor' },
           { code: 'sysOrg', title: '组织架构', path: '/sys/org', icon: 'OfficeBuilding', adminOnly: true },
           { code: 'sysUsage', title: '使用权限查看', path: '/sys/usage', icon: 'View', adminOnly: true },
+          // 数据安全 · 数据库备份(2026-10-19 用户口径「系统管理模块加一个面板,设置数据库数据的
+          //   主动备份和自动备份的时间」):自动备份开关/时间/保留份数/备份目录 + 立即备份 + 备份记录。
+          //   管理员专属(adminOnly),页面见 views/sys/DbBackup.vue。
+          { code: 'sysBackup', title: '数据备份', path: '/sys/backup', icon: 'Download', adminOnly: true },
+        ],
+      },
+      {
+        // 设备维护(2026-10-20 用户口径「把设备维护挪到系统管理平台」):整组从生产域搬来 ——
+        //   设备点检记录 / 保养计划。面板码、权限词、路由原样不变,只换导航位置;
+        //   权限矩阵的分组同步由 yj_panel.module_group='系统管理平台' 驱动。
+        code: 'device',
+        title: '设备维护',
+        icon: 'Tools',
+        children: [
+          { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
+          { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
         ],
       },
     ],

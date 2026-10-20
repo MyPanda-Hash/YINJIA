@@ -8,7 +8,8 @@ export default {
     '已回正': 'Zurückgesetzt',
     '行': 'Zeile(n)',    // 结案异常(2026-10-18):ja 可由外部程序直写,后端按 MES 结案口径反查后标出来
     '结案异常': 'Anomaler Abschluss',
-    '该行已结案，但不满足 MES 的结案条件（入库≥排产 + 组装成品检验已审核）—— 通常是手机端小程序/参考库直连写库造成的，可用「结案体检」核对后回正': 'Die Zeile ist abgeschlossen, erfüllt aber die MES-Abschlussregel nicht (Zugang ≥ geplant + freigegebene Fertigwarenprüfung Montage) — meist durch direkte DB-Schreibzugriffe des Mini-Programms/Altysstems. Mit „Abschluss-Prüfung“ kontrollieren und zurücksetzen.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
+    '该行写着已结案，但入库数量没达到排产数量 —— MES 的两条结案路径都要求入库≥排产，所以这行不是 MES 结的（通常是手机端小程序/参考库直连写库）。可用「结案回正」一键改回未结案':
+      'Die Zeile ist abgeschlossen, aber die Zugangsmenge erreicht die geplante Menge nicht. Beide MES-Abschlusswege verlangen Zugang ≥ geplant, daher wurde diese Zeile nicht von MES abgeschlossen (meist direkt vom Mini-Programm oder Altsystem in die DB geschrieben). Mit „Abschluss zurücksetzen“ wieder öffnen.',    // ---- 检验项目维护·来源②「出货检验计划」(组装成品检验单专用,2026-10-17)----
     '检验标准库': 'Prüfstandard-Bibliothek',
     '出货检验计划': 'Versandprüfplan',
     '计划单号': 'Plannummer',
@@ -1419,6 +1420,11 @@ export default {
     '基础档案': 'Stammdaten',
     '系统管理平台': 'Systemverwaltungsplattform',
     '库存管理': 'Lagerverwaltung',
+    'WMS管理系统': 'WMS-Verwaltung',
+    '生产计划': 'Produktionsplanung',
+    '生产过程': 'Produktionsprozess',
+    '设备维护': 'Gerätewartung',
+    '扫码领料': 'Materialentnahme scannen',
     '数据建模': 'Datenmodellierung',
     '字段管理': 'Feldverwaltung',
     'ERP集成': 'ERP-Integration',

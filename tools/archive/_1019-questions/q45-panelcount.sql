@@ -1,0 +1,3 @@
+SELECT N'yj_panel在册' AS 项, CAST(COUNT(*) AS nvarchar(10)) AS 值 FROM yj_panel
+UNION ALL SELECT N'期望总数(在册 + DASHBOARD + 8 页面级)', CAST(COUNT(*)+9 AS nvarchar(10)) FROM yj_panel
+GO

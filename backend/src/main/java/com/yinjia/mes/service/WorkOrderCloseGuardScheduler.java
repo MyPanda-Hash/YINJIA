@@ -18,14 +18,16 @@ import java.util.Map;
  *
  * <p>本任务每分钟看一次(不写库也能提前发现):
  * <ul>
- *   <li>有异常且开关**关**(默认)⇒ 每 30 分钟最多 WARN 一次,把「谁、几行、哪几行」写进日志,
- *       现场据此判断要不要点「结案回正」或跑回正脚本;</li>
- *   <li>有异常且开关**开**({@code yinjia.workorder.ja-selfheal-enabled=true})⇒ 直接回正
- *       (单次上限 {@link WorkOrderCloseGuard} 内定的 200 行),逐行留痕,并把结果写日志。</li>
+ *   <li>有异常且开关**开**({@code yinjia.workorder.ja-selfheal-enabled=true}，**2026-10-20 起默认开**)
+ *       ⇒ 直接回正(单次上限 {@link WorkOrderCloseGuard} 内定的 200 行),逐行留痕,并把结果写日志;</li>
+ *   <li>有异常但开关**关**(只有显式传 {@code =false} 才关)⇒ 每 30 分钟最多 WARN 一次,
+ *       把「几行、哪几行」写进日志,现场据此点「结案回正」或跑回正脚本。</li>
  * </ul>
  *
- * <p>为什么默认关:回正 = **写生产数据**,还会和外部程序"互搏"(它写 Y、我们改 N)。
- * 口径确认后再开,或先用页面上的「结案回正」手工处理。
+ * <p>为什么 2026-10-20 改成默认开:用户口径「以后手机端报工不要再导致结案现象」。
+ * 判据已收窄成「入库 &lt; 排产」(不会再误伤手工结案/GD2608 历史单),外部写坏的值
+ * 一分钟内被自动纠正 —— 现场不必再人工点「结案回正」。
+ * 若确需"只报不动",启动参数显式传 {@code --yinjia.workorder.ja-selfheal-enabled=false}。
  *
  * <p>配置:
  * <pre>
@@ -68,7 +70,8 @@ public class WorkOrderCloseGuardScheduler {
                     String sample = anomalies.stream().limit(5)
                             .map(r -> r.get("工单号") + "#" + r.get("工单行号"))
                             .reduce((a, b) -> a + "," + b).orElse("");
-                    log.warn("[结案巡检] 发现 {} 行「外部写入的已结案」(不满足 入库≥排产 + 组装成品检验已审核):"
+                    log.warn("[结案巡检] 发现 {} 行「外部写入的已结案」(入库 < 排产 ⇒ 不可能是 MES 结的,"
+                                    + "判据见 PlangClose.anomaly):"
                                     + " {} … 开关 ja-selfheal-enabled=false,本轮只报告不回正(可点「结案回正」或开开关)",
                             anomalies.size(), sample);
                     lastWarnAt = now;

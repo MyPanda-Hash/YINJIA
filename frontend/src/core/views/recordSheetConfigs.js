@@ -1513,6 +1513,14 @@ export const recordSheetConfigs = {
     headMode: 'report',
     docNoDefault: 'YJ-QR-88',
     titlePlaceholder: '出货检验项目控制计划',
+    // 大标题格做成「标题」字段输入框(2026-10-19 用户报障「出货检验计划表出现标题不能为空,
+    //   但是未提示哪一个数据未填」)。
+    //   真因:yj_field 里「标题」是 required=1(header),但本配置既没 titleKey、sections 的 pairs 里
+    //   也没有「标题」(整份配置里「标题」二字出现 0 次) ⇒ ①大标题格走静态分支,用户没有输入口;
+    //   ②保存校验必填永远失败;③pageOfKeyIn 找不到页 ⇒ focusField 返回 false,连高亮定位都没有。
+    //   口径照 RD_CHANGE(立项申请)那条已验收的做法:titleKey 绑「标题」,提示词 = 原静态标题文案。
+    titleKey: '标题',
+    titleKeyPh: '出货检验项目控制计划',
     // 信息栏 = 设计 G3:H4 两格。设计 G5:H7 的 使用范围/版本号 **不在这里** ——
     // 它们在设计里与 产品编号/产品功能类别 同行,所以归 sections 的表头三行(见下)。
     info: [
@@ -1624,7 +1632,9 @@ export const recordSheetConfigs = {
         { key: '控制标准及要求', label: '检验要求', w: 144, area: true },
         { key: '控制方法', label: '检验方法', w: 144, area: true },
         { key: '不合格应对措施', label: '不合格应对措施', w: 294, area: true },
-        { key: '检测频率', label: '检查频率', w: 165 },
+        // 2026-10-19 用户口径:「检查频率字段改为下拉标准库,可通过标准库维护下拉内容」——
+        //   type=select 走下拉,stdLib 指 yj_std_lib 的库编码(列头 ⌄ 可维护条目,改库不影响已录入单据)
+        { key: '检测频率', label: '检查频率', w: 165, type: 'select', stdLib: 'INSP_FREQ' },
         { key: '备注', label: '备注', w: 152 },
         // 6 个不上纸的列:hiddenCol 只管**渲染**(值照常逐格往返 —— 保存链路按 yj_field 走,与 cols 无关)。
         // 上面 5 个非序号列 + 这 6 列正好是标准库 insp.plan 的规范字段(toCanonical/toInspRow 一一对应),
@@ -1688,10 +1698,15 @@ export const recordSheetConfigs = {
     sections: [
       { bar: '一、基础信息', rows: [
         { h: 74, grid: [
+          // 「申请日期」要和下一行的「性质」**左右对齐**(2026-10-19 用户口径)。
+          // 原写法 `{fixed:'YJ-QR-130'}` + `{label:'申请日期'}` 让日期标签落在第 3 列(=441px 的宽列),
+          // 而「性质」标签在第 4 列(=147px)⇒ 两个标签框宽窄、起点都不一样,看着错位。
+          // 现在让编号格跨 2 列,日期标签就正好落到第 4 列,与「性质」同列同宽。
+          // gridCols = [111,205,441,147,210,128](合计 1242):1+2+1+2 = 6 列,rowspan 不变。
           { label: '文件编码' },
-          { fixed: 'YJ-QR-130' },
+          { fixed: 'YJ-QR-130', span: 2 },
           { label: '申请日期' },
-          { key: '申请日期', span: 3 },
+          { key: '申请日期', span: 2 },
         ]},
         { h: 74, grid: [
           { label: '申请部门' },
@@ -1745,7 +1760,16 @@ export const recordSheetConfigs = {
         { h: 74, grid: [
           { label: '变更文件' },
           { key: '变更文件', type: 'checks', span: 5,
-            options: ['成型工艺清单', '组装工艺清单', '规格书', '出货检验计划表'] },
+            options: ['成型工艺清单', '组装工艺清单', '规格书', '出货检验计划表'],
+            // 2026-10-19 用户口径:「勾选哪些面板保存审批之后,就会根据选择的产品编号出现对应的文件跳转入口」。
+            // link = 勾选项 → 面板编码。RecordSheetPanels 在**只读态**(审批后)按它把勾选项渲染成可点入口,
+            // 点击时用本单「产品编号」去该面板查单据,再开页签(带 ?docNo= 定位)。
+            link: {
+              '成型工艺清单': 'RD_MOLD_PROC',
+              '组装工艺清单': 'RD_ASM_PROC',
+              '规格书': 'RD_SPEC_DOC',
+              '出货检验计划表': 'RD_INSP_PLAN',
+            } },
         ]},
       ]},
     ],

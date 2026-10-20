@@ -91,7 +91,10 @@ public class WorkOrderSplitService {
         int parentXc = ((Number) p.get("pl_xc")).intValue();
         String batch = str(p.get("批次号"));
 
-        if ("T".equals(String.valueOf(p.get("ja"))) || "Y".equals(String.valueOf(p.get("ja"))))
+        // 已结案守卫(2026-10-19 收口):不裸读 ja —— 外部程序把 ja 写成 Y 而入库=0 时,
+        //   旧写法会报「已结案,不能切单」把整条调整链挡住。口径见 PlangClose。
+        if (com.yinjia.mes.service.PlangClose.isClosed(str(p.get("ja")), num(p.get("pl_sl")),
+                num(p.get("rk_sl")), parentNo))
             throw new IllegalStateException("工单 " + parentNo + " 已结案,不能切单;如需调整请先取消结案");
 
         double qty = num(req.get("切出数量"));
@@ -202,7 +205,9 @@ public class WorkOrderSplitService {
         String childNo = String.valueOf(c.get("pl_no"));
         double childSl = num(c.get("pl_sl"));
 
-        if ("T".equals(String.valueOf(c.get("ja"))) || "Y".equals(String.valueOf(c.get("ja"))))
+        // 已结案守卫(2026-10-19 收口,同 split):按 PlangClose 判,外部误写 ja=Y 不再挡住撤回。
+        if (com.yinjia.mes.service.PlangClose.isClosed(str(c.get("ja")), num(c.get("pl_sl")),
+                num(c.get("rk_sl")), childNo))
             throw new IllegalStateException("子工单 " + childNo + " 已结案,不能撤回;请先取消结案");
 
         // 下游守卫:报工 / 入库 / 领料 / 再切分(任一存在即拒绝,并给出挡路单据号)

@@ -65,12 +65,17 @@ yinjia:
   #       · 环境变量:set YINJIA_ENABLETESTLEDGER=false   (Spring 宽松绑定,大小写/连字符不敏感)
   enable-test-ledger: true
   workorder:
-    # 结案自愈(2026-10-18):plang.ja 是外部程序(手机端小程序/参考库)也能直写的列,
-    #   现场出现过「扫码报工后其余工单全部变成已结案」。MES 自己的结案必须「入库≥排产 + 组装成品检验已审核」
-    #   且一定写 yj_usage_log ⇒ 没有留痕的 ja=Y 就是外部写的。
-    #   true  = 每分钟巡检,发现这类行直接改回 ja=N(逐行留痕 asp_user2=system(结案自愈),日志 [结案自愈]);
-    #   false = 只巡检、只 WARN 日志,不动数据(默认,先让现场把口径认下来)。
-    ja-selfheal-enabled: false
+    # 结案自愈(2026-10-18 加 / 2026-10-20 起**默认开启**)：
+    #   plang.ja 是外部程序（手机端小程序 / 参考库）也能直写的列。现场反复出现
+    #   「扫码报工后其它工单变已结案」「新建的工单行一出生就 ja=Y」——MES 自己的结案
+    #   两条路都要求「入库 ≥ 排产」（自动结案再加"组装成品检验已审核"），所以
+    #   **入库没达标却写着 ja=Y 的行，一定不是 MES 结的**。
+    #   true  = 每分钟巡检，发现这类行直接改回 ja=N（逐行留痕 asp_user2=system(结案自愈)，
+    #           日志 [结案自愈]）⇒ 手机端再怎么写 Y，一分钟内自动被纠正，**不再需要人工点「结案回正」**；
+    #   false = 只巡检、只 WARN，不动数据（2026-10-18~19 的默认值，已按用户 2026-10-20 口径改掉）。
+    #   ⚠ 判据收窄后（PlangClose.anomaly）**只动「入库<排产」的行**，不会误伤手工结案；
+    #     GD2608* 参考库历史单同样豁免。
+    ja-selfheal-enabled: true
     ja-selfheal-cron: "20 * * * * *"
   test-datasource:
     url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES_TEST;encrypt=false;trustServerCertificate=true;loginTimeout=10;lockTimeout=8000

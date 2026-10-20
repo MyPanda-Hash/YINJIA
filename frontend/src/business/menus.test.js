@@ -2,9 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { menuTree, filterMenuTree } from './menus.js'
 
-/** 研发管理二级目录:按研发流程分组(项目管理 / 测试记录 / 产品文件 / 共享文件) */
+/** 完工明细(2026-10-20 起「生产过程」升为一级目录,不再是 mfg 下的二级) */
 test('完工明细为生产过程下的独立通用列表', () => {
-  const proc = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'prodProcess')
+  const proc = menuTree.find((n) => n.code === 'prodProcess')
   const entry = proc.children.find((n) => n.panelCode === 'WO_COMPLETION_LIST')
   assert.equal(entry?.title, '完工明细')
   assert.equal(entry?.path, '/panelx/list/WO_COMPLETION_LIST')
@@ -142,31 +142,28 @@ test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () =>
 })
 
 /**
- * 2026-10-14 用户口径:「生产制造的侧边栏和其他模块不一样,要求使用相同的实现方式」
- *   + 「明细表和统计表不做大类区分,跟其他模块方式一样」。
- * 病根 = 生产制造下多包了一层空壳二级目录「生产管理」,且「明细表」「统计表」自成了两个二级大类:
- *   · 侧栏点开「生产制造」只列出一项「生产管理」,而 智能供应链/品质管理/基础档案 都列业务域;
- *   · LeftNav 为此写了 `m.code === 'mfg'` 特判去"穿"这层,别的模块走通用分支 —— 两套实现;
- *   · 别的模块里明细/统计表都挂在所属业务对象下(智能供应链·销售管理:销售订单 → 明细表 → 统计表)。
- * 终态 = 二级只剩 6 个业务域,4 张明细/统计面板按业务对象并入 生产计划 / 经典单据。
- * 2026-10-16:样品管理 / 经典单据 两组随其仅有的 5 个叶子整体下架 ⇒ 6 → 4 个业务域。
+ * 2026-10-20 用户口径:「把生产制造的生产计划和生产过程提成一级目录,生产制造这个一级目录不要了;
+ *   把设备维护挪到系统管理平台」。
+ * ⇒ 一级目录里不再有「生产制造」(mfg);生产计划 / 生产过程 各成一级;设备维护整组挂到「系统管理平台」。
+ * 只动菜单分组:面板码/路由/权限词不变(可随时按本段回滚)。
  */
-test('生产制造二级目录 = 3 个业务域(生产执行+生产记录合并为生产过程)', () => {
-  const mfg = menuTree.find((n) => n.code === 'mfg')
-  assert.deepEqual((mfg.children || []).map((c) => c.code),
-    ['plan', 'prodProcess', 'device'])
-  assert.deepEqual((mfg.children || []).map((c) => c.title),
-    ['生产计划', '生产过程', '设备维护'])
-  // 合并后不得再留旧的「生产执行」「生产记录」两个分组
-  assert.ok(!(mfg.children || []).some((c) => c.code === 'exec'), '不应再有 exec 分组')
-  assert.ok(!(mfg.children || []).some((c) => c.code === 'records'), '不应再有 records 分组')
-  assert.ok(!(mfg.children || []).some((c) => c.title === '生产执行' || c.title === '生产记录'),
-    '不应再有「生产执行」「生产记录」分组')
-  // 空壳层 / 类型大类都不得回来
-  assert.ok(!(mfg.children || []).some((c) => c.code === 'prod'), '不应再有 prod 空壳层')
-  assert.ok(!(mfg.children || []).some((c) => c.title === '生产管理'), '不应再有「生产管理」空壳层')
-  assert.ok(!(mfg.children || []).some((c) => c.title === '明细表' || c.title === '统计表'),
-    '明细表/统计表不应再是二级大类')
+test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护移到系统管理平台', () => {
+  const topCodes = menuTree.map((n) => n.code)
+  assert.ok(!topCodes.includes('mfg'), '不应再有「生产制造」一级目录')
+  const plan = menuTree.find((n) => n.code === 'plan')
+  const proc = menuTree.find((n) => n.code === 'prodProcess')
+  assert.equal(plan?.title, '生产计划')
+  assert.equal(proc?.title, '生产过程')
+  // 一级目录顺序:生产计划在生产过程之前(原 mfg 内顺序)
+  assert.ok(topCodes.indexOf('plan') >= 0 && topCodes.indexOf('plan') < topCodes.indexOf('prodProcess'),
+    '生产计划应在生产过程之前')
+  // 设备维护:从生产域挪到「系统管理平台」(base),且不再挂在 plan/prodProcess 下
+  const base = menuTree.find((n) => n.code === 'base')
+  const device = (base.children || []).find((c) => c.code === 'device')
+  assert.equal(device?.title, '设备维护')
+  assert.deepEqual((device.children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN'])
+  assert.ok(!(plan.children || []).some((c) => c.code === 'device'), '生产计划下不应再有设备维护')
+  assert.ok(!(proc.children || []).some((c) => c.code === 'device'), '生产计划下不应再有设备维护')
 })
 
 /**
@@ -175,7 +172,7 @@ test('生产制造二级目录 = 3 个业务域(生产执行+生产记录合并�
  * 顺序被钉住是为了防止合并时不小心丢项或重排(用户按现有位置找菜单)。
  */
 test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不变', () => {
-  const proc = menuTree.find((n) => n.code === 'mfg').children.find((n) => n.code === 'prodProcess')
+  const proc = menuTree.find((n) => n.code === 'prodProcess')
   assert.deepEqual((proc.children || []).map((c) => c.panelCode), [
     'WO_REPORT', 'WO_REPORT_LIST', 'WO_COMPLETION_LIST', 'PROD_ABN',
     'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
@@ -194,22 +191,25 @@ test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不�
  * 恢复 = 放开 menus.js 里那两段的注释,届时本测试必须同步改回。
  */
 test('样品管理 / 经典单据 两组下架:菜单树里不得再有这 5 张面板的入口或分组', () => {
-  const mfg = menuTree.find((n) => n.code === 'mfg')
+  // 2026-10-20:「生产制造」一级目录已拆,故改为在全树范围内钉(原来只看 mfg.children)
+  const allGroups = []
+  const collect = (nodes) => nodes.forEach((n) => { allGroups.push(n); if (n.children) collect(n.children) })
+  collect(menuTree)
   for (const code of ['sample', 'legacy']) {
-    assert.ok(!(mfg.children || []).some((c) => c.code === code), `不应再有 ${code} 二级分组`)
+    assert.ok(!allGroups.some((c) => c.code === code), `不应再有 ${code} 二级分组`)
   }
   for (const title of ['样品管理', '经典单据']) {
-    assert.ok(!(mfg.children || []).some((c) => c.title === title), `不应再有「${title}」分组`)
+    assert.ok(!allGroups.some((c) => c.title === title), `不应再有「${title}」分组`)
   }
-  const all = JSON.stringify(mfg)
+  const all = JSON.stringify(menuTree)
   for (const p of ['SAMPLE_REQ', 'DISPATCH', 'OUTSOURCE_ORDER', 'DISPATCH_DETAIL', 'DISPATCH_STATS']) {
     assert.ok(!all.includes(`"${p}"`), `菜单树里不应再有 ${p} 入口`)
   }
 })
 
-test('生产制造的明细/统计表挂在所属业务对象下(与销售管理同款)', () => {
-  const mfg = menuTree.find((n) => n.code === 'mfg')
-  const group = (code) => (mfg.children || []).find((c) => c.code === code)
+test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属业务对象下(与销售管理同款)', () => {
+  const plan = menuTree.find((n) => n.code === 'plan')
+  const group = () => plan
   // 域内顺序 = 单据 → 明细表 → 统计表(照抄 智能供应链·销售管理)
   // 2026-10-16:生产计划域的四个看板页面(订单结转/生产工单/快速排产/工单排产)新增了
   // **页面级虚拟面板码**(权限化,定义见后端 PagePanelRegistry),故也进入本断言 ——
@@ -217,27 +217,39 @@ test('生产制造的明细/统计表挂在所属业务对象下(与销售管理
   // 2026-10-17:生产工单明细表/统计表(MANU_ORDER_DETAIL/MANU_ORDER_STATS)**下架**
   //   —— 载体视图读的是正式库 0 行的 bd_manu_order/bl_manu_order,打开即空表,且从未被打开过
   //   (migrate-drop-manu-order-report-panels-20261017.sql),故从本断言里移除。
-  assert.deepEqual((group('plan').children || []).map((c) => c.panelCode).filter(Boolean),
+  assert.deepEqual((group().children || []).map((c) => c.panelCode).filter(Boolean),
     ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'])
   // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
-  const all = JSON.stringify(mfg)
+  const all = JSON.stringify(plan)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {
-    assert.equal(all.split(`"${p}"`).length - 1, 0, `${p} 已下架,不该再出现在生产制造菜单里`)
+    assert.equal(all.split(`"${p}"`).length - 1, 0, `${p} 已下架,不该再出现在生产计划菜单里`)
   }
 })
 
 // 2026-10-18:数采平台(dc)的二级项是**页面级叶子**——三页是 Vue 页面,不是 yj_panel 面板,
 //   因此没有 panelCode、也不该再套一层分组。这里不是"放宽断言",而是对它单独钉更严的口子:
 //   必须带 /dc/ 路由前缀、不带 panelCode/operationName、code 与 path 一一对应。
+// 2026-10-20:生产计划 / 生产过程 由「生产制造」下的二级目录升为一级目录 ⇒ 它们的一级子项是
+//   带 panelCode 的**面板叶子**(不是再套一层分组),与 dc 同款但必须挂面板码。
 const PAGE_LEAF_GROUPS = new Set(['dc'])
+const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess'])
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
   for (const g of menuTree) {
     if (!g.children || !g.children.length) continue // 我的桌面 等暂无二级
     if (PAGE_LEAF_GROUPS.has(g.code)) {
       for (const c of g.children) {
         assert.ok(typeof c.path === 'string' && c.path.startsWith('/dc/'), `${g.title} > ${c.title} 应是 /dc/ 下的页面级路由`)
-        assert.equal(c.panelCode, undefined, `${g.title} > ${c.title} 是页面,不该带面板编码`)
+        // 2026-10-20:三页挂上页面级虚拟面板码(DC_CONFIG/DC_MONITOR/DC_STATS),才能在
+        //   组织架构「角色与面板权限」里授权 —— 口径与订单结转等四个看板一致。
+        assert.ok(/^DC_[A-Z]+$/.test(String(c.panelCode)), `${g.title} > ${c.title} 应带 DC_* 页面面板码`)
         assert.equal(c.children, undefined, `${g.title} > ${c.title} 是页面级叶子,不该再套分组`)
+      }
+      continue
+    }
+    if (PANEL_LEAF_GROUPS.has(g.code)) {
+      for (const c of g.children) {
+        assert.ok(typeof c.panelCode === 'string' && c.panelCode.length > 0, `${g.title} > ${c.title} 应带面板编码`)
+        assert.equal(c.children, undefined, `${g.title} > ${c.title} 是面板叶子,不该再套分组`)
       }
       continue
     }
@@ -254,13 +266,13 @@ test('导航层级同构:一级模块的二级目录一律是"带面板的分组
  *       「智能供应链」只剩 销售管理 / 采购管理。
  * 判定口径 = 面板编码集合:同一张面板不得在两个一级目录里各挂一次,也不得从「智能供应链」溜回来。
  */
-test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
+test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
   const topCodes = menuTree.map((n) => n.code)
-  assert.ok(topCodes.includes('inv'), '应有一级目录 库存管理(inv)')
+  assert.ok(topCodes.includes('inv'), '应有一级目录 WMS管理系统(inv)')
   const inv = menuTree.find((n) => n.code === 'inv')
-  assert.equal(inv.title, '库存管理')
+  assert.equal(inv.title, 'WMS管理系统')
   const scm = menuTree.find((n) => n.code === 'scm')
-  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, '库存管理紧随智能供应链(同级)')
+  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, 'WMS管理系统紧随智能供应链(同级)')
 
   // 五个分组:code 保持原值(权限/页签/展开记忆都按 code 走),顺序 = 核算 → 明细 → 统计 → 报表 → 条码管理
   // (条码管理 2026-10-18 并入库存管理:它与库存报表同属 WMS 域,合并在「库存管理」下比留在智能供应链更顺)
@@ -277,20 +289,21 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
     return self.concat(codesOf(node.children))
   }
   const invCodes = codesOf(inv)
-  // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,一张不少、不重复
-  // 2026-10-18:新增调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表
-  //   ⇒ 库存核算 8→10、明细 6→8、统计 6→8,合计 27→33
-  assert.equal(invCodes.length, 33, `库存管理应有 33 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 33, '库存管理内不应有重复面板')
-  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在库存管理')
+  // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,另加 2026-10-20
+  //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
+  //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
+  assert.equal(invCodes.length, 34, `WMS管理系统应有 34 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 34, 'WMS管理系统内不应有重复面板')
+  assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
+  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理系统')
   // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
   for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
                    'STOCKTAKE', 'STOCKTAKE_DETAIL', 'STOCKTAKE_STATS']) {
-    assert.ok(invCodes.includes(p), `库存管理下应有 ${p} 入口`)
+    assert.ok(invCodes.includes(p), `WMS管理系统下应有 ${p} 入口`)
   }
   const scmCodes = codesOf(scm)
   for (const p of invCodes) {
-    assert.ok(!scmCodes.includes(p), `${p} 已在库存管理下,不应再从智能供应链暴露`)
+    assert.ok(!scmCodes.includes(p), `${p} 已在WMS管理系统下,不应再从智能供应链暴露`)
   }
 })
 
@@ -300,19 +313,23 @@ test('库存管理 = 与智能供应链同级的一级目录,含 库存核算/�
  * 终态 = 一级目录 code 仍是 'base'(路由/展开态/页签/权限都不按标题走),但**不挂任何业务面板**,
  *       只剩一个「系统功能」分组:系统管理(入口页 sys/console) / 组织架构 / 使用权限查看。
  */
-test('系统管理平台(base)= 只做系统功能入口,业务面板分组已整体迁出', () => {
+test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从生产域搬来)', () => {
   const base = menuTree.find((n) => n.code === 'base')
   assert.equal(base.title, '系统管理平台')
-  assert.deepEqual((base.children || []).map((c) => c.code), ['sysFunc'])
+  assert.deepEqual((base.children || []).map((c) => c.code), ['sysFunc', 'device'])
   const sysFunc = base.children[0]
   assert.equal(sysFunc.title, '系统功能')
-  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage'])
-  // 组织架构 / 使用权限查看 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
-  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage'])
+  // 2026-10-19 追加「数据备份」(sysBackup,管理员专属的数据安全页:数据库主动/自动备份)
+  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'])
+  // 组织架构 / 使用权限查看 / 数据备份 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
+  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
-  // 整枝一个面板都不许挂(否则就是两处各挂一份)
-  assert.equal(JSON.stringify(base).split('"panelCode"').length - 1, 0, '系统管理平台里不应再有面板入口')
+  // 迁出后只剩 sysFunc(无面板)+ device(2026-10-20 搬来的设备维护:点检记录 / 保养计划)
+  assert.deepEqual((base.children[1].children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN'])
+  // 32 张基础资料面板仍不许回来(口径见下一条测试),整枝只允许 device 这两个码
+  const panelCodes = [...JSON.stringify(base).matchAll(/"panelCode":"([A-Z0-9_]+)"/g)].map((m) => m[1])
+  assert.deepEqual([...new Set(panelCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'])
 })
 
 /**
@@ -340,8 +357,11 @@ test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每
   }
   assert.equal(dmCodes.length, 27, `数据建模应有 27 张面板入口,实际 ${dmCodes.length}`)
   assert.equal(new Set(dmCodes).size, 27, '数据建模内不应有重复面板')
+  // 2026-10-20:设备维护整组搬进系统管理平台 ⇒ base 下允许 EQUIP_CHECK / MAINT_PLAN 两张,
+  //   基础资料那 32 张仍不许回来
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
-  assert.equal(baseCodes.length, 0, '系统管理平台不应再挂任何面板')
+  assert.deepEqual([...new Set(baseCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'],
+    '系统管理平台只应挂设备维护两张(2026-10-20 迁入)')
 })
 
 /**
@@ -356,9 +376,15 @@ test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可�
   assert.ok(codes.includes('sysConsole'), '非管理员应仍能用「系统管理」入口页')
   assert.ok(!codes.includes('sysOrg'), '非管理员不应看到组织架构')
   assert.ok(!codes.includes('sysUsage'), '非管理员不应看到使用权限查看')
+  assert.ok(!codes.includes('sysBackup'), '非管理员不应看到数据备份(备份文件=全库数据拷贝)')
   const admin = filterMenuTree([base], vis(), true)[0]
-  const adminCodes = (admin.children || []).flatMap((g) => (g.children || []).map((c) => c.code))
-  assert.deepEqual(adminCodes, ['sysConsole', 'sysOrg', 'sysUsage'])
+  // 2026-10-20:base 下多了「设备维护」组(设备点检记录 / 保养计划),按组拆开断言
+  const adminGroups = (admin.children || []).map((g) => ({ code: g.code, kids: (g.children || []).map((c) => c.code) }))
+  // 2026-10-19:数据安全 · 数据库备份(sysBackup)接在系统功能组末尾,管理员专属
+  assert.deepEqual(adminGroups, [
+    { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'] },
+    { code: 'device', kids: ['equipCheck', 'maintPlan'] },
+  ])
 })
 
 /**
@@ -453,9 +479,9 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   const bc = (inv.children || []).find((c) => c.code === 'barcode')
   assert.ok(bc, '库存管理下应有「条码管理」分组')
   assert.equal(bc.title, '条码管理')
-  // 2026-10-18 追加第四个叶子「扫码领料」(页面级,无 panelCode):
-  // 面板断言只看带 panelCode 的叶子 ⇒ 库存管理 33 张面板的计数不受影响。
-  const panelLeaves = (bc.children || []).filter((c) => c.panelCode)
+  // 2026-10-18 追加第四个叶子「扫码领料」;2026-10-20 起它也挂页面级面板码 BARCODE_SCAN_PICK
+  //   (此前无码 ⇒ 权限矩阵里勾不到、任何人可进)。三个只读报表面板与本页区分开断言。
+  const panelLeaves = (bc.children || []).filter((c) => c.panelCode && c.path.startsWith('/panelx/list/'))
   assert.deepEqual(panelLeaves.map((c) => c.panelCode),
     ['BARCODE_MAT', 'BARCODE_WIP', 'BARCODE_FIN'])
   assert.deepEqual(panelLeaves.map((c) => c.title),
@@ -466,5 +492,6 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   const scanPick = (bc.children || []).find((c) => c.code === 'barcodeScanPick')
   assert.ok(scanPick, '条码管理下应有「扫码领料」入口')
   assert.equal(scanPick.path, '/scm/scanPick')
+  assert.equal(scanPick.panelCode, 'BARCODE_SCAN_PICK', '扫码领料应挂页面级面板码(2026-10-20)')
   assert.equal(scanPick.title, '扫码领料')
 })
