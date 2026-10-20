@@ -2,10 +2,10 @@
 rem ============================================================================
 rem  apply-update.bat -- HOT UPDATE the MES app.jar on the SERVER (no DB restore)
 rem
-rem  Run this ON THE SERVER (RDP session) as Administrator.
+rem  Run this ON THE SERVER (RDP) as Administrator.
 rem  What it does:
 rem    1) copies the new app.jar from the redirected dev drive (\\tsclient\C\...)
-rem    2) backs up the server jar that is currently in C:\yinjia\update\app.jar
+rem    2) backs up the jar currently staged on the server
 rem    3) runs C:\yinjia\update.bat (stop -> swap -> start)
 rem    4) probes http://127.0.0.1:8090/ and prints RESULT: OK / FAILED
 rem  It does NOT touch the database.
@@ -36,13 +36,11 @@ if not exist "C:\yinjia\update.bat" (
 )
 if not exist "C:\yinjia\update" mkdir "C:\yinjia\update"
 
-rem ---- 1) backup the jar currently staged on the server ----
 if exist "%DEST%" (
-  copy /Y "%DEST%" "%DEST%.bak-before-rdflow" >> "%LOG%" 2>&1
-  echo [backup] %DEST%.bak-before-rdflow >> "%LOG%"
+  copy /Y "%DEST%" "%DEST%.bak-before-iotflow" >> "%LOG%" 2>&1
+  echo [backup] %DEST%.bak-before-iotflow >> "%LOG%"
 )
 
-rem ---- 2) stage the new jar ----
 copy /Y "%SRC%" "%DEST%" >> "%LOG%" 2>&1
 if errorlevel 1 (
   echo [FAIL] copy app.jar failed >> "%LOG%"
@@ -60,11 +58,9 @@ if not "%SRC_SIZE%"=="%DST_SIZE%" (
   exit /b 5
 )
 
-rem ---- 3) stop / swap / start ----
 call "C:\yinjia\update.bat" >> "%LOG%" 2>&1
 echo [update.bat] exit=%ERRORLEVEL% >> "%LOG%"
 
-rem ---- 4) health probe (give Tomcat a moment) ----
 timeout /t 40 /nobreak >nul
 set CODE=
 for /f "delims=" %%C in ('curl -s -o NUL -w "%%{http_code}" http://127.0.0.1:8090/ 2^>nul') do set CODE=%%C
