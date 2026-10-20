@@ -1,0 +1,64 @@
+==> SELECT TOP 20 scope, ref_key, locale, text FROM yj_translation WHERE ref_key IN (N'来料检验单号', N'检验数据记录单号', N'检验数据记录', N'来料检验单')
+scope | ref_key | locale | text
+-------------------------------
+panel | 来料检验单 | en | Incoming Inspection Sheet
+panel | 来料检验单 | ja | 受入検査伝票
+panel | 来料检验单 | ko | 입고검사 전표
+panel | 来料检验单 | es | Hoja de inspección de entrada
+panel | 来料检验单 | fr | Fiche d'inspection à réception
+panel | 来料检验单 | de | Wareneingangsprüfung
+panel | 来料检验单 | ru | Лист входного контроля
+panel | 来料检验单 | vi | Phiếu kiểm nghiệm đầu vào
+panel | 来料检验单 | th | ใบตรวจรับของเข้า
+panel | 检验数据记录 | en | Inspection Data Record
+field | 检验数据记录单号 | en | Inspection Record No.
+(11 行)
+==> SELECT N'残留检查' AS x, (SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.qc_insp_rec') AND name=N'来料检验单号') AS rec_col, (SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.qc_tc_in') AND name=N'检验数据记录单号') AS tc_col, (SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.qc_tc_in') AND name LIKE N'附件%') AS tc_attach
+x | rec_col | tc_col | tc_attach
+--------------------------------
+残留检查 | 0 | 0 | 0
+(1 行)
+==> SELECT panel_code, label, place, seq, visible, hidden, editable FROM yj_field WHERE panel_code IN ('QC_TC_IN','QC_INSP_REC') AND (label LIKE N'%单号' OR place='header') AND panel_code='QC_TC_IN'
+panel_code | label | place | seq | visible | hidden | editable
+--------------------------------------------------------------
+QC_TC_IN | 采购单号 | query,header | 40 | true | false | true
+QC_TC_IN | 产品名称 | header | 50 | true | false | true
+QC_TC_IN | 总数量 | header | 60 | true | false | true
+QC_TC_IN | 不合格品数量 | header | 70 | true | false | true
+QC_TC_IN | 不合格品比例 | header | 80 | true | false | true
+QC_TC_IN | 不良说明 | header | 90 | true | false | true
+QC_TC_IN | 特采理由 | header | 110 | true | false | true
+QC_TC_IN | 产品开发部性能意见 | header | 120 | true | false | true
+QC_TC_IN | 产品开发部工艺意见 | header | 130 | true | false | true
+QC_TC_IN | 品质部意见 | header | 140 | true | false | true
+QC_TC_IN | 销售部意见 | header | 150 | true | false | true
+QC_TC_IN | 研发意见 | header | 160 | true | false | true
+QC_TC_IN | 备注 | header | 180 | true | false | true
+QC_TC_IN | 审核人 | header | 200 | true | false | false
+QC_TC_IN | 审核时间 | header | 210 | true | false | false
+QC_TC_IN | 文档编号 | header | 215 | true | true | true
+QC_TC_IN | 编制人 | header | 220 | true | false | false
+QC_TC_IN | 批次键 | header | 900 | false | true | false
+QC_TC_IN | 批次号 | header | 901 | false | true | false
+QC_TC_IN | 检验单号 | header | 902 | false | true | false
+QC_TC_IN | 特采理由日期 | header | 230 | true | true | true
+QC_TC_IN | 产品开发部签名 | header | 231 | true | true | true
+QC_TC_IN | 产品开发部日期 | header | 232 | true | true | true
+QC_TC_IN | 品质部签名 | header | 233 | true | true | true
+QC_TC_IN | 品质部日期 | header | 234 | true | true | true
+QC_TC_IN | 销售部签名 | header | 235 | true | true | true
+QC_TC_IN | 销售部日期 | header | 236 | true | true | true
+QC_TC_IN | 研发签名 | header | 237 | true | true | true
+QC_TC_IN | 研发日期 | header | 238 | true | true | true
+QC_TC_IN | 计量单位 | header | 65 | false | true | false
+QC_TC_IN | 审批人 | header | 212 | true | false | false
+QC_TC_IN | 审批时间 | header | 213 | true | false | false
+QC_TC_IN | 暂收退料单号 | header | 903 | false | true | false
+(33 行)
+==> SELECT N'特采单行数' AS x, COUNT(*) AS n FROM qc_tc_in
+x | n
+----------
+特采单行数 | 25
+(1 行)
+==> SELECT TOP 5 单据编号, 检验单号, 产品名称, 检验数据记录单号 FROM qc_tc_in
+[ERR] 列名 '检验数据记录单号' 无效。

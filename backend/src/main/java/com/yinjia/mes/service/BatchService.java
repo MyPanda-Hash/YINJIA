@@ -14,9 +14,11 @@ import java.util.Map;
 /**
  * 采购订单分批送料:批次台账 / 送料量统计 / **批次号取号与自洽**(P0,2026-09-20)。
  *
- * 口径(2026-10-04 用户定稿,**取代此前"入库审核取号 + 回填全链"**):
- * - 批次号 = **供应商编码去掉 `YJ-` 前缀 + `-` + 生单当天 yyyyMMdd**
- *   (如 供应商 `YJ-TX`、生单日 2026-09-10 ⇒ `TX-20260910`);不带序号,同一天同供应商共号;
+ * 口径(2026-10-19 用户定稿,**取代 2026-10-04 的"供应商编码 + 日期"**):
+ * - 批次号 = **纯日期 yyyyMMdd**(如 生单日 2026-10-19 ⇒ `20261019`)——
+ *   用户口径「批次号改回采用日期的方式,不再是供应商+日期,就是 `WR-` 后面的数据」(WR = 供应商编码
+ *   `YJ-WR` 去前缀后的那段,改版前印在材料码上是 `WR-20261019`,改版后只留日期段);
+ *   不带序号、不看供应商,同一天的所有批次**共号**(与 2026-09-21 的纯日期口径一致);
  * - **取号时机 = 生单那一刻**(采购订单 → 送料暂收单,见 PushGenerateHandler.generateBatch):
  *   跳过整条「暂收 → 检验 → 入库/退回」链,各站单据带的是同一个号(下游继承,不重新取号);
  * - **不再有回填机制**:批次号在链路头一跳就写进单头 + 全部明细行,下游照搬,
@@ -52,12 +54,6 @@ public class BatchService {
     private static final String BATCH_COL = "批次号";
     /** 链路身份列:有它才算批次号链路成员(见 syncBatchNo 的取号判定与缺列守卫) */
     private static final String BATCH_KEY_COL = "批次键";
-
-    /** 供应商编码字段候选(链路各单异名:暂收/检验/退回叫「供应商代码」,采购入库叫「供应商编码」) */
-    private static final String[] SUPPLIER_CODE_LABELS = {"供应商编码", "供应商代码"};
-
-    /** 供应商编码前缀:取号时剥掉它(用户口径「YJ-后面的数据」) */
-    private static final String SUPPLIER_PREFIX = "YJ-";
 
     /** 超送比例上限(2026-09-22 用户口径:**最高 50%**)——弹窗覆盖与系统参数一律钳在 0~0.5 */
     public static final double MAX_OVER_RATIO = 0.5d;
@@ -194,25 +190,20 @@ public class BatchService {
     // ==================== 批次号取号 / 自洽(2026-10-04 口径) ====================
 
     /**
-     * 取号:批次号 = **供应商编码去掉 {@value #SUPPLIER_PREFIX} 前缀 + `-` + 当天 yyyyMMdd**。
-     * 例:供应商 `YJ-TX`、2026-09-10 ⇒ `TX-20260910`。
+     * 取号:批次号 = **纯日期 yyyyMMdd**(2026-10-19 用户口径,取代 2026-10-04 的"供应商编码 + 日期")。
+     * 例:生单日 2026-10-19 ⇒ `20261019`(改版前同一个供应商 `YJ-WR` 会印成 `WR-20261019`)。
      *
-     * 用户口径(2026-10-04):
-     * - 编码**没有** `YJ-` 前缀时**整串照用**(不截断、不猜测),如 `KH005` ⇒ `KH005-20260910`;
-     * - 编码为空(历史脏单/未选供应商)时退回**纯日期**(`20260910`)—— 永不空号、不阻断生单,
-     *   异常在数据上看得见,人工可改(暂收单草稿态单头可编辑);
-     * - 不带序号:同一天同一供应商的多批**共号**。
+     * 用户口径(2026-10-19):「批次号改回采用日期的方式,不再是供应商+日期,就是 `WR-` 后面的数据,
+     * 需要引号里面的日期数据」⇒ **供应商编码不参与取号**,号里只有日期段:
+     * - 同一天的所有批次共号(不唯一、不带序号)—— 与 2026-09-21 的纯日期口径一致;
+     * - 不因供应商不同而分号:批次号只是"哪天到的货",来源供应商在单据上另有一列;
+     * - 人工仍可在生单对话框 / 材料码打印弹窗里改号(改完以人工值为准,见 generateBatch)。
      *
-     * @param supplierCode 供应商编码(可带 `YJ-` 前缀)
-     * @param date         取号日期(生单当天)
+     * @param date 取号日期(生单当天;null 按今天)
      */
-    public static String buildBatchNo(String supplierCode, java.time.LocalDate date) {
-        String code = str(supplierCode);
-        if (code.regionMatches(true, 0, SUPPLIER_PREFIX, 0, SUPPLIER_PREFIX.length())) code = code.substring(SUPPLIER_PREFIX.length());
-        code = code.trim();
-        String ymd = (date == null ? java.time.LocalDate.now() : date)
+    public static String buildBatchNo(java.time.LocalDate date) {
+        return (date == null ? java.time.LocalDate.now() : date)
                 .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
-        return code.isEmpty() ? ymd : code + "-" + ymd;
     }
 
     /**
@@ -231,7 +222,7 @@ public class BatchService {
      * 批次号自洽(保存/审核收尾,**取代旧的入库审核回填**):
      * <ol>
      *   <li><b>空则取号</b>:单头批次号为空(手工新建的链路单、口径上线前的老单)时,
-     *       按该单「供应商编码/供应商代码 + 当天」取号写回 —— 与生单同一条公式;</li>
+     *       按**当天日期**取号写回 —— 与生单同一条公式(2026-10-19 起不看供应商);</li>
      *   <li><b>头行一致</b>:把单头批次号**覆盖写进全部明细行** —— 用户口径
      *       「一旦审批,包括下面的明细项目也需要做到批次号一致」。明细列元数据为只读
      *       (migrate-batch-no-on-generate.sql),行上的值只由这一处维护;</li>
@@ -257,7 +248,7 @@ public class BatchService {
         boolean chainMember = !colMissing(head, BATCH_KEY_COL);
         String no = str(firstValue("SELECT TOP 1 [" + BATCH_COL + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo));
         if (no.isEmpty() && chainMember) {
-            no = buildBatchNo(supplierCodeOf(def, docNo), java.time.LocalDate.now());
+            no = buildBatchNo(java.time.LocalDate.now());
             jdbc.update("UPDATE " + head + " SET [" + BATCH_COL + "] = ? WHERE [" + gc + "] = ?", no, docNo);
         }
         // ② 头行一致:明细行一律随单头
@@ -276,19 +267,6 @@ public class BatchService {
                     no, user, key);
         }
         return no;
-    }
-
-    /** 该单的供应商编码(链路各单异名:先「供应商编码」后「供应商代码」;都没有 → 空串) */
-    private String supplierCodeOf(PanelRegistry.PanelDef def, String docNo) {
-        String head = def.headTable(), gc = def.groupCol();
-        for (String label : SUPPLIER_CODE_LABELS) {
-            PanelRegistry.FieldDef f = def.byLabel(label);
-            String col = f == null ? label : f.col();
-            if (colMissing(head, col)) continue;
-            String v = str(firstValue("SELECT TOP 1 [" + col + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo));
-            if (!v.isEmpty()) return v;
-        }
-        return "";
     }
 
     /** 表/列存在性(缺失返回 true = 当"没有该列"处理,调用方跳过;不抛错不阻断保存) */

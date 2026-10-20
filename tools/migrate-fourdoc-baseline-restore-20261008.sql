@@ -17,8 +17,8 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 30ae6a770912(sha256 be3491ee1f3261a8…)
- *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=34 · PURCHASE_IN=165(共 323 行)。
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 3036cc6ccdd8(sha256 ff6b3d6db5921b86…)
+ *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=38 · PURCHASE_IN=165(共 327 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
  *   生成器:tools/archive/_gen-fourdoc-restore.mjs(手改本文件无效,请改生成器重跑)。
@@ -43,7 +43,7 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-/* ---------- ⓪ 基线行集(2026-10-03 dump,323 行) ---------- */
+/* ---------- ⓪ 基线行集(2026-10-03 dump,327 行) ---------- */
 IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
 CREATE TABLE #base (
   ord           int           NOT NULL,
@@ -227,6 +227,10 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (32,N'QC_RETURN',N'附件5',N'附件5',N'附件',NULL,NULL,NULL,NULL,N'header',190,220,1,0,0,NULL,1,NULL,NULL,NULL),
   (33,N'QC_RETURN',N'附件6',N'附件6',N'附件',NULL,NULL,NULL,NULL,N'header',200,220,1,0,0,NULL,1,NULL,NULL,NULL),
   (34,N'QC_RETURN',N'批次号',N'批次号',N'文本',NULL,NULL,NULL,NULL,N'detail',206,150,0,0,0,NULL,1,NULL,NULL,NULL),
+  (35,N'QC_RETURN',N'ERP单号',N'ERP单号',N'文本',NULL,NULL,NULL,NULL,N'header',300,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (36,N'QC_RETURN',N'是否已转ERP',N'是否已转ERP',N'文本',NULL,NULL,NULL,NULL,N'header',310,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (37,N'QC_RETURN',N'转ERP操作人',N'转ERP操作人',N'文本',NULL,NULL,NULL,NULL,N'header',320,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (38,N'QC_RETURN',N'转ERP时间',N'转ERP时间',N'文本',NULL,NULL,NULL,NULL,N'header',330,130,0,0,0,NULL,1,NULL,NULL,NULL),
   (1,N'PURCHASE_IN',N'存货编码',N'存货编码',N'参照',NULL,N'INV',N'存货编码',N'存货名称',N'query,detail',10,120,1,1,0,NULL,1,N'Inventory Code',NULL,NULL),
   (2,N'PURCHASE_IN',N'单据日期',N'单据日期',N'日期',NULL,NULL,NULL,NULL,N'query,header',10,140,1,1,0,NULL,1,N'Document Date',NULL,NULL),
   (3,N'PURCHASE_IN',N'单据编号',N'单据编号',N'文本',NULL,NULL,NULL,NULL,N'query,header',20,140,1,1,0,NULL,1,N'Document Number',NULL,NULL),

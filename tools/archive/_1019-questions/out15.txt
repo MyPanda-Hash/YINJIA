@@ -1,0 +1,17 @@
+==> SELECT TOP 30 * FROM yj_role_panel WHERE panel_code='QC_TC_IN'
+id | role_id | panel_code | can_approve | perms
+-----------------------------------------------
+84 | 1 | QC_TC_IN | N | view,query,add,modify,modlog,del,export
+567 | 2 | QC_TC_IN | N | view,query,add,modify,modlog,del,export
+157 | 3 | QC_TC_IN | N | view,query,add,modify,modlog,del,export
+214 | 4 | QC_TC_IN | N | view,query,add,modify,modlog,del,export
+(4 行)
+==> SELECT m.name AS 列名 FROM sys.columns m WHERE m.object_id=OBJECT_ID('dbo.yj_role_panel') ORDER BY m.column_id
+列名
+----------
+id
+role_id
+panel_code
+can_approve
+perms
+(5 行)

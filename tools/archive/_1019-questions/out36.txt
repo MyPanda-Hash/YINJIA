@@ -1,0 +1,29 @@
+==> /* 1) 月结行表 vs 结转行:是否"全部月结"了? */ SELECT (SELECT COUNT(*) FROM bl_stock_close WHERE 期间='2026-09' AND ISNULL(asp_cancel,'N')<>'Y') AS 月结行表_键数, (SELECT COUNT(*) FROM bl_stock_close WHERE 期间='2026-09' AND ISNULL(asp_cancel,'N')<>'Y' AND 结存数量=0) AS 其中结存为0, (SELECT COUNT(*) FROM bl_stock_close WHERE 期间='2026-09' AND ISNULL(asp_cancel,'N')<>'Y' AND 结存数量<>0) AS 其中结存非0, (SELECT COUNT(*) FROM inh WHERE 单据类型=N'月结结转' AND 单据编号='JZ-202609' AND ISNULL(asp_cancel,'N')<>'Y') AS inh_结转行数
+月结行表_键数 | 其中结存为0 | 其中结存非0 | inh_结转行数
+------------------------------------
+2137 | 440 | 1697 | 1697
+(1 行)
+==> /* 2) 结存非 0 的键,是否字字都对得上结转行?(应 0) */ SELECT COUNT(*) AS 结存非0但缺结转行 FROM bl_stock_close c WHERE c.期间='2026-09' AND ISNULL(c.asp_cancel,'N')<>'Y' AND c.结存数量<>0 AND NOT EXISTS (SELECT 1 FROM inh i WHERE i.单据类型=N'月结结转' AND i.单据编号='JZ-202609' AND ISNULL(i.asp_cancel,'N')<>'Y' AND ISNULL(RTRIM(i.物料编码),N'')=ISNULL(RTRIM(c.物料编码),N'') AND ISNULL(RTRIM(i.仓库编码),N'')=ISNULL(RTRIM(c.仓库编码),N'') AND ISNULL(RTRIM(i.批号),N'')=ISNULL(RTRIM(c.批号),N''))
+结存非0但缺结转行
+----------
+0
+(1 行)
+==> /* 3) 结存为 0 的键里,9 月是否真的有流水?(有流水却没结转行的就是"用户看到 9 月单据"的那些) */ SELECT SUM(CASE WHEN 有流水=1 THEN 1 ELSE 0 END) AS 结存0且9月有流水, COUNT(*) AS 结存0总数 FROM ( SELECT c.物料编码, c.仓库编码, c.批号, c.结存数量, CASE WHEN EXISTS ( SELECT 1 FROM inh i WHERE ISNULL(i.asp_cancel,'N')<>'Y' AND ISNULL(i.单据类型,'')<>N'月结结转' AND i.单据日期 >= '2026-09-01' AND i.单据日期 < '2026-10-01' AND ISNULL(RTRIM(i.物料编码),N'')=ISNULL(RTRIM(c.物料编码),N'') AND ISNULL(RTRIM(i.仓库编码),N'')=ISNULL(RTRIM(c.仓库编码),N'') AND ISNULL(RTRIM(i.批号),N'')=ISNULL(RTRIM(c.批号),N'')) OR EXISTS ( SELECT 1 FROM outh o WHERE ISNULL(o.asp_cancel,'N')<>'Y' AND o.单据日期 >= '2026-09-01' AND o.单据日期 < '2026-10-01' AND ISNULL(RTRIM(o.物料编码),N'')=ISNULL(RTRIM(c.物料编码),N'') AND ISNULL(RTRIM(o.仓库编码),N'')=ISNULL(RTRIM(c.仓库编码),N'') AND ISNULL(RTRIM(o.批号),N'')=ISNULL(RTRIM(c.批号),N'')) THEN 1 ELSE 0 END AS 有流水 FROM bl_stock_close c WHERE c.期间='2026-09' AND ISNULL(c.asp_cancel,'N')<>'Y' AND c.结存数量=0 ) t
+结存0且9月有流水 | 结存0总数
+-----------------
+440 | 440
+(1 行)
+==> /* 4) 结存为 0 的键,期初/入/出 举例(说明"结存0"是怎么来的) */ SELECT TOP 8 物料编码, 仓库编码, ISNULL(批号,N'(空)') AS 批号, 期初数量, 入库数量, 出库数量, 结存数量 FROM bl_stock_close WHERE 期间='2026-09' AND ISNULL(asp_cancel,'N')<>'Y' AND 结存数量=0 AND (期初数量<>0 OR 入库数量<>0 OR 出库数量<>0) ORDER BY ABS(入库数量)+ABS(出库数量) DESC
+物料编码 | 仓库编码 | 批号 | 期初数量 | 入库数量 | 出库数量 | 结存数量
+--------------------------------------------
+YJ-CQF-005 | YCL-01 | CQF-20260912 | 0.0000 | 20000.0000 | 20000.0000 | 0.0000
+YJ-SX-003-1 | YCL-01 | (空) | 11200.0000 | 14000.0000 | 25200.0000 | 0.0000
+YJ-SX-003-2 | YCL-01 | (空) | 11200.0000 | 14000.0000 | 25200.0000 | 0.0000
+YJ-KR-001 | YCL-01 | KR-20260907 | 0.0000 | 18000.0000 | 18000.0000 | 0.0000
+YJ-KR-001 | YCL-01 | KR-20260926 | 0.0000 | 15000.0000 | 15000.0000 | 0.0000
+YJ-XWR-003 | CK00006 | XWR-20260910 | 0.0000 | 15000.0000 | 15000.0000 | 0.0000
+YJ-CH-022 | CK00006 | CH-20260907 | 0.0000 | 12500.0000 | 12500.0000 | 0.0000
+YJ-KR-001 | YCL-01 | KR-20260912 | 0.0000 | 12000.0000 | 12000.0000 | 0.0000
+(8 行)
+==> /* 5) kucun 里这些"结存0"的键还在不在?(口径:数量为0就删除批次号) */ SELECT COUNT(*) AS kucun中存量为0的行 FROM kucun WHERE 现存量 = 0
+[ERR] 列名 '现存量' 无效。

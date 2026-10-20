@@ -1,0 +1,26 @@
+==> SELECT r.role_code, r.role_name, p.can_view, p.can_edit, p.can_approve FROM yj_role_panel p JOIN yj_role r ON r.role_code = p.role_code WHERE p.panel_code='QC_TC_IN'
+[ERR] 列名 'role_code' 无效。
+==> SELECT role_code, role_name FROM yj_role ORDER BY role_code
+role_code | role_name
+---------------------
+admin | 管理员
+rd_file_owner | 文件负责人
+rd_review | 研发审核
+user | 普通用户
+(4 行)
+==> SELECT panel_code, panel_name, module_group, category FROM yj_panel WHERE panel_code IN ('QC_TC_IN','QC_INSP','QC_RECV','QC_RETURN','QC_BHG','QC_BHC','QC_BHZ','QC_JJF','QC_SCP','QC_LYB','QC_SCY','PU_ORDER')
+panel_code | panel_name | module_group | category
+-------------------------------------------------
+PU_ORDER | 采购订单 | 智能供应链 | 采购管理
+QC_BHC | 不合格品处理单(制程) | 品质管理 | 单据
+QC_BHG | 不合格报告(制程) | 品质管理 | 单据
+QC_BHZ | 不合格品处理单(自制物料) | 品质管理 | 单据
+QC_INSP | 来料检验单 | 品质管理 | 采购管理
+QC_JJF | 紧急放行申请单 | 品质管理 | 单据
+QC_LYB | 来料异常分析报告 | 品质管理 | 单据
+QC_RECV | 送料暂收单 | 库存管理 | 库存核算
+QC_RETURN | 暂收退回单 | 库存管理 | 采购管理
+QC_SCP | 试产材料使用申请单 | 品质管理 | 单据
+QC_SCY | 生产异常分析报告 | 品质管理 | 单据
+QC_TC_IN | 特采单 | 品质管理 | 单据
+(12 行)

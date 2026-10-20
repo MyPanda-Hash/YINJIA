@@ -1,0 +1,48 @@
+==> ﻿SELECT panel_code, seq, label, place, visible, hidden, required, editable, ref_panel, ref_field FROM yj_field WHERE panel_code IN ('QC_INSP_REC') ORDER BY seq, id
+[ERR] “﻿”附近有语法错误。
+==> SELECT c.name AS 列名, t.name AS 类型 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID('dbo.qc_insp_rec') ORDER BY c.column_id
+列名 | 类型
+----------
+id | int
+单据编号 | nvarchar
+单据日期 | nvarchar
+物料名称 | nvarchar
+物料编码 | nvarchar
+物料批次 | nvarchar
+检验日期 | nvarchar
+来料日期 | nvarchar
+来料数量 | nvarchar
+文件编码 | nvarchar
+检验依据 | nvarchar
+检验结论 | nvarchar
+处理意见 | nvarchar
+检验人 | nvarchar
+备注 | nvarchar
+asp_user1 | nvarchar
+asp_time1 | datetime2
+asp_user2 | nvarchar
+asp_time2 | datetime2
+asp_cancel | char
+表单审核人 | nvarchar
+计量单位 | nvarchar
+备用1 | nvarchar
+备用2 | nvarchar
+备用3 | nvarchar
+备用4 | nvarchar
+备用5 | nvarchar
+备用6 | nvarchar
+备用7 | nvarchar
+备用8 | nvarchar
+备用9 | nvarchar
+备用10 | nvarchar
+备用11 | nvarchar
+备用12 | nvarchar
+备用13 | nvarchar
+备用14 | nvarchar
+备用15 | nvarchar
+备用16 | nvarchar
+备用17 | nvarchar
+备用18 | nvarchar
+备用19 | nvarchar
+备用20 | nvarchar
+(42 行)

@@ -131,6 +131,10 @@ export const menuTree = [
               // (tools/migrate-drop-extra-docs-pu-req-20261008.sql),不是摘菜单,放开注释也恢复不了;
               // 回退:跑 tools/archive/_panel-age/_backup-20261008/restore-metadata.sql + 重建两张表。
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
+              // 特采单(2026-10-19 用户口径「特采单归供应链的采购管理的目录下,不要在品质管理的目录下」):
+              // 面板编码 QC_TC_IN / 路径 / 表 / 前缀 TCI / 权限行一个字节没动,只是**导航父节点**从
+              // 品质管理 > 来料品质 搬到 智能供应链 > 采购管理 > 单据(业务上它是采购口对不合格来料的让步接收申请)。
+              { code: 'qcTcIn', title: '特采单', path: '/panelx/list/QC_TC_IN', icon: 'DocumentAdd', panelCode: 'QC_TC_IN', operationName: '新增流程' },
             ],
           },
           // 2026-10-18 用户口径「为采购订单补齐,采购订单明细表与采购订单统计表」——
@@ -403,12 +407,12 @@ export const menuTree = [
     children: [
       {
         // 来料品质(流程图·采购支线:检验;暂收入库单已下线,暂收角色由「库存核算·送料暂收单」承接)
-        // 特采单(2026-09-21):独立面板 QC_TC_IN / 独立表 qc_tc_in / 前缀 TCI,同一张 YJ-QR-60 表单。
-        // (2026-09-22:「质量单据·特采申请单」QC_TC 与它同表同版式、重复,已整体下线 → 特采只此一个入口。)
+        // 特采单(2026-09-21 建,2026-10-19 迁出):独立面板 QC_TC_IN / 独立表 qc_tc_in / 前缀 TCI,
+        // 同一张 YJ-QR-60 表单 —— 用户口径「特采单归供应链的采购管理的目录下,不要在品质管理的目录下」,
+        // 菜单已搬到 智能供应链 > 采购管理 > 单据(本组只剩检验与检验要求)。
         // 检验目录(2026-09-22):QC_CATALOG 单单据面板(方式对照 RD_PROGRESS),《品质资料 2026.09.19.xlsx》检验目录页签一比一。
         code: 'incoming', title: '来料品质', children: [
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
-          { code: 'qcTcIn', title: '特采单', path: '/panelx/list/QC_TC_IN', icon: 'DocumentAdd', panelCode: 'QC_TC_IN', operationName: '新增流程' },
           { code: 'qcCatalog', title: '检验目录', path: '/panelx/list/QC_CATALOG', icon: 'Notebook', panelCode: 'QC_CATALOG' },
           // 检验数据记录(2026-09-22):纸张式检验报告 YJ-QR-96,版式对照《品质资料 2026.09.19.xlsx》「检验数据记录模版」;
           // 检验目录行上的批次号 📄 可按物料批次查阅本面板的报告。

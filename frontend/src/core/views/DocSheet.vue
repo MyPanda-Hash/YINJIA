@@ -95,6 +95,24 @@
       </div>
     </div>
 
+    <!-- ②b 附件条(2026-10-19 用户口径:「特采单的上传附件的链接放在右边会影响单据的陈列,放在上面吧」)
+         只有「有附件字段、但没有备注列」的文书(特采单)走这里 —— 横向一条贴在标题下方,
+         不再占右侧 250px 的备注列:那列会把纸面表格压窄、整张单的版式跟着走形。
+         有备注列的文书(立项申请表)保持原样,附件仍挂在备注列顶部。 -->
+    <div v-if="remarkAttach && !config.remark && (attachCanEdit || head[remarkAttach.key])" class="as-attach-top">
+      <span class="as-attach-top-label">{{ tt('附件') }}</span>
+      <FileAttachCell
+        class="as-attach-top-cell"
+        :panel-code="panelCode"
+        :doc-no="head['单据编号'] || ''"
+        :field-key="remarkAttach.key"
+        :model-value="head[remarkAttach.key] || ''"
+        :can-edit="attachCanEdit"
+        hide-when-empty
+        @update:model-value="(v) => { head[remarkAttach.key] = v }"
+      />
+    </div>
+
     <!-- ③ 内容表 + 右侧备注列(立项申请表设计:F5「备注」标签 + F6:G15 合并填写区) -->
     <div class="as-body">
     <div class="as-table">
@@ -300,6 +318,13 @@
                 <span v-if="sub.label" class="q-dept-sub-label">{{ tt(sub.label) }}</span>
                 <span v-if="sub.checks" class="q-checks deco">
                   <span v-for="o in sub.checks" :key="o" class="q-check">□ {{ tt(o) }}</span>
+                </span>
+                <!-- 关联单据链接(2026-10-19 用户口径 task 5:「品质部意见生成特采要带检验数据记录单号的链接,
+                     可以跳转」):config 的部门意见行可配 link={key,panel,label},号在库里有值就渲染成可点链接,
+                     点它切到目标面板并定位(router.push + ?docNo=,与检验目录的 ↗ 同款);打印不出现。 -->
+                <span v-if="row.link && docLinkNo(row)" class="q-doclink no-print"
+                      :title="tt('跳转到该单据')" @click.stop="gotoLink(row)">
+                  ⧉ {{ tt(row.link.label || '关联单据') }} {{ docLinkNo(row) }}
                 </span>
                 <span v-if="!config.deptSignBottom" class="q-dept-sign">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
               </div>
@@ -582,8 +607,9 @@
            2026-10-16:本列同时承载**附件入口** —— 立项申请等文书式面板的附件字段(yj_field.data_type=附件)
            是元数据驱动的,但备注不是表头字段格,附件能力原先只接在 RecordSheetPanels,文书式面板整条链没接
            ⇒ 用户报「备注栏没有附件上传入口」。附件字段名从下发的 fields 里发现(attachFieldOf),不写死。
-           该面板没有备注列但有附件字段时也要显示 ⇒ 条件写成 config.remark || remarkAttach。 -->
-      <div v-if="config.remark || remarkAttach" class="as-remark">
+           2026-10-19:**没有备注列的文书**(如特采单)不再借用这一列 —— 附件改到标题下方横向一条
+           (见上面 ②b 的 .as-attach-top),本列只留给真正配了 remark 的文书(立项申请表)。 -->
+      <div v-if="config.remark" class="as-remark">
         <div v-if="config.remark" class="as-remark-label">{{ tt(config.remark.label) }}</div>
         <FileAttachCell
           v-if="remarkAttach"
@@ -626,6 +652,7 @@ import FileAttachCell from './FileAttachCell.vue'
 import { attachFieldOf } from '@core/panel/attachField.js'
 import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { useRouter } from 'vue-router'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
 import { fixedSheetWidth } from './docSheetConfigs'
 
@@ -660,6 +687,23 @@ const remarkAttach = computed(() => attachFieldOf(props.fields))
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
+const router = useRouter()
+
+/* ── 关联单据链接(2026-10-19 用户口径 task 5)──
+   config 的「部门意见」行可带 link={key,panel,label}:key = 存号的头字段(如 检验数据记录单号),
+   panel = 目标面板编码(如 QC_INSP_REC)。号有值才渲染链接(空的就干脆不出现,别占纸面);
+   跳转口径与检验目录的「↗ 跳转到该检验单」一致 —— /panelx/list/{面板}?docNo={单号} 定位。 */
+function docLinkNo(row) {
+  const key = row && row.link ? row.link.key : ''
+  if (!key) return ''
+  const v = props.head ? props.head[key] : ''
+  return v === undefined || v === null ? '' : String(v).trim()
+}
+function gotoLink(row) {
+  const no = docLinkNo(row)
+  if (!no || !row.link || !row.link.panel) return
+  router.push({ path: `/panelx/list/${row.link.panel}`, query: { docNo: no } })
+}
 
 /**
  * 定死纸宽(2026-10-16 用户口径:「定死纸宽 1242」):纸宽表在 docSheetConfigs.FIXED_SHEET_W
@@ -1185,6 +1229,28 @@ defineExpose({ focusField })
   flex-direction: column;
   padding: 3px 6px;
 }
+/* 附件条(标题行下方横向一条,2026-10-19):
+   只服务"有附件字段但没有备注列"的文书(特采单)。用户口径「上传附件的链接放在右边会影响单据的陈列」
+   ⇒ 从右侧 250px 备注列挪到顶部:整宽一条、左标签右内容,表格列宽不再被挤。 */
+.as-attach-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #8a8a8a;
+  font-size: 13px;
+}
+.as-attach-top-label {
+  flex: none;
+  font-weight: 600;
+  color: #333;
+  line-height: 24px;
+}
+.as-attach-top-cell {
+  flex: 1;
+  min-width: 0;
+}
 .as-remark-label {
   flex: none;
   font-size: 15px;
@@ -1602,6 +1668,18 @@ defineExpose({ focusField })
 .q-dept-sign {
   margin-left: auto;
   color: #333;
+}
+/* 部门意见行里的关联单据链接(2026-10-19 task 5:品质部意见 → 检验数据记录单号):
+   跟在子区标题后面,蓝色可点;打印默认隐藏(带 .no-print)。 */
+.q-doclink {
+  color: #1f5fa8;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.q-doclink:hover {
+  text-decoration: underline;
 }
 /* 签名行落子区最下一行(原图);填写区 flex:1 撑开,margin-top:auto 兜底。
    flex 行布局容纳可填的 签名/年/月/日 输入框(不给 signKey/dateKey 时是纯文本,排布不变) */

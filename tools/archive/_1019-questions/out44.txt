@@ -1,0 +1,2 @@
+==> ﻿SELECT N'yj_panel在册' AS 项, CAST(COUNT(*) AS nvarchar(10)) AS 值 FROM yj_panel UNION ALL SELECT N'其中非 flat 页面级(PagePanelRegistry 8 个对应)', N'8' UNION ALL SELECT N'期望总数(在册+DASHBOARD+8页面级)', CAST(COUNT(*)+9 AS nvarchar(10)) FROM yj_panel
+[ERR] “﻿”附近有语法错误。

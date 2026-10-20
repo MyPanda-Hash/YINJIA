@@ -1,0 +1,13 @@
+SELECT TOP 20 单据编号, 单据类型, 单据日期, 物料编码, 仓库编码, 批号, 数量, 往来单位
+FROM inh WHERE 物料编码 = N'Y-C-2040' AND 仓库编码 = N'YCL-01' AND ISNULL(asp_cancel,'N') <> 'Y'
+ORDER BY 单据日期, 单据编号
+GO
+SELECT TOP 20 单据编号, 单据类型, 单据日期, 物料编码, 仓库编码, 批号, 数量, 往来单位
+FROM outh WHERE 物料编码 = N'Y-C-2040' AND 仓库编码 = N'YCL-01' AND ISNULL(asp_cancel,'N') <> 'Y'
+ORDER BY 单据日期, 单据编号
+GO
+SELECT 期间, 物料编码, 仓库编码, 批号, 期初数量, 入库数量, 出库数量, 结存数量
+FROM bl_stock_close WHERE 物料编码 = N'Y-C-2040' AND 仓库编码 = N'YCL-01' AND ISNULL(asp_cancel,'N') <> 'Y'
+ORDER BY 期间, 批号
+GO
+SELECT TOP 10 期间, 状态, 月结人, 月结时间 FROM bd_stock_close ORDER BY 期间 DESC

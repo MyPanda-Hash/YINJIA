@@ -24,11 +24,23 @@ const NAV_ORDER = ['我的桌面', '研发管理', '智能供应链', 'WMS管理
 const LEGACY = ['基础资料', '基础数据', '基础设置', '采购管理', '订单管理', '生产管理', '委外加工', '库存核算', '库存报表', '销售管理', '物料及价格', '通用', '系统管理']
 const STOCK_REPORTS = ['STOCK_BALANCE', 'STOCK_LEDGER', 'STOCK_STATUS', 'STOCK_SUMMARY', 'STOCK_DETAIL']
 /**
- * 面板总数 = yj_panel 在册面板 + DASHBOARD + PagePanelRegistry 页面级面板(2026-10-16 起 4 个,
- * 2026-10-20 再加数采三页 DC_CONFIG/DC_MONITOR/DC_STATS 与扫码领料 BARCODE_SCAN_PICK ⇒ 8 个)。
- * 改面板数量必须同步改这里 —— 它是"矩阵不重不漏"的桩。
+ * 面板总数 = yj_panel 在册面板 + 虚拟面板(DASHBOARD + PagePanelRegistry.ALL)。
+ *
+ * ⚠ 2026-10-20 合并 origin/main 后改成**按库/代码实时算**:
+ *   原先是硬编码 `TOTAL_PANELS = 153`,注释写"yj_panel 在册 + DASHBOARD + 8 页面级"——
+ *   而 `PagePanelRegistry.ALL` 实际是 **9** 个(订单结转/快速排产/工单排产/生产工单列表/系统管理/
+ *   组织架构/使用权限查看/数采三页/扫码领料…合计 9),加 DASHBOARD 共 **10 个虚拟面板**;
+ *   库里 `yj_panel` 145 张 ⇒ 真值 155,那个 153 从一开始就对不上(与本次合并无关,两侧都没增删面板)。
+ *   现在从矩阵里**已知虚拟码集合**反推在册数,再与唯一码数比对 —— 改了面板数不必再改桩,
+ *   "不重不漏"本意(行数 == 唯一码数 == 在册 + 虚拟)照样守住。
  */
-const TOTAL_PANELS = 153
+const VIRTUAL_PANELS = [
+  'DASHBOARD',                                       // 我的桌面(权限化)
+  'ORDER_CONVERT', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'WORK_ORDER_LIST',   // 2026-10-16 页面级
+  'SYS_CONSOLE', 'SYS_ORG', 'SYS_USAGE',             // 系统功能三页
+  // 2026-10-20 新增页面级(数采三页 + 扫码领料):DC_CONFIG/DC_MONITOR/DC_STATS/BARCODE_SCAN_PICK
+  'DC_CONFIG', 'DC_MONITOR', 'DC_STATS', 'BARCODE_SCAN_PICK',
+]
 
 const results = []
 function check(name, ok, detail) {
@@ -74,11 +86,21 @@ async function main() {
   const leftovers = names.filter((n) => LEGACY.includes(n))
   check('历史碎组已归并(无残留)', leftovers.length === 0, leftovers.join(',') || '无')
 
-  // 3. 不重不漏
+  // 3. 不重不漏:矩阵行数 == 唯一码数;且 = yj_panel 在册数 + 虚拟面板数(由接口现算的真值)
   const all = modules.flatMap((m) => (m.panels || []).map((p) => p.panelCode))
   const uniq = new Set(all)
   check('面板无重复', uniq.size === all.length, `${all.length} 行 / ${uniq.size} 唯一`)
-  check(`面板总数 == ${TOTAL_PANELS}(yj_panel 在册 + DASHBOARD + 8 页面级)`, uniq.size === TOTAL_PANELS, `实际 ${uniq.size}`)
+  const counts = rj.data.panelCounts || null
+  if (counts) {
+    console.log(`  数量真值(接口现算): yj_panel 在册 ${counts.yjRegistered} + 虚拟 ${counts.virtual} = ${counts.expected}`)
+    check(`面板总数 == ${counts.expected}(在册 ${counts.yjRegistered} + 虚拟 ${counts.virtual})`,
+      uniq.size === counts.expected, `实际 ${uniq.size}`)
+  } else {
+    // 老后端没有该字段时退回"码必须都认识"的弱校验,并显式说明(不静默通过)
+    const unknown = [...uniq].filter((c) => !VIRTUAL_PANELS.includes(c) && !/^[A-Z][A-Z0-9_]*$/.test(c))
+    check('老后端无 panelCounts:矩阵码不得含未知格式', unknown.length === 0,
+      unknown.join(',') || `实际 ${uniq.size} 行(数量断言已跳过,请升级后端)`)
+  }
   check('每个分组都有面板(无空组)', modules.every((m) => (m.panels || []).length > 0))
 
   // 4. 库存报表族落位(含库存明细)

@@ -1,0 +1,19 @@
+==> SELECT TOP 10 dm, mc FROM dm_gf WHERE mc LIKE N'%元丰%' OR dm LIKE N'%YFHX%'
+dm | mc
+----------
+YJ-YFHX | 广东元丰化学试剂有限公司
+(1 行)
+==> SELECT TOP 5 dm, mc FROM dm_gf ORDER BY dm
+dm | mc
+----------
+GYS00002 | 鑫恒陈总
+GYS00003 | xx配件
+GYS00004 | xxx供应商2
+GYS00006 | 东莞市大朗镇金朗路118号
+GYS00007 | YJ-YM
+(5 行)
+==> SELECT 物料编码 FROM qc_return_detail WHERE 单据编号='TH-2026-10-0047'
+物料编码
+----------
+CL004
+(1 行)

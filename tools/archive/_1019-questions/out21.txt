@@ -1,0 +1,17 @@
+==> SELECT TOP 8 d.单据编号, r.供应商, r.仓库, d.物料编码, d.计量单位, d.退货数量, r.单据状态, s.shr FROM qc_return_detail d JOIN qc_return r ON r.单据编号=d.单据编号 LEFT JOIN yj_doc_status s ON s.panel_code='QC_RETURN' AND s.doc_no=r.单据编号 WHERE s.shr IS NOT NULL AND ISNULL(d.asp_cancel,'N')<>'Y' AND ISNULL(r.asp_cancel,'N')<>'Y' ORDER BY d.单据编号 DESC
+单据编号 | 供应商 | 仓库 | 物料编码 | 计量单位 | 退货数量 | 单据状态 | shr
+-------------------------------------------------
+TH-2026-10-0047 | GYS00002 |  | CL004 | 升 | 30.0000 | 草稿 | admin
+TH-2026-10-0046 | GYS00002 |  | CL004 | 升 | 100.0000 | 草稿 | admin
+TH-2026-10-0046 | GYS00002 |  | CL004 | 升 | 60.0000 | 草稿 | admin
+TH-2026-10-0042 | GYS00002 |  | CL004 | 升 | 40.0000 | 草稿 | admin
+TH-2026-10-0041 | GYS00002 |  | CL004 | 升 | 80.0000 | 草稿 | admin
+TH-2026-10-0040 | GYS00002 |  | CL004 | 升 | 30.0000 | 草稿 | admin
+TH-2026-10-0039 | GYS00002 |  | CL004 | 升 | 100.0000 | 草稿 | admin
+TH-2026-10-0039 | GYS00002 |  | CL004 | 升 | 60.0000 | 草稿 | admin
+(8 行)
+==> SELECT TOP 5 物料编码, 计量单位, 退货数量 FROM qc_return_detail WHERE 单据编号 IN (SELECT TOP 1 单据编号 FROM qc_return_detail d JOIN yj_doc_status s ON s.panel_code='QC_RETURN' AND s.doc_no=d.单据编号 WHERE s.shr IS NOT NULL ORDER BY d.单据编号 DESC)
+物料编码 | 计量单位 | 退货数量
+------------------
+CL004 | 升 | 30.0000
+(1 行)

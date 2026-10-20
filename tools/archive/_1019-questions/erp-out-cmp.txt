@@ -1,0 +1,196 @@
+==> SET NOCOUNT ON;
+[-1 行受影响]
+==> PRINT '=== bl_purchase_in 关键列 ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bl_purchase_in') AND name IN (N'仓库编码', N'仓库名称', N'仓库', N'单位id', N'批号', N'批次号', N'源单行号', N'存货编码', N'计量单位', N'税率%', N'实收数量', N'单价') ORDER BY name;
+name
+----------
+仓库
+仓库编码
+存货编码
+单价
+单位id
+计量单位
+批次号
+批号
+实收数量
+税率%
+源单行号
+(11 行)
+==> PRINT '=== bl_purchase_in 全列 ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bl_purchase_in') ORDER BY column_id;
+name
+----------
+id
+单据编号
+存货名称
+存货图片
+规格型号
+实收数量
+计量单位
+实收数量2
+计量单位2
+计量单位组合
+换算率
+单价
+税率%
+单价2
+含税单价2
+含税单价
+金额
+含税金额
+费用调整
+费用金额
+现存量
+现存量说明
+产成品图片
+备注
+asp_user1
+asp_time1
+asp_cancel
+asp_user2
+asp_time2
+批号
+存货编码
+行号
+商品id
+商品是否多单位
+商品是否序列号
+商品是否辅助属性
+商品是否保质期
+商品是否批次
+仓库id
+仓库编码
+仓库启用仓位管理
+仓位id
+仓库名称_sp_name
+仓位编码
+辅助属性id
+辅助属性名称
+辅助属性编码
+辅助属性1id
+辅助属性1名称
+辅助属性1编码
+辅助属性2id
+辅助属性2名称
+辅助属性2编码
+辅助属性3id
+辅助属性3名称
+辅助属性3编码
+条形码
+产地
+注册证号
+生产许可证
+保质期到期日
+有效期至
+保质期类型
+保质期
+序列号清单
+序列号流转ID
+基本单位id
+基本单位名称
+基本单位编码
+单位id
+单位编码
+辅助单位id
+辅助单位编码
+换算率2
+基本数量
+库存基本数量
+默认浮动数量
+辅助换算系数
+换算系数
+折扣额
+源单编号
+源单类型id
+源单类型名称
+源单类型编码
+源单内部id
+源单日期
+源单行号
+源单分录id
+分录结算状态
+本次结算金额本位币
+折扣率%
+成本视图
+单位成本视图
+退货数量
+价税合计本位币
+是否赠品
+仓位名称
+是否来料检验
+批次号
+送检数量
+部门名称
+生产日期
+特采
+换算率_conversion_rate
+cur_settle_amount_for
+仓库
+备用1
+备用2
+备用3
+备用4
+备用5
+备用6
+备用7
+备用8
+备用9
+备用10
+备用11
+备用12
+备用13
+备用14
+备用15
+备用16
+备用17
+备用18
+备用19
+备用20
+(126 行)
+==> PRINT '=== bd_other_out / bd_other_in 头列(对照:其他出库单怎么拿到仓库/部门) ==='
+[-1 行受影响]
+==> SELECT OBJECT_NAME(object_id) AS 表, name FROM sys.columns WHERE object_id IN (OBJECT_ID('dbo.bd_other_out'), OBJECT_ID('dbo.bd_other_in')) AND (name LIKE N'%仓库%' OR name LIKE N'%ERP%' OR name LIKE N'%部门%' OR name LIKE N'%业务类型%') ORDER BY 表, name;
+表 | name
+----------
+bd_other_in | ERP单号
+bd_other_in | 部门
+bd_other_in | 部门编码
+bd_other_in | 是否已转ERP
+bd_other_in | 业务类型
+bd_other_in | 业务类型id
+bd_other_in | 业务类型编码
+bd_other_in | 转ERP操作人
+bd_other_in | 转ERP时间
+bd_other_out | ERP单号
+bd_other_out | 部门
+bd_other_out | 部门编码
+bd_other_out | 是否已转ERP
+bd_other_out | 业务类型
+bd_other_out | 业务类型id
+bd_other_out | 业务类型编码
+bd_other_out | 转ERP操作人
+bd_other_out | 转ERP时间
+(18 行)
+==> PRINT '=== qc_insp 头关键列(退回单的上游) ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.qc_insp') AND (name LIKE N'%供应商%' OR name LIKE N'%仓库%' OR name LIKE N'%采购订单%' OR name LIKE N'%批次%') ORDER BY name;
+name
+----------
+采购订单号
+供应商
+供应商代码
+批次号
+批次键
+(5 行)
+==> PRINT '=== qc_recv 头关键列(送料暂收单编码口径) ==='
+[-1 行受影响]
+==> SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.qc_recv') AND (name LIKE N'%供应商%' OR name LIKE N'%仓库%' OR name LIKE N'%采购订单%' OR name LIKE N'%批次%') ORDER BY name;
+name
+----------
+(0 行)
+==> PRINT '=== qc_return.供应商(名称) 能否解析到 bs_supplier.供应商编码 ==='
+[-1 行受影响]
+==> SELECT TOP 20 h.单据编号, h.供应商, (SELECT TOP 1 s.供应商编码 FROM bs_supplier s WHERE s.供应商名称 = h.供应商 OR s.供应商编码 = h.供应商) AS 解析到的供应商编码 FROM qc_return h WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' ORDER BY h.单据编号 DESC;
+[ERR] 对象名 'bs_supplier' 无效。

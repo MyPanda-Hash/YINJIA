@@ -22,7 +22,8 @@ import java.util.Map;
  *
  * <h3>口径(用户 2026-10-04 拍板,含当日追加的「一次可多行、但一行一张单」修订)</h3>
  * <ul>
- *   <li>批次号默认 = {@link BatchService#buildBatchNo}(供应商编码, 当天),**可人工改**;</li>
+ *   <li>批次号默认 = {@link BatchService#buildBatchNo}(当天) 即 **纯日期 yyyyMMdd**(2026-10-19 口径),
+ *       **可人工改**;</li>
  *   <li>**打印即预约**:未生单的预约量从「剩余可送 / 可送上限」里扣减;</li>
  *   <li><b>一次可以勾多行,但**每行各出一张单**</b>(用户 2026-10-04 两条口径合起来:「打印需要是每次一行,
  *       不能多行否则作废就全部作废了」+「一次是可以打印多行的」)⇒ 弹窗上多选,落库时**一行一张头**,
@@ -130,8 +131,8 @@ public class PuLabelService {
         out.put("供应商", head.get("supplier"));
         out.put("单据日期", head.get("docDate"));
         out.put("overRatio", ratio);
-        // 预填批次号:与生单同一公式(供应商编码去 YJ- 前缀 + - + 当天),可人工改
-        out.put("prefBatchNo", BatchService.buildBatchNo(supplierCode, LocalDate.now()));
+        // 预填批次号:与生单同一公式(**纯日期 yyyyMMdd**,2026-10-19 用户口径:不再拼供应商编码)
+        out.put("prefBatchNo", BatchService.buildBatchNo(LocalDate.now()));
         out.put("lines", rows);
         out.put("补登行", supplements);             // 下层表「已生单可补打」:按订单行×已生单批次号
         out.put("records", records(labels));      // 已有打印记录(取代查询面板的反查入口)

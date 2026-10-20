@@ -1,0 +1,27 @@
+==> SELECT panel_code, label, col_name, place FROM yj_field WHERE panel_code IN ('STOCK_DETAIL','STOCK_STATUS','STOCK_LEDGER','STOCK_SUMMARY') AND (label LIKE N'%仓库%' OR label LIKE N'%存货%') ORDER BY panel_code, seq, id
+panel_code | label | col_name | place
+-------------------------------------
+STOCK_DETAIL | 仓库编码 | 仓库编码 | query,detail
+STOCK_DETAIL | 仓库名称 | 仓库名称 | detail
+STOCK_DETAIL | 存货编码 | 存货编码 | query,detail
+STOCK_DETAIL | 存货名称 | 存货名称 | detail
+STOCK_LEDGER | 仓库编码 | 仓库编码 | detail
+STOCK_LEDGER | 仓库 | 仓库 | query,detail
+STOCK_LEDGER | 存货编码 | 存货编码 | detail
+STOCK_LEDGER | 存货 | 存货 | query,detail
+STOCK_STATUS | 存货编码 | wzdm | query,detail
+STOCK_STATUS | 存货 | wzdm | detail
+STOCK_STATUS | 仓库 | ckdm | query,detail
+STOCK_SUMMARY | 仓库编码 | 仓库编码 | detail
+STOCK_SUMMARY | 仓库 | 仓库 | query,detail
+STOCK_SUMMARY | 存货编码 | 存货编码 | detail
+STOCK_SUMMARY | 存货 | 存货 | query,detail
+(15 行)
+==> SELECT panel_code, panel_name, line_table, mode FROM yj_panel WHERE panel_code IN ('STOCK_DETAIL','STOCK_STATUS','STOCK_LEDGER','STOCK_SUMMARY')
+panel_code | panel_name | line_table | mode
+-------------------------------------------
+STOCK_DETAIL | 库存明细 | v_stock_kucun | flat
+STOCK_LEDGER | 库存台账 | v_stock_ledger | flat
+STOCK_STATUS | 库存状况 | kucun | flat
+STOCK_SUMMARY | 收发存汇总表 | v_stock_summary | flat
+(4 行)
