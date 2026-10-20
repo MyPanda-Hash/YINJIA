@@ -1,0 +1,4 @@
+﻿SELECT i.name AS 索引, i.is_unique, i.filter_definition, c.name AS 列名
+FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+WHERE i.object_id=OBJECT_ID('dbo.yj_doc_batch') ORDER BY i.name, ic.key_ordinal

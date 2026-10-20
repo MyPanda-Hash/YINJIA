@@ -45,6 +45,8 @@ public class PxController {
     private final com.yinjia.mes.service.PuLabelService puLabel;
     /** 条码标签打印留痕(材料/半成品/成品条码面板,2026-10-18) */
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
+    /** 研发「项目流程管控」只读取数(2026-10-20) */
+    private final com.yinjia.mes.service.RdProjectFlowService rdFlow;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -58,7 +60,8 @@ public class PxController {
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
-                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel) {
+                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
+                        com.yinjia.mes.service.RdProjectFlowService rdFlow) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -73,6 +76,7 @@ public class PxController {
         this.batchService = batchService;
         this.puLabel = puLabel;
         this.barcodeLabel = barcodeLabel;
+        this.rdFlow = rdFlow;
     }
 
     // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============
@@ -502,7 +506,8 @@ public class PxController {
      * 分批送料:按行「本次送料数量」生成一张下游草稿(生单即取批次号 + 按量占用 + 写批次台账)。
      * body.batchNo = **生单对话框里人工填/改的批次号**(可选;2026-10-04 用户口径「在生单时批次号就可以修改」)
      * —— 只在链路头一跳(采购订单→送料暂收单,此时来源单还没有号)生效,留空则按
-     * 「供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd」自动取号;下游各跳一律继承上游的号,忽略该值。
+     * 「**当天 yyyyMMdd**」自动取号(2026-10-19 用户口径:批次号改回纯日期,不再拼供应商编码);
+     * 下游各跳一律继承上游的号,忽略该值。
      */
     @PostMapping("/batchFlow/generate")
     @SuppressWarnings("unchecked")
@@ -598,6 +603,24 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {
         perm.requirePanelView("RD_PROGRESS");
         return ApiResult.ok(buttons.progressDataSheets(code));
+    }
+
+    /**
+     * 研发「项目流程管控」(2026-10-20 用户口径):按立项申请单号查这条项目走到哪一步。
+     * 入参 keyword = 立项单号(可只输片段;空 = 全部在册立项),出参见
+     * {@link com.yinjia.mes.service.RdProjectFlowService#query}——环节判定在前端
+     * {@code core/rd/flowStages.js} 里做(纯函数,单测钉边界)。
+     * 权限:页面级虚拟面板 PROJECT_FLOW 的「可见」词。
+     */
+    @GetMapping("/rdFlow")
+    public ApiResult<Map<String, Object>> rdFlow(@RequestParam(required = false) String keyword) {
+        perm.requirePanelView("PROJECT_FLOW");
+        return ApiResult.ok(rdFlowService().query(keyword));
+    }
+
+    /** 项目流程管控取数服务(直接注入字段,便于本类构造器保持短) */
+    private com.yinjia.mes.service.RdProjectFlowService rdFlowService() {
+        return rdFlow;
     }
 
     /**

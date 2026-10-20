@@ -1,0 +1,8 @@
+==> ﻿SELECT COUNT(*) AS CK00001存在 FROM bs_wh WHERE 仓库编码 = 'CK00001';
+[ERR] “﻿”附近有语法错误。
+==> SELECT 仓库编码, 仓库名称, 停用, asp_cancel FROM bs_wh WHERE 仓库编码 IN ('CK00001','CK-A','YJ-08') ;
+仓库编码 | 仓库名称 | 停用 | asp_cancel
+-----------------------------
+YJ-08 | 车间仓 | false | N
+CK-A | A仓 | false | N
+(2 行)

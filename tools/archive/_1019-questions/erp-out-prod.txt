@@ -1,0 +1,204 @@
+==> -- 只读调研:暂收退回单 QC_RETURN 表结构与转ERP 数据可得性 SET NOCOUNT ON;
+[-1 行受影响]
+==> PRINT '=== 1. qc_return 列清单 ==='
+[-1 行受影响]
+==> SELECT c.column_id, c.name AS 列名, t.name AS 类型, c.max_length AS 长度, c.is_nullable AS 可空, ISNULL(ep.value, '') AS 中文注明 FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id LEFT JOIN sys.extended_properties ep ON ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = 'MS_Description' WHERE c.object_id = OBJECT_ID('dbo.qc_return') ORDER BY c.column_id;
+column_id | 列名 | 类型 | 长度 | 可空 | 中文注明
+------------------------------------
+1 | id | int | 4 | false | 
+2 | 单据编号 | nvarchar | 120 | false | 单号(面板字段列)
+3 | 单据日期 | nvarchar | 40 | true | 
+4 | 检验单号 | nvarchar | 120 | true | 检验单号(来源来料检验单单号,审核自动生单/选单带入;2026-09-30 补列回补溯源)
+5 | 供应商 | nvarchar | 400 | true | 
+6 | 退货原因 | nvarchar | 1000 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+7 | 经手人 | nvarchar | 100 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+8 | 备注 | nvarchar | 1000 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+9 | 单据状态 | nvarchar | 20 | false | 
+10 | 审核人 | nvarchar | 100 | true | 审核人(流程)(面板字段列)
+11 | 审核时间 | nvarchar | 60 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+12 | 审批人 | nvarchar | 100 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+13 | 审批时间 | nvarchar | 60 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+14 | asp_user1 | nvarchar | 100 | true | 
+15 | asp_time1 | datetime2 | 8 | true | 
+16 | asp_user2 | nvarchar | 100 | true | 
+17 | asp_time2 | datetime2 | 8 | true | 
+18 | asp_cancel | char | 1 | true | 
+19 | 采购订单号 | nvarchar | 1000 | true | 来源采购订单号(链路带入:采购订单→送料暂收→来料检验→暂收退回)
+20 | 附件1 | nvarchar | 1000 | true | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+21 | 附件2 | nvarchar | 1000 | true | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+22 | 附件3 | nvarchar | 1000 | true | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+23 | 附件4 | nvarchar | 1000 | true | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+24 | 附件5 | nvarchar | 1000 | true | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+25 | 附件6 | nvarchar | 1000 | true | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+26 | 批次号 | nvarchar | 100 | true | 送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回)
+27 | 退货类型 | nvarchar | 100 | true | 退货类型(退供应商/报废/让步接收;与来料检验单行「处置方式」闭环)
+28 | 仓库 | nvarchar | 200 | true | 仓库(退回出库仓,参照仓库档案 WH,存仓库名称)
+29 | 备用1 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+30 | 备用2 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+31 | 备用3 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+32 | 备用4 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+33 | 备用5 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+34 | 备用6 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+35 | 备用7 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+36 | 备用8 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+37 | 备用9 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+38 | 备用10 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+39 | 备用11 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+40 | 备用12 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+41 | 备用13 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+42 | 备用14 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+43 | 备用15 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+44 | 备用16 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+45 | 备用17 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+46 | 备用18 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+47 | 备用19 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+48 | 备用20 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+(48 行)
+==> PRINT '=== 2. qc_return_detail 列清单 ==='
+[-1 行受影响]
+==> SELECT c.column_id, c.name AS 列名, t.name AS 类型, c.max_length AS 长度, c.is_nullable AS 可空, ISNULL(ep.value, '') AS 中文注明 FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id LEFT JOIN sys.extended_properties ep ON ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = 'MS_Description' WHERE c.object_id = OBJECT_ID('dbo.qc_return_detail') ORDER BY c.column_id;
+column_id | 列名 | 类型 | 长度 | 可空 | 中文注明
+------------------------------------
+1 | id | int | 4 | false | 
+2 | 单据编号 | nvarchar | 120 | false | 单号(面板字段列)
+3 | 物料编码 | nvarchar | 200 | true | 
+4 | 物料名称 | nvarchar | 400 | true | 
+5 | 规格型号 | nvarchar | 400 | true | 
+6 | 单位 | nvarchar | 100 | true | 单位:暂收退料单明细的计量单位(参照计量单位档案 UOM;面板 QC_RETURN 明细隐藏列,与「计量单位」同源)
+7 | 退货数量 | decimal | 9 | true | 退货数量:本行退给供应商的数量(暂收退料单明细「退货数量」的落库列;与不良原因/报废数量分开记账)
+8 | 批号 | nvarchar | 60 | true | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+9 | 备注 | nvarchar | 400 | true | 
+10 | asp_user1 | nvarchar | 100 | true | 
+11 | asp_time1 | datetime2 | 8 | true | 
+12 | asp_user2 | nvarchar | 100 | true | 
+13 | asp_time2 | datetime2 | 8 | true | 
+14 | asp_cancel | char | 1 | true | 
+15 | 采购订单行号 | nvarchar | 1000 | true | 对应采购订单行号(链路带入)
+16 | 计量单位 | nvarchar | 100 | true | 计量单位(自检验行带入)
+17 | 单价 | decimal | 9 | true | 单价(自检验行带入)
+18 | 批次号 | nvarchar | 100 | true | 送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回)
+19 | 不良原因 | nvarchar | 200 | true | 不良原因(行级原因归类,参照不合格原因档案 REJECT;头「退货原因」为整单说明)
+20 | 报废数量 | decimal | 9 | true | 报废数量(不合格中就地报废的量;与「退货数量」=退供应商分开记账)
+21 | 剩余数量 | decimal | 9 | true | 剩余数量(本行退货后仍余的量;参照库入库行同名存储式字段)
+22 | 备用1 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+23 | 备用2 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+24 | 备用3 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+25 | 备用4 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+26 | 备用5 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+27 | 备用6 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+28 | 备用7 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+29 | 备用8 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+30 | 备用9 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+31 | 备用10 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+32 | 备用11 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+33 | 备用12 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+34 | 备用13 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+35 | 备用14 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+36 | 备用15 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+37 | 备用16 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+38 | 备用17 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+39 | 备用18 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+40 | 备用19 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+41 | 备用20 | nvarchar | 1000 | true | 预留扩展字段(未绑定)
+42 | 送检数量 | decimal | 9 | true | 送检数量:来料检验单明细的送检数量(检验单审核自动生成本退料单时随链带入,只读);特采按钮按它填特采单「总数量」
+43 | 特采 | bit | 1 | false | 特采:勾选=该行做特采(让步接收)。本退料单**审核/审批通过**时,勾了的行逐行生成特采单(总数量=本行送检数量、不合格品数量=本行退货数量);特采单审批通过后全部数量进采购入库单(不走退料)
+(43 行)
+==> PRINT '=== 3. 行数(头/行) ==='
+[-1 行受影响]
+==> SELECT (SELECT COUNT(*) FROM dbo.qc_return) AS qc_return_行数, (SELECT COUNT(*) FROM dbo.qc_return_detail) AS qc_return_detail_行数;
+qc_return_行数 | qc_return_detail_行数
+----------------------------------
+38 | 27
+(1 行)
+==> PRINT '=== 4. 单据状态分布(合并 yj_doc_status) ==='
+[-1 行受影响]
+==> SELECT ISNULL(h.单据状态, N'(空)') AS 单据状态, CASE WHEN s.shr IS NULL THEN N'未审核' ELSE N'已审核' END AS 审批, COUNT(*) AS 单据数 FROM dbo.qc_return h LEFT JOIN yj_doc_status s ON s.panel_code = 'QC_RETURN' AND s.doc_no = h.单据编号 WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' GROUP BY ISNULL(h.单据状态, N'(空)'), CASE WHEN s.shr IS NULL THEN N'未审核' ELSE N'已审核' END ORDER BY 1, 2;
+单据状态 | 审批 | 单据数
+---------------
+草稿 | 未审核 | 37
+草稿 | 已审核 | 1
+(2 行)
+==> PRINT '=== 5. 已审核单据 + 明细行数(可直接实推验证的候选) ==='
+[-1 行受影响]
+==> SELECT h.单据编号, CONVERT(varchar(10), h.单据日期, 23) AS 单据日期, h.供应商, h.批次号, h.仓库, ISNULL(h.退货类型, N'') AS 退货类型, s.shr AS 审核人, (SELECT COUNT(*) FROM dbo.qc_return_detail d WHERE d.单据编号 = h.单据编号 AND ISNULL(d.asp_cancel,'N') <> 'Y') AS 明细行, (SELECT SUM(d.退货数量) FROM dbo.qc_return_detail d WHERE d.单据编号 = h.单据编号 AND ISNULL(d.asp_cancel,'N') <> 'Y') AS 退货数量合计 FROM dbo.qc_return h INNER JOIN yj_doc_status s ON s.panel_code = 'QC_RETURN' AND s.doc_no = h.单据编号 AND s.shr IS NOT NULL WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' ORDER BY h.单据编号 DESC;
+单据编号 | 单据日期 | 供应商 | 批次号 | 仓库 | 退货类型 | 审核人 | 明细行 | 退货数量合计
+--------------------------------------------------------
+TH-2026-09-0011 | 2026-09-21 | 广东元丰化学试剂有限公司 |  |  |  | admin | 1 | 1.0000
+(1 行)
+==> PRINT '=== 6. 明细样例(前 30 行,看物料/单位/仓库/批号/源单号是否可用) ==='
+[-1 行受影响]
+==> SELECT TOP 30 d.单据编号, d.物料编码, d.物料名称, d.退货数量, d.计量单位, d.单价, ISNULL(d.批次号, N'') AS 批号, ISNULL(d.采购订单行号,'') AS 源单行号, ISNULL(d.报废数量,0) AS 报废数量 FROM dbo.qc_return_detail d ORDER BY d.单据编号 DESC, d.id ASC;
+单据编号 | 物料编码 | 物料名称 | 退货数量 | 计量单位 | 单价 | 批号 | 源单行号 | 报废数量
+--------------------------------------------------------
+TH-2026-10-0001 | YJ-GL-001 | 纸箱 | 1000.0000 | 个 | 4.500000 | GL-2026-10- | 1 | 0.0000
+TH-2026-09-0025 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0024 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0023 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0022 | Y-S-T | 硫酸氧钛 | 3.0000 | kg | 51.000000 |  | 1 | 0.0000
+TH-2026-09-0021 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0020 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0019 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0018 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0017 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0016 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0015 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0014 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0013 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0012 | Y-GL-300400 | 硅胶粉300-400目 | 10.0000 | kg | 26.000000 |  | 1 | 0.0000
+TH-2026-09-0011 | Y-S-T | 硫酸氧钛 | 1.0000 | kg | 51.000000 |  | 1 | 0.0000
+TH-2026-09-0010 | Y-S-T | 硫酸氧钛 | 1.0000 | kg | 51.000000 | YJ-20260915-11-007 | 1 | 0.0000
+TH-2026-09-0009 | YJ-SX-068 | 端盖 | 5.0000 | 个 | 0.480000 | YJ-20260916-01-001 | 1 | 0.0000
+TH-2026-09-0008 | YJ-HDN-001 | 胶粒 | 5.0000 | kg | 40.000000 | YJ-20260916-03-001 | 1 | 0.0000
+TH-2026-09-0007 | YJ-KBL-021 | 气泡袋 | 5.0000 | 个 | 0.132000 | YJ-20260915-12-001 | 1 | 0.0000
+TH-2026-09-0006 | YJ-HDN-001 | 胶粒 | 20.0000 | kg | 40.000000 | YJ-20260916-03-001 | 1 | 0.0000
+TH-2026-09-0005 | YJ-HDN-001 | 胶粒 | 20.0000 | kg | 40.000000 | YJ-20260916-03-001 | 1 | 0.0000
+TH-2026-09-0004 | YJ-HDN-001 | 胶粒 | 20.0000 | kg | 40.000000 | YJ-20260916-03-001 | 1 | 0.0000
+TH-2026-09-0003 | YJ-HDN-001 | 胶粒 | 20.0000 | kg | 40.000000 | YJ-20260916-03-001 | 1 | 0.0000
+TH-2026-09-0002 | YJ-YCYX-031 | 折叠棉 | 1000.0000 | 支 | 3.000000 | YJ-20260915-08-001 | 1 | 0.0000
+TH-2026-09-0002 | YJ-YCYX-054 | 折叠棉 | 250.0000 | 支 | 2.700000 | YJ-20260915-08-001 | 3 | 0.0000
+TH-2026-09-0001 | YJ-AJ-016-1 | PP棉 | 5000.0000 | 个 | 0.800000 |  | 1 | 0.0000
+(27 行)
+==> PRINT '=== 7. yj_field 登记(QC_RETURN,表头/明细) ==='
+[-1 行受影响]
+==> SELECT f.seq, f.place, f.label AS 字段名, f.visible, f.hidden, ISNULL(f.ref_panel,'') AS 参照面板, ISNULL(f.ref_field,'') AS 参照字段 FROM yj_field f WHERE f.panel_code = 'QC_RETURN' ORDER BY f.place, f.seq, f.id;
+seq | place | 字段名 | visible | hidden | 参照面板 | 参照字段
+--------------------------------------------------
+30 | detail | 物料名称 | true | false | INV | 存货名称
+40 | detail | 规格型号 | true | false |  | 
+60 | detail | 单位 | false | true | UOM | 计量单位名称
+70 | detail | 单价 | true | false |  | 
+80 | detail | 退货数量 | true | false |  | 
+85 | detail | 送检数量 | true | false |  | 
+88 | detail | 特采 | true | false |  | 
+90 | detail | 计量单位 | true | false | UOM | 计量单位名称
+100 | detail | 采购订单行号 | true | false |  | 
+120 | detail | 报废数量 | false | true |  | 
+130 | detail | 剩余数量 | false | true |  | 
+206 | detail | 批次号 | true | false |  | 
+70 | header | 退货类型 | true | false |  | 
+90 | header | 退货原因 | true | false |  | 
+100 | header | 经手人 | true | false | EMP | 员工名称
+120 | header | 审核人 | true | false | EMP | 员工名称
+130 | header | 审核时间 | true | false |  | 
+150 | header | 附件1 | true | false |  | 
+160 | header | 附件2 | true | false |  | 
+170 | header | 附件3 | true | false |  | 
+180 | header | 附件4 | true | false |  | 
+190 | header | 附件5 | true | false |  | 
+200 | header | 附件6 | true | false |  | 
+140 | header,detail | 备注 | true | false |  | 
+20 | query,detail | 物料编码 | true | false | INV | 存货编码
+110 | query,detail | 不良原因 | true | false | REJECT | 不合格原因
+10 | query,header | 单据编号 | true | false |  | 
+20 | query,header | 单据日期 | true | false |  | 
+30 | query,header | 检验单号 | true | false | QC_INSP | 单据编号
+40 | query,header | 采购订单号 | true | false |  | 
+50 | query,header | 批次号 | true | false |  | 
+60 | query,header | 供应商 | true | false | GFDA | mc
+80 | query,header | 仓库 | true | false | WH | 仓库名称
+110 | query,header | 单据状态 | true | false |  | 
+(34 行)
+==> PRINT '=== 8. yj_panel 登记(QC_RETURN) ==='
+[-1 行受影响]
+==> SELECT panel_code, panel_name, category, module_group, table_name, config FROM yj_panel WHERE panel_code = 'QC_RETURN';
+[ERR] 列名 'table_name' 无效。

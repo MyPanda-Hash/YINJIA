@@ -579,16 +579,25 @@ public class StockMonthCloseService {
         out.put("月结快照", "已月结".equals(prevState) && !snap.isEmpty() ? snap.get(0) : null);
 
         List<Map<String, Object>> rows = new ArrayList<>();
-        // 上月部分的行(2026-10-20 用户问「为什么有些行有单据、有些行没有」)—— 两种来源都取,再按
-        //   「单据编号 + 批号」去重,免得同一张结转单被陈列两遍:
-        //   ① 上月**已月结** ⇒ 用那张月结结转单代表上月(它是结转行,落在当月 1 号);
-        //   ② 不管月结与否,都补上**上月原始单据**(入库正、出库负)——
-        //      只取①会漏掉两种键:【本月才有**新批号**】的(上月没这个批号,自然没有它的结转行);
-        //      **上月期末结存 = 0** 的(月结按口径"为 0 不写结转行",这批货月末发完、本月又补货出库)。
-        //      只取②也不对:已月结时原始单据已被结转行取代,再铺一遍等于让上月动了两回。
-        //      故:已月结 → ①+②;未月结/已取消 → 只有②(第三轮口径:取消后要看到原始单据)。
+        // 上月部分的行 —— **已月结时一律只陈列「月结」,绝不再铺上月原始单据**。
+        // 为什么要一刀切(2026-10-20 用户两次追问「月结后为什么还会有 9 月份的单据」「为什么有些批次有结转行、
+        // 有些没有」后定的口径):
+        //   · 月结按钮是把**全部键**月结掉的(实测 bl_stock_close 2026-09 = 2137 个键),差异只在"有没有余额":
+        //     1697 个键月末有余额 ⇒ 有结转行;440 个键月末结存 = 0 ⇒ 按 2026-10-15 口径
+        //     「该批次号的数据月结后数量为 0,就是删除这个批次号」**不写结转行**;
+        //   · 结转行 = 期初 + 本期净额 = 月末结存,是唯一正确的"上月余额"。而上月原始单据**只有净额、没有期初** ——
+        //     拿它当余额必然算错:实测 YJ-SX-003-1 @ CK00006 无批号(期初 20030 + 入 0 − 出 20030 = 结存 0),
+        //     若陈列它的 9 月单据,展开余额会是 −20030,比"翻倍"还离谱。
+        //   ⇒ 已月结:上月 = 结转行(有则用它,数量 = 结存);没有结转行的批次补一行「YYYY-MM月结」数量 = 月结结存
+        //      (即 0)—— 批次照样在明细里看得见,只是余额显示为 0,不会凭空冒出一堆 9 月单据。
+        //   ⇒ 未月结 / 已取消:口径不变,照旧陈列该月原始单据(第三轮用户口径:取消后要能看原始单据)。
+        //   ⚠ 月结之后才补录的上月单据不在这里兜底 —— 那属于"月结要重做"(取消月结 → 重新月结),
+        //     陈列出来只会让余额再错一次;查那几笔请走「库存台账 / 出入库单据」按日期看。
         Set<String> seen = new HashSet<>();
-        if ("已月结".equals(prevState)) {
+        Set<String> carriedLots = new HashSet<>();                 // 已有结转行的批号
+        Map<String, java.math.BigDecimal> closeEnd = new HashMap<>(); // 批号 → 月结结存数量(零余额批次兜底显示用)
+        boolean closed = "已月结".equals(prevState);
+        if (closed) {
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
                             + "  CONVERT(nvarchar(7), DATEADD(month, -1, 单据日期), 120) + N'月结' AS 单据类型,"
@@ -601,10 +610,35 @@ public class StockMonthCloseService {
                                    : new Object[]{CARRY_TYPE, carryNo(prev), w, c, lotArg})) {
                 rows.add(r);
                 seen.add(r.get("单据编号") + "\u0001" + r.get("批号"));
+                carriedLots.add(lotKeyOf(r));
             }
-        }
-        for (Map<String, Object> r : flowRows(prevStart, prevEndEx, w, c, lotArg)) {
-            if (seen.add(r.get("单据编号") + "\u0001" + r.get("批号"))) rows.add(r);
+            // 月结行表的结存(批号 → 结存数量):给"月末结存 = 0、因此没写结转行"的批次兜底
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT ISNULL(RTRIM(批号),N'') AS 批号, 结存数量 FROM bl_stock_close"
+                            + " WHERE 期间 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?"
+                            + (lotArg == null ? "" : "  AND ISNULL(RTRIM(批号),N'') = ?"),
+                    lotArg == null ? new Object[]{prev, w, c} : new Object[]{prev, w, c, lotArg})) {
+                Object end = r.get("结存数量");
+                closeEnd.put(lotKeyOf(r), end instanceof java.math.BigDecimal b ? b : java.math.BigDecimal.ZERO);
+            }
+            // 上月有流水、却没有结转行的批次(月末结存 = 0)⇒ 补一行"月结 0",不铺原始单据
+            for (String lotKey : prevFlowLots(prevStart, prevEndEx, w, c, lotArg)) {
+                if (carriedLots.contains(lotKey)) continue;
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("月份", prev);
+                r.put("单据日期", curStart.toString());
+                r.put("单据类型", prev + "月结");
+                r.put("单据编号", "");          // 该批次没写结转行(月末结存 0),单号留空
+                r.put("批号", lotKey);
+                r.put("数量", closeEnd.getOrDefault(lotKey, java.math.BigDecimal.ZERO));
+                r.put("往来单位", "");
+                r.put("经手人", "");
+                rows.add(r);
+                seen.add("\u0001" + lotKey);
+            }
+        } else {
+            rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
         }
         // **当月单据要展开**(用户 2026-10-15 第十二轮:「当月单据要有…10 月的数据要展开」)——
         //   展开 = 上月的结转行(余额来源;它的"期初数量"= 上上个月如 8 月的月末结转)
@@ -621,6 +655,19 @@ public class StockMonthCloseService {
                 .thenComparing(r -> String.valueOf(r.get("单据编号"))));
         out.put("预警", warn.warnMap(w, c));   // {批号 → 预警数量}(展开区按批次号设置/显示用)
         out.put("单据明细", rows);
+        return out;
+    }
+
+    /**
+     * 该 (物料, 仓库[, 批号]) 在某期间内**有流水**的批号集合(去重,保序)。
+     *
+     * <p>用途:已月结时,月结按口径「期末结存为 0 ⇒ 不写结转行」,这些**没有结转行**的批号
+     * 若不补一行就整个从展开明细里消失了(用户会问"我的货去哪了");调用方据此补一行数量 = 月结结存(即 0)的
+     * 「YYYY-MM月结」占位行 —— 批次照样看得见,但不铺原始单据(原始单据只有净额、没有期初,拿来当余额必错)。
+     */
+    private Set<String> prevFlowLots(java.time.LocalDate start, java.time.LocalDate endEx, String w, String c, String lot) {
+        Set<String> out = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> r : flowRows(start, endEx, w, c, lot)) out.add(lotKeyOf(r));
         return out;
     }
 
@@ -644,20 +691,33 @@ public class StockMonthCloseService {
                 "SELECT CONVERT(nvarchar(7), 单据日期, 120) AS 月份, CONVERT(nvarchar(10), 单据日期, 120) AS 单据日期,"
                         + "  ISNULL(单据类型, N'') AS 单据类型, ISNULL(单据编号, N'') AS 单据编号,"
                         + "  ISNULL(批号, N'') AS 批号, 数量 AS 数量,"
-                        + "  ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人"
+                        + "  ISNULL(往来单位, N'') AS 往来单位, ISNULL(经手人, N'') AS 经手人,"
+                        + "  asp_time1 AS 写入时间"
                         + " FROM inh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(单据类型,'') <> N'" + CARRY_TYPE + "'"
                         + "  AND 单据日期 >= ? AND 单据日期 < ? AND ISNULL(RTRIM(物料编码),N'') = ?"
                         + "  AND ISNULL(RTRIM(仓库编码),N'') = ?" + lotFilter
                         + " UNION ALL "
                         + "SELECT CONVERT(nvarchar(7), 单据日期, 120), CONVERT(nvarchar(10), 单据日期, 120),"
                         + "  ISNULL(单据类型, N''), ISNULL(单据编号, N''), ISNULL(批号, N''), -数量,"
-                        + "  ISNULL(往来单位, N''), ISNULL(经手人, N'')"
+                        + "  ISNULL(往来单位, N''), ISNULL(经手人, N''), asp_time1"
                         + " FROM outh WHERE ISNULL(asp_cancel,'N') <> 'Y' AND 单据日期 >= ? AND 单据日期 < ?"
                         + "  AND ISNULL(RTRIM(物料编码),N'') = ? AND ISNULL(RTRIM(仓库编码),N'') = ?" + lotFilter,
                 args.toArray());
     }
 
     // ==================== 内部工具 ====================
+
+    /**
+     * 展开明细里一行的**批号键**(去首尾空白;NULL/空 = 无批号那一组,用空串)。
+     *
+     * <p>用途:判断「这个批号是否已经被上月的结转行代表」。结转行与原始单据的批号来自同一列
+     * ({@code inh.批号} / {@code outh.批号},SQL 侧已 {@code ISNULL(批号,N'')}),这里再做一次 RTRIM
+     * 的等价处理,免得历史脏数据里的尾空格让同一批货判成两批、重复计算又回来。
+     */
+    private static String lotKeyOf(Map<String, Object> row) {
+        Object v = row == null ? null : row.get("批号");
+        return v == null ? "" : String.valueOf(v).trim();
+    }
 
     private Long upsertHead(String period, String no, String carryDate, int lineCount,
                             BigDecimal sumIn, BigDecimal sumOut, BigDecimal sumEnd, String user) {

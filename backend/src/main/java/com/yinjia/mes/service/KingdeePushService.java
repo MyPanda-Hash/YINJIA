@@ -195,13 +195,23 @@ public class KingdeePushService {
         //   · 其余字段落库口径与产品入库单同族(数值/布尔一律传字符串)。
         boolean isOtherIn = "OTHER_IN".equals(panelCode);
         boolean isOtherOut = "OTHER_OUT".equals(panelCode);
+        // 暂收退料单直推(2026-10-19 用户口径《10.19 问题》第 8 条「暂收退料单需要转 ERP」):
+        // 作为**金蝶「采购退货单」**(`POST /jdy/v2/scm/pur_ret`)落到目标账套。
+        // 为什么是它(而不是 inv_other_out):退料是"来料不合格退回供应商",金蝶侧唯一能挂供应商、
+        // 参与应付/往来结算的单据就是采购退货单;其他出库单**连 supplier 字段都没有**,会让"退给谁"
+        // 在 ERP 里凭空消失,而且它还必须传 trans_type_id(金蝶无业务类型档案接口,只能写死账套常量)。
+        // pur_ret 的头/行键名与 pur_inbound 同族 ⇒ materialMap()/storeIds/unitMap() 三套档案解析可原样复用。
+        boolean isQcReturn = "QC_RETURN".equals(panelCode);
         String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out"
-                : isFinIn ? "bd_finish_in" : isOtherIn ? "bd_other_in" : isOtherOut ? "bd_other_out" : "bd_sale_out";
+                : isFinIn ? "bd_finish_in" : isOtherIn ? "bd_other_in" : isOtherOut ? "bd_other_out"
+                : isQcReturn ? "qc_return" : "bd_sale_out";
         String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out"
-                : isFinIn ? "bl_finish_in" : isOtherIn ? "bl_other_in" : isOtherOut ? "bl_other_out" : "bl_sale_out";
+                : isFinIn ? "bl_finish_in" : isOtherIn ? "bl_other_in" : isOtherOut ? "bl_other_out"
+                : isQcReturn ? "qc_return_detail" : "bl_sale_out";
         // 日志文案用的单据名(此前硬编码"采购入库单",材料出库单接进来后会把日志写错单)
         String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单"
-                : isFinIn ? "产品入库单" : isOtherIn ? "其他入库单" : isOtherOut ? "其他出库单" : "销售出库单";
+                : isFinIn ? "产品入库单" : isOtherIn ? "其他入库单" : isOtherOut ? "其他出库单"
+                : isQcReturn ? "暂收退料单" : "销售出库单";
 
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -255,7 +265,7 @@ public class KingdeePushService {
         // ④ 构建金蝶 body(平铺;不传 bill_no → 金蝶自动生成编号,MES 编号放备注追溯)
         ObjectNode body = json.createObjectNode();
         body.put("bill_date", str(head.get("单据日期")));
-        if (!isOrder && !isMatOut && !isFinIn) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单/产品入库单无此项(产品入库单实测 trans_type 被静默忽略)
+        if (!isOrder && !isMatOut && !isFinIn && !isQcReturn) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单/产品入库单/采购退货单无此项(产品入库单实测 trans_type 被静默忽略;pur_ret 字段表里也没有它)
         // 采购订单直推带 bill_no(2026-09-23):沿用公司 YJ- 编号(MES 同号)——真实账套的订单本来就是
         // YJ- 号(实测 YJ-20260924-01 等),入库单按号挂源单;不带 bill_no 金蝶自动编号(CGDD-…),
         // 入库单的 src_bill_no 按 MES 号就查不到源单(沙箱踩坑:CGDD-20260909-00001 无法被 YJ 号挂联)
@@ -263,6 +273,25 @@ public class KingdeePushService {
         String remark = str(head.get("备注"));
         body.put("remark", (remark.isEmpty() ? "" : remark) + " [MES:" + docNo + "]");
         if (isPur || isOrder) body.put("supplier_number", str(head.get("供应商编码")));
+        // 暂收退料单(采购退货单):**头供应商是金蝶必填**,而 qc_return 只存供应商**名称**(无编码列)。
+        // 名称 → 编码按供应商档案 dm_gf(mc→dm)反查;测试账套那一列里存的其实是编码,故先按编码直判一次。
+        // 反查不到就**拒绝**并说清原因 —— 静默推空只会换来金蝶一句"参数supplier_number不能为空"。
+        else if (isQcReturn) {
+            String supRaw = str(head.get("供应商"));
+            String supNo = supplierNumberOfQcReturn(supRaw);
+            if (supNo.isEmpty()) {
+                throw new RuntimeException("供应商[" + (supRaw.isEmpty() ? "(空)" : supRaw)
+                        + "]在供应商档案中找不到编码,无法转ERP(采购退货单的供应商是必填项):"
+                        + "请先在本单选好供应商,或确认该供应商已建档并同步到金蝶");
+            }
+            body.put("supplier_number", supNo);
+            // 退货原因:头「退货原因」历史列实测全空 ⇒ 退到行上「不良原因」去重拼接,都没有就不传。
+            String reason = str(head.get("退货原因"));
+            if (reason.isEmpty()) reason = badReasonOf(lines);
+            if (!reason.isEmpty()) body.put("return_reason", reason);
+            // 幂等/查重抓手:金蝶 pur_ret 列表支持按 outside_pk_id 过滤,把 MES 单号带过去便于两侧对账
+            body.put("outside_pk_id", docNo);
+        }
         else if (!isMatOut && !isFinIn && !isOtherOut) body.put("customer_number", str(head.get("客户编码")));
 
         // 其他入库单 / 其他出库单 头(2026-10-14):**业务类型(trans_type_id)是必填** ——
@@ -392,7 +421,7 @@ public class KingdeePushService {
         String soNo = str(head.get("销售订单号"));
         String soLinkWarning = "";
         SoRefs soRefs = null;
-        if (!isPur && !isOrder && !isMatOut) {   // 仅销售出库单走此支
+        if (!isPur && !isOrder && !isMatOut && !isFinIn && !isOtherIn && !isOtherOut && !isQcReturn) {   // 仅销售出库单走此支
             if (soNo.isEmpty()) {
                 log.warn("销售出库单[{}]头上无销售订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
                         + "金蝶侧显示为无来源单的普通销售出库单", docNo);
@@ -408,12 +437,18 @@ public class KingdeePushService {
         boolean linkSaleSrc = soRefs != null;
         // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位;
         // 材料出库行叫 材料编码/数量/单价/计量单位(料件口径,与采购入库的"存货"族不同名)
-        String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : isFinIn ? "产品编码" : "存货编码";
-        String qtyKey = isPur || isFinIn ? "实收数量" : "数量";
-        String priceKey = isPur || isOrder || isMatOut ? "单价" : "售价";
+        String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : isFinIn ? "产品编码"
+                : isQcReturn ? "物料编码" : "存货编码";
+        String qtyKey = isPur || isFinIn ? "实收数量" : isQcReturn ? "退货数量" : "数量";
+        String priceKey = isPur || isOrder || isMatOut || isQcReturn ? "单价" : "售价";
         String unitKey = isOrder ? "单位" : "计量单位";
         // 行仓库编号 → 金蝶仓库id(采购订单不推仓库,不必拉)
         Map<String, String> storeIds = isOrder ? Map.of() : safeIdMap(STORE_LIST_PATH, "仓库");
+        // 暂收退料单的行上**没有**仓库列,仓库只在单头且存的是**名称** ⇒ 这里先按 bs_wh 把名称换成编码,
+        // 换不到就留空(下面会按"无仓库"处理:回落默认正品仓 + 返回消息提示)。
+        String qcReturnWhCode = isQcReturn ? warehouseCodeByName(str(head.get("仓库"))) : "";
+        /** 暂收退料单仓库回落默认仓时的提示(拼进返回 message,见 ⑥ 之后) */
+        String qcReturnWhWarn = "";
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
@@ -497,6 +532,19 @@ public class KingdeePushService {
             // 传了被静默忽略 → 整单被拒「请填写"材料分录"第1行:"仓库"」),故按编号再解析一次 id 带上。
             if (!isOrder) {
                 String stock = str(line.get("仓库编码")); if (stock.isEmpty()) stock = str(head.get("仓库编码"));
+                // 暂收退料单:行/头都没有「仓库编码」列(只有头「仓库」名称),上面已按档案换成编码。
+                // 换不到时**与其余 7 张单同口径**回落到默认正品仓 CK00001 —— 实测两个账套 38 张退料单的
+                // 「仓库」列**全空**,若在此硬拦,"转ERP"对这批单等于不可用(用户 2026-10-19 要的是"能转");
+                // 但这属于账实风险点,故:①warn 日志 ②返回消息里显式告知,别让人以为仓是对的。
+                if (isQcReturn) {
+                    stock = qcReturnWhCode;
+                    if (stock.isEmpty()) {
+                        stock = "CK00001";
+                        qcReturnWhWarn = "；注意:本单仓库为空或档案里找不到,已按默认正品仓 CK00001 推送,请核对";
+                        log.warn("暂收退料单[{}]单头仓库[{}]无对应编码,已按默认正品仓 CK00001 推送,请核对",
+                                docNo, str(head.get("仓库")));
+                    }
+                }
                 if (stock.isEmpty()) {
                     stock = "CK00001";
                     log.warn("单据[{}]第{}行无行级/头级仓库编码,已按默认正品仓 CK00001 推送,请核对单据仓库", docNo, rowNo);
@@ -576,6 +624,7 @@ public class KingdeePushService {
                 : isFinIn ? "/jdy/v2/scm/inv_product" // 产品入库单 → 金蝶「产品入库单」
                 : isOtherIn ? "/jdy/v2/scm/inv_other_in"   // 其他入库单 → 金蝶「其他入库单」
                 : isOtherOut ? "/jdy/v2/scm/inv_other_out" // 其他出库单 → 金蝶「其他出库单」
+                : isQcReturn ? "/jdy/v2/scm/pur_ret"       // 暂收退料单 → 金蝶「采购退货单」(单据类型 pur_bill_outbound)
                 : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
         if (res.path("errcode").asInt(-1) != 0) {
@@ -600,7 +649,7 @@ public class KingdeePushService {
         out.put("ERP单号", erpBillNo);
         out.put("转ERP操作人", operator);
         out.put("转ERP时间", now);
-        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning + soLinkWarning);
+        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning + soLinkWarning + qcReturnWhWarn);
         return out;
     }
 
@@ -770,8 +819,68 @@ public class KingdeePushService {
         }
     }
 
-    /** 宽松取整(采购订单行号列是文本:"3"/"3.0" 都能取;非数字返回 null) */
-    private static Integer intOf(Object v) {
+    /**
+     * 暂收退料单的头「供应商」→ 金蝶 `supplier_number`(2026-10-19 转ERP 接入时新增)。
+     *
+     * <p>为什么不能照抄其他入库单的 {@link #archiveCode}：那条走 `bs_supplier`，而**两个账套都没有这张表**
+     * （供应商档案是 `dm_gf`，列 `dm`/`mc`）—— 照抄会因异常被吞而恒返回空串，金蝶只会回一句
+     * 「参数supplier_number不能为空」，排查起来要绕一大圈。
+     *
+     * <p>口径（两条账套都实测过）：
+     * <ol>
+     *   <li>值本身就是一个**存在的编码**（正式账套存名称、测试账套那一列里存的其实是编码 GYS00002）⇒ 直接用；</li>
+     *   <li>否则按**名称**反查 `dm_gf.mc → dm`（正式账套实测按名称 100% 命中，如
+     *       广东元丰化学试剂有限公司 ⇒ YJ-YFHX）；</li>
+     *   <li>都查不到返回空串，由调用方拦下并给出可读提示（不静默推空）。</li>
+     * </ol>
+     * 表/列缺失（迁移未跑、旧血统）一律按"查不到"处理，不抛异常。
+     */
+    private String supplierNumberOfQcReturn(String raw) {
+        String v = str(raw);
+        if (v.isEmpty()) return "";
+        try {
+            List<String> byCode = jdbc.queryForList(
+                    "SELECT TOP 1 dm FROM dm_gf WHERE dm = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, v);
+            if (!byCode.isEmpty()) return str(byCode.get(0));
+        } catch (Exception ignore) { /* dm_gf 不存在等:走名称兜底 */ }
+        try {
+            List<String> byName = jdbc.queryForList(
+                    "SELECT TOP 1 dm FROM dm_gf WHERE mc = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, v);
+            if (!byName.isEmpty()) return str(byName.get(0));
+        } catch (Exception ignore) { /* 同上 */ }
+        return "";
+    }
+
+    /**
+     * 仓库**名称** → 仓库编码(`bs_wh.仓库名称 → 仓库编码`)。
+     * 暂收退料单只有单头「仓库」且存名称，而金蝶行级要 `stock_number`+`stock_id` ⇒ 先换编码再按编码取 id。
+     * 查不到返回空串（调用方拦下并提示），不做"猜一个默认仓"。
+     */
+    private String warehouseCodeByName(String name) {
+        String v = str(name);
+        if (v.isEmpty()) return "";
+        try {
+            List<String> hit = jdbc.queryForList(
+                    "SELECT TOP 1 仓库编码 FROM bs_wh WHERE (仓库名称 = ? OR 仓库编码 = ?)"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, v, v);
+            return hit.isEmpty() ? "" : str(hit.get(0));
+        } catch (Exception e) {
+            log.warn("暂收退料单仓库[{}]→编码解析失败: {}", v, e.getMessage());
+            return "";
+        }
+    }
+
+    /** 暂收退料单的「退货原因」兜底:行上「不良原因」去重后拼接(头列 退货原因 实测全空) */
+    private String badReasonOf(List<Map<String, Object>> lines) {
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> line : lines == null ? List.<Map<String, Object>>of() : lines) {
+            String r = str(line.get("不良原因"));
+            if (!r.isEmpty()) set.add(r);
+        }
+        return String.join("；", set);
+    }
+
+    /** 宽松取整(采购订单行号列是文本:"3"/"3.0" 都能取;非数字返回 null) */    private static Integer intOf(Object v) {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
         if (s.isEmpty()) return null;

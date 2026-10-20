@@ -1,0 +1,13 @@
+/* 10.19 转ERP 端到端验证(第 2 轮):改用**金蝶沙箱真有库存**的仓/物料/单位
+ * 沙箱实测(2026-10-19,/jdy/v2/scm/inventory):有库存的只有 CP-02 成品B仓(183 行)与 CK00003,
+ * 正品仓 CK00001 无库存 ⇒ 上一轮被金蝶以「库存扣减后即时库存不足」拒单(接口链路本身是通的)。
+ * 本轮:A-32-01(S阻垢炭棒/滤芯, 单位 支, 成品B仓 2262 支)+ 数量 1。 */
+UPDATE qc_return SET 供应商 = N'广东元丰化学试剂有限公司', 仓库 = N'成品B仓', 是否已转ERP = NULL, ERP单号 = NULL
+WHERE 单据编号 = N'TH-2026-10-0047'
+GO
+UPDATE qc_return_detail
+   SET 物料编码 = N'A-32-01', 物料名称 = N'S阻垢炭棒/滤芯', 计量单位 = N'支', 单位 = N'支', 退货数量 = 1
+ WHERE 单据编号 = N'TH-2026-10-0047' AND ISNULL(asp_cancel,'N')<>'Y'
+GO
+SELECT r.单据编号, r.供应商, r.仓库, r.是否已转ERP, d.物料编码, d.计量单位, d.退货数量
+FROM qc_return r JOIN qc_return_detail d ON d.单据编号=r.单据编号 WHERE r.单据编号=N'TH-2026-10-0047'

@@ -1,0 +1,25 @@
+db: 补齐角色面板授权缺口(admin 反缺 5 个 + 采购两报表全角色无授权 + role3 孤儿授权)
+
+用户口径(2026-10-20):「更新一下组织架构的角色的面板,现在已经多了一个面板了,调整一下模块」。
+
+实测缺口(两账套一致;/api/sys/role/{id}/panels 与 yj_role_panel 双查):
+① admin(role_id=1)**反而缺 5 个**,而 user/rd_review/rd_file_owner 三个角色都有 —— 倒挂:
+   FIELDMGR(字段管理)/ZDGL(数据字典)这两个还是管理员专属面板
+   (PanelPermissionService.ADMIN_ONLY_PANELS),以及 ERP_INTEG/ERPLG/ERPLG_ROW。
+② PU_ORDER_DETAIL(采购订单明细表)/PU_ORDER_STATS(统计表)四个角色全都没有授权
+   —— 兄弟面板 PU_ORDER / SALES_ORDER_DETAIL / SALE_OUT_DETAIL 都有,属加报表时漏登记,
+   结果任何角色在导航里都看不到这两张表。
+③ role_id=3 有 28 行授权,但 yj_role 里没有 id=3、yj_user 里也没有该角色用户
+   ⇒ 角色被删而授权没跟着删的孤儿数据。
+
+改法(幂等,只 INSERT 缺失行 / 只 DELETE 孤儿,不覆盖现场调过的权限):
+① admin 照 role2 同款 perms 补 5 行;
+② 采购两报表照兄弟面板 PU_ORDER 的授权行复制(同角色/同 can_approve/同 perms);
+③ 删除 role_id 在 yj_role 中已不存在的授权行。
+脚本自带三段自检(admin 不得再缺、采购两报表必须 8 行)。
+
+验证:
+· 两账套 role1/2/4/5 均为 153 个面板(全量 154,仅缺 DASHBOARD —— 虚拟面板由代码恒放行);
+· 采购两报表授权行 = 8(4 角色 × 2);
+· role3 孤儿授权已清零。
+· 8090 接口 /api/sys/role/{id}/panels 复测通过。

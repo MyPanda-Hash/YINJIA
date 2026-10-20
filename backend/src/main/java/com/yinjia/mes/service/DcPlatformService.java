@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 数采平台对外契约层(用户 2026-10-18 需求:设备配置管理 / 数据监控 / 状态统计)。
+ * 数采平台对外契约层(用户 2026-10-18 需求:IOT设备配置 / 数据监控 / 状态统计)。
  *
  * <p>职责边界:{@link DcService} 是库表与五连判据的唯一实现(设备/网关/采集点/规则/采样/报警),
  * 本类只做 <b>reshape + 区间聚合</b>,不重复写 CRUD SQL —— 前端三页(frontend/src/views/dc/)
@@ -49,7 +49,7 @@ public class DcPlatformService {
         this.dc = dc;
     }
 
-    // ───────────────────────── ① 设备配置管理 ─────────────────────────
+    // ───────────────────────── ① IOT设备配置 ─────────────────────────
 
     /** GET /dc/config:五连 KPI + 网关表 + 设备表(前端 DcConfig.vue 直接消费)。 */
     public Map<String, Object> config() {

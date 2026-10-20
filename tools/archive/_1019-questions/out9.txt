@@ -1,0 +1,88 @@
+==> SELECT seq, label, place, visible, hidden, required, editable, ref_panel, ref_field FROM yj_field WHERE panel_code='QC_INSP_REC' ORDER BY seq, id
+seq | label | place | visible | hidden | required | editable | ref_panel | ref_field
+------------------------------------------------------------------------------------
+10 | 物料名称 | query | true | false | false | false | INV | 存货名称
+10 | 单据编号 | header | true | false | true | false |  | 
+10 | 检验项 | detail | true | false | true | true |  | 
+20 | 物料编码 | query | true | false | false | false | INV | 存货编码
+20 | 单据日期 | header | true | false | true | true |  | 
+20 | 检测标准 | detail | true | false | false | true |  | 
+30 | 物料批次 | query | true | false | false | false |  | 
+30 | 物料名称 | header | true | false | true | true | INV | 存货名称
+30 | 检测结果 | detail | true | false | false | true |  | 
+40 | 检验日期 | query | true | false | false | false |  | 
+40 | 物料编码 | header | true | false | false | true | INV | 存货编码
+40 | 单项判定 | detail | true | false | false | true |  | 
+50 | 检验结论 | query | true | false | false | false |  | 
+50 | 物料批次 | header | true | false | false | false |  | 
+60 | 检验人 | query | true | false | false | false |  | 
+60 | 检验日期 | header | true | false | true | true |  | 
+70 | 来料日期 | header | true | false | false | true |  | 
+80 | 来料数量 | header | true | false | false | true |  | 
+85 | 计量单位 | header | false | true | false | true |  | 
+90 | 文件编码 | header | true | false | false | false |  | 
+100 | 检验依据 | header | true | false | false | false |  | 
+110 | 检验结论 | header | true | false | false | true |  | 
+120 | 处理意见 | header | true | false | false | true |  | 
+130 | 检验人 | header | true | false | false | false |  | 
+140 | 表单审核人 | header | true | true | false | true |  | 
+150 | 备注 | header | true | false | false | true |  | 
+(26 行)
+==> SELECT seq, label, place, visible, hidden, required, editable, ref_panel, ref_field FROM yj_field WHERE panel_code='QC_INSP' ORDER BY seq, id
+seq | label | place | visible | hidden | required | editable | ref_panel | ref_field
+------------------------------------------------------------------------------------
+10 | 单据编号 | query,header | true | false | true | false | GFDA | mc
+10 | 物料编码 | query,detail | true | false | true | true | INV | 存货编码
+20 | 单据日期 | query,header | true | false | true | true | GFDA | mc
+20 | 物料名称 | detail | true | false | false | true | INV | 存货名称
+30 | 规格型号 | detail | true | false | false | true | GFDA | mc
+30 | 业务员 | header | true | false | false | true | EMP | 员工名称
+40 | 暂收单号 | query,header | true | false | false | true | QC_RECV | 单号
+40 | 采购订单行号 | detail | true | false | false | true | GFDA | mc
+50 | 单位 | detail | false | true | false | true | UOM | 计量单位名称
+50 | 采购订单号 | query,header | true | false | false | true | GFDA | mc
+60 | 单价 | detail | true | false | false | true | GFDA | mc
+60 | 批次号 | query,header | true | false | false | false |  | 
+70 | 供应商 | query,header | true | false | false | true | GFDA | mc
+70 | 计量单位 | detail | true | false | false | true | UOM | 计量单位名称
+80 | 送检数量 | detail | true | false | false | true | GFDA | mc
+80 | 供应商代码 | query,header | true | false | false | true | GFDA | dm
+90 | 合格数量 | detail | true | false | true | true | GFDA | mc
+90 | 部门 | header | true | false | false | true | DEPT | 部门名称
+100 | 不合格数量 | detail | true | false | false | true | GFDA | mc
+100 | 部门编码 | header | true | false | false | true | DEPT | 部门编码
+110 | 检验员 | header | true | false | false | true | EMP | 员工名称
+110 | 报废数量 | detail | false | true | false | true | GFDA | mc
+120 | 检验日期 | header | true | false | false | true | GFDA | mc
+120 | 损耗 | detail | true | false | false | true | GFDA | mc
+130 | 检验编号 | query,header | true | false | false | true | GFDA | mc
+130 | 损耗率 | detail | true | false | false | true | GFDA | mc
+140 | 检验方案 | header | true | false | false | true | QC_PLAN | 方案名称
+140 | 生产日期 | detail | true | false | false | true | GFDA | mc
+150 | 执行标准 | query,header | true | false | false | true | GFDA | mc
+150 | 批次号 | detail | true | false | false | false |  | 
+160 | 处置方式 | detail | false | true | false | true | GFDA | mc
+160 | 检验类型 | header | true | false | false | true | GFDA | mc
+170 | 总结论 | query,header | true | false | false | true | GFDA | mc
+170 | 条码 | query,detail | false | true | false | true | GFDA | mc
+180 | 成品编号 | detail | false | true | false | true | GFDA | mc
+180 | 附件1 | header | true | false | false | true | GFDA | mc
+190 | 物料描述 | detail | false | true | false | true | GFDA | mc
+190 | 附件2 | header | true | false | false | true | GFDA | mc
+200 | 箱数 | detail | false | true | false | true | GFDA | mc
+200 | 附件3 | header | true | false | false | true | GFDA | mc
+210 | 日期 | detail | false | true | false | true | GFDA | mc
+210 | 附件4 | header | true | false | false | true | GFDA | mc
+220 | 结案 | detail | false | true | false | true | GFDA | mc
+220 | 附件5 | header | true | false | false | true | GFDA | mc
+230 | 部门 | detail | false | true | false | true | DEPT | 部门名称
+230 | 附件6 | header | true | false | false | true | GFDA | mc
+240 | 备注 | header,detail | false | true | false | true | GFDA | mc
+240 | 单据状态 | query,header | false | true | false | false | GFDA | mc
+250 | 部门名称 | detail | false | true | false | true | GFDA | mc
+260 | 审核人 | header | true | false | false | false | EMP | 员工名称
+260 | 入库单号 | detail | true | false | false | false | GFDA | mc
+270 | 审核时间 | header | true | false | false | false | GFDA | mc
+270 | 仓库代码 | detail | false | true | false | true | GFDA | mc
+280 | 批次键 | header | false | true | false | false | GFDA | mc
+(54 行)

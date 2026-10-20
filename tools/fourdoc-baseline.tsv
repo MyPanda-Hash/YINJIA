@@ -157,6 +157,10 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 32	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
 33	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
 34	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
+35	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
+36	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
+37	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
+38	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
 1	PURCHASE_IN	存货编码	存货编码	query,detail	10	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code	
 2	PURCHASE_IN	单据日期	单据日期	query,header	10	日期	140	ER-V							Document Date	
 3	PURCHASE_IN	单据编号	单据编号	query,header	20	文本	140	ER-V							Document Number	

@@ -49,6 +49,21 @@ public final class PagePanelRegistry {
      * 动作只有两个:view(看配置)+ save(改配置);本页不含单据动作。
      */
     public static final String ERP_INTEG = "ERP_INTEG";
+    /** 数采平台·IOT设备配置(2026-10-20) */
+    public static final String DC_CONFIG = "DC_CONFIG";
+    /** 数采平台·数据监控(2026-10-20) */
+    public static final String DC_MONITOR = "DC_MONITOR";
+    /** 数采平台·状态统计(2026-10-20) */
+    public static final String DC_STATS = "DC_STATS";
+    /** 库存管理(现 WMS管理)·条码管理 → 扫码领料(2026-10-20) */
+    public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
+    /**
+     * 研发管理·项目管理 → 项目流程管控(2026-10-20 用户口径):
+     * 按立项申请单号查这条项目在「立项申请 → 定级分发 → 责任人确认 → 实施计划 → 审批归档 → 进度查询」
+     * 里走到哪一步、卡在谁手上。Vue 页面,数据现算(rd_approval/rd_plan/yj_doc_status/yj_form_approval),
+     * **不是** yj_panel 单据面板 ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
+     */
+    public static final String PROJECT_FLOW = "PROJECT_FLOW";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -97,13 +112,63 @@ public final class PagePanelRegistry {
             {"view", "可见"},
     };
 
+    /**
+     * 数采平台三页(2026-10-20):IOT设备配置 / 数据监控 / 状态统计 —— Vue 页面,数据来自
+     * bs_dc_* 七张表,不是 yj_panel 单据面板。此前**没有面板码** ⇒ 权限矩阵里勾不到、任何登录账号都能进。
+     * 动作按页面真实能力给:配置页只有「看」(写操作由后端 requireAdmin 硬闸),监控页可处理报警,统计页只读。
+     */
+    private static final String[][] DC_CONFIG_ACTIONS = {
+            {"view", "可见"},
+            {"query", "查询"},
+    };
+
+    private static final String[][] DC_MONITOR_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"alarm", "处理报警"},
+    };
+
+    private static final String[][] DC_STATS_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+    };
+
+    /**
+     * 扫码领料(2026-10-20):扫标签码 `存货编码|批号` → 组材料出库单草稿。
+     * 数据侧走通用面板引擎(STOCK_PICK 选货 + MATERIAL_OUT 生单),服务端闸门本来就在 MATERIAL_OUT 上;
+     * 这里登记的只是**页面本身**的可见/查询权,让它在「角色与面板权限」里能勾。
+     */
+    private static final String[][] BARCODE_SCAN_PICK_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"pick",  "生成领料单"},
+    };
+
+    /**
+     * 项目流程管控(2026-10-20):**只读**盯单页 —— 查流程走到哪一步、卡在谁手上。
+     * 页面本身不写任何单据(要补审批/定级/确认都回原面板操作),故动作只有可见 + 查询。
+     */
+    private static final String[][] PROJECT_FLOW_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+    };
+
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
-            new PagePanelDef(ORDER_CONVERT, "订单结转", "生产制造", ORDER_CONVERT_ACTIONS),
-            new PagePanelDef(SCHEDULE_BOARD, "快速排产", "生产制造", SCHEDULE_BOARD_ACTIONS),
-            new PagePanelDef(WORK_ORDER_BOARD, "工单排产", "生产制造", WORK_ORDER_BOARD_ACTIONS),
-            new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产制造", WORK_ORDER_LIST_ACTIONS),
-            new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS));
+            // 2026-10-20 导航改版:「生产制造」一级目录拆掉,这四个看板所属分组合并为「生产计划」
+            //   (与 menus.js 的 top-level「生产计划」/「生产过程」对应,权限矩阵按此分组)
+            new PagePanelDef(ORDER_CONVERT, "订单结转", "生产计划", ORDER_CONVERT_ACTIONS),
+            new PagePanelDef(SCHEDULE_BOARD, "快速排产", "生产计划", SCHEDULE_BOARD_ACTIONS),
+            new PagePanelDef(WORK_ORDER_BOARD, "工单排产", "生产计划", WORK_ORDER_BOARD_ACTIONS),
+            new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产计划", WORK_ORDER_LIST_ACTIONS),
+            new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS),
+            // 2026-10-20 补登:数采平台三页 + 扫码领料(此前菜单里无面板码 ⇒ 矩阵里缺这几个)
+            new PagePanelDef(DC_CONFIG, "IOT设备配置", "数采平台", DC_CONFIG_ACTIONS),
+            new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
+            new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
+            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理", BARCODE_SCAN_PICK_ACTIONS),
+            // 2026-10-20:研发管理·项目管理 → 项目流程管控(归「研发管理」组,与菜单一级目录一致)
+            new PagePanelDef(PROJECT_FLOW, "项目流程管控", "研发管理", PROJECT_FLOW_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

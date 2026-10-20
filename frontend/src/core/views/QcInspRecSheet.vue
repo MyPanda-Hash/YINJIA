@@ -7,9 +7,14 @@
        呈现方式与项目进度查询同族:纸张 + 右侧竖排操作栏(PanelxList approval-layout 提供)
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="qc-rec-sheet">
-    <!-- ① 标题 -->
+    <!-- ① 标题(右侧带来料检验单号链接,2026-10-19 用户口径 task 6「检验报告右边带来料检验单单号的链接」:
+         报告由检验单生单时自动建,「来料检验单号」在建单那一刻落库(QcCatalogService.createInspRecord),
+         这里只负责把它渲染成一条可点的链接 —— 点它切到该检验单并定位;打印不出现(no-print)。 -->
     <div class="qr-titlerow">
       <div class="qr-title">{{ tt('检验报告') }}</div>
+      <div v-if="inspNo" class="qr-doclink no-print" :title="tt('跳转到该来料检验单')" @click="gotoInsp">
+        ⧉ {{ tt('来料检验单') }} {{ inspNo }}
+      </div>
     </div>
 
     <!-- ② 抬头(四行 × 标签/值 两对,对齐原表 B|C:D|E|F:I) -->
@@ -181,8 +186,26 @@
         <tr v-for="cell in QC_INSP_REC_FOOT_FULL" :key="cell.key">
           <th class="qr-label">{{ tt(cell.label) }}</th>
           <td class="qr-value qr-value-wide" colspan="3">
+            <!-- 检验结论(2026-10-19 用户口径 task 2):改**下拉选择** 特采/合格/不合格,
+                 且允许"自定义补充" —— filterable + allow-create:预置三项可选,也能直接敲一个新结论回车即落库
+                 (与表体「检验项」同款交互)。选项来自 yj_field.dict_sql(migrate-qc-insp-rec-verdict-dropdown-20261019.sql),
+                 不硬编码;历史库里已有的其它结论文本照原样显示(allow-create 的输入值即原值)。 -->
+            <el-select
+              v-if="editable && cell.key === VERDICT_KEY"
+              v-model="head[cell.key]"
+              size="small"
+              filterable
+              allow-create
+              default-first-option
+              clearable
+              class="qr-cell-input qr-verdict-sel"
+              :placeholder="tt('请选择')"
+              @change="emit('dirty')"
+            >
+              <el-option v-for="o in verdictOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
             <el-input
-              v-if="editable"
+              v-else-if="editable"
               v-model="head[cell.key]"
               type="textarea"
               :autosize="{ minRows: 2, maxRows: 8 }"
@@ -232,7 +255,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
@@ -259,6 +282,9 @@ const K = Object.freeze({
   JUDGE: '单项判定',
 })
 
+/** 检验结论(表尾整宽格,2026-10-19 起是下拉框 + 可自定义补充) */
+const VERDICT_KEY = '检验结论'
+
 const props = defineProps({
   head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
@@ -283,6 +309,18 @@ function optionsOf(key) {
 const itemOptions = computed(() => optionsOf(K.ITEM))
 /** 单项判定:下拉(合格/不合格),字典值=中文数据键 */
 const judgeOptions = computed(() => optionsOf(K.JUDGE))
+/** 检验结论候选:特采/合格/不合格(来自 yj_field.dict_sql,不硬编码);
+ *  `allow-create` 让用户直接敲一个新结论 —— 历史库里已有的自定义值也照原值回显/可再选 */
+const verdictOptions = computed(() => optionsOf(VERDICT_KEY))
+
+/* ── 来料检验单号链接(2026-10-19 用户口径 task 6)──
+   报告建单时落了「来料检验单号」(QcCatalogService.createInspRecord),这里只做跳转:
+   与检验目录的「↗ 跳转到该检验单」同一套做法(router.push + ?docNo= 定位)。 */
+const inspNo = computed(() => String(props.head?.['来料检验单号'] ?? '').trim())
+function gotoInsp() {
+  if (!inspNo.value) return
+  router.push({ path: '/panelx/list/QC_INSP', query: { docNo: inspNo.value } })
+}
 
 function isDateField(key) {
   return String(fieldMap.value.get(key)?.dataType || '') === '日期'
@@ -469,6 +507,8 @@ onBeforeUnmount(() => { if (autoCarryTimer) clearTimeout(autoCarryTimer) })
  * (路由 query: prefillBatch/prefillMaterial)。只在单据还空着时填一次,已录入内容一律不动。
  */
 const route = useRoute()
+/** 跳到关联单据(来料检验单链接用,2026-10-19 task 6):与检验目录的 ↗ 跳转同款 */
+const router = useRouter()
 const prefilled = ref(false)
 watch(
   () => [props.editable, props.head?.['单据编号'], props.head?.['物料批次']],
@@ -535,6 +575,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;   /* 标题右侧「来料检验单号」链接的定位基准(2026-10-19 task 6) */
 }
 .qr-title {
   font-family: 'SimSun', 'Songti SC', serif;
@@ -542,6 +583,29 @@ watch(
   font-weight: 600;
   color: #1f5fa8;
   letter-spacing: 6px;
+}
+/* 标题右侧「来料检验单号」链接(2026-10-19 task 6):绝对定位贴标题行右端,
+   不参与居中排版(标题始终居中),窄窗时自动省略号;打印不出现(.no-print 由全局样式隐藏)。 */
+.qr-doclink {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #1f5fa8;
+  cursor: pointer;
+  user-select: none;
+}
+.qr-doclink:hover {
+  text-decoration: underline;
+}
+/* 检验结论下拉(2026-10-19 task 2):格内铺满、高度与其它整宽格一致 */
+.qr-verdict-sel {
+  width: 100%;
 }
 
 /* ═══ 抬头 / 表尾 ═══ */

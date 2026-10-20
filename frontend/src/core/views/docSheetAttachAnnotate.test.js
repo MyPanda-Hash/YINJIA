@@ -42,14 +42,24 @@ test('attachFieldOf:没有附件字段/空输入 → null(不得抛错)', () => 
   assert.equal(attachFieldOf([null, { dataType: '附件' }]), null, '只有 dataType 没有键 → 取不到行模型键,视为无')
 })
 
-// ── B. DocSheet:备注栏的附件入口 ────────────────────────────────────────────
-test('DocSheet:备注栏(含无备注但有附件字段的文书)必须渲染附件上传入口', () => {
+// ── B. DocSheet:附件入口的位置(2026-10-19 起分两处,别再合回一处) ────────────
+// 口径演进:
+//   · 立项申请表那种**有备注列**的文书 ⇒ 附件入口在右侧备注列顶部(原实现,保留);
+//   · 特采单那种**没有备注列**的文书 ⇒ 附件入口在**标题行下方的顶部附件条**(用户 2026-10-19 原话
+//     「特采单的上传附件的链接放在右边会影响单据的陈列,放在上面吧」:右侧那 250px 列会把纸面表格压窄)。
+test('DocSheet:附件入口按"有没有备注列"分两处渲染', () => {
   assert.match(docSheet, /import FileAttachCell from '\.\/FileAttachCell\.vue'/,
     'DocSheet 必须引入 FileAttachCell —— 附件是元数据驱动(yj_field.data_type=附件)的通用能力,不能只有 RecordSheetPanels 有')
   assert.match(docSheet, /import \{ attachFieldOf \} from '@core\/panel\/attachField\.js'/,
     '附件字段要从下发的 fields 里发现(attachFieldOf),不得在 DocSheet 里写死 附件1')
-  assert.match(docSheet, /v-if="config\.remark \|\| remarkAttach"[\s\S]{0,800}?<FileAttachCell/,
-    '备注块必须同时容纳附件入口(该面板没有备注列、但有附件字段时也要能显示)')
+  // ① 顶部附件条:无备注列时走这里,且在表格(.as-body)之前
+  assert.match(docSheet, /v-if="remarkAttach && !config\.remark[\s\S]{0,400}?class="as-attach-top"/,
+    '没有备注列的文书(特采单)必须把附件条放在标题行下方(顶部),不再塞进右侧备注列')
+  assert.match(docSheet, /class="as-attach-top"[\s\S]{0,900}?<FileAttachCell[\s\S]{0,400}?class="as-attach-top-cell"/,
+    '顶部附件条里要有 FileAttachCell 本体')
+  // ② 右侧备注列:只留给真配了备注的文书,且附件仍在列内
+  assert.match(docSheet, /v-if="config\.remark" class="as-remark"[\s\S]{0,900}?<FileAttachCell/,
+    '有备注列的文书(立项申请表)保持原样:附件入口仍在备注列顶部')
   assert.match(docSheet, /<FileAttachCell[\s\S]{0,400}?:field-key="remarkAttach\.key"/,
     'FileAttachCell 的 field-key 必须绑到发现出来的附件字段键')
   assert.match(docSheet, /:can-edit="attachCanEdit"/,

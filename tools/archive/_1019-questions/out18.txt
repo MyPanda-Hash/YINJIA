@@ -1,0 +1,45 @@
+==> SELECT panel_code, label, data_type, dict_sql FROM yj_field WHERE panel_code='QC_INSP_REC' AND label='检验结论'
+panel_code | label | data_type | dict_sql
+-----------------------------------------
+QC_INSP_REC | 检验结论 | 下拉框 | SELECT v FROM (VALUES (N'特采'),(N'合格'),(N'不合格')) AS t(v)
+QC_INSP_REC | 检验结论 | 下拉框 | SELECT v FROM (VALUES (N'特采'),(N'合格'),(N'不合格')) AS t(v)
+(2 行)
+==> SELECT N'qc_insp_rec.来料检验单号' AS 项, COUNT(*) AS 有值 FROM qc_insp_rec WHERE ISNULL(来料检验单号,'')<>'' UNION ALL SELECT N'qc_insp_rec 总数', COUNT(*) FROM qc_insp_rec UNION ALL SELECT N'qc_tc_in.检验数据记录单号 有值', COUNT(*) FROM qc_tc_in WHERE ISNULL(检验数据记录单号,'')<>'' UNION ALL SELECT N'qc_tc_in 总数', COUNT(*) FROM qc_tc_in UNION ALL SELECT N'QC_TC_IN 附件字段', COUNT(*) FROM yj_field WHERE panel_code='QC_TC_IN' AND data_type='附件' UNION ALL SELECT N'qc_tc_in 附件列', COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.qc_tc_in') AND name LIKE N'附件%'
+项 | 有值
+----------
+qc_insp_rec.来料检验单号 | 46
+qc_insp_rec 总数 | 62
+qc_tc_in.检验数据记录单号 有值 | 4
+qc_tc_in 总数 | 25
+QC_TC_IN 附件字段 | 6
+qc_tc_in 附件列 | 6
+(6 行)
+==> SELECT TOP 8 单据编号, 检验单号, 产品名称, 检验数据记录单号 FROM qc_tc_in ORDER BY id DESC
+单据编号 | 检验单号 | 产品名称 | 检验数据记录单号
+-----------------------------
+TCI-2026-10-0001 | IJ-2026-09-0036 | 硫酸氧钛 | 
+TCI-2026-09-0024 | IJ-2026-09-0153 | PP棉 | JYSJ-2026-09-0049
+TCI-2026-09-0023 | IJ-2026-09-0150 | 硅胶粉300-400目 | JYSJ-2026-09-0046
+TCI-2026-09-0022 | IJ-2026-09-0149 | 硅胶粉300-400目 | JYSJ-2026-09-0045
+TCI-2026-09-0021 |  |  | 
+TCI-2026-09-0020 |  |  | 
+TCI-2026-09-0019 |  |  | 
+TCI-2026-09-0018 |  |  | 
+(8 行)
+==> SELECT TOP 8 单据编号, 物料名称, 来料检验单号 FROM qc_insp_rec ORDER BY id DESC
+单据编号 | 物料名称 | 来料检验单号
+--------------------
+JYSJ-2026-10-0086 | 鑫恒酸洗（80-250） | IJ-2026-10-0020
+JYSJ-2026-10-0085 | 鑫恒酸洗（80-250） | IJ-2026-10-0019
+JYSJ-2026-10-0084 | 鑫恒（80-250） | IJ-2026-10-0019
+JYSJ-2026-10-0083 | 英克瑞斯X5（60-250） | IJ-2026-10-0018
+JYSJ-2026-10-0082 | 英克瑞斯酸洗炭 | IJ-2026-10-0017
+JYSJ-2026-10-0081 | 纸箱 | IJ-2026-10-0016
+JYSJ-2026-10-0080 | 鑫恒酸洗（80-250） | IJ-2026-10-0015
+JYSJ-2026-10-0079 | 英克瑞斯X5（60-250） | IJ-2026-10-0014
+(8 行)
+==> SELECT panel_code, module_group, category FROM yj_panel WHERE panel_code='QC_TC_IN'
+panel_code | module_group | category
+------------------------------------
+QC_TC_IN | 智能供应链 | 采购管理
+(1 行)

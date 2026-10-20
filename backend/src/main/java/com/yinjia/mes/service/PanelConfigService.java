@@ -1036,6 +1036,11 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    // 转ERP(2026-10-19《10.19 问题》第 8 条「暂收退料单需要转 ERP」):
+                    // 推到金蝶**采购退货单**(`/jdy/v2/scm/pur_ret`,单据类型 pur_bill_outbound)——
+                    // 退料=不合格来料退回供应商,金蝶侧唯一能挂供应商/参与往来结算的单据就是它
+                    // (见 KingdeePushService.pushDocument 的 isQcReturn 分支)。
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"查找", "查找", "刷新"},
                     // 打印退货单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
                     // —— 2026-10-06 同采购订单口径:主按钮即纸质单版式(下拉保留原「打印退货单」入口),通用表格打印走「预览」

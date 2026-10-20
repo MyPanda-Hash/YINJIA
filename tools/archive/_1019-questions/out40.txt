@@ -1,0 +1,24 @@
+==> /* migrate-formno-pool-sync-20261019.sql 自检报「重号 5 个」—— 看看是哪 5 个、什么情况 */ SELECT TOP 20 单据编号, COUNT(*) AS 行数, SUM(CASE WHEN ISNULL(asp_cancel,'N')='Y' THEN 1 ELSE 0 END) AS 已作废 FROM sl_recv GROUP BY 单据编号 HAVING COUNT(*) > 1 ORDER BY 单据编号 DESC
+单据编号 | 行数 | 已作废
+---------------
+(0 行)
+==> SELECT TOP 20 单据编号, COUNT(*) AS 行数, SUM(CASE WHEN ISNULL(asp_cancel,'N')='Y' THEN 1 ELSE 0 END) AS 已作废 FROM qc_insp GROUP BY 单据编号 HAVING COUNT(*) > 1 ORDER BY 单据编号 DESC
+单据编号 | 行数 | 已作废
+---------------
+IJ-2026-10-0027 | 2 | 0
+IJ-2026-10-0022 | 3 | 0
+(2 行)
+==> /* 空白占位头行(全字段空) */ SELECT TOP 10 'sl_recv' AS 表, id, 单据编号, 单据日期, ISNULL(供应商,N'') AS 供应商 FROM sl_recv WHERE ISNULL(供应商,N'')=N'' AND ISNULL(供应商代码,N'')=N'' AND ISNULL(备注,N'')=N'' ORDER BY id DESC
+表 | id | 单据编号 | 单据日期 | 供应商
+--------------------------
+sl_recv | 567 | SL-2026-10-0153 | 2026-10-19 | 
+sl_recv | 566 | SL-2026-10-0152 | 2026-10-19 | 
+sl_recv | 565 | SL-2026-10-0151 | 2026-10-19 | 
+sl_recv | 564 | SL-2026-10-0150 | 2026-10-19 | 
+sl_recv | 563 | SL-2026-10-0149 | 2026-10-19 | 
+sl_recv | 562 | SL-2026-10-0148 | 2026-10-19 | 
+sl_recv | 561 | SL-2026-10-0147 | 2026-10-19 | 
+sl_recv | 560 | SL-2026-10-0146 | 2026-10-19 | 
+sl_recv | 559 | SL-2026-10-0145 | 2026-10-19 | 
+sl_recv | 558 | SL-2026-10-0144 | 2026-10-19 | 
+(10 行)

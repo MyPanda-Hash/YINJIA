@@ -1,0 +1,11 @@
+==> ﻿SELECT panel_code, seq, label, place, visible, hidden, required, editable, ref_panel, ref_field FROM yj_field WHERE panel_code='QC_INSP_REC' ORDER BY seq, id
+[ERR] “﻿”附近有语法错误。
+==> SELECT TOP 5 单据编号, 物料名称, 物料批次, 检验结论, 备用1 FROM qc_insp_rec ORDER BY id DESC
+单据编号 | 物料名称 | 物料批次 | 检验结论 | 备用1
+-------------------------------
+JYSJ-2026-10-0086 | 鑫恒酸洗（80-250） | XH-20261015 |  | 
+JYSJ-2026-10-0085 | 鑫恒酸洗（80-250） | XH-20261015 |  | 
+JYSJ-2026-10-0084 | 鑫恒（80-250） | XH-20261015 |  | 
+JYSJ-2026-10-0083 | 英克瑞斯X5（60-250） | YKRS-20261015 |  | 
+JYSJ-2026-10-0082 | 英克瑞斯酸洗炭 | YKRS-20261015 |  | 
+(5 行)

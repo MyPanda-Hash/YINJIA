@@ -262,6 +262,15 @@ public class SysAdminController {
         out.put("allPanels", modules.stream().flatMap(m -> ((List<Map<String, Object>>) m.get("panels")).stream()).toList());
         out.put("granted", sysAdmin.grantedPanels(id));
         out.put("actions", PERMISSION_ACTIONS);
+        // 只读计数:矩阵里来自 yj_panel 的在册面板数 + 虚拟面板数(DASHBOARD + PagePanelRegistry.ALL)。
+        // 给 tools/verify/perm-groups.cjs 当"不重不漏"的真值用 —— 原先那里写死 153,面板一增就与库不符、
+        // 闸门常年红(2026-10-20 合并 origin/main 时发现)。这里现算,不再需要手工同步魔法数字。
+        int yjRegistered = registry.all().size();
+        int virtualPanels = 1 + PagePanelRegistry.ALL.size();   // DASHBOARD + 页面级
+        out.put("panelCounts", Map.of(
+                "yjRegistered", yjRegistered,
+                "virtual", virtualPanels,
+                "expected", yjRegistered + virtualPanels));
         return ApiResult.ok(out);
     }
 

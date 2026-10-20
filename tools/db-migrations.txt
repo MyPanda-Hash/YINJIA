@@ -3994,6 +3994,42 @@ migrate-insp-freq-stdlib-20261019.sql
 #         并回退 inv_cost_ledger 主键与两个视图(见 migrate-stock-views-restore-20261016.sql /
 #         migrate-stock-balance-warn-20261018.sql 的定义)。
 migrate-stock-flow-src-rid-grain-20261020.sql
+# migrate-batch-no-pure-date-20261019.sql — 批次号改回**纯日期 yyyyMMdd**(2026-10-19《10.19 问题》第 1 条)
+#   用户口径「批次号改回采用日期的方式,不再是供应商+日期,就是 WR- 后面的数据」⇒ 2026-10-04 的
+#   「供应商编码去 YJ- 前缀 + - + 日期」(如 XH-20261019)作废,新号 = 20261019(同一天共号)。
+#   只改六处列的 MS_Description(sl_recv/qc_insp/qc_return/bd_purchase_in.批次号、bd_pu_label.批次号、
+#   yj_doc_batch.batch_no)+ 自检;不动任何业务数据,历史旧号原样保留。配套代码见同批 BatchService 等。
+#   两账套均执行,幂等。
+migrate-batch-no-pure-date-20261019.sql
+
+# migrate-qc-insp-rec-verdict-dropdown-20261019.sql — 检验结论改下拉框(特采/合格/不合格 + 可自定义补充)
+#   2026-10-19《10.19 问题》第 2 条。QC_INSP_REC 的「检验结论」两行(query/header)由 文本 → 下拉框,
+#   字典 = 特采/合格/不合格;「自定义补充」由前端 el-select allow-create 承担(值落 nvarchar,天然可存)。
+#   只改元数据。两账套均执行,幂等。
+migrate-qc-insp-rec-verdict-dropdown-20261019.sql
+
+# migrate-qc-doc-links-20261019.sql — 品质单据之间两条单号链接(第 5/6 条)
+#   报告 qc_insp_rec 加 来料检验单号(第 6 条:检验报告右边带来料检验单单号链接);
+#   特采单 qc_tc_in 加 检验数据记录单号(第 5 条:品质部意见要带检验数据记录单号的链接,可跳转)。
+#   两列 + 两行隐藏 yj_field + 来料检验单号 en 译名 + 历史回填(报告←检验目录行、特采单←检验目录行)。
+#   两账套均执行,幂等(只填空值)。
+migrate-qc-doc-links-20261019.sql
+
+# migrate-qc-tc-in-move-attach-20261019.sql — 特采单归采购管理 + 可上传附件(第 3/4 条)
+#   ① 导航真源在前端 menus.js(品质管理>来料品质 → 智能供应链>采购管理>单据),本脚本把 yj_panel 的
+#      module_group/category 对齐成 智能供应链/采购管理(权限树/桌面模块计数/读放行集合同一口径);
+#   ② qc_tc_in 补 附件1..附件6 六列(nvarchar(1000),与出入库单同名同型)+ 列注明 + 6 行 yj_field
+#      (data_type=附件)⇒ 文书式面板 DocSheet 自动挂 FileAttachCell(上传/查看/删除)。
+#   面板编码/表/前缀 TCI/权限行一个字节未动。两账套均执行,幂等。
+migrate-qc-tc-in-move-attach-20261019.sql
+# migrate-qcreturn-erp-20261019.sql — 暂收退料单接「转ERP」(金蝶采购退货单 pur_ret)
+#   2026-10-19《10.19 问题》第 8 条。① qc_return 补 ERP 留位四列(是否已转ERP/ERP单号/转ERP操作人/转ERP时间)
+#   + 列注明 —— **缺这四列转ERP 一推就报「列名无效」**;② 4 行 yj_field(只读可见,左栏「ERP单」派生列要用);
+#   ③ 四标签 en 译名兜底;④ erp_integ_api/erp_integ_field 补 EXP_QRETURN + 11 行字段映射(集成配置清单可见);
+#   ⑤ 自检。接口 = POST /jdy/v2/scm/pur_ret(采购退货单 pur_bill_outbound),不推 src_* 源单组。
+#   ⚠ QC_RETURN 是采购链四单之一 ⇒ 同批重跑 tools/archive/_gen-fourdoc-restore.mjs + FourDocAudit 必须 PASS。
+#   两账套均执行,幂等。
+migrate-qcreturn-erp-20261019.sql
 
 # migrate-formno-pool-sync-20261019.sql — 单号重发事故(新增出来一张「已审核」单)的数据修复
 #   送料暂收单/来料检验单点「新增」→ 新草稿拿到库里**已存在**的单号(SL-2026-10-0032 等),
@@ -4062,3 +4098,39 @@ migrate-plang-ja-guard-trigger-20261020.sql
 #   为什么不改 migrate-db-backup-20261019.sql 的字节:改字节会让 DbSync 按内容哈希重跑整条历史脚本。
 #   幂等;两账套均执行。
 migrate-db-backup-monthly-20261019.sql
+#
+# ---- 2026-10-20 导航改版 + 权限矩阵补面板 ----
+#   用户口径:「现在给组织架构的角色面板权限更新一下，现在少了几个面板，把库存管理名字改为
+#   WMS管理系统，把生产制造的生产计划和生产过程提成一级目录，生产制造这个一级目录不要了，
+#   把设备维护挪到系统管理平台」。
+#   ① yj_panel.module_group:库存管理→WMS管理系统;生产制造拆为 生产计划 / 生产过程(10 张);
+#     设备维护(EQUIP_CHECK/MAINT_PLAN)→系统管理平台。
+#   ② 权限矩阵补 4 个页面级面板授权(DC_CONFIG/DC_MONITOR/DC_STATS/BARCODE_SCAN_PICK)+ en 译名。
+#   自检:旧分组清零、生产过程≥10、设备维护 2 张、每角色 4 码齐全、译名 4 条。幂等;两账套均执行。
+migrate-menu-restructure-wms-20261020.sql
+# 2026-10-20 研发管理·项目管理新增「项目流程管控」页面(页面级虚拟面板 PROJECT_FLOW):
+#   用户口径「填完立项申请提交审批后不知道文件到哪个流程了……通过立项申请表的编号查流程走到哪里」。
+#   不建表:数据现算(rd_approval / rd_plan / rd_progress_detail / yj_doc_status / yj_form_approval)。
+#   ① 现有全部角色补 yj_role_panel 授权(view,query) ② 面板名 en 译名。
+#   自检:PROJECT_FLOW 授权行 ≥ 角色数、en 译名 1 条。幂等;两账套均执行。
+migrate-rd-project-flow-20261020.sql
+# 2026-10-20 用户口径「把WMS管理系统改为WMS管理」:yj_panel.module_group 分组显示值改名。
+#   两账套各 35 张;代码侧 menus.js / PagePanelRegistry / ReportService / i18n 同批改。
+migrate-wms-group-rename-20261020.sql
+# 2026-10-20 测试账套:数采设备全部置为「五连齐备(可用)」—— 用户口径「把测试账套的设备全部改为可用的状态」。
+#   补:1 个演示网关 GW-READY(设备全绑它) + 每台 project_code/scada_drawn/last_debug_at + 每台 1 个采集点 1 条启用规则。
+#   ⚠ 不伪造在线(status/last_seen_at 不动);只动 HSDZ_MES_TEST,正式库 no-op。幂等。
+migrate-dc-test-ready-20261020.sql
+# 2026-10-20 用户口径「更新组织架构的角色面板」:补齐两处授权缺口(幂等,只 INSERT 缺失行)。
+#   ① admin 反而缺 ERP_INTEG/ERPLG/ERPLG_ROW/FIELDMGR/ZDGL(其中两个是管理员专属面板),照 role2 复制;
+#   ② PU_ORDER_DETAIL/PU_ORDER_STATS 四个角色全无授权,照兄弟面板 PU_ORDER 的授权行复制。
+migrate-role-panel-gap-20261020.sql
+# 2026-10-20 正式账套:数采设备配成「五连齐备(可用)」—— 用户口径「把真实账套的也全写成可用的形态,
+#   实际上有一个电子秤是可用的这个不用管」。真实电子秤 DZ-001 点名不动(status/last_seen_at 也不伪造)。
+#   补:兜底网关(有启用网关则不再建) + 每台 project_code/scada_drawn/last_debug_at + 每台 1 采集点 1 启用规则。
+#   只对 HSDZ_MES 生效(测试账套由 migrate-dc-test-ready-20261020.sql 负责),两边互不干扰。幂等。
+migrate-dc-prod-ready-20261020.sql
+# 2026-10-20 用户口径「菜单名称改为 IOT设备配置 … 正式账套中也改」。
+#   DC_CONFIG 是页面级虚拟面板(无 yj_panel 行),库里只有 yj_translation 一条译名改键;
+#   面板名本体在 menus.js / router / DcConfig.vue / PagePanelRegistry,同批代码改动。
+migrate-dc-config-rename-20261020.sql
