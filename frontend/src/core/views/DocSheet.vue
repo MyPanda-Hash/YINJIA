@@ -95,6 +95,24 @@
       </div>
     </div>
 
+    <!-- ②b 附件条(2026-10-19 用户口径:「特采单的上传附件的链接放在右边会影响单据的陈列,放在上面吧」)
+         只有「有附件字段、但没有备注列」的文书(特采单)走这里 —— 横向一条贴在标题下方,
+         不再占右侧 250px 的备注列:那列会把纸面表格压窄、整张单的版式跟着走形。
+         有备注列的文书(立项申请表)保持原样,附件仍挂在备注列顶部。 -->
+    <div v-if="remarkAttach && !config.remark && (attachCanEdit || head[remarkAttach.key])" class="as-attach-top">
+      <span class="as-attach-top-label">{{ tt('附件') }}</span>
+      <FileAttachCell
+        class="as-attach-top-cell"
+        :panel-code="panelCode"
+        :doc-no="head['单据编号'] || ''"
+        :field-key="remarkAttach.key"
+        :model-value="head[remarkAttach.key] || ''"
+        :can-edit="attachCanEdit"
+        hide-when-empty
+        @update:model-value="(v) => { head[remarkAttach.key] = v }"
+      />
+    </div>
+
     <!-- ③ 内容表 + 右侧备注列(立项申请表设计:F5「备注」标签 + F6:G15 合并填写区) -->
     <div class="as-body">
     <div class="as-table">
@@ -589,8 +607,9 @@
            2026-10-16:本列同时承载**附件入口** —— 立项申请等文书式面板的附件字段(yj_field.data_type=附件)
            是元数据驱动的,但备注不是表头字段格,附件能力原先只接在 RecordSheetPanels,文书式面板整条链没接
            ⇒ 用户报「备注栏没有附件上传入口」。附件字段名从下发的 fields 里发现(attachFieldOf),不写死。
-           该面板没有备注列但有附件字段时也要显示 ⇒ 条件写成 config.remark || remarkAttach。 -->
-      <div v-if="config.remark || remarkAttach" class="as-remark">
+           2026-10-19:**没有备注列的文书**(如特采单)不再借用这一列 —— 附件改到标题下方横向一条
+           (见上面 ②b 的 .as-attach-top),本列只留给真正配了 remark 的文书(立项申请表)。 -->
+      <div v-if="config.remark" class="as-remark">
         <div v-if="config.remark" class="as-remark-label">{{ tt(config.remark.label) }}</div>
         <FileAttachCell
           v-if="remarkAttach"
@@ -1209,6 +1228,28 @@ defineExpose({ focusField })
   display: flex;
   flex-direction: column;
   padding: 3px 6px;
+}
+/* 附件条(标题行下方横向一条,2026-10-19):
+   只服务"有附件字段但没有备注列"的文书(特采单)。用户口径「上传附件的链接放在右边会影响单据的陈列」
+   ⇒ 从右侧 250px 备注列挪到顶部:整宽一条、左标签右内容,表格列宽不再被挤。 */
+.as-attach-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #8a8a8a;
+  font-size: 13px;
+}
+.as-attach-top-label {
+  flex: none;
+  font-weight: 600;
+  color: #333;
+  line-height: 24px;
+}
+.as-attach-top-cell {
+  flex: 1;
+  min-width: 0;
 }
 .as-remark-label {
   flex: none;
