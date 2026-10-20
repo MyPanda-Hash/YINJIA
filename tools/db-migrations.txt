@@ -4121,3 +4121,7 @@ migrate-wms-group-rename-20261020.sql
 #   补:1 个演示网关 GW-READY(设备全绑它) + 每台 project_code/scada_drawn/last_debug_at + 每台 1 个采集点 1 条启用规则。
 #   ⚠ 不伪造在线(status/last_seen_at 不动);只动 HSDZ_MES_TEST,正式库 no-op。幂等。
 migrate-dc-test-ready-20261020.sql
+# 2026-10-20 用户口径「更新组织架构的角色面板」:补齐两处授权缺口(幂等,只 INSERT 缺失行)。
+#   ① admin 反而缺 ERP_INTEG/ERPLG/ERPLG_ROW/FIELDMGR/ZDGL(其中两个是管理员专属面板),照 role2 复制;
+#   ② PU_ORDER_DETAIL/PU_ORDER_STATS 四个角色全无授权,照兄弟面板 PU_ORDER 的授权行复制。
+migrate-role-panel-gap-20261020.sql
