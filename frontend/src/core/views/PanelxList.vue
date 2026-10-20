@@ -1681,6 +1681,7 @@
     </el-dialog>
     <NewVoucherDialog v-model:visible="newVisible" :panelCode="panelCode" :panel-name="panelName" @saved="onNewSaved" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
+    <BomImportDialog v-model="bomImpVisible" @done="onBomImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
     <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;多张先选取再查看,单张直接查看) ═══ -->
@@ -2413,6 +2414,7 @@ import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
+import BomImportDialog from './BomImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
@@ -4493,6 +4495,8 @@ const selVisible = ref(false)
 const impVisible = ref(false)
 const impFields = ref([])
 const impLabel = ref('明细')
+// 物料清单(WLBOM)批量导入:一个产品一张单(2026-10-21,见 BomImportDialog.vue)
+const bomImpVisible = ref(false)
 const scanVisible = ref(false)
 const selCfg = ref(null)
 // 材料二维码标签(品检分流链:暂收单行 打印标签)
@@ -9263,6 +9267,12 @@ async function onButton(action) {
     return
   }
   if (action === '导入') {
+    // 物料清单(WLBOM)= 一个产品一张单的批量导入(2026-10-21),不能走通用「追加到当前单」:
+    // Excel 里每行都带物料编码,要按产品**分组建单**,故走专用对话框 BomImportDialog。
+    if (panelCode.value === 'WLBOM') {
+      bomImpVisible.value = true
+      return
+    }
     // Excel 导入：识别 A 区主明细字段，导入后追加行并自动保存
     const blk = blocks.value.find((x) => x.id === 'A')
     const tab = blk ? activeTab(blk) : null
@@ -9935,6 +9945,11 @@ function onSelGenerated(generated) {
     }
   }
   load().then(finish)
+}
+
+// 物料清单(WLBOM)批量导入完成:每个产品各是一张新单,故整页刷新列表即可(2026-10-21)
+function onBomImported() {
+  load()
 }
 
 // Excel 导入完成：单据面板追加到当前单明细并保存；档案面板（无明细 tab）逐行新建档案

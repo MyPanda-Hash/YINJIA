@@ -356,6 +356,7 @@
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
+    <BomImportDialog v-model="bomImpVisible" @done="onBomImported" />
     <ScanFillDialog
       v-model="scanVisible"
       :panel-code="panelCode"
@@ -395,6 +396,7 @@ import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import ImportDialog from './ImportDialog.vue'
+import BomImportDialog from './BomImportDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 
@@ -545,6 +547,8 @@ const selVisible = ref(false)
 const impVisible = ref(false)
 const impFields = ref([])
 const impLabel = ref('明细')
+// 物料清单(WLBOM)批量导入:一个产品一张单(2026-10-21,见 BomImportDialog.vue)
+const bomImpVisible = ref(false)
 const scanVisible = ref(false)
 const selCfg = ref(null)
 
@@ -1218,6 +1222,14 @@ async function onButton(action) {
   }
   // Excel 导入：识别当前主明细 tab 字段，导入后追加明细行
   if (action === '导入') {
+    // 物料清单(WLBOM)= 一个产品一张单的批量导入(2026-10-21),不能走通用「追加到当前单」:
+    // Excel 里每行都带物料编码,要按产品**分组建单**,故走专用对话框 BomImportDialog。
+    // 注意 WLBOM 的菜单入口打开的是**表单页**(PanelxForm),不是列表页,
+    // 所以这里必须也拦一道,只改 PanelxList 的话按钮点了没反应(2026-10-21 实测踩到)。
+    if (panelCode.value === 'WLBOM') {
+      bomImpVisible.value = true
+      return
+    }
     const tab = tabs.value[0]
     if (!tab) return ElMessage.warning('该面板无明细可导入')
     impFields.value = (tab.fields || []).filter((f) => !f.hidden)
@@ -1461,6 +1473,11 @@ function back() {
     return
   }
   router.push({ path: `/panelx/list/${panelCode.value}` })
+}
+
+// 物料清单(WLBOM)批量导入完成:每个产品各是一张新单,故重新载入当前单即可(2026-10-21)
+function onBomImported() {
+  load()
 }
 
 // Excel 导入完成：行追加到主明细，提示保存落库

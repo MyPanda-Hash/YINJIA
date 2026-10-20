@@ -47,6 +47,8 @@ public class PxController {
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
     /** 研发「项目流程管控」只读取数(2026-10-20) */
     private final com.yinjia.mes.service.RdProjectFlowService rdFlow;
+    /** 工单扫码领料取数(2026-10-21):工单行 plang + BOM mate,两张表都不是注册面板 */
+    private final com.yinjia.mes.service.WorkOrderPickService woPick;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -61,7 +63,8 @@ public class PxController {
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
                         com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
-                        com.yinjia.mes.service.RdProjectFlowService rdFlow) {
+                        com.yinjia.mes.service.RdProjectFlowService rdFlow,
+                        com.yinjia.mes.service.WorkOrderPickService woPick) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -77,6 +80,45 @@ public class PxController {
         this.puLabel = puLabel;
         this.barcodeLabel = barcodeLabel;
         this.rdFlow = rdFlow;
+        this.woPick = woPick;
+    }
+
+    // ============ 工单扫码领料取数(2026-10-21,手机端) ============
+    /**
+     * 按工单码取工单行。
+     *
+     * <p>前端扫工单二维码(格式 {@code 公司代码@工单号@(1000+行号)},见 print-formats.woQrText)
+     * 后调本端点拿工单内容(产品/产线/排产数量)。工单落在 {@code plang},它不是注册面板,
+     * 走不了 {@code queryFormDataList},故单列一个只读端点。
+     *
+     * @param orderNo 工单号(必填)
+     * @param lineNo  工单行号;不传或 &lt;=0 表示整单全部行
+     */
+    @GetMapping("/woPick/lines")
+    public Map<String, Object> woPickLines(@RequestParam String orderNo,
+                                           @RequestParam(required = false) Integer lineNo) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", woPick.workOrderLines(orderNo, lineNo == null ? 0 : lineNo));
+        return out;
+    }
+
+    /**
+     * 按产品编码取 BOM 明细(该工单要领哪些料)。
+     *
+     * <p>数据源 = {@code mate}(WLBOM 物料清单面板的底层表)。
+     * 返回空列表表示该产品还没录 BOM —— 前端提示去「物料清单」面板录入,
+     * 而不是静默显示空清单(2026-10-21 实测:金蝶侧 BOM 接口 count=0,
+     * MES 自建 bs_bom 已下架,mate 只剩 T382 一个产品 ⇒ 必须先补数据)。
+     *
+     * @param productCode 产品编码
+     */
+    @GetMapping("/woPick/bom")
+    public Map<String, Object> woPickBom(@RequestParam String productCode) {
+        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", woPick.bomOf(productCode));
+        return out;
     }
 
     // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============
