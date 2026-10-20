@@ -2011,6 +2011,7 @@ export default {
     '供应商/客户': 'Nhà cung cấp/Khách hàng',
     '暂无已审核且未转ERP的单据': 'Không có tài liệu nào đã được xem xét và chưa được chuyển giao cho ERP',
     '材料二维码标签': 'Nhãn mã QR vật liệu',
+    '打印失败': 'In thất bại',
     '打印标签': 'In nhãn',
     '打印产品二维码': 'In mã QR sản phẩm',
     '同步阶段进度': 'Tiến độ giai đoạn đồng bộ',

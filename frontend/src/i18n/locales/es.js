@@ -2006,6 +2006,7 @@ export default {
     '供应商/客户': 'Proveedor/cliente',
     '暂无已审核且未转ERP的单据': 'No hay documentos auditados y no transferidos a ERP',
     '材料二维码标签': 'Etiqueta de código QR de material',
+    '打印失败': 'Error al imprimir',
     '打印标签': 'Imprimir etiqueta',
     '打印产品二维码': 'Imprimir el código QR del producto',
     '同步阶段进度': 'Progress de fase de sincronización',

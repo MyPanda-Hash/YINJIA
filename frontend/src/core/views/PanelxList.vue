@@ -6980,6 +6980,12 @@ function prepareDocPrint() {
 function onAfterPrintDoc() {
   document.body.classList.remove('doc-printing')
   if (docPrintLazy.value) docPrintReady.value = false
+  // 2026-10-20:@page(纸向/页边距)只对**本次**打印有效,打完即摘。
+  //   原实现让这条 A4 @page 常驻 <head>;之后再打 75×100mm 的标识卡/二维码标签
+  //   (页面内打印层,见 @core/panel/printChannel)时,两条 @page 同时存在,
+  //   一旦层叠顺序变化(或浏览器取第一条)标签就会按 A4 出纸、一张纸只印半张卡。
+  //   Ctrl+P / 浏览器菜单打印都会在 beforeprint 里重新注入(onBeforePrintDoc),故摘掉不影响单据打印。
+  document.getElementById('doc-print-page')?.remove()
 }
 /**
  * Ctrl/Cmd+P 拦截:懒渲染面板要先把打印层挂上再交回给浏览器。
@@ -9083,7 +9089,8 @@ async function onButton(action) {
     return
   }
   // 银嘉固定版式纸质单打印(2026-09-23):采购订单/暂收退料单 → print-formats.js;
-  // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),新窗口打印
+  // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),
+  // 出纸 = 页面内打印层(2026-10-20 起不再开子窗口,见 @core/panel/printChannel)
   // (无后端处理器,同 打印工单二维码 本地拦截先例)
   // 打印订单无金额(2026-09-28 用户澄清):采购订单的另一种报表,版式同款仅去 单价/小计/总计金额
   if (action === '打印采购订单' || action === '打印退货单' || action === '打印订单无金额') {

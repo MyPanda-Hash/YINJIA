@@ -29,12 +29,16 @@
  * 数据源:暂收单明细行(物料编码/名称/批号/数量/单位)/采购订单明细行(无批号,供应商贴码);
  * 二维码内容 = `物料编码|批号@数量`(2026-09-28 用户口径加 @数量;批号空→无批号段,数量空→无@段;
  * 工单/产品二维码经 qrText 覆盖,不受默认拼接影响)。
- * 打印:对话框内打印样式(@media print 只显示标签网格),调用 window.print()。
+ * 打印(2026-10-20 改):走**页面内打印通道** `@core/panel/printChannel`,与商品/仓位标识卡、
+ *   采购单据、面板单据打印**同一条路**——不弹窗、不在子窗口里 print。
+ *   旧写法(子窗口 document.write + window.print)与主页面同源共用渲染进程,打印预览/虚拟打印机一卡,
+ *   主页面跟着僵死(现场「打印后卡死、刷新无效」),故整条弹窗打印路已废弃。
  */
 import { ref, computed } from 'vue'
-import { ElDialog, ElButton } from 'element-plus'
+import { ElDialog, ElButton, ElMessage } from 'element-plus'
 import QRCode from 'qrcode'
 import { tt } from '@/i18n'
+import { printInPage } from '@/core/panel/printChannel'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -60,6 +64,17 @@ async function renderQr() {
   }
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+/** 打印层样式:选择器一律收在 `#yj-print-host` 下(页面内打印与主界面共用一个文档,别被全局样式串味) */
+const PRINT_CSS = '@page{size:A4;margin:8mm}'
+  + '#yj-print-host{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#222}'
+  + '#yj-print-host .qrg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}'
+  + '#yj-print-host .card{display:flex;gap:10px;padding:8px;border:1px solid #999;border-radius:4px;'
+  + 'page-break-inside:avoid;break-inside:avoid}'
+  + '#yj-print-host .card img{width:84px;height:84px}'
+  + '#yj-print-host .info{display:flex;flex-direction:column;justify-content:center;min-width:0}'
+  + '#yj-print-host .l{font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '#yj-print-host .strong{font-weight:600;font-size:14px}'
+  + '#yj-print-host .dim{color:#666}'
 function print() {
   // 空值不出行:批号空不写 LOT;仓库/供应商/仓位没有就不印(2026-10-18 用户口径)
   const lineOf = (label, val) => (val ? `<div class="l">${esc(label)} ${esc(val)}</div>` : '')
@@ -67,26 +82,12 @@ function print() {
     <div class="info"><div class="l strong">${esc(l.code)}</div><div class="l">${esc(l.name)}</div>
     ${lineOf('LOT', l.lot)}${lineOf(tt('仓库'), l.warehouse)}${lineOf(tt('供应商'), l.supplier)}${lineOf(tt('仓位'), l.bin)}
     <div class="l dim">${esc(l.qty)} ${esc(l.unit)} · ${esc(l.doc)}</div></div></div>`).join('')
-  // 2026-10-18:复用同一个打印窗口 + 打完自动关(原来每次新开一个窗口且从不关闭,
-  //   打一次标签就多一个带整页图片的窗口,久了把浏览器拖死 —— 现场「打印后卡死」的嫌疑之一)
-  const w = window.open('', 'yj-print-qr', 'width=820,height=640')
-  if (!w) return
-  try { w.document.open() } catch { /* ignore */ }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>材料二维码标签</title><style>'
-    + 'body{font-family:system-ui,"Microsoft YaHei",sans-serif;margin:14px;color:#222}'
-    + '.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}'
-    + '.card{display:flex;gap:10px;padding:8px;border:1px solid #999;border-radius:4px;page-break-inside:avoid;break-inside:avoid}'
-    + '.card img{width:84px;height:84px}'
-    + '.info{display:flex;flex-direction:column;justify-content:center;min-width:0}'
-    + '.l{font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-    + '.strong{font-weight:600;font-size:14px}.dim{color:#666}'
-    + '@page{margin:8mm}'
-    + '</style></head><body><div class="grid">' + cards + '</div>'
-    + '<scr' + 'ipt>'
-    + 'window.onload=function(){setTimeout(function(){try{window.print()}catch(e){}},150)};'
-    + 'window.onafterprint=function(){setTimeout(function(){try{window.close()}catch(e){}},300)};'
-    + '</scr' + 'ipt></body></html>')
-  w.document.close()
+  if (!cards) return ElMessage.warning(tt('当前单据没有可打印的明细行（或行缺少批号，请先保存）'))
+  // 2026-10-20:与商品/仓位标识卡、采购单据、面板单据打印同一条出纸通道(页面内打印层),
+  //   不再开子窗口 —— 那条路会把主页面一起拖死(见 printChannel.js 头部说明)。
+  if (!printInPage(props.title || tt('材料二维码标签'), '<style>' + PRINT_CSS + '</style><div class="qrg">' + cards + '</div>')) {
+    ElMessage.error(tt('打印失败'))
+  }
 }
 </script>
 
