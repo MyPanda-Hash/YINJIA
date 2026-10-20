@@ -114,6 +114,16 @@
             :placeholder="tt('扫描/输入物料条码')"
             @keyup.enter="onScanMaterial"
           />
+          <!-- 手输数量(2026-10-21):秤离线/故障时的兜底 —— 没它的话现场直接卡死,
+               验证阶段没有台车秤也必须能走完「扫码→记量→提交」。
+               填了就优先用手输值,清空则回到取秤。 -->
+          <input
+            v-model="manualQty"
+            class="wop-qty"
+            inputmode="decimal"
+            :placeholder="tt('数量')"
+            :title="tt('手输数量(留空则用电子秤)')"
+          />
           <button v-if="nativeScan" class="wop-btn cam" :disabled="scanning" @click="scanMaterialCamera">
             {{ scanning ? tt('扫码中…') : tt('相机扫码') }}
           </button>
@@ -227,6 +237,8 @@ const prevScale = ref(null)
 const scaleDeviceCode = ref('')
 /** 本次扫码来源(相机/手输),扫码完成后清空 */
 const lastScanSource = ref('')
+/** 手输数量(秤不可用时的兜底);有值优先于秤读数 */
+const manualQty = ref('')
 let scaleTimer = null
 
 const activeLine = computed(() => (activeIdx.value >= 0 ? lines.value[activeIdx.value] : null))
@@ -378,9 +390,9 @@ async function onScanMaterial() {
     return
   }
   activeIdx.value = hit
-  const qty = await readScaleQty()
+  const qty = await qtyOf()
   if (qty == null) {
-    matError.value = tt('电子秤读数不可用,请确认秤已连接并稳定')
+    matError.value = tt('取不到数量:请在「数量」框手输,或确认秤已连接')
     return
   }
   const r = applyScan(lines.value, p, qty)
@@ -398,6 +410,7 @@ async function onScanMaterial() {
     scanSource: lastScanSource.value || '手输',
   })
   lastScanSource.value = ''
+  manualQty.value = ''
   matInput.value = ''
   await nextTick()
   matInputRef.value && matInputRef.value.focus()
@@ -411,9 +424,9 @@ async function useScaleForActive() {
   matError.value = ''
   matOk.value = ''
   if (!activeLine.value) return
-  const qty = await readScaleQty()
+  const qty = await qtyOf()
   if (qty == null) {
-    matError.value = tt('电子秤读数不可用,请确认秤已连接并稳定')
+    matError.value = tt('取不到数量:请在「数量」框手输,或确认秤已连接')
     return
   }
   const r = applyScan(lines.value, { code: activeLine.value.code }, qty)
@@ -530,6 +543,20 @@ function scaleReadingOf(res) {
  *
  * @returns {Promise<number|null>} 可用重量;不可用时 null
  */
+/**
+ * 取本次数量:手输优先,否则读秤。
+ *
+ * 为什么要有手输(2026-10-21):台车秤离线/故障时原先直接报「读数不可用」,现场当场卡死 ——
+ * 既没法验证功能(没有秤硬件),也不符合车间实际(秤坏了还得领料)。
+ *
+ * @returns {Promise<number|null>} 可用数量;两者都取不到时 null
+ */
+async function qtyOf() {
+  const m = Number(manualQty.value)
+  if (Number.isFinite(m) && m > 0) return Math.round(m * 10000) / 10000
+  return await readScaleQty()
+}
+
 async function readScaleQty() {
   try {
     const res = await request.get('/dc/monitor')
@@ -756,6 +783,23 @@ onBeforeUnmount(() => {
   color: #374151;
   cursor: pointer;
   white-space: nowrap;
+}
+.wop-qty {
+  width: 88px;
+  height: 42px;
+  padding: 0 10px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  box-sizing: border-box;
+  outline: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.wop-qty:focus {
+  border-color: #1c4f8a;
+  box-shadow: 0 0 0 2px rgba(28, 79, 138, 0.12);
 }
 .wop-btn.cam {
   background: #eff6ff;
