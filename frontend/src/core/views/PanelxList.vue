@@ -734,6 +734,13 @@
                     ? tt('上月月结已取消,以下陈列该月原始单据')
                     : tt('上月未月结,以下陈列该月原始单据') }}
                 </div>
+                <!-- 口径提示(2026-10-20 用户报障「月结后为什么还会有 9 月份的单据」后补):
+                     已月结时,**有结转行的批次只显示月结结转**(结转行就是该批上月的代表,再铺原始单据会让余额翻倍);
+                     只有「月末结存为 0 的批次」——月结按口径不写结转行——继续陈列它上月的原始单据。
+                     不写这句,用户下次看到那几行 9 月单据还会以为又重复了。 -->
+                <div v-if="mcDetail[row.id]['上月状态'] === '已月结'" class="mc-detail-snap mc-dim mc-dim-tip">
+                  {{ tt('已月结:有结转行的批次只显示月结结转,月末结存为 0 的批次保留上月原始单据') }}
+                </div>
                 <!-- 注:此前的「统一预警」输入框 + 应用按钮已按用户 2026-10-15 当日改口径
                      (「统一预警是对所有数据的,要放在按钮栏那里,点击给弹窗」)**移到工具条 + 弹窗**,
                      展开区只保留下面批次表里的**按批次单独设置**(走 /api/stock/warn/set)。 -->
@@ -11234,6 +11241,8 @@ onUnmounted(() => {
 .mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
 .mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
 .mc-detail-snap.mc-dim { color: #94a3b8; }
+/* 口径提示行(库存明细展开区,2026-10-20):比数字行更轻、不抢眼,单独一行 */
+.mc-detail-snap.mc-dim-tip { margin-top: -4px; margin-bottom: 8px; font-size: 11.5px; }
 .mc-warn-hit { color: #dc2626; font-size: 11px; margin-left: 6px; }
 .mc-snap-note { font-style: normal; color: #94a3b8; font-size: 11px; }
 .mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }

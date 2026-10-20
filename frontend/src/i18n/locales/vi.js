@@ -431,6 +431,7 @@ export default {
     '上月无出入库单据': 'Tháng trước không có chứng từ nhập/xuất',
     '上月期末结存为 0,无结转行': 'Tồn cuối kỳ tháng trước bằng 0, không có dòng kết chuyển',
     '上月未月结,以下陈列该月原始单据': 'Tháng trước chưa kết chuyển; dưới đây là chứng từ gốc của tháng đó',
+    '已月结:有结转行的批次只显示月结结转,月末结存为 0 的批次保留上月原始单据': 'Đã kết chuyển: lô có dòng kết chuyển chỉ hiển thị dòng đó; lô có tồn cuối kỳ bằng 0 vẫn giữ chứng từ gốc tháng trước',
     '上月月结已取消,以下陈列该月原始单据': 'Kết chuyển tháng trước đã bị hủy; dưới đây là chứng từ gốc của tháng đó',
     '勾选仓库即查询(单选);不勾选显示全部': 'Tích chọn kho là truy vấn ngay (chọn một); không chọn thì hiển thị tất cả',
     '勾选仓库即查询;只能选一个;不勾选时列表为空': 'Tích chọn kho là truy vấn ngay; chỉ chọn được một; không chọn thì danh sách trống',
