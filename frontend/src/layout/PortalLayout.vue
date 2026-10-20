@@ -1,5 +1,18 @@
 <template>
   <div class="portal" :class="{ dark: app.dark }">
+    <!-- 窄屏沉浸页(2026-10-20):路由带 meta.immersiveOnMobile 且屏幕窄时,**不套桌面壳**
+         (顶栏/页签/侧栏一律不渲染),只出一块内容区 —— 这样「同一个地址」在手机上是全屏作业页,
+         又不用维护第二套路由/第二份组件。规范依据:docs/design/补充设计-V2.0.md §4.4
+         「移动端 H5 不套完整桌面布局」;桌面宽度下仍是正常壳层。 -->
+    <template v-if="immersive">
+      <div class="portal-immersive">
+        <router-view v-slot="{ Component }">
+          <component :is="Component" :key="route.path" />
+        </router-view>
+      </div>
+    </template>
+
+    <template v-else>
     <TopBar />
     <div class="portal-body">
       <LeftNav v-if="!app.maxContent" />
@@ -32,11 +45,12 @@
 
     <!-- T+ 浮层：右侧帮助面板 -->
     <HelpPanel />
+    </template>
   </div>
 </template>
 
 <script setup>
-import { onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TopBar from './TopBar.vue'
 import LeftNav from './LeftNav.vue'
@@ -52,11 +66,25 @@ const user = useUserStore()
 const tabs = useTabsStore()
 const route = useRoute()
 
+// 窄屏沉浸页(2026-10-20):断点 768,与 LeftNav/PortalLayout 自己的手机菜单断点一致。
+// 只有路由声明了 meta.immersiveOnMobile 的页面才享受(目前只有「生产领料」)。
+const narrow = ref(false)
+let mq = null
+const onMq = (e) => { narrow.value = e.matches }
+const immersive = computed(() => !!route.meta.immersiveOnMobile && narrow.value)
+onBeforeUnmount(() => { if (mq) mq.removeEventListener('change', onMq) })
+
 onMounted(() => {
   if (app.dark) document.documentElement.classList.add('dark')
   // 已离开登录页:清除深色底色标记(供 index.html 预置底色判断)
   try { sessionStorage.removeItem('mes_at_login') } catch { /* ignore */ }
   document.documentElement.classList.remove('login-bg')
+  // 窄屏判定(沉浸页用):768px 与 LeftNav/本文件手机菜单断点保持一致
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    mq = window.matchMedia('(max-width: 767px)')
+    narrow.value = mq.matches
+    mq.addEventListener('change', onMq)
+  }
   // Login data is cached for fast startup; refresh it so server-side corrections
   // and permission changes replace stale localStorage values on the next load.
   Promise.allSettled([user.fetchUserInfo(), user.fetchFactories()])

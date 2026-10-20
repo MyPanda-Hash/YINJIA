@@ -40,7 +40,7 @@ if (!lg?.data?.token) throw new Error('登录失败: ' + JSON.stringify(lg).slic
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-mpick-'))
 const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=' + W + ',' + H,
   `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
-await sleep(2500)
+await sleep(3500)
 let tab
 for (let i = 0; i < 30 && !tab; i++) {
   try { const r = await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) tab = await r.json() } catch {}
@@ -77,17 +77,20 @@ const layout = JSON.parse(await ev(`JSON.stringify({
   footPos: getComputedStyle(document.querySelector('.mp-foot') || document.body).position,
   menuHasPick: Array.from(document.querySelectorAll('.leftnav, .mobile-nav')).some(n => (n.textContent || '').includes('生产领料')),
   isPanelShell: !!document.querySelector('.pl-toolbar, .panelx-toolbar') && !document.querySelector('.mp'),
+  hasTopBar: !!document.querySelector('.topbar'),
+  hasTabs: !!document.querySelector('.tabs, .tabs-bar, .tabbar'),
 })`))
 ok('页面已渲染(.mp-title=' + layout.title + ')', layout.title.length > 0, `cards=${layout.cards}`)
 ok(`${W} 宽无横向滚动`, layout.doc <= layout.win && layout.body <= layout.win, `doc=${layout.doc} win=${layout.win}`)
 if (W >= 900) {
   ok('电脑端双栏(grid)且左右都有宽度', layout.cols === 'grid' && layout.leftW > 0 && layout.rightW > 0, JSON.stringify({ cols: layout.cols, leftW: layout.leftW, rightW: layout.rightW }))
   ok('电脑端底栏不再 fixed(留在内容流里)', layout.footPos !== 'fixed', layout.footPos)
-  ok('左侧菜单能看到「生产领料」', layout.menuHasPick === true, String(layout.menuHasPick))
+  ok('电脑端保留桌面壳(顶栏在)', layout.hasTopBar === true, String(layout.hasTopBar))
 } else {
-  // 统一地址后:手机端也是桌面壳(有顶栏/抽屉导航),页脚改成 flex 贴底(不再 position:fixed)
-  ok('手机端单列 + 页脚在内容流里贴底', layout.cols === 'block' && layout.footPos !== 'fixed', JSON.stringify({ cols: layout.cols, footPos: layout.footPos }))
-  ok('推入面板目录地址后仍在生产领料页(不是通用面板壳)', layout.isPanelShell === false, String(layout.isPanelShell))
+  // 2026-10-20 第三轮:窄屏走「沉浸页」—— 同一个地址,但不渲染桌面壳(顶栏/页签/侧栏),一屏就是作业页
+  ok('手机端单列布局', layout.cols === 'block', layout.cols)
+  ok('手机端不套桌面壳(无顶栏)', layout.hasTopBar === false, String(layout.hasTopBar))
+  ok('手机端不是通用面板壳(仍是生产领料页)', layout.isPanelShell === false, String(layout.isPanelShell))
 }
 
 // ② 工单
@@ -108,7 +111,7 @@ const clickBtn = async (text) => ev(`(() => {
 
 await setInput('.mp-card .el-input__inner', WO)
 await clickBtn('查询')
-await sleep(2500)
+await sleep(3500)
 const woCard = JSON.parse(await ev(`JSON.stringify({
   text: document.querySelector('.mp-wo')?.innerText || '',
   rows: document.querySelectorAll('.mp-kv').length,
@@ -130,7 +133,7 @@ await ev(`(() => {
   const b = Array.from(document.querySelectorAll('.mp button')).filter(x => (x.textContent||'').trim() === '查询');
   (b[b.length - 1] || b[0]).click(); return 'ok';
 })()`)
-await sleep(2500)
+await sleep(3500)
 const matBlock = JSON.parse(await ev(`JSON.stringify({
   text: document.querySelector('.mp-mat')?.innerText || '',
   stock: document.querySelector('.mp-mat-stock b')?.textContent || '',

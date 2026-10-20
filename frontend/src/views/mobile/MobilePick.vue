@@ -395,6 +395,10 @@ async function submit() {
 }
 .mp * { box-sizing: border-box; }
 
+/* 手机宽度下本页不套桌面壳(见 PortalLayout 的 immersiveOnMobile),此时它自己占满整屏 */
+:global(.portal-immersive) { min-height: 100vh; background: var(--el-bg-color-page); }
+:global(.portal-immersive) .mp { min-height: 100vh; }
+
 .mp-top {
   position: sticky;
   top: 0;

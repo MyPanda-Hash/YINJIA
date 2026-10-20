@@ -70,7 +70,7 @@ const routes = [
       //   这条**必须排在下面 `panelx/list/:panelCode` 之前**(静态路径优先于参数路径)。
       //   电脑端与手机端同一地址:窄屏单列 + 吸底栏,≥900px 双栏(同一份组件自适应)。
       //   旧的 `/prod/plan/prodPick`、`/m/pick` 保留为重定向,老链接/收藏不失效。
-      { path: 'panelx/list/PROD_PICK', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
+      { path: 'panelx/list/PROD_PICK', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK', immersiveOnMobile: true } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
