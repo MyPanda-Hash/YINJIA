@@ -82,12 +82,17 @@ const layout = JSON.parse(await ev(`JSON.stringify({
 })`))
 ok('页面已渲染(.mp-title=' + layout.title + ')', layout.title.length > 0, `cards=${layout.cards}`)
 ok(`${W} 宽无横向滚动`, layout.doc <= layout.win && layout.body <= layout.win, `doc=${layout.doc} win=${layout.win}`)
-if (W >= 900) {
-  ok('电脑端双栏(grid)且左右都有宽度', layout.cols === 'grid' && layout.leftW > 0 && layout.rightW > 0, JSON.stringify({ cols: layout.cols, leftW: layout.leftW, rightW: layout.rightW }))
-  ok('电脑端底栏不再 fixed(留在内容流里)', layout.footPos !== 'fixed', layout.footPos)
-  ok('电脑端保留桌面壳(顶栏在)', layout.hasTopBar === true, String(layout.hasTopBar))
+// 断点:≥768 留在桌面壳(≥900 才双栏),<768 走沉浸页(不渲染顶栏/页签/侧栏)
+if (W >= 768) {
+  ok('电脑/平板保留桌面壳(顶栏在)', layout.hasTopBar === true, String(layout.hasTopBar))
+  ok('底栏不压内容(position 非 fixed)', layout.footPos !== 'fixed', layout.footPos)
+  if (W >= 900) {
+    ok('宽屏双栏(grid)且左右都有宽度', layout.cols === 'grid' && layout.leftW > 0 && layout.rightW > 0, JSON.stringify({ cols: layout.cols, leftW: layout.leftW, rightW: layout.rightW }))
+  } else {
+    ok('平板宽度单列', layout.cols === 'block', layout.cols)
+  }
 } else {
-  // 2026-10-20 第三轮:窄屏走「沉浸页」—— 同一个地址,但不渲染桌面壳(顶栏/页签/侧栏),一屏就是作业页
+  // 窄屏「沉浸页」:同一个地址,但不渲染桌面壳 —— 一屏就是作业页(补充设计-V2.0 §4.4)
   ok('手机端单列布局', layout.cols === 'block', layout.cols)
   ok('手机端不套桌面壳(无顶栏)', layout.hasTopBar === false, String(layout.hasTopBar))
   ok('手机端不是通用面板壳(仍是生产领料页)', layout.isPanelShell === false, String(layout.isPanelShell))
