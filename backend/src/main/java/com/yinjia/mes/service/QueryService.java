@@ -828,18 +828,41 @@ public class QueryService {
                     where.append(" AND RTRIM(").append(alias).append(".[").append(whCol).append("]) IN (")
                             .append(String.join(",", java.util.Collections.nCopies(codes.size(), "?"))).append(")");
                     args.addAll(codes);
-                    whName = null; // 已按编码 IN 过滤,名称条件不再叠加
+                    // 已按编码 IN 过滤 ⇒ 名称条件不再叠加。
+                    // ⚠ 2026-10-20 用户报「勾选仓库报错」:这里原来赋的是 **null**,而下面
+                    //    `byWh = ... || !whName.isEmpty()` 直接解引用 ⇒ NPE「Cannot invoke String.isEmpty()
+                    //    because "whName" is null」。空串与 null 在下游(appendWhItemFilter)语义完全相同
+                    //    ("没有名称条件"),故一律用空串,别再让这里产生可空值。
+                    whName = "";
                 }
             }
             Object itemCode = condition.get("_itemCode");
             String itemName = strOf(condition.get("存货"));
             // `_` 开头的是控制键(已在上面各自处理),不进下面的通用循环,免得被当字段名 LIKE
-            String whColForName = l2c.get("仓库");
-            String itemColForName = l2c.get("存货");
-            appendWhItemFilter(where, args, alias, table, "仓库编码", whColForName, strOf(whCode), whName);
-            appendWhItemFilter(where, args, alias, table, "存货编码", itemColForName, strOf(itemCode), itemName);
-            boolean byWh = strOf(whCode).length() > 0 || !whName.isEmpty();
-            boolean byItem = strOf(itemCode).length() > 0 || !itemName.isEmpty();
+            // 名称列:多数面板叫「仓库」/「存货」,但**库存明细(STOCK_DETAIL)** 的字段是
+            // 「仓库名称」/「存货名称」—— 只认「仓库」会让该面板的名称条件退化成"没有列可过滤"
+            // (2026-10-20 实测:condition.仓库=恒亿仓 返回 0 行)。故按优先级取第一个存在的列。
+            //
+            // 编码列同样**不能写死**「仓库编码」(2026-10-20 用户勾选仓库报错时顺带查出):
+            // 库存状况(STOCK_STATUS)的表是 kucun,列名是 `ckdm`/`wzdm`,字段标签才叫「仓库」「存货」
+            // ⇒ 硬编码 "仓库编码" 拼出 `RTRIM(t.[仓库编码])` = 「列名 '仓库编码' 无效」直接 500。
+            // 口径:编码列 = 面板里「仓库编码」→「仓库」→「ckdm」中第一个存在的标签所映射的列;
+            //       存货同理(「存货编码」→「存货」→「wzdm」)。都取不到 = 该面板没有编码列,退到名称列。
+            String whCodeCol = firstCol(l2c, "仓库编码", "仓库", "ckdm");
+            String itemCodeCol = firstCol(l2c, "存货编码", "存货", "wzdm");
+            String whColForName = firstCol(l2c, "仓库", "仓库名称");
+            String itemColForName = firstCol(l2c, "存货", "存货名称");
+            // 名称列与编码列是同一列(如库存状况 label 仓库→ckdm)⇒ 名称位按"是不是编码"的轻判据走,
+            // 不要把名称当独立列再拼一次(那会拼出两个互相矛盾的等值条件)。
+            if (whColForName != null && whColForName.equals(whCodeCol)) whColForName = null;
+            if (itemColForName != null && itemColForName.equals(itemCodeCol)) itemColForName = null;
+            appendWhItemFilter(where, args, alias, table, whCodeCol, whColForName, strOf(whCode), whName,
+                    new String[]{"bs_wh", "仓库名称", "仓库编码"});
+            appendWhItemFilter(where, args, alias, table, itemCodeCol, itemColForName, strOf(itemCode), itemName,
+                    new String[]{"bs_inv", "存货名称", "存货编码"});
+            // 兜底再判一次空(null = 没有名称条件),不要再出现"靠上层保证非 null"的写法(2026-10-20 NPE)
+            boolean byWh = strOf(whCode).length() > 0 || (whName != null && !whName.isEmpty());
+            boolean byItem = strOf(itemCode).length() > 0 || (itemName != null && !itemName.isEmpty());
             // 报表日期段(查询弹窗):开始/结束日期 → 区间过滤。
             // 有 期次 列(收发存汇总)按月(yyyy-MM)闭区间;否则有 单据日期 列(库存台账)按全日期闭区间。
             // 这两个键不进通用 LIKE,下方的 l2c 兜底也会因无列名而跳过。
@@ -912,6 +935,21 @@ public class QueryService {
      */
     private void appendWhItemFilter(StringBuilder where, List<Object> args, String alias, String table,
                                     String codeCol, String nameCol, String code, String name) {
+        appendWhItemFilter(where, args, alias, table, codeCol, nameCol, code, name, null);
+    }
+
+    /**
+     * 同上,多一个 `archive` 参数:**面板只有编码列**时,用档案把"名称"翻成编码(2026-10-20)。
+     *
+     * <p>为什么需要:库存状况(STOCK_STATUS)的表是 `kucun`,只有 `ckdm`/`wzdm`(编码),没有名称列。
+     * 用户在那个面板按「仓库=恒亿仓」查时,旧行为是拿名称去和编码比 ⇒ **恒 0 行**
+     * (或按历史兜底,值恰好是编码时才对)。有了这一跳:名称 → `bs_wh.仓库编码` / `bs_inv.存货编码` ⇒ 按编码比,
+     * 名称与编码两种输入都对。
+     *
+     * @param archive {档案表, 名称列, 编码列};null = 不做名称→编码翻译
+     */
+    private void appendWhItemFilter(StringBuilder where, List<Object> args, String alias, String table,
+                                    String codeCol, String nameCol, String code, String name, String[] archive) {
         String c = code == null ? "" : code.trim();
         String n = name == null ? "" : name.trim();
         if (!c.isEmpty() && codeCol != null) {
@@ -929,11 +967,36 @@ public class QueryService {
         if (nameCol != null) {
             where.append(" AND RTRIM(").append(alias).append(".[").append(nameCol).append("]) = ?");
             args.add(n);
-        } else if (codeCol != null) {
-            // 面板只有编码列:名称位仍按编码兜底(历史行为,不回归成"查不出")
-            where.append(" AND RTRIM(").append(alias).append(".[").append(codeCol).append("]) = ?");
-            args.add(n);
+            return;
         }
+        if (codeCol != null) {
+            // 面板只有编码列:先试"名称 → 档案编码",翻不出来再按原样兜底(历史行为,不回归成"查不出")
+            String resolved = archive == null ? null : resolveByNameFromArchive(archive, n);
+            where.append(" AND RTRIM(").append(alias).append(".[").append(codeCol).append("]) = ?");
+            args.add(resolved == null || resolved.isEmpty() ? n : resolved);
+        }
+    }
+
+    /** 名称 → 档案编码(bs_wh.仓库名称→仓库编码 / bs_inv.存货名称→存货编码);查不到返回 null。 */
+    private String resolveByNameFromArchive(String[] archive, String name) {
+        try {
+            List<String> hit = jdbc.queryForList(
+                    "SELECT TOP 1 [" + archive[2] + "] FROM [" + archive[0] + "] WHERE [" + archive[1] + "] = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, name);
+            return hit.isEmpty() ? null : hit.get(0);
+        } catch (Exception e) {
+            return null;   // 档案表/列缺失 → 按原样兜底,不阻断查询
+        }
+    }
+
+    /** 标签→列名表里**按优先级取第一个存在的列**(都缺返回 null = 该面板没有这一列)。
+     *  用于「仓库/仓库名称」「存货/存货名称」这类同义标签不同名的面板(见 2026-10-20 库存明细 0 行)。 */
+    private static String firstCol(Map<String, String> l2c, String... labels) {
+        for (String lab : labels) {
+            String col = l2c.get(lab);
+            if (col != null && !col.isBlank()) return col;
+        }
+        return null;
     }
 
     /** 「这个值是不是编码」的轻判据:名称列里查不到这个值 ⇒ 当编码看。
