@@ -72,6 +72,10 @@ public class DcController {
      */
     @GetMapping("/config")
     public Map<String, Object> config() {
+        // 2026-10-20 权限化:三页此前**没有面板码**(菜单无 panelCode ⇒ filterMenuTree 放行),
+        //   权限矩阵里也勾不到。现挂页面级虚拟面板码(定义见 PagePanelRegistry),读侧按 view 词拦;
+        //   写操作仍是 requireAdmin(管理员恒过) —— 两层各管一件事。
+        perm.requirePanelView("DC_CONFIG");
         return ok(dcPlatform.config());
     }
 
@@ -122,6 +126,7 @@ public class DcController {
      */
     @GetMapping("/points")
     public Map<String, Object> points(@RequestParam(required = false) Integer deviceId) {
+        perm.requirePanelView("DC_CONFIG");
         return ok(dcPlatform.points(deviceId));
     }
 
@@ -142,6 +147,7 @@ public class DcController {
     /** 数采规则列表(GET /api/dc/rules?deviceId=)。 */
     @GetMapping("/rules")
     public Map<String, Object> rules(@RequestParam(required = false) Integer deviceId) {
+        perm.requirePanelView("DC_CONFIG");
         return ok(dcPlatform.rules(deviceId));
     }
 
@@ -168,6 +174,7 @@ public class DcController {
      */
     @GetMapping("/monitor")
     public Map<String, Object> monitor(@RequestParam(required = false) Integer deviceId) {
+        perm.requirePanelView("DC_MONITOR");
         return ok(dcPlatform.monitor(deviceId));
     }
 
@@ -187,6 +194,7 @@ public class DcController {
     @GetMapping("/stats")
     public Map<String, Object> stats(@RequestParam(required = false) String from,
                                      @RequestParam(required = false) String to) {
+        perm.requirePanelView("DC_STATS");
         return ok(dcPlatform.stats(from, to));
     }
 

@@ -1,10 +1,10 @@
 /**
  * 验证:角色面板权限矩阵的分组是否已归并到「导航一级模块」。
  * 断言:
- *   1. 分组顺序 = 导航模块顺序(我的桌面/研发管理/智能供应链/生产制造/品质管理/财务管理/设备管理/基础档案)
+ *   1. 分组顺序 = 导航模块顺序(ReportService.NAV_GROUP_ORDER,2026-10-20 起 11 组)
  *   2. **分组名必须全是导航一级模块** —— 矩阵里冒出导航没有的分组(历史碎组/写错的值)即 FAIL
- *   3. 全部面板数 == 135(130 张 yj_panel + DASHBOARD + 4 张页面级面板)且不重不漏、无空组
- *   4. 4 张库存报表 + 库存明细 落在「智能供应链」
+ *   3. 全部面板数 == TOTAL_PANELS(= yj_panel 在册 + DASHBOARD + PagePanelRegistry 页面级面板)且不重不漏、无空组
+ *   4. 4 张库存报表 + 库存明细 落在「WMS管理系统」(2026-10-20 前叫「库存管理」;2026-10-18 前在「智能供应链」)
  *   5. 「研发管理」含 25 张
  *
  * ⚠ 本脚本 2026-10-16 修活(此前是**死闸门**,所以「基础设置/系统管理」两个野分组一直没被拦住):
@@ -17,11 +17,18 @@
  */
 const BASE = (process.argv[2] || 'http://127.0.0.1:8090').replace(/\/$/, '')
 
-const NAV_ORDER = ['我的桌面', '研发管理', '智能供应链', '生产制造', '品质管理', '财务管理', '设备管理', '基础档案', '其他']
+/** 导航一级模块顺序 —— 必须与 backend ReportService.NAV_GROUP_ORDER 一致(2026-10-20 导航改版后) */
+const NAV_ORDER = ['我的桌面', '研发管理', '智能供应链', 'WMS管理系统', '生产计划', '生产过程',
+  '品质管理', '数据建模', '系统管理平台', '数采平台', 'ERP系统集成', '其他']
 /** 历史碎值:出现过但**不得**再作为独立分组出现(yj_panel.module_group 的原值,由 ReportService.NAV_GROUP 归并) */
 const LEGACY = ['基础资料', '基础数据', '基础设置', '采购管理', '订单管理', '生产管理', '委外加工', '库存核算', '库存报表', '销售管理', '物料及价格', '通用', '系统管理']
 const STOCK_REPORTS = ['STOCK_BALANCE', 'STOCK_LEDGER', 'STOCK_STATUS', 'STOCK_SUMMARY', 'STOCK_DETAIL']
-const TOTAL_PANELS = 135
+/**
+ * 面板总数 = yj_panel 在册面板 + DASHBOARD + PagePanelRegistry 页面级面板(2026-10-16 起 4 个,
+ * 2026-10-20 再加数采三页 DC_CONFIG/DC_MONITOR/DC_STATS 与扫码领料 BARCODE_SCAN_PICK ⇒ 8 个)。
+ * 改面板数量必须同步改这里 —— 它是"矩阵不重不漏"的桩。
+ */
+const TOTAL_PANELS = 153
 
 const results = []
 function check(name, ok, detail) {
@@ -71,14 +78,14 @@ async function main() {
   const all = modules.flatMap((m) => (m.panels || []).map((p) => p.panelCode))
   const uniq = new Set(all)
   check('面板无重复', uniq.size === all.length, `${all.length} 行 / ${uniq.size} 唯一`)
-  check(`面板总数 == ${TOTAL_PANELS}(130 yj_panel + DASHBOARD + 4 页面级)`, uniq.size === TOTAL_PANELS, `实际 ${uniq.size}`)
+  check(`面板总数 == ${TOTAL_PANELS}(yj_panel 在册 + DASHBOARD + 8 页面级)`, uniq.size === TOTAL_PANELS, `实际 ${uniq.size}`)
   check('每个分组都有面板(无空组)', modules.every((m) => (m.panels || []).length > 0))
 
   // 4. 库存报表族落位(含库存明细)
-  const scm = modules.find((m) => m.name === '智能供应链')
-  const scmCodes = new Set((scm?.panels || []).map((p) => p.panelCode))
-  const missing = STOCK_REPORTS.filter((c) => !scmCodes.has(c))
-  check('库存报表族 5 张(含库存明细)归入「智能供应链」', missing.length === 0, missing.join(',') || '全部命中')
+  const wms = modules.find((m) => m.name === 'WMS管理系统')
+  const wmsCodes = new Set((wms?.panels || []).map((p) => p.panelCode))
+  const missing = STOCK_REPORTS.filter((c) => !wmsCodes.has(c))
+  check('库存报表族 5 张(含库存明细)归入「WMS管理系统」', missing.length === 0, missing.join(',') || '全部命中')
 
   // 5. DASHBOARD 落位
   const dash = modules.find((m) => m.name === '我的桌面')

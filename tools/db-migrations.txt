@@ -4012,3 +4012,13 @@ migrate-db-backup-20261019.sql
 #   为什么不改 migrate-db-backup-20261019.sql 的字节:改字节会让 DbSync 按内容哈希重跑整条历史脚本。
 #   幂等;两账套均执行。
 migrate-db-backup-monthly-20261019.sql
+#
+# ---- 2026-10-20 导航改版 + 权限矩阵补面板 ----
+#   用户口径:「现在给组织架构的角色面板权限更新一下，现在少了几个面板，把库存管理名字改为
+#   WMS管理系统，把生产制造的生产计划和生产过程提成一级目录，生产制造这个一级目录不要了，
+#   把设备维护挪到系统管理平台」。
+#   ① yj_panel.module_group:库存管理→WMS管理系统;生产制造拆为 生产计划 / 生产过程(10 张);
+#     设备维护(EQUIP_CHECK/MAINT_PLAN)→系统管理平台。
+#   ② 权限矩阵补 4 个页面级面板授权(DC_CONFIG/DC_MONITOR/DC_STATS/BARCODE_SCAN_PICK)+ en 译名。
+#   自检:旧分组清零、生产过程≥10、设备维护 2 张、每角色 4 码齐全、译名 4 条。幂等;两账套均执行。
+migrate-menu-restructure-wms-20261020.sql

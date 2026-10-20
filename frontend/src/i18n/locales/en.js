@@ -3817,7 +3817,12 @@ export default {
     '存储分区': 'Sub-zone',
 
     // ── 流程管控看板(2026-10-16):生产/库存两条链路的节点名 · 口径说明 · 状态词 ──
-    '生产过程': 'Production flow',
+    '生产过程': 'Production execution',
+    // 2026-10-20 导航改版:库存管理 → WMS管理系统;生产计划/生产过程 升为一级;设备维护移入系统管理平台
+    'WMS管理系统': 'WMS',
+    '生产计划': 'Production Planning',
+    '设备维护': 'Equipment Maintenance',
+    '扫码领料': 'Scan Picking',
     '库存流转': 'Inventory flow',
     '当前卡点': 'Current blockers',
     '数据时间': 'As of',
