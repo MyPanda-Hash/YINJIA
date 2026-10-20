@@ -2,8 +2,31 @@
 <template>
   <div class="wop-page">
     <div class="wop-head">
-      <div class="wop-title">{{ tt('工单扫码领料') }}</div>
+      <div class="wop-title-row">
+        <div class="wop-title">{{ tt('工单扫码领料') }}</div>
+        <!-- 服务器地址设置(App 内):验证阶段要在本机局域网与公网服务器之间切换,
+             做成运行时可改,免得每次改代码重打包(打包约 1 分钟 + 装机) -->
+        <button v-if="nativeScan" class="wop-srv" :title="tt('设置服务器地址')" @click="openServer">
+          {{ serverLabel }}
+        </button>
+      </div>
       <div class="wop-sub">{{ tt('扫工单码 → 按 BOM 列出该领的料 → 逐项扫码取秤 → 整单提交') }}</div>
+    </div>
+
+    <!-- 服务器地址弹窗 -->
+    <div v-if="srvVisible" class="wop-mask" @click.self="srvVisible = false">
+      <div class="wop-srvdlg">
+        <div class="wop-srvdlg-title">{{ tt('服务器地址') }}</div>
+        <div class="wop-srvdlg-tip">
+          {{ tt('填后端的完整地址,含 http:// 与端口。改完需重新登录。') }}
+        </div>
+        <input v-model="srvInput" class="wop-input" :placeholder="tt('如 http://192.168.0.238:8090')" />
+        <div class="wop-srvdlg-acts">
+          <button class="wop-btn" @click="srvVisible = false">{{ tt('取消') }}</button>
+          <button class="wop-btn" @click="resetServer">{{ tt('恢复默认') }}</button>
+          <button class="wop-btn primary" @click="saveServer">{{ tt('保存并重载') }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="wop-grid">
@@ -140,9 +163,48 @@ import {
 } from '@/business/workOrderPick'
 import request from '@/core/request'
 import { scanOnce, hasNativeScan } from '@/business/nativeScan'
+import { apiOrigin, setApiOrigin, API_ORIGIN } from '@/business/appConfig'
 
 /** App(Capacitor 壳)内才显示「相机扫码」按钮 —— 浏览器摄像头受 HTTPS 限制 */
 const nativeScan = hasNativeScan()
+
+// ---- 服务器地址设置(App 内可改,免重打包) ----
+const srvVisible = ref(false)
+const srvInput = ref('')
+/** 按钮上显示的地址:去掉协议头,只留 host:port,省地方 */
+const serverLabel = computed(() => String(apiOrigin()).replace(/^https?:\/\//i, ''))
+
+function openServer() {
+  srvInput.value = apiOrigin()
+  srvVisible.value = true
+}
+
+/** 保存后整页重载:token 与请求基地址都要按新服务器重新走 */
+function saveServer() {
+  const v = String(srvInput.value || '').trim()
+  if (v && !/^https?:\/\//i.test(v)) {
+    woError.value = tt('地址要以 http:// 或 https:// 开头')
+    return
+  }
+  setApiOrigin(v)
+  srvVisible.value = false
+  // 清掉登录态,避免拿旧服务器的 token 去请求新服务器(必然 401)
+  try {
+    localStorage.removeItem('mes_token')
+    localStorage.removeItem('mes_user')
+  } catch { /* ignore */ }
+  location.reload()
+}
+
+function resetServer() {
+  setApiOrigin('')
+  srvVisible.value = false
+  try {
+    localStorage.removeItem('mes_token')
+    localStorage.removeItem('mes_user')
+  } catch { /* ignore */ }
+  location.reload()
+}
 const scanning = ref(false)
 
 const woInputRef = ref(null)
@@ -590,6 +652,64 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
+}
+.wop-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* 服务器地址按钮:小、靠右、不抢主信息 */
+.wop-srv {
+  margin-left: auto;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wop-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 16px;
+}
+.wop-srvdlg {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+}
+.wop-srvdlg-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+.wop-srvdlg-tip {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.wop-srvdlg-acts {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  flex-wrap: wrap;
 }
 .wop-head {
   margin-bottom: 12px;
