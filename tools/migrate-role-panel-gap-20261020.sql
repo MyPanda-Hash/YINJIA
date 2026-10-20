@@ -71,9 +71,24 @@ BEGIN
     RAISERROR(@m1, 16, 1);
     RETURN;
 END
-IF @puCnt <> 8
+/* 自检不写死「4 角色×2 = 8 行」:测试账套里另有自动化测试建的 AUTO_ROLE_* 角色,
+   角色数随环境变化(2026-10-20 实测 7 个角色 ⇒ 14 行,脚本在测试账套直接中止)。
+   口径改成「凡有 PU_ORDER 的角色,两张报表都必须有」——与 ② 的复制口径一致。 */
+DECLARE @puMissing int = (
+    SELECT COUNT(1) FROM yj_role_panel src
+    WHERE src.panel_code = N'PU_ORDER'
+      AND EXISTS (
+          SELECT 1 FROM (VALUES (N'PU_ORDER_DETAIL'), (N'PU_ORDER_STATS')) p(panel_code)
+          WHERE NOT EXISTS (
+              SELECT 1 FROM yj_role_panel t
+              WHERE t.role_id = src.role_id AND t.panel_code = p.panel_code
+          )
+      )
+);
+IF @puMissing <> 0
 BEGIN
-    DECLARE @m2 nvarchar(200) = N'[FAIL] 采购两报表应有 8 行(4 角色×2),实际 ' + CAST(@puCnt AS nvarchar(10));
+    DECLARE @m2 nvarchar(200) = N'[FAIL] 仍有 ' + CAST(@puMissing AS nvarchar(10))
+        + N' 个拥有 PU_ORDER 的角色缺采购两报表';
     RAISERROR(@m2, 16, 1);
     RETURN;
 END
