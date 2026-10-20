@@ -39,6 +39,17 @@ import java.util.Map;
  * 差别只有两处:建出来的单是首件检验单;明细**按《成型工艺清单》预铺**(与自动出单同源、同一个
  * {@link FirstInspItems}),而不是留空。通用「选单」不可用的三条硬阻断见 QcProcInspController 类注释。</p>
  *
+ * <p><b>2026-10-20 口径变更(本单的准入条件)</b>:用户口径「当前是被流程卡死,不完成成型报工就不能产生
+ * 当前的首件检验单……首件检验单需要关联当前的生产工单即可,不需要实现成型报工完成流程才产生。
+ * 就是当前检验单能选取工单,**未完工的工单就可以选取**,但是**已经完成的就不需要能被选取**,
+ * **已经被当前的检验单选取的也不能被再次选取**。」⇒
+ * <ol>
+ *   <li>**退出**「成型已报工」门禁({@link WoInspGate#gated}({@code QC_FIRST_INSP}) = false);</li>
+ *   <li>列表只出**未完工**({@link PlangDone})、未结案、未作废的行 —— 已完工的行不再出现;</li>
+ *   <li>已有存活首件检验单的工单行**不再列出**(不是灰掉,是根本不出现)。</li>
+ * </ol>
+ * 原来那道「成型完成才放行」的门禁对制程检验单、组装成品检验单仍然有效。</p>
+ *
  * <p>权限:锚 QC_FIRST_INSP 可见性(按钮只下发到这张单)。</p>
  */
 @RestController
@@ -81,9 +92,14 @@ public class QcFirstInspController {
     }
 
     /**
-     * 可选的生产工单行:**已排产入线**、未作废、未结案(ja Y/T 皆属结案口径);
-     * 有预排台账的行还要求成型那道已排(见 {@link com.yinjia.mes.service.WoInspGate#pickable})。
-     * 与制程检验单同一套取数口径。
+     * 可选的生产工单行(2026-10-20 用户口径,规则见类注释):
+     * <ol>
+     *   <li>未作废、**未结案**({@link com.yinjia.mes.service.PlangClose})、**未完工**
+     *       ({@link com.yinjia.mes.service.PlangDone});</li>
+     *   <li>该「工单号 + 工单行号」**还没有存活的首件检验单** —— 已被选过的不再出现。</li>
+     * </ol>
+     * 刻意**不要求**「已排产入线 / 成型已排」,也不再判「成型已报工」:首件检验是脱模后马上做的,
+     * 那一刻成型报工往往还没录(这正是 2026-10-19 那道门禁把现场卡死的原因,见 {@link WoInspGate#gated})。
      */
     @GetMapping("/woLines")
     public ApiResult<Map<String, Object>> woLines(@RequestParam(required = false) String keyword,
@@ -94,11 +110,14 @@ public class QcFirstInspController {
         int size = Math.max(1, Math.min(200, pageSize));
         int page = Math.max(1, pageNo);
 
-        // 只列「至少排产完成」的工单行(2026-10-18 用户口径;条件与制程检验单共用
-        // WoInspGate.pickable —— 两个入口禁止各写一份)。
+        // 准入(2026-10-20):未作废 + 未结案 + 未完工 + 本行还没有存活的首件检验单。
+        // 判据复用 PlangClose / PlangDone 两个唯一口径类,不在这里另写一份表达式。
         StringBuilder where = new StringBuilder(" WHERE ISNULL(p.asp_cancel,'N')<>'Y'"
-                + " AND " + com.yinjia.mes.service.PlangClose.notClosed("p") + ""
-                + com.yinjia.mes.service.WoInspGate.pickable("p"));
+                + " AND " + com.yinjia.mes.service.PlangClose.notClosed("p")
+                + " AND " + com.yinjia.mes.service.PlangDone.notDone("p")
+                + " AND NOT EXISTS (SELECT 1 FROM dbo." + HEAD_TABLE + " h"
+                + "                 WHERE h.[工单号]=p.pl_no AND h.[工单行号]=p.pl_xc"
+                + "                   AND ISNULL(h.asp_cancel,'N')<>'Y')");
         List<Object> args = new ArrayList<>();
         if (!kw.isEmpty()) {
             where.append(" AND (p.pl_no LIKE ? OR ISNULL(p.dm,'') LIKE ? OR ISNULL(p.mc,'') LIKE ?)");
@@ -118,24 +137,25 @@ public class QcFirstInspController {
                         + " ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
                         + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.[批次号],N'') AS 批次号,"
                         + " ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量,"
-                        + " ISNULL(p.khdm,N'') AS 客户, ISNULL(p.[工艺路线],N'') AS 工艺路线,"
-                        // 该行已有的存活首件检验单(列表上直接标「已建单」,并供幂等提示)
-                        + " ISNULL((SELECT TOP 1 h.[单据编号] FROM dbo." + HEAD_TABLE + " h"
-                        + "          WHERE h.[工单号]=p.pl_no AND h.[工单行号]=p.pl_xc"
-                        + "            AND ISNULL(h.asp_cancel,'N')<>'Y'), N'') AS 已建单号"
+                        + " ISNULL(p.khdm,N'') AS 客户,"
+                        // 未完工的判据列(列表上给现场看「未开工 / 在制 / 空」)
+                        + " ISNULL(p.[完工状态],N'') AS 完工状态,"
+                        // 工艺路线:本单已不做门禁,但 {@link WoInspGate#checkPage} 判「路线里有没有成型这道」
+                        // 要用它 —— 留着,`UNGATED_PANELS` 一旦去掉 QC_FIRST_INSP,门禁能原样复算(回滚只改一行)
+                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线"
                         + " FROM dbo.plang p" + where
                         + " ORDER BY p.pl_no DESC, p.pl_xc"
                         + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
                 pageArgs.toArray());
 
-        // 门禁(2026-10-19):与制程检验单**同一份实现、同一句话术**(WoInspGate + WoInspGateGuard),
-        // 对应流程图「成型报工 → 成型质检数据」——首件检验单就是成型那道工序的质检数据。
-        gate.decorate(rows);
+        // 门禁(2026-10-20):首件检验单已退出成型报工门禁 ⇒ 这里只负责把「可开单=true」等共享键补齐,
+        // 不再逐行判成型报工(开关在 WoInspGate.UNGATED_PANELS 一处,与制程检验单共用同一份实现)。
+        gate.decorate(PANEL, rows);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("list", rows);
         out.put("totalSize", total == null ? 0 : total);
-        out.put("gate", gate.meta(PANEL));      // 门禁档位 + 当前用户能否强制开单(弹窗顶部提示用)
+        out.put("gate", gate.meta(PANEL));      // 门禁生效=false + 能否强制开单(共享弹窗顶部提示用)
         return ApiResult.ok(out);
     }
 
@@ -147,7 +167,11 @@ public class QcFirstInspController {
      * <p><b>生产日期刻意留空</b>:按 2026-10-16 第二轮口径,它由「工单第一批完工」时回填
      * (见 {@code FirstInspBackfill}),出单时不写死今天。</p>
      *
-     * <p>幂等:同一 (工单号, 工单行号) 已有存活首件检验单 ⇒ 直接返回那张,不重复建单。</p>
+     * <p><b>准入(2026-10-20)</b>:未作废 + 未结案 + **未完工**才能建;已完工的行直接拒(与列表同口径)。
+     * 不再要求「成型已报工」。</p>
+     *
+     * <p>幂等:同一 (工单号, 工单行号) 已有存活首件检验单 ⇒ 直接返回那张,不重复建单
+     * (列表已把这种行滤掉,这里只兜直连接口)。</p>
      */
     @PostMapping("/fromWoLine")
     @Transactional
@@ -164,13 +188,16 @@ public class QcFirstInspController {
                         + " ISNULL(p.khdm,N'') AS khdm, ISNULL(dk.mc,N'') AS khmc"
                         + " FROM dbo.plang p LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         + " WHERE p.pl_no=? AND p.pl_xc=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + "   AND " + com.yinjia.mes.service.PlangClose.notClosed("p") + "", woNo, xc);
-        if (lines.isEmpty()) return ApiResult.error(400, "该生产工单行不存在、已作废或已结案：" + woNo + " #" + xc);
+                        + "   AND " + com.yinjia.mes.service.PlangClose.notClosed("p")
+                        + "   AND " + com.yinjia.mes.service.PlangDone.notDone("p"), woNo, xc);
+        if (lines.isEmpty()) {
+            return ApiResult.error(400, "该生产工单行不存在、已作废、已完工或已结案：" + woNo + " #" + xc);
+        }
         Map<String, Object> line = lines.get(0);
 
-        // 门禁(2026-10-19 用户口径「成型完成后的生产工单才能生成这个首件检验单」):
-        //   与制程检验单同一份实现(WoInspGateGuard.enforce);前端虽已置灰,这里仍然硬校验,
-        //   防直连接口绕过。强度档位(off/warn/block)、预警留痕、管理员强制开单都在那一处。
+        // 门禁(2026-10-20 用户口径):首件检验单**退出**成型报工门禁 —— 这一步现在恒放行,
+        //   保留调用是为了让开关只存在 WoInspGate.UNGATED_PANELS 一处(将来收紧只改那一行);
+        //   制程检验单同一处的 gate.enforce 仍然是硬校验。
         WoInspGateGuard.Decision d = gate.enforce(PANEL, woNo, xc, body, clientIp(request));
         if (!d.allowed()) return ApiResult.error(d.code(), d.error());
 

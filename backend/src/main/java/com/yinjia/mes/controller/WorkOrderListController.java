@@ -227,7 +227,8 @@ public class WorkOrderListController {
             String line = String.valueOf(r.getOrDefault("生产线", ""));
             boolean closed = "Y".equals(String.valueOf(r.getOrDefault("结案", "N")));
             String doneState = String.valueOf(r.getOrDefault("完工状态", ""));
-            boolean prodDone = "生产完工".equals(doneState) || "已完工".equals(doneState);
+            // 2026-10-20:口径收口到 PlangDone(与计划看板/首页看板/首件选工单同源)
+            boolean prodDone = com.yinjia.mes.service.PlangDone.isDone(doneState);
             m.put("生产状态", line.isBlank() ? "未排产"
                     : closed ? "已结案"
                     : (prodDone || (sched > 0 && in >= sched)) ? "完工"
