@@ -70,7 +70,7 @@
                         <td class="rsp-cover-lb" :class="{ 'rs-focus': isFocus(fd.key) }">{{ tt(fd.label) }}</td>
                         <td class="rsp-cover-vl">
                           <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
-                          <span v-else class="rsp-cover-val" :class="coverValClass(head[fd.key])">{{ head[fd.key] || '' }}</span>
+                          <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
                         </td>
                       </tr>
                     </tbody>
@@ -1792,25 +1792,20 @@ function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
 }
 /**
- * 封面只读值**过长 ⇒ 降字号**的档位(2026-10-15 用户口径:「如果过长应该是适当缩小字体」)。
+ * 封面只读值的字号档位(2026-10-15 引入,**2026-10-21 停用**)。
  *
- * 为什么必须降:值列是 `white-space:nowrap` + `table-layout:auto`,列宽由内容撑开 ⇒
- * 一行长文本(实测 `除余氯效率 ≥95%，压降 ≤5kPa@30L/min，抗压 ≥300N`)会把整张字段表顶宽出画布,
- * 画布 `.rsp-cover-page` 是 `overflow:hidden`,超出部分**直接被切**。
+ * 原委:当时值列是 nowrap + table-layout:auto,长文本会把整张字段表横向顶宽出画布,
+ * 画布 overflow:hidden 直接切掉,所以只能逐档降字号把内容压进一行。
  *
- * 档位按**显示宽度当量**算(中文/全角 1、半角 0.5 —— 与浏览器排版一致,避免"字不多但全是字母"误判),
- * 阈值按"一行放得下"折算:画布 767 设计px − 标签列(最长标签「客户项目名称」≈183)− 内边距/边框
- * ≈ 565 ⇒ 每档字数上限 = 565 / 字号。全部档位只改 font-size(与 white-space),
- * **不碰行高与列宽**,画布版式(8 行等高的网格、四段首尾相接)逐像素不变 ⇒ 回退只需删类名绑定。
- * 最后一档(>48 当量)才允许换行:此时表宽已收到值列的 min-width,行高最多长到 4 行 ——
- * 字段表底(设计 y474)到签字栏(设计 y605)之间还有 131 设计px 余量,压不到签字栏、撑不破格线。
+ * 停用原因(用户 2026-10-21 口径:「宽度固定下来,数据太长就直接换行」):
+ * 现在表已改成 table-layout:fixed + 值列固定 76% 宽 + 格内换行 ⇒ 长文本不再撑宽,
+ * 也就不必把字压到 9.5px(那样反而看不清)。行高由 CSS 表格的 height 下限自动增长,
+ * 签字栏在文档流里跟着下移,不会被盖住。
+ *
+ * 函数保留为「恒返回空串」而不是直接删掉,是为了让历史调用点/外部引用不炸;
+ * 模板里的类名绑定已一并去掉,所以实际没有任何视觉效果。
  */
-function coverValClass(v) {
-  const w = [...String(v ?? '')].reduce((n, ch) => n + (ch.codePointAt(0) > 0xff ? 1 : 0.5), 0)
-  if (w > 48) return 'rsp-cv-4'
-  if (w > 36) return 'rsp-cv-3'
-  if (w > 26) return 'rsp-cv-2'
-  if (w > 18) return 'rsp-cv-1'
+function coverValClass() {
   return ''
 }
 /** 签字栏三栏:与字段表**同宽同居中**(两表共用 CSS 的居中规则 + var(--coverw) 宽度),
@@ -4178,11 +4173,18 @@ function chartOf(dt) {
    ③ 整表的居中由外层 .rsp-cover-block 负责,本表不要自己再定位/居中。 */
 .rsp-cover-fields {
   border-collapse: collapse;
-  table-layout: auto;
+  /* 2026-10-21 用户口径:「有一些数据写太长了之后产品规格书这个面板就会撑得很宽,
+     应该是宽度固定下来,数据太长就直接换行」。
+     原来是 table-layout:auto + 值列 nowrap ⇒ 长文本把整张表**横向撑开**,
+     画布 .rsp-cover-page 是 overflow:hidden,超出的部分连同右边框一起被切掉。
+     改成 fixed + 显式列宽:列宽只由这里决定,内容再长也不改变表格宽度。
+     比例按设计稿:标签列 = 最长标签「客户项目名称」≈183 设计px / 画布 767 ≈ 24%,其余给值列。 */
+  table-layout: fixed;
   width: 100%;
 }
 /* 行高 = 设计 B7..B15 的 46 设计px(9 行等高)。table 上设 height 对行不生效,必须设在 tr 上。
-   ⚠ 别把行高改成 auto:固定等高的 9 行是设计版式的骨架,行高随内容浮动会让整块错位。 */
+   ⚠ 这里 height 在 CSS 表格里是**下限**(内容更高时行会长高)—— 换行后行变高是预期行为,
+   签字栏跟着字段表往下走(同一文档流),不会被盖住。 */
 .rsp-cover-fields tr {
   height: calc(46px * var(--cvy));
 }
@@ -4192,22 +4194,22 @@ function chartOf(dt) {
   vertical-align: middle;
   padding: 0 calc(8px * var(--cok));
 }
-/* 标签列:居中(设计 B 列即居中),宽度由最长的标签决定(所有行自然同宽) */
+/* 标签列:居中(设计 B 列即居中)。宽度固定 24%,不再由最长标签决定 */
 .rsp-cover-lb {
+  width: 24%;
   text-align: center;
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: calc(27.3px * var(--cok));
   color: #111;
   white-space: nowrap;
 }
-/* 值列:整列一个宽度,值左对齐;nowrap 由浏览器撑开 */
+/* 值列:整列固定 76% 宽,值左对齐;**长文本在格内换行**,不再横向撑开整张表 */
 .rsp-cover-vl {
+  width: 76%;
   text-align: left;
-  white-space: nowrap;
-  min-width: calc(280px * var(--cok));
-}
-.rsp-cover-vl {
-  text-align: left;
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .rsp-cover-input {
   width: 100%;
@@ -4236,20 +4238,20 @@ function chartOf(dt) {
   color: #1a1a1a;
 }
 /**
- * 只读值**过长 ⇒ 逐档降字号**(用户 2026-10-15 口径:「如果过长应该是适当缩小字体」)。
- * 档位由模板按显示宽度当量给出(coverValClass),每档字号都保证**一行放得下** ——
- * 值列 nowrap + table-layout:auto,不降字号就会把整张字段表顶宽出画布而被 overflow:hidden 切掉。
- * 只覆盖 font-size(/white-space),不动行高、列宽与边框 ⇒ 版式不变、回退 = 删这几个类。
- * 不用 transition(项目红线:禁 transition: all;这里也没有状态要澄清)。
+ * 只读值的字号档位 **已于 2026-10-21 停用**(见 coverValClass 注释):
+ * 封面改成固定列宽 + 格内换行后,长文本不再撑宽画布,也就不必把字压到 9.5px。
+ * 这里只保留一个通用兜底:极端长串也保证在格内折行,不允许溢出单元格。
  */
+.rsp-cover-val {
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
 .rsp-cover-val.rsp-cv-1 { font-size: calc(20px * var(--cok)); }
 .rsp-cover-val.rsp-cv-2 { font-size: calc(15px * var(--cok)); }
 .rsp-cover-val.rsp-cv-3 { font-size: calc(11px * var(--cok)); }
 .rsp-cover-val.rsp-cv-4 {
   font-size: calc(9.5px * var(--cok));
-  /* 超长才允许折行:表宽此时已收到值列 min-width,行高最多 4 行(设计 46px 网格内) */
-  white-space: normal;
-  word-break: break-all;
   line-height: 1.12;
 }
 /* 签名表:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽、左右边界对齐;

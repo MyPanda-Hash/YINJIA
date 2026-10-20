@@ -341,7 +341,14 @@ public class PanelConfigService {
             buttonGroups.add(group("删除", WO_INSP_PANELS.contains(def.code())
                     ? List.of("删除", "删除单据")
                     : List.of("删除")));
-            buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            // 2026-10-21 用户口径(物料清单):「把物料清单的审批换成修改」——
+            //   它是自助维护型基础数据,保存即归档、没有审批流,工具栏不该出现审批组;
+            //   换成「修改」:已归档的单要再改,走修改态(带修改留痕)再保存归档。
+            if (com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
+                buttonGroups.add(group("修改", List.of("修改")));
+            } else {
+                buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
             buttonGroups.add(group("刷新", List.of("刷新")));

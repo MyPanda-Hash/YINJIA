@@ -641,7 +641,15 @@ public class ButtonService {
         if (markSaved && DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) {
             // ⚠ 两级审批面板(RD_PROD_INFO)不让管理员走"保存即归档"这条自审自批捷径 ——
             //   否则整条两级审批被跳过(见 ADMIN_SAVE_DEFERS_TO_FLOW 的注释)。
-            if (isAdminUser(user) && !ADMIN_SAVE_DEFERS_TO_FLOW.contains(def.code())) {
+            // 2026-10-21:自助维护型面板(WLBOM)排在前面 —— 它**没有审批**,谁保存都直接归档,
+            //   不能落到下面"普通用户保存=送审"的分支(那样又会停在草稿/审批中)。
+            if (SELF_MAINTAINED_PANELS.contains(def.code())) {
+                finalizeOpenModify(def, no, user);
+                markArchived(def.code(), no, user);
+                // 留痕:审批历史里能看到"谁在什么时候保存归档",便于追溯谁改过基础数据
+                recordApproval(def.code(), no, "SUBMIT", "PENDING", "保存即归档（自助维护型面板，无审批）");
+                recordApproval(def.code(), no, "APPROVE", "APPROVED", "保存即归档（自助维护型面板，无审批）");
+            } else if (isAdminUser(user) && !ADMIN_SAVE_DEFERS_TO_FLOW.contains(def.code())) {
                 finalizeOpenModify(def, no, user); // 有未收尾修改留痕(修改闭环/弃审后再编辑)先收尾再归档
                 markArchived(def.code(), no, user);
                 // 保存即归档 = 自审自批,显式留痕(2026-09-12:归档路径审核人不再空白,审批历史可查)
@@ -692,6 +700,15 @@ public class ButtonService {
         // 四个受控文件只按 [产品编号] 关联产品信息表,重号会让"这个产品有哪些文件"分不清 ⇒ 全局唯一。
         // 与文档编号同口径:保存(提交口径)才校验,保存为草稿放过;已作废单据不算占用。
         if (markSaved && "RD_PROD_INFO".equals(def.code())) ensureProductCodeUnique(def, head, no);
+        // 产品信息表「编辑人」= 本次提交人的**真实姓名**(2026-10-21 用户口径:
+        //   「产品信息表的编辑人是提交审批的人的账号的真实名字」)。
+        // ⚠ 原先这一格是普通文本,用户手输,库里实测 3 张单全为 NULL、1 张填了 "111"。
+        //   改成每次保存/提交时按当前登录账号回写真名 —— 它是"谁最后编辑了这张单"的事实,
+        //   不该由填单人自己写(写了也不可信)。保存在落库之后执行,所以同一次提交即可生效。
+        if (markSaved && "RD_PROD_INFO".equals(def.code())) {
+            jdbc.update("UPDATE rd_prod_info_head SET 编辑人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(user), no);
+        }
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
@@ -5003,7 +5020,11 @@ public class ButtonService {
         form.put("文档编号", approvalNo);
         form.put("项目名称", name);
         if (!level.isEmpty()) form.put("项目定级", level);
-        if (!owner.isEmpty()) form.put("负责人", owner);
+        // 2026-10-21 用户口径:「立项申请的责任人确认之后新建的项目实施计划的责任人应该是**显示的真实名字**」。
+        // ⚠ 原来写的是 owner(rd_approval.备用2 = **登录账号**),所以实施计划的「负责人」格显示
+        //   chaishanyin 这类账号而不是"柴善银"(用户报障截图为证)。这里换成 realNameOf(owner)。
+        //   注意:流程判据仍只认账号(备用2/备用3),真实姓名只是**显示值**,不参与任何门禁比较。
+        if (!owner.isEmpty()) form.put("负责人", realNameOf(owner));
         form.put("编制日期", today);
         Map<String, Object> saved = save(registry.panel("RD_PLAN"), form, true);
         String no = str(saved.get("编号"));
@@ -6788,7 +6809,30 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
+            // 物料清单(WLBOM,2026-10-21 用户口径):「物料清单填写是需要保存的,现在显示的都是草稿,
+            //   这个填写保存不需要审批,修改也不需要审批」—— 登记入本集合才走「保存即归档」,
+            //   否则保存后永远停在草稿态(实测用户看到的就是全草稿)。
+            //   它与其余文件类面板的差别只有一处:不区分管理员/普通用户、**谁保存都直接归档**,
+            //   见 SELF_MAINTAINED_PANELS。
+            "WLBOM");
+    /**
+     * **自助维护型**面板(2026-10-21):保存即归档,**任何用户都不走审批**。
+     *
+     * <p>用户口径(物料清单):「填写保存不需要审批,修改也不需要审批」。
+     *
+     * <p>与 {@link #DOC_ARCHIVE_PANELS} 的区别:那张表里的面板是「管理员保存即归档、
+     * 普通用户保存=送审」;这里登记的面板连审批都没有(工具栏也没有审批组),
+     * 谁保存都直接置为已归档 —— 它是**基础数据**,不是要签核的文书。
+     *
+     * <p>配套:
+     * <ul>
+     *   <li>{@code PanelConfigService} 对这里的面板把「审批」组换成「修改」组;</li>
+     *   <li>保存分支见 {@code saveDoc} 里的 SELF_MAINTAINED 判断。</li>
+     * </ul>
+     */
+    public static final java.util.Set<String> SELF_MAINTAINED_PANELS = java.util.Set.of("WLBOM");
+
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
      *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):
      *   它的文档编号不是"单据号"而是**表单固定值** —— 前端 recordSheetConfigs.js 的
