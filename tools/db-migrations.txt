@@ -4144,3 +4144,12 @@ migrate-wo-pick-scan-log-20261021.sql
 #   复用现成「数据字典」面板(ZDGL / bs_dict)，只把字段 dict_sql 指向它并搬入原有 3 个选项。
 #   两账套都执行。
 migrate-prod-func-type-stdlib-20261021.sql
+
+# 2026-10-21 返工:「产品功能类别」改为**标准库类型**(data_type=标准库 / dict_sql=prod.func_type)，
+#   才能出现「⧉ 标准库维护」入口。上一版做成读 bs_dict 的普通下拉(无可维护按钮)已回滚。
+#   两账套都执行。
+migrate-prod-func-type-stdlib-fix-20261021.sql
+
+# 2026-10-21 用户口径「产品管控等级也做」:同 prod.func_type,改为标准库类型(prod.ctrl_level)。
+#   两账套都执行。
+migrate-prod-ctrl-level-stdlib-20261021.sql
