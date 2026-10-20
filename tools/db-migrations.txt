@@ -4117,3 +4117,7 @@ migrate-rd-project-flow-20261020.sql
 # 2026-10-20 用户口径「把WMS管理系统改为WMS管理」:yj_panel.module_group 分组显示值改名。
 #   两账套各 35 张;代码侧 menus.js / PagePanelRegistry / ReportService / i18n 同批改。
 migrate-wms-group-rename-20261020.sql
+# 2026-10-20 测试账套:数采设备全部置为「五连齐备(可用)」—— 用户口径「把测试账套的设备全部改为可用的状态」。
+#   补:1 个演示网关 GW-READY(设备全绑它) + 每台 project_code/scada_drawn/last_debug_at + 每台 1 个采集点 1 条启用规则。
+#   ⚠ 不伪造在线(status/last_seen_at 不动);只动 HSDZ_MES_TEST,正式库 no-op。幂等。
+migrate-dc-test-ready-20261020.sql
