@@ -1132,7 +1132,26 @@
           <span v-for="it in headItems(b)" :key="it.kind + it.key" class="dt-tab" :class="{ on: isOn(b, it) }" @click="switchTab(b, it)">{{ tt(it.label) }}</span>
           <span v-if="b.id === 'B' && activeTab(b).key === 'materials' && selectedProduct" class="filter-hint">{{ tt('当前产品：') }}{{ selectedProduct }} {{ tt('的 BOM 子件') }}</span>
           <span class="dt-ics">
-            <el-button v-if="detailEditable(b)" size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+            <!-- 新增数据(2026-10-21 起可下拉):物料清单(WLBOM)用户口径「可以通过点击新增数据的下拉栏:
+                 导入商品数据,然后勾选商品里面的数据进行一个批量导入」⇒ 同一颗按钮点开是两项菜单。
+                 ⚠ 只有声明过商品导入的面板(当前 = WLBOM)才下拉,其余面板保持原来的一击加行,
+                   免得一次无人要求的按钮改版波及全部单据面板。 -->
+            <el-dropdown
+              v-if="detailEditable(b) && canImportProducts(b)"
+              trigger="click"
+              @command="(cmd) => onAddDetailCommand(cmd, b)"
+            >
+              <el-button size="small" type="primary" :icon="Plus">
+                {{ tt('新增数据') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="add">{{ tt('新增数据') }}</el-dropdown-item>
+                  <el-dropdown-item command="importProduct">{{ tt('导入商品数据') }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
@@ -1682,6 +1701,9 @@
     <NewVoucherDialog v-model:visible="newVisible" :panelCode="panelCode" :panel-name="panelName" @saved="onNewSaved" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <BomImportDialog v-model="bomImpVisible" @done="onBomImported" />
+    <!-- 导入商品数据(2026-10-21,物料清单):勾选商品档案(INV)多行 → 批量追加到当前单明细,
+         不自动保存(与 ImportDialog 同口径,保存仍由用户点「保存」)。 -->
+    <ProductImportDialog v-model="productImpVisible" @confirm="applyProductRows" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
     <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;多张先选取再查看,单张直接查看) ═══ -->
@@ -2351,7 +2373,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
+import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
@@ -2415,6 +2437,7 @@ import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
+import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
@@ -4497,6 +4520,8 @@ const impFields = ref([])
 const impLabel = ref('明细')
 // 物料清单(WLBOM)批量导入:一个产品一张单(2026-10-21,见 BomImportDialog.vue)
 const bomImpVisible = ref(false)
+/** 「导入商品数据」弹窗(2026-10-21):勾选商品档案(INV)多行 → 追加到当前单明细 */
+const productImpVisible = ref(false)
 const scanVisible = ref(false)
 const selCfg = ref(null)
 // 材料二维码标签(品检分流链:暂收单行 打印标签)
@@ -7530,6 +7555,93 @@ function addInlineDetailRow(b) {
     syncActiveCellEcho(row, firstEditable.dataName)
   }
   markInlineDirty() // 新增明细行 = 未保存修改
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   「导入商品数据」(2026-10-21) — 勾选商品档案(INV)多行批量追加到明细
+   ------------------------------------------------------------------------------
+   用户原话:「把填写物料清单的内容可以通过点击新增数据的下拉栏:导入商品数据,
+             然后勾选商品里面的数据进行一个批量导入」。
+   口径(与既有 ImportDialog / 「选检验项目带入」一致,别自己另生一套):
+     · 只**追加**行,不动已有行;不自动保存,保存仍由用户点「保存」;
+     · 行由 newDetailRow(tabKey) 构造 ⇒ 带齐该页签各字段默认值,与「新增数据」完全同构,
+       保存链路(labelsToCols/行表 upsert)一行都不用改;
+     · 同一次勾选里已在明细中的子件直接跳过并告知,不静默少加。
+   面板白名单:目前只有物料清单(WLBOM)有这套字段映射,别的面板加进来要先核对它的明细键。
+   ══════════════════════════════════════════════════════════════════════════════ */
+const PRODUCT_IMPORT_PANELS = new Set(['WLBOM'])
+/** 触发「导入商品数据」的明细区块 id(弹窗确认时才回头找区块,避免把 block 对象存进 ref) */
+const productImpBlockId = ref('')
+
+/** 本明细区块是否给「导入商品数据」入口(白名单面板 + 明细可编辑) */
+function canImportProducts(b) {
+  return !!b && PRODUCT_IMPORT_PANELS.has(panelCode.value) && detailEditable(b)
+}
+
+/** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗 */
+function onAddDetailCommand(cmd, b) {
+  if (cmd === 'importProduct') {
+    if (!canImportProducts(b)) return
+    productImpBlockId.value = b.id
+    productImpVisible.value = true
+    return
+  }
+  addInlineDetailRow(b)
+}
+
+/**
+ * 商品档案行 → 当前明细追加行。
+ *
+ * 字段映射(左 = 商品档案 INV 列,右 = WLBOM 明细中文数据键;标签已按库里
+ * `SELECT label FROM yj_field WHERE panel_code='WLBOM'` 逐个核对,不是猜的):
+ *   存货编码 → 子件代码 / 存货名称 → 子件名称 / 规格型号 → 规格型号 / 计量单位 → 子件单位
+ *   标准用量 = 1(用户导入后自己改) / 行序 = 接已有行递增
+ * 只写**本页签真有的列**(has 判定),换面板复用这份映射时不会凭空多出键。
+ */
+function applyProductRows(items) {
+  const b = blocks.value.find((x) => x.id === productImpBlockId.value) || blocks.value[0]
+  if (!b || !detailEditable(b)) return 0
+  const tabKey = activeTab(b).key
+  // 列集取**该页签全部明细字段**(含隐藏列):报表分组键/内部列也要写值,不能用 activeTab().cols(只有可见列)
+  const cols = new Set((detailTabDefOf(tabKey)?.fields || []).map((f) => f.dataName))
+  const has = (k) => cols.has(k)
+  if (!cur.value.detail) cur.value.detail = {}
+  const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  // 排序激活时先清排序:新行落在数据末尾,避免"插到已排好的中间"的错觉(与 addInlineDetailRow 同)
+  const state = blockSortOf(b)
+  if (state.order) { state.prop = ''; state.order = '' }
+  const norm = (v) => String(v ?? '').trim()
+  // 已在明细里的子件(判重用):同一子件重复挂在一个 BOM 上没有业务意义
+  const seen = new Set(rows.map((r) => norm(r['子件代码'])).filter(Boolean))
+  // 行序接在已有行之后:既有行可能被删过(行数 ≠ 最大行序),取两者较大值再往上数,避免撞号
+  let seq = Math.max(rows.length, rows.reduce((m, r) => Math.max(m, Number(r['行序']) || 0), 0))
+  let n = 0
+  const dupes = []
+  for (const it of items || []) {
+    const code = norm(it['存货编码'])
+    if (!code) continue                                   // 无编码的档案行带进明细只会是空行
+    if (seen.has(code)) { dupes.push(code); continue }
+    seen.add(code)
+    const row = newDetailRow(tabKey)
+    if (has('行序')) row['行序'] = ++seq                   // 只在真要写这一列时才推进行序
+    if (has('子件代码')) row['子件代码'] = code
+    if (has('子件名称')) row['子件名称'] = norm(it['存货名称'])
+    if (has('规格型号')) row['规格型号'] = norm(it['规格型号'])
+    if (has('子件单位')) row['子件单位'] = norm(it['计量单位'])
+    if (has('标准用量')) row['标准用量'] = 1               // 默认 1,导入后由用户按实际用量改
+    rows.push(row)
+    n++
+  }
+  if (!n) {
+    // 勾的全是明细里已有的 ⇒ 一条不加,明确告知(与「带入检验项目」同话术)
+    if (dupes.length) ElMessage.warning(tt('勾选的商品已在明细中，不重复添加'))
+    return 0
+  }
+  archPage.value = Math.ceil(rows.length / archPageSize.value) // 新行在末尾,跳末页立即可见
+  markInlineDirty()                                            // 未保存修改(不自动保存)
+  const dupTip = dupes.length ? `，${tt('跳过已在明细中的')}${dupes.length}${tt('行')}` : ''
+  ElMessage.success(`${tt('已带入')} ${n} ${tt('行')}${dupTip} —— ${tt('导入后不自动保存，请点「保存」后生效')}`)
+  return n
 }
 
 /**
