@@ -2,17 +2,27 @@
 <!--
   network_security_config.xml — 允许 App 访问明文 HTTP 后端(2026-10-21)
 
-  为什么需要:Android 9(API 28)+ 默认禁止 cleartext HTTP。后端是
-  http://36.140.66.163:8090(无 HTTPS、无备案域名),不放开就一律
-  "CLEARTEXT communication not permitted"。
+  为什么需要:Android 9(API 28)+ 默认禁止 cleartext HTTP。本系统后端是
+  纯 http(无 HTTPS、无备案域名),不放开就是 "CLEARTEXT communication not permitted"。
 
-  口径:只对本项目后端 IP 放开明文,其余域仍走系统默认(更安全);
-  换服务器时在这里加 domain。上 HTTPS 后可整段删掉。
+  ⚠ 2026-10-21 踩坑(用户报「改成本地之后,选择工厂选不了」+「服务连接异常」):
+  首版用 **domain-config 白名单**只放行了 36.140.66.163 与 192.168.1.100,
+  用户把服务器改成局域网 192.168.0.238 后**不在名单里** ⇒ 请求被系统拦截 ⇒
+  登录页工厂列表拉不到、整个 App 用不了。
+  而 networkSecurityConfig 一旦指定就**覆盖** manifest 上的 usesCleartextTraffic,
+  所以光写 usesCleartextTraffic="true" 也救不回来。
+
+  改法:改用 **base-config 全局放行**。理由 —— 本 App 的服务器地址是**用户在界面上自填**的
+  (局域网 IP 随时可能变:192.168.0.x / 192.168.1.x / 10.x / 公网),白名单天生跟不上;
+  而这个 App 只连自家 MES 内网服务,不存在浏览任意网站的风险。
+  将来后端上了 HTTPS,把 cleartextTrafficPermitted 改回 false(或删掉本文件)即可。
+
+  trust-anchors 仍保留系统 CA:上 HTTPS 时自动走系统信任链,不需要再改这里。
 -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">36.140.66.163</domain>
-        <!-- 厂内网调试用(换内网 IP 时改这里) -->
-        <domain includeSubdomains="false">192.168.1.100</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
 </network-security-config>
