@@ -342,11 +342,12 @@ public class PanelConfigService {
                     ? List.of("删除", "删除单据")
                     : List.of("删除")));
             // 2026-10-21 用户口径(物料清单):「把物料清单的审批换成修改」——
-            //   它是自助维护型基础数据,保存即归档、没有审批流,工具栏不该出现审批组;
-            //   换成「修改」:已归档的单要再改,走修改态(带修改留痕)再保存归档。
-            if (com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
-                buttonGroups.add(group("修改", List.of("修改")));
-            } else {
+            //   它是自助维护型基础数据,保存即归档、没有审批流,工具栏不该出现审批组。
+            //   「修改」**不在工具栏加按钮**:文书面板的修改闭环由 metadata.docArchive 驱动
+            //   (前端 PanelxList 的「申请修改 / 修改记录」组,见 PanelxList.vue 修改组注释),
+            //   而工具栏本身会过滤掉 修改 这个动作(PanelxList.vue:3159,自 2026-10-07 单据卡片下线起)。
+            //   WLBOM 已登记进 ButtonService.DOC_ARCHIVE_PANELS ⇒ docArchive=true ⇒ 侧栏自动出现修改入口。
+            if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
                 buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             }
             buttonGroups.add(group("生单", List.of("生单")));
