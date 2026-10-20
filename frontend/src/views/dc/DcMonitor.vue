@@ -32,7 +32,7 @@
           </button>
         </div>
         <p v-else-if="loading" class="dc-side-empty">{{ tt('加载中…') }}</p>
-        <p v-else class="dc-side-empty">{{ tt('尚未登记设备，先去「设备配置管理」新增') }}</p>
+        <p v-else class="dc-side-empty">{{ tt('尚未登记设备，先去「IOT设备配置」新增') }}</p>
       </aside>
 
       <main class="dc-main">
@@ -197,9 +197,9 @@
         <section v-if="!current && !loading" class="dc-card dc-empty-card">
           <div class="dc-empty">
             <span>{{ tt('还没有可监控的设备') }}</span>
-            <em>{{ tt('先在「设备配置管理」登记网关与设备，硬件上报后这里才有实时数据') }}</em>
+            <em>{{ tt('先在「IOT设备配置」登记网关与设备，硬件上报后这里才有实时数据') }}</em>
           </div>
-          <el-button type="primary" @click="goConfig">{{ tt('去设备配置管理') }}</el-button>
+          <el-button type="primary" @click="goConfig">{{ tt('去IOT设备配置') }}</el-button>
         </section>
       </main>
     </div>

@@ -49,7 +49,7 @@ public final class PagePanelRegistry {
      * 动作只有两个:view(看配置)+ save(改配置);本页不含单据动作。
      */
     public static final String ERP_INTEG = "ERP_INTEG";
-    /** 数采平台·设备配置管理(2026-10-20) */
+    /** 数采平台·IOT设备配置(2026-10-20) */
     public static final String DC_CONFIG = "DC_CONFIG";
     /** 数采平台·数据监控(2026-10-20) */
     public static final String DC_MONITOR = "DC_MONITOR";
@@ -113,7 +113,7 @@ public final class PagePanelRegistry {
     };
 
     /**
-     * 数采平台三页(2026-10-20):设备配置管理 / 数据监控 / 状态统计 —— Vue 页面,数据来自
+     * 数采平台三页(2026-10-20):IOT设备配置 / 数据监控 / 状态统计 —— Vue 页面,数据来自
      * bs_dc_* 七张表,不是 yj_panel 单据面板。此前**没有面板码** ⇒ 权限矩阵里勾不到、任何登录账号都能进。
      * 动作按页面真实能力给:配置页只有「看」(写操作由后端 requireAdmin 硬闸),监控页可处理报警,统计页只读。
      */
@@ -163,7 +163,7 @@ public final class PagePanelRegistry {
             new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产计划", WORK_ORDER_LIST_ACTIONS),
             new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS),
             // 2026-10-20 补登:数采平台三页 + 扫码领料(此前菜单里无面板码 ⇒ 矩阵里缺这几个)
-            new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),
+            new PagePanelDef(DC_CONFIG, "IOT设备配置", "数采平台", DC_CONFIG_ACTIONS),
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
             new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理", BARCODE_SCAN_PICK_ACTIONS),

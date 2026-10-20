@@ -16,7 +16,7 @@ import java.util.Map;
  *
  * <h3>三个功能与各自的表</h3>
  * <ol>
- *   <li><b>设备配置管理</b>{@link #configAudit}:五连检查(绑定网关 / 数采工程 / 组态 / 数采规则 /
+ *   <li><b>IOT设备配置</b>{@link #configAudit}:五连检查(绑定网关 / 数采工程 / 组态 / 数采规则 /
  *       数据调试)全部由台账字段推导,不另存冗余标记 —— 判据见 {@link #checks};</li>
  *   <li><b>数据监控</b>{@link #realtime} + {@link #alarms}:实时值取 bs_dc_sample 每个采集点的
  *       TOP 1(参数化,无缓存);报警取 bs_dc_alarm(可筛选/可处理);</li>
@@ -57,7 +57,7 @@ public class DcService {
         this.jdbc = jdbc;
     }
 
-    // ───────────────────────────── 设备配置管理 ─────────────────────────────
+    // ───────────────────────────── IOT设备配置 ─────────────────────────────
 
     /** 设备台账(带网关名、点位数、规则数),按设备类型 + 编码排序。 */
     private List<Map<String, Object>> deviceRows() {
@@ -127,7 +127,7 @@ public class DcService {
         return c;
     }
 
-    /** 设备配置管理汇总:按类型的总数 / 已配齐数 / 缺项分布(提示用)。 */
+    /** IOT设备配置汇总:按类型的总数 / 已配齐数 / 缺项分布(提示用)。 */
     public Map<String, Object> configAudit() {
         List<Map<String, Object>> list = devices();
         Map<String, Integer> byType = new LinkedHashMap<>();

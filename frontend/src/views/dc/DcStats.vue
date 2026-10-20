@@ -120,7 +120,7 @@
         <div v-else-if="loading" class="dc-empty"><span>{{ tt('加载中…') }}</span></div>
         <div v-else class="dc-empty">
           <span>{{ tt('区间内没有设备记录') }}</span>
-          <em>{{ tt('先到「设备配置管理」登记设备，网关上报后开始统计') }}</em>
+          <em>{{ tt('先到「IOT设备配置」登记设备，网关上报后开始统计') }}</em>
         </div>
       </section>
 

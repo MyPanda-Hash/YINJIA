@@ -19,7 +19,7 @@ import java.util.Map;
  *
  * <p>三个功能各一组接口:
  * <ol>
- *   <li><b>设备配置管理</b> {@code GET /config} + 网关/设备/调试的写接口;</li>
+ *   <li><b>IOT设备配置</b> {@code GET /config} + 网关/设备/调试的写接口;</li>
  *   <li><b>数据监控</b> {@code GET /monitor} + {@code POST /alarm/handle};</li>
  *   <li><b>状态统计</b> {@code GET /stats}。</li>
  * </ol>
@@ -64,10 +64,10 @@ public class DcController {
         this.dc = dc;
     }
 
-    // ───────────────────────────── ① 设备配置管理 ─────────────────────────────
+    // ───────────────────────────── ① IOT设备配置 ─────────────────────────────
 
     /**
-     * 设备配置管理页:五连检查(KPI + 设备表 + 网关表)。只读,登录即可。
+     * IOT设备配置页:五连检查(KPI + 设备表 + 网关表)。只读,登录即可。
      * 返回 {kpis{deviceTotal,gatewayBound,fullyReady}, gateways[], devices[]}。
      */
     @GetMapping("/config")

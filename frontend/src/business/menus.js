@@ -617,7 +617,7 @@ export const menuTree = [
     title: '数采平台',
     icon: 'Cpu',
     children: [
-      { code: 'dcConfig', title: '设备配置管理', path: '/dc/config', panelCode: 'DC_CONFIG', icon: 'SetUp' },
+      { code: 'dcConfig', title: 'IOT设备配置', path: '/dc/config', panelCode: 'DC_CONFIG', icon: 'SetUp' },
       { code: 'dcMonitor', title: '数据监控', path: '/dc/monitor', panelCode: 'DC_MONITOR', icon: 'Monitor' },
       { code: 'dcStats', title: '状态统计', path: '/dc/stats', panelCode: 'DC_STATS', icon: 'DataAnalysis' },
     ],
