@@ -63,6 +63,12 @@
           <span>{{ errorMessage }}</span>
         </div>
 
+        <!-- 壳内首次使用:先让用户确认后端地址(否则工厂列表一定是空的) -->
+        <div v-if="needOrigin" class="origin-hint">
+          <el-icon><WarningFilled /></el-icon>
+          <span>{{ tt('首次使用请先确认下方「服务器地址」(如 http://192.168.1.10:8090),再点「保存并重连」') }}</span>
+        </div>
+
         <el-form
           ref="formRef"
           :model="form"
@@ -198,7 +204,19 @@ const errorMessage = ref('')
 const IN_SHELL = typeof window !== 'undefined'
   && (!!window.Capacitor || !!window.YjNative || location.protocol === 'file:')
 const showServerAddr = IN_SHELL
-const serverAddr = ref(apiOrigin() || localStorage.getItem(API_ORIGIN_KEY) || '')
+
+/**
+ * 首次进 App(还没配过地址)时,预填一个**可用的默认后端**,并置顶提示。
+ * 2026-10-21 用户报障:「无法选择工厂,工厂为空」—— 根因就是壳里没有地址,
+ * 请求打到 https://localhost/api 拿不到工厂列表;光靠底部一行小输入框太容易被忽略。
+ */
+const DEFAULT_ORIGIN = 'http://36.140.66.163:8090'
+const savedOrigin = (() => {
+  try { return localStorage.getItem(API_ORIGIN_KEY) || '' } catch { return '' }
+})()
+const serverAddr = ref(savedOrigin || apiOrigin() || (IN_SHELL ? DEFAULT_ORIGIN : ''))
+/** 还没配地址 ⇒ 顶部横幅提醒(配过后不再打扰) */
+const needOrigin = ref(IN_SHELL && !savedOrigin)
 
 function saveServerAddr() {
   const v = String(serverAddr.value || '').trim().replace(/\/+$/, '')
@@ -207,6 +225,7 @@ function saveServerAddr() {
     return
   }
   localStorage.setItem(API_ORIGIN_KEY, v)
+  needOrigin.value = false
   // 地址变了要重建 axios 实例:最干净的做法是整页重载
   location.reload()
 }
@@ -593,6 +612,26 @@ onMounted(async () => {
 
 .login-submit .el-icon {
   font-size: 17px;
+}
+
+/* 壳内首次使用的地址提示:比底部那行更醒目,配过就不再出现 */
+.origin-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #f0c78a;
+  border-radius: 8px;
+  background: #fff8ed;
+  color: #8a5a00;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.origin-hint .el-icon {
+  flex: none;
+  margin-top: 2px;
 }
 
 /* 服务器地址(只在安卓壳里渲染):一行三件套,窄屏自动换行 */

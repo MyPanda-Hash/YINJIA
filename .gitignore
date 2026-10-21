@@ -148,10 +148,9 @@ _*.xlsx
 # 解包残留、以及会话调试脚本(如 head_*.java)。原先**没有任何规则覆盖它** ——
 # `git add -A` 会把 619MB 全扫进来(实测 `git check-ignore -v .tmp/cp.txt` 退出码 1 = 未忽略)。
 .tmp/
-# ── 安卓壳(2026-10-20):构建产物 / 签名文件不入库,源码与构建脚本入库 ──
+# ── 安卓壳(2026-10-20):构建产物不入库;keystore 入库(内部自签名,丢了就得全体卸载重装) ──
 android/build/
 android/dist/
-android/debug.keystore
 # 安卓壳:前端产物在构建时从 frontend/dist 拷进 assets/www(每次 build.ps1 重新生成),
 # 属于构建产物,不入库(仓库里已有 frontend/dist 与 backend/static 两份,不再存第三份)。
 android/app/assets/
@@ -170,3 +169,6 @@ android-cap/android/local.properties
 # cap copy 每次从 frontend/dist 生成,属构建产物(与手搓版的 assets/www 同理)
 android-cap/android/app/src/main/assets/public/
 android-cap/android/app/src/main/assets/capacitor.config.json
+# 逆向用的一次性 APK 原件(28MB,用户给的参考包)不入库,只留分析脚本与结论
+tools/archive/_apk-probe-20261020/*.apk
+tools/archive/_apk-probe-20261020/ref-classes.dex

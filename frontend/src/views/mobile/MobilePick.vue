@@ -230,42 +230,87 @@ const canAdd = computed(() => {
   return !!mat.value && need > 0 && alloc.value.length > 0 && !shortage.value
 })
 
-/** 安卓 App 注入的原生桥(见 android/app/src/com/yinjia/mes/app/MainActivity.java):
- *  有 window.YjNative.scan 才显示「扫码」按钮 —— 网页版没有相机(http 不是安全上下文),
- *  所以扫码能力只存在于 App 内;网页版仍然可以手输或用扫码枪。 */
-const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
+/**
+ * 扫码能力来自**两种安卓壳**,网页版没有(浏览器 http 不是安全上下文,调不起摄像头):
+ *  ① 手搓壳:`window.YjNative.scan()` → 结果回调 `window.__yjScanResult(code, ok)`
+ *  ② Capacitor 壳:`window.Capacitor.Plugins.BarcodeScanning`(Google ML Kit 插件)
+ *     —— 结果直接 Promise 返回,`barcodes[0].rawValue`。
+ * 有其中任意一种就显示「扫码」按钮;两种都没有就只留「查询」(手输/扫码枪)。
+ */
+const capScanPlugin = (() => {
+  try {
+    return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BarcodeScanning) || null
+  } catch { return null }
+})()
+const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan) || !!capScanPlugin
 const baseUrl = (() => {
   try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
 })()
 /** 这次扫码是扫给「工单」还是「物料」——原生页返回时用它决定填哪个输入框 */
 let scanTarget = null
 
-function scanInto(target) {
-  scanTarget = target
+/** 把扫到的字符串填进对应的输入框并立刻查询 */
+function applyScan(code) {
+  const text = String(code == null ? '' : code).trim()
+  if (!text) return
+  const target = scanTarget || (wo.value ? 'mat' : 'wo')
+  scanTarget = null
+  if (target === 'wo') {
+    woText.value = text
+    loadWo()
+  } else {
+    matText.value = text
+    probeMaterial()
+  }
+}
+
+/** Capacitor 版(ML Kit):先要相机权限,再开扫描页 */
+async function scanWithCapacitor() {
+  const p = capScanPlugin
   try {
-    window.YjNative.scan()
+    if (p.requestPermissions) {
+      const st = await p.requestPermissions()
+      if (st && st.camera === 'denied') {
+        errText.value = tt('没有相机权限,扫不了码;可在系统设置里开启')
+        scanTarget = null
+        return
+      }
+    }
+    const res = await p.scan({ formats: ['QR_CODE', 'CODE_128', 'CODE_39', 'EAN_13', 'EAN_8', 'ITF', 'DATA_MATRIX'] })
+    const code = res && res.barcodes && res.barcodes.length ? res.barcodes[0].rawValue : ''
+    if (!code) { scanTarget = null; return }
+    applyScan(code)
   } catch (e) {
     scanTarget = null
-    errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+    errText.value = tt('扫码失败,请改用输入框扫码枪或手工输入')
   }
+}
+
+function scanInto(target) {
+  scanTarget = target
+  if (window.YjNative && typeof window.YjNative.scan === 'function') {
+    try {
+      window.YjNative.scan()
+    } catch (e) {
+      scanTarget = null
+      errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+    }
+    return
+  }
+  if (capScanPlugin) {
+    scanWithCapacitor()
+    return
+  }
+  scanTarget = null
+  errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
 }
 
 onMounted(() => {
   nextTick(() => woInput.value?.focus?.())
-  // 原生扫码页返回时由 MainActivity 调这个函数(全局挂载,App 内才有意义)
+  // 手搓壳:原生扫码页返回时由 MainActivity 调这个函数
   window.__yjScanResult = (code, ok) => {
     if (!ok || !code) { scanTarget = null; return }
-    // 顶部原生「扫码」按钮不指定目标:没选工单就先当工单,选了工单就当年物料
-    const target = scanTarget || (wo.value ? 'mat' : 'wo')
-    scanTarget = null
-    const text = String(code).trim()
-    if (target === 'wo') {
-      woText.value = text
-      loadWo()
-    } else {
-      matText.value = text
-      probeMaterial()
-    }
+    applyScan(code)
   }
 })
 

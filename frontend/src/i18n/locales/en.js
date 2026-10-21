@@ -4375,6 +4375,7 @@ export default {
     '保存并重连': 'Save & reconnect',
     '如 http://192.168.1.10:8090': 'e.g. http://192.168.1.10:8090',
     '地址要以 http:// 或 https:// 开头': 'The address must start with http:// or https://',
+    '首次使用请先确认下方「服务器地址」(如 http://192.168.1.10:8090),再点「保存并重连」': 'First run: confirm the Server address below (e.g. http://192.168.1.10:8090), then tap Save & reconnect.',
     // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
     '生产领料': 'Production Picking',
     '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',

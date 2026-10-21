@@ -1,6 +1,6 @@
-﻿{
+{
   "appId": "com.yinjia.mes.pick",
-  "appName": "银嘉扫码领料",
+  "appName": "银嘉系统",
   "webDir": "../frontend/dist",
   "server": {
     "cleartext": true,
