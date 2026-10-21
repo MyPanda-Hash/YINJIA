@@ -24,6 +24,8 @@ import { sumKeepScale } from '../core/panel/sumTotals.js'
 // 打印通道(2026-10-20):与面板单据打印同一条路 —— 主页面打印层 + window.print(),不弹窗。
 // 与 sumTotals 同理写相对路径 + 扩展名:`node --test` 直接加载本文件时不认 Vite 别名。
 import { printInPage } from '../core/panel/printChannel.js'
+// 公司代码常量(2026-10-21 抽出到 core/panel/companyCode.js):三处二维码同源,别再写字面量 '0'。
+import { COMPANY_CODE } from '../core/panel/companyCode.js'
 
 /** qrcode 库兼容取用:CJS 互操作下 toDataURL 可能挂在 .default 上 */
 function qrLib() {
@@ -39,9 +41,10 @@ const COMPANY = {
   fax: '0752-5583930',
   // 银嘉采购订单 抬头行
   brand: 'AGPLUS 银嘉',
-  // 公司代码(2026-09-28 物料二维码口径):取旧系统 plang.comm,全库唯一值 '0';
-  // 标识卡二维码前缀=公司代码@物料编码[@批号],与旧系统扫码解析口径一致
-  companyCode: '0',
+  // 公司代码(2026-09-28 物料二维码口径):取旧系统 plang.comm,全库唯一值 '0'(常量已下沉到
+  // core/panel/companyCode.js,材料仓条码二维码也用同一份);标识卡二维码前缀=公司代码@物料编码[@批号],
+  // 与旧系统扫码解析口径一致
+  companyCode: COMPANY_CODE,
   // 需方签章框
   buyer: { 单位名称: '惠州市银嘉环保科技有限公司', 联系人: '孙郝聪', 联系方式: '13718162430' },
   // 生产任务单(打印工单)固定表头文字

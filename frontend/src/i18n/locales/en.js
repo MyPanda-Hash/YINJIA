@@ -1587,6 +1587,8 @@ export default {
     '半成品仓条码标签': 'WIP warehouse barcode label',
     '成品仓条码标签': 'Finished goods barcode label',
     '二维码 = 码内容(编码|批号,一批一码);勾选一行出一张标签,可多选': 'QR = barcode text (code|batch, one batch one code); one label per selected row, multi-select supported',
+    // 2026-10-21 材料仓条码二维码改「公司代码@物料编码@批号」(半成品/成品仍用上一行)
+    '二维码 = 公司代码@物料编码@批号(一批一码);勾选一行出一张标签,可多选': 'QR = company code@material code@batch (one batch one code); one label per selected row, multi-select supported',
     // 2026-10-18 条码管理三面板:工具栏「标签」组与留痕提示
     '标签': 'Labels',
     '当前页没有可打印的条码行': 'No printable barcode rows on this page',
