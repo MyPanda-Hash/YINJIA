@@ -40,8 +40,12 @@ import java.util.Map;
 public final class FirstInspBackfill {
     private FirstInspBackfill() {}
 
-    /** 首件检验单头表(与 ButtonService.FIRST_INSP_HEAD 同值;此处独立一份,免得两个类互引) */
-    private static final String HEAD = "dbo.qc_first_insp_head";
+    /**
+     * 检验单头表(2026-10-21 改):原指已下架的 {@code qc_first_insp_head},现为**成型检验单**
+     * {@code qc_mold_insp_head}(首件/制程两张单及其表已下架 —— 继续指着旧表会在生产完工/报工审核时
+     * 报「对象名 'dbo.qc_first_insp_head' 无效」,这正是当天现场那条报错)。
+     */
+    private static final String HEAD = "dbo.qc_mold_insp_head";
 
     /**
      * 工单行的**完工批次**:已完工即返回 {@code {批次号, 生产日期}}(生产日期 = 完工当日
@@ -78,17 +82,31 @@ public final class FirstInspBackfill {
      */
     public static int backfillOnFirstBatch(JdbcTemplate jdbc, long plangRowId, String workOrder, String user) {
         if (plangRowId <= 0 || workOrder == null || workOrder.isBlank()) return 0;
+        // 表不在就静默跳过(下架/未建时,不能让报工审核整笔失败)
+        Integer hasTable = jdbc.queryForObject(
+                "SELECT CASE WHEN OBJECT_ID(?, 'U') IS NULL THEN 0 ELSE 1 END", Integer.class, HEAD);
+        if (hasTable == null || hasTable == 0) return 0;
+        // 「生产日期」只有老的首件检验单才有;成型检验单只回填批次号 ⇒ 按列是否存在动态拼。
+        Integer hasDate = jdbc.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH(?, N'生产日期') IS NULL THEN 0 ELSE 1 END", Integer.class, HEAD);
+        boolean date = hasDate != null && hasDate == 1;
+        String setDate = date
+                ? "  h.[生产日期] = COALESCE(NULLIF(h.[生产日期], N''),"
+                        + "       COALESCE(CONVERT(varchar(10), p.完工时间, 120), CONVERT(varchar(10), GETDATE(), 120))),"
+                : "";
+        String tail = date
+                ? "   AND (ISNULL(h.[生产日期],N'') = N'' OR ISNULL(h.[批次号],N'') = N'')"
+                : "   AND ISNULL(h.[批次号],N'') = N''";
         return jdbc.update(
                 "UPDATE h SET"
-                        + "  h.[生产日期] = COALESCE(NULLIF(h.[生产日期], N''),"
-                        + "       COALESCE(CONVERT(varchar(10), p.完工时间, 120), CONVERT(varchar(10), GETDATE(), 120))),"
+                        + setDate
                         + "  h.[批次号] = COALESCE(NULLIF(h.[批次号], N''), NULLIF(p.[批次号], N'')),"
                         + "  h.asp_user2 = ?, h.asp_time2 = GETDATE()"
                         + " FROM " + HEAD + " h JOIN dbo.plang p ON p.id = ?"
                         + " WHERE h.[工单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
                         // 行号:检验单带了行号就必须同号;没带出行号(0/空)的按工单号兜底
                         + "   AND (ISNULL(h.[工单行号],0) = 0 OR ISNULL(h.[工单行号],0) = ISNULL(p.pl_xc,0))"
-                        + "   AND (ISNULL(h.[生产日期],N'') = N'' OR ISNULL(h.[批次号],N'') = N'')",
+                        + tail,
                 user, plangRowId, workOrder.trim());
     }
 }

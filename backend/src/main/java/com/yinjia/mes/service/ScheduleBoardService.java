@@ -79,12 +79,15 @@ public class ScheduleBoardService {
      */
     private record InspSpec(String headTable, String ngColumn, String label) {}
 
+    /**
+     * 工序 → 检验单头表(2026-10-21 改):首件/制程两张单及其表已下架,成型改用现役的
+     * {@code QC_MOLD_INSP}(成型检验单)。继续指着 qc_first_insp_head 会让看板查询报「对象名无效」。
+     */
     private static final Map<String, InspSpec> INSP_HEAD = Map.of(
-            "QC_FIRST_INSP", new InspSpec("qc_first_insp_head", "不合格数量", "首件检验"),
-            "QC_PROC_INSP", new InspSpec("qc_proc_insp_head", "不良数量", "制程检验"),
+            "QC_MOLD_INSP", new InspSpec("qc_mold_insp_head", "不合格数量", "成型检验"),
             "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "组装成品检验"));
 
-    /** 应检工序:成型(首件+制程)、组装(组装成品)—— 与 {@code QcInspAutoService.OP_PANELS} 同源 */
+    /** 应检工序:成型、组装 —— 与 {@code QcInspAutoService.OP_PANELS} 同源 */
     private static final List<String> INSP_OPS = List.of("成型", "组装");
 
     public ScheduleBoardService(JdbcTemplate jdbc) {
