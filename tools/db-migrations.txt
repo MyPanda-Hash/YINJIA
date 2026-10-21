@@ -4117,3 +4117,4 @@ migrate-menu-restructure-wms-20261020.sql
 #   自检:缺授权角色 0 / 译名 1 条 = [PASS]。幂等;两账套均执行。
 #   页面:电脑端 /prod/plan/prodPick(桌面壳内双栏)· 手机端 /m/pick(独立布局),同一份组件。
 migrate-prod-pick-panel-20261020.sql
+migrate-material-out-line-20261021.sql

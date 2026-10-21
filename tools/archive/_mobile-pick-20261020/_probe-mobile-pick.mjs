@@ -123,6 +123,10 @@ const woCard = JSON.parse(await ev(`JSON.stringify({
 })`))
 ok('扫工单 → 工单卡出现', woCard.text.includes(WO) && woCard.rows >= 4, JSON.stringify(woCard).slice(0, 160))
 ok('工单卡含「物料编码」行', /物料编码/.test(woCard.text), woCard.text.split('\n').slice(0, 6).join(' / ').slice(0, 100))
+// 2026-10-21:材料出库单的「生产车间」已改名「生产线」,值由领料按工单带过去;
+// 领用人 = 登录扫码人 ⇒ 卡片上这两行都要有,且领用人不能是空的。
+ok('工单卡含「生产线」行', /生产线/.test(woCard.text), woCard.text.slice(0, 200))
+ok('工单卡含「领用人」行(登录人)', /领用人/.test(woCard.text) && woCard.text.split('领用人')[1]?.trim() !== '', woCard.text.slice(0, 200))
 
 // ②b 未排产分支(--unsched):卡片照常显示,但顶部有提示、物料区与提交禁用
 if (process.argv.includes('--unsched')) {

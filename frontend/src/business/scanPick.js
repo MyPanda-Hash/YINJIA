@@ -95,6 +95,10 @@ export function buildMaterialOutForm(lines, head = {}) {
     材料编码: String(l.code || '').trim(),
     材料名称: String(l.name || '').trim(),
     计量单位: String(l.uom || '').trim(),
+    // 规格型号(2026-10-21 用户报障「物料编码没有把规格型号带入到领料中去」):
+    //   MATERIAL_OUT 明细本来就有「规格型号」列(yj_field place=detail seq=80),
+    //   只是扫码建单时没填 ⇒ 材料出库单上那一列一直是空的。
+    规格型号: String(l.spec || '').trim(),
     批次号: String(l.batch || '').trim(),
     仓库: String(l.warehouse || head.warehouse || '').trim(),
     仓库编码: String(l.warehouseCode || head.warehouseCode || '').trim(),
@@ -123,6 +127,10 @@ export function buildMaterialOutForm(lines, head = {}) {
   if (head.woLine !== undefined && head.woLine !== null && String(head.woLine).trim() !== '') {
     form.工单行号 = Number(head.woLine) || String(head.woLine).trim()
   }
+  // 生产线(2026-10-21):材料出库单原字段叫「生产车间」,已改名「生产线」且**只读** ——
+  //   值只能由生产领料按工单的产线带入(wo.生产线 = plang.scx);取不到就不带,不硬编。
+  if (String(head.prodLine || '').trim()) form.生产线 = String(head.prodLine).trim()
+  // 领用人(2026-10-21):由页面传**登录扫码人**的姓名,不再留空。
   if (String(head.picker || '').trim()) form.领用人 = String(head.picker).trim()
   return form
 }

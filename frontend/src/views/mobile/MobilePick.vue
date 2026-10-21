@@ -88,6 +88,8 @@
         <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ wo.产品名称 || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('规格') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
+        <!-- 领用人 = 登录扫码人(2026-10-21):写在卡片上,让人知道这张单会记谁 -->
+        <div class="mp-kv"><span>{{ tt('领用人') }}</span><b>{{ pickerName || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('排产数量') }}</span><b class="num" :class="{ warn: woBlocked }">{{ fmt(wo.排产数量) }}</b></div>
         <div class="mp-kv"><span>{{ tt('已开领料单') }}</span><b>{{ wo.领料单号 || tt('无') }}</b></div>
       </div>
@@ -256,8 +258,15 @@ import {
   parseWorkOrderCode, parseMaterialCode,
   makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows, selectedTotal, checkSelection,
 } from '@/business/scanCode'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+/**
+ * 领用人 = **登录扫码人**(2026-10-21 用户口径:「领用人就是登录扫码人的名称」)。
+ * realName 优先(姓名),没有姓名时回落到账号。
+ */
+const userStore = useUserStore()
+const pickerName = computed(() => String(userStore.realName || '').trim())
 /**
  * 是否显示「返回」:只有**没有桌面壳**时才有意义 ——
  *   ① 安卓 App(Capacitor/手搓壳)整页无导航;
@@ -685,6 +694,10 @@ async function submit() {
       woNo: wo.value.工单号,
       // 工单行号(2026-10-21):优先用扫工单码解出来的行号,其次工单行自带的行号
       woLine: woLine.value || wo.value.工单行号,
+      // 生产线:材料出库单的「生产线」(原「生产车间」)只读,只能由这里按工单带过去
+      prodLine: wo.value.生产线,
+      // 领用人:登录扫码人
+      picker: pickerName.value,
       warehouse: wh,
       warehouseCode: wh ? lines.value[0].warehouseCode : '',
     })

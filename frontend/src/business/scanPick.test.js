@@ -196,3 +196,27 @@ test('建单:带工单键与仓位(追溯/回写要靠 加工单号+工单行号
   assert.equal(form.detail.items[0].仓位编码, 'A1-09-1')
   assert.equal(form.detail.items[0].仓库编码, 'YCL-01')
 })
+
+test('建单:生产线(原「生产车间」)由领料带入 —— 空则不写,不硬编', () => {
+  const base = [{ code: 'M-001', name: '端盖', uom: '个', batch: 'P1', qty: 2, price: 1 }]
+  assert.equal(buildMaterialOutForm(base, { date: '2026-10-21', prodLine: '1线' }).生产线, '1线')
+  assert.equal('生产线' in buildMaterialOutForm(base, { date: '2026-10-21', prodLine: '  ' }), false)
+})
+
+test('建单:领用人 = 登录扫码人姓名', () => {
+  const form = buildMaterialOutForm([{ code: 'M-001', name: '端盖', uom: '个', qty: 2 }], { date: '2026-10-21', picker: '张三' })
+  assert.equal(form.领用人, '张三')
+})
+
+test('建单:明细带规格型号(用户报障:物料编码没把规格型号带进领料)', () => {
+  const form = buildMaterialOutForm(
+    [{ code: 'M-001', name: '端盖', uom: '个', spec: '63*40*242.5', batch: 'P1', qty: 2, price: 1 }],
+    { date: '2026-10-21' },
+  )
+  assert.equal(form.detail.items[0].规格型号, '63*40*242.5')
+})
+
+test('建单:规格型号为空时不报错(老物料可能没有规格)', () => {
+  const form = buildMaterialOutForm([{ code: 'M-001', name: '端盖', uom: '个', qty: 1 }], { date: '2026-10-21' })
+  assert.equal(form.detail.items[0].规格型号, '')
+})
