@@ -657,6 +657,12 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     top: 0;
     left: 0;
     bottom: 0;
+    /* 顶部安全区(2026-10-21 用户口径「左侧导航边栏也高了一点,会被顶部摄像头挡住」):
+       移动端抽屉是 position:fixed 贴视口顶,不吃 .portal 的 env(safe-area-inset-top) ——
+       抽屉头部(返回/标题/关闭)正好压在挖孔屏摄像头与状态栏下面,点不到也看不清。
+       抽屉背景保留铺到顶(白色盖住挖孔区),只把内容用 padding 让开安全区。 */
+    padding-top: env(safe-area-inset-top, 0px);
+    box-sizing: border-box;
     width: min(320px, 86vw) !important;
     z-index: 1000;
     transform: translateX(-100%);
@@ -690,6 +696,9 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     flex-shrink: 0;
   }
   .mn-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
     font-size: 15px;
     color: var(--t-primary);
     cursor: pointer;
@@ -713,10 +722,13 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     text-align: center;
   }
   .mn-close {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
     font-size: 16px;
     color: var(--t-text-2);
     cursor: pointer;
-    padding: 6px;
     flex-shrink: 0;
   }
   .mn-quick {
@@ -732,7 +744,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-height: 38px;
+    min-height: 40px;
     font-size: 14px;
     color: var(--t-primary);
     background: var(--t-hover-bg);

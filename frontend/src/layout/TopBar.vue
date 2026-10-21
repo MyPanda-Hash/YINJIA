@@ -818,8 +818,8 @@ html:not(.dark) .locale-glass-popper .locale-option.locale-active {
   }
 
   .hamburger {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     display: inline-grid;
     place-items: center;
     padding: 0;
@@ -835,8 +835,11 @@ html:not(.dark) .locale-glass-popper .locale-option.locale-active {
     white-space: nowrap;
   }
 
+  /* 手机端只留「银嘉」两字(2026-10-21):顶栏右侧是 4 个通知图标 + 头像(约 190px),
+     加上汉堡 + 品牌名在 375/320 宽度下超出视口 —— 实测 375 溢出 30px、320 溢出 18px,
+     头像被右侧裁掉(面板页也跟着多出横向滚动条)。副标题是品牌修饰,优先让位给功能。 */
   .logo span {
-    font-size: 11px;
+    display: none;
   }
 
   .t-split {
