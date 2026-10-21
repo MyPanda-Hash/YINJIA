@@ -3194,6 +3194,10 @@ export default {
     '已定级并分发对接人': 'Graded and dispatched to the liaison',
     '定级分发失败': 'Grading/dispatch failed',
     '定级的同时把立项分发给一个对接人账号': 'Grade and dispatch this application to a liaison account in one step',
+    /* ── 2026-10-21:审批已定级后补发对接人(等级只读) ── */
+    '项目已定级': 'Project level already set',
+    '选择对接人即可分发': 'pick a liaison to dispatch',
+    '项目等级已由审批定级，不能在此修改；此处只需选择对接人': 'The level was set during approval and cannot be changed here; just pick a liaison.',
     '定级的同时把立项分发给一个对接人账号：等级作为后续实施计划与进度流程的属性，对接人随后签核并选择项目责任人。': 'Grade and dispatch in one step: the level becomes an attribute of the implementation plan and progress tracking; the liaison then signs off and picks the project owner.',
     '已定级/已分发，要修改请先弃审回草稿': 'Already graded/dispatched — unaudit back to draft to change',
     '仅审批人（或管理员）可定级分发': 'Only an approver (or admin) can grade & dispatch',

@@ -2029,9 +2029,11 @@
     <el-dialog v-model="gradeDispatchVisible" :title="tt('定级分发')" width="480px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('定级的同时把立项分发给一个对接人账号：等级作为后续实施计划与进度流程的属性，对接人随后签核并选择项目责任人。') }}</div>
+        <!-- 2026-10-21:审批通过时已经定过级的单,这里只补发对接人(等级只读,改级仍要弃审) -->
+        <div v-if="gradeLevelLocked" class="mod-log-meta" style="margin-bottom:8px">{{ tt('项目等级已由审批定级，不能在此修改；此处只需选择对接人') }}</div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('项目等级') }}</span>
-          <el-radio-group v-model="gradeLevel">
+          <el-radio-group v-model="gradeLevel" :disabled="gradeLevelLocked">
             <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
           </el-radio-group>
         </div>
@@ -6458,6 +6460,8 @@ async function confirmGrade() {
 // ---------- 定级分发(2026-10-19:定级 + 分发对接人合成一个动作) ----------
 const gradeDispatchVisible = ref(false)
 const gradeDispatchBusy = ref(false)
+/** 等级是否已由「审批通过并定级」写入 ⇒ 弹窗里等级只读,只补发对接人 */
+const gradeLevelLocked = computed(() => !!String(rdFlow.level || '').trim())
 
 async function openGradeDispatch() {
   if (!rdFlow.canGradeDispatch) return
@@ -6617,11 +6621,15 @@ async function confirmOwner() {
 const receiptVisible = ref(false)
 const receiptBusy = ref(false)
 
-/** 第 1 步「定级分发」的提示(2026-10-19 两步合一) */
+/** 第 1 步「定级分发」的提示(2026-10-19 两步合一;2026-10-21 兼容"审批时已定级") */
 const gradeDispatchTip = computed(() => {
-  if (rdFlow.canGradeDispatch) return tt('定级的同时把立项分发给一个对接人账号')
+  if (rdFlow.canGradeDispatch) {
+    return rdFlow.level
+      ? tt('项目已定级') + '（' + rdFlow.level + '）：' + tt('选择对接人即可分发')
+      : tt('定级的同时把立项分发给一个对接人账号')
+  }
   if (!isRdSettled) return tt('仅已审核或已归档的立项申请可定级分发')
-  if (rdFlow.level || rdFlow.liaison) return tt('已定级/已分发，要修改请先弃审回草稿')
+  if (rdFlow.liaison) return tt('已定级/已分发，要修改请先弃审回草稿')
   return tt('仅审批人（或管理员）可定级分发')
 })
 
