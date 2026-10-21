@@ -175,3 +175,6 @@ android-cap/android/app/src/main/assets/capacitor.config.json
 # 逆向用的一次性 APK 原件(28MB,用户给的参考包)不入库,只留分析脚本与结论
 tools/archive/_apk-probe-20261020/*.apk
 tools/archive/_apk-probe-20261020/ref-classes.dex
+# 负库存配平脚本的输出(计划/备份快照里含真实业务数据,不入库)
+tools/_balance-out/
+tools/_out/
