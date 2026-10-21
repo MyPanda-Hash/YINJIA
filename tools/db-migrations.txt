@@ -4153,3 +4153,9 @@ migrate-prod-func-type-stdlib-fix-20261021.sql
 # 2026-10-21 用户口径「产品管控等级也做」:同 prod.func_type,改为标准库类型(prod.ctrl_level)。
 #   两账套都执行。
 migrate-prod-ctrl-level-stdlib-20261021.sql
+
+# 2026-10-21 用户口径「这些表是之前危险删除操作的备份文件……当前可以删除掉这些表了」:
+#   清掉两条数据整理任务的回滚快照(PC0000 归一 5 张 + 检验单空壳清理 7 张 = 12 张 _bak_*)。
+#   三道闸门(PC0000 残留=0 / 快照草稿单未回流 / 名单外无其它备份临时表)、单事务,
+#   只按家族通配删 _bak_pc0000_% 与 _bak_qcdraft_%,幂等可复跑。两账套都执行。
+migrate-drop-bak-snapshots-20261021.sql
