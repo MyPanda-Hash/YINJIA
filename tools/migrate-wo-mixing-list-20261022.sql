@@ -10,6 +10,18 @@
    对这个表的显示查询面板」。该表由服务端维护，MES 这边**只读**消费；
    复制数据会出现两套事实。
 
+   源表真实结构（2026-10-22 从服务器备份 HSDZ_MES-manual-20261021-184953.bak 还原读出）
+   ──────────────────────────────────────────────────────────────────────────────
+   27 列 / 8 行（2026-10-21 08:04~08:13 落的真实数据），一行 = 一张混料单里的一条物料：
+
+     id、单据编号、工单号、工单行id、工单行号、配方单号、配方版本、序号、物料种类、
+     物料编号、物料名称、配料比、单支物料含量、设计添加量、计划用量、实际用量、
+     标记（保存前=N/保存后=Y）、asp_user1..4、asp_time1..4、asp_cancel、asp_print
+
+   所以面板**没有**「单据日期/混料数量/单位/状态/批次号」这些列，排序用 创建时间(asp_time1)；
+   显示字段沿用服务端中文列名，asp_user1/asp_time1/asp_user3/asp_time3 分别显示为
+   创建人/创建时间/审核人/审核时间；其余审计列（修改人/删除人/打印次数/删除标记）不进面板。
+
    列结构自适应（本脚本唯一的"聪明"处，也是它能直接丢给服务器 AI 跑的底气）
    ──────────────────────────────────────────────────────────────
    表/视图的真实列在服务器与本地不一定一致，写死列名必然翻车（列多了少列、中文列
@@ -122,40 +134,49 @@ BEGIN TRY
      WHERE panel_code = @panel;
     IF @@ROWCOUNT <> 1 THROW 51000, N'目标面板行数异常（yj_panel）。', 1;
 
-    /* ── 4. 字段：已知列给中文标题/顺序/宽度，未知列原样登记 ──────────────── */
+    /* ── 4. 字段：已知列给中文标题/顺序/宽度，未知列原样登记 ────────────────
+       2026-10-22 第二版：@map 的**前 19 行是服务器真表的实际列**
+       （从 HSDZ_MES-manual-20261021-184953.bak 还原后读出，27 列：id + 10 个业务列
+        + 5 个 decimal(18,8) 用量列 + 标记 + asp_ 审计列）。
+       其余条目是给"表结构变了/换了同义列名"留的兜底，匹配不到就自然不生效。 */
     DECLARE @map TABLE (
         col sysname PRIMARY KEY, label nvarchar(120), dtype nvarchar(40),
         seq int, width int, qry bit, en nvarchar(400));
     INSERT INTO @map (col, label, dtype, seq, width, qry, en) VALUES
-        (N'单据编号',     N'单据编号',     N'文本',     10, 160, 1, N'Document No.'),
+        (N'单据编号',     N'单据编号',     N'文本',     10, 150, 1, N'Document No.'),
+        (N'工单号',       N'工单号',       N'文本',     20, 160, 1, N'Work Order No.'),
+        (N'工单行号',     N'工单行号',     N'整数',     30,  90, 1, N'WO Line No.'),
+        (N'配方单号',     N'配方单号',     N'文本',     40, 150, 1, N'Recipe No.'),
+        (N'配方版本',     N'配方版本',     N'文本',     50,  90, 0, N'Recipe Version'),
+        (N'序号',         N'序号',         N'文本',     60,  70, 0, N'Seq'),
+        (N'物料种类',     N'物料种类',     N'文本',     70, 110, 0, N'Material Type'),
+        (N'物料编号',     N'物料编号',     N'文本',     80, 150, 1, N'Material Code'),
+        (N'物料名称',     N'物料名称',     N'文本',     90, 200, 1, N'Material Name'),
+        (N'配料比',       N'配料比',       N'小数',    100, 110, 0, N'Ratio'),
+        (N'单支物料含量', N'单支物料含量', N'小数',    110, 130, 0, N'Content per Piece'),
+        (N'设计添加量',   N'设计添加量',   N'小数',    120, 120, 0, N'Design Addition'),
+        (N'计划用量',     N'计划用量',     N'小数',    130, 110, 0, N'Planned Qty'),
+        (N'实际用量',     N'实际用量',     N'小数',    140, 110, 0, N'Actual Qty'),
+        (N'标记',         N'标记',         N'文本',    150,  80, 0, N'Flag'),
+        (N'asp_user1',    N'创建人',       N'文本',    160, 100, 1, N'Created By'),
+        (N'asp_time1',    N'创建时间',     N'日期时间', 170, 170, 1, N'Created At'),
+        (N'asp_user3',    N'审核人',       N'文本',    180, 100, 0, N'Auditor'),
+        (N'asp_time3',    N'审核时间',     N'日期时间', 190, 170, 0, N'Audit Time'),
+        -- ↓ 兜底：表结构若与服务器当前版本不同，这些同义列名仍能给出中文标题
         (N'混料单号',     N'混料单号',     N'文本',     12, 160, 1, N'Mixing No.'),
         (N'混料报工单号', N'混料报工单号', N'文本',     14, 160, 1, N'Mixing Report No.'),
-        (N'单据日期',     N'单据日期',     N'日期',     20, 110, 1, N'Document Date'),
-        (N'混料日期',     N'混料日期',     N'日期',     22, 110, 1, N'Mixing Date'),
-        (N'工单号',       N'工单号',       N'文本',     30, 160, 1, N'Work Order No.'),
-        (N'工单行号',     N'工单行号',     N'整数',     40,  90, 1, N'WO Line No.'),
+        (N'单据日期',     N'单据日期',     N'日期',     15, 110, 1, N'Document Date'),
+        (N'混料日期',     N'混料日期',     N'日期',     16, 110, 1, N'Mixing Date'),
         (N'批次号',       N'批次号',       N'文本',     45, 130, 1, N'Batch No.'),
         (N'混料批次号',   N'混料批次号',   N'文本',     47, 140, 1, N'Mixing Batch No.'),
-        (N'产品编号',     N'产品编号',     N'文本',     50, 150, 1, N'Product Code'),
-        (N'产品名称',     N'产品名称',     N'文本',     55, 200, 1, N'Product Name'),
-        (N'配方单号',     N'配方单号',     N'文本',     60, 170, 1, N'Recipe No.'),
-        (N'配方版本',     N'配方版本',     N'文本',     65,  90, 0, N'Recipe Version'),
-        (N'混料数量',     N'混料数量',     N'小数',     70, 110, 0, N'Mixing Qty'),
-        (N'单位',         N'单位',         N'文本',     75,  70, 0, N'Unit'),
-        (N'状态',         N'状态',         N'文本',     80,  90, 1, N'Status'),
-        (N'生产线',       N'生产线',       N'文本',     85, 120, 0, N'Production Line'),
-        (N'序号',         N'序号',         N'文本',    200,  80, 0, N'Seq'),
-        (N'物料种类',     N'物料种类',     N'文本',    210, 120, 0, N'Material Type'),
-        (N'物料编号',     N'物料编号',     N'文本',    220, 150, 1, N'Material Code'),
-        (N'物料名称',     N'物料名称',     N'文本',    230, 200, 1, N'Material Name'),
-        (N'配料比',       N'配料比',       N'小数',    240, 100, 0, N'Ratio'),
-        (N'单支物料含量', N'单支物料含量', N'小数',    250, 130, 0, N'Content per Piece'),
-        (N'设计添加量',   N'设计添加量',   N'文本',    255, 120, 0, N'Design Addition'),
-        (N'计划用量',     N'计划用量',     N'小数',    260, 110, 0, N'Planned Qty'),
-        (N'实际用量',     N'实际用量',     N'小数',    270, 110, 0, N'Actual Qty'),
+        (N'产品编号',     N'产品编号',     N'文本',     55, 150, 1, N'Product Code'),
+        (N'产品名称',     N'产品名称',     N'文本',     57, 200, 1, N'Product Name'),
+        (N'混料数量',     N'混料数量',     N'小数',     75, 110, 0, N'Mixing Qty'),
+        (N'单位',         N'单位',         N'文本',     78,  70, 0, N'Unit'),
+        (N'状态',         N'状态',         N'文本',     85,  90, 1, N'Status'),
+        (N'生产线',       N'生产线',       N'文本',     88, 120, 0, N'Production Line'),
         (N'操作人',       N'操作人',       N'文本',    300, 100, 1, N'Operator'),
         (N'报工人',       N'报工人',       N'文本',    305, 100, 1, N'Reporter'),
-        (N'创建人',       N'创建人',       N'文本',    310, 100, 0, N'Created By'),
         (N'创建时间',     N'创建时间',     N'日期时间', 320, 170, 0, N'Created At'),
         (N'备注',         N'备注',         N'文本',    330, 220, 0, N'Remark');
 
@@ -196,7 +217,8 @@ BEGIN TRY
      WHERE c.object_id = OBJECT_ID(N'dbo.' + @line)
        AND c.is_computed = 0
        AND c.name NOT IN (N'id', N'工单行id', N'混料头id',
-                          N'asp_user1', N'asp_user2', N'asp_time1', N'asp_time2', N'asp_cancel');
+                          N'asp_user2', N'asp_time2', N'asp_user4', N'asp_time4',
+                          N'asp_print', N'asp_cancel');
 
     IF NOT EXISTS (SELECT 1 FROM @fields) THROW 51000, N'wo_mixing_list 没有任何可登记的业务列。', 1;
 
