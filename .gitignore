@@ -178,3 +178,12 @@ tools/archive/_apk-probe-20261020/ref-classes.dex
 # 负库存配平脚本的输出(计划/备份快照里含真实业务数据,不入库)
 tools/_balance-out/
 tools/_out/
+
+# 混料记录增量包(2026-10-22):包里的 tools\ / static\ / verify\ / SHA256SUMS.txt 都是派生物
+# (由 tools/archive/_assemble-wo-mixing-pkg.ps1 从仓库真源重建),zip 同理不入库。
+/deploy/incr-wo-mixing-*/tools/
+/deploy/incr-wo-mixing-*/static/
+/deploy/incr-wo-mixing-*/verify/
+/deploy/incr-wo-mixing-*/SHA256SUMS.txt
+/deploy/incr-wo-mixing-*/logs/
+/deploy/incr-wo-mixing-*.zip

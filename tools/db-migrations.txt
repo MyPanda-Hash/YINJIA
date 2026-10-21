@@ -4119,3 +4119,14 @@ migrate-menu-restructure-wms-20261020.sql
 migrate-prod-pick-panel-20261020.sql
 migrate-material-out-line-20261021.sql
 migrate-prod-report-panel-20261021.sql
+
+# ---- 2026-10-22 生产过程·混料记录（新面板 WO_MIXING_LIST）----
+#   用户口径「数据库里 wo_mixing_list 这个表，做个和报工记录一样的显示查询面板，写在生产过程里面」。
+#   ① 面板 WO_MIXING_LIST：flat + 类别报表 + module_group=生产过程，数据源**只读直连** wo_mixing_list；
+#   ② 列结构自适应：运行时读源对象真实列登记 yj_field（已知列给中文标题/顺序/查询标记，未知列原样登记），
+#      源对象无 id 列时自动建只读包装视图 v_wo_mixing_list(ROW_NUMBER) —— 源对象一个字节不改；
+#   ③ 面板/字段 en 译名 + 按「报工记录」等价补授只读授权（view,query[,export]）。
+#   幂等；**源表不存在时打印 RESULT: SKIPPED-NO-SOURCE 并原样退出**（绝不凭空造同名表）。
+#   ⚠ 本地两账套都没有该表（它只在服务器上）⇒ 本地跑只会 SKIP；服务器上才真正建面板。
+#   服务器增量包：deploy/incr-wo-mixing-20261022.zip（组装脚本 tools/archive/_assemble-wo-mixing-pkg.ps1）。
+migrate-wo-mixing-list-20261022.sql
