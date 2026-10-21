@@ -92,9 +92,9 @@ if (W >= 768) {
     ok('平板宽度单列', layout.cols === 'block', layout.cols)
   }
 } else {
-  // 窄屏「沉浸页」:同一个地址,但不渲染桌面壳 —— 一屏就是作业页(补充设计-V2.0 §4.4)
+  // 2026-10-21 用户口径:「扫码领料应该是整个图片上红色的窗口保留」⇒ 手机上也保留顶栏+页签
   ok('手机端单列布局', layout.cols === 'block', layout.cols)
-  ok('手机端不套桌面壳(无顶栏)', layout.hasTopBar === false, String(layout.hasTopBar))
+  ok('手机端保留顶栏(红框那一条)', layout.hasTopBar === true, String(layout.hasTopBar))
   ok('手机端不是通用面板壳(仍是生产领料页)', layout.isPanelShell === false, String(layout.isPanelShell))
 }
 

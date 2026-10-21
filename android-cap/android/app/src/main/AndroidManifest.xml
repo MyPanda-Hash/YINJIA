@@ -38,4 +38,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 2026-10-21:ML Kit 扫码头需要相机。Capacitor 模板**没有**这条,
+         @capacitor-mlkit/barcode-scanning 的 AAR 也没合并进来 ⇒ 实测后果:
+         ① requestPermissions 直接返回 denied,扫不了码;
+         ② 系统设置里根本找不到本应用的「相机」权限项。
+         相机声明为「非必需」:没有摄像头的设备照样能装(用扫码枪/手输兜底)。 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 </manifest>
