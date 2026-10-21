@@ -217,14 +217,14 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
-            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20;
-                 2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
+            <!-- 从商品引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20 引入,
+                 2026-10-21 起数据源由 WLBOM 物料清单改为**商品档案**)
                  —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
                     按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
             <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
-                  :title="tt('从物料清单引用(选父件,导入其全部子件)')"
+                  :title="tt('从商品档案引用(按 所属类别/存货编码/存货名称/规格型号 逐项收窄后勾选)')"
                   @click.stop="openMaterialPick(materialPickAt(sec))">
-              <el-icon><Collection /></el-icon>{{ tt('从物料清单引用') }}
+              <el-icon><Collection /></el-icon>{{ tt('从商品引用') }}
             </span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
@@ -768,14 +768,11 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
-            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20;
-                 2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
-                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
-                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <!-- 从商品引用(同 220 行那处;数据源 2026-10-21 起 = 商品档案 INV) -->
             <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
-                  :title="tt('从物料清单引用(选父件,导入其全部子件)')"
+                  :title="tt('从商品档案引用(按 所属类别/存货编码/存货名称/规格型号 逐项收窄后勾选)')"
                   @click.stop="openMaterialPick(materialPickAt(sec))">
-              <el-icon><Collection /></el-icon>{{ tt('从物料清单引用') }}
+              <el-icon><Collection /></el-icon>{{ tt('从商品引用') }}
             </span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
@@ -1313,61 +1310,45 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 从物料清单引用:列出物料清单(WLBOM)的子件行,勾选后批量带进本表明细 ═══
-         2026-10-13 恢复(原实现 2026-09-20 随 MES 自建 BOM 面板族整体下架而删);
-         新版**不再分导入范围**,直接列子件行让人勾,简单为主。行数据取 detail.items。
-         2026-10-21 用户口径:「改为弹窗显示物料清单里面的物料编码、物料代号、物料名称,
-         选择之后就带入对应的明细内容,数量对应标准用量,备注有内容就也引用」⇒
-         列名按用户的话改成 物料编码/物料代号/物料名称(数据键仍是 WLBOM 的 子件代码/
-         物料代码/子件名称,对应关系见 openMaterialPick 的注释),并把备注一起带进去。 -->
-    <!-- ⚠ 2026-10-21 返工:弹窗原先把**所有物料清单的子件平铺**成一张列表(24 行,
-         每行带一个「物料代号」标明它属于哪张 BOM),用户看不懂也不符合他的作业口径:
-         「我要的是选物料编码 S032-3 / 单据日期 / 物料代码 / 物料名称,**然后带入**
-           YJ-YKRS-007 … YJ-XWR-014 … YJ-JPL-067 …」
-         ⇒ 改成**先选物料清单单(表头)**,确认后把该单的全部子件整批带进明细。
-         列与数据键:物料编码=WLBOM 表头 物料编码(m_no) / 物料代码=物料代码(wzdm1) /
-         物料名称=物料名称(wzmc1);子件仍随行挂在 __kids 上供导入时展开。 -->
-    <!-- ⚠ 2026-10-21 第二次返工:弹窗改成**可展开行** ——
-         用户口径「勾选就会展开子件内容,也可以点击收起来」。
-         做法:type="expand" + expand-row-keys 受控 ⇒ 勾选即自动展开该单的子件、
-         取消勾选即收起;同时 @expand-change 把手动点箭头的结果同步回 keys,
-         所以「点一下能收起来」也成立(两种操作不打架)。 -->
-    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="860px" append-to-body>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
-        <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索物料编码/名称')" clearable style="width:260px" @input="filterMatPick" />
-        <span style="color:#909399;font-size:12px">{{ tt('数据源：物料清单') }}</span>
+    <!-- ═══ 从商品引用(数据源 = 商品档案 INV → bs_inv,2026-10-21 用户口径)═══
+         用户原话:「把规格书的从物料清单引用进行一个修改,首先是把引用的数据内容改为引用商品里面的数据,
+         弹窗可以通过上面那些信息来索引数据,然后勾选填写进去,**每进行一个字段的填写,其他选项就可以
+         对应的范围缩小**,方便查找」。
+         ⇒ 顶部四栏 = 商品列表的四列(所属类别 / 存货编码 / 存货名称 / 规格型号),四栏互为筛选项:
+           选了「所属类别」,另外三栏的候选就只剩这一类里的值(纯函数见 @core/panel/goodsPick.js)。
+         ⇒ 勾选后按 物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 / 备注←商品备注 落行。 -->
+    <el-dialog v-model="matPickVisible" :title="tt('从商品引用')" width="900px" append-to-body>
+      <div class="gp-bar">
+        <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
+          <span class="gp-filter-label">{{ tt(f.key) }}</span>
+          <el-select
+            v-model="matPickFilters[f.key]"
+            size="small"
+            filterable
+            clearable
+            :placeholder="tt('全部')"
+            class="gp-filter-select"
+          >
+            <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
+          </el-select>
+          <span v-if="f.more" class="gp-more">{{ tt('还有 {n} 项，输入关键字筛选').replace('{n}', String(f.more)) }}</span>
+        </div>
+        <el-button size="small" text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
       </div>
-      <el-table :data="matPickFiltered" size="small" border max-height="430" row-key="__k"
-                :expand-row-keys="matPickExpandKeys"
-                @selection-change="onMatPickSelection"
-                @expand-change="onMatPickExpand">
-        <!-- 展开区:该物料清单的全部子件(只读预览,导入仍以勾选为准) -->
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div class="mp-kids">
-              <el-table :data="row.__kids || []" size="small" border>
-                <el-table-column prop="子件代码" :label="tt('物料编码')" width="150" />
-                <el-table-column prop="子件名称" :label="tt('物料名称')" min-width="190" show-overflow-tooltip />
-                <el-table-column prop="子件单位" :label="tt('单位')" width="70" />
-                <el-table-column prop="标准用量" :label="tt('标准用量')" width="96" align="right" />
-                <el-table-column prop="备注" :label="tt('备注')" min-width="130" show-overflow-tooltip />
-              </el-table>
-            </div>
-          </template>
-        </el-table-column>
+      <el-table v-loading="matPickLoading" :data="matPickFiltered" size="small" border max-height="420"
+                row-key="__k" @selection-change="onMatPickSelection">
         <el-table-column type="selection" width="42" />
-        <el-table-column prop="物料编码" :label="tt('物料编码')" width="140" />
-        <el-table-column prop="单据日期" :label="tt('单据日期')" width="120" />
-        <el-table-column prop="物料代码" :label="tt('物料代码')" width="120" show-overflow-tooltip />
-        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="180" show-overflow-tooltip />
-        <el-table-column :label="tt('子件数')" width="80" align="right">
-          <template #default="{ row }">{{ (row.__kids || []).length }}</template>
-        </el-table-column>
+        <el-table-column prop="所属类别" :label="tt('所属类别')" width="130" show-overflow-tooltip />
+        <el-table-column prop="存货编码" :label="tt('存货编码')" width="150" show-overflow-tooltip />
+        <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="230" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="190" show-overflow-tooltip />
+        <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" align="center" />
+        <el-table-column prop="备注" :label="tt('备注')" min-width="140" show-overflow-tooltip />
       </el-table>
       <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="confirmMaterialPick">{{ tt('导入') }}({{ matPickChecked.length }})</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('引用') }}({{ matPickChecked.length }})</el-button>
       </template>
     </el-dialog>
 
@@ -1454,7 +1435,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -1479,6 +1460,7 @@ import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/pane
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
 import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
+import { GOODS_FACETS, facetValues, matchGoods, goodsToDetail } from '@/core/panel/goodsPick'
 // 商品档案候选生成(编码+名称子串匹配、去重、封顶 OPTION_CAP 项)—— 与配方计算弹窗同一套纯函数
 import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
 
@@ -3211,152 +3193,92 @@ watch(
   { immediate: true },
 )
 
-// ── 从物料清单引用(数据源 = WLBOM「物料清单」面板,mode=doc ⇒ 单单据)──
-// 2026-10-13 恢复:原实现(2026-09-20)读的是已下架的 BOM 面板主从结构(list[].detail.children),
-//   现改读 WLBOM:res.data.list 长度 1,行在 **list[0].detail.items**(不再是 children)。
-// 行键是**中文字段 label**(本单铁律:后端按 label 收发):物料代码/物料名称(父件)、
-//   子件代码/子件名称/规格型号/子件单位/标准用量/损耗量。新版直接列子件行让人勾,不分导入范围。
+// ── 从商品引用(数据源 = 商品档案 INV → bs_inv;2026-10-21 用户口径)──
+// 用户原话:「把规格书的从物料清单引用进行一个修改,首先是把引用的数据内容改为引用商品里面的数据,
+//   弹窗可以通过上面那些信息来索引数据,然后勾选填写进去,每进行一个字段的填写,其他选项就可以
+//   对应的范围缩小,方便查找」。
+// 形状:商品是**档案型面板**(mode=archive)⇒ 返回「一张虚拟单」,3917 行挂在 detail.inv。
+//   剥形状**不在这里另写一份**:走 invCarry.js 的 invRowsOf(它已经踩过"本地 items / 上线 detail.inv"
+//   的坑,见该文件头),本文件只做级联筛选与落行,规则全在 @core/panel/goodsPick.js(有单测)。
 const matPickVisible = ref(false)
+const matPickLoading = ref(false)
 const matPickRows = ref([])
-const matPickFiltered = ref([])
 const matPickChecked = ref([])
-const matPickKeyword = ref('')
 const matPickTargetDt = ref(null)
-/** 展开中的行 key(= 已勾选那张单的 __k);受控给 el-table 的 expand-row-keys */
-const matPickExpandKeys = ref([])
-/**
- * 勾选变化:同步「已勾选」与「已展开」——
- * 用户口径「勾选就会展开子件内容,也可以点击收起来」⇒ 勾上即展开、取消勾选即收起。
- */
+/** 四栏筛选值(键 = 商品面板的列名;空串 = 不筛) */
+const matPickFilters = reactive(Object.fromEntries(GOODS_FACETS.map((k) => [k, ''])))
 function onMatPickSelection(sel) {
   matPickChecked.value = sel || []
-  matPickExpandKeys.value = (sel || []).map((r) => r.__k)
 }
-/**
- * 手动点展开箭头:把 el-table 的最新展开集合同步回受控 keys。
- * 没有这一步,受控 expand-row-keys 会把用户的手动收起/展开立刻顶回去
- * (点箭头收不起来),那就不满足「也可以点击收起来」。
- */
-function onMatPickExpand(_row, expanded) {
-  if (Array.isArray(expanded)) matPickExpandKeys.value = expanded.map((r) => r.__k)
+function resetMatPickFilters() {
+  for (const k of GOODS_FACETS) matPickFilters[k] = ''
 }
+/** 每栏的候选值 —— 按**其它三栏**的当前条件收窄(用户要的"范围缩小"),capped 见 goodsPick.FACET_CAP */
+const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facetValues(matPickRows.value, k, matPickFilters) })))
+/** 表格数据 = 四栏 AND 之后的结果 */
+const matPickFiltered = computed(() => matchGoods(matPickRows.value, matPickFilters))
 const matPickHint = computed(() => {
-  if (!matPickRows.value.length) return tt('物料清单里还没有数据')
-  const totalKids = matPickRows.value.reduce((n, m) => n + (m.__kids || []).length, 0)
-  return tt('共 {n} 张物料清单、{m} 个子件；勾选物料清单后点「导入」，整单子件追加到本表明细')
-    .replace('{n}', matPickRows.value.length).replace('{m}', totalKids)
+  if (matPickLoading.value) return tt('加载中…')
+  const all = matPickRows.value.length
+  const hit = matPickFiltered.value.length
+  if (!all) return tt('商品档案里还没有数据')
+  const base = hit === all
+    ? tt('共 {n} 条商品；勾选后点「引用」，按 存货编码/名称/规格型号 带进本表').replace('{n}', String(all))
+    : tt('筛选后 {m} / {n} 条；勾选后点「引用」带进本表').replace('{m}', String(hit)).replace('{n}', String(all))
+  return base + (matPickChecked.value.length ? tt('；已选 {c} 条').replace('{c}', String(matPickChecked.value.length)) : '')
 })
-/**
- * 弹窗列 ↔ 数据键的对应(2026-10-21 用户口径「弹窗显示物料清单里面的物料编码、物料代号、
- *   物料名称」):
- *   物料编码 ← 子件代码(mate.wzdm2,该子件自身的编码)
- *   物料代号 ← 物料代码(mate.wzdm1,**物料清单表头**的代码)
- *   物料名称 ← 子件名称(mate.wzmc2)
- *
- * ⚠「物料代号」为什么要借表头那一列(而不是子件自己的某个列):
- *   mate 的物理列里**没有**"物料代号"(查 sys.columns:只有 wzdm1/wzdm2 两个代码列,
- *   备用1~14 实测全空、ywdm 是业务代码且当前数据全为 NULL,见 2026-10-21 的列清单取证)。
- *   而 WLBOM 面板的表头字段正是「物料编码(物料编号 m_no)/ 物料代码(wzdm1)」两列 ——
- *   QueryService.loadDocs 取单据面板明细时会把表头字段**合并进每一条子件行**,
- *   故 r['物料代码'] 现成可取(实测:S022-4 的子件行带着 物料代码=S022-4)。
- *   语义上也对得上:一条子件行属于哪张物料清单,看的就是这个代码;
- *   mate 里 wzdm1 ≡ m_no(实测 24 行中 24 行两者相等),即"这张物料清单的代号"。
- *   若日后真给 mate 加了"物料代号"列,改这里一处即可(弹窗列的 prop 也同步改)。
- */
 async function openMaterialPick(dt) {
   matPickTargetDt.value = dt
-  matPickKeyword.value = ''
   matPickChecked.value = []
   matPickRows.value = []
-  matPickFiltered.value = []
-  matPickExpandKeys.value = []
+  resetMatPickFilters()
   matPickVisible.value = true
+  matPickLoading.value = true
   try {
-    const res = await request.post('/px/queryFormDataList', { panelCode: 'WLBOM', condition: {}, pageNo: 1, pageSize: 500 })
-    const masters = res?.data?.list || res?.data?.rows || res?.data?.data || []
-    // ⚠ 2026-10-21 返工:弹窗列 = **物料清单单(表头)**,不是平铺的子件。
-    //   用户口径「我要的是选物料编码 S032-3 / 单据日期 / 物料代码 / 物料名称,然后带入 YJ-YKRS-007 …」
-    //   ⇒ 每个表头行把子件挂在 __kids 上,确认时整单展开。
-    //   WLBOM 是单据面板,子件在 detail.items(children 是旧 BOM 主从形状,留作兜底)。
-    matPickRows.value = (Array.isArray(masters) ? masters : []).map((m, i) => {
-      const kids = m?.detail?.items || m?.detail?.children || []
-      return {
-        __k: `${m?.['物料编码'] || ''}#${i}`,
-        __kids: Array.isArray(kids) ? kids : [],
-        物料编码: m?.['物料编码'] || '',
-        单据日期: m?.['单据日期'] || '',
-        物料代码: m?.['物料代码'] || m?.['物料编码'] || '',
-        物料名称: m?.['物料名称'] || '',
-      }
-    })
-    matPickFiltered.value = matPickRows.value
+    // 档案型面板不吃 pageSize(必须全量返回,见 QueryService.queryArchive 注释);
+    // 不带 keyword ⇒ 一次拿全 3917 行,级联筛选全在本地做(打开弹窗一次,之后零请求)。
+    const res = await request.post('/px/queryFormDataList', { panelCode: INV_PANEL, condition: {}, pageNo: 1, pageSize: 20 })
+    const rows = invRowsOf(res?.data ?? res)
+    matPickRows.value = rows.map((r, i) => ({ ...r, __k: `${r?.['存货编码'] || ''}#${i}` }))
   } catch (e) {
     matPickRows.value = []
-    matPickFiltered.value = []
-    ElMessage.error(tt('取物料清单失败'))
+    ElMessage.error(tt('取商品档案失败'))
+  } finally {
+    matPickLoading.value = false
   }
 }
-function filterMatPick() {
-  const kw = (matPickKeyword.value || '').trim().toLowerCase()
-  if (!kw) { matPickFiltered.value = matPickRows.value; return }
-  matPickFiltered.value = matPickRows.value.filter((r) =>
-    String(r['物料编码'] || '').toLowerCase().includes(kw) ||
-    String(r['物料名称'] || '').toLowerCase().includes(kw) ||
-    String(r['物料代码'] || '').toLowerCase().includes(kw)
-  )
-}
 /**
- * 确认导入:把勾中的子件行**追加**到目标表的明细数组。
- * 映射按**目标表的列定义**(dt.cols 的 key = 该面板 label)逐列判断,与文件里其它导入同款写法:
- *   表区 ← filterVal('物料清单' —— 规格书全部明细共用一张 rd_spec_doc_detail,
- *          不写这个分区值这些行会掉进"没有表认领"的桶,界面上永不显示);
- *   物料编码 ← 子件代码 / 物料名称 ← 子件名称 / 规格参数 ← 规格型号 / 数量 ← 标准用量;
- *   备注 ← **物料清单该行有备注才带**(2026-10-21 用户口径「备注有内容就也引用」)——
- *          空备注不覆盖:目标行原本可能已经有人手写的备注,拿空串冲掉就是丢数据。
- * 序号从本表区已有行数续编;同表区已有同一物料编码的跳过(重复点导入不会灌重复行)。
+ * 确认引用:把勾中的商品行**追加**到目标表的明细数组。
+ * 映射(纯函数 goodsToDetail,已单测):物料编码←存货编码 / 物料名称←存货名称 /
+ *   规格参数←规格型号 / 备注←商品备注(有内容才带,空备注不覆盖已有人手写的内容)。
+ *   数量**不带**:商品档案没有用量口径,凭空填 1 会变成错误数据。
+ * 表区 ← filterVal('物料清单') 由 addRow 负责(规格书全部明细共用 rd_spec_doc_detail,
+ *   不写这个分区值这些行会掉进"没有表认领"的桶,界面上永不显示)。
+ * 落行**复用表格自带的 addRow**(与界面「＋」同一条已验证路径,避免两条写行路径再次漂移)。
  */
 function confirmMaterialPick() {
   const dt = matPickTargetDt.value
   if (!dt) return
-  const colKeys = new Set((dt.cols || []).map((c) => c.key))
-  const existCodes = new Set(rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean))
+  const colKeys = (dt.cols || []).map((c) => c.key)
+  const existCodes = rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean)
+  const { rows: picked, skipped } = goodsToDetail(matPickChecked.value, existCodes, colKeys)
   let added = 0
-  let skipped = 0
-  // ⚠ 2026-10-21 返工:勾的是**物料清单单**,这里要把它整单的子件(__kids)展开逐行落。
-  for (const master of matPickChecked.value) {
-    const kids = Array.isArray(master.__kids) ? master.__kids : []
-    for (const r of kids) {
-      const code = String(r['子件代码'] || '').trim()
-      if (!code) continue
-      if (existCodes.has(code)) { skipped++; continue }
-      // ⚠ 落行**直接复用表格自带的 addRow**(而不是自己 touch().push):
-      //   addRow 是界面上「＋」走的同一条路,经活体验证确实能出行(2026-10-13 对照实验:
-      //   点 ＋ 13 行 → 14 行);而本函数先前自己 push 时,提示「已导入 1 行」却不出行 ——
-      //   同样操作、同样 touch(),唯一区别只在"谁调用的",故改为共用同一条已验证的落行路径,
-      //   避免两条路径再次漂移(这处已经因此踩过一次)。
-      addRow(dt)
-      const rows = rowsOf(dt)
-      const row = rows[rows.length - 1]
-      if (!row) continue
-      // 序号:按**本表区**已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
-      if (colKeys.has('序号')) row['序号'] = String(rows.length)
-      if (colKeys.has('物料编码')) row['物料编码'] = code
-      if (colKeys.has('物料名称')) row['物料名称'] = r['子件名称'] || ''
-      if (colKeys.has('规格参数')) row['规格参数'] = r['规格型号'] || ''
-      if (colKeys.has('数量')) row['数量'] = r['标准用量'] ?? ''
-      if (colKeys.has('备注')) {
-        const bz = String(r['备注'] ?? '').trim()
-        row['备注'] = bz
-      }
-      existCodes.add(code)
-      added++
+  for (const p of picked) {
+    addRow(dt)
+    const rows = rowsOf(dt)
+    const row = rows[rows.length - 1]
+    if (!row) continue
+    // 序号:按本表区已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
+    if (colKeys.includes('序号')) row['序号'] = String(rows.length)
+    for (const k of ['物料编码', '物料名称', '规格参数', '备注']) {
+      if (k in p) row[k] = p[k]
     }
+    added++
   }
   matPickChecked.value = []
-  matPickExpandKeys.value = []
   matPickVisible.value = false
   emit('dirty')
-  ElMessage.success(tt('已导入 {n} 行').replace('{n}', added)
+  ElMessage.success(tt('已引用 {n} 行').replace('{n}', added)
     + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
 }
 
