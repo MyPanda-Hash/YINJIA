@@ -18,7 +18,7 @@ $JAVA = "$env:USERPROFILE\.jdks\ms-25.0.4\bin\java.exe"
 2. 中文**列名**引用要用方括号(`[现存量]`),裸写会报 `Invalid column name`(驱动按 GBK 送标识符)。
 
 `msdb` 相关的 `q7`/`q9` 用三段名(`msdb.dbo.restorehistory`),从任何库跑都行。
-41 个脚本 2026-10-21 全量跑过一遍,全部 OK。
+44 个 SQL 脚本 + 2 个接口探针,2026-10-21 全量跑过一遍,全部 OK。
 
 ## 文件
 
@@ -54,4 +54,9 @@ $JAVA = "$env:USERPROFILE\.jdks\ms-25.0.4\bin\java.exe"
 | `q39-dup-rows.sql` | 按 `(src,rid)` 复核重复 | **0 组**(此前"47 组"是 rid=NULL 的期初/结转) |
 | `q40/q41` | `900000000+` 号段流水 | 20 行,`migrate-free-pick-rid-20261020.sql` **有意**搬迁 |
 | `q42-miss-impact.sql` | 补上缺流水后台账会变成多少 | **−344,107.33 → −1,543,256.47**(更负) |
+| `q44-doc-cgrk.sql` | 用户截图那张采购入库单(`CGRK-20261011-03389`) | 单据在、流水在(890+16),但 `kucun` 行 `rkl/ckl/yl` 全 0 |
+| `q45-why-hidden.sql` | 谁把结存清零 | `asp_user2=orphan-purge:admin`,10-19 15:02:55(与月结同一秒) |
+| `q46-zero-repair.sql` | 零行的修复面 | 434 键:289 键应恢复(合计 +349,496.10)、92 键真 0、53 键无流水 |
+| `q47-test-detail.sql` | 测试账套的库存明细行数(排除"连错账套"这个解释) | 40 行,不是 0 |
+| `_probe-stockdetail.mjs` / `_probe-item-visibility.mjs` | **调 8090 接口**对比四个面板 | 库存明细 **0 行** / 库存状况 **0** / 库存状况表 **906** / 库存台账 **890+16**;全表 697 行、CK00006 85 行 |
 | `q43-ongoing-gap.sql` | 10-19 之后是否还在出新缺口 | 0 ⇒ 一次性缺口,但同步机制未改仍会复现 |
