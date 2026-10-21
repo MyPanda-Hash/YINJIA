@@ -66,7 +66,24 @@
         <!-- 壳内首次使用:先让用户确认后端地址(否则工厂列表一定是空的) -->
         <div v-if="needOrigin" class="origin-hint">
           <el-icon><WarningFilled /></el-icon>
-          <span>{{ tt('首次使用请先确认下方「服务器地址」(如 http://192.168.1.10:8090),再点「保存并重连」') }}</span>
+          <span>{{ tt('首次使用请先确认「服务器地址」(如 http://192.168.1.10:8090),再点「保存并重连」') }}</span>
+        </div>
+
+        <!-- 服务器地址(2026-10-20 加 / 2026-10-21 从页脚挪到表单上方):
+             只在**安卓壳里**出现 —— Capacitor 版页面 origin 是 https://localhost,没有同源后端,
+             必须在登录前指定后端;网页版部署同源,不显示。
+             ⚠ 挪到上方的理由:原来放在页脚,手机软键盘弹出时会把它整块挡死,根本没法输入。
+             与参考包用同一个 localStorage 键(mes_api_origin)。 -->
+        <div v-if="showServerAddr" class="server-addr">
+          <span class="server-addr-label">{{ tt('服务器地址') }}</span>
+          <el-input
+            v-model="serverAddr"
+            size="small"
+            :placeholder="tt('如 http://192.168.1.10:8090')"
+            @keyup.enter="saveServerAddr"
+            @focus="keepVisible"
+          />
+          <el-button size="small" type="primary" plain @click="saveServerAddr">{{ tt('保存并重连') }}</el-button>
         </div>
 
         <el-form
@@ -138,20 +155,6 @@
             <el-icon v-if="!loading"><ArrowRight /></el-icon>
           </el-button>
         </el-form>
-
-        <!-- 服务器地址(2026-10-20):只在**安卓壳里**出现 —— Capacitor 版的页面 origin 是
-             https://localhost,没有同源后端,必须在登录前指定后端地址;网页版部署同源,不显示。
-             与参考包 银嘉扫码领料.apk 用同一个 localStorage 键(mes_api_origin)。 -->
-        <div v-if="showServerAddr" class="server-addr">
-          <span class="server-addr-label">{{ tt('服务器地址') }}</span>
-          <el-input
-            v-model="serverAddr"
-            size="small"
-            :placeholder="tt('如 http://192.168.1.10:8090')"
-            @keyup.enter="saveServerAddr"
-          />
-          <el-button size="small" type="primary" plain @click="saveServerAddr">{{ tt('保存并重连') }}</el-button>
-        </div>
 
         <footer class="login-footer">
           <span>LIGHT MES · 2026</span>
@@ -228,6 +231,22 @@ function saveServerAddr() {
   needOrigin.value = false
   // 地址变了要重建 axios 实例:最干净的做法是整页重载
   location.reload()
+}
+
+/**
+ * 软键盘弹出时把当前输入框滚到可视区中部。
+ * 光靠 adjustResize 不够:焦点在页面靠下的元素时,安卓 WebView 常把输入框留在键盘下方。
+ */
+function keepVisible(e) {
+  const el = e && e.target ? e.target : null
+  if (!el || typeof el.scrollIntoView !== 'function') return
+  setTimeout(() => {
+    try {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    } catch {
+      el.scrollIntoView()
+    }
+  }, 260)
 }
 
 const rememberedAccount = localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || ''
@@ -634,13 +653,14 @@ onMounted(async () => {
   margin-top: 2px;
 }
 
-/* 服务器地址(只在安卓壳里渲染):一行三件套,窄屏自动换行 */
+/* 服务器地址(只在安卓壳里渲染):一行三件套,窄屏自动换行。
+   2026-10-21:从页脚挪到表单上方(原来键盘弹出会把它挡死),所以下边距改成 12px。 */
 .server-addr {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin: 0 0 12px;
   padding: 8px 10px;
   border: 1px dashed #d5dedb;
   border-radius: 8px;
