@@ -1,0 +1,32 @@
+=== plang id=1171(服务器独有) ===
+   1171 | GD-2026-10-0198 | 2026-10-21 09:13:10.7 | admin | 2026-10-21 09:13:10.7
+   (0 行)
+
+=== plang_pc id=2006(服务器独有) ===
+   0 | 2006 | GD-2026-10-0198 | 3 | 1号车间 | admin | 2026-10-21 09:13:10.7 | null | B-92-16 | 锶碱偏硅酸含锂炭棒 | 45*16*76+0.3-07mm | null | 支 | 200.0 | 0.0 | 200.0 | 0.0 | 0.0 | 0.0 | 0.0 | 2026-10-09 00:00:00.0 | null | null | null | null | N | LZW-20261009-01 | 9490.0 | null | null | null | null | null | null | null | 0 | null | null | null | null | null | null | null | null | 0.0 | admin | 2026-10-21 09:14:39.473 |  | null |  | null | N |  | null | 0 | null | 1171 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null
+
+=== wo_process_line ids 10051-10053(服务器独有) ===
+   [ERR] Invalid column name '工单行号'.
+   0
+
+=== rd_insp_plan_head id=14(服务器独有) ===
+   14 | IP-2026-10-0013 | 2026-10-21 | YJ-RD001 | null | V2026-10-21-01 | null | null | null | null | null | null | null | null | null | null | fengmin | 2026-10-21 08:30:30.0732545 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null
+
+=== s_allno 服务器独有 3 行 ===
+   [ERR] Invalid column name 's_no'.
+
+=== 本地作废的 3 张装配检验单(服务器状态) ===
+   (0 行)
+   ZJ-2026-10-0009 | QC_ASM_INSP | Y | N | null
+   ZJ-2026-10-0013 | QC_ASM_INSP | Y | N | null
+   ZJ-2026-10-0014 | QC_ASM_INSP | Y | N | null
+
+=== 最新业务时间戳对照 ===
+   bd_so_order              服务器=2026-10-20 17:34:01.000   本地=2026-10-20 13:12:31.000
+   bd_pu_order              服务器=2026-10-20 13:51:58.000   本地=2026-10-20 13:51:58.000
+   bd_sale_out              服务器=2026-10-14 12:23:15.000   本地=2026-10-14 12:23:15.000
+   bd_purchase_in           服务器=2026-10-20 16:42:47.761   本地=2026-10-20 16:42:47.761
+   qc_first_insp_head       服务器=2026-10-19 15:23:00.064   本地=2026-10-19 15:23:00.064
+   qc_proc_insp_head        服务器=2026-10-19 15:23:00.107   本地=2026-10-19 15:23:00.107
+   wo_process_line          服务器=2026-10-21 09:14:39.493   本地=2026-10-20 16:52:13.370
+RESULT: DONE

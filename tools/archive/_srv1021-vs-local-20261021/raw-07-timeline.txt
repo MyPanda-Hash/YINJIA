@@ -1,0 +1,55 @@
+=== 库信息 ===
+   HSDZ_MES | 2026-09-01 04:18:42.177 | sa | ONLINE | SIMPLE | 100 | Chinese_PRC_CI_AS
+   HSDZ_MES_SRV1021 | 2026-10-21 03:07:00.843 | sa | ONLINE | SIMPLE | 100 | Chinese_PRC_CI_AS
+
+=== 今日(2026-10-21)新建的表 ===
+ -- HSDZ_MES_SRV1021
+   rd_mold_formula_detail | 2026-10-21 06:57:08.817 | 2026-10-21 07:00:52.410
+   wo_mixing_list | 2026-10-21 08:04:19.457 | 2026-10-21 08:04:19.773
+ -- HSDZ_MES
+   _bak_qcdraft_proc_head_20261021 | 2026-10-21 03:04:01.523 | 2026-10-21 03:04:01.523
+   _bak_qcdraft_proc_detail_20261021 | 2026-10-21 03:04:01.543 | 2026-10-21 03:04:01.543
+   _bak_qcdraft_proc_status_20261021 | 2026-10-21 03:04:01.560 | 2026-10-21 03:04:01.560
+   _bak_qcdraft_fst_head_20261021 | 2026-10-21 03:04:01.577 | 2026-10-21 03:04:01.577
+   _bak_qcdraft_fst_detail_20261021 | 2026-10-21 03:04:01.593 | 2026-10-21 03:04:01.593
+   _bak_qcdraft_fst_status_20261021 | 2026-10-21 03:04:01.610 | 2026-10-21 03:04:01.610
+   _bak_qcdraft_approval_20261021 | 2026-10-21 03:04:01.640 | 2026-10-21 03:04:01.640
+
+=== 表创建时间分布(前后各 3 个) ===
+ -- HSDZ_MES_SRV1021 最早:
+   dm_ck | 2024-12-15 13:28:11.917
+   dm_key | 2024-12-15 13:29:47.533
+   gxgs | 2024-12-15 13:38:17.080
+ -- HSDZ_MES_SRV1021 最新:
+   wo_mixing_list | 2026-10-21 08:04:19.457
+   rd_mold_formula_detail | 2026-10-21 06:57:08.817
+   wo_pick_scan_log | 2026-10-20 14:34:06.530
+   yj_backup_log | 2026-10-19 15:50:27.917
+   _bak_pc0000_merge | 2026-10-18 09:47:47.243
+   _bak_pc0000_baseline | 2026-10-18 09:47:47.213
+ -- HSDZ_MES 最早:
+   dm_ck | 2024-12-15 13:28:11.917
+   dm_key | 2024-12-15 13:29:47.533
+   gxgs | 2024-12-15 13:38:17.080
+ -- HSDZ_MES 最新:
+   _bak_qcdraft_approval_20261021 | 2026-10-21 03:04:01.640
+   _bak_qcdraft_fst_status_20261021 | 2026-10-21 03:04:01.610
+   _bak_qcdraft_fst_detail_20261021 | 2026-10-21 03:04:01.593
+   _bak_qcdraft_fst_head_20261021 | 2026-10-21 03:04:01.577
+   _bak_qcdraft_proc_status_20261021 | 2026-10-21 03:04:01.560
+   _bak_qcdraft_proc_detail_20261021 | 2026-10-21 03:04:01.543
+
+=== 备份表(_bak_pc0000_*)是否两侧都有 ===
+   _bak_pc0000_20261018_kucun | _bak_pc0000_20261018_kucun
+   _bak_pc0000_20261018_inh | _bak_pc0000_20261018_inh
+   _bak_pc0000_20261018_outh | _bak_pc0000_20261018_outh
+   _bak_pc0000_baseline | _bak_pc0000_baseline
+   _bak_pc0000_merge | _bak_pc0000_merge
+   null | _bak_qcdraft_fst_status_20261021
+   null | _bak_qcdraft_fst_head_20261021
+   null | _bak_qcdraft_proc_head_20261021
+   null | _bak_qcdraft_approval_20261021
+   null | _bak_qcdraft_proc_status_20261021
+   null | _bak_qcdraft_proc_detail_20261021
+   null | _bak_qcdraft_fst_detail_20261021
+RESULT: DONE
