@@ -4158,3 +4158,13 @@ migrate-prod-pick-outh-20261022.sql
 #   回滚：tools/rollback-finish-in-wo-backfill-20261022.sql（按留痕还原，幂等）
 #   取证与逐单清单：tools/archive/_finish-in-wo-20261022/
 migrate-finish-in-wo-backfill-20261022.sql
+
+# ---- 2026-10-22 产成品入库单「加工单号」全补（第二轮，放宽；仍只填空值）----
+#   用户口径「放宽要全补上，并且把补充的脚本发给我，方便服务器直接用。」
+#   第一轮 migrate-finish-in-wo-backfill-20261022.sql（strict）只补"全覆盖+时间合理"31 张；
+#   本脚本把**仍然空着的**按三档放宽补完：M2 产品对上·时间合理 / M3 产品对上·工单晚于入库 /
+#   M4 无产品依据·按时间最近。每张单档位写进 yj_usage_log 留痕，可整批回滚或按档复核。
+#   判据与风险见脚本头注 + tools/archive/_finish-in-wo-20261022/README.md。
+#   本地实测：200 张（M2 113 / M3 33 / M4 54）→ 补后 232 张全部有号、0 张空；再跑 NOOP。
+#   服务器包：deploy/incr-finish-in-wo-backfill-20261022.zip（组装：tools/archive/_assemble-finish-in-wo-pkg.ps1）
+migrate-finish-in-wo-backfill-full-20261022.sql

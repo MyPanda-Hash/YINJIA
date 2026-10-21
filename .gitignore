@@ -196,3 +196,11 @@ tools/_out/
 /deploy/incr-prod-pick-outh-*/SHA256SUMS.txt
 /deploy/incr-prod-pick-outh-*/logs/
 /deploy/incr-prod-pick-outh-*.zip
+# 产成品入库单加工单号补齐包(2026-10-22):同前两个增量包 —— 包里的 tools\ / verify\ /
+# SHA256SUMS.txt 都是派生物(由 tools/archive/_assemble-finish-in-wo-pkg.ps1 从仓库真源重建),
+# zip 不入库(deploy/*.zip 已覆盖)。
+/deploy/incr-finish-in-wo-backfill-*/tools/
+/deploy/incr-finish-in-wo-backfill-*/verify/
+/deploy/incr-finish-in-wo-backfill-*/SHA256SUMS.txt
+/deploy/incr-finish-in-wo-backfill-*/logs/
+/deploy/incr-finish-in-wo-backfill-*.zip
