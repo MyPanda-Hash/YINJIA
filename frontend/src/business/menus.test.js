@@ -177,18 +177,20 @@ test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护�
 
 /**
  * 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」。
- * 合并只改菜单分组,**10 个面板入口与顺序保持原样**:原生产执行 4 项在前、原生产记录 6 项在后。
+ * 合并只改菜单分组,面板入口与顺序保持原样:原生产执行 4 项在前、原生产记录 6 项在后。
  * 顺序被钉住是为了防止合并时不小心丢项或重排(用户按现有位置找菜单)。
+ * 2026-10-22:新增只读报表「混料记录」WO_MIXING_LIST,按用户口径插在「物料混合记录」之后
+ *   (原 6 项 → 7 项),其余 10 项顺序不动。
  */
-test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不变', () => {
+test('生产过程组 = 原生产执行 4 项 + 原生产记录 7 项,顺序不变', () => {
   const proc = menuTree.find((n) => n.code === 'prodProcess')
   assert.deepEqual((proc.children || []).map((c) => c.panelCode), [
     'WO_REPORT', 'WO_REPORT_LIST', 'WO_COMPLETION_LIST', 'PROD_ABN',
-    'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
+    'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'WO_MIXING_LIST', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
   ])
   assert.deepEqual((proc.children || []).map((c) => c.title), [
     '工序报工单', '报工记录', '完工明细', '生产异常处理单',
-    '生产日报表', '投料确认单', '物料混合记录', '造粒记录', '无黑处理登记', '封箱确认',
+    '生产日报表', '投料确认单', '物料混合记录', '混料记录', '造粒记录', '无黑处理登记', '封箱确认',
   ])
 })
 

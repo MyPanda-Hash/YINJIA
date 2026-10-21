@@ -4188,3 +4188,12 @@ migrate-wo-completion-sort-20261021.sql
 #   且工序可判归属的生产车间(装箱→组装)。只改 yj_field 元数据 + 空值补全,不动业务单据;
 #   幂等、两账套都执行。配套后端口径见 ProcessShop.java。
 migrate-route-workshop-options-20261021.sql
+
+# 2026-10-22 用户口径「数据库里有 wo_mixing_list 这个表,做个和报工记录一样的显示查询面板」:
+#   新增只读报表面板 混料记录 / WO_MIXING_LIST(生产过程菜单,在「物料混合记录」之后),
+#   flat + category=报表,数据源 dbo.wo_mixing_list 直连只读;字段按该对象真实列自适应生成,
+#   面板名/字段名带 en 译名,角色授权按「报工记录」等价补授 view/query[/export]。
+#   源表缺失时只 SKIP,不建表、不改任何数据。
+#   ⚠ 测试库 HSDZ_MES_TEST(2026-10-16 快照)没有该表 ⇒ 在测试库执行只会 SKIP;
+#     测试库重建出该表后需再 DbSync run 一次。
+migrate-wo-mixing-list-20261022.sql

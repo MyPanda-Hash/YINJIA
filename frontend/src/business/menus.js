@@ -369,6 +369,10 @@ export const menuTree = [
       { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
       { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
       { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
+      // 混料记录(2026-10-22 用户口径「数据库里有 wo_mixing_list 这个表,做个和报工记录一样的显示查询面板」):
+      //   只读报表(flat+报表),数据源 dbo.wo_mixing_list;无新增流程(operationName 不配)。
+      //   面板元数据见 tools/migrate-wo-mixing-list-20261022.sql。
+      { code: 'woMixingList', title: '混料记录', path: '/panelx/list/WO_MIXING_LIST', panelCode: 'WO_MIXING_LIST', icon: 'List' },
       { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
       { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
       { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },

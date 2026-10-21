@@ -4005,6 +4005,7 @@ export default {
     '完工明细': 'Completion detail',
     '完工行': 'Completed rows',
     '报工记录': 'Job report log',
+    '混料记录': 'Mixing Records',
     '记录行': 'Log rows',
     '首件检验单': 'First article inspection',
     '制程检验单(成型产出)': 'Process inspection (moulding output)',
