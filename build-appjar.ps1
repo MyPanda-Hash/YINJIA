@@ -1,4 +1,4 @@
-﻿<#
+<#
   YINJIA-MES 一键打包 -> app.jar(服务器内测部署产物)
   ==================================================
   流程: 前端 npm run build -> dist 镜像同步到后端内嵌 static(/MIR 清陈旧产物)
@@ -67,7 +67,11 @@ $env:JAVA_HOME = $javaOk
 $mvn = "$root\tools\apache-maven-3.9.9\bin\mvn.cmd"
 if (-not (Test-Path $mvn)) { throw "未找到 Maven: $mvn(应位于 tools\apache-maven-3.9.9)" }
 Write-Host '[3/4] Maven package ...'
-& $mvn -q -s "$root\tools\settings.xml" -f "$root\backend\pom.xml" -DskipTests package
+# ⚠ 必须带 `clean`(2026-10-21 修):只跑 package 时 target\classes\static 是**累加**的 ——
+#   前端每次改版都生成新 hash 的 chunk,旧 chunk 不会被清掉,jar 里就同时躺着 3~4 份
+#   RecordSheetPanels-*.js(实测 108.6MB,而干净打包约 107MB;历史最严重一次到 137MB/2303 个资源)。
+#   功能上只加载 index.html 引用的那一份,但包体与审计都会被污染,且"jar 里有旧 chunk"会误导排查。
+& $mvn -q -s "$root\tools\settings.xml" -f "$root\backend\pom.xml" -DskipTests clean package
 if ($LASTEXITCODE -ne 0) { throw "mvn package 失败(exit=$LASTEXITCODE)" }
 Write-Host '[3/4] 后端打包 OK'
 
