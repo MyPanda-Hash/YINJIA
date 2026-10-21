@@ -51,15 +51,24 @@ function startStaticServer() {
   return new Promise((res) => server.listen(SERVE_PORT, '127.0.0.1', () => res(server)));
 }
 
-const server = await startStaticServer();
-const base = `http://127.0.0.1:${SERVE_PORT}`;
+// PROBE_BASE/PROBE_QUERY 可用开发服地址直连(如 http://127.0.0.1:5173 + safeTop=44),
+// 不设时照旧自己起 dist 静态服务。
+const PROBE_BASE = process.env.PROBE_BASE || '';
+const PROBE_QUERY = process.env.PROBE_QUERY || '';
+const server = PROBE_BASE ? null : await startStaticServer();
+const base = PROBE_BASE || `http://127.0.0.1:${SERVE_PORT}`;
+const pageUrl = (hash) => {
+  const q = new URLSearchParams(PROBE_QUERY);
+  q.set('t', String(Date.now()));
+  return `${base}/?${q.toString()}#${hash}`;
+};
 
 const login = await (await fetch(`${base}/api/auth/login`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ userName: 'admin', password: '123456' }),
 })).json();
 const token = login.data?.token;
-if (!token) { console.error('登录失败', JSON.stringify(login).slice(0, 300)); server.close(); process.exit(1); }
+if (!token) { console.error('登录失败', JSON.stringify(login).slice(0, 300)); server?.close(); process.exit(1); }
 const userJson = JSON.stringify(login.data.user || {});
 const factoryJson = JSON.stringify({ code: login.data.user?.factory || 'YJ', name: 'YINJIA-MES' });
 
@@ -92,9 +101,9 @@ try {
 
   await send('Page.enable'); await send('Runtime.enable');
   await setMobile(390, 844);
-  await send('Page.navigate', { url: `${base}/#/login` }); await sleep(2000);
+  await send('Page.navigate', { url: pageUrl('/login') }); await sleep(2000);
   await ev(`localStorage.setItem('mes_token', ${JSON.stringify(token)}); localStorage.setItem('mes_user', ${JSON.stringify(userJson)}); localStorage.setItem('mes_factory', ${JSON.stringify(factoryJson)}); 'ok'`);
-  await send('Page.navigate', { url: `${base}/?t=${Date.now()}#/dashboard` }); await sleep(6000);
+  await send('Page.navigate', { url: pageUrl('/dashboard') }); await sleep(6000);
 
   const rectOf = (sel) => `(() => { const e=document.querySelector(${JSON.stringify(sel)}); if(!e) return null;
     const r=e.getBoundingClientRect(); const cs=getComputedStyle(e);
@@ -150,7 +159,7 @@ try {
   // 面板列表页(手机视口)
   await setMobile(390, 844);
   for (const [hash, name] of [['#/panelx/list/MANU_ORDER', 'mobile-04-list-manu-order.png'], ['#/panelx/form/MANU_ORDER', 'mobile-05-form-manu-order.png']]) {
-    await send('Page.navigate', { url: `${base}/?t=${Date.now()}${hash}` });
+    await send('Page.navigate', { url: pageUrl(hash.replace(/^#/, '')) });
     await sleep(6500);
     console.log(`\n===== ${hash} =====`);
     console.log('页面横向溢出 =', await ev(`document.documentElement.scrollWidth - window.innerWidth`));
@@ -161,7 +170,7 @@ try {
   ws.close();
 } finally {
   edge.kill();
-  server.close();
+  server?.close();
   try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 console.log('\n截图目录:', HERE);

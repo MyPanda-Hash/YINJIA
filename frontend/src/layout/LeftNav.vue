@@ -661,7 +661,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
        移动端抽屉是 position:fixed 贴视口顶,不吃 .portal 的 env(safe-area-inset-top) ——
        抽屉头部(返回/标题/关闭)正好压在挖孔屏摄像头与状态栏下面,点不到也看不清。
        抽屉背景保留铺到顶(白色盖住挖孔区),只把内容用 padding 让开安全区。 */
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: var(--yj-safe-top, env(safe-area-inset-top, 0px));
     box-sizing: border-box;
     width: min(320px, 86vw) !important;
     z-index: 1000;
@@ -755,7 +755,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 6px 8px calc(12px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(12px + var(--yj-safe-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .mn-item {
     display: flex;
