@@ -16,7 +16,7 @@
         <el-button size="small" type="primary" plain @click="apply">{{ tt('查找') }}</el-button>
       </div>
       <div class="dsr-count">
-        {{ tt('共有数据') }}: {{ total }} {{ tt('条') }}
+        {{ tt('共有数据: {n} 条').replace('{n}', String(total)) }}
         <span v-if="keyword" class="dsr-count-sub">（{{ tt('模糊搜索') }}: {{ keyword }}）</span>
       </div>
     </div>

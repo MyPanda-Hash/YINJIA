@@ -259,11 +259,16 @@ const rowsForRender = computed(() => (items.value.length ? items.value : [null])
 /** 空表提示行要跨的列数(右四列 + 操作列) */
 const emptyColspan = computed(() => 4 + (props.editable ? 1 : 0))
 
-/** 稳定的行键(v-for key 用;行是被 markRaw 的原对象,加个不可枚举的 uid) */
+/** 稳定的行键(v-for key 用)。**用 WeakMap 记,不往行对象上挂字段**:
+ *  原实现 `row.__uid = 'q'+n` 是**可枚举**属性 ⇒ ① 被 JSON.stringify 带进"未保存修改"快照,
+ *  一打开制程检验单就被判脏(切单/翻页/左目录点行每次都弹「未保存提示」,2026-10-21 接入左栏时暴露);
+ *  ② 保存时这个键还会跟着明细一起提交给后端。WeakMap 不污染行、天然随行对象回收。 */
+const uidMap = new WeakMap()
 let uidSeq = 0
 function uidOf(row) {
-  if (!row.__uid) row.__uid = 'q' + (++uidSeq)
-  return row.__uid
+  let v = uidMap.get(row)
+  if (!v) { v = 'q' + (++uidSeq); uidMap.set(row, v) }
+  return v
 }
 
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
