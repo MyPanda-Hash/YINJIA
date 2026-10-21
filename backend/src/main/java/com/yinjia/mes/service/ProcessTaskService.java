@@ -91,6 +91,74 @@ public class ProcessTaskService {
         return created;
     }
 
+    /**
+     * 工艺路线(2026-10-21 修正):**工单行上结转时选的路线优先** → 产品档案 → 默认路线。
+     *
+     * <p>用户口径:「工艺路线是在工单结转的时候选择的,选择完后工单跟着走」。
+     * 原实现只查 {@code bs_inv.工艺路线} ⇒「结转时选了 GY-001、产品档案没绑」的工单
+     * 会退回 GY-CB-STD 生成台账,报工页面看到的就是错的三道。
+     */
+    /**
+     * 按工单行的**工艺路线**建「工序台账」(wo_process_line) —— 幂等:该行已有有效台账就跳过。
+     *
+     * <p>为什么要这一步(2026-10-21 用户口径:「工艺路线是在工单结转的时候选择的,选择完后工单跟着走」):
+     * 台账原本只由「快速排产 → 预排全程线」写入,于是「结转过、但还没预排产」的工单在报工页面
+     * 看不到任何工序 ⇒ 现场报不了工。现在订单结转转单后立刻按所选路线建台账(**计划生产线留空**,
+     * 后续预排产再派线,预排产时会把旧台账作废重建,不冲突)。
+     *
+     * @param plNo  工单号
+     * @param route 工艺路线编码(为空则按工单行的路线/产品档案/默认)
+     * @return 新建的台账行数
+     */
+    @Transactional
+    public int ensureLedgerForWorkOrder(String plNo, String route, String user) {
+        if (plNo == null || plNo.isBlank()) return 0;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, pl_no, pl_xc, ISNULL(dm,N'') AS 产品编码, ISNULL([工艺路线],N'') AS 工艺路线,"
+                        + " ISNULL(pl_sl,0) AS 排产数量"
+                        + " FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", plNo);
+        int created = 0;
+        for (Map<String, Object> r : rows) {
+            Object rowId = r.get("id");
+            Integer has = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM dbo.wo_process_line WHERE 工单行id=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                    Integer.class, rowId);
+            if (has != null && has > 0) continue;              // 已有台账(已预排产)⇒ 不动
+            String rt = route != null && !route.isBlank() ? route.trim() : routeOfRow(r);
+            // 同一路线在 bs_route 里可能有“一工序多行”的明细(实测 GY-001 的「下料」有 4 行、
+            // 只是规格/参数不同)⇒ 按工序名称去重,保留最小加工顺序那一行,否则台账会建出 4 条下料。
+            List<Map<String, Object>> ops = jdbc.queryForList(
+                    "SELECT 工序, MIN(加工顺序) AS 加工顺序, MAX(换算率) AS 换算率 FROM ("
+                            + "   SELECT ISNULL(工序名称,N'') AS 工序, ISNULL(加工顺序,999) AS 加工顺序, ISNULL(换算率,1) AS 换算率"
+                            + "     FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + "      AND ISNULL(工序名称,N'')<>N''"
+                            + " ) t GROUP BY 工序 ORDER BY MIN(加工顺序)", rt);
+            double plan = num(r.get("排产数量"));
+            int seq = 0;
+            for (Map<String, Object> op : ops) {
+                seq++;
+                double rate = num(op.get("换算率"));
+                if (rate <= 0) rate = 1;
+                // 首道 = 已落实(现场第一道就开始做),其余 = 计划;计划生产线留空等排产派线
+                String state = seq == 1 ? "已落实" : "计划";
+                created += jdbc.update(
+                        "INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
+                                + " 计划数量, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
+                                + " VALUES (?,?,?,?,NULL,NULL,?,?,?,N'N',?,GETDATE())",
+                        plNo, rowId, op.get("工序"), seq,
+                        round(plan * rate), state,
+                        seq == 1 ? new java.util.Date() : null, user);
+            }
+        }
+        return created;
+    }
+
+    private String routeOfRow(Map<String, Object> row) {
+        String fromRow = row == null ? "" : str(row.get("工艺路线"));
+        if (fromRow != null && !fromRow.isBlank()) return fromRow.trim();
+        return routeOf(row == null ? null : str(row.get("产品编码")));
+    }
+
     /** 产品档案绑定的工艺路线;没绑/查不到 → 默认路线 */
     private String routeOf(String dm) {
         if (dm == null || dm.isBlank()) return DEFAULT_ROUTE;
