@@ -1,0 +1,12 @@
+{
+  "name": "yinjia-mes-cap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "银嘉 MES 安卓包(Capacitor + ML Kit 扫码)—— 与参考包 银嘉扫码领料.apk 同构",
+  "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^7.5.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/core": "^7.6.9"
+  }
+}

@@ -133,6 +133,20 @@
           </el-button>
         </el-form>
 
+        <!-- 服务器地址(2026-10-20):只在**安卓壳里**出现 —— Capacitor 版的页面 origin 是
+             https://localhost,没有同源后端,必须在登录前指定后端地址;网页版部署同源,不显示。
+             与参考包 银嘉扫码领料.apk 用同一个 localStorage 键(mes_api_origin)。 -->
+        <div v-if="showServerAddr" class="server-addr">
+          <span class="server-addr-label">{{ tt('服务器地址') }}</span>
+          <el-input
+            v-model="serverAddr"
+            size="small"
+            :placeholder="tt('如 http://192.168.1.10:8090')"
+            @keyup.enter="saveServerAddr"
+          />
+          <el-button size="small" type="primary" plain @click="saveServerAddr">{{ tt('保存并重连') }}</el-button>
+        </div>
+
         <footer class="login-footer">
           <span>LIGHT MES · 2026</span>
           <span
@@ -162,6 +176,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
+import { API_ORIGIN_KEY, apiOrigin } from '@core/request'
 // 背景图 2026-09-28 转 WebP(1967KB→111KB,q80 视觉无损;原图已删)
 import manufacturingImage from '@/assets/login-manufacturing.webp'
 
@@ -174,6 +189,28 @@ const formRef = ref(null)
 const loading = ref(false)
 const factoryLoading = ref(false)
 const errorMessage = ref('')
+
+/**
+ * 服务器地址(2026-10-20):只在壳里出现。
+ * 判据:Capacitor(window.Capacitor)、手搓壳(window.YjNative)、或用 file:// 打开 —— 这三种都没有同源后端。
+ * 网页部署(8090/5173)同源,不显示这一行。
+ */
+const IN_SHELL = typeof window !== 'undefined'
+  && (!!window.Capacitor || !!window.YjNative || location.protocol === 'file:')
+const showServerAddr = IN_SHELL
+const serverAddr = ref(apiOrigin() || localStorage.getItem(API_ORIGIN_KEY) || '')
+
+function saveServerAddr() {
+  const v = String(serverAddr.value || '').trim().replace(/\/+$/, '')
+  if (v && !/^https?:\/\//i.test(v)) {
+    errorMessage.value = tt('地址要以 http:// 或 https:// 开头')
+    return
+  }
+  localStorage.setItem(API_ORIGIN_KEY, v)
+  // 地址变了要重建 axios 实例:最干净的做法是整页重载
+  location.reload()
+}
+
 const rememberedAccount = localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || ''
 const rememberAccount = ref(Boolean(rememberedAccount))
 const form = reactive({ userName: rememberedAccount, password: '', factory: '' })
@@ -556,6 +593,30 @@ onMounted(async () => {
 
 .login-submit .el-icon {
   font-size: 17px;
+}
+
+/* 服务器地址(只在安卓壳里渲染):一行三件套,窄屏自动换行 */
+.server-addr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px dashed #d5dedb;
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.server-addr-label {
+  flex: none;
+  font-size: 12px;
+  color: #5d6b66;
+}
+
+.server-addr :deep(.el-input) {
+  flex: 1 1 150px;
+  min-width: 0;
 }
 
 .login-footer {

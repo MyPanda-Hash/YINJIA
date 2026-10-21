@@ -4371,6 +4371,10 @@ export default {
     '没有找到该工单:请核对工单号(已作废的单查不到)': 'Work order not found — check the number (cancelled orders are not searchable).',
     '扫码': 'Scan',
     '调不起相机,请改用输入框扫码枪或手工输入': 'Camera unavailable — use a scanner gun or type the code.',
+    '服务器地址': 'Server address',
+    '保存并重连': 'Save & reconnect',
+    '如 http://192.168.1.10:8090': 'e.g. http://192.168.1.10:8090',
+    '地址要以 http:// 或 https:// 开头': 'The address must start with http:// or https://',
     // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
     '生产领料': 'Production Picking',
     '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',
