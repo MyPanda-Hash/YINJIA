@@ -4166,3 +4166,10 @@ migrate-drop-bak-snapshots-20261021.sql
 #   《库存明细》视图隐藏零行 ⇒ 用户报"有单据有流水却查不到库存明细"。
 #   与代码修复同口径(StockMonthCloseService 2026-10-21 两处);幂等、不删行;两账套都执行。
 migrate-kucun-recalc-today-20261021.sql
+
+# 2026-10-21 用户口径「让当前完工明细的数据按时间排列从上到下,上面是新日期的、下方为旧日期的」:
+#   面板 WO_COMPLETION_LIST 的 date_col 写 wgsj(视图里的完工时间物理列)
+#   ⇒ QueryService.queryFlat 走 ORDER BY 完工时间 DESC, id DESC。
+#   只改 yj_panel 元数据,不动业务数据/视图/字段/权限;幂等、两账套都执行。
+#   必须排在本清单 migrate-wo-completion-list.sql(它会把 date_col 写回 NULL)之后。
+migrate-wo-completion-sort-20261021.sql

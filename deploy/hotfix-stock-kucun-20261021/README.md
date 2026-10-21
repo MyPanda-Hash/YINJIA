@@ -38,28 +38,113 @@
 
 服务器:`http://36.140.66.163:8090`,库 `HSDZ_MES`,应用目录 `C:\yinjia`,部署目录 `C:\yj-deploy`。
 
+### 3.1 流程图
+
+```
+开发机                                  服务器(RDP)
+  │  ① 拷 hotfix-stock-kucun-20261021.zip
+  │  ───────────────────────────────────► ② 解压到 C:\yj-deploy\stockfix
+  │                                        ③ certutil 核对 SHA256(可选)
+  │                                        ④ 管理员 cmd 跑 apply-db.bat HSDZ_MES
+  │                                            ├─[1/3] BACKUP DATABASE → C:\yinjia\backup\pre-kucun-recalc-*.bak
+  │                                            ├─[2/3] sqlcmd -f 65001 -i 修复脚本
+  │                                            └─[3/3] 打印自检 5 个数
+  │  ◄─────────────────────────────────── ⑤ 浏览器验收(库存明细),把输出贴回
+```
+
+### 3.2 逐步操作
+
+**① 开发机:把包传到服务器**
+
+包就在本仓库:`D:\workspace\yinjia\deploy\hotfix-stock-kucun-20261021.zip`(8.5 KB)。
+RDP 连上服务器后,在开发机资源管理器里 **复制该 zip → 在 RDP 窗口里粘贴**(剪贴板直通),
+落到桌面即可。
+
+> 校核(可选):zip 的 SHA256 由开发机随包发出(聊天/交付记录里那份),在服务器上比对:
+> `certutil -hashfile hotfix-stock-kucun-20261021.zip SHA256`。
+> 包内 `SHA256SUMS.txt` 是**单文件**指纹(逐文件核对用):
+> `certutil -hashfile apply-db.bat SHA256`。
+
+**② 服务器:解压**
+
 ```cmd
-:: ① 解压到 C:\yj-deploy\stockfix(没有就建)
-:: ② 管理员 cmd 执行
+mkdir C:\yj-deploy\stockfix 2>nul
+tar -xf "%USERPROFILE%\Desktop\hotfix-stock-kucun-20261021.zip" -C C:\yj-deploy\stockfix
+dir C:\yj-deploy\stockfix
+```
+
+应看到 4 个文件:`apply-db.bat`、`migrate-kucun-recalc-today-20261021.sql`、`README.md`、`SHA256SUMS.txt`。
+
+> 没有 `tar`(老系统)就用资源管理器右键"全部解压缩"。
+
+**③ 服务器:管理员 cmd 执行**
+
+> 想留"修复前"的对照数,先在 SSMS 跑这一条并截个图(可跳过):
+>
+> ```sql
+> SELECT N'kucun_rows' AS k, COUNT(*) AS v FROM dbo.kucun
+> UNION ALL SELECT N'sum_yl', CAST(ISNULL(SUM(yl),0) AS decimal(18,4)) FROM dbo.kucun
+> UNION ALL SELECT N'zero_rows', SUM(CASE WHEN yl = 0 THEN 1 ELSE 0 END) FROM dbo.kucun
+> UNION ALL SELECT N'YJ-YCYX-055', CAST(ISNULL(SUM(yl),0) AS decimal(18,4)) FROM dbo.kucun WHERE wzdm = N'YJ-YCYX-055';
+> ```
+
+```cmd
 cd /d C:\yj-deploy\stockfix
 apply-db.bat HSDZ_MES
 ```
 
-成功判据(控制台最后一段):
+- 必须是**管理员** cmd(备份数据库需要);普通窗口跑会卡在 BACKUP 那一步报权限不足;
+- 参数不写默认就是 `HSDZ_MES`;
+- **不需要停 8090**,脚本是短事务(1~2 秒)。
+
+**④ 看输出:三步都要 `ok`**
 
 ```
+[1/3] backup database -> C:\yinjia\backup\pre-kucun-recalc-20261021-175500.bak
+      backup ok.
+[2/3] run the fix script (this is the actual repair)
+      script ok.
+[3/3] self-check (item 1/2/3 must be 0)
 kucun_rows|1480
-sum_yl|-341626.3260        ← 与"全部流水净额"一致
-zero_rows|148              ← 修复前是 434
-seed_item_YJ-YCYX-055|906  ← 就是用户那张单的量
+sum_yl|-341626.3260
+zero_rows|148
+seed_item_YJ-YCYX-055|906
 RESULT: DONE for HSDZ_MES
 ```
 
-脚本自己会先做 `BACKUP DATABASE`(存到 `C:\yinjia\backup\pre-kucun-recalc-<时间戳>.bak`),
-**备份失败就直接中止**,不会动数据。
+| 行 | 含义 | 判据 |
+|---|---|---|
+| `kucun_rows` | 结存键数 | 与修复前基本一致(可能多几个补插的) |
+| `sum_yl` | 结存合计 | 应与"全部流水净额"一致;修复前是 −180,187.63 那种"停在 9 月末"的值 |
+| `zero_rows` | 零行数 | **明显变小**(开发机 434 → 148);不变说明脚本没生效 |
+| `seed_item_YJ-YCYX-055` | 用户报障那批货 | **906** |
+| 脚本自检 ①②③ | 见 `migrate-…sql` 第⑤段 | **必须都是 0** |
 
-> ⚠ 这一步**不需要停 8090**:脚本是短事务,跑完刷新浏览器即可看到 906。
-> 若还有测试库要一起修:`apply-db.bat HSDZ_MES_TEST`。
+**⑤ 浏览器验收**
+
+1. 打开 `http://36.140.66.163:8090`(服务器本机用 `http://localhost:8090`)→ 登录;
+2. 进 **库存 → 库存明细**;
+3. **先清空所有筛选**:顶部"仓库编码/存货编码"输入框清空、左栏"分仓库"**一个都不勾**、若有"模糊搜索"角标点掉
+   —— 这一步很关键,用户上次看到"共 0 条"就是因为页面还带着条件;
+4. 在"存货编码"里输 `YJ-YCYX-055` 查询 → 应看到 **现存量 906**、仓库"华北工控仓";
+5. 再确认一次总量:`库存明细` 行数应比修复前多(开发机 697 → 773)。
+
+**⑥ 收尾**
+
+- 把 ④ 的 5 行输出 + 备份文件名(`pre-kucun-recalc-<时间戳>.bak`)贴回开发机留档;
+- 备份文件**保留至少一周**(回滚就靠它);
+- 测试库也要修的话再跑一次:`apply-db.bat HSDZ_MES_TEST`。
+
+### 3.3 失败怎么办
+
+| 卡在哪 | 现象 | 处置 |
+|---|---|---|
+| 步骤 ③ | `[FAIL] sqlcmd not found` | 服务器没装命令行工具 → 走 §五(SSMS 手工跑,效果一样) |
+| 步骤 ④ `[1/3]` | `[FAIL] backup failed - STOP here` | **数据一行没动**。查 `C:\yinjia\backup` 是否存在、磁盘空间、是否管理员 |
+| 步骤 ④ `[2/3]` | `[FAIL] script failed` | 数据没被改坏(脚本每批独立、幂等),先看报错;要退回就连库回滚(§六) |
+| 步骤 ⑤ | 页面还是看不到 | 先确认筛选清空;再看 `zero_rows` 是否真的降了;还不行贴输出给我 |
+
+> 脚本可**重复执行**:再跑一遍只会得到同样的数字(幂等,不删行)。
 
 ---
 
