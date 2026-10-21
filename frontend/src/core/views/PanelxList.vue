@@ -1808,14 +1808,18 @@
           <span class="efmt-ico">📄</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('导出 PDF') }}</div>
-            <div class="efmt-desc">{{ tt('服务端正式报表：含公司抬头、页眉页脚与页码') }}</div>
+            <div class="efmt-desc">{{ sheetPreviewUsesPaper
+              ? tt('按当前单据的纸张版式生成（与「打印」同一份渲染，所见即所得）')
+              : tt('服务端正式报表：含公司抬头、页眉页脚与页码') }}</div>
           </div>
         </div>
         <div class="efmt-item" @click="previewServerReport">
           <span class="efmt-ico">🖨</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('打印预览') }}</div>
-            <div class="efmt-desc">{{ tt('在浏览器新窗口内打开 PDF，可直接打印') }}</div>
+            <div class="efmt-desc">{{ sheetPreviewUsesPaper
+              ? tt('按当前单据的纸张版式生成（与「打印」同一份渲染，所见即所得）')
+              : tt('在浏览器新窗口内打开 PDF，可直接打印') }}</div>
           </div>
         </div>
         <div class="efmt-item" @click="downloadReport('xlsx')">
@@ -7171,11 +7175,38 @@ function fetchReportBlob(fmt) {
   })
 }
 
-/** 下载报表:PDF / Excel(.xlsx),文件名由后端 Content-Disposition 给,这里按同口径命名 */
+/** 下载报表:PDF / Excel(.xlsx),文件名由后端 Content-Disposition 给,这里按同口径命名。
+ *
+ *  🔴 2026-10-21:检验单类(QC_PROC_INSP / QC_FIRST_INSP)的 **PDF 也走纸张**
+ *    —— 不然同一个弹窗里「打印预览」是纸张、「导出 PDF」是旧的 .jrxml,
+ *    用户拿到两个版式(用户报障的原话就是"打印处的格式应该和当前单据对应")。
+ *    Excel 不动:它本来就是"报表数据行 + 页眉信息",和纸张版式不是一件事。 */
 async function downloadReport(fmt) {
   const no = curDocNo.value
   if (!no) return ElMessage.warning(tt('未找到可导出的单据'))
   reportVisible.value = false
+  if (fmt === 'pdf' && sheetPreviewUsesPaper.value) {
+    const loading = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+    try {
+      const r = await buildSheetPdfBlob()
+      if (!r) { ElMessage.warning(tt('未找到可导出的单据')); return }
+      const url = URL.createObjectURL(r.blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = r.name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      ElMessage.success(tt('已导出') + ' PDF')
+    } catch (e) {
+      console.error('sheet-pdf-export failed', e)
+      ElMessage.error(tt('导出失败'))
+    } finally {
+      loading.close()
+    }
+    return
+  }
   const loading = ElMessage({ message: tt('正在生成报表…'), duration: 0 })
   try {
     const blob = await fetchReportBlob(fmt)
@@ -7195,11 +7226,46 @@ async function downloadReport(fmt) {
   }
 }
 
-/** 打印预览:先同步开窗口占位(否则 await 之后新窗口会被浏览器拦截),拿到 PDF 再指向它 */
+/**
+ * 「导出报表 → 打印预览」:在浏览器新窗口打开 PDF。
+ *
+ * 🔴 2026-10-21 修(用户口径「打印处的格式应该和当前单据对应,修改当前打印预览的渲染方式,
+ *   第一张图为打印预览的格式,第二张为原来的系统内实现的报表」):
+ *   检验单类(QC_PROC_INSP / QC_FIRST_INSP)**不再走服务端 .jrxml** ——
+ *   JRXML 是 2026-10-17 手工重画的第二份版式,与面板纸张表(QcProcInspSheet / QcFirstInspSheet)
+ *   会各改各的:纸张加了「检验结果」分区带、抽检总量位置调整、结论区加了检验人/审核人,
+ *   JRXML 没跟上 ⇒ 同一张单**打印预览与系统内长得不一样**(用户报障正是这个)。
+ *   ⇒ 这两张单的「打印预览」改为**与「打印」同一个渲染源**(buildSheetPdfBlob:把当前纸张
+ *     元素截成 PDF),所见即所得;服务端报表仍保留给「导出报表 → 导出 PDF / Excel」,
+ *     以及其它面板(销售订单/送料暂收单/出厂检验报告)。
+ */
+const SHEET_PREVIEW_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
+/** 「导出报表 → 打印预览」在本面板是否走纸张(= 与「打印」同一份渲染);弹窗文案据此换话术 */
+const sheetPreviewUsesPaper = computed(() => SHEET_PREVIEW_PANELS.includes(String(panelCode.value)))
 async function previewServerReport() {
   const no = curDocNo.value
   if (!no) return ElMessage.warning(tt('未找到可导出的单据'))
   reportVisible.value = false
+  // 检验单:纸张即预览(与「打印」同一份渲染源),先同步开窗占位再生成
+  if (SHEET_PREVIEW_PANELS.includes(String(panelCode.value))) {
+    const win = window.open('', '_blank')
+    const loading = ElMessage({ message: tt('正在生成打印预览…'), duration: 0 })
+    try {
+      const r = await buildSheetPdfBlob()
+      if (!r) { if (win) win.close(); ElMessage.warning(tt('未找到可导出的单据')); return }
+      const url = URL.createObjectURL(r.blob)
+      if (win) win.location.href = url
+      else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
+    } catch (e) {
+      if (win) win.close()
+      console.error('sheet-preview failed', e)
+      ElMessage.error(tt('导出失败'))
+    } finally {
+      loading.close()
+    }
+    return
+  }
   const win = window.open('', '_blank')
   const loading = ElMessage({ message: tt('正在生成报表…'), duration: 0 })
   try {
