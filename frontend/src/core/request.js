@@ -1,7 +1,22 @@
 import axios from 'axios'
 
+/**
+ * API 前缀(2026-10-20):网页部署时是站内相对路径 `/api`;
+ * 而**安卓 App 里页面是从 APK 内置 assets 加载的**(file:///android_asset/www/index.html),
+ * 没有"站内"这回事 ⇒ 由原生壳注入的 window.YjNative.getBaseUrl() 给出服务器地址(接口号),
+ * 这里拼成 `<服务器>/api`。改地址后原生会重载页面,这里随之重算。
+ */
+function resolveApiBase() {
+  try {
+    const n = typeof window !== 'undefined' ? window.YjNative : null
+    const base = n && typeof n.getBaseUrl === 'function' ? String(n.getBaseUrl() || '').trim() : ''
+    if (base) return base.replace(/\/+$/, '') + '/api'
+  } catch { /* 取不到就走站内相对路径 */ }
+  return '/api'
+}
+
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: resolveApiBase(),
   timeout: 15000,
 })
 

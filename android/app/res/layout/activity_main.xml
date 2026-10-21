@@ -27,18 +27,6 @@
             android:textColor="#8A9099" />
 
         <Button
-            android:id="@+id/btn_scan"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:minWidth="0dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:text="扫码"
-            android:textSize="13sp"
-            android:background="#0F7B6C"
-            android:textColor="#FFFFFF" />
-
-        <Button
             android:id="@+id/btn_settings"
             android:layout_width="wrap_content"
             android:layout_height="36dp"

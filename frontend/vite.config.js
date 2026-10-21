@@ -32,6 +32,11 @@ try {
 }
 
 export default defineConfig({
+  // 相对路径(2026-10-20):整包塞进安卓 APK 的 assets/www 后,页面是 file:///android_asset/www/index.html,
+  //   `/assets/xxx` 这种根路径会指到文件系统根 ⇒ 白屏。
+  //   本项目用 hash 路由(/#/...),页面始终落在 `/` 或 `/index.html` 上,相对路径对 Web 端
+  //   (8090 根路径部署)完全等价 ⇒ 两端共用同一份构建产物,不再维护第二套。
+  base: './',
   plugins: [
     vue(),
     // Element Plus 按需引入(模板组件自动注册+按组件带样式;2026-09-28 性能优化,

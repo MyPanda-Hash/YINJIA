@@ -32,11 +32,17 @@ import android.widget.Toast;
  * 为什么做成「WebView + 原生扫码桥」而不是重写一套原生界面:
  *   · MES 是 Vue3 单页应用,面板/字段全部由数据库元数据驱动 —— 重写等于把整套引擎再实现一遍;
  *   · 现场真正缺的只有两件原生能力:**摄像头扫码**、**可配置的服务器地址**(接口号);
- *   · 其余(登录、面板、领料)直接复用同一套网页,升级只改服务器,不用重新发 APK。
+ *   · 其余(登录、面板、领料)直接复用同一套网页。
+ *
+ * 2026-10-20 第二轮(用户口径「需要你将整个系统打包过去,并且里面的生产领料才需要调用扫码」):
+ *   · **整个前端打进 APK**(assets/www),页面从 file:///android_asset/www/index.html 加载,
+ *     断网/服务器没开也能开界面;数据由网页按「接口号」去调后端(见 frontend/src/core/request.js);
+ *   · **扫码只放在「生产领料」页**,由网页调 window.YjNative.scan();工具条不再有全局扫码按钮;
+ *   · 代价:前端改了要重新打包 APK(以前是改服务器即可);接口号仍然只决定"连哪台后端/哪个账套"。
  *
  * 这个 Activity 做三件事:
- *   ① 首次启动弹「接口地址」设置(存 SharedPreferences),之后 WebView 加载 {地址}/#/login;
- *   ② 顶部一条细工具条:显示当前接口号 + 设置 + 扫码(原生相机);
+ *   ① 首次启动弹「接口地址」设置(存 SharedPreferences),之后 WebView 加载**内置页面**;
+ *   ② 顶部一条细工具条:显示当前接口号 + 设置;
  *   ③ 向网页注入 window.YjNative 桥:
  *        YjNative.scan()        —— 打开原生扫码页,结果回调 window.__yjScanResult(code, ok)
  *        YjNative.getBaseUrl()  —— 当前接口地址
@@ -44,7 +50,10 @@ import android.widget.Toast;
  */
 public class MainActivity extends Activity {
 
-    /** 接口号(服务器地址)的存储键;默认值只是占位,首次启动会要求填写 */
+    /** 2026-10-20 第二轮:整个前端打进 APK 的 assets/www,页面从本地加载(断网也能开界面) */
+    public static final String LOCAL_URL = "file:///android_asset/www/index.html";
+
+    /** 接口号(= 连哪台 MES 服务器/哪个账套)的存储键;首次启动要求填 */
     public static final String PREF = "yj_mes";
     public static final String KEY_BASE = "base_url";
     public static final String DEFAULT_BASE = "http://192.168.1.10:8090";
@@ -62,11 +71,9 @@ public class MainActivity extends Activity {
         baseLabel = (TextView) findViewById(com.yinjia.mes.app.R.id.base_label);
         web = (WebView) findViewById(com.yinjia.mes.app.R.id.webview);
 
+        // 工具条只剩「设置」:扫码按用户口径**只放在「生产领料」页**,由网页调桥触发
         findViewById(com.yinjia.mes.app.R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showServerDialog(); }
-        });
-        findViewById(com.yinjia.mes.app.R.id.btn_scan).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startScan(); }
         });
 
         WebSettings s = web.getSettings();
@@ -80,6 +87,12 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // 页面在 file:// 下,还要跨域调 http://<服务器>:8090/api ⇒ 这三件必须放开,
+        // 否则 axios 的 XHR 会被"跨源被拦"(表现为登录一直转圈/网络异常)。
+        s.setAllowFileAccess(true);
+        s.setAllowContentAccess(true);
+        s.setAllowFileAccessFromFileURLs(true);
+        s.setAllowUniversalAccessFromFileURLs(true);
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 // 站内链接留在 WebView;非 http(s) 交给系统
@@ -102,7 +115,7 @@ public class MainActivity extends Activity {
         if (base == null || base.trim().length() == 0) {
             showServerDialog();
         } else {
-            load(base);
+            reload();
         }
     }
 
@@ -119,10 +132,14 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREF, MODE_PRIVATE).edit().putString(KEY_BASE, v).apply();
     }
 
-    private void load(String base) {
-        baseLabel.setText(base);
-        // 直接进登录页;登录后由网页自己的路由接管
-        web.loadUrl(base + "/#/login");
+    /**
+     * 加载**打包进 APK 的前端**(assets/www),不依赖网络;数据由网页按「接口号」去调后端。
+     * 页面在启动时通过 window.YjNative.getBaseUrl() 拿到接口号(见 frontend/src/core/request.js)。
+     */
+    private void reload() {
+        String base = getBase();
+        baseLabel.setText(base == null || base.length() == 0 ? "未设置接口地址(点右侧「设置」)" : base);
+        web.loadUrl(LOCAL_URL);
     }
 
     /** 「接口号」设置:就是服务器地址(IP:端口),它连着哪台服务器/哪个账套由服务器配置决定 */
@@ -139,7 +156,7 @@ public class MainActivity extends Activity {
         int p = (int) (16 * getResources().getDisplayMetrics().density);
         box.setPadding(p, p / 2, p, 0);
         TextView tip = new TextView(this);
-        tip.setText("填写 MES 服务器地址(接口号),例如 http://192.168.1.10:8090。\n手机需与服务器同一网络;保存后自动重新加载。");
+        tip.setText("填写 MES **后端**地址(接口号),例如 http://192.168.1.10:8090。\n界面已打包在 App 内,不需要联网加载;这里只决定连哪台服务器/哪个账套。\n手机需与服务器同一网络;保存后自动重新加载。");
         tip.setTextSize(13);
         tip.setTextColor(Color.parseColor("#666666"));
         box.addView(tip);
@@ -156,14 +173,14 @@ public class MainActivity extends Activity {
                             return;
                         }
                         setBase(v);
-                        load(getBase());
+                        reload();
                     }
                 })
                 .setNegativeButton("取消", null)
                 .setNeutralButton("恢复默认", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         setBase(DEFAULT_BASE);
-                        load(DEFAULT_BASE);
+                        reload();
                     }
                 })
                 .show();

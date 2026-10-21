@@ -9,29 +9,35 @@
 
 ## 1. 它是什么
 
-一个**很薄的安卓壳**,里面是 MES 网页,外面补两件网页给不了的原生能力:
+**整个前端打进 APK**(`assets/www` = `frontend/dist` 的完整镜像),WebView 从
+`file:///android_asset/www/index.html` 加载,**不依赖服务器就能开界面**;
+再补两件网页给不了的原生能力:
 
 | 能力 | 为什么必须原生 |
 |---|---|
 | **摄像头扫码** | 安卓 WebView 把 `http://` 视为**不安全上下文**,`navigator.mediaDevices` 直接不存在(和 Chrome 同一条规则);工厂内网是 `http://IP:8090`,没证书 ⇒ 网页调不起摄像头 |
-| **接口号(服务器地址)可配置** | 手机装到哪台服务器、连哪个账套,网页自己不知道(页面是从那台服务器加载来的) |
+| **接口号(后端地址)可配置** | 页面是本地 assets,不知道后端在哪;由它决定"连哪台服务器 / 哪个账套",网页据此把所有 `/api` 请求指过去(`frontend/src/core/request.js`) |
 
-除此之外**不重写任何业务**:登录、面板、生产领料全是同一套网页 —— 以后改功能只更新服务器,不用重发 APK。
+**扫码只放在「生产计划 → 生产领料」页**(用户 2026-10-20 口径:只有这个页面需要扫码):
+工具条上**没有**全局扫码按钮,页面里的「扫工单 / 扫物料」按需调原生相机。
+
+> ⚠ 代价:整包模式意味着**前端改了要重新打 APK**(以前"改服务器即可"不成立了)。
+> 数据面不受影响 —— 台账/库存/审批仍然全在服务器。
 
 ## 2. 界面
 
 ```
 ┌──────────────────────────────────────────┐
-│ http://192.168.1.10:8090      [扫码][设置] │ ← 42dp 原生工具条(显示当前接口号)
+│ http://192.168.1.10:8090          [设置] │ ← 42dp 原生工具条(显示当前接口号)
 ├──────────────────────────────────────────┤
 │                                          │
-│        MES 网页(WebView)                │
+│   MES 网页(打包在 APK 内,离线可开)     │
 │                                          │
 └──────────────────────────────────────────┘
 ```
 
-- **首次启动**弹「接口地址」对话框(默认 `http://192.168.1.10:8090`),保存后自动加载;
-- 工具条右边「设置」随时可改地址(改完立即重新加载)、「扫码」打开原生相机;
+- **首次启动**弹「接口地址」对话框(默认 `http://192.168.1.10:8090`),保存后加载内置页面;
+- 工具条「设置」随时可改地址(改完重新加载,`/api` 前缀随之变化);
 - 扫码结果通过 JS 桥回传网页:`window.__yjScanResult(code, ok)`。
 
 ## 3. 网页 ↔ 原生 的桥(只在这一个页面用到)
@@ -75,6 +81,7 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 
 | 点 | 说明 |
 |---|---|
+| 前端打包踩坑 | **`aapt2 link -A` 在 Windows 下把条目写成 `assets/www\assets\...`(反斜杠)⇒ WebView 找不到 `index.html`(白屏)。改为在脚本里自己往 zip 写 `assets/www/...`(POSIX 分隔符),实测 122 条全部正斜杠、0 条反斜杠 |
 | 明文 http | `AndroidManifest` 开 `usesCleartextTraffic` + `res/xml/network_security_config.xml` 显式允许;否则 WebView 直接拒绝加载 http |
 | 扫码 | `ScanActivity`:系统 Camera(API1)预览 + **ZXing core** 解码(QR/128/39/93/EAN13/EAN8/ITF/DataMatrix),不联网、不用第三方 SDK |
 | 手电 | 扫码页**点屏幕**开关闪光灯(仓库光线差时用) |
@@ -88,11 +95,13 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 
 | 项 | 结果 |
 |---|---|
-| 构建 | `aapt2 + javac + d8(36.1.0)+ zipalign + apksigner` 全绿,产出 **244.7 KB** APK |
+| 构建 | `aapt2 + javac + d8(36.1.0)+ zipalign + apksigner` 全绿,产出 **2.3 MB** APK(整站前端在内) |
 | 包信息 | `package=com.yinjia.mes.app`,`minSdk=24`(Android 7.0+),`targetSdk=34`,label=`银嘉MES`,launcher=`MainActivity` |
 | 签名/对齐 | `apksigner verify` 通过(证书 `CN=Yinjia MES Debug`);`zipalign 4` 通过 |
 | 权限 | INTERNET / ACCESS_NETWORK_STATE / CAMERA / VIBRATE |
+| 相对路径 | 内置 `index.html` 引用 `./assets/...`(vite `base: './'`),`file://` 下可解析;Web 端同一份产物实测 10/10 不回归 |
 | 明文 http | APK 内 manifest 实测 `usesCleartextTraffic=0xffffffff`(true)、`networkSecurityConfig=@0x7f060000` 已挂上 |
+| 前端打包 | APK 内 `assets/www/` **122 个文件**、`index.html` 在、**0 个反斜杠条目**(踩坑见 §5) |
 | dex 内容 | **317 个类** = 26 个自有类(`MainActivity` / `ScanActivity` / `Bridge` / `R.*`)+ 291 个 ZXing 类,数量与预期一致 |
 | JS 桥契约 | 两侧逐字对得上:原生 `addJavascriptInterface(new Bridge(), "YjNative")` + `window.__yjScanResult(...)`;网页 `window.YjNative.scan/getBaseUrl` + `window.__yjScanResult = (code, ok) => …` |
 | 网页回归 | 390 宽探针 **10/10**(加了扫码按钮后网页版行为不变:检测不到桥就不显示按钮) |

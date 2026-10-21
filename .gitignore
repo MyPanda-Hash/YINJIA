@@ -152,3 +152,6 @@ _*.xlsx
 android/build/
 android/dist/
 android/debug.keystore
+# 安卓壳:前端产物在构建时从 frontend/dist 拷进 assets/www(每次 build.ps1 重新生成),
+# 属于构建产物,不入库(仓库里已有 frontend/dist 与 backend/static 两份,不再存第三份)。
+android/app/assets/
