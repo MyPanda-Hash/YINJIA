@@ -26,7 +26,7 @@ ord|name|data_type|col_type|nullable|identity_col|note
 21|asp_time2|datetime|datetime|1|0|最后修改时间
 22|asp_user3|nvarchar|nvarchar(20)|1|0|审核人
 23|asp_time3|datetime|datetime|1|0|审核时间
-24|asp_cancel|varchar|varchar(0)|1|0|删除标记
+24|asp_cancel|varchar|varchar(1)|1|0|删除标记
 25|asp_user4|nvarchar|nvarchar(20)|1|0|删除人
 26|asp_time4|datetime|datetime|1|0|删除时间
 27|asp_print|int|int|1|0|打印次数
