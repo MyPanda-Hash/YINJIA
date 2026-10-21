@@ -4167,6 +4167,13 @@ migrate-drop-bak-snapshots-20261021.sql
 #   与代码修复同口径(StockMonthCloseService 2026-10-21 两处);幂等、不删行;两账套都执行。
 migrate-kucun-recalc-today-20261021.sql
 
+# 2026-10-21 用户口径「当前组装检验单的各个单据的检验项目高度雷同需要对这个进行差异化修改，
+#   并且增加几条检验项目中的检验标准库，最顶上填写一条检验项目为外观，尺寸，重量的标准库项目」:
+#   bs_qc_plan 加「适用单据」(逗号分隔面板代号;空=未归档)+ 四套方案/18 条项目种子;
+#   组装置顶 QP-ASM-00（检验类型=外观、尺寸、重量，下挂 外观/尺寸/重量 三条项目），
+#   首件/制程各一套，旧 Y料方案不删、不混进这三张单。幂等、两账套都执行。
+migrate-qc-plan-applicable-doc-20261021.sql
+
 # 2026-10-21 用户口径「让当前完工明细的数据按时间排列从上到下,上面是新日期的、下方为旧日期的」:
 #   面板 WO_COMPLETION_LIST 的 date_col 写 wgsj(视图里的完工时间物理列)
 #   ⇒ QueryService.queryFlat 走 ORDER BY 完工时间 DESC, id DESC。

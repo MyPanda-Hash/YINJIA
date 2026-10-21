@@ -2253,6 +2253,7 @@
     <QcInspPlanDialog
       v-model="qcInspPlanVisible"
       :product-code="String(cur?.['产品编码'] || '')"
+      :panel-code="String(panelCode || '')"
       :ship-source="SHIP_PLAN_SOURCE_PANELS.includes(panelCode)"
       @pick="applyInspItems"
     />
@@ -7906,9 +7907,10 @@ function applyInspItems(items) {
   //   否则同一条计划项会被判成两条重复带入)—— 见 normInspType。
   let n = 0
   const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
-  // 类别取值:方案贴着「检验类型」时优先用它,没填才回退项目自己的「检验内容」
+  // 类别取值:项目自己的「检验内容」优先(2026-10-21:一个方案可以带多类项目,如置顶方案
+  // 外观、尺寸、重量下三条项目各带类别),没填才回退弹窗贴上的方案「检验类型」。
   const catOf = (it) => {
-    const raw = String(it['检验类型'] || it['检验内容'] || '').trim()
+    const raw = String(it['检验内容'] || it['检验类型'] || '').trim()
     return areaKey === '检验类型' ? normInspType(raw) : raw
   }
   // 明细已有项目(判重复用):键 = 类别 + 检验项目。同名的两个项目分属不同类别时互不干扰

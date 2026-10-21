@@ -692,6 +692,13 @@ export default {
     '下面列出本单产品对应的《出货检验计划表》里已经填好的检验项目（控制项目/控制标准及要求/控制方法/检测频率）。这里是只读来源：勾选后点「带入明细」写进本单，不会改动标准库、也不会改动计划本身；要改计划请到「研发管理 → 出货检验计划表」。': 'Below are the inspection items already filled in the Shipment Inspection Plan for this sheet\'s product (control item / control standard & requirement / control method / inspection frequency). This source is read-only: tick items and click "Add to Details" to write them into this sheet; it changes neither the standard library nor the plan itself. To edit the plan, go to R&D Management → Shipment Inspection Plan.',
     // 本文件历史遗留缺词(2026-10-17 随上一批补齐,使 QcInspPlanDialog 词条 0 缺失)
     '检验类型 = 项目分类（如 外观检测/重量检测）：一个方案 = 一类项目，带入检验单后它就是横表的「表区」。项目的检验数量可留空；填了 N，带入后该项目在横表里就有 N 格、列头「＋」加不过它。': 'Inspection Type = item category (e.g. Appearance / Weight): one plan = one category, and once added to an inspection sheet it becomes that sheet\'s section ("表区"). An item\'s inspection quantity may be left blank; if you enter N, that item gets N cells in the sheet and the "+" on the column header cannot exceed it.',
+    // ---- 检验标准库按单据分套(2026-10-21)----
+    '方案按「适用单据」分套：首件检验单 / 制程检验单 / 组装成品检验单各看自己适用的方案；勾「显示全部单据的方案」可维护所有方案（未填适用单据的旧方案也只在全部里显示）。': 'Plans are grouped by "Applicable Document": the first-article, in-process and assembly finished-goods sheets each see only the plans that apply to them. Tick "Show plans for all documents" to maintain every plan (legacy plans without an applicable document also appear only there).',
+    '适用单据': 'Applicable Document',
+    '显示全部单据的方案': 'Show plans for all documents',
+    '未指定': 'Unspecified',
+    '制程检验单': 'In-process Inspection Sheet',
+    '不选 = 未归档（默认不显示在任一单据）': 'Leave empty = unassigned (hidden from every document by default)',
     '如 外观 / 重要尺寸 / 性能 / 材质 / 包装(可直接输入新类别)': 'e.g. Appearance / Key Dimensions / Performance / Material / Packaging (you can type a new category)',
     '加载检验方案失败': 'Failed to load inspection plans',
     '加载检验项目失败': 'Failed to load inspection items',
