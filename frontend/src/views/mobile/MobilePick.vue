@@ -24,6 +24,9 @@
 <template>
   <div class="mp">
     <div class="mp-top">
+      <!-- 沉浸页(App 或窄屏)没有桌面壳的页签/侧栏 ⇒ 必须给一条回工作台的路,
+           否则进了生产领料就出不去(2026-10-21 用户反馈「这个界面上面的导航就不见了」) -->
+      <span v-if="showBack" class="mp-back" @click="goHome">‹</span>
       <div class="mp-head">
         <span class="mp-title">{{ tt('生产领料') }}</span>
         <!-- 安卓 App 里显示当前接口号(服务器地址),网页版不显示 -->
@@ -189,11 +192,24 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { queryFormDataList, callButton, errMsg } from '@/business/engine'
 import { allocateFifo, sumAvailable, buildMaterialOutForm } from '@/business/scanPick'
+
+const router = useRouter()
+/**
+ * 是否显示「返回」:只有**没有桌面壳**时才有意义 ——
+ *   ① 安卓 App(Capacitor/手搓壳)整页无导航;
+ *   ② 网页在窄屏下走 immersive(见 PortalLayout 的 meta.immersiveOnMobile)。
+ * 判据在 onMounted 里再确认一次 DOM(immersive 时 PortalLayout 不渲染顶栏/页签)。
+ */
+const showBack = ref(false)
+function goHome() {
+  router.push('/dashboard')
+}
 
 const woInput = ref(null)
 const matInput = ref(null)
@@ -233,16 +249,26 @@ const canAdd = computed(() => {
 /**
  * 扫码能力来自**两种安卓壳**,网页版没有(浏览器 http 不是安全上下文,调不起摄像头):
  *  ① 手搓壳:`window.YjNative.scan()` → 结果回调 `window.__yjScanResult(code, ok)`
- *  ② Capacitor 壳:`window.Capacitor.Plugins.BarcodeScanning`(Google ML Kit 插件)
- *     —— 结果直接 Promise 返回,`barcodes[0].rawValue`。
+ *  ② Capacitor 壳:**动态 import** `@capacitor-mlkit/barcode-scanning` 的插件对象再调
+ *     (Google ML Kit;结果 `barcodes[0].rawValue`)。
+ *     ⚠ 2026-10-21 实测教训:光探测 `window.Capacitor.Plugins.BarcodeScanning` 不够 ——
+ *     插件 JS 侧没被 import 时那里是空的,按钮就不显示(用户报「生产领料没有扫码」)。
+ *     所以先看 `Capacitor.isNativePlatform()`,再真正把插件模块 import 进来。
  * 有其中任意一种就显示「扫码」按钮;两种都没有就只留「查询」(手输/扫码枪)。
  */
+const isNativeShell = (() => {
+  try {
+    return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
+  } catch { return false }
+})()
 const capScanPlugin = (() => {
   try {
     return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BarcodeScanning) || null
   } catch { return null }
 })()
-const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan) || !!capScanPlugin
+const nativeScan = (typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan))
+  || !!capScanPlugin
+  || isNativeShell
 const baseUrl = (() => {
   try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
 })()
@@ -264,13 +290,24 @@ function applyScan(code) {
   }
 }
 
-/** Capacitor 版(ML Kit):先要相机权限,再开扫描页 */
+/**
+ * Capacitor 版(ML Kit):**动态 import 插件模块**再调 —— 只认 window 上的对象不可靠,
+ * 插件 JS 侧必须被加载进 bundle,Capacitor 运行时才能把调用代理到 native。
+ * 网页版不会走到这里(没有 Capacitor 运行时),动态 import 也只是多一个未加载的 chunk。
+ */
 async function scanWithCapacitor() {
-  const p = capScanPlugin
   try {
-    if (p.requestPermissions) {
+    const mod = await import('@capacitor-mlkit/barcode-scanning')
+    const p = (mod && (mod.BarcodeScanner || (mod.default && mod.default.BarcodeScanner))) || capScanPlugin
+    if (!p) {
+      scanTarget = null
+      errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+      return
+    }
+    if (typeof p.requestPermissions === 'function') {
       const st = await p.requestPermissions()
-      if (st && st.camera === 'denied') {
+      // Capacitor 的权限返回值是 { camera: 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale' }
+      if (st && (st.camera === 'denied' || st.camera === 'prompt')) {
         errText.value = tt('没有相机权限,扫不了码;可在系统设置里开启')
         scanTarget = null
         return
@@ -297,7 +334,7 @@ function scanInto(target) {
     }
     return
   }
-  if (capScanPlugin) {
+  if (isNativeShell || capScanPlugin) {
     scanWithCapacitor()
     return
   }
@@ -312,6 +349,11 @@ onMounted(() => {
     if (!ok || !code) { scanTarget = null; return }
     applyScan(code)
   }
+  // 无桌面壳(App)或窄屏沉浸页 ⇒ 显示返回;有壳(PC 宽屏)则不显示,免得和侧栏重复
+  nextTick(() => {
+    const noShell = isNativeShell || !!window.YjNative || !document.querySelector('.topbar')
+    showBack.value = noShell
+  })
 })
 
 onBeforeUnmount(() => {
@@ -536,6 +578,16 @@ async function submit() {
   padding: 0 12px;
   background: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color-lighter);
+}
+/* 返回箭头:只在没有桌面壳时渲染(见 showBack),给沉浸页一条回工作台的路 */
+.mp-back {
+  flex: none;
+  width: 28px;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+  user-select: none;
 }
 .mp-title { font-size: 16px; font-weight: 600; }
 /* App 内显示接口号(服务器地址);省略号截断,长地址不撑破标题栏 */
