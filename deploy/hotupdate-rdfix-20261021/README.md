@@ -47,9 +47,12 @@ copy /Y "\\tsclient\C\INCER\YINJIA-MES\deploy\hotupdate-rdfix-20261021\app.jar" 
 C:\yinjia\update.bat
 ```
 
-脚本依次做：备份现役 jar 为 `C:\yinjia\update\app.jar.bak-before-rdfix` → 复制新 jar → 调
+脚本依次做：**先查包大小**（< 80 MB 直接判 `RESULT: FAILED - app.jar truncated`，绝不用被截断的包覆盖可用的）
+→ 备份现役 jar 为 `C:\yinjia\update\app.jar.bak-before-rdfix` → 复制新 jar → 调
 `C:\yinjia\update.bat`（停 → 换 → 起）→ 等 40 秒探活 → 打印 `RESULT: OK` / `RESULT: FAILED`。
 日志写在同目录 `apply-update-log.txt`（可直接在本机通过重定向盘读）。
+
+`.bat` 用 `pushd` 起头，所以**直接在 `\\tsclient\C\...` 双击也能跑**（`cd /d` 在 UNC 路径上会失败）。
 
 ## 四、部署后怎么确认
 

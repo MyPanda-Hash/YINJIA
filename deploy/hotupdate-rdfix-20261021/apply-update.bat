@@ -5,17 +5,22 @@ rem
 rem  Run this ON THE SERVER (RDP) as Administrator.
 rem  Package: hotupdate-rdfix-20261021
 rem  What it does:
-rem    1) copies the new app.jar from the redirected dev drive (\\tsclient\C\...)
+rem    1) size-gates the new app.jar (must be ~107 MB, never a truncated copy)
 rem    2) backs up the jar currently staged on the server (.bak-before-rdfix)
-rem    3) runs C:\yinjia\update.bat (stop -> swap -> start)
-rem    4) probes http://127.0.0.1:8090/ and prints RESULT: OK / FAILED
+rem    3) copies the new jar to C:\yinjia\update
+rem    4) runs C:\yinjia\update.bat (stop -> swap -> start)
+rem    5) probes http://127.0.0.1:8090/ and prints RESULT: OK / FAILED
 rem  It does NOT touch the database. No SQL to run.
+rem
+rem  Works when launched straight from the redirected drive (\\tsclient\C\...):
+rem  pushd maps a temp drive letter instead of failing like "cd /d" does on UNC.
 rem
 rem  Log: apply-update-log.txt next to this .bat (i.e. on the dev machine,
 rem       through the redirected drive -- read it there, do not trust screenshots)
 rem ============================================================================
 setlocal
-cd /d "%~dp0"
+pushd "%~dp0" 2>nul
+if errorlevel 1 cd /d "%TEMP%"
 set LOG=%~dp0apply-update-log.txt
 set SRC=%~dp0app.jar
 set DEST=C:\yinjia\update\app.jar
@@ -35,6 +40,17 @@ if not exist "C:\yinjia\update.bat" (
   echo RESULT: FAILED - update.bat missing
   exit /b 3
 )
+
+rem --- size gate: never let a truncated / placeholder jar overwrite a working one ---
+for %%A in ("%SRC%") do set SRC_SIZE0=%%~zA
+echo [size] src=%SRC_SIZE0% bytes >> "%LOG%"
+if %SRC_SIZE0% LSS 80000000 (
+  echo [FAIL] app.jar looks truncated ^(expected ~107000000 bytes^) >> "%LOG%"
+  type "%LOG%"
+  echo RESULT: FAILED - app.jar truncated
+  exit /b 7
+)
+
 if not exist "C:\yinjia\update" mkdir "C:\yinjia\update"
 
 if exist "%DEST%" (
@@ -70,6 +86,7 @@ echo [health] http code = %CODE% >> "%LOG%"
 echo. >> "%LOG%"
 type "%LOG%"
 echo.
+popd 2>nul
 if "%CODE%"=="200" (
   echo RESULT: OK
   exit /b 0
