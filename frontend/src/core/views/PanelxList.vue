@@ -5577,9 +5577,13 @@ const qrDialogTitle = computed(() => {
   return tt(panelCode.value === 'BARCODE_FIN' ? '成品仓条码标签'
     : panelCode.value === 'BARCODE_WIP' ? '半成品仓条码标签' : '材料仓条码标签')
 })
-const qrDialogTip = computed(() => (BARCODE_PANELS.includes(panelCode.value)
-  ? tt('二维码 = 码内容(编码|批号,一批一码);勾选一行出一张标签,可多选')
-  : ''))
+const qrDialogTip = computed(() => {
+  if (!BARCODE_PANELS.includes(panelCode.value)) return ''
+  // 2026-10-21 用户口径:材料仓二维码改「公司代码@物料编码@批号」(半成品/成品仍是码内容)
+  return tt(panelCode.value === 'BARCODE_MAT'
+    ? '二维码 = 公司代码@物料编码@批号(一批一码);勾选一行出一张标签,可多选'
+    : '二维码 = 码内容(编码|批号,一批一码);勾选一行出一张标签,可多选')
+})
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
 function qrRowKey(row) {
