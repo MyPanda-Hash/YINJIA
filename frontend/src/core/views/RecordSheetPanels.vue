@@ -4361,6 +4361,19 @@ function chartOf(dt) {
   flex-wrap: wrap;
 }
 .pp-tip { font-size: 12px; color: #909399; }
+/* 从商品引用弹窗(2026-10-21):四栏筛选横排在一行(空间不够自动换行),每栏一个标签 + 下拉。
+   没有这段样式时 .gp-filter 是块级元素 ⇒ 四个下拉各占一整行,弹窗又高又难扫。 */
+.gp-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+.gp-filter { display: flex; align-items: center; gap: 6px; }
+.gp-filter-label { font-size: 12px; color: #606266; white-space: nowrap; }
+.gp-filter-select { width: 190px; }
+.gp-more { font-size: 11px; color: #c0c4cc; }
 .pp-foot { margin-top: 6px; font-size: 12px; color: #909399; }
 /* 行的三种态:已开发(不可选,压灰)/ 当前待引用(高亮)/ 普通。
    ⚠ 必须走 .pp-body :deep(...) —— el-table 的行由组件自己渲染,拿不到本组件的
