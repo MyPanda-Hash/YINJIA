@@ -8,10 +8,5 @@
   },
   "android": {
     "allowMixedContent": true
-  },
-  "plugins": {
-    "BarcodeScanning": {
-      "formats": ["QR_CODE", "CODE_128", "CODE_39", "EAN_13"]
-    }
   }
 }

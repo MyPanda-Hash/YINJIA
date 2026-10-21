@@ -80,9 +80,10 @@
 
       <div v-if="wo" class="mp-wo">
         <div class="mp-wo-no">
-          {{ wo.工单号 }}<span class="mp-tag">#{{ wo.工单行号 }}</span>
+          {{ wo.工单号 }}<span class="mp-tag">#{{ woLine || wo.工单行号 }}</span>
           <span v-if="woBlocked" class="mp-tag mp-tag-warn">{{ tt('未排产') }}</span>
         </div>
+        <div v-if="woLineHint" class="mp-warn">{{ woLineHint }}</div>
         <div class="mp-kv"><span>{{ tt('物料编码') }}</span><b class="mono">{{ wo.物料编码 || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ wo.产品名称 || '—' }}</b></div>
         <div class="mp-kv"><span>{{ tt('规格') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
@@ -126,25 +127,62 @@
       </div>
 
       <template v-if="mat">
+        <!-- 批次勾选(2026-10-21):扫完物料码直接列出该物料**全部批次 + 数量**,
+             默认按先进先出勾好;用户可按数量勾选。日期在前的排在前面。
+             扫到的码里带批次的,那一行标黄底(见 .is-scanned)。 -->
+        <div class="mp-batches">
+          <div class="mp-batches-head">
+            <span class="mp-bh-lot">{{ tt('批号') }}</span>
+            <span class="mp-bh-wh">{{ tt('仓库') }}</span>
+            <span class="mp-bh-avail">{{ tt('可用') }}</span>
+            <span class="mp-bh-qty">{{ tt('本次') }}</span>
+          </div>
+          <div
+            v-for="(b, i) in batchRows"
+            :key="i"
+            class="mp-batch-row"
+            :class="{ 'is-checked': b.qty > 0, 'is-scanned': b.scanned }"
+          >
+            <span class="mp-bh-lot">
+              <el-checkbox :model-value="b.qty > 0" @change="(v) => onBatchQty(b, v ? b.avail : 0)" />
+              <span class="mp-batch-lot" :class="{ mono: !!b.lot }">{{ b.lot || tt('无批次') }}</span>
+              <span v-if="b.scanned" class="mp-batch-scan">{{ tt('扫到') }}</span>
+            </span>
+            <span class="mp-bh-wh">{{ b.warehouse || '—' }}</span>
+            <span class="mp-bh-avail num">{{ fmt(b.avail) }}</span>
+            <span class="mp-bh-qty">
+              <el-input-number
+                :model-value="b.qty"
+                :min="0"
+                :max="b.avail"
+                :precision="2"
+                :step="1"
+                size="small"
+                controls-position="right"
+                @change="(v) => onBatchQty(b, v)"
+              />
+            </span>
+          </div>
+          <div v-if="!batchRows.length" class="mp-empty">{{ tt('该物料没有可用批次') }}</div>
+        </div>
+
         <div class="mp-row mp-qty">
           <span class="mp-qty-label">{{ tt('领用数量') }}</span>
           <el-input-number v-model="qty" :min="0" :precision="2" :step="1" size="large" controls-position="right" />
           <span class="mp-qty-unit">{{ mat.uom }}</span>
+          <el-button size="large" @click="resetFifo">{{ tt('按先进先出重排') }}</el-button>
           <el-button type="primary" size="large" :disabled="!canAdd" @click="addLines">
             {{ tt('加入') }}
           </el-button>
         </div>
 
-        <div v-if="alloc.length" class="mp-alloc">
-          <div class="mp-alloc-title">{{ tt('按批号日期先进先出') }}</div>
-          <div v-for="(a, i) in alloc" :key="i" class="mp-alloc-row">
-            <span class="mp-alloc-batch">{{ a.batch || tt('无批次') }}</span>
-            <span class="mp-alloc-wh">{{ a.warehouse || '—' }}</span>
-            <span class="mp-alloc-qty num">{{ fmt(a.qty) }}</span>
-          </div>
-          <div v-if="shortage > 0" class="mp-warn">
-            {{ tt('可用量不足,缺') }} {{ fmt(shortage) }} {{ mat.uom }}
-          </div>
+        <div class="mp-alloc-sum">
+          <span>{{ tt('已选') }} <b class="num">{{ fmt(selectedQty) }}</b> / {{ fmt(qty) }} {{ mat.uom }}</span>
+          <span v-if="shortage > 0" class="warn">{{ tt('还剩') }} {{ fmt(shortage) }} {{ tt('未分配到批次') }}</span>
+          <span v-else-if="!overSel.ok" class="warn">{{ tt('勾选超过需求') }} {{ fmt(overSel.over) }}</span>
+        </div>
+        <div v-if="nonFifo" class="mp-warn mp-warn-note">
+          {{ tt('当前勾选不是先进先出,生成单据时会写进明细备注') }}
         </div>
       </template>
     </section>
@@ -197,7 +235,11 @@ import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { queryFormDataList, callButton, errMsg } from '@/business/engine'
-import { allocateFifo, sumAvailable, buildMaterialOutForm } from '@/business/scanPick'
+import { sumAvailable, buildMaterialOutForm } from '@/business/scanPick'
+import {
+  parseWorkOrderCode, parseMaterialCode,
+  makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows, selectedTotal, checkSelection,
+} from '@/business/scanCode'
 
 const router = useRouter()
 /**
@@ -225,6 +267,20 @@ const mat = ref(null)
 const matLoading = ref(false)
 const qty = ref(0)
 
+/**
+ * 扫码解析结果(2026-10-21):
+ *   woLine       工单码第 3 段解出的**工单行号**(1001 → 1);0 表示码里没带
+ *   matScanBatch 物料码里带的**批次号**(采购标识码才有);空 = 商品码(不带批次)
+ *   batchRows    该物料的**全部批次**行(可勾选,默认先进先出)
+ */
+const woLine = ref(0)
+const matScanBatch = ref('')
+const batchRows = ref([])
+/** 用户手改过批次数量 ⇒ 不再用"领用数量"自动重排 */
+const qtyEdited = ref(false)
+/** 扫工单码但该工单查不到 / 行号对不上时的提示(不阻断,降到按工单号取) */
+const woLineHint = ref('')
+
 const lines = ref([])
 const saving = ref(false)
 const errText = ref('')
@@ -236,110 +292,91 @@ const fmt = (n) => {
   return Number.isInteger(v) ? String(v) : String(Math.round(v * 10000) / 10000)
 }
 
-/** 先进先出预分配:一批不够就扣下一日期批次,生成多条明细 */
-const allocResult = computed(() => (mat.value && qty.value > 0 ? allocateFifo(mat.value.rows, qty.value) : { lines: [], allocated: 0, shortage: 0 }))
-const alloc = computed(() => allocResult.value.lines)
-const shortage = computed(() => allocResult.value.shortage)
+/** 已勾选的批次行(按 FIFO 顺序) */
+const selected = computed(() => selectedBatchRows(batchRows.value))
+const selectedQty = computed(() => selectedTotal(batchRows.value))
+/** 领用数量还没分配到批次上的部分 */
+const shortage = computed(() => {
+  const want = Number(qty.value) || 0
+  return Math.max(0, Math.round((want - selectedQty.value) * 10000) / 10000)
+})
+/** 勾选是否违反先进先出(违反 ⇒ 明细备注写明) */
+const nonFifo = computed(() => isNonFifo(batchRows.value))
+/** 勾选超过需求/库存 */
+const overSel = computed(() => checkSelection(batchRows.value, qty.value))
+/** 勾选批次扫到的那一批(页面标亮) */
+const scannedLot = computed(() => String(matScanBatch.value || '').trim())
+
+/** 交给「加入清单」的明细行(与批号一一对应,一次领用可拆多条) */
+const alloc = computed(() => selected.value.map((b) => ({
+  code: mat.value ? mat.value.code : '',
+  name: mat.value ? mat.value.name : '',
+  uom: mat.value ? mat.value.uom : '',
+  spec: mat.value ? mat.value.spec : '',
+  batch: b.lot,
+  warehouse: b.warehouse,
+  warehouseCode: b.warehouseCode,
+  qty: b.qty,
+  price: Number(b.row['结存单价']) || 0,
+})))
 
 const canAdd = computed(() => {
-  const need = Number(qty.value) || 0
-  return !!mat.value && need > 0 && alloc.value.length > 0 && !shortage.value
+  const want = Number(qty.value) || 0
+  return !!mat.value && want > 0 && selected.value.length > 0 && shortage.value <= 0 && overSel.value.ok
 })
 
 /**
- * 扫码能力来自**两种安卓壳**,网页版没有(浏览器 http 不是安全上下文,调不起摄像头):
- *  ① 手搓壳:`window.YjNative.scan()` → 结果回调 `window.__yjScanResult(code, ok)`
- *  ② Capacitor 壳:插件名是 **`BarcodeScanner`**(registerPlugin('BarcodeScanner', …)),
- *     ⚠ 不是 `BarcodeScanning` —— 2026-10-21 就是这里写错,探测永远拿到 undefined:
- *       · 按钮不出现(前一版问题)
- *       · 或动态 import 后调用路径不通(这一版「扫码失败」)
- *     用法:`BarcodeScanner.requestPermissions()` → `scan({formats})` → `barcodes[0].rawValue`。
- * 任一可用就显示「扫码」按钮;都不行才只留「查询」(手输/扫码枪)。
+ * 扫码能力(2026-10-21 定稿):
+ *  **只用 `window.YjNative.scan()`** —— 两个安卓壳(手搓版 / Capacitor 版)现在都注入这个桥,
+ *  底层都是自研 ScanActivity + ZXing(离线、不依赖 Google Play 服务)。
+ *  网页版没有这个桥 ⇒ 不显示「扫码」按钮,只留「查询」(手输/扫码枪)。
+ *
+ *  曾经的 ML Kit 方案已移除:@capacitor-mlkit/barcode-scanning 依赖
+ *  play-services-code-scanner(按需下载模块),国内无 GMS 机型必然报
+ *  「The Google Barcode Scanner Module is not available」。
  */
-const isNativeShell = (() => {
-  try {
-    return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
-  } catch { return false }
-})()
-/** Capacitor 运行时会把已注册插件挂到 Capacitor.Plugins 上(键 = registerPlugin 的名字) */
-const capScanPlugin = (() => {
-  try {
-    const P = window.Capacitor && window.Capacitor.Plugins
-    return (P && (P.BarcodeScanner || P.BarcodeScanning)) || null
-  } catch { return null }
-})()
-const nativeScan = (typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan))
-  || !!capScanPlugin
-  || isNativeShell
+const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 const baseUrl = (() => {
   try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
 })()
 /** 这次扫码是扫给「工单」还是「物料」——原生页返回时用它决定填哪个输入框 */
 let scanTarget = null
 
-/** 把扫到的字符串填进对应的输入框并立刻查询 */
+/**
+ * 把扫到的码按**目标**解析后填进去(2026-10-21 用户口径):
+ *
+ *   工单码 `0@GD-2026-10-0221@1001` → 工单号 GD-2026-10-0221 + **工单行号 1**
+ *     (1001 = 固定前缀 1000 + 行号;行号要一起填,材料出库单上也要显示)
+ *   物料码 `0@YJ-ZZ-001`            → 物料编码,不带批次 ⇒ 列出该物料**全部批次**供勾选
+ *   物料码 `0@YJ-ZZ-001@20261021`   → 物料编码 + 批次 ⇒ 同上,并把该批次**标亮**
+ */
 function applyScan(code) {
   const text = String(code == null ? '' : code).trim()
   if (!text) return
   const target = scanTarget || (wo.value ? 'mat' : 'wo')
   scanTarget = null
+
   if (target === 'wo') {
-    woText.value = text
-    loadWo()
-  } else {
-    matText.value = text
-    probeMaterial()
-  }
-}
-
-/**
- * Capacitor 版(ML Kit)扫码。
- *
- * 优先用 Capacitor 运行时挂出来的插件对象(`Capacitor.Plugins.BarcodeScanner`),
- * 拿不到再动态 import 模块兜底 —— 两条路都失败时**把真实错误显示出来**,
- * 不再统一吞成一句「扫码失败」(2026-10-21 就是因为吞了错误,现场无法定位)。
- */
-async function resolveScanPlugin() {
-  if (capScanPlugin) return capScanPlugin
-  try {
-    const mod = await import('@capacitor-mlkit/barcode-scanning')
-    return (mod && (mod.BarcodeScanner || (mod.default && mod.default.BarcodeScanner))) || null
-  } catch (e) {
-    return null
-  }
-}
-
-async function scanWithCapacitor() {
-  try {
-    const p = await resolveScanPlugin()
-    if (!p) {
-      scanTarget = null
-      errText.value = tt('扫码组件没加载起来,请改用输入框扫码枪或手工输入')
+    const p = parseWorkOrderCode(text)
+    if (!p.ok) {
+      errText.value = tt('这个码里没有工单号')
       return
     }
-    if (typeof p.requestPermissions === 'function') {
-      const st = await p.requestPermissions()
-      // Capacitor 权限返回值:{ camera: 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale' }
-      const cam = st && st.camera
-      if (cam && cam !== 'granted' && cam !== 'limited') {
-        errText.value = tt('没有相机权限,扫不了码;可在「设置 → 应用 → 银嘉系统 → 权限」里开启')
-        scanTarget = null
-        return
-      }
-    }
-    const res = await p.scan({ formats: ['QR_CODE', 'CODE_128', 'CODE_39', 'EAN_13', 'EAN_8', 'ITF', 'DATA_MATRIX'] })
-    const code = res && res.barcodes && res.barcodes.length ? res.barcodes[0].rawValue : ''
-    if (!code) { scanTarget = null; return }
-    applyScan(code)
-  } catch (e) {
-    scanTarget = null
-    // 把插件的原始错误带出来(截断到 90 字),便于现场一眼判断是权限、相机还是插件没注册
-    const raw = (e && (e.message || e.errorMessage)) || String(e || '')
-    try { console.error('[扫码] 失败:', e) } catch { /* ignore */ }
-    errText.value = raw
-      ? tt('扫码失败') + ':' + String(raw).slice(0, 90)
-      : tt('扫码失败,请改用输入框扫码枪或手工输入')
+    woText.value = p.wo
+    woLine.value = p.line
+    woLineHint.value = ''
+    loadWo(p.line)
+    return
   }
+
+  const p = parseMaterialCode(text)
+  if (!p.ok) {
+    errText.value = tt('这个码里没有物料编码')
+    return
+  }
+  matText.value = p.code
+  matScanBatch.value = p.batch
+  probeMaterial()
 }
 
 function scanInto(target) {
@@ -351,10 +388,6 @@ function scanInto(target) {
       scanTarget = null
       errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
     }
-    return
-  }
-  if (isNativeShell || capScanPlugin) {
-    scanWithCapacitor()
     return
   }
   scanTarget = null
@@ -385,9 +418,16 @@ onBeforeUnmount(() => {
 
 watch(lines, () => { errText.value = '' })
 
-/** 工单:扫到/输入工单号 → 精确命中优先,否则列出候选 */
-async function loadWo() {
+/**
+ * 工单:扫到/输入工单号 → 精确命中优先,否则列出候选。
+ *
+ * @param {number} [line] 扫工单码解出的**工单行号**(1001→1);给了就**只取这一行** ——
+ *   一张工单可能有多行(不同产品/不同排产),领料必须落到扫的那一行上,
+ *   否则材料出库单的「工单行号」写错、后续回写 plang.ll_no2 也会错行。
+ */
+async function loadWo(line) {
   const kw = String(woText.value || '').trim()
+  const wantLine = Number(line) || 0
   errText.value = ''
   woCandidates.value = []
   if (!kw) {
@@ -403,6 +443,19 @@ async function loadWo() {
       return
     }
     const exact = rows.filter((r) => String(r.工单号 || '').trim() === kw)
+    // 带行号:先在精确匹配里找该行;找不到就提示(不要静默退化成第一行,否则领错行)
+    if (wantLine > 0) {
+      const byLine = exact.filter((r) => Number(r.工单行号) === wantLine)
+      if (byLine.length === 1) {
+        pickWo(byLine[0])
+        return
+      }
+      if (byLine.length === 0 && exact.length > 0) {
+        woLineHint.value = tt('码里的工单行号在该工单上不存在,已列出全部行,请手工选择')
+        woCandidates.value = exact
+        return
+      }
+    }
     if (exact.length === 1) pickWo(exact[0])
     else if (rows.length === 1) pickWo(rows[0])
     else woCandidates.value = exact.length ? exact : rows.slice(0, 20)
@@ -425,11 +478,15 @@ function pickWo(row) {
   const planned = Number(row.排产数量) || 0
   wo.value = row
   woText.value = String(row.工单号 || '').trim()
+  woLine.value = Number(row.工单行号) || Number(woLine.value) || 0
   woCandidates.value = []
   woBlocked.value = planned <= 0
   mat.value = null
   qty.value = 0
   matText.value = ''
+  batchRows.value = []
+  matScanBatch.value = ''
+  qtyEdited.value = false
   if (woBlocked.value) {
     errText.value = tt('该工单未排产(排产数量为 0),不能领料:请先到「快速排产」把该工单行排入产线,再回来扫码领料')
     return
@@ -438,12 +495,20 @@ function pickWo(row) {
   nextTick(() => matInput.value?.focus?.())
 }
 
-/** 物料:按存货编码查批号级可用量(口径仍是 物料+仓库 合计) */
+/**
+ * 物料:按存货编码查**批号级**可用量,并把该物料的**全部批次**整理成可勾选行。
+ *
+ * 2026-10-21 用户口径:「扫完物料码后,直接带出这个物料所有批次号和对应的数量,
+ * 然后可以根据数量来勾选,默认是先进先出;勾选没遵守先进先出要在备注中写出;
+ * 扫到的码里带批次的,要给那个批次标亮」。
+ */
 async function probeMaterial() {
   const code = String(matText.value || '').trim()
   errText.value = ''
   mat.value = null
   qty.value = 0
+  batchRows.value = []
+  qtyEdited.value = false
   if (!code) {
     errText.value = tt('请先扫描或输入物料编码')
     return
@@ -469,12 +534,46 @@ async function probeMaterial() {
       total: sumAvailable(rows),
       rows,
     }
-    qty.value = 0
+    // 全部批次(先进先出排好);扫到的批次会被标记 scanned ⇒ 页面标亮
+    batchRows.value = makeBatchRows(rows, matScanBatch.value)
+    // 扫到的码带了批次 ⇒ 默认就领这一批(数量 = 该批可用量,用户可改)
+    const hit = batchRows.value.find((b) => b.scanned)
+    if (hit) {
+      qty.value = hit.avail
+      qtyEdited.value = true
+      batchRows.value = batchRows.value.map((b) => ({ ...b, qty: b.scanned ? b.avail : 0, checked: !!b.scanned }))
+    }
   } catch (e) {
     errText.value = errMsg(e) || tt('查询可用量失败')
   } finally {
     matLoading.value = false
   }
+}
+
+/** 领用数量变化 ⇒ 未手改过就按先进先出重排批次 */
+watch(qty, (v) => {
+  if (!mat.value) return
+  if (qtyEdited.value) return
+  batchRows.value = autoAllocateFifo(batchRows.value, Number(v) || 0)
+})
+
+/** 用户手改某批数量(勾选 = 数量 > 0) */
+function onBatchQty(row, val) {
+  const b = batchRows.value.find((x) => x.lot === row.lot && x.warehouseCode === row.warehouseCode)
+  if (!b) return
+  const v = Math.max(0, Math.round((Number(val) || 0) * 10000) / 10000)
+  b.qty = Math.min(v, b.avail)
+  b.checked = b.qty > 0
+  qtyEdited.value = true
+  // 领用数量跟着勾选合计走(避免"选了 5 却说领 3")
+  const total = selectedTotal(batchRows.value)
+  if (total > 0) qty.value = total
+}
+
+/** 一键恢复先进先出 */
+function resetFifo() {
+  qtyEdited.value = false
+  batchRows.value = autoAllocateFifo(batchRows.value, Number(qty.value) || 0)
 }
 
 /** 仓库的默认仓位(bs_wh_loc:是否默认=1 优先,其次任一未停用) */
@@ -501,12 +600,16 @@ async function resolveBin(warehouseCode, warehouseName) {
 /** 加入清单:同一 (物料,批号,仓库) 合并数量,避免重复行 */
 async function addLines() {
   if (!canAdd.value) return
+  // 这一批勾选是否违反先进先出 ⇒ 写进明细备注(用户 2026-10-21 口径)
+  const note = nonFifo.value ? tt('未按先进先出') : ''
   const need = await Promise.all(alloc.value.map(async (a) => ({ a, bin: await resolveBin(a.warehouseCode, a.warehouse) })))
   for (const { a, bin } of need) {
     const key = [a.code, a.batch, a.warehouseCode || a.warehouse].map((x) => String(x || '').trim()).join('|')
     const exist = lines.value.find((l) => l.key === key)
-    if (exist) exist.qty = Math.round((exist.qty + a.qty) * 10000) / 10000
-    else {
+    if (exist) {
+      exist.qty = Math.round((exist.qty + a.qty) * 10000) / 10000
+      if (note) exist.note = note
+    } else {
       lines.value.push({
         key,
         code: a.code,
@@ -520,12 +623,16 @@ async function addLines() {
         bin: bin.bin,
         qty: a.qty,
         price: a.price,
+        note,
       })
     }
   }
   matText.value = ''
   mat.value = null
   qty.value = 0
+  batchRows.value = []
+  matScanBatch.value = ''
+  qtyEdited.value = false
   errText.value = ''
   nextTick(() => matInput.value?.focus?.())
 }
@@ -535,6 +642,9 @@ function reset() {
   matText.value = ''
   mat.value = null
   qty.value = 0
+  batchRows.value = []
+  matScanBatch.value = ''
+  qtyEdited.value = false
   errText.value = ''
 }
 
@@ -553,7 +663,8 @@ async function submit() {
       : ''
     const formData = buildMaterialOutForm(lines.value, {
       woNo: wo.value.工单号,
-      woLine: wo.value.工单行号,
+      // 工单行号(2026-10-21):优先用扫工单码解出来的行号,其次工单行自带的行号
+      woLine: woLine.value || wo.value.工单行号,
       warehouse: wh,
       warehouseCode: wh ? lines.value[0].warehouseCode : '',
     })
@@ -676,9 +787,61 @@ async function submit() {
 .mp-mat-stock b { display: block; font-size: 20px; color: var(--el-color-primary); }
 .mp-mat-stock span { font-size: 11px; color: var(--el-text-color-secondary); }
 
-.mp-qty { margin-top: 10px; }
+/* 领用数量这一行:标签 + 数字 + 单位 + 「按先进先出重排」+「加入」共 5 件,
+   390 宽放不下一行 ⇒ 允许换行,并给数字框固定宽(否则标签被压到输入框下面,2026-10-21 实测) */
+.mp-qty { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .mp-qty-label { flex: none; font-size: 13px; color: var(--el-text-color-regular); }
-.mp-qty-unit { flex: none; min-width: 28px; font-size: 13px; color: var(--el-text-color-secondary); }
+.mp-qty :deep(.el-input-number) { flex: none; width: 116px; }
+.mp-qty-unit { flex: none; min-width: 24px; font-size: 13px; color: var(--el-text-color-secondary); }
+.mp-qty :deep(.el-button) { flex: 1 1 96px; margin-left: 0; }
+
+/* ── 批次勾选表(2026-10-21)──────────────────────────────────────────
+   手机 375 宽四列不挤:批号占剩余宽、仓库可截断、可用/本次固定宽。
+   勾选 = 本次数量 > 0;扫到的批次整行淡黄底 + 「扫到」角标。 */
+.mp-batches {
+  margin-top: 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.mp-batches-head,
+.mp-batch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.mp-batches-head {
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+}
+.mp-batch-row {
+  border-top: 1px solid var(--el-border-color-lighter);
+  font-size: 13px;
+}
+.mp-batch-row.is-checked { background: var(--el-color-primary-light-9); }
+.mp-batch-row.is-scanned { box-shadow: inset 3px 0 0 var(--el-color-warning); }
+.mp-bh-lot { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.mp-batch-lot { min-width: 0; word-break: break-all; }
+.mp-batch-scan {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--el-color-warning-light-8);
+  color: var(--el-color-warning-dark-2);
+  font-size: 10px;
+}
+.mp-bh-wh { flex: none; width: 62px; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-bh-avail { flex: none; width: 52px; text-align: right; }
+.mp-bh-qty { flex: none; width: 92px; }
+.mp-bh-qty :deep(.el-input-number) { width: 92px; }
+.mp-bh-qty :deep(.el-input__inner) { text-align: right; }
+.mp-alloc-sum {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary);
+}
+.mp-warn-note { margin-top: 6px; }
 
 .mp-alloc { margin-top: 10px; }
 .mp-alloc-title { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 4px; }

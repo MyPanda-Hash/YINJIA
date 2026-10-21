@@ -50,6 +50,9 @@ tests/
 
 # 例外:数据库同步工具需要的 JDBC 驱动
 !tools/lib/mssql-jdbc.jar
+# 安卓扫码用的 ZXing core(593 KB,离线构建必需;与 mssql-jdbc 同一先例)
+!android/libs/*.jar
+!android-cap/android/app/libs/*.jar
 
 # 误创建的 Maven 本地仓库(settings.xml 的 localRepository 未展开环境变量)
 # 无前导斜杠=任意层级匹配(含仓库根);原 */ 前缀只匹配子目录,根级漏网

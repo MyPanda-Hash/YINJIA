@@ -192,10 +192,16 @@ await ev(`(() => {
 })()`)
 await sleep(900)
 const alloc = JSON.parse(await ev(`JSON.stringify({
-  rows: document.querySelectorAll('.mp-alloc-row').length,
+  rows: document.querySelectorAll('.mp-batch-row.is-checked').length,
   warn: document.querySelector('.mp-warn')?.textContent || '',
 })`))
-ok('填数量 → 先进先出分配预览', alloc.rows > 0, JSON.stringify(alloc))
+ok('填数量 → 批次按先进先出自动勾选', alloc.rows > 0, JSON.stringify(alloc))
+
+// ④b 加物料之前先截一张「批次勾选表」的图(2026-10-21 新交互:批次可勾选/先进先出标亮)
+if (process.env.PROBE_SHOT_BATCH === '1') {
+  const shotB = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  fs.writeFileSync(path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020', 'batch-select.png'), Buffer.from(shotB.result.data, 'base64'))
+}
 
 // ⑤ 加入清单
 await clickBtn('加入')

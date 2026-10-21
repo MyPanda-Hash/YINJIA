@@ -105,7 +105,9 @@ export function buildMaterialOutForm(lines, head = {}) {
     数量: Number(l.qty),
     单价: Number(l.price) || 0,
     金额: Math.round((Number(l.qty) || 0) * (Number(l.price) || 0) * 10000) / 10000,
-    明细备注: '扫码领料',
+    // 明细备注:默认「扫码领料」;若这一批勾选跳了批次(未遵守先进先出),
+    // 由调用方传入 l.note(2026-10-21 用户口径:不按先出先进要在备注里写出)
+    明细备注: String(l.note || '').trim() || '扫码领料',
   }))
   const form = {
     单据日期: today,
