@@ -24,6 +24,15 @@
 
         </activity>
 
+        <!-- 2026-10-21:自带扫描页(ZXing)。不用 ML Kit 的 play-services-code-scanner ——
+             那个要 Google Play 服务按需下载扫码模块,国内无 GMS 的机器直接报
+             「The Google Barcode Scanner Module is not available」。 -->
+        <activity
+            android:name=".ScanActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/ScanTheme" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -19,4 +19,7 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <!-- 扫描页:全屏黑底、无标题栏(与手搓版一致;ZXing 预览页不需要 AppCompat) -->
+    <style name="ScanTheme" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
 </resources>
