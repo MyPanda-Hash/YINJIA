@@ -58,5 +58,9 @@ $JAVA = "$env:USERPROFILE\.jdks\ms-25.0.4\bin\java.exe"
 | `q45-why-hidden.sql` | 谁把结存清零 | `asp_user2=orphan-purge:admin`,10-19 15:02:55(与月结同一秒) |
 | `q46-zero-repair.sql` | 零行的修复面 | 434 键:289 键应恢复(合计 +349,496.10)、92 键真 0、53 键无流水 |
 | `q47-test-detail.sql` | 测试账套的库存明细行数(排除"连错账套"这个解释) | 40 行,不是 0 |
+| `q48-backup-kucun.sql` + `backup-kucun-*-before-recalc-20261021.tsv` | **改前留底**(两账套整表 kucun) | 正式 1,480 行 / 测试 42 行,可还原 |
+| `q49-verify-repair.sql` | 重算后的核对 | 零行 434→148、"应恢复仍为 0"=0、该物料 906 |
+| `q50-postcheck.sql` | 修复后自洽性(现存量=入−出) | 正式全 0 不符;测试 1 行历史残影(`YJ-SX-038` 无流水的 20260930 行) |
+| `q51/q52-test-inconsistent.sql` | 追那 1 行 | 测试库孤儿行,无流水 ⇒ 下次月结会被正常清零 |
 | `_probe-stockdetail.mjs` / `_probe-item-visibility.mjs` | **调 8090 接口**对比四个面板 | 库存明细 **0 行** / 库存状况 **0** / 库存状况表 **906** / 库存台账 **890+16**;全表 697 行、CK00006 85 行 |
 | `q43-ongoing-gap.sql` | 10-19 之后是否还在出新缺口 | 0 ⇒ 一次性缺口,但同步机制未改仍会复现 |
