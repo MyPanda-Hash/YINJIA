@@ -4130,3 +4130,17 @@ migrate-prod-report-panel-20261021.sql
 #   ⚠ 本地两账套都没有该表（它只在服务器上）⇒ 本地跑只会 SKIP；服务器上才真正建面板。
 #   服务器增量包：deploy/incr-wo-mixing-20261022.zip（组装脚本 tools/archive/_assemble-wo-mixing-pkg.ps1）。
 migrate-wo-mixing-list-20261022.sql
+
+# ---- 2026-10-22 WMS管理系统·库存核算：生产领料（新面板 PROD_PICK_LIST）----
+#   用户口径「在库存核算里面加一个生产领料的查看面版与混料记录一样，面版实现和打包成一个压缩包。
+#   把 outh 里面的材料出库单据显示出来。」
+#   ① 面板 PROD_PICK_LIST：flat + 类别报表 + module_group=WMS管理系统，形态对齐「混料记录」；
+#   ② 数据源 = 只读包装视图 v_prod_pick_list（dbo.outh 里 src=6 材料出库且未删除的行，如实测
+#      正式库 2094 行 / 487 张 SCLL-* 生产领料单）；outh 源表一个字节不改、不复制数据；
+#   ③ 18 个只读字段（单据编号/单据日期/物料/仓库/批号/数量/成本…）+ 面板与字段 en 译名；
+#   ④ 授权按「材料出库单明细表」等价补授只读 view,query[,export]，无 add/modify/del/审核。
+#   幂等：视图 CREATE OR ALTER；字段更新保留界面 alias/visible。两账套均执行（本地库有 outh）。
+#   体检：tools/verify/verify-prod-pick-outh.sql（13 项，VERIFY-PASS）
+#   回滚：tools/rollback-prod-pick-outh-20261022.sql
+#   服务器增量包：deploy/incr-prod-pick-outh-20261022.zip（组装脚本 tools/archive/_assemble-prod-pick-outh-pkg.ps1）
+migrate-prod-pick-outh-20261022.sql

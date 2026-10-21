@@ -184,6 +184,13 @@ export const menuTree = [
               { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增' },
               { code: 'saleOut', title: '销售出库单', path: '/panelx/list/SALE_OUT', icon: 'Upload', panelCode: 'SALE_OUT', operationName: '新增流程' },
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
+              // 生产领料(2026-10-22 用户口径「在库存核算里面加一个生产领料的查看面版,与混料记录一样;
+              //   把 outh 里面的材料出库单据显示出来」):只读报表,形态对齐「混料记录」——
+              //   flat + 报表,面板码 PROD_PICK_LIST,数据源 = 包装视图 v_prod_pick_list
+              //   (dbo.outh 里 src=6「材料出库」且未删除的行,即 SCLL-* 生产领料单)。
+              //   入口钉在「材料出库单」之后:先建单、再看已过账的领料明细,找单据的人不会跑错组。
+              //   面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
+              { code: 'prodPickList', title: '生产领料', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
               // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据

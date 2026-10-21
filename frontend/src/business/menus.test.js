@@ -295,8 +295,19 @@ test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算
   // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,另加 2026-10-20
   //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
   //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
-  assert.equal(invCodes.length, 34, `WMS管理系统应有 34 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 34, 'WMS管理系统内不应有重复面板')
+  //   2026-10-22:库存核算新增只读报表「生产领料」PROD_PICK_LIST(数据源 dbo.outh 的 src=6 材料出库)
+  //   ⇒ 34 → 35。
+  assert.equal(invCodes.length, 35, `WMS管理系统应有 35 张面板,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 35, 'WMS管理系统内不应有重复面板')
+  // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
+  const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
+  const docGroup = (invAcct.children || []).find((c) => c.code === 'doc')
+  const pickLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_PICK_LIST')
+  assert.equal(pickLeaf?.title, '生产领料')
+  assert.equal(pickLeaf?.path, '/panelx/list/PROD_PICK_LIST')
+  const docCodes = (docGroup.children || []).map((c) => c.panelCode)
+  assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_OUT') + 1,
+    '生产领料应紧跟材料出库单')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理系统')
   // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死

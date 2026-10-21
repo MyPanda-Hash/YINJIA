@@ -187,3 +187,12 @@ tools/_out/
 /deploy/incr-wo-mixing-*/SHA256SUMS.txt
 /deploy/incr-wo-mixing-*/logs/
 /deploy/incr-wo-mixing-*.zip
+# 生产领料增量包(2026-10-22):同混料记录那套 —— 包里的 tools\ / static\ / verify\ /
+# SHA256SUMS.txt 都是派生物(由 tools/archive/_assemble-prod-pick-outh-pkg.ps1 从仓库真源重建),
+# zip 同理不入库(deploy/*.zip 已覆盖)。
+/deploy/incr-prod-pick-outh-*/tools/
+/deploy/incr-prod-pick-outh-*/static/
+/deploy/incr-prod-pick-outh-*/verify/
+/deploy/incr-prod-pick-outh-*/SHA256SUMS.txt
+/deploy/incr-prod-pick-outh-*/logs/
+/deploy/incr-prod-pick-outh-*.zip
