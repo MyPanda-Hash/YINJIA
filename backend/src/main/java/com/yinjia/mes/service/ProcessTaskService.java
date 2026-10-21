@@ -72,6 +72,8 @@ public class ProcessTaskService {
                             + " FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " ORDER BY 加工顺序", route);
             for (Map<String, Object> op : ops) {
+                // 归口车间(2026-10-21):装箱归组装,路线上的车间空着/写成工序名也照样能判(见 ProcessShop)
+                String opShop = ProcessShop.resolve(str(op.get("工序")), str(op.get("生产车间")));
                 Integer dup = jdbc.queryForObject(
                         "SELECT COUNT(*) FROM dbo.wo_progress WHERE 单据编号=? AND 工单行id=? AND 工序=?"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
@@ -83,7 +85,7 @@ public class ProcessTaskService {
                                 + " 产品编码, 产品名称, 规格型号, asp_cancel, asp_user1, asp_time1)"
                                 + " VALUES (?,?,?,0,?,?,?,?,?,N'待加工',N'普通',?,?,?,?,N'N',?,GETDATE())",
                         plNo, op.get("工序"), r.get("计划数量"), "路线 " + route,
-                        r.get("id"), r.get("批次号"), op.get("加工顺序"), op.get("生产车间"),
+                        r.get("id"), r.get("批次号"), op.get("加工顺序"), opShop,
                         blankToNull(r.get("计划完工日期")), r.get("产品编码"), r.get("产品名称"), r.get("规格型号"),
                         user);
             }
@@ -160,7 +162,9 @@ public class ProcessTaskService {
                 + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, line.trim());
         if (dis != null && dis == 1) throw new IllegalArgumentException("生产线「" + line + "」已停用,不可派工");
         // 工序↔产线挂钩的**服务端硬约束**(2026-10-05):产线的「生产车间」= 工序/工艺(成型/切炭/组装),
-        // 必须与任务的工序一致 —— 前端下拉只是便利,接口层不能靠它兜底
+        // 必须与任务的工序一致 —— 前端下拉只是便利,接口层不能靠它兜底。
+        // 台账口径(2026-10-21 ProcessShop):装箱归组装 —— 装箱任务可派到组装车间下的任一条线
+        // (组装线 / 装箱线),但进不了成型、切炭线。
         String lineShop = jdbc.queryForObject("SELECT ISNULL(生产车间,N'') FROM dbo.bs_prod_line"
                 + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", String.class, line.trim());
         List<String> done = new ArrayList<>();
@@ -174,10 +178,12 @@ public class ProcessTaskService {
                 if (rows.isEmpty()) throw new IllegalStateException("任务不存在或已作废");
                 String st = String.valueOf(rows.get(0).get("状态"));
                 if ("已完工".equals(st)) throw new IllegalStateException("已完工,无需派工");
-                String taskShop = String.valueOf(rows.get(0).get("生产车间"));
-                if (!taskShop.isBlank() && !taskShop.equals(lineShop == null ? "" : lineShop)) {
+                String op = String.valueOf(rows.get(0).get("工序"));
+                // 任务车间取**归口车间**(存量任务可能写着工序名或空,不能拿它直接比)
+                String taskShop = ProcessShop.resolve(op, String.valueOf(rows.get(0).get("生产车间")));
+                if (!ProcessShop.matches(op, String.valueOf(rows.get(0).get("生产车间")), lineShop)) {
                     throw new IllegalStateException("生产线「" + line.trim() + "」属于「" + lineShop + "」,"
-                            + "与任务的工序「" + taskShop + "」不一致");
+                            + "与任务的工序「" + op + "」(应进「" + taskShop + "」车间)不一致");
                 }
                 jdbc.update("UPDATE dbo.wo_progress SET 生产线=?, 状态=N'在加工', asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                         line.trim(), user, id);
@@ -338,8 +344,10 @@ public class ProcessTaskService {
                 "SELECT 单号, 工艺路线, ISNULL(下一道工序,N'') AS 下一道工序, ISNULL(生产车间,N'') AS 生产车间"
                         + " FROM dbo.v_wo_next_process WHERE 单号 IN (" + in + ")", nos.toArray());
         for (Map<String, Object> r : rows) {
-            String shop = String.valueOf(r.get("生产车间"));
+            // 归口车间(2026-10-21 ProcessShop):装箱归组装 ⇒ 装箱的候选线是组装车间下的线,不是"装箱车间"
+            String shop = ProcessShop.resolve(str(r.get("下一道工序")), str(r.get("生产车间")));
             String rt = String.valueOf(r.get("工艺路线"));
+            r.put("生产车间", shop);
             r.put("候选产线", shop.isBlank() ? List.of() : jdbc.queryForList(
                     "SELECT 生产线 FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
                             + " AND ISNULL(生产车间,N'')=? ORDER BY ISNULL(排序,999), 生产线", String.class, shop));
@@ -654,6 +662,10 @@ public class ProcessTaskService {
                 //   计划数量(工序 i) = 本行排产数量 × 该工序换算率;
                 //   ❌ 不逐道累乘(否则 成型7×切炭2 会把切炭算成 14 倍,转序门槛也跟着虚高,完成报工也不转序)。
                 Map<String, Object> s = new LinkedHashMap<>(r);
+                // 归口车间(2026-10-21 ProcessShop):弹窗每道的候选线按它过滤 —— 装箱→组装,
+                //   路线上的车间空着也照样只出组装车间下的线(此前空值 ⇒ 弹窗把全部产线都摆出来,
+                //   装箱能被排到成型线)。
+                s.put("生产车间", ProcessShop.resolve(str(r.get("工序")), str(r.get("生产车间"))));
                 s.put("计划数量", round(baseQty * rate));
                 s.put("计划完工日期", head.get("交期"));
                 steps.add(s);
@@ -679,7 +691,8 @@ public class ProcessTaskService {
      *   · 全路线写台账 {@code wo_process_line}:首道置「已落实」,其余「计划」,等前道报工完工后自动转序;
      *   · 幂等:先作废该工单旧台账再重写(改线 = 重新提交)。
      *
-     * <p>守卫:每道都必须选线 · 线存在且未停用 · **线的生产车间必须等于该工序的车间**(与选线口径一致)·
+     * <p>守卫:每道都必须选线 · 线存在且未停用 · **线的生产车间必须等于该工序的归口车间**
+     * ({@link ProcessShop}:装箱与组装同属组装车间;与选线口径一致)·
      * 工单未结案 · 未排产(scx 空;已排产的换线请先撤销排产)。
      *
      * @param steps [{工序, 生产线, 计划完工日期?(yyyy-MM-dd), 计划数量?(忽略,一律按换算率算)}]
@@ -730,8 +743,14 @@ public class ProcessTaskService {
             if (ls.isEmpty()) throw new IllegalArgumentException("生产线「" + line + "」不存在");
             if (num(ls.get(0).get("停用")) == 1) throw new IllegalArgumentException("生产线「" + line + "」已停用");
             String lineShop = String.valueOf(ls.get(0).get("生产车间"));
-            if (!shop.isBlank() && !shop.equals(lineShop))
-                throw new IllegalArgumentException("生产线「" + line + "」属于「" + lineShop + "」,与工序「" + op + "」(" + shop + ")不一致");
+            // 工序↔产线的服务端硬校验(2026-10-05):产线的「生产车间」必须与这道工序的归口车间一致。
+            // 归口车间的唯一口径在 ProcessShop(2026-10-21 用户口径「组装和装箱工序都是同样进入组装
+            // 生产线才对」):装箱→组装,所以装箱能选组装车间下的组装线/装箱线,但选不了成型/切炭线;
+            // 路线上的车间空着也不再等于"随便挑"(此前空值直接放行 ⇒ 装箱被排到成型线)。
+            String wantShop = ProcessShop.resolve(op, shop);
+            if (!ProcessShop.matches(op, shop, lineShop))
+                throw new IllegalArgumentException("生产线「" + line + "」属于「" + lineShop + "」,与工序「" + op
+                        + "」应进的「" + wantShop + "」车间不一致(装箱与组装同属组装车间)");
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("工序", op);
             p.put("工序序", rt.get("工序序"));
@@ -853,7 +872,8 @@ public class ProcessTaskService {
      *   <li>该道「已审核报工量 ≥ 该道计划数量」= **已达标** ⇒ 台账置「已落实」+ 补实际生产线;</li>
      *   <li>第一道**未达标**的 = **当前该做的道**:台账还是「计划」⇒ 置「已落实」,
      *       并按它的「计划生产线」把工单切过去(写 {@code plang.scx} + {@code plang_pc.scx} + 轨迹
-     *       {@code wo_transfer_log});计划线为空 ⇒ 只提示"请人工派线",**不瞎切**;</li>
+     *       {@code wo_transfer_log});计划线为空 ⇒ 只提示"请人工派线",**不瞎切**;
+     *       计划线的车间配不上这道工序({@link ProcessShop})⇒ 同样只提示重新排线,**不越界切**;</li>
      *   <li>计划线 == 当前线 ⇒ 记「沿用当前线」,**照样把该道置「已落实」**
      *       —— 不落实的话看板的「当前工序」会一直停在上一道,这正是"工单没有进入下一个预排产处";</li>
      *   <li>整条路线都达标 ⇒ 不动(生产完工由 {@link #syncWorkOrderState} 判)。</li>
@@ -920,6 +940,15 @@ public class ProcessTaskService {
             out.put("计划量", plan);
             if (planLine.isEmpty()) {
                 out.put("提示", "下一道(" + op + ")未预排线,请人工派线");
+                return out;
+            }
+            // 计划线的车间必须配得上这道工序(2026-10-21 ProcessShop:装箱归组装):
+            // **存量台账**里可能已经排了跨车间的线(实测 GD-2026-10-0202 行6:装箱→2号车间/成型线)——
+            // 自动转序只做对的事,不替人越界派线 ⇒ 原地提示重新排线,工单保持不动。
+            if (!ProcessShop.matches(op, null, shopOfLine(planLine))) {
+                out.put("提示", "下一道(" + op + ")的计划线「" + planLine + "」属于「" + shopOfLine(planLine)
+                        + "」车间,与工序应进的「" + ProcessShop.resolve(op, "") + "」车间不一致;"
+                        + "请撤销该行排产后重新排线");
                 return out;
             }
             if (!planLine.equals(cur)) {
