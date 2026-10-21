@@ -64,6 +64,8 @@ public class WorkReportController {
                         + " ISNULL(p.dm,N'') AS 物料编码, ISNULL(p.mc,N'') AS 产品名称,"
                         + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.jldw,N'') AS 计量单位,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.lot_no,N'') AS 批号,"
+                        // 工艺路线:决定这张工单有哪些工序(工序台账就是按它生成的),页面上要显示出来
+                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线,"
                         + " ISNULL(p.[当前工序],N'') AS 当前工序, ISNULL(p.[完工状态],N'') AS 完工状态"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " ORDER BY p.pl_xc", no);

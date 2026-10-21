@@ -4406,6 +4406,10 @@ export default {
     '报工已提交并生效': 'Report submitted and effective',
     '报工已提交,待审核后工序进度才更新': 'Report submitted; process progress updates after approval',
     '报工单已建,请到「工序报工单」审核': 'Report created; please approve it in Work reports',
+    '默认路线': 'Default routing',
+    '道工序': 'operations',
+    '该工单行还没有工序台账(没预排产)': 'This work-order line has no process ledger yet (not pre-scheduled)',
+    '请先到「快速排产」把该工单行排入产线:系统会按产品的工艺路线生成工序': 'Go to Quick scheduling and schedule this line first; processes are generated from the product routing',
     // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
     '生产领料': 'Production Picking',
     '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',

@@ -39,6 +39,11 @@
             <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ wo.产品名称 || '—' }}</b></div>
             <div class="mp-kv"><span>{{ tt('规格') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
             <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
+            <!-- 工艺路线:工序不是固定的三道,而是由这张工单的路线决定(不同产品可绑不同路线) -->
+            <div class="mp-kv">
+              <span>{{ tt('工艺路线') }}</span>
+              <b>{{ wo.工艺路线 || tt('默认路线') }} · {{ ops.length }} {{ tt('道工序') }}</b>
+            </div>
             <div class="mp-kv"><span>{{ tt('排产数量') }}</span><b class="num">{{ fmt(wo.排产数量) }}</b></div>
             <!-- 当前工序 / 完工状态:报工提交后由后端推进,这里读的是工单行的实时值 -->
             <div class="mp-kv">
@@ -70,7 +75,12 @@
               </div>
               <div class="mp-op-bar"><i :style="{ width: pct(op) + '%' }"></i></div>
             </div>
-            <div v-if="!ops.length" class="mp-empty">{{ tt('该工单没有工序台账') }}</div>
+            <!-- 台账为空 = 该工单行还没预排产(工序任务由「快速排产 → 预排全程线」按工艺路线生成),
+                 不是"固定三道"。这里要说清下一步去哪,而不是丢一句"没有台账"。 -->
+            <div v-if="!ops.length" class="mp-empty">
+              <div>{{ tt('该工单行还没有工序台账(没预排产)') }}</div>
+              <div class="mp-empty-sub">{{ tt('请先到「快速排产」把该工单行排入产线:系统会按产品的工艺路线生成工序') }}</div>
+            </div>
           </div>
 
           <div class="mp-row mp-qty">
@@ -330,6 +340,7 @@ async function submit() {
 
 .mp-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); }
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-placeholder); }
+.mp-empty-sub { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.5; }
 .mp-warn { margin-top: 8px; font-size: 12px; color: var(--el-color-warning); }
 
 .mp-wo { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--el-border-color-lighter); }
