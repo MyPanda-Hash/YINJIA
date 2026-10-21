@@ -249,21 +249,23 @@ const canAdd = computed(() => {
 /**
  * 扫码能力来自**两种安卓壳**,网页版没有(浏览器 http 不是安全上下文,调不起摄像头):
  *  ① 手搓壳:`window.YjNative.scan()` → 结果回调 `window.__yjScanResult(code, ok)`
- *  ② Capacitor 壳:**动态 import** `@capacitor-mlkit/barcode-scanning` 的插件对象再调
- *     (Google ML Kit;结果 `barcodes[0].rawValue`)。
- *     ⚠ 2026-10-21 实测教训:光探测 `window.Capacitor.Plugins.BarcodeScanning` 不够 ——
- *     插件 JS 侧没被 import 时那里是空的,按钮就不显示(用户报「生产领料没有扫码」)。
- *     所以先看 `Capacitor.isNativePlatform()`,再真正把插件模块 import 进来。
- * 有其中任意一种就显示「扫码」按钮;两种都没有就只留「查询」(手输/扫码枪)。
+ *  ② Capacitor 壳:插件名是 **`BarcodeScanner`**(registerPlugin('BarcodeScanner', …)),
+ *     ⚠ 不是 `BarcodeScanning` —— 2026-10-21 就是这里写错,探测永远拿到 undefined:
+ *       · 按钮不出现(前一版问题)
+ *       · 或动态 import 后调用路径不通(这一版「扫码失败」)
+ *     用法:`BarcodeScanner.requestPermissions()` → `scan({formats})` → `barcodes[0].rawValue`。
+ * 任一可用就显示「扫码」按钮;都不行才只留「查询」(手输/扫码枪)。
  */
 const isNativeShell = (() => {
   try {
     return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform())
   } catch { return false }
 })()
+/** Capacitor 运行时会把已注册插件挂到 Capacitor.Plugins 上(键 = registerPlugin 的名字) */
 const capScanPlugin = (() => {
   try {
-    return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BarcodeScanning) || null
+    const P = window.Capacitor && window.Capacitor.Plugins
+    return (P && (P.BarcodeScanner || P.BarcodeScanning)) || null
   } catch { return null }
 })()
 const nativeScan = (typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan))
@@ -291,24 +293,36 @@ function applyScan(code) {
 }
 
 /**
- * Capacitor 版(ML Kit):**动态 import 插件模块**再调 —— 只认 window 上的对象不可靠,
- * 插件 JS 侧必须被加载进 bundle,Capacitor 运行时才能把调用代理到 native。
- * 网页版不会走到这里(没有 Capacitor 运行时),动态 import 也只是多一个未加载的 chunk。
+ * Capacitor 版(ML Kit)扫码。
+ *
+ * 优先用 Capacitor 运行时挂出来的插件对象(`Capacitor.Plugins.BarcodeScanner`),
+ * 拿不到再动态 import 模块兜底 —— 两条路都失败时**把真实错误显示出来**,
+ * 不再统一吞成一句「扫码失败」(2026-10-21 就是因为吞了错误,现场无法定位)。
  */
-async function scanWithCapacitor() {
+async function resolveScanPlugin() {
+  if (capScanPlugin) return capScanPlugin
   try {
     const mod = await import('@capacitor-mlkit/barcode-scanning')
-    const p = (mod && (mod.BarcodeScanner || (mod.default && mod.default.BarcodeScanner))) || capScanPlugin
+    return (mod && (mod.BarcodeScanner || (mod.default && mod.default.BarcodeScanner))) || null
+  } catch (e) {
+    return null
+  }
+}
+
+async function scanWithCapacitor() {
+  try {
+    const p = await resolveScanPlugin()
     if (!p) {
       scanTarget = null
-      errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+      errText.value = tt('扫码组件没加载起来,请改用输入框扫码枪或手工输入')
       return
     }
     if (typeof p.requestPermissions === 'function') {
       const st = await p.requestPermissions()
-      // Capacitor 的权限返回值是 { camera: 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale' }
-      if (st && (st.camera === 'denied' || st.camera === 'prompt')) {
-        errText.value = tt('没有相机权限,扫不了码;可在系统设置里开启')
+      // Capacitor 权限返回值:{ camera: 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale' }
+      const cam = st && st.camera
+      if (cam && cam !== 'granted' && cam !== 'limited') {
+        errText.value = tt('没有相机权限,扫不了码;可在「设置 → 应用 → 银嘉系统 → 权限」里开启')
         scanTarget = null
         return
       }
@@ -319,7 +333,12 @@ async function scanWithCapacitor() {
     applyScan(code)
   } catch (e) {
     scanTarget = null
-    errText.value = tt('扫码失败,请改用输入框扫码枪或手工输入')
+    // 把插件的原始错误带出来(截断到 90 字),便于现场一眼判断是权限、相机还是插件没注册
+    const raw = (e && (e.message || e.errorMessage)) || String(e || '')
+    try { console.error('[扫码] 失败:', e) } catch { /* ignore */ }
+    errText.value = raw
+      ? tt('扫码失败') + ':' + String(raw).slice(0, 90)
+      : tt('扫码失败,请改用输入框扫码枪或手工输入')
   }
 }
 
@@ -349,10 +368,13 @@ onMounted(() => {
     if (!ok || !code) { scanTarget = null; return }
     applyScan(code)
   }
-  // 无桌面壳(App)或窄屏沉浸页 ⇒ 显示返回;有壳(PC 宽屏)则不显示,免得和侧栏重复
+  // 返回箭头只在**真的没有桌面壳**时显示。
+  // ⚠ 2026-10-21:原来用 `.topbar` 是否存在判断,而它在 mounted 这一刻可能还没渲染完
+  //   ⇒ App 里明明有顶栏页签也冒出个「‹」。改成看壳的根节点 `.portal`(它在 PortalLayout
+  //   模板第一层,挂载时一定在了),并再等一帧。
   nextTick(() => {
-    const noShell = isNativeShell || !!window.YjNative || !document.querySelector('.topbar')
-    showBack.value = noShell
+    const hasShell = !!document.querySelector('.portal .portal-body')
+    showBack.value = !hasShell
   })
 })
 
