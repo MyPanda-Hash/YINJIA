@@ -258,7 +258,14 @@ async function submit() {
       生产线: wo.value.生产线 || '',
     })
     const no = res.data?.data?.报工单号 || ''
-    ElMessage.success(tt('报工已提交并审核') + (no ? ':' + no : ''))
+    const mode = res.data?.data?.生效方式 || ''
+    if (mode === '已审核') {
+      ElMessage.success(tt('报工已提交并生效') + (no ? ':' + no : ''))
+    } else if (mode === '待审核') {
+      ElMessage.warning(tt('报工已提交,待审核后工序进度才更新') + (no ? ':' + no : ''))
+    } else {
+      ElMessage.warning(tt('报工单已建,请到「工序报工单」审核') + (no ? ':' + no : ''))
+    }
     await loadWo(wo.value.工单行号)   // 重新拉一次:工序进度/当前工序会变
   } catch (e) {
     errText.value = e?.response?.data?.message || e?.message || tt('提交报工失败')

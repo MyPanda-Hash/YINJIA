@@ -4403,6 +4403,9 @@ export default {
     '报工已提交并审核': 'Report submitted and approved',
     '提交报工失败': 'Failed to submit the report',
     '先扫工单码:报工会写进该工单行的工序进度': 'Scan the work order first; reports update the process progress of that line',
+    '报工已提交并生效': 'Report submitted and effective',
+    '报工已提交,待审核后工序进度才更新': 'Report submitted; process progress updates after approval',
+    '报工单已建,请到「工序报工单」审核': 'Report created; please approve it in Work reports',
     // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
     '生产领料': 'Production Picking',
     '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',

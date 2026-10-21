@@ -80,6 +80,7 @@ public class WorkReportController {
         Long rowId = ((Number) head.get("id")).longValue();
 
         // 工序台账(wo_process_line):工序序 / 计划数量 / 状态 / 计划生产线
+        String batch = String.valueOf(head.getOrDefault("批号", "") == null ? "" : head.get("批号")).trim();
         List<Map<String, Object>> ledger = new ArrayList<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT ISNULL(工序,N'') AS 工序, ISNULL(工序序,0) AS 工序序,"
@@ -89,18 +90,22 @@ public class WorkReportController {
                         + " ORDER BY ISNULL(工序序,999)", rowId)) {
             Map<String, Object> m = new LinkedHashMap<>(r);
             String op = String.valueOf(m.getOrDefault("工序", "")).trim();
-            // 该道已完工量(只认已审核:wgzt='Y',与 ProcessTaskService.syncOneRowState 同口径)
+            // 口径与 ProcessTaskService.syncOneRowState / WorkOrderListController 完全一致:
+            //   行锚 = scjl.gd_id → plang_pc.plang_id;**草稿期 gd_id 还是 0**(审核时才写),
+            //   所以必须带「批次号」兜底,否则刚报上去的单在页面上看不到(2026-10-21 实测踩到)。
+            // 已报工 = 已审核(wgzt='Y');待审核 = 其余(审核后才会变已报工并推进工序进度)。
             Double done = jdbc.queryForObject(
                     "SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl"
                             + " WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
-                            + "   AND EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=scjl.gd_id AND pc.plang_id=?)",
-                    Double.class, no, op, rowId);
-            // 待审量(已建单未审核)—— 页面提示"还有 N 在等审核",避免重复报工
+                            + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=scjl.gd_id AND pc.plang_id=?)"
+                            + "        OR (ISNULL(gd_id,0)=0 AND ISNULL([批次号],N'')=ISNULL(?,N'')))",
+                    Double.class, no, op, rowId, batch);
             Double pending = jdbc.queryForObject(
                     "SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl"
                             + " WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')<>'Y'"
-                            + "   AND EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=scjl.gd_id AND pc.plang_id=?)",
-                    Double.class, no, op, rowId);
+                            + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=scjl.gd_id AND pc.plang_id=?)"
+                            + "        OR (ISNULL(gd_id,0)=0 AND ISNULL([批次号],N'')=ISNULL(?,N'')))",
+                    Double.class, no, op, rowId, batch);
             m.put("已报工", done == null ? 0 : done);
             m.put("待审核", pending == null ? 0 : pending);
             ledger.add(m);
@@ -132,6 +137,7 @@ public class WorkReportController {
      * @param body { woNo, lineId(可空), 工序, 数量, 报工人, 批次号(可空), 生产线(可空) }
      */
     @PostMapping("/submit")
+    @org.springframework.transaction.annotation.Transactional
     public ApiResult<Map<String, Object>> submit(@RequestBody Map<String, Object> body) {
         String woNo = str(body.get("woNo"));
         String op = str(body.get("工序"));
@@ -158,24 +164,70 @@ public class WorkReportController {
 
         // ① 保存(草稿 → 正式保存),与手工建单同一条路径
         Map<String, Object> saved = buttons.callButton("WO_REPORT", "保存", head, Map.of());
-        String no = str(saved.get("单据编号"));
-        if (no.isEmpty()) no = str(saved.get("单号"));
-        if (no.isEmpty()) throw new IllegalStateException("报工单保存后没有取到单据编号");
+        // ⚠ ButtonService.result() 的返回键是 **编号**(不是 单据编号/单号)——
+        //   2026-10-21 现场报错「报工单保存后没有取到单据编号」就是这里读错键。
+        //   三个都试一遍,兼容 result() 未来改名。
+        String no = firstNonEmpty(saved.get("编号"), saved.get("单据编号"), saved.get("单号"));
+        if (no.isEmpty()) throw new IllegalStateException("报工单保存后没有取到单据编号:" + saved);
 
-        // ② 审核:只有这一步会推进工序进度/当前工序(钩子在 ButtonService.runWoAuditHooks)
+        // ② 生效:工序进度/当前工序只在**审核**那一步推进(钩子 ButtonService.runWoAuditHooks)。
+        //   · 管理员:直接「审核」⇒ 当场生效;
+        //   · 其他角色:直审是收权的(ButtonService.audit 只给管理员) ⇒ 走「提交审批」,
+        //     由有审批权的角色「审批通过」后才生效。
+        //   ⚠ 2026-10-21 实测教训:这里**不能吞异常** —— 首版用 try/catch 兜住"提交审批"失败,
+        //     结果单据建出来了(pending=N 的孤儿单),页面却只报一句泛泛的错,状态卡在草稿。
+        //     现在失败时把「单号 + 原因」一起抛给前端,页面提示去「工序报工单」里审核那张单。
         Map<String, Object> auditBody = new LinkedHashMap<>();
-        auditBody.put("单据编号", no);
-        Map<String, Object> audited = buttons.callButton("WO_REPORT", "审核", auditBody, Map.of());
+        auditBody.put("编号", no);
+        boolean admin = isAdmin();
+        Map<String, Object> effect;
+        String mode;
+        try {
+            effect = buttons.callButton("WO_REPORT", admin ? "审核" : "提交审批", auditBody, Map.of());
+            mode = admin ? "已审核" : "待审核";
+        } catch (Exception e) {
+            // callButton 是 @Transactional ⇒ 同一事务里抛异常会把"保存"一起回滚,
+            // 所以这里可以放心说"没有保存",不会留下孤儿草稿单。
+            throw new IllegalStateException("报工没有提交成功:"
+                    + (admin ? "审核" : "提交审批") + "失败(" + e.getMessage() + ")。请稍后重试,"
+                    + "或直接到「工序报工单」手工建单。");
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("报工单号", no);
-        out.put("审核结果", audited);
+        out.put("生效方式", mode);          // 已审核 = 当场影响工序进度;待审核 = 等审批
+        out.put("审核结果", effect);
         out.put("工序", op);
         out.put("数量", qty);
         return ApiResult.ok(out);
     }
 
+    /**
+     * 当前登录人是否管理员 —— 与 ButtonService.isAdminUser 同口径(yj_user.is_admin='Y'),
+     * 不要用 Spring 的 authority 猜:实测 admin 的 authority 里并没有 ADMIN 字样。
+     */
+    private boolean isAdmin() {
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || auth.getName() == null) return false;
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT is_admin FROM yj_user WHERE username=?", auth.getName());
+            return !rows.isEmpty() && "Y".equals(String.valueOf(rows.get(0).get("is_admin")));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static String str(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
+
+    /** 取第一个非空值(ButtonService 的返回键历史上换过名字,别吊死在一个键上) */
+    private static String firstNonEmpty(Object... vals) {
+        for (Object v : vals) {
+            String s = str(v);
+            if (!s.isEmpty() && !"null".equalsIgnoreCase(s)) return s;
+        }
+        return "";
+    }
 
     private static double num(Object v) {
         if (v == null) return 0;
