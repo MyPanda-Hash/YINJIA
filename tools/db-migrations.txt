@@ -4144,3 +4144,17 @@ migrate-wo-mixing-list-20261022.sql
 #   回滚：tools/rollback-prod-pick-outh-20261022.sql
 #   服务器增量包：deploy/incr-prod-pick-outh-20261022.zip（组装脚本 tools/archive/_assemble-prod-pick-outh-pkg.ps1）
 migrate-prod-pick-outh-20261022.sql
+
+# ---- 2026-10-22 产成品入库单「加工单号」补齐（数据修复，不改表结构）----
+#   用户口径「写个脚本可以补齐成产品入库的加工单号。按照有的补齐。要合理，符合时间。」
+#   ① 加工单号 = 生产工单号 plang.pl_no（现役代码三处同口径：WorkOrderPickingService
+#      「加工单号=工单号」/ ButtonService head.put("加工单号", wo) / 工单追溯按它反查）；
+#   ② 候选 = plang 里含本单产品的工单号；时间闸门 = 该工单最晚一行日期 ≤ 入库日、且 ≤180 天前；
+#      一张入库单只落一个工单号（时间最近优先）；**strict 默认只填"全覆盖"**，单产品单顺带填工单行号；
+#   ③ 只填空值，绝不覆盖既有值；每张单写一条 yj_usage_log 留痕，可精确回滚；
+#   ④ 实测正式库 231 张空单 → 全覆盖 31 张(strict 已补) / 部分覆盖 113 张 / 无候选 87 张；
+#      测试库 plang 0 行 ⇒ 本地跑为 NOOP（幂等）。
+#   报告：tools/verify/finish-in-wo-backfill-report.sql（只读，同一套口径）
+#   回滚：tools/rollback-finish-in-wo-backfill-20261022.sql（按留痕还原，幂等）
+#   取证与逐单清单：tools/archive/_finish-in-wo-20261022/
+migrate-finish-in-wo-backfill-20261022.sql
