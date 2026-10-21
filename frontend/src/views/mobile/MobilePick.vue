@@ -129,41 +129,57 @@
       <template v-if="mat">
         <!-- 批次勾选(2026-10-21):扫完物料码直接列出该物料**全部批次 + 数量**,
              默认按先进先出勾好;用户可按数量勾选。日期在前的排在前面。
-             扫到的码里带批次的,那一行标黄底(见 .is-scanned)。 -->
+             扫到的码里带批次的,那一行标黄底(见 .is-scanned)。
+             2026-10-21 追加:整张表**可展开/收起** —— 批次多的物料(实测 22~30 个批次)
+             会把"领用数量/加入"顶到屏幕外,收起后只留一行摘要。 -->
         <div class="mp-batches">
-          <div class="mp-batches-head">
-            <span class="mp-bh-lot">{{ tt('批号') }}</span>
-            <span class="mp-bh-wh">{{ tt('仓库') }}</span>
-            <span class="mp-bh-avail">{{ tt('可用') }}</span>
-            <span class="mp-bh-qty">{{ tt('本次') }}</span>
-          </div>
-          <div
-            v-for="(b, i) in batchRows"
-            :key="i"
-            class="mp-batch-row"
-            :class="{ 'is-checked': b.qty > 0, 'is-scanned': b.scanned }"
-          >
-            <span class="mp-bh-lot">
-              <el-checkbox :model-value="b.qty > 0" @change="(v) => onBatchQty(b, v ? b.avail : 0)" />
-              <span class="mp-batch-lot" :class="{ mono: !!b.lot }">{{ b.lot || tt('无批次') }}</span>
-              <span v-if="b.scanned" class="mp-batch-scan">{{ tt('扫到') }}</span>
+          <div class="mp-batches-toggle" role="button" @click="batchOpen = !batchOpen">
+            <span class="mp-bt-title">{{ tt('批次') }} · {{ batchRows.length }}</span>
+            <span class="mp-bt-sum">
+              <template v-if="selected.length">
+                {{ tt('已选') }} <b class="num">{{ fmt(selectedQty) }}</b> {{ mat.uom }}
+                <span class="mp-bt-lots">{{ selected.map((b) => b.lot || tt('无批次')).join('、') }}</span>
+              </template>
+              <template v-else>{{ tt('未选批次') }}</template>
             </span>
-            <span class="mp-bh-wh">{{ b.warehouse || '—' }}</span>
-            <span class="mp-bh-avail num">{{ fmt(b.avail) }}</span>
-            <span class="mp-bh-qty">
-              <el-input-number
-                :model-value="b.qty"
-                :min="0"
-                :max="b.avail"
-                :precision="2"
-                :step="1"
-                size="small"
-                controls-position="right"
-                @change="(v) => onBatchQty(b, v)"
-              />
-            </span>
+            <span class="mp-bt-arrow" :class="{ open: batchOpen }" :title="batchOpen ? tt('收起') : tt('展开')">›</span>
           </div>
-          <div v-if="!batchRows.length" class="mp-empty">{{ tt('该物料没有可用批次') }}</div>
+
+          <template v-if="batchOpen">
+            <div class="mp-batches-head">
+              <span class="mp-bh-lot">{{ tt('批号') }}</span>
+              <span class="mp-bh-wh">{{ tt('仓库') }}</span>
+              <span class="mp-bh-avail">{{ tt('可用') }}</span>
+              <span class="mp-bh-qty">{{ tt('本次') }}</span>
+            </div>
+            <div
+              v-for="(b, i) in batchRows"
+              :key="i"
+              class="mp-batch-row"
+              :class="{ 'is-checked': b.qty > 0, 'is-scanned': b.scanned }"
+            >
+              <span class="mp-bh-lot">
+                <el-checkbox :model-value="b.qty > 0" @change="(v) => onBatchQty(b, v ? b.avail : 0)" />
+                <span class="mp-batch-lot" :class="{ mono: !!b.lot }">{{ b.lot || tt('无批次') }}</span>
+                <span v-if="b.scanned" class="mp-batch-scan">{{ tt('扫到') }}</span>
+              </span>
+              <span class="mp-bh-wh">{{ b.warehouse || '—' }}</span>
+              <span class="mp-bh-avail num">{{ fmt(b.avail) }}</span>
+              <span class="mp-bh-qty">
+                <el-input-number
+                  :model-value="b.qty"
+                  :min="0"
+                  :max="b.avail"
+                  :precision="2"
+                  :step="1"
+                  size="small"
+                  controls-position="right"
+                  @change="(v) => onBatchQty(b, v)"
+                />
+              </span>
+            </div>
+            <div v-if="!batchRows.length" class="mp-empty">{{ tt('该物料没有可用批次') }}</div>
+          </template>
         </div>
 
         <div class="mp-row mp-qty">
@@ -276,6 +292,8 @@ const qty = ref(0)
 const woLine = ref(0)
 const matScanBatch = ref('')
 const batchRows = ref([])
+/** 批次表是否展开(2026-10-21:批次多的物料二三十行,允许收起) */
+const batchOpen = ref(true)
 /** 用户手改过批次数量 ⇒ 不再用"领用数量"自动重排 */
 const qtyEdited = ref(false)
 /** 扫工单码但该工单查不到 / 行号对不上时的提示(不阻断,降到按工单号取) */
@@ -536,6 +554,8 @@ async function probeMaterial() {
     }
     // 全部批次(先进先出排好);扫到的批次会被标记 scanned ⇒ 页面标亮
     batchRows.value = makeBatchRows(rows, matScanBatch.value)
+    // 刚扫完就展开,让人先看见批次(之后用户可收起)
+    batchOpen.value = true
     // 扫到的码带了批次 ⇒ 默认就领这一批(数量 = 该批可用量,用户可改)
     const hit = batchRows.value.find((b) => b.scanned)
     if (hit) {
@@ -804,6 +824,34 @@ async function submit() {
   border-radius: 6px;
   overflow: hidden;
 }
+
+/* 批次表表头条 = 展开/收起开关(2026-10-21):收起时只留这一行摘要,
+   把「领用数量 / 加入」留在首屏(批次多的物料有 20~30 行)。 */
+.mp-batches-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--el-fill-color-light);
+  cursor: pointer;
+  user-select: none;
+}
+.mp-bt-title { flex: none; font-size: 13px; font-weight: 600; }
+.mp-bt-sum {
+  flex: 1; min-width: 0;
+  font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mp-bt-lots { margin-left: 4px; color: var(--el-text-color-placeholder); }
+.mp-bt-arrow {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--el-text-color-secondary);
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+.mp-bt-arrow.open { transform: rotate(-90deg); }
 .mp-batches-head,
 .mp-batch-row {
   display: flex;

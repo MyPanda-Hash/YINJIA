@@ -4389,6 +4389,8 @@ export default {
     '勾选超过需求': 'Picked more than required by',
     '当前勾选不是先进先出,生成单据时会写进明细备注': 'Current selection is not FIFO; it will be noted in the document line remark',
     '未按先进先出': 'Not FIFO',
+    '批次': 'Lots',
+    '未选批次': 'No lot selected',
     // ── 生产领料面板(2026-10-20):生产计划 → 生产领料(电脑端 /prod/plan/prodPick;手机端 /m/pick)──
     '生产领料': 'Production Picking',
     '扫工单 → 扫物料 → 先进先出拆批': 'Scan WO → scan material → FIFO split',

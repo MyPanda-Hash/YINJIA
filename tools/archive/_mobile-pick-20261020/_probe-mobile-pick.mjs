@@ -197,6 +197,23 @@ const alloc = JSON.parse(await ev(`JSON.stringify({
 })`))
 ok('填数量 → 批次按先进先出自动勾选', alloc.rows > 0, JSON.stringify(alloc))
 
+// ④a 批次表可展开/收起(2026-10-21):收起后表体消失、摘要仍在、加入按钮还在
+const before = JSON.parse(await ev(`JSON.stringify({ rows: document.querySelectorAll('.mp-batch-row').length })`))
+await ev(`document.querySelector('.mp-batches-toggle').click(); 'ok'`)
+await sleep(400)
+const collapsed = JSON.parse(await ev(`JSON.stringify({
+  rows: document.querySelectorAll('.mp-batch-row').length,
+  sum: document.querySelector('.mp-bt-sum')?.innerText || '',
+  addVisible: !!document.querySelector('.mp-qty .el-button--primary'),
+})`))
+ok('批次表收起 → 表体隐藏、摘要保留、加入仍在',
+  collapsed.rows === 0 && collapsed.sum.trim() !== '' && collapsed.addVisible,
+  JSON.stringify({ before: before.rows, ...collapsed }))
+await ev(`document.querySelector('.mp-batches-toggle').click(); 'ok'`)
+await sleep(400)
+const reopened = JSON.parse(await ev(`JSON.stringify({ rows: document.querySelectorAll('.mp-batch-row').length })`))
+ok('批次表再展开 → 行数恢复', reopened.rows === before.rows, JSON.stringify(reopened))
+
 // ④b 加物料之前先截一张「批次勾选表」的图(2026-10-21 新交互:批次可勾选/先进先出标亮)
 if (process.env.PROBE_SHOT_BATCH === '1') {
   const shotB = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
