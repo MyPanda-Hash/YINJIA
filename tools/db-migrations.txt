@@ -4118,3 +4118,4 @@ migrate-menu-restructure-wms-20261020.sql
 #   页面:电脑端 /prod/plan/prodPick(桌面壳内双栏)· 手机端 /m/pick(独立布局),同一份组件。
 migrate-prod-pick-panel-20261020.sql
 migrate-material-out-line-20261021.sql
+migrate-prod-report-panel-20261021.sql

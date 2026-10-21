@@ -68,6 +68,8 @@ public final class PagePanelRegistry {
      * `/prod/plan/prodPick`(桌面壳内,双栏)。数据侧仍走通用面板引擎 + 审核过账,**没有新表**。
      */
     public static final String PROD_PICK = "PROD_PICK";
+    /** 工序报工(2026-10-21):页面级虚拟面板,扫工单码报工 */
+    public static final String PROD_REPORT = "PROD_REPORT";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -158,6 +160,17 @@ public final class PagePanelRegistry {
             {"pick",  "生成领料单"},
     };
 
+    /**
+     * 工序报工(2026-10-21):扫工单 → 选工序(成型/切炭/组装)→ 填数量 → 提交。
+     * 提交走 WO_REPORT 报工单(保存+审核),工序进度/当前工序由既有审核钩子推进。
+     * 页面自身只需 可见/查询/报工;真正的记账仍受 WO_REPORT 面板权限约束。
+     */
+    private static final String[][] PROD_REPORT_ACTIONS = {
+            {"view",   "可见"},
+            {"query",  "查询"},
+            {"report", "报工"},
+    };
+
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
             // 2026-10-20 导航改版:「生产制造」一级目录拆掉,这四个看板所属分组合并为「生产计划」
@@ -168,6 +181,8 @@ public final class PagePanelRegistry {
             new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产计划", WORK_ORDER_LIST_ACTIONS),
             // 2026-10-20 用户口径「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」
             new PagePanelDef(PROD_PICK, "生产领料", "生产计划", PROD_PICK_ACTIONS),
+            // 2026-10-21 用户口径「再写一个工序报工的面版」(与生产领料同组、同形态)
+            new PagePanelDef(PROD_REPORT, "工序报工", "生产计划", PROD_REPORT_ACTIONS),
             new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS),
             // 2026-10-20 补登:数采平台三页 + 扫码领料(此前菜单里无面板码 ⇒ 矩阵里缺这几个)
             new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),

@@ -74,6 +74,9 @@ const routes = [
       //   留着顶栏 + 页签,不要沉浸。故这条**去掉 immersiveOnMobile**;PortalLayout 的沉浸能力
       //   保留(以后别的页要用),但当前没有任何路由启用它。
       { path: 'panelx/list/PROD_PICK', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
+      // 工序报工(2026-10-21):与生产领料同一形态 —— 页面级虚拟面板 + 标准面板地址 `/panelx/list/<码>`,
+      //   必须排在上面的参数路由之前;手机单列、电脑 ≥900px 双栏(同一份组件)。
+      { path: 'panelx/list/PROD_REPORT', component: () => import('@/views/mobile/MobileReport.vue'), meta: { title: '工序报工', code: 'prodReport', panelCode: 'PROD_REPORT' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
