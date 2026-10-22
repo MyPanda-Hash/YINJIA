@@ -82,7 +82,7 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   const purchase = (scm.children || []).find((c) => c.code === 'purchase')
   assert.ok(purchase, '应有 采购管理 分组')
   // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理)
-  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats'])
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['purchaseDoc', 'purchaseDetail', 'purchaseStats'])
   const codesOf = (node) => {
     if (Array.isArray(node)) return node.flatMap(codesOf)
     if (!node || typeof node !== 'object') return []
@@ -332,10 +332,11 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
   assert.deepEqual((base.children || []).map((c) => c.code), ['sysFunc', 'device'])
   const sysFunc = base.children[0]
   assert.equal(sysFunc.title, '系统功能')
-  // 2026-10-19 追加「数据备份」(sysBackup,管理员专属的数据安全页:数据库主动/自动备份)
-  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'])
-  // 组织架构 / 使用权限查看 / 数据备份 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
-  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup'])
+  // 2026-10-19 追加「数据备份」(sysBackup,管理员专属的数据安全页:数据库主动/自动备份);
+  // 2026-10-23 追加「菜单设计」(sysMenuDesign,管理员专属:改导航名称/分组/顺序/隐藏)
+  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'])
+  // 组织架构 / 使用权限查看 / 数据备份 / 菜单设计 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
+  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
   // 迁出后只剩 sysFunc(无面板)+ device(2026-10-20 搬来的设备维护:点检记录 / 保养计划)
@@ -394,8 +395,9 @@ test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可�
   // 2026-10-20:base 下多了「设备维护」组(设备点检记录 / 保养计划),按组拆开断言
   const adminGroups = (admin.children || []).map((g) => ({ code: g.code, kids: (g.children || []).map((c) => c.code) }))
   // 2026-10-19:数据安全 · 数据库备份(sysBackup)接在系统功能组末尾,管理员专属
+  // 2026-10-23:菜单设计(sysMenuDesign)再往后接一格,同样管理员专属
   assert.deepEqual(adminGroups, [
-    { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'] },
+    { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'] },
     { code: 'device', kids: ['equipCheck', 'maintPlan'] },
   ])
 })
@@ -474,9 +476,10 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
     assert.ok(!all.includes(t), `菜单树里不应再有「${t}」标题`)
   }
   // 制程品质组现役 = 首件 / 制程 / 组装成品 三张;质量单据组现役 = 7 张
+  // (2026-10-23:该组 code 由 'process' 改为 'qcProcess' —— 与「工序 OP」叶子重名,菜单覆盖表要求 code 全树唯一)
   const qc = menuTree.find((n) => n.code === 'qc')
   const group = (code) => (qc.children || []).find((c) => c.code === code)
-  assert.deepEqual((group('process').children || []).map((c) => c.panelCode),
+  assert.deepEqual((group('qcProcess').children || []).map((c) => c.panelCode),
     ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP'])
   assert.equal((group('qcDoc').children || []).length, 7)
 })

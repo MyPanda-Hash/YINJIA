@@ -103,17 +103,21 @@ export const menuTree = [
         icon: 'ShoppingCart',
         children: [
           {
-            code: 'doc', title: '单据', children: [
+            // ⚠ 节点 code 必须**全树唯一**(2026-10-23 菜单设计落地时修):它是 Vue 的 `:key`、
+            //   el-tree 的 node-key,也是覆盖表 `yj_menu_node.menu_code` 的主键。此前销售/采购/库存核算
+            //   三个模块里各有一个 `doc`/`detail`/`stats`,质检的 `process` 又与「工序 OP」叶子重名
+            //   ⇒ 菜单设计器的合并(Map by code)会吃掉其中一项。这里一律加上所属模块前缀。
+            code: 'salesDoc', title: '单据', children: [
               { code: 'soOrder', title: '销售订单', path: '/panelx/list/SO_ORDER', icon: 'Tickets', panelCode: 'SO_ORDER', operationName: '新增流程' },
             ],
           },
           {
-            code: 'detail', title: '明细表', children: [
+            code: 'salesDetail', title: '明细表', children: [
               { code: 'soDetail', title: '销售订单明细表', path: '/panelx/list/SALES_ORDER_DETAIL', panelCode: 'SALES_ORDER_DETAIL', icon: 'List' },
             ],
           },
           {
-            code: 'stats', title: '统计表', children: [
+            code: 'salesStats', title: '统计表', children: [
               { code: 'soStats', title: '销售订单统计表', path: '/panelx/list/SALES_ORDER_STATS', panelCode: 'SALES_ORDER_STATS', icon: 'Histogram' },
             ],
           },
@@ -125,7 +129,7 @@ export const menuTree = [
         icon: 'ShoppingCart',
         children: [
           {
-            code: 'doc', title: '单据', children: [
+            code: 'purchaseDoc', title: '单据', children: [
               // 2026-10-08 下架:请购单(PU_REQ)—— 用户口径「请购单不需要」。
               // 面板/字段/授权/译名与 bd_pu_req+bl_pu_req 两张表已整体删除
               // (tools/migrate-drop-extra-docs-pu-req-20261008.sql),不是摘菜单,放开注释也恢复不了;
@@ -144,12 +148,12 @@ export const menuTree = [
           // 两者都是 flat 只读报表,不改任何业务表、不动采购订单面板本身
           // (tools/migrate-pu-order-detail-stats-20261018.sql)。
           {
-            code: 'detail', title: '明细表', children: [
+            code: 'purchaseDetail', title: '明细表', children: [
               { code: 'puDetail', title: '采购订单明细表', path: '/panelx/list/PU_ORDER_DETAIL', panelCode: 'PU_ORDER_DETAIL', icon: 'List' },
             ],
           },
           {
-            code: 'stats', title: '统计表', children: [
+            code: 'purchaseStats', title: '统计表', children: [
               { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
             ],
           },
@@ -177,7 +181,7 @@ export const menuTree = [
         icon: 'Box',
         children: [
           {
-            code: 'doc', title: '单据', children: [
+            code: 'invAcctDoc', title: '单据', children: [
               // 送料暂收单:面板编码 QC_RECV(2026-09-20 由 SL_RECV 改名,物理表仍 sl_recv/sl_recv_detail,单据前缀 SL)
               { code: 'slRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Download', panelCode: 'QC_RECV', operationName: '新增流程' },
               { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
@@ -445,7 +449,7 @@ export const menuTree = [
         // 回退抓手在 tools/archive/_qc-drop3/_backup-20261016-{prod,test}/。
         // 这两类的工序检验职能由「制程检验单 QC_PROC_INSP」(人工开单)与「首件检验单」
         // (报工审核自动出单)承接,故不再各留一张按工序切的检验单。
-        code: 'process', title: '制程品质', children: [
+        code: 'qcProcess', title: '制程品质', children: [
           // 首件检验单(2026-10-15 新增,面板 QC_FIRST_INSP):按《生产相关品质检验.xlsx》Sheet1 第2步
           // 「车间生产(首批,每天一个生产批次)→ 首件检验」建,实现方式照成品检验单(QC_ASM_INSP)。
           // 本(工单号,批次号,工单行号)的**第一张报工**审核时自动出一张草稿,检验要求按
@@ -662,6 +666,11 @@ export const menuTree = [
           //   主动备份和自动备份的时间」):自动备份开关/时间/保留份数/备份目录 + 立即备份 + 备份记录。
           //   管理员专属(adminOnly),页面见 views/sys/DbBackup.vue。
           { code: 'sysBackup', title: '数据备份', path: '/sys/backup', icon: 'Download', adminOnly: true },
+          // 菜单设计(2026-10-23 用户口径「给系统管理模块加上一个菜单命名的功能,就是可以编辑各个面板的
+          //   位置与一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」):
+          //   改的是**本树的显示层**(名称/上级/排序/隐藏),覆盖行存 yj_menu_node,见 stores/menu.js
+          //   与 views/sys/MenuDesigner.vue。管理员专属(改一处 = 全公司导航一起变)。
+          { code: 'sysMenuDesign', title: '菜单设计', path: '/sys/menuDesign', icon: 'Operation', adminOnly: true },
         ],
       },
       {

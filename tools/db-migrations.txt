@@ -4157,3 +4157,8 @@ migrate-prod-ctrl-level-stdlib-20261021.sql
 # 2026-10-21 物料清单(WLBOM)保存报「将截断字符串或二进制数据」:单号 WL-yyyy-MM-#### 15 位写进
 #   mate.m_no nvarchar(14)。改为 30 位。两账套都执行(根因与取证见脚本头注释)。
 migrate-mate-mno-length-20261021.sql
+
+# 2026-10-23 用户口径「给系统管理模块加上一个菜单命名的功能,就是可以编辑各个面板的位置与
+#   一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」:导航覆盖表 yj_menu_node
+#   (只存名称/上级/排序/隐藏,基线仍在 frontend/src/business/menus.js)。两账套都执行。
+migrate-menu-node-20261023.sql

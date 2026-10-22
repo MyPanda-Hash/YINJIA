@@ -240,7 +240,8 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
-import { flatMenus, menuTree as rawMenuTree, filterMenuTree } from '@/business/menus'
+import { flatMenus, filterMenuTree } from '@/business/menus'
+import { useMenuStore } from '@/stores/menu'
 import { apiGetNotices, apiChangePassword } from '@/business/api'
 import { ElMessage } from 'element-plus'
 import NoticeCenter from './NoticeCenter.vue'
@@ -261,6 +262,9 @@ const localeLabel = (l) => l.locale === 'zh-CN'
   : `${l.nameNative || l.locale} (${l.locale})`
 const tabs = useTabsStore()
 const router = useRouter()
+// 单据查询的索引与左栏同一棵树(含数据库覆盖的名称/位置);LeftNav 已 load,这里是幂等复用
+const menuStore = useMenuStore()
+menuStore.load()
 
 // ---------- 内嵌搜索 ----------
 const keyword = ref('')
@@ -284,7 +288,7 @@ function onPickFactory(f) {
 const matched = computed(() => {
   const k = keyword.value.trim().toLowerCase()
   if (!k) return []
-  return flatMenus(filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin))
+  return flatMenus(filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin))
     .filter((m) => {
       if (!m.path) return false
       return [m.title, m.fullTitle, m.panelCode, m.path]

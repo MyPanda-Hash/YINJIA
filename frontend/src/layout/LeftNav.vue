@@ -131,7 +131,8 @@
 <script setup>
 import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { menuTree as rawMenuTree, filterMenuTree } from '@/business/menus'
+import { filterMenuTree } from '@/business/menus'
+import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
@@ -145,8 +146,11 @@ const user = useUserStore()
 const navRef = ref(null)
 const cardRef = ref(null)
 
-// 角色权限过滤后的菜单树（操作员仅见被授权面板）
-const menuTree = computed(() => filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin))
+// 菜单树 = 代码基线 + 数据库覆盖(名称/位置/顺序/隐藏,见 stores/menu.js),再按角色权限过滤
+const menuStore = useMenuStore()
+const menuTree = computed(() => filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin))
+// 覆盖层只拉一次;失败时 store 内部回落到代码基线(导航不会因此变空)
+menuStore.load()
 
 const expandedGroup = ref('')
 const cardModule = ref(null)
