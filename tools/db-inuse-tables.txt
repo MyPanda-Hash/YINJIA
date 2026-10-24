@@ -11,7 +11,7 @@
 #   dm_key=含明文接口密钥的历史资产(单独处置)。系统自带 dtproperties(is_ms_shipped=1)不在登记范围。
 # 格式:table:<表名>   # 中文说明
 
-# ---- 引擎元数据与运行时(yj_*,29 张;结构由代码与迁移脚本固定,不加自定义字段备用列) ----
+# ---- 引擎元数据与运行时(yj_*,30 张;结构由代码与迁移脚本固定,不加自定义字段备用列) ----
 table:yj_app_setting   # 系统参数表(键值对:收料超送比例等运行期可调口径,见 remark;2026-10-19 增 db_backup.auto_enabled/auto_time/keep_files/dir 四个数据库备份参数)
 table:yj_archive_change_log   # 档案式面板修改记录(每次存档留一条:操作人/时间/行变化摘要/字段级变化;只增不改)
 table:yj_attachment   # 单据附件表(panel_code+doc_no+field_key定位,文件名/存储名/大小/类型)
@@ -30,6 +30,7 @@ table:yj_form_approval   # 审批流记录(提交/通过/驳回留痕)
 table:yj_locale   # 语言表(启用语言清单,插行即出现语言切换器)
 table:yj_lot_seq   # 批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)
 table:yj_message   # 站内消息表(收件人/消息码/关联面板与单据/已读)
+table:yj_menu_node   # 菜单覆盖表(系统管理平台·菜单设计):只存名称/上级/同级排序/隐藏 + 界面新建的分组;导航基线与数据键(path/面板Code/图标)仍在 frontend/src/business/menus.js,合并口径见 frontend/src/business/menuOverrides.js
 table:yj_panel   # 面板注册表(元数据核心:面板编码/模式doc|flat|archive/头行表/前缀/日期列/模块分组)
 table:yj_plan_term   # 计划条款表(阶段中止/恢复申请:stage/reason/state)
 table:yj_report_template   # 报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)

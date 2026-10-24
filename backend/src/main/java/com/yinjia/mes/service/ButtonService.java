@@ -5059,8 +5059,14 @@ public class ButtonService {
     /**
      * 定级分发(2026-10-19):把原「项目定级」与「分发对接人」合成一个动作。
      * 载荷:项目等级(一/二/三/四级) + 对接人(账号)。
-     * 门禁:仅审批人(∪ 管理员);仅已审核/已归档;等级与对接人**都必须尚未设置**(各只能定一次,
-     * 要改只能弃审回草稿重走流程 —— 与 2026-10-09 的「定了不能改」口径一致)。
+     * 门禁:仅审批人(∪ 管理员);仅已审核/已归档;对接人**只能分发一次**(要改只能弃审回草稿重走流程)。
+     *
+     * <p><b>2026-10-21 修「审批完就没法分发对接人」</b>:2026-10-08 口径「冯总审核及定级」让
+     * {@link #approveApproval} 在同一步里把等级写进 rd_approval.项目等级;而 2026-10-19 把
+     * 「分发对接人」按钮并进本动作时,门禁写成了「等级必须为空」,两个口径叠起来就成了死结 ——
+     * 审批通过(等级已写) ⇒ 本动作永远被拒,界面上「定级分发」永久置灰,
+     * 而唯一能写 备用1 的旧按钮「分发对接人」已下架 ⇒ **对接人再也发不出去**。
+     * 现在:等级已存在时**沿用**(不接受改级,要改仍只能弃审),本动作只补发对接人。
      */
     private Map<String, Object> gradeAndDispatch(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可定级分发");
@@ -5072,22 +5078,32 @@ public class ButtonService {
         if (!"已审核".equals(status) && !"已归档".equals(status))
             throw new IllegalStateException("仅已审核或已归档的立项申请可定级分发(当前:" + status + ")");
         Map<String, Object> head = approvalHeadOf(no);
-        if (!blankSafe(head.get("项目等级")).isEmpty())
-            throw new IllegalStateException("本单已定级(" + blankSafe(head.get("项目等级")) + "),不能重复定级;要改请先弃审");
+        // 等级已由「审批通过并定级」写入 ⇒ 沿用,不再重复定级(改级仍只能弃审,口径不变)
+        String existingLevel = blankSafe(head.get("项目等级"));
         if (!blankSafe(head.get("备用1")).isEmpty())
             throw new IllegalStateException("对接人已分发给 " + realNameOf(blankSafe(head.get("备用1"))) + ",不能重复分发;要换人请先弃审");
         String level = pickOf(formData, "项目等级");
+        // 已定级的单:等级沿用库内值;请求若带了**不同**等级直接拒(改级必须弃审,口径不变)
+        if (!existingLevel.isEmpty()) {
+            if (!level.isEmpty() && !level.equals(existingLevel))
+                throw new IllegalStateException("本单已定级(" + existingLevel + "),不能改级;要改请先弃审回草稿");
+            level = existingLevel;
+        }
         if (level.isEmpty()) throw new IllegalStateException("请选择项目等级");
+        // lambda 里要用 ⇒ 取一个 final 别名(level 上面被重新赋值过,不能直接捕获)
+        final String finalLevel = level;
         String liaison = pickOf(formData, "对接人");
         if (liaison.isEmpty()) throw new IllegalStateException("请选择对接人账号");
         if (!isEnabledUser(liaison)) throw new IllegalStateException("对接人账号不存在或已停用：" + liaison);
-        applyGrade(def.code(), no, level, user);
+        if (existingLevel.isEmpty()) applyGrade(def.code(), no, level, user);
         jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", liaison, no);
         String name = realNameOf(liaison);
-        recordApproval(def.code(), no, "GRADE_DISPATCH", "DONE", "定级分发：" + level + " / 对接人 " + name + "（" + liaison + "）");
+        recordApproval(def.code(), no, "GRADE_DISPATCH", "DONE",
+                (existingLevel.isEmpty() ? "定级分发：" : "分发对接人(等级沿用 " + existingLevel + ")：")
+                        + level + " / 对接人 " + name + "（" + liaison + "）");
         if (!liaison.equals(user)) {
             notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
-                    Map.of("level", level, "actor", user), user));
+                    Map.of("level", finalLevel, "actor", user), user));
         }
         Map<String, Object> r = result(no, status);
         r.put("项目等级", level);
@@ -5226,7 +5242,10 @@ public class ButtonService {
             out.put("canConfirmReceipt", settled && !owner.isEmpty() && ownerAck.isEmpty()
                     && ((user.equals(owner) && isEnabledUser(owner)) || isAdminUser(user)));
             // 2026-10-19:定级与分发对接人合并成一个动作(侧栏只露「定级分发」)
-            out.put("canGradeDispatch", settled && level.isEmpty() && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
+            // 2026-10-21 修:原判据带 level.isEmpty() —— 而「审批通过并定级」已经把等级写进库,
+            //   合并后就没有任何入口能写 备用1(对接人),单据永久卡在"已定级、未分发"。改判据为
+            //   "只要对接人还没分发、且当前人是审批人" 即放行;等级已存在时由 gradeAndDispatch 沿用。
+            out.put("canGradeDispatch", settled && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
         } catch (Exception e) {
             log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
         }

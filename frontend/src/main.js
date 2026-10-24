@@ -41,6 +41,25 @@ const app = createApp(App)
   })
 })()
 
+
+// 手机端桌面预览(2026-10-21 用户口径「拿手机看很麻烦」):
+// DevTools 设备模拟能看布局/断点,但**不实现 env(safe-area-inset-*)**,挖孔屏安全区恒为 0
+// ⇒ 电脑上永远看不出「被摄像头顶住」这类问题。开发服(Vite)支持 URL 参数直接模拟:
+//   http://localhost:5173/?safeTop=44&safeBottom=34
+// 只改 CSS 变量(见 PortalLayout / LeftNav 的 var(--yj-safe-top, env(...))),不写死任何尺寸;
+// import.meta.env.DEV 为 false 时整段被摇树删掉,生产包里不存在。
+;(function () {
+  if (!import.meta.env.DEV) return
+  const q = new URLSearchParams(location.search)
+  const set = (name, raw) => {
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n <= 0) return
+    document.documentElement.style.setProperty(name, `${Math.min(n, 200)}px`)
+  }
+  set('--yj-safe-top', q.get('safeTop'))
+  set('--yj-safe-bottom', q.get('safeBottom'))
+})()
+
 installPanelRuntime(sqlPanelRuntime)
 
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

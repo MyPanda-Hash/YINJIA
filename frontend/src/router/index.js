@@ -30,6 +30,9 @@ const routes = [
       //   主动备份和自动备份的时间」):主动备份 / 自动备份时间 / 保留份数 / 备份记录。管理员专属
       //   (菜单 adminOnly + 路由 requireAdmin + 后端 requireAdmin 三层同源);不进 flatMenus 自动路由。
       { path: 'sys/backup', component: () => import('@/views/sys/DbBackup.vue'), meta: { title: '数据备份', requireAdmin: true } },
+      // 菜单设计(2026-10-23):编辑导航的名称/上级分组/顺序/隐藏 —— 覆盖行存 yj_menu_node,
+      //   保存即生效、不用重新打包部署。管理员专属(菜单 adminOnly + 路由 requireAdmin + 后端 requireAdmin)。
+      { path: 'sys/menuDesign', component: () => import('@/views/sys/MenuDesigner.vue'), meta: { title: '菜单设计', requireAdmin: true } },
       { path: 'scm/businessOverview', component: () => import('@/views/scm/BusinessOverview.vue'), meta: { title: '业务总览', code: 'businessOverview' } },
       // 数采平台(2026-10-18):IOT设备配置 / 数据监控 / 状态统计。三页是页面级叶子(非 yj_panel 面板),
       //   故不进 flatMenus 自动路由(下方 filter 已排除 dcConfig/dcMonitor/dcStats),在此显式注册。

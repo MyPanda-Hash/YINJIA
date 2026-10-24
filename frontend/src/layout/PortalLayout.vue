@@ -82,7 +82,9 @@ watch(
      导致「顶部被卡住、按钮点不动」。inset-top 在挖孔屏上约 24~48px,桌面恒为 0。
      用 padding 而不是 margin:整块布局仍在视口内,不会多出滚动条。
      前提是 index.html 的 viewport 带 viewport-fit=cover,否则 env() 恒为 0。 */
-  padding-top: env(safe-area-inset-top, 0px);
+  /* --yj-safe-top = 开发期桌面预览的覆盖层(DevTools 设备模拟不实现 env(),安全区恒为 0),
+     开法见 main.js 顶部的 ?safeTop=44;生产环境没人设这个变量 ⇒ 仍然只用 env()。 */
+  padding-top: var(--yj-safe-top, env(safe-area-inset-top, 0px));
   box-sizing: border-box;
 }
 .portal-body {
