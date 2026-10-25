@@ -403,6 +403,7 @@
                 :maxlength="row.max || 2000"
                 class="as-fill-input as-fill-area"
                 resize="none"
+                :autosize="{ minRows: autoRowsOf(row), maxRows: 40 }"
                 :placeholder="row.hint ? tt(row.hint) : ''"
                 @input="emit('dirty')"
               />
@@ -864,6 +865,23 @@ const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f
 function signLocked(c) {
   return !!(fieldMap.value.get(c.key) || {}).readonly
 }
+
+/**
+ * 文本域最小行数 = 设计行高换算(2026-10-25 用户口径「固定宽度然后可以自动换行」)。
+ *
+ * 【为什么不能只靠 CSS】纸张行高按设计磅值固定(`min-height`),文本域此前被
+ *   `height:100%!important` 锁死在这一行里 —— 文本一换行,超出部分只能框内滚动/被裁,
+ *   纸面(打印)上根本看不到(实测「滤芯/炭棒规格」行:360 字需 143px,行高只给 101px)。
+ *   而 flex 链路里单写 `height:auto` 会被父容器压回(同一次实测只剩 48px),同样不可靠。
+ * ⇒ 改走 Element Plus 原生的 autosize:按内容算真实高度,行高随之撑开。
+ *   行高 13.5px 行距(与 .as-fill-area line-height 1.7 × 14px ≈ 23.8px)按 24px 估;
+ *   至少 1 行,保证空值时不塌。
+ */
+function autoRowsOf(row) {
+  const h = Number(row && row.h) || 0
+  const rows = Math.floor((h - 8) / 24)
+  return rows > 0 ? rows : 1
+}
 /**
  * 签名格同口径只读(2026-10-04):签名格绑的是 signKey(可能不是 c.key 本身 —— 如特采理由行的
  * 「申请人」绑 编制人、底部落款「批准」绑 审批人),此前这些格子**不认**字段只读,于是
@@ -987,6 +1005,45 @@ defineExpose({ focusField })
 .approval-sheet :deep(.el-textarea__inner) {
   font-size: 14px;
   padding: 0;
+}
+/* ═══ 自动换行(2026-10-25 用户口径「这个表不会自动换行,确定宽度,固定宽度然后可以自动换行」) ═══
+   纸宽已由 FIXED_SHEET_W 定死(RD_APPROVAL/RD_PLAN = 1242px),但单元格里的**长内容仍不换行**:
+   · 文本域默认 white-space: pre-wrap 只对真实换行生效,遇到连续长串(客户名/型号/一串数字)不折断;
+   · 只读态由 AnnotatedText 的 span 渲染,是 inline 元素,同样按最长不可断词顶宽。
+   三层一起给:范围内所有文本容器允许换行 + 任意长串可在字符间断行 + 溢出兜底。
+   ⚠ 不加 white-space:nowrap / text-overflow:ellipsis —— 纸面是打印件,截断会丢内容。 */
+.approval-sheet,
+.approval-sheet :deep(.el-textarea__inner),
+.approval-sheet :deep(.el-input__inner),
+.approval-sheet .as-ro-text,
+.approval-sheet .q-ro,
+.approval-sheet .ann-host,
+.approval-sheet .ann-seg {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+/* 单行 input 控件保持单行(它们是短字段:单据号/日期);长文本字段一律走 textarea */
+.approval-sheet :deep(.el-input__inner) {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 值区/填写区必须能收缩,否则 flex 子项按内容撑宽、把整行顶出纸外 */
+.approval-sheet .as-fill,
+.approval-sheet .as-fill-main,
+.approval-sheet .q-value,
+.approval-sheet .q-section-body,
+.approval-sheet .as-ro-text {
+  min-width: 0;
+}
+/* 文本域自身随内容长高(行高已按设计磅值给 min-height;这里只保证内容不被裁切) */
+.approval-sheet .as-fill-area :deep(.el-textarea__inner),
+.approval-sheet .as-fill-main .as-fill-area :deep(.el-textarea__inner) {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
 }
 
 /* ═══ 终止审批横幅(打印隐藏;红系=已终止,蓝系=审批中) ═══ */
@@ -1319,21 +1376,30 @@ defineExpose({ focusField })
   flex: 1;
   min-width: 0;
 }
-/* 填写区主控件:文本域撑满行高(行高按设计磅值给,文本域随之变高) */
+/* 填写区主控件:文本域按内容长高,行高随内容撑开(设计行高只作 min-height 下限)。
+   ⚠ 这里以前是「文本域撑满行高」的反向约束;文本换行后内容会超出固定行高而不可见,
+   2026-10-25 改为内容驱动高度。 */
 .as-fill-main {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 .as-fill-main .as-fill-area {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .as-fill-main .as-fill-area :deep(.el-textarea__inner) {
-  height: 100% !important;
+  /* 2026-10-25:高度交给 Element Plus 的 autosize(见模板 :autosize 与 autoRowsOf),
+     这里只管换行与不再强制锁定高度 —— 用 height:auto 且**不加 !important**,
+     让 autosize 写的内联高度生效;min-height 保证空值时不塌。 */
+  height: auto;
+  min-height: 100%;
+  overflow-y: hidden;
+  resize: none;
 }
 /* 多子区行:如 测试方案(条件/方法/标准) */
 .as-fill-multi {
@@ -1702,7 +1768,10 @@ defineExpose({ focusField })
    (q-sub-h / q-col);高度不确定的容器里 100% 会退化,故不做全局注入,免得影响其它面板 */
 .q-dept-sub.q-sub-h .as-fill-area :deep(.el-textarea__inner),
 .q-value.q-col .as-fill-area :deep(.el-textarea__inner) {
-  height: 100%;
+  /* 2026-10-25:同样改为内容自适应 —— 锁 100% 会把换行后的长文本裁在框内。 */
+  height: auto;
+  min-height: 100%;
+  overflow-y: hidden;
 }
 
 .q-signrow {
