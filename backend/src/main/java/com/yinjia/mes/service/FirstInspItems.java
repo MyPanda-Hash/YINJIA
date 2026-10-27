@@ -25,7 +25,17 @@ public final class FirstInspItems {
 
     public static Result load(JdbcTemplate jdbc, String productCode) {
         String code = productCode == null ? "" : productCode.trim();
-        List<Map<String, Object>> found = code.isEmpty() ? List.of() : jdbc.queryForList(
+        // ⚠ 2026-10-27:成型工艺清单的 产品编号 现在带 -tb 后缀(用户口径「选产品编号后自动加 -tb」),
+        //   而**调用方传进来的是原始产品编号**(工单/产品信息表侧),两边不相等就一条也查不到。
+        //   这里同时认两种形态:原值 和 原值+'-tb';入参本身已带后缀时另加原值候选。
+        //   历史单据(无后缀)与新建单据(有后缀)都能命中,老单不报错。
+        String base = code.replaceAll("(?i)-tb$", "").trim();
+        List<String> codes = new ArrayList<>();
+        if (!base.isEmpty()) {
+            codes.add(base);
+            codes.add(base + "-tb");
+        }
+        List<Map<String, Object>> found = codes.isEmpty() ? List.of() : jdbc.queryForList(
                 "SELECT TOP 1 [单据编号] AS docNo," +
                         " ISNULL([外观要求],N'') AS appearance," +
                         " ISNULL([长度要求],N'') AS lengthReq, ISNULL([重量要求],N'') AS weightReq," +
@@ -39,8 +49,9 @@ public final class FirstInspItems {
                         " ISNULL([强度要求kgf],N'') AS kgf," +
                         " ISNULL([压降标准kpa],N'') AS pressure," +
                         " ISNULL([压降是否测试],N'') AS pressureTest" +
-                        " FROM dbo.rd_mold_proc_head WHERE [产品编号]=?" +
-                        " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", code);
+                        " FROM dbo.rd_mold_proc_head WHERE [产品编号] IN (" +
+                        String.join(",", java.util.Collections.nCopies(codes.size(), "?")) + ")" +
+                        " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", codes.toArray());
         Map<String, Object> h = found.isEmpty() ? Map.of() : found.get(0);
         String docNo = blankToNull(str(h.get("docNo")));
         List<Column> columns = columns(h);

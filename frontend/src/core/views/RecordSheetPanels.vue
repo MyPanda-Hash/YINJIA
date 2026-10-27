@@ -1442,6 +1442,8 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
+import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
+import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
@@ -2048,7 +2050,9 @@ function checkList(v) {
 async function openLinkedFile(c, label) {
   const panel = c && c.link ? c.link[label] : ''
   if (!panel) return
-  const prodNo = String(props.head['产品编号'] || '').trim()
+  // ⚠ 2026-10-27:成型工艺清单的 产品编号 带 -tb 后缀(见 core/panel/productCodeSuffix.js),
+  //   而**下游单据存的是原始编号** ⇒ 反查前必须剥掉后缀,否则永远匹配不到(表现为"该产品还没有该文件")。
+  const prodNo = rawProductCode(props.head['产品编号'])
   if (!prodNo) {
     ElMessage.warning(tt('本单还没有产品编号，无法定位对应的文件'))
     return
@@ -2757,7 +2761,8 @@ const devKey = computed(() => {
 watch(
   () => [props.panelCode, devKey.value ? props.head[devKey.value] : ''],
   async () => {
-    const code = devKey.value ? props.head[devKey.value] : ''
+    // ⚠ 2026-10-27:成型工艺清单的产品编号带 -tb,而 rd_dev_task 存的是原始编号 ⇒ 剥后缀再查
+    const code = devKey.value ? rawProductCode(props.head[devKey.value]) : ''
     if (!code || !DEV_PANEL_CODES.includes(props.panelCode)) {
       devStatus.value = ''
       return
@@ -2782,7 +2787,24 @@ function onProdRefConfirm(rows) {
   const source = rows?.[0]
   if (!f || !source) return
   const refField = f.refField || f.dataName
-  props.head[prodRefKey.value] = source[refField] ?? ''
+  // 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #2):
+  //   「【成型工艺清单页】点击选择产品编号之后,在产品编号后面自动添加 -tb 编号后缀」——
+  //   只对**成型工艺清单的「产品编号」这一格**生效;其它面板、其它参照格保持原样。
+  //
+  // ⚠ 为什么写进值本身而不是只在纸面显示后缀:用户明确说「加在产品编号本身」。
+  //   后果与配套(都已落实,缺一条就会查不到数据):
+  //     ① 本面板的「产品编号」从此是 00011-tb 形态,**下游一律按原始编号查询** ——
+  //        前端三处反查先过 rawProductCode();后端两处 SQL 同时认两种形态
+  //        (FirstInspItems / WorkOrderRecipeService,见两处注释);
+  //     ② 重复点参照时不能叠成 00011-tb-tb ⇒ productCodeWithSuffix 内部先剥一层再拼。
+  //   历史单据(无后缀)不报错:所有读取方都接受两种形态。
+  //
+  // ⚠ 必须显式判 `prodRefKey === '产品编号'`:本面板还有别的**参照**格(生产车间→DEPT 等),
+  //   2026-10-27 起 产品管控类型/外观要求(产品形态)也改成参照 RD_PROD_INFO ——
+  //   不判就会把 `-tb` 拼到「重点产品」「包布」这种值后面,直接写坏数据。
+  props.head[prodRefKey.value] = prodRefKey.value === '产品编号'
+    ? productCodeWithSuffix(source[refField], props.panelCode)
+    : (source[refField] ?? '')
   for (const m of f.refMap || []) {
     if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
   }
@@ -2840,7 +2862,9 @@ function autoFillTargetDt(afs) {
  */
 async function autoFillFromSpec(code, afs) {
   const key = afs?.fromKey
-  const val = String(code ?? '').trim()
+  // ⚠ 2026-10-27:成型工艺清单的产品编号带 -tb 后缀,而规格书是按**原始产品编号**分发的
+  //   ⇒ 取规格书前必须剥后缀,否则一律返回 found=false(用户看到"该产品编号还没有对应的规格书")。
+  const val = rawProductCode(code)
   if (!key || !val || !props.editable) return
   // 明细落点:没配 detail 的链(部分面板只做表头格带入,见 autoFillSpec.headFromDetail)
   // **不认**明细表 —— 否则 autoFillTargetDt 会退回到第一张表,把它整表替换成按空映射生成的空行。
@@ -3164,6 +3188,56 @@ watch(() => [props.editable, props.head], ([v]) => {
   }
 })
 
+/**
+ * 「按表预铺空行」的记账(`单据编号::表区键::表区值` → 已铺过)。
+ * 只活在组件实例内:关掉单据再打开、或刷新页面会重来 —— 那时库里若已有行,
+ * `rowsOf(dt).length` 那道闸会先拦住,不会重复铺。见下方 blankRows watch 注释。
+ */
+const blankRowsSeeded = new Set()
+
+/**
+ * 按**单张数据表**预铺空行(dt.blankRows)。
+ *
+ * 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #8):
+ *   「炭棒配方管控清单页面:配方表默认填充 10 行表格。」
+ *   用户另确认「没有的留空就行」⇒ 铺的是**空行**,不编造物料/比例。
+ *
+ * 【为什么不能用上面的 seedRows】seedRows 是**面板级**的("整个面板明细为空就铺"),
+ *   而成型工艺清单(RD_MOLD_PROC)里有**两张**逻辑表共用一张行表:
+ *   修订记录 + 配方表(靠 filterKey='表区' 分块)。用 seedRows 会在修订记录页也铺 10 行,
+ *   而用户只要配方表那 10 行。
+ *
+ * 口径(每条都踩过坑才写成这样):
+ *   ① 只铺**本表区为空**时才铺 —— 已有配方行(含从旧单带出来的)一行动都不动;
+ *   ② 行只带分块键 + 序号,其余列留空(用户口径"没有的留空");
+ *   ③ 序号按 addRow 同一口径续编(1..10),与之后手动「+ 添加」衔接得上;
+ *   ④ 空行走普通明细保存路径,后端 upsert 会照常落库 —— 纸面与库一致,不是"只在界面上假装有 10 行"。
+ */
+watch(() => [props.editable, props.head, cfg.value], ([v]) => {
+  const tables = cfg.value?.dataTables || []
+  if (!v || !tables.length) return
+  if (!props.head || !props.head['单据编号']) return
+  for (const dt of tables) {
+    const want = Number(dt.blankRows) || 0
+    if (want <= 0) continue
+    // ① 本表区已有行 ⇒ 不铺(绝不能把用户已录的配方冲掉,也不能重复铺成 20 行)
+    if (rowsOf(dt).length) continue
+    // ①b 同一张单只铺一次:本 watch 的依赖含 cfg(配置刷新会重入),
+    //     而空行落进 touch() 后 rowsOf 仍可能读到 0 行(行还没被 items 认领的瞬间)⇒ 用单据号+表区记账。
+    //     不改这个键,用户手动删光 10 行后也不会被"贴心"地补回来(那不是用户要的)。
+    const memoKey = `${props.head['单据编号']}::${dt.filterKey || ''}::${dt.filterVal || ''}`
+    if (blankRowsSeeded.has(memoKey)) continue
+    blankRowsSeeded.add(memoKey)
+    const arr = touch()
+    for (let i = 1; i <= want; i++) {
+      const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
+      // ③ 序号续编(与 addRow 同口径:本表区已有行数 + 1)
+      if (dt.autoSeqBar || cfg.value?.autoSeq) row['序号'] = String(i)
+      arr.push(row)
+    }
+  }
+})
+
 // 章节默认值(规格书 7.运输要求/8.存储环境 通用文案):进入草稿编辑且字段为空时预填
 watch(() => [props.editable, props.head], ([v]) => {
   if (!v || !cfg.value?.sectionDefaults) return
@@ -3476,7 +3550,7 @@ async function openSectionLib(row) {
 }
 function applySectionLib(content) {
   if (!props.head) return
-  props.head[secLibKey.value] = content
+  props.head[secLibKey.value] = sectionLibText(content)
   emit('dirty')
   secLibVisible.value = false
 }
