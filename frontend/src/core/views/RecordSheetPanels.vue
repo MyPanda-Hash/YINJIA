@@ -3011,9 +3011,32 @@ const specDriftText = computed(() => {
 })
 
 // ── 字段编辑(数据记录表):列名可改,应对复杂测试环境 ──
-/** 动态列头标签:优先取后端 yj_field 的 alias/displayName,缺省回退配置硬编码 label */
+/**
+ * 动态列头标签:优先取后端 yj_field 的 alias/displayName,缺省回退配置硬编码 label。
+ *
+ * @param {string} key      字段键(dataName = yj_field.label = col_name)
+ * @param {string} fallback 配置里写死的纸面文案
+ *
+ * 🔴 2026-10-27 修复(#3「产品管控类型」改名不生效):
+ *   grid 的**标签格**传进来的是 `c.label`(纯纸面文案),而 `fieldMap` 是按 `dataName`
+ *   (= 物理列名)建的索引 ⇒ `fieldMap.get('产品管控类型')` 取不到那条字段,于是直接回退纸面文案,
+ *   yj_field.alias 白设。
+ *   "外观要求/产品形态" 之所以早就生效,是因为它作为**值格**走的是 `c.key`(= dataName),恰好对得上。
+ *   修法:按 dataName 取不到时,再用 label 反查一次(col_name 与 label 可能不同,如 alias 改过名的族)。
+ *   只在 label 命中**唯一**一条时才用,避免"两个字段共用文案"时张冠李戴。
+ */
+const fieldsByLabel = computed(() => {
+  const m = new Map()
+  for (const f of props.fields || []) {
+    const lb = String(f.label || '').trim()
+    if (!lb || lb === String(f.dataName || '')) continue
+    // 同一 label 出现两次(脏数据)就不认,免得把 A 的别名显示到 B 上
+    m.set(lb, m.has(lb) ? null : f)
+  }
+  return m
+})
 function effColLabel(key, fallback) {
-  const f = fieldMap.value.get(key)
+  const f = fieldMap.value.get(key) || fieldsByLabel.value.get(String(key || '').trim()) || null
   return f?.displayName || f?.alias || fallback || key
 }
 
