@@ -10,8 +10,17 @@
  *   { anns: Ref<{[fieldKey]: [{start,end,color,bold}]}>,   // 当前单据的标注
  *     mode: Ref<'pen'|'eraser'|null>,                       // 当前模式(决定是否可交互)
  *     active: Ref<boolean>,                                 // 是否已载单据(没单据不标注)
+ *     penReady: Ref<boolean>,                               // 纸面可直接划选标注吗(2026-10-27 新增)
  *     ask: (fieldKey, start, end, at) => void,              // 标注笔:选了范围 → 弹色盘
  *     erase: (fieldKey, start, end) => void }               // 橡皮擦:擦这一段
+ *
+ * penReady 与 mode 的分工(2026-10-27 #11「字体颜色标注调出易误操作,需要简化」):
+ *   旧实现把"能否划选"绑死在 mode==='pen' 上 ⇒ 必须先点「标注笔」进模式,而进模式会把
+ *   **整张草稿纸切成只读**,用户以为点坏了、还容易忘了退出(这正是"易误操作"）。
+ *   现在"能否划选"独立成 penReady:
+ *     · 纸面本来就只读(已审核/已归档)⇒ penReady=true,直接划字就出色盘(少一步);
+ *     · 纸面可编辑 ⇒ 仍要明确开「标注笔」,否则鼠标划选无法区分"选字改内容"与"要标注"。
+ *   未提供 penReady 的旧调用方自动退回 mode 判据(AnnotatedText 内部兜底),零影响。
  */
 import { inject, provide } from 'vue'
 

@@ -1,0 +1,56 @@
+{
+  "cfg": {
+    "total": 0,
+    "pick": []
+  },
+  "cells": [
+    {
+      "label": "产品管控等级",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">产品形态</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品形态",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">生产车间</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品管控等级",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">产品形态</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品形态",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">生产车间</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品管控等级",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">产品形态</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品形态",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">生产车间</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品管控等级",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">产品形态</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    },
+    {
+      "label": "产品形态",
+      "valueCellHtml": "<span data-v-acf3d27e=\"\">生产车间</span>",
+      "hasRefCtl": false,
+      "hasSelect": false
+    }
+  ]
+}

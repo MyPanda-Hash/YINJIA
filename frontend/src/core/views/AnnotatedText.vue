@@ -31,7 +31,16 @@ const props = defineProps({
 
 const ctx = useAnnotations()
 const mode = computed(() => (ctx && ctx.mode ? ctx.mode.value : null))
-const pen = computed(() => mode.value === 'pen' && canEdit())
+// 2026-10-27(#11):「能不能直接划选标注」由上层给(penReady = 纸面只读 或 已开标注笔),
+// 而不是只看 mode==='pen' —— 只读纸上划字就该直接出色盘,不必先点「标注笔」。
+// 若上层没提供 penReady(旧调用方/独立嵌入),退回原判据,行为与改前逐字一致。
+const canPen = computed(() => {
+  const ready = ctx && ctx.penReady ? ctx.penReady.value : null
+  if (ready === true) return true
+  if (ready === false) return false
+  return mode.value === 'pen'
+})
+const pen = computed(() => canPen.value && canEdit())
 const eraser = computed(() => mode.value === 'eraser' && canEdit())
 
 const segs = computed(() => segments(String(props.text ?? ''), annsOf(ctx, props.fieldKey)))

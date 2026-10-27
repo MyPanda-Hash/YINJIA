@@ -1691,6 +1691,9 @@ export default {
     '橡皮擦': 'Eraser',
     '在纸面上划选要标注的文字，再选颜色': 'Select the text on the sheet, then pick a color',
     '点击已标注的文字即可擦除': 'Click the marked text to erase it',
+    // 2026-10-27(#11 标注简化):旧提示拆成两条新的,「划选即标注」不再要求先点标注笔
+    '直接在纸面上划选文字即可标注，划完选颜色': 'Just select text on the sheet to mark it, then pick a color',
+    '点击已标注的文字即可擦除；再点一次「橡皮擦」退出': 'Click the marked text to erase it; click "Eraser" again to exit',
     '该表的承载表未预置备用列池（缺少 备用1..20 列），无法新增自定义字段': 'This table has no spare-column pool (missing 备用1..20 columns); custom fields cannot be added',
     '需要新增字段时：请让管理员先为这张表补 备用1..20 列（见 tools/migrate-share-file-spare-cols-20261016.sql 的做法），补完即可在界面上加字段。': 'To add fields, ask an administrator to add the 备用1..20 columns to this table first (see tools/migrate-share-file-spare-cols-20261016.sql); afterwards fields can be added here.',
     '加粗': 'Bold',

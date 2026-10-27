@@ -1,0 +1,30 @@
+[
+  {
+    "label": "炭棒编号",
+    "nextHtml": "<span data-v-acf3d27e=\"\">产品名称</span>",
+    "refText": "",
+    "isRef": false,
+    "isSelect": false
+  },
+  {
+    "label": "产品形态",
+    "nextHtml": "<span data-v-acf3d27e=\"\">生产车间</span>",
+    "refText": "",
+    "isRef": false,
+    "isSelect": false
+  },
+  {
+    "label": "炭棒编号",
+    "nextHtml": "<span data-v-acf3d27e=\"\">产品名称</span>",
+    "refText": "",
+    "isRef": false,
+    "isSelect": false
+  },
+  {
+    "label": "产品形态",
+    "nextHtml": "<span data-v-acf3d27e=\"\">生产车间</span>",
+    "refText": "",
+    "isRef": false,
+    "isSelect": false
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "tabs": [
+    "成型工艺清单",
+    "成型配方",
+    "修订记录"
+  ],
+  "after": {
+    "ok": false,
+    "note": "没找到配方表",
+    "tableCount": 14
+  },
+  "heads": {
+    "hasCtrlLevel": true,
+    "hasCtrlType": false,
+    "hasForm": true,
+    "hasOldForm": false
+  }
+}
