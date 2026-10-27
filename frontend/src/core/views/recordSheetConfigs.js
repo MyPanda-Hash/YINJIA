@@ -195,7 +195,8 @@ const RD_ASM_PROC_INFO_SEC = (page) => ({
  *    各写一份而不是共用同一个常量:两侧各有各的面板与行表,改一侧不该悄悄改另一侧
  *    (2026-09-20 组装侧重排就是"共用配置"把列序带坏的)。 */
 const RD_MOLD_PROC_DT_REVISION = {
-  page: 0,
+  // 2026-10-27 页序调整后,修订记录从第 0 页挪到第 2 页(见 RD_MOLD_PROC.pages 注释)
+  page: 2,
   pageTitle: '修订记录',
   filterKey: '表区', filterVal: '修订记录',
   // 本页无「产品基本信息」区(没有 工艺形态 格可改),也不靠变体切标题 ⇒ 不渲染表头变体切换行
@@ -224,7 +225,7 @@ const RD_MOLD_PROC_DT_REVISION = {
  *   - 工序五个字段(配料要求/烧结炉参数/烧结时间调速器参数/热压要求/冷却参数设置)挂标准库:
  *     文本框版式的给「⌄标准库」选择(选完还能改),下拉版式的选项即库条目 + 「⧉标准库维护」。 */
 const RD_MOLD_PROC_SEC0 = [
-      { page: 1, bar: '产品基本信息', rows: [
+      { page: 0, bar: '产品基本信息', rows: [
         { grid: [
           { label: '炭棒编号', span: 2 },
           { label: '产品名称', span: 2 },
@@ -244,7 +245,7 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '生产车间', type: 'select' },
         ]},
       ]},
-      { page: 1, bar: '工序', rows: [
+      { page: 0, bar: '工序', rows: [
         { grid: [
           { label: '工序', cap: true },
           { label: '工序管控要求', cap: true, span: 10 },
@@ -322,7 +323,7 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '最高重量g', span: 2 },
         ]},
       ]},
-      { page: 1, bar: '检验要求', rows: [
+      { page: 0, bar: '检验要求', rows: [
         // 炭棒尺寸:标签行 4 格 + 值行 4 格,标签与值同列对齐(新版面无「内孔要求」)
         // ⚠ 四个块名格(炭棒尺寸/跌落强度/抗压强度/压降)在 yj_field 里是**显示标签**
         //   (editable=0 / hidden=1,见 tools/migrate-mold-proc-labels.sql 头注「只做显示(不存数据)」)。
@@ -397,16 +398,16 @@ const RD_MOLD_PROC_SEC0 = [
 const RD_MOLD_FORMULA = {
     staticTitle: '炭棒配方管控清单',
     info: [
-      { page: 2, label: '表单管理人', key: '表单管理人', type: 'text' },
-      { page: 2, label: '密级', key: '密级', type: 'select' },
-      { page: 2, label: '使用范围', key: '使用范围', type: 'select' },
-      { page: 2, label: '版本号', key: '版本号', type: 'text' },
+      { page: 1, label: '表单管理人', key: '表单管理人', type: 'text' },
+      { page: 1, label: '密级', key: '密级', type: 'select' },
+      { page: 1, label: '使用范围', key: '使用范围', type: 'select' },
+      { page: 1, label: '版本号', key: '版本号', type: 'text' },
     ],
     grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57],
     // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
     head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
-      { page: 2, bar: '产品基本信息', rows: [
+      { page: 1, bar: '产品基本信息', rows: [
         { grid: [
           { label: '产品编号', span: 2 },
           { label: '产品名称', span: 2 },
@@ -432,7 +433,10 @@ const RD_MOLD_FORMULA = {
       // 「配方表的数据是在配方计算器里面填写数据然后填入单据的,而不是带入的规格书的」),
       // 算完点「填入单据」写回页 1 十一格 + 本表区**整表替换**为弹窗那份行;
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
-      { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
+      // blankRows:10 —— 2026-10-27 用户口径(#8)「炭棒配方管控清单页面:配方表默认填充 10 行表格」,
+      //   用户另确认「没有的留空就行」⇒ 只铺空的 10 行(只带 表区 + 序号),不编造物料/比例。
+      //   ⚠ 按**表**铺(不是面板级 seedRows):同面板的修订记录表共用一张行表,seedRows 会连它一起铺。
+      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
           // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
@@ -450,7 +454,7 @@ const RD_MOLD_FORMULA = {
         ]},
     ],
     tailSections: [
-      { page: 2, bar: '配料要求', rows: [
+      { page: 1, bar: '配料要求', rows: [
         { label: '配料要求', key: '配料要求', type: 'area' },
       ]},
     ],
@@ -1051,11 +1055,17 @@ export const recordSheetConfigs = {
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
     // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
     // 只有一行居中大标题 + 一行表头(靠 dt.pageTitle 出标题,靠 showHead:false 关掉报告头)。
+    // ⚠ 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #1):
+    //   「默认以为工艺清单第一页,配方第二页,修订记录第三页」——
+    //   页序由 修订记录/工艺清单/配方 **改为 工艺清单/配方/修订记录**。
+    //   页序一变,下面 sections/dataTables/tailSections 上所有 `page:` 数字必须同步重编
+    //   (修订记录 0→2,工艺清单 1→0,配方 2→1);漏改一处的表现是"区块跑到别的页签"或整页空白。
     pages: [
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
       { title: '成型工艺清单', grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125], showHead: true },
-      // 页 3 原始 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
+      // 原页 3 的 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
       { title: '成型配方', grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
+      // 修订记录页不出报告头(设计只有一行居中大标题 + 一行表头,由 dt.pageTitle 出标题)
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
     ],
     sections: [...RD_MOLD_PROC_SEC0, ...RD_MOLD_FORMULA.sections],
     // 两张逻辑表共用行表 rd_mold_proc_detail ⇒ 每条都必须带 filterKey:'表区' + filterVal

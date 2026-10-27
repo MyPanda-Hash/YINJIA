@@ -67,3 +67,24 @@ test('表名 → 表区值(filterVal)对照固化:脚本写行必须用右边这
   })
 })
 
+/**
+ * 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #8):
+ *   「炭棒配方管控清单页面:配方表默认填充 10 行表格」,用户另确认「没有的留空就行」。
+ *
+ * 这条断言守三件**改错了也不会报错**的事:
+ *   ① blankRows 必须挂在**配方表**这张 dt 上(挂错表 = 铺到修订记录页去);
+ *   ② 只能**有它一张**表带 blankRows(同面板修订记录表与它共用行表,多挂一张就多铺一份);
+ *   ③ 值必须正好 10(用户口径的确定数字,不是"随便给几行")。
+ */
+test('#8 配方表默认铺 10 行空行,且只有配方表这一张表带 blankRows', () => {
+  const cfg = recordSheetConfigs.RD_MOLD_PROC
+  const dts = cfg.dataTables || []
+  const formula = dts.find((d) => d.filterVal === '配方表')
+  assert.ok(formula, 'RD_MOLD_PROC 缺配方表')
+  assert.equal(Number(formula.blankRows), 10, '配方表应 blankRows:10(用户口径的确定数字)')
+
+  const withBlank = dts.filter((d) => Number(d.blankRows) > 0)
+  assert.deepEqual(withBlank.map((d) => d.filterVal), ['配方表'],
+    '只有配方表可以带 blankRows —— 修订记录表与它共用一张行表,多挂一张会把空行铺到修订记录页')
+})
+
