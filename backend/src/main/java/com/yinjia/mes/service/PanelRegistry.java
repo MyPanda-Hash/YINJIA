@@ -250,20 +250,21 @@ public class PanelRegistry {
      *       故在面板配置里改它不会生效 —— 这一点写在代码里,避免以后有人以为那是 bug;</li>
      *   <li>表结构(head_table/line_table)本来就读 yj_panel 自己的,与源面板互相独立。</li>
      * </ul>
+     *
+     * <p>映射表本身放在 {@link com.yinjia.mes.panel.PanelAliases} —— 单据状态(yj_doc_status)
+     * 也按面板编码存,同样要折算到源面板,两处共用一份登记,避免只改一边又出现"状态不同步"。
      */
-    private static final Map<String, String> FIELD_FOLLOW = Map.of(
-            "SUPPLIER_PU_ORDER", "PU_ORDER");
-
-    /** 让 {@link #FIELD_FOLLOW} 里的面板改用源面板的字段(仅内存;源面板缺失时保持原样) */
     private static Map<String, PanelDef> applyFieldFollow(Map<String, PanelDef> defs) {
         boolean changed = false;
         Map<String, PanelDef> out = new HashMap<>(defs);
-        for (Map.Entry<String, String> e : FIELD_FOLLOW.entrySet()) {
-            PanelDef follower = out.get(e.getKey());
-            PanelDef source = defs.get(e.getValue());
+        // 副本面板清单与「状态记账面板」共用 PanelAliases 一份登记(见该类注释)
+        for (String mirror : com.yinjia.mes.panel.PanelAliases.mirrorPanels()) {
+            String srcCode = com.yinjia.mes.panel.PanelAliases.fieldSource(mirror);
+            PanelDef follower = out.get(mirror);
+            PanelDef source = defs.get(srcCode);
             if (follower == null || source == null || source.fields().isEmpty()) continue;
             // 已跟随过就不重复构造(每次 reload 只做一次,开销可忽略)
-            out.put(e.getKey(), new PanelDef(follower.code(), follower.name(), follower.nameEn(),
+            out.put(mirror, new PanelDef(follower.code(), follower.name(), follower.nameEn(),
                     follower.category(), follower.mode(), follower.lineTable(), follower.headTable(),
                     follower.groupCol(), follower.pkCol(), follower.codeCol(), follower.prefix(),
                     follower.dateCol(), follower.pageSize(), follower.detailKey(),

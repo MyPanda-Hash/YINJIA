@@ -104,16 +104,21 @@ async function main() {
     } finally { try { fs.unlinkSync(f) } catch (e) { /* ignore */ } }
   }
   const esc = (s) => String(s).replace(/'/g, "''")
-  runner(`SET NOCOUNT ON;\nUPDATE bd_pu_order SET 备注 = N'${esc(stamp)}' WHERE 单据编号 = N'${esc(docNo)}';\nGO\n`)
-  // 采购订单端读
-  const puAfter = await listOne('PU_ORDER', at)
-  // 供应商端读(同一张表,应立刻是新值)
-  const supAfter = await listOne('SUPPLIER_PU_ORDER', supTok)
-  check('采购订单读到新备注', puAfter?.['备注'] === stamp, String(puAfter?.['备注']))
-  check('供应商端**立刻**读到同一新值(同一张表,无需同步)', supAfter?.['备注'] === stamp, String(supAfter?.['备注']))
-  check('两边备注完全一致', puAfter?.['备注'] === supAfter?.['备注'], `${puAfter?.['备注']} / ${supAfter?.['备注']}`)
-  // 还原
-  runner(`SET NOCOUNT ON;\nUPDATE bd_pu_order SET 备注 = N'${esc(before)}' WHERE 单据编号 = N'${esc(docNo)}';\nGO\n`)
+  // ⚠ 还原必须放 try/finally:中途断言失败或进程被杀时,不能让 SYNC-TEST-… 留在正式库里
+  //   (2026-10-25 就留过一次,靠手工 UPDATE 才清掉)
+  try {
+    runner(`SET NOCOUNT ON;\nUPDATE bd_pu_order SET 备注 = N'${esc(stamp)}' WHERE 单据编号 = N'${esc(docNo)}';\nGO\n`)
+    // 采购订单端读
+    const puAfter = await listOne('PU_ORDER', at)
+    // 供应商端读(同一张表,应立刻是新值)
+    const supAfter = await listOne('SUPPLIER_PU_ORDER', supTok)
+    check('采购订单读到新备注', puAfter?.['备注'] === stamp, String(puAfter?.['备注']))
+    check('供应商端**立刻**读到同一新值(同一张表,无需同步)', supAfter?.['备注'] === stamp, String(supAfter?.['备注']))
+    check('两边备注完全一致', puAfter?.['备注'] === supAfter?.['备注'], `${puAfter?.['备注']} / ${supAfter?.['备注']}`)
+  } finally {
+    // 还原
+    runner(`SET NOCOUNT ON;\nUPDATE bd_pu_order SET 备注 = N'${esc(before)}' WHERE 单据编号 = N'${esc(docNo)}';\nGO\n`)
+  }
   const restored = await listOne('PU_ORDER', at)
   check('备注已还原', (restored?.['备注'] ?? '') === before, String(restored?.['备注']))
 

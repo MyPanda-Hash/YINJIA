@@ -529,10 +529,13 @@ public class QueryService {
         }
         String archFrom = qFrom == null ? "" : String.valueOf(qFrom).trim();
         String archTo = qTo == null ? "" : String.valueOf(qTo).trim();
+        // 单据状态记账面板(2026-10-25):副本面板(如供应商采购打印)的状态行记在源面板名下,
+        // 不折算就会查不到自己的作废/删除/归档痕迹 —— 已删除的单据还会照旧出现。详见 PanelAliases。
+        String statusPanel = com.yinjia.mes.panel.PanelAliases.statusSource(def.code());
         if (!archFrom.isEmpty() || !archTo.isEmpty()) {
             where.append(" AND EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
                     .append(g).append("] AND s.archived_at IS NOT NULL");
-            args.add(def.code());
+            args.add(statusPanel);
             if (!archFrom.isEmpty()) {
                 where.append(" AND s.archived_at >= ?");
                 args.add(archFrom);
@@ -547,7 +550,7 @@ public class QueryService {
         // CAST 统一为 nvarchar:date 类型的组列(如 bd_manu_order.合同号)与 doc_no 比较时不会隐式转换失败
         where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = CAST(t.[")
                 .append(g).append("] AS nvarchar(100)) AND s.canceled = 'Y')");
-        args.add(def.code());
+        args.add(statusPanel);
 
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(DISTINCT t.[" + g + "]) FROM " + docTable + " t " + where,
@@ -686,7 +689,10 @@ public class QueryService {
 
     private Map<String, Map<String, Object>> loadStatus(String panelCode, List<String> docNos) {
         String in = String.join(",", docNos.stream().map(n -> "?").toList());
-        List<Object> args = new ArrayList<>(List.of(panelCode));
+        // 副本面板(供应商采购打印)的状态行记在源面板(采购订单)名下,见 PanelAliases:
+        // 不折算 ⇒ 列表里每张单都查不到状态,「单据状态」恒为「草稿」、审核人/审核时间全空。
+        final String statusPanelCode = com.yinjia.mes.panel.PanelAliases.statusSource(panelCode);
+        List<Object> args = new ArrayList<>(List.of(statusPanelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
         jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status"
@@ -1296,7 +1302,8 @@ public class QueryService {
                             .append(" WHERE s.panel_code = ? AND s.doc_no = CAST(t.[").append(g)
                             .append("] AS nvarchar(100)) AND s.shr LIKE ?))");
                     args.add("%" + v + "%");
-                    args.add(def.code());
+                    // 副本面板按源面板的状态记账(同 loadStatus),否则按审核人永远搜不到
+                    args.add(com.yinjia.mes.panel.PanelAliases.statusSource(def.code()));
                     args.add("%" + v + "%");
                 } else if (onDoc) {
                     where.append(" AND t.").append(col).append(" LIKE ?");
