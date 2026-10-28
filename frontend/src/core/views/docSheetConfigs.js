@@ -236,15 +236,21 @@ export const qcSheetCfgs = {
     labelW: 105,
     deptSignBottom: true,
     rows: [
+      // ⚠ 六格等宽(2026-10-28 用户口径「这六个并列的占位应该一致」):
+      //   原图是 105+243 / 172+338 / 130+292 三组不等宽(标签各 105/172/130),
+      //   打印出来三格宽度是 189/264/228px,观感"占位大小不一";且标签窄的格子
+      //   留给值的空间更小,长供应商名只能溢出。
+      //   现改成**三组 labelW 统一 130、flex 统一 292**(与原图第三组一致),
+      //   两行按键位左右对齐 ⇒ 六个格子同标签宽、同总宽。
       { kind: 'pairs', h: 52, vcell: '申', cells: [
-        { label: '供应商', key: '供应商', labelW: 105, flex: 243 },
-        { label: '采购单号', key: '采购单号', labelW: 172, flex: 338 },
+        { label: '供应商', key: '供应商', labelW: 130, flex: 292 },
+        { label: '采购单号', key: '采购单号', labelW: 130, flex: 292 },
         { label: '产品名称', key: '产品名称', labelW: 130, flex: 292 },
       ] },
       // 与上一行同一组列宽(原图两行竖线本是重合的)→ 两组值区左右边界逐格对齐
       { kind: 'pairs', h: 63, vcell: '请', cells: [
-        { label: '总数量', key: '总数量', labelW: 105, flex: 243 },
-        { label: '不合格品数量', key: '不合格品数量', labelW: 172, flex: 338 },
+        { label: '总数量', key: '总数量', labelW: 130, flex: 292 },
+        { label: '不合格品数量', key: '不合格品数量', labelW: 130, flex: 292 },
         { label: '不合格品比例', key: '不合格品比例', labelW: 130, flex: 292 },
       ] },
       // 原图:不良说明 与 严重程度 是上下两行、各占整宽(不是并排)→ 各用单元素 pairs 行

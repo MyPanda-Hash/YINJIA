@@ -79,13 +79,32 @@ test('缩放后纸高不超过 A4 可打印高(否则被切成两页)', () => {
     `缩放后纸高 ${printedH.toFixed(0)}px 超过可打印高 ${PRINT_H.toFixed(0)}px ⇒ 会被分成两页`)
 })
 
-test('打印态值区文字不再被省略号截断', () => {
+test('打印态值区文字:换行显示,既不省略也不溢出', () => {
   const i = VUE.indexOf('@media print')
   const block = VUE.slice(i)
   const m = block.match(/\.approval-sheet \.as-ref-text\s*\{([\s\S]*?)\}/)
   assert.ok(m, '打印样式缺少 .as-ref-text 覆盖规则')
   assert.match(m[1], /text-overflow:\s*clip\s*!important/, '必须把 ellipsis 关掉,否则仍是「江苏...」')
-  assert.match(m[1], /overflow:\s*visible\s*!important/, '必须让文字溢出可见而不是被裁剪')
+  assert.match(m[1], /overflow:\s*visible\s*!important/)
+  // ⚠ nowrap 不能再出现:它一旦生效会把换行压掉,文字只能溢出到隔壁列(「供应商窜出去了」)
+  assert.match(m[1], /white-space:\s*normal\s*!important/,
+    '必须允许换行;若保持 nowrap,长供应商名会窜出格子')
+  assert.ok(!/white-space:\s*nowrap\s*!important/.test(m[1]), '打印态不得强制 nowrap')
+})
+
+test('六格等宽:供应商/采购单号/产品名称 与 总数量/不合格品数量/不合格品比例 列宽一致', () => {
+  const rows = qcSheetCfgs.QC_TC_IN.rows.filter((r) => Array.isArray(r.cells) && r.cells.length === 3)
+  assert.ok(rows.length >= 2, 'QC_TC_IN 应有两条三格并列行')
+  const key = (r) => r.cells.map((c) => `${c.labelW}/${c.flex}`).join('|')
+  const first = key(rows[0])
+  for (const r of rows) {
+    assert.equal(key(r), first, `「${r.cells.map((c) => c.label).join('/')}」列宽与首行不一致`)
+  }
+  // 同一行内三格也必须一致(用户 2026-10-28:「这六个并列的占位应该一致」)
+  for (const c of rows[0].cells) {
+    assert.equal(c.labelW, rows[0].cells[0].labelW, '同一行三格的标签宽必须相同')
+    assert.equal(c.flex, rows[0].cells[0].flex, '同一行三格的值区宽必须相同')
+  }
 })
 
 test('纸面整体成页:分页守卫存在', () => {

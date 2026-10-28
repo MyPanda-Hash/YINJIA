@@ -1498,8 +1498,29 @@ defineExpose({ focusField })
   align-items: stretch;
   padding: 3px 8px 4px;
 }
+/* 参照控件落在表格取值格内时:撑满整格,且**允许收缩**(2026-10-28)。
+ * 为什么必须这三条一起写:
+ *   · `.as-ref-ctl` 自身写死 `width:200px`(那是「文档编号」小格的尺寸),搬进表格格子后
+ *     只写 `width:100%` 是不够的 —— 它作为 flex item 的 flex-basis 仍是 auto(内容宽),
+ *     长供应商名会把控件撑到 484px,溢出到隔壁列,表现就是"供应商窜出去"。
+ *   · min-width:0 是 flex item 的收缩许可(flex item 默认 min-width:auto = 内容宽,不肯缩)。
+ *   · flex:1 1 0 让宽度完全由格子决定,不参与"按内容撑开"。 */
 .q-value .as-ref-ctl {
   width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;   /* 值区左对齐:与同格的文本类取值观感一致,也不会往左窜 */
+}
+/* 取值格里的参照文本:2026-10-28 —— **放不下就换行**,不省略、不溢出。
+ * 为什么不能只靠定宽:列宽是照原图定死的(见 docSheetConfigs),长供应商名
+ * (如「伊诺凯化学试剂有限公司」137px)在 94px 的值区里必然放不下。
+ * 之前 `overflow: visible + nowrap` 会往左窜出格子、压到隔壁列(用户报障"供应商窜出去了");
+ * 改回 ellipsis 又变成「江苏...」被截断。两条都不对 —— 打印件要的是**完整可读**,
+ * 所以这里放开换行:格子高度够(行高 52/63px,两行字放得下),文字完整显示且不越界。 */
+.q-value .as-ref-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 .q-ro {
   flex: 1;
@@ -1837,11 +1858,20 @@ defineExpose({ focusField })
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
-  /* 定宽后禁止再折行:值区文字必须完整显示,而不是被省略号吃掉 */
+  /* 打印态值区文字:**放不下就换行**,既不省略也不溢出(2026-10-28 修正)。
+   * 演变记录(两次都被用户打回,留档避免再来一遍):
+   *   ① 原本 `.as-ref-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`
+   *      ⇒ 长供应商名被截成「江苏...」(用户报障一);
+   *   ② 只把 ellipsis 关掉(overflow:visible + nowrap) ⇒ 文字放不下就**从格子左侧窜出去**
+   *      压到「供应商」标签和隔壁列上(用户报障二「供应商窜出去了」);
+   *   ③ 现在:white-space:normal + overflow-wrap:anywhere ⇒ 在格子内折行,高度由行高(min-height
+   *      52/63px)容纳两行字,文字完整、不越界。
+   * ⚠ 不能留着 nowrap —— 它一旦生效,上面的换行规则全被压掉(debug 实测 computedStyle 仍为 nowrap)。*/
   body.approval-printing .approval-sheet .as-ref-text {
     overflow: visible !important;
     text-overflow: clip !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
   }
   /* 强制打印背景色(蓝底标签/序号列),否则浏览器打印默认丢弃背景 */
   body.approval-printing .approval-sheet,
