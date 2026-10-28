@@ -3397,6 +3397,10 @@ export default {
     '提交终止申请失败': 'Failed to submit termination request',
     '操作成功': 'Operation succeeded',
     '审批意见（选填）': 'Approval comment (optional)',
+    // 2026-10-28「本人自审」权限(组织架构·角色与面板权限的一列 + 审批情况的标记)
+    '本人自审': 'Self-approval',
+    '自审': 'Self-approved',
+    '本单由你提交；本面板已授「本人自审」，通过后会记为自审': 'You submitted this document; this panel grants "Self-approval" — approving it will be recorded as a self-approval',
     '驳回须填写意见': 'A comment is required to reject',
     '意见必填': 'Comment is required',
     '落实于': 'Effective at',

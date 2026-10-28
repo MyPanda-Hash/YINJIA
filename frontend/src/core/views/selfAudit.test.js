@@ -1,0 +1,87 @@
+/**
+ * selfAudit.test.js —— 「本人自审」权限的钉子（2026-10-28 用户口径）
+ *
+ * 【用户原话】「当前需要实现本人可以提出审核后自己审核确认，增加一个这个权限设置，
+ *   保留原来的本人提交审核后不能本人自己审核的逻辑」
+ *
+ * 【口径】
+ *   · 新词 = 面板级动作词 `selfaudit`（组织架构 → 角色与面板权限里的「本人自审」列）；
+ *   · 只**解除**「编制与审批分离」对本人提交单的限制，**不等于审批权** —— requireApprover 仍要过；
+ *   · 默认没有该词 ⇒ 原逻辑一字不动（拒）；
+ *   · 放行时必须留痕 self_audit='Y'（审批情况显示「自审」），不能悄悄混进正常审批；
+ *   · 只管一级审批；二级审批人仍不能是提交人。
+ *
+ * 单测跑不了运行时，按仓库既有做法读源码钉住（同 approvalSeparation.test.js）。
+ */
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const button = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/ButtonService.java', import.meta.url), 'utf8')
+const sys = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/controller/SysAdminController.java', import.meta.url), 'utf8')
+const permSvc = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/PanelPermissionService.java', import.meta.url), 'utf8')
+const authCtl = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/controller/AuthController.java', import.meta.url), 'utf8')
+const store = readFileSync(new URL('../../stores/user.js', import.meta.url), 'utf8')
+const panelx = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
+const history = readFileSync(new URL('./ApprovalHistoryDialog.vue', import.meta.url), 'utf8')
+const en = readFileSync(new URL('../../i18n/locales/en.js', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../../../../tools/migrate-form-approval-self-audit-20261028.sql', import.meta.url), 'utf8')
+const manifest = readFileSync(new URL('../../../../tools/db-migrations.txt', import.meta.url), 'utf8')
+
+test('权限词 selfaudit 同时出现在「通用动作集 / 文书面板动作集 / 引擎词表」', () => {
+  for (const constName of ['PERMISSION_ACTIONS', 'FILE_PANEL_ACTIONS']) {
+    const at = sys.indexOf(`String[][] ${constName} = {`)
+    assert.ok(at > 0, `SysAdminController 里找不到 ${constName}`)
+    const block = sys.slice(at, sys.indexOf('};', at))
+    assert.match(block, /\{\s*"selfaudit"\s*,\s*"本人自审"\s*\}/,
+      `${constName} 缺 selfaudit ⇒ 矩阵里没法勾，权限授不出去`)
+  }
+  assert.match(permSvc, /Map\.entry\("selfaudit", "本人自审"\)/,
+    'PERM_LABEL 缺 selfaudit ⇒ 403 提示与矩阵列头对不上')
+})
+
+test('默认保留原逻辑：没有 selfaudit 词时，提交人自己审批仍然被拒', () => {
+  assert.match(button, /boolean selfAudit = !isAdminUser\(operator\) && operator\.equals\(submitter\) && canSelfAudit\(operator, def\.code\(\)\);/,
+    '自审判定必须先是「我是提交人」再问权限词')
+  assert.match(button, /if \(!isAdminUser\(operator\) && operator\.equals\(submitter\) && !selfAudit\)\s*\n\s*throw new org\.springframework\.security\.access\.AccessDeniedException\(\s*\n\s*"审批人不能与提交人相同（编制与审批分离）/,
+    '未授权时必须仍走这条拒绝分支（原逻辑一字不动）')
+})
+
+test('自审不等于审批权：requireApprover 仍在自审判定之前', () => {
+  const iApprover = button.indexOf('requireApprover(def.code());')
+  const iSelf = button.indexOf('boolean selfAudit =', iApprover)
+  assert.ok(iApprover > 0 && iSelf > iApprover,
+    '顺序必须是 先 requireApprover 再判 selfaudit —— 否则只勾「本人自审」就能审任何单')
+})
+
+test('自审留痕：写 self_audit=Y，审批情况查询回 selfAudit', () => {
+  assert.match(button, /INSERT INTO yj_form_approval \(panel_code, form_no, action, result, node_no, operator, opinion, self_audit, create_time\)/,
+    '留痕 INSERT 必须带 self_audit 列')
+  assert.match(button, /recordApproval\(def\.code\(\), no, "APPROVE", "APPROVED", opinion, 1, selfAudit\);/,
+    '单节点「审批通过」必须把 selfAudit 传进留痕')
+  assert.match(button, /recordApproval\(def\.code\(\), no, "APPROVE_L1", "L1_PASSED", opinion, 1, selfAudit\);/,
+    '两级面板的一级通过同样要标记')
+  assert.match(button, /m\.put\("selfAudit", "Y"\.equals\(rs\.getString\("self_audit"\)\)\)/,
+    'queryApprovalHistory 必须把 self_audit 带出去，否则前端无从显示')
+})
+
+test('二级审批不受影响：二级审核人仍不能是提交人', () => {
+  assert.match(button, /if \(!isAdminUser\(operator\) && l2\.equals\(submitter\)\)\s*\n\s*throw new IllegalStateException\("二级审核人不能是提交人本人（编制与审批分离）/,
+    '自审只开一级；二级选人这条必须原样保留')
+})
+
+test('前端消费 selfAuditPanels：store 下发 → 列表页不再按提交人自我排除 → 审批情况显示「自审」', () => {
+  assert.match(store, /selfAuditPanels: Array\.isArray\(ui\?\.selfAuditPanels\) \? ui\.selfAuditPanels : \[\]/)
+  assert.match(store, /this\.selfAuditPanels = Array\.isArray\(u\?\.selfAuditPanels\)/)
+  assert.match(authCtl, /user\.put\("selfAuditPanels", selfAuditPanelsOf\(admin, u\.get\("role_id"\)\)\)/)
+  assert.match(panelx, /function canSelfAuditHere\(\)/)
+  assert.match(panelx, /if \(canSelfAuditHere\(\)\) return false/)
+  assert.match(history, /v-if="row\.selfAudit"/)
+  assert.match(en, /'本人自审': 'Self-approval'/)
+})
+
+test('数据侧：迁移已登记且写的是幂等加列', () => {
+  assert.ok(manifest.includes('migrate-form-approval-self-audit-20261028.sql'), 'tools/db-migrations.txt 未登记迁移')
+  assert.match(migration, /IF COL_LENGTH\('dbo\.yj_form_approval', 'self_audit'\) IS NULL/)
+  assert.match(migration, /sp_addextendedproperty[\s\S]{0,400}self_audit/)
+})

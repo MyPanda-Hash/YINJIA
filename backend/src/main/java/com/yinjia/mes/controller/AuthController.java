@@ -92,6 +92,9 @@ public class AuthController {
             // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
             // PanelPermissionService.requireWarnConfig(同词 = warn)。
             user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
+            // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
+            // 前端据此把「审批通过」对提交人本人放开;真闸门 ButtonService.canSelfAudit(同词)。
+            user.put("selfAuditPanels", selfAuditPanelsOf(admin, u.get("role_id")));
             // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
             // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
             // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
@@ -115,6 +118,7 @@ public class AuthController {
         out.put("approvePanels", user.get("approvePanels"));
         out.put("fieldPanels", user.get("fieldPanels"));
         out.put("warnPanels", user.get("warnPanels"));
+        out.put("selfAuditPanels", user.get("selfAuditPanels"));
         out.put("pagePerms", user.get("pagePerms"));
         return ApiResult.ok(out);
     }
@@ -180,6 +184,9 @@ public class AuthController {
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
         user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
+        // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
+        // 前端据此把「审批通过」对**提交人本人**放开(展示层);真闸门在 ButtonService.canSelfAudit(同词)。
+        user.put("selfAuditPanels", selfAuditPanelsOf(admin, u.get("role_id")));
         user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
         return user;
     }
@@ -224,6 +231,11 @@ public class AuthController {
                 "SELECT panel_code, perms FROM yj_role_panel WHERE role_id = ?",
                 (rs, i) -> hasPermWord(rs.getString(2), word) ? rs.getString(1) : null, roleId)
                 .stream().filter(java.util.Objects::nonNull).toList();
+    }
+
+    /** 本人自审权限面板(2026-10-28,机制同 field/warn):管理员=全部;普通用户=角色勾了「本人自审」。 */
+    private List<String> selfAuditPanelsOf(boolean admin, Object roleId) {
+        return panelsWithPerm(admin, roleId, "selfaudit");
     }
 
     /**

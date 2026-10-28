@@ -4206,3 +4206,7 @@ migrate-mate-mno-length-20261021.sql
 #   一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」:导航覆盖表 yj_menu_node
 #   (只存名称/上级/排序/隐藏,基线仍在 frontend/src/business/menus.js)。两账套都执行。
 migrate-menu-node-20261023.sql
+
+# 2026-10-28 新增:「本人自审」权限(审批留痕补 self_audit 标记列)——
+#   yj_form_approval.self_audit char(1) NULL,新增 MS_Description;配合面板级动作词 selfaudit。
+migrate-form-approval-self-audit-20261028.sql

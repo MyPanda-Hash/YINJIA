@@ -50,6 +50,10 @@ public class PanelPermissionService {
             Map.entry("view", "可见"), Map.entry("query", "查询单据"), Map.entry("add", "新增保存"),
             Map.entry("modify", "申请修改"), Map.entry("modlog", "修改记录"), Map.entry("del", "删除申请"),
             Map.entry("export", "导出打印"), Map.entry("audit", "审批"), Map.entry("field", "自定义字段"),
+            // 本人自审(2026-10-28):解除「编制与审批分离」对**本人提交的单**的限制。
+            // 与 audit 是两个词 —— 自审不等于审批权:两者都勾中才能审自己提交的单
+            // (真闸门 ButtonService.canSelfAudit;词在 yj_role_panel.perms 的 csv 里)。
+            Map.entry("selfaudit", "本人自审"),
             Map.entry("warn", "预警配置"),
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),

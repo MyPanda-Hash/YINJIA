@@ -408,6 +408,8 @@
                     :title="isDisabled('审批通过') ? disabledReason('审批通过') : ''"
                     @click="onSideAction('审批通过')"
                   >{{ tt(approveBtnLabel) }}</div>
+                  <!-- 2026-10-28:授予「本人自审」时提前说清楚 —— 别让人以为这条通过和平时一样 -->
+                  <div v-if="selfAuditNow" class="as-side-hint">{{ tt('本单由你提交；本面板已授「本人自审」，通过后会记为自审') }}</div>
                   <div
                     class="as-side-btn"
                     :class="{ disabled: isDisabled('审批驳回') }"
@@ -2386,6 +2388,7 @@ import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
+import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
@@ -3221,11 +3224,24 @@ function canApproveHere() {
  * 服务端门禁一条不改、仍是最终裁决。管理员豁免(与后端同款:保存即归档本就是等价权力)。
  */
 const curSubmitter = computed(() => String(cur.value?.['提交人'] || '').trim())
+/**
+ * 本人自审(2026-10-28):该面板是否授了「本人自审」词(后端 AuthController 下发 selfAuditPanels)。
+ * 授了 ⇒ 提交人本人的「审批通过」不再置灰(服务端同一条豁免 = ButtonService.canSelfAudit)。
+ * ⚠ 与「审批」列是两个词:没有审批权的人即使勾了自审也仍然按钮不可见(canApproveHere 决定显隐)。
+ */
+function canSelfAuditHere() {
+  const sp = user.selfAuditPanels || []
+  return user.isAdmin || sp.includes('*') || sp.includes(String(panelCode.value))
+}
 const iAmCurSubmitter = computed(() => {
   const s = curSubmitter.value
   if (!s || user.isAdmin) return false
+  if (canSelfAuditHere()) return false          // 授予自审 ⇒ 不按提交人自我排除(后端会记 self_audit='Y')
   return s === String(user.userName || user.account || '')
 })
+/** 这一次点「审批通过」会不会走自审(用于按钮旁提前说明;真正的裁决在后端 canSelfAudit) */
+const selfAuditNow = computed(() => curSubmitter.value === String(user.userName || user.account || '')
+  && canSelfAuditHere())
 
 // ---------- 文件面板查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间 ----------
 const docQueryVisible = ref(false)
@@ -4746,6 +4762,11 @@ watch(
 
 watch(cur, (v) => {
   current.value = v
+  // 工序检验三单(首件/制程/组装成品,2026-10-21 用户口径「检验人员默认当前电脑端的用户,
+  // 而不是 system(手机端报工吸收)」):后台吸收出单不再写检验员,PC 打开可编辑草稿时带出
+  // **当前登录人姓名**。必须在 markSavedSnapshot 之前 —— 否则带出的值会被算成"未保存修改",
+  // 离开单据时误弹守卫。口径真源见 @core/qc/qcInspector.js(后端保存时同一口径兜底)。
+  if (draftEditable.value) applyInspectorDefault(panelCode.value, v, user)
   markSavedSnapshot() // 基线快照跟随当前单据:静默切单后不重打会快照错位,导致后续误判"有未保存修改"
   detailRefVisible.value = false
   detailRefPick.value = null
@@ -5789,7 +5810,8 @@ async function openPanelPrintWorkOrder() {
       备注: doc['备注'] || '',
       生产线: doc['生产线'] || '',
     }]
-    const sent = await printProductionTask(rows, { line: rows[0].生产线, preparedBy: user.realName })
+    // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
+    const sent = await printProductionTask(rows)
     try {
       await request.post('/px/scheduleBoard/printStamp', { rows: [{ 加工单号: no }] })
     } catch { /* 留痕失败不阻断打印 */ }

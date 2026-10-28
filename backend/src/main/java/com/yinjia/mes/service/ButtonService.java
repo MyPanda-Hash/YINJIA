@@ -394,6 +394,40 @@ public class ButtonService {
         }
     }
 
+    // ────────────────────────────── 工序检验单「检验人员」默认值 ──────────────────────────────
+
+    /** 需要「检验人员默认=当前电脑端登录人」的三张工序检验单(用户口径 2026-10-21) */
+    private static final java.util.Set<String> QC_INSPECTOR_DEFAULT_PANELS =
+            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP");
+
+    /**
+     * 工序检验三单(首件 / 制程 / 组装成品)的「检验人员」兜底 = **当前电脑端登录人的姓名**。
+     *
+     * <p>用户口径(2026-10-21):「将当前首件检验单,制程检验单,组装成品检验单的检验人员都填写
+     * 默认当前电脑端的用户而不是 system(手机端报工吸收)」。
+     *
+     * <p>为什么放在保存这一层(而不是出单那里):这三张单会由**手机端报工吸收的定时任务**在后台
+     * 自动出单,那条线程没有登录人 —— 出单时能拿到的只有审计用的
+     * {@code system(手机端报工吸收)},写进"纸面签名格"没有意义。检验员只能是**保存这张单的人**
+     * (他就是在电脑前端做检验的人),所以:
+     * <ul>
+     *   <li>出单(手机端吸收 / 报工审核)不再写检验员({@link QcInspAutoService});</li>
+     *   <li>保存时:空值或历史遗留的 {@code system…} 占位 → 填当前登录人**姓名**;</li>
+     *   <li>已有真人姓名一律不动(签名是事实,换个人打开也不冒名)。</li>
+     * </ul>
+     *
+     * <p>⚠ 后台线程(定时吸收出单)调用保存时没有认证上下文,{@code user="system"}
+     * ⇒ 这里**留空**不写;等品质在电脑端打开草稿时由前端带出、再保存落库。
+     */
+    private void defaultQcInspector(PanelRegistry.PanelDef def, Map<String, Object> head, String user) {
+        if (head == null || !QC_INSPECTOR_DEFAULT_PANELS.contains(def.code())) return;
+        String now = blankSafe(head.get("检验员"));
+        boolean placeholder = now.isEmpty() || now.toLowerCase(java.util.Locale.ROOT).startsWith("system");
+        if (!placeholder) return;
+        if (user == null || user.isBlank() || "system".equals(user)) return;
+        head.put("检验员", realNameOf(user));
+    }
+
     /** 单据保存(外部入口):systemDraft=false —— 用户操作,门禁全过 */
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user, boolean markSaved) {
@@ -463,6 +497,8 @@ public class ButtonService {
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user,
                                         boolean markSaved, boolean systemDraft) {
+        // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
+        defaultQcInspector(def, head, user);
         boolean split = def.hasHeadTable();
         if (no == null) {
             if (items.isEmpty()) {
@@ -2172,11 +2208,16 @@ public class ButtonService {
         requirePendingSubmission(def.code(), no);
         requireApprover(def.code());
         // 编制审批分离(2026-09-12):审批人不得是提交人本人——此前有审批权的用户可批自己提交的单;
-        // 管理员豁免(保存即归档本就是等价权力,且管理员提交后无他人可批会造死路)
+        // 管理员豁免(保存即归档本就是等价权力,且管理员提交后无他人可批会造死路)。
+        // 2026-10-28 用户口径:「本人可以提出审核后自己审核确认,增加一个这个权限设置,保留原来的
+        //   本人提交审核后不能本人自己审核的逻辑」⇒ 新增面板级动作词 selfaudit(本人自审):
+        //   **勾了该词才放行**,默认没有 = 原逻辑一字不动;放行时留痕记 self_audit='Y'(审批情况里
+        //   显示「自审」),而不是悄悄混在正常审批里。注意 selfaudit ≠ 审批权:requireApprover 仍然要过。
         Object row = st.get("row");
         Object pendingBy = row instanceof Map<?, ?> mp ? ((Map<?, ?>) mp).get("pending_by") : null;
         String submitter = pendingBy == null ? "" : String.valueOf(pendingBy);
-        if (!isAdminUser(operator) && operator.equals(submitter))
+        boolean selfAudit = !isAdminUser(operator) && operator.equals(submitter) && canSelfAudit(operator, def.code());
+        if (!isAdminUser(operator) && operator.equals(submitter) && !selfAudit)
             throw new org.springframework.security.access.AccessDeniedException(
                     "审批人不能与提交人相同（编制与审批分离）：本单由 " + realNameOf(submitter) + "（" + submitter + "）提交，请由他人完成一级审批");
         String opinion = opinionOf(formData);
@@ -2203,7 +2244,7 @@ public class ButtonService {
             } else {
                 writeBackL2Approver(def.code(), no, l2);
             }
-            recordApproval(def.code(), no, "APPROVE_L1", "L1_PASSED", opinion, 1);
+            recordApproval(def.code(), no, "APPROVE_L1", "L1_PASSED", opinion, 1, selfAudit);
             final String l2f = l2;
             final String op1 = operator;
             // 消息:一级通过 → 二级审核人(选定的那位 / 固定超级管理员)
@@ -2221,7 +2262,7 @@ public class ButtonService {
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), update_at = GETDATE()"
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
-        recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 1, selfAudit);
         // 立项申请:审批与定级是**同一步骤的两个动作**(2026-10-08 用户口径②「冯总审核及定级」)——
         // 审批弹窗里一并选项目等级,通过即定级,省掉"审完再点一次项目定级"。载荷没带等级时跳过
         // (兼容旧前端/老单:仍可事后用侧栏「项目定级」按钮补定级)。
@@ -2465,10 +2506,51 @@ public class ButtonService {
 
     /** 审批留痕(带节点号):node=1 一级 / node=2 二级(两级面板用) */
     private void recordApproval(String panelCode, String formNo, String action, String result, String opinion, int node) {
-        jdbc.update("INSERT INTO yj_form_approval (panel_code, form_no, action, result, node_no, operator, opinion, create_time) "
-                        + "VALUES (?,?,?,?,?,?,?,SYSDATETIME())",
+        recordApproval(panelCode, formNo, action, result, opinion, node, false);
+    }
+
+    /**
+     * 审批留痕(完整版,2026-10-28 加 {@code selfAudit}):{@code selfAudit=true} = 本次是通过**提交人本人**审的
+     * (面板授了「本人自审」)。单独一列而不是往 opinion 里塞前缀 —— 见
+     * tools/migrate-form-approval-self-audit-20261028.sql 头部说明。
+     */
+    private void recordApproval(String panelCode, String formNo, String action, String result, String opinion,
+                                int node, boolean selfAudit) {
+        jdbc.update("INSERT INTO yj_form_approval (panel_code, form_no, action, result, node_no, operator, opinion, self_audit, create_time) "
+                        + "VALUES (?,?,?,?,?,?,?,?,SYSDATETIME())",
                 panelCode, formNo, action, result, node, currentUserName(),
-                opinion == null || opinion.isEmpty() ? null : opinion);
+                opinion == null || opinion.isEmpty() ? null : opinion,
+                selfAudit ? "Y" : null);
+    }
+
+    /**
+     * 「本人自审」权限(2026-10-28 用户口径):该账号在当前面板有没有被授予 selfaudit 词。
+     *
+     * <p>语义边界:
+     * <ul>
+     *   <li>它**只解除**「编制与审批分离」对**本人提交的单**的限制,不放宽审批权 ——
+     *       {@code requireApprover} 仍要求该面板 audit 权,两者都满足才能自审;</li>
+     *   <li>管理员本就豁免该限制,这里返回 true 只是让调用点写法统一;</li>
+     *   <li>只管**一级审批通过**;二级审批人仍不能选提交人(见 approveApproval 的 l2 校验)。</li>
+     * </ul>
+     */
+    private boolean canSelfAudit(String user, String panelCode) {
+        if (isAdminUser(user)) return true;
+        List<String> perms = jdbc.query(
+                "SELECT rp.perms FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                        + " WHERE u.username = ? AND rp.panel_code = ?",
+                (rs, i) -> rs.getString(1), user, panelCode);
+        for (String p : perms) if (hasPermWordCsv(p, "selfaudit")) return true;
+        return false;
+    }
+
+    /** csv 权限词表是否含某词(trim + 逐词精确匹配;null/空 = 不含) */
+    private static boolean hasPermWordCsv(String perms, String word) {
+        if (perms == null || perms.isBlank()) return false;
+        for (String w : perms.split(",")) {
+            if (word.equals(w.trim())) return true;
+        }
+        return false;
     }
 
     // ---- 两级审批公共件(2026-09-20)----
@@ -2736,7 +2818,7 @@ public class ButtonService {
         // 按**时间**排序而不是 id(2026-10-17):历史补录(migrate-qc-proc-insp-audit-trail-20261017.sql)
         // 是后插的行,id 比当时的弃审行大 —— 按 id 排会把"审核 → 弃审"显示成"弃审 → 审核"(时间倒挂)。
         // 同一秒内多行用 id 兜底定序。
-        return jdbc.query("SELECT action, result, node_no, operator, opinion, create_time FROM yj_form_approval"
+        return jdbc.query("SELECT action, result, node_no, operator, opinion, self_audit, create_time FROM yj_form_approval"
                         + " WHERE panel_code = ? AND form_no = ? ORDER BY create_time ASC, id ASC",
                 (rs, i) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
@@ -2744,6 +2826,9 @@ public class ButtonService {
                     m.put("result", rs.getString("result"));
                     m.put("operator", rs.getString("operator"));
                     m.put("opinion", rs.getString("opinion"));
+                    // 自审标记(2026-10-28):前端「审批情况」据此显示「自审」—— 编制人=审批人的单据
+                    // 必须一眼可辨,不能与正常他人审批长得一样。
+                    m.put("selfAudit", "Y".equals(rs.getString("self_audit")));
                     m.put("nodeNo", rs.getInt("node_no"));
                     m.put("createTime", rs.getTimestamp("create_time") == null ? ""
                             : rs.getTimestamp("create_time").toLocalDateTime()
@@ -3180,7 +3265,7 @@ public class ButtonService {
         for (Long scjlId : ids) {
             // 与旧实现同事务:出单失败会让本次审核回滚(旧 firstInspGenerate 也是这个语义)。
             // 手机端那条路在吸收事务**提交后**才出单,不受影响。
-            saveDrafts(qcInspAuto.build(scjlId, repNo, user),
+            saveDrafts(qcInspAuto.build(scjlId, repNo),
                     "WO_REPORT", repNo, repNo + "#" + scjlId, user);
         }
     }
@@ -3196,7 +3281,7 @@ public class ButtonService {
      */
     @Transactional
     public Map<String, Object> generateInspFromReportRow(long scjlId, String user) {
-        QcInspAutoService.Result r = qcInspAuto.build(scjlId, "", user);
+        QcInspAutoService.Result r = qcInspAuto.build(scjlId, "");
         List<String> nos = saveDrafts(r, "SCJL", String.valueOf(scjlId), "SCJL#" + scjlId, user);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工序", r.op());
