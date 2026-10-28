@@ -3275,6 +3275,7 @@ export default {
     '非本部门栏目（只读）': 'Not your department (read-only)',
     /* ── 四受控文件编辑门禁 → 前端置灰(2026-09-21) ── */
     '本文件责任人': 'Owner of this document',
+    '除表单负责人之外只读': 'Read-only for everyone except the form owner',
     '尚未分发责任人': 'No owner dispatched yet',
     '请先在产品信息表点「分发责任人」': 'Ask an admin to dispatch owners on the Product Info sheet first',
     '多人用逗号分隔（账号）': 'Separate multiple accounts with commas',
