@@ -3214,7 +3214,15 @@ export default {
     /* ── 2026-10-28:审批定级时一并分发对接人 + 可改人 ── */
     '对接人': 'Liaison',
     '对接人（选填）': 'Liaison (optional)',
-    '在审批定级的同时选择对接人，一步完成分发；不选则审批后再到「定级分发」补发': 'Pick a liaison while grading to dispatch in the same step; leave empty to dispatch later via "Grade & dispatch".',
+    '在审批定级的同时选择对接人，一步完成分发；不选则审批后由侧栏「补发对接人」补上': 'Pick a liaison while grading to dispatch in the same step; if left empty, use "Assign liaison" in the sidebar afterwards.',
+    /* ── 2026-10-28 第二轮:定级分发按钮并入审批通过;保留极窄的补发入口 ── */
+    '补发对接人': 'Assign liaison',
+    '本单已审批但没有对接人：补一个对接人后，他才能签核并确认项目责任人': 'This document is approved but has no liaison yet: assign one so they can sign off and confirm the project owner',
+    '已补发对接人': 'Liaison assigned',
+    '补发对接人失败': 'Failed to assign the liaison',
+    '本单已有对接人，无需补发': 'This document already has a liaison',
+    '仅审批人（或管理员）可补发对接人': 'Only an approver (or admin) can assign the liaison',
+    '仅已审核或已归档的立项申请可补发对接人': 'Only approved or archived project applications can get a liaison assigned',
     '项目已定级': 'Project level already set',
     '选择对接人即可分发': 'pick a liaison to dispatch',
     '项目等级已由审批定级，不能在此修改；此处只需选择对接人': 'The level was set during approval and cannot be changed here; just pick a liaison.',

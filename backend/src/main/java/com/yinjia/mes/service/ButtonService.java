@@ -694,15 +694,22 @@ public class ButtonService {
         // 四个受控文件只按 [产品编号] 关联产品信息表,重号会让"这个产品有哪些文件"分不清 ⇒ 全局唯一。
         // 与文档编号同口径:保存(提交口径)才校验,保存为草稿放过;已作废单据不算占用。
         if (markSaved && "RD_PROD_INFO".equals(def.code())) ensureProductCodeUnique(def, head, no);
-        // 产品信息表「编辑人」= 本次提交人的**真实姓名**(2026-10-21 用户口径:
-        //   「产品信息表的编辑人是提交审批的人的账号的真实名字」)。
-        // ⚠ 原先这一格是普通文本,用户手输,库里实测 3 张单全为 NULL、1 张填了 "111"。
-        //   改成每次保存/提交时按当前登录账号回写真名 —— 它是"谁最后编辑了这张单"的事实,
-        //   不该由填单人自己写(写了也不可信)。保存在落库之后执行,所以同一次提交即可生效。
+        // 产品信息表「编辑人」= 本次**保存人**的真实姓名。
+        //   2026-10-21 口径:「产品信息表的编辑人是提交审批的人的账号的真实名字」;
+        //   2026-10-28 口径扩展:「编辑自动填入当前的对应账号姓名」—— 存草稿同样算一次编辑,
+        //   不再只限提交口径(原先 markSaved 才写,保存为草稿后纸面仍是空的)。
+        // ⚠ 这一格是"谁最后编辑了这张单"的事实,不该由填单人自己写(写了也不可信)⇒
+        //   前端 yj_field.editable=0(只读展示)+ 这里每次保存按登录人回写真名,两处同源。
+        //   保存在落库之后执行,所以同一次提交/存稿即可生效。
         if ("RD_PROD_INFO".equals(def.code())) {
             jdbc.update("UPDATE rd_prod_info_head SET 编辑人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     realNameOf(user), no);
         }
+        // 组装工艺清单「表单管理人」= 当前编辑人的账号姓名(2026-10-28 用户口径:
+        //   「组装工艺的表单管理人修改为编辑人的账号姓名,选择产品编号之后就自动带入,
+        //    或者进行其他编辑也自动带入」)。
+        // 与上面编辑人同一套口径:前端只保证纸面显示与保存报文带上,落库一律以本次保存人为准 ——
+        // 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
         if ("RD_ASM_PROC".equals(def.code())) {
             jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     realNameOf(user), no);
@@ -713,16 +720,19 @@ public class ButtonService {
     /**
      * 「编辑人 / 表单管理人」自动带入的列值(2026-10-28 用户口径)。
      *
-     * <p>两个写入点各管一条路径:本方法 = 空白草稿分支(directAdd 建单即 return);
-     * saveDoc 末尾的 UPDATE = 正常保存/修改。缺一不可(2026-10-28 实测:只加末尾那段,
-     * 空白草稿分支提前 return,新建的 AP 单「表单管理人」落库为 NULL)。
+     * <p>口径:产品信息表的「编辑人」、组装工艺清单的「表单管理人」都 = 当前**编辑人**账号的真实姓名。
+     * 前端只在纸面/保存报文里带显示值(yj_field 已改 editable=0),**落库一律以此处为准** ——
+     * 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
+     *
+     * <p>两个写入点各管一条路径,缺一不可(2026-10-28 实测踩到:只加了末尾那段 UPDATE,
+     * 空白草稿分支提前 return,新建的 AP 单「表单管理人」落库为 NULL):
+     * · 本方法 → 空白草稿分支(directAdd 建单即 return,不经过保存末尾);
+     * · saveDoc 末尾的 UPDATE → 正常保存/修改(落库后按当前人回写,同一次提交即生效)。
      */
     private void putEditorCols(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
         String name = realNameOf(user);
         if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
         if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
-    }
-        return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
     /**
@@ -5308,7 +5318,15 @@ public class ButtonService {
             //   "只要当前人是审批人" 即放行;等级已存在时由 gradeAndDispatch 沿用。
             // 2026-10-28 用户口径「后续也默认是这个对接人，除非进行修改」——
             //   再取消 liaison.isEmpty() 限制:已分发也能再点开改人(留痕写明原对接人)。
+            // 🔴 2026-10-28 第二轮(同日):用户要求「把定级分发这个按钮去掉，合并到审批通过里面」
+            //   ⇒ 侧栏那个按钮已删除,本字段**不再驱动任何按钮**(保留只为兼容仍在缓存的旧前端包)。
             out.put("canGradeDispatch", settled && canApprove(user, "RD_APPROVAL"));
+            // 「补发对接人」补救入口(2026-10-28 第二轮):对接人在审批弹窗里是**选填**
+            // (clearable),而历史单审批时压根没有这个字段 ⇒ 正式账套实测 2 张已审批无对接人
+            // (LXA-2026-10-0013 / LXA-2026-10-0018,均无下游实施计划)。
+            // 按钮一删,这些单就永久卡在"已审批、未分发" ⇒ 给一个**条件极窄**的补救入口:
+            // 已定形 ∧ 对接人为空 ∧ 有审批权。正常单据恒 false,界面上永远看不到它。
+            out.put("canRepairLiaison", settled && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
         } catch (Exception e) {
             log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
         }

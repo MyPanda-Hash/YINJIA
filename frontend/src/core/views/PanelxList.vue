@@ -467,14 +467,20 @@
                    ⚠ 显隐与置灰仍全部来自后端(rdApprovalFlowState / canGradeProject / canDevDispatch…),一条判据没改。 -->
               <div v-if="panelCode === 'RD_APPROVAL' || panelCode === 'RD_PROD_INFO' || (isDevFilePanel && pendingDocs.rows.length)"
                    class="as-side-section">{{ tt('③ 流程') }}</div>
-              <!-- 定级分发(2026-10-19 用户口径:定级与分发对接人合并成一个按钮,定级的同时分发责任人) -->
+              <!-- 🔴 2026-10-28 第二轮：侧栏「定级分发」按钮**已删除** ——
+                   用户口径「在审批人点击审批通过的时候弹窗能定级能选对接人，把定级分发这个按钮去掉，
+                   就是把定级分发的功能合并到审批通过里面」。
+                   定级 + 分发对接人现在只在「审批通过」弹窗里做（apvLevel + apvLiaison）。
+                   下面这条「补发对接人」是**极窄的补救入口**：只对「已审批但无对接人」的单显示
+                   （历史单审批时还没有对接人字段，正式账套实测 2 张）—— 判据来自后端
+                   rdFlow.canRepairLiaison，正常单据恒 false，界面上看不到。 -->
               <div
                 class="as-side-btn"
-                v-if="panelCode === 'RD_APPROVAL'"
-                :class="{ disabled: !rdFlow.canGradeDispatch }"
-                :title="gradeDispatchTip"
-                @click="openGradeDispatch"
-              ><span class="as-side-step">1</span>{{ tt('定级分发') }}{{ rdFlow.level ? '·' + rdFlow.level : '' }}{{ rdFlow.liaisonName ? ' ' + tt('对接人') + ' ' + rdFlow.liaisonName : '' }}</div>
+                v-if="panelCode === 'RD_APPROVAL' && rdFlow.canRepairLiaison"
+                :class="{ disabled: !rdFlow.canRepairLiaison }"
+                :title="repairLiaisonTip"
+                @click="openRepairLiaison"
+              ><span class="as-side-step">1</span>{{ tt('补发对接人') }}{{ rdFlow.level ? '·' + rdFlow.level : '' }}</div>
               <!-- 对接人签核(2026-10-08 研发流程图④):对接人签核并在同一弹窗里选择项目责任人 -->
               <div
                 class="as-side-btn"
@@ -2036,18 +2042,15 @@
       </template>
     </el-dialog>
 
-    <!-- 定级分发弹窗(2026-10-19 用户口径):一个动作 = 选项目等级 + 选对接人账号;
-         等级随「文档编号」参照带给实施计划,对接人随后签核并选责任人。 -->
-    <el-dialog v-model="gradeDispatchVisible" :title="tt('定级分发')" width="480px" append-to-body>
+    <!-- 补发对接人（2026-10-28 第二轮：定级分发按钮已并入「审批通过」弹窗）。
+         这是**补救入口**，不是常规路径：只在「已审批但对接人为空」的历史单上出现
+         （判据 = 后端 rdFlow.canRepairLiaison）。等级这里只读沿用，改级仍只能弃审。 -->
+    <el-dialog v-model="repairLiaisonVisible" :title="tt('补发对接人')" width="440px" append-to-body>
       <div class="dq-form">
-        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('定级的同时把立项分发给一个对接人账号：等级作为后续实施计划与进度流程的属性，对接人随后签核并选择项目责任人。') }}</div>
-        <!-- 2026-10-21:审批通过时已经定过级的单,这里只补发对接人(等级只读,改级仍要弃审) -->
-        <div v-if="gradeLevelLocked" class="mod-log-meta" style="margin-bottom:8px">{{ tt('项目等级已由审批定级，不能在此修改；此处只需选择对接人') }}</div>
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('本单已审批但没有对接人：补一个对接人后，他才能签核并确认项目责任人') }}</div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('项目等级') }}</span>
-          <el-radio-group v-model="gradeLevel" :disabled="gradeLevelLocked">
-            <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
-          </el-radio-group>
+          <span>{{ rdFlow.level || tt('（未定级）') }}</span>
         </div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('对接人') }}</span>
@@ -2057,8 +2060,8 @@
         </div>
       </div>
       <template #footer>
-        <el-button @click="gradeDispatchVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :loading="gradeDispatchBusy" @click="confirmGradeDispatch">{{ tt('定级并分发') }}</el-button>
+        <el-button @click="repairLiaisonVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="repairLiaisonBusy" @click="confirmRepairLiaison">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2100,7 +2103,9 @@
 
     <!-- 立项申请「审批通过 + 定级」弹窗(2026-10-08 研发流程图②):用户口径「冯总审核及定级」= 一次动作两件事。
          2026-10-28 追加对接人:「可以由管理员在审批定级的时候确定一个对接人进行分发，后续也默认是这个对接人」
-         ⇒ 弹窗里多一个对接人下拉(默认带出已有对接人),选了就与定级同一动作完成分发;不选则事后用「定级分发」补发。 -->
+         ⇒ 弹窗里多一个对接人下拉(默认带出已有对接人),选了就与定级同一动作完成分发。
+         2026-10-28 第二轮:侧栏「定级分发」按钮已删除,**本弹窗是定级与分发对接人的唯一入口**;
+         不选对接人时该单会停在"已审批、未分发",由侧栏「补发对接人」补救(仅缺对接人时出现)。 -->
     <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
@@ -2116,7 +2121,7 @@
             <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
           </el-select>
         </div>
-        <div class="dq-tip">{{ tt('在审批定级的同时选择对接人，一步完成分发；不选则审批后再到「定级分发」补发') }}</div>
+        <div class="dq-tip">{{ tt('在审批定级的同时选择对接人，一步完成分发；不选则审批后由侧栏「补发对接人」补上') }}</div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
           <el-input v-model="apvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
@@ -4725,6 +4730,8 @@ const rdFlow = reactive({
   // 2026-10-19 流程第 4 步:责任人确认收到(后端 rdApprovalFlowState 的唯一真源)
   ownerAck: '', ownerAckAt: '',
   canDispatchLiaison: false, canConfirmOwner: false, canConfirmReceipt: false, canGradeDispatch: false,
+  // 2026-10-28 第二轮:定级分发按钮并入审批通过后,「已审批但无对接人」的历史单补救入口
+  canRepairLiaison: false,
 })
 /** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
 const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
@@ -6522,38 +6529,48 @@ async function confirmGrade() {
   }
 }
 
-// ---------- 定级分发(2026-10-19:定级 + 分发对接人合成一个动作) ----------
-const gradeDispatchVisible = ref(false)
-const gradeDispatchBusy = ref(false)
-/** 等级是否已由「审批通过并定级」写入 ⇒ 弹窗里等级只读,只补发对接人 */
-const gradeLevelLocked = computed(() => !!String(rdFlow.level || '').trim())
+// ---------- 补发对接人(2026-10-28 第二轮:定级分发按钮已并入「审批通过」) ----------
+// 用户口径:「把定级分发这个按钮去掉，就是把定级分发的功能合并到审批通过里面」。
+// 常规路径 = 审批通过弹窗(apvLevel + apvLiaison)。这里只剩**补救**:
+// 审批弹窗里对接人是选填,历史单审批时还没有这个字段 ⇒ 正式账套实测 2 张已审批无对接人
+// (LXA-2026-10-0013 / LXA-2026-10-0018,均无下游实施计划)。没有这条,它们永久卡死。
+// 显隐判据来自后端 rdFlow.canRepairLiaison(已定形 ∧ 无对接人 ∧ 有审批权)⇒ 正常单据恒 false。
+const repairLiaisonVisible = ref(false)
+const repairLiaisonBusy = ref(false)
+/** 等级只读沿用(改级仍只能弃审);这里只补对接人 */
+const repairLiaisonTip = computed(() => {
+  if (rdFlow.canRepairLiaison) return tt('本单已审批但没有对接人：补一个对接人后，他才能签核并确认项目责任人')
+  if (!isRdSettled) return tt('仅已审核或已归档的立项申请可补发对接人')
+  if (rdFlow.liaison) return tt('本单已有对接人，无需补发')
+  return tt('仅审批人（或管理员）可补发对接人')
+})
 
-async function openGradeDispatch() {
-  if (!rdFlow.canGradeDispatch) return
+async function openRepairLiaison() {
+  if (!rdFlow.canRepairLiaison) return
   if (!(await ensureRdFlowUsers())) return
-  gradeLevel.value = String(rdFlow.level || '')
   liaisonUser.value = rdFlow.liaison || ''
-  gradeDispatchVisible.value = true
+  repairLiaisonVisible.value = true
 }
 
-async function confirmGradeDispatch() {
-  if (!gradeLevel.value) return ElMessage.warning(tt('请选择项目等级'))
+async function confirmRepairLiaison() {
   if (!liaisonUser.value) return ElMessage.warning(tt('请选择对接人账号'))
-  if (gradeDispatchBusy.value) return
-  gradeDispatchBusy.value = true
+  if (repairLiaisonBusy.value) return
+  repairLiaisonBusy.value = true
   try {
     const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    // 走后端同一个按钮名(定级分发)—— 服务端只有这一条写 备用1 的路径,
+    // 等级已存在时它会沿用库内值;不做"前端另起一个 API"的第二套口径。
     await engine.callButton({
       panelCode: RD_FLOW_PANEL, buttonName: '定级分发',
-      formData: { 编号: no, 项目等级: gradeLevel.value, 对接人: liaisonUser.value }, buttonParam: {},
+      formData: { 编号: no, 项目等级: rdFlow.level || '', 对接人: liaisonUser.value }, buttonParam: {},
     })
-    ElMessage.success(tt('已定级并分发对接人'))
-    gradeDispatchVisible.value = false
+    ElMessage.success(tt('已补发对接人'))
+    repairLiaisonVisible.value = false
     await load()
   } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('定级分发失败'))
+    ElMessage.error(engine.errMsg(e) || tt('补发对接人失败'))
   } finally {
-    gradeDispatchBusy.value = false
+    repairLiaisonBusy.value = false
   }
 }
 
@@ -6578,6 +6595,7 @@ function clearRdFlow() {
     status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
     ownerAck: '', ownerAckAt: '',
     canDispatchLiaison: false, canConfirmOwner: false, canConfirmReceipt: false, canGradeDispatch: false,
+    canRepairLiaison: false,
   })
 }
 
@@ -6595,6 +6613,7 @@ async function loadRdFlowState() {
       ownerAck: r?.ownerAck || '', ownerAckAt: r?.ownerAckAt || '',
       canDispatchLiaison: !!r?.canDispatchLiaison, canConfirmOwner: !!r?.canConfirmOwner,
       canConfirmReceipt: !!r?.canConfirmReceipt, canGradeDispatch: !!r?.canGradeDispatch,
+      canRepairLiaison: !!r?.canRepairLiaison,
     })
   } catch (e) {
     // 端点不可用(旧后端)或网络失败 ⇒ 全部置灰,不阻断打开单据(保存/审批仍走各自门禁)
@@ -6685,18 +6704,6 @@ async function confirmOwner() {
 // ---------- 责任人确认收到(2026-10-19 流程第 4 步) ----------
 const receiptVisible = ref(false)
 const receiptBusy = ref(false)
-
-/** 第 1 步「定级分发」的提示(2026-10-19 两步合一;2026-10-21 兼容"审批时已定级") */
-const gradeDispatchTip = computed(() => {
-  if (rdFlow.canGradeDispatch) {
-    return rdFlow.level
-      ? tt('项目已定级') + '（' + rdFlow.level + '）：' + tt('选择对接人即可分发')
-      : tt('定级的同时把立项分发给一个对接人账号')
-  }
-  if (!isRdSettled) return tt('仅已审核或已归档的立项申请可定级分发')
-  if (rdFlow.liaison) return tt('已定级/已分发，要修改请先弃审回草稿')
-  return tt('仅审批人（或管理员）可定级分发')
-})
 
 /** 第 2 步「对接人签核」的提示 */
 const ownerSignTip = computed(() => {
