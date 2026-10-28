@@ -127,12 +127,8 @@ export const menuTree = [
               // (tools/migrate-drop-extra-docs-pu-req-20261008.sql),不是摘菜单,放开注释也恢复不了;
               // 回退:跑 tools/archive/_panel-age/_backup-20261008/restore-metadata.sql + 重建两张表。
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
-              // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询
-              //   (查询必须只能查供应商关联的数据)按钮的」):
-              //   **独立面板 SUPPLIER_PU_ORDER** —— 元数据是采购订单的逐列副本(同一张 bd_pu_order/bl_pu_order),
-              //   工具栏只有 查询 + 打印;供应商账号登录后菜单里只剩这一条,内部账号也能进(全量、同样只读)。
-              //   地址沿用 /scm/supplierPrint(路由已指向通用面板页 PanelxList)。
-              { code: 'supplierPrint', title: '供应商采购打印', path: '/scm/supplierPrint', icon: 'Printer', panelCode: 'SUPPLIER_PU_ORDER' },
+              // ⚠ 「供应商采购打印」不放这里 —— 2026-10-25 用户口径「放在供应商门户下面」,
+              //   已移到本组下方的「供应商门户」组(见该组注释)。
               // 特采单(2026-10-19 用户口径「特采单归供应链的采购管理的目录下,不要在品质管理的目录下」):
               // 面板编码 QC_TC_IN / 路径 / 表 / 前缀 TCI / 权限行一个字节没动,只是**导航父节点**从
               // 品质管理 > 来料品质 搬到 智能供应链 > 采购管理 > 单据(业务上它是采购口对不合格来料的让步接收申请)。
@@ -157,22 +153,18 @@ export const menuTree = [
           },
           // 供应商门户(2026-10-24 用户口径「采购管理里面多增加俩个面版,一个是供应商采购打印面版,
           //   一个是供应商权限配置。供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版
-          //   (和对应供应商编码的数据)……没有别的权限」):
-          //   · 供应商采购打印 = **页面级虚拟面板** SUPPLIER_PRINT(定义见后端 PagePanelRegistry),
-          //     供应商登录后菜单树只剩这一条;数据由 /api/supplier/portal/* 按供应商编码过滤,
-          //     硬闸门是后端 SupplierPortalGuardFilter(供应商会话其余 /api 一律 403)。
+          //   (和对应供应商编码的数据)……没有别的权限」;2026-10-25「放在供应商门户下面」):
+          //   · 供应商采购打印 = **独立面板 SUPPLIER_PU_ORDER** —— 采购订单的只读元数据副本
+          //     (同一张 bd_pu_order/bl_pu_order,字段逐列复制),工具栏只有「查询 + 打印」。
+          //     供应商登录后菜单树只剩这一条;数据由 QueryService.enforceSupplierScope 在服务端
+          //     按登录态供应商编码强制过滤(前端传什么都不采信),
+          //     硬闸门是 SupplierPortalGuardFilter(供应商会话其余 /api 一律 403)。
           //   · 供应商权限配置 = SUPPLIER_ACCOUNT:**管理员 ∪ 组织架构里给该角色勾了「配置供应商账号」
-          //     的账号**都能进(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
-          //     添加可以配置的账号」)。菜单显隐按 user.canConfigSupplierAccount,路由守卫同源,
-          //     后端真闸门 SupplierPortalService.requireAccountConfig(词 = supplier)。
-          //   · 供应商采购打印(SUPPLIER_PU_ORDER)**已移到上面的「单据」组**(与采购订单并列),
-          //     它是独立面板(采购订单的只读副本),不再是页面级虚拟面板 SUPPLIER_PRINT;
-          //   · 剩下的「供应商权限配置」= SUPPLIER_ACCOUNT:**管理员 ∪ 组织架构里给该角色勾了「配置供应商账号」
-          //     的账号**都能进(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
-          //     添加可以配置的账号」)。菜单显隐按 user.canConfigSupplierAccount,路由守卫同源,
-          //     后端真闸门 SupplierPortalService.requireAccountConfig(词 = supplier)。
+          //     的账号**都能进(菜单显隐按 user.canConfigSupplierAccount,路由守卫同源,
+          //     后端真闸门 SupplierPortalService.requireAccountConfig,词 = supplier)。
           {
             code: 'supplier', title: '供应商门户', icon: 'User', children: [
+              { code: 'supplierPrint', title: '供应商采购打印', path: '/scm/supplierPrint', icon: 'Printer', panelCode: 'SUPPLIER_PU_ORDER' },
               { code: 'supplierAccount', title: '供应商权限配置', path: '/scm/supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', icon: 'Key', permKey: 'canConfigSupplierAccount' },
             ],
           },

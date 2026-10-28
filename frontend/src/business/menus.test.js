@@ -84,7 +84,7 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   // 2026-10-19《10.19 问题》第 3 条:特采单(QC_TC_IN)从 品质管理 > 来料品质 搬到 采购管理 > 单据,
   // 排在采购订单之后(同组叶子顺序即菜单顺序)。
   assert.deepEqual(codesOf(purchase),
-    ['PU_ORDER', 'SUPPLIER_PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS', 'SUPPLIER_ACCOUNT'])
+    ['PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS', 'SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'])
   // 特采单只能有一个入口,且不得再挂在 品质管理 下
   const qc = menuTree.find((n) => n.code === 'qc')
   const qcCodes = JSON.stringify(qc)
@@ -100,39 +100,41 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
 })
 
 /**
- * 2026-10-24 起(2026-10-25 第三次澄清定稿):
- *   ·「供应商采购打印」= **独立面板 SUPPLIER_PU_ORDER**,放在采购管理 → 单据组(与采购订单并列);
- *     它是采购订单的元数据副本(同一张表),工具栏只有 查询 + 打印(见后端 PANDA_BUTTONS);
- *   ·「供应商权限配置」= 页面级面板 SUPPLIER_ACCOUNT,放在采购管理 → 供应商门户组,
+ * 2026-10-24 起(2026-10-25 第三次澄清定稿;同日晚「放在供应商门户下面」调整):
+ *   ·「供应商采购打印」= **独立面板 SUPPLIER_PU_ORDER**(采购订单的元数据副本,同一张表),
+ *     工具栏只有 查询 + 打印(见后端 PANDA_BUTTONS),放在 采购管理 → 供应商门户 组;
+ *   ·「供应商权限配置」= 页面级面板 SUPPLIER_ACCOUNT,同在该组,
  *     管理员 ∪ 组织架构里勾了「配置供应商账号」的角色可进(permKey 判)。
  * 用户口径(2026-10-25):「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询
- *   (查询必须只能查供应商关联的数据)按钮的」。
+ *   (查询必须只能查供应商关联的数据)按钮的」+「放在供应商门户下面」。
  */
-test('采购管理 = 单据(含供应商采购打印) / 明细表 / 统计表 / 供应商门户(权限配置)', () => {
+test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打印 + 权限配置)', () => {
   const scm = menuTree.find((n) => n.code === 'scm')
   const purchase = (scm.children || []).find((c) => c.code === 'purchase')
   assert.ok(purchase, '应有 采购管理 分组')
   assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats', 'supplier'])
 
-  // ① 供应商采购打印:独立面板,挂在「单据」组里(与采购订单并列)
-  const docGroup = purchase.children.find((c) => c.code === 'doc')
-  const printLeaf = (docGroup.children || []).find((c) => c.code === 'supplierPrint')
-  assert.ok(printLeaf, '「单据」组里应有供应商采购打印')
+  // ① 供应商门户组:采购打印 + 权限配置(都在这一组下,用户口径「放在供应商门户下面」)
+  const group = purchase.children.find((c) => c.code === 'supplier')
+  assert.equal(group.title, '供应商门户')
+  assert.deepEqual((group.children || []).map((c) => c.panelCode), ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'])
+
+  const printLeaf = group.children[0]
   assert.equal(printLeaf.title, '供应商采购打印')
   assert.equal(printLeaf.panelCode, 'SUPPLIER_PU_ORDER', '它是独立面板(采购订单的只读副本)')
   assert.equal(printLeaf.path, '/scm/supplierPrint')
   assert.ok(!printLeaf.adminOnly, '供应商采购打印不能是管理员专属 —— 供应商自己就要用它')
 
-  // ② 供应商权限配置:留在「供应商门户」组,按 permKey 判
-  const group = purchase.children.find((c) => c.code === 'supplier')
-  assert.equal(group.title, '供应商门户')
-  assert.deepEqual((group.children || []).map((c) => c.panelCode), ['SUPPLIER_ACCOUNT'],
-    '供应商门户组只剩权限配置(打印已移到单据组)')
-  const accountLeaf = group.children[0]
+  const accountLeaf = group.children[1]
   assert.equal(accountLeaf.title, '供应商权限配置')
   assert.equal(accountLeaf.path, '/scm/supplierAccount')
   assert.ok(!accountLeaf.adminOnly, '供应商权限配置不再是管理员专属')
   assert.equal(accountLeaf.permKey, 'canConfigSupplierAccount')
+
+  // ② 「单据」组里**不得**再重复挂一份采购打印(避免两处入口)
+  const docGroup = purchase.children.find((c) => c.code === 'doc')
+  assert.ok(!(docGroup.children || []).some((c) => c.panelCode === 'SUPPLIER_PU_ORDER'),
+    '供应商采购打印只能有一个入口(供应商门户),单据组里不应再挂')
 
   // ③ 供应商会话(visiblePanels 只含 SUPPLIER_PU_ORDER)看到的整棵树 = 一个叶子
   const supplierTree = filterMenuTree(menuTree, ['SUPPLIER_PU_ORDER'], false)
@@ -141,15 +143,14 @@ test('采购管理 = 单据(含供应商采购打印) / 明细表 / 统计表 / 
   walk(supplierTree)
   assert.deepEqual(leaves, ['SUPPLIER_PU_ORDER'], '供应商账号登录后全站只应看得到「供应商采购打印」这一个入口')
 
-  // ④ 只有面板可见、但没有 permKey 授权 ⇒ 供应商门户组整体不显示(防越权入口)
-  const visibleOnly = filterMenuTree([scm], ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'], false, { canConfigSupplierAccount: false })
-  const vp = visibleOnly[0].children.find((c) => c.code === 'purchase')
-  assert.ok(!(vp.children || []).some((c) => c.code === 'supplier'), '没有 canConfigSupplierAccount 时不得出现供应商门户分组')
-  // 组织架构授权后,权限配置入口出现
+  // ④ 没有 permKey 授权 ⇒ 权限配置不显示;授权后出现
+  const noPerm = filterMenuTree([scm], ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'], false, { canConfigSupplierAccount: false })
+  const np = noPerm[0].children.find((c) => c.code === 'purchase').children.find((c) => c.code === 'supplier')
+  assert.deepEqual((np?.children || []).map((c) => c.panelCode), ['SUPPLIER_PU_ORDER'],
+    '未授权时供应商门户下只有采购打印')
   const authorized = filterMenuTree([scm], ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'], false, { canConfigSupplierAccount: true })
-  const ap = authorized[0].children.find((c) => c.code === 'purchase')
-  const ag = ap.children.find((c) => c.code === 'supplier')
-  assert.deepEqual((ag?.children || []).map((c) => c.panelCode), ['SUPPLIER_ACCOUNT'],
+  const ag = authorized[0].children.find((c) => c.code === 'purchase').children.find((c) => c.code === 'supplier')
+  assert.deepEqual((ag?.children || []).map((c) => c.panelCode), ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'],
     '被授权「配置供应商账号」的角色,菜单里应出现「供应商权限配置」')
 })
 
