@@ -7,6 +7,12 @@ const ModuleView = () => import('@/views/modules/ModuleView.vue')
 const PanelxList = () => import('@core/views/PanelxList.vue')
 const PanelxForm = () => import('@core/views/PanelxForm.vue')
 
+/**
+ * 供应商账号登录后的**唯一落地页**(2026-10-24):供应商采购打印。
+ * 与 menus.js 里 supplierPrint 的 path、以及后端 PagePanelRegistry.SUPPLIER_PRINT 一一对应。
+ */
+export const SUPPLIER_HOME = '/scm/supplierPrint'
+
 const routes = [
   { path: '/login', component: () => import('@/views/login/index.vue'), meta: { title: '登录' } },
   // 生产领料 · 旧地址兼容(2026-10-20 第二轮:用户要求「两个写成一体的、地址要一致,
@@ -45,6 +51,13 @@ const routes = [
       { path: 'dc/stats', component: () => import('@/views/dc/DcStats.vue'), meta: { title: '状态统计', code: 'dcStats', panelCode: 'DC_STATS' } },
       { path: 'scm/mobileWarehouse', component: () => import('@/views/scm/MobileWarehouse.vue'), meta: { title: '移动仓管', code: 'mobileWarehouse' } },
       { path: 'scm/serialNumber', component: () => import('@/views/scm/SerialNumber.vue'), meta: { title: '序列号管理', code: 'serialNumber' } },
+      // 供应商门户(2026-10-24):两个页面级虚拟面板(定义见后端 PagePanelRegistry)。
+      //   · /scm/supplierPrint   供应商采购打印 —— **供应商登录后唯一能进的页面**(只读列表 + 采购订单纸质单);
+      //     数据接口 /api/supplier/portal/* 服务端按供应商编码过滤,前端传什么都不采信。
+      //   · /scm/supplierAccount 供应商权限配置 —— 管理员专属(requireAdmin 双保险,菜单侧 adminOnly)。
+      // 两页都不走通用 PanelxList,故不进 flatMenus 自动路由(菜单项带 panelCode 已被 filter 排除)。
+      { path: 'scm/supplierPrint', component: () => import('@/views/scm/SupplierPrint.vue'), meta: { title: '供应商采购打印', code: 'supplierPrint', panelCode: 'SUPPLIER_PRINT' } },
+      { path: 'scm/supplierAccount', component: () => import('@/views/scm/SupplierAccount.vue'), meta: { title: '供应商权限配置', code: 'supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', requireAdmin: true } },
       // 扫码领料(2026-10-18):条码管理 → 扫码领料。页面级(无 panelCode),扫标签码 `存货编码|批号`
       // 按批号查 v_stock_pick 可用量 → 组材料出库单草稿。理由见 views/scm/ScanPick.vue 头注释。
       { path: 'scm/scanPick', component: () => import('@/views/scm/ScanPick.vue'), meta: { title: '扫码领料', code: 'barcodeScanPick', panelCode: 'BARCODE_SCAN_PICK' } },
@@ -80,7 +93,7 @@ const routes = [
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
-        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && !m.panelCode)
+        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && m.code !== 'supplierPrint' && m.code !== 'supplierAccount' && !m.panelCode)
         .map((m) => ({
           path: m.path.slice(1),
           component: ModuleView,
@@ -109,6 +122,13 @@ router.onError((err) => {
 router.beforeEach((to) => {
   document.title = `${to.meta.title || ''} · YINJIA-MES`
   const user = useUserStore()
+  // 供应商会话(2026-10-24 用户口径「只能看到供应商采购打印面版……没有别的权限」):
+  //   登录/会话还原时后端已把 visiblePanels 裁到只剩 SUPPLIER_PRINT,这里再加一道**显式出口守卫** ——
+  //   敲 URL 进任何别的页面(含 /dashboard)一律送回 供应商采购打印。真正的闸门在后端
+  //   SupplierPortalGuardFilter(供应商会话的 /api 请求只放行门户接口),本守卫只负责"别把人带进死路"。
+  if (user.isLogin && user.supplierCode) {
+    return to.path === SUPPLIER_HOME ? true : SUPPLIER_HOME
+  }
   if (to.path !== '/login' && !user.isLogin) return '/login'
   if (to.meta.requireAdmin && !user.isAdmin) return '/dashboard'
   if (to.path === '/login' && user.isLogin) return '/dashboard'

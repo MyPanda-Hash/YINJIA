@@ -251,6 +251,8 @@ function keepVisible(e) {
 
 const rememberedAccount = localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || ''
 const rememberAccount = ref(Boolean(rememberedAccount))
+// 供应商账号的落地页(2026-10-24):与 router/menus 同一条路径,常量放业务层,登录页不必 import 整个 router
+const SUPPLIER_HOME = '/scm/supplierPrint'
 const form = reactive({ userName: rememberedAccount, password: '', factory: '' })
 /** 语言选项显示:本地名 (语言码)——汉字系语言(日本語/繁體中文)加码消除歧义;简体中文例外。 */
 const localeLabel = (l) => l.locale === 'zh-CN'
@@ -282,7 +284,9 @@ async function doLogin() {
     await user.login({ userName: form.userName, password: form.password, factory: form.factory })
     if (rememberAccount.value) localStorage.setItem(REMEMBERED_ACCOUNT_KEY, form.userName)
     else localStorage.removeItem(REMEMBERED_ACCOUNT_KEY)
-    await router.replace('/dashboard')
+    // 供应商账号(2026-10-24):登录后**直接进「供应商采购打印」**——它只有这一页(用户口径「没有别的权限」);
+    // 普通/内部账号照旧进我的桌面。判据是后端下发的 supplierCode,不是前端猜的。
+    await router.replace(user.supplierCode ? SUPPLIER_HOME : '/dashboard')
   } catch (error) {
     errorMessage.value = error.response?.data?.message || error.message || tt('登录失败，请稍后重试')
   } finally {

@@ -12,8 +12,44 @@
       </div>
     </template>
 
+    <template v-else-if="isSupplier">
+      <!-- 供应商门户(2026-10-24):供应商账号**只有「供应商采购打印」一页**(用户口径「没有别的权限」)。
+           故不给侧栏/页签/我的桌面入口,只留一条极简顶栏(供应商身份 + 改密 + 退出) ——
+           少一个可点的入口,就少一次"点进去吃 403"的困惑。 -->
+      <div class="portal-supplier-bar">
+        <span class="psb-brand">YINJIA-MES</span>
+        <el-tag size="small" type="warning" class="psb-tag">{{ tt('供应商采购打印') }}</el-tag>
+        <span class="psb-supplier">{{ supplierLabel }}</span>
+        <span class="psb-spacer"></span>
+        <el-dropdown trigger="click" @command="onSupplierCommand">
+          <span class="psb-user">
+            <el-icon><User /></el-icon>
+            {{ user.realName || user.account || tt('供应商') }}
+            <el-icon><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="account">{{ tt('账号信息') }}</el-dropdown-item>
+              <el-dropdown-item command="password">{{ tt('修改密码') }}</el-dropdown-item>
+              <el-dropdown-item command="logout" divided>{{ tt('退出登录') }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+      <div class="portal-body">
+        <div class="portal-main">
+          <div class="portal-content">
+            <router-view v-slot="{ Component }">
+              <component :is="Component" :key="route.path" />
+            </router-view>
+          </div>
+        </div>
+      </div>
+      <component :is="AccountDialog" v-model="accountVisible" />
+      <component :is="ChangePwdDialog" v-model="pwdVisible" />
+    </template>
+
     <template v-else>
-    <TopBar />
     <div class="portal-body">
       <LeftNav v-if="!app.maxContent" />
       <div class="portal-main">
@@ -50,21 +86,63 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
 import TopBar from './TopBar.vue'
 import LeftNav from './LeftNav.vue'
 import TabsBar from './TabsBar.vue'
 import HelpPanel from './HelpPanel.vue'
+import { User, ArrowDown } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { findMenuByPath } from '@/business/menus'
+import { tt } from '@/i18n'
 
 const app = useAppStore()
 const user = useUserStore()
 const tabs = useTabsStore()
 const route = useRoute()
+const router = useRouter()
+
+/**
+ * 供应商会话(2026-10-24):后端在登录/会话还原时下发 supplierCode —— 该账号**只有**供应商采购打印一页。
+ * 此时整个桌面壳(顶栏/侧栏/页签)都不渲染,只留一条极简条 + 内容区。
+ */
+const isSupplier = computed(() => !!user.supplierCode)
+const supplierLabel = computed(() => {
+  const code = user.supplierCode || ''
+  const name = user.supplierName || ''
+  if (code && name && name !== code) return `${name}(${code})`
+  return name || code
+})
+
+/**
+ * 供应商顶栏上的两个弹窗**按需加载**(defineAsyncComponent):内部账号一个字节都不必加载,
+ * 供应商会话里也不进主包首屏。仓库里没有语言切换组件 ⇒ 不登记(顶栏就不显示语言切换,
+ * 供应商要换语言走登录页那个切换器,或浏览器默认语言)。
+ */
+const AccountDialog = defineAsyncComponent({
+  loader: () => import('@/layout/AccountDialog.vue'),
+  suspensible: false,
+})
+const ChangePwdDialog = defineAsyncComponent({
+  loader: () => import('@/layout/ChangePwdDialog.vue'),
+  suspensible: false,
+})
+const accountVisible = ref(false)
+const pwdVisible = ref(false)
+
+function onSupplierCommand(cmd) {
+  if (cmd === 'logout') {
+    user.logout()
+    router.replace('/login')
+    return
+  }
+  if (cmd === 'account') accountVisible.value = true
+  if (cmd === 'password') pwdVisible.value = true
+}
 
 // 窄屏沉浸页(2026-10-20):断点 768,与 LeftNav/PortalLayout 自己的手机菜单断点一致。
 // 只有路由声明了 meta.immersiveOnMobile 的页面才享受(目前只有「生产领料」)。
@@ -124,6 +202,33 @@ watch(
   background: var(--t-content-bg);
   padding: 16px;
 }
+
+/* 供应商门户顶栏(2026-10-24):供应商账号只有一页,故只留一条极简条 */
+.portal-supplier-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #e3e8ef;
+  flex: none;
+}
+.psb-brand { font-weight: 700; color: #1c4f8a; letter-spacing: 0.5px; }
+.psb-supplier { font-size: 13px; color: #606266; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.psb-spacer { flex: 1; }
+.psb-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #303133;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.psb-user:hover { background: #f2f6fc; }
 
 /* 移动端：抽屉遮罩 */
 .nav-mask {

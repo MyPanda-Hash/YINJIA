@@ -149,6 +149,20 @@ export const menuTree = [
               { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
             ],
           },
+          // 供应商门户(2026-10-24 用户口径「采购管理里面多增加俩个面版,一个是供应商采购打印面版,
+          //   一个是供应商权限配置。供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版
+          //   (和对应供应商编码的数据)……没有别的权限」):
+          //   · 供应商采购打印 = **页面级虚拟面板** SUPPLIER_PRINT(定义见后端 PagePanelRegistry),
+          //     供应商登录后菜单树只剩这一条;数据由 /api/supplier/portal/* 按供应商编码过滤,
+          //     硬闸门是后端 SupplierPortalGuardFilter(供应商会话其余 /api 一律 403)。
+          //   · 供应商权限配置 = SUPPLIER_ACCOUNT,**管理员专属**(adminOnly ⇒ filterMenuTree 只对 isAdmin 放行,
+          //     路由侧 meta.requireAdmin + 后端 requireAdmin 三层同源),维护"哪个账号绑哪个供应商"。
+          {
+            code: 'supplier', title: '供应商门户', icon: 'User', children: [
+              { code: 'supplierPrint', title: '供应商采购打印', path: '/scm/supplierPrint', panelCode: 'SUPPLIER_PRINT', icon: 'Printer' },
+              { code: 'supplierAccount', title: '供应商权限配置', path: '/scm/supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', icon: 'Key', adminOnly: true },
+            ],
+          },
         ],
       },
     ],

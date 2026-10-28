@@ -74,8 +74,8 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   const scm = menuTree.find((n) => n.code === 'scm')
   const purchase = (scm.children || []).find((c) => c.code === 'purchase')
   assert.ok(purchase, '应有 采购管理 分组')
-  // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理)
-  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats'])
+  // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理);2026-10-24 追加第四组「供应商门户」
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats', 'supplier'])
   const codesOf = (node) => {
     if (Array.isArray(node)) return node.flatMap(codesOf)
     if (!node || typeof node !== 'object') return []
@@ -83,7 +83,8 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   }
   // 2026-10-19《10.19 问题》第 3 条:特采单(QC_TC_IN)从 品质管理 > 来料品质 搬到 采购管理 > 单据,
   // 排在采购订单之后(同组叶子顺序即菜单顺序)。
-  assert.deepEqual(codesOf(purchase), ['PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS'])
+  assert.deepEqual(codesOf(purchase),
+    ['PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS', 'SUPPLIER_PRINT', 'SUPPLIER_ACCOUNT'])
   // 特采单只能有一个入口,且不得再挂在 品质管理 下
   const qc = menuTree.find((n) => n.code === 'qc')
   const qcCodes = JSON.stringify(qc)
@@ -96,6 +97,44 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   assert.equal(leaf('PU_ORDER_DETAIL').path, '/panelx/list/PU_ORDER_DETAIL')
   assert.equal(leaf('PU_ORDER_STATS').path, '/panelx/list/PU_ORDER_STATS')
   assert.equal(leaf('PU_ORDER_STATS').title, '采购订单统计表')
+})
+
+/**
+ * 2026-10-24 用户口径:「采购管理里面多增加俩个面版,一个是供应商采购打印面版,一个是供应商权限配置。
+ *   供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版(和对应供应商编码的数据)。」
+ * 第二轮拍板:① 只做采购订单;② 两个入口都放在「智能供应链 > 采购管理」下。
+ * 这里钉住:入口在采购管理下、走专用路由(不走通用 PanelxList)、供应商权限配置是管理员专属。
+ */
+test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打印 + 权限配置)', () => {
+  const scm = menuTree.find((n) => n.code === 'scm')
+  const purchase = (scm.children || []).find((c) => c.code === 'purchase')
+  assert.ok(purchase, '应有 采购管理 分组')
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats', 'supplier'])
+
+  const group = purchase.children.find((c) => c.code === 'supplier')
+  assert.equal(group.title, '供应商门户')
+  const [printLeaf, accountLeaf] = group.children || []
+  assert.equal(printLeaf.title, '供应商采购打印')
+  assert.equal(printLeaf.panelCode, 'SUPPLIER_PRINT')
+  assert.equal(printLeaf.path, '/scm/supplierPrint', '供应商采购打印走专用页(不是通用面板列表)')
+  assert.ok(!printLeaf.adminOnly, '供应商采购打印不能是管理员专属 —— 供应商自己就要用它')
+  assert.equal(accountLeaf.title, '供应商权限配置')
+  assert.equal(accountLeaf.panelCode, 'SUPPLIER_ACCOUNT')
+  assert.equal(accountLeaf.path, '/scm/supplierAccount')
+  assert.equal(accountLeaf.adminOnly, true, '供应商权限配置 = 维护他人登录账号,必须管理员专属')
+
+  // 非管理员看到采购管理、但看不到供应商权限配置(菜单层)
+  const filtered = filterMenuTree([scm], ['PU_ORDER', 'SUPPLIER_PRINT'], false)
+  const fp = filtered[0].children.find((c) => c.code === 'purchase')
+  const fg = fp.children.find((c) => c.code === 'supplier')
+  assert.deepEqual((fg?.children || []).map((c) => c.panelCode), ['SUPPLIER_PRINT'],
+    '只有 SUPPLIER_PRINT 可见的账号,采购管理下只剩「供应商采购打印」这一条')
+  // 供应商会话(visiblePanels 只含 SUPPLIER_PRINT)看到的整棵树 = 一条路径 → 一个叶子
+  const supplierTree = filterMenuTree(menuTree, ['SUPPLIER_PRINT'], false)
+  const leaves = []
+  const walk = (n) => { if (Array.isArray(n)) return n.forEach(walk); if (!n || typeof n !== 'object') return; if (n.panelCode) leaves.push(n.panelCode); (n.children || []).forEach(walk) }
+  walk(supplierTree)
+  assert.deepEqual(leaves, ['SUPPLIER_PRINT'], '供应商账号登录后全站只应看得到这一个面板入口')
 })
 
 /**

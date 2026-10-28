@@ -5,6 +5,7 @@ import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.UsageLogService;
+import com.yinjia.mes.service.SupplierPortalService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,15 +31,19 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder encoder;
     private final UsageLogService usageLog;
+    /** 供应商门户归属(2026-10-24):登录/会话还原时判定"这个账号是不是供应商账号"(见 SupplierPortalService) */
+    private final SupplierPortalService supplierPortal;
     /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开) */
     private final boolean testLedgerEnabled;
 
     public AuthController(JdbcTemplate jdbc, JwtUtil jwtUtil, PasswordEncoder encoder, UsageLogService usageLog,
+                          SupplierPortalService supplierPortal,
                           @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
         this.jdbc = jdbc;
         this.jwtUtil = jwtUtil;
         this.encoder = encoder;
         this.usageLog = usageLog;
+        this.supplierPortal = supplierPortal;
         this.testLedgerEnabled = testLedgerEnabled;
     }
 
@@ -71,6 +76,9 @@ public class AuthController {
             // BCrypt 不可逆、拿不到明文,只能借"用户自己带明文来登录"这一次机会换掉)
             upgradeStoredHashIfNeeded(username, password, String.valueOf(rows.get(0).get("password_hash")));
             Map<String, Object> u = rows.get(0);
+            // 2026-10-24:用户名按库里存的原文对齐(SQL Server 库排序规则不区分大小写,`WHERE username = ?`
+            // 可能命中大小写不同的行;下游 SupplierPortalService 按 username 查归属表,必须用原文)
+            final String loginName = String.valueOf(u.get("username"));
             boolean admin = "Y".equals(u.get("is_admin"));
             // 使用记录:登录成功事件(失败不记);按所选账套记入对应库
             usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
@@ -81,21 +89,41 @@ public class AuthController {
             user.put("isAdmin", admin);
             user.put("roles", rolesOf(u.get("role_id")));
             user.put("factory", factory);
-            user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
-            // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
-            user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
-            // 自定义字段配置权限面板(2026-10-09):管理员=全部;普通用户=角色勾了「自定义字段」的面板。
-            // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
-            // PanelPermissionService.requireFieldConfig(同词 = field)。
-            user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
-            // 库存预警数量配置权限面板(2026-10-15,同 field 机制):管理员=全部;普通用户=角色勾了「预警配置」的面板。
-            // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
-            // PanelPermissionService.requireWarnConfig(同词 = warn)。
-            user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
-            // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
-            // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
-            // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
-            user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
+            // 供应商门户(2026-10-24):账号落在 yj_supplier_account 里 ⇒ **整体降权**,
+            // 只留「供应商采购打印」一个可见页面,其余权限清单一律清空(用户口径「没有别的权限」)。
+            // 真闸门在 SupplierPortalGuardFilter(供应商会话的 /api 请求只放行门户接口),这里只负责
+            // 让前端菜单/路由/桌面按供应商会话重新构建 —— 两者必须同源,改一侧就要同步另一侧。
+            String supplierCode = supplierPortal.supplierCodeOf(loginName);
+            if (supplierCode != null) {
+                user.put("supplierCode", supplierCode);
+                user.put("supplierName", supplierCode.isEmpty() ? "" : supplierPortal.supplierName(supplierCode));
+                // 页面级面板的只读词(与 PagePanelRegistry.SUPPLIER_PRINT_ACTIONS 同一批词)
+                Map<String, Object> pagePerms = new LinkedHashMap<>();
+                for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
+                pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
+                user.put("pagePerms", pagePerms);
+                user.put("visiblePanels", List.of(PagePanelRegistry.SUPPLIER_PRINT));
+                user.put("approvePanels", List.of());
+                user.put("fieldPanels", List.of());
+                user.put("warnPanels", List.of());
+                user.put("roles", List.of("供应商"));
+            } else {
+                user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
+                // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
+                user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
+                // 自定义字段配置权限面板(2026-10-09):管理员=全部;普通用户=角色勾了「自定义字段」的面板。
+                // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
+                // PanelPermissionService.requireFieldConfig(同词 = field)。
+                user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
+                // 库存预警数量配置权限面板(2026-10-15,同 field 机制):管理员=全部;普通用户=角色勾了「预警配置」的面板。
+                // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
+                // PanelPermissionService.requireWarnConfig(同词 = warn)。
+                user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
+                // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
+                // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
+                // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
+                user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
+            }
             Map<String, Object> out = new HashMap<>();
             out.put("token", jwtUtil.generate(username, factory));
             out.put("user", user);
@@ -176,6 +204,23 @@ public class AuthController {
         // 2026-09-22 补:原先这里不含 factory,前端启动时用本响应覆盖 mes_user,
         // 会把登录时带进来的 factory 抹掉,顶栏账套名只能靠可能陈旧的 localStorage 缓存 —— 又是"显示与实查不一致"的老坑。
         user.put("factory", DataSourceRouter.current());
+        // 供应商会话(2026-10-24):与 {@link #login} **逐字同源** —— 登录时降权、启动时回取也必须降权,
+        // 否则"刷新一次页面权限就回来了"(前端的 mes_user 就是被本方法的响应覆盖的)。改一侧必须同步另一侧。
+        String supplierCode = supplierPortal.supplierCodeOf(u.get("username") == null ? null : String.valueOf(u.get("username")));
+        if (supplierCode != null && !supplierCode.isEmpty()) {
+            user.put("supplierCode", supplierCode);
+            user.put("supplierName", supplierPortal.supplierName(supplierCode));
+            Map<String, Object> pagePerms = new LinkedHashMap<>();
+            for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
+            pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
+            user.put("pagePerms", pagePerms);
+            user.put("visiblePanels", List.of(PagePanelRegistry.SUPPLIER_PRINT));
+            user.put("approvePanels", List.of());
+            user.put("fieldPanels", List.of());
+            user.put("warnPanels", List.of());
+            user.put("roles", List.of("供应商"));
+            return user;
+        }
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));

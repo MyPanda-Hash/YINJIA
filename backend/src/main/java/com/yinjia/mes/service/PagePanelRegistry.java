@@ -70,6 +70,22 @@ public final class PagePanelRegistry {
     public static final String PROD_PICK = "PROD_PICK";
     /** 工序报工(2026-10-21):页面级虚拟面板,扫工单码报工 */
     public static final String PROD_REPORT = "PROD_REPORT";
+    /**
+     * 供应商采购打印(2026-10-24,用户口径「采购管理里面多增加俩个面版,一个是供应商采购打印面版…
+     * 供应商可以通过这个面版来查看和打印数据。没有别的权限」)。
+     *
+     * <p>供应商登录后**唯一**能打开的页面:只读列表(bd_pu_order 头行,服务端强制
+     * {@code 供应商编码 = 当前供应商}) + 银嘉采购订单纸质单打印。
+     * 数据接口在 {@code /api/supplier/portal/*}({@link SupplierPortalService}),
+     * 真正的闸门是 {@code SupplierPortalGuardFilter}(供应商会话的 /api 请求只放行这几条)。
+     */
+    public static final String SUPPLIER_PRINT = "SUPPLIER_PRINT";
+    /**
+     * 供应商权限配置(2026-10-24):采购管理下维护"哪个供应商账号能登录、绑定哪个供应商编码"。
+     * **管理员专属** —— 与 ERP_INTEG 同一先例:矩阵里登记(便于分组展示与统计),写操作一律
+     * {@code requireAdmin},不靠权限词授予。
+     */
+    public static final String SUPPLIER_ACCOUNT = "SUPPLIER_ACCOUNT";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -171,6 +187,21 @@ public final class PagePanelRegistry {
             {"report", "报工"},
     };
 
+    /** 供应商采购打印:只有看与打,连"导出"都不给(用户口径「没有别的权限」) */
+    private static final String[][] SUPPLIER_PRINT_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"print", "打印"},
+    };
+
+    /**
+     * 供应商权限配置:管理员专属页面,动作集只登记「可见」——
+     * 新建/停用/重置密码一律 requireAdmin(与 ERP_INTEG 的 view-only 同一口径)。
+     */
+    private static final String[][] SUPPLIER_ACCOUNT_ACTIONS = {
+            {"view", "可见"},
+    };
+
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
             // 2026-10-20 导航改版:「生产制造」一级目录拆掉,这四个看板所属分组合并为「生产计划」
@@ -188,7 +219,11 @@ public final class PagePanelRegistry {
             new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
-            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理系统", BARCODE_SCAN_PICK_ACTIONS));
+            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理系统", BARCODE_SCAN_PICK_ACTIONS),
+            // 2026-10-24 用户口径:「采购管理里面多增加俩个面版,一个是供应商采购打印面版,一个是供应商权限配置」
+            //   两者都挂在「智能供应链 > 采购管理」下(menus.js 同步),故分组=智能供应链。
+            new PagePanelDef(SUPPLIER_PRINT, "供应商采购打印", "智能供应链", SUPPLIER_PRINT_ACTIONS),
+            new PagePanelDef(SUPPLIER_ACCOUNT, "供应商权限配置", "智能供应链", SUPPLIER_ACCOUNT_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

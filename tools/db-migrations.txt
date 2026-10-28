@@ -4181,3 +4181,10 @@ migrate-pu-label-prod-date-20261023.sql
 #   「生产日期」「批次号」两条字段词条 yj_translation 早已齐备(实测 10 语言 manual 全覆盖),**不重复插**;
 #   本次只补日期框占位词「选择日期」(scope=field),已存在即跳过、不覆盖人工校对。两账套均执行,幂等。
 i18n-pu-label-prod-date-20261023.sql
+
+# ---- 2026-10-24 供应商门户(采购管理 → 供应商采购打印 / 供应商权限配置)----
+#   用户口径「供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版(和对应供应商编码的数据)……没有别的权限」。
+#   ① 建表 yj_supplier_account(供应商登录账号 → 绑定供应商编码,含表/关键列中文注明)+ yj_user.[供应商编码] 归属列 + 回填 + 自检;
+#   ② 两个页面级虚拟面板的译名(yj_translation,scope=panel,9 语言 manual)。两账套均需执行,均幂等。
+migrate-supplier-portal-20261024.sql
+i18n-supplier-portal-20261024.sql

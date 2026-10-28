@@ -24,6 +24,11 @@ export const useUserStore = defineStore('user', {
       // 页面级虚拟面板的动作词(2026-10-16):订单结转/快速排产/工单排产/生产工单,code → perms csv。
       // 管理员=每码 '*'。判定走 core/auth/panelAccess.canDo(与后端 requireButton 同源)。
       pagePerms: ui?.pagePerms && typeof ui.pagePerms === 'object' ? ui.pagePerms : {},
+      // 供应商会话(2026-10-24):后端在登录/会话还原时,凡 yj_supplier_account 里的账号都会把
+      // visiblePanels 裁到只剩 SUPPLIER_PRINT 并下发 supplierCode(= 绑定的供应商编码)。
+      // 前端据此把界面收成「供应商门户」(无侧栏、只有采购打印一页),路由守卫也认这个键。
+      supplierCode: typeof ui?.supplierCode === 'string' ? ui.supplierCode : '',
+      supplierName: ui?.supplierName || '',
     }
   },
   getters: {
@@ -67,6 +72,8 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
       this.warnPanels = Array.isArray(u?.warnPanels) ? u.warnPanels : []
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
+      this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
+      this.supplierName = u?.supplierName || ''
     },
     // 刷新权限（角色/面板配置变更后调用）
     async fetchPerms() {
@@ -80,8 +87,10 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
       this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}
+      this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : ''
+      this.supplierName = p.supplierName || ''
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, pagePerms: this.pagePerms }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, pagePerms: this.pagePerms, supplierCode: this.supplierCode, supplierName: this.supplierName }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -134,6 +143,8 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = []
       this.warnPanels = []
       this.pagePerms = {}
+      this.supplierCode = ''
+      this.supplierName = ''
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
     },
