@@ -2219,30 +2219,6 @@
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
 
-    <!-- 生产工单「排产」弹窗(2026-09-24 用户要求):本单快捷排线——选产线/日期/数量,
-         后端复用排产工作台 assign(仅已审核可排/数量守恒/停用线拒绝/留痕),回执含当日负荷与超载提示 -->
-    <el-dialog v-model="moSchVisible" :title="tt('排产')" width="420px" append-to-body>
-      <div class="mo-sch-row">{{ tt('工单号') }}:<b>{{ moSchNo }}</b></div>
-      <div class="mo-sch-row">{{ tt('生产线') }}
-        <el-select v-model="moSchLine" filterable style="width: 240px" :placeholder="tt('选择生产线')">
-          <el-option v-for="l in moSchLines" :key="l['生产线']" :value="l['生产线']"
-                     :label="`${l['生产线']} · ${tt('今日负荷')}${l['今日负荷'] ?? 0}/${tt('日产能')}${l['日产能'] ?? 0}`" />
-        </el-select>
-      </div>
-      <div class="mo-sch-row">{{ tt('预开工日') }}
-        <el-date-picker v-model="moSchStart" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
-      </div>
-      <div class="mo-sch-row">{{ tt('预完工日') }}
-        <el-date-picker v-model="moSchEnd" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
-      </div>
-      <div class="mo-sch-row">{{ tt('排产数量') }}（{{ tt('空=全排') }}）
-        <el-input-number v-model="moSchQty" :min="0" :controls="false" style="width: 130px" />
-      </div>
-      <template #footer>
-        <el-button @click="moSchVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="submitPanelSchedule">{{ tt('确认排产') }}</el-button>
-      </template>
-    </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
@@ -2462,7 +2438,7 @@ const unsavedGuard = useUnsavedStore()
 // ── 纸质单据/标签打印:统一由面板 runtime 下发,本组件不直接依赖 business/print-formats ──
 const {
   printPuOrder, printQcReturn, printProductCards, printLocationCards,
-  printProductionTask, printPuOrderNoAmount, woQrText,
+  printPuOrderNoAmount, woQrText,
 } = engine
 
 // 语言热切换:仅重拉面板配置(字段标签/面板名/列别名随 Accept-Language 更新),
@@ -4453,7 +4429,7 @@ const draftEditable = computed(() => {
  *  + 立项申请表 RD_APPROVAL(2026-10-16 用户口径「给立项申请表的备注栏加一个可以上传附件的功能」:
  *    该表只有一个附件列位 rd_approval.[附件1],纸面是文书式,佐证材料同属"审核后仍要补"的一类)。 */
 const ATTACH_EDIT_PANELS = new Set([
-  'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
+  'PU_ORDER', 'SO_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
   'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT', 'RD_APPROVAL',
   // 2026-10-19 用户口径(10.19 问题第 4 条「特采单上面也要可以传附件」):
   // 特采单是文书式纸面(DocSheet),附件位由 qc_tc_in.附件1..6 + yj_field(dataType=附件) 驱动;
@@ -5056,8 +5032,7 @@ const mainRows = computed(() => {
   if (!l.length) return []
   const filtered = applyAdvFilters(applyColFilters(l.map((r) => r), mainCols.value.map((c) => ({ prop: c }))))
   // 排序在取前 5 行之前:排序后看到的是"本页该字段前 5 条",而不是"前 5 条里再排"
-  // 生产加工单=工单列表形态(2026-09-24):预览行数放开到 20(其余面板保持 5 行预览)
-  const LIMIT = panelCode.value === 'MANU_ORDER' ? 20 : 5
+  const LIMIT = 5
   const rows = sortViewRows(filtered, mainSort).slice(0, LIMIT)
   while (rows.length < LIMIT) rows.push({ _placeholder: true })
   return rows
@@ -5768,99 +5743,6 @@ async function qrBlobErrMsg(e) {
   return e?.response?.data?.message || e?.message || ''
 }
 
-// ═══ 生产工单:打印工单 / 排产(2026-09-24 用户要求,按钮挂 MANU_ORDER 面板) ═══
-// 打印工单=生产任务单固定版式(print-formats.printProductionTask,与工单排产看板同一实现)+ 打印留痕;
-// 排产=本单快捷排线(弹窗选产线/日期/数量 → 复用排产工作台 assign:仅已审核可排/数量守恒/停用线拒绝/留痕)。
-const moSchVisible = ref(false)
-const moSchNo = ref('')
-const moSchLine = ref('')
-const moSchStart = ref('')
-const moSchEnd = ref('')
-const moSchQty = ref(null)
-const moSchLines = ref([])
-
-/** 当前生产工单单号:头键=合同号(list 行/表单一致) */
-function moDocNo(row) {
-  const r = row || current.value || {}
-  return String(r['合同号'] || r['单据编号'] || r['编号'] || '').trim()
-}
-
-async function openPanelPrintWorkOrder() {
-  const no = moDocNo()
-  if (!no) return ElMessage.warning(tt('请先选择一张单据'))
-  try {
-    const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
-    const doc = res?.data || {}
-    const lines = Object.values(res?.detailData || {})[0] || []
-    const l = lines[0] || {}
-    const qty = doc['排产数量'] ?? l['排产数量'] ?? ''
-    const perBox = l['每箱数量'] ?? ''
-    const rows = [{
-      加工单号: no,
-      客户: doc['客户'] || '',
-      产品名称: l['产品名称'] || '',
-      批号: doc['批号'] || l['批号'] || '',
-      规格型号: l['规格型号'] || '',
-      重点管控: doc['重点管控'] || '',
-      客户PO: doc['销售订单号'] || '',
-      排产数量: qty,
-      每箱数量: perBox,
-      箱数: Number(perBox) > 0 ? Number(qty) / Number(perBox) : '',
-      计划完工日期: String(doc['预完工日'] || '').slice(0, 10),
-      备注: doc['备注'] || '',
-      生产线: doc['生产线'] || '',
-    }]
-    // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
-    const sent = await printProductionTask(rows)
-    try {
-      await request.post('/px/scheduleBoard/printStamp', { rows: [{ 加工单号: no }] })
-    } catch { /* 留痕失败不阻断打印 */ }
-    if (sent) ElMessage.success(tt('已发送打印'))
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('打印失败'))
-  }
-}
-
-/** 打开本单排产弹窗:产线源=排产工作台 stats(启用线 + 当日负荷/日产能) */
-async function openPanelSchedule() {
-  const no = moDocNo()
-  if (!no) return ElMessage.warning(tt('请先选择一张单据'))
-  try {
-    const stats = await request.post('/px/scheduleBoard/stats', {})
-    moSchLines.value = (stats.data?.['产线'] || []).filter((l) => !l['停用'])
-  } catch { moSchLines.value = [] }
-  const cur = current.value || {}
-  moSchNo.value = no
-  moSchLine.value = cur['生产线'] || ''
-  moSchStart.value = String(cur['预开工日'] || '').slice(0, 10)
-  moSchEnd.value = String(cur['预完工日'] || '').slice(0, 10)
-  moSchQty.value = Number(cur['排产数量']) || null
-  moSchVisible.value = true
-}
-
-async function submitPanelSchedule() {
-  if (!moSchLine.value) return ElMessage.warning(tt('请选择生产线'))
-  try {
-    const res = await request.post('/px/scheduleBoard/assign', {
-      rows: [{
-        加工单号: moSchNo.value,
-        生产线: moSchLine.value,
-        预开工日: moSchStart.value || undefined,
-        预完工日: moSchEnd.value || undefined,
-        排产数量: moSchQty.value || undefined,
-      }],
-    })
-    const d = res.data || {}
-    const rc = (d['产线回执'] || []).map((l) => `${l['生产线']}:${tt('今日负荷')}${l['今日负荷'] ?? 0}/${tt('日产能')}${l['日产能'] ?? 0}${l['提示'] === '超载' ? ' ⚠' + tt('超载') : ''}`).join('；')
-    const failed = d['失败行'] || []
-    if (failed.length) ElMessage.warning(failed[0])
-    else ElMessage.success(`${tt('已排产')} ${moSchNo.value} → ${moSchLine.value}` + (rc ? `（${rc}）` : ''))
-    moSchVisible.value = false
-    await search()
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('排产失败'))
-  }
-}
 /** 档案行非响应化(2026-09-16 四期,入口卡顿主因):几千行×几十列被 Vue 深度代理
  *  (首次全量过滤/排序/快照访问 ≈29 万属性走 proxy get)是"点进页面转圈"的最大开销源(实测单一 4.4s 长任务)。
  *  将档案明细数组与行 markRaw 后,读取零代理;写入(编辑/带回/新增)经 markInlineDirty
@@ -9249,17 +9131,9 @@ async function onButton(action) {
         batchSendVisible.value = true
         return
       }
-  // 工单二维码(计划层):单产品工单一张标签,二维码=公司代码@工单号@1000+工单行号(woQrText,2026-10-09 规则改版,扫码报工/领料入口);
-  // 2026-09-22 面板化:适配生产工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
-  // 生产工单:打印工单(生产任务单版式)/排产(本单快捷排线) —— 仅 MANU_ORDER 面板(2026-09-24 用户要求)
-  if (action === '打印工单' && panelCode.value === 'MANU_ORDER') {
-    await openPanelPrintWorkOrder()
-    return
-  }
-  if (action === '排产' && panelCode.value === 'MANU_ORDER') {
-    await openPanelSchedule()
-    return
-  }  if (action === '打印工单二维码') {
+  // 工单二维码(计划层):单产品工单一张标签,二维码=公司代码@工单号@1000+工单行号(woQrText,扫码报工/领料入口);
+  // 2026-10-28 生产加工单 MANU_ORDER 下架后只剩「生产工单(旧版)」WO_ORDER 走这里(现役生产工单列表自带打印工单)。
+  if (action === '打印工单二维码') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || cur['合同号'] || cur['加工单号'] || ''
     if (!no) return ElMessage.warning('请先选择一张工单')
@@ -10014,7 +9888,7 @@ async function onButton(action) {
         return
       }
       // 推式生单：直接跳转到目标面板列表页（不新开标签页），新生成的单据按创建时间倒序显示在第一张（草稿内联可编辑）
-      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
+      ElMessage.success(`已生成${res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
       const targetPath = `/panelx/list/${res.gotoPanel}`
       tabs.close(route.path) // 关闭当前源面板页签（页签被目标面板替换）
       router.push(targetPath)
@@ -10246,7 +10120,7 @@ function onRowClick(row, b) {
     openBlankDetailRow(b)
     return
   }
-  // 产成品→材料联动：MANU_ORDER 等单据点产成品明细行 → 材料明细只显示其 BOM 子件
+  // 产成品→材料联动：单据点产成品明细行 → 材料明细只显示其 BOM 子件
   if (b && b.id === 'A' && row && row['产品编码'] && row['产品编码'] !== selectedProduct.value) {
     selectProduct(row['产品编码'])
     return
@@ -10420,7 +10294,8 @@ onMounted(() => {
   // 懒渲染打印层的 Ctrl+P 拦截(见 onDocPrintKey:已就绪时不拦截)
   window.addEventListener('keydown', onDocPrintKey)
   if (invalidPanel.value) {
-    router.replace('/panelx/list/MANU_ORDER')
+    // 2026-10-28:原先兜底跳旧生产加工单面板(该面板已下架),改为回工作台
+    router.replace('/dashboard')
     return
   }
   // 本实例是当前前台页签(keep-alive 下 onActivated 也会置一次;这里兜住"不在 keep-alive 里"的场景)
@@ -11479,15 +11354,6 @@ onUnmounted(() => {
 }
 .adv-filter-dash { color: #909399; }
 .adv-filter-dim { font-size: 12px; color: #909399; margin-left: 8px; }
-/* 生产工单排产弹窗行 */
-.mo-sch-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: #606266;
-}
 .dark .adv-filter-section { border-color: #3a3b42; }
 .dark .adv-filter-title { color: #bbb; }
 .query-dialog-field {

@@ -12,7 +12,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 const PANELS = [
   'SO_ORDER', 'PU_REQ', 'PU_ORDER', 'PURCHASE_IN', 'SALE_OUT', 'OTHER_IN', 'OTHER_OUT',
   'OUTSOURCE_ORDER', 'OUTSOURCE_ISSUE', 'OUTSOURCE_IN', 'MATERIAL_OUT', 'FINISH_IN',
-  'MANU_ORDER', 'DISPATCH', 'RD_FILTER_EFF', 'RD_INSTR_USE', 'DEPT', 'WH', 'EMP', 'PARTNER', 'INV', 'OP', 'BOM', 'STOCK_STATUS',
+  'DISPATCH', 'RD_FILTER_EFF', 'RD_INSTR_USE', 'DEPT', 'WH', 'EMP', 'PARTNER', 'INV', 'OP', 'BOM', 'STOCK_STATUS',
 ]
 
 async function main() {

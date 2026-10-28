@@ -15,8 +15,7 @@ const routes = [
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', component: () => import('@/views/dashboard/index.vue'), meta: { title: '我的桌面' } },
-      { path: 'prod/manufacture/order', redirect: '/panelx/list/MANU_ORDER' },
-      { path: 'prod/manufacture/orderForm', redirect: '/panelx/form/MANU_ORDER' },
+      // 2026-10-28:旧生产加工单 MANU_ORDER 下架,prod/manufacture/order(Form) 两条重定向一并移除
       { path: 'prod/manufacture/board', component: () => import('@/views/modules/board/ManufactureBoard.vue'), meta: { title: '生产看板', code: 'manufactureBoard' } },
       { path: 'prod/shop/reworkDesk', component: () => import('@/views/modules/rework/ReworkDesk.vue'), meta: { title: '返修工作台', code: 'reworkDesk' } },
       { path: 'top/solution', component: () => import('@/views/modules/solution/SolutionCenter.vue'), meta: { title: '方案中心', code: 'solutionCenter' } },

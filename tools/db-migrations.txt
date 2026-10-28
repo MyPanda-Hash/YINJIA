@@ -4210,3 +4210,11 @@ migrate-menu-node-20261023.sql
 # 2026-10-28 新增:「本人自审」权限(审批留痕补 self_audit 标记列)——
 #   yj_form_approval.self_audit char(1) NULL,新增 MS_Description;配合面板级动作词 selfaudit。
 migrate-form-approval-self-audit-20261028.sql
+
+# 2026-10-28 下架「生产加工单 MANU_ORDER」整套遗留实现(用户口径「当前这个生产加工单应该不再被使用,
+#   当前的内容应该都在生产工单内进行处理实现」)。删:两面板(MANU_ORDER / 同链看板 MANU_SCHEDULE)的
+#   yj_panel/yj_field/yj_role_panel/译名 + 关联数据 + 视图 v_manu_schedule + 两张 0 行物理表
+#   bd_manu_order/bl_manu_order(表非空则整脚本中止);不动 wo_order/wo_progress(WO_ORDER 另一套遗留)、
+#   yj_usage_log/s_allno(审计与号池)。闸门:0 行 + 无其它对象引用 + 收尾自检,不过则 ROLLBACK。
+migrate-drop-manu-order-20261028.sql
+

@@ -126,9 +126,9 @@ const guide = [
   { title: '开始日常业务', desc: '从生产工单开始，按 报工→出入库→质检 的流程运转。' },
 ]
 
+// 2026-10-28:旧「生产加工单 MANU_ORDER」下架,两个加工单快捷入口移除;
+//   生产工单改为工作台页面(菜单「生产计划 → 生产工单」),不在帮助面板里重复放入口。
 const shortcuts = [
-  { title: '新建加工单', icon: 'DocumentAdd', path: '/panelx/form/MANU_ORDER?new=1', tabPath: '/panelx/form/MANU_ORDER', tabTitle: '新增加工单' },
-  { title: '打开加工单列表', icon: 'List', path: '/panelx/list/MANU_ORDER', tabPath: '/panelx/list/MANU_ORDER', tabTitle: '生产工单' },
   { title: '我的桌面', icon: 'HomeFilled', path: '/dashboard', tabPath: '/dashboard', tabTitle: '我的桌面' },
 ]
 

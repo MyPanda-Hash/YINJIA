@@ -10,12 +10,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 生产排产域服务(2026-09-22 面板化改造后仅保留跨面板复用的两段核心):
- * ① 销售订单 → 生产工单({@link #generateFromOrder}/{@link #createFromOrderLine},SO_ORDER「生成生产工单」按钮);
- * ② 生产工单排产({@link #scheduleOne},MANU_ORDER「排产」按钮):就地回写产线/车间/开工·完工日/重点管控,
- *    数量守恒(排产数量≤本单生单量,form_flow_link.linked_quantity 跟随)、余量=排产−入库(头级优先)、排产留痕。
- * 界面层(待生单/排单计划表/负荷看板)不再走专用页——由 SO_ORDER/MANU_ORDER/MANU_SCHEDULE/LINE_CAP/LINE_LOAD 面板承担,
- * 流转 = 面板按钮生单/跳转(gotoPanel),对齐全系统面板↔面板范式。
+ * 生产排产域服务:销售订单 → 生产工单({@link #generateFromOrder}/{@link #createFromOrderLine},
+ * SO_ORDER「生成生产工单」按钮),落 {@code plang},数量守恒靠 form_flow_link.linked_quantity。
+ *
+ * <p>2026-10-28:旧「生产加工单 MANU_ORDER」下架,原 {@code scheduleOne}(回写 bd_manu_order/bl_manu_order)
+ * 一并删除 —— 排产单一入口是「快速排产 / 生产工单」页(Plang 单轨,见 ScheduleBoardService.assign)。
+ * 本类不再承担排产回写。
  */
 @Service
 public class QuickScheduleService {
@@ -184,114 +184,6 @@ public class QuickScheduleService {
             if (!r.isEmpty() && r.get(0) != null) route = r.get(0).trim();
         }
         return route.isEmpty() ? "GY-CB-STD" : route;
-    }
-
-    // ────────────────────────── ② 生产工单排产(排产工作台单一入口,2026-09-23 §5) ──────────────────────────
-
-    /**
-     * 排产(带参数):排产工作台把 生产线/排产班组/预开工日/预完工日/行 排产数量·每箱数量 写入后(生产车间=产线档案属性,2026-09-23 下线),
-     * 再走核心守卫+数量守恒+留痕。参数可空=沿用单上现值;MANU_ORDER 表单的 生产线/预开工日/预完工日 已转只读。
-     */
-    @Transactional
-    public Map<String, Object> scheduleOne(String no, Map<String, Object> p, String user) {
-        if (p != null && !p.isEmpty()) {
-            String line = str(p.get("生产线"));
-            String team = str(p.get("排产班组"));
-            String start = str(p.get("预开工日"));
-            String end = str(p.get("预完工日"));
-            if (start != null && end != null && end.compareTo(start) < 0) {
-                throw new IllegalStateException("预完工日不能早于预开工日(" + start + " → " + end + ")");
-            }
-            if (line != null) {
-                jdbc.update("UPDATE bd_manu_order SET [生产线]=?, [排产班组]=COALESCE(?, [排产班组]),"
-                                + "[预开工日]=COALESCE(?, [预开工日]),"
-                                + " [预完工日]=COALESCE(?, [预完工日]) WHERE [合同号]=?",
-                        line, team, date(start), date(end), no);
-            }
-            Double qty = num(p.get("排产数量"));
-            Double box = num(p.get("每箱数量"));
-            if ((qty != null && qty > 0) || (box != null && box > 0)) {
-                jdbc.update("UPDATE bl_manu_order SET [排产数量]=COALESCE(?, [排产数量]), [每箱数量]=COALESCE(?, [每箱数量])"
-                                + " WHERE [合同号]=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                        (qty != null && qty > 0) ? qty : null, (box != null && box > 0) ? box : null, no);
-            }
-        }
-        return scheduleOne(no, user);
-    }
-
-    private static java.time.LocalDate date(String s) {
-        return s == null || s.isBlank() ? null : java.time.LocalDate.parse(s);
-    }
-
-    /**
-     * 单张加工单排产(核心):读加工单上的 生产线/预开工日/预完工日 + 行 排产数量/每箱数量,就地回写执行信息。
-     * 守卫:**仅已审核可排**(排产台口径 §5,草稿不进池);未作废/未中止/未结案;生产线必填;
-     * 排产数量≤本单生单量(占用守恒:linked_quantity 跟随);留痕 asp_user2/time2 + yj_usage_log。
-     */
-    @Transactional
-    public Map<String, Object> scheduleOne(String no, String user) {
-        Map<String, Object> head;
-        try {
-            head = jdbc.queryForMap(
-                    "SELECT h.[合同号], ISNULL(h.[生产线],N'') AS 生产线,"
-                            + " ISNULL(h.[重点管控],N'') AS 重点管控, ISNULL(h.[结案],N'N') AS 结案,"
-                            + " ISNULL(h.asp_cancel,N'N') AS asp_cancel, ISNULL(h.[入库数量],0) AS 头入库,"
-                            + " (SELECT TOP 1 CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
-                            + "   WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
-                            + "   WHEN s.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END"
-                            + "  FROM yj_doc_status s WHERE s.panel_code='MANU_ORDER' AND s.doc_no=h.[合同号]) AS 单据状态"
-                            + " FROM bd_manu_order h WHERE h.[合同号] = ?", no);
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            throw new IllegalStateException("生产工单不存在:" + no);
-        }
-        String status = str(head.get("单据状态"));
-        if ("已作废".equals(status)) throw new IllegalStateException("该加工单已作废,不能排产");
-        if ("已中止".equals(status)) throw new IllegalStateException("该加工单已中止,不能排产;如需排产请先恢复");
-        if ("Y".equals(str(head.get("结案")))) throw new IllegalStateException("该加工单已结案,不能排产");
-        if (!"已审核".equals(status)) {
-            throw new IllegalStateException("仅已审核工单可排产(当前:" + status + ");请先在生产工单面板审核");
-        }
-        String line = str(head.get("生产线"));
-        if (line == null) throw new IllegalStateException("请先指定生产线(排产工作台顶部参数或行内选择)");
-
-        jdbc.update("UPDATE bd_manu_order SET [操作员]=?, asp_user2=?, asp_time2=SYSDATETIME() WHERE [合同号]=?",
-                user, user, no);
-
-        List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT l.[id] AS 行id, ISNULL(l.[排产数量],0) AS 排产数量, ISNULL(l.[每箱数量],0) AS 每箱数量,"
-                        + " ISNULL(l.[数量],0) AS 本单数量, ISNULL(l.[入库数量],0) AS 行入库"
-                        + " FROM bl_manu_order l WHERE l.[合同号]=? AND ISNULL(l.asp_cancel,'N')<>'Y' ORDER BY l.[id]", no);
-        if (lines.isEmpty()) throw new IllegalStateException("加工单无有效明细行,不能排产");
-        Double cap = jdbc.queryForObject(
-                "SELECT TOP 1 source_quantity FROM form_flow_link"
-                        + " WHERE target_panel_code='MANU_ORDER' AND target_form_no=? AND link_status='ACTIVE' ORDER BY id",
-                Double.class, no);
-        boolean touched = false;
-        for (Map<String, Object> l : lines) {
-            double qty = Num.of(l.get("排产数量")) > 0 ? Num.of(l.get("排产数量")) : Num.of(l.get("本单数量"));
-            if (qty <= 0) continue;
-            if (cap != null && qty > cap + 0.0001) {
-                throw new IllegalStateException("排产数量 " + qty + " 超过本单生单量 " + cap + "(如需增产请对同一订单行再生成一张加工单)");
-            }
-            double inQty = Num.of(head.get("头入库")) > 0 ? Num.of(head.get("头入库")) : Num.of(l.get("行入库"));
-            jdbc.update("UPDATE bl_manu_order SET [余量]=? WHERE [合同号]=? AND [id]=?", qty - inQty, no, l.get("行id"));
-            if (cap != null) {
-                jdbc.update("UPDATE form_flow_link SET linked_quantity=?"
-                                + " WHERE target_panel_code='MANU_ORDER' AND target_form_no=? AND link_status='ACTIVE'",
-                        qty, no);
-            }
-            touched = true;
-        }
-        if (!touched) throw new IllegalStateException("排产数量与本单数量均为 0,请先填写排产数量");
-        try {
-            jdbc.update("INSERT INTO yj_usage_log (user_name, event_type, panel_name, action_name, doc_no, created_at)"
-                            + " VALUES (?, N'排产', N'生产工单', N'排产', ?, GETDATE())", user, no);
-        } catch (Exception ignore) { /* 留痕失败不阻断 */ }
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("编号", no);
-        out.put("生产线", line);
-        out.put("gotoPanel", "MANU_SCHEDULE");   // 2026-09-23 起「生产排产」菜单下线(改「工单排产」看板);当前唯一调用方=排产工作台 assign(回执自带,不用 gotoPanel),此键保留兼容旧调用
-        return out;
     }
 
     // ────────────────────────── 工具 ──────────────────────────

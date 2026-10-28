@@ -1,4 +1,5 @@
-/* 验证下拉框字段双模:DISPATCH 业务类型(2 条)=下拉;MANU_ORDER 测试程序(临时 25 条)=弹窗 */
+/* 验证下拉框字段双模:DISPATCH 业务类型(2 条)=下拉。
+ * 2026-10-28:另一路「MANU_ORDER 测试程序 25 条 = 弹窗」随生产加工单下架删除(面板已不存在)。 */
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -48,41 +49,7 @@ async function main() {
     })()`)
     console.log('DISPATCH 业务类型(2条):', dispatchCtl)
 
-    // 2) MANU_ORDER 表单页:测试程序(临时 25 条)→ 应为弹窗控件
-    await navigate('http://localhost:5173/#/panelx/form/MANU_ORDER')
-    await sleep(4000)
-    const manuCtl = await evaluate(`(() => {
-      const fields = [...document.querySelectorAll('.field')]
-      const f = fields.find(el => (el.querySelector('label')?.textContent || '').includes('测试程序'))
-      if (!f) return 'NO-FIELD'
-      if (f.querySelector('.el-select')) return 'select'
-      if (f.querySelector('.ref-ctl')) return 'dialog-ctl'
-      return 'OTHER'
-    })()`)
-    console.log('MANU_ORDER 测试程序(25条):', manuCtl)
-
-    // 3) 点击弹窗按钮 → 检查弹窗列表项数 = 25
-    if (manuCtl === 'dialog-ctl') {
-      await evaluate(`(() => { const f = [...document.querySelectorAll('.field')].find(el => (el.querySelector('label')?.textContent || '').includes('测试程序')); f?.querySelector('.ref-btn')?.click(); return 'clicked' })()`)
-      await sleep(1200)
-      const listCount = await evaluate(`document.querySelectorAll('.dict-pick-item').length`)
-      const dialogVisible = await evaluate(`!!document.querySelector('.el-dialog') && [...document.querySelectorAll('.el-dialog')].some(d => d.offsetParent !== null)`)
-      console.log('dict dialog visible:', dialogVisible, '| items:', listCount)
-      // 4) 搜索过滤:输入 测试项05 → 应剩 1 项
-      await evaluate(`(() => { const inp = document.querySelector('.dict-pick-search input'); if (inp) { const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(inp, '测试项05'); inp.dispatchEvent(new Event('input', { bubbles: true })); } return 'typed' })()`)
-      await sleep(800)
-      const filtered = await evaluate(`document.querySelectorAll('.dict-pick-item').length`)
-      console.log('after search 测试项05:', filtered, 'item(s)')
-      // 5) 点击选中 → 字段回填
-      await evaluate(`document.querySelector('.dict-pick-item')?.click()`)
-      await sleep(800)
-      const filled = await evaluate(`(() => { const f = [...document.querySelectorAll('.field')].find(el => (el.querySelector('label')?.textContent || '').includes('测试程序')); return f?.querySelector('input')?.value || '' })()`)
-      console.log('field filled:', filled)
-      const pass = listCount === 25 && filtered === 1 && filled === '测试项05'
-      console.log('RESULT:', pass ? 'PASS' : 'FAIL')
-    } else {
-      console.log('RESULT: FAIL (expected dialog-ctl)')
-    }
+    console.log('RESULT:', dispatchCtl === 'select' ? 'PASS' : 'FAIL (expected select)')
     ws.close()
   } finally { edge.kill(); try { fs.rmSync(profile,{recursive:true,force:true}) } catch {} }
 }

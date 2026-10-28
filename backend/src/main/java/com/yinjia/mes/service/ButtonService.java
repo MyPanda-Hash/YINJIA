@@ -1902,16 +1902,6 @@ public class ButtonService {
         // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
         // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
-        // 排产锁定(2026-09-23 用户要求,2026-09-24 随生产域下拉):已进入排产(指派了生产线)的加工单不可弃审——
-        // 弃审会回到草稿而排产信息仍在,池口径/负荷/占用与单据状态错位;请先在排产工作台撤销排产
-        if ("MANU_ORDER".equals(def.code())) {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT ISNULL([生产线],N'') AS 生产线 FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-            String line = rows.isEmpty() ? null : String.valueOf(rows.get(0).get("生产线"));
-            if (line != null && !line.isBlank()) {
-                throw new IllegalStateException("该加工单已排产(生产线:" + line + "),不能弃审;请先在 排产工作台→今日已排产 撤销排产,再回来弃审");
-            }
-        }
         // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
         stockLedger.unpostIn(def.code(), no, currentUserName());
         // 库存成本重算:单据退出 v_stock_movement 后,成本物化表同样需重算(与审核对称)
@@ -3086,24 +3076,20 @@ public class ButtonService {
     /**
      * 生成产品批号:成型后打印产品二维码的数据源(V1.2 #8)。
      * 批号=入库日期+3位流水(与材料批号同一号池);一次生成终身复用,重复调用返回已有批号。
-     * 单轨口径(2026-09-22):生产工单(MANU_ORDER→头.批号);兼容过渡期 GD-生产工单(→产品批号列)。
+     * 2026-10-28 生产加工单 MANU_ORDER 下架后只剩「生产工单(旧版)」WO_ORDER 走本条(现役工单批号由
+     * 报工/入库链在 plang.lot_no 上按需取号,不经过本按钮)。
      */
     private Map<String, Object> genProductLot(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        boolean manu = "MANU_ORDER".equals(def.code());
-        if (!manu && !"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产工单支持生成产品批号");
+        if (!"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产工单(旧版)支持生成产品批号");
         String no = requireNo(formData);
-        List<Map<String, Object>> rows = manu
-                ? jdbc.queryForList("SELECT [批号] AS 产品批号 FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no)
-                : jdbc.queryForList("SELECT [产品批号] FROM wo_order WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT [产品批号] FROM wo_order WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (rows.isEmpty()) throw new IllegalStateException("工单不存在:" + no);
         Object cur = rows.get(0).get("产品批号");
         String lot = cur == null || String.valueOf(cur).isBlank() ? null : String.valueOf(cur).trim();
         if (lot == null) {
             lot = lotSeqService.next();
-            jdbc.update(manu
-                            ? "UPDATE bd_manu_order SET [批号] = ? WHERE [合同号] = ?"
-                            : "UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?",
-                    lot, no);
+            jdbc.update("UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?", lot, no);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编号", no);

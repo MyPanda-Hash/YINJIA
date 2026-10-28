@@ -33,7 +33,6 @@ import java.util.Map;
 @Service
 public class WorkOrderTransferService {
 
-    private static final String PANEL = "MANU_ORDER";
     private static final String LOG_PANEL = "生产工单";
 
     private final JdbcTemplate jdbc;

@@ -13,7 +13,7 @@ import java.util.Map;
  * ⇒ 这三个页面**在权限界面里根本没得勾**;生产工单列表页同样没挂面板码。
  * 后果:四条菜单项在 {@code menus.js} 里没有 panelCode,而 {@code filterMenuTree} 对
  * 「无 panelCode 的叶子」一律放行 ⇒ 任何登录账号都能看到并进入这四个页面;
- * 后端只是"借" SO_ORDER / MANU_ORDER 的权限当闸门,且 {@code /px/workOrderList} 列表接口
+ * 后端原先只是"借" SO_ORDER / MANU_ORDER 的权限当闸门(2026-10-28 MANU_ORDER 已下架,生产域改挂本表页面码),且 {@code /px/workOrderList} 列表接口
  * 此前**完全没有校验**(登录即可读全部工单/客户/数量)。
  *
  * <p>做法沿用既有先例「虚拟面板 DASHBOARD(我的桌面)」:

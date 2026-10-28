@@ -402,14 +402,6 @@ public class PanelConfigService {
         tablePage.put("topBarBtn", panelButtons);
         tablePage.put("rowOperationBarBtn", List.of());
         tablePage.put("events", List.of());
-        // 生产加工单(2026-09-24,用户拍板参考旧系统工单列表):主表预览表格=扁平工单列表形态,
-        // 前端 PanelxList 据此渲染 mainGrid + 产线筛选条(产线下拉/未排产·已排产·未完工·已完工/追溯)
-        if ("MANU_ORDER".equals(def.code())) {
-            tablePage.put("mainTable", Map.of(
-                    "label", "生产加工单",
-                    "columns", List.of("合同号", "单据日期", "客户", "生产线", "预开工日", "预完工日",
-                            "需求数量", "排产数量", "入库数量", "余量", "批号", "重点管控")));
-        }
 
         Map<String, Object> pageDto = new LinkedHashMap<>();
         pageDto.put("tablePages", List.of(tablePage));
@@ -580,7 +572,9 @@ public class PanelConfigService {
             for (Object a : list) {
                 String action = String.valueOf(a);
                 String t = pushTarget(def.code(), action);
-                if (t != null && !disabledActions.contains(action)) pushTargets.put(action, t);
+                // 目标必须是真实面板:2026-10-28 起 SO_ORDER「生成生产工单」的目标是页面 WORK_ORDER_LIST
+                // (不是 yj_panel),它只用于前端「是否需要分批送料弹窗」判断 —— 页面码不满足该判断,不登记。
+                if (t != null && !disabledActions.contains(action) && registry.panel(t) != null) pushTargets.put(action, t);
             }
         }
         if (!pushTargets.isEmpty()) metadata.put("pushTargets", pushTargets);
@@ -1230,24 +1224,7 @@ public class PanelConfigService {
                     new String[]{"导入", "导入"})),
             // 委外三单:OUTSOURCE_IN / OUTSOURCE_ISSUE 于 2026-10-08 下架(面板+表+视图+菜单),
             // 只留 委外加工单 OUTSOURCE_ORDER(其「生成委外发料单」动作随之改为通用「生单」占位)。
-            java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),            // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
-            java.util.Map.entry("MANU_ORDER", List.of(
-                    new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选销售订单"},
-                    new String[]{"修改", "修改"},
-                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
-                    new String[]{"删除", "删除", "删除单据"},
-                    new String[]{"审批", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
-                    new String[]{"生单", "生成产成品入库单"},
-                    // 2026-09-24 用户拍板(参考旧系统工单列表样式收敛):列表特殊按钮只保留
-                    // 打印工单(生产任务单固定版式)/排产(本单快捷排线,弹窗选产线,复用排产工作台
-                    // assign 守卫守恒留痕)/结案/取消结案(ManuCloseHandler);
-                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成产品批号下线出列表;
-                    // 「生成采购申请」(原 ManuPurchaseReqHandler 按 BOM×排产−库存结转)已随 BOM 下架移除(2026-10-04)
-                    // —— 2026-10-06 同采购订单口径:主按钮即生产任务单固定版式(打印留痕一并写入;下拉保留原「打印工单」入口),通用表格打印走「预览」
-                    new String[]{"打印", "打印工单", "预览", "导出", "打印工单"},
-                    new String[]{"排产", "排产", "结案", "取消结案"},
-                    new String[]{"更多", "打印工单二维码", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
+            java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER)             // 委外加工单:选单=销售订单;生单=产成品入库单(已实现)
     )));
 
     /**
@@ -1265,9 +1242,9 @@ public class PanelConfigService {
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             // 「PU_REQ|生成采购订单」已随请购单下架移除(2026-10-08):请购单不需要,采购订单不再有该上游
             java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
-            java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
+            // 2026-10-28 生产加工单 MANU_ORDER 下架:工单实体=plang,页面=WORK_ORDER_LIST(ManuScheduleHandler 实际落 plang)
+            java.util.Map.entry("SO_ORDER|生成生产工单", "WORK_ORDER_LIST"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
-            java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             // 暂收单生单(2026-10-05):按行分流到 来料检验单 / 采购入库单 —— 见上方注释(值仅为路由标记)
             java.util.Map.entry("QC_RECV|生成检验或入库单", "QC_INSP")
             // 「WO_ORDER|生成领料单」→ MATERIAL_OUT 已随 BOM 下架移除(2026-10-04):
@@ -1293,8 +1270,7 @@ public class PanelConfigService {
 
     /** 表单底部按钮(PANDA bottomOperationBarBtn:保存,删除,审核,弃审,+中止类,+放弃)。 */
     private static final Map<String, List<String>> FORM_BOTTOM = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "SO_ORDER", List.of("保存", "删除", "审核", "弃审", "整单中止", "放弃"),
-            "MANU_ORDER", List.of("保存", "删除", "审核", "弃审", "中止执行", "草稿", "放弃")
+            "SO_ORDER", List.of("保存", "删除", "审核", "弃审", "整单中止", "放弃")
     )));
     private static final List<String> FORM_BOTTOM_DEFAULT = List.of("保存", "删除", "审核", "弃审", "放弃");
 
@@ -1302,23 +1278,22 @@ public class PanelConfigService {
     private static final Map<String, String> SELECT_FLOWS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             java.util.Map.entry("PURCHASE_IN", "QC_RECV"),           // 送料暂收单 → 采购入库单(2026-09-22:原 采购订单,
                                                                      //   免检直达已取消,来源收敛到暂收单;见 PUSH_TARGETS 注释)
-            java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产工单 → 材料出库单
-            java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产工单 → 产成品入库单
-            java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产工单 → 工序派工单
+            // 2026-10-28 生产加工单 MANU_ORDER 下架:材料出库单 / 产成品入库单 / 工序派工单 不再以它作选单来源 ——
+            //   材料出库单由生产工单列表「转领料单」直接生成;产成品入库单由组装成品检验单审核自动生成;
+            //   工序派工单(DISPATCH)菜单早已下架。这四条来源面板在改造后一直是 0 行,选单弹窗本来就是空的。
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             // OUTSOURCE_ISSUE / OUTSOURCE_IN 两条「委外加工单 → 委外发料单/入库单」已随两张面板下架移除(2026-10-08)
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
-            java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产工单(销售-生产链)
             // 「PU_ORDER ← PU_REQ」已随请购单下架移除(2026-10-08):采购订单现无上游可选单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER")              // 销售订单 → 生产工单(计划层:选单生单)
-   // 2026-10-14 其他入库/其他出库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
-   //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库);其他出库 ← 生产工单(与材料出库单同源:生产领用类出库)。
-   //   ⚠ 这两条是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
+   // 2026-10-14 其他入库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
+   //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库)。
+   //   ⚠ 这是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
+   //   其他出库原 ← MANU_ORDER,随 2026-10-28 生产加工单下架一并移除(与材料出库单同源,来源已不存在)。
    , java.util.Map.entry("OTHER_IN", "PU_ORDER")
-   , java.util.Map.entry("OTHER_OUT", "MANU_ORDER")
             // 2026-10-18 调拨单/盘点单:来源不是单据,而是**库存可用量**(批号级 kucun 视图 v_stock_pick)。
             // 用户口径「功能和界面要和出入库单对齐」—— 出入库单的「选单」挑的是上游单据,这两张单挑的是"货",
             // 所以来源登记成平表面板 STOCK_PICK(只读、无菜单入口、仅作选单来源)。
@@ -1415,16 +1390,12 @@ public class PanelConfigService {
             // "PU_ORDER|PURCHASE_IN"({单据编号→采购订单号});该免检直达链远端已取消
             // (采购入库单现在只从「送料暂收单」选单,采购订单号随链带入,见上行注释),
             // 本地那条属悬空登记,无实际链路生效。
-            // 销售订单 → 生产工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
-            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空)
-            "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},
             // 销售订单 → 销售出库单(2026-10-15 用户口径:「销售出库单是从销售订单生单或者选单过来的,
             // 要带有销售订单号和销售订单行号」)。头映射的自动同名规则带不到它 —— 来源头的单号标签是
             // 「单据编号」、目标头要的是「销售订单号」,属异名,必须显式登记;
             // 而通用 hmap 的 `单据编号 → 来源单号` 落的是「来源单号」列,不是「销售订单号」。
             // 行上的「销售订单行号」由 FLOW_DETAIL_SYNONYMS 的 {行号 → 销售订单行号} 承担。
             "SO_ORDER|SALE_OUT", new String[][]{{"单据编号", "销售订单号"}},
-            "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
             // + 批次号(2026-10-04 口径:号在生单那一刻定稿,逐站继承 —— 这里是同名直通的兜底登记,

@@ -35,8 +35,6 @@ import java.util.Map;
 @Service
 public class WorkOrderSplitService {
 
-    /** 生产工单面板编码(权限与留痕用) */
-    private static final String PANEL = "MANU_ORDER";
     private static final String LOG_PANEL = "生产工单";
 
     private final JdbcTemplate jdbc;

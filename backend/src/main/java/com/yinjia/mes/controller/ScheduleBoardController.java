@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * 排产工作台(实现总结 V1.0 §5):待排产池/统计/批量排入/撤销排产/今日已排产。
  *
- * <p>权限(2026-10-16 改挂**页面面板**,原为借 MANU_ORDER 的 view + 保存):
+ * <p>权限(2026-10-16 起挂**页面面板**;2026-10-28 生产加工单 MANU_ORDER 下架后不再有旧面板授权):
  * 见 {@link PagePanelRegistry}。本控制器同时服务三个页面,故读端点按「任一命中」放行、
  * 写端点按各自页面的动作词判定:
  * <ul>
@@ -173,7 +173,7 @@ public class ScheduleBoardController {
 
     // ══════════ 工单调拨(9.29 生产管理批次 ②,2026-10-05):产线/车间两级目标 + 轨迹 + 可撤回 ══════════
     // 与 /reassign(只改产线、无轨迹)的区别:本组写 wo_transfer_log 轨迹并支持按轨迹撤回。
-    // 权限:面板查看 + MANU_ORDER「保存」词表。
+    // 权限:页面面板查看 + 「调拨/撤回调拨」动作词。
 
     /** 车间下拉(启用产线的车间 + 该车间产线数;调拨弹窗用) */
     @PostMapping("/workshops")
@@ -216,8 +216,8 @@ public class ScheduleBoardController {
     @PostMapping("/trace")
     public ApiResult<Map<String, Object>> trace(@RequestBody Map<String, Object> body) {
         // 追溯弹窗(WorkOrderTraceDialog)挂在工单排产看板与生产工单列表两处;
-        // MANU_ORDER 保留为放行来源 —— 生产工单面板(RD 前的旧入口)也共用本组件。
-        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD, "MANU_ORDER");
+        // 2026-10-28 生产加工单 MANU_ORDER 下架后不再作为放行来源。
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD);
         return ApiResult.ok(service.trace(str(body.get("工单号")), longOf(body.get("工单行id") != null ? body.get("工单行id") : body.get("行id"))));
     }
 
