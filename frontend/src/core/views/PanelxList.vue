@@ -6338,9 +6338,19 @@ function colW(f) {
 }
 
 // ---------- 明细右键/图标操作（作用于当前活动区块） ----------
-const ctxItems = ['定位', '复制到剪贴板', '从剪贴板粘贴', '另存为EXCEL模板', '批量修改', '销售订单查询', '存货中心', '更多']
-const iconA = ['☑ Ctrl+V列粘贴', '定位', '复制到剪贴板', '从剪贴板粘贴', '另存为EXCEL模板', '批量修改', '销售订单查询', '存货中心', '更多▼']
-const iconB = ['现存量提取', '定位', '复制到剪贴板', '从剪贴板粘贴', '另存为EXCEL模板', '批量修改', '更多▼']
+// 🔴 2026-10-28 用户口径「把所有面板表格上未实现的功能的按钮去掉，现在有一些按钮点击会提示」:
+//   这两组图标/右键项原先是从 T+ 界面照抄的一整套工具条,但**大部分没有实现** ——
+//   点下去只落到 onIcon / onCtxItem 末尾那句「演示环境暂未实现…」，用户看到的就是那条提示。
+//   处置:**没实现就不显示**（不是置灰 —— 置灰仍占位、仍引人去点）。
+//   保留判定 = 处理函数里有显式 `it === 'X'` 分支:
+//     · onIcon   实现了:复制到剪贴板 / 另存为EXCEL模板 / 现存量提取
+//     · onCtxItem 实现了:定位 / 复制到剪贴板 / 另存为EXCEL模板
+//   被拿掉的:☑ Ctrl+V列粘贴、从剪贴板粘贴、批量修改、销售订单查询、存货中心、更多▼
+//   ⚠ 已拿掉的**不要**因为"看着空缺"再补回来:要补就先实现处理分支,
+//     单测 noUnimplementedButtons.test.js 会拦住"清单里有、函数里没有"的项。
+const ctxItems = ['定位', '复制到剪贴板', '另存为EXCEL模板']
+const iconA = ['复制到剪贴板', '另存为EXCEL模板']
+const iconB = ['现存量提取', '复制到剪贴板', '另存为EXCEL模板']
 
 const ctxBlock = ref(null)
 const ctx = reactive({ visible: false, x: 0, y: 0, row: null })
@@ -7385,7 +7395,10 @@ async function onIcon(it, b) {
     }
     return
   }
-  ElMessage.info(`演示环境暂未实现「${it}」，界面与 T+ 保持一致`)
+  // 2026-10-28:未实现的动作**不再出现在工具条上**(见 iconA/iconB 注释),正常路径到不了这里。
+  // 留着这句只为"清单与实现脱节时"能被单测/控制台发现 —— 早先它是静静地弹一句提示,
+  // 用户以为功能在、只是坏了。现在开发期会明显看到它。
+  if (import.meta.env?.DEV) console.warn('[未实现] 工具条动作:', it)
 }
 
 async function onCtxItem(it) {
@@ -7404,7 +7417,8 @@ async function onCtxItem(it) {
     exportActive()
     return
   }
-  ElMessage.info(`演示环境暂未实现「${it}」，界面与 T+ 保持一致`)
+  // 2026-10-28:同 onIcon —— 未实现项已不在 ctxItems 里;这句只在清单脱节时报警
+  if (import.meta.env?.DEV) console.warn('[未实现] 右键动作:', it)
 }
 
 // ---------- 查询区 ----------
