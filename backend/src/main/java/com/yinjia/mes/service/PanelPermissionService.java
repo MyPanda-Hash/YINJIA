@@ -21,6 +21,10 @@ import java.util.Set;
  * view 可见 / query 查询单据 / add 新增保存 / modify 申请修改 / modlog 修改记录 /
  * del 删除申请 / export 导出打印 / audit 审批(can_approve = perms 含 audit)。
  *
+ * <p><b>2026-10-28 口径修正:「提交审批」不再吃 audit</b> —— 提交是编制/发起的动作(有 add/modify
+ * 就能提交),审批才是 audit(审批通过/驳回)。此前两者共用 audit,导致"只有主管能提交、主管又不能
+ * 审自己的单"的循环死路(普通员工连提交按钮都点不动)。
+ *
  * 读权限放行集合 = 可见面板 ∪ 可见面板字段的参照目标(yj_field.ref_panel) ∪ 同模块(module_group)面板。
  * 参照/选单/BOM 勾选/进度表等跨面板读取大量存在(SelectVoucherDialog/RecordSheetPanels/ProgressControlSheet),
  * 只按 view 硬拦会打断合法参照链,故按三层推导放行;跨模块的越权读仍被拦。
@@ -99,46 +103,41 @@ public class PanelPermissionService {
         m.put("撤回终止申请", new String[]{"modify", "audit"});
         // 审批类(audit → can_approve,与 ButtonService.requireApprover 同口径)
         // 「项目定级」= 立项申请审核通过后由审核人给项目定级(2026-09-21),同属审批权动作
-        for (String b : new String[]{"审核", "弃审", "提交审批", "审批通过", "审批驳回", "中止", "取消中止",
+        // ⚠ 2026-10-28:**「提交审批」已从本组移出** —— 提交是"编制/发起",不是审批,见下面单独映射。
+        for (String b : new String[]{"审核", "弃审", "审批通过", "审批驳回", "中止", "取消中止",
                 "项目定级",
                 "删除审批通过", "删除审批驳回", "修改审批通过", "修改审批驳回"})
             m.put(b, new String[]{"audit"});
+        // 提交审批 = 编制/发起动作,与审批权**解耦**(2026-10-28 用户口径:
+        //   「我应该是有没有审批权限都能提交审批。然后我有审批权限才能审批……本身拥有审批权限的
+        //     应该是主管,没有审批权限的就是普通员工,员工不能提交审批需要主管审批吗?」)。
+        // 判据 = 有该面板「新增保存」或「申请修改」权(能编制这张单,就能把它送出去);
+        // 真正的审批仍在「审批通过/驳回」上要求 audit(∪ 管理员)。
+        // 此前归 audit 的后果:普通员工根本提交不了,只能由主管代编代提;而主管提交后又因
+        // 「编制与审批分离」不能自己批 ⇒ 单人部门直接死路(2026-10-28 报障)。
+        m.put("提交审批", new String[]{"add", "modify"});
         BUTTON_PERMS = Map.copyOf(m);
     }
 
     /**
      * 面板级按钮权限覆盖(默认表之外的口径;管理员恒过)。键 = 「面板编码|按钮名」。
-     * 2026-09-21 产品变更申请单:它**不是**文书归档面板(保存不自动送审),所以「提交审批」必须
-     * 由**发起人**自己点 —— 而全局表把「提交审批」归到 audit(普通用户没有该词,cp 实测 403),
-     * 故本面板改判 add/modify(真正的身份门禁在 ButtonService.requireChangeInitiator:
-     * 只有制单人 ∪ 管理员能提交/撤回,别人即使有编辑权也点不动)。
-     * 会签类按钮同理:会签人是被指定的普通人(按账号指定即授权),身份校验在方法内。
      *
-     * 2026-10-04 质量单据一族(QC_TC_IN / QC_BHG / QC_BHC / QC_BHZ / QC_JJF / QC_SCP / QC_LYB / QC_SCY)
-     * 两级审批:用户口径「编制 = 提交审批的人,审核 = 一级审批通过的人」—— 两者**必须是两个人**,
-     * 而全局表让「提交审批」也吃 audit 词,于是只有审核人能提交,编制人恒等于审核人,
-     * 且非管理员提交后会被「编制审批分离」挡在审批这一步(死路)。
-     * 故这些面板的「提交审批」同产品变更申请单口径改判 add/modify:有该面板新增/申请修改权的人
-     * (品质/生产文员)负责编制并提交;「审批通过/审批驳回」仍归 audit(组织架构勾了
-     * 「该面板·审核反审核」的角色 ∪ 管理员),第二级再由超级管理员批准。
+     * <p>2026-10-28 起「提交审批」已**全局**改判 add/modify(见 BUTTON_PERMS 注释),此前为
+     * RD_CHANGE / 8 张质量单据单独写的两条「提交审批」覆盖随之下线(口径一致,不必再各写一份);
+     * 下面保留的覆盖只针对**该面板特有**的动作。
+     *
+     * <p>2026-09-21 产品变更申请单:它的身份门禁不在词表,而在 ButtonService.requireChangeInitiator
+     * (只有制单人 ∪ 管理员能提交/撤回,别人即使有编辑权也点不动)。会签类按钮同理:会签人是被指定的
+     * 普通人(按账号指定即授权),身份校验在方法内。
      */
     private static final Map<String, String[]> BUTTON_PERMS_OVERRIDE;
 
-    /** 「提交审批」在质量单据上的授权词(新增保存 / 申请修改 / 审批 —— 有编辑权就能编制并提交) */
-    private static final String[] SUBMIT_WORDS = {"add", "modify", "audit"};
-
     static {
         Map<String, String[]> m = new HashMap<>();
-        m.put("RD_CHANGE|提交审批", new String[]{"add", "modify"});
         m.put("RD_CHANGE|提交会签", new String[]{"add", "modify"});
         m.put("RD_CHANGE|撤回会签", new String[]{"add", "modify", "audit"});
         m.put("RD_CHANGE|会签通过", new String[]{"view"});
         m.put("RD_CHANGE|会签驳回", new String[]{"view"});
-        // 质量单据一族(2026-10-04 两级审批):提交审批不再吃 audit 词,见上方注释
-        for (String p : new String[]{"QC_TC_IN", "QC_BHG", "QC_BHC", "QC_BHZ",
-                "QC_JJF", "QC_SCP", "QC_LYB", "QC_SCY"}) {
-            m.put(p + "|提交审批", SUBMIT_WORDS);
-        }
         /*
          * 四文件面板的「弃审」(2026-10-16 用户口径:「产品信息表分发下去的 4 类单据没有反审核,写错了改不了,
          * 申请修改是否能用……」)。全局表把「弃审」归 audit ⇒ 文件责任人(角色「文件负责人」只有 add/modify)
