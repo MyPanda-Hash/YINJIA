@@ -37,7 +37,7 @@
       <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
            该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
       <span
-        v-if="reportTemplates.length || user.isAdmin"
+        v-if="(reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')"
         class="tb-main"
         :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
         @click.stop="reportVisible = true"
@@ -532,12 +532,15 @@
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感。
+                   2026-10-28:特采单(QC_TC_IN)按用户口径隐藏本按钮,见 DOC_OUTPUT_HIDDEN -->
+              <div v-if="(reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
               <!-- 导出 / 扫描填单(2026-10-09 用户口径「导出和扫描填单放到下边」):
                    原混在「单据操作」的工具栏动作组里(见 APPROVAL_SIDE_EXCLUDE 已把它们排除),
-                   现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。 -->
+                   现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。
+                   2026-10-28:特采单(QC_TC_IN)按用户口径隐藏「导出」,见 DOC_OUTPUT_HIDDEN -->
               <div
+                v-if="!docOutputHiddenSet.has('导出')"
                 class="as-side-btn"
                 :class="{ disabled: isDisabled('导出') }"
                 @click="onSideAction('导出')"
@@ -3160,6 +3163,27 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
 const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出', '导出', '扫描填单'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除；导出/扫描填单 2026-10-09 按用户口径移到侧栏末尾「文档输出」下(见模板里那两个显式按钮)
+
+/**
+ * 「④ 文档输出」里对某些面板**不出现**的按钮(2026-10-28 用户口径)。
+ *
+ * 用户口径原文:「隐藏特采单的导出报表和导出按钮」。
+ *
+ * 为什么要在面板级单独列,而不是改动的显示条件:
+ *   · 「导出报表」是按「该面板登记了 JasperReports 模板 ∪ 管理员」出现的(见模板里 v-if)——
+ *     特采单本来**没有**报表模板,普通用户看不到,但管理员恒可见 ⇒ 管理员会看到一颗点了没用的按钮;
+ *   · 「导出」会把单据导成 Excel/PDF 明细台账,特采单是纸面申请单(YJ-QR-60),
+ *     正式输出走「打印」(已定版式),导出没有实际用途。
+ * 故这张表只登记「确实不该有这两个按钮」的面板;其余面板行为一字不动。
+ */
+const DOC_OUTPUT_HIDDEN = {
+  // 特采申请单:纸面走打印,不做报表导出/明细导出
+  QC_TC_IN: ['导出报表', '导出'],
+}
+
+/** 当前面板的「文档输出」里被隐藏的按钮 */
+const docOutputHidden = computed(() => DOC_OUTPUT_HIDDEN[String(panelCode.value)] || [])
+const docOutputHiddenSet = computed(() => new Set(docOutputHidden.value))
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
