@@ -1,0 +1,24 @@
+refactor: 设备配置管理 改名 IOT设备配置(菜单/页面/面板名/词条,两账套)
+
+用户口径(2026-10-20):「菜单名称改为 IOT设备配置 … 正式账套中也改为 IOT设备配置」。
+
+对象:数采平台的设备配置页 DC_CONFIG —— **页面级虚拟面板**
+(PagePanelRegistry 定义、无 yj_panel 行、数据走 api/dc 一组接口),
+所以库里只有 yj_translation 一条译名要改键,面板名本体在前端菜单与后端注册表。
+
+改动:
+· 前端 menus.js(菜单标题) / router/index.js(路由 meta.title) /
+  views/dc/DcConfig.vue(页面大标题 + 帮助文案) / DcMonitor.vue / DcStats.vue(引导文案);
+· 前端 i18n en.js 词条键改名,英文值改 'IoT Device Configuration'(连带引导句 under / Go to);
+· 后端 PagePanelRegistry(PagePanelDef 面板名) + DcController / DcPlatformService / DcService 注释;
+· 库:yj_translation ref_key '设备配置管理' → 'IOT设备配置'(两账套),
+  迁移脚本 migrate-dc-config-rename-20261020.sql 幂等(改名 + 英文值校正两段),已登记清单。
+
+踩坑:脚本注释里写了 api/dc/* 的 * 与斜杠组合,SQL Server 当**嵌套块注释**开头 ⇒
+  首跑报「缺少注释的结尾标记 */」;已改写注释措辞。
+
+验证:
+· 两账套 yj_translation = [IOT设备配置] en=IoT Device Configuration;
+· 前端产物含「IOT设备配置」、不含旧名(主入口 + DcConfig chunk 双向核对);
+· 后端 /api/sys/role/1/panels 数采平台模块返回 [DC_CONFIG] IOT设备配置;
+· 全量 815 测试通过、build 通过、后端 compile 通过、8090 已重打 jar 并重启。

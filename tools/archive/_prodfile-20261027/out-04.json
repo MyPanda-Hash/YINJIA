@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "topKeys": [
+    "metadata",
+    "dataSchema",
+    "detail"
+  ],
+  "total": 0,
+  "pick": []
+}

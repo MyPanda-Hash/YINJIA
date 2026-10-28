@@ -9,27 +9,54 @@
  *  ⑤ 仓位标识卡(printLocationCards;2026-09-28 建为库位卡,2026-10-08 库位→仓位术语统一):
  *     同款 75×100mm,卡面=仓库/仓位地址/仓位编码(不含商品字段),
  *     二维码=仓库编码@仓位编码 固定两段(2026-10-18 去地址段;locationCardQrText 直接断言)。
+ * ⚠ 2026-10-20:全部版式从**子窗口打印**(window.open + document.write)改成**页面内打印层**
+ *   (`@core/panel/printChannel`)。所以这里改成 mock document/body 并抓 `#yj-print-host` 的 innerHTML;
+ *   同时**故意不提供 window.open** —— 谁再往回写弹窗打印,单测立刻 TypeError。
  * 运行:npm test(node --test)——mock window/document 捕获打印 HTML,不起浏览器。
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-const captured = { title: '', html: '' }
-const fakeDoc = {
-  write(html) { captured.html += String(html) },
-  close() { /* noop */ },
+const captured = { html: '', printed: 0 }
+function makeEl(tag) {
+  return {
+    tagName: String(tag).toUpperCase(), id: '', innerHTML: '', textContent: '', style: {},
+    children: [],
+    appendChild(child) {
+      this.children.push(child)
+      if (child && child.id === 'yj-print-host') captured.html = child.innerHTML
+      return child
+    },
+    remove() { /* noop */ },
+  }
 }
-globalThis.window = { open: (_u, _t) => { captured.html = ''; return { document: fakeDoc } } }
-globalThis.alert = () => { throw new Error('不应触发拦截告警') }
+const head = makeEl('head')
+const body = makeEl('body')
+globalThis.document = {
+  title: '',
+  head, body,
+  createElement: makeEl,
+  getElementById: () => null,     // 清理阶段取不到 → 什么都不做
+  addEventListener() {}, removeEventListener() {},
+}
+globalThis.window = {
+  // 刻意**不提供 open**:页面内打印不再开子窗口(见文件头 2026-10-20)
+  addEventListener() {}, removeEventListener() {},
+  print() { captured.printed++ },
+}
+globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
+globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
+  const before = captured.printed
   const sent = await printProductCards([{
     编码: 'Y-CSA-23', 规格: '2-3mm', 数量: 11, 批次: '20260928',
     订单编号: 'YJ-20260921-05', 供应商名称: '淄博宗立新材料科技有限公司', 生产日期: '2026-09-21',
   }])
   assert.equal(sent, true)
+  assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次,不开子窗口)')
   const html = captured.html
   assert.ok(html.includes('YJ-20260921-05'), '订单编号应出现在卡面')
   assert.ok(html.includes('淄博宗立新材料科技有限公司'), '供应商名称应出现在卡面')

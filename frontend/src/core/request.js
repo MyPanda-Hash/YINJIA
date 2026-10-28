@@ -1,51 +1,21 @@
 import axios from 'axios'
+import { apiBase, apiOrigin, API_ORIGIN_KEY } from '@/business/appConfig'
 
 /**
- * API 前缀(2026-10-20,两轮):
+ * API 前缀(2026-10-25 合并后收敛):
  *
- * ① 网页部署:站内相对路径 `/api`(页面就是从后端同源加载的)。
- * ② 安卓壳(手搓 Activity,file:///android_asset/www):由原生注入的
- *    `window.YjNative.getBaseUrl()` 给出服务器地址(接口号),拼成 `<服务器>/api`。
- * ③ 安卓壳(Capacitor 版,页面 origin 是 `https://localhost`):没有同源、也没有 YjNative,
- *    地址来自 **localStorage 的 `mes_api_origin`**(用户在登录页「服务器地址」里填),
- *    与参考包 `银嘉扫码领料.apk` 同一套键名(`mes_api_origin`),两边可互相沿用配置。
+ * 地址解析**唯一真源 = `@/business/appConfig`**(`apiBase()` / `apiOrigin()` / `setApiOrigin()`),
+ * 本文件不再自己实现一份 —— 之前 HEAD 与 origin/main 各有一套(YjNative + localStorage 手写 vs appConfig),
+ * 合并时保留了远端这份:① 网页部署走站内相对 `/api`;② 安卓壳(Capacitor)按 appConfig 里的
+ * 服务器地址(用户在登录页「服务器地址」填,存 localStorage `mes_api_origin`)。
  *
- * 优先级:YjNative > localStorage.mes_api_origin > 构建期 VITE_API_ORIGIN > '/api'。
- * 改地址后需要重新登录(页面会 reload,本函数随之重算)。
+ * 这里**re-export** 旧名字,是为了不打断既有 `import { apiOrigin, API_ORIGIN_KEY } from '@core/request'` 的调用方。
  */
-export const API_ORIGIN_KEY = 'mes_api_origin'
-
-function normalizeOrigin(v) {
-  const s = String(v == null ? '' : v).trim().replace(/\/+$/, '')
-  if (!/^https?:\/\//i.test(s)) return ''
-  return s
-}
-
-/** 当前生效的服务器地址(没有就返回空串 = 走站内相对路径) */
-export function apiOrigin() {
-  try {
-    const n = typeof window !== 'undefined' ? window.YjNative : null
-    const fromNative = n && typeof n.getBaseUrl === 'function' ? normalizeOrigin(n.getBaseUrl()) : ''
-    if (fromNative) return fromNative
-  } catch { /* ignore */ }
-  try {
-    const saved = normalizeOrigin(localStorage.getItem(API_ORIGIN_KEY))
-    if (saved) return saved
-  } catch { /* ignore */ }
-  try {
-    const env = normalizeOrigin(import.meta.env && import.meta.env.VITE_API_ORIGIN)
-    if (env) return env
-  } catch { /* ignore */ }
-  return ''
-}
-
-function resolveApiBase() {
-  const origin = apiOrigin()
-  return origin ? origin + '/api' : '/api'
-}
+export { apiOrigin, API_ORIGIN_KEY }
 
 const request = axios.create({
-  baseURL: resolveApiBase(),
+  // App(Capacitor 壳)里没有 Vite 代理,必须打后端绝对地址;浏览器里仍走同源 /api。
+  baseURL: apiBase() + '/api',
   timeout: 15000,
 })
 

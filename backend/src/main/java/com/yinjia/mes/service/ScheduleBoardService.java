@@ -36,9 +36,11 @@ public class ScheduleBoardService {
      *
      * <p>2026-10-16 用户口径「当前生产工单完工后…需要实现当前完工后组装内没有当前生产工单」:
      * 末道(组装)完工后**没有下一道可转序**,`scx` 会一直停在组装线 ⇒ 旧口径下这条工单永远算在
-     * 组装线的未交量/负荷里、且一直挂在「未完工」页签。凡"这条线还有多少活"的口径一律剔除本态。
+     * 组装线的未交量/负荷里、且一直挂在「未完工」页签。凡"这条线还有多少活"的口径一律剔除本态。</p>
+     *
+     * <p>2026-10-20:表达式收口到 {@link PlangDone}(与生产工单列表、首页看板、首件选工单同一份口径)。</p>
      */
-    private static final String DONE_ROW = "ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工')";
+    private static final String DONE_ROW = PlangDone.done("p");
 
     /**
      * **「已结案 / 未结案」的唯一口径**(2026-10-18):{@link PlangClose}。

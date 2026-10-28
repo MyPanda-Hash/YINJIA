@@ -2,7 +2,7 @@
   <div class="dc-page dc-config">
     <header class="dc-head">
       <div class="dc-head-main">
-        <h1 class="dc-title">{{ tt('设备配置管理') }}</h1>
+        <h1 class="dc-title">{{ tt('IOT设备配置') }}</h1>
         <p class="dc-sub">{{ tt('设备接入五连：绑定网关 → 配置数采工程 → 绘制组态 → 配置数采规则 → 数据调试；五项齐备才算接入完成') }}</p>
       </div>
       <p class="dc-source">{{ tt('数据来源：数采网关上报（DC-Ingest 接口），未接入设备显示为离线') }}</p>
@@ -359,7 +359,7 @@
       <div class="dc-help">
         <p class="dc-help-p">{{ tt('本模块只做配置与展示；实时数据由数采网关（或边缘程序）调用下列接口上报，未上报的设备一律显示离线。') }}</p>
         <h3 class="dc-help-h">{{ tt('① 首次上报前先登记') }}</h3>
-        <p class="dc-help-p">{{ tt('在「设备配置管理」里登记网关与设备，网关编码 / 设备编码是上报时的唯一标识。') }}</p>
+        <p class="dc-help-p">{{ tt('在「IOT设备配置」里登记网关与设备，网关编码 / 设备编码是上报时的唯一标识。') }}</p>
         <h3 class="dc-help-h">{{ tt('② 数据上报') }}</h3>
         <pre class="dc-code">POST /api/dc/ingest
 {

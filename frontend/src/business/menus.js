@@ -20,6 +20,10 @@ export const menuTree = [
           { code: 'rdApproval', title: '立项申请', path: '/panelx/list/RD_APPROVAL', icon: 'DocumentAdd', panelCode: 'RD_APPROVAL', operationName: '新增流程' },
           { code: 'rdPlan', title: '项目实施计划', path: '/panelx/list/RD_PLAN', icon: 'Calendar', panelCode: 'RD_PLAN', operationName: '新增流程' },
           { code: 'rdProgress', title: '项目进度查询', path: '/panelx/list/RD_PROGRESS', icon: 'DataLine', panelCode: 'RD_PROGRESS' },
+          // 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个
+          //   项目流程管控,通过立项申请表的编号查流程走到哪里」。只读盯单页(页面级虚拟面板 PROJECT_FLOW,
+          //   定义见后端 PagePanelRegistry),按立项单号把 10 个环节逐条判出来:卡在谁手上、停留几天。
+          { code: 'rdFlow', title: '项目流程管控', path: '/rd/projectFlow', icon: 'Connection', panelCode: 'PROJECT_FLOW' },
         ],
       },
       {
@@ -99,17 +103,21 @@ export const menuTree = [
         icon: 'ShoppingCart',
         children: [
           {
-            code: 'doc', title: '单据', children: [
+            // ⚠ 节点 code 必须**全树唯一**(2026-10-23 菜单设计落地时修):它是 Vue 的 `:key`、
+            //   el-tree 的 node-key,也是覆盖表 `yj_menu_node.menu_code` 的主键。此前销售/采购/库存核算
+            //   三个模块里各有一个 `doc`/`detail`/`stats`,质检的 `process` 又与「工序 OP」叶子重名
+            //   ⇒ 菜单设计器的合并(Map by code)会吃掉其中一项。这里一律加上所属模块前缀。
+            code: 'salesDoc', title: '单据', children: [
               { code: 'soOrder', title: '销售订单', path: '/panelx/list/SO_ORDER', icon: 'Tickets', panelCode: 'SO_ORDER', operationName: '新增流程' },
             ],
           },
           {
-            code: 'detail', title: '明细表', children: [
+            code: 'salesDetail', title: '明细表', children: [
               { code: 'soDetail', title: '销售订单明细表', path: '/panelx/list/SALES_ORDER_DETAIL', panelCode: 'SALES_ORDER_DETAIL', icon: 'List' },
             ],
           },
           {
-            code: 'stats', title: '统计表', children: [
+            code: 'salesStats', title: '统计表', children: [
               { code: 'soStats', title: '销售订单统计表', path: '/panelx/list/SALES_ORDER_STATS', panelCode: 'SALES_ORDER_STATS', icon: 'Histogram' },
             ],
           },
@@ -121,7 +129,7 @@ export const menuTree = [
         icon: 'ShoppingCart',
         children: [
           {
-            code: 'doc', title: '单据', children: [
+            code: 'purchaseDoc', title: '单据', children: [
               // 2026-10-08 下架:请购单(PU_REQ)—— 用户口径「请购单不需要」。
               // 面板/字段/授权/译名与 bd_pu_req+bl_pu_req 两张表已整体删除
               // (tools/migrate-drop-extra-docs-pu-req-20261008.sql),不是摘菜单,放开注释也恢复不了;
@@ -142,12 +150,12 @@ export const menuTree = [
           // 两者都是 flat 只读报表,不改任何业务表、不动采购订单面板本身
           // (tools/migrate-pu-order-detail-stats-20261018.sql)。
           {
-            code: 'detail', title: '明细表', children: [
+            code: 'purchaseDetail', title: '明细表', children: [
               { code: 'puDetail', title: '采购订单明细表', path: '/panelx/list/PU_ORDER_DETAIL', panelCode: 'PU_ORDER_DETAIL', icon: 'List' },
             ],
           },
           {
-            code: 'stats', title: '统计表', children: [
+            code: 'purchaseStats', title: '统计表', children: [
               { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
             ],
           },
@@ -180,10 +188,10 @@ export const menuTree = [
   //     左栏展开记忆、`数据字典`/面板权限里按 code 的引用都不受影响;智能供应链随之只剩 销售管理 / 采购管理。
   {
     code: 'inv',
-    // 2026-10-20 用户口径「把库存管理名字改为 WMS管理系统」:只改显示标题,
+    // 2026-10-20 用户口径「把库存管理名字改为 WMS管理」:只改显示标题,
     // 一级目录 code 仍是 'inv'(路由/展开态/页签/权限词都不按标题走),
     // 权限矩阵的分组名由后端 ReportService.navGroup + yj_panel.module_group 同步改。
-    title: 'WMS管理系统',
+    title: 'WMS管理',
     icon: 'Box',
     children: [
       {
@@ -192,7 +200,7 @@ export const menuTree = [
         icon: 'Box',
         children: [
           {
-            code: 'doc', title: '单据', children: [
+            code: 'invAcctDoc', title: '单据', children: [
               // 送料暂收单:面板编码 QC_RECV(2026-09-20 由 SL_RECV 改名,物理表仍 sl_recv/sl_recv_detail,单据前缀 SL)
               { code: 'slRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Download', panelCode: 'QC_RECV', operationName: '新增流程' },
               { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
@@ -293,6 +301,14 @@ export const menuTree = [
           // 存在的理由:材料出库单里选商品看的是(物料,仓库)聚合口径,常显示「没有库存」;
           // 仓库实际发料关心的是批号级可用量,而标签里正好带着批号。
           { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', panelCode: 'BARCODE_SCAN_PICK', icon: 'FullScreen' },
+          // 工单扫码领料(2026-10-21 用户口径):「扫那个工单码,上面显示出来工单内容,中间显示这个工单要领
+          // 哪些料(按 BOM),一项项扫物料码,自动抓台车电子秤数量,点提交保存一笔;整单领完整单提交」。
+          // 与上面「扫码领料」的区别:那张是**按物料找库存**(扫到哪领到哪),这张是**按工单找用料**
+          // (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
+          { code: 'workOrderPick', title: '工单扫码领料', path: '/scm/workOrderPick', panelCode: 'WORK_ORDER_PICK', icon: 'DocumentChecked' },
+          // 扫码领料记录(2026-10-21 用户口径:「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」):
+          // 只读查询页,数据源 wo_pick_scan_log。权限沿用 WORK_ORDER_PICK(同一作业的作业与留痕)。
+          { code: 'pickScanLog', title: '扫码领料记录', path: '/scm/pickScanLog', panelCode: 'WORK_ORDER_PICK', icon: 'Tickets' },
         ],
       },
     ],
@@ -476,7 +492,7 @@ export const menuTree = [
         // 回退抓手在 tools/archive/_qc-drop3/_backup-20261016-{prod,test}/。
         // 这两类的工序检验职能由「制程检验单 QC_PROC_INSP」(人工开单)与「首件检验单」
         // (报工审核自动出单)承接,故不再各留一张按工序切的检验单。
-        code: 'process', title: '制程品质', children: [
+        code: 'qcProcess', title: '制程品质', children: [
           // 首件检验单(2026-10-15 新增,面板 QC_FIRST_INSP):按《生产相关品质检验.xlsx》Sheet1 第2步
           // 「车间生产(首批,每天一个生产批次)→ 首件检验」建,实现方式照成品检验单(QC_ASM_INSP)。
           // 本(工单号,批次号,工单行号)的**第一张报工**审核时自动出一张草稿,检验要求按
@@ -656,7 +672,7 @@ export const menuTree = [
     title: '数采平台',
     icon: 'Cpu',
     children: [
-      { code: 'dcConfig', title: '设备配置管理', path: '/dc/config', panelCode: 'DC_CONFIG', icon: 'SetUp' },
+      { code: 'dcConfig', title: 'IOT设备配置', path: '/dc/config', panelCode: 'DC_CONFIG', icon: 'SetUp' },
       { code: 'dcMonitor', title: '数据监控', path: '/dc/monitor', panelCode: 'DC_MONITOR', icon: 'Monitor' },
       { code: 'dcStats', title: '状态统计', path: '/dc/stats', panelCode: 'DC_STATS', icon: 'DataAnalysis' },
     ],
@@ -693,6 +709,11 @@ export const menuTree = [
           //   主动备份和自动备份的时间」):自动备份开关/时间/保留份数/备份目录 + 立即备份 + 备份记录。
           //   管理员专属(adminOnly),页面见 views/sys/DbBackup.vue。
           { code: 'sysBackup', title: '数据备份', path: '/sys/backup', icon: 'Download', adminOnly: true },
+          // 菜单设计(2026-10-23 用户口径「给系统管理模块加上一个菜单命名的功能,就是可以编辑各个面板的
+          //   位置与一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」):
+          //   改的是**本树的显示层**(名称/上级/排序/隐藏),覆盖行存 yj_menu_node,见 stores/menu.js
+          //   与 views/sys/MenuDesigner.vue。管理员专属(改一处 = 全公司导航一起变)。
+          { code: 'sysMenuDesign', title: '菜单设计', path: '/sys/menuDesign', icon: 'Operation', adminOnly: true },
         ],
       },
       {

@@ -19,8 +19,15 @@ test('研发管理四个二级分组,顺序=项目管理/测试记录/产品文�
   assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '测试记录', '产品文件', '共享文件'])
 })
 
-test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询', () => {
-  assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS'])
+/**
+ * 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个项目流程管控,
+ *   通过立项申请表的编号查流程走到哪里」。⇒ 项目管理组多一张只读盯单页 PROJECT_FLOW(排最后)。
+ */
+test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询 → 项目流程管控', () => {
+  assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'PROJECT_FLOW'])
+  const flow = group('rdProject').children.find((c) => c.panelCode === 'PROJECT_FLOW')
+  assert.equal(flow.title, '项目流程管控')
+  assert.equal(flow.path, '/rd/projectFlow', '页面级虚拟面板走专用路由,不是 /panelx/list')
 })
 
 test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 张', () => {
@@ -75,7 +82,8 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   const purchase = (scm.children || []).find((c) => c.code === 'purchase')
   assert.ok(purchase, '应有 采购管理 分组')
   // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理);2026-10-24 追加第四组「供应商门户」
-  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats', 'supplier'])
+  // ⚠ 组 code 以远端改版为准(purchaseDoc/purchaseDetail/purchaseStats,2026-10-25 合并时对齐)
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['purchaseDoc', 'purchaseDetail', 'purchaseStats', 'supplier'])
   const codesOf = (node) => {
     if (Array.isArray(node)) return node.flatMap(codesOf)
     if (!node || typeof node !== 'object') return []
@@ -112,7 +120,7 @@ test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打�
   const scm = menuTree.find((n) => n.code === 'scm')
   const purchase = (scm.children || []).find((c) => c.code === 'purchase')
   assert.ok(purchase, '应有 采购管理 分组')
-  assert.deepEqual((purchase.children || []).map((c) => c.code), ['doc', 'detail', 'stats', 'supplier'])
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['purchaseDoc', 'purchaseDetail', 'purchaseStats', 'supplier'])
 
   // ① 供应商门户组:采购打印 + 权限配置(都在这一组下,用户口径「放在供应商门户下面」)
   const group = purchase.children.find((c) => c.code === 'supplier')
@@ -132,7 +140,7 @@ test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打�
   assert.equal(accountLeaf.permKey, 'canConfigSupplierAccount')
 
   // ② 「单据」组里**不得**再重复挂一份采购打印(避免两处入口)
-  const docGroup = purchase.children.find((c) => c.code === 'doc')
+  const docGroup = purchase.children.find((c) => c.code === 'purchaseDoc')
   assert.ok(!(docGroup.children || []).some((c) => c.panelCode === 'SUPPLIER_PU_ORDER'),
     '供应商采购打印只能有一个入口(供应商门户),单据组里不应再挂')
 
@@ -188,13 +196,15 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
  * 2026-09-18:新增 产品文件列表 与 样品编号表(设计对照的 2 张新面板)⇒ 21 → 23 张。
  * 2026-09-21:新增 产品变更申请单 RD_CHANGE ⇒ 23 → 24 张。
  * 2026-09-30:下架 样品编号表 RD_SAMPLE_NO(用户口径「样品编号表删掉」)⇒ 24 → 23 张。
+ * 2026-10-20:新增 项目流程管控 PROJECT_FLOW(只读盯单页)⇒ 23 → 24 张。
  * 计数断言保留价值:防止面板被误删/误加而不自知。
  */
-test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () => {
+test('研发管理 24 个面板一个不少(含新增 项目流程管控)', () => {
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 23)
-  assert.equal(new Set(codes).size, 23)
+  assert.equal(codes.length, 24)
+  assert.equal(new Set(codes).size, 24)
+  assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
 })
 
 /**
@@ -325,13 +335,13 @@ test('导航层级同构:一级模块的二级目录一律是"带面板的分组
  *       「智能供应链」只剩 销售管理 / 采购管理。
  * 判定口径 = 面板编码集合:同一张面板不得在两个一级目录里各挂一次,也不得从「智能供应链」溜回来。
  */
-test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
+test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库存明细/库存统计/库存报表 四组', () => {
   const topCodes = menuTree.map((n) => n.code)
-  assert.ok(topCodes.includes('inv'), '应有一级目录 WMS管理系统(inv)')
+  assert.ok(topCodes.includes('inv'), '应有一级目录 WMS管理(inv)')
   const inv = menuTree.find((n) => n.code === 'inv')
-  assert.equal(inv.title, 'WMS管理系统')
+  assert.equal(inv.title, 'WMS管理')
   const scm = menuTree.find((n) => n.code === 'scm')
-  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, 'WMS管理系统紧随智能供应链(同级)')
+  assert.equal(topCodes.indexOf('inv'), topCodes.indexOf('scm') + 1, 'WMS管理紧随智能供应链(同级)')
 
   // 五个分组:code 保持原值(权限/页签/展开记忆都按 code 走),顺序 = 核算 → 明细 → 统计 → 报表 → 条码管理
   // (条码管理 2026-10-18 并入库存管理:它与库存报表同属 WMS 域,合并在「库存管理」下比留在智能供应链更顺)
@@ -351,13 +361,16 @@ test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算
   // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,另加 2026-10-20
   //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
   //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
-  //   2026-10-22:库存核算新增只读报表「生产领料」PROD_PICK_LIST(数据源 dbo.outh 的 src=6 材料出库)
-  //   ⇒ 34 → 35。
-  assert.equal(invCodes.length, 35, `WMS管理系统应有 35 张面板,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 35, 'WMS管理系统内不应有重复面板')
+  // 2026-10-22:库存核算新增只读报表「生产领料」PROD_PICK_LIST(数据源 dbo.outh 的 src=6 材料出库)
+  // 2026-10-21:再加「工单扫码领料」页面级面板码 WORK_ORDER_PICK(按工单+BOM 作业);
+  //   「扫码领料记录」复用同一个面板码(同一作业的留痕查询,不另开权限码)
+  //   ⇒ 合并后挂点 37、唯一 36(重复的只有 WORK_ORDER_PICK,这是共用面板码的**预期**)。
+  assert.equal(invCodes.length, 37, `WMS管理应有 37 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 36, 'WMS管理内唯一面板码应为 36(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
   // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
   const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
-  const docGroup = (invAcct.children || []).find((c) => c.code === 'doc')
+  // ⚠ 子组 code 以远端改版为准:invAcctDoc(原 doc)
+  const docGroup = (invAcct.children || []).find((c) => c.code === 'invAcctDoc')
   const pickLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_PICK_LIST')
   assert.equal(pickLeaf?.title, '生产领料')
   assert.equal(pickLeaf?.path, '/panelx/list/PROD_PICK_LIST')
@@ -365,15 +378,16 @@ test('WMS管理系统 = 与智能供应链同级的一级目录,含 库存核算
   assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_OUT') + 1,
     '生产领料应紧跟材料出库单')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
-  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理系统')
+  assert.ok(invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料应挂页面级面板码(2026-10-21)')
+  assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')
   // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
   for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
                    'STOCKTAKE', 'STOCKTAKE_DETAIL', 'STOCKTAKE_STATS']) {
-    assert.ok(invCodes.includes(p), `WMS管理系统下应有 ${p} 入口`)
+    assert.ok(invCodes.includes(p), `WMS管理下应有 ${p} 入口`)
   }
   const scmCodes = codesOf(scm)
   for (const p of invCodes) {
-    assert.ok(!scmCodes.includes(p), `${p} 已在WMS管理系统下,不应再从智能供应链暴露`)
+    assert.ok(!scmCodes.includes(p), `${p} 已在WMS管理下,不应再从智能供应链暴露`)
   }
 })
 
@@ -389,10 +403,11 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
   assert.deepEqual((base.children || []).map((c) => c.code), ['sysFunc', 'device'])
   const sysFunc = base.children[0]
   assert.equal(sysFunc.title, '系统功能')
-  // 2026-10-19 追加「数据备份」(sysBackup,管理员专属的数据安全页:数据库主动/自动备份)
-  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'])
-  // 组织架构 / 使用权限查看 / 数据备份 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
-  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup'])
+  // 2026-10-19 追加「数据备份」(sysBackup,管理员专属的数据安全页:数据库主动/自动备份);
+  // 2026-10-23 追加「菜单设计」(sysMenuDesign,管理员专属:改导航名称/分组/顺序/隐藏)
+  assert.deepEqual((sysFunc.children || []).map((c) => c.code), ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'])
+  // 组织架构 / 使用权限查看 / 数据备份 / 菜单设计 = 管理员专属(adminOnly,filterMenuTree 只对 isAdmin 放行)
+  assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
   // 迁出后只剩 sysFunc(无面板)+ device(2026-10-20 搬来的设备维护:点检记录 / 保养计划)
@@ -451,8 +466,9 @@ test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可�
   // 2026-10-20:base 下多了「设备维护」组(设备点检记录 / 保养计划),按组拆开断言
   const adminGroups = (admin.children || []).map((g) => ({ code: g.code, kids: (g.children || []).map((c) => c.code) }))
   // 2026-10-19:数据安全 · 数据库备份(sysBackup)接在系统功能组末尾,管理员专属
+  // 2026-10-23:菜单设计(sysMenuDesign)再往后接一格,同样管理员专属
   assert.deepEqual(adminGroups, [
-    { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup'] },
+    { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'] },
     { code: 'device', kids: ['equipCheck', 'maintPlan'] },
   ])
 })
@@ -531,9 +547,10 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
     assert.ok(!all.includes(t), `菜单树里不应再有「${t}」标题`)
   }
   // 制程品质组现役 = 首件 / 制程 / 组装成品 三张;质量单据组现役 = 7 张
+  // (2026-10-23:该组 code 由 'process' 改为 'qcProcess' —— 与「工序 OP」叶子重名,菜单覆盖表要求 code 全树唯一)
   const qc = menuTree.find((n) => n.code === 'qc')
   const group = (code) => (qc.children || []).find((c) => c.code === code)
-  assert.deepEqual((group('process').children || []).map((c) => c.panelCode),
+  assert.deepEqual((group('qcProcess').children || []).map((c) => c.panelCode),
     ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP'])
   assert.equal((group('qcDoc').children || []).length, 7)
 })
@@ -564,4 +581,11 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   assert.equal(scanPick.path, '/scm/scanPick')
   assert.equal(scanPick.panelCode, 'BARCODE_SCAN_PICK', '扫码领料应挂页面级面板码(2026-10-20)')
   assert.equal(scanPick.title, '扫码领料')
+  // 工单扫码领料(2026-10-21):与上面「扫码领料」并列,但作业口径不同 —— 这张按工单+BOM,
+  // 那张按物料找库存。两者都必须有各自的页面级面板码,否则权限矩阵里勾不到。
+  const woPick = (bc.children || []).find((c) => c.code === 'workOrderPick')
+  assert.ok(woPick, '条码管理下应有「工单扫码领料」入口')
+  assert.equal(woPick.path, '/scm/workOrderPick')
+  assert.equal(woPick.panelCode, 'WORK_ORDER_PICK')
+  assert.equal(woPick.title, '工单扫码领料')
 })

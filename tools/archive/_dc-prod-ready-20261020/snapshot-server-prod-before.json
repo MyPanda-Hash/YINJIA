@@ -1,0 +1,79 @@
+{
+  "at": "2026-10-20T07:40:58.033Z",
+  "base": "http://36.140.66.163:8090",
+  "factory": "YJ",
+  "gateways": [
+    {
+      "id": 1,
+      "code": "GW-DZ-01",
+      "name": "电子秤网关",
+      "protocol": "HTTP",
+      "host": "36.140.66.163",
+      "port": 8090,
+      "remark": "电子秤经 W111 模块 HTTP 直推",
+      "status": true,
+      "enabled": true,
+      "lastSeenAt": "2026-10-20T10:47:19",
+      "keySet": true,
+      "deviceCount": 1
+    }
+  ],
+  "devices": [
+    {
+      "id": 6,
+      "code": "BGDN-001",
+      "gatewayId": null,
+      "projectCode": "",
+      "scadaDrawn": false,
+      "lastDebugAt": null
+    },
+    {
+      "id": 1,
+      "code": "DZ-001",
+      "gatewayId": 1,
+      "projectCode": "DC-PROJ-DZ01",
+      "scadaDrawn": true,
+      "lastDebugAt": null
+    },
+    {
+      "id": 3,
+      "code": "KB-001",
+      "gatewayId": null,
+      "projectCode": "",
+      "scadaDrawn": false,
+      "lastDebugAt": null
+    },
+    {
+      "id": 5,
+      "code": "KB-002",
+      "gatewayId": null,
+      "projectCode": "",
+      "scadaDrawn": false,
+      "lastDebugAt": null
+    },
+    {
+      "id": 2,
+      "code": "FX-001",
+      "gatewayId": null,
+      "projectCode": "",
+      "scadaDrawn": false,
+      "lastDebugAt": null
+    },
+    {
+      "id": 4,
+      "code": "SM-001",
+      "gatewayId": null,
+      "projectCode": "",
+      "scadaDrawn": false,
+      "lastDebugAt": null
+    },
+    {
+      "id": 7,
+      "code": "SM-002",
+      "gatewayId": null,
+      "projectCode": "",
+      "scadaDrawn": false,
+      "lastDebugAt": null
+    }
+  ]
+}

@@ -159,6 +159,7 @@ import { UploadFilled, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/core/request'
 import { tt } from '@/i18n'
+import { openAttachmentPreview, triggerDownload } from '@core/panel/attachmentPreview'
 
 const perm = reactive({ canUpload: false, canMaintain: false, canDelete: false })
 const cats = ref([])
@@ -401,91 +402,18 @@ async function onDeleteFile(row) {
   }
 }
 
-/** 预览:同「导出报表→打印预览」(previewServerReport) 机制——点击时同步开窗口占位
- *  (用户手势内,弹窗拦截器不拦),await 拿到文件后再呈现:
- *  图片/PDF/文本=blob 直指(浏览器原生渲染);docx=docx-preview 按需加载渲染成 HTML 写入占位窗;
- *  其余类型(含老 .doc)转下载。 */
+/** 预览(2026-10-28 起与「单据附件」共用同一份实现,见 @core/panel/attachmentPreview):
+ *  图片/PDF/文本/JSON 浏览器直开;.docx 用 docx-preview;.xlsx/.xls/.csv 转表格;
+ *  老 .doc 等无原生渲染能力的类型保底下载。 */
 async function openFile(row) {
   if (!row.attachmentId) return
-  const type = row.contentType || ''
-  const inlineable = type.startsWith('image/') || type.startsWith('text/')
-    || type === 'application/pdf' || type === 'application/json'
-  const docx = isDocx(row)
-  if (!inlineable && !docx) {
-    await downloadFile(row)
-    ElMessage.info(tt('已开始下载'))
-    return
-  }
-  const win = window.open('', '_blank')
-  const loading = ElMessage({ message: tt('正在打开预览…'), duration: 0 })
-  try {
-    const blob = await request.get(`/attachment/${row.attachmentId}/download`, { responseType: 'blob', timeout: 120000 })
-    if (docx) {
-      if (!win) {
-        triggerDownload(URL.createObjectURL(blob), row.fileName || row.name)
-        ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
-        return
-      }
-      try {
-        await renderDocxToWindow(blob, row, win)
-      } catch {
-        // 渲染失败(老格式伪装 docx/文件损坏/极端排版)优雅降级为下载
-        if (win) win.close()
-        triggerDownload(URL.createObjectURL(blob), row.fileName || row.name)
-        ElMessage.info(tt('该文件无法在线预览，已转为下载'))
-      }
-    } else {
-      const url = URL.createObjectURL(blob)
-      if (win) win.location.href = url
-      else {
-        triggerDownload(url, row.fileName || row.name)
-        ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
-      }
-    }
-  } catch {
-    if (win) win.close()
-    ElMessage.error(tt('附件下载失败'))
-  } finally {
-    loading.close()
-  }
-}
-
-/** .docx 识别:content_type(wordprocessingml)优先,扩展名兜底(历史行 content_type 可能缺失) */
-function isDocx(row) {
-  const type = row.contentType || ''
-  if (type.includes('wordprocessingml')) return true
-  return /\.docx$/i.test(String(row.fileName || row.name || ''))
-}
-
-/** docx → HTML 渲染进占位窗口:docx-preview 按需动态加载(不预览 Word 不下载这段代码);
- *  先在主文档隐藏容器渲染再序列化写入,避免第三方库跨 window 建 DOM 的兼容性问题。
- *  useBase64URL 把内嵌图片转 data URI,弹窗 HTML 自包含。 */
-async function renderDocxToWindow(blob, row, win) {
-  const { renderAsync } = await import('docx-preview')
-  const buf = await blob.arrayBuffer()
-  const bodyHost = document.createElement('div')
-  const styleHost = document.createElement('div')
-  bodyHost.style.display = 'none'
-  styleHost.style.display = 'none'
-  document.body.appendChild(bodyHost)
-  document.body.appendChild(styleHost)
-  try {
-    await renderAsync(buf, bodyHost, styleHost, { inWrapper: true, useBase64URL: true })
-    if (!bodyHost.innerHTML) throw new Error('docx 渲染结果为空')
-    const title = row.fileName || row.name || ''
-    const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-    win.document.open()
-    win.document.write(
-      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
-      + '<style>body{margin:0;background:#525659;}</style>'
-      + styleHost.innerHTML
-      + '</head><body>' + bodyHost.innerHTML + '</body></html>'
-    )
-    win.document.close()
-  } finally {
-    bodyHost.remove()
-    styleHost.remove()
-  }
+  await openAttachmentPreview(row, {
+    loadBlob: () => request.get(`/attachment/${row.attachmentId}/download`, { responseType: 'blob', timeout: 120000 }),
+    // 老 .doc(OLE2):后端 HWPF 转 HTML(与单据附件同一套)
+    loadLegacyDocHtml: () => request.get(`/attachment/${row.attachmentId}/preview-doc`, { responseType: 'text', timeout: 120000 }),
+    onInfo: (msg) => ElMessage.info(tt(msg)),
+    onError: (msg) => ElMessage.error(tt(msg)),
+  })
 }
 
 async function downloadFile(row) {
@@ -496,14 +424,6 @@ async function downloadFile(row) {
   } catch {
     ElMessage.error(tt('附件下载失败'))
   }
-}
-
-function triggerDownload(url, name) {
-  const el = document.createElement('a')
-  el.href = url
-  el.download = name
-  el.click()
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
 function fmtSize(n) {

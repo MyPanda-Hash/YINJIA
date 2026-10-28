@@ -501,6 +501,10 @@ public class ButtonService {
                 if (!preCol.isBlank() && !cols.containsKey(preCol) && tableCols(table).contains(preCol)) {
                     cols.put(preCol, realNameOf(user));
                 }
+                // 编辑人/表单管理人(2026-10-28 用户口径):空白草稿分支也要按当前登录人写入 ——
+                // 该分支在下方直接 return,走不到保存末尾那段 UPDATE(实测漏写:AP-2026-10-01 草稿
+                // 的「表单管理人」落库为 NULL)。这里与末尾那段同口径(值=realNameOf(user))。
+                putEditorCols(def, table, cols, user);
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
@@ -635,29 +639,26 @@ public class ButtonService {
         // 主保存路径落库成功才写 saved:markSaved=true「保存/提交/保存新增」,false「保存为草稿/新增」。
         // saved='Y' 只表示"这张单存过一次"(不表示已审核),前端 isFreshAddedDoc() 用 'N' 界定"本次新增"窗口。
         markDocSaved(def.code(), no, markSaved);
-        // 文件类面板:管理员「保存」即归档;普通用户「保存」即提交审批(管理员审批通过后归档);
-        // 「保存为草稿/新增」不触发(markSaved=false,2026-09-12 修复:此前草稿路径同样被自动归档/送审,
-        // 文书面板实际没有"存一半不送审"的能力);修改态保存不归档走再审批
+        // 文件类面板:保存 = 落库 + 按面板语义流转(「保存为草稿/新增」不流转,markSaved=false,
+        // 2026-09-12 修复:此前草稿路径同样被自动归档/送审,文书面板实际没有"存一半不送审"的能力);
+        // 修改态保存不归档走再审批
+        // 🔴 2026-10-28 用户口径:「把所有研发的管理员的保存就归档去掉，一样走审批流程，
+        //   但是管理员可以自己提交自己审批」—— 管理员的"保存即归档"捷径**整段移除**:
+        //   管理员保存与普通用户同一条路(送审 pending='Y'),再点「审批通过」才归档;
+        //   approveApproval 里编制审批分离对管理员早已豁免,故"自己提交自己审批"不需要新增豁免。
+        //   唯一的例外是 SELF_MAINTAINED_PANELS(WLBOM,基础数据、根本没有审批)。
         if (markSaved && DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) {
-            // ⚠ 两级审批面板(RD_PROD_INFO)不让管理员走"保存即归档"这条自审自批捷径 ——
-            //   否则整条两级审批被跳过(见 ADMIN_SAVE_DEFERS_TO_FLOW 的注释)。
-            if (isAdminUser(user) && !ADMIN_SAVE_DEFERS_TO_FLOW.contains(def.code())) {
-                finalizeOpenModify(def, no, user); // 有未收尾修改留痕(修改闭环/弃审后再编辑)先收尾再归档
+            // 自助维护型面板(WLBOM):**没有审批**,谁保存都直接归档 ——
+            //   不能落到下面"保存=送审"的分支(那样会永远停在审批中)。
+            if (SELF_MAINTAINED_PANELS.contains(def.code())) {
+                finalizeOpenModify(def, no, user);
                 markArchived(def.code(), no, user);
-                // 保存即归档 = 自审自批,显式留痕(2026-09-12:归档路径审核人不再空白,审批历史可查)
-                recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
-                recordApproval(def.code(), no, "APPROVE", "APPROVED", "保存即归档（管理员保存）");
-                // 申请立项人 = 把这张单推进流程的人(2026-10-09 用户口径)。管理员这条是自审自批,
-                // 既不走 doSubmitApproval、也不走下面的普通用户分支 ⇒ 三处各要落一次,否则这一格恒为空。
-                if ("RD_APPROVAL".equals(def.code())) {
-                    jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                            realNameOf(user), no);
-                }
-                // 保存即归档也要同步进度查询(用户报的"保存归档后没导进来"就是漏了这条路径)
-                if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
+                // 留痕:审批历史里能看到"谁在什么时候保存归档",便于追溯谁改过基础数据
+                recordApproval(def.code(), no, "SUBMIT", "PENDING", "保存即归档（自助维护型面板，无审批）");
+                recordApproval(def.code(), no, "APPROVE", "APPROVED", "保存即归档（自助维护型面板，无审批）");
             } else {
-                // 普通用户,以及「管理员保存不直接归档」的两级面板(RD_PROD_INFO):
-                // 保存 → 自动提交审批(pending='Y'),走完整审批流(两级面板还须先选二级审核人)
+                // 管理员与普通用户同口径:保存 → 自动提交审批(pending='Y'),走完整审批流
+                // (两级面板 RD_PROD_INFO 还须先选二级审核人,由审批弹窗处理)。
                 jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                                 + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
                                 + "WHEN MATCHED THEN UPDATE SET pending = 'Y', pending_by = ?, pending_at = GETDATE(), update_at = GETDATE() "
@@ -665,7 +666,8 @@ public class ButtonService {
                                 + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
                         def.code(), no, user, user);
                 recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
-                // 同上:普通用户「保存」= 送审,这才是正常流程走的那条路
+                // 申请立项人 = 把这张单推进流程的人(2026-10-09 用户口径「一开始提交审批的人」)。
+                // 2026-10-28 起管理员也走这条分支 ⇒ 原管理员归档分支里的那次写入随之撤销(只此一处)。
                 if ("RD_APPROVAL".equals(def.code())) {
                     jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                             realNameOf(user), no);
@@ -692,7 +694,45 @@ public class ButtonService {
         // 四个受控文件只按 [产品编号] 关联产品信息表,重号会让"这个产品有哪些文件"分不清 ⇒ 全局唯一。
         // 与文档编号同口径:保存(提交口径)才校验,保存为草稿放过;已作废单据不算占用。
         if (markSaved && "RD_PROD_INFO".equals(def.code())) ensureProductCodeUnique(def, head, no);
+        // 产品信息表「编辑人」= 本次**保存人**的真实姓名。
+        //   2026-10-21 口径:「产品信息表的编辑人是提交审批的人的账号的真实名字」;
+        //   2026-10-28 口径扩展:「编辑自动填入当前的对应账号姓名」—— 存草稿同样算一次编辑,
+        //   不再只限提交口径(原先 markSaved 才写,保存为草稿后纸面仍是空的)。
+        // ⚠ 这一格是"谁最后编辑了这张单"的事实,不该由填单人自己写(写了也不可信)⇒
+        //   前端 yj_field.editable=0(只读展示)+ 这里每次保存按登录人回写真名,两处同源。
+        //   保存在落库之后执行,所以同一次提交/存稿即可生效。
+        if ("RD_PROD_INFO".equals(def.code())) {
+            jdbc.update("UPDATE rd_prod_info_head SET 编辑人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(user), no);
+        }
+        // 组装工艺清单「表单管理人」= 当前编辑人的账号姓名(2026-10-28 用户口径:
+        //   「组装工艺的表单管理人修改为编辑人的账号姓名,选择产品编号之后就自动带入,
+        //    或者进行其他编辑也自动带入」)。
+        // 与上面编辑人同一套口径:前端只保证纸面显示与保存报文带上,落库一律以本次保存人为准 ——
+        // 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
+        if ("RD_ASM_PROC".equals(def.code())) {
+            jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(user), no);
+        }
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /**
+     * 「编辑人 / 表单管理人」自动带入的列值(2026-10-28 用户口径)。
+     *
+     * <p>口径:产品信息表的「编辑人」、组装工艺清单的「表单管理人」都 = 当前**编辑人**账号的真实姓名。
+     * 前端只在纸面/保存报文里带显示值(yj_field 已改 editable=0),**落库一律以此处为准** ——
+     * 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
+     *
+     * <p>两个写入点各管一条路径,缺一不可(2026-10-28 实测踩到:只加了末尾那段 UPDATE,
+     * 空白草稿分支提前 return,新建的 AP 单「表单管理人」落库为 NULL):
+     * · 本方法 → 空白草稿分支(directAdd 建单即 return,不经过保存末尾);
+     * · saveDoc 末尾的 UPDATE → 正常保存/修改(落库后按当前人回写,同一次提交即生效)。
+     */
+    private void putEditorCols(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
+        String name = realNameOf(user);
+        if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
+        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
     }
 
     /**
@@ -2211,6 +2251,11 @@ public class ButtonService {
         if ("RD_APPROVAL".equals(def.code())) {
             String level = pickOf(formData, "项目等级");
             if (!level.isEmpty()) applyGrade(def.code(), no, level, operator);
+            // 2026-10-28 用户口径:「立项申请可以由管理员在审批定级的时候确定一个对接人进行分发，
+            //   后续也默认是这个对接人，除非进行修改」⇒ 审批弹窗里一并选对接人,与定级同一动作完成分发。
+            // 载荷不带对接人则跳过(兼容旧前端/老单:仍可用侧栏「定级分发」补发)。
+            String liaison = pickOf(formData, "对接人");
+            if (!liaison.isEmpty()) assignLiaison(def.code(), no, liaison, operator);
         }
         // 产品变更申请单:审批通过即**生效**(2026-09-21 用户口径第⑤条)——状态转「已生效」,
         // 并按勾选的受控文件建下一版草稿(带来源单号)+ 通知各文件责任人重走受控审核
@@ -2534,11 +2579,13 @@ public class ButtonService {
      * 实测(测试账套 PI-2026-10-0013):留痕 APPROVE/APPROVED 意见 =「保存即归档（管理员保存）」,
      * 而该单按设计应当停在「待二级审批」。
      *
-     * ⚠ 只收 RD_PROD_INFO —— **用户 2026-10-13 明确选定「只改产品信息表」**。
-     *   同为两级面板的 8 张质量单据(ADMIN_L2_PANELS:QC_TC_IN/QC_LYB/QC_SCY/QC_BHG/QC_BHC/
-     *   QC_BHZ/QC_JJF/QC_SCP)保持"管理员保存即归档"的现状,未经用户确认不要顺手扩大。
+     * <p>🔴 2026-10-28 用户口径「把所有研发的管理员的保存就归档去掉，一样走审批流程，
+     * 但是管理员可以自己提交自己审批」⇒ 这条捷径**整段移除**,管理员与普通用户走同一条
+     * 送审路径 ⇒ 上述白名单已无存在意义,一并删除(别再逐个往名单里加面板:
+     * 判据现在是"只要是归档面板就送审",见 saveDoc 里的分支)。
+     *
+     * <p>保留本注释只为记录历史位置与原因;代码中不再有 ADMIN_SAVE_DEFERS_TO_FLOW。
      */
-    private static final java.util.Set<String> ADMIN_SAVE_DEFERS_TO_FLOW = java.util.Set.of("RD_PROD_INFO");
 
     /** 当前待审批节点:1=待一级(缺省)/2=待二级;不在审批中返回 1 */
     private int pendingNodeOf(String panelCode, String no) {
@@ -5036,7 +5083,11 @@ public class ButtonService {
         form.put("文档编号", approvalNo);
         form.put("项目名称", name);
         if (!level.isEmpty()) form.put("项目定级", level);
-        if (!owner.isEmpty()) form.put("负责人", owner);
+        // 2026-10-21 用户口径:「立项申请的责任人确认之后新建的项目实施计划的责任人应该是**显示的真实名字**」。
+        // ⚠ 原来写的是 owner(rd_approval.备用2 = **登录账号**),所以实施计划的「负责人」格显示
+        //   chaishanyin 这类账号而不是"柴善银"(用户报障截图为证)。这里换成 realNameOf(owner)。
+        //   注意:流程判据仍只认账号(备用2/备用3),真实姓名只是**显示值**,不参与任何门禁比较。
+        if (!owner.isEmpty()) form.put("负责人", realNameOf(owner));
         form.put("编制日期", today);
         Map<String, Object> saved = save(registry.panel("RD_PLAN"), form, true);
         String no = str(saved.get("编号"));
@@ -5071,8 +5122,14 @@ public class ButtonService {
     /**
      * 定级分发(2026-10-19):把原「项目定级」与「分发对接人」合成一个动作。
      * 载荷:项目等级(一/二/三/四级) + 对接人(账号)。
-     * 门禁:仅审批人(∪ 管理员);仅已审核/已归档;等级与对接人**都必须尚未设置**(各只能定一次,
-     * 要改只能弃审回草稿重走流程 —— 与 2026-10-09 的「定了不能改」口径一致)。
+     * 门禁:仅审批人(∪ 管理员);仅已审核/已归档;对接人**只能分发一次**(要改只能弃审回草稿重走流程)。
+     *
+     * <p><b>2026-10-21 修「审批完就没法分发对接人」</b>:2026-10-08 口径「冯总审核及定级」让
+     * {@link #approveApproval} 在同一步里把等级写进 rd_approval.项目等级;而 2026-10-19 把
+     * 「分发对接人」按钮并进本动作时,门禁写成了「等级必须为空」,两个口径叠起来就成了死结 ——
+     * 审批通过(等级已写) ⇒ 本动作永远被拒,界面上「定级分发」永久置灰,
+     * 而唯一能写 备用1 的旧按钮「分发对接人」已下架 ⇒ **对接人再也发不出去**。
+     * 现在:等级已存在时**沿用**(不接受改级,要改仍只能弃审),本动作只补发对接人。
      */
     private Map<String, Object> gradeAndDispatch(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可定级分发");
@@ -5084,28 +5141,81 @@ public class ButtonService {
         if (!"已审核".equals(status) && !"已归档".equals(status))
             throw new IllegalStateException("仅已审核或已归档的立项申请可定级分发(当前:" + status + ")");
         Map<String, Object> head = approvalHeadOf(no);
-        if (!blankSafe(head.get("项目等级")).isEmpty())
-            throw new IllegalStateException("本单已定级(" + blankSafe(head.get("项目等级")) + "),不能重复定级;要改请先弃审");
-        if (!blankSafe(head.get("备用1")).isEmpty())
-            throw new IllegalStateException("对接人已分发给 " + realNameOf(blankSafe(head.get("备用1"))) + ",不能重复分发;要换人请先弃审");
+        // 等级已由「审批通过并定级」写入 ⇒ 沿用,不再重复定级(改级仍只能弃审,口径不变)
+        String existingLevel = blankSafe(head.get("项目等级"));
+        String existingLiaison = blankSafe(head.get("备用1"));
         String level = pickOf(formData, "项目等级");
+        // 已定级的单:等级沿用库内值;请求若带了**不同**等级直接拒(改级必须弃审,口径不变)
+        if (!existingLevel.isEmpty()) {
+            if (!level.isEmpty() && !level.equals(existingLevel))
+                throw new IllegalStateException("本单已定级(" + existingLevel + "),不能改级;要改请先弃审回草稿");
+            level = existingLevel;
+        }
         if (level.isEmpty()) throw new IllegalStateException("请选择项目等级");
+        // lambda 里要用 ⇒ 取一个 final 别名(level 上面被重新赋值过,不能直接捕获)
+        final String finalLevel = level;
         String liaison = pickOf(formData, "对接人");
         if (liaison.isEmpty()) throw new IllegalStateException("请选择对接人账号");
         if (!isEnabledUser(liaison)) throw new IllegalStateException("对接人账号不存在或已停用：" + liaison);
-        applyGrade(def.code(), no, level, user);
-        jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", liaison, no);
-        String name = realNameOf(liaison);
-        recordApproval(def.code(), no, "GRADE_DISPATCH", "DONE", "定级分发：" + level + " / 对接人 " + name + "（" + liaison + "）");
-        if (!liaison.equals(user)) {
-            notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
-                    Map.of("level", level, "actor", user), user));
+        if (existingLevel.isEmpty()) applyGrade(def.code(), no, level, user);
+        // 2026-10-28 用户口径「后续也默认是这个对接人，除非进行修改」——
+        // 取消 2026-10-09 那条"已分发就硬拒"的门禁:允许改人,由 assignLiaison 留痕写明原值。
+        // 留痕只留一条:首次同时定级 → 记 GRADE_DISPATCH(含等级与对接人);
+        // 改人 → 由 assignLiaison 记 LIAISON(写明原对接人),不再叠一条 GRADE_DISPATCH。
+        if (existingLevel.isEmpty() && existingLiaison.isEmpty()) {
+            jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    liaison, no);
+            recordApproval(def.code(), no, "GRADE_DISPATCH", "DONE",
+                    "定级分发：" + level + " / 对接人 " + realNameOf(liaison) + "（" + liaison + "）");
+            if (!liaison.equals(user)) {
+                notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
+                        Map.of("level", finalLevel, "actor", user), user));
+            }
+        } else if (!liaison.equals(existingLiaison)) {
+            assignLiaison(def.code(), no, liaison, user, existingLiaison);
         }
+        String name = realNameOf(liaison);
         Map<String, Object> r = result(no, status);
         r.put("项目等级", level);
         r.put("对接人", liaison);
         r.put("对接人姓名", name);
         return r;
+    }
+
+    /**
+     * 立项对接人落库(2026-10-28):**三条路共用** —— ①审批通过并定级时一起分发;
+     * ②侧栏「定级分发」首次分发;③侧栏「定级分发」改人(用户口径「除非进行修改」)。
+     *
+     * <p>为什么不各写一份:落点(rd_approval.备用1)、留痕(GRADE_DISPATCH/LIAISON)、
+     * 通知(LIAISON_ASSIGNED)、以及"原对接人是谁"的措辞必须逐字一致,否则流程管控页
+     * 会看到两套口径的留痕、被换掉的人也可能收不到通知。
+     *
+     * <p>本方法**只做落库**,不做门禁 —— 门禁由调用方按各自的入口判:
+     * 审批路径已在 {@code approveApproval} 里过完审批权;侧栏路径在 {@code gradeAndDispatch} 里判。
+     *
+     * @param prevLiaison 原对接人账号(改人时非空,用于留痕与"换人"措辞;首次分发传空串)
+     */
+    private void assignLiaison(String panelCode, String no, String liaison, String operator, String prevLiaison) {
+        jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                liaison, no);
+        String name = realNameOf(liaison);
+        String prev = blankSafe(prevLiaison);
+        if (prev.isEmpty()) {
+            recordApproval(panelCode, no, "LIAISON", "DISPATCHED", "分发对接人：" + name + "（" + liaison + "）");
+        } else {
+            // 改人留痕写明"从谁改到谁" —— 用户口径允许修改,但历史必须查得到被换下的是谁
+            recordApproval(panelCode, no, "LIAISON", "DISPATCHED",
+                    "改派对接人：" + realNameOf(prev) + "（" + prev + "）→ " + name + "（" + liaison + "）,操作人 " + operator);
+        }
+        if (!liaison.equals(operator)) {
+            notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
+                    Map.of("level", blankSafe(approvalHeadOf(no).get("项目等级")), "actor", operator), operator));
+        }
+    }
+
+    /** 首次分发/审批时一并分发(无原对接人) */
+    private void assignLiaison(String panelCode, String no, String liaison, String operator) {
+        assignLiaison(panelCode, no, liaison, operator, "");
     }
 
     /** 分发对接人(2026-10-08 流程图③):定级完成后,由该面板**审批人**(∪ 管理员)从账号里指定一个对接人。
@@ -5125,25 +5235,23 @@ public class ButtonService {
         // 「定级完之后就要分发对接人」:没定级就没有下游项目属性,先定级(顺序即流程图顺序)
         String level = blankSafe(approvalHeadOf(no).get("项目等级"));
         if (level.isEmpty()) throw new IllegalStateException("请先完成项目定级,再分发对接人");
-        // 2026-10-09 用户口径:「对接人不能更改」—— 只能分发一次,已分发的直接拒(要换人只能弃审回草稿)。
+        // 2026-10-28 用户口径「后续也默认是这个对接人，除非进行修改」——
+        // 取消 2026-10-09 的「对接人不能更改」硬拒:改人走同一个 assignLiaison,留痕写明原值。
         String existingLiaison = blankSafe(approvalHeadOf(no).get("备用1"));
-        if (!existingLiaison.isEmpty())
-            throw new IllegalStateException("对接人已分发给 " + realNameOf(existingLiaison) + "（" + existingLiaison
-                    + "）,不能更改;要换人请先弃审回草稿重新走流程");
         String liaison = pickOf(formData, "对接人");
         if (liaison.isEmpty()) throw new IllegalStateException("请选择对接人账号");
         if (!isEnabledUser(liaison)) throw new IllegalStateException("对接人账号不存在或已停用：" + liaison);
-        int n = jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", liaison, no);
-        if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
-        String name = realNameOf(liaison);
-        recordApproval(def.code(), no, "LIAISON", "DISPATCHED", "分发对接人：" + name + "（" + liaison + "）");
-        if (!liaison.equals(user)) {
-            notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
-                    Map.of("level", level, "actor", user), user));
+        if (liaison.equals(existingLiaison)) {
+            // 选了同一个人 = 无变化:不重复留痕、不重复通知(但也不算失败)
+            Map<String, Object> same = result(no, status);
+            same.put("对接人", liaison);
+            same.put("对接人姓名", realNameOf(liaison));
+            return same;
         }
+        assignLiaison(def.code(), no, liaison, user, existingLiaison);
         Map<String, Object> r = result(no, status);
         r.put("对接人", liaison);
-        r.put("对接人姓名", name);
+        r.put("对接人姓名", realNameOf(liaison));
         return r;
     }
 
@@ -5238,7 +5346,20 @@ public class ButtonService {
             out.put("canConfirmReceipt", settled && !owner.isEmpty() && ownerAck.isEmpty()
                     && ((user.equals(owner) && isEnabledUser(owner)) || isAdminUser(user)));
             // 2026-10-19:定级与分发对接人合并成一个动作(侧栏只露「定级分发」)
-            out.put("canGradeDispatch", settled && level.isEmpty() && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
+            // 2026-10-21 修:原判据带 level.isEmpty() —— 而「审批通过并定级」已经把等级写进库,
+            //   合并后就没有任何入口能写 备用1(对接人),单据永久卡在"已定级、未分发"。改判据为
+            //   "只要当前人是审批人" 即放行;等级已存在时由 gradeAndDispatch 沿用。
+            // 2026-10-28 用户口径「后续也默认是这个对接人，除非进行修改」——
+            //   再取消 liaison.isEmpty() 限制:已分发也能再点开改人(留痕写明原对接人)。
+            // 🔴 2026-10-28 第二轮(同日):用户要求「把定级分发这个按钮去掉，合并到审批通过里面」
+            //   ⇒ 侧栏那个按钮已删除,本字段**不再驱动任何按钮**(保留只为兼容仍在缓存的旧前端包)。
+            out.put("canGradeDispatch", settled && canApprove(user, "RD_APPROVAL"));
+            // 「补发对接人」补救入口(2026-10-28 第二轮):对接人在审批弹窗里是**选填**
+            // (clearable),而历史单审批时压根没有这个字段 ⇒ 正式账套实测 2 张已审批无对接人
+            // (LXA-2026-10-0013 / LXA-2026-10-0018,均无下游实施计划)。
+            // 按钮一删,这些单就永久卡在"已审批、未分发" ⇒ 给一个**条件极窄**的补救入口:
+            // 已定形 ∧ 对接人为空 ∧ 有审批权。正常单据恒 false,界面上永远看不到它。
+            out.put("canRepairLiaison", settled && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
         } catch (Exception e) {
             log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
         }
@@ -6821,7 +6942,30 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
+            // 物料清单(WLBOM,2026-10-21 用户口径):「物料清单填写是需要保存的,现在显示的都是草稿,
+            //   这个填写保存不需要审批,修改也不需要审批」—— 登记入本集合才走「保存即归档」,
+            //   否则保存后永远停在草稿态(实测用户看到的就是全草稿)。
+            //   它与其余文件类面板的差别只有一处:不区分管理员/普通用户、**谁保存都直接归档**,
+            //   见 SELF_MAINTAINED_PANELS。
+            "WLBOM");
+    /**
+     * **自助维护型**面板(2026-10-21):保存即归档,**任何用户都不走审批**。
+     *
+     * <p>用户口径(物料清单):「填写保存不需要审批,修改也不需要审批」。
+     *
+     * <p>与 {@link #DOC_ARCHIVE_PANELS} 的区别:那张表里的面板是「管理员保存即归档、
+     * 普通用户保存=送审」;这里登记的面板连审批都没有(工具栏也没有审批组),
+     * 谁保存都直接置为已归档 —— 它是**基础数据**,不是要签核的文书。
+     *
+     * <p>配套:
+     * <ul>
+     *   <li>{@code PanelConfigService} 对这里的面板把「审批」组换成「修改」组;</li>
+     *   <li>保存分支见 {@code saveDoc} 里的 SELF_MAINTAINED 判断。</li>
+     * </ul>
+     */
+    public static final java.util.Set<String> SELF_MAINTAINED_PANELS = java.util.Set.of("WLBOM");
+
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
      *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):
      *   它的文档编号不是"单据号"而是**表单固定值** —— 前端 recordSheetConfigs.js 的

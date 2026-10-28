@@ -49,13 +49,13 @@ public final class PagePanelRegistry {
      * 动作只有两个:view(看配置)+ save(改配置);本页不含单据动作。
      */
     public static final String ERP_INTEG = "ERP_INTEG";
-    /** 数采平台·设备配置管理(2026-10-20) */
+    /** 数采平台·IOT设备配置(2026-10-20) */
     public static final String DC_CONFIG = "DC_CONFIG";
     /** 数采平台·数据监控(2026-10-20) */
     public static final String DC_MONITOR = "DC_MONITOR";
     /** 数采平台·状态统计(2026-10-20) */
     public static final String DC_STATS = "DC_STATS";
-    /** 库存管理(现 WMS管理系统)·条码管理 → 扫码领料(2026-10-20) */
+    /** 库存管理(现 WMS管理)·条码管理 → 扫码领料(2026-10-20) */
     public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
     /**
      * 生产计划 → 生产领料(2026-10-20,用户口径「把他写成面版,这样我也可以选择在电脑端操作,
@@ -78,14 +78,30 @@ public final class PagePanelRegistry {
      * {@code 供应商编码 = 当前供应商}) + 银嘉采购订单纸质单打印。
      * 数据接口在 {@code /api/supplier/portal/*}({@link SupplierPortalService}),
      * 真正的闸门是 {@code SupplierPortalGuardFilter}(供应商会话的 /api 请求只放行这几条)。
+     *
+     * <p>⚠ 2026-10-25:界面入口已改为**独立面板** {@code SUPPLIER_PU_ORDER}(采购订单的只读元数据副本,
+     * 见 PanelAliases),本条保留只为兼容既有授权行与译名。
      */
     public static final String SUPPLIER_PRINT = "SUPPLIER_PRINT";
     /**
      * 供应商权限配置(2026-10-24):采购管理下维护"哪个供应商账号能登录、绑定哪个供应商编码"。
-     * **管理员专属** —— 与 ERP_INTEG 同一先例:矩阵里登记(便于分组展示与统计),写操作一律
-     * {@code requireAdmin},不靠权限词授予。
+     * **管理员 ∪ 组织架构授权「配置供应商账号」的账号**(2026-10-25 起不再管理员专属)。
      */
     public static final String SUPPLIER_ACCOUNT = "SUPPLIER_ACCOUNT";
+    /**
+     * WMS管理·条码管理 → 工单扫码领料(2026-10-21,手机端)。
+     * 扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码 → 自动抓台车电子秤数量 → 整单提交生成材料出库单。
+     * 数据侧走既有面板(PLANG 查工单 / WLBOM 查 BOM / MATERIAL_OUT 生单),
+     * 页面本身是 Vue ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
+     */
+    public static final String WORK_ORDER_PICK = "WORK_ORDER_PICK";
+    /**
+     * 研发管理·项目管理 → 项目流程管控(2026-10-20 用户口径):
+     * 按立项申请单号查这条项目在「立项申请 → 定级分发 → 责任人确认 → 实施计划 → 审批归档 → 进度查询」
+     * 里走到哪一步、卡在谁手上。Vue 页面,数据现算(rd_approval/rd_plan/yj_doc_status/yj_form_approval),
+     * **不是** yj_panel 单据面板 ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
+     */
+    public static final String PROJECT_FLOW = "PROJECT_FLOW";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -135,7 +151,7 @@ public final class PagePanelRegistry {
     };
 
     /**
-     * 数采平台三页(2026-10-20):设备配置管理 / 数据监控 / 状态统计 —— Vue 页面,数据来自
+     * 数采平台三页(2026-10-20):IOT设备配置 / 数据监控 / 状态统计 —— Vue 页面,数据来自
      * bs_dc_* 七张表,不是 yj_panel 单据面板。此前**没有面板码** ⇒ 权限矩阵里勾不到、任何登录账号都能进。
      * 动作按页面真实能力给:配置页只有「看」(写操作由后端 requireAdmin 硬闸),监控页可处理报警,统计页只读。
      */
@@ -175,6 +191,23 @@ public final class PagePanelRegistry {
             {"query", "查询"},
             {"pick",  "生成领料单"},
     };
+    /**
+     * 工单扫码领料(2026-10-21,手机端):扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码
+     * → 自动抓台车电子秤数量 → 整单提交生成材料出库单。
+     *
+     * <p>数据侧全部走既有面板引擎:工单查 {@code PLANG}、BOM 查 {@code WLBOM}(mate)、
+     * 生单走 {@code MATERIAL_OUT};秤值取数采平台 {@code /api/dc/monitor}。
+     * 这里登记的只是**页面本身**的可见/查询/生单权,让它在「角色与面板权限」里能勾 ——
+     * 与 {@link #BARCODE_SCAN_PICK} 同一套做法。
+     *
+     * <p>与「扫码领料」的区别:那张按**物料**找库存(扫到哪领到哪),这张按**工单**找用料
+     * (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
+     */
+    private static final String[][] WORK_ORDER_PICK_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"pick",  "生成领料单"},
+    };
 
     /**
      * 工序报工(2026-10-21):扫工单 → 选工序(成型/切炭/组装)→ 填数量 → 提交。
@@ -210,6 +243,14 @@ public final class PagePanelRegistry {
     private static final String[][] SUPPLIER_ACCOUNT_ACTIONS = {
             {"supplier", "配置供应商账号"},
     };
+    /**
+     * 项目流程管控(2026-10-20):**只读**盯单页 —— 查流程走到哪一步、卡在谁手上。
+     * 页面本身不写任何单据(要补审批/定级/确认都回原面板操作),故动作只有可见 + 查询。
+     */
+    private static final String[][] PROJECT_FLOW_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+    };
 
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
@@ -225,10 +266,15 @@ public final class PagePanelRegistry {
             new PagePanelDef(PROD_REPORT, "工序报工", "生产计划", PROD_REPORT_ACTIONS),
             new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS),
             // 2026-10-20 补登:数采平台三页 + 扫码领料(此前菜单里无面板码 ⇒ 矩阵里缺这几个)
-            new PagePanelDef(DC_CONFIG, "设备配置管理", "数采平台", DC_CONFIG_ACTIONS),
+            new PagePanelDef(DC_CONFIG, "IOT设备配置", "数采平台", DC_CONFIG_ACTIONS),
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
-            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理系统", BARCODE_SCAN_PICK_ACTIONS),
+            // ⚠ 模块名以远端改版为准(2026-10-20 导航改版:「WMS管理系统」→「WMS管理」)
+            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理", BARCODE_SCAN_PICK_ACTIONS),
+            // 2026-10-21:工单扫码领料(手机端,按工单+BOM 作业)
+            new PagePanelDef(WORK_ORDER_PICK, "工单扫码领料", "WMS管理", WORK_ORDER_PICK_ACTIONS),
+            // 2026-10-20:研发管理·项目管理 → 项目流程管控(归「研发管理」组,与菜单一级目录一致)
+            new PagePanelDef(PROJECT_FLOW, "项目流程管控", "研发管理", PROJECT_FLOW_ACTIONS),
             // 2026-10-24 用户口径:「采购管理里面多增加俩个面版,一个是供应商采购打印面版,一个是供应商权限配置」
             //   两者都挂在「智能供应链 > 采购管理」下(menus.js 同步),故分组=智能供应链。
             new PagePanelDef(SUPPLIER_PRINT, "供应商采购打印", "智能供应链", SUPPLIER_PRINT_ACTIONS),

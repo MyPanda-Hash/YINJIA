@@ -378,7 +378,9 @@
                    而旧提示只说"尚未分发责任人",看不出是"哪张产品"。现在把后端原因(含产品编号)原样显示。 -->
               <div v-if="devFileGate?.applicable && devFileGate.canEdit === false"
                    style="font-size:12px;color:#e6a23c;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
-                <div v-if="devFileGate.ownerName">{{ tt('本文件责任人') }}：{{ devFileGate.ownerName }}（{{ tt('只读') }}）</div>
+                <!-- 2026-10-28 用户口径:名字后面只跟「（只读）」会被读成"这个人只读"或"这一格只读",
+                     实际规则是**除该负责人之外的人只读** ⇒ 提示词改成把规则说全。 -->
+                <div v-if="devFileGate.ownerName">{{ tt('本文件责任人') }}：{{ devFileGate.ownerName }}（{{ tt('除表单负责人之外只读') }}）</div>
                 <div v-else-if="devFileGate.reason">{{ tt(devFileGate.reason) }}</div>
                 <div v-else>{{ tt('尚未分发责任人') }}：{{ tt('请先在产品信息表点「分发责任人」') }}</div>
               </div>
@@ -467,14 +469,20 @@
                    ⚠ 显隐与置灰仍全部来自后端(rdApprovalFlowState / canGradeProject / canDevDispatch…),一条判据没改。 -->
               <div v-if="panelCode === 'RD_APPROVAL' || panelCode === 'RD_PROD_INFO' || (isDevFilePanel && pendingDocs.rows.length)"
                    class="as-side-section">{{ tt('③ 流程') }}</div>
-              <!-- 定级分发(2026-10-19 用户口径:定级与分发对接人合并成一个按钮,定级的同时分发责任人) -->
+              <!-- 🔴 2026-10-28 第二轮：侧栏「定级分发」按钮**已删除** ——
+                   用户口径「在审批人点击审批通过的时候弹窗能定级能选对接人，把定级分发这个按钮去掉，
+                   就是把定级分发的功能合并到审批通过里面」。
+                   定级 + 分发对接人现在只在「审批通过」弹窗里做（apvLevel + apvLiaison）。
+                   下面这条「补发对接人」是**极窄的补救入口**：只对「已审批但无对接人」的单显示
+                   （历史单审批时还没有对接人字段，正式账套实测 2 张）—— 判据来自后端
+                   rdFlow.canRepairLiaison，正常单据恒 false，界面上看不到。 -->
               <div
                 class="as-side-btn"
-                v-if="panelCode === 'RD_APPROVAL'"
-                :class="{ disabled: !rdFlow.canGradeDispatch }"
-                :title="gradeDispatchTip"
-                @click="openGradeDispatch"
-              ><span class="as-side-step">1</span>{{ tt('定级分发') }}{{ rdFlow.level ? '·' + rdFlow.level : '' }}{{ rdFlow.liaisonName ? ' ' + tt('对接人') + ' ' + rdFlow.liaisonName : '' }}</div>
+                v-if="panelCode === 'RD_APPROVAL' && rdFlow.canRepairLiaison"
+                :class="{ disabled: !rdFlow.canRepairLiaison }"
+                :title="repairLiaisonTip"
+                @click="openRepairLiaison"
+              ><span class="as-side-step">1</span>{{ tt('补发对接人') }}{{ rdFlow.level ? '·' + rdFlow.level : '' }}</div>
               <!-- 对接人签核(2026-10-08 研发流程图④):对接人签核并在同一弹窗里选择项目责任人 -->
               <div
                 class="as-side-btn"
@@ -551,8 +559,18 @@
                 @click="onSideAction('扫描填单')"
               >{{ tt('扫描填单') }}</div>
 
-              <!-- 标注笔 / 橡皮擦(2026-10-16 用户口径):仅**研发管理面板**(RD_*)且已载单据时出现。
-                   标注只落在**只读纸面与打印**上 —— 可编辑态的值在 <input> 里,HTML 无法只给其中几个字上色。 -->
+              <!-- 标注笔 / 橡皮擦(2026-10-16;2026-10-27 简化):仅**研发管理面板**(RD_*)且已载单据时出现。
+                   标注只落在**只读纸面与打印**上 —— 可编辑态的值在 <input> 里,HTML 无法只给其中几个字上色。
+
+                   🔴 2026-10-27 用户口径(#11)「字体颜色标注调出易误操作操作,需要简化」——
+                   旧交互是**三步**:① 点「标注笔」进模式 → ② 纸面划选 → ③ 弹色盘选色。
+                   误操作根源是第 ① 步:进了模式之后整张纸被切成只读(`:editable` 关掉),
+                   用户以为"点了没反应"或"纸变成不能填了",而按钮还亮着、很容易忘记退出。
+                   简化后按**纸面是否本来就只读**分流(见下方 annPenReady):
+                     · 已审核/已归档的纸(最常标注的场景)**划选即出色盘**,不用点按钮 —— 三步变两步;
+                     · 草稿/可编辑的纸仍先点「标注笔」:那里鼠标划选还要用来"选字改内容",
+                       不区分就会误触。这时「标注笔」才是真正的模式开关。
+                     · 「橡皮擦」始终是独立模式(点字即擦),用完再点一次退出。 -->
               <template v-if="annActive">
                 <div
                   class="as-side-btn"
@@ -564,9 +582,14 @@
                   :style="annMode === 'eraser' ? 'background:#b94d3f;color:#fff' : ''"
                   @click="toggleAnnMode('eraser')"
                 >{{ tt('橡皮擦') }}</div>
-                <!-- 模式提示(开着才显示):第一次用最常见的卡点就是"点了标注笔以后呢?" -->
-                <div v-if="annMode" class="as-side-hint">
-                  {{ tt(annMode === 'pen' ? '在纸面上划选要标注的文字，再选颜色' : '点击已标注的文字即可擦除') }}
+                <!-- 模式提示:说明"现在能做什么"。
+                     2026-10-28 最终版:回到**划选即弹**(业界主流)。
+                     中间那版"划选后再点一下"实战不可用 —— 浏览器第二次点击 mousedown 会先清选区,
+                     两种语义分不开,表现为"点了弹不出来"。 -->
+                <div class="as-side-hint">
+                  {{ tt(annMode === 'eraser'
+                    ? '点击已标注的文字即可擦除；再点一次「橡皮擦」退出'
+                    : '划选要标注的文字即弹出颜色盘') }}
                 </div>
               </template>
               <!-- 字段管理:配置类动作(动态字段 / 备用列池),不属于"本单操作" ⇒ 归到输出段末尾,弱化显示 -->
@@ -614,9 +637,12 @@
       </div>
 
       <!-- 标注色盘(选中文字后浮出;position:fixed 用视口坐标,内联样式免动本文件巨大的样式段)。
-           点色即落库并关闭;「加粗」是叠加开关,勾上再点色 = 该段着色且加粗。 -->
+           点色即落库并关闭;「加粗」是叠加开关,勾上再点色 = 该段着色且加粗。
+           2026-10-28:加 .ann-palette 类 —— 原来它只靠内联样式,没有任何可选择的标识,
+           探针/测试无法确认"到底弹没弹"(只能靠肉眼看截图)。 -->
       <div
         v-if="annPending"
+        class="ann-palette"
         :style="`position:fixed;left:${annPending.x + 8}px;top:${annPending.y + 8}px;z-index:3000;background:#fff;border:1px solid #d8d8d8;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:8px 10px;width:172px`"
       >
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -1135,7 +1161,26 @@
           <span v-for="it in headItems(b)" :key="it.kind + it.key" class="dt-tab" :class="{ on: isOn(b, it) }" @click="switchTab(b, it)">{{ tt(it.label) }}</span>
           <span v-if="b.id === 'B' && activeTab(b).key === 'materials' && selectedProduct" class="filter-hint">{{ tt('当前产品：') }}{{ selectedProduct }} {{ tt('的 BOM 子件') }}</span>
           <span class="dt-ics">
-            <el-button v-if="detailEditable(b)" size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+            <!-- 新增数据(2026-10-21 起可下拉):物料清单(WLBOM)用户口径「可以通过点击新增数据的下拉栏:
+                 导入商品数据,然后勾选商品里面的数据进行一个批量导入」⇒ 同一颗按钮点开是两项菜单。
+                 ⚠ 只有声明过商品导入的面板(当前 = WLBOM)才下拉,其余面板保持原来的一击加行,
+                   免得一次无人要求的按钮改版波及全部单据面板。 -->
+            <el-dropdown
+              v-if="detailEditable(b) && canImportProducts(b)"
+              trigger="click"
+              @command="(cmd) => onAddDetailCommand(cmd, b)"
+            >
+              <el-button size="small" type="primary" :icon="Plus">
+                {{ tt('新增数据') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="add">{{ tt('新增数据') }}</el-dropdown-item>
+                  <el-dropdown-item command="importProduct">{{ tt('导入商品数据') }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
@@ -1684,6 +1729,10 @@
     </el-dialog>
     <NewVoucherDialog v-model:visible="newVisible" :panelCode="panelCode" :panel-name="panelName" @saved="onNewSaved" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
+    <BomImportDialog v-model="bomImpVisible" @done="onBomImported" />
+    <!-- 导入商品数据(2026-10-21,物料清单):勾选商品档案(INV)多行 → 批量追加到当前单明细,
+         不自动保存(与 ImportDialog 同口径,保存仍由用户点「保存」)。 -->
+    <ProductImportDialog v-model="productImpVisible" @confirm="applyProductRows" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
     <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;多张先选取再查看,单张直接查看) ═══ -->
@@ -2004,16 +2053,15 @@
       </template>
     </el-dialog>
 
-    <!-- 定级分发弹窗(2026-10-19 用户口径):一个动作 = 选项目等级 + 选对接人账号;
-         等级随「文档编号」参照带给实施计划,对接人随后签核并选责任人。 -->
-    <el-dialog v-model="gradeDispatchVisible" :title="tt('定级分发')" width="480px" append-to-body>
+    <!-- 补发对接人（2026-10-28 第二轮：定级分发按钮已并入「审批通过」弹窗）。
+         这是**补救入口**，不是常规路径：只在「已审批但对接人为空」的历史单上出现
+         （判据 = 后端 rdFlow.canRepairLiaison）。等级这里只读沿用，改级仍只能弃审。 -->
+    <el-dialog v-model="repairLiaisonVisible" :title="tt('补发对接人')" width="440px" append-to-body>
       <div class="dq-form">
-        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('定级的同时把立项分发给一个对接人账号：等级作为后续实施计划与进度流程的属性，对接人随后签核并选择项目责任人。') }}</div>
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('本单已审批但没有对接人：补一个对接人后，他才能签核并确认项目责任人') }}</div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('项目等级') }}</span>
-          <el-radio-group v-model="gradeLevel">
-            <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
-          </el-radio-group>
+          <span>{{ rdFlow.level || tt('（未定级）') }}</span>
         </div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('对接人') }}</span>
@@ -2023,8 +2071,8 @@
         </div>
       </div>
       <template #footer>
-        <el-button @click="gradeDispatchVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :loading="gradeDispatchBusy" @click="confirmGradeDispatch">{{ tt('定级并分发') }}</el-button>
+        <el-button @click="repairLiaisonVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="repairLiaisonBusy" @click="confirmRepairLiaison">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2065,7 +2113,10 @@
     </el-dialog>
 
     <!-- 立项申请「审批通过 + 定级」弹窗(2026-10-08 研发流程图②):用户口径「冯总审核及定级」= 一次动作两件事。
-         仅立项申请表出现;其余面板的「审批通过」仍是原来的意见确认框。 -->
+         2026-10-28 追加对接人:「可以由管理员在审批定级的时候确定一个对接人进行分发，后续也默认是这个对接人」
+         ⇒ 弹窗里多一个对接人下拉(默认带出已有对接人),选了就与定级同一动作完成分发。
+         2026-10-28 第二轮:侧栏「定级分发」按钮已删除,**本弹窗是定级与分发对接人的唯一入口**;
+         不选对接人时该单会停在"已审批、未分发",由侧栏「补发对接人」补救(仅缺对接人时出现)。 -->
     <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
@@ -2075,6 +2126,13 @@
             <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
           </el-radio-group>
         </div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('对接人') }}</span>
+          <el-select v-model="apvLiaison" style="flex:1" filterable clearable :placeholder="tt('对接人（选填）')">
+            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="dq-tip">{{ tt('在审批定级的同时选择对接人，一步完成分发；不选则审批后由侧栏「补发对接人」补上') }}</div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
           <el-input v-model="apvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
@@ -2353,7 +2411,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
+import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
@@ -2416,6 +2474,8 @@ import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
+import BomImportDialog from './BomImportDialog.vue'
+import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
@@ -4307,7 +4367,18 @@ const annActive = computed(() => !!isRdPanel.value && !!curDocNo.value)
  * 否则草稿单的值都在 <input>/<textarea> 里,HTML 无法只给其中几个字上色,
  * 划选也没有 AnnotatedText 去换算下标 ⇒ 用户点标注笔"没有反应"(2026-10-16 报障的真因)。
  * 退出模式即恢复可编辑;未保存的值在 cur 里,不因切渲染而丢。
+ *
+ * 🔴 2026-10-27(#11「字体颜色标注调出易误操作操作,需要简化」)改写:
+ *   切只读这件事本身就是"误操作"的来源 —— 进了标注笔,整张草稿纸突然不能填了,
+ *   而按钮还亮着,很容易以为系统坏了。
+ *   现在按**纸张是否本来就只读**分流:
+ *     · 纸张本来只读(已审核/已归档/无权限)⇒ **不需要开模式**:直接划字就出色盘
+ *       (见 annPenReady)。少了"点标注笔"这一步,也就不存在"忘了退出"。
+ *     · 纸张本来可编辑 ⇒ 仍必须先点「标注笔」才能划选:否则鼠标划选既可能是"选字准备改内容"
+ *       也可能是"要标注",无法区分。这时按钮才是真正的模式开关。
+ *   ⇒ 最常用的场景(看已审核的受控文件、给某几个字标色)从三步变两步。
  */
+const annPenReady = computed(() => !!annActive.value && (!draftEditable.value || annMode.value === 'pen'))
 const annOn = computed(() => !!isRdPanel.value && annMode.value !== null)
 function setAnnList(list) {
   const m = {}
@@ -4408,6 +4479,10 @@ provideAnnotations({
   anns: annMap,
   mode: annMode,
   active: annActive,
+  // 2026-10-27(#11):纸面据此决定"划选即可标注"还是"必须先点标注笔"。
+  // 与 annMode 分开传,是因为 annMode='pen' 在只读纸上本来就没必要开 ——
+  // 纸面窗口 AnnotatedText 只认这个布尔值,不关心用户点没点按钮。
+  penReady: annPenReady,
   ask: askAnn,
   erase: eraseAnn,
 })
@@ -4584,6 +4659,10 @@ const selVisible = ref(false)
 const impVisible = ref(false)
 const impFields = ref([])
 const impLabel = ref('明细')
+// 物料清单(WLBOM)批量导入:一个产品一张单(2026-10-21,见 BomImportDialog.vue)
+const bomImpVisible = ref(false)
+/** 「导入商品数据」弹窗(2026-10-21):勾选商品档案(INV)多行 → 追加到当前单明细 */
+const productImpVisible = ref(false)
 const scanVisible = ref(false)
 const selCfg = ref(null)
 // 材料二维码标签(品检分流链:暂收单行 打印标签)
@@ -4750,6 +4829,8 @@ const rdFlow = reactive({
   // 2026-10-19 流程第 4 步:责任人确认收到(后端 rdApprovalFlowState 的唯一真源)
   ownerAck: '', ownerAckAt: '',
   canDispatchLiaison: false, canConfirmOwner: false, canConfirmReceipt: false, canGradeDispatch: false,
+  // 2026-10-28 第二轮:定级分发按钮并入审批通过后,「已审批但无对接人」的历史单补救入口
+  canRepairLiaison: false,
 })
 /** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
 const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
@@ -4790,6 +4871,24 @@ watch(
   () => {
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
     applyDocDefaults(panelCode.value, cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
+  },
+)
+
+// 「编辑人 / 表单管理人」自动带入(2026-10-28 用户口径):
+//   · 产品信息表:编辑人 = 当前编辑账号姓名;
+//   · 组装工艺清单:表单管理人也 = 编辑人 ——「选择产品编号之后就自动带入,或者进行其他编辑也自动带入」。
+// 只改**显示值与保存报文**(cur 是保存时回传的表头对象),不主动置脏:
+//   用户没有别的改动就不该弹「未保存」提醒。落库权威仍在服务端(ButtonService 每次保存按登录人回写),
+//   所以即使这一格没被前端改到,存下去也一定是当前登录人。
+const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人', RD_ASM_PROC: '表单管理人' }
+watch(
+  () => [panelCode.value, draftEditable.value, cur.value?.['单据编号'], JSON.stringify(cur.value || {})],
+  () => {
+    const key = EDITOR_STAMP_FIELDS[panelCode.value]
+    if (!key || !cur.value || !draftEditable.value) return
+    const name = String(user.realName || user.userName || '').trim()
+    if (!name || cur.value[key] === name) return
+    cur.value[key] = name
   },
 )
 
@@ -6335,9 +6434,19 @@ function colW(f) {
 }
 
 // ---------- 明细右键/图标操作（作用于当前活动区块） ----------
-const ctxItems = ['定位', '复制到剪贴板', '从剪贴板粘贴', '另存为EXCEL模板', '批量修改', '销售订单查询', '存货中心', '更多']
-const iconA = ['☑ Ctrl+V列粘贴', '定位', '复制到剪贴板', '从剪贴板粘贴', '另存为EXCEL模板', '批量修改', '销售订单查询', '存货中心', '更多▼']
-const iconB = ['现存量提取', '定位', '复制到剪贴板', '从剪贴板粘贴', '另存为EXCEL模板', '批量修改', '更多▼']
+// 🔴 2026-10-28 用户口径「把所有面板表格上未实现的功能的按钮去掉，现在有一些按钮点击会提示」:
+//   这两组图标/右键项原先是从 T+ 界面照抄的一整套工具条,但**大部分没有实现** ——
+//   点下去只落到 onIcon / onCtxItem 末尾那句「演示环境暂未实现…」，用户看到的就是那条提示。
+//   处置:**没实现就不显示**（不是置灰 —— 置灰仍占位、仍引人去点）。
+//   保留判定 = 处理函数里有显式 `it === 'X'` 分支:
+//     · onIcon   实现了:复制到剪贴板 / 另存为EXCEL模板 / 现存量提取
+//     · onCtxItem 实现了:定位 / 复制到剪贴板 / 另存为EXCEL模板
+//   被拿掉的:☑ Ctrl+V列粘贴、从剪贴板粘贴、批量修改、销售订单查询、存货中心、更多▼
+//   ⚠ 已拿掉的**不要**因为"看着空缺"再补回来:要补就先实现处理分支,
+//     单测 noUnimplementedButtons.test.js 会拦住"清单里有、函数里没有"的项。
+const ctxItems = ['定位', '复制到剪贴板', '另存为EXCEL模板']
+const iconA = ['复制到剪贴板', '另存为EXCEL模板']
+const iconB = ['现存量提取', '复制到剪贴板', '另存为EXCEL模板']
 
 const ctxBlock = ref(null)
 const ctx = reactive({ visible: false, x: 0, y: 0, row: null })
@@ -6441,10 +6550,16 @@ const apvBusy = ref(false)
 const apvLevel = ref('')
 const apvOpinion = ref('')
 const apvDocNo = ref('')
+/** 2026-10-28:审批定级时一并分发对接人(用户口径「后续也默认是这个对接人」) */
+const apvLiaison = ref('')
 async function openRdApprove(no) {
   apvDocNo.value = no
   // 已定过级的单据默认选中当前等级(改级场景);新单默认空,必须选(与用户口径「审批与定级同一步」一致)
   apvLevel.value = String(current.value?.['项目等级'] || '')
+  // 对接人下拉的候选来自账号清单(与「定级分发」同一份);不预取 ⇒ 打开弹窗时拉一次
+  await ensureRdFlowUsers()
+  // 默认带出已有对接人("后续也默认是这个对接人");新单为空,由用户自行选或不选
+  apvLiaison.value = String(rdFlow.liaison || '')
   apvOpinion.value = ''
   apvVisible.value = true
 }
@@ -6455,7 +6570,13 @@ async function confirmRdApprove() {
   try {
     await engine.callButton({
       panelCode: RD_FLOW_PANEL, buttonName: '审批通过',
-      formData: { 编号: apvDocNo.value, 项目等级: apvLevel.value, ...(apvOpinion.value ? { 审批意见: apvOpinion.value } : {}) },
+      formData: {
+        编号: apvDocNo.value,
+        项目等级: apvLevel.value,
+        // 空串不发:后端按"没带对接人"处理(与旧前端/老单兼容),不会误清已分发的人
+        ...(apvLiaison.value ? { 对接人: apvLiaison.value } : {}),
+        ...(apvOpinion.value ? { 审批意见: apvOpinion.value } : {}),
+      },
       buttonParam: {},
     })
     ElMessage.success(tt('审批通过并定级：') + apvLevel.value)
@@ -6522,36 +6643,48 @@ async function confirmGrade() {
   }
 }
 
-// ---------- 定级分发(2026-10-19:定级 + 分发对接人合成一个动作) ----------
-const gradeDispatchVisible = ref(false)
-const gradeDispatchBusy = ref(false)
+// ---------- 补发对接人(2026-10-28 第二轮:定级分发按钮已并入「审批通过」) ----------
+// 用户口径:「把定级分发这个按钮去掉，就是把定级分发的功能合并到审批通过里面」。
+// 常规路径 = 审批通过弹窗(apvLevel + apvLiaison)。这里只剩**补救**:
+// 审批弹窗里对接人是选填,历史单审批时还没有这个字段 ⇒ 正式账套实测 2 张已审批无对接人
+// (LXA-2026-10-0013 / LXA-2026-10-0018,均无下游实施计划)。没有这条,它们永久卡死。
+// 显隐判据来自后端 rdFlow.canRepairLiaison(已定形 ∧ 无对接人 ∧ 有审批权)⇒ 正常单据恒 false。
+const repairLiaisonVisible = ref(false)
+const repairLiaisonBusy = ref(false)
+/** 等级只读沿用(改级仍只能弃审);这里只补对接人 */
+const repairLiaisonTip = computed(() => {
+  if (rdFlow.canRepairLiaison) return tt('本单已审批但没有对接人：补一个对接人后，他才能签核并确认项目责任人')
+  if (!isRdSettled) return tt('仅已审核或已归档的立项申请可补发对接人')
+  if (rdFlow.liaison) return tt('本单已有对接人，无需补发')
+  return tt('仅审批人（或管理员）可补发对接人')
+})
 
-async function openGradeDispatch() {
-  if (!rdFlow.canGradeDispatch) return
+async function openRepairLiaison() {
+  if (!rdFlow.canRepairLiaison) return
   if (!(await ensureRdFlowUsers())) return
-  gradeLevel.value = String(rdFlow.level || '')
   liaisonUser.value = rdFlow.liaison || ''
-  gradeDispatchVisible.value = true
+  repairLiaisonVisible.value = true
 }
 
-async function confirmGradeDispatch() {
-  if (!gradeLevel.value) return ElMessage.warning(tt('请选择项目等级'))
+async function confirmRepairLiaison() {
   if (!liaisonUser.value) return ElMessage.warning(tt('请选择对接人账号'))
-  if (gradeDispatchBusy.value) return
-  gradeDispatchBusy.value = true
+  if (repairLiaisonBusy.value) return
+  repairLiaisonBusy.value = true
   try {
     const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    // 走后端同一个按钮名(定级分发)—— 服务端只有这一条写 备用1 的路径,
+    // 等级已存在时它会沿用库内值;不做"前端另起一个 API"的第二套口径。
     await engine.callButton({
       panelCode: RD_FLOW_PANEL, buttonName: '定级分发',
-      formData: { 编号: no, 项目等级: gradeLevel.value, 对接人: liaisonUser.value }, buttonParam: {},
+      formData: { 编号: no, 项目等级: rdFlow.level || '', 对接人: liaisonUser.value }, buttonParam: {},
     })
-    ElMessage.success(tt('已定级并分发对接人'))
-    gradeDispatchVisible.value = false
+    ElMessage.success(tt('已补发对接人'))
+    repairLiaisonVisible.value = false
     await load()
   } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('定级分发失败'))
+    ElMessage.error(engine.errMsg(e) || tt('补发对接人失败'))
   } finally {
-    gradeDispatchBusy.value = false
+    repairLiaisonBusy.value = false
   }
 }
 
@@ -6576,6 +6709,7 @@ function clearRdFlow() {
     status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
     ownerAck: '', ownerAckAt: '',
     canDispatchLiaison: false, canConfirmOwner: false, canConfirmReceipt: false, canGradeDispatch: false,
+    canRepairLiaison: false,
   })
 }
 
@@ -6593,6 +6727,7 @@ async function loadRdFlowState() {
       ownerAck: r?.ownerAck || '', ownerAckAt: r?.ownerAckAt || '',
       canDispatchLiaison: !!r?.canDispatchLiaison, canConfirmOwner: !!r?.canConfirmOwner,
       canConfirmReceipt: !!r?.canConfirmReceipt, canGradeDispatch: !!r?.canGradeDispatch,
+      canRepairLiaison: !!r?.canRepairLiaison,
     })
   } catch (e) {
     // 端点不可用(旧后端)或网络失败 ⇒ 全部置灰,不阻断打开单据(保存/审批仍走各自门禁)
@@ -6683,14 +6818,6 @@ async function confirmOwner() {
 // ---------- 责任人确认收到(2026-10-19 流程第 4 步) ----------
 const receiptVisible = ref(false)
 const receiptBusy = ref(false)
-
-/** 第 1 步「定级分发」的提示(2026-10-19 两步合一) */
-const gradeDispatchTip = computed(() => {
-  if (rdFlow.canGradeDispatch) return tt('定级的同时把立项分发给一个对接人账号')
-  if (!isRdSettled) return tt('仅已审核或已归档的立项申请可定级分发')
-  if (rdFlow.level || rdFlow.liaison) return tt('已定级/已分发，要修改请先弃审回草稿')
-  return tt('仅审批人（或管理员）可定级分发')
-})
 
 /** 第 2 步「对接人签核」的提示 */
 const ownerSignTip = computed(() => {
@@ -6797,26 +6924,24 @@ const sheetExcelDesc = computed(() => {
 /**
  * 把当前文书纸面截成 PDF(返回 blob + 文件名)—— **导出 PDF 与打印预览共用这一份实现**。
  *
- * 页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
+ * 页面尺寸=纸张实际尺寸(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
  * 无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
  * 宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
  * 根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
  * 里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。
+ *
+ * 🔴 2026-10-28 用户口径:「导出需要能将当前的规格书所有内容导出,当前只能导出当前的对应页面」——
+ *   规格书/组装工艺清单这类**多页签文书**(pages 2~4 页)现在整份导出:逐页切页签各截一张,
+ *   合成**一个多页 PDF**(每页仍是纸张实际尺寸)。单页文书(立项申请/DocSheet 等)路径不变。
+ *   页签条(.rsp-pages)是编辑控件,截图前从克隆体里摘掉(与打印口径 body.approval-printing 一致)。
  *
  * ⚠ $el 在 dev 下可能是 fragment **注释锚点**(模板顶部的注释块、组件内的 append-to-body 弹窗
  *   都会把单根变多根,§5.5 B1)⇒ 判不出元素时按纸张根**类名**兜底;
  *   兜底名单必须把**每种纸张的根类名**都列全 —— 2026-10-17 实测漏了 `.fi-sheet`,
  *   于是首件检验单点「导出 PDF」直接报「未找到可导出的单据」。
  */
-async function buildSheetPdfBlob() {
-  const el0 = approvalSheetRef.value?.$el
-  const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
-    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
-    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .qr-sheet')
-  if (!el || !(el instanceof HTMLElement)) return null
-  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
-  await nextTick()
+/** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0 } */
+async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
@@ -6827,32 +6952,75 @@ async function buildSheetPdfBlob() {
     clone.style.width = w0 + 'px'
     clone.style.maxWidth = 'none'
     clone.style.overflow = 'visible'
+    // 页签条是编辑控件,不进导出件(打印时由 body.approval-printing 隐藏;导出走同一口径)
+    clone.querySelectorAll('.rsp-pages').forEach((n) => n.remove())
     holder.appendChild(clone)
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
-    const scale = 2
     const dataUrl = await domToPng(clone, {
-      scale,
+      scale: 2,
       backgroundColor: '#ffffff',
       width: w0,
       height: h0,
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
-    // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
-    const MM = 25.4 / 96
-    const pw = w0 * MM
-    const ph = h0 * MM
-    const pdf = new jsPDF({ orientation: pw > ph ? 'l' : 'p', unit: 'mm', format: [pw, ph], compress: true })
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pw, ph)
-    const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
-    return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
+    return { dataUrl, w0, h0 }
   } finally {
     if (holder) holder.remove()
   }
+}
+async function buildSheetPdfBlob() {
+  const comp = approvalSheetRef.value
+  const el0 = comp?.$el
+  const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
+    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
+    + '.approval-layout .qr-sheet')
+  if (!el || !(el instanceof HTMLElement)) return null
+  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
+  await nextTick()
+  // 多页签文书的页数由 RecordSheetPanels 暴露(单页/非记录纸组件恒为 1)
+  const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
+  const startPage = typeof comp?.activePage === 'number' ? comp.activePage : 0
+  const shots = []
+  try {
+    for (let i = 0; i < pageCount; i++) {
+      if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
+        comp.setActivePage(i)
+        await nextTick()
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      }
+      shots.push(await snapSheetPage(el, domToPng))
+    }
+  } finally {
+    // 切回导出前的页签,别把用户的界面停在最后一页
+    if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
+      comp.setActivePage(startPage)
+      await nextTick()
+    }
+  }
+  if (!shots.length) return null
+  // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
+  // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
+  const MM = 25.4 / 96
+  const first = shots[0]
+  const pdf = new jsPDF({
+    orientation: first.w0 * MM > first.h0 * MM ? 'l' : 'p',
+    unit: 'mm',
+    format: [first.w0 * MM, first.h0 * MM],
+    compress: true,
+  })
+  shots.forEach((s, i) => {
+    const pw = s.w0 * MM
+    const ph = s.h0 * MM
+    if (i > 0) pdf.addPage([pw, ph], pw > ph ? 'l' : 'p')
+    pdf.addImage(s.dataUrl, 'PNG', 0, 0, pw, ph)
+  })
+  const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
+  return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
 }
 /** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机 */
 async function exportSheetPdf() {
@@ -7076,6 +7244,12 @@ function prepareDocPrint() {
 function onAfterPrintDoc() {
   document.body.classList.remove('doc-printing')
   if (docPrintLazy.value) docPrintReady.value = false
+  // 2026-10-20:@page(纸向/页边距)只对**本次**打印有效,打完即摘。
+  //   原实现让这条 A4 @page 常驻 <head>;之后再打 75×100mm 的标识卡/二维码标签
+  //   (页面内打印层,见 @core/panel/printChannel)时,两条 @page 同时存在,
+  //   一旦层叠顺序变化(或浏览器取第一条)标签就会按 A4 出纸、一张纸只印半张卡。
+  //   Ctrl+P / 浏览器菜单打印都会在 beforeprint 里重新注入(onBeforePrintDoc),故摘掉不影响单据打印。
+  document.getElementById('doc-print-page')?.remove()
 }
 /**
  * Ctrl/Cmd+P 拦截:懒渲染面板要先把打印层挂上再交回给浏览器。
@@ -7317,7 +7491,10 @@ async function onIcon(it, b) {
     }
     return
   }
-  ElMessage.info(`演示环境暂未实现「${it}」，界面与 T+ 保持一致`)
+  // 2026-10-28:未实现的动作**不再出现在工具条上**(见 iconA/iconB 注释),正常路径到不了这里。
+  // 留着这句只为"清单与实现脱节时"能被单测/控制台发现 —— 早先它是静静地弹一句提示,
+  // 用户以为功能在、只是坏了。现在开发期会明显看到它。
+  if (import.meta.env?.DEV) console.warn('[未实现] 工具条动作:', it)
 }
 
 async function onCtxItem(it) {
@@ -7336,7 +7513,8 @@ async function onCtxItem(it) {
     exportActive()
     return
   }
-  ElMessage.info(`演示环境暂未实现「${it}」，界面与 T+ 保持一致`)
+  // 2026-10-28:同 onIcon —— 未实现项已不在 ctxItems 里;这句只在清单脱节时报警
+  if (import.meta.env?.DEV) console.warn('[未实现] 右键动作:', it)
 }
 
 // ---------- 查询区 ----------
@@ -7622,6 +7800,93 @@ function addInlineDetailRow(b) {
     syncActiveCellEcho(row, firstEditable.dataName)
   }
   markInlineDirty() // 新增明细行 = 未保存修改
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   「导入商品数据」(2026-10-21) — 勾选商品档案(INV)多行批量追加到明细
+   ------------------------------------------------------------------------------
+   用户原话:「把填写物料清单的内容可以通过点击新增数据的下拉栏:导入商品数据,
+             然后勾选商品里面的数据进行一个批量导入」。
+   口径(与既有 ImportDialog / 「选检验项目带入」一致,别自己另生一套):
+     · 只**追加**行,不动已有行;不自动保存,保存仍由用户点「保存」;
+     · 行由 newDetailRow(tabKey) 构造 ⇒ 带齐该页签各字段默认值,与「新增数据」完全同构,
+       保存链路(labelsToCols/行表 upsert)一行都不用改;
+     · 同一次勾选里已在明细中的子件直接跳过并告知,不静默少加。
+   面板白名单:目前只有物料清单(WLBOM)有这套字段映射,别的面板加进来要先核对它的明细键。
+   ══════════════════════════════════════════════════════════════════════════════ */
+const PRODUCT_IMPORT_PANELS = new Set(['WLBOM'])
+/** 触发「导入商品数据」的明细区块 id(弹窗确认时才回头找区块,避免把 block 对象存进 ref) */
+const productImpBlockId = ref('')
+
+/** 本明细区块是否给「导入商品数据」入口(白名单面板 + 明细可编辑) */
+function canImportProducts(b) {
+  return !!b && PRODUCT_IMPORT_PANELS.has(panelCode.value) && detailEditable(b)
+}
+
+/** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗 */
+function onAddDetailCommand(cmd, b) {
+  if (cmd === 'importProduct') {
+    if (!canImportProducts(b)) return
+    productImpBlockId.value = b.id
+    productImpVisible.value = true
+    return
+  }
+  addInlineDetailRow(b)
+}
+
+/**
+ * 商品档案行 → 当前明细追加行。
+ *
+ * 字段映射(左 = 商品档案 INV 列,右 = WLBOM 明细中文数据键;标签已按库里
+ * `SELECT label FROM yj_field WHERE panel_code='WLBOM'` 逐个核对,不是猜的):
+ *   存货编码 → 子件代码 / 存货名称 → 子件名称 / 规格型号 → 规格型号 / 计量单位 → 子件单位
+ *   标准用量 = 1(用户导入后自己改) / 行序 = 接已有行递增
+ * 只写**本页签真有的列**(has 判定),换面板复用这份映射时不会凭空多出键。
+ */
+function applyProductRows(items) {
+  const b = blocks.value.find((x) => x.id === productImpBlockId.value) || blocks.value[0]
+  if (!b || !detailEditable(b)) return 0
+  const tabKey = activeTab(b).key
+  // 列集取**该页签全部明细字段**(含隐藏列):报表分组键/内部列也要写值,不能用 activeTab().cols(只有可见列)
+  const cols = new Set((detailTabDefOf(tabKey)?.fields || []).map((f) => f.dataName))
+  const has = (k) => cols.has(k)
+  if (!cur.value.detail) cur.value.detail = {}
+  const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  // 排序激活时先清排序:新行落在数据末尾,避免"插到已排好的中间"的错觉(与 addInlineDetailRow 同)
+  const state = blockSortOf(b)
+  if (state.order) { state.prop = ''; state.order = '' }
+  const norm = (v) => String(v ?? '').trim()
+  // 已在明细里的子件(判重用):同一子件重复挂在一个 BOM 上没有业务意义
+  const seen = new Set(rows.map((r) => norm(r['子件代码'])).filter(Boolean))
+  // 行序接在已有行之后:既有行可能被删过(行数 ≠ 最大行序),取两者较大值再往上数,避免撞号
+  let seq = Math.max(rows.length, rows.reduce((m, r) => Math.max(m, Number(r['行序']) || 0), 0))
+  let n = 0
+  const dupes = []
+  for (const it of items || []) {
+    const code = norm(it['存货编码'])
+    if (!code) continue                                   // 无编码的档案行带进明细只会是空行
+    if (seen.has(code)) { dupes.push(code); continue }
+    seen.add(code)
+    const row = newDetailRow(tabKey)
+    if (has('行序')) row['行序'] = ++seq                   // 只在真要写这一列时才推进行序
+    if (has('子件代码')) row['子件代码'] = code
+    if (has('子件名称')) row['子件名称'] = norm(it['存货名称'])
+    if (has('规格型号')) row['规格型号'] = norm(it['规格型号'])
+    if (has('子件单位')) row['子件单位'] = norm(it['计量单位'])
+    if (has('标准用量')) row['标准用量'] = 1               // 默认 1,导入后由用户按实际用量改
+    rows.push(row)
+    n++
+  }
+  if (!n) {
+    // 勾的全是明细里已有的 ⇒ 一条不加,明确告知(与「带入检验项目」同话术)
+    if (dupes.length) ElMessage.warning(tt('勾选的商品已在明细中，不重复添加'))
+    return 0
+  }
+  archPage.value = Math.ceil(rows.length / archPageSize.value) // 新行在末尾,跳末页立即可见
+  markInlineDirty()                                            // 未保存修改(不自动保存)
+  const dupTip = dupes.length ? `，${tt('跳过已在明细中的')}${dupes.length}${tt('行')}` : ''
+  ElMessage.success(`${tt('已带入')} ${n} ${tt('行')}${dupTip} —— ${tt('导入后不自动保存，请点「保存」后生效')}`)
+  return n
 }
 
 /**
@@ -8766,7 +9031,7 @@ function disabledReason(action) {
     if (devFileBlocked.value) {
       const owner = devFileGate.value?.ownerName
       return owner
-        ? tt('本文件责任人') + '：' + owner + '（' + tt('只读') + '）'
+        ? tt('本文件责任人') + '：' + owner + '（' + tt('除表单负责人之外只读') + '）'
         : tt('尚未分发责任人') + '：' + tt('请先在产品信息表点「分发责任人」')
     }
     return tt('单据状态') + '：' + stText + '，' + tt('仅草稿可编辑')
@@ -9209,7 +9474,8 @@ async function onButton(action) {
     return
   }
   // 银嘉固定版式纸质单打印(2026-09-23):采购订单/暂收退料单 → print-formats.js;
-  // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),新窗口打印
+  // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),
+  // 出纸 = 页面内打印层(2026-10-20 起不再开子窗口,见 @core/panel/printChannel)
   // (无后端处理器,同 打印工单二维码 本地拦截先例)
   // 打印订单无金额(2026-09-28 用户澄清):采购订单的另一种报表,版式同款仅去 单价/小计/总计金额
   if (action === '打印采购订单' || action === '打印退货单' || action === '打印订单无金额') {
@@ -9389,6 +9655,12 @@ async function onButton(action) {
     return
   }
   if (action === '导入') {
+    // 物料清单(WLBOM)= 一个产品一张单的批量导入(2026-10-21),不能走通用「追加到当前单」:
+    // Excel 里每行都带物料编码,要按产品**分组建单**,故走专用对话框 BomImportDialog。
+    if (panelCode.value === 'WLBOM') {
+      bomImpVisible.value = true
+      return
+    }
     // Excel 导入：识别 A 区主明细字段，导入后追加行并自动保存
     const blk = blocks.value.find((x) => x.id === 'A')
     const tab = blk ? activeTab(blk) : null
@@ -10067,6 +10339,11 @@ function onSelGenerated(generated) {
     }
   }
   load().then(finish)
+}
+
+// 物料清单(WLBOM)批量导入完成:每个产品各是一张新单,故整页刷新列表即可(2026-10-21)
+function onBomImported() {
+  load()
 }
 
 // Excel 导入完成：单据面板追加到当前单明细并保存；档案面板（无明细 tab）逐行新建档案

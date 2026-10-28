@@ -9,6 +9,7 @@ import fr from 'element-plus/es/locale/lang/fr'
 import de from 'element-plus/es/locale/lang/de'
 import ru from 'element-plus/es/locale/lang/ru'
 import { i18n, LOCALE_KEY, ensureLocalePack } from '@/i18n'
+import { apiBase } from '@/business/appConfig'
 
 /** Element Plus 组件库文案 locale 映射(缺失语言回退英文)。 */
 const EP_LOCALES = { 'zh-CN': zhCn, 'zh-TW': zhTw, en, ja, ko, es, fr, de, ru }
@@ -51,7 +52,7 @@ export const useLocaleStore = defineStore('locale', {
     /** 拉取启用语言列表(切换器数据源;失败回退内置两语)。 */
     async loadAvailable() {
       try {
-        const r = await fetch('/api/locale/list')
+        const r = await fetch(apiBase() + '/api/locale/list')
         const d = await r.json()
         if (Array.isArray(d?.data) && d.data.length) this.available = d.data
       } catch { /* 保持内置 */ }
@@ -67,7 +68,7 @@ export const useLocaleStore = defineStore('locale', {
       ))
       if (!missing.length) return
       try {
-        const r = await fetch('/api/locale/dict', {
+        const r = await fetch(apiBase() + '/api/locale/dict', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ locale, keys: missing }),

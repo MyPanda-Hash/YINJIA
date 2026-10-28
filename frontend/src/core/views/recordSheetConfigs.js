@@ -157,11 +157,10 @@ const RD_ASM_PROC_DT_BOM = {
   noVariant: true,
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-    { key: '物料编号', label: '物料编号', w: 130 },
-    { key: '物料名', label: '物料名称', w: 140 },
-    { key: '物料规格', label: '物料规格', w: 300, area: true },
-    { key: '外观要求', label: '外观要求', w: 340 },
-    { key: '用量', label: '用量', w: 130 },
+    { key: '物料编号', label: '物料编号', w: 150 },
+    { key: '物料名', label: '物料名称', w: 220 },
+    { key: '物料规格', label: '物料规格', w: 500, area: true },
+    { key: '用量', label: '用量', w: 170 },
   ],
 }
 
@@ -195,7 +194,8 @@ const RD_ASM_PROC_INFO_SEC = (page) => ({
  *    各写一份而不是共用同一个常量:两侧各有各的面板与行表,改一侧不该悄悄改另一侧
  *    (2026-09-20 组装侧重排就是"共用配置"把列序带坏的)。 */
 const RD_MOLD_PROC_DT_REVISION = {
-  page: 0,
+  // 2026-10-27 页序调整后,修订记录从第 0 页挪到第 2 页(见 RD_MOLD_PROC.pages 注释)
+  page: 2,
   pageTitle: '修订记录',
   filterKey: '表区', filterVal: '修订记录',
   // 本页无「产品基本信息」区(没有 工艺形态 格可改),也不靠变体切标题 ⇒ 不渲染表头变体切换行
@@ -224,7 +224,7 @@ const RD_MOLD_PROC_DT_REVISION = {
  *   - 工序五个字段(配料要求/烧结炉参数/烧结时间调速器参数/热压要求/冷却参数设置)挂标准库:
  *     文本框版式的给「⌄标准库」选择(选完还能改),下拉版式的选项即库条目 + 「⧉标准库维护」。 */
 const RD_MOLD_PROC_SEC0 = [
-      { page: 1, bar: '产品基本信息', rows: [
+      { page: 0, bar: '产品基本信息', rows: [
         { grid: [
           { label: '炭棒编号', span: 2 },
           { label: '产品名称', span: 2 },
@@ -244,7 +244,7 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '生产车间', type: 'select' },
         ]},
       ]},
-      { page: 1, bar: '工序', rows: [
+      { page: 0, bar: '工序', rows: [
         { grid: [
           { label: '工序', cap: true },
           { label: '工序管控要求', cap: true, span: 10 },
@@ -322,7 +322,7 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '最高重量g', span: 2 },
         ]},
       ]},
-      { page: 1, bar: '检验要求', rows: [
+      { page: 0, bar: '检验要求', rows: [
         // 炭棒尺寸:标签行 4 格 + 值行 4 格,标签与值同列对齐(新版面无「内孔要求」)
         // ⚠ 四个块名格(炭棒尺寸/跌落强度/抗压强度/压降)在 yj_field 里是**显示标签**
         //   (editable=0 / hidden=1,见 tools/migrate-mold-proc-labels.sql 头注「只做显示(不存数据)」)。
@@ -397,16 +397,16 @@ const RD_MOLD_PROC_SEC0 = [
 const RD_MOLD_FORMULA = {
     staticTitle: '炭棒配方管控清单',
     info: [
-      { page: 2, label: '表单管理人', key: '表单管理人', type: 'text' },
-      { page: 2, label: '密级', key: '密级', type: 'select' },
-      { page: 2, label: '使用范围', key: '使用范围', type: 'select' },
-      { page: 2, label: '版本号', key: '版本号', type: 'text' },
+      { page: 1, label: '表单管理人', key: '表单管理人', type: 'text' },
+      { page: 1, label: '密级', key: '密级', type: 'select' },
+      { page: 1, label: '使用范围', key: '使用范围', type: 'select' },
+      { page: 1, label: '版本号', key: '版本号', type: 'text' },
     ],
     grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57],
     // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
     head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
-      { page: 2, bar: '产品基本信息', rows: [
+      { page: 1, bar: '产品基本信息', rows: [
         { grid: [
           { label: '产品编号', span: 2 },
           { label: '产品名称', span: 2 },
@@ -432,7 +432,10 @@ const RD_MOLD_FORMULA = {
       // 「配方表的数据是在配方计算器里面填写数据然后填入单据的,而不是带入的规格书的」),
       // 算完点「填入单据」写回页 1 十一格 + 本表区**整表替换**为弹窗那份行;
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
-      { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
+      // blankRows:10 —— 2026-10-27 用户口径(#8)「炭棒配方管控清单页面:配方表默认填充 10 行表格」,
+      //   用户另确认「没有的留空就行」⇒ 只铺空的 10 行(只带 表区 + 序号),不编造物料/比例。
+      //   ⚠ 按**表**铺(不是面板级 seedRows):同面板的修订记录表共用一张行表,seedRows 会连它一起铺。
+      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
           // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
@@ -450,7 +453,7 @@ const RD_MOLD_FORMULA = {
         ]},
     ],
     tailSections: [
-      { page: 2, bar: '配料要求', rows: [
+      { page: 1, bar: '配料要求', rows: [
         { label: '配料要求', key: '配料要求', type: 'area' },
       ]},
     ],
@@ -1051,11 +1054,17 @@ export const recordSheetConfigs = {
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
     // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
     // 只有一行居中大标题 + 一行表头(靠 dt.pageTitle 出标题,靠 showHead:false 关掉报告头)。
+    // ⚠ 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #1):
+    //   「默认以为工艺清单第一页,配方第二页,修订记录第三页」——
+    //   页序由 修订记录/工艺清单/配方 **改为 工艺清单/配方/修订记录**。
+    //   页序一变,下面 sections/dataTables/tailSections 上所有 `page:` 数字必须同步重编
+    //   (修订记录 0→2,工艺清单 1→0,配方 2→1);漏改一处的表现是"区块跑到别的页签"或整页空白。
     pages: [
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
       { title: '成型工艺清单', grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125], showHead: true },
-      // 页 3 原始 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
+      // 原页 3 的 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
       { title: '成型配方', grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
+      // 修订记录页不出报告头(设计只有一行居中大标题 + 一行表头,由 dt.pageTitle 出标题)
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
     ],
     sections: [...RD_MOLD_PROC_SEC0, ...RD_MOLD_FORMULA.sections],
     // 两张逻辑表共用行表 rd_mold_proc_detail ⇒ 每条都必须带 filterKey:'表区' + filterVal
@@ -1137,7 +1146,10 @@ export const recordSheetConfigs = {
     // 报告头右侧信息块:**编辑人在上、单据日期在下**(用户口径:原来上下颠倒了)。
     // 设计纸面 B21:E23 右侧就是「编号：/ 编辑人 / 日期」竖排,编号即报告头右上角那一格。
     info: [
-      { label: '编辑人', key: '编辑人', type: 'text' },
+      // 2026-10-28 用户口径「产品信息表编辑自动填入当前账号姓名」:
+      //   这一格只读(readonly) —— 值由 PanelxList 监视器带当前登录人 + 后端 ButtonService
+      //   每次保存回写真名;放开手填既没意义,也会被下一次保存覆盖。
+      { label: '编辑人', key: '编辑人', type: 'text', readonly: true },
       { label: '单据日期', key: '单据日期', type: 'text' },
     ],
     grid: [130, 260, 130, 260],
@@ -1255,7 +1267,10 @@ export const recordSheetConfigs = {
     grid: [130, 390, 130, 390],
     head: { title: 2, infoLabel: 1, infoValue: 1 },
     info: [
-      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
+      //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
+      //   保存时由后端 ButtonService 按登录人回写(见 docDefaults + PanelxList 的 EDITOR_STAMP_FIELDS)。
+      { label: '表单管理人', key: '表单管理人', type: 'text', readonly: true },
       { label: '密级', key: '密级', type: 'text' },
       { label: '使用范围', key: '使用范围', type: 'text' },
       { label: '版本号', key: '版本号', type: 'text' },
@@ -1347,10 +1362,76 @@ export const recordSheetConfigs = {
     //   两者不同正是这里要分开的原因:数据库列名 客户名 永久不变,但该字段 label 早在
     //   migrate-rd-2026-design.sql 已对齐设计改成「客户名称」⇒ 老配置写 key:'客户名' 取到的是
     //   undefined(**整格空白且保存静默丢值**)。本表修复即为此 —— 见下方 key:'客户名称'。
-    /** 封面右上角「编号」格取哪个键:2026-09-30 起 = 产品编号(改名后不再与单据标识撞键) */
-    coverDocNoKey: '产品编号',
+    /**
+     * 封面右上角那格绑哪个键(2026-10-28 用户口径②:「原来的产品编号的位置改为自动生成的
+     * 单据编号，现在的单据编号不是看不到吗？」)
+     *
+     * 历史:
+     *   · 2026-09-30 之前那格漏渲染(只画了公司名);
+     *   · 2026-09-30 起绑「产品编号」(当时产品编号只在这一格能看);
+     *   · **2026-10-28** 产品编号移进封面字段表第一行(与大表格同款、仍可引用产品信息表),
+     *     这一格改回显示**引擎的自动单据号**(`SD-2026-10-0001` 这类)。
+     *     ⚠ 这里写「单据编号」而不是旧键名「编号」:后者会被当成引擎单据标识,语义容易混
+     *     (见上方 coverDocNoKey 历史注释)。渲染侧对「单据编号」按只读文本走,不给输入框。
+     */
+    coverDocNoKey: '单据编号',
+    /**
+     * 封面「产品编号」= **引用产品信息表(RD_PROD_INFO)的弹窗**(2026-10-21 用户口径):
+     *   「产品规格书的产品编号做成引用产品信息表的产品编号的弹窗,可用带入对应的产品信息表
+     *    的填写的数据,引用过的就显示已开发,一个产品信息表对应一个产品规格书,不能多次引用,
+     *    弹窗的信息是最新的产品信息表在最上面」。
+     * 为什么单开这份配置、不复用 yj_field 的通用参照链(ref_panel=RD_PROD_INFO 那条):
+     *   ① 通用链会按「参照面板有审批按钮」自动追加 `单据状态=已审核`(business/engine.js
+     *      queryRefRows),而产品信息表现行数据多为「草稿/已归档/已通过」⇒ 弹窗一条都出不来;
+     *   ② 通用链只有勾选框,不支持「已引用 ⇒ 该行不可选」这条硬规则;
+     *   ③ 通用链按面板列表顺序出数,而用户要求「最新的在最上面」。
+     * 取数仍走已有接口 POST /px/queryFormDataList(单据面板列表行**带全部表头字段**),
+     *   不新增后端端点 —— 实测该接口回的就是封面要带的整份产品信息表数据。
+     */
+    prodPick: {
+      /** 候选来源面板 = 产品信息表 */
+      fromPanel: 'RD_PROD_INFO',
+      /** 「已引用」判据面板 + 字段:同产品编号已存在未作废的规格书单 ⇒ 该行显示已开发、
+       *  不可再选(用户口径「一个产品信息表对应一个产品规格书,不能多次引用」) */
+      usedPanel: 'RD_SPEC_DOC',
+      targetKey: '产品编号',
+      /** 弹窗列(key = RD_PROD_INFO 的 yj_field.label;label 走 tt 译名) */
+      columns: [
+        { key: '产品编号', label: '产品编号', w: 150 },
+        { key: '产品名称', label: '产品名称', min: 170 },
+        { key: '单据日期', label: '单据日期', w: 110 },
+      ],
+      /**
+       * 选中后带回封面的映射(to = 封面 cover.fields 的 key,from = RD_PROD_INFO 字段 label)。
+       * ⚠ 两处**跨名映射**是刻意的语义对齐,不是笔误:
+       *    产品整体尺寸 → 整体规格参数、主要性能描述 → 产品主要性能
+       *    (产品信息表这两列按它自己的表单命名,规格书封面按设计《规格书细分.xlsx》命名,
+       *     同一个东西;RD_INSP_PLAN 的 autoFillSpec 反向映射也认这一对)。
+       * ⚠ 封面里另外三个键**故意没有来源**,不要硬凑:
+       *    客户名称 —— 产品信息表只有 客户项目名称/客户料号,没有"客户"这一层(它来自立项申请
+       *      RD_APPROVAL,由参照链路另行带回);
+       *    应用场景 —— 产品信息表没有该列(rd_prod_info_head 无此字段);
+       *    版本 —— 同上(产品信息表无 版本 列,规格书的版本是规格书自己的修订版本)。
+       *   空值一律**不回填**(不拿空串清掉已录内容),规则同 autoFillSpec。
+       */
+      map: [
+        { from: '产品编号', to: '产品编号' },
+        { from: '产品名称', to: '名称' },
+        { from: '产品类别', to: '产品类别' },
+        { from: '客户料号', to: '客户料号' },
+        { from: '客户项目名称', to: '客户项目名称' },
+        { from: '产品整体尺寸', to: '整体规格参数' },
+        { from: '主要性能描述', to: '产品主要性能' },
+      ],
+    },
     cover: {
       fields: [
+        // 2026-10-28 用户口径①:「把产品规格书的产品编号做成和产品类别一样的大表格进行填写，
+        //   引用还是可以引用的」—— 原先产品编号只在封面右上角那个小格子里,现在是字段表第一行;
+        //   该行的值格仍走 prodPick 引用控件(点击弹产品信息表、能带回数据),不是纯文本框。
+        // 2026-10-28 用户口径②:右上角那格改绑「单据编号」(自动号 SD-…),
+        //   否则单据号在纸面上完全看不到(原来那格绑的是产品编号)。
+        { label: '产品编号', key: '产品编号' },
         { label: '产品类别', key: '产品类别' },
         { label: '客户名称', key: '客户名称' },
         { label: '客户料号', key: '客户料号' },
@@ -1467,6 +1548,11 @@ export const recordSheetConfigs = {
       //    (按钮模板/弹窗/取数 WLBOM/字段映射),数据源是 WLBOM「物料清单」
       //    (line_table=mate,单单据面板,子件行在 detail.items),不再读已删掉的 BOM 面板。
       //    [表区]='物料清单' 是分区值,不动。开关由 materialPick: true 控制(见下行)。
+      // ⚠ 2026-10-21 用户口径:「改为弹窗显示物料清单里面的物料编码、物料代号、物料名称,
+      //    选择之后就带入对应的明细内容,数量对应标准用量,备注有内容就也引用」。
+      //    弹窗列 → 数据键的对应关系见 RecordSheetPanels.vue 的 openMaterialPick 注释
+      //    (「物料代号」在 mate 里没有独立列,取的是物料清单表头「物料代码」wzdm1 ——
+      //     该键由 QueryService 合并在每条子件行上,现成可用)。
       { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },

@@ -1,0 +1,17 @@
+{
+  "appId": "com.yinjia.mes.pick",
+  "appName": "银嘉扫码领料",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "BarcodeScanning": {
+      "formats": ["QR_CODE", "CODE_128", "CODE_39", "EAN_13"]
+    }
+  }
+}

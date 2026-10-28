@@ -341,10 +341,26 @@ public class PanelConfigService {
             buttonGroups.add(group("删除", WO_INSP_PANELS.contains(def.code())
                     ? List.of("删除", "删除单据")
                     : List.of("删除")));
-            buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            // 2026-10-21 用户口径(物料清单):「把物料清单的审批换成修改」——
+            //   它是自助维护型基础数据,保存即归档、没有审批流,工具栏不该出现审批组。
+            //   「修改」**不在工具栏加按钮**:文书面板的修改闭环由 metadata.docArchive 驱动
+            //   (前端 PanelxList 的「申请修改 / 修改记录」组,见 PanelxList.vue 修改组注释),
+            //   而工具栏本身会过滤掉 修改 这个动作(PanelxList.vue:3159,自 2026-10-07 单据卡片下线起)。
+            //   WLBOM 已登记进 ButtonService.DOC_ARCHIVE_PANELS ⇒ docArchive=true ⇒ 侧栏自动出现修改入口。
+            if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
+                buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
             buttonGroups.add(group("刷新", List.of("刷新")));
+            // 物料清单(WLBOM)的 Excel 批量导入(2026-10-21):扫码领料要按 BOM 展开「该领哪些料」,
+            // 而金蝶侧 BOM 接口实测 count=0(3878 个商品一个 BOM 都没建)、MES 自建 bs_bom 已下架、
+            // mate 只剩 T382 一个产品 ⇒ 唯一可行路径是**在本面板批量录入**。导入组插在「更多」之前,
+            // 与其它单据面板(采购订单/采购入库等)的「导入」位置一致;按钮动作走前端 ImportDialog,
+            // 识别明细字段(子件代码/子件名称/标准用量…)后追加到当前单明细。
+            if (IMPORTABLE_PANELS.contains(def.code())) {
+                buttonGroups.add(group("导入", List.of("导入")));
+            }
             buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
         }
 
@@ -928,6 +944,21 @@ public class PanelConfigService {
      */
     private static final java.util.Set<String> BARCODE_PANELS =
             java.util.Set.of("BARCODE_MAT", "BARCODE_WIP", "BARCODE_FIN");
+
+    /**
+     * 支持 Excel 批量导入的**无 PANDA 基准**单据面板(2026-10-21)。
+     *
+     * <p>背景:扫码领料要按 BOM 展开「工单该领哪些料」,但三条料源全断 ——
+     * 金蝶 {@code /jdy/v2/bd/bom} 实测 count=0(真实账套 3878 个商品一个 BOM 都没建)、
+     * MES 自建 {@code bs_bom}+{@code v_wo_kit} 已于 2026-10-04 下架、遗留 {@code mate}
+     * 只剩 T382 一个产品的 5 行。用户拍板(2026-10-21)「在 MES 里维护 BOM」,
+     * 故给物料清单面板开一个 Excel 导入入口,一次录几百个产品。
+     *
+     * <p>只对**本集合内**的面板加「导入」组:其余无 PANDA 基准的面板维持原样,不扩大改动面。
+     * 前端动作复用通用 {@code ImportDialog.vue}(识别明细字段名 → 追加行 → 保存落库),
+     * 与采购订单/采购入库单等 PANDA 面板的「导入」同一套实现,不新增后端端点。
+     */
+    private static final java.util.Set<String> IMPORTABLE_PANELS = java.util.Set.of("WLBOM");
 
     /**
      * 平表面板「更多」组的动作清单。

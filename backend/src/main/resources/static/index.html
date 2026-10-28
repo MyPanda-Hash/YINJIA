@@ -2,11 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover(2026-10-21 加):手机端顶部被摄像头/刘海卡住、点不动 ——
+       不加这个,页面按「安全区外」渲染,内容会伸到挖孔屏的摄像头下面。
+       配合 CSS 的 env(safe-area-inset-top) 才真正把顶栏让出来。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>银嘉数字化平台 · 生产制造执行系统</title>
   <!-- 站点图标(2026-09-22b):不声明的话浏览器会默认请求 /favicon.ico,缺失时后端返回 500 并刷日志 -->
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-  <link rel="alternate icon" href="./favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="alternate icon" href="/favicon.svg" />
   <!-- 前端 /api 固定访问本地 Spring Boot + SQL Server HSDZ_MES 后端。 -->
   <!-- 预置页面底色(登录页深色/主界面浅色):加载与语言切换刷新瞬间即正确底色,消除闪白 -->
   <style>
@@ -21,11 +24,11 @@
       }
     })()
   </script>
-  <script type="module" crossorigin src="./assets/index-Dqd-1W4p.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/vue-vendor-hxe9VyB5.js">
-  <link rel="modulepreload" crossorigin href="./assets/element-icons-DIvmO7zL.js">
-  <link rel="modulepreload" crossorigin href="./assets/element-plus-BIhcGH2S.js">
-  <link rel="stylesheet" crossorigin href="./assets/index-DPtuGwYO.css">
+  <script type="module" crossorigin src="/assets/index-C6SDtraC.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vue-vendor-CWVaElZN.js">
+  <link rel="modulepreload" crossorigin href="/assets/element-icons-DjyukLWY.js">
+  <link rel="modulepreload" crossorigin href="/assets/element-plus-Vyq3nsjo.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-DPtuGwYO.css">
 </head>
 <body>
   <div id="app">
@@ -150,6 +153,6 @@
         if (btn) { btn.style.display = 'inline-block'; btn.onclick = hardReload }
       }, 12000)
     })()
-  </script>
+  </script>
 </body>
 </html>

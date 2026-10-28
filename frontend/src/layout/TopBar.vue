@@ -240,7 +240,8 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
-import { flatMenus, menuTree as rawMenuTree, filterMenuTree } from '@/business/menus'
+import { flatMenus, filterMenuTree } from '@/business/menus'
+import { useMenuStore } from '@/stores/menu'
 import { apiGetNotices, apiChangePassword } from '@/business/api'
 import { ElMessage } from 'element-plus'
 import NoticeCenter from './NoticeCenter.vue'
@@ -261,6 +262,9 @@ const localeLabel = (l) => l.locale === 'zh-CN'
   : `${l.nameNative || l.locale} (${l.locale})`
 const tabs = useTabsStore()
 const router = useRouter()
+// 单据查询的索引与左栏同一棵树(含数据库覆盖的名称/位置);LeftNav 已 load,这里是幂等复用
+const menuStore = useMenuStore()
+menuStore.load()
 
 // ---------- 内嵌搜索 ----------
 const keyword = ref('')
@@ -284,7 +288,8 @@ function onPickFactory(f) {
 const matched = computed(() => {
   const k = keyword.value.trim().toLowerCase()
   if (!k) return []
-  return flatMenus(filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin, user.$state))
+  // 第 4 个参数传 user:菜单项的 permKey(如「供应商权限配置」)要读登录用户的布尔位(2026-10-25)
+  return flatMenus(filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin, user.$state))
     .filter((m) => {
       if (!m.path) return false
       return [m.title, m.fullTitle, m.panelCode, m.path]
@@ -818,8 +823,8 @@ html:not(.dark) .locale-glass-popper .locale-option.locale-active {
   }
 
   .hamburger {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     display: inline-grid;
     place-items: center;
     padding: 0;
@@ -835,8 +840,11 @@ html:not(.dark) .locale-glass-popper .locale-option.locale-active {
     white-space: nowrap;
   }
 
+  /* 手机端只留「银嘉」两字(2026-10-21):顶栏右侧是 4 个通知图标 + 头像(约 190px),
+     加上汉堡 + 品牌名在 375/320 宽度下超出视口 —— 实测 375 溢出 30px、320 溢出 18px,
+     头像被右侧裁掉(面板页也跟着多出横向滚动条)。副标题是品牌修饰,优先让位给功能。 */
   .logo span {
-    font-size: 11px;
+    display: none;
   }
 
   .t-split {

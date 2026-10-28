@@ -1,0 +1,118 @@
+[
+  {
+    "k": "login",
+    "v": "YJ_TEST"
+  },
+  {
+    "k": "候选对接人 A/B",
+    "v": "chaishanyin / cp"
+  },
+  {
+    "k": "① 新建单号",
+    "v": "LXA-2026-10-0020"
+  },
+  {
+    "k": "① 保存 code/status",
+    "v": "200 / 审批中"
+  },
+  {
+    "k": "① 管理员保存后状态",
+    "v": "审批中"
+  },
+  {
+    "k": "① 断言 = 审批中",
+    "v": "PASS"
+  },
+  {
+    "k": "② 审批前 canRepairLiaison(未定形应为 false)",
+    "v": false
+  },
+  {
+    "k": "② 断言 = 未见定形时不给补发入口",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 审批通过 code/message",
+    "v": "200 / success"
+  },
+  {
+    "k": "③ 审批后状态",
+    "v": "已归档"
+  },
+  {
+    "k": "③ level / liaison",
+    "v": "四级 / chaishanyin"
+  },
+  {
+    "k": "③ 断言 = 定级与分发一步完成",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 断言 = 已有对接人 ⇒ canRepairLiaison=false",
+    "v": "PASS"
+  },
+  {
+    "k": "④ 第二张探针单",
+    "v": "LXA-2026-10-0021"
+  },
+  {
+    "k": "④ 审批(不带对接人) code/message",
+    "v": "200 / success"
+  },
+  {
+    "k": "④ level / liaison",
+    "v": "二级 / (空)"
+  },
+  {
+    "k": "④ 断言 = 无对接人 ⇒ canRepairLiaison=true",
+    "v": "PASS"
+  },
+  {
+    "k": "④ 补发 code/message",
+    "v": "200 / success"
+  },
+  {
+    "k": "④ 补发后 liaison",
+    "v": "cp"
+  },
+  {
+    "k": "④ 补发后 level(应仍为 二级)",
+    "v": "二级"
+  },
+  {
+    "k": "④ 补发后 canRepairLiaison(应 false)",
+    "v": false
+  },
+  {
+    "k": "④ 断言 = 补发成功且等级沿用",
+    "v": "PASS"
+  },
+  {
+    "k": "④b 历史单 LXA-2026-10-0013 canRepairLiaison / liaison / level",
+    "v": "false / (空) / (空)"
+  },
+  {
+    "k": "④b 历史单 LXA-2026-10-0018 canRepairLiaison / liaison / level",
+    "v": "true / (空) / (空)"
+  },
+  {
+    "k": "⑤ PanelxList 产物",
+    "v": {
+      "file": "PanelxList-Bs1Dil1e.js",
+      "hasRepairBtn": true,
+      "hasOldGradeBtn": false
+    }
+  },
+  {
+    "k": "⑤ 断言 = 有补发入口 / 无定级分发按钮文案",
+    "v": "PASS"
+  },
+  {
+    "k": "⑤ 首页 chunk",
+    "v": "assets/index-BkJw1wuO.js"
+  },
+  {
+    "k": "探针单据号(留档)",
+    "v": "LXA-2026-10-0020"
+  }
+]

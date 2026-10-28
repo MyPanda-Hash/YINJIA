@@ -148,7 +148,8 @@ public class FlowBoardService {
         try {
             Map<String, Object> m = new LinkedHashMap<>();
             String base = " FROM plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y'";
-            String done = "ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工')";
+            // 2026-10-20:「完工」表达式收口到 PlangDone(与生产工单列表/计划看板/首件选工单同源)
+            String done = PlangDone.done("p");
             // 2026-10-19 收口:此前裸读 ja ⇒ 外部误写 Y 的行被算进「已结案」、从「未排产」里消失,
             //   首页四个桶看起来"少了几行"。口径统一走 PlangClose(与生产工单列表同源)。
             String closed = PlangClose.closed("p");

@@ -1,0 +1,21 @@
+refactor: WMS管理系统 改名 WMS管理(库侧 module_group + 代码 + 8 语言同批)
+
+用户口径(2026-10-20):「把WMS管理系统改为WMS管理」。
+
+改名要**库与代码同步**,否则同一组会裂成两个分组头 / 报表归组错位:
+① 库:yj_panel.module_group 'WMS管理系统' → 'WMS管理'
+   (两账套各 35 张,迁移脚本 migrate-wms-group-rename-20261020.sql,幂等 + 末尾
+    「旧名残留必须 0」自检;两账套均已执行);
+② 前端:menus.js 一级目录 title、menus.test.js 断言(9 处);
+③ 后端:PagePanelRegistry 的 PagePanelDef 分组名、ReportService 的 navGroup 映射表与
+   分组顺序表(8 处);
+④ i18n:8 个语言词条 key 从 'WMS管理系统' 改为 'WMS管理'(值保持原译:
+   en=WMS / de=WMS-Verwaltung / es=Gestión WMS / fr=Gestion WMS / ja=WMS管理システム /
+   ko=WMS 관리 시스템 / ru=Управление WMS / th=ระบบจัดการ WMS / vi=Quản lý WMS)。
+
+验证:
+· 两账套:module_group WMS管理 = 35 张 / 旧名 = 0 张;
+· 前端产物含「WMS管理」、不含「WMS管理系统」;
+· 全量 813 测试通过、build 通过、后端 compile 通过;
+· CDP 活体截图(tools/archive/_wms-rename-20261020/_wms-menu.png):左侧一级菜单显示「WMS管理」。
+· 8090 已重打 jar 并重启。

@@ -522,6 +522,21 @@ onBeforeUnmount(() => {
   }
 }
 
+/* 320px 小屏(2026-10-21):4 个通知图标 + 头像 + 汉堡/品牌/工厂在 320 下还多出 18px,
+   整页跟着出现横向滚动条 —— 小屏里通知组收窄到 30px 一格。 */
+@media (max-width: 360px) {
+  .notice-center {
+    height: 32px;
+    grid-template-columns: repeat(4, 30px);
+  }
+
+  .nc-ref {
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+}
+
 :global(.notice-popover) {
   max-width: calc(100vw - 20px);
 }

@@ -1,0 +1,9 @@
+== HSDZ_MES 设备快照 ==
+1 | DZ-001 | 电子秤 | gw=4 | proj=DC-PROJ-DZ01 | scada=Y | debug=2026-10-19 16:11:16 | enabled=Y | status=online | seen=2026-10-19 16:11:16
+2 | FX-001 | 扫码枪 | gw=3 | proj=DC-PROJ-FX01 | scada=Y | debug=2026-10-18 17:19:21 | enabled=Y | status=online | seen=2026-10-18 17:19:21
+3 | KB-001 | 车间看板 | gw=4 | proj= | scada=N | debug=2026-10-20 15:17:32 | enabled=Y | status=offline | seen=
+4 | SIM-SCALE-01 | 电子秤01 | gw=2 | proj=SIM-PROJ | scada=Y | debug=2026-10-18 17:05:38 | enabled=Y | status=online | seen=2026-10-18 17:05:38
+== HSDZ_MES 网关快照 ==
+GW-DZ-01 | 电子秤串口网关 | RS232 | 127.0.0.1:9100 | online | enabled=Y
+GW-SCAN-01 | 扫码枪网关 | HTTP | 127.0.0.1:8100 | online | enabled=Y
+GW-SIM | 测试网关 | HTTP | 127.0.0.1:8099 | online | enabled=Y

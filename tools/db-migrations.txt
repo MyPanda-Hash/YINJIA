@@ -4108,6 +4108,32 @@ migrate-db-backup-monthly-20261019.sql
 #   ② 权限矩阵补 4 个页面级面板授权(DC_CONFIG/DC_MONITOR/DC_STATS/BARCODE_SCAN_PICK)+ en 译名。
 #   自检:旧分组清零、生产过程≥10、设备维护 2 张、每角色 4 码齐全、译名 4 条。幂等;两账套均执行。
 migrate-menu-restructure-wms-20261020.sql
+# 2026-10-20 研发管理·项目管理新增「项目流程管控」页面(页面级虚拟面板 PROJECT_FLOW):
+#   用户口径「填完立项申请提交审批后不知道文件到哪个流程了……通过立项申请表的编号查流程走到哪里」。
+#   不建表:数据现算(rd_approval / rd_plan / rd_progress_detail / yj_doc_status / yj_form_approval)。
+#   ① 现有全部角色补 yj_role_panel 授权(view,query) ② 面板名 en 译名。
+#   自检:PROJECT_FLOW 授权行 ≥ 角色数、en 译名 1 条。幂等;两账套均执行。
+migrate-rd-project-flow-20261020.sql
+# 2026-10-20 用户口径「把WMS管理系统改为WMS管理」:yj_panel.module_group 分组显示值改名。
+#   两账套各 35 张;代码侧 menus.js / PagePanelRegistry / ReportService / i18n 同批改。
+migrate-wms-group-rename-20261020.sql
+# 2026-10-20 测试账套:数采设备全部置为「五连齐备(可用)」—— 用户口径「把测试账套的设备全部改为可用的状态」。
+#   补:1 个演示网关 GW-READY(设备全绑它) + 每台 project_code/scada_drawn/last_debug_at + 每台 1 个采集点 1 条启用规则。
+#   ⚠ 不伪造在线(status/last_seen_at 不动);只动 HSDZ_MES_TEST,正式库 no-op。幂等。
+migrate-dc-test-ready-20261020.sql
+# 2026-10-20 用户口径「更新组织架构的角色面板」:补齐两处授权缺口(幂等,只 INSERT 缺失行)。
+#   ① admin 反而缺 ERP_INTEG/ERPLG/ERPLG_ROW/FIELDMGR/ZDGL(其中两个是管理员专属面板),照 role2 复制;
+#   ② PU_ORDER_DETAIL/PU_ORDER_STATS 四个角色全无授权,照兄弟面板 PU_ORDER 的授权行复制。
+migrate-role-panel-gap-20261020.sql
+# 2026-10-20 正式账套:数采设备配成「五连齐备(可用)」—— 用户口径「把真实账套的也全写成可用的形态,
+#   实际上有一个电子秤是可用的这个不用管」。真实电子秤 DZ-001 点名不动(status/last_seen_at 也不伪造)。
+#   补:兜底网关(有启用网关则不再建) + 每台 project_code/scada_drawn/last_debug_at + 每台 1 采集点 1 启用规则。
+#   只对 HSDZ_MES 生效(测试账套由 migrate-dc-test-ready-20261020.sql 负责),两边互不干扰。幂等。
+migrate-dc-prod-ready-20261020.sql
+# 2026-10-20 用户口径「菜单名称改为 IOT设备配置 … 正式账套中也改」。
+#   DC_CONFIG 是页面级虚拟面板(无 yj_panel 行),库里只有 yj_translation 一条译名改键;
+#   面板名本体在 menus.js / router / DcConfig.vue / PagePanelRegistry,同批代码改动。
+migrate-dc-config-rename-20261020.sql
 # migrate-prod-pick-panel-20261020.sql — 生产领料 页面级虚拟面板(PROD_PICK):角色授权 + 面板译名
 #   用户 2026-10-20「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」。
 #   ① 不往 yj_panel 插行(空面板会污染报表/选单/字段配置的下游),按先例登记为**页面级虚拟面板**
@@ -4212,3 +4238,48 @@ i18n-supplier-picker-20261025.sql
 #   ① yj_supplier_account 加 password_hash / real_name;② 从 yj_user 回填;
 #   ③ 删除 yj_user 里的供应商镜像行;④ 列注明 + 自检(无镜像行、启用账号必有口令)。两账套均需执行,幂等。
 migrate-supplier-account-standalone-20261025.sql
+
+# 2026-10-28 出货检验计划表:去掉「编号」格的固定默认值(用户口径「这个默认的编号去掉，
+#   只保留背景提示词：请填写编号」)。四张受控文件本来都已自动发单号(IP-… 一直在生成),
+#   问题只在纸面那一格绑了 文档编号 而库里有 DEFAULT N'YJ-RD001';删约束 + 注销字段后
+#   纸面自动落到「单据编号」,与成型工艺清单/组装工艺清单/规格书口径一致。
+#   物理列保留,历史值不丢。
+migrate-drop-insp-docno-default-20261028.sql
+migrate-insp-docno-unregister-20261028.sql
+
+# 2026-10-28 编辑人/表单管理人自动带入:RD_PROD_INFO.编辑人、RD_ASM_PROC.表单管理人 改只读(值由前端带出+后端回写)。
+#   两账套都执行。
+# 2026-10-27 用户口径(#5)「章节标准库·配料要求:支持多行同步填入文本框,多行填充时赋予序号」——
+#   纯前端改动,无迁移脚本:mold.batching 库本就存在(RD_MOLD_PROC.配料要求 data_type=标准库),
+#   只是还没有条目。用户 2026-10-27 明确「只补机制,库留空」⇒ 种子条目由工艺科在
+#   「⧉ 标准库维护」里自行录入,本批不替业务编造正文(编了就成了受控文书上的假数据)。
+#   改动位置:frontend/src/core/views/sectionLibText.js(多行带序号)+ RecordSheetPanels.applySectionLib。
+# 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #3/#4):
+#   「产品管控类型:名称改为【产品管控等级】其内容引用产品信息表对应字段的内容」/
+#   「产品形态:其内容引用产品信息表对应字段的内容」——选 A = 真参照。
+#   RD_MOLD_PROC / RD_MOLD_FORMULA 的这两格由写死下拉改成参照 RD_PROD_INFO;
+#   纸面名走 alias(数据键 col_name 不动 ⇒ 历史单据照原值显示,不报错)。两账套都执行。
+migrate-mold-proc-ref-prodinfo-20261027.sql
+# 2026-10-23 用户口径「给系统管理模块加上一个菜单命名的功能,就是可以编辑各个面板的位置与
+#   一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」:导航覆盖表 yj_menu_node
+#   (只存名称/上级/排序/隐藏,基线仍在 frontend/src/business/menus.js)。两账套都执行。
+migrate-menu-node-20261023.sql
+# 2026-10-21 物料清单(WLBOM)保存报「将截断字符串或二进制数据」:单号 WL-yyyy-MM-#### 15 位写进
+#   mate.m_no nvarchar(14)。改为 30 位。两账套都执行(根因与取证见脚本头注释)。
+migrate-mate-mno-length-20261021.sql
+# 2026-10-21 用户口径「产品管控等级也做」:同 prod.func_type,改为标准库类型(prod.ctrl_level)。
+#   两账套都执行。
+# 2026-10-21 返工:「产品功能类别」改为**标准库类型**(data_type=标准库 / dict_sql=prod.func_type)，
+#   才能出现「⧉ 标准库维护」入口。上一版做成读 bs_dict 的普通下拉(无可维护按钮)已回滚。
+#   两账套都执行。
+# 2026-10-21 用户口径「产品信息表的功能类别下拉做成一个标准库，可以进行填写维护」。
+#   复用现成「数据字典」面板(ZDGL / bs_dict)，只把字段 dict_sql 指向它并搬入原有 3 个选项。
+#   两账套都执行。
+# 2026-10-21 用户口径「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」。
+#   工单扫码领料逐笔留痕表 wo_pick_scan_log(只增不改);扫码明细装不进 yj_usage_log 的粗粒度结构。
+#   两账套都执行。
+migrate-rd-editor-stamp-20261028.sql
+migrate-prod-ctrl-level-stdlib-20261021.sql
+migrate-prod-func-type-stdlib-fix-20261021.sql
+migrate-prod-func-type-stdlib-20261021.sql
+migrate-wo-pick-scan-log-20261021.sql
