@@ -42,6 +42,8 @@ async function main() {
   for (let i = 0; i < 20; i++) { try { list = await httpJson('/json/list'); if (list && list.length) break } catch (e) {} await sleep(500) }
   const target = list.find((t) => t.type === 'page')
   const { connect } = require(path.join(__dirname, '..', 'verify', 'lib', 'mini-ws.cjs'))
+  const { killTree } = require(path.join(__dirname, '..', 'verify', 'lib', 'kill-tree.cjs'))
+  const { closeBrowser } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
   let id = 0; const pending = new Map()
   const sock = await connect(target.webSocketDebuggerUrl)
   sock.on('message', (data) => { const m = JSON.parse(data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } })
@@ -150,7 +152,8 @@ async function main() {
   const pass = results.filter((r) => r.ok).length
   console.log(`\n=== 结果: ${pass}/${results.length} 通过 ===`)
   try { sock.close() } catch (e) {}
-  try { process.kill(-proc.pid) } catch (e) {}
+  await closeBrowser(CDP_PORT)
+  killTree(proc.pid)
   process.exit(pass === results.length ? 0 : 1)
 }
 main().catch((e) => { console.error('[FATAL]', e); process.exit(2) })
