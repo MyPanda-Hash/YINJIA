@@ -2443,7 +2443,18 @@ watch(() => localeStore.locale, async () => {
   } catch { /* 配置重拉失败保持现状 */ }
 })
 
-const panelCode = computed(() => route.params.panelCode)
+/**
+ * 可选的面板码 prop(2026-10-25)。
+ *
+ * 默认面板码取自 `route.params.panelCode`(标准地址 /panelx/list/:panelCode);
+ * 但有些入口只用**静态地址**指向某一个固定面板(如「供应商采购打印」/scm/supplierPrint),
+ * 路由里没有 :panelCode 参数,params 为空 ⇒ 组件会判"面板编号无效"直接 return,
+ * 既不取配置也不取数(2026-10-25 实测:界面只剩一颗查询按钮、单数据为 0)。
+ * 故允许由路由 `props` 直接指定面板码;不传时行为与原来完全一致。
+ */
+// eslint-disable-next-line vue/require-prop-types
+const routeProps = defineProps({ panelCode: { type: String, default: '' } })
+const panelCode = computed(() => routeProps.panelCode || route.params.panelCode)
 const operationName = computed(() => route.meta.operationName || route.query.operationName || '新增流程')
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
 
@@ -3157,6 +3168,11 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   //   (VoucherFormDialog)」的入口 —— 「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,
   //   故与 查询/查找 一样从工具栏摘掉。(档案面板本就内联可编辑:单据状态=启用/停用 ⇒ draftEditable
   //   为真,单元格直接点即可编辑,不依赖本动作。原文注释误记为 2026-10-15,2026-10-08 更正。)
+  //
+  // ⚠ 2026-10-25 修(供应商采购打印面板只有「查询+打印」两组时暴露的两个坑):
+  //   ① 字段名是 **name**(不是 title):曾写成 g.title ⇒ 每一组都判"不在白名单" ⇒ 工具栏整条清空。
+  //   ② 工具栏最左本来就有常驻「查询」按钮(.toolbar-query-btn),故「查询/查找」组的动作要剥掉,
+  //      剥空后该组改名成剩余首个动作(通常是"刷新"),不能保留组名「查询」——否则界面上两颗查询。
   const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
@@ -4361,8 +4377,22 @@ function toggleAnnMode(m) {
  * 故这里即便漏摘某个按钮,服务端也打不开写接口。
  * ⚠ 声明位置:`user` 与 `reportMode` 都已在其上初始化(放前面会命中 TDZ,见 READONLY_PANELS 注释)。
  */
+/**
+ * 供应商门户的「只读场景」(2026-10-25 用户口径:「是多做一个和采购订单一样的供应商面版,
+ * 只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」)。
+ *
+ * 供应商端 = **独立面板 SUPPLIER_PU_ORDER**(采购订单的元数据副本:同一张表、同样的字段/版式/纸张),
+ * 它天生就只有「查询 + 打印」两组按钮(后端 PANDA_BUTTONS 里只登记这两组),编辑态本就不成立。
+ *
+ * 这里再补一层**兜底**,覆盖两种情况:
+ *   ① 供应商账号(登录态带 supplierCode);
+ *   ② 任何人在这个面板上(内部账号进来也一样)—— 面板名是只读面版,不给编辑/写入口。
+ * ⚠ `user` / `reportMode` 都已在其上初始化(放前面会命中 TDZ,见 READONLY_PANELS 注释)。
+ */
+const READONLY_DOC_PANELS = ['SUPPLIER_PU_ORDER']
 const supplierScope = computed(() => String(user.supplierCode || ''))
-const supplierReadonly = computed(() => !!supplierScope.value && !reportMode.value)
+const supplierReadonly = computed(() =>
+  (!!supplierScope.value && !reportMode.value) || READONLY_DOC_PANELS.includes(panelCode.value))
 /**
  * 供应商会话在该面板上被授予的权限词(2026-10-25):后端登录时下发 `supplierPanelPerms`,
  * 当前恒为 `PU_ORDER: 'view,query,print'`。**按词判按钮**,而不是在组件里再写一份写死的按钮名清单 ——
@@ -4824,6 +4854,10 @@ const DOC_RAIL_PANELS = {
   // ERP单号/是否已转ERP 两列由本批迁移给 qc_return 加上并登记 yj_field,随行下发 ⇒ 直接派生。
   QC_RETURN: ['供应商', '检验单号', '批次号', ERP_TAG_COL],
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
+  // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版」):
+  //   **与采购订单同一份左栏**(单号 | 日期 | 供应商 | 审核状态)—— 它是采购订单的元数据副本,
+  //   不登记在这里就没有左栏,也就"和采购订单不一样"了。
+  SUPPLIER_PU_ORDER: ['供应商'],
   SO_ORDER: ['客户'],            // 销售订单(对齐采购订单:中间列只留往来单位,采购=供应商/销售=客户)
   PURCHASE_IN: ['供应商', '批次号', ERP_TAG_COL], // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态;2026-09-20 加批次号)
   // 三张出库单(2026-10-15 用户口径:「为成品出库、销售出库与材料出库,都配置与销售订单一样的订单选择列」)
@@ -8629,17 +8663,21 @@ async function loadCrg() {
   // 同一份采购订单面板,供应商账号进来只留**浏览动作**——
   // 新增/保存/删除/审核/生单/转ERP/导入 等写动作全部摘掉。
   //
-  // ⚠ 两个坑(2026-10-25 实测踩过,改这里前必读):
-  //   ① 工具栏**按组名渲染**(「打印 ▼」「更多 ▼」),组内动作是下拉项(打印采购订单/预览/导出/打印材料码)。
-  //      只按动作名过滤会把「打印 / 更多」两组整个删掉 —— 供应商端就少了一整块,
-  //      用户看到的"不一致"正是这个。故**组名本身也要过白名单**。
-  //   ② 「查询/查找/刷新」由前端拆成独立按钮渲染,不在组里;「查询」组在采购订单上没有动作项。
+  // ⚠ 三个坑(2026-10-25 实测踩过,改这里前必读):
+  //   ① 按钮组对象的字段名是 **`name`**(不是 title)—— 写成 g.title 会让每一组都判定"不在白名单",
+  //      工具栏整条被清空。
+  //   ② 工具栏**按组名渲染**(「打印 ▼」),组内动作才是真正执行的东西:采购订单/供应商采购打印的
+  //      「打印」组里是 打印采购订单 / 预览 / 导出 / 打印订单无金额 / 打印材料码 —— **没有字面量「打印」**。
+  //      若按 READONLY_ACTIONS 过滤动作,这组会被剥成空组 ⇒ 主按钮变成组名、点了什么也不发生
+  //      (实测:点「打印」无窗口、无请求、无报错)。
+  //   ③ 故这里按**动作语义**判:打印/预览/导出族一律放行,其余只留 READONLY_ACTIONS 白名单。
+  const PRINT_FAMILY = ['打印采购订单', '打印订单无金额', '打印材料码', '打印', '预览', '导出', '导出报表']
+  const isReadonlyAction = (a) => READONLY_ACTIONS.includes(a) || PRINT_FAMILY.includes(a)
   if (supplierReadonly.value) {
     groups.value = groups.value
       .map((g) => {
-        // 组名在白名单里(打印/更多/刷新/查询…)⇒ 整组保留,组内再按动作过一遍白名单
-        const groupOk = READONLY_ACTIONS.includes(g.title || '')
-        const actions = (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a))
+        const groupOk = READONLY_ACTIONS.includes(g.name || '') || g.name === '打印'
+        const actions = (g.actions || []).filter(isReadonlyAction)
         if (!groupOk && actions.length === 0) return null
         return { ...g, actions }
       })
@@ -9084,11 +9122,17 @@ async function onButton(action) {
   }
       // ═══ 分批送料(2026-09-20):仅"批次源头那一跳"(采购订单→送料暂收单)弹分批对话框 ═══
       // 逐行填本次送料数量、可多次分批;下游(暂收→检验)来源已带批次号 → 一键整单生单,不弹框
-      const pushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
-      if (await needBatchDialog(pushTarget)) {
+      //
+      // ⚠ 2026-10-25 修:这一段原本是**游离代码块**(缺外层 if 守卫),又位于所有打印分支之前 ⇒
+      //   任何动作都会先落到这里。判据直接看 metadata.pushTargets 里有没有这个动作:
+      //   打印类动作没有 pushTarget ⇒ 直接跳过本段,继续往下走打印分支。
+      //   (曾误写成不存在的 pushTargetLike(action) ⇒ 点击时抛 ReferenceError,
+      //    表现为"点打印完全没反应、无请求无提示",2026-10-25 实测踩到。)
+      const actionPushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
+      if (actionPushTarget && await needBatchDialog(actionPushTarget)) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning('请先选择一张单据')
-        batchSend.value = { sourcePanel: panelCode.value, targetPanel: pushTarget, sourceNo: no }
+        batchSend.value = { sourcePanel: panelCode.value, targetPanel: actionPushTarget, sourceNo: no }
         batchSendVisible.value = true
         return
       }

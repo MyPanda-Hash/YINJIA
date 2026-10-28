@@ -51,15 +51,29 @@ const routes = [
       { path: 'dc/stats', component: () => import('@/views/dc/DcStats.vue'), meta: { title: '状态统计', code: 'dcStats', panelCode: 'DC_STATS' } },
       { path: 'scm/mobileWarehouse', component: () => import('@/views/scm/MobileWarehouse.vue'), meta: { title: '移动仓管', code: 'mobileWarehouse' } },
       { path: 'scm/serialNumber', component: () => import('@/views/scm/SerialNumber.vue'), meta: { title: '序列号管理', code: 'serialNumber' } },
-      // 供应商门户(2026-10-24):两个页面级虚拟面板(定义见后端 PagePanelRegistry)。
-      //   · /scm/supplierPrint   供应商采购打印 —— **供应商登录后唯一能进的页面**(只读列表 + 采购订单纸质单);
-      //     数据接口 /api/supplier/portal/* 服务端按供应商编码过滤,前端传什么都不采信。
+      // 供应商门户(2026-10-24 起):
       //   · /scm/supplierAccount 供应商权限配置 —— **管理员 ∪ 组织架构授权了「配置供应商账号」的账号**
       //     (2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」);
       //     用 meta.permKey 判(与菜单项 permKey、后端 requireAccountConfig 同源),不再是 requireAdmin。
-      // 两页都不走通用 PanelxList,故不进 flatMenus 自动路由(菜单项带 panelCode 已被 filter 排除)。
-      { path: 'scm/supplierPrint', component: () => import('@/views/scm/SupplierPrint.vue'), meta: { title: '供应商采购打印', code: 'supplierPrint', panelCode: 'SUPPLIER_PRINT' } },
+      //     它不走通用 PanelxList,故仍不进 flatMenus 自动路由(菜单项带 panelCode 已被 filter 排除)。
       { path: 'scm/supplierAccount', component: () => import('@/views/scm/SupplierAccount.vue'), meta: { title: '供应商权限配置', code: 'supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', permKey: 'canConfigSupplierAccount' } },
+      // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询
+      //   (查询必须只能查供应商关联的数据)按钮的」):
+      //   面板 = SUPPLIER_PU_ORDER(bd_pu_order/bl_pu_order 的元数据副本,字段与采购订单逐列一致,
+      //   工具栏只有「查询 + 打印」,见后端 PANDA_BUTTONS)。
+      //   ⚠ 地址必须**带 :panelCode 参数**(PanelxList 的面板码取自 route.params.panelCode)——
+      //     早先写成静态路径 /scm/supplierPrint ⇒ params 为空 ⇒ 组件判"面板编号无效"直接 return,
+      //     不取配置也不取数(界面只剩一颗查询按钮,2026-10-25 实测踩到)。
+      //     这里与「生产领料 /panelx/list/PROD_PICK」同一形态:静态地址 + props 固定面板码。
+      //   供应商会话:菜单只剩这一条,数据由后端按登录态供应商编码强制过滤;内部账号也能进,看全量、同样只读。
+      {
+        path: 'scm/supplierPrint',
+        component: PanelxList,
+        props: { panelCode: 'SUPPLIER_PU_ORDER' },
+        meta: { title: '供应商采购打印', code: 'supplierPrint', panelCode: 'SUPPLIER_PU_ORDER' },
+      },
+      // 兼容老地址/书签:直接落到标准面板地址
+      { path: 'scm/supplierPrint/:panelCode', redirect: '/panelx/list/SUPPLIER_PU_ORDER' },
       // 扫码领料(2026-10-18):条码管理 → 扫码领料。页面级(无 panelCode),扫标签码 `存货编码|批号`
       // 按批号查 v_stock_pick 可用量 → 组材料出库单草稿。理由见 views/scm/ScanPick.vue 头注释。
       { path: 'scm/scanPick', component: () => import('@/views/scm/ScanPick.vue'), meta: { title: '扫码领料', code: 'barcodeScanPick', panelCode: 'BARCODE_SCAN_PICK' } },

@@ -94,6 +94,33 @@ public class QueryService {
     public static final String PANEL_CONFIG_PATH = "/api/px/getPanelConfig";
 
     /**
+     * 供应商会话可用的**单张单据详情**接口(2026-10-25 用户口径「只有打印按钮和查询」)。
+     *
+     * <p>纸质单打印(print-formats)与明细预览都走这一条取「头 + 明细行」。不放行 ⇒ 点「打印」
+     * 拿不到数据(实测:下拉里有 打印采购订单,点了没纸)。它是**只读**取数,但会返回完整单据内容,
+     * 所以必须在服务端限定范围:{@link #loadOneDoc} 不走列表过滤,故由
+     * {@link #supplierMayReadDoc} 逐单核对「这张单的供应商编码 = 当前会话的供应商编码」,不符即 403。
+     */
+    public static final String FORM_DESCRIPTOR_PATH = "/api/px/getFormDescriptor";
+
+    /** 供应商会话读取单张单据前的归属核对(见 {@link #FORM_DESCRIPTOR_PATH}) */
+    public boolean supplierMayReadDoc(String panelCode, String docNo) {
+        String code = sessionSupplierCode();
+        if (code == null) return true;                 // 内部账号:不限制
+        if (code.isEmpty()) return false;              // 供应商账号已停用
+        if (!SUPPLIER_PANEL_CODE.equals(panelCode)) return false;
+        if (docNo == null || docNo.isBlank()) return false;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM bd_pu_order WHERE [单据编号] = ? AND ISNULL([供应商编码],N'') = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, docNo.trim(), code);
+            return n != null && n > 0;
+        } catch (RuntimeException e) {
+            return false;                              // 查不到就拒绝(默认拒绝)
+        }
+    }
+
+    /**
      * 当前登录人若是供应商会话,返回其绑定供应商编码(否则 null)。
      * 抽成静态方法是为了让过滤器与 QueryService 用**同一个判据**(都在 yj_supplier_account 上),
      * 不在 QueryService 里再注入一份 SupplierPortalService 造成循环依赖风险。
@@ -123,7 +150,7 @@ public class QueryService {
     private Map<String, Object> enforceSupplierScope(String panelCode, Map<String, Object> condition, String code) {
         if (!SUPPLIER_PANEL_CODE.equals(panelCode)) {
             throw new org.springframework.security.access.AccessDeniedException(
-                    "供应商账号只能查询采购订单:" + panelCode);
+                    "供应商账号只能查询「供应商采购打印」面板:" + panelCode);
         }
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         if (def.byLabel("供应商编码") == null) {
@@ -135,8 +162,15 @@ public class QueryService {
         return merged;
     }
 
-    /** 供应商端唯一允许的面板(与 PagePanelRegistry.SUPPLIER_PRINT 对应的单据面板) */
-    public static final String SUPPLIER_PANEL_CODE = "PU_ORDER";
+    /**
+     * 供应商端唯一允许的面板(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,
+     * 只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」)。
+     *
+     * <p>它是 PU_ORDER 的**元数据副本**(同一张 bd_pu_order/bl_pu_order,字段逐列复制,
+     * 见 tools/migrate-supplier-po-panel-20261025.sql),工具栏只有「查询 + 打印」。
+     * 供应商会话**只能**查这一张;查别的一律拒绝(见 {@link #enforceSupplierScope})。
+     */
+    public static final String SUPPLIER_PANEL_CODE = "SUPPLIER_PU_ORDER";
 
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                                  Map<String, Object> condition, int pageNo, int pageSize) {

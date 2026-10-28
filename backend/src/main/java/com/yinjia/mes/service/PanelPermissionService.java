@@ -271,10 +271,10 @@ public class PanelPermissionService {
     /**
      * 供应商会话在本面板上是否允许"看"(2026-10-25)。
      * 判据与 {@link QueryService#enforceSupplierScope} / SupplierPortalGuardFilter 同源:
-     * 账号在 yj_supplier_account 里启用,且面板是供应商端唯一复用的那个单据面板(PU_ORDER)。
+     * 账号在 yj_supplier_account 里启用,且面板是供应商端唯一的那个单据面板(SUPPLIER_PU_ORDER)。
      */
     private boolean isSupplierScope(String user, String panelCode) {
-        if (panelCode == null || !"PU_ORDER".equals(panelCode.trim())) return false;
+        if (panelCode == null || !QueryService.SUPPLIER_PANEL_CODE.equals(panelCode.trim())) return false;
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT enabled FROM yj_supplier_account WHERE username = ?", user);

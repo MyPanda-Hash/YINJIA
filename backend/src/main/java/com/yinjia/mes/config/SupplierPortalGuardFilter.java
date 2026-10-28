@@ -97,7 +97,10 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
         // 同上:面板元数据配置(工具栏按钮组/明细页签/字段)。只读元数据,不含业务数据 ——
         // 不放行则供应商端缺「打印」组,与采购订单长得不一样;放行后业务数据仍受范围过滤约束。
         if (path.equals(com.yinjia.mes.service.QueryService.PANEL_CONFIG_PATH)
-                && "PU_ORDER".equals(request.getParameter("panelCode"))) return true;
+                && com.yinjia.mes.service.QueryService.SUPPLIER_PANEL_CODE.equals(request.getParameter("panelCode"))) return true;
+        // 同上:单张单据详情(纸质单打印/明细预览取「头+行」)。逐单归属核对在
+        // PxController.getFormDescriptor → QueryService.supplierMayReadDoc(别人的单一律 403)。
+        if (path.equals(com.yinjia.mes.service.QueryService.FORM_DESCRIPTOR_PATH)) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")

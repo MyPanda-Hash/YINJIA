@@ -45,6 +45,12 @@ public class PxController {
     private final com.yinjia.mes.service.PuLabelService puLabel;
     /** 条码标签打印留痕(材料/半成品/成品条码面板,2026-10-18) */
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
+    /**
+     * 查询服务(2026-10-25):只为「供应商会话逐单归属核对」而注入 ——
+     * 单张单据详情接口(getFormDescriptor)不走列表过滤,必须调用
+     * {@link com.yinjia.mes.service.QueryService#supplierMayReadDoc} 核对这张单是不是当前供应商的。
+     */
+    private final com.yinjia.mes.service.QueryService queryService;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -58,7 +64,8 @@ public class PxController {
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
-                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel) {
+                        com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
+                        com.yinjia.mes.service.QueryService queryService) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -73,6 +80,7 @@ public class PxController {
         this.batchService = batchService;
         this.puLabel = puLabel;
         this.barcodeLabel = barcodeLabel;
+        this.queryService = queryService;
     }
 
     // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============
@@ -588,6 +596,11 @@ public class PxController {
     public ApiResult<Map<String, Object>> getFormDescriptor(@RequestParam String panelCode,
                                                             @RequestParam String code) {
         perm.requirePanelView(panelCode);
+        // 供应商会话(2026-10-25「只有打印按钮和查询」):供应商端要用这条取「头+行」出纸质单,
+        // 但本接口不走列表过滤 ⇒ 必须逐单核对归属:别人的单据一律 403(服务端权威,不信前端)。
+        if (!queryService.supplierMayReadDoc(panelCode, code)) {
+            throw new org.springframework.security.access.AccessDeniedException("该单据不属于当前供应商:" + code);
+        }
         return ApiResult.ok(service.getFormDescriptor(panelCode, code));
     }
 

@@ -949,6 +949,19 @@ public class PanelConfigService {
     }
 
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
+            // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,
+            //   只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」):
+            // 同一张 bd_pu_order/bl_pu_order、同一套字段与版式(见 migrate-supplier-po-panel-20261025.sql,
+            // 字段按 PU_ORDER 逐列复制),但工具栏**只有「查询」和「打印」两颗**:
+            //   · 查询:由前端那颗常驻查询按钮承担(所有面板都有),这里登记动作只为让
+            //     「查询弹窗按表头字段过滤」的链路成立;组内**不带「刷新」** —— 否则工具栏会多出一颗
+            //     "刷新"(用户口径「只有打印按钮和查询按钮」)。
+            //   · 打印:与采购订单一字不差的纸质单版式(打印采购订单/预览/导出/无金额/材料码)。
+            // 没有 新增/保存/删除/审核/生单/转ERP/导入/更多:内部账号进来也只读(数据全量),
+            // 供应商账号进来的数据由 QueryService.enforceSupplierScope 按登录态供应商编码强制过滤。
+            java.util.Map.entry("SUPPLIER_PU_ORDER", List.of(
+                    new String[]{"查询", "查询"},
+                    new String[]{"打印", "打印采购订单", "预览", "导出", "打印订单无金额", "打印材料码"})),
             // 销售订单:选单灰(无上游);生单=生产工单/销售出库单(已实现)
             java.util.Map.entry("SO_ORDER", List.of(
                     new String[]{"新增", "新增"},

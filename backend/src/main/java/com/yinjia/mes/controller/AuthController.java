@@ -4,6 +4,7 @@ import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PagePanelRegistry;
+import com.yinjia.mes.service.QueryService;
 import com.yinjia.mes.service.UsageLogService;
 import com.yinjia.mes.service.SupplierPortalService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -107,9 +108,12 @@ public class AuthController {
                 for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
                 pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
                 user.put("pagePerms", pagePerms);
-                user.put("visiblePanels", List.of(PagePanelRegistry.SUPPLIER_PRINT));
-                // 单据面板(PU_ORDER)的只读词:前端 SupplierPrint 页按这份清单一字不改地渲染采购订单面板
-                user.put("supplierPanelPerms", Map.of("PU_ORDER", "view,query,print"));
+                // 菜单里"供应商采购打印"那条是**独立面板 SUPPLIER_PU_ORDER**(采购订单的只读副本),
+                // 不是页面级面板 ⇒ visiblePanels 直接给这个面板码(菜单 filterMenuTree 按 panelCode 放行)。
+                user.put("visiblePanels", List.of(QueryService.SUPPLIER_PANEL_CODE));
+                // 单据面板(供应商采购打印 SUPPLIER_PU_ORDER)的只读词:它与采购订单是同一张单的
+                // 元数据副本,前端按这份清单只留 查询/打印(2026-10-25 用户口径「只有打印按钮和查询」)。
+                user.put("supplierPanelPerms", Map.of(QueryService.SUPPLIER_PANEL_CODE, "view,query,print"));
                 user.put("approvePanels", List.of());
                 user.put("fieldPanels", List.of());
                 user.put("warnPanels", List.of());
@@ -242,9 +246,10 @@ public class AuthController {
             for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
             pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
             user.put("pagePerms", pagePerms);
-            user.put("visiblePanels", List.of(PagePanelRegistry.SUPPLIER_PRINT));
-            // 2026-10-25:供应商端 = 采购订单面板只读(与 {@link #login} 同源下发,否则刷新后权限又变)
-            user.put("supplierPanelPerms", Map.of("PU_ORDER", "view,query,print"));
+            // 同上(与 login 逐字同源):供应商会话唯一可见 = 供应商采购打印面板
+            user.put("visiblePanels", List.of(QueryService.SUPPLIER_PANEL_CODE));
+            // 2026-10-25:供应商端 = 「供应商采购打印」面板只读(与 {@link #login} 同源下发,否则刷新后权限又变)
+            user.put("supplierPanelPerms", Map.of(QueryService.SUPPLIER_PANEL_CODE, "view,query,print"));
             user.put("approvePanels", List.of());
             user.put("fieldPanels", List.of());
             user.put("warnPanels", List.of());
