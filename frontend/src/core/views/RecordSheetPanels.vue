@@ -3754,35 +3754,74 @@ function chartOf(dt) {
 .rsp-docval.rsp-pre {
   min-height: 22px;
 }
-.rs-t-in,
-.rs-c-in {
-  width: 100%;
-}
 /**
- * 日期/时间控件:纸面单元格常见只有 90~120px,Element 默认 11px 左右内边距 +
- * 前缀/清除图标会把 '2026-10-07' 挤成省略号 ⇒ 这里压紧内边距、居中,字号随设计表缩放。
+ * 日期/时间/区间格:控件宽度必须**收口在单元格里**(2026-10-28 用户报障
+ * 「仪器使用记录表的起止时间显示位置异常」:值挤在格子左上角、下方一条空白带、右边把邻列顶歪)。
+ *
+ * 【根因有**两层**,缺任一层都修不好】
+ *   ① 特异性:Element Plus 写死了
+ *        .el-date-editor.el-input, .el-date-editor.el-input__wrapper { width: var(--el-date-editor-width) }
+ *        .el-date-editor--daterange, .el-date-editor--timerange { --el-date-editor-width: 350px }
+ *        .el-date-editor(默认)                                   { --el-date-editor-width: 220px }
+ *      都是 0,2,0 —— 只在 `.rs-date-in` 上写 width:100%(0,1,0) 压不住。
+ *   ② scoped 作用域:el-date-picker 的根 div.el-date-editor **没有拿到本组件的 data-v-* 属性**
+ *      (实测该元素只有 class/tabindex),所以任何 `.rs-range-in[data-v-x]` 形态的规则**永不命中**。
+ *      原来的 `.rs-date-in{...}` / `.rs-range-in{...}` 全是死代码,控件始终是 350px/220px 默认宽,
+ *      在 120px/110px 的纸面格子里向右溢出(活体实测溢出 239px / 119px)。
+ *   ⇒ 唯一正解:`.rs-td :deep(...)`,编译成 `.rs-td[data-v-x] .el-date-editor.rs-range-in`
+ *     (祖先 .rs-td 有 data-v,后代不受作用域限制)。钉子见 recordSheetDateCellWidth.test.js。
  */
-.rs-date-in {
+.rs-td :deep(.el-date-editor.rs-date-in),
+.rs-td :deep(.el-date-editor.rs-range-in) {
   width: 100%;
-}
-.rs-date-in :deep(.el-input__wrapper) {
+  min-width: 0;
+  box-sizing: border-box;
   padding: 0 4px;
 }
-.rs-date-in :deep(.el-input__inner) {
+/* 日期格:Element 默认左右 11px 内边距会把 '2026-10-07' 挤成省略号,这里归零并居中 */
+.rs-td :deep(.rs-date-in .el-input__inner) {
   padding: 0;
   text-align: center;
 }
-.rs-range-in {
-  width: 100%;
+/*
+ * 日期格同样不显示日历图标:110px 的格子扣掉图标 20px 后输入框只剩 65px,
+ * 而 '2026-10-28' 实测需要 69px ⇒ 被裁成 '2026-10-2'(会看错日期,比省 20px 严重)。
+ * 隐藏后输入框 85px,日期完整;点击输入框本身即可打开日期面板,图标只是装饰。
+ */
+.rs-td :deep(.rs-date-in .el-input__prefix) {
+  display: none;
 }
-.rs-range-in :deep(.el-range-input) {
-  width: 38%;
+/* 区间格:120px 的格子装不下默认 0 10px 内边距 + 两个 39% 宽的输入 */
+.rs-td :deep(.el-date-editor.rs-range-in) {
+  padding: 0 2px;
+}
+/* 两个 HH:mm 按剩余宽度**平分**(flex:1),min-width:0 防止输入框固有宽度下限把格子重新撑开 */
+.rs-td :deep(.rs-range-in .el-range-input) {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
   font-size: inherit;
   text-align: center;
 }
-.rs-range-in :deep(.el-range-separator) {
-  padding: 0 2px;
+/* 分隔符定宽,不参与平分(Element 默认给 separator flex:1,会白白吃掉半个格子) */
+.rs-td :deep(.rs-range-in .el-range-separator) {
+  flex: none;
+  padding: 0 1px;
   font-size: inherit;
+}
+/*
+ * 纸面小格子里**不显示时钟图标**:120px 的格子扣掉图标占的 20px 后,
+ * 两个 HH:mm 各只剩 31px ⇒ 实测 '06:14' 被裁成 '06:1'(活体截图)。
+ * 隐藏后每个输入回到 39px,5 个字符(≈35px)完整显示。
+ * 不影响选择能力:el-date-picker 的整个控件区域都可以点开面板,图标只是装饰。
+ */
+.rs-td :deep(.rs-range-in .el-range__icon) {
+  display: none;
+}
+/* 纸面格内控件一律铺满格子(文本/下拉/自动完成) */
+.rs-t-in,
+.rs-c-in {
+  width: 100%;
 }
 /* 参照单元格(产品编号 -> 产品信息表):拟态输入框,点击弹参照 */
 .rs-ref-ctl {
