@@ -114,6 +114,15 @@
       <artifactId>poi-ooxml</artifactId>
       <version>${poi.version}</version>
     </dependency>
+    <!-- 老二进制 Word(.doc,OLE2/HWPF)转 HTML 预览(2026-10-28 用户口径「附件要能点开就看」):
+         现场附件「开题报告-修改版.doc」实测文件头 D0 CF 11 E0 = 真正的 OLE2(不是 docx 改名),
+         docx-preview 解析不了 ⇒ 改由后端 HWPF 转 HTML,前端 iframe 展示。
+         poi-ooxml 只覆盖 OOXML(.docx),HWPF 在 scratchpad 里,必须单独声明。 -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-scratchpad</artifactId>
+      <version>${poi.version}</version>
+    </dependency>
     <!-- JR 条码组件(含 QRCode)所需的 barcode4j;上游为可选依赖,必须显式声明,
          缺它会在渲染 QRCode 时抛 NoClassDefFoundError(2026-09-16 sl_recv 报表实证) -->
     <dependency>

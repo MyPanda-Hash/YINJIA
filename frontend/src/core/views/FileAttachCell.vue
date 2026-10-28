@@ -37,6 +37,7 @@ import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/core/request'
+import { openAttachmentPreview } from '@core/panel/attachmentPreview'
 
 const props = defineProps({
   panelCode: { type: String, required: true },
@@ -200,24 +201,19 @@ async function removeFile(a) {
   }
 }
 
-/** 点击文件名=查看:图片/PDF/文本新标签页打开,其余浏览器下载(均保留原文件名) */
+/** 点击文件名=**预览**(2026-10-28 用户口径「加预览,不用每次都下载再看,归档的也一样」):
+ *  图片/PDF/文本/JSON 浏览器直开;.docx 用 docx-preview 渲染;.xlsx/.xls/.csv 用 SheetJS 转表格;
+ *  老 .doc、压缩包等无原生渲染能力的类型保底下载。实现见 @core/panel/attachmentPreview.js。
+ *  ⚠ 与 canEdit 无关:未保存新单里传的、审批中、已归档的附件都能点开 ——
+ *    能不能看只由后端 requirePanelView(面板查看权)把关。 */
 async function openFile(a) {
-  try {
-    const blob = await request.get(`/attachment/${a.id}/download`, { responseType: 'blob', timeout: 120000 })
-    const type = a.contentType || blob?.type || ''
-    const url = URL.createObjectURL(blob)
-    if (type.startsWith('image/') || type.startsWith('text/') || type === 'application/pdf') {
-      window.open(url, '_blank')
-    } else {
-      const el = document.createElement('a')
-      el.href = url
-      el.download = a.fileName
-      el.click()
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
-  } catch {
-    ElMessage.error(tt('附件下载失败'))
-  }
+  await openAttachmentPreview(a, {
+    loadBlob: () => request.get(`/attachment/${a.id}/download`, { responseType: 'blob', timeout: 120000 }),
+    // 老 .doc(OLE2)前端解析不了 ⇒ 后端 HWPF 转 HTML 回来,直接写进预览窗
+    loadLegacyDocHtml: () => request.get(`/attachment/${a.id}/preview-doc`, { responseType: 'text', timeout: 120000 }),
+    onInfo: (msg) => ElMessage.info(tt(msg)),
+    onError: (msg) => ElMessage.error(tt(msg)),
+  })
 }
 </script>
 
