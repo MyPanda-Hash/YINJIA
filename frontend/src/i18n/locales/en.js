@@ -403,6 +403,9 @@ export default {
     '单据编号：': 'Document No.:',
     /* ── 2026-10-28:编号格的输入提示词(原先复述前缀「编号：」，看起来像已有固定编号) ── */
     '请输入编号': 'Enter number',
+    /* ── 2026-10-28:标注笔改两段式(划选 → 再点一下才弹色盘) ── */
+    '划选文字后点一下，即弹出颜色盘选择颜色': 'Select text, then click once to open the color palette',
+    '再点一下即弹出颜色盘': 'Click once more to open the palette',
     '选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。': 'Select a variant: a complete set of operations of this variant will replace the current content of this table (not append). You can "disable" the entire article here; to change the operation content, go to Standard Library Maintenance 」.',
     '变体': 'Variant',
     '工序数': 'Number of processes',

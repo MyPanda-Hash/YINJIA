@@ -579,11 +579,12 @@
                   :style="annMode === 'eraser' ? 'background:#b94d3f;color:#fff' : ''"
                   @click="toggleAnnMode('eraser')"
                 >{{ tt('橡皮擦') }}</div>
-                <!-- 模式提示:说明"现在能做什么",把旧的三步压成一句话 -->
+                <!-- 模式提示:说明"现在能做什么"。
+                     2026-10-28 用户口径:标注笔改为**两段式**(划选 → 再点一下才弹色盘)。 -->
                 <div class="as-side-hint">
                   {{ tt(annMode === 'eraser'
                     ? '点击已标注的文字即可擦除；再点一次「橡皮擦」退出'
-                    : '直接在纸面上划选文字即可标注，划完选颜色') }}
+                    : '划选文字后点一下，即弹出颜色盘选择颜色') }}
                 </div>
               </template>
               <!-- 字段管理:配置类动作(动态字段 / 备用列池),不属于"本单操作" ⇒ 归到输出段末尾,弱化显示 -->
@@ -631,9 +632,12 @@
       </div>
 
       <!-- 标注色盘(选中文字后浮出;position:fixed 用视口坐标,内联样式免动本文件巨大的样式段)。
-           点色即落库并关闭;「加粗」是叠加开关,勾上再点色 = 该段着色且加粗。 -->
+           点色即落库并关闭;「加粗」是叠加开关,勾上再点色 = 该段着色且加粗。
+           2026-10-28:加 .ann-palette 类 —— 原来它只靠内联样式,没有任何可选择的标识,
+           探针/测试无法确认"到底弹没弹"(只能靠肉眼看截图)。 -->
       <div
         v-if="annPending"
+        class="ann-palette"
         :style="`position:fixed;left:${annPending.x + 8}px;top:${annPending.y + 8}px;z-index:3000;background:#fff;border:1px solid #d8d8d8;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:8px 10px;width:172px`"
       >
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">

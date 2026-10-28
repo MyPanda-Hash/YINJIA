@@ -1,0 +1,88 @@
+[
+  {
+    "k": "目标单据",
+    "v": "LXA-2026-10-0030"
+  },
+  {
+    "k": "登录表单",
+    "v": {
+      "ok": true,
+      "acc": "admin",
+      "pwdLen": 6
+    }
+  },
+  {
+    "k": "点击进入系统",
+    "v": true
+  },
+  {
+    "k": "登录后",
+    "v": {
+      "hash": "#/dashboard",
+      "hasSide": false
+    }
+  },
+  {
+    "k": "登录成功",
+    "v": true
+  },
+  {
+    "k": "纸面态",
+    "v": "ready"
+  },
+  {
+    "k": "可标注格",
+    "v": {
+      "count": 1,
+      "sample": [
+        "2727"
+      ],
+      "sideHints": [
+        "划选文字后点一下，即弹出颜色盘选择颜色"
+      ],
+      "hasPenBtn": true,
+      "penReady": true
+    }
+  },
+  {
+    "k": "① 划选并 mouseup",
+    "v": {
+      "paletteAfterUp": false,
+      "armedClass": true,
+      "selectedText": "27"
+    }
+  },
+  {
+    "k": "① 断言 = 抬手不弹盘",
+    "v": "PASS"
+  },
+  {
+    "k": "① 断言 = 已记住范围(ann-armed)",
+    "v": "PASS"
+  },
+  {
+    "k": "② 拖拽补发的 click",
+    "v": {
+      "paletteAfterInstantClick": false
+    }
+  },
+  {
+    "k": "② 断言 = 补发的 click 不算\"再点一下\"",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 稍后再点一下",
+    "v": {
+      "paletteAfterRealClick": true,
+      "swatches": 8
+    }
+  },
+  {
+    "k": "③ 断言 = 这次才弹盘",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 断言 = 盘里 8 个色块",
+    "v": "PASS"
+  }
+]
