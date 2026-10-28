@@ -102,6 +102,9 @@ export default {
     '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'El "{panelName} {docNo}" que revisó en primer nivel fue rechazado por {actor} y devuelto a borrador. Comentario: {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Distribución correcta; se asignaron {n} hoja(s) de especificación',
     '已选 {n} 个商品，预览二维码标签？': '{n} artículo(s) seleccionado(s). ¿Previsualizar etiquetas QR?',
+    // 打印材料码·生产日期(2026-10-23):批次号旁边填写,打印时印到材料码卡面「生产日期」栏
+    '生产日期': 'Fecha de producción',
+    '选择日期': 'Seleccionar fecha',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'La hoja de especificación {no} de este producto no ha completado el envío/aprobación (actual: {st}); no se puede rellenar automáticamente. Complete primero la hoja y finalice el envío/aprobación.',
     '本表已有 {n} 行，改用规格书 {no} 的 {m} 行内容替换？': 'Esta tabla ya tiene {n} fila(s). ¿Reemplazarlas por las {m} fila(s) de la hoja {no}?',
     '已按规格书 {no} 自动填充': 'Rellenado automáticamente desde la hoja {no}',

@@ -102,6 +102,9 @@ export default {
     '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': '"{panelName} {docNo}" mà bạn kiểm tra cấp một đã bị {actor} từ chối và trả về bản nháp. Ý kiến: {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Phân phối thành công, đã gán {n} bản đặc tả',
     '已选 {n} 个商品，预览二维码标签？': 'Đã chọn {n} sản phẩm. Xem trước nhãn mã QR?',
+    // 打印材料码·生产日期(2026-10-23):批次号旁边填写,打印时印到材料码卡面「生产日期」栏
+    '生产日期': 'Ngày sản xuất',
+    '选择日期': 'Chọn ngày',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'Bản đặc tả {no} của sản phẩm này chưa hoàn tất gửi/duyệt (hiện tại: {st}), nên chưa thể tự động điền — vui lòng hoàn thành bản đặc tả và duyệt xong trước.',
     '本表已有 {n} 行，改用规格书 {no} 的 {m} 行内容替换？': 'Bảng này đã có {n} dòng. Thay bằng {m} dòng từ bản đặc tả {no}?',
     '已按规格书 {no} 自动填充': 'Đã tự động điền từ bản đặc tả {no}',

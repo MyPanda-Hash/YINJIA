@@ -1,0 +1,2 @@
+﻿DELETE FROM bd_pu_label WHERE 单据编号 = N'TMP-PROD-DATE-PROBE';
+SELECT COUNT(*) AS 残留 FROM bd_pu_label WHERE 单据编号 = N'TMP-PROD-DATE-PROBE';

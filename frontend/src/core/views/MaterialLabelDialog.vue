@@ -25,8 +25,15 @@
           {{ tt('批次号') }}:
           <el-input v-model="batchNo" size="small" class="mlq-batch-inp" maxlength="100" clearable
             :placeholder="tt('生单时按当天日期生成')" />
-          <el-button v-if="batchNo !== data.prefBatchNo" link type="primary" size="small"
+          <el-button v-if="batchNo !== (data.prefBatchNo || '')" link type="primary" size="small"
             @click="batchNo = data.prefBatchNo">{{ tt('恢复默认') }}</el-button>
+        </span>
+        <!-- 生产日期(2026-10-23 用户口径「在批次号后面加个生产日期,进行填写,填写后可以打印的材料码会加上生产日期」):
+             紧跟在批次号右边;填了就会登记到这张打印单上,出纸时印到材料码「生产日期」栏(不填则该栏留空白手填) -->
+        <span class="mlq-chip mlq-batch">
+          {{ tt('生产日期') }}:
+          <el-date-picker v-model="prodDate" type="date" size="small" class="mlq-prod-inp" clearable
+            value-format="YYYY-MM-DD" :placeholder="tt('选择日期')" />
         </span>
         <span class="mlq-chip mlq-tip">{{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单') }}</span>
       </div>
@@ -93,6 +100,8 @@
         <div class="mlq-rec-title">{{ tt('已打印记录（本订单）') }}</div>
         <el-table :data="data.records || []" border size="small" max-height="200">
           <el-table-column prop="批次号" :label="tt('批次号')" min-width="160" />
+          <!-- 生产日期(2026-10-23):与批次号一期登记的,这里一并可查(重打也按它出纸) -->
+          <el-table-column prop="生产日期" :label="tt('生产日期')" width="110" />
           <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
           <el-table-column :label="tt('用途')" width="110" align="center">
             <template #default="{ row }">
@@ -166,6 +175,9 @@ const data = ref({})
 const head = computed(() => data.value || {})
 const rows = computed(() => data.value.lines || [])
 const batchNo = ref('')
+/** 生产日期(2026-10-23):批次号旁边填,`YYYY-MM-DD`(**不是** Date 对象,el-date-picker 用 value-format 直接给串);
+ *  默认空 —— 生产日期是事实,系统不猜;空则卡面该栏留空白手填线(与原行为一致) */
+const prodDate = ref('')
 const tableRef = ref(null)
 /** **多选**:本次要打的行(勾选是权威;服务端会按**每行一张单**落库) */
 const picked = ref([])
@@ -210,6 +222,8 @@ async function load() {
   try {
     data.value = await engine.puLabelDialog(props.orderNo)
     batchNo.value = String(data.value?.prefBatchNo || '')
+    // 生产日期:取服务端回的可选预填(目前恒空,不猜),每次开窗重置,避免沿用上次的值
+    prodDate.value = String(data.value?.['生产日期'] || '')
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of rows.value) qtyOf[r.id] = capOf(r) > 0 ? capOf(r) : 0
     // 下层补登:数量与勾选每次都清空(默认不勾 —— 补登是"事后补打",必须显式选)
@@ -254,8 +268,10 @@ function clearAll() {
   syncPick([])
 }
 
-/** 出纸:纸上的号 = 库里的号(先落库再打印) */
+/** 出纸:纸上的号 = 库里的号(先落库再打印);生产日期取**服务端回读的单头值**(不取输入框 ——
+ *  人工填了又没落库的话,纸上印的就是"系统里没有的日期",返查对不上) */
 function cardsOf(res) {
+  const date = res['生产日期'] || ''
   return (res?.lines || []).map((l) => ({
     编码: l['物料编码'],
     规格: l['规格型号'] || '',
@@ -263,7 +279,7 @@ function cardsOf(res) {
     批次: res['批次号'],
     订单编号: props.orderNo,
     供应商名称: head.value['供应商'] || '',
-    生产日期: '',
+    生产日期: date,
   }))
 }
 
@@ -286,13 +302,16 @@ async function confirm() {
   try {
     // 可以一次勾多行:服务端**每行各出一张打印单**(作废因此只影响对应那一行)
     const res = await engine.puLabelPrint({
-      orderNo: props.orderNo, batchNo: String(batchNo.value).trim(), lines: all,
+      orderNo: props.orderNo, batchNo: String(batchNo.value).trim(),
+      // 生产日期(2026-10-23):与批次号一起登记在单头,出纸时印到卡面「生产日期」栏;空串 = 不登记
+      prodDate: String(prodDate.value || '').trim(), lines: all,
     })
     await printProductCards(cardsOf(res))
     const docs = res['单据编号列表'] || [res['单据编号']]
+    const tail = `（${tt('批次号')} ${res['批次号']}${res['生产日期'] ? ` · ${tt('生产日期')} ${res['生产日期']}` : ''}）`
     ElMessage.success(docs.length > 1
-      ? `${tt('已登记并打印 {n} 张打印单').replace('{n}', docs.length)}${docs.join('、')}（${tt('批次号')} ${res['批次号']}）`
-      : `${tt('已登记并打印')} ${res['单据编号']}（${tt('批次号')} ${res['批次号']}）`)
+      ? `${tt('已登记并打印 {n} 张打印单').replace('{n}', docs.length)}${docs.join('、')}${tail}`
+      : `${tt('已登记并打印')} ${res['单据编号']}${tail}`)
     emit('printed', {
       orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: docs.length,
     })
@@ -344,6 +363,8 @@ async function doVoid(row) {
 .mlq-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
 .mlq-batch { display: inline-flex; align-items: center; gap: 4px; }
 .mlq-batch-inp { width: 190px; }
+/* 生产日期日期框:与批次号框同高同宽,保证两枚 chip 并排不跳行 */
+.mlq-prod-inp { width: 150px; }
 .mlq-tip { color: #8b9893; }
 /* 多行提示条(浅黄底,说明"每行各出一张打印单;作废只影响对应那一行") */
 .mlq-oneline { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }

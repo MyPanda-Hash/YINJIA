@@ -114,18 +114,22 @@ public class PxController {
         return ApiResult.ok(puLabel.dialog(orderNo));
     }
 
-    /** 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头) */
+    /**
+     * 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头)。
+     * 2026-10-23 增 prodDate(生产日期,可空):批次号旁边填,登记在单头、印到材料码卡面。
+     */
     @PostMapping("/puLabel/print")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
         perm.requireButton("PU_ORDER", "修改");
         String orderNo = String.valueOf(body.getOrDefault("orderNo", ""));
         String batchNo = body.get("batchNo") == null ? "" : String.valueOf(body.get("batchNo"));
+        String prodDate = body.get("prodDate") == null ? "" : String.valueOf(body.get("prodDate"));
         List<Map<String, Object>> lines = new java.util.ArrayList<>();
         if (body.get("lines") instanceof List<?> l) {
             for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
         }
-        return ApiResult.ok(puLabel.print(orderNo, batchNo, lines, currentUser()));
+        return ApiResult.ok(puLabel.print(orderNo, batchNo, prodDate, lines, currentUser()));
     }
 
     /** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */

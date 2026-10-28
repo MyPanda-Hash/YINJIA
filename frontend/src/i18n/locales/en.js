@@ -177,6 +177,9 @@ export default {
     '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'The "{panelName} {docNo}" you reviewed at level 1 was rejected by {actor} and returned to draft. Comment: {opinion}',
     '已选 {n} 个商品，预览二维码标签？': '{n} item(s) selected. Preview QR code labels?',
     '打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单': 'Printable max = ordered qty × (1 + over-delivery ratio) − sent + returned − printed but not yet received',
+    // 打印材料码·生产日期(2026-10-23):批次号旁边填写,打印时印到材料码卡面「生产日期」栏
+    '生产日期': 'Production Date',
+    '选择日期': 'Select date',
     '已打印': 'Printed',
     '剩余可打': 'Remaining printable',
     '本次打印数量': 'Print qty this time',

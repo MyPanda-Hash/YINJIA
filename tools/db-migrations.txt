@@ -4168,3 +4168,16 @@ migrate-finish-in-wo-backfill-20261022.sql
 #   本地实测：200 张（M2 113 / M3 33 / M4 54）→ 补后 232 张全部有号、0 张空；再跑 NOOP。
 #   服务器包：deploy/incr-finish-in-wo-backfill-20261022.zip（组装：tools/archive/_assemble-finish-in-wo-pkg.ps1）
 migrate-finish-in-wo-backfill-full-20261022.sql
+
+# ---- 2026-10-23 采购订单「打印材料码」增生产日期(批次号右边填写,打印时印到材料码上)----
+#   用户口径「采购订单的打印材料码界面需要在批次号后面加个生产日期,进行填写,填写后可以打印的材料码会加上生产日期」
+#   bd_pu_label 加 [生产日期] date NULL(按头登记:一张打印单=一个批次号=一批货,与批次号同级;**不加行表**)+ 列注明 + 自检。
+#   历史行为 NULL ⇒ 卡面仍留空白手填线;重打按头读数原样带出。两账套均执行,幂等。
+#   代码同批:PuLabelService(dialog/print/reprint/labelRows)、PxController(prodDate)、MaterialLabelDialog.vue + 10 语言词条。
+#   表清单:docs/development/数据库表清单.md bd_pu_label 列数 15→16。
+migrate-pu-label-prod-date-20261023.sql
+
+# ---- 2026-10-23 采购订单「打印材料码」新增 UI 词条:选择日期(日期框占位词)----
+#   「生产日期」「批次号」两条字段词条 yj_translation 早已齐备(实测 10 语言 manual 全覆盖),**不重复插**;
+#   本次只补日期框占位词「选择日期」(scope=field),已存在即跳过、不覆盖人工校对。两账套均执行,幂等。
+i18n-pu-label-prod-date-20261023.sql
