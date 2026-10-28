@@ -83,15 +83,17 @@
     <!-- 新增 / 编辑 -->
     <el-dialog v-model="dlg.visible" :title="dlg.id ? tt('编辑供应商账号') : tt('新增供应商账号')" width="580px" append-to-body>
       <el-form :model="dlg.form" label-width="110px" @submit.prevent>
-        <!-- 2026-10-25 用户口径「新增应该弹窗关联供应商,然后选择后账号默认供应商编码(可修改)」:
-             顺序 = **先选供应商**,账号随供应商自动带出,仍可手改(账号是登录名,允许与编码不同)。 -->
+        <!-- 2026-10-25 用户口径「不要下来框,要是可以勾选的弹窗。单据的关联供应商基础资料是一样的」
+             + 「每次勾选,账号密码都要对应变化」→ 实际只要**账号**跟着变(=供应商编码,可改);
+             姓名与密码不自动变(用户明确「密码不用,姓名不用」)。 -->
         <el-form-item :label="tt('供应商')" required>
-          <el-select v-model="dlg.form.supplierCode" filterable remote clearable class="sa-sel"
-            :remote-method="searchSuppliers" :loading="supplierLoading" :placeholder="tt('选择供应商(可输入编码或名称搜索)')"
-            @change="onSupplierChange">
-            <el-option v-for="s in suppliers" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
-          </el-select>
-          <div class="sa-hint">{{ tt('选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。') }}</div>
+          <el-input :model-value="selectedSupplierLabel" readonly class="sa-sel"
+            :placeholder="tt('点右侧「选择」勾选供应商')" @click="pickerVisible = true">
+            <template #append>
+              <el-button @click="pickerVisible = true">{{ tt('选择') }}</el-button>
+            </template>
+          </el-input>
+          <div class="sa-hint">{{ tt('从供应商档案勾选;勾选后账号自动填该供应商编码,可手动修改。') }}</div>
         </el-form-item>
         <el-form-item :label="tt('账号')" required>
           <el-input v-model="dlg.form.userName" :disabled="!!dlg.id" maxlength="40"
@@ -126,6 +128,10 @@
         <el-button type="primary" :loading="saving" @click="save">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 供应商勾选弹窗(2026-10-25):单据里「关联供应商」用的是同一份供应商档案(dm_gf / GFDA),
+         这里照它的交互做成**可勾选弹窗**,替掉原来的下拉框。勾选后只改「账号」,姓名/密码不动。 -->
+    <SupplierPickerDialog v-model="pickerVisible" :value="dlg.form.supplierCode" @picked="onSupplierPicked" />
   </div>
 </template>
 
@@ -136,18 +142,27 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@core/request'
 import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
+import SupplierPickerDialog from './SupplierPickerDialog.vue'
 
 const user = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
 const rows = ref([])
-const suppliers = ref([])
-const supplierLoading = ref(false)
+/** 已选供应商的展示名(勾选弹窗回传;打开编辑时用兜底行填充) */
+const supplierName = ref('')
+const pickerVisible = ref(false)
 const stats = reactive({})
 const filter = reactive({ keyword: '' })
 /** 无权限时的说明(不再是"只有管理员":组织架构授权的账号也能进,真拦下时要说清为什么) */
 const denied = ref('')
+
+/** 「供应商」格里显示的「编码 名称」(只读展示,点它或右侧按钮打开勾选弹窗) */
+const selectedSupplierLabel = computed(() => {
+  const code = dlg.form.supplierCode
+  if (!code) return ''
+  return supplierName.value ? `${code} ${supplierName.value}` : code
+})
 
 const dlg = reactive({
   visible: false,
@@ -193,32 +208,21 @@ async function load() {
   }
 }
 
-async function searchSuppliers(keyword) {
-  supplierLoading.value = true
-  try {
-    const r = await request.get('/supplier/portal/suppliers', { params: { keyword: keyword || '' } })
-    suppliers.value = r?.data || []
-  } catch (e) {
-    suppliers.value = []
-  } finally {
-    supplierLoading.value = false
-  }
-}
-
 /**
- * 选供应商后自动带出「账号 = 供应商编码」+「姓名 = 供应商名称」(2026-10-25 用户口径
- * 「新增应该弹窗关联供应商,然后选择后账号默认供应商编码(可修改)」)。
+ * 勾选弹窗回填(2026-10-25)。用户口径:「每次勾选,账号密码都要对应变化」
+ * —— 实际只让**账号**跟着供应商变(= 该供应商编码),姓名与密码不动
+ * (用户明确「密码不用,姓名不用」,所以这里绝不自动改 realName / password)。
  *
  * 只在**新增**时预填账号,且只在当前账号为空、或仍是上一次自动填的值时才覆盖 ——
  * 用户如果已经手改过账号,就不该被后续换供应商冲掉(改到一半被覆盖很恼人)。
  * 账号规则是 3~40 位字母/数字/下划线/点/横线,供应商编码不满足时不预填,让用户手填。
  */
-function onSupplierChange(code) {
-  const hit = suppliers.value.find((s) => s.code === code)
-  if (hit && !dlg.form.realName) dlg.form.realName = hit.name
+function onSupplierPicked(s) {
+  if (!s || !s.code) return
+  const codeStr = String(s.code).trim()
+  dlg.form.supplierCode = codeStr
+  supplierName.value = s.name || ''
   if (dlg.id) return                                    // 编辑态:账号不可改名,不预填
-  const codeStr = String(code || '').trim()
-  if (!codeStr) { autoFilledUser.value = ''; return }
   const untouched = !dlg.form.userName || dlg.form.userName === autoFilledUser.value
   if (!untouched) return                                // 用户已手改过,保留他的值
   if (!/^[A-Za-z0-9_.\-]{3,40}$/.test(codeStr)) { autoFilledUser.value = ''; return }
@@ -229,14 +233,15 @@ function onSupplierChange(code) {
 function openCreate() {
   dlg.id = null
   autoFilledUser.value = ''
+  supplierName.value = ''
   dlg.form = { userName: '', supplierCode: '', realName: '', phone: '', password: '', enabled: true, remark: '' }
   dlg.visible = true
-  searchSuppliers('')
 }
 
 function openEdit(row) {
   dlg.id = row.id
   autoFilledUser.value = ''
+  supplierName.value = row.supplierName || ''
   dlg.form = {
     userName: row.userName,
     supplierCode: row.supplierCode,
@@ -247,9 +252,6 @@ function openEdit(row) {
     remark: row.remark || '',
   }
   dlg.visible = true
-  // 先放当前绑定进下拉,免得"打开编辑却看不到已选供应商"
-  suppliers.value = [{ code: row.supplierCode, name: row.supplierName || '' }]
-  searchSuppliers('')
 }
 
 async function save() {
@@ -348,8 +350,8 @@ async function remove(row) {
 }
 
 onMounted(() => {
+  // 供应商档案改为**勾选弹窗内加载**(打开时才查,避免进页面就拉 500 行档案)
   load()
-  searchSuppliers('')
 })
 </script>
 

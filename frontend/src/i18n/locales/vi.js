@@ -2424,6 +2424,13 @@ export default {
     '选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。': 'Sau khi chọn nhà cung cấp, tài khoản tự điền mã nhà cung cấp (có thể sửa); họ tên lấy theo tên nhà cung cấp.',
     '默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)': 'Mặc định = mã nhà cung cấp, có thể sửa (3–40 ký tự)',
     '已按供应商编码自动填写,可直接修改。': 'Đã điền theo mã nhà cung cấp — có thể sửa.',
+    '选择供应商': 'Chọn nhà cung cấp',
+    '点右侧「选择」勾选供应商': 'Bấm "Chọn" ở bên phải',
+    '从供应商档案勾选;勾选后账号自动填该供应商编码,可手动修改。': 'Chọn từ danh mục nhà cung cấp; tài khoản sẽ tự điền mã đó (có thể sửa).',
+    '输入关键字过滤(编码/名称/联系人/电话)': 'Lọc theo mã/tên/liên hệ/điện thoại',
+    '没有符合条件的供应商': 'Không có nhà cung cấp phù hợp',
+    '请选择一个供应商': 'Vui lòng chọn nhà cung cấp',
+    '加载供应商档案失败': 'Không tải được danh mục nhà cung cấp',
   },
 
 }

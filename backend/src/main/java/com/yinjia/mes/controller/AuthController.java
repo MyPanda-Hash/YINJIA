@@ -71,7 +71,20 @@ public class AuthController {
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
-            if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
+            // 供应商账号(2026-10-25 用户口径「供应商配置的账号不属于用户账号,单独一个表吧」):
+            //   yj_user 里查不到时**再查 yj_supplier_account**(口令就存在那张表),校验通过直接签令牌返回。
+            //   两边不会同名 —— 新建供应商账号时会拒绝与内部账号重名,所以这个先后顺序不产生歧义。
+            if (rows.isEmpty()) {
+                Map<String, Object> s = supplierPortal.authenticate(username, password);
+                if (s == null) throw new IllegalStateException("用户名或密码错误");
+                String supName = String.valueOf(s.get("username"));
+                usageLog.recordLogin(supName, String.valueOf(s.get("real_name")), clientIp(request));
+                Map<String, Object> out = new HashMap<>();
+                out.put("token", jwtUtil.generate(supName, factory));
+                out.put("user", supplierSession(s, factory));
+                return ApiResult.ok(out);
+            }
+            if (!encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
                 throw new IllegalStateException("用户名或密码错误");
             }
             // 过渡期收口:存量 BCrypt 哈希在登录成功时顺手升级成自写格式(
@@ -91,50 +104,25 @@ public class AuthController {
             user.put("isAdmin", admin);
             user.put("roles", rolesOf(u.get("role_id")));
             user.put("factory", factory);
-            // 供应商门户(2026-10-24):账号落在 yj_supplier_account 里 ⇒ **整体降权**,
-            // 只留「供应商采购打印」一个可见页面,其余权限清单一律清空(用户口径「没有别的权限」)。
-            // 真闸门在 SupplierPortalGuardFilter(供应商会话的 /api 请求只放行门户接口),这里只负责
-            // 让前端菜单/路由/桌面按供应商会话重新构建 —— 两者必须同源,改一侧就要同步另一侧。
-            String supplierCode = supplierPortal.supplierCodeOf(loginName);
-            if (supplierCode != null) {
-                user.put("supplierCode", supplierCode);
-                user.put("supplierName", supplierCode.isEmpty() ? "" : supplierPortal.supplierName(supplierCode));
-                // 2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致,只是显示和权限不一样」:
-                // 供应商端**就是采购订单面板本身**(同一个 PanelxList + PU_ORDER 版式),故这里下发的是
-                // 「PU_ORDER 只读」的页面权限,同时保留门户页 SUPPLIER_PRINT 作入口。
-                //   · 菜单树只出「采购管理 → 供应商采购打印」一条(visiblePanels 只含 SUPPLIER_PRINT);
-                //   · 面板级权限词只给 view/query/print(前端工具栏据此只留浏览动作;真闸门是过滤器 + 查询范围)。
-                Map<String, Object> pagePerms = new LinkedHashMap<>();
-                for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
-                pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
-                user.put("pagePerms", pagePerms);
-                // 菜单里"供应商采购打印"那条是**独立面板 SUPPLIER_PU_ORDER**(采购订单的只读副本),
-                // 不是页面级面板 ⇒ visiblePanels 直接给这个面板码(菜单 filterMenuTree 按 panelCode 放行)。
-                user.put("visiblePanels", List.of(QueryService.SUPPLIER_PANEL_CODE));
-                // 单据面板(供应商采购打印 SUPPLIER_PU_ORDER)的只读词:它与采购订单是同一张单的
-                // 元数据副本,前端按这份清单只留 查询/打印(2026-10-25 用户口径「只有打印按钮和查询」)。
-                user.put("supplierPanelPerms", Map.of(QueryService.SUPPLIER_PANEL_CODE, "view,query,print"));
-                user.put("approvePanels", List.of());
-                user.put("fieldPanels", List.of());
-                user.put("warnPanels", List.of());
-                user.put("roles", List.of("供应商"));
-            } else {
-                user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
-                // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
-                user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
-                // 自定义字段配置权限面板(2026-10-09):管理员=全部;普通用户=角色勾了「自定义字段」的面板。
-                // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
-                // PanelPermissionService.requireFieldConfig(同词 = field)。
-                user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
-                // 库存预警数量配置权限面板(2026-10-15,同 field 机制):管理员=全部;普通用户=角色勾了「预警配置」的面板。
-                // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
-                // PanelPermissionService.requireWarnConfig(同词 = warn)。
-                user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
-                // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
-                // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
-                // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
-                user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
-            }
+            // 供应商门户(2026-10-24 / 2026-10-25 独立成表后):
+            //   供应商账号**不再来自 yj_user** —— 上面 rows 为空时已由 supplierPortal.authenticate 分支返回,
+            //   走到这里的一定是内部账号,权限按角色正常下发,不做任何降权。
+            //   真闸门在 SupplierPortalGuardFilter:供应商会话的 /api 只放行门户接口。
+            user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
+            // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
+            user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
+            // 自定义字段配置权限面板(2026-10-09):管理员=全部;普通用户=角色勾了「自定义字段」的面板。
+            // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
+            // PanelPermissionService.requireFieldConfig(同词 = field)。
+            user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
+            // 库存预警数量配置权限面板(2026-10-15,同 field 机制):管理员=全部;普通用户=角色勾了「预警配置」的面板。
+            // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
+            // PanelPermissionService.requireWarnConfig(同词 = warn)。
+            user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
+            // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
+            // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
+            // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
+            user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
             // 供应商权限配置入口(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
             //   添加可以配置的账号」):管理员 ∪ 角色持有 SUPPLIER_ACCOUNT 的 supplier 词。
             //   前端据此显隐菜单/页签;真闸门是 SupplierPortalService.requireAccountConfig(同一句判定)。
@@ -207,6 +195,12 @@ public class AuthController {
         String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getName();
         if (username == null) throw new IllegalStateException("未登录");
+        // 2026-10-25:供应商账号的口令在自己那张表里(yj_supplier_account),不在 yj_user ——
+        // 供应商会话改密必须走它,否则"改密成功"是假的(改的是不存在的用户)。
+        if (supplierPortal.isSupplierAccount(username)) {
+            supplierPortal.changePassword(username, oldPassword, newPassword);
+            return ApiResult.ok(null);
+        }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT password_hash FROM yj_user WHERE username = ?", username);
         if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
@@ -217,13 +211,75 @@ public class AuthController {
         return ApiResult.ok(null);
     }
 
+    /**
+     * 供应商账号行(2026-10-25 独立成表)。表还没建时返回 null(当作"不是供应商账号")。
+     * 查询列表显式列出所需列,避免 `SELECT *` 把口令哈希带到下游。
+     */
+    private Map<String, Object> supplierAccountRow(String username) {
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT username, supplier_code, enabled, ISNULL(real_name,N'') AS real_name"
+                            + " FROM yj_supplier_account WHERE username = ?", username);
+            return rows.isEmpty() ? null : rows.get(0);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 供应商会话的用户对象(2026-10-25 供应商账号独立成表后新增)。
+     *
+     * <p>**login 与 currentUser 共用这一个方法** —— 两处手写同一份清单是历史事故源
+     * (登录降权、刷新又变回来)。改这里一处即可同时生效。
+     *
+     * <p>口径(用户 2026-10-24/25):供应商只能看「供应商采购打印」一个页面、只读 + 打印,
+     * 没有别的前限;数据范围由服务端按 {@code supplierCode} 强制过滤。
+     */
+    private Map<String, Object> supplierSession(Map<String, Object> s, String factory) {
+        String supName = String.valueOf(s.get("username"));
+        String supplierCode = s.get("supplier_code") == null ? "" : String.valueOf(s.get("supplier_code")).trim();
+        Map<String, Object> user = new HashMap<>();
+        user.put("userName", supName);
+        user.put("realName", s.get("real_name") == null ? "" : s.get("real_name"));
+        user.put("roleCode", "supplier");
+        user.put("isAdmin", false);
+        user.put("roles", List.of("供应商"));
+        user.put("factory", factory != null ? factory : DataSourceRouter.current());
+        user.put("supplierCode", supplierCode);
+        user.put("supplierName", supplierCode.isEmpty() ? "" : supplierPortal.supplierName(supplierCode));
+        // 页面级权限:只有「供应商采购打印」那一条给 view/query/print,其余页面级面板清空
+        Map<String, Object> pagePerms = new LinkedHashMap<>();
+        for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
+        pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
+        user.put("pagePerms", pagePerms);
+        // 菜单里「供应商采购打印」是**独立面板 SUPPLIER_PU_ORDER**(采购订单的只读副本),
+        // 前端 filterMenuTree 按 panelCode 放行 ⇒ visiblePanels 直接给这个面板码
+        user.put("visiblePanels", List.of(QueryService.SUPPLIER_PANEL_CODE));
+        // 该面板的只读词:前端工具栏据此只留 查询/打印(真闸门是过滤器 + QueryService 范围过滤)
+        user.put("supplierPanelPerms", Map.of(QueryService.SUPPLIER_PANEL_CODE, "view,query,print"));
+        user.put("approvePanels", List.of());
+        user.put("fieldPanels", List.of());
+        user.put("warnPanels", List.of());
+        user.put("canConfigSupplierAccount", false);
+        return user;
+    }
+
     private Map<String, Object> currentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getName();
         if (username == null) throw new IllegalStateException("未登录");
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT username, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
-        if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
+        if (rows.isEmpty()) {
+            // 供应商账号(2026-10-25 独立成表):不在 yj_user ⇒ 到本表取,并按供应商会话下发权限。
+            // 与 {@link #login} 同源(共用 supplierSession),否则"刷新一次页面权限就回来了"。
+            Map<String, Object> s = supplierAccountRow(username);
+            if (s == null) throw new IllegalStateException("用户不存在");
+            if (!"1".equals(String.valueOf(s.get("enabled")))) {
+                throw new IllegalStateException("该供应商账号已停用,请联系采购部");
+            }
+            return supplierSession(s, DataSourceRouter.current());
+        }
         Map<String, Object> u = rows.get(0);
         boolean admin = "Y".equals(u.get("is_admin"));
         Map<String, Object> user = new HashMap<>();
@@ -236,26 +292,6 @@ public class AuthController {
         // 2026-09-22 补:原先这里不含 factory,前端启动时用本响应覆盖 mes_user,
         // 会把登录时带进来的 factory 抹掉,顶栏账套名只能靠可能陈旧的 localStorage 缓存 —— 又是"显示与实查不一致"的老坑。
         user.put("factory", DataSourceRouter.current());
-        // 供应商会话(2026-10-24):与 {@link #login} **逐字同源** —— 登录时降权、启动时回取也必须降权,
-        // 否则"刷新一次页面权限就回来了"(前端的 mes_user 就是被本方法的响应覆盖的)。改一侧必须同步另一侧。
-        String supplierCode = supplierPortal.supplierCodeOf(u.get("username") == null ? null : String.valueOf(u.get("username")));
-        if (supplierCode != null && !supplierCode.isEmpty()) {
-            user.put("supplierCode", supplierCode);
-            user.put("supplierName", supplierPortal.supplierName(supplierCode));
-            Map<String, Object> pagePerms = new LinkedHashMap<>();
-            for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
-            pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
-            user.put("pagePerms", pagePerms);
-            // 同上(与 login 逐字同源):供应商会话唯一可见 = 供应商采购打印面板
-            user.put("visiblePanels", List.of(QueryService.SUPPLIER_PANEL_CODE));
-            // 2026-10-25:供应商端 = 「供应商采购打印」面板只读(与 {@link #login} 同源下发,否则刷新后权限又变)
-            user.put("supplierPanelPerms", Map.of(QueryService.SUPPLIER_PANEL_CODE, "view,query,print"));
-            user.put("approvePanels", List.of());
-            user.put("fieldPanels", List.of());
-            user.put("warnPanels", List.of());
-            user.put("roles", List.of("供应商"));
-            return user;
-        }
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));

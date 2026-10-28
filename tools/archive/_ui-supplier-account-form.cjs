@@ -22,8 +22,12 @@ const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const BASE = (process.argv[2] || 'http://127.0.0.1:8090').replace(/\/?$/, '/')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 function httpJson(p) {
+  return httpJsonOn(CDP_PORT, p)
+}
+/** 指到具体端口的 /json/list(dynamic port:Edge 自选端口时用) */
+function httpJsonOn(port, p) {
   return new Promise((res, rej) => {
-    http.get({ host: '127.0.0.1', port: CDP_PORT, path: p }, (r) => {
+    http.get({ host: '127.0.0.1', port, path: p }, (r) => {
       let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => { try { res(JSON.parse(d)) } catch (e) { rej(e) } })
     }).on('error', rej)
   })
@@ -45,22 +49,39 @@ async function main() {
   const at = (await api('api/auth/login', { method: 'POST', body: { userName: 'admin', password: '123456', factory: 'YJ' } })).data.token
   // 清理旧测试账号
   for (const a of ((await api('api/supplier/portal/accounts', { token: at })).data || [])) {
-    if (a.userName === 'YJ-SX' || a.userName === 'kbl01' || a.userName === 'mycustom01') {
+    if (a.userName === 'YJ-SX' || a.userName === 'mycustom01') {
       await api('api/supplier/portal/accounts/' + a.id, { method: 'DELETE', token: at })
     }
   }
 
-  const proc = spawn(EDGE, [`--remote-debugging-port=${CDP_PORT}`, '--headless=new', '--disable-gpu',
-    '--window-size=1680,1100', '--user-data-dir=' + path.join(os.tmpdir(), '_acc_form'), 'about:blank'],
-  { stdio: 'ignore', detached: true })
+  // 每次跑用**独立 profile 目录**并让 Edge 自选调试端口 —— 复用固定目录/端口时,
+  // 上一条用例残留的 Edge 会占住目录,导致 /json/list 拿不到 target(脚本直接 undefined 崩)。
+  const profileDir = path.join(os.tmpdir(), '_acc_form_' + Date.now())
+  const proc = spawn(EDGE, ['--remote-debugging-port=0', '--headless=new', '--disable-gpu',
+    '--window-size=1680,1100', '--user-data-dir=' + profileDir, 'about:blank'],
+  { stdio: ['ignore', 'ignore', 'pipe'], detached: true })
   proc.unref()
-  await sleep(4000)
-  let list
-  for (let i = 0; i < 20; i++) { try { list = await httpJson('/json/list'); if (list && list.length) break } catch (e) {} await sleep(500) }
-  const target = list.find((t) => t.type === 'page')
+  // 从 stderr 里读 "DevTools listening on ws://127.0.0.1:PORT/..." 拿到真实端口与目标
+  let wsUrl = ''
+  proc.stderr.on('data', (d) => {
+    const m = String(d).match(/DevTools listening on (ws:\/\/[^\s]+)/)
+    if (m) wsUrl = m[1]
+  })
+  for (let i = 0; i < 40 && !wsUrl; i++) await sleep(300)
+  let target = null
+  if (wsUrl) {
+    const port = Number(new URL(wsUrl).port)
+    let list
+    for (let i = 0; i < 20; i++) {
+      try { list = await httpJsonOn(port, '/json/list'); if (list && list.length) break } catch (e) {}
+      await sleep(400)
+    }
+    target = list && list.find((t) => t.type === 'page')
+  }
+  if (!target) { console.error('[FATAL] 无法启动 headless Edge(未拿到调试目标)'); process.exit(2) }
   const { connect } = require(path.join(__dirname, '..', 'verify', 'lib', 'mini-ws.cjs'))
   const { killTree } = require(path.join(__dirname, '..', 'verify', 'lib', 'kill-tree.cjs'))
-  const { closeBrowser } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
+  const { closeBrowser, killHeadlessEdge } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
   let id = 0; const pending = new Map()
   const sock = await connect(target.webSocketDebuggerUrl)
   sock.on('message', (data) => { const m = JSON.parse(data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } })
@@ -105,42 +126,46 @@ async function main() {
     `供应商@${idxSupplier} 账号@${idxUser}`)
   check('弹窗有「联系电话」', (L.labels || []).includes('联系电话'))
 
-  // 选择供应商 YJ-SX(山东鑫永恒)—— 用 Element Plus 的远程下拉:输入关键字后点选项
+  // 选择供应商 YJ-SX —— 2026-10-25 第 4 轮起改为**勾选弹窗**(不再有下拉框):
+  //   点「供应商」行的「选择」按钮 → 在弹窗里搜编码 → 点中该行 → 确定。
   const pickSupplier = async (code) => {
-    // 点开下拉
     await evaluate(`(function(){
-      var sel = Array.from(document.querySelectorAll('.el-dialog .el-select')).find(function(s){
-        var lab = s.closest('.el-form-item');
-        return lab && (lab.innerText||'').indexOf('供应商') >= 0;
-      });
-      if (sel) { var inp = sel.querySelector('input'); if (inp) { inp.focus(); inp.click(); } }
-      return !!sel;
+      var d = Array.from(document.querySelectorAll('.el-dialog')).find(function(x){ return x.offsetParent !== null && (x.innerText||'').indexOf('账号') >= 0; });
+      var it = d && Array.from(d.querySelectorAll('.el-form-item')).find(function(i){ return ((i.querySelector('.el-form-item__label')||{}).innerText||'').trim() === '供应商'; });
+      var b = it && Array.from(it.querySelectorAll('button')).find(function(x){ return (x.innerText||'').trim() === '选择'; });
+      if (b) b.click();
+      return !!b;
     })()`)
-    await sleep(800)
-    // 输入编码触发远程搜索
+    await sleep(2200)
     await evaluate(`(function(){
-      var sel = Array.from(document.querySelectorAll('.el-dialog .el-select')).find(function(s){
-        var lab = s.closest('.el-form-item');
-        return lab && (lab.innerText||'').indexOf('供应商') >= 0;
-      });
-      if (!sel) return false;
-      var inp = sel.querySelector('input');
+      var d = Array.from(document.querySelectorAll('.el-dialog')).find(function(x){ return x.offsetParent !== null && (x.innerText||'').indexOf('选择供应商') >= 0; });
+      if (!d) return false;
+      var inp = d.querySelector('input');
       var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
       setter.call(inp, ${JSON.stringify(code)});
       inp.dispatchEvent(new Event('input', { bubbles: true }));
+      var b = Array.from(d.querySelectorAll('button')).find(function(x){ return (x.innerText||'').replace(/\\s+/g,'') === '查询'; });
+      if (b) b.click();
       return true;
     })()`)
-    await sleep(1500)
-    const opts = await evaluate(`JSON.stringify(Array.from(document.querySelectorAll('.el-select-dropdown__item')).map(function(o){ return (o.innerText||'').trim(); }).slice(0, 8))`)
-    console.log(`  搜「${code}」候选:`, opts)
-    const ok = await evaluate(`(function(){
-      var items = Array.from(document.querySelectorAll('.el-select-dropdown__item'));
-      var hit = items.find(function(o){ return (o.innerText||'').indexOf(${JSON.stringify(code)}) === 0; });
-      if (hit) { hit.click(); return true; }
-      return false;
+    await sleep(1800)
+    const hit = await evaluate(`(function(){
+      var d = Array.from(document.querySelectorAll('.el-dialog')).find(function(x){ return x.offsetParent !== null && (x.innerText||'').indexOf('选择供应商') >= 0; });
+      if (!d) return 'no-picker';
+      var tr = Array.from(d.querySelectorAll('.el-table__body tr')).find(function(r){ return (r.innerText||'').indexOf(${JSON.stringify(code)}) >= 0; });
+      if (!tr) return 'no-row';
+      tr.click();
+      return (tr.innerText||'').replace(/\\s+/g,' ').slice(0, 50);
+    })()`)
+    console.log(`  搜「${code}」命中行:`, hit)
+    await sleep(600)
+    await evaluate(`(function(){
+      var d = Array.from(document.querySelectorAll('.el-dialog')).find(function(x){ return x.offsetParent !== null && (x.innerText||'').indexOf('选择供应商') >= 0; });
+      var b = d && Array.from(d.querySelectorAll('button')).find(function(x){ return (x.innerText||'').trim() === '确定'; });
+      if (b) b.click();
     })()`)
     await sleep(1200)
-    return ok
+    return hit !== 'no-picker' && hit !== 'no-row'
   }
   const picked = await pickSupplier('YJ-SX')
   check('能选中供应商 YJ-SX', picked)
@@ -158,7 +183,9 @@ async function main() {
   console.log('选供应商后:', afterPick)
   const ap = JSON.parse(afterPick)
   check('账号已自动填成供应商编码 YJ-SX', ap.userName === 'YJ-SX', ap.userName)
-  check('姓名自动带出供应商名称', !!ap.realName && ap.realName !== ap.userName, ap.realName)
+  // 2026-10-25 用户口径:「密码不用,姓名不用(只要对应账号)」
+  // ⇒ 姓名**不得**被自动带出(上一版会自动填供应商名称,已按口径撤销)
+  check('姓名不再自动带出(用户口径:姓名不用)', ap.realName === '', ap.realName)
 
   // ③ 账号可手改
   const renamed = await evaluate(`(function(){
@@ -249,7 +276,7 @@ async function main() {
 
   // 清理
   const all = (await api('api/supplier/portal/accounts', { token: at })).data || []
-  for (const a of all.filter((x) => ['mycustom01', 'YJ-SX', 'kbl01'].includes(x.userName))) {
+  for (const a of all.filter((x) => ['mycustom01', 'YJ-SX'].includes(x.userName))) {   // ⚠ 不删 kbl01:它是别的用例依赖的常驻测试账号
     await api('api/supplier/portal/accounts/' + a.id, { method: 'DELETE', token: at })
   }
   console.log('\n(测试账号已清理)')
@@ -258,6 +285,12 @@ async function main() {
   try { sock.close() } catch (e) {}
   await closeBrowser(CDP_PORT)
   killTree(proc.pid)
-  process.exit(pass === results.length ? 0 : 1)
+  killHeadlessEdge('_acc_form')
+  process.exitCode = pass === results.length ? 0 : 1   // 用 exitCode:process.exit() 会截断管道里的 stdout
 }
-main().catch((e) => { console.error('[FATAL]', e); process.exit(2) })
+main().catch((e) => {
+  console.error('[FATAL]', e)
+  // 异常路径也要收掉浏览器,否则一次失败就泄漏一整份(曾把 8090 拖死)
+  try { killHeadlessEdge('_acc_form') } catch (e2) { /* ignore */ }
+  process.exitCode = 2
+})

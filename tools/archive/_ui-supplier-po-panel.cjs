@@ -43,7 +43,7 @@ async function main() {
   const target = list.find((t) => t.type === 'page')
   const { connect } = require(path.join(__dirname, '..', 'verify', 'lib', 'mini-ws.cjs'))
   const { killTree } = require(path.join(__dirname, '..', 'verify', 'lib', 'kill-tree.cjs'))
-  const { closeBrowser } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
+  const { closeBrowser, killHeadlessEdge } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
   let id = 0; const pending = new Map()
   const sock = await connect(target.webSocketDebuggerUrl)
   sock.on('message', (data) => { const m = JSON.parse(data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } })
@@ -107,28 +107,37 @@ async function main() {
 
   // ---------- 打印 ----------
   console.log('\n== ② 打印:与采购订单同一张纸质单 ==')
+  // 2026-10-25 改:不再真的开弹窗(headless 下 window.open 偶发卡住主线程,曾把用例挂十几分钟)。
+  // 给 window.open 塞一个**假窗口**,只记录 print-formats 写进去的 HTML ——
+  // 断言"印出来的是哪张纸"这件事不变,但不再依赖浏览器窗口行为。
   const printed = await evaluate(`(function(){
+    var orig = window.open; var html = ''; var calls = 0;
+    window.open = function(){
+      calls++;
+      var doc = {
+        write: function(s){ html += String(s); },
+        writeln: function(s){ html += String(s) + '\\n'; },
+        close: function(){}, open: function(){},
+      };
+      return { document: doc, focus: function(){}, print: function(){}, close: function(){}, closed: false };
+    };
+    var grp = Array.from(document.querySelectorAll('.tb-group')).find(function(g){
+      var n = g.querySelector('.act-name');
+      return n && (n.innerText||'').replace(/\\s+/g,'') === '打印';
+    });
+    var btn = grp && grp.querySelector('.tb-main');
+    if (!btn) { window.open = orig; return JSON.stringify({ why: 'no-print-button' }); }
+    btn.click();
     return new Promise(function(resolve){
-      var orig = window.open; var opened = null;
-      window.open = function(u, n, f){ var w = orig.call(window, '', n, f); if (w) opened = w; return w; };
-      // 主按钮 = 「打印」组的 .tb-main(工具栏组是 span.tb-main,不是 <button>)
-      var grp = Array.from(document.querySelectorAll('.tb-group')).find(function(g){
-        var n = g.querySelector('.act-name');
-        return n && (n.innerText||'').replace(/\\s+/g,'') === '打印';
-      });
-      var btn = grp && grp.querySelector('.tb-main');
-      if (!btn) { window.open = orig; resolve(JSON.stringify({ why: 'no-print-button' })); return; }
-      btn.click();
       setTimeout(function(){
         window.open = orig;
-        var text = '';
-        try { text = opened && opened.document ? (opened.document.body.innerText||'').replace(/\\s+/g,' ') : ''; } catch (e) { text = 'ERR ' + e.message; }
-        resolve(JSON.stringify({ opened: !!opened, text: text.slice(0, 200) }));
-      }, 4500);
+        var text = html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();
+        resolve(JSON.stringify({ opened: calls > 0, htmlLen: html.length, text: text.slice(0, 400) }));
+      }, 5000);
     });
   })()`)
   const pr = JSON.parse(printed)
-  check('点打印打开了纸质单窗口', pr.opened, JSON.stringify(pr).slice(0, 120))
+  check('点打印生成了纸质单内容', pr.opened && pr.htmlLen > 500, `htmlLen=${pr.htmlLen}`)
   check('纸质单是「银嘉采购订单」(与采购订单同版式)', String(pr.text || '').includes('银嘉采购订单'), String(pr.text || '').slice(0, 100))
   check('纸质单是本供应商的单号', String(pr.text || '').includes('YJ-'), String(pr.text || '').slice(0, 80))
 
@@ -146,7 +155,10 @@ async function main() {
   check('内部账号工具栏同样只有 查询 + 打印',
     a.hasQueryBtn && JSON.stringify(a.groups) === JSON.stringify(['打印']),
     `常驻查询=${a.hasQueryBtn} 组=${(a.groups || []).join(',')}`)
-  check('内部账号看到全量(2245 张)', a.total === '2245', `共 ${a.total} 张`)
+  // 断言"全量"而不是钉死 2245:采购订单会随业务增减,钉死数字会让用例天天红。
+  // 真正要证的是「内部账号不受供应商范围限制」⇒ 数量级远大于单个供应商(约 74)。
+  check('内部账号看到全量(远大于单供应商)', Number(a.total) > 1000,
+    `共 ${a.total} 张(供应商侧仅 74)`)
   await shot('admin')
 
   const pass = results.filter((r) => r.ok).length
@@ -154,6 +166,12 @@ async function main() {
   try { sock.close() } catch (e) {}
   await closeBrowser(CDP_PORT)
   killTree(proc.pid)
-  process.exit(pass === results.length ? 0 : 1)
+  killHeadlessEdge('_po_panel')
+  process.exitCode = pass === results.length ? 0 : 1   // 用 exitCode:process.exit() 会截断管道里的 stdout
 }
-main().catch((e) => { console.error('[FATAL]', e); process.exit(2) })
+main().catch((e) => {
+  console.error('[FATAL]', e)
+  // 异常路径也要收掉浏览器,否则一次失败就泄漏一整份(曾把 8090 拖死)
+  try { killHeadlessEdge('_po_panel') } catch (e2) { /* ignore */ }
+  process.exitCode = 2
+})

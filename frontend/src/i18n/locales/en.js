@@ -4500,6 +4500,13 @@ export default {
     '选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。': 'Once a supplier is selected the account defaults to its supplier code (editable); the name defaults to the supplier name.',
     '默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)': 'Defaults to the supplier code, editable (3–40 letters/digits/underscore/dot/hyphen)',
     '已按供应商编码自动填写,可直接修改。': 'Filled from the supplier code — you can edit it.',
+    '选择供应商': 'Select Supplier',
+    '点右侧「选择」勾选供应商': 'Click "Select" to pick a supplier',
+    '从供应商档案勾选;勾选后账号自动填该供应商编码,可手动修改。': 'Picked from the supplier master; the account then defaults to that supplier code (editable).',
+    '输入关键字过滤(编码/名称/联系人/电话)': 'Filter by code / name / contact / phone',
+    '没有符合条件的供应商': 'No matching suppliers',
+    '请选择一个供应商': 'Please select a supplier',
+    '加载供应商档案失败': 'Failed to load supplier master',
   },
 
 }

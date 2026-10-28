@@ -24,11 +24,12 @@ import java.util.regex.Pattern;
  *
  * <h3>权限模型:供应商会话是「降权」而不是「加权」</h3>
  * <ul>
- *   <li>登录凭据仍在 {@code yj_user}(口令同 {@link PasswordEncoder} 口径),归属在
- *       {@code yj_supplier_account}(username 一对一 → supplier_code);</li>
+ *   <li><b>账号独立成表</b>(2026-10-25 用户口径「供应商配置的账号不属于用户账号,单独一个表吧」):
+ *       账号、口令、姓名、电话、启停、归属供应商**全部在 {@code yj_supplier_account}**,
+ *       与 {@code yj_user} 无任何行级关联 —— 供应商账号不会出现在组织架构/用户管理里;</li>
  *   <li>登录成功那一刻命中本表 ⇒ {@code AuthController} 把会话整体改写为:
- *       {@code supplierCode} + {@code visiblePanels=[SUPPLIER_PRINT]} + 全部其它权限清单清空
- *       —— 前端菜单树因此只剩「采购管理 → 供应商采购打印」这一条;</li>
+ *       {@code supplierCode} + {@code visiblePanels=[SUPPLIER_PU_ORDER]} + 全部其它权限清单清空
+ *       —— 前端菜单树因此只剩「采购管理 → 供应商门户 → 供应商采购打印」这一条;</li>
  *   <li>后端不靠"菜单藏起来"当闸门:{@link SupplierPortalGuardFilter} 在过滤器层把供应商账号的
  *       **全部 /api 请求**收口到 {@code /api/supplier/portal/*} 白名单,其余一律 403 ——
  *       拿令牌直接调 /api/px/* 读不到任何别的面板,也调不动任何业务按钮;</li>
@@ -329,20 +330,34 @@ public class SupplierPortalService {
 
     // ==================== 管理员端:供应商账号维护 ====================
 
-    /** 供应商档案下拉(账套内 dm_gf:dm=编码, mc=名称) */
+    /**
+     * 供应商档案候选(**就是单据里「关联供应商」用的那份基础资料**:账套内 `dm_gf` / 面板 GFDA)。
+     *
+     * <p>2026-10-25 用户口径:「不要下来框,要是可以勾选的弹窗。单据的关联供应商基础资料是一样的」
+     * ⇒ 返回的列与单据参照弹窗一致:编码 / 名称 / 联系人 / 电话 / 地址,前端用**勾选弹窗**呈现。
+     * 排序按编码;无关键字时最多 500 行(避免一次铺全部档案),有关键字时 100 行。
+     */
     public List<Map<String, Object>> suppliers(String keyword) {
         String kw = keyword == null ? "" : keyword.trim();
+        String cols = "SELECT TOP {n} ISNULL([dm],N'') AS code, ISNULL([mc],N'') AS name,"
+                + " ISNULL([ywman],N'') AS contact, ISNULL([tel],N'') AS tel, ISNULL([addr],N'') AS addr";
+        String from = " FROM dm_gf WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([dm],N'') <> N''";
         if (kw.isEmpty()) {
-            return jdbc.queryForList("SELECT TOP 500 ISNULL([dm],N'') AS code, ISNULL([mc],N'') AS name FROM dm_gf"
-                    + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([dm],N'') <> N'' ORDER BY [dm]");
+            return jdbc.queryForList(cols.replace("{n}", "500") + from + " ORDER BY [dm]");
         }
         String like = "%" + kw + "%";
-        return jdbc.queryForList("SELECT TOP 100 ISNULL([dm],N'') AS code, ISNULL([mc],N'') AS name FROM dm_gf"
-                + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([dm],N'') <> N''"
-                + " AND ([dm] LIKE ? OR [mc] LIKE ?) ORDER BY [dm]", like, like);
+        return jdbc.queryForList(cols.replace("{n}", "100") + from
+                + " AND ([dm] LIKE ? OR [mc] LIKE ? OR ISNULL([ywman],N'') LIKE ? OR ISNULL([tel],N'') LIKE ?)"
+                + " ORDER BY [dm]", like, like, like, like);
     }
 
-    /** 账号列表(供应商维度 + 账号维度两张表 join,不暴露口令哈希) */
+    /**
+     * 账号列表。**只读 yj_supplier_account 一张表**(2026-10-25 用户口径
+     * 「供应商配置的账号不属于用户账号,单独一个表吧」—— 不再 join yj_user)。
+     *
+     * <p>`userEnabled` 保留同名字段给前端(状态标签看它),值直接取本表 enabled ——
+     * 前端不必因为"换了个来源"而改判据。
+     */
     public List<Map<String, Object>> accounts(String keyword, String supplierCode) {
         StringBuilder sql = new StringBuilder(
                 "SELECT a.id, a.username AS userName, a.supplier_code AS supplierCode,"
@@ -350,18 +365,18 @@ public class SupplierPortalService {
                         // 联系电话(2026-10-25 用户口径「可以有联系电话」):供应商侧业务联系方式,可空
                         + " ISNULL(a.phone,N'') AS phone,"
                         + " CONVERT(varchar(19),a.create_at,120) AS createAt, ISNULL(a.create_by,N'') AS createBy,"
-                        + " ISNULL(u.real_name,N'') AS realName, ISNULL(u.[供应商编码],N'') AS userSupplierCode,"
-                        + " ISNULL(u.enabled,'') AS userEnabled"
+                        // 姓名/启停全部来自本表(口令列查询接口不返回)
+                        + " ISNULL(a.real_name,N'') AS realName, a.supplier_code AS userSupplierCode,"
+                        + " a.enabled AS userEnabled"
                         + " FROM yj_supplier_account a"
-                        + " LEFT JOIN yj_user u ON u.username = a.username"
                         + " LEFT JOIN dm_gf g ON g.[dm] = a.supplier_code WHERE 1=1");
         List<Object> args = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
         if (!kw.isEmpty()) {
             sql.append(" AND (a.username LIKE ? OR a.supplier_code LIKE ? OR g.[mc] LIKE ?"
-                    + " OR ISNULL(a.phone,N'') LIKE ?)");
+                    + " OR ISNULL(a.phone,N'') LIKE ? OR ISNULL(a.real_name,N'') LIKE ?)");
             String like = "%" + kw + "%";
-            args.add(like); args.add(like); args.add(like); args.add(like);
+            args.add(like); args.add(like); args.add(like); args.add(like); args.add(like);
         }
         if (supplierCode != null && !supplierCode.isBlank()) {
             sql.append(" AND a.supplier_code = ?");
@@ -373,9 +388,10 @@ public class SupplierPortalService {
 
     /**
      * 新建/修改供应商账号。一处写入两处状态:
-     * {@code yj_supplier_account}(归属 + 启停) 与 {@code yj_user}(登录凭据 + real_name + 供应商编码 + enabled),
-     * 同事务 —— 否则会出现"能登录但不知道是谁"或"账号在、归属没"。停用时把口令哈希也清掉:
-     * 账号再启用必须由采购重新设密(防离职/解约后旧口令复用)。
+     * <p><b>2026-10-25 起只写一张表</b>(用户口径「供应商配置的账号不属于用户账号,单独一个表吧」):
+     * 归属、启停、姓名、电话、**登录口令**全在 {@code yj_supplier_account},不再碰 {@code yj_user}
+     * —— 供应商账号从此不会出现在组织架构/用户管理里,也不会和内部账号抢同名。
+     * 停用时把口令哈希也清掉:再启用必须由采购重新设密(防解约后旧口令复用)。
      */
     @Transactional
     public void saveAccount(Map<String, Object> body) {
@@ -408,47 +424,56 @@ public class SupplierPortalService {
             }
         } else {
             if (!exist.isEmpty()) throw new IllegalStateException("账号已存在:" + userName);
+            // 与内部账号**重名**仍要拦:两者是两套凭据,但登录入口只有一个登录框,
+            // 同名会让"到底登进了哪一边"无法解释 ⇒ 新建时明确拒绝,不制造歧义。
             Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_user WHERE username = ?", Integer.class, userName);
             if (dup != null && dup > 0) throw new IllegalStateException("该账号名已被内部账号占用:" + userName);
             if (password.isBlank()) throw new IllegalArgumentException("新建供应商账号必须设置密码");
         }
         if (!password.isBlank() && password.length() < 6) throw new IllegalArgumentException("密码至少 6 位");
+        // 姓名留空 ⇒ 取供应商档案名称(用户口径「姓名不用」指"不因勾选供应商自动改",不是"不许有姓名")
         if (realName.isEmpty()) realName = supplierName(supplierCode);
 
         String by = currentUserName();
         if (editing) {
             int id = Integer.parseInt(String.valueOf(idObj));
-            jdbc.update("UPDATE yj_supplier_account SET supplier_code=?, enabled=?, remark=?, phone=?, update_by=?, update_at=SYSDATETIME()"
-                            + " WHERE id=?", supplierCode, enabled ? "1" : "0", remark,
-                    phone.isEmpty() ? null : phone, by, id);
             if (!password.isBlank()) {
-                jdbc.update("UPDATE yj_user SET real_name=?, [供应商编码]=?, enabled=?, password_hash=? WHERE username=?",
-                        realName, supplierCode, enabled ? "1" : "0", encoder.encode(password), userName);
+                jdbc.update("UPDATE yj_supplier_account SET supplier_code=?, enabled=?, remark=?, phone=?, real_name=?,"
+                                + " password_hash=?, update_by=?, update_at=SYSDATETIME() WHERE id=?",
+                        supplierCode, enabled ? "1" : "0", remark, phone.isEmpty() ? null : phone, realName,
+                        encoder.encode(password), by, id);
             } else if (enabled) {
-                jdbc.update("UPDATE yj_user SET real_name=?, [供应商编码]=?, enabled='1' WHERE username=?", realName, supplierCode, userName);
+                // 启用且没改密码:口令保持原值(可能就是之前停用时被清空 ⇒ 下面兜底提示)
+                jdbc.update("UPDATE yj_supplier_account SET supplier_code=?, enabled='1', remark=?, phone=?, real_name=?,"
+                                + " update_by=?, update_at=SYSDATETIME() WHERE id=?",
+                        supplierCode, remark, phone.isEmpty() ? null : phone, realName, by, id);
+                requirePassword(userName);
             } else {
                 // 停用 + 清空口令:重新启用必须重设密码(见方法头注)
-                jdbc.update("UPDATE yj_user SET real_name=?, [供应商编码]=?, enabled='0', password_hash='' WHERE username=?", realName, supplierCode, userName);
-            }
-            // yj_user 行可能因历史原因缺失(例如手工删了密码行):补齐,否则"启用了却登不进"
-            Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM yj_user WHERE username=?", Integer.class, userName);
-            if (n == null || n == 0) {
-                jdbc.update("INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled, [供应商编码])"
-                        + " VALUES (?,?,?,'N',NULL,NULL,?,?)", userName, encoder.encode(password), realName,
-                        enabled ? "1" : "0", supplierCode);
+                jdbc.update("UPDATE yj_supplier_account SET supplier_code=?, enabled='0', remark=?, phone=?, real_name=?,"
+                                + " password_hash=NULL, update_by=?, update_at=SYSDATETIME() WHERE id=?",
+                        supplierCode, remark, phone.isEmpty() ? null : phone, realName, by, id);
             }
         } else {
-            jdbc.update("INSERT INTO yj_supplier_account (username, supplier_code, enabled, remark, phone, create_by, asp_user1, asp_time1)"
-                    + " VALUES (?,?,?,?,?,?,?,SYSDATETIME())", userName, supplierCode, enabled ? "1" : "0", remark,
-                    phone.isEmpty() ? null : phone, by, by);
-            jdbc.update("INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled, [供应商编码])"
-                    + " VALUES (?,?,?,'N',NULL,NULL,?,?)", userName, encoder.encode(password), realName,
-                    enabled ? "1" : "0", supplierCode);
+            jdbc.update("INSERT INTO yj_supplier_account (username, supplier_code, enabled, remark, phone, real_name,"
+                            + " password_hash, create_by, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,SYSDATETIME())",
+                    userName, supplierCode, enabled ? "1" : "0", remark, phone.isEmpty() ? null : phone, realName,
+                    encoder.encode(password), by, by);
         }
-        // 权限:页面级虚拟面板 SUPPLIER_PRINT 的只读词(view,query,print)落在 yj_role_panel(该表无外键,按码存字符串)。
-        // 角色是"面板权限矩阵"的数据载体;供应商账号不走角色,但登记一份让矩阵里能查到"这个账号读什么",
-        // 真闸门仍是 SupplierPortalGuardFilter + 本服务的 supplier_code 过滤。
+        // 权限:只读词(view,query,print)登记到 yj_role_panel —— 供应商账号无角色时是空操作,
+        // 真闸门仍是 SupplierPortalGuardFilter + QueryService 的 supplier_code 强制过滤。
         syncAccountPanel(userName);
+    }
+
+    /** 启用中的供应商账号必须有口令,否则"启用了却登不进"—— 报错说清补救办法 */
+    private void requirePassword(String userName) {
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_supplier_account WHERE username = ? AND password_hash IS NOT NULL AND password_hash <> N''",
+                Integer.class, userName);
+        if (n == null || n == 0) {
+            throw new IllegalStateException("该账号当前没有密码(停用时已清空),请在同一窗口直接设置新密码后再启用");
+        }
     }
 
     /** 给供应商账号所属角色(若有)登记只读的 SUPPLIER_PRINT 行;供应商账号通常无角色 ⇒ 无操作 */
@@ -466,14 +491,89 @@ public class SupplierPortalService {
         }
     }
 
-    /** 删除供应商账号(账号行 + 登录行;历史打印留痕 yj_usage_log 保留) */
+    /**
+     * 删除供应商账号。**只删本表**(2026-10-25 起供应商账号独立成表,不再有 yj_user 行);
+     * 历史打印留痕(yj_usage_log)保留,便于对账。
+     */
     @Transactional
     public void deleteAccount(int id) {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT username FROM yj_supplier_account WHERE id = ?", id);
         if (rows.isEmpty()) throw new IllegalStateException("供应商账号不存在");
         String userName = String.valueOf(rows.get(0).get("username"));
         jdbc.update("DELETE FROM yj_supplier_account WHERE id = ?", id);
-        jdbc.update("DELETE FROM yj_user WHERE username = ? AND [供应商编码] IS NOT NULL", userName);
+        // 兜底清理:历史遗留的镜像行(旧实现写过 yj_user),有才删、没有也不算错
+        try {
+            jdbc.update("DELETE FROM yj_user WHERE username = ? AND ISNULL(is_admin,'N') <> 'Y'"
+                    + " AND NOT EXISTS (SELECT 1 FROM yj_supplier_account a WHERE a.username = yj_user.username)", userName);
+        } catch (RuntimeException ignore) {
+            // yj_user 结构差异不应挡住删除本身
+        }
+    }
+
+    // ==================== 供应商账号登录(单表凭据) ====================
+
+    /**
+     * 按供应商账号表校验口令并返回登录所需信息(2026-10-25 用户口径
+     * 「供应商配置的账号不属于用户账号,单独一个表吧」)。
+     *
+     * @return 命中并校验通过 → 该账号行;账号不存在 → {@code null};口令错/已停用 → 抛异常
+     *
+     * <p>⚠ 调用方(AuthController.login)先查 yj_user,查不到才走这里 —— 内部账号优先,
+     * 供应商账号不会与内部账号同名(新建时已拦),所以不会出现"两边都能登"的歧义。
+     */
+    public Map<String, Object> authenticate(String username, String rawPassword) {
+        if (username == null || username.isBlank()) return null;
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbc.queryForList(
+                    "SELECT id, username, supplier_code, enabled, ISNULL(real_name,N'') AS real_name,"
+                            + " ISNULL(password_hash,N'') AS password_hash"
+                            + " FROM yj_supplier_account WHERE username = ?", username);
+        } catch (RuntimeException e) {
+            // 表还没建(未执行迁移):当作"不是供应商账号",让内部账号流程继续报"用户名或密码错误"
+            return null;
+        }
+        if (rows.isEmpty()) return null;
+        Map<String, Object> row = rows.get(0);
+        if (!"1".equals(String.valueOf(row.get("enabled")))) {
+            throw new IllegalStateException("该供应商账号已停用,请联系采购部");
+        }
+        String hash = String.valueOf(row.get("password_hash"));
+        if (hash.isBlank() || !encoder.matches(rawPassword, hash)) {
+            throw new IllegalStateException("用户名或密码错误");
+        }
+        return row;
+    }
+
+    /** 供应商账号自助改密(口令就存在本表;停用账号不许改) */
+    @Transactional
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT enabled, ISNULL(password_hash,N'') AS password_hash FROM yj_supplier_account WHERE username = ?",
+                username);
+        if (rows.isEmpty()) throw new IllegalStateException("供应商账号不存在");
+        Map<String, Object> row = rows.get(0);
+        if (!"1".equals(String.valueOf(row.get("enabled")))) {
+            throw new IllegalStateException("账号已停用,不能修改密码");
+        }
+        String hash = String.valueOf(row.get("password_hash"));
+        if (hash.isBlank() || !encoder.matches(oldPassword, hash)) {
+            throw new IllegalStateException("原密码不正确");
+        }
+        jdbc.update("UPDATE yj_supplier_account SET password_hash = ?, update_by = ?, update_at = SYSDATETIME()"
+                + " WHERE username = ?", encoder.encode(newPassword), username, username);
+    }
+
+    /** 该用户名是否属于供应商账号表(登录/回取会话时判分支用;表不可用时返回 false) */
+    public boolean isSupplierAccount(String username) {
+        if (username == null || username.isBlank()) return false;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_supplier_account WHERE username = ?", Integer.class, username);
+            return n != null && n > 0;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** 总览(供应商权限配置页顶部):账号数 / 供应商数 / 近 30 天打印次数 */

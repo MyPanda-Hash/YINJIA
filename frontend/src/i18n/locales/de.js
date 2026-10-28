@@ -2419,6 +2419,13 @@ export default {
     '选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。': 'Nach Auswahl des Lieferanten wird das Konto mit dessen Code vorbelegt (änderbar); der Name kommt vom Lieferantennamen.',
     '默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)': 'Standard = Lieferantencode, änderbar (3–40 Zeichen)',
     '已按供应商编码自动填写,可直接修改。': 'Aus dem Lieferantencode vorbelegt – änderbar.',
+    '选择供应商': 'Lieferant wählen',
+    '点右侧「选择」勾选供应商': 'Rechts auf „Wählen" klicken',
+    '从供应商档案勾选;勾选后账号自动填该供应商编码,可手动修改。': 'Aus dem Lieferantenstamm wählen; das Konto wird dann mit dem Code vorbelegt (änderbar).',
+    '输入关键字过滤(编码/名称/联系人/电话)': 'Nach Code/Name/Ansprechpartner/Telefon filtern',
+    '没有符合条件的供应商': 'Keine passenden Lieferanten',
+    '请选择一个供应商': 'Bitte einen Lieferanten wählen',
+    '加载供应商档案失败': 'Lieferantenstamm konnte nicht geladen werden',
   },
 
 }

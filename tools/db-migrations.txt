@@ -4203,3 +4203,12 @@ migrate-supplier-po-panel-20261025.sql
 #   ② 弹窗新文案(联系电话/选定供应商后账号自动填编码/已自动填写)9 语言。两账套均需执行,幂等。
 migrate-supplier-account-phone-20261025.sql
 i18n-supplier-account-phone-20261025.sql
+# ---- 2026-10-25 供应商改为勾选弹窗:弹窗文案译名 ----
+#   用户口径「不要下来框,要是可以勾选的弹窗。单据的关联供应商基础资料是一样的」。
+#   选择供应商/选择/勾选提示/搜索占位/档案列名/空态/加载中 等 9 语言。两账套均需执行,幂等。
+i18n-supplier-picker-20261025.sql
+# ---- 2026-10-25 供应商账号独立成表(不再写 yj_user)----
+#   用户口径「供应商配置的账号不属于用户账号,单独一个表吧」。
+#   ① yj_supplier_account 加 password_hash / real_name;② 从 yj_user 回填;
+#   ③ 删除 yj_user 里的供应商镜像行;④ 列注明 + 自检(无镜像行、启用账号必有口令)。两账套均需执行,幂等。
+migrate-supplier-account-standalone-20261025.sql
