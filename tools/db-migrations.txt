@@ -4175,3 +4175,7 @@ migrate-mold-proc-ref-prodinfo-20261027.sql
 #   只是还没有条目。用户 2026-10-27 明确「只补机制,库留空」⇒ 种子条目由工艺科在
 #   「⧉ 标准库维护」里自行录入,本批不替业务编造正文(编了就成了受控文书上的假数据)。
 #   改动位置:frontend/src/core/views/sectionLibText.js(多行带序号)+ RecordSheetPanels.applySectionLib。
+
+# 2026-10-28 编辑人/表单管理人自动带入:RD_PROD_INFO.编辑人、RD_ASM_PROC.表单管理人 改只读(值由前端带出+后端回写)。
+#   两账套都执行。
+migrate-rd-editor-stamp-20261028.sql
