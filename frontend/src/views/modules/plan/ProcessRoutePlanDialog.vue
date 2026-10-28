@@ -34,7 +34,13 @@
       <el-table v-else :data="rows" size="small" border max-height="380" empty-text="">
         <el-table-column type="index" :label="tt('序')" width="52" />
         <el-table-column :label="tt('工序')" prop="工序" width="110" />
-        <el-table-column :label="tt('生产车间')" prop="生产车间" width="100" />
+        <el-table-column :label="tt('生产车间')" width="120">
+          <template #default="{ row }">
+            <span>{{ row['生产车间'] || '-' }}</span>
+            <!-- 2026-10-28:不限定车间的行 ⇒ 下拉是全部启用线,给个标记免得以为筛选坏了 -->
+            <el-tag v-if="!row['限定车间']" size="small" type="info" class="prp-open-tag">{{ tt('全部产线') }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="tt('生产线')" min-width="290">
           <template #default="{ row, $index }">
             <el-select v-model="row.生产线" filterable size="small" style="width: 100%"
@@ -42,6 +48,12 @@
               <el-option v-for="l in optionsOf(row)" :key="l.生产线" :value="l.生产线"
                          :label="`${l.生产线} · ${tt('负荷')}${num(l['今日负荷'])}/${tt('日产能')}${num(l['日产能'])}${l['提示'] === '超载' ? ' ⚠' + tt('超载') : ''}`" />
             </el-select>
+            <!-- 条7(2026-10-25):按同物料上次排产带出的行,行内加来源小字(可逐行改,不锁死) -->
+            <div v-if="row.线来源 === 'last'" class="prp-lock">{{ tt('按同物料上次排产带出，可改') }}</div>
+            <!-- 2026-10-28:存量台账里的跨车间脏线(实测 GD-2026-10-0202 行6「装箱→2号车间」)——
+                 这个值不在下拉里,照原样提交必被服务端拒(「与工序应进的X车间不一致」),
+                 所以先标红让人知道要重选,而不是让他"选了但存不进去" -->
+            <div v-if="lineNotInOptions(row)" class="prp-bad">{{ tt('原预排线与该工序车间不一致,请重新选择') }}</div>
             <div v-if="locked && $index === 0" class="prp-lock">{{ tt('首道线 = 当前排产线;换线请先撤销排产') }}</div>
           </template>
         </el-table-column>
@@ -62,6 +74,10 @@
       <div v-if="rows.length" class="prp-dim">
         {{ tt('说明') }}：{{ tt('首道工序的线 = 该工单的排产线(报工闸门按它判已排产);其余各道为预排线,前道报工完工审核后自动转序到下一道的线') }}。
         {{ tt('计划数量 = 本工单行排产数量 × 该工序自己的换算率(各道分开算,不累乘)') }}。
+        <!-- 2026-10-28:新工序/未建线车间的行,下拉是**全部启用产线** —— 说明一句,免得以为筛选坏了 -->
+        <span v-if="hasOpenLineRow" class="prp-open">
+          {{ tt('有工序没有固定车间(或该车间还没有产线),这些行的「生产线」已列出全部启用产线,可任选一条') }}。
+        </span>
       </div>
     </div>
     <template #footer>
@@ -78,6 +94,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import { applyLineDefaults, lineOptions } from '@/business/routeDefaults'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -110,12 +127,21 @@ const demand = computed(() => Number(head.value['需求数量'] || 0))
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 /** 该道工序的换算后计划数量 = **本次排产数量** × 该工序自己的换算率(改数量即时重算,与后端 preplanManual 同式) */
 function planOf(row) { return Number(qty.value || 0) * Number(row?.['换算率'] || 1) }
-/** 该道工序的候选线:启用线里车间匹配的(与顶部选线同口径) */
+/** 该道工序的候选线(2026-10-28 改调 business lineOptions 单一口径,与服务端 requiredShop 一一对应):
+ *  · 后端说「限定车间」(工序登记过固定车间且该车间确有启用线)⇒ 只出该车间启用线(装箱→组装);
+ *  · 否则(工序没登记固定车间 / 该车间还没建线 / 用户以后新建的工序)⇒ **全部启用线**,
+ *    让人任何工序都排得进去 —— 这是用户口径「没有对应产线类型就显示全部产线」。 */
 function optionsOf(row) {
-  const shop = String(row['生产车间'] || '')
-  const list = lines.value.filter((l) => !shop || String(l['生产车间'] || '') === shop)
-  return list.length ? list : lines.value
+  return lineOptions(row, lines.value).lines
 }
+/** 当前值不在下拉候选里(存量台账的跨车间/停用/脏线名)—— 提交必被拒,行内标红提示重选 */
+function lineNotInOptions(row) {
+  const cur = String(row?.['生产线'] || '').trim()
+  if (!cur) return false
+  return !optionsOf(row).some((l) => String(l['生产线'] || '').trim() === cur)
+}
+/** 有没有「不限定车间」的行 —— 有就在表格下方提示一句,别让人以为筛选坏了 */
+const hasOpenLineRow = computed(() => rows.value.some((r) => !lineOptions(r, lines.value).limited))
 
 async function load() {
   if (!no.value) return
@@ -138,12 +164,21 @@ async function load() {
       const rate = Number(s['换算率'] || 0)
       return {
         工序: s['工序'], 生产车间: s['生产车间'], 工序序: s['工序序'],
+        // 2026-10-28:这道工序是否**只允许本车间产线**(后端 requiredShop 的口径)。
+        // false = 工序没登记固定车间 / 该车间还没建线 ⇒ 下拉列全部启用产线(见 optionsOf)
+        限定车间: s['限定车间'] === true,
         // 换算率(2026-10-07:此前映射里漏带该字段 ⇒ 列里恒显示 0)
         换算率: rate > 0 ? rate : 1,
         计划完工日期: (had && had['计划完工日期']) || s['计划完工日期'] || '',
         生产线: (had && (had['状态'] === '已落实' ? (had['实际生产线'] || had['计划生产线']) : had['计划生产线'])) || '',
       }
     })
+    // 条7「排产带上次产线」(2026-10-25 定稿方案 v2):对「生产线」为空的行预填 ——
+    // **仅填空行**(已排台账回填优先不动)、工序名两边 trim 后精确匹配、首道可用「上次首道」兜底、
+    // 只预填归口车间(ProcessShop 口径)的启用线 —— 候选校验不通过(跨车间/停用/脏名)留空,绝不锁死。
+    // 改线模式(locked)首道本就锁定,lockedFirst 双保险不覆盖。
+    const lastFirst = d['上次首道'] && Object.keys(d['上次首道']).length ? d['上次首道'] : null
+    applyLineDefaults(rows.value, d['上次产线'] || [], lastFirst, lines.value, { lockedFirst: locked.value })
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || tt('读取工艺路线失败'))
     rows.value = []
@@ -191,4 +226,8 @@ watch(() => props.modelValue, (v) => { if (v) load() })
 .prp-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .prp-dim { margin-top: 8px; font-size: 12px; color: #909399; line-height: 1.6; }
 .prp-lock { font-size: 12px; color: #e6a23c; margin-top: 2px; }
+/* 2026-10-28:不限定车间的行(全部产线可选)的标记与提示 */
+.prp-open-tag { margin-left: 4px; }
+.prp-open { color: #e6a23c; }
+.prp-bad { font-size: 12px; color: #f56c6c; margin-top: 2px; }
 </style>

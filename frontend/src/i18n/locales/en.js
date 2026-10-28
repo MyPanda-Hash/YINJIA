@@ -845,6 +845,8 @@ export default {
     '浏览器拦截了打印窗口,请允许弹出窗口': 'Print window blocked; please allow pop-ups',
     '已发送打印': 'Sent to print:',
     '成型生产任务单': 'Molding Task Sheet',
+    // 2026-10-21 用户口径「增加一种打印为切炭打印」:切炭/组装只是标题不同,列结构一致
+    '切炭生产任务单': 'Carbon Cutting Task Sheet',
     '组装生产任务单': 'Assembly Task Sheet',
     '生产投料单': 'Production Feeding Sheet',
     '选择打印模板': 'Select Print Template',
@@ -922,6 +924,10 @@ export default {
       'This routing is not audited — cannot convert to work order; complete its audit in Basic Settings → Routings first',
     '行所选工艺路线尚未审核，不能转工单;请先在「基础设置→工艺路线」对该路线提交审批并通过':
       'row(s) use an unaudited routing and cannot be converted; submit and pass its approval in Basic Settings → Routings first',
+    // ---- 「上次」预填(2026-10-25 条39 转工单带上次工艺路线 / 条7 排产带上次产线)----
+    '上次': 'Last used',
+    '按同物料上次转单带出，可改': 'Prefilled from the last conversion of this material; editable',
+    '按同物料上次排产带出，可改': 'Prefilled from the last scheduling of this material; editable',
     '下一道工序': 'Next Process',
     '按勾选工单': 'per selected work order',
     '默认 GY-CB-STD': 'default GY-CB-STD',
@@ -2245,6 +2251,7 @@ export default {
     '其他入库单': 'Other receipt',
     '销售出库单': 'Sales issue',
     '材料出库单': 'Material issue',
+    '生产领料': 'Production Picking',
     '其他出库单': 'Other issue',
     '请购单': 'Purchase requisition',
     '采购订单': 'Purchase order',
@@ -3870,6 +3877,12 @@ export default {
     '排线失败': 'Line planning failed',
     '计划数量 = 本工单行排产数量 × 该工序自己的换算率(各道分开算,不累乘)':
       "Planned qty = this work-order line's scheduled qty × the operation's own conversion rate (each operation is computed separately, not compounded)",
+    // 2026-10-28:工序没有固定车间(或该车间还没建线)⇒ 下拉列全部启用产线
+    '全部产线': 'All lines',
+    '有工序没有固定车间(或该车间还没有产线),这些行的「生产线」已列出全部启用产线,可任选一条':
+      'Some operations have no fixed workshop (or that workshop has no line yet) — their "Line" dropdown lists all enabled lines; pick any one',
+    '原预排线与该工序车间不一致,请重新选择':
+      'The previously planned line does not match this operation\'s workshop — pick a line again',
     '行排产': "work-order line('s) schedule",
     '撤销后回到待排产池;换线=撤销+重排;该行预排线同时作废':
       'It returns to the pending pool; changing lines = revoke + re-schedule; this line\'s planned lines are voided as well',
