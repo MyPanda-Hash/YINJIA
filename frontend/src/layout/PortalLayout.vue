@@ -50,6 +50,10 @@
     </template>
 
     <template v-else>
+    <!-- ⚠ 这一行是内部账号(含管理员)的**整条顶栏**(银嘉数字化平台/账本/搜索/公告/通知/系统管理员/用户下拉)。
+         2026-10-24 加供应商门户分支时被误删过一行 ⇒ 所有人顶栏消失(截图可见工作区从侧栏开始)。
+         改本文件的分支结构时,务必先确认内部账号那支里 TopBar / LeftNav / TabsBar / HelpPanel 四件套齐全。 -->
+    <TopBar />
     <div class="portal-body">
       <LeftNav v-if="!app.maxContent" />
       <div class="portal-main">
