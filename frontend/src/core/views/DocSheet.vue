@@ -1791,6 +1791,26 @@ defineExpose({ focusField })
     padding-right: 0 !important;
     margin: 0 !important;
   }
+  /* ── 纸面宽度(2026-10-22 修「被分成两页 / 数据被省略」)────────────────────────────
+   * 冻结自用户报障截图(特采申请单 YJ-QR-60 打印预览):供应商显示「江苏...」、
+   * 采购单号显示「YJ-2...」,且整张单被切成两页。
+   *
+   * 根因(两条,同源):
+   *   ① 版式是**按设计宽 938px 排的固定栅格**(见 docSheetConfigs「表体 447px → 纸面 938px,
+   *      比例 2.098」:供应商列 flex:243 / 采购单号 338 / 产品名称 292 都是这个基准下的实测值);
+   *   ② 而打印态这里把纸面压成 width:100%,A4 去掉 8mm 边距只剩 733px ⇒ 纸面被压缩到 78%。
+   *   ⇒ 值区跟着缩窄(采购单号 338→264px),放不下的文字走 .as-ref-text 的
+   *      `text-overflow:ellipsis + white-space:nowrap` 被截成「江苏...」;
+   *   ⇒ 同时行内内容在窄格子里换行/撑高,整张纸从设计高 1340px 涨到约 1362px,
+   *      超过 A4 可打印高 1062px ⇒ 被浏览器切成两页。
+   *
+   * 修法:**打印时让纸面按设计宽 938px 排版(不压缩、不换行),再交给浏览器整体等比缩放**。
+   *   · 纸面定宽后,各值区回到设计宽度 ⇒ 文字放得下 ⇒ 不再出现省略号;
+   *   · 行高回到设计值 ⇒ 纸面总高回到 ~1340px;
+   *   · `zoom` 是「布局后再缩放」,浏览器会按缩放后的尺寸分页:
+   *     733 / 938 = 78.15% ⇒ 1340 × 78.15% ≈ 1047px < 1062px 可打印高 ⇒ **一页放得下**。
+   *   (不用 transform:scale —— 它不影响布局盒尺寸,分页仍按未缩放的 1340px 切,照样两页。)
+   * 其它文书式面板(非固定宽)不受影响:它们本就没有 938px 设计基准,保持 width:100%。 */
   body.approval-printing .approval-sheet {
     visibility: visible !important;
     position: absolute !important;
@@ -1801,6 +1821,27 @@ defineExpose({ focusField })
     margin: 0 !important;
     border: 1px solid #8a8a8a !important;
     box-shadow: none !important;
+  }
+  /* ⚠ 只作用于**按 938px 设计基准排版的品质系表格单**(QC_* 八张 + 特采单等,见 docSheetConfigs
+   *   「表体 447px → 纸面 938px」那段注释)。RD_APPROVAL / RD_PLAN 走 FIXED_SHEET_W=1242 的另一套
+   *   基准,以及其余自适应宽面板,一律**不动** —— 否则会把 1242 的设计纸压成 938。
+   *   判据用 qc 版式独有的网格结构 `.q-vrows`(左侧竖排「申请单位」字列 + 右侧 pairs 网格),
+   *   RD 系列走的是 as-no/as-name 那一套,不会命中。 */
+  body.approval-printing .approval-sheet:has(.q-vrows) {
+    width: 938px !important;
+    max-width: none !important;
+    flex: none !important;
+    /* 733.2 / 938 = 78.16%,取 78% 留一点余量,确保不越过可打印高 */
+    zoom: 0.78 !important;
+    /* 分页兜底:纸面本身是不可分割的整块,任何情况下优先整体成页,不做拦腰截断 */
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* 定宽后禁止再折行:值区文字必须完整显示,而不是被省略号吃掉 */
+  body.approval-printing .approval-sheet .as-ref-text {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
   }
   /* 强制打印背景色(蓝底标签/序号列),否则浏览器打印默认丢弃背景 */
   body.approval-printing .approval-sheet,
