@@ -2099,7 +2099,8 @@
     </el-dialog>
 
     <!-- 立项申请「审批通过 + 定级」弹窗(2026-10-08 研发流程图②):用户口径「冯总审核及定级」= 一次动作两件事。
-         仅立项申请表出现;其余面板的「审批通过」仍是原来的意见确认框。 -->
+         2026-10-28 追加对接人:「可以由管理员在审批定级的时候确定一个对接人进行分发，后续也默认是这个对接人」
+         ⇒ 弹窗里多一个对接人下拉(默认带出已有对接人),选了就与定级同一动作完成分发;不选则事后用「定级分发」补发。 -->
     <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
@@ -2109,6 +2110,13 @@
             <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
           </el-radio-group>
         </div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('对接人') }}</span>
+          <el-select v-model="apvLiaison" style="flex:1" filterable clearable :placeholder="tt('对接人（选填）')">
+            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="dq-tip">{{ tt('在审批定级的同时选择对接人，一步完成分发；不选则审批后再到「定级分发」补发') }}</div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
           <el-input v-model="apvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
@@ -6403,10 +6411,16 @@ const apvBusy = ref(false)
 const apvLevel = ref('')
 const apvOpinion = ref('')
 const apvDocNo = ref('')
+/** 2026-10-28:审批定级时一并分发对接人(用户口径「后续也默认是这个对接人」) */
+const apvLiaison = ref('')
 async function openRdApprove(no) {
   apvDocNo.value = no
   // 已定过级的单据默认选中当前等级(改级场景);新单默认空,必须选(与用户口径「审批与定级同一步」一致)
   apvLevel.value = String(current.value?.['项目等级'] || '')
+  // 对接人下拉的候选来自账号清单(与「定级分发」同一份);不预取 ⇒ 打开弹窗时拉一次
+  await ensureRdFlowUsers()
+  // 默认带出已有对接人("后续也默认是这个对接人");新单为空,由用户自行选或不选
+  apvLiaison.value = String(rdFlow.liaison || '')
   apvOpinion.value = ''
   apvVisible.value = true
 }
@@ -6417,7 +6431,13 @@ async function confirmRdApprove() {
   try {
     await engine.callButton({
       panelCode: RD_FLOW_PANEL, buttonName: '审批通过',
-      formData: { 编号: apvDocNo.value, 项目等级: apvLevel.value, ...(apvOpinion.value ? { 审批意见: apvOpinion.value } : {}) },
+      formData: {
+        编号: apvDocNo.value,
+        项目等级: apvLevel.value,
+        // 空串不发:后端按"没带对接人"处理(与旧前端/老单兼容),不会误清已分发的人
+        ...(apvLiaison.value ? { 对接人: apvLiaison.value } : {}),
+        ...(apvOpinion.value ? { 审批意见: apvOpinion.value } : {}),
+      },
       buttonParam: {},
     })
     ElMessage.success(tt('审批通过并定级：') + apvLevel.value)

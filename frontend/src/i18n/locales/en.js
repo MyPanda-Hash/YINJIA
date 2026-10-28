@@ -2614,6 +2614,8 @@ export default {
     '二三四级': 'Level 2/3/4',
     '文档编号': 'Document No.',
     '文档编号：': 'Document No.: ',
+    /* ── 2026-10-28:立项申请右上角编号格改叫「项目编号」(只换显示名,数据键仍是文档编号) ── */
+    '项目编号：': 'Project No.: ',
     '填写内容': 'Content',
     '可写字数': 'Char Limit',
     '可写': 'Up to ',
@@ -3209,7 +3211,10 @@ export default {
     '已定级并分发对接人': 'Graded and dispatched to the liaison',
     '定级分发失败': 'Grading/dispatch failed',
     '定级的同时把立项分发给一个对接人账号': 'Grade and dispatch this application to a liaison account in one step',
-    /* ── 2026-10-21:审批已定级后补发对接人(等级只读) ── */
+    /* ── 2026-10-28:审批定级时一并分发对接人 + 可改人 ── */
+    '对接人': 'Liaison',
+    '对接人（选填）': 'Liaison (optional)',
+    '在审批定级的同时选择对接人，一步完成分发；不选则审批后再到「定级分发」补发': 'Pick a liaison while grading to dispatch in the same step; leave empty to dispatch later via "Grade & dispatch".',
     '项目已定级': 'Project level already set',
     '选择对接人即可分发': 'pick a liaison to dispatch',
     '项目等级已由审批定级，不能在此修改；此处只需选择对接人': 'The level was set during approval and cannot be changed here; just pick a liaison.',

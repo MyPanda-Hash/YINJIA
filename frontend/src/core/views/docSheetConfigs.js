@@ -27,6 +27,27 @@ export function fixedSheetWidth(panelCode) {
   return FIXED_SHEET_W[String(panelCode || '')] || 0
 }
 
+/**
+ * 纸张右上角「编号」格的**标识文案**(2026-10-28 用户口径:
+ * 「立项申请的右上角的文件编号名字改为项目编号」)。
+ *
+ * 【只改显示名,不动数据键】落库列仍是 `rd_approval.文档编号`、`yj_field.col_name` 仍是
+ * 「文档编号」、下游实施计划按「文档编号」参照的关联链路一字不改(ADR-0001 红线:
+ * 数据键永远中文、不随口径与语言变化)。所以老单据零迁移、下游零影响。
+ *
+ * 【为什么按面板登记而不是全局改】实施计划(RD_PLAN)的同一格印的确实是"文档编号"
+ * (设计纸面如此),跟着改会把另一张纸改错。没登记的面板回空串 ⇒ 仍走「文档编号：」。
+ *
+ * ⚠ 值必须是**标签原文**(不带冒号);DocSheet 拼冒号后走 `tt()` 取译名
+ *   (en 词条键 = `'项目编号：'`,少这条英文界面下这一格会掉回中文)。
+ */
+const DOCNO_LABEL = { RD_APPROVAL: '项目编号' }
+
+/** 该面板右上角编号格的标识(不带冒号);'' = 保持「文档编号」 */
+export function docnoLabel(panelCode) {
+  return DOCNO_LABEL[String(panelCode || '')] || ''
+}
+
 export const approvalSheetCfg = {
   titlePart1: '立项申请表',
   titlePart2: '二三四级项目',

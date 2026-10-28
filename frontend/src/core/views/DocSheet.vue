@@ -33,7 +33,7 @@
       <!-- 右上角:配置为参照时(项目实施计划→立项申请右上角编号)点击弹参照;否则保持手填(默认 YJ-XS002 模板号) -->
       <div class="as-docno">
         <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-          <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('文档编号：') }}</span>
+          <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt(docnoLabelText) }}</span>
           <el-icon class="as-ref-ico"><Search /></el-icon>
         </div>
         <el-input
@@ -42,7 +42,7 @@
           size="small"
           maxlength="30"
           class="as-docno-input"
-          :placeholder="tt('文档编号：')"
+          :placeholder="tt(docnoLabelText)"
           @input="emit('dirty')"
         />
         <template v-else>{{ head['文档编号'] || head['单据编号'] || config.docno || 'YJ-XS002' }}</template>
@@ -655,7 +655,7 @@ import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { useRouter } from 'vue-router'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
-import { fixedSheetWidth } from './docSheetConfigs'
+import { fixedSheetWidth, docnoLabel } from './docSheetConfigs'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -723,6 +723,17 @@ const sheetStyle = computed(() => {
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
+
+/**
+ * 右上角编号格的**标识文案**(2026-10-28 用户口径「立项申请的右上角的文件编号名字改为项目编号」)。
+ * 只换显示名:数据键仍是「文档编号」(ADR-0001),老单据零迁移、下游参照链路不动。
+ * 判定表在 docSheetConfigs.docnoLabel(可单测);未登记的面板回空串 ⇒ 仍显示「文档编号：」。
+ * 已带冒号,模板里直接 `tt(docnoLabelText)` 取译名。
+ */
+const docnoLabelText = computed(() => {
+  const lb = docnoLabel(props.panelCode)
+  return lb ? lb + '：' : '文档编号：'
+})
 
 /** vcell 连续的 pairs 行合成一段(渲染成左侧一格真正的合并竖列):
  *  原图(扫描实测):申请单位 申/请/单/位 四字紧排成一组,组中心 207 ≈ 整段中心 208,
