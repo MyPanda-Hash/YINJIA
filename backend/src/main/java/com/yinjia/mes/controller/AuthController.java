@@ -98,12 +98,18 @@ public class AuthController {
             if (supplierCode != null) {
                 user.put("supplierCode", supplierCode);
                 user.put("supplierName", supplierCode.isEmpty() ? "" : supplierPortal.supplierName(supplierCode));
-                // 页面级面板的只读词(与 PagePanelRegistry.SUPPLIER_PRINT_ACTIONS 同一批词)
+                // 2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致,只是显示和权限不一样」:
+                // 供应商端**就是采购订单面板本身**(同一个 PanelxList + PU_ORDER 版式),故这里下发的是
+                // 「PU_ORDER 只读」的页面权限,同时保留门户页 SUPPLIER_PRINT 作入口。
+                //   · 菜单树只出「采购管理 → 供应商采购打印」一条(visiblePanels 只含 SUPPLIER_PRINT);
+                //   · 面板级权限词只给 view/query/print(前端工具栏据此只留浏览动作;真闸门是过滤器 + 查询范围)。
                 Map<String, Object> pagePerms = new LinkedHashMap<>();
                 for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
                 pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
                 user.put("pagePerms", pagePerms);
                 user.put("visiblePanels", List.of(PagePanelRegistry.SUPPLIER_PRINT));
+                // 单据面板(PU_ORDER)的只读词:前端 SupplierPrint 页按这份清单一字不改地渲染采购订单面板
+                user.put("supplierPanelPerms", Map.of("PU_ORDER", "view,query,print"));
                 user.put("approvePanels", List.of());
                 user.put("fieldPanels", List.of());
                 user.put("warnPanels", List.of());
@@ -163,6 +169,9 @@ public class AuthController {
         out.put("fieldPanels", user.get("fieldPanels"));
         out.put("warnPanels", user.get("warnPanels"));
         out.put("pagePerms", user.get("pagePerms"));
+        out.put("supplierCode", user.get("supplierCode"));
+        out.put("supplierPanelPerms", user.get("supplierPanelPerms"));
+        out.put("canConfigSupplierAccount", user.get("canConfigSupplierAccount"));
         return ApiResult.ok(out);
     }
 
@@ -234,6 +243,8 @@ public class AuthController {
             pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
             user.put("pagePerms", pagePerms);
             user.put("visiblePanels", List.of(PagePanelRegistry.SUPPLIER_PRINT));
+            // 2026-10-25:供应商端 = 采购订单面板只读(与 {@link #login} 同源下发,否则刷新后权限又变)
+            user.put("supplierPanelPerms", Map.of("PU_ORDER", "view,query,print"));
             user.put("approvePanels", List.of());
             user.put("fieldPanels", List.of());
             user.put("warnPanels", List.of());

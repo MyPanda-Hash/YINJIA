@@ -4346,6 +4346,34 @@ function toggleAnnMode(m) {
   annPending.value = null
   annMode.value = annMode.value === m ? null : m
 }
+
+/**
+ * 供应商门户的「只读场景」(2026-10-25 用户口径:「供应商打印面版的前端要与采购订单一致。
+ * 只是显示和权限不一样」)。
+ *
+ * 页面**就是采购订单面板本身**(PanelxList + PU_ORDER 的版式、左栏、明细、纸张、打印版式一字不改),
+ * 供应商账号进来只改两件事:
+ *   ① **权限**:工具栏只留浏览动作(用 READONLY_PANELS 那一套过滤),编辑态不加载、写入口不给;
+ *   ② **数据**:取数带 `condition['__supplierScope'] = 本供应商编码`,由 QueryService 解析成
+ *      `供应商编码 LIKE 值` 并在服务端**强制**执行(与「查询」弹窗里选供应商同一口径)。
+ * 判据取登录态里的 supplierCode(后端登录时下发,供应商会话必有;内部账号为空 ⇒ 不进只读场景)。
+ * 与后端 SupplierPortalGuardFilter 同源:供应商会话除 /supplier/portal/* 之外的 /api 一律 403,
+ * 故这里即便漏摘某个按钮,服务端也打不开写接口。
+ * ⚠ 声明位置:`user` 与 `reportMode` 都已在其上初始化(放前面会命中 TDZ,见 READONLY_PANELS 注释)。
+ */
+const supplierScope = computed(() => String(user.supplierCode || ''))
+const supplierReadonly = computed(() => !!supplierScope.value && !reportMode.value)
+/**
+ * 供应商会话在该面板上被授予的权限词(2026-10-25):后端登录时下发 `supplierPanelPerms`,
+ * 当前恒为 `PU_ORDER: 'view,query,print'`。**按词判按钮**,而不是在组件里再写一份写死的按钮名清单 ——
+ * 以后要给供应商放开某个动作(例如「导出」),只改后端下发的那串词即可,前端零改动。
+ */
+const supplierWords = computed(() => {
+  const all = user.supplierPanelPerms || {}
+  const csv = all[panelCode.value]
+  if (!csv) return null
+  return new Set(String(csv).split(',').map((s) => s.trim()).filter(Boolean))
+})
 provideAnnotations({
   anns: annMap,
   mode: annMode,
@@ -4399,9 +4427,18 @@ const ADMIN_ONLY_PANELS = ['FIELDMGR', 'ZDGL']
  * 也是删除联动的触发点 ⇒ 只读面板上也保留(2026-10-19 用户口径「项目进度查询改为仅查询面板」)。
  */
 const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录', '同步进度']
+/**
+ * 供应商场景对查询条件注入的强制过滤键(2026-10-25)。
+ * 以双下划线开头 = 与 _whCode/_itemCode 同族的「控制键」:不占用业务字段名,
+ * 由后端 QueryService 认领并解析成 `供应商编码 LIKE 值`(供应商编码本系统按名称存,
+ * 与采购订单「查询」弹窗选供应商完全同一口径)。不是字段标签 ⇒ 会被通用循环跳过,只被专门处理。
+ */
+const SUPPLIER_SCOPE_KEY = '__supplierScope'
 
 const draftEditable = computed(() => {
   if (reportMode.value) return false
+  // 供应商门户(2026-10-25):供应商账号看采购订单时**一律只读**,先于其它判定(连草稿也不给编辑)
+  if (supplierReadonly.value) return false
   // ERP集成只读(2026-10-18 用户口径「不可以进行任何人为操作,不可以新增保存删除」):
   // 放在最前 —— 这两个面板的数据由金蝶接口同步写入,界面不给任何内联编辑/加行/粘贴的值入口。
   // 服务端同口径闸门 = PanelPermissionService.requireReadonlyAllowed(连管理员也不给写)。
@@ -8588,6 +8625,26 @@ async function loadCrg() {
       .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a)) }))
       .filter((g) => (g.actions || []).length > 0)
   }
+  // 供应商门户(2026-10-25 用户口径「前端要与采购订单一致,只是显示和权限不一样」):
+  // 同一份采购订单面板,供应商账号进来只留**浏览动作**——
+  // 新增/保存/删除/审核/生单/转ERP/导入 等写动作全部摘掉。
+  //
+  // ⚠ 两个坑(2026-10-25 实测踩过,改这里前必读):
+  //   ① 工具栏**按组名渲染**(「打印 ▼」「更多 ▼」),组内动作是下拉项(打印采购订单/预览/导出/打印材料码)。
+  //      只按动作名过滤会把「打印 / 更多」两组整个删掉 —— 供应商端就少了一整块,
+  //      用户看到的"不一致"正是这个。故**组名本身也要过白名单**。
+  //   ② 「查询/查找/刷新」由前端拆成独立按钮渲染,不在组里;「查询」组在采购订单上没有动作项。
+  if (supplierReadonly.value) {
+    groups.value = groups.value
+      .map((g) => {
+        // 组名在白名单里(打印/更多/刷新/查询…)⇒ 整组保留,组内再按动作过一遍白名单
+        const groupOk = READONLY_ACTIONS.includes(g.title || '')
+        const actions = (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a))
+        if (!groupOk && actions.length === 0) return null
+        return { ...g, actions }
+      })
+      .filter(Boolean)
+  }
   return cfg
 }
 
@@ -9878,6 +9935,12 @@ async function load(clamping = false) {
   try {
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    // 供应商门户(2026-10-25):供应商账号看采购订单时,取数**强制**带本供应商编码。
+    // 服务端 QueryService 把它解析成 `供应商编码 LIKE 值` 并 AND 进 WHERE(与「查询」弹窗里
+    // 选供应商同一口径),页面版式/交互与采购订单面板完全一致,只有数据范围不同。
+    // ⚠ 键名以双下划线开头:与 _whCode/_itemCode 同族的「控制键」,不占用业务字段名,
+    //   也不会被写进 condition(切面板/reset 都不影响它 —— 它在请求时现取登录态)。
+    if (supplierScope.value) params.condition[SUPPLIER_SCOPE_KEY] = supplierScope.value
     // 库存明细左栏「分仓库」的过滤条件**在请求时派生**,不写进共用的 condition ——
     //   condition 由各面板共享、切面板时会被 reset 清空(顺序一变就互相影响);
     //   2026-10-15 用户报「库存明细的查询会影响到库存状况表」就是这类跨面板串味。

@@ -77,7 +77,7 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);   // 内部账号:照旧
             return;
         }
-        if (allowed(path)) {
+        if (allowed(path, request)) {
             chain.doFilter(request, response);
             return;
         }
@@ -86,9 +86,18 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
                 : "供应商账号仅可使用「供应商采购打印」,无其它权限");
     }
 
-    /** 供应商会话唯一放行清单(全是只读/自身接口,永不含业务面板接口) */
-    private static boolean allowed(String path) {
+    /** 供应商会话唯一放行清单(全是只读/自身接口,永不含写接口) */
+    private static boolean allowed(String path, jakarta.servlet.http.HttpServletRequest request) {
         if (path.startsWith("/api/supplier/portal/")) return true;
+        // 2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。只是显示和权限不一样」:
+        // 供应商端直接渲染**采购订单面板**(PanelxList),它靠这一条接口取列表。
+        // 放行的代价由 QueryService.enforceSupplierScope 兜住 —— 服务端用登录态认定的供应商编码
+        // **覆盖**前端条件,且只认 PU_ORDER;前端传什么、传不传都不影响结果。其余面板接口仍一律 403。
+        if (path.equals(com.yinjia.mes.service.QueryService.PANEL_LIST_PATH)) return true;
+        // 同上:面板元数据配置(工具栏按钮组/明细页签/字段)。只读元数据,不含业务数据 ——
+        // 不放行则供应商端缺「打印」组,与采购订单长得不一样;放行后业务数据仍受范围过滤约束。
+        if (path.equals(com.yinjia.mes.service.QueryService.PANEL_CONFIG_PATH)
+                && "PU_ORDER".equals(request.getParameter("panelCode"))) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")
