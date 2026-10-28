@@ -157,11 +157,10 @@ const RD_ASM_PROC_DT_BOM = {
   noVariant: true,
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-    { key: '物料编号', label: '物料编号', w: 130 },
-    { key: '物料名', label: '物料名称', w: 140 },
-    { key: '物料规格', label: '物料规格', w: 300, area: true },
-    { key: '外观要求', label: '外观要求', w: 340 },
-    { key: '用量', label: '用量', w: 130 },
+    { key: '物料编号', label: '物料编号', w: 150 },
+    { key: '物料名', label: '物料名称', w: 220 },
+    { key: '物料规格', label: '物料规格', w: 500, area: true },
+    { key: '用量', label: '用量', w: 170 },
   ],
 }
 
