@@ -399,6 +399,8 @@ export default {
     '点「填入单据」后按下面这张表覆盖对应格(明细整表替换为上面那份物料行);未变化的格不列出。': 'Click Fill Document to overwrite the corresponding cells by the table below (the detail table is replaced wholesale by the material rows above); unchanged cells are not listed.',
     '物料': 'Material',
     '编号：': 'Number:',
+    /* ── 2026-10-28:规格书封面右上角改显示自动单据编号 ── */
+    '单据编号：': 'Document No.:',
     /* ── 2026-10-28:编号格的输入提示词(原先复述前缀「编号：」，看起来像已有固定编号) ── */
     '请输入编号': 'Enter number',
     '选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。': 'Select a variant: a complete set of operations of this variant will replace the current content of this table (not append). You can "disable" the entire article here; to change the operation content, go to Standard Library Maintenance 」.',

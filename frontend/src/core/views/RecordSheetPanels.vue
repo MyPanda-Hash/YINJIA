@@ -48,7 +48,7 @@
                 <!-- 标识文案跟键走(2026-10-19 用户口径「产品规格书右上角的编号名称改为产品编号」):
                      规格书这个格绑的是 coverDocNoKey='产品编号',却一直印「编号：」—— 用户看到的
                      就是「编号： 00011」,读不出这是产品编号。绑编号/文档编号的面板仍显示「编号：」。 -->
-                <span class="rsp-cover-docno-lb">{{ tt(coverDocNoKey === '产品编号' ? '产品编号：' : '编号：') }}</span>
+                <span class="rsp-cover-docno-lb">{{ tt(coverDocNoLabel) }}</span>
                 <!-- 引用产品信息表(2026-10-21 用户口径):
                      「产品规格书的产品编号做成引用产品信息表的产品编号的弹窗,可用带入对应的产品信息表
                       的填写的数据,引用过的就显示已开发,一个产品信息表对应一个产品规格书,不能多次引用,
@@ -57,17 +57,10 @@
                      其它封面面板(没有 prodPick)保持原输入框,行为一字不变。
                      为什么这里不再给 el-input:用户要的是"引用",手工敲产品编号会绕过
                      「一个产品信息表只能对应一张规格书」这条规则(敲了也不校验)。 -->
-                <div v-if="editable && prodPickCfg" class="rsp-cover-docno-pick"
-                     :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :title="tt('点击选择')"
-                     @click.stop="openProdPick">
-                  <span class="rsp-cover-docno-val">{{ head[coverDocNoKey] || tt('点击选择') }}</span>
-                  <!-- 产品开发状态角标(与纸面其它参照格同一套口径:未开发/已开发) -->
-                  <span v-if="devStatus && devKey === coverDocNoKey" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
-                  <el-icon class="rs-ref-ico"><Search /></el-icon>
-                </div>
-                <el-input v-else-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
-                          :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :maxlength="60" @input="emit('dirty')" />
-                <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
+                <!-- 2026-10-28 用户口径②「原来的产品编号的位置改为自动生成的单据编号，现在的单据编号
+                     不是看不到吗？」⇒ 该格改绑「单据编号」(引擎自动号 SD-…),不再放 prodPick 引用控件;
+                     产品编号本身已移进下方封面字段表第一行(引用能力跟着搬过去,仍可弹产品信息表)。 -->
+                <span class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '—' }}</span>
               </div>
               <div class="rsp-cover-title"
                    :style="{ top: (COVER_TITLE_TOP * coverVy) + 'px', height: (COVER_TITLE_H * coverVy) + 'px' }">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
@@ -85,7 +78,20 @@
                       <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
                         <td class="rsp-cover-lb" :class="{ 'rs-focus': isFocus(fd.key) }">{{ tt(fd.label) }}</td>
                         <td class="rsp-cover-vl">
-                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                          <!-- 产品编号行(2026-10-28 用户口径①):值格 = **引用产品信息表**的控件,
+                               与原来右上角那个 prodPick 是同一套(点击弹窗、带回数据、已引用的不可再选)。
+                               为什么保留引用而不是给文本框:用户明确「引用还是可以引用的」,而且手敲编号
+                               会绕过「一个产品信息表只能对应一张规格书」这条硬规则(敲了也不校验)。 -->
+                          <div v-if="editable && prodPickCfg && fd.key === prodPickCfg.targetKey"
+                               class="rsp-cover-docno-pick rsp-cover-vl-pick"
+                               :class="{ 'rs-focus': isFocus(fd.key) }" :title="tt('点击选择')"
+                               @click.stop="openProdPick">
+                            <span class="rsp-cover-docno-val">{{ head[fd.key] || tt('点击选择') }}</span>
+                            <!-- 产品开发状态角标(与纸面其它参照格同一套口径:未开发/已开发) -->
+                            <span v-if="devStatus && devKey === fd.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
+                            <el-icon class="rs-ref-ico"><Search /></el-icon>
+                          </div>
+                          <el-input v-else-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
                           <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
                         </td>
                       </tr>
@@ -1840,12 +1846,13 @@ const COVER_TITLE_TOP = COVER_COMPANY_TOP + COVER_COMPANY_H
 const COVER_GRID_TOP = 106
 /** 标题带高 = 字段表顶 − 标题带起点(由分区反推,不凭感觉填) */
 const COVER_TITLE_H = COVER_GRID_TOP - COVER_TITLE_TOP
-/** 封面字段表**行数**(签字栏间距按它算)。2026-09-30 由 9 改 **8**:
- *  原第一行「编  号」(设计 B7)已移到封面右上角的编号格(设计原文本就是「公司左上 + 编号右上」),
- *  字段表剩 B8..B15 = 产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本。
+/** 封面字段表**行数**(签字栏间距按它算)。
+ *  2026-09-30 由 9 改 8:原第一行「编  号」曾移到封面右上角编号格。
+ *  🔴 **2026-10-28 由 8 改回 9**:产品编号按用户口径①移进字段表(与产品类别同款大表格),
+ *     右上角那格改显示**自动单据编号** —— 两者各占一格,不再是同一件事。
  *  ⚠ 改这个数就够,不用动 COVER_GRID_TOP/COVER_SIGN_TOP —— 字段表仍从设计 B7 的 y 起排,
- *    少的那一行空间由签字栏 margin-top 自动吸收(见模板里那句 marginTop 注释)。 */
-const COVER_ROWS = 8
+ *    行数变化由签字栏 margin-top 自动吸收(见模板里那句 marginTop 注释)。 */
+const COVER_ROWS = 9
 /** 字段表行高(设计 B7..B15 等距 46px) */
 const COVER_ROW_H = 46
 /** 签字栏顶(设计 B17);三栏列宽按设计 B17..D17 比例 92.7:97.3:97.3 */
@@ -1862,6 +1869,18 @@ const coverVy = computed(() => coverPageH.value / COVER_H)
  *  ⚠ 必须是**字段名**(如「产品编号」),不能是引擎的**单据标识键**「编号」——
  *    后者会被 QueryService.loadDocs 的单据号覆盖(见 recordSheetConfigs.js 的封面注释)。 */
 const coverDocNoKey = computed(() => String(cfg.value?.coverDocNoKey || ''))
+/**
+ * 封面右上角编号格的**标识文案**(带冒号,直接喂 tt())。
+ * 2026-10-28 用户口径②:该格从「产品编号」改绑「单据编号」⇒ 文案跟着换,
+ * 否则会印着「产品编号：SD-2026-10-0001」这种张冠李戴的字。
+ * 未声明的封面面板不渲染该格,回落到「编号：」只为兜底。
+ */
+const coverDocNoLabel = computed(() => {
+  const k = coverDocNoKey.value
+  if (k === '单据编号') return '单据编号：'
+  if (k === '产品编号') return '产品编号：'
+  return '编号：'
+})
 /** 字段行顶部(设计 px):等宽等高,由行号推出(不再手写坐标表 —— 加行不用改这里) */
 function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
@@ -4510,6 +4529,15 @@ function chartOf(dt) {
   border-color: var(--el-color-primary, #409eff);
   background: #f0f6ff;
 }
+/* 产品编号搬进封面字段表后(2026-10-28),引用控件改用**整格宽**、去掉右上角那套固定尺寸:
+   右上角是窄带里的独立控件(定 min-width 防抖),值格里则应铺满单元格,与其它行的输入框观感一致。 */
+.rsp-cover-vl-pick {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: calc(27.3px * var(--cok));
+}
 /* 引用产品信息表弹窗(2026-10-21):提示行/表体/底注三段的排布,与文件里其它弹窗同款 */
 .pp-toolbar {
   display: flex;
@@ -4593,6 +4621,12 @@ function chartOf(dt) {
        这是表格里「一列自适应、一列吃剩余」的经典写法,不依赖容器绝对宽度。 */
   table-layout: auto;
   width: 100%;
+  /* 2026-10-28 用户口径③「把产品规格书的表格做宽一点点，现在看起来有一点窄了」:
+     此前整表宽度**只由内容撑开**(inline-block 父层),而封面容器实测比设计画布窄得多
+     ⇒ 内容一短表就跟着缩,看着窄。给一个下限(设计值,随 --cok 缩放)把表撑到设计比例;
+     ⚠ 不用 width 写死,仍是 min-width —— 内容更宽时照旧自适应,不会反过来压窄标签。
+     ⚠ 保持 table-layout:auto(见上方注释:fixed + 百分比会把标签压到值格上)。 */
+  min-width: calc(620px * var(--cok));
 }
 /* 行高 = 设计 B7..B15 的 46 设计px(9 行等高)。table 上设 height 对行不生效,必须设在 tr 上。
    ⚠ 这里 height 在 CSS 表格里是**下限**(内容更高时行会长高)—— 换行后行变高是预期行为,
