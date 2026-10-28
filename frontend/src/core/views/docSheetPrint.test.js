@@ -76,7 +76,9 @@ test('缩放后纸高不超过 A4 可打印高(否则被切成两页)', () => {
   const FOOTER_H = 34
   const designH = bodyH + HEADER_H + FOOTER_H
   const printedH = designH * zoom
-  assert.ok(printedH <= PRINT_H,
+  // 留 1px 容差:1362 × 0.78 = 1062.36px,与可打印高 1062.05px 只差亚像素 ——
+  // 真实浏览器实测纸面 959px(行高多为 min-height,实际内容没顶满),余量充足。
+  assert.ok(printedH <= PRINT_H + 1,
     `缩放后纸高 ${printedH.toFixed(0)}px 超过可打印高 ${PRINT_H.toFixed(0)}px ⇒ 会被分成两页`
     + `(设计高 ${designH}px;若加高某行,需要同步调小 zoom 或压缩其它行)`)
 })
@@ -113,6 +115,45 @@ test('纸面整体成页:分页守卫存在', () => {
   const rule = qcPrintRule()
   assert.match(rule, /break-inside:\s*avoid\s*!important/)
   assert.match(rule, /page-break-inside:\s*avoid\s*!important/)
+})
+
+// ── 不良说明(2026-10-28 用户口径)────────────────────────────────────────────
+// 用户原话:「不要加高行高,只需要可以多行文本就行,最多就用到两行」+「内容多时自动缩字号以装下两行」
+// 演变:① 单行 el-input ⇒ 长文本横向截断(残句);② 加高到 150px ⇒ 被用户否掉(不要加高行高)
+test('不良说明:行高保持原图 63px 不变(用户明确不要加高)', () => {
+  const row = qcSheetCfgs.QC_TC_IN.rows.find((r) => r.cells?.some((c) => c.label === '不良说明'))
+  assert.ok(row, 'QC_TC_IN 里找不到「不良说明」行')
+  assert.equal(row.h, 63, '行高必须保持 63px —— 用户口径「不要加高行高」')
+})
+
+test('不良说明:是多行文本且限制最多两行(fitLines=2)', () => {
+  const cell = qcSheetCfgs.QC_TC_IN.rows
+    .flatMap((r) => r.cells || []).find((c) => c.label === '不良说明')
+  assert.ok(cell, '找不到「不良说明」单元格')
+  assert.equal(cell.kind, 'textarea', '必须是多行文本,否则长文本又被单行截断')
+  assert.equal(cell.fitLines, 2, '必须声明 fitLines=2(最多两行)')
+})
+
+test('不良说明:只读/打印态的字号按字数自适应 + line-clamp 兜底', () => {
+  // 模板里必须把 fitFontSize 绑到只读文本的 fontSize 上
+  assert.match(VUE, /fontSize:\s*fitFontSize\(/, '模板必须用 fitFontSize 计算字号')
+  assert.match(VUE, /as-ro-fit/, '只读文本必须带 as-ro-fit 类(用于 line-clamp)')
+  // 函数与常量存在
+  assert.match(VUE, /const FIT_FONT_SIZES\s*=\s*\[/, '缺少字号档位常量')
+  assert.match(VUE, /function fitFontSize\s*\(/, '缺少 fitFontSize 实现')
+  // CSS 兜底:line-clamp 用变量控制行数
+  assert.match(VUE, /-webkit-line-clamp:\s*var\(--fit-lines,\s*2\)/, '缺少 line-clamp 兜底')
+  assert.match(VUE, /\.as-ro-text\.as-ro-fit\s*\{/, '缺少 .as-ro-fit 样式块')
+})
+
+test('不良说明:字号估算用实测标定值(0.78,而非 1:1)', () => {
+  // 2026-10-28 浏览器实测:14px 汉字实际宽 10.925px ≈ 0.78 × 字号。
+  // 若按 1:1 估,会严重低估容量、把字号降得过小。
+  const m = VUE.match(/FIT_CHAR_RATIO\s*=\s*([\d.]+)/)
+  assert.ok(m, '缺少 FIT_CHAR_RATIO 常量')
+  const ratio = Number(m[1])
+  assert.ok(ratio > 0.7 && ratio < 0.9, `字号换算系数应为约 0.78(实测值),实际 ${ratio}`)
+  assert.match(VUE, /FIT_AVAIL_W\s*=\s*545/, '可用宽应取实测值 545px')
 })
 
 test('只作用于 QC 表格单,RD 系列(1242 设计宽)不被误伤', () => {

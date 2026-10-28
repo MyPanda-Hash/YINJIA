@@ -214,7 +214,13 @@
                   :rows="c.rows || 3" :maxlength="c.max || 2000"
                   class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
                 />
-                <AnnotatedText v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <!-- 只读/打印态:声明 fitLines 的格子按字数自动缩字号(最多 N 行,行高不变),
+                     并加 line-clamp 兜底 —— 见 fitFontSize 注释 -->
+                <AnnotatedText
+                  v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')"
+                  :class="{ 'as-ro-fit': c.fitLines }"
+                  :style="c.fitLines ? { fontSize: fitFontSize(c.key, c.fitLines) + 'px', '--fit-lines': c.fitLines } : null"
+                />
                 <div v-if="c.sign" class="q-signline end">
                   <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                   <span class="q-sign-val">
@@ -752,6 +758,42 @@ const setDatePart = (key, p, v) => {
   emit('dirty')
 }
 
+/**
+ * 「最多 N 行」自适应字号(2026-10-28 用户口径)。
+ *
+ * 适用:单元格声明了 `fitLines`(目前只有特采单「不良说明」= 2)。
+ *
+ * 为什么要自动缩字号:用户明确要求「**不要加高行高**,只需要可以多行文本,最多就用到两行」。
+ * 行高 63px 固定 ⇒ 本格只能放两行;而不良说明常见 50~100 字。
+ * 既要行高不变、又要内容不被吃掉,只能按字数缩字号。
+ *
+ * 【换算基准】用真实浏览器实测标定(2026-10-28,print 媒体,545px 可用宽):
+ *   汉字实际渲染宽度 ≈ **0.78 × 字号**(14px 字宽实测 10.925px),不是 1:1 ——
+ *   按 1:1 估会严重低估容量、字号掉得过早。
+ *   各档两行容量(汉字):14px→98 / 13→106 / 12→116 / 11→126 / 10→138 / 9→154 / 8→174
+ * 半角字符按 0.55 个汉字宽折算。
+ *
+ * 兜底:CSS 再挂 `-webkit-line-clamp`(见 .as-ro-fit),保证**永远不超过 N 行**。
+ *
+ * @param {string|number} key  数据键(字段 label)
+ * @param {number} fitLines    允许的最大行数
+ * @returns {number} 字号(px)
+ */
+const FIT_FONT_SIZES = [14, 13, 12, 11, 10, 9, 8]
+const FIT_AVAIL_W = 545         // 打印态该格可用宽实测值
+const FIT_CHAR_RATIO = 0.78     // 汉字宽 ÷ 字号(实测标定)
+function fitFontSize(key, fitLines) {
+  const text = String(props.head?.[key] ?? '')
+  const maxLines = Number(fitLines) || 0
+  if (!text || maxLines <= 0) return FIT_FONT_SIZES[0]
+  const units = [...text].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0)
+  for (const fs of FIT_FONT_SIZES) {
+    const perLine = Math.floor(FIT_AVAIL_W / (fs * FIT_CHAR_RATIO))
+    if (Math.ceil(units / perLine) <= maxLines) return fs
+  }
+  return FIT_FONT_SIZES[FIT_FONT_SIZES.length - 1]
+}
+
 /** 阶段计划开始:归一空值(清空时 el-date-picker 给 null),别把 null 存进库 */
 function onPhaseStart(phaseKey, v) {
   props.head[phaseKey + '_计划开始'] = v || ''
@@ -1210,6 +1252,16 @@ defineExpose({ focusField })
   white-space: pre-wrap;
   word-break: break-all;
   padding: 2px 4px;
+}
+/* 「最多 N 行」兜底(2026-10-28):字号由 fitFontSize 按字数自动选,这里再用 line-clamp
+   把超出 N 行的部分收掉,保证**永远是 N 行以内、绝不撑破格子**(行高不变)。
+   只作用于声明了 fitLines 的格子(.as-ro-fit),其余只读文本不受影响。 */
+.as-ro-text.as-ro-fit {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--fit-lines, 2);
+  line-clamp: var(--fit-lines, 2);
+  overflow: hidden;
 }
 /* 内容区左右分栏:左=表格(序号/项目名/填写区),右=可填备注列(设计 立项申请表 F5/F6:G15)
    备注列原先是 .as-deco 装饰虚线(只画不填),2026-09-22 改为真字段 */
@@ -1854,11 +1906,10 @@ defineExpose({ focusField })
     flex: none !important;
     /* 缩放比 = min(可打印宽 / 938, 可打印高 / 设计纸高)
      *   · 宽:733.2 / 938 = 78.2%
-     *   · 高:2026-10-28「不良说明」改成多行文本后行高 63→150px,设计纸高增到 1449px
-     *         ⇒ 1062 / 1449 = 73.3%
-     *   取 0.72 同时满足两者并留一点余量(宽度 938×0.72=675 < 733,高度 1449×0.72=1043 < 1062)。
+     *   · 高:设计纸高 1362px ⇒ 1062 / 1362 = 78.0%
+     *   取 0.78 两者同时满足(宽 732 ≤ 733、高 1062 ≤ 1062,余量较紧故取 0.78 不多也不少)。
      * ⚠ 改任何行高都要重算本值 —— docSheetPrint.test.js 的「纸高不超可打印高」会挡住漏算。 */
-    zoom: 0.72 !important;
+    zoom: 0.78 !important;
     /* 分页兜底:纸面本身是不可分割的整块,任何情况下优先整体成页,不做拦腰截断 */
     break-inside: avoid !important;
     page-break-inside: avoid !important;
