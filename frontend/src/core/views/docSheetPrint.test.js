@@ -29,9 +29,10 @@ const VUE = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
 const mm2px = (mm) => (mm / 25.4) * 96
 const A4_W = mm2px(210)
 const A4_H = mm2px(297)
-const PAGE_MARGIN = 8                      // @page { margin: 8mm }
-const PRINT_W = A4_W - PAGE_MARGIN * 2     // ≈ 733.2px
-const PRINT_H = A4_H - PAGE_MARGIN * 2     // ≈ 1062.0px
+const PAGE_MARGIN_MM = 8                    // @page { margin: 8mm }
+const PAGE_MARGIN = mm2px(PAGE_MARGIN_MM)   // ⚠ 必须先换算成 px 再参与相减
+const PRINT_W = A4_W - PAGE_MARGIN * 2      // ≈ 733.2px
+const PRINT_H = A4_H - PAGE_MARGIN * 2      // ≈ 1062.0px
 
 /** QC 版式的设计纸宽(与 docSheetConfigs 注释「表体 447px → 纸面 938px,比例 2.098」一致) */
 const QC_DESIGN_W = 938
@@ -76,7 +77,8 @@ test('缩放后纸高不超过 A4 可打印高(否则被切成两页)', () => {
   const designH = bodyH + HEADER_H + FOOTER_H
   const printedH = designH * zoom
   assert.ok(printedH <= PRINT_H,
-    `缩放后纸高 ${printedH.toFixed(0)}px 超过可打印高 ${PRINT_H.toFixed(0)}px ⇒ 会被分成两页`)
+    `缩放后纸高 ${printedH.toFixed(0)}px 超过可打印高 ${PRINT_H.toFixed(0)}px ⇒ 会被分成两页`
+    + `(设计高 ${designH}px;若加高某行,需要同步调小 zoom 或压缩其它行)`)
 })
 
 test('打印态值区文字:换行显示,既不省略也不溢出', () => {

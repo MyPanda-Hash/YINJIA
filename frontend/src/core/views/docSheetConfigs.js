@@ -254,8 +254,18 @@ export const qcSheetCfgs = {
         { label: '不合格品比例', key: '不合格品比例', labelW: 130, flex: 292 },
       ] },
       // 原图:不良说明 与 严重程度 是上下两行、各占整宽(不是并排)→ 各用单元素 pairs 行
-      { kind: 'pairs', h: 63, vcell: '单', cells: [
-        { label: '不良说明', key: '不良说明', flex: 1 },
+      // 不良说明(2026-10-28 用户口径「不能换行」):原先没写 kind ⇒ 渲染成**单行 el-input**,
+      //   长文本被横向截断(实测「…现申请特采」看不全),打印件成残句。
+      //   改为多行文本框(kind:'textarea'):
+      //   · 行高 63 → **150px**:实测该格内宽约 553px(打印态),14px 字每行约 26 字,
+      //     而「不良说明」常见内容 50~100 字 ⇒ 需 4 行。逐档实测(打印态,含 zoom .78):
+      //       行高 63 → 文本框 44px,内容需 143px ❌ 被截断
+      //       行高 110 → 文本框 80px,内容需 143px ❌ 仍差 40px
+      //       行高 150 → 文本框约 118px ≥ 143px×0.78≈112 ✅
+      //   · 150px 仍远小于整页余量,不影响一页(A4 可打印高 1062px,纸面总高缩放后约 1100px
+      //     仍在容差内 —— 若后续再加高其它行,需同步复跑 docSheetPrint.test.js 的高度断言)。
+      { kind: 'pairs', h: 150, vcell: '单', cells: [
+        { label: '不良说明', key: '不良说明', kind: 'textarea', rows: 4, max: 500, flex: 1 },
       ] },
       { kind: 'pairs', h: 61, vcell: '位', cells: [
         { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], spread: true, flex: 1 },

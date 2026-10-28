@@ -1852,8 +1852,13 @@ defineExpose({ focusField })
     width: 938px !important;
     max-width: none !important;
     flex: none !important;
-    /* 733.2 / 938 = 78.16%,取 78% 留一点余量,确保不越过可打印高 */
-    zoom: 0.78 !important;
+    /* 缩放比 = min(可打印宽 / 938, 可打印高 / 设计纸高)
+     *   · 宽:733.2 / 938 = 78.2%
+     *   · 高:2026-10-28「不良说明」改成多行文本后行高 63→150px,设计纸高增到 1449px
+     *         ⇒ 1062 / 1449 = 73.3%
+     *   取 0.72 同时满足两者并留一点余量(宽度 938×0.72=675 < 733,高度 1449×0.72=1043 < 1062)。
+     * ⚠ 改任何行高都要重算本值 —— docSheetPrint.test.js 的「纸高不超可打印高」会挡住漏算。 */
+    zoom: 0.72 !important;
     /* 分页兜底:纸面本身是不可分割的整块,任何情况下优先整体成页,不做拦腰截断 */
     break-inside: avoid !important;
     page-break-inside: avoid !important;
