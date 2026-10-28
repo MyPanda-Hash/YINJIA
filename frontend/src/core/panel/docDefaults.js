@@ -28,6 +28,11 @@ const LOCKED_PERSON = {
   QC_INSP_REC: '检验人',
   // 2026-09-18:出货检验计划表「编写人」= 编写人固定登录账号人员(设计原文),元数据 editable=0
   RD_INSP_PLAN: '编写人',
+  // 2026-10-28 用户口径「产品信息表的编辑自动填入当前的对应账号姓名」:
+  //   「编辑人」= 最后编辑这张单的人。新增时先带当前用户(纸面立即有名字),
+  //   任何一次保存(含存草稿)由后端 ButtonService 再按当前登录人回写真名 —— 前端值只是显示层,
+  //   落库以服务端为准(yj_field 已改 editable=0,用户不再手输)。
+  RD_PROD_INFO: '编辑人',
 }
 
 /** 非锁定默认值:'@today' 占位表示当天日期(可内嵌,如「V@today」⇒ V2026-09-20);函数形式按 (form, ctx) 现算 */
@@ -111,7 +116,17 @@ const DOC_DEFAULTS = {
   //     实测 RD_MOLD_PROC.使用范围 候选 = 工艺科/成型车间、工程技术中心、银嘉内部、公司内 ⇒ 有。
   RD_MOLD_PROC: [['表单管理人', '刘磊'], ['密级', '保密'], ['使用范围', '银嘉内部'], ['版本号', 'V@today']],
   RD_MOLD_FORMULA: [['表单管理人', '刘磊'], ['密级', '保密'], ['使用范围', '银嘉内部'], ['版本号', 'V@today']],
-  RD_ASM_PROC: [['表单管理人', '刘磊'], ['密级', '保密'], ['使用范围', '银嘉内部'], ['版本号', 'V@today']],
+  // 2026-10-28 用户口径:「组装工艺的表单管理人修改为编辑人的账号姓名,选择产品编号之后就自动带入,
+  //   或者进行其他编辑也自动带入」—— 本面板的表单管理人不再写死刘磊,而是**当前登录人姓名**
+  //   (函数形式:applyDocDefaults 把 userName 放 ctx;新建时先带,后续任意编辑由
+  //    PanelxList 的 EDITOR_STAMP_FIELDS 监视器刷新,保存时 ButtonService 再按当前人回写)。
+  //   ⚠ 同批的成型工艺清单/成型配方**不动**(仍为刘磊,用户本次只点了组装工艺)。
+  RD_ASM_PROC: [
+    ['表单管理人', (form, ctx) => ctx.userName || ''],
+    ['密级', '保密'],
+    ['使用范围', '银嘉内部'],
+    ['版本号', 'V@today'],
+  ],
 }
 
 /** 该面板由当前用户锁定的字段标签;没有则 null */
@@ -172,7 +187,11 @@ export function applyDocDefaults(panelCode, form, user, opts = {}) {
 
   for (const [key, value] of DOC_DEFAULTS[code] || []) {
     if (!isEmpty(form[key])) continue
-    form[key] = typeof value === 'function' ? value(form, { today }) : expandToday(value, today)
+    // 函数形式默认值:ctx = { today, userName } —— userName 供「表单管理人=编辑人」这类
+    // 「按当前登录人现算」的默认值用(2026-10-28)。
+    form[key] = typeof value === 'function'
+      ? value(form, { today, userName: displayNameOf(user) })
+      : expandToday(value, today)
   }
   return form
 }

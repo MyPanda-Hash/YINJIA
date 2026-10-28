@@ -501,6 +501,10 @@ public class ButtonService {
                 if (!preCol.isBlank() && !cols.containsKey(preCol) && tableCols(table).contains(preCol)) {
                     cols.put(preCol, realNameOf(user));
                 }
+                // 编辑人/表单管理人(2026-10-28 用户口径):空白草稿分支也要按当前登录人写入 ——
+                // 该分支在下方直接 return,走不到保存末尾那段 UPDATE(实测漏写:AP-2026-10-01 草稿
+                // 的「表单管理人」落库为 NULL)。这里与末尾那段同口径(值=realNameOf(user))。
+                putEditorCols(def, table, cols, user);
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
@@ -695,10 +699,29 @@ public class ButtonService {
         // ⚠ 原先这一格是普通文本,用户手输,库里实测 3 张单全为 NULL、1 张填了 "111"。
         //   改成每次保存/提交时按当前登录账号回写真名 —— 它是"谁最后编辑了这张单"的事实,
         //   不该由填单人自己写(写了也不可信)。保存在落库之后执行,所以同一次提交即可生效。
-        if (markSaved && "RD_PROD_INFO".equals(def.code())) {
+        if ("RD_PROD_INFO".equals(def.code())) {
             jdbc.update("UPDATE rd_prod_info_head SET 编辑人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     realNameOf(user), no);
         }
+        if ("RD_ASM_PROC".equals(def.code())) {
+            jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(user), no);
+        }
+        return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /**
+     * 「编辑人 / 表单管理人」自动带入的列值(2026-10-28 用户口径)。
+     *
+     * <p>两个写入点各管一条路径:本方法 = 空白草稿分支(directAdd 建单即 return);
+     * saveDoc 末尾的 UPDATE = 正常保存/修改。缺一不可(2026-10-28 实测:只加末尾那段,
+     * 空白草稿分支提前 return,新建的 AP 单「表单管理人」落库为 NULL)。
+     */
+    private void putEditorCols(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
+        String name = realNameOf(user);
+        if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
+        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
+    }
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 

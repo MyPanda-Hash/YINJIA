@@ -237,8 +237,8 @@ test('项目进度查询:密级默认「绝密」+ 适用范围默认「工程�
  *   本测试随口径更新,并**额外钉住** 密级/使用范围 两条(此前只断言了管理人+版本号,
  *   所以 2026-10-15 加的 密级/使用范围 一直没被测到 —— 口径再变就没人守)。
  */
-test('成型工艺清单/成型配方/组装工艺清单:表单管理人=刘磊、密级=保密、使用范围=银嘉内部、版本号=V+当天', () => {
-  for (const code of ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_PROC']) {
+test('成型工艺清单/成型配方:表单管理人=刘磊、密级=保密、使用范围=银嘉内部、版本号=V+当天', () => {
+  for (const code of ['RD_MOLD_PROC', 'RD_MOLD_FORMULA']) {
     const form = {}
     applyDocDefaults(code, form, USER, { isNew: true, today: T })
     assert.equal(form['表单管理人'], '刘磊', `${code} 的表单管理人应默认刘磊`)
@@ -246,6 +246,37 @@ test('成型工艺清单/成型配方/组装工艺清单:表单管理人=刘磊�
     assert.equal(form['使用范围'], '银嘉内部', `${code} 的使用范围应默认银嘉内部`)
     assert.equal(form['版本号'], 'V2026-09-11', `${code} 的版本号应展开成 V+当天(@today 占位)`)
   }
+})
+
+/**
+ * 2026-10-28 用户口径变更:「组装工艺的表单管理人修改为编辑人的账号姓名」。
+ * ⇒ RD_ASM_PROC 的表单管理人不再写死刘磊,而是当前登录人姓名;其余三门(密级/使用范围/版本号)不动。
+ * 这条测试必须能在「有人把 ASM 改回固定人名」时变红。
+ */
+test('组装工艺清单:表单管理人=当前登录人姓名(不再是固定刘磊)', () => {
+  const form = {}
+  applyDocDefaults('RD_ASM_PROC', form, USER, { isNew: true, today: T })
+  assert.equal(form['表单管理人'], USER.realName, '表单管理人应带当前登录人姓名')
+  assert.notEqual(form['表单管理人'], '刘磊', '不得再回落成固定人名')
+  assert.equal(form['密级'], '保密', '密级仍默认保密')
+  assert.equal(form['使用范围'], '银嘉内部', '使用范围仍默认银嘉内部')
+  assert.equal(form['版本号'], 'V2026-09-11', '版本号仍按当天展开')
+})
+
+/**
+ * 2026-10-28 用户口径:「产品信息表的编辑自动填入当前的对应账号姓名」。
+ * 编辑人走 LOCKED_PERSON(新增即带当前用户),且 yj_field 在迁移里改成 editable=0;
+ * 落库另有后端 ButtonService 每次保存回写真名(前端值只保证纸面显示)。
+ */
+test('产品信息表:新增时编辑人=当前登录人姓名;既有单据不被改写', () => {
+  const form = {}
+  applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
+  assert.equal(form['编辑人'], USER.realName, '新增时应带当前登录人姓名')
+  assert.equal(lockedPersonLabel('RD_PROD_INFO'), '编辑人', '编辑人应登记为锁定字段')
+
+  const existing = { 编辑人: '冯敏' }
+  applyDocDefaults('RD_PROD_INFO', existing, USER, { isNew: false, today: T })
+  assert.equal(existing['编辑人'], '冯敏', '打开既有单据不得改写编辑人(冒名)')
 })
 
 test('三张表的默认值不得覆盖用户已填内容(仅空时填)', () => {

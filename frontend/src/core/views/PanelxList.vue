@@ -4768,6 +4768,24 @@ watch(
   },
 )
 
+// 「编辑人 / 表单管理人」自动带入(2026-10-28 用户口径):
+//   · 产品信息表:编辑人 = 当前编辑账号姓名;
+//   · 组装工艺清单:表单管理人也 = 编辑人 ——「选择产品编号之后就自动带入,或者进行其他编辑也自动带入」。
+// 只改**显示值与保存报文**(cur 是保存时回传的表头对象),不主动置脏:
+//   用户没有别的改动就不该弹「未保存」提醒。落库权威仍在服务端(ButtonService 每次保存按登录人回写),
+//   所以即使这一格没被前端改到,存下去也一定是当前登录人。
+const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人', RD_ASM_PROC: '表单管理人' }
+watch(
+  () => [panelCode.value, draftEditable.value, cur.value?.['单据编号'], JSON.stringify(cur.value || {})],
+  () => {
+    const key = EDITOR_STAMP_FIELDS[panelCode.value]
+    if (!key || !cur.value || !draftEditable.value) return
+    const name = String(user.realName || user.userName || '').trim()
+    if (!name || cur.value[key] === name) return
+    cur.value[key] = name
+  },
+)
+
 // 采购入库单批次号(2026-10-04 口径变更):批次号不再由前端「按单据日期预设」——
 // 它由**服务端在生单那一刻**定稿(2026-10-19 起 = **纯日期 yyyyMMdd**,如 20261019),
 // 并沿 暂收 → 检验 → 入库 逐站继承;BatchService.syncBatchNo 在每次保存/审核时把单头值同步到全部明细行。
@@ -6785,26 +6803,24 @@ const sheetExcelDesc = computed(() => {
 /**
  * 把当前文书纸面截成 PDF(返回 blob + 文件名)—— **导出 PDF 与打印预览共用这一份实现**。
  *
- * 页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
+ * 页面尺寸=纸张实际尺寸(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
  * 无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
  * 宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
  * 根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
  * 里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。
+ *
+ * 🔴 2026-10-28 用户口径:「导出需要能将当前的规格书所有内容导出,当前只能导出当前的对应页面」——
+ *   规格书/组装工艺清单这类**多页签文书**(pages 2~4 页)现在整份导出:逐页切页签各截一张,
+ *   合成**一个多页 PDF**(每页仍是纸张实际尺寸)。单页文书(立项申请/DocSheet 等)路径不变。
+ *   页签条(.rsp-pages)是编辑控件,截图前从克隆体里摘掉(与打印口径 body.approval-printing 一致)。
  *
  * ⚠ $el 在 dev 下可能是 fragment **注释锚点**(模板顶部的注释块、组件内的 append-to-body 弹窗
  *   都会把单根变多根,§5.5 B1)⇒ 判不出元素时按纸张根**类名**兜底;
  *   兜底名单必须把**每种纸张的根类名**都列全 —— 2026-10-17 实测漏了 `.fi-sheet`,
  *   于是首件检验单点「导出 PDF」直接报「未找到可导出的单据」。
  */
-async function buildSheetPdfBlob() {
-  const el0 = approvalSheetRef.value?.$el
-  const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
-    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
-    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .qr-sheet')
-  if (!el || !(el instanceof HTMLElement)) return null
-  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
-  await nextTick()
+/** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0 } */
+async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
@@ -6815,32 +6831,75 @@ async function buildSheetPdfBlob() {
     clone.style.width = w0 + 'px'
     clone.style.maxWidth = 'none'
     clone.style.overflow = 'visible'
+    // 页签条是编辑控件,不进导出件(打印时由 body.approval-printing 隐藏;导出走同一口径)
+    clone.querySelectorAll('.rsp-pages').forEach((n) => n.remove())
     holder.appendChild(clone)
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
-    const scale = 2
     const dataUrl = await domToPng(clone, {
-      scale,
+      scale: 2,
       backgroundColor: '#ffffff',
       width: w0,
       height: h0,
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
-    // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
-    const MM = 25.4 / 96
-    const pw = w0 * MM
-    const ph = h0 * MM
-    const pdf = new jsPDF({ orientation: pw > ph ? 'l' : 'p', unit: 'mm', format: [pw, ph], compress: true })
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pw, ph)
-    const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
-    return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
+    return { dataUrl, w0, h0 }
   } finally {
     if (holder) holder.remove()
   }
+}
+async function buildSheetPdfBlob() {
+  const comp = approvalSheetRef.value
+  const el0 = comp?.$el
+  const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
+    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
+    + '.approval-layout .qr-sheet')
+  if (!el || !(el instanceof HTMLElement)) return null
+  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
+  await nextTick()
+  // 多页签文书的页数由 RecordSheetPanels 暴露(单页/非记录纸组件恒为 1)
+  const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
+  const startPage = typeof comp?.activePage === 'number' ? comp.activePage : 0
+  const shots = []
+  try {
+    for (let i = 0; i < pageCount; i++) {
+      if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
+        comp.setActivePage(i)
+        await nextTick()
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      }
+      shots.push(await snapSheetPage(el, domToPng))
+    }
+  } finally {
+    // 切回导出前的页签,别把用户的界面停在最后一页
+    if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
+      comp.setActivePage(startPage)
+      await nextTick()
+    }
+  }
+  if (!shots.length) return null
+  // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
+  // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
+  const MM = 25.4 / 96
+  const first = shots[0]
+  const pdf = new jsPDF({
+    orientation: first.w0 * MM > first.h0 * MM ? 'l' : 'p',
+    unit: 'mm',
+    format: [first.w0 * MM, first.h0 * MM],
+    compress: true,
+  })
+  shots.forEach((s, i) => {
+    const pw = s.w0 * MM
+    const ph = s.h0 * MM
+    if (i > 0) pdf.addPage([pw, ph], pw > ph ? 'l' : 'p')
+    pdf.addImage(s.dataUrl, 'PNG', 0, 0, pw, ph)
+  })
+  const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
+  return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
 }
 /** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机 */
 async function exportSheetPdf() {

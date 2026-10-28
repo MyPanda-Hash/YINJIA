@@ -1147,7 +1147,10 @@ export const recordSheetConfigs = {
     // 报告头右侧信息块:**编辑人在上、单据日期在下**(用户口径:原来上下颠倒了)。
     // 设计纸面 B21:E23 右侧就是「编号：/ 编辑人 / 日期」竖排,编号即报告头右上角那一格。
     info: [
-      { label: '编辑人', key: '编辑人', type: 'text' },
+      // 2026-10-28 用户口径「产品信息表编辑自动填入当前账号姓名」:
+      //   这一格只读(readonly) —— 值由 PanelxList 监视器带当前登录人 + 后端 ButtonService
+      //   每次保存回写真名;放开手填既没意义,也会被下一次保存覆盖。
+      { label: '编辑人', key: '编辑人', type: 'text', readonly: true },
       { label: '单据日期', key: '单据日期', type: 'text' },
     ],
     grid: [130, 260, 130, 260],
@@ -1265,7 +1268,10 @@ export const recordSheetConfigs = {
     grid: [130, 390, 130, 390],
     head: { title: 2, infoLabel: 1, infoValue: 1 },
     info: [
-      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
+      //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
+      //   保存时由后端 ButtonService 按登录人回写(见 docDefaults + PanelxList 的 EDITOR_STAMP_FIELDS)。
+      { label: '表单管理人', key: '表单管理人', type: 'text', readonly: true },
       { label: '密级', key: '密级', type: 'text' },
       { label: '使用范围', key: '使用范围', type: 'text' },
       { label: '版本号', key: '版本号', type: 'text' },

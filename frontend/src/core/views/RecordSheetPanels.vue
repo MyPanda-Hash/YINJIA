@@ -183,10 +183,12 @@
           <template v-if="infoSpan">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
             <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
-              <el-select v-if="editable && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
+              <!-- readonly(2026-10-28):报告头里由系统带入的格(产品信息表 编辑人 / 组装工艺清单 表单管理人)
+                   只显示值、不出控件 —— 值由前端监视器与后端保存回写,放开手填会被下一次保存覆盖 -->
+              <el-select v-if="editable && !effInfo[0].readonly && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
                 <el-option v-for="o in selectOptions(effInfo[0].key)" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <el-input v-else-if="editable" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable && !effInfo[0].readonly" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
               <template v-else>{{ head[effInfo[0].key] || '' }}</template>
             </td>
           </template>
@@ -195,10 +197,11 @@
           <tr v-for="ii in infoSpan - 1" :key="'hi' + ii">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
             <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
-              <el-select v-if="editable && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
+              <!-- readonly 同上:系统带入的格只显示值 -->
+              <el-select v-if="editable && !effInfo[ii].readonly && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
                 <el-option v-for="o in selectOptions(effInfo[ii].key)" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <el-input v-else-if="editable" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable && !effInfo[ii].readonly" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
               <template v-else>{{ head[effInfo[ii].key] || '' }}</template>
             </td>
           </tr>
@@ -2188,7 +2191,18 @@ async function focusField(key) {
   focusTimer = setTimeout(() => { focusKey.value = ''; focusTimer = null; clearFocusOf = null }, 3000)
   return true
 }
-defineExpose({ focusField, pageOfKey })
+defineExpose({
+  focusField,
+  pageOfKey,
+  // 多页导出用(2026-10-28):整份文书导出「所有页面」时,由 PanelxList 逐页切页签再截图。
+  //   pageCount  = 本面板页签数(单页 = 1);
+  //   pageTitles = 页签标题(仅诊断用);
+  //   activePage / setActivePage = 读当前页 / 切到第 i 页(0 基)。
+  pageCount: computed(() => Math.max(1, pageList.value.length)),
+  pageTitles: computed(() => pageList.value.map((p) => String(p?.title || ''))),
+  activePage,
+  setActivePage: (i) => { activePage.value = Math.max(0, Math.min(pageList.value.length - 1, Number(i) || 0)) },
+})
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
 function plainCols(dt) {
