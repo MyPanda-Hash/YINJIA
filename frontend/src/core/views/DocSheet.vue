@@ -42,10 +42,12 @@
           size="small"
           maxlength="30"
           class="as-docno-input"
-          :placeholder="tt(docnoLabelText)"
+          :placeholder="tt('请输入编号')"
           @input="emit('dirty')"
         />
-        <template v-else>{{ head['文档编号'] || head['单据编号'] || config.docno || 'YJ-XS002' }}</template>
+        <!-- 只读兜底:原写死 'YJ-XS002' 会让人以为那张单的编号就是它(2026-10-28 用户口径)。
+             config.docno 保留(个别面板的设计样板号),都取不到时显示「—」。 -->
+        <template v-else>{{ head['文档编号'] || head['单据编号'] || config.docno || '—' }}</template>
       </div>
     </div>
 

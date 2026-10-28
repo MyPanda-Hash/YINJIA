@@ -154,11 +154,19 @@
               <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
               <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
                 <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
-                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '编号：' : docNoKey)" @input="emit('dirty')" />
+                <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
+                     带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
+                     读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
+                     不带前缀的 7 张裸编号设计表仍用字段名(docNoKey)做提示,它们没有前缀可重复。 -->
+                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '请输入编号' : docNoKey)" @input="emit('dirty')" />
               </div>
               <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
                    给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
-              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
+              <!-- 只读兜底口径(2026-10-28 用户口径「会让人误会是固定的一个编号在这边」):
+                   原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
+                   cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
+                   两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
+              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
