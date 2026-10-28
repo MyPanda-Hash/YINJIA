@@ -3855,13 +3855,16 @@ public class ButtonService {
     }
 
     /**
-     * 特采单(QC_TC_IN)审核=审批通过 → 自动生成**一张采购入库单**(2026-09-22 用户口径:
-     * 特采=让步接收,**全部数量入库、不走退料**):
+     * 特采单(QC_TC_IN)审核=审批通过 → 自动生成**一张采购入库单**(2026-10-22 修正口径):
      * - 仅对「有来源链路」的特采单生效;纯手工新建的特采单不自动生成(无来源上下文,避免凭空入库);
-     * - 数量 = 特采单「总数量」(审批人可在特采单上改数后批准,按批准值入库);
+     * - **数量 = 来源检验行的「不合格数量」** —— 特采 = 让步接收「不合格那部分」;
+     *   合格那部分已由检验单审核自动生成的采购入库单(inspAutoPurchaseIn,入合格数量)走掉,
+     *   这里**不再**取特采单「总数量」(那是送检数量 = 合格 + 不合格,取它会把合格品入两次)。
+     *   历史口径(2026-09-22~2026-10-22)是「特采=全部数量入库」,已按用户口径改正。
      * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次号/批次键,外部单据号已下线),
      *   行上 是否来料检验=是,特采=是(本条链就是特采,不再看检验行的任何标志);
-     * - 行级占用写 form_flow_link(QC_TC_IN→PURCHASE_IN)并回填检验行「入库单号」;
+     * - 行级占用写 form_flow_link(QC_TC_IN→PURCHASE_IN);检验行「入库单号」**仅在为空时**回填,
+     *   不覆盖合格品入库单已写入的号码(溯源链走 form_flow_link);
      * - **批次号在生单时随链带入**(2026-10-04 口径:号在「采购订单→送料暂收单」那一跳就定稿、逐站继承,
      *   不再有"入库审核取号 + 回填全链";入库单上没有号时由 BatchService.syncBatchNo 兜底取号)。
      *   幂等:该特采单已有 ACTIVE 入库单占用(重审)跳过。
@@ -3940,19 +3943,42 @@ public class ButtonService {
         }
         if (drows.isEmpty()) throw new IllegalStateException("来源检验行不存在(特采单 " + no + " 的检验单号 " + inspNo + ")");
         Map<String, Object> r = drows.get(0);
-        // 特采单总数量是 数值+单位 拼合文本('200支';2026-09-24 用户口径)→ 取前缀数字,解析失败退检验行数量
-        double totQty;
+        // ── 入库数量 = **不合格数量**(用户 2026-10-22 口径)──
+        // 为什么不再取「特采单总数量」:总数量是**送检数量**(= 合格 + 不合格,见 returnAutoSpecialAccept),
+        // 而合格那部分已经由「检验单审核 → 采购入库单」走掉了(inspAutoPurchaseIn 入的是合格数量),
+        // 特采只承担不合格那部分。此前取总数量 ⇒ 合格品被入两次。
+        //   实测(测试账套 IJ-2026-10-0099,送检 100 / 合格 60 / 不合格 40):
+        //     合格品入库 PI-2026-10-0090 = 60,特采入库 PI-2026-10-0091 曾 = 100 ⇒ 虚增 60。
+        // 特采单的「总数量」字段保持送检数量不变(它是送检口径,纸面 YJ-QR-60 要它)。
+        double qty = numOr(r.get("不合格数量"));
+        if (qty <= 0.000001) {
+            // 兜底:老链路的检验行可能只记了「不良数量」或口径不同;仍取不到 ⇒ 不生成 0 数量入库单
+            qty = numOr(r.get("不良数量"));
+        }
+        if (qty <= 0.000001) {
+            throw new IllegalStateException("来源检验行没有不合格数量(检验单 " + inspNo
+                    + "),特采单 " + no + " 无数量可入库;请先在检验单上填写不合格数量");
+        }
+        // 防呆:不合格数量不应超过送检数量(检验数据自相矛盾时宁可拒绝,也不要凭空入库)
+        double sentQty = numOr(r.get("送检数量"));
+        if (sentQty > 0.000001 && qty - sentQty > 0.000001) {
+            throw new IllegalStateException("不合格数量 " + qty + " 大于送检数量 " + sentQty
+                    + "(检验单 " + inspNo + "),特采入库数量异常,已拒绝生成");
+        }
+        // 特采单总数量仅用于日志/追溯(送检口径),不参与入库数量
+        double tcTotalQty;
         try {
             java.util.regex.Matcher m = java.util.regex.Pattern.compile("^-?\\d+(\\.\\d+)?").matcher(str(tc.get("总数量")));
-            totQty = m.find() ? Double.parseDouble(m.group()) : 0;
-        } catch (Exception e) { totQty = 0; }
-        double qty = totQty > 0.000001 ? totQty
-                : numOr(r.get("合格数量")) + numOr(r.get("不合格数量"));
+            tcTotalQty = m.find() ? Double.parseDouble(m.group()) : 0;
+        } catch (Exception e) { tcTotalQty = 0; }
+        if (tcTotalQty > 0.000001 && qty - tcTotalQty > 0.000001) {
+            throw new IllegalStateException("不合格数量 " + qty + " 大于特采单总数量 " + tcTotalQty + "(特采单 " + no + ")");
+        }
         Map<String, Object> line = new LinkedHashMap<>();
         line.put("存货编码", r.get("物料编码"));
         line.put("存货名称", r.get("物料名称"));
         line.put("规格型号", r.get("规格型号"));
-        line.put("实收数量", qty);                                  // 特采=全部数量入库(合格+不合格)
+        line.put("实收数量", qty);                                  // 特采入库=不合格数量(合格部分已由检验单入库)
         line.put("计量单位", r.get("计量单位") != null ? r.get("计量单位") : r.get("单位"));
         line.put("单价", r.get("单价"));
         // 是否来料检验:该批物料走过检验 = 是(与 inspAutoPurchaseIn 同口径)
@@ -4004,8 +4030,13 @@ public class ButtonService {
                     no, no, piNo, piNo + "#" + tgtIds.get(0), r.get("物料编码"),
                     r.get("数量"), qty, ih.get("批次键"), user);
         }
-        // 检验行回填入库单号(与 inspAutoPurchaseIn 同口径,便于追溯)
-        jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+        // 检验行回填入库单号(与 inspAutoPurchaseIn 同口径,便于追溯)。
+        // ⚠ 2026-10-22 修正:合格品入库(inspAutoPurchaseIn)已把**合格品**那张入库单号写在本列,
+        //   这里无条件覆盖会把合格品入库单的号码冲掉(实测 IJ-2026-10-0099:合格 PI-2026-10-0090 被
+        //   特采 PI-2026-10-0091 顶掉)。特采入库单的溯源走 form_flow_link(QC_TC_IN→PURCHASE_IN),
+        //   故本列**只在为空时**才写,不抢已有关联。
+        jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                        + " WHERE id = ? AND ISNULL(RTRIM(入库单号), '') = ''",
                 piNo, user, r.get("id"));
     }
 
