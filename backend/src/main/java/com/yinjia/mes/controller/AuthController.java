@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.UsageLogService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -94,7 +95,7 @@ public class AuthController {
             user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
             // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
             // 前端据此把「审批通过」对提交人本人放开;真闸门 ButtonService.canSelfAudit(同词)。
-            user.put("selfAuditPanels", selfAuditPanelsOf(admin, u.get("role_id")));
+            user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));
             // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
             // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
             // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
@@ -184,9 +185,9 @@ public class AuthController {
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
         user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
-        // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
-        // 前端据此把「审批通过」对**提交人本人**放开(展示层);真闸门在 ButtonService.canSelfAudit(同词)。
-        user.put("selfAuditPanels", selfAuditPanelsOf(admin, u.get("role_id")));
+        // 本人自审(2026-10-28):管理员=全部;普通用户 = 角色勾了「本人自审」的面板 ∪「我是唯一审批人」的面板。
+        // 前端据此把「审批通过」对**提交人本人**放开(展示层);真闸门在 ButtonService.canSelfAudit(同一判据)。
+        user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));
         user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
         return user;
     }
@@ -236,6 +237,39 @@ public class AuthController {
     /** 本人自审权限面板(2026-10-28,机制同 field/warn):管理员=全部;普通用户=角色勾了「本人自审」。 */
     private List<String> selfAuditPanelsOf(boolean admin, Object roleId) {
         return panelsWithPerm(admin, roleId, "selfaudit");
+    }
+
+    /**
+     * 本人自审 = **显式授权 ∪ 单人审批兜底**(2026-10-28 用户口径:
+     * 「我既然拥有审批权限我就应该能审批,而不是提交了还要其他账户给我批」)。
+     *
+     * <p>兜底口径:该面板**除我之外没有别的启用审批人** ⇒ 允许自审;这与
+     * {@code ButtonService.canSelfAudit} 的第二条判定一一对应(展示层/服务端同源)。
+     * 两级面板(RD_PROD_INFO + 8 张质量单据)不兜底——它们本就有确定的第二级,不存在死路。
+     */
+    private List<String> selfAuditPanelsFull(boolean admin, Object roleId, String username) {
+        if (admin) return List.of("*");
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>(selfAuditPanelsOf(false, roleId));
+        out.addAll(onlyApproverPanels(username));
+        return List.copyOf(out);
+    }
+
+    /** 我是该面板**唯一**启用审批人的面板码(不含两级面板) */
+    private List<String> onlyApproverPanels(String username) {
+        if (username == null || username.isBlank()) return List.of();
+        List<String> rows = jdbc.query(
+                "SELECT DISTINCT rp.panel_code FROM yj_role_panel rp"
+                        + " JOIN yj_user me ON me.role_id = rp.role_id"
+                        + " WHERE me.username = ? AND rp.can_approve = 'Y'"
+                        + "   AND NOT EXISTS (SELECT 1 FROM yj_role_panel rp2"
+                        + "        JOIN yj_user o ON o.role_id = rp2.role_id"
+                        + "        WHERE rp2.panel_code = rp.panel_code AND rp2.can_approve = 'Y'"
+                        + "          AND o.username <> me.username AND o.is_admin = 'N'"
+                        + "          AND ISNULL(o.enabled,1) = 1 AND ISNULL(o.asp_cancel,'N') <> 'Y')",
+                (rs, i) -> rs.getString(1), username);
+        java.util.Set<String> twoLevel = new java.util.HashSet<>(ButtonService.ADMIN_L2_PANELS);
+        twoLevel.add("RD_PROD_INFO");
+        return rows.stream().filter(c -> !twoLevel.contains(c)).toList();
     }
 
     /**

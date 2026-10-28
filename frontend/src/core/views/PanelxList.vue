@@ -409,7 +409,7 @@
                     @click="onSideAction('审批通过')"
                   >{{ tt(approveBtnLabel) }}</div>
                   <!-- 2026-10-28:授予「本人自审」时提前说清楚 —— 别让人以为这条通过和平时一样 -->
-                  <div v-if="selfAuditNow" class="as-side-hint">{{ tt('本单由你提交；本面板已授「本人自审」，通过后会记为自审') }}</div>
+                  <div v-if="selfAuditNow" class="as-side-hint">{{ tt('本单由你提交；本面板没有其他审批人（或已授「本人自审」），通过后会记为自审') }}</div>
                   <div
                     class="as-side-btn"
                     :class="{ disabled: isDisabled('审批驳回') }"

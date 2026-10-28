@@ -2524,24 +2524,45 @@ public class ButtonService {
     }
 
     /**
-     * 「本人自审」权限(2026-10-28 用户口径):该账号在当前面板有没有被授予 selfaudit 词。
+     * 「本人能不能审自己提交的单」(2026-10-28)。
+     *
+     * <p>两条来源,任一成立即可:
+     * <ol>
+     *   <li><b>显式授权</b>:角色在该面板勾了 selfaudit(「本人自审」列);</li>
+     *   <li><b>单人审批兜底</b>(2026-10-28 用户口径:「我既然拥有审批权限我就应该能审批,
+     *       而不是提交了还要其他账户给我批」):该面板**除我之外没有别的启用审批人** ——
+     *       这时不放开就等于死路,只能找管理员(super admin 一直被豁免,理由完全一样:
+     *       「管理员提交后无他人可批会造死路」,只是同样的事现在发生在只有一个审批人的部门)。</li>
+     * </ol>
      *
      * <p>语义边界:
      * <ul>
      *   <li>它**只解除**「编制与审批分离」对**本人提交的单**的限制,不放宽审批权 ——
      *       {@code requireApprover} 仍要求该面板 audit 权,两者都满足才能自审;</li>
      *   <li>管理员本就豁免该限制,这里返回 true 只是让调用点写法统一;</li>
+     *   <li>只作用于**单节点**面板;两级面板(RD_PROD_INFO / 8 张质量单据)不兜底 ——
+     *       它们本来就有确定的第二级(超管或被选中的二级审核人),不存在死路;</li>
      *   <li>只管**一级审批通过**;二级审批人仍不能选提交人(见 approveApproval 的 l2 校验)。</li>
      * </ul>
      */
     private boolean canSelfAudit(String user, String panelCode) {
         if (isAdminUser(user)) return true;
+        // ① 显式授权(角色在该面板勾了「本人自审」)
         List<String> perms = jdbc.query(
                 "SELECT rp.perms FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
                         + " WHERE u.username = ? AND rp.panel_code = ?",
                 (rs, i) -> rs.getString(1), user, panelCode);
         for (String p : perms) if (hasPermWordCsv(p, "selfaudit")) return true;
-        return false;
+        // ② 单人审批兜底:除我之外还有没有别的启用审批人
+        if (TWO_LEVEL_PANELS.contains(panelCode)) return false;
+        Integer others = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT o.username) FROM yj_role_panel rp2"
+                        + " JOIN yj_user o ON o.role_id = rp2.role_id"
+                        + " WHERE rp2.panel_code = ? AND rp2.can_approve = 'Y'"
+                        + "   AND o.username <> ? AND o.is_admin = 'N'"
+                        + "   AND ISNULL(o.enabled,1) = 1 AND ISNULL(o.asp_cancel,'N') <> 'Y'",
+                Integer.class, panelCode, user);
+        return others == null || others == 0;
     }
 
     /** csv 权限词表是否含某词(trim + 逐词精确匹配;null/空 = 不含) */

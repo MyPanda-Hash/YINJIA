@@ -73,11 +73,27 @@ test('二级审批不受影响：二级审核人仍不能是提交人', () => {
 test('前端消费 selfAuditPanels：store 下发 → 列表页不再按提交人自我排除 → 审批情况显示「自审」', () => {
   assert.match(store, /selfAuditPanels: Array\.isArray\(ui\?\.selfAuditPanels\) \? ui\.selfAuditPanels : \[\]/)
   assert.match(store, /this\.selfAuditPanels = Array\.isArray\(u\?\.selfAuditPanels\)/)
-  assert.match(authCtl, /user\.put\("selfAuditPanels", selfAuditPanelsOf\(admin, u\.get\("role_id"\)\)\)/)
+  assert.match(authCtl, /user\.put\("selfAuditPanels", selfAuditPanelsFull\(admin, u\.get\("role_id"\), username\)\)/)
   assert.match(panelx, /function canSelfAuditHere\(\)/)
   assert.match(panelx, /if \(canSelfAuditHere\(\)\) return false/)
   assert.match(history, /v-if="row\.selfAudit"/)
   assert.match(en, /'本人自审': 'Self-approval'/)
+})
+
+// ── 2026-10-28 追加:单人审批兜底(用户口径「我既然拥有审批权限我就应该能审批」) ──
+test('单人审批兜底:该面板除我之外没有别的启用审批人 ⇒ 允许自审(服务端与下发同源)', () => {
+  assert.match(button, /Integer others = jdbc\.queryForObject\(\s*\n\s*"SELECT COUNT\(DISTINCT o\.username\) FROM yj_role_panel rp2"/,
+    'canSelfAudit 必须有「其他审批人」计数')
+  assert.match(button, /AND o\.username <> \? AND o\.is_admin = 'N'/,
+    '排除自己、排除管理员(管理员本就豁免)')
+  assert.match(button, /ISNULL\(o\.enabled,1\) = 1 AND ISNULL\(o\.asp_cancel,'N'\) <> 'Y'/,
+    '只数**启用且未作废**的审批人')
+  assert.match(button, /if \(TWO_LEVEL_PANELS\.contains\(panelCode\)\) return false;/,
+    '两级面板不兜底(它们本就有第二级,不存在死路)')
+  assert.match(authCtl, /private List<String> onlyApproverPanels\(String username\)/)
+  assert.match(authCtl, /out\.addAll\(onlyApproverPanels\(username\)\)/,
+    '下发给前端的 selfAuditPanels 必须并上「我是唯一审批人」的面板,否则前端仍会置灰')
+  assert.match(authCtl, /twoLevel\.add\("RD_PROD_INFO"\);/, '下发也要排除两级面板')
 })
 
 test('数据侧：迁移已登记且写的是幂等加列', () => {

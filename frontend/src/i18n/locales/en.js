@@ -3400,7 +3400,7 @@ export default {
     // 2026-10-28「本人自审」权限(组织架构·角色与面板权限的一列 + 审批情况的标记)
     '本人自审': 'Self-approval',
     '自审': 'Self-approved',
-    '本单由你提交；本面板已授「本人自审」，通过后会记为自审': 'You submitted this document; this panel grants "Self-approval" — approving it will be recorded as a self-approval',
+    '本单由你提交；本面板没有其他审批人（或已授「本人自审」），通过后会记为自审': 'You submitted this document; no other approver exists for this panel (or "Self-approval" is granted) — approving it will be recorded as a self-approval',
     '驳回须填写意见': 'A comment is required to reject',
     '意见必填': 'Comment is required',
     '落实于': 'Effective at',
