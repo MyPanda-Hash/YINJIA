@@ -59,38 +59,43 @@ function canEdit() {
 }
 
 /**
- * 两段式标注(2026-10-28 用户口径「可以直接鼠标划选然后点击一下就弹出颜色盘选择颜色」)
+ * 标注笔交互(2026-10-28 第二轮:改回"划选即弹",与业界主流一致)
  *
- * ① 划选(mouseup)→ 只**记住**范围(armed),不弹盘、**不清选区** —— 用户要先看清自己选了哪几个字;
- * ② 在被选中的文字上**再点一下**(click)→ 才弹色盘。
+ * 【用户反馈】「不好用，点击都弹不出来色盘」
+ *   上一版做成了「划选 → 再点一下 → 弹盘」。实战不可行,原因是浏览器的既定行为:
+ *   第二次点击时 `mousedown` 会**先清掉选区**,于是"选区已清"这个信号既可能是
+ *   "用户第二次点击"、也可能是"用户点到别处",判据天然歧义 ⇒ 时灵时不灵。
  *
- * 【为什么必须两段】改前 mouseup 一抬手就弹:想选中某句话看清内容也会弹,误触很多。
+ * 【业界怎么做】(查证 GitHub,见下)一律是**划选结束就弹**:
+ *   · recogito/text-annotator-js(BSD-3,用户最多的文本标注库):`selectionMode` 决定
+ *     选中即创建,浮层由库自带;它显式提供 `dismissOnNotAnnotatable` 来控制"点空白处才收起"。
+ *   · hypothesis/client(注释领域的元老级实现):`mouseup` 后弹 Adder。
+ *   · openannotation/annotator:同样是 mouseup 后弹 Viewer/Adder。
+ *   ⇒ 没有任何一个把"再点一下"作为主路径 —— 因为那正是本 bug 的来源。
  *
- * 【怎么区分"拖拽补发的 click"与"用户的第二次点击"】
- * 浏览器在 mousedown/mouseup 落回同一元素时会**补发**一次 click。
- *   · 第一版用时间差(<250ms 算补发)—— **不可靠**:实测用户在划选后稍停一下再点,
- *     间隔超过 250ms 就被判成"补发"而弹不出盘(反之手快时又可能真点击被判成补发)。
- *   · 现在改用 **window.getSelection() 是否仍停留在这次划选上**:
- *       补发的 click 紧跟在 mouseup 之后、**选区还在**;
- *       用户第二次点击时,浏览器会**先清掉选区**(点击即取消选择)⇒ collapsed=true。
- *     即:选区还在 = 同一次拖拽(不弹);选区没了 = 用户的第二次点击(弹)。
- *     这跟人的直觉一致,也不受手快手慢影响。
- *   · 兜底:若浏览器行为差异导致选区没被清,仍用 3 秒上限防"很久以后的点击误弹"。
+ * 【本实现】回到 mouseup 即弹,但用**两道守卫**避免上一版想解决的误触:
+ *   ① 拖拽补发的 click 不再参与判断(根本不监听 click);
+ *   ② 只在**真正的文字选区**上弹(非空、未折叠、同一文本节点),
+ *      单纯点击(无拖拽)不会产生选区 ⇒ 不会误弹。
+ *   ③ 弹盘后立即清选区(与主流一致:色盘一出现,选区使命就完成了)。
+ *
+ * 兼容:`armMaxAgeMs`/`armed` 保留为无害的过渡态(色盘弹出前的一瞬),
+ * 便于将来若要做"二次确认"再挂逻辑,也让测试能观察到"已选中待确认"。
  */
 const armMaxAgeMs = 3000
-/** 已划选、等待"再点一下"确认的范围;null=没在等 */
+/** 最近一次有效划选(弹出瞬时态;色盘出现后即被清) */
 const armed = ref(null)
-/** 上次 mouseup 的时刻(兜底上限用) */
+/** 上次 mouseup 的时刻 */
 let lastUpAt = 0
 
-/** 标注笔:划选一段文字 → **只记住范围**(等用户再点一下才弹色盘) */
+/** 标注笔:划选一段文字 → **立即**交范围给上层弹色盘(主流做法) */
 function onMouseUp(ev) {
   if (!pen.value) return
   const r = rangeInTextNode(window.getSelection())
   lastUpAt = Date.now()
   if (!r) { armed.value = null; return }
   const base = Number(r.node.parentElement?.dataset?.start || 0)
-  armed.value = {
+  const sel = {
     fieldKey: props.fieldKey,
     start: base + r.start,
     end: base + r.end,
@@ -98,35 +103,30 @@ function onMouseUp(ev) {
     x: ev?.clientX ?? 0,
     y: ev?.clientY ?? 0,
   }
+  armed.value = sel
+  // 立即弹盘(不再等"第二次点击"):清理选区后交给上层
+  window.getSelection?.()?.removeAllRanges?.()
+  ctx.ask?.(sel.fieldKey, sel.start, sel.end, { x: sel.x, y: sel.y })
 }
 
-/** 标注笔的"再点一下":确认划选范围 → 弹色盘(拖拽补发的 click 不算) */
+/** 保留给"点击已标注段"等场景;标注笔路径不再依赖它 */
 function fireIfArmed(ev) {
   const a = armed.value
   if (!a || a.fieldKey !== props.fieldKey) return false
-  // 兜底上限:armed 放太久就不认(免得用户早先选过、很久后随手一点又弹盘)
   if (Date.now() - lastUpAt > armMaxAgeMs) { armed.value = null; return false }
-  // 判据:选区还在 ⇒ 这是紧跟 mouseup 的**补发 click**(同一次拖拽),不弹;
-  //       选区已被清 ⇒ 用户**第二次点击**(点击本身会取消选择),才弹。
-  const sel = window.getSelection?.()
-  const stillSelecting = !!sel && sel.rangeCount > 0 && !sel.isCollapsed
-  if (stillSelecting) return false
   armed.value = null
-  window.getSelection?.()?.removeAllRanges?.()   // 弹盘才清选区
   ctx.ask?.(a.fieldKey, a.start, a.end, { x: ev?.clientX || a.x, y: ev?.clientY || a.y })
   return true
 }
 
-/** 橡皮擦:点在某个已标注的段上 → 擦掉它(后端只擦相交区间);否则处理标注笔的"再点一下" */
+/** 橡皮擦:点在某个已标注的段上 → 擦掉它(后端只擦相交区间);标注笔路径已不再依赖 click */
 function onClick(ev) {
   if (eraser.value) {
     const host = ev.target?.closest?.('.ann-seg[data-ann="1"]')
     if (!host) return
     const start = Number(host.dataset.start || 0)
     ctx.erase?.(props.fieldKey, start, start + (host.textContent || '').length)
-    return
   }
-  fireIfArmed(ev)
 }
 </script>
 

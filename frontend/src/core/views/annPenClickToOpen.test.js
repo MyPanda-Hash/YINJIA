@@ -1,22 +1,25 @@
 /**
- * annPenClickToOpen.test.js —— 标注笔改为「划选 → 再点一下 → 弹色盘」
+ * annPenClickToOpen.test.js —— 标注笔交互：**划选即弹**（业界主流）
  *
- * 【用户口径 2026-10-28】「现在优化一下标注笔的使用方法，现在改为是可以直接鼠标划选
- *   然后点击一下就弹出颜色盘选择颜色」
+ * 【演进记录，别退回】
+ *   v1（2026-10-16）：必须先点「标注笔」进模式 → 划选 → 弹盘。用户在只读纸上划字没反应。
+ *   v2（2026-10-27）：纸面本来就只读时不必点按钮，划选即弹（penReady）。用户仍报"易误操作"。
+ *   v3（2026-10-28 上午）：做成「划选 → 再点一下才弹」。**实战不可用**——
+ *       浏览器第二次点击的 mousedown 会**先清掉选区**，"选区已清"这个信号天然歧义
+ *       （既可能是"用户点第二下"，也可能是"用户点到别处"）⇒ 时灵时不灵，用户报"点了弹不出来"。
+ *   v4（2026-10-28 下午，本版）：回到 **mouseup 即弹**，与主流实现一致。
  *
- * 【改前】mouseup 一抬手就弹色盘（`onMouseUp` 里直接 `ctx.ask`）——
- *   划选过程中只要松手就弹，误触很多（想选中看清某句话也会弹），且弹完立刻 `removeAllRanges`，
- *   用户连自己选了哪几个字都没看清。
+ * 【业界依据】（2026-10-28 查证）
+ *   · recogito/text-annotator-js（BSD-3，最常用的文本标注库）：选中即创建注释/浮层；
+ *     它用 `dismissOnNotAnnotatable` 处理"点空白处才收起"，而不是要求"再点一下"。
+ *   · hypothesis/client：mouseup 后弹 Adder。
+ *   · openannotation/annotator：同样 mouseup 后弹 Viewer/Adder。
+ *   三家都没把"二次点击"当主路径 —— 那正是 v3 的 bug 来源。
  *
- * 【改后】两段式:
- *   ① 划选（mouseup）→ 只**记住**范围并高亮，不弹盘；
- *   ② 在被选中的文字上**再点一下**（click）→ 才弹色盘。
- *   为什么必须用 click 而不是继续用 mouseup:拖拽选字的落点就是 mouseup，
- *   用户说的"点击一下"是**第二次**独立点击。所以 mouseup 只 arm，click 才 fire。
- *
- * 【同一次拖拽不能算"点击"】Chrome 在 mousedown/mouseup 同一元素上会补发 click，
- *   若不加判据，划选完的那次 click 会立刻弹盘 = 退回改前行为。
- *   判据 = mouseup 到 click 的时间差（拖拽补发的 click 几乎为 0ms）。
+ * 【本版防误触靠什么】不是"再点一下"，而是：
+ *   ① 只在**真正的文字选区**上弹（非空/未折叠/同一文本节点）⇒ 单纯点击不产生选区，不会误弹；
+ *   ② 弹盘后立即清选区（主流同款）；
+ *   ③ 不监听 click 参与弹盘判断 ⇒ 拖拽补发的 click 无从干扰。
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -26,61 +29,41 @@ const src = readFileSync(new URL('./AnnotatedText.vue', import.meta.url), 'utf8'
 const panelx = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
 const en = readFileSync(new URL('../../i18n/locales/en.js', import.meta.url), 'utf8')
 
-test('mouseup 只记住范围，不再直接弹色盘', () => {
+test('mouseup 里**直接**弹色盘（不再等第二次点击）', () => {
   const at = src.indexOf('function onMouseUp')
   assert.ok(at >= 0, '找不到 onMouseUp')
-  // 切到下一个函数定义为止（onMouseUp 后面紧跟 fireIfArmed）
   const end = src.indexOf('function fireIfArmed', at)
-  const body = src.slice(at, end > at ? end : at + 1500)
-  assert.ok(!/ctx\.ask\?\./.test(body),
-    'onMouseUp 里不能再调 ctx.ask（一抬手就弹盘就是用户要改掉的旧行为）')
-  assert.match(body, /armed/, 'mouseup 要记录待确认范围(armed)')
-  assert.ok(!/removeAllRanges/.test(body),
-    'mouseup 就 removeAllRanges 会让用户看不清选中了什么 —— 改到弹盘之后才清')
+  const body = src.slice(at, end > at ? end : at + 1600)
+  assert.match(body, /ctx\.ask\?\./, 'mouseup 必须直接调 ctx.ask（v3 的"等第二次点击"已验证不可用）')
+  // 反例守卫：不能再用"选区是否还在"这种歧义判据决定弹不弹
+  assert.ok(!/stillSelecting/.test(body), '别再引入"选区已清/仍在"的判据 —— 那正是 v3 时灵时不灵的原因')
 })
 
-test('click 时才弹色盘（第二次独立点击）', () => {
-  const at = src.indexOf('function fireIfArmed')
-  assert.ok(at >= 0, '找不到 fireIfArmed（弹盘的唯一出口）')
-  const body = src.slice(at, at + 1400)
-  assert.match(body, /ctx\.ask\?\./, 'click 里要调 ctx.ask 弹色盘')
-  assert.match(body, /armed/, 'click 要用 mouseup 记下的范围')
-  // 时间差已不再是主判据（改用选区是否已清），但兜底上限仍在 → 见下一条测试
-})
-
-test('拖拽补发的 click 不算"再点一下"（判据 = 选区是否已清）', () => {
-  const at = src.indexOf('function fireIfArmed')
-  const body = src.slice(at, at + 1400)
-  // 实测：时间差判据不可靠（用户稍停再点就超阈值；手快时真点击又会被误判成补发）
-  assert.ok(!/CLICK_GAP_MS/.test(body), '不能再用时间差当主判据')
-  assert.match(body, /getSelection/, '要读当前选区')
-  assert.match(body, /isCollapsed/, '判据 = 选区是否已被清（点击会取消选择）')
-  assert.match(body, /stillSelecting/, '要有一个明确的"还在划选中"分支')
-  // 兜底上限仍要留着（防很久以后误弹）
-  assert.match(src, /const armMaxAgeMs\s*=\s*\d+/, '要有一个兜底上限常量')
-  assert.match(body, /armMaxAgeMs/, '兜底上限要用上')
-})
-
-test('click 委托到 fireIfArmed（onClick 自己不再重复判时间）', () => {
-  const at = src.indexOf('function onClick')
-  const body = src.slice(at, at + 1200)
-  assert.match(body, /fireIfArmed/, 'onClick 要调用 fireIfArmed')
-})
-
-test('armed 是响应式的（要高亮"已选中、待点击"）', () => {
-  assert.match(src, /const armed\s*=\s*ref\(/, 'armed 要用 ref，才能在纸面上给出视觉反馈')
-})
-
-test('划选后不清空浏览器选区（用户要先看清自己选了哪几个字）', () => {
+test('弹盘后立即清选区（主流做法：色盘出现后选区使命完成）', () => {
   const at = src.indexOf('function onMouseUp')
   const end = src.indexOf('function fireIfArmed', at)
-  const body = src.slice(at, end > at ? end : at + 1500)
-  assert.ok(!/removeAllRanges/.test(body),
-    'mouseup 就 removeAllRanges 会让用户看不清选中了什么 —— 改到弹盘之后才清')
+  const body = src.slice(at, end > at ? end : at + 1600)
+  assert.match(body, /removeAllRanges/, 'mouseup 弹盘后要清选区')
 })
 
-test('侧栏提示文案改成新交互', () => {
-  assert.match(panelx, /划选文字后点一下/, '提示要说明"划选 + 点一下"两步')
-  assert.match(en, /'划选文字后点一下，即弹出颜色盘选择颜色':/,
-    '新增 UI 文案必须有多语言词条(en 至少)')
+test('click 不再参与标注笔弹盘（避免拖拽补发的 click 干扰）', () => {
+  const at = src.indexOf('function onClick')
+  assert.ok(at >= 0, '找不到 onClick')
+  const body = src.slice(at, at + 900)
+  assert.ok(!/fireIfArmed/.test(body), 'onClick 不该再调 fireIfArmed（v3 的做法已废弃）')
+  assert.match(body, /eraser/, 'click 只留给橡皮擦')
+})
+
+test('只在真正有选区时弹（单纯点击不该弹）', () => {
+  const at = src.indexOf('function onMouseUp')
+  const end = src.indexOf('function fireIfArmed', at)
+  const body = src.slice(at, end > at ? end : at + 1600)
+  // rangeInTextNode 本身保证:非空、未折叠、同一文本节点
+  assert.match(body, /rangeInTextNode/, '必须用 rangeInTextNode 校验"是真正的文字选区"')
+  assert.match(body, /if \(!r\) \{ armed\.value = null; return \}/, '没选区就直接返回，不弹盘')
+})
+
+test('侧栏提示文案说明"划选即弹"', () => {
+  assert.match(panelx, /划选要标注的文字即弹出颜色盘/, '提示要与实际交互一致')
+  assert.match(en, /'划选要标注的文字即弹出颜色盘':/, '新增 UI 文案必须有多语言词条(en 至少)')
 })
