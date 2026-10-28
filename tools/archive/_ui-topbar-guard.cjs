@@ -46,7 +46,7 @@ async function main() {
   const target = list.find((t) => t.type === 'page')
   const { connect } = require(path.join(__dirname, '..', 'verify', 'lib', 'mini-ws.cjs'))
   const { killTree } = require(path.join(__dirname, '..', 'verify', 'lib', 'kill-tree.cjs'))
-  const { closeBrowser } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
+  const { closeBrowser, killHeadlessEdge } = require(path.join(__dirname, '..', 'verify', 'lib', 'browser-close.cjs'))
   let id = 0
   const pending = new Map()
   const sock = await connect(target.webSocketDebuggerUrl)
@@ -157,6 +157,12 @@ async function main() {
   try { sock.close() } catch (e) {}
   await closeBrowser(CDP_PORT)
   killTree(proc.pid)
-  process.exit(pass === results.length ? 0 : 1)
+  killHeadlessEdge('_topbar')
+  process.exitCode = pass === results.length ? 0 : 1   // 用 exitCode:process.exit() 会截断管道里的 stdout
 }
-main().catch((e) => { console.error('[FATAL]', e); process.exit(2) })
+main().catch((e) => {
+  console.error('[FATAL]', e)
+  // 异常路径也要收掉浏览器,否则一次失败就泄漏一整份(曾把 8090 拖死)
+  try { killHeadlessEdge('_topbar') } catch (e2) { /* ignore */ }
+  process.exitCode = 2
+})
