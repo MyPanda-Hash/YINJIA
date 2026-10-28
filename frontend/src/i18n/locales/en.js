@@ -1814,6 +1814,7 @@ export default {
     '设置实时生效并保存到本机浏览器。': 'Applies instantly and is saved in this browser.',
     '快捷入口': 'Quick actions',
     '新建加工单': 'New work order',
+    '工单由订单结转生成': 'Work orders are generated from order conversion',
     '快速报工': 'Quick report',
     '生产看板': 'Production board',
     '项目申请': 'Project request',

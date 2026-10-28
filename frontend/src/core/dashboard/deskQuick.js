@@ -28,9 +28,11 @@ export const DESK_QUICK_VERSION = 2
 /** v2 新增的候选 key —— 只给"角色默认包含它"的用户补 */
 export const DESK_QUICK_V2_ADDED = ['rdApply', 'rdProduct']
 
-// 2026-10-28:旧「生产加工单 MANU_ORDER」下架,原「新建加工单」quick 入口一并移除 ——
-//   工单不再在空白表单上新建,统一走「订单结转 → 生产工单(plang)」。
+// 2026-10-28:旧「生产加工单 MANU_ORDER」下架后,「新建加工单」入口按用户口径恢复,
+//   但目标改为**现役生产工单页面**(WORK_ORDER_LIST / plang)——工单由订单结转生成,
+//   不再打开已下架的空白旧表单。key 沿用 newOrder:老用户 localStorage 里已勾选的会自动回来。
 export const QUICK_ENTRIES = [
+  { key: 'newOrder', title: '新建加工单', path: '/prod/plan/workOrderList', panelCode: 'WORK_ORDER_LIST', hint: '工单由订单结转生成', primary: true },
   { key: 'rdApply', title: '项目申请', path: '/panelx/form/RD_APPROVAL', panelCode: 'RD_APPROVAL', hint: '填写立项申请表' },
   { key: 'rdProduct', title: '产品开发', path: '/panelx/form/RD_PROD_INFO', panelCode: 'RD_PROD_INFO', hint: '填写产品信息表' },
 ]
