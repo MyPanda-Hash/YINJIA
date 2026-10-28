@@ -2414,6 +2414,11 @@ export default {
     '配置供应商账号': 'Gérer les comptes fournisseurs',
     '没有该面板的权限': 'Pas de droit sur ce panneau',
     '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Accès réservé aux administrateurs et aux comptes dont le rôle a « Gérer les comptes fournisseurs » coché dans Organisation → Rôles et droits des panneaux → Chaîne d’approvisionnement → Droits fournisseurs.',
+    '联系电话': 'Téléphone',
+    '如 13800000000 / 0752-5583930': 'ex. 06 12 34 56 78',
+    '选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。': 'Une fois le fournisseur choisi, le compte reprend son code (modifiable) ; le nom est celui du fournisseur.',
+    '默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)': 'Par défaut = code fournisseur, modifiable (3 à 40 caractères)',
+    '已按供应商编码自动填写,可直接修改。': 'Pré-rempli avec le code fournisseur — modifiable.',
   },
 
 }

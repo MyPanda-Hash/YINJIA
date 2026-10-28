@@ -54,7 +54,10 @@
       <el-table-column :label="tt('供应商名称')" prop="supplierName" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.supplierName || '-' }}</template>
       </el-table-column>
-      <el-table-column :label="tt('姓名')" prop="realName" width="130" show-overflow-tooltip />
+      <el-table-column :label="tt('姓名')" prop="realName" width="110" show-overflow-tooltip />
+      <el-table-column :label="tt('联系电话')" width="130" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.phone || '—' }}</template>
+      </el-table-column>
       <el-table-column :label="tt('状态')" width="96" align="center">
         <template #default="{ row }">
           <el-tag size="small" :type="row.enabled === '1' && row.userEnabled === '1' ? 'success' : 'info'">
@@ -78,22 +81,30 @@
     </el-table>
 
     <!-- 新增 / 编辑 -->
-    <el-dialog v-model="dlg.visible" :title="dlg.id ? tt('编辑供应商账号') : tt('新增供应商账号')" width="560px" append-to-body>
+    <el-dialog v-model="dlg.visible" :title="dlg.id ? tt('编辑供应商账号') : tt('新增供应商账号')" width="580px" append-to-body>
       <el-form :model="dlg.form" label-width="110px" @submit.prevent>
-        <el-form-item :label="tt('账号')" required>
-          <el-input v-model="dlg.form.userName" :disabled="!!dlg.id" maxlength="40"
-            :placeholder="tt('3~40 位字母/数字/下划线,如 kbl01')" />
-          <div v-if="dlg.id" class="sa-hint">{{ tt('账号创建后不可改名;如需换名,请新建账号并停用旧账号。') }}</div>
-        </el-form-item>
+        <!-- 2026-10-25 用户口径「新增应该弹窗关联供应商,然后选择后账号默认供应商编码(可修改)」:
+             顺序 = **先选供应商**,账号随供应商自动带出,仍可手改(账号是登录名,允许与编码不同)。 -->
         <el-form-item :label="tt('供应商')" required>
           <el-select v-model="dlg.form.supplierCode" filterable remote clearable class="sa-sel"
             :remote-method="searchSuppliers" :loading="supplierLoading" :placeholder="tt('选择供应商(可输入编码或名称搜索)')"
             @change="onSupplierChange">
             <el-option v-for="s in suppliers" :key="s.code" :label="`${s.code} ${s.name}`" :value="s.code" />
           </el-select>
+          <div class="sa-hint">{{ tt('选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。') }}</div>
+        </el-form-item>
+        <el-form-item :label="tt('账号')" required>
+          <el-input v-model="dlg.form.userName" :disabled="!!dlg.id" maxlength="40"
+            :placeholder="tt('默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)')" />
+          <div v-if="dlg.id" class="sa-hint">{{ tt('账号创建后不可改名;如需换名,请新建账号并停用旧账号。') }}</div>
+          <div v-else-if="autoFilledUser" class="sa-hint">{{ tt('已按供应商编码自动填写,可直接修改。') }}</div>
         </el-form-item>
         <el-form-item :label="tt('姓名')">
           <el-input v-model="dlg.form.realName" maxlength="60" :placeholder="tt('默认取供应商名称')" />
+        </el-form-item>
+        <el-form-item :label="tt('联系电话')">
+          <el-input v-model="dlg.form.phone" maxlength="50" clearable
+            :placeholder="tt('如 13800000000 / 0752-5583930')" />
         </el-form-item>
         <el-form-item :label="tt('登录密码')" :required="!dlg.id">
           <el-input v-model="dlg.form.password" type="password" show-password maxlength="40" autocomplete="new-password"
@@ -141,8 +152,15 @@ const denied = ref('')
 const dlg = reactive({
   visible: false,
   id: null,
-  form: { userName: '', supplierCode: '', realName: '', password: '', enabled: true, remark: '' },
+  form: { userName: '', supplierCode: '', realName: '', phone: '', password: '', enabled: true, remark: '' },
 })
+
+/**
+ * 「账号是自动填的供应商编码」的标记(2026-10-25)。
+ * 用于区分"用户还没动过账号"与"用户已经手改过":
+ * 前者换供应商时跟着变,后者不覆盖(避免改到一半被冲掉)。
+ */
+const autoFilledUser = ref('')
 
 const ledgerName = computed(() => (stats.ledger === 'YJ_TEST' ? tt('测试账套') : tt('正式账套')))
 
@@ -187,24 +205,43 @@ async function searchSuppliers(keyword) {
   }
 }
 
+/**
+ * 选供应商后自动带出「账号 = 供应商编码」+「姓名 = 供应商名称」(2026-10-25 用户口径
+ * 「新增应该弹窗关联供应商,然后选择后账号默认供应商编码(可修改)」)。
+ *
+ * 只在**新增**时预填账号,且只在当前账号为空、或仍是上一次自动填的值时才覆盖 ——
+ * 用户如果已经手改过账号,就不该被后续换供应商冲掉(改到一半被覆盖很恼人)。
+ * 账号规则是 3~40 位字母/数字/下划线/点/横线,供应商编码不满足时不预填,让用户手填。
+ */
 function onSupplierChange(code) {
   const hit = suppliers.value.find((s) => s.code === code)
   if (hit && !dlg.form.realName) dlg.form.realName = hit.name
+  if (dlg.id) return                                    // 编辑态:账号不可改名,不预填
+  const codeStr = String(code || '').trim()
+  if (!codeStr) { autoFilledUser.value = ''; return }
+  const untouched = !dlg.form.userName || dlg.form.userName === autoFilledUser.value
+  if (!untouched) return                                // 用户已手改过,保留他的值
+  if (!/^[A-Za-z0-9_.\-]{3,40}$/.test(codeStr)) { autoFilledUser.value = ''; return }
+  dlg.form.userName = codeStr
+  autoFilledUser.value = codeStr
 }
 
 function openCreate() {
   dlg.id = null
-  dlg.form = { userName: '', supplierCode: '', realName: '', password: '', enabled: true, remark: '' }
+  autoFilledUser.value = ''
+  dlg.form = { userName: '', supplierCode: '', realName: '', phone: '', password: '', enabled: true, remark: '' }
   dlg.visible = true
   searchSuppliers('')
 }
 
 function openEdit(row) {
   dlg.id = row.id
+  autoFilledUser.value = ''
   dlg.form = {
     userName: row.userName,
     supplierCode: row.supplierCode,
     realName: row.realName,
+    phone: row.phone || '',
     password: '',
     enabled: row.enabled === '1',
     remark: row.remark || '',
@@ -227,12 +264,14 @@ async function save() {
       userName: f.userName,
       supplierCode: f.supplierCode,
       realName: f.realName,
+      phone: f.phone,
       password: f.password,
       enabled: f.enabled ? '1' : '0',
       remark: f.remark,
     })
     ElMessage.success(tt('已保存'))
     dlg.visible = false
+    autoFilledUser.value = ''
     await load()
   } catch (e) {
     ElMessage.error(apiMsg(e, tt('保存失败')))
@@ -255,6 +294,8 @@ async function toggle(row) {
       userName: row.userName,
       supplierCode: row.supplierCode,
       realName: row.realName,
+      // 带上电话:它只是档案信息,启停不该把它清掉(不带 = 后端按空值写入)
+      phone: row.phone || '',
       password: '',
       enabled: next,
       remark: row.remark,
@@ -280,6 +321,7 @@ async function resetPwd(row) {
       userName: row.userName,
       supplierCode: row.supplierCode,
       realName: row.realName,
+      phone: row.phone || '',   // 同上:重置密码不动电话
       password: value,
       enabled: row.enabled === '1' ? '1' : '0',
       remark: row.remark,

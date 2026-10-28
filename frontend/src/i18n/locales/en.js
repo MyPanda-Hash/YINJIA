@@ -4495,6 +4495,11 @@ export default {
     '配置供应商账号': 'Manage supplier accounts',
     '没有该面板的权限': 'No permission for this panel',
     '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Who can open this page: administrators, plus accounts whose role has “Manage supplier accounts” checked under Organization → Role & panel permissions → Smart Supply Chain → Supplier Permission Setup.',
+    '联系电话': 'Phone',
+    '如 13800000000 / 0752-5583930': 'e.g. 13800000000',
+    '选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。': 'Once a supplier is selected the account defaults to its supplier code (editable); the name defaults to the supplier name.',
+    '默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)': 'Defaults to the supplier code, editable (3–40 letters/digits/underscore/dot/hyphen)',
+    '已按供应商编码自动填写,可直接修改。': 'Filled from the supplier code — you can edit it.',
   },
 
 }

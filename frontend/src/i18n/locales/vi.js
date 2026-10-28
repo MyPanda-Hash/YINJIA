@@ -2419,6 +2419,11 @@ export default {
     '配置供应商账号': 'Quản lý tài khoản nhà cung cấp',
     '没有该面板的权限': 'Không có quyền với màn hình này',
     '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Người được vào trang này: quản trị viên và tài khoản thuộc vai trò đã chọn «Quản lý tài khoản nhà cung cấp» trong Tổ chức → Vai trò và quyền màn hình → Chuỗi cung ứng → Cấu hình quyền nhà cung cấp.',
+    '联系电话': 'Điện thoại',
+    '如 13800000000 / 0752-5583930': 'vd. 0901234567',
+    '选定供应商后,账号自动填该供应商编码,可手动修改;姓名默认取供应商名称。': 'Sau khi chọn nhà cung cấp, tài khoản tự điền mã nhà cung cấp (có thể sửa); họ tên lấy theo tên nhà cung cấp.',
+    '默认=供应商编码,可修改(3~40 位字母/数字/下划线/点/横线)': 'Mặc định = mã nhà cung cấp, có thể sửa (3–40 ký tự)',
+    '已按供应商编码自动填写,可直接修改。': 'Đã điền theo mã nhà cung cấp — có thể sửa.',
   },
 
 }

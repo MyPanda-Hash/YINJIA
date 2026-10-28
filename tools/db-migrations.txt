@@ -4197,3 +4197,9 @@ i18n-supplier-account-perm-20261025.sql
 #   用户口径「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」。
 #   不建表:与采购订单共用 bd_pu_order/bl_pu_order;yj_panel 插 1 行 + yj_field 按 PU_ORDER 逐列复制 186 行 + 面板名译名 9 语言鉴。两账套均需执行,幂等。
 migrate-supplier-po-panel-20261025.sql
+# ---- 2026-10-25 供应商账号加「联系电话」+ 弹窗新文案译名 ----
+#   用户口径「新增应该弹窗关联供应商,然后选择后账号默认供应商编码(可修改)。可以有联系电话」。
+#   ① yj_supplier_account 加 [phone] nvarchar(50) NULL + 列注明 + 自检;
+#   ② 弹窗新文案(联系电话/选定供应商后账号自动填编码/已自动填写)9 语言。两账套均需执行,幂等。
+migrate-supplier-account-phone-20261025.sql
+i18n-supplier-account-phone-20261025.sql

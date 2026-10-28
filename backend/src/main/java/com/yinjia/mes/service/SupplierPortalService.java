@@ -347,6 +347,8 @@ public class SupplierPortalService {
         StringBuilder sql = new StringBuilder(
                 "SELECT a.id, a.username AS userName, a.supplier_code AS supplierCode,"
                         + " ISNULL(g.[mc], N'') AS supplierName, a.enabled, ISNULL(a.remark,N'') AS remark,"
+                        // 联系电话(2026-10-25 用户口径「可以有联系电话」):供应商侧业务联系方式,可空
+                        + " ISNULL(a.phone,N'') AS phone,"
                         + " CONVERT(varchar(19),a.create_at,120) AS createAt, ISNULL(a.create_by,N'') AS createBy,"
                         + " ISNULL(u.real_name,N'') AS realName, ISNULL(u.[供应商编码],N'') AS userSupplierCode,"
                         + " ISNULL(u.enabled,'') AS userEnabled"
@@ -356,9 +358,10 @@ public class SupplierPortalService {
         List<Object> args = new ArrayList<>();
         String kw = keyword == null ? "" : keyword.trim();
         if (!kw.isEmpty()) {
-            sql.append(" AND (a.username LIKE ? OR a.supplier_code LIKE ? OR g.[mc] LIKE ?)");
+            sql.append(" AND (a.username LIKE ? OR a.supplier_code LIKE ? OR g.[mc] LIKE ?"
+                    + " OR ISNULL(a.phone,N'') LIKE ?)");
             String like = "%" + kw + "%";
-            args.add(like); args.add(like); args.add(like);
+            args.add(like); args.add(like); args.add(like); args.add(like);
         }
         if (supplierCode != null && !supplierCode.isBlank()) {
             sql.append(" AND a.supplier_code = ?");
@@ -380,6 +383,9 @@ public class SupplierPortalService {
         String supplierCode = str(body.get("supplierCode"));
         String realName = str(body.get("realName"));
         String remark = str(body.get("remark"));
+        // 联系电话(2026-10-25 用户口径「可以有联系电话」):可空,只作档案联系信息,不参与鉴权
+        String phone = str(body.get("phone"));
+        if (phone.length() > 50) throw new IllegalArgumentException("联系电话最多 50 个字符");
         String password = body.get("password") == null ? "" : String.valueOf(body.get("password"));
         boolean enabled = !"0".equals(String.valueOf(body.getOrDefault("enabled", "1")));
         if (userName.isEmpty() || !USERNAME.matcher(userName).matches()) {
@@ -412,8 +418,9 @@ public class SupplierPortalService {
         String by = currentUserName();
         if (editing) {
             int id = Integer.parseInt(String.valueOf(idObj));
-            jdbc.update("UPDATE yj_supplier_account SET supplier_code=?, enabled=?, remark=?, update_by=?, update_at=SYSDATETIME()"
-                            + " WHERE id=?", supplierCode, enabled ? "1" : "0", remark, by, id);
+            jdbc.update("UPDATE yj_supplier_account SET supplier_code=?, enabled=?, remark=?, phone=?, update_by=?, update_at=SYSDATETIME()"
+                            + " WHERE id=?", supplierCode, enabled ? "1" : "0", remark,
+                    phone.isEmpty() ? null : phone, by, id);
             if (!password.isBlank()) {
                 jdbc.update("UPDATE yj_user SET real_name=?, [供应商编码]=?, enabled=?, password_hash=? WHERE username=?",
                         realName, supplierCode, enabled ? "1" : "0", encoder.encode(password), userName);
@@ -431,8 +438,9 @@ public class SupplierPortalService {
                         enabled ? "1" : "0", supplierCode);
             }
         } else {
-            jdbc.update("INSERT INTO yj_supplier_account (username, supplier_code, enabled, remark, create_by, asp_user1, asp_time1)"
-                    + " VALUES (?,?,?,?,?,?,SYSDATETIME())", userName, supplierCode, enabled ? "1" : "0", remark, by, by);
+            jdbc.update("INSERT INTO yj_supplier_account (username, supplier_code, enabled, remark, phone, create_by, asp_user1, asp_time1)"
+                    + " VALUES (?,?,?,?,?,?,?,SYSDATETIME())", userName, supplierCode, enabled ? "1" : "0", remark,
+                    phone.isEmpty() ? null : phone, by, by);
             jdbc.update("INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled, [供应商编码])"
                     + " VALUES (?,?,?,'N',NULL,NULL,?,?)", userName, encoder.encode(password), realName,
                     enabled ? "1" : "0", supplierCode);
