@@ -76,23 +76,48 @@
           </el-button>
         </div>
       </div>
+      <!-- ② 已排产 的本地筛选(2026-10-28 用户口径:「除去「全部」这个筛选外,还需要增加其他筛选 ——
+           增加模糊搜索查看当前的已排产内容」)。
+           纯前端过滤:数据已整表在手(今日几十行 / 全部四百余行),输入即时出结果,不往返服务端;
+           与顶部①的「关键字/客户」互不相干(那两个只筛待排产池)。 -->
+      <div class="sb-filters">
+        <el-input v-model="todayKw" size="small" clearable class="sb-f-kw"
+                  :placeholder="tt('加工单号 / 行号 / 批次号 / 产品 / 品名 / 型号 / 产线 / 班组(空格分词,全部命中)')"
+                  @input="onTodayFilter" @clear="onTodayFilter" />
+        <el-select v-model="todayLine" size="small" clearable class="sb-f-sel" :placeholder="tt('生产线')" @change="onTodayFilter">
+          <el-option v-for="x in todayLineOpts" :key="x" :label="x" :value="x" />
+        </el-select>
+        <el-select v-model="todayStatus" size="small" clearable class="sb-f-sel" :placeholder="tt('生产状态')" @change="onTodayFilter">
+          <el-option v-for="x in todayStatusOpts" :key="x" :label="x" :value="x" />
+        </el-select>
+        <span class="sb-dim">{{ tt('显示') }} {{ filteredToday.length }} / {{ todayRows.length }} {{ tt('行') }}</span>
+        <el-button v-if="todayFiltering" size="small" link type="primary" @click="clearTodayFilter">{{ tt('清空筛选') }}</el-button>
+      </div>
       <!-- row-key 必须**唯一到行**(2026-10-07 修:此前用 加工单号 ⇒ 同一工单多行时勾一条会全勾) -->
-      <el-table ref="todayTable" :data="todayRows" size="small" border height="240" empty-text="" row-key="rowKey"
+      <el-table ref="todayTable" :data="filteredToday" size="small" border height="240" empty-text="" row-key="rowKey"
                 @selection-change="onCheckToday">
         <el-table-column type="selection" width="42" />
         <el-table-column :label="tt('生产线')" prop="生产线" width="110" fixed />
         <el-table-column :label="tt('排产班组')" prop="排产班组" width="100" fixed />
-        <el-table-column :label="tt('加工单号')" prop="加工单号" width="150" />
+        <el-table-column :label="tt('加工单号')" prop="加工单号" width="130" />
         <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
-        <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
-        <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" />
-        <el-table-column :label="tt('排产数量')" prop="排产数量" width="95" align="right" />
-        <el-table-column :label="tt('需求数量')" prop="需求数量" width="95" align="right" />
-        <el-table-column :label="tt('入库数量')" prop="入库数量" width="95" align="right" />
-        <el-table-column :label="tt('余量')" prop="余量" width="85" align="right" />
-        <el-table-column :label="tt('预开工日')" prop="预开工日" width="105" />
-        <el-table-column :label="tt('预完工日')" prop="预完工日" width="105" />
-        <el-table-column :label="tt('计划线')" prop="计划线" min-width="240" show-overflow-tooltip />
+        <el-table-column :label="tt('批次号')" prop="批次号" width="90" sortable />
+        <!-- 产品 / 品名 / 型号(2026-10-21 用户口径「快速排产看不到已排单的型号,需要增加对应的产品
+             还有规格型号」):与上面①待排产池的列同名同值(产品编号/品名/型号),同一屏上下口径一致。
+             加这三列后整套列宽做了一轮收紧(加工单号 150→130、数量列 95→85、日期列 105→90、
+             计划线 240→220…,表宽 1502→1717px),让 1920 屏可视区(1674px)仍能一眼看到计划线;
+             窄屏仍可横向拖动。列宽别随手加大 —— 加过去就要从别处挪回来。 -->
+        <el-table-column :label="tt('产品编号')" prop="产品编号" width="100" show-overflow-tooltip />
+        <el-table-column :label="tt('品名')" prop="品名" min-width="130" show-overflow-tooltip />
+        <el-table-column :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
+        <el-table-column :label="tt('生产状态')" prop="生产状态" width="80" />
+        <el-table-column :label="tt('排产数量')" prop="排产数量" width="85" align="right" />
+        <el-table-column :label="tt('需求数量')" prop="需求数量" width="85" align="right" />
+        <el-table-column :label="tt('入库数量')" prop="入库数量" width="80" align="right" />
+        <el-table-column :label="tt('余量')" prop="余量" width="75" align="right" />
+        <el-table-column :label="tt('预开工日')" prop="预开工日" width="90" />
+        <el-table-column :label="tt('预完工日')" prop="预完工日" width="90" />
+        <el-table-column :label="tt('计划线')" prop="计划线" min-width="220" show-overflow-tooltip />
       </el-table>
     </div>
 
@@ -111,6 +136,7 @@ import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { canDo, canDoAny } from '@core/auth/panelAccess'
 import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
+import { filterScheduled, isFiltering } from '@/business/scheduleFilter'
 
 /**
  * 页面级权限(2026-10-16):本组件**两处挂载** —— 快速排产页(/prod/plan/scheduleBoard)与其
@@ -177,7 +203,11 @@ async function loadStats() {
 
 async function loadToday() {
   try {
-    const res = await request.post('/px/scheduleBoard/today', { mode: mode.value, keyword: keyword.value })
+    // 2026-10-28:② 有了自己的筛选条 ⇒ 顶部①的「关键字」不再连带筛②(两个域各管各的,免得
+    //   "在①里打了个关键字,②莫名其妙只剩几行")。**内嵌模式例外**(生产工单页弹出本组件时,
+    //   目的就是只看那一张工单的已排行,必须继续按预置单号收敛)。
+    const kw = props.embedded ? keyword.value : ''
+    const res = await request.post('/px/scheduleBoard/today', { mode: mode.value, keyword: kw })
     // 行唯一键:同一工单可能有多行(多工单行/多批次)⇒ 用 加工单号#工单行号#批次号(否则勾一条会全勾)
     todayRows.value = (res.data || []).map((r, i) => ({
       ...r,
@@ -190,6 +220,35 @@ async function loadToday() {
 function loadAll() { loadPool(); loadStats(); loadToday() }
 function onCheck(r) { checked.value = r }
 function onCheckToday(r) { checkedToday.value = r }
+
+// ───────── ② 已排产 的本地筛选(2026-10-28) ─────────
+// 用户口径:「除去「全部」这个筛选外,还需要增加其他筛选实现 —— 增加模糊搜索查看当前的已排产内容」。
+// 规则与边界全在纯函数 business/scheduleFilter.js(带单测),本组件只存状态 + 渲染:
+//   · 关键字按空格分词,每个词都要命中任一列(不分大小写);生产线/生产状态为精确等值,三者叠加;
+//   · 纯前端过滤(整表已在手),输入即时出结果,不往返服务端。
+// ⚠ 顶部①的「关键字/客户」只管待排产池(loadToday 非内嵌时不再带 keyword,见上面的注释)。
+const todayKw = ref('')
+const todayLine = ref('')
+const todayStatus = ref('')
+const todayLineOpts = computed(() => [...new Set(todayRows.value.map((r) => r['生产线']).filter(Boolean))].sort())
+const todayStatusOpts = computed(() => [...new Set(todayRows.value.map((r) => r['生产状态']).filter(Boolean))])
+const filteredToday = computed(() => filterScheduled(todayRows.value, {
+  keyword: todayKw.value, line: todayLine.value, status: todayStatus.value,
+}))
+const todayFiltering = computed(() => isFiltering({
+  keyword: todayKw.value, line: todayLine.value, status: todayStatus.value,
+}))
+/** 改了筛选就把勾选清掉:否则会「勾上了看不见的行」,撤销/预排线按看不见的行执行 */
+function onTodayFilter() {
+  checkedToday.value = []
+  todayTable.value?.clearSelection?.()
+}
+function clearTodayFilter() {
+  todayKw.value = ''
+  todayLine.value = ''
+  todayStatus.value = ''
+  onTodayFilter()
+}
 
 
 // ───────── 工序路线排线(2026-10-07):排产 = 一次把整条工艺路线的线选好 ─────────
@@ -270,6 +329,10 @@ onMounted(() => {
 .sb-block-title { font-weight: 600; font-size: 13px; color: #303133; }
 .sb-dim { font-size: 12px; color: #909399; }
 .sb-actions { margin-left: auto; }
+/* ② 已排产 的本地筛选条(2026-10-28) */
+.sb-filters { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f0f2f3; flex-wrap: wrap; }
+.sb-f-kw { width: 320px; }
+.sb-f-sel { width: 130px; }
 .sb-late { color: #f56c6c; font-weight: 600; }
 .sb-near { color: #e6a23c; font-weight: 600; }
 </style>

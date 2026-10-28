@@ -1095,6 +1095,9 @@ export default {
     '本次排产数量': 'Qty This Run',
     '今日已排产': "Today's Assigned",
     '全部已排产': 'All Assigned',
+    // ② 已排产的本地筛选(2026-10-28 用户口径:除「全部」外再加模糊搜索)
+    '加工单号 / 行号 / 批次号 / 产品 / 品名 / 型号 / 产线 / 班组(空格分词,全部命中)':
+      'MO no. / line / lot / item code / name / spec / line / team (space-separated, all must match)',
     '撤销排产': 'Unassign',
     '生产线': 'Line',
     '生产状态': 'Status',
