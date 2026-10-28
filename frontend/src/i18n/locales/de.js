@@ -2410,6 +2410,10 @@ export default {
     '删除后该账号不能再登录(历史打印记录保留)。': 'Danach keine Anmeldung mehr (Druckhistorie bleibt).',
     '测试账套': 'Testdatenbank',
     '共 {n} 张': 'Gesamt {n} Belege',
+    '已授权': 'Berechtigt',
+    '配置供应商账号': 'Lieferantenkonten verwalten',
+    '没有该面板的权限': 'Keine Berechtigung für dieses Panel',
+    '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Zugriff haben Administratoren sowie Konten, deren Rolle unter Organisation → Rollen- und Panelrechte → Smart Supply Chain → Lieferantenberechtigungen „Lieferantenkonten verwalten“ angehakt hat.',
   },
 
 }

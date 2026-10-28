@@ -121,7 +121,10 @@ test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打�
   assert.equal(accountLeaf.title, '供应商权限配置')
   assert.equal(accountLeaf.panelCode, 'SUPPLIER_ACCOUNT')
   assert.equal(accountLeaf.path, '/scm/supplierAccount')
-  assert.equal(accountLeaf.adminOnly, true, '供应商权限配置 = 维护他人登录账号,必须管理员专属')
+  // 2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」
+  // ⇒ 不再是 adminOnly,而是按 permKey 判(登录用户身上的 canConfigSupplierAccount 布尔位)
+  assert.ok(!accountLeaf.adminOnly, '供应商权限配置不再是管理员专属')
+  assert.equal(accountLeaf.permKey, 'canConfigSupplierAccount')
 
   // 非管理员看到采购管理、但看不到供应商权限配置(菜单层)
   const filtered = filterMenuTree([scm], ['PU_ORDER', 'SUPPLIER_PRINT'], false)
@@ -129,6 +132,21 @@ test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打�
   const fg = fp.children.find((c) => c.code === 'supplier')
   assert.deepEqual((fg?.children || []).map((c) => c.panelCode), ['SUPPLIER_PRINT'],
     '只有 SUPPLIER_PRINT 可见的账号,采购管理下只剩「供应商采购打印」这一条')
+
+  // 组织架构授权后(用户对象上 canConfigSupplierAccount=true + 面板可见):两条都在
+  const authorized = filterMenuTree([scm], ['PU_ORDER', 'SUPPLIER_PRINT', 'SUPPLIER_ACCOUNT'], false,
+    { canConfigSupplierAccount: true })
+  const ap = authorized[0].children.find((c) => c.code === 'purchase')
+  const ag = ap.children.find((c) => c.code === 'supplier')
+  assert.deepEqual((ag?.children || []).map((c) => c.panelCode), ['SUPPLIER_PRINT', 'SUPPLIER_ACCOUNT'],
+    '被授权「配置供应商账号」的角色,菜单里应出现「供应商权限配置」')
+
+  // 只有面板可见、但没有 permKey 授权 ⇒ 仍不显示(防越权入口)
+  const visibleOnly = filterMenuTree([scm], ['PU_ORDER', 'SUPPLIER_ACCOUNT'], false, { canConfigSupplierAccount: false })
+  const vp = visibleOnly[0].children.find((c) => c.code === 'purchase')
+  assert.ok(!(vp.children || []).some((c) => c.code === 'supplier'),
+    '没有 canConfigSupplierAccount 时不得出现供应商门户分组')
+
   // 供应商会话(visiblePanels 只含 SUPPLIER_PRINT)看到的整棵树 = 一条路径 → 一个叶子
   const supplierTree = filterMenuTree(menuTree, ['SUPPLIER_PRINT'], false)
   const leaves = []

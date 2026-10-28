@@ -112,6 +112,72 @@ public class SupplierPortalService {
     }
 
     /**
+     * 「供应商权限配置」的权限词(与 {@link PagePanelRegistry#SUPPLIER_ACCOUNT} 动作集同一个词)。
+     * 词落 yj_role_panel.perms:组织架构 →「角色与面板权限」→ 智能供应链 →「供应商权限配置」勾上即授权。
+     */
+    public static final String PERM_SUPPLIER_ACCOUNT = "supplier";
+
+    /**
+     * 配置供应商账号的闸门(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
+     * 添加可以配置的账号」)。
+     *
+     * <p>判据 = **管理员 ∪ 角色在本面板持有 {@code supplier} 词**:
+     * <ul>
+     *   <li>管理员恒过(与全站其他面板一致);</li>
+     *   <li>组织架构里给某角色勾上「供应商权限配置 · 配置供应商账号」,该角色下的账号即可维护供应商账号
+     *       (与 field/warn 同一套「逐面板授予的配置权」);</li>
+     *   <li>供应商账号本身永远不过 —— 它只能看自己的采购订单,不能自己开账号;</li>
+     *   <li>权限收回也立即生效(每次请求现查 yj_role_panel,无缓存)。</li>
+     * </ul>
+     * 前端只做入口显隐(未授权时菜单里不出现该项),这里才是真闸门。
+     */
+    public void requireAccountConfig() {
+        String user = currentUserName();
+        try {
+            Integer admin = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_user WHERE username = ? AND is_admin = 'Y'", Integer.class, user);
+            if (admin != null && admin > 0) return;   // 管理员恒过
+        } catch (RuntimeException ignore) {
+            // 账号表异常:继续走权限词判定(宁可拦下,也不放大权限)
+        }
+        if (supplierCodeOf(user) != null) {
+            throw new AccessDeniedException("供应商账号无「供应商权限配置」权限");
+        }
+        boolean granted;
+        try {
+            granted = jdbc.queryForList(
+                    "SELECT rp.perms FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                            + " WHERE u.username = ? AND rp.panel_code = ?", user, PANEL_ACCOUNT)
+                    .stream().anyMatch(r -> hasWord(r.get("perms"), PERM_SUPPLIER_ACCOUNT));
+        } catch (RuntimeException e) {
+            granted = false;
+        }
+        if (!granted) {
+            throw new AccessDeniedException("当前账号没有「供应商权限配置」权限(请联系管理员在组织架构里为该角色勾选「配置供应商账号」)");
+        }
+    }
+
+    /** 当前账号能否配置供应商账号(前端入口显隐用;真闸门在 requireAccountConfig) */
+    public boolean canConfigAccounts() {
+        try {
+            requireAccountConfig();
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** csv 权限词表是否含某词(与 PanelPermissionService.hasAnyPerm 同口径:逐词精确匹配) */
+    private static boolean hasWord(Object perms, String word) {
+        if (perms == null) return false;
+        String s = String.valueOf(perms);
+        for (String p : s.split(",")) {
+            if (word.equals(p.trim())) return true;
+        }
+        return false;
+    }
+
+    /**
      * 供应商门店取数前的闸门:必须**登录态属于某个供应商**(管理员/内部账号不适用 ——
      * 他们没有"对应供应商编码",一律 403;管理员要看数据请到采购订单面板)。
      * 返回的编码已经是**服务端认定的**,前端传来的任何供应商编码一律不采信。

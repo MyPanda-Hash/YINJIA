@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -124,6 +125,24 @@ public class AuthController {
                 // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
                 user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
             }
+            // 供应商权限配置入口(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
+            //   添加可以配置的账号」):管理员 ∪ 角色持有 SUPPLIER_ACCOUNT 的 supplier 词。
+            //   前端据此显隐菜单/页签;真闸门是 SupplierPortalService.requireAccountConfig(同一句判定)。
+            boolean canConfigSupplier = !admin && canConfigSupplierAccount(u.get("role_id"));
+            if (canConfigSupplier) {
+                // 让前端能看见并进入该页:页面级权限补上「可见」+ supplier 词,导航里才留得住这一条
+                Object raw = user.get("pagePerms");
+                if (raw instanceof Map<?, ?> m) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> pagePerms = (Map<String, Object>) m;
+                    pagePerms.put(PagePanelRegistry.SUPPLIER_ACCOUNT, "view,supplier");
+                }
+                @SuppressWarnings("unchecked")
+                List<Object> vis = user.get("visiblePanels") instanceof List<?> l ? new ArrayList<>(l) : new ArrayList<>();
+                vis.add(PagePanelRegistry.SUPPLIER_ACCOUNT);
+                user.put("visiblePanels", vis);
+            }
+            user.put("canConfigSupplierAccount", admin || canConfigSupplier);
             Map<String, Object> out = new HashMap<>();
             out.put("token", jwtUtil.generate(username, factory));
             out.put("user", user);
@@ -226,7 +245,34 @@ public class AuthController {
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
         user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
         user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
+        // 供应商权限配置(2026-10-25):与 {@link #login} 同源下发,否则刷新页面后入口又消失
+        boolean canConfigSupplier = !admin && canConfigSupplierAccount(u.get("role_id"));
+        if (canConfigSupplier) {
+            Object raw = user.get("pagePerms");
+            if (raw instanceof Map<?, ?> m) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> pagePerms = (Map<String, Object>) m;
+                pagePerms.put(PagePanelRegistry.SUPPLIER_ACCOUNT, "view,supplier");
+            }
+            @SuppressWarnings("unchecked")
+            List<Object> vis = user.get("visiblePanels") instanceof List<?> l ? new ArrayList<>(l) : new ArrayList<>();
+            vis.add(PagePanelRegistry.SUPPLIER_ACCOUNT);
+            user.put("visiblePanels", vis);
+        }
+        user.put("canConfigSupplierAccount", admin || canConfigSupplier);
         return user;
+    }
+
+    /**
+     * 该角色是否持有「供应商权限配置 · 配置供应商账号」词(2026-10-25)。
+     * 判定 = yj_role_panel 里 SUPPLIER_ACCOUNT 这一行的 perms 含 `supplier`(逐词精确匹配,
+     * 不用 LIKE '%supplier%' 免得将来出现同前缀词被误命中);与
+     * SupplierPortalService.requireAccountConfig() 的真闸门**同一口径**。
+     */
+    private boolean canConfigSupplierAccount(Object roleId) {
+        if (roleId == null) return false;
+        return panelsWithPerm(false, roleId, SupplierPortalService.PERM_SUPPLIER_ACCOUNT)
+                .contains(PagePanelRegistry.SUPPLIER_ACCOUNT);
     }
 
     /** 角色名(2026-10-18 补)。顶栏「账号信息」弹窗与新的系统管理平台入口页都显示「角色」,

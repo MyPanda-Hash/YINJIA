@@ -195,11 +195,20 @@ public final class PagePanelRegistry {
     };
 
     /**
-     * 供应商权限配置:管理员专属页面,动作集只登记「可见」——
-     * 新建/停用/重置密码一律 requireAdmin(与 ERP_INTEG 的 view-only 同一口径)。
+     * 供应商权限配置(2026-10-24;2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
+     * 添加可以配置的账号」)。
+     *
+     * <p>动作集 = 「配置供应商账号」这一个词(supplier):
+     * <ul>
+     *   <li>组织架构 →「角色与面板权限」勾上它,该角色下的账号就能进本页维护供应商账号
+     *       (与「自定义字段」field、「预警配置」warn 同一套机制:词落 yj_role_panel.perms);</li>
+     *   <li>管理员恒可(与其他面板一致);</li>
+     *   <li>真正的闸门在 {@link SupplierPortalService#requireAccountConfig()} ——
+     *       前端只做入口显隐,拿令牌直接调接口一样要过这个词。</li>
+     * </ul>
      */
     private static final String[][] SUPPLIER_ACCOUNT_ACTIONS = {
-            {"view", "可见"},
+            {"supplier", "配置供应商账号"},
     };
 
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */

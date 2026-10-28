@@ -146,7 +146,8 @@ const navRef = ref(null)
 const cardRef = ref(null)
 
 // 角色权限过滤后的菜单树（操作员仅见被授权面板）
-const menuTree = computed(() => filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin))
+// 第 4 个参数传 user:菜单项上的 permKey(如「供应商权限配置」= canConfigSupplierAccount)要读登录用户身上的布尔位
+const menuTree = computed(() => filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin, user.$state))
 
 const expandedGroup = ref('')
 const cardModule = ref(null)

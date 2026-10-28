@@ -4188,3 +4188,7 @@ i18n-pu-label-prod-date-20261023.sql
 #   ② 两个页面级虚拟面板的译名(yj_translation,scope=panel,9 语言 manual)。两账套均需执行,均幂等。
 migrate-supplier-portal-20261024.sql
 i18n-supplier-portal-20261024.sql
+
+#  ---- 2026-10-25 「供应商权限配置」改为组织架构按角色授权(不再仅管理员):新文案译名 ----
+#    用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」。只补界面文案译名(已授权/配置供应商账号/说明句),幂等。
+i18n-supplier-account-perm-20261025.sql

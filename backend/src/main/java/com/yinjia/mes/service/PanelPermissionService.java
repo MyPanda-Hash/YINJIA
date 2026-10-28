@@ -54,7 +54,9 @@ public class PanelPermissionService {
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),
             Map.entry("unclose", "取消结案"), Map.entry("print", "打印"), Map.entry("close", "结案"),
-            Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"));
+            Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"),
+            // 供应商权限配置(2026-10-25):组织架构里给角色勾上这个词即可维护供应商账号
+            Map.entry("supplier", "配置供应商账号"));
 
     static {
         Map<String, String[]> m = new HashMap<>();

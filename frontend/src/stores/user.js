@@ -29,6 +29,11 @@ export const useUserStore = defineStore('user', {
       // 前端据此把界面收成「供应商门户」(无侧栏、只有采购打印一页),路由守卫也认这个键。
       supplierCode: typeof ui?.supplierCode === 'string' ? ui.supplierCode : '',
       supplierName: ui?.supplierName || '',
+      // 能否配置供应商账号(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加
+      // 可以配置的账号」):管理员 ∪ 角色在组织架构里被勾了「供应商权限配置 · 配置供应商账号」。
+      // 前端据此显隐「采购管理 → 供应商权限配置」菜单与入口;真闸门在后端
+      // SupplierPortalService.requireAccountConfig(同一个 supplier 词)。
+      canConfigSupplierAccount: !!ui?.canConfigSupplierAccount,
     }
   },
   getters: {
@@ -74,6 +79,7 @@ export const useUserStore = defineStore('user', {
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
       this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
       this.supplierName = u?.supplierName || ''
+      this.canConfigSupplierAccount = !!u?.canConfigSupplierAccount
     },
     // 刷新权限（角色/面板配置变更后调用）
     async fetchPerms() {
@@ -89,8 +95,10 @@ export const useUserStore = defineStore('user', {
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}
       this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : ''
       this.supplierName = p.supplierName || ''
+      // /auth/perms 不下发该布尔位时保持原值(只有登录/userinfo 是它的真源)
+      if (p.canConfigSupplierAccount !== undefined) this.canConfigSupplierAccount = !!p.canConfigSupplierAccount
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, pagePerms: this.pagePerms, supplierCode: this.supplierCode, supplierName: this.supplierName }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, pagePerms: this.pagePerms, supplierCode: this.supplierCode, supplierName: this.supplierName, canConfigSupplierAccount: this.canConfigSupplierAccount }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -145,6 +153,7 @@ export const useUserStore = defineStore('user', {
       this.pagePerms = {}
       this.supplierCode = ''
       this.supplierName = ''
+      this.canConfigSupplierAccount = false
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
     },

@@ -284,7 +284,7 @@ function onPickFactory(f) {
 const matched = computed(() => {
   const k = keyword.value.trim().toLowerCase()
   if (!k) return []
-  return flatMenus(filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin))
+  return flatMenus(filterMenuTree(rawMenuTree, user.visiblePanels, user.isAdmin, user.$state))
     .filter((m) => {
       if (!m.path) return false
       return [m.title, m.fullTitle, m.panelCode, m.path]

@@ -1,7 +1,6 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
-import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.SupplierPortalService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,8 +25,9 @@ import java.util.Map;
  *    GET  /portal/orders                   → 采购订单清单(分页/关键词/日期/只看未关闭)
  *    GET  /portal/order?docNo=…            → 单张订单(头 + 明细行;按 单据号+供应商编码 双过滤)
  *    POST /portal/print                    → 打印留痕(同样先核归属)
- *  管理员端(全部 requireAdmin):
- *    GET  /accounts                        → 供应商账号列表
+ *  管理端(管理员 ∪ 组织架构授权了「配置供应商账号」的账号,统一走 requireAccountConfig):
+ *    GET  /accounts/permission           → { canConfig } 前端入口显隐
+ *    GET  /accounts                      → 供应商账号列表
  *    GET  /accounts/overview               → 顶部统计
  *    GET  /suppliers?keyword=              → 供应商档案下拉
  *    POST /accounts/save                   → 新建/修改(同事务写 yj_supplier_account + yj_user)
@@ -43,11 +43,9 @@ import java.util.Map;
 public class SupplierPortalController {
 
     private final SupplierPortalService portal;
-    private final PanelPermissionService perm;
 
-    public SupplierPortalController(SupplierPortalService portal, PanelPermissionService perm) {
+    public SupplierPortalController(SupplierPortalService portal) {
         this.portal = portal;
-        this.perm = perm;
     }
 
     // ============ 供应商端 ============
@@ -96,38 +94,47 @@ public class SupplierPortalController {
         return ApiResult.ok(null);
     }
 
-    // ============ 管理员端:供应商账号维护 ============
+    // ============ 管理端:供应商账号维护 ============
+    // 2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」:
+    //   **管理员 ∪ 组织架构里给该角色勾了「供应商权限配置 · 配置供应商账号」的账号** 都能进;
+    //   判据统一走 SupplierPortalService.requireAccountConfig()(逐请求现查 yj_role_panel,收回立即生效)。
+
+    /** 本账号能不能配置供应商账号(前端入口显隐用;真闸门是各写接口里的 requireAccountConfig) */
+    @GetMapping("/accounts/permission")
+    public ApiResult<Map<String, Object>> accountPermission() {
+        return ApiResult.ok(Map.of("canConfig", portal.canConfigAccounts()));
+    }
 
     @GetMapping("/accounts/overview")
     public ApiResult<Map<String, Object>> overview() {
-        perm.requireAdmin();
+        portal.requireAccountConfig();
         return ApiResult.ok(portal.overview());
     }
 
     @GetMapping("/accounts")
     public ApiResult<List<Map<String, Object>>> accounts(@RequestParam(required = false) String keyword,
                                                          @RequestParam(required = false) String supplierCode) {
-        perm.requireAdmin();
+        portal.requireAccountConfig();
         return ApiResult.ok(portal.accounts(keyword, supplierCode));
     }
 
     /** 供应商档案下拉(dm_gf);供应商权限配置页选供应商用 */
     @GetMapping("/suppliers")
     public ApiResult<List<Map<String, Object>>> suppliers(@RequestParam(required = false) String keyword) {
-        perm.requireAdmin();
+        portal.requireAccountConfig();
         return ApiResult.ok(portal.suppliers(keyword));
     }
 
     @PostMapping("/accounts/save")
     public ApiResult<Void> saveAccount(@RequestBody Map<String, Object> body) {
-        perm.requireAdmin();
+        portal.requireAccountConfig();
         portal.saveAccount(body == null ? Map.of() : body);
         return ApiResult.ok(null);
     }
 
     @DeleteMapping("/accounts/{id}")
     public ApiResult<Void> deleteAccount(@PathVariable int id) {
-        perm.requireAdmin();
+        portal.requireAccountConfig();
         portal.deleteAccount(id);
         return ApiResult.ok(null);
     }

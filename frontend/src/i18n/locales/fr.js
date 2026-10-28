@@ -2410,6 +2410,10 @@ export default {
     '删除后该账号不能再登录(历史打印记录保留)。': 'Le compte ne pourra plus se connecter (historique conservé).',
     '测试账套': 'Base de test',
     '共 {n} 张': '{n} pièces',
+    '已授权': 'Autorisé',
+    '配置供应商账号': 'Gérer les comptes fournisseurs',
+    '没有该面板的权限': 'Pas de droit sur ce panneau',
+    '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Accès réservé aux administrateurs et aux comptes dont le rôle a « Gérer les comptes fournisseurs » coché dans Organisation → Rôles et droits des panneaux → Chaîne d’approvisionnement → Droits fournisseurs.',
   },
 
 }

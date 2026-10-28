@@ -4491,6 +4491,10 @@ export default {
     '删除供应商账号': 'Delete Supplier Account',
     '删除后该账号不能再登录(历史打印记录保留)。': 'The account can no longer sign in (print history is kept).',
     '共 {n} 张': '{n} orders',
+    '已授权': 'Authorized',
+    '配置供应商账号': 'Manage supplier accounts',
+    '没有该面板的权限': 'No permission for this panel',
+    '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Who can open this page: administrators, plus accounts whose role has “Manage supplier accounts” checked under Organization → Role & panel permissions → Smart Supply Chain → Supplier Permission Setup.',
   },
 
 }

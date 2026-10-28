@@ -54,10 +54,12 @@ const routes = [
       // 供应商门户(2026-10-24):两个页面级虚拟面板(定义见后端 PagePanelRegistry)。
       //   · /scm/supplierPrint   供应商采购打印 —— **供应商登录后唯一能进的页面**(只读列表 + 采购订单纸质单);
       //     数据接口 /api/supplier/portal/* 服务端按供应商编码过滤,前端传什么都不采信。
-      //   · /scm/supplierAccount 供应商权限配置 —— 管理员专属(requireAdmin 双保险,菜单侧 adminOnly)。
+      //   · /scm/supplierAccount 供应商权限配置 —— **管理员 ∪ 组织架构授权了「配置供应商账号」的账号**
+      //     (2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」);
+      //     用 meta.permKey 判(与菜单项 permKey、后端 requireAccountConfig 同源),不再是 requireAdmin。
       // 两页都不走通用 PanelxList,故不进 flatMenus 自动路由(菜单项带 panelCode 已被 filter 排除)。
       { path: 'scm/supplierPrint', component: () => import('@/views/scm/SupplierPrint.vue'), meta: { title: '供应商采购打印', code: 'supplierPrint', panelCode: 'SUPPLIER_PRINT' } },
-      { path: 'scm/supplierAccount', component: () => import('@/views/scm/SupplierAccount.vue'), meta: { title: '供应商权限配置', code: 'supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', requireAdmin: true } },
+      { path: 'scm/supplierAccount', component: () => import('@/views/scm/SupplierAccount.vue'), meta: { title: '供应商权限配置', code: 'supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', permKey: 'canConfigSupplierAccount' } },
       // 扫码领料(2026-10-18):条码管理 → 扫码领料。页面级(无 panelCode),扫标签码 `存货编码|批号`
       // 按批号查 v_stock_pick 可用量 → 组材料出库单草稿。理由见 views/scm/ScanPick.vue 头注释。
       { path: 'scm/scanPick', component: () => import('@/views/scm/ScanPick.vue'), meta: { title: '扫码领料', code: 'barcodeScanPick', panelCode: 'BARCODE_SCAN_PICK' } },
@@ -131,6 +133,9 @@ router.beforeEach((to) => {
   }
   if (to.path !== '/login' && !user.isLogin) return '/login'
   if (to.meta.requireAdmin && !user.isAdmin) return '/dashboard'
+  // 按登录用户身上的布尔位守卫(2026-10-25):组织架构授权的页面(供应商权限配置)不是 adminOnly,
+  // 判定读 user[meta.permKey](canConfigSupplierAccount),与菜单项 permKey 同源。
+  if (to.meta.permKey && user.isLogin && !user[to.meta.permKey]) return '/dashboard'
   if (to.path === '/login' && user.isLogin) return '/dashboard'
   // 页面级面板守卫(2026-10-16):直接敲 URL 也要拦 —— 菜单隐藏只是显示层,
   // 订单结转/快速排产/工单排产/生产工单四个看板页面此前没有面板码,任何人都能直连。

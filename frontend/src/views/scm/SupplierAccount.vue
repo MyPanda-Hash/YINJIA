@@ -14,7 +14,7 @@
     <div class="sa-head">
       <div class="sa-head-main">
         <span class="sa-title">{{ tt('供应商权限配置') }}</span>
-        <el-tag size="small" type="info">{{ tt('仅管理员') }}</el-tag>
+        <el-tag v-if="!user.isAdmin" size="small" type="success">{{ tt('已授权') }}</el-tag>
         <el-tag v-if="stats.ledger" size="small" type="warning">{{ ledgerName }}</el-tag>
       </div>
       <div class="sa-head-tools">
@@ -25,6 +25,9 @@
 
     <div class="sa-tip">
       {{ tt('供应商账号登录后只能看到「供应商采购打印」一页,只能查看和打印所绑定供应商编码名下的采购订单,没有其它任何权限。') }}
+    </div>
+    <div class="sa-tip">
+      {{ tt('谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。') }}
     </div>
 
     <!-- 顶部统计 -->
@@ -45,7 +48,7 @@
     </div>
 
     <el-table :data="rows" v-loading="loading" border stripe size="small"
-      :empty-text="loading ? tt('加载中…') : tt('还没有供应商账号,点右上角「新增供应商账号」')">
+      :empty-text="loading ? tt('加载中…') : (denied || tt('还没有供应商账号,点右上角「新增供应商账号」'))">
       <el-table-column :label="tt('账号')" prop="userName" min-width="140" show-overflow-tooltip />
       <el-table-column :label="tt('供应商编码')" prop="supplierCode" width="130" />
       <el-table-column :label="tt('供应商名称')" prop="supplierName" min-width="200" show-overflow-tooltip>
@@ -120,7 +123,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@core/request'
+import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
+
+const user = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -129,6 +135,8 @@ const suppliers = ref([])
 const supplierLoading = ref(false)
 const stats = reactive({})
 const filter = reactive({ keyword: '' })
+/** 无权限时的说明(不再是"只有管理员":组织架构授权的账号也能进,真拦下时要说清为什么) */
+const denied = ref('')
 
 const dlg = reactive({
   visible: false,
@@ -151,10 +159,17 @@ async function load() {
       request.get('/supplier/portal/accounts', { params: { keyword: filter.keyword || '' } }),
       request.get('/supplier/portal/accounts/overview'),
     ])
+    // 后端 403 走 HTTP 200 + body code(GlobalExceptionHandler),这里必须显式判码,
+    // 否则未授权账号会看到一张"空列表"而不是"没有权限"的说明。
+    if (list?.code && list.code !== 200) throw new Error(list.message || tt('没有该面板的权限'))
+    if (ov?.code && ov.code !== 200) throw new Error(ov.message || tt('没有该面板的权限'))
     rows.value = list?.data || []
     Object.assign(stats, ov?.data || {})
+    denied.value = ''
   } catch (e) {
-    ElMessage.error(apiMsg(e, tt('加载供应商账号失败')))
+    denied.value = apiMsg(e, tt('加载供应商账号失败'))
+    rows.value = []
+    ElMessage.error(denied.value)
   } finally {
     loading.value = false
   }

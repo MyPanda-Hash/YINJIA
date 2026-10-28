@@ -2415,6 +2415,10 @@ export default {
     '删除后该账号不能再登录(历史打印记录保留)。': 'Sau khi xóa sẽ không đăng nhập được (giữ lịch sử in).',
     '测试账套': 'Dữ liệu thử nghiệm',
     '共 {n} 张': '{n} đơn',
+    '已授权': 'Đã được cấp quyền',
+    '配置供应商账号': 'Quản lý tài khoản nhà cung cấp',
+    '没有该面板的权限': 'Không có quyền với màn hình này',
+    '谁能进入本页:管理员,以及在「组织架构 → 角色与面板权限 → 智能供应链 → 供应商权限配置」勾了「配置供应商账号」的角色下的账号。': 'Người được vào trang này: quản trị viên và tài khoản thuộc vai trò đã chọn «Quản lý tài khoản nhà cung cấp» trong Tổ chức → Vai trò và quyền màn hình → Chuỗi cung ứng → Cấu hình quyền nhà cung cấp.',
   },
 
 }

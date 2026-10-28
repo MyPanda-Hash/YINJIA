@@ -155,12 +155,14 @@ export const menuTree = [
           //   · 供应商采购打印 = **页面级虚拟面板** SUPPLIER_PRINT(定义见后端 PagePanelRegistry),
           //     供应商登录后菜单树只剩这一条;数据由 /api/supplier/portal/* 按供应商编码过滤,
           //     硬闸门是后端 SupplierPortalGuardFilter(供应商会话其余 /api 一律 403)。
-          //   · 供应商权限配置 = SUPPLIER_ACCOUNT,**管理员专属**(adminOnly ⇒ filterMenuTree 只对 isAdmin 放行,
-          //     路由侧 meta.requireAdmin + 后端 requireAdmin 三层同源),维护"哪个账号绑哪个供应商"。
+          //   · 供应商权限配置 = SUPPLIER_ACCOUNT:**管理员 ∪ 组织架构里给该角色勾了「配置供应商账号」
+          //     的账号**都能进(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
+          //     添加可以配置的账号」)。菜单显隐按 user.canConfigSupplierAccount,路由守卫同源,
+          //     后端真闸门 SupplierPortalService.requireAccountConfig(词 = supplier)。
           {
             code: 'supplier', title: '供应商门户', icon: 'User', children: [
               { code: 'supplierPrint', title: '供应商采购打印', path: '/scm/supplierPrint', panelCode: 'SUPPLIER_PRINT', icon: 'Printer' },
-              { code: 'supplierAccount', title: '供应商权限配置', path: '/scm/supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', icon: 'Key', adminOnly: true },
+              { code: 'supplierAccount', title: '供应商权限配置', path: '/scm/supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', icon: 'Key', permKey: 'canConfigSupplierAccount' },
             ],
           },
         ],
@@ -742,7 +744,7 @@ export function filterTree(nodes, keyword) {
 }
 
 // 角色权限过滤：仅保留 visiblePanels 内的面板叶子；分组节点在子项全不可见时隐藏；admin 返回全量
-export function filterMenuTree(tree, visiblePanels, isAdmin) {
+export function filterMenuTree(tree, visiblePanels, isAdmin, user) {
   if (isAdmin) return tree
   const vis = Array.isArray(visiblePanels) ? visiblePanels : []
   const filterNode = (nodes) => {
@@ -751,6 +753,10 @@ export function filterMenuTree(tree, visiblePanels, isAdmin) {
       // adminOnly:整枝只对管理员可见(如「系统功能 → 组织架构 / 使用权限查看」)。
       //   这类叶子没有 panelCode 却带 path,原来会在下面那条 if (n.path) 里被判成有权而放行。
       if (n.adminOnly) continue
+      // permKey(2026-10-25):按登录用户身上的布尔位判显隐 —— 如「供应商权限配置」不是 adminOnly,
+      //   而是由组织架构授权(supplier 词)决定的 canConfigSupplierAccount。判定与路由守卫、后端闸门同源。
+      //   未传 user(单测/旧调用)时该项不显示,避免把未授权入口渲染出来。
+      if (n.permKey && !(user && user[n.permKey])) continue
       if (n.panelCode) {
         if (vis.includes(n.panelCode)) out.push({ ...n })
         continue
