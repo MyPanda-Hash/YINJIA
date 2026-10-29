@@ -226,6 +226,7 @@ export default {
     '点「填入单据」后按下面这张表覆盖对应格;未变化的格不列出。': 'Cliquez sur "Remplissez le document" et appuyez sur le tableau ci-dessous pour remplacer la grille correspondante, la grille inchangée n\'est pas répertoriée.',
     '物料': 'Matériaux',
     '编号：': 'Numéro:',
+    '单据编号：': 'N° de document:',
     '选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。': 'Sélectionnez une variante: l\'ensemble des processus de cette variante remplacera le contenu actuel de cette table (pas un ajout). Vous pouvez "désactiver" l\'intégralité de l\'article ici; pour changer le contenu du processus, veuillez vous rendre à la "maintenance de la bibliothèque standard".',
     '变体': 'Variantes',
     '工序数': 'Nombre de processus',

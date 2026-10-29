@@ -138,6 +138,105 @@ public class PanelRegistry {
         }
 
         /**
+         * **新建单据的默认值**(yj_panel.config 的 {@code "headDefaults"},2026-10-29 起):
+         * 写法 {@code {"密级":"保密","文件使用范围":"银嘉内部"}} —— 「新增」建单时写进头表,
+         * 之后用户仍可改(只是初始值,不是锁死)。
+         *
+         * <p>用户口径:「密级以及文件使用范围默认选择保密、内部,这些是可以换的,
+         *   只是新增的单据就是默认选择这些」。
+         *
+         * <p>声明式,与 {@link #fixedItems()} / {@link #uniqueKeys()} 同一条规矩:
+         * 改默认值 = 改这一行 JSON,不加代码。解析失败返回空表(宁可不带默认值,也不能让新建失败)。
+         */
+        public Map<String, String> headDefaults() {
+            if (config == null || !config.contains("headDefaults")) return Map.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("headDefaults");
+                if (!node.isObject()) return Map.of();
+                Map<String, String> out = new java.util.LinkedHashMap<>();
+                node.fields().forEachRemaining(e -> {
+                    if (!e.getValue().isNull()) out.put(e.getKey(), e.getValue().asText(""));
+                });
+                return java.util.Collections.unmodifiableMap(out);
+            } catch (Exception ex) {
+                return Map.of();
+            }
+        }
+
+        /**
+         * **行标题可改的声明**(yj_panel.config 的 {@code "editableRowLabel"},2026-10-29 起):
+         * 值为一组「行标题字段名」,前端据此把该行左侧的标题格做成可编辑,并把改后的名字记进
+         * 同面板 config 的 {@code "rowLabels"} 映射(见 PanelConfigService.saveRowLabels)。
+         *
+         * <p>现役唯一消费者:功能性滤效(RD_FILTER_EFF)的「原水水质条件」——
+         *   用户口径「原水水质条件这一行做成可以自己新增列表格,和可以自己编辑这些列以及最前的标题的名字」。
+         */
+        public List<String> editableRowLabels() {
+            if (config == null || !config.contains("editableRowLabels")) return List.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("editableRowLabels");
+                if (!node.isArray()) return List.of();
+                List<String> out = new ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode e : node) {
+                    if (e.isTextual() && !e.asText().isBlank()) out.add(e.asText().trim());
+                }
+                return List.copyOf(out);
+            } catch (Exception ex) {
+                return List.of();
+            }
+        }
+
+        /**
+         * **原水水质条件指标列声明**(yj_panel.config 的 {@code "waterIndicators"},2026-10-29 起):
+         * 一条 = 一个指标格,写法 {@code [{"key":"原水自来水","name":"自来水","kind":"bool"}]}。
+         * kind:bool(=√/× 下拉)/ text(自由文本)。key 必须是该面板已登记的**表头字段数据键**
+         * (加指标 = 先用「自定义字段」绑一个备用列,再在这里登记 —— 物理列不能凭空出现)。
+         *
+         * <p>为什么走 config 而不是写死在组件里:用户要求「自己新增列、自己编辑列名」,
+         *   而 DataRecordSheet.vue 原本把 8 个指标硬编码在模板里,增删一律要改代码。
+         */
+        public List<Map<String, Object>> waterIndicators() {
+            if (config == null || !config.contains("waterIndicators")) return List.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("waterIndicators");
+                if (!node.isArray()) return List.of();
+                List<Map<String, Object>> out = new ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode e : node) {
+                    String key = e.path("key").asText("").trim();
+                    if (key.isEmpty()) continue;
+                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("key", key);
+                    m.put("name", e.path("name").asText("").trim());
+                    m.put("kind", e.path("kind").asText("text").trim());
+                    out.add(java.util.Collections.unmodifiableMap(m));
+                }
+                return List.copyOf(out);
+            } catch (Exception ex) {
+                return List.of();
+            }
+        }
+
+        /**
+         * **行标题/指标名的显示覆盖**(yj_panel.config 的 {@code "rowLabels"},{@code {"原名":"新名"}})。
+         * 只影响显示,数据键与物理列永不改(ADR-0001 的数据键中文不变原则)。
+         */
+        public Map<String, String> rowLabels() {
+            if (config == null || !config.contains("rowLabels")) return Map.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("rowLabels");
+                if (!node.isObject()) return Map.of();
+                Map<String, String> out = new java.util.LinkedHashMap<>();
+                node.fields().forEachRemaining(f -> {
+                    String v = f.getValue().asText("").trim();
+                    if (!v.isEmpty()) out.put(f.getKey(), v);
+                });
+                return java.util.Collections.unmodifiableMap(out);
+            } catch (Exception ex) {
+                return Map.of();
+            }
+        }
+
+        /**
          * **唯一键声明**(yj_panel.config 的 {@code "uniqueKeys"},2026-10-16 起):
          * 每个元素是一组「组内列不得重复出现同一取值」的字段标签(数据键=中文 label)。
          * 写法:{@code {"uniqueKeys":["工序编码"]}}(单列)或

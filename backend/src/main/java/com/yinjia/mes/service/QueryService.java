@@ -682,6 +682,19 @@ public class QueryService {
             doc.put("单据状态", statusText);
             doc.put("saved", st != null ? st.get("saved") : null);
             doc.put("detail", Map.of("items", items));
+            // 「发起人」= 提交审批的人(2026-10-29 用户口径「发起人应该是提交审批的人的账号名,
+            // 以提交审批的为准,草稿的可以覆盖」)。
+            //   权威源 = yj_doc_status.pending_by(提交审批时写入,提交人自己会变就跟着变);
+            //   草稿还没提交过 ⇒ 没有 pending_by,退回表内「制单人/申请人」(新建草稿也有值),
+            //   一旦提交审批就按 pending_by 覆盖 —— 正是用户说的「以提交审批的为准,草稿的可以覆盖」。
+            //   行契约里另给「提交人」只是它的账号版;汇总表要显示**姓名**,故这里一并把名字解出来。
+            String submitter = st == null ? "" : blankSafe(st.get("pending_by"));
+            if (submitter.isEmpty()) submitter = blankSafe(doc.get("制单人"));
+            if (submitter.isEmpty()) submitter = blankSafe(doc.get("申请人"));
+            if (!submitter.isEmpty()) {
+                doc.put("发起人", realNameOf(submitter));
+                doc.put("发起人账号", submitter);
+            }
             if (st != null && st.get("shr") != null) {
                 // 质量单据(2026-10-04 两级审批)例外:它的「审核人/审核时间」是**表内真值** ——
                 // 一级审批通过时写纸面「审核」格(一级审核人),「批准」另落 审批人。
@@ -953,6 +966,29 @@ public class QueryService {
             return String.valueOf(v);
         }
         return String.valueOf(v);
+    }
+
+    /** 空值安全的字符串(去空白;null → 空串) —— 发起人取值用 */
+    private static String blankSafe(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /**
+     * 账号 → 真实姓名(取不到回退账号)。
+     * 与 ButtonService.realNameOf 同一口径:汇总表的「发起人」要的是**人名**,
+     * 而 yj_doc_status.pending_by 存的是账号。
+     */
+    private String realNameOf(String user) {
+        String u = blankSafe(user);
+        if (u.isEmpty()) return "";
+        try {
+            List<String> names = jdbc.queryForList(
+                    "SELECT real_name FROM yj_user WHERE username = ?", String.class, u);
+            String n = names.isEmpty() ? null : names.get(0);
+            return n == null || n.isBlank() ? u : n.trim();
+        } catch (RuntimeException e) {
+            return u;   // 取名字失败不该让整张汇总表崩掉(账号也看得懂)
+        }
     }
 
     private static final java.time.format.DateTimeFormatter D_FMT =

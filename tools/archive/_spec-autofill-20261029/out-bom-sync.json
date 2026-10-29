@@ -1,0 +1,34 @@
+[
+  {
+    "k": "预清理",
+    "v": "done"
+  },
+  {
+    "k": "建单1",
+    "v": "PI-2026-10-0012"
+  },
+  {
+    "k": "保存1",
+    "v": "{\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"审批中\",\"编号\":\"PI-2026-10-0012\"}}"
+  },
+  {
+    "k": "状态1",
+    "v": "panel_code | doc_no | archived | pending\r\nRD_PROD_INFO | PI-2026-10-0012 | N | Y\r\n-- (1 rows) --"
+  },
+  {
+    "k": "mate(第一次归档后)",
+    "v": "m_no | wzdm1 | wzmc1 | wzdm2 | wzmc2 | gg2 | bzl\r\n-- (0 rows) --"
+  },
+  {
+    "k": "建单2",
+    "v": "PI-2026-10-0013"
+  },
+  {
+    "k": "mate(第二次后)",
+    "v": "m_no | wzdm1 | wzmc1 | wzdm2 | wzmc2 | gg2 | bzl\r\n-- (0 rows) --"
+  },
+  {
+    "k": "清理",
+    "v": "-- updated 0 --\r\n-- updated 1 --\r\n-- updated 2 --\r\n残留\r\n0\r\n-- (1 rows) --"
+  }
+]

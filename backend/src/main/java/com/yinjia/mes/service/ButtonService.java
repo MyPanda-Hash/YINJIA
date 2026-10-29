@@ -196,8 +196,15 @@ public class ButtonService {
             // ── 检验目录(QC_CATALOG,2026-09-22 用户口径)─────────────────────────────
             // 完成:校验关联的检验单与检验数据记录都已审批 → 置「已完成检验」并给出是否合格
             case "完成" -> completeCatalogRow(def, formData, buttonParam);
-            // 修改:把「已完成检验」回弹为「正在检验中」并写修改记录(之后才可反审核挂靠单据)
-            case "修改" -> reopenCatalogRow(def, formData);
+            // 「修改」按面板分流,两个语义不能混:
+            //   · 检验目录(QC_CATALOG):把「已完成检验」回弹为「正在检验中」并写修改记录
+            //     (之后才可反审核挂靠单据);
+            //   · 自助维护型面板(WLBOM 物料清单):**已归档 → 退回草稿**改一改再存
+            //     (2026-10-29 用户口径「加上一个修改按钮,点击之后就退回草稿状态,
+            //       然后就可以继续修改了,修改完再保存就行了」)。
+            case "修改" -> SELF_MAINTAINED_PANELS.contains(def.code())
+                    ? selfModify(def, formData)
+                    : reopenCatalogRow(def, formData);
             // 删除记录(行级):挂靠的检验单/检验数据记录还在时拒绝,提示先删除它们
             case "删除记录" -> deleteCatalogRow(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
@@ -351,14 +358,24 @@ public class ButtonService {
     }
 
     /**
-     * 新建单据的「版本」默认值(2026-10-16 用户口径:规格书「版本自动生成 V1.0」)。
+     * 新建单据的「版本」默认值(2026-10-16 用户口径「版本自动生成」;**2026-10-29 改格式**)。
      *
-     * <p>⚠ 与 {@link #nextVersionNo}(「版本号」列,四文件面板的 `V<当天日期>-NN`)是**两套口径**:
-     * 规格书这一列叫「版本」,记的是产品版本号 V1.0/V2.0…,不是当天流水号。
+     * <p>2026-10-29 用户口径(产品规格书新版设计图):版本那格写的是「**V+年月日**」
+     * ⇒ 由固定 `V1.0` 改为 `V<yyyy-MM-dd>`(如 `V2026-10-29`)。
+     *
+     * <p>⚠ 与 {@link #nextVersionNo}(「版本号」列,四文件面板的 `V<当天日期>-NN`)仍是**两套列**:
+     * 「版本」= 规格书自己的版本标识(设计口径 V+日期);
+     * 「版本号」= 四文件面板当天流水号。两者互不覆盖。
      * 只在**新建且该格为空**时写入 —— 已有单、以及产品变更单「建下一版草稿」(整单复制,
      * 走 insertRow 不经这里)一律不覆盖,免得把别人推进的版本号抹回去。
      */
-    private static final Map<String, String> NEW_DOC_VERSION = Map.of("RD_SPEC_DOC", "V1.0");
+    private static final java.util.Set<String> NEW_DOC_VERSION_DATE_PANELS = java.util.Set.of("RD_SPEC_DOC");
+
+    /** 新建单据的「版本」默认值;不在表里 ⇒ null(不写)。见 {@link #NEW_DOC_VERSION_DATE_PANELS} */
+    private static String newDocVersion(String panelCode) {
+        if (panelCode == null || !NEW_DOC_VERSION_DATE_PANELS.contains(panelCode)) return null;
+        return "V" + LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    }
 
     /**
      * 「版本号」建单自动带出:`V<当天日期>-<当日流水两位>`(如 V2026-10-15-01)。
@@ -477,8 +494,8 @@ public class ButtonService {
                 // 同一天建第二张单版本号一模一样 ⇒ 必须加序列数,如 V2026-10-15-01。
                 String vno1 = nextVersionNo(table);
                 if (vno1 != null && !cols.containsKey("版本号")) cols.put("版本号", vno1);
-                // 「版本」默认值(2026-10-16 用户口径「版本自动生成 V1.0」):仅规格书,仅新建且该格为空
-                String vdef1 = NEW_DOC_VERSION.get(def.code());
+                // 「版本」默认值(2026-10-29 口径「V+年月日」):仅规格书,仅新建且该格为空
+                String vdef1 = newDocVersion(def.code());
                 if (vdef1 != null && !cols.containsKey("版本") && tableCols(table).contains("版本")) {
                     cols.put("版本", vdef1);
                 }
@@ -505,6 +522,9 @@ public class ButtonService {
                 // 该分支在下方直接 return,走不到保存末尾那段 UPDATE(实测漏写:AP-2026-10-01 草稿
                 // 的「表单管理人」落库为 NULL)。这里与末尾那段同口径(值=realNameOf(user))。
                 putEditorCols(def, table, cols, user);
+                // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
+                // 只补没有值的列 ⇒ 用户手改过的不会被抢回默认值。
+                putHeadDefaults(def, table, cols);
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
@@ -527,8 +547,8 @@ public class ButtonService {
                     && (head.get("版本号") == null || String.valueOf(head.get("版本号")).isBlank())) {
                 head.put("版本号", vno2);
             }
-            // 「版本」默认值:同空白草稿分支口径(规格书 V1.0),仅新建且为空时写
-            String vdef2 = NEW_DOC_VERSION.get(def.code());
+            // 「版本」默认值:同空白草稿分支口径(V+年月日),仅新建且为空时写
+            String vdef2 = newDocVersion(def.code());
             if (vdef2 != null && def.byLabel("版本") != null
                     && (head.get("版本") == null || String.valueOf(head.get("版本")).isBlank())) {
                 head.put("版本", vdef2);
@@ -694,6 +714,13 @@ public class ButtonService {
         // 四个受控文件只按 [产品编号] 关联产品信息表,重号会让"这个产品有哪些文件"分不清 ⇒ 全局唯一。
         // 与文档编号同口径:保存(提交口径)才校验,保存为草稿放过;已作废单据不算占用。
         if (markSaved && "RD_PROD_INFO".equals(def.code())) ensureProductCodeUnique(def, head, no);
+        // 规格书:「一个产品信息表只能对应一张规格书」(用户 2026-10-21 口径「不能多次引用」)。
+        // 🔴 2026-10-29 全流程验收抓到的缺口:这条规则此前**只做在前端引用弹窗**里
+        //   (已引用的行标 __used、点它只提示),后端保存完全没校验 ⇒ 直连 /px/callButton
+        //   或换台机器,同一个产品编号能存出**第二张规格书**,两套数据并存且各自走审批归档
+        //   (实测 SD-2026-10-0017 / SD-2026-10-0018 两张都绑 YJ-CB-2026-001,后一张返回 200)。
+        //   照 ensureProductCodeUnique 的既有做法补齐:保存(提交口径)才校验、已作废不算占用。
+        if (markSaved && "RD_SPEC_DOC".equals(def.code())) ensureSpecOnePerProduct(def, head, no);
         // 产品信息表「编辑人」= 本次**保存人**的真实姓名。
         //   2026-10-21 口径:「产品信息表的编辑人是提交审批的人的账号的真实名字」;
         //   2026-10-28 口径扩展:「编辑自动填入当前的对应账号姓名」—— 存草稿同样算一次编辑,
@@ -733,6 +760,35 @@ public class ButtonService {
         String name = realNameOf(user);
         if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
         if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
+    }
+
+    /**
+     * 面板声明的**新建默认值**(yj_panel.config 的 {@code headDefaults},2026-10-29)。
+     *
+     * <p>用户口径:「密级以及文件使用范围默认选择保密、内部,这些是可以换的,
+     *   只是新增的单据就是默认选择这些」。
+     *
+     * <p>只补**当前没有值**的列 —— 载荷里已经给了值(用户手改/参照带回)就不覆盖,
+     * 否则「默认值」会变成「每次保存都抢回默认值」。
+     *
+     * @param cols 即将写库的列(键 = 物理列名)
+     */
+    private void putHeadDefaults(PanelRegistry.PanelDef def, String table, Map<String, Object> cols) {
+        Map<String, String> defaults = def.headDefaults();
+        if (defaults.isEmpty() || cols == null) return;
+        java.util.Set<String> existing = tableCols(table);
+        for (Map.Entry<String, String> e : defaults.entrySet()) {
+            String label = e.getKey();      // 声明用的是**字段标签**(数据键),与 yj_field.label 同名
+            String val = e.getValue();
+            if (label == null || label.isBlank() || val == null) continue;
+            // 落库要换成物理列名(label 与 col_name 会分叉,如「使用日期」)
+            PanelRegistry.FieldDef f = def.byLabel(label);
+            String col = f != null ? f.col() : label;
+            if (!existing.contains(col)) continue;          // 该表没有这一列 ⇒ 跳过
+            Object cur = cols.get(col);
+            if (cur != null && !String.valueOf(cur).trim().isEmpty()) continue;  // 已有值不覆盖
+            cols.put(col, val);
+        }
     }
 
     /**
@@ -777,6 +833,50 @@ public class ButtonService {
         if (!dup.isEmpty()) {
             throw new IllegalStateException("产品编号「" + code + "」已被产品信息表 " + str(dup.get(0).get("no"))
                     + " 占用：一个产品编号只能对应一张产品信息表，请换号（同号老单已作废才可复用）");
+        }
+    }
+
+    /**
+     * 规格书「一个产品信息表只能对应一张规格书」的唯一性校验(2026-10-29 补)。
+     *
+     * <p>用户口径(2026-10-21)：「一个产品信息表对应一个产品规格书,不能多次引用」。
+     * 此前只在前端引用弹窗里拦(已引用的行标 __used),后端保存完全不校验 ⇒
+     * 直连接口就能把同一产品编号存成第二张规格书,两套数据并存且各自走审批归档。
+     *
+     * <p>判据与 {@link #ensureProductCodeUnique(String, String)} 同源(便于两处口径一致):
+     * <ul>
+     *   <li>按 [产品编号] 查 rd_spec_doc_head;</li>
+     *   <li>排除自己那张({@code 单据编号 <> no})—— 改自己时不能判成冲突;</li>
+     *   <li>排除已作废的两侧(业务表 asp_cancel='Y' + 状态表 canceled='Y')——
+     *       否则作废后永远无法重录同一产品;</li>
+     *   <li>空产品编号跳过(草稿阶段允许还没引用)。</li>
+     * </ul>
+     */
+    private void ensureSpecOnePerProduct(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
+        Object raw = head == null ? null : head.get("产品编号");
+        if (raw == null && head != null) {
+            PanelRegistry.FieldDef f = def.byCol("产品编号");
+            if (f != null) raw = head.get(f.label());
+        }
+        if (raw == null) {
+            // 载荷没带(局部提交):退回库里的现值
+            try {
+                List<String> cur = jdbc.queryForList(
+                        "SELECT [产品编号] FROM rd_spec_doc_head WHERE [单据编号] = ?", String.class, no);
+                if (!cur.isEmpty()) raw = cur.get(0);
+            } catch (Exception ignore) { /* 取不到就跳过 */ }
+        }
+        String code = String.valueOf(raw == null ? "" : raw).trim();
+        if (code.isEmpty()) return;
+        List<Map<String, Object>> dup = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] AS no FROM rd_spec_doc_head"
+                        + " WHERE [产品编号] = ? AND [单据编号] <> ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SPEC_DOC'"
+                        + " AND s.doc_no = rd_spec_doc_head.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')",
+                code, no == null ? "" : no);
+        if (!dup.isEmpty()) {
+            throw new IllegalStateException("产品编号「" + code + "」已存在规格书 " + str(dup.get(0).get("no"))
+                    + "：一个产品信息表只能对应一张产品规格书，不能再引用（原规格书作废后才可重录）");
         }
     }
 
@@ -1272,6 +1372,111 @@ public class ButtonService {
         // 四个受控文件:归档即**本文件受控**(2026-09-30 用户口径「受控按文件」)。
         // 需求原文(《产品开发系统需求汇总》5.1):「保存/提交 → 提交后审批 → 审批后自动受控」。
         markFileControlled(panelCode, no, user);
+        // 产品信息表归档 ⇒ BOM 明细同步写入物料清单(mate)。
+        // 挂在这里是因为 markArchived 是**唯一的归档入口**:保存即归档 / 审批通过 /
+        // 二级审批通过 / 再归档,四条路最后都汇到本方法 —— 挂别处必漏。
+        if ("RD_PROD_INFO".equals(panelCode)) syncProdBomToMaterialList(no, user);
+    }
+
+    /**
+     * 产品信息表归档时,把它的 BOM 明细同步成一张**物料清单**。
+     *
+     * <p>用户口径(2026-10-29):「产品信息表的BOM明细在产品信息表归档之后,同时保存到物料清单
+     * 里面去」;问「重复归档怎么处理」选 B:「覆盖更新,这个是因为产品编号是唯一的,
+     * 如果BOM更新了,就根据这个产品编号重新覆盖原来的BOM就行了」。
+     *
+     * <p><b>覆盖语义</b>(与需求逐条对应):
+     * <ul>
+     *   <li>定位键 = <b>产品编号</b>(物料清单表头 m_no 存的也是产品编号)—— 同编号重新归档时
+     *       先删掉该编号的旧子件行,再写新的一批 ⇒ 物料清单里永远只有**一张**该产品的单,
+     *       BOM 改了就是覆盖,不会出现第二张;</li>
+     *   <li>产品编号改过名(旧号 → 新号):本次归档只按**新号**写;
+     *       旧号那张不在本方法处理范围(它对应的是另一次归档,由那次的状态负责),
+     *       不在归档热路径上做"清理孤儿"这种不可逆动作。</li>
+     * </ul>
+     *
+     * <p><b>字段映射</b>(mate 的物理列 → 产品信息表的数据键):
+     * <pre>
+     *   m_no   物料清单号     ← 产品编号
+     *   m_date 单据日期       ← 单据日期
+     *   wzdm1  物料代码(表头) ← 产品编号(原实现里 wzdm1 ≡ m_no,实测 24/24 相等)
+     *   wzmc1  物料名称(表头) ← 产品名称
+     *   wzdm2  子件代码       ← 明细 物料编号
+     *   wzmc2  子件名称       ← 明细 物料名称
+     *   gg2    规格型号       ← 明细 尺寸规格
+     *   bzl    标准用量       ← 明细 数量
+     * </pre>
+     * 规格书「从物料清单引用」读的就是这几个键(见前端 recordSheetPanels 的 mate 分支),
+     * 两边口径必须一致 —— 改这里要同步改那边。
+     *
+     * <p><b>为什么不抛异常</b>:BOM 写失败只记 warning。归档是业务主流程,让它因为
+     * "物料清单没写进去"而失败,单子会卡在未归档(比不同步更糟);而物料清单可随时靠
+     * 重新归档重算 —— 幂等,补得回来。
+     */
+    private void syncProdBomToMaterialList(String no, String user) {
+        try {
+            if (no == null || no.isBlank()) return;
+            PanelRegistry.PanelDef def = registry.panel("RD_PROD_INFO");
+            if (def == null) return;
+            String headTbl = def.headTable();
+            String dtlTbl = def.lineTable();   // PanelDef 里明细表叫 lineTable(不是 detailTable)
+            if (headTbl == null || headTbl.isBlank() || dtlTbl == null || dtlTbl.isBlank()) return;
+
+            // ── 表头:产品编号(定位键)/ 单据日期 / 产品名称 ──
+            java.util.List<java.util.Map<String, Object>> heads = jdbc.queryForList(
+                    "SELECT TOP 1 [产品编号], [产品名称], [单据日期] FROM [" + headTbl + "] WHERE ["
+                            + def.groupCol() + "] = ?", no);
+            if (heads.isEmpty()) return;
+            java.util.Map<String, Object> h = heads.get(0);
+            String prodNo = safeStr(h.get("产品编号"));
+            if (prodNo.isBlank()) {
+                log.warn("[BOM→物料清单] 产品信息表 {} 没有产品编号,跳过同步(物料清单以产品编号为准)", no);
+                return;
+            }
+
+            // ── 明细:物料编号 / 物料名称 / 尺寸规格 / 数量 ──
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT [物料编号],[物料名称],[尺寸规格],[数量] FROM [" + dtlTbl + "] WHERE ["
+                            + def.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [序号]", no);
+            if (rows.isEmpty()) {
+                log.info("[BOM→物料清单] 产品信息表 {} (产品编号 {}) 没有 BOM 明细,跳过同步", no, prodNo);
+                return;
+            }
+
+            // ── 覆盖更新:先清该产品编号的旧子件(mate 一行 = 一个子件,表头信息重复携带)──
+            int del = jdbc.update("DELETE FROM [mate] WHERE [m_no] = ?", prodNo);
+
+            Object mDate = h.get("单据日期");
+            String prodName = safeStr(h.get("产品名称"));
+            int ins = 0;
+            for (java.util.Map<String, Object> r : rows) {
+                String subCode = safeStr(r.get("物料编号"));
+                if (subCode.isBlank()) continue;
+                jdbc.update("INSERT INTO [mate] ([m_no],[m_date],[wzdm1],[wzmc1],[wzdm2],[wzmc2],[gg2],[bzl],"
+                                + "[asp_user1],[asp_time1],[asp_cancel]) VALUES (?,?,?,?,?,?,?,?,?,GETDATE(),'N')",
+                        prodNo, mDate, prodNo, prodName,
+                        subCode, safeStr(r.get("物料名称")), safeStr(r.get("尺寸规格")), safeNum(r.get("数量")), user);
+                ins++;
+            }
+            log.info("[BOM→物料清单] 产品信息表 {} → 物料清单 {} :覆盖 {} 行、写入 {} 行",
+                    no, prodNo, del, ins);
+        } catch (Exception e) {
+            // 不抛:归档主流程优先(见方法注释)
+            log.warn("[BOM→物料清单] 产品信息表 {} 同步失败(归档已照常完成):{}", no, e.getMessage());
+        }
+    }
+
+    /** 安全取字符串(空/null → "") —— 注意与类里已有的 {@link #str(Object)}(返回 null)区分:
+     *  本方法给「拼 SQL 值 / 判空」用,返回空串更省心;那个给「有值才写」用。 */
+    private static String safeStr(Object v) {
+        return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    /** 安全取数值(文本"2"→2.0;空/非数字 → null,不伪造 0) */
+    private static Double safeNum(Object v) {
+        String s = safeStr(v);
+        if (s.isEmpty()) return null;
+        try { return Double.valueOf(s); } catch (NumberFormatException e) { return null; }
     }
 
     /**
@@ -1346,6 +1551,10 @@ public class ButtonService {
     private void upsertHeadRow(PanelRegistry.PanelDef def, Map<String, Object> head, String no, String user) {
         List<PanelRegistry.FieldDef> fields = def.fieldsAt("header");
         Map<String, Object> cols = labelsToCols(fields, head);
+        // 新建默认值:主保存路径也要补(2026-10-29 用户报障「两个审核人没显示出来」的真因之一)。
+        // 原先 putHeadDefaults 只挂在**空白草稿分支**(directAdd),而「新增 → 填数据 → 保存」
+        // 走的是本方法 ⇒ 那两格默认值从来没写进去过。这里补上,口径同款:只填空列,不覆盖已有值。
+        putHeadDefaults(def, def.headTable(), cols);
         Integer existing = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.headTable() + " WHERE " + def.groupCol() + " = ?",
                 Integer.class, no);
@@ -1859,6 +2068,45 @@ public class ButtonService {
         return result(no, "已审核");
     }
 
+    /**
+     * **自助维护型面板的「修改」**:把已归档/已审核的单据直接退回草稿,改完再保存即重新归档。
+     *
+     * <p>用户口径(2026-10-29):「我现在想的是肯定是要能保存归档的,但是加上一个修改按钮,
+     * 点击之后就退回草稿状态,然后就可以继续修改了,修改完再保存就行了」。
+     *
+     * <p>为什么不是复用 {@link #unaudit}:那条路要求"审批权"(requireApprover),
+     * 且对归档单会先拦一道"请先申请修改并经管理员审批"。物料清单是**基础数据**、
+     * 谁维护谁就能改,不该被审批权卡住,也不该走文书的两轮闭环。
+     *
+     * <p>与 unaudit 一致的部分(照搬,别各写一套):
+     * <ul>
+     *   <li>退回前落一份快照({@link #snapshotOnUnaudit}),改完保存时 finalizeOpenModify 收尾 diff
+     *       ⇒ 「修改记录」照样逐条留痕,不是无痕直改;</li>
+     *   <li>同时清 archived / shr / shsj / modify_state —— 状态推导里任一残留都会让单据看起来没退回。</li>
+     * </ul>
+     *
+     * <p>只对 SELF_MAINTAINED_PANELS 开放,其它面板调它直接拒绝(防止将来误接线)。
+     */
+    private Map<String, Object> selfModify(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!SELF_MAINTAINED_PANELS.contains(def.code())) {
+            throw new IllegalStateException("该面板不支持「修改」(仅自助维护型面板可用)");
+        }
+        String no = requireNo(formData);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        String status = String.valueOf(st.get("status"));
+        if (!"已归档".equals(status) && !"已审核".equals(status)) {
+            throw new IllegalStateException("仅已归档/已审核状态可点「修改」退回草稿(当前:" + status + ")");
+        }
+        // 退回前留痕:弃审前的数据落快照,改完保存时 finalizeOpenModify 出 diff 并再归档
+        snapshotOnUnaudit(def, no, currentUserName());
+        // 清归档/审核标记 + 修改态:任一残留都会让状态推导停在不该停的位置
+        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL,"
+                + " modify_state = NULL, update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?",
+                def.code(), no);
+        recordApproval(def.code(), no, "UNAUDIT", "DRAFT", "修改（自助维护型面板，退回草稿）");
+        return result(no, "草稿");
+    }
+
     private Map<String, Object> unaudit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         // 审批权校验:与 审核 同口径,防"自审自弃"绕过审批权
         // ⚠ 2026-10-16 放宽(用户口径「产品信息表分发下去的 4 类单据没有反审核,写错了改不了」):
@@ -2256,6 +2504,14 @@ public class ButtonService {
             // 载荷不带对接人则跳过(兼容旧前端/老单:仍可用侧栏「定级分发」补发)。
             String liaison = pickOf(formData, "对接人");
             if (!liaison.isEmpty()) assignLiaison(def.code(), no, liaison, operator);
+        }
+        // 测试申请单:审批时可以**一并分发测试负责人**(2026-10-29 用户口径
+        //   「借鉴前面的立项申请的流程,现在也加上在审批的时候可以分发对应的负责人去测试之后填写数据记录表」)。
+        // 与立项申请「定级分发」同一范式:审批弹窗里选人 → 通过即写 RD_DOM_TEST 头表「测试负责人」+ 留痕 + 通知。
+        // 载荷不带就跳过(兼容旧前端/老单:事后仍可用侧栏按钮补发)。
+        if ("RD_DOM_TEST".equals(def.code())) {
+            String tester = pickOf(formData, "测试负责人");
+            if (!tester.isEmpty()) assignTestOwner(no, tester, operator);
         }
         // 产品变更申请单:审批通过即**生效**(2026-09-21 用户口径第⑤条)——状态转「已生效」,
         // 并按勾选的受控文件建下一版草稿(带来源单号)+ 通知各文件责任人重走受控审核
@@ -2819,6 +3075,15 @@ public class ButtonService {
         // 分批送料:作废**不回收**批次号与台账号(2026-09-21 口径 —— 批次号在采购入库单审核时已定,
         // 回收会让已编号批次重号;弃审/作废只作废单据,台账号原样保留,见 BatchService.RECYCLE_ON_RELEASE)
         batchService.releaseByTarget(def.code(), no);
+        // 研发链:作废/删除立项申请或实施计划 → **立刻**把对应进度行清掉(2026-10-30 用户报障
+        //   「服务器上把立项申请和项目实施计划删掉了,现在还出现在项目进度查询,而且删除不了」)。
+        //   此前只有"下一次同步进度"才跑 pruneProgressRows,作废后不点「同步进度」就永远挂着;
+        //   而进度查询是只读面板,用户没有别的手段删掉它。
+        if ("RD_APPROVAL".equals(def.code()) || "RD_PLAN".equals(def.code())) {
+            try { syncAllPlansToProgress(); } catch (Exception e) {
+                log.warn("[研发作废联动] 清理进度行失败(不影响作废):{}", e.getMessage());
+            }
+        }
         return result(no, "已作废");
     }
 
@@ -4435,13 +4700,34 @@ public class ButtonService {
                     + " WHERE ISNULL(asp_cancel,'N') <> 'Y'"
                     + " AND ("
                     // ① 源单据没了:该项目编号在未作废的「实施计划」「立项申请」里都不存在了
-                    + "   (ISNULL([说明], N'') <> '' AND [说明] NOT IN ("
-                    + "       SELECT [文档编号] FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                    + "         AND ISNULL([文档编号],'') <> ''"
+                    // ⚠ 2026-10-30 用户报障「服务器上把立项申请和项目实施计划删掉了,现在还出现在
+                    //   项目进度查询……而且删除不了」:作废/删除只写 yj_doc_status.canceled='Y',
+                    //   **不动业务表 asp_cancel** ⇒ 只按 asp_cancel 判活时作废单仍算"源还在",
+                    //   进度行永远清不掉。两条子查询都补上状态表过滤。
+                    // ⚠ 判据必须带「[说明] = [项目编号]」:syncPlanToProgress 两个列写同值(=文档编号),
+                    //   但四级行(syncTestDocsToProgress)的 [说明] 存的是「测试背景」文本、
+                    //   [项目编号] 才是单据编号 —— 不加这个条件会把四级行当成孤儿全清掉。
+                    + "   ((ISNULL([说明], N'') <> '' AND ISNULL([说明], N'') = ISNULL([项目编号], N'')"
+                    + "     AND [说明] NOT IN ("
+                    + "       SELECT p.[文档编号] FROM rd_plan p WHERE ISNULL(p.asp_cancel,'N') <> 'Y'"
+                    + "         AND ISNULL(p.[文档编号],'') <> ''"
+                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_PLAN'"
+                    + "           AND s.doc_no = p.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                     + "       UNION"
-                    + "       SELECT [文档编号] FROM rd_approval WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                    + "         AND ISNULL([文档编号],'') <> ''"
+                    + "       SELECT a.[文档编号] FROM rd_approval a WHERE ISNULL(a.asp_cancel,'N') <> 'Y'"
+                    + "         AND ISNULL(a.[文档编号],'') <> ''"
+                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_APPROVAL'"
+                    + "           AND s.doc_no = a.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                     + "   ))"
+                    // ①b 四级项目(简单开发/检测申请单 → 进度查询):来源单号存在「项目编号」上,
+                    //     「说明」放的是测试背景 ⇒ 单独按 rd_dom_test_head 判活(2026-10-30 补;
+                    //     见 syncTestDocsToProgress)。作废(canceled='Y')同样算没有源单据。
+                    + "   OR ([项目层级] = N'四级' AND ISNULL([项目编号], N'') <> ''"
+                    + "     AND NOT EXISTS (SELECT 1 FROM rd_dom_test_head h"
+                    + "       WHERE h.[单据编号] = rd_progress_detail.[项目编号]"
+                    + "         AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_DOM_TEST'"
+                    + "           AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y'))))"
                     // ② 或:所属进度单本身已作废/不存在(换过汇总单后的旧行)
                     //     ⇒ 否则旧行会以"源单据还在"逃过 ①,变成挂在死单上的孤儿
                     //     (2026-10-19 模拟服务器空库时实测:旧单 LXJ2609040100 软删了,它的行还活着)。
@@ -5216,6 +5502,31 @@ public class ButtonService {
     /** 首次分发/审批时一并分发(无原对接人) */
     private void assignLiaison(String panelCode, String no, String liaison, String operator) {
         assignLiaison(panelCode, no, liaison, operator, "");
+    }
+
+    /**
+     * 测试申请单:分发**测试负责人**(2026-10-29)。
+     *
+     * <p>用户口径:「借鉴前面的立项申请的流程,现在也加上在审批的时候可以分发对应的负责人去测试
+     * 之后填写数据记录表」—— 与立项申请「定级分发」同一范式:
+     * 审批弹窗里选人 → 审批通过即落库 + 留痕 + 通知被指派人。
+     *
+     * <p>落的是 {@code rd_dom_test_head.测试负责人}(账号口径,与 rd_approval.备用1 同款)。
+     * 分发的意义:被指派的人据此去填对应这张申请单的**数据记录表**(记录表表头的「测试申请单编号」
+     * 填这张单的号 —— 见 migrate-rd-domtest-link-20261029.sql)。
+     *
+     * @param tester 测试负责人账号(必须存在且启用)
+     */
+    private void assignTestOwner(String no, String tester, String operator) {
+        if (!isEnabledUser(tester)) throw new IllegalStateException("测试负责人账号不存在或已停用：" + tester);
+        jdbc.update("UPDATE rd_dom_test_head SET 测试负责人 = ? WHERE 单据编号 = ?", tester, no);
+        String name = realNameOf(tester);
+        recordApproval("RD_DOM_TEST", no, "TEST_OWNER", "DISPATCHED",
+                "分发测试负责人：" + name + "（" + tester + "）");
+        if (!tester.equals(operator)) {
+            notify(() -> messageService.send(List.of(tester), MessageService.LIAISON_ASSIGNED, "RD_DOM_TEST", no,
+                    Map.of("actor", operator), operator));
+        }
     }
 
     /** 分发对接人(2026-10-08 流程图③):定级完成后,由该面板**审批人**(∪ 管理员)从账号里指定一个对接人。
@@ -6390,10 +6701,60 @@ public class ButtonService {
             notify(() -> messageService.send(List.of(owner), MessageService.SPEC_ASSIGNED, "RD_SPEC_DOC", docNo,
                     Map.of("kind", kind, "productCode", productCode, "productName", productName), user));
         }
+        // 产品负责人回填(2026-10-29 用户口径):
+        //   「产品负责人是对接人签核分发的规格书的负责人,在对接人签核分发规格书的负责人之后
+        //    自动回填到这个产品信息表里面,但是不修改产品信息表的状态,
+        //    就是可以在产品信息表处于归档状态的情况下回填产品负责人」。
+        // 取**规格书(分发到 RD_SPEC_DOC 那个责任人)**当产品负责人 —— 不是操作人、不是总负责人。
+        // ⚠ 只 UPDATE 责任人列,绝不碰 yj_doc_status / archived / pending
+        //   (单据此时通常已归档,碰状态会把它从归档打回草稿 —— 用户明确要求"不改状态")。
+        String specOwner = "";
+        for (Map<String, Object> a : assigned) {
+            Object o = a.get("责任人");
+            if (o != null) specOwner = String.valueOf(o).trim();
+        }
+        backfillProdOwner(no, specOwner);
+
         Map<String, Object> r = result(no, "已分发");
         r.put("productCode", productCode);
         r.put("assigned", assigned);
         return r;
+    }
+
+    /**
+     * 把「规格书责任人」回填到产品信息表的「产品负责人」(列名 责任人)。
+     *
+     * <p>用户口径(2026-10-29):「产品负责人是对接人签核分发的规格书的负责人…自动回填到
+     * 这个产品信息表里面,**但是不修改产品信息表的状态**,就是可以在产品信息表处于
+     * 归档状态的情况下回填产品负责人」。
+     *
+     * <p>所以这里**只发一条 UPDATE 到 rd_prod_info_head**:
+     * <ul>
+     *   <li>只写 [责任人] 一列(值 = 责任人账号转**真实姓名**,与界面上其它人名列同口径);</li>
+     *   <li>不碰 yj_doc_status,不改 archived / pending / canceled —— 单据保持原状态;</li>
+     *   <li>不写 asp_user2/asp_time2 之外的审计列,避免把"回填"误记成一次编辑;</li>
+     *   <li>取不到账号/账号不存在时安静跳过(不阻断分发主流程)。</li>
+     * </ul>
+     *
+     * @param prodDocNo 产品信息表**单据编号**(不是产品编号)
+     * @param specOwnerAccount 规格书责任人账号(cp / liulei / chaishanyin / fengmin …)
+     */
+    private void backfillProdOwner(String prodDocNo, String specOwnerAccount) {
+        try {
+            if (prodDocNo == null || prodDocNo.isBlank()) return;
+            if (specOwnerAccount == null || specOwnerAccount.isBlank()) return;
+            String realName = realNameOf(specOwnerAccount);
+            String val = (realName == null || realName.isBlank()) ? specOwnerAccount : realName;
+            int n = jdbc.update(
+                    "UPDATE rd_prod_info_head SET 责任人 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    val, currentUserName(), prodDocNo);
+            log.info("[产品负责人回填] 产品信息表 {} ← 规格书责任人 {} ({}):更新 {} 行,单据状态未改动",
+                    prodDocNo, specOwnerAccount, val, n);
+        } catch (Exception e) {
+            // 不抛:回填是附带动作,不能让它把分发主流程搞失败
+            log.warn("[产品负责人回填] 产品信息表 {} 回填失败(分发已成功):{}", prodDocNo, e.getMessage());
+        }
     }
 
     /** 已分配规格书单的编辑封锁:仅 责任人∪总负责人(活值)∪管理员 可保存/申请修改/删除;
@@ -6943,11 +7304,13 @@ public class ButtonService {
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
             "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // 物料清单(WLBOM,2026-10-21 用户口径):「物料清单填写是需要保存的,现在显示的都是草稿,
-            //   这个填写保存不需要审批,修改也不需要审批」—— 登记入本集合才走「保存即归档」,
-            //   否则保存后永远停在草稿态(实测用户看到的就是全草稿)。
-            //   它与其余文件类面板的差别只有一处:不区分管理员/普通用户、**谁保存都直接归档**,
-            //   见 SELF_MAINTAINED_PANELS。
+            // 物料清单(WLBOM,2026-10-21 登记,2026-10-29 复归):保存即归档是**对的**
+            //   (用户口径「肯定是要能保存归档的」),它属于基础数据:填完保存就定稿归档。
+            //   修改路径不用文书那一套「申请修改→管理员审批→修改中」——
+            //   WLBOM ∈ SELF_MAINTAINED_PANELS ⇒ 走 {@link #selfModify} 的「修改」按钮:
+            //   点一下直接退回草稿、改完再保存即重新归档,全程无审批。
+            //   ⚠ 曾经的问题不是"归档"本身,而是**归档后没有退路**(前端 draftEditable 不认已归档)
+            //     ⇒ 2026-10-29 用户报障「保存之后不能修改」。修法是补「修改」按钮,不是取消归档。
             "WLBOM");
     /**
      * **自助维护型**面板(2026-10-21):保存即归档,**任何用户都不走审批**。
@@ -6957,6 +7320,13 @@ public class ButtonService {
      * <p>与 {@link #DOC_ARCHIVE_PANELS} 的区别:那张表里的面板是「管理员保存即归档、
      * 普通用户保存=送审」;这里登记的面板连审批都没有(工具栏也没有审批组),
      * 谁保存都直接置为已归档 —— 它是**基础数据**,不是要签核的文书。
+     *
+     * <p>本集合的面板**保存即归档**(基础数据填完即定稿),但归档后要能回来改 ——
+     *   入口是本集合专属的「修改」按钮({@link #selfModify}),点一下直接退回草稿,
+     *   不走文书那套「申请修改→管理员审批→修改中」。
+     *
+     * <p>2026-10-29 用户口径:「我现在想的是肯定是要能保存归档的,但是加上一个修改按钮,
+     *   点击之后就退回草稿状态,然后就可以继续修改了,修改完再保存就行了」。
      *
      * <p>配套:
      * <ul>

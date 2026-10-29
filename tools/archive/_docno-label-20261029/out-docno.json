@@ -1,0 +1,84 @@
+[
+  {
+    "k": "各面板首单",
+    "v": {
+      "RD_PROD_INFO": "PI-2026-10-0009",
+      "RD_MOLD_PROC": "MP-2026-10-0005",
+      "RD_SPEC_DOC": "SD-2026-10-0009",
+      "RD_ASM_PROC": "AP-2026-10-0003",
+      "RD_INSP_PLAN": "IP-2026-10-0015",
+      "RD_PROD_DOCLIST": "",
+      "RD_CHANGE": "CHG-2026-10-0001"
+    }
+  },
+  {
+    "k": "RD_PROD_INFO",
+    "v": {
+      "cell": "单据编号：PI-2026-10-0009",
+      "prefix": "单据编号：",
+      "cover": null,
+      "pds": null,
+      "anyPrefix": true
+    }
+  },
+  {
+    "k": "RD_MOLD_PROC",
+    "v": {
+      "cell": "单据编号：MP-2026-10-0005",
+      "prefix": "单据编号：",
+      "cover": null,
+      "pds": null,
+      "anyPrefix": true
+    }
+  },
+  {
+    "k": "RD_SPEC_DOC",
+    "v": {
+      "cell": null,
+      "prefix": null,
+      "cover": "单据编号：—",
+      "pds": null,
+      "anyPrefix": false
+    }
+  },
+  {
+    "k": "RD_ASM_PROC",
+    "v": {
+      "cell": null,
+      "prefix": null,
+      "cover": null,
+      "pds": null,
+      "anyPrefix": false
+    }
+  },
+  {
+    "k": "RD_INSP_PLAN",
+    "v": {
+      "cell": "单据编号：YJ-QR-88",
+      "prefix": "单据编号：",
+      "cover": null,
+      "pds": null,
+      "anyPrefix": true
+    }
+  },
+  {
+    "k": "RD_PROD_DOCLIST",
+    "v": {
+      "cell": null,
+      "prefix": null,
+      "cover": null,
+      "pds": "单据编号：—",
+      "anyPrefix": false
+    }
+  },
+  {
+    "k": "RD_CHANGE",
+    "v": {
+      "cell": "单据编号：CHG-2026-10-0001",
+      "prefix": "单据编号：",
+      "cover": null,
+      "pds": null,
+      "anyPrefix": true
+    }
+  }
+]

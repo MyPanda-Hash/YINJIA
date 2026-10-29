@@ -417,13 +417,37 @@ public class DevTaskService {
         return out;
     }
 
-    /** 已下发产品的开发矩阵:一行 = 一个产品,列 = 5 个下游面板 */
+    /**
+     * 已下发产品的开发矩阵:一行 = 一个产品,列 = 5 个下游面板。
+     *
+     * <p>**行必须以「产品信息表」为根**(2026-10-30 用户口径:「本地的这个产品文件列表也是和
+     * 产品信息表关联的,没有对应的产品信息表就不显示了,现在我只有一个产品信息表,但是有三个
+     * 文件列表数据」)。此前直接对 `rd_dev_task` 按产品编号 GROUP BY ⇒ 只要历史上给某个产品编号
+     * 下发过文件,即使那个产品的产品信息表从没建过/已作废,它照样占一行(本地实测 3 行 vs 1 张表)。
+     *
+     * <p>判活两侧都排(与 QueryService / 本文件其它取数同口径):
+     * <ul>
+     *   <li>`asp_cancel='Y'` —— 业务行软删;</li>
+     *   <li>`yj_doc_status.canceled='Y'` —— 作废/删除**只写这里,不动 asp_cancel**,
+     *       只查前者会把作废单当成还活着(2026-10-30 的另一个坑,同批修过项目流程管控)。</li>
+     * </ul>
+     * <p>⚠ 产品编号两边的空值都必须排除:空 = 空 会把「产品编号没填的产品信息表」匹配到
+     * 所有缺编号的下发行上,等于又放开了一道口子。
+     */
     public List<Map<String, Object>> board() {
         List<Map<String, Object>> tasks = jdbc.queryForList(
-                "SELECT 产品编号, MAX(产品名称) AS 产品名称, MAX(源单据号) AS 源单据号,"
-                        + " MAX(下发人) AS 下发人, MAX(下发时间) AS 下发时间"
-                        + " FROM rd_dev_task WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                        + " GROUP BY 产品编号 ORDER BY MAX(下发时间) DESC");
+                "SELECT t.产品编号, MAX(t.产品名称) AS 产品名称, MAX(t.源单据号) AS 源单据号,"
+                        + " MAX(t.下发人) AS 下发人, MAX(t.下发时间) AS 下发时间"
+                        + " FROM rd_dev_task t WHERE ISNULL(t.asp_cancel,'N') <> 'Y'"
+                        + " AND LTRIM(RTRIM(ISNULL(t.产品编号, N''))) <> N''"
+                        + " AND EXISTS (SELECT 1 FROM rd_prod_info_head h"
+                        + "   WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
+                        + "     AND LTRIM(RTRIM(ISNULL(h.产品编号, N''))) <> N''"
+                        + "     AND LTRIM(RTRIM(h.产品编号)) = LTRIM(RTRIM(t.产品编号))"
+                        + "     AND NOT EXISTS (SELECT 1 FROM yj_doc_status s"
+                        + "       WHERE s.panel_code = N'RD_PROD_INFO' AND s.doc_no = h.[单据编号]"
+                        + "         AND ISNULL(s.canceled,'N') = 'Y'))"
+                        + " GROUP BY t.产品编号 ORDER BY MAX(t.下发时间) DESC");
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> t : tasks) {
             String productCode = String.valueOf(t.get("产品编号"));

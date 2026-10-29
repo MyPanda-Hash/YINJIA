@@ -72,9 +72,18 @@ export function facetValues(rows, key, filters, cap = FACET_CAP) {
 }
 
 /**
- * 勾选的行 → 「关键物料列表」要落的值(按目标表实际存在的列过滤,多余列不落)。
- * 映射:物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 / 备注←商品备注(有才带)。
+ * 勾选的行 → 目标表要落的值(按目标表实际存在的列过滤,多余列不落)。
+ * 映射(同一个商品列对不同目标表可能是不同名字,**按目标表的列名适配**):
+ *   物料编码 / 物料编号 ← 存货编码
+ *   物料名称           ← 存货名称
+ *   规格参数 / 尺寸规格 ← 规格型号
+ *   备注               ← 商品备注(有才带)
  * 同一物料编码已在本表区存在(或本次勾选里重复)时跳过 —— 重复点导入不会灌重复行。
+ *
+ * ⚠ 2026-10-29 扩两组别名:产品信息表新版「三、产品BOM表」的列叫 **物料编号 / 尺寸规格**
+ *   (旧的两张表叫 物料编码 / 规格参数)。两套名字并存,靠"目标表里有哪个就落哪个"适配,
+ *   不给调用方加分支、也不改既有两张表的落点。
+ * ⚠ 数量**不在这里带**:商品档案没有用量口径,凭空填 1 会变成错误数据(口径同 2026-10-21)。
  *
  * @returns {{ rows: Array<Record<string,string>>, skipped: number }}
  */
@@ -88,10 +97,13 @@ export function goodsToDetail(checked, existingCodes = [], colKeys = []) {
     if (!code) continue
     if (seen.has(code)) { skipped++; continue }
     seen.add(code)
+    const spec = String(r?.['规格型号'] ?? '').trim()
     const row = {}
     if (cols.has('物料编码')) row['物料编码'] = code
+    if (cols.has('物料编号')) row['物料编号'] = code
     if (cols.has('物料名称')) row['物料名称'] = String(r?.['存货名称'] ?? '').trim()
-    if (cols.has('规格参数')) row['规格参数'] = String(r?.['规格型号'] ?? '').trim()
+    if (cols.has('规格参数')) row['规格参数'] = spec
+    if (cols.has('尺寸规格')) row['尺寸规格'] = spec
     if (cols.has('备注')) row['备注'] = String(r?.['备注'] ?? '').trim()
     out.push(row)
   }

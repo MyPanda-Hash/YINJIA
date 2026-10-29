@@ -22,6 +22,9 @@ import java.util.Map;
 @Service
 public class PanelConfigService {
 
+    /** 诊断日志(行标题/指标列保存链路的可见性:配置坏了宁可在日志里说清楚,也别静默不生效) */
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(PanelConfigService.class);
+
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final TranslationService translations;
@@ -347,8 +350,16 @@ public class PanelConfigService {
             //   (前端 PanelxList 的「申请修改 / 修改记录」组,见 PanelxList.vue 修改组注释),
             //   而工具栏本身会过滤掉 修改 这个动作(PanelxList.vue:3159,自 2026-10-07 单据卡片下线起)。
             //   WLBOM 已登记进 ButtonService.DOC_ARCHIVE_PANELS ⇒ docArchive=true ⇒ 侧栏自动出现修改入口。
+            // WLBOM(物料清单)2026-10-29:**保存即归档(要归档)+ 单独一个「修改」按钮退回草稿**。
+            //   用户口径:「肯定是要能保存归档的,但是加上一个修改按钮,点击之后就退回草稿状态,
+            //   然后就可以继续修改了,修改完再保存就行了」。
+            //   ⇒ 审批组仍然不出(它没有审批流),但**多一个「修改」组**放在「删除」之后。
             if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
                 buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            }
+            // 自助维护型面板(物料清单):归档后靠它退回草稿 —— 后端 ButtonService.selfModify。
+            if (com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
+                buttonGroups.add(group("修改", List.of("修改")));
             }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
@@ -445,6 +456,9 @@ public class PanelConfigService {
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
         // 「申请修改/修改审批/修改记录」闭环按钮(2026-09-11 起从产品文件 7 面板放开到全部文书归档面板)
         metadata.put("docArchive", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code()));
+        // 自助维护型面板(物料清单 WLBOM):保存即归档,归档后侧栏给「修改」按钮直接退回草稿。
+        // 前端据 metadata.selfMaintained 出那个按钮(见 PanelxList 的 isSelfMaintainedPanel)。
+        metadata.put("selfMaintained", ButtonService.SELF_MAINTAINED_PANELS.contains(def.code()));
         // 产品变更申请单(2026-09-21):按账号部门的**行级编辑门禁**要下发给前端(界面把非本部门行置灰只读)。
         // 真源 = yj_change_dept(纸面部门 ↔ 系统部门映射),与后端 ButtonService.gateChangeDetail 同一张表;
         // 前端拿到的是"我能填哪几个部门行",管理员另行豁免(前端按登录用户 isAdmin 判)。
@@ -572,6 +586,17 @@ public class PanelConfigService {
             metadata.put("fixedItems", fixedList);
         }
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
+        // 行标题/指标列的声明(2026-10-29,见 PanelDef.editableRowLabels/waterIndicators/rowLabels):
+        // 现役唯一消费者是功能性滤效 RD_FILTER_EFF 的「原水水质条件」——那个块原本 8 个指标
+        // 硬编码在 DataRecordSheet.vue 模板里,增删改名都得改代码。现在改成元数据驱动:
+        //   声明了 waterIndicators ⇒ 前端按它铺指标格;声明了 editableRowLabels ⇒ 左侧标题格可改。
+        if (!def.waterIndicators().isEmpty()) metadata.put("waterIndicators", def.waterIndicators());
+        if (!def.editableRowLabels().isEmpty()) metadata.put("editableRowLabels", def.editableRowLabels());
+        if (!def.rowLabels().isEmpty()) metadata.put("rowLabels", def.rowLabels());
+        // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
+        // 后端「新增」建单时已写库,但前端新建后的**本地草稿对象**是空的 ——
+        // 不下发就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
+        if (!def.headDefaults().isEmpty()) metadata.put("headDefaults", def.headDefaults());
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
         for (Map<String, Object> g : buttonGroups) {
@@ -959,6 +984,8 @@ public class PanelConfigService {
      * 与采购订单/采购入库单等 PANDA 面板的「导入」同一套实现,不新增后端端点。
      */
     private static final java.util.Set<String> IMPORTABLE_PANELS = java.util.Set.of("WLBOM");
+
+
 
     /**
      * 平表面板「更多」组的动作清单。
@@ -1801,6 +1828,167 @@ public class PanelConfigService {
                     (i + 1) * 10, alias.isBlank() ? null : alias, !visible, visible, panelCode, fd.col());
         }
         registry.reload();
+    }
+
+    /**
+     * 保存「原水水质条件」块的行标题与指标列名(2026-10-29)。
+     *
+     * <p>用户口径:「原水水质条件这一行做成可以自己新增列表格,和可以自己编辑这些列以及最前的
+     * 标题的名字」。数据键(物理列/字段 label)**永不改** —— 只把显示名写进 {@code yj_panel.config}
+     * 的 {@code rowLabels} 映射(原名 → 新名),与 ADR-0001「数据键中文不变、翻译只落显示层」同一条规矩,
+     * 也和 columnPrefs 的 alias 是同一类东西:改显示不改数据。
+     *
+     * @param rowLabel 行标题新名(空 = 不修改)
+     * @param cols     {@code [{key, name}]} 指标列显示名(空/缺省 = 不修改)
+     */
+    public void saveRowLabels(String panelCode, String rowLabel, List<Map<String, Object>> cols) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        // 只允许改**声明过**的块(否则任何面板都能被塞任意显示名,失去元数据闸门)
+        boolean declaresIndicators = !def.waterIndicators().isEmpty();
+        boolean declaresRows = !def.editableRowLabels().isEmpty();
+        if (!declaresIndicators && !declaresRows) {
+            throw new IllegalArgumentException("该面板没有可编辑的行标题/指标列:" + panelCode);
+        }
+        // 读出既有 config(可能是 null / 非法 JSON —— 非法时宁可报错也不能把它覆盖掉,
+        // 那份 config 里通常还有 uniqueKeys/fixedItems 等别的声明)
+        java.util.Map<String, Object> cfg = new java.util.LinkedHashMap<>();
+        String raw = def.config();
+        if (raw != null && !raw.isBlank()) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode root = JSON.readTree(raw);
+                if (root.isObject()) {
+                    root.fields().forEachRemaining(e -> cfg.put(e.getKey(), JSON.convertValue(e.getValue(), Object.class)));
+                }
+            } catch (Exception ex) {
+                throw new IllegalStateException("该面板的 config 不是合法 JSON,拒绝覆盖(请先修 yj_panel.config):" + panelCode);
+            }
+        }
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> labels = cfg.get("rowLabels") instanceof java.util.Map<?, ?> m
+                ? new java.util.LinkedHashMap<>((java.util.Map<String, Object>) m)
+                : new java.util.LinkedHashMap<String, Object>();
+        List<String> validKeys = new ArrayList<>();
+        for (Map<String, Object> w : def.waterIndicators()) validKeys.add(String.valueOf(w.get("key")));
+        int changed = 0;
+        LOG.info("[ROWLABELS] panel={} rowLabel=[{}] declaresRows={} declaresIndicators={} rawConfigLen={}",
+                panelCode, rowLabel, declaresRows, declaresIndicators, raw == null ? -1 : raw.length());
+        if (rowLabel != null && !rowLabel.isBlank()) {
+            String name = rowLabel.trim();
+            if (name.length() > 30) throw new IllegalArgumentException("行标题过长(≤30)");
+            // 行标题本身也是"原字段名 → 新名";原名用第一个可编辑行标题字段(现役只有「原水水质条件」)
+            if (declaresRows) {
+                String origin = def.editableRowLabels().get(0);
+                // 与原值相同 ⇒ 不必写,但也不能当成"没改"而把整次保存跳掉(列名可能同时改了)
+                if (!name.equals(labels.get(origin))) {
+                    labels.put(origin, name);
+                    changed++;
+                }
+            }
+        }
+        for (Map<String, Object> c : cols == null ? List.<Map<String, Object>>of() : cols) {
+            String key = String.valueOf(c.getOrDefault("key", "")).trim();
+            String name = String.valueOf(c.getOrDefault("name", "")).trim();
+            if (key.isEmpty() || name.isEmpty()) continue;
+            if (!validKeys.contains(key)) throw new IllegalArgumentException("指标列不属于该块:" + key);
+            if (name.length() > 20) throw new IllegalArgumentException("列名过长(≤20)：" + name);
+            labels.put(key, name);
+            changed++;
+        }
+        if (changed == 0) return;
+        cfg.put("rowLabels", labels);
+        LOG.info("[ROWLABELS] panel={} 写入 {} 条显示名: {}", panelCode, labels.size(), labels);
+        String json;
+        try {
+            json = JSON.writeValueAsString(cfg);
+        } catch (Exception ex) {
+            throw new IllegalStateException("配置序列化失败:" + ex.getMessage());
+        }
+        if (json.length() > 4000) throw new IllegalArgumentException("配置过长(>4000),请精简列名");
+        jdbc.update("UPDATE yj_panel SET config = ?, config_at = SYSDATETIME() WHERE panel_code = ?", json, panelCode);
+        registry.reload();
+    }
+
+    /** config 读写用的 ObjectMapper(与 PanelRegistry 同款;放在这里避免再引一个静态字段到领域记录里) */
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * 某张测试申请单关联了哪些「数据记录表」(2026-10-29)。
+     *
+     * <p>用户口径:「测试申请单的汇总也能看到有哪些数据记录表关联了测试申请单,
+     * 然后点击可以弹窗显示对应的数据记录表的数据」。
+     *
+     * <p><b>关联判据(2026-10-29 修正)</b>:记录表右上角那格「文档编号」填的就是测试申请单的
+     * 单据编号 —— 用户原话「数据记录表也是引用的申请单的右上角的单据编号」。
+     * 所以主判据是 {@code [文档编号]}。
+     * <p>为什么之前查不到(踩坑记录):第一版只查迁移新增的 {@code [测试申请单编号]} 列,
+     * 而那列在纸面上是 place=query 的**不可见**字段,用户在界面上根本不会去填它 ——
+     * 他填的是「文档编号」。于是记录表明明存了 DT-…,汇总表却一直显示「无」。
+     *
+     * <p>兼容口径:两列任一命中即算关联(老数据可能只填了「测试申请单编号」;
+     * 未来若把那个隐藏列彻底移除,这段也能原样工作)。
+     *
+     * @param domNo 测试申请单的单据编号(DT-…);空串直接返回空表
+     * @return {@code [{panelCode, panelName, docNo, date}]},按单据日期倒序
+     */
+    public List<Map<String, Object>> linkedRecordSheets(String domNo) {
+        String no = domNo == null ? "" : domNo.trim();
+        if (no.isEmpty()) return List.of();
+        // 面板码 ↔ 头表。新增实验室记录表时,与迁移脚本里的清单一起加(两处同源)。
+        String[][] panels = {
+                {"RD_ALKALINE", "rd_alkaline_head"},
+                {"RD_MINERAL", "rd_mineral_head"},
+                {"RD_ANTIBACT", "rd_antibact_head"},
+                {"RD_SCALE", "rd_scale_head"},
+                {"RD_RO_PROTECT", "rd_ro_protect_head"},
+                {"RD_SOAK", "rd_soak_head"},
+                {"RD_DROP_PREC", "rd_drop_prec_head"},
+                {"RD_FILTER_EFF", "rd_filter_eff_head"},
+        };
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String[] p : panels) {
+            String table = p[1];
+            // 表名来自上面的白名单常量(不是用户输入),不接受外部拼接
+            List<String> cols = jdbc.queryForList(
+                    "SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(?)", String.class, "dbo." + table);
+            if (cols.isEmpty()) continue;                 // 表不存在
+            boolean hasDocNo = cols.contains("文档编号");       // 主判据(用户实际填的那格)
+            boolean hasLink = cols.contains("测试申请单编号");   // 兼容判据(隐藏列)
+            if (!hasDocNo && !hasLink) continue;
+
+            // 两列任一等于该申请单号即命中;用 ISNULL 包一层,避免 NULL 参与比较
+            StringBuilder where = new StringBuilder();
+            if (hasDocNo) where.append("LTRIM(RTRIM(ISNULL([文档编号],''))) = ?");
+            if (hasLink) {
+                if (where.length() > 0) where.append(" OR ");
+                where.append("LTRIM(RTRIM(ISNULL([测试申请单编号],''))) = ?");
+            }
+            List<Object> args = new ArrayList<>();
+            if (hasDocNo) args.add(no);
+            if (hasLink) args.add(no);
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(
+                        "SELECT 单据编号 AS docNo, 单据日期 AS docDate FROM dbo." + table
+                                + " WHERE (" + where + ") ORDER BY 单据日期 DESC, id DESC", args.toArray())) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("panelCode", p[0]);
+                    m.put("panelName", panelDisplayName(p[0]));
+                    m.put("docNo", r.get("docNo"));
+                    m.put("date", r.get("docDate"));
+                    out.add(m);
+                }
+            } catch (Exception ex) {
+                LOG.warn("[LINKED-SHEETS] 查询 {} 失败(跳过该表): {}", table, ex.getMessage());
+            }
+        }
+        return out;
+    }
+
+    /** 面板显示名(取不到回退面板码) */
+    private String panelDisplayName(String code) {
+        PanelRegistry.PanelDef def = registry.panel(code);
+        return def == null ? code : def.name();
     }
 
     /** 保存表头字段排序/栏名/显隐(表头调整;更新 yj_field 的 seq/alias,显隐 hidden+visible 同开同关) */

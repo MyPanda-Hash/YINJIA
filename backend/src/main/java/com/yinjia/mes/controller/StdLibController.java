@@ -71,8 +71,16 @@ public class StdLibController {
         if (content.length() > 4000) {
             return ApiResult.error(400, "内容过长(≤4000 字)");
         }
-        jdbc.update("INSERT INTO yj_std_lib (lib_code, item_code, content, asp_user1, asp_time1) VALUES (?,?,?,?,SYSDATETIME())",
-                lib, item, content, username);
+        // seq 必须给值:INSERT 不写 seq 时该列为 NULL,而所有读取路径都是 ORDER BY seq,...
+        // —— NULL 在 SQL Server 的升序里排**最前**,于是用户新加的条目会窜到下拉第一项、
+        //    把「每批次/裸棒」这类业务首项挤下去(2026-10-29 实测:新增「自动化测试形态」后
+        //    seq=0,直接排在 裸棒(seq=10) 前面)。
+        // 取「当前库最大 seq + 10」⇒ 新条目一律排在末尾,与「先有后无」的直觉一致;
+        // 空库(MAX 为 NULL)时从 10 起。
+        Integer nextSeq = jdbc.queryForObject(
+                "SELECT ISNULL(MAX(seq), 0) + 10 FROM yj_std_lib WHERE lib_code = ?", Integer.class, lib);
+        jdbc.update("INSERT INTO yj_std_lib (lib_code, item_code, content, seq, asp_user1, asp_time1) VALUES (?,?,?,?,?,SYSDATETIME())",
+                lib, item, content, nextSeq == null ? 10 : nextSeq, username);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", true);
         return ApiResult.ok(out);

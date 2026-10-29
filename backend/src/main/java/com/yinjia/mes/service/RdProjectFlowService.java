@@ -64,7 +64,14 @@ public class RdProjectFlowService {
                         + " CONVERT(varchar(19), asp_time1, 120) AS createdAt,"
                         + " CONVERT(varchar(19), asp_time2, 120) AS updatedAt,"
                         + " ISNULL(asp_user1,N'') AS createdBy"
+                        // 作废/删除判活(2026-10-30 用户报障「服务器上已经把这个项目的立项申请和项目实施计划
+                        // 删掉了,现在还出现在项目流程管控……已经弃审废弃删除的单据流程就不需要再追踪了」):
+                        // voidDoc 只写 yj_doc_status.canceled='Y'、**不动业务表 asp_cancel**
+                        // ⇒ 只按 asp_cancel 过滤的话,已作废的立项照样被当成活着,越积越多且无人工删除入口
+                        //   (项目进度查询是只读面板)。两侧都排(与 QueryService 列表口径一致)。
                         + "  FROM rd_approval WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_APPROVAL'"
+                        + " AND s.doc_no = rd_approval.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                         + (kw.isEmpty() ? "" : " AND ([单据编号] LIKE ? OR ISNULL([文档编号],N'') LIKE ?"
                         + " OR ISNULL([机型及应用位置],N'') LIKE ? OR ISNULL([客户名],N'') LIKE ?)")
                         + " ORDER BY [单据编号] DESC",
@@ -197,6 +204,9 @@ public class RdProjectFlowService {
                         + " CONVERT(varchar(19), asp_time2, 120) AS updatedAt,"
                         + " ISNULL(asp_user1,N'') AS createdBy" + stageCols
                         + "  FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                        // 同上(2026-10-30):已作废的实施计划不再参与流程追踪与"疑似关联"提示
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_PLAN'"
+                        + " AND s.doc_no = rd_plan.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                         + " AND [文档编号] IN (" + marks(docNos.size()) + ") ORDER BY id",
                 docNos.toArray());
         for (Map<String, Object> r : rows) {
@@ -222,7 +232,13 @@ public class RdProjectFlowService {
                 "SELECT d.[单据编号] AS no, ISNULL(d.[说明],N'') AS docNo, ISNULL(d.[状态],N'') AS status"
                         + "  FROM rd_progress_detail d"
                         + "  JOIN rd_progress p ON p.[单据编号] = d.[单据编号] AND ISNULL(p.asp_cancel,'N') <> 'Y'"
-                        + " WHERE ISNULL(d.asp_cancel,'N') <> 'Y' AND d.[说明] IN (" + marks(docNos.size()) + ")",
+                        // 已作废的进度单不算"已进入进度查询"(2026-10-30)。
+                        // ⚠ 用 NOT EXISTS 而不是 JOIN yj_doc_status:进度单可能根本没状态行,
+                        //   INNER JOIN 会把"正常但没状态行"的单一起丢掉(实测:该表只有被操作过的单才有行)。
+                        + "  WHERE ISNULL(d.asp_cancel,'N') <> 'Y'"
+                        + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status ps WHERE ps.panel_code = N'RD_PROGRESS'"
+                        + "     AND ps.doc_no = d.[单据编号] AND ISNULL(ps.canceled,'N') = 'Y')"
+                        + "   AND d.[说明] IN (" + marks(docNos.size()) + ")",
                 docNos.toArray());
         for (Map<String, Object> r : rows) {
             out.computeIfAbsent(str(r.get("docNo")), k -> new ArrayList<>())
@@ -259,17 +275,21 @@ public class RdProjectFlowService {
      */
     private List<Map<String, Object>> planCandidates(String projectName) {
         List<Map<String, Object>> out = new ArrayList<>();
+        // 已作废的计划不当候选(2026-10-30):否则作废掉的单还会以"疑似关联"提示挂在别人名下
+        final String alive = " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_PLAN'"
+                + " AND s.doc_no = rd_plan.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')";
         if (projectName.isEmpty()) {
             out.addAll(jdbc.queryForList(
                     "SELECT TOP 3 [单据编号] AS no, ISNULL([文档编号],N'') AS docNo, ISNULL([项目名称],N'') AS projectName"
                             + "  FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([文档编号],N'') = N''"
+                            + alive
                             + " ORDER BY id DESC"));
             return out;
         }
         out.addAll(jdbc.queryForList(
                 "SELECT TOP 3 [单据编号] AS no, ISNULL([文档编号],N'') AS docNo, ISNULL([项目名称],N'') AS projectName"
                         + "  FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                        + "   AND ([项目名称] = ? OR ISNULL([文档编号],N'') = N'') ORDER BY id DESC",
+                        + "   AND ([项目名称] = ? OR ISNULL([文档编号],N'') = N'')" + alive + " ORDER BY id DESC",
                 projectName));
         return out;
     }

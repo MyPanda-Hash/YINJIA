@@ -194,6 +194,7 @@
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
           :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
+          :metadata="cfgCache?.metadata || {}"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -362,6 +363,7 @@
                 <div
                   class="as-side-btn"
                   :class="{ primary: btnName(g) === '保存' && curDocStatus === '草稿', disabled: isDisabled(btnName(g)) }"
+                  :title="btnName(g) === '修改' ? tt('修改：退回草稿后可以继续修改，改完保存即重新归档') : ''"
                   @click="onSideAction(btnName(g))"
                 >{{ tt(btnName(g)) }}</div>
                 <div
@@ -2117,6 +2119,31 @@
          ⇒ 弹窗里多一个对接人下拉(默认带出已有对接人),选了就与定级同一动作完成分发。
          2026-10-28 第二轮:侧栏「定级分发」按钮已删除,**本弹窗是定级与分发对接人的唯一入口**;
          不选对接人时该单会停在"已审批、未分发",由侧栏「补发对接人」补救(仅缺对接人时出现)。 -->
+    <!-- 测试申请单「审批通过 + 分发测试负责人」弹窗(2026-10-29)。
+         用户口径:「借鉴前面的立项申请的流程,现在也加上在审批的时候可以分发对应的负责人
+         去测试之后填写数据记录表」—— 与立项申请「审批定级 + 分发对接人」同一范式:
+         审批弹窗里选人 → 通过即写 rd_dom_test_head.测试负责人 + 留痕 + 通知。 -->
+    <el-dialog v-model="domApvVisible" :title="tt('审批通过并分发测试负责人')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审批通过时可以指定测试负责人：他会去填写关联到本单的数据记录表。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('测试负责人') }}</span>
+          <el-select v-model="domApvTester" style="flex:1" filterable clearable :placeholder="tt('测试负责人（选填）')">
+            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="dq-tip">{{ tt('不选则审批后由管理员用「分发测试负责人」补上') }}</div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="domApvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="domApvVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="domApvBusy" @click="confirmDomApprove">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
@@ -3233,7 +3260,13 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   //   ① 字段名是 **name**(不是 title):曾写成 g.title ⇒ 每一组都判"不在白名单" ⇒ 工具栏整条清空。
   //   ② 工具栏最左本来就有常驻「查询」按钮(.toolbar-query-btn),故「查询/查找」组的动作要剥掉,
   //      剥空后该组改名成剩余首个动作(通常是"刷新"),不能保留组名「查询」——否则界面上两颗查询。
-  const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
+  // ⚠ 2026-10-29:「修改」不再**无条件**摘掉 ——
+  //   当年摘它是因为"唯一作用是弹整单卡片,卡片已删 ⇒ 死按钮";
+  //   但物料清单(WLBOM)用的是**无侧栏的工具栏布局**,「修改」在那里是
+  //   「已归档 → 退回草稿」的唯一入口(用户口径:加一个修改按钮,点了退回草稿再改)。
+  //   故按面板放行:自助维护型保留「修改」,其余面板仍摘(检验目录走侧栏/行内,不吃工具栏)。
+  const actions = actsOf(group).filter((action) => !['查询', '查找'].includes(action)
+    && !(action === '修改' && !isSelfMaintainedPanel.value))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
@@ -3861,6 +3894,12 @@ async function openPreviewCard(c) {
 }
 /** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
 const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
+/**
+ * 自助维护型面板(物料清单 WLBOM):**保存即归档**,但归档后侧栏给一个「修改」按钮
+ * 直接退回草稿(不走申请修改/审批)。
+ * 真源 = 后端 ButtonService.SELF_MAINTAINED_PANELS,经 metadata.selfMaintained 下发。
+ */
+const isSelfMaintainedPanel = computed(() => !!cfgCache.value?.metadata?.selfMaintained)
 /**
  * 侧栏是否放出「修改记录」按钮:文书归档面板一族(isDocArchivePanel)照旧;
  * 检验目录(QC_CATALOG)不是归档面板,但其「修改」动作会把「已完成检验」回弹并写 yj_doc_modify_log
@@ -4883,7 +4922,14 @@ watch(
   () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
   () => {
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
-    applyDocDefaults(panelCode.value, cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
+    applyDocDefaults(panelCode.value, cur.value, user, {
+      isNew: isFreshAddedDoc(),
+      today: todayStr(),
+      // 声明式默认值(yj_panel.config.headDefaults,后端 buildMeta 下发)。
+      // 关键:后端「新增」建单时已把默认值写库,但前端新建后的本地草稿是空的 ——
+      // 不在这里补,就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
+      headDefaults: cfgCache.value?.metadata?.headDefaults || null,
+    })
   },
 )
 
@@ -6565,6 +6611,44 @@ const apvOpinion = ref('')
 const apvDocNo = ref('')
 /** 2026-10-28:审批定级时一并分发对接人(用户口径「后续也默认是这个对接人」) */
 const apvLiaison = ref('')
+
+// ── 测试申请单:审批通过 + 分发测试负责人(2026-10-29) ──
+const domApvVisible = ref(false)
+const domApvBusy = ref(false)
+const domApvTester = ref('')
+const domApvOpinion = ref('')
+const domApvDocNo = ref('')
+async function openDomApprove(no) {
+  domApvDocNo.value = no
+  await ensureRdFlowUsers()
+  // 默认带出已分发的负责人(改人场景);新单为空,由用户自行选或不选
+  domApvTester.value = String(current.value?.['测试负责人'] || '')
+  domApvOpinion.value = ''
+  domApvVisible.value = true
+}
+async function confirmDomApprove() {
+  if (domApvBusy.value) return
+  domApvBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'RD_DOM_TEST', buttonName: '审批通过',
+      formData: {
+        编号: domApvDocNo.value,
+        // 空串不发:后端按"没带负责人"处理(与旧前端/老单兼容),不会误清已分发的人
+        ...(domApvTester.value ? { 测试负责人: domApvTester.value } : {}),
+        ...(domApvOpinion.value ? { 审批意见: domApvOpinion.value } : {}),
+      },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('审批通过'))
+    domApvVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    domApvBusy.value = false
+  }
+}
 async function openRdApprove(no) {
   apvDocNo.value = no
   // 已定过级的单据默认选中当前等级(改级场景);新单默认空,必须选(与用户口径「审批与定级同一步」一致)
@@ -6998,39 +7082,77 @@ async function buildSheetPdfBlob() {
   // 多页签文书的页数由 RecordSheetPanels 暴露(单页/非记录纸组件恒为 1)
   const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
   const startPage = typeof comp?.activePage === 'number' ? comp.activePage : 0
+  // 分组面板(设备使用/仪器使用/加标水):每个有数据的下拉值 = 一张纸(2026-10-29 用户口径
+  //「有多少个下拉切换就打印对应页面的多少张」)。组与页签是**两层**循环:一份文书有多页,
+  // 每一页对每组都要各出一张 —— 故按「页 → 组」的顺序出纸,页序稳定、组序按单据里的出现顺序。
+  const groups = Array.isArray(comp?.groupPages) ? comp.groupPages.slice() : []
+  const startGroup = typeof comp?.getViewGroup === 'function' ? comp.getViewGroup() : ''
   const shots = []
   try {
     for (let i = 0; i < pageCount; i++) {
       if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
         comp.setActivePage(i)
         await nextTick()
+        // 页签切换会换网格/列宽/报告头(见 RecordSheetPanels 的 effGrid/effHead 按 activePage 解析)
+        // ⇒ 必须等浏览器完成一次布局再截图,否则截到的是**上一页**的排版(2026-10-29 补)。
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
       }
-      shots.push(await snapSheetPage(el, domToPng))
+      const perGroup = groups.length ? groups : [null]
+      for (const gv of perGroup) {
+        if (gv !== null && typeof comp?.setViewGroup === 'function') {
+          comp.setViewGroup(gv)
+          await nextTick()
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        }
+        shots.push(await snapSheetPage(el, domToPng))
+      }
     }
   } finally {
-    // 切回导出前的页签,别把用户的界面停在最后一页
-    if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
-      comp.setActivePage(startPage)
-      await nextTick()
-    }
+    // 切回导出前的页签/分组,别把用户的界面停在最后一页或别的设备上
+    if (groups.length && typeof comp?.setViewGroup === 'function') comp.setViewGroup(startGroup)
+    if (pageCount > 1 && typeof comp?.setActivePage === 'function') comp.setActivePage(startPage)
+    await nextTick()
   }
   if (!shots.length) return null
   // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
-  // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
+  // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证物理尺寸可预期。
   const MM = 25.4 / 96
-  const first = shots[0]
+  /**
+   * 纸张统一为 **A4 竖向**(210×297mm),不再按每张截图的实际尺寸出纸。
+   *
+   * 🔴 2026-10-29 用户口径:「组装工艺清单的 BOM 表打印出来是横向的,和组装工艺清单的竖向不一样」。
+   *   实测(AP-2026-10-0003)三页纸张元素宽**完全相同**(1041px),高 260/471/468 ——
+   *   几何上没有区别;真正的原因是旧实现把**内容尺寸**当页面尺寸:
+   *     format: [first.w0 * MM, first.h0 * MM]  +  addPage([pw, ph], pw > ph ? 'l' : 'p')
+   *   内容矮的一页(w>h)就被判成横向 ⇒ 同一份打印件里三种页面尺寸、全部 275mm 扁横条,
+   *   阅读器/打印机再按各页比例自行旋转,看起来就是「一个横一个竖」。
+   *
+   *   固定 A4 竖向后:① 每页方向尺寸完全一致;② 与单页面板走 window.print() 的观感一致
+   *   (浏览器默认也是 A4 竖向、按纸宽缩放);③ 内容**等比**缩放居中,列宽比例不变(不拉伸)。
+   */
+  const PAGE_W = 210
+  const PAGE_H = 297
+  const MARGIN = 8            // 页边距(mm),与 CSS @page { margin: 8mm } 同口径
+  const contentW = PAGE_W - MARGIN * 2
+  const contentH = PAGE_H - MARGIN * 2
   const pdf = new jsPDF({
-    orientation: first.w0 * MM > first.h0 * MM ? 'l' : 'p',
+    orientation: 'p',
     unit: 'mm',
-    format: [first.w0 * MM, first.h0 * MM],
+    format: [PAGE_W, PAGE_H],
     compress: true,
   })
   shots.forEach((s, i) => {
-    const pw = s.w0 * MM
-    const ph = s.h0 * MM
-    if (i > 0) pdf.addPage([pw, ph], pw > ph ? 'l' : 'p')
-    pdf.addImage(s.dataUrl, 'PNG', 0, 0, pw, ph)
+    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], 'p')
+    // 截图原始尺寸(px) → mm
+    const iw = s.w0 * MM
+    const ih = s.h0 * MM
+    // 等比缩放到内容区:取较小的那个比例,宽高都不越界
+    const k = Math.min(contentW / iw, contentH / ih)
+    const w = iw * k
+    const h = ih * k
+    // 水平居中、垂直顶对齐(纸张是从上往下读的,顶部留白由 MARGIN 统一)
+    const x = MARGIN + (contentW - w) / 2
+    pdf.addImage(s.dataUrl, 'PNG', x, MARGIN, w, h)
   })
   const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
   return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
@@ -7144,12 +7266,83 @@ async function exportSheetExcel() {
     ElMessage.error(tt('导出失败'))
   }
 }
+/**
+ * 打印当前文书。
+ *
+ * 两条路径,**判据只此一处**:
+ *   ① 多页签(pages ≥ 2)**或**分组面板有多个下拉值 ⇒ 先按「页 × 组」逐张截图拼成一份多页 PDF,
+ *      在新窗口打开让用户直接打印;
+ *   ② 单页面板 ⇒ 老路径:加打印样式后 window.print()。
+ *
+ * 【为什么多页签不能走 window.print()】浏览器 window.print() 只认**当前 DOM**,而纸张内容是按
+ *   `pageOf(x) === activePage` 用 v-show 显隐的 ⇒ 纸面只出当前页签那一张,其余页签的内容
+ *   虽然在 DOM 里但 display:none,打印预览里看不到。2026-10-29 用户口径:
+ *   「研发管理有 tap 页的面板…只能是一个 tap 页打印完再切 tap 页,看看有没有什么办法可以
+ *    全部 tap 页打印出来」。
+ *   buildSheetPdfBlob 本来就是逐页切页签各截一张再拼多页 PDF(2026-10-28 为「导出 PDF 要
+ *   全部内容」实现,2026-10-29 扩到分组),打印复用它 ⇒ 版式与导出**零差异**。
+ *
+ * 分组面板(设备使用/仪器使用/加标水)口径不变:「有多少个下拉切换就打印对应页面的多少张」。
+ */
 async function printApprovalSheet() {
+  const comp = approvalSheetRef.value
+  const groups = Array.isArray(comp?.groupPages) ? comp.groupPages : []
+  const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
+  // 多页签 或 多组 ⇒ 都要出多张纸,只能走 PDF(见上)
+  if (pageCount > 1 || groups.length > 1) {
+    const loadingMsg = ElMessage({ message: tt('正在生成打印件…'), duration: 0 })
+    try {
+      const r = await buildSheetPdfBlob()
+      if (!r) { ElMessage.warning(tt('未找到可导出的单据')); return }
+      const url = URL.createObjectURL(r.blob)
+      const w = window.open(url, '_blank')
+      if (!w) {
+        // 弹窗被拦:退回下载,至少不丢
+        const a = document.createElement('a')
+        a.href = url
+        a.download = r.name
+        a.click()
+        ElMessage.warning(tt('浏览器拦截了新窗口，已改为下载 PDF'))
+      } else {
+        // 张数 = 页签数 × 组数(与 buildSheetPdfBlob 的「页 → 组」两层循环同口径)
+        const n = pageCount * Math.max(1, groups.length)
+        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(n)))
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) {
+      ElMessage.error(tt('打印失败') + ':' + (e?.message || ''))
+    } finally {
+      loadingMsg.close()
+    }
+    return
+  }
   if (!approvalSheetRef.value) return
   // 打印样式(approval-printing):只打印文书纸张,隐藏侧栏/其它页面元素
   document.body.classList.add('approval-printing')
+  /**
+   * 按纸宽**等比缩放**后再打印 —— 2026-10-29 用户口径「给原生打印也加等比缩放」。
+   *
+   * 为什么必须算:那张纸的内层表格宽度是**行内 px**(secW(sec) = 网格列宽之和),
+   *   而 A4 竖向在 8mm 边距下只能容 ≈733px。旧样式写死 `zoom:0.92`,宽表面板照样溢出:
+   *   实测纸宽 1510px 的面板 ×0.92 后仍 1389px,**右侧 656px 被切掉**;
+   *   最宽的测试申请单 1708px 溢出 838px(半个表消失)。
+   *
+   * 算法:zoom = 纸宽 ÷ A4 内容宽,上限 1(窄表不放大),下限 0.32(约 5px 字,再小就没意义)。
+   *   结果写到 <html> 的 CSS 变量上,样式侧用 var(--print-zoom) 取值 ⇒ 一处算、一处用。
+   */
+  const A4_CONTENT_PX = Math.round((210 - 16) / 25.4 * 96)   // 194mm @96dpi ≈ 733px
+  const paperEl = document.querySelector(
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
+    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
+    + '.approval-layout .qr-sheet, .record-sheet')
+  const paperW = paperEl ? Math.max(paperEl.scrollWidth, paperEl.offsetWidth) : 0
+  const printZoom = paperW > 0
+    ? Math.max(0.32, Math.min(1, A4_CONTENT_PX / paperW))
+    : 1
+  document.documentElement.style.setProperty('--print-zoom', String(printZoom))
   const restore = () => {
     document.body.classList.remove('approval-printing')
+    document.documentElement.style.removeProperty('--print-zoom')
     window.removeEventListener('afterprint', restore)
   }
   window.addEventListener('afterprint', restore)
@@ -8979,7 +9172,12 @@ function isDisabled(action) {
     整单中止: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     草稿: !current.value || st !== '已中止',
     取消中止: !current.value || st !== '已中止',
-    修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
+    // 「修改」两套语义,按面板分流(与后端 ButtonService 的 case "修改" 同源):
+    //   · 自助维护型(物料清单 WLBOM):已归档/已审核 → 退回草稿(2026-10-29 用户口径)
+    //   · 检验目录(QC_CATALOG):已审核/生产中/已完工 → 回弹「正在检验中」
+    修改: isSelfMaintainedPanel.value
+      ? (!current.value || !['已归档', '已审核'].includes(st))
+      : (!current.value || !['已审核', '生产中', '已完工'].includes(st)),
     审批情况: false,
     提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
     审批通过: !current.value || !IN_APPROVAL.includes(st)
@@ -10051,6 +10249,15 @@ async function onButton(action) {
           if (!saved) return
         }
         return openRdApprove(current.value['编号'] || current.value['单据编号'] || '')
+      }
+      // 测试申请单(2026-10-29 用户口径「借鉴前面的立项申请的流程,现在也加上在审批的时候可以
+      // 分发对应的负责人去测试之后填写数据记录表」):审批通过与分发测试负责人同一步骤 ⇒ 专用弹窗。
+      if (action === '审批通过' && panelCode.value === 'RD_DOM_TEST') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openDomApprove(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {

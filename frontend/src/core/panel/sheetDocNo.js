@@ -16,3 +16,39 @@
 export function docNoKeyOf(head) {
   return head && Object.prototype.hasOwnProperty.call(head, '文档编号') ? '文档编号' : '单据编号'
 }
+
+/**
+ * 该面板纸张右上角那格**该绑哪个键**:配置声明优先,没声明才自动推断。
+ *
+ * 2026-10-29 引入。用户口径「产品文件内的面板的右上角的编号应该改为单据编号,所有的都是」——
+ * 只改标识文案不够:同一句「编号」在不同面板指向两种号,而自动推断只看「head 里有没有 文档编号」,
+ * 撞上**文档编号是隐藏物理列但仍在 head 里**的面板(出货检验计划表 RD_INSP_PLAN)就把 YJ-RD001
+ * 印到右上角,那张单自己的 IP-2026-10-00xx 反而一个字看不到(2026-10-29 探针实测)。
+ *
+ * @param {Record<string, unknown>|null|undefined} head 单据表头
+ * @param {Record<string, unknown>|null|undefined} effHead 生效的报告头配置(可能含 docNoKey)
+ * @returns {string} 数据键名
+ */
+export function docNoKeyFor(head, effHead) {
+  const declared = String((effHead && effHead.docNoKey) || '')
+  return declared || docNoKeyOf(head)
+}
+
+/**
+ * 纸张右上角那格的**标识文案**(带全角冒号,直接喂 tt())。'' = 不印标识。
+ *
+ * 三种取值(未声明的面板逐字不变 —— 几十张面板依赖这个缺省):
+ *   · `docnoPrefix === false`  ⇒ ''(7 张数据记录表设计原值就是裸编号,无「编号：」);
+ *   · `docnoPrefix` 是**字符串** ⇒ 文案本身,补全角冒号('单据编号' → '单据编号：');
+ *   · 其余(undefined / true)  ⇒ 缺省「编号：」。
+ *
+ * ⚠ 与 docNoKeyFor 必须成对使用:只改文案会印出「单据编号：YJ-RD001」这种张冠李戴的字。
+ *
+ * @param {unknown} v 配置里的 head.docnoPrefix
+ * @returns {string} 带冒号的标识;'' = 不印
+ */
+export function docnoPrefixOf(v) {
+  if (v === false) return ''
+  if (typeof v === 'string') return v.endsWith('：') ? v : v + '：'
+  return '编号：'
+}

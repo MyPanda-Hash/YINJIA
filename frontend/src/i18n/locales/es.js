@@ -226,6 +226,7 @@ export default {
     '点「填入单据」后按下面这张表覆盖对应格;未变化的格不列出。': 'Haga clic en "Complete el documento" y haga clic en la tabla a continuación para cubrir la cuadrícula correspondiente; la cuadrícula sin cambios no se enumera.',
     '物料': 'Material',
     '编号：': 'Número:',
+    '单据编号：': 'N.º de documento:',
     '选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。': 'Seleccione una variante: un conjunto completo de procedimientos para esta variante reemplazará el contenido actual de esta tabla (no una adición). Puede "desactivar" todo el artículo aquí; para cambiar el contenido del proceso, vaya a "Mantenimiento de la biblioteca estándar".',
     '变体': 'Variante',
     '工序数': 'Número de procesos',

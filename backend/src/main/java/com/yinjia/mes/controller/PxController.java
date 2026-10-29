@@ -859,6 +859,24 @@ public class PxController {
         return ApiResult.ok(service.getApprovalHistory(panelCode, code));
     }
 
+    /**
+     * 某张**测试申请单**关联了哪些「数据记录表」(2026-10-29)。
+     *
+     * <p>用户口径:「测试申请单的汇总也能看到有哪些数据记录表关联了测试申请单,
+     * 然后点击可以弹窗显示对应的数据记录表的数据」。
+     *
+     * <p>关联靠的是 8 张数据记录表表头新增的「测试申请单编号」列(迁移
+     * {@code migrate-rd-domtest-link-20261029.sql})—— 登记式关联,不是隐式推导:
+     * 记录表上填了哪张申请单,这里就能查到哪张。
+     *
+     * @param domNo 测试申请单的单据编号(DT-…)
+     */
+    @GetMapping("/linkedRecordSheets")
+    public ApiResult<List<Map<String, Object>>> linkedRecordSheets(@RequestParam String domNo) {
+        perm.requirePanelView("RD_DOM_TEST");
+        return ApiResult.ok(configService.linkedRecordSheets(domNo));
+    }
+
     @PostMapping("/callButton")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> callButton(@RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -960,6 +978,22 @@ public class PxController {
         perm.requirePanelRead(panelCode);
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveHeaderPrefs(panelCode, columns);
+        return ApiResult.ok(null);
+    }
+
+    /**
+     * 「原水水质条件」块的行标题/指标列显示名(2026-10-29)。
+     * 只改显示名(落 yj_panel.config 的 rowLabels),数据键与物理列不动;
+     * 加指标列仍走「自定义字段」(extField/add)绑备用列,再在此改名。
+     */
+    @PostMapping("/saveRowLabels")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Void> saveRowLabels(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String rowLabel = String.valueOf(body.getOrDefault("rowLabel", ""));
+        List<Map<String, Object>> cols = (List<Map<String, Object>>) body.getOrDefault("cols", List.of());
+        configService.saveRowLabels(panelCode, rowLabel, cols);
         return ApiResult.ok(null);
     }
 
