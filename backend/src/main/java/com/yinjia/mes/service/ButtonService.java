@@ -2991,6 +2991,15 @@ public class ButtonService {
         // 分批送料:作废**不回收**批次号与台账号(2026-09-21 口径 —— 批次号在采购入库单审核时已定,
         // 回收会让已编号批次重号;弃审/作废只作废单据,台账号原样保留,见 BatchService.RECYCLE_ON_RELEASE)
         batchService.releaseByTarget(def.code(), no);
+        // 研发链:作废/删除立项申请或实施计划 → **立刻**把对应进度行清掉(2026-10-30 用户报障
+        //   「服务器上把立项申请和项目实施计划删掉了,现在还出现在项目进度查询,而且删除不了」)。
+        //   此前只有"下一次同步进度"才跑 pruneProgressRows,作废后不点「同步进度」就永远挂着;
+        //   而进度查询是只读面板,用户没有别的手段删掉它。
+        if ("RD_APPROVAL".equals(def.code()) || "RD_PLAN".equals(def.code())) {
+            try { syncAllPlansToProgress(); } catch (Exception e) {
+                log.warn("[研发作废联动] 清理进度行失败(不影响作废):{}", e.getMessage());
+            }
+        }
         return result(no, "已作废");
     }
 
@@ -4607,13 +4616,34 @@ public class ButtonService {
                     + " WHERE ISNULL(asp_cancel,'N') <> 'Y'"
                     + " AND ("
                     // ① 源单据没了:该项目编号在未作废的「实施计划」「立项申请」里都不存在了
-                    + "   (ISNULL([说明], N'') <> '' AND [说明] NOT IN ("
-                    + "       SELECT [文档编号] FROM rd_plan WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                    + "         AND ISNULL([文档编号],'') <> ''"
+                    // ⚠ 2026-10-30 用户报障「服务器上把立项申请和项目实施计划删掉了,现在还出现在
+                    //   项目进度查询……而且删除不了」:作废/删除只写 yj_doc_status.canceled='Y',
+                    //   **不动业务表 asp_cancel** ⇒ 只按 asp_cancel 判活时作废单仍算"源还在",
+                    //   进度行永远清不掉。两条子查询都补上状态表过滤。
+                    // ⚠ 判据必须带「[说明] = [项目编号]」:syncPlanToProgress 两个列写同值(=文档编号),
+                    //   但四级行(syncTestDocsToProgress)的 [说明] 存的是「测试背景」文本、
+                    //   [项目编号] 才是单据编号 —— 不加这个条件会把四级行当成孤儿全清掉。
+                    + "   ((ISNULL([说明], N'') <> '' AND ISNULL([说明], N'') = ISNULL([项目编号], N'')"
+                    + "     AND [说明] NOT IN ("
+                    + "       SELECT p.[文档编号] FROM rd_plan p WHERE ISNULL(p.asp_cancel,'N') <> 'Y'"
+                    + "         AND ISNULL(p.[文档编号],'') <> ''"
+                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_PLAN'"
+                    + "           AND s.doc_no = p.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                     + "       UNION"
-                    + "       SELECT [文档编号] FROM rd_approval WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                    + "         AND ISNULL([文档编号],'') <> ''"
+                    + "       SELECT a.[文档编号] FROM rd_approval a WHERE ISNULL(a.asp_cancel,'N') <> 'Y'"
+                    + "         AND ISNULL(a.[文档编号],'') <> ''"
+                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_APPROVAL'"
+                    + "           AND s.doc_no = a.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                     + "   ))"
+                    // ①b 四级项目(简单开发/检测申请单 → 进度查询):来源单号存在「项目编号」上,
+                    //     「说明」放的是测试背景 ⇒ 单独按 rd_dom_test_head 判活(2026-10-30 补;
+                    //     见 syncTestDocsToProgress)。作废(canceled='Y')同样算没有源单据。
+                    + "   OR ([项目层级] = N'四级' AND ISNULL([项目编号], N'') <> ''"
+                    + "     AND NOT EXISTS (SELECT 1 FROM rd_dom_test_head h"
+                    + "       WHERE h.[单据编号] = rd_progress_detail.[项目编号]"
+                    + "         AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_DOM_TEST'"
+                    + "           AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y'))))"
                     // ② 或:所属进度单本身已作废/不存在(换过汇总单后的旧行)
                     //     ⇒ 否则旧行会以"源单据还在"逃过 ①,变成挂在死单上的孤儿
                     //     (2026-10-19 模拟服务器空库时实测:旧单 LXJ2609040100 软删了,它的行还活着)。
