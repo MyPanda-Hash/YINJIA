@@ -66,3 +66,39 @@ export function stampGroup(row, detailKey, current) {
   row[detailKey] = val
   return true
 }
+
+/**
+ * 这张单里**有数据的全部组**,按首次出现顺序,当前值排在最前。
+ *
+ * 用于「保存后要能切着看」与「打印/导出按组各出一页」(2026-10-29 用户口径:
+ *   「改过的 3 个面板在保存之后没有办法进行切换去查看对应的数据,只能是在最后保存停留的那页
+ *    数据看得到,到时候打印也应该是有多少个下拉切换就打印对应页面的多少张」)。
+ *
+ * 为什么不直接用下拉候选(标准库条目)?候选里有**没填过的**设备/仪器,照它出纸会印出一堆空白页。
+ * 组的真源只有明细行上的分组列。
+ *
+ * @param {object[]} rows 全部明细行
+ * @param {string} detailKey 分组列名
+ * @param {string} [current] 当前下拉值(排第一,保证"先看到我停在哪一组")
+ * @returns {string[]}
+ */
+export function groupValues(rows, detailKey, current) {
+  // 没有分组字段 = 非分组面板(一条明细一条纸),不能凭空多出页
+  if (!detailKey) return []
+  const cur = current === undefined || current === null ? '' : String(current).trim()
+  const out = []
+  const seen = new Set()
+  for (const row of Array.isArray(rows) ? rows : []) {
+    // 空值行算「当前组」(与 inGroup 同一口径),组名取当前下拉值;当前也没选就跳过
+    const name = groupOf(row, detailKey) || cur
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    out.push(name)
+  }
+  if (cur) {
+    const i = out.indexOf(cur)
+    if (i > 0) { out.splice(i, 1); out.unshift(cur) }
+    else if (i < 0) out.unshift(cur)
+  }
+  return out
+}

@@ -512,13 +512,27 @@
             <tr v-if="effPlain && cfg.subtitle">
               <td :colspan="totalSpan(dt)" class="rsp-subtitle-row" :class="{ right: cfg.subtitle.align === 'right' }">
                 <span class="rsp-sub-label">{{ tt(cfg.subtitle.label) }}</span>
-                <el-select v-if="editable && cfg.subtitle.type === 'select'" v-model="head[cfg.subtitle.key]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
+                <!-- 分组面板的这格是**查看开关**:保存后单据转只读,原来看不到别的设备/仪器/项目的行
+                     (2026-10-29 用户口径「保存之后没有办法进行切换去查看对应的数据,只能是在最后保存
+                      停留的那页数据看得到」)。故只读态也渲染成下拉,但**不回写头字段** ——
+                     否则重开单据时"当前组"被迫跟着改,而它本是用户保存时的编辑位置。 -->
+                <el-select
+                  v-if="cfg.subtitle.type === 'select' && (editable || isGroupHead(cfg.subtitle.key))"
+                  :model-value="head[cfg.subtitle.key]"
+                  size="small"
+                  class="rsp-sub-ctl"
+                  :clearable="false"
+                  filterable
+                  :allow-create="editable"
+                  default-first-option
+                  @update:model-value="(v) => onGroupHeadChange(cfg.subtitle.key, v)"
+                >
                   <el-option v-for="o in subtitleOptions" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
                 <!-- 标准库字段:条目可维护(打印时隐藏,纸张上不出现"标准库"字样) -->
                 <span v-if="editable && cfg.subtitle.type === 'select' && stdLibOf(cfg.subtitle.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.subtitle.key))">⧉ {{ tt('标准库维护') }}</span>
-                <el-input v-else-if="editable" v-model="head[cfg.subtitle.key]" size="small" maxlength="100" class="rsp-sub-ctl" @input="emit('dirty')" />
-                <span v-else class="rsp-sub-value">{{ head[cfg.subtitle.key] || '' }}</span>
+                <el-input v-else-if="editable && cfg.subtitle.type !== 'select'" v-model="head[cfg.subtitle.key]" size="small" maxlength="100" class="rsp-sub-ctl" @input="emit('dirty')" />
+                <span v-else-if="cfg.subtitle.type !== 'select'" class="rsp-sub-value">{{ head[cfg.subtitle.key] || '' }}</span>
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
@@ -620,7 +634,7 @@
                   <el-input v-if="editable" v-model="r.row['检验依据']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
                   <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验依据'] || ' / ' }}</span>
                 </td>
-                <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(r.row)">×</span></td>
+                <td v-if="editable" class="rs-td-op"><span class="rs-op-add" :title="tt('在本行下方插入一行')" @click="addRow(dt, r.row)">＋</span><span class="rs-op-del" @click="removeRow(r.row)">×</span></td>
               </tr>
             </template>
             <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }" :style="dt.rowH ? { height: dt.rowH + 'px' } : null">
@@ -729,7 +743,7 @@
                 <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" @change="onDetailTextCommit(row, c.key)" />
                 <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
               </td>
-              <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
+              <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" :title="tt('在本行下方插入一行')" @click="addRow(dt, row)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
             <tr v-if="!rowsOf(dt).length">
               <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
@@ -1193,7 +1207,7 @@
       <div v-if="!isAsmProcLib" class="lib-tip">{{ tt('库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。') }}</div>
       <!-- 组装工艺 4 变体:一变体一条目,勾选即整表替换 -->
       <template v-if="libTargetDt && libTargetDt.lib === 'asm.proc'">
-        <div class="lib-tip">{{ tt('选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。') }}</div>
+        <div class="lib-tip">{{ tt('选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条，或新增/修改自己的变体与工序。') }}</div>
         <el-table
           :data="libRows"
           size="small"
@@ -1217,7 +1231,36 @@
           <el-table-column :label="tt('工序一览')" min-width="360">
             <template #default="{ row }">{{ (row.rows || []).map((r) => r['工序']).join(' / ') }}</template>
           </el-table-column>
+          <el-table-column :label="tt('操作')" width="100" align="center">
+            <template #default="{ row }">
+              <span class="lib-sub-del" :title="tt('停用')" @click.stop="stopLibRow(row.dbId)">✕</span>
+              <span class="lib-sub-destroy" :title="tt('彻底删除')" @click.stop="destroyLibRow(row.dbId)">🗑</span>
+            </template>
+          </el-table-column>
         </el-table>
+        <!-- 新增/修改**自己的**变体(2026-10-29 用户口径「组装工艺清单的这个标准库不能新增,
+             要改为可以新增自己维护的」):原来这一态只给了「选一条替换 + 停用」,
+             想加变体或改工序只能去「标准库维护」当纯文本编辑 JSON,实际用不了。 -->
+        <div class="lib-custom">
+          <div class="lib-custom-title">
+            {{ asmEditName ? tt('修改变体') + '：' + asmEditName : tt('新增变体') }}
+            <span class="lib-custom-hint">{{ tt('变体名 + 工序一行一条（工序|工序控制内容|管控要求|检查比例，后三列可空）') }}</span>
+          </div>
+          <div class="lib-custom-form">
+            <el-input v-model="asmDraftName" size="small" :placeholder="tt('变体名（如 裸棒/成品/半成品A）')" :disabled="!!asmEditItem" />
+            <el-input
+              v-model="asmDraftRows"
+              size="small"
+              type="textarea"
+              :autosize="{ minRows: 4, maxRows: 14 }"
+              class="lib-wide"
+              :placeholder="tt('一行一道工序，用 | 分隔：无黑处理|无黑时间|12-24小时|随机取2支')"
+            />
+            <el-button size="small" type="primary" @click="saveAsmVariant">{{ asmEditItem ? tt('保存修改') : tt('存入标准库') }}</el-button>
+            <el-button v-if="asmEditItem" size="small" @click="resetAsmVariant">{{ tt('取消编辑') }}</el-button>
+            <el-button v-else size="small" @click="resetAsmVariant">{{ tt('清空') }}</el-button>
+          </div>
+        </div>
       </template>
       <template v-else-if="libRows.length && Array.isArray(libRows[0].subs)">
         <el-scrollbar max-height="520">
@@ -1464,7 +1507,7 @@ import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { groupRows, stampGroup } from '@/core/panel/recordGroup'
+import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -1539,6 +1582,10 @@ const emit = defineEmits(['dirty', 'refresh-config', 'open-file'])
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 // 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
 // 单据类面板编辑期间那格永远空白;见 @/core/panel/sheetDocNo 的说明)
+// ⚠ 2026-10-29:**面板可显式声明** head.docNoKey 覆盖自动推断。自动推断只看「head 里有没有
+//   文档编号」这一条,撞上"文档编号是隐藏物理列但仍在 head 里"的面板(出货检验计划表 RD_INSP_PLAN)
+//   就会把 YJ-RD001 印到右上角,而这张单自己的 IP-2026-10-00xx 一个字看不到(实测探针证实)。
+//   未声明的面板仍走原推断,逐字不变。
 const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
@@ -2262,6 +2309,14 @@ defineExpose({
   pageTitles: computed(() => pageList.value.map((p) => String(p?.title || ''))),
   activePage,
   setActivePage: (i) => { activePage.value = Math.max(0, Math.min(pageList.value.length - 1, Number(i) || 0)) },
+  // 分组面板的出纸序列(2026-10-29):每个有数据的设备/仪器/项目 = 一张纸。
+  // 打印与导出都读它,口径只有一处(其余面板恒为空数组 ⇒ 沿用原路径)。
+  groupPages: computed(() => groupPages.value),
+  groupKey: computed(() => groupBy.value?.headKey || ''),
+  /** 打印/导出时切到某一组:只改视图,不写头字段、不标 dirty */
+  setViewGroup: (v) => { viewGroup.value = v === undefined || v === null ? '' : String(v) },
+  /** 当前查看的组(收尾还原用) */
+  getViewGroup: () => currentGroupValue(),
 })
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
@@ -2440,7 +2495,8 @@ const libFMethod = ref('')
 function oneEditableChecked() {
   if (libChecked.value.length !== 1) return null
   const it = libChecked.value[0]
-  // 变体库:弹窗里的编辑器只有"分组/扁平"两种形态,都不认 rows 结构 ⇒ 不给编辑(见 isAsmProcLib)
+  // 变体库:条目正文是 rows 结构,扁平/分组编辑器都不认它 ⇒ 不走这条通用路径
+  // (2026-10-29 起改由 editLibEntry 里的变体专用表单处理)
   if (isAsmProcLib.value) return null
   if (isGroupedLib.value) {
     const key = String(it)
@@ -2450,8 +2506,27 @@ function oneEditableChecked() {
   }
   return it && it.dbId ? it : null
 }
-const canEditLibEntry = computed(() => !!oneEditableChecked())
+const canEditLibEntry = computed(() => {
+  // 变体库:勾选一条库内条目(dbId)即可编辑 —— 用专用的变体表单(见 editLibEntry)
+  if (isAsmProcLib.value) {
+    const r = libChecked.value[0]
+    return !!(r && r.dbId)
+  }
+  return !!oneEditableChecked()
+})
 function editLibEntry() {
+  // 组装工艺变体库(第三态):条目正文是 rows 结构,扁平/分组编辑器都不认它 ——
+  // 2026-10-29 起改由**变体专用表单**带入(asmDraft*),不再置灰。
+  if (isAsmProcLib.value) {
+    const row = libChecked.value[0]
+    if (!row || !row.dbId) {
+      ElMessage.warning(tt('请先勾选一条要编辑的条目'))
+      return
+    }
+    editAsmVariant(row)
+    ElMessage.info(tt('已带入表单，改完点「保存修改」'))
+    return
+  }
   const e = oneEditableChecked()
   if (!e) {
     ElMessage.warning(tt('请先勾选一条要编辑的条目'))
@@ -2598,6 +2673,78 @@ const hasDbFlat = computed(() => libRows.value.some((r) => r.dbId))
  *        条目的增删改走「标准库维护」(StdLibManager,它把正文当字符串原样往返)。
  */
 const isAsmProcLib = computed(() => libTargetDt.value?.lib === 'asm.proc')
+// ── 组装工艺变体:自己新增/修改(2026-10-29)──────────────────────────────
+// 条目正文结构 = {v:1, rows:[{工序,工序控制内容,管控要求,检查比例}]}(见 tools/gen/gen-asm-proc-lib.cjs)。
+// 表单用「一行一道工序、竖线分隔」的纯文本:比让人手写 JSON 现实,也比四列表格少一半控件。
+const asmDraftName = ref('')
+const asmDraftRows = ref('')
+/** 正在编辑的变体 item_code(null = 新增) */
+const asmEditItem = ref(null)
+const asmEditName = computed(() => asmEditItem.value || '')
+const ASM_ROW_KEYS = ['工序', '工序控制内容', '管控要求', '检查比例']
+/** 变体条目 → 表单文本(工序行反序列化) */
+function asmRowsToText(rows) {
+  return (rows || [])
+    .map((r) => ASM_ROW_KEYS.map((k) => String(r[k] ?? '').replace(/[\r\n]+/g, ' ')).join('|'))
+    .join('\n')
+}
+/** 表单文本 → 变体条目 JSON(空行忽略;竖线后三列可空) */
+function asmTextToContent(text) {
+  const rows = String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split('|')
+      const row = {}
+      ASM_ROW_KEYS.forEach((k, i) => { row[k] = String(parts[i] ?? '').trim() })
+      return row
+    })
+    .filter((r) => r['工序'])
+  return JSON.stringify({ v: 1, rows })
+}
+/** 勾选某条 → 带入表单改名改工序 */
+function editAsmVariant(row) {
+  if (!row) return
+  asmEditItem.value = row.item
+  asmDraftName.value = row.name || row.item
+  asmDraftRows.value = asmRowsToText(row.rows)
+}
+function resetAsmVariant() {
+  asmEditItem.value = null
+  asmDraftName.value = ''
+  asmDraftRows.value = ''
+}
+/** 存入/保存变体:新增走 /stdlib/add,改名改工序走 /stdlib/update(条目 id 不变) */
+async function saveAsmVariant() {
+  const name = String(asmDraftName.value || '').trim()
+  if (!name) { ElMessage.warning(tt('请填写变体名')); return }
+  const content = asmTextToContent(asmDraftRows.value)
+  let rowCount = 0
+  try { rowCount = (JSON.parse(content).rows || []).length } catch { rowCount = 0 }
+  if (!rowCount) { ElMessage.warning(tt('请至少填写一道工序')); return }
+  try {
+    if (asmEditItem.value) {
+      // 找到该条目的 dbId(表单里只有 item_code)
+      const hit = (libRows.value || []).find((r) => String(r.item) === String(asmEditItem.value))
+      if (!hit?.dbId) { ElMessage.error(tt('该条目没有库记录，无法保存')); return }
+      await request.post('/stdlib/update', { id: hit.dbId, content })
+      ElMessage.success(tt('已保存修改'))
+    } else {
+      // 同名守卫:变体名 = item_code,重名会与既有一行混淆(列表按 item_code 分组)
+      if ((libRows.value || []).some((r) => String(r.item) === name)) {
+        ElMessage.warning(tt('已有同名变体：') + name)
+        return
+      }
+      await request.post('/stdlib/add', { lib: 'asm.proc', item: name, content })
+      ElMessage.success(tt('已存入标准库'))
+    }
+    resetAsmVariant()
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('保存失败') + ':' + (e?.response?.data?.message || e?.message || ''))
+  }
+}
 /** 平表表单 → 规范结构:编辑时以条目原规范结构打底(保住列上没显示的字段),新增时空字段留空 */
 function flatContent() {
   return toContentJson({
@@ -3272,13 +3419,48 @@ function spreadSubHeads(dt) {
  * 其它组的行仍留在 head.detail.items 里,保存时整体提交。
  */
 const groupBy = computed(() => cfg.value?.groupBy || null)
-/** 当前下拉值(未选 = 空串 ⇒ 不过滤,保持改造前观感) */
+/**
+ * 只读态「看哪一组」(2026-10-29)。
+ * 可编辑时看的就是头字段本身;保存后单据转只读,若还绑头字段就没法切组了
+ * (用户口径:「保存之后没有办法进行切换去查看对应的数据,只能是在最后保存停留的那页数据看得到」)。
+ * 所以只读态用这个独立值,默认跟随头字段,切它**不写库、不标 dirty**。
+ */
+const viewGroup = ref(null)
+/** 这格是不是分组面板的「当前组」下拉(决定只读态是否仍可切换) */
+function isGroupHead(key) {
+  const g = groupBy.value
+  return !!g?.headKey && String(g.headKey) === String(key)
+}
+/** 下拉切组:可编辑 → 改头字段(要保存);只读 → 只改视图 */
+function onGroupHeadChange(key, val) {
+  if (props.editable) {
+    props.head[key] = val
+    viewGroup.value = null
+    emit('dirty')
+    return
+  }
+  viewGroup.value = val === undefined || val === null ? '' : String(val)
+}
+// 换单/换面板时清掉只读视图位置,否则上一张单看的那一组会带到下一张
+watch(() => [props.panelCode, props.head?.['单据编号'], props.head?.['编号']], () => { viewGroup.value = null })
+/** 当前下拉值(未选 = 空串 ⇒ 不过滤,保持改造前观感);只读态优先用查看位置 */
 function currentGroupValue() {
   const g = groupBy.value
   if (!g?.headKey) return ''
-  const v = props.head?.[g.headKey]
+  const v = props.editable
+    ? props.head?.[g.headKey]
+    : (viewGroup.value ?? props.head?.[g.headKey])
   return v === undefined || v === null ? '' : String(v).trim()
 }
+/**
+ * 本单**有数据的组**(下拉切过去的页序列)。
+ * 保存后靠它把「三个下拉 = 三页」铺出来看;打印/导出按它逐组出纸。
+ */
+const groupPages = computed(() => {
+  const g = groupBy.value
+  if (!g?.detailKey) return []
+  return groupValues(items.value, g.detailKey, currentGroupValue())
+})
 /** 行集:矿化按 指标 / 规格书按 表区 分块(filterKey+filterVal);分组面板再按当前下拉过滤;其余全量 */
 function rowsOf(dt) {
   let list = items.value
@@ -3288,7 +3470,16 @@ function rowsOf(dt) {
   if (g?.detailKey) list = groupRows(list, g.detailKey, currentGroupValue())
   return list
 }
-function addRow(dt) {
+/**
+ * 加一行。
+ * @param {object} dt 数据表配置
+ * @param {object} [afterRow] 行内「＋」带上来的**本行** —— 有值就插在它正下方(2026-10-29 用户口径
+ *   「点击这个数据行新增,空白表格是新增到最底下了,应该是在对应的数据行下边新增空白行插进去」),
+ *   没值(表底「＋ 新增数据记录行」按钮)才追加到末尾。
+ *   注意插入点是**底层 items 数组**里的位置(rowsOf 只是过滤后的视图),否则跨表区分组时
+ *   会把行插到别的表区/分组里。
+ */
+function addRow(dt, afterRow) {
   const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
   if (dt.metric) row['指标'] = dt.metric
   // 新行必须带上当前下拉值:否则它会飘在"空组"里,切到别组就看不见、重开也可能归错组
@@ -3297,8 +3488,14 @@ function addRow(dt) {
   // 序号自动编:dataTables 里声明 autoSeqBar 的表(成型配方表)按**本表区**已有行数续编。
   // 原来只认面板级 cfg.autoSeq 且用全表 touch().length 计数——多表区共用一张明细表时
   // 会串号(配方行数被工序/BOM 行数带偏),故改为按表区过滤后计数。
-  if (dt.autoSeqBar || cfg.value?.autoSeq) row['序号'] = String(rowsOf(dt).length + 1)
-  touch().push(row)
+  const arr = touch()
+  const autoSeq = !!(dt.autoSeqBar || cfg.value?.autoSeq)
+  if (autoSeq && !afterRow) row['序号'] = String(rowsOf(dt).length + 1)
+  const at = afterRow ? arr.indexOf(afterRow) : -1
+  if (afterRow && at >= 0) arr.splice(at + 1, 0, row)
+  else arr.push(row)
+  // 中间插入会把后续行号顶乱 ⇒ 本表区重排序号(仅自动序号表;手填序号的表不动用户的值)
+  if (autoSeq) rowsOf(dt).forEach((r, i) => { r['序号'] = String(i + 1) })
   emit('dirty')
 }
 function removeRow(row) {

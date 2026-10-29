@@ -207,31 +207,42 @@
             <span v-else class="rs-txt">{{ head['测试用仪器/检出限'] || '' }}</span>
           </td>
         </tr>
-        <!-- 原水水质条件:左侧标签跨两行,右侧内嵌 指标名行 + 值行 -->
+        <!-- 原水水质条件:左侧标签跨两行,右侧内嵌 指标名行 + 值行。
+             2026-10-29 用户口径「原水水质条件这一行做成可以自己新增列表格,和可以自己编辑这些列
+             以及最前的标题的名字」⇒ 指标列不再写死在模板里:
+               · 列清单 = metadata.waterIndicators(服务端 yj_panel.config 下发),加/删指标改元数据即可;
+               · 显示名 = metadata.rowLabels 覆盖(只改显示,数据键与物理列永不改);
+               · 行标题同样可改,改完 POST /px/saveRowLabels 落 config。
+             没下发 metadata 时退回内置 8 个指标(老环境/未配元数据的面板行为不变)。 -->
         <tr>
-          <td class="rs-td rs-label rs-water-label" rowspan="2">{{ tt('原水水质条件') }}</td>
+          <td class="rs-td rs-label rs-water-label" rowspan="2">
+            <template v-if="!waterEditOn">{{ waterRowTitle }}</template>
+            <template v-else>
+              <el-input v-model="waterRowDraft" size="small" maxlength="30" :placeholder="tt('行标题')" />
+            </template>
+            <span v-if="editable" class="rs-tool no-print rs-water-edit" :title="tt('编辑行标题与指标列名')" @click.stop="toggleWaterEdit">
+              <el-icon><EditPen /></el-icon>{{ waterEditOn ? tt('完成') : tt('编辑') }}
+            </span>
+          </td>
           <td class="rs-td rs-water-zone" :colspan="sampleCount">
             <table class="rs-inner">
               <tbody>
                 <tr>
-                  <td class="rs-ind-name">{{ tt('自来水') }}</td>
-                  <td class="rs-ind-name">{{ tt('纯水') }}</td>
-                  <td class="rs-ind-name">{{ tt('超纯水') }}</td>
-                  <td class="rs-ind-name">{{ tt('PH') }}</td>
-                  <td class="rs-ind-name">{{ tt('TDS') }}</td>
-                  <td class="rs-ind-name narrow">{{ tt('缸内自来水VOC浓度') }}</td>
-                  <td class="rs-ind-name">{{ tt('自来水加氯浓度') }}</td>
-                  <td class="rs-ind-name">{{ tt('水温℃') }}</td>
+                  <td v-for="(w, wi) in waterCols" :key="'wn' + wi" class="rs-ind-name" :class="{ narrow: wi === 5 }">
+                    <template v-if="!waterEditOn">{{ w.name }}</template>
+                    <template v-else>
+                      <el-input v-model="w.draft" size="small" maxlength="20" :placeholder="tt('列名')" />
+                    </template>
+                  </td>
                 </tr>
                 <tr>
-                  <td class="rs-water-val"><el-select v-if="editable" v-model="head['原水自来水']" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions('原水自来水')" :key="o.value" :label="o.label" :value="o.value" /></el-select><template v-else>{{ head['原水自来水'] || '' }}</template></td>
-                  <td class="rs-water-val"><el-select v-if="editable" v-model="head['原水纯水']" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions('原水纯水')" :key="o.value" :label="o.label" :value="o.value" /></el-select><template v-else>{{ head['原水纯水'] || '' }}</template></td>
-                  <td class="rs-water-val"><el-select v-if="editable" v-model="head['原水超纯水']" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions('原水超纯水')" :key="o.value" :label="o.label" :value="o.value" /></el-select><template v-else>{{ head['原水超纯水'] || '' }}</template></td>
-                  <td class="rs-water-val"><el-input v-if="editable" v-model="head['原水PH']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['原水PH'] || '' }}</span></td>
-                  <td class="rs-water-val"><el-input v-if="editable" v-model="head['原水TDS']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['原水TDS'] || '' }}</span></td>
-                  <td class="rs-water-val"><el-input v-if="editable" v-model="head['缸内自来水VOC浓度']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['缸内自来水VOC浓度'] || '' }}</span></td>
-                  <td class="rs-water-val"><el-input v-if="editable" v-model="head['自来水加氯浓度']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['自来水加氯浓度'] || '' }}</span></td>
-                  <td class="rs-water-val"><el-input v-if="editable" v-model="head['水温']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['水温'] || '' }}</span></td>
+                  <td v-for="(w, wi) in waterCols" :key="'wv' + wi" class="rs-water-val">
+                    <el-select v-if="editable && w.kind === 'bool'" v-model="head[w.key]" size="small" :clearable="false" @change="emit('dirty')">
+                      <el-option v-for="o in selectOptions(w.key)" :key="o.value" :label="o.label" :value="o.value" />
+                    </el-select>
+                    <el-input v-else-if="editable" v-model="head[w.key]" size="small" class="rs-c-in" @input="emit('dirty')" />
+                    <template v-else>{{ head[w.key] || '' }}</template>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -355,7 +366,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -370,6 +381,9 @@ const props = defineProps({
   head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
+  // 面板元数据(可选):原水水质条件的指标列清单/显示名覆盖从这里来(服务端 yj_panel.config 下发)。
+  // 不传时退回内置 8 指标 —— 老调用点行为不变。
+  metadata: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['dirty'])
 
@@ -481,6 +495,75 @@ function dtFieldOf(key) {
 }
 function dtHidden(key) {
   return isColumnHidden(dtFieldOf(key))
+}
+
+// ── 原水水质条件:指标列清单 + 显示名覆盖(2026-10-29) ──
+/** 内置兜底:服务端没下发 waterIndicators 时按这 8 个铺(改造前的版式) */
+const WATER_DEFAULT = [
+  { key: '原水自来水', name: '自来水', kind: 'bool' },
+  { key: '原水纯水', name: '纯水', kind: 'bool' },
+  { key: '原水超纯水', name: '超纯水', kind: 'bool' },
+  { key: '原水PH', name: 'PH', kind: 'text' },
+  { key: '原水TDS', name: 'TDS', kind: 'text' },
+  { key: '缸内自来水VOC浓度', name: '缸内自来水VOC浓度', kind: 'text' },
+  { key: '自来水加氯浓度', name: '自来水加氯浓度', kind: 'text' },
+  { key: '水温', name: '水温℃', kind: 'text' },
+]
+/** 显示名覆盖(原名 → 新名):只改显示,数据键与物理列不动 */
+const rowLabels = computed(() => (props.metadata?.rowLabels && typeof props.metadata.rowLabels === 'object') ? props.metadata.rowLabels : {})
+function labelOver(name) {
+  return rowLabels.value[name] || name
+}
+/** 行标题(默认「原水水质条件」,可在编辑态改名) */
+const waterRowTitle = computed(() => tt(labelOver('原水水质条件')))
+/** 指标列(名称已套用覆盖);draft 是编辑态里的输入框绑定,确认时才提交 */
+const waterCols = ref([])
+function syncWaterCols() {
+  const list = Array.isArray(props.metadata?.waterIndicators) && props.metadata.waterIndicators.length
+    ? props.metadata.waterIndicators
+    : WATER_DEFAULT
+  waterCols.value = list.map((w) => ({
+    key: String(w.key || ''),
+    // 列名:rowLabels 覆盖优先,其次元数据里的 name,最后回退数据键
+    name: labelOver(String(w.name || w.key || '')),
+    kind: String(w.kind || 'text') === 'bool' ? 'bool' : 'text',
+    draft: labelOver(String(w.name || w.key || '')),
+  }))
+}
+watch(() => [props.metadata?.waterIndicators, props.metadata?.rowLabels], syncWaterCols, { immediate: true, deep: true })
+
+/** 编辑态:改行标题 + 指标列名,提交到 yj_panel.config(数据键不动) */
+const waterEditOn = ref(false)
+const waterRowDraft = ref('')
+function toggleWaterEdit() {
+  if (!props.editable) return
+  if (!waterEditOn.value) {
+    // 进编辑态:把当前显示名灌进草稿
+    syncWaterCols()
+    waterRowDraft.value = labelOver('原水水质条件')
+    waterEditOn.value = true
+    return
+  }
+  saveWaterLabels()
+}
+async function saveWaterLabels() {
+  const cols = waterCols.value.map((w) => ({ key: w.key, name: String(w.draft || '').trim() }))
+  try {
+    const res = await request.post('/px/saveRowLabels', {
+      panelCode: 'RD_FILTER_EFF',
+      rowLabel: String(waterRowDraft.value || '').trim(),
+      cols,
+    })
+    if (res && res.code && res.code !== 200) {
+      ElMessage.error(res.message || tt('保存失败'))
+      return
+    }
+    ElMessage.success(tt('已保存'))
+    waterEditOn.value = false
+    emit('refresh-config')
+  } catch (e) {
+    ElMessage.error(tt('保存失败') + ':' + (e?.response?.data?.message || e?.message || ''))
+  }
 }
 function dtLabel(key, fallback) {
   return resolveColumnLabel(dtFieldOf(key), fallback || key)

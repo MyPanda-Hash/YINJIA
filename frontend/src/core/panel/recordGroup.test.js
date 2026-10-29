@@ -18,7 +18,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { inGroup, groupRows, stampGroup, groupOf } from './recordGroup.js'
+import { inGroup, groupRows, stampGroup, groupOf, groupValues } from './recordGroup.js'
 
 const KEY = '设备名称'
 
@@ -60,4 +60,35 @@ test('groupOf:读行上的分组值并按字段口径归一（数字/空格/缺�
   assert.equal(groupOf({ [KEY]: 7 }, KEY), '7')
   assert.equal(groupOf({}, KEY), '')
   assert.equal(groupOf({ [KEY]: 'x' }, ''), '')
+})
+
+// ── groupValues:保存后「能切着看」与「按组出纸」(2026-10-29 用户口径) ──
+test('groupValues:只列**真的有行**的组，按首次出现顺序', () => {
+  const rows = [
+    { 设备名称: 'B', 使用日期: '10-02' },
+    { 设备名称: 'A', 使用日期: '10-01' },
+    { 设备名称: 'B', 使用日期: '10-03' },
+  ]
+  assert.deepEqual(groupValues(rows, KEY, ''), ['B', 'A'])
+})
+
+test('groupValues:当前下拉值排第一（先看到停在哪一组）', () => {
+  const rows = [{ 设备名称: 'A' }, { 设备名称: 'B' }, { 设备名称: 'C' }]
+  assert.deepEqual(groupValues(rows, KEY, 'B'), ['B', 'A', 'C'])
+})
+
+test('groupValues:没填过的候选组不出页（下拉候选里有很多空设备）', () => {
+  // 只有 A 有行；下拉候选还有 D/E —— 它们不应出现在页序列里
+  const rows = [{ 设备名称: 'A', 使用日期: '10-01' }]
+  assert.deepEqual(groupValues(rows, KEY, 'D'), ['D', 'A'])
+})
+
+test('groupValues:空值行算当前组，当前未选时忽略', () => {
+  assert.deepEqual(groupValues([{}, { 设备名称: 'A' }], KEY, 'A'), ['A'])
+  assert.deepEqual(groupValues([{}], KEY, ''), [])
+  assert.deepEqual(groupValues([], KEY, 'A'), ['A'])
+})
+
+test('groupValues:没有分组字段时返回空（非分组面板不出多余页）', () => {
+  assert.deepEqual(groupValues([{ x: 1 }], '', 'A'), [])
 })

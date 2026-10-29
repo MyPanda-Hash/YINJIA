@@ -22,6 +22,9 @@ import java.util.Map;
 @Service
 public class PanelConfigService {
 
+    /** 诊断日志(行标题/指标列保存链路的可见性:配置坏了宁可在日志里说清楚,也别静默不生效) */
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(PanelConfigService.class);
+
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final TranslationService translations;
@@ -572,6 +575,13 @@ public class PanelConfigService {
             metadata.put("fixedItems", fixedList);
         }
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
+        // 行标题/指标列的声明(2026-10-29,见 PanelDef.editableRowLabels/waterIndicators/rowLabels):
+        // 现役唯一消费者是功能性滤效 RD_FILTER_EFF 的「原水水质条件」——那个块原本 8 个指标
+        // 硬编码在 DataRecordSheet.vue 模板里,增删改名都得改代码。现在改成元数据驱动:
+        //   声明了 waterIndicators ⇒ 前端按它铺指标格;声明了 editableRowLabels ⇒ 左侧标题格可改。
+        if (!def.waterIndicators().isEmpty()) metadata.put("waterIndicators", def.waterIndicators());
+        if (!def.editableRowLabels().isEmpty()) metadata.put("editableRowLabels", def.editableRowLabels());
+        if (!def.rowLabels().isEmpty()) metadata.put("rowLabels", def.rowLabels());
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
         for (Map<String, Object> g : buttonGroups) {
@@ -1802,6 +1812,89 @@ public class PanelConfigService {
         }
         registry.reload();
     }
+
+    /**
+     * 保存「原水水质条件」块的行标题与指标列名(2026-10-29)。
+     *
+     * <p>用户口径:「原水水质条件这一行做成可以自己新增列表格,和可以自己编辑这些列以及最前的
+     * 标题的名字」。数据键(物理列/字段 label)**永不改** —— 只把显示名写进 {@code yj_panel.config}
+     * 的 {@code rowLabels} 映射(原名 → 新名),与 ADR-0001「数据键中文不变、翻译只落显示层」同一条规矩,
+     * 也和 columnPrefs 的 alias 是同一类东西:改显示不改数据。
+     *
+     * @param rowLabel 行标题新名(空 = 不修改)
+     * @param cols     {@code [{key, name}]} 指标列显示名(空/缺省 = 不修改)
+     */
+    public void saveRowLabels(String panelCode, String rowLabel, List<Map<String, Object>> cols) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        // 只允许改**声明过**的块(否则任何面板都能被塞任意显示名,失去元数据闸门)
+        boolean declaresIndicators = !def.waterIndicators().isEmpty();
+        boolean declaresRows = !def.editableRowLabels().isEmpty();
+        if (!declaresIndicators && !declaresRows) {
+            throw new IllegalArgumentException("该面板没有可编辑的行标题/指标列:" + panelCode);
+        }
+        // 读出既有 config(可能是 null / 非法 JSON —— 非法时宁可报错也不能把它覆盖掉,
+        // 那份 config 里通常还有 uniqueKeys/fixedItems 等别的声明)
+        java.util.Map<String, Object> cfg = new java.util.LinkedHashMap<>();
+        String raw = def.config();
+        if (raw != null && !raw.isBlank()) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode root = JSON.readTree(raw);
+                if (root.isObject()) {
+                    root.fields().forEachRemaining(e -> cfg.put(e.getKey(), JSON.convertValue(e.getValue(), Object.class)));
+                }
+            } catch (Exception ex) {
+                throw new IllegalStateException("该面板的 config 不是合法 JSON,拒绝覆盖(请先修 yj_panel.config):" + panelCode);
+            }
+        }
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> labels = cfg.get("rowLabels") instanceof java.util.Map<?, ?> m
+                ? new java.util.LinkedHashMap<>((java.util.Map<String, Object>) m)
+                : new java.util.LinkedHashMap<String, Object>();
+        List<String> validKeys = new ArrayList<>();
+        for (Map<String, Object> w : def.waterIndicators()) validKeys.add(String.valueOf(w.get("key")));
+        int changed = 0;
+        LOG.info("[ROWLABELS] panel={} rowLabel=[{}] declaresRows={} declaresIndicators={} rawConfigLen={}",
+                panelCode, rowLabel, declaresRows, declaresIndicators, raw == null ? -1 : raw.length());
+        if (rowLabel != null && !rowLabel.isBlank()) {
+            String name = rowLabel.trim();
+            if (name.length() > 30) throw new IllegalArgumentException("行标题过长(≤30)");
+            // 行标题本身也是"原字段名 → 新名";原名用第一个可编辑行标题字段(现役只有「原水水质条件」)
+            if (declaresRows) {
+                String origin = def.editableRowLabels().get(0);
+                // 与原值相同 ⇒ 不必写,但也不能当成"没改"而把整次保存跳掉(列名可能同时改了)
+                if (!name.equals(labels.get(origin))) {
+                    labels.put(origin, name);
+                    changed++;
+                }
+            }
+        }
+        for (Map<String, Object> c : cols == null ? List.<Map<String, Object>>of() : cols) {
+            String key = String.valueOf(c.getOrDefault("key", "")).trim();
+            String name = String.valueOf(c.getOrDefault("name", "")).trim();
+            if (key.isEmpty() || name.isEmpty()) continue;
+            if (!validKeys.contains(key)) throw new IllegalArgumentException("指标列不属于该块:" + key);
+            if (name.length() > 20) throw new IllegalArgumentException("列名过长(≤20)：" + name);
+            labels.put(key, name);
+            changed++;
+        }
+        if (changed == 0) return;
+        cfg.put("rowLabels", labels);
+        LOG.info("[ROWLABELS] panel={} 写入 {} 条显示名: {}", panelCode, labels.size(), labels);
+        String json;
+        try {
+            json = JSON.writeValueAsString(cfg);
+        } catch (Exception ex) {
+            throw new IllegalStateException("配置序列化失败:" + ex.getMessage());
+        }
+        if (json.length() > 4000) throw new IllegalArgumentException("配置过长(>4000),请精简列名");
+        jdbc.update("UPDATE yj_panel SET config = ?, config_at = SYSDATETIME() WHERE panel_code = ?", json, panelCode);
+        registry.reload();
+    }
+
+    /** config 读写用的 ObjectMapper(与 PanelRegistry 同款;放在这里避免再引一个静态字段到领域记录里) */
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
+            new com.fasterxml.jackson.databind.ObjectMapper();
 
     /** 保存表头字段排序/栏名/显隐(表头调整;更新 yj_field 的 seq/alias,显隐 hidden+visible 同开同关) */
     public void saveHeaderPrefs(String panelCode, List<Map<String, Object>> columns) {

@@ -194,6 +194,7 @@
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
           :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
+          :metadata="cfgCache?.metadata || {}"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -6985,22 +6986,33 @@ async function buildSheetPdfBlob() {
   // 多页签文书的页数由 RecordSheetPanels 暴露(单页/非记录纸组件恒为 1)
   const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
   const startPage = typeof comp?.activePage === 'number' ? comp.activePage : 0
+  // 分组面板(设备使用/仪器使用/加标水):每个有数据的下拉值 = 一张纸(2026-10-29 用户口径
+  //「有多少个下拉切换就打印对应页面的多少张」)。组与页签是**两层**循环:一份文书有多页,
+  // 每一页对每组都要各出一张 —— 故按「页 → 组」的顺序出纸,页序稳定、组序按单据里的出现顺序。
+  const groups = Array.isArray(comp?.groupPages) ? comp.groupPages.slice() : []
+  const startGroup = typeof comp?.getViewGroup === 'function' ? comp.getViewGroup() : ''
   const shots = []
   try {
     for (let i = 0; i < pageCount; i++) {
       if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
         comp.setActivePage(i)
         await nextTick()
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
       }
-      shots.push(await snapSheetPage(el, domToPng))
+      const perGroup = groups.length ? groups : [null]
+      for (const gv of perGroup) {
+        if (gv !== null && typeof comp?.setViewGroup === 'function') {
+          comp.setViewGroup(gv)
+          await nextTick()
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        }
+        shots.push(await snapSheetPage(el, domToPng))
+      }
     }
   } finally {
-    // 切回导出前的页签,别把用户的界面停在最后一页
-    if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
-      comp.setActivePage(startPage)
-      await nextTick()
-    }
+    // 切回导出前的页签/分组,别把用户的界面停在最后一页或别的设备上
+    if (groups.length && typeof comp?.setViewGroup === 'function') comp.setViewGroup(startGroup)
+    if (pageCount > 1 && typeof comp?.setActivePage === 'function') comp.setActivePage(startPage)
+    await nextTick()
   }
   if (!shots.length) return null
   // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
@@ -7131,7 +7143,43 @@ async function exportSheetExcel() {
     ElMessage.error(tt('导出失败'))
   }
 }
+/**
+ * 打印当前文书。
+ *
+ * 分组面板(设备使用/仪器使用/加标水)要**按下拉各出一张**(2026-10-29 用户口径
+ * 「有多少个下拉切换就打印对应页面的多少张」),但浏览器 window.print() 只认当前 DOM,
+ * 没法在一次打印里换内容 ⇒ 走「先按组截成 PDF,再在新窗口里打印」这条唯一可行的路,
+ * 与「导出 PDF」共用 buildSheetPdfBlob(同一份实现,版式与导出完全一致)。
+ * 其余面板仍是老路径:加打印样式后直接 window.print()。
+ */
 async function printApprovalSheet() {
+  const comp = approvalSheetRef.value
+  const groups = Array.isArray(comp?.groupPages) ? comp.groupPages : []
+  if (groups.length > 1) {
+    const loadingMsg = ElMessage({ message: tt('正在生成打印件…'), duration: 0 })
+    try {
+      const r = await buildSheetPdfBlob()
+      if (!r) { ElMessage.warning(tt('未找到可导出的单据')); return }
+      const url = URL.createObjectURL(r.blob)
+      const w = window.open(url, '_blank')
+      if (!w) {
+        // 弹窗被拦:退回下载,至少不丢
+        const a = document.createElement('a')
+        a.href = url
+        a.download = r.name
+        a.click()
+        ElMessage.warning(tt('浏览器拦截了新窗口，已改为下载 PDF'))
+      } else {
+        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(groups.length)))
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) {
+      ElMessage.error(tt('打印失败') + ':' + (e?.message || ''))
+    } finally {
+      loadingMsg.close()
+    }
+    return
+  }
   if (!approvalSheetRef.value) return
   // 打印样式(approval-printing):只打印文书纸张,隐藏侧栏/其它页面元素
   document.body.classList.add('approval-printing')

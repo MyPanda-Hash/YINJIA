@@ -894,6 +894,22 @@ public class PxController {
         return ApiResult.ok(null);
     }
 
+    /**
+     * 「原水水质条件」块的行标题/指标列显示名(2026-10-29)。
+     * 只改显示名(落 yj_panel.config 的 rowLabels),数据键与物理列不动;
+     * 加指标列仍走「自定义字段」(extField/add)绑备用列,再在此改名。
+     */
+    @PostMapping("/saveRowLabels")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Void> saveRowLabels(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String rowLabel = String.valueOf(body.getOrDefault("rowLabel", ""));
+        List<Map<String, Object>> cols = (List<Map<String, Object>>) body.getOrDefault("cols", List.of());
+        configService.saveRowLabels(panelCode, rowLabel, cols);
+        return ApiResult.ok(null);
+    }
+
     // ---------- 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ----------
 
     /** 字段管理总览:现有动态字段 + 备用列池占用/脏行 */
