@@ -26,18 +26,20 @@ import { readFileSync } from 'node:fs'
 const DOC = readFileSync(new URL('../panel/docDefaults.js', import.meta.url), 'utf8')
 const BTN = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/ButtonService.java', import.meta.url), 'utf8')
 
-test('① 两级审核人的默认值是 冯敏 / 陈秀丽(不是旧的"冯总/秀丽"占位)', () => {
+test('① 两级审核人的默认值是 冯总 / 陈秀丽', () => {
   const at = DOC.indexOf('RD_PROD_INFO: [')
   assert.ok(at >= 0, '找不到 RD_PROD_INFO 默认值段')
   // 取到该段的收尾 `  ],`(两个空格的缩进)—— 不能用 indexOf('],') ,那会截到注释里的逗号
   const end = DOC.indexOf('\n  ],', at)
   assert.ok(end > at, '找不到 RD_PROD_INFO 段的结尾')
   const seg = DOC.slice(at, end)
-  assert.match(seg, /'审核人（一级审批人）',\s*'冯敏'/, '一级审核人默认应为「冯敏」(账号 fengmin 的真实姓名)')
+  // 用户 2026-10-29 补充口径:「不是冯敏,就是冯总,因为冯总使用的是管理员的账号」
+  //   冯总用 admin 账号,这两列是纯展示文字,不参与账号反查 ⇒ 就写「冯总」。
+  assert.match(seg, /'审核人（一级审批人）',\s*'冯总'/, '一级审核人默认应为「冯总」')
   assert.match(seg, /'审核人（二级审批人）',\s*'陈秀丽'/, '二级审核人默认应为「陈秀丽」(账号 cp 的真实姓名)')
-  // 旧值必须清干净,否则两者并存时取到哪个看顺序
-  assert.ok(!/['"]冯总['"]/.test(seg), '段内不该再残留旧值「冯总」')
-  assert.ok(!/['"]秀丽['"]\s*\]/.test(seg), '段内不该再残留旧值「秀丽」')
+  // 反例:不能是冯敏(那是 fengmin 账号的姓名,不是冯总)
+  assert.ok(!/'审核人（一级审批人）',\s*'冯敏'/.test(seg), '一级不该是「冯敏」——冯敏是另一个账号')
+  assert.ok(!/['"]秀丽['"]\s*\]/.test(seg), '段内不该再残留旧值「秀丽」(缺姓)')
 })
 
 test('② 后端主保存路径也要补默认值(不能只在空白草稿分支)', () => {

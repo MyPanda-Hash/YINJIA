@@ -11,8 +11,10 @@
      b) 前端 applyDocDefaults 只在 draftEditable(草稿态)跑,单据一归档就不再补 ⇒ 历史单永远空。
 
    本脚本负责**数据侧的默认值声明**:yj_panel.config.headDefaults。
-   值取本库真实账号姓名(yj_user 实测:fengmin=冯敏 / cp=陈秀丽),
-   旧值「冯总/秀丽」是设计稿称谓、库里没有这两个姓名,分发/审批按姓名匹配会落空。
+   值:一级 = **冯总**(用户 2026-10-29 补充「不是冯敏,就是冯总,因为冯总使用的是管理员的账号」;
+     冯总本人用 admin 账号,库里没有「冯总」这个 yj_user —— 但这两列是**纯展示文字**,
+     审批人匹配走 yj_doc_status.l2_approver(存账号),不按姓名反查 ⇒ 写「冯总」不影响权限);
+   二级 = **陈秀丽**(账号 cp 的真实姓名 —— writeBackL2Approver 写回时也是按 real_name 落这一格)。
 
    ⚠ JSON_MODIFY 的坑(本脚本第一版踩到,自检直接 FAIL):
      对**不存在的父路径**做 `$.a.b` 的 MODIFY 不会自动建中间对象 —— 必须
@@ -41,7 +43,7 @@ SET config = JSON_MODIFY(
             THEN JSON_MODIFY(config, N'$.headDefaults', JSON_QUERY(N'{}'))
             ELSE config
         END,
-        N'$.headDefaults."审核人（一级审批人）"', N'冯敏')
+        N'$.headDefaults."审核人（一级审批人）"', N'冯总')
 WHERE panel_code = N'RD_PROD_INFO';
 
 UPDATE yj_panel
@@ -53,13 +55,13 @@ DECLARE @l1 nvarchar(100) = (SELECT JSON_VALUE(config, N'$.headDefaults."审核�
                              FROM yj_panel WHERE panel_code = N'RD_PROD_INFO');
 DECLARE @l2 nvarchar(100) = (SELECT JSON_VALUE(config, N'$.headDefaults."审核人（二级审批人）"')
                              FROM yj_panel WHERE panel_code = N'RD_PROD_INFO');
-IF ISNULL(@l1, N'') != N'冯敏' OR ISNULL(@l2, N'') != N'陈秀丽'
+IF ISNULL(@l1, N'') != N'冯总' OR ISNULL(@l2, N'') != N'陈秀丽'
 BEGIN
-    RAISERROR(N'自检失败:一级=「%s」二级=「%s」(期望 冯敏 / 陈秀丽)', 16, 1, @l1, @l2);
+    RAISERROR(N'自检失败:一级=「%s」二级=「%s」(期望 冯总 / 陈秀丽)', 16, 1, @l1, @l2);
     RETURN;
 END
 
-PRINT N'[migrate-prodinfo-auditor-defaults] OK';
+PRINT N'[migrate-prodinfo-auditor-defaults] OK(一级=冯总 / 二级=陈秀丽)';
 SELECT panel_code,
        JSON_VALUE(config, N'$.headDefaults."审核人（一级审批人）"') AS 一级审核人,
        JSON_VALUE(config, N'$.headDefaults."审核人（二级审批人）"') AS 二级审核人
