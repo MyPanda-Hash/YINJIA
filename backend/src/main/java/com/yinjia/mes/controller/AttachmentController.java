@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.AttachmentService;
+import com.yinjia.mes.service.DocPreviewService;
 import com.yinjia.mes.service.PanelPermissionService;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.ContentDisposition;
@@ -40,10 +41,13 @@ public class AttachmentController {
 
     private final AttachmentService service;
     private final PanelPermissionService perms;
+    private final DocPreviewService docPreview;
 
-    public AttachmentController(AttachmentService service, PanelPermissionService perms) {
+    public AttachmentController(AttachmentService service, PanelPermissionService perms,
+                                DocPreviewService docPreview) {
         this.service = service;
         this.perms = perms;
+        this.docPreview = docPreview;
     }
 
     /** 上传:POST multipart {file} + panelCode/docNo/field;返回 {files, names}。 */
@@ -92,6 +96,27 @@ public class AttachmentController {
         headers.setContentDisposition(ContentDisposition.builder(inline ? "inline" : "attachment")
                 .filename(fileName, StandardCharsets.UTF_8).build());
         return ResponseEntity.ok().headers(headers).body(new FileSystemResource(path));
+    }
+
+    /**
+     * 老二进制 Word(.doc)在线预览:GET /{id}/preview-doc → 自包含 HTML。
+     *
+     * <p>为什么单开一条:现场附件《开题报告-修改版.doc》是 OLE2 真·老 Word(文件头 D0CF11E0),
+     * 浏览器与前端 docx-preview 都解析不了(2026-10-28 用户口径「加预览,不用每次都下载再看」)。
+     * HWPF 只能在后端做;解析失败一律 400,由前端捕获后降级为下载,不返回半截 HTML。
+     *
+     * <p>权限与下载同源:面板查看权(perms.requirePanelView),与「单据能不能编辑」无关 ——
+     * 未保存新单里传的附件、审批中、已归档的单据都同样可预览。
+     */
+    @GetMapping(value = "/{id}/preview-doc", produces = MediaType.TEXT_HTML_VALUE + ";charset=UTF-8")
+    public ResponseEntity<String> previewDoc(@PathVariable long id) {
+        Map<String, Object> row = service.loadForDownload(id);
+        perms.requirePanelView(String.valueOf(row.get("panelCode")));
+        String html = docPreview.docToHtml((Path) row.get("path"), String.valueOf(row.get("fileName")));
+        return ResponseEntity.ok()
+                .contentType(new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8))
+                .header("Cache-Control", "no-store")
+                .body(html);
     }
 
     private static String currentUsername(Authentication authentication) {

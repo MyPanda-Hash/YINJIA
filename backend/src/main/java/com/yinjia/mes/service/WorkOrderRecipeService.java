@@ -142,16 +142,38 @@ public class WorkOrderRecipeService {
                 number(r.get("pl_sl")));
     }
 
+    /**
+     * 把「面板编码 + 若干产品编号候选」拼成一个参数数组(给 IN (?,?) 用)。
+     * 只服务于 产品编号 的双形态查询(原值 / 原值-tb),见 findUsableFormula 注释。
+     */
+    private static Object[] concat(String first, List<String> rest) {
+        Object[] out = new Object[rest.size() + 1];
+        out[0] = first;
+        for (int i = 0; i < rest.size(); i++) out[i + 1] = rest.get(i);
+        return out;
+    }
+
     private Formula findUsableFormula(String productCode) {
         if (productCode == null || productCode.isBlank()) throw new IllegalStateException("工单未填写产品编号,不能获取成型配方");
+        // ⚠ 2026-10-27:成型工艺清单的 产品编号 现在带 -tb 后缀(用户口径「选产品编号后自动加 -tb」),
+        //   而工单/产品信息表侧存的是**原始编号** ⇒ 只按原值查会一条也匹配不到。
+        //   同时认两种形态:原值 和 原值+'-tb';入参已带后缀时也补上原值候选。历史单据照常命中。
+        String raw = productCode.trim();
+        String base = raw.replaceAll("(?i)-tb$", "").trim();
+        List<String> codes = new ArrayList<>();
+        if (!base.isEmpty()) {
+            codes.add(base);
+            codes.add(base + "-tb");
+        }
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT TOP 1 h.[单据编号], ISNULL(h.[版本号],N'') AS 版本号,"
                         + " CASE WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档' ELSE N'已审核' END AS 状态"
                         + " FROM dbo.rd_mold_proc_head h JOIN dbo.yj_doc_status s ON s.panel_code=? AND s.doc_no=h.[单据编号]"
-                        + " WHERE h.[产品编号]=? AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                        + " WHERE h.[产品编号] IN (" + String.join(",", java.util.Collections.nCopies(codes.size(), "?")) + ")"
+                        + " AND ISNULL(h.asp_cancel,'N')<>'Y'"
                         + " AND ISNULL(s.canceled,'N')<>'Y' AND (ISNULL(s.archived,'N')='Y' OR ISNULL(s.shr,N'')<>'')"
                         + " ORDER BY CASE WHEN ISNULL(s.archived,'N')='Y' THEN 0 ELSE 1 END, h.id DESC",
-                FORMULA_PANEL, productCode.trim());
+                concat(FORMULA_PANEL, codes));
         if (heads.isEmpty()) throw new IllegalStateException("该产品没有已审核/已归档的成型工艺清单配方");
         Map<String, Object> h = heads.get(0);
         String no = String.valueOf(h.get("单据编号"));

@@ -27,6 +27,7 @@ public class QuickScheduleService {
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
     /** 工序任务(路线驱动,A 项):转工单即按工艺路线生成各工序任务 */
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QuickScheduleService.class);
     private final ProcessTaskService processTask;
 
     public QuickScheduleService(JdbcTemplate jdbc, FormNoService formNo, PanelRegistry registry, QueryService queryService,
@@ -166,6 +167,16 @@ public class QuickScheduleService {
                 // 工单关联工艺路线(2026-10-05):**用订单结转所选,不兜底默认**(用户口径「不需要实现默认选择」);
                 // 未选 = NULL,后续不推导"下一道工序",由经办人补选后再排产
                 (route != null && !route.isBlank()) ? route.trim() : null);
+        // 工序台账(2026-10-21 用户口径:「工艺路线是在工单结转的时候选择的,选择完后工单跟着走」):
+        //   转单后立刻按**结转时选的路线**建 wo_process_line,否则「结转过但没预排产」的工单在
+        //   工序报工页面看不到任何工序、现场报不了工。计划生产线留空,后续预排产再派线。
+        //   幂等:该行已有有效台账(已预排产)则跳过;失败不阻断转单(台账可事后补)。
+        try {
+            int n = processTask.ensureLedgerForWorkOrder(plNo, route, user);
+            if (n > 0) log.info("[订单结转] 工单 {} 按路线 {} 建工序台账 {} 道", plNo, route, n);
+        } catch (Exception e) {
+            log.warn("[订单结转] 工单 {} 建工序台账失败(不阻断转单): {}", plNo, e.getMessage());
+        }
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo, "");
         return plNo;

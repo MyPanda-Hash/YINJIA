@@ -1,0 +1,51 @@
+[
+  {
+    "k": "登录",
+    "v": "#/dashboard"
+  },
+  {
+    "k": "① 单纯点击(无选区)",
+    "v": {
+      "palette": false
+    }
+  },
+  {
+    "k": "① 断言 = 不弹盘",
+    "v": "PASS"
+  },
+  {
+    "k": "② 划选 + mouseup",
+    "v": {
+      "palette": true,
+      "swatches": 8,
+      "selectionCleared": true
+    }
+  },
+  {
+    "k": "② 断言 = 立刻弹盘",
+    "v": "PASS"
+  },
+  {
+    "k": "② 断言 = 8 个色块",
+    "v": "PASS"
+  },
+  {
+    "k": "② 断言 = 弹盘后选区已清",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 点色落库",
+    "v": {
+      "paletteClosed": true,
+      "coloredSegs": 3
+    }
+  },
+  {
+    "k": "③ 断言 = 色盘关闭",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 断言 = 出现着色段",
+    "v": "PASS"
+  }
+]

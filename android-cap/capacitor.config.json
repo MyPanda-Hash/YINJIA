@@ -1,0 +1,12 @@
+{
+  "appId": "com.yinjia.mes.pick",
+  "appName": "银嘉系统",
+  "webDir": "../frontend/dist",
+  "server": {
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

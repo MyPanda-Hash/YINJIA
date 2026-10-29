@@ -1,5 +1,17 @@
 import axios from 'axios'
-import { apiBase } from '@/business/appConfig'
+import { apiBase, apiOrigin, API_ORIGIN_KEY } from '@/business/appConfig'
+
+/**
+ * API 前缀(2026-10-25 合并后收敛):
+ *
+ * 地址解析**唯一真源 = `@/business/appConfig`**(`apiBase()` / `apiOrigin()` / `setApiOrigin()`),
+ * 本文件不再自己实现一份 —— 之前 HEAD 与 origin/main 各有一套(YjNative + localStorage 手写 vs appConfig),
+ * 合并时保留了远端这份:① 网页部署走站内相对 `/api`;② 安卓壳(Capacitor)按 appConfig 里的
+ * 服务器地址(用户在登录页「服务器地址」填,存 localStorage `mes_api_origin`)。
+ *
+ * 这里**re-export** 旧名字,是为了不打断既有 `import { apiOrigin, API_ORIGIN_KEY } from '@core/request'` 的调用方。
+ */
+export { apiOrigin, API_ORIGIN_KEY }
 
 const request = axios.create({
   // App(Capacitor 壳)里没有 Vite 代理,必须打后端绝对地址;浏览器里仍走同源 /api。

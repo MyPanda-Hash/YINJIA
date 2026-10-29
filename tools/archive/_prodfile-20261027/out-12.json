@@ -1,0 +1,19 @@
+{
+  "out": {
+    "wqedqw": {
+      "specByProductForMold": {
+        "status": 200,
+        "code": 200,
+        "msg": "success"
+      }
+    },
+    "wqedqw-tb": {
+      "specByProductForMold": {
+        "status": 200,
+        "code": 200,
+        "msg": "success"
+      }
+    }
+  },
+  "fatal": ""
+}

@@ -44,8 +44,9 @@ node tools/archive/_demo-flow-20261016/_seed-demo-flow.mjs --db HSDZ_MES --clean
 
 ## ⚠ 部署前必须清理
 
-这批是**演示数据**(工单排产/报工/完工都是造的)。按 AGENTS「部署默认全量恢复备份」的口径,
-打包前必须清理:`--cleanup --apply` 两个账套各跑一次,并确认
+这批是**演示数据**(工单排产/报工/完工都是造的)。**仅当走全量恢复例外路线时**(2026-10-25 起需显式
+`CONFIRM-FULL-REPLACE`)才必须清理;**常规增量部署根本不碰本地库,不需要清这批**。
+清法:`--cleanup --apply` 两个账套各跑一次,并确认
 `SELECT COUNT(*) FROM scjl WHERE asp_user1='demo-flow-20261016'` = 0。
 (同理:`bs_prod_line.日产能` 是档案主数据,清理由同一脚本复位为 NULL。)
 

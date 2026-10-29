@@ -1,0 +1,5 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 扫码页:全屏黑底、无标题栏 -->
+    <style name="ScanTheme" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+</resources>

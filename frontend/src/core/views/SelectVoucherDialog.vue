@@ -7,7 +7,9 @@
       <div v-if="masterDetail" class="sv-search-container">
         <div class="sv-search-header">
           <el-button size="small" type="primary" :icon="Search" @click="load(1)">{{ tt('查询') }}</el-button>
-          <el-button size="small" :icon="Setting" @click="notImplemented(tt('筛选设置'))">{{ tt('筛选设置') }}</el-button>
+          <!-- 2026-10-28 用户口径「把所有面板表格上未实现的功能的按钮去掉」:
+               原「筛选设置」按钮点下去只弹「演示环境暂未实现」⇒ 已删除。
+               要放回来请先实现真实的筛选设置面板，别只留个入口。 -->
           <span class="sv-search-slide" @click="queryExpanded = !queryExpanded">
             {{ queryExpanded ? tt('收起') : tt('展开') }}
             <el-icon><ArrowUp v-if="queryExpanded" /><ArrowDown v-else /></el-icon>
@@ -107,7 +109,7 @@
       <!-- ═══ ④ 底部操作区(对齐 T+ operation-zone:栏目设置 + 连续选择 + 分页 + 确定/取消) ═══ -->
       <div class="sv-operation-zone">
         <div class="sv-op-left">
-          <el-button link size="small" @click="notImplemented(tt('栏目设置'))">{{ tt('栏目设置') }}</el-button>
+          <!-- 2026-10-28 「栏目设置」点了只弹未实现提示 ⇒ 已删除（同「筛选设置」口径） -->
           <el-checkbox v-model="continueSelect" size="small" style="margin-left:16px">{{ tt('连续选择') }}</el-checkbox>
           <span v-if="selectedCount" class="sv-selected-count">{{ tt('已选') }} {{ selectedCount }} {{ tt('行') }}</span>
         </div>
@@ -127,7 +129,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, ArrowUp, Search, Setting } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '../panel-runtime'
 import {
@@ -178,7 +180,8 @@ const shortcutOptions = [
 ]
 
 function close() { emit('update:modelValue', false) }
-function notImplemented(action) { ElMessage.info(tt('演示环境暂未实现') + '「' + action + '」') }
+// 2026-10-28:notImplemented() 已删除 —— 它只用来给两个"没实现的按钮"弹提示,
+// 按钮本身按用户口径去掉了,留这个函数等于给下一个按钮留暗门。
 function columnWidth(col) { return ['单据编号', '单据日期', '预完工日', '预计交货日期'].includes(col) ? 120 : undefined }
 function columnMinWidth(col) { return ['存货名称', '产品名称', '客户'].includes(col) ? 140 : 90 }
 function sourceItems(row) {

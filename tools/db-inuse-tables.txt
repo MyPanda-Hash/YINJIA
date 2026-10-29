@@ -39,9 +39,10 @@ table:yj_role_panel   # 角色-面板授权表(perms动作词表含view等,can_a
 table:yj_share_file   # 共享文件表(研发管理·全公司共享资料:标准/测试报告/认证报告;1行=1份文件,文件本体存yj_attachment,权限=指定人上传改删、其余仅查阅)
 table:yj_share_file_cat   # 共享文件分类表(树形 parent_id,研发管理·共享文件模块;分类可增减,有文件或子分类时禁删)
 table:yj_std_lib   # 标准库(lib_code+item_code 内容片段,供文书面板引用)
+table:yj_supplier_account   # 供应商门户账号(2026-10-24):username 一对一 → supplier_code(绑定供应商编码);登录凭据仍在 yj_user,命中即整体降权为供应商会话(只留「供应商采购打印」一页);维护入口 = 采购管理 → 供应商权限配置(管理员专属)
 table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
-table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
+table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin/供应商编码=供应商门户账号的归属标签,2026-10-24 加)
 
 # ---- MES 自有业务表(173 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案

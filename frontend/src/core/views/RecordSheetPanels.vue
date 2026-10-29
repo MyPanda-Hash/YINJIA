@@ -48,7 +48,7 @@
                 <!-- 标识文案跟键走(2026-10-19 用户口径「产品规格书右上角的编号名称改为产品编号」):
                      规格书这个格绑的是 coverDocNoKey='产品编号',却一直印「编号：」—— 用户看到的
                      就是「编号： 00011」,读不出这是产品编号。绑编号/文档编号的面板仍显示「编号：」。 -->
-                <span class="rsp-cover-docno-lb">{{ tt(coverDocNoKey === '产品编号' ? '产品编号：' : '编号：') }}</span>
+                <span class="rsp-cover-docno-lb">{{ tt(coverDocNoLabel) }}</span>
                 <!-- 引用产品信息表(2026-10-21 用户口径):
                      「产品规格书的产品编号做成引用产品信息表的产品编号的弹窗,可用带入对应的产品信息表
                       的填写的数据,引用过的就显示已开发,一个产品信息表对应一个产品规格书,不能多次引用,
@@ -57,17 +57,10 @@
                      其它封面面板(没有 prodPick)保持原输入框,行为一字不变。
                      为什么这里不再给 el-input:用户要的是"引用",手工敲产品编号会绕过
                      「一个产品信息表只能对应一张规格书」这条规则(敲了也不校验)。 -->
-                <div v-if="editable && prodPickCfg" class="rsp-cover-docno-pick"
-                     :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :title="tt('点击选择')"
-                     @click.stop="openProdPick">
-                  <span class="rsp-cover-docno-val">{{ head[coverDocNoKey] || tt('点击选择') }}</span>
-                  <!-- 产品开发状态角标(与纸面其它参照格同一套口径:未开发/已开发) -->
-                  <span v-if="devStatus && devKey === coverDocNoKey" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
-                  <el-icon class="rs-ref-ico"><Search /></el-icon>
-                </div>
-                <el-input v-else-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
-                          :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :maxlength="60" @input="emit('dirty')" />
-                <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
+                <!-- 2026-10-28 用户口径②「原来的产品编号的位置改为自动生成的单据编号，现在的单据编号
+                     不是看不到吗？」⇒ 该格改绑「单据编号」(引擎自动号 SD-…),不再放 prodPick 引用控件;
+                     产品编号本身已移进下方封面字段表第一行(引用能力跟着搬过去,仍可弹产品信息表)。 -->
+                <span class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '—' }}</span>
               </div>
               <div class="rsp-cover-title"
                    :style="{ top: (COVER_TITLE_TOP * coverVy) + 'px', height: (COVER_TITLE_H * coverVy) + 'px' }">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
@@ -85,7 +78,20 @@
                       <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
                         <td class="rsp-cover-lb" :class="{ 'rs-focus': isFocus(fd.key) }">{{ tt(fd.label) }}</td>
                         <td class="rsp-cover-vl">
-                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                          <!-- 产品编号行(2026-10-28 用户口径①):值格 = **引用产品信息表**的控件,
+                               与原来右上角那个 prodPick 是同一套(点击弹窗、带回数据、已引用的不可再选)。
+                               为什么保留引用而不是给文本框:用户明确「引用还是可以引用的」,而且手敲编号
+                               会绕过「一个产品信息表只能对应一张规格书」这条硬规则(敲了也不校验)。 -->
+                          <div v-if="editable && prodPickCfg && fd.key === prodPickCfg.targetKey"
+                               class="rsp-cover-docno-pick rsp-cover-vl-pick"
+                               :class="{ 'rs-focus': isFocus(fd.key) }" :title="tt('点击选择')"
+                               @click.stop="openProdPick">
+                            <span class="rsp-cover-docno-val">{{ head[fd.key] || tt('点击选择') }}</span>
+                            <!-- 产品开发状态角标(与纸面其它参照格同一套口径:未开发/已开发) -->
+                            <span v-if="devStatus && devKey === fd.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
+                            <el-icon class="rs-ref-ico"><Search /></el-icon>
+                          </div>
+                          <el-input v-else-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
                           <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
                         </td>
                       </tr>
@@ -154,11 +160,19 @@
               <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
               <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
                 <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
-                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '编号：' : docNoKey)" @input="emit('dirty')" />
+                <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
+                     带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
+                     读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
+                     不带前缀的 7 张裸编号设计表仍用字段名(docNoKey)做提示,它们没有前缀可重复。 -->
+                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '请输入编号' : docNoKey)" @input="emit('dirty')" />
               </div>
               <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
                    给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
-              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
+              <!-- 只读兜底口径(2026-10-28 用户口径「会让人误会是固定的一个编号在这边」):
+                   原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
+                   cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
+                   两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
+              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
@@ -183,10 +197,12 @@
           <template v-if="infoSpan">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
             <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
-              <el-select v-if="editable && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
+              <!-- readonly(2026-10-28):报告头里由系统带入的格(产品信息表 编辑人 / 组装工艺清单 表单管理人)
+                   只显示值、不出控件 —— 值由前端监视器与后端保存回写,放开手填会被下一次保存覆盖 -->
+              <el-select v-if="editable && !effInfo[0].readonly && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
                 <el-option v-for="o in selectOptions(effInfo[0].key)" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <el-input v-else-if="editable" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable && !effInfo[0].readonly" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
               <template v-else>{{ head[effInfo[0].key] || '' }}</template>
             </td>
           </template>
@@ -195,10 +211,11 @@
           <tr v-for="ii in infoSpan - 1" :key="'hi' + ii">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
             <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
-              <el-select v-if="editable && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
+              <!-- readonly 同上:系统带入的格只显示值 -->
+              <el-select v-if="editable && !effInfo[ii].readonly && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
                 <el-option v-for="o in selectOptions(effInfo[ii].key)" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <el-input v-else-if="editable" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable && !effInfo[ii].readonly" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
               <template v-else>{{ head[effInfo[ii].key] || '' }}</template>
             </td>
           </tr>
@@ -1442,6 +1459,8 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
+import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
+import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
@@ -1827,12 +1846,13 @@ const COVER_TITLE_TOP = COVER_COMPANY_TOP + COVER_COMPANY_H
 const COVER_GRID_TOP = 106
 /** 标题带高 = 字段表顶 − 标题带起点(由分区反推,不凭感觉填) */
 const COVER_TITLE_H = COVER_GRID_TOP - COVER_TITLE_TOP
-/** 封面字段表**行数**(签字栏间距按它算)。2026-09-30 由 9 改 **8**:
- *  原第一行「编  号」(设计 B7)已移到封面右上角的编号格(设计原文本就是「公司左上 + 编号右上」),
- *  字段表剩 B8..B15 = 产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本。
+/** 封面字段表**行数**(签字栏间距按它算)。
+ *  2026-09-30 由 9 改 8:原第一行「编  号」曾移到封面右上角编号格。
+ *  🔴 **2026-10-28 由 8 改回 9**:产品编号按用户口径①移进字段表(与产品类别同款大表格),
+ *     右上角那格改显示**自动单据编号** —— 两者各占一格,不再是同一件事。
  *  ⚠ 改这个数就够,不用动 COVER_GRID_TOP/COVER_SIGN_TOP —— 字段表仍从设计 B7 的 y 起排,
- *    少的那一行空间由签字栏 margin-top 自动吸收(见模板里那句 marginTop 注释)。 */
-const COVER_ROWS = 8
+ *    行数变化由签字栏 margin-top 自动吸收(见模板里那句 marginTop 注释)。 */
+const COVER_ROWS = 9
 /** 字段表行高(设计 B7..B15 等距 46px) */
 const COVER_ROW_H = 46
 /** 签字栏顶(设计 B17);三栏列宽按设计 B17..D17 比例 92.7:97.3:97.3 */
@@ -1849,6 +1869,18 @@ const coverVy = computed(() => coverPageH.value / COVER_H)
  *  ⚠ 必须是**字段名**(如「产品编号」),不能是引擎的**单据标识键**「编号」——
  *    后者会被 QueryService.loadDocs 的单据号覆盖(见 recordSheetConfigs.js 的封面注释)。 */
 const coverDocNoKey = computed(() => String(cfg.value?.coverDocNoKey || ''))
+/**
+ * 封面右上角编号格的**标识文案**(带冒号,直接喂 tt())。
+ * 2026-10-28 用户口径②:该格从「产品编号」改绑「单据编号」⇒ 文案跟着换,
+ * 否则会印着「产品编号：SD-2026-10-0001」这种张冠李戴的字。
+ * 未声明的封面面板不渲染该格,回落到「编号：」只为兜底。
+ */
+const coverDocNoLabel = computed(() => {
+  const k = coverDocNoKey.value
+  if (k === '单据编号') return '单据编号：'
+  if (k === '产品编号') return '产品编号：'
+  return '编号：'
+})
 /** 字段行顶部(设计 px):等宽等高,由行号推出(不再手写坐标表 —— 加行不用改这里) */
 function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
@@ -2048,7 +2080,9 @@ function checkList(v) {
 async function openLinkedFile(c, label) {
   const panel = c && c.link ? c.link[label] : ''
   if (!panel) return
-  const prodNo = String(props.head['产品编号'] || '').trim()
+  // ⚠ 2026-10-27:成型工艺清单的 产品编号 带 -tb 后缀(见 core/panel/productCodeSuffix.js),
+  //   而**下游单据存的是原始编号** ⇒ 反查前必须剥掉后缀,否则永远匹配不到(表现为"该产品还没有该文件")。
+  const prodNo = rawProductCode(props.head['产品编号'])
   if (!prodNo) {
     ElMessage.warning(tt('本单还没有产品编号，无法定位对应的文件'))
     return
@@ -2184,7 +2218,18 @@ async function focusField(key) {
   focusTimer = setTimeout(() => { focusKey.value = ''; focusTimer = null; clearFocusOf = null }, 3000)
   return true
 }
-defineExpose({ focusField, pageOfKey })
+defineExpose({
+  focusField,
+  pageOfKey,
+  // 多页导出用(2026-10-28):整份文书导出「所有页面」时,由 PanelxList 逐页切页签再截图。
+  //   pageCount  = 本面板页签数(单页 = 1);
+  //   pageTitles = 页签标题(仅诊断用);
+  //   activePage / setActivePage = 读当前页 / 切到第 i 页(0 基)。
+  pageCount: computed(() => Math.max(1, pageList.value.length)),
+  pageTitles: computed(() => pageList.value.map((p) => String(p?.title || ''))),
+  activePage,
+  setActivePage: (i) => { activePage.value = Math.max(0, Math.min(pageList.value.length - 1, Number(i) || 0)) },
+})
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
 function plainCols(dt) {
@@ -2757,7 +2802,8 @@ const devKey = computed(() => {
 watch(
   () => [props.panelCode, devKey.value ? props.head[devKey.value] : ''],
   async () => {
-    const code = devKey.value ? props.head[devKey.value] : ''
+    // ⚠ 2026-10-27:成型工艺清单的产品编号带 -tb,而 rd_dev_task 存的是原始编号 ⇒ 剥后缀再查
+    const code = devKey.value ? rawProductCode(props.head[devKey.value]) : ''
     if (!code || !DEV_PANEL_CODES.includes(props.panelCode)) {
       devStatus.value = ''
       return
@@ -2782,7 +2828,24 @@ function onProdRefConfirm(rows) {
   const source = rows?.[0]
   if (!f || !source) return
   const refField = f.refField || f.dataName
-  props.head[prodRefKey.value] = source[refField] ?? ''
+  // 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #2):
+  //   「【成型工艺清单页】点击选择产品编号之后,在产品编号后面自动添加 -tb 编号后缀」——
+  //   只对**成型工艺清单的「产品编号」这一格**生效;其它面板、其它参照格保持原样。
+  //
+  // ⚠ 为什么写进值本身而不是只在纸面显示后缀:用户明确说「加在产品编号本身」。
+  //   后果与配套(都已落实,缺一条就会查不到数据):
+  //     ① 本面板的「产品编号」从此是 00011-tb 形态,**下游一律按原始编号查询** ——
+  //        前端三处反查先过 rawProductCode();后端两处 SQL 同时认两种形态
+  //        (FirstInspItems / WorkOrderRecipeService,见两处注释);
+  //     ② 重复点参照时不能叠成 00011-tb-tb ⇒ productCodeWithSuffix 内部先剥一层再拼。
+  //   历史单据(无后缀)不报错:所有读取方都接受两种形态。
+  //
+  // ⚠ 必须显式判 `prodRefKey === '产品编号'`:本面板还有别的**参照**格(生产车间→DEPT 等),
+  //   2026-10-27 起 产品管控类型/外观要求(产品形态)也改成参照 RD_PROD_INFO ——
+  //   不判就会把 `-tb` 拼到「重点产品」「包布」这种值后面,直接写坏数据。
+  props.head[prodRefKey.value] = prodRefKey.value === '产品编号'
+    ? productCodeWithSuffix(source[refField], props.panelCode)
+    : (source[refField] ?? '')
   for (const m of f.refMap || []) {
     if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
   }
@@ -2840,7 +2903,9 @@ function autoFillTargetDt(afs) {
  */
 async function autoFillFromSpec(code, afs) {
   const key = afs?.fromKey
-  const val = String(code ?? '').trim()
+  // ⚠ 2026-10-27:成型工艺清单的产品编号带 -tb 后缀,而规格书是按**原始产品编号**分发的
+  //   ⇒ 取规格书前必须剥后缀,否则一律返回 found=false(用户看到"该产品编号还没有对应的规格书")。
+  const val = rawProductCode(code)
   if (!key || !val || !props.editable) return
   // 明细落点:没配 detail 的链(部分面板只做表头格带入,见 autoFillSpec.headFromDetail)
   // **不认**明细表 —— 否则 autoFillTargetDt 会退回到第一张表,把它整表替换成按空映射生成的空行。
@@ -2987,9 +3052,32 @@ const specDriftText = computed(() => {
 })
 
 // ── 字段编辑(数据记录表):列名可改,应对复杂测试环境 ──
-/** 动态列头标签:优先取后端 yj_field 的 alias/displayName,缺省回退配置硬编码 label */
+/**
+ * 动态列头标签:优先取后端 yj_field 的 alias/displayName,缺省回退配置硬编码 label。
+ *
+ * @param {string} key      字段键(dataName = yj_field.label = col_name)
+ * @param {string} fallback 配置里写死的纸面文案
+ *
+ * 🔴 2026-10-27 修复(#3「产品管控类型」改名不生效):
+ *   grid 的**标签格**传进来的是 `c.label`(纯纸面文案),而 `fieldMap` 是按 `dataName`
+ *   (= 物理列名)建的索引 ⇒ `fieldMap.get('产品管控类型')` 取不到那条字段,于是直接回退纸面文案,
+ *   yj_field.alias 白设。
+ *   "外观要求/产品形态" 之所以早就生效,是因为它作为**值格**走的是 `c.key`(= dataName),恰好对得上。
+ *   修法:按 dataName 取不到时,再用 label 反查一次(col_name 与 label 可能不同,如 alias 改过名的族)。
+ *   只在 label 命中**唯一**一条时才用,避免"两个字段共用文案"时张冠李戴。
+ */
+const fieldsByLabel = computed(() => {
+  const m = new Map()
+  for (const f of props.fields || []) {
+    const lb = String(f.label || '').trim()
+    if (!lb || lb === String(f.dataName || '')) continue
+    // 同一 label 出现两次(脏数据)就不认,免得把 A 的别名显示到 B 上
+    m.set(lb, m.has(lb) ? null : f)
+  }
+  return m
+})
 function effColLabel(key, fallback) {
-  const f = fieldMap.value.get(key)
+  const f = fieldMap.value.get(key) || fieldsByLabel.value.get(String(key || '').trim()) || null
   return f?.displayName || f?.alias || fallback || key
 }
 
@@ -3161,6 +3249,56 @@ watch(() => [props.editable, props.head], ([v]) => {
   if (arr.length) return
   for (const row of cfg.value.seedRows) {
     arr.push({ ...row })
+  }
+})
+
+/**
+ * 「按表预铺空行」的记账(`单据编号::表区键::表区值` → 已铺过)。
+ * 只活在组件实例内:关掉单据再打开、或刷新页面会重来 —— 那时库里若已有行,
+ * `rowsOf(dt).length` 那道闸会先拦住,不会重复铺。见下方 blankRows watch 注释。
+ */
+const blankRowsSeeded = new Set()
+
+/**
+ * 按**单张数据表**预铺空行(dt.blankRows)。
+ *
+ * 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #8):
+ *   「炭棒配方管控清单页面:配方表默认填充 10 行表格。」
+ *   用户另确认「没有的留空就行」⇒ 铺的是**空行**,不编造物料/比例。
+ *
+ * 【为什么不能用上面的 seedRows】seedRows 是**面板级**的("整个面板明细为空就铺"),
+ *   而成型工艺清单(RD_MOLD_PROC)里有**两张**逻辑表共用一张行表:
+ *   修订记录 + 配方表(靠 filterKey='表区' 分块)。用 seedRows 会在修订记录页也铺 10 行,
+ *   而用户只要配方表那 10 行。
+ *
+ * 口径(每条都踩过坑才写成这样):
+ *   ① 只铺**本表区为空**时才铺 —— 已有配方行(含从旧单带出来的)一行动都不动;
+ *   ② 行只带分块键 + 序号,其余列留空(用户口径"没有的留空");
+ *   ③ 序号按 addRow 同一口径续编(1..10),与之后手动「+ 添加」衔接得上;
+ *   ④ 空行走普通明细保存路径,后端 upsert 会照常落库 —— 纸面与库一致,不是"只在界面上假装有 10 行"。
+ */
+watch(() => [props.editable, props.head, cfg.value], ([v]) => {
+  const tables = cfg.value?.dataTables || []
+  if (!v || !tables.length) return
+  if (!props.head || !props.head['单据编号']) return
+  for (const dt of tables) {
+    const want = Number(dt.blankRows) || 0
+    if (want <= 0) continue
+    // ① 本表区已有行 ⇒ 不铺(绝不能把用户已录的配方冲掉,也不能重复铺成 20 行)
+    if (rowsOf(dt).length) continue
+    // ①b 同一张单只铺一次:本 watch 的依赖含 cfg(配置刷新会重入),
+    //     而空行落进 touch() 后 rowsOf 仍可能读到 0 行(行还没被 items 认领的瞬间)⇒ 用单据号+表区记账。
+    //     不改这个键,用户手动删光 10 行后也不会被"贴心"地补回来(那不是用户要的)。
+    const memoKey = `${props.head['单据编号']}::${dt.filterKey || ''}::${dt.filterVal || ''}`
+    if (blankRowsSeeded.has(memoKey)) continue
+    blankRowsSeeded.add(memoKey)
+    const arr = touch()
+    for (let i = 1; i <= want; i++) {
+      const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
+      // ③ 序号续编(与 addRow 同口径:本表区已有行数 + 1)
+      if (dt.autoSeqBar || cfg.value?.autoSeq) row['序号'] = String(i)
+      arr.push(row)
+    }
   }
 })
 
@@ -3476,7 +3614,7 @@ async function openSectionLib(row) {
 }
 function applySectionLib(content) {
   if (!props.head) return
-  props.head[secLibKey.value] = content
+  props.head[secLibKey.value] = sectionLibText(content)
   emit('dirty')
   secLibVisible.value = false
 }
@@ -3643,35 +3781,74 @@ function chartOf(dt) {
 .rsp-docval.rsp-pre {
   min-height: 22px;
 }
-.rs-t-in,
-.rs-c-in {
-  width: 100%;
-}
 /**
- * 日期/时间控件:纸面单元格常见只有 90~120px,Element 默认 11px 左右内边距 +
- * 前缀/清除图标会把 '2026-10-07' 挤成省略号 ⇒ 这里压紧内边距、居中,字号随设计表缩放。
+ * 日期/时间/区间格:控件宽度必须**收口在单元格里**(2026-10-28 用户报障
+ * 「仪器使用记录表的起止时间显示位置异常」:值挤在格子左上角、下方一条空白带、右边把邻列顶歪)。
+ *
+ * 【根因有**两层**,缺任一层都修不好】
+ *   ① 特异性:Element Plus 写死了
+ *        .el-date-editor.el-input, .el-date-editor.el-input__wrapper { width: var(--el-date-editor-width) }
+ *        .el-date-editor--daterange, .el-date-editor--timerange { --el-date-editor-width: 350px }
+ *        .el-date-editor(默认)                                   { --el-date-editor-width: 220px }
+ *      都是 0,2,0 —— 只在 `.rs-date-in` 上写 width:100%(0,1,0) 压不住。
+ *   ② scoped 作用域:el-date-picker 的根 div.el-date-editor **没有拿到本组件的 data-v-* 属性**
+ *      (实测该元素只有 class/tabindex),所以任何 `.rs-range-in[data-v-x]` 形态的规则**永不命中**。
+ *      原来的 `.rs-date-in{...}` / `.rs-range-in{...}` 全是死代码,控件始终是 350px/220px 默认宽,
+ *      在 120px/110px 的纸面格子里向右溢出(活体实测溢出 239px / 119px)。
+ *   ⇒ 唯一正解:`.rs-td :deep(...)`,编译成 `.rs-td[data-v-x] .el-date-editor.rs-range-in`
+ *     (祖先 .rs-td 有 data-v,后代不受作用域限制)。钉子见 recordSheetDateCellWidth.test.js。
  */
-.rs-date-in {
+.rs-td :deep(.el-date-editor.rs-date-in),
+.rs-td :deep(.el-date-editor.rs-range-in) {
   width: 100%;
-}
-.rs-date-in :deep(.el-input__wrapper) {
+  min-width: 0;
+  box-sizing: border-box;
   padding: 0 4px;
 }
-.rs-date-in :deep(.el-input__inner) {
+/* 日期格:Element 默认左右 11px 内边距会把 '2026-10-07' 挤成省略号,这里归零并居中 */
+.rs-td :deep(.rs-date-in .el-input__inner) {
   padding: 0;
   text-align: center;
 }
-.rs-range-in {
-  width: 100%;
+/*
+ * 日期格同样不显示日历图标:110px 的格子扣掉图标 20px 后输入框只剩 65px,
+ * 而 '2026-10-28' 实测需要 69px ⇒ 被裁成 '2026-10-2'(会看错日期,比省 20px 严重)。
+ * 隐藏后输入框 85px,日期完整;点击输入框本身即可打开日期面板,图标只是装饰。
+ */
+.rs-td :deep(.rs-date-in .el-input__prefix) {
+  display: none;
 }
-.rs-range-in :deep(.el-range-input) {
-  width: 38%;
+/* 区间格:120px 的格子装不下默认 0 10px 内边距 + 两个 39% 宽的输入 */
+.rs-td :deep(.el-date-editor.rs-range-in) {
+  padding: 0 2px;
+}
+/* 两个 HH:mm 按剩余宽度**平分**(flex:1),min-width:0 防止输入框固有宽度下限把格子重新撑开 */
+.rs-td :deep(.rs-range-in .el-range-input) {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
   font-size: inherit;
   text-align: center;
 }
-.rs-range-in :deep(.el-range-separator) {
-  padding: 0 2px;
+/* 分隔符定宽,不参与平分(Element 默认给 separator flex:1,会白白吃掉半个格子) */
+.rs-td :deep(.rs-range-in .el-range-separator) {
+  flex: none;
+  padding: 0 1px;
   font-size: inherit;
+}
+/*
+ * 纸面小格子里**不显示时钟图标**:120px 的格子扣掉图标占的 20px 后,
+ * 两个 HH:mm 各只剩 31px ⇒ 实测 '06:14' 被裁成 '06:1'(活体截图)。
+ * 隐藏后每个输入回到 39px,5 个字符(≈35px)完整显示。
+ * 不影响选择能力:el-date-picker 的整个控件区域都可以点开面板,图标只是装饰。
+ */
+.rs-td :deep(.rs-range-in .el-range__icon) {
+  display: none;
+}
+/* 纸面格内控件一律铺满格子(文本/下拉/自动完成) */
+.rs-t-in,
+.rs-c-in {
+  width: 100%;
 }
 /* 参照单元格(产品编号 -> 产品信息表):拟态输入框,点击弹参照 */
 .rs-ref-ctl {
@@ -4352,6 +4529,15 @@ function chartOf(dt) {
   border-color: var(--el-color-primary, #409eff);
   background: #f0f6ff;
 }
+/* 产品编号搬进封面字段表后(2026-10-28),引用控件改用**整格宽**、去掉右上角那套固定尺寸:
+   右上角是窄带里的独立控件(定 min-width 防抖),值格里则应铺满单元格,与其它行的输入框观感一致。 */
+.rsp-cover-vl-pick {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: calc(27.3px * var(--cok));
+}
 /* 引用产品信息表弹窗(2026-10-21):提示行/表体/底注三段的排布,与文件里其它弹窗同款 */
 .pp-toolbar {
   display: flex;
@@ -4435,6 +4621,12 @@ function chartOf(dt) {
        这是表格里「一列自适应、一列吃剩余」的经典写法,不依赖容器绝对宽度。 */
   table-layout: auto;
   width: 100%;
+  /* 2026-10-28 用户口径③「把产品规格书的表格做宽一点点，现在看起来有一点窄了」:
+     此前整表宽度**只由内容撑开**(inline-block 父层),而封面容器实测比设计画布窄得多
+     ⇒ 内容一短表就跟着缩,看着窄。给一个下限(设计值,随 --cok 缩放)把表撑到设计比例;
+     ⚠ 不用 width 写死,仍是 min-width —— 内容更宽时照旧自适应,不会反过来压窄标签。
+     ⚠ 保持 table-layout:auto(见上方注释:fixed + 百分比会把标签压到值格上)。 */
+  min-width: calc(620px * var(--cok));
 }
 /* 行高 = 设计 B7..B15 的 46 设计px(9 行等高)。table 上设 height 对行不生效,必须设在 tr 上。
    ⚠ 这里 height 在 CSS 表格里是**下限**(内容更高时行会长高)—— 换行后行变高是预期行为,

@@ -38,7 +38,9 @@ test('其余文书式面板不受影响(返回 0 = 保持自适应弹性宽)', (
 
 test('纸面根节点真的套上了 sheetStyle(否则配置只是摆设)', () => {
   assert.match(docSheet, /<div class="approval-sheet" :style="sheetStyle">/, '模板根节点必须绑定 :style="sheetStyle"')
-  assert.match(docSheet, /import \{ fixedSheetWidth \} from '\.\/docSheetConfigs'/, '必须从 docSheetConfigs 取宽度表')
+  // 2026-10-28:同一行还 import 了 docnoLabel(右上角编号格标识),故只钉"从 docSheetConfigs 取"
+  assert.match(docSheet, /import \{[^}]*\bfixedSheetWidth\b[^}]*\} from '\.\/docSheetConfigs'/,
+    '必须从 docSheetConfigs 取宽度表')
 })
 
 test('定宽三件套齐备:width + maxWidth:none + flex:none', () => {

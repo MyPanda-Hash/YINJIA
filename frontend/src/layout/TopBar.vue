@@ -288,7 +288,8 @@ function onPickFactory(f) {
 const matched = computed(() => {
   const k = keyword.value.trim().toLowerCase()
   if (!k) return []
-  return flatMenus(filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin))
+  // 第 4 个参数传 user:菜单项的 permKey(如「供应商权限配置」)要读登录用户的布尔位(2026-10-25)
+  return flatMenus(filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin, user.$state))
     .filter((m) => {
       if (!m.path) return false
       return [m.title, m.fullTitle, m.panelCode, m.path]

@@ -33,7 +33,7 @@
       <!-- 右上角:配置为参照时(项目实施计划→立项申请右上角编号)点击弹参照;否则保持手填(默认 YJ-XS002 模板号) -->
       <div class="as-docno">
         <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-          <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('文档编号：') }}</span>
+          <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt(docnoLabelText) }}</span>
           <el-icon class="as-ref-ico"><Search /></el-icon>
         </div>
         <el-input
@@ -42,10 +42,12 @@
           size="small"
           maxlength="30"
           class="as-docno-input"
-          :placeholder="tt('文档编号：')"
+          :placeholder="tt('请输入编号')"
           @input="emit('dirty')"
         />
-        <template v-else>{{ head['文档编号'] || head['单据编号'] || config.docno || 'YJ-XS002' }}</template>
+        <!-- 只读兜底:原写死 'YJ-XS002' 会让人以为那张单的编号就是它(2026-10-28 用户口径)。
+             config.docno 保留(个别面板的设计样板号),都取不到时显示「—」。 -->
+        <template v-else>{{ head['文档编号'] || head['单据编号'] || config.docno || '—' }}</template>
       </div>
     </div>
 
@@ -214,7 +216,13 @@
                   :rows="c.rows || 3" :maxlength="c.max || 2000"
                   class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
                 />
-                <AnnotatedText v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <!-- 只读/打印态:声明 fitLines 的格子按字数自动缩字号(最多 N 行,行高不变),
+                     并加 line-clamp 兜底 —— 见 fitFontSize 注释 -->
+                <AnnotatedText
+                  v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')"
+                  :class="{ 'as-ro-fit': c.fitLines }"
+                  :style="c.fitLines ? { fontSize: fitFontSize(c.key, c.fitLines) + 'px', '--fit-lines': c.fitLines } : null"
+                />
                 <div v-if="c.sign" class="q-signline end">
                   <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                   <span class="q-sign-val">
@@ -403,6 +411,7 @@
                 :maxlength="row.max || 2000"
                 class="as-fill-input as-fill-area"
                 resize="none"
+                :autosize="{ minRows: autoRowsOf(row), maxRows: 40 }"
                 :placeholder="row.hint ? tt(row.hint) : ''"
                 @input="emit('dirty')"
               />
@@ -654,7 +663,7 @@ import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { useRouter } from 'vue-router'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
-import { fixedSheetWidth } from './docSheetConfigs'
+import { fixedSheetWidth, docnoLabel } from './docSheetConfigs'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -723,6 +732,17 @@ const sheetStyle = computed(() => {
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
 
+/**
+ * 右上角编号格的**标识文案**(2026-10-28 用户口径「立项申请的右上角的文件编号名字改为项目编号」)。
+ * 只换显示名:数据键仍是「文档编号」(ADR-0001),老单据零迁移、下游参照链路不动。
+ * 判定表在 docSheetConfigs.docnoLabel(可单测);未登记的面板回空串 ⇒ 仍显示「文档编号：」。
+ * 已带冒号,模板里直接 `tt(docnoLabelText)` 取译名。
+ */
+const docnoLabelText = computed(() => {
+  const lb = docnoLabel(props.panelCode)
+  return lb ? lb + '：' : '文档编号：'
+})
+
 /** vcell 连续的 pairs 行合成一段(渲染成左侧一格真正的合并竖列):
  *  原图(扫描实测):申请单位 申/请/单/位 四字紧排成一组,组中心 207 ≈ 整段中心 208,
  *  即字组在整条合并格里垂直居中,而非逐行居中;行间横线只画到列右沿(列内无线)。 */
@@ -750,6 +770,42 @@ const setDatePart = (key, p, v) => {
   parts[p === 'y' ? 0 : p === 'm' ? 1 : 2] = String(v ?? '').replace(/\D/g, '').slice(0, p === 'y' ? 4 : 2)
   props.head[key] = parts.every(x => !x) ? '' : parts.join('-')
   emit('dirty')
+}
+
+/**
+ * 「最多 N 行」自适应字号(2026-10-28 用户口径)。
+ *
+ * 适用:单元格声明了 `fitLines`(目前只有特采单「不良说明」= 2)。
+ *
+ * 为什么要自动缩字号:用户明确要求「**不要加高行高**,只需要可以多行文本,最多就用到两行」。
+ * 行高 63px 固定 ⇒ 本格只能放两行;而不良说明常见 50~100 字。
+ * 既要行高不变、又要内容不被吃掉,只能按字数缩字号。
+ *
+ * 【换算基准】用真实浏览器实测标定(2026-10-28,print 媒体,545px 可用宽):
+ *   汉字实际渲染宽度 ≈ **0.78 × 字号**(14px 字宽实测 10.925px),不是 1:1 ——
+ *   按 1:1 估会严重低估容量、字号掉得过早。
+ *   各档两行容量(汉字):14px→98 / 13→106 / 12→116 / 11→126 / 10→138 / 9→154 / 8→174
+ * 半角字符按 0.55 个汉字宽折算。
+ *
+ * 兜底:CSS 再挂 `-webkit-line-clamp`(见 .as-ro-fit),保证**永远不超过 N 行**。
+ *
+ * @param {string|number} key  数据键(字段 label)
+ * @param {number} fitLines    允许的最大行数
+ * @returns {number} 字号(px)
+ */
+const FIT_FONT_SIZES = [14, 13, 12, 11, 10, 9, 8]
+const FIT_AVAIL_W = 545         // 打印态该格可用宽实测值
+const FIT_CHAR_RATIO = 0.78     // 汉字宽 ÷ 字号(实测标定)
+function fitFontSize(key, fitLines) {
+  const text = String(props.head?.[key] ?? '')
+  const maxLines = Number(fitLines) || 0
+  if (!text || maxLines <= 0) return FIT_FONT_SIZES[0]
+  const units = [...text].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0)
+  for (const fs of FIT_FONT_SIZES) {
+    const perLine = Math.floor(FIT_AVAIL_W / (fs * FIT_CHAR_RATIO))
+    if (Math.ceil(units / perLine) <= maxLines) return fs
+  }
+  return FIT_FONT_SIZES[FIT_FONT_SIZES.length - 1]
 }
 
 /** 阶段计划开始:归一空值(清空时 el-date-picker 给 null),别把 null 存进库 */
@@ -863,6 +919,23 @@ const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f
 /** 字段级只读(元数据 editable=0 → readonly):文书锁定字段(申请立项人/负责人)按纯文本显示,不可改 */
 function signLocked(c) {
   return !!(fieldMap.value.get(c.key) || {}).readonly
+}
+
+/**
+ * 文本域最小行数 = 设计行高换算(2026-10-25 用户口径「固定宽度然后可以自动换行」)。
+ *
+ * 【为什么不能只靠 CSS】纸张行高按设计磅值固定(`min-height`),文本域此前被
+ *   `height:100%!important` 锁死在这一行里 —— 文本一换行,超出部分只能框内滚动/被裁,
+ *   纸面(打印)上根本看不到(实测「滤芯/炭棒规格」行:360 字需 143px,行高只给 101px)。
+ *   而 flex 链路里单写 `height:auto` 会被父容器压回(同一次实测只剩 48px),同样不可靠。
+ * ⇒ 改走 Element Plus 原生的 autosize:按内容算真实高度,行高随之撑开。
+ *   行高 13.5px 行距(与 .as-fill-area line-height 1.7 × 14px ≈ 23.8px)按 24px 估;
+ *   至少 1 行,保证空值时不塌。
+ */
+function autoRowsOf(row) {
+  const h = Number(row && row.h) || 0
+  const rows = Math.floor((h - 8) / 24)
+  return rows > 0 ? rows : 1
 }
 /**
  * 签名格同口径只读(2026-10-04):签名格绑的是 signKey(可能不是 c.key 本身 —— 如特采理由行的
@@ -987,6 +1060,45 @@ defineExpose({ focusField })
 .approval-sheet :deep(.el-textarea__inner) {
   font-size: 14px;
   padding: 0;
+}
+/* ═══ 自动换行(2026-10-25 用户口径「这个表不会自动换行,确定宽度,固定宽度然后可以自动换行」) ═══
+   纸宽已由 FIXED_SHEET_W 定死(RD_APPROVAL/RD_PLAN = 1242px),但单元格里的**长内容仍不换行**:
+   · 文本域默认 white-space: pre-wrap 只对真实换行生效,遇到连续长串(客户名/型号/一串数字)不折断;
+   · 只读态由 AnnotatedText 的 span 渲染,是 inline 元素,同样按最长不可断词顶宽。
+   三层一起给:范围内所有文本容器允许换行 + 任意长串可在字符间断行 + 溢出兜底。
+   ⚠ 不加 white-space:nowrap / text-overflow:ellipsis —— 纸面是打印件,截断会丢内容。 */
+.approval-sheet,
+.approval-sheet :deep(.el-textarea__inner),
+.approval-sheet :deep(.el-input__inner),
+.approval-sheet .as-ro-text,
+.approval-sheet .q-ro,
+.approval-sheet .ann-host,
+.approval-sheet .ann-seg {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+/* 单行 input 控件保持单行(它们是短字段:单据号/日期);长文本字段一律走 textarea */
+.approval-sheet :deep(.el-input__inner) {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 值区/填写区必须能收缩,否则 flex 子项按内容撑宽、把整行顶出纸外 */
+.approval-sheet .as-fill,
+.approval-sheet .as-fill-main,
+.approval-sheet .q-value,
+.approval-sheet .q-section-body,
+.approval-sheet .as-ro-text {
+  min-width: 0;
+}
+/* 文本域自身随内容长高(行高已按设计磅值给 min-height;这里只保证内容不被裁切) */
+.approval-sheet .as-fill-area :deep(.el-textarea__inner),
+.approval-sheet .as-fill-main .as-fill-area :deep(.el-textarea__inner) {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
 }
 
 /* ═══ 终止审批横幅(打印隐藏;红系=已终止,蓝系=审批中) ═══ */
@@ -1211,6 +1323,16 @@ defineExpose({ focusField })
   word-break: break-all;
   padding: 2px 4px;
 }
+/* 「最多 N 行」兜底(2026-10-28):字号由 fitFontSize 按字数自动选,这里再用 line-clamp
+   把超出 N 行的部分收掉,保证**永远是 N 行以内、绝不撑破格子**(行高不变)。
+   只作用于声明了 fitLines 的格子(.as-ro-fit),其余只读文本不受影响。 */
+.as-ro-text.as-ro-fit {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--fit-lines, 2);
+  line-clamp: var(--fit-lines, 2);
+  overflow: hidden;
+}
 /* 内容区左右分栏:左=表格(序号/项目名/填写区),右=可填备注列(设计 立项申请表 F5/F6:G15)
    备注列原先是 .as-deco 装饰虚线(只画不填),2026-09-22 改为真字段 */
 .as-body {
@@ -1319,21 +1441,30 @@ defineExpose({ focusField })
   flex: 1;
   min-width: 0;
 }
-/* 填写区主控件:文本域撑满行高(行高按设计磅值给,文本域随之变高) */
+/* 填写区主控件:文本域按内容长高,行高随内容撑开(设计行高只作 min-height 下限)。
+   ⚠ 这里以前是「文本域撑满行高」的反向约束;文本换行后内容会超出固定行高而不可见,
+   2026-10-25 改为内容驱动高度。 */
 .as-fill-main {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 .as-fill-main .as-fill-area {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .as-fill-main .as-fill-area :deep(.el-textarea__inner) {
-  height: 100% !important;
+  /* 2026-10-25:高度交给 Element Plus 的 autosize(见模板 :autosize 与 autoRowsOf),
+     这里只管换行与不再强制锁定高度 —— 用 height:auto 且**不加 !important**,
+     让 autosize 写的内联高度生效;min-height 保证空值时不塌。 */
+  height: auto;
+  min-height: 100%;
+  overflow-y: hidden;
+  resize: none;
 }
 /* 多子区行:如 测试方案(条件/方法/标准) */
 .as-fill-multi {
@@ -1498,8 +1629,29 @@ defineExpose({ focusField })
   align-items: stretch;
   padding: 3px 8px 4px;
 }
+/* 参照控件落在表格取值格内时:撑满整格,且**允许收缩**(2026-10-28)。
+ * 为什么必须这三条一起写:
+ *   · `.as-ref-ctl` 自身写死 `width:200px`(那是「文档编号」小格的尺寸),搬进表格格子后
+ *     只写 `width:100%` 是不够的 —— 它作为 flex item 的 flex-basis 仍是 auto(内容宽),
+ *     长供应商名会把控件撑到 484px,溢出到隔壁列,表现就是"供应商窜出去"。
+ *   · min-width:0 是 flex item 的收缩许可(flex item 默认 min-width:auto = 内容宽,不肯缩)。
+ *   · flex:1 1 0 让宽度完全由格子决定,不参与"按内容撑开"。 */
 .q-value .as-ref-ctl {
   width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;   /* 值区左对齐:与同格的文本类取值观感一致,也不会往左窜 */
+}
+/* 取值格里的参照文本:2026-10-28 —— **放不下就换行**,不省略、不溢出。
+ * 为什么不能只靠定宽:列宽是照原图定死的(见 docSheetConfigs),长供应商名
+ * (如「伊诺凯化学试剂有限公司」137px)在 94px 的值区里必然放不下。
+ * 之前 `overflow: visible + nowrap` 会往左窜出格子、压到隔壁列(用户报障"供应商窜出去了");
+ * 改回 ellipsis 又变成「江苏...」被截断。两条都不对 —— 打印件要的是**完整可读**,
+ * 所以这里放开换行:格子高度够(行高 52/63px,两行字放得下),文字完整显示且不越界。 */
+.q-value .as-ref-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 .q-ro {
   flex: 1;
@@ -1702,7 +1854,10 @@ defineExpose({ focusField })
    (q-sub-h / q-col);高度不确定的容器里 100% 会退化,故不做全局注入,免得影响其它面板 */
 .q-dept-sub.q-sub-h .as-fill-area :deep(.el-textarea__inner),
 .q-value.q-col .as-fill-area :deep(.el-textarea__inner) {
-  height: 100%;
+  /* 2026-10-25:同样改为内容自适应 —— 锁 100% 会把换行后的长文本裁在框内。 */
+  height: auto;
+  min-height: 100%;
+  overflow-y: hidden;
 }
 
 .q-signrow {
@@ -1791,6 +1946,26 @@ defineExpose({ focusField })
     padding-right: 0 !important;
     margin: 0 !important;
   }
+  /* ── 纸面宽度(2026-10-22 修「被分成两页 / 数据被省略」)────────────────────────────
+   * 冻结自用户报障截图(特采申请单 YJ-QR-60 打印预览):供应商显示「江苏...」、
+   * 采购单号显示「YJ-2...」,且整张单被切成两页。
+   *
+   * 根因(两条,同源):
+   *   ① 版式是**按设计宽 938px 排的固定栅格**(见 docSheetConfigs「表体 447px → 纸面 938px,
+   *      比例 2.098」:供应商列 flex:243 / 采购单号 338 / 产品名称 292 都是这个基准下的实测值);
+   *   ② 而打印态这里把纸面压成 width:100%,A4 去掉 8mm 边距只剩 733px ⇒ 纸面被压缩到 78%。
+   *   ⇒ 值区跟着缩窄(采购单号 338→264px),放不下的文字走 .as-ref-text 的
+   *      `text-overflow:ellipsis + white-space:nowrap` 被截成「江苏...」;
+   *   ⇒ 同时行内内容在窄格子里换行/撑高,整张纸从设计高 1340px 涨到约 1362px,
+   *      超过 A4 可打印高 1062px ⇒ 被浏览器切成两页。
+   *
+   * 修法:**打印时让纸面按设计宽 938px 排版(不压缩、不换行),再交给浏览器整体等比缩放**。
+   *   · 纸面定宽后,各值区回到设计宽度 ⇒ 文字放得下 ⇒ 不再出现省略号;
+   *   · 行高回到设计值 ⇒ 纸面总高回到 ~1340px;
+   *   · `zoom` 是「布局后再缩放」,浏览器会按缩放后的尺寸分页:
+   *     733 / 938 = 78.15% ⇒ 1340 × 78.15% ≈ 1047px < 1062px 可打印高 ⇒ **一页放得下**。
+   *   (不用 transform:scale —— 它不影响布局盒尺寸,分页仍按未缩放的 1340px 切,照样两页。)
+   * 其它文书式面板(非固定宽)不受影响:它们本就没有 938px 设计基准,保持 width:100%。 */
   body.approval-printing .approval-sheet {
     visibility: visible !important;
     position: absolute !important;
@@ -1801,6 +1976,40 @@ defineExpose({ focusField })
     margin: 0 !important;
     border: 1px solid #8a8a8a !important;
     box-shadow: none !important;
+  }
+  /* ⚠ 只作用于**按 938px 设计基准排版的品质系表格单**(QC_* 八张 + 特采单等,见 docSheetConfigs
+   *   「表体 447px → 纸面 938px」那段注释)。RD_APPROVAL / RD_PLAN 走 FIXED_SHEET_W=1242 的另一套
+   *   基准,以及其余自适应宽面板,一律**不动** —— 否则会把 1242 的设计纸压成 938。
+   *   判据用 qc 版式独有的网格结构 `.q-vrows`(左侧竖排「申请单位」字列 + 右侧 pairs 网格),
+   *   RD 系列走的是 as-no/as-name 那一套,不会命中。 */
+  body.approval-printing .approval-sheet:has(.q-vrows) {
+    width: 938px !important;
+    max-width: none !important;
+    flex: none !important;
+    /* 缩放比 = min(可打印宽 / 938, 可打印高 / 设计纸高)
+     *   · 宽:733.2 / 938 = 78.2%
+     *   · 高:设计纸高 1362px ⇒ 1062 / 1362 = 78.0%
+     *   取 0.78 两者同时满足(宽 732 ≤ 733、高 1062 ≤ 1062,余量较紧故取 0.78 不多也不少)。
+     * ⚠ 改任何行高都要重算本值 —— docSheetPrint.test.js 的「纸高不超可打印高」会挡住漏算。 */
+    zoom: 0.78 !important;
+    /* 分页兜底:纸面本身是不可分割的整块,任何情况下优先整体成页,不做拦腰截断 */
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* 打印态值区文字:**放不下就换行**,既不省略也不溢出(2026-10-28 修正)。
+   * 演变记录(两次都被用户打回,留档避免再来一遍):
+   *   ① 原本 `.as-ref-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`
+   *      ⇒ 长供应商名被截成「江苏...」(用户报障一);
+   *   ② 只把 ellipsis 关掉(overflow:visible + nowrap) ⇒ 文字放不下就**从格子左侧窜出去**
+   *      压到「供应商」标签和隔壁列上(用户报障二「供应商窜出去了」);
+   *   ③ 现在:white-space:normal + overflow-wrap:anywhere ⇒ 在格子内折行,高度由行高(min-height
+   *      52/63px)容纳两行字,文字完整、不越界。
+   * ⚠ 不能留着 nowrap —— 它一旦生效,上面的换行规则全被压掉(debug 实测 computedStyle 仍为 nowrap)。*/
+  body.approval-printing .approval-sheet .as-ref-text {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
   }
   /* 强制打印背景色(蓝底标签/序号列),否则浏览器打印默认丢弃背景 */
   body.approval-printing .approval-sheet,

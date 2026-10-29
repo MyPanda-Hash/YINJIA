@@ -1,0 +1,46 @@
+[
+  {
+    "k": "login",
+    "v": "YJ_TEST"
+  },
+  {
+    "k": "① 新建单号",
+    "v": "IP-2026-10-0002"
+  },
+  {
+    "k": "② 带标题保存 code/message/no",
+    "v": "200 / success / IP-2026-10-0003"
+  },
+  {
+    "k": "② 落库标题",
+    "v": "出货检验项目控制计划"
+  },
+  {
+    "k": "② 断言 = 标题正确落库",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 说明",
+    "v": "required 只在前端 NewVoucherDialog.validate 生效;直连 API 不校验(既有架构)"
+  },
+  {
+    "k": "③ 断言 = 前端有必填闸门(isNotNull → 不能为空)",
+    "v": "PASS"
+  },
+  {
+    "k": "④ PanelxList 产物",
+    "v": {
+      "file": "PanelxList-gIwsv7NH.js",
+      "hasTitle": true,
+      "hasReviewer": true
+    }
+  },
+  {
+    "k": "④ 断言 = 默认值已烘焙",
+    "v": "PASS"
+  },
+  {
+    "k": "探针单据号(待清理)",
+    "v": "IP-2026-10-0002, IP-2026-10-0003"
+  }
+]

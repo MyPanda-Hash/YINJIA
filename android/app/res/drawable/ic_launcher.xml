@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 图标:深绿底 + 白色条码竖条(纯矢量,免去多套 PNG) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#0F7B6C" android:pathData="M0,0h48v48h-48z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M8,12h3v24h-3z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M13,12h2v24h-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M17,12h4v24h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M23,12h2v24h-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M27,12h3v24h-3z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M32,12h2v24h-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M36,12h4v24h-4z" />
+</vector>

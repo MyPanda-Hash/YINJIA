@@ -1,0 +1,78 @@
+[
+  {
+    "k": "login",
+    "v": "YJ"
+  },
+  {
+    "k": "① 「文档编号」字段",
+    "v": {
+      "hidden": true
+    }
+  },
+  {
+    "k": "① 「单据编号」字段",
+    "v": {
+      "hidden": false
+    }
+  },
+  {
+    "k": "① 断言 = 文档编号已隐藏、单据编号可见",
+    "v": "PASS"
+  },
+  {
+    "k": "② 新建返回 code / 单号",
+    "v": "200 / IP-2026-10-0017"
+  },
+  {
+    "k": "② 断言 = 单号是 IP- 自动号",
+    "v": "PASS"
+  },
+  {
+    "k": "② 行上的「文档编号」",
+    "v": ""
+  },
+  {
+    "k": "② 断言 = 不再是 YJ-RD001",
+    "v": "PASS"
+  },
+  {
+    "k": "③ RD_INSP_PLAN 自动号样例 / 前缀 IP",
+    "v": "IP-2026-10-0017,IP-2026-10-0016,IP-2026-10-0015 → PASS"
+  },
+  {
+    "k": "③ RD_MOLD_PROC 自动号样例 / 前缀 MP",
+    "v": "MP-2026-10-0003,MP-2026-10-0002,MP-2026-10-0001 → PASS"
+  },
+  {
+    "k": "③ RD_ASM_PROC 自动号样例 / 前缀 AP",
+    "v": "AP-2026-10-0003,AP-2026-10-0002,AP-2026-10-0001 → PASS"
+  },
+  {
+    "k": "③ RD_SPEC_DOC 自动号样例 / 前缀 SD",
+    "v": "SD-2026-10-0001 → PASS"
+  },
+  {
+    "k": "④ RecordSheetPanels 产物",
+    "v": {
+      "file": "RecordSheetPanels-Ct8NcK1d.js",
+      "hasEnter": true,
+      "hasFake1": false
+    }
+  },
+  {
+    "k": "④ PanelxList(DocSheet) 产物",
+    "v": {
+      "file": "PanelxList-fHBIXe5c.js",
+      "hasEnter": true,
+      "hasFakeXs": false
+    }
+  },
+  {
+    "k": "④ 断言 = 提示词已换、假号兜底已清",
+    "v": "PASS"
+  },
+  {
+    "k": "探针单据号(待清理)",
+    "v": "IP-2026-10-0017"
+  }
+]

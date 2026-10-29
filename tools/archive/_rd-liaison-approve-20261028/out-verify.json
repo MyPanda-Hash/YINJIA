@@ -1,0 +1,114 @@
+[
+  {
+    "k": "login",
+    "v": "ok"
+  },
+  {
+    "k": "新建单号(directAdd 草稿)",
+    "v": "LXA-2026-10-0019"
+  },
+  {
+    "k": "① 保存返回 code",
+    "v": 200
+  },
+  {
+    "k": "① 保存返回 message",
+    "v": "success"
+  },
+  {
+    "k": "① 保存返回 status",
+    "v": "审批中"
+  },
+  {
+    "k": "① 管理员保存后状态",
+    "v": "审批中"
+  },
+  {
+    "k": "① 断言 = 审批中",
+    "v": "PASS"
+  },
+  {
+    "k": "② 选作对接人的账号",
+    "v": "chaishanyin"
+  },
+  {
+    "k": "② 审批通过 code",
+    "v": 200
+  },
+  {
+    "k": "② 审批通过 message",
+    "v": "success"
+  },
+  {
+    "k": "② 审批通过后状态",
+    "v": "已归档"
+  },
+  {
+    "k": "② 断言 = 已归档",
+    "v": "PASS"
+  },
+  {
+    "k": "③ 流程态 level",
+    "v": "三级"
+  },
+  {
+    "k": "③ 流程态 liaison",
+    "v": "chaishanyin"
+  },
+  {
+    "k": "③ 断言 = 审批时已分发对接人",
+    "v": "PASS"
+  },
+  {
+    "k": "③ canGradeDispatch(已分发后仍可改)",
+    "v": true
+  },
+  {
+    "k": "③ 改对接人 code",
+    "v": 200
+  },
+  {
+    "k": "③ 改对接人 message",
+    "v": "success"
+  },
+  {
+    "k": "③ 改后人",
+    "v": "cp"
+  },
+  {
+    "k": "③ 断言 = 已改人",
+    "v": "PASS"
+  },
+  {
+    "k": "④ 首页 chunk",
+    "v": "assets/index-Blj9wGnD.js"
+  },
+  {
+    "k": "④ en 产物",
+    "v": {
+      "file": "en-7JfUH5mo.js",
+      "docno": true,
+      "liaison": true
+    }
+  },
+  {
+    "k": "④ 断言 = 英文词条齐备",
+    "v": "PASS"
+  },
+  {
+    "k": "④ 前端产物命中",
+    "v": {
+      "file": "PanelxList-9WxIZ95b.js",
+      "docnoMap": true,
+      "liaison": true
+    }
+  },
+  {
+    "k": "④ 断言 = 中文文案已打进产物",
+    "v": "PASS"
+  },
+  {
+    "k": "探针单据号(留档)",
+    "v": "LXA-2026-10-0019"
+  }
+]

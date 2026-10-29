@@ -1,0 +1,99 @@
+{
+  "opened": {
+    "clicked": true,
+    "rows": 93
+  },
+  "tabs": [
+    "成型工艺清单",
+    "成型配方",
+    "修订记录"
+  ],
+  "detail": {
+    "tableCount": 14,
+    "info": [
+      {
+        "trs": 13,
+        "rows": [
+          {
+            "tds": 2,
+            "ths": 0,
+            "hasOp": false,
+            "seq": "配方表配方计"
+          },
+          {
+            "tds": 0,
+            "ths": 8,
+            "hasOp": false,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": true,
+            "seq": ""
+          },
+          {
+            "tds": 8,
+            "ths": 0,
+            "hasOp": false,
+            "seq": "合计"
+          }
+        ]
+      }
+    ]
+  }
+}

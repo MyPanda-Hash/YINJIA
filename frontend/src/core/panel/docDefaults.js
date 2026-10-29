@@ -28,6 +28,11 @@ const LOCKED_PERSON = {
   QC_INSP_REC: '检验人',
   // 2026-09-18:出货检验计划表「编写人」= 编写人固定登录账号人员(设计原文),元数据 editable=0
   RD_INSP_PLAN: '编写人',
+  // 2026-10-28 用户口径「产品信息表的编辑自动填入当前的对应账号姓名」:
+  //   「编辑人」= 最后编辑这张单的人。新增时先带当前用户(纸面立即有名字),
+  //   任何一次保存(含存草稿)由后端 ButtonService 再按当前登录人回写真名 —— 前端值只是显示层,
+  //   落库以服务端为准(yj_field 已改 editable=0,用户不再手输)。
+  RD_PROD_INFO: '编辑人',
 }
 
 /** 非锁定默认值:'@today' 占位表示当天日期(可内嵌,如「V@today」⇒ V2026-09-20);函数形式按 (form, ctx) 现算 */
@@ -87,6 +92,12 @@ const DOC_DEFAULTS = {
   //   版本号设计原文是「V + 按照日期来」⇒ 'V@today' 展开成「V2026-09-20」(当天)。
   //   ⚠ 编写人不在这里:它由登录人决定,在 LOCKED_PERSON 里(editable=0,UI 三处按只读渲染)。
   RD_INSP_PLAN: [
+    // 2026-10-28 用户口径:「出货检验计划表，默认填写出货检验项目控制计划」。
+    // 大标题格 2026-10-19 起是 titleKey='标题' 的输入框(yj_field: required=1),
+    // 新建时为空 ⇒ 用户看到的是 placeholder 灰字、保存还被必填拦住(实测正式账套现有 2 张
+    // 单据的标题被手填成「cs」)。这是**纸面固定表单名**(YJ-RD001),与下面几条同款:
+    // 走默认值(仅空时填),不锁只读 —— 个别客户要改抬头时仍能改。
+    ['标题', '出货检验项目控制计划'],
     ['表单管理人', '冯敏'],
     ['密级', '保密'],
     ['使用范围', '全公司'],
@@ -104,9 +115,24 @@ const DOC_DEFAULTS = {
   //   与「版本号」(seq 60/60/98);同为版本号的 RD_SPEC_DOC 那条 label 是**「版本」**(不是「版本号」),
   //   故本表**不适用**该默认值。label 写错会被后端 labelsToCols 静默丢弃(见 RD_PROD_INFO 段注释)。
   //   顺序按各表 seq 排(密级 → 使用范围 → 版本号),与 RD_INSP_PLAN 那条的写法一致。
-  RD_MOLD_PROC: [['表单管理人', '冯敏'], ['密级', '保密'], ['使用范围', '全公司'], ['版本号', 'V@today']],
-  RD_MOLD_FORMULA: [['表单管理人', '冯敏'], ['密级', '保密'], ['使用范围', '全公司'], ['版本号', 'V@today']],
-  RD_ASM_PROC: [['表单管理人', '冯敏'], ['密级', '保密'], ['使用范围', '全公司'], ['版本号', 'V@today']],
+  // ⚠ 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #7):
+  //   「表单管理人:默认为刘磊,密级默认保密;使用范围默认银嘉内部」—— 三条一次性改口径:
+  //     表单管理人 冯敏 → **刘磊**;密级 = 保密(不变);使用范围 全公司 → **银嘉内部**。
+  //   ⚠ 「银嘉内部」必须在 yj_field.dict_sql 的候选里,否则 el-select 选中后显示不出标签:
+  //     实测 RD_MOLD_PROC.使用范围 候选 = 工艺科/成型车间、工程技术中心、银嘉内部、公司内 ⇒ 有。
+  RD_MOLD_PROC: [['表单管理人', '刘磊'], ['密级', '保密'], ['使用范围', '银嘉内部'], ['版本号', 'V@today']],
+  RD_MOLD_FORMULA: [['表单管理人', '刘磊'], ['密级', '保密'], ['使用范围', '银嘉内部'], ['版本号', 'V@today']],
+  // 2026-10-28 用户口径:「组装工艺的表单管理人修改为编辑人的账号姓名,选择产品编号之后就自动带入,
+  //   或者进行其他编辑也自动带入」—— 本面板的表单管理人不再写死刘磊,而是**当前登录人姓名**
+  //   (函数形式:applyDocDefaults 把 userName 放 ctx;新建时先带,后续任意编辑由
+  //    PanelxList 的 EDITOR_STAMP_FIELDS 监视器刷新,保存时 ButtonService 再按当前人回写)。
+  //   ⚠ 同批的成型工艺清单/成型配方**不动**(仍为刘磊,用户本次只点了组装工艺)。
+  RD_ASM_PROC: [
+    ['表单管理人', (form, ctx) => ctx.userName || ''],
+    ['密级', '保密'],
+    ['使用范围', '银嘉内部'],
+    ['版本号', 'V@today'],
+  ],
 }
 
 /** 该面板由当前用户锁定的字段标签;没有则 null */
@@ -167,7 +193,11 @@ export function applyDocDefaults(panelCode, form, user, opts = {}) {
 
   for (const [key, value] of DOC_DEFAULTS[code] || []) {
     if (!isEmpty(form[key])) continue
-    form[key] = typeof value === 'function' ? value(form, { today }) : expandToday(value, today)
+    // 函数形式默认值:ctx = { today, userName } —— userName 供「表单管理人=编辑人」这类
+    // 「按当前登录人现算」的默认值用(2026-10-28)。
+    form[key] = typeof value === 'function'
+      ? value(form, { today, userName: displayNameOf(user) })
+      : expandToday(value, today)
   }
   return form
 }

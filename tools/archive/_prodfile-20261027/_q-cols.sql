@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT TOP 0 * FROM yj_field;

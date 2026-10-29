@@ -16,9 +16,11 @@
           size="small"
           maxlength="30"
           class="ps-docno-input"
+          :placeholder="tt('请输入编号')"
           @input="emit('dirty')"
         />
-        <template v-else>{{ head['文档编号'] || 'YJ-XS002' }}</template>
+        <!-- 只读兜底:原写死 'YJ-XS002' 会让人以为那张单的编号就是它(2026-10-28 用户口径) -->
+        <template v-else>{{ head['文档编号'] || '—' }}</template>
       </div>
     </div>
 
@@ -853,7 +855,8 @@ function importExcelFile(e) {
   const head = props.head || {}
   const rows = (head.detail && Array.isArray(head.detail.items) ? head.detail.items : [])
   const title = '产品开发二三四级项目控制列表'
-  const info = `惠州市银嘉环保科技有限公司　　文档编号：${head['文档编号'] || 'YJ-XS002'}　　密级：${head['密级'] || ''}　　使用范围：${head['文件使用范围'] || ''}　　单据编号：${head['单据编号'] || ''}`
+  // 文档编号取不到就留空(原写死 'YJ-XS002' 会让导出的表看起来"固定就是这个编号")
+  const info = `惠州市银嘉环保科技有限公司　　文档编号：${head['文档编号'] || ''}　　密级：${head['密级'] || ''}　　使用范围：${head['文件使用范围'] || ''}　　单据编号：${head['单据编号'] || ''}`
   // 表头=显示名(label);取数=落库键(key);列宽也用同一份定义(见 progressColumns.js)
   const header = PROGRESS_COLUMNS.map((c) => c.label)
   const data = rows.map((r) => PROGRESS_COLUMNS.map((c) => r[c.key]))

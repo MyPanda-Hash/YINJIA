@@ -7,13 +7,24 @@ rem  in a zh-CN cmd console (the GBK parser chokes on it). All Chinese
 rem  text lives in the .sql files, which sqlcmd reads as UTF-8
 rem  (-f i:65001,o:65001), and lands in the returned log.
 rem
+rem  !! DANGER - THIS IS THE FULL-REPLACE ROUTE, NOT THE DEFAULT !!
+rem  It DROPS the server database and restores our local .bak. Since
+rem  2026-10-25 the ONLY supported production route is the incremental
+rem  package (deploy-incremental.bat: migrate -> baseline -> swap jar).
+rem  Use this script ONLY for a first install / demo / rebuild whose
+rem  data is explicitly allowed to be replaced.
+rem
 rem  Run this ON THE SERVER:
 rem    deploy-all.bat          CHECK - read-only: prerequisites + state.
-rem    deploy-all.bat GO       DEPLOY - stop app, backup server DB,
-rem                                     restore our DB, verify, swap
-rem                                     app.jar, start, verify login.
-rem    deploy-all.bat GO APP   swap app.jar only (DB untouched).
-rem    deploy-all.bat GO DB    restore DB only (app.jar untouched).
+rem    deploy-all.bat GO APP   swap app.jar only (DB untouched) - SAFE.
+rem    deploy-all.bat GO CONFIRM-FULL-REPLACE
+rem                           full deploy (stop, backup, REPLACE DB,
+rem                           verify, swap jar, start, verify login).
+rem    deploy-all.bat GO DB CONFIRM-FULL-REPLACE
+rem                           replace DB only (app.jar untouched).
+rem
+rem  GO / GO DB without the exact token CONFIRM-FULL-REPLACE stops before
+rem  touching anything with RESULT: FAIL-FULL-REPLACE-NOT-CONFIRMED.
 rem
 rem  What GO does, in order:
 rem    1 prerequisites          2 server state (check-db.sql)
@@ -33,10 +44,36 @@ rem  Exit codes: 0 ok  1 failed  2 prerequisites missing
 rem ==================================================================
 setlocal enabledelayedexpansion
 
-set "MODE=%~1"
-set "SCOPE=%~2"
-if /i "%MODE%"=="GO" (set "MODE=GO") else (set "MODE=CHECK")
-if /i "%SCOPE%"=="APP" (set "SCOPE=APP") else if /i "%SCOPE%"=="DB" (set "SCOPE=DB") else (set "SCOPE=ALL")
+rem Argument parsing: recognise tokens BY VALUE, never by position, because the
+rem confirm token may sit in arg2 (GO CONFIRM-FULL-REPLACE) or arg3 (GO DB ...).
+set "MODE=CHECK"
+set "SCOPE=ALL"
+set "CONFIRM="
+if /i "%~1"=="GO" set "MODE=GO"
+if /i "%~2"=="APP" set "SCOPE=APP"
+if /i "%~2"=="DB" set "SCOPE=DB"
+if /i "%~2"=="CONFIRM-FULL-REPLACE" set "CONFIRM=CONFIRM-FULL-REPLACE"
+if /i "%~3"=="CONFIRM-FULL-REPLACE" set "CONFIRM=CONFIRM-FULL-REPLACE"
+
+rem ---- FULL-REPLACE GUARD (2026-10-25) ------------------------------
+rem Full replacement is an explicit exception: any GO that would touch the
+rem server DB must carry the exact third argument CONFIRM-FULL-REPLACE.
+rem Without it we stop here, before stopping the app or reading the backup.
+rem APP-only deploys are safe and therefore not gated.
+if /i not "%MODE%"=="GO" goto :full_scope_checked
+if /i "%SCOPE%"=="APP" goto :full_scope_checked
+if /i "%CONFIRM%"=="CONFIRM-FULL-REPLACE" goto :full_scope_checked
+echo.
+echo RESULT: FAIL-FULL-REPLACE-NOT-CONFIRMED
+echo   This script DROPS and REPLACES the server database; it is NOT the
+echo   normal production update route.
+echo   Production update: use deploy-incremental.bat ^(migrate + swap jar^).
+echo   If you really intend to replace all server data, re-run as:
+echo     deploy-all.bat GO CONFIRM-FULL-REPLACE
+echo     deploy-all.bat GO DB CONFIRM-FULL-REPLACE
+echo   Nothing was changed.
+exit /b 2
+:full_scope_checked
 
 set "SRC=%~dp0"
 if "%SRC:~-1%"=="\" set "SRC=%SRC:~0,-1%"
@@ -179,7 +216,8 @@ dir /b "%SRC%" 2>nul
 if /i not "%MODE%"=="GO" (
   echo.
   echo CHECK done - nothing was changed.
-  echo To deploy:  deploy-all.bat GO
+  echo Production update : deploy-incremental.bat GO ^(default route^)
+  echo Full replace only : deploy-all.bat GO CONFIRM-FULL-REPLACE
   exit /b 0
 )
 
@@ -267,7 +305,7 @@ type "%LOGDIR%\step-sqllogin.txt"
 findstr /c:"RESULT: SQL-LOGIN-OK" "%LOGDIR%\step-sqllogin.txt" >nul 2>nul
 if errorlevel 1 (
   echo RESULT: FAIL-SQL-LOGIN - yinjia cannot log in ^(orphaned login after restore^)
-  echo hint: run fix-db-logins.sql, then deploy-all.bat GO DB
+  echo hint: run fix-db-logins.sql, then deploy-all.bat GO DB CONFIRM-FULL-REPLACE
   exit /b 1
 )
 echo RESULT: SQL-LOGIN-GATE-PASSED

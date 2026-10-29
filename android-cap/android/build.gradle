@@ -1,0 +1,36 @@
+// Top-level build file(Capacitor 模板 + 2026-10-20 国内镜像改造)
+//
+// 为什么改仓库顺序:google()/mavenCentral() 在国内直连经常 read timeout,
+// 首次构建要拉 AGP + Capacitor AAR + Google ML Kit 一大堆依赖,断了就前功尽弃。
+// 阿里云的 google/central 是官方仓库镜像,失败再回落到官方源。
+
+buildscript {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'com.google.gms:google-services:4.4.2'
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

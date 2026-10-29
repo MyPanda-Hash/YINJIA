@@ -21,8 +21,11 @@
               <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
               <el-icon class="rs-ref-ico"><Search /></el-icon>
             </div>
-            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
-            <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</span>
+            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('请输入编号')" @input="emit('dirty')" />
+            <!-- 只读兜底:原先写死 'YJ-PD-01'(设计纸面样板号)—— 在线看一张**还没发号**的单时
+                 屏幕上印出假编号,容易被当成"这张单的编号就是它"(2026-10-28 用户口径)。
+                 取不到号就显示「—」,不再编造。 -->
+            <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || '—' }}</span>
           </td>
         </tr>
         <tr>

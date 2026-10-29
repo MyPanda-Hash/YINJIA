@@ -1,0 +1,129 @@
+# 银嘉 MES · 安卓壳(`android/`)
+
+> **日期**:2026-10-20
+> **产物**:`android/dist/yinjia-mes-1.0.0.apk`(自签名,可直接侧载)
+> **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
+> 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
+
+---
+
+## 1. 它是什么
+
+**整个前端打进 APK**(`assets/www` = `frontend/dist` 的完整镜像),WebView 从
+`file:///android_asset/www/index.html` 加载,**不依赖服务器就能开界面**;
+再补两件网页给不了的原生能力:
+
+| 能力 | 为什么必须原生 |
+|---|---|
+| **摄像头扫码** | 安卓 WebView 把 `http://` 视为**不安全上下文**,`navigator.mediaDevices` 直接不存在(和 Chrome 同一条规则);工厂内网是 `http://IP:8090`,没证书 ⇒ 网页调不起摄像头 |
+| **接口号(后端地址)可配置** | 页面是本地 assets,不知道后端在哪;由它决定"连哪台服务器 / 哪个账套",网页据此把所有 `/api` 请求指过去(`frontend/src/core/request.js`) |
+
+**扫码只放在「生产计划 → 生产领料」页**(用户 2026-10-20 口径:只有这个页面需要扫码):
+工具条上**没有**全局扫码按钮,页面里的「扫工单 / 扫物料」按需调原生相机。
+
+> ⚠ 代价:整包模式意味着**前端改了要重新打 APK**(以前"改服务器即可"不成立了)。
+> 数据面不受影响 —— 台账/库存/审批仍然全在服务器。
+
+## 2. 界面
+
+```
+┌──────────────────────────────────────────┐
+│ http://192.168.1.10:8090          [设置] │ ← 42dp 原生工具条(显示当前接口号)
+├──────────────────────────────────────────┤
+│                                          │
+│   MES 网页(打包在 APK 内,离线可开)     │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+- **首次启动**弹「接口地址」对话框(默认 `http://192.168.1.10:8090`),保存后加载内置页面;
+- 工具条「设置」随时可改地址(改完重新加载,`/api` 前缀随之变化);
+- 扫码结果通过 JS 桥回传网页:`window.__yjScanResult(code, ok)`。
+
+## 3. 网页 ↔ 原生 的桥(只在这一个页面用到)
+
+原生注入的对象:
+
+```js
+window.YjNative.scan()        // 打开原生扫码页(异步,结果走 __yjScanResult)
+window.YjNative.getBaseUrl()  // 当前接口号
+window.YjNative.setBaseUrl(u) // 改接口号(暂未在页面上开放写)
+window.YjNative.toast(msg)    // 原生 toast
+window.YjNative.appVersion()  // 壳版本
+```
+
+页面侧(见 [MobilePick.vue](../frontend/src/views/mobile/MobilePick.vue) 「生产领料」):
+
+- 只有检测到 `window.YjNative.scan` 才显示「扫码」按钮 ⇒ **网页版不受影响**;
+- 「扫工单」按钮 → 结果填工单号并自动查询;「扫物料」按钮 → 结果填物料编码并自动查可用量;
+- 顶部原生「扫码」不指定目标:没选工单就当工单码,已选工单就当物料码;
+- 结果回调统一走 `window.__yjScanResult(code, ok)`,页面卸载时注销。
+
+## 4. 构建 / 安装
+
+```powershell
+# 出包(仓库根)
+powershell -ExecutionPolicy Bypass -File android\build.ps1
+
+# 出包并 adb 安装到已连的手机(需开 USB 调试)
+powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
+```
+
+前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
+脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
+
+**手机安装**:把 `android/dist/yinjia-mes-1.0.0.apk` 拷到手机点安装(需允许「安装未知应用」)。
+
+> ⚠ 签名是 `debug.keystore`(自签名,脚本首次运行自动生成,不入库)。**内部侧载够用**;
+> 若要上应用市场/企业分发,换成正式 keystore 并妥善保管(丢了就没法覆盖升级)。
+
+## 5. 关键实现点
+
+| 点 | 说明 |
+|---|---|
+| 前端打包踩坑 | **`aapt2 link -A` 在 Windows 下把条目写成 `assets/www\assets\...`(反斜杠)⇒ WebView 找不到 `index.html`(白屏)。改为在脚本里自己往 zip 写 `assets/www/...`(POSIX 分隔符),实测 122 条全部正斜杠、0 条反斜杠 |
+| 明文 http | `AndroidManifest` 开 `usesCleartextTraffic` + `res/xml/network_security_config.xml` 显式允许;否则 WebView 直接拒绝加载 http |
+| 扫码 | `ScanActivity`:系统 Camera(API1)预览 + **ZXing core** 解码(QR/128/39/93/EAN13/EAN8/ITF/DataMatrix),不联网、不用第三方 SDK |
+| 手电 | 扫码页**点屏幕**开关闪光灯(仓库光线差时用) |
+| 震动 | 扫中震 60ms,给现场一个"扫到了"的反馈 |
+| 返回键 | WebView 能后退就后退,退到底再退出 App |
+| 权限 | 仅 INTERNET / CAMERA / VIBRATE / ACCESS_NETWORK_STATE;相机在首次扫码时动态申请 |
+
+## 6. 验证状态(2026-10-20)
+
+### 6.1 已完成(不需要手机就能验的,全绿)
+
+| 项 | 结果 |
+|---|---|
+| 构建 | `aapt2 + javac + d8(36.1.0)+ zipalign + apksigner` 全绿,产出 **2.3 MB** APK(整站前端在内) |
+| 包信息 | `package=com.yinjia.mes.app`,`minSdk=24`(Android 7.0+),`targetSdk=34`,label=`银嘉MES`,launcher=`MainActivity` |
+| 签名/对齐 | `apksigner verify` 通过(证书 `CN=Yinjia MES Debug`);`zipalign 4` 通过 |
+| 权限 | INTERNET / ACCESS_NETWORK_STATE / CAMERA / VIBRATE |
+| 相对路径 | 内置 `index.html` 引用 `./assets/...`(vite `base: './'`),`file://` 下可解析;Web 端同一份产物实测 10/10 不回归 |
+| 明文 http | APK 内 manifest 实测 `usesCleartextTraffic=0xffffffff`(true)、`networkSecurityConfig=@0x7f060000` 已挂上 |
+| 前端打包 | APK 内 `assets/www/` **122 个文件**、`index.html` 在、**0 个反斜杠条目**(踩坑见 §5) |
+| dex 内容 | **317 个类** = 26 个自有类(`MainActivity` / `ScanActivity` / `Bridge` / `R.*`)+ 291 个 ZXing 类,数量与预期一致 |
+| JS 桥契约 | 两侧逐字对得上:原生 `addJavascriptInterface(new Bridge(), "YjNative")` + `window.__yjScanResult(...)`;网页 `window.YjNative.scan/getBaseUrl` + `window.__yjScanResult = (code, ok) => …` |
+| 网页回归 | 390 宽探针 **10/10**(加了扫码按钮后网页版行为不变:检测不到桥就不显示按钮) |
+| 安装脚本 | `android\install.ps1` 冒烟通过:能找到 APK、能进入「等设备」循环、无设备时给出人话提示 |
+
+### 6.2 待办:真机验证(本机做不了)
+
+`adb devices` 为空;SDK 里**没有 AVD、没有系统镜像、也没有 cmdline-tools**(`sdkmanager` 不可用),
+所以这台机器上无法自主起模拟器安装。需要**任一条**:
+
+| 做法 | 怎么做 |
+|---|---|
+| **A. 插手机(最直接)** | 手机开「USB 调试」→ 连电脑 → `powershell -ExecutionPolicy Bypass -File android\install.ps1`(会等设备连上再装) |
+| **B. 让我起模拟器** | 需要先下载系统镜像(约 1.0~1.3 GB,x86_64 API 34)+ 补 cmdline-tools;模拟器**没有真实相机**,只能验「启动 / 接口号保存 / 网页加载 / 表单流程」,验不了扫码取景 |
+| **C. 先不动** | 包已在 `android/dist/`,等人到位再装;代码与文档已冻结 |
+
+真机装好后要看的三件事:① 能否登录(接口号填对);② 「扫工单」取景方向是否正常(横/倒就调 `ScanActivity` 的 `setDisplayOrientation` 与预览尺寸);③ 扫出来的码是否落进正确的输入框(工单/物料)。
+
+## 7. 已知限制 / 下一步
+
+1. **未在真机验证**:相机预览方向、扫码速度要以真机为准(不同机型 preview 尺寸/方向有差异);
+2. 目前只支持 **http/https** 的 MES 地址;若以后上 HTTPS 域名,这里什么都不用改;
+3. 没有做「离线缓存 / 断网重试」;没有做 App 内自动升级(需要的话加个版本检查接口);
+4. 扫码只回传**一段文本**(码内容)。工单码内容是 `工单号`(或 `公司代码@工单号@行号`),物料码是 `存货编码|批号` —— 解析交回网页(`parseBarcode` 已实现);
+5. 若以后要在网页里用摄像头(不装 App),必须先给 MES 配 **HTTPS**。

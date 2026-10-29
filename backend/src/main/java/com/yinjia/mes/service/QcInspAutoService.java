@@ -67,14 +67,22 @@ public class QcInspAutoService {
     }
 
     /** 工序 → 检验单面板(顺序即出单顺序;改口径只改这一处) */
+    /**
+     * 工序 → 检验单面板(顺序即出单顺序;改口径只改这一处)。
+     *
+     * <p>⚠ 2026-10-21 修正(现场报障「报工没有提交成功:审核失败 … 对象名 'dbo.qc_first_insp_head' 无效」):
+     * 成型原来出 {@code QC_FIRST_INSP}(首件检验)+ {@code QC_PROC_INSP}(制程检验),这两个面板与表
+     * **都已下架**(yj_panel 无行、yj_field 0 行、qc_first_insp_head / qc_proc_insp_head 表不存在)
+     * ⇒ 任何人报成型都会让整笔报工在审核钩子里炸掉。现成型只出 {@code QC_MOLD_INSP}(成型检验单,现役),
+     * 组装仍出 {@code QC_ASM_INSP}。属踩坑台账 G12 那一类:表下架了,还在查它的代码必须一起改。
+     */
     private static final Map<String, List<String>> OP_PANELS = Map.of(
-            "成型", List.of("QC_FIRST_INSP", "QC_PROC_INSP"),
+            "成型", List.of("QC_MOLD_INSP"),
             "组装", List.of("QC_ASM_INSP"));
 
     /** 面板 → 头表(幂等查重;取值全是本类常量,无拼接注入面) */
     private static final Map<String, String> HEAD_TABLE = Map.of(
-            "QC_FIRST_INSP", "qc_first_insp_head",
-            "QC_PROC_INSP", "qc_proc_insp_head",
+            "QC_MOLD_INSP", "qc_mold_insp_head",
             "QC_ASM_INSP", "qc_asm_insp_head");
 
     private final JdbcTemplate jdbc;
@@ -152,11 +160,48 @@ public class QcInspAutoService {
     private Map<String, Object> head(String panel, Map<String, Object> r, Map<String, Object> p,
                                      String op, int xc, double done, String repNo, String user) {
         return switch (panel) {
-            case "QC_FIRST_INSP" -> firstInspHead(r, p, op, xc, done, repNo, user);
-            case "QC_PROC_INSP" -> procInspHead(p, xc, done, op, repNo, user);
+            // 成型检验单(2026-10-21 接替已下架的 QC_FIRST_INSP):字段与首件检验同源,
+            //   但不写 QC_MOLD_INSP 没有的键(生产日期/客户代码/客户名称/工艺清单单号),
+            //   明细仍用成型工艺清单 FirstInspItems 预铺。
+            case "QC_MOLD_INSP" -> moldInspHead(r, p, op, xc, done, repNo, user);
             case "QC_ASM_INSP" -> asmInspHead(r, p, op, xc, done, repNo, user);
             default -> Map.of();
         };
+    }
+
+    /**
+     * 成型检验单(QC_MOLD_INSP)单头:照抄报工行 + 工单行,明细按《成型工艺清单》预铺。
+     * 与 {@link #firstInspHead} 的唯一区别:只写 QC_MOLD_INSP 实际存在的字段。
+     */
+    private Map<String, Object> moldInspHead(Map<String, Object> r, Map<String, Object> p, String op,
+                                             int xc, double done, String repNo, String user) {
+        String today = LocalDate.now().toString();
+        String productCode = firstNonBlank(str(r.get("产品编码")), str(p.get("dm")));
+
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", today);
+        head.put("检验日期", today);
+        head.put("工单号", str(r.get("工单号")));
+        if (xc != 0) head.put("工单行号", xc);
+        if (!repNo.isBlank()) head.put("报工单号", repNo);
+        head.put("工序", op);
+        String batch = str(r.get("批次号"));
+        if (!batch.isEmpty()) head.put("批次号", batch);
+        head.put("产品编码", productCode);
+        head.put("产品名称", firstNonBlank(str(r.get("产品名称")), str(p.get("mc"))));
+        String spec = firstNonBlank(str(r.get("规格型号")), str(p.get("gg")));
+        if (!spec.isEmpty()) head.put("规格型号", spec);
+        String line = firstNonBlank(str(r.get("生产线")), str(p.get("scx")));
+        if (!line.isEmpty()) {
+            head.put("生产线", line);
+            String shop = lineShop(line);
+            if (shop != null) head.put("生产车间", shop);
+        }
+        head.put("报工数量", round(done));
+        head.put("检验员", user);
+        FirstInspItems.Result items = FirstInspItems.load(jdbc, productCode);
+        head.put("detail", Map.of("items", items.rows()));
+        return head;
     }
 
     /**
