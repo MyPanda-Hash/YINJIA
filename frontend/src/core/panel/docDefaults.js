@@ -82,8 +82,12 @@ const DOC_DEFAULTS = {
     //     · 保存:后端 labelsToCols 按 label 取值,取不到 ⇒ 静默丢弃,落库恒 NULL。
     //   2026-10-13 实测(测试账套 PI-2026-10-0013):这两列保存后都是 NULL,即此因。
     //   批量核对口径见 tools/archive/_check-docdefaults-keys.sql(2026-10-13 全量比对 35 个键,仅此两处错)。
-    ['审核人（一级审批人）', '冯总'],
-    ['审核人（二级审批人）', '秀丽'],
+    // ⚠ 2026-10-29 用户口径:「产品信息表的这个两个审核人默认填写为冯总和陈秀丽,
+    //   也可以修改的,保存之后也显示出来,现在没有显示出来」——
+    //   改成本库**真实账号的姓名**(yj_user 实测:fengmin=冯敏 / cp=陈秀丽),
+    //   旧值「冯总/秀丽」是设计稿上的称谓,库里没有这两个姓名,分发/审批按姓名匹配时会落空。
+    ['审核人（一级审批人）', '冯敏'],
+    ['审核人（二级审批人）', '陈秀丽'],
   ],
   // 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」。
   //   设计纸张上写死的那几格(表单管理人=冯敏 / 密级=保密 / 使用范围=全公司 / 审核人=冯加劲)
@@ -178,17 +182,30 @@ function displayNameOf(user) {
  * @param {string} panelCode 面板编码
  * @param {object} form 表单(键=字段标签)
  * @param {object} user 当前用户(realName/userName)
- * @param {{isNew?: boolean, today?: string}} opts isNew=新增(才写锁定字段)
+ * @param {{isNew?: boolean, today?: string, headDefaults?: object}} opts
+ *   isNew=新增(才写锁定字段);headDefaults=面板元数据下发的**声明式**默认值
+ *   (yj_panel.config.headDefaults,键=字段标签)。声明式优先级低于代码里的 DOC_DEFAULTS
+ *   —— 代码里那些是"带业务含义"的(如 申请立项人=提交人),配置这些只是初始选项。
  */
 export function applyDocDefaults(panelCode, form, user, opts = {}) {
   if (!form || typeof form !== 'object') return form
   const code = String(panelCode || '')
-  const { isNew = false, today = todayStr() } = opts
+  const { isNew = false, today = todayStr(), headDefaults = null } = opts
 
   if (isNew) {
     const locked = lockedPersonLabel(code)
     const name = displayNameOf(user)
     if (locked && name) form[locked] = name
+  }
+
+  // 声明式默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,这些是可以换的」):
+  // 只填空格 —— 用户手改过的值不会被抢回默认值。
+  if (headDefaults && typeof headDefaults === 'object') {
+    for (const [key, val] of Object.entries(headDefaults)) {
+      if (!key || val === undefined || val === null) continue
+      if (!isEmpty(form[key])) continue
+      form[key] = String(val)
+    }
   }
 
   for (const [key, value] of DOC_DEFAULTS[code] || []) {

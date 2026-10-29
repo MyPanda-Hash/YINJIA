@@ -760,6 +760,35 @@ public class ButtonService {
     }
 
     /**
+     * 面板声明的**新建默认值**(yj_panel.config 的 {@code headDefaults},2026-10-29)。
+     *
+     * <p>用户口径:「密级以及文件使用范围默认选择保密、内部,这些是可以换的,
+     *   只是新增的单据就是默认选择这些」。
+     *
+     * <p>只补**当前没有值**的列 —— 载荷里已经给了值(用户手改/参照带回)就不覆盖,
+     * 否则「默认值」会变成「每次保存都抢回默认值」。
+     *
+     * @param cols 即将写库的列(键 = 物理列名)
+     */
+    private void putHeadDefaults(PanelRegistry.PanelDef def, String table, Map<String, Object> cols) {
+        Map<String, String> defaults = def.headDefaults();
+        if (defaults.isEmpty() || cols == null) return;
+        java.util.Set<String> existing = tableCols(table);
+        for (Map.Entry<String, String> e : defaults.entrySet()) {
+            String label = e.getKey();      // 声明用的是**字段标签**(数据键),与 yj_field.label 同名
+            String val = e.getValue();
+            if (label == null || label.isBlank() || val == null) continue;
+            // 落库要换成物理列名(label 与 col_name 会分叉,如「使用日期」)
+            PanelRegistry.FieldDef f = def.byLabel(label);
+            String col = f != null ? f.col() : label;
+            if (!existing.contains(col)) continue;          // 该表没有这一列 ⇒ 跳过
+            Object cur = cols.get(col);
+            if (cur != null && !String.valueOf(cur).trim().isEmpty()) continue;  // 已有值不覆盖
+            cols.put(col, val);
+        }
+    }
+
+    /**
      * 产品编号不允许重复(同面板其它未作废单据占用即拒绝;空值跳过)。
      *
      * <p>为什么必须唯一:产品信息表是"这个产品"的档案,而下游四个受控文件(规格书/成型工艺清单/
@@ -1517,6 +1546,10 @@ public class ButtonService {
     private void upsertHeadRow(PanelRegistry.PanelDef def, Map<String, Object> head, String no, String user) {
         List<PanelRegistry.FieldDef> fields = def.fieldsAt("header");
         Map<String, Object> cols = labelsToCols(fields, head);
+        // 新建默认值:主保存路径也要补(2026-10-29 用户报障「两个审核人没显示出来」的真因之一)。
+        // 原先 putHeadDefaults 只挂在**空白草稿分支**(directAdd),而「新增 → 填数据 → 保存」
+        // 走的是本方法 ⇒ 那两格默认值从来没写进去过。这里补上,口径同款:只填空列,不覆盖已有值。
+        putHeadDefaults(def, def.headTable(), cols);
         Integer existing = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.headTable() + " WHERE " + def.groupCol() + " = ?",
                 Integer.class, no);
@@ -6663,11 +6696,57 @@ public class ButtonService {
             notify(() -> messageService.send(List.of(owner), MessageService.SPEC_ASSIGNED, "RD_SPEC_DOC", docNo,
                     Map.of("kind", kind, "productCode", productCode, "productName", productName), user));
         }
+        //   (单据此时通常已归档,碰状态会把它从归档打回草稿 —— 用户明确要求"不改状态")。
+        String specOwner = "";
+        for (Map<String, Object> a : assigned) {
+            Object o = a.get("责任人");
+            if (o != null) specOwner = String.valueOf(o).trim();
+        }
+        backfillProdOwner(no, specOwner);
+
+
         Map<String, Object> r = result(no, "已分发");
         r.put("productCode", productCode);
         r.put("assigned", assigned);
         return r;
     }
+
+    /**
+     * 把「规格书责任人」回填到产品信息表的「产品负责人」(列名 责任人)。
+     *
+     * <p>用户口径(2026-10-29):「产品负责人是对接人签核分发的规格书的负责人…自动回填到
+     * 这个产品信息表里面,**但是不修改产品信息表的状态**,就是可以在产品信息表处于
+     * 归档状态的情况下回填产品负责人」。
+     *
+     * <p>所以这里**只发一条 UPDATE 到 rd_prod_info_head**:
+     * <ul>
+     *   <li>只写 [责任人] 一列(值 = 责任人账号转**真实姓名**,与界面上其它人名列同口径);</li>
+     *   <li>不碰 yj_doc_status,不改 archived / pending / canceled —— 单据保持原状态;</li>
+     *   <li>不写 asp_user2/asp_time2 之外的审计列,避免把"回填"误记成一次编辑;</li>
+     *   <li>取不到账号/账号不存在时安静跳过(不阻断分发主流程)。</li>
+     * </ul>
+     *
+     * @param prodDocNo 产品信息表**单据编号**(不是产品编号)
+     * @param specOwnerAccount 规格书责任人账号(cp / liulei / chaishanyin / fengmin …)
+     */
+    private void backfillProdOwner(String prodDocNo, String specOwnerAccount) {
+        try {
+            if (prodDocNo == null || prodDocNo.isBlank()) return;
+            if (specOwnerAccount == null || specOwnerAccount.isBlank()) return;
+            String realName = realNameOf(specOwnerAccount);
+            String val = (realName == null || realName.isBlank()) ? specOwnerAccount : realName;
+            int n = jdbc.update(
+                    "UPDATE rd_prod_info_head SET 责任人 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    val, currentUserName(), prodDocNo);
+            log.info("[产品负责人回填] 产品信息表 {} ← 规格书责任人 {} ({}):更新 {} 行,单据状态未改动",
+                    prodDocNo, specOwnerAccount, val, n);
+        } catch (Exception e) {
+            // 不抛:回填是附带动作,不能让它把分发主流程搞失败
+            log.warn("[产品负责人回填] 产品信息表 {} 回填失败(分发已成功):{}", prodDocNo, e.getMessage());
+        }
+    }
+
 
     /** 已分配规格书单的编辑封锁:仅 责任人∪总负责人(活值)∪管理员 可保存/申请修改/删除;
      *  未分配的历史单不受限(直接放行)。 */

@@ -123,7 +123,7 @@ test('未知面板:不做任何写入', () => {
 })
 
 /**
- * 2026-09-18 第二轮:产品信息表两级审批人固定填写 冯总 / 秀丽。
+ * 产品信息表两级审批人固定填写(2026-09-18 第二轮首次引入)。
  * 口径:走"默认值"(仅空时填、可人工改),不是"锁定只读" —— 与 文件管理人=陈秀丽 同款。
  * 若将来要收紧成不可改,改 yj_field.editable=0 即可(那时这条测试要改成断言 lockedPersonLabel)。
  *
@@ -133,12 +133,16 @@ test('未知面板:不做任何写入', () => {
  *   纸面格子按 label 取值 ⇒ 显示为空;保存时后端 labelsToCols 按 label 取 ⇒ 静默丢弃、落库恒 NULL
  *   (实测 测试账套 PI-2026-10-0013 两列皆 NULL)。
  *   **这条测试此前测的是错的行为,不是漏测 —— 断言照抄了生产代码的键名。**
+ *
+ * ⚠ 2026-10-29 改值:冯总/秀丽 → **冯敏/陈秀丽**。用户口径「两个审核人默认填写为冯总和陈秀丽」;
+ *   而本库 yj_user 实测只有 fengmin=冯敏 / cp=陈秀丽 —— 旧字面「冯总」「秀丽」在库里**没有对应账号**,
+ *   下游按姓名反查账号(分发/审批)会落空。名字对齐真实账号后,分发链路才走得通。
  */
-test('产品信息表:两级审批人默认带出 冯总 / 秀丽(键=字段标签,不是物理列名)', () => {
+test('产品信息表:两级审批人默认带出 冯敏 / 陈秀丽(键=字段标签,不是物理列名)', () => {
   const form = {}
   applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
-  assert.equal(form['审核人（一级审批人）'], '冯总')
-  assert.equal(form['审核人（二级审批人）'], '秀丽')
+  assert.equal(form['审核人（一级审批人）'], '冯敏')
+  assert.equal(form['审核人（二级审批人）'], '陈秀丽')
   // 防回归:绝不能再退回物理列名做键(那两个名字在 yj_field.label 里不存在 ⇒ 两头都丢)
   assert.equal(form['审核人一级'], undefined, '键不能是物理列名「审核人一级」')
   assert.equal(form['审核人二级'], undefined, '键不能是物理列名「审核人二级」')
@@ -146,7 +150,7 @@ test('产品信息表:两级审批人默认带出 冯总 / 秀丽(键=字段标�
   const filled = { '审核人（一级审批人）': '张三' }
   applyDocDefaults('RD_PROD_INFO', filled, USER, { isNew: true, today: T })
   assert.equal(filled['审核人（一级审批人）'], '张三', '已有值不应被默认值覆盖')
-  assert.equal(filled['审核人（二级审批人）'], '秀丽', '空值仍应带出默认')
+  assert.equal(filled['审核人（二级审批人）'], '陈秀丽', '空值仍应带出默认')
 })
 
 test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', () => {
@@ -294,4 +298,38 @@ test('版本号占位符只认「版本号」这个 label —— 规格书那条
   const spec = {}
   applyDocDefaults('RD_SPEC_DOC', spec, USER, { isNew: true, today: T })
   assert.deepEqual(spec, {}, '本批默认值不得落到规格书(那边 label 是「版本」不是「版本号」)')
+})
+
+// ── 声明式默认值(yj_panel.config.headDefaults,2026-10-29) ──
+test('headDefaults:只填空格，已有值不覆盖（默认值不是锁死的）', () => {
+  const form = { 密级: '公开' }
+  applyDocDefaults('RD_DOM_TEST', form, USER, {
+    isNew: true,
+    today: T,
+    headDefaults: { 密级: '保密', 文件使用范围: '银嘉内部' },
+  })
+  assert.equal(form['密级'], '公开', '用户已选的密级不能被抢回默认值')
+  assert.equal(form['文件使用范围'], '银嘉内部', '空格要填默认值')
+})
+
+test('headDefaults:都能填时两个都写进去（新增单的初始状态）', () => {
+  const form = {}
+  applyDocDefaults('RD_DOM_TEST', form, USER, {
+    isNew: true,
+    today: T,
+    headDefaults: { 密级: '保密', 文件使用范围: '银嘉内部' },
+  })
+  assert.equal(form['密级'], '保密')
+  assert.equal(form['文件使用范围'], '银嘉内部')
+})
+
+test('headDefaults:不传/为空串时行为与改造前一致（不给别的面板添乱）', () => {
+  const a = {}
+  applyDocDefaults('RD_DOM_TEST', a, USER, { isNew: true, today: T })
+  assert.deepEqual(a, {}, '没声明默认值 ⇒ 不写任何东西')
+
+  const b = { 密级: '公开' }
+  applyDocDefaults('RD_DOM_TEST', b, USER, { isNew: true, today: T, headDefaults: { 密级: '', 文件使用范围: null } })
+  assert.equal(b['密级'], '公开', '空串/null 默认值不得覆盖或写入')
+  assert.ok(!('文件使用范围' in b), 'null 默认值不应写入空键')
 })
