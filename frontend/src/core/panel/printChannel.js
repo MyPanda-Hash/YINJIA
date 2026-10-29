@@ -64,11 +64,17 @@ export function printInPage(title, bodyHtml, opts) {
     style.id = PRINT_CSS_ID
     // 屏幕上完全看不到这一层;打印时只留它,并把 html/body 的高度/溢出复位
     // (`html,body{height:100%}` 是应用外壳的全局样式,多页打印会被它裁掉后面的页)
-    style.textContent = '@media screen{#yj-print-host{display:none!important}}'
+    style.textContent = '@media screen{'
+      // 屏幕上完全看不到这一层(用离屏定位 + 不可见,而不是 display:none:
+      // 有些 Edge 版本在打印预览卡住时 display:none 会连带影响主界面,见下方注释)
+      + '#yj-print-host{position:fixed!important;left:-10000px!important;top:0!important;'
+      + 'width:210mm;opacity:0!important;pointer-events:none!important;z-index:-1!important}'
+      + '}'
       + '@media print{body>*:not(#yj-print-host){display:none!important}'
       + 'html,body{height:auto!important;min-height:0!important;overflow:visible!important;'
       + 'background:#fff!important;margin:0!important;padding:0!important}'
-      + '#yj-print-host{display:block!important;height:auto!important;overflow:visible!important}}'
+      + '#yj-print-host{display:block!important;height:auto!important;overflow:visible!important;'
+      + 'position:static!important;left:auto!important;opacity:1!important;width:auto!important;z-index:auto!important}}'
     document.head.appendChild(style)
     window.addEventListener?.('afterprint', cleanup)
     pendingCleanup = cleanup
@@ -97,23 +103,37 @@ export function printInPage(title, bodyHtml, opts) {
         new Promise((res) => setTimeout(res, 3000)),  // 整体兜底:3 秒还没好就照常打,不能一直等
       ])
     }
+    // 把「等图 + 打印」包一层,并记录开始时间:打印预览若长时间回不来(打印机枚举卡住),
+    // 用户看到的就是整页白屏。这里不做主动打断(主线程被冻时定时器也跑不动),
+    // 但把耗时打到控制台,便于现场确认是"打印机枚举慢"而不是我们的排版慢。
+    const doPrint = () => {
+      const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      try {
+        window.print()
+      } catch {
+        cleanup()
+        return
+      }
+      const cost = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0
+      if (cost > 3000) {
+        // 打印预览超过 3 秒才回来:几乎都是**默认打印机枚举慢**(典型:WSD/网络打印机休眠或离线)。
+        // 打印内容本身只有百来个节点,不可能排这么久(实测 560~630ms 走完 Chrome 的 printToPDF)。
+        console.warn(`[printChannel] window.print() 阻塞了 ${Math.round(cost)}ms —— `
+          + '打印预览要枚举默认打印机,请检查默认打印机是否在线(网络/WSD 打印机常见)。'
+          + '临时办法:把默认打印机换成「Microsoft Print to PDF」或本机 USB 打印机再试。')
+      }
+    }
     // 先等一帧让样式/布局生效,再决定要不要等图片(否则偶发空白页)。
     //   · 打印层里**没有图片**(纯文字单据):与历史行为完全一致,一帧后直接 print;
     //   · 有图片(材料码/标签里的二维码 data URL):等它们解码完再 print ——
-    //     否则打印预览的光栅化会做在 window.print() 内部(同步冻结渲染进程),
-    //     现场表现为"打印时 Edge 未响应,要等很久"(2026-10-29 用户报障)。
+    //     否则打印预览的光栅化会做在 window.print() 内部(同步冻结渲染进程)。
     requestAnimationFrame(() => {
       // ⚠ 用可选调用:单测桩的 DOM 元素没有 querySelectorAll,别让"等图片"这层把打印整条路弄挂
       const imgs = typeof host.querySelectorAll === 'function'
         ? Array.from(host.querySelectorAll('img'))
         : []
-      if (!imgs.length) {
-        try { window.print() } catch { cleanup() }
-        return
-      }
-      imagesReady(imgs).finally(() => {
-        try { window.print() } catch { cleanup() }
-      })
+      if (!imgs.length) { doPrint(); return }
+      imagesReady(imgs).finally(doPrint)
     })
     timer = setTimeout(cleanup, PRINT_GUARD_MS)
     // node --test 里 setTimeout 返回 Timeout 对象:unref 掉,别让单测进程挂着等这 3 分钟
