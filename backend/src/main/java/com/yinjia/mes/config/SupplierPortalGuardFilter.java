@@ -101,6 +101,22 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
         // 同上:单张单据详情(纸质单打印/明细预览取「头+行」)。逐单归属核对在
         // PxController.getFormDescriptor → QueryService.supplierMayReadDoc(别人的单一律 403)。
         if (path.equals(com.yinjia.mes.service.QueryService.FORM_DESCRIPTOR_PATH)) return true;
+        // 材料码打印(2026-10-29 用户报障「供应商登录打印材料码时,直接就显示打印成功了,没有和采购订单一样有弹窗」):
+        // 供应商的「打印」组里有「打印材料码」,它必须先开弹窗填批次号、再登记落库 ——
+        // 这两步走的正是下面两条 /px/puLabel/*。不放行 ⇒ 弹窗取数/登记全 403,界面只剩一句"打印成功"。
+        // 归属核对在 PxController.requireMaterialLabelAccess(只认自己供应商的采购订单,别人的一律 403)。
+        if (path.equals("/api/px/puLabel/dialog")) return true;
+        if (path.equals("/api/px/puLabel/print")) return true;
+        // 批次号锁定查询(只读):供应商面板打开单据时问一次,决定「批次号」是否只读
+        if (path.equals("/api/px/puLabel/batchLock")) return true;
+        // 重打 / 作废(2026-10-29 用户报障「打印材料码的时候作废和重打,都有问题,
+        // 作废显示成功,时间没有变化,重打就是报错 undefined」):
+        // 弹窗的「已打印记录」表格里就有这两颗按钮,客户自己打的码自然要能自己重打/作废
+        // (作废=预约量释放回余量)。**不放行 ⇒ 403,而前端 unwrap 不抛错 ⇒ 界面还显示"成功"**,
+        // 于是表现为"作废成功但记录没变、重打报 undefined"。
+        // 归属核对在 PxController:同样是 requireMaterialLabelAccess(只能动自己订单下的打印单)。
+        if (path.equals("/api/px/puLabel/reprint")) return true;
+        if (path.equals("/api/px/puLabel/void")) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")

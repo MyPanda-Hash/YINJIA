@@ -576,9 +576,15 @@ export async function puLabelPrint(payload) {
   return unwrap(await request.post('/px/puLabel/print', payload))
 }
 
-/** 重打:同一张打印单原样再打一遍(只累加 打印次数,不新增预约 —— 一次一行后由它承担"重打不重复占量") */
+/**
+ * 重打:同一张打印单原样再打一遍(只累加 打印次数,不新增预约 —— 一次一行后由它承担"重打不重复占量")
+ *
+ * ⚠ 2026-10-29 用 unwrapStrict:原来用 unwrap,后端回 403(供应商会话未放行)时**不抛错**,
+ * 只返回 undefined ⇒ 界面弹「已重打(第 undefined 次) undefined」,用户以为打成功了。
+ * 严格版在 code≠200 时抛出,走 catch 显示真实原因。
+ */
 export async function puLabelReprint(docNo) {
-  return unwrap(await request.post('/px/puLabel/reprint', { docNo }))
+  return unwrapStrict(await request.post('/px/puLabel/reprint', { docNo }))
 }
 
 /** 该单据的批次号是否因"来自材料码打印明细"而**不可修改**(含草稿态;前端据此把单头批次号渲染成只读) */
@@ -586,9 +592,14 @@ export async function puLabelBatchLock(panelCode, docNo) {
   return unwrap(await request.get('/px/puLabel/batchLock', { params: { panelCode, docNo } }))
 }
 
-/** 作废打印记录(软删):预约量立即释放回余量 */
+/**
+ * 作废打印记录(软删):预约量立即释放回余量
+ *
+ * ⚠ 2026-10-29 用 unwrapStrict:原来用 unwrap,403 不抛错 ⇒ 界面显示「已作废」但记录纹丝不动
+ * (用户报障「作废显示成功,时间没有变化」)。严格版让失败走到 catch。
+ */
 export async function puLabelVoid(docNo) {
-  return unwrap(await request.post('/px/puLabel/void', { docNo }))
+  return unwrapStrict(await request.post('/px/puLabel/void', { docNo }))
 }
 
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
