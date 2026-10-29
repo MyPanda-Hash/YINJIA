@@ -351,14 +351,24 @@ public class ButtonService {
     }
 
     /**
-     * 新建单据的「版本」默认值(2026-10-16 用户口径:规格书「版本自动生成 V1.0」)。
+     * 新建单据的「版本」默认值(2026-10-16 用户口径「版本自动生成」;**2026-10-29 改格式**)。
      *
-     * <p>⚠ 与 {@link #nextVersionNo}(「版本号」列,四文件面板的 `V<当天日期>-NN`)是**两套口径**:
-     * 规格书这一列叫「版本」,记的是产品版本号 V1.0/V2.0…,不是当天流水号。
+     * <p>2026-10-29 用户口径(产品规格书新版设计图):版本那格写的是「**V+年月日**」
+     * ⇒ 由固定 `V1.0` 改为 `V<yyyy-MM-dd>`(如 `V2026-10-29`)。
+     *
+     * <p>⚠ 与 {@link #nextVersionNo}(「版本号」列,四文件面板的 `V<当天日期>-NN`)仍是**两套列**:
+     * 「版本」= 规格书自己的版本标识(设计口径 V+日期);
+     * 「版本号」= 四文件面板当天流水号。两者互不覆盖。
      * 只在**新建且该格为空**时写入 —— 已有单、以及产品变更单「建下一版草稿」(整单复制,
      * 走 insertRow 不经这里)一律不覆盖,免得把别人推进的版本号抹回去。
      */
-    private static final Map<String, String> NEW_DOC_VERSION = Map.of("RD_SPEC_DOC", "V1.0");
+    private static final java.util.Set<String> NEW_DOC_VERSION_DATE_PANELS = java.util.Set.of("RD_SPEC_DOC");
+
+    /** 新建单据的「版本」默认值;不在表里 ⇒ null(不写)。见 {@link #NEW_DOC_VERSION_DATE_PANELS} */
+    private static String newDocVersion(String panelCode) {
+        if (panelCode == null || !NEW_DOC_VERSION_DATE_PANELS.contains(panelCode)) return null;
+        return "V" + LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    }
 
     /**
      * 「版本号」建单自动带出:`V<当天日期>-<当日流水两位>`(如 V2026-10-15-01)。
@@ -477,8 +487,8 @@ public class ButtonService {
                 // 同一天建第二张单版本号一模一样 ⇒ 必须加序列数,如 V2026-10-15-01。
                 String vno1 = nextVersionNo(table);
                 if (vno1 != null && !cols.containsKey("版本号")) cols.put("版本号", vno1);
-                // 「版本」默认值(2026-10-16 用户口径「版本自动生成 V1.0」):仅规格书,仅新建且该格为空
-                String vdef1 = NEW_DOC_VERSION.get(def.code());
+                // 「版本」默认值(2026-10-29 口径「V+年月日」):仅规格书,仅新建且该格为空
+                String vdef1 = newDocVersion(def.code());
                 if (vdef1 != null && !cols.containsKey("版本") && tableCols(table).contains("版本")) {
                     cols.put("版本", vdef1);
                 }
@@ -527,8 +537,8 @@ public class ButtonService {
                     && (head.get("版本号") == null || String.valueOf(head.get("版本号")).isBlank())) {
                 head.put("版本号", vno2);
             }
-            // 「版本」默认值:同空白草稿分支口径(规格书 V1.0),仅新建且为空时写
-            String vdef2 = NEW_DOC_VERSION.get(def.code());
+            // 「版本」默认值:同空白草稿分支口径(V+年月日),仅新建且为空时写
+            String vdef2 = newDocVersion(def.code());
             if (vdef2 != null && def.byLabel("版本") != null
                     && (head.get("版本") == null || String.valueOf(head.get("版本")).isBlank())) {
                 head.put("版本", vdef2);

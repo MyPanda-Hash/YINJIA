@@ -4187,3 +4187,4 @@ migrate-rd-editor-stamp-20261028.sql
 #   物理列保留,历史值不丢。
 migrate-drop-insp-docno-default-20261028.sql
 migrate-insp-docno-unregister-20261028.sql
+migrate-prodinfo-bom-20261029.sql

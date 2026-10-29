@@ -2456,6 +2456,9 @@ export default {
     '从物料清单引用(选父件,导入其全部子件)': 'Reference from BOM (pick a parent to import all its components)',
     /* ── 2026-10-21:关键物料列表改为「从商品引用」(数据源 = 商品档案 INV,四栏级联收窄) ── */
     '从商品引用': 'Pick from Goods',
+    // 2026-10-29 产品信息表「三、产品BOM表」的引用按钮文案(设计图右侧批注原话);
+    // 取数机制与「从商品引用」完全相同,只是这张单上的业务说法不同(见 recordSheetConfigs.RD_PROD_INFO.dataTables)。
+    '直接导入采购物料清单': 'Import Purchase Material List',
     '从商品档案引用(按 所属类别/存货编码/存货名称/规格型号 逐项收窄后勾选)': 'Pick from the goods master (each of category / code / name / spec narrows the rest)',
     '清空筛选': 'Clear filters',
     '还有 {n} 项，输入关键字筛选': '{n} more — type to filter',

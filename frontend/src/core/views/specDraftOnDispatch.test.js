@@ -85,13 +85,18 @@ test('主要性能描述 ↔ 产品主要性能 走参照同义词(两侧标签�
     '自动建草稿那条路也按同一对应关系带值')
 })
 
-test('新建规格书的「版本」自动生成 V1.0(仅新建且为空时写)', () => {
-  assert.match(buttons, /NEW_DOC_VERSION = Map\.of\("RD_SPEC_DOC", "V1\.0"\)/, '默认值表要有规格书')
-  assert.match(buttons, /String vdef1 = NEW_DOC_VERSION\.get\(def\.code\(\)\);[\s\S]{0,220}?cols\.put\("版本", vdef1\);/,
+test('新建规格书的「版本」自动生成 V+年月日(仅新建且为空时写)', () => {
+  // 2026-10-29 用户口径(产品规格书新版设计图):版本那格写「V+年月日」
+  // ⇒ 由固定 V1.0 改为 V<yyyy-MM-dd>(如 V2026-10-29)。
+  assert.match(buttons, /NEW_DOC_VERSION_DATE_PANELS = java\.util\.Set\.of\("RD_SPEC_DOC"\)/,
+    '默认值表要有规格书')
+  assert.match(buttons, /private static String newDocVersion\(String panelCode\)[\s\S]{0,260}?"V" \+ LocalDate\.now\(\)\.format\([\s\S]{0,80}?"yyyy-MM-dd"/,
+    '版本默认值必须是 V+年月日(不是固定 V1.0)')
+  assert.match(buttons, /String vdef1 = newDocVersion\(def\.code\(\)\);[\s\S]{0,220}?cols\.put\("版本", vdef1\);/,
     '空白草稿分支要写(自动建规格书草稿走的正是这一支)')
-  assert.match(buttons, /String vdef2 = NEW_DOC_VERSION\.get\(def\.code\(\)\);[\s\S]{0,260}?def\.byLabel\("版本"\) != null[\s\S]{0,200}?head\.put\("版本", vdef2\);/,
+  assert.match(buttons, /String vdef2 = newDocVersion\(def\.code\(\)\);[\s\S]{0,260}?def\.byLabel\("版本"\) != null[\s\S]{0,200}?head\.put\("版本", vdef2\);/,
     '带明细新建分支同口径')
-  // 不能覆盖已有版本(变更单「建下一版」是整单复制,不该被抹回 V1.0)
+  // 不能覆盖已有版本(变更单「建下一版」是整单复制,不该被抹回默认值)
   assert.ok(!/UPDATE\s+\w+\s+SET\s+\[?版本\]?\s*=/.test(buttons), '不该有"UPDATE 版本"这种回写')
   assert.match(buttons, /if \(vdef1 != null && !cols\.containsKey\("版本"\)/, '只在没有值时写')
 })

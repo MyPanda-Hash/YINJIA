@@ -241,7 +241,7 @@
             <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
                   :title="tt('从商品档案引用(按 所属类别/存货编码/存货名称/规格型号 逐项收窄后勾选)')"
                   @click.stop="openMaterialPick(materialPickAt(sec))">
-              <el-icon><Collection /></el-icon>{{ tt('从商品引用') }}
+              <el-icon><Collection /></el-icon>{{ tt(materialPickLabelOf(sec)) }}
             </span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
@@ -789,7 +789,7 @@
             <span v-if="materialPickAt(sec) && editable" class="rs-tool no-print"
                   :title="tt('从商品档案引用(按 所属类别/存货编码/存货名称/规格型号 逐项收窄后勾选)')"
                   @click.stop="openMaterialPick(materialPickAt(sec))">
-              <el-icon><Collection /></el-icon>{{ tt('从商品引用') }}
+              <el-icon><Collection /></el-icon>{{ tt(materialPickLabelOf(sec)) }}
             </span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-tool no-print" @click.stop="openFieldEdit"><el-icon><EditPen /></el-icon>{{ tt('字段编辑') }}</span>
           </span>
@@ -1334,7 +1334,7 @@
          ⇒ 顶部四栏 = 商品列表的四列(所属类别 / 存货编码 / 存货名称 / 规格型号),四栏互为筛选项:
            选了「所属类别」,另外三栏的候选就只剩这一类里的值(纯函数见 @core/panel/goodsPick.js)。
          ⇒ 勾选后按 物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 / 备注←商品备注 落行。 -->
-    <el-dialog v-model="matPickVisible" :title="tt('从商品引用')" width="900px" append-to-body>
+    <el-dialog v-model="matPickVisible" :title="tt(matPickTitle)" width="900px" append-to-body>
       <div class="gp-bar">
         <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
           <span class="gp-filter-label">{{ tt(f.key) }}</span>
@@ -2002,6 +2002,24 @@ function materialPickAt(sec) {
   return (c.dataTables || []).find((d) =>
     d.materialPick && !d.bar && d.tablesAfterBar === sec.bar && pageOf(d) === pageOf(sec)) || null
 }
+
+/**
+ * 「从…引用」按钮的**文案** —— 由表的 `materialPickLabel` 决定,缺省仍是「从商品引用」。
+ *
+ * 为什么可配:同一个取数机制(商品档案 INV)在不同单据上的业务说法不一样 ——
+ *   规格书第 4 页叫「从商品引用」;
+ *   产品信息表新版「三、产品BOM表」设计要求写「直接导入采购物料清单」(2026-10-29 设计图右侧批注)。
+ * 只改纸面上的字,不动取数源、不动落点映射。
+ */
+function materialPickLabelOf(sec) {
+  const dt = materialPickAt(sec)
+  return (dt && dt.materialPickLabel) || '从商品引用'
+}
+/** 弹窗标题跟随按钮文案(同一张表的按钮叫「直接导入采购物料清单」,弹窗标题却写「从商品引用」会很割裂) */
+const matPickTitle = computed(() => {
+  const dt = matPickTargetDt.value
+  return (dt && dt.materialPickLabel) || '从商品引用'
+})
 
 watch(() => props.panelCode, () => { activePage.value = 0; loadStdLibs() }, { immediate: true })
 
@@ -3408,7 +3426,8 @@ function confirmMaterialPick() {
     if (!row) continue
     // 序号:按本表区已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
     if (colKeys.includes('序号')) row['序号'] = String(rows.length)
-    for (const k of ['物料编码', '物料名称', '规格参数', '备注']) {
+    // 落点列名按目标表实际列名落(两套叫法并存:规格书=物料编码/规格参数,产品信息表BOM=物料编号/尺寸规格)
+    for (const k of ['物料编码', '物料编号', '物料名称', '规格参数', '尺寸规格', '备注']) {
       if (k in p) row[k] = p[k]
     }
     added++
