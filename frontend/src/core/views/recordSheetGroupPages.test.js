@@ -50,11 +50,13 @@ test('导出 PDF：按「页 × 组」两层出纸，且收尾还原页签与分
 })
 
 test('打印：多组时先出 PDF 再打印（window.print 只能印当前 DOM）', () => {
-  const fn = list.slice(list.indexOf('async function printApprovalSheet'), list.indexOf('async function printApprovalSheet') + 1800)
+  const fn = list.slice(list.indexOf('async function printApprovalSheet'), list.indexOf('async function printApprovalSheet') + 2600)
   assert.match(fn, /const groups = Array\.isArray\(comp\?\.groupPages\)/, '打印要读 groupPages')
-  assert.match(fn, /if \(groups\.length > 1\)/, '多组走 PDF 路径')
+  // 2026-10-29 条件扩成「多页签 或 多组」:多页签同样只能靠逐张截图出纸
+  // (window.print 只印当前页签那一张)。见 sheetPrintAllTabs.test.js。
+  assert.match(fn, /if \(pageCount > 1 \|\| groups\.length > 1\)/, '多页签或多组都走 PDF 路径')
   assert.match(fn, /buildSheetPdfBlob\(\)/, '与导出共用同一份实现')
-  // 单组/非分组面板仍走老的 window.print()
+  // 单组/单页面板仍走老的 window.print()
   assert.match(fn, /window\.print\(\)/, '单组保留原生打印路径')
 })
 
