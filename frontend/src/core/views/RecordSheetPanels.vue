@@ -1398,41 +1398,61 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 从商品引用(数据源 = 商品档案 INV → bs_inv,2026-10-21 用户口径)═══
-         用户原话:「把规格书的从物料清单引用进行一个修改,首先是把引用的数据内容改为引用商品里面的数据,
-         弹窗可以通过上面那些信息来索引数据,然后勾选填写进去,**每进行一个字段的填写,其他选项就可以
-         对应的范围缩小**,方便查找」。
-         ⇒ 顶部四栏 = 商品列表的四列(所属类别 / 存货编码 / 存货名称 / 规格型号),四栏互为筛选项:
-           选了「所属类别」,另外三栏的候选就只剩这一类里的值(纯函数见 @core/panel/goodsPick.js)。
-         ⇒ 勾选后按 物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 / 备注←商品备注 落行。 -->
+    <!-- ═══ 物料/商品引用弹窗 —— **两条源,由表的 materialPickSource 决定** ═══
+         ① 'mate' = 物料清单(WLBOM)—— 规格书「1.关键物料列表」用这条
+            (2026-10-29 用户口径「规格书的从商品引用改回去引用物料清单」)。
+            历史:2026-10-13 恢复 WLBOM 链路 → 2026-10-21 换成商品档案 → 2026-10-29 改回。
+            弹窗列 = 物料编码 / 单据日期 / 物料代码 / 物料名称,**勾的是整张物料清单单**,
+            确认时把该单全部子件展开逐行落(数量 ← 标准用量)。
+         ② 'goods' = 商品档案(INV)—— 产品信息表「三、产品BOM表」用这条。
+            顶部四栏互为筛选项(所属类别/存货编码/存货名称/规格型号),
+            勾选后 物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 落行。
+            数量**不带**(商品档案没有用量口径)。 -->
     <el-dialog v-model="matPickVisible" :title="tt(matPickTitle)" width="900px" append-to-body>
-      <div class="gp-bar">
-        <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
-          <span class="gp-filter-label">{{ tt(f.key) }}</span>
-          <el-select
-            v-model="matPickFilters[f.key]"
-            size="small"
-            filterable
-            clearable
-            :placeholder="tt('全部')"
-            class="gp-filter-select"
-          >
-            <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
-          </el-select>
-          <span v-if="f.more" class="gp-more">{{ tt('还有 {n} 项，输入关键字筛选').replace('{n}', String(f.more)) }}</span>
+      <!-- ── 源 ①:物料清单单(表头),整单带入子件 ── -->
+      <template v-if="matPickSource === 'mate'">
+        <el-table v-loading="matPickLoading" :data="matPickRows" size="small" border max-height="420"
+                  row-key="__k" @selection-change="onMatPickSelection">
+          <el-table-column type="selection" width="42" />
+          <el-table-column prop="物料编码" :label="tt('物料编码')" width="150" show-overflow-tooltip />
+          <el-table-column prop="单据日期" :label="tt('单据日期')" width="120" show-overflow-tooltip />
+          <el-table-column prop="物料代码" :label="tt('物料代码')" width="150" show-overflow-tooltip />
+          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="240" show-overflow-tooltip />
+          <el-table-column :label="tt('子件数')" width="90" align="right">
+            <template #default="{ row }">{{ (row.__kids || []).length }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+      <!-- ── 源 ②:商品档案(四栏级联收窄 + 勾选落行)── -->
+      <template v-else>
+        <div class="gp-bar">
+          <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
+            <span class="gp-filter-label">{{ tt(f.key) }}</span>
+            <el-select
+              v-model="matPickFilters[f.key]"
+              size="small"
+              filterable
+              clearable
+              :placeholder="tt('全部')"
+              class="gp-filter-select"
+            >
+              <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
+            </el-select>
+            <span v-if="f.more" class="gp-more">{{ tt('还有 {n} 项，输入关键字筛选').replace('{n}', String(f.more)) }}</span>
+          </div>
+          <el-button size="small" text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
         </div>
-        <el-button size="small" text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
-      </div>
-      <el-table v-loading="matPickLoading" :data="matPickFiltered" size="small" border max-height="420"
-                row-key="__k" @selection-change="onMatPickSelection">
-        <el-table-column type="selection" width="42" />
-        <el-table-column prop="所属类别" :label="tt('所属类别')" width="130" show-overflow-tooltip />
-        <el-table-column prop="存货编码" :label="tt('存货编码')" width="150" show-overflow-tooltip />
-        <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="230" show-overflow-tooltip />
-        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="190" show-overflow-tooltip />
-        <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" align="center" />
-        <el-table-column prop="备注" :label="tt('备注')" min-width="140" show-overflow-tooltip />
-      </el-table>
+        <el-table v-loading="matPickLoading" :data="matPickFiltered" size="small" border max-height="420"
+                  row-key="__k" @selection-change="onMatPickSelection">
+          <el-table-column type="selection" width="42" />
+          <el-table-column prop="所属类别" :label="tt('所属类别')" width="130" show-overflow-tooltip />
+          <el-table-column prop="存货编码" :label="tt('存货编码')" width="150" show-overflow-tooltip />
+          <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="230" show-overflow-tooltip />
+          <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="190" show-overflow-tooltip />
+          <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" align="center" />
+          <el-table-column prop="备注" :label="tt('备注')" min-width="140" show-overflow-tooltip />
+        </el-table>
+      </template>
       <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
@@ -2168,22 +2188,27 @@ function materialPickAt(sec) {
 }
 
 /**
- * 「从…引用」按钮的**文案** —— 由表的 `materialPickLabel` 决定,缺省仍是「从商品引用」。
+ * 「从…引用」按钮的**文案** —— 由表的 `materialPickLabel` 决定。
  *
- * 为什么可配:同一个取数机制(商品档案 INV)在不同单据上的业务说法不一样 ——
- *   规格书第 4 页叫「从商品引用」;
- *   产品信息表新版「三、产品BOM表」设计要求写「直接导入采购物料清单」(2026-10-29 设计图右侧批注)。
- * 只改纸面上的字,不动取数源、不动落点映射。
+ * 两种取数源各有缺省文案(`materialPickSource`):
+ *   · 'goods'(缺省)= 商品档案 INV ⇒ 「从商品引用」(产品信息表「三、产品BOM表」用这条);
+ *   · 'mate'       = 物料清单 WLBOM ⇒ 「从物料清单引用」(规格书「1.关键物料列表」用这条)。
+ * 各表也可以用 `materialPickLabel` 逐表覆盖文案(如「直接导入采购物料清单」)。
  */
+function defaultPickLabel(dt) {
+  return (dt && dt.materialPickSource === 'mate') ? '从物料清单引用' : '从商品引用'
+}
 function materialPickLabelOf(sec) {
   const dt = materialPickAt(sec)
-  return (dt && dt.materialPickLabel) || '从商品引用'
+  return (dt && dt.materialPickLabel) || defaultPickLabel(dt)
 }
 /** 弹窗标题跟随按钮文案(同一张表的按钮叫「直接导入采购物料清单」,弹窗标题却写「从商品引用」会很割裂) */
 const matPickTitle = computed(() => {
   const dt = matPickTargetDt.value
-  return (dt && dt.materialPickLabel) || '从商品引用'
+  return (dt && dt.materialPickLabel) || defaultPickLabel(dt)
 })
+/** 本次引用走哪条源(弹窗模板按它切列)'goods' = 商品档案 / 'mate' = 物料清单(WLBOM) */
+const matPickSource = computed(() => (matPickTargetDt.value?.materialPickSource === 'mate' ? 'mate' : 'goods'))
 
 watch(() => props.panelCode, () => { activePage.value = 0; loadStdLibs() }, { immediate: true })
 
@@ -3889,6 +3914,16 @@ const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facet
 const matPickFiltered = computed(() => matchGoods(matPickRows.value, matPickFilters))
 const matPickHint = computed(() => {
   if (matPickLoading.value) return tt('加载中…')
+  // 源 ①:物料清单 —— 勾的是整张单,提示要说清「整单子件会全部带入」
+  if (matPickSource.value === 'mate') {
+    const n = matPickRows.value.length
+    if (!n) return tt('物料清单里还没有数据')
+    const kids = matPickRows.value.reduce((s, m) => s + (m.__kids || []).length, 0)
+    return tt('共 {n} 张物料清单、{m} 个子件；勾选物料清单后点「引用」，整单子件追加到本表明细')
+      .replace('{n}', String(n)).replace('{m}', String(kids))
+      + (matPickChecked.value.length ? tt('；已选 {c} 张').replace('{c}', String(matPickChecked.value.length)) : '')
+  }
+  // 源 ②:商品档案 —— 四栏级联,勾单条存货
   const all = matPickRows.value.length
   const hit = matPickFiltered.value.length
   if (!all) return tt('商品档案里还没有数据')
@@ -3905,14 +3940,34 @@ async function openMaterialPick(dt) {
   matPickVisible.value = true
   matPickLoading.value = true
   try {
+    if (dt && dt.materialPickSource === 'mate') {
+      // ── 源 ①:物料清单(WLBOM)—— 勾的是**整张单**,子件挂在 __kids 上等确认时展开 ──
+      // 用户可以点名的四列:物料编码 / 单据日期 / 物料代码 / 物料名称。
+      // WLBOM 是单据面板,子件在 detail.items(children 是旧 BOM 主从形状,留作兜底)。
+      const res = await request.post('/px/queryFormDataList', { panelCode: 'WLBOM', condition: {}, pageNo: 1, pageSize: 500 })
+      const masters = res?.data?.list || res?.data?.rows || res?.data?.data || []
+      matPickRows.value = (Array.isArray(masters) ? masters : []).map((m, i) => {
+        const kids = m?.detail?.items || m?.detail?.children || []
+        return {
+          __k: `${m?.['物料编码'] || ''}#${i}`,
+          __kids: Array.isArray(kids) ? kids : [],
+          物料编码: m?.['物料编码'] || '',
+          单据日期: m?.['单据日期'] || '',
+          物料代码: m?.['物料代码'] || m?.['物料编码'] || '',
+          物料名称: m?.['物料名称'] || '',
+        }
+      })
+      return
+    }
+    // ── 源 ②:商品档案(INV)──
     // 档案型面板不吃 pageSize(必须全量返回,见 QueryService.queryArchive 注释);
-    // 不带 keyword ⇒ 一次拿全 3917 行,级联筛选全在本地做(打开弹窗一次,之后零请求)。
+    // 不带 keyword ⇒ 一次拿全,级联筛选全在本地做(打开弹窗一次,之后零请求)。
     const res = await request.post('/px/queryFormDataList', { panelCode: INV_PANEL, condition: {}, pageNo: 1, pageSize: 20 })
     const rows = invRowsOf(res?.data ?? res)
     matPickRows.value = rows.map((r, i) => ({ ...r, __k: `${r?.['存货编码'] || ''}#${i}` }))
   } catch (e) {
     matPickRows.value = []
-    ElMessage.error(tt('取商品档案失败'))
+    ElMessage.error(matPickSource.value === 'mate' ? tt('取物料清单失败') : tt('取商品档案失败'))
   } finally {
     matPickLoading.value = false
   }
@@ -3930,22 +3985,57 @@ function confirmMaterialPick() {
   const dt = matPickTargetDt.value
   if (!dt) return
   const colKeys = (dt.cols || []).map((c) => c.key)
-  const existCodes = rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean)
-  const { rows: picked, skipped } = goodsToDetail(matPickChecked.value, existCodes, colKeys)
+  // 现有编码集合:两条源都用它判重(重复点引用不灌重复行)
+  const existSet = new Set(rowsOf(dt).map((r) => String(r['物料编码'] || r['物料编号'] || '').trim()).filter(Boolean))
   let added = 0
-  for (const p of picked) {
-    addRow(dt)
-    const rows = rowsOf(dt)
-    const row = rows[rows.length - 1]
-    if (!row) continue
-    // 序号:按本表区已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
-    if (colKeys.includes('序号')) row['序号'] = String(rows.length)
-    // 落点列名按目标表实际列名落(两套叫法并存:规格书=物料编码/规格参数,产品信息表BOM=物料编号/尺寸规格)
-    for (const k of ['物料编码', '物料编号', '物料名称', '规格参数', '尺寸规格', '备注']) {
-      if (k in p) row[k] = p[k]
+  let skipped = 0
+
+  if (matPickSource.value === 'mate') {
+    // ── 源 ①:物料清单 —— 勾的是整张单,把它**全部子件**展开逐行落 ──
+    // 映射(与原实现逐字一致,已活体验证):
+    //   物料编码 ← 子件代码 / 物料名称 ← 子件名称 / 规格参数 ← 规格型号 /
+    //   数量 ← **标准用量**(这是商品档案没有、而物料清单有的关键一列)/
+    //   备注 ← 该行有内容才带(空串不覆盖人手写的内容)。
+    for (const master of matPickChecked.value) {
+      const kids = Array.isArray(master.__kids) ? master.__kids : []
+      for (const r of kids) {
+        const code = String(r['子件代码'] || '').trim()
+        if (!code) continue
+        if (existSet.has(code)) { skipped++; continue }
+        addRow(dt)
+        const rows = rowsOf(dt)
+        const row = rows[rows.length - 1]
+        if (!row) continue
+        if (colKeys.includes('序号')) row['序号'] = String(rows.length)
+        if (colKeys.includes('物料编码')) row['物料编码'] = code
+        if (colKeys.includes('物料名称')) row['物料名称'] = r['子件名称'] || ''
+        if (colKeys.includes('规格参数')) row['规格参数'] = r['规格型号'] || ''
+        if (colKeys.includes('数量')) row['数量'] = r['标准用量'] ?? ''
+        if (colKeys.includes('备注')) row['备注'] = String(r['备注'] ?? '').trim()
+        existSet.add(code)
+        added++
+      }
     }
-    added++
+  } else {
+    // ── 源 ②:商品档案 —— 映射走纯函数 goodsToDetail(已单测);数量**不带** ──
+    const existCodes = rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean)
+    const { rows: picked, skipped: sk } = goodsToDetail(matPickChecked.value, existCodes, colKeys)
+    for (const p of picked) {
+      addRow(dt)
+      const rows = rowsOf(dt)
+      const row = rows[rows.length - 1]
+      if (!row) continue
+      // 序号:按本表区已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
+      if (colKeys.includes('序号')) row['序号'] = String(rows.length)
+      // 落点列名按目标表实际列名落(两套叫法并存:规格书=物料编码/规格参数,产品信息表BOM=物料编号/尺寸规格)
+      for (const k of ['物料编码', '物料编号', '物料名称', '规格参数', '尺寸规格', '备注']) {
+        if (k in p) row[k] = p[k]
+      }
+      added++
+    }
+    skipped = sk
   }
+
   matPickChecked.value = []
   matPickVisible.value = false
   emit('dirty')

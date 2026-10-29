@@ -1663,7 +1663,13 @@ export const recordSheetConfigs = {
       //    弹窗列 → 数据键的对应关系见 RecordSheetPanels.vue 的 openMaterialPick 注释
       //    (「物料代号」在 mate 里没有独立列,取的是物料清单表头「物料代码」wzdm1 ——
       //     该键由 QueryService 合并在每条子件行上,现成可用)。
-      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true,
+        // 2026-10-29 用户口径「规格书的从商品引用改回去引用物料清单」:
+        //   引用源 = **物料清单(WLBOM)** —— 勾整张物料清单单,该单全部子件展开落行,
+        //   数量 ← 标准用量(商品档案没有这一列,这也正是当初换回物料清单的关键原因)。
+        // 沿革:2026-10-13 WLBOM → 2026-10-21 改商品档案 → 2026-10-29 改回 WLBOM。
+        // 产品信息表「三、产品BOM表」仍是商品档案(那边没有声明 materialPickSource)。
+        materialPickSource: 'mate', cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
