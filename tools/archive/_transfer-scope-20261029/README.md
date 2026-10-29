@@ -12,6 +12,8 @@
 | `check-sfc.mjs` | 沙箱里 `npm run build` 会因 esbuild spawn EPERM,用 `@vue/compiler-sfc` 纯 JS 校验改过的 SFC 语法 |
 | `qa-transfer.ps1` | **正式库(8090)** 接口验收:候选线只出本工序 + 错投被拒 + 未发生写入(只跑"该被拒"分支) |
 | `qa-transfer-success.ps1` | **测试库(8091 实例)** 成功路径:同工序换线 → 轨迹 → 撤回调拨回原线 |
+| `qa-postmerge.ps1` | 2026-10-30 合并 `origin/main` 后**重建 jar 的 8090** 上重跑:本任务回归 + 相关接口冒烟 |
+| `ProbeTestDb.java` | 只读:测试库 `HSDZ_MES_TEST` 是否已跟上新增对象/列(两账套核对) |
 
 跑法:
 
@@ -59,3 +61,25 @@ MO-2026-09-0004#1(行id=26,当前工序=成型,原线 成型2线)
 ```
 
 ⚠ 该测试库行/轨迹是测试账套里的验收留痕(不是正式库数据),保留可作证据。
+
+## 2026-10-30 合并 `origin/main` 后复验(合并 04e9672a / 静态同步 cc20b19c)
+
+并行会话在 10-30 00:04~00:19 完成了 `origin/main`(61 提交)的合并;合并把后端 61 个提交带进来了,
+**但运行时 jar 还是合并前的**(00:06 那次构建)⇒ 本次收尾:停 8090 → `mvn clean package -DskipTests`
+(JDK 25;fat jar 97,573,090 B / `BOOT-INF/lib` 129 条)→ `start-prod.ps1` 重启。
+
+```
+① 启动时数据库增量同步:执行 0 / 跳过 661 / 失败 0(合并带来的迁移此前已应用)
+② 两账套核对(ProbeTestDb.java,HSDZ_MES_TEST):wo_day_plan、wo_proc_card_head/detail、
+   wo_process_line.计划开工/完工日期、yj_form_approval.self_audit 全 [有];yj_schema_log 689 条登记 ⇒ 测试库已跟上
+③ 四单回归闸 verify/FourDocAudit.java HSDZ_MES → [PASS](四单 327 行:多 0 / 缺 0 / 内容变 0 / 名次不符 0)
+④ 本任务回归(qa-postmerge.ps1,仍是 GD-2026-10-0227#1,成型,现线 2号车间):
+   候选 18 条成型线(不含原线,候选车间只有「成型」);调到「切炭线」→ 409 且列全候选线;
+   旧入口 /reassign → 409;该行仍在 2号车间(零写入)
+⑤ 冒烟:lineSummary 30 条(成型 19/切炭 5/组装 6)、stats、生产工单列表 390 行、工单追溯 15 段、
+   日排产·读 200(说明上一轮未提交的日排产后端也随工作区编进了新 jar)
+```
+
+合并本身**没有改动**本任务的 5 个文件(`git diff 08b0f6cf..HEAD -- <5 files>` 为空),
+所以上面 2026-10-29 的口径与验收结论继续有效。
+
