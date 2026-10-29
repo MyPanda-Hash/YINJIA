@@ -4717,6 +4717,10 @@ export default {
     '取产品信息表失败': 'Failed to load Product Info',
     '该产品编号已经引用过产品规格书，不能再引用': 'This product No. is already used by a spec sheet and cannot be referenced again',
     '已引用产品信息表 {no}，带入 {n} 项': 'Referenced Product Info {no}; {n} fields filled in',
+    /* 2026-10-29 规格书关键物料列表改为「按产品编号从产品信息表 BOM 整表重带」后的三条提示 */
+    '取产品信息表 BOM 明细失败，关键物料列表未带入': 'Could not read that Product Info BOM; Key Materials was left unchanged',
+    '已按产品信息表的 BOM 明细带入 {n} 行关键物料': 'Filled {n} Key Material rows from the Product Info BOM',
+    '该产品信息表还没有 BOM 明细，关键物料列表已清空': 'That Product Info document has no BOM lines; Key Materials was cleared',
     '物料代号': 'Item Alias',
     '搜索子件代码/名称': 'Search item code / name',
     '数据源：物料清单': 'Source: Bill of Materials',
