@@ -1670,7 +1670,15 @@ const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
-/** 动态列变体:按头字段值解析(加标水经 variantOptions 映射/委托单直取),缺省第一个变体 */
+/** 动态列变体:按头字段值解析(加标水经 variantOptions 映射/委托单直取),缺省第一个变体。
+ *
+ *  ⚠ 2026-10-29「工艺形态改为可维护标准库」后新增的一条:**配置里没有的自定义变体**。
+ *  变体字段(工艺形态)现在是标准库字段,用户可以在「⧉ 标准库维护」里自己加一个形态(如「半成品A」),
+ *  而 variants 的键只有设计那 4 个 ⇒ 原来直接回落到 Object.keys(vs)[0],结果是:
+ *    选了「半成品A」→ 纸上标题印成「…---裸棒」、列集也用裸棒那一套(看起来像选错了变体)。
+ *  现在为未登记的变体造一个**按名字派生**的骨架:标题「<面板变体标题前缀>---<变体名>」,
+ *  列集/网格沿用第一个变体的骨架(工艺形态本身不切列集,只切标题;内容由 asm.proc 勾选带入)。
+ *  已登记的变体走原路径,逐字不变。 */
 const activeVariant = computed(() => {
   const vs = cfg.value?.variants
   if (!vs) return null
@@ -1679,10 +1687,23 @@ const activeVariant = computed(() => {
     if (vs[val]) return { name: val, ...vs[val] }
     const opt = (cfg.value.variantOptions || []).find((o) => o.value === val)
     if (opt && vs[opt.variant]) return { name: opt.variant, ...vs[opt.variant] }
+    // 未登记的自定义变体:沿用首个变体的骨架 + 按名字派生标题
+    const first = Object.keys(vs)[0]
+    const base = vs[first] || {}
+    const derived = variantTitleOf(first, String(val))
+    return { name: String(val), ...base, ...(derived ? { plainTitle: derived } : {}), custom: true }
   }
   const first = Object.keys(vs)[0]
   return { name: first, ...vs[first] }
 })
+/** 由已登记变体的标题推出同款标题,把结尾的变体名换掉。
+ *  例:'炭棒滤芯组装/包装段-关键工序控制清单---裸棒' → '…---半成品A';
+ *  推不出来(标题不以变体名结尾)时返回空串,交给上层退回面板级 plainTitle,不乱编。 */
+function variantTitleOf(baseName, name) {
+  const t = cfg.value?.variants?.[baseName]?.plainTitle
+  if (!t || !baseName || !t.endsWith(baseName)) return ''
+  return t.slice(0, t.length - baseName.length) + name
+}
 const variantOptions = computed(() => {
   if (cfg.value?.variantOptions) return cfg.value.variantOptions.map((o) => ({ value: o.value, label: o.value }))
   return selectOptions(cfg.value?.variantKey)

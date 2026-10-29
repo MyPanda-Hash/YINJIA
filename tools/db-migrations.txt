@@ -4296,6 +4296,11 @@ migrate-rd-domtest-link-20261029.sql
 # 2026-10-29 测试申请单:右上角改显单据编号;新建默认 密级=保密/文件使用范围=银嘉内部(config.headDefaults)。两账套都执行。
 migrate-rd-domtest-docno-headdefaults-20261029.sql
 
+# 2026-10-29 组装工艺清单「工艺形态」改为**标准库**(data_type=标准库 / dict_sql=asm.form),
+#   可在「⧉ 标准库维护」里新增/删除/停用;asm.form(形态候选词)与 asm.proc(关键控制清单内容)是两个库。
+#   两账套都执行。
+migrate-asm-proc-form-stdlib-20261029.sql
+
 # 2026-10-29 删除 8 张数据记录表上无人使用的「测试申请单编号」列(关联判据改为「文档编号」)。
 #   删前已核实:两账套该列非空行数全 0;脚本内置守卫(有数据即中止)。两账套都执行。
 migrate-drop-domtest-link-col-20261029.sql

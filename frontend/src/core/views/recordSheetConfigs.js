@@ -166,7 +166,14 @@ const RD_ASM_PROC_DT_BOM = {
 
 /** 三个页签的「产品基本信息」区(设计两张表都有 B9:G9 这一块,格子相同)
  *  按用户口径只保留设计的四格 + 工艺形态(驱动 4 个关键控制清单变体的字段)——
- *  产品名称/产品种类/成品重量/整体规格(外径)/整体规格(长度) 已置 visible=0 退出编辑面板。 */
+ *  产品名称/产品种类/成品重量/整体规格(外径)/整体规格(长度) 已置 visible=0 退出编辑面板。
+ *
+ *  ⚠ 工艺形态 = **标准库字段**(2026-10-29 用户口径「组装工艺清单的所有 tap 的工艺形态改为标准库,
+ *    可以自己新增删除维护」):yj_field.data_type='标准库' + dict_sql='asm.form'
+ *    (迁移 tools/migrate-asm-proc-form-stdlib-20261029.sql)。
+ *    渲染不需要在这里写 stdLib —— stdLibOf(key) 查的是后端 fieldSpec 下发的 stdLib,
+ *    「⧉ 标准库维护」入口按元数据自动出现(见 RecordSheetPanels 的 pair 分支)。
+ *    asm.form(形态候选词)与 asm.proc(关键控制清单内容)**是两个库**,不要合并。 */
 const RD_ASM_PROC_INFO_SEC = (page) => ({
   page,
   bar: '产品基本信息',
