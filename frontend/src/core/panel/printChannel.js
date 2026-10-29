@@ -30,10 +30,16 @@ let pendingCleanup = null
  * 在**当前页面**打印一段独立 HTML(不弹窗、不 document.write、不在子窗口里 print)。
  * @param {string} title 打印期间的 document.title(打印页眉/另存 PDF 的默认文件名)
  * @param {string} bodyHtml 待打印内容(可带 <style>);建议自带 `@page{size:…}` 控制纸张
+ * @param {Object} [opts] 可选项
+ * @param {Function} [opts.onDone] **打印结束**(afterprint / 兜底清理)后回调一次。
+ *   用途:调用方原来在 `window.print()` 之后**紧接着**刷新数据/重绘 —— 而打印对话框打开期间
+ *   渲染进程被浏览器占着,这时再发请求 + 重绘,界面看起来就是"卡死"(2026-10-29 供应商现场)。
+ *   把刷新放到这个回调里,打印层摘掉之后再动 DOM。
  * @returns {boolean} true=已交给浏览器打印;false=异常(调用方自行提示)
  */
-export function printInPage(title, bodyHtml) {
+export function printInPage(title, bodyHtml, opts) {
   const prevTitle = document.title
+  const onDone = typeof opts?.onDone === 'function' ? opts.onDone : null
   let timer = null
   let done = false
   const cleanup = () => {
@@ -45,6 +51,8 @@ export function printInPage(title, bodyHtml) {
     if (title) document.title = prevTitle
     window.removeEventListener?.('afterprint', cleanup)
     if (pendingCleanup === cleanup) pendingCleanup = null
+    // 兜底清理(3 分钟)不是"真的打完了"——只有 afterprint 才算;但两种都回调,免得调用方永远等不到
+    if (onDone) { try { onDone() } catch (e) { console.warn('[printChannel] onDone 回调失败:', e?.message || e) } }
   }
   try {
     if (pendingCleanup) pendingCleanup() // 上一次没走完(打印中途关掉/浏览器不触发 afterprint)

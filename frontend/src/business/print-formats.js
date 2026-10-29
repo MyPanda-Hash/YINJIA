@@ -330,7 +330,7 @@ export function productCardQrText(card, companyCode = COMPANY.companyCode) {
   return [companyCode, card['编码'], card['批次'] || ''].filter((s) => s !== '' && s != null).join('@')
 }
 
-export async function printProductCards(rows) {
+export async function printProductCards(rows, opts) {
   const cards = (Array.isArray(rows) ? rows : []).filter((r) => r && r['编码'])
   if (!cards.length) return false
   const pageCss = '@page{size:75mm 100mm;margin:0}'
@@ -361,7 +361,9 @@ export async function printProductCards(rows) {
       + '</div>')
   }
   const body = '<style>' + pageCss + cardCss + '</style>' + trs.join('')
-  if (!printInPage('产品标识卡', body)) { alert(PRINT_FAIL_MSG); return false }
+  // opts.onDone:打印结束(afterprint)后才回调 —— 调用方用它把「刷新数据」推迟到打印层摘掉之后,
+  // 避免打印对话框打开期间还去重绘界面(2026-10-29 供应商现场「打印卡死」)
+  if (!printInPage('产品标识卡', body, opts)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }
 

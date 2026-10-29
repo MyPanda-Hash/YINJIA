@@ -306,7 +306,12 @@ async function confirm() {
       // 生产日期(2026-10-23):与批次号一起登记在单头,出纸时印到卡面「生产日期」栏;空串 = 不登记
       prodDate: String(prodDate.value || '').trim(), lines: all,
     })
-    await printProductCards(cardsOf(res))
+    // ⚠ 打印层挂上后 window.print() 是**异步**返回的(打印对话框还开着)。
+    //   原来这里紧接着 load() 刷新弹窗 ⇒ 打印对话框期间又发请求又重绘,界面像卡死(2026-10-29)。
+    //   现在把刷新放到 onDone(打印层摘掉 / afterprint)之后。
+    let afterPrint = null
+    let printDone = false      // onDone 可能比下面的赋值先到(打印被浏览器拒/层摘得快)
+    await printProductCards(cardsOf(res), { onDone: () => { printDone = true; if (afterPrint) afterPrint() } })
     const docs = res['单据编号列表'] || [res['单据编号']]
     const tail = `（${tt('批次号')} ${res['批次号']}${res['生产日期'] ? ` · ${tt('生产日期')} ${res['生产日期']}` : ''}）`
     ElMessage.success(docs.length > 1
@@ -315,7 +320,10 @@ async function confirm() {
     emit('printed', {
       orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: docs.length,
     })
-    await load()          // 刷新"剩余可打"与"已打印记录"
+    // 刷新"剩余可打"与"已打印记录":打印对话框可能还开着 → 先挂起,onDone 里再执行
+    afterPrint = () => { load() }
+    // onDone 已来过 / 打印层已摘(打印被浏览器拒)⇒ 立即刷新,别傻等
+    if (printDone || !document.getElementById('yj-print-host')) afterPrint()
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('打印登记失败'))
   } finally {
