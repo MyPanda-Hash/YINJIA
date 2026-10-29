@@ -912,21 +912,26 @@ export const recordSheetConfigs = {
           //   改造前这里写的是 col_name ⇒ 那五列取不到值、保存还被 labelsToCols 静默丢掉
           //   (旧配置挂在 variants 下,而 keys.test.js 只查 dataTables/cover/sections ⇒ 没人拦住;
           //    2026-09-30 改挂 dataTables 后由该测试守住)。
-          { key: '序号', label: '序号', rowspan: 2 },
-          { key: '日期', label: '日期', rowspan: 2 },
+          // ⚠ 2026-10-29:原先这 16 列里只有 背景/目的 与 方法 标了 area,其余全是单行 el-input
+          //   ⇒ 用户报「测试申请单的表格填写并没有自动换行,现在是会被截断」
+          //   (截图:「测试（检测）标准」填 1111111111111111 被格子横向切掉)。
+          //   现在:文本列一律走「自动换行 textarea」(RecordSheetPanels 的 .rs-wrap-in),
+          //   只有**日期/自增号**这类真短的才 singleLine(日期列另有日期控件接管,这里只是兜底)。
+          { key: '序号', label: '序号', rowspan: 2, singleLine: true },
+          { key: '日期', label: '日期', rowspan: 2, singleLine: true },
           { key: '申请人', label: '申请人', rowspan: 2 },
           { key: '测试（检测）背景/目的', label: '测试（检测）背景/目的', rowspan: 2, area: true },
           { key: '尺寸', label: '尺寸', group: '测试（检测）样品信息' },
           { key: '配方', label: '配方', group: '测试（检测）样品信息' },
           { key: '密度', label: '密度', group: '测试（检测）样品信息' },
           { key: '测试（检测）方法', label: '测试（检测）方法', rowspan: 2, area: true },
-          { key: '测试（检测）标准', label: '测试（检测）标准', rowspan: 2 },
-          { key: '测试（检测）目标', label: '测试（检测）目标', rowspan: 2 },
+          { key: '测试（检测）标准', label: '测试（检测）标准', rowspan: 2, area: true },
+          { key: '测试（检测）目标', label: '测试（检测）目标', rowspan: 2, area: true },
           { key: '组装方式', label: '组装方式', rowspan: 2 },
-          { key: '测完后样品样品处理', label: '测完后样品样品处理', rowspan: 2 },
+          { key: '测完后样品样品处理', label: '测完后样品样品处理', rowspan: 2, area: true },
           { key: '紧急程度', label: '紧急程度', rowspan: 2 },
-          { key: '期望完成日期', label: '期望完成日期', rowspan: 2 },
-          { key: '预计完成日期', label: '预计完成日期', rowspan: 2 },
+          { key: '期望完成日期', label: '期望完成日期', rowspan: 2, singleLine: true },
+          { key: '预计完成日期', label: '预计完成日期', rowspan: 2, singleLine: true },
           { key: '备注', label: '备注', rowspan: 2 },
         ],
       },

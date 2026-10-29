@@ -740,7 +740,30 @@
                   :style="designInputStyle(dt)"
                   @update:model-value="(v) => setCellValue(row, c, v)"
                 />
-                <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" @change="onDetailTextCommit(row, c.key)" />
+                <!-- 文本格:默认**自动换行**(2026-10-29 用户报障「测试申请单的表格填写并没有自动换行,
+                     现在是会被截断」——原来这里是单行 el-input,长文本横向溢出被格子切掉)。
+                     现在:area 声明 → 多行编辑域(minRows 2);其余文本列 → autosize textarea 起步 1 行、
+                     随内容长高,长值不再被截断。需要严格单行的列(编码/短代号)写 singleLine:true 保持原样。 -->
+                <el-input
+                  v-else-if="cellEditable(dt, row, c) && c.singleLine"
+                  v-model="row[c.key]"
+                  size="small"
+                  class="rs-c-in"
+                  :style="designInputStyle(dt)"
+                  @input="emit('dirty')"
+                  @change="onDetailTextCommit(row, c.key)"
+                />
+                <el-input
+                  v-else-if="cellEditable(dt, row, c)"
+                  v-model="row[c.key]"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: c.rows || 12 }"
+                  size="small"
+                  class="rs-t-in rs-wrap-in"
+                  :style="designInputStyle(dt)"
+                  @input="emit('dirty')"
+                  @change="onDetailTextCommit(row, c.key)"
+                />
                 <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" :title="tt('在本行下方插入一行')" @click="addRow(dt, row)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
@@ -4133,6 +4156,21 @@ function chartOf(dt) {
 .rs-c-in {
   width: 100%;
 }
+/**
+ * 明细行「自动换行」编辑格(2026-10-29):textarea 版 el-input 默认会按内容长高,
+ * 但 Element 给 .el-textarea__inner 的 min-height 与白空格策略需要显式放开,
+ * 否则长串(如 1111111111111111)被 white-space:nowrap 撑出去再被格子切掉 ——
+ * 这正是用户报的「没有自动换行,会被截断」。
+ */
+.rs-wrap-in :deep(.el-textarea__inner) {
+  min-height: 24px !important;
+  padding: 2px 6px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  resize: none;
+}
 /* 参照单元格(产品编号 -> 产品信息表):拟态输入框,点击弹参照 */
 .rs-ref-ctl {
   display: flex;
@@ -4711,6 +4749,9 @@ function chartOf(dt) {
 .rsp-cell {
   display: block;
   min-height: 20px;
+  /* 只读态同一口径:长串/长文本必须换行,不能被格子切掉(2026-10-29 与编辑态 .rs-wrap-in 配套) */
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* ═══ 页签(规格书多页) ═══ */
