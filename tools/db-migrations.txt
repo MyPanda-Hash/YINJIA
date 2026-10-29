@@ -4188,3 +4188,9 @@ migrate-rd-editor-stamp-20261028.sql
 migrate-drop-insp-docno-default-20261028.sql
 migrate-insp-docno-unregister-20261028.sql
 migrate-prodinfo-bom-20261029.sql
+
+# 2026-10-28 用户口径「把这三张表按测试项目、设备名称、仪器名称这些下拉来切数据表填写,改为一张单据,
+#   通过切换给对应的项目/设备/仪器分别填写数据,而不是每个都要新建一张单」:
+#   加标水行表补「测试项目」列;三张表补 place=detail 的分组字段登记(设备名称/仪器名称·型号/测试项目),
+#   使明细行的归属值能落库。两账套都执行。
+migrate-record-group-20261028.sql
