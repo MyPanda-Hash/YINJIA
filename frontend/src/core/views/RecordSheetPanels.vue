@@ -149,17 +149,17 @@
               <!-- 受控表单编号(逐页常量,如测试申请单的 YJ-RIR001 / YJ-XS002):
                    设计里这一格是**表单固定值**不是单据号 ⇒ 渲染常量文本、不给输入框(见 docNoStatic 注释) -->
               <div v-if="docNoStatic" class="rs-docno-wrap">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
+                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
                 <span class="rs-docno-static">{{ docNoStatic }}</span>
               </div>
               <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
+                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
                 <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
                 <el-icon class="rs-ref-ico"><Search /></el-icon>
               </div>
               <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
               <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
+                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
                 <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
                      带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
                      读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
@@ -172,7 +172,7 @@
                    原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
                    cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
                    两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
-              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
+              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
@@ -1462,7 +1462,7 @@ import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
 import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
-import { docNoKeyOf } from '@/core/panel/sheetDocNo'
+import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
@@ -1539,7 +1539,7 @@ const emit = defineEmits(['dirty', 'refresh-config', 'open-file'])
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 // 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
 // 单据类面板编辑期间那格永远空白;见 @/core/panel/sheetDocNo 的说明)
-const docNoKey = computed(() => docNoKeyOf(props.head))
+const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
 /** 动态列变体:按头字段值解析(加标水经 variantOptions 映射/委托单直取),缺省第一个变体 */
@@ -1758,7 +1758,21 @@ const sameCellDocno = computed(() => effHead.value.noSpan === 0)
 const noGapSpan = computed(() => Math.max(0, Math.floor(Number(effHead.value.noGapSpan) || 0)))
 const gapLeftSpan = computed(() => (sameCellDocno.value ? 0 : noGapSpan.value))
 const gapRightSpan = computed(() => (sameCellDocno.value ? noGapSpan.value : 0))
-const docnoPrefix = computed(() => effHead.value.docnoPrefix !== false)
+/**
+ * 纸张右上角那格的**标识文案**(已带全角冒号,直接喂 tt())—— 2026-10-29 引入,
+ * 用户口径「产品文件内的面板的右上角的编号应该改为单据编号,所有的都是」。
+ *
+ * 三种取值(未声明的面板逐字不变,几十张面板依赖这个缺省):
+ *   · `head.docnoPrefix === false` ⇒ 空串(不印标识;7 张数据记录表的设计原值就是裸编号);
+ *   · `head.docnoPrefix` 是**字符串** ⇒ 文案本身,补全角冒号(如 '单据编号' → '单据编号：');
+ *   · 其余(undefined / true) ⇒ 缺省「编号：」。
+ *
+ * ⚠ 只改文案不改绑键会印出张冠李戴的字:同一句「编号」在不同面板指向两种号
+ *   (表单型绑 单据编号 PI-…、检验计划表绑 文档编号 YJ-RD001)。故配套 head.docNoKey
+ *   强制绑键(见 docNoKey 计算属性),两处必须成对出现。
+ */
+const docnoPrefixText = computed(() => docnoPrefixOf(effHead.value.docnoPrefix))
+const docnoPrefix = computed(() => !!docnoPrefixText.value)
 
 /**
  * 本页纸张右上角「编号」格的**受控表单编号常量**(pages[i].docNoStatic)。

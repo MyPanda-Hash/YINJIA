@@ -216,6 +216,7 @@ export default {
     '点「填入单据」后按下面这张表覆盖对应格;未变化的格不列出。': 'Nhấp vào "Điền vào tài liệu" và nhấp vào bảng bên dưới để ghi đè ô tương ứng; ô không thay đổi sẽ không được liệt kê.',
     '物料': 'Vật liệu',
     '编号：': 'Số hiệu:',
+    '单据编号：': 'Số chứng từ:',
     '选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。': 'Chọn một biến thể: Toàn bộ quy trình của biến thể này sẽ thay thế nội dung hiện tại của bảng này (không phải bổ sung). Bạn có thể "vô hiệu hóa" toàn bộ mục tại đây; để thay đổi nội dung của quy trình, vui lòng truy cập "Bảo trì thư viện tiêu chuẩn".',
     '变体': 'Biến thể',
     '工序数': 'Số quy trình',

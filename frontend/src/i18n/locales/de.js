@@ -226,6 +226,7 @@ export default {
     '点「填入单据」后按下面这张表覆盖对应格;未变化的格不列出。': 'Klicken Sie auf "Dokumente ausfüllen" und klicken Sie auf die folgende Tabelle, um das entsprechende Raster abzudecken. Die unveränderten Raster werden nicht aufgelistet.',
     '物料': 'Materialien',
     '编号：': 'Nummer:',
+    '单据编号：': 'Belegnummer:',
     '选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。': 'Wählen Sie eine Variante: Ein vollständiger Satz von Prozessen dieser Variante ersetzt den aktuellen Inhalt dieser Tabelle (nicht hinzugefügt). Sie können den gesamten Artikel hier "deaktivieren". Um den Inhalt des Prozesses zu ändern, wenden Sie sich bitte an "Standard Library Maintenance".',
     '变体': 'Varianten',
     '工序数': 'Anzahl der Prozesse',

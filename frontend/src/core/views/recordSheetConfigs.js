@@ -1066,7 +1066,7 @@ export const recordSheetConfigs = {
     // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
     // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
     grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125],
-    head: { title: 7, infoLabel: 2, infoValue: 2 },
+    head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
     // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
@@ -1172,7 +1172,7 @@ export const recordSheetConfigs = {
       { label: '日期', key: '单据日期', type: 'text' },
     ],
     grid: [130, 260, 130, 260],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     sections: [
       // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
       // ⚠ 行宽对齐:双列行的占法是「左标签1 + 左值1 + 右标签1 + 右值1 = 4」——
@@ -1328,7 +1328,7 @@ export const recordSheetConfigs = {
     // 信息栏照设计 F5:G8(D5:E5..D8:E8)= 表单管理人/密级/使用范围/版本号,
     // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
     grid: [130, 390, 130, 390],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     info: [
       // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
       //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
@@ -1684,7 +1684,7 @@ export const recordSheetConfigs = {
       { label: '密级', key: '密级', type: 'select' },
     ],
     grid: [144, 144, 144, 144, 294, 165, 152],
-    head: { title: 5, infoLabel: 1, infoValue: 1 },
+    head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     // 表头三行照设计 r5/r6/r7 逐格对位(每行 3 对 = 7 格;产品编号/产品功能类别/编写人 的值格跨 C:D):
     //   r5 [产品编号 | 客户项目名称 | 使用范围]
     //   r6 [产品功能类别 | 产品整体尺寸 | 版本号]
@@ -1849,7 +1849,7 @@ export const recordSheetConfigs = {
     titleKeyPh: 'KPC管控点申请单',
     titlePlaceholder: 'KPC管控点申请单',
     grid: [111, 205, 441, 147, 210, 128],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
     sections: [
       { bar: '一、基础信息', rows: [

@@ -1,0 +1,32 @@
+[
+  {
+    "k": "RD_INSP_PLAN(IP-2026-10-0015)",
+    "v": {
+      "prefix": "单据编号：",
+      "cellText": "单据编号：IP-2026-10-0015",
+      "inputValue": null,
+      "coverDocno": null,
+      "statusShown": true
+    }
+  },
+  {
+    "k": "RD_SPEC_DOC(SD-2026-10-0009)",
+    "v": {
+      "prefix": null,
+      "cellText": null,
+      "inputValue": null,
+      "coverDocno": "单据编号：SD-2026-10-0009",
+      "statusShown": true
+    }
+  },
+  {
+    "k": "RD_PROD_DOCLIST()",
+    "v": {
+      "prefix": null,
+      "cellText": null,
+      "inputValue": null,
+      "coverDocno": null,
+      "statusShown": false
+    }
+  }
+]
