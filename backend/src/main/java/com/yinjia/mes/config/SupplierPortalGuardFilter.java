@@ -109,6 +109,14 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
         if (path.equals("/api/px/puLabel/print")) return true;
         // 批次号锁定查询(只读):供应商面板打开单据时问一次,决定「批次号」是否只读
         if (path.equals("/api/px/puLabel/batchLock")) return true;
+        // 重打 / 作废(2026-10-29 用户报障「打印材料码的时候作废和重打,都有问题,
+        // 作废显示成功,时间没有变化,重打就是报错 undefined」):
+        // 弹窗的「已打印记录」表格里就有这两颗按钮,客户自己打的码自然要能自己重打/作废
+        // (作废=预约量释放回余量)。**不放行 ⇒ 403,而前端 unwrap 不抛错 ⇒ 界面还显示"成功"**,
+        // 于是表现为"作废成功但记录没变、重打报 undefined"。
+        // 归属核对在 PxController:同样是 requireMaterialLabelAccess(只能动自己订单下的打印单)。
+        if (path.equals("/api/px/puLabel/reprint")) return true;
+        if (path.equals("/api/px/puLabel/void")) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")

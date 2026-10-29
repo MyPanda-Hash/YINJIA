@@ -73,9 +73,47 @@ export function printInPage(title, bodyHtml, opts) {
     window.addEventListener?.('afterprint', cleanup)
     pendingCleanup = cleanup
     if (title) document.title = title
-    // 等一帧让样式/图片(data URL)生效再拉起打印(否则偶发空白页)
+    // 等一帧让样式生效,再**等图片解码完**才拉起打印(2026-10-29 用户报障「打印会出现 Edge 无响应」)。
+    //
+    // 为什么不能只等一帧:材料码卡面里有二维码(data URL 图片)。一帧时它们往往还没解码,
+    // 于是浏览器的**打印预览/光栅化要做在 window.print() 内部**(同步、冻结渲染进程)——
+    // 界面就整个"未响应",打印机对话框关掉后才恢复,现场感受就是"卡很久"。
+    // 先把图片解码好再 print,布局与光栅化都在主线程之外完成,对话框一弹立刻能响应。
+    const imagesReady = (imgList) => {
+      const imgs = imgList || []
+      if (!imgs.length) return Promise.resolve()
+      const one = (img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve()
+        // decode() 是标准 API(Chrome/Edge 90+);老浏览器没有就退回 load 事件
+        if (typeof img.decode === 'function') return img.decode().catch(() => {})
+        return new Promise((res) => {
+          img.addEventListener('load', res, { once: true })
+          img.addEventListener('error', res, { once: true })
+          setTimeout(res, 2000)   // 兜底:图片挂了也别把打印卡住
+        })
+      }
+      return Promise.race([
+        Promise.all(imgs.map(one)),
+        new Promise((res) => setTimeout(res, 3000)),  // 整体兜底:3 秒还没好就照常打,不能一直等
+      ])
+    }
+    // 先等一帧让样式/布局生效,再决定要不要等图片(否则偶发空白页)。
+    //   · 打印层里**没有图片**(纯文字单据):与历史行为完全一致,一帧后直接 print;
+    //   · 有图片(材料码/标签里的二维码 data URL):等它们解码完再 print ——
+    //     否则打印预览的光栅化会做在 window.print() 内部(同步冻结渲染进程),
+    //     现场表现为"打印时 Edge 未响应,要等很久"(2026-10-29 用户报障)。
     requestAnimationFrame(() => {
-      try { window.print() } catch { cleanup() }
+      // ⚠ 用可选调用:单测桩的 DOM 元素没有 querySelectorAll,别让"等图片"这层把打印整条路弄挂
+      const imgs = typeof host.querySelectorAll === 'function'
+        ? Array.from(host.querySelectorAll('img'))
+        : []
+      if (!imgs.length) {
+        try { window.print() } catch { cleanup() }
+        return
+      }
+      imagesReady(imgs).finally(() => {
+        try { window.print() } catch { cleanup() }
+      })
     })
     timer = setTimeout(cleanup, PRINT_GUARD_MS)
     // node --test 里 setTimeout 返回 Timeout 对象:unref 掉,别让单测进程挂着等这 3 分钟

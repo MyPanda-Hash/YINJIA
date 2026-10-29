@@ -336,9 +336,15 @@ async function doReprint(row) {
   busy.value = true
   try {
     const res = await engine.puLabelReprint(row['单据编号'])
-    await printProductCards(cardsOf(res))
-    ElMessage.success(`${tt('已重打（第 {n} 次）').replace('{n}', res['打印次数'])} ${res['单据编号']}`)
-    await load()
+    // res 可能是"未抛错但没数据"(老实现回 undefined)⇒ 明确报错,别再弹「第 undefined 次」
+    if (!res || !res['单据编号']) throw new Error('重打未返回打印单数据(权限或服务异常)')
+    // 与「确认打印」同一口径:刷新放到打印层摘掉之后(2026-10-29 卡顿修复)
+    let afterPrint = null
+    let printDone = false
+    await printProductCards(cardsOf(res), { onDone: () => { printDone = true; if (afterPrint) afterPrint() } })
+    ElMessage.success(`${tt('已重打（第 {n} 次）').replace('{n}', res['打印次数'] ?? '')} ${res['单据编号']}`)
+    afterPrint = () => { load() }
+    if (printDone || !document.getElementById('yj-print-host')) afterPrint()
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('重打失败'))
   } finally {

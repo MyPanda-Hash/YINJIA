@@ -261,6 +261,39 @@ public class PxController {
     }
 
     /**
+     * 按**打印单号**做归属核对(重打 / 作废用,2026-10-29)。
+     *
+     * <p>供应商弹窗的「已打印记录」表格里就有「重打」「作废」两颗按钮 —— 客户自己打的码,
+     * 自然要能自己重打/作废(作废=预约量释放回余量)。但这两个接口收的是**打印单号**
+     * (`bd_pu_label.单据编号`,如 MQ-2026-10-0024),不是采购订单号,故先反查它属于哪张采购订单,
+     * 再走同一套闸门:
+     * <ul>
+     *   <li>内部账号:按 PU_ORDER 的修改权;</li>
+     *   <li>供应商账号:该打印单的采购订单必须属于登录态供应商,别人的一律 403
+     *       (否则供应商可以拿别人的 MQ 单号作废掉别人的量)。</li>
+     * </ul>
+     */
+    private void requireMaterialLabelAccessByLabelDoc(String labelDocNo) {
+        String no = labelDocNo == null ? "" : labelDocNo.trim();
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印单号");
+        String supplierCode = queryService.sessionSupplierCode();
+        if (supplierCode == null) {
+            // 内部账号:保持原口径(与界面「重打/作废」一致,要修改权)
+            perm.requireButton("PU_ORDER", "修改");
+            return;
+        }
+        if (supplierCode.isEmpty()) {
+            throw new org.springframework.security.access.AccessDeniedException("供应商账号已停用");
+        }
+        // 反查这张打印单对应的采购订单号,再核对归属
+        String orderNo = queryService.supplierOrderOfLabelDoc(no);
+        if (orderNo.isEmpty()
+                || !queryService.supplierMayReadDoc(com.yinjia.mes.service.QueryService.SUPPLIER_PANEL_CODE, orderNo)) {
+            throw new org.springframework.security.access.AccessDeniedException("该打印单不属于当前供应商:" + no);
+        }
+    }
+
+    /**
      * 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头)。
      * 2026-10-23 增 prodDate(生产日期,可空):批次号旁边填,登记在单头、印到材料码卡面。
      */
@@ -282,8 +315,11 @@ public class PxController {
     /** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */
     @PostMapping("/puLabel/reprint")
     public ApiResult<Map<String, Object>> puLabelReprint(@RequestBody Map<String, Object> body) {
-        perm.requireButton("PU_ORDER", "修改");
-        return ApiResult.ok(puLabel.reprint(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        // 2026-10-29:供应商弹窗里就有「重打」按钮,故与 dialog/print 同一套闸门
+        // (内部按 PU_ORDER 的修改权;供应商按**打印单归属**,只能动自己订单下的打印记录)
+        requireMaterialLabelAccessByLabelDoc(docNo);
+        return ApiResult.ok(puLabel.reprint(docNo, currentUser()));
     }
 
     /**
@@ -298,8 +334,10 @@ public class PxController {
     /** 作废打印记录(软删,预约量立即释放回余量) */
     @PostMapping("/puLabel/void")
     public ApiResult<Map<String, Object>> puLabelVoid(@RequestBody Map<String, Object> body) {
-        perm.requireButton("PU_ORDER", "修改");
-        return ApiResult.ok(puLabel.voidDoc(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        // 同上:供应商可作废自己打出来的码(预约量释放回余量)
+        requireMaterialLabelAccessByLabelDoc(docNo);
+        return ApiResult.ok(puLabel.voidDoc(docNo, currentUser()));
     }
 
     /** 当前操作人(与 batchFlow 各端点同口径:无认证上下文时记 system) */
