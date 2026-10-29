@@ -5525,8 +5525,11 @@ function chartOf(dt) {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    /* 打印适配:宽度 100%(≈733px@8mm页边距)下固定高度封面(1123px)会溢出到第二页,整体 0.92 缩入一页 */
-    zoom: 0.92 !important;
+    /* 打印适配:宽度 100%(≈733px@8mm页边距)下固定高度封面(1123px)会溢出到第二页;
+       超宽表格(纸面 px 宽远大于 733px)此前只给 0.92 会被**横向裁掉**。
+       2026-10-29:改读 --print-zoom —— 由 PanelxList.printApprovalSheet 按「纸宽÷A4 内容宽」算出;
+       未设变量时回落到 0.92(Ctrl+P 直接打印等未经按钮的路径,行为与改造前一致)。 */
+    zoom: var(--print-zoom, 0.92) !important;
   }
   body.approval-printing .rsp-sheet,
   body.approval-printing .rsp-sheet * {

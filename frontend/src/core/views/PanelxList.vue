@@ -7287,13 +7287,31 @@ async function printApprovalSheet() {
   if (!approvalSheetRef.value) return
   // 打印样式(approval-printing):只打印文书纸张,隐藏侧栏/其它页面元素
   document.body.classList.add('approval-printing')
+  /**
+   * 按纸宽**等比缩放**后再打印 —— 2026-10-29 用户口径「给原生打印也加等比缩放」。
+   *
+   * 为什么必须算:那张纸的内层表格宽度是**行内 px**(secW(sec) = 网格列宽之和),
+   *   而 A4 竖向在 8mm 边距下只能容 ≈733px。旧样式写死 `zoom:0.92`,宽表面板照样溢出:
+   *   实测纸宽 1510px 的面板 ×0.92 后仍 1389px,**右侧 656px 被切掉**;
+   *   最宽的测试申请单 1708px 溢出 838px(半个表消失)。
+   *
+   * 算法:zoom = 纸宽 ÷ A4 内容宽,上限 1(窄表不放大),下限 0.32(约 5px 字,再小就没意义)。
+   *   结果写到 <html> 的 CSS 变量上,样式侧用 var(--print-zoom) 取值 ⇒ 一处算、一处用。
+   */
+  const A4_CONTENT_PX = Math.round((210 - 16) / 25.4 * 96)   // 194mm @96dpi ≈ 733px
+  const paperEl = document.querySelector(
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
+    + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
+    + '.approval-layout .qr-sheet, .record-sheet')
+  const paperW = paperEl ? Math.max(paperEl.scrollWidth, paperEl.offsetWidth) : 0
+  const printZoom = paperW > 0
+    ? Math.max(0.32, Math.min(1, A4_CONTENT_PX / paperW))
+    : 1
+  document.documentElement.style.setProperty('--print-zoom', String(printZoom))
   const restore = () => {
     document.body.classList.remove('approval-printing')
+    document.documentElement.style.removeProperty('--print-zoom')
     window.removeEventListener('afterprint', restore)
-  }
-  window.addEventListener('afterprint', restore)
-  // 等样式生效后调打印预览(用户可另存为 PDF 或打印)
-  setTimeout(() => window.print(), 150)
 }
 
 // ══════════ 单据打印版式(2026-09-15):宽明细表 A4 纸面优化 ══════════

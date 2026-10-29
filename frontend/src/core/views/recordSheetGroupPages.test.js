@@ -50,7 +50,10 @@ test('导出 PDF：按「页 × 组」两层出纸，且收尾还原页签与分
 })
 
 test('打印：多组时先出 PDF 再打印（window.print 只能印当前 DOM）', () => {
-  const fn = list.slice(list.indexOf('async function printApprovalSheet'), list.indexOf('async function printApprovalSheet') + 2600)
+  // 切片到下一个顶层函数为止(函数体随缩放逻辑变长,固定长度会截断——2026-10-29 踩到)
+  const at = list.indexOf('async function printApprovalSheet')
+  const nx = list.indexOf('\nasync function ', at + 10)
+  const fn = list.slice(at, nx > at ? nx : at + 5000)
   assert.match(fn, /const groups = Array\.isArray\(comp\?\.groupPages\)/, '打印要读 groupPages')
   // 2026-10-29 条件扩成「多页签 或 多组」:多页签同样只能靠逐张截图出纸
   // (window.print 只印当前页签那一张)。见 sheetPrintAllTabs.test.js。
