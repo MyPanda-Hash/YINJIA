@@ -96,9 +96,14 @@ public class QcInspAutoService {
      *
      * @param scjlId 报工行 id({@code scjl.id});调用方已确认该行未作废
      * @param repNo  报工单号(手机端直写时为空串;仅用于表头留痕)
-     * @param user   检验员(= 触发人/吸收人)
+     *
+     * <p>⚠ 单头**不写「检验员」**(2026-10-21 用户口径):它就是纸面上签字的人,
+     * 只能来自"此刻在电脑前操作的人"。原来的 {@code user}(触发人/吸收人)在后台定时吸收时
+     * 是 {@code system(手机端报工吸收)},写进签名格没有意义 ⇒ 改为留空,由
+     * {@code ButtonService.defaultQcInspector} 在保存时按当前电脑端登录人姓名兜底,
+     * PC 打开草稿时前端也会先带出(见 {@code core/qc/qcInspector.js})。
      */
-    public Result build(long scjlId, String repNo, String user) {
+    public Result build(long scjlId, String repNo) {
         Map<String, Object> r = loadReportRow(scjlId);
         if (r == null) return new Result(List.of(), "报工行不存在或已作废", "", 0, 0);
 
@@ -147,7 +152,7 @@ public class QcInspAutoService {
                 skipped.add(panel);
                 continue;
             }
-            drafts.add(new Draft(panel, head(panel, r, p, op, xc, done, repNo, user)));
+            drafts.add(new Draft(panel, head(panel, r, p, op, xc, done, repNo)));
         }
         String reason = drafts.isEmpty()
                 ? "已达计划量,但 " + String.join("/", skipped) + " 已有存活单(幂等跳过)"
@@ -158,13 +163,16 @@ public class QcInspAutoService {
     // ────────────────────────────── 单头组装 ──────────────────────────────
 
     private Map<String, Object> head(String panel, Map<String, Object> r, Map<String, Object> p,
-                                     String op, int xc, double done, String repNo, String user) {
+                                     String op, int xc, double done, String repNo) {
+        // ⚠ 三张单的「检验员」**都不在这里写**(2026-10-21):后台定时吸收没有登录人,
+        //   写 system 占位没有意义;真值 = 保存时在电脑前操作的那个人,见
+        //   ButtonService.defaultQcInspector(保存兜底)+ core/qc/qcInspector.js(打开即带出)。
         return switch (panel) {
             // 成型检验单(2026-10-21 接替已下架的 QC_FIRST_INSP):字段与首件检验同源,
             //   但不写 QC_MOLD_INSP 没有的键(生产日期/客户代码/客户名称/工艺清单单号),
             //   明细仍用成型工艺清单 FirstInspItems 预铺。
-            case "QC_MOLD_INSP" -> moldInspHead(r, p, op, xc, done, repNo, user);
-            case "QC_ASM_INSP" -> asmInspHead(r, p, op, xc, done, repNo, user);
+            case "QC_MOLD_INSP" -> moldInspHead(r, p, op, xc, done, repNo);
+            case "QC_ASM_INSP" -> asmInspHead(r, p, op, xc, done, repNo);
             default -> Map.of();
         };
     }
@@ -174,7 +182,7 @@ public class QcInspAutoService {
      * 与 {@link #firstInspHead} 的唯一区别:只写 QC_MOLD_INSP 实际存在的字段。
      */
     private Map<String, Object> moldInspHead(Map<String, Object> r, Map<String, Object> p, String op,
-                                             int xc, double done, String repNo, String user) {
+                                             int xc, double done, String repNo) {
         String today = LocalDate.now().toString();
         String productCode = firstNonBlank(str(r.get("产品编码")), str(p.get("dm")));
 
@@ -198,7 +206,6 @@ public class QcInspAutoService {
             if (shop != null) head.put("生产车间", shop);
         }
         head.put("报工数量", round(done));
-        head.put("检验员", user);
         FirstInspItems.Result items = FirstInspItems.load(jdbc, productCode);
         head.put("detail", Map.of("items", items.rows()));
         return head;
@@ -210,7 +217,7 @@ public class QcInspAutoService {
      * 生产日期/批号由工单行**首批完工**时回填(见 {@link FirstInspBackfill}),出单时不写死今天。
      */
     private Map<String, Object> firstInspHead(Map<String, Object> r, Map<String, Object> p, String op,
-                                              int xc, double done, String repNo, String user) {
+                                              int xc, double done, String repNo) {
         String today = LocalDate.now().toString();
         String wo = str(r.get("工单号"));
         String productCode = firstNonBlank(str(r.get("产品编码")), str(p.get("dm")));
@@ -247,14 +254,13 @@ public class QcInspAutoService {
         head.put("报工数量", round(done));
         FirstInspItems.Result items = FirstInspItems.load(jdbc, productCode);
         if (items.docNo() != null) head.put("工艺清单单号", items.docNo());
-        head.put("检验员", user);
         head.put("detail", Map.of("items", items.rows()));
         return head;
     }
 
     /** 制程检验单(与 {@code QcProcInspController.fromWoLine} 同一套字段;明细留空由品质带入) */
     private Map<String, Object> procInspHead(Map<String, Object> p, int xc, double done, String op,
-                                             String repNo, String user) {
+                                             String repNo) {
         String today = LocalDate.now().toString();
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", today);
@@ -277,14 +283,13 @@ public class QcInspAutoService {
             if (shop != null) head.put("生产车间", shop);
         }
         head.put("检验类别", "制程检验");
-        head.put("检验员", user);
         head.put("detail", Map.of("items", List.of()));
         return head;
     }
 
     /** 组装成品检验单(与 {@code ButtonService.woInspGenerate} 原组装分支同一套字段;明细按出货检验计划预铺) */
     private Map<String, Object> asmInspHead(Map<String, Object> r, Map<String, Object> p, String op,
-                                            int xc, double done, String repNo, String user) {
+                                            int xc, double done, String repNo) {
         String today = LocalDate.now().toString();
         String productCode = firstNonBlank(str(r.get("产品编码")), str(p.get("dm")));
         Map<String, Object> head = new LinkedHashMap<>();
@@ -307,7 +312,6 @@ public class QcInspAutoService {
         }
         head.put("报工数量", round(done));
         head.put("检验日期", today);
-        head.put("检验员", user);
         AsmInspItems.Result items = AsmInspItems.load(jdbc, productCode);
         head.put("detail", Map.of("items", items.rows()));
         return head;
