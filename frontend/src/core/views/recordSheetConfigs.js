@@ -113,9 +113,9 @@ const RD_ASM_PROC_DT0 = [
         ], cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 90 },
           { key: '工序', label: '工序', w: 130 },
-          { key: '工序控制内容', label: '工序控制内容', w: 320, area: true },
-          { key: '管控要求', label: '管控要求', w: 430, area: true },
-          { key: '检查比例', label: '检查比例', w: 160 },
+          { key: '工序控制内容', label: '工序控制内容', w: 250, area: true },
+          { key: '管控要求', label: '管控要求', w: 280, area: true },
+          { key: '检查比例', label: '检查比例', w: 120 },
         ]},
     ]
 
@@ -133,12 +133,12 @@ const RD_ASM_PROC_DT_REVISION = {
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
-    { key: '序号', label: '序号', w: 60, align: 'center' },
-    { key: '更改内容', label: '更改内容', w: 300, area: true },
-    { key: '更改原因', label: '更改原因', w: 200 },
-    { key: '更改时间', label: '更改时间', w: 130 },
-    { key: '责任人', label: '责任人', w: 120 },
-    { key: '备注', label: '备注', w: 184, area: true },
+    { key: '序号', label: '序号', w: 50, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 240, area: true },
+    { key: '更改原因', label: '更改原因', w: 160 },
+    { key: '更改时间', label: '更改时间', w: 110 },
+    { key: '责任人', label: '责任人', w: 90 },
+    { key: '备注', label: '备注', w: 130, area: true },
   ],
 }
 
@@ -159,8 +159,8 @@ const RD_ASM_PROC_DT_BOM = {
     { key: '表区', label: '表区', hiddenCol: true, w: 90 },
     { key: '物料编号', label: '物料编号', w: 150 },
     { key: '物料名', label: '物料名称', w: 220 },
-    { key: '物料规格', label: '物料规格', w: 500, area: true },
-    { key: '用量', label: '用量', w: 170 },
+    { key: '物料规格', label: '物料规格', w: 280, area: true },
+    { key: '用量', label: '用量', w: 130 },
   ],
 }
 
@@ -210,12 +210,12 @@ const RD_MOLD_PROC_DT_REVISION = {
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
-    { key: '序号', label: '序号', w: 60, align: 'center' },
-    { key: '更改内容', label: '更改内容', w: 300, area: true },
-    { key: '更改原因', label: '更改原因', w: 200 },
-    { key: '更改时间', label: '更改时间', w: 130 },
-    { key: '责任人', label: '责任人', w: 120 },
-    { key: '备注', label: '备注', w: 184, area: true },
+    { key: '序号', label: '序号', w: 50, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 240, area: true },
+    { key: '更改原因', label: '更改原因', w: 160 },
+    { key: '更改时间', label: '更改时间', w: 110 },
+    { key: '责任人', label: '责任人', w: 90 },
+    { key: '备注', label: '备注', w: 130, area: true },
   ],
 }
 
@@ -409,7 +409,7 @@ const RD_MOLD_FORMULA = {
       { page: 1, label: '使用范围', key: '使用范围', type: 'select' },
       { page: 1, label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57],
+    grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41],
     // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
     head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
@@ -1105,7 +1105,7 @@ export const recordSheetConfigs = {
     //   · 内径:D=100,E/F/G=70 ⇒ D+E=85+70=155,F+G=78+77=155(内径mm 155 | 内径公差 155)
     // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
     // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
-    grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125],
+    grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93],
     head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
@@ -1117,11 +1117,11 @@ export const recordSheetConfigs = {
     //   页序一变,下面 sections/dataTables/tailSections 上所有 `page:` 数字必须同步重编
     //   (修订记录 0→2,工艺清单 1→0,配方 2→1);漏改一处的表现是"区块跑到别的页签"或整页空白。
     pages: [
-      { title: '成型工艺清单', grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125], showHead: true },
+      { title: '成型工艺清单', grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93], showHead: true },
       // 原页 3 的 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
-      { title: '成型配方', grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
+      { title: '成型配方', grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
       // 修订记录页不出报告头(设计只有一行居中大标题 + 一行表头,由 dt.pageTitle 出标题)
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93] },
     ],
     sections: [...RD_MOLD_PROC_SEC0, ...RD_MOLD_FORMULA.sections],
     // 两张逻辑表共用行表 rd_mold_proc_detail ⇒ 每条都必须带 filterKey:'表区' + filterVal
@@ -1367,7 +1367,7 @@ export const recordSheetConfigs = {
     // 报告头(页 1/页 2 共用):公司名 + 编号 + 居中大标题 + 右侧信息栏四格。
     // 信息栏照设计 F5:G8(D5:E5..D8:E8)= 表单管理人/密级/使用范围/版本号,
     // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
-    grid: [130, 390, 130, 390],
+    grid: [130, 260, 130, 260],
     head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     info: [
       // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
@@ -1381,10 +1381,10 @@ export const recordSheetConfigs = {
     pages: [
       // 页 0:设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
       // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
-      { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 260, 130, 260] },
+      { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-BOM表' },
-      { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+      { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-组装/包装关键控制清单' },
     ],
     // 设计两张表的 B9:G9 都是「产品基本信息」,格子相同 ⇒ 同一份声明给两页(各声明 page)。
