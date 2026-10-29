@@ -1,0 +1,387 @@
+[
+  {
+    "panel": "RD_MOLD_PROC",
+    "tables": [
+      {
+        "ti": 0,
+        "nCols": 11,
+        "width": 1041,
+        "cells": [
+          {
+            "i": 0,
+            "w": 130,
+            "textW": 0,
+            "need": 18,
+            "waste": 112,
+            "sample": ""
+          },
+          {
+            "i": 1,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 85,
+            "textW": 0,
+            "need": 18,
+            "waste": 67,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 78,
+            "textW": 0,
+            "need": 18,
+            "waste": 60,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 77,
+            "textW": 0,
+            "need": 18,
+            "waste": 59,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 100,
+            "textW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 125,
+            "textW": 0,
+            "need": 18,
+            "waste": 107,
+            "sample": ""
+          },
+          {
+            "i": 10,
+            "w": 125,
+            "textW": 0,
+            "need": 18,
+            "waste": 107,
+            "sample": ""
+          }
+        ]
+      },
+      {
+        "ti": 1,
+        "nCols": 11,
+        "width": 1041,
+        "cells": [
+          {
+            "i": 0,
+            "w": 130,
+            "textW": 0,
+            "need": 18,
+            "waste": 112,
+            "sample": ""
+          },
+          {
+            "i": 1,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 85,
+            "textW": 0,
+            "need": 18,
+            "waste": 67,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 78,
+            "textW": 0,
+            "need": 18,
+            "waste": 60,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 77,
+            "textW": 0,
+            "need": 18,
+            "waste": 59,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 100,
+            "textW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 125,
+            "textW": 108,
+            "need": 126,
+            "waste": -1,
+            "sample": "点击选择"
+          },
+          {
+            "i": 10,
+            "w": 125,
+            "textW": 109,
+            "need": 127,
+            "waste": -2,
+            "sample": "点击选择"
+          }
+        ]
+      },
+      {
+        "ti": 2,
+        "nCols": 11,
+        "width": 1041,
+        "cells": [
+          {
+            "i": 0,
+            "w": 130,
+            "textW": 56,
+            "need": 74,
+            "waste": 56,
+            "sample": "配料要求"
+          },
+          {
+            "i": 1,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 85,
+            "textW": 0,
+            "need": 18,
+            "waste": 67,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 78,
+            "textW": 0,
+            "need": 18,
+            "waste": 60,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 77,
+            "textW": 0,
+            "need": 18,
+            "waste": 59,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 100,
+            "textW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 125,
+            "textW": 0,
+            "need": 18,
+            "waste": 107,
+            "sample": ""
+          },
+          {
+            "i": 10,
+            "w": 125,
+            "textW": 0,
+            "need": 18,
+            "waste": 107,
+            "sample": ""
+          }
+        ]
+      },
+      {
+        "ti": 3,
+        "nCols": 11,
+        "width": 1041,
+        "cells": [
+          {
+            "i": 0,
+            "w": 130,
+            "textW": 56,
+            "need": 74,
+            "waste": 56,
+            "sample": "炭棒尺寸"
+          },
+          {
+            "i": 1,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 90,
+            "textW": 0,
+            "need": 18,
+            "waste": 72,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 85,
+            "textW": 0,
+            "need": 18,
+            "waste": 67,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 78,
+            "textW": 0,
+            "need": 18,
+            "waste": 60,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 77,
+            "textW": 0,
+            "need": 18,
+            "waste": 59,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 100,
+            "textW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 70,
+            "textW": 0,
+            "need": 18,
+            "waste": 52,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 125,
+            "textW": 0,
+            "need": 18,
+            "waste": 107,
+            "sample": ""
+          },
+          {
+            "i": 10,
+            "w": 125,
+            "textW": 0,
+            "need": 18,
+            "waste": 107,
+            "sample": ""
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,151 @@
+[
+  {
+    "panel": "RD_DROP_PREC",
+    "tables": [
+      {
+        "width": 1510,
+        "cells": [
+          {
+            "i": 0,
+            "span": 9,
+            "w": 1228,
+            "head": "惠州市银嘉环保科技有限公司",
+            "headW": 182,
+            "bodyW": 288,
+            "need": 304
+          },
+          {
+            "i": 9,
+            "span": 1,
+            "w": 116,
+            "head": "",
+            "headW": 0,
+            "bodyW": 0,
+            "need": 16
+          },
+          {
+            "i": 10,
+            "span": 1,
+            "w": 165,
+            "head": "—",
+            "headW": 14,
+            "bodyW": 0,
+            "need": 30
+          }
+        ]
+      },
+      {
+        "width": 1510,
+        "cells": [
+          {
+            "i": 0,
+            "span": 11,
+            "w": 1509,
+            "head": "1.基本信息",
+            "headW": 68,
+            "bodyW": 88,
+            "need": 104
+          }
+        ]
+      },
+      {
+        "width": 1510,
+        "cells": [
+          {
+            "i": 0,
+            "span": 11,
+            "w": 1509,
+            "head": "2.测试条件",
+            "headW": 68,
+            "bodyW": 116,
+            "need": 132
+          }
+        ]
+      },
+      {
+        "width": 1510,
+        "cells": [
+          {
+            "i": 0,
+            "span": 11,
+            "w": 1509,
+            "head": "3.数据记录表字段编辑",
+            "headW": 138,
+            "bodyW": 212,
+            "need": 228
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "panel": "RD_SCALE",
+    "tables": [
+      {
+        "width": 1376,
+        "cells": [
+          {
+            "i": 0,
+            "span": 10,
+            "w": 1250,
+            "head": "惠州市银嘉环保科技有限公司—",
+            "headW": 196,
+            "bodyW": 126,
+            "need": 212
+          },
+          {
+            "i": 10,
+            "span": 1,
+            "w": 125,
+            "head": "",
+            "headW": 0,
+            "bodyW": 0,
+            "need": 16
+          }
+        ]
+      },
+      {
+        "width": 1376,
+        "cells": [
+          {
+            "i": 0,
+            "span": 11,
+            "w": 1375,
+            "head": "1.基本信息",
+            "headW": 68,
+            "bodyW": 88,
+            "need": 104
+          }
+        ]
+      },
+      {
+        "width": 1376,
+        "cells": [
+          {
+            "i": 0,
+            "span": 11,
+            "w": 1375,
+            "head": "2.测试条件",
+            "headW": 68,
+            "bodyW": 70,
+            "need": 86
+          }
+        ]
+      },
+      {
+        "width": 1376,
+        "cells": [
+          {
+            "i": 0,
+            "span": 11,
+            "w": 1375,
+            "head": "3.数据记录表字段编辑",
+            "headW": 138,
+            "bodyW": 158,
+            "need": 174
+          }
+        ]
+      }
+    ]
+  }
+]

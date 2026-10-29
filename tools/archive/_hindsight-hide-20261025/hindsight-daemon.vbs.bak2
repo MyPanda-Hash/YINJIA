@@ -1,0 +1,8 @@
+' Hindsight local memory daemon (DSH) - starts at logon with NO console window.
+' Replaces hindsight-daemon.bat, which opened a minimized cmd console every logon.
+' `daemon start` is idempotent: it adopts any daemon that is already running.
+' Window style 0 = hidden, so the process is invisible and not in the taskbar.
+Option Explicit
+Dim sh
+Set sh = CreateObject("WScript.Shell")
+sh.Run """C:\Users\x1787\.local\bin\hindsight-embed.exe"" -p coding-agent daemon start", 0, False
