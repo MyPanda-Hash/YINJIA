@@ -704,6 +704,13 @@ public class ButtonService {
         // 四个受控文件只按 [产品编号] 关联产品信息表,重号会让"这个产品有哪些文件"分不清 ⇒ 全局唯一。
         // 与文档编号同口径:保存(提交口径)才校验,保存为草稿放过;已作废单据不算占用。
         if (markSaved && "RD_PROD_INFO".equals(def.code())) ensureProductCodeUnique(def, head, no);
+        // 规格书:「一个产品信息表只能对应一张规格书」(用户 2026-10-21 口径「不能多次引用」)。
+        // 🔴 2026-10-29 全流程验收抓到的缺口:这条规则此前**只做在前端引用弹窗**里
+        //   (已引用的行标 __used、点它只提示),后端保存完全没校验 ⇒ 直连 /px/callButton
+        //   或换台机器,同一个产品编号能存出**第二张规格书**,两套数据并存且各自走审批归档
+        //   (实测 SD-2026-10-0017 / SD-2026-10-0018 两张都绑 YJ-CB-2026-001,后一张返回 200)。
+        //   照 ensureProductCodeUnique 的既有做法补齐:保存(提交口径)才校验、已作废不算占用。
+        if (markSaved && "RD_SPEC_DOC".equals(def.code())) ensureSpecOnePerProduct(def, head, no);
         // 产品信息表「编辑人」= 本次**保存人**的真实姓名。
         //   2026-10-21 口径:「产品信息表的编辑人是提交审批的人的账号的真实名字」;
         //   2026-10-28 口径扩展:「编辑自动填入当前的对应账号姓名」—— 存草稿同样算一次编辑,
@@ -787,6 +794,50 @@ public class ButtonService {
         if (!dup.isEmpty()) {
             throw new IllegalStateException("产品编号「" + code + "」已被产品信息表 " + str(dup.get(0).get("no"))
                     + " 占用：一个产品编号只能对应一张产品信息表，请换号（同号老单已作废才可复用）");
+        }
+    }
+
+    /**
+     * 规格书「一个产品信息表只能对应一张规格书」的唯一性校验(2026-10-29 补)。
+     *
+     * <p>用户口径(2026-10-21)：「一个产品信息表对应一个产品规格书,不能多次引用」。
+     * 此前只在前端引用弹窗里拦(已引用的行标 __used),后端保存完全不校验 ⇒
+     * 直连接口就能把同一产品编号存成第二张规格书,两套数据并存且各自走审批归档。
+     *
+     * <p>判据与 {@link #ensureProductCodeUnique(String, String)} 同源(便于两处口径一致):
+     * <ul>
+     *   <li>按 [产品编号] 查 rd_spec_doc_head;</li>
+     *   <li>排除自己那张({@code 单据编号 <> no})—— 改自己时不能判成冲突;</li>
+     *   <li>排除已作废的两侧(业务表 asp_cancel='Y' + 状态表 canceled='Y')——
+     *       否则作废后永远无法重录同一产品;</li>
+     *   <li>空产品编号跳过(草稿阶段允许还没引用)。</li>
+     * </ul>
+     */
+    private void ensureSpecOnePerProduct(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
+        Object raw = head == null ? null : head.get("产品编号");
+        if (raw == null && head != null) {
+            PanelRegistry.FieldDef f = def.byCol("产品编号");
+            if (f != null) raw = head.get(f.label());
+        }
+        if (raw == null) {
+            // 载荷没带(局部提交):退回库里的现值
+            try {
+                List<String> cur = jdbc.queryForList(
+                        "SELECT [产品编号] FROM rd_spec_doc_head WHERE [单据编号] = ?", String.class, no);
+                if (!cur.isEmpty()) raw = cur.get(0);
+            } catch (Exception ignore) { /* 取不到就跳过 */ }
+        }
+        String code = String.valueOf(raw == null ? "" : raw).trim();
+        if (code.isEmpty()) return;
+        List<Map<String, Object>> dup = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] AS no FROM rd_spec_doc_head"
+                        + " WHERE [产品编号] = ? AND [单据编号] <> ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SPEC_DOC'"
+                        + " AND s.doc_no = rd_spec_doc_head.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')",
+                code, no == null ? "" : no);
+        if (!dup.isEmpty()) {
+            throw new IllegalStateException("产品编号「" + code + "」已存在规格书 " + str(dup.get(0).get("no"))
+                    + "：一个产品信息表只能对应一张产品规格书，不能再引用（原规格书作废后才可重录）");
         }
     }
 
