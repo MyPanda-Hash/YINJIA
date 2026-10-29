@@ -4156,7 +4156,7 @@ function onProdPickRowClick(row) {
  * 确认引用:按 prodPick.map 逐项写回封面,空值**不回填**(同 autoFillSpec 口径 ——
  * 拿空串去冲掉已录内容等于丢数据),最后提示带入了多少项,让用户知道成不成功。
  */
-function confirmProdPick() {
+async function confirmProdPick() {
   const pp = prodPickCfg.value
   const row = prodPickRow.value
   if (!pp || !row) return
@@ -4183,6 +4183,72 @@ function confirmProdPick() {
   emit('dirty')
   ElMessage.success(tt('已引用产品信息表 {no}，带入 {n} 项')
     .replace('{no}', String(row['单据编号'] ?? '')).replace('{n}', String(filled)))
+
+  // ── 关键物料列表 ← 产品信息表的 BOM 明细(2026-10-29 用户口径)──
+  // 「现在把这个规格书的 1.关键物料列表 改为在选择产品信息表的产品编号的时候,由产品信息表带过来」;
+  // 追问「已有手工行怎么办」选 B:「清空后整表重带」。
+  // ⇒ 选完产品编号,**先清空该表区已有的全部物料行,再按 BOM 明细整表重带**。
+  //   清空是用户明确要求的(避免旧产品的残留行混在新产品里)。
+  await carryBomFromProdBom(row)
+}
+
+/**
+ * 规格书「1.关键物料列表」← 产品信息表的 BOM 明细。
+ *
+ * 数据源 = **产品信息表的 BOM 明细**(rd_prod_info_detail),不是物料清单 —— 用户 2026-10-29 口径:
+ * 「从产品信息表的 BOM 明细带,然后产品信息表的BOM明细在产品信息表归档之后,
+ *  同时保存到物料清单里面去」。⇒ 两条链是**同源**:产品信息表是权威,BOM 随归档流进物料清单。
+ *
+ * 覆盖语义 = 用户选的 B:「清空后整表重带」。所以这里先删本表区的行,再整批重建
+ * (而不是追加) —— 换成另一个产品编号时不会把上一个产品的料留着。
+ *
+ * 映射(BOM 明细 → 规格书物料清单列):
+ *   物料编码 ← 物料编号 / 物料名称 ← 物料名称 / 规格参数 ← 尺寸规格 / 数量 ← 数量 /
+ *   备注 ← (产品信息表 BOM 没有备注列,留空)
+ */
+async function carryBomFromProdBom(prodRow) {
+  const dt = (cfg.value?.dataTables || []).find((d) => d.tablesAfterBar === '1.关键物料列表')
+  if (!dt) return
+  const docNo = String(prodRow?.['单据编号'] ?? '').trim()
+  if (!docNo) return
+  let rows = []
+  try {
+    // 取那张产品信息表的**明细行**:单据面板列表接口回的 list 行带 detail.items(与其它链路同款形状)
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: 'RD_PROD_INFO', condition: {}, pageNo: 1, pageSize: 500,
+    })
+    const hit = (listOfRes(res) || []).find((r) => String(r?.['单据编号'] ?? '').trim() === docNo)
+    const items = hit?.detail?.items || hit?.detail?.children || []
+    rows = Array.isArray(items) ? items : []
+  } catch (e) {
+    ElMessage.warning(tt('取产品信息表 BOM 明细失败，关键物料列表未带入'))
+    return
+  }
+  // 清空后整表重带(B 方案)
+  const cur = rowsOf(dt)
+  cur.splice(0, cur.length)
+  const colKeys = (dt.cols || []).map((c) => c.key)
+  let n = 0
+  for (const r of rows) {
+    const code = String(r['物料编号'] ?? '').trim()
+    if (!code) continue
+    addRow(dt)
+    const list = rowsOf(dt)
+    const row = list[list.length - 1]
+    if (!row) continue
+    if (colKeys.includes('序号')) row['序号'] = String(list.length)
+    if (colKeys.includes('物料编码')) row['物料编码'] = code
+    if (colKeys.includes('物料名称')) row['物料名称'] = String(r['物料名称'] ?? '')
+    if (colKeys.includes('规格参数')) row['规格参数'] = String(r['尺寸规格'] ?? '')
+    if (colKeys.includes('数量')) row['数量'] = String(r['数量'] ?? '')
+    n++
+  }
+  emit('dirty')
+  if (n) {
+    ElMessage.success(tt('已按产品信息表的 BOM 明细带入 {n} 行关键物料').replace('{n}', String(n)))
+  } else {
+    ElMessage.info(tt('该产品信息表还没有 BOM 明细，关键物料列表已清空'))
+  }
 }
 
 // ---------- 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表) ----------

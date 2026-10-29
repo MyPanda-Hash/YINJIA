@@ -1279,9 +1279,112 @@ public class ButtonService {
                 + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, shr, shsj, archived_at, update_at) "
                 + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', ?, GETDATE(), GETDATE(), GETDATE());",
                 panelCode, no, user, user);
-        // 四个受控文件:归档即**本文件受控**(2026-09-30 用户口径「受控按文件」)。
-        // 需求原文(《产品开发系统需求汇总》5.1):「保存/提交 → 提交后审批 → 审批后自动受控」。
         markFileControlled(panelCode, no, user);
+        // 产品信息表归档 ⇒ BOM 明细同步写入物料清单(mate)。
+        // 挂在这里是因为 markArchived 是**唯一的归档入口**:保存即归档 / 审批通过 /
+        // 二级审批通过 / 再归档,四条路最后都汇到本方法 —— 挂别处必漏。
+        if ("RD_PROD_INFO".equals(panelCode)) syncProdBomToMaterialList(no, user);
+    }
+
+    /**
+     * 产品信息表归档时,把它的 BOM 明细同步成一张**物料清单**。
+     *
+     * <p>用户口径(2026-10-29):「产品信息表的BOM明细在产品信息表归档之后,同时保存到物料清单
+     * 里面去」;问「重复归档怎么处理」选 B:「覆盖更新,这个是因为产品编号是唯一的,
+     * 如果BOM更新了,就根据这个产品编号重新覆盖原来的BOM就行了」。
+     *
+     * <p><b>覆盖语义</b>(与需求逐条对应):
+     * <ul>
+     *   <li>定位键 = <b>产品编号</b>(物料清单表头 m_no 存的也是产品编号)—— 同编号重新归档时
+     *       先删掉该编号的旧子件行,再写新的一批 ⇒ 物料清单里永远只有**一张**该产品的单,
+     *       BOM 改了就是覆盖,不会出现第二张;</li>
+     *   <li>产品编号改过名(旧号 → 新号):本次归档只按**新号**写;
+     *       旧号那张不在本方法处理范围(它对应的是另一次归档,由那次的状态负责),
+     *       不在归档热路径上做"清理孤儿"这种不可逆动作。</li>
+     * </ul>
+     *
+     * <p><b>字段映射</b>(mate 的物理列 → 产品信息表的数据键):
+     * <pre>
+     *   m_no   物料清单号     ← 产品编号
+     *   m_date 单据日期       ← 单据日期
+     *   wzdm1  物料代码(表头) ← 产品编号(原实现里 wzdm1 ≡ m_no,实测 24/24 相等)
+     *   wzmc1  物料名称(表头) ← 产品名称
+     *   wzdm2  子件代码       ← 明细 物料编号
+     *   wzmc2  子件名称       ← 明细 物料名称
+     *   gg2    规格型号       ← 明细 尺寸规格
+     *   bzl    标准用量       ← 明细 数量
+     * </pre>
+     * 规格书「从物料清单引用」读的就是这几个键(见前端 recordSheetPanels 的 mate 分支),
+     * 两边口径必须一致 —— 改这里要同步改那边。
+     *
+     * <p><b>为什么不抛异常</b>:BOM 写失败只记 warning。归档是业务主流程,让它因为
+     * "物料清单没写进去"而失败,单子会卡在未归档(比不同步更糟);而物料清单可随时靠
+     * 重新归档重算 —— 幂等,补得回来。
+     */
+    private void syncProdBomToMaterialList(String no, String user) {
+        try {
+            if (no == null || no.isBlank()) return;
+            PanelRegistry.PanelDef def = registry.panel("RD_PROD_INFO");
+            if (def == null) return;
+            String headTbl = def.headTable();
+            String dtlTbl = def.lineTable();   // PanelDef 里明细表叫 lineTable(不是 detailTable)
+            if (headTbl == null || headTbl.isBlank() || dtlTbl == null || dtlTbl.isBlank()) return;
+
+            // ── 表头:产品编号(定位键)/ 单据日期 / 产品名称 ──
+            java.util.List<java.util.Map<String, Object>> heads = jdbc.queryForList(
+                    "SELECT TOP 1 [产品编号], [产品名称], [单据日期] FROM [" + headTbl + "] WHERE ["
+                            + def.groupCol() + "] = ?", no);
+            if (heads.isEmpty()) return;
+            java.util.Map<String, Object> h = heads.get(0);
+            String prodNo = safeStr(h.get("产品编号"));
+            if (prodNo.isBlank()) {
+                log.warn("[BOM→物料清单] 产品信息表 {} 没有产品编号,跳过同步(物料清单以产品编号为准)", no);
+                return;
+            }
+
+            // ── 明细:物料编号 / 物料名称 / 尺寸规格 / 数量 ──
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT [物料编号],[物料名称],[尺寸规格],[数量] FROM [" + dtlTbl + "] WHERE ["
+                            + def.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [序号]", no);
+            if (rows.isEmpty()) {
+                log.info("[BOM→物料清单] 产品信息表 {} (产品编号 {}) 没有 BOM 明细,跳过同步", no, prodNo);
+                return;
+            }
+
+            // ── 覆盖更新:先清该产品编号的旧子件(mate 一行 = 一个子件,表头信息重复携带)──
+            int del = jdbc.update("DELETE FROM [mate] WHERE [m_no] = ?", prodNo);
+
+            Object mDate = h.get("单据日期");
+            String prodName = safeStr(h.get("产品名称"));
+            int ins = 0;
+            for (java.util.Map<String, Object> r : rows) {
+                String subCode = safeStr(r.get("物料编号"));
+                if (subCode.isBlank()) continue;
+                jdbc.update("INSERT INTO [mate] ([m_no],[m_date],[wzdm1],[wzmc1],[wzdm2],[wzmc2],[gg2],[bzl],"
+                                + "[asp_user1],[asp_time1],[asp_cancel]) VALUES (?,?,?,?,?,?,?,?,?,GETDATE(),'N')",
+                        prodNo, mDate, prodNo, prodName,
+                        subCode, safeStr(r.get("物料名称")), safeStr(r.get("尺寸规格")), safeNum(r.get("数量")), user);
+                ins++;
+            }
+            log.info("[BOM→物料清单] 产品信息表 {} → 物料清单 {} :覆盖 {} 行、写入 {} 行",
+                    no, prodNo, del, ins);
+        } catch (Exception e) {
+            // 不抛:归档主流程优先(见方法注释)
+            log.warn("[BOM→物料清单] 产品信息表 {} 同步失败(归档已照常完成):{}", no, e.getMessage());
+        }
+    }
+
+    /** 安全取字符串(空/null → "") —— 注意与类里已有的 {@link #str(Object)}(返回 null)区分:
+     *  本方法给「拼 SQL 值 / 判空」用,返回空串更省心;那个给「有值才写」用。 */
+    private static String safeStr(Object v) {
+        return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    /** 安全取数值(文本"2"→2.0;空/非数字 → null,不伪造 0) */
+    private static Double safeNum(Object v) {
+        String s = safeStr(v);
+        if (s.isEmpty()) return null;
+        try { return Double.valueOf(s); } catch (NumberFormatException e) { return null; }
     }
 
     /**
