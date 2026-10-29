@@ -7139,13 +7139,15 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // 物料清单(WLBOM,2026-10-21 用户口径):「物料清单填写是需要保存的,现在显示的都是草稿,
-            //   这个填写保存不需要审批,修改也不需要审批」—— 登记入本集合才走「保存即归档」,
-            //   否则保存后永远停在草稿态(实测用户看到的就是全草稿)。
-            //   它与其余文件类面板的差别只有一处:不区分管理员/普通用户、**谁保存都直接归档**,
-            //   见 SELF_MAINTAINED_PANELS。
-            "WLBOM");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO"
+            // ⚠ 物料清单(WLBOM,2026-10-21 曾登记,2026-10-29 **移出**)——
+            //   当年登记是想让「保存后不是草稿」,但落到本集合 = 保存即归档,而前端 draftEditable
+            //   不认「已归档」⇒ **保存一次就锁死、再也改不了**(2026-10-29 用户报障:
+            //   「这个是不需要审批的,现在保存之后是不能修改的」)。
+            //   用户口径是「填写和修改都不需要审批」= 基础数据随时可改,不是"存一次定稿的文书"。
+            //   ⇒ 移出本集合,WLBOM 保存后**保持草稿**,前端天然可继续编辑;
+            //     它也不进 SELF_MAINTAINED_PANELS(那里同样意味着保存即归档)。
+            );
     /**
      * **自助维护型**面板(2026-10-21):保存即归档,**任何用户都不走审批**。
      *
@@ -7155,13 +7157,21 @@ public class ButtonService {
      * 普通用户保存=送审」;这里登记的面板连审批都没有(工具栏也没有审批组),
      * 谁保存都直接置为已归档 —— 它是**基础数据**,不是要签核的文书。
      *
+     * <p>⚠ 2026-10-29 起 **WLBOM 已移出**(集合目前为空):
+     *   用户报障「物料清单保存之后是不能修改的」。根因是本集合的语义 = 保存即归档,
+     *   而前端 draftEditable 不认「已归档」⇒ 存一次就锁死。
+     *   用户口径「填写不需要审批、修改也不需要审批」的正确实现是
+     *   **保存后保持草稿**(随时可改),而不是"存一次就定稿归档"。
+     *   ⇒ WLBOM 既不进本集合、也不进 DOC_ARCHIVE_PANELS。
+     *   本集合保留给将来真正"存一次定稿"的自助面板。
+     *
      * <p>配套:
      * <ul>
      *   <li>{@code PanelConfigService} 对这里的面板把「审批」组换成「修改」组;</li>
      *   <li>保存分支见 {@code saveDoc} 里的 SELF_MAINTAINED 判断。</li>
      * </ul>
      */
-    public static final java.util.Set<String> SELF_MAINTAINED_PANELS = java.util.Set.of("WLBOM");
+    public static final java.util.Set<String> SELF_MAINTAINED_PANELS = java.util.Set.of();
 
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
      *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):

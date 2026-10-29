@@ -350,7 +350,12 @@ public class PanelConfigService {
             //   (前端 PanelxList 的「申请修改 / 修改记录」组,见 PanelxList.vue 修改组注释),
             //   而工具栏本身会过滤掉 修改 这个动作(PanelxList.vue:3159,自 2026-10-07 单据卡片下线起)。
             //   WLBOM 已登记进 ButtonService.DOC_ARCHIVE_PANELS ⇒ docArchive=true ⇒ 侧栏自动出现修改入口。
-            if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
+            // WLBOM(物料清单)2026-10-29 起**也不出审批组**:用户口径「填写/修改都不需要审批」,
+            //   它保存后保持草稿、随时可改,工具栏只该有「保存 / 保存为草稿 / 删除 / 刷新 / 导入」。
+            //   (它已从 SELF_MAINTAINED_PANELS 与 DOC_ARCHIVE_PANELS 双双移出 ——
+            //    前者=保存即归档会锁死,后者=保存即送审同样锁死,见 ButtonService 两处注释。)
+            if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())
+                    && !NOT_APPROVAL_PANELS.contains(def.code())) {
                 buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             }
             buttonGroups.add(group("生单", List.of("生单")));
@@ -973,6 +978,19 @@ public class PanelConfigService {
      * 与采购订单/采购入库单等 PANDA 面板的「导入」同一套实现,不新增后端端点。
      */
     private static final java.util.Set<String> IMPORTABLE_PANELS = java.util.Set.of("WLBOM");
+
+    /**
+     * **不设审批组**的平铺用面板(2026-10-29)。
+     *
+     * <p>用户口径(物料清单 WLBOM):「这个是不需要审批的」。
+     * 它既不是文书面板(不该保存即归档),也不是自助维护型(不该存一次定稿)——
+     * 就是**随时可改的基础数据**,保存后保持草稿。
+     *
+     * <p>为什么单独开一个集合而不是塞进 SELF_MAINTAINED_PANELS:
+     * 那个集合的语义是「保存即归档」,把 WLBOM 放回去会重新锁死(2026-10-29 报障的原因)。
+     * 这里只表达"工具栏不出审批按钮",与归档行为解耦。
+     */
+    private static final java.util.Set<String> NOT_APPROVAL_PANELS = java.util.Set.of("WLBOM");
 
     /**
      * 平表面板「更多」组的动作清单。

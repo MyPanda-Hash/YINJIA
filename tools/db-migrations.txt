@@ -4301,6 +4301,10 @@ migrate-rd-domtest-docno-headdefaults-20261029.sql
 #   两账套都执行。
 migrate-asm-proc-form-stdlib-20261029.sql
 
+# 2026-10-29 物料清单(WLBOM)保存后仍可编辑:代码侧移出「保存即归档」两集合(SELF_MAINTAINED/DOC_ARCHIVE),
+#   本脚本回正存量 —— 已被旧逻辑置成已归档的 WLBOM 单退回草稿。两账套都执行。
+migrate-wlbom-editable-20261029.sql
+
 # 2026-10-29 删除 8 张数据记录表上无人使用的「测试申请单编号」列(关联判据改为「文档编号」)。
 #   删前已核实:两账套该列非空行数全 0;脚本内置守卫(有数据即中止)。两账套都执行。
 migrate-drop-domtest-link-col-20261029.sql
