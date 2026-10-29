@@ -3,7 +3,8 @@
  *   ① 左上角日期从「单日/近N天档位」改成**日期范围选择**(daterange,默认 [今天,今天]);
  *   ② 工具栏「列设置」:勾掉「客户订单号」→ 表头消失;刷新页面仍不出现(后端持久化 + 挂载即应用);
  *      「恢复默认」→ 保存 → 表头回来;
- *   ③ 「型号」旁新增**产品名称**列,值=订单行存货名称(非空)。
+ *   ③ 「型号」旁新增**产品名称**列,值=订单行存货名称(非空);「订单资料」右侧新增**物料编码**单列(有值);
+ *   ④ 「列设置」支持**调整列顺序**(▲▼):下移一位 → 保存生效 → 刷新仍按新顺序 → 恢复默认回默认顺序;
  * 附带:旧口径不能回归(今天没数据→弹窗询问;取消=留在本日);英语界面新控件全译、无裸中文;无 JS 报错。
  *
  * 用法(先确认 5173/8090 都在跑):
@@ -297,6 +298,51 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
   await sleep(1500)
   s = await waitFor(ev, (x) => x.heads.includes('客户订单号'), 10000)
   check(s.heads.includes('客户订单号'), '② 「恢复默认」+保存后列全部回来', s.heads.join('|'))
+
+  // ⑤ 调整列顺序(2026-10-29 追加口径):▼ 把「物料编码」下移一位 → 表头顺序变 → 刷新仍按新顺序
+  const MID = ['物料编码', '行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量']
+  const midOrder = (heads) => heads.filter((h) => MID.includes(h))
+  const midBefore = midOrder(s.heads)
+  check(midBefore.length === MID.length && midBefore[0] === '物料编码', '⑤ 初始列顺序 = 默认(物料编码第一)', midBefore.join('|'))
+  await clickText(ev, '.oc-bar .el-button', '列设置')
+  await sleep(900)
+  const mv = await ev(`(() => {
+    const d = [...document.querySelectorAll('.el-dialog')].find(x => x.innerText.includes('列设置'));
+    if (!d) return 'no-dialog';
+    const it = [...d.querySelectorAll('.csd-item')].find(x => (x.querySelector('.csd-label')?.innerText || '').trim() === '物料编码');
+    if (!it) return 'no-item';
+    const btns = it.querySelectorAll('.csd-arrows .el-button');
+    if (btns.length < 2) return 'no-arrows';
+    btns[1].click(); return 'ok';
+  })()`)
+  check(mv === 'ok', '⑤ 列设置里有 ▲/▼ 调序按钮且可点', mv)
+  await sleep(400)
+  await clickText(ev, '.el-dialog__footer button', '保存')
+  await sleep(1500)
+  s = await waitFor(ev, (x) => !x.dialog, 10000)
+  const after = midOrder(s.heads)
+  check(after[0] === '行号' && after[1] === '物料编码', '⑤ 保存后列顺序生效(物料编码下移一位)', after.join('|'))
+
+  // 刷新后顺序仍要生效(顺序随 columns[] 一起持久化)
+  await send('Page.navigate', { url: `${BASE}/?t=${Date.now()}#/prod/plan/orderConvert` })
+  await sleep(9000)
+  await dismissOnboarding(ev)
+  s = await waitFor(ev, (x) => x.hasRange && (x.rows > 0 || x.empty || x.box), 25000)
+  if (s.box) { await clickText(ev, '.el-message-box__btns button', '留在本日'); await sleep(800) }
+  if (s.rows === 0) { await clickText(ev, '.oc-empty .el-button', '跳到最近有数据的一天'); s = await waitFor(ev, (x) => x.rows > 0, 15000) }
+  const afterReload = midOrder(s.heads)
+  check(afterReload[0] === '行号' && afterReload[1] === '物料编码', '⑤ 刷新后列顺序仍生效(持久化)', afterReload.join('|'))
+
+  // 恢复默认 → 顺序回到默认
+  await clickText(ev, '.oc-bar .el-button', '列设置')
+  await sleep(900)
+  await clickText(ev, '.csd-bar .el-button', '恢复默认')
+  await sleep(400)
+  await clickText(ev, '.el-dialog__footer button', '保存')
+  await sleep(1500)
+  s = await waitFor(ev, (x) => !x.dialog, 10000)
+  const def = midOrder(s.heads)
+  check(def[0] === '物料编码' && def.join('|') === MID.join('|'), '⑤ 恢复默认后顺序回到默认', def.join('|'))
 
   // 英语:新控件全译、工具栏无裸中文
   await openPage(ev, send, 'en')

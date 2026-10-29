@@ -530,6 +530,10 @@ export default {
     '单日只看一天;近几日=以所选日期为截止日往前数': 'Single day = that day only; recent days = count back from the selected end date',
     '该日期范围没有待结转数据': 'No pending orders in this date range',
     '看近7天': 'View last 7 days',
+    // 2026-10-29 列设置支持调整列顺序(▲▼):上移=靠左
+    '上移': 'Move up',
+    '下移': 'Move down',
+    '勾选决定显示哪几列;▲▼ 调整列顺序(上移=靠左)': 'Tick to show columns; ▲▼ reorders them (up = further left)',
     // 2026-10-29 用户口径:日期查询改「日期范围」选择;表格列可调(列设置显/隐)、型号旁增「产品名称」列
     '列设置': 'Columns',
     '下单日期': 'Order Date',

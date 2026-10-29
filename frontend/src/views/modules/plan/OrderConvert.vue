@@ -15,7 +15,8 @@
        ②工具栏加**「列设置」**:勾选决定表格显示哪些列(如不想看「客户订单号」就取消勾选),
          复用系统级列设置实现 useReportColumns + /px/reportColumnSettings(panelCode=ORDER_CONVERT,刷新后仍生效);
        ③「型号」列旁新增**「产品名称」**列(订单行 存货名称,与订单资料堆叠格同源);
-       ④「订单资料」右侧新增**「物料编码」**单列(订单行 存货编码;堆叠格小字保留,列可随列设置显隐)。 -->
+       ④「订单资料」右侧新增**「物料编码」**单列(订单行 存货编码;堆叠格小字保留,列可随列设置显隐);
+       ⑤「列设置」除显隐外还支持**调整列顺序**(▲▼ 上移/下移,草稿即预览,保存后刷新仍按该顺序)。 -->
 <template>
   <div class="oc-page">
     <!-- 汇总条(蓝底白字,同参考) -->
@@ -66,11 +67,7 @@
             <div class="oc-dim">{{ row.品名 }}</div>
           </template>
         </el-table-column>
-        <!-- 物料编码单列(2026-10-29 用户口径「当前表格列还应该增加有物料编码」):
-             订单行 存货编码;「订单资料」堆叠格里仍保留小字(紧凑识别用),本列可随「列设置」显隐/单独看 -->
-        <el-table-column v-if="colVisible('物料编码')" :label="tt('物料编码')" prop="物料编码" width="130" show-overflow-tooltip />
-        <el-table-column v-if="colVisible('行号')" :label="tt('行号')" prop="行号" width="70" />
-        <el-table-column v-if="colVisible('下单日期')" :label="tt('下单日期')" prop="下单日期" width="100" />
+        <!-- 交货日期(锁定常显·就地可改):与「订单资料」一起钉在左侧,不参与列顺序调整 -->
         <el-table-column :label="tt('交货日期')" width="150" fixed="left">
           <template #default="{ row }">
             <el-date-picker v-model="row.交货日期" type="date" value-format="YYYY-MM-DD" size="small"
@@ -79,18 +76,15 @@
                             :title="tt('同步交期常与创建日期雷同，可在此修正；保存交期或转单时回写订单行')" />
           </template>
         </el-table-column>
-        <el-table-column v-if="colVisible('客户')" :label="tt('客户')" prop="客户" min-width="160" show-overflow-tooltip />
-        <el-table-column v-if="colVisible('客户等级')" :label="tt('客户等级')" prop="客户等级" width="90" />
-        <!-- 产品名称(2026-10-29 用户口径「在当前的型号旁边增加产品名称」):取订单行 存货名称,
-             与「订单资料」堆叠格里的小字同源;单列后可随「列设置」显隐 -->
-        <el-table-column v-if="colVisible('产品名称')" :label="tt('产品名称')" prop="产品名称" width="170" show-overflow-tooltip />
-        <el-table-column v-if="colVisible('型号')" :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
-        <el-table-column v-if="colVisible('重点管控')" :label="tt('重点管控')" prop="重点管控" width="90" />
-        <el-table-column v-if="colVisible('客户订单号')" :label="tt('客户订单号')" prop="客户订单号" width="120" show-overflow-tooltip />
-        <el-table-column v-if="colVisible('需求数量')" :label="tt('需求数量')" prop="需求数量" width="100" align="right" />
-        <el-table-column v-if="colVisible('已排产数量')" :label="tt('已排产数量')" width="105" align="right">
+        <!-- 可调整列(2026-10-29):顺序与显隐都由「列设置」决定 ⇒ 这里按 orderedColumns 的**草稿顺序**渲染。
+             列定义(宽/右对齐/溢出省略)在 MID_COLUMNS,标签走 tt();锁定列(选择/订单资料/交货日期/剩余数量/
+             工艺路线/本次转单数量)固定在左右两端,不进列设置。 -->
+        <el-table-column v-for="col in orderedColumns" :key="col.prop" :label="tt(col.label)" :prop="col.prop"
+                         :width="col.width" :min-width="col.minWidth" :align="col.align"
+                         :show-overflow-tooltip="!!col.showOverflow">
           <template #default="{ row }">
-            <span :class="{ 'oc-blue': Number(row.已排产数量) > 0 }">{{ row.已排产数量 }}</span>
+            <span v-if="col.prop === '已排产数量'" :class="{ 'oc-blue': Number(row.已排产数量) > 0 }">{{ row.已排产数量 }}</span>
+            <span v-else>{{ row[col.prop] }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="tt('剩余数量')" width="100" align="right" fixed="right">
@@ -155,12 +149,12 @@
       </template>
     </el-dialog>
 
-    <!-- 列设置弹窗(2026-10-29):通用组件,显隐草稿由 useReportColumns 持有,
-         保存走 /px/reportColumnSettings(panelCode=ORDER_CONVERT),刷新后仍按保存的显隐渲染。
-         关闭/取消 = 丢弃未保存的勾选(回到后端已保存那份),否则"取消"后表格已经被改了 -->
+    <!-- 列设置弹窗(2026-10-29):通用组件,显隐**与列顺序**草稿由 useReportColumns 持有,
+         保存走 /px/reportColumnSettings(panelCode=ORDER_CONVERT),刷新后仍按保存的显隐/顺序渲染。
+         关闭/取消 = 丢弃未保存的勾选与顺序(回到后端已保存那份),否则"取消"后表格已经被改了 -->
     <ColumnSettingsDialog :model-value="columnVisible" :columns="columnDraft"
                           @update:model-value="onColumnDialogToggle"
-                          @toggle="onColToggle" @reset="resetDraft" @save="saveColumns" />
+                          @toggle="onColToggle" @move="onColMove" @reset="resetDraft" @save="saveColumns" />
     </div>
 
     <div class="oc-pager">
@@ -231,27 +225,54 @@ const s = ref({})
 /** 行内修改过交期(与原始值比对)的行 */
 const dateChanged = computed(() => rows.value.filter((r) => r.交货日期 && r.交货日期 !== r.交货日期原始))
 
-// ── 表格列设置「什么查看什么不查看」(2026-10-29 用户口径)────────────────────────────
-// 复用系统级实现:useReportColumns(列显隐 + 后端持久化 /px/reportColumnSettings,panelCode=ORDER_CONVERT)。
-// 弹窗里只放**可隐藏列**;以下列永远显示(它们是本页的操作与判断依据,隐藏后按钮点不了/看不出为何不能转单):
+// ── 表格列设置「什么查看什么不查看 + 列顺序」(2026-10-29 用户口径)──────────────────
+// 复用系统级实现:useReportColumns(列显隐/顺序 + 后端持久化 /px/reportColumnSettings,panelCode=ORDER_CONVERT)。
+// 弹窗里只放**可调整列**(显隐 + 顺序);以下列永远显示且固定在两端(本页操作与判断依据,隐藏后按钮点不了/看不出为何不能转单):
 //   选择框 / 订单资料 / 交货日期(可就地改) / 剩余数量 / 工艺路线(必选) / 本次转单数量(必填)。
-const COLUMNS = [
-  '物料编码', '行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量',
+// ⚠ 顺序:草稿数组顺序 = 表格列顺序(useReportColumns 的 visibleProps 按草稿顺序返回),保存后刷新仍按该顺序渲染。
+const MID_COLUMNS = [
+  { prop: '物料编码', label: '物料编码', width: 130, showOverflow: true },
+  { prop: '行号', label: '行号', width: 70 },
+  { prop: '下单日期', label: '下单日期', width: 100 },
+  { prop: '客户', label: '客户', minWidth: 160, showOverflow: true },
+  { prop: '客户等级', label: '客户等级', width: 90 },
+  { prop: '产品名称', label: '产品名称', width: 170, showOverflow: true },
+  { prop: '型号', label: '型号', width: 120, showOverflow: true },
+  { prop: '重点管控', label: '重点管控', width: 90 },
+  { prop: '客户订单号', label: '客户订单号', width: 120, showOverflow: true },
+  { prop: '需求数量', label: '需求数量', width: 100, align: 'right' },
+  { prop: '已排产数量', label: '已排产数量', width: 105, align: 'right' },
 ]
+const MID_PROPS = MID_COLUMNS.map((c) => c.prop)
 const {
   columnVisible, columnDraft, visibleProps,
   openDialog, saveDialog, cancelDialog, init: initColumns, resetDraft,
-} = useReportColumns(ref('ORDER_CONVERT'), computed(() => COLUMNS), rows)
+} = useReportColumns(ref('ORDER_CONVERT'), computed(() => MID_PROPS), rows)
 
-/** 某列当前是否显示(读取后端已保存的显隐;未保存过 = 全部显示) */
-function colVisible(prop) { return visibleProps.value.includes(prop) }
+/** 表格实际渲染的可调整列:按「列设置」草稿顺序 + 显隐过滤(未保存过 = 默认顺序、全部显示) */
+const orderedColumns = computed(() => visibleProps.value
+  .map((prop) => MID_COLUMNS.find((c) => c.prop === prop))
+  .filter(Boolean))
+
 /** 勾选/取消勾选:只改草稿,点弹窗「保存」才落后端 */
 function onColToggle({ prop, visible }) {
   const col = columnDraft.value.find((c) => c.prop === prop)
   if (col) col.visible = visible
 }
 /**
- * 弹窗开/关:关(取消按钮或右上角 X)= **丢弃未保存的勾选**,回到后端已保存那份。
+ * ▲/▼ 调整列顺序(2026-10-29 用户口径「把这个修改为可以调整这个表格列顺序的实现」):
+ * 只改草稿数组顺序(草稿即预览),点「保存」才落后端;delta=-1 上移/靠左,+1 下移/靠右。
+ */
+function onColMove({ prop, delta }) {
+  const arr = columnDraft.value
+  const i = arr.findIndex((c) => c.prop === prop)
+  const j = i + (Number(delta) || 0)
+  if (i < 0 || j < 0 || j >= arr.length) return
+  const [moved] = arr.splice(i, 1)
+  arr.splice(j, 0, moved)
+}
+/**
+ * 弹窗开/关:关(取消按钮或右上角 X)= **丢弃未保存的勾选与顺序**,回到后端已保存那份。
  * 不这么做的话,草稿即生效(visibleProps 从草稿派生)⇒ 点「取消」列也已经被改掉了。
  */
 function onColumnDialogToggle(open) {
