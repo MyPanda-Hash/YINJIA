@@ -2,9 +2,10 @@
  * routeDefaults.test.js — 「上次」预填纯逻辑单测(2026-10-25 条39/条7)
  *
  * 每条断言都指向定稿方案的拍板语义,改坏必红:
- *   · pickRouteDefault    → 优先级 上次(∈bs_route 候选)>绑定>空;上次已删路线回退绑定
+ *   · pickRouteDefault    → 优先级 同物料上次(∈bs_route 候选)> 同品名同规格族(∈候选)> 绑定 > 空
+ *                           (2026-10-29 增族兜底:同物料无历史/路线已删时借同品名同规格的兄弟编码)
  *   · applyRouteDefaults  → **计算 default 后整行写入**(冷读#1 拍板,不是仅补空);
- *                           路线审核状态仅 source='last' 改写,bound/'' 保留后端列值
+ *                           路线审核状态仅 source='last'/'spec' 改写,bound/'' 保留后端列值
  *   · candidateLines      → 按生产车间过滤启用线;预填路径**不回退全量**(与手选回退的差异)
  *   · lineOptions         → 排线弹窗下拉:限定车间才筛,否则(新工序/车间没线)列全部启用线(2026-10-28)
  *   · applyLineDefaults   → 仅填空行;工序名两边 trim 后精确匹配;首道才用上次首道兜底;
@@ -60,6 +61,75 @@ test('pickRouteDefault:上次两侧空白也认(归一后比对)', () => {
   const r = pickRouteDefault({ 工艺路线: '', 上次工艺路线: ' GY-CB-STD ' }, routeSet)
   assert.equal(r.route, 'GY-CB-STD')
   assert.equal(r.source, 'last')
+})
+
+// ── ①-b 同品名同规格族兜底(2026-10-29 用户口径:同规格同品名的产品实现) ──
+
+test('pickRouteDefault:同物料无历史 → 用同品名同规格族路线兜底(source=spec)', () => {
+  const r = pickRouteDefault(
+    {
+      工艺路线: '', 上次工艺路线: '',
+      同品名同规格上次工艺路线: 'GY-CB-STD', 同品名同规格上次来源单: 'GD-2026-10-0201',
+      同品名同规格上次日期: '2026-10-18', 同品名同规格上次审核状态: '已审核',
+    },
+    routeSet,
+  )
+  assert.equal(r.route, 'GY-CB-STD')
+  assert.equal(r.source, 'spec')
+  assert.equal(r.fromNo, 'GD-2026-10-0201')          // 来源单取族档,不是同物料档
+  assert.equal(r.fromDate, '2026-10-18')
+})
+
+test('pickRouteDefault:同物料有历史时族不覆盖(优先级=同物料>族,2026-10-29 拍板)', () => {
+  const r = pickRouteDefault(
+    { 上次工艺路线: 'GY-2026-10-0001', 上次路线来源单: 'GD-A', 同品名同规格上次工艺路线: 'GY-CB-STD', 同品名同规格上次来源单: 'GD-B' },
+    routeSet,
+  )
+  assert.equal(r.route, 'GY-2026-10-0001')
+  assert.equal(r.source, 'last')
+  assert.equal(r.fromNo, 'GD-A')
+})
+
+test('pickRouteDefault:族路线已删(不在候选)→ 回退档案绑定', () => {
+  const r = pickRouteDefault({ 工艺路线: 'GY-CB-STD', 同品名同规格上次工艺路线: 'GY-DELETED' }, routeSet)
+  assert.equal(r.route, 'GY-CB-STD')
+  assert.equal(r.source, 'bound')
+})
+
+test('pickRouteDefault:同物料上次已删 → 先下探族(不是直接回退绑定)', () => {
+  const r = pickRouteDefault(
+    { 上次工艺路线: 'GY-DELETED', 同品名同规格上次工艺路线: 'GY-CB-STD', 同品名同规格上次来源单: 'GD-C' },
+    routeSet,
+  )
+  assert.equal(r.route, 'GY-CB-STD')
+  assert.equal(r.source, 'spec')
+  assert.equal(r.fromNo, 'GD-C')
+})
+
+test('applyRouteDefaults:source=spec 写族来源单/日期,审核状态取族审核状态', () => {
+  const rows = [{
+    工艺路线: 'GY-2026-10-0001', 路线审核状态: '已审核',     // 绑定档的旧值
+    同品名同规格上次工艺路线: 'GY-CB-STD', 同品名同规格上次来源单: 'GD-D',
+    同品名同规格上次日期: '2026-10-19', 同品名同规格上次审核状态: '未审核',
+  }]
+  applyRouteDefaults(rows, routeSet)
+  assert.equal(rows[0].工艺路线, 'GY-CB-STD')        // 整行写入:绑定被族档覆盖
+  assert.equal(rows[0].路线来源, 'spec')
+  assert.equal(rows[0].路线来源单, 'GD-D')
+  assert.equal(rows[0].路线来源日期, '2026-10-19')
+  assert.equal(rows[0].路线审核状态, '未审核')        // 族路线没审核 → 前端红显/转单前置拦生效
+})
+
+test('applyRouteDefaults:族与同物料都无历史 → 保留后端绑定值与"未选择"状态', () => {
+  const bound = { 工艺路线: 'GY-CB-STD', 路线审核状态: '已审核', 上次工艺路线: '', 同品名同规格上次工艺路线: '' }
+  applyRouteDefaults([bound], routeSet)
+  assert.equal(bound.工艺路线, 'GY-CB-STD')
+  assert.equal(bound.路线来源, 'bound')
+  assert.equal(bound.路线审核状态, '已审核')
+  const none = { 工艺路线: '', 路线审核状态: '未选择', 上次工艺路线: '', 同品名同规格上次工艺路线: '' }
+  applyRouteDefaults([none], routeSet)
+  assert.equal(none.路线来源, '')
+  assert.equal(none.路线审核状态, '未选择')
 })
 
 // ── ② applyRouteDefaults:整行写入语义 ──

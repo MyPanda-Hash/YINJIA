@@ -6,10 +6,14 @@
  *
  * 数据键中文(与 dataName 口径一致,永不翻译):
  *   · 条39 后端 pending 行:工艺路线(=档案绑定 bs_inv.工艺路线)、上次工艺路线/上次路线来源单/上次日期/上次路线审核状态
+ *     ,以及 2026-10-29 增的「同品名同规格」族兜底四列:同品名同规格上次工艺路线/…来源单/…日期/…审核状态
  *   · 条7 后端 routeSteps:上次首道 {上次首道线, 工单号, 日期}、上次产线 [{工序, 上次生产线, 工单号, 日期}]
  *
- * 优先级(定稿拍板):**上次 > 档案绑定** —— 按需求原文「带出之前选过的」定死;
- * 若业务日后要求「绑定优先、上次兜底」,只需对调 pickRouteDefault 里的两段顺序+对应断言,其余零影响。
+ * 优先级(2026-10-29 用户拍板):**同物料 > 同品名同规格(族兜底)> 档案绑定 > 空**
+ *   —— 先认这个存货编码自己的最近一次转单;只有它没历史(或带出的路线已不在 bs_route)时,
+ *   才用「同品名 + 同规格型号」的兄弟编码兜底(用户口径:「要同规格同品名的产品实现,
+ *   不然只是根据上次的随便一条转工单的工艺路线就没有实际存在的意义」)。
+ * 若业务日后要求「族优先、单物料兜底」,只需对调 pickRouteDefault 里两段顺序+对应断言,其余零影响。
  */
 
 const norm = (v) => String(v ?? '').trim()
@@ -59,12 +63,13 @@ export function lineOptions(step, lines) {
 }
 
 /**
- * 条39:该结转行的默认工艺路线。优先级 = 上次(须在 routeSet=bs_route 编码集合内)> 绑定 > 空。
+ * 条39:该结转行的默认工艺路线。
+ * 优先级 = 同物料上次(∈ bs_route 候选)> 同品名同规格族上次(∈ 候选)> 档案绑定 > 空。
  *
- * @param {object} row 后端 pending 行(含 工艺路线/上次工艺路线/上次路线来源单/上次日期/上次路线审核状态)
- * @param {Set<string>|Iterable<string>} routeSet 路线候选(bs_route 编码集合;上次已删路线 ⇒ 回退绑定)
- * @returns {{ route: string, source: 'last'|'bound'|'', fromNo: string, fromDate: string }}
- *   source='last'=按上次带出 / 'bound'=按档案绑定 / ''=两者皆无
+ * @param {object} row 后端 pending 行(含 工艺路线/上次工艺路线/… 与 同品名同规格上次工艺路线/…)
+ * @param {Set<string>|Iterable<string>} routeSet 路线候选(bs_route 编码集合;上次已删路线 ⇒ 下探一档)
+ * @returns {{ route: string, source: 'last'|'spec'|'bound'|'', fromNo: string, fromDate: string }}
+ *   source='last'=按同物料上次带出 / 'spec'=按同品名同规格族兜底 / 'bound'=按档案绑定 / ''=皆无
  */
 export function pickRouteDefault(row, routeSet) {
   const set = routeSet instanceof Set ? routeSet : new Set([...(routeSet || [])].map(norm).filter(Boolean))
@@ -77,6 +82,16 @@ export function pickRouteDefault(row, routeSet) {
       fromDate: norm(row?.['上次日期']),
     }
   }
+  // 族兜底(2026-10-29):同物料没历史/路线已删时,借「同品名+同规格」的兄弟编码最近一次
+  const spec = norm(row?.['同品名同规格上次工艺路线'])
+  if (spec && set.has(spec)) {
+    return {
+      route: spec,
+      source: 'spec',
+      fromNo: norm(row?.['同品名同规格上次来源单']),
+      fromDate: norm(row?.['同品名同规格上次日期']),
+    }
+  }
   const bound = norm(row?.['工艺路线'])
   if (bound) return { route: bound, source: 'bound', fromNo: '', fromDate: '' }
   return { route: '', source: '', fromNo: '', fromDate: '' }
@@ -84,13 +99,14 @@ export function pickRouteDefault(row, routeSet) {
 
 /**
  * 条39:整行写入语义(冷读#1 拍板,**不是「仅补空值」**)——
- * 每行按 default=上次(∈候选)>绑定>空 **计算后整行写入** 行.工艺路线。
+ * 每行按 default=同物料上次(∈候选)>族兜底>绑定>空 **计算后整行写入** 行.工艺路线。
  * 此刻行刚由后端返回、无用户编辑可覆盖(与今天后端每次预填绑定同构);用户可逐行改,永不锁死。
  *
- * 路线审核状态**仅 source='last' 时**改写为 上次路线审核状态:
+ * 路线审核状态**仅 source='last'/'spec' 时**改写为上面对应档的审核状态:
+ *   · 'last' → 上次路线审核状态;'spec' → 同品名同规格上次审核状态;
  *   · source='bound' 保留后端按绑定算好的列值(本就正确);
  *   · source=''      保留后端的 '未选择'(无历史不产生红显噪音,冷读#6)。
- * 后端审核闸(requireRouteAudited)零改动,未审核的上次路线照样转不了单。
+ * 后端审核闸(requireRouteAudited)零改动,未审核的上次/族路线照样转不了单。
  *
  * @param {Array<object>} rows loadPending 映射后的行
  * @param {Set<string>|Iterable<string>} routeSet bs_route 编码集合
@@ -104,6 +120,7 @@ export function applyRouteDefaults(rows, routeSet) {
     row['路线来源单'] = pick.fromNo
     row['路线来源日期'] = pick.fromDate
     if (pick.source === 'last') row['路线审核状态'] = norm(row['上次路线审核状态'])
+    if (pick.source === 'spec') row['路线审核状态'] = norm(row['同品名同规格上次审核状态'])
   }
   return rows
 }

@@ -86,12 +86,18 @@
         </el-table-column>
         <el-table-column :label="tt('工艺路线')" width="180" fixed="right">
           <template #default="{ row }">
-            <!-- 用户口径(2026-10-05):**在订单结转处选择工序路线** —— 预填产品绑定(否则默认 GY-CB-STD),可逐行改;
+            <!-- 用户口径(2026-10-05):**在订单结转处选择工序路线** —— 预填产品绑定,可逐行改;
                  转单时原样带入工单(plang.工艺路线),之后排产/详情一律按这条路线解释"走到哪一步"。
                  2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」:未审核的路线标红 + 行内提示，
-                 转工单按钮对含未审核路线的行一并禁用(后端同口径拒绝)。 -->
+                 转工单按钮对含未审核路线的行一并禁用(后端同口径拒绝)。
+                 2026-10-25 条39:预填优先级=上次>绑定(applyRouteDefaults 整行写入);按上次带出的行
+                 加「上次」小标,tooltip 带出来源工单+日期。
+                 2026-10-29 增族兜底:同物料没历史时按「同品名同规格」的兄弟编码带出,小标写「同规格上次」,
+                 与单物料的「上次」区分开(两者 tooltip 文案不同)。 -->
             <span :class="row.工艺路线 && row.路线审核状态 === '已审核' ? 'oc-blue' : 'oc-warn'"
                   :title="routeAuditTip(row)">{{ row.工艺路线 || '-' }}</span>
+            <div v-if="row.路线来源 === 'last'" class="oc-last">{{ tt('上次') }}</div>
+            <div v-else-if="row.路线来源 === 'spec'" class="oc-last">{{ tt('同规格上次') }}</div>
           </template>
         </el-table-column>
         <el-table-column :label="tt('本次转单数量')" width="125" fixed="right">
@@ -152,6 +158,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { canDo } from '@core/auth/panelAccess'
+import { applyRouteDefaults } from '@/business/routeDefaults'
 
 /**
  * 页面级权限(2026-10-16):本页挂页面面板 ORDER_CONVERT
@@ -242,6 +249,12 @@ async function loadPending() {
       生单数量: Number(r.剩余数量) || 0,
       rowKey: `${r.订单号}#${r['行id']}`,
     }))
+    // 条39「转工单带上次工艺路线」(2026-10-25 定稿方案 v2):
+    // 整行写入语义(冷读#1 拍板)= 每行按 default=上次(须 ∈ bs_route 候选)>绑定>空 **计算后整行写入**;
+    // 此刻行刚由后端返回,无用户编辑可覆盖。routeSet 取自 routeOptions(bs_route 编码集合),
+    // loadRoutes 失败 ⇒ routeSet 空 ⇒ 「上次」静默不预填(保守失效无害:绑定预填仍在,页面照常)。
+    const routeSet = new Set(routeOptions.value.map((r) => String(r?.编码 ?? '').trim()).filter(Boolean))
+    applyRouteDefaults(rows.value, routeSet)
     pageNo.value = 1
     checked.value = []
     tableRef.value?.clearSelection?.()
@@ -312,12 +325,20 @@ async function toManu() {
   await convert('toManu', '转工单')
 }
 
-/** 工艺路线列的气泡提示(2026-10-16:未审核 → 说明为什么不能转工单) */
+/** 工艺路线列的气泡提示(2026-10-16:未审核 → 说明为什么不能转工单;
+ *  2026-10-25 条39:按上次带出的行追加 来源工单+日期,让用户知道默认值从哪来、可改;
+ *  2026-10-29 增族兜底来源:同物料上次 vs 同品名同规格族,文案分开写清口径) */
 function routeAuditTip(row) {
+  const src = row.路线来源单 ? `\n${row.路线来源单}${row.路线来源日期 ? ' · ' + row.路线来源日期 : ''}` : ''
+  const from = row.路线来源 === 'spec'
+    ? `\n${tt('按同品名同规格产品上次转单带出，可改')}${src}`
+    : row.路线来源 === 'last'
+      ? `\n${tt('按同物料上次转单带出，可改')}${src}`
+      : ''
   const st = row.路线审核状态
-  if (st === '已审核') return row.工艺路线
+  if (st === '已审核') return row.工艺路线 + from
   if (st === '未选择') return tt('未选择工艺路线，不能转工单')
-  return `${row.工艺路线 || ''}\n${tt('该工艺路线未审核，不能转工单；请先在「基础设置→工艺路线」完成审核')}`
+  return `${row.工艺路线 || ''}\n${tt('该工艺路线未审核，不能转工单；请先在「基础设置→工艺路线」完成审核')}` + from
 }
 
 async function convert(api, label) {
@@ -375,7 +396,10 @@ async function convert(api, label) {
 }
 
 onMounted(async () => {
-  loadRoutes()
+  // 条39(2026-10-25):先等路线档案到位再拉待结转行 —— applyRouteDefaults 要用 routeOptions
+  // 做「上次 ∈ bs_route」候选校验;fire-and-forget 会跟 loadPending 竞态(慢时首屏全部按绑定预填)。
+  // loadRoutes 自带 catch:失败 ⇒ routeOptions=[] ⇒ routeSet 空 ⇒ 「上次」静默不预填(页面照常)。
+  await loadRoutes()
   // 首帧:默认「单日 = 今天」并直接查;今天没有待结转数据时**弹窗询问**是否跳到最近有数据的一天
   // (2026-10-06 用户口径:以前是静默跳转,现在必须先问;取消就停在今天)。
   // 之前更早的写法是"不带条件拉全量":数据一多,进页面就卡死(同日用户报障)。
@@ -403,6 +427,8 @@ onMounted(async () => {
 .oc-orange { color: #e6a23c; font-weight: 600; }
 /* 未审核的工艺路线(2026-10-16 用户口径「审核完成后才能被使用」):红字提示 */
 .oc-warn { color: #f56c6c; font-weight: 600; }
+/* 条39(2026-10-25):工艺路线按「上次」带出的小标 */
+.oc-last { font-size: 11px; color: #e6a23c; line-height: 1.4; }
 .oc-route-note { margin-bottom: 6px; font-size: 12px; color: #e6a23c; }
 /* 路线弹窗里未审核的行:整行置灰，且不给选中 */
 :deep(.oc-row-warn) { color: #c0c4cc; background: #fafafa; }

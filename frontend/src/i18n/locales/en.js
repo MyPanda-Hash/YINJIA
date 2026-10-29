@@ -939,6 +939,9 @@ export default {
     '上次': 'Last used',
     '按同物料上次转单带出，可改': 'Prefilled from the last conversion of this material; editable',
     '按同物料上次排产带出，可改': 'Prefilled from the last scheduling of this material; editable',
+    // ---- 「同品名同规格」族兜底(2026-10-29 用户口径:同规格同品名的产品)----
+    '同规格上次': 'Last used (same spec)',
+    '按同品名同规格产品上次转单带出，可改': 'Prefilled from the last conversion of a product with the same name and spec; editable',
     '下一道工序': 'Next Process',
     '按勾选工单': 'per selected work order',
     '默认 GY-CB-STD': 'default GY-CB-STD',
