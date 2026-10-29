@@ -1464,6 +1464,7 @@ import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
+import { groupRows, stampGroup } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -3235,15 +3236,38 @@ function spreadSubHeads(dt) {
   }
   return out
 }
-/** 行集:矿化按 指标 / 规格书按 表区 分块(filterKey+filterVal);其余全量 */
+/**
+ * 「一组一行」的分组维度(2026-10-28 用户口径):
+ *   「把这三张表按测试项目、设备名称、仪器名称这些下拉来切数据表填写…一张单据可填写的内容就多一些,
+ *    而不是不同项目、仪器、设备都要新建一张单」。
+ * 声明在 recordSheetConfigs 面板级:
+ *   groupBy: { headKey: 头上下拉的字段 label, detailKey: 行上标组归属的字段 label }
+ * 规则(纯函数在 core/panel/recordGroup.js,有单测):切换下拉只改**显示哪些行**,
+ * 其它组的行仍留在 head.detail.items 里,保存时整体提交。
+ */
+const groupBy = computed(() => cfg.value?.groupBy || null)
+/** 当前下拉值(未选 = 空串 ⇒ 不过滤,保持改造前观感) */
+function currentGroupValue() {
+  const g = groupBy.value
+  if (!g?.headKey) return ''
+  const v = props.head?.[g.headKey]
+  return v === undefined || v === null ? '' : String(v).trim()
+}
+/** 行集:矿化按 指标 / 规格书按 表区 分块(filterKey+filterVal);分组面板再按当前下拉过滤;其余全量 */
 function rowsOf(dt) {
-  if (dt.filterKey) return items.value.filter((r) => (r[dt.filterKey] || '') === dt.filterVal)
-  if (!dt.metric) return items.value
-  return items.value.filter((r) => (r['指标'] || '') === dt.metric)
+  let list = items.value
+  if (dt.filterKey) list = list.filter((r) => (r[dt.filterKey] || '') === dt.filterVal)
+  else if (dt.metric) list = list.filter((r) => (r['指标'] || '') === dt.metric)
+  const g = groupBy.value
+  if (g?.detailKey) list = groupRows(list, g.detailKey, currentGroupValue())
+  return list
 }
 function addRow(dt) {
   const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
   if (dt.metric) row['指标'] = dt.metric
+  // 新行必须带上当前下拉值:否则它会飘在"空组"里,切到别组就看不见、重开也可能归错组
+  const g = groupBy.value
+  if (g?.detailKey) stampGroup(row, g.detailKey, currentGroupValue())
   // 序号自动编:dataTables 里声明 autoSeqBar 的表(成型配方表)按**本表区**已有行数续编。
   // 原来只认面板级 cfg.autoSeq 且用全表 touch().length 计数——多表区共用一张明细表时
   // 会串号(配方行数被工序/BOM 行数带偏),故改为按表区过滤后计数。
@@ -3268,6 +3292,23 @@ watch(() => [props.editable, props.head], ([v]) => {
   for (const row of cfg.value.seedRows) {
     arr.push({ ...row })
   }
+})
+
+/**
+ * 旧行归组(2026-10-28):改造前录的明细行没有分组列值 ⇒ 打开时归到**当前下拉那一组**。
+ * 不这么做的话,老单据的行会漂在"空组"里 —— 切到别的设备/仪器/项目再切回来才看得见,
+ * 用户会以为数据丢了。只在可编辑态补(已审批的单不该被前端改内容),已有值的行一律不动。
+ * ⚠ 只监听 head **对象引用**(加载/换单),不监听 head[headKey]:切下拉时不能再把空值行归到新组。
+ */
+watch(() => [props.editable, props.head], ([v]) => {
+  if (!v) return
+  const g = groupBy.value
+  if (!g?.detailKey) return
+  const cur = currentGroupValue()
+  if (!cur) return
+  const rows = items.value
+  if (!Array.isArray(rows) || !rows.length) return
+  for (const row of rows) stampGroup(row, g.detailKey, cur)
 })
 
 /**

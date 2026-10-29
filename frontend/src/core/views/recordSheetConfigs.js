@@ -817,6 +817,14 @@ export const recordSheetConfigs = {
           { key: '负责人', label: '负责人', w: 80, rowspan: 2 },
       ]},
     },
+    /**
+     * 一组一行(2026-10-28 用户口径「按测试项目/设备名称/仪器名称这些下拉来切数据表填写,
+     * 改为一张单据…而不是不同项目、仪器、设备都要新建一张单」):
+     *   头上下拉 = 当前编辑哪一组;明细行带同一个字段标明归属;切换只改**显示哪些行**,
+     *   其它组的行留在单据里,保存时整体提交(规则见 core/panel/recordGroup.js,有单测)。
+     * 加标水:下拉即 variantKey(测试项目),切换同时换列集与当前组 —— 两者本就同一个字段。
+     */
+    groupBy: { headKey: '测试项目', detailKey: '测试项目' },
     dataTables: [{}],
   },
 
@@ -979,6 +987,8 @@ export const recordSheetConfigs = {
     headMode: 'plain',
     plainTitle: '测试设备使用登记表',
     subtitle: { label: '设备名称：', key: '设备名称', type: 'select' },
+    /** 一台设备一组行(2026-10-28):切换「设备名称」只换显示的行,其它设备的记录仍在这张单里 */
+    groupBy: { headKey: '设备名称', detailKey: '设备名称' },
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 100 },
@@ -1002,6 +1012,8 @@ export const recordSheetConfigs = {
     headMode: 'plain',
     plainTitle: '实验室仪器使用记录表',
     subtitle: { label: '仪器名称/型号：', key: '仪器名称/型号', type: 'select' },   // 标准库(可维护)
+    /** 一台仪器一组行(2026-10-28):切换「仪器名称/型号」只换显示的行 */
+    groupBy: { headKey: '仪器名称/型号', detailKey: '仪器名称/型号' },
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 110 },
