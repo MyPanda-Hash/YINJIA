@@ -2267,6 +2267,14 @@ public class ButtonService {
             String liaison = pickOf(formData, "对接人");
             if (!liaison.isEmpty()) assignLiaison(def.code(), no, liaison, operator);
         }
+        // 测试申请单:审批时可以**一并分发测试负责人**(2026-10-29 用户口径
+        //   「借鉴前面的立项申请的流程,现在也加上在审批的时候可以分发对应的负责人去测试之后填写数据记录表」)。
+        // 与立项申请「定级分发」同一范式:审批弹窗里选人 → 通过即写 RD_DOM_TEST 头表「测试负责人」+ 留痕 + 通知。
+        // 载荷不带就跳过(兼容旧前端/老单:事后仍可用侧栏按钮补发)。
+        if ("RD_DOM_TEST".equals(def.code())) {
+            String tester = pickOf(formData, "测试负责人");
+            if (!tester.isEmpty()) assignTestOwner(no, tester, operator);
+        }
         // 产品变更申请单:审批通过即**生效**(2026-09-21 用户口径第⑤条)——状态转「已生效」,
         // 并按勾选的受控文件建下一版草稿(带来源单号)+ 通知各文件责任人重走受控审核
         if (CHANGE_PANEL.equals(def.code())) {
@@ -5226,6 +5234,31 @@ public class ButtonService {
     /** 首次分发/审批时一并分发(无原对接人) */
     private void assignLiaison(String panelCode, String no, String liaison, String operator) {
         assignLiaison(panelCode, no, liaison, operator, "");
+    }
+
+    /**
+     * 测试申请单:分发**测试负责人**(2026-10-29)。
+     *
+     * <p>用户口径:「借鉴前面的立项申请的流程,现在也加上在审批的时候可以分发对应的负责人去测试
+     * 之后填写数据记录表」—— 与立项申请「定级分发」同一范式:
+     * 审批弹窗里选人 → 审批通过即落库 + 留痕 + 通知被指派人。
+     *
+     * <p>落的是 {@code rd_dom_test_head.测试负责人}(账号口径,与 rd_approval.备用1 同款)。
+     * 分发的意义:被指派的人据此去填对应这张申请单的**数据记录表**(记录表表头的「测试申请单编号」
+     * 填这张单的号 —— 见 migrate-rd-domtest-link-20261029.sql)。
+     *
+     * @param tester 测试负责人账号(必须存在且启用)
+     */
+    private void assignTestOwner(String no, String tester, String operator) {
+        if (!isEnabledUser(tester)) throw new IllegalStateException("测试负责人账号不存在或已停用：" + tester);
+        jdbc.update("UPDATE rd_dom_test_head SET 测试负责人 = ? WHERE 单据编号 = ?", tester, no);
+        String name = realNameOf(tester);
+        recordApproval("RD_DOM_TEST", no, "TEST_OWNER", "DISPATCHED",
+                "分发测试负责人：" + name + "（" + tester + "）");
+        if (!tester.equals(operator)) {
+            notify(() -> messageService.send(List.of(tester), MessageService.LIAISON_ASSIGNED, "RD_DOM_TEST", no,
+                    Map.of("actor", operator), operator));
+        }
     }
 
     /** 分发对接人(2026-10-08 流程图③):定级完成后,由该面板**审批人**(∪ 管理员)从账号里指定一个对接人。

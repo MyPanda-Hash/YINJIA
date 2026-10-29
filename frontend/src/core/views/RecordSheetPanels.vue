@@ -1195,7 +1195,12 @@
           </tr>
           <tr v-for="(row, ri) in ledgerRows" :key="'lr' + ri">
             <td v-for="c in ledgerCfg.cols" :key="'lc' + c.label" class="rs-td" :class="{ 'rsp-center': c.align === 'center' }">
-              <span class="rs-txt rsp-cell">{{ ledgerCell(c, row, ri) }}</span>
+              <!-- 关联列(数据记录表):渲染成可点入口,点开弹窗看关联了哪几张、并逐张查看数据
+                   (2026-10-29 用户口径「点击可以弹窗显示对应的数据记录表的数据」) -->
+              <span v-if="c.link === 'recordSheets'" class="rsp-link-cell no-print" @click="openLinkedSheets(row)">
+                <el-icon><Document /></el-icon>{{ linkedCountOf(row) }}
+              </span>
+              <span v-else class="rs-txt rsp-cell">{{ ledgerCell(c, row, ri) }}</span>
             </td>
           </tr>
           <tr v-if="ledgerLoading">
@@ -1514,6 +1519,58 @@
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
+
+    <!-- ═══ 编号双源选择(2026-10-29):数据记录表的「文档编号」既可以关联立项申请的项目编号,
+         也可以关联**测试申请单的单据编号**。左栏沿用字段自己的参照定义(项目编号),
+         右栏是 RD_DOM_TEST 的单据编号清单 —— 用户口径「改为左右两边」。 -->
+    <DocNoPickDialog v-model="docNoPickVisible" :field="prodRefField" @confirm="onDocNoPickConfirm" />
+
+    <!-- ═══ 关联数据记录表(汇总表里点「数据记录表」那格):先列关联了哪几张,
+         再可单张打开看它的数据(2026-10-29 用户口径「点击可以弹窗显示对应的数据记录表的数据」) -->
+    <el-dialog v-model="linkedVisible" :title="tt('关联的数据记录表') + (linkedDomNo ? ' · ' + linkedDomNo : '')" width="880px" append-to-body>
+      <div class="lib-tip">{{ tt('这些记录表的「文档编号」填的就是这张测试申请单的编号。点「查看数据」显示该表内容。') }}</div>
+      <el-table :data="linkedRows" size="small" border max-height="300">
+        <el-table-column prop="panelName" :label="tt('记录表')" min-width="160" />
+        <el-table-column prop="docNo" :label="tt('单据编号')" width="180" />
+        <el-table-column prop="date" :label="tt('单据日期')" width="120" />
+        <el-table-column :label="tt('操作')" width="110" align="center">
+          <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="viewLinkedSheet(row)">{{ tt('查看数据') }}</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <span class="lib-tip">{{ linkedLoading ? tt('加载中…') : tt('暂无关联的数据记录表') }}</span>
+        </template>
+      </el-table>
+      <template #footer>
+        <el-button @click="linkedVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ═══ 单张数据记录表的数据(只读预览) ═══ -->
+    <el-dialog v-model="sheetViewVisible" :title="sheetViewTitle" width="980px" append-to-body>
+      <div v-if="sheetViewLoading" class="lib-tip">{{ tt('加载中…') }}</div>
+      <template v-else>
+        <table v-if="sheetViewFields.length" class="rs-t rsp-view-t">
+          <tbody>
+            <tr v-for="f in sheetViewFields" :key="f.key">
+              <td class="rs-td rs-label rsp-view-lb">{{ tt(f.label) }}</td>
+              <td class="rs-td rsp-view-vl">{{ f.value || ' / ' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="sheetViewItems.length" class="rsp-view-rows">
+          <div class="rsp-view-rows-t">{{ tt('明细') }}</div>
+          <el-table :data="sheetViewItems" size="small" border max-height="320">
+            <el-table-column v-for="k in sheetViewItemCols" :key="k" :prop="k" :label="tt(k)" min-width="110" show-overflow-tooltip />
+          </el-table>
+        </div>
+        <div v-if="!sheetViewFields.length && !sheetViewItems.length" class="lib-tip">{{ tt('该单据没有可显示的数据') }}</div>
+      </template>
+      <template #footer>
+        <el-button @click="sheetViewVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1521,7 +1578,7 @@
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Document } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
@@ -1533,6 +1590,7 @@ import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
+import DocNoPickDialog from './DocNoPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
@@ -2140,6 +2198,19 @@ async function loadLedger() {
     })
     const data = res?.data || res || {}
     ledgerRows.value = Array.isArray(data.list) ? data.list : []
+    // 关联记录表数量:台账里那列要显示"几张"(2026-10-29)。并行取,单张失败不影响台账本身。
+    if ((lg.cols || []).some((c) => c.link === 'recordSheets')) {
+      const nos = ledgerRows.value
+        .map((r) => String(r?.['单据编号'] ?? r?.['编号'] ?? ''))
+        .filter(Boolean)
+        .slice(0, 60)   // 台账上限 200 行;前 60 张够看清概览,其余点开时现查
+      const pairs = await Promise.all(nos.map(async (no) => {
+        try { return [no, await loadLinked(no)] } catch { return [no, []] }
+      }))
+      const next = { ...linkedMap.value }
+      for (const [no, list] of pairs) next[no] = list
+      linkedMap.value = next
+    }
   } catch {
     ledgerRows.value = [] // 取数失败只留空表(台账是只读附属视图,不该挡住单据本身)
   } finally {
@@ -2152,6 +2223,115 @@ async function loadLedger() {
  * seq 行号 / keys 按序回退 / map 显示映射 / 取不到即空串)。
  */
 const ledgerCell = ledgerCellOf
+// ── 关联数据记录表(2026-10-29):汇总表里一单关联了哪几张记录表、点开看它们的数 ──
+// 取数走后端 /px/linkedRecordSheets:按 8 张记录表表头的「测试申请单编号」反查。
+// 缓存按单据号存,避免同一张单反复点就反复请求(汇总表一屏有几十行)。
+const linkedMap = ref({})       // { docNo: [{panelCode,panelName,docNo,date}] }
+const linkedVisible = ref(false)
+const linkedRows = ref([])
+const linkedLoading = ref(false)
+const linkedDomNo = ref('')
+
+/**
+ * 该行关联了几张记录表。
+ * 还没取过 ⇒ 显示「查询」(**不能显示 0** —— 0 会被读成"没有关联",
+ * 而实际上只是还没查;用户点开才发现有关系,观感像坏了)。
+ */
+function linkedCountOf(row) {
+  const no = String(row?.['单据编号'] ?? row?.['编号'] ?? '')
+  const hit = linkedMap.value[no]
+  if (!hit) return '查询'
+  return hit.length ? String(hit.length) : '无'
+}
+
+async function loadLinked(no) {
+  if (!no) return []
+  if (linkedMap.value[no]) return linkedMap.value[no]
+  const res = await request.get('/px/linkedRecordSheets', { params: { domNo: no } }).catch(() => null)
+  const list = res?.data || []
+  linkedMap.value = { ...linkedMap.value, [no]: Array.isArray(list) ? list : [] }
+  return linkedMap.value[no]
+}
+
+/** 汇总表点「数据记录表」那格 */
+async function openLinkedSheets(row) {
+  const no = String(row?.['单据编号'] ?? row?.['编号'] ?? '')
+  linkedDomNo.value = no
+  linkedVisible.value = true
+  linkedLoading.value = true
+  try {
+    linkedRows.value = await loadLinked(no)
+  } finally {
+    linkedLoading.value = false
+  }
+}
+
+// ── 单张记录表的数据预览 ──
+const sheetViewVisible = ref(false)
+const sheetViewLoading = ref(false)
+const sheetViewTitle = ref('')
+const sheetViewFields = ref([])
+const sheetViewItems = ref([])
+const sheetViewItemCols = ref([])
+
+/**
+ * 打开某张关联记录表的数据(只读)。
+ * 走面板自身的表单描述接口拿"这张单的完整内容",与打开单据同源 ——
+ * 不另写一套取数 SQL,字段顺序/取值口径自然一致。
+ */
+/**
+ * 打开某张关联记录表的数据(只读)。
+ *
+ * ⚠ 为什么用 queryFormDataList 而不用 getFormDescriptor(2026-10-29 两轮实测):
+ *   getFormDescriptor 返回的是**编辑表单描述符**(data + detailData + meta/privilege/selectConfig…),
+ *   外层还包了一层 ApiResult,前端不同调用点解出来的层级不一致 —— 我连写两版层级都取错,
+ *   弹窗里列出的是 selectConfig/meta 这类**配置键**,不是单据数据。
+ *   queryFormDataList 是**列表接口**,返回 {list:[{表头字段…, detail:{items:[]}}]},
+ *   形状单一、且台账页本身就在用它(同一份真源)。按单据编号精确过滤后取第一行即可。
+ */
+async function viewLinkedSheet(r) {
+  sheetViewVisible.value = true
+  sheetViewLoading.value = true
+  sheetViewTitle.value = (r?.panelName || '') + ' · ' + (r?.docNo || '')
+  sheetViewFields.value = []
+  sheetViewItems.value = []
+  sheetViewItemCols.value = []
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: r.panelCode,
+      condition: { 单据编号: r.docNo },
+      pageNo: 1,
+      pageSize: 5,
+    })
+    const data = res?.data || res || {}
+    const list = Array.isArray(data.list) ? data.list : (Array.isArray(data) ? data : [])
+    // 条件过滤是 LIKE 语义 ⇒ 再按单号精确挑一次,避免把相似号也带进来
+    const doc = list.find((x) => String(x?.['单据编号'] ?? x?.['编号'] ?? '') === String(r.docNo)) || list[0] || {}
+    // 表头:只列有值的键;排除内部字段与明细容器
+    const SKIP = new Set(['id', '编号', '单据状态', '单据编号', 'detail', 'detailData', 'saved', '审核人', '审核时间', '审批状态', '提交人', '提交时间'])
+    sheetViewFields.value = Object.keys(doc || {})
+      .filter((k) => !SKIP.has(k) && !/^备用\d+$/.test(k) && !/^asp_/.test(k))
+      .filter((k) => String(doc[k] ?? '').trim() !== '')
+      .slice(0, 60)
+      .map((k) => ({ key: k, label: k, value: String(doc[k] ?? '') }))
+    // 明细:列表行的 detail.items(QueryService 的行契约)
+    const items = Array.isArray(doc?.detail?.items) ? doc.detail.items : []
+    sheetViewItems.value = items
+    const cols = []
+    for (const it of items.slice(0, 20)) {
+      for (const k of Object.keys(it || {})) {
+        if (k === 'id' || /^备用\d+$/.test(k) || /^asp_/.test(k)) continue
+        if (!cols.includes(k)) cols.push(k)
+      }
+    }
+    sheetViewItemCols.value = cols.slice(0, 20)
+  } catch (e) {
+    sheetViewFields.value = []
+    sheetViewItems.value = []
+  } finally {
+    sheetViewLoading.value = false
+  }
+}
 
 // 台账只在「切到台账页 / 换面板 / 换单(载入或保存后单据号变化)」时重取 —— 不跟随每一下击键
 watch(
@@ -3033,10 +3213,36 @@ watch(
   },
   { immediate: true }
 )
+/**
+ * 点参照格。
+ *
+ * 「文档编号」这格在**数据记录表**上要能挂两种来源(2026-10-29 用户口径):
+ *   左边立项申请的项目编号(原口径)、右边测试申请单的单据编号。
+ * 判定按**面板配置**声明(dualDocNo:true),而不是按面板码写死 ——
+ * 以后别的记录表也要挂测试申请单时,配置里加一行即可。
+ */
+const docNoPickVisible = ref(false)
+/** 这格的参照是否走「双源」弹窗(左=项目编号 / 右=测试申请单) */
+function isDualDocNoKey(key) {
+  if (!cfg.value?.dualDocNo) return false
+  return String(key) === String(cfg.value.dualDocNo)
+}
 function openProdRef(key) {
   if (!props.editable || !isRefKey(key)) return
   prodRefKey.value = key
+  if (isDualDocNoKey(key)) {
+    docNoPickVisible.value = true
+    return
+  }
   prodRefVisible.value = true
+}
+/** 双源选号的确认:把选中的编号写进那一格(两种来源写同一个字段) */
+function onDocNoPickConfirm(value) {
+  const key = prodRefKey.value
+  const v = String(value || '').trim()
+  if (!key || !v) return
+  props.head[key] = v
+  emit('dirty')
 }
 function onProdRefConfirm(rows) {
   const f = prodRefField.value
@@ -4368,6 +4574,44 @@ function chartOf(dt) {
 }
 .rsp-center {
   text-align: center;
+}
+/* 汇总表的「数据记录表」关联格:渲染成可点入口(不是纯文本),点开看关联了哪几张 */
+.rsp-link-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid #8fb4e0;
+  border-radius: 10px;
+  color: #0d5bd3;
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 20px;
+  background: #f2f7fd;
+}
+.rsp-link-cell:hover {
+  background: #e2eefc;
+}
+/* 关联记录表的只读预览:标签列 | 值列两栏 */
+.rsp-view-t {
+  width: 100%;
+}
+.rsp-view-lb {
+  width: 180px;
+  white-space: nowrap;
+}
+.rsp-view-vl {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.rsp-view-rows {
+  margin-top: 12px;
+}
+.rsp-view-rows-t {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
 }
 
 /* ═══ 像素级还原数据表(dt.design):单元格垂直居中,输入/文本随单元格字号 ═══ */

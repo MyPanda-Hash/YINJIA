@@ -790,6 +790,24 @@ public class PxController {
         return ApiResult.ok(service.getApprovalHistory(panelCode, code));
     }
 
+    /**
+     * 某张**测试申请单**关联了哪些「数据记录表」(2026-10-29)。
+     *
+     * <p>用户口径:「测试申请单的汇总也能看到有哪些数据记录表关联了测试申请单,
+     * 然后点击可以弹窗显示对应的数据记录表的数据」。
+     *
+     * <p>关联靠的是 8 张数据记录表表头新增的「测试申请单编号」列(迁移
+     * {@code migrate-rd-domtest-link-20261029.sql})—— 登记式关联,不是隐式推导:
+     * 记录表上填了哪张申请单,这里就能查到哪张。
+     *
+     * @param domNo 测试申请单的单据编号(DT-…)
+     */
+    @GetMapping("/linkedRecordSheets")
+    public ApiResult<List<Map<String, Object>>> linkedRecordSheets(@RequestParam String domNo) {
+        perm.requirePanelView("RD_DOM_TEST");
+        return ApiResult.ok(configService.linkedRecordSheets(domNo));
+    }
+
     @PostMapping("/callButton")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> callButton(@RequestBody Map<String, Object> body, HttpServletRequest request) {

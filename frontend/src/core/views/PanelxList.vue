@@ -2118,6 +2118,31 @@
          ⇒ 弹窗里多一个对接人下拉(默认带出已有对接人),选了就与定级同一动作完成分发。
          2026-10-28 第二轮:侧栏「定级分发」按钮已删除,**本弹窗是定级与分发对接人的唯一入口**;
          不选对接人时该单会停在"已审批、未分发",由侧栏「补发对接人」补救(仅缺对接人时出现)。 -->
+    <!-- 测试申请单「审批通过 + 分发测试负责人」弹窗(2026-10-29)。
+         用户口径:「借鉴前面的立项申请的流程,现在也加上在审批的时候可以分发对应的负责人
+         去测试之后填写数据记录表」—— 与立项申请「审批定级 + 分发对接人」同一范式:
+         审批弹窗里选人 → 通过即写 rd_dom_test_head.测试负责人 + 留痕 + 通知。 -->
+    <el-dialog v-model="domApvVisible" :title="tt('审批通过并分发测试负责人')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审批通过时可以指定测试负责人：他会去填写关联到本单的数据记录表。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('测试负责人') }}</span>
+          <el-select v-model="domApvTester" style="flex:1" filterable clearable :placeholder="tt('测试负责人（选填）')">
+            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="dq-tip">{{ tt('不选则审批后由管理员用「分发测试负责人」补上') }}</div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="domApvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="domApvVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="domApvBusy" @click="confirmDomApprove">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
@@ -6553,6 +6578,44 @@ const apvOpinion = ref('')
 const apvDocNo = ref('')
 /** 2026-10-28:审批定级时一并分发对接人(用户口径「后续也默认是这个对接人」) */
 const apvLiaison = ref('')
+
+// ── 测试申请单:审批通过 + 分发测试负责人(2026-10-29) ──
+const domApvVisible = ref(false)
+const domApvBusy = ref(false)
+const domApvTester = ref('')
+const domApvOpinion = ref('')
+const domApvDocNo = ref('')
+async function openDomApprove(no) {
+  domApvDocNo.value = no
+  await ensureRdFlowUsers()
+  // 默认带出已分发的负责人(改人场景);新单为空,由用户自行选或不选
+  domApvTester.value = String(current.value?.['测试负责人'] || '')
+  domApvOpinion.value = ''
+  domApvVisible.value = true
+}
+async function confirmDomApprove() {
+  if (domApvBusy.value) return
+  domApvBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'RD_DOM_TEST', buttonName: '审批通过',
+      formData: {
+        编号: domApvDocNo.value,
+        // 空串不发:后端按"没带负责人"处理(与旧前端/老单兼容),不会误清已分发的人
+        ...(domApvTester.value ? { 测试负责人: domApvTester.value } : {}),
+        ...(domApvOpinion.value ? { 审批意见: domApvOpinion.value } : {}),
+      },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('审批通过'))
+    domApvVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    domApvBusy.value = false
+  }
+}
 async function openRdApprove(no) {
   apvDocNo.value = no
   // 已定过级的单据默认选中当前等级(改级场景);新单默认空,必须选(与用户口径「审批与定级同一步」一致)
@@ -6997,6 +7060,9 @@ async function buildSheetPdfBlob() {
       if (pageCount > 1 && typeof comp?.setActivePage === 'function') {
         comp.setActivePage(i)
         await nextTick()
+        // 页签切换会换网格/列宽/报告头(见 RecordSheetPanels 的 effGrid/effHead 按 activePage 解析)
+        // ⇒ 必须等浏览器完成一次布局再截图,否则截到的是**上一页**的排版(2026-10-29 补)。
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
       }
       const perGroup = groups.length ? groups : [null]
       for (const gv of perGroup) {
@@ -7146,16 +7212,27 @@ async function exportSheetExcel() {
 /**
  * 打印当前文书。
  *
- * 分组面板(设备使用/仪器使用/加标水)要**按下拉各出一张**(2026-10-29 用户口径
- * 「有多少个下拉切换就打印对应页面的多少张」),但浏览器 window.print() 只认当前 DOM,
- * 没法在一次打印里换内容 ⇒ 走「先按组截成 PDF,再在新窗口里打印」这条唯一可行的路,
- * 与「导出 PDF」共用 buildSheetPdfBlob(同一份实现,版式与导出完全一致)。
- * 其余面板仍是老路径:加打印样式后直接 window.print()。
+ * 两条路径,**判据只此一处**:
+ *   ① 多页签(pages ≥ 2)**或**分组面板有多个下拉值 ⇒ 先按「页 × 组」逐张截图拼成一份多页 PDF,
+ *      在新窗口打开让用户直接打印;
+ *   ② 单页面板 ⇒ 老路径:加打印样式后 window.print()。
+ *
+ * 【为什么多页签不能走 window.print()】浏览器 window.print() 只认**当前 DOM**,而纸张内容是按
+ *   `pageOf(x) === activePage` 用 v-show 显隐的 ⇒ 纸面只出当前页签那一张,其余页签的内容
+ *   虽然在 DOM 里但 display:none,打印预览里看不到。2026-10-29 用户口径:
+ *   「研发管理有 tap 页的面板…只能是一个 tap 页打印完再切 tap 页,看看有没有什么办法可以
+ *    全部 tap 页打印出来」。
+ *   buildSheetPdfBlob 本来就是逐页切页签各截一张再拼多页 PDF(2026-10-28 为「导出 PDF 要
+ *   全部内容」实现,2026-10-29 扩到分组),打印复用它 ⇒ 版式与导出**零差异**。
+ *
+ * 分组面板(设备使用/仪器使用/加标水)口径不变:「有多少个下拉切换就打印对应页面的多少张」。
  */
 async function printApprovalSheet() {
   const comp = approvalSheetRef.value
   const groups = Array.isArray(comp?.groupPages) ? comp.groupPages : []
-  if (groups.length > 1) {
+  const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
+  // 多页签 或 多组 ⇒ 都要出多张纸,只能走 PDF(见上)
+  if (pageCount > 1 || groups.length > 1) {
     const loadingMsg = ElMessage({ message: tt('正在生成打印件…'), duration: 0 })
     try {
       const r = await buildSheetPdfBlob()
@@ -7170,7 +7247,9 @@ async function printApprovalSheet() {
         a.click()
         ElMessage.warning(tt('浏览器拦截了新窗口，已改为下载 PDF'))
       } else {
-        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(groups.length)))
+        // 张数 = 页签数 × 组数(与 buildSheetPdfBlob 的「页 → 组」两层循环同口径)
+        const n = pageCount * Math.max(1, groups.length)
+        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(n)))
       }
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) {
@@ -10084,6 +10163,15 @@ async function onButton(action) {
           if (!saved) return
         }
         return openRdApprove(current.value['编号'] || current.value['单据编号'] || '')
+      }
+      // 测试申请单(2026-10-29 用户口径「借鉴前面的立项申请的流程,现在也加上在审批的时候可以
+      // 分发对应的负责人去测试之后填写数据记录表」):审批通过与分发测试负责人同一步骤 ⇒ 专用弹窗。
+      if (action === '审批通过' && panelCode.value === 'RD_DOM_TEST') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openDomApprove(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {

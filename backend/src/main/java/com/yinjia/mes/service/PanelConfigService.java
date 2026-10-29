@@ -1896,6 +1896,66 @@ public class PanelConfigService {
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
             new com.fasterxml.jackson.databind.ObjectMapper();
 
+    /**
+     * 某张测试申请单关联了哪些「数据记录表」(2026-10-29)。
+     *
+     * <p>用户口径:「测试申请单的汇总也能看到有哪些数据记录表关联了测试申请单,
+     * 然后点击可以弹窗显示对应的数据记录表的数据」。
+     *
+     * <p>关联 = 8 张数据记录表表头的「测试申请单编号」列(见
+     * {@code tools/migrate-rd-domtest-link-20261029.sql})。这是**登记式**关联:
+     * 记录表上填了哪张申请单,这里就查得到哪张 —— 不做"同产品编号即关联"之类的隐式推导,
+     * 那种推导会把历史单全部串成一片,用户分不清谁是谁。
+     *
+     * @param domNo 测试申请单的单据编号(DT-…);空串直接返回空表
+     * @return {@code [{panelCode, panelName, docNo, date}]},按单据日期倒序
+     */
+    public List<Map<String, Object>> linkedRecordSheets(String domNo) {
+        String no = domNo == null ? "" : domNo.trim();
+        if (no.isEmpty()) return List.of();
+        // 面板码 ↔ 头表。新增实验室记录表时,与迁移脚本里的清单一起加(两处同源)。
+        String[][] panels = {
+                {"RD_ALKALINE", "rd_alkaline_head"},
+                {"RD_MINERAL", "rd_mineral_head"},
+                {"RD_ANTIBACT", "rd_antibact_head"},
+                {"RD_SCALE", "rd_scale_head"},
+                {"RD_RO_PROTECT", "rd_ro_protect_head"},
+                {"RD_SOAK", "rd_soak_head"},
+                {"RD_DROP_PREC", "rd_drop_prec_head"},
+                {"RD_FILTER_EFF", "rd_filter_eff_head"},
+        };
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String[] p : panels) {
+            String table = p[1];
+            // 表名来自上面的白名单常量(不是用户输入),不接受外部拼接
+            Integer cols = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = N'测试申请单编号'",
+                    Integer.class, "dbo." + table);
+            if (cols == null || cols == 0) continue;   // 该环境还没跑迁移 / 表不存在
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(
+                        "SELECT 单据编号 AS docNo, 单据日期 AS docDate FROM dbo." + table
+                                + " WHERE [测试申请单编号] = ? ORDER BY 单据日期 DESC, id DESC", no)) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("panelCode", p[0]);
+                    m.put("panelName", panelDisplayName(p[0]));
+                    m.put("docNo", r.get("docNo"));
+                    m.put("date", r.get("docDate"));
+                    out.add(m);
+                }
+            } catch (Exception ex) {
+                LOG.warn("[LINKED-SHEETS] 查询 {} 失败(跳过该表): {}", table, ex.getMessage());
+            }
+        }
+        return out;
+    }
+
+    /** 面板显示名(取不到回退面板码) */
+    private String panelDisplayName(String code) {
+        PanelRegistry.PanelDef def = registry.panel(code);
+        return def == null ? code : def.name();
+    }
+
     /** 保存表头字段排序/栏名/显隐(表头调整;更新 yj_field 的 seq/alias,显隐 hidden+visible 同开同关) */
     public void saveHeaderPrefs(String panelCode, List<Map<String, Object>> columns) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);

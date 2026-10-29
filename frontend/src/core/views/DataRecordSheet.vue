@@ -16,8 +16,10 @@
         <tr>
           <td class="rs-td rs-company-cell">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
-            <!-- 文档编号:配置为参照时(数据记录表→立项申请右上角编号)点击弹参照;否则保持纯输入 -->
-            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+            <!-- 文档编号:配置为参照时(数据记录表→立项申请右上角编号)点击弹参照;否则保持纯输入。
+                 2026-10-29 用户口径「选择编号的弹窗改为左右两边,左边还是立项申请的项目编号关联,
+                 右边加入测试申请单的单据编号」⇒ 数据记录表这格走**左右双源**弹窗。 -->
+            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openDocNoPick">
               <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
               <el-icon class="rs-ref-ico"><Search /></el-icon>
             </div>
@@ -338,6 +340,8 @@
       </tbody>
     </table>
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
+    <!-- 编号左右双源选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号 -->
+    <DocNoPickDialog v-model="docNoPickVisible" :field="docNoRefField" @confirm="onDocNoPickConfirm" />
 
     <!-- ═══ 字段编辑(3.数据记录表):列别名/显隐可改,应对复杂测试环境 ═══ -->
     <el-dialog v-model="fieldEditVisible" :title="tt('字段编辑')" width="620px" append-to-body>
@@ -372,6 +376,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
+import DocNoPickDialog from './DocNoPickDialog.vue'
 import { buildColumnPrefsPayload, isColumnHidden, resolveColumnLabel } from '@core/sheet/columnPrefs'
 // 按样品铺开的字段名单(样品信息/测试装置及编号/样品配方 + 明细三组)—— 减列清空走它,
 // 漏登记一处就只在"减列"时才暴露(2026-09-30 样品配方即因此漏掉),故集中成单一真源
@@ -407,6 +412,23 @@ function openProdRef(key) {
   if (!props.editable || !isRefKey(key)) return
   prodRefKey.value = key
   prodRefVisible.value = true
+}
+/**
+ * 「文档编号」的左右双源选择(2026-10-29 用户口径「选择编号的弹窗改为左右两边」)。
+ * 左栏沿用该字段自己的参照定义(立项申请项目编号),右栏是测试申请单的单据编号;
+ * 两种来源写同一个字段 —— 这格表示"本记录表关联到哪张单据"。
+ */
+const docNoPickVisible = ref(false)
+const docNoRefField = computed(() => fieldMap.value.get('文档编号') || null)
+function openDocNoPick() {
+  if (!props.editable || !isRefKey('文档编号')) return
+  docNoPickVisible.value = true
+}
+function onDocNoPickConfirm(value) {
+  const v = String(value || '').trim()
+  if (!v) return
+  props.head['文档编号'] = v
+  emit('dirty')
 }
 function onProdRefConfirm(rows) {
   const f = prodRefField.value

@@ -4289,3 +4289,6 @@ migrate-prodinfo-bom-20261029.sql
 #   三张使用记录表的分组字段改 label(设备归属/仪器归属/项目归属),物理列名不变。两账套都执行。
 migrate-record-group-relabel-20261028.sql
 migrate-filter-eff-water-cols-20261029.sql
+
+# 2026-10-29 数据记录表 ↔ 测试申请单 关联(8 张记录表加「测试申请单编号」参照 + 测试申请单头表加「测试负责人」)。两账套都执行。
+migrate-rd-domtest-link-20261029.sql
