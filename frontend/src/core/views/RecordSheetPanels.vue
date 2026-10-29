@@ -146,13 +146,13 @@
               <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
                    设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
                    故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
-              <!-- 受控表单编号(逐页常量,如测试申请单的 YJ-RIR001 / YJ-XS002):
-                   设计里这一格是**表单固定值**不是单据号 ⇒ 渲染常量文本、不给输入框(见 docNoStatic 注释) -->
-              <div v-if="docNoStatic" class="rs-docno-wrap">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
-                <span class="rs-docno-static">{{ docNoStatic }}</span>
-              </div>
-              <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+              <!-- 受控表单编号(逐页常量 YJ-RIR001 / YJ-XS002)—— **2026-10-29 起停用**
+                   (用户口径:「这个应该是显示表格编号,不应该是 YJ-RIR001,这个改为单据编号,
+                    自动生成,内容就是表格编号」)。
+                   现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
+                   与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
+                   留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
+              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
                 <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
                 <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
                 <el-icon class="rs-ref-ico"><Search /></el-icon>
