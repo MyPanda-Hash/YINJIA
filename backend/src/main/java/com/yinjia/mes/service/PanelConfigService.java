@@ -332,13 +332,15 @@ public class PanelConfigService {
             // 位置:第一个动作 = 侧边栏主按钮,其余进 ▼ 下拉 ⇒ 主按钮仍是「保存」(即提交),
             //   草稿落在下拉,不改变既有主路径的点击习惯(与 PANDA_BUTTONS 各单据的写法一致)。
             buttonGroups.add(group("保存", List.of("保存", "保存为草稿")));
-            // 删除组:四张工序检验单(成型/切炭/组装/制程)额外给「删除单据」——
-            // 用户 2026-10-14 口径「为当前的四张检验单增加删除中的删除单据的按钮」。
-            // 语义区别:「删除」= 进入明细行勾选删除模式(删行);「删除单据」= 删整张单据
+            // 删除组:「删除」= 进入明细行勾选删除模式(删行);「删除单据」= 删整张单据
             // (前端 engine.deleteForms → ButtonService.delete:doc 面板草稿直接作废,
             //  已审核抛「仅草稿状态可删除(已审核请先弃审)」,不会误删已审核单)。
-            // 只放开这四张单,其余无 PANDA 基准的面板维持原样(不扩大改动面)。
-            buttonGroups.add(group("删除", WO_INSP_PANELS.contains(def.code())
+            // 额外下发「删除单据」的面板见 DELETE_DOC_PANELS:
+            //   · 三张工序检验单(2026-10-14 用户口径「为当前的检验单增加删除中的删除单据的按钮」;
+            //     当时四张,2026-10-16 成型/切炭下架后剩组装/制程/首件);
+            //   · 工艺路线 ROUTE(2026-10-29 用户口径「给这个工艺路线下发删除单据」)。
+            // 其余无 PANDA 基准的面板维持原样(不扩大改动面)。
+            buttonGroups.add(group("删除", DELETE_DOC_PANELS.contains(def.code())
                     ? List.of("删除", "删除单据")
                     : List.of("删除")));
             // 2026-10-21 用户口径(物料清单):「把物料清单的审批换成修改」——
@@ -1964,6 +1966,22 @@ public class PanelConfigService {
      */
     private static final java.util.Set<String> WO_INSP_PANELS =
             java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
+
+    /**
+     * 「删除」组额外下发「删除单据」动作的面板(2026-10-29 从 WO_INSP_PANELS 抽出)。
+     *
+     * <p>与 {@link #WO_INSP_PANELS} **刻意分开**:那张表还用来给「检验项目维护」入口定位面板
+     * (见 buildDocConfig 里的 WO_INSP_PANELS 注入),把工艺路线塞进去会连维护入口一起下发。
+     *
+     * <p>工艺路线(ROUTE)2026-10-29 用户口径:「给这个工艺路线下发删除单据」——
+     * 它是 doc 面板(表头 + 工序明细,head_table=NULL 单表式)但没有 PANDA_BUTTONS 基准,
+     * 走兜底分支时原来只给「删除」(勾选明细行删除),整张路线单没有删除入口。
+     * 引擎侧能力本已具备(前端 engine.deleteForms → /api/px/deleteForms → ButtonService.delete),
+     * 这里只补下发。注意语义:仅**草稿**可整单删除(已审核需先弃审),且作废的是单据状态,
+     * 不替代明细行删除。
+     */
+    private static final java.util.Set<String> DELETE_DOC_PANELS = java.util.Set.of(
+            "QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP", "ROUTE");
 
     /**
      * 「取出货检验计划」(RD_INSP_PLAN)入口下发的面板集 —— **不含首件检验单**:
