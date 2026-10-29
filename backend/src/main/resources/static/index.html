@@ -15,7 +15,6 @@
   <style>
     html { background: #f0f2f3; }
     html.login-bg { background: #15241f; }
-<<<<<<< HEAD
   </style>
   <script>
     ;(function () {
@@ -25,149 +24,7 @@
       }
     })()
   </script>
-  <script type="module" crossorigin src="/assets/index-CuFDTeg3.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/vue-vendor-CWVaElZN.js">
-  <link rel="modulepreload" crossorigin href="/assets/element-icons-DjyukLWY.js">
-  <link rel="modulepreload" crossorigin href="/assets/element-plus-Vyq3nsjo.js">
-  <link rel="stylesheet" crossorigin href="/assets/index-DPtuGwYO.css">
-</head>
-<body>
-  <div id="app">
-    <!--
-      启动占位 + 看门狗(2026-10-18)。
-      为什么需要:#app 是空的,页面内容要等 entry chunk 下载完才挂载;只要其中任意一条 module 请求
-      **卡住**(典型:页面空闲久了,浏览器复用了被 NAT/防火墙静默丢弃的长连接),页面就会
-      **一直白屏转圈**,而且后端**一条日志都没有**(请求根本没到服务器)。
-      现场报障(2026-10-18):「小程序报工后刷新页面一直转圈,关掉重开就好」= 正是这一类。
-      这里给一个看得见的加载态,并在 12 秒还没挂载时:①自动带 cache-bust 重载一次(强制换新连接)
-      ②仍失败则给出「重新加载」按钮 —— 让人永远有出路,而不是对着白屏等。
-    -->
-    <div id="boot-tip" style="max-width:520px;margin:18vh auto;font:14px/1.7 -apple-system,'Segoe UI','Microsoft YaHei',sans-serif;color:#556;text-align:center">
-      <div style="width:34px;height:34px;margin:0 auto 14px;border:3px solid #d8dee3;border-top-color:#2f9e73;border-radius:50%;animation:yjspin .9s linear infinite"></div>
-      <div id="boot-msg">正在加载系统…</div>
-      <div style="color:#8a97a3;font-size:12px">Loading…</div>
-      <div id="boot-slow" style="display:none;margin-top:14px;color:#c45656"></div>
-      <button id="boot-retry" style="display:none;margin-top:12px;padding:6px 16px;border:1px solid #2f9e73;color:#2f9e73;background:#fff;border-radius:4px;cursor:pointer;font-size:13px">重新加载 / Reload</button>
-    </div>
-    <style>@keyframes yjspin{to{transform:rotate(360deg)}}</style>
-  </div>
-  <script>
-    ;(function () {
-      // 启动占位文案跟随浏览器语言(AGENTS 多语言规范:显示层不得只有裸中文)。
-      // 这个脚本跑在 Vue 之前,拿不到 i18n store,只能按 navigator.language 二选一;
-      // 中文用户保持原文,其余语言走英文,挂载后由 tt() 接管。
-      var ZH = /^zh/i.test(navigator.language || navigator.userLanguage || 'zh')
-      function L(zh, en) { return ZH ? zh : en }
-      var msgEl = document.getElementById('boot-msg')
-      if (msgEl) msgEl.textContent = L('正在加载系统…', 'Loading the system…')
-      var mounted = false
-      var KEY = 'mes_boot_retry_at'
-      var appEl = document.getElementById('app')
-      var mo = new MutationObserver(function () {
-        // Vue 挂载后 #app 里会出现真实节点(占位 div 也会被替换掉)
-        if (document.querySelector('#app > *:not(#boot-tip)')) {
-          mounted = true
-          var tip = document.getElementById('boot-tip')
-          if (tip) tip.remove()
-          mo.disconnect()
-        }
-      })
-      mo.observe(appEl, { childList: true })
-
-      function hardReload() {
-        var u = location.pathname + location.search.replace(/[?&]_r=\d+/, '')
-        location.replace(u + (u.indexOf('?') >= 0 ? '&' : '?') + '_r=' + Date.now() + location.hash)
-      }
-
-      // 错误可视化(2026-10-18):白屏最常见的原因是「脚本/资源没加载出来」或「启动期 JS 异常」,
-      // 而这两种在页面上**什么都不会显示**(连 Vue 都没起来,控制台又没人看)。
-      // 这里把 js 异常、未捕获 Promise、以及 <script>/<link> 加载失败都画到页面上,并给重载按钮 ——
-      // 下次白屏时截个图就能直接定位是哪条资源/哪一句。
-      function showFatal(title, detail) {
-        try {
-          var box = document.getElementById('boot-fatal')
-          if (!box) {
-            box = document.createElement('div')
-            box.id = 'boot-fatal'
-            box.style.cssText = 'max-width:760px;margin:12vh auto;padding:16px 18px;border:1px solid #f0b4b4;'
-              + 'background:#fff5f5;color:#8a2b2b;border-radius:6px;font:13px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;word-break:break-all'
-            document.body.appendChild(box)
-          }
-          // 用 DOM 拼接而不是 innerHTML:异常消息/资源地址都来自页面自身,不做转义会变成注入点
-          box.textContent = ''
-          var b = document.createElement('b')
-          b.textContent = title
-          var d = document.createElement('div')
-          d.style.cssText = 'margin-top:8px;color:#663'
-          d.textContent = detail
-          var wrap = document.createElement('div')
-          wrap.style.cssText = 'margin-top:12px'
-          var btn = document.createElement('button')
-          btn.id = 'boot-fatal-reload'
-          btn.style.cssText = 'padding:6px 16px;border:1px solid #c45656;color:#c45656;background:#fff;border-radius:4px;cursor:pointer'
-          btn.textContent = L('重新加载', 'Reload')
-          btn.onclick = hardReload
-          wrap.appendChild(btn)
-          box.appendChild(b); box.appendChild(d); box.appendChild(wrap)
-        } catch (e) { /* 兜底里再出错就不管了 */ }
-      }
-      window.addEventListener('error', function (e) {
-        // 良性告警:Element Plus / 布局组件高频触发,浏览器自身会重排,不是页面故障 ——
-        // 不拦截的话每次都会在页面上画一个红色「页面脚本异常」,反而吓人(2026-10-18 实测)。
-        if (/ResizeObserver loop/i.test(String(e.message || ''))) return
-        // 资源(script/link/img)加载失败:event.target 是元素本身
-        var t = e.target
-        if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
-          showFatal(L('静态资源加载失败', 'Failed to load a static asset'),
-            t.tagName.toLowerCase() + ': ' + (t.src || t.href || '') + L('（服务器返回 404 或连接被断开）', ' (404 or connection dropped)'))
-          return
-        }
-        showFatal(L('页面脚本异常', 'Script error'),
-          (e.message || L('未知错误', 'unknown error')) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''))
-      }, true)
-      window.addEventListener('unhandledrejection', function (e) {
-        var r = e && e.reason
-        var msg = (r && (r.message || r)) || L('未知 Promise 拒绝', 'unknown promise rejection')
-        // 动态 import 失败常见文案:Failed to fetch dynamically imported module
-        showFatal(L('页面脚本异常（异步）', 'Script error (async)'), String(msg))
-      })
-
-      setTimeout(function () {
-        if (mounted || !document.getElementById('boot-tip')) return
-        var last = Number(sessionStorage.getItem(KEY) || 0)
-        // ① 第一次超时:带 cache-bust 自动重载一次(换新 TCP 连接,绕开可能卡死的长连接)
-        if (Date.now() - last > 60000) {
-          sessionStorage.setItem(KEY, String(Date.now()))
-          hardReload()
-          return
-        }
-        // ② 重载过还是超时:给明确提示 + 按钮
-        var slow = document.getElementById('boot-slow')
-        var btn = document.getElementById('boot-retry')
-        if (slow) {
-          slow.style.display = 'block'
-          slow.textContent = L(
-            '加载超过 12 秒仍未完成：可能是浏览器复用了已失效的连接，或服务器暂时不可达。请点下面按钮重试。',
-            'Still loading after 12s — the browser may be reusing a dead connection, or the server is unreachable. Click the button below to retry.',
-          )
-        }
-        if (btn) { btn.style.display = 'inline-block'; btn.onclick = hardReload }
-      }, 12000)
-    })()
-  </script>
-</body>
-</html>
-=======
-  </style>
-  <script>
-    ;(function () {
-      var h = (location.hash || '').toLowerCase()
-      if (h.indexOf('/login') >= 0 || (!h && sessionStorage.getItem('mes_at_login') === '1')) {
-        document.documentElement.classList.add('login-bg')
-      }
-    })()
-  </script>
-  <script type="module" crossorigin src="./assets/index-BhsFVI1L.js"></script>
+  <script type="module" crossorigin src="./assets/index-C8u4NKiN.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/vue-vendor-hxe9VyB5.js">
   <link rel="modulepreload" crossorigin href="./assets/element-icons-OI1i2y4c.js">
   <link rel="modulepreload" crossorigin href="./assets/element-plus-SAiOE_Up.js">
@@ -296,7 +153,6 @@
         if (btn) { btn.style.display = 'inline-block'; btn.onclick = hardReload }
       }, 12000)
     })()
-  </script>
+  </script>
 </body>
 </html>
->>>>>>> origin/main
