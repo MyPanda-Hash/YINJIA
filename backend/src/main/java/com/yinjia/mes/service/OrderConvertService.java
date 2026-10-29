@@ -148,6 +148,7 @@ public class OrderConvertService {
      * @param dateFrom/dateTo 下单日期范围(含端点,yyyy-MM-dd;null/空=不限)。
      *   2026-10-06 用户口径:左上角日期查询默认「单日」= 最近有数据的一天,可切近 3/7/14/30 天 ——
      *   此前无日期条件,一进页面把**全部历史**待结转行一次拉回,数据一多页面就卡死。
+     *   2026-10-29 用户口径:前端控件改为**日期范围选择**(默认 [今天,今天]),本方法的 from/to 语义不变。
      */
     public List<Map<String, Object>> pending(String keyword, String dateFrom, String dateTo) {
         String kw = keyword == null ? "" : keyword.trim();
@@ -164,6 +165,10 @@ public class OrderConvertService {
                         + " COALESCE(pt.往来单位名称, dk.mc, o.[客户]) AS 客户,"
                         + " ISNULL(pt.[客户价格等级], N'') AS 客户等级,"
                         + " l.[存货编码] AS 物料编码, l.[存货名称] AS 品名, ISNULL(l.[规格型号], N'') AS 型号,"
+                        // 产品名称列(2026-10-29 用户口径「在当前的型号旁边增加产品名称」):
+                        // 与 品名 同源(订单行 存货名称)—— 品名 继续供「订单资料」堆叠格使用,
+                        // 这里单列一个 产品名称 数据键,让表格列与列设置(显/隐)按列独立配置。
+                        + " ISNULL(l.[存货名称], N'') AS 产品名称,"
                         + " ISNULL(l.[客户订单号], N'') AS 客户订单号, ISNULL(l.[批次号], N'') AS 批号,"
                         + " ISNULL(备注_管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(l.[数量], 0) AS 需求数量,"

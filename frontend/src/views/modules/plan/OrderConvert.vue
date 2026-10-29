@@ -7,7 +7,14 @@
          —— 此前无日期条件,一进页面就把**全部历史**待结转行拉回来,数据一多页面卡死(用户报障原文);
        ②**今天没有待结转数据时弹窗询问**是否跳到最近有数据的一天(不静默跳转;取消则停在当天,空表给近路按钮);
        ③列表**分页**(默认 100/页),几千行也不会一次全渲染;勾选跨页保留(row-key + reserve-selection);
-       ④汇总条「当前数据笔数」随日期/关键字口径联动(未结转汇总仍是全量积压,口径不变)。 -->
+       ④汇总条「当前数据笔数」随日期/关键字口径联动(未结转汇总仍是全量积压,口径不变)。
+
+     2026-10-29 用户口径(本轮):
+       ①左上角日期查询由「单日/近N天档位」改为**日期范围选择**(daterange,自带今日/本周/本月/近7天/近30天/上月快捷档,
+         默认 [今天,今天] 保住"打开只看一天"的口径;后端 dateFrom/dateTo 不变);
+       ②工具栏加**「列设置」**:勾选决定表格显示哪些列(如不想看「客户订单号」就取消勾选),
+         复用系统级列设置实现 useReportColumns + /px/reportColumnSettings(panelCode=ORDER_CONVERT,刷新后仍生效);
+       ③「型号」列旁新增**「产品名称」**列(订单行 存货名称,与订单资料堆叠格同源)。 -->
 <template>
   <div class="oc-page">
     <!-- 汇总条(蓝底白字,同参考) -->
@@ -19,17 +26,14 @@
       <span>{{ tt('当前数据') }}（{{ s.当前数据笔数 ?? 0 }}）{{ tt('笔') }}</span>
     </div>
 
-    <!-- 工具栏:左上角日期查询(默认单日)+ 查询条件 + 动作 -->
+    <!-- 工具栏:左上角日期范围查询(2026-10-29 用户口径:由「单日/近N天档位」改成**日期范围选择**)
+         + 查询条件 + 动作 + 列设置(显/隐) -->
     <el-form inline class="oc-bar" @submit.prevent>
-      <el-form-item :label="tt(dateMode === 'day' ? '日期' : '截止日期')">
-        <el-select v-model="dateMode" size="small" class="oc-mode" @change="onQuery" :title="tt('单日只看一天;近几日=以所选日期为截止日往前数')">
-          <el-option :label="tt('单日')" value="day" />
-          <el-option v-for="n in NEAR_DAYS" :key="n" :label="tt('近' + n + '天')" :value="String(n)" />
-        </el-select>
-        <el-date-picker v-model="anchor" type="date" value-format="YYYY-MM-DD" size="small" class="oc-date"
-                        :clearable="false" :placeholder="tt('日期')" @change="onQuery" />
-        <!-- 生效区间回显:单日模式下日期框本身就是区间,不再重复显示;近N天才需要把窗口写出来 -->
-        <span v-if="dateMode !== 'day'" class="oc-range">{{ rangeText }}</span>
+      <el-form-item :label="tt('日期范围')">
+        <el-date-picker v-model="datePick" type="daterange" unlink-panels value-format="YYYY-MM-DD"
+                        size="small" class="oc-daterange" :clearable="false"
+                        :start-placeholder="tt('开始日期')" :end-placeholder="tt('结束日期')"
+                        :shortcuts="dateShortcuts" @change="onQuery" />
       </el-form-item>
       <el-form-item :label="tt('查询条件')">
         <el-input v-model="keyword" :placeholder="tt('订单号 / 客户 / 物料')" clearable style="width: 200px" @keyup.enter="onQuery" />
@@ -43,6 +47,9 @@
       </el-button>
       <el-button v-if="canConvert" :disabled="!checked.length" @click="openRouteDialog">{{ tt('选择工艺路线') }}（{{ checked.length }}）</el-button>
       <el-button v-if="canConvert" type="success" :disabled="!checked.length" @click="toManu">{{ tt('转工单') }}（{{ checked.length }}）</el-button>
+      <!-- 列设置(2026-10-29 用户口径「什么查看什么不查看」):勾选决定表格显示哪些列,
+           与报表栏目设置同一套后端持久化(/px/reportColumnSettings,panelCode=ORDER_CONVERT) -->
+      <el-button plain @click="openDialog">{{ tt('列设置') }}</el-button>
       <span class="oc-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </el-form>
 
@@ -58,8 +65,8 @@
             <div class="oc-dim">{{ row.品名 }}</div>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('行号')" prop="行号" width="70" />
-        <el-table-column :label="tt('下单日期')" prop="下单日期" width="100" />
+        <el-table-column v-if="colVisible('行号')" :label="tt('行号')" prop="行号" width="70" />
+        <el-table-column v-if="colVisible('下单日期')" :label="tt('下单日期')" prop="下单日期" width="100" />
         <el-table-column :label="tt('交货日期')" width="150" fixed="left">
           <template #default="{ row }">
             <el-date-picker v-model="row.交货日期" type="date" value-format="YYYY-MM-DD" size="small"
@@ -68,13 +75,16 @@
                             :title="tt('同步交期常与创建日期雷同，可在此修正；保存交期或转单时回写订单行')" />
           </template>
         </el-table-column>
-        <el-table-column :label="tt('客户')" prop="客户" min-width="160" show-overflow-tooltip />
-        <el-table-column :label="tt('客户等级')" prop="客户等级" width="90" />
-        <el-table-column :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
-        <el-table-column :label="tt('重点管控')" prop="重点管控" width="90" />
-        <el-table-column :label="tt('客户订单号')" prop="客户订单号" width="120" show-overflow-tooltip />
-        <el-table-column :label="tt('需求数量')" prop="需求数量" width="100" align="right" />
-        <el-table-column :label="tt('已排产数量')" width="105" align="right">
+        <el-table-column v-if="colVisible('客户')" :label="tt('客户')" prop="客户" min-width="160" show-overflow-tooltip />
+        <el-table-column v-if="colVisible('客户等级')" :label="tt('客户等级')" prop="客户等级" width="90" />
+        <!-- 产品名称(2026-10-29 用户口径「在当前的型号旁边增加产品名称」):取订单行 存货名称,
+             与「订单资料」堆叠格里的小字同源;单列后可随「列设置」显隐 -->
+        <el-table-column v-if="colVisible('产品名称')" :label="tt('产品名称')" prop="产品名称" width="170" show-overflow-tooltip />
+        <el-table-column v-if="colVisible('型号')" :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
+        <el-table-column v-if="colVisible('重点管控')" :label="tt('重点管控')" prop="重点管控" width="90" />
+        <el-table-column v-if="colVisible('客户订单号')" :label="tt('客户订单号')" prop="客户订单号" width="120" show-overflow-tooltip />
+        <el-table-column v-if="colVisible('需求数量')" :label="tt('需求数量')" prop="需求数量" width="100" align="right" />
+        <el-table-column v-if="colVisible('已排产数量')" :label="tt('已排产数量')" width="105" align="right">
           <template #default="{ row }">
             <span :class="{ 'oc-blue': Number(row.已排产数量) > 0 }">{{ row.已排产数量 }}</span>
           </template>
@@ -105,7 +115,7 @@
             <el-input-number v-model="row.生单数量" :min="0" :max="Number(row.剩余数量)" :controls="false" size="small" style="width: 100%" />
           </template>
         </el-table-column>
-        <!-- 空表提示:所选日期确实没有待结转单 —— 给"跳到最近有数据的一天"/"切近7天"两条近路
+        <!-- 空表提示:所选区间确实没有待结转单 —— 给"跳到最近有数据的一天"/"看近7天"两条近路
              (打开页面时的跳转是**弹窗询问**,用户点了「留在本日」才落到这里) -->
         <template #empty>
           <div class="oc-empty">
@@ -113,7 +123,7 @@
             <el-button v-if="latestDay && !latestInRange" link type="primary" @click="jumpToLatest">
               {{ tt('跳到最近有数据的一天') }} {{ latestDay }}
             </el-button>
-            <el-button v-if="dateMode === 'day'" link type="primary" @click="quickNear(7)">{{ tt('看近7天') }}</el-button>
+            <el-button link type="primary" @click="quickNear(7)">{{ tt('看近7天') }}</el-button>
           </div>
         </template>
       </el-table>
@@ -140,6 +150,13 @@
         <el-button type="primary" :disabled="!routePick || routePick.审核状态 !== '已审核'" @click="applyRoute">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 列设置弹窗(2026-10-29):通用组件,显隐草稿由 useReportColumns 持有,
+         保存走 /px/reportColumnSettings(panelCode=ORDER_CONVERT),刷新后仍按保存的显隐渲染。
+         关闭/取消 = 丢弃未保存的勾选(回到后端已保存那份),否则"取消"后表格已经被改了 -->
+    <ColumnSettingsDialog :model-value="columnVisible" :columns="columnDraft"
+                          @update:model-value="onColumnDialogToggle"
+                          @toggle="onColToggle" @reset="resetDraft" @save="saveColumns" />
     </div>
 
     <div class="oc-pager">
@@ -158,6 +175,9 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { canDo } from '@core/auth/panelAccess'
+import { useReportColumns } from '@core/report/useReportColumns'
+import { PRESETS, presetRange } from '@core/dashboard/dateRange'
+import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 import { applyRouteDefaults } from '@/business/routeDefaults'
 
 /**
@@ -169,13 +189,8 @@ const user = useUserStore()
 const canDates = computed(() => canDo(user, 'ORDER_CONVERT', 'date'))
 const canConvert = computed(() => canDo(user, 'ORDER_CONVERT', 'convert'))
 
-/** 近N天档位(用户口径:默认单日,可切近几日) */
-const NEAR_DAYS = [3, 7, 14, 30]
-
 const keyword = ref('')
 const loading = ref(false)
-const dateMode = ref('day')   // 'day'=单日;'3'/'7'/'14'/'30'=近N天(anchor 为截止日)
-const anchor = ref('')        // 单日=查询的那一天;近N天=截止日;空=按今天兜底
 const pageNo = ref(1)
 const pageSize = ref(100)
 /** 可选工艺路线(弹窗选择,2026-10-05):来自 bs_route,含工序序列 */
@@ -212,21 +227,67 @@ const s = ref({})
 /** 行内修改过交期(与原始值比对)的行 */
 const dateChanged = computed(() => rows.value.filter((r) => r.交货日期 && r.交货日期 !== r.交货日期原始))
 
-// ── 日期查询:单日 / 近N天(本地日期算,不走 UTC,避免时区把"今天"算偏一天) ──
+// ── 表格列设置「什么查看什么不查看」(2026-10-29 用户口径)────────────────────────────
+// 复用系统级实现:useReportColumns(列显隐 + 后端持久化 /px/reportColumnSettings,panelCode=ORDER_CONVERT)。
+// 弹窗里只放**可隐藏列**;以下列永远显示(它们是本页的操作与判断依据,隐藏后按钮点不了/看不出为何不能转单):
+//   选择框 / 订单资料 / 交货日期(可就地改) / 剩余数量 / 工艺路线(必选) / 本次转单数量(必填)。
+const COLUMNS = [
+  '行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量',
+]
+const {
+  columnVisible, columnDraft, visibleProps,
+  openDialog, saveDialog, cancelDialog, init: initColumns, resetDraft,
+} = useReportColumns(ref('ORDER_CONVERT'), computed(() => COLUMNS), rows)
+
+/** 某列当前是否显示(读取后端已保存的显隐;未保存过 = 全部显示) */
+function colVisible(prop) { return visibleProps.value.includes(prop) }
+/** 勾选/取消勾选:只改草稿,点弹窗「保存」才落后端 */
+function onColToggle({ prop, visible }) {
+  const col = columnDraft.value.find((c) => c.prop === prop)
+  if (col) col.visible = visible
+}
+/**
+ * 弹窗开/关:关(取消按钮或右上角 X)= **丢弃未保存的勾选**,回到后端已保存那份。
+ * 不这么做的话,草稿即生效(visibleProps 从草稿派生)⇒ 点「取消」列也已经被改掉了。
+ */
+function onColumnDialogToggle(open) {
+  if (open) { columnVisible.value = true; return }
+  cancelDialog()
+}
+/** 保存列设置(后端按 panelCode 存一份,刷新/换浏览器都生效;失败如实提示,不谎报「已保存」) */
+async function saveColumns() {
+  const ok = await saveDialog()
+  if (ok) ElMessage.success(tt('已保存'))
+  else ElMessage.warning(tt('保存失败'))
+}
+
+// ── 日期范围查询(2026-10-29 用户口径:左上角由「单日/近N天档位」改为**日期范围选择**) ──
+// 本地日期算,不走 UTC,避免时区把"今天"算偏一天;默认 [今天, 今天],与旧「默认单日=今天」口径一致。
 const pad2 = (n) => String(n).padStart(2, '0')
 const fmtDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 const todayStr = () => fmtDay(new Date())
 function parseDay(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1) }
+/** 日期 ±n 天(yyyy-MM-dd 进、同格式出) */
+function shiftDay(day, n) { const d = parseDay(day); d.setDate(d.getDate() + n); return fmtDay(d) }
 
-/** 当前查询区间(含端点):单日=锚点当天;近N天= [锚点−(N−1), 锚点] */
+/** 日期框绑定值:['开始','结束'](value-format=YYYY-MM-DD) */
+const datePick = ref([todayStr(), todayStr()])
+
+/** 生效区间(含端点):两值兜底成合法日期 + 反序自动交换(用户先点结束日后点开始日不丢条件) */
 const range = computed(() => {
-  const to = anchor.value || todayStr()
-  const n = dateMode.value === 'day' ? 1 : (Number(dateMode.value) || 1)
-  const end = parseDay(to)
-  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (n - 1))
-  return { from: fmtDay(start), to }
+  const a = String((datePick.value || [])[0] || '').slice(0, 10)
+  const b = String((datePick.value || [])[1] || '').slice(0, 10)
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(a) ? a : todayStr()
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(b) ? b : from
+  return from <= to ? { from, to } : { from: to, to: from }
 })
 const rangeText = computed(() => (range.value.from === range.value.to ? range.value.from : `${range.value.from} ~ ${range.value.to}`))
+
+/** 日期框内的快捷档(今日/本周/本月/近7天/近30天/上月;文案走 tt,复用看板同一份 PRESETS) */
+const dateShortcuts = computed(() => PRESETS.map((p) => ({
+  text: tt(p.label),
+  value: () => { const r = presetRange(p.key); return [parseDay(r.from), parseDay(r.to)] },
+})))
 
 /** 当前页数据(前端分页:渲染行数封顶,勾选跨页保留) */
 const pagedRows = computed(() => {
@@ -279,29 +340,35 @@ const latestDay = computed(() => String(s.value['最新下单日期'] || '').sli
 const latestInRange = computed(() => !!latestDay.value && latestDay.value >= range.value.from && latestDay.value <= range.value.to)
 
 async function loadAll() { await Promise.all([loadPending(), loadStats()]) }
-/** 日期档位/锚点/关键字变动:回第一页重查(2026-10-06 起页面默认只查一天,切档即查) */
+/** 日期范围/关键字变动:回第一页重查(页面默认只查一天,改范围即查) */
 function onQuery() { pageNo.value = 1; loadAll() }
-function quickNear(n) { dateMode.value = String(n); onQuery() }
+/** 「看近N天」:以最近有数据的一天为结束日往前数(当天没数据时也能看到数据,旧口径保留) */
+function quickNear(n) {
+  const end = latestDay.value || todayStr()
+  datePick.value = [shiftDay(end, -(n - 1)), end]
+  onQuery()
+}
 /** 跳到最近有数据的一天(空表近路按钮;与打开页面时的弹窗同一个动作) */
-function jumpToLatest() { if (!latestDay.value) return; anchor.value = latestDay.value; onQuery() }
+function jumpToLatest() { if (!latestDay.value) return; datePick.value = [latestDay.value, latestDay.value]; onQuery() }
 
 /**
- * 打开页面时当天没有待结转数据 → **弹窗询问**是否跳到最近有数据的一天
- * (2026-10-06 用户口径:不要静默跳转;用户点「留在本日」就停在当天,空表里另给近路按钮)。
- * 只在首帧调用一次;用户后续自己切日期/刷新不再打扰。
+ * 打开页面时当前日期范围里没有待结转数据 → **弹窗询问**是否跳到最近有数据的一天
+ * (2026-10-06 用户口径:不要静默跳转;用户点「留在本日」就停在当前区间,空表里另给近路按钮)。
+ * 只在首帧调用一次;用户后续自己改日期/刷新不再打扰。
  */
 async function askJumpToLatest() {
   if (rows.value.length) return
   const latest = latestDay.value
-  if (!latest || latest === range.value.to) return
+  // 最近有数据的一天若已在当前区间里,就没必要再问"要不要跳过去"(空表是关键字过滤等其它原因)
+  if (!latest || latestInRange.value) return
   try {
     await ElMessageBox.confirm(
       // 标点用半角(与仓库既有组合文案一致:`${tt('生成子工单')}?`),否则英语界面会出现全角「，？」
-      `${range.value.to} ${tt('没有待结转数据')}, ${tt('跳到最近有数据的一天')} ${latest}?`,
+      `${rangeText.value} ${tt('没有待结转数据')}, ${tt('跳到最近有数据的一天')} ${latest}?`,
       tt('没有数据'), { confirmButtonText: tt('跳转'), cancelButtonText: tt('留在本日'), type: 'info' },
     )
-  } catch { return }   // 取消:停在所选日期(空表 + 近路按钮)
-  anchor.value = latest
+  } catch { return }   // 取消:停在所选区间(空表 + 近路按钮)
+  datePick.value = [latest, latest]
   await loadAll()
 }
 function onCheck(r) { checked.value = r }
@@ -399,11 +466,12 @@ onMounted(async () => {
   // 条39(2026-10-25):先等路线档案到位再拉待结转行 —— applyRouteDefaults 要用 routeOptions
   // 做「上次 ∈ bs_route」候选校验;fire-and-forget 会跟 loadPending 竞态(慢时首屏全部按绑定预填)。
   // loadRoutes 自带 catch:失败 ⇒ routeOptions=[] ⇒ routeSet 空 ⇒ 「上次」静默不预填(页面照常)。
-  await loadRoutes()
-  // 首帧:默认「单日 = 今天」并直接查;今天没有待结转数据时**弹窗询问**是否跳到最近有数据的一天
-  // (2026-10-06 用户口径:以前是静默跳转,现在必须先问;取消就停在今天)。
+  // 列设置(2026-10-29)同样先应用已保存的显隐,首帧就按用户口径渲染(失败=全部显示,不阻断)。
+  await Promise.all([loadRoutes(), initColumns()])
+  // 首帧:默认日期范围 = 今天(口径与旧「单日=今天」一致,只是控件换成范围选择)并直接查;
+  // 当前区间没有待结转数据时**弹窗询问**是否跳到最近有数据的一天(2026-10-06 用户口径:不静默跳转)。
   // 之前更早的写法是"不带条件拉全量":数据一多,进页面就卡死(同日用户报障)。
-  anchor.value = todayStr()
+  datePick.value = [todayStr(), todayStr()]
   await loadAll()
   await askJumpToLatest()
 })
@@ -414,9 +482,8 @@ onMounted(async () => {
 .oc-summary { background: #1e6fb8; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 13px; line-height: 1.6; }
 .oc-sep { opacity: .8; }
 .oc-bar { margin: 0; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; padding: 6px 10px 0; }
-.oc-mode { width: 108px; }
-.oc-date { width: 138px; margin-left: 6px; }
-.oc-range { margin-left: 8px; color: #909399; font-size: 12px; }
+/* 日期范围选择(2026-10-29):两个日期框 + 分隔符,约 250px */
+.oc-daterange { width: 260px; }
 .oc-count { margin-left: 12px; color: #606266; font-size: 12px; }
 .oc-table { flex: 1; min-height: 0; }
 .oc-pager { display: flex; justify-content: flex-end; }
