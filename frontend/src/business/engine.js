@@ -1,6 +1,8 @@
 import request from '@core/request'
 import { unwrap, unwrapStrict, errMsg } from '@core/panel-engine'
 import { fetchAllRows } from './pagedQuery.js'
+// 参照弹窗「显示哪几列」的判据（纯函数,单测见 core/ref/refColumns.test.js）
+import { pickRefColumns } from '@core/ref/refColumns'
 
 // 通用层函数继续对外导出（保持既有调用方兼容）
 export { unwrap, unwrapStrict, errMsg }
@@ -174,19 +176,24 @@ export async function refPanelName(field) {
   }
 }
 
-// 弹窗表格列：优先字段 refColumns，其次引用面板网格列，最后 refField/displayField
+// 弹窗表格列：优先字段 refColumns，其次引用面板的**表头字段**，再退网格列，最后 refField/displayField
+//
+// ⚠ 2026-10-30 修（用户报障「产品文件里面的面板点击选择框的弹窗都没有显示信息」）：
+//   原实现直接取 `panelPageDto.tablePages[0].gridTabs[0].columns` —— 那一份按后端
+//   PanelConfigService 的定义是**明细列**（`fieldsAt("detail")`），而本弹窗的数据来自
+//   `queryFormDataList`，返回的是**单据头行**。两者不同源 ⇒ 每格都取不到值，弹窗整片空白
+//   （实测：产品信息表 2026-10-29 新增 BOM 明细列后，只剩前端造的「开发状态」有值）。
+//   判据统一收到 `@core/ref/refColumns` 的纯函数里（单测 5 条钉住优先级）。
 export async function refColumns(field) {
   const r = normRef(field)
   if (r.refColumns && r.refColumns.length) return r.refColumns
-  let cols = null
+  let cfg = null
   try {
-    const cfg = await getRefPanelConfig(r.refPanel)
-    cols = cfg?.metadata?.panelPageDto?.tablePages?.[0]?.gridTabs?.[0]?.columns
+    cfg = await getRefPanelConfig(r.refPanel)
   } catch (e) {
     /* SQL 后端无该面板时使用兜底列 */
   }
-  if (cols && cols.length) return cols
-  return [...new Set([r.refField, r.displayField].filter(Boolean))]
+  return pickRefColumns(cfg, r)
 }
 
 /** 参照过滤值里的 `$字段` 占位 → 取**本行**该字段的值(用于「仓位随仓库收窄」这类级联)。

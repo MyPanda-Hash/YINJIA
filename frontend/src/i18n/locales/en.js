@@ -4652,6 +4652,9 @@ export default {
     '已进进度查询': 'On Progress Board',
     '10 个环节全部完成': 'All ten steps completed',
     '输入立项申请编号（支持片段），如 LXA-2026-10': 'Application No. (a fragment is enough), e.g. LXA-2026-10',
+    // 2026-10-30:流程管控第一列改为项目编号后,搜索提示同步
+    '输入项目编号或立项单号（支持片段），如 YJ-RD-2026 / LXA-2026-10':
+      'Project No. or application No. (a fragment is enough), e.g. YJ-RD-2026 / LXA-2026-10',
     '查询': 'Search',
     '只看未完成': 'Open only',
     '展开行可看 10 步时间轴': 'Expand a row to see all ten steps',

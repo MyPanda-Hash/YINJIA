@@ -25,7 +25,7 @@
         v-model="keyword"
         class="pf-search"
         clearable
-        :placeholder="tt('输入立项申请编号（支持片段），如 LXA-2026-10')"
+        :placeholder="tt('输入项目编号或立项单号（支持片段），如 YJ-RD-2026 / LXA-2026-10')"
         @keyup.enter="load"
       >
         <template #prefix><el-icon><Search /></el-icon></template>
@@ -81,7 +81,15 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="approvalNo" :label="tt('立项申请编号')" width="180" />
+        <!-- 第一列 = 立项申请的**项目编号**(= 文档编号,如 YJ-RD-2026-001)。
+             2026-10-30 用户口径「流程管控的立项申请编号应该是立项申请的项目编号来关联」:
+             原先直出 approvalNo(引擎自动生成的单据编号 LXA-2026-10-0032),与用户日常找项目
+             用的号对不上。老单文档编号可能为空 ⇒ 退回单据编号,否则整列空白。 -->
+        <el-table-column :label="tt('项目编号')" width="180">
+          <template #default="{ row }">
+            <span class="pf-no">{{ row.approvalDocNo || row.approvalNo }}</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="tt('项目名称')" min-width="160">
           <template #default="{ row }">
             <span class="pf-name">{{ row.projectName || '-' }}</span>
@@ -312,6 +320,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 .pf-card-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--t-primary); }
 .pf-card-hint { font-size: 12px; color: var(--t-text-3); }
 .pf-name { font-weight: 600; }
+/* 项目编号(文档编号):等宽数字更易逐位核对,与单据编号的观感区分开 */
+.pf-no { font-variant-numeric: tabular-nums; letter-spacing: 0.2px; }
 .pf-muted { color: var(--t-text-3); font-size: 12px; }
 .pf-badge {
   display: inline-block;
