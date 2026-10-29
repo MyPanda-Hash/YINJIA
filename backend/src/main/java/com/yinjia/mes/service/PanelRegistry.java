@@ -230,7 +230,48 @@ public class PanelRegistry {
                             rs.getString("detail_key"), rs.getString("module_group"),
                             rs.getString("config"), byPanel.getOrDefault(code, List.of())));
                 });
-        caches.put(DataSourceRouter.current(), new Snapshot(out, System.currentTimeMillis()));
+        // 字段跟随(2026-10-25):供应商采购打印 = 采购订单的字段定义,保证两边**永不漂移**
+        // (out 被上面两个 jdbc.query 的 lambda 引用过 ⇒ 不能重新赋值,故用新变量接收)
+        Map<String, PanelDef> effective = applyFieldFollow(out);
+        caches.put(DataSourceRouter.current(), new Snapshot(effective, System.currentTimeMillis()));
+    }
+
+    /**
+     * 字段定义「跟随」声明(2026-10-25 用户口径「供应商采购打印应该和采购订单用同一个表,不然数据不同步」)。
+     *
+     * <p>供应商采购打印 `SUPPLIER_PU_ORDER` 与采购订单 `PU_ORDER` **本来就是同一张表**
+     * (`bd_pu_order` + `bl_pu_order`),数据天然同步。但它的 `yj_field` 是建面板时**复制的一份副本** ——
+     * 采购订单以后加/改/删字段,这份副本不会跟着变,于是两边的列会慢慢漂移,最后"看起来不同步"。
+     *
+     * <p>这里在**读取元数据时**直接让被跟随的面板**复用源面板的字段定义**(纯内存,不写库):
+     * <ul>
+     *   <li>采购订单改了字段 ⇒ 供应商端下一次 reload(≤30s)自动就是新字段,零同步脚本;</li>
+     *   <li>{@code yj_field} 里那份副本保留(面板配置界面/权限矩阵仍能看到可用列),但**不再是真源**,
+     *       故在面板配置里改它不会生效 —— 这一点写在代码里,避免以后有人以为那是 bug;</li>
+     *   <li>表结构(head_table/line_table)本来就读 yj_panel 自己的,与源面板互相独立。</li>
+     * </ul>
+     *
+     * <p>映射表本身放在 {@link com.yinjia.mes.panel.PanelAliases} —— 单据状态(yj_doc_status)
+     * 也按面板编码存,同样要折算到源面板,两处共用一份登记,避免只改一边又出现"状态不同步"。
+     */
+    private static Map<String, PanelDef> applyFieldFollow(Map<String, PanelDef> defs) {
+        boolean changed = false;
+        Map<String, PanelDef> out = new HashMap<>(defs);
+        // 副本面板清单与「状态记账面板」共用 PanelAliases 一份登记(见该类注释)
+        for (String mirror : com.yinjia.mes.panel.PanelAliases.mirrorPanels()) {
+            String srcCode = com.yinjia.mes.panel.PanelAliases.fieldSource(mirror);
+            PanelDef follower = out.get(mirror);
+            PanelDef source = defs.get(srcCode);
+            if (follower == null || source == null || source.fields().isEmpty()) continue;
+            // 已跟随过就不重复构造(每次 reload 只做一次,开销可忽略)
+            out.put(mirror, new PanelDef(follower.code(), follower.name(), follower.nameEn(),
+                    follower.category(), follower.mode(), follower.lineTable(), follower.headTable(),
+                    follower.groupCol(), follower.pkCol(), follower.codeCol(), follower.prefix(),
+                    follower.dateCol(), follower.pageSize(), follower.detailKey(),
+                    follower.moduleGroup(), follower.config(), source.fields()));
+            changed = true;
+        }
+        return changed ? out : defs;
     }
 
     /** 当前账套的元数据快照;过期或无则重载。账套取自路由上下文(无上下文=正式库,安全默认)。 */

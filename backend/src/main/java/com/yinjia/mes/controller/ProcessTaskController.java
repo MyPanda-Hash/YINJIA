@@ -88,6 +88,27 @@ public class ProcessTaskController {
         return ApiResult.ok(service.rebuild(str(body.get("工单号")), currentUser()));
     }
 
+    /**
+     * 给工单补「工序台账」(wo_process_line,2026-10-21)。
+     *
+     * <p>订单结转转单时已按所选路线自动建台账;本接口用于**老工单**(结转过但当时没建台账)
+     * 或台账被误删后的补建。幂等:该工单行已有有效台账则跳过。
+     *
+     * @param body {工单号: "...", 工艺路线: "GY-xxx"(可空,空则按工单行/产品档案/默认)}
+     */
+    @PostMapping("/ensureLedger")
+    public ApiResult<Map<String, Object>> ensureLedger(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        String wo = str(body.get("工单号"));
+        if (wo == null || wo.isBlank()) throw new IllegalArgumentException("请提供工单号");
+        int n = service.ensureLedgerForWorkOrder(wo.trim(), str(body.get("工艺路线")), currentUser());
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("工单号", wo.trim());
+        out.put("新建台账行数", n);
+        out.put("说明", n > 0 ? "已按工艺路线补齐工序台账" : "该工单行已有台账(或路线没有工序),未改动");
+        return ApiResult.ok(out);
+    }
+
     /** 可选工艺路线列表(含工序序列;订单结转/排产弹窗选择用) */
     @PostMapping("/routes")
     public ApiResult<List<Map<String, Object>>> routes() {

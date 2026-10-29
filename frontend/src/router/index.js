@@ -7,8 +7,19 @@ const ModuleView = () => import('@/views/modules/ModuleView.vue')
 const PanelxList = () => import('@core/views/PanelxList.vue')
 const PanelxForm = () => import('@core/views/PanelxForm.vue')
 
+/**
+ * 供应商账号登录后的**唯一落地页**(2026-10-24):供应商采购打印。
+ * 与 menus.js 里 supplierPrint 的 path、以及后端 PagePanelRegistry.SUPPLIER_PRINT 一一对应。
+ */
+export const SUPPLIER_HOME = '/scm/supplierPrint'
+
 const routes = [
   { path: '/login', component: () => import('@/views/login/index.vue'), meta: { title: '登录' } },
+  // 生产领料 · 旧地址兼容(2026-10-20 第二轮:用户要求「两个写成一体的、地址要一致,
+  //   在 panelx/list 目录下」⇒ 正式地址统一为 `/panelx/list/PROD_PICK`,与本文件里那条路由同一份组件)。
+  //   这里只保留重定向,避免手机收藏/以前发的链接失效。
+  { path: '/m/pick', redirect: '/panelx/list/PROD_PICK', meta: { title: '生产领料' } },
+  { path: '/prod/plan/prodPick', redirect: '/panelx/list/PROD_PICK', meta: { title: '生产领料' } },
   {
     path: '/',
     component: () => import('@/layout/PortalLayout.vue'),
@@ -43,6 +54,29 @@ const routes = [
       { path: 'dc/stats', component: () => import('@/views/dc/DcStats.vue'), meta: { title: '状态统计', code: 'dcStats', panelCode: 'DC_STATS' } },
       { path: 'scm/mobileWarehouse', component: () => import('@/views/scm/MobileWarehouse.vue'), meta: { title: '移动仓管', code: 'mobileWarehouse' } },
       { path: 'scm/serialNumber', component: () => import('@/views/scm/SerialNumber.vue'), meta: { title: '序列号管理', code: 'serialNumber' } },
+      // 供应商门户(2026-10-24 起):
+      //   · /scm/supplierAccount 供应商权限配置 —— **管理员 ∪ 组织架构授权了「配置供应商账号」的账号**
+      //     (2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」);
+      //     用 meta.permKey 判(与菜单项 permKey、后端 requireAccountConfig 同源),不再是 requireAdmin。
+      //     它不走通用 PanelxList,故仍不进 flatMenus 自动路由(菜单项带 panelCode 已被 filter 排除)。
+      { path: 'scm/supplierAccount', component: () => import('@/views/scm/SupplierAccount.vue'), meta: { title: '供应商权限配置', code: 'supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', permKey: 'canConfigSupplierAccount' } },
+      // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询
+      //   (查询必须只能查供应商关联的数据)按钮的」):
+      //   面板 = SUPPLIER_PU_ORDER(bd_pu_order/bl_pu_order 的元数据副本,字段与采购订单逐列一致,
+      //   工具栏只有「查询 + 打印」,见后端 PANDA_BUTTONS)。
+      //   ⚠ 地址必须**带 :panelCode 参数**(PanelxList 的面板码取自 route.params.panelCode)——
+      //     早先写成静态路径 /scm/supplierPrint ⇒ params 为空 ⇒ 组件判"面板编号无效"直接 return,
+      //     不取配置也不取数(界面只剩一颗查询按钮,2026-10-25 实测踩到)。
+      //     这里与「生产领料 /panelx/list/PROD_PICK」同一形态:静态地址 + props 固定面板码。
+      //   供应商会话:菜单只剩这一条,数据由后端按登录态供应商编码强制过滤;内部账号也能进,看全量、同样只读。
+      {
+        path: 'scm/supplierPrint',
+        component: PanelxList,
+        props: { panelCode: 'SUPPLIER_PU_ORDER' },
+        meta: { title: '供应商采购打印', code: 'supplierPrint', panelCode: 'SUPPLIER_PU_ORDER' },
+      },
+      // 兼容老地址/书签:直接落到标准面板地址
+      { path: 'scm/supplierPrint/:panelCode', redirect: '/panelx/list/SUPPLIER_PU_ORDER' },
       // 扫码领料(2026-10-18):条码管理 → 扫码领料。页面级(无 panelCode),扫标签码 `存货编码|批号`
       // 按批号查 v_stock_pick 可用量 → 组材料出库单草稿。理由见 views/scm/ScanPick.vue 头注释。
       { path: 'scm/scanPick', component: () => import('@/views/scm/ScanPick.vue'), meta: { title: '扫码领料', code: 'barcodeScanPick', panelCode: 'BARCODE_SCAN_PICK' } },
@@ -71,10 +105,24 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
+      // 生产领料(2026-10-20):**地址统一到面板目录** —— 用户口径「两个要写成一体的,地址要一致,
+      //   最好是在 panelx/list 的目录下方」。
+      //   它仍然是**页面级虚拟面板**(PROD_PICK,定义见 PagePanelRegistry,不是 yj_panel 的单据表),
+      //   但地址走标准面板形态 `/panelx/list/PROD_PICK`;因为是专用页面而不是通用 PanelxList,
+      //   这条**必须排在下面 `panelx/list/:panelCode` 之前**(静态路径优先于参数路径)。
+      //   电脑端与手机端同一地址:窄屏单列 + 吸底栏,≥900px 双栏(同一份组件自适应)。
+      //   旧的 `/prod/plan/prodPick`、`/m/pick` 保留为重定向,老链接/收藏不失效。
+      // ⚠ 2026-10-21 用户口径:「扫码领料应该是整个图片上红色的窗口保留」—— 即手机上也要
+      //   留着顶栏 + 页签,不要沉浸。故这条**去掉 immersiveOnMobile**;PortalLayout 的沉浸能力
+      //   保留(以后别的页要用),但当前没有任何路由启用它。
+      { path: 'panelx/list/PROD_PICK', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
+      // 工序报工(2026-10-21):与生产领料同一形态 —— 页面级虚拟面板 + 标准面板地址 `/panelx/list/<码>`,
+      //   必须排在上面的参数路由之前;手机单列、电脑 ≥900px 双栏(同一份组件)。
+      { path: 'panelx/list/PROD_REPORT', component: () => import('@/views/mobile/MobileReport.vue'), meta: { title: '工序报工', code: 'prodReport', panelCode: 'PROD_REPORT' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
-        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && !m.panelCode)
+        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && m.code !== 'supplierPrint' && m.code !== 'supplierAccount' && !m.panelCode)
         .map((m) => ({
           path: m.path.slice(1),
           component: ModuleView,
@@ -103,8 +151,18 @@ router.onError((err) => {
 router.beforeEach((to) => {
   document.title = `${to.meta.title || ''} · YINJIA-MES`
   const user = useUserStore()
+  // 供应商会话(2026-10-24 用户口径「只能看到供应商采购打印面版……没有别的权限」):
+  //   登录/会话还原时后端已把 visiblePanels 裁到只剩 SUPPLIER_PRINT,这里再加一道**显式出口守卫** ——
+  //   敲 URL 进任何别的页面(含 /dashboard)一律送回 供应商采购打印。真正的闸门在后端
+  //   SupplierPortalGuardFilter(供应商会话的 /api 请求只放行门户接口),本守卫只负责"别把人带进死路"。
+  if (user.isLogin && user.supplierCode) {
+    return to.path === SUPPLIER_HOME ? true : SUPPLIER_HOME
+  }
   if (to.path !== '/login' && !user.isLogin) return '/login'
   if (to.meta.requireAdmin && !user.isAdmin) return '/dashboard'
+  // 按登录用户身上的布尔位守卫(2026-10-25):组织架构授权的页面(供应商权限配置)不是 adminOnly,
+  // 判定读 user[meta.permKey](canConfigSupplierAccount),与菜单项 permKey 同源。
+  if (to.meta.permKey && user.isLogin && !user[to.meta.permKey]) return '/dashboard'
   if (to.path === '/login' && user.isLogin) return '/dashboard'
   // 页面级面板守卫(2026-10-16):直接敲 URL 也要拦 —— 菜单隐藏只是显示层,
   // 订单结转/快速排产/工单排产/生产工单四个看板页面此前没有面板码,任何人都能直连。

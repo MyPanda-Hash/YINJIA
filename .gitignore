@@ -50,6 +50,9 @@ tests/
 
 # 例外:数据库同步工具需要的 JDBC 驱动
 !tools/lib/mssql-jdbc.jar
+# 安卓扫码用的 ZXing core(593 KB,离线构建必需;与 mssql-jdbc 同一先例)
+!android/libs/*.jar
+!android-cap/android/app/libs/*.jar
 
 # 误创建的 Maven 本地仓库(settings.xml 的 localRepository 未展开环境变量)
 # 无前导斜杠=任意层级匹配(含仓库根);原 */ 前缀只匹配子目录,根级漏网
@@ -148,3 +151,56 @@ _*.xlsx
 # 解包残留、以及会话调试脚本(如 head_*.java)。原先**没有任何规则覆盖它** ——
 # `git add -A` 会把 619MB 全扫进来(实测 `git check-ignore -v .tmp/cp.txt` 退出码 1 = 未忽略)。
 .tmp/
+# ── 安卓壳(2026-10-20):构建产物不入库;keystore 入库(内部自签名,丢了就得全体卸载重装) ──
+android/build/
+android/dist/
+# 安卓壳:前端产物在构建时从 frontend/dist 拷进 assets/www(每次 build.ps1 重新生成),
+# 属于构建产物,不入库(仓库里已有 frontend/dist 与 backend/static 两份,不再存第三份)。
+android/app/assets/
+# ── 安卓 Capacitor 工程(2026-10-20):依赖/构建产物/本地下发的工具链都不入库 ──
+android-cap/node_modules/
+android-cap/dist/
+android-cap/.tmp/
+android-cap/.gradle-home/
+android-cap/.gradle-dist/
+android-cap/.jdk21/
+android-cap/android/.gradle/
+android-cap/android/.idea/
+android-cap/android/build/
+android-cap/android/app/build/
+android-cap/android/local.properties
+# cap copy 每次从 frontend/dist 生成,属构建产物(与手搓版的 assets/www 同理)
+android-cap/android/app/src/main/assets/public/
+android-cap/android/app/src/main/assets/capacitor.config.json
+# 逆向用的一次性 APK 原件(28MB,用户给的参考包)不入库,只留分析脚本与结论
+tools/archive/_apk-probe-20261020/*.apk
+tools/archive/_apk-probe-20261020/ref-classes.dex
+# 负库存配平脚本的输出(计划/备份快照里含真实业务数据,不入库)
+tools/_balance-out/
+tools/_out/
+
+# 混料记录增量包(2026-10-22):包里的 tools\ / static\ / verify\ / SHA256SUMS.txt 都是派生物
+# (由 tools/archive/_assemble-wo-mixing-pkg.ps1 从仓库真源重建),zip 同理不入库。
+/deploy/incr-wo-mixing-*/tools/
+/deploy/incr-wo-mixing-*/static/
+/deploy/incr-wo-mixing-*/verify/
+/deploy/incr-wo-mixing-*/SHA256SUMS.txt
+/deploy/incr-wo-mixing-*/logs/
+/deploy/incr-wo-mixing-*.zip
+# 生产领料增量包(2026-10-22):同混料记录那套 —— 包里的 tools\ / static\ / verify\ /
+# SHA256SUMS.txt 都是派生物(由 tools/archive/_assemble-prod-pick-outh-pkg.ps1 从仓库真源重建),
+# zip 同理不入库(deploy/*.zip 已覆盖)。
+/deploy/incr-prod-pick-outh-*/tools/
+/deploy/incr-prod-pick-outh-*/static/
+/deploy/incr-prod-pick-outh-*/verify/
+/deploy/incr-prod-pick-outh-*/SHA256SUMS.txt
+/deploy/incr-prod-pick-outh-*/logs/
+/deploy/incr-prod-pick-outh-*.zip
+# 产成品入库单加工单号补齐包(2026-10-22):同前两个增量包 —— 包里的 tools\ / verify\ /
+# SHA256SUMS.txt 都是派生物(由 tools/archive/_assemble-finish-in-wo-pkg.ps1 从仓库真源重建),
+# zip 不入库(deploy/*.zip 已覆盖)。
+/deploy/incr-finish-in-wo-backfill-*/tools/
+/deploy/incr-finish-in-wo-backfill-*/verify/
+/deploy/incr-finish-in-wo-backfill-*/SHA256SUMS.txt
+/deploy/incr-finish-in-wo-backfill-*/logs/
+/deploy/incr-finish-in-wo-backfill-*.zip

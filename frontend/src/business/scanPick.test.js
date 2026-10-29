@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseBarcode, matchPickRows, checkPickQty, buildMaterialOutForm } from './scanPick.js'
+import { parseBarcode, matchPickRows, checkPickQty, buildMaterialOutForm, batchDate, fifoSort, sumAvailable, allocateFifo } from './scanPick.js'
 
 /**
  * scanPick.test.js — 条码扫码领料的纯逻辑(2026-10-18)
@@ -114,4 +114,109 @@ test('建单:明细必填列齐 + 金额按数量×单价', () => {
   assert.equal(item.数量, 2)
   assert.equal(item.金额, 3)
   assert.equal(item.行号, '1')
+})
+
+/* ─────────── 批号日期 / 先进先出(2026-10-20 用户口径)─────────── */
+
+test('批号日期:8 位数字/带分隔符都能取,取不到给空串', () => {
+  assert.equal(batchDate('SX-20260907'), '2026-09-07')
+  assert.equal(batchDate('20261014001'), '2026-10-14')
+  assert.equal(batchDate('GL-2026-09-17'), '2026-09-17')
+  assert.equal(batchDate('TL00210'), '')
+  assert.equal(batchDate('PC0000'), '')
+  assert.equal(batchDate(''), '')
+  assert.equal(batchDate(null), '')
+})
+
+test('批号日期:月份/日期越界时当没有日期(不猜)', () => {
+  assert.equal(batchDate('X-20261340'), '')
+})
+
+test('先进先出:日期在前先出,取不到日期的排最后', () => {
+  const rows = [
+    { 存货编码: 'A', 批号: 'ZZ-20261001', 仓库编码: 'W1', 现存量: 5 },
+    { 存货编码: 'A', 批号: 'AA-20260901', 仓库编码: 'W1', 现存量: 5 },
+    { 存货编码: 'A', 批号: '', 仓库编码: 'W1', 现存量: 5 },
+  ]
+  const sorted = fifoSort(rows).map((r) => r.批号)
+  assert.deepEqual(sorted, ['AA-20260901', 'ZZ-20261001', ''])
+})
+
+test('可用量合计:只看 物料+仓库(多批次相加,不看批号)', () => {
+  const rows = [
+    { 存货编码: 'A', 批号: 'P1', 仓库编码: 'W1', 现存量: 3.5 },
+    { 存货编码: 'A', 批号: 'P2', 仓库编码: 'W1', 现存量: 1.25 },
+  ]
+  assert.equal(sumAvailable(rows), 4.75)
+})
+
+test('分配:一批够 → 只出一行', () => {
+  const rows = [{ 存货编码: 'A', 存货名称: '炭棒', 计量单位: '支', 批号: 'SX-20260901', 仓库: '原料仓', 仓库编码: 'YCL-01', 现存量: 100, 结存单价: 2 }]
+  const r = allocateFifo(rows, 30)
+  assert.equal(r.lines.length, 1)
+  assert.equal(r.lines[0].qty, 30)
+  assert.equal(r.allocated, 30)
+  assert.equal(r.shortage, 0)
+})
+
+test('分配:一批不够 → 扣下一日期批次,生成多条明细', () => {
+  const rows = [
+    { 存货编码: 'A', 批号: 'SX-20260920', 仓库编码: 'W1', 仓库: '仓1', 现存量: 10 },
+    { 存货编码: 'A', 批号: 'SX-20260905', 仓库编码: 'W1', 仓库: '仓1', 现存量: 10 },
+    { 存货编码: 'A', 批号: 'SX-20260912', 仓库编码: 'W1', 仓库: '仓1', 现存量: 10 },
+  ]
+  const r = allocateFifo(rows, 25)
+  assert.deepEqual(r.lines.map((l) => l.batch), ['SX-20260905', 'SX-20260912', 'SX-20260920'])
+  assert.deepEqual(r.lines.map((l) => l.qty), [10, 10, 5])
+  assert.equal(r.allocated, 25)
+  assert.equal(r.shortage, 0)
+})
+
+test('分配:数量超过可用合计 → 全部分完并报缺口(不拦,交给审核闸门)', () => {
+  const rows = [{ 存货编码: 'A', 批号: 'P1', 仓库编码: 'W1', 现存量: 4 }]
+  const r = allocateFifo(rows, 6)
+  assert.equal(r.allocated, 4)
+  assert.equal(r.shortage, 2)
+})
+
+test('分配:数量非正/没有库存 → 不出行', () => {
+  assert.deepEqual(allocateFifo([{ 现存量: 5 }], 0).lines, [])
+  const r = allocateFifo([{ 存货编码: 'A', 现存量: 0 }], 3)
+  assert.equal(r.lines.length, 0)
+  assert.equal(r.shortage, 3)
+})
+
+test('建单:带工单键与仓位(追溯/回写要靠 加工单号+工单行号)', () => {
+  const form = buildMaterialOutForm(
+    [{ code: 'M-001', name: '端盖', uom: '个', batch: 'P1', warehouse: '原料仓', warehouseCode: 'YCL-01', binCode: 'A1-09-1', bin: 'A1-09-1', qty: 2, price: 1 }],
+    { date: '2026-10-20', woNo: 'GD-2026-10-0001', woLine: 1, warehouseCode: 'YCL-01' },
+  )
+  assert.equal(form.加工单号, 'GD-2026-10-0001')
+  assert.equal(form.工单行号, 1)
+  assert.equal(form.detail.items[0].仓位编码, 'A1-09-1')
+  assert.equal(form.detail.items[0].仓库编码, 'YCL-01')
+})
+
+test('建单:生产线(原「生产车间」)由领料带入 —— 空则不写,不硬编', () => {
+  const base = [{ code: 'M-001', name: '端盖', uom: '个', batch: 'P1', qty: 2, price: 1 }]
+  assert.equal(buildMaterialOutForm(base, { date: '2026-10-21', prodLine: '1线' }).生产线, '1线')
+  assert.equal('生产线' in buildMaterialOutForm(base, { date: '2026-10-21', prodLine: '  ' }), false)
+})
+
+test('建单:领用人 = 登录扫码人姓名', () => {
+  const form = buildMaterialOutForm([{ code: 'M-001', name: '端盖', uom: '个', qty: 2 }], { date: '2026-10-21', picker: '张三' })
+  assert.equal(form.领用人, '张三')
+})
+
+test('建单:明细带规格型号(用户报障:物料编码没把规格型号带进领料)', () => {
+  const form = buildMaterialOutForm(
+    [{ code: 'M-001', name: '端盖', uom: '个', spec: '63*40*242.5', batch: 'P1', qty: 2, price: 1 }],
+    { date: '2026-10-21' },
+  )
+  assert.equal(form.detail.items[0].规格型号, '63*40*242.5')
+})
+
+test('建单:规格型号为空时不报错(老物料可能没有规格)', () => {
+  const form = buildMaterialOutForm([{ code: 'M-001', name: '端盖', uom: '个', qty: 1 }], { date: '2026-10-21' })
+  assert.equal(form.detail.items[0].规格型号, '')
 })

@@ -1,0 +1,259 @@
+/**
+ * _probe-mobile-pick.mjs — 移动端扫码领料页 /#/m/pick 的 375 宽验收探针(只读)
+ *
+ * 验什么(对应 2026-10-20 用户口径 + 规范):
+ *   ① 375 宽不横向滚动(docs/frontend/前端面板设计.md §10 / 补充设计 §4.4);
+ *   ② 扫工单(手输/扫码枪回车)→ 工单卡出来(工单号/产品/产线/排产数量);
+ *   ③ 扫物料 → 可用量(物料+仓库合计);
+ *   ④ 填数量 → 按批号日期先进先出的分配预览;
+ *   ⑤ 加入 → 领料清单有行;
+ *   ⑥ 截图留档。
+ *   ⚠ **不点提交**(不往正式库造草稿单)。
+ *
+ * 用法(5173 或 8090 均可,前提是后端在跑):
+ *   node tools/archive/_mobile-pick-20261020/_probe-mobile-pick.mjs [uiBase] [工单号] [物料编码] [数量]
+ */
+import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
+const UI = (process.argv[2] || 'http://127.0.0.1:5173').replace(/\/$/, '')
+const WO = process.argv[3] || 'GD-2026-10-0222'
+const MAT = process.argv[4] || 'A-32-01'
+const QTY = process.argv[5] || '2'
+// 2026-10-20:同一个组件两端共用 —— 手机端 /#/m/pick(独立布局)· 电脑端 /#/prod/plan/prodPick(桌面壳内双栏)
+const ROUTE = process.env.PROBE_ROUTE || '/#/m/pick'
+const W = Number(process.env.PROBE_W || 375)
+const H = Number(process.env.PROBE_H || 900)
+const PORT = 9411
+const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+const apiBase = UI.includes(':5173') ? 'http://127.0.0.1:8090' : UI
+const lg = await (await fetch(apiBase + '/api/auth/login', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ userName: 'admin', password: '123456', factory: process.env.PROBE_FACTORY || 'YJ' }),
+})).json()
+if (!lg?.data?.token) throw new Error('登录失败: ' + JSON.stringify(lg).slice(0, 200))
+
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-mpick-'))
+const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=' + W + ',' + H,
+  `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
+await sleep(3500)
+let tab
+for (let i = 0; i < 30 && !tab; i++) {
+  try { const r = await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) tab = await r.json() } catch {}
+  if (!tab) await sleep(500)
+}
+const ws = new WebSocket(tab.webSocketDebuggerUrl)
+await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
+let seq = 0
+const pending = new Map()
+ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } }
+const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })) })
+const ev = async (x) => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true }))?.result?.result?.value
+
+await send('Page.enable'); await send('Runtime.enable'); await send('DOM.enable')
+await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 2, mobile: W < 600 })
+await send('Page.navigate', { url: `${UI}/#/login` }); await sleep(1800)
+await ev(`localStorage.setItem('mes_token', ${JSON.stringify(lg.data.token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(lg.data.user))}); 'ok'`)
+await send('Page.navigate', { url: 'about:blank' }); await sleep(300)
+await send('Page.navigate', { url: UI + ROUTE }); await sleep(4500)
+
+const out = []
+const ok = (name, pass, detail = '') => { out.push({ name, pass, detail }); console.log(`${pass ? '  ✔' : '  ✘'} ${name}${detail ? '  ' + detail : ''}`) }
+
+// ① 布局
+const layout = JSON.parse(await ev(`JSON.stringify({
+  win: window.innerWidth,
+  doc: document.documentElement.scrollWidth,
+  body: document.body.scrollWidth,
+  title: document.querySelector('.mp-title')?.textContent || '',
+  cards: document.querySelectorAll('.mp-card').length,
+  cols: getComputedStyle(document.querySelector('.mp-body') || document.body).display,
+  leftW: Math.round((document.querySelector('.mp-left')?.getBoundingClientRect().width) || 0),
+  rightW: Math.round((document.querySelector('.mp-right')?.getBoundingClientRect().width) || 0),
+  footPos: getComputedStyle(document.querySelector('.mp-foot') || document.body).position,
+  menuHasPick: Array.from(document.querySelectorAll('.leftnav, .mobile-nav')).some(n => (n.textContent || '').includes('生产领料')),
+  isPanelShell: !!document.querySelector('.pl-toolbar, .panelx-toolbar') && !document.querySelector('.mp'),
+  hasTopBar: !!document.querySelector('.topbar'),
+  hasTabs: !!document.querySelector('.tabs, .tabs-bar, .tabbar'),
+})`))
+ok('页面已渲染(.mp-title=' + layout.title + ')', layout.title.length > 0, `cards=${layout.cards}`)
+ok(`${W} 宽无横向滚动`, layout.doc <= layout.win && layout.body <= layout.win, `doc=${layout.doc} win=${layout.win}`)
+// 断点:≥768 留在桌面壳(≥900 才双栏),<768 走沉浸页(不渲染顶栏/页签/侧栏)
+if (W >= 768) {
+  ok('电脑/平板保留桌面壳(顶栏在)', layout.hasTopBar === true, String(layout.hasTopBar))
+  ok('底栏不压内容(position 非 fixed)', layout.footPos !== 'fixed', layout.footPos)
+  if (W >= 900) {
+    ok('宽屏双栏(grid)且左右都有宽度', layout.cols === 'grid' && layout.leftW > 0 && layout.rightW > 0, JSON.stringify({ cols: layout.cols, leftW: layout.leftW, rightW: layout.rightW }))
+  } else {
+    ok('平板宽度单列', layout.cols === 'block', layout.cols)
+  }
+} else {
+  // 2026-10-21 用户口径:「扫码领料应该是整个图片上红色的窗口保留」⇒ 手机上也保留顶栏+页签
+  ok('手机端单列布局', layout.cols === 'block', layout.cols)
+  ok('手机端保留顶栏(红框那一条)', layout.hasTopBar === true, String(layout.hasTopBar))
+  ok('手机端不是通用面板壳(仍是生产领料页)', layout.isPanelShell === false, String(layout.isPanelShell))
+}
+
+// ② 工单
+const setInput = async (sel, val) => ev(`(() => {
+  const el = document.querySelector(${JSON.stringify(sel)});
+  if (!el) return 'no-input';
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(el, ${JSON.stringify(val)});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'ok';
+})()`)
+const clickBtn = async (text) => ev(`(() => {
+  const b = Array.from(document.querySelectorAll('.mp button')).find(x => (x.textContent||'').trim() === ${JSON.stringify(text)});
+  if (!b) return 'no-btn';
+  b.click(); return 'ok';
+})()`)
+
+await setInput('.mp-card .el-input__inner', WO)
+await clickBtn('查询')
+await sleep(3500)
+const woCard = JSON.parse(await ev(`JSON.stringify({
+  text: document.querySelector('.mp-wo')?.innerText || '',
+  rows: document.querySelectorAll('.mp-kv').length,
+})`))
+ok('扫工单 → 工单卡出现', woCard.text.includes(WO) && woCard.rows >= 4, JSON.stringify(woCard).slice(0, 160))
+ok('工单卡含「物料编码」行', /物料编码/.test(woCard.text), woCard.text.split('\n').slice(0, 6).join(' / ').slice(0, 100))
+// 2026-10-21:材料出库单的「生产车间」已改名「生产线」,值由领料按工单带过去;
+// 领用人 = 登录扫码人 ⇒ 卡片上这两行都要有,且领用人不能是空的。
+ok('工单卡含「生产线」行', /生产线/.test(woCard.text), woCard.text.slice(0, 200))
+ok('工单卡含「领用人」行(登录人)', /领用人/.test(woCard.text) && woCard.text.split('领用人')[1]?.trim() !== '', woCard.text.slice(0, 200))
+
+// ②b 未排产分支(--unsched):卡片照常显示,但顶部有提示、物料区与提交禁用
+if (process.argv.includes('--unsched')) {
+  const st = JSON.parse(await ev(`JSON.stringify({
+    err: document.querySelector('.mp-err')?.textContent || '',
+    warnTag: !!document.querySelector('.mp-tag-warn'),
+    matDisabled: (() => {
+      const els = document.querySelectorAll('.mp-card .el-input__inner');
+      const el = els[els.length - 1];
+      return el ? el.disabled : null;
+    })(),
+    footDisabled: Array.from(document.querySelectorAll('.mp-foot button')).map((b) => b.disabled),
+  })`))
+  ok('未排产 → 顶部提示条点名原因', /未排产/.test(st.err), st.err.slice(0, 80))
+  ok('未排产 → 工单卡打「未排产」标', st.warnTag === true, String(st.warnTag))
+  ok('未排产 → 物料输入禁用', st.matDisabled === true, String(st.matDisabled))
+  ok('未排产 → 提交按钮禁用', st.footDisabled.length > 0 && st.footDisabled.every(Boolean), JSON.stringify(st.footDisabled))
+
+  const shot0 = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  fs.writeFileSync(path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020', 'unscheduled-blocked.png'), Buffer.from(shot0.result.data, 'base64'))
+  const pass0 = out.filter((x) => x.pass).length
+  console.log(`\n=== ${pass0}/${out.length} 通过 ===`)
+  try { edge.kill() } catch {}
+  process.exit(pass0 === out.length ? 0 : 1)
+}
+
+// ③ 物料
+const inputs = await ev(`document.querySelectorAll('.mp-card .el-input__inner').length`)
+await ev(`(() => {
+  const els = document.querySelectorAll('.mp-card .el-input__inner');
+  const el = els[els.length - 1];
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(el, ${JSON.stringify(MAT)});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'ok';
+})()`)
+await ev(`(() => {
+  const b = Array.from(document.querySelectorAll('.mp button')).filter(x => (x.textContent||'').trim() === '查询');
+  (b[b.length - 1] || b[0]).click(); return 'ok';
+})()`)
+await sleep(3500)
+const matBlock = JSON.parse(await ev(`JSON.stringify({
+  text: document.querySelector('.mp-mat')?.innerText || '',
+  stock: document.querySelector('.mp-mat-stock b')?.textContent || '',
+})`))
+if (!matBlock.text) {
+  const dbg = await ev(`JSON.stringify({
+    err: document.querySelector('.mp-err')?.textContent || '',
+    inputs: document.querySelectorAll('.mp-card .el-input__inner').length,
+    btns: Array.from(document.querySelectorAll('.mp button')).map(b => (b.textContent||'').trim()),
+  })`)
+  console.log('  [DBG] ' + dbg)
+}
+ok('扫物料 → 可用量出现', matBlock.text.includes(MAT) && matBlock.stock.trim() !== '', JSON.stringify(matBlock).slice(0, 160))
+
+// ④ 数量 → FIFO 预览
+await ev(`(() => {
+  const el = document.querySelector('.mp-qty .el-input__inner');
+  if (!el) return 'no-qty';
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(el, ${JSON.stringify(QTY)});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.dispatchEvent(new Event('blur', { bubbles: true }));
+  return 'ok';
+})()`)
+await sleep(900)
+const alloc = JSON.parse(await ev(`JSON.stringify({
+  rows: document.querySelectorAll('.mp-batch-row.is-checked').length,
+  warn: document.querySelector('.mp-warn')?.textContent || '',
+})`))
+ok('填数量 → 批次按先进先出自动勾选', alloc.rows > 0, JSON.stringify(alloc))
+
+// ④a 批次表可展开/收起(2026-10-21):收起后表体消失、摘要仍在、加入按钮还在
+const before = JSON.parse(await ev(`JSON.stringify({ rows: document.querySelectorAll('.mp-batch-row').length })`))
+await ev(`document.querySelector('.mp-batches-toggle').click(); 'ok'`)
+await sleep(400)
+const collapsed = JSON.parse(await ev(`JSON.stringify({
+  rows: document.querySelectorAll('.mp-batch-row').length,
+  sum: document.querySelector('.mp-bt-sum')?.innerText || '',
+  addVisible: !!document.querySelector('.mp-qty .el-button--primary'),
+})`))
+ok('批次表收起 → 表体隐藏、摘要保留、加入仍在',
+  collapsed.rows === 0 && collapsed.sum.trim() !== '' && collapsed.addVisible,
+  JSON.stringify({ before: before.rows, ...collapsed }))
+await ev(`document.querySelector('.mp-batches-toggle').click(); 'ok'`)
+await sleep(400)
+const reopened = JSON.parse(await ev(`JSON.stringify({ rows: document.querySelectorAll('.mp-batch-row').length })`))
+ok('批次表再展开 → 行数恢复', reopened.rows === before.rows, JSON.stringify(reopened))
+
+// ④b 加物料之前先截一张「批次勾选表」的图(2026-10-21 新交互:批次可勾选/先进先出标亮)
+if (process.env.PROBE_SHOT_BATCH === '1') {
+  const shotB = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  fs.writeFileSync(path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020', 'batch-select.png'), Buffer.from(shotB.result.data, 'base64'))
+}
+
+// ⑤ 加入清单
+await clickBtn('加入')
+await sleep(800)
+const list = JSON.parse(await ev(`JSON.stringify({
+  lines: document.querySelectorAll('.mp-line').length,
+  text: document.querySelector('.mp-line')?.innerText || '',
+})`))
+ok('加入 → 领料清单有行', list.lines > 0, JSON.stringify(list).slice(0, 160))
+
+// ⑤b 提交(仅 --submit;测试账套用)
+if (process.argv.includes('--submit')) {
+  await clickBtn('生成材料出库单')
+  await sleep(3000)
+  const msg = await ev(`(() => {
+    const boxes = Array.from(document.querySelectorAll('.el-message'));
+    return boxes.map(b => (b.textContent||'').trim()).join(' | ');
+  })()`)
+  const errBox = await ev(`document.querySelector('.mp-err')?.textContent || ''`)
+  ok('提交 → 生成草稿', /已生成材料出库单草稿/.test(msg || ''), (msg || errBox || '(无提示)').slice(0, 120))
+  await sleep(600)
+}
+
+
+const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+const file = path.join(process.cwd(), 'tools', 'archive', '_mobile-pick-20261020',
+  W < 600 ? 'mobile-pick-375.png' : 'prod-pick-desktop.png')
+fs.writeFileSync(file, Buffer.from(shot.result.data, 'base64'))
+console.log(`\n截图: ${file}`)
+
+const pass = out.filter((x) => x.pass).length
+console.log(`\n=== ${pass}/${out.length} 通过 ===`)
+try { edge.kill() } catch {}
+process.exit(pass === out.length ? 0 : 1)

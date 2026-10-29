@@ -216,7 +216,13 @@
                   :rows="c.rows || 3" :maxlength="c.max || 2000"
                   class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
                 />
-                <AnnotatedText v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <!-- 只读/打印态:声明 fitLines 的格子按字数自动缩字号(最多 N 行,行高不变),
+                     并加 line-clamp 兜底 —— 见 fitFontSize 注释 -->
+                <AnnotatedText
+                  v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')"
+                  :class="{ 'as-ro-fit': c.fitLines }"
+                  :style="c.fitLines ? { fontSize: fitFontSize(c.key, c.fitLines) + 'px', '--fit-lines': c.fitLines } : null"
+                />
                 <div v-if="c.sign" class="q-signline end">
                   <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                   <span class="q-sign-val">
@@ -766,6 +772,42 @@ const setDatePart = (key, p, v) => {
   emit('dirty')
 }
 
+/**
+ * 「最多 N 行」自适应字号(2026-10-28 用户口径)。
+ *
+ * 适用:单元格声明了 `fitLines`(目前只有特采单「不良说明」= 2)。
+ *
+ * 为什么要自动缩字号:用户明确要求「**不要加高行高**,只需要可以多行文本,最多就用到两行」。
+ * 行高 63px 固定 ⇒ 本格只能放两行;而不良说明常见 50~100 字。
+ * 既要行高不变、又要内容不被吃掉,只能按字数缩字号。
+ *
+ * 【换算基准】用真实浏览器实测标定(2026-10-28,print 媒体,545px 可用宽):
+ *   汉字实际渲染宽度 ≈ **0.78 × 字号**(14px 字宽实测 10.925px),不是 1:1 ——
+ *   按 1:1 估会严重低估容量、字号掉得过早。
+ *   各档两行容量(汉字):14px→98 / 13→106 / 12→116 / 11→126 / 10→138 / 9→154 / 8→174
+ * 半角字符按 0.55 个汉字宽折算。
+ *
+ * 兜底:CSS 再挂 `-webkit-line-clamp`(见 .as-ro-fit),保证**永远不超过 N 行**。
+ *
+ * @param {string|number} key  数据键(字段 label)
+ * @param {number} fitLines    允许的最大行数
+ * @returns {number} 字号(px)
+ */
+const FIT_FONT_SIZES = [14, 13, 12, 11, 10, 9, 8]
+const FIT_AVAIL_W = 545         // 打印态该格可用宽实测值
+const FIT_CHAR_RATIO = 0.78     // 汉字宽 ÷ 字号(实测标定)
+function fitFontSize(key, fitLines) {
+  const text = String(props.head?.[key] ?? '')
+  const maxLines = Number(fitLines) || 0
+  if (!text || maxLines <= 0) return FIT_FONT_SIZES[0]
+  const units = [...text].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0)
+  for (const fs of FIT_FONT_SIZES) {
+    const perLine = Math.floor(FIT_AVAIL_W / (fs * FIT_CHAR_RATIO))
+    if (Math.ceil(units / perLine) <= maxLines) return fs
+  }
+  return FIT_FONT_SIZES[FIT_FONT_SIZES.length - 1]
+}
+
 /** 阶段计划开始:归一空值(清空时 el-date-picker 给 null),别把 null 存进库 */
 function onPhaseStart(phaseKey, v) {
   props.head[phaseKey + '_计划开始'] = v || ''
@@ -1281,6 +1323,16 @@ defineExpose({ focusField })
   word-break: break-all;
   padding: 2px 4px;
 }
+/* 「最多 N 行」兜底(2026-10-28):字号由 fitFontSize 按字数自动选,这里再用 line-clamp
+   把超出 N 行的部分收掉,保证**永远是 N 行以内、绝不撑破格子**(行高不变)。
+   只作用于声明了 fitLines 的格子(.as-ro-fit),其余只读文本不受影响。 */
+.as-ro-text.as-ro-fit {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--fit-lines, 2);
+  line-clamp: var(--fit-lines, 2);
+  overflow: hidden;
+}
 /* 内容区左右分栏:左=表格(序号/项目名/填写区),右=可填备注列(设计 立项申请表 F5/F6:G15)
    备注列原先是 .as-deco 装饰虚线(只画不填),2026-09-22 改为真字段 */
 .as-body {
@@ -1577,8 +1629,29 @@ defineExpose({ focusField })
   align-items: stretch;
   padding: 3px 8px 4px;
 }
+/* 参照控件落在表格取值格内时:撑满整格,且**允许收缩**(2026-10-28)。
+ * 为什么必须这三条一起写:
+ *   · `.as-ref-ctl` 自身写死 `width:200px`(那是「文档编号」小格的尺寸),搬进表格格子后
+ *     只写 `width:100%` 是不够的 —— 它作为 flex item 的 flex-basis 仍是 auto(内容宽),
+ *     长供应商名会把控件撑到 484px,溢出到隔壁列,表现就是"供应商窜出去"。
+ *   · min-width:0 是 flex item 的收缩许可(flex item 默认 min-width:auto = 内容宽,不肯缩)。
+ *   · flex:1 1 0 让宽度完全由格子决定,不参与"按内容撑开"。 */
 .q-value .as-ref-ctl {
   width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;   /* 值区左对齐:与同格的文本类取值观感一致,也不会往左窜 */
+}
+/* 取值格里的参照文本:2026-10-28 —— **放不下就换行**,不省略、不溢出。
+ * 为什么不能只靠定宽:列宽是照原图定死的(见 docSheetConfigs),长供应商名
+ * (如「伊诺凯化学试剂有限公司」137px)在 94px 的值区里必然放不下。
+ * 之前 `overflow: visible + nowrap` 会往左窜出格子、压到隔壁列(用户报障"供应商窜出去了");
+ * 改回 ellipsis 又变成「江苏...」被截断。两条都不对 —— 打印件要的是**完整可读**,
+ * 所以这里放开换行:格子高度够(行高 52/63px,两行字放得下),文字完整显示且不越界。 */
+.q-value .as-ref-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 .q-ro {
   flex: 1;
@@ -1873,6 +1946,26 @@ defineExpose({ focusField })
     padding-right: 0 !important;
     margin: 0 !important;
   }
+  /* ── 纸面宽度(2026-10-22 修「被分成两页 / 数据被省略」)────────────────────────────
+   * 冻结自用户报障截图(特采申请单 YJ-QR-60 打印预览):供应商显示「江苏...」、
+   * 采购单号显示「YJ-2...」,且整张单被切成两页。
+   *
+   * 根因(两条,同源):
+   *   ① 版式是**按设计宽 938px 排的固定栅格**(见 docSheetConfigs「表体 447px → 纸面 938px,
+   *      比例 2.098」:供应商列 flex:243 / 采购单号 338 / 产品名称 292 都是这个基准下的实测值);
+   *   ② 而打印态这里把纸面压成 width:100%,A4 去掉 8mm 边距只剩 733px ⇒ 纸面被压缩到 78%。
+   *   ⇒ 值区跟着缩窄(采购单号 338→264px),放不下的文字走 .as-ref-text 的
+   *      `text-overflow:ellipsis + white-space:nowrap` 被截成「江苏...」;
+   *   ⇒ 同时行内内容在窄格子里换行/撑高,整张纸从设计高 1340px 涨到约 1362px,
+   *      超过 A4 可打印高 1062px ⇒ 被浏览器切成两页。
+   *
+   * 修法:**打印时让纸面按设计宽 938px 排版(不压缩、不换行),再交给浏览器整体等比缩放**。
+   *   · 纸面定宽后,各值区回到设计宽度 ⇒ 文字放得下 ⇒ 不再出现省略号;
+   *   · 行高回到设计值 ⇒ 纸面总高回到 ~1340px;
+   *   · `zoom` 是「布局后再缩放」,浏览器会按缩放后的尺寸分页:
+   *     733 / 938 = 78.15% ⇒ 1340 × 78.15% ≈ 1047px < 1062px 可打印高 ⇒ **一页放得下**。
+   *   (不用 transform:scale —— 它不影响布局盒尺寸,分页仍按未缩放的 1340px 切,照样两页。)
+   * 其它文书式面板(非固定宽)不受影响:它们本就没有 938px 设计基准,保持 width:100%。 */
   body.approval-printing .approval-sheet {
     visibility: visible !important;
     position: absolute !important;
@@ -1883,6 +1976,40 @@ defineExpose({ focusField })
     margin: 0 !important;
     border: 1px solid #8a8a8a !important;
     box-shadow: none !important;
+  }
+  /* ⚠ 只作用于**按 938px 设计基准排版的品质系表格单**(QC_* 八张 + 特采单等,见 docSheetConfigs
+   *   「表体 447px → 纸面 938px」那段注释)。RD_APPROVAL / RD_PLAN 走 FIXED_SHEET_W=1242 的另一套
+   *   基准,以及其余自适应宽面板,一律**不动** —— 否则会把 1242 的设计纸压成 938。
+   *   判据用 qc 版式独有的网格结构 `.q-vrows`(左侧竖排「申请单位」字列 + 右侧 pairs 网格),
+   *   RD 系列走的是 as-no/as-name 那一套,不会命中。 */
+  body.approval-printing .approval-sheet:has(.q-vrows) {
+    width: 938px !important;
+    max-width: none !important;
+    flex: none !important;
+    /* 缩放比 = min(可打印宽 / 938, 可打印高 / 设计纸高)
+     *   · 宽:733.2 / 938 = 78.2%
+     *   · 高:设计纸高 1362px ⇒ 1062 / 1362 = 78.0%
+     *   取 0.78 两者同时满足(宽 732 ≤ 733、高 1062 ≤ 1062,余量较紧故取 0.78 不多也不少)。
+     * ⚠ 改任何行高都要重算本值 —— docSheetPrint.test.js 的「纸高不超可打印高」会挡住漏算。 */
+    zoom: 0.78 !important;
+    /* 分页兜底:纸面本身是不可分割的整块,任何情况下优先整体成页,不做拦腰截断 */
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* 打印态值区文字:**放不下就换行**,既不省略也不溢出(2026-10-28 修正)。
+   * 演变记录(两次都被用户打回,留档避免再来一遍):
+   *   ① 原本 `.as-ref-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`
+   *      ⇒ 长供应商名被截成「江苏...」(用户报障一);
+   *   ② 只把 ellipsis 关掉(overflow:visible + nowrap) ⇒ 文字放不下就**从格子左侧窜出去**
+   *      压到「供应商」标签和隔壁列上(用户报障二「供应商窜出去了」);
+   *   ③ 现在:white-space:normal + overflow-wrap:anywhere ⇒ 在格子内折行,高度由行高(min-height
+   *      52/63px)容纳两行字,文字完整、不越界。
+   * ⚠ 不能留着 nowrap —— 它一旦生效,上面的换行规则全被压掉(debug 实测 computedStyle 仍为 nowrap)。*/
+  body.approval-printing .approval-sheet .as-ref-text {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
   }
   /* 强制打印背景色(蓝底标签/序号列),否则浏览器打印默认丢弃背景 */
   body.approval-printing .approval-sheet,

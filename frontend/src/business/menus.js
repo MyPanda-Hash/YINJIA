@@ -135,6 +135,8 @@ export const menuTree = [
               // (tools/migrate-drop-extra-docs-pu-req-20261008.sql),不是摘菜单,放开注释也恢复不了;
               // 回退:跑 tools/archive/_panel-age/_backup-20261008/restore-metadata.sql + 重建两张表。
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
+              // ⚠ 「供应商采购打印」不放这里 —— 2026-10-25 用户口径「放在供应商门户下面」,
+              //   已移到本组下方的「供应商门户」组(见该组注释)。
               // 特采单(2026-10-19 用户口径「特采单归供应链的采购管理的目录下,不要在品质管理的目录下」):
               // 面板编码 QC_TC_IN / 路径 / 表 / 前缀 TCI / 权限行一个字节没动,只是**导航父节点**从
               // 品质管理 > 来料品质 搬到 智能供应链 > 采购管理 > 单据(业务上它是采购口对不合格来料的让步接收申请)。
@@ -155,6 +157,23 @@ export const menuTree = [
           {
             code: 'purchaseStats', title: '统计表', children: [
               { code: 'puStats', title: '采购订单统计表', path: '/panelx/list/PU_ORDER_STATS', panelCode: 'PU_ORDER_STATS', icon: 'Histogram' },
+            ],
+          },
+          // 供应商门户(2026-10-24 用户口径「采购管理里面多增加俩个面版,一个是供应商采购打印面版,
+          //   一个是供应商权限配置。供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版
+          //   (和对应供应商编码的数据)……没有别的权限」;2026-10-25「放在供应商门户下面」):
+          //   · 供应商采购打印 = **独立面板 SUPPLIER_PU_ORDER** —— 采购订单的只读元数据副本
+          //     (同一张 bd_pu_order/bl_pu_order,字段逐列复制),工具栏只有「查询 + 打印」。
+          //     供应商登录后菜单树只剩这一条;数据由 QueryService.enforceSupplierScope 在服务端
+          //     按登录态供应商编码强制过滤(前端传什么都不采信),
+          //     硬闸门是 SupplierPortalGuardFilter(供应商会话其余 /api 一律 403)。
+          //   · 供应商权限配置 = SUPPLIER_ACCOUNT:**管理员 ∪ 组织架构里给该角色勾了「配置供应商账号」
+          //     的账号**都能进(菜单显隐按 user.canConfigSupplierAccount,路由守卫同源,
+          //     后端真闸门 SupplierPortalService.requireAccountConfig,词 = supplier)。
+          {
+            code: 'supplier', title: '供应商门户', icon: 'User', children: [
+              { code: 'supplierPrint', title: '供应商采购打印', path: '/scm/supplierPrint', icon: 'Printer', panelCode: 'SUPPLIER_PU_ORDER' },
+              { code: 'supplierAccount', title: '供应商权限配置', path: '/scm/supplierAccount', panelCode: 'SUPPLIER_ACCOUNT', icon: 'Key', permKey: 'canConfigSupplierAccount' },
             ],
           },
         ],
@@ -192,6 +211,13 @@ export const menuTree = [
               { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增' },
               { code: 'saleOut', title: '销售出库单', path: '/panelx/list/SALE_OUT', icon: 'Upload', panelCode: 'SALE_OUT', operationName: '新增流程' },
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
+              // 生产领料(2026-10-22 用户口径「在库存核算里面加一个生产领料的查看面版,与混料记录一样;
+              //   把 outh 里面的材料出库单据显示出来」):只读报表,形态对齐「混料记录」——
+              //   flat + 报表,面板码 PROD_PICK_LIST,数据源 = 包装视图 v_prod_pick_list
+              //   (dbo.outh 里 src=6「材料出库」且未删除的行,即 SCLL-* 生产领料单)。
+              //   入口钉在「材料出库单」之后:先建单、再看已过账的领料明细,找单据的人不会跑错组。
+              //   面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
+              { code: 'prodPickList', title: '生产领料', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
               // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
@@ -334,6 +360,17 @@ export const menuTree = [
           // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
           // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
           { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', panelCode: 'WORK_ORDER_BOARD', icon: 'Histogram' },
+          // 生产领料(2026-10-20 用户口径「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」;
+          //   第二轮「两个要写成一体的,地址要一致,最好在 panelx/list 目录下方」⇒ 地址统一 /panelx/list/PROD_PICK):
+          //   扫工单(带出产品/产线/排产数量)→ 逐件扫原材料 → 按批号日期先进先出自动拆批 → 生成材料出库单草稿。
+          //   与「条码管理 → 扫码领料」的区别:那条是仓管按标签(存货编码|批号)领料,这条是车间/生管按**工单**领料。
+          //   电脑端与手机端**同一地址**:窄屏单列+吸底栏,≥900px 双栏(同一份组件自适应)。
+          { code: 'prodPick', title: '生产领料', path: '/panelx/list/PROD_PICK', panelCode: 'PROD_PICK', icon: 'ShoppingCart' },
+    // 工序报工(2026-10-21 用户口径:「再写一个工序报工的面版,扫码然后填工序,工序有成型/切碳/组装3个工序,
+    //   然后选择后填入数量。提交后…会影响到生产工单里面的工序进度和当前工序,还会填入报工记录。」)
+    //   与生产领料同组同形态:扫工单码(带出工单行) → 选工序 → 填完工数量 → 提交即报工并审核,
+    //   工序进度/当前工序由既有审核钩子推进;今日报工明细就是「报工记录」。
+    { code: 'prodReport', title: '工序报工', path: '/panelx/list/PROD_REPORT', panelCode: 'PROD_REPORT', icon: 'Memo' },
           // 工序任务(路线驱动,A 项 2026-10-05)菜单已按用户口径**撤下**(「把工序任务删除掉算了」,
           // 2026-10-05):工单详情只看"走到哪一步"(按报工统计),不再维护工序任务队列。
           // 页面组件/后端接口/表结构按可撤回要求保留但不再挂菜单;要恢复只需把下面一行注释去掉。
@@ -373,6 +410,12 @@ export const menuTree = [
       { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
       { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
       { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
+      // 混料记录(2026-10-22 用户口径「数据库里有 wo_mixing_list 这个表,做个和报工记录一样的
+      //   对这个表的显示查询面板,写在生产过程里面」):只读报表,形态对齐「报工记录」——
+      //   flat + 报表,一行一条同表展开,面板码 WO_MIXING_LIST,数据源 = 服务端维护的 wo_mixing_list
+      //   (表或视图均可;列结构由 tools/migrate-wo-mixing-list-20261022.sql 运行时自适应)。
+      //   位置钉在「物料混合记录」之后(混料业务挨在一起),顺序改动必须同步 menus.test.js。
+      { code: 'woMixingList', title: '混料记录', path: '/panelx/list/WO_MIXING_LIST', panelCode: 'WO_MIXING_LIST', icon: 'List' },
       { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
       { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
       { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
@@ -725,7 +768,7 @@ export function filterTree(nodes, keyword) {
 }
 
 // 角色权限过滤：仅保留 visiblePanels 内的面板叶子；分组节点在子项全不可见时隐藏；admin 返回全量
-export function filterMenuTree(tree, visiblePanels, isAdmin) {
+export function filterMenuTree(tree, visiblePanels, isAdmin, user) {
   if (isAdmin) return tree
   const vis = Array.isArray(visiblePanels) ? visiblePanels : []
   const filterNode = (nodes) => {
@@ -734,6 +777,10 @@ export function filterMenuTree(tree, visiblePanels, isAdmin) {
       // adminOnly:整枝只对管理员可见(如「系统功能 → 组织架构 / 使用权限查看」)。
       //   这类叶子没有 panelCode 却带 path,原来会在下面那条 if (n.path) 里被判成有权而放行。
       if (n.adminOnly) continue
+      // permKey(2026-10-25):按登录用户身上的布尔位判显隐 —— 如「供应商权限配置」不是 adminOnly,
+      //   而是由组织架构授权(supplier 词)决定的 canConfigSupplierAccount。判定与路由守卫、后端闸门同源。
+      //   未传 user(单测/旧调用)时该项不显示,避免把未授权入口渲染出来。
+      if (n.permKey && !(user && user[n.permKey])) continue
       if (n.panelCode) {
         if (vis.includes(n.panelCode)) out.push({ ...n })
         continue

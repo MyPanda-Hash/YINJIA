@@ -24,6 +24,9 @@ import java.util.Map;
  * <ul>
  *   <li>批次号默认 = {@link BatchService#buildBatchNo}(当天) 即 **纯日期 yyyyMMdd**(2026-10-19 口径),
  *       **可人工改**;</li>
+ *   <li><b>生产日期</b>(2026-10-23 用户口径「在批次号后面加个生产日期,填写后打印的材料码会加上生产日期」):
+ *       弹窗在批次号右边填,**打印时与批次号一起登记在单头** {@code bd_pu_label.[生产日期]},
+ *       标识卡卡面「生产日期」栏印这个值;重打按单头读数原样带出(与批次号同一条路径);</li>
  *   <li>**打印即预约**:未生单的预约量从「剩余可送 / 可送上限」里扣减;</li>
  *   <li><b>一次可以勾多行,但**每行各出一张单**</b>(用户 2026-10-04 两条口径合起来:「打印需要是每次一行,
  *       不能多行否则作废就全部作废了」+「一次是可以打印多行的」)⇒ 弹窗上多选,落库时**一行一张头**,
@@ -133,6 +136,9 @@ public class PuLabelService {
         out.put("overRatio", ratio);
         // 预填批次号:与生单同一公式(**纯日期 yyyyMMdd**,2026-10-19 用户口径:不再拼供应商编码)
         out.put("prefBatchNo", BatchService.buildBatchNo(LocalDate.now()));
+        // 预填生产日期(2026-10-23):**不猜**,默认空由人工填 —— 生产日期是事实,不能由系统编,
+        // 缺值时卡面该栏留空白手填线(与原行为一致)。前端只认 yyyy-MM-dd 字符串。
+        out.put("生产日期", "");
         out.put("lines", rows);
         out.put("补登行", supplements);             // 下层表「已生单可补打」:按订单行×已生单批次号
         out.put("records", records(labels));      // 已有打印记录(取代查询面板的反查入口)
@@ -226,6 +232,7 @@ public class PuLabelService {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("单据编号", docNo);
                 m.put("批次号", r.get("批次号"));
+                m.put("生产日期", r.get("生产日期"));       // 2026-10-23:打印时填的,记录表里一并可查
                 m.put("打印人", r.get("打印人"));
                 m.put("打印时间", r.get("打印时间"));
                 m.put("打印次数", r.get("打印次数"));
@@ -276,11 +283,25 @@ public class PuLabelService {
      * (否则两段数量会各按"未含对方"的额度算,合起来可能超)。
      *
      * @param rows [{采购订单行id, 打印数量}] —— 一行或多行,但**每行一张单**
+     * @param prodDate 生产日期(yyyy-MM-dd,**可空**) —— 2026-10-23 用户口径:批次号旁边填,
+     *                 打印后印到材料码卡面「生产日期」栏;空 = 不登记,卡面该栏留空白手填线
      */
     @Transactional
     public Map<String, Object> print(String orderNo, String batchNo, List<Map<String, Object>> rows, String user) {
+        return print(orderNo, batchNo, "", rows, user);
+    }
+
+    /**
+     * 登记一次打印(带生产日期,2026-10-23)。语义同 {@link #print(String, String, List, String)},
+     * 多出的 {@code prodDate} 落在**单头** {@code bd_pu_label.[生产日期]}:
+     * 一张打印单 = 一个批次号 = 一批货 ⇒ 一个生产日期,与批次号同级(行表不放,免得同一张单的多行各写各的)。
+     */
+    @Transactional
+    public Map<String, Object> print(String orderNo, String batchNo, String prodDate,
+                                     List<Map<String, Object>> rows, String user) {
         if (orderNo == null || orderNo.isBlank()) throw new IllegalArgumentException("缺少采购订单号");
         String no = str(batchNo);
+        LocalDate prod = parseDate(prodDate);   // 格式不对直接拒(张冠李戴的日期比空值更坏)
         // 顶部批次号可以为空 —— 只要**每一行都自带批次号**(补登行必须自带:它要跟已生单单据同号)。
         // 逐行的空值在下面的循环里判,避免"只勾补登行"被顶部的空号误伤。
         if (no.length() > BATCH_NO_MAX) throw new IllegalArgumentException("批次号过长(最多 " + BATCH_NO_MAX + " 个字符):" + no);
@@ -369,10 +390,11 @@ public class PuLabelService {
             }
             // ★ 每行一张单:各自取号、各自建头(作废时才互不牵连)
             String docNo = formNoService.next(PREFIX, user);
-            jdbc.update("INSERT INTO bd_pu_label ([单据编号],[单据日期],[采购订单号],[供应商编码],[批次号],"
+            jdbc.update("INSERT INTO bd_pu_label ([单据编号],[单据日期],[采购订单号],[供应商编码],[批次号],[生产日期],"
                             + " [打印人],[打印时间],[打印次数],asp_user1,asp_time1,asp_cancel)"
-                            + " VALUES (?,?,?,?,?,?,SYSDATETIME(),1,?,SYSDATETIME(),'N')",
-                    docNo, LocalDate.now(), orderNo, str(head.get("supplierCode")), rowBatch, user, user);
+                            + " VALUES (?,?,?,?,?,?,?,SYSDATETIME(),1,?,SYSDATETIME(),'N')",
+                    docNo, LocalDate.now(), orderNo, str(head.get("supplierCode")), rowBatch,
+                    prod == null ? null : java.sql.Date.valueOf(prod), user, user);
             jdbc.update("INSERT INTO bl_pu_label ([单据编号],[采购订单行号],[采购订单行id],[物料编码],[物料名称],"
                             + " [规格型号],[计量单位],[打印数量],[补登],[去向单据],asp_user1,asp_time1,asp_cancel)"
                             + " VALUES (?,?,?,?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",
@@ -404,6 +426,7 @@ public class PuLabelService {
         out.put("单据编号列表", docNos);
         out.put("张数", docNos.size());
         out.put("批次号", no);
+        out.put("生产日期", prod == null ? "" : prod.toString());   // 出纸卡面直接印它(空=留手填线)
         out.put("采购订单号", orderNo);
         out.put("供应商编码", str(head.get("supplierCode")));
         out.put("打印次数", 1);
@@ -423,7 +446,8 @@ public class PuLabelService {
         String no = str(docNo);
         if (no.isEmpty()) throw new IllegalArgumentException("缺少打印单号");
         Map<String, Object> head = firstRow("SELECT TOP 1 [采购订单号] AS orderNo, [批次号] AS batchNo,"
-                + " [供应商编码] AS supplierCode FROM bd_pu_label WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                + " [供应商编码] AS supplierCode, CONVERT(varchar(10),[生产日期],120) AS prodDate"
+                + " FROM bd_pu_label WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT [采购订单行号] AS 行号, [物料编码] AS 物料编码, [物料名称] AS 物料名称,"
@@ -436,6 +460,7 @@ public class PuLabelService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("单据编号", no);
         out.put("批次号", head.get("batchNo"));
+        out.put("生产日期", str(head.get("prodDate")));      // 重打按单头原样带出(与批次号同一条路径)
         out.put("采购订单号", head.get("orderNo"));
         out.put("供应商编码", str(head.get("supplierCode")));
         out.put("打印次数", (int) num(firstRow("SELECT ISNULL([打印次数],0) AS t FROM bd_pu_label WHERE [单据编号]=?", no).get("t")));
@@ -487,6 +512,7 @@ public class PuLabelService {
                         + " l.[计量单位] AS 计量单位, ISNULL(l.[打印数量],0) AS 打印数量,"
                         + " ISNULL(l.[补登], N'N') AS 补登, l.[去向单据] AS 去向单据,"
                         + " h.[单据编号] AS 单据编号, h.[批次号] AS 批次号,"
+                        + " CONVERT(varchar(10), h.[生产日期], 120) AS 生产日期,"
                         + " h.[打印人] AS 打印人, CONVERT(varchar(19), h.[打印时间], 120) AS 打印时间,"
                         + " ISNULL(h.[打印次数],0) AS 打印次数,"
                         // 已生单量:**派生**,不落表 —— 下游单作废/删除时 link 置 RELEASED,这里自动回落
@@ -580,6 +606,24 @@ public class PuLabelService {
     }
 
     private static double round2(double v) { return Math.round(v * 100.0) / 100.0; }
+
+    /**
+     * 解析前端传来的生产日期(yyyy-MM-dd / yyyy/MM/dd,也接受 yyyyMMdd)。
+     * 空 → null(不登记,卡面留手填线);格式不对 → 直接抛,宁可拒也不把"看不懂的日期"落库
+     * (生产日期是会印到实物标签上的事实,错一个字符就是整批货的身份错了)。
+     */
+    private static LocalDate parseDate(String s) {
+        String v = str(s).replace('/', '-');
+        if (v.isEmpty()) return null;
+        try {
+            if (v.length() == 8 && !v.contains("-")) {
+                return LocalDate.parse(v.substring(0, 4) + "-" + v.substring(4, 6) + "-" + v.substring(6, 8));
+            }
+            return LocalDate.parse(v);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("生产日期格式不正确(应为 yyyy-MM-dd):" + s);
+        }
+    }
 
     /** 数量展示:整数不带小数点(与前端口径一致) */
     private static String trim(double v) {

@@ -24,6 +24,20 @@ export const useUserStore = defineStore('user', {
       // 页面级虚拟面板的动作词(2026-10-16):订单结转/快速排产/工单排产/生产工单,code → perms csv。
       // 管理员=每码 '*'。判定走 core/auth/panelAccess.canDo(与后端 requireButton 同源)。
       pagePerms: ui?.pagePerms && typeof ui.pagePerms === 'object' ? ui.pagePerms : {},
+      // 供应商会话(2026-10-24):后端在登录/会话还原时,凡 yj_supplier_account 里的账号都会把
+      // visiblePanels 裁到只剩 SUPPLIER_PRINT 并下发 supplierCode(= 绑定的供应商编码)。
+      // 前端据此把界面收成「供应商门户」(无侧栏、只有采购打印一页),路由守卫也认这个键。
+      supplierCode: typeof ui?.supplierCode === 'string' ? ui.supplierCode : '',
+      supplierName: ui?.supplierName || '',
+      // 能否配置供应商账号(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构添加
+      // 可以配置的账号」):管理员 ∪ 角色在组织架构里被勾了「供应商权限配置 · 配置供应商账号」。
+      // 前端据此显隐「采购管理 → 供应商权限配置」菜单与入口;真闸门在后端
+      // SupplierPortalService.requireAccountConfig(同一个 supplier 词)。
+      canConfigSupplierAccount: !!ui?.canConfigSupplierAccount,
+      // 供应商会话下**单据面板的只读词清单**(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致,
+      // 只是显示和权限不一样」):供应商端直接渲染采购订单面板(PU_ORDER),这份清单 = 它在该面板上被授予的
+      // 权限词(当前恒为 view,query,print)。PanelxList 据此只留浏览动作;真闸门在后端过滤器与 SQL 范围过滤。
+      supplierPanelPerms: ui?.supplierPanelPerms && typeof ui.supplierPanelPerms === 'object' ? ui.supplierPanelPerms : {},
     }
   },
   getters: {
@@ -67,6 +81,10 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
       this.warnPanels = Array.isArray(u?.warnPanels) ? u.warnPanels : []
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
+      this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
+      this.supplierName = u?.supplierName || ''
+      this.canConfigSupplierAccount = !!u?.canConfigSupplierAccount
+      this.supplierPanelPerms = u?.supplierPanelPerms && typeof u.supplierPanelPerms === 'object' ? u.supplierPanelPerms : {}
     },
     // 刷新权限（角色/面板配置变更后调用）
     async fetchPerms() {
@@ -80,8 +98,14 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
       this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}
+      this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : ''
+      this.supplierName = p.supplierName || ''
+      // /auth/perms 不下发该布尔位时保持原值(只有登录/userinfo 是它的真源)
+      if (p.canConfigSupplierAccount !== undefined) this.canConfigSupplierAccount = !!p.canConfigSupplierAccount
+      this.supplierPanelPerms = p.supplierPanelPerms && typeof p.supplierPanelPerms === 'object' ? p.supplierPanelPerms : {}
+      if (p.supplierCode !== undefined) this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : this.supplierCode
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, pagePerms: this.pagePerms }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, pagePerms: this.pagePerms, supplierCode: this.supplierCode, supplierName: this.supplierName, canConfigSupplierAccount: this.canConfigSupplierAccount, supplierPanelPerms: this.supplierPanelPerms }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -134,6 +158,10 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = []
       this.warnPanels = []
       this.pagePerms = {}
+      this.supplierCode = ''
+      this.supplierName = ''
+      this.canConfigSupplierAccount = false
+      this.supplierPanelPerms = {}
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
     },

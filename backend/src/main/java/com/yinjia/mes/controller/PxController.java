@@ -45,6 +45,12 @@ public class PxController {
     private final com.yinjia.mes.service.PuLabelService puLabel;
     /** 条码标签打印留痕(材料/半成品/成品条码面板,2026-10-18) */
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
+    /**
+     * 查询服务(2026-10-25):只为「供应商会话逐单归属核对」而注入 ——
+     * 单张单据详情接口(getFormDescriptor)不走列表过滤,必须调用
+     * {@link com.yinjia.mes.service.QueryService#supplierMayReadDoc} 核对这张单是不是当前供应商的。
+     */
+    private final com.yinjia.mes.service.QueryService queryService;
     /** 研发「项目流程管控」只读取数(2026-10-20) */
     private final com.yinjia.mes.service.RdProjectFlowService rdFlow;
     /** 工单扫码领料取数(2026-10-21):工单行 plang + BOM mate,两张表都不是注册面板 */
@@ -65,6 +71,7 @@ public class PxController {
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
                         com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
+                        com.yinjia.mes.service.QueryService queryService,
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.service.WorkOrderPickService woPick,
                         com.yinjia.mes.service.WoPickScanLogService woPickLog) {
@@ -82,6 +89,7 @@ public class PxController {
         this.batchService = batchService;
         this.puLabel = puLabel;
         this.barcodeLabel = barcodeLabel;
+        this.queryService = queryService;
         this.rdFlow = rdFlow;
         this.woPick = woPick;
         this.woPickLog = woPickLog;
@@ -222,18 +230,22 @@ public class PxController {
         return ApiResult.ok(puLabel.dialog(orderNo));
     }
 
-    /** 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头) */
+    /**
+     * 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头)。
+     * 2026-10-23 增 prodDate(生产日期,可空):批次号旁边填,登记在单头、印到材料码卡面。
+     */
     @PostMapping("/puLabel/print")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
         perm.requireButton("PU_ORDER", "修改");
         String orderNo = String.valueOf(body.getOrDefault("orderNo", ""));
         String batchNo = body.get("batchNo") == null ? "" : String.valueOf(body.get("batchNo"));
+        String prodDate = body.get("prodDate") == null ? "" : String.valueOf(body.get("prodDate"));
         List<Map<String, Object>> lines = new java.util.ArrayList<>();
         if (body.get("lines") instanceof List<?> l) {
             for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
         }
-        return ApiResult.ok(puLabel.print(orderNo, batchNo, lines, currentUser()));
+        return ApiResult.ok(puLabel.print(orderNo, batchNo, prodDate, lines, currentUser()));
     }
 
     /** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */
@@ -692,6 +704,11 @@ public class PxController {
     public ApiResult<Map<String, Object>> getFormDescriptor(@RequestParam String panelCode,
                                                             @RequestParam String code) {
         perm.requirePanelView(panelCode);
+        // 供应商会话(2026-10-25「只有打印按钮和查询」):供应商端要用这条取「头+行」出纸质单,
+        // 但本接口不走列表过滤 ⇒ 必须逐单核对归属:别人的单据一律 403(服务端权威,不信前端)。
+        if (!queryService.supplierMayReadDoc(panelCode, code)) {
+            throw new org.springframework.security.access.AccessDeniedException("该单据不属于当前供应商:" + code);
+        }
         return ApiResult.ok(service.getFormDescriptor(panelCode, code));
     }
 

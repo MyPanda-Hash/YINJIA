@@ -54,7 +54,9 @@ public class PanelPermissionService {
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),
             Map.entry("unclose", "取消结案"), Map.entry("print", "打印"), Map.entry("close", "结案"),
-            Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"));
+            Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"),
+            // 供应商权限配置(2026-10-25):组织架构里给角色勾上这个词即可维护供应商账号
+            Map.entry("supplier", "配置供应商账号"));
 
     static {
         Map<String, String[]> m = new HashMap<>();
@@ -257,8 +259,29 @@ public class PanelPermissionService {
         // 读入口不再按"管理员专属"硬拦 —— 写操作仍由 requireAdminOnlyWritable 拦住。
         String user = currentUserName();
         if (isAdmin(user)) return;
+        // 供应商门户(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。只是显示和权限不一样」):
+        // 供应商端直接渲染**采购订单面板**,它要能读列表。这里按"供应商会话 + 允许的面板"放行**只看**;
+        // 数据范围由 QueryService.enforceSupplierScope 在 SQL 里强制(登录态编码覆盖前端条件),
+        // 写动作仍由 SupplierPortalGuardFilter(供应商会话其余 /api 一律 403)挡住。
+        if (isSupplierScope(user, panelCode)) return;
         if (readablePanels(user).contains(panelCode)) return;
         throw new AccessDeniedException("当前角色无该面板的查看权限：" + panelCode);
+    }
+
+    /**
+     * 供应商会话在本面板上是否允许"看"(2026-10-25)。
+     * 判据与 {@link QueryService#enforceSupplierScope} / SupplierPortalGuardFilter 同源:
+     * 账号在 yj_supplier_account 里启用,且面板是供应商端唯一的那个单据面板(SUPPLIER_PU_ORDER)。
+     */
+    private boolean isSupplierScope(String user, String panelCode) {
+        if (panelCode == null || !QueryService.SUPPLIER_PANEL_CODE.equals(panelCode.trim())) return false;
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT enabled FROM yj_supplier_account WHERE username = ?", user);
+            return !rows.isEmpty() && "1".equals(String.valueOf(rows.get(0).get("enabled")));
+        } catch (RuntimeException e) {
+            return false;   // 表未建/库抖动:按普通账号处理(不会放行)
+        }
     }
 
     /**
@@ -294,6 +317,10 @@ public class PanelPermissionService {
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (panelCode == null || panelCode.isBlank()) throw new AccessDeniedException("面板编码不能为空");
+        // 供应商门户(2026-10-25):采购订单面板的**元数据/配置**要能读 —— 工具栏「打印」组、页签、
+        // 字段全靠它,不放行供应商端就少一块、与采购订单对不上。只读元数据不含业务数据;
+        // 业务数据范围由 QueryService.enforceSupplierScope 在列表接口上强制。
+        if (isSupplierScope(user, panelCode)) return;
         if (readablePanels(user).contains(panelCode)) return;
         throw new AccessDeniedException("当前角色无该面板的读取权限：" + panelCode);
     }

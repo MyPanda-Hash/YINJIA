@@ -4134,51 +4134,110 @@ migrate-dc-prod-ready-20261020.sql
 #   DC_CONFIG 是页面级虚拟面板(无 yj_panel 行),库里只有 yj_translation 一条译名改键;
 #   面板名本体在 menus.js / router / DcConfig.vue / PagePanelRegistry,同批代码改动。
 migrate-dc-config-rename-20261020.sql
+# migrate-prod-pick-panel-20261020.sql — 生产领料 页面级虚拟面板(PROD_PICK):角色授权 + 面板译名
+#   用户 2026-10-20「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」。
+#   ① 不往 yj_panel 插行(空面板会污染报表/选单/字段配置的下游),按先例登记为**页面级虚拟面板**
+#      (PagePanelRegistry.PROD_PICK,模块=生产计划);本脚本给所有角色补 yj_role_panel(view,query,pick),
+#      真正落库仍受 MATERIAL_OUT 权限约束(生成的是它的草稿)。
+#   ② 面板名「生产领料」en 译名(多语言红线);yj_translation scope='panel'。
+#   自检:缺授权角色 0 / 译名 1 条 = [PASS]。幂等;两账套均执行。
+#   页面:电脑端 /prod/plan/prodPick(桌面壳内双栏)· 手机端 /m/pick(独立布局),同一份组件。
+migrate-prod-pick-panel-20261020.sql
+migrate-material-out-line-20261021.sql
+migrate-prod-report-panel-20261021.sql
 
-# 2026-10-21 用户口径「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」。
-#   工单扫码领料逐笔留痕表 wo_pick_scan_log(只增不改);扫码明细装不进 yj_usage_log 的粗粒度结构。
-#   两账套都执行。
-migrate-wo-pick-scan-log-20261021.sql
+# ---- 2026-10-22 生产过程·混料记录（新面板 WO_MIXING_LIST）----
+#   用户口径「数据库里 wo_mixing_list 这个表，做个和报工记录一样的显示查询面板，写在生产过程里面」。
+#   ① 面板 WO_MIXING_LIST：flat + 类别报表 + module_group=生产过程，数据源**只读直连** wo_mixing_list；
+#   ② 列结构自适应：运行时读源对象真实列登记 yj_field（已知列给中文标题/顺序/查询标记，未知列原样登记），
+#      源对象无 id 列时自动建只读包装视图 v_wo_mixing_list(ROW_NUMBER) —— 源对象一个字节不改；
+#   ③ 面板/字段 en 译名 + 按「报工记录」等价补授只读授权（view,query[,export]）。
+#   幂等；**源表不存在时打印 RESULT: SKIPPED-NO-SOURCE 并原样退出**（绝不凭空造同名表）。
+#   ⚠ 本地两账套都没有该表（它只在服务器上）⇒ 本地跑只会 SKIP；服务器上才真正建面板。
+#   服务器增量包：deploy/incr-wo-mixing-20261022.zip（组装脚本 tools/archive/_assemble-wo-mixing-pkg.ps1）。
+migrate-wo-mixing-list-20261022.sql
 
-# 2026-10-21 用户口径「产品信息表的功能类别下拉做成一个标准库，可以进行填写维护」。
-#   复用现成「数据字典」面板(ZDGL / bs_dict)，只把字段 dict_sql 指向它并搬入原有 3 个选项。
-#   两账套都执行。
-migrate-prod-func-type-stdlib-20261021.sql
+# ---- 2026-10-22 WMS管理系统·库存核算：生产领料（新面板 PROD_PICK_LIST）----
+#   用户口径「在库存核算里面加一个生产领料的查看面版与混料记录一样，面版实现和打包成一个压缩包。
+#   把 outh 里面的材料出库单据显示出来。」
+#   ① 面板 PROD_PICK_LIST：flat + 类别报表 + module_group=WMS管理系统，形态对齐「混料记录」；
+#   ② 数据源 = 只读包装视图 v_prod_pick_list（dbo.outh 里 src=6 材料出库且未删除的行，如实测
+#      正式库 2094 行 / 487 张 SCLL-* 生产领料单）；outh 源表一个字节不改、不复制数据；
+#   ③ 18 个只读字段（单据编号/单据日期/物料/仓库/批号/数量/成本…）+ 面板与字段 en 译名；
+#   ④ 授权按「材料出库单明细表」等价补授只读 view,query[,export]，无 add/modify/del/审核。
+#   幂等：视图 CREATE OR ALTER；字段更新保留界面 alias/visible。两账套均执行（本地库有 outh）。
+#   体检：tools/verify/verify-prod-pick-outh.sql（13 项，VERIFY-PASS）
+#   回滚：tools/rollback-prod-pick-outh-20261022.sql
+#   服务器增量包：deploy/incr-prod-pick-outh-20261022.zip（组装脚本 tools/archive/_assemble-prod-pick-outh-pkg.ps1）
+migrate-prod-pick-outh-20261022.sql
 
-# 2026-10-21 返工:「产品功能类别」改为**标准库类型**(data_type=标准库 / dict_sql=prod.func_type)，
-#   才能出现「⧉ 标准库维护」入口。上一版做成读 bs_dict 的普通下拉(无可维护按钮)已回滚。
-#   两账套都执行。
-migrate-prod-func-type-stdlib-fix-20261021.sql
+# ---- 2026-10-22 产成品入库单「加工单号」补齐（数据修复，不改表结构）----
+#   用户口径「写个脚本可以补齐成产品入库的加工单号。按照有的补齐。要合理，符合时间。」
+#   ① 加工单号 = 生产工单号 plang.pl_no（现役代码三处同口径：WorkOrderPickingService
+#      「加工单号=工单号」/ ButtonService head.put("加工单号", wo) / 工单追溯按它反查）；
+#   ② 候选 = plang 里含本单产品的工单号；时间闸门 = 该工单最晚一行日期 ≤ 入库日、且 ≤180 天前；
+#      一张入库单只落一个工单号（时间最近优先）；**strict 默认只填"全覆盖"**，单产品单顺带填工单行号；
+#   ③ 只填空值，绝不覆盖既有值；每张单写一条 yj_usage_log 留痕，可精确回滚；
+#   ④ 实测正式库 231 张空单 → 全覆盖 31 张(strict 已补) / 部分覆盖 113 张 / 无候选 87 张；
+#      测试库 plang 0 行 ⇒ 本地跑为 NOOP（幂等）。
+#   报告：tools/verify/finish-in-wo-backfill-report.sql（只读，同一套口径）
+#   回滚：tools/rollback-finish-in-wo-backfill-20261022.sql（按留痕还原，幂等）
+#   取证与逐单清单：tools/archive/_finish-in-wo-20261022/
+migrate-finish-in-wo-backfill-20261022.sql
 
-# 2026-10-21 用户口径「产品管控等级也做」:同 prod.func_type,改为标准库类型(prod.ctrl_level)。
-#   两账套都执行。
-migrate-prod-ctrl-level-stdlib-20261021.sql
+# ---- 2026-10-22 产成品入库单「加工单号」全补（第二轮，放宽；仍只填空值）----
+#   用户口径「放宽要全补上，并且把补充的脚本发给我，方便服务器直接用。」
+#   第一轮 migrate-finish-in-wo-backfill-20261022.sql（strict）只补"全覆盖+时间合理"31 张；
+#   本脚本把**仍然空着的**按三档放宽补完：M2 产品对上·时间合理 / M3 产品对上·工单晚于入库 /
+#   M4 无产品依据·按时间最近。每张单档位写进 yj_usage_log 留痕，可整批回滚或按档复核。
+#   判据与风险见脚本头注 + tools/archive/_finish-in-wo-20261022/README.md。
+#   本地实测：200 张（M2 113 / M3 33 / M4 54）→ 补后 232 张全部有号、0 张空；再跑 NOOP。
+#   服务器包：deploy/incr-finish-in-wo-backfill-20261022.zip（组装：tools/archive/_assemble-finish-in-wo-pkg.ps1）
+migrate-finish-in-wo-backfill-full-20261022.sql
 
-# 2026-10-21 物料清单(WLBOM)保存报「将截断字符串或二进制数据」:单号 WL-yyyy-MM-#### 15 位写进
-#   mate.m_no nvarchar(14)。改为 30 位。两账套都执行(根因与取证见脚本头注释)。
-migrate-mate-mno-length-20261021.sql
+# ---- 2026-10-23 采购订单「打印材料码」增生产日期(批次号右边填写,打印时印到材料码上)----
+#   用户口径「采购订单的打印材料码界面需要在批次号后面加个生产日期,进行填写,填写后可以打印的材料码会加上生产日期」
+#   bd_pu_label 加 [生产日期] date NULL(按头登记:一张打印单=一个批次号=一批货,与批次号同级;**不加行表**)+ 列注明 + 自检。
+#   历史行为 NULL ⇒ 卡面仍留空白手填线;重打按头读数原样带出。两账套均执行,幂等。
+#   代码同批:PuLabelService(dialog/print/reprint/labelRows)、PxController(prodDate)、MaterialLabelDialog.vue + 10 语言词条。
+#   表清单:docs/development/数据库表清单.md bd_pu_label 列数 15→16。
+migrate-pu-label-prod-date-20261023.sql
 
-# 2026-10-23 用户口径「给系统管理模块加上一个菜单命名的功能,就是可以编辑各个面板的位置与
-#   一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」:导航覆盖表 yj_menu_node
-#   (只存名称/上级/排序/隐藏,基线仍在 frontend/src/business/menus.js)。两账套都执行。
-migrate-menu-node-20261023.sql
+# ---- 2026-10-23 采购订单「打印材料码」新增 UI 词条:选择日期(日期框占位词)----
+#   「生产日期」「批次号」两条字段词条 yj_translation 早已齐备(实测 10 语言 manual 全覆盖),**不重复插**;
+#   本次只补日期框占位词「选择日期」(scope=field),已存在即跳过、不覆盖人工校对。两账套均执行,幂等。
+i18n-pu-label-prod-date-20261023.sql
 
-# 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #3/#4):
-#   「产品管控类型:名称改为【产品管控等级】其内容引用产品信息表对应字段的内容」/
-#   「产品形态:其内容引用产品信息表对应字段的内容」——选 A = 真参照。
-#   RD_MOLD_PROC / RD_MOLD_FORMULA 的这两格由写死下拉改成参照 RD_PROD_INFO;
-#   纸面名走 alias(数据键 col_name 不动 ⇒ 历史单据照原值显示,不报错)。两账套都执行。
-migrate-mold-proc-ref-prodinfo-20261027.sql
+# ---- 2026-10-24 供应商门户(采购管理 → 供应商采购打印 / 供应商权限配置)----
+#   用户口径「供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版(和对应供应商编码的数据)……没有别的权限」。
+#   ① 建表 yj_supplier_account(供应商登录账号 → 绑定供应商编码,含表/关键列中文注明)+ yj_user.[供应商编码] 归属列 + 回填 + 自检;
+#   ② 两个页面级虚拟面板的译名(yj_translation,scope=panel,9 语言 manual)。两账套均需执行,均幂等。
+migrate-supplier-portal-20261024.sql
+i18n-supplier-portal-20261024.sql
 
-# 2026-10-27 用户口径(#5)「章节标准库·配料要求:支持多行同步填入文本框,多行填充时赋予序号」——
-#   纯前端改动,无迁移脚本:mold.batching 库本就存在(RD_MOLD_PROC.配料要求 data_type=标准库),
-#   只是还没有条目。用户 2026-10-27 明确「只补机制,库留空」⇒ 种子条目由工艺科在
-#   「⧉ 标准库维护」里自行录入,本批不替业务编造正文(编了就成了受控文书上的假数据)。
-#   改动位置:frontend/src/core/views/sectionLibText.js(多行带序号)+ RecordSheetPanels.applySectionLib。
+#  ---- 2026-10-25 「供应商权限配置」改为组织架构按角色授权(不再仅管理员):新文案译名 ----
+#    用户口径「不只是管理员可以来配置,需要能够通过组织架构添加可以配置的账号」。只补界面文案译名(已授权/配置供应商账号/说明句),幂等。
+i18n-supplier-account-perm-20261025.sql
 
-# 2026-10-28 编辑人/表单管理人自动带入:RD_PROD_INFO.编辑人、RD_ASM_PROC.表单管理人 改只读(值由前端带出+后端回写)。
-#   两账套都执行。
-migrate-rd-editor-stamp-20261028.sql
+# ---- 2026-10-25 新增独立面板 SUPPLIER_PU_ORDER(供应商采购打印:采购订单的只读元数据副本)----
+#   用户口径「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」。
+#   不建表:与采购订单共用 bd_pu_order/bl_pu_order;yj_panel 插 1 行 + yj_field 按 PU_ORDER 逐列复制 186 行 + 面板名译名 9 语言鉴。两账套均需执行,幂等。
+migrate-supplier-po-panel-20261025.sql
+# ---- 2026-10-25 供应商账号加「联系电话」+ 弹窗新文案译名 ----
+#   用户口径「新增应该弹窗关联供应商,然后选择后账号默认供应商编码(可修改)。可以有联系电话」。
+#   ① yj_supplier_account 加 [phone] nvarchar(50) NULL + 列注明 + 自检;
+#   ② 弹窗新文案(联系电话/选定供应商后账号自动填编码/已自动填写)9 语言。两账套均需执行,幂等。
+migrate-supplier-account-phone-20261025.sql
+i18n-supplier-account-phone-20261025.sql
+# ---- 2026-10-25 供应商改为勾选弹窗:弹窗文案译名 ----
+#   用户口径「不要下来框,要是可以勾选的弹窗。单据的关联供应商基础资料是一样的」。
+#   选择供应商/选择/勾选提示/搜索占位/档案列名/空态/加载中 等 9 语言。两账套均需执行,幂等。
+i18n-supplier-picker-20261025.sql
+# ---- 2026-10-25 供应商账号独立成表(不再写 yj_user)----
+#   用户口径「供应商配置的账号不属于用户账号,单独一个表吧」。
+#   ① yj_supplier_account 加 password_hash / real_name;② 从 yj_user 回填;
+#   ③ 删除 yj_user 里的供应商镜像行;④ 列注明 + 自检(无镜像行、启用账号必有口令)。两账套均需执行,幂等。
+migrate-supplier-account-standalone-20261025.sql
 
 # 2026-10-28 出货检验计划表:去掉「编号」格的固定默认值(用户口径「这个默认的编号去掉，
 #   只保留背景提示词：请填写编号」)。四张受控文件本来都已自动发单号(IP-… 一直在生成),
@@ -4187,10 +4246,41 @@ migrate-rd-editor-stamp-20261028.sql
 #   物理列保留,历史值不丢。
 migrate-drop-insp-docno-default-20261028.sql
 migrate-insp-docno-unregister-20261028.sql
-migrate-prodinfo-bom-20261029.sql
 
-# 2026-10-28 用户口径「把这三张表按测试项目、设备名称、仪器名称这些下拉来切数据表填写,改为一张单据,
-#   通过切换给对应的项目/设备/仪器分别填写数据,而不是每个都要新建一张单」:
-#   加标水行表补「测试项目」列;三张表补 place=detail 的分组字段登记(设备名称/仪器名称·型号/测试项目),
-#   使明细行的归属值能落库。两账套都执行。
-migrate-record-group-20261028.sql
+# 2026-10-28 编辑人/表单管理人自动带入:RD_PROD_INFO.编辑人、RD_ASM_PROC.表单管理人 改只读(值由前端带出+后端回写)。
+#   两账套都执行。
+# 2026-10-27 用户口径(#5)「章节标准库·配料要求:支持多行同步填入文本框,多行填充时赋予序号」——
+#   纯前端改动,无迁移脚本:mold.batching 库本就存在(RD_MOLD_PROC.配料要求 data_type=标准库),
+#   只是还没有条目。用户 2026-10-27 明确「只补机制,库留空」⇒ 种子条目由工艺科在
+#   「⧉ 标准库维护」里自行录入,本批不替业务编造正文(编了就成了受控文书上的假数据)。
+#   改动位置:frontend/src/core/views/sectionLibText.js(多行带序号)+ RecordSheetPanels.applySectionLib。
+# 2026-10-27 用户口径(1027系统使用-产品工艺文件问题点待改善 #3/#4):
+#   「产品管控类型:名称改为【产品管控等级】其内容引用产品信息表对应字段的内容」/
+#   「产品形态:其内容引用产品信息表对应字段的内容」——选 A = 真参照。
+#   RD_MOLD_PROC / RD_MOLD_FORMULA 的这两格由写死下拉改成参照 RD_PROD_INFO;
+#   纸面名走 alias(数据键 col_name 不动 ⇒ 历史单据照原值显示,不报错)。两账套都执行。
+migrate-mold-proc-ref-prodinfo-20261027.sql
+# 2026-10-23 用户口径「给系统管理模块加上一个菜单命名的功能,就是可以编辑各个面板的位置与
+#   一级模块与二级模块的分支和名字,就不需要每次修改都要重新打包部署」:导航覆盖表 yj_menu_node
+#   (只存名称/上级/排序/隐藏,基线仍在 frontend/src/business/menus.js)。两账套都执行。
+migrate-menu-node-20261023.sql
+# 2026-10-21 物料清单(WLBOM)保存报「将截断字符串或二进制数据」:单号 WL-yyyy-MM-#### 15 位写进
+#   mate.m_no nvarchar(14)。改为 30 位。两账套都执行(根因与取证见脚本头注释)。
+migrate-mate-mno-length-20261021.sql
+# 2026-10-21 用户口径「产品管控等级也做」:同 prod.func_type,改为标准库类型(prod.ctrl_level)。
+#   两账套都执行。
+# 2026-10-21 返工:「产品功能类别」改为**标准库类型**(data_type=标准库 / dict_sql=prod.func_type)，
+#   才能出现「⧉ 标准库维护」入口。上一版做成读 bs_dict 的普通下拉(无可维护按钮)已回滚。
+#   两账套都执行。
+# 2026-10-21 用户口径「产品信息表的功能类别下拉做成一个标准库，可以进行填写维护」。
+#   复用现成「数据字典」面板(ZDGL / bs_dict)，只把字段 dict_sql 指向它并搬入原有 3 个选项。
+#   两账套都执行。
+# 2026-10-21 用户口径「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」。
+#   工单扫码领料逐笔留痕表 wo_pick_scan_log(只增不改);扫码明细装不进 yj_usage_log 的粗粒度结构。
+#   两账套都执行。
+migrate-rd-editor-stamp-20261028.sql
+migrate-prod-ctrl-level-stdlib-20261021.sql
+migrate-prod-func-type-stdlib-fix-20261021.sql
+migrate-prod-func-type-stdlib-20261021.sql
+migrate-wo-pick-scan-log-20261021.sql
+migrate-prodinfo-bom-20261029.sql

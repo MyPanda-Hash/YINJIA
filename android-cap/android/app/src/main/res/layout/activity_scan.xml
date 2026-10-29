@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 扫码页:全屏预览 + 中间取景框提示 + 底部说明 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <SurfaceView
+        android:id="@+id/preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:padding="18dp"
+        android:gravity="center"
+        android:text="对准二维码 / 条形码;点屏幕开关手电;返回键取消"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF"
+        android:background="#99000000" />
+</FrameLayout>

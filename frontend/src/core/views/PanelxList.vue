@@ -37,7 +37,7 @@
       <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
            该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
       <span
-        v-if="reportTemplates.length || user.isAdmin"
+        v-if="(reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')"
         class="tb-main"
         :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
         @click.stop="reportVisible = true"
@@ -540,12 +540,15 @@
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感。
+                   2026-10-28:特采单(QC_TC_IN)按用户口径隐藏本按钮,见 DOC_OUTPUT_HIDDEN -->
+              <div v-if="(reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
               <!-- 导出 / 扫描填单(2026-10-09 用户口径「导出和扫描填单放到下边」):
                    原混在「单据操作」的工具栏动作组里(见 APPROVAL_SIDE_EXCLUDE 已把它们排除),
-                   现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。 -->
+                   现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。
+                   2026-10-28:特采单(QC_TC_IN)按用户口径隐藏「导出」,见 DOC_OUTPUT_HIDDEN -->
               <div
+                v-if="!docOutputHiddenSet.has('导出')"
                 class="as-side-btn"
                 :class="{ disabled: isDisabled('导出') }"
                 @click="onSideAction('导出')"
@@ -2500,7 +2503,18 @@ watch(() => localeStore.locale, async () => {
   } catch { /* 配置重拉失败保持现状 */ }
 })
 
-const panelCode = computed(() => route.params.panelCode)
+/**
+ * 可选的面板码 prop(2026-10-25)。
+ *
+ * 默认面板码取自 `route.params.panelCode`(标准地址 /panelx/list/:panelCode);
+ * 但有些入口只用**静态地址**指向某一个固定面板(如「供应商采购打印」/scm/supplierPrint),
+ * 路由里没有 :panelCode 参数,params 为空 ⇒ 组件会判"面板编号无效"直接 return,
+ * 既不取配置也不取数(2026-10-25 实测:界面只剩一颗查询按钮、单数据为 0)。
+ * 故允许由路由 `props` 直接指定面板码;不传时行为与原来完全一致。
+ */
+// eslint-disable-next-line vue/require-prop-types
+const routeProps = defineProps({ panelCode: { type: String, default: '' } })
+const panelCode = computed(() => routeProps.panelCode || route.params.panelCode)
 const operationName = computed(() => route.meta.operationName || route.query.operationName || '新增流程')
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
 
@@ -3214,12 +3228,38 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   //   (VoucherFormDialog)」的入口 —— 「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,
   //   故与 查询/查找 一样从工具栏摘掉。(档案面板本就内联可编辑:单据状态=启用/停用 ⇒ draftEditable
   //   为真,单元格直接点即可编辑,不依赖本动作。原文注释误记为 2026-10-15,2026-10-08 更正。)
+  //
+  // ⚠ 2026-10-25 修(供应商采购打印面板只有「查询+打印」两组时暴露的两个坑):
+  //   ① 字段名是 **name**(不是 title):曾写成 g.title ⇒ 每一组都判"不在白名单" ⇒ 工具栏整条清空。
+  //   ② 工具栏最左本来就有常驻「查询」按钮(.toolbar-query-btn),故「查询/查找」组的动作要剥掉,
+  //      剥空后该组改名成剩余首个动作(通常是"刷新"),不能保留组名「查询」——否则界面上两颗查询。
   const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
 const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出', '导出', '扫描填单'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除；导出/扫描填单 2026-10-09 按用户口径移到侧栏末尾「文档输出」下(见模板里那两个显式按钮)
+
+/**
+ * 「④ 文档输出」里对某些面板**不出现**的按钮(2026-10-28 用户口径)。
+ *
+ * 用户口径原文:「隐藏特采单的导出报表和导出按钮」。
+ *
+ * 为什么要在面板级单独列,而不是改动的显示条件:
+ *   · 「导出报表」是按「该面板登记了 JasperReports 模板 ∪ 管理员」出现的(见模板里 v-if)——
+ *     特采单本来**没有**报表模板,普通用户看不到,但管理员恒可见 ⇒ 管理员会看到一颗点了没用的按钮;
+ *   · 「导出」会把单据导成 Excel/PDF 明细台账,特采单是纸面申请单(YJ-QR-60),
+ *     正式输出走「打印」(已定版式),导出没有实际用途。
+ * 故这张表只登记「确实不该有这两个按钮」的面板;其余面板行为一字不动。
+ */
+const DOC_OUTPUT_HIDDEN = {
+  // 特采申请单:纸面走打印,不做报表导出/明细导出
+  QC_TC_IN: ['导出报表', '导出'],
+}
+
+/** 当前面板的「文档输出」里被隐藏的按钮 */
+const docOutputHidden = computed(() => DOC_OUTPUT_HIDDEN[String(panelCode.value)] || [])
+const docOutputHiddenSet = computed(() => new Set(docOutputHidden.value))
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
@@ -4393,6 +4433,48 @@ function toggleAnnMode(m) {
   annPending.value = null
   annMode.value = annMode.value === m ? null : m
 }
+
+/**
+ * 供应商门户的「只读场景」(2026-10-25 用户口径:「供应商打印面版的前端要与采购订单一致。
+ * 只是显示和权限不一样」)。
+ *
+ * 页面**就是采购订单面板本身**(PanelxList + PU_ORDER 的版式、左栏、明细、纸张、打印版式一字不改),
+ * 供应商账号进来只改两件事:
+ *   ① **权限**:工具栏只留浏览动作(用 READONLY_PANELS 那一套过滤),编辑态不加载、写入口不给;
+ *   ② **数据**:取数带 `condition['__supplierScope'] = 本供应商编码`,由 QueryService 解析成
+ *      `供应商编码 LIKE 值` 并在服务端**强制**执行(与「查询」弹窗里选供应商同一口径)。
+ * 判据取登录态里的 supplierCode(后端登录时下发,供应商会话必有;内部账号为空 ⇒ 不进只读场景)。
+ * 与后端 SupplierPortalGuardFilter 同源:供应商会话除 /supplier/portal/* 之外的 /api 一律 403,
+ * 故这里即便漏摘某个按钮,服务端也打不开写接口。
+ * ⚠ 声明位置:`user` 与 `reportMode` 都已在其上初始化(放前面会命中 TDZ,见 READONLY_PANELS 注释)。
+ */
+/**
+ * 供应商门户的「只读场景」(2026-10-25 用户口径:「是多做一个和采购订单一样的供应商面版,
+ * 只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」)。
+ *
+ * 供应商端 = **独立面板 SUPPLIER_PU_ORDER**(采购订单的元数据副本:同一张表、同样的字段/版式/纸张),
+ * 它天生就只有「查询 + 打印」两组按钮(后端 PANDA_BUTTONS 里只登记这两组),编辑态本就不成立。
+ *
+ * 这里再补一层**兜底**,覆盖两种情况:
+ *   ① 供应商账号(登录态带 supplierCode);
+ *   ② 任何人在这个面板上(内部账号进来也一样)—— 面板名是只读面版,不给编辑/写入口。
+ * ⚠ `user` / `reportMode` 都已在其上初始化(放前面会命中 TDZ,见 READONLY_PANELS 注释)。
+ */
+const READONLY_DOC_PANELS = ['SUPPLIER_PU_ORDER']
+const supplierScope = computed(() => String(user.supplierCode || ''))
+const supplierReadonly = computed(() =>
+  (!!supplierScope.value && !reportMode.value) || READONLY_DOC_PANELS.includes(panelCode.value))
+/**
+ * 供应商会话在该面板上被授予的权限词(2026-10-25):后端登录时下发 `supplierPanelPerms`,
+ * 当前恒为 `PU_ORDER: 'view,query,print'`。**按词判按钮**,而不是在组件里再写一份写死的按钮名清单 ——
+ * 以后要给供应商放开某个动作(例如「导出」),只改后端下发的那串词即可,前端零改动。
+ */
+const supplierWords = computed(() => {
+  const all = user.supplierPanelPerms || {}
+  const csv = all[panelCode.value]
+  if (!csv) return null
+  return new Set(String(csv).split(',').map((s) => s.trim()).filter(Boolean))
+})
 provideAnnotations({
   anns: annMap,
   mode: annMode,
@@ -4450,9 +4532,18 @@ const ADMIN_ONLY_PANELS = ['FIELDMGR', 'ZDGL']
  * 也是删除联动的触发点 ⇒ 只读面板上也保留(2026-10-19 用户口径「项目进度查询改为仅查询面板」)。
  */
 const READONLY_ACTIONS = ['刷新', '查找', '查询', '导出', '打印', '导出报表', '表格调整', '表头调整', '审批情况', '修改记录', '同步进度']
+/**
+ * 供应商场景对查询条件注入的强制过滤键(2026-10-25)。
+ * 以双下划线开头 = 与 _whCode/_itemCode 同族的「控制键」:不占用业务字段名,
+ * 由后端 QueryService 认领并解析成 `供应商编码 LIKE 值`(供应商编码本系统按名称存,
+ * 与采购订单「查询」弹窗选供应商完全同一口径)。不是字段标签 ⇒ 会被通用循环跳过,只被专门处理。
+ */
+const SUPPLIER_SCOPE_KEY = '__supplierScope'
 
 const draftEditable = computed(() => {
   if (reportMode.value) return false
+  // 供应商门户(2026-10-25):供应商账号看采购订单时**一律只读**,先于其它判定(连草稿也不给编辑)
+  if (supplierReadonly.value) return false
   // ERP集成只读(2026-10-18 用户口径「不可以进行任何人为操作,不可以新增保存删除」):
   // 放在最前 —— 这两个面板的数据由金蝶接口同步写入,界面不给任何内联编辑/加行/粘贴的值入口。
   // 服务端同口径闸门 = PanelPermissionService.requireReadonlyAllowed(连管理员也不给写)。
@@ -4862,6 +4953,10 @@ const DOC_RAIL_PANELS = {
   // ERP单号/是否已转ERP 两列由本批迁移给 qc_return 加上并登记 yj_field,随行下发 ⇒ 直接派生。
   QC_RETURN: ['供应商', '检验单号', '批次号', ERP_TAG_COL],
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
+  // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版」):
+  //   **与采购订单同一份左栏**(单号 | 日期 | 供应商 | 审核状态)—— 它是采购订单的元数据副本,
+  //   不登记在这里就没有左栏,也就"和采购订单不一样"了。
+  SUPPLIER_PU_ORDER: ['供应商'],
   SO_ORDER: ['客户'],            // 销售订单(对齐采购订单:中间列只留往来单位,采购=供应商/销售=客户)
   PURCHASE_IN: ['供应商', '批次号', ERP_TAG_COL], // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态;2026-09-20 加批次号)
   // 三张出库单(2026-10-15 用户口径:「为成品出库、销售出库与材料出库,都配置与销售订单一样的订单选择列」)
@@ -4870,7 +4965,8 @@ const DOC_RAIL_PANELS = {
   // (实测 yj_field:仅 SALE_OUT 有 客户),故硬填「客户」只会得到一列全空(列名对齐而数据对不齐),
   // 改按**实测有值率**挑列(HSDZ_MES 计数:nz/total —— 空列等于没配):
   //   SALE_OUT     → 客户      :销售出库对象,与销售订单同义(54/54 有值)
-  //   MATERIAL_OUT → 生产车间  :材料出库归属车间,参照 DEPT(2/2 有值;其 加工单号 0/2 恒空)
+  //   MATERIAL_OUT → 生产线   :材料出库归属产线(2026-10-21 用户口径:原「生产车间」改名「生产线」,
+  //                              值由生产领料按工单带入;左栏列必须跟着换,否则按旧键 生产车间 取不到值)
   //   FINISH_IN    → 加工单号  :产成品入库的来源工单(1/1 有值;其 生产车间/业务类型/仓库 均 0/1 恒空)
   // 🔴 2026-10-15 第二轮(用户口径):销售出库单还要显示「销售订单号」+「ERP单」——
   //   它是从销售订单生单/选单过来的,左栏要能一眼看到来源订单;材料出库单同样要 ERP单。
@@ -4882,7 +4978,7 @@ const DOC_RAIL_PANELS = {
     '客户',
     ERP_TAG_COL,
   ],
-  MATERIAL_OUT: ['生产车间', ERP_TAG_COL],
+  MATERIAL_OUT: ['生产线', ERP_TAG_COL],
   // 产成品入库(2026-10-16 用户口径:「产成品入库选择的左侧少了一个 ERP单号这个状态记录」):
   //   其余五张出入库单的左栏都带 ERP_TAG_COL(已转/未转 ERP 派生标签),唯独本单只有「加工单号」⇒ 补齐。
   //   ERP单号/是否已转ERP 两个字段实测均已在 yj_field(FINISH_IN)且随行下发,故可直接派生。
@@ -8828,6 +8924,30 @@ async function loadCrg() {
       .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => READONLY_ACTIONS.includes(a)) }))
       .filter((g) => (g.actions || []).length > 0)
   }
+  // 供应商门户(2026-10-25 用户口径「前端要与采购订单一致,只是显示和权限不一样」):
+  // 同一份采购订单面板,供应商账号进来只留**浏览动作**——
+  // 新增/保存/删除/审核/生单/转ERP/导入 等写动作全部摘掉。
+  //
+  // ⚠ 三个坑(2026-10-25 实测踩过,改这里前必读):
+  //   ① 按钮组对象的字段名是 **`name`**(不是 title)—— 写成 g.title 会让每一组都判定"不在白名单",
+  //      工具栏整条被清空。
+  //   ② 工具栏**按组名渲染**(「打印 ▼」),组内动作才是真正执行的东西:采购订单/供应商采购打印的
+  //      「打印」组里是 打印采购订单 / 预览 / 导出 / 打印订单无金额 / 打印材料码 —— **没有字面量「打印」**。
+  //      若按 READONLY_ACTIONS 过滤动作,这组会被剥成空组 ⇒ 主按钮变成组名、点了什么也不发生
+  //      (实测:点「打印」无窗口、无请求、无报错)。
+  //   ③ 故这里按**动作语义**判:打印/预览/导出族一律放行,其余只留 READONLY_ACTIONS 白名单。
+  const PRINT_FAMILY = ['打印采购订单', '打印订单无金额', '打印材料码', '打印', '预览', '导出', '导出报表']
+  const isReadonlyAction = (a) => READONLY_ACTIONS.includes(a) || PRINT_FAMILY.includes(a)
+  if (supplierReadonly.value) {
+    groups.value = groups.value
+      .map((g) => {
+        const groupOk = READONLY_ACTIONS.includes(g.name || '') || g.name === '打印'
+        const actions = (g.actions || []).filter(isReadonlyAction)
+        if (!groupOk && actions.length === 0) return null
+        return { ...g, actions }
+      })
+      .filter(Boolean)
+  }
   return cfg
 }
 
@@ -9267,11 +9387,17 @@ async function onButton(action) {
   }
       // ═══ 分批送料(2026-09-20):仅"批次源头那一跳"(采购订单→送料暂收单)弹分批对话框 ═══
       // 逐行填本次送料数量、可多次分批;下游(暂收→检验)来源已带批次号 → 一键整单生单,不弹框
-      const pushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
-      if (await needBatchDialog(pushTarget)) {
+      //
+      // ⚠ 2026-10-25 修:这一段原本是**游离代码块**(缺外层 if 守卫),又位于所有打印分支之前 ⇒
+      //   任何动作都会先落到这里。判据直接看 metadata.pushTargets 里有没有这个动作:
+      //   打印类动作没有 pushTarget ⇒ 直接跳过本段,继续往下走打印分支。
+      //   (曾误写成不存在的 pushTargetLike(action) ⇒ 点击时抛 ReferenceError,
+      //    表现为"点打印完全没反应、无请求无提示",2026-10-25 实测踩到。)
+      const actionPushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
+      if (actionPushTarget && await needBatchDialog(actionPushTarget)) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning('请先选择一张单据')
-        batchSend.value = { sourcePanel: panelCode.value, targetPanel: pushTarget, sourceNo: no }
+        batchSend.value = { sourcePanel: panelCode.value, targetPanel: actionPushTarget, sourceNo: no }
         batchSendVisible.value = true
         return
       }
@@ -10125,6 +10251,12 @@ async function load(clamping = false) {
   try {
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    // 供应商门户(2026-10-25):供应商账号看采购订单时,取数**强制**带本供应商编码。
+    // 服务端 QueryService 把它解析成 `供应商编码 LIKE 值` 并 AND 进 WHERE(与「查询」弹窗里
+    // 选供应商同一口径),页面版式/交互与采购订单面板完全一致,只有数据范围不同。
+    // ⚠ 键名以双下划线开头:与 _whCode/_itemCode 同族的「控制键」,不占用业务字段名,
+    //   也不会被写进 condition(切面板/reset 都不影响它 —— 它在请求时现取登录态)。
+    if (supplierScope.value) params.condition[SUPPLIER_SCOPE_KEY] = supplierScope.value
     // 库存明细左栏「分仓库」的过滤条件**在请求时派生**,不写进共用的 condition ——
     //   condition 由各面板共享、切面板时会被 reset 清空(顺序一变就互相影响);
     //   2026-10-15 用户报「库存明细的查询会影响到库存状况表」就是这类跨面板串味。

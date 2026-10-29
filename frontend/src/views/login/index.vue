@@ -63,6 +63,29 @@
           <span>{{ errorMessage }}</span>
         </div>
 
+        <!-- 壳内首次使用:先让用户确认后端地址(否则工厂列表一定是空的) -->
+        <div v-if="needOrigin" class="origin-hint">
+          <el-icon><WarningFilled /></el-icon>
+          <span>{{ tt('首次使用请先确认「服务器地址」(如 http://192.168.1.10:8090),再点「保存并重连」') }}</span>
+        </div>
+
+        <!-- 服务器地址(2026-10-20 加 / 2026-10-21 从页脚挪到表单上方):
+             只在**安卓壳里**出现 —— Capacitor 版页面 origin 是 https://localhost,没有同源后端,
+             必须在登录前指定后端;网页版部署同源,不显示。
+             ⚠ 挪到上方的理由:原来放在页脚,手机软键盘弹出时会把它整块挡死,根本没法输入。
+             与参考包用同一个 localStorage 键(mes_api_origin)。 -->
+        <div v-if="showServerAddr" class="server-addr">
+          <span class="server-addr-label">{{ tt('服务器地址') }}</span>
+          <el-input
+            v-model="serverAddr"
+            size="small"
+            :placeholder="tt('如 http://192.168.1.10:8090')"
+            @keyup.enter="saveServerAddr"
+            @focus="keepVisible"
+          />
+          <el-button size="small" type="primary" plain @click="saveServerAddr">{{ tt('保存并重连') }}</el-button>
+        </div>
+
         <el-form
           ref="formRef"
           :model="form"
@@ -183,7 +206,8 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
-import { apiOrigin, setApiOrigin } from '@/business/appConfig'
+// 服务器地址读写统一走 appConfig(2026-10-25 合并:HEAD 侧从 @core/request 取,现由 appConfig 唯一真源)
+import { apiOrigin, setApiOrigin, API_ORIGIN_KEY } from '@/business/appConfig'
 import { hasNativeScan } from '@/business/nativeScan'
 // 背景图 2026-09-28 转 WebP(1967KB→111KB,q80 视觉无损;原图已删)
 import manufacturingImage from '@/assets/login-manufacturing.webp'
@@ -223,8 +247,61 @@ const formRef = ref(null)
 const loading = ref(false)
 const factoryLoading = ref(false)
 const errorMessage = ref('')
+
+/**
+ * 服务器地址(2026-10-20):只在壳里出现。
+ * 判据:Capacitor(window.Capacitor)、手搓壳(window.YjNative)、或用 file:// 打开 —— 这三种都没有同源后端。
+ * 网页部署(8090/5173)同源,不显示这一行。
+ */
+const IN_SHELL = typeof window !== 'undefined'
+  && (!!window.Capacitor || !!window.YjNative || location.protocol === 'file:')
+const showServerAddr = IN_SHELL
+
+/**
+ * 首次进 App(还没配过地址)时,预填一个**可用的默认后端**,并置顶提示。
+ * 2026-10-21 用户报障:「无法选择工厂,工厂为空」—— 根因就是壳里没有地址,
+ * 请求打到 https://localhost/api 拿不到工厂列表;光靠底部一行小输入框太容易被忽略。
+ */
+const DEFAULT_ORIGIN = 'http://36.140.66.163:8090'
+const savedOrigin = (() => {
+  try { return localStorage.getItem(API_ORIGIN_KEY) || '' } catch { return '' }
+})()
+const serverAddr = ref(savedOrigin || apiOrigin() || (IN_SHELL ? DEFAULT_ORIGIN : ''))
+/** 还没配地址 ⇒ 顶部横幅提醒(配过后不再打扰) */
+const needOrigin = ref(IN_SHELL && !savedOrigin)
+
+function saveServerAddr() {
+  const v = String(serverAddr.value || '').trim().replace(/\/+$/, '')
+  if (v && !/^https?:\/\//i.test(v)) {
+    errorMessage.value = tt('地址要以 http:// 或 https:// 开头')
+    return
+  }
+  localStorage.setItem(API_ORIGIN_KEY, v)
+  needOrigin.value = false
+  // 地址变了要重建 axios 实例:最干净的做法是整页重载
+  location.reload()
+}
+
+/**
+ * 软键盘弹出时把当前输入框滚到可视区中部。
+ * 光靠 adjustResize 不够:焦点在页面靠下的元素时,安卓 WebView 常把输入框留在键盘下方。
+ */
+function keepVisible(e) {
+  const el = e && e.target ? e.target : null
+  if (!el || typeof el.scrollIntoView !== 'function') return
+  setTimeout(() => {
+    try {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    } catch {
+      el.scrollIntoView()
+    }
+  }, 260)
+}
+
 const rememberedAccount = localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || ''
 const rememberAccount = ref(Boolean(rememberedAccount))
+// 供应商账号的落地页(2026-10-24):与 router/menus 同一条路径,常量放业务层,登录页不必 import 整个 router
+const SUPPLIER_HOME = '/scm/supplierPrint'
 const form = reactive({ userName: rememberedAccount, password: '', factory: '' })
 /** 语言选项显示:本地名 (语言码)——汉字系语言(日本語/繁體中文)加码消除歧义;简体中文例外。 */
 const localeLabel = (l) => l.locale === 'zh-CN'
@@ -256,7 +333,9 @@ async function doLogin() {
     await user.login({ userName: form.userName, password: form.password, factory: form.factory })
     if (rememberAccount.value) localStorage.setItem(REMEMBERED_ACCOUNT_KEY, form.userName)
     else localStorage.removeItem(REMEMBERED_ACCOUNT_KEY)
-    await router.replace('/dashboard')
+    // 供应商账号(2026-10-24):登录后**直接进「供应商采购打印」**——它只有这一页(用户口径「没有别的权限」);
+    // 普通/内部账号照旧进我的桌面。判据是后端下发的 supplierCode,不是前端猜的。
+    await router.replace(user.supplierCode ? SUPPLIER_HOME : '/dashboard')
   } catch (error) {
     errorMessage.value = error.response?.data?.message || error.message || tt('登录失败，请稍后重试')
   } finally {
@@ -605,6 +684,51 @@ onMounted(async () => {
 
 .login-submit .el-icon {
   font-size: 17px;
+}
+
+/* 壳内首次使用的地址提示:比底部那行更醒目,配过就不再出现 */
+.origin-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #f0c78a;
+  border-radius: 8px;
+  background: #fff8ed;
+  color: #8a5a00;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.origin-hint .el-icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* 服务器地址(只在安卓壳里渲染):一行三件套,窄屏自动换行。
+   2026-10-21:从页脚挪到表单上方(原来键盘弹出会把它挡死),所以下边距改成 12px。 */
+.server-addr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px dashed #d5dedb;
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.server-addr-label {
+  flex: none;
+  font-size: 12px;
+  color: #5d6b66;
+}
+
+.server-addr :deep(.el-input) {
+  flex: 1 1 150px;
+  min-width: 0;
 }
 
 .footer-srv {

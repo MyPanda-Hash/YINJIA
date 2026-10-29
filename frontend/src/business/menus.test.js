@@ -81,8 +81,9 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   const scm = menuTree.find((n) => n.code === 'scm')
   const purchase = (scm.children || []).find((c) => c.code === 'purchase')
   assert.ok(purchase, '应有 采购管理 分组')
-  // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理)
-  assert.deepEqual((purchase.children || []).map((c) => c.code), ['purchaseDoc', 'purchaseDetail', 'purchaseStats'])
+  // 顺序即菜单顺序:单据 → 明细表 → 统计表(照抄 销售管理);2026-10-24 追加第四组「供应商门户」
+  // ⚠ 组 code 以远端改版为准(purchaseDoc/purchaseDetail/purchaseStats,2026-10-25 合并时对齐)
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['purchaseDoc', 'purchaseDetail', 'purchaseStats', 'supplier'])
   const codesOf = (node) => {
     if (Array.isArray(node)) return node.flatMap(codesOf)
     if (!node || typeof node !== 'object') return []
@@ -90,7 +91,8 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   }
   // 2026-10-19《10.19 问题》第 3 条:特采单(QC_TC_IN)从 品质管理 > 来料品质 搬到 采购管理 > 单据,
   // 排在采购订单之后(同组叶子顺序即菜单顺序)。
-  assert.deepEqual(codesOf(purchase), ['PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS'])
+  assert.deepEqual(codesOf(purchase),
+    ['PU_ORDER', 'QC_TC_IN', 'PU_ORDER_DETAIL', 'PU_ORDER_STATS', 'SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'])
   // 特采单只能有一个入口,且不得再挂在 品质管理 下
   const qc = menuTree.find((n) => n.code === 'qc')
   const qcCodes = JSON.stringify(qc)
@@ -103,6 +105,61 @@ test('采购管理 = 采购订单 → 明细表 → 统计表(与销售管理同
   assert.equal(leaf('PU_ORDER_DETAIL').path, '/panelx/list/PU_ORDER_DETAIL')
   assert.equal(leaf('PU_ORDER_STATS').path, '/panelx/list/PU_ORDER_STATS')
   assert.equal(leaf('PU_ORDER_STATS').title, '采购订单统计表')
+})
+
+/**
+ * 2026-10-24 起(2026-10-25 第三次澄清定稿;同日晚「放在供应商门户下面」调整):
+ *   ·「供应商采购打印」= **独立面板 SUPPLIER_PU_ORDER**(采购订单的元数据副本,同一张表),
+ *     工具栏只有 查询 + 打印(见后端 PANDA_BUTTONS),放在 采购管理 → 供应商门户 组;
+ *   ·「供应商权限配置」= 页面级面板 SUPPLIER_ACCOUNT,同在该组,
+ *     管理员 ∪ 组织架构里勾了「配置供应商账号」的角色可进(permKey 判)。
+ * 用户口径(2026-10-25):「是多做一个和采购订单一样的供应商面版,只有打印按钮和查询
+ *   (查询必须只能查供应商关联的数据)按钮的」+「放在供应商门户下面」。
+ */
+test('采购管理 = 单据 / 明细表 / 统计表 / 供应商门户(采购打印 + 权限配置)', () => {
+  const scm = menuTree.find((n) => n.code === 'scm')
+  const purchase = (scm.children || []).find((c) => c.code === 'purchase')
+  assert.ok(purchase, '应有 采购管理 分组')
+  assert.deepEqual((purchase.children || []).map((c) => c.code), ['purchaseDoc', 'purchaseDetail', 'purchaseStats', 'supplier'])
+
+  // ① 供应商门户组:采购打印 + 权限配置(都在这一组下,用户口径「放在供应商门户下面」)
+  const group = purchase.children.find((c) => c.code === 'supplier')
+  assert.equal(group.title, '供应商门户')
+  assert.deepEqual((group.children || []).map((c) => c.panelCode), ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'])
+
+  const printLeaf = group.children[0]
+  assert.equal(printLeaf.title, '供应商采购打印')
+  assert.equal(printLeaf.panelCode, 'SUPPLIER_PU_ORDER', '它是独立面板(采购订单的只读副本)')
+  assert.equal(printLeaf.path, '/scm/supplierPrint')
+  assert.ok(!printLeaf.adminOnly, '供应商采购打印不能是管理员专属 —— 供应商自己就要用它')
+
+  const accountLeaf = group.children[1]
+  assert.equal(accountLeaf.title, '供应商权限配置')
+  assert.equal(accountLeaf.path, '/scm/supplierAccount')
+  assert.ok(!accountLeaf.adminOnly, '供应商权限配置不再是管理员专属')
+  assert.equal(accountLeaf.permKey, 'canConfigSupplierAccount')
+
+  // ② 「单据」组里**不得**再重复挂一份采购打印(避免两处入口)
+  const docGroup = purchase.children.find((c) => c.code === 'purchaseDoc')
+  assert.ok(!(docGroup.children || []).some((c) => c.panelCode === 'SUPPLIER_PU_ORDER'),
+    '供应商采购打印只能有一个入口(供应商门户),单据组里不应再挂')
+
+  // ③ 供应商会话(visiblePanels 只含 SUPPLIER_PU_ORDER)看到的整棵树 = 一个叶子
+  const supplierTree = filterMenuTree(menuTree, ['SUPPLIER_PU_ORDER'], false)
+  const leaves = []
+  const walk = (n) => { if (Array.isArray(n)) return n.forEach(walk); if (!n || typeof n !== 'object') return; if (n.panelCode) leaves.push(n.panelCode); (n.children || []).forEach(walk) }
+  walk(supplierTree)
+  assert.deepEqual(leaves, ['SUPPLIER_PU_ORDER'], '供应商账号登录后全站只应看得到「供应商采购打印」这一个入口')
+
+  // ④ 没有 permKey 授权 ⇒ 权限配置不显示;授权后出现
+  const noPerm = filterMenuTree([scm], ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'], false, { canConfigSupplierAccount: false })
+  const np = noPerm[0].children.find((c) => c.code === 'purchase').children.find((c) => c.code === 'supplier')
+  assert.deepEqual((np?.children || []).map((c) => c.panelCode), ['SUPPLIER_PU_ORDER'],
+    '未授权时供应商门户下只有采购打印')
+  const authorized = filterMenuTree([scm], ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'], false, { canConfigSupplierAccount: true })
+  const ag = authorized[0].children.find((c) => c.code === 'purchase').children.find((c) => c.code === 'supplier')
+  assert.deepEqual((ag?.children || []).map((c) => c.panelCode), ['SUPPLIER_PU_ORDER', 'SUPPLIER_ACCOUNT'],
+    '被授权「配置供应商账号」的角色,菜单里应出现「供应商权限配置」')
 })
 
 /**
@@ -182,13 +239,14 @@ test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护�
  */
 test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不变', () => {
   const proc = menuTree.find((n) => n.code === 'prodProcess')
+  // 2026-10-22:新增「混料记录」WO_MIXING_LIST,钉在「物料混合记录」之后(混料业务挨在一起)
   assert.deepEqual((proc.children || []).map((c) => c.panelCode), [
     'WO_REPORT', 'WO_REPORT_LIST', 'WO_COMPLETION_LIST', 'PROD_ABN',
-    'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
+    'DAY_REPORT', 'FEED_CONFIRM', 'MIX_RECORD', 'WO_MIXING_LIST', 'GRAN_RECORD', 'WH_RECORD', 'PACK_CONFIRM',
   ])
   assert.deepEqual((proc.children || []).map((c) => c.title), [
     '工序报工单', '报工记录', '完工明细', '生产异常处理单',
-    '生产日报表', '投料确认单', '物料混合记录', '造粒记录', '无黑处理登记', '封箱确认',
+    '生产日报表', '投料确认单', '物料混合记录', '混料记录', '造粒记录', '无黑处理登记', '封箱确认',
   ])
 })
 
@@ -226,8 +284,10 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
   // 2026-10-17:生产工单明细表/统计表(MANU_ORDER_DETAIL/MANU_ORDER_STATS)**下架**
   //   —— 载体视图读的是正式库 0 行的 bd_manu_order/bl_manu_order,打开即空表,且从未被打开过
   //   (migrate-drop-manu-order-report-panels-20261017.sql),故从本断言里移除。
+  // 2026-10-22 补:2026-10-20/21 新增的两张页面级面板(生产领料 PROD_PICK / 工序报工 PROD_REPORT)
+  //   当时只改了 menus.js,没同步本断言 ⇒ 这里长期红着;按现有菜单顺序补回来。
   assert.deepEqual((group().children || []).map((c) => c.panelCode).filter(Boolean),
-    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'])
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROD_PICK', 'PROD_REPORT', 'LINE_LOAD'])
   // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
   const all = JSON.stringify(plan)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {
@@ -301,11 +361,22 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   // 库存核算 10 张单据 + 明细 8 + 统计 8 + 报表 4 + 条码管理 3 = 33 张面板,另加 2026-10-20
   //   给「扫码领料」挂的页面级面板码 BARCODE_SCAN_PICK(此前无码 ⇒ 任何人可进,也不在权限矩阵里)
   //   ⇒ 34。2026-10-18 的增项:调拨单 TRANSFER / 盘点单 STOCKTAKE 及其明细表/统计表。
-  // 2026-10-21 再加「工单扫码领料」的页面级面板码 WORK_ORDER_PICK(按工单+BOM 作业)⇒ 35。
-  // 同批「扫码领料记录」也挂 WORK_ORDER_PICK(同一作业的留痕查询,不另开权限码)⇒ 菜单项多一条
-  // 但**面板码不重复** —— 下面 new Set 的断言仍然成立,这正是共用面板码的预期。
-  assert.equal(invCodes.length, 36, `WMS管理应有 36 个面板码挂点,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 35, 'WMS管理内不应有重复面板(扫码领料记录与工单扫码领料共用 WORK_ORDER_PICK)')
+  // 2026-10-22:库存核算新增只读报表「生产领料」PROD_PICK_LIST(数据源 dbo.outh 的 src=6 材料出库)
+  // 2026-10-21:再加「工单扫码领料」页面级面板码 WORK_ORDER_PICK(按工单+BOM 作业);
+  //   「扫码领料记录」复用同一个面板码(同一作业的留痕查询,不另开权限码)
+  //   ⇒ 合并后挂点 37、唯一 36(重复的只有 WORK_ORDER_PICK,这是共用面板码的**预期**)。
+  assert.equal(invCodes.length, 37, `WMS管理应有 37 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 36, 'WMS管理内唯一面板码应为 36(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
+  // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
+  const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
+  // ⚠ 子组 code 以远端改版为准:invAcctDoc(原 doc)
+  const docGroup = (invAcct.children || []).find((c) => c.code === 'invAcctDoc')
+  const pickLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_PICK_LIST')
+  assert.equal(pickLeaf?.title, '生产领料')
+  assert.equal(pickLeaf?.path, '/panelx/list/PROD_PICK_LIST')
+  const docCodes = (docGroup.children || []).map((c) => c.panelCode)
+  assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_OUT') + 1,
+    '生产领料应紧跟材料出库单')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
   assert.ok(invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料应挂页面级面板码(2026-10-21)')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')

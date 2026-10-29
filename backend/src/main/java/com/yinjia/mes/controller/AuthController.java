@@ -4,7 +4,9 @@ import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PagePanelRegistry;
+import com.yinjia.mes.service.QueryService;
 import com.yinjia.mes.service.UsageLogService;
+import com.yinjia.mes.service.SupplierPortalService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,15 +33,19 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder encoder;
     private final UsageLogService usageLog;
+    /** 供应商门户归属(2026-10-24):登录/会话还原时判定"这个账号是不是供应商账号"(见 SupplierPortalService) */
+    private final SupplierPortalService supplierPortal;
     /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开) */
     private final boolean testLedgerEnabled;
 
     public AuthController(JdbcTemplate jdbc, JwtUtil jwtUtil, PasswordEncoder encoder, UsageLogService usageLog,
+                          SupplierPortalService supplierPortal,
                           @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
         this.jdbc = jdbc;
         this.jwtUtil = jwtUtil;
         this.encoder = encoder;
         this.usageLog = usageLog;
+        this.supplierPortal = supplierPortal;
         this.testLedgerEnabled = testLedgerEnabled;
     }
 
@@ -64,13 +71,29 @@ public class AuthController {
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
-            if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
+            // 供应商账号(2026-10-25 用户口径「供应商配置的账号不属于用户账号,单独一个表吧」):
+            //   yj_user 里查不到时**再查 yj_supplier_account**(口令就存在那张表),校验通过直接签令牌返回。
+            //   两边不会同名 —— 新建供应商账号时会拒绝与内部账号重名,所以这个先后顺序不产生歧义。
+            if (rows.isEmpty()) {
+                Map<String, Object> s = supplierPortal.authenticate(username, password);
+                if (s == null) throw new IllegalStateException("用户名或密码错误");
+                String supName = String.valueOf(s.get("username"));
+                usageLog.recordLogin(supName, String.valueOf(s.get("real_name")), clientIp(request));
+                Map<String, Object> out = new HashMap<>();
+                out.put("token", jwtUtil.generate(supName, factory));
+                out.put("user", supplierSession(s, factory));
+                return ApiResult.ok(out);
+            }
+            if (!encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
                 throw new IllegalStateException("用户名或密码错误");
             }
             // 过渡期收口:存量 BCrypt 哈希在登录成功时顺手升级成自写格式(
             // BCrypt 不可逆、拿不到明文,只能借"用户自己带明文来登录"这一次机会换掉)
             upgradeStoredHashIfNeeded(username, password, String.valueOf(rows.get(0).get("password_hash")));
             Map<String, Object> u = rows.get(0);
+            // 2026-10-24:用户名按库里存的原文对齐(SQL Server 库排序规则不区分大小写,`WHERE username = ?`
+            // 可能命中大小写不同的行;下游 SupplierPortalService 按 username 查归属表,必须用原文)
+            final String loginName = String.valueOf(u.get("username"));
             boolean admin = "Y".equals(u.get("is_admin"));
             // 使用记录:登录成功事件(失败不记);按所选账套记入对应库
             usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
@@ -81,6 +104,10 @@ public class AuthController {
             user.put("isAdmin", admin);
             user.put("roles", rolesOf(u.get("role_id")));
             user.put("factory", factory);
+            // 供应商门户(2026-10-24 / 2026-10-25 独立成表后):
+            //   供应商账号**不再来自 yj_user** —— 上面 rows 为空时已由 supplierPortal.authenticate 分支返回,
+            //   走到这里的一定是内部账号,权限按角色正常下发,不做任何降权。
+            //   真闸门在 SupplierPortalGuardFilter:供应商会话的 /api 只放行门户接口。
             user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
             // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
             user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
@@ -96,6 +123,24 @@ public class AuthController {
             // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
             // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
             user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
+            // 供应商权限配置入口(2026-10-25 用户口径「不只是管理员可以来配置,需要能够通过组织架构
+            //   添加可以配置的账号」):管理员 ∪ 角色持有 SUPPLIER_ACCOUNT 的 supplier 词。
+            //   前端据此显隐菜单/页签;真闸门是 SupplierPortalService.requireAccountConfig(同一句判定)。
+            boolean canConfigSupplier = !admin && canConfigSupplierAccount(u.get("role_id"));
+            if (canConfigSupplier) {
+                // 让前端能看见并进入该页:页面级权限补上「可见」+ supplier 词,导航里才留得住这一条
+                Object raw = user.get("pagePerms");
+                if (raw instanceof Map<?, ?> m) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> pagePerms = (Map<String, Object>) m;
+                    pagePerms.put(PagePanelRegistry.SUPPLIER_ACCOUNT, "view,supplier");
+                }
+                @SuppressWarnings("unchecked")
+                List<Object> vis = user.get("visiblePanels") instanceof List<?> l ? new ArrayList<>(l) : new ArrayList<>();
+                vis.add(PagePanelRegistry.SUPPLIER_ACCOUNT);
+                user.put("visiblePanels", vis);
+            }
+            user.put("canConfigSupplierAccount", admin || canConfigSupplier);
             Map<String, Object> out = new HashMap<>();
             out.put("token", jwtUtil.generate(username, factory));
             out.put("user", user);
@@ -116,6 +161,9 @@ public class AuthController {
         out.put("fieldPanels", user.get("fieldPanels"));
         out.put("warnPanels", user.get("warnPanels"));
         out.put("pagePerms", user.get("pagePerms"));
+        out.put("supplierCode", user.get("supplierCode"));
+        out.put("supplierPanelPerms", user.get("supplierPanelPerms"));
+        out.put("canConfigSupplierAccount", user.get("canConfigSupplierAccount"));
         return ApiResult.ok(out);
     }
 
@@ -147,6 +195,12 @@ public class AuthController {
         String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getName();
         if (username == null) throw new IllegalStateException("未登录");
+        // 2026-10-25:供应商账号的口令在自己那张表里(yj_supplier_account),不在 yj_user ——
+        // 供应商会话改密必须走它,否则"改密成功"是假的(改的是不存在的用户)。
+        if (supplierPortal.isSupplierAccount(username)) {
+            supplierPortal.changePassword(username, oldPassword, newPassword);
+            return ApiResult.ok(null);
+        }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT password_hash FROM yj_user WHERE username = ?", username);
         if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
@@ -157,13 +211,75 @@ public class AuthController {
         return ApiResult.ok(null);
     }
 
+    /**
+     * 供应商账号行(2026-10-25 独立成表)。表还没建时返回 null(当作"不是供应商账号")。
+     * 查询列表显式列出所需列,避免 `SELECT *` 把口令哈希带到下游。
+     */
+    private Map<String, Object> supplierAccountRow(String username) {
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT username, supplier_code, enabled, ISNULL(real_name,N'') AS real_name"
+                            + " FROM yj_supplier_account WHERE username = ?", username);
+            return rows.isEmpty() ? null : rows.get(0);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 供应商会话的用户对象(2026-10-25 供应商账号独立成表后新增)。
+     *
+     * <p>**login 与 currentUser 共用这一个方法** —— 两处手写同一份清单是历史事故源
+     * (登录降权、刷新又变回来)。改这里一处即可同时生效。
+     *
+     * <p>口径(用户 2026-10-24/25):供应商只能看「供应商采购打印」一个页面、只读 + 打印,
+     * 没有别的前限;数据范围由服务端按 {@code supplierCode} 强制过滤。
+     */
+    private Map<String, Object> supplierSession(Map<String, Object> s, String factory) {
+        String supName = String.valueOf(s.get("username"));
+        String supplierCode = s.get("supplier_code") == null ? "" : String.valueOf(s.get("supplier_code")).trim();
+        Map<String, Object> user = new HashMap<>();
+        user.put("userName", supName);
+        user.put("realName", s.get("real_name") == null ? "" : s.get("real_name"));
+        user.put("roleCode", "supplier");
+        user.put("isAdmin", false);
+        user.put("roles", List.of("供应商"));
+        user.put("factory", factory != null ? factory : DataSourceRouter.current());
+        user.put("supplierCode", supplierCode);
+        user.put("supplierName", supplierCode.isEmpty() ? "" : supplierPortal.supplierName(supplierCode));
+        // 页面级权限:只有「供应商采购打印」那一条给 view/query/print,其余页面级面板清空
+        Map<String, Object> pagePerms = new LinkedHashMap<>();
+        for (String code : PagePanelRegistry.codes()) pagePerms.put(code, "");
+        pagePerms.put(PagePanelRegistry.SUPPLIER_PRINT, "view,query,print");
+        user.put("pagePerms", pagePerms);
+        // 菜单里「供应商采购打印」是**独立面板 SUPPLIER_PU_ORDER**(采购订单的只读副本),
+        // 前端 filterMenuTree 按 panelCode 放行 ⇒ visiblePanels 直接给这个面板码
+        user.put("visiblePanels", List.of(QueryService.SUPPLIER_PANEL_CODE));
+        // 该面板的只读词:前端工具栏据此只留 查询/打印(真闸门是过滤器 + QueryService 范围过滤)
+        user.put("supplierPanelPerms", Map.of(QueryService.SUPPLIER_PANEL_CODE, "view,query,print"));
+        user.put("approvePanels", List.of());
+        user.put("fieldPanels", List.of());
+        user.put("warnPanels", List.of());
+        user.put("canConfigSupplierAccount", false);
+        return user;
+    }
+
     private Map<String, Object> currentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getName();
         if (username == null) throw new IllegalStateException("未登录");
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT username, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
-        if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
+        if (rows.isEmpty()) {
+            // 供应商账号(2026-10-25 独立成表):不在 yj_user ⇒ 到本表取,并按供应商会话下发权限。
+            // 与 {@link #login} 同源(共用 supplierSession),否则"刷新一次页面权限就回来了"。
+            Map<String, Object> s = supplierAccountRow(username);
+            if (s == null) throw new IllegalStateException("用户不存在");
+            if (!"1".equals(String.valueOf(s.get("enabled")))) {
+                throw new IllegalStateException("该供应商账号已停用,请联系采购部");
+            }
+            return supplierSession(s, DataSourceRouter.current());
+        }
         Map<String, Object> u = rows.get(0);
         boolean admin = "Y".equals(u.get("is_admin"));
         Map<String, Object> user = new HashMap<>();
@@ -181,7 +297,34 @@ public class AuthController {
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
         user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
         user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
+        // 供应商权限配置(2026-10-25):与 {@link #login} 同源下发,否则刷新页面后入口又消失
+        boolean canConfigSupplier = !admin && canConfigSupplierAccount(u.get("role_id"));
+        if (canConfigSupplier) {
+            Object raw = user.get("pagePerms");
+            if (raw instanceof Map<?, ?> m) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> pagePerms = (Map<String, Object>) m;
+                pagePerms.put(PagePanelRegistry.SUPPLIER_ACCOUNT, "view,supplier");
+            }
+            @SuppressWarnings("unchecked")
+            List<Object> vis = user.get("visiblePanels") instanceof List<?> l ? new ArrayList<>(l) : new ArrayList<>();
+            vis.add(PagePanelRegistry.SUPPLIER_ACCOUNT);
+            user.put("visiblePanels", vis);
+        }
+        user.put("canConfigSupplierAccount", admin || canConfigSupplier);
         return user;
+    }
+
+    /**
+     * 该角色是否持有「供应商权限配置 · 配置供应商账号」词(2026-10-25)。
+     * 判定 = yj_role_panel 里 SUPPLIER_ACCOUNT 这一行的 perms 含 `supplier`(逐词精确匹配,
+     * 不用 LIKE '%supplier%' 免得将来出现同前缀词被误命中);与
+     * SupplierPortalService.requireAccountConfig() 的真闸门**同一口径**。
+     */
+    private boolean canConfigSupplierAccount(Object roleId) {
+        if (roleId == null) return false;
+        return panelsWithPerm(false, roleId, SupplierPortalService.PERM_SUPPLIER_ACCOUNT)
+                .contains(PagePanelRegistry.SUPPLIER_ACCOUNT);
     }
 
     /** 角色名(2026-10-18 补)。顶栏「账号信息」弹窗与新的系统管理平台入口页都显示「角色」,

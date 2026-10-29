@@ -147,8 +147,10 @@ const navRef = ref(null)
 const cardRef = ref(null)
 
 // 菜单树 = 代码基线 + 数据库覆盖(名称/位置/顺序/隐藏,见 stores/menu.js),再按角色权限过滤
+// 第 4 个参数传 user:菜单项上的 permKey(如「供应商权限配置」= canConfigSupplierAccount)
+// 要读登录用户身上的布尔位(2026-10-25)
 const menuStore = useMenuStore()
-const menuTree = computed(() => filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin))
+const menuTree = computed(() => filterMenuTree(menuStore.visibleTree, user.visiblePanels, user.isAdmin, user.$state))
 // 覆盖层只拉一次;失败时 store 内部回落到代码基线(导航不会因此变空)
 menuStore.load()
 

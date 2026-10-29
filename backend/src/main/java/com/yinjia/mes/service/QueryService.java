@@ -49,6 +49,129 @@ public class QueryService {
      * 这里是服务端的第二道防线。
      */
     private static final List<String> WH_DOCK_PANELS = List.of("STOCK_DETAIL");
+    /**
+     * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
+     * 只是显示和权限不一样」)。
+     *
+     * <p>供应商端**直接复用采购订单面板**(同一个 PanelxList、同一套版式与打印),它把登录态里绑定的
+     * 供应商编码放进 {@code condition["__supplierScope"]};本类在**服务端**把它翻译成
+     * {@code [供应商编码] LIKE 值} 并 AND 进 WHERE —— 与「查询」弹窗里选供应商完全同一口径
+     * (供应商编码在本系统按**名称**存,金蝶口径,故用 LIKE 与 appendDocFilters 的字段条件一致)。
+     *
+     * <ul>
+     *   <li>键以双下划线开头 = 控制键,不是字段标签 ⇒ 通用字段循环(appendDocFilters)不会误吃;这里显式剔除;</li>
+     *   <li>**只在单据模式生效**;面板里没有「供应商编码」列 ⇒ 直接 403(宁可报错,也不当成"没有过滤"放全量);</li>
+     *   <li>值来自登录态由前端带上来,但真正的隔离还有两层:SupplierPortalGuardFilter(供应商会话除门户接口
+     *       外一律 403)+ 门户接口自身按服务端认定的 supplier_code 过滤。这里这一层是在"允许的
+     *       /px/queryFormDataList"上再加一道数据范围,防止把整表拉走。</li>
+     * </ul>
+     */
+    public static final String SUPPLIER_SCOPE_KEY = "__supplierScope";
+
+    /**
+     * 供应商会话可用的**唯一**面板接口(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
+     * 只是显示和权限不一样」)。
+     *
+     * <p>供应商端直接渲染采购订单面板(PanelxList),它必须能取数;而供应商会话在
+     * {@code SupplierPortalGuardFilter} 里被默认拒绝(其余 /api 一律 403)。所以这里把
+     * 「查询列表」这一条**定向放行**,代价是:范围过滤必须在服务端完成,不能依赖前端。
+     * 故 {@link #queryFormDataList} 在**供应商会话**下会**忽略**前端传来的条件,强制
+     * {@code 供应商编码 = 登录账号绑定的供应商}(见 {@link #enforceSupplierScope})。
+     *
+     * <p>只放行这一条:getPanelConfig(元数据)、getFormDescriptor(单据详情)、callButton(动作)、
+     * deleteForms 等一律仍被过滤器挡住 —— 供应商拿不到编辑态需要的接口,写不了也看不到别人的单。
+     */
+    public static final String PANEL_LIST_PATH = "/api/px/queryFormDataList";
+
+    /**
+     * 供应商会话可用的**面板元数据**接口(2026-10-25 同上口径)。
+     *
+     * <p>采购订单面板的**工具栏按钮组**(「打印」组里是 打印采购订单/预览/导出/打印材料码)、
+     * 明细页签、表头字段都来自这一条配置接口 —— 不放行,供应商端就只剩一颗「查询」,
+     * 与采购订单长得不一样(而这正是用户要的一致)。它是**只读元数据**,不含业务数据;
+     * 业务数据的范围过滤仍由 {@link #enforceSupplierScope} 在列表接口上强制。
+     */
+    public static final String PANEL_CONFIG_PATH = "/api/px/getPanelConfig";
+
+    /**
+     * 供应商会话可用的**单张单据详情**接口(2026-10-25 用户口径「只有打印按钮和查询」)。
+     *
+     * <p>纸质单打印(print-formats)与明细预览都走这一条取「头 + 明细行」。不放行 ⇒ 点「打印」
+     * 拿不到数据(实测:下拉里有 打印采购订单,点了没纸)。它是**只读**取数,但会返回完整单据内容,
+     * 所以必须在服务端限定范围:{@link #loadOneDoc} 不走列表过滤,故由
+     * {@link #supplierMayReadDoc} 逐单核对「这张单的供应商编码 = 当前会话的供应商编码」,不符即 403。
+     */
+    public static final String FORM_DESCRIPTOR_PATH = "/api/px/getFormDescriptor";
+
+    /** 供应商会话读取单张单据前的归属核对(见 {@link #FORM_DESCRIPTOR_PATH}) */
+    public boolean supplierMayReadDoc(String panelCode, String docNo) {
+        String code = sessionSupplierCode();
+        if (code == null) return true;                 // 内部账号:不限制
+        if (code.isEmpty()) return false;              // 供应商账号已停用
+        if (!SUPPLIER_PANEL_CODE.equals(panelCode)) return false;
+        if (docNo == null || docNo.isBlank()) return false;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM bd_pu_order WHERE [单据编号] = ? AND ISNULL([供应商编码],N'') = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, docNo.trim(), code);
+            return n != null && n > 0;
+        } catch (RuntimeException e) {
+            return false;                              // 查不到就拒绝(默认拒绝)
+        }
+    }
+
+    /**
+     * 当前登录人若是供应商会话,返回其绑定供应商编码(否则 null)。
+     * 抽成静态方法是为了让过滤器与 QueryService 用**同一个判据**(都在 yj_supplier_account 上),
+     * 不在 QueryService 里再注入一份 SupplierPortalService 造成循环依赖风险。
+     */
+    private String sessionSupplierCode() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String user = auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : null;
+        if (user == null) return null;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT supplier_code, enabled FROM yj_supplier_account WHERE username = ?", user);
+            if (rows.isEmpty()) return null;
+            if (!"1".equals(String.valueOf(rows.get(0).get("enabled")))) return "";
+            Object code = rows.get(0).get("supplier_code");
+            return code == null ? null : String.valueOf(code).trim();
+        } catch (RuntimeException e) {
+            return null;   // 表未建/库抖动:按"不是供应商"处理(与 SupplierPortalService 同口径)
+        }
+    }
+
+    /**
+     * 供应商会话的范围收口(服务端权威,不信前端):
+     * ① 只允许 PU_ORDER 面板(供应商端就是采购订单页;别的面板一律拒绝);
+     * ② 条件里的「供应商编码」**无条件覆盖**成登录态认定的编码 —— 前端不传、传错、传空都无效;
+     * ③ 前提是该面板确实有「供应商编码」字段,否则等价于"没有范围"⇒ 直接拒绝(宁可报错也不漏数据)。
+     */
+    private Map<String, Object> enforceSupplierScope(String panelCode, Map<String, Object> condition, String code) {
+        if (!SUPPLIER_PANEL_CODE.equals(panelCode)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "供应商账号只能查询「供应商采购打印」面板:" + panelCode);
+        }
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def.byLabel("供应商编码") == null) {
+            throw new org.springframework.security.access.AccessDeniedException("采购订单面板缺少「供应商编码」字段,无法限定范围");
+        }
+        Map<String, Object> merged = condition == null ? new LinkedHashMap<>() : new LinkedHashMap<>(condition);
+        merged.remove(SUPPLIER_SCOPE_KEY);
+        merged.put("供应商编码", code);   // 覆盖式写入:前端任何同名条件都被丢弃
+        return merged;
+    }
+
+    /**
+     * 供应商端唯一允许的面板(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,
+     * 只有打印按钮和查询(查询必须只能查供应商关联的数据)按钮的」)。
+     *
+     * <p>它是 PU_ORDER 的**元数据副本**(同一张 bd_pu_order/bl_pu_order,字段逐列复制,
+     * 见 tools/migrate-supplier-po-panel-20261025.sql),工具栏只有「查询 + 打印」。
+     * 供应商会话**只能**查这一张;查别的一律拒绝(见 {@link #enforceSupplierScope})。
+     */
+    public static final String SUPPLIER_PANEL_CODE = "SUPPLIER_PU_ORDER";
+
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                                  Map<String, Object> condition, int pageNo, int pageSize) {
         return queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, null);
@@ -78,6 +201,29 @@ public class QueryService {
                                                  Map<String, Object> condition, int pageNo, int pageSize,
                                                  List<Map<String, Object>> advFilters, boolean countOnly) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
+        // 供应商会话的范围收口(2026-10-25):优先级最高 —— 登录态认定的供应商编码**覆盖**前端一切条件,
+        // 见 {@link #enforceSupplierScope}。这样即便把本条接口放行给供应商,也拉不到别人的单。
+        String sessionSupplier = sessionSupplierCode();
+        if (sessionSupplier != null) {
+            if (sessionSupplier.isEmpty()) {
+                throw new org.springframework.security.access.AccessDeniedException("供应商账号已停用,请联系采购部");
+            }
+            condition = enforceSupplierScope(panelCode, condition, sessionSupplier);
+        }
+        // 供应商范围控制键(2026-10-25):先摘出来,再按需折成「供应商编码 LIKE 值」——
+        // 见 {@link #SUPPLIER_SCOPE_KEY} 的长注释。放最前是因为后面三种模式都要用它。
+        String supplierScope = "";
+        if (condition != null && condition.get(SUPPLIER_SCOPE_KEY) != null) {
+            supplierScope = String.valueOf(condition.get(SUPPLIER_SCOPE_KEY)).trim();
+            if (!supplierScope.isEmpty()) {
+                condition = new LinkedHashMap<>(condition);
+                condition.remove(SUPPLIER_SCOPE_KEY);
+                condition.put("供应商编码", supplierScope);   // 与弹窗选供应商同一口径(按名称 LIKE)
+            } else {
+                condition = new LinkedHashMap<>(condition);
+                condition.remove(SUPPLIER_SCOPE_KEY);
+            }
+        }
         Map<String, String> l2c = def.labelToCol();
         if ("flat".equals(def.mode())) {
             return queryFlat(def, keyword, condition, l2c, pageNo, pageSize, advFilters, countOnly);
@@ -383,10 +529,13 @@ public class QueryService {
         }
         String archFrom = qFrom == null ? "" : String.valueOf(qFrom).trim();
         String archTo = qTo == null ? "" : String.valueOf(qTo).trim();
+        // 单据状态记账面板(2026-10-25):副本面板(如供应商采购打印)的状态行记在源面板名下,
+        // 不折算就会查不到自己的作废/删除/归档痕迹 —— 已删除的单据还会照旧出现。详见 PanelAliases。
+        String statusPanel = com.yinjia.mes.panel.PanelAliases.statusSource(def.code());
         if (!archFrom.isEmpty() || !archTo.isEmpty()) {
             where.append(" AND EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
                     .append(g).append("] AND s.archived_at IS NOT NULL");
-            args.add(def.code());
+            args.add(statusPanel);
             if (!archFrom.isEmpty()) {
                 where.append(" AND s.archived_at >= ?");
                 args.add(archFrom);
@@ -401,7 +550,7 @@ public class QueryService {
         // CAST 统一为 nvarchar:date 类型的组列(如 bd_manu_order.合同号)与 doc_no 比较时不会隐式转换失败
         where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = CAST(t.[")
                 .append(g).append("] AS nvarchar(100)) AND s.canceled = 'Y')");
-        args.add(def.code());
+        args.add(statusPanel);
 
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(DISTINCT t.[" + g + "]) FROM " + docTable + " t " + where,
@@ -540,7 +689,10 @@ public class QueryService {
 
     private Map<String, Map<String, Object>> loadStatus(String panelCode, List<String> docNos) {
         String in = String.join(",", docNos.stream().map(n -> "?").toList());
-        List<Object> args = new ArrayList<>(List.of(panelCode));
+        // 副本面板(供应商采购打印)的状态行记在源面板(采购订单)名下,见 PanelAliases:
+        // 不折算 ⇒ 列表里每张单都查不到状态,「单据状态」恒为「草稿」、审核人/审核时间全空。
+        final String statusPanelCode = com.yinjia.mes.panel.PanelAliases.statusSource(panelCode);
+        List<Object> args = new ArrayList<>(List.of(statusPanelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
         jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status"
@@ -1150,7 +1302,8 @@ public class QueryService {
                             .append(" WHERE s.panel_code = ? AND s.doc_no = CAST(t.[").append(g)
                             .append("] AS nvarchar(100)) AND s.shr LIKE ?))");
                     args.add("%" + v + "%");
-                    args.add(def.code());
+                    // 副本面板按源面板的状态记账(同 loadStatus),否则按审核人永远搜不到
+                    args.add(com.yinjia.mes.panel.PanelAliases.statusSource(def.code()));
                     args.add("%" + v + "%");
                 } else if (onDoc) {
                     where.append(" AND t.").append(col).append(" LIKE ?");
