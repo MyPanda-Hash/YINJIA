@@ -4326,3 +4326,11 @@ migrate-drop-domtest-link-col-20261029.sql
 #   代码已同步修:pruneProgressRows / voidDoc / RdProjectFlowService。本脚本清**存量**孤儿行
 #   (软删 asp_cancel='Y',与修复后判据完全一致,可幂等复跑)。两账套都执行。
 migrate-prune-voided-progress-20261030.sql
+
+# 2026-10-29 产品信息表两级审核人默认值(用户口径「两个审核人默认填写为冯总和陈秀丽,
+#   也可以修改的,保存之后也显示出来,现在没有显示出来」)。
+#   写入 yj_panel.config.headDefaults:一级=冯敏 / 二级=陈秀丽(取 yj_user 真实姓名;
+#   旧字面「冯总」「秀丽」库里没有对应账号,下游按姓名反查会落空)。
+#   ⚠ 配套代码同批提交(456666bf):putHeadDefaults 补进主保存路径(原先只挂在空白草稿分支),
+#   否则写进 config 也不会落库。两账套都执行。
+migrate-prodinfo-auditor-defaults-20261029.sql
