@@ -196,8 +196,15 @@ public class ButtonService {
             // ── 检验目录(QC_CATALOG,2026-09-22 用户口径)─────────────────────────────
             // 完成:校验关联的检验单与检验数据记录都已审批 → 置「已完成检验」并给出是否合格
             case "完成" -> completeCatalogRow(def, formData, buttonParam);
-            // 修改:把「已完成检验」回弹为「正在检验中」并写修改记录(之后才可反审核挂靠单据)
-            case "修改" -> reopenCatalogRow(def, formData);
+            // 「修改」按面板分流,两个语义不能混:
+            //   · 检验目录(QC_CATALOG):把「已完成检验」回弹为「正在检验中」并写修改记录
+            //     (之后才可反审核挂靠单据);
+            //   · 自助维护型面板(WLBOM 物料清单):**已归档 → 退回草稿**改一改再存
+            //     (2026-10-29 用户口径「加上一个修改按钮,点击之后就退回草稿状态,
+            //       然后就可以继续修改了,修改完再保存就行了」)。
+            case "修改" -> SELF_MAINTAINED_PANELS.contains(def.code())
+                    ? selfModify(def, formData)
+                    : reopenCatalogRow(def, formData);
             // 删除记录(行级):挂靠的检验单/检验数据记录还在时拒绝,提示先删除它们
             case "删除记录" -> deleteCatalogRow(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
@@ -2021,6 +2028,45 @@ public class ButtonService {
             return result(no, "已归档");
         }
         return result(no, "已审核");
+    }
+
+    /**
+     * **自助维护型面板的「修改」**:把已归档/已审核的单据直接退回草稿,改完再保存即重新归档。
+     *
+     * <p>用户口径(2026-10-29):「我现在想的是肯定是要能保存归档的,但是加上一个修改按钮,
+     * 点击之后就退回草稿状态,然后就可以继续修改了,修改完再保存就行了」。
+     *
+     * <p>为什么不是复用 {@link #unaudit}:那条路要求"审批权"(requireApprover),
+     * 且对归档单会先拦一道"请先申请修改并经管理员审批"。物料清单是**基础数据**、
+     * 谁维护谁就能改,不该被审批权卡住,也不该走文书的两轮闭环。
+     *
+     * <p>与 unaudit 一致的部分(照搬,别各写一套):
+     * <ul>
+     *   <li>退回前落一份快照({@link #snapshotOnUnaudit}),改完保存时 finalizeOpenModify 收尾 diff
+     *       ⇒ 「修改记录」照样逐条留痕,不是无痕直改;</li>
+     *   <li>同时清 archived / shr / shsj / modify_state —— 状态推导里任一残留都会让单据看起来没退回。</li>
+     * </ul>
+     *
+     * <p>只对 SELF_MAINTAINED_PANELS 开放,其它面板调它直接拒绝(防止将来误接线)。
+     */
+    private Map<String, Object> selfModify(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!SELF_MAINTAINED_PANELS.contains(def.code())) {
+            throw new IllegalStateException("该面板不支持「修改」(仅自助维护型面板可用)");
+        }
+        String no = requireNo(formData);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        String status = String.valueOf(st.get("status"));
+        if (!"已归档".equals(status) && !"已审核".equals(status)) {
+            throw new IllegalStateException("仅已归档/已审核状态可点「修改」退回草稿(当前:" + status + ")");
+        }
+        // 退回前留痕:弃审前的数据落快照,改完保存时 finalizeOpenModify 出 diff 并再归档
+        snapshotOnUnaudit(def, no, currentUserName());
+        // 清归档/审核标记 + 修改态:任一残留都会让状态推导停在不该停的位置
+        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL,"
+                + " modify_state = NULL, update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?",
+                def.code(), no);
+        recordApproval(def.code(), no, "UNAUDIT", "DRAFT", "修改（自助维护型面板，退回草稿）");
+        return result(no, "草稿");
     }
 
     private Map<String, Object> unaudit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -7169,15 +7215,16 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO"
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
             // ⚠ 物料清单(WLBOM,2026-10-21 曾登记,2026-10-29 **移出**)——
             //   当年登记是想让「保存后不是草稿」,但落到本集合 = 保存即归档,而前端 draftEditable
             //   不认「已归档」⇒ **保存一次就锁死、再也改不了**(2026-10-29 用户报障:
             //   「这个是不需要审批的,现在保存之后是不能修改的」)。
             //   用户口径是「填写和修改都不需要审批」= 基础数据随时可改,不是"存一次定稿的文书"。
-            //   ⇒ 移出本集合,WLBOM 保存后**保持草稿**,前端天然可继续编辑;
-            //     它也不进 SELF_MAINTAINED_PANELS(那里同样意味着保存即归档)。
-            );
+            //   ⇒ 复归本集合:保存即归档是**对的**(用户口径「肯定是要能保存归档的」),
+            //     缺的是**归档后的退路** ⇒ 由本集合 + SELF_MAINTAINED_PANELS 配套的
+            //     「修改」按钮({@link #selfModify})退回草稿,而不是取消归档。
+            "WLBOM");
     /**
      * **自助维护型**面板(2026-10-21):保存即归档,**任何用户都不走审批**。
      *
@@ -7187,13 +7234,14 @@ public class ButtonService {
      * 普通用户保存=送审」;这里登记的面板连审批都没有(工具栏也没有审批组),
      * 谁保存都直接置为已归档 —— 它是**基础数据**,不是要签核的文书。
      *
-     * <p>⚠ 2026-10-29 起 **WLBOM 已移出**(集合目前为空):
-     *   用户报障「物料清单保存之后是不能修改的」。根因是本集合的语义 = 保存即归档,
-     *   而前端 draftEditable 不认「已归档」⇒ 存一次就锁死。
-     *   用户口径「填写不需要审批、修改也不需要审批」的正确实现是
-     *   **保存后保持草稿**(随时可改),而不是"存一次就定稿归档"。
-     *   ⇒ WLBOM 既不进本集合、也不进 DOC_ARCHIVE_PANELS。
-     *   本集合保留给将来真正"存一次定稿"的自助面板。
+     * <p>本集合的面板**保存即归档**(基础数据填完即定稿),但归档后要能回来改 ——
+     *   入口是本集合专属的「修改」按钮({@link #selfModify}),点一下直接退回草稿,
+     *   不走文书那套「申请修改→管理员审批→修改中」。
+     *
+     * <p>2026-10-29 用户口径:「我现在想的是肯定是要能保存归档的,但是加上一个修改按钮,
+     *   点击之后就退回草稿状态,然后就可以继续修改了,修改完再保存就行了」。
+     *   ⚠ 曾经的问题是**归档后没有退路**(前端 draftEditable 不认已归档)⇒ 存一次就锁死;
+     *     修法是补「修改」按钮,不是取消归档。
      *
      * <p>配套:
      * <ul>
@@ -7201,7 +7249,7 @@ public class ButtonService {
      *   <li>保存分支见 {@code saveDoc} 里的 SELF_MAINTAINED 判断。</li>
      * </ul>
      */
-    public static final java.util.Set<String> SELF_MAINTAINED_PANELS = java.util.Set.of();
+    public static final java.util.Set<String> SELF_MAINTAINED_PANELS = java.util.Set.of("WLBOM");
 
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
      *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):

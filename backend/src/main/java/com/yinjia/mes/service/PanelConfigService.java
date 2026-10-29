@@ -350,13 +350,16 @@ public class PanelConfigService {
             //   (前端 PanelxList 的「申请修改 / 修改记录」组,见 PanelxList.vue 修改组注释),
             //   而工具栏本身会过滤掉 修改 这个动作(PanelxList.vue:3159,自 2026-10-07 单据卡片下线起)。
             //   WLBOM 已登记进 ButtonService.DOC_ARCHIVE_PANELS ⇒ docArchive=true ⇒ 侧栏自动出现修改入口。
-            // WLBOM(物料清单)2026-10-29 起**也不出审批组**:用户口径「填写/修改都不需要审批」,
-            //   它保存后保持草稿、随时可改,工具栏只该有「保存 / 保存为草稿 / 删除 / 刷新 / 导入」。
-            //   (它已从 SELF_MAINTAINED_PANELS 与 DOC_ARCHIVE_PANELS 双双移出 ——
-            //    前者=保存即归档会锁死,后者=保存即送审同样锁死,见 ButtonService 两处注释。)
-            if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())
-                    && !NOT_APPROVAL_PANELS.contains(def.code())) {
+            // WLBOM(物料清单)2026-10-29:**保存即归档(要归档)+ 单独一个「修改」按钮退回草稿**。
+            //   用户口径:「肯定是要能保存归档的,但是加上一个修改按钮,点击之后就退回草稿状态,
+            //   然后就可以继续修改了,修改完再保存就行了」。
+            //   ⇒ 审批组仍然不出(它没有审批流),但**多一个「修改」组**放在「删除」之后。
+            if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
                 buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            }
+            // 自助维护型面板(物料清单):归档后靠它退回草稿 —— 后端 ButtonService.selfModify。
+            if (com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
+                buttonGroups.add(group("修改", List.of("修改")));
             }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
@@ -453,6 +456,9 @@ public class PanelConfigService {
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
         // 「申请修改/修改审批/修改记录」闭环按钮(2026-09-11 起从产品文件 7 面板放开到全部文书归档面板)
         metadata.put("docArchive", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code()));
+        // 自助维护型面板(物料清单 WLBOM):保存即归档,归档后侧栏给「修改」按钮直接退回草稿。
+        // 前端据 metadata.selfMaintained 出那个按钮(见 PanelxList 的 isSelfMaintainedPanel)。
+        metadata.put("selfMaintained", ButtonService.SELF_MAINTAINED_PANELS.contains(def.code()));
         // 产品变更申请单(2026-09-21):按账号部门的**行级编辑门禁**要下发给前端(界面把非本部门行置灰只读)。
         // 真源 = yj_change_dept(纸面部门 ↔ 系统部门映射),与后端 ButtonService.gateChangeDetail 同一张表;
         // 前端拿到的是"我能填哪几个部门行",管理员另行豁免(前端按登录用户 isAdmin 判)。
@@ -979,18 +985,7 @@ public class PanelConfigService {
      */
     private static final java.util.Set<String> IMPORTABLE_PANELS = java.util.Set.of("WLBOM");
 
-    /**
-     * **不设审批组**的平铺用面板(2026-10-29)。
-     *
-     * <p>用户口径(物料清单 WLBOM):「这个是不需要审批的」。
-     * 它既不是文书面板(不该保存即归档),也不是自助维护型(不该存一次定稿)——
-     * 就是**随时可改的基础数据**,保存后保持草稿。
-     *
-     * <p>为什么单独开一个集合而不是塞进 SELF_MAINTAINED_PANELS:
-     * 那个集合的语义是「保存即归档」,把 WLBOM 放回去会重新锁死(2026-10-29 报障的原因)。
-     * 这里只表达"工具栏不出审批按钮",与归档行为解耦。
-     */
-    private static final java.util.Set<String> NOT_APPROVAL_PANELS = java.util.Set.of("WLBOM");
+
 
     /**
      * 平表面板「更多」组的动作清单。

@@ -3259,7 +3259,13 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   //   ① 字段名是 **name**(不是 title):曾写成 g.title ⇒ 每一组都判"不在白名单" ⇒ 工具栏整条清空。
   //   ② 工具栏最左本来就有常驻「查询」按钮(.toolbar-query-btn),故「查询/查找」组的动作要剥掉,
   //      剥空后该组改名成剩余首个动作(通常是"刷新"),不能保留组名「查询」——否则界面上两颗查询。
-  const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
+  // ⚠ 2026-10-29:「修改」不再**无条件**摘掉 ——
+  //   当年摘它是因为"唯一作用是弹整单卡片,卡片已删 ⇒ 死按钮";
+  //   但物料清单(WLBOM)用的是**无侧栏的工具栏布局**,「修改」在那里是
+  //   「已归档 → 退回草稿」的唯一入口(用户口径:加一个修改按钮,点了退回草稿再改)。
+  //   故按面板放行:自助维护型保留「修改」,其余面板仍摘(检验目录走侧栏/行内,不吃工具栏)。
+  const actions = actsOf(group).filter((action) => !['查询', '查找'].includes(action)
+    && !(action === '修改' && !isSelfMaintainedPanel.value))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
@@ -3887,6 +3893,12 @@ async function openPreviewCard(c) {
 }
 /** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
 const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
+/**
+ * 自助维护型面板(物料清单 WLBOM):**保存即归档**,但归档后侧栏给一个「修改」按钮
+ * 直接退回草稿(不走申请修改/审批)。
+ * 真源 = 后端 ButtonService.SELF_MAINTAINED_PANELS,经 metadata.selfMaintained 下发。
+ */
+const isSelfMaintainedPanel = computed(() => !!cfgCache.value?.metadata?.selfMaintained)
 /**
  * 侧栏是否放出「修改记录」按钮:文书归档面板一族(isDocArchivePanel)照旧;
  * 检验目录(QC_CATALOG)不是归档面板,但其「修改」动作会把「已完成检验」回弹并写 yj_doc_modify_log
@@ -9136,7 +9148,12 @@ function isDisabled(action) {
     整单中止: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     草稿: !current.value || st !== '已中止',
     取消中止: !current.value || st !== '已中止',
-    修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
+    // 「修改」两套语义,按面板分流(与后端 ButtonService 的 case "修改" 同源):
+    //   · 自助维护型(物料清单 WLBOM):已归档/已审核 → 退回草稿(2026-10-29 用户口径)
+    //   · 检验目录(QC_CATALOG):已审核/生产中/已完工 → 回弹「正在检验中」
+    修改: isSelfMaintainedPanel.value
+      ? (!current.value || !['已归档', '已审核'].includes(st))
+      : (!current.value || !['已审核', '生产中', '已完工'].includes(st)),
     审批情况: false,
     提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
     审批通过: !current.value || !IN_APPROVAL.includes(st)
