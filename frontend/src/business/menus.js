@@ -371,6 +371,11 @@ export const menuTree = [
     //   与生产领料同组同形态:扫工单码(带出工单行) → 选工序 → 填完工数量 → 提交即报工并审核,
     //   工序进度/当前工序由既有审核钩子推进;今日报工明细就是「报工记录」。
     { code: 'prodReport', title: '工序报工', path: '/panelx/list/PROD_REPORT', panelCode: 'PROD_REPORT', icon: 'Memo' },
+    // 工序流程追踪卡(2026-10-29,用户口述《新建 DOCX 文档 (2).docx》「生产相关」):
+    //   日期大批次 → 小批次(工单行=一张卡) → 每道工序挂现场照片(电脑选图/手机拍照) → 按卡追溯;
+    //   卡的工序行挂载到工序台账与已审核报工(完成量/完成时间取 scjl 现算)。
+    //   页面级虚拟面板 PROC_FLOW_CARD(定义见后端 PagePanelRegistry),动作词 view/query/entry/confirm。
+    { code: 'procFlowCard', title: '工序流程追踪卡', path: '/prod/plan/procFlowCard', panelCode: 'PROC_FLOW_CARD', icon: 'Postcard' },
           // 工序任务(路线驱动,A 项 2026-10-05)菜单已按用户口径**撤下**(「把工序任务删除掉算了」,
           // 2026-10-05):工单详情只看"走到哪一步"(按报工统计),不再维护工序任务队列。
           // 页面组件/后端接口/表结构按可撤回要求保留但不再挂菜单;要恢复只需把下面一行注释去掉。

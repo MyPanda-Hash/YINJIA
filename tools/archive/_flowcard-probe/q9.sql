@@ -1,0 +1,13 @@
+SET NOCOUNT ON;
+PRINT '--- plang route-ish cols ---';
+SELECT name FROM sys.columns WHERE object_id=OBJECT_ID('dbo.plang') AND (name LIKE N'%路线%' OR name LIKE N'%工艺%');
+PRINT '--- plang_pc full cols ---';
+SELECT name, TYPE_NAME(user_type_id) AS t FROM sys.columns WHERE object_id=OBJECT_ID('dbo.plang_pc') ORDER BY column_id;
+PRINT '--- sample route rows for recent product ---';
+SELECT TOP 10 工艺路线编码, 工序编码, 工序名称, 加工顺序, 生产车间, 状态, asp_cancel FROM bs_route WHERE ISNULL(asp_cancel,'N')<>'Y' ORDER BY 工艺路线编码, 加工顺序;
+PRINT '--- bs_inv route col ---';
+SELECT name FROM sys.columns WHERE object_id=OBJECT_ID('dbo.bs_inv') AND (name LIKE N'%路线%' OR name LIKE N'%工艺%');
+PRINT '--- sample plang_pc ---';
+SELECT TOP 5 * FROM plang_pc ORDER BY id DESC;
+PRINT '--- yj_panel panel names for 生产计划 group ---';
+SELECT panel_code, panel_name, module_group, mode FROM yj_panel WHERE module_group=N'生产计划' ORDER BY panel_code;

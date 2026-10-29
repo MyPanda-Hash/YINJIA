@@ -1,0 +1,1386 @@
+{
+  "locales": {
+    "zh-CN": {
+      "initial": {
+        "title": "工序流程追踪卡 · YINJIA-MES",
+        "workspaceTab": [
+          "我的桌面",
+          "工序流程追踪卡"
+        ],
+        "menuGroup": [
+          "我的桌面",
+          "研发管理",
+          "智能供应链",
+          "WMS管理"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "生产工单",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工序报工",
+          "工序流程追踪卡",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "录入",
+          "卡片列表",
+          "批次追溯"
+        ],
+        "barLabels": [
+          "大批次"
+        ],
+        "barButtons": [
+          "查询",
+          "刷新"
+        ],
+        "placeholders": [
+          "批次号关键字",
+          "筛选工单号/产品"
+        ],
+        "emptyTexts": [
+          "请先在左侧选择工单行"
+        ],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "工单号",
+          "行号",
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "计划数量",
+          "当前工序",
+          "卡号",
+          "卡状态",
+          "照片"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "card": {
+        "title": "工序流程追踪卡 · YINJIA-MES",
+        "workspaceTab": [
+          "我的桌面",
+          "工序流程追踪卡"
+        ],
+        "menuGroup": [
+          "我的桌面",
+          "研发管理",
+          "智能供应链",
+          "WMS管理"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "生产工单",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工序报工",
+          "工序流程追踪卡",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "录入",
+          "卡片列表",
+          "批次追溯"
+        ],
+        "barLabels": [
+          "大批次"
+        ],
+        "barButtons": [
+          "查询",
+          "刷新"
+        ],
+        "placeholders": [
+          "批次号关键字",
+          "筛选工单号/产品"
+        ],
+        "emptyTexts": [],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "工单号",
+          "行号",
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "计划数量",
+          "当前工序",
+          "卡号",
+          "卡状态",
+          "照片"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "list": {
+        "title": "工序流程追踪卡 · YINJIA-MES",
+        "workspaceTab": [
+          "我的桌面",
+          "工序流程追踪卡"
+        ],
+        "menuGroup": [
+          "我的桌面",
+          "研发管理",
+          "智能供应链",
+          "WMS管理"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "生产工单",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工序报工",
+          "工序流程追踪卡",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "录入",
+          "卡片列表",
+          "批次追溯"
+        ],
+        "barLabels": [],
+        "barButtons": [
+          "查询",
+          "刷新"
+        ],
+        "placeholders": [
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "工单号",
+          "批次号",
+          "日期从",
+          "日期到"
+        ],
+        "emptyTexts": [],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "卡号",
+          "小批次号",
+          "大批次号",
+          "工单号",
+          "行号",
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "计划数量",
+          "生产线",
+          "卡状态",
+          "工序进度",
+          "完成工序数",
+          "照片",
+          "创建人",
+          "更新时间"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "trace": {
+        "title": "工序流程追踪卡 · YINJIA-MES",
+        "workspaceTab": [
+          "我的桌面",
+          "工序流程追踪卡"
+        ],
+        "menuGroup": [
+          "我的桌面",
+          "研发管理",
+          "智能供应链",
+          "WMS管理"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "生产工单",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工序报工",
+          "工序流程追踪卡",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "录入",
+          "卡片列表",
+          "批次追溯"
+        ],
+        "barLabels": [
+          "批次号"
+        ],
+        "barButtons": [
+          "查询",
+          "刷新"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "各工序完成量"
+        ],
+        "statLabels": [
+          "卡数",
+          "产品数",
+          "计划数量"
+        ],
+        "paneTableHeaders": [
+          "工序",
+          "计划量",
+          "已报工",
+          "卡片数",
+          "卡号",
+          "小批次号",
+          "大批次号",
+          "工单号",
+          "行号",
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "计划数量",
+          "生产线",
+          "卡状态",
+          "工序进度",
+          "完成工序数",
+          "照片",
+          "创建人",
+          "更新时间"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "drawer": {
+        "title": "工序流程追踪卡 · YINJIA-MES",
+        "workspaceTab": [
+          "我的桌面",
+          "工序流程追踪卡"
+        ],
+        "menuGroup": [
+          "我的桌面",
+          "研发管理",
+          "智能供应链",
+          "WMS管理"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "生产工单",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工序报工",
+          "工序流程追踪卡",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "录入",
+          "卡片列表",
+          "批次追溯"
+        ],
+        "barLabels": [
+          "批次号"
+        ],
+        "barButtons": [
+          "查询",
+          "刷新"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "各工序完成量"
+        ],
+        "statLabels": [
+          "卡数",
+          "产品数",
+          "计划数量"
+        ],
+        "paneTableHeaders": [
+          "工序",
+          "计划量",
+          "已报工",
+          "卡片数",
+          "卡号",
+          "小批次号",
+          "大批次号",
+          "工单号",
+          "行号",
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "计划数量",
+          "生产线",
+          "卡状态",
+          "工序进度",
+          "完成工序数",
+          "照片",
+          "创建人",
+          "更新时间"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "drawerExpanded": {
+        "title": "工序流程追踪卡 · YINJIA-MES",
+        "workspaceTab": [
+          "我的桌面",
+          "工序流程追踪卡"
+        ],
+        "menuGroup": [
+          "我的桌面",
+          "研发管理",
+          "智能供应链",
+          "WMS管理"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "生产工单",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工序报工",
+          "工序流程追踪卡",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "录入",
+          "卡片列表",
+          "批次追溯"
+        ],
+        "barLabels": [
+          "批次号"
+        ],
+        "barButtons": [
+          "查询",
+          "刷新"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "各工序完成量"
+        ],
+        "statLabels": [
+          "卡数",
+          "产品数",
+          "计划数量"
+        ],
+        "paneTableHeaders": [
+          "工序",
+          "计划量",
+          "已报工",
+          "卡片数",
+          "卡号",
+          "小批次号",
+          "大批次号",
+          "工单号",
+          "行号",
+          "产品编码",
+          "产品名称",
+          "规格型号",
+          "计划数量",
+          "生产线",
+          "卡状态",
+          "工序进度",
+          "完成工序数",
+          "照片",
+          "创建人",
+          "更新时间"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      }
+    },
+    "en": {
+      "initial": {
+        "title": "YINJIA-MES · Manufacturing Execution System",
+        "workspaceTab": [
+          "My Dashboard",
+          "Process Flow Tracking Card"
+        ],
+        "menuGroup": [
+          "My Dashboard",
+          "R&D Management",
+          "Smart SCM",
+          "WMS"
+        ],
+        "menuLeaf": [
+          "Order Convert",
+          "Production Work Order",
+          "Quick Scheduling",
+          "Schedule Work Order",
+          "Production Picking",
+          "Stage Reporting",
+          "Process Flow Tracking Card",
+          "Line load"
+        ],
+        "tabs": [
+          "Entry",
+          "Card list",
+          "Batch trace"
+        ],
+        "barLabels": [
+          "Batch"
+        ],
+        "barButtons": [
+          "Search",
+          "Refresh"
+        ],
+        "placeholders": [
+          "Batch No. keyword",
+          "Filter by work order / product"
+        ],
+        "emptyTexts": [
+          "Select a work order line on the left first"
+        ],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "Work Order No.",
+          "Line No.",
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Planned Quantity",
+          "Current Process",
+          "Card No.",
+          "Card status",
+          "Photos"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "card": {
+        "title": "YINJIA-MES · Manufacturing Execution System",
+        "workspaceTab": [
+          "My Dashboard",
+          "Process Flow Tracking Card"
+        ],
+        "menuGroup": [
+          "My Dashboard",
+          "R&D Management",
+          "Smart SCM",
+          "WMS"
+        ],
+        "menuLeaf": [
+          "Order Convert",
+          "Production Work Order",
+          "Quick Scheduling",
+          "Schedule Work Order",
+          "Production Picking",
+          "Stage Reporting",
+          "Process Flow Tracking Card",
+          "Line load"
+        ],
+        "tabs": [
+          "Entry",
+          "Card list",
+          "Batch trace"
+        ],
+        "barLabels": [
+          "Batch"
+        ],
+        "barButtons": [
+          "Search",
+          "Refresh"
+        ],
+        "placeholders": [
+          "Batch No. keyword",
+          "Filter by work order / product"
+        ],
+        "emptyTexts": [],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "Work Order No.",
+          "Line No.",
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Planned Quantity",
+          "Current Process",
+          "Card No.",
+          "Card status",
+          "Photos"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "list": {
+        "title": "YINJIA-MES · Manufacturing Execution System",
+        "workspaceTab": [
+          "My Dashboard",
+          "Process Flow Tracking Card"
+        ],
+        "menuGroup": [
+          "My Dashboard",
+          "R&D Management",
+          "Smart SCM",
+          "WMS"
+        ],
+        "menuLeaf": [
+          "Order Convert",
+          "Production Work Order",
+          "Quick Scheduling",
+          "Schedule Work Order",
+          "Production Picking",
+          "Stage Reporting",
+          "Process Flow Tracking Card",
+          "Line load"
+        ],
+        "tabs": [
+          "Entry",
+          "Card list",
+          "Batch trace"
+        ],
+        "barLabels": [],
+        "barButtons": [
+          "Search",
+          "Refresh"
+        ],
+        "placeholders": [
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Work Order No.",
+          "Batch No.",
+          "Date from",
+          "Date to"
+        ],
+        "emptyTexts": [],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "Card No.",
+          "Sub-batch No.",
+          "Batch No.",
+          "Work Order No.",
+          "Line No.",
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Planned Quantity",
+          "Production line",
+          "Card status",
+          "Process Progress",
+          "Ops done",
+          "Photos",
+          "Created by",
+          "Updated at"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "trace": {
+        "title": "YINJIA-MES · Manufacturing Execution System",
+        "workspaceTab": [
+          "My Dashboard",
+          "Process Flow Tracking Card"
+        ],
+        "menuGroup": [
+          "My Dashboard",
+          "R&D Management",
+          "Smart SCM",
+          "WMS"
+        ],
+        "menuLeaf": [
+          "Order Convert",
+          "Production Work Order",
+          "Quick Scheduling",
+          "Schedule Work Order",
+          "Production Picking",
+          "Stage Reporting",
+          "Process Flow Tracking Card",
+          "Line load"
+        ],
+        "tabs": [
+          "Entry",
+          "Card list",
+          "Batch trace"
+        ],
+        "barLabels": [
+          "Batch No."
+        ],
+        "barButtons": [
+          "Search",
+          "Refresh"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "Completed quantity by operation"
+        ],
+        "statLabels": [
+          "Cards",
+          "Products",
+          "Planned Quantity"
+        ],
+        "paneTableHeaders": [
+          "Process",
+          "Planned qty",
+          "Reported",
+          "Card count",
+          "Card No.",
+          "Sub-batch No.",
+          "Batch No.",
+          "Work Order No.",
+          "Line No.",
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Planned Quantity",
+          "Production line",
+          "Card status",
+          "Process Progress",
+          "Ops done",
+          "Photos",
+          "Created by",
+          "Updated at"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "drawer": {
+        "title": "YINJIA-MES · Manufacturing Execution System",
+        "workspaceTab": [
+          "My Dashboard",
+          "Process Flow Tracking Card"
+        ],
+        "menuGroup": [
+          "My Dashboard",
+          "R&D Management",
+          "Smart SCM",
+          "WMS"
+        ],
+        "menuLeaf": [
+          "Order Convert",
+          "Production Work Order",
+          "Quick Scheduling",
+          "Schedule Work Order",
+          "Production Picking",
+          "Stage Reporting",
+          "Process Flow Tracking Card",
+          "Line load"
+        ],
+        "tabs": [
+          "Entry",
+          "Card list",
+          "Batch trace"
+        ],
+        "barLabels": [
+          "Batch No."
+        ],
+        "barButtons": [
+          "Search",
+          "Refresh"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "Completed quantity by operation"
+        ],
+        "statLabels": [
+          "Cards",
+          "Products",
+          "Planned Quantity"
+        ],
+        "paneTableHeaders": [
+          "Process",
+          "Planned qty",
+          "Reported",
+          "Card count",
+          "Card No.",
+          "Sub-batch No.",
+          "Batch No.",
+          "Work Order No.",
+          "Line No.",
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Planned Quantity",
+          "Production line",
+          "Card status",
+          "Process Progress",
+          "Ops done",
+          "Photos",
+          "Created by",
+          "Updated at"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "drawerExpanded": {
+        "title": "YINJIA-MES · Manufacturing Execution System",
+        "workspaceTab": [
+          "My Dashboard",
+          "Process Flow Tracking Card"
+        ],
+        "menuGroup": [
+          "My Dashboard",
+          "R&D Management",
+          "Smart SCM",
+          "WMS"
+        ],
+        "menuLeaf": [
+          "Order Convert",
+          "Production Work Order",
+          "Quick Scheduling",
+          "Schedule Work Order",
+          "Production Picking",
+          "Stage Reporting",
+          "Process Flow Tracking Card",
+          "Line load"
+        ],
+        "tabs": [
+          "Entry",
+          "Card list",
+          "Batch trace"
+        ],
+        "barLabels": [
+          "Batch No."
+        ],
+        "barButtons": [
+          "Search",
+          "Refresh"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "Completed quantity by operation"
+        ],
+        "statLabels": [
+          "Cards",
+          "Products",
+          "Planned Quantity"
+        ],
+        "paneTableHeaders": [
+          "Process",
+          "Planned qty",
+          "Reported",
+          "Card count",
+          "Card No.",
+          "Sub-batch No.",
+          "Batch No.",
+          "Work Order No.",
+          "Line No.",
+          "Product code",
+          "Product Name",
+          "Specification",
+          "Planned Quantity",
+          "Production line",
+          "Card status",
+          "Process Progress",
+          "Ops done",
+          "Photos",
+          "Created by",
+          "Updated at"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      }
+    },
+    "ja": {
+      "initial": {
+        "title": "YINJIA-MES · 生産製造実行システム",
+        "workspaceTab": [
+          "マイデスク",
+          "工程フロー追跡カード"
+        ],
+        "menuGroup": [
+          "マイデスク",
+          "研究開発管理",
+          "スマートサプライチェーン",
+          "WMS管理システム"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "製造オーダ",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工程報告",
+          "工程フロー追跡カード",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "入力",
+          "カード一覧",
+          "ロット追跡"
+        ],
+        "barLabels": [
+          "大ロット"
+        ],
+        "barButtons": [
+          "照会",
+          "更新"
+        ],
+        "placeholders": [
+          "ロット番号キーワード",
+          "製造指図番号/製品で絞り込み"
+        ],
+        "emptyTexts": [
+          "先に左側で製造指図行を選択してください"
+        ],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "作業票番号",
+          "行番号",
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "計画数量",
+          "現在工程",
+          "カード番号",
+          "カード状態",
+          "写真"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "card": {
+        "title": "YINJIA-MES · 生産製造実行システム",
+        "workspaceTab": [
+          "マイデスク",
+          "工程フロー追跡カード"
+        ],
+        "menuGroup": [
+          "マイデスク",
+          "研究開発管理",
+          "スマートサプライチェーン",
+          "WMS管理システム"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "製造オーダ",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工程報告",
+          "工程フロー追跡カード",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "入力",
+          "カード一覧",
+          "ロット追跡"
+        ],
+        "barLabels": [
+          "大ロット"
+        ],
+        "barButtons": [
+          "照会",
+          "更新"
+        ],
+        "placeholders": [
+          "ロット番号キーワード",
+          "製造指図番号/製品で絞り込み"
+        ],
+        "emptyTexts": [],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "作業票番号",
+          "行番号",
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "計画数量",
+          "現在工程",
+          "カード番号",
+          "カード状態",
+          "写真"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "list": {
+        "title": "YINJIA-MES · 生産製造実行システム",
+        "workspaceTab": [
+          "マイデスク",
+          "工程フロー追跡カード"
+        ],
+        "menuGroup": [
+          "マイデスク",
+          "研究開発管理",
+          "スマートサプライチェーン",
+          "WMS管理システム"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "製造オーダ",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工程報告",
+          "工程フロー追跡カード",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "入力",
+          "カード一覧",
+          "ロット追跡"
+        ],
+        "barLabels": [],
+        "barButtons": [
+          "照会",
+          "更新"
+        ],
+        "placeholders": [
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "作業票番号",
+          "バッチ番号",
+          "開始日",
+          "終了日"
+        ],
+        "emptyTexts": [],
+        "sectionTitles": [],
+        "statLabels": [],
+        "paneTableHeaders": [
+          "カード番号",
+          "サブバッチ番号",
+          "大ロット番号",
+          "作業票番号",
+          "行番号",
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "計画数量",
+          "生産ライン",
+          "カード状態",
+          "工程進捗",
+          "完了工程数",
+          "写真",
+          "作成者",
+          "更新日時"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "trace": {
+        "title": "YINJIA-MES · 生産製造実行システム",
+        "workspaceTab": [
+          "マイデスク",
+          "工程フロー追跡カード"
+        ],
+        "menuGroup": [
+          "マイデスク",
+          "研究開発管理",
+          "スマートサプライチェーン",
+          "WMS管理システム"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "製造オーダ",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工程報告",
+          "工程フロー追跡カード",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "入力",
+          "カード一覧",
+          "ロット追跡"
+        ],
+        "barLabels": [
+          "バッチ番号"
+        ],
+        "barButtons": [
+          "照会",
+          "更新"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "各工程の完了数量"
+        ],
+        "statLabels": [
+          "カード数",
+          "製品数",
+          "計画数量"
+        ],
+        "paneTableHeaders": [
+          "工程",
+          "計画数量",
+          "実績済み",
+          "カード数",
+          "カード番号",
+          "サブバッチ番号",
+          "大ロット番号",
+          "作業票番号",
+          "行番号",
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "計画数量",
+          "生産ライン",
+          "カード状態",
+          "工程進捗",
+          "完了工程数",
+          "写真",
+          "作成者",
+          "更新日時"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "drawer": {
+        "title": "YINJIA-MES · 生産製造実行システム",
+        "workspaceTab": [
+          "マイデスク",
+          "工程フロー追跡カード"
+        ],
+        "menuGroup": [
+          "マイデスク",
+          "研究開発管理",
+          "スマートサプライチェーン",
+          "WMS管理システム"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "製造オーダ",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工程報告",
+          "工程フロー追跡カード",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "入力",
+          "カード一覧",
+          "ロット追跡"
+        ],
+        "barLabels": [
+          "バッチ番号"
+        ],
+        "barButtons": [
+          "照会",
+          "更新"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "各工程の完了数量"
+        ],
+        "statLabels": [
+          "カード数",
+          "製品数",
+          "計画数量"
+        ],
+        "paneTableHeaders": [
+          "工程",
+          "計画数量",
+          "実績済み",
+          "カード数",
+          "カード番号",
+          "サブバッチ番号",
+          "大ロット番号",
+          "作業票番号",
+          "行番号",
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "計画数量",
+          "生産ライン",
+          "カード状態",
+          "工程進捗",
+          "完了工程数",
+          "写真",
+          "作成者",
+          "更新日時"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      },
+      "drawerExpanded": {
+        "title": "YINJIA-MES · 生産製造実行システム",
+        "workspaceTab": [
+          "マイデスク",
+          "工程フロー追跡カード"
+        ],
+        "menuGroup": [
+          "マイデスク",
+          "研究開発管理",
+          "スマートサプライチェーン",
+          "WMS管理システム"
+        ],
+        "menuLeaf": [
+          "订单结转",
+          "製造オーダ",
+          "快速排产",
+          "工单排产",
+          "生产领料",
+          "工程報告",
+          "工程フロー追跡カード",
+          "产线排产负荷"
+        ],
+        "tabs": [
+          "入力",
+          "カード一覧",
+          "ロット追跡"
+        ],
+        "barLabels": [
+          "バッチ番号"
+        ],
+        "barButtons": [
+          "照会",
+          "更新"
+        ],
+        "placeholders": [],
+        "emptyTexts": [],
+        "sectionTitles": [
+          "各工程の完了数量"
+        ],
+        "statLabels": [
+          "カード数",
+          "製品数",
+          "計画数量"
+        ],
+        "paneTableHeaders": [
+          "工程",
+          "計画数量",
+          "実績済み",
+          "カード数",
+          "カード番号",
+          "サブバッチ番号",
+          "大ロット番号",
+          "作業票番号",
+          "行番号",
+          "製品コード",
+          "製品名",
+          "規格型番",
+          "計画数量",
+          "生産ライン",
+          "カード状態",
+          "工程進捗",
+          "完了工程数",
+          "写真",
+          "作成者",
+          "更新日時"
+        ],
+        "cardLabels": [],
+        "cardButtons": [],
+        "opLabels": [],
+        "opNoteLabel": [],
+        "photosHint": []
+      }
+    }
+  },
+  "errors": [],
+  "verdict": {
+    "en": {
+      "residualChinese": [],
+      "pass": 245,
+      "fail": 0
+    },
+    "ja": {
+      "sameAsZh": [
+        {
+          "key": "initial.menuLeaf[0]",
+          "zh": "订单结转",
+          "ja": "订单结转"
+        },
+        {
+          "key": "initial.menuLeaf[2]",
+          "zh": "快速排产",
+          "ja": "快速排产"
+        },
+        {
+          "key": "initial.menuLeaf[3]",
+          "zh": "工单排产",
+          "ja": "工单排产"
+        },
+        {
+          "key": "initial.menuLeaf[4]",
+          "zh": "生产领料",
+          "ja": "生产领料"
+        },
+        {
+          "key": "initial.menuLeaf[7]",
+          "zh": "产线排产负荷",
+          "ja": "产线排产负荷"
+        },
+        {
+          "key": "card.menuLeaf[0]",
+          "zh": "订单结转",
+          "ja": "订单结转"
+        },
+        {
+          "key": "card.menuLeaf[2]",
+          "zh": "快速排产",
+          "ja": "快速排产"
+        },
+        {
+          "key": "card.menuLeaf[3]",
+          "zh": "工单排产",
+          "ja": "工单排产"
+        },
+        {
+          "key": "card.menuLeaf[4]",
+          "zh": "生产领料",
+          "ja": "生产领料"
+        },
+        {
+          "key": "card.menuLeaf[7]",
+          "zh": "产线排产负荷",
+          "ja": "产线排产负荷"
+        },
+        {
+          "key": "list.menuLeaf[0]",
+          "zh": "订单结转",
+          "ja": "订单结转"
+        },
+        {
+          "key": "list.menuLeaf[2]",
+          "zh": "快速排产",
+          "ja": "快速排产"
+        },
+        {
+          "key": "list.menuLeaf[3]",
+          "zh": "工单排产",
+          "ja": "工单排产"
+        },
+        {
+          "key": "list.menuLeaf[4]",
+          "zh": "生产领料",
+          "ja": "生产领料"
+        },
+        {
+          "key": "list.menuLeaf[7]",
+          "zh": "产线排产负荷",
+          "ja": "产线排产负荷"
+        },
+        {
+          "key": "trace.menuLeaf[0]",
+          "zh": "订单结转",
+          "ja": "订单结转"
+        },
+        {
+          "key": "trace.menuLeaf[2]",
+          "zh": "快速排产",
+          "ja": "快速排产"
+        },
+        {
+          "key": "trace.menuLeaf[3]",
+          "zh": "工单排产",
+          "ja": "工单排产"
+        },
+        {
+          "key": "trace.menuLeaf[4]",
+          "zh": "生产领料",
+          "ja": "生产领料"
+        },
+        {
+          "key": "trace.menuLeaf[7]",
+          "zh": "产线排产负荷",
+          "ja": "产线排产负荷"
+        },
+        {
+          "key": "drawer.menuLeaf[0]",
+          "zh": "订单结转",
+          "ja": "订单结转"
+        },
+        {
+          "key": "drawer.menuLeaf[2]",
+          "zh": "快速排产",
+          "ja": "快速排产"
+        },
+        {
+          "key": "drawer.menuLeaf[3]",
+          "zh": "工单排产",
+          "ja": "工单排产"
+        },
+        {
+          "key": "drawer.menuLeaf[4]",
+          "zh": "生产领料",
+          "ja": "生产领料"
+        },
+        {
+          "key": "drawer.menuLeaf[7]",
+          "zh": "产线排产负荷",
+          "ja": "产线排产负荷"
+        },
+        {
+          "key": "drawerExpanded.menuLeaf[0]",
+          "zh": "订单结转",
+          "ja": "订单结转"
+        },
+        {
+          "key": "drawerExpanded.menuLeaf[2]",
+          "zh": "快速排产",
+          "ja": "快速排产"
+        },
+        {
+          "key": "drawerExpanded.menuLeaf[3]",
+          "zh": "工单排产",
+          "ja": "工单排产"
+        },
+        {
+          "key": "drawerExpanded.menuLeaf[4]",
+          "zh": "生产领料",
+          "ja": "生产领料"
+        },
+        {
+          "key": "drawerExpanded.menuLeaf[7]",
+          "zh": "产线排产负荷",
+          "ja": "产线排产负荷"
+        }
+      ],
+      "pass": 215,
+      "fail": 30
+    }
+  }
+}

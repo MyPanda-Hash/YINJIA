@@ -109,8 +109,14 @@ public class AttachmentService {
      *  字段键必须是该面板在 yj_field 注册过的列名(防动态列名注入),未注册则只存附件不同步。 */
     private void syncHeadField(String panelCode, String docNo, String fieldKey, String username) {
         String joined = joinedNames(panelCode, docNo, fieldKey);
-        Map<String, Object> panel = jdbc.queryForMap(
+        // 2026-10-29:页面级虚拟面板(如工序流程追踪卡 PROC_FLOW_CARD)不在 yj_panel 里 ——
+        //   它们没有"单据头表/单号列",附件只做登记(元数据 + 磁盘文件),没有头字段可同步。
+        //   此前这里用 queryForMap 空结果会抛 EmptyResultDataAccessException ⇒ 上传直接 500;
+        //   改为"查不到面板 = 只存附件不同步",既有面板行为一字不动。
+        List<Map<String, Object>> panels = jdbc.queryForList(
                 "SELECT head_table, group_col FROM yj_panel WHERE panel_code=?", panelCode);
+        if (panels.isEmpty()) return;
+        Map<String, Object> panel = panels.get(0);
         String headTable = str(panel.get("head_table"));
         String groupCol = str(panel.get("group_col"));
         if (headTable.isBlank() || groupCol.isBlank()) return;

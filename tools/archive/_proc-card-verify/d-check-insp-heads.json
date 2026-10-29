@@ -1,0 +1,80 @@
+{
+  "tables": {
+    "qc_first_insp_head": {
+      "method": "firstInspHead",
+      "keys": [
+        "单据日期",
+        "检验日期",
+        "工单号",
+        "工单行号",
+        "报工单号",
+        "工序",
+        "批次号",
+        "生产日期",
+        "产品编码",
+        "产品名称",
+        "规格型号",
+        "客户代码",
+        "客户名称",
+        "生产线",
+        "生产车间",
+        "报工数量",
+        "工艺清单单号",
+        "detail"
+      ],
+      "missing": [],
+      "headerCols": 38,
+      "detailNg": "不合格数量",
+      "detailNgOk": true
+    },
+    "qc_proc_insp_head": {
+      "method": "procInspHead",
+      "keys": [
+        "单据日期",
+        "检验日期",
+        "工单号",
+        "工单行号",
+        "工序",
+        "报工单号",
+        "报工数量",
+        "产品编码",
+        "产品名称",
+        "规格型号",
+        "批次号",
+        "生产线",
+        "生产车间",
+        "检验类别",
+        "detail"
+      ],
+      "missing": [],
+      "headerCols": 36,
+      "detailNg": "不良数量",
+      "detailNgOk": true
+    },
+    "qc_asm_insp_head": {
+      "method": "asmInspHead",
+      "keys": [
+        "单据日期",
+        "工单号",
+        "工单行号",
+        "报工单号",
+        "工序",
+        "批次号",
+        "产品编码",
+        "产品名称",
+        "规格型号",
+        "生产线",
+        "生产车间",
+        "报工数量",
+        "检验日期",
+        "detail"
+      ],
+      "missing": [],
+      "headerCols": 35,
+      "detailNg": "不合格数量",
+      "detailNgOk": true
+    }
+  },
+  "pass": true,
+  "droppedReferenced": []
+}

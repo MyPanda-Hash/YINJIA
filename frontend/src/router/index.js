@@ -118,6 +118,10 @@ const routes = [
       // 工序报工(2026-10-21):与生产领料同一形态 —— 页面级虚拟面板 + 标准面板地址 `/panelx/list/<码>`,
       //   必须排在上面的参数路由之前;手机单列、电脑 ≥900px 双栏(同一份组件)。
       { path: 'panelx/list/PROD_REPORT', component: () => import('@/views/mobile/MobileReport.vue'), meta: { title: '工序报工', code: 'prodReport', panelCode: 'PROD_REPORT' } },
+      // 工序流程追踪卡(2026-10-29,生产计划):日期大批次 → 小批次(工单行)→ 工序照片 → 按卡追溯。
+      //   页面级虚拟面板 PROC_FLOW_CARD(定义见后端 PagePanelRegistry,不是 yj_panel 单据表);
+      //   菜单项同名挂 panelCode,meta.panelCode 供路由守卫拦「直接敲 URL」。
+      { path: 'prod/plan/procFlowCard', component: () => import('@/views/modules/plan/ProcFlowCard.vue'), meta: { title: '工序流程追踪卡', code: 'procFlowCard', panelCode: 'PROC_FLOW_CARD' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()

@@ -288,8 +288,10 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
   //   (migrate-drop-manu-order-report-panels-20261017.sql),故从本断言里移除。
   // 2026-10-22 补:2026-10-20/21 新增的两张页面级面板(生产领料 PROD_PICK / 工序报工 PROD_REPORT)
   //   当时只改了 menus.js,没同步本断言 ⇒ 这里长期红着;按现有菜单顺序补回来。
+  // 2026-10-29 补:工序流程追踪卡(PROC_FLOW_CARD,页面级虚拟面板,紧跟工序报工)
   assert.deepEqual((group().children || []).map((c) => c.panelCode).filter(Boolean),
-    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROD_PICK', 'PROD_REPORT', 'LINE_LOAD'])
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROD_PICK', 'PROD_REPORT',
+      'PROC_FLOW_CARD', 'LINE_LOAD'])
   // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
   const all = JSON.stringify(plan)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {

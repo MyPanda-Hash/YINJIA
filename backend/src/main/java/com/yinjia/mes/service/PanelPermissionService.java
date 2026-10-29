@@ -178,6 +178,13 @@ public class PanelPermissionService {
         // 预排线(工序路线逐道选线)是「排产」的提交动作,同一 assign 词,两个入口都要登记 ——
         // 只登记 SCHEDULE_BOARD 会让"仅授了生产工单·排产"的角色在内嵌弹窗里被 403(requireButtonAny 逐面板找词)。
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|预排线", new String[]{"assign"});
+        // 工序流程追踪卡(2026-10-29):建卡/上传/删除照片 = entry;确认完成 = confirm。
+        // 按钮名取页面实际文案(见 views/modules/plan/ProcFlowCard.vue),端点按 requireButtonAny 取词。
+        m.put(PagePanelRegistry.PROC_FLOW_CARD + "|创建流程卡", new String[]{"entry"});
+        m.put(PagePanelRegistry.PROC_FLOW_CARD + "|上传照片", new String[]{"entry"});
+        m.put(PagePanelRegistry.PROC_FLOW_CARD + "|删除照片", new String[]{"entry"});
+        m.put(PagePanelRegistry.PROC_FLOW_CARD + "|确认完成", new String[]{"confirm"});
+        m.put(PagePanelRegistry.PROC_FLOW_CARD + "|保存", new String[]{"entry"});
         // ERP 集成配置清单(2026-10-18 用户口径「除管理员只可看不可编辑」):写配置**不挂权限词**,
         // 由 ErpIntegController 直接 requireAdmin();同时登记进 ADMIN_ONLY_PANELS 做纵深防御
         // (将来若给该页加按钮,非管理员的写动作仍会被 requireButton 的 admin 闸门拦住)。

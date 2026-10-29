@@ -4323,3 +4323,11 @@ migrate-form-approval-self-audit-20261028.sql
 #   yj_panel/yj_field/yj_role_panel/译名 + 关联数据 + 视图 v_manu_schedule + 两张 0 行物理表。
 #   闸门:0 行 + 无其它对象引用 + 收尾自检,不过则 ROLLBACK。
 migrate-drop-manu-order-20261028.sql
+
+
+# 2026-10-29 工序流程追踪卡(生产计划 → PROC_FLOW_CARD 页面级虚拟面板):
+#   建 wo_proc_card_head / wo_proc_card_detail(照片复用 yj_attachment,不新建照片表),
+#   两表 + 逐列中文注明 + 唯一键/查询索引 + 角色授权(view,query,entry,confirm)+ 面板/动作词译名。
+#   幂等、两账套都执行;回滚脚本 tools/archive/_proc-card-rollback-20261029.sql 有意链外。
+migrate-wo-proc-card-20261029.sql
+

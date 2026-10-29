@@ -1,0 +1,32 @@
+fix: 工单追溯/成型报工审核指向已下架表 qc_mold_insp_head —— 恢复首件/制程检验单映射
+
+现象(2026-10-29 实测复现):
+  POST /api/px/scheduleBoard/trace 对任何工单都 500「对象名 'dbo.qc_mold_insp_head' 无效」
+  ⇒ 生产工单 / 工单排产页的「工单详情·追溯」全挂;
+  QcInspAutoService 成型报工审核钩子同样指向该表 ⇒ 成型报工审核整笔回滚(现场表现为报工提交不了)。
+
+根因:
+  qc_mold_insp_head 早在 2026-10-16 随「成型检验单 QC_MOLD_INSP」整体下架
+  (migrate-drop-qc-mold-cut-finspec-20261016.sql),而 2026-10-21 的提交 12866177
+  以「首件/制程两张单已下架」为前提把四处代码改指向它;该前提已不成立。
+  实测现库(yj_panel + sys.tables 双证):qc_first_insp_head 425 行 / qc_proc_insp_head 434 行 /
+  qc_asm_insp_head 435 行 都在用,QC_FIRST_INSP / QC_PROC_INSP / QC_ASM_INSP 三面板在册;
+  qc_mold_insp_head / qc_cut_insp_head 不存在。
+
+改法(只改映射,不动其它逻辑):
+  · ScheduleBoardService.INSP_HEAD → 首件 + 制程 + 组装成品三张现役单;
+  · QcInspAutoService.OP_PANELS / HEAD_TABLE / head() → 成型恢复首件 + 制程两张,
+    删除已无用的 moldInspHead();
+  · ButtonService.WO_INSP_HEAD 与弃审级联面板清单 → 同步三张现役单;
+  · FirstInspBackfill.HEAD → 回到 qc_first_insp_head(OBJECT_ID / COL_LENGTH 守卫保留)。
+  明细「不合格」列不同名:首件/组装成品 = 不合格数量,制程 = 不良数量(已按表登记)。
+
+验证:
+  · mvn -DskipTests package 通过;8090 重打包后 jar 内已无 qc_mold_insp_head 引用;
+  · /api/px/scheduleBoard/trace 200,质检段 3 行(首件/制程/组装成品,均已审核)、质检汇总正常;
+  · 生产工单页「工单详情·追溯」弹窗质检段 3 行、无「对象名无效」;
+  · 静态核对:firstInspHead/procInspHead/asmInspHead 组装的键 vs 三张头表实际列,缺列 0;
+  · 回归:生产工单/工序报工/工单排产三页正常,pagePerms 正常。
+
+遗留(待补):成型报工审核的**活体**验证未在生产库做(避免造业务数据),建议在测试账套造一条成型报工再审核。
+证据:tools/archive/_proc-card-verify/{trace-fix-result.json,d-check-insp-heads.json,shots/regression-workorder-trace.png}

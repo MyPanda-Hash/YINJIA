@@ -1,0 +1,36 @@
+feat: 工序流程追踪卡(生产计划 → PROC_FLOW_CARD 页面级虚拟面板)
+
+需求(2026-10-29 用户口述《新建 DOCX 文档 (2).docx》「生产相关」+「在生产计划模块内」):
+  批次号当前是日期形式,大批次下挂小批次;小批次有对应的工序图片(电脑选图/手机拍照导入);
+  要有录入界面(批次号,照片)、列表界面(按产品物料查)、查询界面(按批次查);
+  工序流程卡挂载到当前工序完成,追溯按卡;只管制程,来料仍走采购链。
+
+实现(方案基线 docs/design/工序流程追踪卡-V1.0.md,实现记录 docs/development/工序流程追踪卡-实现与验证.md):
+  · 数据:两表 wo_proc_card_head(卡头,23 列)/ wo_proc_card_detail(工序行,16 列),
+    逐列中文注明 + 卡号唯一 + 每工单行唯一 + 批次/卡id 查询索引;照片复用 yj_attachment
+    (panel_code='PROC_FLOW_CARD',doc_no=卡号,field_key='工序照片-<工序序>'),不新建照片表。
+  · 口径(实测后定):plang.lot_no 全库为 NULL 不能当批次;生产批次号 plang→plang_pc→scjl,
+    首次生产完工才生成(完工当天日期)⇒ 卡头先按工单日期推定(批次来源标注),读卡时自动同步;
+    卡号 LZK-<工单号>-<工单行号>(身份=工单行,同步不影响);完成量/状态/完成时间一律按已审核报工
+    scjl 现算(行锚 gd_id→plang_pc.plang_id,口径同 WorkReportController),不落冗余完成量。
+  · 后端:ProcCardService(795 行)+ ProcCardController,8 个接口
+    /api/procCard/{meta,batches,lines,create,detail,save,list,batchTrace,trace};
+    页面级虚拟面板 PROC_FLOW_CARD(PagePanelRegistry:view/query/entry/confirm),
+    按钮词映射入 PanelPermissionService,权限行落 yj_role_panel(两账套,13/7 角色)。
+  · 前端:views/modules/plan/ProcFlowCard.vue + procFlowCard*.{vue,js}(三页签:录入/卡片列表/批次追溯;
+    窄屏单列、≥900px 双栏;照片墙缩略图走 Bearer blob、上传支持 capture=environment 手机拍照);
+    菜单「生产计划 → 工序流程追踪卡」、路由 /prod/plan/procFlowCard、en/ja 译名。
+  · 数据规范:AttachmentService.syncHeadField 对虚拟面板(不在 yj_panel)容错,原先空结果会 500。
+  · 台账:db-migrations.txt / db-inuse-tables.txt / 数据库表清单(v3.68)同步;回滚脚本链外。
+
+验证(独立验证角色 + 证据 tools/archive/_proc-card-verify/):
+  · 迁移两账套各跑 2 次幂等、DbSync 登记;DbNormAudit 无本次新增 FAIL;
+  · mvn package / npm run build 通过,npm test 1111(1106 pass,5 fail 与基线一致);
+  · 接口冒烟 56/56(真实工单行 GD-2026-10-0223#1 → 卡号 LZK-GD-2026-10-0223-1);
+  · 权限:有 view 无 entry 15/15、零权限 14/14;
+  · 界面 33/33(桌面 1440×900 + 窄屏 390×844,建卡/上传/缩略图/删除/列表查询/批次追溯全通);
+  · 多语言 en 中文残留 0;ja 本页文案已本地化(其余菜单为既有缺口);
+  · 回归 10/10(生产工单/工序报工/工单排产 + pagePerms 含 PROC_FLOW_CARD)。
+
+已知边界:照片上传沿用全局 /api/attachment/upload(该接口无面板动作词闸门,平台级既有行为);
+菜单标题翻译需同时落前端静态语言包(仅写 yj_translation 不够,本次已验证并补 en/ja)。
