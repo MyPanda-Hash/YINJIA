@@ -14,7 +14,8 @@
          默认 [今天,今天] 保住"打开只看一天"的口径;后端 dateFrom/dateTo 不变);
        ②工具栏加**「列设置」**:勾选决定表格显示哪些列(如不想看「客户订单号」就取消勾选),
          复用系统级列设置实现 useReportColumns + /px/reportColumnSettings(panelCode=ORDER_CONVERT,刷新后仍生效);
-       ③「型号」列旁新增**「产品名称」**列(订单行 存货名称,与订单资料堆叠格同源)。 -->
+       ③「型号」列旁新增**「产品名称」**列(订单行 存货名称,与订单资料堆叠格同源);
+       ④「订单资料」右侧新增**「物料编码」**单列(订单行 存货编码;堆叠格小字保留,列可随列设置显隐)。 -->
 <template>
   <div class="oc-page">
     <!-- 汇总条(蓝底白字,同参考) -->
@@ -65,6 +66,9 @@
             <div class="oc-dim">{{ row.品名 }}</div>
           </template>
         </el-table-column>
+        <!-- 物料编码单列(2026-10-29 用户口径「当前表格列还应该增加有物料编码」):
+             订单行 存货编码;「订单资料」堆叠格里仍保留小字(紧凑识别用),本列可随「列设置」显隐/单独看 -->
+        <el-table-column v-if="colVisible('物料编码')" :label="tt('物料编码')" prop="物料编码" width="130" show-overflow-tooltip />
         <el-table-column v-if="colVisible('行号')" :label="tt('行号')" prop="行号" width="70" />
         <el-table-column v-if="colVisible('下单日期')" :label="tt('下单日期')" prop="下单日期" width="100" />
         <el-table-column :label="tt('交货日期')" width="150" fixed="left">
@@ -232,7 +236,7 @@ const dateChanged = computed(() => rows.value.filter((r) => r.交货日期 && r.
 // 弹窗里只放**可隐藏列**;以下列永远显示(它们是本页的操作与判断依据,隐藏后按钮点不了/看不出为何不能转单):
 //   选择框 / 订单资料 / 交货日期(可就地改) / 剩余数量 / 工艺路线(必选) / 本次转单数量(必填)。
 const COLUMNS = [
-  '行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量',
+  '物料编码', '行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量',
 ]
 const {
   columnVisible, columnDraft, visibleProps,

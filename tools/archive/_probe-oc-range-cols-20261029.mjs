@@ -49,7 +49,7 @@ const post = async (p, body) => (await (await fetch(BASE + '/api' + p, {
 })).json())
 
 /** 可隐藏列(与页面 COLUMNS 同口径;复位时全部 visible=true) */
-const COLS = ['行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量']
+const COLS = ['物料编码', '行号', '下单日期', '客户', '客户等级', '产品名称', '型号', '重点管控', '客户订单号', '需求数量', '已排产数量']
 const resetCols = () => post('/px/reportColumnSettings', {
   panelCode: 'ORDER_CONVERT',
   settings: { columns: COLS.map((p) => ({ prop: p, label: p, visible: true })), sort: { prop: '', order: '' } },
@@ -226,6 +226,17 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
     return JSON.stringify({ value: idx >= 0 ? (cells[idx] || '') : '', heads, cells: cells.slice(0, 12) });
   })()`))
   check(!!first.value, '③ 产品名称有值(订单行存货名称)', `"${first.value}"`)
+
+  // ④ 物料编码单列(2026-10-29 追加口径):表头有、首行有值、且不受「订单资料」堆叠格影响
+  const mat = JSON.parse(await ev(`(() => {
+    const heads = [...document.querySelectorAll('.el-table__header th')].map(th => th.innerText.trim());
+    const tr = document.querySelector('.el-table__body-wrapper tbody tr');
+    const cells = tr ? [...tr.querySelectorAll('td')].map(td => td.innerText.trim()) : [];
+    const idx = heads.indexOf('物料编码');
+    return JSON.stringify({ has: idx >= 0, at: idx, value: idx >= 0 ? (cells[idx] || '') : '', heads });
+  })()`))
+  check(mat.has, '④ 表头出现「物料编码」', mat.heads.slice(0, 6).join('|'))
+  check(!!mat.value, '④ 物料编码列有值(订单行存货编码)', `"${mat.value}"`)
 
   // ② 列设置:勾掉「客户订单号」→ 保存 → 表头消失
   check(!!s.colBtn, '② 工具栏有「列设置」按钮', s.colBtn)
