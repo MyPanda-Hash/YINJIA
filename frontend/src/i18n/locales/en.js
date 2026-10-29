@@ -1041,6 +1041,11 @@ export default {
     '撤回调拨失败': 'Undo transfer failed',
     '调回原产线,轨迹留痕': 'back to the original line; the log is kept',
     '调拨写入轨迹(工单追溯可见);「撤回调拨」可把产线调回原线': 'The transfer is logged (visible in WO trace); Undo Transfer moves it back to the original line',
+    // 调拨收口(2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」)
+    '只能调拨到本工序的产线': 'Only lines of the current process can be selected',
+    '判不出': 'Unknown',
+    '没有可调拨的目标产线': 'No target line available for the current process',
+    '调拨候选加载失败': 'Failed to load transfer targets',
     '从生产线': 'From Line',
     '从车间': 'From Workshop',
     '到生产线': 'To Line',

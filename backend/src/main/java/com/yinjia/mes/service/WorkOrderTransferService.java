@@ -29,6 +29,18 @@ import java.util.Map;
  *   <li>与「撤销排产」的区别:撤销排产把工单退回待排产池(要求无报工/无入库);<b>调拨允许在产工单</b>
  *       (会议要的就是在产转移),只要求未结案。</li>
  * </ol>
+ *
+ * <p><b>2026-10-29 收口(用户口径:「修改当前工单排产的调拨逻辑,需要实现当前的调拨只能调拨到
+ * 当前工序的产线中」)</b>:目标产线不再是"整条产线档案任选",必须配得上该工单行**当前工序** ——
+ * <ol>
+ *   <li>当前工序 = 看板「当前工序」列同一口径({@link ProcessTaskService#currentProcess}:
+ *       台账最后一道已落实 → 回落本行 plang.当前工序);</li>
+ *   <li>该工序能去哪些线 = {@link ProcessTaskService#lineScope}(与派工/预排线/转序**同一处**软判据:
+ *       成型/切炭/组装/装箱 认得的工序且该车间真有启用线才限定,判不出则不拦);</li>
+ *   <li>弹窗下拉由 {@link #targets} 一次算好(前端只展示,不自己拼),但**守卫在服务端**:
+ *       前端传什么都要逐行复核,不信任界面;</li>
+ *   <li>多行同时勾选时只给**交集**候选 —— 不同工序的工单没有共同合法目标,宁可明说"分行调拨"。</li>
+ * </ol>
  */
 @Service
 public class WorkOrderTransferService {
@@ -36,9 +48,12 @@ public class WorkOrderTransferService {
     private static final String LOG_PANEL = "生产工单";
 
     private final JdbcTemplate jdbc;
+    /** 当前工序 / 工序→产线软判据的唯一出处(调拨守卫与候选线都读它,不另写一套) */
+    private final ProcessTaskService processTask;
 
-    public WorkOrderTransferService(JdbcTemplate jdbc) {
+    public WorkOrderTransferService(JdbcTemplate jdbc, ProcessTaskService processTask) {
         this.jdbc = jdbc;
+        this.processTask = processTask;
     }
 
     /** 车间下拉(启用产线的车间去重;调拨弹窗用) */
@@ -87,6 +102,24 @@ public class WorkOrderTransferService {
                     if (from == null) throw new IllegalStateException("该工单未排产,无需调拨(请先在快速排产排入产线)");
                     if (from.equals(line)) throw new IllegalStateException("已在该产线(" + line + "),无需调拨");
                     long id = ((Number) h.get("id")).longValue();
+                    // 🔴 2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」:
+                    //   当前工序 = 看板「当前工序」列同一口径;该道能去的线 = 派工/预排线/转序同一处软判据。
+                    //   ⚠ 前端下拉只是便利(见 targets),**守卫必须在服务端** —— 手搓请求/旧页面同样要被拦住。
+                    String op = processTask.currentProcess(no, id);
+                    Map<String, Object> scope = processTask.lineScope(op, null);
+                    Object needShopObj = scope.get("限定车间");
+                    if (needShopObj != null) {
+                        String needShop = String.valueOf(needShopObj);
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> allowLines = (List<Map<String, Object>>) scope.get("产线");
+                        List<String> allowNames = allowLines.stream()
+                                .map(x -> String.valueOf(x.get("生产线"))).toList();
+                        if (!allowNames.contains(line))
+                            throw new IllegalStateException("当前工序「" + op + "」只能调拨到「" + needShop
+                                    + "」车间下的产线(" + (allowNames.isEmpty() ? "该车间暂无启用产线"
+                                    : String.join("、", allowNames))
+                                    + ");目标线「" + line + "」属于「" + (shop == null ? "未归类" : shop) + "」车间");
+                    }
                     double qty = Num.of(h.get("pl_sl"));
                     String fromShop = str(shopOf(from));
                     jdbc.update("UPDATE dbo.plang SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", line, user, id);
@@ -112,6 +145,92 @@ public class WorkOrderTransferService {
         out.put("单号清单", done);
         out.put("失败行", failed);
         out.put("目标", line + (shop == null ? "" : "·" + shop));
+        return out;
+    }
+
+    /**
+     * **调拨候选**(2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」):弹窗要显示的
+     * 「这些工单行的当前工序是什么、目标车间/产线能选哪些」—— 一次算好给前端,前端不再自己拼。
+     *
+     * <p>多行同时勾选时取**交集**(每个选中行都允许的线):不同工序的工单没有共同的合法目标,
+     * 宁可明说「请分行调拨」,也不给一个点了就被服务端驳回的选项。
+     *
+     * <p>⚠ 本方法的判定与 {@link #transfer} 的守卫**同一处来源**
+     * ({@link ProcessTaskService#currentProcess} + {@link ProcessTaskService#lineScope}):
+     * 弹窗看到的可选项 == 点确认后能通过的行,不会出现"选得到却调不动"。
+     *
+     * @param rows 勾选行(工单号/行id/工单行号/批次号,与 /transfer 同格式)
+     * @return {@code {逐行, 工序, 车间, 产线, 可调拨, 提示}}
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> targets(List<Map<String, Object>> rows) {
+        if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要调拨的工单");
+        List<Map<String, Object>> perRow = new ArrayList<>();
+        List<Map<String, Object>> allow = null;      // 交集;null = 尚未起手
+        List<String> ops = new ArrayList<>();
+        String commonFrom = null;                    // 所有选中行的共同当前产线(用来剔掉"调回原线")
+        boolean sameFrom = true;
+        for (Map<String, Object> r : rows) {
+            String no = str(r.get("工单号") != null ? r.get("工单号") : r.get("加工单号"));
+            if (no == null) continue;
+            for (Map<String, Object> h : targetRows(no, r)) {
+                long id = ((Number) h.get("id")).longValue();
+                String op = processTask.currentProcess(no, id);
+                Map<String, Object> scope = processTask.lineScope(op, null);
+                Object needShop = scope.get("限定车间");
+                List<Map<String, Object>> lines = (List<Map<String, Object>>) scope.get("产线");
+                allow = allow == null ? new ArrayList<>(lines) : intersect(allow, lines);
+                if (op != null && !ops.contains(op)) ops.add(op);
+                String from = str(h.get("scx"));
+                if (from == null) sameFrom = false;
+                else if (commonFrom == null) commonFrom = from;
+                else if (!commonFrom.equals(from)) sameFrom = false;
+                Map<String, Object> pr = new LinkedHashMap<>();
+                pr.put("工单号", no);
+                pr.put("行id", id);
+                pr.put("工单行号", h.get("pl_xc"));
+                pr.put("当前工序", op == null ? "" : op);
+                pr.put("应进车间", needShop == null ? "" : String.valueOf(needShop));
+                pr.put("当前产线", from == null ? "" : from);
+                pr.put("候选数", lines.size());
+                perRow.add(pr);
+            }
+        }
+        if (perRow.isEmpty()) throw new IllegalStateException("没找到可调拨的工单行(工单不存在或已作废)");
+        List<Map<String, Object>> lines = allow == null ? new ArrayList<>() : allow;
+        // 全部选中行都在同一条线上 ⇒ 候选里剔掉它(调回原线没有意义,transfer 也会拒)
+        if (sameFrom && commonFrom != null) {
+            String fromLine = commonFrom;
+            lines.removeIf(x -> fromLine.equals(str(x.get("生产线"))));
+        }
+        List<String> lineShops = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            String s = str(l.get("生产车间"));
+            if (s != null && !lineShops.contains(s)) lineShops.add(s);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("逐行", perRow);
+        out.put("工序", ops);
+        out.put("车间", lineShops);
+        out.put("产线", lines);
+        out.put("可调拨", !lines.isEmpty());
+        out.put("提示", !lines.isEmpty() ? ""
+                : ops.size() > 1
+                    ? "所选工单当前工序不同(" + String.join(" / ", ops) + "),没有共同的合法目标产线;请按工序分行调拨"
+                    : "当前工序「" + (ops.isEmpty() ? "判不出" : ops.get(0)) + "」没有可调拨的目标产线"
+                        + "(该工序归口车间没有启用线,或只剩当前产线)");
+        return out;
+    }
+
+    /** 两组产线取交集(按「生产线」名称;保留第一组的顺序与字段) */
+    private static List<Map<String, Object>> intersect(List<Map<String, Object>> a, List<Map<String, Object>> b) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> x : a) {
+            String name = str(x.get("生产线"));
+            for (Map<String, Object> y : b) {
+                if (name != null && name.equals(str(y.get("生产线")))) { out.add(x); break; }
+            }
+        }
         return out;
     }
 

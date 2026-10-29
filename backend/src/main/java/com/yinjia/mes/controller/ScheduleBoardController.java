@@ -161,14 +161,22 @@ public class ScheduleBoardController {
         return ApiResult.ok(rows);
     }
 
-    /** 批量调线:勾选已排工单 → 目标生产线(停用线拒绝) */
+    /**
+     * 批量调线(旧入口,2026-10-29 起**并入调拨口径**)。
+     *
+     * <p>原实现只改产线:不写轨迹、不做工序校验 —— 等于给「调拨只能调拨到当前工序的产线中」
+     * 留了一条绕过口。前端已无调用方(本页调拨走 /transfer),保留 URL 只为兼容老调用方;
+     * 实现直接转 {@link WorkOrderTransferService#transfer}(同一套工序守卫 + 轨迹 + 可撤回),
+     * 从此**只有一条改线路径**。
+     */
     @PostMapping("/reassign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> reassign(@RequestBody Map<String, Object> body) {
         perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "调拨");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
-        return ApiResult.ok(service.reassign(rows, str(body.get("目标生产线")), currentUser()));
+        return ApiResult.ok(transferService.transfer(rows, str(body.get("目标生产线")), null,
+                "批量调线", currentUser()));
     }
 
     // ══════════ 工单调拨(9.29 生产管理批次 ②,2026-10-05):产线/车间两级目标 + 轨迹 + 可撤回 ══════════
@@ -192,6 +200,23 @@ public class ScheduleBoardController {
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(transferService.transfer(rows, str(body.get("目标生产线")), str(body.get("目标车间")),
                 str(body.get("原因")), currentUser()));
+    }
+
+    /**
+     * **调拨候选**(2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」):弹窗的目标车间/产线下拉数据。
+     *
+     * <p>与 {@link WorkOrderTransferService#transfer} 的守卫**同一处口径**
+     * ({@code ProcessTaskService.currentProcess} + {@code lineScope}),前端只展示、不自己拼;
+     * 多行勾选时返回**交集**候选(不同工序没有共同合法目标 → 可调拨=false + 提示)。
+     */
+    @PostMapping("/transferTargets")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> transferTargets(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "调拨");
+        List<Map<String, Object>> rows = body == null ? List.of()
+                : (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(transferService.targets(rows));
     }
 
     /** 撤回调拨:按工单最后一条生效轨迹把产线调回原线(轨迹标撤销,留痕不删) */

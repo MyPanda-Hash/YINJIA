@@ -141,26 +141,34 @@
       </div>
     </div>
 
-    <!-- 调拨弹窗(9.29 批次②):车间 → 产线 两级目标;写 wo_transfer_log 轨迹,可撤回(调回原线、轨迹留痕) -->
-    <el-dialog v-model="raVisible" :title="tt('工单调拨')" width="430px" append-to-body>
+    <!-- 调拨弹窗(9.29 批次②;2026-10-29 收口「调拨只能调拨到当前工序的产线中」):
+         目标车间/产线下拉由 /transferTargets **按选中行的当前工序**算好(与 /transfer 的守卫同一处口径),
+         前端只展示、不自己拼;多行工序不同 ⇒ 没有交集 + 提示「分行调拨」 -->
+    <el-dialog v-model="raVisible" :title="tt('工单调拨')" width="470px" append-to-body>
+      <div class="wb-p">{{ tt('当前工序') }}：
+        <b>{{ raOps.length ? raOps.map((x) => tt(x)).join(' / ') : tt('判不出') }}</b>
+        <span v-if="raLimited" class="wb-shop">{{ tt('只能调拨到本工序的产线') }}</span>
+      </div>
       <div class="wb-p">{{ tt('目标车间') }}
-        <el-select v-model="raShop" filterable clearable style="width: 210px" @change="raLine = ''">
-          <el-option v-for="x in shops" :key="x.车间" :label="x.车间 + '（' + x.产线数 + '）'" :value="x.车间" />
+        <el-select v-model="raShop" filterable clearable style="width: 220px" :disabled="!raShops.length"
+                   @change="raLine = ''">
+          <el-option v-for="x in raShops" :key="x" :label="x" :value="x" />
         </el-select>
       </div>
       <div class="wb-p">{{ tt('目标生产线') }}
-        <el-select v-model="raLine" filterable style="width: 210px">
+        <el-select v-model="raLine" filterable style="width: 220px" :disabled="!raLines.length">
           <el-option v-for="x in raLines" :key="x.生产线"
                      :label="x.生产线 + (x.生产车间 ? '·' + x.生产车间 : '')" :value="x.生产线" />
         </el-select>
       </div>
       <div class="wb-p">{{ tt('调拨原因') }}
-        <el-input v-model="raReason" size="small" style="width: 210px" :placeholder="tt('选填')" />
+        <el-input v-model="raReason" size="small" style="width: 220px" :placeholder="tt('选填')" />
       </div>
+      <div v-if="raTip" class="wb-p wb-warn">{{ raTip }}</div>
       <div class="wb-p wb-dim">{{ tt('调拨写入轨迹(工单追溯可见);「撤回调拨」可把产线调回原线') }}</div>
       <template #footer>
         <el-button @click="raVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="doTransfer">{{ tt('确认调拨') }}</el-button>
+        <el-button type="primary" :disabled="!raCan || !raLine" @click="doTransfer">{{ tt('确认调拨') }}</el-button>
       </template>
     </el-dialog>
 
@@ -201,19 +209,18 @@ const raVisible = ref(false)
 const raLine = ref('')
 const raShop = ref('')
 const raReason = ref('')
-const shops = ref([])
-// 调拨目标=启用线(停用线不可再排/调入);选了车间则只看该车间的线(车间是产线的属性)
-const raLines = computed(() => lineSummary.value
-  .filter((l) => !l.停用 && (!raShop.value || l.生产车间 === raShop.value))
-  .map((l) => ({ 生产线: l.生产线, 生产车间: l.生产车间 })))
-
-/** 车间下拉(启用产线的车间去重 + 该车间产线数) */
-async function loadShops() {
-  try {
-    const res = await request.post('/px/scheduleBoard/workshops', {})
-    shops.value = res.data || []
-  } catch { /* 不阻断 */ }
-}
+/** 选中行的当前工序(去重;2026-10-29 调拨候选由服务端按它算) */
+const raOps = ref([])
+/** 服务端给的可选车间 / 候选产线(只含当前工序的线) */
+const raShops = ref([])
+const raLinesAll = ref([])
+/** 可调拨 = 服务端判定"有共同合法目标";提示原文(后端中文业务话术,与 err() 一样原样显示,不走 tt) */
+const raCan = ref(false)
+const raTip = ref('')
+/** 至少一行有固定归口车间 ⇒ 显示"只能调到本工序的产线"的提示 */
+const raLimited = ref(false)
+// 车间只是候选线的二级过滤(车间是产线的属性);候选线已由 /transferTargets 按当前工序算好
+const raLines = computed(() => raLinesAll.value.filter((l) => !raShop.value || l.生产车间 === raShop.value))
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
@@ -274,13 +281,31 @@ function loadAll() {
   return Promise.all([loadSummary(), loadScheduled(), loadStats()]).finally(() => { loading.value = false })
 }
 
-function openReassign() {
+/**
+ * 打开调拨弹窗(2026-10-29 收口):先问服务端「这些行的当前工序能去哪些线」——
+ * 与 /transfer 的守卫同一处口径(ProcessTaskService.currentProcess + lineScope),
+ * 前端不再用整条产线档案拼下拉(旧写法能把切炭单调到成型线)。
+ */
+async function openReassign() {
   if (!checkedSched.value.length) return
-  raLine.value = sel.line
-  raShop.value = lineSummary.value.find((l) => l.生产线 === sel.line)?.生产车间 || ''
-  raReason.value = ''
-  loadShops()
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 行id: r.行id, 工单行号: r.工单行号, 批次号: r.批次号 }))
+  raLine.value = ''; raShop.value = ''; raReason.value = ''
+  raOps.value = []; raShops.value = []; raLinesAll.value = []; raCan.value = false; raTip.value = ''; raLimited.value = false
   raVisible.value = true
+  try {
+    const res = await request.post('/px/scheduleBoard/transferTargets', { rows })
+    const d = res.data || {}
+    raOps.value = d['工序'] || []
+    raLinesAll.value = d['产线'] || []
+    raShops.value = d['车间'] || []
+    raLimited.value = (d['逐行'] || []).some((x) => x['应进车间'])
+    raCan.value = d['可调拨'] !== false && raLinesAll.value.length > 0
+    raTip.value = d['提示'] || ''
+    if (raShops.value.length === 1) raShop.value = raShops.value[0]
+  } catch (e) {
+    raCan.value = false
+    raTip.value = e?.response?.data?.message || '调拨候选加载失败'
+  }
 }
 
 // ── 取消结案(旧系统 ProSchedList 同名按钮):回退到已审核、不锁死;走 MANU_ORDER「取消结案」按钮(ManuCloseHandler) ──
@@ -360,8 +385,12 @@ async function printTask(mode) {
   loadScheduled()
 }
 
-/** 调拨(9.29 批次②):勾选已排工单 → 目标产线(可按车间收敛)+ 原因 → 写 `wo_transfer_log` 轨迹 */
+/**
+ * 调拨(9.29 批次②;2026-10-29 收口):勾选已排工单 → 目标产线(**只能是当前工序的线**)+ 原因 →
+ * 写 `wo_transfer_log` 轨迹。下拉来自 /transferTargets;服务端还会逐行复核(不信任前端)。
+ */
 async function doTransfer() {
+  if (!raCan.value) { ElMessage.warning(tt('没有可调拨的目标产线')); return }
   if (!raLine.value) { ElMessage.warning(tt('请选择目标生产线')); return }
   // 行级(2026-10-15):必须带 行id —— 同工单多行同批次号时,(工单号+批次号) 无法唯一定位;
   //   后端 WorkOrderTransferService 优先按 行id 精确到行(缺 行id 才退回整单/批次)
@@ -449,6 +478,8 @@ onMounted(() => {
 .wb-shop-group { padding: 6px 10px 2px; font-size: 12px; font-weight: 600; color: #116a5b; background: #f5f7fa; display: flex; justify-content: space-between; }
 .wb-shop-cnt { color: #909399; font-weight: 400; }
 .wb-shop { margin-left: 12px; font-size: 12px; color: #e6a23c; font-weight: 600; }
+/* 调拨弹窗的"不可调拨/无候选线"提示(2026-10-29):后端中文原样显示,前端只给颜色 */
+.wb-warn { color: #f56c6c; font-weight: 600; }
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .wb-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; flex-wrap: wrap; }

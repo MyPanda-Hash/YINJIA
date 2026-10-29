@@ -479,6 +479,55 @@ public class ProcessTaskService {
     }
 
     /**
+     * 该**工单行**的「当前工序」—— 与工单排产看板「当前工序」列 / 生产工单列表**同一口径**。
+     *
+     * <p>口径(2026-10-07 定、2026-10-15 收口到行级):预排台账 {@code wo_process_line} 里
+     * **最后一道「已落实」**(工序序倒序)优先;台账缺失回落**本行** {@code plang.[当前工序]}。
+     *
+     * <p>2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」:调拨守卫({@code WorkOrderTransferService})
+     * 与调拨候选线都读这一处 —— 若各写一套 SQL,会出现「看板显示切炭、调拨却按成型判」的两套口径
+     * (与 2026-10-05 的产线口径分叉同类事故)。
+     *
+     * @param plNo  工单号
+     * @param rowId 工单行id(= {@code plang.id};唯一键 = 工单号 + 工单行)
+     * @return 工序名;判不出(无台账且本行状态为空)返回 {@code null} = 不设限
+     */
+    public String currentProcess(String plNo, Long rowId) {
+        if (!notBlank(plNo) || rowId == null) return null;
+        List<String> ops = jdbc.queryForList(
+                "SELECT TOP 1 工序 FROM dbo.wo_process_line"
+                        + " WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + "   AND (工单行id=? OR 工单行id IS NULL) AND ISNULL(状态,N'')=N'已落实'"
+                        + " ORDER BY ISNULL(工序序,999) DESC, id DESC", String.class, plNo.trim(), rowId);
+        if (!ops.isEmpty() && notBlank(ops.get(0))) return ops.get(0).trim();
+        List<String> fallback = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL([当前工序],N'') FROM dbo.plang WHERE id=?", String.class, rowId);
+        return fallback.isEmpty() || !notBlank(fallback.get(0)) ? null : fallback.get(0).trim();
+    }
+
+    /**
+     * 某道工序**可去的产线**(调拨候选线的唯一出处):与 {@link #nextProcess} 同一套软判据 ——
+     * 认得的工序(成型/切炭/组装/装箱)且该车间真有启用线 ⇒ 只出该车间的线;
+     * 其余(新工序、该车间没建线、工序为空)⇒ 全部启用线(不猜也不拦,见 {@link #requiredShop})。
+     *
+     * @param op        工序名;{@code null}/空 = 不设限
+     * @param routeShop 路线登记的车间(自由文本,可空;只对"不认识的新工序"有意义)
+     * @return {@code {工序, 限定车间, 产线:[{生产线,生产车间,日产能}]}};限定车间 = null 表示不设限
+     */
+    public Map<String, Object> lineScope(String op, String routeShop) {
+        String needShop = requiredShop(op, routeShop);
+        List<Map<String, Object>> lines = needShop == null ? allEnabledLines() : jdbc.queryForList(
+                "SELECT 生产线, ISNULL(生产车间,N'') AS 生产车间, ISNULL(日产能,0) AS 日产能"
+                        + " FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
+                        + " AND ISNULL(生产车间,N'')=? ORDER BY ISNULL(排序,999), 生产线", needShop);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("工序", op == null ? "" : op.trim());
+        out.put("限定车间", needShop);
+        out.put("产线", lines);
+        return out;
+    }
+
+    /**
      * 工单详情(2026-10-05 **第三版**,用户口径修正):点开一张单**只看它走到哪一步**。
      *   · 表头 = 工单级(计划数量 = Σ 计划量 pl_sl;用户确认口径);
      *   · **工序步骤** = 按**报工**(scjl 已审核)统计标准五道工序(混料/成型/切炭/组装/装箱)的完工量,
