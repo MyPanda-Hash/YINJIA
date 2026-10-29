@@ -96,3 +96,24 @@ test('⑥ 空产品编号 / 无 BOM 明细时安静跳过(不造空单)', () => 
   assert.match(body, /isBlank|isEmpty/, '要判空')
   assert.match(body, /return/, '空值直接返回')
 })
+
+test('⑦ 只在归档时同步(用户 2026-10-29 选 A):保存路径不得调用同步', () => {
+  // 全类里 syncProdBomToMaterialList 只允许出现两处:定义 1 次 + markArchived 里调用 1 次。
+  // 一旦有人在 saveDoc / approve / audit 里再加一处,这里立刻红 ——
+  // 用户口径是「BOM 未定稿不进物料清单」,草稿态同步会把半成品 BOM 灌进去。
+  const hits = [...btn.matchAll(/syncProdBomToMaterialList\s*\(/g)]
+  assert.equal(hits.length, 2,
+    `syncProdBomToMaterialList 应只出现 2 次(定义 + markArchived 调用),实际 ${hits.length} 次 —— 有人在保存/审批路径里加了同步`)
+
+  // 并且那唯一一处调用必须在 markArchived 方法体内
+  const arch = methodBody(btn, 'private void markArchived(')
+  assert.match(arch, /syncProdBomToMaterialList\s*\(/, '调用点必须在 markArchived(唯一归档入口)')
+
+  // 反向确认:保存类方法里不能出现它
+  for (const fn of ['saveDoc', 'approve', 'audit']) {
+    try {
+      const b = methodBody(btn, fn + '(')
+      assert.ok(!/syncProdBomToMaterialList/.test(b), `${fn} 里不该有同步调用`)
+    } catch { /* 该重载/签名不存在就跳过 */ }
+  }
+})
