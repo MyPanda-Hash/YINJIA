@@ -101,6 +101,14 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
         // 同上:单张单据详情(纸质单打印/明细预览取「头+行」)。逐单归属核对在
         // PxController.getFormDescriptor → QueryService.supplierMayReadDoc(别人的单一律 403)。
         if (path.equals(com.yinjia.mes.service.QueryService.FORM_DESCRIPTOR_PATH)) return true;
+        // 材料码打印(2026-10-29 用户报障「供应商登录打印材料码时,直接就显示打印成功了,没有和采购订单一样有弹窗」):
+        // 供应商的「打印」组里有「打印材料码」,它必须先开弹窗填批次号、再登记落库 ——
+        // 这两步走的正是下面两条 /px/puLabel/*。不放行 ⇒ 弹窗取数/登记全 403,界面只剩一句"打印成功"。
+        // 归属核对在 PxController.requireMaterialLabelAccess(只认自己供应商的采购订单,别人的一律 403)。
+        if (path.equals("/api/px/puLabel/dialog")) return true;
+        if (path.equals("/api/px/puLabel/print")) return true;
+        // 批次号锁定查询(只读):供应商面板打开单据时问一次,决定「批次号」是否只读
+        if (path.equals("/api/px/puLabel/batchLock")) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")

@@ -223,11 +223,41 @@ public class PxController {
     // 方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md。**不建面板**(用户明确不要),
     // 故三个端点直接挂既有 /px 运行时,权限按「采购订单」面板的查看/修改权把关。
 
-    /** 打印弹窗取数:订单行(含可打印量)+ 预填批次号 + 本订单已有打印记录 */
+    /**
+     * 打印弹窗取数:订单行(含可打印量)+ 预填批次号 + 本订单已有打印记录。
+     *
+     * <p>2026-10-29:供应商会话也要能用(用户报障「供应商登录打印材料码时,直接就显示打印成功了,
+     * 没有和采购订单一样有弹窗」)。供应商没有 PU_ORDER 的面板权(它只有 SUPPLIER_PU_ORDER 的只读权),
+     * 故:内部账号照旧按 PU_ORDER 的面板权把关;供应商会话改按**逐单归属**把关
+     * ({@link com.yinjia.mes.service.QueryService#supplierMayReadDoc} —— 只能操作自己供应商的订单)。
+     */
     @GetMapping("/puLabel/dialog")
     public ApiResult<Map<String, Object>> puLabelDialog(@RequestParam String orderNo) {
-        perm.requirePanelView("PU_ORDER");
+        requireMaterialLabelAccess(orderNo);
         return ApiResult.ok(puLabel.dialog(orderNo));
+    }
+
+    /**
+     * 材料码打印的权限闸门(2026-10-29 抽出)。
+     *
+     * <p>内部账号:仍按「采购订单」面板的查看权(取数)/修改权(登记)。
+     * <p>供应商账号:它只有 `SUPPLIER_PU_ORDER` 的 view/query/print,没有 PU_ORDER 的修改权,
+     * 而这套「打自己的材料码」正是供应商门户的唯一作业(用户 2026-10-04 口径「供应商自己打码」),
+     * 故改为**逐单核对归属**:单据必须属于登录态供应商,别人的单一律 403。
+     * 写库范围由 {@code PuLabelService} 自己限定在那一张单,不会越界。
+     */
+    private void requireMaterialLabelAccess(String orderNo) {
+        String supplierCode = queryService.sessionSupplierCode();
+        if (supplierCode == null) {
+            // 内部账号:保持原口径(查看 + 修改,与 saveButton 一致)
+            perm.requirePanelView("PU_ORDER");
+            return;
+        }
+        // 供应商账号:只认自己的单(停用账号 supplierCode 为 "" ⇒ 直接拒)
+        if (supplierCode.isEmpty()
+                || !queryService.supplierMayReadDoc(com.yinjia.mes.service.QueryService.SUPPLIER_PANEL_CODE, orderNo)) {
+            throw new org.springframework.security.access.AccessDeniedException("该采购订单不属于当前供应商:" + orderNo);
+        }
     }
 
     /**
@@ -237,8 +267,9 @@ public class PxController {
     @PostMapping("/puLabel/print")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
-        perm.requireButton("PU_ORDER", "修改");
         String orderNo = String.valueOf(body.getOrDefault("orderNo", ""));
+        // 供应商会话走逐单归属核对(它没有 PU_ORDER 的修改权,见 requireMaterialLabelAccess)
+        requireMaterialLabelAccess(orderNo);
         String batchNo = body.get("batchNo") == null ? "" : String.valueOf(body.get("batchNo"));
         String prodDate = body.get("prodDate") == null ? "" : String.valueOf(body.get("prodDate"));
         List<Map<String, Object>> lines = new java.util.ArrayList<>();

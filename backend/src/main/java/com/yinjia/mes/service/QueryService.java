@@ -124,8 +124,17 @@ public class QueryService {
      * 当前登录人若是供应商会话,返回其绑定供应商编码(否则 null)。
      * 抽成静态方法是为了让过滤器与 QueryService 用**同一个判据**(都在 yj_supplier_account 上),
      * 不在 QueryService 里再注入一份 SupplierPortalService 造成循环依赖风险。
+     *
+     * <p>返回值三态:
+     * <ul>
+     *   <li>{@code null} = 不是供应商账号(内部账号);</li>
+     *   <li>{@code ""} = 是供应商账号但**已停用**;</li>
+     *   <li>其它 = 该账号绑定的供应商编码。</li>
+     * </ul>
+     * 2026-10-29 改为 public:材料码打印的权限闸门(PxController.requireMaterialLabelAccess)也要用它区分
+     * 「内部账号按面板权 / 供应商账号按逐单归属」。
      */
-    private String sessionSupplierCode() {
+    public String sessionSupplierCode() {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String user = auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : null;
         if (user == null) return null;

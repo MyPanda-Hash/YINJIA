@@ -4670,6 +4670,19 @@ const qrVisible = ref(false)
 /** 采购订单·打印材料码弹窗(2026-10-04):批次号在打印时登记,并预约该行数量 */
 const materialLabelVisible = ref(false)
 const materialLabelNo = ref('')
+/**
+ * 「打印材料码」弹窗适用的面板族(2026-10-29 用户报障「供应商登录打印材料码时,直接就显示打印成功了,
+ * 没有和采购订单一样有弹窗」)。
+ *
+ * 原来这个分支写死 `panelCode === 'PU_ORDER'`,而供应商采购打印是**另一个面板编码**
+ * `SUPPLIER_PU_ORDER`(采购订单的只读副本,同一张 bd_pu_order、同一套按钮,见后端 PanelAliases)
+ * ⇒ 供应商点「打印材料码」不进弹窗,落到后面的通用分支直接提示成功,**批次号根本没登记**。
+ *
+ * 凡是「采购订单这一族」的面板都必须走同一个弹窗:批次号要落库(bd_pu_label/bl_pu_label)、
+ * 数量要预约,跳过的后果是标签没批号、订单余量也不扣。
+ * ⚠ 以后再加采购订单的副本面板,把它加进这个集合(与后端 PanelAliases 登记保持一致)。
+ */
+const MATERIAL_LABEL_PANELS = ['PU_ORDER', 'SUPPLIER_PU_ORDER']
 /** 打印登记完成后提示一句:这批量已从订单数量隔离成独立一行,去生单对话框勾它即可 */
 function onMaterialLabelPrinted({ docNo, batchNo, count }) {
   ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批数量已从订单数量隔离出来，生单时在明细里直接勾选它')}`)
@@ -9432,7 +9445,9 @@ async function onButton(action) {
   // 并**预约**该行数量(未生单的预约量从余量里扣减)。该预约随后在生单对话框的
   // 作为**独立的一行**被消费。方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md
   // 入口分工不变:没批号→商品档案「二维码标签」;自己打带批号→本弹窗(采购入库单另有「打印标识卡」)。
-  if (action === '打印材料码' && panelCode.value === 'PU_ORDER') {
+  // ⚠ 判据用**面板族** MATERIAL_LABEL_PANELS,不能写死 'PU_ORDER' ——
+  //   供应商采购打印(SUPPLIER_PU_ORDER)也要弹这个窗(2026-10-29 用户报障修)。
+  if (action === '打印材料码' && MATERIAL_LABEL_PANELS.includes(String(panelCode.value))) {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || ''
     if (!no) return ElMessage.warning(tt('请先选择一张单据'))
