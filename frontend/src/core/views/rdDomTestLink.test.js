@@ -57,16 +57,30 @@ test('② 审批时可分发测试负责人（借鉴立项申请定级分发）'
   assert.match(list, /测试负责人: domApvTester\.value/, '载荷要带 测试负责人')
 })
 
-test('③ 数据记录表 ↔ 测试申请单：8 张表都有「测试申请单编号」参照字段', () => {
-  // 迁移脚本覆盖 8 张表
-  const tables = ['rd_alkaline_head', 'rd_mineral_head', 'rd_antibact_head', 'rd_scale_head',
-    'rd_ro_protect_head', 'rd_soak_head', 'rd_drop_prec_head', 'rd_filter_eff_head']
-  for (const t of tables) assert.ok(migration.includes(t), `迁移缺表 ${t}`)
-  assert.match(migration, /测试申请单编号/, '迁移要加这一列')
-  assert.match(migration, /'RD_DOM_TEST', N'单据编号'/, '参照要指向测试申请单的单据编号')
+test('③ 关联判据读「文档编号」（用户实际填的那格），不是隐藏的「测试申请单编号」', () => {
+  // 2026-10-29 修正:第一版只查迁移新加的「测试申请单编号」列,而它 place=query **界面上填不到**
+  //   ⇒ 用户明明在记录表填了 DT-…,汇总表一直显示「无」。现主判据 = 文档编号。
+  const fn = cfgSvc.slice(cfgSvc.indexOf('public List<Map<String, Object>> linkedRecordSheets'))
+  const body = fn.slice(0, 3000)
+  assert.match(body, /文档编号/, '主判据必须是「文档编号」')
+  // 该列在 SQL 里参与匹配(不是只出现在注释里)
+  assert.match(body, /ISNULL\(\[文档编号\]/, '文档编号要进 WHERE 条件')
   // 后端反查接口
   assert.match(pxCtl, /\/linkedRecordSheets/, '要有反查端点')
   assert.match(cfgSvc, /public List<Map<String, Object>> linkedRecordSheets/, '反查实现要在 PanelConfigService')
+  // 隐藏列已被删除(见 migrate-drop-domtest-link-col-20261029.sql),代码仍兼容但不作为唯一判据
+  assert.ok(!/only.*测试申请单编号/.test(body), '不能只查隐藏列')
+})
+
+test('③b 隐藏列已写迁移删除（8 表 × 1 列 + 8 条 yj_field），且带守卫', () => {
+  const drop = read('tools/migrate-drop-domtest-link-col-20261029.sql')
+  const tables = ['rd_alkaline_head', 'rd_mineral_head', 'rd_antibact_head', 'rd_scale_head',
+    'rd_ro_protect_head', 'rd_soak_head', 'rd_drop_prec_head', 'rd_filter_eff_head']
+  for (const t of tables) assert.ok(drop.includes(t), `删除迁移缺表 ${t}`)
+  assert.match(drop, /DROP COLUMN \[测试申请单编号\]/, '要真的删列')
+  assert.match(drop, /DELETE FROM yj_field WHERE label = N'测试申请单编号'/, '要删字段登记')
+  // 不可逆操作必须有守卫:任一表该列有数据就中止
+  assert.match(drop, /RAISERROR\('中止:测试申请单编号列仍有/, '必须有"有数据就中止"的守卫')
 })
 
 test('④ 汇总表有「数据记录表」列，且是可点入口（不是纯文本）', () => {

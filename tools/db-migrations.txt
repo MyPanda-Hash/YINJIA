@@ -4292,3 +4292,10 @@ migrate-filter-eff-water-cols-20261029.sql
 
 # 2026-10-29 数据记录表 ↔ 测试申请单 关联(8 张记录表加「测试申请单编号」参照 + 测试申请单头表加「测试负责人」)。两账套都执行。
 migrate-rd-domtest-link-20261029.sql
+
+# 2026-10-29 测试申请单:右上角改显单据编号;新建默认 密级=保密/文件使用范围=银嘉内部(config.headDefaults)。两账套都执行。
+migrate-rd-domtest-docno-headdefaults-20261029.sql
+
+# 2026-10-29 删除 8 张数据记录表上无人使用的「测试申请单编号」列(关联判据改为「文档编号」)。
+#   删前已核实:两账套该列非空行数全 0;脚本内置守卫(有数据即中止)。两账套都执行。
+migrate-drop-domtest-link-col-20261029.sql

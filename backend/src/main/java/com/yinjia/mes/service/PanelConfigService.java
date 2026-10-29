@@ -582,6 +582,10 @@ public class PanelConfigService {
         if (!def.waterIndicators().isEmpty()) metadata.put("waterIndicators", def.waterIndicators());
         if (!def.editableRowLabels().isEmpty()) metadata.put("editableRowLabels", def.editableRowLabels());
         if (!def.rowLabels().isEmpty()) metadata.put("rowLabels", def.rowLabels());
+        // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
+        // 后端「新增」建单时已写库,但前端新建后的**本地草稿对象**是空的 ——
+        // 不下发就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
+        if (!def.headDefaults().isEmpty()) metadata.put("headDefaults", def.headDefaults());
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
         for (Map<String, Object> g : buttonGroups) {
@@ -1902,10 +1906,15 @@ public class PanelConfigService {
      * <p>用户口径:「测试申请单的汇总也能看到有哪些数据记录表关联了测试申请单,
      * 然后点击可以弹窗显示对应的数据记录表的数据」。
      *
-     * <p>关联 = 8 张数据记录表表头的「测试申请单编号」列(见
-     * {@code tools/migrate-rd-domtest-link-20261029.sql})。这是**登记式**关联:
-     * 记录表上填了哪张申请单,这里就查得到哪张 —— 不做"同产品编号即关联"之类的隐式推导,
-     * 那种推导会把历史单全部串成一片,用户分不清谁是谁。
+     * <p><b>关联判据(2026-10-29 修正)</b>:记录表右上角那格「文档编号」填的就是测试申请单的
+     * 单据编号 —— 用户原话「数据记录表也是引用的申请单的右上角的单据编号」。
+     * 所以主判据是 {@code [文档编号]}。
+     * <p>为什么之前查不到(踩坑记录):第一版只查迁移新增的 {@code [测试申请单编号]} 列,
+     * 而那列在纸面上是 place=query 的**不可见**字段,用户在界面上根本不会去填它 ——
+     * 他填的是「文档编号」。于是记录表明明存了 DT-…,汇总表却一直显示「无」。
+     *
+     * <p>兼容口径:两列任一命中即算关联(老数据可能只填了「测试申请单编号」;
+     * 未来若把那个隐藏列彻底移除,这段也能原样工作)。
      *
      * @param domNo 测试申请单的单据编号(DT-…);空串直接返回空表
      * @return {@code [{panelCode, panelName, docNo, date}]},按单据日期倒序
@@ -1928,14 +1937,27 @@ public class PanelConfigService {
         for (String[] p : panels) {
             String table = p[1];
             // 表名来自上面的白名单常量(不是用户输入),不接受外部拼接
-            Integer cols = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = N'测试申请单编号'",
-                    Integer.class, "dbo." + table);
-            if (cols == null || cols == 0) continue;   // 该环境还没跑迁移 / 表不存在
+            List<String> cols = jdbc.queryForList(
+                    "SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(?)", String.class, "dbo." + table);
+            if (cols.isEmpty()) continue;                 // 表不存在
+            boolean hasDocNo = cols.contains("文档编号");       // 主判据(用户实际填的那格)
+            boolean hasLink = cols.contains("测试申请单编号");   // 兼容判据(隐藏列)
+            if (!hasDocNo && !hasLink) continue;
+
+            // 两列任一等于该申请单号即命中;用 ISNULL 包一层,避免 NULL 参与比较
+            StringBuilder where = new StringBuilder();
+            if (hasDocNo) where.append("LTRIM(RTRIM(ISNULL([文档编号],''))) = ?");
+            if (hasLink) {
+                if (where.length() > 0) where.append(" OR ");
+                where.append("LTRIM(RTRIM(ISNULL([测试申请单编号],''))) = ?");
+            }
+            List<Object> args = new ArrayList<>();
+            if (hasDocNo) args.add(no);
+            if (hasLink) args.add(no);
             try {
                 for (Map<String, Object> r : jdbc.queryForList(
                         "SELECT 单据编号 AS docNo, 单据日期 AS docDate FROM dbo." + table
-                                + " WHERE [测试申请单编号] = ? ORDER BY 单据日期 DESC, id DESC", no)) {
+                                + " WHERE (" + where + ") ORDER BY 单据日期 DESC, id DESC", args.toArray())) {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("panelCode", p[0]);
                     m.put("panelName", panelDisplayName(p[0]));
