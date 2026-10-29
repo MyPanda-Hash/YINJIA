@@ -4284,3 +4284,7 @@ migrate-prod-func-type-stdlib-fix-20261021.sql
 migrate-prod-func-type-stdlib-20261021.sql
 migrate-wo-pick-scan-log-20261021.sql
 migrate-prodinfo-bom-20261029.sql
+
+# 2026-10-28 修「标准库启用后下拉仍无数据」:分组字段与表头字段同名,被前端 fieldMap 后写覆盖。
+#   三张使用记录表的分组字段改 label(设备归属/仪器归属/项目归属),物理列名不变。两账套都执行。
+migrate-record-group-relabel-20261028.sql
