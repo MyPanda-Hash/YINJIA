@@ -2793,8 +2793,20 @@ function totalOf(dt, key) {
 }
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
+/**
+ * 下拉选项。
+ * ⚠ 2026-10-28「标准库启用后下拉仍是『无数据』」的根因就在口径不一致:
+ *   stdLibOf/cellKind 用 `find`(取**第一条**同名定义 ⇒ 表头那条「标准库」),
+ *   而这里原先用 fieldMap(**后写覆盖** ⇒ 明细里同名字段「文本、无 options」)——
+ *   于是同一个格子上「标准库维护」按钮在、下拉却是空的。
+ * 现在统一成:优先取**带 options 的那条**同名定义,其次第一条。
+ *   (同名字段改名是根治,见 migrate-record-group-relabel-20261028.sql;这里只是兜底。)
+ */
 function selectOptions(key) {
-  const f = fieldMap.value.get(key)
+  const list = props.fields || []
+  const withOpts = list.find((x) => (x.dataName || x.code) === key
+    && Array.isArray(x.options) && x.options.length)
+  const f = withOpts || list.find((x) => (x.dataName || x.code) === key)
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }

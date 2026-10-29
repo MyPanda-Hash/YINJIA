@@ -823,8 +823,9 @@ export const recordSheetConfigs = {
      *   头上下拉 = 当前编辑哪一组;明细行带同一个字段标明归属;切换只改**显示哪些行**,
      *   其它组的行留在单据里,保存时整体提交(规则见 core/panel/recordGroup.js,有单测)。
      * 加标水:下拉即 variantKey(测试项目),切换同时换列集与当前组 —— 两者本就同一个字段。
+     * ⚠ detailKey 用「项目归属」而不是同名表头字段,原因见 RD_EQUIP_USE.groupBy 注释。
      */
-    groupBy: { headKey: '测试项目', detailKey: '测试项目' },
+    groupBy: { headKey: '测试项目', detailKey: '项目归属' },
     dataTables: [{}],
   },
 
@@ -987,8 +988,11 @@ export const recordSheetConfigs = {
     headMode: 'plain',
     plainTitle: '测试设备使用登记表',
     subtitle: { label: '设备名称：', key: '设备名称', type: 'select' },
-    /** 一台设备一组行(2026-10-28):切换「设备名称」只换显示的行,其它设备的记录仍在这张单里 */
-    groupBy: { headKey: '设备名称', detailKey: '设备名称' },
+    /** 一台设备一组行(2026-10-28):切换「设备名称」只换显示的行,其它设备的记录仍在这张单里。
+     *  ⚠ detailKey 是**行归属字段的 label**(「设备归属」,物理列仍是 设备名称):
+     *    不能与表头字段同名 —— 同名会让前端按 dataName 建的字段表被明细定义覆盖,
+     *    表头那句标准库下拉因此取不到 options(实测「无数据」),见 migrate-record-group-relabel-20261028.sql。 */
+    groupBy: { headKey: '设备名称', detailKey: '设备归属' },
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 100 },
@@ -1012,8 +1016,9 @@ export const recordSheetConfigs = {
     headMode: 'plain',
     plainTitle: '实验室仪器使用记录表',
     subtitle: { label: '仪器名称/型号：', key: '仪器名称/型号', type: 'select' },   // 标准库(可维护)
-    /** 一台仪器一组行(2026-10-28):切换「仪器名称/型号」只换显示的行 */
-    groupBy: { headKey: '仪器名称/型号', detailKey: '仪器名称/型号' },
+    /** 一台仪器一组行(2026-10-28):切换「仪器名称/型号」只换显示的行
+     *  ⚠ detailKey 用「仪器归属」而不是同名的表头字段,原因见 RD_EQUIP_USE.groupBy 注释 */
+    groupBy: { headKey: '仪器名称/型号', detailKey: '仪器归属' },
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 110 },

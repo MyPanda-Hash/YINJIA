@@ -719,3 +719,29 @@ test('烧结尺寸表(无头档案表):走 plain 版式且逐列给宽,否则整
     assert.ok(Number.isFinite(c.w) && c.w > 0, `列「${c.label}」缺 w(plain 表宽 = Σw,缺了会退回兜底值并与 dtOwnsWidth 判据打架)`)
   }
 })
+
+/**
+ * 断言 ⑨(2026-10-28 用户报「这个标准库启用之后,并没有可以下拉」):
+ * `groupBy.detailKey` **不得与 `headKey` 同名**。
+ *
+ * 为什么:纸面字段集 = [...表头字段, ...明细字段](PanelxList.sheetAllFields),
+ * 而后端按 label 下发同名两条(表头那条 dataType=标准库 带 options;明细那条是行归属列,文本、无 options)。
+ * 前端 fieldMap 按 dataName 建 Map 是**后写覆盖** ⇒ 同名时取到明细定义 ⇒
+ * 「标准库维护」按钮还在(stdLibOf 用 find 取第一条),下拉却是**空的**(「无数据」)。
+ * 实测就是仪器使用记录表:补了同名分组字段后,「仪器名称/型号」下拉变空。
+ *
+ * 根治 = 行归属字段换 label(设备归属/仪器归属/项目归属),物理列名不变;
+ * 本断言防止以后又有人图省事把 detailKey 写成表头字段名。
+ */
+test('groupBy:行归属字段(detailKey)不得与表头字段(headKey)同名——否则标准库下拉会被顶成空', () => {
+  const problems = []
+  for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {
+    const g = cfg.groupBy
+    if (!g) continue
+    assert.ok(g.headKey && g.detailKey, `${panel}.groupBy 需要 headKey + detailKey`)
+    if (g.headKey === g.detailKey) {
+      problems.push(`${panel}: headKey 与 detailKey 都是「${g.headKey}」——同名会让下拉/参照取到明细那条定义`)
+    }
+  }
+  assert.deepEqual(problems, [], problems.join('; '))
+})
