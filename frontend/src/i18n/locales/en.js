@@ -1191,6 +1191,10 @@ export default {
     '不选则审批后由管理员用「分发测试负责人」补上': 'If left empty, an administrator can assign the test owner afterwards',
     '数据记录表': 'Data record sheets',
     '关联的记录表': 'Linked record sheets',
+    '单据编号': 'Document No.',
+    '保密': 'Confidential',
+    '银嘉内部': 'Yinjia internal',
+    '内部（密级）': 'Internal (classification)',
     '修改变体': 'Edit variant',
     '新增变体': 'New variant',
     '变体名 + 工序一行一条（工序|工序控制内容|管控要求|检查比例，后三列可空）': 'Variant name plus one process per line (process|control content|requirements|inspection ratio; last three may be empty)',
@@ -3165,6 +3169,9 @@ export default {
     '物料清单里还没有数据': 'No BOM documents yet',
     '共 {n} 张物料清单、{m} 个子件；勾选物料清单后点「导入」，整单子件追加到本表明细':
       '{n} BOM documents, {m} components. Check the BOMs you want, then Import to append all their components.',
+    /* 2026-10-29「引用」口径(与上一行「导入」只差按钮名,分开登记以免两处再各说各的) */
+    '共 {n} 张物料清单、{m} 个子件；勾选物料清单后点「引用」，整单子件追加到本表明细':
+      '{n} BOM documents, {m} components. Check the BOMs you want, then Reference to append all their components.',
     '从物料清单引用': 'Pick from Materials',
     '搜索物料名/编号/规格': 'Search name / code / spec',
     '物料名': 'Material Name',
