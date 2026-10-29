@@ -3282,10 +3282,11 @@ public class ButtonService {
     /** 检验单面板 → 头表名(作废/幂等查重用;取值全是本类常量,无拼接注入面) */
     private static final java.util.Map<String, String> WO_INSP_HEAD = java.util.Map.of(
             "QC_ASM_INSP", "qc_asm_insp_head",
-            // 2026-10-21:成型侧由「首件检验 QC_FIRST_INSP」改为现役的「成型检验单 QC_MOLD_INSP」
-            //   —— 首件/制程两张单及其头表(qc_first_insp_head/qc_proc_insp_head)已下架,
-            //   仍指着旧表会让弃审报工直接报「对象名无效」(与 QcInspAutoService 同批修正)。
-            "QC_MOLD_INSP", "qc_mold_insp_head");
+            // 2026-10-29 修正:成型侧恢复为现役的「首件检验 QC_FIRST_INSP + 制程检验 QC_PROC_INSP」
+            //   (2026-10-21 曾改指 QC_MOLD_INSP,但那张单/表 2026-10-16 已下架、现库不存在 ——
+            //    继续指着它会让弃审报工与报工审核双双「对象名无效」;与 QcInspAutoService/ScheduleBoardService 同批)
+            "QC_FIRST_INSP", "qc_first_insp_head",
+            "QC_PROC_INSP", "qc_proc_insp_head");
 
     /**
      * 报工单审核 → 按**报工量达标**自动生成检验单草稿(判据/单头组装都在 {@link QcInspAutoService})。
@@ -3372,7 +3373,7 @@ public class ButtonService {
         List<Map<String, Object>> links = jdbc.queryForList(
                 "SELECT target_panel_code, target_form_no FROM form_flow_link"
                         + " WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
-                        + "   AND target_panel_code IN ('QC_ASM_INSP','QC_MOLD_INSP')"
+                        + "   AND target_panel_code IN ('QC_ASM_INSP','QC_FIRST_INSP','QC_PROC_INSP')"
                         + "   AND link_status='ACTIVE'", repNo);
         for (Map<String, Object> l : links) {
             String p = String.valueOf(l.get("target_panel_code"));

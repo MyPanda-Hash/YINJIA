@@ -41,11 +41,12 @@ public final class FirstInspBackfill {
     private FirstInspBackfill() {}
 
     /**
-     * 检验单头表(2026-10-21 改):原指已下架的 {@code qc_first_insp_head},现为**成型检验单**
-     * {@code qc_mold_insp_head}(首件/制程两张单及其表已下架 —— 继续指着旧表会在生产完工/报工审核时
-     * 报「对象名 'dbo.qc_first_insp_head' 无效」,这正是当天现场那条报错)。
+     * 检验单头表(2026-10-29 修正):**首件检验单** {@code qc_first_insp_head}。
+     * 2026-10-21 曾改指已下架的 {@code qc_mold_insp_head}(该表 2026-10-16 随「成型检验单」一起下架,
+     * 现库不存在)⇒ 之后的回填全部静默跳过(有 OBJECT_ID 守卫,不会报错,但也没回填);
+     * 现按现役面板 QC_FIRST_INSP 恢复。列存在性仍动态判断(见下),换表/缺列都不会炸。
      */
-    private static final String HEAD = "dbo.qc_mold_insp_head";
+    private static final String HEAD = "dbo.qc_first_insp_head";
 
     /**
      * 工单行的**完工批次**:已完工即返回 {@code {批次号, 生产日期}}(生产日期 = 完工当日

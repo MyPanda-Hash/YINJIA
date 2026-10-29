@@ -82,11 +82,21 @@ public class ScheduleBoardService {
     private record InspSpec(String headTable, String ngColumn, String label) {}
 
     /**
-     * 工序 → 检验单头表(2026-10-21 改):首件/制程两张单及其表已下架,成型改用现役的
-     * {@code QC_MOLD_INSP}(成型检验单)。继续指着 qc_first_insp_head 会让看板查询报「对象名无效」。
+     * 工序 → 检验单头表。
+     *
+     * <p>🔴 2026-10-29 修正(本任务实测,必须记下来):2026-10-21 那版把成型指向
+     * {@code qc_mold_insp_head},当时的前提是「首件/制程两张单及其表已下架」——**该前提后来被推翻**:
+     * 现库(yj_panel + sys.tables 双证)`QC_FIRST_INSP`(qc_first_insp_head 425 行)、
+     * `QC_PROC_INSP`(qc_proc_insp_head 434 行)、`QC_ASM_INSP`(435 行)三张单都在用,
+     * 而 `qc_mold_insp_head` / `qc_cut_insp_head` **不存在**(2026-10-16 已下架)。
+     * ⇒ 指向 MOLD 会让 `/api/px/scheduleBoard/trace`(生产工单/工单排产页的「工单详情·追溯」)
+     * 对**任何工单**报「对象名 dbo.qc_mold_insp_head 无效」HTTP 500 —— 实测 2026-10-29 复现。
+     * 现按现役三张单登记(首件+制程都归成型,与 {@code QcInspAutoService} 2026-10-18 版口径一致;
+     * 明细「不合格」列不同名:首件/组装成品=不合格数量,制程=不良数量)。
      */
     private static final Map<String, InspSpec> INSP_HEAD = Map.of(
-            "QC_MOLD_INSP", new InspSpec("qc_mold_insp_head", "不合格数量", "成型检验"),
+            "QC_FIRST_INSP", new InspSpec("qc_first_insp_head", "不合格数量", "首件检验"),
+            "QC_PROC_INSP", new InspSpec("qc_proc_insp_head", "不良数量", "制程检验"),
             "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "组装成品检验"));
 
     /** 应检工序:成型、组装 —— 与 {@code QcInspAutoService.OP_PANELS} 同源 */
