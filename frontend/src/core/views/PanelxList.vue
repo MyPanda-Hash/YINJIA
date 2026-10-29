@@ -7081,21 +7081,46 @@ async function buildSheetPdfBlob() {
     await nextTick()
   }
   if (!shots.length) return null
+  if (!shots.length) return null
   // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
-  // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
+  // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证物理尺寸可预期。
   const MM = 25.4 / 96
-  const first = shots[0]
+  /**
+   * 纸张统一为 **A4 竖向**(210×297mm),不再按每张截图的实际尺寸出纸。
+   *
+   * 🔴 2026-10-29 用户口径:「组装工艺清单的 BOM 表打印出来是横向的,和组装工艺清单的竖向不一样」。
+   *   实测(AP-2026-10-0003)三页纸张元素宽**完全相同**(1041px),高 260/471/468 ——
+   *   几何上没有区别;真正的原因是旧实现把**内容尺寸**当页面尺寸:
+   *     format: [first.w0 * MM, first.h0 * MM]  +  addPage([pw, ph], pw > ph ? 'l' : 'p')
+   *   内容矮的一页(w>h)就被判成横向 ⇒ 同一份打印件里三种页面尺寸、全部 275mm 扁横条,
+   *   阅读器/打印机再按各页比例自行旋转,看起来就是「一个横一个竖」。
+   *
+   *   固定 A4 竖向后:① 每页方向尺寸完全一致;② 与单页面板走 window.print() 的观感一致
+   *   (浏览器默认也是 A4 竖向、按纸宽缩放);③ 内容**等比**缩放居中,列宽比例不变(不拉伸)。
+   */
+  const PAGE_W = 210
+  const PAGE_H = 297
+  const MARGIN = 8            // 页边距(mm),与 CSS @page { margin: 8mm } 同口径
+  const contentW = PAGE_W - MARGIN * 2
+  const contentH = PAGE_H - MARGIN * 2
   const pdf = new jsPDF({
-    orientation: first.w0 * MM > first.h0 * MM ? 'l' : 'p',
+    orientation: 'p',
     unit: 'mm',
-    format: [first.w0 * MM, first.h0 * MM],
+    format: [PAGE_W, PAGE_H],
     compress: true,
   })
   shots.forEach((s, i) => {
-    const pw = s.w0 * MM
-    const ph = s.h0 * MM
-    if (i > 0) pdf.addPage([pw, ph], pw > ph ? 'l' : 'p')
-    pdf.addImage(s.dataUrl, 'PNG', 0, 0, pw, ph)
+    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], 'p')
+    // 截图原始尺寸(px) → mm
+    const iw = s.w0 * MM
+    const ih = s.h0 * MM
+    // 等比缩放到内容区:取较小的那个比例,宽高都不越界
+    const k = Math.min(contentW / iw, contentH / ih)
+    const w = iw * k
+    const h = ih * k
+    // 水平居中、垂直顶对齐(纸张是从上往下读的,顶部留白由 MARGIN 统一)
+    const x = MARGIN + (contentW - w) / 2
+    pdf.addImage(s.dataUrl, 'PNG', x, MARGIN, w, h)
   })
   const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
   return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
