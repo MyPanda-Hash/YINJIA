@@ -1,0 +1,30 @@
+[
+  {
+    "step": "起始状态",
+    "result": "doc_no | archived | pending\r\nLXA-2026-10-0032 | Y | N\r\n-- (1 rows) --"
+  },
+  {
+    "step": "1.分发对接人",
+    "result": "{\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"已归档\",\"对接人姓名\":\"系统管理员\",\"对接人\":\"admin\",\"编号\":\"LXA-2026-10-0032\"}}"
+  },
+  {
+    "step": "1b.库内对接人",
+    "result": "单据编号 | 对接人\r\nLXA-2026-10-0032 | admin\r\n-- (1 rows) --"
+  },
+  {
+    "step": "2.确认责任人",
+    "result": "{\"code\":409,\"message\":\"项目责任人已确认为 系统管理员（admin）,不能更改;要换人请先弃审回草稿重新走流程\",\"data\":null}"
+  },
+  {
+    "step": "2b.库内责任人",
+    "result": "单据编号 | 对接人 | 项目责任人 | 责任人确认\r\nLXA-2026-10-0032 | admin | admin | null\r\n-- (1 rows) --"
+  },
+  {
+    "step": "3.最终库状态",
+    "result": "单据编号 | 项目等级 | 申请立项人 | 对接人 | 责任人\r\nLXA-2026-10-0032 | 三级 | 系统管理员 | admin | admin\r\n-- (1 rows) --"
+  },
+  {
+    "step": "3b.审批留痕",
+    "result": "form_no | action | result | node_no | operator | opinion\r\nLXA-2026-10-0032 | SUBMIT | PENDING | 1 | admin | null\r\nLXA-2026-10-0032 | APPROVE | APPROVED | 1 | admin | 同意立项\r\nLXA-2026-10-0032 | GRADE | GRADED | 1 | admin | 项目定级：三级\r\nLXA-2026-10-0032 | LIAISON | DISPATCHED | 1 | admin | 分发对接人：系统管理员（admin）\r\nLXA-2026-10-0032 | OWNER | CONFIRMED | 1 | admin | 确认项目责任人：系统管理员（admin）\r\n-- (5 rows) --"
+  }
+]

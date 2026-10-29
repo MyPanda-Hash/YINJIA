@@ -113,9 +113,9 @@ const RD_ASM_PROC_DT0 = [
         ], cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 90 },
           { key: '工序', label: '工序', w: 130 },
-          { key: '工序控制内容', label: '工序控制内容', w: 320, area: true },
-          { key: '管控要求', label: '管控要求', w: 430, area: true },
-          { key: '检查比例', label: '检查比例', w: 160 },
+          { key: '工序控制内容', label: '工序控制内容', w: 250, area: true },
+          { key: '管控要求', label: '管控要求', w: 280, area: true },
+          { key: '检查比例', label: '检查比例', w: 120 },
         ]},
     ]
 
@@ -133,12 +133,12 @@ const RD_ASM_PROC_DT_REVISION = {
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
-    { key: '序号', label: '序号', w: 60, align: 'center' },
-    { key: '更改内容', label: '更改内容', w: 300, area: true },
-    { key: '更改原因', label: '更改原因', w: 200 },
-    { key: '更改时间', label: '更改时间', w: 130 },
-    { key: '责任人', label: '责任人', w: 120 },
-    { key: '备注', label: '备注', w: 184, area: true },
+    { key: '序号', label: '序号', w: 50, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 240, area: true },
+    { key: '更改原因', label: '更改原因', w: 160 },
+    { key: '更改时间', label: '更改时间', w: 110 },
+    { key: '责任人', label: '责任人', w: 90 },
+    { key: '备注', label: '备注', w: 130, area: true },
   ],
 }
 
@@ -159,14 +159,21 @@ const RD_ASM_PROC_DT_BOM = {
     { key: '表区', label: '表区', hiddenCol: true, w: 90 },
     { key: '物料编号', label: '物料编号', w: 150 },
     { key: '物料名', label: '物料名称', w: 220 },
-    { key: '物料规格', label: '物料规格', w: 500, area: true },
-    { key: '用量', label: '用量', w: 170 },
+    { key: '物料规格', label: '物料规格', w: 280, area: true },
+    { key: '用量', label: '用量', w: 130 },
   ],
 }
 
 /** 三个页签的「产品基本信息」区(设计两张表都有 B9:G9 这一块,格子相同)
  *  按用户口径只保留设计的四格 + 工艺形态(驱动 4 个关键控制清单变体的字段)——
- *  产品名称/产品种类/成品重量/整体规格(外径)/整体规格(长度) 已置 visible=0 退出编辑面板。 */
+ *  产品名称/产品种类/成品重量/整体规格(外径)/整体规格(长度) 已置 visible=0 退出编辑面板。
+ *
+ *  ⚠ 工艺形态 = **标准库字段**(2026-10-29 用户口径「组装工艺清单的所有 tap 的工艺形态改为标准库,
+ *    可以自己新增删除维护」):yj_field.data_type='标准库' + dict_sql='asm.form'
+ *    (迁移 tools/migrate-asm-proc-form-stdlib-20261029.sql)。
+ *    渲染不需要在这里写 stdLib —— stdLibOf(key) 查的是后端 fieldSpec 下发的 stdLib,
+ *    「⧉ 标准库维护」入口按元数据自动出现(见 RecordSheetPanels 的 pair 分支)。
+ *    asm.form(形态候选词)与 asm.proc(关键控制清单内容)**是两个库**,不要合并。 */
 const RD_ASM_PROC_INFO_SEC = (page) => ({
   page,
   bar: '产品基本信息',
@@ -203,12 +210,12 @@ const RD_MOLD_PROC_DT_REVISION = {
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
-    { key: '序号', label: '序号', w: 60, align: 'center' },
-    { key: '更改内容', label: '更改内容', w: 300, area: true },
-    { key: '更改原因', label: '更改原因', w: 200 },
-    { key: '更改时间', label: '更改时间', w: 130 },
-    { key: '责任人', label: '责任人', w: 120 },
-    { key: '备注', label: '备注', w: 184, area: true },
+    { key: '序号', label: '序号', w: 50, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 240, area: true },
+    { key: '更改原因', label: '更改原因', w: 160 },
+    { key: '更改时间', label: '更改时间', w: 110 },
+    { key: '责任人', label: '责任人', w: 90 },
+    { key: '备注', label: '备注', w: 130, area: true },
   ],
 }
 
@@ -402,7 +409,7 @@ const RD_MOLD_FORMULA = {
       { page: 1, label: '使用范围', key: '使用范围', type: 'select' },
       { page: 1, label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57],
+    grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41],
     // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
     head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
@@ -461,6 +468,9 @@ const RD_MOLD_FORMULA = {
 
 export const recordSheetConfigs = {
   RD_ALKALINE: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '伊可普碱性寿命测试',
     grid: [115, 80, 93, 98, 84, 90, 90, 90, 90, 70, 70, 85, 128],
     // 设计「碱性」第 2 行:B2:M2 公司名(12 列)+ N2 编号(1 列,裸值 " YJ-PD-01")
@@ -502,6 +512,9 @@ export const recordSheetConfigs = {
   },
 
   RD_MINERAL: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '伊可普 RO后置矿化滤芯 纯水寿命测试',
     grid: [170, 170, 170, 170, 170],
     // 设计「矿化」第 2 行:B2:E2 公司名(4 列)+ F2 编号(1 列,裸值 "YJ-PD-01")
@@ -557,6 +570,9 @@ export const recordSheetConfigs = {
   },
 
   RD_ANTIBACT: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '集芈（康立根抑菌项目）',
     grid: [117, 117, 117, 117, 117, 117, 93, 102],
     head: { title: 6, infoLabel: 1, infoValue: 1 },
@@ -588,6 +604,9 @@ export const recordSheetConfigs = {
   },
 
   RD_SCALE: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '阻垢炭棒阻垢率测试',
     grid: [125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125],
     // 设计「阻垢性能」第 1 行是**一格含两段文字**:A1:J1 = 公司名 + 靠右的编号
@@ -627,6 +646,9 @@ export const recordSheetConfigs = {
   },
 
   RD_RO_PROTECT: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '桌面机RO保护测试',
     grid: [158, 78, 106, 78, 78, 78, 78, 78, 78, 78],
     // 设计「RO保护」第 2 行:B2:I2 公司名(8 列)/ J2 空 / K2 编号(1 列,裸值 "YJ-PD-01")
@@ -666,6 +688,9 @@ export const recordSheetConfigs = {
   },
 
   RD_SOAK: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '伊可普高品质冰箱炭棒项目浸泡安全测试',
     grid: [177, 164, 204, 206, 200, 209],
     // 设计「浸泡安全」第 2 行 B2:G2 把**整行并成一格**,一格含两段文字
@@ -718,6 +743,9 @@ export const recordSheetConfigs = {
   },
 
   RD_DROP_PREC: {
+    /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
+     *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
+    dualDocNo: '文档编号',
     titlePlaceholder: '伊可普冰箱滤芯（需求3）压降、一级精度测试',
     grid: [157, 280, 120, 100, 106, 106, 116, 116, 127, 116, 165],
     // 设计「压降、精度」第 2 行:B2:J2 公司名(9 列)/ K2 空 / L2 编号(1 列,裸值 " YJ-PD-01")
@@ -817,6 +845,15 @@ export const recordSheetConfigs = {
           { key: '负责人', label: '负责人', w: 80, rowspan: 2 },
       ]},
     },
+    /**
+     * 一组一行(2026-10-28 用户口径「按测试项目/设备名称/仪器名称这些下拉来切数据表填写,
+     * 改为一张单据…而不是不同项目、仪器、设备都要新建一张单」):
+     *   头上下拉 = 当前编辑哪一组;明细行带同一个字段标明归属;切换只改**显示哪些行**,
+     *   其它组的行留在单据里,保存时整体提交(规则见 core/panel/recordGroup.js,有单测)。
+     * 加标水:下拉即 variantKey(测试项目),切换同时换列集与当前组 —— 两者本就同一个字段。
+     * ⚠ detailKey 用「项目归属」而不是同名表头字段,原因见 RD_EQUIP_USE.groupBy 注释。
+     */
+    groupBy: { headKey: '测试项目', detailKey: '项目归属' },
     dataTables: [{}],
   },
 
@@ -876,13 +913,22 @@ export const recordSheetConfigs = {
           pageSize: 200,
           cols: [
             { label: '序号', seq: true, w: 80, align: 'center' },
-            { label: '表格编号', keys: ['单据编号', '编号', '单号'], w: 200 },
-            // 发起人 = 申请单上的人:设计里它是**明细列**(内部页叫 申请人 / 外部页叫 发起人),
-            // 单据表头根本没有这一项 ⇒ 必须给 detailKeys 退到明细第一行,否则整列空白(实测踩过)
-            { label: '发起人', keys: ['申请人', '发起人'], detailKeys: ['申请人', '发起人'], w: 130 },
+            // 2026-10-29 用户口径「表格编号改为单据编号」—— 这一列本来存的就是单据编号(DT-…),
+            // 列名与纸面右上角那一格统一,避免「表格编号」被读成 YJ-RIR001 那种受控表单号。
+            { label: '单据编号', keys: ['单据编号', '编号', '单号'], w: 200 },
+            // 发起人 = **提交审批的人**(2026-10-29 用户口径「发起人没有,应该是提交审批的人的账号名,
+            //   以提交审批的为准,草稿的可以覆盖」)。后端 QueryService 已按
+            //   yj_doc_status.pending_by(权威) → 表内「制单人」顺序解出**真实姓名**放进「发起人」,
+            //   故这里直接读它;detailKeys 只保留给改造前的老行兜底(那时后端还没这个虚拟字段)。
+            { label: '发起人', keys: ['发起人', '提交人'], detailKeys: ['申请人', '发起人'], w: 130 },
             { label: '申请日期', keys: ['单据日期', '日期'], w: 140 },
             { label: '分类', key: '申请单类型', map: { 内部委托: '内部', 销售端: '外部' }, w: 110, hint: '内部/外部' },
             { label: '状态', keys: ['单据状态'], w: 140, align: 'center', hint: '测试中/已完成/已审核' },
+            // 关联的数据记录表(2026-10-29 用户口径「测试申请单的汇总也能看到有哪些数据记录表关联了
+            //   测试申请单,然后点击可以弹窗显示对应的数据记录表的数据」)。
+            // 取数走后端 /px/linkedRecordSheets(按记录表头的「测试申请单编号」查),本列不落库;
+            // 声明 link 后该格渲染成可点按钮,点开弹窗列出关联记录表,再点单张查看其数据。
+            { label: '数据记录表', link: 'recordSheets', w: 150, align: 'center', hint: '关联的记录表' },
           ],
         },
       },
@@ -903,21 +949,26 @@ export const recordSheetConfigs = {
           //   改造前这里写的是 col_name ⇒ 那五列取不到值、保存还被 labelsToCols 静默丢掉
           //   (旧配置挂在 variants 下,而 keys.test.js 只查 dataTables/cover/sections ⇒ 没人拦住;
           //    2026-09-30 改挂 dataTables 后由该测试守住)。
-          { key: '序号', label: '序号', rowspan: 2 },
-          { key: '日期', label: '日期', rowspan: 2 },
+          // ⚠ 2026-10-29:原先这 16 列里只有 背景/目的 与 方法 标了 area,其余全是单行 el-input
+          //   ⇒ 用户报「测试申请单的表格填写并没有自动换行,现在是会被截断」
+          //   (截图:「测试（检测）标准」填 1111111111111111 被格子横向切掉)。
+          //   现在:文本列一律走「自动换行 textarea」(RecordSheetPanels 的 .rs-wrap-in),
+          //   只有**日期/自增号**这类真短的才 singleLine(日期列另有日期控件接管,这里只是兜底)。
+          { key: '序号', label: '序号', rowspan: 2, singleLine: true },
+          { key: '日期', label: '日期', rowspan: 2, singleLine: true },
           { key: '申请人', label: '申请人', rowspan: 2 },
           { key: '测试（检测）背景/目的', label: '测试（检测）背景/目的', rowspan: 2, area: true },
           { key: '尺寸', label: '尺寸', group: '测试（检测）样品信息' },
           { key: '配方', label: '配方', group: '测试（检测）样品信息' },
           { key: '密度', label: '密度', group: '测试（检测）样品信息' },
           { key: '测试（检测）方法', label: '测试（检测）方法', rowspan: 2, area: true },
-          { key: '测试（检测）标准', label: '测试（检测）标准', rowspan: 2 },
-          { key: '测试（检测）目标', label: '测试（检测）目标', rowspan: 2 },
+          { key: '测试（检测）标准', label: '测试（检测）标准', rowspan: 2, area: true },
+          { key: '测试（检测）目标', label: '测试（检测）目标', rowspan: 2, area: true },
           { key: '组装方式', label: '组装方式', rowspan: 2 },
-          { key: '测完后样品样品处理', label: '测完后样品样品处理', rowspan: 2 },
+          { key: '测完后样品样品处理', label: '测完后样品样品处理', rowspan: 2, area: true },
           { key: '紧急程度', label: '紧急程度', rowspan: 2 },
-          { key: '期望完成日期', label: '期望完成日期', rowspan: 2 },
-          { key: '预计完成日期', label: '预计完成日期', rowspan: 2 },
+          { key: '期望完成日期', label: '期望完成日期', rowspan: 2, singleLine: true },
+          { key: '预计完成日期', label: '预计完成日期', rowspan: 2, singleLine: true },
           { key: '备注', label: '备注', rowspan: 2 },
         ],
       },
@@ -979,6 +1030,11 @@ export const recordSheetConfigs = {
     headMode: 'plain',
     plainTitle: '测试设备使用登记表',
     subtitle: { label: '设备名称：', key: '设备名称', type: 'select' },
+    /** 一台设备一组行(2026-10-28):切换「设备名称」只换显示的行,其它设备的记录仍在这张单里。
+     *  ⚠ detailKey 是**行归属字段的 label**(「设备归属」,物理列仍是 设备名称):
+     *    不能与表头字段同名 —— 同名会让前端按 dataName 建的字段表被明细定义覆盖,
+     *    表头那句标准库下拉因此取不到 options(实测「无数据」),见 migrate-record-group-relabel-20261028.sql。 */
+    groupBy: { headKey: '设备名称', detailKey: '设备归属' },
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 100 },
@@ -1002,6 +1058,9 @@ export const recordSheetConfigs = {
     headMode: 'plain',
     plainTitle: '实验室仪器使用记录表',
     subtitle: { label: '仪器名称/型号：', key: '仪器名称/型号', type: 'select' },   // 标准库(可维护)
+    /** 一台仪器一组行(2026-10-28):切换「仪器名称/型号」只换显示的行
+     *  ⚠ detailKey 用「仪器归属」而不是同名的表头字段,原因见 RD_EQUIP_USE.groupBy 注释 */
+    groupBy: { headKey: '仪器名称/型号', detailKey: '仪器归属' },
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 110 },
@@ -1048,8 +1107,8 @@ export const recordSheetConfigs = {
     //   · 内径:D=100,E/F/G=70 ⇒ D+E=85+70=155,F+G=78+77=155(内径mm 155 | 内径公差 155)
     // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
     // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
-    grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125],
-    head: { title: 7, infoLabel: 2, infoValue: 2 },
+    grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93],
+    head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
     // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
@@ -1060,11 +1119,11 @@ export const recordSheetConfigs = {
     //   页序一变,下面 sections/dataTables/tailSections 上所有 `page:` 数字必须同步重编
     //   (修订记录 0→2,工艺清单 1→0,配方 2→1);漏改一处的表现是"区块跑到别的页签"或整页空白。
     pages: [
-      { title: '成型工艺清单', grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125], showHead: true },
+      { title: '成型工艺清单', grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93], showHead: true },
       // 原页 3 的 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
-      { title: '成型配方', grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
+      { title: '成型配方', grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
       // 修订记录页不出报告头(设计只有一行居中大标题 + 一行表头,由 dt.pageTitle 出标题)
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93] },
     ],
     sections: [...RD_MOLD_PROC_SEC0, ...RD_MOLD_FORMULA.sections],
     // 两张逻辑表共用行表 rd_mold_proc_detail ⇒ 每条都必须带 filterKey:'表区' + filterVal
@@ -1150,26 +1209,34 @@ export const recordSheetConfigs = {
       //   这一格只读(readonly) —— 值由 PanelxList 监视器带当前登录人 + 后端 ButtonService
       //   每次保存回写真名;放开手填既没意义,也会被下一次保存覆盖。
       { label: '编辑人', key: '编辑人', type: 'text', readonly: true },
-      { label: '单据日期', key: '单据日期', type: 'text' },
+      // 2026-10-29 新版设计:表头那一格印的是「日期」(上一版配置写「单据日期」);
+      // 纯显示文案,数据键仍是 yj_field.label「单据日期」,历史值不受影响。
+      { label: '日期', key: '单据日期', type: 'text' },
     ],
     grid: [130, 260, 130, 260],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     sections: [
       // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
       // ⚠ 行宽对齐:双列行的占法是「左标签1 + 左值1 + 右标签1 + 右值1 = 4」——
       //   右值**不能再写 vspan:3**(那会变 6 列超宽,纸面直接串行;本次自检工具抓到的就是这个)。
       //   只有"整行一个值"的行才用 标签1 + vspan3。
       { bar: '一、产品基本信息', rows: [
-        // 2026-10-16 项目管理 ↔ 产品信息表 关联:标明这张产品属于哪一次立项
-        // (项目唯一键 = 立项申请的「文档编号」)。参照源在元数据里(RD_APPROVAL.文档编号),
-        // 选立项单时同名字段(客户名/项目等级等)按 refMap 自动带回;
-        // 「项目进度查询」每行的 [项目编号]/[说明] 存的就是这个值 ⇒「开发产品」按钮按它配对。
+        // 2026-10-29 新版设计重排(用户截图「格式变了,按上面说的来改」):
+        //   行1 项目编号 | 项目名称       ← 新增;项目编号来自立项(RD_APPROVAL.文档编号),可参照带回
+        //   行2 产品编号 | 客户名称       ← 右格由「客户项目名称」改为**客户名称**(客户维度)
+        //   行3 客户料号 | 产品管控等级   ← 不变
+        //   行4 产品功能类别 | 产品形态   ← 不变
+        //   行5 应用场景(整行)           ← 新增
+        // ⚠ 「立项文档编号」不再上纸面:它是「项目进度查询」配对用的物理列(改名会断链),
+        //   故新建设计只是**不画**它,库里的列与历史值原样保留(yj_field 仍 visible=1,编辑面板还能填)。
+        // ⚠ 「客户项目名称」同理保留在库里(规格书封面/下游参照还在用),只是这张纸面改成客户名称。
         { pairs: [
-          { label: '立项文档编号', key: '立项文档编号', type: 'text', vspan: 3 },
+          { label: '项目编号', key: '项目编号', type: 'text' },
+          { label: '项目名称', key: '项目名称', type: 'text' },
         ]},
         { pairs: [
           { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '客户项目名称', key: '客户项目名称', type: 'text' },
+          { label: '客户名称', key: '客户名称', type: 'text' },
         ]},
         { pairs: [
           { label: '客户料号', key: '客户料号', type: 'text' },
@@ -1178,6 +1245,9 @@ export const recordSheetConfigs = {
         { pairs: [
           { label: '产品功能类别', key: '产品功能类别', type: 'select' },
           { label: '产品形态', key: '产品形态', type: 'select' },
+        ]},
+        { pairs: [
+          { label: '应用场景', key: '应用场景', type: 'text', vspan: 3 },
         ]},
       ]},
       // 二、规格与尺寸:产品整体尺寸一行 + 炭棒尺寸一行(各整行,值区 vspan 3)
@@ -1192,18 +1262,26 @@ export const recordSheetConfigs = {
       //   整体尺寸与炭棒三格统一按 **外径*内径*长度** 写;「开发产品」按项目带入时也是按这个格式拆的
       //   (解析见 @core/progress/devProduct.parseCarbonSize)。
       { bar: '二、规格与尺寸', rows: [
+        // 2026-10-29 新版设计提示词改成「…±公差」口径(带公差是该格的实际填法);
+        // 保留 2026-10-16 用户要的「33*12*110」示例作括号补充,两句话在同一行里都能看到。
         { pairs: [
-          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3, ph: '例：33*12*110（外径*内径*长度）' },
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3, ph: '（外径*内径*长）±公差，如 33*12*110±0.5' },
         ]},
         { pairs: [
           { label: '炭棒尺寸', cells: [
-            { key: '炭棒外径', ph: '外径(mm) 如 33' },
-            { key: '炭棒内径', ph: '内径(mm) 如 12' },
-            { key: '炭棒长度', ph: '长度(mm) 如 110' },
+            { key: '炭棒外径', ph: '外径mm±公差' },
+            { key: '炭棒内径', ph: '内径mm±公差' },
+            { key: '炭棒长度', ph: '长度mm±公差' },
           ], vspan: 3 },
         ]},
       ]},
-      // 三、特殊性能描述 = 设计 B31「主要性能描述」。
+      // 三、产品BOM表 —— **2026-10-29 新版设计新增的一节**(旧设计没有)。
+      // 本节点只出「三、产品BOM表」那条栏目带;表体由下面的 dataTables 出
+      // (模板渲染次序是 sections → dataTables,靠 tablesAfterBar 把表夹在本节之后,
+      //  与规格书第 4 页「1.关键物料列表」同一套机制 ⇒ 这里**故意不给表加 bar**,否则标题画两遍)。
+      // 设计图右侧那句「直接导入采购物料清单」= 本节标题行上的引用按钮(materialPick + materialPickLabel)。
+      { bar: '三、产品BOM表', doc: true, rows: [] },
+      // 四、特殊性能描述 = 设计 B31「主要性能描述」。
       // ⚠⚠ 2026-10-16 修(用户报障「主要性能描述和审批人那些信息保存都不见了」):
       //   纸面里的 `key` **必须是 yj_field.label**(接口行契约就是 label —— QueryService.rowToLabels),
       //   而这里原先填的是**物理列名**(特殊性能描述/审核人一级/审核人二级/责任人):
@@ -1212,13 +1290,13 @@ export const recordSheetConfigs = {
       //   实测(服务器 PI-2026-10-0007):主要性能描述=null(丢了);
       //     而 审核人一级/二级、责任人 由**审批流**写入,库里其实有值(冯总/陈秀丽/admin),
       //     纸面却读不到 ⇒ 用户看到的"审批人也不见了"是**读**的问题,同一个根因。
-      { bar: '三、特殊性能描述', rows: [
+      { bar: '四、特殊性能描述', rows: [
         { pairs: [
           { label: '主要性能描述', key: '主要性能描述', vspan: 3 },
         ]},
       ]},
       // 四、文件与签署 = 设计 B33 客户图纸或规格书 / B34-B35 两级审核 / B36 产品负责人 / B37 备注
-      { bar: '四、文件与签署', rows: [
+      { bar: '五、文件与签署', rows: [
         { pairs: [
           // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
           { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
@@ -1227,10 +1305,10 @@ export const recordSheetConfigs = {
         // docDefaults.js 在新建时带出(与 申请立项人/负责人 同机制,仍可人工改)。
         // 原「审核人」列保留为历史列(hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢)。
         { pairs: [
-          { label: '审核人（一级审批人）', key: '审核人（一级审批人）', type: 'text', vspan: 3 },
+          { label: '审核人（一级审核）', key: '审核人（一级审批人）', type: 'text', vspan: 3 },
         ]},
         { pairs: [
-          { label: '审核人（二级审批人）', key: '审核人（二级审批人）', type: 'text', vspan: 3 },
+          { label: '审核人（二级审核）', key: '审核人（二级审批人）', type: 'text', vspan: 3 },
         ]},
         { pairs: [
           { label: '产品负责人', key: '产品负责人', type: 'text', vspan: 3 },
@@ -1239,6 +1317,33 @@ export const recordSheetConfigs = {
           { label: '备注', key: '备注', vspan: 3 },
         ]},
       ]},
+    ],
+    /**
+     * 三、产品BOM表(2026-10-29 新版设计新增;本面板历史上**没有明细表**,rd_prod_info_detail
+     * 此前只有 单据编号 + 备用1..20 占位列、0 行数据)。
+     *
+     * 版式:设计 BOM 表 4 列 = 物料编号 | 物料名称 | 尺寸规格 | 数量(没有序号列)——
+     *   序号只作为**物理列**存在(for 排序/追溯),纸面用 hiddenCol 藏起来。
+     * 宽度合计 150+180+330+120 = 780 必须等于本面板纸面网格 130+260+130+260 = 780
+     *   (该表自带列宽 colgroup,总和与网格不等就会比上边的章节表短一截,2026-10-28 组装BOM表踩过)。
+     * 引用:materialPick 走**商品档案(INV)**同一套弹窗(四栏级联收窄 + 勾选落行),
+     *   落点映射按列名适配(物料编号←存货编码 / 尺寸规格←规格型号,见 core/panel/goodsPick.js);
+     *   materialPickLabel 只改纸面上的字,对应设计图右侧那句「直接导入采购物料清单」。
+     *   数量不由引用带入(商品档案没有用量口径,凭空填 1 会是错数据)。
+     */
+    dataTables: [
+      {
+        tablesAfterBar: '三、产品BOM表',
+        materialPick: true,
+        materialPickLabel: '直接导入采购物料清单',
+        cols: [
+          { key: '序号', label: '序号', hiddenCol: true, w: 70 },
+          { key: '物料编号', label: '物料编号', w: 150 },
+          { key: '物料名称', label: '物料名称', w: 180 },
+          { key: '尺寸规格', label: '尺寸规格', w: 330, area: true },
+          { key: '数量', label: '数量', w: 120 },
+        ],
+      },
     ],
   },
 
@@ -1264,8 +1369,8 @@ export const recordSheetConfigs = {
     // 报告头(页 1/页 2 共用):公司名 + 编号 + 居中大标题 + 右侧信息栏四格。
     // 信息栏照设计 F5:G8(D5:E5..D8:E8)= 表单管理人/密级/使用范围/版本号,
     // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
-    grid: [130, 390, 130, 390],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    grid: [130, 260, 130, 260],
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     info: [
       // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
       //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
@@ -1278,10 +1383,10 @@ export const recordSheetConfigs = {
     pages: [
       // 页 0:设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
       // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
-      { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 260, 130, 260] },
+      { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-BOM表' },
-      { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+      { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-组装/包装关键控制清单' },
     ],
     // 设计两张表的 B9:G9 都是「产品基本信息」,格子相同 ⇒ 同一份声明给两页(各声明 page)。
@@ -1432,10 +1537,17 @@ export const recordSheetConfigs = {
         // 2026-10-28 用户口径②:右上角那格改绑「单据编号」(自动号 SD-…),
         //   否则单据号在纸面上完全看不到(原来那格绑的是产品编号)。
         { label: '产品编号', key: '产品编号' },
+        // 2026-10-29 新版设计:封面第 2 行是「产品名称」。
+        // ⚠ 数据键必须是 yj_field.label —— 规格书这一列物理列叫 `名称`、label 也是「名称」,
+        //   故 key 写 '名称'(不是 '产品名称');prodPick.map 里 `{ from:'产品名称', to:'名称' }`
+        //   正是这条跨名映射,引用产品信息表时会自动带回。
+        { label: '产品名称', key: '名称' },
         { label: '产品类别', key: '产品类别' },
-        { label: '客户名称', key: '客户名称' },
+        // 2026-10-29 新版设计**去掉**「客户名称」这一行(设计只有 9 行,客户维度由下一行承担)。
+        // 只是不上纸面;RD_SPEC_DOC.客户名 的库里历史值原样保留,编辑面板仍可见。
         { label: '客户料号', key: '客户料号' },
-        { label: '客户项目名称', key: '客户项目名称' },
+        // 显示文案照设计加括号;数据键仍是「客户项目名称」,不动。
+        { label: '客户（项目）名称', key: '客户项目名称' },
         { label: '应用场景', key: '应用场景' },
         { label: '整体规格参数', key: '整体规格参数' },
         { label: '产品主要性能', key: '产品主要性能' },
@@ -1553,7 +1665,13 @@ export const recordSheetConfigs = {
       //    弹窗列 → 数据键的对应关系见 RecordSheetPanels.vue 的 openMaterialPick 注释
       //    (「物料代号」在 mate 里没有独立列,取的是物料清单表头「物料代码」wzdm1 ——
       //     该键由 QueryService 合并在每条子件行上,现成可用)。
-      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true,
+        // 2026-10-29 用户口径「规格书的从商品引用改回去引用物料清单」:
+        //   引用源 = **物料清单(WLBOM)** —— 勾整张物料清单单,该单全部子件展开落行,
+        //   数量 ← 标准用量(商品档案没有这一列,这也正是当初换回物料清单的关键原因)。
+        // 沿革:2026-10-13 WLBOM → 2026-10-21 改商品档案 → 2026-10-29 改回 WLBOM。
+        // 产品信息表「三、产品BOM表」仍是商品档案(那边没有声明 materialPickSource)。
+        materialPickSource: 'mate', cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
@@ -1614,7 +1732,7 @@ export const recordSheetConfigs = {
       { label: '密级', key: '密级', type: 'select' },
     ],
     grid: [144, 144, 144, 144, 294, 165, 152],
-    head: { title: 5, infoLabel: 1, infoValue: 1 },
+    head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     // 表头三行照设计 r5/r6/r7 逐格对位(每行 3 对 = 7 格;产品编号/产品功能类别/编写人 的值格跨 C:D):
     //   r5 [产品编号 | 客户项目名称 | 使用范围]
     //   r6 [产品功能类别 | 产品整体尺寸 | 版本号]
@@ -1779,7 +1897,7 @@ export const recordSheetConfigs = {
     titleKeyPh: 'KPC管控点申请单',
     titlePlaceholder: 'KPC管控点申请单',
     grid: [111, 205, 441, 147, 210, 128],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
     sections: [
       { bar: '一、基础信息', rows: [

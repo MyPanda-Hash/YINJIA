@@ -137,7 +137,7 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 
 ## 架构速查
 
-- 术语表:`CONTEXT.md`(翻译表/翻译分层/字典翻事实不翻)
+- 术语表:`GLOSSARY.md`(翻译表/翻译分层/字典翻事实不翻)
 - 决策记录:`docs/adr/0001-dictionary-only-translation.md`
 - 多语言实现:`TranslationService`(后端缓存+机翻)、`stores/locale.js`(前端真源)、
   `tools/i18n-*.sql`(翻译表迁移脚本)

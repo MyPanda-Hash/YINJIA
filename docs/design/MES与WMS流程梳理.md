@@ -7,7 +7,7 @@
 | 依据·导航与流程真源 | `frontend/src/business/menus.js`（左侧导航唯一真源） |
 | 依据·后端实现 | `ButtonService.java`(审核/审批钩子、状态推导、归档面板集)、`PanelConfigService.java`(按钮组/选单流向/推式生单目标)、`StockLedgerService.java`、`StockFlowService.java`、`WoReportService.java`、`ManuWritebackService.java`、`OrderConvertService.java`、`WorkOrderPickingService.java`、`QcRecvGenerateHandler.java`、`QcCatalogService.java`、`KingdeePushService.java` |
 | 依据·元数据与实库 | `yj_panel`(125 行)、`yj_field`、`yj_doc_status`(30 列)、`form_flow_link`；`HSDZ_MES`(实测 209 表 / 97 视图) |
-| 依据·文档 | `CONTEXT.md`(术语表)、`README.md`、`docs/development/数据库表清单.md`、`docs/development/采购链四单字段与显示字段.md`、`docs/design/银嘉MES总流程整理-V1.2.md`、`docs/design/补充设计-V2.0.md` |
+| 依据·文档 | `GLOSSARY.md`(术语表)、`README.md`、`docs/development/数据库表清单.md`、`docs/development/采购链四单字段与显示字段.md`、`docs/design/银嘉MES总流程整理-V1.2.md`、`docs/design/补充设计-V2.0.md` |
 | 记号 | **【已验证】** = 本次读代码或查库可直接复现；**【未确认】** = 静态推断、或无法只读验证 |
 
 > ⚠ **前提（影响本文的取证方式）**：正式库 `HSDZ_MES` 当前**没有业务单据数据** ——
@@ -307,7 +307,7 @@ case "PURCHASE_IN", "FINISH_IN", "MATERIAL_OUT", "SALE_OUT" -> true;   // 其余
 
 - **现役 21 张**：立项申请、项目实施计划、数据记录表 8、实验室使用记录表 4、
   产品文件族 7(产品信息表/成型工艺清单/成型配方/组装BOM表/组装工艺清单/规格书/出货检验计划表)。
-  > ⚠ 术语表 `CONTEXT.md` 写的是「22 面 = … + 样品编号表 1」，**该面板 2026-09-30 已下架并从集合移除**，
+  > ⚠ 术语表 `GLOSSARY.md` 写的是「22 面 = … + 样品编号表 1」，**该面板 2026-09-30 已下架并从集合移除**，
   > 现在代码里是 21 面(见 §6 不一致 F)。
 - 行为：**管理员点「保存」= 直接归档**(不经审批，同时写审核人 `shr`)；
   **普通用户点「保存」= 自动进审批中**，管理员审批通过后归档。
@@ -425,7 +425,7 @@ case "PURCHASE_IN", "FINISH_IN", "MATERIAL_OUT", "SALE_OUT" -> true;   // 其余
 | `ERPLG_ROW` | ERP 导入明细 | 无独立入口(从 `ERPLG` 下钻) |
 | `CGD` / `KHDD` | 采购单/客户订单 | **遗留面板**(表 `Porder`/`order_bs`/`order_bt`)，菜单里从未挂载；`PanelxForm`/`PanelxList` 还有它们的特殊分支 |
 
-### F. 术语表 `CONTEXT.md` 的数字与代码不符【已验证】
+### F. 术语表 `GLOSSARY.md` 的数字与代码不符【已验证】
 
 - 「文书归档面板 …**共 22 面** …+ 样品编号表 1」：代码 `ButtonService.DOC_ARCHIVE_PANELS`
   现为 **21 个**面板码，且**不含** `RD_SAMPLE_NO`(2026-09-30 下架并同批从集合移除)。
@@ -469,7 +469,7 @@ case "PURCHASE_IN", "FINISH_IN", "MATERIAL_OUT", "SALE_OUT" -> true;   // 其余
    `KingdeePushService` 虽支持推送 `PU_ORDER`，但该面板按钮组无「转ERP」按钮——**这部分仍成立**。
 3. **`plang` 与 `v_manu_order_*` 明细/统计表是否同源**：菜单的「生产工单明细表/统计表」面板绑的是
    `v_manu_order_detail/stats`，未逐列核对它们读的是 `plang` 还是 `bd_manu_order`。
-4. **线边库存/线边仓**：V1.2 与 `CONTEXT.md` 都提到线边库存，代码里未找到实现。
+4. **线边库存/线边仓**：V1.2 与 `GLOSSARY.md` 都提到线边库存，代码里未找到实现。
 5. **PDA/手机端扫码报工现状**：只有顶栏「建设中」提示与通用「扫描填单」(OCR)，
    未见扫码报工专用界面。
 6. **现役工单列表页是否还有独立的"工单二维码"打印入口**：列表页确认含二维码要素

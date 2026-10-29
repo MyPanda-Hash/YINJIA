@@ -204,3 +204,15 @@ tools/_out/
 /deploy/incr-finish-in-wo-backfill-*/SHA256SUMS.txt
 /deploy/incr-finish-in-wo-backfill-*/logs/
 /deploy/incr-finish-in-wo-backfill-*.zip
+
+# ── 根层 _scratch/ 不入库(2026-10-30 审查增)──────────────────────────
+# ego-browser 等工具的会话工作区(round-NN.mjs 探针 + 截图,实测 73 个文件)。
+# 按 AGENTS.md:一次性探针/任务产物应写 tools/archive/_* 并入库;
+# 根层这个目录是"边跑边写"的工作区,不是仓库内容。截图另有 *.png 规则覆盖。
+_scratch/
+
+# ── 运行时用户上传附件不入库(2026-10-30 审查增)──────────────────────
+# backend/uploads/attachments/ 由应用运行时写入(用户上传的 pdf/doc/xlsx)。
+# 属业务数据,与「参考（不上传仓库）/」同一约定:不入库、不上传。
+# ⚠ 历史上已入库的那一个 xlsx 保持原样(已跟踪文件不受本规则影响,不会被动删)。
+/backend/uploads/attachments/

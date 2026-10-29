@@ -1,0 +1,37 @@
+[
+  {
+    "step": "产品信息表单号",
+    "result": "PI-2026-10-0018"
+  },
+  {
+    "step": "1.产品开发下发",
+    "result": {
+      "code": 200,
+      "msg": "success"
+    }
+  },
+  {
+    "step": "2.rd_dev_task 行",
+    "result": "产品编号 | 产品名称 | 源单据号 | 目标面板 | 负责人 | 作废\r\nYJ-CB-2026-001 | 高效除重金属炭棒滤芯 YKRS-200 | PI-2026-10-0018 | RD_ASM_PROC | null | N\r\nYJ-CB-2026-001 | 高效除重金属炭棒滤芯 YKRS-200 | PI-2026-10-0018 | RD_INSP_PLAN | null | N\r\nYJ-CB-2026-001 | 高效除重金属炭棒滤芯 YKRS-200 | PI-2026-10-0018 | RD_MOLD_PROC | null | N\r\nYJ-CB-2026-001 | 高效除重金属炭棒滤芯 YKRS-200 | PI-2026-10-0018 | RD_SPEC_DOC | null | N\r\n-- (4 rows) --"
+  },
+  {
+    "step": "2b.任务数",
+    "result": "n\r\n4\r\n-- (1 rows) --"
+  },
+  {
+    "step": "3.矩阵行",
+    "result": {
+      "产品编号": "YJ-CB-2026-001",
+      "cells": {
+        "RD_SPEC_DOC": "开发完毕",
+        "RD_MOLD_PROC": "开发完毕",
+        "RD_ASM_PROC": "开发完毕",
+        "RD_INSP_PLAN": "开发完毕"
+      },
+      "doneCount": 4,
+      "totalCount": 4,
+      "overall": "开发完毕",
+      "产品负责人": ""
+    }
+  }
+]

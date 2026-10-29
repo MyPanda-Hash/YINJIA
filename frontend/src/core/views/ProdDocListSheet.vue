@@ -12,10 +12,11 @@
        只读视图:产品文件由各自的面板维护,这里不做就地编辑(与"产品开发"按钮同一份数据源)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="prod-doc-sheet">
-    <!-- ① 公司头 + 右上单据编号 -->
+    <!-- ① 公司头 + 右上单据编号(2026-10-29 用户口径「产品文件内的面板的右上角的编号应该改为
+         单据编号,所有的都是」⇒ 与其余 6 张面板统一印「单据编号：」标识 + 单据编号本体) -->
     <div class="pds-topbar">
       <div class="pds-company">{{ tt('惠州市银嘉环保科技有限公司') }}</div>
-      <div class="pds-docno">{{ head && head['单据编号'] ? head['单据编号'] : '' }}</div>
+      <div class="pds-docno"><span class="pds-docno-prefix">{{ tt('单据编号：') }}</span>{{ (head && head['单据编号']) || '—' }}</div>
     </div>
 
     <!-- ② 标题行 -->
@@ -208,6 +209,7 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 .pds-topbar { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 6px; }
 .pds-company { font-size: 15px; font-weight: 700; letter-spacing: .5px; }
 .pds-docno { font-size: 13px; color: #409eff; }
+.pds-docno-prefix { color: #1f2d3d; margin-right: 2px; }
 
 .pds-title-row {
   display: flex; align-items: center; justify-content: space-between;

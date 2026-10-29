@@ -106,11 +106,17 @@ SELECT N'field', t.ref_key, t.locale, t.text, N'manual'
 PRINT N'供应商勾选弹窗文案译名已写入(已存在的不覆盖)';
 GO
 
-/* ---------- 自检:每个键 9 语言 ---------- */
+/* ---------- 自检:每个键 9 语言 ----------
+ * ⚠ 2026-10-29 修(自检口径过严,曾把整条迁移链打断):原判据带 `source = N'manual'`,
+ *   而 地址 / 电话 / 供应商名称 / 联系人 这几个**老字段**的译名早由机翻管线写过
+ *   (source='mt',各 9~10 语言)⇒ 本脚本"已存在即跳过"不会重复插,它们的 manual 只有 1 行,
+ *   自检因此**恒失败**,`DbSync` 遇 FAIL 即停,排在后面的迁移全部轮不到。
+ *   语言"齐不齐"只能看**语言数**:manual=人工校对过、mt=机翻,是质量等级,不是缺失。
+ *   RAISERROR 与下面的展示 SELECT 用同一份判据,保持口径一致。 */
 DECLARE @bad nvarchar(1000) = N'';
 SELECT @bad = @bad + ref_key + N'(' + CAST(c AS varchar) + N')'
   FROM (SELECT ref_key, COUNT(*) AS c FROM yj_translation
-         WHERE scope = N'field' AND source = N'manual'
+         WHERE scope = N'field'
            AND ref_key IN (N'选择供应商', N'点右侧「选择」勾选供应商', N'供应商名称',
                            N'联系人', N'电话', N'地址', N'没有符合条件的供应商',
                            N'请选择一个供应商', N'加载供应商档案失败')
@@ -119,7 +125,7 @@ SELECT @bad = @bad + ref_key + N'(' + CAST(c AS varchar) + N')'
 IF @bad <> N'' RAISERROR(N'自检失败:以下词条语言数不足 9: %s', 16, 1, @bad);
 
 SELECT ref_key AS 文案, COUNT(*) AS 语言数 FROM yj_translation
- WHERE scope = N'field' AND source = N'manual'
+ WHERE scope = N'field'
    AND ref_key IN (N'选择供应商', N'供应商名称', N'联系人', N'电话', N'地址')
  GROUP BY ref_key ORDER BY ref_key;
 GO

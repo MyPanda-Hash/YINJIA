@@ -1,0 +1,387 @@
+[
+  {
+    "panel": "RD_DROP_PREC",
+    "tables": [
+      {
+        "ti": 0,
+        "width": 1510,
+        "nCols": 11,
+        "cells": [
+          {
+            "i": 0,
+            "w": 157,
+            "maxTextW": 65,
+            "need": 83,
+            "waste": 74,
+            "sample": "测试负责人"
+          },
+          {
+            "i": 1,
+            "w": 280,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 262,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 120,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 102,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 100,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 106,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 88,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 106,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 88,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 127,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 109,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 116,
+            "maxTextW": 26,
+            "need": 44,
+            "waste": 72,
+            "sample": "密级"
+          },
+          {
+            "i": 10,
+            "w": 165,
+            "maxTextW": 136,
+            "need": 154,
+            "waste": 11,
+            "sample": "—"
+          }
+        ]
+      },
+      {
+        "ti": 1,
+        "width": 1510,
+        "nCols": 11,
+        "cells": [
+          {
+            "i": 0,
+            "w": 157,
+            "maxTextW": 88,
+            "need": 106,
+            "waste": 51,
+            "sample": "测试目的/背景"
+          },
+          {
+            "i": 1,
+            "w": 280,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 262,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 120,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 102,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 100,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 106,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 88,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 106,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 88,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 127,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 109,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 10,
+            "w": 165,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 147,
+            "sample": ""
+          }
+        ]
+      },
+      {
+        "ti": 2,
+        "width": 1510,
+        "nCols": 11,
+        "cells": [
+          {
+            "i": 0,
+            "w": 157,
+            "maxTextW": 116,
+            "need": 134,
+            "waste": 23,
+            "sample": "测试用仪器/检出限"
+          },
+          {
+            "i": 1,
+            "w": 280,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 262,
+            "sample": ""
+          },
+          {
+            "i": 2,
+            "w": 120,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 102,
+            "sample": ""
+          },
+          {
+            "i": 3,
+            "w": 100,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 82,
+            "sample": ""
+          },
+          {
+            "i": 4,
+            "w": 106,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 88,
+            "sample": ""
+          },
+          {
+            "i": 5,
+            "w": 106,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 88,
+            "sample": ""
+          },
+          {
+            "i": 6,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 127,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 109,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 10,
+            "w": 165,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 147,
+            "sample": ""
+          }
+        ]
+      },
+      {
+        "ti": 3,
+        "width": 1510,
+        "nCols": 11,
+        "cells": [
+          {
+            "i": 0,
+            "w": 157,
+            "maxTextW": 64,
+            "need": 82,
+            "waste": 75,
+            "sample": "前压（kpa)"
+          },
+          {
+            "i": 1,
+            "w": 280,
+            "maxTextW": 64,
+            "need": 82,
+            "waste": 198,
+            "sample": "后压（kpa)"
+          },
+          {
+            "i": 2,
+            "w": 120,
+            "maxTextW": 64,
+            "need": 82,
+            "waste": 38,
+            "sample": "压差（kpa)"
+          },
+          {
+            "i": 3,
+            "w": 100,
+            "maxTextW": 25,
+            "need": 43,
+            "waste": 57,
+            "sample": "密度"
+          },
+          {
+            "i": 4,
+            "w": 106,
+            "maxTextW": 88,
+            "need": 106,
+            "waste": 0,
+            "sample": "测试水温（℃）"
+          },
+          {
+            "i": 5,
+            "w": 106,
+            "maxTextW": 89,
+            "need": 107,
+            "waste": -1,
+            "sample": "测试流速（L/min）"
+          },
+          {
+            "i": 6,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 7,
+            "w": 116,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 98,
+            "sample": ""
+          },
+          {
+            "i": 8,
+            "w": 127,
+            "maxTextW": 0,
+            "need": 18,
+            "waste": 109,
+            "sample": ""
+          },
+          {
+            "i": 9,
+            "w": 116,
+            "maxTextW": 98,
+            "need": 116,
+            "waste": 0,
+            "sample": "0.5-1μm颗粒物去除"
+          },
+          {
+            "i": 10,
+            "w": 165,
+            "maxTextW": 25,
+            "need": 43,
+            "waste": 122,
+            "sample": "备注"
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -76,11 +76,16 @@ test('pageOfLabelIn: 旧调用按纸面文案找页(返回 null 口径不变)', 
   assert.equal(pageOfLabelIn(cfg, '不存在'), null)
 })
 
-test('规格书 RD_SPEC_DOC:必填的「名称」在纸面配置里查无此页(定位极限,需纸面/元数据决策)', () => {  const spec = recordSheetConfigs.RD_SPEC_DOC
-  assert.equal(pageOfKeyIn(spec, '名称'), -1)
-  assert.equal(pageOfLabelIn(spec, '名称'), null)
-  // 反面:同一面板里**会被渲染**的必填字段必须找得到页(否则「跳到缺失字段」无从谈起)
-  assert.equal(pageOfKeyIn(spec, '产品编号'), 0, '封面右上角编号格')
+test('规格书 RD_SPEC_DOC:必填的「名称」已上封面,能被定位到第 0 页(旧定位极限已解除)', () => {
+  // 【历史】2026-10-13 ~ 2026-10-28:yj_field 里「名称」required=1,但纸面一处都没渲染它
+  //   ⇒ 校验提示「名称不能为空」时前端翻不过去(本测试原先是把这个"找不到"当事实钉住的)。
+  // 【2026-10-29】产品规格书新版设计把「产品名称」放上封面第 2 行(key = 名称)
+  //   ⇒ 该字段现在**真的在纸面上**,定位必须命中第 0 页。反过来钉住:谁再把它从封面删掉,这里就红。
+  const spec = recordSheetConfigs.RD_SPEC_DOC
+  assert.equal(pageOfKeyIn(spec, '名称'), 0, '封面「产品名称」= 数据键 名称,应在第 0 页')
+  assert.equal(pageOfLabelIn(spec, '产品名称'), 0, '纸面文案「产品名称」也要能找到页')
+  // 同一面板里其它会被渲染的必填/常用字段也必须找得到页
+  assert.equal(pageOfKeyIn(spec, '产品编号'), 0, '封面字段表第一行')
   assert.equal(pageOfKeyIn(spec, '客户料号'), 0)
   assert.equal(pageOfKeyIn(spec, '应用场景'), 0)
   assert.equal(pageOfKeyIn(spec, '更改内容'), 1)

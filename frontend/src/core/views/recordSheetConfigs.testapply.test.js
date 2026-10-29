@@ -105,12 +105,19 @@ test('页 0 带设计的两处附录:测试周期须知(表尾)+ 国标可测项
   assert.deepEqual([tail.rows[0].项目, tail.rows[16].项目], ['浑浊度', '银'])
 })
 
-test('页 2 汇总表:列 = 设计 6 列,分类由 申请单类型 映射', () => {
+test('页 2 汇总表:列 = 设计 6 列 + 关联记录表列,分类由 申请单类型 映射', () => {
   const lg = cfg.pages[2].ledger
   assert.ok(lg, '页 2 必须是只读台账页(pages[2].ledger)')
-  assert.deepEqual(lg.cols.map((c) => c.label), ['序号', '表格编号', '发起人', '申请日期', '分类', '状态'])
-  assert.equal(lg.cols[1].keys[0], '单据编号', '表格编号 = 单据编号(设计对照 §2.11 口径)')
+  // 2026-10-29:「表格编号」改名为「单据编号」(用户口径「表格编号改为单据编号」),
+  //   并追加关联列(用户口径「测试申请单的汇总也能看到有哪些数据记录表关联了测试申请单…」)。
+  assert.deepEqual(lg.cols.map((c) => c.label),
+    ['序号', '单据编号', '发起人', '申请日期', '分类', '状态', '数据记录表'])
+  assert.equal(lg.cols[1].keys[0], '单据编号', '单据编号列的取值键 = 单据编号')
   assert.deepEqual(lg.cols[4].map, { 内部委托: '内部', 销售端: '外部' })
+  // 关联列:必须声明 link(否则前端渲染成纯文本,点不了)
+  assert.equal(lg.cols[6].link, 'recordSheets')
+  // 发起人 = 提交审批的人(后端虚拟字段),不能又退回明细申请人
+  assert.equal(lg.cols[2].keys[0], '发起人', '发起人首选后端算出的「发起人」')
 })
 
 test('页 0 / 页 1 每个列的 key 都必须是 yj_field.label —— 五列 col_name 与 label 分叉是重灾区', () => {

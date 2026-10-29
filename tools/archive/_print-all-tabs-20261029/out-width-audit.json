@@ -1,0 +1,135 @@
+[
+  {
+    "panel": "RD_ALKALINE",
+    "no": "PH-2026-10-0002",
+    "w": 1185,
+    "h": 716,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_MINERAL",
+    "no": "",
+    "w": 1385,
+    "h": 1843,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_ANTIBACT",
+    "no": "",
+    "w": 898,
+    "h": 656,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_SCALE",
+    "no": "",
+    "w": 1376,
+    "h": 553,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_RO_PROTECT",
+    "no": "",
+    "w": 889,
+    "h": 786,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_SOAK",
+    "no": "",
+    "w": 1161,
+    "h": 827,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_DROP_PREC",
+    "no": "",
+    "w": 1510,
+    "h": 596,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_SPIKE_WATER",
+    "no": "SW-2026-10-0001",
+    "w": 1611,
+    "h": 234,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_DOM_TEST",
+    "no": "DT-2026-10-0016",
+    "w": 1708,
+    "h": 1182,
+    "tabs": 3
+  },
+  {
+    "panel": "RD_EQUIP_USE",
+    "no": "EU-2026-10-0001",
+    "w": 921,
+    "h": 156,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_INSTR_USE",
+    "no": "",
+    "w": 1141,
+    "h": 249,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_MOLD_PROC",
+    "no": "MP-2026-10-0005",
+    "w": 1041,
+    "h": 1189,
+    "tabs": 3
+  },
+  {
+    "panel": "RD_PROD_INFO",
+    "no": "PI-2026-10-0009",
+    "w": 781,
+    "h": 877,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_ASM_PROC",
+    "no": "AP-2026-10-0003",
+    "w": 1041,
+    "h": 260,
+    "tabs": 3
+  },
+  {
+    "panel": "RD_SPEC_DOC",
+    "no": "SD-2026-10-0009",
+    "w": 794,
+    "h": 1159,
+    "tabs": 4
+  },
+  {
+    "panel": "RD_INSP_PLAN",
+    "no": "IP-2026-10-0015",
+    "w": 1188,
+    "h": 385,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_CHANGE",
+    "no": "CHG-2026-10-0001",
+    "w": 1243,
+    "h": 2385,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_SHARE_FILE",
+    "no": "共享文件库",
+    "w": 67,
+    "h": 634,
+    "tabs": 0
+  },
+  {
+    "panel": "RD_SINTER_TOL",
+    "no": "烧结尺寸表",
+    "w": 1137,
+    "h": 2188,
+    "tabs": 0
+  }
+]

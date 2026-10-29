@@ -121,11 +121,40 @@ public class QueryService {
     }
 
     /**
+     * 按**材料码打印单号**(`bd_pu_label.单据编号`,如 MQ-2026-10-0024)反查它属于哪张采购订单。
+     *
+     * <p>用途:重打 / 作废接口收的是打印单号,供应商会话要据此核对归属
+     * (见 PxController.requireMaterialLabelAccessByLabelDoc)。查不到或已作废 → 空串。
+     */
+    public String supplierOrderOfLabelDoc(String labelDocNo) {
+        String no = labelDocNo == null ? "" : labelDocNo.trim();
+        if (no.isEmpty()) return "";
+        try {
+            String orderNo = jdbc.queryForObject(
+                    "SELECT TOP 1 ISNULL([采购订单号],N'') FROM bd_pu_label"
+                            + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    String.class, no);
+            return orderNo == null ? "" : orderNo.trim();
+        } catch (RuntimeException e) {
+            return "";                                  // 查不到就拒绝(默认拒绝)
+        }
+    }
+
+    /**
      * 当前登录人若是供应商会话,返回其绑定供应商编码(否则 null)。
      * 抽成静态方法是为了让过滤器与 QueryService 用**同一个判据**(都在 yj_supplier_account 上),
      * 不在 QueryService 里再注入一份 SupplierPortalService 造成循环依赖风险。
+     *
+     * <p>返回值三态:
+     * <ul>
+     *   <li>{@code null} = 不是供应商账号(内部账号);</li>
+     *   <li>{@code ""} = 是供应商账号但**已停用**;</li>
+     *   <li>其它 = 该账号绑定的供应商编码。</li>
+     * </ul>
+     * 2026-10-29 改为 public:材料码打印的权限闸门(PxController.requireMaterialLabelAccess)也要用它区分
+     * 「内部账号按面板权 / 供应商账号按逐单归属」。
      */
-    private String sessionSupplierCode() {
+    public String sessionSupplierCode() {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String user = auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : null;
         if (user == null) return null;
@@ -653,6 +682,19 @@ public class QueryService {
             doc.put("单据状态", statusText);
             doc.put("saved", st != null ? st.get("saved") : null);
             doc.put("detail", Map.of("items", items));
+            // 「发起人」= 提交审批的人(2026-10-29 用户口径「发起人应该是提交审批的人的账号名,
+            // 以提交审批的为准,草稿的可以覆盖」)。
+            //   权威源 = yj_doc_status.pending_by(提交审批时写入,提交人自己会变就跟着变);
+            //   草稿还没提交过 ⇒ 没有 pending_by,退回表内「制单人/申请人」(新建草稿也有值),
+            //   一旦提交审批就按 pending_by 覆盖 —— 正是用户说的「以提交审批的为准,草稿的可以覆盖」。
+            //   行契约里另给「提交人」只是它的账号版;汇总表要显示**姓名**,故这里一并把名字解出来。
+            String submitter = st == null ? "" : blankSafe(st.get("pending_by"));
+            if (submitter.isEmpty()) submitter = blankSafe(doc.get("制单人"));
+            if (submitter.isEmpty()) submitter = blankSafe(doc.get("申请人"));
+            if (!submitter.isEmpty()) {
+                doc.put("发起人", realNameOf(submitter));
+                doc.put("发起人账号", submitter);
+            }
             if (st != null && st.get("shr") != null) {
                 // 质量单据(2026-10-04 两级审批)例外:它的「审核人/审核时间」是**表内真值** ——
                 // 一级审批通过时写纸面「审核」格(一级审核人),「批准」另落 审批人。
@@ -924,6 +966,29 @@ public class QueryService {
             return String.valueOf(v);
         }
         return String.valueOf(v);
+    }
+
+    /** 空值安全的字符串(去空白;null → 空串) —— 发起人取值用 */
+    private static String blankSafe(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /**
+     * 账号 → 真实姓名(取不到回退账号)。
+     * 与 ButtonService.realNameOf 同一口径:汇总表的「发起人」要的是**人名**,
+     * 而 yj_doc_status.pending_by 存的是账号。
+     */
+    private String realNameOf(String user) {
+        String u = blankSafe(user);
+        if (u.isEmpty()) return "";
+        try {
+            List<String> names = jdbc.queryForList(
+                    "SELECT real_name FROM yj_user WHERE username = ?", String.class, u);
+            String n = names.isEmpty() ? null : names.get(0);
+            return n == null || n.isBlank() ? u : n.trim();
+        } catch (RuntimeException e) {
+            return u;   // 取名字失败不该让整张汇总表崩掉(账号也看得懂)
+        }
     }
 
     private static final java.time.format.DateTimeFormatter D_FMT =
