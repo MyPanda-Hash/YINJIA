@@ -363,6 +363,7 @@
                 <div
                   class="as-side-btn"
                   :class="{ primary: btnName(g) === '保存' && curDocStatus === '草稿', disabled: isDisabled(btnName(g)) }"
+                  :title="btnName(g) === '修改' ? tt('修改：退回草稿后可以继续修改，改完保存即重新归档') : ''"
                   @click="onSideAction(btnName(g))"
                 >{{ tt(btnName(g)) }}</div>
                 <div
@@ -4908,7 +4909,14 @@ watch(
   () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
   () => {
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
-    applyDocDefaults(panelCode.value, cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
+    applyDocDefaults(panelCode.value, cur.value, user, {
+      isNew: isFreshAddedDoc(),
+      today: todayStr(),
+      // 声明式默认值(yj_panel.config.headDefaults,后端 buildMeta 下发)。
+      // 关键:后端「新增」建单时已把默认值写库,但前端新建后的本地草稿是空的 ——
+      // 不在这里补,就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
+      headDefaults: cfgCache.value?.metadata?.headDefaults || null,
+    })
   },
 )
 
@@ -7093,7 +7101,6 @@ async function buildSheetPdfBlob() {
     await nextTick()
   }
   if (!shots.length) return null
-  if (!shots.length) return null
   // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
   // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证物理尺寸可预期。
   const MM = 25.4 / 96
@@ -7324,6 +7331,10 @@ async function printApprovalSheet() {
     document.body.classList.remove('approval-printing')
     document.documentElement.style.removeProperty('--print-zoom')
     window.removeEventListener('afterprint', restore)
+  }
+  window.addEventListener('afterprint', restore)
+  // 等样式生效后调打印预览(用户可另存为 PDF 或打印)
+  setTimeout(() => window.print(), 150)
 }
 
 // ══════════ 单据打印版式(2026-09-15):宽明细表 A4 纸面优化 ══════════

@@ -522,6 +522,9 @@ public class ButtonService {
                 // 该分支在下方直接 return,走不到保存末尾那段 UPDATE(实测漏写:AP-2026-10-01 草稿
                 // 的「表单管理人」落库为 NULL)。这里与末尾那段同口径(值=realNameOf(user))。
                 putEditorCols(def, table, cols, user);
+                // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
+                // 只补没有值的列 ⇒ 用户手改过的不会被抢回默认值。
+                putHeadDefaults(def, table, cols);
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
@@ -1366,6 +1369,8 @@ public class ButtonService {
                 + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, shr, shsj, archived_at, update_at) "
                 + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', ?, GETDATE(), GETDATE(), GETDATE());",
                 panelCode, no, user, user);
+        // 四个受控文件:归档即**本文件受控**(2026-09-30 用户口径「受控按文件」)。
+        // 需求原文(《产品开发系统需求汇总》5.1):「保存/提交 → 提交后审批 → 审批后自动受控」。
         markFileControlled(panelCode, no, user);
         // 产品信息表归档 ⇒ BOM 明细同步写入物料清单(mate)。
         // 挂在这里是因为 markArchived 是**唯一的归档入口**:保存即归档 / 审批通过 /
@@ -6696,6 +6701,12 @@ public class ButtonService {
             notify(() -> messageService.send(List.of(owner), MessageService.SPEC_ASSIGNED, "RD_SPEC_DOC", docNo,
                     Map.of("kind", kind, "productCode", productCode, "productName", productName), user));
         }
+        // 产品负责人回填(2026-10-29 用户口径):
+        //   「产品负责人是对接人签核分发的规格书的负责人,在对接人签核分发规格书的负责人之后
+        //    自动回填到这个产品信息表里面,但是不修改产品信息表的状态,
+        //    就是可以在产品信息表处于归档状态的情况下回填产品负责人」。
+        // 取**规格书(分发到 RD_SPEC_DOC 那个责任人)**当产品负责人 —— 不是操作人、不是总负责人。
+        // ⚠ 只 UPDATE 责任人列,绝不碰 yj_doc_status / archived / pending
         //   (单据此时通常已归档,碰状态会把它从归档打回草稿 —— 用户明确要求"不改状态")。
         String specOwner = "";
         for (Map<String, Object> a : assigned) {
@@ -6703,7 +6714,6 @@ public class ButtonService {
             if (o != null) specOwner = String.valueOf(o).trim();
         }
         backfillProdOwner(no, specOwner);
-
 
         Map<String, Object> r = result(no, "已分发");
         r.put("productCode", productCode);
@@ -6746,7 +6756,6 @@ public class ButtonService {
             log.warn("[产品负责人回填] 产品信息表 {} 回填失败(分发已成功):{}", prodDocNo, e.getMessage());
         }
     }
-
 
     /** 已分配规格书单的编辑封锁:仅 责任人∪总负责人(活值)∪管理员 可保存/申请修改/删除;
      *  未分配的历史单不受限(直接放行)。 */
@@ -7295,14 +7304,13 @@ public class ButtonService {
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
             "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // ⚠ 物料清单(WLBOM,2026-10-21 曾登记,2026-10-29 **移出**)——
-            //   当年登记是想让「保存后不是草稿」,但落到本集合 = 保存即归档,而前端 draftEditable
-            //   不认「已归档」⇒ **保存一次就锁死、再也改不了**(2026-10-29 用户报障:
-            //   「这个是不需要审批的,现在保存之后是不能修改的」)。
-            //   用户口径是「填写和修改都不需要审批」= 基础数据随时可改,不是"存一次定稿的文书"。
-            //   ⇒ 复归本集合:保存即归档是**对的**(用户口径「肯定是要能保存归档的」),
-            //     缺的是**归档后的退路** ⇒ 由本集合 + SELF_MAINTAINED_PANELS 配套的
-            //     「修改」按钮({@link #selfModify})退回草稿,而不是取消归档。
+            // 物料清单(WLBOM,2026-10-21 登记,2026-10-29 复归):保存即归档是**对的**
+            //   (用户口径「肯定是要能保存归档的」),它属于基础数据:填完保存就定稿归档。
+            //   修改路径不用文书那一套「申请修改→管理员审批→修改中」——
+            //   WLBOM ∈ SELF_MAINTAINED_PANELS ⇒ 走 {@link #selfModify} 的「修改」按钮:
+            //   点一下直接退回草稿、改完再保存即重新归档,全程无审批。
+            //   ⚠ 曾经的问题不是"归档"本身,而是**归档后没有退路**(前端 draftEditable 不认已归档)
+            //     ⇒ 2026-10-29 用户报障「保存之后不能修改」。修法是补「修改」按钮,不是取消归档。
             "WLBOM");
     /**
      * **自助维护型**面板(2026-10-21):保存即归档,**任何用户都不走审批**。
@@ -7319,8 +7327,6 @@ public class ButtonService {
      *
      * <p>2026-10-29 用户口径:「我现在想的是肯定是要能保存归档的,但是加上一个修改按钮,
      *   点击之后就退回草稿状态,然后就可以继续修改了,修改完再保存就行了」。
-     *   ⚠ 曾经的问题是**归档后没有退路**(前端 draftEditable 不认已归档)⇒ 存一次就锁死;
-     *     修法是补「修改」按钮,不是取消归档。
      *
      * <p>配套:
      * <ul>

@@ -138,6 +138,32 @@ public class PanelRegistry {
         }
 
         /**
+         * **新建单据的默认值**(yj_panel.config 的 {@code "headDefaults"},2026-10-29 起):
+         * 写法 {@code {"密级":"保密","文件使用范围":"银嘉内部"}} —— 「新增」建单时写进头表,
+         * 之后用户仍可改(只是初始值,不是锁死)。
+         *
+         * <p>用户口径:「密级以及文件使用范围默认选择保密、内部,这些是可以换的,
+         *   只是新增的单据就是默认选择这些」。
+         *
+         * <p>声明式,与 {@link #fixedItems()} / {@link #uniqueKeys()} 同一条规矩:
+         * 改默认值 = 改这一行 JSON,不加代码。解析失败返回空表(宁可不带默认值,也不能让新建失败)。
+         */
+        public Map<String, String> headDefaults() {
+            if (config == null || !config.contains("headDefaults")) return Map.of();
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("headDefaults");
+                if (!node.isObject()) return Map.of();
+                Map<String, String> out = new java.util.LinkedHashMap<>();
+                node.fields().forEachRemaining(e -> {
+                    if (!e.getValue().isNull()) out.put(e.getKey(), e.getValue().asText(""));
+                });
+                return java.util.Collections.unmodifiableMap(out);
+            } catch (Exception ex) {
+                return Map.of();
+            }
+        }
+
+        /**
          * **行标题可改的声明**(yj_panel.config 的 {@code "editableRowLabel"},2026-10-29 起):
          * 值为一组「行标题字段名」,前端据此把该行左侧的标题格做成可编辑,并把改后的名字记进
          * 同面板 config 的 {@code "rowLabels"} 映射(见 PanelConfigService.saveRowLabels)。
@@ -223,31 +249,6 @@ public class PanelRegistry {
          * <p>解析失败(手写 config 写坏)时返回空表并在日志里骂一句:宁可不拦业务,
          * 也不能因为一段配置让整个面板存不进去 —— 数据库侧的过滤唯一索引仍是最后一道闸。
          */
-        /**
-         * **新建单据的默认值**(yj_panel.config 的 {@code "headDefaults"},2026-10-29 起):
-         * 写法 {@code {"密级":"保密","文件使用范围":"银嘉内部"}} —— 「新增」建单时写进头表,
-         * 之后用户仍可改(只是初始值,不是锁死)。
-         *
-         * <p>用户口径:「密级以及文件使用范围默认选择保密、内部,这些是可以换的,
-         *   只是新增的单据就是默认选择这些」。
-         *
-         * <p>声明式,与 {@link #fixedItems()} / {@link #uniqueKeys()} 同一条规矩:
-         * 改默认值 = 改这一行 JSON,不加代码。解析失败返回空表(宁可不带默认值,也不能让新建失败)。
-         */
-        public Map<String, String> headDefaults() {
-            if (config == null || !config.contains("headDefaults")) return Map.of();
-            try {
-                com.fasterxml.jackson.databind.JsonNode node = CONFIG_JSON.readTree(config).path("headDefaults");
-                if (!node.isObject()) return Map.of();
-                Map<String, String> out = new java.util.LinkedHashMap<>();
-                node.fields().forEachRemaining(e -> {
-                    if (!e.getValue().isNull()) out.put(e.getKey(), e.getValue().asText(""));
-                });
-                return java.util.Collections.unmodifiableMap(out);
-            } catch (Exception ex) {
-                return Map.of();
-            }
-
         public List<List<String>> uniqueKeys() {
             if (config == null || !config.contains("uniqueKeys")) return List.of();
             try {
