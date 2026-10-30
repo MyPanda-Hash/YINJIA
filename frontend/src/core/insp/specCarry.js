@@ -1,4 +1,4 @@
-import { parseDimensionRequirement } from './dimensionSpec.js'
+import { parseDimensionRequirement, parseRodSizeRequirement } from './dimensionSpec.js'
 import { parseDropRequirement } from './dropSpec.js'
 import { parseTestMethod } from './testParamSpec.js'
 
@@ -105,6 +105,9 @@ const DETAIL_PARSERS = {
   // 「检验方法」里那几个测试参数(测试间距mm/压头下降速度/压降测试流速)—— 与上面两个的区别是
   // **取哪一列**由映射项的 `from` 指定(默认 检验要求,这里写 from:'检验方法')
   testParams: parseTestMethod,
+  // X烧结工艺清单(RD_X_SINTER)专用:同一句尺寸落到 炭棒外径/炭棒内径/炭棒出货长度 三格
+  // (要长度、不要公差;格名与成型工艺清单不同,故单开一个解析器,见 dimensionSpec 的说明)
+  rodSize: parseRodSizeRequirement,
 }
 
 /** 项目名归一:去掉**全部空白**与 `*`/`#` 装饰(含全角 ＊＃) */

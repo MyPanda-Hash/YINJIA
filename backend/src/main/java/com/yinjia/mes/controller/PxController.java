@@ -627,6 +627,23 @@ public class PxController {
         return ApiResult.ok(devTaskService.specByProduct(code, DevTaskService.SPEC_SHEET_AREA_INSPECT));
     }
 
+    /**
+     * X烧结工艺清单（RD_X_SINTER）的规格书取数 —— 与上面那条**同一套服务、同一个表区**，
+     * 只是权限按本面板校验。
+     *
+     * <p>用户口径（2026-10-30）：「这个新增的面板和之前的成型面板一样是可以关联规格书的数据的，
+     * 就是通过产品编号进行关联，带入规格书的对应数据」。
+     *
+     * <p>为什么要单开一条而不复用上面那条：{@code requirePanelView} 是**按面板**校验的，
+     * 两张面板的角色授权各自独立（yj_role_panel 里 RD_X_SINTER 与 RD_MOLD_PROC 是两组行），
+     * 借别人的端点会出现「有 X烧结权限、没成型工艺清单权限 ⇒ 一带规格书就 403」。
+     */
+    @GetMapping("/specByProductForXSinter")
+    public ApiResult<Map<String, Object>> specByProductForXSinter(@RequestParam String code) {
+        perm.requirePanelView("RD_X_SINTER");
+        return ApiResult.ok(devTaskService.specByProduct(code, DevTaskService.SPEC_SHEET_AREA_INSPECT));
+    }
+
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
      *  权限按目标面板校验(选单是为了在目标面板生单,来源数据是选单必需的参照)。 */
     @PostMapping("/voucherFlow/sources")

@@ -1241,7 +1241,11 @@ export const recordSheetConfigs = {
           { label: '生产车间', span: 2 },
         ]},
         { grid: [
-          { key: '炭棒编号', span: 2 },
+          // ⚠ 纸面写「炭棒编号」，数据键用**产品编号** —— 与 RD_MOLD_PROC 完全同一做法
+          //   （那边注释写明「只是纸面的字：数据键仍是 产品编号」）。
+          //   必须用 产品编号 做键，`autoFillSpec.fromKey` 才选得中它可以带规格书；
+          //   元数据里的「炭棒编号」字段保留（编辑面板可填），只是不上这张纸。
+          { key: '产品编号', span: 2 },
           { key: '产品名称', span: 2 },
           // 「炭棒规格」三格 = 外径 / 内径 / 出货长度(Excel E8/F8/G8 ← 计算器 E4/F4/G4)
           { key: '炭棒外径' },
@@ -1372,6 +1376,33 @@ export const recordSheetConfigs = {
         ],
       },
     ],
+    // ══════════════════════════════════════════════════════════════════
+    // 规格书联动（2026-10-30 用户口径：「这个新增的面板和之前的成型面板一样是可以
+    //   关联规格书的数据的，就是通过产品编号进行关联，带入规格书的对应数据」）
+    //
+    // 链路与成型工艺清单同源（core/insp/specCarry.js 头注）：
+    //   选「产品编号」→ onProdRefConfirm() → autoFillFromSpec()
+    //   → 后端 GET /px/specByProductForXSinter?code=  ← **按本面板权限校验**
+    //     （借 /specByProductForMold 会因为缺 RD_MOLD_PROC 权限 403）
+    //   → 只带回**已审核/已归档**规格书的「检验要求」表区（未审批 ⇒ 一格不带 + 弹提示）
+    //
+    // 与成型工艺清单的差异：X烧结要的是**炭棒名义尺寸**（外径/内径/出货长度 ——
+    //   出货长度是计算器里「切割长度 = 出货长度 + 修正参数」的必要输入），**不要公差**
+    //   （X烧结的公差由模具表带入）⇒ 用 parse:'rodSize'
+    //   （见 core/insp/dimensionSpec.js 的 parseRodSizeRequirement）。
+    // 配方表**不从规格书带**：用户已明确配方表由配方计算器填写后填入
+    //   （与 RD_MOLD_PROC 2026-10-15 同一口径）。
+    // ══════════════════════════════════════════════════════════════════
+    autoFillSpec: {
+      fromKey: '产品编号',
+      endpoint: '/px/specByProductForXSinter',
+      // 本面板明细是「配方表」不是「检验项目」，比规格书变动只会误报
+      specDrift: false,
+      headFromDetail: [
+        // 规格书里该检验项目实测有「炭棒尺寸」「尺寸」两种写法，按优先级择一
+        { parse: 'rodSize', matchProject: ['炭棒尺寸', '尺寸'] },
+      ],
+    },
   },
   RD_PROD_INFO: {
     headMode: 'report',
