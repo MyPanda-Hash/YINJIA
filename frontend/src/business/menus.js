@@ -58,13 +58,13 @@ export const menuTree = [
           { code: 'rdProdInfo', title: '产品信息表', path: '/panelx/list/RD_PROD_INFO', panelCode: 'RD_PROD_INFO', icon: 'Tickets' },
           // 2026-10-30 用户口径:「系统上现有的成型文件内容就是改成<烧结工艺清单>入口」
           //   ⇒ 只改**显示名**,panel_code 仍是 RD_MOLD_PROC(全前端 94 处引用它,改 code 会连锁 403/参照断链)。
+          // 同日第二轮口径(用户看了效果后):「把这个x烧结面板放到烧结面板里面去,做成一个双面板设计的
+          //   一个总面板……最外的导航栏还是成型工艺清单,但是里面是两个不同的操作的面板」
+          //   ⇒ **只保留这一个入口**,X烧结工艺清单不再单独占菜单项,而是本页面内的第二个 Tab
+          //   (容器组件 @core/views/MoldProcPanel.vue,两条静态路由都指向它)。
           //   3 页不变:成型工艺清单 / 成型配方 / 修订记录。
           // 成型工艺清单(原显示名) = 页1 工艺清单 + 页2 成型配方(2026-09-11 起 RD_MOLD_FORMULA 并入其第 2 页签)
           { code: 'rdMoldProc', title: '烧结工艺清单', path: '/panelx/list/RD_MOLD_PROC', panelCode: 'RD_MOLD_PROC', icon: 'SetUp' },
-          // 2026-10-30 新增:X烧结工艺清单(2 页: X烧结配方工艺管控清单 / 修订记录)。
-          //   与「烧结工艺清单」并列,同一份产品工艺文件的**两个模板**;
-          //   一个产品可能两个都有,也可能只有其中一个(用户口径)。
-          { code: 'rdXSinter', title: 'X烧结工艺清单', path: '/panelx/list/RD_X_SINTER', panelCode: 'RD_X_SINTER', icon: 'Odometer' },
           // 2026-09-11 下线(并入 RD_MOLD_PROC 第 2 页签):yj_panel/yj_field/yj_role_panel 行保留,
           // 面板配置与保存链路都还在,需要恢复入口时放开本行即可。
           // { code: 'rdMoldFormula', title: '成型配方', path: '/panelx/list/RD_MOLD_FORMULA', panelCode: 'RD_MOLD_FORMULA', icon: 'Coin' },

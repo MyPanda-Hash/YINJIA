@@ -45,9 +45,9 @@ test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 �
   assert.ok(!JSON.stringify(menuTree).includes('内部委托测试申请单'), '旧菜单名不应残留')
 })
 
-test('产品文件组 8 张(2026-10-30 新增 X烧结工艺清单)', () => {
+test('产品文件组 7 张(2026-10-30 X烧结并入烧结工艺清单的双模板 Tab,不单独占菜单)', () => {
   assert.deepEqual(leafCodes(group('rdFiles')), [
-    'RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_X_SINTER', 'RD_SPEC_DOC', 'RD_ASM_PROC', 'RD_INSP_PLAN',
+    'RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_ASM_PROC', 'RD_INSP_PLAN',
     'RD_PROD_DOCLIST', 'RD_CHANGE',
   ])
   // 下线面板不得从别处溜回导航(RD_MOLD_FORMULA/RD_ASM_BOM 仍是合法面板,只是没有菜单入口)
@@ -199,14 +199,15 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
  * 2026-10-20:新增 项目流程管控 PROJECT_FLOW(只读盯单页)⇒ 23 → 24 张。
  * 计数断言保留价值:防止面板被误删/误加而不自知。
  */
-test('研发管理 25 个面板一个不少(含新增 项目流程管控 / X烧结工艺清单)', () => {
+test('研发管理 24 个面板一个不少(含新增 项目流程管控)', () => {
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 25)
-  assert.equal(new Set(codes).size, 25)
+  assert.equal(codes.length, 24)
+  assert.equal(new Set(codes).size, 24)
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
-  // 2026-10-30:X烧结工艺清单与烧结工艺清单(RD_MOLD_PROC)并列,同一产品可两张都有
-  assert.ok(codes.includes('RD_X_SINTER'), 'X烧结工艺清单必须挂在研发管理下')
+  // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,
+  // 由 @core/views/MoldProcPanel.vue 承载 ⇒ **不占菜单项**,这里也不该出现。
+  assert.ok(!codes.includes('RD_X_SINTER'), 'X烧结工艺清单不单独占菜单入口（已并入烧结工艺清单页）')
 })
 
 /**

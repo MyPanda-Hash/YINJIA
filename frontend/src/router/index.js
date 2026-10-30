@@ -119,6 +119,25 @@ const routes = [
       // 工序报工(2026-10-21):与生产领料同一形态 —— 页面级虚拟面板 + 标准面板地址 `/panelx/list/<码>`,
       //   必须排在上面的参数路由之前;手机单列、电脑 ≥900px 双栏(同一份组件)。
       { path: 'panelx/list/PROD_REPORT', component: () => import('@/views/mobile/MobileReport.vue'), meta: { title: '工序报工', code: 'prodReport', panelCode: 'PROD_REPORT' } },
+      // 烧结工艺清单 = **一个导航入口 + 两个模板 Tab**(2026-10-30 用户口径「把这个x烧结面板放到
+      //   烧结面板里面去,做成一个双面板设计的一个总面板……最外的导航栏还是成型工艺清单,
+      //   但是里面是两个不同的操作的面板」)。
+      //   两个模板绑**不同的表**(rd_mold_proc_* / rd_x_sinter_*),各自独立建单 ——
+      //   同一产品可以只填一个,也可以两个都填,所以不是一张单的两个页签。
+      //   两条静态路由都指向同一容器组件 ⇒ **必须排下面 `panelx/list/:panelCode` 参数路由之前**;
+      //   地址随 Tab 走(容器内 router.replace) ⇒ 刷新/收藏/分享都落在同一个 Tab。
+      {
+        path: 'panelx/list/RD_MOLD_PROC',
+        component: () => import('@core/views/MoldProcPanel.vue'),
+        props: { panelCode: 'RD_MOLD_PROC' },
+        meta: { title: '烧结工艺清单', panelCode: 'RD_MOLD_PROC' },
+      },
+      {
+        path: 'panelx/list/RD_X_SINTER',
+        component: () => import('@core/views/MoldProcPanel.vue'),
+        props: { panelCode: 'RD_X_SINTER' },
+        meta: { title: 'X烧结工艺清单', panelCode: 'RD_X_SINTER' },
+      },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
