@@ -4364,3 +4364,8 @@ migrate-wo-pick-return-20261030.sql
 #   把 退料标志 登记进 yj_field(OTHER_IN 面板 header/只读/可见)+ 9 语言译名。
 #   ⚠ 不登记就没用:ButtonService.save 只写 yj_field 里登记过的字段,列加了也落不了库。
 migrate-wo-pick-return-flag-field-20261030.sql
+# fix-mobile-pick-note-20261030.sql:
+#   补救:writeQty 曾用 SET 明细备注=? 整块覆盖,冲掉了生单时写入的「(需求 N)」,
+#   导致前端默认领用数量退化成库存上限(实测 需求 3 → 默认 12000)。
+#   本脚本按 工单行 → 产品 → 最新组装工艺清单 反查用量,拼回备注;幂等。
+fix-mobile-pick-note-20261030.sql

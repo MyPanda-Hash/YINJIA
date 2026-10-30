@@ -996,6 +996,38 @@ public class MobilePickController {
         }
     }
 
+    /**
+     * 把「批次串」并进原有的明细备注,而不是覆盖它。
+     *
+     * <p>原备注里可能带着生单时写的 **BOM 需求**(「…(需求 3)」),那是 {@link #bomUsageOf} 的取数依据 ——
+     * 一旦被批次串冲掉,前端默认领用数量就会退化成库存上限(2026-10-30 实测:需求 3 → 默认 12000)。
+     *
+     * <p>幂等:原备注里已经有同一条批次串(或前缀相同)时**替换而不是追加**,
+     * 否则反复写入会越堆越长(用户改几次数量就变成长串)。
+     *
+     * @param old  原备注
+     * @param note 本次的批次串(如「领料批次:无批次=3」)
+     * @return 合并后的备注:「原备注;批次串」
+     */
+    private static String mergeNote(String old, String note) {
+        String base = old == null ? "" : old.trim();
+        if (note == null || note.isBlank()) return base;
+        // 去掉旧备注里已有的同前缀批次段(领料批次: / 退料批次:)
+        String prefix = note.startsWith("退料批次:") ? "退料批次:" : "领料批次:";
+        StringBuilder keep = new StringBuilder();
+        for (String seg : base.split("[;；]")) {
+            String s = seg.trim();
+            if (s.isEmpty()) continue;
+            if (s.startsWith(prefix)) continue;     // 旧的批次段丢掉,用这次的
+            if (keep.length() > 0) keep.append("; ");
+            keep.append(s);
+        }
+        keep.append(keep.length() > 0 ? "; " : "").append(note);
+        String out = keep.toString();
+        // 明细备注列宽有限(nvarchar 长度视表而定),超长截前段保住需求那一截
+        return out.length() > 400 ? out.substring(0, 400) : out;
+    }
+
     /** 打/重打工单二维码:只记打印次数,内容由前端按 woQrText 同口径渲染 */
     @PostMapping("/reprint")
     public ApiResult<Map<String, Object>> reprint(@RequestBody Map<String, Object> body) {
@@ -1333,8 +1365,17 @@ public class MobilePickController {
             jdbc.update("UPDATE dbo." + table + " SET 数量 = ? WHERE 单据编号 = ? AND " + lineCol + " = ?",
                     qty, no, line);
         } else {
+            // 🔴 2026-10-30 修:**必须在原备注后面追加,不能整块覆盖**。
+            //   生单时把「BOM 需求」写进了明细备注(如「生产领料·组装工艺清单 AP-STG-03(需求 3)」),
+            //   而这里原来 `SET 明细备注 = ?` 直接盖成「领料批次:…」⇒ **需求被冲掉**,
+            //   之后 bomUsageOf 解析不到,前端默认数量退化成库存上限
+            //   (实测:需求 3 的 OPP袋,扫码后数量框默认 12000)。改为读原备注再拼接。
+            List<String> curNotes = jdbc.queryForList(
+                    "SELECT ISNULL(明细备注,N'') FROM dbo." + table + " WHERE 单据编号 = ? AND " + lineCol + " = ?",
+                    String.class, no, line);
+            String old = curNotes.isEmpty() ? "" : curNotes.get(0);
             jdbc.update("UPDATE dbo." + table + " SET 数量 = ?, 明细备注 = ? WHERE 单据编号 = ? AND " + lineCol + " = ?",
-                    qty, note, no, line);
+                    qty, mergeNote(old, note), no, line);
         }
         // 批号列:拆批后本行只记第一条批号(多批次在明细备注里),保持"单据上能看见批号"
         if (batchesRaw instanceof List<?> list && !list.isEmpty()) {
