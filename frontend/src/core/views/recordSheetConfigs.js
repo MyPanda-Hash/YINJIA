@@ -1340,14 +1340,18 @@ export const recordSheetConfigs = {
         // ⚠ 不写 fixedRows:它是**布尔**(真 = 隐藏「＋/×」增删按钮),不是行数 ——
         //   写 `fixedRows: 10` 只会静默隐藏增删按钮、且**一行都不会多出来**。
         //   配方表默认 10 行的职能交给计算器(录入物料后铺行),人手补行用「＋」。
+        // ⚠ 列宽合计**必须等于纸面 grid 合计 780**，否则表格比上面的 sections 宽出来一截
+        //   （2026-10-30 用户实测：「配方表要和上边的对齐呀，现在上面窄下面宽」——
+        //    上一版 70+150+300+315+105+105=1045，比 grid 多 265px）。
+        //   60+130+215+230+72+73 = 780。
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '序号', label: 'No.', w: 70, align: 'center' },
-          { key: '物料种类', label: '物料种类', w: 150 },
-          { key: '物料编号', label: '物料编号', w: 300 },
-          { key: '物料名称', label: '物料名称', w: 315 },
-          { key: '添加比例', label: '添加比例%', w: 105 },
-          { key: '单支含量g', label: '单支含量g', w: 105 },
+          { key: '序号', label: 'No.', w: 60, align: 'center' },
+          { key: '物料种类', label: '物料种类', w: 130 },
+          { key: '物料编号', label: '物料编号', w: 215 },
+          { key: '物料名称', label: '物料名称', w: 230 },
+          { key: '添加比例', label: '添加比例%', w: 72 },
+          { key: '单支含量g', label: '单支含量g', w: 73 },
         ],
       },
       {
@@ -1358,12 +1362,13 @@ export const recordSheetConfigs = {
         design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '序号', label: '序号', w: 70, align: 'center' },
-          { key: '更改内容', label: '更改内容', w: 300, area: true },
-          { key: '更改原因', label: '更改原因', w: 230 },
-          { key: '更改时间', label: '更改时间', w: 130 },
-          { key: '责任人', label: '责任人', w: 110 },
-          { key: '备注', label: '备注', w: 200, area: true },
+          // 同上：合计 60+220+170+100+90+140 = 780，与 grid 对齐
+          { key: '序号', label: '序号', w: 60, align: 'center' },
+          { key: '更改内容', label: '更改内容', w: 220, area: true },
+          { key: '更改原因', label: '更改原因', w: 170 },
+          { key: '更改时间', label: '更改时间', w: 100 },
+          { key: '责任人', label: '责任人', w: 90 },
+          { key: '备注', label: '备注', w: 140, area: true },
         ],
       },
     ],

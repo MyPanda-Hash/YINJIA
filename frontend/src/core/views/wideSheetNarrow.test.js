@@ -22,7 +22,10 @@ import assert from 'node:assert/strict'
 import { recordSheetConfigs } from './recordSheetConfigs.js'
 
 const TARGET = 780
-const PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC']
+// 2026-10-30 加入 RD_X_SINTER：它在「烧结工艺清单」页内以第二个 Tab 呈现，
+//   两个模板切来切去纸宽必须一致 —— 用户实测报过「配方表要和上边的对齐呀，
+//   现在上面窄下面宽」（数据表自持列宽 1045 vs 网格 780）。
+const PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_X_SINTER']
 
 /** 某面板某页的网格合计 */
 function gridSum(cfg, pageIdx) {
