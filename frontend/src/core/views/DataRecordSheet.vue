@@ -825,9 +825,10 @@ function removeRow(i) {
 }
 .rs-ref-text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 只读格 = 打印口径：整段显示，不再用省略号吞字（同 RecordSheetPanels 的体检结论） */
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-size: 12.5px;
   color: #333;
   text-align: right;

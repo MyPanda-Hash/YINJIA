@@ -4765,9 +4765,12 @@ function chartOf(dt) {
 }
 .rs-ref-text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 只读格 = 打印口径：**整段显示**，不再用省略号吞字。
+     2026-10-30 打印体检：这是全站唯一一类"真截断"（nowrap + ellipsis），
+     引用型字段（产品编号/名称这类）一长就在纸面上变成「阻垢炭棒滤…」。 */
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-size: 12.5px;
   color: #333;
 }

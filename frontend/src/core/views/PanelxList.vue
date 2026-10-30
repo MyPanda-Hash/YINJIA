@@ -7055,6 +7055,9 @@ async function snapSheetPage(el, domToPng) {
     clone.style.overflow = 'visible'
     // 页签条是编辑控件,不进导出件(打印时由 body.approval-printing 隐藏;导出走同一口径)
     clone.querySelectorAll('.rsp-pages').forEach((n) => n.remove())
+    // 行操作列(＋插入/×删除)只在编辑态存在;从"编辑中的单据"直接打印时它会连 60px 一起上纸
+    // (2026-10-30 打印体检:成型配方页纸宽 781、scrollWidth 817,多出来的就是这两颗按钮)。
+    clone.querySelectorAll('.rs-td-op, .rs-op-pad').forEach((n) => n.remove())
     holder.appendChild(clone)
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
