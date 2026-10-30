@@ -2590,6 +2590,9 @@ export default {
     '刷新开单状态': 'Status aktualisieren',
     '没有查到工单': 'Keine Aufträge gefunden',
     '看明细': 'Details',
+    '没有未开单的工单': 'Keine offenen Aufträge',
+    '还没有已开单的工单': 'Noch keine erstellten Aufträge',
+    '只读查看:领料与退料请到「生产领料」里操作': 'Nur Ansicht: Entnahme und Rückgabe unter „Produktionsentnahme"',
   },
 
 }

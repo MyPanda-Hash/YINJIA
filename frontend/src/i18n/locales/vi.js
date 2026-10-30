@@ -2595,6 +2595,9 @@ export default {
     '刷新开单状态': 'Làm mới trạng thái',
     '没有查到工单': 'Không tìm thấy lệnh',
     '看明细': 'Xem chi tiết',
+    '没有未开单的工单': 'Không có lệnh chưa tạo',
+    '还没有已开单的工单': 'Chưa có lệnh nào được tạo',
+    '只读查看:领料与退料请到「生产领料」里操作': 'Chỉ xem: xuất và trả hàng làm ở "Xuất vật tư sản xuất"',
   },
 
 }

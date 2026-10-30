@@ -202,6 +202,9 @@ const ROWS = [
   ['刷新开单状态', 'Refresh status', '状況を更新', '상태 새로고침', 'Actualizar estado', 'Actualiser', 'Status aktualisieren', 'Обновить статус', 'Làm mới trạng thái', 'รีเฟรชสถานะ'],
   ['没有查到工单', 'No work orders found', '指示が見つかりません', '작업지시 없음', 'No se encontraron órdenes', 'Aucun OF trouvé', 'Keine Aufträge gefunden', 'Заказы не найдены', 'Không tìm thấy lệnh', 'ไม่พบใบสั่ง'],
   ['看明细', 'Details', '明細を見る', '명세 보기', 'Ver detalle', 'Détails', 'Details', 'Подробнее', 'Xem chi tiết', 'ดูรายละเอียด'],
+  ['没有未开单的工单', 'No work orders pending', '未作成の指示はありません', '미생성 작업지시 없음', 'No hay órdenes pendientes', 'Aucun OF en attente', 'Keine offenen Aufträge', 'Нет неоформленных заказов', 'Không có lệnh chưa tạo', 'ไม่มีใบสั่งที่ยังไม่สร้าง'],
+  ['还没有已开单的工单', 'No work orders created yet', '作成済みの指示はまだありません', '생성된 작업지시 없음', 'Aún ninguna orden creada', 'Aucun OF créé', 'Noch keine erstellten Aufträge', 'Созданных заказов пока нет', 'Chưa có lệnh nào được tạo', 'ยังไม่มีใบสั่งที่สร้างแล้ว'],
+  ['只读查看:领料与退料请到「生产领料」里操作', 'Read-only view: do picking and returns in "Production Picking"', '閲覧のみ:払出・返却は「払出」画面で行ってください', '읽기 전용: 출고·반납은 "출고" 화면에서 하세요', 'Solo lectura: realice retiradas y devoluciones en «Retirada de producción»', 'Lecture seule : effectuez prélèvements et retours dans « Prélèvement »', 'Nur Ansicht: Entnahme und Rückgabe unter „Produktionsentnahme"', 'Только просмотр: выдача и возврат — в «Выдаче в производство»', 'Chỉ xem: xuất và trả hàng làm ở "Xuất vật tư sản xuất"', 'ดูอย่างเดียว: เบิกและคืนที่ "เบิกวัสดุการผลิต"'],
 ]
 
 const LOCALES = {

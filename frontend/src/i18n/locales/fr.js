@@ -2590,6 +2590,9 @@ export default {
     '刷新开单状态': 'Actualiser',
     '没有查到工单': 'Aucun OF trouvé',
     '看明细': 'Détails',
+    '没有未开单的工单': 'Aucun OF en attente',
+    '还没有已开单的工单': 'Aucun OF créé',
+    '只读查看:领料与退料请到「生产领料」里操作': 'Lecture seule : effectuez prélèvements et retours dans « Prélèvement »',
   },
 
 }

@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30 第三轮改版)
 
   【两种状态,两套动作】
@@ -33,6 +33,11 @@
     <div v-if="errText" class="mp-err mp-err-top">{{ errText }}</div>
     <div v-if="okText" class="mp-ok mp-err-top">{{ okText }}</div>
 
+    <!-- 只读提示(2026-10-30:从开单工作台点进来,只能看不能操作) -->
+    <div v-if="readOnly" class="mp-ro">
+      {{ tt('只读查看:领料与退料请到「生产领料」里操作') }}
+    </div>
+
     <!-- 抬头 -->
     <section class="mp-card">
       <div class="mp-kv"><span>{{ tt('工单号') }}</span><b>{{ doc.工单号 }}<i v-if="doc.工单行号"> #{{ doc.工单行号 }}</i></b></div>
@@ -54,8 +59,9 @@
       </div>
     </section>
 
-    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料 -->
-    <section class="mp-card" :class="{ dim: isDone && !returnMode }">
+    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料
+         ⚠ 只读模式下(从开单工作台点进来)整块**不渲染**:那里只看明细,不做任何操作 -->
+    <section v-if="!readOnly" class="mp-card" :class="{ dim: isDone && !returnMode }">
       <div class="mp-sec">
         <span>{{ isDone ? (returnMode ? tt('扫物料码 · 退料') : tt('扫物料码 · 领料')) : tt('扫物料码') }}</span>
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
@@ -164,8 +170,8 @@
         v-for="r in rows"
         :key="r.行号"
         class="mp-line"
-        :class="{ 'is-cur': cur && cur.编码 === r.编码, 'is-ret': returnMode && qtyOf(r.编码) > 0 }"
-        @click="pickRow(r)"
+        :class="{ 'is-cur': cur && cur.编码 === r.编码, 'is-ret': returnMode && qtyOf(r.编码) > 0, 'is-ro': readOnly }"
+        @click="!readOnly && pickRow(r)"
       >
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
         <div class="mp-line-main">
@@ -184,8 +190,8 @@
       </div>
     </section>
 
-    <!-- 底栏 -->
-    <div class="mp-foot">
+    <!-- 底栏(只读模式下不渲染:这里没有可操作的东西) -->
+    <div v-if="!readOnly" class="mp-foot">
       <template v-if="returnMode">
         <el-button size="large" @click="cancelReturn">{{ tt('退出退料') }}</el-button>
         <el-button
@@ -231,6 +237,18 @@ const route = useRoute()
 const router = useRouter()
 
 const docId = Number(route.query.id) || 0
+
+/**
+ * 只读模式(2026-10-30 用户口径:「还有明细里面只能看不能操作」)。
+ *
+ * <p>从「生成工单领料/退料单」点进来时带 {@code readOnly=1} —— 那一页是**开单工作台**,
+ * 它的职责到"生单"为止;点开明细只是**看一眼开了什么**,领料/退料要在「生产领料」里做。
+ * 只读模式下:扫码区、数量输入、提交/退料按钮全部不渲染,只剩抬头 + 明细。
+ *
+ * <p>⚠ 这只是**界面层**的约束。真正的写权限仍由后端按 MOBILE_PICK 的 pick/submit 词判定,
+ * 拿令牌直接调接口照样要被拦 —— 界面隐藏从来不是安全边界。
+ */
+const readOnly = computed(() => String(route.query.readOnly || '') === '1')
 const doc = ref({})
 const wo = ref({})
 const pickRows = ref([])
@@ -657,6 +675,7 @@ async function submit() {
 .mp-line:last-child { border-bottom: 0; }
 .mp-line.is-cur { background: var(--el-color-primary-light-9); border-radius: 6px; }
 .mp-line.is-ret { background: var(--el-color-warning-light-9); border-radius: 6px; }
+.mp-line.is-ro { cursor: default; }   /* 只读模式:明细行不可点 */
 .mp-line-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--el-border-color); }
 .mp-line-dot.on { background: var(--el-color-success); }
 .mp-line-main { flex: 1; min-width: 0; }
@@ -678,6 +697,11 @@ async function submit() {
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
 .num { font-variant-numeric: tabular-nums; }
 
+/* 只读提示条(2026-10-30) */
+.mp-ro {
+  margin: 10px 12px 0; padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5;
+  background: var(--el-color-info-light-9); color: var(--el-color-info-dark-2);
+}
 .mp-err, .mp-ok { margin: 10px 12px 0; padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; }
 .mp-err { background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2); }
 .mp-ok { background: var(--el-color-success-light-9); color: var(--el-color-success-dark-2); }

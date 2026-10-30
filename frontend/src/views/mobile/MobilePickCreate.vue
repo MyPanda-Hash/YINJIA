@@ -127,27 +127,60 @@
       </div>
 
       <div v-if="!woList.length" class="mp-empty">{{ tt('没有查到工单') }}</div>
-      <div
-        v-for="w in woList"
-        :key="w.工单号 + '#' + w.工单行号"
-        class="mp-wo-row"
-        :class="{ 'is-done': w.已开单, 'is-click': w.已开单 }"
-        @click="w.已开单 && openDoc(w.台账id)"
-      >
-        <div class="mp-wo-l1">
-          <span class="mp-wo-no">{{ w.工单号 }}<i> #{{ w.工单行号 }}</i></span>
-          <span class="mp-wo-tag" :class="tagClass(w)">{{ tagText(w) }}</span>
-        </div>
-        <div class="mp-wo-l2">
-          <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
-          <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
-        </div>
-        <div v-if="w.已开单" class="mp-wo-l3">
-          <span class="mono">{{ w.领料单号 }}</span>
-          <span class="mp-wo-prog">{{ tt('已领') }} {{ w.已领项数 || 0 }}/{{ w.物料项数 || 0 }}</span>
-          <span class="mp-wo-more">{{ tt('看明细') }} ›</span>
-        </div>
+
+      <!-- 未开单(2026-10-30:与「生产领料」的未完成/已完成同款分组,各自可展开收起) -->
+      <div class="mp-grp-head" @click="openTodo = !openTodo">
+        <span class="mp-grp-title">{{ tt('未开单') }}</span>
+        <span class="mp-grp-num">{{ woTodo.length }}</span>
+        <span class="mp-grp-arrow" :class="{ open: openTodo }">›</span>
       </div>
+      <template v-if="openTodo">
+        <div v-if="!woTodo.length" class="mp-empty">{{ tt('没有未开单的工单') }}</div>
+        <div
+          v-for="w in woTodo"
+          :key="'t' + w.工单号 + '#' + w.工单行号"
+          class="mp-wo-row"
+        >
+          <div class="mp-wo-l1">
+            <span class="mp-wo-no">{{ w.工单号 }}<i> #{{ w.工单行号 }}</i></span>
+            <span class="mp-wo-tag" :class="tagClass(w)">{{ tagText(w) }}</span>
+          </div>
+          <div class="mp-wo-l2">
+            <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
+            <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
+          </div>
+        </div>
+      </template>
+
+      <!-- 已开单:可点开看明细(只读) -->
+      <div class="mp-grp-head" @click="openCreated = !openCreated">
+        <span class="mp-grp-title">{{ tt('已开单') }}</span>
+        <span class="mp-grp-num">{{ woCreated.length }}</span>
+        <span class="mp-grp-arrow" :class="{ open: openCreated }">›</span>
+      </div>
+      <template v-if="openCreated">
+        <div v-if="!woCreated.length" class="mp-empty">{{ tt('还没有已开单的工单') }}</div>
+        <div
+          v-for="w in woCreated"
+          :key="'c' + w.工单号 + '#' + w.工单行号"
+          class="mp-wo-row is-done is-click"
+          @click="openDoc(w.台账id)"
+        >
+          <div class="mp-wo-l1">
+            <span class="mp-wo-no">{{ w.工单号 }}<i> #{{ w.工单行号 }}</i></span>
+            <span class="mp-wo-tag" :class="tagClass(w)">{{ tagText(w) }}</span>
+          </div>
+          <div class="mp-wo-l2">
+            <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
+            <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
+          </div>
+          <div class="mp-wo-l3">
+            <span class="mono">{{ w.领料单号 }}</span>
+            <span class="mp-wo-prog">{{ tt('已领') }} {{ w.已领项数 || 0 }}/{{ w.物料项数 || 0 }}</span>
+            <span class="mp-wo-more">{{ tt('看明细') }} ›</span>
+          </div>
+        </div>
+      </template>
     </section>
 
     <!-- 底栏:本面板的终点就是"生单完成";去领料是另一个面板的事 -->
@@ -196,6 +229,19 @@ const baseUrl = (() => {
 
 const canGenerate = computed(() => queue.value.length > 0 && !genLoading.value)
 
+/** 分组展开状态(与「生产领料」的未完成/已完成同款:默认展开未开单、收起已开单) */
+const openTodo = ref(true)
+const openCreated = ref(false)
+
+/**
+ * 拆成两组(2026-10-30 用户口径:「把开单和未开单分成两个状态,和生产领料的已完成和未完成一样」)。
+ *
+ * <p>判据 = 有没有台账行(已开单)。开不了单的(未排产/已结案)仍留在"未开单"组里,
+ * 靠行上的红标签说明原因 —— 不单独塞第三组,否则分组会随业务原因越裂越多。
+ */
+const woTodo = computed(() => (woList.value || []).filter((w) => !w.已开单))
+const woCreated = computed(() => (woList.value || []).filter((w) => w.已开单))
+
 function clearMsg() { errText.value = ''; okText.value = '' }
 function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 
@@ -208,7 +254,7 @@ function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
  */
 function openDoc(id) {
   if (!id) return
-  router.push({ path: '/panelx/list/MOBILE_PICK/doc', query: { id: String(id) } })
+  router.push({ path: '/panelx/list/MOBILE_PICK/doc', query: { id: String(id), readOnly: '1' } })
 }
 function fmtQty(v) {
   const n = Number(v)
