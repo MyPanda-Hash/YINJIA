@@ -3159,20 +3159,28 @@ function designInputStyle(dt) {
   return { fontSize: dpx(dt, dt.design.fontSize || 11) + 'px', textAlign: 'center' }
 }
 
-// ── 分组式设计表(检验项目及标准):行按「组·子项」前缀分组,组跨行、序号按组编号 ──
+// ── 分组式设计表(检验项目及标准):行按「组·子项」分组,组跨行、序号按组编号 ──
+// ⚠ 两种数据形态都要认(2026-10-30 用户报障「这些都合并不了，应该是按第二张图来展示才对」)：
+//   ① **新口径**：检验项目 / 检验子项 **分两列**存 —— 项目=`*黑水及颗粒物测试`、子项=`初始黑水测试`；
+//   ② **老口径**：两样合在「检验项目」一列里用 `·` 拼 —— 项目=`*黑水及颗粒物测试·（裸棒）`，子项列空。
+//   原实现只认 ②（一律按 `·` 拆），于是 ① 的整组被当成 standalone ⇒ 每行各占一格、
+//   检验项目显示三遍、检验子项列反而空着（就是用户截图里那个样子）。
+//   ⇒ 判据改成：**子项列有值就用它**，没有才回退 `·` 拆分；两者都没有才算 standalone(跨两列独占)。
 function designGroupRows(dt) {
   const out = []
   let g = null
   for (const row of rowsOf(dt)) {
-    const label = row['检验项目'] || ''
+    const label = String(row['检验项目'] ?? '')
     const dot = label.indexOf('·')
     const gLabel = dot >= 0 ? label.slice(0, dot) : label
-    const sub = dot >= 0 ? label.slice(dot + 1) : ''
+    // 子项:优先「检验子项」列(新口径),空则回退到项目名里 `·` 之后那段(老口径)
+    const subCol = String(row['检验子项'] ?? '').trim()
+    const sub = subCol || (dot >= 0 ? label.slice(dot + 1) : '')
     if (!g || g.label !== gLabel) {
       g = { label: gLabel, count: 0, seq: out.filter((x) => x.groupFirst).length + 1 }
     }
     g.count++
-    out.push({ key: 'gr' + out.length, row, group: g, groupFirst: g.count === 1, sub, standalone: dot < 0, seq: g.seq })
+    out.push({ key: 'gr' + out.length, row, group: g, groupFirst: g.count === 1, sub, standalone: !sub, seq: g.seq })
   }
   return out
 }
