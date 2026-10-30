@@ -624,12 +624,27 @@
                  依次**右移两列**——于是子项目列、检验要求列看着空白,而「除余氯寿命」跑到检验方法列、
                  「寿命920L，全程加标」跑到检验依据列。行首两格必须由 rowspan 覆盖,不能重复输出。 -->
             <template v-if="dt.design?.groupCol">
-              <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design">
+              <!-- 点行 = 指定「从标准库勾选」的落点（2026-10-30 用户口径：
+                   「我可以直接选到这个位置，然后再从标准库引用…它就可以弹出在这个位置」） -->
+              <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design"
+                  :class="{ 'rsp-row-sel': libInsertAt === r.idx }"
+                  @click="libInsertAt = r.idx">
                 <template v-if="r.groupFirst">
                   <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.group.count">{{ r.seq }}</td>
-                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">{{ tt(r.group.label) }}</td>
+                  <!-- 检验项目:组首行渲染(跨整组)。2026-10-30 用户口径「检测项目栏写入之后可以编辑」
+                       ⇒ 从只读文本改成输入框;@change(失焦/回车)才提交,避免每敲一个字就重算分组把光标顶掉。
+                       改的是整组(组是合并显示的,改一行等于改整组)。 -->
+                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">
+                    <el-input v-if="editable" :model-value="r.group.label" size="small" class="rs-t-in"
+                              @change="(v) => renameGroup(dt, r, v)" />
+                    <span v-else>{{ tt(r.group.label) }}</span>
+                  </td>
                 </template>
-                <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">{{ tt(r.sub || '') }}</td>
+                <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">
+                  <el-input v-if="editable" :model-value="r.sub" size="small" class="rs-t-in"
+                            @change="(v) => renameSub(r, v)" />
+                  <span v-else>{{ tt(r.sub || '') }}</span>
+                </td>
                 <td class="rs-td" :style="designTdStyle(dt, 'req')">
                   <el-input v-if="editable" v-model="r.row['检验要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
                   <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验要求'] || ' / ' }}</span>
@@ -2609,6 +2624,43 @@ function colsOf(dt) {
 // ── 标准库勾选(规格书检验要求 26 组分组标准库 / 出货检验计划 必测项+型式项) ──
 const libVisible = ref(false)
 const libChecked = ref([])
+/**
+ * 「从标准库勾选」的落点行号：**用户点过的那一行**在 rowsOf(dt) 里的下标（-1 = 没点，追加到末尾）。
+ * 2026-10-30 用户口径：「我可以直接选到这个位置，然后再从标准库引用……它就可以弹出在这个位置，
+ * 就是先填充上边的新增空白栏」。原先 confirmLib 一律 arr.push 追加到末尾，想补一条中途漏掉的
+ * 检验项目就只能追加到最后再手动挪。
+ */
+const libInsertAt = ref(-1)
+
+/** 检验项目改名 = 改整组（组是合并显示的）。老口径 `组名·子项` 要保留 `·` 后面那段。 */
+function renameGroup(dt, r, newLabel) {
+  const v = String(newLabel ?? '').trim()
+  const old = String(r.group.label ?? '')
+  if (!v || v === old) return
+  const arr = touch()
+  for (const row of arr) {
+    const cur = String(row['检验项目'] ?? '')
+    const dot = cur.indexOf('·')
+    const curGroup = dot >= 0 ? cur.slice(0, dot) : cur
+    if (curGroup !== old) continue
+    row['检验项目'] = dot >= 0 ? v + cur.slice(dot) : v
+  }
+  emit('dirty')
+}
+
+/** 检验子项改名：写独立列「检验子项」；老口径若还在项目名里拼着子项，顺手拆掉（改由独立列承载）。 */
+function renameSub(r, newVal) {
+  const s = String(newVal ?? '').trim()
+  if (s === String(r.sub ?? '').trim()) return
+  const arr = touch()
+  const i = arr.indexOf(r.row)
+  if (i < 0) return
+  arr[i]['检验子项'] = s
+  const cur = String(arr[i]['检验项目'] ?? '')
+  const dot = cur.indexOf('·')
+  if (dot >= 0) arr[i]['检验项目'] = cur.slice(0, dot)
+  emit('dirty')
+}
 const libRows = ref([])
 async function openLib(dt) {
   libTargetDt.value = dt
@@ -3080,13 +3132,16 @@ function confirmLib() {
     return
   }
   const grouped = libRows.value.length && Array.isArray(libRows.value[0].subs)
+  // 勾选出来的行先攒在这里，最后统一「落位」（2026-10-30）：
+  // 原来两个分支都是一律 arr.push 追加到末尾，用户想补一条中途漏掉的检验项目就只能追加到最后再手挪。
+  const newRows = []
   if (grouped) {
     for (const key of libChecked.value) {
       const [gi, si] = key.split(':').map(Number)
       const g = libRows.value[gi]
       const s = g && g.subs[si]
       if (!g || !s) continue
-      arr.push({
+      newRows.push({
         '表区': dt.filterVal,
         '检验项目': s.name ? g.name + '·' + s.name : g.name,
         '检验要求': s.req || '',
@@ -3105,12 +3160,51 @@ function confirmLib() {
       // proj 的值(条目正文的真实内容)也不让分组名去覆盖,故先判 undefined 再写。
       const grp = flatGroupOf(row)
       if (dt.libGroupKey && grp && out[dt.libGroupKey] === undefined) out[dt.libGroupKey] = grp
-      arr.push(out)
+      newRows.push(out)
     }
   }
+  placeLibRows(arr, dt, newRows)
   libChecked.value = []
   libVisible.value = false
   emit('dirty')
+}
+
+/**
+ * 「从标准库勾选」的落位（2026-10-30 用户口径）：
+ *   「我可以直接选到这个位置，然后再从标准库引用……它就可以弹出在这个位置，
+ *     就是先填充上边的新增空白栏」。
+ *
+ * 三步：
+ *   ① 从用户点的那一行**往上**收集「空白行」（检验项目/子项/要求都空），按行序排；
+ *   ② 勾出来的行先**就地填**进这些空行（保住原有的 表区 等列，不新起一行）；
+ *   ③ 剩下的行插到落点那一行**之前**；没点过行（libInsertAt<0）就照旧追加到末尾。
+ */
+function placeLibRows(arr, dt, newRows) {
+  if (!newRows.length) return
+  const rows = rowsOf(dt)
+  const at = Number(libInsertAt.value)
+  const validAt = Number.isFinite(at) && at >= 0 && at < rows.length
+  const blankRow = (r) => !String(r['检验项目'] ?? '').trim()
+    && !String(r['检验子项'] ?? '').trim()
+    && !String(r['检验要求'] ?? '').trim()
+  const slots = []
+  if (validAt) {
+    for (let i = at; i >= 0; i--) {
+      const idx = arr.indexOf(rows[i])
+      if (idx >= 0 && blankRow(rows[i])) slots.push(idx)
+    }
+    slots.reverse()          // 按行序从前到后填
+  }
+  let k = 0
+  for (; k < newRows.length && k < slots.length; k++) {
+    arr[slots[k]] = { ...arr[slots[k]], ...newRows[k] }
+  }
+  const rest = newRows.slice(k)
+  if (rest.length) {
+    const pos = validAt ? Math.max(0, arr.indexOf(rows[at])) : arr.length
+    arr.splice(pos < 0 ? arr.length : pos, 0, ...rest)
+  }
+  libInsertAt.value = -1     // 落位用完复位，下次不会粘在上一张表
 }
 
 /** 数据表列宽是否自持(列带 w 时数据表用自己的 colgroup,与全页网格解耦——出货检验计划/规格书) */
@@ -3177,7 +3271,9 @@ function designInputStyle(dt) {
 function designGroupRows(dt) {
   const out = []
   let g = null
-  for (const row of rowsOf(dt)) {
+  const rows = rowsOf(dt)
+  for (let idx = 0; idx < rows.length; idx++) {
+    const row = rows[idx]
     const label = String(row['检验项目'] ?? '')
     const dot = label.indexOf('·')
     const gLabel = dot >= 0 ? label.slice(0, dot) : label
@@ -3188,7 +3284,8 @@ function designGroupRows(dt) {
       g = { label: gLabel, count: 0, seq: out.filter((x) => x.groupFirst).length + 1 }
     }
     g.count++
-    out.push({ key: 'gr' + out.length, row, group: g, groupFirst: g.count === 1, sub, standalone: !sub, seq: g.seq })
+    // idx = 该行在 rowsOf(dt) 里的原始下标 —— 「从标准库勾选」要知道用户指的是哪一行
+    out.push({ key: 'gr' + out.length, idx, row, group: g, groupFirst: g.count === 1, sub, standalone: !sub, seq: g.seq })
   }
   return out
 }
@@ -5480,6 +5577,10 @@ function chartOf(dt) {
 .rsp-cover-input.rsp-cover-area {
   height: auto;
   min-height: calc(38px * var(--cvy));
+}
+/* 「从标准库勾选」的落点行:点过哪一行就把哪一行标出来,否则用户不知道会插到哪(2026-10-30) */
+.rsp-design.rsp-row-sel > td {
+  background: #e8f2ff;
 }
 .rsp-cover-input.rsp-cover-area :deep(.el-textarea__inner) {
   padding: 2px calc(8px * var(--cok));
