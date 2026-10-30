@@ -5,7 +5,7 @@
  *      「恢复默认」→ 保存 → 表头回来;
  *   ③ 「型号」旁新增**产品名称**列,值=订单行存货名称(非空);「订单资料」右侧新增**物料编码**单列(有值);
  *   ④ 「列设置」支持**调整列顺序**(▲▼):下移一位 → 保存生效 → 刷新仍按新顺序 → 恢复默认回默认顺序;
- *   ⑥ 「列设置」支持**拖动行排序**(2026-10-30):合成 dragstart/dragover/drop 把首列拖到第 3 位 →
+ *   ⑥ 「列设置」支持**拖动行排序**(2026-10-30):按 Pointer Events 真实拖动路径把首列拖到第 3 行之后 →
  *      表格即时预览 → 保存生效 → 恢复默认;
  * 附带:旧口径不能回归(今天没数据→弹窗询问;取消=留在本日);英语界面新控件全译、无裸中文;无 JS 报错。
  *
@@ -346,7 +346,8 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
   const def = midOrder(s.heads)
   check(def[0] === '物料编码' && def.join('|') === MID.join('|'), '⑤ 恢复默认后顺序回到默认', def.join('|'))
 
-  // ⑥ 拖动排序(2026-10-30 用户口径「让这个能拖动吧」):把「物料编码」拖到第 3 位
+  // ⑥ 拖动排序(2026-10-30 用户口径「让这个能拖动吧」→二次修「拖了但列位置没变」):
+  //    用 **Pointer Events**(与实机同一路径,不再依赖 HTML5 DnD)把「物料编码」拖到第 3 行之后
   //    → 表格即时预览(草稿即预览)→ 保存生效 → 恢复默认回默认顺序
   await clickText(ev, '.oc-bar .el-button', '列设置')
   await sleep(900)
@@ -354,17 +355,26 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
     const d = [...document.querySelectorAll('.el-dialog')].find(x => x.innerText.includes('列设置'));
     if (!d) return 'no-dialog';
     const items = [...d.querySelectorAll('.csd-item')].filter(x => x.offsetParent !== null);
-    if (items.length < 3) return 'too-few:' + items.length;
-    if (!items[0].getAttribute('draggable')) return 'not-draggable';
-    const from = items[0], to = items[2];
-    const mk = (type) => new Event(type, { bubbles: true, cancelable: true });
-    from.dispatchEvent(mk('dragstart'));
-    to.dispatchEvent(mk('dragover'));
-    to.dispatchEvent(mk('drop'));
-    from.dispatchEvent(mk('dragend'));
+    if (items.length < 4) return 'too-few:' + items.length;
+    const handle = items[0].querySelector('.csd-drag');
+    if (!handle) return 'no-handle';
+    const hr = handle.getBoundingClientRect();
+    const x = hr.left + hr.width / 2;
+    const y0 = hr.top + hr.height / 2;
+    const tgt = items[2].getBoundingClientRect();          // 第 3 行
+    const yMid = tgt.top + tgt.height / 2;
+    const yEnd = tgt.bottom - 2;                            // 落在第 3 行下半 ⇒ 插到它之后
+    const mk = (type, y) => new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+      isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y,
+    });
+    handle.dispatchEvent(mk('pointerdown', y0));
+    window.dispatchEvent(mk('pointermove', yMid));
+    window.dispatchEvent(mk('pointermove', yEnd));
+    window.dispatchEvent(mk('pointerup', yEnd));
     return 'ok';
   })()`)
-  check(drag === 'ok', '⑥ 列设置行可拖动(合成 dragstart/dragover/drop)', drag)
+  check(drag === 'ok', '⑥ 列设置行可拖动(pointerdown/move/up 真实拖动路径)', drag)
   await sleep(600)
   const dragged = midOrder(JSON.parse(await ev(READ)).heads)
   check(dragged[0] === '行号' && dragged[2] === '物料编码', '⑥ 拖动后表格即时预览(草稿即预览)', dragged.join('|'))
@@ -381,6 +391,50 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
   await sleep(1500)
   s = await waitFor(ev, (x) => !x.dialog, 10000)
   check(midOrder(s.heads).join('|') === MID.join('|'), '⑥ 恢复默认后回到默认顺序', midOrder(s.heads).join('|'))
+
+  // ⑦ 真实输入路径(CDP Input 域按下/移动/松开鼠标,等价人手动拖,不是页面内合成事件):
+  //    这是 2026-10-30「能拖但列位置没变」的回归闸 —— 走的是浏览器真实 pointer 事件流。
+  await clickText(ev, '.oc-bar .el-button', '列设置')
+  await sleep(900)
+  const rects = JSON.parse(await ev(`(() => {
+    const d = [...document.querySelectorAll('.el-dialog')].find(x => x.innerText.includes('列设置'));
+    if (!d) return JSON.stringify({ ok: false });
+    const items = [...d.querySelectorAll('.csd-item')].filter(x => x.offsetParent !== null);
+    if (items.length < 4) return JSON.stringify({ ok: false });
+    const h = items[0].querySelector('.csd-drag').getBoundingClientRect();
+    const t = items[2].getBoundingClientRect();
+    return JSON.stringify({ ok: true, x: h.left + h.width / 2, y0: h.top + h.height / 2, y1: t.bottom - 2 });
+  })()`))
+  if (!rects.ok) {
+    check(false, '⑦ 取拖动坐标失败(弹窗/行未渲染)')
+  } else {
+    const mouse = (type, y, buttons) => send('Input.dispatchMouseEvent',
+      { type, x: rects.x, y, button: type === 'mouseMoved' ? 'none' : 'left', buttons, clickCount: 1 })
+    await mouse('mouseMoved', rects.y0, 0)
+    await mouse('mousePressed', rects.y0, 1)
+    await sleep(150)
+    await mouse('mouseMoved', (rects.y0 + rects.y1) / 2, 1)
+    await sleep(120)
+    await mouse('mouseMoved', rects.y1, 1)
+    await sleep(150)
+    await mouse('mouseReleased', rects.y1, 0)
+    await sleep(700)
+    const d2 = midOrder(JSON.parse(await ev(READ)).heads)
+    check(d2[0] === '行号' && d2[2] === '物料编码', '⑦ 真实鼠标拖动也能换位(CDP Input 按下/移动/松开)', d2.join('|'))
+    await clickText(ev, '.el-dialog__footer button', '保存')
+    await sleep(1500)
+    s = await waitFor(ev, (x) => !x.dialog, 10000)
+    check(midOrder(s.heads).join('|') === d2.join('|'), '⑦ 保存后真实拖动的新顺序生效', midOrder(s.heads).join('|'))
+    // 收尾:恢复默认
+    await clickText(ev, '.oc-bar .el-button', '列设置')
+    await sleep(900)
+    await clickText(ev, '.csd-bar .el-button', '恢复默认')
+    await sleep(300)
+    await clickText(ev, '.el-dialog__footer button', '保存')
+    await sleep(1500)
+    s = await waitFor(ev, (x) => !x.dialog, 10000)
+    check(midOrder(s.heads).join('|') === MID.join('|'), '⑦ 真实拖动用例后恢复默认顺序', midOrder(s.heads).join('|'))
+  }
 
   // 英语:新控件全译、工具栏无裸中文
   await openPage(ev, send, 'en')
