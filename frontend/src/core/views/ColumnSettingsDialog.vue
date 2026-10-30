@@ -4,11 +4,12 @@
      已经管着列显隐/排序/后端持久化,但**列设置弹窗从未落地**(报表面板只用了排序与筛选),
      各业务页因此各自画勾选列表。本组件补上这块通用 UI。
 
-     排序两种操作(2026-10-30 用户口径「让这个能拖动吧」→ 当日二次修「拖了但列位置没变」):
-       · **拖动 ⠿ 手柄**换位:用 **Pointer Events(pointerdown/move/up)** 自己算落点,
+     排序两种操作(2026-10-30 用户口径「让这个能拖动吧」→ 当日两次修「拖了但列位置没变 / 仍无法拖动」):
+       · **拖动行**换位(整行可拖,⠿ 只是抓手提示):用 **Pointer Events(pointerdown/move/up)** 自己算落点,
          不用 HTML5 原生 DnD —— 原生 DnD 在弹窗里表现不稳定(要 dropEffect 恰好被接受、
          Firefox 还要 setData,实机出现过"能拖但松手不换位"),且触屏完全不支持;
          指针方案鼠标/触屏/手写笔一致,拖起行半透明 + **行间蓝色插入线**标出落点;
+         勾选框与 ▲▼ 按钮上照常点击(不触发拖动);无 PointerEvent 的老环境退到 mousedown/mousemove;
        · **▲/▼** 保留作微调与键盘/无障碍兜底。
        两者都只改调用方的草稿,点「保存」才落库。
 
@@ -36,8 +37,9 @@
       <template v-for="(c, i) in columns" :key="c.prop">
         <!-- 落点插入线:画在目标行之前(拖动时才出现) -->
         <div v-if="dragging && insertAt === i" class="csd-insert"></div>
-        <div v-show="match(c)" class="csd-item" :data-idx="i" :class="{ 'is-dragged': dragging && dragFrom === i }">
-          <span class="csd-drag" :title="tt('拖动调整列顺序')" @pointerdown.prevent="startDrag(i, $event)">⠿</span>
+        <div v-show="match(c)" class="csd-item" :data-idx="i" :class="{ 'is-dragged': dragging && dragFrom === i }"
+             @pointerdown="onRowPress(i, $event)" @mousedown="onMousePress(i, $event)">
+          <span class="csd-drag" :title="tt('拖动调整列顺序')">⠿</span>
           <el-checkbox :model-value="!!c.visible" @change="(v) => emit('toggle', { prop: c.prop, visible: !!v })" />
           <span class="csd-label" :title="c.prop">{{ tt(c.label || c.prop) }}</span>
           <span class="csd-arrows">
@@ -85,24 +87,45 @@ function setAll(visible) {
 }
 
 /* ── 拖动排序:Pointer Events 自算落点(不用 HTML5 DnD,见文件头注释) ──
-   下标一律用 props.columns 的**全量下标**(行上 data-idx),搜索过滤时也准。 */
+   下标一律用 props.columns 的**全量下标**(行上 data-idx),搜索过滤时也准。
+   2026-10-30 二次修(用户「还是无法进行」):**整行都可按下拖动**(不再只认 ⠿ 小图标),
+   勾选框/▲▼ 按钮上照常点击;老浏览器无 PointerEvent 时自动退到 mousedown/mousemove。 */
 const listRef = ref(null)
 const dragging = ref(false)   // 是否正在拖动(控制插入线/拖起行样式)
 const dragFrom = ref(-1)      // 被拖行的全量下标
 const insertAt = ref(-1)      // 落点:插到该全量下标之前(== columns.length 表示插到末尾)
 let startY = 0
 let movedEnough = false
+const hasPointerEvent = typeof window !== 'undefined' && !!window.PointerEvent
+
+/** 整行按下:控件(勾选框/按钮/输入)上放行原有点击,其余位置开始拖动 */
+function onRowPress(i, e) {
+  if (e.button !== undefined && e.button !== 0) return   // 只认左键(触屏 button=0)
+  const t = e.target
+  if (t && typeof t.closest === 'function' && t.closest('.el-checkbox, .el-button, button, input, textarea, select')) return
+  if (e.cancelable) e.preventDefault()   // 防拖出文字选区
+  startDrag(i, e)
+}
+/** 无 PointerEvent 的老环境兜底(有 PointerEvent 时 mousedown 会紧跟 pointerdown,忽略掉避免一次按下算两次) */
+function onMousePress(i, e) {
+  if (hasPointerEvent) return
+  onRowPress(i, e)
+}
 
 function startDrag(i, e) {
-  if (e.button !== undefined && e.button !== 0) return   // 只认左键(触屏 button=0)
   dragFrom.value = i
   insertAt.value = i
   dragging.value = true
   startY = e.clientY
   movedEnough = false
-  window.addEventListener('pointermove', onPointerMove, { passive: false })
-  window.addEventListener('pointerup', onPointerUp)
-  window.addEventListener('pointercancel', onPointerUp)
+  if (hasPointerEvent) {
+    window.addEventListener('pointermove', onPointerMove, { passive: false })
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+  } else {
+    window.addEventListener('mousemove', onPointerMove, { passive: false })
+    window.addEventListener('mouseup', onPointerUp)
+  }
 }
 
 /** 指针移动:算落点 + 靠近上下边缘时自动滚动 */
@@ -154,6 +177,8 @@ function stopDrag() {
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
   window.removeEventListener('pointercancel', onPointerUp)
+  window.removeEventListener('mousemove', onPointerMove)
+  window.removeEventListener('mouseup', onPointerUp)
 }
 onBeforeUnmount(stopDrag)
 </script>
@@ -165,12 +190,14 @@ onBeforeUnmount(stopDrag)
 .csd-tip { color: #909399; font-size: 12px; margin-bottom: 6px; }
 .csd-list { max-height: 360px; overflow: auto; }
 .csd-list.is-dragging { user-select: none; cursor: grabbing; }
-.csd-item { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; }
+/* 整行可拖:整行 grab 手型,行内控件保持 pointer/默认 */
+.csd-item { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; cursor: grab; touch-action: none; }
 .csd-item:hover { background: #f5f7fa; }
-/* 拖动排序:手柄可抓(触屏要吃掉默认手势);拖起行半透明;落点画蓝色插入线 */
+.csd-item .el-checkbox, .csd-item .el-button { cursor: pointer; }
+/* 拖动排序:手柄可抓;拖起行半透明;落点画蓝色插入线 */
 .csd-drag { cursor: grab; color: #a8abb2; font-size: 13px; user-select: none; letter-spacing: -1px; touch-action: none; }
 .csd-drag:active { cursor: grabbing; }
-.csd-item.is-dragged { opacity: .45; background: #ecf5ff; }
+.csd-item.is-dragged { opacity: .45; background: #ecf5ff; cursor: grabbing; }
 .csd-insert { height: 2px; margin: 1px 4px; background: #409eff; border-radius: 1px; }
 .csd-label { flex: 1; font-size: 13px; color: #303133; }
 .csd-arrows { display: inline-flex; align-items: center; }

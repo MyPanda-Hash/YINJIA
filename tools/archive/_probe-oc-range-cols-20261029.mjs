@@ -346,8 +346,8 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
   const def = midOrder(s.heads)
   check(def[0] === '物料编码' && def.join('|') === MID.join('|'), '⑤ 恢复默认后顺序回到默认', def.join('|'))
 
-  // ⑥ 拖动排序(2026-10-30 用户口径「让这个能拖动吧」→二次修「拖了但列位置没变」):
-  //    用 **Pointer Events**(与实机同一路径,不再依赖 HTML5 DnD)把「物料编码」拖到第 3 行之后
+  // ⑥ 拖动排序(2026-10-30 用户口径「让这个能拖动吧」→二次「拖了但列位置没变」→三次「还是无法进行」):
+  //    按 **整行按下** 的真实拖动路径(不是只点 ⠿ 小图标)把「物料编码」拖到第 3 行之后
   //    → 表格即时预览(草稿即预览)→ 保存生效 → 恢复默认回默认顺序
   await clickText(ev, '.oc-bar .el-button', '列设置')
   await sleep(900)
@@ -356,11 +356,11 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
     if (!d) return 'no-dialog';
     const items = [...d.querySelectorAll('.csd-item')].filter(x => x.offsetParent !== null);
     if (items.length < 4) return 'too-few:' + items.length;
-    const handle = items[0].querySelector('.csd-drag');
-    if (!handle) return 'no-handle';
-    const hr = handle.getBoundingClientRect();
-    const x = hr.left + hr.width / 2;
-    const y0 = hr.top + hr.height / 2;
+    const label = items[0].querySelector('.csd-label');   // 按在列名上(整行可拖,不再要求点手柄)
+    if (!label) return 'no-label';
+    const lr = label.getBoundingClientRect();
+    const x = lr.left + lr.width / 2;
+    const y0 = lr.top + lr.height / 2;
     const tgt = items[2].getBoundingClientRect();          // 第 3 行
     const yMid = tgt.top + tgt.height / 2;
     const yEnd = tgt.bottom - 2;                            // 落在第 3 行下半 ⇒ 插到它之后
@@ -368,13 +368,13 @@ const errs = await withEdge(async ({ ev, shot, send }) => {
       bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
       isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y,
     });
-    handle.dispatchEvent(mk('pointerdown', y0));
+    label.dispatchEvent(mk('pointerdown', y0));
     window.dispatchEvent(mk('pointermove', yMid));
     window.dispatchEvent(mk('pointermove', yEnd));
     window.dispatchEvent(mk('pointerup', yEnd));
     return 'ok';
   })()`)
-  check(drag === 'ok', '⑥ 列设置行可拖动(pointerdown/move/up 真实拖动路径)', drag)
+  check(drag === 'ok', '⑥ 整行按下即可拖动(pointerdown/move/up,按在列名上)', drag)
   await sleep(600)
   const dragged = midOrder(JSON.parse(await ev(READ)).heads)
   check(dragged[0] === '行号' && dragged[2] === '物料编码', '⑥ 拖动后表格即时预览(草稿即预览)', dragged.join('|'))
