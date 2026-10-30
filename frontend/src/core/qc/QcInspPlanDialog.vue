@@ -344,11 +344,12 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { QC_PLAN_DOC_OPTIONS, docCodesOf, docCodesToText, docLabelsOf } from './qcPlanApplicableDocs.js'
+import { defaultShipRows, shipRowType } from './shipPlanDefaults.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -422,12 +423,33 @@ async function loadShip() {
     // row-key 必须唯一:同产品同名项目可能重复,故带上下标(纯视图用,不入库)
     shipRows.value = (d.rows || []).map((x, i) => ({ ...x, __k: i }))
     shipMeta.value = { planNo: d.planNo || '', title: d.title || '', version: d.version || '' }
+    await applyDefaultShipSelection()
   } catch (e) {
     if (seq !== shipSeq) return
     err(e, '取出货检验计划失败')
   } finally {
     if (seq === shipSeq) shipLoading.value = false
   }
+}
+
+/**
+ * 打开「出货检验计划」页签时把**默认勾选**刷到表格上(2026-10-30 用户口径):
+ *   · 组装成品检验 = 外观/尺寸/出货重量 三类默认勾选,其余默认不勾(还列着,要带手动勾);
+ *   · 制程检验     = 反过来,这三类默认不勾、其余(性能/功能性测试…)默认勾选。
+ * 规则本体在 shipPlanDefaults.js(纯函数 + 单测),这里只负责把勾选态落到 el-table。
+ * 每次取数(打开弹窗 / 切来源 / 点刷新)都重刷默认勾选 —— 与「打开即复位来源」同一口径,
+ * 用户手改过的勾选在刷新时回到默认(要保留就点完直接「带入明细」)。
+ * 表格还没渲染(来源停在标准库、或没取到行)时静默跳过。
+ */
+async function applyDefaultShipSelection() {
+  const rows = shipRows.value
+  if (!rows.length) return
+  await nextTick()
+  const table = shipTable.value
+  if (!table) return
+  const want = new Set(defaultShipRows(props.panelCode, rows).map((r) => r.__k))
+  table.clearSelection()
+  for (const r of rows) if (want.has(r.__k)) table.toggleRowSelection(r, true)
 }
 
 /**
@@ -442,7 +464,9 @@ function confirmPickShip() {
     // 类别:后端把计划表里**填了但界面隐藏**的「检验内容」(外观/重要尺寸/重量/性能)映射成 表区 / 检验类型,
     // 它决定本单明细归到哪一类(组装成品检验单就是明细第一列「检验类型」,打印报表也按它归组),
     // 故照样带过去 —— 本单没有这一列时 applyInspItems 会自己跳过;组装成品检验单还会按三类归一。
-    检验内容: r['表区'] || '',
+    // 2026-10-30:「检验内容」这一列库里普遍为空(实测两张计划全 NULL)⇒ 回退按检验项目名判三类
+    // (shipRowType:含 外观/尺寸/重量),否则成品明细的「检验类型」会落成「检验项目」这种占位值。
+    检验内容: r['表区'] || shipRowType(r) || '',
     检验标准: r['检验要求'] || '',
     检验方法: r['检验方法'] || '',
     检查频率: r['检查频率'] || '',

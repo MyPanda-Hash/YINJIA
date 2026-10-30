@@ -2437,6 +2437,7 @@ import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
+import { defaultShipRows, shipRowType } from '@core/qc/shipPlanDefaults'
 import QcProcInspSheet from '@core/qc/QcProcInspSheet.vue'
 import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
 // 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
@@ -8170,10 +8171,12 @@ function applyShipPlanItems(items) {
   const hasArea = (k) => dataCols.size === 0 || dataCols.has(k)
   // 计划行 → 本单的类别值:组装成品检验单按三类(外观/尺寸/出货重量)归一(否则与生单预铺写出的值
   // 对不上,判重会失效),其余面板原样;本面板没有类别列 ⇒ 空串(不写这一格)。
+  // 2026-10-30:计划明细的「检验内容」列普遍为空(实测两张计划全 NULL)⇒ 回退按检验项目名判三类
+  // (shipRowType),否则成品明细第一列「检验类型」会是空值/占位值。
   const catOf = (it) => {
     if (!areaKey) return ''
-    if (areaKey === '检验类型') return normInspType(it['检验类型'] || it['表区'])
-    return String(it['表区'] ?? '')
+    if (areaKey === '检验类型') return normInspType(it['检验类型'] || it['表区'] || shipRowType(it))
+    return String(it['表区'] || shipRowType(it) || '')
   }
   // 后端已用这些键名下发(与 yj_field.label 对齐);本面板没有的列自动跳过(类别列单独处理)
   const KEYS = ['检验项目', '检验要求', '检验方法', '检查频率', '检验仪器', '不合格应对措施', '备注']
@@ -9924,12 +9927,16 @@ async function onButton(action) {
     }
     return
   }
-  // 取出货检验计划(2026-10-13):**制程检验单专用** —— 按本单的「产品编码」从出货检验计划表
+  // 取出货检验计划(2026-10-13):按本单的「产品编码」从出货检验计划表
   // (RD_INSP_PLAN,文档编号 YJ-RD001)取回该产品的检验项目,追加到明细。
   // 用户口径:「实现对应的产品编码就能获取到对应的检验内容进行填入」。
   // 追加不覆盖(可重复点、可手工删多余行);查不到计划不算错,由这里给业务话术。
   // 2026-10-14 口径:「获得项目后应存校验、查看是否已获取,不能无限添加」——
   //   ⇒ 带入前先与明细已有项目对账:已带的跳过不重复加,重复项在结果里报出来。
+  // 🔴 2026-10-30 用户口径:「取出货检验计划只带 外观/尺寸/重量 三项、其余默认不勾选带入成品检验」
+  //   + 制程检验「默认不带这三项、其他都默认勾选」⇒ 本动作不再整张计划全量带入,只带本面板的
+  //   **默认勾选**行(规则见 core/qc/shipPlanDefaults.js,与弹窗里「出货检验计划」页签的默认勾选同源;
+  //   其余项目要带请走「检验项目/检验方案」弹窗手动勾)。
   if (action === '取出货检验计划') {
     const code = String(cur.value?.['产品编码'] || '').trim()
     if (!code) return ElMessage.warning(tt('请先填写产品编码'))
@@ -9942,17 +9949,25 @@ async function onButton(action) {
           ? tt('该出货检验计划没有明细')
           : `${tt('该产品没有出货检验计划')}：${code}`)
       }
-      const r = applyShipPlanItems(planRows)
+      const pickedRows = defaultShipRows(panelCode.value, planRows)
+      if (!pickedRows.length) {
+        // 计划里没有本面板默认要带的行(如成品检验的计划没有任何 外观/尺寸/重量 项):
+        // 直接打开弹窗让用户自己勾(弹窗默认也停在「出货检验计划」页签),不给「没有计划」这种误导话术
+        qcInspPlanVisible.value = true
+        return
+      }
+      const r = applyShipPlanItems(pickedRows)
       if (!r.added) {
-        // 一条都没加进来 ⇒ 计划里的项目都在明细里了,明确告知不重复添加
+        // 一条都没加进来 ⇒ 默认要带的项目都在明细里了,明确告知不重复添加
         return ElMessage.warning(
           `${tt('该产品')}${code}${tt('的检验项目已全部带入')}(${r.dupes.length})${tt('，不重复添加')}`)
       }
-      // 有新增也有重复:说明新增几条、跳过几条,避免用户以为整张计划都进来了
+      // 有新增也有重复:说明新增几条、跳过几条,避免用户以为整张计划都进来了。
+      // 分母用**整张计划**的行数(= 默认勾选/整张计划),让人一眼看出「其余项没带」而不是计划只有这么点。
       const dupTip = r.dupes.length
         ? `，${tt('跳过已带入')}${r.dupes.length}${tt('项(带入结果)')}`
         : ''
-      ElMessage.success(`${tt('已按出货检验计划')} ${data.planNo} ${tt('带入')} ${r.added}/${r.total} ${tt('行(带入结果)')}${dupTip}${tt('，请填写实测数值与判定')}`)
+      ElMessage.success(`${tt('已按出货检验计划')} ${data.planNo} ${tt('带入')} ${r.added}/${planRows.length} ${tt('行(带入结果)')}${dupTip}${tt('，请填写实测数值与判定')}`)
     } catch (error) {
       ElMessage.error(engine.errMsg(error) || tt('取出货检验计划失败'))
     }
