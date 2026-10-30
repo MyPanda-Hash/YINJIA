@@ -76,6 +76,15 @@ public class MobilePickController {
     /** 退料业务类型:金蝶「其他入库单」里这一类的业务类型写「生产退料」(数据键,不翻译) */
     private static final String BIZ_BACK = "生产退料";
 
+    /**
+     * 列表每组最多返回多少条(2026-10-30 由 200 调整)。
+     *
+     * <p>为什么调大:演示/验收时两组各有二三十条,页面上"已完成 21 条只显示 21 条里的前 20"
+     * 这类截断会让用户以为数据丢了(实测踩到)。一次拉 500 条 JSON 也就几十 KB,
+     * 比"看不到自己刚造的数据"强。真要分页时再补滚动加载。
+     */
+    private static final int LIST_LIMIT = 500;
+
     private final JdbcTemplate jdbc;
     private final WoPickDocService docs;
     private final ButtonService buttons;
@@ -155,8 +164,8 @@ public class MobilePickController {
     public ApiResult<Map<String, Object>> createList(@RequestParam(required = false) String keyword) {
         perm.requirePanelView(PagePanelRegistry.MOBILE_PICK_CREATE);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("open", docs.list(WoPickDocService.STATE_OPEN, keyword, 200));
-        out.put("done", docs.list(WoPickDocService.STATE_DONE, keyword, 200));
+        out.put("open", docs.list(WoPickDocService.STATE_OPEN, keyword, LIST_LIMIT));
+        out.put("done", docs.list(WoPickDocService.STATE_DONE, keyword, LIST_LIMIT));
         out.put("openTotal", docs.countByState(WoPickDocService.STATE_OPEN));
         out.put("doneTotal", docs.countByState(WoPickDocService.STATE_DONE));
         return ApiResult.ok(out);
@@ -434,8 +443,8 @@ public class MobilePickController {
     public ApiResult<Map<String, Object>> list(@RequestParam(required = false) String keyword) {
         perm.requirePanelView(PANEL_SELF);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("open", docs.list(WoPickDocService.STATE_OPEN, keyword, 200));
-        out.put("done", docs.list(WoPickDocService.STATE_DONE, keyword, 200));
+        out.put("open", docs.list(WoPickDocService.STATE_OPEN, keyword, LIST_LIMIT));
+        out.put("done", docs.list(WoPickDocService.STATE_DONE, keyword, LIST_LIMIT));
         out.put("openTotal", docs.countByState(WoPickDocService.STATE_OPEN));
         out.put("doneTotal", docs.countByState(WoPickDocService.STATE_DONE));
         return ApiResult.ok(out);
