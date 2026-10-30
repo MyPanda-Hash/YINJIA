@@ -3264,6 +3264,16 @@ const reportColumnTree = computed(() => {
   }
   return out
 })
+/**
+ * 从「生单」组里**隐藏**的动作(2026-10-31 用户口径:「销售订单只用生销售出库单,不用生成生产工单」)。
+ *
+ * 只影响列表页工具栏的显示:后端 `PUSH_TARGETS` 与 `ManuScheduleHandler` 保留(订单结转、选单等
+ * 其它入口仍在用这条链路),所以数据键与能力都不动 —— 销售订单的「生单」主按钮因此变成
+ * 「生成销售出库单」,点下去走统一生单对话框。
+ */
+const GENERATE_HIDDEN = { SO_ORDER: ['生成生产工单'] }
+const hiddenGenerateActions = computed(() => GENERATE_HIDDEN[String(panelCode.value)] || [])
+
 const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   // 2026-10-07 用户口径(提交 3dd7dbb0「删除整单卡片入口」):列表页不再提供「能打开整单卡片
   //   (VoucherFormDialog)」的入口 —— 「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,
@@ -3280,7 +3290,8 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   //   「已归档 → 退回草稿」的唯一入口(用户口径:加一个修改按钮,点了退回草稿再改)。
   //   故按面板放行:自助维护型保留「修改」,其余面板仍摘(检验目录走侧栏/行内,不吃工具栏)。
   const actions = actsOf(group).filter((action) => !['查询', '查找'].includes(action)
-    && !(action === '修改' && !isSelfMaintainedPanel.value))
+    && !(action === '修改' && !isSelfMaintainedPanel.value)
+    && !hiddenGenerateActions.value.includes(action))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   // 「批量生单」是生单组的**下拉项**(2026-10-31 用户口径:「在生单下多写一个批量生单的功能」):
   // 追加在生单组动作末尾 —— 组里只有一个动作时也因此在主按钮右侧出现 ▼,下拉里就是它。

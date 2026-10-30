@@ -28,7 +28,9 @@
       <div class="gl-bar">
         <span class="gl-chip">{{ tt('目标单据') }}: {{ meta.targetName ? tt(meta.targetName) : '-' }}</span>
         <span class="gl-chip">{{ tt('来源单据') }}: {{ docs.length }} {{ tt('张') }}</span>
-        <span v-if="meta.batchFlow" class="gl-ratio">
+        <!-- 超送比例**只有采购订单这一跳有**(用户口径 2026-10-31:「除了采购订单,别的生单没有超送比例」)——
+             送料暂收→检验/入库、销售订单→销售出库单 等一律不显示,上限就是剩余量 -->
+        <span v-if="showOverRatio" class="gl-ratio">
           {{ tt('超送比例') }}:
           <el-input-number v-model="ratioPct" :min="0" :max="50" :step="1" :precision="0" :controls="false"
                            size="small" style="width: 62px" />
@@ -147,6 +149,12 @@ const failed = ref([])
 
 /** 标题里也带目标面板名 → 同样过 tt()(面板名走 yj_translation scope=panel,英文界面不掉回中文) */
 const title = computed(() => `${tt('生单')} → ${meta.targetName ? tt(meta.targetName) : tt('目标单据')}`)
+/**
+ * 收料超送额度**只属于采购订单这一跳**(2026-10-31 用户口径:「除了采购订单,别的生单没有超送比例」)。
+ * 供应商采购打印(SUPPLIER_PU_ORDER)是采购订单的副本面板,同一张订单、同一套口径,一并放行。
+ */
+const OVER_RATIO_PANELS = new Set(['PU_ORDER', 'SUPPLIER_PU_ORDER'])
+const showOverRatio = computed(() => meta.batchFlow && OVER_RATIO_PANELS.has(String(props.sourcePanel)))
 const totalQty = computed(() => sumPicked(docs.value, pickedByDoc, qtyOf))
 const count = computed(() => {
   let n = 0
@@ -207,10 +215,10 @@ async function load() {
     meta.targetName = res?.targetName || ''
     meta.batchFlow = !!res?.batchFlow
     meta.overRatio = Number(res?.overRatio || 0)
-    // 超送比例**只对分批送料链路有效**(收料允许超送);普通链路(销售出库/生产工单/加工单)
-    // 没有超送额度 —— 上限就是剩余量。这里必须置 0,否则「可生单」会显示成 数量×1.2,
+    // 超送比例只对**采购订单这一跳**生效;其余链路(暂收→检验/入库、销售订单→销售出库单)
+    // 没有超送额度 —— 上限就是剩余量。置 0,否则「可生单」会显示成 数量×1.2,
     // 用户照着填 60 再被后端按 50 拒掉(2026-10-31 实测到)。
-    ratioPct.value = meta.batchFlow ? Math.round(meta.overRatio * 100) : 0
+    ratioPct.value = showOverRatio.value ? Math.round(meta.overRatio * 100) : 0
     for (const k of Object.keys(qtyOf)) delete qtyOf[k]
     for (const k of Object.keys(pickedByDoc)) delete pickedByDoc[k]
     for (const k of Object.keys(batchNoOf)) delete batchNoOf[k]
@@ -247,6 +255,7 @@ async function confirm() {
   try {
     const res = await engine.pushFlowGenerate({
       panelCode: props.sourcePanel, action: props.action, docs: payloadDocs,
+      // 分批链路才带比例;非采购订单恒 0(= 不许超送),后端 generateBatch 按 0 校验
       overRatio: meta.batchFlow ? ratioPct.value / 100 : undefined,
     })
     const made = res?.['生成'] || []

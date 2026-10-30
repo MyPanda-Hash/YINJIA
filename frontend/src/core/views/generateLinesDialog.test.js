@@ -100,7 +100,21 @@ test('生单结果支持「一单生两张」', () => {
   // 送料暂收单 → 检验单 + 入库单(一条动作两个去向)
   assert.match(dialog, /m\['生成清单'\]/, '对话框要把「生成清单」摊平后计数,否则只报一张')
   assert.match(dialog, /商品档案未登记的商品按免检（否）处理/, '未登记商品要提示(与旧 callButton 路径同口径)')
-  // 普通链路没有超送额度:比例必须置 0,否则"可生单"显示 数量×1.2,填了会被后端按剩余量拒
-  assert.match(dialog, /ratioPct\.value = meta\.batchFlow \? Math\.round\(meta\.overRatio \* 100\) : 0/,
-    '非分批链路的上限 = 剩余量(不带超送比例)')
+})
+
+test('超送比例只有采购订单有,别的生单不显示也不放额度', () => {
+  // 用户口径(2026-10-31):「除了采购订单,别的生单没有超送比例」
+  assert.match(dialog, /OVER_RATIO_PANELS = new Set\(\['PU_ORDER', 'SUPPLIER_PU_ORDER'\]\)/,
+    '超送额度只属于采购订单(含供应商打印副本)这一跳')
+  assert.match(dialog, /v-if="showOverRatio"/, '比例输入框要按面板显隐,不能对所有分批链路都显示')
+  assert.match(dialog, /ratioPct\.value = showOverRatio\.value \? Math\.round\(meta\.overRatio \* 100\) : 0/,
+    '非采购订单的比例恒 0 ⇒ 上限=剩余量(否则显示 数量×1.2,填了会被后端按剩余拒)')
+})
+
+test('销售订单的生单只用「生成销售出库单」', () => {
+  // 用户口径(2026-10-31):「销售订单只用生销售出库单,不用生成生产工单」
+  assert.match(list, /GENERATE_HIDDEN = \{ SO_ORDER: \['生成生产工单'\] \}/,
+    '销售订单生单组里要隐藏「生成生产工单」⇒ 主按钮变成「生成销售出库单」')
+  assert.match(list, /!hiddenGenerateActions\.value\.includes\(action\)/,
+    '隐藏要落在 toolbarGroups 的动作过滤上(数据键与后端能力保留给订单结转/选单)')
 })

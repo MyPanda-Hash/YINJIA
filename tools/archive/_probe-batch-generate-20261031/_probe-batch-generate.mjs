@@ -90,8 +90,7 @@ async function openPanel(code, withRail = true) {
 }
 /** 点生单组的主按钮(不点下拉) */
 const clickGenerateMain = () => ev(`(() => {
-  const groups = [...document.querySelectorAll('.tools .tb-group')]
-  const g = groups.find(x => (x.querySelector('.act-name')?.innerText || '').trim() === '生单')
+  const g = ${GEN_GROUP_FIND}
   if (!g) return false
   g.querySelector('.tb-main')?.click()
   return true
@@ -184,7 +183,7 @@ console.log('  分批对话框存在 =', await ev(`!!document.querySelector('.bs
 await shot('04-pu-batch-send-dialog.png')
 await ensureNoDialog()
 
-// ============ C. 销售订单:生单(主按钮 → 生成生产工单)/ 下拉 → 生成销售出库单 ============
+// ============ C. 销售订单:主按钮「生单」= 生成销售出库单;下拉只剩「批量生单」 ============
 console.log('== C. 销售订单 生单组 ==')
 await openPanel('SO_ORDER')
 console.log('  下拉项 =', JSON.stringify(await ev(`(() => {
@@ -193,13 +192,7 @@ console.log('  下拉项 =', JSON.stringify(await ev(`(() => {
   g.querySelector('.tb-caret')?.click()
   return []
 })()`).then(async () => { await sleep(400); return ev(`[...document.querySelectorAll('.tools .tb-menu .ctx-item')].map(x=>x.innerText.trim())`) })))
-console.log('  点生单(主按钮,= 生成生产工单) =', await clickGenerateMain())
-for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
-await sleep(800)
-console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
-await shot('05a-so-manu-order-dialog.png')
-await ensureNoDialog()
-console.log('  点生成销售出库单 =', await clickGenerateItem('生成销售出库单'))
+console.log('  点生单(主按钮,= 生成销售出库单) =', await clickGenerateMain())
 for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
 await sleep(800)
 console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
@@ -211,8 +204,8 @@ console.log('== D. 英文界面走查 ==')
 await setLocale('en')
 await openPanel('SO_ORDER')
 console.log('  工具栏 =', JSON.stringify(await ev(`[...document.querySelectorAll('.tools .tb-group .act-name')].map(x=>x.innerText.trim())`)))
-// 英文下的动作名 = tt('生成销售出库单') → 'Generate Sales Issue'(见 i18n/locales/en.js)
-console.log('  点 Generate Sales Issue =', await clickGenerateItem('Generate Sales Issue'))
+// 英文下主按钮 = tt('生单')= Generate;点它开的是「销售出库单」对话框(标题 Generate → Sales issue)
+console.log('  点 Generate(主按钮) =', await clickGenerateMain())
 for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
 await sleep(900)
 console.log('  EN 对话框:', JSON.stringify(await dialogSummary(), null, 1))
