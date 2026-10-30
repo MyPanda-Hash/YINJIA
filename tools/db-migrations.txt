@@ -4351,3 +4351,11 @@ migrate-drop-test-progress-20261030.sql
 #   用户 2026-10-30 确认「是,确实要清掉」—— 这批是 10-10~10-30 逐个删除的,不恢复。
 #   幂等;自检「canceled=Y 但 asp_cancel<>Y」必须 0,否则整体回滚。两账套都执行。
 migrate-align-canceled-to-aspcancel-20261030.sql
+
+# 2026-10-30 产品信息表「三、产品BOM表」补物理列与元数据字段(用户报障「填了 BOM 保存后
+#   三行全是 /」)。2026-10-29 新版设计加了 BOM 节(recordSheetConfigs.js RD_PROD_INFO.dataTables,
+#   5 列=序号|物料编号|物料名称|尺寸规格|数量),但 rd_prod_info_detail 没有任何业务列、
+#   yj_field 也没有 detail 字段 ⇒ 后端按元数据认列全丢弃,只插了空明细行。
+#   本脚本补 5 个物理列 + 5 条 yj_field detail 字段(译名已存在)+ 列中文注释。
+#   幂等;自检「列 5/5 且 字段 5/5」不满足整体回滚。两账套都执行。
+migrate-prodinfo-bom-detail-20261030.sql
