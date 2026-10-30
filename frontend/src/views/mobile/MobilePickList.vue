@@ -36,22 +36,11 @@
     <div v-if="errText" class="mp-err mp-err-top">{{ errText }}</div>
     <div v-if="okText" class="mp-ok mp-err-top">{{ okText }}</div>
 
-    <!-- ① 开单入口(2026-10-30 第二轮:生单已独立成面板「生成工单领料/退料单」)
-         用户口径:「还有少了一个『生成工单领料/退料单』这个面版,这个面版的功能和生成领料是有区别的
-         (不是一个面版)」+ 确认「生成面板只管生单,生完跳转/引导到生产领料面板去领」。
-         ⇒ 本页**不再直接生单**,只保留一个跳转入口,避免两个面板职责重叠。 -->
-    <section class="mp-card">
-      <div class="mp-sec">
-        <span>{{ tt('生成工单领料/退料单') }}</span>
-        <span class="mp-sec-note">{{ tt('按组装BOM表展开用料') }}</span>
-      </div>
-      <div class="mp-go">
-        <span class="mp-go-text">{{ tt('生单在独立的工作台里做:可连续扫多张工单批量生成') }}</span>
-        <el-button type="primary" size="large" @click="goCreate">{{ tt('去生成领料/退料单') }}</el-button>
-      </div>
-    </section>
-
-    <!-- ② 查询 + 扫码定位 -->
+    <!-- 查询 + 扫码定位(2026-10-30 第三轮:本面板**只看单据**)
+         用户口径:「生成工单领料/退料单和生产领料功能都重叠了,给我区分开来」+
+         确认「彻底切干净:生单只看工单、领料只看单据」。
+         ⇒ 原来那块「去生成领料/退料单」的跳转入口**整个删掉**:生单是另一个面板的事,
+           本页只做"查单 + 领料 + 退料",一个按钮都不留(菜单上两个面板各进各的)。 -->
     <section class="mp-card">
       <div class="mp-sec">{{ tt('查询单据') }}</div>
       <div class="mp-row">
@@ -218,11 +207,6 @@ function errMsgOf(e) {
   return e?.response?.data?.message || e?.message || ''
 }
 
-/** 去开单工作台(生单在那里做) */
-function goCreate() {
-  router.push('/panelx/list/MOBILE_PICK_CREATE')
-}
-
 /**
  * 这张单是否含退料(2026-10-30 第三轮)。
  *
@@ -348,10 +332,7 @@ function openDoc(id) {
 .mp-row :deep(.el-input__wrapper) { min-height: 44px; }
 .mp-row :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
 
-/* 开单入口(2026-10-30 第二轮:生单独立成面板后,本页只留跳转) */
-.mp-go { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.mp-go-text { flex: 1 1 200px; min-width: 0; font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.5; }
-.mp-go :deep(.el-button) { flex: 0 0 auto; height: 44px; }
+/* 开单入口样式已删除(2026-10-30 第三轮:本面板只看单据,不再有"去生成"跳转) */
 .mp-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
 
 /* 分组头 = 展开/收起开关(用户口径「已完成和未完成都可以展开和收缩」) */

@@ -191,6 +191,16 @@ const ROWS = [
   ['项物料,合计', 'item(s), total', '件,合計', '건, 합계', 'ítem(s), total', 'ligne(s), total', 'Position(en), gesamt', 'поз., всего', 'mục, tổng', 'รายการ รวม'],
   ['提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?', 'This creates an other-inbound document tagged as a return and stocks in — inventory will increase. Continue?', '「返却」フラグ付きのその他入庫伝票が作成され、在庫が増えます。よろしいですか?', '"반납" 표시가 붙은 기타입고 전표가 생성되고 재고가 증가합니다. 계속하시겠습니까?', 'Se creará una entrada con la marca «devolución» y aumentará el stock. ¿Continuar?', 'Une entrée marquée « retour » sera créée et le stock augmentera. Continuer ?', 'Ein Eingang mit „Rückgabe" wird erstellt, der Bestand steigt. Fortfahren?', 'Будет создан приход с пометкой «возврат», остаток увеличится. Продолжить?', 'Sẽ tạo phiếu nhập có đánh dấu "trả hàng", tồn kho tăng. Tiếp tục?', 'จะสร้างใบรับเข้าที่มีเครื่องหมาย "คืน" และสต็อกจะเพิ่ม ดำเนินการต่อ?'],
   ['这张单还没提交完成,不能退料', 'This slip is not completed yet — cannot return', 'この伝票は未完了のため返却できません', '이 전표는 미완료라 반납할 수 없습니다', 'Este vale no está completado: no se puede devolver', 'Ce bon n\'est pas terminé : retour impossible', 'Beleg nicht abgeschlossen — keine Rückgabe', 'Накладная не завершена — возврат невозможен', 'Phiếu chưa hoàn thành — không trả được', 'ใบยังไม่เสร็จ คืนไม่ได้'],
+
+  // ── 2026-10-30 第四轮:生单面板与领料面板彻底切干净 ──
+  ['工单开单状态', 'Work-order status', '指示の伝票作成状況', '작업지시 전표 생성 상태', 'Estado de la orden', 'État des OF', 'Auftragsstatus', 'Статус заказов', 'Trạng thái lệnh', 'สถานะใบสั่ง'],
+  ['只显示工单,单据请到「生产领料」查', 'Work orders only — see "Production Picking" for documents', '指示のみ表示。伝票は「払出」で確認', '작업지시만 표시. 전표는 "출고"에서', 'Solo órdenes; los vales en «Retirada»', 'OF uniquement ; bons dans « Prélèvement »', 'Nur Aufträge; Belege unter „Entnahme"', 'Только заказы; документы в «Выдаче»', 'Chỉ lệnh SX; phiếu xem ở "Xuất kho"', 'เฉพาะใบสั่ง เอกสารดูที่ "เบิก"'],
+  ['工单号 / 产品名称', 'Work order / Product', '指示番号/製品名', '작업지시/품목명', 'OT / Producto', 'OF / Produit', 'Auftrag / Produkt', 'Заказ / Изделие', 'Lệnh / Sản phẩm', 'ใบสั่ง / ชื่อสินค้า'],
+  ['未开单', 'Not created', '未作成', '미생성', 'Sin crear', 'Non créé', 'Nicht erstellt', 'Не создан', 'Chưa tạo', 'ยังไม่สร้าง'],
+  ['已开单', 'Created', '作成済み', '생성됨', 'Creado', 'Créé', 'Erstellt', 'Создан', 'Đã tạo', 'สร้างแล้ว'],
+  ['排产', 'Planned', '計画', '계획', 'Planificado', 'Planifié', 'Geplant', 'План', 'Kế hoạch', 'แผน'],
+  ['刷新开单状态', 'Refresh status', '状況を更新', '상태 새로고침', 'Actualizar estado', 'Actualiser', 'Status aktualisieren', 'Обновить статус', 'Làm mới trạng thái', 'รีเฟรชสถานะ'],
+  ['没有查到工单', 'No work orders found', '指示が見つかりません', '작업지시 없음', 'No se encontraron órdenes', 'Aucun OF trouvé', 'Keine Aufträge gefunden', 'Заказы не найдены', 'Không tìm thấy lệnh', 'ไม่พบใบสั่ง'],
 ]
 
 const LOCALES = {

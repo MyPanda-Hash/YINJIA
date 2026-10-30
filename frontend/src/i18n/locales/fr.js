@@ -2581,6 +2581,14 @@ export default {
     '项物料,合计': 'ligne(s), total',
     '提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?': 'Une entrée marquée « retour » sera créée et le stock augmentera. Continuer ?',
     '这张单还没提交完成,不能退料': 'Ce bon n\'est pas terminé : retour impossible',
+    '工单开单状态': 'État des OF',
+    '只显示工单,单据请到「生产领料」查': 'OF uniquement ; bons dans « Prélèvement »',
+    '工单号 / 产品名称': 'OF / Produit',
+    '未开单': 'Non créé',
+    '已开单': 'Créé',
+    '排产': 'Planifié',
+    '刷新开单状态': 'Actualiser',
+    '没有查到工单': 'Aucun OF trouvé',
   },
 
 }

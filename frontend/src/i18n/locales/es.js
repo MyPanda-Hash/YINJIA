@@ -2581,6 +2581,14 @@ export default {
     '项物料,合计': 'ítem(s), total',
     '提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?': 'Se creará una entrada con la marca «devolución» y aumentará el stock. ¿Continuar?',
     '这张单还没提交完成,不能退料': 'Este vale no está completado: no se puede devolver',
+    '工单开单状态': 'Estado de la orden',
+    '只显示工单,单据请到「生产领料」查': 'Solo órdenes; los vales en «Retirada»',
+    '工单号 / 产品名称': 'OT / Producto',
+    '未开单': 'Sin crear',
+    '已开单': 'Creado',
+    '排产': 'Planificado',
+    '刷新开单状态': 'Actualizar estado',
+    '没有查到工单': 'No se encontraron órdenes',
   },
 
 }

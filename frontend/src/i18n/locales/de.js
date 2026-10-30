@@ -2581,6 +2581,14 @@ export default {
     '项物料,合计': 'Position(en), gesamt',
     '提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?': 'Ein Eingang mit „Rückgabe" wird erstellt, der Bestand steigt. Fortfahren?',
     '这张单还没提交完成,不能退料': 'Beleg nicht abgeschlossen — keine Rückgabe',
+    '工单开单状态': 'Auftragsstatus',
+    '只显示工单,单据请到「生产领料」查': 'Nur Aufträge; Belege unter „Entnahme"',
+    '工单号 / 产品名称': 'Auftrag / Produkt',
+    '未开单': 'Nicht erstellt',
+    '已开单': 'Erstellt',
+    '排产': 'Geplant',
+    '刷新开单状态': 'Status aktualisieren',
+    '没有查到工单': 'Keine Aufträge gefunden',
   },
 
 }

@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   MobilePickCreate.vue — 手机扫码 · 生成工单领料/退料单(开单工作台,2026-10-30)
 
   【为什么是独立一页】(用户 2026-10-30 第二轮口径)
@@ -93,8 +93,7 @@
           <span class="mp-res-wo">{{ r.工单号 }}<i v-if="r.工单行号"> #{{ r.工单行号 }}</i></span>
           <span class="mp-res-tag">{{ r.重复 ? tt('已存在') : tt('已生成') }}</span>
         </div>
-        <div class="mp-res-l2 mono">{{ r.领料单号 || '—' }}<template v-if="r.退料单号"> / {{ r.退料单号 }}</template></div>
-        <el-button size="small" @click="openDoc(r.id)">{{ tt('去领料') }}</el-button>
+        <div class="mp-res-l2 mono">{{ r.领料单号 || '—' }}</div>
       </div>
 
       <div v-for="(f, i) in failures" :key="'bad' + i" class="mp-res is-bad">
@@ -106,78 +105,66 @@
       </div>
     </section>
 
-    <!-- ③ 已生成(列表) -->
+    <!-- ③ 工单开单状态(2026-10-30 第三轮:本面板**只看工单**,不看单据)
+         用户口径:「生成工单领料/退料单和生产领料功能都重叠了,给我区分开来」+
+         确认「彻底切干净:生单只看工单、领料只看单据」。
+         ⇒ 这里列的是**工单**(按工单号/产品查),每行显示"这张工单开了没有",
+           而不是领料单列表 —— 单据列表在「生产领料」面板里,本页不重复。 -->
     <section class="mp-card">
-      <div class="mp-sec">{{ tt('已生成的单') }}</div>
+      <div class="mp-sec">
+        <span>{{ tt('工单开单状态') }}</span>
+        <span class="mp-sec-note">{{ tt('只显示工单,单据请到「生产领料」查') }}</span>
+      </div>
       <div class="mp-row">
         <el-input
           v-model="keyword"
-          :placeholder="tt('工单号 / 领料单号 / 产品名称')"
+          :placeholder="tt('工单号 / 产品名称')"
           size="large"
           clearable
-          @keyup.enter="loadList"
+          @keyup.enter="loadWoStatus"
         />
-        <el-button size="large" :loading="listLoading" @click="loadList">{{ tt('查询') }}</el-button>
+        <el-button size="large" :loading="listLoading" @click="loadWoStatus">{{ tt('查询') }}</el-button>
       </div>
 
-      <div class="mp-grp-head" @click="openOpen = !openOpen">
-        <span class="mp-grp-title">{{ tt('未完成') }}</span>
-        <span class="mp-grp-num">{{ list.open.length }}</span>
-        <span class="mp-grp-arrow" :class="{ open: openOpen }">›</span>
-      </div>
-      <template v-if="openOpen">
-        <div v-if="!list.open.length" class="mp-empty">{{ tt('没有未完成的单据') }}</div>
-        <div v-for="d in list.open" :key="d.id" class="mp-doc" @click="openDoc(d.id)">
-          <div class="mp-doc-l1">
-            <span class="mp-doc-no mono">{{ d.领料单号 || tt('未生成') }}</span>
-            <span class="mp-doc-prog">{{ d.已领项数 || 0 }}/{{ d.物料项数 || 0 }}</span>
-          </div>
-          <div class="mp-doc-l2">
-            <span>{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
-            <span class="mp-doc-p">{{ d.产品名称 || d.产品编号 || '—' }}</span>
-          </div>
+      <div v-if="!woList.length" class="mp-empty">{{ tt('没有查到工单') }}</div>
+      <div
+        v-for="w in woList"
+        :key="w.工单号 + '#' + w.工单行号"
+        class="mp-wo-row"
+        :class="{ 'is-done': w.已开单 }"
+      >
+        <div class="mp-wo-l1">
+          <span class="mp-wo-no">{{ w.工单号 }}<i> #{{ w.工单行号 }}</i></span>
+          <span class="mp-wo-tag" :class="tagClass(w)">{{ tagText(w) }}</span>
         </div>
-      </template>
-
-      <div class="mp-grp-head" @click="openDone = !openDone">
-        <span class="mp-grp-title">{{ tt('已完成') }}</span>
-        <span class="mp-grp-num">{{ list.done.length }}</span>
-        <span class="mp-grp-arrow" :class="{ open: openDone }">›</span>
-      </div>
-      <template v-if="openDone">
-        <div v-if="!list.done.length" class="mp-empty">{{ tt('还没有已完成的单据') }}</div>
-        <div v-for="d in list.done" :key="d.id" class="mp-doc is-done" @click="openDoc(d.id)">
-          <div class="mp-doc-l1">
-            <span class="mp-doc-no mono">{{ d.领料单号 || '—' }}</span>
-            <span class="mp-doc-prog">{{ d.已领项数 || 0 }}/{{ d.物料项数 || 0 }}</span>
-          </div>
-          <div class="mp-doc-l2">
-            <span>{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
-            <span class="mp-doc-p">{{ d.产品名称 || d.产品编号 || '—' }}</span>
-          </div>
+        <div class="mp-wo-l2">
+          <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
+          <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
         </div>
-      </template>
+        <div v-if="w.已开单" class="mp-wo-l3">
+          <span class="mono">{{ w.领料单号 }}</span>
+          <span class="mp-wo-prog">{{ tt('已领') }} {{ w.已领项数 || 0 }}/{{ w.物料项数 || 0 }}</span>
+        </div>
+      </div>
     </section>
 
-    <!-- 引导:生完去领料面板 -->
+    <!-- 底栏:本面板的终点就是"生单完成";去领料是另一个面板的事 -->
     <div class="mp-foot">
-      <el-button size="large" @click="clearAll">{{ tt('清空结果') }}</el-button>
-      <el-button type="primary" size="large" @click="goPick">{{ tt('去生产领料') }}</el-button>
+      <el-button size="large" :disabled="!results.length && !failures.length" @click="clearAll">
+        {{ tt('清空结果') }}
+      </el-button>
+      <el-button size="large" @click="loadWoStatus">{{ tt('刷新开单状态') }}</el-button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, nextTick, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
 import { printWoQr } from '@/business/print-formats'
 import { queueToPrintStation } from '@/business/printStation'
-
-const router = useRouter()
 
 const woInput = ref(null)
 const woText = ref('')
@@ -190,9 +177,12 @@ const keyword = ref('')
 const listLoading = ref(false)
 const errText = ref('')
 const okText = ref('')
-const openOpen = ref(true)
-const openDone = ref(false)
-const list = reactive({ open: [], done: [], openTotal: 0, doneTotal: 0 })
+
+/**
+ * 工单开单状态列表(2026-10-30 第三轮:本面板**只看工单**)。
+ * 每行 = 一条工单行 + 它开了没有;不列领料单,单据在「生产领料」面板看。
+ */
+const woList = ref([])
 
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 const baseUrl = (() => {
@@ -204,8 +194,23 @@ const canGenerate = computed(() => queue.value.length > 0 && !genLoading.value)
 function clearMsg() { errText.value = ''; okText.value = '' }
 function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 
-function goPick() { router.push('/panelx/list/MOBILE_PICK') }
-function openDoc(id) { if (id) router.push({ path: '/panelx/list/MOBILE_PICK/doc', query: { id: String(id) } }) }
+function fmtQty(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '0'
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 10000) / 10000)
+}
+
+/** 工单行的开单标签 */
+function tagText(w) {
+  if (w.异常) return w.异常
+  if (!w.已开单) return tt('未开单')
+  return String(w.状态 || '') === '已完成' ? tt('已完成') : tt('已开单')
+}
+function tagClass(w) {
+  if (w.异常) return 'is-bad'
+  if (!w.已开单) return 'is-todo'
+  return String(w.状态 || '') === '已完成' ? 'is-done' : 'is-open'
+}
 
 function clearAll() {
   results.value = []
@@ -216,7 +221,7 @@ function clearAll() {
 onMounted(() => {
   nextTick(() => woInput.value?.focus?.())
   window.__yjScanResult = (code, ok) => { if (ok && code) applyScan(code) }
-  loadList()
+  loadWoStatus()
 })
 
 onBeforeUnmount(() => {
@@ -285,7 +290,7 @@ async function generateBatch() {
     } else if (failures.value.length) {
       errText.value = `${tt('全部失败')}:${failures.value[0].原因 || ''}`
     }
-    await loadList()
+    await loadWoStatus()
   } catch (e) {
     errText.value = errMsgOf(e) || tt('生成失败')
   } finally {
@@ -312,17 +317,20 @@ async function autoPrintAll() {
   }
 }
 
-async function loadList() {
+/**
+ * 工单开单状态(本面板唯一的列表)。
+ *
+ * 与「生产领料」的区别:**这里一行是工单**,回答"这张工单开了没有";
+ * 那边一行是**单据**,回答"这张单领到哪了"。两个面板各看各的,不重复。
+ */
+async function loadWoStatus() {
   listLoading.value = true
   try {
-    const res = await request.get('/px/mobilePick/create/list', {
+    const res = await request.get('/px/mobilePick/create/woStatus', {
       params: { keyword: String(keyword.value || '').trim() || undefined },
     })
     const d = res.data?.data || res.data || {}
-    list.open = Array.isArray(d.open) ? d.open : []
-    list.done = Array.isArray(d.done) ? d.done : []
-    list.openTotal = Number(d.openTotal) || list.open.length
-    list.doneTotal = Number(d.doneTotal) || list.done.length
+    woList.value = Array.isArray(d.list) ? d.list : []
   } catch (e) {
     errText.value = errMsgOf(e) || tt('查询失败')
   } finally {

@@ -4932,6 +4932,13 @@ export default {
     '项物料,合计': 'item(s), total',
     '提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?': 'This creates an other-inbound document tagged as a return and stocks in — inventory will increase. Continue?',
     '这张单还没提交完成,不能退料': 'This slip is not completed yet — cannot return',
+    '工单开单状态': 'Work-order status',
+    '只显示工单,单据请到「生产领料」查': 'Work orders only — see "Production Picking" for documents',
+    '工单号 / 产品名称': 'Work order / Product',
+    '未开单': 'Not created',
+    '已开单': 'Created',
+    '刷新开单状态': 'Refresh status',
+    '没有查到工单': 'No work orders found',
   },
 
 }

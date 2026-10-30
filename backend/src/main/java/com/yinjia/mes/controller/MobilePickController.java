@@ -162,6 +162,73 @@ public class MobilePickController {
         return ApiResult.ok(out);
     }
 
+    /**
+     * 开单工作台:**工单视角**的开单状态列表(2026-10-30 第三轮)。
+     *
+     * <p>用户口径:「生成工单领料/退料单和生产领料功能都重叠了,给我区分开来」+
+     *   确认「彻底切干净:生单只看工单、领料只看单据」。
+     *
+     * <p>⇒ 本接口**一行是一条工单行**,回答"这张工单开了没有";
+     *   「生产领料」那边一行是**单据**,回答"这张单领到哪了"。两个面板各看各的,不重复。
+     *
+     * <p>返回每行:工单号/行号/产品/排产数量/已开单(true/false)/领料单号/状态/进度,
+     * 以及 {@code 异常} —— 未排产或已结案的工单开不了单,直接在列表上标出来,
+     * 省得用户扫了才发现(与 {@code generateOne} 的拦截口径一致)。
+     */
+    @GetMapping("/create/woStatus")
+    public ApiResult<Map<String, Object>> createWoStatus(@RequestParam(required = false) String keyword) {
+        perm.requirePanelView(PagePanelRegistry.MOBILE_PICK_CREATE);
+
+        String kw = keyword == null ? "" : keyword.trim();
+        StringBuilder sql = new StringBuilder(
+                "SELECT TOP (200) p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
+                        + " ISNULL(p.dm,N'') AS 产品编号, ISNULL(p.mc,N'') AS 产品名称,"
+                        + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.scx,N'') AS 生产线,"
+                        + " ISNULL(p.完工状态,N'') AS 完工状态,"
+                        + " d.id AS 台账id, ISNULL(d.领料单号,N'') AS 领料单号, ISNULL(d.状态,N'') AS 状态,"
+                        + " ISNULL(d.已领项数,0) AS 已领项数, ISNULL(d.物料项数,0) AS 物料项数"
+                        + " FROM dbo.plang p"
+                        + " LEFT JOIN dbo.wo_pick_doc d"
+                        + "   ON d.工单号 = p.pl_no AND d.工单行号 = p.pl_xc AND d.状态 <> N'已作废'"
+                        + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y'");
+        List<Object> args = new ArrayList<>();
+        if (!kw.isEmpty()) {
+            sql.append(" AND (p.pl_no LIKE ? OR ISNULL(p.dm,N'') LIKE ? OR ISNULL(p.mc,N'') LIKE ?)");
+            String like = "%" + kw + "%";
+            args.add(like); args.add(like); args.add(like);
+        }
+        // 未开单的排前面(这才是开单工作台要干的事),同组内按工单号
+        sql.append(" ORDER BY CASE WHEN d.id IS NULL THEN 0 ELSE 1 END, p.pl_no, p.pl_xc");
+
+        List<Map<String, Object>> raw = jdbc.queryForList(sql.toString(), args.toArray());
+        List<Map<String, Object>> out = new ArrayList<>(raw.size());
+        for (Map<String, Object> r : raw) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("工单号", r.get("工单号"));
+            m.put("工单行号", r.get("工单行号"));
+            m.put("产品编号", r.get("产品编号"));
+            m.put("产品名称", r.get("产品名称"));
+            m.put("排产数量", r.get("排产数量"));
+            m.put("生产线", r.get("生产线"));
+            m.put("已开单", r.get("台账id") != null);
+            m.put("台账id", r.get("台账id"));
+            m.put("领料单号", r.get("领料单号"));
+            m.put("状态", r.get("状态"));
+            m.put("已领项数", r.get("已领项数"));
+            m.put("物料项数", r.get("物料项数"));
+            // 开不了单的原因(与 generateOne 的拦截同一口径,列表上先标出来)
+            Object pq = r.get("排产数量");
+            if (num(pq) <= 0) m.put("异常", "未排产");
+            else if ("Y".equalsIgnoreCase(str(r.get("完工状态")))) m.put("异常", "已结案");
+            else m.put("异常", "");
+            out.add(m);
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("list", out);
+        res.put("total", out.size());
+        return ApiResult.ok(res);
+    }
+
     // ══════════════════════════ ① 生成工单领料/退料单 ══════════════════════════
 
     /**

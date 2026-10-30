@@ -2586,6 +2586,14 @@ export default {
     '项物料,合计': 'mục, tổng',
     '提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?': 'Sẽ tạo phiếu nhập có đánh dấu "trả hàng", tồn kho tăng. Tiếp tục?',
     '这张单还没提交完成,不能退料': 'Phiếu chưa hoàn thành — không trả được',
+    '工单开单状态': 'Trạng thái lệnh',
+    '只显示工单,单据请到「生产领料」查': 'Chỉ lệnh SX; phiếu xem ở "Xuất kho"',
+    '工单号 / 产品名称': 'Lệnh / Sản phẩm',
+    '未开单': 'Chưa tạo',
+    '已开单': 'Đã tạo',
+    '排产': 'Kế hoạch',
+    '刷新开单状态': 'Làm mới trạng thái',
+    '没有查到工单': 'Không tìm thấy lệnh',
   },
 
 }
