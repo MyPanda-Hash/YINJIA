@@ -4692,16 +4692,9 @@ async function panelHasBatchField(panel) {
  * 生单是否走「分批送料对话框」——**只在批次源头那一跳**(用户口径 2026-09-20):
  * 采购订单→送料暂收单:来源(订单)无批次号 → 弹框逐行填本次送料量,可多次分批;
  * 送料暂收→来料检验:来源已带批次号 → 走统一生单对话框(批次号继承),不弹分批框。
- *
- * ⚠ 判据不能只看"目标面板有没有表头批次号"(2026-10-31 实测踩到):生产工单(MANU_ORDER)也登记了
- * 批次号,但它的是**完工时才取的生产批号**,转工单既不取号也不继承;照分批处理会让「生成生产工单」
- * 弹出「分批送料」对话框(用户报障截图:点生单弹出分批送料)。故与后端
- * {@code PushGenerateHandler.GENERIC_ONLY} 同一份清单,把这些动作排除。
  */
-const GENERIC_ONLY_ACTIONS = new Set(['SO_ORDER|生成生产工单'])
-async function needBatchDialog(target, action) {
+async function needBatchDialog(target) {
   if (!target) return false
-  if (GENERIC_ONLY_ACTIONS.has(String(panelCode.value) + '|' + action)) return false
   if (!(await panelHasBatchField(target))) return false
   return !(await panelHasBatchField(panelCode.value))
 }
@@ -4725,8 +4718,19 @@ async function needBatchDialog(target, action) {
  */
 /** 后端 metadata.pushTargets:{ 生单动作 → 目标面板 } */
 const pushTargets = computed(() => cfgCache.value?.metadata?.pushTargets || {})
-/** 可走「勾选明细 + 本次数量」的推式生单动作(= 全部已登记链路的动作) */
-const generatableActions = computed(() => Object.keys(pushTargets.value))
+/**
+ * **保持原样的两条生单链路**(2026-10-31 用户口径:「销售订单 → 生产工单、生产工单 → 产成品入库单
+ * 这两个保持原来的不变」)。
+ *
+ * 它们不进统一生单对话框、也不出「批量生单」下拉:
+ *  · 销售订单→生产工单:仍走原来的调用(后端 ManuScheduleHandler 按订单行 1:1 落 plang + 工序台账,
+ *    工艺路线由服务端按产品绑定/结转所选决定);
+ *  · 生产工单→产成品入库单:仍是原来的一键整单(后端 generateBatch 按剩余量整单送出,批次号继承)。
+ */
+const GENERATE_KEEP_ORIGINAL = new Set(['SO_ORDER|生成生产工单', 'MANU_ORDER|生成产成品入库单'])
+const keepOriginalGenerate = (action) => GENERATE_KEEP_ORIGINAL.has(String(panelCode.value) + '|' + action)
+/** 可走「勾选明细 + 本次数量」的推式生单动作(= 全部已登记链路 − 保持原样的两条) */
+const generatableActions = computed(() => Object.keys(pushTargets.value).filter((a) => !keepOriginalGenerate(a)))
 /**
  * 「批量生单」下拉项:一个生单动作一项。
  *  • 只有一个动作 → 文案就是「批量生单」(绝大多数面板:采购订单/暂收单/生产工单);
@@ -4780,21 +4784,12 @@ function openGenerateDialog(action, sourceNos) {
  * · 只生成 1 张 → 与推式生单同款(关源页签、开目标页签,新单按创建时间倒序在第一张);
  * · 生成多张(批量生单,或"一条动作两个去向"如 暂收单→检验单+入库单)→ 留在来源列表刷新
  *   (用户多半还要接着挑),勾选清零 —— 跳走反而看不到刚生成的那几张。
- * · 生产工单是**独立路由**(落 plang,不是 panelx 面板),要跳 /prod/plan/workOrderList。
  */
 function onGenerateDone({ panel, no, count }) {
   railChecked.value = []
   if (count > 1) {
     ElMessage.info(tt('已生成新单据，可在目标面板查看'))
     load()
-    return
-  }
-  if (String(panel) === 'WORK_ORDER_LIST') {
-    ElMessage.success(tt('已生成生产工单：') + no)
-    const targetPath = '/prod/plan/workOrderList'
-    tabs.close(route.path)
-    router.push(targetPath)
-    tabs.open({ path: targetPath, title: '生产工单' })
     return
   }
   onBatchGenerated({ panel, no, silent: true })
@@ -9749,7 +9744,7 @@ async function onButton(action) {
       //   (曾误写成不存在的 pushTargetLike(action) ⇒ 点击时抛 ReferenceError,
       //    表现为"点打印完全没反应、无请求无提示",2026-10-25 实测踩到。)
       const actionPushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
-      if (actionPushTarget && await needBatchDialog(actionPushTarget, action)) {
+      if (actionPushTarget && await needBatchDialog(actionPushTarget)) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning('请先选择一张单据')
         batchSend.value = { sourcePanel: panelCode.value, targetPanel: actionPushTarget, sourceNo: no }
@@ -9758,9 +9753,9 @@ async function onButton(action) {
       }
       // 推式生单(2026-10-31 用户口径「所有单据只要有生单和批量生单这个按钮的,都要实现」):
       // 一律先开统一生单对话框 —— 勾明细行 + 填本次数量(默认全选有剩余的行)。
-      // 两个"自己算行"的动作(生成生产工单 / 生成检验或入库单)也一样:后端按动作分派到各自的
-      // 服务(见 PxController.generateByAction),行与数量都由对话框给。
-      if (actionPushTarget) {
+      // 例外是上面 GENERATE_KEEP_ORIGINAL 那两条(销售订单→生产工单 / 生产工单→产成品入库单),
+      // 用户明确要求保持原样 ⇒ 落到函数末尾原来的 callButton 调用。
+      if (actionPushTarget && !keepOriginalGenerate(action)) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning(tt('请先选择一张单据'))
         openGenerateDialog(action, [no])

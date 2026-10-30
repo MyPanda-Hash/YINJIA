@@ -47,8 +47,7 @@ test('对话框 + 左栏 + 列表页新增文案在 en.js 都有词条', () => {
   // 列表页只用本功能新增的那几条(整份 PanelxList 有上千条历史文案,不在本闸范围内)
   for (const k of ['批量生单', '请先在左侧单据列表勾选要生单的单据', '该面板没有可批量生单的下游链路',
     '已生成新单据，可在目标面板查看', '请先选择一张单据',
-    '勾选的单据都不是「已审核」状态：生单只能已审核单据', '已跳过', '张非已审核单据',
-    '已生成生产工单：']) keys.push(k)
+    '勾选的单据都不是「已审核」状态：生单只能已审核单据', '已跳过', '张非已审核单据']) keys.push(k)
   const missing = [...new Set(keys)].filter((k) => !en.includes("'" + k + "'"))
   assert.deepEqual(missing, [], 'en.js 缺词条:\n' + missing.join('\n'))
 })
@@ -81,27 +80,26 @@ test('左栏勾选列由「有批量生单链路」驱动,并且状态按单号�
   assert.match(list, /railSelectable = computed/, '是否显示勾选列由面板能力派生')
 })
 
-test('所有推式生单都走对话框(不再有"定制化例外")', () => {
+test('所有推式生单都走对话框(只有两条按用户口径保持原样)', () => {
   // 用户口径(10-31 第二轮)「所有单据只要有生单和批量生单这个按钮的,都要实现 ——
   // 送料暂收就不能批量,而且生单也没有勾选」⇒ 不能再按动作名排除
   assert.ok(!/CUSTOM_GENERATE_ACTIONS|isCustomGenerate/.test(list),
     '不该再有"定制化动作不走对话框"的白名单(它是送料暂收单没有勾选的根因)')
-  assert.match(list, /generatableActions = computed\(\(\) => Object\.keys\(pushTargets\.value\)\)/,
-    '可生单动作 = metadata.pushTargets 的全部键')
-  assert.match(list, /if \(actionPushTarget\) \{[\s\S]{0,200}openGenerateDialog\(action, \[no\]\)/,
-    '只要有推式生单目标就开对话框(单张)')
+  // 但 10-31 第三轮:「销售订单 → 生产工单、生产工单 → 产成品入库单 这两个保持原来的不变」
+  assert.match(list, /GENERATE_KEEP_ORIGINAL = new Set\(\['SO_ORDER\|生成生产工单', 'MANU_ORDER\|生成产成品入库单'\]\)/,
+    '这两条必须登记为"保持原样"(不进对话框、也不出批量生单)')
+  assert.match(list, /generatableActions = computed\(\(\) => Object\.keys\(pushTargets\.value\)\.filter\(\(a\) => !keepOriginalGenerate\(a\)\)\)/,
+    '可生单动作 = 全部链路 − 保持原样的两条')
+  assert.match(list, /if \(actionPushTarget && !keepOriginalGenerate\(action\)\)/,
+    '保持原样的两条要落回原来的 callButton 调用')
   // 分批源头那一跳(采购订单→送料暂收单)的分批对话框必须原样保留
-  assert.match(list, /needBatchDialog\(actionPushTarget, action\)/, '分批送料对话框不能被新对话框顶掉')
-  // 但"目标面板有批次号"≠"分批送料":生产工单的批次号是完工时才取的,不能弹分批框
-  assert.match(list, /GENERIC_ONLY_ACTIONS = new Set\(\['SO_ORDER\|生成生产工单'\]\)/,
-    '与后端 PushGenerateHandler.GENERIC_ONLY 同一份清单(否则生成生产工单会弹「分批送料」)')
+  assert.match(list, /needBatchDialog\(actionPushTarget\)/, '分批送料对话框不能被新对话框顶掉')
 })
 
-test('生单结果支持「一单生两张」与生产工单跳转', () => {
+test('生单结果支持「一单生两张」', () => {
   // 送料暂收单 → 检验单 + 入库单(一条动作两个去向)
   assert.match(dialog, /m\['生成清单'\]/, '对话框要把「生成清单」摊平后计数,否则只报一张')
   assert.match(dialog, /商品档案未登记的商品按免检（否）处理/, '未登记商品要提示(与旧 callButton 路径同口径)')
-  assert.match(list, /String\(panel\) === 'WORK_ORDER_LIST'/, '生产工单是独立路由,不能按 /panelx/list 跳')
   // 普通链路没有超送额度:比例必须置 0,否则"可生单"显示 数量×1.2,填了会被后端按剩余量拒
   assert.match(dialog, /ratioPct\.value = meta\.batchFlow \? Math\.round\(meta\.overRatio \* 100\) : 0/,
     '非分批链路的上限 = 剩余量(不带超送比例)')

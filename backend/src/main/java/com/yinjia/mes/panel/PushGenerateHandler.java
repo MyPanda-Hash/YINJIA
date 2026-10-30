@@ -743,38 +743,13 @@ public class PushGenerateHandler implements PanelActionHandler {
     // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
 
     /**
-     * 「目标面板虽是分批面板,但这条生单**不是分批送料**」的动作(2026-10-31)。
-     *
-     * <p>判据不能只看"目标面板有没有表头批次号":生产工单(MANU_ORDER)也登记了批次号,
-     * 但它的批次号是**完工时才取的生产批号**(QuickScheduleService.createFromOrderLine 写 null),
-     * 转工单时既不取号也不继承;而且工单**没有超送**额度。
-     * 若照分批链路处理,对话框会多出一个"批次号"输入框(填了也不生效)、可生单上限还会
-     * 按超送比例放大(20% 时 100 件能填 120),直接被 QuickScheduleService 的 residual 校验拒。
-     *
-     * <p>value = 该动作的**占用通道**(算剩余量时只扣这些目标面板的 link),与
-     * {@code QuickScheduleService.createFromOrderLine} 里 residual 的口径一致。
-     */
-    private static final Map<String, String> GENERIC_ONLY = Map.of(
-            "SO_ORDER|生成生产工单", "MANU_ORDER,PLANG");
-
-    /** 该动作的占用通道(逗号分隔);未登记 = 不限定 */
-    private static java.util.List<String> occupyChannels(String panelCode, String action) {
-        String v = GENERIC_ONLY.get(panelCode + "|" + action);
-        if (v == null || v.isBlank()) return null;
-        return java.util.Arrays.stream(v.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
-    }
-
-    /** 该动作是否按"分批送料"处理(目标面板有表头批次号 且 不在 {@link #GENERIC_ONLY} 里) */
-    private boolean isBatchFlowAction(String panelCode, String action, String target) {
-        return isBatchTarget(target) && GENERIC_ONLY.get(panelCode + "|" + action) == null;
-    }
-
-    /**
      * 「统一生单对话框」的候选行(勾选 + 本次数量)。
      *
      * <p>用户口径(2026-10-31):「**生单**也要变成可以勾选的和选择数量的(现在只有采购订单的生单做了特殊处理),
      * 非定制化的生单只要可以勾选和选择数量就可以」;并要一个「**批量生单**」——
      * 在左侧单据选择栏勾多张来源单 → 打开一个界面列出这些单据的明细行 → 再勾行/填量 → 转单。
+     * 第二轮补充:「所有单据只要有生单和批量生单这个按钮的,都要实现 —— **送料暂收就不能批量,
+     * 而且生单也没有勾选**」。
      *
      * <p>所以本方法把「一张来源单能生什么」摊平成同一份行契约,**分批链路与普通推式生单共用**:
      * <ul>
@@ -787,12 +762,15 @@ public class PushGenerateHandler implements PanelActionHandler {
      *   <li>行键统一 {@code {来源单号}#{来源明细行id}}(与选单/分批同一约定),前端只认它。</li>
      * </ul>
      *
+     * <p>「销售订单 → 生产工单」「生产工单 → 产成品入库单」按用户口径**保持原来的不变**
+     * (不进本对话框,前端也不给这两个动作出「批量生单」),故这里不必为它们做特殊处理。
+     *
      * @param sourceNos 勾选的来源单据号(单张 = 原「生单」,多张 = 新「批量生单」)
      */
     public Map<String, Object> pushPreview(String sourcePanel, String action, List<String> sourceNos) {
         String target = pushTarget(sourcePanel, action);
         if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
-        boolean batchFlow = isBatchFlowAction(sourcePanel, action, target);
+        boolean batchFlow = isBatchTarget(target);
         String[] filter = configService.detailFilter(sourcePanel, action);
         List<Map<String, Object>> docs = new ArrayList<>();
         for (String no : sourceNos) {
@@ -857,10 +835,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             doc.put("nextBatchNo", srcBatch.isEmpty() ? BatchService.buildBatchNo(java.time.LocalDate.now()) : srcBatch);
             doc.put("batches", batchService.batches(sourcePanel, sourceNo));
         } else {
-            // 普通链路:剩余量只扣**本动作的占用通道**(未登记 = 不过滤,见 occupyChannels)
-            Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo,
-                    occupyChannels(sourcePanel, action));
-            doc.put("lines", genericRows(items, sourceNo, sent));
+            doc.put("lines", genericRows(items, sourceNo, batchService.sentByLineKey(sourcePanel, sourceNo)));
             doc.put("batchInherited", false);
             doc.put("nextBatchNo", "");
             doc.put("batches", List.of());
@@ -941,8 +916,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                                            Map<String, Double> qtyByLineKey, String batchNo) {
         String target = pushTarget(sourcePanel, action);
         if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
-        // 分批链路 vs 普通链路:判据与预览同源(isBatchFlowAction —— 生产工单虽是分批面板但不算分批送料)
-        if (isBatchFlowAction(sourcePanel, action, target)) {
+        if (isBatchTarget(target)) {
             return generateBatch(sourcePanel, target, sourceNo, user, qtyByLineKey, null, batchNo);
         }
         return generateLines(sourcePanel, action, target, sourceNo, user, qtyByLineKey);
@@ -981,7 +955,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 3) 候选行(与预览同一口径) + 本次数量校验
         Map<String, Map<String, Object>> byKey = new LinkedHashMap<>();
         for (Map<String, Object> r : genericRows(srcItems, sourceNo,
-                batchService.sentByLineKey(sourcePanel, sourceNo, occupyChannels(sourcePanel, action)))) {
+                batchService.sentByLineKey(sourcePanel, sourceNo))) {
             byKey.put(str(r.get("lineKey")), r);
         }
         List<Map<String, Object>> picked = new ArrayList<>();   // {item, row, qty}

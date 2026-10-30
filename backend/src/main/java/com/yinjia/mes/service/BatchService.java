@@ -515,34 +515,12 @@ public class BatchService {
 
     /** 该来源单各来源行的**已送量**:form_flow_link.source_line_key → Σlinked_quantity(仅 ACTIVE) */
     public Map<String, Double> sentByLineKey(String srcPanel, String srcNo) {
-        return sentByLineKey(srcPanel, srcNo, null);
-    }
-
-    /**
-     * 同上,但**只看指定目标面板通道**(2026-10-31)。
-     *
-     * <p>为什么需要:同一张来源单可能有多条下游通道,而各通道要各算各的剩余量 ——
-     * 例:销售订单行既能「生成销售出库单」又能「生成生产工单」,查工单剩余时只能扣
-     * {@code MANU_ORDER/PLANG} 的占用;不限定通道就会把已经出库的量也从工单额度里扣掉,
-     * 对话框上会显示"剩余不足",与 {@code QuickScheduleService.createFromOrderLine} 的
-     * residual(只扣 MANU_ORDER/PLANG)对不上。
-     *
-     * @param targetPanels 目标面板编码白名单;null/空 = 不限定(沿用原口径)
-     */
-    public Map<String, Double> sentByLineKey(String srcPanel, String srcNo, java.util.List<String> targetPanels) {
         Map<String, Double> out = new LinkedHashMap<>();
-        boolean filter = targetPanels != null && !targetPanels.isEmpty();
-        String sql = "SELECT source_line_key, SUM(COALESCE(linked_quantity,0)) FROM form_flow_link"
-                + " WHERE source_panel_code=? AND source_form_no=? AND link_status='ACTIVE'"
-                + (filter ? " AND target_panel_code IN (" + String.join(",",
-                        java.util.Collections.nCopies(targetPanels.size(), "?")) + ")" : "")
-                + " GROUP BY source_line_key";
-        Object[] flat = new Object[2 + (filter ? targetPanels.size() : 0)];
-        flat[0] = srcPanel;
-        flat[1] = srcNo;
-        if (filter) for (int i = 0; i < targetPanels.size(); i++) flat[2 + i] = targetPanels.get(i);
         try {
-            jdbc.query(sql, rs -> { out.put(rs.getString(1), rs.getDouble(2)); }, flat);
+            jdbc.query("SELECT source_line_key, SUM(COALESCE(linked_quantity,0)) FROM form_flow_link"
+                            + " WHERE source_panel_code=? AND source_form_no=? AND link_status='ACTIVE'"
+                            + " GROUP BY source_line_key",
+                    rs -> { out.put(rs.getString(1), rs.getDouble(2)); }, srcPanel, srcNo);
         } catch (Exception ignore) { /* 表未建 */ }
         return out;
     }
