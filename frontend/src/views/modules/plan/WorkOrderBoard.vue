@@ -162,31 +162,43 @@
       </div>
     </div>
 
-    <!-- 调拨弹窗(9.29 批次②;2026-10-29 收口「调拨只能调拨到当前工序的产线中」):
-         目标车间/产线下拉由 /transferTargets **按选中行的当前工序**算好(与 /transfer 的守卫同一处口径),
-         前端只展示、不自己拼;多行工序不同 ⇒ 没有交集 + 提示「分行调拨」 -->
-    <el-dialog v-model="raVisible" :title="tt('工单调拨')" width="470px" append-to-body>
-      <div class="wb-p">{{ tt('当前工序') }}：
-        <b>{{ raOps.length ? raOps.map((x) => tt(x)).join(' / ') : tt('判不出') }}</b>
-        <span v-if="raLimited" class="wb-shop">{{ tt('只能调拨到本工序的产线') }}</span>
+    <!-- 调拨弹窗(9.29 批次②;2026-10-29 收口「调拨只能调拨到当前工序的产线中」;
+         2026-10-30 排版:改**两列表单**(标签定宽右对齐 + 控件一列对齐 + 行距 14px),
+         不再把标签和下拉挨着摆 —— 原先 inline-flex 各写各的宽度,标签一长一短就挤成一团 -->
+    <el-dialog v-model="raVisible" :title="tt('工单调拨')" width="520px" append-to-body>
+      <div class="ra-form">
+        <div class="ra-row">
+          <span class="ra-label">{{ tt('当前工序') }}</span>
+          <div class="ra-value">
+            <b>{{ raOps.length ? raOps.map((x) => tt(x)).join(' / ') : tt('判不出') }}</b>
+            <span v-if="raLimited" class="ra-hint">{{ tt('只能调拨到本工序的产线') }}</span>
+          </div>
+        </div>
+        <div class="ra-row">
+          <span class="ra-label">{{ tt('目标车间') }}</span>
+          <el-select v-model="raShop" class="ra-ctl" filterable clearable :disabled="!raShops.length"
+                     @change="raLine = ''">
+            <el-option v-for="x in raShops" :key="x" :label="x" :value="x" />
+          </el-select>
+        </div>
+        <div class="ra-row">
+          <span class="ra-label">{{ tt('目标生产线') }}</span>
+          <el-select v-model="raLine" class="ra-ctl" filterable :disabled="!raLines.length"
+                     :placeholder="tt('请选择目标生产线')">
+            <el-option v-for="x in raLines" :key="x.生产线"
+                       :label="x.生产线 + (x.生产车间 ? '·' + x.生产车间 : '')" :value="x.生产线" />
+          </el-select>
+        </div>
+        <div class="ra-row">
+          <span class="ra-label">{{ tt('调拨原因') }}</span>
+          <el-input v-model="raReason" class="ra-ctl" :placeholder="tt('选填')" />
+        </div>
+        <div v-if="raTip" class="ra-row">
+          <span class="ra-label"></span>
+          <div class="ra-tip">{{ raTip }}</div>
+        </div>
       </div>
-      <div class="wb-p">{{ tt('目标车间') }}
-        <el-select v-model="raShop" filterable clearable style="width: 220px" :disabled="!raShops.length"
-                   @change="raLine = ''">
-          <el-option v-for="x in raShops" :key="x" :label="x" :value="x" />
-        </el-select>
-      </div>
-      <div class="wb-p">{{ tt('目标生产线') }}
-        <el-select v-model="raLine" filterable style="width: 220px" :disabled="!raLines.length">
-          <el-option v-for="x in raLines" :key="x.生产线"
-                     :label="x.生产线 + (x.生产车间 ? '·' + x.生产车间 : '')" :value="x.生产线" />
-        </el-select>
-      </div>
-      <div class="wb-p">{{ tt('调拨原因') }}
-        <el-input v-model="raReason" size="small" style="width: 220px" :placeholder="tt('选填')" />
-      </div>
-      <div v-if="raTip" class="wb-p wb-warn">{{ raTip }}</div>
-      <div class="wb-p wb-dim">{{ tt('调拨写入轨迹(工单追溯可见);「撤回调拨」可把产线调回原线') }}</div>
+      <div class="ra-note">{{ tt('调拨写入轨迹(工单追溯可见);「撤回调拨」可把产线调回原线') }}</div>
       <template #footer>
         <el-button @click="raVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" :disabled="!raCan || !raLine" @click="doTransfer">{{ tt('确认调拨') }}</el-button>
@@ -578,6 +590,18 @@ onMounted(() => {
 .wb-shop { margin-left: 12px; font-size: 12px; color: #e6a23c; font-weight: 600; }
 /* 调拨弹窗的"不可调拨/无候选线"提示(2026-10-29):后端中文原样显示,前端只给颜色 */
 .wb-warn { color: #f56c6c; font-weight: 600; }
+/* ── 调拨弹窗两列表单(2026-10-30 用户报障「排列有问题,不要把表格挤在一起」)──
+   旧写法每行都是 inline-flex + 标签自然宽度 + 固定 220px 控件:标签一长一短,控件起点参差,
+   行与行只靠相邻 div 的默认间距 ⇒ 看起来挤成一团。改成:标签定宽 84px 右对齐、控件 flex:1 同一起点、
+   行间距 14px;有提示时单独占一行(与控件左缘对齐)。 */
+.ra-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 8px; }
+.ra-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ra-label { flex: 0 0 84px; text-align: right; font-size: 13px; line-height: 1.5; color: #606266; }
+.ra-value { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #303133; }
+.ra-ctl { flex: 1; width: 100%; min-width: 0; }
+.ra-hint { font-size: 12px; font-weight: 600; color: #e6a23c; }
+.ra-tip { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; line-height: 1.6; color: #f56c6c; }
+.ra-note { margin-top: 6px; padding-top: 10px; border-top: 1px dashed #ebeef5; font-size: 12px; line-height: 1.6; color: #909399; }
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 日排产日期列(2026-10-29):格内输入计划,格下小灰字=该天已审核报工量 */
