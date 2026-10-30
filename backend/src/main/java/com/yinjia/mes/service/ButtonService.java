@@ -6303,7 +6303,7 @@ public class ButtonService {
      * 引用规格书的三个面板(成型工艺清单/组装工艺清单/出货检验计划表)—— 漂移提示只对它们有意义。
      * 规格书本身(RD_SPEC_DOC)与被引用方向相反,不入本集合。
      */
-    private static final java.util.Set<String> SPEC_REF_PANELS = java.util.Set.of("RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN");
+    private static final java.util.Set<String> SPEC_REF_PANELS = java.util.Set.of("RD_MOLD_PROC", "RD_X_SINTER", "RD_ASM_PROC", "RD_INSP_PLAN");
 
     /**
      * 「本单引用的规格书变了吗」判定(2026-10-16 用户口径):前端在单据靠上位置挂一条黄条提示。
@@ -6407,7 +6407,7 @@ public class ButtonService {
      * 与 {@link #SPEC_REF_PANELS} 并列:那是"规格书变了",这是"产品信息表变了"。
      */
     private static final java.util.Set<String> PRODINFO_REF_PANELS = java.util.Set.of(
-            "RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN");
+            "RD_SPEC_DOC", "RD_MOLD_PROC", "RD_X_SINTER", "RD_ASM_PROC", "RD_INSP_PLAN");
 
     /**
      * 「本单引用的产品信息表变了吗」判定(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,
@@ -7222,7 +7222,7 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
+            "RD_MOLD_PROC", "RD_X_SINTER", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
             // 物料清单(WLBOM,2026-10-21 登记,2026-10-29 复归):保存即归档是**对的**
             //   (用户口径「肯定是要能保存归档的」),它属于基础数据:填完保存就定稿归档。
             //   修改路径不用文书那一套「申请修改→管理员审批→修改中」——

@@ -25,8 +25,8 @@ const perms = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia
 const controller = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/controller/PxController.java', import.meta.url), 'utf8')
 
 // ── 一、弃审放宽:前门(权限表) + 身份门禁(责任人)两层都要改,少一层就等于没放 ──
-test('前门放行:四文件面板的「弃审」不再只吃 audit 词', () => {
-  assert.match(perms, /for \(String p : new String\[\]\{"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN"\}\) \{\s*\n\s*m\.put\(p \+ "\|弃审", new String\[\]\{"add", "modify", "audit"\}\);/,
+test('前门放行:四文件面板（含 2026-10-30 新增的 X烧结）的「弃审」不再只吃 audit 词', () => {
+  assert.match(perms, /for \(String p : new String\[\]\{"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_X_SINTER", "RD_ASM_PROC", "RD_INSP_PLAN"\}\) \{\s*\n\s*m\.put\(p \+ "\|弃审", new String\[\]\{"add", "modify", "audit"\}\);/,
     '只有放开前门,文件责任人(角色仅有 add/modify)才走得到后端')
   // 反例守卫:别把整张表都改判成 add/modify(那会让"有编辑权的人"都能弃审别的面板)
   assert.ok(!/m\.put\("弃审", new String\[\]\{"add"/.test(perms), '全局「弃审」仍应吃 audit 词')
@@ -40,8 +40,8 @@ test('身份门禁:四文件面板弃审 = 审批权 ∪ 该文件责任人,其�
 })
 
 // ── 二、漂移判定:两种口径 + 两个必须避开的坑 ──
-test('规格书漂移判定:只对三个引用方生效', () => {
-  assert.match(buttons, /SPEC_REF_PANELS = java\.util\.Set\.of\("RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN"\)/)
+test('规格书漂移判定:只对引用方生效（2026-10-30 起含 X烧结工艺清单）', () => {
+  assert.match(buttons, /SPEC_REF_PANELS = java\.util\.Set\.of\("RD_MOLD_PROC", "RD_X_SINTER", "RD_ASM_PROC", "RD_INSP_PLAN"\)/)
   assert.match(buttons, /out\.put\("applicable", SPEC_REF_PANELS\.contains\(panelCode\)\)/)
   // 规格书自己是数据源,不能被当成引用方(方向相反)
   assert.ok(!/SPEC_REF_PANELS = java\.util\.Set\.of\("RD_SPEC_DOC"/.test(buttons))
@@ -66,7 +66,7 @@ test('str() 对空值返回 null ⇒ 判空前必须过 nz()(端到端跑出过 
 test('端点 + 前端 API + 前端加载时机', () => {
   assert.match(controller, /@GetMapping\("\/rdDev\/specDrift"\)[\s\S]{0,200}?buttons\.specDriftState\(panelCode, docNo\)/)
   assert.match(engine, /export async function rdSpecDrift\(panelCode, docNo\)/)
-  assert.match(panelx, /const SPEC_REF_PANELS = \['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
+  assert.match(panelx, /const SPEC_REF_PANELS = \['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
   assert.match(panelx, /loadRdFlowState\(\); loadPendingDocs\(\); loadSpecDrift\(\); loadProdDrift\(\) \}/,
     '切单据的 watch 里必须带上 loadSpecDrift/loadProdDrift —— 否则黄条永远不出现')
 })
@@ -95,8 +95,8 @@ test('新增 UI 文案都有多语言词条(en 至少)', () => {
 
 // ── 四、产品信息表漂移(2026-10-16 用户口径:「产品信息表要是申请修改怎么办,那些引用产品信息表的
 //        怎么办?应该也做一个提示通知」)—— 与规格书那条同构,两个层次:页面黄条 + 消息中心通知 ──
-test('产品信息表漂移:四个引用方(含规格书本身)按产品编号关联', () => {
-  assert.match(buttons, /PRODINFO_REF_PANELS = java\.util\.Set\.of\(\s*\n?\s*"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN"\)/)
+test('产品信息表漂移:引用方(含规格书本身、2026-10-30 起含 X烧结)按产品编号关联', () => {
+  assert.match(buttons, /PRODINFO_REF_PANELS = java\.util\.Set\.of\(\s*\n?\s*"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_X_SINTER", "RD_ASM_PROC", "RD_INSP_PLAN"\)/)
   assert.match(buttons, /out\.put\("applicable", PRODINFO_REF_PANELS\.contains\(panelCode\)\)/)
   assert.match(buttons, /out\.put\("reason", "prod_in_flux"\)/, '正在改(修改申请中/修改中)⇒ prod_in_flux')
   assert.match(buttons, /out\.put\("reason", "prod_reaudited"\)/, '被弃审退回草稿 ⇒ prod_reaudited(靠 UNAUDIT 留痕区分新建草稿)')
@@ -109,7 +109,7 @@ test('产品信息表漂移:四个引用方(含规格书本身)按产品编号�
 test('产品信息表漂移:端点 + 前端 API + 黄条三档文案 + 词条', () => {
   assert.match(controller, /@GetMapping\("\/rdDev\/prodInfoDrift"\)[\s\S]{0,200}?buttons\.prodInfoDriftState\(panelCode, docNo\)/)
   assert.match(engine, /export async function rdProdInfoDrift\(panelCode, docNo\)/)
-  assert.match(panelx, /const PRODINFO_REF_PANELS = \['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
+  assert.match(panelx, /const PRODINFO_REF_PANELS = \['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
   assert.match(panelx, /<div v-if="prodDrift" class="spec-drift-banner">/)
   assert.match(panelx, /本单引用的产品信息表 \{no\} 正在修改（\{st\}），请及时核对数据/)
   assert.match(panelx, /本单引用的产品信息表 \{no\} 已被反审核退回草稿，请核对数据/)

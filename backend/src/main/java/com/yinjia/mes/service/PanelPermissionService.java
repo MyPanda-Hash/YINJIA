@@ -145,7 +145,7 @@ public class PanelPermissionService {
          * ButtonService.requireApproverOrDevFileOwner:该文件责任人 ∪ 规格书被分发责任人 ∪ 产品总负责人
          * ∪ 审批人 ∪ 管理员。实测非责任人(liulei)走完前门照样被后端拒 —— 不是"谁都能弃审"。
          */
-        for (String p : new String[]{"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_ASM_PROC", "RD_INSP_PLAN"}) {
+        for (String p : new String[]{"RD_SPEC_DOC", "RD_MOLD_PROC", "RD_X_SINTER", "RD_ASM_PROC", "RD_INSP_PLAN"}) {
             m.put(p + "|弃审", new String[]{"add", "modify", "audit"});
         }
         // ── 页面级虚拟面板(2026-10-16):动作词按**页面特性**定义,编码/动作集见 PagePanelRegistry ──

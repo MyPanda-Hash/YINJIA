@@ -192,10 +192,10 @@ test('「规格书等 4 张单」= 四文件面板集合(前端判据与后端 D
   // (实测:RD_MOLD_PROC / RD_ASM_PROC 的 产品编号 参照 refMap 含 {"from":"产品名称","to":"产品名称"};
   //  RD_SPEC_DOC / RD_INSP_PLAN 没有「产品名称」字段 ⇒ 不带,符合「没有就不影响」)。
   // 前端这一侧只负责:这 4 张单认得出「我方产品键」并在格上标注开发状态。
-  assert.match(panelx, /const DEV_FILE_PANELS = \['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN'\]/,
-    '四文件面板集合应保持这 4 张(规格书/成型/组装/出货检验计划)')
+  assert.match(panelx, /const DEV_FILE_PANELS = \['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN'\]/,
+    '四文件面板集合 = 规格书/烧结工艺/X烧结/组装/出货检验计划（2026-10-30 起含 X烧结）')
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
-  assert.match(rec, /const DEV_PANEL_CODES = \['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN'\]/,
+  assert.match(rec, /const DEV_PANEL_CODES = \['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN'\]/,
     '纸面侧的开发状态角标面板集合应与之一致')
 })
 

@@ -3238,7 +3238,7 @@ const prodRefKey = ref('')
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
 
 // ── 产品开发状态角标(2026-09-09):本面板的产品键已下发时,在单元格标注 未开发 / 已开发 ──
-const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
 const devStatus = ref('')
 const devKey = computed(() => {
   for (const k of ['产品编号', '编号']) {

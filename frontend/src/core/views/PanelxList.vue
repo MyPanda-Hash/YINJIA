@@ -3969,7 +3969,7 @@ const canUnauditHere = computed(() => isDocArchivePanel.value
 // ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
 // 服务端 ensureDevFileEditable 早就拦住了非责任人,但界面不置灰:用户能改、能点保存,点完才被拒。
 // 现在判定经 /px/rdDev/fileEdit 下发(与保存门禁同一真源),非责任人打开就只读 + 看得到责任人是谁。
-const DEV_FILE_PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const DEV_FILE_PANELS = ['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
 const devFileGate = ref(null)
 /** 门禁不适用(非四文件面板/历史单/管理员)时为 false */
 const devFileBlocked = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === false))
@@ -3995,7 +3995,7 @@ const modifyLogNo = ref('')
 // 只对**引用方**成立:成型工艺清单/组装工艺清单/出货检验计划表(规格书是数据源,方向相反,不入列)。
 // 判定全在服务端 /px/rdDev/specDrift(规格书正在改 或 改完且比本单新),前端只负责显示与引导:
 // 提示里直接告诉用户"点弃审退回草稿再重新引用"——四文件面板的弃审已同批放给责任人(canUnauditHere)。
-const SPEC_REF_PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN']
+const SPEC_REF_PANELS = ['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_INSP_PLAN']
 const specDrift = ref(null)
 async function loadSpecDrift() {
   if (!SPEC_REF_PANELS.includes(String(panelCode.value))) { specDrift.value = null; return }
@@ -4017,7 +4017,7 @@ async function loadSpecDrift() {
 //   产品信息表是四文件的数据源头(产品编号/尺寸/客户项目名称…),它一进修改流程或被人弃审,
 //   已经归档的四文件里那份数据就可能过期 ⇒ 在单据靠上位置挂一条黄条,引导用户弃审后重新引用。
 //   判定全在服务端 /px/rdDev/prodInfoDrift(正在改 / 被弃审退回草稿 / 改完且比本单新),前端只显示。
-const PRODINFO_REF_PANELS = ['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_INSP_PLAN']
+const PRODINFO_REF_PANELS = ['RD_SPEC_DOC', 'RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_INSP_PLAN']
 const prodDrift = ref(null)
 async function loadProdDrift() {
   if (!PRODINFO_REF_PANELS.includes(String(panelCode.value))) { prodDrift.value = null; return }
