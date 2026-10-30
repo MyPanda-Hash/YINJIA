@@ -105,11 +105,22 @@
             allow-create
             default-first-option
             :loading="row.loading"
+            :title="optionHint(row)"
             :placeholder="row.loading ? tt('加载中…') : tt('选择或直接输入编号')"
             @focus="loadRowOptions(row)"
             @change="() => onPickMaterial(row)"
           >
-            <el-option v-for="o in row.options" :key="o.value" :label="o.label" :value="o.value" />
+            <!-- 选中后**只回显编号**（2026-10-30 用户口径「下拉的时候能够看到名字，但是选择填写进去的时候
+                 就显示编号就行了，因为后面已经有名称了，重复了」）：
+                 右边紧邻的就是「物料名称」列，两格都带名字等于同一行写两遍，还把编号挤成省略号。
+                 下拉里仍然是「编号 + 名称」两段（见下面 el-option）：搜编号、搜名字都能命中。 -->
+            <template #label="{ value }">{{ value }}</template>
+            <el-option v-for="o in row.options" :key="o.value" :label="o.label" :value="o.value">
+              <span class="xc-opt">
+                <span class="xc-opt-code">{{ o.value }}</span>
+                <span v-if="o.name" class="xc-opt-name">{{ o.name }}</span>
+              </span>
+            </el-option>
           </el-select>
           <el-input v-else v-model="row.code" size="small" :placeholder="tt('手填物料编号')" />
         </template>
@@ -200,13 +211,14 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import request from '@/core/request'
 import { invRowsOf } from '@/core/panel/invCarry'
 import { computeXsinter, problemsOf, ROW_KINDS } from './calcEngine.js'
 import { engineDesignsOf, isGramRow, percentOf } from './designUnits.js'
 import { kindsOfXsinterRow, rowHasKindFilter } from './materialKindMap.js'
+import { xsinterMaterialOptions } from './materialOptions.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -281,8 +293,13 @@ watch(() => props.modelValue, (open) => {
       code: String(r['物料编号'] || ''),
       name: String(r['物料名称'] || ''),
       design: String(r['设计添加量'] ?? ''),
+      // 候选列表：optionsLoaded 与 options 分开记 —— 空类别也是"加载过"，否则每次聚焦都重拉一遍
+      options: [], optionsLoaded: false, matched: 0, loading: false,
     }
   })
+  // 预热物料候选。必须放到下一个 tick：本 watch 是 immediate，此刻下面那些
+  // `const invKindRows / kindPending` 还没初始化（TDZ），同步调 ensureKindRows 会直接 ReferenceError。
+  nextTick(prefetchRowOptions)
 }, { immediate: true })
 
 // ── 按料位预筛商品档案（物料编号下拉）────────────────────────────────────
@@ -318,27 +335,43 @@ async function ensureKindRows(kind) {
   return p
 }
 
-/** 该行的下拉候选：按料位合并多个类别（粉料 = 炭粉 + 功能料-粉末） */
+/** 该行的下拉候选：按料位合并多个类别（粉料 = 炭粉 + 功能料-粉末）。
+ *  去重/排序/封顶/命中数在 core/xsinter/materialOptions.js（纯函数，有单测）：
+ *  生产档案几千行，一次全渲成 el-option 会让下拉打开时卡住。 */
 async function loadRowOptions(row) {
   if (!rowHasKindFilter(row.kind)) return
-  if ((row.options || []).length) return          // 已加载过就不重复拉
+  if (row.optionsLoaded) return          // 加载过（哪怕是空类别）就不重复拉
   row.loading = true
   try {
     const all = []
     for (const k of kindsOfXsinterRow(row.kind)) all.push(...(await ensureKindRows(k)))
-    const seen = new Set()
-    const opts = []
-    for (const r of all) {
-      const code = String(r?.['存货编码'] ?? '').trim()
-      if (!code || seen.has(code)) continue
-      seen.add(code)
-      const name = String(r?.['存货名称'] ?? '').trim()
-      opts.push({ value: code, label: `${code} ${name}`.trim(), name })
-    }
-    row.options = opts
+    const { options, matched } = xsinterMaterialOptions(all)
+    row.options = options
+    row.matched = matched
+    row.optionsLoaded = true
   } finally {
     row.loading = false
   }
+}
+
+/** 候选被上限截断时挂在下拉上的提示（200 条以内基本不触发；档案变大时才用得上） */
+function optionHint(row) {
+  const matched = Number(row.matched || 0)
+  const shown = (row.options || []).length
+  if (!matched || matched <= shown) return ''
+  return tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(matched))
+}
+
+/**
+ * 打开弹窗就**预先把这几个类别拉一次**（料位前缀只有 粉料 / 胶粉 / 颗粒料 三组）。
+ * 原来只在 `@focus` 时才拉 ⇒ 第一次点开物料编号下拉是空的、直接打字也没有候选，
+ * 非要等一次往返才出现（2026-10-30 用户口径「这两个的物料的筛选效果要优化好」）。
+ * 失败不拦：ensureKindRows 自己吞异常，下拉退回"可手填"。
+ */
+function prefetchRowOptions() {
+  const kinds = new Set()
+  for (const row of lines.value) for (const k of kindsOfXsinterRow(row.kind)) kinds.add(k)
+  for (const k of kinds) ensureKindRows(k).catch(() => {})
 }
 
 /** 选中/手打编号 → 带出名称。
@@ -417,6 +450,11 @@ function apply() {
 .xc-grid-gap { margin-top: 6px; }
 .xc-lab { font-weight: 600; color: #606266; font-size: 12px; }
 .xc-kind { color: #303133; font-size: 12px; }
+/* 物料下拉的一行：编号左对齐等宽当"锚"，名称退成次要色 —— 一列扫下去是编号对齐，而不是一坨长句。
+   scoped 样式对 el-option 的插槽内容照样生效（元素是这个组件渲染的，作用域属性跟着 vnode 走）。 */
+.xc-opt { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.xc-opt-code { flex: none; font-variant-numeric: tabular-nums; }
+.xc-opt-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a3a9b3; }
 .xc-out { font-variant-numeric: tabular-nums; color: #303133; font-size: 12px; }
 .xc-unit { color: #909399; font-size: 12px; }
 .xc-strong { font-weight: 700; color: #0d5bd3; }

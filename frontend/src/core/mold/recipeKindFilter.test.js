@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { invFillFor, invRowsOfKind, invSearchOptions, materialFillFor, uniqueInvRowBy } from './recipeRows.js'
+import { invFillFor, invRowsOfKind, invSearchOptions, materialClearFor, materialFillFor, uniqueInvRowBy } from './recipeRows.js'
 
 /**
  * 配方计算弹窗「物料行」的**种类前置筛选**(2026-10-15 用户口径)。
@@ -178,4 +178,28 @@ test('名称侧唯一命中 · 同名两条谁都不可选,不猜;取不到档�
     '档案查不到(读不到/没有)⇒ 什么都不动,不清空用户输入')
   assert.deepEqual(materialFillFor({ 物料名称: '炭棒' }, INV('M-001', '炭棒', '其它类别'), '物料名称'),
     { 物料编号: 'M-001' }, '档案里的类别不是引擎认的词 ⇒ 只回填编号,种类不猜')
+})
+
+/* ── ④ 清空要连带清对侧(2026-10-30 用户口径)────────────────────────────────────────
+   原话:「另一个配方计算的叉掉分类、编号、名称自己退回空白还没有做，现在就是 X烧结 实现了」。
+   带出是"挑中就填"，清空是它的另一半 —— 只剩一半的值比空着更糟:
+   屏幕上写着「YJ-XXX 英克瑞斯椰壳炭」，实际只清了编号，下次保存就是旧名字配空编号。 */
+
+test('清空 · 清掉编号或名称,对侧跟着退回空白(只剩一半 = 静默错数)', () => {
+  const row = { 物料种类: '炭粉', 物料编号: 'YJ-YKRS-001', 物料名称: '英克瑞斯椰壳炭', 设计添加量: '45' }
+  assert.deepEqual(materialClearFor(row, '物料编号'), { 物料名称: '' }, '清编号 ⇒ 名称必须一起空')
+  assert.deepEqual(materialClearFor(row, '物料名称'), { 物料编号: '' }, '清名称 ⇒ 编号必须一起空')
+  assert.deepEqual(materialClearFor({ 物料编号: 'A' }, '物料编号'), {},
+    '对侧本来就空 ⇒ 一个格都不写(免得白触发一轮 change)')
+})
+
+test('清空 · 清掉物料种类时编号与名称一起退空;选上种类时什么都不清', () => {
+  const row = { 物料种类: '炭粉', 物料编号: 'YJ-YKRS-001', 物料名称: '英克瑞斯椰壳炭', 设计添加量: '45' }
+  assert.deepEqual(materialClearFor(row, '物料种类'), { 物料编号: '', 物料名称: '' },
+    '候选范围是靠种类收窄的,种类没了还留着那对编号/名称 = 假装它仍属于刚被清掉的类别')
+  // 选上(而不是清空)种类时由 onKindChange 走另一条路:只作废旧候选,不许抹掉已录的物料
+  assert.deepEqual(materialClearFor({ 物料编号: 'A', 物料名称: '甲' }, '设计添加量'), {},
+    '清别的格(数量等)不许动物料三格')
+  assert.deepEqual(materialClearFor(null, '物料编号'), {}, '空行不炸')
+  assert.deepEqual(materialClearFor(row, ''), {})
 })

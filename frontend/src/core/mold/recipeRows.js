@@ -246,6 +246,40 @@ export function materialFillFor(row, inv, side) {
 }
 
 /**
+ * 清掉一格时，这一行**要跟着退回空白**的格 —— `materialFillFor` 的对称那一半。
+ *
+ * 【用户口径·2026-10-30】「另一个配方计算的叉掉分类、编号、名称自己退回空白还没有做，
+ *   现在就是 X烧结配方计算实现了」。
+ *
+ * 三条规矩：
+ *   ① 被操作的那一格由 el-select 自己写空，这里**只算兄弟格**（回写它就又触发一轮 change）；
+ *   ② **编号与名称是同一物料的两种写法** ⇒ 清掉任一半，另一半必须跟着空。只剩一半比空着更糟：
+ *      屏幕上写着「YJ-XXX 英克瑞斯椰壳炭」，实际只清了编号，下次保存就是旧名字配空编号（静默错数）；
+ *   ③ 清掉**物料种类**时把编号与名称一起清：候选范围本来靠它收窄，种类没了还留着那对值，
+ *      等于假装这颗料仍属于刚被清掉的类别。反过来**选上**种类时什么都不清（那是补分类，
+ *      不该抹掉已录的物料）—— 这条由组件在 onKindChange 里按"清空 vs 选上"分开处理。
+ *
+ * @param {Record<string, any>|null} row 弹窗里的编辑行
+ * @param {'物料种类'|'物料编号'|'物料名称'|string} field 刚被清空的那一格
+ * @returns {Record<string, ''>} 要写空的格；一个都不用写时给 {}
+ */
+export function materialClearFor(row, field) {
+  const f = norm(field)
+  const filled = (k) => norm(row?.[k]) !== ''
+  const out = {}
+  if (f === '物料编号' || f === '物料名称') {
+    const other = f === '物料编号' ? '物料名称' : '物料编号'
+    if (filled(other)) out[other] = ''
+    return out
+  }
+  if (f === '物料种类') {
+    if (filled('物料编号')) out['物料编号'] = ''
+    if (filled('物料名称')) out['物料名称'] = ''
+  }
+  return out
+}
+
+/**
  * 商品档案行 → 这行**还能补上**的格(填「物料编号」带出名称/种类;只补空格)。
  *
  * 数据源 = 既有档案查询(商品档案 INV,列 `存货编码`/`存货名称`/`所属类别`),

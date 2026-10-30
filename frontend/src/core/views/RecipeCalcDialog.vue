@@ -101,11 +101,20 @@
                          remote :debounce="300" :remote-method="(q) => searchInv(i, '物料编号', q)"
                          :loading="!!invOptLoading[optKey(i, '物料编号')]" :title="optHint(i, '物料编号')"
                          @change="onMaterialPick(i, '物料编号')">
+                <!-- 选中后**只回显编号**（2026-10-30 用户口径，与 X烧结 同一口径）：右边紧邻的就是
+                     「物料名称」列，两格都带名字等于同一行写两遍，还把编号挤成省略号。
+                     下拉里仍然给「编号 — 名称」（候选 label），编号与名称两头都能搜。 -->
+                <template #label="{ value }">{{ value }}</template>
                 <el-option v-for="o in optList(i, '物料编号')" :key="o.value" :label="o.label" :value="o.value" />
                 <!-- remote 下拉必须给 empty 槽:否则"没候选"时下拉整个不弹(点了没反应),
                      用户根本看不到"先选种类"这句提示(Element Plus 的 dropdownMenuVisible 依赖它有槽) -->
                 <template #empty>
                   <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
+                </template>
+                <!-- 候选被 cap 截断时**在下拉里说清楚**:原来只挂在 title 上，不悬停根本看不见，
+                     用户只会觉得"搜不到"。v-if 是为了不截断时连那一条空白页脚都不出现。 -->
+                <template v-if="optHint(i, '物料编号')" #footer>
+                  <div class="rcd-sel-foot">{{ optHint(i, '物料编号') }}</div>
                 </template>
               </el-select>
             </td>
@@ -117,6 +126,9 @@
                 <el-option v-for="o in optList(i, '物料名称')" :key="o.value" :label="o.label" :value="o.value" />
                 <template #empty>
                   <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
+                </template>
+                <template v-if="optHint(i, '物料名称')" #footer>
+                  <div class="rcd-sel-foot">{{ optHint(i, '物料名称') }}</div>
                 </template>
               </el-select>
             </td>
@@ -250,7 +262,7 @@ import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
   slot1RowIndex, slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop,
   sinterRowsFromQuery, unfilledDesignRows } from '@/core/mold/recipeSheet.js'
-import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialFillFor,
+import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialClearFor, materialFillFor,
   uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
 import { invRowsOf } from '@/core/panel/invCarry.js'
@@ -634,9 +646,17 @@ function onKindChange(i) {
   delete next[optKey(i, '物料编号')]
   delete next[optKey(i, '物料名称')]
   invOpts.value = next
+  // 清空种类 ⇒ 同行的编号/名称跟着退回空白（2026-10-30 用户口径「叉掉分类、编号、名称自己退回空白」）。
+  // 候选范围本来就是靠它收窄的，种类没了还留着那对值 = 假装这颗料仍属于刚被清掉的类别。
+  // 反过来**选上**种类只作废旧候选，绝不动已经录好的物料（那一步是补分类，不是改物料）。
+  if (!kind) {
+    const clear = materialClearFor(editRows.value[i], '物料种类')
+    if (Object.keys(clear).length) Object.assign(editRows.value[i], clear)
+    invKindTip.value = ''
+    return
+  }
   // 预取只是热身:两格的候选由下拉**打开/输入**时经 remote-method 填(那时种类池已在缓存里,零请求)
-  if (kind) ensureKindRows(kind).catch(() => {})
-  else invKindTip.value = ''
+  ensureKindRows(kind).catch(() => {})
 }
 /**
  * 挑中/手填一格后,拿**唯一命中**的档案行。
@@ -676,7 +696,18 @@ async function onMaterialPick(i, field) {
   const row = editRows.value[i]
   const typed = String(row?.[field] ?? '').trim()
   invTip.value = ''
-  if (!typed) return
+  // 清空一格（点下拉里的 ✕ / 退格清光）⇒ 兄弟格一起退回空白（2026-10-30 用户口径
+  // 「叉掉分类、编号、名称自己退回空白」，与 X烧结 同一口径）。
+  // 原来这里直接 return，于是"编号清掉了、名称还留着"—— 屏幕上还是那袋料，
+  // 存回单据就是旧名字配空编号，属于静默错数。
+  if (!typed) {
+    const clear = materialClearFor(row, field)
+    if (Object.keys(clear).length) {
+      fillingAt.value = i
+      try { Object.assign(editRows.value[i], clear) } finally { fillingAt.value = null }
+    }
+    return
+  }
   const inv = await lookupInvRow(field, typed)
   // 等请求期间用户又改了这一格 ⇒ 这次带出作废(异步竞态不许把旧结果写回去)
   if (String(editRows.value[i]?.[field] ?? '').trim() !== typed) return
@@ -929,6 +960,8 @@ function apply() {
 .rcd-sel { width: 100%; }
 /* remote 下拉的"没有候选"提示(下拉面板里的空槽):小字、不抢眼、可换行 */
 .rcd-sel-empty { padding: 6px 10px; color: #909399; font-size: 11px; line-height: 1.5; white-space: normal; }
+/* 下拉页脚：候选被上限截断时告诉用户"还有多少、继续打字缩小"（截断不提示 = 看起来像搜不到） */
+.rcd-sel-foot { padding: 5px 10px 6px; color: #909399; font-size: 11px; line-height: 1.5; white-space: normal; border-top: 1px solid #f0f2f5; }
 .rcd-del { color: #f56c6c; cursor: pointer; padding: 0 6px; font-size: 12px; }
 .rcd-del:hover { color: #c45656; }
 .rcd-src { margin-left: 3px; font-size: 10px; color: #67c23a; border: 1px solid #b3e19d; border-radius: 2px; padding: 0 2px; vertical-align: middle; }
