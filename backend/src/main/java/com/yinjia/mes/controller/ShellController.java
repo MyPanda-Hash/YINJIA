@@ -64,6 +64,41 @@ public class ShellController {
      * HSDZ_MES_TEST 这个库(两账套只在开发机),菜单里挂着"点了就 500 的选项"纯属坑人;
      * 关掉后登录页与顶栏切换菜单都不再出现测试库。服务器打开方式见 deploy/部署说明.md §A4。
      */
+    /**
+     * 前端构建信息(2026-10-30)。
+     *
+     * <p>为什么要有这个接口:改完前端「用户刷新了却说没变」反复出现
+     * (最近一次:生产领料页的旧入口明明已删,用户截图里还在 —— 实为**标签页没真加载**,
+     *   双方只能靠"我这边是新的 / 我这边还是旧的"互相猜)。
+     * ⇒ 提供一条可直接引用的判据:当前 jar 里打包的前端入口 chunk 名与构建时间。
+     *
+     * <p>用法:浏览器打开 {@code /api/build} 看 {@code indexChunk},
+     * 与 F12 → Network 里实际加载的 {@code index-*.js} 比对 —— 不一致 = 浏览器缓存/标签页没刷新。
+     */
+    @GetMapping("/build")
+    public ApiResult<Map<String, Object>> build() {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        String html = "";
+        try (java.io.InputStream in = new org.springframework.core.io.ClassPathResource("static/index.html").getInputStream()) {
+            html = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            out.put("note", "index.html 读取失败:" + e.getMessage());
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("assets/index-[A-Za-z0-9_-]+\\.js").matcher(html);
+        out.put("indexChunk", m.find() ? m.group() : "");
+        try {
+            java.net.URL u = getClass().getClassLoader().getResource("static/index.html");
+            if (u != null) {
+                out.put("staticBuiltAt", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                        .format(new java.util.Date(u.openConnection().getLastModified())));
+            }
+        } catch (Exception ignore) { /* 取不到就不给这一项 */ }
+        out.put("serverTime", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                .format(new java.util.Date()));
+        return ApiResult.ok(out);
+    }
+
     @GetMapping("/base/factory/list")
     public ApiResult<List<Map<String, Object>>> factories() {
         List<Map<String, Object>> list = new ArrayList<>();
