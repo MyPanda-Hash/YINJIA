@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { DESK_QUICK_VERSION, upgradeDeskSettings as upgradeQuick } from '@core/dashboard/deskQuick'
+import { readSkin, applySkin } from '@core/ui/skins.js'
 
 const DESK_DEFAULT = {
   quick: ['newOrder', 'quickReport', 'board'],
@@ -44,6 +45,8 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     collapsed: localStorage.getItem('mes_collapsed') === '1',
     dark: localStorage.getItem('mes_dark') === '1',
+    // 换肤(2026-10-30):皮肤 id 存在本机;颜色全在 styles/skins.css,这里只记"选了哪套"
+    skin: readSkin(),
     menuMode: localStorage.getItem('mes_menu_mode') || 'accordion',
     fullscreen: false,
     deskSettings: loadDeskSettings(),
@@ -68,6 +71,13 @@ export const useAppStore = defineStore('app', {
     setMenuMode(mode) {
       this.menuMode = mode
       localStorage.setItem('mes_menu_mode', mode)
+    },
+    /**
+     * 切皮肤:落 `<html data-skin>` + localStorage,并回写 store(脏值会被 applySkin 纠正,
+     * 所以要用它的返回值,不能让界面选中态停在用户点的那个不存在的 id 上)。
+     */
+    setSkin(id) {
+      this.skin = applySkin(id)
     },
     toggleFullscreen() {
       if (!document.fullscreenElement) {

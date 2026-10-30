@@ -1854,8 +1854,8 @@ function go(path, title) {
   padding: 16px 20px;
   overflow: hidden;
   border: 0;
-  border-left: 4px solid #e0a83a;
-  background: #173f38;
+  border-left: 4px solid var(--t-plate-accent, #e0a83a);
+  background: var(--t-plate-bg, #173f38);
   color: #fff;
   box-shadow: 0 5px 15px rgba(19, 61, 53, 0.13);
 }
@@ -1912,13 +1912,13 @@ function go(path, title) {
   color: var(--t-primary);
 }
 .quick .el-button--primary {
-  border-color: #e0a83a;
-  background: #e0a83a;
+  border-color: var(--t-plate-accent, #e0a83a);
+  background: var(--t-plate-accent, #e0a83a);
   color: #1f302b;
 }
 .quick .el-button--primary:hover {
-  border-color: #edba54;
-  background: #edba54;
+  border-color: var(--t-plate-accent, #edba54);
+  background: var(--t-plate-accent, #edba54);
   color: #1f302b;
 }
 

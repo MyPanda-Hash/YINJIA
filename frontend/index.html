@@ -22,6 +22,15 @@
       if (h.indexOf('/login') >= 0 || (!h && sessionStorage.getItem('mes_at_login') === '1')) {
         document.documentElement.classList.add('login-bg')
       }
+      // 换肤(2026-10-30):在主包 CSS 到达之前就把 data-skin 挂上,避免"先亮默认皮肤、
+      // 再跳成用户选的那套"的闪一下。默认值与 core/ui/skins.js 的 DEFAULT_SKIN 一致;
+      // 这里只做底色归属,真正的颜色全在 styles/skins.css。
+      try {
+        var s = localStorage.getItem('mes_skin')
+        document.documentElement.dataset.skin = (s === 'deepseek' || s === 'jade') ? s : 'claude'
+      } catch (e) {
+        document.documentElement.dataset.skin = 'claude'
+      }
     })()
   </script>
 </head>

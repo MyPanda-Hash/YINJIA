@@ -167,7 +167,10 @@
             <el-dropdown-item command="account"><el-icon><User /></el-icon>{{ tt('账号管理') }}</el-dropdown-item>
             <el-dropdown-item command="pwd"><el-icon><Key /></el-icon>{{ tt('修改密码') }}</el-dropdown-item>
             <el-dropdown-item command="ui"><el-icon><Setting /></el-icon>{{ tt('界面设置') }}</el-dropdown-item>
-            <el-dropdown-item command="dark"><el-icon><Brush /></el-icon>{{ app.dark ? tt('切换亮色') : tt('换肤（暗色）') }}</el-dropdown-item>
+            <!-- 换肤(2026-10-30):原来是「换肤（暗色）」一个暗色开关,现在外壳换了皮肤体系,
+                 明暗只是同一套皮肤的两面 ⇒ 这一项直接打开界面设置里的「外观皮肤」,
+                 不再单独做第二入口,避免"菜单里两个地方都能改外观"的分裂。 -->
+            <el-dropdown-item command="skin"><el-icon><Brush /></el-icon>{{ tt('换肤') }}</el-dropdown-item>
             <el-dropdown-item command="desk"><el-icon><Monitor /></el-icon>{{ tt('工作台设置') }}</el-dropdown-item>
             <el-dropdown-item command="logout" divided><el-icon><SwitchButton /></el-icon>{{ tt('退出') }}</el-dropdown-item>
           </el-dropdown-menu>
@@ -369,7 +372,7 @@ function onUserCommand(cmd) {
   else if (cmd === 'usage') router.push('/sys/usage')
   else if (cmd === 'pwd') pwdVisible.value = true
   else if (cmd === 'ui') uiSettingVisible.value = true
-  else if (cmd === 'dark') app.toggleDark()
+  else if (cmd === 'skin') uiSettingVisible.value = true
   else if (cmd === 'desk') deskSettingVisible.value = true
   else if (cmd === 'logout') {
     user.logout()

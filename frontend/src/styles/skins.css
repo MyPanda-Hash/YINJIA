@@ -1,0 +1,244 @@
+/* ============================================================================
+   换肤 · 皮肤令牌（2026-10-30）
+   ----------------------------------------------------------------------------
+   设计基线取自 dsh-claude-style 插件 docs/STYLE.md 的"色卡"规则:
+     · 一套皮肤 = 一个强调色(accent) + 一个画布家族(canvas)，明暗各一份；
+       所有中性色都由这两个种子派生 ⇒ 不许出现"暖强调 + 冷灰"的拼凑感；
+     · 永不纯黑、永不冷灰：暖砂的正文墨色是 #161616 而不是 #000；
+     · 强调色只给链接/焦点/选中，占可见元素 10% 以内 —— MES 一天盯 8 小时表格，
+       满屏彩色会让人找不到真正要看的那一格；
+     · 边框 1px；分隔线比最浅的边框还要再浅一档；暗色里边框不是"更深"，而是
+       半透明白（像木板的倒角接光），这样任何底色上都成立。
+
+   三套皮肤:
+     claude   暖砂  暖纸底 + 陶土强调（dsh-claude-style 的 claude 卡）
+     deepseek 深海  冷白底 + 靛蓝强调（同一插件的 deepseek 卡）
+     jade     松墨  原来的制造绿 —— 换肤前的独一份，原样保留，选它即回到从前
+
+   ⚠ 加皮肤的顺序:skins.js 的 SKINS → 本文件补明/暗两块(**一个 token 都不能少**)。
+     少一个不会报错，只会让那一处界面停在上一套的颜色上。skins.test.js 会拦住。
+   ⚠ 本文件必须排在 index.css 之后加载（main.js 的 import 顺序），否则 :root 的默认绿会盖住皮肤。
+   ⚠ 这些 token 只覆盖"读 token 的部分"（外壳/表格/按钮/弹窗/输入框）。业务面板里
+     历史上写死的色值不跟皮肤走 —— 那是另一件事，不在换肤范围内。
+
+   2026-10-30 补丁（实测反馈）：第一版明色下换肤几乎看不出差别（像素差异仅 0.18%）。
+   原因有二，各自补掉:
+     ① 明色的画布底只差一两个色阶 ⇒ 现在暖砂 #f4f1ec（纸）、深海 #eef2fd（冷白），
+        整窗底色占屏面积最大，这一档必须拉开；
+     ② 首页那块深绿欢迎条是写死的 #173f38，是全屏最大的一块彩色，不动它换肤等于没换
+        ⇒ 新增 --t-plate-bg / --t-plate-accent（深色"底板" + 底板上的强调），
+        三套皮肤各自派生，业务组件改读这两个 token。
+   ========================================================================== */
+
+/* ── 暖砂 claude ─────────────────────────────────────────────────────────── */
+html[data-skin="claude"] {
+  --t-primary: #bf6446;
+  --t-primary-dark: #a35035;
+  --t-tab-active: #bf6446;
+  --t-badge: #c84d3f;
+  --t-navbar-bg: #ffffff;
+  --t-navbar-text: #413b38;
+  --t-navbar-info: #91888a;
+  --t-sidebar-bg: #fbfaf7;
+  --t-content-bg: #f4f1ec;
+  --t-card-bg: #ffffff;
+  --t-text-1: #161616;
+  --t-text-2: #70686a;
+  --t-text-3: #91888a;
+  --t-border: #e9e9e9;
+  --t-border-light: #f1f0ee;
+  --t-hover-bg: #f4f2f3;
+  --t-plate-bg: #2b2421;
+  --t-plate-accent: #d97757;
+  --el-color-primary: #d97757;
+  --el-color-primary-light-3: #e4a089;
+  --el-color-primary-light-5: #ecbbab;
+  --el-color-primary-light-7: #f4d6cd;
+  --el-color-primary-light-8: #f7e4dd;
+  --el-color-primary-light-9: #fbf1ee;
+  --el-color-primary-dark-2: #ae5f46;
+}
+html[data-skin="claude"].dark {
+  --t-primary: #eaa088;
+  --t-primary-dark: #ffbea6;
+  --t-tab-active: #d97757;
+  --t-badge: #d0645a;
+  --t-navbar-bg: #1f1f1f;
+  --t-navbar-text: #e8e3e1;
+  --t-navbar-info: #9c9395;
+  --t-sidebar-bg: #1f1f1f;
+  --t-content-bg: #191919;
+  --t-card-bg: #212121;
+  --t-text-1: #fdfdfd;
+  --t-text-2: #beb6b8;
+  --t-text-3: #9c9395;
+  --t-border: rgba(255, 255, 255, 0.10);
+  --t-border-light: rgba(255, 255, 255, 0.06);
+  --t-hover-bg: #2b2b2b;
+  --t-plate-bg: #2e2a27;
+  --t-plate-accent: #d97757;
+  --el-color-primary: #d97757;
+  --el-color-primary-light-3: #e4a089;
+  --el-color-primary-light-5: #ecbbab;
+  --el-color-primary-light-7: #f4d6cd;
+  --el-color-primary-light-8: #f7e4dd;
+  --el-color-primary-light-9: #fbf1ee;
+  --el-color-primary-dark-2: #ae5f46;
+  --el-bg-color: #212121;
+  --el-bg-color-page: #191919;
+  --el-bg-color-overlay: #282828;
+  --el-text-color-primary: #fdfdfd;
+  --el-text-color-regular: #beb6b8;
+  --el-text-color-secondary: #9c9395;
+  --el-text-color-placeholder: #776f71;
+  --el-border-color: rgba(255, 255, 255, 0.20);
+  --el-border-color-light: rgba(255, 255, 255, 0.14);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.09);
+  --el-fill-color: #2b2b2b;
+  --el-fill-color-light: #262626;
+  --el-fill-color-lighter: #222222;
+  --el-fill-color-dark: #333333;
+  --el-fill-color-blank: #212121;
+}
+
+/* ── 深海 deepseek ───────────────────────────────────────────────────────── */
+html[data-skin="deepseek"] {
+  --t-primary: #3e57e0;
+  --t-primary-dark: #2e41c0;
+  --t-tab-active: #3e57e0;
+  --t-badge: #c84d3f;
+  --t-navbar-bg: #ffffff;
+  --t-navbar-text: #353945;
+  --t-navbar-info: #848891;
+  --t-sidebar-bg: #f6f8ff;
+  --t-content-bg: #eef2fd;
+  --t-card-bg: #ffffff;
+  --t-text-1: #131416;
+  --t-text-2: #656871;
+  --t-text-3: #848891;
+  --t-border: #e4e7f0;
+  --t-border-light: #eef0f7;
+  --t-hover-bg: #ecf0ff;
+  --t-plate-bg: #171d2f;
+  --t-plate-accent: #4d6bfe;
+  --el-color-primary: #4d6bfe;
+  --el-color-primary-light-3: #8297fe;
+  --el-color-primary-light-5: #a6b5ff;
+  --el-color-primary-light-7: #cad3ff;
+  --el-color-primary-light-8: #dbe1ff;
+  --el-color-primary-light-9: #edf0ff;
+  --el-color-primary-dark-2: #3e56cb;
+}
+html[data-skin="deepseek"].dark {
+  --t-primary: #7594fd;
+  --t-primary-dark: #91b1ff;
+  --t-tab-active: #6a84ff;
+  --t-badge: #d0645a;
+  --t-navbar-bg: #13161d;
+  --t-navbar-text: #d8dfee;
+  --t-navbar-info: #8a92a3;
+  --t-sidebar-bg: #13161d;
+  --t-content-bg: #0f1218;
+  --t-card-bg: #1b1e26;
+  --t-text-1: #f4f9ff;
+  --t-text-2: #aeb5c4;
+  --t-text-3: #8a92a3;
+  --t-border: rgba(255, 255, 255, 0.10);
+  --t-border-light: rgba(255, 255, 255, 0.06);
+  --t-hover-bg: #262b36;
+  --t-plate-bg: #1e2433;
+  --t-plate-accent: #4d6bfe;
+  --el-color-primary: #4d6bfe;
+  --el-color-primary-light-3: #8297fe;
+  --el-color-primary-light-5: #a6b5ff;
+  --el-color-primary-light-7: #cad3ff;
+  --el-color-primary-light-8: #dbe1ff;
+  --el-color-primary-light-9: #edf0ff;
+  --el-color-primary-dark-2: #3e56cb;
+  --el-bg-color: #1b1e26;
+  --el-bg-color-page: #13161d;
+  --el-bg-color-overlay: #22252d;
+  --el-text-color-primary: #f4f9ff;
+  --el-text-color-regular: #aeb5c4;
+  --el-text-color-secondary: #8a92a3;
+  --el-text-color-placeholder: #676e7d;
+  --el-border-color: rgba(255, 255, 255, 0.20);
+  --el-border-color-light: rgba(255, 255, 255, 0.14);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.09);
+  --el-fill-color: #262b36;
+  --el-fill-color-light: #22252d;
+  --el-fill-color-lighter: #1e212a;
+  --el-fill-color-dark: #2b2f37;
+  --el-fill-color-blank: #1b1e26;
+}
+
+/* ── 松墨 jade：换肤前的原样（制造绿），选它即回到从前，数值与 index.css 完全一致 ── */
+html[data-skin="jade"] {
+  --t-primary: #116a5b;
+  --t-primary-dark: #0d584c;
+  --t-tab-active: #116a5b;
+  --t-badge: #c84d3f;
+  --t-navbar-bg: #ffffff;
+  --t-navbar-text: #40504b;
+  --t-navbar-info: #7b8984;
+  --t-sidebar-bg: #f7f9f8;
+  --t-content-bg: #f2f5f4;
+  --t-card-bg: #ffffff;
+  --t-text-1: #1e2b27;
+  --t-text-2: #5d6c67;
+  --t-text-3: #8b9893;
+  --t-border: #dce4e1;
+  --t-border-light: #edf1ef;
+  --t-hover-bg: #e9f3f0;
+  --t-plate-bg: #173f38;
+  --t-plate-accent: #e0a83a;
+  --el-color-primary: #116a5b;
+  --el-color-primary-light-3: #58958a;
+  --el-color-primary-light-5: #88b4ac;
+  --el-color-primary-light-7: #b8d3ce;
+  --el-color-primary-light-8: #cfe1de;
+  --el-color-primary-light-9: #e8f1ef;
+  --el-color-primary-dark-2: #0d584c;
+}
+html[data-skin="jade"].dark {
+  --t-primary: #58b09e;
+  --t-primary-dark: #76c2b2;
+  --t-tab-active: #58b09e;
+  --t-badge: #d0645a;
+  --t-navbar-bg: #202925;
+  --t-navbar-text: #d1d9d6;
+  --t-navbar-info: #8f9c97;
+  --t-sidebar-bg: #202925;
+  --t-content-bg: #18201d;
+  --t-card-bg: #222c28;
+  --t-text-1: #e2e8e5;
+  --t-text-2: #b3bfba;
+  --t-text-3: #7f8e88;
+  --t-border: #35423d;
+  --t-border-light: #303c37;
+  --t-hover-bg: #293a34;
+  --t-plate-bg: #1c332d;
+  --t-plate-accent: #e0a83a;
+  --el-color-primary: #116a5b;
+  --el-color-primary-light-3: #58958a;
+  --el-color-primary-light-5: #88b4ac;
+  --el-color-primary-light-7: #b8d3ce;
+  --el-color-primary-light-8: #cfe1de;
+  --el-color-primary-light-9: #e8f1ef;
+  --el-color-primary-dark-2: #0d584c;
+  --el-bg-color: #222c28;
+  --el-bg-color-page: #18201d;
+  --el-bg-color-overlay: #27322e;
+  --el-text-color-primary: #e2e8e5;
+  --el-text-color-regular: #b3bfba;
+  --el-text-color-secondary: #8f9c97;
+  --el-text-color-placeholder: #73817b;
+  --el-border-color: #35423d;
+  --el-border-color-light: #3b4943;
+  --el-border-color-lighter: #303c37;
+  --el-fill-color: #2c3933;
+  --el-fill-color-light: #293630;
+  --el-fill-color-lighter: #27332e;
+  --el-fill-color-dark: #303f39;
+  --el-fill-color-blank: #222c28;
+}

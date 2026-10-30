@@ -1,6 +1,8 @@
 <template>
-  <el-dialog :model-value="modelValue" :title="tt('界面设置')" width="460px" append-to-body @update:model-value="(v) => $emit('update:modelValue', v)">
+  <el-dialog :model-value="modelValue" :title="tt('界面设置')" width="480px" append-to-body @update:model-value="(v) => $emit('update:modelValue', v)">
     <div class="ui-setting">
+      <!-- 换肤（2026-10-30）：外观排在最上面 —— 打开这一页的人十次有九次是来改外观的。 -->
+      <SkinPicker />
       <div class="set-row">
         <div class="set-label">{{ tt('菜单模式') }}</div>
         <el-radio-group v-model="mode" @change="(v) => app.setMenuMode(v)">
@@ -12,10 +14,6 @@
         <div class="set-label">{{ tt('侧边栏默认折叠') }}</div>
         <el-switch :model-value="app.collapsed" @change="app.toggleCollapse()" />
       </div>
-      <div class="set-row">
-        <div class="set-label">{{ tt('暗色模式') }}</div>
-        <el-switch :model-value="app.dark" @change="app.toggleDark()" />
-      </div>
       <div class="set-hint">{{ tt('设置实时生效并保存到本机浏览器。') }}</div>
     </div>
   </el-dialog>
@@ -25,6 +23,7 @@
 import { ref, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { tt } from '@/i18n'
+import SkinPicker from '@core/ui/SkinPicker.vue'
 
 defineProps({ modelValue: Boolean })
 defineEmits(['update:modelValue'])
@@ -46,15 +45,9 @@ watch(
   padding: 10px 0;
   border-bottom: 1px solid var(--t-border-light);
 }
-.dark .set-row {
-  border-color: #3a3b42;
-}
 .set-label {
   font-size: 13px;
   color: var(--t-text-2);
-}
-.dark .set-label {
-  color: #bbb;
 }
 .set-hint {
   margin-top: 10px;
