@@ -2312,6 +2312,15 @@ public class ButtonService {
         // 2026-10-16 用户口径:产品信息表**被弃审**(退回草稿、重新走审核)同样会让四文件里的数据过期
         // ⇒ 与「申请修改」同一条通知(recordApproval 已写 UNAUDIT 留痕,故放在它之后)。
         if ("RD_PROD_INFO".equals(def.code())) notifyProdInfoChanged(no, currentUserName(), "弃审");
+        // 2026-10-30 用户口径「要跟着退回草稿」：产品信息表弃审 ⇒ 它那张物料清单也退回**草稿**
+        //   （与归档那半对称：归档时物料清单变已归档，弃审就退回草稿，别让它挂着一份"已归档"
+        //     的旧 BOM 而产品信息表却是草稿）。只动状态位，不碰 mate 行。
+        if ("RD_PROD_INFO".equals(def.code())) {
+            String prodNoOfDoc = safeStr(jdbc.queryForList(
+                    "SELECT TOP 1 [产品编号] FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    no).stream().findFirst().orElse(java.util.Map.of()).get("产品编号"));
+            if (!prodNoOfDoc.isBlank()) markMaterialListDraft(prodNoOfDoc, currentUserName());
+        }
         return result(no, "草稿");
     }
 

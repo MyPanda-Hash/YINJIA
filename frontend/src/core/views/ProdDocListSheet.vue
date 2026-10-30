@@ -204,60 +204,117 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 </script>
 
 <style scoped>
-.prod-doc-sheet { padding: 8px 4px 24px; color: #1f2d3d; }
+/* ════════════════════════════════════════════════════════════════════════════
+   产品文件列表 —— 2026-10-30 视觉重做（**只动观感，一行逻辑没改**）
+   用户口径：「设计得不是很好看，重新设计一下，要高级简约，不改变现有逻辑」
 
-.pds-topbar { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 6px; }
-.pds-company { font-size: 15px; font-weight: 700; letter-spacing: .5px; }
-.pds-docno { font-size: 13px; color: #409eff; }
-.pds-docno-prefix { color: #1f2d3d; margin-right: 2px; }
+   旧版的问题：整块标题条是高饱和蓝底白字（#2f6fbf），吃掉了一整页的注意力，
+   而这页真正要看的是「哪几个文件还没开发」；表格又是逐格 1px 实线方格纸，
+   和标题条一起把页面压得很满。
 
-.pds-title-row {
-  display: flex; align-items: center; justify-content: space-between;
-  background: #2f6fbf; color: #fff; padding: 8px 12px; border-radius: 2px;
+   新版三件事：
+     ① 标题条去色 → 深墨字 + 细分隔线（去掉色块，视觉重心回到表格内容）
+     ② 表格改「横向细线」→ 竖线只保留极浅的辅助线，行高放宽，读起来不挤
+     ③ 状态标签降饱和 → 同色系浅底 + 细边，不再是四种抢眼的彩色胶囊
+   ========================================================================== */
+.prod-doc-sheet {
+  --pds-ink: #1d232b;          /* 主文字 */
+  --pds-ink-2: #5b6472;        /* 次要文字 */
+  --pds-ink-3: #98a1ad;        /* 弱提示 */
+  --pds-line: #e8eaee;         /* 分隔线 */
+  --pds-line-soft: #f1f3f6;    /* 极浅辅助线 */
+  --pds-surface: #f7f8fa;      /* 表头/淡底 */
+  padding: 10px 6px 28px;
+  color: var(--pds-ink);
+  font-variant-numeric: tabular-nums;
 }
-.pds-title { font-size: 17px; font-weight: 700; letter-spacing: 2px; }
-.pds-info-table { font-size: 12px; }
-.pds-info-row { display: flex; gap: 6px; line-height: 1.7; }
-.pds-info-label { opacity: .85; min-width: 62px; text-align: right; }
+
+/* ── 抬头 ── */
+.pds-topbar {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0 2px 14px;
+}
+.pds-company { font-size: 15px; font-weight: 600; letter-spacing: .3px; color: var(--pds-ink); }
+.pds-docno { font-size: 12px; color: var(--pds-ink-2); letter-spacing: .2px; }
+.pds-docno-prefix { color: var(--pds-ink-3); margin-right: 4px; }
+
+/* ── 标题条：去色块，改成「大字 + 右侧信息 + 一条细线」 ── */
+.pds-title-row {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; padding: 4px 2px 12px; border-bottom: 1px solid var(--pds-line);
+}
+.pds-title {
+  font-size: 20px; font-weight: 600; letter-spacing: 3px; color: var(--pds-ink);
+}
+.pds-info-table { font-size: 12px; color: var(--pds-ink-2); }
+.pds-info-row { display: flex; gap: 8px; line-height: 1.8; }
+.pds-info-label { min-width: 62px; text-align: right; color: var(--pds-ink-3); }
 .pds-info-value { min-width: 70px; }
 
-.pds-note { padding: 8px 6px 10px; font-size: 12px; color: #606266; }
+.pds-note {
+  padding: 12px 2px 16px; font-size: 12px; color: var(--pds-ink-3); line-height: 1.7;
+}
 
-/* 筛选中横幅(侧栏搜索 → 本表行筛选) */
+/* ── 筛选横幅：淡到几乎只剩一条提示 ── */
 .pds-filter {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin: 0 6px 8px; padding: 6px 10px; font-size: 12px;
-  background: #eef6ff; border: 1px solid #c8ddf7; border-radius: 3px; color: #2f6fbf;
+  margin: 0 2px 14px; padding: 8px 12px; font-size: 12px;
+  background: var(--pds-surface); border: 1px solid var(--pds-line);
+  border-radius: 6px; color: var(--pds-ink-2);
 }
-.pds-filter-count { margin-left: 8px; color: #909399; }
-.pds-filter-clear { cursor: pointer; color: #2f6fbf; text-decoration: underline; }
-.pds-filter-clear:hover { color: #1f4f8a; }
+.pds-filter-count { margin-left: 8px; color: var(--pds-ink-3); }
+.pds-filter-clear {
+  cursor: pointer; color: var(--pds-ink-2); text-decoration: none;
+  border-bottom: 1px solid currentColor; padding-bottom: 1px;
+}
+.pds-filter-clear:hover { color: var(--pds-ink); }
 
-.pds-scroll { overflow: auto; }
-.pds-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.pds-table th, .pds-table td { border: 1px solid #d9dee5; padding: 5px 6px; vertical-align: middle; }
+/* ── 表格：横向细线为主，竖线只留极浅 ── */
+.pds-scroll { overflow: auto; border-radius: 6px; }
+.pds-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: 12.5px; background: #fff;
+}
+.pds-table th, .pds-table td {
+  padding: 10px 10px; vertical-align: middle;
+  border-bottom: 1px solid var(--pds-line);
+  border-right: 1px solid var(--pds-line-soft);
+}
+.pds-table th:last-child, .pds-table td:last-child { border-right: none; }
 .pds-table thead th {
-  background: #eef2f7; font-weight: 600; text-align: center; white-space: nowrap;
+  background: var(--pds-surface); font-weight: 500; text-align: center;
+  white-space: nowrap; color: var(--pds-ink-2); letter-spacing: .3px;
+  border-bottom: 1px solid var(--pds-line);
 }
-.pds-c-no { min-width: 110px; font-weight: 600; }
-.pds-c-file { min-width: 108px; white-space: nowrap; }
-.pds-c-status { min-width: 96px; text-align: center; }
-/* 状态格可点:跳该文件面板查看(无权限时给提示) */
-.pds-c-jump { cursor: pointer; }
-.pds-c-jump:hover { background: #eef6ff; }
-.pds-c-jump:hover .pds-badge { box-shadow: 0 0 0 2px #c8ddf7; }
-.pds-c-owner { min-width: 90px; }
-.pds-c-ctrl { min-width: 74px; text-align: center; }
-.pds-c-date { min-width: 120px; }
-.pds-empty { text-align: center; color: #909399; padding: 18px 0; }
+.pds-table tbody tr:last-child td { border-bottom: none; }
+.pds-table tbody tr:hover td { background: #fafbfc; }
 
-.pds-badge { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 11px; line-height: 17px; }
-.pds-badge.done { background: #e7f7ed; color: #1f9254; border: 1px solid #b7e3c7; }
-.pds-badge.review { background: #eaf1fd; color: #2f6fbf; border: 1px solid #bfd5f5; }
-.pds-badge.doing { background: #eef6ff; color: #3d7ec4; border: 1px solid #c8ddf7; }
-.pds-badge.none { background: #f4f5f7; color: #909399; border: 1px solid #e0e3e8; }
+.pds-c-no { min-width: 112px; font-weight: 600; color: var(--pds-ink); }
+.pds-c-file { min-width: 108px; white-space: nowrap; color: var(--pds-ink-2); }
+.pds-c-status { min-width: 96px; text-align: center; }
+/* 状态格可点：跳该文件面板查看（无权限时给提示）—— 只做极轻的反馈，不抢眼 */
+.pds-c-jump { cursor: pointer; }
+.pds-c-jump:hover td { background: #f6f8fb; }
+.pds-c-jump:hover .pds-badge { border-color: #c9d3e0; }
+.pds-c-owner { min-width: 92px; color: var(--pds-ink-2); }
+.pds-c-ctrl { min-width: 74px; text-align: center; color: var(--pds-ink-2); }
+.pds-c-date { min-width: 122px; color: var(--pds-ink-3); }
+.pds-empty { text-align: center; color: var(--pds-ink-3); padding: 28px 0; }
+
+/* ── 状态标签：同色系浅底 + 细边，降饱和 ── */
+.pds-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; line-height: 18px; letter-spacing: .2px;
+  background: #fff; border: 1px solid var(--pds-line); color: var(--pds-ink-2);
+}
+.pds-badge.done { background: #f1f8f3; color: #2f7a4f; border-color: #d8e9de; }
+.pds-badge.review { background: #f2f5fb; color: #3c5c8a; border-color: #dbe3f0; }
+.pds-badge.doing { background: #f4f7fb; color: #4a6b8f; border-color: #dfe6ef; }
+.pds-badge.none { background: #fafbfc; color: #9aa3ae; border-color: #e8eaee; }
 
 @media print {
   .pds-note { display: none; }
+  .prod-doc-sheet { padding: 0; }
+  .pds-title-row { border-bottom: 1px solid #c9ccd2; }
 }
 </style>
