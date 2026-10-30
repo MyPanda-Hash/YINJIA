@@ -1,26 +1,23 @@
 <!--
-  MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30)
+  MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30 第三轮改版)
 
-  【用户口径】(2026-10-30 原话)
-  「然后进入到那个单据(带有明细里面),可以扫码(扫的是物料码,如果对应的物料码存在,
-    就可以填写领料数量(数量可以随意填写,只要仓库数量足够,多少都可以),批次处理也保留之前的)
-    和打印(打印就先只是先打印工单二维码,在生成生产领料单的时候自动打印一次)。
-    全部领料完成后才可以提交转成材料出库单……
-    生产退料与领料一致,只是退料默认数量为0。可以不进行退料操作,
-    退料生成的应该是其他入库单,并且写好备注」
+  【两种状态,两套动作】
+  · **未完成**(还没领完/没提交):扫物料码 → 填领料数量 → 全部领完才能「提交转材料出库单」;
+  · **已完成**(已审核过账):这张单变成"可退料"的凭据 —— 扫物料码 → 填**退料**数量 → 提交退料,
+    每次退料生成一张**带退料标志的其他入库单**(库存加回来),可分多次退。
 
-  ⇒ 一页两个页签(领料 / 退料),两边同一套交互,只是退料默认 0 且上限 = 已领数量。
+  【用户口径】
+  第三轮(本轮):「退料直接在生产领料界面。可以点开已完成的生产领料数据再次进行扫码。
+    这样就可以来退料了。然后退料的单据做一个退料的标志。」
+    确认:① 只有**已完成**能退;② 累计可退 = 已领 − 已退,可分多次;③ 单据头加「退料」标志列;
+    ④ 领料单**保持已完成**(写着含退料即可)。
+  第一轮(领料部分):「扫的是物料码,如果对应的物料码存在,就可以填写领料数量
+    (数量可以随意填写,只要仓库数量足够,多少都可以),批次处理也保留之前的」
 
-  【交互骨架】
-    · 抬头:工单号 #行号 / 产品 / 领料单号 / 退料单号 / 进度(已领 N/M);
-    · 扫码框:扫物料码 → 校验"这个物料在本单明细里" → 解锁这一行的数量输入
-      (批次沿用 scanCode.js 的先进先出拆批;扫到批次优先填那一批);
-    · 明细表:每行 物料/规格/可用量/数量/BOM用量/批次;
-    · 底栏:打印(工单二维码) / 提交(仅领料页签,且**每行都有数量**才亮)。
-
-  【为什么数量不是"选批次填"而是"填总量自动拆批"】
-  用户口径「数量可以随意填写,只要仓库数量足够,多少都可以」+ 二次确认「超出自动拆到下一批」
-  ⇒ 人只填一个总数,拆到哪些批由系统按先进先出决定,拆批结果写在明细备注里(可追溯)。
+  【为什么不再有「退料页签」】
+  上一版生单时就预建一张 0 数量的退料单草稿,所以页面要两个页签并排看。
+  现在退料是**按需产生**的(退多少生多少),没有"待填的退料单"要看 ——
+  页签取消,退料直接在"已完成"的同一张明细上做(勾选要退的行 → 填数量 → 提交退料)。
 -->
 <template>
   <div class="mp">
@@ -43,116 +40,115 @@
       <div class="mp-kv"><span>{{ tt('规格') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('领料单号') }}</span><b class="mono">{{ doc.领料单号 || '—' }}</b></div>
-      <div class="mp-kv"><span>{{ tt('退料单号') }}</span><b class="mono">{{ doc.退料单号 || '—' }}</b></div>
+      <!-- 退料标志(2026-10-30 第三轮):退过料就把退料单号列出来,一眼看到"这张含退料" -->
+      <div class="mp-kv">
+        <span>{{ tt('退料单号') }}</span>
+        <b class="mono" :class="{ 'is-back': hasReturn }">
+          {{ hasReturn ? doc.退料单号 : '—' }}
+          <span v-if="hasReturn" class="mp-flag">{{ tt('含退料') }}</span>
+        </b>
+      </div>
       <div class="mp-kv">
         <span>{{ tt('领料进度') }}</span>
         <b class="num" :class="{ ok: progress.ok }">{{ progress.done }} / {{ progress.total }}</b>
       </div>
     </section>
 
-    <!-- 页签:领料 / 退料 -->
-    <div class="mp-tabs">
-      <div class="mp-tab" :class="{ on: side === 'pick' }" @click="side = 'pick'">
-        {{ tt('生产领料') }} <i>{{ pickRows.length }}</i>
-      </div>
-      <div class="mp-tab" :class="{ on: side === 'back' }" @click="side = 'back'">
-        {{ tt('生产退料') }} <i>{{ backRows.length }}</i>
-        <span v-if="backEmpty" class="mp-tab-tip">{{ tt('默认 0') }}</span>
-      </div>
-    </div>
-
-    <!-- 扫码区 -->
-    <section class="mp-card" :class="{ dim: isDone }">
+    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料 -->
+    <section class="mp-card" :class="{ dim: isDone && !returnMode }">
       <div class="mp-sec">
-        <span>{{ tt('扫物料码') }}</span>
+        <span>{{ isDone ? (returnMode ? tt('扫物料码 · 退料') : tt('扫物料码 · 领料')) : tt('扫物料码') }}</span>
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
-      </div>
-      <div class="mp-row">
-        <el-input
-          ref="matInput"
-          v-model="matText"
-          :placeholder="tt('扫物料码或输入物料编码')"
-          size="large"
-          clearable
-          :disabled="isDone"
-          @keyup.enter="scanMaterial"
-        />
-        <el-button size="large" :loading="matLoading" :disabled="isDone" @click="scanMaterial">{{ tt('查询') }}</el-button>
-        <el-button v-if="nativeScan" size="large" :disabled="isDone" @click="scanInto">{{ tt('扫码') }}</el-button>
+        <span v-if="isDone" class="mp-sec-note">{{ returnMode ? tt('退料模式') : tt('这张单已完成,可点「开始退料」') }}</span>
       </div>
 
-      <div v-if="cur" class="mp-mat">
-        <div class="mp-mat-main">
-          <div class="mp-mat-name">{{ cur.名称 || cur.编码 }}</div>
-          <div class="mp-mat-meta">
-            {{ cur.编码 }} · {{ cur.规格 || '—' }} · {{ cur.单位 || '—' }}
-            <template v-if="cur.BOM用量 > 0"> · {{ tt('BOM用量') }} {{ fmtQty(cur.BOM用量) }}</template>
-          </div>
-        </div>
-        <div class="mp-mat-stock">
-          <b class="num">{{ fmtQty(cur.允许上限) }}</b>
-          <span>{{ side === 'back' ? tt('最多可退') : tt('可用总量') }}</span>
-        </div>
+      <!-- 已完成 + 非退料模式:引导到退料 -->
+      <div v-if="isDone && !returnMode" class="mp-retire-cta">
+        <span>{{ tt('这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料。') }}</span>
+        <el-button type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
       </div>
 
-      <template v-if="cur">
-        <!-- 数量:随便填,上限 = 库存总量(领) / 已领数量(退) -->
-        <div class="mp-row mp-qty">
-          <span class="mp-qty-label">{{ side === 'back' ? tt('退料数量') : tt('领用数量') }}</span>
-          <el-input-number
-            v-model="curQty"
-            :min="0"
-            :max="cur.允许上限"
-            :precision="4"
-            :step="1"
+      <template v-else>
+        <div class="mp-row">
+          <el-input
+            ref="matInput"
+            v-model="matText"
+            :placeholder="tt('扫物料码或输入物料编码')"
             size="large"
-            controls-position="right"
-            :disabled="isDone"
-            @change="onQtyChange"
+            clearable
+            @keyup.enter="scanMaterial"
           />
-          <span class="mp-qty-unit">{{ cur.单位 || '' }}</span>
-          <el-button
-            type="primary"
-            size="large"
-            :loading="saving"
-            :disabled="isDone || !(curQty > 0)"
-            @click="saveQty"
-          >
-            {{ tt('写入') }}
-          </el-button>
+          <el-button size="large" :loading="matLoading" @click="scanMaterial">{{ tt('查询') }}</el-button>
+          <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
         </div>
 
-        <!-- 批次:沿用旧逻辑(先进先出/扫到优先),这里只读展示拆批结果 -->
-        <div v-if="batchRows.length" class="mp-batches">
-          <div class="mp-batches-head">
-            <span class="mp-bh-lot">{{ tt('批号') }}</span>
-            <span class="mp-bh-wh">{{ tt('仓库') }}</span>
-            <span class="mp-bh-avail">{{ tt('可用') }}</span>
-            <span class="mp-bh-qty">{{ tt('本次') }}</span>
+        <div v-if="cur" class="mp-mat">
+          <div class="mp-mat-main">
+            <div class="mp-mat-name">{{ cur.名称 || cur.编码 }}</div>
+            <div class="mp-mat-meta">
+              {{ cur.编码 }} · {{ cur.规格 || '—' }} · {{ cur.单位 || '—' }}
+              <template v-if="!returnMode && cur.BOM用量 > 0"> · {{ tt('BOM用量') }} {{ fmtQty(cur.BOM用量) }}</template>
+              <template v-if="returnMode"> · {{ tt('已领') }} {{ fmtQty(cur.已领数量) }} / {{ tt('已退') }} {{ fmtQty(cur.已退数量) }}</template>
+            </div>
           </div>
-          <div
-            v-for="(b, i) in batchRows"
-            :key="i"
-            class="mp-batch-row"
-            :class="{ 'is-checked': b.qty > 0, 'is-scanned': b.scanned }"
-          >
-            <span class="mp-bh-lot">
-              <span class="mp-batch-lot" :class="{ mono: !!b.lot }">{{ b.lot || tt('无批次') }}</span>
-              <span v-if="b.scanned" class="mp-batch-scan">{{ tt('扫到') }}</span>
-            </span>
-            <span class="mp-bh-wh">{{ b.warehouse || '—' }}</span>
-            <span class="mp-bh-avail num">{{ fmtQty(b.avail) }}</span>
-            <span class="mp-bh-qty num">{{ b.qty > 0 ? fmtQty(b.qty) : '—' }}</span>
+          <div class="mp-mat-stock">
+            <b class="num">{{ fmtQty(cur.上限) }}</b>
+            <span>{{ returnMode ? tt('本次可退') : tt('可用总量') }}</span>
           </div>
-          <div v-if="shortage > 0" class="mp-warn">
-            {{ tt('库存不够') }}:{{ tt('还差') }} {{ fmtQty(shortage) }} {{ cur.单位 }}
-          </div>
-          <div v-else-if="nonFifo" class="mp-warn">{{ tt('当前不是先进先出,已写进明细备注') }}</div>
         </div>
+
+        <template v-if="cur">
+          <div class="mp-row mp-qty">
+            <span class="mp-qty-label">{{ returnMode ? tt('退料数量') : tt('领用数量') }}</span>
+            <el-input-number
+              v-model="curQty"
+              :min="0"
+              :max="cur.上限"
+              :precision="4"
+              :step="1"
+              size="large"
+              controls-position="right"
+              @change="onQtyChange"
+            />
+            <span class="mp-qty-unit">{{ cur.单位 || '' }}</span>
+            <el-button type="primary" size="large" :loading="saving" :disabled="!(curQty > 0)" @click="saveQty">
+              {{ tt('写入') }}
+            </el-button>
+          </div>
+
+          <!-- 批次:领料沿用先进先出拆批;退料按原领料批号回退 -->
+          <div v-if="batchRows.length && !returnMode" class="mp-batches">
+            <div class="mp-batches-head">
+              <span class="mp-bh-lot">{{ tt('批号') }}</span>
+              <span class="mp-bh-wh">{{ tt('仓库') }}</span>
+              <span class="mp-bh-avail">{{ tt('可用') }}</span>
+              <span class="mp-bh-qty">{{ tt('本次') }}</span>
+            </div>
+            <div
+              v-for="(b, i) in batchRows"
+              :key="i"
+              class="mp-batch-row"
+              :class="{ 'is-checked': b.qty > 0, 'is-scanned': b.scanned }"
+            >
+              <span class="mp-bh-lot">
+                <span class="mp-batch-lot" :class="{ mono: !!b.lot }">{{ b.lot || tt('无批次') }}</span>
+                <span v-if="b.scanned" class="mp-batch-scan">{{ tt('扫到') }}</span>
+              </span>
+              <span class="mp-bh-wh">{{ b.warehouse || '—' }}</span>
+              <span class="mp-bh-avail num">{{ fmtQty(b.avail) }}</span>
+              <span class="mp-bh-qty num">{{ b.qty > 0 ? fmtQty(b.qty) : '—' }}</span>
+            </div>
+            <div v-if="shortage > 0" class="mp-warn">
+              {{ tt('库存不够') }}:{{ tt('还差') }} {{ fmtQty(shortage) }} {{ cur.单位 }}
+            </div>
+            <div v-else-if="nonFifo" class="mp-warn">{{ tt('当前不是先进先出,已写进明细备注') }}</div>
+          </div>
+        </template>
       </template>
-      <div v-else class="mp-hint">
-        {{ side === 'back'
-          ? tt('退料默认数量为 0:不退料就不用管本页签,提交时这张退料单会一起作废,不产生其他入库单')
+
+      <div v-if="!cur && !(isDone && !returnMode)" class="mp-hint">
+        {{ isDone
+          ? tt('扫物料码:只有这张单里有的物料才能退,数量按「已领 − 已退」限制')
           : tt('扫物料码:物料存在才能填数量;数量可随意填,只要仓库数量足够') }}
       </div>
     </section>
@@ -160,7 +156,7 @@
     <!-- 明细 -->
     <section class="mp-card">
       <div class="mp-sec">
-        <span>{{ side === 'back' ? tt('退料明细') : tt('领料明细') }}</span>
+        <span>{{ returnMode ? tt('选择要退的物料') : tt('领料明细') }}</span>
         <span class="mp-sec-num">{{ rows.length }}</span>
       </div>
       <div v-if="!rows.length" class="mp-empty">{{ tt('没有明细') }}</div>
@@ -168,7 +164,7 @@
         v-for="r in rows"
         :key="r.行号"
         class="mp-line"
-        :class="{ 'is-cur': cur && cur.编码 === r.编码 }"
+        :class="{ 'is-cur': cur && cur.编码 === r.编码, 'is-ret': returnMode && qtyOf(r.编码) > 0 }"
         @click="pickRow(r)"
       >
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
@@ -178,27 +174,44 @@
             {{ r.编码 }} · {{ r.规格 || '—' }}
             <template v-if="r.批号"> · {{ r.批号 }}</template>
             <template v-if="r.BOM用量 > 0"> · {{ tt('BOM') }} {{ fmtQty(r.BOM用量) }}</template>
+            <template v-if="returnMode"> · {{ tt('可退') }} {{ fmtQty(canReturnOf(r)) }}</template>
           </div>
-          <div v-if="r.明细备注" class="mp-line-note">{{ r.明细备注 }}</div>
         </div>
-        <span class="mp-line-qty num">{{ fmtQty(r.数量) }} <i>{{ r.单位 }}</i></span>
+        <span v-if="returnMode" class="mp-line-qty num is-ret">
+          {{ qtyOf(r.编码) > 0 ? '-' + fmtQty(qtyOf(r.编码)) : '—' }} <i>{{ r.单位 }}</i>
+        </span>
+        <span v-else class="mp-line-qty num">{{ fmtQty(r.数量) }} <i>{{ r.单位 }}</i></span>
       </div>
     </section>
 
     <!-- 底栏 -->
     <div class="mp-foot">
-      <el-button size="large" :loading="printing" @click="reprint">{{ tt('打印二维码') }}</el-button>
-      <el-button
-        v-if="side === 'pick'"
-        type="primary"
-        size="large"
-        :loading="submitting"
-        :disabled="!progress.ok || isDone"
-        @click="submit"
-      >
-        {{ isDone ? tt('已完成') : tt('提交转材料出库单') }}
-      </el-button>
-      <el-button v-else disabled size="large">{{ tt('退料提交在领料页签') }}</el-button>
+      <template v-if="returnMode">
+        <el-button size="large" @click="cancelReturn">{{ tt('退出退料') }}</el-button>
+        <el-button
+          type="warning"
+          size="large"
+          :loading="submittingReturn"
+          :disabled="returnTotal <= 0"
+          @click="submitReturn"
+        >
+          {{ tt('提交退料') }}{{ returnTotal > 0 ? ' (' + fmtQty(returnTotal) + ')' : '' }}
+        </el-button>
+      </template>
+      <template v-else>
+        <el-button size="large" :loading="printing" @click="reprint">{{ tt('打印二维码') }}</el-button>
+        <el-button
+          v-if="!isDone"
+          type="primary"
+          size="large"
+          :loading="submitting"
+          :disabled="!progress.ok"
+          @click="submit"
+        >
+          {{ tt('提交转材料出库单') }}
+        </el-button>
+        <el-button v-else type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
+      </template>
     </div>
   </div>
 </template>
@@ -210,7 +223,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
-import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, backIsEmpty, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
+import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
 import { printWoQr } from '@/business/print-formats'
 import { queueToPrintStation } from '@/business/printStation'
 
@@ -221,8 +234,6 @@ const docId = Number(route.query.id) || 0
 const doc = ref({})
 const wo = ref({})
 const pickRows = ref([])
-const backRows = ref([])
-const side = ref('pick')
 
 const matInput = ref(null)
 const matText = ref('')
@@ -236,31 +247,45 @@ const printing = ref(false)
 const errText = ref('')
 const okText = ref('')
 
+/**
+ * 退料模式(2026-10-30 第三轮)。
+ * 只有**已完成**的单能进;进去后扫物料码走 /returnScan,写入的是"本次退多少",
+ * 逐项累加到 {@link #returnQty}(不落库,提交时一次性生成退料单)。
+ */
+const returnMode = ref(false)
+/** 本次要退的: { 物料编码: 数量 } */
+const returnQty = ref({})
+const submittingReturn = ref(false)
+
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 
-const rows = computed(() => (side.value === 'back' ? backRows.value : pickRows.value))
-const progress = computed(() => pickProgress(pickRows.value))
-const backEmpty = computed(() => backIsEmpty(backRows.value))
 const isDone = computed(() => String(doc.value.状态 || '') === '已完成')
+/** 这张单是否含退料(抬头「退料单号」非空 = 退过料) */
+const hasReturn = computed(() => !!(doc.value.退料单号 && String(doc.value.退料单号).trim()))
+const progress = computed(() => pickProgress(pickRows.value))
+const rows = computed(() => pickRows.value)
 const shortage = computed(() => round4((Number(curQty.value) || 0) - batchRows.value.reduce((s, b) => s + round4(b.qty), 0)))
-/**
- * 是否跳批(没按先进先出) —— 直接用 scanCode 的同一判定,别在这里自己数。
- * 跳批不是错误:拆批备注里已经写明,过账照常(与 2026-10-21 版口径一致)。
- */
 const nonFifo = computed(() => isNonFifo(batchRows.value))
+/** 本次退料合计 */
+const returnTotal = computed(() => round4(Object.values(returnQty.value).reduce((s, v) => s + (Number(v) || 0), 0)))
+
+function qtyOf(code) { return round4(returnQty.value[code] || 0) }
+
+/**
+ * 该物料还能退多少 = 已领 − 已退(已退数量由后端按退料台账算过,存在行上的 已退数量)。
+ * 未退过的行没有 已退数量 字段 ⇒ 按 0。
+ */
+function canReturnOf(r) {
+  return round4(Math.max(0, (Number(r.数量) || 0) - (Number(r.已退数量) || 0)))
+}
 
 function clearMsg() { errText.value = ''; okText.value = '' }
 function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 
-function goBack() {
-  router.push('/panelx/list/MOBILE_PICK')
-}
+function goBack() { router.push('/panelx/list/MOBILE_PICK') }
 
 onMounted(() => {
-  window.__yjScanResult = (code, ok) => {
-    if (!ok || !code) return
-    applyScan(code)
-  }
+  window.__yjScanResult = (code, ok) => { if (ok && code) applyScan(code) }
   loadDoc()
   nextTick(() => matInput.value?.focus?.())
 })
@@ -292,9 +317,7 @@ async function loadDoc() {
     const d = res.data?.data || res.data || {}
     doc.value = d
     wo.value = d.工单 || {}
-    // BOM 用量:后端明细里没有直接带,按"领料行 → 组装BOM 明细"的用量补上(取后端给的 BOM用量 字段)
     pickRows.value = (d.领料明细 || []).map(normalize)
-    backRows.value = (d.退料明细 || []).map(normalize)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('加载单据失败')
   }
@@ -314,17 +337,17 @@ function normalize(l) {
     批号: String(l?.批号 ?? '').trim(),
     明细备注: String(l?.明细备注 ?? '').trim(),
     BOM用量: Number(l?.BOM用量) || 0,
+    已退数量: round4(l?.已退数量 || 0),
   }
 }
 
-/** 点明细行 = 直接把那一行加载到扫码区(不用再扫一次码) */
+/** 点明细行 = 直接把那一行加载到扫码区 */
 function pickRow(r) {
-  if (isDone.value) return
   matText.value = r.编码
   scanMaterial(r.批号)
 }
 
-/** 扫物料码 → 后端校验"本单是否有这个料"并回库存/批次 */
+/** 扫物料码 → 后端校验并回可用量/可退量 */
 async function scanMaterial(scanBatch) {
   const code = String(matText.value || '').trim()
   clearMsg()
@@ -333,23 +356,42 @@ async function scanMaterial(scanBatch) {
   if (!code) { errText.value = tt('请先扫描或输入物料编码'); return }
   matLoading.value = true
   try {
+    if (returnMode.value) {
+      // ── 退料:问后端"这个料还能退多少"
+      const res = await request.post('/px/mobilePick/returnScan', { id: docId, code })
+      const d = res.data?.data || res.data || {}
+      if (!(Number(d.可退数量) > 0)) {
+        throw new Error(`${tt('这个物料已经退完了')}({{ already }} ${tt('已领')} ${fmtQty(d.已领数量)},${tt('已退')} ${fmtQty(d.已退数量)})`.replace('{{ already }}', ''))
+      }
+      cur.value = {
+        编码: d.编码, 名称: d.名称, 规格: d.规格, 单位: d.单位,
+        上限: Number(d.可退数量) || 0,
+        已领数量: Number(d.已领数量) || 0,
+        已退数量: Number(d.已退数量) || 0,
+        BOM用量: 0,
+      }
+      // 默认填满可退数量(现场多半是整项退),用户可改
+      curQty.value = cur.value.上限
+      returnQty.value = { ...returnQty.value, [code]: curQty.value }
+      return
+    }
+
+    // ── 领料:问库存与批次
     const res = await request.post('/px/mobilePick/scanMaterial', {
-      id: docId, code, batch: String(scanBatch || '').trim(), side: side.value,
+      id: docId, code, batch: String(scanBatch || '').trim(), side: 'pick',
     })
     const d = res.data?.data || res.data || {}
     cur.value = {
       编码: d.编码, 名称: d.名称, 规格: d.规格, 单位: d.单位,
-      允许上限: Number(d.允许上限) || 0,
+      上限: Number(d.允许上限) || 0,
       BOM用量: Number(d.BOM用量) || 0,
       当前数量: Number(d.当前数量) || 0,
-      可用总量: Number(d.可用总量) || 0,
+      已领数量: 0, 已退数量: 0,
     }
-    // 批次行沿用 scanCode.makeBatchRows(先进先出排好;扫到的批次标亮)
     batchRows.value = makeBatchRows(Array.isArray(d.批次) ? d.批次 : [], String(scanBatch || '').trim())
-    // 默认数量:已有的填多少就带多少;没有则按扫到的批次可用量(退料默认 0)
-    const preset = side.value === 'back' ? cur.value.当前数量 : (cur.value.当前数量 > 0 ? cur.value.当前数量 : cur.value.允许上限)
-    curQty.value = round4(Math.min(Math.max(0, preset), cur.value.允许上限))
-    onQtyChange(curQty.value, String(scanBatch || '').trim())
+    const preset = cur.value.当前数量 > 0 ? cur.value.当前数量 : cur.value.上限
+    curQty.value = round4(Math.min(Math.max(0, preset), cur.value.上限))
+    onQtyChange(curQty.value)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('查询物料失败')
   } finally {
@@ -357,23 +399,34 @@ async function scanMaterial(scanBatch) {
   }
 }
 
-/**
- * 数量变化 → 重算拆批。
- *
- * 口径(用户二次确认「超出自动拆到下一批」):
- *   · 扫到批次的:sanctify 先填那一批,不够再按 FIFO 往后补;
- *   · 没扫批次的:纯先进先出。
- */
+/** 领料:数量变化 → 重算拆批(沿用先进先出) */
 function onQtyChange(v) {
+  if (returnMode.value) {
+    // 退料:不拆批(按原领料批号回退),只更新本次退料表
+    if (cur.value) {
+      const q = round4(Math.min(Math.max(0, Number(v) || 0), cur.value.上限))
+      returnQty.value = { ...returnQty.value, [cur.value.编码]: q }
+      curQty.value = q
+    }
+    return
+  }
   const need = round4(Number(v) || 0)
   const scanned = batchRows.value.some((b) => b.scanned)
   const r = scanned ? allocateScannedFirst(batchRows.value, need) : allocateForQty(batchRows.value, need)
   batchRows.value = r.rows
 }
 
-/** 写入数量(后端改明细行 + 写批次备注),成功后就地刷新进度 */
+/** 写入(领料:落库;退料:只是记在本次退料表里,提交时才落库) */
 async function saveQty() {
   if (!cur.value || !(curQty.value > 0)) return
+  if (returnMode.value) {
+    okText.value = `${tt('已记下')} ${cur.value.编码} · ${tt('退料')} ${fmtQty(curQty.value)} ${cur.value.单位}`
+    matText.value = ''
+    cur.value = null
+    curQty.value = 0
+    nextTick(() => matInput.value?.focus?.())
+    return
+  }
   saving.value = true
   clearMsg()
   try {
@@ -381,11 +434,10 @@ async function saveQty() {
       .filter((b) => round4(b.qty) > 0)
       .map((b) => ({ 批号: b.lot, 仓库: b.warehouse, 仓库编码: b.warehouseCode, 数量: round4(b.qty) }))
     const res = await request.post('/px/mobilePick/setQty', {
-      id: docId, side: side.value, code: cur.value.编码, qty: round4(curQty.value), batches,
+      id: docId, side: 'pick', code: cur.value.编码, qty: round4(curQty.value), batches,
     })
     const d = res.data?.data || res.data || {}
     pickRows.value = (d.领料明细 || []).map(normalize)
-    backRows.value = (d.退料明细 || []).map(normalize)
     doc.value = { ...doc.value, 物料项数: d.物料项数, 已领项数: d.已领项数 }
     okText.value = progress.value.ok
       ? tt('全部明细已领完,可以提交')
@@ -402,6 +454,59 @@ async function saveQty() {
   }
 }
 
+/** 进入退料模式 */
+function startReturn() {
+  if (!isDone.value) { errText.value = tt('这张单还没提交完成,不能退料'); return }
+  returnMode.value = true
+  returnQty.value = {}
+  clearMsg()
+  nextTick(() => matInput.value?.focus?.())
+}
+
+function cancelReturn() {
+  returnMode.value = false
+  returnQty.value = {}
+  cur.value = null
+  matText.value = ''
+  curQty.value = 0
+  clearMsg()
+}
+
+/**
+ * 提交退料:本次选中的所有物料一次生成**一张**退料单(其他入库单,带退料标志)并审核入账。
+ */
+async function submitReturn() {
+  const items = Object.entries(returnQty.value)
+    .map(([code, qty]) => ({ code, qty: round4(qty) }))
+    .filter((x) => x.qty > 0)
+  if (!items.length) return
+  try {
+    await ElMessageBox.confirm(
+      `${tt('将退')} ${items.length} ${tt('项物料,合计')} ${fmtQty(returnTotal.value)}。`
+      + tt('提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?'),
+      tt('退料确认'),
+      { confirmButtonText: tt('确定退料'), cancelButtonText: tt('取消'), type: 'warning' },
+    )
+  } catch { return }
+  submittingReturn.value = true
+  clearMsg()
+  try {
+    const res = await request.post('/px/mobilePick/submitReturn', { id: docId, items })
+    const d = res.data?.data || res.data || {}
+    okText.value = d.说明 || `${tt('退料成功')}:${d.退料单号}`
+    ElMessage.success(tt('退料成功'))
+    returnMode.value = false
+    returnQty.value = {}
+    cur.value = null
+    matText.value = ''
+    await loadDoc()
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('退料失败')
+  } finally {
+    submittingReturn.value = false
+  }
+}
+
 /** 打印工单二维码:优先发打印站点,没在线站点就用本机打印层 */
 async function reprint() {
   printing.value = true
@@ -410,10 +515,7 @@ async function reprint() {
     const res = await request.post('/px/mobilePick/reprint', { id: docId })
     const payload = (res.data?.data || res.data || {}).打印 || {}
     const queued = await queueToPrintStation({ ...payload, 来源: 'mobilePick.doc' })
-    if (queued && queued.online) {
-      okText.value = tt('已发送到打印电脑')
-      return
-    }
+    if (queued && queued.online) { okText.value = tt('已发送到打印电脑'); return }
     await printWoQr(payload)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('打印失败')
@@ -422,25 +524,25 @@ async function reprint() {
   }
 }
 
-/** 提交:全部领完 → 审核领料单 → 材料出库单过账;退料全 0 时那张退料单一起作废 */
+/** 提交领料:全部领完 → 审核 → 材料出库单过账 */
 async function submit() {
   if (!progress.value.ok || isDone.value) return
-  const tip = backEmpty.value
-    ? tt('提交后领料单会审核过账成材料出库单;本次没有退料,那张退料单会一起作废(不产生其他入库单)。确定提交?')
-    : tt('提交后领料单会审核过账成材料出库单。确定提交?')
   try {
-    await ElMessageBox.confirm(tip, tt('提交确认'), {
-      confirmButtonText: tt('确定提交'), cancelButtonText: tt('取消'), type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      tt('提交后领料单会审核过账成材料出库单。确定提交?'),
+      tt('提交确认'),
+      { confirmButtonText: tt('确定提交'), cancelButtonText: tt('取消'), type: 'warning' },
+    )
   } catch { return }
   submitting.value = true
   clearMsg()
   try {
     const res = await request.post('/px/mobilePick/submit', { id: docId })
     const d = res.data?.data || res.data || {}
-    doc.value = { ...doc.value, 状态: d.状态 || '已完成', 退料单号: d.退料单号 || null }
+    doc.value = { ...doc.value, 状态: d.状态 || '已完成' }
     ElMessage.success(tt('已提交:材料出库单已生成'))
     okText.value = d.说明 || tt('已提交')
+    await loadDoc()
   } catch (e) {
     errText.value = errMsgOf(e) || tt('提交失败')
   } finally {
@@ -450,7 +552,6 @@ async function submit() {
 </script>
 
 <style scoped>
-/* 与 MobilePickList.vue 同一套视觉语言:卡片 / 44px 命中区 / 等宽数字 / 无装饰动画 */
 .mp {
   box-sizing: border-box;
   display: flex;
@@ -489,23 +590,13 @@ async function submit() {
   background: var(--el-bg-color); border-radius: 8px; border: 1px solid var(--el-border-color-lighter);
 }
 .mp-card.dim { opacity: .6; }
-.mp-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mp-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; flex-wrap: wrap; }
 .mp-sec-ok { font-size: 11px; font-weight: 400; color: var(--el-color-success); }
+.mp-sec-note { font-size: 11px; font-weight: 400; color: var(--el-color-warning-dark-2); }
 .mp-sec-num {
   min-width: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
   background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; font-weight: 400;
 }
-
-/* 页签 */
-.mp-tabs { display: flex; gap: 8px; margin: 10px 12px 0; }
-.mp-tab {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 44px; font-size: 14px; cursor: pointer; user-select: none;
-  background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
-}
-.mp-tab.on { border-color: var(--el-color-primary); color: var(--el-color-primary); font-weight: 600; }
-.mp-tab i { font-style: normal; font-size: 12px; color: var(--el-text-color-secondary); }
-.mp-tab-tip { font-size: 10px; padding: 0 4px; border-radius: 3px; background: var(--el-fill-color); color: var(--el-text-color-secondary); }
 
 .mp-row { display: flex; align-items: center; gap: 8px; }
 .mp-row :deep(.el-input), .mp-row :deep(.el-input-number) { flex: 1; min-width: 0; }
@@ -523,7 +614,14 @@ async function submit() {
 .mp-kv > span { width: 76px; flex: none; color: var(--el-text-color-secondary); }
 .mp-kv > b { font-weight: 500; min-width: 0; word-break: break-all; }
 .mp-kv > b.ok { color: var(--el-color-success); }
+.mp-kv > b.is-back { color: var(--el-color-warning-dark-2); }
 .mp-kv > b i { font-style: normal; color: var(--el-text-color-secondary); }
+
+/* 退料标志(2026-10-30 第三轮):抬头「退料单号」后面的小徽标 */
+.mp-flag {
+  margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 11px; font-weight: 400;
+  background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
+}
 
 .mp-mat {
   display: flex; align-items: center; gap: 10px;
@@ -536,11 +634,8 @@ async function submit() {
 .mp-mat-stock b { display: block; font-size: 20px; color: var(--el-color-primary); }
 .mp-mat-stock span { font-size: 11px; color: var(--el-text-color-secondary); }
 
-/* 批次表(与 MobilePick.vue 同款四列) */
 .mp-batches { margin-top: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; overflow: hidden; }
-.mp-batches-head, .mp-batch-row {
-  display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px;
-}
+.mp-batches-head, .mp-batch-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; }
 .mp-batches-head { background: var(--el-fill-color-light); color: var(--el-text-color-secondary); }
 .mp-batch-row { border-top: 1px solid var(--el-border-color-lighter); font-size: 13px; }
 .mp-batch-row.is-checked { background: var(--el-color-primary-light-9); }
@@ -561,14 +656,20 @@ async function submit() {
 }
 .mp-line:last-child { border-bottom: 0; }
 .mp-line.is-cur { background: var(--el-color-primary-light-9); border-radius: 6px; }
+.mp-line.is-ret { background: var(--el-color-warning-light-9); border-radius: 6px; }
 .mp-line-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--el-border-color); }
 .mp-line-dot.on { background: var(--el-color-success); }
 .mp-line-main { flex: 1; min-width: 0; }
 .mp-line-name { font-size: 14px; }
 .mp-line-meta { margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
-.mp-line-note { margin-top: 2px; font-size: 11px; color: var(--el-text-color-placeholder); word-break: break-all; }
 .mp-line-qty { flex: none; min-width: 84px; text-align: right; font-size: 14px; font-weight: 600; }
+.mp-line-qty.is-ret { color: var(--el-color-warning-dark-2); }
 .mp-line-qty i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--el-text-color-secondary); }
+
+/* 已完成单的退料引导 */
+.mp-retire-cta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mp-retire-cta span { flex: 1 1 200px; min-width: 0; font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.5; }
+.mp-retire-cta :deep(.el-button) { flex: 0 0 auto; height: 44px; }
 
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .mp-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
@@ -588,11 +689,9 @@ async function submit() {
 }
 .mp-foot :deep(.el-button) { flex: 1; height: 46px; margin: 0; }
 
-/* 电脑端两栏:左=扫码区,右=明细 */
 @media (min-width: 900px) {
   .mp { display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 12px; align-items: start; }
-  .mp-top, .mp-tabs, .mp-err, .mp-ok, .mp-foot { grid-column: 1 / -1; }
+  .mp-top, .mp-err, .mp-ok, .mp-foot { grid-column: 1 / -1; }
   .mp-card { margin: 0 0 12px; }
-  .mp-tabs { margin: 0 0 12px; }
 }
 </style>

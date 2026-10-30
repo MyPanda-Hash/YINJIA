@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   MobilePickList.vue — 手机扫码 · 生产领料(列表页 + 生单入口,2026-10-30 重写)
 
   【为什么是这一页】(用户 2026-10-30 口径原文)
@@ -125,6 +125,8 @@
         >
           <div class="mp-doc-l1">
             <span class="mp-doc-no mono">{{ d.领料单号 || '—' }}</span>
+            <!-- 退料标志(2026-10-30 第三轮):退过料的单在列表里就能认出来 -->
+            <span v-if="hasReturn(d)" class="mp-flag" :title="d.退料单号">{{ tt('含退料') }}</span>
             <span class="mp-doc-state is-done">{{ d.状态 }}</span>
           </div>
           <div class="mp-doc-l2">
@@ -219,6 +221,16 @@ function errMsgOf(e) {
 /** 去开单工作台(生单在那里做) */
 function goCreate() {
   router.push('/panelx/list/MOBILE_PICK_CREATE')
+}
+
+/**
+ * 这张单是否含退料(2026-10-30 第三轮)。
+ *
+ * <p>判据:台账上的「退料单号」非空 —— 退料是按需生成的,退过料才会被 appendReturnNo 写上。
+ * 多次退料时是逗号分隔的多个单号,列表只显示标志,点进去看具体单号。
+ */
+function hasReturn(d) {
+  return !!(d && d.退料单号 && String(d.退料单号).trim())
 }
 
 async function loadList() {
@@ -376,6 +388,11 @@ function openDoc(id) {
 .mp-doc.is-done { opacity: .82; }
 .mp-doc-l1 { display: flex; align-items: center; gap: 8px; }
 .mp-doc-no { font-size: 14px; font-weight: 600; }
+/* 退料标志(2026-10-30 第三轮):含退料的单在列表里一眼可辨 */
+.mp-flag {
+  padding: 0 6px; border-radius: 4px; font-size: 11px; white-space: nowrap;
+  background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
+}
 .mp-doc-state {
   margin-left: auto; padding: 0 6px; border-radius: 4px; font-size: 11px;
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);

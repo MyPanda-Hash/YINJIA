@@ -4356,3 +4356,11 @@ i18n-mobile-scan-20261030.sql
 #   面板名 9 语言译名 + 按 MOBILE_PICK 现有角色整份复制授权(view,query,create,print)。
 #   ⚠ 与 MOBILE_PICK 分开授权是为了**分岗**:计划员给 create、车间给 pick/submit,互不越权。
 migrate-mobile-pick-create-panel-20261030.sql
+# migrate-wo-pick-return-20261030.sql:
+#   生产退料改「已完成领料单上按需退」:bd_other_in 加 退料标志 列 + 建 wo_pick_return 退料台账
+#   + 作废历史遗留的空退料单(数量全 0)。⚠ 退料不再预生成,退多少生多少。
+migrate-wo-pick-return-20261030.sql
+# migrate-wo-pick-return-flag-field-20261030.sql:
+#   把 退料标志 登记进 yj_field(OTHER_IN 面板 header/只读/可见)+ 9 语言译名。
+#   ⚠ 不登记就没用:ButtonService.save 只写 yj_field 里登记过的字段,列加了也落不了库。
+migrate-wo-pick-return-flag-field-20261030.sql

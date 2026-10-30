@@ -274,7 +274,6 @@ public class MobilePickController {
         final String whFinal = wh;
         boolean allSameWh = !whFinal.isEmpty() && outItems.stream()
                 .allMatch(it -> whFinal.equals(str(it.get("仓库"))));
-        String backWh = "";
         Map<String, Object> outForm = new LinkedHashMap<>();
         outForm.put("单据日期", today);
         outForm.put("单据编号", "");                  // 后端 FormNoService 生成
@@ -288,50 +287,28 @@ public class MobilePickController {
         outForm.put("备注", "手机扫码生单:工单 " + lineWoNo + " 第 " + line + " 行;按组装BOM表 "
                 + str(bomHead.get("单据编号")) + " 展开 " + bomLines.size() + " 项用料");
         outForm.put("detail", Map.of("items", outItems));
-        if (allSameWh) backWh = wh;
 
         String outNo = saveDoc(PANEL_OUT, outForm);
 
-        // ── 退料单草稿(其他入库单,业务类型「生产退料」),数量全 0
-        List<Map<String, Object>> backItems = new ArrayList<>();
-        for (int i = 0; i < bomLines.size(); i++) {
-            Map<String, Object> b = bomLines.get(i);
-            String code = str(b.get("物料编号"));
-            String[] lineWh = defaultWarehouseOf(code);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("序号", String.valueOf(i + 1));
-            item.put("存货编码", code);
-            item.put("存货名称", str(b.get("物料名")));
-            item.put("规格型号", str(b.get("物料规格")));
-            item.put("计量单位", str(b.get("计量单位")));
-            item.put("仓库", lineWh[0]);
-            if (!lineWh[1].isEmpty()) item.put("仓库编码", lineWh[1]);
-            item.put("数量", 0);
-            item.put("明细备注", "生产退料:数量为 0 表示本次不退料;不做退料时整单作废即可");
-            backItems.add(item);
-        }
-        Map<String, Object> backForm = new LinkedHashMap<>();
-        backForm.put("单据日期", today);
-        backForm.put("单据编号", "");
-        backForm.put("业务类型", BIZ_BACK);
-        // 备注按用户口径「写好备注」:写清来源、为什么是 0、以及退料单最终去哪儿
-        backForm.put("备注", "【生产退料】工单 " + lineWoNo + " 第 " + line + " 行 由手机扫码自动生成;"
-                + "默认数量 0(不退料);有退料时按实收数量填写并审核,生成其他入库单入账;"
-                + "整单不退料则作废本单");
-        backForm.put("经手人", user);
-        if (!backWh.isEmpty()) backForm.put("仓库", backWh);
-        backForm.put("detail", Map.of("items", backItems));
-
-        String backNo = saveDoc(PANEL_BACK, backForm);
+        // ── 不再预生成退料单(2026-10-30 第三轮用户改口径)
+        //
+        // 用户口径:「退料直接在生产领料界面。可以点开已完成的生产领料数据再次进行扫码。
+        //   这样就可以来退料了。然后退料的单据做一个退料的标志。」
+        // ⇒ 退料是**领完之后的后续动作**:生单时只建领料单;
+        //   现场真要退料时,点开这张**已完成**的领料单扫码退,退多少生多少
+        //   (见 {@link #returnScan} / {@link #submitReturn})。
+        //
+        // 上一版按首轮口径预建「数量全 0 的退料草稿」已废弃 —— 那是空单:
+        //   它躺在其他入库单列表里像待办,没人退料还得专门作废,纯噪声。
+        //   历史遗留的空退料单由 migrate-wo-pick-return-20261030.sql 统一作废。
 
         // ── 台账(唯一约束在这里挡"连扫两下")
         long id;
         try {
             id = docs.insert(lineWoNo, line, productCode, str(wo.get("产品名称")),
-                    outNo, backNo, bomLines.size(), user);
+                    outNo, null, bomLines.size(), user);
         } catch (RuntimeException e) {
             // 并发:另一个手机刚给同一工单行建了单。把已存在的还给调用方,不要留半截数据
-            // (⚠ 两张草稿单已经建出来了 —— 它们是空单,无害,但要在提示里说清楚)
             WoPickDocService.PickDoc raced = docs.findActive(lineWoNo, line);
             if (raced != null) {
                 log.warn("手机扫码生单并发撞唯一约束:{}/{};已回落到既有台账 {}", lineWoNo, line, raced.id(), e);
@@ -343,7 +320,6 @@ public class MobilePickController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("领料单号", outNo);
-        out.put("退料单号", backNo);
         out.put("工单", wo);
         out.put("BOM单据编号", str(bomHead.get("单据编号")));
         out.put("物料项数", bomLines.size());
@@ -472,8 +448,20 @@ public class MobilePickController {
                 d.woNo(), d.woLine());
         out.put("工单", woRows.isEmpty() ? Map.of() : woRows.get(0));
 
-        out.put("领料明细", linesOf(d.outNo(), "pick"));
-        out.put("退料明细", linesOf(d.backNo(), "back"));
+        // 领料明细:每行补上**已退数量**(2026-10-30 第三轮),前端据此算"还能退多少"、
+        // 并在已完成单上直接显示可退量。已退数量唯一真源 = wo_pick_return。
+        List<Map<String, Object>> pickLines = linesOf(d.outNo(), "pick");
+        for (Map<String, Object> it : pickLines) {
+            it.put("已退数量", returnedQtyOf(d.outNo(), str(it.get("编码"))));
+        }
+        out.put("领料明细", pickLines);
+        // 退料明细不再有"预生成待填"的退料单(改为按需生成),这里保留空数组做结构兼容
+        out.put("退料明细", List.of());
+        // 已退合计 —— 列表/单据上显示"含退料 N"
+        double returnedTotal = 0;
+        for (Map<String, Object> it : pickLines) returnedTotal += num(it.get("已退数量"));
+        out.put("已退合计", round4(returnedTotal));
+        out.put("含退料", returnedTotal > 0);
         return ApiResult.ok(out);
     }
 
@@ -653,80 +641,255 @@ public class MobilePickController {
         //   写「单据编号」会被挡回"缺少表单编号"(2026-10-30 实测踩到)。
         buttons.callButton(PANEL_OUT, "审核", docNoForm(d.outNo()), null);
 
-        // 退料:本单退料数量若全为 0 且用户不做退料 → 整单作废(不产生其他入库单)
-        //
-        // 用户口径:「退料默认数量为0。可以不进行退料操作,退料生成的应该是其他入库单,并且写好备注」。
-        // ⚠ 作废口径(2026-10-30 实测踩到):**不能用 callButton(OTHER_IN, "删除")** ——
-        //   ButtonService.delete 对 doc 面板先判 {@code docStatusOf} 必须是「草稿」,
-        //   而 OTHER_IN 的作废态落在 yj_doc_status.canceled;这张单生出来没多久,
-        //   状态推导在某些时序下会给出别的值 ⇒ 抛"仅草稿状态可删除",被我下面的 catch 吞掉,
-        //   结果退料单没作废、台账还把它的单号清空了(数据对不上)。
-        //   这里直接按**同一落点**写软删:yj_doc_status.canceled='Y' + 行/头 asp_cancel='Y'
-        //   (与 voidDoc 完全一致的终态),并**核对影响行数**,失败就抛出来而不是静默。
-        String backNo = d.backNo();
-        boolean backVoided = false;
-        if (backNo != null && !backNo.isBlank()) {
-            double backQty = 0;
-            for (Map<String, Object> it : linesOf(backNo, "back")) {
-                if (num(it.get("数量")) > 0) backQty += num(it.get("数量"));
-            }
-            if (backQty <= 0) {
-                backVoided = voidDocQuietly(PANEL_BACK, backNo, user);
-                if (!backVoided) {
-                    // 作废失败不阻断提交(领料已经过账了);但**必须**把单号留在台账上,
-                    // 否则界面显示"没有退料单"而库里挂着一张空草稿 —— 那才是对不上账
-                    log.warn("提交后作废空退料单 {} 失败(领料已过账,退料单保留待人工处理)", backNo);
-                }
-            }
-        }
-
+        // 退料不在这里做(2026-10-30 第三轮用户改口径):
+        //   用户口径「可以点开已完成的生产领料数据再次进行扫码。这样就可以来退料了」——
+        //   退料是**提交之后**的独立动作,走 {@link #returnScan} / {@link #submitReturn},
+        //   不再有"生单时预建一张空退料单、提交时作废它"这一套。
         docs.markDone(id, user);
-        // 退料单真作废掉了 ⇒ 台账上把单号清空(界面上这张单就是"没有退料单");
-        // 没作废成功就把单号留着,让人能在其他入库单里找到它处理
-        if (backVoided) {
-            jdbc.update("UPDATE dbo.wo_pick_doc SET 退料单号 = NULL WHERE id = ?", id);
-        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("已提交", true);
         out.put("领料单号", d.outNo());
-        out.put("退料单号", backVoided ? null : backNo);
-        out.put("退料已作废", backVoided);
         out.put("状态", WoPickDocService.STATE_DONE);
-        out.put("说明", backVoided
-                ? "领料单已审核并过账为材料出库单;本次没有退料,退料单已作废"
-                : "领料单已审核并过账为材料出库单");
+        out.put("说明", "领料单已审核并过账为材料出库单;如需退料,点开这张单再次扫码即可(剩余可退 "
+                + fmtQty(pickedQtyOf(d.outNo())) + ")");
+        return ApiResult.ok(out);
+    }
+
+    // ══════════════════════════ ④ 退料(已完成单上按需退) ══════════════════════════
+
+    /**
+     * 扫物料码 → 返回"这个料还能退多少"(累计可退 = 已领 − 已退)。
+     *
+     * <p>用户口径(2026-10-30 第三轮):「退料直接在生产领料界面。可以点开已完成的生产领料数据
+     * 再次进行扫码。这样就可以来退料了。」+ 确认「累计可退 = 已领数量 − 已退数量(可分多次退)」。
+     *
+     * <p>**只有已完成(已过账)的领料单能退** —— 没领的料退什么?这也是服务端的硬闸门,
+     * 不靠界面挡(界面挡不住直接调接口)。
+     *
+     * @param body {id:台账主键, code:物料编码}
+     */
+    @PostMapping("/returnScan")
+    public ApiResult<Map<String, Object>> returnScan(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "扫码核销", "pick");
+        requireLedger();
+        long id = toLong(body.get("id"));
+        String code = str(body.get("code"));
+        if (code.isEmpty()) throw new IllegalArgumentException("请先扫描或输入物料编码");
+
+        WoPickDocService.PickDoc d = requireReturnable(id);
+        Map<String, Object> line = pickLineOf(d.outNo(), code);
+        if (line == null) {
+            throw new IllegalStateException("物料 " + code + " 不在这张领料单里:请核对是否扫错了料");
+        }
+        double picked = num(line.get("数量"));
+        double returned = returnedQtyOf(d.outNo(), code);
+        double canReturn = round4(Math.max(0, picked - returned));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编码", code);
+        out.put("名称", str(line.get("名称")));
+        out.put("规格", str(line.get("规格")));
+        out.put("单位", str(line.get("单位")));
+        out.put("仓库", str(line.get("仓库")));
+        out.put("仓库编码", str(line.get("仓库编码")));
+        out.put("批号", str(line.get("批号")));
+        out.put("已领数量", picked);
+        out.put("已退数量", returned);
+        // 累计可退 —— 前端输入框的 max,后端提交时再校验一次
+        out.put("可退数量", canReturn);
+        out.put("可退", canReturn > 0);
         return ApiResult.ok(out);
     }
 
     /**
-     * 作废一张单据(软删),落点与 {@code ButtonService.voidDoc} **完全一致**:
-     * {@code yj_doc_status.canceled='Y'} + 行/头 {@code asp_cancel='Y'}。
+     * 提交退料:为本次退料生成一张**其他入库单**(业务类型「生产退料」+ 退料标志)并审核入账。
      *
-     * <p>为什么不用 {@code callButton(panel, "删除")}:它先判「仅草稿状态可删除」,
-     * 而"草稿"是按 {@code docStatusOf} 现推的 —— 生单后立刻提交时,状态推导的时序会让它报错,
-     * 于是"不做退料 ⇒ 退料单作废"这一步静默失败(2026-10-30 实测:退料单留着、台账单号被清空)。
-     * 这里直接按终态写,并核对影响行数。
+     * <p>用户口径:「退料生成的应该是其他入库单,并且写好备注」+「退多少生多少」。
+     * 一张退料单可以一次退多个料(前端把本次要退的几项一起提交),
+     * 明细逐行落 {@code bl_other_in},台账逐行落 {@code wo_pick_return}。
      *
-     * @return true = 确实作废了;false = 单子本来就不存在(没什么可作废的)
+     * @param body {id:台账主键, items:[{code, qty}]}
+     * @return {退料单号, 明细:[{code,qty}], 合计数量}
      */
-    private boolean voidDocQuietly(String panelCode, String no, String user) {
-        int n = jdbc.update("MERGE dbo.yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no)"
-                        + " ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no"
-                        + " WHEN MATCHED THEN UPDATE SET canceled = 'Y'"
-                        + " WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, canceled) VALUES (s.panel_code, s.doc_no, 'Y');",
-                panelCode, no);
-        // 行/头软删(与 voidDoc 同一套列;表里没有该列时忽略,不阻断)
-        for (String sql : new String[]{
-                "UPDATE dbo.bl_other_in SET asp_cancel = 'Y' WHERE 单据编号 = ?",
-                "UPDATE dbo.bd_other_in SET asp_cancel = 'Y' WHERE 单据编号 = ?"}) {
-            try {
-                jdbc.update(sql, no);
-            } catch (RuntimeException e) {
-                log.debug("作废 {} 时软删语句失败(忽略):{}", no, e.getMessage());
+    @PostMapping("/submitReturn")
+    public ApiResult<Map<String, Object>> submitReturn(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "扫码核销", "pick");
+        requireLedger();
+        long id = toLong(body.get("id"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = body.get("items") instanceof List<?> l
+                ? (List<Map<String, Object>>) l : List.of();
+        if (items.isEmpty()) throw new IllegalArgumentException("请先扫码并填写退料数量");
+
+        WoPickDocService.PickDoc d = requireReturnable(id);
+        String user = currentUserName();
+
+        // ① 逐项校验 + 组装明细
+        List<Map<String, Object>> lines = new ArrayList<>();
+        double total = 0;
+        for (Map<String, Object> it : items) {
+            String code = str(it.get("code"));
+            double qty = round4(num(it.get("qty")));
+            if (code.isEmpty() || qty <= 0) continue;
+            Map<String, Object> line = pickLineOf(d.outNo(), code);
+            if (line == null) throw new IllegalStateException("物料 " + code + " 不在这张领料单里");
+            double picked = num(line.get("数量"));
+            double returned = returnedQtyOf(d.outNo(), code);
+            double canReturn = round4(Math.max(0, picked - returned));
+            if (qty > canReturn) {
+                throw new IllegalStateException("物料 " + code + " 可退只剩 " + fmtQty(canReturn)
+                        + "(已领 " + fmtQty(picked) + " − 已退 " + fmtQty(returned) + "),本次要退 " + fmtQty(qty));
             }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("编码", code);
+            row.put("名称", str(line.get("名称")));
+            row.put("规格", str(line.get("规格")));
+            row.put("单位", str(line.get("单位")));
+            row.put("仓库", str(line.get("仓库")));
+            row.put("仓库编码", str(line.get("仓库编码")));
+            row.put("批号", str(line.get("批号")));
+            row.put("数量", qty);
+            lines.add(row);
+            total = round4(total + qty);
         }
-        return n > 0;
+        if (lines.isEmpty()) throw new IllegalArgumentException("退料数量必须大于 0");
+
+        // ② 建其他入库单(业务类型「生产退料」+ 退料标志)
+        String today = java.time.LocalDate.now().toString();
+        List<Map<String, Object>> backItems = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            Map<String, Object> l = lines.get(i);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("序号", String.valueOf(i + 1));
+            item.put("存货编码", str(l.get("编码")));
+            item.put("存货名称", str(l.get("名称")));
+            item.put("规格型号", str(l.get("规格")));
+            item.put("计量单位", str(l.get("单位")));
+            if (!str(l.get("仓库")).isEmpty()) item.put("仓库", str(l.get("仓库")));
+            if (!str(l.get("仓库编码")).isEmpty()) item.put("仓库编码", str(l.get("仓库编码")));
+            if (!str(l.get("批号")).isEmpty()) item.put("批号", str(l.get("批号")));
+            item.put("数量", num(l.get("数量")));
+            item.put("明细备注", "生产退料:退自领料单 " + d.outNo() + "(工单 " + d.woNo() + " 第 " + d.woLine() + " 行)");
+            backItems.add(item);
+        }
+        Map<String, Object> backForm = new LinkedHashMap<>();
+        backForm.put("单据日期", today);
+        backForm.put("单据编号", "");
+        backForm.put("业务类型", BIZ_BACK);
+        // 退料标志(迁移加的列):系统按它识别"这是一张退料单",不随业务类型下拉被人工改掉
+        backForm.put("退料标志", BIZ_BACK);
+        backForm.put("经手人", user);
+        // 备注按用户口径「写好备注」
+        backForm.put("备注", "【生产退料】退自领料单 " + d.outNo()
+                + ";工单 " + d.woNo() + " 第 " + d.woLine() + " 行;产品 " + nz(d.productName())
+                + ";本次退料 " + lines.size() + " 项,合计 " + fmtQty(total));
+        backForm.put("detail", Map.of("items", backItems));
+
+        String backNo = saveDoc(PANEL_BACK, backForm);
+
+        // ③ 审核 → StockLedgerService 按其他入库(+)过账,库存加回来
+        buttons.callButton(PANEL_BACK, "审核", docNoForm(backNo), null);
+
+        // ④ 退料台账:一行 = 一次退料(这是"已退数量"的唯一真源)
+        for (Map<String, Object> l : lines) {
+            jdbc.update("INSERT INTO dbo.wo_pick_return"
+                            + " (领料单号, 工单号, 工单行号, 物料编码, 物料名称, 计量单位, 仓库, 批号,"
+                            + "  退料数量, 退料单号, 退料人, 退料时间, 备注,"
+                            + "  asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,SYSDATETIME(),?,?,SYSDATETIME(),?,SYSDATETIME(),'N')",
+                    d.outNo(), d.woNo(), d.woLine(), str(l.get("编码")), str(l.get("名称")),
+                    str(l.get("单位")), str(l.get("仓库")), str(l.get("批号")),
+                    num(l.get("数量")), backNo, user,
+                    "退自领料单 " + d.outNo(), user, user);
+        }
+
+        // ⑤ 单据上挂个退料单号,让人从这张领料单能看到"退过料了"
+        //    (台账 wo_pick_doc 的退料单号:多次退料就追加,用逗号分隔)
+        docs.appendReturnNo(id, backNo, user);
+
+        // ⑥ 回执:剩余可退
+        List<Map<String, Object>> remain = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            String code = str(l.get("编码"));
+            Map<String, Object> line = pickLineOf(d.outNo(), code);
+            double picked = line == null ? 0 : num(line.get("数量"));
+            double returned = returnedQtyOf(d.outNo(), code);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("编码", code);
+            m.put("已领数量", picked);
+            m.put("已退数量", returned);
+            m.put("可退数量", round4(Math.max(0, picked - returned)));
+            remain.add(m);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("退料单号", backNo);
+        out.put("明细", lines);
+        out.put("合计数量", total);
+        out.put("剩余", remain);
+        out.put("说明", "已生成退料单 " + backNo + " 并审核入账(其他入库单,带退料标志)");
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 这张单能不能退料:必须**已完成**(领料已审核过账)。
+     *
+     * <p>为什么是硬闸门而不是界面判断:没领过的料退什么?直接在接口上拦,
+     * 拿令牌构造请求也进不来。
+     */
+    private WoPickDocService.PickDoc requireReturnable(long id) {
+        WoPickDocService.PickDoc d = docs.byId(id);
+        if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
+        if (!WoPickDocService.STATE_DONE.equals(d.state())) {
+            throw new IllegalStateException("这张领料单还没提交完成,不能退料:"
+                    + "请先把料领完并提交(提交后才能对已领的料退料)");
+        }
+        if (d.outNo() == null || d.outNo().isBlank()) {
+            throw new IllegalStateException("这张单没有领料单号,不能退料");
+        }
+        return d;
+    }
+
+    /** 领料单里找某一物料的明细行 */
+    private Map<String, Object> pickLineOf(String outNo, String code) {
+        Map<String, Object> hit = null;
+        for (Map<String, Object> it : linesOf(outNo, "pick")) {
+            if (code.equals(str(it.get("编码")))) { hit = it; break; }
+        }
+        return hit;
+    }
+
+    /** 领料单已领数量合计(给提交回执显示"剩余可退") */
+    private double pickedQtyOf(String outNo) {
+        double t = 0;
+        for (Map<String, Object> it : linesOf(outNo, "pick")) t += num(it.get("数量"));
+        return round4(t);
+    }
+
+    /**
+     * 该领料单上某物料**已退多少**(累计)。
+     *
+     * <p>唯一真源 = {@code wo_pick_return}(作废的退料不计)。**不查 bl_other_in** ——
+     * 那是物料的账面流水,按 (领料单, 物料) 去数它既慢又容易被手改的单据带偏。
+     *
+     * <p>表没建(迁移没跑)时返回 0:退料功能不可用比整个页面 500 好,
+     * 真去提交会被上面 canReturn 挡回"可退只剩 0"。
+     */
+    private double returnedQtyOf(String outNo, String code) {
+        if (outNo == null || outNo.isBlank()) return 0;
+        try {
+            Double n = jdbc.queryForObject(
+                    "SELECT ISNULL(SUM(退料数量),0) FROM dbo.wo_pick_return"
+                            + " WHERE 领料单号 = ? AND 物料编码 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Double.class, outNo, code);
+            return round4(n == null ? 0 : n);
+        } catch (RuntimeException e) {
+            log.debug("退料台账不可用(迁移未执行?)已退数量按 0 计:{}", e.getMessage());
+            return 0;
+        }
     }
 
     /** 打/重打工单二维码:只记打印次数,内容由前端按 woQrText 同口径渲染 */
@@ -1043,6 +1206,17 @@ public class MobilePickController {
     }
 
     // ── 小工具 ──
+
+    /** 空值转占位串(拼备注时用,避免出现 "产品 null") */
+    private static String nz(String s) {
+        return s == null || s.isBlank() ? "—" : s.trim();
+    }
+
+    /** 数量展示:整数不带小数点,小数最多 4 位(与 decimal(18,4) 同口径) */
+    private static String fmtQty(double v) {
+        double r = round4(v);
+        return r == Math.rint(r) ? String.valueOf((long) r) : String.valueOf(r);
+    }
 
     /**
      * callButton 的单据载荷:单号键必须是「编号」。

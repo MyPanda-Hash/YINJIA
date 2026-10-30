@@ -175,8 +175,35 @@ public class WoPickDocService {
                 STATE_VOID, user, id);
     }
 
-    /** 打印留痕:生单时自动打一次、单据里重打,每次 +1(用户口径「生成生产领料单的时候自动打印一次」) */
-    public void bumpPrint(long id, String user) {
+    /**
+     * 追加退料单号(2026-10-30 第三轮:退料改为在**已完成**的领料单上按需做,可分多次)。
+     *
+     * <p>一张领料单可能退好几次 ⇒ 退料单号**累加**(逗号分隔),让人从这张领料单一眼看到
+     * "退过料了、退的是哪几张单"。真正的数量明细在 {@code wo_pick_return} 里,
+     * 这里只是给人看的索引;重复提交同一单号不重复追加。
+     *
+     * <p>列宽注意:{@code 退料单号} 是 nvarchar(60);累加后可能超长,
+     * 超了就只保留**最近几张**(更早的去退料台账查)。不抛错 —— 索引信息不值得阻断退料。
+     */
+    public void appendReturnNo(long id, String backNo, String user) {
+        if (backNo == null || backNo.isBlank()) return;
+        PickDoc d = byId(id);
+        if (d == null) return;
+        String cur = d.backNo() == null ? "" : d.backNo().trim();
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        for (String p : cur.split("[,，]")) {
+            String s = p.trim();
+            if (!s.isEmpty()) parts.add(s);
+        }
+        if (parts.contains(backNo.trim())) return;
+        parts.add(backNo.trim());
+        // 超长裁剪:只留最近的几张(单号 60 以内)
+        while (String.join(",", parts).length() > 58 && parts.size() > 1) parts.remove(0);
+        jdbc.update("UPDATE dbo.wo_pick_doc SET 退料单号 = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                + " WHERE id = ?", String.join(",", parts), user, id);
+    }
+
+    /** 打印留痕:生单时自动打一次、单据里重打,每次 +1(用户口径「生成生产领料单的时候自动打印一次」) */    public void bumpPrint(long id, String user) {
         jdbc.update("UPDATE dbo.wo_pick_doc SET 打印次数 = ISNULL(打印次数,0) + 1,"
                         + " 打印时间 = SYSDATETIME(), asp_user2 = ?, asp_time2 = SYSDATETIME() WHERE id = ?",
                 user, id);
