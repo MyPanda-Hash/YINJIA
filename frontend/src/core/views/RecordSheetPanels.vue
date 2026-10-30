@@ -1626,6 +1626,8 @@ import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/panel/sheetDateCells'
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
+// X烧结「炭棒规格」三格的三层兜底(独立字段 → 异名键 → 整串解析),单测见 core/xsinter/
+import { rodSpecFromProdInfo } from '@/core/xsinter/rodSpecFromProdInfo.js'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
 import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
 import { GOODS_FACETS, facetValues, matchGoods, goodsToDetail } from '@/core/panel/goodsPick'
@@ -3325,6 +3327,15 @@ function onProdRefConfirm(rows) {
   // 空的不写 —— 半截的 `外：` 不许落格)。只在有这三个格的成型工艺面板上动手。
   for (const [k, v] of Object.entries(carbonSpecFrom(source, fieldMap.value.has('炭棒规格1')))) {
     props.head[k] = v
+  }
+  // X烧结工艺清单(RD_X_SINTER):refMap 只带「参照行里存在的键」，长度那格常缺
+  //（用户 2026-10-30 报障「炭棒规格没带全」：33/12 有、长度空）⇒ 三层兜底
+  //  独立字段 → 改过名的键 → 「炭棒尺寸/产品整体尺寸」整串解析；已填的格不覆盖。
+  //  纯函数 + 单测：core/xsinter/rodSpecFromProdInfo.js
+  if (String(props.panelCode) === 'RD_X_SINTER') {
+    for (const [k, v] of Object.entries(rodSpecFromProdInfo(source, props.head))) {
+      props.head[k] = v
+    }
   }
   prodRefVisible.value = false
   emit('dirty')
