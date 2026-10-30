@@ -337,6 +337,11 @@ public class MobilePickController {
         String today = java.time.LocalDate.now().toString();
         String prodLine = str(wo.get("生产线"));
 
+        // 工单需求数量 = 该工单行的**排产数量**(plang.pl_sl)。
+        // 用户口径(2026-10-30):「对应的 bom 生成的领料单明细,应该是每条明细的
+        //   bom 组成个数 × 工单需求数量」,且 BOM 的「用量」是**每 1 个成品的用量**。
+        double woQty = num(wo.get("排产数量"));
+
         // ── 领料单草稿(材料出库单,业务类型「生产领料」)
         List<Map<String, Object>> outItems = new ArrayList<>();
         String wh = "";          // 单头仓库(全部明细同仓时才有意义,见下)
@@ -346,19 +351,24 @@ public class MobilePickController {
             String code = str(b.get("物料编号"));
             // 每行按**该物料有库存的那个仓**预填(库存最大的仓优先,恒亿仓/主料仓优先于不良品仓)
             String[] lineWh = defaultWarehouseOf(code);
+            // 需求用量 = BOM 单件用量 × 工单数量(四位小数,与 decimal(18,4) 同口径)
+            double unit = num(b.get("用量"));
+            double need = round4(unit * woQty);
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("行号", String.valueOf(i + 1));
             item.put("材料编码", code);
             item.put("材料名称", str(b.get("物料名")));
             item.put("规格型号", str(b.get("物料规格")));
             item.put("计量单位", str(b.get("计量单位")));
-            // ⚠ 领料数量留 0:用户口径是"进了单据再扫物料码填数量",不是生单时就领满。
-            //   0 数量行不会被审核过账(过账前提交会做"全部领完"闸门)。
-            item.put("数量", 0);
+            // 数量 = 需求用量,**生单时就填好**(用户口径「生成时就按用量×工单数量填好」)。
+            // 到单据里扫码仍可核对/调整;提交前仍要"每行都有数量"(见 submit 的闸门)。
+            item.put("数量", need);
             item.put("仓库", lineWh[0]);
             if (!lineWh[1].isEmpty()) item.put("仓库编码", lineWh[1]);
+            // 备注留痕:**单件用量、工单数量、需求合计**都写清楚 —— 现场看到 2000 时能自己算出
+            // 「2/支 × 1000 支 = 2000」。bomUsageOf 取的是「需求 N」里的 N(合计),不是单件用量。
             item.put("明细备注", "生产领料·组装工艺清单 " + str(bomHead.get("单据编号"))
-                    + "(需求 " + str(b.get("用量")) + ")");
+                    + "(用量 " + fmtQty(unit) + " × 工单 " + fmtQty(woQty) + " = 需求 " + fmtQty(need) + ")");
             outItems.add(item);
             // 单头仓库:第一行有仓就记第一行的(全部同仓时才是"这单从哪个仓出")
             if (wh.isEmpty() && !lineWh[0].isEmpty()) { wh = lineWh[0]; whCode = lineWh[1]; }
@@ -1251,8 +1261,13 @@ public class MobilePickController {
      */
     private static double bomUsageOf(String note) {
         if (note == null || note.isBlank()) return 0;
+        // 🔴 2026-10-30 修:正则**不能要求「需求」前面是左括号**。
+        //   备注格式已经变成「…(用量 1 × 工单 300 = 需求 300)」—— 括号在最前面,
+        //   「需求」前面是「= 」;旧正则 `\(需求\s*N\s*\)` 因此全部匹配失败,
+        //   前端拿到 BOM用量=0 就退回库存上限(实测需求 3 变成 12000、默认领满)。
+        //   改为只认「需求 <数字>)」，「需求」前不限字符,兼容新旧两种写法。
         java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("\\(需求\\s*([0-9]+(?:\\.[0-9]+)?)\\s*\\)").matcher(note);
+                .compile("需求\\s*([0-9]+(?:\\.[0-9]+)?)\\s*\\)").matcher(note);
         if (!m.find()) return 0;
         try {
             return round4(Double.parseDouble(m.group(1)));
