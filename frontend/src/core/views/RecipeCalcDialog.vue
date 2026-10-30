@@ -563,8 +563,12 @@ async function ensureKindRows(kind) {
   if (kindPending.has(k)) return kindPending.get(k)
   const p = (async () => {
     try {
-      const res = await request.post('/px/queryFormDataList', {
-        panelCode: 'INV', condition: { 所属类别: k }, pageNo: 1, pageSize: INV_PAGE_SIZE,
+      // ⚠ 走 `/px/invOptions`（按**本面板** RD_MOLD_PROC 的查看权校验），
+      //   不再用 `/px/queryFormDataList(panelCode='INV')` —— 后者按 INV 面板自身的权限校验，
+      //   研发角色（文件负责人/研发审核）对 INV 没有授权 ⇒ 403 ⇒ 物料下拉全空
+      //   （2026-10-30 用户报障：刘磊的两个配方计算器都不能引用物料，管理员正常）。
+      const res = await request.get('/px/invOptions', {
+        params: { panelCode: 'RD_MOLD_PROC', kind: k },
       })
       const raw = invRowsOf(res?.data)
       rememberRows(raw)
@@ -583,10 +587,11 @@ async function ensureKindRows(kind) {
   kindPending.set(k, p)
   return p
 }
-/** 没选种类时的远程搜索:服务端 keyword(编码/名称一起模糊)。空关键字不发请求 */
+/** 没选种类时的远程搜索:服务端 keyword(编码/名称一起模糊)。空关键字不发请求。
+ *  同 ensureKindRows:走 `/px/invOptions` 按本面板权限校验，避免研发角色因缺 INV 授权而搜不到。 */
 async function remoteInvSearch(kw) {
-  const res = await request.post('/px/queryFormDataList', {
-    panelCode: 'INV', keyword: kw, condition: {}, pageNo: 1, pageSize: 50,
+  const res = await request.get('/px/invOptions', {
+    params: { panelCode: 'RD_MOLD_PROC', keyword: kw },
   })
   const rows = invRowsOf(res?.data)
   rememberRows(rows)
@@ -644,8 +649,10 @@ async function lookupInvRow(field, value) {
   if (local) return local
   if (invSeen.value.filter((r) => String(r?.[col] ?? '').trim() === want).length > 1) return null
   try {
-    const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'INV', condition: { [col]: want }, pageNo: 1, pageSize: 50,
+    // 同 ensureKindRows：走 `/px/invOptions`（按 RD_MOLD_PROC 权限），不走 INV 面板权限，
+    // 否则研发角色手打编号后带不出名称/类别（2026-10-30 同批修复）。
+    const res = await request.get('/px/invOptions', {
+      params: { panelCode: 'RD_MOLD_PROC', keyword: want },
     })
     const rows = invRowsOf(res?.data)
     rememberRows(rows)

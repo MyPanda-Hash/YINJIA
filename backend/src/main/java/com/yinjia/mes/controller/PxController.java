@@ -644,6 +644,36 @@ public class PxController {
         return ApiResult.ok(devTaskService.specByProduct(code, DevTaskService.SPEC_SHEET_AREA_INSPECT));
     }
 
+    /**
+     * **配方计算器的物料候选**（2026-10-30）。
+     *
+     * <p>用户报障：「服务器上使用刘磊这个账号，在烧结面板的两个配方计算器，都不能引用物料，
+     * 但是管理员可以」。根因不是前端：候选走的是 {@code /px/queryFormDataList(panelCode=INV)}，
+     * 那个端点按 **INV（商品档案）面板自己的权限**校验，而「文件负责人」「研发审核」这类研发角色
+     * 对 INV 一行授权都没有（实测 yj_role_panel 里为空）⇒ 403 ⇒ 下拉全空；管理员有 view/query ⇒ 正常。
+     *
+     * <p>为什么不直接把 INV 的 view 授给研发角色：那会让「商品」出现在工艺员的菜单里 ——
+     * 他们需要的只是"录配方时从物料档案里选一条"，不是浏览商品档案。
+     *
+     * <p>⇒ 本端点按**调用方自己的面板**校验权限（能看 RD_MOLD_PROC / RD_X_SINTER 就能查物料候选），
+     * 语义上与 {@code /specByProductForMold} 同一处理（按使用方面板而非数据源面板授权）。
+     *
+     * @param panelCode 调用方面板码（RD_MOLD_PROC / RD_X_SINTER …），需有查看权
+     * @param kind      商品档案「所属类别」收窄（炭粉 / 胶粉 / 功能料-粉末 / 功能料-颗粒）；空 = 不收窄
+     * @param keyword   编码/名称模糊；空 = 该类别全部
+     */
+    @GetMapping("/invOptions")
+    public ApiResult<Map<String, Object>> invOptions(@RequestParam String panelCode,
+                                                     @RequestParam(required = false) String kind,
+                                                     @RequestParam(required = false) String keyword) {
+        perm.requirePanelView(panelCode);
+        Map<String, Object> cond = new LinkedHashMap<>();
+        if (kind != null && !kind.isBlank()) cond.put("所属类别", kind.trim());
+        // 档案模式(INV 是档案面板)会忽略 pageSize 全量返回 ⇒ 靠 condition 收窄到一个类别,
+        // 与前端原调用(queryFormDataList + condition{所属类别})行为完全一致。
+        return ApiResult.ok(queryService.queryFormDataList("INV", keyword, cond, 1, 5000));
+    }
+
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
      *  权限按目标面板校验(选单是为了在目标面板生单,来源数据是选单必需的参照)。 */
     @PostMapping("/voucherFlow/sources")

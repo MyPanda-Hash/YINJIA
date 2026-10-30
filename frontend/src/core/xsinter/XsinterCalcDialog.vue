@@ -272,8 +272,12 @@ async function ensureKindRows(kind) {
   if (kindPending.has(k)) return kindPending.get(k)
   const p = (async () => {
     try {
-      const res = await request.post('/px/queryFormDataList', {
-        panelCode: 'INV', condition: { 所属类别: k }, pageNo: 1, pageSize: 1000,
+      // ⚠ 走 `/px/invOptions` 而不是 `/px/queryFormDataList(panelCode='INV')`：
+      //   后者按 **INV（商品档案）面板自己的权限**校验，而「文件负责人」「研发审核」这类研发角色
+      //   对 INV 没有任何授权 ⇒ 403 ⇒ 下拉全空（2026-10-30 用户报障：刘磊这两个计算器都不能引用物料，
+      //   管理员正常）。专用端点按**本面板**（RD_X_SINTER）的查看权校验，语义 = 能看这张单就能选物料。
+      const res = await request.get('/px/invOptions', {
+        params: { panelCode: 'RD_X_SINTER', kind: k },
       })
       const rows = invRowsOf(res?.data).filter((r) => String(r?.['所属类别'] ?? '').trim() === k)
       invKindRows.value = { ...invKindRows.value, [k]: rows }
@@ -310,10 +314,20 @@ async function loadRowOptions(row) {
   }
 }
 
-/** 选中编号 → 带出名称（名称已手填则不覆盖，与配方计算器 materialFillFor 同口径） */
-function onPickMaterial(row) {
-  const hit = (row.options || []).find((o) => o.value === row.code)
-  if (hit && !String(row.name || '').trim()) row.name = hit.name
+/** 选中/手打编号 → 带出名称（名称已手填则不覆盖，与配方计算器 materialFillFor 同口径）。
+ *  用 allow-create 手打的编号不在候选里 ⇒ 回档案查一次再带；查不到就留空让用户手填。 */
+async function onPickMaterial(row) {
+  const code = String(row.code ?? '').trim()
+  if (!code || String(row.name ?? '').trim()) return
+  const hit = (row.options || []).find((o) => o.value === code)
+  if (hit) { row.name = hit.name; return }
+  try {
+    const res = await request.get('/px/invOptions', {
+      params: { panelCode: 'RD_X_SINTER', keyword: code },
+    })
+    const one = invRowsOf(res?.data).find((r) => String(r?.['存货编码'] ?? '').trim() === code)
+    if (one) row.name = String(one['存货名称'] ?? '').trim()
+  } catch { /* 档案查不到就留空，名称可手填，不阻断计算 */ }
 }
 
 /** 填入单据：头 12 格 + 配方表 10 行 */
