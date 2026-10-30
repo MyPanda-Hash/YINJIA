@@ -45,6 +45,24 @@ public class WorkOrderListController {
             PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD};
     private static final String[] PRINT_ENTRIES = CLOSE_ENTRIES;
 
+    /**
+     * 本工单行自己的订单占用合计(2026-10-30):form_flow_link 按 `工单号#行号` 命中,
+     * 兼容历史 `工单号#行号#批次号` 键(与 ScheduleBoardService.ROW_USED 同一口径)。
+     */
+    private static final String ROW_USED = "(SELECT SUM(l.linked_quantity) FROM form_flow_link l"
+            + " WHERE l.target_panel_code='PLANG' AND l.target_form_no=p.pl_no"
+            + " AND (l.target_line_key = p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0))"
+            + "      OR l.target_line_key LIKE p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0)) + N'#%')"
+            + " AND l.link_status='ACTIVE')";
+
+    /**
+     * **余量 = 行级**(2026-10-30):本工单行需求 − **本工单行自己**的占用,不足 0 记 0。
+     * 原口径是「本行需求 − 整条订单行占用」,切单拆成父子两行后双双变负数(用户报障 −10/−90);
+     * 切单已把占用链按行拆账(WorkOrderSplitService.splitLink),父子合计 = 订单行剩余。
+     */
+    private static final String ROW_YL = "CASE WHEN ISNULL(p.xq_sl,0) <= ISNULL(" + ROW_USED + ",0)"
+            + " THEN 0 ELSE ISNULL(p.xq_sl,0) - ISNULL(" + ROW_USED + ",0) END";
+
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
     private final WorkOrderSplitService splitService;
@@ -187,12 +205,8 @@ public class WorkOrderListController {
                         + " ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(r.换算率,1) FROM dbo.bs_route r"
                         + "   WHERE r.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r.工序名称 = cop.当前工序"
                         + "     AND ISNULL(r.asp_cancel,'N')<>'Y'), 0) AS 当前工序计划量,"
-                        // 余量(2026-09-28 用户定稿)=订单结转的剩余数量:订单行需求 − 已转出占用
-                        // (form_flow_link ACTIVE 占用,与订单结转页「剩余可转」同源;转工单/转采购都占)
-                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l"
-                        + "   WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no"
-                        + "     AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc))"
-                        + "     AND l.link_status = 'ACTIVE'), 0) AS 余量,"
+                        // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用,不足 0 记 0
+                        + " " + ROW_YL + " AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"

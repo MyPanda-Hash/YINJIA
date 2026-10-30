@@ -196,6 +196,35 @@ public class ProcessTaskService {
         return created;
     }
 
+    /**
+     * 按**新的排产数量**重算某工单行各道工序台账的「计划数量」(2026-10-30 切单用)。
+     *
+     * <p>口径与 {@link #preplanManual}(预排全程线)**完全一致**:计划数量 = 排产数量 × 该道自己的换算率
+     * (各道分开算、不累乘);只改数量,不动状态/生产线/日期 —— 切单不是重新排线。
+     *
+     * <p>不重算的后果(2026-10-30 用户报障,服务器 GD-2026-10-0234):切单只改了 plang.pl_sl,
+     * 台账还是切单前的旧量(排产 776、当前工序计划量仍 976);报工封顶按 pl_sl×换算率(776),
+     * 而转序判据按台账(976)⇒ 该道永远达不到 976、也报不过 776,父单永久卡在切炭工序。
+     */
+    @Transactional
+    public void rescaleRowLedger(Object rowId, String route, double newQty, String user) {
+        if (rowId == null || !(newQty > 0)) return;
+        String rt = route == null ? "" : route.trim();
+        if (rt.isEmpty()) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT id, ISNULL([工艺路线],N'') AS 工艺路线, ISNULL(dm,N'') AS 产品编码 FROM dbo.plang WHERE id=?",
+                    rowId);
+            if (rows.isEmpty()) return;
+            rt = routeOfRow(rows.get(0));
+        }
+        jdbc.update("UPDATE w SET w.计划数量 = ? * ISNULL((SELECT MAX(ISNULL(r.换算率,1)) FROM dbo.bs_route r"
+                        + "   WHERE r.工艺路线编码=? AND r.工序名称=w.工序 AND ISNULL(r.asp_cancel,'N')<>'Y'),1),"
+                        + " w.asp_user2=?, w.asp_time2=GETDATE()"
+                        + " FROM dbo.wo_process_line w"
+                        + " WHERE w.工单行id=? AND ISNULL(w.asp_cancel,'N')<>'Y'",
+                newQty, rt, user, rowId);
+    }
+
     private String routeOfRow(Map<String, Object> row) {
         String fromRow = row == null ? "" : str(row.get("工艺路线"));
         if (fromRow != null && !fromRow.isBlank()) return fromRow.trim();

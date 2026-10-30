@@ -56,6 +56,28 @@ public class ScheduleBoardService {
     private static final String NOT_CLOSED = PlangClose.notClosed("p");
 
     /**
+     * **本工单行自己的订单占用合计**(2026-10-30):form_flow_link 按 `工单号#行号` 命中,
+     * 兼容 2026-10-14 那批历史 `工单号#行号#批次号` 键(现行写入方 {@code QuickScheduleService.linkLine}
+     * 写的是两段键,切单拆账/余量都必须两种都能认)。
+     */
+    private static final String ROW_USED = "(SELECT SUM(l.linked_quantity) FROM form_flow_link l"
+            + " WHERE l.target_panel_code='PLANG' AND l.target_form_no=p.pl_no"
+            + " AND (l.target_line_key = p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0))"
+            + "      OR l.target_line_key LIKE p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0)) + N'#%')"
+            + " AND l.link_status='ACTIVE')";
+
+    /**
+     * **「余量」的唯一口径 = 行级**(2026-10-30):本工单行需求 − **本工单行自己**的占用,不足 0 记 0。
+     *
+     * <p>🔴 为什么改:原口径是「本行需求 − **整条订单行**占用」。切单把一张工单行拆成父子两行后,
+     * 两行仍去减整条订单行的占用(订单行 100)⇒ 父 90−100=−10、子 10−100=−90,「余量」变负数
+     * (2026-10-30 用户报障:截图 −10/−90/−200)。切单同时把占用链按行拆账
+     * ({@code WorkOrderSplitService.splitLink}),行级口径才连得起来;父子合计 = 订单行剩余,守恒。
+     */
+    private static final String ROW_YL = "CASE WHEN ISNULL(p.xq_sl,0) <= ISNULL(" + ROW_USED + ",0)"
+            + " THEN 0 ELSE ISNULL(p.xq_sl,0) - ISNULL(" + ROW_USED + ",0) END";
+
+    /**
      * **生产状态唯一定义**(2026-10-16 收口):显示列与「未完工 / 已完工」页签筛选**必须同源**。
      * <ol>
      *   <li>{@link #CLOSED} ⇒ 已结案;</li>
@@ -509,11 +531,8 @@ public class ScheduleBoardService {
                         + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量,"
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
-                        // 余量(2026-09-28 定稿)=订单结转剩余数量(需求−已转出占用,与订单结转页同源)
-                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l"
-                        + "   WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no"
-                        + "     AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc))"
-                        + "     AND l.link_status = 'ACTIVE'), 0) AS 余量,"
+                        // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用
+                        + " " + ROW_YL + " AS 余量,"
                         + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日,"
                         // 计划线(各工序)(2026-10-07 预排全程线):排产时人工逐道选定的线
@@ -652,7 +671,7 @@ public class ScheduleBoardService {
                         // 生产状态 = {@link #ST_EXPR}(唯一定义;页签筛选用同一个表达式,见上面 complete)
                         + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, " + ROW_YL + " AS 余量,"
                         // 批号=转单批次号(与生产工单页「批次号」对应;legacy 旧行无批次号回退产品批号 lot_no)
                         + " ISNULL(NULLIF(pc.[批次号],N''), ISNULL(pc.lot_no,N'')) AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(pc.pl_man,N'') AS 操作员, CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
@@ -739,7 +758,7 @@ public class ScheduleBoardService {
                             + " ISNULL(p.jldw,N'') AS 单位, ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_man,N'') AS 操作员,"
                             + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
                             + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                            + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
+                            + " ISNULL(p.rk_sl,0) AS 入库数量, " + ROW_YL + " AS 余量,"
                             + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
                             + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日,"
                             + " CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
@@ -901,7 +920,7 @@ public class ScheduleBoardService {
         //   (JOIN 已含 pc.plang_id = p.id,故此处按 pc.plang_id = 本行 id 精确取。)
         List<Map<String, Object>> sched = jdbc.queryForList(
                 "SELECT p.pl_xc AS 工单行号, pc.scx AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, " + ROW_YL + " AS 余量,"
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"
                         + " CASE WHEN " + CLOSED + " THEN N'已结案'"
