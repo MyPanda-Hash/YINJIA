@@ -11587,7 +11587,8 @@ onUnmounted(() => {
   text-align: center;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
+  /* 项目红线：禁 transition: all（hover 时把所有属性都纳入补间，包括会触发回流的那些） */
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 .as-side-btn:hover {
   background: #f2f6fa;
@@ -11677,7 +11678,8 @@ onUnmounted(() => {
   user-select: none;
   font-size: 9px;
   box-shadow: 0 1px 3px rgba(28, 79, 138, 0.1);
-  transition: all 0.15s ease;
+  /* 项目红线：禁 transition: all。只列真正会变的三个属性（颜色类，不影响回流） */
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 .as-side-caret:hover {
   border-color: #b9c9dc;

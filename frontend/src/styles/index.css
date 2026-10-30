@@ -94,6 +94,22 @@ body,
   background: transparent;
 }
 
+/* ===== 系统级「减少动效」（2026-10-30）=====
+   Windows「辅助功能 → 视觉效果 → 动画效果」关掉后（老办公机、远程桌面、晕动症用户常见），
+   整个界面应当瞬切而不是补间。这既是无障碍要求，也是最便宜的"流畅度开关"：
+   弱机上真正拖慢手感的是时长几十到几百毫秒的补间，而不是内容本身。
+   放在全局而不是逐个组件写，避免新组件漏掉（此前只有 5 处零散声明）。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ===== 下划线输入框（T+ 风格）：所有单据面板表头填写框统一 ===== */
 .udl-fields .el-input__wrapper,
 .udl-fields .el-select__wrapper,
