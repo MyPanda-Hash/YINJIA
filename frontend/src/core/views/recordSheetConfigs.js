@@ -1347,6 +1347,12 @@ export const recordSheetConfigs = {
         //   的 isAtOrBeforeTableAnchor：章节被拆成"表前/表后"两段渲染，本节点不需要别的标记）。
         //   最终版式：一、产品基本信息 → 【配方表】 → 配料要求 → 成型管控要求 → 特殊管控要求。
         tablesAfterBar: '一、产品基本信息',
+        // 2026-10-30 用户补齐：「这个面板也是默认10行带序号的」（照 RD_MOLD_PROC 的配方表同一套）。
+        //   blankRows 是**按表**铺空行的机制（RecordSheetPanels 的 watch，键 = 单据号+表区，
+        //   只在本表区为空时铺一次，且只带 表区 + 序号，不编造物料/比例）；
+        //   autoSeqBar 让「序号」列自动编号 1..10 —— 少这一条就铺出 10 行但没有序号。
+        autoSeqBar: true,
+        blankRows: 10,
         // 纸面右上出「🧮 配方计算」按钮 → 打开 XsinterCalcDialog（RecordSheetPanels 按
         // panelCode 分流；成型工艺清单走它自己那套 RecipeCalcDialog，两者公式体系不同，不能共用）。
         recipeCalc: true,

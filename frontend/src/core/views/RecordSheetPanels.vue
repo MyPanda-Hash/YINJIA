@@ -3967,7 +3967,14 @@ const blankRowsSeeded = new Set()
 watch(() => [props.editable, props.head, cfg.value], ([v]) => {
   const tables = cfg.value?.dataTables || []
   if (!v || !tables.length) return
-  if (!props.head || !props.head['单据编号']) return
+  if (!props.head) return
+  // ⚠ 2026-10-30 修正：原来这里还有一条 `if (!props.head['单据编号']) return`。
+  //   单据编号是**保存后才由后端分配**的 ⇒ 刚点「新增」时那格是空的(纸面显示"—"),
+  //   于是新建单永远铺不出默认行，用户看到的就是「一张新单配方表只有一行 —」
+  //   （口径：「这个面板也是默认10行带序号的，你刚才没改到这个」）。
+  //   现在改成：没有编号也铺，只是**不记账**（下面 memoKey 置 null）——
+  //   新建单每次都是新的 head 对象，靠「本表区为空」这一条判空就够了。
+  const docNo = props.head['单据编号']
   for (const dt of tables) {
     const want = Number(dt.blankRows) || 0
     if (want <= 0) continue
@@ -3976,9 +3983,10 @@ watch(() => [props.editable, props.head, cfg.value], ([v]) => {
     // ①b 同一张单只铺一次:本 watch 的依赖含 cfg(配置刷新会重入),
     //     而空行落进 touch() 后 rowsOf 仍可能读到 0 行(行还没被 items 认领的瞬间)⇒ 用单据号+表区记账。
     //     不改这个键,用户手动删光 10 行后也不会被"贴心"地补回来(那不是用户要的)。
-    const memoKey = `${props.head['单据编号']}::${dt.filterKey || ''}::${dt.filterVal || ''}`
-    if (blankRowsSeeded.has(memoKey)) continue
-    blankRowsSeeded.add(memoKey)
+    //     新建单(无单据号)不记账 —— 见上面那条说明。
+    const memoKey = docNo ? `${docNo}::${dt.filterKey || ''}::${dt.filterVal || ''}` : null
+    if (memoKey && blankRowsSeeded.has(memoKey)) continue
+    if (memoKey) blankRowsSeeded.add(memoKey)
     const arr = touch()
     for (let i = 1; i <= want; i++) {
       const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
