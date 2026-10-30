@@ -1221,13 +1221,13 @@ export const recordSheetConfigs = {
       { label: '使用范围', key: '使用范围', type: 'select' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [52, 52, 56, 56, 56, 56, 56, 86, 76, 76, 79, 79],
+    grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50],
     // 报告头三段跨度 7+2+3 = 12
     head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '单据编号', docNoKey: '单据编号' },
     pages: [
-      { title: 'X烧结配方工艺管控清单', grid: [52, 52, 56, 56, 56, 56, 56, 86, 76, 76, 79, 79], showHead: true },
+      { title: 'X烧结配方工艺管控清单', grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50], showHead: true },
       // 修订记录页不出报告头(同 RD_MOLD_PROC 页2:只有居中大标题 + 一行表头,由 dt.pageTitle 出标题)
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [52, 52, 56, 56, 56, 56, 56, 86, 76, 76, 79, 79] },
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50] },
     ],
     sections: [
       /* ── 一、产品基本信息(标签行 + 值行 两行式,照 Excel row7/row8)── */
@@ -1334,8 +1334,12 @@ export const recordSheetConfigs = {
         page: 0,
         bar: '配方表',
         filterKey: '表区', filterVal: '配方表',
-        // Excel A10:L20 = 表头 + 10 行固定行(用户口径:默认 10 行物料信息)
-        fixedRows: 10,
+        // 纸面右上出「🧮 配方计算」按钮 → 打开 XsinterCalcDialog（RecordSheetPanels 按
+        // panelCode 分流；成型工艺清单走它自己那套 RecipeCalcDialog，两者公式体系不同，不能共用）。
+        recipeCalc: true,
+        // ⚠ 不写 fixedRows:它是**布尔**(真 = 隐藏「＋/×」增删按钮),不是行数 ——
+        //   写 `fixedRows: 10` 只会静默隐藏增删按钮、且**一行都不会多出来**。
+        //   配方表默认 10 行的职能交给计算器(录入物料后铺行),人手补行用「＋」。
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: 'No.', w: 70, align: 'center' },

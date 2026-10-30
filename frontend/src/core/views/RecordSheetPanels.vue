@@ -1536,6 +1536,8 @@
 
     <!-- ═══ 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表;输入不落库) ═══ -->
     <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="onRecipeApplied" />
+<!-- X烧结工艺清单(RD_X_SINTER):另一套公式体系的计算器(见 core/xsinter/calcEngine.js) -->
+<XsinterCalcDialog v-model="xSinterVisible" :head="head" :rows="xSinterRows" @applied="onXSinterApplied" />
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
@@ -1616,6 +1618,8 @@ import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
 import AnnotatedText from './AnnotatedText.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
+// 2026-10-30 X烧结工艺清单的配方计算器:公式体系与 RecipeCalcDialog 不同,独立组件
+import XsinterCalcDialog from '@/core/xsinter/XsinterCalcDialog.vue'
 // 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 // 日期/时间格:控件种类按 yj_field.data_type 决定,取值归一同上(纯函数 + 单测)
@@ -4259,7 +4263,16 @@ async function carryBomFromProdBom(prodRow) {
 const recipeCalcVisible = ref(false)
 const recipeCalcRows = ref([])
 const recipeCalcDt = ref(null)
+// X烧结工艺清单(RD_X_SINTER)用**另一套**计算器：公式体系与成型工艺清单不同
+// （X烧结是「圆柱体积×密度 + 粉料1 倒推 + 颗粒料按克数」，见 core/xsinter/calcEngine.js）。
 function openRecipeCalc(dt) {
+  // ⚠ 本组件的面板码在 **props** 上（不是 computed ref），别写成 panelCode.value
+  if (String(props.panelCode) === 'RD_X_SINTER') {
+    xSinterDt.value = dt
+    xSinterRows.value = rowsOf(dt)
+    xSinterVisible.value = true
+    return
+  }
   recipeCalcDt.value = dt
   recipeCalcRows.value = rowsOf(dt)
   recipeCalcVisible.value = true
@@ -4271,6 +4284,36 @@ function onRecipeApplied(payload) {
   if (dt) {
     const arr = touch()
     if (dt.filterKey) for (const r of rows) r[dt.filterKey] = dt.filterVal
+    const kept = dt.filterKey
+      ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
+      : []
+    arr.splice(0, arr.length, ...kept, ...rows)
+  }
+  emit('dirty')
+}
+
+// ---------- X烧结配方计算(RD_X_SINTER):头 18 格 + 配方表 10 行 ----------
+const xSinterVisible = ref(false)
+const xSinterRows = ref([])
+const xSinterDt = ref(null)
+/**
+ * X烧结计算器「填入单据」：
+ *   头 —— 把算出来的 18 格（模具/参数/切炭/冷却/重量/密度）写进单据头，**覆盖**同名键；
+ *   明细 —— 与本文件其它「整表替换」同一口径：先剔除本表区的旧行，再整体塞入新 10 行。
+ * 输入参数（折算系数/修正长度/密度上下限）同时回落单头 —— 历史单据要能追溯当时用的参数，
+ * 否则日后改了公式或默认值就没法复算。
+ */
+function onXSinterApplied(payload) {
+  const dt = xSinterDt.value
+  const headPatch = payload?.head || {}
+  const h = props.head || {}
+  for (const [k, v] of Object.entries(headPatch)) {
+    if (v !== undefined && v !== null) h[k] = String(v)
+  }
+  const detail = Array.isArray(payload?.detail) ? payload.detail : []
+  if (dt) {
+    const arr = touch()
+    const rows = detail.map((r) => ({ ...r, [dt.filterKey]: dt.filterVal }))
     const kept = dt.filterKey
       ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
       : []
@@ -5539,6 +5582,9 @@ function chartOf(dt) {
   background: #f4f9ff;
   cursor: pointer;
   user-select: none;
+  /* 2026-10-30(X烧结对齐):窄格子里「⧉ 标准库维护」曾折成两行、把整行行高撑高,
+     与左侧标签行对不齐。一律不折行 ⇒ 行高只由标签决定。 */
+  white-space: nowrap;
 }
 .rs-lib-btn:hover {
   background: #e8f2ff;
