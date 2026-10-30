@@ -2589,6 +2589,7 @@ export default {
     '排产': 'Geplant',
     '刷新开单状态': 'Status aktualisieren',
     '没有查到工单': 'Keine Aufträge gefunden',
+    '看明细': 'Details',
   },
 
 }

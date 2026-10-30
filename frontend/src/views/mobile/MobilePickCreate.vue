@@ -131,7 +131,8 @@
         v-for="w in woList"
         :key="w.工单号 + '#' + w.工单行号"
         class="mp-wo-row"
-        :class="{ 'is-done': w.已开单 }"
+        :class="{ 'is-done': w.已开单, 'is-click': w.已开单 }"
+        @click="w.已开单 && openDoc(w.台账id)"
       >
         <div class="mp-wo-l1">
           <span class="mp-wo-no">{{ w.工单号 }}<i> #{{ w.工单行号 }}</i></span>
@@ -144,6 +145,7 @@
         <div v-if="w.已开单" class="mp-wo-l3">
           <span class="mono">{{ w.领料单号 }}</span>
           <span class="mp-wo-prog">{{ tt('已领') }} {{ w.已领项数 || 0 }}/{{ w.物料项数 || 0 }}</span>
+          <span class="mp-wo-more">{{ tt('看明细') }} ›</span>
         </div>
       </div>
     </section>
@@ -160,11 +162,14 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
 import { printWoQr } from '@/business/print-formats'
 import { queueToPrintStation } from '@/business/printStation'
+
+const router = useRouter()
 
 const woInput = ref(null)
 const woText = ref('')
@@ -194,6 +199,17 @@ const canGenerate = computed(() => queue.value.length > 0 && !genLoading.value)
 function clearMsg() { errText.value = ''; okText.value = '' }
 function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 
+/**
+ * 点开工单行 → 看明细(2026-10-30 用户口径:「单据可以点开看明细」)。
+ *
+ * 只对**已开单**的行可点(没开单的点进去也没有明细)。跳的是「生产领料」的单据详情,
+ * 因为明细(领了哪些料、领了多少)本来就长在那张单上 —— 这里只是给一个"从工单进到明细"的入口,
+ * 不重复实现一份只读明细(重复实现必然和单据详情分叉)。
+ */
+function openDoc(id) {
+  if (!id) return
+  router.push({ path: '/panelx/list/MOBILE_PICK/doc', query: { id: String(id) } })
+}
 function fmtQty(v) {
   const n = Number(v)
   if (!Number.isFinite(n)) return '0'
@@ -440,6 +456,28 @@ async function loadWoStatus() {
 .mp-doc-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
 .mp-doc-l2 i { font-style: normal; color: var(--el-text-color-secondary); }
 .mp-doc-p { flex: 1; min-width: 0; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 工单开单状态行(2026-10-30 第三轮:本面板只看工单) */
+.mp-wo-row { padding: 8px 0; border-top: 1px solid var(--el-border-color-lighter); }
+.mp-wo-row:first-of-type { border-top: 0; }
+.mp-wo-row.is-done { opacity: .86; }
+.mp-wo-row.is-click { cursor: pointer; }
+.mp-wo-row.is-click:active { background: var(--el-fill-color-lighter); border-radius: 6px; }
+.mp-wo-l1 { display: flex; align-items: center; gap: 8px; }
+.mp-wo-no { font-size: 14px; font-weight: 600; }
+.mp-wo-no i { font-style: normal; font-weight: 400; color: var(--el-text-color-secondary); }
+.mp-wo-tag { margin-left: auto; padding: 0 6px; border-radius: 4px; font-size: 11px; white-space: nowrap; }
+.mp-wo-tag.is-todo { background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
+.mp-wo-tag.is-open { background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2); }
+.mp-wo-tag.is-done { background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2); }
+.mp-wo-tag.is-bad  { background: var(--el-color-danger-light-9);  color: var(--el-color-danger); }
+.mp-wo-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
+.mp-wo-p { flex: 1; min-width: 0; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-wo-qty { flex: none; color: var(--el-text-color-placeholder); font-variant-numeric: tabular-nums; }
+.mp-wo-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; font-size: 12px; }
+.mp-wo-l3 .mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mp-wo-prog { flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.mp-wo-more { flex: none; margin-left: auto; color: var(--el-color-primary); font-size: 12px; }
 
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }

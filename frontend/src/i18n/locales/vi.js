@@ -2594,6 +2594,7 @@ export default {
     '排产': 'Kế hoạch',
     '刷新开单状态': 'Làm mới trạng thái',
     '没有查到工单': 'Không tìm thấy lệnh',
+    '看明细': 'Xem chi tiết',
   },
 
 }

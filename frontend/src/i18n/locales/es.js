@@ -2589,6 +2589,7 @@ export default {
     '排产': 'Planificado',
     '刷新开单状态': 'Actualizar estado',
     '没有查到工单': 'No se encontraron órdenes',
+    '看明细': 'Ver detalle',
   },
 
 }

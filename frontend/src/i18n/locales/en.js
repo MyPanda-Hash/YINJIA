@@ -4939,6 +4939,7 @@ export default {
     '已开单': 'Created',
     '刷新开单状态': 'Refresh status',
     '没有查到工单': 'No work orders found',
+    '看明细': 'Details',
   },
 
 }

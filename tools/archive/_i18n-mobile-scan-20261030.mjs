@@ -201,6 +201,7 @@ const ROWS = [
   ['排产', 'Planned', '計画', '계획', 'Planificado', 'Planifié', 'Geplant', 'План', 'Kế hoạch', 'แผน'],
   ['刷新开单状态', 'Refresh status', '状況を更新', '상태 새로고침', 'Actualizar estado', 'Actualiser', 'Status aktualisieren', 'Обновить статус', 'Làm mới trạng thái', 'รีเฟรชสถานะ'],
   ['没有查到工单', 'No work orders found', '指示が見つかりません', '작업지시 없음', 'No se encontraron órdenes', 'Aucun OF trouvé', 'Keine Aufträge gefunden', 'Заказы не найдены', 'Không tìm thấy lệnh', 'ไม่พบใบสั่ง'],
+  ['看明细', 'Details', '明細を見る', '명세 보기', 'Ver detalle', 'Détails', 'Details', 'Подробнее', 'Xem chi tiết', 'ดูรายละเอียด'],
 ]
 
 const LOCALES = {

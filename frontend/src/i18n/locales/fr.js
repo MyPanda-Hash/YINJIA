@@ -2589,6 +2589,7 @@ export default {
     '排产': 'Planifié',
     '刷新开单状态': 'Actualiser',
     '没有查到工单': 'Aucun OF trouvé',
+    '看明细': 'Détails',
   },
 
 }
