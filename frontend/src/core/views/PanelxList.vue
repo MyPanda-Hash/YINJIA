@@ -7293,26 +7293,37 @@ async function printApprovalSheet() {
   const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
   // 多页签 或 多组 ⇒ 都要出多张纸,只能走 PDF(见上)
   if (pageCount > 1 || groups.length > 1) {
+    /**
+     * ⚠ 窗口必须**同步**先开 —— 2026-10-30 用户报障「产品规格书打印会直接下载文件，
+     *   而不是打印预览」的**唯一**病根就在这:
+     *   buildSheetPdfBlob 是 html2canvas 逐页截图拼 PDF,要好几秒;旧写法 `await` 之后才
+     *   `window.open(url)`，此时用户手势(transient activation)早已过期，浏览器把它当**弹窗**拦掉，
+     *   返回 null ⇒ 一路落到下面的「改为下载 PDF」兜底 ⇒ 用户看到的是下载而不是预览。
+     *   现在照 previewSheetPdf 的做法:先同步开一张空白页占位，拿到 blob 再指过去。
+     */
+    const win = window.open('', '_blank')
     const loadingMsg = ElMessage({ message: tt('正在生成打印件…'), duration: 0 })
     try {
       const r = await buildSheetPdfBlob()
-      if (!r) { ElMessage.warning(tt('未找到可导出的单据')); return }
+      if (!r) { if (win && !win.closed) win.close(); ElMessage.warning(tt('未找到可导出的单据')); return }
       const url = URL.createObjectURL(r.blob)
-      const w = window.open(url, '_blank')
-      if (!w) {
-        // 弹窗被拦:退回下载,至少不丢
+      if (win && !win.closed) {
+        win.location.href = url
+        // 张数 = 页签数 × 组数(与 buildSheetPdfBlob 的「页 → 组」两层循环同口径)
+        const n = pageCount * Math.max(1, groups.length)
+        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(n)))
+      } else {
+        // 占位页被用户关了 / 浏览器仍拦截 ⇒ 退回下载,至少不丢
         const a = document.createElement('a')
         a.href = url
         a.download = r.name
         a.click()
         ElMessage.warning(tt('浏览器拦截了新窗口，已改为下载 PDF'))
-      } else {
-        // 张数 = 页签数 × 组数(与 buildSheetPdfBlob 的「页 → 组」两层循环同口径)
-        const n = pageCount * Math.max(1, groups.length)
-        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(n)))
       }
-      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      // 120s 才回收:打印对话框可能开很久,中途 revoke 会让 PDF 变白页
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
     } catch (e) {
+      if (win && !win.closed) win.close()
       ElMessage.error(tt('打印失败') + ':' + (e?.message || ''))
     } finally {
       loadingMsg.close()
