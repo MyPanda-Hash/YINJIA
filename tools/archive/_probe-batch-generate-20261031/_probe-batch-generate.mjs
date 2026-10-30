@@ -139,6 +139,21 @@ const dialogSummary = () => ev(`(() => {
 })()`)
 const closeDialog = () => ev(`(() => { const btns=[...document.querySelectorAll('.el-dialog__footer button')]; const b=btns.find(x=>x.innerText.trim()==='取消'||x.innerText.trim()==='Cancel'); if(b) b.click(); return true })()`)
 
+/**
+ * 关掉所有生单对话框并**等它们真的从 DOM 消失**。
+ * 为什么必须等:下一个场景要是直接读 `.gl-doc`,读到的是上一个还挂着的对话框 ⇒ 结论错误
+ * (实测:F 场景"单张生单"读到了 E 场景两张单的残影)。
+ */
+const ensureNoDialog = async () => {
+  for (let i = 0; i < 10; i++) {
+    if (!(await ev(`document.querySelectorAll('.gl-doc, .bsd, .bsd-printed').length`))) return true
+    await ev(`(() => { [...document.querySelectorAll('.el-dialog__headerbtn')].forEach(b => b.click()); return true })()`)
+    await sleep(450)
+  }
+  console.log('  ⚠ 对话框没能关掉(继续跑,但下面读到的可能是残影)')
+  return false
+}
+
 // ============ A. 采购订单:左栏勾两张 → 生单 ▼ → 批量生单 ============
 console.log('== A. 采购订单 批量生单 ==')
 await openPanel('PU_ORDER')
@@ -158,7 +173,7 @@ for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')
 await sleep(800)
 console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
 await shot('03-batch-dialog.png')
-await closeDialog(); await sleep(600)
+await ensureNoDialog()
 
 // ============ B. 采购订单:生单(主按钮)= 原分批送料对话框(不能被顶掉) ============
 console.log('== B. 采购订单 生单(原分批送料对话框) ==')
@@ -167,17 +182,29 @@ await sleep(2500)
 console.log('  标题 =', JSON.stringify(await ev(`document.querySelector('.el-dialog .el-dialog__title')?.innerText.trim()`)))
 console.log('  分批对话框存在 =', await ev(`!!document.querySelector('.bsd')`))
 await shot('04-pu-batch-send-dialog.png')
-await closeDialog(); await sleep(600)
+await ensureNoDialog()
 
-// ============ C. 销售订单:生单 ▼ → 生成销售出库单 → 统一对话框(单张) ============
-console.log('== C. 销售订单 生成销售出库单(非定制化 → 统一对话框) ==')
+// ============ C. 销售订单:生单(主按钮 → 生成生产工单)/ 下拉 → 生成销售出库单 ============
+console.log('== C. 销售订单 生单组 ==')
 await openPanel('SO_ORDER')
+console.log('  下拉项 =', JSON.stringify(await ev(`(() => {
+  const g = ${GEN_GROUP_FIND}
+  if (!g) return []
+  g.querySelector('.tb-caret')?.click()
+  return []
+})()`).then(async () => { await sleep(400); return ev(`[...document.querySelectorAll('.tools .tb-menu .ctx-item')].map(x=>x.innerText.trim())`) })))
+console.log('  点生单(主按钮,= 生成生产工单) =', await clickGenerateMain())
+for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
+await sleep(800)
+console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
+await shot('05a-so-manu-order-dialog.png')
+await ensureNoDialog()
 console.log('  点生成销售出库单 =', await clickGenerateItem('生成销售出库单'))
 for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
 await sleep(800)
 console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
 await shot('05-so-single-dialog.png')
-await closeDialog(); await sleep(600)
+await ensureNoDialog()
 
 // ============ D. 同一对话框切英文(多语言红线) ============
 console.log('== D. 英文界面走查 ==')
@@ -190,8 +217,44 @@ for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')
 await sleep(900)
 console.log('  EN 对话框:', JSON.stringify(await dialogSummary(), null, 1))
 await shot('06-en-dialog.png')
-await closeDialog()
+await ensureNoDialog()
 await setLocale('zh-CN')
+
+// ============ E. 送料暂收单:本次修的就是它(之前没有勾选、也不能批量) ============
+console.log('== E. 送料暂收单 生单 ▼ → 批量生单(一条动作两个去向) ==')
+await openPanel('QC_RECV')
+console.log('  左栏表头 =', JSON.stringify(await ev(`[...document.querySelectorAll('.doc-select-rail thead th')].map(th=>th.innerText.trim())`)))
+console.log('  勾选框数 =', await ev(`document.querySelectorAll('.doc-select-rail tbody td.dsr-check').length`))
+const qcClicked = await ev(`(() => {
+  const trs = [...document.querySelectorAll('.doc-select-rail tbody tr')].slice(0, 2)
+  let n = 0
+  for (const tr of trs) { const b = tr.querySelector('td.dsr-check .el-checkbox'); if (b) { b.click(); n++ } }
+  return n
+})()`)
+await sleep(500)
+console.log('  勾选', qcClicked, '张 →', JSON.stringify(await ev(`document.querySelector('.dsr-picked')?.innerText.trim()`)))
+await shot('07-qc-recv-rail-checked.png')
+console.log('  下拉项 =', JSON.stringify(await ev(`(() => {
+  const g = ${GEN_GROUP_FIND}
+  if (!g) return []
+  g.querySelector('.tb-caret')?.click()
+  return []
+})()`).then(async () => { await sleep(350); return ev(`[...document.querySelectorAll('.tools .tb-menu .ctx-item')].map(x=>x.innerText.trim())`) })))
+console.log('  点批量生单 =', await clickGenerateItem('批量生单'))
+for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
+await sleep(900)
+console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
+await shot('08-qc-recv-batch-dialog.png')
+await ensureNoDialog()
+
+// ============ F. 送料暂收单:单张生单(主按钮)= 同一个对话框(以前是一把梭) ============
+console.log('== F. 送料暂收单 生单(主按钮) ==')
+console.log('  点生单 =', await clickGenerateMain())
+for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('.gl-doc')`)) break; await sleep(300) }
+await sleep(800)
+console.log('  对话框:', JSON.stringify(await dialogSummary(), null, 1))
+await shot('09-qc-recv-single-dialog.png')
+await ensureNoDialog()
 
 try { edge.kill() } catch {}
 console.log('DONE(未生成任何单据)')

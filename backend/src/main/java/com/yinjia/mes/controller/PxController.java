@@ -57,6 +57,13 @@ public class PxController {
     private final com.yinjia.mes.service.WorkOrderPickService woPick;
     /** 工单扫码领料的逐笔留痕(2026-10-21):扫了哪些料/各多少/什么时候 */
     private final com.yinjia.mes.service.WoPickScanLogService woPickLog;
+    /**
+     * 统一生单对话框的两个「自己算行」的动作(2026-10-31):
+     * 送料暂收单按商品档案分流({@link com.yinjia.mes.panel.QcRecvGenerateHandler}),
+     * 销售订单按行转工单({@link com.yinjia.mes.service.QuickScheduleService}),见 generateByAction。
+     */
+    private final com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate;
+    private final com.yinjia.mes.service.QuickScheduleService quickSchedule;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -74,7 +81,9 @@ public class PxController {
                         com.yinjia.mes.service.QueryService queryService,
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.service.WorkOrderPickService woPick,
-                        com.yinjia.mes.service.WoPickScanLogService woPickLog) {
+                        com.yinjia.mes.service.WoPickScanLogService woPickLog,
+                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
+                        com.yinjia.mes.service.QuickScheduleService quickSchedule) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -93,6 +102,8 @@ public class PxController {
         this.rdFlow = rdFlow;
         this.woPick = woPick;
         this.woPickLog = woPickLog;
+        this.qcRecvGenerate = qcRecvGenerate;
+        this.quickSchedule = quickSchedule;
     }
 
     // ============ 工单扫码领料取数(2026-10-21,手机端) ============
@@ -789,12 +800,17 @@ public class PxController {
                 Map<String, Object> row = new java.util.LinkedHashMap<>();
                 row.put("sourceNo", sourceNo);
                 try {
-                    Map<String, Object> res = pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user,
+                    Map<String, Object> res = generateByAction(sourcePanel, action, sourceNo, user,
                             qtyByLine.isEmpty() ? null : qtyByLine,
                             m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")));
                     row.put("编号", res.get("编号"));
                     row.put("面板", res.getOrDefault("gotoPanel", target));
                     row.put("批次号", res.get("批次号"));
+                    // 一条动作两个去向的生单(暂收单 → 检验/入库):把「生成清单」原样带给界面,
+                    // 否则用户只看到一张单的号,以为另一张漏了(见 QcRecvGenerateHandler)
+                    if (res.get("生成清单") instanceof List<?> made2) row.put("生成清单", made2);
+                    if (res.get("未登记商品") instanceof List<?> missing) row.put("未登记商品", missing);
+                    if (res.get("编号清单") instanceof List<?> nos) row.put("编号清单", nos);
                     made.add(row);
                 } catch (Exception e) {
                     row.put("原因", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
@@ -823,6 +839,49 @@ public class PxController {
             for (String s : String.valueOf(raw).split("[,，]")) if (!s.isBlank()) out.add(s.trim());
         }
         return out;
+    }
+
+    /**
+     * 按动作分派「一张来源单的生单」。
+     *
+     * <p>绝大多数动作走通用处理器({@link PushGenerateHandler#generateOne},内部再分分批/普通两条);
+     * 只有两个动作**自己算行**(与 {@link PushGenerateHandler} 的 CUSTOM_OWNED 同一份清单),
+     * 因为它们的落库语义不是"按头行映射存一张单":
+     * <ul>
+     *   <li><b>送料暂收单 → 检验或入库单</b>:按商品档案「来料检验」把行**分成两组各出一张**
+     *       ({@link com.yinjia.mes.panel.QcRecvGenerateHandler#generateSelected});</li>
+     *   <li><b>销售订单 → 生产工单</b>:按订单行 1:1 落 plang + 工艺路线/工序台账
+     *       ({@link com.yinjia.mes.service.QuickScheduleService#generateFromOrderLines})。</li>
+     * </ul>
+     * 2026-10-31:这两条此前被排除在「勾选 + 数量」之外(送料暂收单连勾选框都没有),现在一并接上。
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> generateByAction(String sourcePanel, String action, String sourceNo, String user,
+                                                 Map<String, Double> qtyByLine, String batchNo) {
+        if (com.yinjia.mes.panel.QcRecvGenerateHandler.PANEL.equals(sourcePanel)
+                && com.yinjia.mes.panel.QcRecvGenerateHandler.ACTION.equals(action)) {
+            return qcRecvGenerate.generateSelected(sourceNo, user, qtyByLine);
+        }
+        if ("SO_ORDER".equals(sourcePanel) && "生成生产工单".equals(action)) {
+            // 行键 = {单号}#{行id} → 转单服务要的是行id → 本次数量
+            Map<String, Double> byLineId = new java.util.LinkedHashMap<>();
+            if (qtyByLine != null) {
+                for (Map.Entry<String, Double> e : qtyByLine.entrySet()) {
+                    String k = e.getKey();
+                    int hash = k == null ? -1 : k.lastIndexOf('#');
+                    if (hash < 0) continue;
+                    byLineId.put(k.substring(hash + 1), e.getValue());
+                }
+            }
+            List<String> created = quickSchedule.generateFromOrderLines(sourceNo, user, byLineId);
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            out.put("编号", created.get(0));
+            out.put("编号清单", created);
+            out.put("单据状态", "草稿");
+            out.put("gotoPanel", "WORK_ORDER_LIST");
+            return out;
+        }
+        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo);
     }
 
     /** 报表栏目设置读取(报表表头筛选与排序补丁) */    @GetMapping("/reportColumnSettings")

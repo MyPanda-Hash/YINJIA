@@ -207,7 +207,10 @@ async function load() {
     meta.targetName = res?.targetName || ''
     meta.batchFlow = !!res?.batchFlow
     meta.overRatio = Number(res?.overRatio || 0)
-    ratioPct.value = Math.round(meta.overRatio * 100)
+    // 超送比例**只对分批送料链路有效**(收料允许超送);普通链路(销售出库/生产工单/加工单)
+    // 没有超送额度 —— 上限就是剩余量。这里必须置 0,否则「可生单」会显示成 数量×1.2,
+    // 用户照着填 60 再被后端按 50 拒掉(2026-10-31 实测到)。
+    ratioPct.value = meta.batchFlow ? Math.round(meta.overRatio * 100) : 0
     for (const k of Object.keys(qtyOf)) delete qtyOf[k]
     for (const k of Object.keys(pickedByDoc)) delete pickedByDoc[k]
     for (const k of Object.keys(batchNoOf)) delete batchNoOf[k]
@@ -248,20 +251,29 @@ async function confirm() {
     })
     const made = res?.['生成'] || []
     failed.value = res?.['失败'] || []
-    if (made.length) {
-      const list = made.map((m) => (m['批次号'] ? `${m['编号']}(${m['批次号']})` : m['编号'])).join('、')
-      ElMessage.success(`${tt('已生成')} ${made.length} ${tt('张单据')}：${list}`
+    // 一条动作两个去向(暂收单 → 来料检验单 + 采购入库单)时,后端把这两张放在该来源单的
+    // 「生成清单」里 —— 这里摊平后再数张数/回显单号,否则界面上只报一张,用户会以为另一张没出。
+    const created = made.flatMap((m) => (Array.isArray(m['生成清单']) && m['生成清单'].length
+      ? m['生成清单'].map((x) => ({ 编号: x['编号'], 面板: x['面板'], 批次号: x['批次号'], 面板名称: x['面板名称'] }))
+      : [{ 编号: m['编号'], 面板: m['面板'], 批次号: m['批次号'] }]))
+    const missing = made.flatMap((m) => (Array.isArray(m['未登记商品']) ? m['未登记商品'] : []))
+    if (created.length) {
+      const list = created.map((m) => (m['批次号'] ? `${m['编号']}(${m['批次号']})` : m['编号'])).join('、')
+      ElMessage.success(`${tt('已生成')} ${created.length} ${tt('张单据')}：${list}`
         + (failed.value.length ? `（${tt('失败')} ${failed.value.length}）` : ''))
+      if (missing.length) {
+        ElMessage.warning(`${tt('商品档案未登记的商品按免检（否）处理')}：${[...new Set(missing)].join('、')}`)
+      }
     }
-    if (failed.value.length && !made.length) {
+    if (failed.value.length && !created.length) {
       ElMessage.error(failed.value[0]['原因'] || tt('生单失败'))
     }
-    if (!made.length) return
+    if (!created.length) return
     emit('generated', {
-      panel: res?.targetPanel || meta.targetPanel,
-      no: made[0]?.['编号'] || '',
-      count: made.length,
-      docs: made,
+      panel: created[0]?.['面板'] || res?.targetPanel || meta.targetPanel,
+      no: created[0]?.['编号'] || '',
+      count: created.length,
+      docs: created,
       failed: failed.value,
       sourceCount: props.sourceNos.length,
     })

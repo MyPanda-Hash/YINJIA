@@ -4795,6 +4795,13 @@ export default {
     '生成销售出库单': 'Generate Sales Issue',
     '生成产成品入库单': 'Generate Finished Goods Receipt',
     '生成检验或入库单': 'Generate Inspection/Receipt',
+    // 多去向面板的「批量生单」下拉项(文案带动作名区分;见 PanelxList.batchGenerateItems)
+    '批量生单·生成生产工单': 'Batch Generate · Work Order',
+    '批量生单·生成销售出库单': 'Batch Generate · Sales Issue',
+    '勾选的单据都不是「已审核」状态：生单只能已审核单据': 'None of the ticked documents is approved; only approved documents can be generated',
+    '已跳过': 'Skipped',
+    '张非已审核单据': 'non-approved document(s)',
+    '已生成生产工单：': 'Work order created: ',
   },
 
 }

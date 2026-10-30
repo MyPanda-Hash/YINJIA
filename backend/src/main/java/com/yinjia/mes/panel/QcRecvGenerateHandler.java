@@ -79,40 +79,80 @@ public class QcRecvGenerateHandler implements PanelActionHandler {
     public Map<String, Object> handle(PanelActionContext context) {
         Object noObj = context.formData() == null ? null : context.formData().get("编号");
         if (noObj == null || String.valueOf(noObj).isBlank()) throw new IllegalArgumentException("缺少表单编号");
-        String sourceNo = String.valueOf(noObj);
-        String user = context.userName();
+        return generateSelected(String.valueOf(noObj), context.userName(), null);
+    }
 
+    /**
+     * 按「勾选的行 + 本次数量」生单(2026-10-31 用户口径:统一生单对话框)。
+     *
+     * <p>用户报障:「所有单据只要有生单和批量生单这个按钮的,都要实现,**送料暂收就不能批量,
+     * 而且生单也没有勾选**」—— 暂收单这条链原先因为"自己分流"被列为定制化,按钮就只能整单一把梭。
+     * 现在把分流逻辑**原样保留**(按商品档案「来料检验」把行分成 检验 / 免检直达 两组),
+     * 只是每组的行与数量由对话框决定。
+     *
+     * @param qtyByLineKey 行键 → 本次数量;**null/空 = 整单剩余全送**(等价于旧的一键生单)
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateSelected(String sourceNo, String user, Map<String, Double> qtyByLineKey) {
         // 1) 候选行 + 剩余量:取自 batchLines(与 generateBatch 的校验同一份口径,免得两处各算一套)
         Map<String, Object> probe = pushGenerate.batchLines(PANEL, INSPECTION_TARGET, sourceNo);
         List<Map<String, Object>> rows = probe.get("lines") instanceof List<?> l
                 ? (List<Map<String, Object>>) l : List.of();
+        Map<String, Map<String, Object>> byKey = new LinkedHashMap<>();
+        for (Map<String, Object> r : rows) byKey.put(str(r.get("lineKey")), r);
 
-        // 2) 商品基本档案的「来料检验」:一次 IN 查询拿全,不逐行查库
-        Map<String, String> flags = inspectionFlagsOf(rows);
-
-        // 3) 逐行分流(剩余量为 0 的行 = 已送满,不参与)
-        Map<String, Double> toInspection = new LinkedHashMap<>();
-        Map<String, Double> toReceipt = new LinkedHashMap<>();
-        Set<String> unregistered = new LinkedHashSet<>();
-        for (Map<String, Object> r : rows) {
-            double qty = numOf(r.get("剩余数量"));
-            if (qty <= EPS) continue;
-            String lineKey = str(r.get("lineKey"));
-            if (lineKey.isEmpty()) continue;
-            String code = str(r.get("物料编码"));
-            String flag = flags.get(code.trim());
-            if (INSPECTION_YES.equals(flag)) {
-                toInspection.put(lineKey, qty);
-            } else {
-                if (flag == null) unregistered.add(code);   // 档案里查不到 → 按否(免检),并把编码报给前端
-                toReceipt.put(lineKey, qty);
+        // 2) 本次要送的行:null = 全部剩余行(旧行为);否则按对话框勾选的行 + 本次数量
+        Map<String, Double> picked = new LinkedHashMap<>();
+        if (qtyByLineKey == null || qtyByLineKey.isEmpty()) {
+            for (Map<String, Object> r : rows) {
+                double qty = numOf(r.get("剩余数量"));
+                if (qty <= EPS) continue;
+                String lineKey = str(r.get("lineKey"));
+                if (!lineKey.isEmpty()) picked.put(lineKey, qty);
+            }
+        } else {
+            for (Map.Entry<String, Double> e : qtyByLineKey.entrySet()) {
+                double qty = e.getValue() == null ? 0d : e.getValue();
+                if (qty <= EPS) continue;                       // 本次不送
+                Map<String, Object> r = byKey.get(e.getKey());
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + e.getKey());
+                double cap = numOf(r.get("可送上限"));
+                if (qty > cap + EPS) {
+                    // 暂收单明细的「行号」实测可能为空(金蝶导入的行没有 seq),别把提示写成「第 null 行」
+                    String label = r.get("行号") == null || String.valueOf(r.get("行号")).isBlank()
+                            ? "物料 " + str(r.get("物料编码")) + " 这一行"
+                            : "第 " + r.get("行号") + " 行";
+                    throw new IllegalStateException(label + "本次送料量 " + round2(qty)
+                            + " 超出允许上限 " + round2(cap));
+                }
+                picked.put(e.getKey(), qty);
             }
         }
-        if (toInspection.isEmpty() && toReceipt.isEmpty()) {
+        if (picked.isEmpty()) {
             throw new IllegalStateException("该单据已无剩余可生单(各明细行均已生成下游单据)");
         }
 
-        // 4) 两组各生成一张草稿(某组无行则不出单)—— 同一事务:任一张失败则两张都不落库
+        // 3) 商品基本档案的「来料检验」:一次 IN 查询拿全,不逐行查库
+        Map<String, String> flags = inspectionFlagsOf(rows);
+
+        // 4) 逐行分流(只看本次挑选的行)
+        Map<String, Double> toInspection = new LinkedHashMap<>();
+        Map<String, Double> toReceipt = new LinkedHashMap<>();
+        Set<String> unregistered = new LinkedHashSet<>();
+        for (Map.Entry<String, Double> e : picked.entrySet()) {
+            Map<String, Object> r = byKey.get(e.getKey());
+            String code = str(r == null ? null : r.get("物料编码"));
+            String flag = flags.get(code.trim());
+            if (INSPECTION_YES.equals(flag)) {
+                toInspection.put(e.getKey(), e.getValue());
+            } else {
+                if (flag == null) unregistered.add(code);   // 档案里查不到 → 按否(免检),并把编码报给前端
+                toReceipt.put(e.getKey(), e.getValue());
+            }
+        }
+
+        // 5) 两组各生成一张草稿(某组无行则不出单)—— 同一事务:任一张失败则两张都不落库
         List<Map<String, Object>> made = new ArrayList<>();
         if (!toInspection.isEmpty()) made.add(generate(INSPECTION_TARGET, sourceNo, user, toInspection));
         if (!toReceipt.isEmpty()) made.add(generate(RECEIPT_TARGET, sourceNo, user, toReceipt));
@@ -127,6 +167,8 @@ public class QcRecvGenerateHandler implements PanelActionHandler {
         if (!unregistered.isEmpty()) out.put("未登记商品", new ArrayList<>(unregistered));
         return out;
     }
+
+    private static double round2(double v) { return Math.round(v * 100.0) / 100.0; }
 
     /**
      * 生成一组:委托通用分批生单({@link PushGenerateHandler#generateBatch})—— 头行映射、批次号继承、

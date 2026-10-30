@@ -46,7 +46,9 @@ test('对话框 + 左栏 + 列表页新增文案在 en.js 都有词条', () => {
   const keys = [...ttKeys(dialog), ...ttKeys(rail)]
   // 列表页只用本功能新增的那几条(整份 PanelxList 有上千条历史文案,不在本闸范围内)
   for (const k of ['批量生单', '请先在左侧单据列表勾选要生单的单据', '该面板没有可批量生单的下游链路',
-    '已生成新单据，可在目标面板查看', '请先选择一张单据']) keys.push(k)
+    '已生成新单据，可在目标面板查看', '请先选择一张单据',
+    '勾选的单据都不是「已审核」状态：生单只能已审核单据', '已跳过', '张非已审核单据',
+    '已生成生产工单：']) keys.push(k)
   const missing = [...new Set(keys)].filter((k) => !en.includes("'" + k + "'"))
   assert.deepEqual(missing, [], 'en.js 缺词条:\n' + missing.join('\n'))
 })
@@ -65,8 +67,11 @@ test('「批量生单」是生单组的下拉项,且没有勾选时先提示而�
   assert.match(list, /action === '批量生单'/, 'onButton 必须接住这个动作')
   assert.match(list, /请先在左侧单据列表勾选要生单的单据/,
     '没勾单据就点批量生单时应先提示,不能弹一个空对话框')
-  assert.match(list, /openGenerateDialog\(batchGenerateAction\.value, railChecked\.value\)/,
-    '批量生单的取数来源必须是左栏勾选(railChecked)')
+  assert.match(list, /openGenerateDialog\(item\.action, audited\.map\(docNoOfRow\)\)/,
+    '批量生单的取数来源必须是左栏勾选(railChecked),且只送已审核的那几张')
+  // 多去向面板(销售订单:生成生产工单 / 生成销售出库单)要各出一项,否则两项同名没法选
+  assert.match(list, /batchGenerateItems = computed/, '批量生单项要按生单动作派生')
+  assert.match(list, /批量生单·/, '一个生单动作一项,多动作面板文案要带动作名区分')
 })
 
 test('左栏勾选列由「有批量生单链路」驱动,并且状态按单号保管', () => {
@@ -76,12 +81,28 @@ test('左栏勾选列由「有批量生单链路」驱动,并且状态按单号�
   assert.match(list, /railSelectable = computed/, '是否显示勾选列由面板能力派生')
 })
 
-test('非定制化生单走对话框;定制化动作保持直接调用', () => {
-  assert.match(list, /CUSTOM_GENERATE_ACTIONS = new Set\(\['SO_ORDER\|生成生产工单', 'QC_RECV\|生成检验或入库单'\]\)/,
-    '定制化生单清单必须与后端 PushGenerateHandler.CUSTOM_OWNED 一致')
-  assert.match(list, /actionPushTarget && !isCustomGenerate\(action\)/,
-    '非定制化的推式生单要改走统一对话框')
-  assert.match(list, /openGenerateDialog\(action, \[no\]\)/, '单张生单 = 对话框里只列这一张')
+test('所有推式生单都走对话框(不再有"定制化例外")', () => {
+  // 用户口径(10-31 第二轮)「所有单据只要有生单和批量生单这个按钮的,都要实现 ——
+  // 送料暂收就不能批量,而且生单也没有勾选」⇒ 不能再按动作名排除
+  assert.ok(!/CUSTOM_GENERATE_ACTIONS|isCustomGenerate/.test(list),
+    '不该再有"定制化动作不走对话框"的白名单(它是送料暂收单没有勾选的根因)')
+  assert.match(list, /generatableActions = computed\(\(\) => Object\.keys\(pushTargets\.value\)\)/,
+    '可生单动作 = metadata.pushTargets 的全部键')
+  assert.match(list, /if \(actionPushTarget\) \{[\s\S]{0,200}openGenerateDialog\(action, \[no\]\)/,
+    '只要有推式生单目标就开对话框(单张)')
   // 分批源头那一跳(采购订单→送料暂收单)的分批对话框必须原样保留
-  assert.match(list, /needBatchDialog\(actionPushTarget\)/, '分批送料对话框不能被新对话框顶掉')
+  assert.match(list, /needBatchDialog\(actionPushTarget, action\)/, '分批送料对话框不能被新对话框顶掉')
+  // 但"目标面板有批次号"≠"分批送料":生产工单的批次号是完工时才取的,不能弹分批框
+  assert.match(list, /GENERIC_ONLY_ACTIONS = new Set\(\['SO_ORDER\|生成生产工单'\]\)/,
+    '与后端 PushGenerateHandler.GENERIC_ONLY 同一份清单(否则生成生产工单会弹「分批送料」)')
+})
+
+test('生单结果支持「一单生两张」与生产工单跳转', () => {
+  // 送料暂收单 → 检验单 + 入库单(一条动作两个去向)
+  assert.match(dialog, /m\['生成清单'\]/, '对话框要把「生成清单」摊平后计数,否则只报一张')
+  assert.match(dialog, /商品档案未登记的商品按免检（否）处理/, '未登记商品要提示(与旧 callButton 路径同口径)')
+  assert.match(list, /String\(panel\) === 'WORK_ORDER_LIST'/, '生产工单是独立路由,不能按 /panelx/list 跳')
+  // 普通链路没有超送额度:比例必须置 0,否则"可生单"显示 数量×1.2,填了会被后端按剩余量拒
+  assert.match(dialog, /ratioPct\.value = meta\.batchFlow \? Math\.round\(meta\.overRatio \* 100\) : 0/,
+    '非分批链路的上限 = 剩余量(不带超送比例)')
 })

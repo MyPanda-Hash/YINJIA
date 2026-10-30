@@ -48,6 +48,26 @@ public class QuickScheduleService {
     @Transactional
     @SuppressWarnings("unchecked")
     public List<String> generateFromOrder(String sourceNo, String user) {
+        return generateFromOrderLines(sourceNo, user, null);
+    }
+
+    /**
+     * 按**勾选的订单行 + 本次数量**生成工单(2026-10-31:统一生单对话框)。
+     *
+     * <p>用户口径:「所有单据只要有生单和批量生单这个按钮的,都要实现」。销售订单这一跳原先
+     * 只认整单(前端连勾选框都没有),现在对话框把 行 + 数量 传进来,这里逐行转。
+     *
+     * <p><b>顺带修掉一个死按钮</b>:2026-10-16 给 {@code createFromOrderLine} 加了
+     * 「工艺路线必须已审核」的闸门(route 为空直接拒),而本方法(4 参重载)一直传 route=null ⇒
+     * 「生单」按钮**每次都报「未选择工艺路线,不能转工单」**,实测 ZL-20260916-01 复现。
+     * 现按 {@link #resolveRoute} 取产品档案绑定的路线(→ 默认 GY-CB-STD)再走同一道审核闸门:
+     * 路线已审核就正常转;未审核仍拒(提示去订单结转处选一条已审核路线) —— 闸门不放松,只是不再恒空。
+     *
+     * @param qtyByLineKey 行id(字符串) → 本次数量;**null/空 = 全部剩余行**(旧「整单生单」行为)
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public List<String> generateFromOrderLines(String sourceNo, String user, Map<String, Double> qtyByLineKey) {
         requireAudited(sourceNo);
         PanelRegistry.PanelDef soDef = registry.panel("SO_ORDER");
         Map<String, Object> src = queryService.loadOneDoc(soDef, sourceNo);
@@ -61,8 +81,24 @@ public class QuickScheduleService {
         for (Map<String, Object> line : lines) {
             String lineId = str(line.get("id"));
             if (lineId == null) continue;
-            if (residual(sourceNo, lineId, line) <= 0.0001) continue;   // 剩余为 0:已生成的行跳过
-            created.add(createFromOrderLine(sourceNo, lineId, null, user));
+            Double override = null;
+            if (qtyByLineKey != null && !qtyByLineKey.isEmpty()) {
+                override = qtyByLineKey.get(lineId);
+                if (override == null || override <= 0) continue;      // 没勾选的行不转
+            }
+            double left = residual(sourceNo, lineId, line);
+            if (left <= 0.0001) {
+                if (qtyByLineKey != null && !qtyByLineKey.isEmpty()) {
+                    throw new IllegalStateException("第 " + str(line.get("行号")) + " 行已全部转出(剩余可转数量 0)");
+                }
+                continue;                                             // 整单模式:剩余 0 的行跳过
+            }
+            // createFromOrderLine 对超量是 Math.min 静默截断 —— 这里先拦,免得"填 100 只转出 40"没人说
+            if (override != null && override > left + 0.0001) {
+                throw new IllegalStateException("第 " + str(line.get("行号")) + " 行本次转单数量 " + override
+                        + " 超出剩余可转数量 " + left);
+            }
+            created.add(createFromOrderLine(sourceNo, lineId, override, user, resolveRoute(str(line.get("存货编码")))));
         }
         if (created.isEmpty()) throw new IllegalStateException("该订单明细行均已生成生产工单,无需重复生成(如需调整请先删除对应工单草稿)");
         return created;

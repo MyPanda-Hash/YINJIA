@@ -3284,10 +3284,12 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   // 「批量生单」是生单组的**下拉项**(2026-10-31 用户口径:「在生单下多写一个批量生单的功能」):
   // 追加在生单组动作末尾 —— 组里只有一个动作时也因此在主按钮右侧出现 ▼,下拉里就是它。
-  // 判据用 railSelectable(面板要有左栏勾选列 + 有非定制化生单链路):没有左栏就没法勾单据,
+  // 判据用 railSelectable(面板要有左栏勾选列 + 有生单链路):没有左栏就没法勾单据,
   // 硬放一颗点了只会提示"请先勾选"的按钮,是死入口。
-  if (name === '生单' && railSelectable.value && !actions.includes('批量生单')) {
-    return { ...group, name, actions: [...actions, '批量生单'] }
+  // 一个生单动作一项(销售订单有 生成生产工单 / 生成销售出库单 两个去向,文案带动作名区分)。
+  if (name === '生单' && railSelectable.value) {
+    const extra = batchGenerateItems.value.map((it) => it.label).filter((l) => !actions.includes(l))
+    if (extra.length) return { ...group, name, actions: [...actions, ...extra] }
   }
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
@@ -4689,37 +4691,57 @@ async function panelHasBatchField(panel) {
 /**
  * 生单是否走「分批送料对话框」——**只在批次源头那一跳**(用户口径 2026-09-20):
  * 采购订单→送料暂收单:来源(订单)无批次号 → 弹框逐行填本次送料量,可多次分批;
- * 送料暂收→来料检验:来源已带批次号 → **一键整单生单**(送检数量 = 剩余全部,批次号继承),不弹框。
+ * 送料暂收→来料检验:来源已带批次号 → 走统一生单对话框(批次号继承),不弹分批框。
+ *
+ * ⚠ 判据不能只看"目标面板有没有表头批次号"(2026-10-31 实测踩到):生产工单(MANU_ORDER)也登记了
+ * 批次号,但它的是**完工时才取的生产批号**,转工单既不取号也不继承;照分批处理会让「生成生产工单」
+ * 弹出「分批送料」对话框(用户报障截图:点生单弹出分批送料)。故与后端
+ * {@code PushGenerateHandler.GENERIC_ONLY} 同一份清单,把这些动作排除。
  */
-async function needBatchDialog(target) {
+const GENERIC_ONLY_ACTIONS = new Set(['SO_ORDER|生成生产工单'])
+async function needBatchDialog(target, action) {
   if (!target) return false
+  if (GENERIC_ONLY_ACTIONS.has(String(panelCode.value) + '|' + action)) return false
   if (!(await panelHasBatchField(target))) return false
   return !(await panelHasBatchField(panelCode.value))
 }
 // ══════════ 统一生单对话框 / 批量生单(2026-10-31 用户口径)══════════
 /**
- * 用户口径(2026-10-31):
- *   ① 「在生单下多写一个**批量生单**的功能」——左侧单据选择栏勾多张来源单,点「生单 ▼ → 批量生单」,
- *      打开一个界面列出这些单据的明细行,再挑行/填量转单;
+ * 用户口径:
+ *   ① (10-31 第一轮)「在生单下多写一个**批量生单**的功能」——左侧单据选择栏勾多张来源单,
+ *      点「生单 ▼ → 批量生单」,打开一个界面列出这些单据的明细行,再挑行/填量转单;
  *   ② 「**生单**也要变成可以勾选的和选择数量的(现在只有采购订单的生单做了特殊处理),
- *      非定制化的生单只要可以勾选和选择数量就可以」。
+ *      非定制化的生单只要可以勾选和选择数量就可以」;
+ *   ③ (10-31 第二轮,本段)「所有单据只要有生单和批量生单这个按钮的,都要实现 ——
+ *      **送料暂收就不能批量,而且生单也没有勾选**」。
  *
- * 所以:凡是**非定制化**的推式生单(后端 PushGenerateHandler 通用映射接管的那些),
- * 点「生单」不再一把梭整单,而是打开 {@link GenerateLinesDialog}(勾行 + 本次数量);
- * 定制化动作(后端 CUSTOM_OWNED,自己算行/自己分流)保持原样直接调用后端。
+ * 所以现在**没有"定制化例外"**:凡是 metadata.pushTargets 里登记的生单动作,点「生单」都开
+ * {@link GenerateLinesDialog}(勾行 + 本次数量)。原先排除的两个动作由后端按动作分派自己算行
+ * (见 PxController.generateByAction):
+ *   · 送料暂收单 → 检验或入库单:仍按商品档案「来料检验」分流,只是行/数量由对话框给;
+ *   · 销售订单 → 生产工单:按行 1:1 落 plang,数量取本次填的值(顺带修好它"未选择工艺路线"的死按钮)。
  * 采购订单 → 送料暂收单 这一跳仍是原来的分批送料对话框(材料码隔离行/超送比例/批次号那套口径不动),
  * 但它的「批量生单」走新对话框(N 张单各一段明细,同一套勾选+数量)。
  */
-const CUSTOM_GENERATE_ACTIONS = new Set(['SO_ORDER|生成生产工单', 'QC_RECV|生成检验或入库单'])
-const isCustomGenerate = (action) => CUSTOM_GENERATE_ACTIONS.has(String(panelCode.value) + '|' + action)
 /** 后端 metadata.pushTargets:{ 生单动作 → 目标面板 } */
 const pushTargets = computed(() => cfgCache.value?.metadata?.pushTargets || {})
-/** 可走「勾选明细 + 本次数量」的推式生单动作(非定制) */
-const generatableActions = computed(() => Object.keys(pushTargets.value).filter((a) => !isCustomGenerate(a)))
-/** 「批量生单」用的动作(同一面板最多一个可批量生单的下游链路;多于一个时取第一个) */
-const batchGenerateAction = computed(() => generatableActions.value[0] || '')
+/** 可走「勾选明细 + 本次数量」的推式生单动作(= 全部已登记链路的动作) */
+const generatableActions = computed(() => Object.keys(pushTargets.value))
+/**
+ * 「批量生单」下拉项:一个生单动作一项。
+ *  • 只有一个动作 → 文案就是「批量生单」(绝大多数面板:采购订单/暂收单/生产工单);
+ *  • 多个动作(销售订单:生成生产工单 / 生成销售出库单)→ 文案带动作名区分去向,否则两项同名没法选。
+ */
+const batchGenerateItems = computed(() => {
+  const acts = generatableActions.value
+  if (!acts.length) return []
+  return acts.map((action) => ({
+    action,
+    label: acts.length === 1 ? '批量生单' : `批量生单·${tt(action)}`,
+  }))
+})
 /** 左栏勾选框只在「有批量生单链路 + 有单据选择栏」时出现(报表/文书面板不显示) */
-const railSelectable = computed(() => !!docRailCfg.value && !!batchGenerateAction.value && !reportMode.value)
+const railSelectable = computed(() => !!docRailCfg.value && batchGenerateItems.value.length > 0 && !reportMode.value)
 /** 左栏勾选(单号数组;PanelxList 是唯一真源,翻页/切换当前单都不丢) */
 const railChecked = ref([])
 /** 勾选归属的面板 —— 切面板必须清零:单号是上一个面板的,留着会拿错单去生单 */
@@ -4744,6 +4766,8 @@ function onRailCheckAll({ nos, checked }) {
 const genVisible = ref(false)
 const genAction = ref('')
 const genDocNos = ref([])
+/** 列表行 → 单号(与 DocSelectRail 的取值顺序一致:编号 → 单据编号 → 单号) */
+const docNoOfRow = (r) => String(r?.['编号'] || r?.['单据编号'] || r?.['单号'] || '')
 function openGenerateDialog(action, sourceNos) {
   const nos = (sourceNos || []).filter(Boolean)
   if (!action || !nos.length) return
@@ -4753,14 +4777,24 @@ function openGenerateDialog(action, sourceNos) {
 }
 /**
  * 生单完成:
- * · 单张 → 与推式生单同款(关源页签、开目标页签、新单按创建时间倒序在第一张);
- * · 多张 → 留在来源列表刷新(用户多半还要接着挑/接着送),勾选清零。
+ * · 只生成 1 张 → 与推式生单同款(关源页签、开目标页签,新单按创建时间倒序在第一张);
+ * · 生成多张(批量生单,或"一条动作两个去向"如 暂收单→检验单+入库单)→ 留在来源列表刷新
+ *   (用户多半还要接着挑),勾选清零 —— 跳走反而看不到刚生成的那几张。
+ * · 生产工单是**独立路由**(落 plang,不是 panelx 面板),要跳 /prod/plan/workOrderList。
  */
 function onGenerateDone({ panel, no, count }) {
   railChecked.value = []
   if (count > 1) {
     ElMessage.info(tt('已生成新单据，可在目标面板查看'))
     load()
+    return
+  }
+  if (String(panel) === 'WORK_ORDER_LIST') {
+    ElMessage.success(tt('已生成生产工单：') + no)
+    const targetPath = '/prod/plan/workOrderList'
+    tabs.close(route.path)
+    router.push(targetPath)
+    tabs.open({ path: targetPath, title: '生产工单' })
     return
   }
   onBatchGenerated({ panel, no, silent: true })
@@ -9677,10 +9711,19 @@ async function onButton(action) {
     return
   }
   // 批量生单(2026-10-31 用户口径):左栏勾多张来源单 → 统一生单对话框(勾行 + 本次数量)
-  if (action === '批量生单') {
-    if (!batchGenerateAction.value) return ElMessage.warning(tt('该面板没有可批量生单的下游链路'))
+  // 一个生单动作一个下拉项(多动作面板文案带动作名),按文案回找对应动作。
+  if (action === '批量生单' || action.startsWith('批量生单·')) {
+    const item = batchGenerateItems.value.find((it) => it.label === action)
+    if (!item) return ElMessage.warning(tt('该面板没有可批量生单的下游链路'))
     if (!railChecked.value.length) return ElMessage.warning(tt('请先在左侧单据列表勾选要生单的单据'))
-    openGenerateDialog(batchGenerateAction.value, railChecked.value)
+    // 后端只认「已审核」可生单(与单张生单同一句话)。勾选里混了草稿就跳过并说清,
+    // 不要让他们在对话框里看到一片灰行才明白(2026-10-31 实测:第一张就是草稿)。
+    const rows = list.value.filter((r) => railChecked.value.includes(docNoOfRow(r)))
+    const audited = rows.filter((r) => String(r['单据状态'] || '') === '已审核')
+    if (!audited.length) return ElMessage.warning(tt('勾选的单据都不是「已审核」状态：生单只能已审核单据'))
+    const skipped = rows.length - audited.length
+    if (skipped > 0) ElMessage.warning(`${tt('已跳过')} ${skipped} ${tt('张非已审核单据')}`)
+    openGenerateDialog(item.action, audited.map(docNoOfRow))
     return
   }
   // 批量转ERP:弹窗显示已审核+未转的单据,勾选后批量推送
@@ -9706,17 +9749,18 @@ async function onButton(action) {
       //   (曾误写成不存在的 pushTargetLike(action) ⇒ 点击时抛 ReferenceError,
       //    表现为"点打印完全没反应、无请求无提示",2026-10-25 实测踩到。)
       const actionPushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
-      if (actionPushTarget && await needBatchDialog(actionPushTarget)) {
+      if (actionPushTarget && await needBatchDialog(actionPushTarget, action)) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning('请先选择一张单据')
         batchSend.value = { sourcePanel: panelCode.value, targetPanel: actionPushTarget, sourceNo: no }
         batchSendVisible.value = true
         return
       }
-      // 非定制化的推式生单(2026-10-31 用户口径「生单也要变成可以勾选的和选择数量的」):
-      // 不再整单一键生成,而是打开统一生单对话框 —— 勾明细行 + 填本次数量(默认全选有剩余的行)。
-      // 定制化动作(如 生成生产工单/生成检验或入库单,自己算行或按行分流)保持原路径直接调后端。
-      if (actionPushTarget && !isCustomGenerate(action)) {
+      // 推式生单(2026-10-31 用户口径「所有单据只要有生单和批量生单这个按钮的,都要实现」):
+      // 一律先开统一生单对话框 —— 勾明细行 + 填本次数量(默认全选有剩余的行)。
+      // 两个"自己算行"的动作(生成生产工单 / 生成检验或入库单)也一样:后端按动作分派到各自的
+      // 服务(见 PxController.generateByAction),行与数量都由对话框给。
+      if (actionPushTarget) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning(tt('请先选择一张单据'))
         openGenerateDialog(action, [no])
