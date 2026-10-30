@@ -294,7 +294,21 @@ const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window
 
 const isDone = computed(() => String(doc.value.状态 || '') === '已完成')
 /** 这张单是否含退料(抬头「退料单号」非空 = 退过料) */
-const hasReturn = computed(() => !!(doc.value.退料单号 && String(doc.value.退料单号).trim()))
+/**
+ * 这张单是否含退料(抬头「含退料」徽标 + 退料单号)。
+ *
+ * <p>🔴 2026-10-30 修正:**只有"已完成"的单才谈得上退料**。
+ * 退料是提交过账**之后**的后续动作(见 submitReturn 的 requireReturnable 闸门);
+ * 一张**未完成**的单不可能退过料。之前这里只看"退料单号非空",于是:
+ * <ul>
+ *   <li>第一版遗留的"生单时预建的空退料单"(OI-2026-10-0005)残留在台账上,
+ *       让未完成的 LL-2026-10-0007 顶着「含退料」徽标 —— 用户 2026-10-30 截图报障的正是这个;</li>
+ *   <li>已作废的退料单也可能还写着单号。</li>
+ * </ul>
+ * ⇒ 判据加上"必须已完成";遗留脏数据由 migrate-wo-pick-return-cleanup-20261030.sql 清理。
+ */
+const hasReturn = computed(() => isDone.value
+  && !!(doc.value.退料单号 && String(doc.value.退料单号).trim()))
 const progress = computed(() => pickProgress(pickRows.value))
 const rows = computed(() => pickRows.value)
 const shortage = computed(() => round4((Number(curQty.value) || 0) - batchRows.value.reduce((s, b) => s + round4(b.qty), 0)))

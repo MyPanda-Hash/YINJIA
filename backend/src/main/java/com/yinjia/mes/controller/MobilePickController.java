@@ -605,7 +605,7 @@ public class MobilePickController {
         out.put("单位", str(hit.get("单位")));
         out.put("行号", hit.get("行号"));
         out.put("仓库", wh);
-        out.put("BOM用量", num(hit.get("BOM用量")));
+        out.put("BOM用量", bomUsageOf(str(hit.get("明细备注"))));
         out.put("当前数量", num(hit.get("数量")));
         // 允许上限:领料看库房有多少;退料看这单领了多少(退料不能退得比领的多)
         double cap = "back".equals(side) ? num(hit.get("数量")) : total;
