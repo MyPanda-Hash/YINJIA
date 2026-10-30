@@ -4941,6 +4941,32 @@ export default {
     '小批次号': 'Sub-batch No.',
     '批次来源': 'Batch source',
 
+    // ---- 生产工单·批量排产(2026-10-30 用户口径:多个工单排入同一组产线,排产数量逐行算)----
+    '批量排产': 'Batch Scheduling',
+    '批量排产（快速排产）': 'Batch Scheduling (Quick Scheduling)',
+    '本批工序': 'Batch operations',
+    '工序不同': 'Different operation',
+    '未绑定工艺路线': 'No process route bound',
+    '以下工单行工序不同或未绑路线，已排除，不参与本批': 'The following work order lines use different operations or have no process route; excluded from this batch',
+    '只排所选这一组;其余组在下方点名排除': 'Only the selected group is scheduled; the others are listed below as excluded',
+    '本批各行换算率不同：计划量按各行自己的工艺路线分别换算，互不影响': 'Conversion rates differ in this batch: planned quantities are converted per line by its own process route, without affecting each other',
+    '每道工序的生产线（整批共用）': 'Production line per operation (shared by the batch)',
+    '计划完工日期留空 = 各行按自己的交期': 'Leave the planned finish date empty = each line uses its own due date',
+    '本批计划量': 'Batch planned qty',
+    '本批工单行（排产数量按各行自己算）': 'Work order lines in this batch (schedule qty per line)',
+    '可逐行改小；不得超过该行需求数量': 'Editable per line; must not exceed that line demand',
+    '各行不同': 'Differs by line',
+    '换算率与首行不同': 'Rate differs from first line',
+    '本行计划量': 'Planned qty (this line)',
+    '产品 / 品名': 'Product / Name',
+    '以下工单行不能排产，已跳过': 'The following work order lines cannot be scheduled and were skipped',
+    '以下工单行已不在待排产池（可能已被排产或结案），已跳过': 'The following work order lines are no longer in the pending pool (scheduled or closed) and were skipped',
+    '已按生产工单页勾选收敛为本批（可多选后点「批量排产」）': 'Scoped to the lines selected on the Work Order page (select multiple, then click Batch Scheduling)',
+    '请先勾选要排产的工单': 'Select the work order lines to schedule first',
+    '排产数量必须大于 0': 'Schedule qty must be greater than 0',
+    '排产数量超过需求数量': 'Schedule qty exceeds demand qty',
+    '批量排产结果': 'Batch scheduling result',
+
   },
 
 }

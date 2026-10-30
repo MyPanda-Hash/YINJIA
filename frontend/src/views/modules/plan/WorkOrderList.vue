@@ -32,7 +32,9 @@
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button v-if="canDo('split')" size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
-      <!-- 工单排产弹窗(2026-10-05 用户口径):**一次只排一行**(勾多行会提示"请只勾选一张工单",与切单同范式);
+      <!-- 工单排产(2026-10-30 用户口径):勾 1 行 = 原内嵌快速排产单行流程;勾 N 行 = 仍打开内嵌
+           快速排产页(①池收敛成勾选的行并默认全选)→「批量排产」= 多个工单排入同一组产线、数量逐行算。
+           已排产/已结案/已完工的行先点名跳过。
            「排产」与快速排产页同一个动作词 assign —— 两处任一授予即可(与后端 requireButtonAny 同口径) -->
       <el-button v-if="canSchedule" size="small" type="success" plain :disabled="!checked.length && !currentRow" @click="openSchedule">{{ tt('排产') }}</el-button>
       <el-button v-if="canDo('split')" size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
@@ -165,11 +167,13 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,按「工单号+工单行号」筛选 ⇒ 只显示这一行 -->
-    <el-dialog v-model="schedVisible" :title="tt('工单排产（快速排产）')" width="94%" top="4vh" append-to-body destroy-on-close
+    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**。
+         单行:按「工单号+工单行号」收敛 ⇒ 只显示这一行;
+         多行(2026-10-30):按「行id列表」把①池收敛成勾选的这些行并默认全选,勾多行点「批量排产」。 -->
+    <el-dialog v-model="schedVisible" :title="schedTitle" width="94%" top="4vh" append-to-body destroy-on-close
                @closed="load">
       <div style="height: 76vh; overflow: hidden">
-        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" embedded />
+        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" :行id列表="schedIds" :工单号列表="schedNos" embedded />
       </div>
     </el-dialog>
 
@@ -314,44 +318,57 @@ const traceVisible = ref(false)
 const traceNo = ref('')
 /** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
 const traceRowId = ref(null)
-/** 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产 */
+/** 工单排产弹窗(2026-10-05 用户口径):带**这一行**的快速排产(单行) */
 const schedVisible = ref(false)
 const schedNo = ref('')
 /** 弹窗要预筛的工单行号(2026-10-15):带上它 ⇒ 快速排产只出这一行,而不是同工单所有行 */
 const schedXc = ref(null)
+/** 多行批量排产(2026-10-30):勾选的行 id / 工单号 —— 带给内嵌快速排产页收敛①池与②已排产 */
+const schedIds = ref([])
+const schedNos = ref([])
+const schedTitle = computed(() => (schedIds.value.length > 1 ? tt('批量排产（快速排产）') : tt('工单排产（快速排产）')))
 /**
- * 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产。
- *
- * <p>2026-10-15 用户拍板:**排产一次只能勾一行** —— 勾多行时不动手,直接提示"请只勾选一张工单"
- * (与「切单」的 splitTarget 同一范式)。理由:排产要逐道工序选线,一次只能针对一行做决策;
- * 批量排产应当去「快速排产」页自己勾(那里有多选批量排入)。
- * ⚠ 上一版曾试图支持"勾 N 行弹窗出 N 行"(加过 `限定行id` 列表通道),按用户口径**已回退**。
+ * 工单排产入口(2026-10-30 用户口径改版):
+ *   · 勾 1 行 = 原流程:内嵌快速排产按「工单号#行号」收敛,再点「排产」逐道选线;
+ *   · 勾 N 行 = 仍打开**内嵌快速排产页**(复用原页面,不新建页面):①池收敛成这 N 行并默认全选,
+ *     点「批量排产」= 多个工单排入同一组产线,排产数量逐行按各行自己算。
+ * 先在前端点名排除不可排的行(已排产/已结案/已完工),避免打开后才发现行在池子里凭空消失。
  */
-function scheduleTarget() {
+function openSchedule() {
   // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
   const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
   const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
   const list = alive.length ? alive : (cur ? [cur] : [])
-  if (list.length !== 1) {
-    ElMessage.warning(list.length === 0 ? tt('请先勾选一张工单')
-      : `${tt('请只勾选一张工单')}（${tt('当前已勾选')} ${list.length} ${tt('张')}）`)
-    return null
-  }
-  const r = list[0]
-  if (r['生产线']) {
-    ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`)
-    return null
-  }
-  return r
-}
+  if (!list.length) { ElMessage.warning(tt('请先勾选要排产的工单')); return }
 
-function openSchedule() {
-  const r = scheduleTarget()
-  if (!r) return
-  schedNo.value = r['工单号']
-  // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
-  //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
-  schedXc.value = r['工单行号'] ?? null
+  const bad = []
+  const ok = []
+  for (const r of list) {
+    const key = `${r['工单号']}${r['工单行号'] != null ? '#' + r['工单行号'] : ''}`
+    if (String(r['生产线'] || '').trim()) bad.push(`${key}（${tt('已排产')}：${r['生产线']}）`)
+    else if (r['结案'] === 'Y') bad.push(`${key}（${tt('已结案')}）`)
+    else if (r['生产状态'] === '完工') bad.push(`${key}（${tt('已完工')}）`)
+    else ok.push(r)
+  }
+  if (bad.length) ElMessage.warning(`${tt('以下工单行不能排产，已跳过')}：${bad.join('、')}`)
+  if (!ok.length) return
+
+  if (ok.length === 1) {
+    const r = ok[0]
+    schedIds.value = []
+    schedNos.value = []
+    schedNo.value = r['工单号']
+    // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
+    //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
+    schedXc.value = r['工单行号'] ?? null
+    schedVisible.value = true
+    return
+  }
+  // 多行:关键字表达不了多张单 ⇒ 不预置 keyword,改把 行id/工单号 列表交给内嵌页收敛
+  schedNo.value = ''
+  schedXc.value = null
+  schedIds.value = ok.map((r) => r['行id']).filter((x) => x != null)
+  schedNos.value = [...new Set(ok.map((r) => r['工单号']).filter(Boolean))]
   schedVisible.value = true
 }
 

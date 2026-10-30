@@ -3,7 +3,11 @@
      2026-10-07 用户口径:排产改为**工序路线排线** —— 勾选一张工单 → 「排产」→ 弹窗里按工艺路线
      逐道选线(人工选,一次选好全程线;计划数量只读)→ 首道线写 plang.scx/plang_pc,全路线写预排台账
      wo_process_line;前道报工完工审核后自动转序到下一道的线。撤销排产会同时作废台账。
-     (原「顶部选线 + 批量排入」入口与 排产班组/预开工/预完工/排产数量 参数随之移除:班组移入弹窗。) -->
+     (原「顶部选线 + 批量排入」入口与 排产班组/预开工/预完工/排产数量 参数随之移除:班组移入弹窗。)
+     2026-10-30 用户口径:生产工单页可**勾选多个工单行**批量排产 —— 仍复用本页面(不新建页面),
+     只把①待排产池收敛成勾选的那些行并默认全选;点「排产」:1 行仍走原单行排线弹窗,
+     多行走新的批量排线弹窗(整批共用每道工序的线;排产数量逐行按各行自己算)。
+     多行行为全部挂在**新增可选参数**「行id列表/工单号列表」后面:不传时查询参数/按钮/弹窗与原来逐字一致。 -->
 <template>
   <div class="sb-page">
 
@@ -21,9 +25,10 @@
       <el-button :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
       <!-- 2026-10-07 用户口径:排产时**一次把整条工艺路线的线选好**(弹窗逐道选线,人工选)。
            2026-10-16 权限:排产=页面面板「排产」动作词(assign);快速排产页与生产工单页两个入口
-           任一授予即可(与后端 requireButtonAny 同口径)。 -->
-      <el-button v-if="canAssign" type="success" :disabled="checked.length !== 1" @click="openPlan(checked[0])">
-        {{ tt('排产') }}
+           任一授予即可(与后端 requireButtonAny 同口径)。
+           2026-10-30:勾 1 行 = 原单行排线弹窗;勾多行 = 批量排线弹窗(整批共用产线、数量逐行算)。 -->
+      <el-button v-if="canAssign" type="success" :disabled="!checked.length" @click="openScheduleChecked">
+        {{ checked.length > 1 ? tt('批量排产') : tt('排产') }}
       </el-button>
       <span class="sb-stats">
         <b v-if="s['车间']" class="sb-shop">{{ tt('当前车间') }}：{{ s['车间'] }}</b>
@@ -37,7 +42,12 @@
 
     <!-- ① 待排产池 -->
     <div class="sb-block">
-      <div class="sb-head"><span class="sb-block-title">① {{ tt('待排产') }}</span><span class="sb-dim">{{ tt('勾选一张工单 → 点「排产」→ 按工艺路线逐道选线(双击行同效)') }}</span></div>
+      <div class="sb-head">
+        <span class="sb-block-title">① {{ tt('待排产') }}</span>
+        <span class="sb-dim">{{ scoped
+          ? tt('已按生产工单页勾选收敛为本批（可多选后点「批量排产」）')
+          : tt('勾选一张工单 → 点「排产」→ 按工艺路线逐道选线(双击行同效)') }}</span>
+      </div>
       <el-table ref="poolTable" :data="pool" size="small" border height="300" empty-text="" row-key="rowKey"
                 @selection-change="onCheck" @row-dblclick="planOne">
         <el-table-column type="selection" width="42" reserve-selection />
@@ -125,17 +135,21 @@
     <ProcessRoutePlanDialog v-model="planVisible" :加工单号="planRow['加工单号'] || ''"
                             :行id="planRow['行id'] ?? null" :工单行号="planRow['工单行号'] || ''"
                             :批次号="planRow['批次号'] || ''" :已排产="planLocked" @changed="loadAll" />
+
+    <!-- 批量排产弹窗(2026-10-30):多行勾选 = 多个工单排入同一组产线;排产数量逐行按各行算 -->
+    <ScheduleBatchDialog v-model="batchVisible" :rows="batchRows" @changed="loadAll" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { canDo, canDoAny } from '@core/auth/panelAccess'
 import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
+import ScheduleBatchDialog from './ScheduleBatchDialog.vue'
 import { filterScheduled, isFiltering } from '@/business/scheduleFilter'
 
 /**
@@ -151,13 +165,24 @@ const canUnassign = computed(() => canDo(user, 'SCHEDULE_BOARD', 'unassign'))
 /** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单;
  *  2026-10-15 补「工单行号」—— 用户口径「工单号+工单行号确定当前唯一工单」:
  *  从生产工单页点「排产」时,弹窗必须只出**那一行**,不能把同工单所有行都列出来。
- *  ⚠ 生产工单页的「排产」**一次只允许勾一行**(勾多行会先提示),所以这里只需单行入参;
- *    曾经加过的「限定行id 列表」(为支持多选)已按用户口径回退。 */
+ *  2026-10-30:生产工单页支持**勾选多行**批量排产 ⇒ 新增可选参数「行id列表/工单号列表」:
+ *    ①池只显示这些行(后端返回全池后前端按行id收敛,不新增后端参数)、默认全选;
+ *    ②已排产只显示这些工单号的已排行。**不传时原行为逐字不变**(单行仍走 keyword=工单号#行号)。 */
 const props = defineProps({
   '工单号': { type: String, default: '' },
   '工单行号': { type: [Number, String], default: null },
   embedded: { type: Boolean, default: false },
+  /** 多行模式:勾选的工单行 id(plang.id);空数组 = 原行为(单行/独立快速排产页) */
+  '行id列表': { type: Array, default: () => [] },
+  /** 多行模式:②已排产 只显示这些工单号(与①同一批工单;空 = 不收敛) */
+  '工单号列表': { type: Array, default: () => [] },
 })
+
+/** 多行模式(2026-10-30):只显示生产工单页勾选的那些行;空 = 原行为 */
+const scopedIds = computed(() => (props['行id列表'] || []).map(String).filter(Boolean))
+const scoped = computed(() => scopedIds.value.length > 0)
+/** 勾选的行已不在待排产池(被别处排掉/结案)时只提示一次,刷新时不反复弹 */
+const missingWarned = ref(false)
 
 const keyword = ref('')
 const customer = ref('')
@@ -185,13 +210,39 @@ async function loadPool() {
   loading.value = true
   try {
     const res = await request.post('/px/scheduleBoard/pending', { keyword: keyword.value, 客户: customer.value })
-    pool.value = (res.data || []).map((r) => ({
+    let list = (res.data || []).map((r) => ({
       ...r,
       rowKey: `${r.加工单号}#${r['行id']}`,
     }))
+    // 2026-10-30 多行模式:后端仍返回待排产池,前端按勾选的 行id 收敛(不新增后端参数;不传 = 原样)
+    if (scoped.value) {
+      const want = new Set(scopedIds.value)
+      const got = new Set()
+      list = list.filter((r) => {
+        const hit = want.has(String(r['行id']))
+        if (hit) got.add(String(r['行id']))
+        return hit
+      })
+      const missing = scopedIds.value.filter((id) => !got.has(id))
+      if (missing.length && !missingWarned.value) {
+        missingWarned.value = true
+        ElMessage.warning(`${tt('以下工单行已不在待排产池（可能已被排产或结案），已跳过')}：${missing.length} ${tt('行')}`)
+      }
+    }
+    pool.value = list
     checked.value = []
     poolTable.value?.clearSelection?.()
+    // 多行模式:生产工单页已经勾过 ⇒ 进来默认全选,直接点「批量排产」
+    if (scoped.value) await selectAllPool()
   } catch (e) { err(e, '查询失败') } finally { loading.value = false }
+}
+
+/** 多行模式:池子收敛后默认全选(逐行 toggle 会触发 selection-change,checked 自动同步) */
+async function selectAllPool() {
+  await nextTick()
+  const t = poolTable.value
+  if (!t) return
+  for (const row of pool.value) t.toggleRowSelection(row, true)
 }
 
 async function loadStats() {
@@ -209,10 +260,17 @@ async function loadToday() {
     const kw = props.embedded ? keyword.value : ''
     const res = await request.post('/px/scheduleBoard/today', { mode: mode.value, keyword: kw })
     // 行唯一键:同一工单可能有多行(多工单行/多批次)⇒ 用 加工单号#工单行号#批次号(否则勾一条会全勾)
-    todayRows.value = (res.data || []).map((r, i) => ({
+    let list = (res.data || []).map((r, i) => ({
       ...r,
       rowKey: `${r['加工单号']}#${r['工单行号'] ?? ''}#${r['批次号'] ?? ''}#${i}`,
     }))
+    // 2026-10-30 多行模式:②只显示「这批工单号」下的已排行(与①同一批,不把无关单铺满屏)
+    const nos = (props['工单号列表'] || []).map(String).filter(Boolean)
+    if (nos.length) {
+      const set = new Set(nos)
+      list = list.filter((r) => set.has(String(r['加工单号'])))
+    }
+    todayRows.value = list
     checkedToday.value = []
   } catch (e) { err(e, '查询失败') }
 }
@@ -263,6 +321,21 @@ function openPlan(row, locked) {
   planVisible.value = true
 }
 function planOne(row) { openPlan(row, false) }
+
+// ───────── 批量排产(2026-10-30):多行勾选 = 多个工单排入**同一组产线** ─────────
+// 用户口径:「排产数量按各行根据各行的算,这样各个工单排产的产线都是相同的 ——
+//   本身当前作为排产的就是实现将多个工单排入相同产线的操作」。
+// 1 行 = 原单行排线弹窗(ProcessRoutePlanDialog,逐道选线 + 一个排产数量);
+// 多行 = 批量排线弹窗(ScheduleBatchDialog,整批共用每道工序的线 + 逐行排产数量)。
+const batchVisible = ref(false)
+const batchRows = ref([])
+function openScheduleChecked() {
+  const list = checked.value || []
+  if (!list.length) { ElMessage.warning(tt('请先勾选要排产的工单')); return }
+  if (list.length === 1) { openPlan(list[0], false); return }
+  batchRows.value = list.slice()
+  batchVisible.value = true
+}
 
 async function unassign() {
   const list = checkedToday.value
