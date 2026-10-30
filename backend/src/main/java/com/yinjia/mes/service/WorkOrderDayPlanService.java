@@ -156,6 +156,8 @@ public class WorkOrderDayPlanService {
         if (cells.size() > MAX_SAVE_CELLS) throw new IllegalArgumentException("一次保存的格子过多(" + cells.size() + ")");
 
         int saved = 0, cleared = 0;
+        // 本次动过的 (工单行id|工序) —— 保存完逐个做「Σ计划 ≤ 排产数量」的守卫(2026-10-30)
+        Map<String, double[]> touched = new LinkedHashMap<>();
         for (Map<String, Object> cell : cells) {
             long rowId = longOf(cell.get("工单行id"));
             if (rowId <= 0) throw new IllegalArgumentException("缺少工单行id");
@@ -174,6 +176,7 @@ public class WorkOrderDayPlanService {
             if (wo == null) throw new IllegalArgumentException("工单行不存在或已作废:" + rowId);
             String no = str(wo.get("pl_no"));
             Integer xc = wo.get("pl_xc") instanceof Number n ? n.intValue() : null;
+            touched.put(rowId + "|" + (op == null ? "" : op), new double[]{0});
 
             if (qty <= 0) {
                 cleared += jdbc.update(
@@ -195,10 +198,159 @@ public class WorkOrderDayPlanService {
             }
             saved++;
         }
+        // 🔴 2026-10-30 新增守卫(断点 3 的配套):**同一工单行同一工序的 Σ计划 ≤ 排产数量**。
+        //   日计划是工序单位(排产数量 × 该道换算率),所以按换算率折回成品再比。
+        //   不设这道闸,切单后父行计划合计会长期大于新排产数量而无人察觉(此前只靠前端拦,接口层裸奔)。
+        //   超出即整笔回滚(前端拿到明确报错),而不是静默写脏。
+        for (Map.Entry<String, double[]> e : touched.entrySet()) {
+            String[] k = e.getKey().split("\\|", 2);
+            long rid = longOf(k[0]);
+            String op = k[1];
+            Double planSl = jdbc.queryForObject(
+                    "SELECT ISNULL(pl_sl,0) FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, rid);
+            if (planSl == null) continue;
+            String route = jdbc.queryForObject(
+                    "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?", String.class, rid);
+            double rate = rateOf(route, op);
+            double sum = jdbc.queryForObject(
+                    "SELECT ISNULL(SUM(计划数量),0) FROM dbo.wo_day_plan WHERE 工单行id=? AND 工序=? AND asp_cancel='N'",
+                    Double.class, rid, op);
+            double cap = round(planSl * rate);
+            if (sum > cap + 0.0001)
+                throw new IllegalStateException("工单行 " + rid + " 工序[" + (op == null || op.isEmpty() ? "未指定" : op)
+                        + "] 的日计划合计 " + trim(sum) + " 超过可排上限 " + trim(cap)
+                        + "(排产数量 " + trim(planSl) + " × 换算率 " + trim(rate) + ")");
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("保存格数", saved);
         out.put("清空格数", cleared);
         return out;
+    }
+
+    /**
+     * **切单拆日排产**(2026-10-30):把父行该切出量对应的日计划,按日期从**最晚往回扣**,同日同工序移给子单。
+     *
+     * <p>🔴 为什么要做:切单只改 plang.pl_sl,wo_day_plan 不动 ⇒ 父行「计划合计」仍等于切单前的量
+     * (> 新排产数量),子行「计划合计」= 0 却有排产数量 —— 生产工单/工单排产两页的日期列与汇总列直接失真。
+     *
+     * <p>口径:
+     * <ul>
+     *   <li>日计划按**工序**存,单位是该道工序单位;切出量是**成品单位** ⇒ 每道扣 {@code 切出量 × 该道换算率};</li>
+     *   <li>从**最晚的计划日**往回扣(现场先把后面的活切走,前面的照旧做),扣多少给子单同日同工序多少;</li>
+     *   <li>某道计划合计不足扣减时,扣完为止,不足部分在返回值里报出来(不虚增子单计划);</li>
+     *   <li>守恒:父行扣掉的 = 子行新增的(逐格相等)。</li>
+     * </ul>
+     *
+     * @return { 已拆数量(成品单位), 已拆格数, 未拆数量(父行该道计划不足的部分) }
+     */
+    @Transactional
+    public Map<String, Object> splitFrom(long parentId, long childId, String childNo, Integer childXc,
+                                        double qty, String route, String line, String user) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("已拆数量", 0.0);
+        out.put("已拆格数", 0);
+        out.put("未拆数量", 0.0);
+        if (parentId <= 0 || childId <= 0 || !(qty > 0)) return out;
+        List<Map<String, Object>> cells = jdbc.queryForList(
+                "SELECT 工序, 计划日期, SUM(计划数量) AS qty, MAX(ISNULL(生产线,N'')) AS line"
+                        + " FROM dbo.wo_day_plan WHERE 工单行id=? AND asp_cancel='N'"
+                        + " GROUP BY 工序, 计划日期 ORDER BY 工序, 计划日期 DESC", parentId);
+        if (cells.isEmpty()) return out;
+
+        double movedTotal = 0;      // 成品口径(按已扣工序单位折算回去后累加)
+        double shortTotal = 0;      // 成品口径
+        int movedCells = 0;
+        Map<String, Double> remainingByOp = new LinkedHashMap<>();
+        for (Map<String, Object> c : cells) {
+            String op = str(c.get("工序"));
+            if (op == null) op = "";
+            double rate = rateOf(route, op);
+            double need = remainingByOp.computeIfAbsent(op, k -> round(qty * rate));   // 该道还要扣多少(工序单位)
+            if (need <= 0.0001) continue;
+            double cellQty = num(c.get("qty"));
+            if (cellQty <= 0.0001) continue;
+            Object dateObj = c.get("计划日期");
+            if (dateObj == null) continue;
+            double take = Math.min(cellQty, need);
+            take = round(take);
+            if (take <= 0.0001) continue;
+            // 父行扣减
+            jdbc.update("UPDATE dbo.wo_day_plan SET 计划数量 = 计划数量 - ?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N'",
+                    take, user, parentId, op, dateObj);
+            // 扣到 0 的格子作废(与 save() 的清空语义一致,保留行但不再占唯一键之外的东西)
+            jdbc.update("UPDATE dbo.wo_day_plan SET 计划数量=0, asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N' AND 计划数量<=0.0001",
+                    user, parentId, op, dateObj);
+            // 子行同日期同工序新增(已有则累加)
+            int n = jdbc.update("UPDATE dbo.wo_day_plan SET 计划数量 = 计划数量 + ?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N'",
+                    take, user, childId, op, dateObj);
+            if (n == 0) {
+                jdbc.update("INSERT INTO dbo.wo_day_plan (工单行id, 工单号, 工单行号, 工序, 计划日期, 计划数量, 生产线,"
+                                + " asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",
+                        childId, childNo, childXc, op, dateObj, take,
+                        str(c.get("line")) == null || str(c.get("line")).isBlank() ? line : str(c.get("line")), user);
+            }
+            remainingByOp.put(op, round(need - take));
+            movedTotal += take / rate;
+            movedCells++;
+        }
+        for (Map.Entry<String, Double> e : remainingByOp.entrySet()) {
+            if (e.getValue() > 0.0001) shortTotal += e.getValue() / rateOf(route, e.getKey());
+        }
+        out.put("已拆数量", round(movedTotal));
+        out.put("已拆格数", movedCells);
+        out.put("未拆数量", round(shortTotal));
+        return out;
+    }
+
+    /**
+     * **撤回切单:把子单的日计划并回父行**(2026-10-30,与 {@link #splitFrom} 严格互逆)。
+     *
+     * <p>同日同工序累加到父行;子单那些格子随后软删 —— 否则子单被软删后,它的日计划成了孤儿活跃行
+     * (读不到、也永不释放),而父行计划永远少一块。
+     *
+     * @return 并回的格数
+     */
+    @Transactional
+    public int mergeFrom(long childId, long parentId, String parentNo, Integer parentXc, String user) {
+        if (childId <= 0 || parentId <= 0) return 0;
+        List<Map<String, Object>> cells = jdbc.queryForList(
+                "SELECT 工序, 计划日期, SUM(计划数量) AS qty, MAX(ISNULL(生产线,N'')) AS line"
+                        + " FROM dbo.wo_day_plan WHERE 工单行id=? AND asp_cancel='N'"
+                        + " GROUP BY 工序, 计划日期 ORDER BY 工序, 计划日期", childId);
+        int merged = 0;
+        for (Map<String, Object> c : cells) {
+            String op = str(c.get("工序"));
+            Object dateObj = c.get("计划日期");
+            double qty = num(c.get("qty"));
+            if (dateObj == null || qty <= 0.0001) continue;
+            int n = jdbc.update("UPDATE dbo.wo_day_plan SET 计划数量 = 计划数量 + ?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N'",
+                    qty, user, parentId, op, dateObj);
+            if (n == 0) {
+                jdbc.update("INSERT INTO dbo.wo_day_plan (工单行id, 工单号, 工单行号, 工序, 计划日期, 计划数量, 生产线,"
+                                + " asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",
+                        parentId, parentNo, parentXc, op, dateObj, qty,
+                        str(c.get("line")) == null || str(c.get("line")).isBlank() ? null : str(c.get("line")), user);
+            }
+            merged++;
+        }
+        // 子单的格子全部软删(留痕不物理删)
+        jdbc.update("UPDATE dbo.wo_day_plan SET 计划数量=0, asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME()"
+                + " WHERE 工单行id=? AND asp_cancel='N'", user, childId);
+        return merged;
+    }
+
+    /** 该道工序的换算率(路线 + 工序);查不到按 1(与报工封顶/台账同一兜底) */
+    private double rateOf(String route, String op) {
+        String rt = route == null ? "" : route.trim();
+        if (rt.isEmpty() || op == null || op.isBlank()) return 1;
+        Double v = jdbc.queryForObject(
+                "SELECT MAX(ISNULL(换算率,1)) FROM dbo.bs_route WHERE 工艺路线编码=? AND 工序名称=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, rt, op);
+        return v == null || v <= 0 ? 1 : v;
     }
 
     // ── 行解析 ──────────────────────────────────────────────────────────
@@ -428,6 +580,15 @@ public class WorkOrderDayPlanService {
     }
 
     private static String rowKey(long id, String op) { return id + "|" + (op == null ? "" : op); }
+
+    /** 数量显示(去无意义小数尾巴;守卫报错文案用) */
+    private static String trim(double v) {
+        double r = Math.round(v * 10000.0) / 10000.0;
+        return r == Math.floor(r) ? String.valueOf((long) r) : String.valueOf(r);
+    }
+
+    /** 四舍五入到 4 位(与 plang/wo_day_plan 的 decimal 精度一致) */
+    private static double round(double v) { return Math.round(v * 10000.0) / 10000.0; }
 
     /** 宽松日期解析:空/非法 → null(用于展示口径;保存路径另有严格校验) */
     private static LocalDate parseDate(String text) {

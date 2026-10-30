@@ -43,13 +43,17 @@ public class WorkOrderSplitService {
 
     private final JdbcTemplate jdbc;
     private final FormNoService formNo;
-    /** 工序台账(切单后按新排产数量重算父行台账 + 给子单建台账;2026-10-30) */
+    /** 工序台账(切单后按新排产数量重算父行台账 + 复制父行预排台账给子单;2026-10-30) */
     private final ProcessTaskService processTask;
+    /** 日排产(切单时把切出量对应的日计划移给子单;2026-10-30) */
+    private final WorkOrderDayPlanService dayPlanService;
 
-    public WorkOrderSplitService(JdbcTemplate jdbc, FormNoService formNo, ProcessTaskService processTask) {
+    public WorkOrderSplitService(JdbcTemplate jdbc, FormNoService formNo, ProcessTaskService processTask,
+                                 WorkOrderDayPlanService dayPlanService) {
         this.jdbc = jdbc;
         this.formNo = formNo;
         this.processTask = processTask;
+        this.dayPlanService = dayPlanService;
     }
 
     // ────────────────────────── 预览(前端弹窗:可切上限) ──────────────────────────
@@ -72,8 +76,12 @@ public class WorkOrderSplitService {
         // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单」):原按 pl_no 整单汇总报工,
         //   会把同工单**别的行**的报工算进本行的可切上限 ⇒ 本行明明没生产却切不出来(上限被压成 0),
         //   或反过来算错。现按**本行**(工单号+工单行号)统计。
-        out.put("已完工报工", round(maxCompletedOfRow(((Number) p.get("id")).longValue(),
-                String.valueOf(p.get("pl_no")), str(p.get("批次号")))));
+        double doneRaw = round(maxCompletedOfRow(((Number) p.get("id")).longValue(),
+                String.valueOf(p.get("pl_no")), str(p.get("批次号"))));
+        out.put("已完工报工", doneRaw);                                  // 工序单位(现场报工原值)
+        // 2026-10-30:同时给出**折成品**的已完工量 —— 可切上限是成品单位,弹窗里两个数并排才看得懂
+        out.put("已完工折成品", round(doneRaw / rateOf(str(p.get("工艺路线")), null,
+                ((Number) p.get("id")).longValue(), String.valueOf(p.get("pl_no")), str(p.get("批次号")))));
         out.put("已切出数量", round(sumChildren(((Number) p.get("id")).longValue())));
         out.put("可切上限", round(cutLimit(p, str(p.get("批次号")))));
         // 血缘与家族(会议口径:多级切分一律按根单聚合 —— 计划员看整体进度用)
@@ -139,8 +147,12 @@ public class WorkOrderSplitService {
         //   此前只减了排产数量 ⇒ 生产工单列表的「需求数量」不变、子单又各带一份 → 家族需求被重复计。
         //   余量口径保持 需求−排产 不变:yl = (旧需求−切出) − 新排产)
         double newParentSl = round(num(p.get("pl_sl")) - qty);
+        // ⚠ 2026-10-30:切单/撤回**不再写 asp_time2**。asp_time2 是「排产/改线留痕」,
+        //   而「今日排产」统计与列表就是按 asp_time2 = 今天 取的(ScheduleBoardService.stats/today)——
+        //   切一张上周排的单会把它算成"今天排产",数量还显示成剩余量(用户看到统计跳变)。
+        //   切单自己的留痕走 yj_usage_log + wo_split_log,足够追溯。
         jdbc.update("UPDATE dbo.plang SET pl_sl=?, xq_sl=ISNULL(xq_sl,0)-?,"
-                        + " yl=ISNULL(xq_sl,0)-?-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                        + " yl=ISNULL(xq_sl,0)-?-?, asp_user2=? WHERE id=?",
                 newParentSl, qty, qty, newParentSl, user, parentId);
         WorkOrderScheduleRecord.sync(jdbc, parentId, user);
 
@@ -181,14 +193,14 @@ public class WorkOrderSplitService {
                 "SELECT TOP 1 id FROM dbo.plang WHERE pl_no=? AND [源工单行id]=? ORDER BY id DESC", Long.class,
                 childNo, parentId);
 
-        // ②.5 子单建工序台账(2026-10-30):子单继承了排产(plang_pc)却没有自己的 wo_process_line 时,
-        //   报工页没有工序可选、自动转序提示「没有预排线」;而「预排线」入口对已排产行又要求先撤销排产
-        //   ⇒ 子单彻底卡死。按父行工艺路线建台账(计划数量 = 切出量 × 该道换算率,首道已落实)。
+        // ②.5 子单台账 = **复制父行的预排台账**(2026-10-30):工序/工序序/计划生产线/计划日期照抄,
+        //   计划数量 = 切出量 × 该道换算率。⚠ 不能用 ensureLedgerForWorkOrder —— 它新建的台账计划线为空,
+        //   子单第一道报完转序时会直接报「下一道未预排线,请人工派线」,卡死在首道。
         if (route != null) {
             try {
-                processTask.ensureLedgerForWorkOrder(childNo, route, user);
+                processTask.cloneRowLedger(parentId, childId, childNo, qty, route, user);
             } catch (Exception e) {
-                log.warn("[切单] 子单 {} 建工序台账失败(不阻断切单): {}", childNo, e.getMessage());
+                log.warn("[切单] 子单 {} 复制工序台账失败(不阻断切单): {}", childNo, e.getMessage());
             }
         }
 
@@ -201,6 +213,18 @@ public class WorkOrderSplitService {
 
         // ④ 占用链拆账(SO 行 → 父/子两张工单,合计不变)
         boolean linkAdjusted = splitLink(parentNo, parentXc, batch, childNo, childId, qty);
+
+        // ④.5 日排产随切单拆账(2026-10-30):父行把切出量对应的日计划按日期从最晚往回扣,同日同工序移给子单。
+        //   不做的话:父行「计划合计」仍等于切单前的量(> 新排产数量)、子行「计划合计」=0 却有排产数量,
+        //   生产工单/工单排产两页的日期列与 7天/15天已排 全部失真。
+        Map<String, Object> dayPlan = Map.of();
+        if (childId != null) {
+            try {
+                dayPlan = dayPlanService.splitFrom(parentId, childId, childNo, 1, qty, route, scx, user);
+            } catch (Exception e) {
+                log.warn("[切单] 日排产拆账失败(不阻断切单): {}", e.getMessage());
+            }
+        }
 
         // ⑤ 留痕(两侧各一条,工单追溯时间线直接可见)+ 切单操作日志(谁/何时/从哪单切出多少/生成哪张子单)
         // 2026-10-15 带工单行号:子单是新建行(pl_xc=1),父单留痕带**被切的那一行**的行号
@@ -220,6 +244,9 @@ public class WorkOrderSplitService {
         out.put("子单交期", dueDate == null ? p.get("交期") : dueDate);
         out.put("继承排产", scheduled);
         out.put("占用链已拆账", linkAdjusted);
+        out.put("日计划已拆数量", dayPlan.getOrDefault("已拆数量", 0.0));
+        out.put("日计划已拆格数", dayPlan.getOrDefault("已拆格数", 0));
+        out.put("日计划未拆数量", dayPlan.getOrDefault("未拆数量", 0.0));
         out.put("打印提示", "子工单 " + childNo + " 已生成:请在生产工单页勾选该单打印子工单码(扫码领料/报工将绑定到子单)");
         out.put("家族汇总", familySummary(root));
         return out;
@@ -290,13 +317,14 @@ public class WorkOrderSplitService {
         int parentXc = ((Number) parent.get("pl_xc")).intValue();
 
         // 回冲:删子单排产薄记录 → 软删子单 → 父单数量还原 → 占用链回冲
+        // ⚠ 2026-10-30:撤回同样**不写 asp_time2**(理由同 split:asp_time2 是排产留痕,不是修改留痕)
         jdbc.update("DELETE FROM dbo.plang_pc WHERE plang_id=?", childId);
-        jdbc.update("UPDATE dbo.plang SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE id=?", user, childId);
+        jdbc.update("UPDATE dbo.plang SET asp_cancel='Y', asp_user2=? WHERE id=?", user, childId);
         double newParentSl = round(num(parent.get("pl_sl")) + childSl);
         // 撤回时**需求数量一并还原**(与切单核减对称,2026-10-05):新需求=旧需求+子单需求;余量仍=需求−排产
         double childXq = round(num(c.get("xq_sl")));
         jdbc.update("UPDATE dbo.plang SET pl_sl=?, xq_sl=ISNULL(xq_sl,0)+?,"
-                        + " yl=ISNULL(xq_sl,0)+?-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                        + " yl=ISNULL(xq_sl,0)+?-?, asp_user2=? WHERE id=?",
                 newParentSl, childXq, childXq, newParentSl, user, parentId);
         WorkOrderScheduleRecord.sync(jdbc, parentId, user);
         // 台账与切单严格互逆(2026-10-30):父行台账按还原后的排产数量重算;子单台账软删 ——
@@ -317,6 +345,15 @@ public class WorkOrderSplitService {
         }
         boolean linkRestored = mergeLink(parentNo, parentXc, str(parent.get("批次号")), childNo, childSl);
 
+        // 日排产互逆(2026-10-30):子单的日计划并回父行同日同工序,再把子单日计划软删。
+        //   不做的话子单软删后 wo_day_plan 留着孤儿活跃行(读不到、也永不释放),父行计划永远少一块。
+        int dayMerged = 0;
+        try {
+            dayMerged = dayPlanService.mergeFrom(childId, parentId, parentNo, parentXc, user);
+        } catch (Exception e) {
+            log.warn("[撤回切单] 日排产并回失败(不阻断): {}", e.getMessage());
+        }
+
         // 2026-10-15 带工单行号:子单是它自己的行(pl_xc=1),父单留痕带**被撤回的那一行**的行号
         logUsage(user, "撤回切单", childNo, c.get("pl_xc") == null ? 1 : ((Number) c.get("pl_xc")).intValue());
         logUsage(user, "撤回子工单", parentNo, parentXc);
@@ -334,6 +371,7 @@ public class WorkOrderSplitService {
         out.put("还原数量", trim(childSl));
         out.put("父单排产数量", trim(newParentSl));
         out.put("占用链已回冲", linkRestored);
+        out.put("日计划并回格数", dayMerged);
         return out;
     }
 
@@ -406,14 +444,52 @@ public class WorkOrderSplitService {
     }
 
     /**
-     * 可切上限 = 排产数量 − max(已入库, **本行**各工序已完工报工量最大值)。
-     * 🔴 2026-10-15:报工量改为**按行**统计(原来按 pl_no 整单汇总,会把别的行的报工算进来)。
+     * 可切上限 = 排产数量 − max(已入库, **本行**各工序已完工报工量折回成品)。
+     *
+     * <p>🔴 2026-10-30 单位口径修正(断点 2):报工量 {@code scjl.sl} 是**工序单位**
+     * (= 排产数量 × 该道换算率,见 {@link WoReportService#complete} 的 cap),而 {@code pl_sl} 是**成品单位**。
+     * 旧写法直接把两者相减 ⇒ 换算率 > 1 的路线必然算错:
+     * 实测 GY-2026-10-0006 切炭换算率 3、排产 6000 ⇒ 切炭台账计划 18000;切炭一旦报工,
+     * 可切上限 = 6000 − 18000 = **−12000**,永远切不出来;反之报工小时又会把已完工量当可切量切走。
+     * 现按「各道报工量 ÷ 该道换算率」折回成品单位再取最大值。
+     *
+     * <p>🔴 2026-10-15:报工量按**行**统计(原来按 pl_no 整单汇总,会把别的行的报工算进来)。
      */
     private double cutLimit(Map<String, Object> p, String batch) {
         double plSl = num(p.get("pl_sl"));
-        double bound = Math.max(num(p.get("rk_sl")),
-                maxCompletedOfRow(((Number) p.get("id")).longValue(), String.valueOf(p.get("pl_no")), batch));
+        long rowId = ((Number) p.get("id")).longValue();
+        String no = String.valueOf(p.get("pl_no"));
+        String route = str(p.get("工艺路线"));
+        double done = maxCompletedOfRow(rowId, no, batch);          // 工序单位
+        double doneAsFinished = round(done / rateOf(route, null, rowId, no, batch));
+        double bound = Math.max(num(p.get("rk_sl")), doneAsFinished);
         return round(plSl - bound);
+    }
+
+    /**
+     * 换算率:优先按路线 + 工序取;工序为空时取本行**已报工量最大的那道**的换算率(切单上限只需要"折回成品"的比例)。
+     *
+     * <p>路线为空(历史行)或路线里查不到该工序时返回 1 —— 与 {@link WoReportService#complete}
+     * 的兜底口径一致(取不到换算率就按 1 算),不会把上限算成 0。
+     */
+    private double rateOf(String route, String op, long rowId, String plNo, String batch) {
+        String rt = route == null ? "" : route.trim();
+        if (rt.isEmpty() || op == null) {
+            // 没有工序/路线:取本行已报工量最大的那道工序的换算率
+            List<String> ops = jdbc.queryForList(
+                    "SELECT TOP 1 s.gxdm FROM dbo.scjl s"
+                            + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                            + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
+                            + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')=?))"
+                            + " GROUP BY s.gxdm ORDER BY SUM(ISNULL(s.sl,0)) DESC", String.class,
+                    plNo, rowId, batch == null ? "" : batch);
+            if (ops.isEmpty()) return 1;
+            op = ops.get(0);
+        }
+        Double v = jdbc.queryForObject(
+                "SELECT MAX(ISNULL(换算率,1)) FROM dbo.bs_route WHERE 工艺路线编码=? AND 工序名称=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, rt, op);
+        return v == null || v <= 0 ? 1 : v;
     }
 
     /**

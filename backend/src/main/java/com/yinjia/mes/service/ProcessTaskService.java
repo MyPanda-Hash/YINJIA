@@ -230,6 +230,57 @@ public class ProcessTaskService {
                 newQty, rt, user, rowId);
     }
 
+    /**
+     * **切单专用:把父行的预排台账复制成子单台账**(2026-10-30)。
+     *
+     * <p>🔴 为什么不能再用 {@link #ensureLedgerForWorkOrder}:它按路线**新建**一套台账,`计划生产线` 一律留空
+     * (那是「结转过但还没排产」的形态)。切单的子单是**继承父单排产**的,如果照它建,子单台账计划线为空 ⇒
+     * 第一道报完该转序时 {@link #applyNextProcess} 直接返回「下一道未预排线,请人工派线」,子单卡死在首道
+     * (2026-10-30 实测本机切单对 GD-2026-10-0226:父子两行台账的计划线都是空)。
+     *
+     * <p>口径:工序 / 工序序 / **计划生产线** / 计划开工完工日期 全部照抄父行;计划数量 = 切出量 × 该道换算率
+     * (各道分开算,不累乘);状态按「首道已落实、其余计划」重来(子单是自己的一份未生产量),
+     * 落实时间留空 —— 实际开工只由真转序/报工写。
+     *
+     * @return 复制的台账行数;父行没有台账时退回 {@link #ensureLedgerForWorkOrder}(计划线为空,由人工派线)
+     */
+    @Transactional
+    public int cloneRowLedger(Object parentRowId, Object childRowId, String childNo, double childQty,
+                              String route, String user) {
+        if (parentRowId == null || childRowId == null || !(childQty > 0)) return 0;
+        List<Map<String, Object>> src = jdbc.queryForList(
+                "SELECT 工序, ISNULL(工序序,999) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
+                        + " 计划开工日期, 计划完工日期 FROM dbo.wo_process_line"
+                        + " WHERE 工单行id=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " ORDER BY ISNULL(工序序,999), id", parentRowId);
+        if (src.isEmpty()) {
+            // 父行没有预排台账(结转过但没排过线):只能按路线新建,计划线留空等人工派线
+            return ensureLedgerForWorkOrder(childNo, route, user);
+        }
+        String rt = route == null ? "" : route.trim();
+        int seq = 0;
+        for (Map<String, Object> r : src) {
+            seq++;
+            String op = str(r.get("工序"));
+            double rate = 1;
+            if (!rt.isEmpty()) {
+                Double v = jdbc.queryForObject(
+                        "SELECT MAX(ISNULL(换算率,1)) FROM dbo.bs_route WHERE 工艺路线编码=? AND 工序名称=?"
+                                + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, rt, op);
+                if (v != null && v > 0) rate = v;
+            }
+            String line = str(r.get("计划生产线"));
+            jdbc.update("INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
+                            + " 计划数量, 计划开工日期, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,NULL,?,?,?,?,NULL,N'N',?,GETDATE())",
+                    childNo, childRowId, op, r.get("工序序"), line == null || line.isBlank() ? null : line,
+                    round(childQty * rate),
+                    r.get("计划开工日期"), r.get("计划完工日期"),
+                    seq == 1 ? "已落实" : "计划", user);
+        }
+        return seq;
+    }
+
     private String routeOfRow(Map<String, Object> row) {
         String fromRow = row == null ? "" : str(row.get("工艺路线"));
         if (fromRow != null && !fromRow.isBlank()) return fromRow.trim();
