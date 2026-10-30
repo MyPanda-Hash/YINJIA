@@ -733,6 +733,12 @@ export const menuTree = [
         children: [
           { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
           { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
+          // 生产模具表（2026-10-30 用户口径）：「在设备维护下边加上一个新面板，叫生产模具表…
+          //   不需要审批，就是一个维护表，不需要多单据，就放一张表就行，根据现在系统上有的进行设计」。
+          // 面板 PROD_MOLD（mode='archive'，维护表形态）复用已有的 rd_sinter_tolerance
+          // （烧结尺寸表那 60 行模具数据），只补了「模具数量」一列 —— 见
+          // tools/migrate-prod-mold-panel-20261030.sql 头部说明。车间按现有数据原样保留（1/1-3/3/4…）。
+          { code: 'prodMold', title: '生产模具表', path: '/panelx/list/PROD_MOLD', panelCode: 'PROD_MOLD', icon: 'Setter', operationName: '新增流程' },
         ],
       },
     ],

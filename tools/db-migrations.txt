@@ -4404,3 +4404,4 @@ migrate-mold-proc-rename-20261030.sql
 #   照抄 RD_MOLD_PROC 的同一行配置(ref_panel=RD_PROD_INFO / ref_field=产品编号 / display_field=产品名称)。
 #   幂等;自检「data_type=参照 且 ref_panel=RD_PROD_INFO」不满足整体回滚。两账套都执行。
 migrate-x-sinter-spec-ref-20261030.sql
+migrate-prod-mold-panel-20261030.sql

@@ -230,7 +230,8 @@ test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护�
   const base = menuTree.find((n) => n.code === 'base')
   const device = (base.children || []).find((c) => c.code === 'device')
   assert.equal(device?.title, '设备维护')
-  assert.deepEqual((device.children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN'])
+  // 2026-10-30 追加「生产模具表」PROD_MOLD（维护表，复用 rd_sinter_tolerance）
+  assert.deepEqual((device.children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'])
   assert.ok(!(plan.children || []).some((c) => c.code === 'device'), '生产计划下不应再有设备维护')
   assert.ok(!(proc.children || []).some((c) => c.code === 'device'), '生产计划下不应再有设备维护')
 })
@@ -413,11 +414,11 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
   assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
-  // 迁出后只剩 sysFunc(无面板)+ device(2026-10-20 搬来的设备维护:点检记录 / 保养计划)
-  assert.deepEqual((base.children[1].children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN'])
-  // 32 张基础资料面板仍不许回来(口径见下一条测试),整枝只允许 device 这两个码
+  // 迁出后只剩 sysFunc(无面板)+ device(设备维护:点检记录 / 保养计划 / 生产模具表)
+  assert.deepEqual((base.children[1].children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'])
+  // 32 张基础资料面板仍不许回来(口径见下一条测试),整枝只允许 device 这三个码
   const panelCodes = [...JSON.stringify(base).matchAll(/"panelCode":"([A-Z0-9_]+)"/g)].map((m) => m[1])
-  assert.deepEqual([...new Set(panelCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'])
+  assert.deepEqual([...new Set(panelCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'])
 })
 
 /**
@@ -448,8 +449,8 @@ test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每
   // 2026-10-20:设备维护整组搬进系统管理平台 ⇒ base 下允许 EQUIP_CHECK / MAINT_PLAN 两张,
   //   基础资料那 32 张仍不许回来
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
-  assert.deepEqual([...new Set(baseCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'],
-    '系统管理平台只应挂设备维护两张(2026-10-20 迁入)')
+  assert.deepEqual([...new Set(baseCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'],
+    '系统管理平台只应挂设备维护三张(2026-10-20 迁入两张 + 2026-10-30 生产模具表)')
 })
 
 /**
@@ -472,7 +473,7 @@ test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可�
   // 2026-10-23:菜单设计(sysMenuDesign)再往后接一格,同样管理员专属
   assert.deepEqual(adminGroups, [
     { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'] },
-    { code: 'device', kids: ['equipCheck', 'maintPlan'] },
+    { code: 'device', kids: ['equipCheck', 'maintPlan', 'prodMold'] },
   ])
 })
 
@@ -592,3 +593,4 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   assert.equal(woPick.panelCode, 'WORK_ORDER_PICK')
   assert.equal(woPick.title, '工单扫码领料')
 })
+
