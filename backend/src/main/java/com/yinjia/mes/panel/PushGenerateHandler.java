@@ -792,6 +792,10 @@ public class PushGenerateHandler implements PanelActionHandler {
         if (src == null || src.isEmpty()) throw new IllegalStateException("来源单据不存在:" + sourceNo);
         Map<String, Object> head = new LinkedHashMap<>(src);
         head.remove("detail");
+        // 单据已被别人删掉/作废(列表是几秒前的快照)时,loadOneDoc 只回一个 {编号, 单据状态} 的空壳 ——
+        // 不拦就会在对话框里显示一段"没有明细"的空单,或者生单时被"仅已审核单据可生单,当前状态:草稿"
+        // 这种与用户所见(列表里写着已审核)对不上的话误导。这里直接说清"单据不在了"。
+        if (looksEmptyDoc(head)) throw new IllegalStateException("来源单据不存在或已被删除:" + sourceNo);
         List<Map<String, Object>> items = applyDetailFilter(new ArrayList<>(itemsOf(src)), filter);
 
         Map<String, Object> doc = new LinkedHashMap<>();
@@ -921,6 +925,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
         Map<String, Object> head = new LinkedHashMap<>(src);
         head.remove("detail");
+        if (looksEmptyDoc(head)) throw new IllegalStateException("来源单据不存在或已被删除:" + sourceNo);
         List<Map<String, Object>> srcItems = applyDetailFilter(new ArrayList<>(itemsOf(src)),
                 configService.detailFilter(sourcePanel, action));
         if (srcItems.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生单");
@@ -1023,6 +1028,22 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     /** 非空字符串(去空白);null → 空串 */
     private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
+
+    /**
+     * 「这张单其实不存在」的判据:单头里除了 编号/单据状态/saved 这些**由查询层兜底填的壳**之外,
+     * 一个非空业务值都没有(见 {@link #previewDoc} 的调用点注释)。
+     * 真实单据的单据日期/往来单位等必有值,不会被误判。
+     */
+    private static boolean looksEmptyDoc(Map<String, Object> head) {
+        if (head == null) return true;
+        for (Map.Entry<String, Object> e : head.entrySet()) {
+            String k = e.getKey();
+            if ("编号".equals(k) || "单据状态".equals(k) || "saved".equals(k)) continue;
+            Object v = e.getValue();
+            if (v != null && !String.valueOf(v).trim().isEmpty()) return false;
+        }
+        return true;
+    }
 
     /**
      * 只在目标面板**注册了该字段**时才写入(未注册的键会被通用保存静默丢弃,先判一下更直观)。
