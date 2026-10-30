@@ -4769,6 +4769,32 @@ export default {
     '恢复': 'Restore',
     '已恢复代码默认': 'Code defaults restored',
     '恢复失败': 'Restore failed',
+    // ---- 批量生单 / 统一生单对话框(2026-10-31)----
+    '批量生单': 'Batch Generate',
+    '目标单据': 'Target document',
+    '已勾选': 'Selected',
+    '全选本页': 'Select this page',
+    '取消全选': 'Deselect all',
+    '本次数量': 'This Qty',
+    '可生单': 'Generatable',
+    '未打印': 'Not printed',
+    '继承来源单': 'Inherited from source',
+    '批次号随来源单继承，不能在这里改': 'Batch No. is inherited from the source document and cannot be changed here',
+    '生单时按当天日期生成，可改': 'Generated from today\'s date at document creation; editable',
+    '（本次生效；最高 50%，额度按来源行数量算）': '(applies to this run; max 50%, allowance based on the source line quantity)',
+    '勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据':
+      'Tick the lines to generate and enter the quantity; unticked lines are not copied to the new document',
+    '该单据没有可生单的明细行': 'This document has no lines available for generation',
+    '没有可生单的明细行': 'No lines available for generation',
+    '请至少勾选一行并填写本次生单数量': 'Tick at least one line and enter the quantity',
+    '生单数据加载失败': 'Failed to load generation data',
+    '请先在左侧单据列表勾选要生单的单据': 'Tick the documents to generate in the left-hand list first',
+    '该面板没有可批量生单的下游链路': 'This panel has no downstream flow for batch generation',
+    '已生成新单据，可在目标面板查看': 'New documents created; open the target panel to view them',
+    // 生单动作名(显示层翻译;buttonName 数据键仍是中文,ADR-0001):生单组下拉里英文界面不能掉回中文
+    '生成销售出库单': 'Generate Sales Issue',
+    '生成产成品入库单': 'Generate Finished Goods Receipt',
+    '生成检验或入库单': 'Generate Inspection/Receipt',
   },
 
 }

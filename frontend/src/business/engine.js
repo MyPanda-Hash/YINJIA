@@ -600,6 +600,26 @@ export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
 }
 
+// ==================== 统一生单对话框(2026-10-31 用户口径) ====================
+/**
+ * 生单预览:勾选的来源单据(一张 = 原「生单」,多张 = 「批量生单」)各自的明细行。
+ * 返回 { targetPanel, targetName, batchFlow, overRatio, docs:[{sourceNo,status,header,lines,nextBatchNo,batches}] };
+ * 分批链路(采购订单→送料暂收单)与普通推式生单返回**同一份行契约**(数量/已送数量/剩余数量/可送上限/rowKind)。
+ *
+ * ⚠ 用 unwrapStrict(与 puLabelReprint 同款):权限拒绝是 **HTTP 200 + body code 403**,
+ *   走 unwrap 时后端那句"当前角色无该面板「可见」权限"不会抛错 ⇒ 对话框只是空的,
+ *   用户看到的像"这张单没有明细"(2026-10-29 那类误判)。
+ */
+export async function pushFlowLines({ panelCode, action, sourceNos }) {
+  return unwrapStrict(await request.post('/px/push/lines', { panelCode, action, sourceNos }))
+}
+
+/** 生单:按「勾选的行 + 本次数量」逐张生成(单张/多张同一入口),返回 { 生成:[], 失败:[] } */
+export async function pushFlowGenerate({ panelCode, action, docs, overRatio }) {
+  return unwrapStrict(await request.post('/px/push/generate', { panelCode, action, docs, overRatio }))
+}
+
+
 
 /**
  * Upload a voucher image to the MES backend. The backend owns the cloud OCR

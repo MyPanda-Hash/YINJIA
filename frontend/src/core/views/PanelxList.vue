@@ -136,6 +136,8 @@
           @toggle="railCollapsed = !railCollapsed"
           @page="onRailPage"
           @search="onRailSearch"
+          @check="onRailCheck"
+          @check-all="onRailCheckAll"
         />
         <!-- 项目进度查询(RD_PROGRESS)= 汇总查看面板:数据由「项目实施计划归档 / 立项申请」自动导入,
              人工不再往里写 ⇒ **单元格恒只读**(:editable 硬编码 false,2026-10-09 用户口径「去掉自己写入功能」)。
@@ -924,6 +926,8 @@
           @toggle="railCollapsed = !railCollapsed"
           @page="onRailPage"
           @search="onRailSearch"
+          @check="onRailCheck"
+          @check-all="onRailCheckAll"
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
@@ -1546,6 +1550,15 @@
       :target-panel="batchSend?.targetPanel || ''"
       :source-no="batchSend?.sourceNo || ''"
       @generated="onBatchGenerated"
+    />
+    <!-- 统一生单对话框(2026-10-31):「生单」(非定制化)与「批量生单」共用 ——
+         列出勾选来源单的明细行,挑行 + 填本次数量后逐张转单(分批链路带批次号) -->
+    <GenerateLinesDialog
+      v-model="genVisible"
+      :source-panel="panelCode"
+      :action="genAction"
+      :source-nos="genDocNos"
+      @generated="onGenerateDone"
     />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
@@ -2479,6 +2492,7 @@ import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
 import BatchSendDialog from './BatchSendDialog.vue'
+import GenerateLinesDialog from './GenerateLinesDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
@@ -3268,6 +3282,13 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   const actions = actsOf(group).filter((action) => !['查询', '查找'].includes(action)
     && !(action === '修改' && !isSelfMaintainedPanel.value))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
+  // 「批量生单」是生单组的**下拉项**(2026-10-31 用户口径:「在生单下多写一个批量生单的功能」):
+  // 追加在生单组动作末尾 —— 组里只有一个动作时也因此在主按钮右侧出现 ▼,下拉里就是它。
+  // 判据用 railSelectable(面板要有左栏勾选列 + 有非定制化生单链路):没有左栏就没法勾单据,
+  // 硬放一颗点了只会提示"请先勾选"的按钮,是死入口。
+  if (name === '生单' && railSelectable.value && !actions.includes('批量生单')) {
+    return { ...group, name, actions: [...actions, '批量生单'] }
+  }
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
@@ -4675,6 +4696,76 @@ async function needBatchDialog(target) {
   if (!(await panelHasBatchField(target))) return false
   return !(await panelHasBatchField(panelCode.value))
 }
+// ══════════ 统一生单对话框 / 批量生单(2026-10-31 用户口径)══════════
+/**
+ * 用户口径(2026-10-31):
+ *   ① 「在生单下多写一个**批量生单**的功能」——左侧单据选择栏勾多张来源单,点「生单 ▼ → 批量生单」,
+ *      打开一个界面列出这些单据的明细行,再挑行/填量转单;
+ *   ② 「**生单**也要变成可以勾选的和选择数量的(现在只有采购订单的生单做了特殊处理),
+ *      非定制化的生单只要可以勾选和选择数量就可以」。
+ *
+ * 所以:凡是**非定制化**的推式生单(后端 PushGenerateHandler 通用映射接管的那些),
+ * 点「生单」不再一把梭整单,而是打开 {@link GenerateLinesDialog}(勾行 + 本次数量);
+ * 定制化动作(后端 CUSTOM_OWNED,自己算行/自己分流)保持原样直接调用后端。
+ * 采购订单 → 送料暂收单 这一跳仍是原来的分批送料对话框(材料码隔离行/超送比例/批次号那套口径不动),
+ * 但它的「批量生单」走新对话框(N 张单各一段明细,同一套勾选+数量)。
+ */
+const CUSTOM_GENERATE_ACTIONS = new Set(['SO_ORDER|生成生产工单', 'QC_RECV|生成检验或入库单'])
+const isCustomGenerate = (action) => CUSTOM_GENERATE_ACTIONS.has(String(panelCode.value) + '|' + action)
+/** 后端 metadata.pushTargets:{ 生单动作 → 目标面板 } */
+const pushTargets = computed(() => cfgCache.value?.metadata?.pushTargets || {})
+/** 可走「勾选明细 + 本次数量」的推式生单动作(非定制) */
+const generatableActions = computed(() => Object.keys(pushTargets.value).filter((a) => !isCustomGenerate(a)))
+/** 「批量生单」用的动作(同一面板最多一个可批量生单的下游链路;多于一个时取第一个) */
+const batchGenerateAction = computed(() => generatableActions.value[0] || '')
+/** 左栏勾选框只在「有批量生单链路 + 有单据选择栏」时出现(报表/文书面板不显示) */
+const railSelectable = computed(() => !!docRailCfg.value && !!batchGenerateAction.value && !reportMode.value)
+/** 左栏勾选(单号数组;PanelxList 是唯一真源,翻页/切换当前单都不丢) */
+const railChecked = ref([])
+/** 勾选归属的面板 —— 切面板必须清零:单号是上一个面板的,留着会拿错单去生单 */
+let railPanelCode = ''
+function onRailCheck({ no, checked }) {
+  if (!no) return
+  const set = new Set(railChecked.value)
+  if (checked) set.add(no)
+  else set.delete(no)
+  railChecked.value = [...set]
+}
+function onRailCheckAll({ nos, checked }) {
+  const set = new Set(railChecked.value)
+  for (const no of nos || []) {
+    if (!no) continue
+    if (checked) set.add(no)
+    else set.delete(no)
+  }
+  railChecked.value = [...set]
+}
+/** 统一生单对话框(单张=原「生单」/ 多张=「批量生单」共用) */
+const genVisible = ref(false)
+const genAction = ref('')
+const genDocNos = ref([])
+function openGenerateDialog(action, sourceNos) {
+  const nos = (sourceNos || []).filter(Boolean)
+  if (!action || !nos.length) return
+  genAction.value = action
+  genDocNos.value = nos
+  genVisible.value = true
+}
+/**
+ * 生单完成:
+ * · 单张 → 与推式生单同款(关源页签、开目标页签、新单按创建时间倒序在第一张);
+ * · 多张 → 留在来源列表刷新(用户多半还要接着挑/接着送),勾选清零。
+ */
+function onGenerateDone({ panel, no, count }) {
+  railChecked.value = []
+  if (count > 1) {
+    ElMessage.info(tt('已生成新单据，可在目标面板查看'))
+    load()
+    return
+  }
+  onBatchGenerated({ panel, no, silent: true })
+}
+
 /** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
 function onBatchGenerated({ panel, no, batchNo, silent }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
@@ -5120,6 +5211,9 @@ const railBind = computed(() => ({
   pageNo: query.pageNo,
   pageSize: query.pageSize,
   keyword: query.keyword,
+  // 批量生单(2026-10-31):勾选列 + 已勾单号(按单号保管,翻页不丢)
+  selectable: railSelectable.value,
+  checked: railChecked.value,
 }))
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })
@@ -9582,6 +9676,13 @@ async function onButton(action) {
     scanVisible.value = true
     return
   }
+  // 批量生单(2026-10-31 用户口径):左栏勾多张来源单 → 统一生单对话框(勾行 + 本次数量)
+  if (action === '批量生单') {
+    if (!batchGenerateAction.value) return ElMessage.warning(tt('该面板没有可批量生单的下游链路'))
+    if (!railChecked.value.length) return ElMessage.warning(tt('请先在左侧单据列表勾选要生单的单据'))
+    openGenerateDialog(batchGenerateAction.value, railChecked.value)
+    return
+  }
   // 批量转ERP:弹窗显示已审核+未转的单据,勾选后批量推送
   if (action === '批量转ERP') {
     openBatchErp()
@@ -9610,6 +9711,15 @@ async function onButton(action) {
         if (!no) return ElMessage.warning('请先选择一张单据')
         batchSend.value = { sourcePanel: panelCode.value, targetPanel: actionPushTarget, sourceNo: no }
         batchSendVisible.value = true
+        return
+      }
+      // 非定制化的推式生单(2026-10-31 用户口径「生单也要变成可以勾选的和选择数量的」):
+      // 不再整单一键生成,而是打开统一生单对话框 —— 勾明细行 + 填本次数量(默认全选有剩余的行)。
+      // 定制化动作(如 生成生产工单/生成检验或入库单,自己算行或按行分流)保持原路径直接调后端。
+      if (actionPushTarget && !isCustomGenerate(action)) {
+        const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
+        if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+        openGenerateDialog(action, [no])
         return
       }
   // 工单二维码(计划层):单产品工单一张标签,二维码=公司代码@工单号@1000+工单行号(woQrText,2026-10-09 规则改版,扫码报工/领料入口);
@@ -10453,6 +10563,11 @@ async function load(clamping = false) {
   delMode.value = false
   delSel.value = []
   archPage.value = 1 // 档案分页随每次载入回到首页
+  // 切面板:左栏勾选(批量生单)清零(同一面板的刷新/翻页保留勾选,方便翻页挑单)
+  if (railPanelCode !== String(panelCode.value)) {
+    railPanelCode = String(panelCode.value)
+    railChecked.value = []
+  }
   if (invalidPanel.value) {
     ElMessage.error('面板编号无效，请从菜单重新进入')
     return
