@@ -81,7 +81,27 @@
       </el-table-column>
       <el-table-column :label="tt('物料编号')" min-width="170">
         <template #default="{ row }">
-          <el-input v-model="row.code" size="small" :placeholder="tt('手填物料编号')" />
+          <!-- 按**本行料位**预筛档案类别（粉料=炭粉+功能料-粉末 / 胶粉=胶粉 / 颗粒料=功能料-颗粒），
+               见 core/xsinter/materialKindMap.js。认不出料位时退回可手填。
+               ⚠ allow-create：实测档案里存在「所属类别」为空或写成「原材料」的物料
+                 （BK1-D/10、YJ-YKRS-014 都这样），它们进不了任何按类别收窄的候选。
+                 没有这条，用户会觉得"档案里明明有却选不到"。手打编号照常参与计算。 -->
+          <el-select
+            v-if="rowHasKindFilter(row.kind)"
+            v-model="row.code"
+            size="small"
+            filterable
+            clearable
+            allow-create
+            default-first-option
+            :loading="row.loading"
+            :placeholder="row.loading ? tt('加载中…') : tt('选择或直接输入编号')"
+            @focus="loadRowOptions(row)"
+            @change="() => onPickMaterial(row)"
+          >
+            <el-option v-for="o in row.options" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+          <el-input v-else v-model="row.code" size="small" :placeholder="tt('手填物料编号')" />
         </template>
       </el-table-column>
       <el-table-column :label="tt('物料名称')" min-width="200">
@@ -164,7 +184,10 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { tt } from '@/i18n'
+import request from '@/core/request'
+import { invRowsOf } from '@/core/panel/invCarry'
 import { computeXsinter, problemsOf, ROW_KINDS } from './calcEngine.js'
+import { kindsOfXsinterRow, rowHasKindFilter } from './materialKindMap.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -234,6 +257,64 @@ watch(() => props.modelValue, (open) => {
     }
   })
 }, { immediate: true })
+
+// ── 按料位预筛商品档案（物料编号下拉）────────────────────────────────────
+// 与成型工艺清单的配方计算器同一套后端接口与判据（RecipeCalcDialog.ensureKindRows）：
+//   POST /px/queryFormDataList { panelCode:'INV', condition:{ 所属类别: k } }
+// ⚠ 服务端 LIKE %值% 只当收窄，**判据是本地 trim 全等**（实测 condition 传 M-001 会带回 YJ-HSM-001）。
+const invKindRows = ref({})        // { 类别: 档案行[] } —— 同类别只拉一次
+const kindPending = new Map()      // 并发去重：同一类别正在拉时不重复发请求
+
+async function ensureKindRows(kind) {
+  const k = String(kind ?? '').trim()
+  if (!k) return []
+  if (invKindRows.value[k]) return invKindRows.value[k]
+  if (kindPending.has(k)) return kindPending.get(k)
+  const p = (async () => {
+    try {
+      const res = await request.post('/px/queryFormDataList', {
+        panelCode: 'INV', condition: { 所属类别: k }, pageNo: 1, pageSize: 1000,
+      })
+      const rows = invRowsOf(res?.data).filter((r) => String(r?.['所属类别'] ?? '').trim() === k)
+      invKindRows.value = { ...invKindRows.value, [k]: rows }
+      return rows
+    } catch {
+      // 无权限/接口异常 ⇒ 该行下拉为空但**不影响计算**（物料编号是录入便利，不是计算输入）
+      return []
+    } finally { kindPending.delete(k) }
+  })()
+  kindPending.set(k, p)
+  return p
+}
+
+/** 该行的下拉候选：按料位合并多个类别（粉料 = 炭粉 + 功能料-粉末） */
+async function loadRowOptions(row) {
+  if (!rowHasKindFilter(row.kind)) return
+  if ((row.options || []).length) return          // 已加载过就不重复拉
+  row.loading = true
+  try {
+    const all = []
+    for (const k of kindsOfXsinterRow(row.kind)) all.push(...(await ensureKindRows(k)))
+    const seen = new Set()
+    const opts = []
+    for (const r of all) {
+      const code = String(r?.['存货编码'] ?? '').trim()
+      if (!code || seen.has(code)) continue
+      seen.add(code)
+      const name = String(r?.['存货名称'] ?? '').trim()
+      opts.push({ value: code, label: `${code} ${name}`.trim(), name })
+    }
+    row.options = opts
+  } finally {
+    row.loading = false
+  }
+}
+
+/** 选中编号 → 带出名称（名称已手填则不覆盖，与配方计算器 materialFillFor 同口径） */
+function onPickMaterial(row) {
+  const hit = (row.options || []).find((o) => o.value === row.code)
+  if (hit && !String(row.name || '').trim()) row.name = hit.name
+}
 
 /** 填入单据：头 12 格 + 配方表 10 行 */
 function apply() {
