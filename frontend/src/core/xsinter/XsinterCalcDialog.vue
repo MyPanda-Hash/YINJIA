@@ -32,34 +32,37 @@
   >
     <!-- ── 输入参数 ── -->
     <div class="xc-sec">{{ tt('一、输入参数') }}</div>
-    <el-table :data="[1]" :show-header="false" border size="small" class="xc-grid">
-      <el-table-column label="" width="96" align="center">
+    <!-- ⚠ 表头必须显示（2026-10-30 用户口径「不太清楚每个代表什么，麻烦按我那个标识清楚」）：
+         原先写了 :show-header="false"，5 个格子的标签（炭棒外径/内径/出货长度/模具出料口/中心杆）
+         全被藏起来，界面上只剩 5 个空输入框，没人知道该填哪个。单位一并写进表头。 -->
+    <el-table :data="[1]" border size="small" class="xc-grid">
+      <el-table-column :label="tt('参数')" width="96" align="center">
         <template #default><span class="xc-lab">{{ tt('炭棒规格') }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('炭棒外径')">
+      <el-table-column :label="tt('炭棒外径 mm')">
         <template #default><el-input v-model="form.rodOuter" size="small" /></template>
       </el-table-column>
-      <el-table-column :label="tt('炭棒内径')">
+      <el-table-column :label="tt('炭棒内径 mm')">
         <template #default><el-input v-model="form.rodInner" size="small" /></template>
       </el-table-column>
-      <el-table-column :label="tt('炭棒出货长度')">
+      <el-table-column :label="tt('炭棒出货长度 mm')">
         <template #default><el-input v-model="form.shipLength" size="small" /></template>
       </el-table-column>
-      <el-table-column :label="tt('模具出料口内径')">
+      <el-table-column :label="tt('模具出料口内径 mm')">
         <template #default><el-input v-model="form.dieOutlet" size="small" /></template>
       </el-table-column>
-      <el-table-column :label="tt('中心杆外径')">
+      <el-table-column :label="tt('中心杆外径 mm')">
         <template #default><el-input v-model="form.rodDiameter" size="small" /></template>
       </el-table-column>
     </el-table>
-    <el-table :data="[1]" :show-header="false" border size="small" class="xc-grid xc-grid-gap">
-      <el-table-column label="" width="96" align="center">
+    <el-table :data="[1]" border size="small" class="xc-grid xc-grid-gap">
+      <el-table-column :label="tt('参数')" width="96" align="center">
         <template #default><span class="xc-lab">{{ tt('计算参数') }}</span></template>
       </el-table-column>
       <el-table-column :label="tt('颗粒物料折算系数')">
         <template #default><el-input v-model="form.granuleFactor" size="small" /></template>
       </el-table-column>
-      <el-table-column :label="tt('成型修正长度参数mm')">
+      <el-table-column :label="tt('成型修正长度参数 mm')">
         <template #default><el-input v-model="form.lengthFix" size="small" /></template>
       </el-table-column>
       <el-table-column :label="tt('密度参数下限')">
@@ -132,37 +135,37 @@
 
     <!-- ── 计算结果 ── -->
     <div class="xc-sec">{{ tt('三、计算结果') }}</div>
-    <el-table :data="[1]" :show-header="false" border size="small" class="xc-grid">
-      <el-table-column label="" width="96" align="center">
+    <el-table :data="[1]" border size="small" class="xc-grid">
+      <el-table-column :label="tt('项目')" width="96" align="center">
         <template #default><span class="xc-lab">{{ tt('切割长度') }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('炭棒体积cm3')">
+      <el-table-column :label="tt('炭棒体积 cm³')">
         <template #default><span class="xc-out">{{ fmt(calc.volume) }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('切割长度中间值mm')">
+      <el-table-column :label="tt('切割长度中间值 mm')">
         <template #default><span class="xc-out">{{ fmt(calc.cut.mid) }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('折算物料重量g')">
+      <el-table-column :label="tt('折算物料重量 g')">
         <template #default><span class="xc-out">{{ fmt(calc.convWeight) }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('单支总重g')">
+      <el-table-column :label="tt('单支总重 g')">
         <template #default><span class="xc-out xc-strong">{{ fmt(calc.totalWeight) }}</span></template>
       </el-table-column>
       <el-table-column :label="tt('比例合计')">
         <template #default><span class="xc-out">{{ fmt(calc.totalRatio) }}</span></template>
       </el-table-column>
     </el-table>
-    <el-table :data="[1]" :show-header="false" border size="small" class="xc-grid xc-grid-gap">
-      <el-table-column label="" width="96" align="center">
+    <el-table :data="[1]" border size="small" class="xc-grid xc-grid-gap">
+      <el-table-column :label="tt('项目')" width="96" align="center">
         <template #default><span class="xc-lab">{{ tt('成型管控要求') }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('成型切炭长度')">
+      <el-table-column :label="tt('成型切炭长度 mm（下限/中间值/上限）')">
         <template #default><span class="xc-out">{{ fmt(calc.cut.low) }} / {{ fmt(calc.cut.mid) }} / {{ fmt(calc.cut.high) }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('成型冷却长度')">
+      <el-table-column :label="tt('成型冷却长度 mm（下限/中间值/上限）')">
         <template #default><span class="xc-out">{{ fmt(calc.cool.low) }} / {{ fmt(calc.cool.mid) }} / {{ fmt(calc.cool.high) }}</span></template>
       </el-table-column>
-      <el-table-column :label="tt('炭棒重量g')">
+      <el-table-column :label="tt('炭棒重量 g（下限/中间值/上限）')">
         <template #default><span class="xc-out">{{ fmt(calc.weight.low) }} / {{ fmt(calc.weight.mid) }} / {{ fmt(calc.weight.high) }}</span></template>
       </el-table-column>
       <el-table-column :label="tt('密度要求')">
