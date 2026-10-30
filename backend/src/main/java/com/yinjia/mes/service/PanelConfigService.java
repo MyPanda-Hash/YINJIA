@@ -601,7 +601,9 @@ public class PanelConfigService {
                 String t = pushTarget(def.code(), action);
                 // 目标必须是真实面板:2026-10-28 起 SO_ORDER「生成生产工单」的目标是页面 WORK_ORDER_LIST
                 // (不是 yj_panel),它只用于前端「是否需要分批送料弹窗」判断 —— 页面码不满足该判断,不登记。
-                if (t != null && !disabledActions.contains(action) && registry.panel(t) != null) pushTargets.put(action, t);
+                // ⚠ 必须用 find():panel() 找不到是抛异常,写成 panel(t) != null 会当场 400 把整个面板配置打挂
+                //   (2026-10-28~10-30 销售订单左栏恒 0 条、右栏空白就是这个)。
+                if (t != null && !disabledActions.contains(action) && registry.find(t) != null) pushTargets.put(action, t);
             }
         }
         if (!pushTargets.isEmpty()) metadata.put("pushTargets", pushTargets);
