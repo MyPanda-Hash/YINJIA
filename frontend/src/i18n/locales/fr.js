@@ -2593,6 +2593,8 @@ export default {
     '没有未开单的工单': 'Aucun OF en attente',
     '还没有已开单的工单': 'Aucun OF créé',
     '只读查看:领料与退料请到「生产领料」里操作': 'Lecture seule : effectuez prélèvements et retours dans « Prélèvement »',
+    '需求': 'Requis',
+    '这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。': 'Ce bon est terminé. Pour retourner, cliquez ci-dessous ; une entrée sera créée.',
   },
 
 }

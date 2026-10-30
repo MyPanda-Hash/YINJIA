@@ -348,7 +348,8 @@ public class MobilePickController {
             item.put("数量", 0);
             item.put("仓库", lineWh[0]);
             if (!lineWh[1].isEmpty()) item.put("仓库编码", lineWh[1]);
-            item.put("明细备注", "生产领料·组装BOM表 " + str(bomHead.get("单据编号")));
+            item.put("明细备注", "生产领料·组装工艺清单 " + str(bomHead.get("单据编号"))
+                    + "(需求 " + str(b.get("用量")) + ")");
             outItems.add(item);
             // 单头仓库:第一行有仓就记第一行的(全部同仓时才是"这单从哪个仓出")
             if (wh.isEmpty() && !lineWh[0].isEmpty()) { wh = lineWh[0]; whCode = lineWh[1]; }
@@ -1050,12 +1051,27 @@ public class MobilePickController {
         return wo;
     }
 
-    /** 最新一张未作废的组装BOM表头(按产品编号) */
+    /**
+     * 取该产品**最新一张**《组装工艺清单》的表头(用于领料展开与追溯留痕)。
+     *
+     * <p>🔴 2026-10-30 重要修正:此前取的是 {@code rd_asm_bom_head}(组装BOM表)—— **取错表了**。
+     * <ul>
+     *   <li>{@code RD_ASM_BOM}(组装BOM表)**面板菜单早已下线**(2026-09-11 并入组装工艺清单第 2 页签,
+     *       见 menus.test.js 的钉死断言);它当前 0 行,我造的演示数据放进去后
+     *       用户在界面上打开「组装工艺清单」看到 BOM 表**是空的**,而领料单却领着料 ——
+     *       两边对不上,这是用户 2026-10-30 反馈的第三个问题的根因;</li>
+     *   <li>现在界面里维护 BOM 的位置是**组装工艺清单 → 页签1「组装BOM表」**,
+     *       物理落点是 {@code rd_asm_proc_detail}(三张逻辑表共用该行表,用 {@code 表区='物料清单'} 区分,
+     *       见 frontend `recordSheetConfigs.js` 的 RD_ASM_PROC_DT_BOM)。</li>
+     * </ul>
+     * ⇒ 取数改为按**产品编号**找最新的 {@code rd_asm_proc_head},再取其
+     * {@code rd_asm_proc_detail} 里 {@code 表区='物料清单'} 的行。
+     */
     private Map<String, Object> latestAsmBom(String productCode) {
         if (productCode == null || productCode.isBlank()) return null;
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP 1 单据编号, 产品编号, 产品名称"
-                        + " FROM dbo.rd_asm_bom_head"
+                "SELECT TOP 1 单据编号, 产品编号, 产品名称, ISNULL(版本号,N'') AS 版本号"
+                        + " FROM dbo.rd_asm_proc_head"
                         + " WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY ISNULL(单据日期,'') DESC, id DESC",
                 productCode.trim());
@@ -1063,22 +1079,23 @@ public class MobilePickController {
     }
 
     /**
-     * 组装BOM表明细行(物料编号/物料名/物料规格/用量),用量解析成数字。
+     * 组装工艺清单里「组装BOM表」页签的明细行(物料编号/物料名/物料规格/用量)。
      *
-     * <p>⚠ 组装BOM表**没有「计量单位」列**(它的列只有 物料编号/物料名/物料规格/外观要求/用量),
-     * 而材料出库单的明细把「计量单位」设为必填 —— 生单时若不带就被 {@code ButtonService.save}
-     * 挡回「明细第 1 行计量单位不能为空」(2026-10-30 实测踩到)。
-     * ⇒ 单位**从存货档案 bs_inv 带出**(与材料出库单里手选商品的取值同源),
-     *   档案里也没有时留空,由保存时的既有校验给出可读错误(不在这里猜)。
+     * <p>🔴 数据源 = {@code rd_asm_proc_detail} 且 {@code 表区='物料清单'}。
+     * 为什么必须带表区过滤:这张行表由**三张逻辑表共用**(修订记录 / 物料清单 / 关键控制清单),
+     * 不带过滤会把修订记录、工序控制点也当成领料用料。
+     *
+     * <p>⚠ 计量单位:BOM 表本身没有单位列,而材料出库单的计量单位是必填 ⇒
+     * 从存货档案 {@code bs_inv} 带出(与材料出库单里手选商品的取值同源)。
      */
     private List<Map<String, Object>> bomDetail(String bomNo) {
         List<Map<String, Object>> raw = jdbc.queryForList(
                 "SELECT ISNULL(d.物料编号,N'') AS 物料编号, ISNULL(d.物料名,N'') AS 物料名,"
                         + " ISNULL(d.物料规格,N'') AS 物料规格, ISNULL(d.用量,N'') AS 用量,"
                         + " ISNULL(i.计量单位,N'') AS 计量单位, ISNULL(i.规格型号,N'') AS 档案规格"
-                        + " FROM dbo.rd_asm_bom_detail d"
+                        + " FROM dbo.rd_asm_proc_detail d"
                         + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = d.物料编号 AND ISNULL(i.asp_cancel,'N') <> 'Y'"
-                        + " WHERE d.单据编号 = ? AND ISNULL(d.asp_cancel,'N') <> 'Y'"
+                        + " WHERE d.单据编号 = ? AND d.表区 = N'物料清单' AND ISNULL(d.asp_cancel,'N') <> 'Y'"
                         + " ORDER BY TRY_CAST(d.序号 AS int), d.id", bomNo);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : raw) {
@@ -1164,9 +1181,33 @@ public class MobilePickController {
         m.put("数量", r.get("数量"));
         m.put("批号", r.get("批号"));
         m.put("明细备注", r.get("明细备注"));
-        m.put("BOM用量", 0);
+        // BOM 需求用量(2026-10-30):生单时写进了明细备注 "… (需求 2)" —— 这里解析回来,
+        // 前端扫物料码时用它做**默认领用数量**(用户口径「默认数量根据领料单需要的数量来」)。
+        // 解析不出就 0(不猜),此时前端退回"按库存上限预填"。
+        m.put("BOM用量", bomUsageOf(str(r.get("明细备注"))));
         m.put("codeCol", codeCol);
         return m;
+    }
+
+    /**
+     * 从明细备注里取 BOM 需求用量。
+     *
+     * <p>为什么从备注解析而不是加列:领料单明细表 {@code bl_material_out} 是金蝶同步口径的表,
+     * 加自有列会与 ERP 字段对账打架;而"需求多少"是**生单那一刻的快照**,写进备注正好留痕
+     * (明细备注本来就允许自由文本,且现场在材料出库单里也看得到)。
+     *
+     * @return 需求用量;备注里没有或解析不出 → 0
+     */
+    private static double bomUsageOf(String note) {
+        if (note == null || note.isBlank()) return 0;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\\(需求\\s*([0-9]+(?:\\.[0-9]+)?)\\s*\\)").matcher(note);
+        if (!m.find()) return 0;
+        try {
+            return round4(Double.parseDouble(m.group(1)));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /** 该物料的库存批次行(v_stock_pick 口径:物料+仓库+批号,只出有货的) */

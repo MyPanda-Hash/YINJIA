@@ -4943,6 +4943,7 @@ export default {
     '没有未开单的工单': 'No work orders pending',
     '还没有已开单的工单': 'No work orders created yet',
     '只读查看:领料与退料请到「生产领料」里操作': 'Read-only view: do picking and returns in "Production Picking"',
+    '这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。': 'This picking slip is completed and posted. To return material, tap below; submitting creates an other-inbound document.',
   },
 
 }

@@ -2593,6 +2593,8 @@ export default {
     '没有未开单的工单': 'No hay órdenes pendientes',
     '还没有已开单的工单': 'Aún ninguna orden creada',
     '只读查看:领料与退料请到「生产领料」里操作': 'Solo lectura: realice retiradas y devoluciones en «Retirada de producción»',
+    '需求': 'Requerido',
+    '这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。': 'Este vale está completado. Para devolver, pulse abajo; se creará una entrada.',
   },
 
 }

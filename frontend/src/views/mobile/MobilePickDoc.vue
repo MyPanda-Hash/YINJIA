@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30 第三轮改版)
 
   【两种状态,两套动作】
@@ -59,7 +59,7 @@
       </div>
     </section>
 
-    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料
+    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料(生成其他入库单)
          ⚠ 只读模式下(从开单工作台点进来)整块**不渲染**:那里只看明细,不做任何操作 -->
     <section v-if="!readOnly" class="mp-card" :class="{ dim: isDone && !returnMode }">
       <div class="mp-sec">
@@ -68,13 +68,15 @@
         <span v-if="isDone" class="mp-sec-note">{{ returnMode ? tt('退料模式') : tt('这张单已完成,可点「开始退料」') }}</span>
       </div>
 
-      <!-- 已完成 + 非退料模式:引导到退料 -->
+      <!-- 已完成 + 非退料模式:引导到(退料 → 生成其他入库单) -->
       <div v-if="isDone && !returnMode" class="mp-retire-cta">
-        <span>{{ tt('这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料。') }}</span>
+        <span>{{ tt('这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。') }}</span>
         <el-button type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
       </div>
 
       <template v-else>
+        <!-- 扫物料码解锁(2026-10-30 用户口径:「只有扫了对应物料的编码才能解锁填入,填入后要重新锁定」)
+             ⇒ 扫码框常驻;数量输入框**只有扫到物料后才出现**,写完/取消后重新锁定 -->
         <div class="mp-row">
           <el-input
             ref="matInput"
@@ -93,7 +95,7 @@
             <div class="mp-mat-name">{{ cur.名称 || cur.编码 }}</div>
             <div class="mp-mat-meta">
               {{ cur.编码 }} · {{ cur.规格 || '—' }} · {{ cur.单位 || '—' }}
-              <template v-if="!returnMode && cur.BOM用量 > 0"> · {{ tt('BOM用量') }} {{ fmtQty(cur.BOM用量) }}</template>
+              <template v-if="!returnMode && cur.BOM用量 > 0"> · {{ tt('需求') }} {{ fmtQty(cur.BOM用量) }}</template>
               <template v-if="returnMode"> · {{ tt('已领') }} {{ fmtQty(cur.已领数量) }} / {{ tt('已退') }} {{ fmtQty(cur.已退数量) }}</template>
             </div>
           </div>
@@ -103,6 +105,7 @@
           </div>
         </div>
 
+        <!-- 解锁区(2026-10-30):扫到物料才出现;「写入」或「取消」后**重新锁定**回到扫码 -->
         <template v-if="cur">
           <div class="mp-row mp-qty">
             <span class="mp-qty-label">{{ returnMode ? tt('退料数量') : tt('领用数量') }}</span>
@@ -120,6 +123,7 @@
             <el-button type="primary" size="large" :loading="saving" :disabled="!(curQty > 0)" @click="saveQty">
               {{ tt('写入') }}
             </el-button>
+            <el-button size="large" @click="cancelLock">{{ tt('取消') }}</el-button>
           </div>
 
           <!-- 批次:领料沿用先进先出拆批;退料按原领料批号回退 -->
@@ -170,8 +174,8 @@
         v-for="r in rows"
         :key="r.行号"
         class="mp-line"
-        :class="{ 'is-cur': cur && cur.编码 === r.编码, 'is-ret': returnMode && qtyOf(r.编码) > 0, 'is-ro': readOnly }"
-        @click="!readOnly && pickRow(r)"
+        :class="{ 'is-cur': cur && cur.编码 === r.编码, 'is-ret': returnMode && qtyOf(r.编码) > 0, 'is-ro': rowLocked }"
+        @click="!rowLocked && pickRow(r)"
       >
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
         <div class="mp-line-main">
@@ -249,6 +253,17 @@ const docId = Number(route.query.id) || 0
  * 拿令牌直接调接口照样要被拦 —— 界面隐藏从来不是安全边界。
  */
 const readOnly = computed(() => String(route.query.readOnly || '') === '1')
+
+/**
+ * 明细行是否不可点(2026-10-30 用户口径「明细里面只能看不能操作」+「已完成的进去是要生成其他入库单」)。
+ *
+ * <p>三种情况都不可点:
+ *   ① 只读模式(从开单工作台点进来);
+ *   ② 这张单**已完成** —— 领料明细已是过账历史,点一行就往扫码区装料是错的;
+ *      已完成单要动就只能走「开始退料」(退料 → 生成其他入库单);
+ *   ③ 正在退料模式里点的那一行仍可点(否则退料没法按行选)。
+ */
+const rowLocked = computed(() => readOnly.value || (isDone.value && !returnMode.value))
 const doc = ref({})
 const wo = ref({})
 const pickRows = ref([])
@@ -407,7 +422,13 @@ async function scanMaterial(scanBatch) {
       已领数量: 0, 已退数量: 0,
     }
     batchRows.value = makeBatchRows(Array.isArray(d.批次) ? d.批次 : [], String(scanBatch || '').trim())
-    const preset = cur.value.当前数量 > 0 ? cur.value.当前数量 : cur.value.上限
+    // 默认领用数量(2026-10-30 用户口径:「默认数量根据领料单需要的数量来」):
+    //   ① 这一行已经填过数量 ⇒ 沿用(续领时不要把已填的冲掉);
+    //   ② 否则取 **BOM 需求用量**(生单时写在明细备注里,后端解析成 BOM用量 下发);
+    //   ③ 需求为 0(历史单/备注里没写)⇒ 退回库存上限,至少不是 0。
+    // 都按上限夹住 —— 需求超过库存时只能领到库存那么多。
+    const need = cur.value.BOM用量 > 0 ? cur.value.BOM用量 : cur.value.上限
+    const preset = cur.value.当前数量 > 0 ? cur.value.当前数量 : need
     curQty.value = round4(Math.min(Math.max(0, preset), cur.value.上限))
     onQtyChange(curQty.value)
   } catch (e) {
@@ -472,9 +493,31 @@ async function saveQty() {
   }
 }
 
+/**
+ * 取消本次填写并**重新锁定**回到扫码状态(2026-10-30 用户口径
+ * 「只有扫了对应物料的编码才能解锁填入,填入后要重新锁定」)。
+ *
+ * 与「写入」后的清空是同一套动作;写成一个函数,免得两处各写一遍后渐渐不一致。
+ */
+function cancelLock() {
+  // ⚠ 先记下编码再清 cur —— 清空后就取不到了(第一次写这里时前后顺序反了)
+  const code = cur.value ? cur.value.编码 : ''
+  if (returnMode.value && code) {
+    // 退料模式:本次记下的也一并撤掉(用户按"取消"就是不想要了)
+    const next = { ...returnQty.value }
+    delete next[code]
+    returnQty.value = next
+  }
+  matText.value = ''
+  cur.value = null
+  batchRows.value = []
+  curQty.value = 0
+  clearMsg()
+  nextTick(() => matInput.value?.focus?.())
+}
+
 /** 进入退料模式 */
-function startReturn() {
-  if (!isDone.value) { errText.value = tt('这张单还没提交完成,不能退料'); return }
+function startReturn() {  if (!isDone.value) { errText.value = tt('这张单还没提交完成,不能退料'); return }
   returnMode.value = true
   returnQty.value = {}
   clearMsg()
