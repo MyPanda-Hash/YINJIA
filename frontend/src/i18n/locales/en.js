@@ -3628,12 +3628,16 @@ export default {
     '维护尺寸表': 'Maintain Size Table',
     /* 该面板纸面版式的标题条(recordSheetConfigs.RD_SINTER_TOL.plainTitle) */
     '烧结尺寸表': 'Sintering Size Table',
+    '生产模具表': 'Production Mold Table',
     '未选型号 —— 尺寸按单据上的炭棒规格': 'No model selected — sizes come from the document spec',
     '正在读取烧结尺寸表…': 'Loading sintering size table…',
     '来自烧结尺寸表': 'from the sintering size table:',
+    '正在读取生产模具表…': 'Loading the production mold table…',
+    '来自生产模具表': 'from the production mold table:',
     '个型号': 'models',
     '尺寸表没有可用行': 'the size table has no usable rows',
     '读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the sintering size table (panel permission missing?) — enter sizes on the document instead',
+    '读不到生产模具表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the production mold table (panel permission missing?) — enter sizes on the document instead',
     /* 从标准库勾选/标准库维护 的措辞与既有页面一致(此前只有机翻兜底) */
     '从标准库勾选': 'Pick from Library',
     /* ── 成型工艺清单(页1)按设计图重排:纸面新标签(数据键不变,改名走 yj_field.alias) ── */

@@ -323,25 +323,28 @@ const sinterHint = computed(() => (sinterRow.value ? (sinterLengthWarning(sinter
 function onSinterWorkshopChange() { sinterModel.value = '' }
 
 async function loadSinterRows() {
-  sinterTip.value = tt('正在读取烧结尺寸表…')
+  sinterTip.value = tt('正在读取生产模具表…')
   try {
     const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'RD_SINTER_TOL', condition: {}, pageNo: 1, pageSize: 500,
+      // 2026-10-30 面板合并：烧结尺寸表(RD_SINTER_TOL)已并入「生产模具表」PROD_MOLD（同一张物理表）。
+      // 列名改成用户口径（炭棒尺寸/外模规格/…），行键由 recipeSheet.sinterRowsFromQuery 归一化回原名，
+      // 下游按 型号/模具尺寸/… 读代码一个字都不用改。
+      panelCode: 'PROD_MOLD', condition: {}, pageNo: 1, pageSize: 500,
     })
     sinterRows.value = sinterRowsFromQuery(res)
     sinterTip.value = sinterRows.value.length
-      ? `· ${tt('来自烧结尺寸表')} ${sinterRows.value.length} ${tt('个型号')}`
+      ? `· ${tt('来自生产模具表')} ${sinterRows.value.length} ${tt('个型号')}`
       : `· ${tt('尺寸表没有可用行')}`
   } catch {
     // 权限/接口异常都按"读不到"处理:退回单据上手填,不阻断计算(探测过的 403 场景)
     sinterRows.value = []
-    sinterTip.value = `· ${tt('读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填')}`
+    sinterTip.value = `· ${tt('读不到生产模具表（可能没有该面板权限），尺寸按单据上手填')}`
   }
 }
 
 /** 维护入口:直接开那个档案面板(它没有侧栏菜单,入口就放在用它的人手边) */
 function openSinterTable() {
-  const url = `${location.origin}${location.pathname}#/panelx/list/RD_SINTER_TOL`
+  const url = `${location.origin}${location.pathname}#/panelx/list/PROD_MOLD`
   window.open(url, '_blank')
 }
 
@@ -806,7 +809,7 @@ async function saveParams() {
 /* ── 按产品规格一键带出(2026-09-21)────────────────────────────────────────
    做同一产品的第二张单时,炭棒规格/烧结型号/密度范围本来都要重敲;这三样都能从已有数据推出来:
      · 炭棒规格 1/2/3 ← 产品信息表 RD_PROD_INFO(炭棒外径/炭棒内径/炭棒长度);
-     · 烧结型号       ← 按外径/内径在烧结尺寸表里匹配(先看单据车间,匹配不到不猜);
+     · 烧结型号       ← 按外径/内径在生产模具表里匹配(先看单据车间,匹配不到不猜);
      · 密度上下限     ← **该产品最近一张已保存的成型工艺清单**(只有「密度管控要求」文本也能解析)。
    取不到就如实提示,**绝不编造密度**(质量口径的数不能猜);已填的格一律不动(specCarryFrom 有单测)。
    放在 ③ 区头:算不出来时(blockReason)它就在眼前。 */
@@ -943,3 +946,4 @@ function apply() {
   .rcd-two { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
+

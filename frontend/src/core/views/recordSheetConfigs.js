@@ -2349,34 +2349,4 @@ export const recordSheetConfigs = {
     dataTables: [],
   },
 
-  // 烧结尺寸表 —— 无头表(整表即行表)。yj_panel: head_table=NULL, line_table=rd_sinter_tolerance,
-  //                                          detail_key=items, page_size=25
-  // 10 个字段全部 place 含 'detail';车间/型号另含 'query'(进查询区)且 required=1。
-  //
-  // ⚠ 版式必须是 **plain**(2026-10-15 用户报障「配方计算里点『维护尺寸表』打开的视图有问题」):
-  //   这张表不是纸面文书(没有报告头,也没有 密级/报告编号 那套「数据记录表」抬头),走 report 版式会同时踩两个坑:
-  //     ① `effInfo` 在 `cfg.info === undefined` 时回落 DEFAULT_INFO ⇒ 纸上凭空多出
-  //        「YJ-PD-01 密级 适用范围 测试负责人 报告编号 审核人」这一整块属于数据记录表的抬头(实测);
-  //     ② 本面板未声明 `grid` ⇒ `gridW = 0`,而 `.rs-t` 是 `table-layout:fixed` ⇒ **整张纸塌成一条竖线**
-  //        (实测 1600×1000 截图:10 个列名与 62 行全挤在一列里,与 keys.test.js 断言⑥ 记的坑同源)。
-  //   plain 版式不渲报告头,表宽直接取 `plainW = Σcols[].w`,故这里**逐列给宽**(取该字段 yj_field.width)。
-  RD_SINTER_TOL: {
-    headMode: 'plain',
-    plainTitle: '烧结尺寸表',
-    sections: [],
-    dataTables: [
-      { bar: '烧结尺寸', cols: [
-        { key: '车间', label: '车间', w: 90 },
-        { key: '型号', label: '型号', w: 130 },
-        { key: '模具尺寸', label: '模具尺寸', w: 100 },
-        { key: '中心杆尺寸', label: '中心杆尺寸', w: 110 },
-        { key: '炭棒外径', label: '炭棒外径', w: 100 },
-        { key: '炭棒外径公差', label: '炭棒外径公差', w: 110 },
-        { key: '炭棒内径', label: '炭棒内径', w: 100 },
-        { key: '炭棒内径公差', label: '炭棒内径公差', w: 110 },
-        { key: '长度范围', label: '长度范围', w: 170 },
-        { key: '停用', label: '停用', type: 'bool', w: 80 },
-      ]},
-    ],
-  },
 }
