@@ -406,10 +406,10 @@ function applyScan(code) {
 }
 
 async function loadDoc() {
-  if (!docId) { errText.value = tt('没有指定单据:请从生产领料列表点进来'); return }
+  if (!docId.value) { errText.value = tt('没有指定单据:请从生产领料列表点进来'); return }
   clearMsg()
   try {
-    const res = await request.get('/px/mobilePick/doc', { params: { id: docId } })
+    const res = await request.get('/px/mobilePick/doc', { params: { id: docId.value } })
     const d = res.data?.data || res.data || {}
     doc.value = d
     wo.value = d.工单 || {}
@@ -476,7 +476,7 @@ async function scanMaterial(scanBatch) {
   try {
     if (returnMode.value) {
       // ── 退料:问后端"这个料还能退多少"
-      const res = await request.post('/px/mobilePick/returnScan', { id: docId, code })
+      const res = await request.post('/px/mobilePick/returnScan', { id: docId.value, code })
       const d = res.data?.data || res.data || {}
       if (!(Number(d.可退数量) > 0)) {
         throw new Error(`${tt('这个物料已经退完了')}({{ already }} ${tt('已领')} ${fmtQty(d.已领数量)},${tt('已退')} ${fmtQty(d.已退数量)})`.replace('{{ already }}', ''))
@@ -496,7 +496,7 @@ async function scanMaterial(scanBatch) {
 
     // ── 领料:问库存与批次
     const res = await request.post('/px/mobilePick/scanMaterial', {
-      id: docId, code, batch: String(scanBatch || '').trim(), side: 'pick',
+      id: docId.value, code, batch: String(scanBatch || '').trim(), side: 'pick',
     })
     const d = res.data?.data || res.data || {}
     cur.value = {
@@ -558,7 +558,7 @@ async function saveQty() {
       .filter((b) => round4(b.qty) > 0)
       .map((b) => ({ 批号: b.lot, 仓库: b.warehouse, 仓库编码: b.warehouseCode, 数量: round4(b.qty) }))
     const res = await request.post('/px/mobilePick/setQty', {
-      id: docId, side: 'pick', code: cur.value.编码, qty: round4(curQty.value), batches,
+      id: docId.value, side: 'pick', code: cur.value.编码, qty: round4(curQty.value), batches,
     })
     const d = res.data?.data || res.data || {}
     pickRows.value = (d.领料明细 || []).map(normalize)
@@ -637,7 +637,7 @@ async function submitReturn() {
   submittingReturn.value = true
   clearMsg()
   try {
-    const res = await request.post('/px/mobilePick/submitReturn', { id: docId, items })
+    const res = await request.post('/px/mobilePick/submitReturn', { id: docId.value, items })
     const d = res.data?.data || res.data || {}
     okText.value = d.说明 || `${tt('退料成功')}:${d.退料单号}`
     ElMessage.success(tt('退料成功'))
@@ -658,7 +658,7 @@ async function reprint() {
   printing.value = true
   clearMsg()
   try {
-    const res = await request.post('/px/mobilePick/reprint', { id: docId })
+    const res = await request.post('/px/mobilePick/reprint', { id: docId.value })
     const payload = (res.data?.data || res.data || {}).打印 || {}
     const queued = await queueToPrintStation({ ...payload, 来源: 'mobilePick.doc' })
     if (queued && queued.online) { okText.value = tt('已发送到打印电脑'); return }
@@ -683,7 +683,7 @@ async function submit() {
   submitting.value = true
   clearMsg()
   try {
-    const res = await request.post('/px/mobilePick/submit', { id: docId })
+    const res = await request.post('/px/mobilePick/submit', { id: docId.value })
     const d = res.data?.data || res.data || {}
     doc.value = { ...doc.value, 状态: d.状态 || '已完成' }
     ElMessage.success(tt('已提交:材料出库单已生成'))
