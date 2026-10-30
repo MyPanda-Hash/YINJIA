@@ -56,10 +56,24 @@ export const SKINS = [
   },
 ]
 
-export const DEFAULT_SKIN = 'claude'
+/**
+ * 默认皮肤 = 松墨（原来的制造绿）。
+ *
+ * 2026-10-30 用户口径:「一开始登录的时候默认为松墨」—— 系统换肤前的唯一外观就是这套绿，
+ * 让它做默认，等于"升级后所有人第一眼看到的还是自己熟悉的那套"；新皮肤（暖砂/深海）
+ * 作为可选项，谁想要谁自己点。默认换成陌生配色对车间和仓管的日常操作没有好处。
+ */
+export const DEFAULT_SKIN = 'jade'
 
-/** localStorage 键（与 mes_dark / mes_collapsed 同族命名） */
-export const SKIN_STORAGE_KEY = 'mes_skin'
+/**
+ * localStorage 键（与 mes_dark / mes_collapsed 同族命名）。
+ *
+ * 带 `_v2` 是因为默认皮肤在 2026-10-30 当天由 claude 改成 jade，而**首版启动流程会把当时
+ * 生效的皮肤写回本机**（哪怕用户从没点过色卡）⇒ 所有人浏览器里都被钉成了 claude。
+ * 换一个键，等于让所有人重新按新默认走一次；真正动手选过的人再点一次即可
+ * （而且现在启动不再写盘，见 applySkin 的 persist 参数）。
+ */
+export const SKIN_STORAGE_KEY = 'mes_skin_v2'
 
 /**
  * 每套皮肤在明暗两块里都必须给全的 token。
@@ -129,18 +143,24 @@ export function readSkin() {
 }
 
 /**
- * 切换皮肤：只改 `<html data-skin>` 与 localStorage，颜色全由 skins.css 决定。
+ * 切换皮肤：只改 `<html data-skin>`，颜色全由 skins.css 决定。
  * 返回真正生效的皮肤 id（脏值会被纠正，调用方可据此更新界面选中态）。
+ *
+ * `persist=false` 用于**启动时把默认皮肤挂上**：那时用户可能从没选过，
+ * 若照样写盘就把"当前默认"钉死在这一台浏览器上，以后改默认对他就永久无效了。
+ * 只有人真的点了色卡（setSkin）才落盘。
  */
-export function applySkin(id) {
+export function applySkin(id, persist = true) {
   const skin = normalizeSkin(id)
   if (typeof document !== 'undefined' && document.documentElement) {
     document.documentElement.dataset.skin = skin
   }
-  try {
-    localStorage.setItem(SKIN_STORAGE_KEY, skin)
-  } catch (e) {
-    /* 隐私模式/配额满：本机记不住，但当前会话仍然换得动 */
+  if (persist) {
+    try {
+      localStorage.setItem(SKIN_STORAGE_KEY, skin)
+    } catch (e) {
+      /* 隐私模式/配额满：本机记不住，但当前会话仍然换得动 */
+    }
   }
   return skin
 }

@@ -99,6 +99,7 @@ import TabsBar from './TabsBar.vue'
 import HelpPanel from './HelpPanel.vue'
 import { User, ArrowDown } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
+import { applySkin } from '@core/ui/skins.js'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { findMenuByPath } from '@/business/menus'
@@ -160,7 +161,8 @@ onMounted(() => {
   if (app.dark) document.documentElement.classList.add('dark')
   // 换肤(2026-10-30):index.html 已在首帧前按 localStorage 挂过 data-skin,这里再对齐一次
   // ——把 store 里纠过脏值的那套写回去,避免"本地存了个不存在的皮肤 id 时界面无皮肤"。
-  app.setSkin(app.skin)
+  // 只挂不写盘:用户没点过色卡就不该被钉死在这套默认皮上(点色卡走 setSkin,才落盘)。
+  applySkin(app.skin, false)
   // 已离开登录页:清除深色底色标记(供 index.html 预置底色判断)
   try { sessionStorage.removeItem('mes_at_login') } catch { /* ignore */ }
   document.documentElement.classList.remove('login-bg')
