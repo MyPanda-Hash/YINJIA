@@ -99,36 +99,42 @@
                    allow-create 保留:档案里没有的编号/名称照样能手打输入。 -->
               <el-select v-model="r['物料编号']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
                          remote :debounce="300" :remote-method="(q) => searchInv(i, '物料编号', q)"
-                         :loading="!!invOptLoading[optKey(i, '物料编号')]" :title="optHint(i, '物料编号')"
+                         :loading="!!invOptLoading[optKey(i, '物料编号')]"
                          @change="onMaterialPick(i, '物料编号')">
                 <!-- 选中后**只回显编号**（2026-10-30 用户口径，与 X烧结 同一口径）：右边紧邻的就是
                      「物料名称」列，两格都带名字等于同一行写两遍，还把编号挤成省略号。
                      下拉里仍然给「编号 — 名称」（候选 label），编号与名称两头都能搜。 -->
                 <template #label="{ value }">{{ value }}</template>
-                <el-option v-for="o in optList(i, '物料编号')" :key="o.value" :label="o.label" :value="o.value" />
+                <el-option v-for="o in optSlice(i, '物料编号').items" :key="o.value" :label="o.label" :value="o.value" />
                 <!-- remote 下拉必须给 empty 槽:否则"没候选"时下拉整个不弹(点了没反应),
                      用户根本看不到"先选种类"这句提示(Element Plus 的 dropdownMenuVisible 依赖它有槽) -->
                 <template #empty>
                   <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
                 </template>
-                <!-- 候选被 cap 截断时**在下拉里说清楚**:原来只挂在 title 上，不悬停根本看不见，
-                     用户只会觉得"搜不到"。v-if 是为了不截断时连那一条空白页脚都不出现。 -->
-                <template v-if="optHint(i, '物料编号')" #footer>
-                  <div class="rcd-sel-foot">{{ optHint(i, '物料编号') }}</div>
+                <!-- 候选超过一页 ⇒ 页脚翻页（2026-10-30 用户口径「明明有这个物料但是因为下拉框限制找不到」）。
+                     只有一页时不出现，免得白占一格。 -->
+                <template v-if="optSlice(i, '物料编号').pages > 1" #footer>
+                  <SelectPager :page="optSlice(i, '物料编号').page" :pages="optSlice(i, '物料编号').pages"
+                               :from="optSlice(i, '物料编号').from" :to="optSlice(i, '物料编号').to"
+                               :total="optSlice(i, '物料编号').total"
+                               @go="(p) => setOptPage(i, '物料编号', p)" />
                 </template>
               </el-select>
             </td>
             <td>
               <el-select v-model="r['物料名称']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
                          remote :debounce="300" :remote-method="(q) => searchInv(i, '物料名称', q)"
-                         :loading="!!invOptLoading[optKey(i, '物料名称')]" :title="optHint(i, '物料名称')"
+                         :loading="!!invOptLoading[optKey(i, '物料名称')]"
                          @change="onMaterialPick(i, '物料名称')">
-                <el-option v-for="o in optList(i, '物料名称')" :key="o.value" :label="o.label" :value="o.value" />
+                <el-option v-for="o in optSlice(i, '物料名称').items" :key="o.value" :label="o.label" :value="o.value" />
                 <template #empty>
                   <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
                 </template>
-                <template v-if="optHint(i, '物料名称')" #footer>
-                  <div class="rcd-sel-foot">{{ optHint(i, '物料名称') }}</div>
+                <template v-if="optSlice(i, '物料名称').pages > 1" #footer>
+                  <SelectPager :page="optSlice(i, '物料名称').page" :pages="optSlice(i, '物料名称').pages"
+                               :from="optSlice(i, '物料名称').from" :to="optSlice(i, '物料名称').to"
+                               :total="optSlice(i, '物料名称').total"
+                               @go="(p) => setOptPage(i, '物料名称', p)" />
                 </template>
               </el-select>
             </td>
@@ -265,6 +271,8 @@ import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisture
 import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialClearFor, materialFillFor,
   uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
+import { slicePage } from '@/core/ui/selectPage.js'
+import SelectPager from '@/core/ui/SelectPager.vue'
 import { invRowsOf } from '@/core/panel/invCarry.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
@@ -543,16 +551,21 @@ const fillingAt = ref(null)            // 正在被"对侧带出"写入的行号
 const invCodeOf = (r) => String(r?.['存货编码'] ?? '').trim()
 const optKey = (i, field) => `${i}|${field}`
 const optList = (i, field) => invOpts.value[optKey(i, field)]?.options || []
-/** 候选被 cap 截断时的提示(挂在控件 title 上:继续输入就能缩小) */
-const optHint = (i, field) => {
-  const r = invOpts.value[optKey(i, field)]
-  return r && r.matched > r.options.length
-    ? tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(r.matched))
-    : ''
+/** 该格的页码（1 起；换关键字/换种类时回到 1） */
+const invPages = ref({})
+const optPage = (i, field) => invPages.value[optKey(i, field)] || 1
+function setOptPage(i, field, page) {
+  invPages.value = { ...invPages.value, [optKey(i, field)]: Number(page) || 1 }
 }
+/**
+ * 这一格**当前页**的候选（过滤在取数那一步做完，这里只切页）。
+ * 候选本身**不封顶**（invSearchOptions 传 cap=0）：被截掉的那部分在界面上等于不存在，
+ * 用户会以为档案里没有这个料 —— 2026-10-30 用户口径「明明有这个物料但是因为下拉框限制找不到」。
+ */
+const optSlice = (i, field) => slicePage(optList(i, field), optPage(i, field))
 function setOpts(key, val) { invOpts.value = { ...invOpts.value, [key]: val } }
 /** 行结构变了(加行/删行)⇒ 行号做键的候选表整体作废 */
-function resetRowOptions() { invOpts.value = {}; invOptLoading.value = {} }
+function resetRowOptions() { invOpts.value = {}; invOptLoading.value = {}; invPages.value = {} }
 
 /** 把取回来的档案行并进"见过"的缓存(按 编码+名称 去重:同码不同名是真重码,必须保留两条给唯一命中判据用) */
 function rememberRows(rows) {
@@ -627,7 +640,9 @@ async function searchInv(i, field, kw) {
   try {
     const rows = kind ? await ensureKindRows(kind) : await remoteInvSearch(q)
     if (invSearchSeq.get(key) !== seq) return       // 这一格已经发起了更新的一次搜索 ⇒ 本次结果作废
-    setOpts(key, invSearchOptions(rows, field, q))
+    // cap=0 = 不封顶：命中多少给多少，界面上按 50 条一页翻（core/ui/selectPage.js）
+    setOpts(key, invSearchOptions(rows, field, q, 0))
+    setOptPage(i, field, 1)                         // 换了关键字 ⇒ 回到第 1 页
   } catch {
     if (invSearchSeq.get(key) === seq) setOpts(key, { options: [], matched: 0 })   // 读不到就只剩手打
   } finally {
@@ -960,8 +975,6 @@ function apply() {
 .rcd-sel { width: 100%; }
 /* remote 下拉的"没有候选"提示(下拉面板里的空槽):小字、不抢眼、可换行 */
 .rcd-sel-empty { padding: 6px 10px; color: #909399; font-size: 11px; line-height: 1.5; white-space: normal; }
-/* 下拉页脚：候选被上限截断时告诉用户"还有多少、继续打字缩小"（截断不提示 = 看起来像搜不到） */
-.rcd-sel-foot { padding: 5px 10px 6px; color: #909399; font-size: 11px; line-height: 1.5; white-space: normal; border-top: 1px solid #f0f2f5; }
 .rcd-del { color: #f56c6c; cursor: pointer; padding: 0 6px; font-size: 12px; }
 .rcd-del:hover { color: #c45656; }
 .rcd-src { margin-left: 3px; font-size: 10px; color: #67c23a; border: 1px solid #b3e19d; border-radius: 2px; padding: 0 2px; vertical-align: middle; }

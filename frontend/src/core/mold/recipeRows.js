@@ -212,7 +212,10 @@ export function invSearchOptions(rows, field, keyword, cap = OPTION_CAP) {
       label: field === '物料名称' ? value : (name ? `${value} — ${name}` : value),
     })
   }
-  const limit = Number.isInteger(cap) && cap > 0 ? cap : OPTION_CAP
+  // cap === 0 ⇒ **不限**（由调用方按页切，见 core/ui/selectPage.js）。
+  // 别再把"封顶"当筛选手段用：被截掉的那部分在界面上等于不存在，用户会以为档案里没有这个料
+  // （2026-10-30 用户口径「明明有这个物料但是因为下拉框限制找不到」）。
+  const limit = cap === 0 ? Infinity : (Number.isInteger(cap) && cap > 0 ? cap : OPTION_CAP)
   return { options: hits.slice(0, limit), matched: hits.length }
 }
 

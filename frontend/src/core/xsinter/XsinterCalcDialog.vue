@@ -105,7 +105,7 @@
             allow-create
             default-first-option
             :loading="row.loading"
-            :title="optionHint(row)"
+            :filter-method="(q) => onFilter(row, q)"
             :placeholder="row.loading ? tt('加载中…') : tt('选择或直接输入编号')"
             @focus="loadRowOptions(row)"
             @change="() => onPickMaterial(row)"
@@ -115,12 +115,21 @@
                  右边紧邻的就是「物料名称」列，两格都带名字等于同一行写两遍，还把编号挤成省略号。
                  下拉里仍然是「编号 + 名称」两段（见下面 el-option）：搜编号、搜名字都能命中。 -->
             <template #label="{ value }">{{ value }}</template>
-            <el-option v-for="o in row.options" :key="o.value" :label="o.label" :value="o.value">
+            <el-option v-for="o in shownOptions(row)" :key="o.value" :label="o.label" :value="o.value">
               <span class="xc-opt">
                 <span class="xc-opt-code">{{ o.value }}</span>
                 <span v-if="o.name" class="xc-opt-name">{{ o.name }}</span>
               </span>
             </el-option>
+            <!-- 候选超过一页 ⇒ 页脚给翻页（2026-10-30 用户口径「提供切页选项…不会出现明明有这个物料
+                 但是因为下拉框限制找不到」）。只有一页时不出现任何东西，免得白占一格。 -->
+            <template v-if="pagerOf(row).pages > 1" #footer>
+              <SelectPager
+                :page="pagerOf(row).page" :pages="pagerOf(row).pages"
+                :from="pagerOf(row).from" :to="pagerOf(row).to" :total="pagerOf(row).total"
+                @go="(p) => gotoPage(row, p)"
+              />
+            </template>
           </el-select>
           <el-input v-else v-model="row.code" size="small" :placeholder="tt('手填物料编号')" />
         </template>
@@ -219,6 +228,8 @@ import { computeXsinter, problemsOf, ROW_KINDS } from './calcEngine.js'
 import { engineDesignsOf, isGramRow, percentOf } from './designUnits.js'
 import { kindsOfXsinterRow, rowHasKindFilter } from './materialKindMap.js'
 import { xsinterMaterialOptions } from './materialOptions.js'
+import { slicePage } from '@/core/ui/selectPage.js'
+import SelectPager from '@/core/ui/SelectPager.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -293,8 +304,9 @@ watch(() => props.modelValue, (open) => {
       code: String(r['物料编号'] || ''),
       name: String(r['物料名称'] || ''),
       design: String(r['设计添加量'] ?? ''),
-      // 候选列表：optionsLoaded 与 options 分开记 —— 空类别也是"加载过"，否则每次聚焦都重拉一遍
-      options: [], optionsLoaded: false, matched: 0, loading: false,
+      // 候选列表：optionsLoaded 与 all 分开记 —— 空类别也是"加载过"，否则每次聚焦都重拉一遍；
+      // all 存**全量**（不封顶），query/page 是这行的搜索词与页码（翻页见 shownOptions）
+      all: [], optionsLoaded: false, loading: false, query: '', page: 1,
     }
   })
   // 预热物料候选。必须放到下一个 tick：本 watch 是 immediate，此刻下面那些
@@ -336,8 +348,8 @@ async function ensureKindRows(kind) {
 }
 
 /** 该行的下拉候选：按料位合并多个类别（粉料 = 炭粉 + 功能料-粉末）。
- *  去重/排序/封顶/命中数在 core/xsinter/materialOptions.js（纯函数，有单测）：
- *  生产档案几千行，一次全渲成 el-option 会让下拉打开时卡住。 */
+ *  去重/排序在 core/xsinter/materialOptions.js（纯函数，有单测）；**不封顶**，
+ *  翻页在下面 shownOptions/pagerOf（core/ui/selectPage.js）。 */
 async function loadRowOptions(row) {
   if (!rowHasKindFilter(row.kind)) return
   if (row.optionsLoaded) return          // 加载过（哪怕是空类别）就不重复拉
@@ -345,21 +357,46 @@ async function loadRowOptions(row) {
   try {
     const all = []
     for (const k of kindsOfXsinterRow(row.kind)) all.push(...(await ensureKindRows(k)))
-    const { options, matched } = xsinterMaterialOptions(all)
-    row.options = options
-    row.matched = matched
+    row.all = xsinterMaterialOptions(all)
     row.optionsLoaded = true
   } finally {
     row.loading = false
   }
 }
 
-/** 候选被上限截断时挂在下拉上的提示（200 条以内基本不触发；档案变大时才用得上） */
-function optionHint(row) {
-  const matched = Number(row.matched || 0)
-  const shown = (row.options || []).length
-  if (!matched || matched <= shown) return ''
-  return tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(matched))
+/**
+ * 本行候选经过**当前输入关键字**过滤后的全量。
+ *
+ * 为什么自己过滤（`filter-method`）而不是靠 el-select 内置的 filterable：
+ *   内置过滤只看得见**已渲染**的 option。一旦分页，第 2 页的候选根本没渲染，
+ *   用户打名字搜第 2 页上的物料就会"搜不到"—— 正是要修的那个毛病。
+ *   所以过滤必须在**全量**上做，再把结果切页渲染。
+ * 口径与内置一致：label（编号 + 名称）里包含关键字即命中，大小写无关。
+ */
+function filteredOptions(row) {
+  const q = String(row.query || '').trim().toLowerCase()
+  const all = row.all || []
+  return q ? all.filter((o) => o.label.toLowerCase().includes(q)) : all
+}
+
+/** 当前页的候选（过滤 → 切页；页码越界由 slicePage 夹取，不会给空页） */
+function shownOptions(row) {
+  return slicePage(filteredOptions(row), row.page).items
+}
+
+/** 页脚需要的页码/区间信息（同一份计算，模板里只取一次结果） */
+function pagerOf(row) {
+  return slicePage(filteredOptions(row), row.page)
+}
+
+/** 用户改了关键字 ⇒ 回到第 1 页（否则停在第 3 页搜出 1 条时会被夹到第 1 页，看着像没反应） */
+function onFilter(row, q) {
+  row.query = String(q ?? '')
+  row.page = 1
+}
+
+function gotoPage(row, p) {
+  row.page = Number(p) || 1
 }
 
 /**
@@ -382,7 +419,7 @@ function prefetchRowOptions() {
 async function onPickMaterial(row) {
   const code = String(row.code ?? '').trim()
   if (!code) { row.name = ''; return }
-  const hit = (row.options || []).find((o) => o.value === code)
+  const hit = (row.all || []).find((o) => o.value === code)
   if (hit) { row.name = hit.name || ''; return }
   // allow-create 手打的编号不在候选里 ⇒ 先清空再回档案查一次
   row.name = ''

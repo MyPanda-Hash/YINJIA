@@ -180,6 +180,22 @@ test('名称侧唯一命中 · 同名两条谁都不可选,不猜;取不到档�
     { 物料编号: 'M-001' }, '档案里的类别不是引擎认的词 ⇒ 只回填编号,种类不猜')
 })
 
+/* ── ③′ cap=0 ⇒ 全量（翻页那一半，2026-10-30 用户口径「明明有这个物料但是因为下拉框限制找不到」）── */
+
+test('候选不限量 · cap=0 给全量并把真实条数报在 matched 里（翻页由界面按页切）', () => {
+  const rows = Array.from({ length: 120 }, (_, i) => INV(`C-${String(i).padStart(3, '0')}`, `料${i}`, '炭粉'))
+  const all = invSearchOptions(rows, '物料编号', '', 0)
+  assert.equal(all.options.length, 120, 'cap=0 表示不限：一条都不许藏')
+  assert.equal(all.matched, 120)
+  assert.equal(all.options[119].value, 'C-119', '最后一条必须在（上一版封顶 50，后面的在界面上根本不存在）')
+  // 关键字过滤仍然生效，且过滤后的总数也要如实报
+  const hit = invSearchOptions(rows, '物料编号', '料11', 0)
+  assert.ok(hit.options.length > 0 && hit.options.length < 120)
+  assert.equal(hit.matched, hit.options.length)
+  // 不传 cap 时仍是老的默认封顶口径（别的调用方不受影响）
+  assert.equal(invSearchOptions(rows, '物料编号', '').options.length, 50)
+})
+
 /* ── ④ 清空要连带清对侧(2026-10-30 用户口径)────────────────────────────────────────
    原话:「另一个配方计算的叉掉分类、编号、名称自己退回空白还没有做，现在就是 X烧结 实现了」。
    带出是"挑中就填"，清空是它的另一半 —— 只剩一半的值比空着更糟:
