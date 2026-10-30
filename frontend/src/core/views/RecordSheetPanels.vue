@@ -232,6 +232,16 @@
       </tbody>
     </table>
 
+    <!-- ═══ 页级标题(按页配置 cfg.pagePrintTitle;规格书第 4 页「成品及包装运输」) ═══
+         2026-10-30 用户口径：「在关键物料列表顶部加上一个『成品及包装运输』标题，是这一页的标题」——
+         页签条打印时不印，纸面上原本只有「1.关键物料列表」这种表区小节名，看不出这是哪一页。 -->
+    <table v-if="curPagePrintTitle" class="rs-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in effGrid" :key="'pt' + i" :style="{ width: w + 'px' }" /></colgroup>
+      <tbody>
+        <tr><td :colspan="nCols" class="rsp-page-title rsp-ptitle">{{ tt(curPagePrintTitle) }}</td></tr>
+      </tbody>
+    </table>
+
     <!-- ═══ 条件区(共享网格:标签=第1列,值跨其余列;与数据表竖线对齐;按页归属渲染) ═══
          ⚠ 本循环只渲染**数据表锚点之前(含锚点)**的章节;锚点之后的章节由下面第二段循环渲染,
            目的是让数据表能夹在两者之间(设计第 4 页:物料表紧跟「1.关键物料列表」)。
@@ -1943,6 +1953,11 @@ const showReportHead = computed(() => {
 const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
 const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
+/**
+ * 当前页的页级标题(印在纸面最上方)。按页号配置:cfg.pagePrintTitle = { 3: '成品及包装运输' }。
+ * 2026-10-30 用户口径:「在关键物料列表顶部加上一个『成品及包装运输』标题，是这一页的标题」。
+ */
+const curPagePrintTitle = computed(() => String((cfg.value?.pagePrintTitle || {})[activePage.value] || ''))
 /** 报告头左侧公司名(7 张数据记录表 + 其它文书面板的纸面首行文字,逐张一致;尾随空格不计) */
 const COMPANY_NAME = '惠州市银嘉环保科技有限公司'
 /** 报告头第 1 行「公司名格 | 编号格」的分列 —— 优先按**设计原表的 !merges**显式切分:
@@ -4909,6 +4924,12 @@ function chartOf(dt) {
   padding: 16px 0 12px;
   text-align: center;
 }
+/* 页级标题(规格书第 4 页「成品及包装运输」)：字距不要 6px —— 那套是给 4 字大标题留的呼吸,
+   5 个字以上会松散到像分开的两个词 */
+.rsp-ptitle {
+  letter-spacing: 2px;
+  padding: 10px 0 8px;
+}
 
 /* ═══ 表尾静态附表(cfg.tailTables:纸面固定附录,只读) ═══
    宽度取自表自己的列宽(比整页窄)⇒ 居中摆放,与设计里它缩进一列的位置观感一致 */
@@ -5720,6 +5741,12 @@ function chartOf(dt) {
 .rsp-docval {
   font-family: 'SimSun', 'Songti SC', serif;
 }
+/* 2026-10-30 用户报「最后一页字体还乱了 / 左右被切」：
+   doc 行的值格是 flex 子项，默认 min-width:auto ⇒ 遇到长串（40*11.5*209±0.5mm 这类
+   不含空格/句读、浏览器不给断点的字符串）时**整行撑出纸宽**，打印时被左右裁掉。
+   这两条把行宽锁在格子里：标签不参与压缩、值格可缩+可任意断行。 */
+.rsp-docrow .rsp-doclabel { flex: none; white-space: nowrap; }
+.rsp-docrow .rsp-docval { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 
 /* ═══ 标准库勾选按钮 ═══ */
 .mp-kids {

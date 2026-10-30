@@ -2446,7 +2446,7 @@ import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
-import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, sheetPrintHtml } from '@core/panel/sheetPrintHtml'
+import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintHtml } from '@core/panel/sheetPrintHtml'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
 import { useUnsavedStore } from '@/stores/unsaved'
 
@@ -7074,6 +7074,42 @@ async function snapSheetPage(el, domToPng) {
   }
 }
 /**
+ * 长页切张：把一张过高的截图按「按宽度铺满」的比例切成几张，避免整份纸被缩成糊字。
+ * 判据与切法全在 core/panel/sheetPrintHtml.js 的 planSheetPages（纯算术，有单测）；
+ * 这里只做浏览器侧的图像切分（canvas）。
+ *
+ * 2026-10-30 用户口径：「规格书这一页有点窄了，可以加宽一点」「最后一页字体还乱了」——
+ * 根因是这两页内容远高于一张 A4，旧逻辑硬塞进一张 ⇒ 整体缩到很窄、字挤在一起。
+ * 现在按宽度铺满、纵向多切几张；正常页（差得不多）仍是一页，不改变既有面板的出纸。
+ */
+async function shotsForPages(shots) {
+  const plan = planSheetPages(shots)
+  const out = []
+  let i = 0
+  while (i < plan.length) {
+    const first = plan[i]
+    const shot = shots[first.index]
+    const same = []
+    while (i < plan.length && plan[i].index === first.index) { same.push(plan[i]); i += 1 }
+    // 整张就是一张纸 ⇒ 原样用，不做 canvas 往返（避免质量损失）
+    if (same.length === 1 && same[0].y === 0 && same[0].h === shot.h0) { out.push(shot); continue }
+    const img = new Image()
+    img.src = shot.dataUrl
+    await img.decode()
+    const scale = img.naturalWidth / shot.w0          // 截图倍率(domToPng scale:2)
+    for (const p of same) {
+      const sy = Math.max(0, Math.round(p.y * scale))
+      const sh = Math.max(1, Math.min(Math.round(p.h * scale), img.naturalHeight - sy))
+      const cv = document.createElement('canvas')
+      cv.width = img.naturalWidth
+      cv.height = sh
+      cv.getContext('2d').drawImage(img, 0, sy, img.naturalWidth, sh, 0, 0, img.naturalWidth, sh)
+      out.push({ dataUrl: cv.toDataURL('image/png'), w0: shot.w0, h0: sh / scale })
+    }
+  }
+  return out
+}
+/**
  * 采集「页 × 组」的纸张截图 —— 打印与导出**共用同一份走纸逻辑**。
  * 版式只有一处实现：改一处两条路一起变，不会出现「导出的对、打印的不对」。
  * @returns {{shots: Array<{dataUrl,w0,h0}>, name: string, pageCount: number, groupCount: number}|null}
@@ -7125,7 +7161,7 @@ async function collectSheetShots() {
   if (!shots.length) return null
   const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
   return {
-    shots,
+    shots: await shotsForPages(shots),
     name: `${panelName.value}-${no || '导出'}`,
     pageCount,
     groupCount: Math.max(1, groups.length),

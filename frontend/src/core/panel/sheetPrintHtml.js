@@ -21,6 +21,42 @@ export const SHEET_PAGE_H = 297        // A4 竖向高(mm)
 export const SHEET_MARGIN = 8          // 页边距(mm),与 CSS @page { margin } 同口径
 export const SHEET_MM = 25.4 / 96      // 截图 px → mm(96dpi)
 
+/**
+ * 一张截图缩到不足「按宽度铺满」的 80% 时，说明它是被**高度**卡住的长表
+ * （实测：规格书「检验项目及标准」26 组检验项、成品及包装运输 6 段文字），
+ * 硬塞进一张 A4 只能整体缩小 ⇒ 字变成糊的一团（用户 2026-10-30
+ * 「这一页有点窄」「最后一页字体还乱了」）。这种页改为**纵向切张**，按宽度铺满、跨几张纸。
+ */
+export const SHEET_SPLIT_RATIO = 0.8
+
+/**
+ * 每张截图要印成几张纸、每张取哪一段（纯算术，不碰 DOM）。
+ * @returns {Array<{index:number, k:number, y:number, h:number}>} y/h 单位为截图**原始 CSS px**
+ */
+export function planSheetPages(shots) {
+  const contentW = SHEET_PAGE_W - SHEET_MARGIN * 2
+  // 与 sheetPrintHtml 的页框同口径（比内容区矮 1mm，防亚像素溢出）
+  const contentH = SHEET_PAGE_H - SHEET_MARGIN * 2 - 1
+  const out = []
+  const list = Array.isArray(shots) ? shots : []
+  list.forEach((s, index) => {
+    const w0 = Math.max(1, Number(s?.w0) || 0)
+    const h0 = Math.max(1, Number(s?.h0) || 0)
+    const kW = contentW / (w0 * SHEET_MM)          // 按宽度铺满的比例
+    const kFit = Math.min(kW, contentH / (h0 * SHEET_MM))
+    if (kFit >= kW * SHEET_SPLIT_RATIO) {
+      out.push({ index, k: kFit, y: 0, h: h0 })
+      return
+    }
+    const sliceH = contentH / kW / SHEET_MM        // 一张纸能放多少 CSS px
+    for (let y = 0; y < h0; y += sliceH) {
+      out.push({ index, k: kW, y, h: Math.min(sliceH, h0 - y) })
+    }
+  })
+  return out
+}
+
+
 /** HTML 文本转义（标题/按钮文字可能是「规格书-<单据号>&…」） */
 export function escHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (

@@ -3011,6 +3011,8 @@ export default {
     '检验项目及标准': 'Inspection Items & Standards',
     '成品及包装运输': 'Packaging & Transportation',
     '4.产品性能检验项目及检验标准': '4. Product Performance Inspection Items & Standards',
+    '产品性能检验项目及检验标准': 'Product Performance Inspection Items & Standards',
+    '成品及包装运输': 'Finished Product, Packaging & Transport',
     '5.关键物料列表': '5. Key Material List',
     '6.包装方式': '6. Packaging',
     '7.运输要求': '7. Shipping Requirements',

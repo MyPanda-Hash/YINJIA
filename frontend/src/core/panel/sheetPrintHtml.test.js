@@ -11,7 +11,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W,
-  escHtml, sheetImageMm, sheetPrintHtml,
+  escHtml, planSheetPages, sheetImageMm, sheetPrintHtml,
 } from './sheetPrintHtml.js'
 
 const shot = (w0, h0) => ({ dataUrl: `data:image/png;base64,AAA${w0}x${h0}`, w0, h0 })
@@ -83,4 +83,43 @@ test('⑨ 空数组也要产出合法文档（宁可空白也不抛错）', () =
   assert.match(html, /^<!doctype html>/)
   assert.ok(!/<div class="pg">/.test(html))
   assert.equal((sheetPrintHtml(null, 'x', '打印').match(/<body>/g) || []).length, 1)
+})
+
+/* ── 长页切张（2026-10-30「这一页太窄」「最后一页字体乱」的修法）── */
+test('⑩ 正常页不分张：一张截图 = 一张纸，比例仍是「塞进一张」', () => {
+  const plan = planSheetPages([shot(794, 700)])
+  assert.equal(plan.length, 1, '矮于一页的纸不能被切开')
+  assert.equal(plan[0].y, 0)
+  assert.equal(plan[0].h, 700)
+  assert.ok(plan[0].k > 0.9, `按宽度铺满（k≈${plan[0].k}）`)
+})
+
+test('⑪ 长表按宽度铺满分张：26 组检验项那种高页不能整张缩成糊字', () => {
+  // 794px 宽(=A4 210mm)、3000px 高的长表
+  const plan = planSheetPages([shot(794, 3000)])
+  assert.ok(plan.length >= 2, `应切成多张，实际 ${plan.length}`)
+  // 每张都按宽度铺满（同一比例 ⇒ 张与张之间不会一大一小）
+  const k0 = plan[0].k
+  for (const p of plan) assert.ok(Math.abs(p.k - k0) < 1e-9, '所有分张必须同一比例')
+  assert.ok(Math.abs(k0 - CONTENT_W / (794 * SHEET_MM)) < 1e-9, `按宽度铺满：k=${k0}`)
+  // 覆盖完整、不重不漏
+  assert.equal(plan[0].y, 0)
+  for (let i = 1; i < plan.length; i++) {
+    assert.ok(Math.abs(plan[i].y - (plan[i - 1].y + plan[i - 1].h)) < 1e-6, '分张必须首尾相接')
+  }
+  const last = plan[plan.length - 1]
+  assert.ok(Math.abs(last.y + last.h - 3000) < 1e-6, '最后一张必须取到表尾')
+  // 每张的高度换算成 mm 都不能超过内容区（否则会多印空白纸）
+  for (const p of plan) assert.ok(p.h * SHEET_MM * p.k <= 281 + 0.01, '单张不得高过纸面内容区')
+})
+
+test('⑫ 多张截图各算各的（封面矮、检验表长，互不影响）', () => {
+  const plan = planSheetPages([shot(794, 700), shot(794, 3000), shot(794, 400)])
+  const byIndex = (i) => plan.filter((p) => p.index === i)
+  assert.equal(byIndex(0).length, 1)
+  assert.ok(byIndex(1).length >= 2)
+  assert.equal(byIndex(2).length, 1)
+  // 顺序必须与页序一致（打印按页序出纸）
+  const order = plan.map((p) => p.index)
+  assert.deepEqual(order, [...order].sort((a, b) => a - b))
 })
