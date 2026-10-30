@@ -151,10 +151,12 @@
 
     <!-- 列设置弹窗(2026-10-29):通用组件,显隐**与列顺序**草稿由 useReportColumns 持有,
          保存走 /px/reportColumnSettings(panelCode=ORDER_CONVERT),刷新后仍按保存的显隐/顺序渲染。
+         排序:拖动行(⠿)换位 + ▲▼ 微调(2026-10-30 用户口径「让这个能拖动」)。
          关闭/取消 = 丢弃未保存的勾选与顺序(回到后端已保存那份),否则"取消"后表格已经被改了 -->
     <ColumnSettingsDialog :model-value="columnVisible" :columns="columnDraft"
                           @update:model-value="onColumnDialogToggle"
-                          @toggle="onColToggle" @move="onColMove" @reset="resetDraft" @save="saveColumns" />
+                          @toggle="onColToggle" @move="onColMove" @reorder="onColReorder"
+                          @reset="resetDraft" @save="saveColumns" />
     </div>
 
     <div class="oc-pager">
@@ -270,6 +272,19 @@ function onColMove({ prop, delta }) {
   if (i < 0 || j < 0 || j >= arr.length) return
   const [moved] = arr.splice(i, 1)
   arr.splice(j, 0, moved)
+}
+/**
+ * 拖动换位(2026-10-30 用户口径「让这个能拖动吧,现在操作太死板了,实现这个模式即可」):
+ * 弹窗里把某行拖到另一行的位置 = 从 from 摘下插到 to(下标基于草稿全量数组);同样只改草稿。
+ */
+function onColReorder({ from, to }) {
+  const arr = columnDraft.value
+  const a = Number(from)
+  const b = Number(to)
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return
+  if (a < 0 || b < 0 || a >= arr.length || b >= arr.length || a === b) return
+  const [moved] = arr.splice(a, 1)
+  arr.splice(b, 0, moved)
 }
 /**
  * 弹窗开/关:关(取消按钮或右上角 X)= **丢弃未保存的勾选与顺序**,回到后端已保存那份。
