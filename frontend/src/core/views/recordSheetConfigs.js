@@ -1341,6 +1341,12 @@ export const recordSheetConfigs = {
         page: 0,
         bar: '配方表',
         filterKey: '表区', filterVal: '配方表',
+        // 2026-10-30 用户口径（截图圈注）：「应该是把配方表放到特殊管控上边」
+        //                          「配方表应该在管控要求上面」「产品基本信息区域下面」
+        // ⇒ 靠 tablesAfterBar 把表夹在「一、产品基本信息」之后（机制见 RecordSheetPanels
+        //   的 isAtOrBeforeTableAnchor：章节被拆成"表前/表后"两段渲染，本节点不需要别的标记）。
+        //   最终版式：一、产品基本信息 → 【配方表】 → 配料要求 → 成型管控要求 → 特殊管控要求。
+        tablesAfterBar: '一、产品基本信息',
         // 纸面右上出「🧮 配方计算」按钮 → 打开 XsinterCalcDialog（RecordSheetPanels 按
         // panelCode 分流；成型工艺清单走它自己那套 RecipeCalcDialog，两者公式体系不同，不能共用）。
         recipeCalc: true,

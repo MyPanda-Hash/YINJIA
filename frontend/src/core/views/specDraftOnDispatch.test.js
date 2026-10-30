@@ -56,7 +56,8 @@ test('内部代建草稿走 systemDraft 通道:跳过四文件责任人门禁,�
   assert.match(buttons,
     /private Map<String, Object> saveDoc\(PanelRegistry\.PanelDef def, Map<String, Object> head,\s*\n\s*List<Map<String, Object>> items, String no, String user, boolean markSaved\) \{\s*\n\s*return saveDoc\(def, head, items, no, user, markSaved, false\);/,
     '外部调用入口必须固定 systemDraft=false(否则用户也能绕门禁)')
-  assert.match(buttons, /if \(!systemDraft && DevTaskService\.devPanelCodes\(\)\.contains\(def\.code\(\)\)\) ensureDevFileEditable\(def, no, head, user\);/,
+  // 2026-10-30：改用 isDevFilePanel（含同族模板 X烧结）—— 同族模板同样受文件责任人门禁约束
+  assert.match(buttons, /if \(!systemDraft && DevTaskService\.isDevFilePanel\(def\.code\(\)\)\) ensureDevFileEditable\(def, no, head, user\);/,
     '只有内部代建才跳过"该文件责任人才能建单"的门禁')
 })
 

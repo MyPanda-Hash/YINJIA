@@ -33,7 +33,8 @@ test('前门放行:四文件面板（含 2026-10-30 新增的 X烧结）的「�
 })
 
 test('身份门禁:四文件面板弃审 = 审批权 ∪ 该文件责任人,其余面板一字不动', () => {
-  assert.match(buttons, /if \(DevTaskService\.devPanelCodes\(\)\.contains\(def\.code\(\)\)\) requireApproverOrDevFileOwner\(def, no\);\s*\n\s*else requireApprover\(def\.code\(\)\);/,
+  // 2026-10-30：改用 isDevFilePanel（含同族模板 X烧结），否则 X烧结 会落到 notApplicable ⇒ 谁都能改
+  assert.match(buttons, /if \(DevTaskService\.isDevFilePanel\(def\.code\(\)\)\) requireApproverOrDevFileOwner\(def, no\);\s*\n\s*else requireApprover\(def\.code\(\)\);/,
     'unaudit 要按面板分流:四文件走责任人闸门,其余面板维持 requireApprover')
   assert.match(buttons, /private void requireApproverOrDevFileOwner\(PanelRegistry\.PanelDef def, String no\) \{[\s\S]{0,400}?devFileEditVerdict\(def, no, null, user\)/,
     '责任人判定必须复用保存门禁的同一真源 devFileEditVerdict(能改这张单的人才能退回来改)')
