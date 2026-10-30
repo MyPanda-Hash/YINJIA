@@ -509,6 +509,12 @@ export const menuTree = [
           { code: 'qcProcInsp', title: '制程检验单', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
           // 组装成品检验单(9.29 批次④,2026-10-05):**组装**报工审核自动出单;含合格转库存/不合格待处理
           { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
+          // 出厂检验报告(2026-10-30 新增,面板 QC_OQC_REPORT,前缀 OQC):用户口径「出厂检验报告的内容
+          // 就是首件/制程/成品三张单检验数据共同数据之上生成;在销售出库勾选货物时跳转到这个页面,
+          // 然后走正常的审批形式」。一份报告=一个产品(勾选多行→多张单);行清单来自《出货检验计划表》
+          // 的只读视图 v_oqc_std(不改该表任何一列),实测值按 qc_oqc_item_map 的优先级从三张单并集取。
+          // 设计定稿 docs/design/出厂检验报告-从三张检验单并集生成.md。
+          { code: 'qcOqcReport', title: '出厂检验报告', path: '/panelx/list/QC_OQC_REPORT', icon: 'Stamp', panelCode: 'QC_OQC_REPORT', operationName: '新增流程' },
         ],
       },
       // 2026-10-09 下架:「不良处理」整组(不良品处理单 QC_DISPOSAL / 炭棒不良退货登记 ROD_RETURN)、
@@ -626,6 +632,11 @@ export const menuTree = [
           { code: 'routing', title: '工艺路线', path: '/panelx/list/ROUTE', icon: 'Guide', panelCode: 'ROUTE', operationName: '新增流程' },
           // 工序工时:参考库 gxgs——按 客户×物料×工序 维护 换线/标准·最快·最慢·平均时间与加工单价(排产产能/计件依据)
           { code: 'opTime', title: '工序工时', path: '/panelx/list/OP_TIME', icon: 'Timer', panelCode: 'OP_TIME', operationName: '新增流程' },
+          // 组装物料清单(2026-10-30 用户口径「组装物料清单需要单独分出来放在数据建模中生产部分」):
+          //   新表 bs_asm_bom(单表 doc 模式,按 BOM编号 分组),工序 是 BOM 的维度(本期只有「组装」,
+          //   成型/切炭后续同表追加);数据由 migrate-asm-bom-data-20261030.sql 从金蝶 BOM 引出表导入
+          //   (在产工单涉及的 236 个产品)。扫码领料端将来按「产品编码+工序」取清单、页面选工序。
+          { code: 'asmBom', title: '组装物料清单', path: '/panelx/list/ASM_BOM', icon: 'Files', panelCode: 'ASM_BOM', operationName: '新增流程' },
           { code: 'reject', title: '不合格原因', path: '/panelx/list/REJECT', icon: 'CircleClose', panelCode: 'REJECT', operationName: '新增流程' },
           // 2026-10-09 摘除「检验项目 QC_ITEM」「检验方案 QC_PLAN」两个菜单入口(用户口径:维护入口收敛到
           // 检验单工具栏那一个按钮,弹窗两用=勾选带入 + 就地维护)。⚠ 只摘菜单:**面板与数据表保留不动**

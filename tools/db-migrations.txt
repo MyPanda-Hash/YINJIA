@@ -4389,3 +4389,24 @@ migrate-prodinfo-auditor-defaults-20261029.sql
 # 2026-10-29 工序路线排线补「计划开工日期」(计划链:上一道计划完工日=下一道计划开工日;
 #   日排产按 开工~完工 均摊计划数量);列 + 中文注明,幂等、两账套都执行。
 migrate-wo-process-line-plan-start-20261029.sql
+
+# 2026-10-30 新增「组装物料清单」bs_asm_bom + 面板 ASM_BOM(数据建模→生产;单表 doc 模式,
+#   工序维度本期=组装,成型/切炭后续同表追加)。列=47(id/20业务列/备注/5审计列/20备用列),
+#   表+列 MS_Description 齐全,已登记 db-inuse-tables.txt。两账套已执行。
+migrate-asm-bom-20261030.sql
+
+# 2026-10-30 组装物料清单数据导入:从金蝶 BOM 引出表(827 块/817 产品)取「plang 在产产品
+#   ∩ Excel 父件」= 236 个产品,落 bs_asm_bom(工序=组装,1085 行/236 张单);标准用量
+#   =金蝶 用量分子/分母,计量单位从 bs_inv 回填。幂等:仅按 来源 删除本来源旧行后重插。
+#   两账套已执行(DbSync run);建表脚本见上一条 migrate-asm-bom-20261030.sql。
+migrate-asm-bom-data-20261030.sql
+
+# 2026-10-30 出厂检验报告 —— 面板 QC_OQC_REPORT + 对齐面板 QC_OQC_ITEMMAP
+#   (用户口径「出厂检验报告的内容就是首件/制程/成品三张单检验数据的共同数据之上生成;
+#    在销售出库勾选货物时跳转到这个页面,然后走正常的审批形式」)。
+#   ① 只读视图 v_oqc_std 取《出货检验计划表》(不改该表任何一列);
+#   ② 头/行表 qc_oqc_head / qc_oqc_detail(一份报告=一个产品,出库勾选多行→多张单);
+#   ③ 项目对齐表 qc_oqc_item_map(三单词表不同名、明细无项目编码,只能按名字对齐)。
+#   设计定稿:docs/design/出厂检验报告-从三张检验单并集生成.md。两账套都执行。
+migrate-oqc-report-20261030.sql
+migrate-oqc-itemmap-seed-20261030.sql

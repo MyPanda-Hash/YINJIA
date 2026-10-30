@@ -74,6 +74,16 @@ export default {
     "生成材料出库单失败": "Failed to create the material issue draft",
     // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
     "首件检验单": "First Article Inspection Sheet",
+    // ---- 出厂检验报告(QC_OQC_REPORT,2026-10-30)----
+    "出厂检验报告": "Factory Inspection Report",
+    "出厂检验项目对齐": "Factory Inspection Item Mapping",
+    "生成出厂检验报告": "Create Factory Inspection Report",
+    "该出库单没有可生成报告的明细行": "No reportable lines in this sales outbound document",
+    "请先选择销售出库单": "Select a sales outbound document first",
+    "标准行数": "Standard rows",
+    "批次可用": "Batch usable",
+    "出库未填真实批次，已按最近一批带入，请核对": "No real batch number on the outbound line; the most recent batch was used — please verify",
+    "一份报告=一个产品": "One report per product",
     "取成型工艺清单": "Fetch from Molding Process Sheet",
     "该产品没有成型工艺清单": "No molding process sheet for this product",
     "取成型工艺清单失败": "Failed to fetch the molding process sheet",
@@ -530,15 +540,15 @@ export default {
     '单日只看一天;近几日=以所选日期为截止日往前数': 'Single day = that day only; recent days = count back from the selected end date',
     '该日期范围没有待结转数据': 'No pending orders in this date range',
     '看近7天': 'View last 7 days',
-    // 2026-10-30 用户口径「让这个能拖动吧」:列设置支持拖动行排序(▲▼ 保留作微调兜底)
-    '拖动调整列顺序': 'Drag to reorder',
-    '勾选决定显示哪几列;拖动 ⠿ 或点 ▲▼ 调整列顺序(上移=靠左)': 'Tick to show columns; drag ⠿ or use ▲▼ to reorder (up = further left)',
     // 2026-10-29 用户口径:日期查询改「日期范围」选择;表格列可调(列设置显/隐)、型号旁增「产品名称」列
     '列设置': 'Columns',
     '下单日期': 'Order Date',
     // 2026-10-29 列设置支持调整列顺序(▲▼):上移=靠左
     '上移': 'Move up',
     '下移': 'Move down',
+    // 2026-10-30 用户口径「让这个能拖动吧」:列设置支持拖动行排序(▲▼ 保留作微调兜底)
+    '拖动调整列顺序': 'Drag to reorder',
+    '勾选决定显示哪几列;拖动 ⠿ 或点 ▲▼ 调整列顺序(上移=靠左)': 'Tick to show columns; drag ⠿ or use ▲▼ to reorder (up = further left)',
     // 当天没数据 → 弹窗询问是否跳到最近有数据的一天(2026-10-06 用户口径:不静默跳转)
     '没有数据': 'No data',
     '没有待结转数据': 'has no pending orders',
@@ -2822,6 +2832,7 @@ export default {
     '成型配方': 'Molding Formula',
     '规格书': 'Specification',
     '组装BOM表': 'Assembly BOM',
+    '组装物料清单': 'Assembly BOM',
     '组装工艺清单': 'Assembly Process List',
     '出货检验计划表': 'Outgoing Inspection Plan',
     '加标水配置记录表': 'Spike Water Preparation',
