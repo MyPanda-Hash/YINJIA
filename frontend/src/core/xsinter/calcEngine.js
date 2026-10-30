@@ -151,7 +151,8 @@ export function problemsOf(input = {}) {
 
   const designs = Array.isArray(input.designs) ? input.designs : []
   const rest = designs.slice(1, 7).reduce((a, b) => a + num(b), 0)
-  if (rest > 1) out.push(`粉料2~5 与胶粉1~2 的比例合计 ${r6(rest)} 超过 1，粉料1 会倒推成负数`)
+  // 提示里说**百分数**（人填的是百分数，说"超过 1"没人看得懂 1 是什么单位）
+  if (rest > 1) out.push(`粉料2~5 与胶粉1~2 的比例合计 ${r6(rest * 100)}% 超过 100%，粉料1 会倒推成负数`)
   if (rest <= 0) out.push('至少填一个粉料或胶粉的设计添加量')
   return out
 }

@@ -135,7 +135,7 @@ test('⑬ problemsOf：缺关键输入时给出人话原因（不是静默算 0�
   assert.ok(problemsOf({ ...T205, rodOuter: 12, rodInner: 12 }).some((s) => s.includes('必须大于内径')))
   assert.ok(problemsOf({ ...T205, densLow: 0.7, densHigh: 0.6 }).some((s) => s.includes('下限不能大于上限')))
   assert.ok(problemsOf({ ...T205, designs: [0, 0.5, 0.5, 0, 0, 0.5, 0, 0, 0, 0] })
-    .some((s) => s.includes('超过 1')))
+    .some((s) => s.includes('超过 100%')))
   assert.deepEqual(problemsOf(T205), [], 'T205 这组输入应当无问题')
 })
 

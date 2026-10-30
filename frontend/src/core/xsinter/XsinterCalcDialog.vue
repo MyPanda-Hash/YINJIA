@@ -19,6 +19,13 @@
   【物料编号】
     与烧结工艺清单同一套：可手填，也可用「商品档案」下拉远程搜（invSearchOptions，按编号/名称）。
     名称随编号自动带出（带不出就保留用户手填值，不覆盖）。
+
+  【设计添加量的单位】2026-10-30 用户口径「没有默认百分比%，填数字会超过1，计算异常」
+    · 粉料1~5 / 胶粉1~2 = **比例**：填 45 或 45% 都按 45% 解释（→ 0.45），填 0.45 也是 45%；
+    · 颗粒料1~3      = **克数**：填 2 就是 2 克（Excel E16:E18 直接进单支总重，不是比例）。
+    换算全在 core/xsinter/designUnits.js（复用烧结工艺清单的 parseRatio 口径）——
+    同一袋料在两张单上必须得出同一个比例，所以不另写第二套解释。
+    落库的「设计添加量 / 添加比例」是**百分数**（45），与纸面「添加比例%」同单位。
 -->
 <template>
   <el-dialog
@@ -112,18 +119,26 @@
       </el-table-column>
       <el-table-column :label="tt('设计添加量')" width="130">
         <template #default="{ row, $index }">
-          <!-- 粉料1 是倒推值（Excel E9 = 1 − Σ其他），不可手填 -->
+          <!-- 粉料1 是倒推值（Excel E9 = 1 − Σ其他），不可手填。
+               单位必须**写在格子里**（2026-10-30 用户口径「没有默认百分比%，填数字会超过1」）：
+               粉料/胶粉 = %，颗粒料 = 克 —— 同一列两种单位，只在表头写会误导其中一种。
+               单位换算见 core/xsinter/designUnits.js（'45' 与 '45%' 都是 45%）。 -->
           <el-input
             v-model="row.design"
             size="small"
             :disabled="$index === 0"
             :placeholder="$index === 0 ? tt('自动倒推') : ''"
-          />
+          >
+            <template #suffix>
+              <span class="xc-unit">{{ isGramRow(row.kind) ? 'g' : '%' }}</span>
+            </template>
+          </el-input>
         </template>
       </el-table-column>
       <el-table-column :label="tt('添加比例%')" width="120" align="right">
         <template #default="{ row, $index }">
-          <span class="xc-out">{{ fmt($index === 0 ? calc.rows[0]?.actual : calc.rows[$index]?.actual) }}</span>
+          <!-- 粉料/胶粉给百分数（0.45 → 45）；颗粒料没有比例，按克数显示并带 g -->
+          <span class="xc-out">{{ ratioText(row.kind, $index === 0 ? calc.rows[0]?.actual : calc.rows[$index]?.actual) }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('单支含量g')" width="130" align="right">
@@ -190,6 +205,7 @@ import { tt } from '@/i18n'
 import request from '@/core/request'
 import { invRowsOf } from '@/core/panel/invCarry'
 import { computeXsinter, problemsOf, ROW_KINDS } from './calcEngine.js'
+import { engineDesignsOf, isGramRow, percentOf } from './designUnits.js'
 import { kindsOfXsinterRow, rowHasKindFilter } from './materialKindMap.js'
 
 const props = defineProps({
@@ -227,7 +243,9 @@ const input = computed(() => ({
   dieOutlet: form.dieOutlet, rodDiameter: form.rodDiameter,
   granuleFactor: form.granuleFactor, lengthFix: form.lengthFix,
   densLow: form.densLow, densHigh: form.densHigh,
-  designs: lines.value.map((r) => r.design),
+  // ⚠ 喂给引擎的必须是**比例**：粉料/胶粉那 7 行把"人手填的 45"解释成 0.45，
+  //   颗粒料那 3 行保留克数（见 core/xsinter/designUnits.js）
+  designs: engineDesignsOf(lines.value),
 }))
 const calc = computed(() => computeXsinter(input.value))
 const probs = computed(() => problemsOf(input.value))
@@ -237,6 +255,12 @@ const fmt = (v) => {
   const n = Number(v)
   if (!Number.isFinite(n)) return ''
   return String(Math.round(n * 1e6) / 1e6)
+}
+
+/** 「添加比例%」格：比例行给百分数，颗粒料行给克数（它没有比例） */
+function ratioText(kind, actual) {
+  if (isGramRow(kind)) return `${fmt(actual)} g`
+  return fmt(percentOf(actual))
 }
 
 /** 打开时把单据头/已有行带进来（每次打开都重算，避免残留上一次的试算） */
@@ -362,15 +386,22 @@ function apply() {
     '密度要求中间值': fmt(c.density.mid),
     '密度要求上限': fmt(c.density.high),
   }
-  const detail = lines.value.map((r, i) => ({
-    序号: String(i + 1),
-    物料种类: r.kind,
-    物料编号: r.code || '',
-    物料名称: r.name || '',
-    设计添加量: fmt(c.rows[i]?.design),
-    添加比例: fmt(c.rows[i]?.actual),
-    '单支含量g': fmt(c.rows[i]?.perPiece),
-  }))
+  const detail = lines.value.map((r, i) => {
+    const gram = isGramRow(r.kind)
+    const design = c.rows[i]?.design
+    const actual = c.rows[i]?.actual
+    return {
+      序号: String(i + 1),
+      物料种类: r.kind,
+      物料编号: r.code || '',
+      物料名称: r.name || '',
+      // 落**百分数**而不是比例：纸面「添加比例%」那列直接印数字（45 而不是 0.45），
+      // 重新打开计算器读回来也还是同一个值（'45' → 0.45 的容错在 designUnits）。
+      设计添加量: fmt(gram ? design : percentOf(design)),
+      添加比例: fmt(gram ? actual : percentOf(actual)),
+      '单支含量g': fmt(c.rows[i]?.perPiece),
+    }
+  })
   emit('applied', { head, detail })
   emit('update:modelValue', false)
 }
@@ -387,6 +418,7 @@ function apply() {
 .xc-lab { font-weight: 600; color: #606266; font-size: 12px; }
 .xc-kind { color: #303133; font-size: 12px; }
 .xc-out { font-variant-numeric: tabular-nums; color: #303133; font-size: 12px; }
+.xc-unit { color: #909399; font-size: 12px; }
 .xc-strong { font-weight: 700; color: #0d5bd3; }
 .xc-lines :deep(.el-table__cell) { padding: 2px 0; }
 .xc-warn { margin-top: 10px; }
