@@ -4909,6 +4909,10 @@ function chartOf(dt) {
   font-weight: 700;
   padding: 5px 10px;
   text-align: center;
+  /* 章节条标题一律不折行（2026-10-30）：实测纸面宽 794，正常装得下；
+     但打印栅格化那一步若把列宽算窄了，折行会让标题**压到下一行表格上**（用户截图
+     「1.关键物料列 / 表」并盖住表头）。不折行时最坏是横向溢出，不会压行。 */
+  white-space: nowrap;
 }
 .rs-t > tbody > tr:first-child .rs-sectionbar {
   border-top: 1px solid #7f7f7f;

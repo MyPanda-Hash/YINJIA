@@ -56,12 +56,13 @@ test('⑤ 每张纸一页 + 最后一页不再分页（否则末尾多一张空�
   assert.match(html, /html,body\{margin:0;padding:0/, '默认的 body 外边距会顶出一页空白')
 })
 
-test('⑥ 图片宽高按 mm 写死（与导出 PDF 逐 mm 对齐）', () => {
+test('⑥ 图片宽高按 mm 写死 + 可缩（与导出 PDF 逐 mm 对齐，但用户页边距更大时不许被裁）', () => {
   const html = sheetPrintHtml([shot(1041, 260)], 'x', '打印')
-  const m = /style="width:([\d.]+)mm;height:([\d.]+)mm"/.exec(html)
-  assert.ok(m, '图片必须带 mm 宽高')
+  const m = /style="width:([\d.]+)mm;height:auto;max-width:100%"/.exec(html)
+  assert.ok(m, '图片应带 mm 宽度 + height:auto + max-width:100%')
   assert.ok(Math.abs(Number(m[1]) - CONTENT_W) < 0.01, `宽度 ${m[1]}mm 应顶满 ${CONTENT_W}mm`)
-  assert.ok(Number(m[2]) <= CONTENT_H + 0.01)
+  const dh = /data-h="([\d.]+)mm"/.exec(html)
+  assert.ok(Number(dh[1]) <= CONTENT_H + 0.01, '高度(记录值)不得超过内容区')
 })
 
 test('⑦ 工具条只在屏幕显示，打印时隐藏（不能占掉纸面）', () => {

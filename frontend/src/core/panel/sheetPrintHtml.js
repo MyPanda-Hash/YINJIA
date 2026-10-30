@@ -89,7 +89,12 @@ export function sheetPrintHtml(shots, title, printLabel) {
   const contentH = SHEET_PAGE_H - SHEET_MARGIN * 2 - 1
   const pages = list.map((s) => {
     const { w, h } = sheetImageMm(s, contentH)
-    return `<div class="pg"><img src="${s.dataUrl}" style="width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm" alt=""></div>`
+    // ⚠ width 用 mm 写死（与导出 PDF 逐 mm 对齐），但必须带 max-width:100%：
+    //   打印对话框里的纸张/页边距是**用户环境**决定的（实测有 1 英寸 = 25.5mm 边距的），
+    //   那时可打印宽只有 ~159mm；图片若仍按 194mm 铺，两侧会被打印机裁掉
+    //   （2026-10-30 用户截图：序号列只剩「号」、备注列只剩「备」）。
+    //   height 交给 auto，等比跟着缩，绝不变形。
+    return `<div class="pg"><img src="${s.dataUrl}" style="width:${w.toFixed(2)}mm;height:auto;max-width:100%" alt="" data-h="${h.toFixed(2)}mm"></div>`
   }).join('')
   // 顶部工具条只在屏幕上显示：自动唤打印被浏览器压住时（窗口未聚焦等），用户还能自己点
   const bar = '<div class="bar"><span class="tt">' + escHtml(title) + '</span>'
