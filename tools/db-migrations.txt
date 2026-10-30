@@ -4343,3 +4343,11 @@ migrate-prodinfo-auditor-defaults-20261029.sql
 #   代码已整段删除该方法;pruneProgressRows 的 ①b 改按 asp_user1='sync' 清理四级行。
 #   本脚本清**存量**四级同步行(软删,可幂等复跑)。两账套都执行。
 migrate-drop-test-progress-20261030.sql
+
+# 2026-10-30 「状态表已作废」与「业务表 asp_cancel」口径对齐。作废/删除只写
+#   yj_doc_status.canceled='Y' 不动 asp_cancel ⇒ 面板列表(排 canceled)看不到、看板(只看
+#   asp_cancel)却算得出来,服务器实测立项申请 19 vs 0。代码侧四处判活已补状态表过滤,
+#   本脚本补**存量**:状态表里已作废的研发单据,业务表也置 asp_cancel='Y'。
+#   用户 2026-10-30 确认「是,确实要清掉」—— 这批是 10-10~10-30 逐个删除的,不恢复。
+#   幂等;自检「canceled=Y 但 asp_cancel<>Y」必须 0,否则整体回滚。两账套都执行。
+migrate-align-canceled-to-aspcancel-20261030.sql
