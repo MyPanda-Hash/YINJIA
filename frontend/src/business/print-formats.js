@@ -467,3 +467,61 @@ export async function printProductionTask(rows, opts = {}) {
   if (!printInPage(COMPANY.woTitle, body)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }
+
+/**
+ * 工单二维码单张标签(2026-10-30,「手机扫码 · 生产领料」用)。
+ *
+ * 用户口径:「打印就先只是先打印工单二维码,在生成生产领料单的时候自动打印一次」。
+ * ⇒ 只出一张 75×100mm 标签,卡面 = 标题 / 工单号 #行号 / 产品 / 规格,右下角二维码。
+ * 二维码内容走 {@link woQrText} 的同一口径(公司代码@工单号@1000+行号)——
+ * 现场用同一个扫码入口继续扫(生产领料、工序报工都认这个码)。
+ *
+ * @param {{工单号?:string, 工单行号?:number, 产品名称?:string, 规格型号?:string,
+ *          标题?:string, 二维码内容?:string}} payload
+ *        也接受后端 `/mobilePick/generate` 直接回的那份 `打印` 对象(字段名一致)。
+ * @param {{onDone?:Function}} [opts]
+ * @return {Promise<boolean>} true = 已交给页面内打印层(不弹新窗口)
+ */
+export async function printWoQr(payload, opts = {}) {
+  const p = payload || {}
+  const woNo = String(p['工单号'] ?? '').trim()
+  if (!woNo) return false
+  const qrText = String(p['二维码内容'] ?? '').trim() || woQrText(p)
+  let qr = ''
+  try {
+    const lib = qrLib()
+    if (!lib) throw new Error('qrcode lib unavailable')
+    qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
+  } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
+
+  const title = String(p['标题'] ?? '').trim() || '生产领料单'
+  const line = Number(p['工单行号']) || 0
+  const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
+  const body = '<style>'
+    + '@page{size:75mm 100mm;margin:0}'
+    + '.card{width:75mm;height:100mm;box-sizing:border-box;border:0.35mm solid #000;'
+    + 'padding:5mm 5mm 26mm 5mm;position:relative;page-break-after:always;background:#fff;'
+    + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#111}'
+    + '.card .t{font-size:13pt;font-weight:700;text-align:center;letter-spacing:2mm;margin-bottom:4mm}'
+    + '.card .f{display:flex;align-items:flex-end;margin:2.2mm 0;line-height:1.3;font-size:10pt}'
+    + '.card .f .lb{flex:none;white-space:nowrap}'
+    + '.card .f .v{flex:0 1 auto;min-width:22mm;border-bottom:0.25mm solid #000;padding:0 1mm 0.4mm;'
+    + 'font-size:9.5pt;word-break:break-all;overflow-wrap:anywhere}'
+    + '.card .qr{position:absolute;right:6mm;bottom:6mm;width:20mm;height:20mm}'
+    + '.card .qr img{width:20mm;height:20mm;display:block}'
+    + '.card .code{position:absolute;left:5mm;bottom:10mm;font-size:7pt;color:#444;'
+    + 'max-width:40mm;word-break:break-all}'
+    + 'body{margin:0;background:#fff}'
+    + '</style>'
+    + '<div class="card">'
+    + `<div class="t">${esc(title)}</div>`
+    + f('工单号', woNo) + f('工单行号', line ? `#${line}` : '')
+    + f('产　　品', p['产品名称']) + f('规　　格', p['规格型号'])
+    + `<div class="code">${esc(qrText)}</div>`
+    + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
+    + '</div>'
+
+  // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调
+  if (!printInPage(title, body, opts)) { alert(PRINT_FAIL_MSG); return false }
+  return true
+}

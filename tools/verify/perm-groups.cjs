@@ -17,11 +17,15 @@
  */
 const BASE = (process.argv[2] || 'http://127.0.0.1:8090').replace(/\/$/, '')
 
-/** 导航一级模块顺序 —— 必须与 backend ReportService.NAV_GROUP_ORDER 一致(2026-10-20 导航改版后) */
-const NAV_ORDER = ['我的桌面', '研发管理', '智能供应链', 'WMS管理系统', '生产计划', '生产过程',
+/** 导航一级模块顺序 —— 必须与 backend ReportService.NAV_GROUP_ORDER 一致 */
+// ⚠ 2026-10-30 对齐现状(此前本数组停在 2026-10-20 那一版,已与代码不一致 ⇒ 断言 1/2/4 长期假红):
+//   ① 「库存管理」在 menus.js 里早改名为「WMS管理」(ReportService.NAV_GROUP 也把旧值映射到它,
+//      这里还写「WMS管理系统」⇒ 面板分组算出来永远对不上);
+//   ② 新增一级目录「手机扫码」(生产领料 / 工序报工 / 自动打印),插在「生产计划」之前。
+const NAV_ORDER = ['我的桌面', '研发管理', '智能供应链', 'WMS管理', '手机扫码', '生产计划', '生产过程',
   '品质管理', '数据建模', '系统管理平台', '数采平台', 'ERP系统集成', '其他']
 /** 历史碎值:出现过但**不得**再作为独立分组出现(yj_panel.module_group 的原值,由 ReportService.NAV_GROUP 归并) */
-const LEGACY = ['基础资料', '基础数据', '基础设置', '采购管理', '订单管理', '生产管理', '委外加工', '库存核算', '库存报表', '销售管理', '物料及价格', '通用', '系统管理']
+const LEGACY = ['基础资料', '基础数据', '基础设置', '采购管理', '订单管理', '生产管理', '委外加工', '库存核算', '库存报表', '销售管理', '物料及价格', '通用', '系统管理', '库存管理', 'WMS管理系统']
 const STOCK_REPORTS = ['STOCK_BALANCE', 'STOCK_LEDGER', 'STOCK_STATUS', 'STOCK_SUMMARY', 'STOCK_DETAIL']
 /**
  * 面板总数 = yj_panel 在册面板 + 虚拟面板(DASHBOARD + PagePanelRegistry.ALL)。
@@ -104,18 +108,31 @@ async function main() {
   check('每个分组都有面板(无空组)', modules.every((m) => (m.panels || []).length > 0))
 
   // 4. 库存报表族落位(含库存明细)
-  const wms = modules.find((m) => m.name === 'WMS管理系统')
+  // 2026-10-30:「WMS管理系统」已改名「WMS管理」(menus.js / ReportService.NAV_GROUP 同源) ⇒ 断言跟着改。
+  const wms = modules.find((m) => m.name === 'WMS管理')
   const wmsCodes = new Set((wms?.panels || []).map((p) => p.panelCode))
   const missing = STOCK_REPORTS.filter((c) => !wmsCodes.has(c))
-  check('库存报表族 5 张(含库存明细)归入「WMS管理系统」', missing.length === 0, missing.join(',') || '全部命中')
+  check('库存报表族 5 张(含库存明细)归入「WMS管理」', missing.length === 0, missing.join(',') || '全部命中')
 
   // 5. DASHBOARD 落位
   const dash = modules.find((m) => m.name === '我的桌面')
   check('DASHBOARD 归入「我的桌面」', (dash?.panels || []).some((p) => p.panelCode === 'DASHBOARD'))
 
   // 6. 研发管理 25 张
+  // 2026-10-30:研发侧面板此后有过增补(项目流程管控等)⇒ 断言从"恰好 25"改成"至少 25 且码不重复",
+  //   否则每加一张研发表都要改这行,反而让这条闸门变成"跟着改数据"的摆设。
   const rd = modules.find((m) => m.name === '研发管理')
-  check('「研发管理」含 25 张面板', (rd?.panels || []).length === 25, `实际 ${(rd?.panels || []).length}`)
+  const rdCodes = (rd?.panels || []).map((p) => p.panelCode)
+  check('「研发管理」至少 25 张且不重复',
+    rdCodes.length >= 25 && new Set(rdCodes).size === rdCodes.length,
+    `实际 ${rdCodes.length} 张 / ${new Set(rdCodes).size} 唯一`)
+
+  // 7. 手机扫码(2026-10-30 新增一级目录):三张页面级面板必须都在这一组里
+  const scan = modules.find((m) => m.name === '手机扫码')
+  const scanCodes = new Set((scan?.panels || []).map((p) => p.panelCode))
+  const scanMissing = ['MOBILE_PICK', 'MOBILE_REPORT', 'PRINT_STATION'].filter((c) => !scanCodes.has(c))
+  check('「手机扫码」含 生产领料/工序报工/自动打印', scanMissing.length === 0,
+    scanMissing.join(',') || '全部命中')
 
   const failed = results.filter((r) => !r.ok)
   console.log(`\n== ${results.length - failed.length}/${results.length} 通过 ==`)

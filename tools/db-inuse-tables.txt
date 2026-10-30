@@ -44,7 +44,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin/供应商编码=供应商门户账号的归属标签,2026-10-24 加)
 
-# ---- MES 自有业务表(173 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(174 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -225,6 +225,7 @@ table:wo_split_log   # 切单操作日志(9.29 批次①:谁/何时/从哪单切
 table:wo_process_line   # 工序—产线预排台账(2026-10-07:一行=一工单行×一工序;计划生产线=排产时人工按工艺路线逐道选定,实际生产线=报工完工转序时落实;撤销排产按行作废)
 table:wo_mixing_head     # 生产工单混料配方快照头表(工单行绑定配方、混料数量、版本)
 table:wo_mixing_detail   # 生产工单混料配方快照行表(物料、配料比、单支含量、计划用量)
+table:wo_pick_doc   # 手机扫码·生产领料 配对台账(2026-10-30:一行=一工单行的一对「生产领料单+生产退料单」;记单号/状态/已领项数,唯一约束排除已作废行;**不参与库存增减**)
 
 # ---- 经典 HSDZ 遗留但仍在用(15 张;改动前须评估面板影响,新功能禁止再用) ----
 table:dm_ck   # 仓库代码

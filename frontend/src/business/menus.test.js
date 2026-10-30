@@ -233,6 +233,42 @@ test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护�
 })
 
 /**
+ * 2026-10-30 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』
+ *   (和生产计划平级)导航下。工序报工不变。生产领料重写。」
+ *
+ * 钉住三件事:
+ *   ① 一级目录里有「手机扫码」(code=mobileScan),且与「生产计划」平级(同在 menuTree 顶层);
+ *   ② 它的子项 = 生产领料 / 工序报工 / 自动打印,面板码换新为 MOBILE_* / PRINT_STATION;
+ *   ③ 旧位置(生产计划组里)不得再残留 prodPick / prodReport —— 否则侧栏会出两个入口。
+ * 旧地址重定向与后端旧码别名(PagePanelRegistry 的 PROD_PICK/PROD_REPORT)不在本文件断言范围。
+ */
+test('手机扫码:与生产计划平级的一级目录,下挂生产领料 / 工序报工 / 自动打印', () => {
+  const scan = menuTree.find((n) => n.code === 'mobileScan')
+  assert.ok(scan, '应有一级目录 mobileScan(手机扫码)')
+  assert.equal(scan.title, '手机扫码')
+  // 平级:同在顶层,且顺序在生产计划之前(用户按「先扫码、后排产」的现场顺序找菜单)
+  const topCodes = menuTree.map((n) => n.code)
+  assert.ok(topCodes.includes('plan'), '生产计划应仍是一级目录')
+  assert.ok(topCodes.indexOf('mobileScan') < topCodes.indexOf('plan'),
+    '手机扫码应排在生产计划之前')
+  // 子项:面板码 + 地址 + 标题(顺序即菜单顺序,改菜单必须同步这里)
+  // 2026-10-30 第二轮:「生成工单领料/退料单」是**独立面板**,排在「生产领料」之前
+  //   (用户口径「这个面版的功能和生成领料是有区别的(不是一个面版)」)。
+  assert.deepEqual((scan.children || []).map((c) => c.code), ['mobilePickCreate', 'mobilePick', 'mobileReport', 'printStation'])
+  assert.deepEqual((scan.children || []).map((c) => c.panelCode), ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'MOBILE_REPORT', 'PRINT_STATION'])
+  assert.deepEqual((scan.children || []).map((c) => c.title), ['生成工单领料/退料单', '生产领料', '工序报工', '自动打印'])
+  assert.deepEqual((scan.children || []).map((c) => c.path), [
+    '/panelx/list/MOBILE_PICK_CREATE', '/panelx/list/MOBILE_PICK', '/panelx/list/MOBILE_REPORT', '/sys/printStation',
+  ])
+  // 旧位置不得再残留(生产计划组里) —— 否则侧栏两个「生产领料」入口
+  const plan = menuTree.find((n) => n.code === 'plan')
+  assert.ok(!(plan.children || []).some((c) => c.code === 'prodPick' || c.code === 'prodReport'),
+    '生产计划组里不应再有 prodPick/prodReport(已迁到手机扫码)')
+  assert.ok(!JSON.stringify(plan).includes('"PROD_PICK"') && !JSON.stringify(plan).includes('"PROD_REPORT"'),
+    '生产计划组里不应再有 PROD_PICK/PROD_REPORT 面板码')
+})
+
+/**
  * 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」。
  * 合并只改菜单分组,**10 个面板入口与顺序保持原样**:原生产执行 4 项在前、原生产记录 6 项在后。
  * 顺序被钉住是为了防止合并时不小心丢项或重排(用户按现有位置找菜单)。
@@ -286,8 +322,10 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
   //   (migrate-drop-manu-order-report-panels-20261017.sql),故从本断言里移除。
   // 2026-10-22 补:2026-10-20/21 新增的两张页面级面板(生产领料 PROD_PICK / 工序报工 PROD_REPORT)
   //   当时只改了 menus.js,没同步本断言 ⇒ 这里长期红着;按现有菜单顺序补回来。
+  // 2026-10-30:**这两张已迁到新一级目录「手机扫码」(MOBILE_PICK / MOBILE_REPORT)**,不再属于生产计划;
+  //   本断言同步移除,改由下方「手机扫码」用例另钉。
   assert.deepEqual((group().children || []).map((c) => c.panelCode).filter(Boolean),
-    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROD_PICK', 'PROD_REPORT', 'LINE_LOAD'])
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'])
   // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
   const all = JSON.stringify(plan)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {
@@ -301,7 +339,8 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
 // 2026-10-20:生产计划 / 生产过程 由「生产制造」下的二级目录升为一级目录 ⇒ 它们的一级子项是
 //   带 panelCode 的**面板叶子**(不是再套一层分组),与 dc 同款但必须挂面板码。
 const PAGE_LEAF_GROUPS = new Set(['dc'])
-const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess'])
+// 2026-10-30:新一级目录「手机扫码」同样是「带面板码的页面级叶子」(不是再套一层分组)。
+const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess', 'mobileScan'])
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
   for (const g of menuTree) {
     if (!g.children || !g.children.length) continue // 我的桌面 等暂无二级

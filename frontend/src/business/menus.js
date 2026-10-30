@@ -313,6 +313,46 @@ export const menuTree = [
       },
     ],
   },
+  // ══════════ 手机扫码(2026-10-30 新增一级目录,与「生产计划」平级)══════════
+  // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
+  //   导航下。工序报工不变。生产领料重写。」
+  //
+  // 为什么单独一个一级目录:这两页是**车间现场的手机作业页**(扫码枪/手机相机),
+  //   不是生管在电脑上排产/看板那一类「生产计划」工作;混在「生产计划」里现场要翻两层才能点到。
+  //
+  // 与旧位置的关系(可回滚):
+  //   · 两个叶子原先在「生产计划」组(prodPick 2026-10-20 / prodReport 2026-10-21),本批整组搬到这里;
+  //   · code 与 panelCode 一并换新(MOBILE_PICK / MOBILE_REPORT)—— 面板码要跟一级模块走,
+  //     权限矩阵按 PagePanelRegistry 的 module 分组,旧码 PROD_PICK / PROD_REPORT 在后端登记为**别名**,
+  //     既有 yj_role_panel 授权行与译名继续有效(不会因为改名把已授权账号挡在门外);
+  //   · 旧地址 /panelx/list/PROD_PICK、/panelx/list/PROD_REPORT 在 router 里保留为重定向。
+  // 生产领料三页(生成 → 列表 → 单据)同属本页面的内部步骤,不进菜单:
+  //   /panelx/list/MOBILE_PICK → 生成工单领料/退料单 + 生产领料列表(同一组件按 tab 切换);
+  //   /panelx/list/MOBILE_PICK/doc → 单据详情(领料/退料两页签)。
+  {
+    code: 'mobileScan',
+    title: '手机扫码',
+    icon: 'FullScreen',
+    children: [
+      // 生成工单领料/退料单(2026-10-30 第二轮用户口径:「还有少了一个『生成工单领料/退料单』这个面版,
+      //   这个面版的功能和生成领料是有区别的(不是一个面版),重新分析需求」)。
+      //   **电脑上的开单工作台**:扫多张工单批量生成一对领料/退料单 + 列表看已生成的单;
+      //   只管生单,生完引导去下面的「生产领料」领料 —— 故排在「生产领料」**之前**。
+      { code: 'mobilePickCreate', title: '生成工单领料/退料单', path: '/panelx/list/MOBILE_PICK_CREATE', panelCode: 'MOBILE_PICK_CREATE', icon: 'DocumentAdd' },
+      // 生产领料(2026-10-30 重写):未完成/已完成两组单据 + 扫码定位 + 单据内扫码核销 → 全部领完提交。
+      //   ⚠ **生单不在这一页**(见上面那张),本页只负责"领"。
+      { code: 'mobilePick', title: '生产领料', path: '/panelx/list/MOBILE_PICK', panelCode: 'MOBILE_PICK', icon: 'ShoppingCart' },
+      // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单码 → 选工序 → 填完工数量 →
+      //   提交即报工并审核;工序进度/当前工序由既有审核钩子推进。
+      { code: 'mobileReport', title: '工序报工', path: '/panelx/list/MOBILE_REPORT', panelCode: 'MOBILE_REPORT', icon: 'Memo' },
+      // 自动打印站点(2026-10-30,用户口径「单独配一个自动打印的面版(这个面版是电脑上的)。
+      //   只要这个面版配置参数并且设置成打开,然后在手机打印的时候就可以关联这个打开了面版参数的
+      //   电脑,这台电脑连接的打印机就会自动打印」):电脑上打开的一页,选打印机 + 开关自动打印 +
+      //   常驻轮询接单。**普通站点配置页** —— 每台电脑各自设置自己那台打印机,
+      //   故配置按浏览器 localStorage 绑本机,不用登录账号区分(一个账号可能登录多台电脑)。
+      { code: 'printStation', title: '自动打印', path: '/sys/printStation', panelCode: 'PRINT_STATION', icon: 'Printer' },
+    ],
+  },
   // 2026-10-20 用户口径:「把生产制造的生产计划和生产过程提成一级目录,生产制造这个一级目录不要了;
   //   把设备维护挪到系统管理平台」—— 原一级目录「生产制造」(mfg)拆掉:
   //   生产计划 / 生产过程 各升为一级目录,设备维护整组移到「系统管理平台」。
@@ -360,17 +400,13 @@ export const menuTree = [
           // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
           // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
           { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', panelCode: 'WORK_ORDER_BOARD', icon: 'Histogram' },
-          // 生产领料(2026-10-20 用户口径「把他写成面版,这样我也可以选择在电脑端操作,名字叫生产领料在生产计划里面」;
-          //   第二轮「两个要写成一体的,地址要一致,最好在 panelx/list 目录下方」⇒ 地址统一 /panelx/list/PROD_PICK):
-          //   扫工单(带出产品/产线/排产数量)→ 逐件扫原材料 → 按批号日期先进先出自动拆批 → 生成材料出库单草稿。
-          //   与「条码管理 → 扫码领料」的区别:那条是仓管按标签(存货编码|批号)领料,这条是车间/生管按**工单**领料。
-          //   电脑端与手机端**同一地址**:窄屏单列+吸底栏,≥900px 双栏(同一份组件自适应)。
-          { code: 'prodPick', title: '生产领料', path: '/panelx/list/PROD_PICK', panelCode: 'PROD_PICK', icon: 'ShoppingCart' },
-    // 工序报工(2026-10-21 用户口径:「再写一个工序报工的面版,扫码然后填工序,工序有成型/切碳/组装3个工序,
-    //   然后选择后填入数量。提交后…会影响到生产工单里面的工序进度和当前工序,还会填入报工记录。」)
-    //   与生产领料同组同形态:扫工单码(带出工单行) → 选工序 → 填完工数量 → 提交即报工并审核,
-    //   工序进度/当前工序由既有审核钩子推进;今日报工明细就是「报工记录」。
-    { code: 'prodReport', title: '工序报工', path: '/panelx/list/PROD_REPORT', panelCode: 'PROD_REPORT', icon: 'Memo' },
+          // ══════════ 2026-10-30 迁出:「生产领料」「工序报工」整组移到新一级目录「手机扫码」 ══════════
+          // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)导航下」。
+          // 两个叶子的 code / panelCode 一并换新(MOBILE_PICK / MOBILE_REPORT,地址 /panelx/list/MOBILE_*),
+          // 旧地址 /panelx/list/PROD_PICK|PROD_REPORT 在 router 里保留为重定向,老收藏/App 内置链接不断。
+          // 要回滚:把下面两行注释去掉、并把「手机扫码」整组注释掉即可(路由/权限后端同时保留旧码别名)。
+          // { code: 'prodPick', title: '生产领料', path: '/panelx/list/PROD_PICK', panelCode: 'PROD_PICK', icon: 'ShoppingCart' },
+          // { code: 'prodReport', title: '工序报工', path: '/panelx/list/PROD_REPORT', panelCode: 'PROD_REPORT', icon: 'Memo' },
           // 工序任务(路线驱动,A 项 2026-10-05)菜单已按用户口径**撤下**(「把工序任务删除掉算了」,
           // 2026-10-05):工单详情只看"走到哪一步"(按报工统计),不再维护工序任务队列。
           // 页面组件/后端接口/表结构按可撤回要求保留但不再挂菜单;要恢复只需把下面一行注释去掉。

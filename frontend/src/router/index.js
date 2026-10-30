@@ -18,8 +18,13 @@ const routes = [
   // 生产领料 · 旧地址兼容(2026-10-20 第二轮:用户要求「两个写成一体的、地址要一致,
   //   在 panelx/list 目录下」⇒ 正式地址统一为 `/panelx/list/PROD_PICK`,与本文件里那条路由同一份组件)。
   //   这里只保留重定向,避免手机收藏/以前发的链接失效。
-  { path: '/m/pick', redirect: '/panelx/list/PROD_PICK', meta: { title: '生产领料' } },
-  { path: '/prod/plan/prodPick', redirect: '/panelx/list/PROD_PICK', meta: { title: '生产领料' } },
+  // ⚠ 2026-10-30:正式地址已迁到「手机扫码」一级目录下的 /panelx/list/MOBILE_PICK(见下方该条路由)。
+  //   PROD_PICK / PROD_REPORT 连同这三条旧路径一律**重定向**到新地址 ——
+  //   老 App 内置链接、手机收藏、已发出去的二维码都不用重发。
+  { path: '/m/pick', redirect: '/panelx/list/MOBILE_PICK', meta: { title: '生产领料' } },
+  { path: '/prod/plan/prodPick', redirect: '/panelx/list/MOBILE_PICK', meta: { title: '生产领料' } },
+  { path: '/panelx/list/PROD_PICK', redirect: '/panelx/list/MOBILE_PICK', meta: { title: '生产领料' } },
+  { path: '/panelx/list/PROD_REPORT', redirect: '/panelx/list/MOBILE_REPORT', meta: { title: '工序报工' } },
   {
     path: '/',
     component: () => import('@/layout/PortalLayout.vue'),
@@ -44,6 +49,11 @@ const routes = [
       // 菜单设计(2026-10-23):编辑导航的名称/上级分组/顺序/隐藏 —— 覆盖行存 yj_menu_node,
       //   保存即生效、不用重新打包部署。管理员专属(菜单 adminOnly + 路由 requireAdmin + 后端 requireAdmin)。
       { path: 'sys/menuDesign', component: () => import('@/views/sys/MenuDesigner.vue'), meta: { title: '菜单设计', requireAdmin: true } },
+      // 自动打印站点(2026-10-30,「手机扫码」一级目录下):电脑上打开的一页,选打印机 + 开关自动打印,
+      //   页面常驻轮询打印队列,收到手机端发来的工单二维码就静默出纸。
+      // 页面级虚拟面板 PRINT_STATION(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
+      // 配置按浏览器 localStorage 绑本机(每台电脑设置自己那台打印机),不写库。
+      { path: 'sys/printStation', component: () => import('@/views/sys/PrintStation.vue'), meta: { title: '自动打印', code: 'printStation', panelCode: 'PRINT_STATION' } },
       { path: 'scm/businessOverview', component: () => import('@/views/scm/BusinessOverview.vue'), meta: { title: '业务总览', code: 'businessOverview' } },
       // 数采平台(2026-10-18):IOT设备配置 / 数据监控 / 状态统计。三页是页面级叶子(非 yj_panel 面板),
       //   故不进 flatMenus 自动路由(下方 filter 已排除 dcConfig/dcMonitor/dcStats),在此显式注册。
@@ -105,24 +115,44 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
-      // 生产领料(2026-10-20):**地址统一到面板目录** —— 用户口径「两个要写成一体的,地址要一致,
-      //   最好是在 panelx/list 的目录下方」。
-      //   它仍然是**页面级虚拟面板**(PROD_PICK,定义见 PagePanelRegistry,不是 yj_panel 的单据表),
-      //   但地址走标准面板形态 `/panelx/list/PROD_PICK`;因为是专用页面而不是通用 PanelxList,
-      //   这条**必须排在下面 `panelx/list/:panelCode` 之前**(静态路径优先于参数路径)。
-      //   电脑端与手机端同一地址:窄屏单列 + 吸底栏,≥900px 双栏(同一份组件自适应)。
-      //   旧的 `/prod/plan/prodPick`、`/m/pick` 保留为重定向,老链接/收藏不失效。
+      // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
+      // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
+      //   导航下。工序报工不变。生产领料重写。」
+      // 两条都仍是**页面级虚拟面板**(MOBILE_PICK / MOBILE_REPORT,定义见后端 PagePanelRegistry,
+      //   不是 yj_panel 的单据表),地址走标准面板形态 `/panelx/list/<码>`;因为是专用页面而不是
+      //   通用 PanelxList,这两条**必须排在下面 `panelx/list/:panelCode` 之前**(静态路径优先于参数路径)。
+      // 旧地址 /panelx/list/PROD_PICK、/panelx/list/PROD_REPORT 在本文件顶部已重定向到新地址。
       // ⚠ 2026-10-21 用户口径:「扫码领料应该是整个图片上红色的窗口保留」—— 即手机上也要
-      //   留着顶栏 + 页签,不要沉浸。故这条**去掉 immersiveOnMobile**;PortalLayout 的沉浸能力
-      //   保留(以后别的页要用),但当前没有任何路由启用它。
-      { path: 'panelx/list/PROD_PICK', component: () => import('@/views/mobile/MobilePick.vue'), meta: { title: '生产领料', code: 'prodPick', panelCode: 'PROD_PICK' } },
-      // 工序报工(2026-10-21):与生产领料同一形态 —— 页面级虚拟面板 + 标准面板地址 `/panelx/list/<码>`,
-      //   必须排在上面的参数路由之前;手机单列、电脑 ≥900px 双栏(同一份组件)。
-      { path: 'panelx/list/PROD_REPORT', component: () => import('@/views/mobile/MobileReport.vue'), meta: { title: '工序报工', code: 'prodReport', panelCode: 'PROD_REPORT' } },
+      //   留着顶栏 + 页签,不要沉浸。故这两条**不加 immersiveOnMobile**。
+      //
+      // 生产领料(2026-10-30 重写):列表页 = 未完成/已完成两组单据 + 中间扫码定位;生单在下面那张独立面板。
+      {
+        path: 'panelx/list/MOBILE_PICK', component: () => import('@/views/mobile/MobilePickList.vue'),
+        meta: { title: '生产领料', code: 'mobilePick', panelCode: 'MOBILE_PICK' },
+      },
+      // 生成工单领料/退料单(2026-10-30 第二轮用户口径:「还有少了一个『生成工单领料/退料单』这个面版,
+      //   这个面版的功能和生成领料是有区别的(不是一个面版),重新分析需求」+ 三问确认:
+      //   电脑上的**开单工作台**(可扫多张工单批量生成、列表看已生成的单),**只管生单**,生完引导去领料。
+      //   必须排在 `panelx/list/:panelCode` 之前,理由同上。
+      {
+        path: 'panelx/list/MOBILE_PICK_CREATE', component: () => import('@/views/mobile/MobilePickCreate.vue'),
+        meta: { title: '生成工单领料/退料单', code: 'mobilePickCreate', panelCode: 'MOBILE_PICK_CREATE' },
+      },
+      // 单据详情(领料 / 退料两页签):扫物料码核销、批次沿用旧逻辑、全部领完才能提交。
+      // 必须排在 `panelx/list/:panelCode` 之前,理由同上。
+      {
+        path: 'panelx/list/MOBILE_PICK/doc', component: () => import('@/views/mobile/MobilePickDoc.vue'),
+        meta: { title: '生产领料单', code: 'mobilePickDoc', panelCode: 'MOBILE_PICK' },
+      },
+      // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单 → 选工序 → 填完工数量 → 提交。
+      {
+        path: 'panelx/list/MOBILE_REPORT', component: () => import('@/views/mobile/MobileReport.vue'),
+        meta: { title: '工序报工', code: 'mobileReport', panelCode: 'MOBILE_REPORT' },
+      },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
-        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && m.code !== 'supplierPrint' && m.code !== 'supplierAccount' && !m.panelCode)
+        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && m.code !== 'supplierPrint' && m.code !== 'supplierAccount' && m.code !== 'printStation' && !m.panelCode)
         .map((m) => ({
           path: m.path.slice(1),
           component: ModuleView,

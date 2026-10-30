@@ -4334,3 +4334,25 @@ migrate-prune-voided-progress-20261030.sql
 #   ⚠ 配套代码同批提交(456666bf):putHeadDefaults 补进主保存路径(原先只挂在空白草稿分支),
 #   否则写进 config 也不会落库。两账套都执行。
 migrate-prodinfo-auditor-defaults-20261029.sql
+#
+# ── 手机扫码 · 生产领料重写(2026-10-30)───────────────────────────────────────────
+# 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
+#   导航下。工序报工不变。生产领料重写。」
+# migrate-wo-pick-doc-20261030.sql:
+#   建表 wo_pick_doc(21 列,一对领料/退料单一行,唯一约束 UX_wo_pick_doc_wo 排除已作废行)
+#   + 3 索引 + 表级/21 条列级中文注明 + yj_app_setting 补 print.auto_enabled / print.station_name /
+#   print.last_heartbeat 三个参数;末尾自检(列 21 / 索引 4 / 参数 3 / 注明 21)不达标即 RAISERROR。
+#   ⚠ 本表**不参与库存增减**(只记单号与状态),不改「上线前必验-库存批次追溯」任何验收口径。
+#   两账套都执行。
+migrate-wo-pick-doc-20261030.sql
+# i18n-mobile-scan-20261030.sql:
+#   面板名译名 4 张 × 9 语言(手机扫码 / 生产领料 / 工序报工 / 自动打印)+ 新面板码授权:
+#   MOBILE_PICK(按旧 PROD_PICK 的授权角色补,submit 词只给本来能审 MATERIAL_OUT 的角色)、
+#   MOBILE_REPORT(词集与旧 PROD_REPORT 一致)、PRINT_STATION(config 词,只给管理员)。
+#   ⚠ 旧码 PROD_PICK / PROD_REPORT 的授权行**保留**(后端 PagePanelRegistry 登记为别名,改名不断权)。
+i18n-mobile-scan-20261030.sql
+# migrate-mobile-pick-create-panel-20261030.sql:
+#   「生成工单领料/退料单」独立面板(2026-10-30 第二轮用户口径「不是一个面版」):
+#   面板名 9 语言译名 + 按 MOBILE_PICK 现有角色整份复制授权(view,query,create,print)。
+#   ⚠ 与 MOBILE_PICK 分开授权是为了**分岗**:计划员给 create、车间给 pick/submit,互不越权。
+migrate-mobile-pick-create-panel-20261030.sql
