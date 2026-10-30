@@ -23,7 +23,8 @@
     <!-- 来源切换(2026-10-17):用户口径「维护检验项目可以根据当前出货检验计划来获取」
          —— 弹窗多一个**只读**来源:按本单「产品编码」读《出货检验计划表》RD_INSP_PLAN 里**已经填好**的
          检验项目,勾选后带入本单明细。计划是单据事实、标准库是标准,两者各自独立:这个来源只读,
-         不改 bs_qc_item、也不改计划本身。默认仍是标准库,没开这个来源的面板连切换条都不显示。
+         不改 bs_qc_item、也不改计划本身。2026-10-30 用户口径:开了这个来源的面板**默认就停在这一页**
+         (「把当前这个出货检验计划的页签放在默认进入的第一个」);没开这个来源的面板连切换条都不显示。
          2026-10-18 开到组装成品检验单 + 制程检验单(见 PanelxList SHIP_PLAN_SOURCE_PANELS)。 -->
     <el-radio-group v-if="shipSource" v-model="source" size="small" class="qcplan-src" @change="onSourceChange">
       <el-radio-button value="lib">{{ tt('检验标准库') }}</el-radio-button>
@@ -564,10 +565,11 @@ function load() {
   showAllDocs.value = false
   loadPlans()
   // 打开即复位来源与计划数据(2026-10-18):
-  //   · 面板开了「出货检验计划」来源 ⇒ 按**最新**表头产品编码重取一次(编码可能在弹窗外刚改过);
-  //     编码为空时 loadShip 自己会停在"不发请求"上,表里只剩提示语。
+  //   · 面板开了「出货检验计划」来源 ⇒ **默认就停在该来源**(2026-10-30 用户口径「把当前这个出货
+  //     检验计划的页签放在默认进入的第一个」),并按**最新**表头产品编码重取一次(编码可能在弹窗外
+  //     刚改过);编码为空时 loadShip 自己会停在"不发请求"上,表里只剩提示语。
   //   · 面板没开 ⇒ 来源拉回标准库 + 清掉上一个面板留下的计划行,否则会串到别的检验单上。
-  if (props.shipSource) loadShip()
+  if (props.shipSource) { source.value = 'ship'; loadShip() }
   else { source.value = 'lib'; resetShip() }
 }
 
