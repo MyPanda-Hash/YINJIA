@@ -205,6 +205,23 @@ public class MobilePickController {
         String lineWoNo = str(wo.get("工单号"));
         int line = toInt(wo.get("工单行号"));
 
+        // 前置校验(2026-10-30 补):**未排产 / 已结案的工单不该能开领料单**。
+        //
+        // 为什么在开单这一步就拦:领料的前提是"这行要生产",没排产的工单行没有排产数量,
+        // 领了料也没地方用;已结案的行再领料等于给一张已完成的单补料。
+        // 上一版只靠"扫到就开单",于是有人扫了这类单照样开出一张空领料单 ——
+        // 白占台账唯一约束(GD-DEMO-09/10 实测),还得手工作废。
+        // 连带口径:2026-10-20 生产领料的旧版也是这个规矩(未排产直接拒)。
+        Object planQty = wo.get("排产数量");
+        double planned = planQty == null ? 0 : num(planQty);
+        if (planned <= 0) {
+            throw new IllegalStateException("工单 " + lineWoNo + " 第 " + line + " 行未排产(排产数量为 0),不能开领料单:"
+                    + "请先到「生产计划 → 快速排产」把该工单行排入产线");
+        }
+        if ("Y".equalsIgnoreCase(str(wo.get("完工状态")))) {
+            throw new IllegalStateException("工单 " + lineWoNo + " 第 " + line + " 行已结案,不能再开领料单");
+        }
+
         // 已开过单就不重开 —— 用户第二次扫同一行时应当"进到那张单",而不是再开一对空单
         WoPickDocService.PickDoc exist = docs.findActive(lineWoNo, line);
         if (exist != null) {
