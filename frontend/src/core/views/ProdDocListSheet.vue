@@ -12,26 +12,18 @@
        只读视图:产品文件由各自的面板维护,这里不做就地编辑(与"产品开发"按钮同一份数据源)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="prod-doc-sheet">
-    <!-- ① 公司头 + 右上单据编号(2026-10-29 用户口径「产品文件内的面板的右上角的编号应该改为
-         单据编号,所有的都是」⇒ 与其余 6 张面板统一印「单据编号：」标识 + 单据编号本体) -->
+    <!-- ① 公司头 + 标题行
+         2026-10-30 用户口径:去掉「单据编号 / 密级 / 文件使用范围」这三格。
+         理由:本面板是 4 张文件面板的派生只读视图,既没有自己的单据号,也没有密级与
+         使用范围的值(head 里永远是空/—),三个空标签只会占掉抬头最显眼的位置。
+         单据编号仍由 props.head 传给下面的 load() 当刷新触发器,这里只是不再显示。 -->
     <div class="pds-topbar">
       <div class="pds-company">{{ tt('惠州市银嘉环保科技有限公司') }}</div>
-      <div class="pds-docno"><span class="pds-docno-prefix">{{ tt('单据编号：') }}</span>{{ (head && head['单据编号']) || '—' }}</div>
     </div>
 
     <!-- ② 标题行 -->
     <div class="pds-title-row">
       <div class="pds-title">{{ tt('产品文件列表') }}</div>
-      <div class="pds-info-table">
-        <div class="pds-info-row">
-          <span class="pds-info-label">{{ tt('密级') }}</span>
-          <span class="pds-info-value">{{ (head && head['密级']) || '' }}</span>
-        </div>
-        <div class="pds-info-row">
-          <span class="pds-info-label">{{ tt('文件使用范围') }}</span>
-          <span class="pds-info-value">{{ (head && head['文件使用范围']) || '' }}</span>
-        </div>
-      </div>
     </div>
 
     <!-- ③ 说明段 -->
@@ -235,21 +227,15 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
   padding: 0 2px 14px;
 }
 .pds-company { font-size: 15px; font-weight: 600; letter-spacing: .3px; color: var(--pds-ink); }
-.pds-docno { font-size: 12px; color: var(--pds-ink-2); letter-spacing: .2px; }
-.pds-docno-prefix { color: var(--pds-ink-3); margin-right: 4px; }
 
-/* ── 标题条：去色块，改成「大字 + 右侧信息 + 一条细线」 ── */
+/* ── 标题条：大字 + 一条细线（右侧信息格已于 2026-10-30 去掉） ── */
 .pds-title-row {
-  display: flex; align-items: flex-end; justify-content: space-between;
-  gap: 16px; padding: 4px 2px 12px; border-bottom: 1px solid var(--pds-line);
+  display: flex; align-items: flex-end;
+  padding: 4px 2px 12px; border-bottom: 1px solid var(--pds-line);
 }
 .pds-title {
   font-size: 20px; font-weight: 600; letter-spacing: 3px; color: var(--pds-ink);
 }
-.pds-info-table { font-size: 12px; color: var(--pds-ink-2); }
-.pds-info-row { display: flex; gap: 8px; line-height: 1.8; }
-.pds-info-label { min-width: 62px; text-align: right; color: var(--pds-ink-3); }
-.pds-info-value { min-width: 70px; }
 
 .pds-note {
   padding: 12px 2px 16px; font-size: 12px; color: var(--pds-ink-3); line-height: 1.7;
