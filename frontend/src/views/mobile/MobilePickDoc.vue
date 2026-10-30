@@ -61,22 +61,17 @@
 
     <!-- 扫码区:未完成=扫料领料;已完成=扫料退料(生成其他入库单)
          ⚠ 只读模式下(从开单工作台点进来)整块**不渲染**:那里只看明细,不做任何操作 -->
-    <section v-if="!readOnly" class="mp-card" :class="{ dim: isDone && !returnMode }">
+    <section v-if="!readOnly" class="mp-card">
       <div class="mp-sec">
-        <span>{{ isDone ? (returnMode ? tt('扫物料码 · 退料') : tt('扫物料码 · 领料')) : tt('扫物料码') }}</span>
+        <!-- 已完成 = 退料(生成其他入库单);未完成 = 领料。标题跟着状态走,不让人误会 -->
+        <span>{{ isDone ? tt('扫物料码 · 退料') : tt('扫物料码 · 领料') }}</span>
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
-        <span v-if="isDone" class="mp-sec-note">{{ returnMode ? tt('退料模式') : tt('这张单已完成,可点「开始退料」') }}</span>
+        <span v-if="isDone" class="mp-sec-note">{{ tt('这张单已完成:扫码即退料,提交后生成其他入库单') }}</span>
       </div>
 
-      <!-- 已完成 + 非退料模式:引导到(退料 → 生成其他入库单) -->
-      <div v-if="isDone && !returnMode" class="mp-retire-cta">
-        <span>{{ tt('这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。') }}</span>
-        <el-button type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
-      </div>
-
-      <template v-else>
-        <!-- 扫物料码解锁(2026-10-30 用户口径:「只有扫了对应物料的编码才能解锁填入,填入后要重新锁定」)
-             ⇒ 扫码框常驻;数量输入框**只有扫到物料后才出现**,写完/取消后重新锁定 -->
+        <!-- 已完成的单**直接进退料模式**(loadDoc 里按状态设 returnMode=true)——
+             用户口径「已完成的进去扫码应该是其他入库才对」,不再需要先点一次「开始退料」。
+             扫物料码解锁:数量框只有扫到物料后才出现,写入/取消后重新锁定。 -->
         <div class="mp-row">
           <el-input
             ref="matInput"
@@ -154,9 +149,8 @@
             <div v-else-if="nonFifo" class="mp-warn">{{ tt('当前不是先进先出,已写进明细备注') }}</div>
           </div>
         </template>
-      </template>
 
-      <div v-if="!cur && !(isDone && !returnMode)" class="mp-hint">
+      <div v-if="!cur" class="mp-hint">
         {{ isDone
           ? tt('扫物料码:只有这张单里有的物料才能退,数量按「已领 − 已退」限制')
           : tt('扫物料码:物料存在才能填数量;数量可随意填,只要仓库数量足够') }}
@@ -236,7 +230,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -249,7 +243,20 @@ import { queueToPrintStation } from '@/business/printStation'
 const route = useRoute()
 const router = useRouter()
 
-const docId = Number(route.query.id) || 0
+/**
+ * 单据主键 —— ⚠ 必须是**响应式**的(2026-10-30 修)。
+ *
+ * <p>原来写成 `const docId = Number(route.query.id) || 0`,只在组件**首次挂载**时取一次值。
+ * 而 vue-router 对**同一个路由页**复用同一个组件实例:从列表先点 C01、返回、再点 F01 时,
+ * 组件不会重建、onMounted 不重跑 ⇒ 页面永远停在第一张单的数据上。
+ *
+ * <p>用户 2026-10-30 报障「已完成的单据点开还是未完成,扫码应该是其他入库才对」正是这个:
+ * 之前打开过一张未完成的单,再点已完成的单,看到的还是那张未完成的
+ * (状态显示未完成、0/3、扫码走的是领料分支)。
+ *
+ * <p>修法:改成 computed 跟随 route.query.id,并在下方 watch 它重新加载。
+ */
+const docId = computed(() => Number(route.query.id) || 0)
 
 /**
  * 只读模式(2026-10-30 用户口径:「还有明细里面只能看不能操作」)。
@@ -348,6 +355,37 @@ onMounted(() => {
   nextTick(() => matInput.value?.focus?.())
 })
 
+/**
+ * 切换单据时重新加载(2026-10-30 修)。
+ *
+ * <p>vue-router 复用同一路由页的组件实例 ⇒ 只改 query.id 不会重跑 onMounted。
+ * 不监听的话,从已完成单切到另一张单,页面还停在上一张的**状态与明细**上
+ * (用户看到「已完成的点开还是未完成」就是它)。
+ *
+ * <p>切单时必须把**页面内临时状态**一起清掉:扫码框、解锁的数量框、批次、退料模式与待退数量、
+ * 提示条 —— 否则会把这些属于"上一张单"的东西带进新单据,比数据没刷新更危险。
+ */
+watch(docId, () => {
+  doc.value = {}
+  wo.value = {}
+  pickRows.value = []
+  softReset()
+  returnMode.value = false
+  returnQty.value = {}
+  loadDoc()
+  nextTick(() => matInput.value?.focus?.())
+})
+
+/** 清掉扫码区与解锁态的临时状态(切单 / 提交后都用它) */
+function softReset() {
+  matText.value = ''
+  cur.value = null
+  curRow.value = null
+  batchRows.value = []
+  curQty.value = 0
+  clearMsg()
+}
+
 onBeforeUnmount(() => {
   try { delete window.__yjScanResult } catch { /* ignore */ }
 })
@@ -376,6 +414,19 @@ async function loadDoc() {
     doc.value = d
     wo.value = d.工单 || {}
     pickRows.value = (d.领料明细 || []).map(normalize)
+
+    // 已完成单:进页面**直接就是退料模式**(2026-10-30 用户口径
+    // 「已完成的进去扫码应该是其他入库才对」)。
+    //   原来要先点一下「开始退料」才切模式,而完成态下扫码框默认走的是**领料**分支 ——
+    //   用户直接扫就会调错接口(scanMaterial side='pick'),像是"还能领料"。
+    //   领料只应发生在**未完成**的单上;已完成 = 已过账,之后只能退(生成其他入库单)。
+    if (String(d.状态 || '') === '已完成') {
+      returnMode.value = true
+      returnQty.value = {}
+    } else {
+      returnMode.value = false
+      returnQty.value = {}
+    }
   } catch (e) {
     errText.value = errMsgOf(e) || tt('加载单据失败')
   }

@@ -585,7 +585,11 @@ public class MobilePickController {
         WoPickDocService.PickDoc d = docs.byId(id);
         if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
         if (WoPickDocService.STATE_DONE.equals(d.state())) {
-            throw new IllegalStateException("这张单已经提交,不能再改数量");
+            // 2026-10-30:已完成 = 已审核过账,之后只能退料(生成其他入库单),**不能再改领料数量**。
+            // 之前这里只笼统报"已经提交,不能再改数量";现在把"该走哪条路"直接告诉调用方 ——
+            // 用户报障「已完成的进去扫码应该是其他入库才对」,根因之一就是界面在完成态仍走领料分支。
+            throw new IllegalStateException("这张单已经完成并过账,不能再改领料数量:"
+                    + "如需退货请走「开始退料」(生成其他入库单)");
         }
 
         // ① 这个物料码必须在**本单的明细里**(领料/退料各自的明细) —— 「对应的物料码存在」的第一个含义
@@ -644,7 +648,13 @@ public class MobilePickController {
         double qty = round4(num(body.get("qty")));
         WoPickDocService.PickDoc d = docs.byId(id);
         if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
-        if (WoPickDocService.STATE_DONE.equals(d.state())) throw new IllegalStateException("这张单已经提交,不能再改数量");
+        // 已完成 = 已审核过账,之后只能退料(生成其他入库单),不能再改领料数量。
+        // ⚠ 与 scanMaterial 里同一道闸门:两处都在,漏一处就能绕过(2026-10-30 改了一处后
+        //   实测仍报旧文案才发现 —— 后端两个入口必须同口径)。
+        if (WoPickDocService.STATE_DONE.equals(d.state())) {
+            throw new IllegalStateException("这张单已经完成并过账,不能再改领料数量:"
+                    + "如需退货请走「开始退料」(生成其他入库单)");
+        }
         if (code.isEmpty()) throw new IllegalArgumentException("物料编码不能为空");
         if (qty < 0) throw new IllegalArgumentException("数量不能为负数");
 
