@@ -48,6 +48,13 @@
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
+      <!-- 日排产(2026-10-29):表格内的日期列 —— 保存计划 / 按完工日期均摊;列由后端按数据生成 -->
+      <el-button v-if="canDayPlan" size="small" type="success" plain :disabled="planDirtyCount === 0" @click="savePlan">
+        {{ tt('保存日排产') }}（{{ planDirtyCount }}）
+      </el-button>
+      <el-button v-if="canDayPlan" size="small" plain :disabled="!splitTargetRow()" @click="openDpSplit">
+        {{ tt('按完工日期均摊') }}
+      </el-button>
     </div>
 
     <!-- 产线筛选条 -->
@@ -111,6 +118,27 @@
           <span :class="{ 'wol-closed': row.当前工序 === '组装' }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
         </template>
       </el-table-column>
+      <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),位置即用户截图标红处
+           (「当前工序」之后、「工序进度」之前)。每个日期格都可填计划(含今天以前的日期);
+           格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
+      <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="110" />
+      <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
+      <el-table-column :label="tt('7天需交付')" prop="7天需交付" width="92" align="right" />
+      <el-table-column :label="tt('15天需交付')" prop="15天需交付" width="96" align="right" />
+      <el-table-column :label="tt('大于15天需交付')" prop="大于15天需交付" width="112" align="right" />
+      <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
+      <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
+      <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
+      <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="canDayPlan" v-model="row.日计划[d]" size="small"
+                           :controls="false" :min="0" class="dp-input" @change="markCell(row, d)" />
+          <span v-else>{{ qtyText((row.日计划 || {})[d]) }}</span>
+          <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
+            {{ qtyText(row.日报工[d]) }}
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('工序进度')" width="120" align="right">
         <template #default="{ row }">
           <span v-if="row.当前工序">{{ num(row.当前工序完工量) }}/{{ num(row.当前工序计划量) }}</span>
@@ -144,6 +172,11 @@
         <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" embedded />
       </div>
     </el-dialog>
+
+    <!-- 按完工日期均摊(2026-10-29):把该行剩余量铺到 起点~完工日,填进日期列后再保存 -->
+    <DayPlanSplitDialog v-model="dpSplitVisible" :工单号="dpSplitRow['工单号'] || ''" :工单行号="dpSplitRow['工单行号']"
+                        :工序="dpSplitRow['工序日'] || dpSplitRow['当前工序'] || ''" :剩余="dpSplitRemain"
+                        :完工日期="dpSplitDueDefault" @apply="applyDpSplit" />
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
@@ -201,7 +234,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -209,6 +242,9 @@ import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
+import DayPlanSplitDialog from './DayPlanSplitDialog.vue'
+import { qtyText } from '@/business/dayPlan'
+import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -329,6 +365,111 @@ const paged = computed(() => filtered.value)
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
+// ───────── 日排产(2026-10-29):直接长在本页明细表的日期列 ─────────
+// 用户口径:「生产工单中需要能实现对后面日期的排产量设定……在当前的表格内容处插入当前设定的
+// 日排产数量,修改需要针对当前生产工单和工单排产中都要实现」⇒ 不新增表格/块:
+//   窗口内每一天都可编辑计划(含今天以前的日期);格下方小字 = 当天已审核报工量(只读对照)。
+// 数据接口与工单排产同一套(/px/scheduleBoard/dayPlan/*),两页行为一致。
+const planDates = ref([])
+const planToday = ref('')
+const planDirty = reactive(new Map())
+const planDirtyCount = computed(() => planDirty.size)
+const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
+
+async function loadDayPlan() {
+  const ids = rows.value.map((r) => r.行id).filter((x) => x != null)
+  if (!ids.length) { planDates.value = []; planToday.value = ''; planDirty.clear(); return }
+  try {
+    const data = await fetchDayPlan({ 行id列表: ids })
+    planDates.value = data['日期'] || []
+    planToday.value = data['今天'] || ''
+    const byId = new Map()
+    for (const p of data['行'] || []) byId.set(String(p['行id']), p)
+    for (const row of rows.value) {
+      const p = byId.get(String(row.行id))
+      row.工序日 = p ? p['工序'] : (row.当前工序 || '')
+      row.日计划 = { ...((p && p['日计划']) || {}) }
+      row.日报工 = { ...((p && p['日报工']) || {}) }
+      row._原计划 = { ...row.日计划 }
+      // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
+      if (p) {
+        for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
+          '7天需交付', '15天需交付', '大于15天需交付',
+          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计']) row[k] = p[k]
+      }
+    }
+    planDirty.clear()
+  } catch (e) { err(e, '查询失败') }
+}
+
+/** 单元格改动 → 记入待保存(与加载时的原值比较,改回原值则移出) */
+function markCell(row, d) {
+  const v = Number(row.日计划[d] || 0)
+  const o = Number((row._原计划 || {})[d] || 0)
+  const key = `${row.行id}|${d}`
+  if (v === o) { planDirty.delete(key); return }
+  planDirty.set(key, {
+    工单行id: row.行id,
+    工序: row.工序日 || row.当前工序 || '',
+    生产线: row.生产线 || '',
+    计划日期: d,
+    计划数量: v,
+  })
+}
+
+async function savePlan() {
+  const cells = [...planDirty.values()]
+  if (!cells.length) { ElMessage.info(tt('没有需要保存的改动')); return }
+  try {
+    const d = await saveDayPlan(cells)
+    ElMessage.success(`${tt('日排产已保存')}（${d['保存格数'] ?? 0}）`)
+    await loadDayPlan()
+  } catch (e) { err(e, '保存失败') }
+}
+
+// 按完工日期均摊:优先勾选行,其次当前行(与切单/排产的"单行"口径一致)
+const dpSplitVisible = ref(false)
+const dpSplitRow = ref({})
+const dpSplitRemain = computed(() => {
+  const r = dpSplitRow.value || {}
+  const plan = Number(r['当前工序计划量'] || 0)
+  const done = Number(r['当前工序完工量'] || 0)
+  const left = plan - done
+  return left > 0 ? left : Number(r['排产数量'] || 0)
+})
+function splitTargetRow() {
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  if (alive.length === 1) return alive[0]
+  if (!alive.length && currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id))) {
+    return currentRow.value
+  }
+  return null
+}
+function openDpSplit() {
+  const r = splitTargetRow()
+  if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
+  dpSplitRow.value = r
+  dpSplitVisible.value = true
+}
+/** 均摊的默认完工日:取该行计划完工日期;超出窗口右端时夹到最后一天(窗口已按最晚完工日自动延长) */
+const dpSplitDueDefault = computed(() => {
+  const due = String(dpSplitRow.value['计划完工日期'] || '')
+  const last = planDates.value[planDates.value.length - 1] || ''
+  if (due && last && due > last) return last
+  return due || last
+})
+/** 清空该行当前各列计划后按均摊结果重填;均摊落到列之外的日期会并入列(否则"填了但看不到") */
+function applyDpSplit({ map }) {
+  const row = dpSplitRow.value
+  const all = Object.keys(map)
+  const merged = [...new Set([...planDates.value, ...all])].sort()
+  if (merged.length !== planDates.value.length) planDates.value = merged
+  for (const d of planDates.value) row.日计划[d] = undefined
+  for (const d of all) row.日计划[d] = map[d]
+  for (const d of planDates.value) markCell(row, d)
+  ElMessage.info(tt('已填充到表格,请点「保存日排产」'))
+}
+
 async function load() {  try {
     const cond = {}
     if (dateFrom.value) cond['日期从'] = dateFrom.value
@@ -336,13 +477,18 @@ async function load() {  try {
     if (qText.value.trim()) cond['keyword'] = qText.value.trim()
     if (lineFilter.value) cond['生产线'] = lineFilter.value
     const res = await request.post('/px/workOrderList', cond)
-    rows.value = (res.data || []).map((r) => ({ ...r, rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)) }))
+    rows.value = (res.data || []).map((r) => ({
+      ...r,
+      rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)),
+      日计划: {}, 日报工: {},
+    }))
     // 2026-10-05 修复:刷新后清掉旧勾选 —— reserve-selection 会保留"已从列表消失的行"的勾选(且无法手动取消),
     // 造成切单/撤回切单永久提示「请先勾选一张工单」。
     checked.value = []
     currentRow.value = null
     tableRef.value?.clearSelection?.()
     applyLineMeta()
+    await loadDayPlan()
   } catch (e) { err(e, '查询失败') }
 }
 
@@ -450,7 +596,8 @@ async function doPrintTask(mode) {
       批号: r.批号 || '', 物料编码: r.物料编码 || '',
       排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
     }))
-    const okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
+    // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
+    const okPrint = await printWorkTaskSheet(mode, rowsToPrint)
     if (okPrint) {
       await request.post('/px/workOrderList/printStamp', {
         rows: src.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
@@ -692,6 +839,10 @@ onActivated(() => {
 .wol-sep { color: #909399; }
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
+/* 日排产日期列(2026-10-29):格内输入计划,格下小灰字=该天已审核报工量 */
+.dp-done { color: #909399; }
+.dp-input { width: 72px; }
+.dp-act { font-size: 11px; color: #909399; line-height: 1.1; }
 .wol-closed { color: #f56c6c; font-weight: 600; }
 .wol-split { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .wol-split-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

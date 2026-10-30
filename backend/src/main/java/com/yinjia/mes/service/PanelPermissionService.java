@@ -162,6 +162,9 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|撤回调拨", new String[]{"revoke"});
         m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|取消结案", new String[]{"unclose"});
         m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|打印", new String[]{"print"});
+        // 日排产(2026-10-29):两页表格内的日期列(未来可填计划)—— 同一动作词,两页任一授予即可
+        m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|日排产", new String[]{"dayplan"});
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|日排产", new String[]{"dayplan"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|打印", new String[]{"print"});
         // 生产工单列表:「结案/取消结案」是同一个按钮的两种取向,同挂 close 词;
         // 工单排产看板上的「取消结案」是**另一个**动作(只撤结案不改结案)⇒ 挂 unclose 词。

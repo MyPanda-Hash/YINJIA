@@ -223,6 +223,7 @@ table:wo_split_log   # 切单操作日志(9.29 批次①:谁/何时/从哪单切
 table:wo_process_line   # 工序—产线预排台账(2026-10-07:一行=一工单行×一工序;计划生产线=排产时人工按工艺路线逐道选定,实际生产线=报工完工转序时落实;撤销排产按行作废)
 table:wo_mixing_head     # 生产工单混料配方快照头表(工单行绑定配方、混料数量、版本)
 table:wo_mixing_detail   # 生产工单混料配方快照行表(物料、配料比、单支含量、计划用量)
+table:wo_day_plan   # 工单日排产(2026-10-29:生产工单/工单排产两页表格内的日期列;一行=工单行×工序×计划日期→计划数量,实际完成量仍取报工 scjl)
 table:wo_proc_card_head   # 工序流程追踪卡·卡头(2026-10-29:一张卡=日期大批次下的一个小批次=一个工单行;照片挂 yj_attachment,完成情况按已审核报工 scjl 现算)
 table:wo_proc_card_detail   # 工序流程追踪卡·工序行(卡的各道工序,来源=工序台账 wo_process_line;完成量/状态/完成时间不落库,查询现算)
 
@@ -243,6 +244,7 @@ table:Porder   # 采购单
 table:s_log   # 上机日志
 table:scjl   # 生产记录
 view:v_wo_completion_detail   # 完工明细只读视图(scjl已完工未作废记录;WO_COMPLETION_LIST)
+view:v_prod_pick_list   # 生产领料只读视图(dbo.outh src=6 材料出库未删除流水行;PROD_PICK_LIST。2026-10-22 链外建置、脚本遗失,2026-10-25 由 migrate-prod-pick-outh-20261022.sql 补登记进链)
 
 # ---- 快照回补(6 张;2026-10-17 按服务器快照 HSDZ_MES_SRV1015 补回 —— 经典 HSDZ 资产,
 #      后端源码里只出现在注释中(「对齐 HSDZ permission.GROP」),运行期零引用,补回不改任何行为。

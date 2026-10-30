@@ -6,6 +6,7 @@ import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
 import com.yinjia.mes.service.ProcessTaskService;
+import com.yinjia.mes.service.WorkOrderDayPlanService;
 import com.yinjia.mes.service.WorkOrderTransferService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,15 +49,19 @@ public class ScheduleBoardController {
     private final ProcessTaskService processTask;
     /** 手机端/外部报工吸收(2026-10-17):外部直写 scjl 的完工行 → 补镜像 + 推进 + 转序 */
     private final ExternalReportAbsorbService absorbService;
+    /** 工单日排产(2026-10-29):生产工单/工单排产两页表格内的日期列 —— 读计划 + 写计划(不另记完成量) */
+    private final WorkOrderDayPlanService dayPlanService;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
                                    WorkOrderTransferService transferService, ProcessTaskService processTask,
-                                   ExternalReportAbsorbService absorbService) {
+                                   ExternalReportAbsorbService absorbService,
+                                   WorkOrderDayPlanService dayPlanService) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
         this.processTask = processTask;
         this.absorbService = absorbService;
+        this.dayPlanService = dayPlanService;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -159,6 +164,54 @@ public class ScheduleBoardController {
             rows = service.scheduled(line, scope, workshop());
         }
         return ApiResult.ok(rows);
+    }
+
+    /**
+     * **工单日排产·读**(2026-10-29):生产工单 / 工单排产 两页表格内「日期列」的数据。
+     *
+     * <p>用户口径:「在当前的表格内容处插入当前设定的日排产数量,修改需要针对当前生产工单和
+     * 工单排产中都要实现」⇒ 不加任何新表格/块,两页各自在现有明细表里追加列,共用本接口:
+     * <ul>
+     *   <li>生产工单页:传 {@code 行id}(当前表格行),工序取各行「当前工序」;</li>
+     *   <li>工单排产页:传 {@code 生产线}+{@code scope},工序取所选产线的车间工序。</li>
+     * </ul>
+     * 返回窗口内每行的「日计划」(wo_day_plan)与「日报工」(scjl 已审核,含手机端吸收);
+     * 过去日期页面只读显示完成量,今天及以后显示可编辑的计划量。只读接口 ⇒ 只校验页面「可见」。
+     */
+    @PostMapping("/dayPlan/data")
+    public ApiResult<Map<String, Object>> dayPlanData(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Object d = b.get("未来天数");
+        Integer future = d instanceof Number n ? n.intValue() : null;
+        return ApiResult.ok(dayPlanService.data(longList(b.get("行id列表")), str(b.get("生产线")),
+                str(b.get("scope")), future, workshop()));
+    }
+
+    /**
+     * **工单日排产·写**(2026-10-29):保存两页表格里填/均摊出来的日计划。
+     * 数量 &gt; 0 = 写入或覆盖;0/空 = 软删该格。动作词 dayplan(两页任一授予即可)。
+     */
+    @PostMapping("/dayPlan/save")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> dayPlanSave(@RequestBody Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
+                "日排产");
+        List<Map<String, Object>> cells = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(dayPlanService.save(cells, currentUser()));
+    }
+
+    private static List<Long> longList(Object o) {
+        if (!(o instanceof List<?> list) || list.isEmpty()) return List.of();
+        List<Long> out = new java.util.ArrayList<>();
+        for (Object x : list) {
+            if (x instanceof Number n) out.add(n.longValue());
+            else {
+                try { out.add(Long.valueOf(String.valueOf(x).trim())); } catch (NumberFormatException ignore) { }
+            }
+        }
+        return out;
     }
 
     /**

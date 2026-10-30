@@ -4324,6 +4324,9 @@ migrate-form-approval-self-audit-20261028.sql
 #   闸门:0 行 + 无其它对象引用 + 收尾自检,不过则 ROLLBACK。
 migrate-drop-manu-order-20261028.sql
 
+# 2026-10-29 日排产:生产工单/工单排产两页表格内追加「日期列」(未来可填计划、近日只读完成量),
+#   手填计划落库 wo_day_plan(工单行id × 工序 × 计划日期);两页各加动作词 dayplan。幂等、两账套都执行。
+migrate-wo-day-plan-20261029.sql
 
 # 2026-10-29 工序流程追踪卡(生产计划 → PROC_FLOW_CARD 页面级虚拟面板):
 #   建 wo_proc_card_head / wo_proc_card_detail(照片复用 yj_attachment,不新建照片表),
@@ -4382,3 +4385,7 @@ migrate-prune-voided-progress-20261030.sql
 #   ⚠ 配套代码同批提交(456666bf):putHeadDefaults 补进主保存路径(原先只挂在空白草稿分支),
 #   否则写进 config 也不会落库。两账套都执行。
 migrate-prodinfo-auditor-defaults-20261029.sql
+
+# 2026-10-29 工序路线排线补「计划开工日期」(计划链:上一道计划完工日=下一道计划开工日;
+#   日排产按 开工~完工 均摊计划数量);列 + 中文注明,幂等、两账套都执行。
+migrate-wo-process-line-plan-start-20261029.sql

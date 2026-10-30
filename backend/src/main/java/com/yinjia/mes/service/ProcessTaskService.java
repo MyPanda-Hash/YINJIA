@@ -845,11 +845,28 @@ public class ProcessTaskService {
                 steps.add(s);
             }
         }
+        // 计划链(2026-10-29 用户口径):上一道「计划完工日期」= 下一道「计划开工日期」;
+        //   首道默认今天(排产当天开工)。实际开工/实际完工另给(实际开工取台账落实时间,
+        //   实际完工取该道已审报工的最大完工时间 —— 计划与实际本来就不一致,分开展示)。
+        String todayText = java.time.LocalDate.now().toString();
+        String prevDue = null;
+        for (Map<String, Object> s : steps) {
+            String start = prevDue == null ? todayText : prevDue;
+            String due = str(s.get("计划完工日期"));
+            // 逾期工单(交期已过)不能给「开工今天、完工昨天」这种自相矛盾的默认值 ⇒ 完工日拉到开工日
+            if (due != null && java.time.LocalDate.parse(due).isBefore(java.time.LocalDate.parse(start))) due = start;
+            s.put("计划开工日期", start);
+            if (due != null) s.put("计划完工日期", due);
+            prevDue = due == null ? start : due;
+            s.put("实际完工", doneTimeText(no, rowId, str(s.get("工序"))));
+        }
         // 已有台账(未作废):改线时回填
         List<Map<String, Object>> planned = jdbc.queryForList(
                 "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
                         + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(计划数量,0) AS 计划数量,"
-                        + " CONVERT(varchar(10), 计划完工日期, 120) AS 计划完工日期, ISNULL(状态,N'') AS 状态"
+                        + " CONVERT(varchar(10), 计划开工日期, 120) AS 计划开工日期,"
+                        + " CONVERT(varchar(10), 计划完工日期, 120) AS 计划完工日期,"
+                        + " CONVERT(varchar(16), 落实时间, 120) AS 实际开工, ISNULL(状态,N'') AS 状态"
                         + " FROM dbo.wo_process_line WHERE 工单号=? AND (? IS NULL OR 工单行id=?)"
                         + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY ISNULL(工序序,999), id", no, lineId, lineId);
         // ── 条7「排产带上次产线」(2026-10-25 定稿方案 v2)────────────────────────────────────
@@ -979,7 +996,28 @@ public class ProcessTaskService {
             double stepRate = num(rt.get("换算率"));
             if (stepRate <= 0) stepRate = 1;
             p.put("计划数量", round(qty * stepRate));
-            p.put("计划完工日期", str(given.get("计划完工日期")) != null ? str(given.get("计划完工日期")) : rt.get("计划完工日期"));
+            // 计划开工/完工(2026-10-29):**上一道的计划完工日 = 下一道的计划开工日**(计划链,服务端强制);
+            //   下一道完工日早于这个开工日的,按它原来的计划时长(完工-开工)整体顺延,不报错
+            //   (历史台账日期各排各的,不能把计划链打断)。
+            String givenStart = str(given.get("计划开工日期"));
+            String givenDue = str(given.get("计划完工日期"));
+            String due = givenDue != null ? givenDue : str(rt.get("计划完工日期"));
+            String prevDue = plan.isEmpty() ? null : str(plan.get(plan.size() - 1).get("计划完工日期"));
+            String start = prevDue != null ? prevDue : givenStart;
+            if (start == null) start = java.time.LocalDate.now().toString();
+            if (due == null) due = start;
+            if (java.time.LocalDate.parse(due).isBefore(java.time.LocalDate.parse(start))) {
+                long dur = 0;
+                if (givenStart != null && givenDue != null) {
+                    try {
+                        dur = java.time.temporal.ChronoUnit.DAYS.between(
+                                java.time.LocalDate.parse(givenStart), java.time.LocalDate.parse(givenDue));
+                    } catch (RuntimeException ignore) { dur = 0; }
+                }
+                due = java.time.LocalDate.parse(start).plusDays(Math.max(0, dur)).toString();
+            }
+            p.put("计划开工日期", start);
+            p.put("计划完工日期", due);
             plan.add(p);
         }
         // ① 工单级排产:首道线(复用现有排产口径;该行未排产才可排;该行已排产=改线,首道线必须仍是该行当前线)
@@ -995,6 +1033,8 @@ public class ProcessTaskService {
             assignRow.put("生产线", firstPlan);
             assignRow.put("排产数量", qty);        // 2026-10-16:人工给定的排产数量(assign 写 plang.pl_sl + plang_pc 镜像)
             if (str(team) != null) assignRow.put("排产班组", str(team));
+            // 计划开工/完工(2026-10-29):首道的计划开工日写 plang.st_date / plang_pc.st_date(看板「开工日期」同源)
+            if (plan.get(0).get("计划开工日期") != null) assignRow.put("预开工日", plan.get(0).get("计划开工日期"));
             if (plan.get(0).get("计划完工日期") != null) assignRow.put("预完工日", plan.get(0).get("计划完工日期"));
             Map<String, Object> assigned = scheduleBoard.assign(List.of(assignRow), user);
             List<String> headFailed = castList(assigned.get("失败行"));
@@ -1015,13 +1055,19 @@ public class ProcessTaskService {
             Map<String, Object> p = plan.get(i);
             boolean first = i == 0;
             jdbc.update("INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
-                            + " 计划数量, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
-                            + " VALUES (?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
+                            + " 计划数量, 计划开工日期, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
                     no, rowId == null ? null : ((Number) rowId).longValue(), p.get("工序"),
                     p.get("工序序") == null ? null : ((Number) p.get("工序序")).intValue(),
                     p.get("生产线"), first ? p.get("生产线") : null,
-                    p.get("计划数量"), p.get("计划完工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划完工日期"))),
+                    p.get("计划数量"),
+                    p.get("计划开工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划开工日期"))),
+                    p.get("计划完工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划完工日期"))),
                     first ? "已落实" : "计划", first ? new java.util.Date() : null, user);
+            // 日排产(2026-10-29):按「计划开工日 ~ 计划完工日」把该道计划数量均摊成每日计划(wo_day_plan),
+            //   生产工单/工单排产两页的日期列据此自动带出;后续仍可人工逐格改。
+            autoFillDayPlan(rowId == null ? null : ((Number) rowId).longValue(), no, str(p.get("工序")), str(p.get("生产线")),
+                    str(p.get("计划开工日期")), str(p.get("计划完工日期")), num(p.get("计划数量")), user);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工单号", no);
@@ -1133,19 +1179,24 @@ public class ProcessTaskService {
         List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE id=?", String.class, row);
         String cur = cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
         int steps = 0;
+        String prevOp = null;
         for (Map<String, Object> r : rows) {
             String op = String.valueOf(r.get("工序")).trim();
+            String prevOpForThis = prevOp;
+            prevOp = op;
             double plan = num(r.get("计划数量"));
             double d = reportedQty(no, row, op);
             String st = String.valueOf(r.get("状态"));
             // ① 该道已达标(已审完工量 ≥ 该道计划量)⇒ 台账落实(补实际生产线),继续看下一道
             if (plan > 0 && d + 0.0001 >= plan) {
                 if (!"已落实".equals(st)) {
+                    // 实际完成时间(2026-10-29 用户口径「实际开工 = 上一道实际完工时间」):
+                    //   落实时间优先取该道**已审报工的最大完工时间**(真实做完那一刻),取不到才用当前时间。
                     jdbc.update("UPDATE dbo.wo_process_line SET 状态=N'已落实',"
                                     + " 实际生产线=COALESCE(NULLIF(实际生产线,N''), NULLIF(计划生产线,N''), NULLIF(?,N'')),"
-                                    + " 落实时间=COALESCE(落实时间,GETDATE()), asp_user2=?, asp_time2=GETDATE()"
+                                    + " 落实时间=COALESCE(落实时间, ?, GETDATE()), asp_user2=?, asp_time2=GETDATE()"
                                     + " WHERE id=?",
-                            cur, user, r.get("id"));
+                            cur, reportedDoneTime(no, rowId, op), user, r.get("id"));
                     steps++;
                 }
                 continue;
@@ -1189,9 +1240,10 @@ public class ProcessTaskService {
                 out.put("提示", "下一道(" + op + ")沿用当前线");
             }
             // 当前道落实(含"沿用当前线":不落实会导致看板当前工序一直停在上一道)
+            // 实际开工(落实时间)= **上一道实际完工时间**(2026-10-29 用户口径);取不到才用当前时间
             jdbc.update("UPDATE dbo.wo_process_line SET 状态=N'已落实', 实际生产线=?,"
-                            + " 落实时间=COALESCE(落实时间,GETDATE()), asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                    planLine, user, r.get("id"));
+                            + " 落实时间=COALESCE(落实时间, ?, GETDATE()), asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                    planLine, reportedDoneTime(no, row, prevOpForThis), user, r.get("id"));
             steps++;
             out.put("推进道数", steps);
             return out;
@@ -1249,6 +1301,70 @@ public class ProcessTaskService {
      */
     private double reportedQty(String plNo, Long rowId, String op) {
         return WoInspGate.reportedQty(jdbc, plNo, rowId, op);
+    }
+
+    /**
+     * 该道工序**已审报工的最大完工时间**(= 实际完工;没有则 null)。
+     * 2026-10-29 用户口径「实际的开工日期要在当前实际的完工日期时间处进行」——
+     * 转序时下一道的落实时间(实际开工)取上一道的这个方法,而不是"看板打开那一刻"。
+     */
+    private java.sql.Timestamp reportedDoneTime(String plNo, Long rowId, String op) {
+        if (!notBlank(plNo) || !notBlank(op) || rowId == null) return null;
+        List<java.sql.Timestamp> ts = jdbc.queryForList(
+                "SELECT MAX(s.wgsj) AS t FROM dbo.scjl s"
+                        + " WHERE s.gldh=? AND ISNULL(s.gxdm,N'')=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "   AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=s.gd_id AND pc.plang_id=?)"
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "            (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id=?)))",
+                java.sql.Timestamp.class, plNo.trim(), op.trim(), rowId, rowId);
+        return ts.isEmpty() ? null : ts.get(0);
+    }
+
+    /** 实际完工时间(展示文本 yyyy-MM-dd HH:mm;没有则 null) */
+    private String doneTimeText(String plNo, Long rowId, String op) {
+        java.sql.Timestamp t = reportedDoneTime(plNo, rowId, op);
+        return t == null ? null
+                : t.toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+    }
+
+    /**
+     * 按「计划开工日期 ~ 计划完工日期」把该道计划数量均摊成每日计划({@code wo_day_plan})。
+     *
+     * <p>用户口径(2026-10-29):「根据设定完工日期和数量配置每天需要完成的数量」⇒ 排线保存时
+     * 直接把日计划铺好,生产工单/工单排产两页表格的日期列自动带出;后续仍可人工逐格改。
+     * 均匀口径与前端 {@code buildSplit} 一致:整数件按整数排,余数给最后一天。
+     */
+    private void autoFillDayPlan(Long rowId, String no, String op, String line,
+                                 String startText, String dueText, double qty, String user) {
+        if (rowId == null || !notBlank(op) || qty <= 0 || !notBlank(startText) || !notBlank(dueText)) return;
+        java.time.LocalDate start;
+        java.time.LocalDate due;
+        try {
+            start = java.time.LocalDate.parse(startText.trim());
+            due = java.time.LocalDate.parse(dueText.trim());
+        } catch (RuntimeException e) {
+            return;
+        }
+        if (due.isBefore(start)) return;
+        // 重新排产 = 重排该道日计划:先作废该行该道全部有效格,再按新起止日铺
+        jdbc.update("UPDATE dbo.wo_day_plan SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
+                + " WHERE 工单行id=? AND 工序=? AND asp_cancel='N'", user, rowId, op);
+        List<Map<String, Object>> wo = jdbc.queryForList(
+                "SELECT TOP 1 pl_no, pl_xc FROM dbo.plang WHERE id=?", rowId);
+        Integer xc = wo.isEmpty() || wo.get(0).get("pl_xc") == null
+                ? null : ((Number) wo.get(0).get("pl_xc")).intValue();
+        int n = (int) (java.time.temporal.ChronoUnit.DAYS.between(start, due) + 1);
+        if (n <= 0) return;
+        boolean integerQty = Math.abs(qty - Math.rint(qty)) < 0.00005;
+        double base = integerQty ? Math.floor(qty / n) : Math.round((qty / n) * 10000) / 10000;
+        for (int i = 0; i < n; i++) {
+            double v = i == n - 1 ? round(qty - base * (n - 1)) : base;
+            if (v <= 0) continue;
+            jdbc.update("INSERT INTO dbo.wo_day_plan (工单行id, 工单号, 工单行号, 工序, 计划日期, 计划数量,"
+                            + " 生产线, asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,GETDATE(),N'N')",
+                    rowId, no, xc, op, start.plusDays(i), v, line, user);
+        }
     }
 
     /** 产线所属车间(取不到返回 null) */

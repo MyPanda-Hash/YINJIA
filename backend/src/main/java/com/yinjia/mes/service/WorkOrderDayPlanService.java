@@ -1,0 +1,440 @@
+package com.yinjia.mes.service;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * 工单日排产(生产工单 / 工单排产 两页表格内的「日期列」,2026-10-29)。
+ *
+ * <p><b>用户口径</b>(2026-10-29,附《成型车间排单计划》纸表 + 生产工单页截图):
+ * 「生产工单中需要能实现对后面日期的排产量设定,或者根据设定完工日期和数量配置每天需要完成的数量……
+ * 在当前的表格内容处插入当前设定的日排产数量,修改需要针对当前生产工单和工单排产中都要实现」。
+ * ⇒ **页面不新增任何表格/块**:两张现有明细表各追加日期列;本服务只负责两件事:
+ * <ol>
+ *   <li><b>读</b>:窗口内每行的「日计划」(wo_day_plan)与「日报工」(scjl 已审核,含手机端吸收);
+ *       窗口内**每一天都可编辑计划**(含今天以前的日期,用户口径「23~28 号填不了」),已报工量
+ *       作为格下方小字对照;窗口右端 = max(今天+最少未来天数, 各行计划完工日期),不再写死天数;</li>
+ *   <li><b>写</b>:保存人工填/均摊出来的日计划(0 或空 = 软删该格)。</li>
+ * </ol>
+ *
+ * <p><b>口径</b>:
+ * <ul>
+ *   <li>行键 = {@code plang.id};计划按 {@code (工单行id, 工序, 计划日期)} 唯一;</li>
+ *   <li>工序:生产工单页 = 该行 {@code plang.[当前工序]};工单排产页 = 所选产线车间的工序;</li>
+ *   <li>报工锚 {@code scjl.gd_id → plang_pc.plang_id},老数据 {@code gd_id=0} 按(工单号+批次号)
+ *       唯一命中兜底;只认 {@code wgzt='Y'}(草稿/待审核不算完成);</li>
+ *   <li>两账不合一:计划在 wo_day_plan,完成量永远是报工事实,互不覆盖。</li>
+ * </ul>
+ */
+@Service
+public class WorkOrderDayPlanService {
+
+    /** 日期列上限(按数据生成后最多保留这么多列,取最近的一段) */
+    private static final int MAX_COLUMNS = 160;
+    /** 单段计划区间最多铺多少天(防脏数据把列撑爆) */
+    private static final int RANGE_CAP_DAYS = 120;
+    /** 单次保存格子数上限 */
+    private static final int MAX_SAVE_CELLS = 5000;
+
+    private final JdbcTemplate jdbc;
+    private final ScheduleBoardService board;
+
+    public WorkOrderDayPlanService(JdbcTemplate jdbc, ScheduleBoardService board) {
+        this.jdbc = jdbc;
+        this.board = board;
+    }
+
+    /**
+     * 读:窗口内每行的日计划 / 日报工。
+     *
+     * @param ids        生产工单页:当前表格里的行 id(空 = 走产线模式)
+     * @param line       工单排产页:选中产线
+     * @param scope      未完工/已完工/全部(产线模式,与排产明细页签同口径)
+     * @param futureDays 未来最少列数(默认 14);实际窗口会按各行「计划完工日期」自动延长到最晚那天
+     *                   (用户口径「28 号往后的表格显示不全」⇒ 不再按固定天数截断)
+     * @param workshop   登录账号车间(可空)
+     */
+    public Map<String, Object> data(List<Long> ids, String line, String scope, Integer futureDays, String workshop) {
+        LocalDate today = LocalDate.now();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("今天", today.toString());
+
+        List<RowRef> refs = resolveRows(ids, line, scope, workshop);
+        if (refs.isEmpty()) {
+            out.put("日期", List.of());
+            out.put("行", List.of());
+            return out;
+        }
+        List<Long> rowIds = new ArrayList<>();
+        for (RowRef r : refs) rowIds.add(r.id);
+
+        Map<String, Map<String, Double>> plans = plansByDate(rowIds);
+        Map<String, Map<String, Double>> actuals = actualByDate(rowIds);
+        // 日期列**按数据生成**(2026-10-29 用户口径「不存在当前日期的时候不显示这些数据列」):
+        //   = 这些行的日计划/日报工出现过的日期 ∪ 各工序「计划开工~计划完工」区间;
+        //   不再给「今天-14 ~ 今天+14」的固定窗口(那样会满屏空列)。
+        List<String> dates = buildDates(refs, plans, actuals, today);
+        out.put("日期", dates);
+        LocalDate d7 = today.plusDays(7);
+        LocalDate d15 = today.plusDays(15);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (RowRef r : refs) {
+            String key = rowKey(r.id, r.op);
+            Map<String, Double> planAll = plans.getOrDefault(key, Map.of());
+            Map<String, Double> doneAll = actuals.getOrDefault(key, Map.of());
+            double plannedTotal = 0;
+            for (double v : planAll.values()) plannedTotal += v;
+            double doneTotal = 0;
+            for (double v : doneAll.values()) doneTotal += v;
+
+            // 需交付三桶:按交期落桶(逾期归 7 天;无交期归 大于15天)
+            double due7 = 0, due15 = 0, dueOver = 0;
+            if (r.due == null) {
+                dueOver = r.demand;
+            } else {
+                long left = java.time.temporal.ChronoUnit.DAYS.between(today, r.due);
+                if (left <= 7) due7 = r.demand;
+                else if (left <= 15) due15 = r.demand;
+                else dueOver = r.demand;
+            }
+            // 已排三桶:7天/15天为**累计**(≤7 / ≤15,与纸表「7天=15天」同口径),大于15天为 15 天之后的部分
+            double plan7 = 0, plan15 = 0, planOver = 0;
+            for (Map.Entry<String, Double> p : planAll.entrySet()) {
+                LocalDate d = parseDate(p.getKey());
+                if (d == null) continue;
+                if (!d.isAfter(d7)) plan7 += p.getValue();
+                if (!d.isAfter(d15)) plan15 += p.getValue();
+                else planOver += p.getValue();
+            }
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("行id", r.id);
+            row.put("工序", r.op);
+            row.put("交期", r.due == null ? "" : r.due.toString());
+            row.put("交期紧迫度", r.due == null ? null
+                    : java.time.temporal.ChronoUnit.DAYS.between(today, r.due));
+            row.put("需求数量", r.demand);
+            row.put("排产数量", r.planQty);
+            row.put("7天需交付", due7);
+            row.put("15天需交付", due15);
+            row.put("大于15天需交付", dueOver);
+            row.put("7天已排", plan7);
+            row.put("15天已排", plan15);
+            row.put("大于15天已排", planOver);
+            row.put("日计划", slice(planAll, dates));
+            row.put("日报工", slice(doneAll, dates));
+            row.put("计划合计", plannedTotal);
+            row.put("完工合计", doneTotal);
+            rows.add(row);
+        }
+        out.put("行", rows);
+        return out;
+    }
+
+    /**
+     * 写:保存日计划格子。计划数量 &gt; 0 = 写入/覆盖;0 或空 = 软删该格(留痕不物理删)。
+     *
+     * @param cells { 工单行id, 工序, 生产线, 计划日期, 计划数量 }
+     * @param user  当前登录账号
+     */
+    @Transactional
+    public Map<String, Object> save(List<Map<String, Object>> cells, String user) {
+        if (cells == null || cells.isEmpty()) return Map.of("保存格数", 0, "清空格数", 0);
+        if (cells.size() > MAX_SAVE_CELLS) throw new IllegalArgumentException("一次保存的格子过多(" + cells.size() + ")");
+
+        int saved = 0, cleared = 0;
+        for (Map<String, Object> cell : cells) {
+            long rowId = longOf(cell.get("工单行id"));
+            if (rowId <= 0) throw new IllegalArgumentException("缺少工单行id");
+            String op = str(cell.get("工序"));                 // 未排产行允许空工序(计划先行)
+            String dateText = str(cell.get("计划日期"));
+            LocalDate date;
+            try {
+                date = LocalDate.parse(dateText);
+            } catch (RuntimeException ex) {
+                throw new IllegalArgumentException("日期格式应为 yyyy-MM-dd:" + dateText);
+            }
+            double qty = num(cell.get("计划数量"));
+            String line = str(cell.get("生产线"));
+
+            Map<String, Object> wo = woRow(rowId);
+            if (wo == null) throw new IllegalArgumentException("工单行不存在或已作废:" + rowId);
+            String no = str(wo.get("pl_no"));
+            Integer xc = wo.get("pl_xc") instanceof Number n ? n.intValue() : null;
+
+            if (qty <= 0) {
+                cleared += jdbc.update(
+                        "UPDATE dbo.wo_day_plan SET 计划数量=0, asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME()"
+                                + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N'",
+                        user, rowId, op, date);
+                continue;
+            }
+            int n = jdbc.update(
+                    "UPDATE dbo.wo_day_plan SET 计划数量=?, 生产线=?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N'",
+                    qty, line, user, rowId, op, date);
+            if (n == 0) {
+                jdbc.update(
+                        "INSERT INTO dbo.wo_day_plan (工单行id, 工单号, 工单行号, 工序, 计划日期, 计划数量, 生产线,"
+                                + " asp_user1, asp_time1, asp_cancel)"
+                                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, SYSDATETIME(), 'N')",
+                        rowId, no, xc, op, date, qty, line, user);
+            }
+            saved++;
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("保存格数", saved);
+        out.put("清空格数", cleared);
+        return out;
+    }
+
+    // ── 行解析 ──────────────────────────────────────────────────────────
+
+    private record RowRef(long id, String op, LocalDate due, double demand, double planQty) { }
+
+    /** 行集:生产工单页按 id 列表(工序取各行当前工序;当前工序空时回落台账当前道);工单排产页按选中产线 */
+    private List<RowRef> resolveRows(List<Long> ids, String line, String scope, String workshop) {
+        List<RowRef> out = new ArrayList<>();
+        if (ids != null && !ids.isEmpty()) {
+            Map<Long, String> fallback = ledgerCurrentOp(ids);
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT id, ISNULL([当前工序],N'') AS op, CONVERT(varchar(10), cp_date, 120) AS due,"
+                            + " ISNULL(xq_sl,0) AS demand, ISNULL(pl_sl,0) AS plan_qty FROM dbo.plang"
+                            + " WHERE id IN (" + qs(ids.size()) + ") AND ISNULL(asp_cancel,'N')<>'Y'",
+                    ids.toArray())) {
+                long id = ((Number) r.get("id")).longValue();
+                String op = str(r.get("op"));
+                // plang.[当前工序] 可能为空(老数据/未回写)⇒ 用台账"当前道"兜底,否则日计划/日期列会查不到
+                if (op.isEmpty()) op = fallback.getOrDefault(id, "");
+                out.add(new RowRef(id, op, parseDate(str(r.get("due"))),
+                        num(r.get("demand")), num(r.get("plan_qty"))));
+            }
+            return out;
+        }
+        String ln = str(line);
+        if (ln.isEmpty()) return out;
+        String op = processOfLine(ln, workshop);
+        Map<Long, Boolean> seen = new LinkedHashMap<>();
+        for (Map<String, Object> r : board.scheduled(ln, scope, workshop)) {
+            Object ido = r.get("行id");
+            if (!(ido instanceof Number n)) continue;
+            long id = n.longValue();
+            if (seen.putIfAbsent(id, Boolean.TRUE) != null) continue;
+            out.add(new RowRef(id, op, parseDate(str(r.get("计划完工日期"))),
+                    num(r.get("需求数量")), num(r.get("排产数量"))));
+        }
+        return out;
+    }
+
+    /**
+     * 各行「当前道」(plang.[当前工序] 为空时兜底):台账里**已落实**的工序序最大那道;
+     * 一道都没落实的,取工序序最小的第一道。与看板 curOp 同口径。
+     */
+    private Map<Long, String> ledgerCurrentOp(List<Long> ids) {
+        Map<Long, String> out = new HashMap<>();
+        if (ids.isEmpty()) return out;
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT t.rid AS rid, t.op AS op FROM ("
+                        + " SELECT w.工单行id AS rid, ISNULL(w.工序,N'') AS op,"
+                        + "   ROW_NUMBER() OVER (PARTITION BY w.工单行id ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC) AS rn"
+                        + " FROM dbo.wo_process_line w WHERE w.工单行id IN (" + qs(ids.size()) + ")"
+                        + "   AND ISNULL(w.asp_cancel,'N')<>'Y' AND ISNULL(w.状态,N'')=N'已落实') t"
+                        + " WHERE t.rn=1", ids.toArray())) {
+            if (r.get("rid") instanceof Number n) out.put(n.longValue(), str(r.get("op")));
+        }
+        List<Long> rest = new ArrayList<>();
+        for (Long id : ids) if (!out.containsKey(id)) rest.add(id);
+        if (!rest.isEmpty()) {
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT t.rid AS rid, t.op AS op FROM ("
+                            + " SELECT w.工单行id AS rid, ISNULL(w.工序,N'') AS op,"
+                            + "   ROW_NUMBER() OVER (PARTITION BY w.工单行id ORDER BY ISNULL(w.工序序,999), w.id) AS rn"
+                            + " FROM dbo.wo_process_line w WHERE w.工单行id IN (" + qs(rest.size()) + ")"
+                            + "   AND ISNULL(w.asp_cancel,'N')<>'Y') t WHERE t.rn=1", rest.toArray())) {
+                if (r.get("rid") instanceof Number n) out.putIfAbsent(n.longValue(), str(r.get("op")));
+            }
+        }
+        return out;
+    }
+
+    /** 产线 → 工序(成型/切炭/组装;产线档案车间唯一决定,判不出留空) */
+    private String processOfLine(String line, String workshop) {
+        String shop = str(workshop);
+        if (shop.isEmpty()) {
+            List<String> s = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(生产车间,N'') FROM dbo.bs_prod_line WHERE 生产线=?", String.class, line);
+            shop = s.isEmpty() ? "" : str(s.get(0));
+        }
+        if ("成型".equals(shop) || "切炭".equals(shop) || "组装".equals(shop)) return shop;
+        return "";
+    }
+
+    // ── 计划 / 报工 ────────────────────────────────────────────────────
+
+    /**
+     * 日期列:按**数据**生成(2026-10-29 用户口径「不存在当前日期的时候不显示这些数据列」)。
+     *
+     * <p>= 这些行的日计划/日报工出现过的日期 ∪ 各工序台账「计划开工~计划完工」区间。
+     * 不再用「今天-N ~ 今天+M」的固定窗口 —— 那样会出现一整排空列。
+     * 一行数据都没有时兜底给「今天起 20 天」,否则第一次没法录入。
+     */
+    private List<String> buildDates(List<RowRef> refs,
+                                    Map<String, Map<String, Double>> plans,
+                                    Map<String, Map<String, Double>> actuals,
+                                    LocalDate today) {
+        TreeSet<LocalDate> set = new TreeSet<>();
+        LocalDate min = today.minusDays(180);
+        LocalDate max = today.plusDays(365);
+        for (RowRef r : refs) {
+            String key = rowKey(r.id, r.op);
+            collectDates(set, plans.get(key), min, max);
+            collectDates(set, actuals.get(key), min, max);
+        }
+        // 工序台账的计划区间(开工~计划完工)整段显示:还没铺日计划的区间也能看到/能录
+        Map<Long, Set<String>> opsById = new HashMap<>();
+        for (RowRef r : refs) opsById.computeIfAbsent(r.id, k -> new HashSet<>()).add(r.op);
+        List<Long> ids = new ArrayList<>();
+        for (RowRef r : refs) if (!ids.contains(r.id)) ids.add(r.id);
+        if (!ids.isEmpty()) {
+            for (Map<String, Object> w : jdbc.queryForList(
+                    "SELECT 工单行id AS rid, ISNULL(工序,N'') AS op, 计划开工日期 AS s, 计划完工日期 AS e"
+                            + " FROM dbo.wo_process_line WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                            + "   AND 工单行id IN (" + qs(ids.size()) + ")", ids.toArray())) {
+                Object ridObj = w.get("rid");
+                if (!(ridObj instanceof Number rn)) continue;
+                long rid = rn.longValue();
+                String op = str(w.get("op"));
+                if (!opsById.getOrDefault(rid, Set.of()).contains(op)) continue;
+                LocalDate s = toDate(w.get("s"));
+                if (s == null) continue;
+                LocalDate e = toDate(w.get("e"));
+                if (e == null || e.isBefore(s)) e = s;
+                if (java.time.temporal.ChronoUnit.DAYS.between(s, e) > RANGE_CAP_DAYS) e = s.plusDays(RANGE_CAP_DAYS);
+                for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) {
+                    if (!d.isBefore(min) && !d.isAfter(max)) set.add(d);
+                }
+            }
+        }
+        List<String> out = new ArrayList<>();
+        for (LocalDate d : set) out.add(d.toString());
+        if (out.size() > MAX_COLUMNS) out = new ArrayList<>(out.subList(out.size() - MAX_COLUMNS, out.size()));
+        return out;
+    }
+
+    private static void collectDates(Set<LocalDate> set, Map<String, Double> m, LocalDate min, LocalDate max) {
+        if (m == null) return;
+        for (String k : m.keySet()) {
+            LocalDate d = parseDate(k);
+            if (d != null && !d.isBefore(min) && !d.isAfter(max)) set.add(d);
+        }
+    }
+
+    private static LocalDate toDate(Object o) {
+        if (o instanceof java.sql.Date d) return d.toLocalDate();
+        return parseDate(str(o));
+    }
+
+    /** 日计划(全部日期):key = 行id|工序 → 日期 → 数量 */
+    private Map<String, Map<String, Double>> plansByDate(List<Long> ids) {
+        Map<String, Map<String, Double>> out = new LinkedHashMap<>();
+        if (ids.isEmpty()) return out;
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT 工单行id AS rid, ISNULL(工序,N'') AS op, CONVERT(varchar(10), 计划日期, 120) AS d,"
+                        + " SUM(计划数量) AS q FROM dbo.wo_day_plan"
+                        + " WHERE asp_cancel='N' AND 工单行id IN (" + qs(ids.size()) + ")"
+                        + " GROUP BY 工单行id, 工序, 计划日期", ids.toArray())) {
+            if (r.get("rid") == null || r.get("d") == null) continue;
+            out.computeIfAbsent(rowKey(((Number) r.get("rid")).longValue(), str(r.get("op"))),
+                            k -> new LinkedHashMap<>())
+                    .merge(str(r.get("d")), num(r.get("q")), Double::sum);
+        }
+        return out;
+    }
+
+    /**
+     * 报工(全部日期):key = 行id|工序 → 日期 → 数量。
+     * 锚定与看板「当前工序完工量」同口径(gd_id→plang_pc.plang_id;老数据按工单号+批次号兜底)。
+     */
+    private Map<String, Map<String, Double>> actualByDate(List<Long> ids) {
+        Map<String, Map<String, Double>> out = new LinkedHashMap<>();
+        if (ids.isEmpty()) return out;
+        List<String> nos = jdbc.queryForList(
+                "SELECT DISTINCT pl_no FROM dbo.plang WHERE id IN (" + qs(ids.size()) + ")",
+                String.class, ids.toArray());
+        if (nos.isEmpty()) return out;
+        List<Object> args = new ArrayList<>(nos);
+        args.addAll(ids);
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT x.rid AS rid, x.op AS op, CONVERT(varchar(10), x.d, 120) AS d, SUM(x.q) AS q FROM ("
+                        + " SELECT ISNULL(pc.plang_id, fb.pid) AS rid, ISNULL(s.gxdm,N'') AS op,"
+                        + "        CAST(s.sc_date AS date) AS d, ISNULL(s.sl,0) AS q"
+                        + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
+                        + " OUTER APPLY (SELECT TOP 1 p2.id AS pid FROM dbo.plang p2"
+                        + "   WHERE ISNULL(s.gd_id,0)=0 AND p2.pl_no = s.gldh"
+                        + "     AND ISNULL(p2.[批次号],N'') = ISNULL(s.[批次号],N'')"
+                        + "     AND ISNULL(p2.asp_cancel,'N')<>'Y' ORDER BY p2.id) fb"
+                        + " WHERE ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND s.gldh IN (" + qs(nos.size()) + ")"
+                        + ") x WHERE x.rid IN (" + qs(ids.size()) + ") GROUP BY x.rid, x.op, x.d", args.toArray())) {
+            if (r.get("rid") == null || r.get("d") == null) continue;
+            out.computeIfAbsent(rowKey(((Number) r.get("rid")).longValue(), str(r.get("op"))),
+                            k -> new LinkedHashMap<>())
+                    .merge(str(r.get("d")), num(r.get("q")), Double::sum);
+        }
+        return out;
+    }
+
+    /** 只保留窗口内的日期(0/空不输出) */
+    private static Map<String, Double> slice(Map<String, Double> all, List<String> dates) {
+        Map<String, Double> out = new LinkedHashMap<>();
+        for (String d : dates) {
+            Double v = all.get(d);
+            if (v != null && v != 0) out.put(d, v);
+        }
+        return out;
+    }
+
+    // ── 小工具 ──────────────────────────────────────────────────────────
+
+    private Map<String, Object> woRow(long id) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 id, pl_no, pl_xc FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", id);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private static String rowKey(long id, String op) { return id + "|" + (op == null ? "" : op); }
+
+    /** 宽松日期解析:空/非法 → null(用于展示口径;保存路径另有严格校验) */
+    private static LocalDate parseDate(String text) {
+        if (text == null || text.isBlank()) return null;
+        try { return LocalDate.parse(text.trim()); } catch (RuntimeException e) { return null; }
+    }
+
+    private static String qs(int n) { return String.join(",", Collections.nCopies(n, "?")); }
+
+    private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
+
+    private static double num(Object o) {
+        if (o == null) return 0;
+        if (o instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(String.valueOf(o).trim()); } catch (RuntimeException e) { return 0; }
+    }
+
+    private static long longOf(Object o) {
+        if (o instanceof Number n) return n.longValue();
+        try { return Long.parseLong(str(o)); } catch (RuntimeException e) { return 0; }
+    }
+}

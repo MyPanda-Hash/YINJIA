@@ -7,7 +7,7 @@
      参考库口径 pl_sl 是**排产确认量**:默认=需求数量、由排产员人工给定、可小于需求(部分排产);
      它同时是**各道计划数量的基数**(计划数量 = 排产数量 × 该工序换算率,改数量即时重算)。 -->
 <template>
-  <el-dialog v-model="visible" :title="tt('工序路线排线')" width="900px" append-to-body destroy-on-close>
+  <el-dialog v-model="visible" :title="tt('工序路线排线')" width="1180px" append-to-body destroy-on-close>
     <div v-loading="loading" class="prp-body">
       <div class="prp-head">
         <b>{{ tt('工单') }}：{{ no }}</b>
@@ -65,15 +65,37 @@
         <el-table-column :label="tt('计划数量')" width="110" align="right">
           <template #default="{ row }">{{ num(planOf(row)) }}</template>
         </el-table-column>
+        <!-- 计划开工日期(2026-10-29):上一道的「计划完工日期」= 下一道的「计划开工日期」;
+             与「计划完工日期」一起决定日排产按天均摊的天数(保存时自动铺日计划) -->
+        <el-table-column :label="tt('计划开工日期')" width="160">
+          <template #default="{ row, $index }">
+            <el-date-picker v-model="row.计划开工日期" type="date" value-format="YYYY-MM-DD" size="small"
+                            style="width: 100%" @change="(v) => onStartChange($index, v)" />
+          </template>
+        </el-table-column>
         <el-table-column :label="tt('计划完工日期')" width="160">
+          <template #default="{ row, $index }">
+            <el-date-picker v-model="row.计划完工日期" type="date" value-format="YYYY-MM-DD" size="small"
+                            style="width: 100%" @change="(v) => onDueChange($index, v)" />
+          </template>
+        </el-table-column>
+        <!-- 实际开工/实际完工(只读):实际开工 = 台账落实时间(= 上一道实际完工那一刻);
+             实际完工 = 该道已审报工的最大完工时间。计划与实际本来就不一致,分开展示。 -->
+        <el-table-column :label="tt('实际开工')" width="140">
           <template #default="{ row }">
-            <el-date-picker v-model="row.计划完工日期" type="date" value-format="YYYY-MM-DD" size="small" style="width: 100%" />
+            <span class="prp-actual">{{ row['实际开工'] || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('实际完工')" width="140">
+          <template #default="{ row }">
+            <span class="prp-actual">{{ row['实际完工'] || '-' }}</span>
           </template>
         </el-table-column>
       </el-table>
       <div v-if="rows.length" class="prp-dim">
         {{ tt('说明') }}：{{ tt('首道工序的线 = 该工单的排产线(报工闸门按它判已排产);其余各道为预排线,前道报工完工审核后自动转序到下一道的线') }}。
         {{ tt('计划数量 = 本工单行排产数量 × 该工序自己的换算率(各道分开算,不累乘)') }}。
+        {{ tt('上一道的计划完工日期 = 下一道的计划开工日期;保存时按「计划开工 ~ 计划完工」把计划数量均摊成每日计划') }}。
         <!-- 2026-10-28:新工序/未建线车间的行,下拉是**全部启用产线** —— 说明一句,免得以为筛选坏了 -->
         <span v-if="hasOpenLineRow" class="prp-open">
           {{ tt('有工序没有固定车间(或该车间还没有产线),这些行的「生产线」已列出全部启用产线,可任选一条') }}。
@@ -143,6 +165,73 @@ function lineNotInOptions(row) {
 /** 有没有「不限定车间」的行 —— 有就在表格下方提示一句,别让人以为筛选坏了 */
 const hasOpenLineRow = computed(() => rows.value.some((r) => !lineOptions(r, lines.value).limited))
 
+/** 计划完工日变化 → 下一道的计划开工日跟着变,并沿链一路往下传(2026-10-29 用户口径) */
+function onDueChange(index, v) {
+  const next = rows.value[index + 1]
+  if (!next || !v) return
+  // 保留下一道原来的计划时长(完工-开工),整体顺延;原来就是负数/缺失则按 0 天
+  const dur = next['计划开工日期'] && next['计划完工日期']
+    ? daysBetween(next['计划开工日期'], next['计划完工日期']) : 0
+  next.计划开工日期 = v
+  next.计划完工日期 = addDays(v, Math.max(0, dur))
+  onDueChange(index + 1, next.计划完工日期)
+}
+/** 计划开工日晚于计划完工日时,把完工日拉到开工日(避免提交被后端拒),并继续向后传链 */
+function onStartChange(index, v) {
+  const r = rows.value[index]
+  if (!r) return
+  if (v && r.计划完工日期 && v > r.计划完工日期) {
+    r.计划完工日期 = v
+    onDueChange(index, v)
+  }
+}
+
+/**
+ * 打开弹窗时把计划链**规整成一条**:上一道的计划完工日 = 下一道的计划开工日。
+ *
+ * <p>2026-10-29 用户报障(工序路线排线截图):台账里各道日期是历史各次排产留下的,
+ * 打开时出现「成型 10-29~10-31,切炭却 10-08~10-15,装箱 10-30~10-29(开工晚于完工)」——
+ * 计划链没有真正生效。这里在加载后统一收口:第 2 道起开工日=上一道完工日,
+ * **保留该道原来的计划时长**整体顺延;首道缺开工日给今天。
+ */
+function normalizePlanChain() {
+  const today = todayStr()
+  for (let i = 0; i < rows.value.length; i++) {
+    const r = rows.value[i]
+    if (i > 0) {
+      const prev = rows.value[i - 1]
+      if (prev['计划完工日期']) {
+        const dur = r['计划开工日期'] && r['计划完工日期']
+          ? daysBetween(r['计划开工日期'], r['计划完工日期']) : 0
+        r.计划开工日期 = prev['计划完工日期']
+        r.计划完工日期 = addDays(r['计划开工日期'], Math.max(0, dur))
+      }
+    }
+    if (!r['计划开工日期']) r.计划开工日期 = today
+    if (!r['计划完工日期']) r.计划完工日期 = r['计划开工日期']
+    if (r['计划完工日期'] < r['计划开工日期']) r.计划完工日期 = r['计划开工日期']
+  }
+}
+function todayStr() {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+function addDays(text, n) {
+  const [y, m, d] = String(text).split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + n)
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${dt.getFullYear()}-${mm}-${dd}`
+}
+function daysBetween(a, b) {
+  const [y1, m1, d1] = String(a).split('-').map(Number)
+  const [y2, m2, d2] = String(b).split('-').map(Number)
+  return Math.round((new Date(y2, m2 - 1, d2) - new Date(y1, m1 - 1, d1)) / 86400000)
+}
+
 async function load() {
   if (!no.value) return
   loading.value = true
@@ -169,7 +258,13 @@ async function load() {
         限定车间: s['限定车间'] === true,
         // 换算率(2026-10-07:此前映射里漏带该字段 ⇒ 列里恒显示 0)
         换算率: rate > 0 ? rate : 1,
+        // 计划开工/完工(2026-10-29):台账已有值优先;没有则用后端给的计划链默认值
+        // (首道=今天,后续=上一道计划完工日);两者一起决定日排产均摊天数
+        计划开工日期: (had && had['计划开工日期']) || s['计划开工日期'] || '',
         计划完工日期: (had && had['计划完工日期']) || s['计划完工日期'] || '',
+        // 实际开工/实际完工(只读):实际开工=台账落实时间(=上一道实际完工那一刻);实际完工=该道报工最大完工时间
+        实际开工: (had && had['实际开工']) || '',
+        实际完工: s['实际完工'] || '',
         生产线: (had && (had['状态'] === '已落实' ? (had['实际生产线'] || had['计划生产线']) : had['计划生产线'])) || '',
       }
     })
@@ -179,6 +274,9 @@ async function load() {
     // 改线模式(locked)首道本就锁定,lockedFirst 双保险不覆盖。
     const lastFirst = d['上次首道'] && Object.keys(d['上次首道']).length ? d['上次首道'] : null
     applyLineDefaults(rows.value, d['上次产线'] || [], lastFirst, lines.value, { lockedFirst: locked.value })
+    // 计划链规整:台账里的历史日期各排各的(实测 成型 10-29~10-31、切炭 10-08~10-15、
+    // 装箱 10-30~10-29),打开时统一按「上一道完工日 = 下一道开工日」收口,避免出现开工晚于完工
+    normalizePlanChain()
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || tt('读取工艺路线失败'))
     rows.value = []
@@ -202,7 +300,13 @@ async function submit() {
       行id: props.行id ?? undefined,
       排产班组: team.value || undefined,
       排产数量: q,                                  // 2026-10-16:人工给定的排产数量(写 plang.pl_sl + plang_pc 镜像)
-      步骤: rows.value.map((r) => ({ 工序: r.工序, 生产线: r.生产线, 计划完工日期: r['计划完工日期'] || undefined })),
+      步骤: rows.value.map((r) => ({
+        工序: r.工序,
+        生产线: r.生产线,
+        // 计划时间(2026-10-29):上一道计划完工日 = 下一道计划开工日;两者一起决定日排产均摊
+        计划开工日期: r['计划开工日期'] || undefined,
+        计划完工日期: r['计划完工日期'] || undefined,
+      })),
     })
     const d = res.data || {}
     const plan = (d['计划线'] || []).join(' → ')
@@ -225,6 +329,7 @@ watch(() => props.modelValue, (v) => { if (v) load() })
 .prp-demand { color: #909399; font-size: 12px; }
 .prp-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .prp-dim { margin-top: 8px; font-size: 12px; color: #909399; line-height: 1.6; }
+.prp-actual { font-size: 12px; color: #909399; }
 .prp-lock { font-size: 12px; color: #e6a23c; margin-top: 2px; }
 /* 2026-10-28:不限定车间的行(全部产线可选)的标记与提示 */
 .prp-open-tag { margin-left: 4px; }

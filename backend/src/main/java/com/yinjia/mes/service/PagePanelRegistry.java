@@ -135,6 +135,8 @@ public final class PagePanelRegistry {
             {"revoke",   "撤回调拨"},
             {"unclose",  "取消结案"},
             {"print",    "打印"},
+            // 2026-10-29:表格内「日排产」日期列(计划可填)—— 与生产工单页同一动作词
+            {"dayplan",  "日排产"},
     };
 
     private static final String[][] WORK_ORDER_LIST_ACTIONS = {
@@ -147,6 +149,8 @@ public final class PagePanelRegistry {
             {"recipe",  "获取混料配方"},
             {"export",  "导出"},
             {"assign",  "排产"},
+            // 2026-10-29:表格内「日排产」日期列(计划可填)—— 与工单排产页同一动作词
+            {"dayplan", "日排产"},
     };
 
     /**

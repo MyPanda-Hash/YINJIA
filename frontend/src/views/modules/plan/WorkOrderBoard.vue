@@ -53,16 +53,19 @@
         <div class="wb-block">
           <div class="wb-head">
             <span class="wb-block-title">{{ tt('排产明细') }}——{{ sel.line || '-' }}</span>
-            <el-radio-group v-model="scope" size="small" @change="loadScheduled">
+            <el-radio-group v-model="scope" size="small" @change="onScope">
               <el-radio-button value="未完工">{{ tt('未完工') }}</el-radio-button>
               <el-radio-button value="已完工">{{ tt('已完工') }}</el-radio-button>
               <el-radio-button value="全部">{{ tt('全部') }}</el-radio-button>
             </el-radio-group>
             <div class="wb-actions">
-              <!-- 页面级权限(2026-10-16):本页挂页面面板 WORK_ORDER_BOARD
-                   (可见/查询/调拨/撤回调拨/取消结案/打印,词表见后端 PagePanelRegistry)。
-                   无该动作词的角色不显示按钮;后端按同一份 perms 复核(取消结案与打印
-                   与生产工单列表共用端点,故那边授予的同名词亦可放行 —— 见 requireButtonAny)。 -->
+              <!-- 日排产(2026-10-29):保存计划 / 按完工日期均摊(单行);日期列由后端按数据生成,不再选固定天数 -->
+              <el-button v-if="canDayPlan" size="small" type="success" plain :disabled="planDirtyCount === 0" @click="savePlan">
+                {{ tt('保存日排产') }}（{{ planDirtyCount }}）
+              </el-button>
+              <el-button v-if="canDayPlan" size="small" plain :disabled="checkedSched.length !== 1" @click="openSplit">
+                {{ tt('按完工日期均摊') }}
+              </el-button>
               <el-button v-if="canDo('unclose')" size="small" type="danger" plain :disabled="!checkedSched.length" @click="unclose">
                 {{ tt('取消结案') }}（{{ checkedSched.length }}）
               </el-button>
@@ -114,6 +117,26 @@
             </el-table-column>
             <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
             <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
+            <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),紧跟工序完工口径。
+                 每个日期格都可填计划(含今天以前的日期 —— 用户口径「23~28 号填不了」);
+                 格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
+            <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
+            <el-table-column :label="tt('7天需交付')" prop="7天需交付" width="92" align="right" />
+            <el-table-column :label="tt('15天需交付')" prop="15天需交付" width="96" align="right" />
+            <el-table-column :label="tt('大于15天需交付')" prop="大于15天需交付" width="112" align="right" />
+            <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
+            <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
+            <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
+            <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="right">
+              <template #default="{ row }">
+                <el-input-number v-if="canDayPlan" v-model="row.日计划[d]" size="small"
+                                 :controls="false" :min="0" class="dp-input" @change="markCell(row, d)" />
+                <span v-else>{{ qtyText((row.日计划 || {})[d]) }}</span>
+                <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
+                  {{ qtyText(row.日报工[d]) }}
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
               <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
             </el-table-column>
@@ -172,6 +195,11 @@
       </template>
     </el-dialog>
 
+    <!-- 按完工日期均摊(2026-10-29):把该行剩余量铺到 起点~完工日,填进日期列后再保存 -->
+    <DayPlanSplitDialog v-model="splitVisible" :工单号="splitRow['加工单号'] || ''" :工单行号="splitRow['工单行号']"
+                        :工序="splitRow['工序日'] || splitRow['当前工序'] || ''" :剩余="splitRemain"
+                        :完工日期="splitDueDefault" @apply="applySplit" />
+
     <!-- 工单详情·追溯:共用组件 WorkOrderTraceDialog(2026-10-05;生产工单页也原地挂同一个) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
   </div>
@@ -184,8 +212,11 @@ import request from '@core/request'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
+import DayPlanSplitDialog from './DayPlanSplitDialog.vue'
+import { qtyText } from '@/business/dayPlan'
+import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
-import { canDo as canDoPerm } from '@core/auth/panelAccess'
+import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
 
 /**
  * 页面级动作权限(2026-10-16):页面面板 WORK_ORDER_BOARD
@@ -246,7 +277,7 @@ const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.�
 
 function select(l) {
   sel.line = l.生产线
-  loadScheduled()
+  loadScheduled().then(() => loadDayPlan())
 }
 
 async function loadSummary() {
@@ -263,7 +294,8 @@ async function loadScheduled() {
   if (!sel.line) { schedRows.value = []; return }
   try {
     const res = await request.post('/px/scheduleBoard/scheduled', { 生产线: sel.line, scope: scope.value })
-    schedRows.value = res.data || []
+    // 日期列(2026-10-29):先给每行挂上空的日计划/日报工,模板里的 v-model 才有可写路径
+    schedRows.value = (res.data || []).map((r) => ({ ...r, 日计划: {}, 日报工: {} }))
   } catch (e) { err(e, '查询失败') }
 }
 
@@ -274,11 +306,116 @@ async function loadStats() {
   } catch { /* 统计失败不阻断 */ }
 }
 
-function loadAll() {
+// ───────── 日排产(2026-10-29):直接长在排产明细表的日期列 ─────────
+// 用户口径:「在当前的表格内容处插入当前设定的日排产数量,修改需要针对当前生产工单和工单排产中都要实现」
+//   ⇒ 不新增表格/块。窗口内**每一天都可填计划**(含今天以前的日期);格下方小字=当天已审核报工量;
+//     「保存日排产」落库;「按完工日期均摊」把剩余量铺到 起点~完工日,仍需点保存。
+const planDates = ref([])
+const planToday = ref('')
+/** 待保存的改动:key = 行id|日期 */
+const planDirty = reactive(new Map())
+const planDirtyCount = computed(() => planDirty.size)
+const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_BOARD', 'WORK_ORDER_LIST'], 'dayplan'))
+
+async function loadDayPlan() {
+  if (!sel.line) { planDates.value = []; planToday.value = ''; planDirty.clear(); return }
+  try {
+    const data = await fetchDayPlan({ 生产线: sel.line, scope: scope.value })
+    planDates.value = data['日期'] || []
+    planToday.value = data['今天'] || ''
+    const byId = new Map()
+    for (const p of data['行'] || []) byId.set(String(p['行id']), p)
+    for (const row of schedRows.value) {
+      const p = byId.get(String(row.行id))
+      row.工序日 = p ? p['工序'] : (row.当前工序 || '')
+      row.日计划 = { ...((p && p['日计划']) || {}) }
+      row.日报工 = { ...((p && p['日报工']) || {}) }
+      row._原计划 = { ...row.日计划 }
+      // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
+      if (p) {
+        for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
+          '7天需交付', '15天需交付', '大于15天需交付',
+          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计']) row[k] = p[k]
+      }
+    }
+    planDirty.clear()
+  } catch (e) { err(e, '查询失败') }
+}
+
+/** 单元格改动 → 记入待保存(与加载时的原值比较,改回原值则移出) */
+function markCell(row, d) {
+  const v = Number(row.日计划[d] || 0)
+  const o = Number((row._原计划 || {})[d] || 0)
+  const key = `${row.行id}|${d}`
+  if (v === o) { planDirty.delete(key); return }
+  planDirty.set(key, {
+    工单行id: row.行id,
+    工序: row.工序日 || row.当前工序 || '',
+    生产线: row.生产线 || sel.line,
+    计划日期: d,
+    计划数量: v,
+  })
+}
+
+async function savePlan() {
+  const cells = [...planDirty.values()]
+  if (!cells.length) { ElMessage.info(tt('没有需要保存的改动')); return }
+  try {
+    const d = await saveDayPlan(cells)
+    ElMessage.success(`${tt('日排产已保存')}（${d['保存格数'] ?? 0}）`)
+    await loadDayPlan()
+  } catch (e) { err(e, '保存失败') }
+}
+
+// 按完工日期均摊:单行(与「排产」同口径一次只处理一行),填进表格后再保存
+const splitVisible = ref(false)
+const splitRow = ref({})
+const splitRemain = computed(() => {
+  const r = splitRow.value || {}
+  const plan = Number(r['当前工序计划量'] || 0)
+  const done = Number(r['当前工序完工量'] || 0)
+  const left = plan - done
+  return left > 0 ? left : Number(r['排产数量'] || 0)
+})
+function openSplit() {
+  const r = checkedSched.value[0]
+  if (!r) return
+  splitRow.value = r
+  splitVisible.value = true
+}
+/** 均摊的默认完工日:取该行计划完工日期;超出窗口右端时夹到最后一天(窗口已按最晚完工日自动延长) */
+const splitDueDefault = computed(() => {
+  const due = String(splitRow.value['计划完工日期'] || '')
+  const last = planDates.value[planDates.value.length - 1] || ''
+  if (due && last && due > last) return last
+  return due || last
+})
+/** 清空该行窗口内计划后按均摊结果重填(窗口内每一天都可填,含今天以前的日期) */
+function applySplit({ map }) {
+  const row = splitRow.value
+  const all = Object.keys(map)
+  // 均摊可能落到当前列之外 ⇒ 把新日期并入列(排序),否则"填了但看不到"
+  const merged = [...new Set([...planDates.value, ...all])].sort()
+  if (merged.length !== planDates.value.length) planDates.value = merged
+  for (const d of planDates.value) row.日计划[d] = undefined
+  for (const d of all) row.日计划[d] = map[d]
+  for (const d of planDates.value) markCell(row, d)
+  ElMessage.info(tt('已填充到表格,请点「保存日排产」'))
+}
+
+/** 页签(未完工/已完工/全部)变化:排产明细 + 日排产一起换 */
+function onScope() {
+  loadScheduled().then(() => loadDayPlan())
+}
+
+async function loadAll() {
   // 刷新按钮的 loading(2026-10-17):三个请求各自内部吞异常(不阻断其余取数),
   // 故 Promise.all 只会全部成功 ⇒ finally 收口即可。
   loading.value = true
-  return Promise.all([loadSummary(), loadScheduled(), loadStats()]).finally(() => { loading.value = false })
+  try {
+    await Promise.all([loadSummary(), loadScheduled(), loadStats()])
+    await loadDayPlan()
+  } finally { loading.value = false }
 }
 
 /**
@@ -372,7 +509,8 @@ async function printTask(mode) {
     批号: r.批号 || '', 物料编码: r.物料编码 || '',
     排产数量: r.排产数量, 生产线: r.生产线 || sel.line || '',
   }))
-  const okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: sel.line || '', preparedBy: useUserStore().realName })
+  // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
+  const okPrint = await printWorkTaskSheet(mode, rowsToPrint)
   if (!okPrint) return
   try {
     // 行级留痕(2026-10-15):带 行id + 公司代码 + 批次号,后端按 plang.id 精确定位(原只传加工单号,
@@ -482,6 +620,10 @@ onMounted(() => {
 .wb-warn { color: #f56c6c; font-weight: 600; }
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* 日排产日期列(2026-10-29):格内输入计划,格下小灰字=该天已审核报工量 */
+.dp-done { color: #909399; }
+.dp-input { width: 72px; }
+.dp-act { font-size: 11px; color: #909399; line-height: 1.1; }
 .wb-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; flex-wrap: wrap; }
 .wb-block-title { font-weight: 600; font-size: 13px; color: #303133; }
 .wb-actions { margin-left: auto; }
