@@ -732,6 +732,12 @@ public class ButtonService {
             jdbc.update("UPDATE rd_prod_info_head SET 编辑人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     realNameOf(user), no);
         }
+        // 产品信息表保存(提交审批口径) ⇒ 同步刷新它那张**物料清单**,并把它置为**草稿**。
+        // 2026-10-30 用户口径:「产品信息表处于审批的时候,物料清单是草稿状态;审批通过归档的时候
+        //   物料清单也同时归档」—— 归档那半在 markArchived(唯一归档入口)里做,这里做"进审批那半",
+        //   这样在审批期间打开物料清单看到的是草稿 + 当前 BOM,而不是"什么都没有/上次归档的旧状态"。
+        // 只在 markSaved(真提交/保存)时同步:纯存草稿不动物料清单,免得填一半的 BOM 就被写进去。
+        if (markSaved && "RD_PROD_INFO".equals(def.code())) syncProdBomToMaterialList(no, user, false);
         // 组装工艺清单「表单管理人」= 当前编辑人的账号姓名(2026-10-28 用户口径:
         //   「组装工艺的表单管理人修改为编辑人的账号姓名,选择产品编号之后就自动带入,
         //    或者进行其他编辑也自动带入」)。
@@ -1375,7 +1381,52 @@ public class ButtonService {
         // 产品信息表归档 ⇒ BOM 明细同步写入物料清单(mate)。
         // 挂在这里是因为 markArchived 是**唯一的归档入口**:保存即归档 / 审批通过 /
         // 二级审批通过 / 再归档,四条路最后都汇到本方法 —— 挂别处必漏。
-        if ("RD_PROD_INFO".equals(panelCode)) syncProdBomToMaterialList(no, user);
+        if ("RD_PROD_INFO".equals(panelCode)) {
+            // 2026-10-30 用户口径:「产品信息表处于审批的时候,物料清单是草稿状态;
+            //   审批通过归档的时候物料清单也同时归档」⇒ 同步行数据时按 archived=true 写状态。
+            syncProdBomToMaterialList(no, user, true);
+        }
+    }
+
+    /**
+     * 把「这个产品对应的那张物料清单」标成已归档。
+     *
+     * <p>物料清单(WLBOM)在这套流程里是产品信息表的**从属单据**:它不自己走审批,
+     * 状态完全跟随产品信息表(2026-10-30 用户口径)。所以这里不走 {@link #markArchived}
+     * (那条路还会顺带做受控/文件受控等文件类面板的事),只写状态位。
+     */
+    private void markMaterialListArchived(String prodNo, String user) {
+        try {
+            jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?)) AS s(doc_no) "
+                            + "ON t.panel_code = 'WLBOM' AND t.doc_no = s.doc_no "
+                            + "WHEN MATCHED THEN UPDATE SET archived = 'Y', pending = 'N', saved = 1, "
+                            + "shr = CASE WHEN t.shr IS NULL THEN ? ELSE t.shr END, "
+                            + "shsj = CASE WHEN t.shsj IS NULL THEN GETDATE() ELSE t.shsj END, "
+                            + "archived_at = CASE WHEN t.archived_at IS NULL THEN GETDATE() ELSE t.archived_at END, "
+                            + "update_at = GETDATE() "
+                            + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, saved, shr, shsj, archived_at, update_at) "
+                            + "VALUES ('WLBOM', s.doc_no, 'Y', 'N', 1, ?, GETDATE(), GETDATE(), GETDATE());",
+                    prodNo, user, user);
+        } catch (Exception e) {
+            log.warn("[BOM→物料清单] 物料清单 {} 归档标记失败(不影响产品信息表归档): {}", prodNo, e.toString());
+        }
+    }
+
+    /**
+     * 把物料清单退回**草稿**(产品信息表还在审批 / 被退回时)。
+     * 与 {@link #markMaterialListArchived} 对称:只动状态位,不碰行数据。
+     */
+    private void markMaterialListDraft(String prodNo, String user) {
+        try {
+            jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?)) AS s(doc_no) "
+                            + "ON t.panel_code = 'WLBOM' AND t.doc_no = s.doc_no "
+                            + "WHEN MATCHED THEN UPDATE SET archived = NULL, pending = 'N', saved = 1, update_at = GETDATE() "
+                            + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, saved, update_at) "
+                            + "VALUES ('WLBOM', s.doc_no, NULL, 'N', 1, GETDATE());",
+                    prodNo);
+        } catch (Exception e) {
+            log.warn("[BOM→物料清单] 物料清单 {} 退回草稿失败: {}", prodNo, e.toString());
+        }
     }
 
     /**
@@ -1413,25 +1464,26 @@ public class ButtonService {
      * "物料清单没写进去"而失败,单子会卡在未归档(比不同步更糟);而物料清单可随时靠
      * 重新归档重算 —— 幂等,补得回来。
      */
-    private void syncProdBomToMaterialList(String no, String user) {
+    private String syncProdBomToMaterialList(String no, String user, boolean archived) {
+        String prodNoOut = null;
         try {
-            if (no == null || no.isBlank()) return;
+            if (no == null || no.isBlank()) return null;
             PanelRegistry.PanelDef def = registry.panel("RD_PROD_INFO");
-            if (def == null) return;
+            if (def == null) return null;
             String headTbl = def.headTable();
             String dtlTbl = def.lineTable();   // PanelDef 里明细表叫 lineTable(不是 detailTable)
-            if (headTbl == null || headTbl.isBlank() || dtlTbl == null || dtlTbl.isBlank()) return;
+            if (headTbl == null || headTbl.isBlank() || dtlTbl == null || dtlTbl.isBlank()) return null;
 
             // ── 表头:产品编号(定位键)/ 单据日期 / 产品名称 ──
             java.util.List<java.util.Map<String, Object>> heads = jdbc.queryForList(
                     "SELECT TOP 1 [产品编号], [产品名称], [单据日期] FROM [" + headTbl + "] WHERE ["
                             + def.groupCol() + "] = ?", no);
-            if (heads.isEmpty()) return;
+            if (heads.isEmpty()) return null;
             java.util.Map<String, Object> h = heads.get(0);
             String prodNo = safeStr(h.get("产品编号"));
             if (prodNo.isBlank()) {
                 log.warn("[BOM→物料清单] 产品信息表 {} 没有产品编号,跳过同步(物料清单以产品编号为准)", no);
-                return;
+                return null;
             }
 
             // ── 明细:物料编号 / 物料名称 / 尺寸规格 / 数量 ──
@@ -1440,7 +1492,7 @@ public class ButtonService {
                             + def.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [序号]", no);
             if (rows.isEmpty()) {
                 log.info("[BOM→物料清单] 产品信息表 {} (产品编号 {}) 没有 BOM 明细,跳过同步", no, prodNo);
-                return;
+                return null;
             }
 
             // ── 覆盖更新:先清该产品编号的旧子件(mate 一行 = 一个子件,表头信息重复携带)──
@@ -1460,10 +1512,14 @@ public class ButtonService {
             }
             log.info("[BOM→物料清单] 产品信息表 {} → 物料清单 {} :覆盖 {} 行、写入 {} 行",
                     no, prodNo, del, ins);
+            // 状态跟随产品信息表:归档时=已归档,保存(还在审批)时=草稿(2026-10-30 用户口径)
+            if (archived) markMaterialListArchived(prodNo, user); else markMaterialListDraft(prodNo, user);
+            prodNoOut = prodNo;
         } catch (Exception e) {
             // 不抛:归档主流程优先(见方法注释)
             log.warn("[BOM→物料清单] 产品信息表 {} 同步失败(归档已照常完成):{}", no, e.getMessage());
         }
+        return prodNoOut;
     }
 
     /** 安全取字符串(空/null → "") —— 注意与类里已有的 {@link #str(Object)}(返回 null)区分:
@@ -7382,3 +7438,4 @@ public class ButtonService {
         return out;
     }
 }
+

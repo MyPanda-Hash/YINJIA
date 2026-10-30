@@ -4406,3 +4406,4 @@ migrate-mold-proc-rename-20261030.sql
 migrate-x-sinter-spec-ref-20261030.sql
 migrate-prod-mold-panel-20261030.sql
 migrate-prod-mold-retire-old-20261030.sql
+migrate-bom-material-list-status-20261030.sql
