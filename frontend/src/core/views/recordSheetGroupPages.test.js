@@ -43,22 +43,27 @@ test('组件要向下暴露 groupPages / setViewGroup / getViewGroup（打印与
 })
 
 test('导出 PDF：按「页 × 组」两层出纸，且收尾还原页签与分组', () => {
-  const fn = list.slice(list.indexOf('async function buildSheetPdfBlob'), list.indexOf('async function buildSheetPdfBlob') + 3200)
-  assert.match(fn, /const groups = Array\.isArray\(comp\?\.groupPages\)/, '导出要读 groupPages')
+  // 2026-10-30 起「逐页截图」这段被抽成 collectSheetShots（导出 PDF 与打印共用同一份走纸逻辑）
+  const at = list.indexOf('async function collectSheetShots')
+  const fn = list.slice(at, at + 3200)
+  assert.match(fn, /const groups = Array\.isArray\(comp\?\.groupPages\)/, '采集要读 groupPages')
   assert.match(fn, /for \(const gv of perGroup\)/, '每组各截一张')
   assert.match(fn, /comp\.setViewGroup\(startGroup\)/, '收尾要把分组切回来，别把界面停在别的设备上')
+  // 导出必须仍走这份采集，否则两条路的版式会各自漂移
+  const pdfAt = list.indexOf('async function buildSheetPdfBlob')
+  assert.match(list.slice(pdfAt, pdfAt + 800), /await collectSheetShots\(\)/, '导出 PDF 必须复用 collectSheetShots')
 })
 
-test('打印：多组时先出 PDF 再打印（window.print 只能印当前 DOM）', () => {
-  // 切片到下一个顶层函数为止(函数体随缩放逻辑变长,固定长度会截断——2026-10-29 踩到)
+test('打印：多页签/多组走逐张出纸（window.print 只能印当前 DOM）', () => {
   const at = list.indexOf('async function printApprovalSheet')
   const nx = list.indexOf('\nasync function ', at + 10)
   const fn = list.slice(at, nx > at ? nx : at + 5000)
   assert.match(fn, /const groups = Array\.isArray\(comp\?\.groupPages\)/, '打印要读 groupPages')
   // 2026-10-29 条件扩成「多页签 或 多组」:多页签同样只能靠逐张截图出纸
   // (window.print 只印当前页签那一张)。见 sheetPrintAllTabs.test.js。
-  assert.match(fn, /if \(pageCount > 1 \|\| groups\.length > 1\)/, '多页签或多组都走 PDF 路径')
-  assert.match(fn, /buildSheetPdfBlob\(\)/, '与导出共用同一份实现')
+  // 2026-10-30 起出纸实现改为 openSheetPrint（写 HTML + 原生打印预览，不再交 blob PDF 给阅读器）。
+  assert.match(fn, /if \(pageCount > 1 \|\| groups\.length > 1\)/, '多页签或多组都走逐张出纸')
+  assert.match(fn, /openSheetPrint\(/, '逐张出纸走 openSheetPrint')
   // 单组/单页面板仍走老的 window.print()
   assert.match(fn, /window\.print\(\)/, '单组保留原生打印路径')
 })

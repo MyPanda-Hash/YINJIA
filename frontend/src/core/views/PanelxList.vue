@@ -2446,6 +2446,7 @@ import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
+import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, sheetPrintHtml } from '@core/panel/sheetPrintHtml'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
 import { useUnsavedStore } from '@/stores/unsaved'
 
@@ -7072,7 +7073,12 @@ async function snapSheetPage(el, domToPng) {
     if (holder) holder.remove()
   }
 }
-async function buildSheetPdfBlob() {
+/**
+ * 采集「页 × 组」的纸张截图 —— 打印与导出**共用同一份走纸逻辑**。
+ * 版式只有一处实现：改一处两条路一起变，不会出现「导出的对、打印的不对」。
+ * @returns {{shots: Array<{dataUrl,w0,h0}>, name: string, pageCount: number, groupCount: number}|null}
+ */
+async function collectSheetShots() {
   const comp = approvalSheetRef.value
   const el0 = comp?.$el
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
@@ -7080,7 +7086,7 @@ async function buildSheetPdfBlob() {
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
     + '.approval-layout .qr-sheet')
   if (!el || !(el instanceof HTMLElement)) return null
-  const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
+  const [{ domToPng }] = await Promise.all([import('modern-screenshot')])
   await nextTick()
   // 多页签文书的页数由 RecordSheetPanels 暴露(单页/非记录纸组件恒为 1)
   const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
@@ -7117,9 +7123,23 @@ async function buildSheetPdfBlob() {
     await nextTick()
   }
   if (!shots.length) return null
+  const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
+  return {
+    shots,
+    name: `${panelName.value}-${no || '导出'}`,
+    pageCount,
+    groupCount: Math.max(1, groups.length),
+  }
+}
+async function buildSheetPdfBlob() {
+  const r = await collectSheetShots()
+  if (!r) return null
+  const { jsPDF } = await import('jspdf')
+  const shots = r.shots
   // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
   // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证物理尺寸可预期。
-  const MM = 25.4 / 96
+  // （纸张/边距/换算三个常量与打印页 HTML 共用 core/panel/sheetPrintHtml.js，别各写一份）
+  const MM = SHEET_MM
   /**
    * 纸张统一为 **A4 竖向**(210×297mm),不再按每张截图的实际尺寸出纸。
    *
@@ -7133,9 +7153,9 @@ async function buildSheetPdfBlob() {
    *   固定 A4 竖向后:① 每页方向尺寸完全一致;② 与单页面板走 window.print() 的观感一致
    *   (浏览器默认也是 A4 竖向、按纸宽缩放);③ 内容**等比**缩放居中,列宽比例不变(不拉伸)。
    */
-  const PAGE_W = 210
-  const PAGE_H = 297
-  const MARGIN = 8            // 页边距(mm),与 CSS @page { margin: 8mm } 同口径
+  const PAGE_W = SHEET_PAGE_W
+  const PAGE_H = SHEET_PAGE_H
+  const MARGIN = SHEET_MARGIN
   const contentW = PAGE_W - MARGIN * 2
   const contentH = PAGE_H - MARGIN * 2
   const pdf = new jsPDF({
@@ -7157,8 +7177,67 @@ async function buildSheetPdfBlob() {
     const x = MARGIN + (contentW - w) / 2
     pdf.addImage(s.dataUrl, 'PNG', x, MARGIN, w, h)
   })
-  const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
-  return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
+  return { blob: pdf.output('blob'), name: `${r.name}.pdf` }
+}
+
+/* ══════════ 打印 / 打印预览：不再依赖浏览器 PDF 阅读器（2026-10-30 二次修正）══════════
+ *
+ * 【为什么放弃"新窗口打开 PDF blob"】用户回帖：「然后还会显示浏览器拦截了打印，改为下载，
+ *   是因为我现在没有连接打印机吗？但是不应该是有那个打印页面吗？」，截图里新标签页停在
+ *   **about:blank**。这说明窗口开出来了（同步开窗已生效），但浏览器**拒绝把 blob PDF 内联渲染**、
+ *   直接当下载处理 —— 典型是 Chrome/Edge 的「下载 PDF 文件，而不是自动在浏览器中打开」设置
+ *   （或企业策略 AlwaysOpenPdfExternally）。这跟有没有接打印机**无关**：打印对话框由浏览器提供，
+ *   没装打印机时会给出「另存为 PDF」目标。
+ *
+ * 【现在的做法】把每页截图直接写进那个新窗口（A4 版面 + 每张纸一页），再唤 `win.print()`：
+ *   · 全程不经过 PDF 阅读器 ⇒ 上面那条设置/策略再也影响不到；
+ *   · 看到的就是浏览器**原生打印预览**（可打印、可另存为 PDF、可缩放）；
+ *   · 走纸版式与"导出 PDF"仍用同一份截图与同一套 mm 换算，两者观感一致。
+ *
+ * 【分页算术去哪了】挪到 core/panel/sheetPrintHtml.js（纯函数 + 9 条单测）：纸张/边距/96dpi
+ *   三个常量也在那里，导出 PDF 的 jsPDF 布局直接复用，不再各写一份。
+ */
+/**
+ * 打开「打印预览」窗口。
+ * ⚠ 窗口必须**同步**先开（调用方在点击事件里立即调用本函数）：截图要好几秒，
+ *   await 之后再 window.open 会被浏览器当弹窗拦掉。
+ * @param {string} loadingText 生成中的提示文案（走 tt()）
+ */
+async function openSheetPrint(loadingText) {
+  const win = window.open('', '_blank')
+  const loadingMsg = ElMessage({ message: tt(loadingText), duration: 0 })
+  try {
+    const r = await collectSheetShots()
+    if (!r) {
+      if (win && !win.closed) win.close()
+      ElMessage.warning(tt('未找到可导出的单据'))
+      return
+    }
+    if (!win || win.closed) {
+      // 同步开窗基本不会被拦；真被拦了不能装作成功（旧实现的"改为下载"就是这么来的）
+      ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+      return
+    }
+    const doc = win.document
+    doc.open()
+    doc.write(sheetPrintHtml(r.shots, r.name, tt('打印')))
+    doc.close()
+    // 等图片解码完再唤打印：data URL 多半是同步的，但不等就可能印出空白页
+    await Promise.all(Array.from(doc.images).map((im) => (
+      im.complete && im.naturalWidth
+        ? Promise.resolve()
+        : new Promise((res) => { im.onload = res; im.onerror = res })
+    )))
+    win.focus()
+    win.print()
+    ElMessage.success(tt('已打开打印预览（共 {n} 张），可直接打印').replace('{n}', String(r.shots.length)))
+  } catch (e) {
+    if (win && !win.closed) win.close()
+    console.error('sheet-print failed', e)
+    ElMessage.error(tt('打印失败') + ':' + (e?.message || ''))
+  } finally {
+    loadingMsg.close()
+  }
 }
 /** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机 */
 async function exportSheetPdf() {
@@ -7188,24 +7267,16 @@ async function exportSheetPdf() {
  * 打印/缩放/另存为,所见即所得(用户口径「打印预览也需要实现」)。
  * ⚠ 窗口必须**同步**先开(否则 await 之后被浏览器当弹窗拦截),拿到 blob 再指向它。
  */
+/**
+ * 打印预览(导出菜单里的「打印预览」):与「打印」按钮**同一个窗口、同一份版面**。
+ *
+ * 2026-10-30 第二次修正:原先是把 PDF blob 塞进新标签页,指望浏览器自带 PDF 阅读器来预览。
+ *   用户机器上浏览器把 blob PDF 当下载处理(设置/策略),于是预览变成下载、标签页停在 about:blank
+ *   ⇒ 改成写 HTML 页面 + 原生打印预览(见 openSheetPrint 注释)。
+ */
 async function previewSheetPdf() {
   exportFmtVisible.value = false
-  const win = window.open('', '_blank')
-  const loadingMsg = ElMessage({ message: tt('正在生成打印预览…'), duration: 0 })
-  try {
-    const r = await buildSheetPdfBlob()
-    if (!r) { if (win) win.close(); ElMessage.warning(tt('未找到可导出的单据')); return }
-    const url = URL.createObjectURL(r.blob)
-    if (win) win.location.href = url
-    else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
-    setTimeout(() => URL.revokeObjectURL(url), 120000)
-  } catch (e) {
-    if (win) win.close()
-    console.error('pdf-preview failed', e)
-    ElMessage.error(tt('导出失败'))
-  } finally {
-    loadingMsg.close()
-  }
+  await openSheetPrint('正在生成打印预览…')
 }
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {
@@ -7291,43 +7362,11 @@ async function printApprovalSheet() {
   const comp = approvalSheetRef.value
   const groups = Array.isArray(comp?.groupPages) ? comp.groupPages : []
   const pageCount = Math.max(1, Number(comp?.pageCount) || 1)
-  // 多页签 或 多组 ⇒ 都要出多张纸,只能走 PDF(见上)
+  // 多页签 或 多组 ⇒ 当前 DOM 只看得见一个页签/一组,必须逐页截图再排成多张纸
   if (pageCount > 1 || groups.length > 1) {
-    /**
-     * ⚠ 窗口必须**同步**先开 —— 2026-10-30 用户报障「产品规格书打印会直接下载文件，
-     *   而不是打印预览」的**唯一**病根就在这:
-     *   buildSheetPdfBlob 是 html2canvas 逐页截图拼 PDF,要好几秒;旧写法 `await` 之后才
-     *   `window.open(url)`，此时用户手势(transient activation)早已过期，浏览器把它当**弹窗**拦掉，
-     *   返回 null ⇒ 一路落到下面的「改为下载 PDF」兜底 ⇒ 用户看到的是下载而不是预览。
-     *   现在照 previewSheetPdf 的做法:先同步开一张空白页占位，拿到 blob 再指过去。
-     */
-    const win = window.open('', '_blank')
-    const loadingMsg = ElMessage({ message: tt('正在生成打印件…'), duration: 0 })
-    try {
-      const r = await buildSheetPdfBlob()
-      if (!r) { if (win && !win.closed) win.close(); ElMessage.warning(tt('未找到可导出的单据')); return }
-      const url = URL.createObjectURL(r.blob)
-      if (win && !win.closed) {
-        win.location.href = url
-        // 张数 = 页签数 × 组数(与 buildSheetPdfBlob 的「页 → 组」两层循环同口径)
-        const n = pageCount * Math.max(1, groups.length)
-        ElMessage.success(tt('已打开打印件（共 {n} 张），可直接打印').replace('{n}', String(n)))
-      } else {
-        // 占位页被用户关了 / 浏览器仍拦截 ⇒ 退回下载,至少不丢
-        const a = document.createElement('a')
-        a.href = url
-        a.download = r.name
-        a.click()
-        ElMessage.warning(tt('浏览器拦截了新窗口，已改为下载 PDF'))
-      }
-      // 120s 才回收:打印对话框可能开很久,中途 revoke 会让 PDF 变白页
-      setTimeout(() => URL.revokeObjectURL(url), 120000)
-    } catch (e) {
-      if (win && !win.closed) win.close()
-      ElMessage.error(tt('打印失败') + ':' + (e?.message || ''))
-    } finally {
-      loadingMsg.close()
-    }
+    // 走 openSheetPrint:同步开窗 → 逐页截图 → 写 HTML → 原生打印预览。
+    // 两次踩坑记录见 openSheetPrint 上方注释（① await 后开窗被当弹窗；② blob PDF 被浏览器当下载）。
+    await openSheetPrint('正在生成打印件…')
     return
   }
   if (!approvalSheetRef.value) return

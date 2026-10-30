@@ -1165,6 +1165,7 @@ export default {
     '浏览器拦截了新窗口，请允许弹出窗口': 'The browser blocked the new tab, please allow pop-ups',
     '正在生成打印件…': 'Generating print copy...',
     '已打开打印件（共 {n} 张），可直接打印': 'Print copy opened ({n} pages), ready to print',
+    '已打开打印预览（共 {n} 张），可直接打印': 'Print preview opened ({n} pages), ready to print',
     '浏览器拦截了新窗口，已改为下载 PDF': 'The browser blocked the new tab; the PDF was downloaded instead',
     '在本行下方插入一行': 'Insert a row below this one',
     '选择关联单据': 'Select linked document',
