@@ -2600,6 +2600,7 @@ export default {
     '只读查看:领料与退料请到「生产领料」里操作': 'Chỉ xem: xuất và trả hàng làm ở "Xuất vật tư sản xuất"',
     '需求': 'Cần',
     '这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。': 'Phiếu đã hoàn tất. Để trả hàng, nhấn bên dưới; sẽ tạo phiếu nhập.',
+    '请扫物料码': 'Vui lòng quét mã vật tư',
   },
 
 }

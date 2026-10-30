@@ -2595,6 +2595,7 @@ export default {
     '只读查看:领料与退料请到「生产领料」里操作': 'Nur Ansicht: Entnahme und Rückgabe unter „Produktionsentnahme"',
     '需求': 'Bedarf',
     '这张领料单已完成并过账。如需退料,点下面的按钮开始扫码退料,提交后生成其他入库单。': 'Beleg abgeschlossen. Zum Zurückgeben unten tippen; es entsteht ein Eingang.',
+    '请扫物料码': 'Bitte Materialcode scannen',
   },
 
 }

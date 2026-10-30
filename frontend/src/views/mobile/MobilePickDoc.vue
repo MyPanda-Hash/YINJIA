@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30 第三轮改版)
 
   【两种状态,两套动作】
@@ -168,13 +168,18 @@
       <div class="mp-sec">
         <span>{{ returnMode ? tt('选择要退的物料') : tt('领料明细') }}</span>
         <span class="mp-sec-num">{{ rows.length }}</span>
+        <!-- 列头(2026-10-30 用户口径「这里应该加个 已领/需求」):
+             两侧数字各自有含义,不写列头会让人以为"0"是需求没填 -->
+        <span v-if="!returnMode" class="mp-sec-note mp-colhint">
+          {{ tt('已领') }} / {{ tt('需求') }}
+        </span>
       </div>
       <div v-if="!rows.length" class="mp-empty">{{ tt('没有明细') }}</div>
       <div
         v-for="r in rows"
         :key="r.行号"
         class="mp-line"
-        :class="{ 'is-cur': cur && cur.编码 === r.编码, 'is-ret': returnMode && qtyOf(r.编码) > 0, 'is-ro': rowLocked }"
+        :class="{ 'is-cur': (cur && cur.编码 === r.编码) || (curRow && curRow.编码 === r.编码), 'is-ret': returnMode && qtyOf(r.编码) > 0, 'is-ro': rowLocked }"
         @click="!rowLocked && pickRow(r)"
       >
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
@@ -183,14 +188,18 @@
           <div class="mp-line-meta">
             {{ r.编码 }} · {{ r.规格 || '—' }}
             <template v-if="r.批号"> · {{ r.批号 }}</template>
-            <template v-if="r.BOM用量 > 0"> · {{ tt('BOM') }} {{ fmtQty(r.BOM用量) }}</template>
             <template v-if="returnMode"> · {{ tt('可退') }} {{ fmtQty(canReturnOf(r)) }}</template>
           </div>
         </div>
+        <!-- 退料:本次要退多少 -->
         <span v-if="returnMode" class="mp-line-qty num is-ret">
           {{ qtyOf(r.编码) > 0 ? '-' + fmtQty(qtyOf(r.编码)) : '—' }} <i>{{ r.单位 }}</i>
         </span>
-        <span v-else class="mp-line-qty num">{{ fmtQty(r.数量) }} <i>{{ r.单位 }}</i></span>
+        <!-- 领料:已领 / 需求(BOM 用量)。之前只显示单个"0",看不出还差多少 —— 用户 2026-10-30 报障 -->
+        <span v-else class="mp-line-qty num" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
+          {{ fmtQty(r.数量) }}<span class="mp-sep">/</span>{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}
+          <i>{{ r.单位 }}</i>
+        </span>
       </div>
     </section>
 
@@ -273,6 +282,8 @@ const matText = ref('')
 const matLoading = ref(false)
 const cur = ref(null)
 const curQty = ref(0)
+/** 被点中的明细行(只用于高亮与提示,不解锁 —— 见 pickRow 注释) */
+const curRow = ref(null)
 const batchRows = ref([])
 const saving = ref(false)
 const submitting = ref(false)
@@ -388,10 +399,19 @@ function normalize(l) {
   }
 }
 
-/** 点明细行 = 直接把那一行加载到扫码区 */
+/**
+ * 点明细行 = **只做提示,不解锁**(2026-10-30 用户报障:
+ * 「电脑端点击就可以添加领料了」—— 原来这里直接 `matText = 编码; scanMaterial()`,
+ * 等于**点一下就把料"扫"进去了**,绕过了"必须扫物料码才解锁"的口径)。
+ *
+ * <p>现在:点一行只把它**高亮**(让人看清是哪个料),并提示"请扫物料码",
+ * 解锁仍然只能靠扫物料码 / 扫码枪录码。手机上点行还有意义(看信息),
+ * 电脑上点行不会误触发带料。
+ */
 function pickRow(r) {
-  matText.value = r.编码
-  scanMaterial(r.批号)
+  if (rowLocked.value) return
+  curRow.value = r
+  okText.value = `${tt('请扫物料码')}: ${r.编码}${r.名称 ? ' · ' + r.名称 : ''}`
 }
 
 /** 扫物料码 → 后端校验并回可用量/可退量 */
@@ -740,6 +760,10 @@ async function submit() {
 .mp-line-meta { margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
 .mp-line-qty { flex: none; min-width: 84px; text-align: right; font-size: 14px; font-weight: 600; }
 .mp-line-qty.is-ret { color: var(--el-color-warning-dark-2); }
+.mp-line-qty.ok { color: var(--el-color-success); }
+.mp-line-qty.zero { color: var(--el-text-color-placeholder); }
+.mp-sep { margin: 0 1px; color: var(--el-text-color-placeholder); font-weight: 400; }
+.mp-colhint { margin-left: auto; }
 .mp-line-qty i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--el-text-color-secondary); }
 
 /* 已完成单的退料引导 */
