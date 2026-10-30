@@ -632,16 +632,18 @@
                 <template v-if="r.groupFirst">
                   <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.group.count">{{ r.seq }}</td>
                   <!-- 检验项目:组首行渲染(跨整组)。2026-10-30 用户口径「检测项目栏写入之后可以编辑」
-                       ⇒ 从只读文本改成输入框;@change(失焦/回车)才提交,避免每敲一个字就重算分组把光标顶掉。
-                       改的是整组(组是合并显示的,改一行等于改整组)。 -->
+                       ⇒ 从只读文本改成**多行域**（先试过单行 input，实测「跌落强度（裸…」被截断/盖住，
+                       项目名和子项名都可能很长）；@change(失焦/回车)才提交，避免每敲一个字就重算分组顶掉光标。 -->
                   <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">
-                    <el-input v-if="editable" :model-value="r.group.label" size="small" class="rs-t-in"
+                    <el-input v-if="editable" :model-value="r.group.label" type="textarea"
+                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in rsp-center"
                               @change="(v) => renameGroup(dt, r, v)" />
                     <span v-else>{{ tt(r.group.label) }}</span>
                   </td>
                 </template>
                 <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">
-                  <el-input v-if="editable" :model-value="r.sub" size="small" class="rs-t-in"
+                  <el-input v-if="editable" :model-value="r.sub" type="textarea"
+                            :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in rsp-center"
                             @change="(v) => renameSub(r, v)" />
                   <span v-else>{{ tt(r.sub || '') }}</span>
                 </td>
@@ -5581,6 +5583,12 @@ function chartOf(dt) {
 /* 「从标准库勾选」的落点行:点过哪一行就把哪一行标出来,否则用户不知道会插到哪(2026-10-30) */
 .rsp-design.rsp-row-sel > td {
   background: #e8f2ff;
+}
+/* 检验项目/子项的多行域:文字居中(这两列一直是 center 对齐),并压掉 textarea 默认的上下留白 */
+.rsp-center :deep(.el-textarea__inner) {
+  text-align: center;
+  padding: 2px 4px;
+  line-height: 1.4;
 }
 .rsp-cover-input.rsp-cover-area :deep(.el-textarea__inner) {
   padding: 2px calc(8px * var(--cok));
