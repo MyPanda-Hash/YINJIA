@@ -534,7 +534,7 @@ public class ButtonService {
                 // 产品**建出一张空白草稿(实测品质部账号建成 MP-xxxx)。UI 的「新增」不带产品编号,
                 // 正常建单不受影响;带产品编号建单=替别人开单,本就该拦。
                 // ⚠ systemDraft=true(引擎内部代建,如分发责任人时自动建规格书草稿)跳过本条 —— 见 saveDoc 重载注释。
-                if (!systemDraft && DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
+                if (!systemDraft && DevTaskService.isDevFilePanel(def.code())) ensureDevFileEditable(def, no, head, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
@@ -575,7 +575,7 @@ public class ButtonService {
         // 四个下游文件的编辑门禁(2026-09-20):未分发禁编 / 分发后只放该文件责任人 ∪ 管理员。
         // 产品编号为空的历史单在门禁里豁免(否则既有单据被锁死);head 传进来是为了拦住
         // "本次保存才第一次填上产品编号"这一档(库里此时还是 NULL)。
-        if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
+        if (DevTaskService.isDevFilePanel(def.code())) ensureDevFileEditable(def, no, head, user);
         // 已审核/审批中/已中止单据不允许保存(照搬 light-mes:仅草稿可改);终止审批中/已终止同样锁定
         Map<String, Object> st = docStatusOf(def.code(), no);
         String stStatus = String.valueOf(st.get("status"));
@@ -1491,7 +1491,8 @@ public class ButtonService {
      * 非四文件面板 / 表或列缺失时静默跳过(记 warning),不影响归档主流程。
      */
     private void markFileControlled(String panelCode, String no, String user) {
-        if (panelCode == null || !DevTaskService.devPanelCodes().contains(panelCode)) return;
+        // 同族模板(X烧结)归档后同样要盖「受控」——它和烧结工艺清单是同一份文件的两种模板
+        if (panelCode == null || !DevTaskService.isDevFilePanel(panelCode)) return;
         try {
             PanelRegistry.PanelDef def = registry.panel(panelCode);
             String tbl = def.headTable();
@@ -2115,7 +2116,7 @@ public class ButtonService {
         //   {@link #ensureDevFileEditable} 完全同源(能改这张单的人就该能把它退回来改,
         //   不必走「申请修改→管理员审批→改→再审批」两轮)。其余面板一字不动,仍是 requireApprover。
         String no = requireNo(formData);
-        if (DevTaskService.devPanelCodes().contains(def.code())) requireApproverOrDevFileOwner(def, no);
+        if (DevTaskService.isDevFilePanel(def.code())) requireApproverOrDevFileOwner(def, no);
         else requireApprover(def.code());
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
@@ -3137,7 +3138,7 @@ public class ButtonService {
         if (!def.isDoc()) return delete(def, formData);
         String no = requireNo(formData);
         ensureSpecAssignEditable(def, no, user); // 已分配规格书:删除/删除申请同样仅 责任人∪总负责人∪管理员
-        if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
+        if (DevTaskService.isDevFilePanel(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if ("删除申请中".equals(st)) throw new IllegalStateException("删除申请已提交，待管理员审核");
         if ("草稿".equals(st)) return delete(def, formData);
@@ -6234,7 +6235,10 @@ public class ButtonService {
     }
 
     private DevFileEdit devFileEditVerdict(PanelRegistry.PanelDef def, String no, Map<String, Object> head, String user) {
-        if (!DevTaskService.devPanelCodes().contains(def.code())) return DevFileEdit.notApplicable();
+        // 2026-10-30：改用 isDevFilePanel —— 同族模板(X烧结)虽不在 DEV_PANELS 这个分发/矩阵清单里，
+        //   但它属于「烧结工艺清单」这份文件，责任人门禁必须同样生效；
+        //   原先用 devPanelCodes().contains 判断会让 X烧结 落到 notApplicable ⇒ **任何人都能改**。
+        if (!DevTaskService.isDevFilePanel(def.code())) return DevFileEdit.notApplicable();
         if (isAdminUser(user)) return new DevFileEdit(true, true, "", "", "", "", 0);
         String key = DevTaskService.productKeyOf(def.code());
         String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
@@ -6263,7 +6267,8 @@ public class ButtonService {
             return new DevFileEdit(true, false,
                     "该产品(" + productCode + ")尚未分发责任人，请先在产品信息表点「分发责任人」",
                     productCode, "", "", 1);
-        owner = assigns.get(def.code());
+        // 责任人按**主文件面板码**取：X烧结沿用烧结工艺清单分发的那个责任人（同一份文件、同一批人）
+        owner = assigns.get(DevTaskService.fileOwnerPanelOf(def.code()));
         if (user.equals(owner)) return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
         if ("RD_SPEC_DOC".equals(def.code())) {
             // 兼容既有规格书两级分发:已分配的责任人 / 产品总负责人照样可编辑
@@ -6730,7 +6735,7 @@ public class ButtonService {
         String no = requireNo(formData);
         ensureDocExists(def, no);
         ensureSpecAssignEditable(def, no, user); // 已分配规格书:申请修改同样仅 责任人∪总负责人∪管理员
-        if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
+        if (DevTaskService.isDevFilePanel(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if (!"已归档".equals(st) && !"已审核".equals(st)) throw new IllegalStateException("仅已归档单据可申请修改");
         // 修改原因**必填**(2026-09-30 需求:「修改:只需填写修改原因」)—— 空则拒绝,理由同所有必填:
