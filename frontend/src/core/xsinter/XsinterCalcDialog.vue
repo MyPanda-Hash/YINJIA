@@ -314,13 +314,18 @@ async function loadRowOptions(row) {
   }
 }
 
-/** 选中/手打编号 → 带出名称（名称已手填则不覆盖，与配方计算器 materialFillFor 同口径）。
- *  用 allow-create 手打的编号不在候选里 ⇒ 回档案查一次再带；查不到就留空让用户手填。 */
+/** 选中/手打编号 → 带出名称。
+ *  ⚠ 2026-10-30 用户口径：「更换重新选编号之后需要清空后面文本内容重新填充」——
+ *    原实现"名称已填就不覆盖"会让**上一袋料的名字**留在这一行（实测编号=黑卡戴银炭粉、
+ *    名称却还是英克瑞斯碳洗200-500目），编号与名称对不上比空着更糟。
+ *    现在编号一变就**整格重填**：先清空，再从候选/档案取新名称；取不到就留空（名称可手填）。 */
 async function onPickMaterial(row) {
   const code = String(row.code ?? '').trim()
-  if (!code || String(row.name ?? '').trim()) return
+  if (!code) { row.name = ''; return }
   const hit = (row.options || []).find((o) => o.value === code)
-  if (hit) { row.name = hit.name; return }
+  if (hit) { row.name = hit.name || ''; return }
+  // allow-create 手打的编号不在候选里 ⇒ 先清空再回档案查一次
+  row.name = ''
   try {
     const res = await request.get('/px/invOptions', {
       params: { panelCode: 'RD_X_SINTER', keyword: code },

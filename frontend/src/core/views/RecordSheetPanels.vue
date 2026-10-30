@@ -91,6 +91,14 @@
                             <span v-if="devStatus && devKey === fd.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                             <el-icon class="rs-ref-ico"><Search /></el-icon>
                           </div>
+                          <!-- 长文本格(2026-10-30 用户报障「规格书在编辑的时候数据长换不了行」):
+                               整体规格参数/产品主要性能 这类格在编辑态是单行 input、高度还写死 38px,
+                               长了只能横向溢出(截图里「去除余氯、阻垢率 黑水量≤3」顶出右框)。
+                               fd.area ⇒ 多行域,行高随内容长,封面其它行自然下移。 -->
+                          <el-input v-else-if="editable && fd.area" v-model="head[fd.key]" type="textarea"
+                                    :autosize="{ minRows: 1, maxRows: 6 }" size="small"
+                                    class="rsp-cover-input rsp-cover-area" :class="{ 'rs-focus': isFocus(fd.key) }"
+                                    :maxlength="fd.max || 2000" @input="emit('dirty')" />
                           <el-input v-else-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
                           <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
                         </td>
@@ -5467,6 +5475,15 @@ function chartOf(dt) {
 .rsp-cover-input {
   width: 100%;
   height: calc(38px * var(--cvy));
+}
+/* 长文本格的编辑态:去掉写死高度,行高交给 autosize(2026-10-30) */
+.rsp-cover-input.rsp-cover-area {
+  height: auto;
+  min-height: calc(38px * var(--cvy));
+}
+.rsp-cover-input.rsp-cover-area :deep(.el-textarea__inner) {
+  padding: 2px calc(8px * var(--cok));
+  line-height: 1.5;
 }
 /* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
    并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径) */
