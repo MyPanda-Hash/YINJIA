@@ -25,6 +25,7 @@ const read = (p) => readFileSync(new URL(p, root), 'utf8')
 
 const flowSvc = read('backend/src/main/java/com/yinjia/mes/service/RdProjectFlowService.java')
 const buttonSvc = read('backend/src/main/java/com/yinjia/mes/service/ButtonService.java')
+const dashSvc = read('backend/src/main/java/com/yinjia/mes/service/DashboardStatsService.java')
 
 /** 取某个方法/长字符串片段的源码(找不到返回空串，让断言失败而不是抛错) */
 function slice(src, from, to, len = 4000) {
@@ -98,6 +99,22 @@ test('⑤ 测试申请单(RD_DOM_TEST)不再同步进项目进度查询', () => 
     /private Map<String, Object> syncTestDocsToProgress\(/,
     '旧同步方法要整段删掉，否则点「同步进度」又会把 DT-xxx 写回进度查询',
   )
+})
+
+test('⑥ 桌面看板「面板单据量」必须与面板列表同口径（排除 canceled=Y）', () => {
+  // 【需求来源·用户原文 2026-10-30】
+  //   「服务器上的单据与看板的数据对的上吗？」
+  // 实测服务器:rd_approval 19 张全活着(asp_cancel='N'),但 yj_doc_status 19/19 canceled='Y';
+  //   面板列表(QueryService.queryDocs 排除 canceled)⇒ 0 张,
+  //   看板 docStats 只按 asp_cancel 判活 ⇒ 19 张。两边差 19。
+  const seg = slice(dashSvc, 'private List<Map<String, Object>> docStats(', 'return docStats', 3000)
+  assert.ok(seg, 'docStats 要能找到')
+  assert.match(
+    seg,
+    /yj_doc_status/,
+    '看板只按 asp_cancel 判活 ⇒ 已作废单据仍被计数，与面板列表对不上（实测 19 vs 0）',
+  )
+  assert.match(seg, /canceled/, '必须判 yj_doc_status.canceled')
 })
 
 test('④ 作废/删除单据后立刻清理进度行（不用等下一次同步）', () => {
