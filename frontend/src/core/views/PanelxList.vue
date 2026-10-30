@@ -4153,10 +4153,13 @@ const devAssignVisible = ref(false)
 const devAssignBusy = ref(false)
 const devAssignUsers = ref([])
 // 顺序与后端 DevTaskService.DEV_PANELS / 设计「文件汇总表」第 9 行一致:
-// 规格书 → 成型工艺清单 → 组装工艺清单 → 出货检验计划表(2026-09-30 用户口径:按设计排)
+// 规格书 → 烧结工艺清单 → 组装工艺清单 → 出货检验计划表(2026-09-30 用户口径:按设计排)
+// 2026-10-30 用户口径「现有成型文件内容改成<烧结工艺清单>入口」:只是**显示名**,
+//   panel 值仍是 RD_MOLD_PROC(分发关系、责任人、门禁全按 code 走,不能动)。
+//   X烧结工艺清单(RD_X_SINTER)暂不进本清单:用户口径「两个入口属于同一份文件」⇒ 责任人同工艺清单。
 const DEV_PANELS = [
   { code: 'RD_SPEC_DOC', label: '规格书' },
-  { code: 'RD_MOLD_PROC', label: '成型工艺清单' },
+  { code: 'RD_MOLD_PROC', label: '烧结工艺清单' },
   { code: 'RD_ASM_PROC', label: '组装工艺清单' },
   { code: 'RD_INSP_PLAN', label: '出货检验计划表' },
 ]

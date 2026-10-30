@@ -1190,6 +1190,176 @@ export const recordSheetConfigs = {
   },
 // 产品信息表:14 字段纯表单升级为文书面板(纸张式,与产品文件家族同视觉语言);
   // 网格 4 列(标签130/值260×2),报告头带单据日期信息块;下拉走 yj_field 字典,长文本不写 type 即多行域
+  // ══════════════════════════════════════════════════════════════════════
+  // X烧结工艺清单(RD_X_SINTER) —— 2026-10-30 新增
+  //
+  // 设计源:《X烧结工单模板-261029.xlsx》「产品工单打印输出模版」页(A1:M37)。
+  // 两页(用户口径「新加的面板X烧结面板就2页」):
+  //   页0 X烧结配方工艺管控清单   页1 修订记录
+  //
+  // 与既有 RD_MOLD_PROC 的关系(用户口径「两个入口在产品文件里面是属于同一份文件,
+  // 只是模板不一样」「一个产品可能有两个工艺也可能就只有一个工艺」):
+  //   · RD_MOLD_PROC = 「烧结工艺清单」,3 页(成型工艺清单/成型配方/修订记录),本批只改**显示名**;
+  //   · RD_X_SINTER  = 「X烧结工艺清单」,2 页,配方计算器驱动。
+  //   两者各自独立建单,互不排斥 —— 同一产品可以只有一张,也可以两张都有。
+  //
+  // 网格 12 列(A~L,总宽 1040 与本家族其它面板一致;Excel 的 M 列是开发者备注,不上纸面):
+  //   70+70+75+75+75+75+75+115+100+100+105+105 = 1040
+  // 计算输出那 12 格(切炭/冷却/重量/密度 各三值)全部可编辑 —— 用户口径
+  //   「所有文本框可手工二次输入修改」;计算器算完只是把值填进来,不锁死。
+  // ══════════════════════════════════════════════════════════════════════
+  RD_X_SINTER: {
+    headMode: 'report',
+    staticTitle: 'X烧结配方工艺管控清单',
+    info: [
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'select' },
+      { label: '使用范围', key: '使用范围', type: 'select' },
+      { label: '版本号', key: '版本号', type: 'text' },
+    ],
+    grid: [70, 70, 75, 75, 75, 75, 75, 115, 100, 100, 105, 105],
+    // 报告头三段跨度 7+2+3 = 12
+    head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    pages: [
+      { title: 'X烧结配方工艺管控清单', grid: [70, 70, 75, 75, 75, 75, 75, 115, 100, 100, 105, 105], showHead: true },
+      // 修订记录页不出报告头(同 RD_MOLD_PROC 页2:只有居中大标题 + 一行表头,由 dt.pageTitle 出标题)
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [70, 70, 75, 75, 75, 75, 75, 115, 100, 100, 105, 105] },
+    ],
+    sections: [
+      /* ── 一、产品基本信息(标签行 + 值行 两行式,照 Excel row7/row8)── */
+      { page: 0, bar: '一、产品基本信息', rows: [
+        { grid: [
+          { label: '炭棒编号', span: 2 },
+          { label: '产品名称', span: 2 },
+          { label: '炭棒规格', span: 3 },
+          { label: '产品管控类型' },
+          { label: '产品形态', span: 2 },
+          { label: '生产车间', span: 2 },
+        ]},
+        { grid: [
+          { key: '炭棒编号', span: 2 },
+          { key: '产品名称', span: 2 },
+          // 「炭棒规格」三格 = 外径 / 内径 / 出货长度(Excel E8/F8/G8 ← 计算器 E4/F4/G4)
+          { key: '炭棒外径' },
+          { key: '炭棒内径' },
+          { key: '炭棒出货长度' },
+          { key: '产品管控类型', type: 'select' },
+          { key: '产品形态', type: 'select', span: 2 },
+          { key: '生产车间', type: 'select', span: 2 },
+        ]},
+      ]},
+      /* ── 配料要求(Excel A22)── */
+      { page: 0, bar: '配料要求', rows: [
+        { grid: [{ key: '配料要求', span: 12, area: true }] },
+      ]},
+      /* ── 成型管控要求(Excel A23 + 五段;每段「标签行 + 值行」)── */
+      { page: 0, bar: '成型管控要求', rows: [
+        // 模具段:模具尺寸 竖跨两行;外径/内径 各「值|公差」两格
+        { grid: [
+          { label: '模具尺寸', rowspan: 2, span: 2 },
+          { label: '模具出料口', span: 2 },
+          { label: '中心杆', span: 4 },
+          { label: '外径(值/公差)', span: 2 },
+          { label: '内径(值/公差)', span: 2 },
+        ]},
+        { grid: [
+          { key: '模具出料口内径', span: 2 },
+          { key: '中心杆外径', span: 4 },
+          { key: '炭棒外径' },
+          { key: '炭棒外径公差' },
+          { key: '炭棒内径' },
+          { key: '炭棒内径公差' },
+        ]},
+        // 成型切炭长度
+        { grid: [
+          { label: '成型切炭长度', rowspan: 2, span: 2 },
+          { label: '下限mm', span: 2 },
+          { label: '中间值mm', span: 4 },
+          { label: '上限mm', span: 4 },
+        ]},
+        { grid: [
+          { key: '切炭长度下限mm', span: 2 },
+          { key: '切炭长度中间值mm', span: 4 },
+          { key: '切炭长度上限mm', span: 4 },
+        ]},
+        // 成型冷却长度
+        { grid: [
+          { label: '成型冷却长度', rowspan: 2, span: 2 },
+          { label: '下限mm', span: 2 },
+          { label: '中间值mm', span: 4 },
+          { label: '上限mm', span: 4 },
+        ]},
+        { grid: [
+          { key: '冷却长度下限mm', span: 2 },
+          { key: '冷却长度中间值mm', span: 4 },
+          { key: '冷却长度上限mm', span: 4 },
+        ]},
+        // 炭棒重量
+        { grid: [
+          { label: '炭棒重量', rowspan: 2, span: 2 },
+          { label: '下限g', span: 2 },
+          { label: '中间值g', span: 4 },
+          { label: '上限g', span: 4 },
+        ]},
+        { grid: [
+          { key: '炭棒重量下限g', span: 2 },
+          { key: '炭棒重量中间值g', span: 4 },
+          { key: '炭棒重量上限g', span: 4 },
+        ]},
+        // 密度要求
+        { grid: [
+          { label: '密度要求', rowspan: 2, span: 2 },
+          { label: '下限', span: 2 },
+          { label: '中间值', span: 4 },
+          { label: '上限', span: 4 },
+        ]},
+        { grid: [
+          { key: '密度要求下限', span: 2 },
+          { key: '密度要求中间值', span: 4 },
+          { key: '密度要求上限', span: 4 },
+        ]},
+      ]},
+      /* ── 特殊管控要求(Excel A34)── */
+      { page: 0, bar: '特殊管控要求', rows: [
+        { grid: [{ key: '特殊管控要求', span: 12, area: true }] },
+      ]},
+    ],
+    // 两张逻辑表共用 rd_x_sinter_detail ⇒ 各自必须带 filterKey:'表区' + filterVal,少一条就串表
+    dataTables: [
+      {
+        page: 0,
+        bar: '配方表',
+        filterKey: '表区', filterVal: '配方表',
+        // Excel A10:L20 = 表头 + 10 行固定行(用户口径:默认 10 行物料信息)
+        fixedRows: 10,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '序号', label: 'No.', w: 70, align: 'center' },
+          { key: '物料种类', label: '物料种类', w: 150 },
+          { key: '物料编号', label: '物料编号', w: 300 },
+          { key: '物料名称', label: '物料名称', w: 315 },
+          { key: '添加比例', label: '添加比例%', w: 105 },
+          { key: '单支含量g', label: '单支含量g', w: 105 },
+        ],
+      },
+      {
+        page: 1,
+        pageTitle: '修订记录',
+        filterKey: '表区', filterVal: '修订记录',
+        noVariant: true,
+        design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '序号', label: '序号', w: 70, align: 'center' },
+          { key: '更改内容', label: '更改内容', w: 300, area: true },
+          { key: '更改原因', label: '更改原因', w: 230 },
+          { key: '更改时间', label: '更改时间', w: 130 },
+          { key: '责任人', label: '责任人', w: 110 },
+          { key: '备注', label: '备注', w: 200, area: true },
+        ],
+      },
+    ],
+  },
   RD_PROD_INFO: {
     headMode: 'report',
     staticTitle: '产品信息表',

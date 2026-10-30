@@ -184,8 +184,8 @@ table:rd_instr_use_detail   # 仪器使用记录表行表
 table:rd_instr_use_head   # 仪器使用记录表头表
 table:rd_mineral_detail   # 矿化测试行表
 table:rd_mineral_head   # 矿化测试头表
-table:rd_mold_proc_detail   # 成型工艺清单行表
-table:rd_mold_proc_head   # 成型工艺清单头表
+table:rd_mold_proc_detail   # 成型工艺清单行表(2026-10-30 显示名改「烧结工艺清单」,panel_code 未变)
+table:rd_mold_proc_head   # 成型工艺清单头表(同上;3 页:成型工艺清单/成型配方/修订记录)
 table:rd_mold_formula_detail   # 成型配方行表(面板 RD_MOLD_FORMULA;2026-09-11 并入成型工艺清单第2页签、菜单下线;当前空表)
 table:rd_mold_formula_head   # 成型配方头表(面板 RD_MOLD_FORMULA;后端文书归档集合与 DevTaskService 仍引用,历史 rd_dev_task 行留审计;当前空表)
 table:rd_plan   # 项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)
@@ -210,6 +210,8 @@ table:rd_spec_doc_detail   # 规格书行表
 table:rd_spec_doc_head   # 规格书头表(按规格书种类页签)
 table:rd_spike_water_detail   # 加标水配置记录表行表
 table:rd_spike_water_head   # 加标水配置记录表头表
+table:rd_x_sinter_detail   # X烧结工艺清单行表(面板 RD_X_SINTER,2026-10-30 新增):表区=配方表(10 行物料)/修订记录
+table:rd_x_sinter_head   # X烧结工艺清单头表(2026-10-30 新增):产品基本信息+模具参数+配方计算器输出五段+管控要求
 table:report_column_settings   # 报表列设置(用户自定义列布局,按panel_code存JSON)
 table:s_allno   # 单据编号
 table:sample_req   # 样品申请单头表(录入/审核/执行三级)

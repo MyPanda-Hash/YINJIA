@@ -69,7 +69,8 @@ test('⑥ 研发管理的多页签面板确实存在(口径变了要同步本文
   const multi = Object.entries(recordSheetConfigs)
     .filter(([, v]) => (v.pages || []).length > 1)
     .map(([k]) => k)
-  // 这 4 张是 2026-10-29 实测的多页签面板;数量变化本身不是 bug,但要有人看一眼
-  assert.deepEqual(multi.sort(), ['RD_ASM_PROC', 'RD_DOM_TEST', 'RD_MOLD_PROC', 'RD_SPEC_DOC'],
+  // 这 4 张是 2026-10-29 实测的多页签面板;2026-10-30 新增 X烧结工艺清单(2 页)后变 5 张。
+  // 数量变化本身不是 bug,但要有人看一眼:打印多页逻辑影响的就是这几张,确认新面板也能整份打印。
+  assert.deepEqual(multi.sort(), ['RD_ASM_PROC', 'RD_DOM_TEST', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_X_SINTER'],
     '多页签面板清单变了 —— 打印多页逻辑影响的就是这几张,确认新面板也能整份打印')
 })

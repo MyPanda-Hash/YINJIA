@@ -4374,3 +4374,25 @@ migrate-specdoc-subitem-20261030.sql
 #   ⇒ 后端认不到这 4 个键，用户填了保存时被丢弃。本脚本只补 yj_field(place='header')。
 #   幂等；自检「字段4/4、列4/4、译名4/4」不满足整体回滚。两账套都执行。
 migrate-prodinfo-head-extra-20261030.sql
+
+# 2026-10-30 X烧结工艺清单（RD_X_SINTER）建表。设计源《X烧结工单模板-261029.xlsx》
+#   「产品工单打印输出模版」页 + 《T205-X冰箱炭棒-26102901.xlsx》真实单据（验证计算器）。
+#   两张表：rd_x_sinter_head（产品基本信息 + 模具参数 + 计算输出五段 + 管控要求）
+#          rd_x_sinter_detail（表区=配方表 10 行物料 / 修订记录）。
+#   为什么不复用 rd_mold_proc_*：既有面板 3 页、承载工序分段版式；X烧结是配方计算器驱动的
+#   单页工艺卡，字段重合度极低。已有面板只改**显示名**（见 migrate-mold-proc-rename）。
+#   计算字段一律落库（保存时前端算好）：历史单据数值不随日后改公式而变。两账套都执行。
+migrate-x-sinter-tables-20261030.sql
+
+# 2026-10-30 X烧结工艺清单（RD_X_SINTER）面板与字段元数据：yj_panel 1 行 + header 37 +
+#   detail 13 + 面板/字段译名。计算输出 12 格全部 editable（用户口径「所有文本框可手工二次修改」）。
+#   ⚠ 译名走「表变量 + NOT EXISTS」：yj_translation 有 uq_translation(scope,ref_key,locale)，
+#   同词条（如「配料要求」）别处已存在时直接 VALUES 会整批失败。两账套都执行。
+migrate-x-sinter-panel-20261030.sql
+
+# 2026-10-30 「成型工艺清单」→「烧结工艺清单」显示名变更（用户口径「现有成型文件内容就是
+#   改成<烧结工艺清单>入口」）。**只改 yj_panel.panel_name**，panel_code 仍是 RD_MOLD_PROC
+#   （全前端 94 处引用，改 code 会断参照链/门禁/分发/-tb 后缀）。3 页不变。
+#   刻意不动：RD_CHANGE「变更文件」勾选项里的字面值 '成型工艺清单'（历史数据键，改了老单据对不上）。
+#   两账套都执行。
+migrate-mold-proc-rename-20261030.sql
