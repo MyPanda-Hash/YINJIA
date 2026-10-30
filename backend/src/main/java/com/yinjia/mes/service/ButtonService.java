@@ -4719,15 +4719,13 @@ public class ButtonService {
                     + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_APPROVAL'"
                     + "           AND s.doc_no = a.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                     + "   ))"
-                    // ①b 四级项目(简单开发/检测申请单 → 进度查询):来源单号存在「项目编号」上,
-                    //     「说明」放的是测试背景 ⇒ 单独按 rd_dom_test_head 判活(2026-10-30 补;
-                    //     见 syncTestDocsToProgress)。作废(canceled='Y')同样算没有源单据。
-                    + "   OR ([项目层级] = N'四级' AND ISNULL([项目编号], N'') <> ''"
-                    + "     AND NOT EXISTS (SELECT 1 FROM rd_dom_test_head h"
-                    + "       WHERE h.[单据编号] = rd_progress_detail.[项目编号]"
-                    + "         AND ISNULL(h.asp_cancel,'N') <> 'Y'"
-                    + "         AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_DOM_TEST'"
-                    + "           AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y'))))"
+                    // ①b 四级项目行 = 测试申请单同步来的 —— 2026-10-30 用户口径:
+                    //     「测试申请单不在这个项目进度查询里面显示,那个不是在测试申请单的汇总里面显示吗?」
+                    //     四级分支的源头是 RD_DOM_TEST,它自己的汇总面板就够了,不再进进度查询
+                    //     ⇒ 旧版 syncTestDocsToProgress 生成的行走这条一律打作废。
+                    //     判据用 asp_user1='sync'(那方法 INSERT 时硬编码的落库标记),
+                    //     人工建的四级行(asp_user1 不是 sync)保留,避免误伤。
+                    + "   OR ([项目层级] = N'四级' AND ISNULL(asp_user1,'') = 'sync'))"
                     // ② 或:所属进度单本身已作废/不存在(换过汇总单后的旧行)
                     //     ⇒ 否则旧行会以"源单据还在"逃过 ①,变成挂在死单上的孤儿
                     //     (2026-10-19 模拟服务器空库时实测:旧单 LXJ2609040100 软删了,它的行还活着)。
@@ -4772,93 +4770,14 @@ public class ButtonService {
         out.put("新增行", inserted);
         out.put("更新行", updated);
         out.put("跳过", skipped);
-        // 四级项目(2026-09-30 需求「四级项目要进进度查询」):四级不走实施计划,
-        // 走的是「测试流程 → 简单开发/检测申请单」,同步逻辑同批补在下面。
-        Map<String, Object> four = syncTestDocsToProgress();
-        out.put("四级测试单", four.get("单据数"));
-        out.put("四级新增行", four.get("新增行"));
-        out.put("四级更新行", four.get("更新行"));
+        // ⚠ 四级项目(测试申请单 RD_DOM_TEST)**不进**项目进度查询 —— 2026-10-30 用户口径:
+        //   「测试申请单不在这个项目进度查询里面显示,那个不是在测试申请单的汇总里面显示吗?」
+        //   2026-09-30 的 syncTestDocsToProgress 已移除(它把测试单同步成四级进度行,
+        //   导致「立项申请里没有单据、进度查询却多出 DT-xxx 行」);历史同步行由下面
+        //   pruneProgressRows 的 ①b 分支清理,测试单自己的汇总面板就是 RD_DOM_TEST。
         // 删除联动(2026-10-19 用户口径):源单据(实施计划/立项申请)都删掉的,
         // 对应的进度行也随这一轮同步清掉;两个源任一还在就不动。
         out.put("清理孤儿行", pruneProgressRows());
-        return out;
-    }
-
-    /**
-     * 四级项目(检测/打样) → 项目进度查询(2026-09-30)。
-     *
-     * 需求(《产品开发系统需求汇总.xlsx》sheet「开发相关流程」):四级支走的是
-     * 「测试流程 → 简单开发/检测申请单(发起人)→ 任务分发 → 打样测试 → 结果输出」,
-     * 即**测试申请单 RD_DOM_TEST**;而上面那条同步只读 rd_plan ⇒ 四级任务
-     * **永远不会**出现在「项目进度查询」里(2026-09-30 调研实测确认)。本方法把它补上。
-     *
-     * 列映射(取该单明细第一条作业务内容;测试申请单的表头基本只有单据标识):
-     *   项目名称 ← 产品名称(缺则测试（检测）内容)
-     *   项目层级 ← 四级        (需求:四级项目 = 简单应对(检测/打样):如内部简单测试、客户样品测试等)
-     *   项目编号 ← 单据编号    (四级没有实施计划,拿它自己当项目编号)
-     *   内容     ← 测试（检测）内容      说明 ← 测试（检测）背景
-     *   项目负责 ← 发起人                里程完成 ← 期望完成日期
-     *   状态     ← 单据状态(草稿/审批中/已归档…)的派生值
-     *   ⚠ 人工列(项目级/实施进度/测试员/谁来批准/谁来检验/未批准原因)一律不碰 —— 与 syncPlanToProgress 同口径。
-     * 幂等:按「项目编号=单据编号」找既有行,有则更新系统列、无则插入。
-     */
-    private Map<String, Object> syncTestDocsToProgress() {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("单据数", 0);
-        out.put("新增行", 0);
-        out.put("更新行", 0);
-        try {
-            List<String> progressNos = jdbc.queryForList(
-                    "SELECT TOP 1 [单据编号] FROM rd_progress WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [单据编号] DESC", String.class);
-            if (progressNos.isEmpty()) return out;   // 进度查询还没有那张宿主单,先不动
-            String progressNo = progressNos.get(0);
-            List<Map<String, Object>> docs = jdbc.queryForList(
-                    "SELECT h.[单据编号], ISNULL(h.[申请单类型], N'') AS 申请单类型,"
-                            + " ISNULL(d.[产品名称], N'') AS 产品名称, ISNULL(d.[测试（检测）内容], N'') AS 内容,"
-                            + " ISNULL(d.[测试（检测）背景], N'') AS 背景, ISNULL(d.[发起人], N'') AS 发起人,"
-                            + " ISNULL(d.[期望完成日期], N'') AS 期望完成日期"
-                            + " FROM rd_dom_test_head h"
-                            + " LEFT JOIN rd_dom_test_detail d ON d.[单据编号] = h.[单据编号]"
-                            + "   AND d.[序号] = (SELECT MIN(x.[序号]) FROM rd_dom_test_detail x WHERE x.[单据编号] = h.[单据编号])"
-                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
-                            + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_DOM_TEST'"
-                            + "                   AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
-                            + " ORDER BY h.[单据编号]");
-            out.put("单据数", docs.size());
-            int ins = 0, upd = 0;
-            for (Map<String, Object> d : docs) {
-                String docNo = String.valueOf(d.get("单据编号"));
-                String name = String.valueOf(d.get("产品名称"));
-                if (name.isBlank()) name = String.valueOf(d.get("内容"));
-                if (name.isBlank()) name = docNo;
-                String status = String.valueOf(docStatusOf("RD_DOM_TEST", docNo).get("status"));
-                Integer exists = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM rd_progress_detail WHERE [单据编号] = ? AND [项目编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                        Integer.class, progressNo, docNo);
-                if (exists != null && exists > 0) {
-                    jdbc.update("UPDATE rd_progress_detail SET [项目名称]=?, [项目层级]=N'四级', [内容]=?, [说明]=?,"
-                                    + " [项目负责]=?, [里程完成]=?, [状态]=?, [预计完成日期]=? WHERE [单据编号]=? AND [项目编号]=?",
-                            name, d.get("内容"), d.get("背景"), d.get("发起人"), d.get("期望完成日期"), status,
-                            d.get("期望完成日期"), progressNo, docNo);
-                    upd++;
-                } else {
-                    jdbc.update("INSERT INTO rd_progress_detail ([单据编号],[项目名称],[项目层级],[项目编号],[内容],[说明],"
-                                    + "[项目负责],[里程完成],[状态],[预计完成日期],asp_user1,asp_time1)"
-                                    + " VALUES (?,?,N'四级',?,?,?,?,?,?,?,N'sync',GETDATE())",
-                            progressNo, name, docNo, d.get("内容"), d.get("背景"),
-                            d.get("发起人"), d.get("期望完成日期"), status, d.get("期望完成日期"));
-                    ins++;
-                }
-            }
-            out.put("新增行", ins);
-            out.put("更新行", upd);
-            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
-                    .info("[RD_DOM_TEST→RD_PROGRESS] 四级同步: 测试单 {} 张, 新增 {} 行, 更新 {} 行", docs.size(), ins, upd);
-        } catch (Exception e) {
-            // 测试申请单表/列缺失(或该面板尚未上线)时降级:不影响实施计划那条主链
-            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
-                    .warn("[RD_DOM_TEST→RD_PROGRESS] 四级同步跳过: {}", e.getMessage());
-        }
         return out;
     }
 

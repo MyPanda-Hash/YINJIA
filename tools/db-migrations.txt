@@ -4334,3 +4334,12 @@ migrate-prune-voided-progress-20261030.sql
 #   ⚠ 配套代码同批提交(456666bf):putHeadDefaults 补进主保存路径(原先只挂在空白草稿分支),
 #   否则写进 config 也不会落库。两账套都执行。
 migrate-prodinfo-auditor-defaults-20261029.sql
+
+# 2026-10-30 测试申请单(RD_DOM_TEST)不再进「项目进度查询」(用户口径「测试申请单不在这个项目
+#   进度查询里面显示,那个不是在测试申请单的汇总里面显示吗?修复这个问题」)。
+#   2026-09-30 的 syncTestDocsToProgress 会把每张测试单同步成一条「项目层级=四级」进度行
+#   (asp_user1='sync'),导致服务器上「立项申请里没有 DT-xxx 单据,进度查询却显示两行」——
+#   四级分支的源头本来就是测试申请单,不是立项申请。
+#   代码已整段删除该方法;pruneProgressRows 的 ①b 改按 asp_user1='sync' 清理四级行。
+#   本脚本清**存量**四级同步行(软删,可幂等复跑)。两账套都执行。
+migrate-drop-test-progress-20261030.sql

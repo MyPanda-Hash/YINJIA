@@ -66,7 +66,7 @@ test('③ 进度行孤儿清理：作废(canceled=Y)的源单据等同于"已删
   assert.match(apSub, /yj_doc_status/, 'rd_approval 子查询没排除作废单 ⇒ 进度行永远清不掉')
 })
 
-test('③a 孤儿清理的判据要带 [说明] = [项目编号] 守卫，别把四级行误清', () => {
+test('③a 孤儿清理的判据要带 [说明] = [项目编号] 守卫，四级行不该进 ① 分支', () => {
   const seg = slice(buttonSvc, 'private int pruneProgressRows(', 'if (n > 0)', 4000)
   assert.match(
     seg,
@@ -75,9 +75,29 @@ test('③a 孤儿清理的判据要带 [说明] = [项目编号] 守卫，别把
   )
 })
 
-test('③b 孤儿清理不能只认「说明」：四级测试单行把来源单号存在「项目编号」', () => {
+test('③b 四级行不走「说明」判活：改由 ①b 无条件清理（2026-10-30 口径变更）', () => {
   const seg = slice(buttonSvc, 'private int pruneProgressRows(', 'if (n > 0)', 4000)
-  assert.match(seg, /\[项目编号\]/, '四级行(来源=测试申请单)的键在「项目编号」上，只认「说明」会漏判')
+  assert.match(seg, /\[项目层级\] = N'四级'/, '要能识别四级行')
+  assert.match(
+    seg,
+    /asp_user1/,
+    '四级行的清理判据要用 asp_user1(旧版 syncTestDocsToProgress 的 sync 落库标记)，不能按源单据判活',
+  )
+})
+
+test('⑤ 测试申请单(RD_DOM_TEST)不再同步进项目进度查询', () => {
+  // 【需求来源·用户原文 2026-10-30】
+  //   「测试申请单不在这个项目进度查询里面显示，那个不是在测试申请单的汇总里面显示吗？修复这个问题」
+  // 旧实现(syncTestDocsToProgress，2026-09-30 引入)会把 RD_DOM_TEST 的每张单同步成一条
+  // 「项目层级=四级」的进度行 ⇒ 服务器上出现「立项申请里根本没有单据，进度查询却有 DT-xxx 两行」。
+  const seg = slice(buttonSvc, 'public Map<String, Object> syncAllPlansToProgress(', 'out.put("清理孤儿行"', 3000)
+  assert.ok(seg, 'syncAllPlansToProgress 要能找到')
+  assert.doesNotMatch(seg, /syncTestDocsToProgress\(\)/, '测试申请单不得再同步进进度查询')
+  assert.doesNotMatch(
+    buttonSvc,
+    /private Map<String, Object> syncTestDocsToProgress\(/,
+    '旧同步方法要整段删掉，否则点「同步进度」又会把 DT-xxx 写回进度查询',
+  )
 })
 
 test('④ 作废/删除单据后立刻清理进度行（不用等下一次同步）', () => {
