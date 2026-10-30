@@ -2028,19 +2028,13 @@ export default {
     '近14天': 'Last 14 days',
     '近30天': 'Last 30 days',
     // 日排产(2026-10-29):生产工单 / 工单排产 两页表格内的日期列
+    // 2026-10-30:「按完工日期均摊」按钮/弹窗与相关文案已按用户口径删除
+    //   (原 '按完工日期均摊' / '起点日期' / '将均摊到' / '填充' / '每天' / '最后一天' /
+    //    '已填充到表格,请点「保存日排产」' / '起点/完工日期不正确或数量为 0' 等词条一并移除)
     '日排产': 'Daily Plan',
     '保存日排产': 'Save Daily Plan',
-    '按完工日期均摊': 'Spread to Completion Date',
-    '未来': 'Future',
-    '起点日期': 'Start Date',
-    '将均摊到': 'Spread over',
-    '填充': 'Fill',
-    '每天': 'per day',
-    '最后一天': 'last day',
     '没有需要保存的改动': 'No changes to save',
     '日排产已保存': 'Daily plan saved',
-    '已填充到表格,请点「保存日排产」': 'Filled into the table — click "Save Daily Plan"',
-    '起点/完工日期不正确或数量为 0': 'Start/completion date is invalid or quantity is 0',
     '7天需交付': 'Due ≤7 days',
     '15天需交付': 'Due ≤15 days',
     '大于15天需交付': 'Due >15 days',
@@ -2048,13 +2042,12 @@ export default {
     '15天已排': 'Planned ≤15 days',
     '大于15天已排': 'Planned >15 days',
     '当天已审核报工量': 'Approved reported qty of that day',
-    '完工日期超出当前显示窗口,超出的': 'Completion date exceeds the visible window; days not written:',
-    '天未写入;可把「未来」调大后重排': '— increase "Future" and re-spread',
     // 工序路线排线·计划开工/实际开工(2026-10-29)
     '计划开工日期': 'Planned Start',
     '实际开工': 'Actual Start',
     '实际完工': 'Actual Finish',
-    '上一道的计划完工日期 = 下一道的计划开工日期;保存时按「计划开工 ~ 计划完工」把计划数量均摊成每日计划': "The previous step's planned finish = the next step's planned start; on save the planned qty is spread daily across planned start → finish",
+    '上一道的计划完工日期 = 下一道的计划开工日期': "The previous step's planned finish = the next step's planned start",
+    '日排产请到「生产工单 / 工单排产」的日期列里逐格填写后保存': 'Fill the daily plan cell by cell in the date columns of "Production Order / Work Order Scheduling", then save',
     '本月': 'This month',
     '上月': 'Last month',
     '本季': 'This quarter',

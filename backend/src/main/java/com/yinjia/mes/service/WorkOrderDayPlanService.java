@@ -290,6 +290,12 @@ public class WorkOrderDayPlanService {
      * <p>= 这些行的日计划/日报工出现过的日期 ∪ 各工序台账「计划开工~计划完工」区间。
      * 不再用「今天-N ~ 今天+M」的固定窗口 —— 那样会出现一整排空列。
      * 一行数据都没有时兜底给「今天起 20 天」,否则第一次没法录入。
+     *
+     * <p><b>2026-10-30 收口</b>(用户报障:工单 10-30 建的,表头却长出 10-20 的列):
+     * 日期列是**整张表所有行的并集** ⇒ 别的工单(如 GD-2026-10-0223)有一条 10-20 的历史日计划,
+     * 就会给所有行(包括当天才建的工单)长出 10-20 这一列,而那一列对本行永远是空的。
+     * ⇒ **今天以前的日期,只有当天真的有已审报工量才出列**(对照历史完成量有用),
+     * 否则不显示;今天及以后的日期照旧(计划区间/日计划照常出列)。
      */
     private List<String> buildDates(List<RowRef> refs,
                                     Map<String, Map<String, Double>> plans,
@@ -298,10 +304,13 @@ public class WorkOrderDayPlanService {
         TreeSet<LocalDate> set = new TreeSet<>();
         LocalDate min = today.minusDays(180);
         LocalDate max = today.plusDays(365);
+        // 有报工事实的日期(用于筛掉"过去但没报工"的空列)
+        Set<LocalDate> doneDates = new HashSet<>();
         for (RowRef r : refs) {
             String key = rowKey(r.id, r.op);
             collectDates(set, plans.get(key), min, max);
             collectDates(set, actuals.get(key), min, max);
+            collectDates(doneDates, actuals.get(key), min, max);
         }
         // 工序台账的计划区间(开工~计划完工)整段显示:还没铺日计划的区间也能看到/能录
         Map<Long, Set<String>> opsById = new HashMap<>();
@@ -329,7 +338,11 @@ public class WorkOrderDayPlanService {
             }
         }
         List<String> out = new ArrayList<>();
-        for (LocalDate d : set) out.add(d.toString());
+        for (LocalDate d : set) {
+            // 过去的日期:当天没有已审报工就不出列(否则整表并集会把别人的历史日期带给本行)
+            if (d.isBefore(today) && !doneDates.contains(d)) continue;
+            out.add(d.toString());
+        }
         if (out.size() > MAX_COLUMNS) out = new ArrayList<>(out.subList(out.size() - MAX_COLUMNS, out.size()));
         return out;
     }
@@ -341,7 +354,6 @@ public class WorkOrderDayPlanService {
             if (d != null && !d.isBefore(min) && !d.isAfter(max)) set.add(d);
         }
     }
-
     private static LocalDate toDate(Object o) {
         if (o instanceof java.sql.Date d) return d.toLocalDate();
         return parseDate(str(o));

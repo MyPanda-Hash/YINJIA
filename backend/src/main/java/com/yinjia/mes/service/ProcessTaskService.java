@@ -184,13 +184,18 @@ public class ProcessTaskService {
                 if (rate <= 0) rate = 1;
                 // 首道 = 已落实(现场第一道就开始做),其余 = 计划;计划生产线留空等排产派线
                 String state = seq == 1 ? "已落实" : "计划";
+                // 🔴 2026-10-30 用户报障(工序路线排线截图:「未进行排产就已经有实际开工日期」):
+                //   **落实时间 = 实际开工,只能是真实发生的时刻**(报工/转序),不能在这里"建台账顺手写一个"。
+                //   原实现写 `new java.util.Date()`(JVM 本地时间)⇒ 结转那一刻就成了首道的「实际开工」,
+                //   工单还没排产、车间还没动工,弹窗里却已显示实际开工;而且它与 GETDATE()(库为 UTC)
+                //   相差 8 小时,同一行两个时间口径打架(实测 GD-2026-10-0229:pl_date 03:22 / 落实时间 11:22)。
+                //   ⇒ 这里一律留空,由 {@link #applyNextProcess} 在**真的达标转序**时写真实时间。
                 created += jdbc.update(
                         "INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
                                 + " 计划数量, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
-                                + " VALUES (?,?,?,?,NULL,NULL,?,?,?,N'N',?,GETDATE())",
+                                + " VALUES (?,?,?,?,NULL,NULL,?,?,NULL,N'N',?,GETDATE())",
                         plNo, rowId, op.get("工序"), seq,
-                        round(plan * rate), state,
-                        seq == 1 ? new java.util.Date() : null, user);
+                        round(plan * rate), state, user);
             }
         }
         return created;
@@ -875,8 +880,10 @@ public class ProcessTaskService {
             }
         }
         // 计划链(2026-10-29 用户口径):上一道「计划完工日期」= 下一道「计划开工日期」;
-        //   首道默认今天(排产当天开工)。实际开工/实际完工另给(实际开工取台账落实时间,
-        //   实际完工取该道已审报工的最大完工时间 —— 计划与实际本来就不一致,分开展示)。
+        //   首道默认今天(排产当天开工)。实际开工/实际完工另给:
+        //   **实际开工 = 该道已审核报工的最早时间**(2026-10-30 用户口径「只有真报工才显示」;
+        //   原口径取台账 落实时间,而 落实时间 曾被「建台账/排产」顺手写成当时时刻 ⇒ 没开工也显示开工),
+        //   实际完工 = 该道已审报工的最大完工时间 —— 计划与实际本来就不一致,分开展示。
         String todayText = java.time.LocalDate.now().toString();
         String prevDue = null;
         for (Map<String, Object> s : steps) {
@@ -890,14 +897,25 @@ public class ProcessTaskService {
             s.put("实际完工", doneTimeText(no, rowId, str(s.get("工序"))));
         }
         // 已有台账(未作废):改线时回填
+        // 「实际开工」= **该道已审核报工的最早时间**(2026-10-30 用户口径「只有真报工才显示」),
+        //   不再直接读 落实时间 —— 落实时间历史上被「建台账/排产」顺手写成当时时刻(见 ensureLedgerForWorkOrder
+        //   与 preplanManual 的注释),那些是**假的实际开工**:实测 GD-2026-10-0229 工单 10-30 才建、
+        //   却显示 11:22 实际开工,而该工单一条报工都没有。改成按报工事实取最早时刻,
+        //   既修好新数据,也把存量脏时间一并"盖掉"(不需要改库)。
         List<Map<String, Object>> planned = jdbc.queryForList(
                 "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
                         + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(计划数量,0) AS 计划数量,"
                         + " CONVERT(varchar(10), 计划开工日期, 120) AS 计划开工日期,"
                         + " CONVERT(varchar(10), 计划完工日期, 120) AS 计划完工日期,"
-                        + " CONVERT(varchar(16), 落实时间, 120) AS 实际开工, ISNULL(状态,N'') AS 状态"
-                        + " FROM dbo.wo_process_line WHERE 工单号=? AND (? IS NULL OR 工单行id=?)"
-                        + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY ISNULL(工序序,999), id", no, lineId, lineId);
+                        + " CONVERT(varchar(16), (SELECT MIN(COALESCE(s.kssj, s.wgsj, s.sc_date)) FROM dbo.scjl s"
+                        + "    WHERE s.gldh = w.工单号 AND ISNULL(s.gxdm,N'') = ISNULL(w.工序,N'')"
+                        + "      AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "      AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = w.工单行id)"
+                        + "           OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "               (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id = w.工单行id)))), 120) AS 实际开工,"
+                        + " ISNULL(状态,N'') AS 状态"
+                        + " FROM dbo.wo_process_line w WHERE w.工单号=? AND (? IS NULL OR w.工单行id=?)"
+                        + " AND ISNULL(w.asp_cancel,'N')<>'Y' ORDER BY ISNULL(w.工序序,999), w.id", no, lineId, lineId);
         // ── 条7「排产带上次产线」(2026-10-25 定稿方案 v2)────────────────────────────────────
         // lastBasis(键=物料编码,用户拍板):
         //   · 【上次首道】键=plang_pc.dm(=本工单行 plang.dm);源=plang_pc 排产台账,
@@ -1092,11 +1110,13 @@ public class ProcessTaskService {
                     p.get("计划数量"),
                     p.get("计划开工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划开工日期"))),
                     p.get("计划完工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划完工日期"))),
-                    first ? "已落实" : "计划", first ? new java.util.Date() : null, user);
-            // 日排产(2026-10-29):按「计划开工日 ~ 计划完工日」把该道计划数量均摊成每日计划(wo_day_plan),
-            //   生产工单/工单排产两页的日期列据此自动带出;后续仍可人工逐格改。
-            autoFillDayPlan(rowId == null ? null : ((Number) rowId).longValue(), no, str(p.get("工序")), str(p.get("生产线")),
-                    str(p.get("计划开工日期")), str(p.get("计划完工日期")), num(p.get("计划数量")), user);
+                    // 落实时间(实际开工)= 留空(2026-10-30):排产只是"计划",不是"实际开工"。
+                    //   原实现写 new java.util.Date() ⇒ 排产那一刻就成了实际开工,而它还是 JVM 本地时间,
+                    //   与库 GETDATE()(UTC)差 8 小时。实际开工一律由 {@link #applyNextProcess} 在真转序时写。
+                    first ? "已落实" : "计划", null, user);
+            // ⚠ 2026-10-30 用户口径「把当前这个按日期均摊的功能删除,没啥用」:
+            //   这里原有一句 autoFillDayPlan(按「计划开工~计划完工」把计划数量均摊进 wo_day_plan)。
+            //   已删除 —— 日计划只由排产员在「生产工单 / 工单排产」两页的日期列里手工填、手工保存。
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工单号", no);
@@ -1357,44 +1377,9 @@ public class ProcessTaskService {
                 : t.toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
-    /**
-     * 按「计划开工日期 ~ 计划完工日期」把该道计划数量均摊成每日计划({@code wo_day_plan})。
-     *
-     * <p>用户口径(2026-10-29):「根据设定完工日期和数量配置每天需要完成的数量」⇒ 排线保存时
-     * 直接把日计划铺好,生产工单/工单排产两页表格的日期列自动带出;后续仍可人工逐格改。
-     * 均匀口径与前端 {@code buildSplit} 一致:整数件按整数排,余数给最后一天。
-     */
-    private void autoFillDayPlan(Long rowId, String no, String op, String line,
-                                 String startText, String dueText, double qty, String user) {
-        if (rowId == null || !notBlank(op) || qty <= 0 || !notBlank(startText) || !notBlank(dueText)) return;
-        java.time.LocalDate start;
-        java.time.LocalDate due;
-        try {
-            start = java.time.LocalDate.parse(startText.trim());
-            due = java.time.LocalDate.parse(dueText.trim());
-        } catch (RuntimeException e) {
-            return;
-        }
-        if (due.isBefore(start)) return;
-        // 重新排产 = 重排该道日计划:先作废该行该道全部有效格,再按新起止日铺
-        jdbc.update("UPDATE dbo.wo_day_plan SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
-                + " WHERE 工单行id=? AND 工序=? AND asp_cancel='N'", user, rowId, op);
-        List<Map<String, Object>> wo = jdbc.queryForList(
-                "SELECT TOP 1 pl_no, pl_xc FROM dbo.plang WHERE id=?", rowId);
-        Integer xc = wo.isEmpty() || wo.get(0).get("pl_xc") == null
-                ? null : ((Number) wo.get(0).get("pl_xc")).intValue();
-        int n = (int) (java.time.temporal.ChronoUnit.DAYS.between(start, due) + 1);
-        if (n <= 0) return;
-        boolean integerQty = Math.abs(qty - Math.rint(qty)) < 0.00005;
-        double base = integerQty ? Math.floor(qty / n) : Math.round((qty / n) * 10000) / 10000;
-        for (int i = 0; i < n; i++) {
-            double v = i == n - 1 ? round(qty - base * (n - 1)) : base;
-            if (v <= 0) continue;
-            jdbc.update("INSERT INTO dbo.wo_day_plan (工单行id, 工单号, 工单行号, 工序, 计划日期, 计划数量,"
-                            + " 生产线, asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,GETDATE(),N'N')",
-                    rowId, no, xc, op, start.plusDays(i), v, line, user);
-        }
-    }
+    // ⚠ 2026-10-30 已删除 autoFillDayPlan(按「计划开工~计划完工」把计划数量均摊成每日计划)。
+    //   用户口径:「把当前这个按日期均摊的功能删除,没啥用」。日计划(wo_day_plan)现在只由
+    //   「生产工单 / 工单排产」两页的日期列**手工填写 + 保存日排产**产生(见 WorkOrderDayPlanService.save)。
 
     /** 产线所属车间(取不到返回 null) */
     private String shopOfLine(String line) {

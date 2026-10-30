@@ -50,12 +50,10 @@
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
-      <!-- 日排产(2026-10-29):表格内的日期列 —— 保存计划 / 按完工日期均摊;列由后端按数据生成 -->
+      <!-- 日排产(2026-10-29):表格内的日期列 —— 只保留「保存日排产」;列由后端按数据生成
+           (2026-10-30 用户口径「把当前这个按日期均摊的功能删除,没啥用」⇒「按完工日期均摊」按钮与弹窗已删除) -->
       <el-button v-if="canDayPlan" size="small" type="success" plain :disabled="planDirtyCount === 0" @click="savePlan">
         {{ tt('保存日排产') }}（{{ planDirtyCount }}）
-      </el-button>
-      <el-button v-if="canDayPlan" size="small" plain :disabled="!splitTargetRow()" @click="openDpSplit">
-        {{ tt('按完工日期均摊') }}
       </el-button>
     </div>
 
@@ -177,11 +175,6 @@
       </div>
     </el-dialog>
 
-    <!-- 按完工日期均摊(2026-10-29):把该行剩余量铺到 起点~完工日,填进日期列后再保存 -->
-    <DayPlanSplitDialog v-model="dpSplitVisible" :工单号="dpSplitRow['工单号'] || ''" :工单行号="dpSplitRow['工单行号']"
-                        :工序="dpSplitRow['工序日'] || dpSplitRow['当前工序'] || ''" :剩余="dpSplitRemain"
-                        :完工日期="dpSplitDueDefault" @apply="applyDpSplit" />
-
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
 
@@ -246,7 +239,6 @@ import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
-import DayPlanSplitDialog from './DayPlanSplitDialog.vue'
 import { qtyText } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
@@ -444,48 +436,9 @@ async function savePlan() {
   } catch (e) { err(e, '保存失败') }
 }
 
-// 按完工日期均摊:优先勾选行,其次当前行(与切单/排产的"单行"口径一致)
-const dpSplitVisible = ref(false)
-const dpSplitRow = ref({})
-const dpSplitRemain = computed(() => {
-  const r = dpSplitRow.value || {}
-  const plan = Number(r['当前工序计划量'] || 0)
-  const done = Number(r['当前工序完工量'] || 0)
-  const left = plan - done
-  return left > 0 ? left : Number(r['排产数量'] || 0)
-})
-function splitTargetRow() {
-  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
-  if (alive.length === 1) return alive[0]
-  if (!alive.length && currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id))) {
-    return currentRow.value
-  }
-  return null
-}
-function openDpSplit() {
-  const r = splitTargetRow()
-  if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
-  dpSplitRow.value = r
-  dpSplitVisible.value = true
-}
-/** 均摊的默认完工日:取该行计划完工日期;超出窗口右端时夹到最后一天(窗口已按最晚完工日自动延长) */
-const dpSplitDueDefault = computed(() => {
-  const due = String(dpSplitRow.value['计划完工日期'] || '')
-  const last = planDates.value[planDates.value.length - 1] || ''
-  if (due && last && due > last) return last
-  return due || last
-})
-/** 清空该行当前各列计划后按均摊结果重填;均摊落到列之外的日期会并入列(否则"填了但看不到") */
-function applyDpSplit({ map }) {
-  const row = dpSplitRow.value
-  const all = Object.keys(map)
-  const merged = [...new Set([...planDates.value, ...all])].sort()
-  if (merged.length !== planDates.value.length) planDates.value = merged
-  for (const d of planDates.value) row.日计划[d] = undefined
-  for (const d of all) row.日计划[d] = map[d]
-  for (const d of planDates.value) markCell(row, d)
-  ElMessage.info(tt('已填充到表格,请点「保存日排产」'))
-}
+// ⚠ 2026-10-30 用户口径「把当前这个按日期均摊的功能删除,没啥用」:
+//   原「按完工日期均摊」(DayPlanSplitDialog + splitTargetRow/openDpSplit/applyDpSplit)已整体删除,
+//   日计划只由用户在日期列里逐格填写 → 点「保存日排产」落库。
 
 async function load() {  try {
     const cond = {}

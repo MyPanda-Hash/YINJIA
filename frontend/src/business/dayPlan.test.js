@@ -1,28 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSplit, diffPlan, qtyText, isPast } from './dayPlan.js'
+import { diffPlan, qtyText, isPast } from './dayPlan.js'
 
-test('均摊:整除时每天相同', () => {
-  const r = buildSplit(3000, '2026-10-29', '2026-10-31')
-  assert.deepEqual(r, { '2026-10-29': 1000, '2026-10-30': 1000, '2026-10-31': 1000 })
-})
-
-test('均摊:除不尽余数给最后一天,合计守恒', () => {
-  const r = buildSplit(3000, '2026-10-29', '2026-11-04')
-  const days = Object.keys(r)
-  assert.equal(days.length, 7)
-  assert.equal(days.reduce((a, d) => a + r[d], 0), 3000)
-  assert.equal(r['2026-11-04'], 3000 - 428 * 6)
-})
-
-test('均摊:起止同一天 = 全给当天', () => {
-  assert.deepEqual(buildSplit(1500, '2026-10-29', '2026-10-29'), { '2026-10-29': 1500 })
-})
-
-test('均摊:数量<=0 或完工日早于起点 → 空', () => {
-  assert.deepEqual(buildSplit(0, '2026-10-29', '2026-11-01'), {})
-  assert.deepEqual(buildSplit(100, '2026-11-02', '2026-11-01'), {})
-})
+// ⚠ 2026-10-30:「按完工日期均摊」已按用户口径删除(buildSplit 一并删除),
+//   这里只保留仍在用的纯函数测试。日计划改为手工逐格填写 + 保存。
 
 test('diffPlan:只回改动格(含清空)', () => {
   const orig = { '2026-10-30': 500, '2026-10-31': 500 }
