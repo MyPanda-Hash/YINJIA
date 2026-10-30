@@ -4359,3 +4359,18 @@ migrate-align-canceled-to-aspcancel-20261030.sql
 #   本脚本补 5 个物理列 + 5 条 yj_field detail 字段(译名已存在)+ 列中文注释。
 #   幂等;自检「列 5/5 且 字段 5/5」不满足整体回滚。两账套都执行。
 migrate-prodinfo-bom-detail-20261030.sql
+
+# 2026-10-30 产品规格书「4.产品性能检验项目及检验标准」补「检验子项」列。
+#   排查研发管理同类问题(比对 前端 dataTables cols ↔ yj_field.label ↔ 物理列)时发现:
+#   recordSheetConfigs.js:1649 有 `{ key: '检验子项' }`,但 yj_field 与 rd_spec_doc_detail
+#   都没有它 ⇒ 该列填的内容保存时被丢弃。groupSub 是设计遗留属性(无代码消费),不是豁免理由。
+#   本脚本补物理列 + yj_field(seq=75,夹在 检验项目70 / 检验要求80 之间) + 10 种语言译名。
+#   幂等;自检「列1/1、字段1/1、译名10/10」不满足整体回滚。两账套都执行。
+migrate-specdoc-subitem-20261030.sql
+
+# 2026-10-30 产品信息表表头补登记 4 个字段（项目编号/项目名称/客户名称/应用场景）。
+#   2026-10-29 新版纸面新增了这 4 个输入格（recordSheetConfigs.js:1234-1250），
+#   rd_prod_info_head 的物理列与 10 种语言译名**都已存在**，唯独 yj_field 没登记
+#   ⇒ 后端认不到这 4 个键，用户填了保存时被丢弃。本脚本只补 yj_field(place='header')。
+#   幂等；自检「字段4/4、列4/4、译名4/4」不满足整体回滚。两账套都执行。
+migrate-prodinfo-head-extra-20261030.sql
