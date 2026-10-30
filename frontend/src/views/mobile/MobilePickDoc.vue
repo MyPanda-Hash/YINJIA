@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30 第三轮改版)
 
   【两种状态,两套动作】
@@ -20,7 +20,7 @@
   页签取消,退料直接在"已完成"的同一张明细上做(勾选要退的行 → 填数量 → 提交退料)。
 -->
 <template>
-  <div class="mp">
+  <div class="mp" :class="{ 'is-readonly': readOnly }">
     <div class="mp-top">
       <span class="mp-back" @click="goBack">‹</span>
       <div class="mp-head">
@@ -849,5 +849,14 @@ async function submit() {
   .mp { display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 12px; align-items: start; }
   .mp-top, .mp-err, .mp-ok, .mp-foot { grid-column: 1 / -1; }
   .mp-card { margin: 0 0 12px; }
+
+  /* 只读模式(2026-10-30):从开单工作台点进来时**没有扫码区**,
+     两栏布局会把左栏整块留空(用户报障「排版有问题」)⇒ 改单栏、收窄居中,
+     抬头与明细上下排,和一张单据的阅读顺序一致。 */
+  .mp.is-readonly { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+  .mp.is-readonly .mp-top,
+  .mp.is-readonly .mp-ro,
+  .mp.is-readonly .mp-err,
+  .mp.is-readonly .mp-ok { grid-column: 1 / -1; }
 }
 </style>

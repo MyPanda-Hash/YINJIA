@@ -606,7 +606,7 @@ public class MobilePickController {
 
         // ② 库存可用量(按 物料+仓库 汇总;批次明细另给,前端沿用先进先出拆批)
         String wh = str(hit.get("仓库"));
-        List<Map<String, Object>> stock = stockRows(code, wh);
+        List<Map<String, Object>> stock = stockRows(code, wh, d.outNo());
         double total = 0;
         for (Map<String, Object> r : stock) total += num(r.get("现存量"));
         total = round4(total);
@@ -668,7 +668,7 @@ public class MobilePickController {
         // 库存守卫(领料):超出跨批次合计就拦 —— 用户口径「只要仓库数量足够,多少都可以」
         if (!"back".equals(side) && qty > 0) {
             double avail = 0;
-            for (Map<String, Object> r : stockRows(code, str(hit.get("仓库")))) avail += num(r.get("现存量"));
+            for (Map<String, Object> r : stockRows(code, str(hit.get("仓库")), d.outNo())) avail += num(r.get("现存量"));
             if (round4(qty) > round4(avail)) {
                 throw new IllegalStateException("库存不足:物料 " + code + " 当前可用 " + round4(avail)
                         + ",本次要填 " + qty + ";请减少数量或先补货");
@@ -1229,8 +1229,31 @@ public class MobilePickController {
         }
     }
 
-    /** 该物料的库存批次行(v_stock_pick 口径:物料+仓库+批号,只出有货的) */
-    private List<Map<String, Object>> stockRows(String code, String wh) {
+    /**
+     * 该物料的**可用量**批次行(2026-10-30 口径改造)。
+     *
+     * <h3>为什么不再是"实时结存"</h3>
+     * 用户口径(本轮):「判断库存的计算是不是其他入库和材料出库审核后才可以计算的」——
+     * 对,{@code kucun} 只在**审核过账**时变动(StockLedgerService),草稿不动库存。
+     * 但那样一来,两张未审核的草稿可以各自领到同一个数字,审核时才突然发现不够。
+     * ⇒ 显示给现场的是**可用量** = 实时结存 − **其他未审核草稿**已占用的量。
+     *
+     * <h3>口径</h3>
+     * <ul>
+     *   <li>基数:{@code v_stock_pick}(= kucun 三键结存,已过账的真账);</li>
+     *   <li>扣减:同物料、同仓库、**状态为草稿**(即还没审核)的材料出库单明细数量合计;
+     *       ⚠ 要排除**本单自己** —— 否则自己已填的数量会把自己挤掉,越领越少;</li>
+     *   <li>不退到负数:最多减到 0(已填满的单会让可用量显示 0,不会显示负数)。</li>
+     * </ul>
+     *
+     * <p>批次行仍按 (物料,仓库,批号) 给,{@code 现存量} 字段放的是**可用量**;
+     * 批号级的占用量按"同批号优先抵扣,不够再顺延"分摊,保证各行可用量加起来等于总量。
+     *
+     * @param code    物料编码
+     * @param wh      仓库(空 = 不限)
+     * @param selfNo  本单编号(排除本单自己的占用量;null/空 = 不排除)
+     */
+    private List<Map<String, Object>> stockRows(String code, String wh, String selfNo) {
         String sql = "SELECT 存货编码, 存货名称, 规格型号, 计量单位, 仓库, 仓库编码, 批号, 现存量"
                 + " FROM dbo.v_stock_pick WHERE 存货编码 = ?"
                 + (wh == null || wh.isBlank() ? "" : " AND (仓库 = ? OR 仓库编码 = ?)")
@@ -1238,13 +1261,45 @@ public class MobilePickController {
         List<Map<String, Object>> rows = (wh == null || wh.isBlank())
                 ? jdbc.queryForList(sql, code)
                 : jdbc.queryForList(sql, code, wh, wh);
+
+        // 其他未审核草稿已占用的量(按 批号 分组;没有批号的行合并到空批号)
+        Map<String, Double> occupied = new LinkedHashMap<>();
+        try {
+            String osql = "SELECT ISNULL(l.批号,N'') AS lot, SUM(ISNULL(l.数量,0)) AS qty"
+                    + " FROM dbo.bl_material_out l"
+                    + " JOIN dbo.bd_material_out h ON h.单据编号 = l.单据编号"
+                    + " WHERE l.材料编码 = ? AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                    + "   AND ISNULL(l.数量,0) > 0"
+                    + "   AND ISNULL(h.单据编号, N'') <> ?"
+                    // 未审核 = 还没在 yj_doc_status 里写审核人(shr)。已审核的已经在 kucun 里扣过了,不能再扣一次。
+                    + "   AND NOT EXISTS (SELECT 1 FROM dbo.yj_doc_status s"
+                    + "                    WHERE s.panel_code = N'MATERIAL_OUT' AND s.doc_no = h.单据编号"
+                    + "                      AND ISNULL(s.shr, N'') <> N'')"
+                    + " GROUP BY ISNULL(l.批号,N'')";
+            for (Map<String, Object> r : jdbc.queryForList(osql, code, selfNo == null ? "" : selfNo)) {
+                occupied.put(str(r.get("lot")), num(r.get("qty")));
+            }
+        } catch (RuntimeException e) {
+            // 占用查询失败不阻断:退化为实时结存(宁可显示宽一点,也不要让扫码直接报错)
+            log.debug("可用量占用查询失败,退化为实时结存:{}", e.getMessage());
+        }
+
+        // 逐行抵扣:先扣同批号的占用,再按顺序扣空批号/其它批号的剩余占用
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
+            String lot = str(r.get("批号"));
+            double avail = num(r.get("现存量"));
+            double occ = occupied.getOrDefault(lot, 0d);
+            if (occ > 0) {
+                double take = Math.min(occ, avail);
+                avail = round4(avail - take);
+                occupied.put(lot, round4(occ - take));
+            }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("批号", r.get("批号"));
             m.put("仓库", r.get("仓库"));
             m.put("仓库编码", r.get("仓库编码"));
-            m.put("现存量", r.get("现存量"));
+            m.put("现存量", round4(Math.max(0, avail)));
             out.add(m);
         }
         return out;

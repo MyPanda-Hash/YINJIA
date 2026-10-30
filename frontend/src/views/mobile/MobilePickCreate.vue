@@ -164,7 +164,7 @@
           v-for="w in woCreated"
           :key="'c' + w.工单号 + '#' + w.工单行号"
           class="mp-wo-row is-done is-click"
-          @click="openDoc(w.台账id)"
+          @click="openDoc(w)"
         >
           <div class="mp-wo-l1">
             <span class="mp-wo-no">{{ w.工单号 }}<i> #{{ w.工单行号 }}</i></span>
@@ -190,6 +190,42 @@
       </el-button>
       <el-button size="large" @click="loadWoStatus">{{ tt('刷新开单状态') }}</el-button>
     </div>
+
+    <!-- 看明细抽屉(2026-10-30 用户口径:「点击生成的明细就直接到生产领料那边去了,想回来查看非常不方便」)
+         ⇒ 不再跳转到「生产领料」的单据页,改为**就地弹抽屉**:看完关掉,还停在开单工作台原位,
+           不必再点菜单回来。抽屉里只读(与详情页 readOnly 同一口径:不让在这一页领料/退料)。 -->
+    <el-drawer
+      v-model="detailOpen"
+      :title="detail.领料单号 || tt('领料明细')"
+      direction="rtl"
+      size="620px"
+      :destroy-on-close="true"
+    >
+      <div v-if="detailLoading" class="mp-empty">{{ tt('加载中') }}</div>
+      <template v-else>
+        <div class="mp-dv-head">
+          <div class="mp-kv"><span>{{ tt('工单号') }}</span><b>{{ detail.工单号 }}<i v-if="detail.工单行号"> #{{ detail.工单行号 }}</i></b></div>
+          <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ detail.产品名称 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('状态') }}</span><b :class="{ ok: String(detail.状态) === '已完成' }">{{ detail.状态 }}</b></div>
+          <div class="mp-kv"><span>{{ tt('领料进度') }}</span><b>{{ detail.已领项数 || 0 }} / {{ detail.物料项数 || 0 }}</b></div>
+          <div v-if="detail.退料单号" class="mp-kv"><span>{{ tt('退料单号') }}</span><b>{{ detail.退料单号 }}</b></div>
+        </div>
+        <div class="mp-dv-title">{{ tt('领料明细') }}</div>
+        <div v-if="!(detail.领料明细 || []).length" class="mp-empty">{{ tt('没有明细') }}</div>
+        <div v-for="r in (detail.领料明细 || [])" :key="r.行号" class="mp-dv-line">
+          <div class="mp-dv-main">
+            <div class="mp-dv-name">{{ r.名称 || r.编码 }}</div>
+            <div class="mp-dv-meta">{{ r.编码 }} · {{ r.规格 || '—' }}<template v-if="r.仓库"> · {{ r.仓库 }}</template></div>
+          </div>
+          <div class="mp-dv-qty">
+            <b class="num">{{ fmtQty(r.数量) }}</b><span class="mp-dv-sep">/</span>
+            <span class="num mp-dv-need">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</span>
+            <i>{{ r.单位 }}</i>
+          </div>
+        </div>
+        <div class="mp-dv-note">{{ tt('只读查看:领料与退料请到「生产领料」里操作') }}</div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -222,6 +258,11 @@ const okText = ref('')
  */
 const woList = ref([])
 
+/** 明细抽屉(就地查看,不跳页 —— 见 openDoc 注释) */
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detail = ref({})
+
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 const baseUrl = (() => {
   try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
@@ -246,15 +287,32 @@ function clearMsg() { errText.value = ''; okText.value = '' }
 function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 
 /**
- * 点开工单行 → 看明细(2026-10-30 用户口径:「单据可以点开看明细」)。
+ * 点开工单行 → **就地弹抽屉看明细**(2026-10-30 第二轮修正)。
  *
- * 只对**已开单**的行可点(没开单的点进去也没有明细)。跳的是「生产领料」的单据详情,
- * 因为明细(领了哪些料、领了多少)本来就长在那张单上 —— 这里只是给一个"从工单进到明细"的入口,
- * 不重复实现一份只读明细(重复实现必然和单据详情分叉)。
+ * <p>用户报障:「点击生成的明细就直接到生产领料那边去了,想回来查看非常不方便」——
+ * 原来这里是 `router.push('/panelx/list/MOBILE_PICK/doc?...')`,一跳走就离开了开单工作台,
+ * 看完还得重新点菜单回来、重新查一次。
+ *
+ * <p>⇒ 改成抽屉:关掉即回到原位,列表状态与滚动位置都不丢。
+ * 抽屉里**只读**(不提供扫码/数量/提交/退料):这一页的职责到"生单"为止,
+ * 领料与退料去「生产领料」—— 与 readOnly 详情页同一口径。
  */
-function openDoc(id) {
+async function openDoc(w) {
+  const id = w && w.台账id
   if (!id) return
-  router.push({ path: '/panelx/list/MOBILE_PICK/doc', query: { id: String(id), readOnly: '1' } })
+  detail.value = { 工单号: w.工单号, 工单行号: w.工单行号, 领料明细: [] }
+  detailOpen.value = true
+  detailLoading.value = true
+  clearMsg()
+  try {
+    const res = await request.get('/px/mobilePick/doc', { params: { id } })
+    detail.value = res.data?.data || res.data || {}
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('加载单据失败')
+    detailOpen.value = false
+  } finally {
+    detailLoading.value = false
+  }
 }
 function fmtQty(v) {
   const n = Number(v)
@@ -524,6 +582,25 @@ async function loadWoStatus() {
 .mp-wo-l3 .mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mp-wo-prog { flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
 .mp-wo-more { flex: none; margin-left: auto; color: var(--el-color-primary); font-size: 12px; }
+
+/* 明细抽屉(就地查看,不跳页) */
+.mp-dv-head { margin-bottom: 12px; }
+.mp-dv-title { margin: 10px 0 6px; font-size: 13px; font-weight: 600; }
+.mp-dv-line {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+.mp-dv-main { flex: 1; min-width: 0; }
+.mp-dv-name { font-size: 14px; }
+.mp-dv-meta { margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
+.mp-dv-qty { flex: none; text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
+.mp-dv-qty b { font-weight: 600; }
+.mp-dv-sep { margin: 0 2px; color: var(--el-text-color-placeholder); }
+.mp-dv-need { color: var(--el-text-color-secondary); }
+.mp-dv-qty i { font-style: normal; margin-left: 3px; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-dv-note { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
+.mp-kv > b.ok { color: var(--el-color-success); }
+.mp-kv > b i { font-style: normal; color: var(--el-text-color-secondary); }
 
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
