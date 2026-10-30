@@ -6163,6 +6163,14 @@ public class ButtonService {
             putIfVal(draft, "产品类别", src.get("产品类别"));
             putIfVal(draft, "客户项目名称", src.get("客户项目名称"));
             putIfVal(draft, "客户料号", src.get("客户料号"));
+            // 2026-10-30 用户报障「应用场景没有导过来，看看还有没有没有导过来的字段」：
+            //   产品信息表 → 规格书这张草稿的映射原先只覆盖 7 个字段，漏了两个**两边都有**的：
+            //     · 应用场景（规格书 RD_SPEC_DOC.应用场景 / col=应用场景）—— 实测 PI-2026-10-0064 该格有值「台面机」却没带；
+            //     · 客户名称（规格书 label=客户名称，**物理列叫 客户名**）—— 靠 labelsToCols 按 label→col 落库，draft 键写 label。
+            //   其余对不上的都不是"漏"：项目名称/项目编号/产品功能类别/产品形态/产品管控等级 规格书没有对应字段；
+            //   适用范围/炭棒处理要求/包装方式/出货检验报告/运输要求/存储环境 是规格书独有，产品信息表没有。
+            putIfVal(draft, "应用场景", src.get("应用场景"));
+            putIfVal(draft, "客户名称", src.get("客户名称"));
             putIfVal(draft, "产品主要性能", src.get("特殊性能描述"));
             putIfVal(draft, "整体规格参数", specSizeText(src));
             if (draft.isEmpty()) return "";

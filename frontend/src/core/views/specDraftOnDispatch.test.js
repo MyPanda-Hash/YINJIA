@@ -101,3 +101,31 @@ test('新建规格书的「版本」自动生成 V+年月日(仅新建且为空�
   assert.ok(!/UPDATE\s+\w+\s+SET\s+\[?版本\]?\s*=/.test(buttons), '不该有"UPDATE 版本"这种回写')
   assert.match(buttons, /if \(vdef1 != null && !cols\.containsKey\("版本"\)/, '只在没有值时写')
 })
+
+// ── 产品信息表 → 规格书草稿的字段映射(2026-10-30 用户报障「应用场景没有导过来,看看还有没有没导过来的字段」) ──
+// 口径:凡**规格书有该字段、产品信息表也有该列**的，都必须带过去;两边对不上的不在此列。
+test('规格书草稿的字段映射：产品信息表与规格书共有的字段一个都不能漏', () => {
+  // 产品信息表(rd_prod_info_head) → 规格书(yj_field label) 的共有字段，逐条钉死
+  const EXPECT = [
+    ['产品编号', '产品编号'],
+    ['名称', '产品名称'],
+    ['产品类别', '产品类别'],
+    ['客户项目名称', '客户项目名称'],
+    ['客户料号', '客户料号'],
+    ['产品主要性能', '特殊性能描述'],
+    // 下面两条是 2026-10-30 补的 —— 原先漏了，实测 应用场景=台面机、客户名称 都没带进草稿
+    ['应用场景', '应用场景'],
+    ['客户名称', '客户名称'],
+  ]
+  for (const [specLabel, srcCol] of EXPECT) {
+    const re = new RegExp(`putIfVal\\(draft, "${specLabel}", src\\.get\\("${srcCol}"\\)\\)`)
+    assert.match(buttons, re, `规格书「${specLabel}」必须从产品信息表「${srcCol}」带过来`)
+  }
+  // 整体规格参数是拼装的(整体尺寸 + 炭棒三格)，单独确认
+  assert.match(buttons, /putIfVal\(draft, "整体规格参数", specSizeText\(src\)\)/)
+  // 反例守卫:别把规格书没有的字段硬塞进去(写不存在的 label 会被静默丢弃,反而掩盖问题)
+  for (const absent of ['项目名称', '项目编号', '产品功能类别', '产品管控等级']) {
+    assert.ok(!new RegExp(`putIfVal\\(draft, "${absent}"`).test(buttons),
+      `规格书没有「${absent}」这个字段，不该出现在草稿映射里`)
+  }
+})
