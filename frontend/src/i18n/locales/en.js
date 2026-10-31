@@ -2266,6 +2266,8 @@ export default {
     '注册资本': 'Registered Capital',
     '成立日期': 'Founded Date',
     '订单编号': 'Order No.',
+    '订单号': 'Order No.',
+    '订单行号': 'Order Line No.',
     '客户PO': 'Customer PO',
     '订单日期': 'Order Date',
     '订单类型': 'Order Type',

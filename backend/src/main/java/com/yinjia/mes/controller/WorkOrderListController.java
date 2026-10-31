@@ -140,11 +140,13 @@ public class WorkOrderListController {
             args.add(String.valueOf(b.get("生产线")).trim());
         }
         // 单框模糊搜索(2026-09-26 用户拍板):关键字在 工单号/物料编码/产品名称/客户代码/客户名称 多列 OR
+        // 2026-10-31 补「订单号」:工单带订单追溯后,按销售订单号反查生产工单是现场常见用法
         String kw = b.get("keyword") == null ? "" : String.valueOf(b.get("keyword")).trim();
         if (!kw.isEmpty()) {
             String like = "%" + kw + "%";
-            w.append(" AND (p.pl_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,N'') LIKE ?)");
-            for (int i = 0; i < 5; i++) args.add(like);
+            w.append(" AND (p.pl_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,N'') LIKE ?"
+                    + " OR ISNULL(p.od_no,N'') LIKE ?)");
+            for (int i = 0; i < 6; i++) args.add(like);
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.comm AS 公司代码, p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
@@ -153,6 +155,13 @@ public class WorkOrderListController {
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
                         + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
+                        // 订单追溯(2026-10-31 用户口径「工单里要有订单ID或订单号,订单行号,能够保持订单的追溯」):
+                        //   · 订单号 = plang.od_no(转单时从销售订单带入);
+                        //   · 订单行号 = {@link com.yinjia.mes.service.PlangOrderLine}(按 od_xc 行 id 精确解析,
+                        //     过期时按「同订单同物料唯一行」兜底;解析不出的显示空,不硬凑)。
+                        //   工单行号 pl_xc 本身也等于订单行号(每次转单一张新工单、单行),这里显式给出便于核对。
+                        + " ISNULL(p.od_no, N'') AS 订单号,"
+                        + " " + com.yinjia.mes.service.PlangOrderLine.expr("p") + " AS 订单行号,"
                         + " ISNULL(p.scx, N'') AS 生产线,"
                         + " ISNULL(p.[打印人], N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
                         // 切单父子关联(9.29 批次①,2026-10-05):子单带 源工单号/拆分序号,列表直接可见「由谁切出」
@@ -213,6 +222,8 @@ public class WorkOrderListController {
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
                         + " FROM dbo.plang p"
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
+                        // 订单追溯(2026-10-31):od_xc 存销售订单行 id ⇒ 反查行号(见 SELECT 段注释)。
+                        + com.yinjia.mes.service.PlangOrderLine.join("p")
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress prg ON prg.单号 = p.pl_no`:

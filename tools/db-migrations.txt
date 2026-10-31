@@ -4410,3 +4410,11 @@ migrate-asm-bom-data-20261030.sql
 #   设计定稿:docs/design/出厂检验报告-从三张检验单并集生成.md。两账套都执行。
 migrate-oqc-report-20261030.sql
 migrate-oqc-itemmap-seed-20261030.sql
+
+# 2026-10-31 订单结转转工单口径修正(修存量):需求数量 = 本次转单数量。
+#   旧代码把 xq_sl 写成整条订单行数量 ⇒ 同一订单行分两次转时,两张工单各带一份整单需求
+#   (需求重复计,用户报障 200+200)。判据:有 ACTIVE 的 SO→PLANG 占用链且 xq_sl > 占用合计
+#   (完整转出/切单父子行都相等,不动;没有占用链的手机端直写行也不动)。
+#   代码侧:QuickScheduleService.createFromOrderLine 改为每次转单一张新工单 + 行号=订单行号。
+#   两账套均执行(先正式、后测试)。
+migrate-plang-order-demand-20261031.sql

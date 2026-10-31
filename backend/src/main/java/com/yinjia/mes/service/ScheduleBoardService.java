@@ -754,6 +754,9 @@ public class ScheduleBoardService {
             head = jdbc.queryForMap(
                     "SELECT TOP 1 p.pl_no AS 加工单号, CONVERT(varchar(10), p.pl_date, 120) AS 工单日期,"
                             + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.od_no,N'') AS 客户订单号,"
+                            // 订单追溯(2026-10-31 用户口径):追溯头带出订单行号 —— 解析口径与生产工单列表
+                            // 同一份实现({@link PlangOrderLine}:od_xc 行 id 精确 → 同订单同物料唯一行兜底)。
+                            + " " + PlangOrderLine.expr("p") + " AS 订单行号,"
                             + " p.dm AS 产品编码, ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
                             + " ISNULL(p.jldw,N'') AS 单位, ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_man,N'') AS 操作员,"
                             + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
@@ -778,6 +781,8 @@ public class ScheduleBoardService {
                             + " ISNULL(p.asp_user1,N'') AS 创建人, CONVERT(varchar(16), p.asp_time1, 120) AS 创建时间"
                             + " FROM dbo.plang p"
                             + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
+                            // 订单追溯(2026-10-31):od_xc 存销售订单行 id ⇒ 反查 行号(同上 SELECT 注释)。
+                            + PlangOrderLine.join("p")
                             + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                             + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                             + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
@@ -829,8 +834,14 @@ public class ScheduleBoardService {
                             + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                             + " ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
                             + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.lot_no,N'') AS 批号,"
+                            // 订单追溯(2026-10-31):**按行**解析订单行号 —— 追溯头默认取整单首行,
+                            // 老「一单多行」工单按行看时必须换成当前行的(QA 复核用例:
+                            // GD-2026-09-0009 行id=22 的 工单行号=7 却显示 订单行号=1)。
+                            + " " + PlangOrderLine.expr("p") + " AS 订单行号,"
                             + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案"
-                            + " FROM dbo.plang p WHERE p.pl_no=? AND p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'",
+                            + " FROM dbo.plang p"
+                            + PlangOrderLine.join("p")
+                            + " WHERE p.pl_no=? AND p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'",
                     doc, rowId);
             if (!rr.isEmpty()) curRow = rr.get(0);
         }
@@ -849,6 +860,8 @@ public class ScheduleBoardService {
             head.put("单据状态", "Y".equals(String.valueOf(curRow.get("结案"))) ? "已结案"
                     : ("".equals(String.valueOf(curRow.get("生产线"))) ? "未排产" : "已排产"));
             head.put("工单行号", curRow.get("工单行号"));
+            // 订单行号也按行覆盖(2026-10-31 QA P2):整单口径的头是首行解析值,按行看必须换成本行的
+            head.put("订单行号", curRow.get("订单行号"));
             head.put("批次号", rowBatch);
             head.put("追溯口径", "按工单行");
         } else {
