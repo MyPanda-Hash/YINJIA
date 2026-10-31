@@ -30,8 +30,9 @@ const d = res?.data || {}
 console.log('行数 =', (d['行'] || []).length, '日期列 =', (d['日期'] || []).join(' '), '今天 =', d['今天'])
 if (!(d['行'] || []).length) { console.log('无数据'); process.exit(1) }
 
-const { schedPlanSheetHtml } = await import('file:///D:/workspace/yinjia/frontend/src/business/print-formats.js')
-const body = schedPlanSheetHtml(d['行'], d['日期'] || [], { today: d['今天'] || '', days: 7 })
+const { schedPlanPrintHtml } = await import('file:///D:/workspace/yinjia/frontend/src/business/print-formats.js')
+// 两张合一(排单计划 + 成型生产任务单/二维码),与出纸内容完全一致
+const body = await schedPlanPrintHtml(d['行'], d['日期'] || [], { today: d['今天'] || '', days: 7 })
 const html = '<!doctype html><html><head><meta charset="utf-8"><title>成型车间排单计划</title></head>'
   + '<body style="margin:6mm;background:#fff">' + body + '</body></html>'
 const file = path.join(process.cwd(), '_sheet_preview.html')
@@ -41,7 +42,7 @@ console.log('[written]', file)
 const s = await launch({ port: 9479 })
 try {
   // A4 横向 297×210mm ≈ 1123×794px @96dpi;留一点余量看整张
-  await s.send('Emulation.setDeviceMetricsOverride', { width: 1180, height: 860, deviceScaleFactor: 1.4, mobile: false })
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1180, height: 1700, deviceScaleFactor: 1.2, mobile: false })
   await s.navigate('file:///' + file.replace(/\\/g, '/'))
   await sleep(1200)
   const png = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })

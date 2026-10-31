@@ -58,3 +58,27 @@ export function isOverCapacity(planned, capacity) {
   const cap = Number(capacity || 0)
   return cap > 0 && Number(planned || 0) > cap + 1e-6
 }
+
+/**
+ * 日计划格的**融合显示**(2026-10-31 用户口径:「计划和实际排产这个得融合的好一点,当前太丑了…
+ * 如果没达成当前的计划产量日期的量再填入实际的数量,没有实际报工的话就还是显示原来的数量」)。
+ *
+ * <p>一个格子只显示**一个数**:
+ * <ul>
+ *   <li>当天没有已审报工 ⇒ 显示**计划**(原来那样);</li>
+ *   <li>报了但**没达成**计划 ⇒ 显示**实际**(一眼看出差多少);</li>
+ *   <li>已达成的 ⇒ 仍显示**计划**(达成时两者没差,不必再标)。</li>
+ * </ul>
+ * 计划为 0 却有报工(临时插单/补做)⇒ 显示实际。
+ *
+ * @param {number} plan   当日计划(人工指定 ∪ 自动摊剩余后的值)
+ * @param {number} actual 当日已审核报工量
+ * @returns {{qty:number, isActual:boolean}} qty=要显示的数; isActual=显示的是不是实际值(前端标色)
+ */
+export function dayCellQty(plan, actual) {
+  const p = Number(plan || 0)
+  const a = Number(actual || 0)
+  if (a <= 0) return { qty: p, isActual: false }
+  if (p <= 0 || a < p) return { qty: a, isActual: true }
+  return { qty: p, isActual: false }
+}

@@ -158,15 +158,15 @@
           </div>
         </template>
         <template #default="{ row }">
-          <span class="dp-plan" :class="{ manual: isManual(row, d) }"
-                :title="tt('双击可改当天数量;清空恢复自动')" @dblclick="openQuick(row, d)">
-            {{ qtyText((row.日计划 || {})[d]) }}<span v-if="isManual(row, d)" class="dp-hand"
+          <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
+                           :controls="false" :min="0" class="dp-input" autofocus
+                           @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
+          <span v-else class="dp-plan" :class="{ manual: isManual(row, d), short: dayCell(row, d).isActual }"
+                :title="dayTitle(row, d)" @dblclick="startQtyEdit(row, d)">
+            {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
                 :class="{ over: Number(row.超分配 || 0) > 0 }"
                 :title="overTitle(row)">{{ tt('手') }}</span>
           </span>
-          <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
-            <span class="dp-act-lb">{{ tt('实') }}</span>{{ qtyText(row.日报工[d]) }}
-          </div>
         </template>
       </el-table-column>
       <el-table-column :label="tt('工序进度')" width="120" align="right">
@@ -274,8 +274,8 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
-import { qtyText, dayColState, isToday } from '@/business/dayPlan'
-import { fetchDayPlan } from '@/business/dayPlanApi'
+import { qtyText, dayColState, isToday, dayCellQty } from '@/business/dayPlan'
+import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -419,6 +419,8 @@ function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 // 数据接口与工单排产同一套(/px/scheduleBoard/dayPlan/*),两页行为一致。
 const planDates = ref([])
 const planToday = ref('')
+/** 「日排产」权(改当天数量/日期):两页任一授予即可 */
+const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
 /** 排产快速调整弹窗(生产工单页不带「调线」块 —— 用户口径 A:该页不需要调线) */
 const quickVisible = ref(false)
 const quickRow = ref({})
@@ -435,6 +437,43 @@ function isManual(row, d) { return ((row.人工指定 || {})[d] ?? null) != null
 function overTitle(row) {
   const over = Number(row.超分配 || 0)
   return over > 0 ? `${tt('人工指定')} · ${tt('超分配')} ${qtyText(over)}` : tt('人工指定')
+}
+
+/** 格内显示一个数:计划 ∪ 实际融合(未达成显示实际;没报工显示计划) —— 见 business/dayPlan.js */
+function dayCell(row, d) {
+  return dayCellQty((row.日计划 || {})[d], (row.日报工 || {})[d])
+}
+/** 格 tooltip:计划 / 实报都摆出来,但不占版面 */
+function dayTitle(row, d) {
+  const p = Number((row.日计划 || {})[d] || 0)
+  const a = Number((row.日报工 || {})[d] || 0)
+  return `${tt('计划')} ${qtyText(p)}` + (a ? ` · ${tt('实报')} ${qtyText(a)}` : '')
+    + ' · ' + tt('双击直接填当天数量;清空恢复自动')
+}
+
+/** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
+const qtyEdit = ref('')
+const qtyDraft = ref(0)
+function qtyKey(row, d) { return `${row.行id}|${d}` }
+function startQtyEdit(row, d) {
+  if (!canDayPlan.value) return
+  qtyEdit.value = qtyKey(row, d)
+  qtyDraft.value = Number(dayCell(row, d).qty || 0) || undefined
+}
+function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
+async function commitQty(row, d) {
+  if (qtyEdit.value !== qtyKey(row, d)) return
+  const v = Number(qtyDraft.value || 0)
+  const before = Number(dayCell(row, d).qty || 0)
+  qtyEdit.value = ''
+  if (v === before) return
+  try {
+    const r = await saveDayPlan([{ 工单行id: row.行id, 工序: row.工序日 || row.当前工序 || '',
+      生产线: row.生产线 || '', 计划日期: d, 计划数量: v }])
+    const o = (r['超分配'] || []).find((x) => String(x['工单行id']) === String(row.行id))
+    if (o) ElMessage.warning(`${tt('人工指定已超出工序计划量')}: ${qtyText(o['超出'])}${tt('(只提示,不拦保存)')}`)
+    await loadDayPlan()
+  } catch (e) { err(e, '保存失败') }
 }
 
 async function loadDayPlan() {
@@ -838,6 +877,9 @@ onActivated(() => {
 .wol-table { flex: 1; min-height: 0; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
+/* 2026-10-31 融合显示:未达成计划的格子显示的是「实际」值 ⇒ 标橙色一眼看出差多少 */
+.dp-plan.short { color: #e6a23c; }
+.dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
 .dp-plan.manual { color: #b88230; }
 .dp-hand { margin-left: 2px; padding: 0 2px; font-size: 10px; font-weight: 700; color: #fff;

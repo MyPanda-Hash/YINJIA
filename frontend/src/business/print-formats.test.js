@@ -204,13 +204,20 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', () => {
   assert.ok(html.includes('成型车间排单计划'), '标题')
 })
 
-test('printSchedPlanSheet:空数据不出纸;有数据走页面内打印', () => {
+test('printSchedPlanSheet:空数据不出纸;有数据一次出两张(排单计划 + 生产任务单/二维码)', async () => {
   const before = captured.printed
-  assert.equal(printSchedPlanSheet([], []), false, '空数据返回 false,不打印')
+  assert.equal(await printSchedPlanSheet([], []), false, '空数据返回 false,不打印')
   assert.equal(captured.printed, before, '空数据不应触发 window.print')
-  const ok = printSchedPlanSheet([{ 客户: 'A', 生产线: '1号机', 日计划: { '2026-10-31': 1 } }],
-    ['2026-10-31'], { today: '2026-10-31' })
+  const ok = await printSchedPlanSheet([{
+    客户: 'A', 生产线: '1号机', 加工单号: 'GD-1', 工单行号: 1, 公司代码: '0',
+    物料编码: 'S031-3', 产品名称: '滤芯', 规格型号: '28*12', 需求数量: 10, 排产数量: 10,
+    计划完工日期: '2026-11-05', 日计划: { '2026-10-31': 1 },
+  }], ['2026-10-31'], { today: '2026-10-31' })
   assert.equal(ok, true)
   assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
-  assert.ok(captured.html.includes('A'))
+  assert.ok(captured.html.includes('成型车间排单计划'), '第 1 张:排单计划')
+  assert.ok(captured.html.includes('成型生产任务单'), '第 2 张:生产任务单(与打印工单同款)')
+  assert.ok(captured.html.includes('page-break-after'), '两张之间分页')
+  assert.ok(/data:image\/png/.test(captured.html), '任务单行尾二维码')
+  assert.ok(captured.html.includes('GD-1') && captured.html.includes('S031-3'), '任务单主要信息')
 })

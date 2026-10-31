@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { qtyText, isPast, isToday, dayColState, isOverCapacity } from './dayPlan.js'
+import { qtyText, isPast, isToday, dayColState, isOverCapacity, dayCellQty } from './dayPlan.js'
 
 // ⚠ 2026-10-31 用户口径「当前不需要手填,能自动算就可以了」:
 //   日计划改由后端自动均摊(DayPlanSpread),前端的 buildSplit / diffPlan / unplannedQty
@@ -41,4 +41,18 @@ test('isOverCapacity:超产能只用于显示;未配产能(<=0)不判', () => {
   assert.equal(isOverCapacity(0, 11000), false)
   assert.equal(isOverCapacity(12000, 0), false)     // 未配产能 = 不判超载
   assert.equal(isOverCapacity(12000, null), false)
+})
+
+test('dayCellQty:计划/实际融合成一个数(未达成显示实际,没报工显示计划)', () => {
+  // 没报工 ⇒ 显示计划
+  assert.deepEqual(dayCellQty(2, 0), { qty: 2, isActual: false })
+  // 报了但没达成 ⇒ 显示实际(标色)
+  assert.deepEqual(dayCellQty(5, 3), { qty: 3, isActual: true })
+  // 达成 ⇒ 仍显示计划
+  assert.deepEqual(dayCellQty(5, 5), { qty: 5, isActual: false })
+  assert.deepEqual(dayCellQty(5, 8), { qty: 5, isActual: false })
+  // 计划 0 但有报工(补做)⇒ 显示实际
+  assert.deepEqual(dayCellQty(0, 3), { qty: 3, isActual: true })
+  // 空值安全
+  assert.deepEqual(dayCellQty(null, null), { qty: 0, isActual: false })
 })
