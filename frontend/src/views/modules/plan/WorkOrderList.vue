@@ -133,8 +133,9 @@
       <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
       <!-- ⚠ 2026-10-31 用户口径「格子里两个数堆在一起分不清谁是谁」:
            上方计划量(可编辑,深色)/ 下方报工量(只读,加「实」标识 + 绿色);列头「今」标今天、
-           过去列灰底 = 历史对照段。日期列由后端按数据生成(见 WorkOrderDayPlanService.buildDates)。 -->
-      <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="right"
+           过去列灰底 = 历史对照段。日期列由后端按数据生成(见 WorkOrderDayPlanService.buildDates)。
+           ⚠ 2026-10-31 二次修正(用户口径「不要这样在右下角显示」):计划与报工两行**居中对齐**,成对显示。 -->
+      <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="center"
                        :label-class-name="'dp-col-' + dayColState(d, planToday)"
                        :class-name="'dp-col-' + dayColState(d, planToday)">
         <template #header>

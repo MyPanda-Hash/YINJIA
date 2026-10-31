@@ -141,8 +141,8 @@
             <!-- 日期列(2026-10-31):列头多一行「该线当天 已排/日产能」——产能只显示、不拦截录入。
                  超产能只把列头标红(不弹窗、不改数、不禁填);未配产能(档案日产能 0/空)写"未配",不判超载。
                  列分段:今天列标「今」+ 浅蓝底;过去列灰底 = 历史对照段(照样可填);
-                 格内两个数分清:上方计划(可编辑)/ 下方报工(绿色 + 「实」标)。 -->
-            <el-table-column v-for="d in planDates" :key="d" width="88" align="right"
+                 格内两个数分清:上方计划(可编辑)/ 下方报工(绿色 + 「实」标),两行居中对齐。 -->
+            <el-table-column v-for="d in planDates" :key="d" width="88" align="center"
                              :label-class-name="'dp-col-' + dayColState(d, planToday)"
                              :class-name="'dp-col-' + dayColState(d, planToday)">
               <template #header>
