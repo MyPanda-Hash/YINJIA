@@ -2085,6 +2085,14 @@ export default {
     '保存后同步工单/排产镜像/当前工序台账,日计划随之重算': 'Saving syncs the work order, schedule mirror and current process ledger; the daily plan is then recalculated',
     '调线': 'Move to line',
     '调线走调拨轨迹(工单追溯可见),可用「撤回调拨」调回原线': 'Line moves are recorded as transfer traces (visible in work-order trace) and can be revoked',
+    // 弹窗内的辅助信息与动作(2026-10-31 二次补齐:用户反馈「数量填不了」)
+    '当天已报工': 'Reported that day',
+    '人工指定合计': 'Manual total',
+    '剩余自动摊': 'Auto remainder',
+    '清空本行人工指定': 'Clear manual entries of this row',
+    '已清空人工指定': 'Manual entries cleared',
+    '无「日排产」权限,只能查看': 'No Daily-Plan permission; view only',
+    '无「调拨」权限,不能调线': 'No Transfer permission; cannot move line',
     // 产能可见 + 分配完整性(2026-10-31 用户口径):产能只显示不拦截;开工/完工/交期只做查询与显示
     '该线当天已排/日产能': 'Scheduled / daily capacity of this line that day',
     '产线档案未配日产能': 'Line master has no daily capacity',

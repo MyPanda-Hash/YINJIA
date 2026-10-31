@@ -32,6 +32,17 @@
         <span class="sq-hint" :class="{ manual: manualAtDay != null }">
           {{ manualAtDay != null ? tt('当前为人工指定') : tt('当前为系统自动摊') }}
         </span>
+        <span v-if="!canDayPlan" class="sq-warn">{{ tt('无「日排产」权限,只能查看') }}</span>
+      </div>
+      <div class="sq-row">
+        <span class="sq-label">{{ tt('当天已报工') }}</span>
+        <span class="sq-val">{{ num(doneAtDay) }}</span>
+        <span class="sq-label">{{ tt('人工指定合计') }}</span>
+        <span class="sq-val">{{ num(manualSum) }}</span>
+        <span class="sq-label">{{ tt('剩余自动摊') }}</span>
+        <span class="sq-val">{{ num(autoRest) }}</span>
+        <el-button size="small" text type="warning" :disabled="!canDayPlan || !manualCount"
+                   @click="clearAllManual">{{ tt('清空本行人工指定') }}（{{ manualCount }}）</el-button>
       </div>
       <div class="sq-note">{{ tt('改完其余天按剩余量自动重摊(合计不变);清空/恢复自动 = 交回系统摊') }}</div>
     </div>
@@ -52,19 +63,20 @@
       <div class="sq-note">{{ tt('保存后同步工单/排产镜像/当前工序台账,日计划随之重算') }}</div>
     </div>
 
-    <!-- ③ 调线(仅工单排产页:需要「调拨」权) -->
+    <!-- ③ 调线(仅工单排产页;需要「调拨」权) -->
     <div v-if="supportTransfer" class="sq-block">
       <div class="sq-title">{{ tt('调线') }}</div>
       <div class="sq-row">
         <span class="sq-label">{{ tt('目标车间') }}</span>
-        <el-select v-model="shop" clearable filterable class="sq-ctl" :disabled="!canTransfer || !shops.length"
-                   @change="line2 = ''">
+        <el-select v-model="shop" clearable filterable class="sq-ctl"
+                   :disabled="!canTransfer || !canTransferPerm || !shops.length" @change="line2 = ''">
           <el-option v-for="x in shops" :key="x" :label="x" :value="x" />
         </el-select>
       </div>
       <div class="sq-row">
         <span class="sq-label">{{ tt('目标生产线') }}</span>
-        <el-select v-model="line2" filterable class="sq-ctl" :disabled="!canTransfer || !lines.length"
+        <el-select v-model="line2" filterable class="sq-ctl"
+                   :disabled="!canTransfer || !canTransferPerm || !lines.length"
                    :placeholder="tt('请选择目标生产线')">
           <el-option v-for="x in lines" :key="x.生产线"
                      :label="x.生产线 + (x.生产车间 ? '·' + x.生产车间 : '')" :value="x.生产线" />
@@ -72,8 +84,10 @@
       </div>
       <div class="sq-row">
         <span class="sq-label">{{ tt('原因') }}</span>
-        <el-input v-model="reason" class="sq-ctl" :placeholder="tt('选填')" :disabled="!canTransfer" />
+        <el-input v-model="reason" class="sq-ctl" :placeholder="tt('选填')"
+                  :disabled="!canTransfer || !canTransferPerm" />
       </div>
+      <div v-if="canTransfer && !canTransferPerm" class="sq-tip">{{ tt('无「调拨」权限,不能调线') }}</div>
       <div v-if="tip" class="sq-tip">{{ tip }}</div>
       <div class="sq-note">{{ tt('调线走调拨轨迹(工单追溯可见),可用「撤回调拨」调回原线') }}</div>
     </div>
@@ -101,6 +115,8 @@ import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import request from '@core/request'
+import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
+import { useUserStore } from '@/stores/user'
 import { saveDayPlan, saveRowDates } from '@/business/dayPlanApi'
 
 const props = defineProps({
@@ -116,6 +132,13 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
+// 权限(2026-10-31 修):原来模板里用了 canDayPlan 却没定义 ⇒ :disabled="!undefined" = 恒灰,
+//   用户反馈「弹窗之后数量也不可以填写手动修改」。改数量/日期 = 两页任一「日排产」;
+//   调线 = 工单排产页「调拨」。
+const permUser = useUserStore()
+const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
+const canTransferPerm = computed(() => canDoPerm(permUser, 'WORK_ORDER_BOARD', 'transfer'))
+
 const visible = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
@@ -123,10 +146,14 @@ const visible = computed({
 const head = computed(() => props.row || {})
 const opText = computed(() => head.value.工序日 || head.value.当前工序 || head.value.工序 || '-')
 const over = computed(() => Number(head.value.超分配 || 0))
-const manualAtDay = computed(() => {
-  const m = head.value.人工指定 || {}
-  return m[props.date] ?? null
-})
+const manualMap = computed(() => head.value.人工指定 || {})
+const manualAtDay = computed(() => manualMap.value[props.date] ?? null)
+const manualCount = computed(() => Object.keys(manualMap.value).length)
+const manualSum = computed(() => Object.values(manualMap.value).reduce((a, b) => a + Number(b || 0), 0))
+/** 当天已审核报工量(只读对照) */
+const doneAtDay = computed(() => Number((head.value.日报工 || {})[props.date] || 0))
+/** 剩余自动摊 = 工序计划量 − 人工指定合计(负值按 0;超分配时另在头部红字提示) */
+const autoRest = computed(() => Math.max(0, Number(head.value.工序计划量 || 0) - manualSum.value))
 
 const qty = ref(0)
 const st = ref('')
@@ -180,13 +207,32 @@ async function onOpen() {
 
 function restoreAuto() { qty.value = undefined; restore.value = true }
 
+/** 清空本行全部人工指定(逐格按 0 提交 = 后端软删);清完日计划回到纯自动摊 */
+async function clearAllManual() {
+  const r = head.value || {}
+  const cells = Object.keys(manualMap.value).map((d) => ({
+    工单行id: r.行id, 工序: opText.value === '-' ? '' : opText.value,
+    生产线: props.line || r.生产线 || '', 计划日期: d, 计划数量: 0,
+  }))
+  if (!cells.length) return
+  saving.value = true
+  try {
+    const d = await saveDayPlan(cells)
+    ElMessage.success(`${tt('已清空人工指定')} ${d['清空格数'] ?? cells.length}`)
+    visible.value = false
+    emit('saved')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || tt('保存失败'))
+  } finally { saving.value = false }
+}
+
 async function save() {
   const r = head.value || {}
   const q = restore.value ? 0 : Number(qty.value || 0)
   const qtyChanged = q !== origQty.value || (restore.value && manualAtDay.value != null)
   const stChanged = String(st.value || '') !== origSt.value
   const cpChanged = String(cp.value || '') !== origCp.value
-  const transfer = canTransfer.value && !!line2.value && line2.value !== (props.line || '')
+  const transfer = canTransferPerm.value && canTransfer.value && !!line2.value && line2.value !== (props.line || '')
   if (!qtyChanged && !stChanged && !cpChanged && !transfer) { ElMessage.info(tt('没有需要保存的改动')); return }
   saving.value = true
   try {
@@ -233,6 +279,8 @@ async function save() {
 .sq-title { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 8px; }
 .sq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .sq-label { font-size: 12px; color: #909399; min-width: 76px; text-align: right; }
+.sq-val { font-size: 12px; color: #303133; font-weight: 600; min-width: 42px; }
+.sq-warn { font-size: 12px; color: #f56c6c; }
 .sq-num { width: 130px; }
 .sq-date { width: 150px; }
 .sq-ctl { width: 150px; }
