@@ -31,8 +31,8 @@ console.log('行数 =', (d['行'] || []).length, '日期列 =', (d['日期'] || 
 if (!(d['行'] || []).length) { console.log('无数据'); process.exit(1) }
 
 const { schedPlanPrintHtml } = await import('file:///D:/workspace/yinjia/frontend/src/business/print-formats.js')
-// 两张合一(排单计划 + 成型生产任务单/二维码),与出纸内容完全一致
-const body = await schedPlanPrintHtml(d['行'], d['日期'] || [], { today: d['今天'] || '', days: 7 })
+// 单张(纸表列 + 单据编号 + 行尾二维码),与出纸内容完全一致
+const body = await schedPlanPrintHtml(d['行'], d['日期'] || [], { today: d['今天'] || '', days: 5 })
 const html = '<!doctype html><html><head><meta charset="utf-8"><title>成型车间排单计划</title></head>'
   + '<body style="margin:6mm;background:#fff">' + body + '</body></html>'
 const file = path.join(process.cwd(), '_sheet_preview.html')

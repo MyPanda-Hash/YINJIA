@@ -564,7 +564,7 @@ async function printPlanSheet() {
     const d = res.data || {}
     const rows = d['行'] || []
     if (!rows.length) { ElMessage.warning(tt('没有可打印的排产行')); return }
-    await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: 7 })
+    await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: 5 })
   } catch (e) { err(e, '打印失败') }
 }
 

@@ -478,19 +478,21 @@ export async function printProductionTask(rows) {
  * (纸表也只印 3~5 天;列太多会挤成一团,可用 opts.days 调)。
  */
 const PLAN_SHEET_BASE_COLS = [
-  { t: '客户等级', w: 4, k: (r) => r['客户等级'] },
-  { t: '客户名称', w: 11, k: (r) => r['客户'] },
+  { t: '客户等级', w: 2, k: (r) => r['客户等级'] },
+  { t: '客户名称', w: 9, k: (r) => r['客户'] },
+  // 主要信息(2026-11-01 用户口径「不是两张纸,当前同一行融合起来」):工单号融进本行
+  { t: '单据编号', w: 10, k: (r) => r['加工单号'] },
   { t: '产品编号', w: 6, k: (r) => r['物料编码'] },
-  { t: '型号', w: 7, k: (r) => r['规格型号'] },
+  { t: '型号', w: 6, k: (r) => r['规格型号'] },
   { t: '成型车间', w: 5, k: (r) => r['生产线'] },
   { t: '未完成总数', w: 5, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
   { t: '生产计划数量', w: 5, k: (r) => fmtNum(r['排产数量']), n: true },
   { t: '实际完成数量', w: 5, k: (r) => fmtNum(r['当前工序完工量']), n: true },
-  { t: '成型交期', w: 6, k: (r) => monthDay(r['交期'] || r['计划完工日期']) },
-  { t: '成型交期紧迫度', w: 6, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true },
+  { t: '成型交期', w: 5, k: (r) => monthDay(r['交期'] || r['计划完工日期']) },
+  { t: '成型交期紧迫度', w: 5, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true },
   { t: '7天', w: 3, k: (r) => fmtNum(r['7天已排']), n: true },
   { t: '15天', w: 3, k: (r) => fmtNum(r['15天已排']), n: true },
-  { t: '大于15', w: 3, k: (r) => fmtNum(r['大于15天已排']), n: true },
+  { t: '大于15', w: 4, k: (r) => fmtNum(r['大于15天已排']), n: true },
 ]
 
 /** yyyy-MM-dd → M月D日(纸表写法);非法/空 → '' */
@@ -501,7 +503,7 @@ function monthDay(v) {
 }
 
 /** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天 */
-export function planSheetDates(dates, today, days = 7) {
+export function planSheetDates(dates, today, days = 5) {
   const list = (Array.isArray(dates) ? dates : []).filter(Boolean).slice().sort()
   if (!list.length) return []
   const from = list.filter((d) => !today || d >= today)
@@ -515,20 +517,26 @@ export function planSheetDates(dates, today, days = 7) {
  * @param {Array} dates 日期列(`日期`)
  * @param {Object} [opts] { today, days }
  */
-export function schedPlanSheetHtml(rows, dates, opts = {}) {
+export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
-  const ds = planSheetDates(dates, opts.today || '', opts.days || 7)
+  const ds = planSheetDates(dates, opts.today || '', opts.days || 5)
   const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0)
-  // 日期列:先按剩余均分,但不低于 4%(否则「10月31日」列头和千位数会被挤成两行);
-  // 列太多(如 >8 天)时按 4% 固定、表格整体略超宽由浏览器压缩(比断字好看)
+  // 日期列:按剩余均分,但不低于 4%(否则「10月31日」列头和千位数会被挤成两行);
+  // 列多时按 4% 走,表格整体略超宽由浏览器压缩(比断字好看)
   const dateW = ds.length ? Math.max(4, Math.floor((100 - baseW) / ds.length)) : 0
   const colgroup = '<colgroup>'
     + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${c.w}%"/>`).join('')
     + ds.map(() => `<col style="width:${dateW}%"/>`).join('')
+    + '<col style="width:5%"/>'                       // 二维码(行尾)
     + '</colgroup>'
   const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.t)}</th>`).join('')
     + ds.map((d) => `<th>${esc(monthDay(d))}</th>`).join('')
-  const trs = list.map((r) => {
+    + '<th>二维码</th>'
+  // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
+  const qrs = await Promise.all(list.map((r) => woQrImg({
+    公司代码: r['公司代码'] || '', 工单号: r['加工单号'], 工单行号: r['工单行号'],
+  })))
+  const trs = list.map((r, i) => {
     const plan = r['日计划'] || {}
     return '<tr>'
       + PLAN_SHEET_BASE_COLS.map((c) => {
@@ -536,6 +544,7 @@ export function schedPlanSheetHtml(rows, dates, opts = {}) {
         return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
       }).join('')
       + ds.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
+      + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
       + '</tr>'
   }).join('')
   return '<style>'
@@ -545,10 +554,10 @@ export function schedPlanSheetHtml(rows, dates, opts = {}) {
     + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + 'th,td{border:1px solid #333;padding:2px 3px;font-size:9.5px;line-height:1.25;word-break:break-all;vertical-align:middle}'
-    + 'th{background:#f2f2f2;font-weight:600;text-align:center}'
+    + 'th{background:#f2f2f2;font-weight:600;text-align:center;font-size:9px;line-height:1.15}'
     + 'td.r{text-align:right;white-space:nowrap}'
-    + 'th{word-break:keep-all}'
-    + 'tbody tr{height:26px}'
+    + 'td.qr{text-align:center;padding:1px}td.qr img{width:34px;height:34px}'
+    + 'tbody tr{height:38px}'
     + '</style>'
     + '<div class="hd"><span class="t">成型车间排单计划</span></div>'
     + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
@@ -567,55 +576,13 @@ async function woQrImg(row) {
 }
 
 /**
- * 成型生产任务单(排单计划的第 2 张,2026-10-31 用户口径:
- * 「把这个派单计划和打印工单的形式一样,就是都有那些主要信息和二维码,这里一起出来」)。
- * 列与「打印工单→成型生产任务单」一致,行尾二维码 = 工单二维码。
+ * 排单计划整张 HTML(**单张纸**:纸表列 + 单据编号 + 行尾二维码,主要信息全融在同一行);
+ * 单独导出便于单测/预览。用户口径:「不是这样实现,是当前同一行融合起来」。
  */
-async function schedTaskSheetHtml(rows) {
-  const trs = []
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i]
-    const qr = await woQrImg({
-      公司代码: r['公司代码'] || '', 工单号: r['加工单号'], 工单行号: r['工单行号'],
-    })
-    trs.push('<tr>'
-      + `<td class="c">${i + 1}</td>`
-      + `<td>${esc(r['加工单号'])}</td><td class="c">${esc(r['重点管控'])}</td>`
-      + `<td>${esc(r['物料编码'])}</td><td>${esc(r['产品名称'])}</td><td>${esc(r['规格型号'])}</td>`
-      + `<td class="r">${esc(fmtNum(r['需求数量']))}</td><td class="r">${esc(fmtNum(r['排产数量']))}</td>`
-      + `<td>${esc(r['计划完工日期'])}</td>`
-      + `<td class="qr">${qr ? `<img src="${qr}"/>` : ''}</td></tr>`)
-  }
-  return '<style>'
-    + '@page{size:A4 landscape;margin:8mm}'
-    + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
-    + '.hd{text-align:center;margin:0 0 6px}'
-    + '.hd .t{font-size:20px;font-weight:700;letter-spacing:6px}'
-    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
-    + 'th{background:#f2f2f2;font-weight:600}'
-    + 'td.r{text-align:right}td.c{text-align:center}'
-    + 'td.qr{text-align:center;padding:2px}td.qr img{width:64px;height:64px}'
-    + '</style>'
-    + '<div class="hd"><span class="t">成型生产任务单</span></div>'
-    + '<table><thead><tr><th>序号</th><th>单据编号</th><th>是否重点管控产品</th><th>商品编码</th>'
-    + '<th>商品名称</th><th>规格型号</th><th>订单数量</th><th>成型折算后数量</th><th>计划完工日期</th><th>二维码</th>'
-    + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
-}
-
-/**
- * 打印排单计划(工单排产页「排单计划」按钮),**一次出两张**:
- *   第 1 张 = 成型车间排单计划(纸表版式);
- *   第 2 张 = 成型生产任务单(主要信息 + 行尾二维码),与「打印工单」同款。
- * 数据来自 /px/scheduleBoard/planSheet(全产线)。
- */
-/** 两张合一的 HTML(排单计划 + 生产任务单);单独导出便于单测/预览,出纸用它 */
 export async function schedPlanPrintHtml(rows, dates, opts = {}) {
   const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
   if (!list.length) return ''
-  const plan = '<div class="pg">' + schedPlanSheetHtml(list, dates, opts) + '</div>'
-  const task = await schedTaskSheetHtml(list)
-  return '<style>.pg{page-break-after:always}</style>' + plan + task
+  return await schedPlanSheetHtml(list, dates, opts)
 }
 
 export async function printSchedPlanSheet(rows, dates, opts = {}) {
