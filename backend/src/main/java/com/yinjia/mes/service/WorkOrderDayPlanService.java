@@ -180,11 +180,13 @@ public class WorkOrderDayPlanService {
      * (与页面上格子同一把尺:人工指定 ∪ 自动摊剩余)。只读、不落表,供前端按纸表版式打印。
      *
      * @param scope    未完工/已完工/全部(与页面页签同口径)
+     * @param line     **选中的产线**(空 = 全部产线)。2026-11-01 用户口径「一个产线打印的排单计划
+     *                 只存在当前的产线东西内容」⇒ 传了就只取这条线的行
      * @param workshop 登录账号车间(空 = 全部)
      */
-    public Map<String, Object> planSheet(String scope, String workshop) {
+    public Map<String, Object> planSheet(String scope, String line, String workshop) {
         Map<String, Object> out = new LinkedHashMap<>();
-        List<Map<String, Object>> rows = board.scheduled("", scope, workshop);
+        List<Map<String, Object>> rows = board.scheduled(str(line), scope, workshop);
         List<Long> ids = new ArrayList<>();
         for (Map<String, Object> r : rows) if (r.get("行id") instanceof Number n) ids.add(n.longValue());
         if (ids.isEmpty()) {

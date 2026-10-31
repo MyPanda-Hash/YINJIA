@@ -25,6 +25,14 @@ try {
   await s.navigate(BASE + '/#/login'); await sleep(2500)
   console.log('登录', await s.evaluate(LOGIN_JS)); await sleep(4000)
   await s.navigate(BASE + '/#/prod/plan/workOrderBoard'); await sleep(7000)
+  // 选 1号机(2026-11-01:打印跟随选中产线)
+  console.log('选线', await s.evaluate(`(() => {
+    const items = [...document.querySelectorAll('.wb-line')]
+    const hit = items.find(x => ((x.querySelector('.wb-line-name') || {}).innerText || '').trim() === '1号机')
+    if (!hit) return 'no-node'
+    ;(hit.querySelector('.wb-line-name') || hit).click(); return 'clicked'
+  })()`))
+  await sleep(6000)
 
   // 打桩 window.print:无头浏览器不会弹系统打印框,也避免 afterprint 立刻摘掉打印层
   console.log('打桩', await s.evaluate(`(() => { window.print = function () { window.__printed = (window.__printed || 0) + 1 } ; return 'ok' })()`))

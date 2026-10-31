@@ -15,6 +15,7 @@ const { launch, sleep } = require('./_cdpclient.cjs')
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8090'
 const OUT = process.argv[3] || 'sheet.png'
+const LINE = process.argv[4] || ''   // 传产线=只渲染这条线(与页面上选线一致)
 
 const login = await (await fetch(BASE + '/api/auth/login', {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -24,7 +25,7 @@ const token = login?.data?.token
 if (!token) { console.log('登录失败'); process.exit(1) }
 const res = await (await fetch(BASE + '/api/px/scheduleBoard/planSheet', {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-  body: JSON.stringify({ scope: '未完工' }),
+  body: JSON.stringify({ scope: '未完工', ...(LINE ? { 生产线: LINE } : {}) }),
 })).json()
 const d = res?.data || {}
 console.log('行数 =', (d['行'] || []).length, '日期列 =', (d['日期'] || []).join(' '), '今天 =', d['今天'])

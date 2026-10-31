@@ -97,7 +97,8 @@
               </el-button>
               <!-- 成型车间排单计划(2026-10-31 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,
                    这样就不需要根据那个产线进行处理了」):整张表出纸,**全部产线一张**、不依赖左侧选线。 -->
-              <el-button v-if="canDo('print')" size="small" type="warning" plain @click="printPlanSheet">
+              <el-button v-if="canDo('print')" size="small" type="warning" plain :title="tt('打印当前选中产线的排单计划;未选线=全部产线')"
+                         @click="printPlanSheet">
                 {{ tt('排单计划') }}
               </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
@@ -560,7 +561,10 @@ function openTrace(noParam) {
 // ── 成型车间排单计划(2026-10-31):整张报表出纸,取全部产线(与左侧选中哪条线无关) ──
 async function printPlanSheet() {
   try {
-    const res = await request.post('/px/scheduleBoard/planSheet', { scope: scope.value })
+    // 2026-11-01 用户口径「一个产线打印的排单计划只存在当前的产线东西内容」:
+    //   带了产线 ⇒ 只打这条线;没选线(左侧未点)⇒ 退回全部产线(不让人打出一张空表)
+    const res = await request.post('/px/scheduleBoard/planSheet',
+      { scope: scope.value, 生产线: sel.line || undefined })
     const d = res.data || {}
     const rows = d['行'] || []
     if (!rows.length) { ElMessage.warning(tt('没有可打印的排产行')); return }

@@ -903,6 +903,7 @@ export default {
     '打印失败': 'Print failed',
     // 成型车间排单计划(2026-10-31):工单排产页「排单计划」按钮,整张纸表出纸(全产线一张)
     '排单计划': 'Scheduling Plan',
+    '打印当前选中产线的排单计划;未选线=全部产线': 'Print the scheduling plan of the selected line (all lines if none selected)',
     '没有可打印的排产行': 'No scheduled rows to print',
     // 计划/实报融合显示(2026-10-31 用户口径「当前太丑了…没达成再填入实际的数量」):
     //   一格只显示一个数 —— 没报工显示计划、未达成显示实际(橙色)、达成显示计划;tooltip 里两值都给

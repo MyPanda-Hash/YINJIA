@@ -232,7 +232,7 @@ public class ScheduleBoardController {
     /**
      * **成型车间排单计划**(2026-10-31 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,
      * 不需要根据产线处理」):全产线一张报表的取数 —— 全部在册排产行 + 各行日计划(只读)。
-     * body: {@code { scope }};动作词 打印(两页任一授予即可)。
+     * body: {@code { scope, 生产线? }};传产线则只打这条线(2026-11-01 用户口径);动作词 打印(两页任一授予即可)。
      */
     @PostMapping("/planSheet")
     public ApiResult<Map<String, Object>> planSheet(@RequestBody(required = false) Map<String, Object> body) {
@@ -240,7 +240,7 @@ public class ScheduleBoardController {
         perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
                 "打印");
         Map<String, Object> b = body == null ? Map.of() : body;
-        return ApiResult.ok(dayPlanService.planSheet(str(b.get("scope")), workshop()));
+        return ApiResult.ok(dayPlanService.planSheet(str(b.get("scope")), str(b.get("生产线")), workshop()));
     }
 
     private static List<Long> longList(Object o) {
