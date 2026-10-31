@@ -50,11 +50,9 @@
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
-      <!-- 日排产(2026-10-29):表格内的日期列 —— 只保留「保存日排产」;列由后端按数据生成
-           (2026-10-30 用户口径「把当前这个按日期均摊的功能删除,没啥用」⇒「按完工日期均摊」按钮与弹窗已删除) -->
-      <el-button v-if="canDayPlan" size="small" type="success" plain :disabled="planDirtyCount === 0" @click="savePlan">
-        {{ tt('保存日排产') }}（{{ planDirtyCount }}）
-      </el-button>
+      <!-- 日排产(2026-10-29):表格内的日期列 —— 列由后端按数据生成。
+           2026-10-31 用户口径「**当前不需要手填,能自动算就可以了**」⇒ 「保存日排产」按钮已撤(含均摊弹窗),
+           日期格改为<b>只读</b>:计划由后端按「工序计划量 ÷ 开工日→交期」自动均摊算出。 -->
     </div>
 
     <!-- 产线筛选条 -->
@@ -132,22 +130,22 @@
       <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
       <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
       <!-- ⚠ 2026-10-31 用户口径「格子里两个数堆在一起分不清谁是谁」:
-           上方计划量(可编辑,深色)/ 下方报工量(只读,加「实」标识 + 绿色);列头「今」标今天、
+           上方计划量(自动算,只读,深色)/ 下方报工量(只读,加「实」标识 + 绿色);列头「今」标今天、
            过去列灰底 = 历史对照段。日期列由后端按数据生成(见 WorkOrderDayPlanService.buildDates)。
-           ⚠ 2026-10-31 二次修正(用户口径「不要这样在右下角显示」):计划与报工两行**居中对齐**,成对显示。 -->
+           ⚠ 2026-10-31 二次修正(用户口径「不要这样在右下角显示」):计划与报工两行**居中对齐**,成对显示。
+           ⚠ 2026-10-31 三次修正(用户口径「当前不需要手填,能自动算就可以了」):格子改**只读**,
+           计划 = 工序计划量按「开工日→交期」自动均摊(DayPlanSpread),不再保存到 wo_day_plan。 -->
       <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="center"
                        :label-class-name="'dp-col-' + dayColState(d, planToday)"
                        :class-name="'dp-col-' + dayColState(d, planToday)">
         <template #header>
-          <div class="dp-head" :class="dayColState(d, planToday)">
+          <div class="dp-head" :class="dayColState(d, planToday)" :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊')">
             <span class="dp-date">{{ d.slice(5) }}</span>
             <span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span>
           </div>
         </template>
         <template #default="{ row }">
-          <el-input-number v-if="canDayPlan" v-model="row.日计划[d]" size="small"
-                           :controls="false" :min="0" class="dp-input" @change="markCell(row, d)" />
-          <span v-else>{{ qtyText((row.日计划 || {})[d]) }}</span>
+          <span class="dp-plan">{{ qtyText((row.日计划 || {})[d]) }}</span>
           <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
             <span class="dp-act-lb">{{ tt('实') }}</span>{{ qtyText(row.日报工[d]) }}
           </div>
@@ -245,7 +243,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -254,7 +252,7 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
 import { qtyText, dayColState, isToday } from '@/business/dayPlan'
-import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
+import { fetchDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -391,17 +389,16 @@ function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 // ───────── 日排产(2026-10-29):直接长在本页明细表的日期列 ─────────
 // 用户口径:「生产工单中需要能实现对后面日期的排产量设定……在当前的表格内容处插入当前设定的
 // 日排产数量,修改需要针对当前生产工单和工单排产中都要实现」⇒ 不新增表格/块:
-//   窗口内每一天都可编辑计划(含今天以前的日期);格下方小字 = 当天已审核报工量(只读对照)。
-// 数据接口与工单排产同一套(/px/scheduleBoard/dayPlan/*),两页行为一致。
+//   窗口内每天一列;**2026-10-31 用户口径「当前不需要手填,能自动算就可以了」⇒ 格子只读**:
+//   计划由后端按「工序计划量 ÷ 开工日→交期」自动均摊(DayPlanSpread),不再手工填/保存;
+//   格下方绿色小字 = 当天已审核报工量(只读对照)。
+// 数据接口与工单排产同一套(/px/scheduleBoard/dayPlan/data),两页行为一致。
 const planDates = ref([])
 const planToday = ref('')
-const planDirty = reactive(new Map())
-const planDirtyCount = computed(() => planDirty.size)
-const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
 
 async function loadDayPlan() {
   const ids = rows.value.map((r) => r.行id).filter((x) => x != null)
-  if (!ids.length) { planDates.value = []; planToday.value = ''; planDirty.clear(); return }
+  if (!ids.length) { planDates.value = []; planToday.value = ''; return }
   try {
     const data = await fetchDayPlan({ 行id列表: ids })
     planDates.value = data['日期'] || []
@@ -413,7 +410,6 @@ async function loadDayPlan() {
       row.工序日 = p ? p['工序'] : (row.当前工序 || '')
       row.日计划 = { ...((p && p['日计划']) || {}) }
       row.日报工 = { ...((p && p['日报工']) || {}) }
-      row._原计划 = { ...row.日计划 }
       // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
       if (p) {
         for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
@@ -421,38 +417,12 @@ async function loadDayPlan() {
           '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计']) row[k] = p[k]
       }
     }
-    planDirty.clear()
   } catch (e) { err(e, '查询失败') }
 }
 
-/** 单元格改动 → 记入待保存(与加载时的原值比较,改回原值则移出) */
-function markCell(row, d) {
-  const v = Number(row.日计划[d] || 0)
-  const o = Number((row._原计划 || {})[d] || 0)
-  const key = `${row.行id}|${d}`
-  if (v === o) { planDirty.delete(key); return }
-  planDirty.set(key, {
-    工单行id: row.行id,
-    工序: row.工序日 || row.当前工序 || '',
-    生产线: row.生产线 || '',
-    计划日期: d,
-    计划数量: v,
-  })
-}
-
-async function savePlan() {
-  const cells = [...planDirty.values()]
-  if (!cells.length) { ElMessage.info(tt('没有需要保存的改动')); return }
-  try {
-    const d = await saveDayPlan(cells)
-    ElMessage.success(`${tt('日排产已保存')}（${d['保存格数'] ?? 0}）`)
-    await loadDayPlan()
-  } catch (e) { err(e, '保存失败') }
-}
-
-// ⚠ 2026-10-30 用户口径「把当前这个按日期均摊的功能删除,没啥用」:
-//   原「按完工日期均摊」(DayPlanSplitDialog + splitTargetRow/openDpSplit/applyDpSplit)已整体删除,
-//   日计划只由用户在日期列里逐格填写 → 点「保存日排产」落库。
+// ⚠ 2026-10-31 用户口径「当前不需要手填,能自动算就可以了」:
+//   原「逐格手填 → 保存日排产」链路(含 2026-10-30 之前删掉的「按完工日期均摊」弹窗)整体撤除;
+//   日计划现在是**派生值**,交期/排产数量一改、下次刷新自然就变,不需要也不允许手改。
 
 async function load() {  try {
     const cond = {}
@@ -823,9 +793,8 @@ onActivated(() => {
 .wol-sep { color: #909399; }
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
-/* 日排产日期列(2026-10-29):格内输入计划,格下小灰字=该天已审核报工量 */
-.dp-done { color: #909399; }
-.dp-input { width: 72px; }
+/* 日排产日期列(2026-10-29;2026-10-31 改为「自动算、只读」):上=当天计划(系统均摊),下=当天已审核报工量 */
+.dp-plan { color: #303133; font-weight: 600; line-height: 1.2; }
 /* 2026-10-31:格内两个数分清 —— 计划(深色,可编辑) / 报工(绿色 + 「实」标,只读)*/
 .dp-act { font-size: 11px; color: #529b2e; line-height: 1.1; }
 .dp-act-lb { margin-right: 1px; font-weight: 700; }

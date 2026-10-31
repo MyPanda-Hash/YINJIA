@@ -1,0 +1,86 @@
+package com.yinjia.mes.service;
+
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * 日计划「自动均摊」纯函数(2026-10-31 用户口径:**「当前不需要手填,能自动算就可以了」**)。
+ *
+ * <p><b>为什么是纯函数</b>:这条规则现在同时被三处消费 —— 单元格里的日计划、行上的
+ * {@code 7天已排/15天已排/计划合计}、以及产线「今天已排/今日超载」。三处必须**同一把尺**,
+ * 否则又会回到 2026-10-31 上午那个「格子里的数对不上汇总」的老问题。所以只在这里算一次,
+ * 别处只调用;而且它是纯函数,不碰库,便于用 {@code tools/verify/DayPlanSpreadTest.java} 直接验算。
+ *
+ * <p><b>口径</b>(与用户 2026-10-31 选定的一致:工序计划量 ÷ 开工日→交期):
+ * <ul>
+ *   <li>总额 = **工序计划量** = {@code 排产数量 × 该道换算率}(与保存守卫、工序进度同一口径);</li>
+ *   <li>区间 = <b>开工日 → 交期</b>;开工日为空(现役工单大量如此)⇒ 从**今天**起;交期为空 ⇒ 单日;</li>
+ *   <li>交期早于起点(逾期单/脏数据)⇒ 收成**单日**(起点=今天),逾期量整笔落在今天;</li>
+ *   <li>区间上限 {@link #MAX_SPAN_DAYS} 天(防老单把区间拉到半年、把列撑爆);</li>
+ *   <li>整数件:每天取整,余数全部给最后一天(现场按件报,不出现小数);总额不足每天 1 件或非整数
+ *       ⇒ 按 4 位小数均分,余数同样归最后一天。</li>
+ * </ul>
+ *
+ * <p><b>不落表</b>:日计划是**派生值**(由 排产数量/换算率/开工日/交期 决定),不再写 {@code wo_day_plan};
+ * 交期或排产数量一改,下次刷新自然就变 —— 这也是「不需要手填」的含义。
+ */
+public final class DayPlanSpread {
+
+    /** 单行最多摊多少天(防脏数据;正常工单 1~15 天) */
+    public static final int MAX_SPAN_DAYS = 60;
+
+    /** 4 位小数(与 plang/wo_day_plan 的 decimal 精度一致) */
+    private static final double EPS = 1e-9;
+
+    private DayPlanSpread() { }
+
+    /**
+     * 把一行的工序计划量按「开工日→交期」摊到每天。
+     *
+     * @param total 工序计划量(排产数量 × 换算率)
+     * @param start 开工日(st_date);空 = 今天
+     * @param due   交期(cp_date);空 = 单日
+     * @param today 今天(由调用方传,便于测试与跨零点一致)
+     * @return 日期 → 当天计划量(按日期升序;**保留 0 值**,因为日期列窗口要靠它撑开)
+     */
+    public static Map<LocalDate, Double> of(double total, LocalDate start, LocalDate due, LocalDate today) {
+        Map<LocalDate, Double> out = new LinkedHashMap<>();
+        if (today == null || total <= 0) return out;
+
+        LocalDate s = start == null ? today : start;
+        LocalDate e = due == null ? s : due;
+        if (e.isBefore(s)) e = s;                                   // 逾期:整笔压到起点那天(开工日为空时即今天)
+        if (ChronoUnit.DAYS.between(s, e) > MAX_SPAN_DAYS) s = e.minusDays(MAX_SPAN_DAYS);
+        int n = (int) ChronoUnit.DAYS.between(s, e) + 1;
+
+        double t = round(total);
+        boolean wholePieces = t >= n && Math.abs(t - Math.rint(t)) < EPS;   // 整数件且够分:按件取整
+        if (wholePieces) {
+            long whole = Math.round(t);
+            long base = whole / n;
+            for (int i = 0; i < n; i++) {
+                long v = (i == n - 1) ? whole - base * (n - 1) : base;
+                out.put(s.plusDays(i), (double) v);
+            }
+        } else {
+            double base = round(t / n);
+            for (int i = 0; i < n; i++) {
+                double v = (i == n - 1) ? round(t - base * (n - 1)) : base;
+                out.put(s.plusDays(i), v);
+            }
+        }
+        return out;
+    }
+
+    /** 某一天摊到多少(产线「今天已排/今日超载」用;取不到=0) */
+    public static double on(double total, LocalDate start, LocalDate due, LocalDate day, LocalDate today) {
+        if (day == null) return 0d;
+        Double v = of(total, start, due, today).get(day);
+        return v == null ? 0d : v;
+    }
+
+    /** 4 位小数 */
+    public static double round(double v) { return Math.round(v * 10000d) / 10000d; }
+}

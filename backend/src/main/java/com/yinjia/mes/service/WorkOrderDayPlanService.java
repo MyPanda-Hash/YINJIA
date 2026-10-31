@@ -21,21 +21,23 @@ import java.util.TreeSet;
  * <p><b>用户口径</b>(2026-10-29,附《成型车间排单计划》纸表 + 生产工单页截图):
  * 「生产工单中需要能实现对后面日期的排产量设定,或者根据设定完工日期和数量配置每天需要完成的数量……
  * 在当前的表格内容处插入当前设定的日排产数量,修改需要针对当前生产工单和工单排产中都要实现」。
- * ⇒ **页面不新增任何表格/块**:两张现有明细表各追加日期列;本服务只负责两件事:
+ * ⇒ **页面不新增任何表格/块**:两张现有明细表各追加日期列;本服务只负责:
  * <ol>
- *   <li><b>读</b>:窗口内每行的「日计划」(wo_day_plan)与「日报工」(scjl 已审核,含手机端吸收);
- *       窗口内**每一天都可编辑计划**(含今天以前的日期,用户口径「23~28 号填不了」),已报工量
- *       作为格下方小字对照;窗口右端 = max(今天+最少未来天数, 各行计划完工日期),不再写死天数;</li>
- *   <li><b>写</b>:保存人工填/均摊出来的日计划(0 或空 = 软删该格)。</li>
+ *   <li><b>读</b>:窗口内每行的「日计划」与「日报工」(scjl 已审核,含手机端吸收);已报工量
+ *       作为格下方小字对照;</li>
+ *   <li><b>算</b>(2026-10-31 起):「日计划」不再是人工填的账,而是 {@link DayPlanSpread} 按
+ *       「工序计划量 ÷ 开工日→交期」**自动均摊**出来的派生值 —— 用户口径
+ *       「**当前不需要手填,能自动算就可以了**」;</li>
+ *   <li><b>写</b>:{@link #save} 保留(兼容/回滚用),页面已不再调用。</li>
  * </ol>
  *
  * <p><b>口径</b>:
  * <ul>
- *   <li>行键 = {@code plang.id};计划按 {@code (工单行id, 工序, 计划日期)} 唯一;</li>
- *   <li>工序:生产工单页 = 该行 {@code plang.[当前工序]};工单排产页 = 所选产线车间的工序;</li>
+ *   <li>行键 = {@code plang.id};</li>
+ *   <li>工序:生产工单页 = 该行 {@code plang.[当前工序]}(空则回落台账当前道);工单排产页 = 所选产线车间的工序;</li>
  *   <li>报工锚 {@code scjl.gd_id → plang_pc.plang_id},老数据 {@code gd_id=0} 按(工单号+批次号)
  *       唯一命中兜底;只认 {@code wgzt='Y'}(草稿/待审核不算完成);</li>
- *   <li>两账不合一:计划在 wo_day_plan,完成量永远是报工事实,互不覆盖。</li>
+ *   <li>两账不合一:计划是派生值(算出来的),完成量永远是报工事实,互不覆盖。</li>
  * </ul>
  */
 @Service
@@ -80,20 +82,26 @@ public class WorkOrderDayPlanService {
         List<Long> rowIds = new ArrayList<>();
         for (RowRef r : refs) rowIds.add(r.id);
 
-        Map<String, Map<String, Double>> plans = plansByDate(rowIds);
+        // 日计划(2026-10-31 用户口径「**当前不需要手填,能自动算就可以了**」):
+        //   不再读/写 wo_day_plan —— 由「工序计划量 ÷ 开工日→交期」按 {@link DayPlanSpread} **现算**。
+        //   一行一份 {日期:数量};下面的「计划合计 / 7天已排 / 15天已排 / 未分配量」全部用同一份,
+        //   保证格子与行汇总永远是同一把尺(上午那版「格子对不上汇总」的根因就是两处各算各的)。
+        Map<String, Double> opCaps = new LinkedHashMap<>();
+        for (RowRef r : refs) opCaps.put(rowKey(r.id, r.op), round(r.planQty * rateOf(jdbc, r.route(), r.op())));
+        Map<String, Map<String, Double>> plans = derivedPlans(refs, opCaps, today);
         Map<String, Map<String, Double>> actuals = actualByDate(rowIds);
         // 日期列**按数据生成**(2026-10-29 用户口径「不存在当前日期的时候不显示这些数据列」):
-        //   = 这些行的日计划/日报工出现过的日期 ∪ 各工序「计划开工~计划完工」区间;
+        //   = 这些行的自动日计划/日报工出现过的日期 ∪ 各工序「计划开工~计划完工」区间;
         //   不再给「今天-14 ~ 今天+14」的固定窗口(那样会满屏空列)。
         List<String> dates = buildDates(refs, plans, actuals, today);
         out.put("日期", dates);
         // 产能可见(2026-10-31 用户口径「产能只显示、不拦截」):
         //   · 产线产能 = bs_prod_line.日产能(0/空 = 未配 ⇒ 不判超载,沿用列注明「0=不判超载」);
-        //   · 每日已排 = 该线**当前归属**(plang.scx)当天全部日计划合计,不分页签(产能账是整条线的);
+        //   · 每日已排 = 该线**全部在册行**(plang.scx,不分页签)的自动日计划按日合计;
         //   只对「工单排产页」(按产线)出这两项;生产工单页(按行 id)返回结构不变(前端不用即忽略)。
         boolean lineMode = (ids == null || ids.isEmpty()) && !str(line).isEmpty();
         out.put("产线产能", lineMode ? dayCapacity(str(line)) : 0d);
-        out.put("每日已排", lineMode ? dailyLinePlan(str(line), dates) : Map.of());
+        out.put("每日已排", lineMode ? lineDailyPlan(str(line), dates, today) : Map.of());
         LocalDate d7 = today.plusDays(7);
         LocalDate d15 = today.plusDays(15);
 
@@ -135,10 +143,9 @@ public class WorkOrderDayPlanService {
                     : java.time.temporal.ChronoUnit.DAYS.between(today, r.due));
             row.put("需求数量", r.demand);
             row.put("排产数量", r.planQty);
-            // 工序计划量 = 排产数量 × 该道换算率(2026-10-31:与 save() 里「Σ计划 ≤ 排产数量×换算率」同一公式)。
-            //   前端拿它算「未分配量」= 工序计划量 − Σ日计划 ⇒ 允许只排一部分,但把"还差多少"摆出来。
-            //   取不到工艺路线/工序时按率 1(rateOf 的既有兜底)。
-            row.put("工序计划量", round(r.planQty * rateOf(r.route(), r.op())));
+            // 工序计划量 = 排产数量 × 该道换算率(与保存守卫、工序进度同一公式;取不到工艺路线/工序按率 1)。
+            //   2026-10-31:它是「自动日计划」的**总额**,日计划已由系统摊好 ⇒ 未分配量恒为 0(前端列已撤)。
+            row.put("工序计划量", opCaps.getOrDefault(key, 0d));
             row.put("7天需交付", due7);
             row.put("15天需交付", due15);
             row.put("大于15天需交付", dueOver);
@@ -222,7 +229,7 @@ public class WorkOrderDayPlanService {
             if (planSl == null) continue;
             String route = jdbc.queryForObject(
                     "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?", String.class, rid);
-            double rate = rateOf(route, op);
+            double rate = rateOf(jdbc, route, op);
             double sum = jdbc.queryForObject(
                     "SELECT ISNULL(SUM(计划数量),0) FROM dbo.wo_day_plan WHERE 工单行id=? AND 工序=? AND asp_cancel='N'",
                     Double.class, rid, op);
@@ -275,7 +282,7 @@ public class WorkOrderDayPlanService {
         for (Map<String, Object> c : cells) {
             String op = str(c.get("工序"));
             if (op == null) op = "";
-            double rate = rateOf(route, op);
+            double rate = rateOf(jdbc, route, op);
             double need = remainingByOp.computeIfAbsent(op, k -> round(qty * rate));   // 该道还要扣多少(工序单位)
             if (need <= 0.0001) continue;
             double cellQty = num(c.get("qty"));
@@ -308,7 +315,7 @@ public class WorkOrderDayPlanService {
             movedCells++;
         }
         for (Map.Entry<String, Double> e : remainingByOp.entrySet()) {
-            if (e.getValue() > 0.0001) shortTotal += e.getValue() / rateOf(route, e.getKey());
+            if (e.getValue() > 0.0001) shortTotal += e.getValue() / rateOf(jdbc, route, e.getKey());
         }
         out.put("已拆数量", round(movedTotal));
         out.put("已拆格数", movedCells);
@@ -354,8 +361,12 @@ public class WorkOrderDayPlanService {
         return merged;
     }
 
-    /** 该道工序的换算率(路线 + 工序);查不到按 1(与报工封顶/台账同一兜底) */
-    private double rateOf(String route, String op) {
+    /**
+     * 该道工序的换算率(路线 + 工序);查不到按 1(与报工封顶/台账同一兜底)。
+     * <p>2026-10-31:改成 {@code static} 供同包的 ScheduleBoardService 复用(**同一把尺** ——
+     * 产能「今日已排」与格子里的日计划都必须用同一个换算率)。
+     */
+    static double rateOf(JdbcTemplate jdbc, String route, String op) {
         String rt = route == null ? "" : route.trim();
         if (rt.isEmpty() || op == null || op.isBlank()) return 1;
         Double v = jdbc.queryForObject(
@@ -380,50 +391,72 @@ public class WorkOrderDayPlanService {
     }
 
     /**
-     * 该线**当天已排**合计(日期列头「已排/日产能」):按 {@code plang.scx}(当前归属)算,不分页签。
+     * 该线**每天已排**合计(日期列头「已排/日产能」、顶部「今日超载」):按 {@code plang.scx}(当前归属)算。
      *
-     * <p>为什么不用 {@code wo_day_plan.生产线}:调拨只改 plang/plang_pc/wo_process_line,日计划行上
-     * 记的线是**写入那天**的线、不会跟着改 ⇒ 按它汇总会把调走的活算回原线。以 plang.scx 为准 = 活跟工单走。
+     * <p>2026-10-31「日计划改成自动算」之后,这里不再查 {@code wo_day_plan},而是把**整条线全部在册行**
+     * (不分页签 —— 产能账是整条线的)逐行按 {@link DayPlanSpread} 摊一遍再按日合计:
+     * 与格子里的日计划、行上的 7天/15天已排**同一把尺**,不会各算各的。
+     *
+     * <p>按 {@code plang.scx} 而不是 {@code wo_day_plan.生产线}:调拨只改 plang/plang_pc/wo_process_line,
+     * 以"活跟工单走"为准。
      */
-    private Map<String, Double> dailyLinePlan(String line, List<String> dates) {
-        Map<String, Double> all = new LinkedHashMap<>();
-        if (str(line).isEmpty()) return all;
-        for (Map<String, Object> r : jdbc.queryForList(
-                "SELECT CONVERT(varchar(10), w.计划日期, 120) AS d, SUM(ISNULL(w.计划数量,0)) AS q"
-                        + " FROM dbo.wo_day_plan w"
-                        + " JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + " WHERE ISNULL(w.asp_cancel,'N')='N' AND ISNULL(p.scx,N'') = ?"
-                        + " GROUP BY w.计划日期", line)) {
-            if (r.get("d") == null) continue;
-            all.merge(str(r.get("d")), num(r.get("q")), Double::sum);
+    private Map<String, Double> lineDailyPlan(String line, List<String> dates, LocalDate today) {
+        Map<String, Double> sums = new LinkedHashMap<>();
+        String ln = str(line);
+        if (ln.isEmpty()) return sums;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT p.id AS id, ISNULL(p.[当前工序],N'') AS op, ISNULL(p.[工艺路线],N'') AS route,"
+                        + " ISNULL(p.pl_sl,0) AS plan_qty, p.st_date AS st, p.cp_date AS cp"
+                        + " FROM dbo.plang p"
+                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?", ln);
+        // 当前工序为空的行:回落到台账当前道(换算率要靠它);批量查,别 N+1
+        List<Long> noOp = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            if (str(r.get("op")).isEmpty() && r.get("id") instanceof Number n) noOp.add(n.longValue());
         }
-        return slice(all, dates);
+        Map<Long, String> fallback = noOp.isEmpty() ? Map.of() : ledgerCurrentOp(jdbc, noOp);
+        Map<String, Double> rateCache = new HashMap<>();          // 路线|工序 → 换算率
+        for (Map<String, Object> r : rows) {
+            if (!(r.get("id") instanceof Number idn)) continue;
+            String opRaw = str(r.get("op"));
+            final String op = opRaw.isEmpty() ? fallback.getOrDefault(idn.longValue(), "") : opRaw;
+            final String route = str(r.get("route"));
+            double rate = rateCache.computeIfAbsent(route + "|" + op, k -> rateOf(jdbc, route, op));
+            double total = round(num(r.get("plan_qty")) * rate);
+            for (Map.Entry<LocalDate, Double> e
+                    : DayPlanSpread.of(total, toDate(r.get("st")), toDate(r.get("cp")), today).entrySet()) {
+                sums.merge(e.getKey().toString(), e.getValue(), Double::sum);
+            }
+        }
+        return slice(sums, dates);
     }
 
     // ── 行解析 ──────────────────────────────────────────────────────────
 
     /**
-     * 行引用。{@code route} = 该行的工艺路线编码(2026-10-31 加:用来算「工序计划量」=
-     * 排产数量 × 该道换算率,给「分配完整性(未分配量)」提示用;空 = 没绑路线,按率 1)。
+     * 行引用。{@code route} = 该行的工艺路线编码(用来算「工序计划量」= 排产数量 × 该道换算率;空 = 按率 1);
+     * {@code start} = 计划开工日(2026-10-31 加:自动均摊的区间起点;空 = 从今天起)。
      */
-    private record RowRef(long id, String op, LocalDate due, double demand, double planQty, String route) { }
+    private record RowRef(long id, String op, LocalDate due, LocalDate start,
+                          double demand, double planQty, String route) { }
 
     /** 行集:生产工单页按 id 列表(工序取各行当前工序;当前工序空时回落台账当前道);工单排产页按选中产线 */
     private List<RowRef> resolveRows(List<Long> ids, String line, String scope, String workshop) {
         List<RowRef> out = new ArrayList<>();
         if (ids != null && !ids.isEmpty()) {
-            Map<Long, String> fallback = ledgerCurrentOp(ids);
+            Map<Long, String> fallback = ledgerCurrentOp(jdbc, ids);
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT id, ISNULL([当前工序],N'') AS op, CONVERT(varchar(10), cp_date, 120) AS due,"
                             + " ISNULL(xq_sl,0) AS demand, ISNULL(pl_sl,0) AS plan_qty,"
-                            + " ISNULL([工艺路线],N'') AS route FROM dbo.plang"
+                            + " ISNULL([工艺路线],N'') AS route, CONVERT(varchar(10), st_date, 120) AS st"
+                            + " FROM dbo.plang"
                             + " WHERE id IN (" + qs(ids.size()) + ") AND ISNULL(asp_cancel,'N')<>'Y'",
                     ids.toArray())) {
                 long id = ((Number) r.get("id")).longValue();
                 String op = str(r.get("op"));
                 // plang.[当前工序] 可能为空(老数据/未回写)⇒ 用台账"当前道"兜底,否则日计划/日期列会查不到
                 if (op.isEmpty()) op = fallback.getOrDefault(id, "");
-                out.add(new RowRef(id, op, parseDate(str(r.get("due"))),
+                out.add(new RowRef(id, op, parseDate(str(r.get("due"))), parseDate(str(r.get("st"))),
                         num(r.get("demand")), num(r.get("plan_qty")), str(r.get("route"))));
             }
             return out;
@@ -439,12 +472,13 @@ public class WorkOrderDayPlanService {
             long id = n.longValue();
             if (seen.putIfAbsent(id, Boolean.TRUE) != null) continue;
             refs.add(new RowRef(id, op, parseDate(str(r.get("计划完工日期"))),
+                    parseDate(str(r.get("开工日期"))),
                     num(r.get("需求数量")), num(r.get("排产数量")), ""));
         }
         // 工艺路线是**行级属性**,看板明细 SQL 不返回它 ⇒ 一次批量补齐(别在循环里按行 N+1 查)
         Map<Long, String> routes = routesByIds(refs);
         for (RowRef r : refs) {
-            out.add(new RowRef(r.id(), r.op(), r.due(), r.demand(), r.planQty(),
+            out.add(new RowRef(r.id(), r.op(), r.due(), r.start(), r.demand(), r.planQty(),
                     routes.getOrDefault(r.id(), "")));
         }
         return out;
@@ -467,8 +501,9 @@ public class WorkOrderDayPlanService {
     /**
      * 各行「当前道」(plang.[当前工序] 为空时兜底):台账里**已落实**的工序序最大那道;
      * 一道都没落实的,取工序序最小的第一道。与看板 curOp 同口径。
+     * <p>2026-10-31:改成 {@code static}(供同包的 ScheduleBoardService 复用,避免两套兜底逻辑)。
      */
-    private Map<Long, String> ledgerCurrentOp(List<Long> ids) {
+    static Map<Long, String> ledgerCurrentOp(JdbcTemplate jdbc, List<Long> ids) {
         Map<Long, String> out = new HashMap<>();
         if (ids.isEmpty()) return out;
         for (Map<String, Object> r : jdbc.queryForList(
@@ -589,24 +624,33 @@ public class WorkOrderDayPlanService {
             if (d != null && !d.isBefore(min) && !d.isAfter(max)) set.add(d);
         }
     }
+    /** 各种日期列(sql date / datetime=Timestamp / 字符串)统一取日期部分;空/非法 → null */
     private static LocalDate toDate(Object o) {
         if (o instanceof java.sql.Date d) return d.toLocalDate();
-        return parseDate(str(o));
+        if (o instanceof java.sql.Timestamp t) return t.toLocalDateTime().toLocalDate();
+        if (o instanceof java.time.LocalDate ld) return ld;
+        String s = str(o);
+        return parseDate(s.length() > 10 ? s.substring(0, 10) : s);
     }
 
-    /** 日计划(全部日期):key = 行id|工序 → 日期 → 数量 */
-    private Map<String, Map<String, Double>> plansByDate(List<Long> ids) {
+    /**
+     * 自动日计划(2026-10-31 用户口径「不需要手填,能自动算就可以了」):
+     * key = 行id|工序 → 日期 → 数量,由 {@link DayPlanSpread} 现算,**不落表**。
+     *
+     * <p>总额 = 工序计划量({@code 排产数量 × 换算率});区间 = 开工日→交期(开工日空 ⇒ 今天起)。
+     */
+    private static Map<String, Map<String, Double>> derivedPlans(List<RowRef> refs,
+                                                                 Map<String, Double> opCaps,
+                                                                 LocalDate today) {
         Map<String, Map<String, Double>> out = new LinkedHashMap<>();
-        if (ids.isEmpty()) return out;
-        for (Map<String, Object> r : jdbc.queryForList(
-                "SELECT 工单行id AS rid, ISNULL(工序,N'') AS op, CONVERT(varchar(10), 计划日期, 120) AS d,"
-                        + " SUM(计划数量) AS q FROM dbo.wo_day_plan"
-                        + " WHERE asp_cancel='N' AND 工单行id IN (" + qs(ids.size()) + ")"
-                        + " GROUP BY 工单行id, 工序, 计划日期", ids.toArray())) {
-            if (r.get("rid") == null || r.get("d") == null) continue;
-            out.computeIfAbsent(rowKey(((Number) r.get("rid")).longValue(), str(r.get("op"))),
-                            k -> new LinkedHashMap<>())
-                    .merge(str(r.get("d")), num(r.get("q")), Double::sum);
+        for (RowRef r : refs) {
+            String key = rowKey(r.id, r.op);
+            Map<String, Double> m = new LinkedHashMap<>();
+            for (Map.Entry<LocalDate, Double> e
+                    : DayPlanSpread.of(opCaps.getOrDefault(key, 0d), r.start(), r.due(), today).entrySet()) {
+                m.put(e.getKey().toString(), e.getValue());
+            }
+            out.put(key, m);
         }
         return out;
     }

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -360,8 +361,9 @@ public class ScheduleBoardService {
      *
      * <p>口径(与 {@link #lineLoads} 那套「plang 在制均摊的理论负荷」**不是同一笔账**,别混用):
      * <ul>
-     *   <li><b>已排</b> = {@code wo_day_plan} 里**当前归属该线**({@code plang.scx})、计划日期=今天、
-     *       未作废的 Σ计划数量 —— 排产员在日期格里真实填的那笔账,不分页签(产能看的是整条线);</li>
+     *   <li><b>已排</b> = 该线**当前归属**({@code plang.scx})各行「自动日计划」在**今天**的份额合计
+     *       —— 2026-10-31 起日计划是派生值({@link DayPlanSpread}),不再读 {@code wo_day_plan};
+     *       与页面上格子里的数字同一把尺,不分页签(产能看的是整条线);</li>
      *   <li><b>产能</b> = {@code bs_prod_line.日产能};0/空 = <b>未配产能</b> ⇒ 不判超载
      *       (沿用列注明「0=不判超载」);</li>
      *   <li><b>余量</b> = 产能 − 已排(可为负 = 超);未配产能时返回 {@code null}(前端显示"未配",
@@ -373,17 +375,7 @@ public class ScheduleBoardService {
      */
     private List<Map<String, Object>> dayPlanLoads(String workshop) {
         String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
-        Map<String, Double> done = new LinkedHashMap<>();
-        for (Map<String, Object> r : jdbc.queryForList(
-                "SELECT ISNULL(p.scx,N'') AS 生产线, SUM(ISNULL(w.计划数量,0)) AS q"
-                        + " FROM dbo.wo_day_plan w"
-                        + " JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + " WHERE ISNULL(w.asp_cancel,'N')='N'"
-                        + "   AND CAST(w.计划日期 AS date) = CAST(GETDATE() AS date)"
-                        + "   AND ISNULL(p.scx,N'')<>N''"
-                        + " GROUP BY p.scx")) {
-            done.put(String.valueOf(r.get("生产线")), Num.of(r.get("q")));
-        }
+        Map<String, Double> done = dayPlanTodayByLine(java.time.LocalDate.now());
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> l : jdbc.queryForList(
                 "SELECT [生产线] AS 生产线, ISNULL([生产车间],N'') AS 生产车间, ISNULL([日产能],0) AS 日产能"
@@ -408,6 +400,60 @@ public class ScheduleBoardService {
 
     /** 保留 4 位小数(与 decimal(18,4) 口径一致) */
     private static double r4(double v) { return Math.round(v * 10000d) / 10000d; }
+
+    /**
+     * 各产线「**今天已排**」= Σ 该线每一行自动日计划在**今天**的份额(2026-10-31)。
+     *
+     * <p>日计划已改成「不需要手填、自动算」的派生值(见 {@link DayPlanSpread}):不再读
+     * {@code wo_day_plan},而是按「工序计划量 ÷ 开工日→交期」现摊再取今天那格 —— 与「生产工单/工单排产」
+     * 页面上格子里的数字**同一把尺**,否则又会各算各的(上午那版就是这个毛病)。
+     *
+     * <p>只算「今天」:产能判超载看的是当天负荷(用户口径「产能只显示、不拦截」)。
+     */
+    private Map<String, Double> dayPlanTodayByLine(java.time.LocalDate today) {
+        Map<String, Double> out = new LinkedHashMap<>();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT p.id AS id, ISNULL(p.scx,N'') AS line, ISNULL(p.[当前工序],N'') AS op,"
+                        + " ISNULL(p.[工艺路线],N'') AS route, ISNULL(p.pl_sl,0) AS plan_qty,"
+                        + " p.st_date AS st, p.cp_date AS cp"
+                        + " FROM dbo.plang p"
+                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''");
+        // 当前工序为空的行:回落到台账当前道(换算率要靠它);一次批量查,别 N+1
+        List<Long> noOp = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            if (nz(str(r.get("op"))).isEmpty() && r.get("id") instanceof Number n) noOp.add(n.longValue());
+        }
+        Map<Long, String> fallback = noOp.isEmpty() ? java.util.Map.of()
+                : WorkOrderDayPlanService.ledgerCurrentOp(jdbc, noOp);
+        Map<String, Double> rateCache = new HashMap<>();          // 路线|工序 → 换算率
+        for (Map<String, Object> r : rows) {
+            if (!(r.get("id") instanceof Number idn)) continue;
+            final String line = nz(str(r.get("line")));
+            final String opRaw = nz(str(r.get("op")));
+            final String op = opRaw.isEmpty() ? nz(fallback.get(idn.longValue())) : opRaw;
+            final String route = nz(str(r.get("route")));
+            double rate = rateCache.computeIfAbsent(route + "|" + op,
+                    k -> WorkOrderDayPlanService.rateOf(jdbc, route, op));
+            double total = r4(Num.of(r.get("plan_qty")) * rate);
+            double q = DayPlanSpread.on(total, toDate(r.get("st")), toDate(r.get("cp")), today, today);
+            if (q != 0) out.merge(line, q, Double::sum);
+        }
+        return out;
+    }
+
+    /** 本类的 str() 空白返回 null(与 WorkOrderDayPlanService.str() 返回 "" 不同)—— 拼字符串/查缓存前统一成 "" */
+    private static String nz(String s) { return s == null ? "" : s; }
+
+    /** 各种日期列(sql date / datetime=Timestamp / 字符串)统一取日期部分;空/非法 → null */
+    private static java.time.LocalDate toDate(Object o) {
+        if (o instanceof java.sql.Date d) return d.toLocalDate();
+        if (o instanceof java.sql.Timestamp t) return t.toLocalDateTime().toLocalDate();
+        if (o instanceof java.time.LocalDate ld) return ld;
+        String s = str(o);
+        if (s == null) return null;
+        try { return java.time.LocalDate.parse(s.length() > 10 ? s.substring(0, 10) : s); }
+        catch (RuntimeException e) { return null; }
+    }
 
     /**
      * 批量排入(plang 单轨):每行 {加工单号, 行id?(plang.id 精确到批次行), 排产数量?(空=沿用), 生产线?} + 公共参数

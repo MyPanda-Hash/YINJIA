@@ -175,8 +175,9 @@ public class ScheduleBoardController {
      *   <li>生产工单页:传 {@code 行id}(当前表格行),工序取各行「当前工序」;</li>
      *   <li>工单排产页:传 {@code 生产线}+{@code scope},工序取所选产线的车间工序。</li>
      * </ul>
-     * 返回窗口内每行的「日计划」(wo_day_plan)与「日报工」(scjl 已审核,含手机端吸收);
-     * 过去日期页面只读显示完成量,今天及以后显示可编辑的计划量。只读接口 ⇒ 只校验页面「可见」。
+     * 返回窗口内每行的「日计划」(2026-10-31 起为**自动均摊的派生值**,见 DayPlanSpread,
+     * 不再读/写 wo_day_plan)与「日报工」(scjl 已审核,含手机端吸收);
+     * 日期格只读(用户口径「当前不需要手填,能自动算就可以了」)。只读接口 ⇒ 只校验页面「可见」。
      */
     @PostMapping("/dayPlan/data")
     public ApiResult<Map<String, Object>> dayPlanData(@RequestBody(required = false) Map<String, Object> body) {

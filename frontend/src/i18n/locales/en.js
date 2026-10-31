@@ -2056,6 +2056,9 @@ export default {
     //   列头「今」= 今天那一列,过去列灰底 = 历史对照段
     '实': 'Act.',
     '今': 'Today',
+    // 日排产「自动算」(2026-10-31 用户口径「当前不需要手填,能自动算就可以了」):日期格只读,
+    //   计划 = 工序计划量按 开工日→交期 均摊;列头悬停给出口径
+    '计划由系统按 工序计划量÷开工日→交期 自动均摊': 'Auto-spread: process planned qty ÷ (start date → due date)',
     // 产能可见 + 分配完整性(2026-10-31 用户口径):产能只显示不拦截;开工/完工/交期只做查询与显示
     '该线当天已排/日产能': 'Scheduled / daily capacity of this line that day',
     '产线档案未配日产能': 'Line master has no daily capacity',
