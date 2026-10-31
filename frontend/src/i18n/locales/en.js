@@ -2052,6 +2052,18 @@ export default {
     '15天已排': 'Planned ≤15 days',
     '大于15天已排': 'Planned >15 days',
     '当天已审核报工量': 'Approved reported qty of that day',
+    // 产能可见 + 分配完整性(2026-10-31 用户口径):产能只显示不拦截;开工/完工/交期只做查询与显示
+    '该线当天已排/日产能': 'Scheduled / daily capacity of this line that day',
+    '产线档案未配日产能': 'Line master has no daily capacity',
+    '产线档案未配日产能,不做超载提示': 'Line master has no daily capacity; no overload hint',
+    '未配产能': 'No capacity',
+    '今日超载': 'Over capacity today',
+    '条线': 'line(s)',
+    '合计超': 'total over',
+    '今日已排/日产能/今日余量': 'Scheduled today / daily capacity / remaining today',
+    '未分配量': 'Unallocated qty',
+    '已分': 'Allocated',
+    '计划合计': 'Planned total',
     // 工序路线排线·计划开工/实际开工(2026-10-29)
     '计划开工日期': 'Planned Start',
     '实际开工': 'Actual Start',

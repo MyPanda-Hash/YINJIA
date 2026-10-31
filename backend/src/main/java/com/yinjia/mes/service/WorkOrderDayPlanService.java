@@ -87,6 +87,13 @@ public class WorkOrderDayPlanService {
         //   不再给「今天-14 ~ 今天+14」的固定窗口(那样会满屏空列)。
         List<String> dates = buildDates(refs, plans, actuals, today);
         out.put("日期", dates);
+        // 产能可见(2026-10-31 用户口径「产能只显示、不拦截」):
+        //   · 产线产能 = bs_prod_line.日产能(0/空 = 未配 ⇒ 不判超载,沿用列注明「0=不判超载」);
+        //   · 每日已排 = 该线**当前归属**(plang.scx)当天全部日计划合计,不分页签(产能账是整条线的);
+        //   只对「工单排产页」(按产线)出这两项;生产工单页(按行 id)返回结构不变(前端不用即忽略)。
+        boolean lineMode = (ids == null || ids.isEmpty()) && !str(line).isEmpty();
+        out.put("产线产能", lineMode ? dayCapacity(str(line)) : 0d);
+        out.put("每日已排", lineMode ? dailyLinePlan(str(line), dates) : Map.of());
         LocalDate d7 = today.plusDays(7);
         LocalDate d15 = today.plusDays(15);
 
@@ -128,6 +135,10 @@ public class WorkOrderDayPlanService {
                     : java.time.temporal.ChronoUnit.DAYS.between(today, r.due));
             row.put("需求数量", r.demand);
             row.put("排产数量", r.planQty);
+            // 工序计划量 = 排产数量 × 该道换算率(2026-10-31:与 save() 里「Σ计划 ≤ 排产数量×换算率」同一公式)。
+            //   前端拿它算「未分配量」= 工序计划量 − Σ日计划 ⇒ 允许只排一部分,但把"还差多少"摆出来。
+            //   取不到工艺路线/工序时按率 1(rateOf 的既有兜底)。
+            row.put("工序计划量", round(r.planQty * rateOf(r.route(), r.op())));
             row.put("7天需交付", due7);
             row.put("15天需交付", due15);
             row.put("大于15天需交付", dueOver);
@@ -353,9 +364,49 @@ public class WorkOrderDayPlanService {
         return v == null || v <= 0 ? 1 : v;
     }
 
+    // ── 产能可见(2026-10-31 用户口径「产能只显示、不拦截;不影响实际排产量」)────────
+
+    /**
+     * 产线日产能({@code bs_prod_line.日产能});0/空 = **未配产能** ⇒ 前端显示"未配"、不判超载。
+     *
+     * <p>⚠ 本方法只读:任何保存路径都不许拿它拦录入(用户口径「不能堵死录入」)。
+     */
+    private double dayCapacity(String line) {
+        if (str(line).isEmpty()) return 0d;
+        List<Double> v = jdbc.queryForList(
+                "SELECT ISNULL(日产能,0) FROM dbo.bs_prod_line WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                Double.class, line);
+        return v.isEmpty() || v.get(0) == null ? 0d : v.get(0);
+    }
+
+    /**
+     * 该线**当天已排**合计(日期列头「已排/日产能」):按 {@code plang.scx}(当前归属)算,不分页签。
+     *
+     * <p>为什么不用 {@code wo_day_plan.生产线}:调拨只改 plang/plang_pc/wo_process_line,日计划行上
+     * 记的线是**写入那天**的线、不会跟着改 ⇒ 按它汇总会把调走的活算回原线。以 plang.scx 为准 = 活跟工单走。
+     */
+    private Map<String, Double> dailyLinePlan(String line, List<String> dates) {
+        Map<String, Double> all = new LinkedHashMap<>();
+        if (str(line).isEmpty()) return all;
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT CONVERT(varchar(10), w.计划日期, 120) AS d, SUM(ISNULL(w.计划数量,0)) AS q"
+                        + " FROM dbo.wo_day_plan w"
+                        + " JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " WHERE ISNULL(w.asp_cancel,'N')='N' AND ISNULL(p.scx,N'') = ?"
+                        + " GROUP BY w.计划日期", line)) {
+            if (r.get("d") == null) continue;
+            all.merge(str(r.get("d")), num(r.get("q")), Double::sum);
+        }
+        return slice(all, dates);
+    }
+
     // ── 行解析 ──────────────────────────────────────────────────────────
 
-    private record RowRef(long id, String op, LocalDate due, double demand, double planQty) { }
+    /**
+     * 行引用。{@code route} = 该行的工艺路线编码(2026-10-31 加:用来算「工序计划量」=
+     * 排产数量 × 该道换算率,给「分配完整性(未分配量)」提示用;空 = 没绑路线,按率 1)。
+     */
+    private record RowRef(long id, String op, LocalDate due, double demand, double planQty, String route) { }
 
     /** 行集:生产工单页按 id 列表(工序取各行当前工序;当前工序空时回落台账当前道);工单排产页按选中产线 */
     private List<RowRef> resolveRows(List<Long> ids, String line, String scope, String workshop) {
@@ -364,7 +415,8 @@ public class WorkOrderDayPlanService {
             Map<Long, String> fallback = ledgerCurrentOp(ids);
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT id, ISNULL([当前工序],N'') AS op, CONVERT(varchar(10), cp_date, 120) AS due,"
-                            + " ISNULL(xq_sl,0) AS demand, ISNULL(pl_sl,0) AS plan_qty FROM dbo.plang"
+                            + " ISNULL(xq_sl,0) AS demand, ISNULL(pl_sl,0) AS plan_qty,"
+                            + " ISNULL([工艺路线],N'') AS route FROM dbo.plang"
                             + " WHERE id IN (" + qs(ids.size()) + ") AND ISNULL(asp_cancel,'N')<>'Y'",
                     ids.toArray())) {
                 long id = ((Number) r.get("id")).longValue();
@@ -372,21 +424,42 @@ public class WorkOrderDayPlanService {
                 // plang.[当前工序] 可能为空(老数据/未回写)⇒ 用台账"当前道"兜底,否则日计划/日期列会查不到
                 if (op.isEmpty()) op = fallback.getOrDefault(id, "");
                 out.add(new RowRef(id, op, parseDate(str(r.get("due"))),
-                        num(r.get("demand")), num(r.get("plan_qty"))));
+                        num(r.get("demand")), num(r.get("plan_qty")), str(r.get("route"))));
             }
             return out;
         }
         String ln = str(line);
         if (ln.isEmpty()) return out;
         String op = processOfLine(ln, workshop);
+        List<RowRef> refs = new ArrayList<>();
         Map<Long, Boolean> seen = new LinkedHashMap<>();
         for (Map<String, Object> r : board.scheduled(ln, scope, workshop)) {
             Object ido = r.get("行id");
             if (!(ido instanceof Number n)) continue;
             long id = n.longValue();
             if (seen.putIfAbsent(id, Boolean.TRUE) != null) continue;
-            out.add(new RowRef(id, op, parseDate(str(r.get("计划完工日期"))),
-                    num(r.get("需求数量")), num(r.get("排产数量"))));
+            refs.add(new RowRef(id, op, parseDate(str(r.get("计划完工日期"))),
+                    num(r.get("需求数量")), num(r.get("排产数量")), ""));
+        }
+        // 工艺路线是**行级属性**,看板明细 SQL 不返回它 ⇒ 一次批量补齐(别在循环里按行 N+1 查)
+        Map<Long, String> routes = routesByIds(refs);
+        for (RowRef r : refs) {
+            out.add(new RowRef(r.id(), r.op(), r.due(), r.demand(), r.planQty(),
+                    routes.getOrDefault(r.id(), "")));
+        }
+        return out;
+    }
+
+    /** 行 id → 工艺路线编码(空 = 没绑路线);只查一次,供「工序计划量」按换算率折算 */
+    private Map<Long, String> routesByIds(List<RowRef> refs) {
+        Map<Long, String> out = new HashMap<>();
+        if (refs.isEmpty()) return out;
+        List<Long> ids = new ArrayList<>();
+        for (RowRef r : refs) if (!ids.contains(r.id())) ids.add(r.id());
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT id, ISNULL([工艺路线],N'') AS route FROM dbo.plang WHERE id IN (" + qs(ids.size()) + ")",
+                ids.toArray())) {
+            if (r.get("id") instanceof Number n) out.put(n.longValue(), str(r.get("route")));
         }
         return out;
     }

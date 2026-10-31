@@ -17,6 +17,11 @@
       <span class="wb-stats">
         {{ tt('待排产') }}（{{ s['待排产笔数'] ?? 0 }}{{ tt('笔') }}）；{{ tt('今日排产') }}（{{ s['今日排产']?.张数 ?? 0 }}{{ tt('张') }}/{{ num(s['今日排产']?.数量) }}{{ tt('件') }}）；{{ tt('总未完成量') }} {{ num(s['总未完成量']) }}
       </span>
+      <!-- 产能可见(2026-10-31 用户口径「产能只显示、不拦截」):全部启用线今天「已排>日产能」的汇总。
+           只提示 —— 不弹窗、不改数、不禁填。 -->
+      <span class="wb-over" :class="{ hot: overLineCount > 0 }">
+        {{ tt('今日超载') }} {{ overLineCount }} {{ tt('条线') }}<template v-if="overQty > 0">，{{ tt('合计超') }} {{ num(overQty) }}</template>
+      </span>
     </div>
 
     <div class="wb-body">
@@ -34,6 +39,13 @@
             </div>
             <div class="wb-line-row">
               <span class="wb-qty">{{ num(l.未交量) }}</span>
+              <!-- 今日已排/日产能(2026-10-31):只显示、不拦截;未配产能的线明确写"未配",不显示 0 -->
+              <span v-if="Number(l.日产能 || 0) > 0" class="wb-daycap"
+                    :class="{ over: l.今日余量 != null && Number(l.今日余量) < 0 }"
+                    :title="tt('今日已排/日产能/今日余量')">
+                {{ num(l.今日已排) }}/{{ num(l.日产能) }}
+              </span>
+              <span v-else class="wb-daycap unset" :title="tt('产线档案未配日产能')">{{ tt('未配产能') }}</span>
             </div>
           </div>
         </template>
@@ -75,6 +87,7 @@
                 {{ tt('打印工单') }}（{{ checkedSched.length }}）
                 <template #dropdown>
                   <el-dropdown-item command="成型生产任务单">{{ tt('成型生产任务单') }}</el-dropdown-item>
+                  <el-dropdown-item command="切炭生产任务单">{{ tt('切炭生产任务单') }}</el-dropdown-item>
                   <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
                 </template>
               </el-dropdown>
@@ -125,7 +138,18 @@
             <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
             <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
             <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
-            <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="right">
+            <!-- 日期列(2026-10-31):列头多一行「该线当天 已排/日产能」——产能只显示、不拦截录入。
+                 超产能只把列头标红(不弹窗、不改数、不禁填);未配产能(档案日产能 0/空)写"未配",不判超载。 -->
+            <el-table-column v-for="d in planDates" :key="d" width="88" align="right">
+              <template #header>
+                <div class="dp-head" :class="{ over: isOverDay(d) }">
+                  <div class="dp-date">{{ d.slice(5) }}</div>
+                  <div v-if="lineCap > 0" class="dp-cap" :title="tt('该线当天已排/日产能')">
+                    {{ qtyText(dayTotal[d]) }}/{{ qtyText(lineCap) }}
+                  </div>
+                  <div v-else class="dp-cap unset" :title="tt('产线档案未配日产能,不做超载提示')">{{ tt('未配产能') }}</div>
+                </div>
+              </template>
               <template #default="{ row }">
                 <el-input-number v-if="canDayPlan" v-model="row.日计划[d]" size="small"
                                  :controls="false" :min="0" class="dp-input" @change="markCell(row, d)" />
@@ -133,6 +157,17 @@
                 <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
                   {{ qtyText(row.日报工[d]) }}
                 </div>
+              </template>
+            </el-table-column>
+            <!-- 分配完整性(2026-10-31 用户口径「允许只排一部分,但把还差多少摆出来」):
+                 未分配量 = 工序计划量 − Σ日计划;只提示,不拦保存、不逼一次排完。 -->
+            <el-table-column :label="tt('未分配量')" width="96" align="right">
+              <template #default="{ row }">
+                <span v-if="unplanned(row) != null" :class="{ 'dp-warn': unplanned(row) > 0 }"
+                      :title="tt('已分') + ' ' + qtyText(row.计划合计 || 0) + ' / ' + tt('计划合计') + ' ' + qtyText(row.工序计划量 || 0)">
+                  {{ qtyText(unplanned(row)) }}
+                </span>
+                <span v-else class="dp-unset">-</span>
               </template>
             </el-table-column>
             <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
@@ -217,7 +252,7 @@ import request from '@core/request'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
-import { qtyText } from '@/business/dayPlan'
+import { qtyText, isOverCapacity, unplannedQty } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -278,6 +313,10 @@ const shop = computed(() => {
 })
 // 未完工量=Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
+// 产能可见(2026-10-31 用户口径「产能只显示、不拦截;不影响实际排产量」):
+//   顶部汇总 = 全部启用线今天「已排 > 日产能」的条数与合计超额(/stats 实时算,不落表)。
+const overLineCount = computed(() => Number(s.value['今日超载线数'] || 0))
+const overQty = computed(() => Number(s.value['今日超额合计'] || 0))
 
 function select(l) {
   sel.line = l.生产线
@@ -320,13 +359,27 @@ const planToday = ref('')
 const planDirty = reactive(new Map())
 const planDirtyCount = computed(() => planDirty.size)
 const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_BOARD', 'WORK_ORDER_LIST'], 'dayplan'))
+// ── 产能可见(2026-10-31,用户口径「产能只显示、不拦截;不影响实际排产量」)──────────────
+//   lineCap  = 产线档案 bs_prod_line.日产能(0/空 = 未配产能 ⇒ 不判超载);
+//   dayTotal = 该线每天已排合计(后端按 plang.scx 当前归属算,不分页签);
+//   超产能**只标红列头** —— 不弹窗、不改数、不禁填,与「保存日排产」的既有校验无关。
+const lineCap = ref(0)
+const dayTotal = ref({})
+
+/** 该日期是否超产能(只用于列头标红;产能 <= 0 视为未配,不判) */
+function isOverDay(d) { return isOverCapacity(dayTotal.value[d], lineCap.value) }
+
+/** 未分配量 = 工序计划量 − Σ日计划;返回 null 表示取不到工序计划量(界面显示 "-") */
+function unplanned(row) { return unplannedQty(row && row.工序计划量, row && row.计划合计) }
 
 async function loadDayPlan() {
-  if (!sel.line) { planDates.value = []; planToday.value = ''; planDirty.clear(); return }
+  if (!sel.line) { planDates.value = []; planToday.value = ''; lineCap.value = 0; dayTotal.value = {}; planDirty.clear(); return }
   try {
     const data = await fetchDayPlan({ 生产线: sel.line, scope: scope.value })
     planDates.value = data['日期'] || []
     planToday.value = data['今天'] || ''
+    lineCap.value = Number(data['产线产能'] || 0)
+    dayTotal.value = data['每日已排'] || {}
     const byId = new Map()
     for (const p of data['行'] || []) byId.set(String(p['行id']), p)
     for (const row of schedRows.value) {
@@ -335,11 +388,12 @@ async function loadDayPlan() {
       row.日计划 = { ...((p && p['日计划']) || {}) }
       row.日报工 = { ...((p && p['日报工']) || {}) }
       row._原计划 = { ...row.日计划 }
-      // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
+      // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)+ 工序计划量(分配完整性用)
+      //   —— 由后端算,前端只显示
       if (p) {
         for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
           '7天需交付', '15天需交付', '大于15天需交付',
-          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计']) row[k] = p[k]
+          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计', '工序计划量']) row[k] = p[k]
       }
     }
     planDirty.clear()
@@ -608,6 +662,21 @@ onMounted(() => {
 .dp-done { color: #909399; }
 .dp-input { width: 72px; }
 .dp-act { font-size: 11px; color: #909399; line-height: 1.1; }
+/* ── 产能可见(2026-10-31 用户口径「产能只显示、不拦截」)──
+   列头两行:日期 + 该线当天「已排/日产能」;超产能只标红,不弹窗、不改数、不禁填。
+   未配产能(档案日产能 0/空)写"未配",不参与超载判定。 */
+.wb-over { margin-left: 12px; font-size: 12px; color: #fff; opacity: .85; }
+.wb-over.hot { color: #ffe58f; font-weight: 700; opacity: 1; }
+.wb-daycap { font-size: 11px; color: #909399; }
+.wb-daycap.over { color: #f56c6c; font-weight: 700; }
+.wb-daycap.unset { color: #c0c4cc; }
+.dp-head { line-height: 1.15; }
+.dp-date { font-weight: 600; color: #303133; }
+.dp-cap { font-size: 10px; color: #909399; font-weight: 400; }
+.dp-head.over .dp-date, .dp-head.over .dp-cap { color: #f56c6c; font-weight: 700; }
+.dp-cap.unset { color: #c0c4cc; }
+.dp-warn { color: #e6a23c; font-weight: 600; }
+.dp-unset { color: #c0c4cc; }
 .wb-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; flex-wrap: wrap; }
 .wb-block-title { font-weight: 600; font-size: 13px; color: #303133; }
 .wb-actions { margin-left: auto; }

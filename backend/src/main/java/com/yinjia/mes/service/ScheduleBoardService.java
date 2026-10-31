@@ -280,6 +280,18 @@ public class ScheduleBoardService {
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))",
                 Double.class, ws, ws);
         List<Map<String, Object>> lines = lineLoads(null, ws);
+        // 产能可见(2026-10-31 用户口径「产能只显示、不拦截;不影响实际排产量」):
+        //   全部启用线里「今天已排 > 日产能」的条数与合计超额 —— 只提示,不拦任何保存。
+        //   与左侧骨架/日期列头读**同一份**实时账(dayPlanLoads),不另算一套。
+        List<Map<String, Object>> dayLoad = dayPlanLoads(ws);
+        int overLines = 0;
+        double overQty = 0;
+        for (Map<String, Object> l : dayLoad) {
+            if (Boolean.TRUE.equals(l.get("超载"))) {
+                overLines++;
+                overQty += Num.of(l.get("今日已排")) - Num.of(l.get("日产能"));
+            }
+        }
         List<String> teams = jdbc.queryForList(
                 "SELECT 班组名称 FROM bs_team WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY 班组编码", String.class);
 
@@ -290,6 +302,9 @@ public class ScheduleBoardService {
         t.put("数量", today.get("qty"));
         out.put("今日排产", t);
         out.put("总未完成量", undone == null ? 0 : Math.round(undone * 10000d) / 10000d);
+        // 产能可见(2026-10-31):顶部一行「今日超载 N 条线、合计超 M」——只提示,不影响排产量
+        out.put("今日超载线数", overLines);
+        out.put("今日超额合计", r4(overQty));
         out.put("产线", lines);
         out.put("班组", teams);
         out.put("车间", ws);                                  // 前端「当前车间」标识
@@ -339,6 +354,60 @@ public class ScheduleBoardService {
                         + " ON ld.生产线 = pl.生产线" + f + " ORDER BY pl.生产线",
                 args.toArray());
     }
+
+    /**
+     * 各产线**当日日排产负荷**(2026-10-31,用户口径「产能只显示、不拦截;不影响实际排产量」)。
+     *
+     * <p>口径(与 {@link #lineLoads} 那套「plang 在制均摊的理论负荷」**不是同一笔账**,别混用):
+     * <ul>
+     *   <li><b>已排</b> = {@code wo_day_plan} 里**当前归属该线**({@code plang.scx})、计划日期=今天、
+     *       未作废的 Σ计划数量 —— 排产员在日期格里真实填的那笔账,不分页签(产能看的是整条线);</li>
+     *   <li><b>产能</b> = {@code bs_prod_line.日产能};0/空 = <b>未配产能</b> ⇒ 不判超载
+     *       (沿用列注明「0=不判超载」);</li>
+     *   <li><b>余量</b> = 产能 − 已排(可为负 = 超);未配产能时返回 {@code null}(前端显示"未配",
+     *       而不是 0/超载 —— 免得一上线满屏红,以后没人看);</li>
+     *   <li>只算**启用线**({@code 停用}=0):停用线不排产,不进顶部汇总。</li>
+     * </ul>
+     *
+     * <p>实时算、不落表(用户口径「不需要记录,给提示就行」)。
+     */
+    private List<Map<String, Object>> dayPlanLoads(String workshop) {
+        String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
+        Map<String, Double> done = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT ISNULL(p.scx,N'') AS 生产线, SUM(ISNULL(w.计划数量,0)) AS q"
+                        + " FROM dbo.wo_day_plan w"
+                        + " JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " WHERE ISNULL(w.asp_cancel,'N')='N'"
+                        + "   AND CAST(w.计划日期 AS date) = CAST(GETDATE() AS date)"
+                        + "   AND ISNULL(p.scx,N'')<>N''"
+                        + " GROUP BY p.scx")) {
+            done.put(String.valueOf(r.get("生产线")), Num.of(r.get("q")));
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> l : jdbc.queryForList(
+                "SELECT [生产线] AS 生产线, ISNULL([生产车间],N'') AS 生产车间, ISNULL([日产能],0) AS 日产能"
+                        + " FROM bs_prod_line"
+                        + " WHERE ISNULL([asp_cancel],'N') <> 'Y' AND ISNULL([停用],0) = 0"
+                        + "   AND (? = N'' OR ISNULL([生产车间],N'') = ?)"
+                        + " ORDER BY ISNULL([排序],999), [生产线]", ws, ws)) {
+            String ln = String.valueOf(l.get("生产线"));
+            double cap = Num.of(l.get("日产能"));
+            double q = done.getOrDefault(ln, 0d);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("生产线", ln);
+            m.put("生产车间", String.valueOf(l.get("生产车间")));
+            m.put("日产能", r4(cap));
+            m.put("今日已排", r4(q));
+            m.put("今日余量", cap > 0 ? r4(cap - q) : null);
+            m.put("超载", cap > 0 && q > cap + 0.0001);
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** 保留 4 位小数(与 decimal(18,4) 口径一致) */
+    private static double r4(double v) { return Math.round(v * 10000d) / 10000d; }
 
     /**
      * 批量排入(plang 单轨):每行 {加工单号, 行id?(plang.id 精确到批次行), 排产数量?(空=沿用), 生产线?} + 公共参数
@@ -527,6 +596,11 @@ public class ScheduleBoardService {
         return jdbc.queryForList(
                 "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.lb,N'') AS 排产班组,"
+                        // 产品 / 品名 / 型号(2026-10-21 用户口径「快速排产看不到已排单的型号,需要增加对应的产品
+                        // 还有规格型号」):已排产列表此前只有单号+数量,看不出排的是哪个产品、什么规格 ——
+                        // 与①待排产池(产品编号/品名/型号)逐列同源,同一屏上下两张表口径一致。
+                        // 型号 = plang.gg(产品规格;gg2「产品规格2」按银嘉单规格口径全链路不用)
+                        + " ISNULL(p.dm,N'') AS 产品编号, ISNULL(p.mc,N'') AS 品名, ISNULL(p.gg,N'') AS 型号,"
                         // 生产状态 = {@link #ST_EXPR}(唯一定义,与工单排产看板/生产工单列表同源)
                         + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量,"
@@ -544,12 +618,13 @@ public class ScheduleBoardService {
                         + "   AND " + NOT_CLOSED + ""
                         + (all ? "" : " AND CONVERT(varchar(10), p.asp_time2, 120) = CONVERT(varchar(10), GETDATE(), 120)")
                         + "   AND (? = '' OR p.pl_no LIKE ? OR p.scx LIKE ? OR p.dm LIKE ? OR p.mc LIKE ?"
-                        + "        OR ISNULL(p.[批次号],N'') LIKE ?)"
+                        // 型号也参与模糊搜索(2026-10-21:列里既然显示出型号,按型号找行才顺)
+                        + "        OR p.gg LIKE ? OR ISNULL(p.[批次号],N'') LIKE ?)"
                         + "   AND (? IS NULL OR ISNULL(p.pl_xc,0) = ?)"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))"
                         + " ORDER BY p.scx, p.pl_no, p.pl_xc, p.[批次号]",
-                kw, noLike, like, like, like, like, xcEq, xcEq, ws, ws);
+                kw, noLike, like, like, like, like, like, xcEq, xcEq, ws, ws);
     }
 
     /**
@@ -593,10 +668,17 @@ public class ScheduleBoardService {
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT [生产线] AS 生产线, ISNULL([生产车间],N'') AS 生产车间,"
                         + " ISNULL([产线分组],N'') AS 产线分组,"   // 第 2 级分类(成型→烧结/X烧结;依《新系统产线命名.xlsx》)
+                        + " ISNULL([日产能],0) AS 日产能,"
                         + " CASE WHEN ISNULL([停用],0) = 1 THEN 1 ELSE 0 END AS 停用"
                         + " FROM bs_prod_line"
                         + " WHERE ISNULL([asp_cancel],'N') <> 'Y' AND (? = N'' OR ISNULL([生产车间],N'') = ?)"
                         + " ORDER BY ISNULL([排序],999), [生产线]", ws, ws);
+        // 产能可见(2026-10-31):每条线「今天已排 / 日产能 / 今日余量」——只显示、不拦截;
+        //   未配产能(日产能 0/空)时 今日余量 = null ⇒ 前端显示"未配",不显示 0/超载。
+        Map<String, Double> doneToday = new LinkedHashMap<>();
+        for (Map<String, Object> r : dayPlanLoads(ws)) {
+            doneToday.put(String.valueOf(r.get("生产线")), Num.of(r.get("今日已排")));
+        }
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> line : lines) {
             String ln = String.valueOf(line.get("生产线"));
@@ -607,6 +689,11 @@ public class ScheduleBoardService {
             m.put("停用", Integer.valueOf(1).equals(line.get("停用")));
             double v = bk.getOrDefault(ln, 0d);
             m.put("未交量", Math.round(v * 10000d) / 10000d);
+            double cap = Num.of(line.get("日产能"));
+            double done = doneToday.getOrDefault(ln, 0d);
+            m.put("日产能", r4(cap));
+            m.put("今日已排", r4(done));
+            m.put("今日余量", cap > 0 ? r4(cap - done) : null);
             out.add(m);
         }
         return out;
@@ -725,7 +812,10 @@ public class ScheduleBoardService {
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = pc.scx"
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))" + complete
-                        + " ORDER BY pc.cp_date, pc.pl_no, pc.pl_xc",
+                        // 行顺序(2026-10-31 用户口径「工单的开工日/完工日/交期只是查询与显示,不参与排产」):
+                        //   原 `ORDER BY pc.cp_date, ...` 是按**计划完工日期**排 —— 等于让交期决定"从上到下的优先度",
+                        //   与口径冲突。改为稳定的业务键:工单号 + 工单行号(可预期、可复现,不随交期跳)。
+                        + " ORDER BY pc.pl_no, pc.pl_xc",
                 line == null ? "" : line, ws, ws);
     }
 
