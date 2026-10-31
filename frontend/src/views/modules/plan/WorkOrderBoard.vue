@@ -174,7 +174,7 @@
                 <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
                                  :controls="false" :min="0" class="dp-input" autofocus
                                  @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
-                <span v-else class="dp-plan" :class="{ manual: isManual(row, d), short: dayCell(row, d).isActual }"
+                <span v-else class="dp-plan" :class="{ manual: isManual(row, d), actual: dayCell(row, d).isActual }"
                       :title="dayTitle(row, d)" @dblclick="startQtyEdit(row, d)">
                   {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
                     :class="{ over: Number(row.超分配 || 0) > 0 }" :title="overTitle(row)">{{ tt('手') }}</span>
@@ -406,8 +406,9 @@ function dayCell(row, d) {
 function dayTitle(row, d) {
   const p = Number((row.日计划 || {})[d] || 0)
   const a = Number((row.日报工 || {})[d] || 0)
-  return `${tt('计划')} ${qtyText(p)}` + (a ? ` · ${tt('实报')} ${qtyText(a)}` : '')
-    + ' · ' + tt('双击直接填当天数量;清空恢复自动')
+  let t = `${tt('计划')} ${qtyText(p)}`
+  if (a > 0) t += ` · ${tt('实报')} ${qtyText(a)}` + (a < p ? ` (${tt('差')} ${qtyText(p - a)})` : '')
+  return t + ' · ' + tt('双击直接填当天数量;清空恢复自动')
 }
 
 /** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
@@ -711,8 +712,8 @@ onMounted(() => {
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
-/* 2026-10-31 融合显示:未达成计划的格子显示的是「实际」值 ⇒ 标橙色一眼看出差多少 */
-.dp-plan.short { color: #e6a23c; }
+/* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */
+.dp-plan.actual { color: #529b2e; }
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
 .dp-plan.manual { color: #b88230; }

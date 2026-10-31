@@ -61,24 +61,25 @@ export function isOverCapacity(planned, capacity) {
 
 /**
  * 日计划格的**融合显示**(2026-10-31 用户口径:「计划和实际排产这个得融合的好一点,当前太丑了…
- * 如果没达成当前的计划产量日期的量再填入实际的数量,没有实际报工的话就还是显示原来的数量」)。
+ * 没有实际报工的话就还是显示原来的数量」;**当天有报工就必须看到实际完成数**——
+ * 2026-10-31 晚用户再次报障:「红框内不是存在对应的完成数量的吗?怎么没有了」)。
  *
  * <p>一个格子只显示**一个数**:
  * <ul>
- *   <li>当天没有已审报工 ⇒ 显示**计划**(原来那样);</li>
- *   <li>报了但**没达成**计划 ⇒ 显示**实际**(一眼看出差多少);</li>
- *   <li>已达成的 ⇒ 仍显示**计划**(达成时两者没差,不必再标)。</li>
+ *   <li>当天**有已审报工** ⇒ 显示**实际完成数**(绿色,一眼看出真做了多少;没达成时自然就比计划小);</li>
+ *   <li>当天**没有报工** ⇒ 显示**计划**(原来那样)。</li>
  * </ul>
- * 计划为 0 却有报工(临时插单/补做)⇒ 显示实际。
+ * 计划为 0 却有报工(临时插单/补做)⇒ 同样显示实际。
+ *
+ * <p>计划值不丢:进格子的 tooltip(`计划 X · 实报 Y`),屏幕上不再挤两行数字。
  *
  * @param {number} plan   当日计划(人工指定 ∪ 自动摊剩余后的值)
  * @param {number} actual 当日已审核报工量
- * @returns {{qty:number, isActual:boolean}} qty=要显示的数; isActual=显示的是不是实际值(前端标色)
+ * @returns {{qty:number, isActual:boolean}} qty=要显示的数; isActual=显示的是实际值(前端标绿)
  */
 export function dayCellQty(plan, actual) {
   const p = Number(plan || 0)
   const a = Number(actual || 0)
-  if (a <= 0) return { qty: p, isActual: false }
-  if (p <= 0 || a < p) return { qty: a, isActual: true }
+  if (a > 0) return { qty: a, isActual: true }
   return { qty: p, isActual: false }
 }

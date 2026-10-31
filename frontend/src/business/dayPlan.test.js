@@ -43,14 +43,13 @@ test('isOverCapacity:超产能只用于显示;未配产能(<=0)不判', () => {
   assert.equal(isOverCapacity(12000, null), false)
 })
 
-test('dayCellQty:计划/实际融合成一个数(未达成显示实际,没报工显示计划)', () => {
+test('dayCellQty:一格一个数 —— 有报工显示实际,没报工显示计划', () => {
   // 没报工 ⇒ 显示计划
   assert.deepEqual(dayCellQty(2, 0), { qty: 2, isActual: false })
-  // 报了但没达成 ⇒ 显示实际(标色)
+  // 报了(不论达成与否)⇒ 显示实际(标色,2026-10-31 用户口径「完成数量不能没有」)
   assert.deepEqual(dayCellQty(5, 3), { qty: 3, isActual: true })
-  // 达成 ⇒ 仍显示计划
-  assert.deepEqual(dayCellQty(5, 5), { qty: 5, isActual: false })
-  assert.deepEqual(dayCellQty(5, 8), { qty: 5, isActual: false })
+  assert.deepEqual(dayCellQty(5, 5), { qty: 5, isActual: true })
+  assert.deepEqual(dayCellQty(5, 8), { qty: 8, isActual: true })
   // 计划 0 但有报工(补做)⇒ 显示实际
   assert.deepEqual(dayCellQty(0, 3), { qty: 3, isActual: true })
   // 空值安全

@@ -908,6 +908,7 @@ export default {
     //   一格只显示一个数 —— 没报工显示计划、未达成显示实际(橙色)、达成显示计划;tooltip 里两值都给
     '计划': 'Planned',
     '实报': 'Actual',
+    '差': 'short',
     '双击直接填当天数量;清空恢复自动': 'Double-click to fill that day; clear to restore auto',
     // 开线管理已下线(2026-09-24 用户拍板),相关词条随之移除
     '未完工': 'Unfinished',
