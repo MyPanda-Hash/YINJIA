@@ -117,20 +117,14 @@
                  后端同步 plang + plang_pc + 工序台账区间(用户口径「该日期要同步吧」)。 -->
             <el-table-column :label="tt('开工日期')" prop="开工日期" width="105">
               <template #default="{ row }">
-                <el-date-picker v-if="dateEdit === 'st|' + row.行id" v-model="dateDraft" type="date" size="small"
-                                value-format="YYYY-MM-DD" :clearable="false" style="width: 130px"
-                                @change="commitDate(row, 'st')" />
-                <span v-else class="dp-date-cell" :title="tt('双击可改计划开工日期')"
-                      @dblclick="startDateEdit(row, 'st')">{{ row.开工日期 || '-' }}</span>
+                <span class="dp-date-cell" :title="tt('双击可改排产日期')"
+                      @dblclick="openQuick(row, planDates[0] || planToday)">{{ row.开工日期 || '-' }}</span>
               </template>
             </el-table-column>
             <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="115">
               <template #default="{ row }">
-                <el-date-picker v-if="dateEdit === 'cp|' + row.行id" v-model="dateDraft" type="date" size="small"
-                                value-format="YYYY-MM-DD" :clearable="false" style="width: 130px"
-                                @change="commitDate(row, 'cp')" />
-                <span v-else class="dp-date-cell" :title="tt('双击可改计划完工日期')"
-                      @dblclick="startDateEdit(row, 'cp')">{{ row.计划完工日期 || '-' }}</span>
+                <span class="dp-date-cell" :title="tt('双击可改排产日期')"
+                      @dblclick="openQuick(row, planDates[planDates.length - 1] || planToday)">{{ row.计划完工日期 || '-' }}</span>
               </template>
             </el-table-column>
             <el-table-column :label="tt('实际完工日期')" prop="实际完工日期" width="105" />
@@ -163,7 +157,7 @@
                              :class-name="'dp-col-' + dayColState(d, planToday)">
               <template #header>
                 <div class="dp-head" :class="{ over: isOverDay(d), past: dayColState(d, planToday) === 'past' }"
-                     :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊')">
+                     :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊;双击数量弹出调整')">
                   <div class="dp-date">{{ d.slice(5) }}<span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span></div>
                   <div v-if="lineCap > 0" class="dp-cap" :title="tt('该线当天已排/日产能')">
                     {{ qtyText(dayTotal[d]) }}/{{ qtyText(lineCap) }}
@@ -172,11 +166,8 @@
                 </div>
               </template>
               <template #default="{ row }">
-                <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
-                                 :controls="false" :min="0" class="dp-input" autofocus
-                                 @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
-                <span v-else class="dp-plan" :class="{ manual: isManual(row, d) }"
-                      :title="tt('双击可改当天数量;清空恢复自动')" @dblclick="startQtyEdit(row, d)">
+                <span class="dp-plan" :class="{ manual: isManual(row, d) }"
+                      :title="tt('双击可改当天数量;清空恢复自动')" @dblclick="openQuick(row, d)">
                   {{ qtyText((row.日计划 || {})[d]) }}<span v-if="isManual(row, d)" class="dp-hand"
                     :class="{ over: Number(row.超分配 || 0) > 0 }" :title="overTitle(row)">{{ tt('手') }}</span>
                 </span>
@@ -257,6 +248,10 @@
 
     <!-- 工单详情·追溯:共用组件 WorkOrderTraceDialog(2026-10-05;生产工单页也原地挂同一个) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
+
+    <!-- 排产快速调整(2026-10-31):双击日期格弹出;本页带「调线」块(复用调拨,带轨迹可撤回) -->
+    <ScheduleQuickEditDialog v-model="quickVisible" :row="quickRow" :date="quickDate" :line="sel.line"
+                             support-transfer @saved="afterQuickSaved" />
   </div>
 </template>
 
@@ -267,8 +262,9 @@ import request from '@core/request'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
+import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import { qtyText, isOverCapacity, dayColState, isToday } from '@/business/dayPlan'
-import { fetchDayPlan, saveDayPlan, saveRowDates } from '@/business/dayPlanApi'
+import { fetchDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm } from '@core/auth/panelAccess'
 
@@ -377,61 +373,22 @@ const planToday = ref('')
 //   超产能**只标红列头** —— 不弹窗、不改数、不禁填。
 const lineCap = ref(0)
 const dayTotal = ref({})
-/** 就地编辑数量:qtyEdit = '行id|日期'(一次只有一个) */
-const qtyEdit = ref('')
-const qtyDraft = ref(0)
-/** 就地编辑日期:dateEdit = 'st|行id' / 'cp|行id'(开工日/计划完工日) */
-const dateEdit = ref('')
-const dateDraft = ref('')
+/** 排产快速调整弹窗(2026-10-31):双击日期格弹出;本页带「调线」块(复用调拨) */
+const quickVisible = ref(false)
+const quickRow = ref({})
+const quickDate = ref('')
+function openQuick(row, d) {
+  quickRow.value = row
+  quickDate.value = d || planToday.value
+  quickVisible.value = true
+}
+/** 弹窗保存后:重拉排产明细 + 日计划(数量/日期/产线都可能变) */
+function afterQuickSaved() { loadScheduled().then(() => loadDayPlan()) }
 
-function qtyKey(row, d) { return `${row.行id}|${d}` }
 function isManual(row, d) { return ((row.人工指定 || {})[d] ?? null) != null }
 function overTitle(row) {
   const over = Number(row.超分配 || 0)
   return over > 0 ? `${tt('人工指定')} · ${tt('超分配')} ${qtyText(over)}` : tt('人工指定')
-}
-function startQtyEdit(row, d) {
-  qtyEdit.value = qtyKey(row, d)
-  qtyDraft.value = Number((row.日计划 || {})[d] || 0) || undefined
-}
-function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
-
-/** 提交当天数量:有值 = 人工指定该天;清空/0 = 恢复自动(后端按软删处理) */
-async function commitQty(row, d) {
-  const key = qtyKey(row, d)
-  if (qtyEdit.value !== key) return
-  const v = Number(qtyDraft.value || 0)
-  const o = Number((row.日计划 || {})[d] || 0)
-  const wasManual = isManual(row, d)
-  qtyEdit.value = ''
-  if (v === o && wasManual === (v > 0)) return                     // 没变:不打扰
-  try {
-    const r = await saveDayPlan([{ 工单行id: row.行id, 工序: row.工序日 || row.当前工序 || '',
-      生产线: row.生产线 || sel.line, 计划日期: d, 计划数量: v }])
-    const over = (r['超分配'] || []).find((x) => String(x['工单行id']) === String(row.行id))
-    if (over) ElMessage.warning(`${tt('人工指定已超出工序计划量')}: ${qtyText(over['超出'])}${tt('(只提示,不拦保存)')}`)
-    await loadDayPlan()
-  } catch (e) { err(e, '保存失败') }
-}
-
-function startDateEdit(row, kind) {
-  dateEdit.value = `${kind}|${row.行id}`
-  dateDraft.value = (kind === 'st' ? row.开工日期 : row.计划完工日期) || ''
-}
-/** 提交排产日期:后端同步 plang + plang_pc + 工序台账区间;区间变了日计划要重算 */
-async function commitDate(row, kind) {
-  if (dateEdit.value !== `${kind}|${row.行id}`) return
-  const v = dateDraft.value
-  dateEdit.value = ''
-  const old = (kind === 'st' ? row.开工日期 : row.计划完工日期) || ''
-  if (!v || v === old) return
-  try {
-    const r = await saveRowDates({ 行id: row.行id, ...(kind === 'st' ? { 计划开工日期: v } : { 交期: v }) })
-    if (kind === 'st') row.开工日期 = r['计划开工日期'] ?? v
-    else row.计划完工日期 = r['预定完成日期'] ?? v
-    ElMessage.success(`${tt('排产日期已保存')}(${tt('同步工序')} ${r['同步工序行数'] ?? 0})`)
-    await loadDayPlan()
-  } catch (e) { err(e, '保存失败') }
 }
 
 /** 该日期是否超产能(只用于列头标红;产能 <= 0 视为未配,不判) */

@@ -121,24 +121,18 @@
       <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),位置即用户截图标红处
            (「当前工序」之后、「工序进度」之前)。每个日期格都可改计划(含今天以前的日期);
            格下方小字 = 该天已审核报工量(含手机端),只读。 -->
-      <!-- 排产日期(2026-10-31):就地改「计划开工日 / 计划完工日」—— 双击进 date-picker;
-           后端同步 plang + plang_pc + 工序台账区间(用户口径「该日期要同步吧」)。 -->
+      <!-- 排产日期(2026-10-31):双击弹出「排产快速调整」,在那里集中改 数量/开工日/完工日
+           (后端同步 plang + plang_pc + 当前工序台账区间 —— 用户口径「该日期要同步吧」)。 -->
       <el-table-column :label="tt('计划开工日期')" prop="计划开工日期" width="112">
         <template #default="{ row }">
-          <el-date-picker v-if="dateEdit === 'st|' + row.行id" v-model="dateDraft" type="date" size="small"
-                          value-format="YYYY-MM-DD" :clearable="false" style="width: 136px"
-                          @change="commitDate(row, 'st')" />
-          <span v-else class="dp-date-cell" :title="tt('双击可改计划开工日期')"
-                @dblclick="startDateEdit(row, 'st')">{{ row.计划开工日期 || '-' }}</span>
+          <span class="dp-date-cell" :title="tt('双击可改排产日期')"
+                @dblclick="openQuick(row, planDates[0] || planToday)">{{ row.计划开工日期 || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="112">
         <template #default="{ row }">
-          <el-date-picker v-if="dateEdit === 'cp|' + row.行id" v-model="dateDraft" type="date" size="small"
-                          value-format="YYYY-MM-DD" :clearable="false" style="width: 136px"
-                          @change="commitDate(row, 'cp')" />
-          <span v-else class="dp-date-cell" :title="tt('双击可改计划完工日期')"
-                @dblclick="startDateEdit(row, 'cp')">{{ row.计划完工日期 || '-' }}</span>
+          <span class="dp-date-cell" :title="tt('双击可改排产日期')"
+                @dblclick="openQuick(row, planDates[planDates.length - 1] || planToday)">{{ row.计划完工日期 || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
@@ -150,26 +144,22 @@
       <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
       <!-- ⚠ 2026-10-31 用户口径「格子里两个数堆在一起分不清谁是谁」:
            上方计划量/ 下方报工量(只读,加「实」标识 + 绿色);列头「今」标今天、过去列灰底。
-           ⚠ 2026-10-31 二次修正(「不要这样在右下角显示」):计划与报工两行**居中对齐**。
-           ⚠ 2026-10-31 三次修正(「当前不需要手填,能自动算就可以了」):格子默认只读,自动均摊。
-           ⚠ 2026-10-31 四次修正(「双击那个数字可以修改」):**双击当天数量可就地改** ——
-            改过的那天记为「人工指定」(wo_day_plan),其余天按**剩余量重摊**(守恒);
-            清空输入框再保存 = 恢复自动。人工格右上角带「手」角标,超分配标红(只提示不拦)。 -->
+           ⚠ 二次修正(「不要这样在右下角显示」):计划与报工两行**居中对齐**。
+           ⚠ 三次修正(「当前不需要手填,能自动算就可以了」):格子默认只读,自动均摊。
+           ⚠ 五次修正(「还是改成弹窗」):**双击日期格 → 弹「排产快速调整」**,在那里集中改
+             数量/开工日/完工日(生产工单页不带调线)。人工指定的格子带「手」角标。 -->
       <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="center"
                        :label-class-name="'dp-col-' + dayColState(d, planToday)"
                        :class-name="'dp-col-' + dayColState(d, planToday)">
         <template #header>
-          <div class="dp-head" :class="dayColState(d, planToday)" :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊;双击数量可改当天')">
+          <div class="dp-head" :class="dayColState(d, planToday)" :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊;双击数量弹出调整')">
             <span class="dp-date">{{ d.slice(5) }}</span>
             <span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span>
           </div>
         </template>
         <template #default="{ row }">
-          <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
-                           :controls="false" :min="0" class="dp-input" autofocus
-                           @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
-          <span v-else class="dp-plan" :class="{ manual: isManual(row, d) }"
-                :title="tt('双击可改当天数量;清空恢复自动')" @dblclick="startQtyEdit(row, d)">
+          <span class="dp-plan" :class="{ manual: isManual(row, d) }"
+                :title="tt('双击可改当天数量;清空恢复自动')" @dblclick="openQuick(row, d)">
             {{ qtyText((row.日计划 || {})[d]) }}<span v-if="isManual(row, d)" class="dp-hand"
                 :class="{ over: Number(row.超分配 || 0) > 0 }"
                 :title="overTitle(row)">{{ tt('手') }}</span>
@@ -217,6 +207,10 @@
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
+
+    <!-- 排产快速调整(2026-10-31):双击日期格弹出;本页不出「调线」块(用户口径 A) -->
+    <ScheduleQuickEditDialog v-model="quickVisible" :row="quickRow" :date="quickDate"
+                             :line="quickRow.生产线 || ''" @saved="afterQuickSaved" />
 
     <!-- 获取当前工单行的研发配方并保存投料快照 -->
     <el-dialog v-model="mixingVisible" :title="tt('获取混料配方')" width="760px" append-to-body :close-on-click-modal="false">
@@ -278,9 +272,10 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
+import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
 import { qtyText, dayColState, isToday } from '@/business/dayPlan'
-import { fetchDayPlan, saveDayPlan, saveRowDates } from '@/business/dayPlanApi'
+import { fetchDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -417,67 +412,29 @@ function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 // ───────── 日排产(2026-10-29):直接长在本页明细表的日期列 ─────────
 // 用户口径:「生产工单中需要能实现对后面日期的排产量设定……在当前的表格内容处插入当前设定的
 // 日排产数量,修改需要针对当前生产工单和工单排产中都要实现」⇒ 不新增表格/块,窗口内每天一列。
-// 2026-10-31 口径演进:①自动算(工序计划量 ÷ 开工日→交期);②**双击当天数量可改** ——
-//   改过的那天存 wo_day_plan 当「人工指定」,其余天按剩余量重摊(守恒),清空 = 恢复自动;
+// 2026-10-31 口径演进:①自动算(工序计划量 ÷ 开工日→交期);②**双击弹出「排产快速调整」**,
+//   在那里集中改 当天数量(人工指定/恢复自动)、计划开工日、预定完成日;
+//   改过的那天存 wo_day_plan 当「人工指定」,其余天按剩余量重摊(守恒);
 //   格下方绿色小字 = 当天已审核报工量(只读对照)。
 // 数据接口与工单排产同一套(/px/scheduleBoard/dayPlan/*),两页行为一致。
 const planDates = ref([])
 const planToday = ref('')
-/** 就地编辑数量:qtyEdit = '行id|日期' 时该格变输入框(一次只有一个) */
-const qtyEdit = ref('')
-const qtyDraft = ref(0)
-/** 就地编辑日期:dateEdit = 'st|行id' / 'cp|行id' */
-const dateEdit = ref('')
-const dateDraft = ref('')
+/** 排产快速调整弹窗(生产工单页不带「调线」块 —— 用户口径 A:该页不需要调线) */
+const quickVisible = ref(false)
+const quickRow = ref({})
+const quickDate = ref('')
+function openQuick(row, d) {
+  quickRow.value = row
+  quickDate.value = d || planToday.value
+  quickVisible.value = true
+}
+/** 弹窗保存后:整表重拉(数量/日期/产线都可能变),日计划后端会重算 */
+function afterQuickSaved() { load() }
 
-function qtyKey(row, d) { return `${row.行id}|${d}` }
 function isManual(row, d) { return ((row.人工指定 || {})[d] ?? null) != null }
 function overTitle(row) {
   const over = Number(row.超分配 || 0)
   return over > 0 ? `${tt('人工指定')} · ${tt('超分配')} ${qtyText(over)}` : tt('人工指定')
-}
-function startQtyEdit(row, d) {
-  qtyEdit.value = qtyKey(row, d)
-  qtyDraft.value = Number((row.日计划 || {})[d] || 0) || undefined
-}
-function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
-
-/** 提交当天数量:有值 = 人工指定该天;清空/0 = 恢复自动(后端按软删处理) */
-async function commitQty(row, d) {
-  const key = qtyKey(row, d)
-  if (qtyEdit.value !== key) return
-  const v = Number(qtyDraft.value || 0)
-  const o = Number((row.日计划 || {})[d] || 0)
-  const wasManual = isManual(row, d)
-  qtyEdit.value = ''
-  if (v === o && wasManual === (v > 0)) return                     // 没变:不打扰
-  try {
-    const r = await saveDayPlan([{ 工单行id: row.行id, 工序: row.工序日 || row.当前工序 || '',
-      生产线: row.生产线 || '', 计划日期: d, 计划数量: v }])
-    const over = (r['超分配'] || []).find((x) => String(x['工单行id']) === String(row.行id))
-    if (over) ElMessage.warning(`${tt('人工指定已超出工序计划量')}: ${qtyText(over['超出'])}${tt('(只提示,不拦保存)')}`)
-    await loadDayPlan()
-  } catch (e) { err(e, '保存失败') }
-}
-
-function startDateEdit(row, kind) {
-  dateEdit.value = `${kind}|${row.行id}`
-  dateDraft.value = (kind === 'st' ? row.计划开工日期 : row.计划完工日期) || ''
-}
-/** 提交排产日期(计划开工日/计划完工日):后端同步 plang + plang_pc + 工序台账区间 */
-async function commitDate(row, kind) {
-  if (dateEdit.value !== `${kind}|${row.行id}`) return
-  const v = dateDraft.value
-  dateEdit.value = ''
-  const old = (kind === 'st' ? row.计划开工日期 : row.计划完工日期) || ''
-  if (!v || v === old) return
-  try {
-    const r = await saveRowDates({ 行id: row.行id, ...(kind === 'st' ? { 计划开工日期: v } : { 交期: v }) })
-    if (kind === 'st') row.计划开工日期 = r['计划开工日期'] ?? v
-    else row.计划完工日期 = r['预定完成日期'] ?? v
-    ElMessage.success(`${tt('排产日期已保存')}(${tt('同步工序')} ${r['同步工序行数'] ?? 0})`)
-    await loadDayPlan()                                            // 区间变了 → 日计划重算
-  } catch (e) { err(e, '保存失败') }
 }
 
 async function loadDayPlan() {

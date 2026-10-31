@@ -47,3 +47,11 @@ JAVA=C:/Users/vigna/.jdks/ms-25.0.4/bin/java      # 任意 JDK 21+ 均可
   `plang_pc` + 同步 `wo_process_line` **当前工序**那道区间(不碰后续工序的排期)。
 
 复核:`node verify-inline.mjs http://127.0.0.1:8090 2173`(自动还原) + `node shot-inline.mjs`。
+
+## 2026-10-31 晚:改回弹窗
+
+用户口径「那还是改成弹窗先给我看下吧」⇒ 表格里不再就地编辑,双击日期格弹
+`ScheduleQuickEditDialog`(数量/开工日/预定完成日,工单排产页多一块调线);后端逻辑与口径不变。
+
+- `shot-dialog.mjs` —— 截图两页的弹窗(生产工单两块 / 工单排产含调线);
+- `dialog-save.mjs` —— 端到端:双击 → 弹窗填 3 → 保存 → 校验 `wo_day_plan` 与接口,跑完自动还原。
