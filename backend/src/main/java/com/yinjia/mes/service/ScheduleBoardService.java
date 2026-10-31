@@ -402,16 +402,29 @@ public class ScheduleBoardService {
     private static double r4(double v) { return Math.round(v * 10000d) / 10000d; }
 
     /**
-     * 各产线「**今天已排**」= Σ 该线每一行自动日计划在**今天**的份额(2026-10-31)。
+     * 各产线「**今天已排**」= Σ 该线每一行日计划在**今天**的份额(2026-10-31)。
      *
-     * <p>日计划已改成「不需要手填、自动算」的派生值(见 {@link DayPlanSpread}):不再读
-     * {@code wo_day_plan},而是按「工序计划量 ÷ 开工日→交期」现摊再取今天那格 —— 与「生产工单/工单排产」
-     * 页面上格子里的数字**同一把尺**,否则又会各算各的(上午那版就是这个毛病)。
+     * <p>口径 = 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge}):自动部分按「工序计划量 ÷
+     * 开工日→交期」现摊、人工改过的那天以人工值为准(2026-10-31 下午补:不叠加人工指定的话,
+     * 改完数量产能数会偏)。与「生产工单/工单排产」页面格子里是**同一把尺**。
      *
      * <p>只算「今天」:产能判超载看的是当天负荷(用户口径「产能只显示、不拦截」)。
      */
     private Map<String, Double> dayPlanTodayByLine(java.time.LocalDate today) {
         Map<String, Double> out = new LinkedHashMap<>();
+        // 人工指定(一次查完;只有"在册且已排线"的行才参与产能账)
+        Map<Long, Map<java.time.LocalDate, Double>> manual = new HashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT w.工单行id AS rid, w.计划日期 AS d, SUM(w.计划数量) AS q"
+                        + " FROM dbo.wo_day_plan w JOIN dbo.plang p ON p.id = w.工单行id"
+                        + " WHERE w.asp_cancel='N' AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
+                        + " GROUP BY w.工单行id, w.计划日期")) {
+            if (!(r.get("rid") instanceof Number rid)) continue;
+            java.time.LocalDate d = toDate(r.get("d"));
+            if (d == null) continue;
+            manual.computeIfAbsent(rid.longValue(), k -> new java.util.LinkedHashMap<>())
+                    .merge(d, Num.of(r.get("q")), Double::sum);
+        }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.id AS id, ISNULL(p.scx,N'') AS line, ISNULL(p.[当前工序],N'') AS op,"
                         + " ISNULL(p.[工艺路线],N'') AS route, ISNULL(p.pl_sl,0) AS plan_qty,"
@@ -435,8 +448,10 @@ public class ScheduleBoardService {
             double rate = rateCache.computeIfAbsent(route + "|" + op,
                     k -> WorkOrderDayPlanService.rateOf(jdbc, route, op));
             double total = r4(Num.of(r.get("plan_qty")) * rate);
-            double q = DayPlanSpread.on(total, toDate(r.get("st")), toDate(r.get("cp")), today, today);
-            if (q != 0) out.merge(line, q, Double::sum);
+            Map<java.time.LocalDate, Double> merged = DayPlanSpread.merge(total, toDate(r.get("st")),
+                    toDate(r.get("cp")), today, manual.getOrDefault(idn.longValue(), java.util.Map.of()));
+            Double q = merged.get(today);
+            if (q != null && q != 0) out.merge(line, q, Double::sum);
         }
         return out;
     }
@@ -453,6 +468,95 @@ public class ScheduleBoardService {
         if (s == null) return null;
         try { return java.time.LocalDate.parse(s.length() > 10 ? s.substring(0, 10) : s); }
         catch (RuntimeException e) { return null; }
+    }
+
+    /**
+     * **改排产日期**(2026-10-31,「就地改开工日/预定完成日」的后端):只动日期,不动数量/产线。
+     *
+     * <p>为什么不复用 {@link #assign}:它要 加工单号+产线+数量,还会重算 排产数量/余量,
+     * 对"只想把完成日往后挪两天"这种动作太重,且会把数量一起覆盖。
+     *
+     * <p>写三处(同事务):
+     * <ol>
+     *   <li>{@code plang.st_date / cp_date}(唯一真源);</li>
+     *   <li>{@code plang_pc} —— 走 {@link WorkOrderScheduleRecord#sync} 镜像(看板读的是它,不镜像两页会不一);</li>
+     *   <li>{@code wo_process_line} 各道工序的「计划开工/完工」—— **用户口径「该日期要同步吧」**:
+     *       日期列窗口有一部分就来自这些区间,不跟着改的话把交期改到 11-07 也看不到新列。</li>
+     * </ol>
+     *
+     * <p>工序区间的同步规则:**只改当前工序那道**的计划开工/完工(整单 st/cp 就是当前道的区间;
+     * 后面几道是预排线给的后续排期,一起压进来会把后续排期毁掉 —— 详见 {@link #syncProcessRanges})。
+     */
+    @Transactional
+    public Map<String, Object> updateRowDates(long rowId, String startText, String dueText, String user) {
+        if (rowId <= 0) throw new IllegalArgumentException("缺少工单行id");
+        Map<String, Object> row;
+        try {
+            row = jdbc.queryForMap(
+                    "SELECT p.id, p.pl_no, CONVERT(varchar(10), p.st_date, 120) AS st,"
+                            + " CONVERT(varchar(10), p.cp_date, 120) AS cp,"
+                            + " CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END AS 已结案标志"
+                            + " FROM dbo.plang p WHERE p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'", rowId);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            throw new IllegalStateException("工单行不存在或已作废");
+        }
+        if (Integer.valueOf(1).equals(row.get("已结案标志")))
+            throw new IllegalStateException("已结案工单不能改排产日期(先取消结案)");
+        java.time.LocalDate st = parseDateOrNull(startText, "计划开工日期");
+        java.time.LocalDate cp = parseDateOrNull(dueText, "预定完成日期");
+        if (st == null) st = toDate(row.get("st"));
+        if (cp == null) cp = toDate(row.get("cp"));
+        if (st != null && cp != null && cp.isBefore(st))
+            throw new IllegalArgumentException("预定完成日期不能早于计划开工日期(" + st + " → " + cp + ")");
+        jdbc.update("UPDATE dbo.plang SET st_date=?, cp_date=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                st, cp, user, rowId);
+        WorkOrderScheduleRecord.sync(jdbc, rowId, user);          // 镜像 plang_pc(看板读它)
+        int ops = syncProcessRanges(rowId, st, cp, user);
+        logUsage(user, "改排产日期", String.valueOf(row.get("pl_no")), null);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("行id", rowId);
+        out.put("计划开工日期", st == null ? "" : st.toString());
+        out.put("预定完成日期", cp == null ? "" : cp.toString());
+        out.put("同步工序行数", ops);
+        return out;
+    }
+
+    /** 严格解析 yyyy-MM-dd;空 ⇒ null;非法抛中文错误(前端直接弹) */
+    private static java.time.LocalDate parseDateOrNull(String text, String label) {
+        String s = text == null ? "" : text.trim();
+        if (s.isEmpty()) return null;
+        try {
+            return java.time.LocalDate.parse(s.length() > 10 ? s.substring(0, 10) : s);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(label + "格式应为 yyyy-MM-dd:" + s);
+        }
+    }
+
+    /**
+     * 把整单 [开工, 完工] 同步到 {@code wo_process_line} **当前工序**那道工序的计划区间
+     * (见 {@link #updateRowDates})。
+     *
+     * <p>🔴 只同步当前工序:整单的 st_date/cp_date 是**当前这道**的计划开工/完工
+     * (实测 GD-2026-10-0226-1:成型 10-31~11-05、切炭 11-05~12-23、组装 12-23~2027-01-22),
+     * 后面几道的区间是预排线给的**后续排期**;若把三道一起线性压进 [开工,完工],会把后面的
+     * 排期整段毁掉。日期列窗口本来就只取「当前工序」那道区间(buildDates 按工序过滤)⇒ 只改当前道即可。
+     *
+     * @return 实际更新的工序行数(判不出当前工序 ⇒ 0,不动台账)
+     */
+    private int syncProcessRanges(long rowId, java.time.LocalDate st, java.time.LocalDate cp, String user) {
+        if (st == null && cp == null) return 0;
+        List<String> curOp = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL([当前工序],N'') FROM dbo.plang WHERE id=?", String.class, rowId);
+        String op = curOp.isEmpty() ? "" : nz(curOp.get(0));
+        if (op.isEmpty()) {                                       // 当前工序空:回落台账「已落实」最后一道
+            String fb = WorkOrderDayPlanService.ledgerCurrentOp(jdbc, List.of(rowId)).get(rowId);
+            op = nz(fb);
+        }
+        if (op.isEmpty()) return 0;
+        return jdbc.update("UPDATE dbo.wo_process_line SET 计划开工日期=?, 计划完工日期=?,"
+                        + " asp_user2=?, asp_time2=GETDATE()"
+                        + " WHERE 工单行id=? AND 工序=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                st, cp, user, rowId, op);
     }
 
     /**

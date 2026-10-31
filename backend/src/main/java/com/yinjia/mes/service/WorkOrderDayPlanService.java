@@ -82,13 +82,14 @@ public class WorkOrderDayPlanService {
         List<Long> rowIds = new ArrayList<>();
         for (RowRef r : refs) rowIds.add(r.id);
 
-        // 日计划(2026-10-31 用户口径「**当前不需要手填,能自动算就可以了**」):
-        //   不再读/写 wo_day_plan —— 由「工序计划量 ÷ 开工日→交期」按 {@link DayPlanSpread} **现算**。
-        //   一行一份 {日期:数量};下面的「计划合计 / 7天已排 / 15天已排 / 未分配量」全部用同一份,
-        //   保证格子与行汇总永远是同一把尺(上午那版「格子对不上汇总」的根因就是两处各算各的)。
+        // 日计划(2026-10-31):默认由「工序计划量 ÷ 开工日→交期」自动均摊({@link DayPlanSpread});
+        //   **双击改过的那天**存 wo_day_plan 当「人工指定」,其余天按剩余量重摊(守恒,用户口径
+        //   「剩余量重摊,总数守恒」)。一行一份 {日期:数量};下面的「计划合计 / 7天已排 / 15天已排」
+        //   全部用同一份,保证格子与行汇总永远是同一把尺。
         Map<String, Double> opCaps = new LinkedHashMap<>();
         for (RowRef r : refs) opCaps.put(rowKey(r.id, r.op), round(r.planQty * rateOf(jdbc, r.route(), r.op())));
-        Map<String, Map<String, Double>> plans = derivedPlans(refs, opCaps, today);
+        Map<String, Map<LocalDate, Double>> manual = manualByDate(rowIds);
+        Map<String, Map<String, Double>> plans = mergedPlans(refs, opCaps, manual, today);
         Map<String, Map<String, Double>> actuals = actualByDate(rowIds);
         // 日期列**按数据生成**(2026-10-29 用户口径「不存在当前日期的时候不显示这些数据列」):
         //   = 这些行的自动日计划/日报工出现过的日期 ∪ 各工序「计划开工~计划完工」区间;
@@ -156,6 +157,15 @@ public class WorkOrderDayPlanService {
             row.put("日报工", slice(doneAll, dates));
             row.put("计划合计", plannedTotal);
             row.put("完工合计", doneTotal);
+            // 人工指定 + 超分配(2026-10-31):前端拿它画「手」角标、清空即恢复自动;超分配只提示不拦。
+            Map<LocalDate, Double> m = manual.getOrDefault(key, Map.of());
+            Map<String, Double> manualOut = new LinkedHashMap<>();
+            for (LocalDate d : new java.util.TreeSet<>(m.keySet())) {
+                if (m.get(d) != null) manualOut.put(d.toString(), m.get(d));
+            }
+            row.put("人工指定", manualOut);
+            row.put("超分配", DayPlanSpread.overAllocated(opCaps.getOrDefault(key, 0d), m));
+            row.put("计划开工日期", r.start == null ? "" : r.start.toString());
             rows.add(row);
         }
         out.put("行", rows);
@@ -216,10 +226,10 @@ public class WorkOrderDayPlanService {
             }
             saved++;
         }
-        // 🔴 2026-10-30 新增守卫(断点 3 的配套):**同一工单行同一工序的 Σ计划 ≤ 排产数量**。
-        //   日计划是工序单位(排产数量 × 该道换算率),所以按换算率折回成品再比。
-        //   不设这道闸,切单后父行计划合计会长期大于新排产数量而无人察觉(此前只靠前端拦,接口层裸奔)。
-        //   超出即整笔回滚(前端拿到明确报错),而不是静默写脏。
+        // 2026-10-31 下午:原 2026-10-30 的「Σ计划 ≤ 排产数量 × 换算率，超了整笔回滚」是**全量手填**时代的闸；
+        //   现在 wo_day_plan 只存「人工指定」,人工改大一点(临时插单/赶工)不该 500 ⇒ 改成**软校验**:
+        //   超了记进返回值「超分配」清单,自动部分不再摊(R = 0),但照样保存 —— 沿用用户口径「不堵死录入」。
+        List<Map<String, Object>> over = new ArrayList<>();
         for (Map.Entry<String, double[]> e : touched.entrySet()) {
             String[] k = e.getKey().split("\\|", 2);
             long rid = longOf(k[0]);
@@ -234,14 +244,20 @@ public class WorkOrderDayPlanService {
                     "SELECT ISNULL(SUM(计划数量),0) FROM dbo.wo_day_plan WHERE 工单行id=? AND 工序=? AND asp_cancel='N'",
                     Double.class, rid, op);
             double cap = round(planSl * rate);
-            if (sum > cap + 0.0001)
-                throw new IllegalStateException("工单行 " + rid + " 工序[" + (op == null || op.isEmpty() ? "未指定" : op)
-                        + "] 的日计划合计 " + trim(sum) + " 超过可排上限 " + trim(cap)
-                        + "(排产数量 " + trim(planSl) + " × 换算率 " + trim(rate) + ")");
+            if (sum > cap + 0.0001) {
+                Map<String, Object> w = new LinkedHashMap<>();
+                w.put("工单行id", rid);
+                w.put("工序", op == null ? "" : op);
+                w.put("人工合计", round(sum));
+                w.put("工序计划量", cap);
+                w.put("超出", round(sum - cap));
+                over.add(w);
+            }
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("保存格数", saved);
         out.put("清空格数", cleared);
+        out.put("超分配", over);
         return out;
     }
 
@@ -393,9 +409,9 @@ public class WorkOrderDayPlanService {
     /**
      * 该线**每天已排**合计(日期列头「已排/日产能」、顶部「今日超载」):按 {@code plang.scx}(当前归属)算。
      *
-     * <p>2026-10-31「日计划改成自动算」之后,这里不再查 {@code wo_day_plan},而是把**整条线全部在册行**
-     * (不分页签 —— 产能账是整条线的)逐行按 {@link DayPlanSpread} 摊一遍再按日合计:
-     * 与格子里的日计划、行上的 7天/15天已排**同一把尺**,不会各算各的。
+     * <p>2026-10-31 起日计划 = 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge}),这里把**整条线全部
+     * 在册行**(不分页签 —— 产能账是整条线的)逐行合并一遍再按日合计:与格子里的日计划、行上的
+     * 7天/15天已排**同一把尺**。2026-10-31 下午补:人工改过的格子也要算进来,否则改完数量产能数会偏。
      *
      * <p>按 {@code plang.scx} 而不是 {@code wo_day_plan.生产线}:调拨只改 plang/plang_pc/wo_process_line,
      * 以"活跟工单走"为准。
@@ -404,6 +420,18 @@ public class WorkOrderDayPlanService {
         Map<String, Double> sums = new LinkedHashMap<>();
         String ln = str(line);
         if (ln.isEmpty()) return sums;
+        // 该线各行的人工指定(一次查完,别逐行 N+1)
+        Map<Long, Map<LocalDate, Double>> manual = new HashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT w.工单行id AS rid, w.计划日期 AS d, SUM(w.计划数量) AS q"
+                        + " FROM dbo.wo_day_plan w JOIN dbo.plang p ON p.id = w.工单行id"
+                        + " WHERE w.asp_cancel='N' AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?"
+                        + " GROUP BY w.工单行id, w.计划日期", ln)) {
+            if (!(r.get("rid") instanceof Number rid)) continue;
+            LocalDate d = toDate(r.get("d"));
+            if (d == null) continue;
+            manual.computeIfAbsent(rid.longValue(), k -> new LinkedHashMap<>()).merge(d, num(r.get("q")), Double::sum);
+        }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.id AS id, ISNULL(p.[当前工序],N'') AS op, ISNULL(p.[工艺路线],N'') AS route,"
                         + " ISNULL(p.pl_sl,0) AS plan_qty, p.st_date AS st, p.cp_date AS cp"
@@ -423,8 +451,9 @@ public class WorkOrderDayPlanService {
             final String route = str(r.get("route"));
             double rate = rateCache.computeIfAbsent(route + "|" + op, k -> rateOf(jdbc, route, op));
             double total = round(num(r.get("plan_qty")) * rate);
-            for (Map.Entry<LocalDate, Double> e
-                    : DayPlanSpread.of(total, toDate(r.get("st")), toDate(r.get("cp")), today).entrySet()) {
+            Map<LocalDate, Double> merged = DayPlanSpread.merge(total, toDate(r.get("st")), toDate(r.get("cp")),
+                    today, manual.getOrDefault(idn.longValue(), Map.of()));
+            for (Map.Entry<LocalDate, Double> e : merged.entrySet()) {
                 sums.merge(e.getKey().toString(), e.getValue(), Double::sum);
             }
         }
@@ -634,23 +663,48 @@ public class WorkOrderDayPlanService {
     }
 
     /**
-     * 自动日计划(2026-10-31 用户口径「不需要手填,能自动算就可以了」):
-     * key = 行id|工序 → 日期 → 数量,由 {@link DayPlanSpread} 现算,**不落表**。
+     * 合并后的日计划(2026-10-31):key = 行id|工序 → 日期 → 数量。
+     *
+     * <p>= 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge})。用户口径「剩余量重摊,总数守恒」:
+     * 改过的那天用人工值,其余天按 {@code 工序计划量 − 人工合计} 重摊,合计仍等于工序计划量(除非超分配)。
      *
      * <p>总额 = 工序计划量({@code 排产数量 × 换算率});区间 = 开工日→交期(开工日空 ⇒ 今天起)。
      */
-    private static Map<String, Map<String, Double>> derivedPlans(List<RowRef> refs,
-                                                                 Map<String, Double> opCaps,
-                                                                 LocalDate today) {
+    private static Map<String, Map<String, Double>> mergedPlans(List<RowRef> refs,
+                                                                Map<String, Double> opCaps,
+                                                                Map<String, Map<LocalDate, Double>> manual,
+                                                                LocalDate today) {
         Map<String, Map<String, Double>> out = new LinkedHashMap<>();
         for (RowRef r : refs) {
             String key = rowKey(r.id, r.op);
             Map<String, Double> m = new LinkedHashMap<>();
-            for (Map.Entry<LocalDate, Double> e
-                    : DayPlanSpread.of(opCaps.getOrDefault(key, 0d), r.start(), r.due(), today).entrySet()) {
+            for (Map.Entry<LocalDate, Double> e : DayPlanSpread.merge(opCaps.getOrDefault(key, 0d),
+                    r.start(), r.due(), today, manual.getOrDefault(key, Map.of())).entrySet()) {
                 m.put(e.getKey().toString(), e.getValue());
             }
             out.put(key, m);
+        }
+        return out;
+    }
+
+    /**
+     * 人工指定(2026-10-31):key = 行id|工序 → 日期 → 数量。来源 = {@code wo_day_plan} 未作废行。
+     *
+     * <p>这张表从"全量日计划"改成"**人工指定覆盖表**":只存被人工改过的格子,没行 = 走自动摊。
+     */
+    private Map<String, Map<LocalDate, Double>> manualByDate(List<Long> ids) {
+        Map<String, Map<LocalDate, Double>> out = new HashMap<>();
+        if (ids.isEmpty()) return out;
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT 工单行id AS rid, ISNULL(工序,N'') AS op, 计划日期 AS d, SUM(计划数量) AS q"
+                        + " FROM dbo.wo_day_plan WHERE asp_cancel='N' AND 工单行id IN (" + qs(ids.size()) + ")"
+                        + " GROUP BY 工单行id, 工序, 计划日期", ids.toArray())) {
+            if (r.get("rid") == null) continue;
+            LocalDate d = toDate(r.get("d"));
+            if (d == null) continue;
+            out.computeIfAbsent(rowKey(((Number) r.get("rid")).longValue(), str(r.get("op"))),
+                            k -> new LinkedHashMap<>())
+                    .merge(d, num(r.get("q")), Double::sum);
         }
         return out;
     }

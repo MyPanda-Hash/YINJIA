@@ -2,7 +2,9 @@ package com.yinjia.mes.service;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,14 +49,30 @@ public final class DayPlanSpread {
      * @return 日期 → 当天计划量(按日期升序;**保留 0 值**,因为日期列窗口要靠它撑开)
      */
     public static Map<LocalDate, Double> of(double total, LocalDate start, LocalDate due, LocalDate today) {
+        return of(total, start, due, today, java.util.Set.of());
+    }
+
+    /**
+     * 同上,但**跳过** {@code skip} 里的日期(那些天已由人工指定,自动部分不再摊到它们头上)。
+     *
+     * <p>这是「自动算 + 人工改一格」共存的关键:改了一格 ⇒ 剩余量只摊到**没被改过的天**
+     * (2026-10-31 用户口径「剩余量重摊,总数守恒」)。
+     */
+    public static Map<LocalDate, Double> of(double total, LocalDate start, LocalDate due, LocalDate today,
+                                            java.util.Set<LocalDate> skip) {
         Map<LocalDate, Double> out = new LinkedHashMap<>();
-        if (today == null || total <= 0) return out;
+        if (today == null) return out;
 
         LocalDate s = start == null ? today : start;
         LocalDate e = due == null ? s : due;
         if (e.isBefore(s)) e = s;                                   // 逾期:整笔压到起点那天(开工日为空时即今天)
         if (ChronoUnit.DAYS.between(s, e) > MAX_SPAN_DAYS) s = e.minusDays(MAX_SPAN_DAYS);
-        int n = (int) ChronoUnit.DAYS.between(s, e) + 1;
+        List<LocalDate> days = new ArrayList<>();
+        for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) {
+            if (skip == null || !skip.contains(d)) days.add(d);
+        }
+        int n = days.size();
+        if (n == 0 || total <= 0) return out;
 
         double t = round(total);
         boolean wholePieces = t >= n && Math.abs(t - Math.rint(t)) < EPS;   // 整数件且够分:按件取整
@@ -66,16 +84,57 @@ public final class DayPlanSpread {
                 // 余数**逐天摊开**(前重后轻),不压在最后一天 ——
                 // 2026-10-31 用户反馈「应该是均摊而不是最后一天全部完成」(10 件 6 天:2,2,2,2,1,1)
                 long v = base + (i < rem ? 1 : 0);
-                out.put(s.plusDays(i), (double) v);
+                out.put(days.get(i), (double) v);
             }
         } else {
             double base = round(t / n);
             for (int i = 0; i < n; i++) {
                 double v = (i == n - 1) ? round(t - base * (n - 1)) : base;
-                out.put(s.plusDays(i), v);
+                out.put(days.get(i), v);
             }
         }
         return out;
+    }
+
+    /**
+     * **合并**「人工指定」与「自动摊剩余」—— 页面/产能/汇总都走这一个出口(同一把尺)。
+     *
+     * <p>口径(2026-10-31 用户选定「剩余量重摊,总数守恒」):
+     * <ol>
+     *   <li>{@code S = Σ人工指定};</li>
+     *   <li>{@code R = total − S} 摊到「区间内**没被人工指定**的天」;{@code R ≤ 0} ⇒ 不再自动摊(超分配);</li>
+     *   <li>{@code 某天 = 人工值 ?? 自动值};人工指定在区间外的日期也保留(计入 S)。</li>
+     * </ol>
+     *
+     * @param total  工序计划量
+     * @param manual 人工指定(日期 → 数量);空 = 全自动
+     * @return 日期 → 当天计划(按日期升序)
+     */
+    public static Map<LocalDate, Double> merge(double total, LocalDate start, LocalDate due, LocalDate today,
+                                               Map<LocalDate, Double> manual) {
+        Map<LocalDate, Double> m = manual == null ? Map.of() : manual;
+        double s = 0;
+        for (Double v : m.values()) if (v != null) s += v;
+        Map<LocalDate, Double> out = new LinkedHashMap<>();
+        out.putAll(of(round(total - s), start, due, today, m.keySet()));
+        for (Map.Entry<LocalDate, Double> e : m.entrySet()) {
+            if (e.getKey() != null && e.getValue() != null) out.put(e.getKey(), e.getValue());
+        }
+        Map<LocalDate, Double> sorted = new java.util.TreeMap<>(out);
+        return new LinkedHashMap<>(sorted);
+    }
+
+    /** 人工指定合计(= S) */
+    public static double manualSum(Map<LocalDate, Double> manual) {
+        double s = 0;
+        if (manual != null) for (Double v : manual.values()) if (v != null) s += v;
+        return round(s);
+    }
+
+    /** 超分配量 = max(0, Σ人工指定 − 工序计划量);只用于提示,不拦保存(用户口径「不堵死录入」) */
+    public static double overAllocated(double total, Map<LocalDate, Double> manual) {
+        double over = round(manualSum(manual) - total);
+        return over > 0 ? over : 0d;
     }
 
     /** 某一天摊到多少(产线「今天已排/今日超载」用;取不到=0) */

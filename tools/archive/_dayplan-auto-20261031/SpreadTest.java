@@ -106,6 +106,36 @@ public class SpreadTest {
         eq("on(今天)", 2000, DayPlanSpread.on(6000, LocalDate.parse("2026-10-29"), today, today, today));
         eq("on(区间外)", 0, DayPlanSpread.on(6000, LocalDate.parse("2026-10-29"), today, LocalDate.parse("2026-11-05"), today));
 
+        // 11. merge():人工指定 ∪ 自动摊剩余(2026-10-31 用户口径「剩余量重摊,总数守恒」)
+        //     10 件 6 天(10-31~11-05),把 11-05 改成 3 ⇒ 剩余 7 摊到 10-31~11-04(5 天)= 2,2,1,1,1,末位 3
+        eqMap("merge:改一格,其余天重摊(10/6 天,11-05 改 3)",
+                m("2026-10-31", "2", "2026-11-01", "2", "2026-11-02", "1",
+                        "2026-11-03", "1", "2026-11-04", "1", "2026-11-05", "3"),
+                DayPlanSpread.merge(10, today, LocalDate.parse("2026-11-05"), today,
+                        Map.of(LocalDate.parse("2026-11-05"), 3d)));
+        eq("merge:合计守恒", 10,
+                DayPlanSpread.merge(10, today, LocalDate.parse("2026-11-05"), today,
+                        Map.of(LocalDate.parse("2026-11-05"), 3d)).values().stream().mapToDouble(Double::doubleValue).sum());
+
+        // 12. 无人工指定 ⇒ merge = 纯自动
+        eqMap("merge:无人工=自动", m("2026-10-31", "2", "2026-11-01", "2", "2026-11-02", "2",
+                        "2026-11-03", "2", "2026-11-04", "1", "2026-11-05", "1"),
+                DayPlanSpread.merge(10, today, LocalDate.parse("2026-11-05"), today, Map.of()));
+
+        // 13. 超分配:人工 12 > 工序计划量 10 ⇒ 只保留人工值、不再自动摊;超 2(只提示不拦)
+        java.util.Map<LocalDate, Double> over = DayPlanSpread.merge(10, today, LocalDate.parse("2026-11-05"),
+                today, Map.of(LocalDate.parse("2026-11-05"), 12d));
+        eq("超分配:只留人工格(1 天)", 1, over.size());
+        eq("超分配:值 = 12", 12, over.get(LocalDate.parse("2026-11-05")));
+        eq("超分配:提示量 = 2", 2, DayPlanSpread.overAllocated(10, Map.of(LocalDate.parse("2026-11-05"), 12d)));
+        eq("超分配:未超时 = 0", 0, DayPlanSpread.overAllocated(10, Map.of(LocalDate.parse("2026-11-05"), 3d)));
+
+        // 14. 人工指定落在区间外(改交期后常见):保留并计入 S,自动部分不再覆盖它
+        java.util.Map<LocalDate, Double> outRange = DayPlanSpread.merge(10, today, LocalDate.parse("2026-11-02"),
+                today, Map.of(LocalDate.parse("2026-11-09"), 4d));
+        eq("区间外人工值保留", 4, outRange.get(LocalDate.parse("2026-11-09")));
+        eq("区间外:合计仍 10", 10, outRange.values().stream().mapToDouble(Double::doubleValue).sum());
+
         System.out.println(fail == 0 ? "\nRESULT: [PASS] 全部通过" : "\nRESULT: [FAIL] " + fail + " 项不通过");
         if (fail > 0) System.exit(1);
     }

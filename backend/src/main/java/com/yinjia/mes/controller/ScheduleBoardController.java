@@ -190,8 +190,9 @@ public class ScheduleBoardController {
     }
 
     /**
-     * **工单日排产·写**(2026-10-29):保存两页表格里填/均摊出来的日计划。
-     * 数量 &gt; 0 = 写入或覆盖;0/空 = 软删该格。动作词 dayplan(两页任一授予即可)。
+     * **工单日排产·写**(2026-10-29;2026-10-31 语义更新为「人工指定覆盖」):
+     * 数量 &gt; 0 = 指定该天(该天不再自动摊);0/空 = 软删该格 = **恢复自动**。
+     * 超分配不再整笔回滚(返回「超分配」清单,前端提示)。动作词 dayplan(两页任一授予即可)。
      */
     @PostMapping("/dayPlan/save")
     @SuppressWarnings("unchecked")
@@ -201,6 +202,31 @@ public class ScheduleBoardController {
                 "日排产");
         List<Map<String, Object>> cells = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(dayPlanService.save(cells, currentUser()));
+    }
+
+    /**
+     * **改排产日期**(2026-10-31):就地改「计划开工日 / 预定完成日」。
+     *
+     * <p>body: {@code { 行id, 计划开工日期?, 交期? }} —— 只传改动的那一个也行;
+     * 写 plang(真源)+ 镜像 plang_pc + 同步 wo_process_line 当前工序的计划区间
+     * (用户口径「该日期要同步吧」:日期列窗口来自那些区间,不同步会把新日期藏起来)。
+     * 动作词 **日排产**(dayplan) —— 两页动作集里都有、且改数量用的也是它;不用 assign:
+     * 工单排产页(WORK_ORDER_BOARD)的动作集里没有 assign,挂它等于该页永远点不动。
+     */
+    @PostMapping("/rowDates")
+    public ApiResult<Map<String, Object>> rowDates(@RequestBody Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
+                "日排产");
+        Object ido = body.get("行id");
+        long rowId;
+        try {
+            rowId = ido instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(ido).trim());
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("缺少工单行id");
+        }
+        return ApiResult.ok(service.updateRowDates(rowId, str(body.get("计划开工日期")),
+                str(body.get("交期")), currentUser()));
     }
 
     private static List<Long> longList(Object o) {

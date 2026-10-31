@@ -218,6 +218,7 @@ public class WorkOrderListController {
                         + " " + ROW_YL + " AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
+                        + " CONVERT(varchar(10), p.st_date, 120) AS 计划开工日期,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
                         + " FROM dbo.plang p"
