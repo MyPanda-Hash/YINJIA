@@ -5054,6 +5054,68 @@ export default {
     '排产数量超过需求数量': 'Schedule qty exceeds demand qty',
     '批量排产结果': 'Batch scheduling result',
 
+    // ---- 出厂检验报告·纸面版式(QcOqcSheet.vue,c-95-12 / YJ-QR-05/A1,2026-11-01 第三轮)----
+    // 面板页改成与「首件检验单」同款纸张式受控表单:纸面静态标签一律走 tt(),业务数据(客户名/
+    // 产品名/检验项目文字)按 ADR-0001 不翻译。
+    '编制日期': 'Prepared Date',
+    '产品规格': 'Product Specification',
+    '生产量': 'Output Qty',
+    '检测日期': 'Test Date',
+    '抽样标准': 'Sampling Standard',
+    '抽检量': 'Sample Qty',
+    // 判定列只有 44px 宽(原件 twips 663),Judgement 会断成 "Judge ment" ⇒ 用 Judge
+    '判定': 'Judge',
+    // 签署行标签用「审 核 / 批 准」两个**本纸专用**词条(带空格):中文仍是「审 核/批 准」的公文
+    // 空格排版,英文可分别译成 Reviewed by / Approved by;避免复用全局的「审核/批准」
+    // (那两条同时是按钮名,不能改)。
+    '审 核': 'Reviewed by',
+    '批 准': 'Approved by',
+    '见型式检验报告': 'See Type Test Report',
+    '惠州大亚湾区龙海二路 303 号': 'No. 303, Longhai 2nd Road, Daya Bay District, Huizhou',
+    '暂无检验项目（可在销售出库单点「生成出厂检验报告」按出货检验计划带入）':
+      'No inspection items yet (create one from the Sales Outbound sheet via "Create Factory Inspection Report" to fill them from the shipping inspection plan)',
+    '暂无检验项目': 'No inspection items',
+    '按《生活饮用水输配水设备及防护材料卫生安全评价规范》':
+      'Per the Hygienic Safety Evaluation Specifications for Drinking Water Conveyance Equipment and Protective Materials',
+    // 卫生安全 15 行(项目 / 卫生要求) —— 受控表单固定内容,不随单据变化
+    '浑浊度': 'Turbidity',
+    '臭和味': 'Odor and Taste',
+    '肉眼可见物': 'Visible Matter',
+    '溶解性总固体': 'Total Dissolved Solids',
+    '耗氧量（以O2计）': 'Oxygen Consumption (as O2)',
+    '砷': 'Arsenic',
+    '铬': 'Chromium',
+    '铝': 'Aluminum',
+    '铅': 'Lead',
+    '汞': 'Mercury',
+    '铁': 'Iron',
+    '锰': 'Manganese',
+    '铜': 'Copper',
+    '锌': 'Zinc',
+    '增加量≤0.2NTU': 'Increase ≤ 0.2 NTU',
+    '浸泡后水无异臭、异味': 'No odor or off-flavor in the soaked water',
+    '浸泡后水不产生任何肉眼可见的碎片杂物等': 'No visible debris or foreign matter in the soaked water',
+    '改变量≤0.5': 'Change ≤ 0.5',
+    '增加量≤1 mg/L': 'Increase ≤ 1 mg/L',
+    '增加量≤0.001 mg/L': 'Increase ≤ 0.001 mg/L',
+    '增加量≤0.005 mg/L': 'Increase ≤ 0.005 mg/L',
+    '增加量≤0.02 mg/L': 'Increase ≤ 0.02 mg/L',
+    '增加量≤0.0001 mg/L': 'Increase ≤ 0.0001 mg/L',
+    '增加量≤0.06 mg/L': 'Increase ≤ 0.06 mg/L',
+    '增加量≤0.2 mg/L': 'Increase ≤ 0.2 mg/L',
+    // ⚠ 覆盖旧词条('Project'):本次纸面上的「项目」是卫生安全表的列头(检验项目),
+    //   与研发的"项目"不是一回事;全库唯一另一处用法(QcCatalogSheet 的「项目」列)同样是检验项目列,
+    //   改按 Item 更准确。放文件末尾 ⇒ 后写的键生效。
+    '项目': 'Item',
+    // ---- 出厂检验报告·「导出」弹窗 PDF/Excel 走服务端受控表单报表(2026-11-01 第三轮)----
+    '正在生成 Excel…': 'Generating Excel…',
+    '服务端受控表单版式（与「导出报表」同一份模板，按 A4 分页）':
+      'Server-side controlled-form layout (same template as "Export Report", paginated to A4)',
+    '服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）':
+      'Server-side controlled-form PDF (same template as "Export Report", paginated to A4)',
+    '在浏览器新窗口打开服务端受控表单 PDF，可直接打印':
+      'Open the server-side controlled-form PDF in a new browser window for direct printing',
+
   },
 
 }

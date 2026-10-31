@@ -180,6 +180,17 @@
           :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
         />
+        <!-- 出厂检验报告(QC_OQC_REPORT,2026-11-01 用户口径「改成和首件检验单相同的形式」):
+             与首件检验单同一形态 —— 整页 A4 受控表单纸居中、左单据选择栏、右按钮竖栏、纸上直接填
+             (c-95-12 / YJ-QR-05/A1:抬头 9 格 + 7 列主表 + 检验结论/备注 + 卫生安全 15 行 + 签署)。
+             原来这里是「表头字段条 + 17 列明细表格」的数据页,已整体弃用;
+             服务端 Jasper 版式(reports/qc_oqc.jrxml)仍保留,只给导出报表的 PDF/Excel 用。 -->
+        <QcOqcSheet
+          v-else-if="panelCode === 'QC_OQC_REPORT'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          @dirty="markInlineDirty"
+        />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
              数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
         <ProdDocListSheet
@@ -1804,14 +1815,14 @@
           <span class="efmt-ico">🖨</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('打印预览') }}</div>
-            <div class="efmt-desc">{{ tt('在新窗口内打开这张纸的 PDF，可直接打印或另存为 PDF') }}</div>
+            <div class="efmt-desc">{{ sheetPdfPreviewDesc }}</div>
           </div>
         </div>
         <div class="efmt-item" @click="exportSheetPdf">
           <span class="efmt-ico">📄</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('导出 PDF') }}</div>
-            <div class="efmt-desc">{{ tt('按纸张实际尺寸单页生成，直接下载，无需打印机') }}</div>
+            <div class="efmt-desc">{{ sheetPdfDesc }}</div>
           </div>
         </div>
         <div class="efmt-item" @click="exportSheetExcel">
@@ -2489,6 +2500,8 @@ import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import { defaultShipRows, shipRowType } from '@core/qc/shipPlanDefaults'
 import QcProcInspSheet from '@core/qc/QcProcInspSheet.vue'
 import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
+// 出厂检验报告(2026-11-01):与首件检验单同款纸张式受控记录表(c-95-12 / YJ-QR-05/A1)
+import QcOqcSheet from '@core/qc/QcOqcSheet.vue'
 // 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
 import { mergeFetchedColumns } from '@core/qc/firstInspCols.js'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
@@ -2584,7 +2597,10 @@ const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC',
   // 制程检验单(2026-10-12):用户口径「参考检验数据记录的做法」—— 作为文书式面板,
   // 整页纸张居中 + 功能按钮右侧竖排,由 QcProcInspSheet 以报表形态接管
-  'QC_PROC_INSP', 'QC_FIRST_INSP', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+  'QC_PROC_INSP', 'QC_FIRST_INSP',
+  // 出厂检验报告(2026-11-01 用户口径):「和首件检验单相同的形式」——
+  // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
+  'QC_OQC_REPORT', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
  * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
@@ -4088,8 +4104,14 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  *   ③ 审核后单据锁定(单据状态=已审核 ⇒ draftEditable 为假、纸面只读);
  *   ④ 纸面/列表/服务端报表的「审核人」格由 QueryService 虚拟字段(取 yj_doc_status.shr)自动显示。
  *   存量已直审单据的 AUDIT 行由 tools/migrate-first-insp-audit-trail-20261018.sql 补录。
+ *
+ * ⚠ 2026-11-01(用户口径「出厂检验报告实现和首件检验单相同的形式」):
+ *   出厂检验报告(QC_OQC_REPORT)本轮改成 approval-layout 纸面后,和首件/制程同属「报工-检验」一族、
+ *   不进两级审批的 8 张质量单据、也没有审批流 ⇒ 同一口径放开「审核 / 弃审」(仅管理员)。
+ *   后端 ButtonService.audit() 是通用 doc 面板直审,**无需改后端**(仅 ADMIN_L2_PANELS 会被拒,
+ *   QC_OQC_REPORT 不在其中);审核后 yj_doc_status.shr 有值 ⇒ 纸面「审核人」格与导出报表都带出留痕。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
+const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP', 'QC_OQC_REPORT']
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -5249,6 +5271,11 @@ const DOC_RAIL_PANELS = {
   QC_PROC_INSP: ['工单号', '产品名称'],
   QC_FIRST_INSP: ['工单号', '产品名称'],
   QC_ASM_INSP: ['工单号', '产品名称'],
+  // 出厂检验报告(2026-11-01 用户口径「和首件检验单相同的形式」):
+  //   面板改成纸面 approval-layout 后,左侧也补同款「单据选择」栏(单号 | 日期 | 客户名称 | 产品名称 | 审核状态);
+  //   中间列按**该面板表头真实有值**挑:报告按「客户 × 产品」定位(一张单=一个产品的一份报告),
+  //   工单号/检验类别这类字段本面板没有,不配。
+  QC_OQC_REPORT: ['客户名称', '产品名称'],
 }
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
@@ -7087,18 +7114,35 @@ function onSideAction(a) {
 
 // ── 文书面板导出:格式选择(打印预览 / PDF / Excel);打印为独立按钮不经过这里 ──
 const exportFmtVisible = ref(false)
+/** 出厂检验报告(QC_OQC_REPORT):面板是 approval-layout 纸面,但导出 PDF/Excel **不走截图**,
+ *  统一切到服务端受控表单报表(reports/qc_oqc.jrxml,与「导出报表」同一份模板)。
+ *  判据只此一处:导出三件套(previewSheetPdf / exportSheetPdf / exportSheetExcel)与弹窗文案共用。 */
+const OQC_REPORT_CODE = 'qc_oqc'
+const isOqcSheetPanel = computed(() => String(panelCode.value) === 'QC_OQC_REPORT')
 /**
  * 「导出 Excel」在**本文书面板**到底导什么 —— 三种口径,弹窗里如实说明(别一句话糊到底):
  *   · 纸面版式   : 检验单类(QC_PROC_INSP / QC_FIRST_INSP),导出的就是这张纸(纯函数 + 单测);
  *   · 控制列表版式: RD_PROGRESS / QC_CATALOG,按纸面列定义导全部行;
+ *   · 服务端受控表单: 出厂检验报告(QC_OQC_REPORT),与「导出报表」同一份 .jrxml;
  *   · 头字段+全明细: 其余文书面板(exportSheetExcel 的通用分支)。
  */
 const sheetExcelDesc = computed(() => {
   const code = String(panelCode.value)
   if (code === 'QC_PROC_INSP' || code === 'QC_FIRST_INSP') return tt('导出当前这张纸，版式与纸面一致')
   if (code === 'RD_PROGRESS' || code === 'QC_CATALOG') return tt('按纸面列定义导出全部行')
+  // 出厂检验报告:面板上的纸是**连续 HTML**,PDF/Excel 都改走服务端受控表单报表(见 downloadOqcReport),
+  // 与「导出报表」同一份模板 ⇒ 文案要说清楚,别让人以为导的是屏幕这张截图。
+  if (code === 'QC_OQC_REPORT') return tt('服务端受控表单版式（与「导出报表」同一份模板，按 A4 分页）')
   return tt('头字段键值 + 各明细页签全字段全数据，不受纸张限制')
 })
+/** 「导出」弹窗里「打印预览」的说明文字:出厂检验报告打开的是服务端受控表单 PDF,不是屏幕截图 */
+const sheetPdfPreviewDesc = computed(() => (isOqcSheetPanel.value
+  ? tt('在浏览器新窗口打开服务端受控表单 PDF，可直接打印')
+  : tt('在新窗口内打开这张纸的 PDF，可直接打印或另存为 PDF')))
+/** 「导出」弹窗里「导出 PDF」的说明文字:同上,出厂检验报告不再"按纸张实际尺寸单页生成" */
+const sheetPdfDesc = computed(() => (isOqcSheetPanel.value
+  ? tt('服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）')
+  : tt('按纸张实际尺寸单页生成，直接下载，无需打印机')))
 /**
  * 把当前文书纸面截成 PDF(返回 blob + 文件名)—— **导出 PDF 与打印预览共用这一份实现**。
  *
@@ -7156,7 +7200,7 @@ async function buildSheetPdfBlob() {
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .qr-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet')
   if (!el || !(el instanceof HTMLElement)) return null
   const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
   await nextTick()
@@ -7238,9 +7282,75 @@ async function buildSheetPdfBlob() {
   const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
   return { blob: pdf.output('blob'), name: `${panelName.value}-${no || '导出'}.pdf` }
 }
+// ══════════ 出厂检验报告(QC_OQC_REPORT):「导出」弹窗的 PDF/Excel 走**服务端受控表单报表** ══════════
+// 面板页本身已是纸面(approval-layout + QcOqcSheet),但这张纸是**连续 HTML**:
+//   · buildSheetPdfBlob 的截图路径只按「一张纸 = 一页」拼,15 行主表会被压成一页/裁掉;
+//   · 而服务端模板 reports/qc_oqc.jrxml 就是按 c-95-12 受控表单做的 A4 分页版式(与「导出报表」同源),
+//     logo 页眉/页脚/页码齐全 ⇒ 导出件才是受控表单该有的样子。
+// 故本面板的「导出 PDF / 打印预览 / 导出 Excel」三个入口**不走截图**,统一请求 /report/export。
+// (判据 OQC_REPORT_CODE / isOqcSheetPanel 定义在 sheetExcelDesc 上方,弹窗文案与导出实现共用。)
+/** 报表文件名(后端 Content-Disposition 也会给,但浏览器 a[download] 用这里的更稳) */
+function oqcReportName(fmt) {
+  return `${panelName.value}-${curDocNo.value || '导出'}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`
+}
+/** 取服务端受控表单报表字节(PDF/Excel);靠 request 的 blob 响应,失败抛给调用方提示 */
+function fetchOqcReportBlob(fmt) {
+  return request.get('/report/export', {
+    params: {
+      code: OQC_REPORT_CODE,
+      panelCode: panelCode.value,
+      docNo: curDocNo.value,
+      format: fmt,
+    },
+    responseType: 'blob',
+  })
+}
+/** 下载服务端受控表单(PDF/Excel) */
+async function downloadOqcReport(fmt) {
+  if (!curDocNo.value) { ElMessage.warning(tt('未找到可导出的单据')); return }
+  const loading = ElMessage({ message: tt(fmt === 'xlsx' ? '正在生成 Excel…' : '正在生成 PDF…'), duration: 0 })
+  try {
+    const blob = await fetchOqcReportBlob(fmt)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = oqcReportName(fmt)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    ElMessage.success(tt('已导出') + ' ' + (fmt === 'xlsx' ? 'Excel' : 'PDF'))
+  } catch (e) {
+    console.error('oqc-report-export failed', e)
+    ElMessage.error(tt('导出失败'))
+  } finally {
+    loading.close()
+  }
+}
+/** 打印预览服务端受控表单:先同步开窗占位,拿到 blob 再把窗口指过去(否则会被当弹窗拦截) */
+async function previewOqcReport() {
+  if (!curDocNo.value) { ElMessage.warning(tt('未找到可导出的单据')); return }
+  const win = window.open('', '_blank')
+  const loading = ElMessage({ message: tt('正在生成打印预览…'), duration: 0 })
+  try {
+    const blob = await fetchOqcReportBlob('pdf')
+    const url = URL.createObjectURL(blob)
+    if (win) win.location.href = url
+    else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+    setTimeout(() => URL.revokeObjectURL(url), 120000)
+  } catch (e) {
+    if (win) win.close()
+    console.error('oqc-report-preview failed', e)
+    ElMessage.error(tt('导出失败'))
+  } finally {
+    loading.close()
+  }
+}
 /** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机 */
 async function exportSheetPdf() {
   exportFmtVisible.value = false
+  // 出厂检验报告:走服务端受控表单报表(见上方注释),不截图
+  if (isOqcSheetPanel.value) { await downloadOqcReport('pdf'); return }
   const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
   try {
     const r = await buildSheetPdfBlob()
@@ -7268,6 +7378,8 @@ async function exportSheetPdf() {
  */
 async function previewSheetPdf() {
   exportFmtVisible.value = false
+  // 出厂检验报告:预览服务端受控表单 PDF(与「导出报表 → 打印预览」同一份)
+  if (isOqcSheetPanel.value) { await previewOqcReport(); return }
   const win = window.open('', '_blank')
   const loadingMsg = ElMessage({ message: tt('正在生成打印预览…'), duration: 0 })
   try {
@@ -7288,6 +7400,9 @@ async function previewSheetPdf() {
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {
   exportFmtVisible.value = false
+  // 出厂检验报告:Excel 也走服务端受控表单报表(.jrxml 的 XLSX 输出与 PDF 同一份版式),
+  // 避免落在下面的「头字段键值 + 17 列明细」通用导出上(那正是本次被替换掉的数据页口径)。
+  if (isOqcSheetPanel.value) { await downloadOqcReport('xlsx'); return }
   // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录 / 制程检验单 / 首件检验单纸面)
   const catalogExporter = {
     RD_PROGRESS: 'exportProgressExcel',
@@ -7415,7 +7530,7 @@ async function printApprovalSheet() {
   const paperEl = document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .qr-sheet, .record-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .record-sheet')
   const paperW = paperEl ? Math.max(paperEl.scrollWidth, paperEl.offsetWidth) : 0
   const printZoom = paperW > 0
     ? Math.max(0.32, Math.min(1, A4_CONTENT_PX / paperW))
@@ -7666,40 +7781,12 @@ function previewTpl(row) {
   }).catch((e) => ElMessage.error(engine.errMsg(e) || tt('预览失败')))
 }
 
-/**
- * 出厂检验报告「打印 / 预览」(2026-11-01):打开服务端受控表单 PDF(c-95-12 版式)。
- *
- * <p>为什么不用浏览器打印屏幕版式:屏幕上是 17 列明细表(含检验方法/数据来源/是否手填),
- * 与受控表单 YJ-QR-05/A1 的 7 列表格不是一回事 —— 用户口径「需要修改为图中所示的表格形式」。
- * 服务端 PDF 与「导出报表 → 打印预览」同源(reportTemplates[0].code = qc_oqc),
- * 一张单只出一张纸,不会因为屏幕列多而被裁掉。</p>
- *
- * <p>打印前不强制保存:服务端 PDF 取的是**已落库**的内容,内联草稿若还有未保存的修改,
- * 这里只提示一句、不拦打印 —— 报告是「边填边核」的单子,不该因为必填项没填全就点不动
- * (用户可以先看纸、再回来补数据);要打最新内容就先保存。</p>
- */
-async function printOqcReport() {
-  const no = curDocNo.value
-  if (!no) return ElMessage.warning(tt('请先在列表勾选一张单据（预览用其数据渲染）'))
-  if (draftEditable.value && inlineDirtyFlag.value) {
-    ElMessage.info(tt('打印的是已保存的内容，未保存的修改不会体现'))
-  }
-  try {
-    const blob = await request.get('/report/export', {
-      params: {
-        code: selectedReportCode.value || reportTemplates.value[0]?.code || 'qc_oqc',
-        panelCode: panelCode.value,
-        docNo: no,
-        format: 'pdf',
-        disposition: 'inline',
-      },
-      responseType: 'blob',
-    })
-    window.open(URL.createObjectURL(blob), '_blank')
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('打印失败'))
-  }
-}
+// ⚠ 2026-11-01 第三轮已删除 printOqcReport():出厂检验报告改成 approval-layout 纸面后,
+//   工具栏整条不再渲染(上面 if (action === '打印'||'预览') 的 QC_OQC_REPORT 分支随之删除),
+//   侧栏「打印」统一走 printApprovalSheet(浏览器打印 QcOqcSheet 这张纸),
+//   「导出」弹窗的 PDF/Excel 走服务端受控表单报表(downloadOqcReport)。
+//   原函数留着只会是"看着像入口、实际没人调"的死代码(且它打的是服务端旧版式,与屏幕纸面对不上)。
+
 /** 取报表字节(Blob);失败由调用方提示 */
 function fetchReportBlob(fmt) {
   return request.get('/report/export', {
@@ -9986,12 +10073,13 @@ async function onButton(action) {
     return
   }
   if (action === '打印' || action === '预览') {
-    // 出厂检验报告(QC_OQC_REPORT,2026-11-01):打印/预览走**服务端受控表单 PDF**
-    // (reports/qc_oqc.jrxml,按 c-95-12 / 表单编号 YJ-QR-05/A1 的表格版式),不是屏幕 DOM 打印层 ——
-    // 用户口径「这个当前的出厂检验报告需要修改为图中所示的表格形式」。屏幕上这张是宽明细表
-    // (17 列、含检验方法/来源),直接 window.print() 出来的纸面跟受控表单完全不是一回事。
-    if (panelCode.value === 'QC_OQC_REPORT') {
-      await printOqcReport()
+    // 出厂检验报告(QC_OQC_REPORT):面板已改成 approval-layout 纸面 ⇒ 工具栏整条不渲染,
+    // 本分支正常走不到;侧栏「打印」走 printApprovalSheet(打印 QcOqcSheet 这张纸),
+    // 「导出」弹窗的 PDF/Excel 走服务端受控表单报表(downloadOqcReport)。
+    // ⚠ 兜底:后端配置若还是旧版(给本面板多了「打印|预览」按钮,例如换 jar 之前/缓存),
+    //   点到的仍是本分支 —— 文书式面板一律走纸张打印,别让它退化成 window.print() 印整个界面。
+    if (isApprovalDoc.value) {
+      await printApprovalSheet()
       return
     }
     if (docPrintEnabled.value) {

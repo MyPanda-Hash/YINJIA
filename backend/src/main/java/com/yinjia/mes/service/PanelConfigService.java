@@ -376,15 +376,11 @@ public class PanelConfigService {
             }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
-            // 出厂检验报告(2026-11-01):补「打印/预览」入口 —— 该面板是 2026-10-30 新建、没有 PANDA 基准,
-            // 落到本分支时**默认没有打印组**(只有「导出报表」弹窗里的打印预览)。用户口径
-            // 「出厂检验报告要改成受控表单的表格形式」⇒ 工具栏直接给一颗「打印」,前端 onButton 对
-            // QC_OQC_REPORT 的打印/预览改为**打开服务端受控表单 PDF**(reports/qc_oqc.jrxml),
-            // 不再 window.print() 屏幕上的 17 列明细宽表(与纸面完全不是一回事)。
-            // 放在「生单」之后、「刷新」之前,与其它单据面板「打印」在业务动作之后的位置一致。
-            if ("QC_OQC_REPORT".equals(def.code())) {
-                buttonGroups.add(group("打印", List.of("打印", "预览")));
-            }
+            // ⚠ 出厂检验报告(QC_OQC_REPORT)不在这里补「打印」组:2026-11-01 第三轮该面板已改为
+            // approval-layout 纸面(前端 QcOqcSheet.vue,与首件检验单同形态)—— 工具栏整条不渲染,
+            // 打印走侧栏「打印」(printApprovalSheet,打的就是屏幕上那张受控表单纸),
+            // 导出 PDF/Excel 走「导出」弹窗 → 服务端受控表单报表(reports/qc_oqc.jrxml)。
+            // 上一轮加的那组「打印|预览」因此是死配置(按钮永远不渲染),已删,别再补回来。
             buttonGroups.add(group("刷新", List.of("刷新")));
             // 物料清单(WLBOM)的 Excel 批量导入(2026-10-21):扫码领料要按 BOM 展开「该领哪些料」,
             // 而金蝶侧 BOM 接口实测 count=0(3878 个商品一个 BOM 都没建)、MES 自建 bs_bom 已下架、
