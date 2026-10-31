@@ -229,6 +229,20 @@ public class ScheduleBoardController {
                 str(body.get("交期")), currentUser()));
     }
 
+    /**
+     * **成型车间排单计划**(2026-10-31 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,
+     * 不需要根据产线处理」):全产线一张报表的取数 —— 全部在册排产行 + 各行日计划(只读)。
+     * body: {@code { scope }};动作词 打印(两页任一授予即可)。
+     */
+    @PostMapping("/planSheet")
+    public ApiResult<Map<String, Object>> planSheet(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
+                "打印");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(dayPlanService.planSheet(str(b.get("scope")), workshop()));
+    }
+
     private static List<Long> longList(Object o) {
         if (!(o instanceof List<?> list) || list.isEmpty()) return List.of();
         List<Long> out = new java.util.ArrayList<>();

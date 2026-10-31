@@ -901,6 +901,9 @@ export default {
     '请先选择一张单据': 'Select a document first',
     '未取到单据数据': 'Document data not found',
     '打印失败': 'Print failed',
+    // 成型车间排单计划(2026-10-31):工单排产页「排单计划」按钮,整张纸表出纸(全产线一张)
+    '排单计划': 'Scheduling Plan',
+    '没有可打印的排产行': 'No scheduled rows to print',
     // 开线管理已下线(2026-09-24 用户拍板),相关词条随之移除
     '未完工': 'Unfinished',
     '目标生产线': 'Target Line',

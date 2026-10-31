@@ -470,3 +470,99 @@ export async function printProductionTask(rows, opts = {}) {
   if (!printInPage(COMPANY.woTitle, body)) { alert(PRINT_FAIL_MSG); return false }
   return true
 }
+
+/**
+ * 成型车间排单计划(2026-10-31)—— 照纸表《成型车间排单计划》出的整张报表。
+ *
+ * <p>用户口径:「这个需要能打出这样的报表形式,就在当前工单排产处实现即可,
+ * 这样就不需要根据那个产线进行处理了」⇒ 取数走 `/px/scheduleBoard/planSheet`(**全部产线一张表**),
+ * 版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 成型车间 / 未完成总数 / 生产计划数量 /
+ * 实际完成数量 / 成型交期 / 成型交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
+ *
+ * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001);日期列默认从**今天起 7 天**
+ * (纸表也只印 3~5 天;列太多会挤成一团,可用 opts.days 调)。
+ */
+const PLAN_SHEET_BASE_COLS = [
+  { t: '客户等级', w: 5, k: (r) => r['客户等级'] },
+  { t: '客户名称', w: 14, k: (r) => r['客户'] },
+  { t: '产品编号', w: 7, k: (r) => r['物料编码'] },
+  { t: '型号', w: 10, k: (r) => r['规格型号'] },
+  { t: '成型车间', w: 6, k: (r) => r['生产线'] },
+  { t: '未完成总数', w: 6, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
+  { t: '生产计划数量', w: 6, k: (r) => fmtNum(r['排产数量']), n: true },
+  { t: '实际完成数量', w: 6, k: (r) => fmtNum(r['当前工序完工量']), n: true },
+  { t: '成型交期', w: 6, k: (r) => monthDay(r['交期'] || r['计划完工日期']) },
+  { t: '成型交期紧迫度', w: 6, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true },
+  { t: '7天', w: 4, k: (r) => fmtNum(r['7天已排']), n: true },
+  { t: '15天', w: 4, k: (r) => fmtNum(r['15天已排']), n: true },
+  { t: '大于15', w: 4, k: (r) => fmtNum(r['大于15天已排']), n: true },
+]
+
+/** yyyy-MM-dd → M月D日(纸表写法);非法/空 → '' */
+function monthDay(v) {
+  const s = String(v ?? '').slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  return m ? `${Number(m[2])}月${Number(m[3])}日` : s
+}
+
+/** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天 */
+export function planSheetDates(dates, today, days = 7) {
+  const list = (Array.isArray(dates) ? dates : []).filter(Boolean).slice().sort()
+  if (!list.length) return []
+  const from = list.filter((d) => !today || d >= today)
+  const pick = (from.length ? from : list).slice(0, days)
+  return pick
+}
+
+/**
+ * 生成排单计划 HTML(纯函数,便于单测;真正出纸见 {@link printSchedPlanSheet})。
+ * @param {Array} rows  /px/scheduleBoard/planSheet 的 `行`
+ * @param {Array} dates 日期列(`日期`)
+ * @param {Object} [opts] { today, days }
+ */
+export function schedPlanSheetHtml(rows, dates, opts = {}) {
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  const ds = planSheetDates(dates, opts.today || '', opts.days || 7)
+  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0)
+  const dateW = ds.length ? Math.max(3, Math.round((100 - baseW) / ds.length)) : 0
+  const colgroup = '<colgroup>'
+    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${c.w}%"/>`).join('')
+    + ds.map(() => `<col style="width:${dateW}%"/>`).join('')
+    + '</colgroup>'
+  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.t)}</th>`).join('')
+    + ds.map((d) => `<th>${esc(monthDay(d))}</th>`).join('')
+  const trs = list.map((r) => {
+    const plan = r['日计划'] || {}
+    return '<tr>'
+      + PLAN_SHEET_BASE_COLS.map((c) => {
+        const v = c.k(r)
+        return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
+      }).join('')
+      + ds.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
+      + '</tr>'
+  }).join('')
+  return '<style>'
+    + '@page{size:A4 landscape;margin:6mm}'
+    + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
+    + '.hd{text-align:center;margin:0 0 4px}'
+    + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + 'th,td{border:1px solid #333;padding:2px 3px;font-size:9.5px;line-height:1.25;word-break:break-all;vertical-align:middle}'
+    + 'th{background:#f2f2f2;font-weight:600;text-align:center}'
+    + 'td.r{text-align:right}'
+    + 'tbody tr{height:26px}'
+    + '</style>'
+    + '<div class="hd"><span class="t">成型车间排单计划</span></div>'
+    + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
+}
+
+/** 打印排单计划(工单排产页「排单计划」按钮):数据来自 /px/scheduleBoard/planSheet(全产线) */
+export function printSchedPlanSheet(rows, dates, opts = {}) {
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  if (!list.length) return false
+  if (!printInPage('成型车间排单计划', schedPlanSheetHtml(list, dates, opts))) {
+    alert(PRINT_FAIL_MSG)
+    return false
+  }
+  return true
+}

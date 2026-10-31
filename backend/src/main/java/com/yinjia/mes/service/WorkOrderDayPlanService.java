@@ -173,6 +173,55 @@ public class WorkOrderDayPlanService {
     }
 
     /**
+     * **成型车间排单计划**(2026-10-31 用户口径:「需要能打出这样的报表形式,就在当前工单排产处实现即可,
+     * 这样就不需要根据那个产线进行处理了」)。
+     *
+     * <p>= **全部在册排产行**(`board.scheduled("")` —— 不分产线) + 每行的日计划
+     * (与页面上格子同一把尺:人工指定 ∪ 自动摊剩余)。只读、不落表,供前端按纸表版式打印。
+     *
+     * @param scope    未完工/已完工/全部(与页面页签同口径)
+     * @param workshop 登录账号车间(空 = 全部)
+     */
+    public Map<String, Object> planSheet(String scope, String workshop) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        List<Map<String, Object>> rows = board.scheduled("", scope, workshop);
+        List<Long> ids = new ArrayList<>();
+        for (Map<String, Object> r : rows) if (r.get("行id") instanceof Number n) ids.add(n.longValue());
+        if (ids.isEmpty()) {
+            out.put("日期", List.of());
+            out.put("今天", LocalDate.now().toString());
+            out.put("行", List.of());
+            return out;
+        }
+        Map<String, Object> day = data(ids, null, scope, null, workshop);
+        out.put("日期", day.getOrDefault("日期", List.of()));
+        out.put("今天", day.getOrDefault("今天", LocalDate.now().toString()));
+        // 行id → 日计划/汇总(与页面同一份算法)
+        Map<Long, Map<String, Object>> byId = new HashMap<>();
+        Object list = day.get("行");
+        if (list instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Map<?, ?> m && m.get("行id") instanceof Number n) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> mm = (Map<String, Object>) m;
+                    byId.put(n.longValue(), mm);
+                }
+            }
+        }
+        for (Map<String, Object> r : rows) {
+            if (!(r.get("行id") instanceof Number n)) continue;
+            Map<String, Object> d = byId.get(n.longValue());
+            if (d == null) continue;
+            for (String k : new String[]{"交期", "交期紧迫度", "7天已排", "15天已排", "大于15天已排",
+                    "日计划", "人工指定", "超分配", "计划合计", "工序计划量", "工序"}) {
+                if (d.containsKey(k)) r.put(k, d.get(k));
+            }
+        }
+        out.put("行", rows);
+        return out;
+    }
+
+    /**
      * 写:保存日计划格子。计划数量 &gt; 0 = 写入/覆盖;0 或空 = 软删该格(留痕不物理删)。
      *
      * @param cells { 工单行id, 工序, 生产线, 计划日期, 计划数量 }

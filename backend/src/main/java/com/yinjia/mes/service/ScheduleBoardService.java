@@ -897,6 +897,8 @@ public class ScheduleBoardService {
                 //   下游(打印留痕/取消结案/调拨/追溯)一律拿它定位,不再只靠(工单号+批次号)反查 ——
                 //   同天多笔转单批次号相同,只有 plang.id 才唯一。
                 "SELECT p.id AS 行id, pc.pl_no AS 加工单号, pc.pl_xc AS 工单行号, ISNULL(p.comm,N'') AS 公司代码, ISNULL(dk.mc, p.khdm) AS 客户,"
+                        // 排单计划(2026-10-31):纸表要「成型车间」「客户等级」两列,随行一起带出来
+                        + " ISNULL(dk.khjb,N'') AS 客户等级, ISNULL(pc.scx,N'') AS 生产线,"
                         // 排产日期=实际排入时间(plang_pc.asp_time1,排入即写);asp_time2 仅调线/改动时才有
                         + " CONVERT(varchar(10), pc.asp_time1, 120) AS 排产日期,"
                         + " ISNULL(p.od_no,N'') AS 客户PO, p.dm AS 物料编码,"
@@ -959,14 +961,14 @@ public class ScheduleBoardService {
                         // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress wpp`(整单聚合视图,与行级口径冲突;
                         //   其唯一用处 wpp.当前工序 已改为回落本行 p.[当前工序],见上方 curOp)
                         + " CROSS APPLY (SELECT " + ST_EXPR + " AS [生产状态]) st"
-                        + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?"
+                        + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND (? = N'' OR ISNULL(pc.scx,N'') = ?)"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = pc.scx"
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))" + complete
                         // 行顺序(2026-10-31 用户口径「工单的开工日/完工日/交期只是查询与显示,不参与排产」):
                         //   原 `ORDER BY pc.cp_date, ...` 是按**计划完工日期**排 —— 等于让交期决定"从上到下的优先度",
                         //   与口径冲突。改为稳定的业务键:工单号 + 工单行号(可预期、可复现,不随交期跳)。
                         + " ORDER BY pc.pl_no, pc.pl_xc",
-                line == null ? "" : line, ws, ws);
+                line == null ? "" : line, line == null ? "" : line, ws, ws);
     }
 
     /**
