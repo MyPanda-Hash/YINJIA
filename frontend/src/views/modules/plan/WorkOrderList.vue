@@ -122,7 +122,7 @@
       </el-table-column>
       <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),位置即用户截图标红处
            (「当前工序」之后、「工序进度」之前)。每个日期格都可填计划(含今天以前的日期);
-           格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
+           格下方小字 = 该天已审核报工量(含手机端),只读。 -->
       <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="110" />
       <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
       <el-table-column :label="tt('7天需交付')" prop="7天需交付" width="92" align="right" />
@@ -131,13 +131,24 @@
       <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
       <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
       <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
-      <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="right">
+      <!-- ⚠ 2026-10-31 用户口径「格子里两个数堆在一起分不清谁是谁」:
+           上方计划量(可编辑,深色)/ 下方报工量(只读,加「实」标识 + 绿色);列头「今」标今天、
+           过去列灰底 = 历史对照段。日期列由后端按数据生成(见 WorkOrderDayPlanService.buildDates)。 -->
+      <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="right"
+                       :label-class-name="'dp-col-' + dayColState(d, planToday)"
+                       :class-name="'dp-col-' + dayColState(d, planToday)">
+        <template #header>
+          <div class="dp-head" :class="dayColState(d, planToday)">
+            <span class="dp-date">{{ d.slice(5) }}</span>
+            <span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span>
+          </div>
+        </template>
         <template #default="{ row }">
           <el-input-number v-if="canDayPlan" v-model="row.日计划[d]" size="small"
                            :controls="false" :min="0" class="dp-input" @change="markCell(row, d)" />
           <span v-else>{{ qtyText((row.日计划 || {})[d]) }}</span>
           <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
-            {{ qtyText(row.日报工[d]) }}
+            <span class="dp-act-lb">{{ tt('实') }}</span>{{ qtyText(row.日报工[d]) }}
           </div>
         </template>
       </el-table-column>
@@ -241,7 +252,7 @@ import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
-import { qtyText } from '@/business/dayPlan'
+import { qtyText, dayColState, isToday } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
@@ -814,7 +825,16 @@ onActivated(() => {
 /* 日排产日期列(2026-10-29):格内输入计划,格下小灰字=该天已审核报工量 */
 .dp-done { color: #909399; }
 .dp-input { width: 72px; }
-.dp-act { font-size: 11px; color: #909399; line-height: 1.1; }
+/* 2026-10-31:格内两个数分清 —— 计划(深色,可编辑) / 报工(绿色 + 「实」标,只读)*/
+.dp-act { font-size: 11px; color: #529b2e; line-height: 1.1; }
+.dp-act-lb { margin-right: 1px; font-weight: 700; }
+/* 日期列分段:今天列标「今」+ 浅蓝底;过去列 = 历史对照段,灰底(只影响显示,照样可填)*/
+.dp-head { line-height: 1.15; }
+.dp-head.past .dp-date { color: #909399; font-weight: 500; }
+.dp-head.today .dp-date { color: #1e6fb8; }
+.dp-today { margin-left: 2px; font-size: 10px; font-weight: 700; color: #1e6fb8; }
+:deep(th.dp-col-past), :deep(td.dp-col-past) { background: #f5f6f8; }
+:deep(th.dp-col-today), :deep(td.dp-col-today) { background: #eef6ff; }
 .wol-closed { color: #f56c6c; font-weight: 600; }
 .wol-split { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .wol-split-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

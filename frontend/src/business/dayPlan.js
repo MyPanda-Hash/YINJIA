@@ -15,6 +15,11 @@
  *   · 超产能只把界面标红(不弹窗、不改数、不禁填);
  *   · 「分配」由排产员手工做,系统只提示「还差多少没分配」(允许只排一部分,不逼一次排完)。
  *   本文件只放这两件事的纯判定,接口调用见 business/dayPlanApi.js,组件只管状态与渲染。
+ *
+ * ⚠ 2026-10-31 下午(用户报障「格子里两个数堆在一起,不知道哪个是报工」):
+ *   日期列的分段与标识也只在这里判定 —— `dayColState` 决定列头「今」/过去列灰底,
+ *   格内则固定「上=计划(可编辑)、下=报工(加「实」标)」。均为显示层,不改任何取数口径
+ *   (过去日期照旧可填计划,见 2026-10-29 口径「23~28 号填不了」)。
  */
 
 /** 对比「原计划 / 当前计划」,返回改动过的格子(含清空:数量 0) */
@@ -37,6 +42,24 @@ export function qtyText(v) {
 /** 日期是否属于"过去"(不含今天):过去格只读显示完成量 */
 export function isPast(date, today) {
   return !!date && !!today && date < today
+}
+
+/** 日期是否就是"今天"(列头标「今」,一眼看出哪一列是当天) */
+export function isToday(date, today) {
+  return !!date && !!today && date === today
+}
+
+/**
+ * 日期列状态(2026-10-31 用户口径「列头标出今/过去,别让两段混在一起」):
+ * `past` = 今天以前的列(只做历史对照,列头/格子灰底)、`today` = 今天列(标「今」)、
+ * `future` = 今天以后的列(照常排产)。
+ *
+ * <p>当天色板只影响显示,不改任何取数口径 —— 过去列同样可编辑(用户口径「23~28 号填不了」要能填)。
+ */
+export function dayColState(date, today) {
+  if (!date || !today) return 'future'
+  if (isToday(date, today)) return 'today'
+  return isPast(date, today) ? 'past' : 'future'
 }
 
 /**

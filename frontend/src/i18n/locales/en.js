@@ -2052,6 +2052,10 @@ export default {
     '15天已排': 'Planned ≤15 days',
     '大于15天已排': 'Planned >15 days',
     '当天已审核报工量': 'Approved reported qty of that day',
+    // 日排产日期列语义(2026-10-31):格上=计划(可编辑,深色)、格下=报工(只读,前缀「实」);
+    //   列头「今」= 今天那一列,过去列灰底 = 历史对照段
+    '实': 'Act.',
+    '今': 'Today',
     // 产能可见 + 分配完整性(2026-10-31 用户口径):产能只显示不拦截;开工/完工/交期只做查询与显示
     '该线当天已排/日产能': 'Scheduled / daily capacity of this line that day',
     '产线档案未配日产能': 'Line master has no daily capacity',

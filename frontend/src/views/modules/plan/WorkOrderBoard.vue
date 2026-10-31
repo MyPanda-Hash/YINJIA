@@ -139,11 +139,15 @@
             <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
             <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
             <!-- 日期列(2026-10-31):列头多一行「该线当天 已排/日产能」——产能只显示、不拦截录入。
-                 超产能只把列头标红(不弹窗、不改数、不禁填);未配产能(档案日产能 0/空)写"未配",不判超载。 -->
-            <el-table-column v-for="d in planDates" :key="d" width="88" align="right">
+                 超产能只把列头标红(不弹窗、不改数、不禁填);未配产能(档案日产能 0/空)写"未配",不判超载。
+                 列分段:今天列标「今」+ 浅蓝底;过去列灰底 = 历史对照段(照样可填);
+                 格内两个数分清:上方计划(可编辑)/ 下方报工(绿色 + 「实」标)。 -->
+            <el-table-column v-for="d in planDates" :key="d" width="88" align="right"
+                             :label-class-name="'dp-col-' + dayColState(d, planToday)"
+                             :class-name="'dp-col-' + dayColState(d, planToday)">
               <template #header>
-                <div class="dp-head" :class="{ over: isOverDay(d) }">
-                  <div class="dp-date">{{ d.slice(5) }}</div>
+                <div class="dp-head" :class="{ over: isOverDay(d), past: dayColState(d, planToday) === 'past' }">
+                  <div class="dp-date">{{ d.slice(5) }}<span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span></div>
                   <div v-if="lineCap > 0" class="dp-cap" :title="tt('该线当天已排/日产能')">
                     {{ qtyText(dayTotal[d]) }}/{{ qtyText(lineCap) }}
                   </div>
@@ -155,7 +159,7 @@
                                  :controls="false" :min="0" class="dp-input" @change="markCell(row, d)" />
                 <span v-else>{{ qtyText((row.日计划 || {})[d]) }}</span>
                 <div v-if="(row.日报工 || {})[d]" class="dp-act" :title="tt('当天已审核报工量')">
-                  {{ qtyText(row.日报工[d]) }}
+                  <span class="dp-act-lb">{{ tt('实') }}</span>{{ qtyText(row.日报工[d]) }}
                 </div>
               </template>
             </el-table-column>
@@ -252,7 +256,7 @@ import request from '@core/request'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
-import { qtyText, isOverCapacity, unplannedQty } from '@/business/dayPlan'
+import { qtyText, isOverCapacity, unplannedQty, dayColState, isToday } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -661,7 +665,14 @@ onMounted(() => {
 /* 日排产日期列(2026-10-29):格内输入计划,格下小灰字=该天已审核报工量 */
 .dp-done { color: #909399; }
 .dp-input { width: 72px; }
-.dp-act { font-size: 11px; color: #909399; line-height: 1.1; }
+/* 2026-10-31:格内两个数分清 —— 计划(深色,可编辑) / 报工(绿色 + 「实」标,只读)*/
+.dp-act { font-size: 11px; color: #529b2e; line-height: 1.1; }
+.dp-act-lb { margin-right: 1px; font-weight: 700; }
+/* 日期列分段:今天列标「今」+ 浅蓝底;过去列 = 历史对照段,灰底(只影响显示,照样可填)*/
+.dp-today { margin-left: 2px; font-size: 10px; font-weight: 700; color: #1e6fb8; }
+.dp-head.past .dp-date { color: #909399; font-weight: 500; }
+:deep(th.dp-col-past), :deep(td.dp-col-past) { background: #f5f6f8; }
+:deep(th.dp-col-today), :deep(td.dp-col-today) { background: #eef6ff; }
 /* ── 产能可见(2026-10-31 用户口径「产能只显示、不拦截」)──
    列头两行:日期 + 该线当天「已排/日产能」;超产能只标红,不弹窗、不改数、不禁填。
    未配产能(档案日产能 0/空)写"未配",不参与超载判定。 */

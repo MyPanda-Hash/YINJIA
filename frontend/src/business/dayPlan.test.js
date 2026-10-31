@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { diffPlan, qtyText, isPast, isOverCapacity, unplannedQty } from './dayPlan.js'
+import { diffPlan, qtyText, isPast, isToday, dayColState, isOverCapacity, unplannedQty } from './dayPlan.js'
 
 // ⚠ 2026-10-30:「按完工日期均摊」已按用户口径删除(buildSplit 一并删除),
 //   这里只保留仍在用的纯函数测试。日计划改为手工逐格填写 + 保存。
@@ -25,6 +25,22 @@ test('qtyText:0 显示空白', () => {
 test('isPast:今天不算过去', () => {
   assert.equal(isPast('2026-10-28', '2026-10-29'), true)
   assert.equal(isPast('2026-10-29', '2026-10-29'), false)
+})
+
+test('isToday:只有当天为真', () => {
+  assert.equal(isToday('2026-10-31', '2026-10-31'), true)
+  assert.equal(isToday('2026-10-30', '2026-10-31'), false)
+  assert.equal(isToday('2026-11-01', '2026-10-31'), false)
+  assert.equal(isToday('', '2026-10-31'), false)
+})
+
+test('dayColState:过去/今天/未来三段(只影响列头与底色,不改取数)', () => {
+  const today = '2026-10-31'
+  assert.equal(dayColState('2026-10-20', today), 'past')
+  assert.equal(dayColState('2026-10-31', today), 'today')
+  assert.equal(dayColState('2026-11-01', today), 'future')
+  assert.equal(dayColState('2026-10-31', ''), 'future')   // 没拿到今天:不标「今」也不灰底
+  assert.equal(dayColState('', today), 'future')
 })
 
 test('isOverCapacity:超产能只用于显示;未配产能(<=0)不判', () => {

@@ -521,6 +521,13 @@ public class WorkOrderDayPlanService {
      * 就会给所有行(包括当天才建的工单)长出 10-20 这一列,而那一列对本行永远是空的。
      * ⇒ **今天以前的日期,只有当天真的有已审报工量才出列**(对照历史完成量有用),
      * 否则不显示;今天及以后的日期照旧(计划区间/日计划照常出列)。
+     *
+     * <p><b>2026-10-31 二次收口</b>(用户报障:日期格里的数对不上行汇总):
+     * 只认「已审报工」会把**过去日期的日计划吞掉** —— 计划在、格子不出列 ⇒ 排产员看不见也改不了,
+     * 但 7天已排/15天已排/计划合计照样把它算进去。实测 GD-2026-10-0227 行1:10-29、10-30 各 2000,
+     * 两列都不出列,而 7天已排/15天已排 显示 6000(表格里只有 10-31 的 2000)。
+     * ⇒ 判据改成「**当天有计划 或 有已审报工**」:计划不再凭空消失,数字与格子对得上。
+     * 代价:整表并集的老毛病还在(别的行的历史计划也会给本行长列,格子空),已与用户确认接受。
      */
     private List<String> buildDates(List<RowRef> refs,
                                     Map<String, Map<String, Double>> plans,
@@ -529,11 +536,13 @@ public class WorkOrderDayPlanService {
         TreeSet<LocalDate> set = new TreeSet<>();
         LocalDate min = today.minusDays(180);
         LocalDate max = today.plusDays(365);
-        // 有报工事实的日期(用于筛掉"过去但没报工"的空列)
+        // 有报工事实 / 有日计划的日期(用于筛掉"过去且两样都没有"的空列)
         Set<LocalDate> doneDates = new HashSet<>();
+        Set<LocalDate> planDates = new HashSet<>();
         for (RowRef r : refs) {
             String key = rowKey(r.id, r.op);
             collectDates(set, plans.get(key), min, max);
+            collectDates(planDates, plans.get(key), min, max);
             collectDates(set, actuals.get(key), min, max);
             collectDates(doneDates, actuals.get(key), min, max);
         }
@@ -564,8 +573,9 @@ public class WorkOrderDayPlanService {
         }
         List<String> out = new ArrayList<>();
         for (LocalDate d : set) {
-            // 过去的日期:当天没有已审报工就不出列(否则整表并集会把别人的历史日期带给本行)
-            if (d.isBefore(today) && !doneDates.contains(d)) continue;
+            // 过去的日期:当天有计划或有已审报工才出列(2026-10-31:只认报工会把过去的计划吞掉,
+            // 计划量却仍计入 7天已排/15天已排 ⇒ 格子与汇总对不上;见方法头注释)
+            if (d.isBefore(today) && !planDates.contains(d) && !doneDates.contains(d)) continue;
             out.add(d.toString());
         }
         if (out.size() > MAX_COLUMNS) out = new ArrayList<>(out.subList(out.size() - MAX_COLUMNS, out.size()));
