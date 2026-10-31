@@ -8,7 +8,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| `SpreadTest.java` | **回归闸**：直接调用业务类 `com.yinjia.mes.service.DayPlanSpread`（不是复制公式），14 个用例覆盖 整数均分/余数归最后一天/逾期压今天/无开工日/非整数/跨度上限/边界零负值 |
+| `SpreadTest.java` | **回归闸**：直接调用业务类 `com.yinjia.mes.service.DayPlanSpread`（不是复制公式），15 个用例覆盖 整数均分/余数逐天摊开/逾期压今天/无开工日/非整数/跨度上限/边界零负值 |
 | `Q.java` | 只读查库小工具（核对 plang 的 排产数量/开工日/交期/当前工序） |
 
 业务实现在 `backend/src/main/java/com/yinjia/mes/service/DayPlanSpread.java`。
