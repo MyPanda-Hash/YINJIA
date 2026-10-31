@@ -2364,6 +2364,55 @@
       </template>
     </el-dialog>
 
+    <!-- 销售出库单 → 生成出厂检验报告(2026-11-01)
+         用户口径:「同时当前实现方式不改变,让当前勾选对应的销售出库单时候能转跳到当前这个
+         出厂检验报告来进行操作这种实现我感觉会好一点。」
+         勾选出库明细行(一份报告=一个产品) → POST /api/oqc/generate 建报告草稿 →
+         跳到 QC_OQC_REPORT 并打开第一张新单继续填/审批/打印。后端生成逻辑不动。 -->
+    <el-dialog v-model="oqcPickVisible" :title="tt('生成出厂检验报告')" width="1020px" append-to-body
+               :close-on-click-modal="false" @opened="applyOqcDefaultSelection">
+      <div class="col-pref-tip">
+        {{ tt('勾选要生成出厂检验报告的出库明细行（一份报告=一个产品）') }}
+        <span v-if="oqcPickNo" class="col-pref-count">{{ tt('出库单号') }}: {{ oqcPickNo }}</span>
+      </div>
+      <!-- 标准行数=0 = 出货检验计划表里还没这个产品 ⇒ 建出来的报告是空单,置灰不可勾并醒目提示。
+           行数后缀走可翻译词条「（{n} 行）」:中文=全角括号、英文=(n row(s)) —— 别在模板里裸写全角括号,
+           否则切英文会留下中文标点(2026-11-01 实测)。 -->
+      <div v-if="oqcNoPlanCount" class="oqc-warn">
+        {{ tt('标准行数为 0 的产品没有出货检验计划，不会被生成报告') }}{{ tt('（{n} 行）').replace('{n}', oqcNoPlanCount) }}
+      </div>
+      <div v-if="oqcBadBatchCount" class="oqc-warn">
+        {{ tt('出库未填真实批次，已按最近一批带入，请核对') }}{{ tt('（{n} 行）').replace('{n}', oqcBadBatchCount) }}
+      </div>
+      <el-table ref="oqcTableRef" :data="oqcRows" size="small" border max-height="420" row-key="id"
+                @selection-change="(val) => (oqcSel = val)">
+        <el-table-column type="selection" width="46" :selectable="(row) => Number(row.标准行数) > 0" />
+        <el-table-column prop="存货编码" :label="tt('存货编码')" width="120" />
+        <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="170" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" width="150" show-overflow-tooltip />
+        <el-table-column prop="批号" :label="tt('批号')" width="120" />
+        <el-table-column prop="数量" :label="tt('数量')" width="90" align="right" />
+        <el-table-column :label="tt('标准行数')" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="Number(row.标准行数) > 0" type="success" size="small">{{ row.标准行数 }}</el-tag>
+            <el-tag v-else type="danger" size="small">{{ tt('无检验计划') }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('批次可用')" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="String(row.批次可用 || '').startsWith('否')" type="warning" size="small">{{ tt('否') }}</el-tag>
+            <span v-else>{{ tt('是') }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button size="small" @click="oqcPickVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" size="small" :loading="oqcGenerating" @click="doOqcGenerate">
+          {{ tt('生成出厂检验报告') }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 表头字段自定义(表头调整:排序/栏名/显隐,与表格调整同款交互) -->
     <el-dialog v-model="headPrefVisible" :title="tt('表头调整')" width="520px" append-to-body :close-on-click-modal="false">
       <div class="col-pref-tip">{{ tt('拖动或用箭头调整字段顺序;勾选=显示;栏名可改。') }}
@@ -2755,6 +2804,109 @@ async function doBatchErp() {
   ElMessage.success(`批量转ERP完成: 成功${ok} 跳过${skip} 失败${fail}`)
   await load()
 }
+
+// ── 销售出库单 → 生成出厂检验报告(2026-11-01)──
+// 用户口径(原话):「同时当前实现方式不改变,让当前勾选对应的销售出库单时候能转跳到当前这个
+// 出厂检验报告来进行操作这种实现我感觉会好一点。」
+// 即:后端 2026-10-30 的「一份报告=一个产品」生成逻辑保留不动,这里只补前端入口 ——
+//   销售出库单工具栏「生成出厂检验报告」→ /api/oqc/preview 拉本单明细 →
+//   弹窗勾选(默认勾标准行数>0 的行) → /api/oqc/generate 建报告草稿 →
+//   跳到 QC_OQC_REPORT 并打开第一张(同一个产品多行=多张,只开第一张)。
+const oqcPickVisible = ref(false)
+const oqcPickNo = ref('')          // 当前销售出库单号(预览/生成都按它取行)
+const oqcRows = ref([])            // /api/oqc/preview 的 data.明细
+const oqcSel = ref([])             // 勾选行(>0 才允许生成)
+const oqcGenerating = ref(false)
+const oqcTableRef = ref(null)
+/** 标准行数=0 的行数(= 出货检验计划表里还没录这个产品,建出来会是空报告) */
+const oqcNoPlanCount = computed(() => (oqcRows.value || []).filter((r) => !(Number(r.标准行数) > 0)).length)
+/** 批次不可用的行数(出库批号为 PC0000/空 ⇒ 后端按该产品最近一张已审核成品检验单带入) */
+const oqcBadBatchCount = computed(() => (oqcRows.value || []).filter((r) => String(r.批次可用 || '').startsWith('否')).length)
+
+/**
+ * 后端 OQC 专用接口的调用壳子(2026-11-01)。
+ *
+ * <p>服务端的业务失败是「HTTP 200 + body code != 200」(见 GlobalExceptionHandler 口径),
+ * 直接 `request.post` 不会抛错,必须自己判 body.code —— 否则用户点了没反应、也无提示。</p>
+ */
+async function postOqc(url, payload) {
+  const body = await request.post(url, payload)
+  if (body && typeof body === 'object' && body.code != null && body.code !== 200) {
+    throw new Error(body.message || '')
+  }
+  return body?.data || {}
+}
+
+/**
+ * 「生成出厂检验报告」入口:拉预览 → 开勾选弹窗(2026-11-01)。
+ *
+ * <p>前置只有一条:当前必须选中一张销售出库单(取其「单据编号」)。后端 generate 不校验单据状态
+ * (出库单草稿/已审核都能建报告),故这里也不按状态拦。</p>
+ */
+async function openOqcPicker() {
+  const no = String(cur.value?.['单据编号'] || cur.value?.['编号'] || '').trim()
+  if (!no) return ElMessage.warning(tt('请先选择销售出库单'))
+  try {
+    const data = await postOqc('/oqc/preview', { 出库单号: no })
+    const rows = Array.isArray(data.明细) ? data.明细 : []
+    if (!rows.length) return ElMessage.warning(tt('该出库单没有可生成报告的明细行'))
+    // 一行都没有检验计划时,后端也会建出空报告 ⇒ 直接挡在入口,不让用户白点一次(与弹窗内
+    // 「标准行数=0 置灰不可勾」同一口径)
+    if (!rows.some((r) => Number(r.标准行数) > 0)) {
+      return ElMessage.warning(tt('该出库单没有可生成报告的明细行'))
+    }
+    oqcPickNo.value = no
+    oqcRows.value = rows
+    oqcSel.value = []
+    oqcPickVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('读取销售出库单明细失败'))
+  }
+}
+
+/** 弹窗打开动画结束后打默认勾:标准行数>0 的行(可直接确认) */
+function applyOqcDefaultSelection() {
+  const t = oqcTableRef.value
+  if (!t) return
+  t.clearSelection()
+  for (const r of oqcRows.value) {
+    if (Number(r.标准行数) > 0) t.toggleRowSelection(r, true)
+  }
+}
+
+/**
+ * 确认生成:POST /api/oqc/generate → 提示单号 → 跳 QC_OQC_REPORT 打开第一张(2026-11-01)。
+ *
+ * <p>跳转口径同既有 gotoPanel 分支(`tabs.close` → `router.push` → `tabs.open`);带 `?docNo=`
+ * 定位第一张新单,由 PanelxList 的 applyDocNoQuery / panelCode watcher 消费(跨面板复用同一组件)。</p>
+ */
+async function doOqcGenerate() {
+  if (oqcGenerating.value) return
+  const ids = (oqcSel.value || []).map((r) => r.id).filter((v) => v != null)
+  if (!ids.length) return ElMessage.warning(tt('请先勾选要生成报告的明细行'))
+  oqcGenerating.value = true
+  try {
+    const data = await postOqc('/oqc/generate', { 出库单号: oqcPickNo.value, 明细id: ids })
+    const nos = (Array.isArray(data.单据编号) ? data.单据编号 : []).filter(Boolean).map(String)
+    if (!nos.length) return ElMessage.warning(tt('该出库单没有可生成报告的明细行'))
+    oqcPickVisible.value = false
+    if (nos.length > 1) {
+      ElMessage.success(tt('已生成 {n} 张出厂检验报告（一份报告=一个产品）：{nos}，正在打开第一张')
+        .replace('{n}', nos.length).replace('{nos}', nos.join('、')))
+    } else {
+      ElMessage.success(tt('已生成出厂检验报告：{no}').replace('{no}', nos[0]))
+    }
+    const targetPath = '/panelx/list/QC_OQC_REPORT'
+    tabs.close(route.path)                                  // 源面板页签被目标面板替换(同 gotoPanel 分支)
+    router.push({ path: targetPath, query: { docNo: nos[0] } })
+    tabs.open({ path: targetPath, title: tt('出厂检验报告') })
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('生成出厂检验报告失败'))
+  } finally {
+    oqcGenerating.value = false
+  }
+}
+
 const colDragIdx = ref(-1)
 
 function openColPrefs() {
@@ -7513,6 +7665,41 @@ function previewTpl(row) {
     window.open(url, '_blank')
   }).catch((e) => ElMessage.error(engine.errMsg(e) || tt('预览失败')))
 }
+
+/**
+ * 出厂检验报告「打印 / 预览」(2026-11-01):打开服务端受控表单 PDF(c-95-12 版式)。
+ *
+ * <p>为什么不用浏览器打印屏幕版式:屏幕上是 17 列明细表(含检验方法/数据来源/是否手填),
+ * 与受控表单 YJ-QR-05/A1 的 7 列表格不是一回事 —— 用户口径「需要修改为图中所示的表格形式」。
+ * 服务端 PDF 与「导出报表 → 打印预览」同源(reportTemplates[0].code = qc_oqc),
+ * 一张单只出一张纸,不会因为屏幕列多而被裁掉。</p>
+ *
+ * <p>打印前不强制保存:服务端 PDF 取的是**已落库**的内容,内联草稿若还有未保存的修改,
+ * 这里只提示一句、不拦打印 —— 报告是「边填边核」的单子,不该因为必填项没填全就点不动
+ * (用户可以先看纸、再回来补数据);要打最新内容就先保存。</p>
+ */
+async function printOqcReport() {
+  const no = curDocNo.value
+  if (!no) return ElMessage.warning(tt('请先在列表勾选一张单据（预览用其数据渲染）'))
+  if (draftEditable.value && inlineDirtyFlag.value) {
+    ElMessage.info(tt('打印的是已保存的内容，未保存的修改不会体现'))
+  }
+  try {
+    const blob = await request.get('/report/export', {
+      params: {
+        code: selectedReportCode.value || reportTemplates.value[0]?.code || 'qc_oqc',
+        panelCode: panelCode.value,
+        docNo: no,
+        format: 'pdf',
+        disposition: 'inline',
+      },
+      responseType: 'blob',
+    })
+    window.open(URL.createObjectURL(blob), '_blank')
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+  }
+}
 /** 取报表字节(Blob);失败由调用方提示 */
 function fetchReportBlob(fmt) {
   return request.get('/report/export', {
@@ -9193,6 +9380,11 @@ function isDisabled(action) {
     打印: false, 预览: false, 导出: false,
     发送邮件: false, 退出: false, 表格调整: false, 分类管理: false, 表头调整: false,
     二维码标签: false, // 档案工具栏动作:是否可点由前端勾选数提示兜底,不按单据状态置灰
+    // 生成出厂检验报告(2026-11-01,销售出库单):**不是 T+ 生单**——它只按勾选的出库明细建报告草稿,
+    // 后端 generate 不校验出库单状态(草稿/已审核都能建),故必须在此显式登记,否则会落进下面
+    // 「所有『生成XX』仅已审核可用」的兜底而被错误置灰(出库单还是草稿时用户就点不动了)。
+    // 只要选中一张单据即可点(单号判空见 openOqcPicker)。
+    生成出厂检验报告: !current.value,
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路)恒置灰,点击忽略
   if (map[action] === undefined && (cfgCache.value?.metadata?.disabledActions || []).includes(action)) {
@@ -9794,6 +9986,14 @@ async function onButton(action) {
     return
   }
   if (action === '打印' || action === '预览') {
+    // 出厂检验报告(QC_OQC_REPORT,2026-11-01):打印/预览走**服务端受控表单 PDF**
+    // (reports/qc_oqc.jrxml,按 c-95-12 / 表单编号 YJ-QR-05/A1 的表格版式),不是屏幕 DOM 打印层 ——
+    // 用户口径「这个当前的出厂检验报告需要修改为图中所示的表格形式」。屏幕上这张是宽明细表
+    // (17 列、含检验方法/来源),直接 window.print() 出来的纸面跟受控表单完全不是一回事。
+    if (panelCode.value === 'QC_OQC_REPORT') {
+      await printOqcReport()
+      return
+    }
     if (docPrintEnabled.value) {
       // 档案面板的打印层是懒渲染的:先等它挂进 DOM 再调打印(否则打出来是屏幕版式)
       await ensureDocPrintLayer()
@@ -9971,6 +10171,15 @@ async function onButton(action) {
     } catch (error) {
       ElMessage.error(engine.errMsg(error) || tt('取出货检验计划失败'))
     }
+    return
+  }
+  // 生成出厂检验报告(2026-11-01,销售出库单专用入口):用户口径「当前实现方式不改变,让当前勾选
+  // 对应的销售出库单时候能转跳到当前这个出厂检验报告来进行操作」。
+  // 后端 2026-10-30 的 /api/oqc/preview + /api/oqc/generate(一份报告=一个产品)原样复用:
+  // 这里只负责拉明细 → 弹窗勾选 → 生成 → 跳到 QC_OQC_REPORT 打开第一张。
+  // ⚠ 动作名是中文数据键(ADR-0001 永不翻译),按原样比较;判空/提示见 openOqcPicker。
+  if (action === '生成出厂检验报告') {
+    await openOqcPicker()
     return
   }
   // 2026-10-16 注:固定组/固定项(外观·端盖两头/管身两侧、尺寸、出货重量)**不再用按钮带入** ——
@@ -12659,6 +12868,13 @@ onUnmounted(() => {
 .cp-label { flex: 1; font-size: 13px; color: #333; min-width: 80px; }
 .cp-alias { width: 140px; }
 .cp-alias .el-input__inner { font-size: 12px; }
+
+/* 生成出厂检验报告弹窗(2026-11-01,销售出库单):标准行数=0 / 批次不可用的醒目提示 */
+.oqc-warn {
+  font-size: 12px; color: #b88230; background: #fdf6ec;
+  border: 1px solid #faecd8; border-radius: 4px;
+  padding: 4px 8px; margin-bottom: 8px;
+}
 
 /* ══════════ 报表表头筛选与排序补丁 ══════════ */
 /* ---- 表头排序和筛选图标 ---- */

@@ -84,6 +84,22 @@ export default {
     "批次可用": "Batch usable",
     "出库未填真实批次，已按最近一批带入，请核对": "No real batch number on the outbound line; the most recent batch was used — please verify",
     "一份报告=一个产品": "One report per product",
+    // ---- 销售出库单 → 生成出厂检验报告 入口弹窗(2026-11-01)----
+    "勾选要生成出厂检验报告的出库明细行（一份报告=一个产品）":
+      "Select the outbound lines to turn into factory inspection reports (one report per product)",
+    "无检验计划": "No inspection plan",
+    "标准行数为 0 的产品没有出货检验计划，不会被生成报告":
+      "Products with 0 standard rows have no shipping inspection plan and will not get a report",
+    "请先勾选要生成报告的明细行": "Select at least one line to generate a report",
+    "读取销售出库单明细失败": "Failed to load the sales outbound document lines",
+    "生成出厂检验报告失败": "Failed to create the factory inspection reports",
+    "已生成出厂检验报告：{no}": "Factory inspection report created: {no}",
+    "已生成 {n} 张出厂检验报告（一份报告=一个产品）：{nos}，正在打开第一张":
+      "Created {n} factory inspection reports (one report per product): {nos} — opening the first one",
+    // ---- 出厂检验报告 打印/预览走服务端受控表单 PDF(2026-11-01)----
+    "打印的是已保存的内容，未保存的修改不会体现":
+      "Printing the saved version; unsaved changes are not included",
+    "（{n} 行）": " ({n} row(s))",
     "取成型工艺清单": "Fetch from Molding Process Sheet",
     "该产品没有成型工艺清单": "No molding process sheet for this product",
     "取成型工艺清单失败": "Failed to fetch the molding process sheet",

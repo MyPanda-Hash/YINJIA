@@ -309,6 +309,17 @@ public class PanelConfigService {
             buttonGroups.add(group("更多", flatMoreActions(def.code())));
         } else if (doc && panda != null) {
             for (String[] g : panda) {
+                // 出厂检验报告入口(2026-11-01):用户口径「同时当前实现方式不改变,让当前勾选对应的
+                // 销售出库单时候能转跳到当前这个出厂检验报告来进行操作这种实现我感觉会好一点。」
+                // ⇒ 2026-10-30 的后端生成逻辑(OqcReportService / OqcReportController,一份报告=一个产品)
+                //   **一字不动**,只给销售出库单的工具栏补一颗入口:
+                //   点击 → 勾选出库明细行 → /api/oqc/generate 建报告草稿 → 前端跳到 QC_OQC_REPORT
+                //   并打开第一张新单继续填/审批/打印。
+                // 独立成组、插在「打印」组之前(先生成报告,再到报告面板打印);动作名=按钮名(中文数据键,
+                // ADR-0001 永不翻译);`def.code()` 判定保证**其余面板的按钮下发面为 0 变化**。
+                if ("SALE_OUT".equals(def.code()) && "打印".equals(g[0])) {
+                    buttonGroups.add(group("生成出厂检验报告", List.of("生成出厂检验报告")));
+                }
                 buttonGroups.add(group(g[0], List.of(g).subList(1, g.length)));
                 if ("选单".equals(g[0]) && !SELECT_FLOWS.containsKey(def.code())) {
                     disabledActions.addAll(List.of(g).subList(1, g.length));
@@ -365,6 +376,15 @@ public class PanelConfigService {
             }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
+            // 出厂检验报告(2026-11-01):补「打印/预览」入口 —— 该面板是 2026-10-30 新建、没有 PANDA 基准,
+            // 落到本分支时**默认没有打印组**(只有「导出报表」弹窗里的打印预览)。用户口径
+            // 「出厂检验报告要改成受控表单的表格形式」⇒ 工具栏直接给一颗「打印」,前端 onButton 对
+            // QC_OQC_REPORT 的打印/预览改为**打开服务端受控表单 PDF**(reports/qc_oqc.jrxml),
+            // 不再 window.print() 屏幕上的 17 列明细宽表(与纸面完全不是一回事)。
+            // 放在「生单」之后、「刷新」之前,与其它单据面板「打印」在业务动作之后的位置一致。
+            if ("QC_OQC_REPORT".equals(def.code())) {
+                buttonGroups.add(group("打印", List.of("打印", "预览")));
+            }
             buttonGroups.add(group("刷新", List.of("刷新")));
             // 物料清单(WLBOM)的 Excel 批量导入(2026-10-21):扫码领料要按 BOM 展开「该领哪些料」,
             // 而金蝶侧 BOM 接口实测 count=0(3878 个商品一个 BOM 都没建)、MES 自建 bs_bom 已下架、

@@ -4,7 +4,6 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.OqcReportService;
 import com.yinjia.mes.service.PanelPermissionService;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,9 +51,14 @@ public class OqcReportController {
      *
      * <p>返回:{@code { 单据编号: [...], gotoPanel: 'QC_OQC_REPORT', 提示: '...' }} ——
      * 前端按既有 gotoPanel 分支跳转到第一张。</p>
+     *
+     * <p>⚠ **不能**在这里标 {@code @Transactional}(2026-11-01 修):事务边界在
+     * {@link OqcReportService#generateFromSaleOut} 那一层。以前这里也标了,服务层抛
+     * {@code IllegalArgumentException} 后内层事务已被标记 rollback-only,外层提交时抛
+     * {@code UnexpectedRollbackException} ⇒ 前端拿到的是 HTTP 500「服务异常:Transaction rolled back…」,
+     * 而不是下面 catch 里设计的 400 中文原因(实测:出库单没有可生成行时提示不可读)。</p>
      */
     @PostMapping("/generate")
-    @Transactional
     public ApiResult<Map<String, Object>> generate(@RequestBody Map<String, Object> body) {
         perm.requirePanelView(PANEL);
         String outNo = str(body.get("出库单号"));
