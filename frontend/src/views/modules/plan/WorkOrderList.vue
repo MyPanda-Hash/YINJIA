@@ -126,13 +126,13 @@
       <el-table-column :label="tt('计划开工日期')" prop="计划开工日期" width="112">
         <template #default="{ row }">
           <span class="dp-date-cell" :title="tt('双击可改排产日期')"
-                @dblclick="openQuick(row, planDates[0] || planToday)">{{ row.计划开工日期 || '-' }}</span>
+                @dblclick="openQuick(row, planToday)">{{ row.计划开工日期 || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="112">
         <template #default="{ row }">
           <span class="dp-date-cell" :title="tt('双击可改排产日期')"
-                @dblclick="openQuick(row, planDates[planDates.length - 1] || planToday)">{{ row.计划完工日期 || '-' }}</span>
+                @dblclick="openQuick(row, planToday)">{{ row.计划完工日期 || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
@@ -162,7 +162,7 @@
                            :controls="false" :min="0" class="dp-input" autofocus
                            @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
           <span v-else class="dp-plan" :class="{ manual: isManual(row, d), actual: dayCell(row, d).isActual }"
-                :title="dayTitle(row, d)" @dblclick="startQtyEdit(row, d)">
+                :title="dayTitle(row, d)" @click="startQtyEdit(row, d)">
             {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
                 :class="{ over: Number(row.超分配 || 0) > 0 }"
                 :title="overTitle(row)">{{ tt('手') }}</span>
