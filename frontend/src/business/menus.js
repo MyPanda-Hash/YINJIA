@@ -5,7 +5,9 @@ export const menuTree = [
     code: 'dashboard',
     title: '我的桌面',
     path: '/dashboard',
-    icon: 'HomeFilled',
+    // 图标体系（2026-10-31）：同一列模块图标只用线框那一套。原来是 HomeFilled（实心），
+    // 与下面 MagicStick / Notebook / Monitor 这些线框图标混排 —— 一排里唯一的实心会显得偏重。
+    icon: 'House',
     panelCode: 'DASHBOARD', // 权限化:组织架构「通用·我的桌面」勾可见才显示(admin 恒可见)
   },
   {
@@ -412,7 +414,7 @@ export const menuTree = [
       { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
       { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
       // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
-      { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
+      { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'Warning' },
       // ── 原「生产记录」6 项 ──
       { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
       { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
@@ -620,7 +622,7 @@ export const menuTree = [
         icon: 'Cpu',
         children: [
           { code: 'equip', title: '设备', path: '/panelx/list/EQUIP', icon: 'Cpu', panelCode: 'EQUIP', operationName: '新增流程' },
-          { code: 'team', title: '班组', path: '/panelx/list/TEAM', icon: 'UserFilled', panelCode: 'TEAM', operationName: '新增流程' },
+          { code: 'team', title: '班组', path: '/panelx/list/TEAM', icon: 'User', panelCode: 'TEAM', operationName: '新增流程' },
           { code: 'wc', title: '工作中心', path: '/panelx/list/WC', icon: 'Odometer', panelCode: 'WC', operationName: '新增流程' },
           // 生产线档案(2026-09-23 归位基础资料):排产指派对象,日产能=负荷/超载基准;原「产线产能」(生产计划组)收编下线
           { code: 'prodLine', title: '生产线', path: '/panelx/list/PROD_LINE', icon: 'DCaret', panelCode: 'PROD_LINE', operationName: '新增流程' },

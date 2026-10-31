@@ -143,7 +143,7 @@
       <!-- 帮助下拉 -->
       <el-dropdown @command="onHelpCommand" popper-class="t-dropdown-popper">
         <el-tooltip :content="tt('帮助')" placement="bottom">
-          <span class="bar-icon"><el-icon><QuestionFilled /></el-icon></span>
+          <span class="bar-icon"><el-icon><Help /></el-icon></span>
         </el-tooltip>
         <template #dropdown>
           <el-dropdown-menu>
@@ -157,7 +157,7 @@
       <!-- 用户下拉 -->
       <el-dropdown @command="onUserCommand" popper-class="t-dropdown-popper">
         <span class="user">
-          <el-icon class="user-img"><UserFilled /></el-icon>
+          <el-icon class="user-img"><User /></el-icon>
           <span class="show-name">{{ user.realName }}</span>
         </span>
         <template #dropdown>
@@ -660,21 +660,31 @@ html:not(.dark) .locale-glass-popper .locale-option.locale-active {
   font-style: italic;
 }
 
+/* 纯图标按钮（2026-10-31 图标体系）：命中区 32×32 与搜索框同高，图标 16 居中。
+   改动前三处毛病：字号 17px 与全栏其它图标对不上；命中区只有 17×17（点不中）；
+   hover 只换颜色、没有底，密集图标区看不出"这是能点的控件"。 */
 .bar-icon {
   display: inline-flex;
-  font-size: 17px;
+  align-items: center;
+  justify-content: center;
+  width: var(--ic-hit, 32px);
+  height: var(--ic-hit, 32px);
+  border-radius: 6px;
+  font-size: var(--ic-main, 16px);
   cursor: pointer;
   color: var(--t-navbar-text);
   outline: none;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 .bar-icon:hover {
   color: var(--t-primary);
+  background: var(--t-hover-bg);
 }
 
 .user {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--ic-gap, 8px);
   cursor: pointer;
   font-size: 13px;
   color: var(--t-navbar-text);
@@ -683,8 +693,9 @@ html:not(.dark) .locale-glass-popper .locale-option.locale-active {
 .user:hover {
   color: var(--t-primary);
 }
+/* 用户图标与同一行的功能图标同尺寸（原来是 15px，比顶栏其它图标小一档） */
 .user-img {
-  font-size: 15px;
+  font-size: var(--ic-main, 16px);
   color: var(--t-navbar-info);
 }
 .show-name {
