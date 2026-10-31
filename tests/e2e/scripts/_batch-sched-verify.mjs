@@ -63,6 +63,17 @@ async function setDateRange(page, from, to) {
   await page.keyboard.press('Escape')
 }
 
+/** 读批量弹窗「工序表」(第一张表)每道的计划开工/完工日期输入值 [start,due] */
+async function planDates(dlg) {
+  const rows = dlg.locator('.el-table').first().locator('.el-table__body-wrapper tr')
+  const out = []
+  for (let i = 0; i < await rows.count(); i++) {
+    const inputs = rows.nth(i).locator('.el-date-editor input')
+    out.push({ start: await inputs.nth(0).inputValue(), due: await inputs.nth(1).inputValue() })
+  }
+  return out
+}
+
 async function scenario(sc) {
   log('\n── 场景 ' + sc.tag + '(' + (sc.factory || 'YJ') + ')──')
   const data = await loginAs(sc.factory)
@@ -114,6 +125,15 @@ async function scenario(sc) {
   for (const t of sc.targets) check(text.includes(t + '#1'), '行表含 ' + t + '#1')
   for (const c of sc.planChains) check(text.includes(c), '计划量链 ' + c)
   check(text.includes('合计'), '底部合计')
+
+  // 计划开工/完工日期(2026-10-30 用户口径:与单行排线弹窗同口径)
+  for (const h of ['计划开工日期', '计划完工日期', '实际开工', '实际完工']) check(text.includes(h), '工序表含列「' + h + '」')
+  const dates = await planDates(dlg)
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  check(dates.length >= 1 && dates.every((d) => dateRe.test(d.start) && dateRe.test(d.due)), '每道都有默认计划开工/完工日期')
+  check(dates.slice(1).every((d, i) => d.start === dates[i].due), '日期链:上一道计划完工 = 下一道计划开工')
+  check(dates.every((d) => d.due >= d.start), '每道计划完工不早于计划开工')
+  log('  计划日期:', JSON.stringify(dates))
   await page.screenshot({ path: OUT + '/' + sc.shot2 })
 
   // 取消(不写库)后核对池子行数不变
@@ -127,12 +147,69 @@ async function scenario(sc) {
   await browser.close()
 }
 
+/** 场景 C:单行排产弹窗回归(2026-10-30 把日期链抽到 business/planChain.js 后,行为与改造前一致) */
+async function singleScenario() {
+  log('\n── 场景 C 单行排产弹窗(回归:日期链抽取后行为不变)──')
+  const data = await loginAs(null)
+  const token = data.token
+  const browser = await chromium.launch()
+  const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 }, locale: 'zh-CN' })
+  await ctx.addInitScript(({ token }) => {
+    localStorage.setItem('mes_token', token)
+    localStorage.setItem('mes_user', JSON.stringify({
+      userName: 'admin', realName: '管理员', roleCode: 'admin', isAdmin: true,
+      visiblePanels: ['*'], approvePanels: ['*'],
+    }))
+    localStorage.setItem('mes_init_done', '1')
+  }, { token })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+
+  const kwSel = 'GD-2026-10-0231'
+  const pendBefore = await pendingCount(token, kwSel)
+  await page.goto(WEB + '/#/prod/plan/workOrderList', { waitUntil: 'domcontentloaded' })
+  const kw = page.locator('input[placeholder="输入查询条件..."]')
+  await kw.waitFor({ timeout: 20000 })
+  await kw.fill(kwSel)
+  await page.locator('.wol-query').getByRole('button', { name: '查找' }).click()
+  await page.waitForTimeout(1500)
+  await selectRows(page, [kwSel])
+  await page.locator('.wol-btns').getByRole('button', { name: '排产', exact: true }).click()
+  const embed = page.locator('.el-dialog', { hasText: '工单排产（快速排产）' }).first()
+  await embed.waitFor({ timeout: 20000 })
+  await page.waitForTimeout(2000)
+  // ①池唯一行勾选 → 排产 → 单行「工序路线排线」弹窗
+  await embed.locator('.el-table__body-wrapper').first().locator('.el-checkbox').first().click()
+  await page.waitForTimeout(300)
+  await embed.locator('.sb-bar').getByRole('button', { name: '排产', exact: true }).click()
+  const dlg = page.locator('.el-dialog', { hasText: '工序路线排线' }).first()
+  await dlg.waitFor({ timeout: 20000 })
+  await page.waitForTimeout(1000)
+  const text = await dlg.innerText()
+  for (const h of ['计划开工日期', '计划完工日期', '实际开工', '实际完工']) check(text.includes(h), '单行弹窗含列「' + h + '」')
+  const dates = await planDates(dlg)
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  check(dates.length >= 1 && dates.every((d) => dateRe.test(d.start) && dateRe.test(d.due)), '单行弹窗每道都有计划日期')
+  check(dates.slice(1).every((d, i) => d.start === dates[i].due), '单行弹窗日期链:上一道完工 = 下一道开工')
+  log('  单行计划日期:', JSON.stringify(dates))
+  await page.screenshot({ path: OUT + '/C1-single-route-dialog.png' })
+
+  await dlg.getByRole('button', { name: '取消' }).click()
+  await page.waitForTimeout(500)
+  await embed.locator('.el-dialog__headerbtn').first().click().catch(() => {})
+  await page.waitForTimeout(600)
+  check((await pendingCount(token, kwSel)) === pendBefore, '单行取消后待排产池不变(未写库)')
+  check(errors.length === 0, '单行弹窗无 console.error(实际 ' + errors.length + ')')
+  await browser.close()
+}
+
 const scenarios = [
   {
-    tag: 'A 正式库(换算率 1/1/1)', factory: null, keyword: 'GD-2026-10-022',
-    targets: ['GD-2026-10-0225', 'GD-2026-10-0226', 'GD-2026-10-0226-1'],
+    tag: 'A 正式库(换算率 1/1/1)', factory: null, keyword: 'GD-2026-10-02',
+    targets: ['GD-2026-10-0225', 'GD-2026-10-0226', 'GD-2026-10-0230'],
     chain: '成型>切炭>组装',
-    planChains: ['200·200·200', '90·90·90', '10·10·10'],
+    planChains: ['200·200·200', '90·90·90', '100·100·100'],
     shot1: 'A1-embedded-quick-schedule.png', shot2: 'A2-batch-dialog.png',
   },
   {
@@ -148,5 +225,6 @@ const scenarios = [
 for (const sc of scenarios) {
   try { await scenario(sc) } catch (e) { failed++; console.error('[FAIL] 场景 ' + sc.tag + ' 异常: ' + e.message) }
 }
+try { await singleScenario() } catch (e) { failed++; console.error('[FAIL] 场景 C 异常: ' + e.message) }
 log(failed ? '\nRESULT: FAIL(' + failed + ')' : '\nRESULT: PASS')
 process.exit(failed ? 1 : 0)

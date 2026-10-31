@@ -122,6 +122,7 @@ import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { applyLineDefaults, lineOptions } from '@/business/routeDefaults'
+import { cascadeDue, cascadeStart, normalizePlanChain } from '@/business/planChain'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -170,72 +171,11 @@ function lineNotInOptions(row) {
 /** 有没有「不限定车间」的行 —— 有就在表格下方提示一句,别让人以为筛选坏了 */
 const hasOpenLineRow = computed(() => rows.value.some((r) => !lineOptions(r, lines.value).limited))
 
-/** 计划完工日变化 → 下一道的计划开工日跟着变,并沿链一路往下传(2026-10-29 用户口径) */
-function onDueChange(index, v) {
-  const next = rows.value[index + 1]
-  if (!next || !v) return
-  // 保留下一道原来的计划时长(完工-开工),整体顺延;原来就是负数/缺失则按 0 天
-  const dur = next['计划开工日期'] && next['计划完工日期']
-    ? daysBetween(next['计划开工日期'], next['计划完工日期']) : 0
-  next.计划开工日期 = v
-  next.计划完工日期 = addDays(v, Math.max(0, dur))
-  onDueChange(index + 1, next.计划完工日期)
-}
+/** 计划完工日变化 → 下一道的计划开工日跟着变,并沿链一路往下传(2026-10-29 用户口径;
+ *  日期链纯逻辑在 business/planChain.js,与批量排产弹窗共用同一份) */
+function onDueChange(index, v) { cascadeDue(rows.value, index, v) }
 /** 计划开工日晚于计划完工日时,把完工日拉到开工日(避免提交被后端拒),并继续向后传链 */
-function onStartChange(index, v) {
-  const r = rows.value[index]
-  if (!r) return
-  if (v && r.计划完工日期 && v > r.计划完工日期) {
-    r.计划完工日期 = v
-    onDueChange(index, v)
-  }
-}
-
-/**
- * 打开弹窗时把计划链**规整成一条**:上一道的计划完工日 = 下一道的计划开工日。
- *
- * <p>2026-10-29 用户报障(工序路线排线截图):台账里各道日期是历史各次排产留下的,
- * 打开时出现「成型 10-29~10-31,切炭却 10-08~10-15,装箱 10-30~10-29(开工晚于完工)」——
- * 计划链没有真正生效。这里在加载后统一收口:第 2 道起开工日=上一道完工日,
- * **保留该道原来的计划时长**整体顺延;首道缺开工日给今天。
- */
-function normalizePlanChain() {
-  const today = todayStr()
-  for (let i = 0; i < rows.value.length; i++) {
-    const r = rows.value[i]
-    if (i > 0) {
-      const prev = rows.value[i - 1]
-      if (prev['计划完工日期']) {
-        const dur = r['计划开工日期'] && r['计划完工日期']
-          ? daysBetween(r['计划开工日期'], r['计划完工日期']) : 0
-        r.计划开工日期 = prev['计划完工日期']
-        r.计划完工日期 = addDays(r['计划开工日期'], Math.max(0, dur))
-      }
-    }
-    if (!r['计划开工日期']) r.计划开工日期 = today
-    if (!r['计划完工日期']) r.计划完工日期 = r['计划开工日期']
-    if (r['计划完工日期'] < r['计划开工日期']) r.计划完工日期 = r['计划开工日期']
-  }
-}
-function todayStr() {
-  const d = new Date()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${m}-${day}`
-}
-function addDays(text, n) {
-  const [y, m, d] = String(text).split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-  dt.setDate(dt.getDate() + n)
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getDate()).padStart(2, '0')
-  return `${dt.getFullYear()}-${mm}-${dd}`
-}
-function daysBetween(a, b) {
-  const [y1, m1, d1] = String(a).split('-').map(Number)
-  const [y2, m2, d2] = String(b).split('-').map(Number)
-  return Math.round((new Date(y2, m2 - 1, d2) - new Date(y1, m1 - 1, d1)) / 86400000)
-}
+function onStartChange(index, v) { cascadeStart(rows.value, index, v) }
 
 async function load() {
   if (!no.value) return
@@ -282,7 +222,7 @@ async function load() {
     applyLineDefaults(rows.value, d['上次产线'] || [], lastFirst, lines.value, { lockedFirst: locked.value })
     // 计划链规整:台账里的历史日期各排各的(实测 成型 10-29~10-31、切炭 10-08~10-15、
     // 装箱 10-30~10-29),打开时统一按「上一道完工日 = 下一道开工日」收口,避免出现开工晚于完工
-    normalizePlanChain()
+    normalizePlanChain(rows.value)
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || tt('读取工艺路线失败'))
     rows.value = []

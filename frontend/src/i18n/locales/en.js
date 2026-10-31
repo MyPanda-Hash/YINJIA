@@ -5021,7 +5021,7 @@ export default {
     '只排所选这一组;其余组在下方点名排除': 'Only the selected group is scheduled; the others are listed below as excluded',
     '本批各行换算率不同：计划量按各行自己的工艺路线分别换算，互不影响': 'Conversion rates differ in this batch: planned quantities are converted per line by its own process route, without affecting each other',
     '每道工序的生产线（整批共用）': 'Production line per operation (shared by the batch)',
-    '计划完工日期留空 = 各行按自己的交期': 'Leave the planned finish date empty = each line uses its own due date',
+    '计划开工/完工按「上一道完工 = 下一道开工」自动带出，可逐道改': "Planned start/finish are pre-filled by the rule 'previous finish = next start' and can be edited per operation",
     '本批计划量': 'Batch planned qty',
     '本批工单行（排产数量按各行自己算）': 'Work order lines in this batch (schedule qty per line)',
     '可逐行改小；不得超过该行需求数量': 'Editable per line; must not exceed that line demand',

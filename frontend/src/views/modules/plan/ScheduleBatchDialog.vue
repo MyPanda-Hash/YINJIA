@@ -5,11 +5,14 @@
        · 排产数量**逐行、各行按各行算**(默认 = 该行当前排产数量>0 否则需求;可改小,≤ 该行需求);
        · 计划量 = 本行排产数量 × 本行该道换算率(各道分开算、不累乘);同链不同率的行各自换算、互不影响;
        · 工序链(工序名称+顺序)不同的行**点名排除**,只排同一组(用户口径「提示这个工单号不是同一个工序」);
+       · 计划开工/完工日期(2026-10-30 用户口径「也要和单个实现一样有开工日期之类的实现」):
+         与单行排线弹窗同一套日期链 —— 上一道的计划完工 = 下一道的计划开工;
+         日期链纯逻辑在 business/planChain.js(单行/批量共用一份),实际开工/完工只读展示;
        · 提交 = 逐行调既有 /px/scheduleBoard/preplan(与单行排产同一套守卫/换算),部分失败点名、可重试。
      纯逻辑在 business/scheduleBatch.js(带 node --test 单测),本组件只负责请求与渲染;
-     单行排产仍走原 ProcessRoutePlanDialog,本组件不参与、不修改它。 -->
+     单行排产仍走原 ProcessRoutePlanDialog,本组件不参与、不修改它的行为。 -->
 <template>
-  <el-dialog v-model="visible" :title="tt('批量排产')" width="980px" top="4vh" append-to-body destroy-on-close>
+  <el-dialog v-model="visible" :title="tt('批量排产')" width="1180px" top="4vh" append-to-body destroy-on-close>
     <div v-loading="loading" class="sbd-body">
       <!-- 工序组:多个组时可选(默认行数最多的一组),其余组在下方点名排除 -->
       <div v-if="groups.length > 1" class="sbd-line">
@@ -45,7 +48,7 @@
             <el-option v-for="t in teams" :key="t" :label="t" :value="t" />
           </el-select>
         </span>
-        <span class="sbd-dim">{{ tt('计划完工日期留空 = 各行按自己的交期') }}</span>
+        <span class="sbd-dim">{{ tt('计划开工/完工按「上一道完工 = 下一道开工」自动带出，可逐道改') }}</span>
       </div>
 
       <el-table :data="steps" size="small" border max-height="260" empty-text="">
@@ -71,10 +74,26 @@
         <el-table-column :label="tt('本批计划量')" width="110" align="right">
           <template #default="{ $index }">{{ num(stepTotal(included, $index)) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('计划完工日期')" width="150">
-          <template #default="{ row }">
-            <el-date-picker v-model="row.计划完工日期" type="date" value-format="YYYY-MM-DD" size="small" style="width: 100%" />
+        <!-- 计划开工/完工(2026-10-30 与单行排线弹窗同口径):上一道的计划完工 = 下一道的计划开工;
+             日期链逻辑在 business/planChain.js(单行/批量共用),改任一日期沿链下传 -->
+        <el-table-column :label="tt('计划开工日期')" width="155">
+          <template #default="{ row, $index }">
+            <el-date-picker v-model="row['计划开工日期']" type="date" value-format="YYYY-MM-DD" size="small"
+                            style="width: 100%" @change="(v) => onStartChange($index, v)" />
           </template>
+        </el-table-column>
+        <el-table-column :label="tt('计划完工日期')" width="155">
+          <template #default="{ row, $index }">
+            <el-date-picker v-model="row['计划完工日期']" type="date" value-format="YYYY-MM-DD" size="small"
+                            style="width: 100%" @change="(v) => onDueChange($index, v)" />
+          </template>
+        </el-table-column>
+        <!-- 实际开工/实际完工(只读):批量只收未排产的行,通常还是「-」;列保留与单行排线弹窗一致 -->
+        <el-table-column :label="tt('实际开工')" width="140">
+          <template #default="{ row }"><span class="sbd-actual">{{ row['实际开工'] || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column :label="tt('实际完工')" width="140">
+          <template #default="{ row }"><span class="sbd-actual">{{ row['实际完工'] || '-' }}</span></template>
         </el-table-column>
       </el-table>
 
@@ -113,6 +132,11 @@
         </el-table-column>
       </el-table>
 
+      <div class="sbd-note">
+        {{ tt('说明') }}：{{ tt('上一道的计划完工日期 = 下一道的计划开工日期') }}。
+        {{ tt('日排产请到「生产工单 / 工单排产」的日期列里逐格填写后保存') }}。
+      </div>
+
       <div class="sbd-total">
         {{ tt('合计') }}：{{ tt('排产数量') }} {{ num(totalQty) }}
         <template v-for="(s, i) in steps" :key="s['工序'] + i">
@@ -136,6 +160,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { applyLineDefaults, lineOptions } from '@/business/routeDefaults'
+import { cascadeDue, cascadeStart, normalizePlanChain } from '@/business/planChain'
 import {
   num, groupByChain, splitBatch, planChainOf, stepTotal, ratesOf,
   rateChainOf, rateDiffFromFirst, rowKeyOf, validateQty,
@@ -200,11 +225,23 @@ function syncSteps() {
       换算率: rate > 0 ? rate : 1,
       工序序: s['工序序'],
       生产线: '',
+      // 计划开工/完工 + 实际开工/完工(2026-10-30 与单行排线弹窗同口径):
+      //   计划日期优先用 routeSteps 给的链默认(首道=今天、后续=上一道完工),打开后统一规整成一条链;
+      //   实际开工/完工只读 —— 批量只收未排产的行,通常为空,显示「-」。
+      计划开工日期: s['计划开工日期'] || '',
       计划完工日期: s['计划完工日期'] || '',
+      实际开工: s['实际开工'] || '',
+      实际完工: s['实际完工'] || '',
     }
   })
   applyLineDefaults(steps.value, first['上次产线'] || [], first['上次首道'] || {}, lines.value, {})
+  // 计划链规整(与单行排线弹窗同一份纯逻辑 business/planChain.js):第 2 道起开工=上一道完工、保留原时长
+  normalizePlanChain(steps.value)
 }
+/** 计划完工日变化 → 下一道开工日跟着变,并沿链下传(与单行排线弹窗同一份 planChain 逻辑) */
+function onDueChange(index, v) { cascadeDue(steps.value, index, v) }
+/** 计划开工日晚于本道完工 ⇒ 完工拉到开工日,并继续沿链下传 */
+function onStartChange(index, v) { cascadeStart(steps.value, index, v) }
 watch(chosenChain, () => syncSteps())
 
 async function load() {
@@ -272,6 +309,8 @@ async function submit() {
   const bodySteps = steps.value.map((s) => ({
     工序: s['工序'],
     生产线: s['生产线'],
+    // 计划时间(2026-10-30):与单行排产同一口径 —— 上一道计划完工日 = 下一道计划开工日
+    计划开工日期: s['计划开工日期'] || undefined,
     计划完工日期: s['计划完工日期'] || undefined,
   }))
   for (const row of included.value.slice()) {
@@ -318,5 +357,7 @@ watch(() => props.modelValue, (v) => { if (v) load() })
 .sbd-alert { margin-bottom: 8px; }
 .sbd-ex { font-size: 12px; line-height: 1.7; }
 .sbd-tag { margin-left: 4px; }
+.sbd-actual { font-size: 12px; color: #909399; }
+.sbd-note { margin-top: 8px; font-size: 12px; color: #909399; line-height: 1.6; }
 .sbd-total { margin-top: 8px; font-size: 12px; color: #606266; }
 </style>
