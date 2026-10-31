@@ -137,12 +137,12 @@
                             :批次号="planRow['批次号'] || ''" :已排产="planLocked" @changed="loadAll" />
 
     <!-- 批量排产弹窗(2026-10-30):多行勾选 = 多个工单排入同一组产线;排产数量逐行按各行算 -->
-    <ScheduleBatchDialog v-model="batchVisible" :rows="batchRows" @changed="loadAll" />
+    <ScheduleBatchDialog v-model="batchVisible" :rows="batchRows" @changed="onBatchChanged" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onActivated, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -183,6 +183,8 @@ const scopedIds = computed(() => (props['行id列表'] || []).map(String).filter
 const scoped = computed(() => scopedIds.value.length > 0)
 /** 勾选的行已不在待排产池(被别处排掉/结案)时只提示一次,刷新时不反复弹 */
 const missingWarned = ref(false)
+/** 换一批勾选(重新打开内嵌页)时重置「只提示一次」开关 */
+watch(scopedIds, () => { missingWarned.value = false })
 
 const keyword = ref('')
 const customer = ref('')
@@ -335,6 +337,15 @@ function openScheduleChecked() {
   if (list.length === 1) { openPlan(list[0], false); return }
   batchRows.value = list.slice()
   batchVisible.value = true
+}
+/**
+ * 批量提交完刷新:刚排走的那几行会从待排产池消失,属**预期** ——
+ * 不能触发「以下工单行已不在待排产池…已跳过」的缺行告警(那是"别人先排了"才该提示的),
+ * 否则批量排产一成功就弹一条吓人的警告。先置 missingWarned 再刷新。
+ */
+function onBatchChanged() {
+  missingWarned.value = true
+  loadAll()
 }
 
 async function unassign() {
