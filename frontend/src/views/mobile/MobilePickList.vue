@@ -31,6 +31,10 @@
         <span v-if="baseUrl" class="mp-base" :title="baseUrl">{{ baseUrl }}</span>
       </div>
       <span class="mp-sub">{{ tt('查询单据 → 扫码定位 → 扫码核销 → 全部领完提交') }}</span>
+      <!-- 刷新(2026-11-01):keep-alive 会保留旧实例,别处改了状态后本页要靠它拉最新 -->
+      <el-button class="mp-refresh" size="small" :loading="listLoading" @click="refreshAll">
+        {{ tt('刷新') }}
+      </el-button>
     </div>
 
     <div v-if="errText" class="mp-err mp-err-top">{{ errText }}</div>
@@ -134,7 +138,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onActivated, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -219,6 +223,19 @@ function showErr(msg) {
 
 function clearOk() { okText.value = '' }
 
+/**
+ * 刷新按钮:重拉列表 + 清掉旧提示。
+ *
+ * <p>为什么要一个按钮而不只靠 onActivated:现场常遇到"人不在页面上、状态被别处改了"
+ * (另一台手机提交了、仓管刚审批了),回到页面时数据是旧的。给一个明确的手动刷新,
+ * 比让人怀疑"系统是不是没保存"要好。
+ */
+async function refreshAll() {
+  clearMsg()
+  await loadList()
+  okText.value = tt('已刷新')
+}
+
 onMounted(() => {
   /**
    * 扫码壳回调(Android MainActivity 在 onActivityResult 里 evaluateJavascript 调它)。
@@ -235,6 +252,22 @@ onMounted(() => {
     }
     applyScan(code)
   }
+  loadList()
+})
+
+/**
+ * 🔴 keep-alive 下**必须**自己判断"是不是又被激活"。
+ *
+ * <p>PortalLayout 用 `<component :is>` + keep-alive 缓存页面实例(按 route.path 做 key),
+ * 所以从单据明细点「返回」回到本页时,**实例是旧的、onMounted 不会重跑** ——
+ * 列表还停着你离开那一刻的数据(刚提交完的单还显示在"未完成"里)。
+ * 用户 2026-11-01 口径:「手机端应该有一个刷新按钮,不然会出现旧缓存没跟新状态问题」。
+ *
+ * <p>首次挂载时 mounted 已经加载过一次,这里跳过,避免开页面就发两次请求。
+ */
+let activatedOnce = false
+onActivated(() => {
+  if (!activatedOnce) { activatedOnce = true; return }
   loadList()
 })
 
@@ -366,7 +399,10 @@ function openDoc(id) {
   max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.mp-sub { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
+.mp-sub { flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 刷新按钮:右上角固定,不参与挤压 */
+.mp-refresh { flex: none; }
 
 .mp-card {
   margin: 10px 12px 0;

@@ -28,6 +28,10 @@
         <span class="mp-sub2">{{ doc.工单号 }}<i v-if="doc.工单行号"> #{{ doc.工单行号 }}</i></span>
       </div>
       <span class="mp-state" :class="{ done: isDone }">{{ doc.状态 }}</span>
+      <!-- 刷新(2026-11-01):仓管审批、别处退料之后,这张单的状态要靠它拉最新 -->
+      <el-button class="mp-refresh" size="small" :loading="loading" @click="refreshDoc">
+        {{ tt('刷新') }}
+      </el-button>
     </div>
 
     <div v-if="errText" class="mp-err mp-err-top">{{ errText }}</div>
@@ -244,7 +248,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -301,6 +305,8 @@ const pickRows = ref([])
 const matInput = ref(null)
 const matText = ref('')
 const matLoading = ref(false)
+/** 整页加载态(刷新按钮用) */
+const loading = ref(false)
 const cur = ref(null)
 const curQty = ref(0)
 /** 被点中的明细行(只用于高亮与提示,不解锁 —— 见 pickRow 注释) */
@@ -379,6 +385,19 @@ onMounted(() => {
 })
 
 /**
+ * 回到本页时自动重拉(2026-11-01)。
+ *
+ * <p>keep-alive 会保留实例,从别处回来时 onMounted 不再执行;
+ * 而"仓管批了没""别处退了多少"都是**外部**改的状态,不重拉就一直是旧的。
+ * 首次挂载已由 mounted 加载,这里跳过以免开页面发两次请求。
+ */
+let activatedOnce = false
+onActivated(() => {
+  if (!activatedOnce) { activatedOnce = true; return }
+  loadDoc()
+})
+
+/**
  * 切换单据时重新加载(2026-10-30 修)。
  *
  * <p>vue-router 复用同一路由页的组件实例 ⇒ 只改 query.id 不会重跑 onMounted。
@@ -426,6 +445,27 @@ function applyScan(code) {
   if (!p.ok) { errText.value = tt('这个码里没有物料编码'); return }
   matText.value = p.code
   scanMaterial(p.batch)
+}
+
+/**
+ * 刷新按钮:重拉这张单(状态、进度、明细、是否已审批全都更新)。
+ *
+ * <p>为什么需要(2026-11-01 用户口径「手机端应该有一个刷新按钮,不然会出现旧缓存没跟新状态问题」):
+ * PortalLayout 用 keep-alive 缓存页面,从别处回到这张单时实例是旧的;
+ * 而"材料出库单有没有被仓管审批"这种状态**是别人在另一台电脑上改的**,
+ * 不主动重拉就永远看不到 —— 用户会以为"我明明审批了,手机还说没审批"。
+ */
+async function refreshDoc() {
+  loading.value = true
+  try {
+    await loadDoc()
+    if (!errText.value) {
+      okText.value = tt('已刷新')
+      setTimeout(() => { if (okText.value === tt('已刷新')) okText.value = '' }, 1500)
+    }
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadDoc() {
@@ -767,6 +807,8 @@ async function submit() {
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
 }
 .mp-state.done { background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2); }
+/* 刷新按钮:右上角固定,不参与挤压 */
+.mp-refresh { flex: none; margin-left: 6px; }
 
 .mp-card {
   margin: 10px 12px 0; padding: 12px;

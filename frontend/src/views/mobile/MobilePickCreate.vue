@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   MobilePickCreate.vue — 手机扫码 · 生成工单领料/退料单(开单工作台,2026-10-30)
 
   【为什么是独立一页】(用户 2026-10-30 第二轮口径)
@@ -26,6 +26,10 @@
         <span v-if="baseUrl" class="mp-base" :title="baseUrl">{{ baseUrl }}</span>
       </div>
       <span class="mp-sub">{{ tt('扫工单生单 → 自动打印工单二维码') }}</span>
+      <!-- 刷新(2026-11-01):keep-alive 下"已开单/未开单"不会自己更新,靠它拉最新 -->
+      <el-button class="mp-refresh" size="small" :loading="listLoading" @click="refreshAll">
+        {{ tt('刷新') }}
+      </el-button>
     </div>
 
     <div v-if="errText" class="mp-err mp-err-top">{{ errText }}</div>
@@ -230,7 +234,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -344,9 +348,29 @@ onMounted(() => {
   loadWoStatus()
 })
 
+/**
+ * 回到本页时自动重拉(2026-11-01)。
+ *
+ * <p>keep-alive 会保留实例:从生产领料页返回时「已开单/未开单」还是旧的分组,
+ * 刚生成过单据的工单仍显示在"未开单"里。首次挂载已由 mounted 加载,这里跳过。
+ */
+let activatedOnce = false
+onActivated(() => {
+  if (!activatedOnce) { activatedOnce = true; return }
+  loadWoStatus()
+})
+
 onBeforeUnmount(() => {
   try { delete window.__yjScanResult } catch { /* ignore */ }
 })
+
+/** 刷新按钮:重拉工单列表并清提示 */
+async function refreshAll() {
+  errText.value = ''
+  okText.value = ''
+  await loadWoStatus()
+  okText.value = tt('已刷新')
+}
 
 function scanInto() {
   if (!(window.YjNative && typeof window.YjNative.scan === 'function')) {
@@ -479,13 +503,16 @@ async function loadWoStatus() {
   height: 48px; padding: 0 12px;
   background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
 }
+/* 刷新按钮:右上角固定 */
+.mp-refresh { flex: none; }
 .mp-title { font-size: 16px; font-weight: 600; }
 .mp-head { display: flex; flex-direction: column; min-width: 0; }
 .mp-base {
   max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.mp-sub { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
+.mp-sub { flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .mp-card {
   margin: 10px 12px 0; padding: 12px;
