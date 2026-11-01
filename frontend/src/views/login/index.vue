@@ -63,28 +63,17 @@
           <span>{{ errorMessage }}</span>
         </div>
 
-        <!-- 壳内首次使用:先让用户确认后端地址(否则工厂列表一定是空的) -->
+        <!-- 壳内首次使用:先让用户确认后端地址(否则工厂列表一定是空的)
+             ⚠ 2026-11-01:改地址入口已统一到**顶部原生工具条的「设置」**(见 showServerAddr 注释),
+                这里只提示"去哪儿改",不再自带输入框。 -->
         <div v-if="needOrigin" class="origin-hint">
           <el-icon><WarningFilled /></el-icon>
-          <span>{{ tt('首次使用请先确认「服务器地址」(如 http://192.168.1.10:8090),再点「保存并重连」') }}</span>
+          <span>{{ tt('首次使用请点顶部的「设置」确认服务器地址(如 http://192.168.1.10:8090),改完会自动重连') }}</span>
         </div>
 
-        <!-- 服务器地址(2026-10-20 加 / 2026-10-21 从页脚挪到表单上方):
-             只在**安卓壳里**出现 —— Capacitor 版页面 origin 是 https://localhost,没有同源后端,
-             必须在登录前指定后端;网页版部署同源,不显示。
-             ⚠ 挪到上方的理由:原来放在页脚,手机软键盘弹出时会把它整块挡死,根本没法输入。
-             与参考包用同一个 localStorage 键(mes_api_origin)。 -->
-        <div v-if="showServerAddr" class="server-addr">
-          <span class="server-addr-label">{{ tt('服务器地址') }}</span>
-          <el-input
-            v-model="serverAddr"
-            size="small"
-            :placeholder="tt('如 http://192.168.1.10:8090')"
-            @keyup.enter="saveServerAddr"
-            @focus="keepVisible"
-          />
-          <el-button size="small" type="primary" plain @click="saveServerAddr">{{ tt('保存并重连') }}</el-button>
-        </div>
+        <!-- 服务器地址输入框已移除(2026-11-01)。
+             原位置在这里有一行「服务器地址 + 保存并重连」,与顶部原生工具条的「设置」重复;
+             详见下方 showServerAddr 的注释。改地址请用**顶部原生工具条的「设置」**。 -->
 
         <el-form
           ref="formRef"
@@ -158,42 +147,23 @@
 
         <footer class="login-footer">
           <span>LIGHT MES · 2026</span>
-          <!-- App 内的服务器地址入口(2026-10-21):原先只能在扫码页改,但那个页要登录后才进得去
-               —— 服务器配错就永远进不了、也就永远改不了(死锁)。这里做成连不上时点一下就能改。 -->
-          <span v-if="nativeScan" class="footer-srv" @click="openServer">{{ serverLabel }}</span>
+          <!-- 页脚的 serverLabel 入口已去掉(2026-11-01):与顶部原生工具条重复,
+               见 showServerAddr 的注释。这里只保留**连接状态指示**(有用,且不该能点开改地址)。 -->
           <span
             class="footer-status"
             :class="{ 'is-error': !factoryLoading && !user.factories.length }"
-            :title="nativeScan ? tt('点这里可设置服务器地址') : ''"
-            @click="nativeScan && openServer()"
           >
             <span class="status-dot"></span>
             {{ factoryLoading ? tt('正在连接服务') : user.factories.length ? tt('服务连接正常') : tt('服务连接异常') }}
           </span>
         </footer>
-
-        <!-- 服务器地址弹窗(App 内) -->
-        <div v-if="srvVisible" class="srv-mask" @click.self="srvVisible = false">
-          <div class="srv-dlg">
-            <div class="srv-title">{{ tt('服务器地址') }}</div>
-            <div class="srv-tip">
-              {{ tt('填后端的完整地址,含 http:// 与端口。手机需与服务器在同一网络。') }}
-            </div>
-            <input v-model="srvInput" class="srv-input" :placeholder="tt('如 http://192.168.0.238:8090')" />
-            <div class="srv-acts">
-              <button class="srv-btn" @click="srvVisible = false">{{ tt('取消') }}</button>
-              <button class="srv-btn" @click="resetServer">{{ tt('恢复默认') }}</button>
-              <button class="srv-btn primary" @click="saveServer">{{ tt('保存并重载') }}</button>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   </main>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
@@ -207,39 +177,19 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 // 服务器地址读写统一走 appConfig(2026-10-25 合并:HEAD 侧从 @core/request 取,现由 appConfig 唯一真源)
-import { apiOrigin, setApiOrigin, API_ORIGIN_KEY } from '@/business/appConfig'
-import { hasNativeScan } from '@/business/nativeScan'
+// 2026-11-01:网页内的改地址入口已全部去掉(统一到顶部原生工具条「设置」),
+// 这里只留读取 —— apiOrigin() 现在**优先读原生 SharedPreferences**,见 appConfig 注释。
+import { API_ORIGIN_KEY } from '@/business/appConfig'
 // 背景图 2026-09-28 转 WebP(1967KB→111KB,q80 视觉无损;原图已删)
 import manufacturingImage from '@/assets/login-manufacturing.webp'
 
 const REMEMBERED_ACCOUNT_KEY = 'mes_login_account'
 const router = useRouter()
 
-// ---- App 内的服务器地址设置(2026-10-21):服务器配错时靠这里救回来 ----
-const nativeScan = hasNativeScan()
-const srvVisible = ref(false)
-const srvInput = ref('')
-/** 按钮显示 host:port,省地方 */
-const serverLabel = computed(() => String(apiOrigin()).replace(/^https?:\/\//i, ''))
-
-function openServer() {
-  srvInput.value = apiOrigin()
-  srvVisible.value = true
-}
-
-function saveServer() {
-  const v = String(srvInput.value || '').trim()
-  if (v && !/^https?:\/\//i.test(v)) return
-  setApiOrigin(v)
-  srvVisible.value = false
-  location.reload()
-}
-
-function resetServer() {
-  setApiOrigin('')
-  srvVisible.value = false
-  location.reload()
-}
+// ---- 服务器地址设置 ----
+// 2026-11-01:网页内的三个入口(表单框 / 页脚 serverLabel / srvVisible 弹窗)全部去掉,
+// 统一到**顶部原生工具条的「设置」**—— 它在 WebView 外层,页面白屏时照样能用。
+// 原实现保留在 git 历史(fail-safe:真要救急,先看 MainActivity.showServerDialog)。
 const user = useUserStore()
 const localeStore = useLocaleStore()
 localeStore.loadAvailable?.()
@@ -255,48 +205,45 @@ const errorMessage = ref('')
  */
 const IN_SHELL = typeof window !== 'undefined'
   && (!!window.Capacitor || !!window.YjNative || location.protocol === 'file:')
-const showServerAddr = IN_SHELL
+/**
+ * 是否在登录表单里显示「服务器地址」输入框(2026-11-01 改为 false)。
+ *
+ * <p>🔴 为什么去掉:用户报障「为什么会有上下两个连接的设置」——
+ * 壳里同时存在**三个**改地址的入口:
+ * <ol>
+ *   <li>原生顶部工具条「设置」(MainActivity 的 btn_settings,在 WebView **外面**);</li>
+ *   <li>本表单里的这一行;</li>
+ *   <li>页脚的 serverLabel(点开 srvVisible 弹窗)。</li>
+ * </ol>
+ * 三处读写同一个 localStorage 键,功能完全重复,现场只会困惑。
+ *
+ * <p>⇒ 统一收敛到**原生工具条那一个**。关键理由:它在 WebView 外层,
+ * 网页白屏 / JS 报错 / 地址配错导致页面加载不出来时**照样能点开改** ——
+ * 而网页里的入口一旦页面没渲染出来就完全失效(这正是"配错地址就永远进不去"的死锁)。
+ */
+const showServerAddr = false
 
 /**
- * 首次进 App(还没配过地址)时,预填一个**可用的默认后端**,并置顶提示。
- * 2026-10-21 用户报障:「无法选择工厂,工厂为空」—— 根因就是壳里没有地址,
- * 请求打到 https://localhost/api 拿不到工厂列表;光靠底部一行小输入框太容易被忽略。
+ * 首次进 App(还没配过地址)时给个置顶提示。
+ *
+ * <p>⚠ 2026-11-01:地址的**存储真源已改为原生 SharedPreferences**
+ * (`YjNative.getBaseUrl()`,由顶部工具条「设置」写入),localStorage 只作兼容回退。
+ * 所以这里判断"是否配过"要**两边都看**:只要任一处有合法地址,就不再打扰。
  */
-const DEFAULT_ORIGIN = 'http://36.140.66.163:8090'
 const savedOrigin = (() => {
-  try { return localStorage.getItem(API_ORIGIN_KEY) || '' } catch { return '' }
+  try {
+    const nat = window.YjNative && typeof window.YjNative.getBaseUrl === 'function'
+      ? String(window.YjNative.getBaseUrl() || '').trim() : ''
+    if (nat && /^https?:\/\//i.test(nat)) return nat
+    return localStorage.getItem(API_ORIGIN_KEY) || ''
+  } catch { return '' }
 })()
-const serverAddr = ref(savedOrigin || apiOrigin() || (IN_SHELL ? DEFAULT_ORIGIN : ''))
 /** 还没配地址 ⇒ 顶部横幅提醒(配过后不再打扰) */
 const needOrigin = ref(IN_SHELL && !savedOrigin)
 
-function saveServerAddr() {
-  const v = String(serverAddr.value || '').trim().replace(/\/+$/, '')
-  if (v && !/^https?:\/\//i.test(v)) {
-    errorMessage.value = tt('地址要以 http:// 或 https:// 开头')
-    return
-  }
-  localStorage.setItem(API_ORIGIN_KEY, v)
-  needOrigin.value = false
-  // 地址变了要重建 axios 实例:最干净的做法是整页重载
-  location.reload()
-}
-
-/**
- * 软键盘弹出时把当前输入框滚到可视区中部。
- * 光靠 adjustResize 不够:焦点在页面靠下的元素时,安卓 WebView 常把输入框留在键盘下方。
- */
-function keepVisible(e) {
-  const el = e && e.target ? e.target : null
-  if (!el || typeof el.scrollIntoView !== 'function') return
-  setTimeout(() => {
-    try {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    } catch {
-      el.scrollIntoView()
-    }
-  }, 260)
-}
+// 原 keepVisible() 只服务于「服务器地址」输入框(软键盘遮挡时滚到可视区中部);
+// 该输入框已于 2026-11-01 移除,函数一并删除。登录表单本身用 el-form + 大尺寸输入,
+// 安卓 adjustResize 已足够,不需要再手工滚动。
 
 const rememberedAccount = localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || ''
 const rememberAccount = ref(Boolean(rememberedAccount))
