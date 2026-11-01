@@ -73,6 +73,26 @@ public class WoReportService {
     }
 
     /**
+     * 报工单**单据日期**补默认(2026-11-01 用户报障:
+     * 「我报工了这一条为什么没有显示当前日期的实际报工数量」)。
+     *
+     * <p>根因:报工单的「单据日期」没人填时 {@code scjl.sc_date} 落成 NULL;而
+     * 工单排产/生产工单的**日期列**是拿 sc_date 把「已审核报工」分到当天的
+     * (见 WorkOrderDayPlanService.actualByDate)⇒ 这张单已审核了,日期格上却查不到实际值
+     * (实测 BG-2026-11-0001:wgsj=2026-11-01,wgzt=Y,sc_date=NULL ⇒ 11-01 格只有计划 2)。
+     *
+     * <p>口径:只在**为空**时补,已填的日期(含补录历史单)一律不动;日期取**应用本地日期**
+     * (与 wgsj 同一把墙钟 —— SQL Server 在 Docker 里是 UTC,不能直接 GETDATE() 取日期)。
+     * 保存时补一次(草稿期就能看到日期),审核时再兜一次(历史草稿/外部直写单)。
+     */
+    public void stampDocDate(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        jdbc.update("UPDATE dbo.scjl SET sc_date = ? WHERE [报工单号]=? AND sc_date IS NULL"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'",
+                java.sql.Date.valueOf(java.time.LocalDate.now()), no);
+    }
+
+    /**
      * 报工行的**行锚点**解析(取不到返回 null = 不猜):
      *   ① 本单已带 gd_id(=plang_pc.id,重审/再报时)→ plang_pc.plang_id;
      *   ② 本单带 工单行号(scjl.工单行号,界面可见)→ (工单号 + 行号 [+批次]) 恰命中 1 行。
@@ -122,6 +142,8 @@ public class WoReportService {
         if (!posts(panelCode) || no == null || no.isBlank()) return;
         // 与审核同源:先尽力补一次行号(按 gd_id / 工单号+批次号 唯一命中才补,补不到不猜)
         stampRowNo(panelCode, no);
+        // 单据日期也补一次:日期列(排产看板「日报工」)按它分桶,空着会让已审报工在日期上消失
+        stampDocDate(panelCode, no);
         for (Map<String, Object> r : rows(no)) {
             validateRow(r, "提交审批");
         }
@@ -133,6 +155,8 @@ public class WoReportService {
         // 审核前先补行号(2026-10-15):complete() 的锚定与工序校验都读 scjl.[工单行号];
         //   若本单是"直接审核"(没走过保存)或行号尚未解析,这里补一次,保证按「工单号+工单行号」落点。
         stampRowNo(panelCode, no);
+        // 单据日期同样补一次(2026-11-01):空着的话排产看板日期列查不到这条已审报工的「实际值」
+        stampDocDate(panelCode, no);
         for (Map<String, Object> r : rows(no)) {
             complete(r, user);
         }

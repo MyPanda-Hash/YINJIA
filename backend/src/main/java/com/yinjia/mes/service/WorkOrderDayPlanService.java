@@ -763,6 +763,13 @@ public class WorkOrderDayPlanService {
     /**
      * 报工(全部日期):key = 行id|工序 → 日期 → 数量。
      * 锚定与看板「当前工序完工量」同口径(gd_id→plang_pc.plang_id;老数据按工单号+批次号兜底)。
+     *
+     * <p>日期口径(2026-11-01 修,用户报障:「我报工了这一条为什么没有显示当前日期的实际报工数量」):
+     * 优先 scjl.**sc_date(单据日期)**,为空时依次回落 **wgsj(完工时刻)→ asp_time1(录入时刻)**。
+     * 根因:报工单「单据日期」没人填时 sc_date 为 NULL,而这里原来只认 sc_date ⇒ 这一行
+     * 已审核报工在日期列上**整片消失**(实测 BG-2026-11-0001:wgsj=2026-11-01、sc_date=NULL,
+     * 日计划 11-01 格只有计划 2,没有实际值)。补日期见
+     * {@link WoReportService#stampDocDate}(保存/审核时补 sc_date)。
      */
     private Map<String, Map<String, Double>> actualByDate(List<Long> ids) {
         Map<String, Map<String, Double>> out = new LinkedHashMap<>();
@@ -776,7 +783,8 @@ public class WorkOrderDayPlanService {
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT x.rid AS rid, x.op AS op, CONVERT(varchar(10), x.d, 120) AS d, SUM(x.q) AS q FROM ("
                         + " SELECT ISNULL(pc.plang_id, fb.pid) AS rid, ISNULL(s.gxdm,N'') AS op,"
-                        + "        CAST(s.sc_date AS date) AS d, ISNULL(s.sl,0) AS q"
+                        // 单据日期缺失时回落完工时刻/录入时刻,别让已审核报工在日期列上消失
+                        + "        CAST(COALESCE(s.sc_date, s.wgsj, s.asp_time1) AS date) AS d, ISNULL(s.sl,0) AS q"
                         + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
                         + " OUTER APPLY (SELECT TOP 1 p2.id AS pid FROM dbo.plang p2"
                         + "   WHERE ISNULL(s.gd_id,0)=0 AND p2.pl_no = s.gldh"

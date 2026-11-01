@@ -4433,3 +4433,12 @@ migrate-oqc-hygiene-results-20261101.sql
 #   ② 存量修数:scjl.gxdm 恰好等于(唯一)bs_op.工序编码 的行改成对应 工序名称。
 #   幂等;两账套均执行(先正式、后测试)。
 migrate-wo-report-op-name-20261101.sql
+
+# 2026-11-01 报工单「单据日期」补默认(修「报工了但排产看板日期列没有实际报工数量」)。
+#   用户报障:报工单已审核,工单排产页当天格只有计划量、没有绿色实际值。
+#   根因:报工单单据日期没人填 ⇒ scjl.sc_date=NULL,而日期列按 sc_date 给已审报工分桶。
+#   ① 存量:sc_date 为空的行按 COALESCE(wgsj, asp_time1) 的日期补(只补空值);
+#   ② 增量:WoReportService.stampDocDate 在保存/提交审批/审核时补当天;
+#      取数侧同时 COALESCE(sc_date, wgsj, asp_time1) 兜底。
+#   幂等;两账套均执行(先正式、后测试)。
+migrate-scjl-report-date-20261101.sql
