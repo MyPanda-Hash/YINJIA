@@ -1,0 +1,28 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== recon2.sql ==
+  | 1-panel-trans | 15372 | panel | 生产领料 | en | Production Picking | manual | 2026-10-21 16:58:08.9167267 | 2026-10-21 16:58:08.9167267 | 
+  | 1-panel-trans | 15373 | panel | 生产领料 | ja | 生産材料出庫 | manual | 2026-10-21 16:58:08.9167267 | 2026-10-21 16:58:08.9167267 | 
+  | 2-field-cover | 仓库编码 | Warehouse Code | 9 | Warehouse code | 倉庫コード | 
+  | 2-field-cover | 仓库名称 | Warehouse | 10 | Warehouse Name | 倉庫名 | 
+  | 2-field-cover | 成本单价 | Cost Price | 1 | Cost Price | null | 
+  | 2-field-cover | 成本金额 | Cost Amount | 9 | Cost amount | 原価金額 | 
+  | 2-field-cover | 创建人 | Created By | 2 | Created By | 作成者 | 
+  | 2-field-cover | 创建时间 | Created At | 9 | Created at | 作成時間 | 
+  | 2-field-cover | 单据编号 | Document No. | 9 | Document Number | 伝票番号 | 
+  | 2-field-cover | 单据类型 | Document Type | 1 | Doc Type | null | 
+  | 2-field-cover | 单据日期 | Document Date | 9 | Document Date | 伝票日付 | 
+  | 2-field-cover | 规格型号 | Spec / Model | 9 | Specification | 規格型番 | 
+  | 2-field-cover | 计量单位 | UOM | 9 | Unit of measurement | 計量単位 | 
+  | 2-field-cover | 经手人 | Handler | 9 | Person in charge | 取扱人 | 
+  | 2-field-cover | 批号 | Lot No. | 10 | Lot No. | ロット番号 | 
+  | 2-field-cover | 审核人 | Auditor | 10 | Approved by | 承認者 | 
+  | 2-field-cover | 审核时间 | Audit Time | 10 | Approved at | 承認時間 | 
+  | 2-field-cover | 数量 | Quantity | 9 | Quantity | 数量 | 
+  | 2-field-cover | 物料编码 | Material Code | 9 | Material Code | 資材コード | 
+  | 2-field-cover | 物料名称 | Material Name | 10 | Material Name | 資材名 | 
+  | 3-roles | 12 | 4 | 
+  | 4-outh-src | 5 | 1109 | 
+  | 4-outh-src | 6 | 2094 | 
+  | 4-outh-src | 7 | 114 | 
+  | 5-view-rows | 2094 | 
+[OK] recon2.sql (1 batches)

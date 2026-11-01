@@ -1,0 +1,121 @@
+库A(服务器)=HSDZ_MES_SRV1849   库B(本地)=HSDZ_MES
+表                                              rowsA     rowsB     onlyA     onlyB  说明
+_bak_pc0000_20261018_inh                           ?         -                      仅服务器存在(本地无此表)
+_bak_pc0000_20261018_kucun                         ?         -                      仅服务器存在(本地无此表)
+_bak_pc0000_20261018_outh                          ?         -                      仅服务器存在(本地无此表)
+_bak_pc0000_baseline                               ?         -                      仅服务器存在(本地无此表)
+_bak_pc0000_merge                                  ?         -                      仅服务器存在(本地无此表)
+_bak_qccat_detail_20261021                         -         ?                      仅本地存在(服务器无此表)
+_bak_qcinsp_empty_20261021                         -         ?                      仅本地存在(服务器无此表)
+_bak_qcinsp_empty_approval_20261021                -         ?                      仅本地存在(服务器无此表)
+_bak_qcinsp_empty_detail_20261021                  -         ?                      仅本地存在(服务器无此表)
+_bak_qcinsp_empty_flow_20261021                    -         ?                      仅本地存在(服务器无此表)
+_bak_qcinsp_empty_status_20261021                  -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_form_flow_link                 -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_catalog_detail              -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_insp                        -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_insp_detail                 -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_insp_rec                    -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_insp_rec_detail             -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_return                      -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_qc_return_detail               -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_yj_doc_status                  -         ?                      仅本地存在(服务器无此表)
+_bak_qcmix_20261021_yj_form_approval               -         ?                      仅本地存在(服务器无此表)
+_bak_qcrec_20261021                                -         ?                      仅本地存在(服务器无此表)
+_bak_qcrec_approval_20261021                       -         ?                      仅本地存在(服务器无此表)
+_bak_qcrec_detail_20261021                         -         ?                      仅本地存在(服务器无此表)
+_bak_qcrec_status_20261021                         -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_bd_purchase_in               -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_bl_purchase_in               -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_form_flow_link               -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_catalog                   -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_catalog_detail            -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_insp                      -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_insp_detail               -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_insp_rec                  -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_insp_rec_detail           -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_return                    -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_qc_return_detail             -         ?                      仅本地存在(服务器无此表)
+_bak_qcregen_20261021_yj_doc_status                -         ?                      仅本地存在(服务器无此表)
+_bak_qctcin_ref_20261021                           -         ?                      仅本地存在(服务器无此表)
+bd_pu_label                                       16        13         3         0  <-- 
+bd_pu_order                                      223       223         5         5  <-- 
+bd_purchase_in                                   324       322         3         1  <-- 
+bd_so_order                                      296       290        18        12  <-- 
+bl_pu_label                                       16        13         3         0  <-- 
+bl_pu_order                                      529       529         9         9  <-- 
+bl_purchase_in                                   861       858         3         0  <-- 
+bl_so_order                                      558       551        26        19  <-- 
+bs_dc_device                                       7         7         1         1  <-- 
+bs_dc_gateway                                      2         2         1         1  <-- 
+bs_dc_sample                                       8        10         1         3  <-- 
+bs_inv                                          3903      3899        74        70  <-- 
+bs_qc_item                                        14        32         0        18  <-- 
+bs_qc_plan                                         2         6         0         4  <-- 本地独有列:[适用单据] 
+bs_route                                          34        34         2         2  <-- 
+dm_langue                                         19        18         2         1  <-- 
+equip_check                                        3         1         2         0  <-- 
+equip_check_detail                                 2         0         2         0  <-- 
+erp_imp_log                                        0         9         0         9  <-- 
+erp_imp_row                                        0        45         0        45  <-- 
+form_flow_link                                  1372      1153       240        21  <-- 
+inh                                             2529      2529         1         1  <-- 
+inv_cost_ledger                                 5017      5018      5017      5018  <-- 
+kucun                                           1480      1480      1480      1480  <-- 
+maint_plan                                         2         1         1         0  <-- 
+maint_plan_detail                                  1         0         1         0  <-- 
+outh                                            3319      3318         1         0  <-- 
+plang                                            473       468        13         8  <-- 
+plang_pc                                         435       430         5         0  <-- 
+qc_asm_insp_detail                               862      1342       240       720  <-- 
+qc_asm_insp_head                                 436       435         1         0  <-- 
+qc_catalog                                         1         1         1         1  <-- 
+qc_catalog_detail                                 52        16        52        16  <-- 
+qc_first_insp_detail                           38439     38169       360        90  <-- 
+qc_first_insp_head                               491       425        67         1  <-- 
+qc_insp                                           17        12        17        12  <-- 
+qc_insp_detail                                    24        16        24        16  <-- 
+qc_insp_rec                                       38        16        38        16  <-- 
+qc_insp_rec_detail                                29        73        29        73  <-- 
+qc_proc_insp_head                                452       434        18         0  <-- 
+qc_return                                          7         5         7         5  <-- 
+qc_return_detail                                  17         5        17         5  <-- 
+qc_tc_in                                          12        12        10        10  <-- 
+rd_approval                                        9         7         3         1  <-- 
+rd_equip_use_detail                                1         0         1         0  <-- 
+rd_equip_use_head                                  2         0         2         0  <-- 
+rd_insp_plan_head                                  9         8         1         0  <-- 
+rd_instr_use_head                                  1         0         1         0  <-- 
+rd_mold_formula_detail                             4         4         4         4  <-- 
+rd_mold_proc_detail                                9         7         4         2  <-- 
+rd_mold_proc_head                                  5         7         3         5  <-- 
+rd_prod_info_head                                  6         6         1         1  <-- 
+rd_spec_doc_head                                   7         7         1         1  <-- 
+rd_spike_water_detail                              2         0         2         0  <-- 
+rd_spike_water_head                                3         0         3         0  <-- 
+s_allno                                         4765      4776        38        49  <-- 
+scjl                                            1288      1283         6         1  <-- 
+sl_recv                                          308       307         2         1  <-- 
+sl_recv_detail                                   513       512         3         2  <-- 
+wo_mixing_list                                     8         1         8         1  <-- 服务器独有列:[asp_user3, asp_time3, asp_print] 
+wo_process_line                                   66        53        14         1  <-- 
+wo_transfer_log                                   22        18         4         0  <-- 
+yj_barcode_label_log                              70        20        53         3  <-- 
+yj_doc_batch                                      51        50         1         0  <-- 
+yj_doc_modify_log                                  3         2         3         2  <-- 
+yj_doc_status                                   5780      5691       155        66  <-- 
+yj_field                                        4466      4467         1         2  <-- 
+yj_form_approval                                5098      5101        48        51  <-- 
+yj_lot_seq                                         3         4         0         1  <-- 
+yj_message                                      3793      3795        16        18  <-- 
+yj_panel                                         143       143         1         1  <-- 
+yj_role                                           19        12         7         0  <-- 
+yj_role_panel                                   1155       762       561       168  <-- 
+yj_schema_log                                    652       657         1         6  <-- 
+yj_translation                                  6828      6829         0         1  <-- 
+yj_usage_log                                    8579      8595       160       176  <-- 
+yj_user                                           26        25         2         1  <-- 
+
+合计行数: A(服务器)=173549  B(本地)=172902  差=-647 | 仅服务器行=8905  仅本地行=8258
+有差异的表 77 张
+RESULT: DONE
