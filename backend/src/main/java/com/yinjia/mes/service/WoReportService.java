@@ -43,6 +43,10 @@ public class WoReportService {
      *
      * <p>解析口径(与 {@link #reportRows} 同源,取不到**不猜**):① 已有 gd_id → 经 plang_pc 反查 pl_xc;
      * ② 否则按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空(等审核时按行锚定)。
+     *
+     * <p>⚠ 2026-11-01:「工单行号 = 0」也算**未解析**(前端新增明细行的整数格默认填 0;
+     * 只判 IS NULL 的话这类行永远补不上,行锚点一直挂空 —— 用户报障的
+     * 「报工缺少唯一工单行锚点…不能审核」正是这么来的)。两条 UPDATE 一并按 ISNULL(col,0)=0 判。
      */
     public void stampRowNo(String panelCode, String no) {
         if (!posts(panelCode) || no == null || no.isBlank()) return;
@@ -53,7 +57,7 @@ public class WoReportService {
                         + "   JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + "   WHERE pc.id = s.gd_id) x"
                         + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                        + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) > 0", no);
+                        + "   AND ISNULL(s.[工单行号],0) = 0 AND ISNULL(s.gd_id,0) > 0", no);
         // ② 没有 gd_id(草稿期常态)→ 按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空。
         //    ⚠ 必须用 CTE + HAVING COUNT(*)=1 的形态:T-SQL 的 `UPDATE … FROM … GROUP BY` 是**语法错**
         //      (实测 "Incorrect syntax near the keyword 'GROUP'"),与迁移脚本 migrate-scjl-wo-line-20261015.sql 同款。
@@ -63,9 +67,67 @@ public class WoReportService {
                         + "  JOIN dbo.plang p ON p.pl_no = s.gldh AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
                         + "       AND ISNULL(p.asp_cancel,'N') <> 'Y'"
                         + "  WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                        + "    AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') <> N''"
+                        + "    AND ISNULL(s.[工单行号],0) = 0 AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') <> N''"
                         + "  GROUP BY s.id HAVING COUNT(*) = 1)"
                         + " UPDATE s SET s.[工单行号] = c.xc FROM dbo.scjl s JOIN cand c ON c.sid = s.id", no);
+    }
+
+    /**
+     * 报工行的**行锚点**解析(取不到返回 null = 不猜):
+     *   ① 本单已带 gd_id(=plang_pc.id,重审/再报时)→ plang_pc.plang_id;
+     *   ② 本单带 工单行号(scjl.工单行号,界面可见)→ (工单号 + 行号 [+批次]) 恰命中 1 行。
+     *
+     * <p>供 {@link #complete}(审核既有判据)与 {@link #assertRowAnchors}(提交审批前置)共用,
+     * 保证「提交审批放行的」与「审核能落点的」是同一份判据(不会出现送审能过、审核必炸的错位)。
+     */
+    private Long anchorRowId(Map<String, Object> r) {
+        // ① gd_id(= plang_pc.id,重审/再报时)→ plang_pc.plang_id
+        double ownGd = num(r.get("gd_id"));
+        if (ownGd > 0) {
+            List<Long> rr = jdbc.queryForList(
+                    "SELECT TOP 1 pc.plang_id FROM dbo.plang_pc pc"
+                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " WHERE pc.id=?", Long.class, (long) ownGd);
+            if (!rr.isEmpty()) return rr.get(0);
+        }
+        // ② 工单号 + 工单行号(+批次)恰命中 1 行才认,多行不猜
+        if (r.get("own_xc") != null) {
+            String wo = String.valueOf(r.get("gldh") == null ? "" : r.get("gldh")).trim();
+            String rptBatch = r.get("rpt_batch") == null ? "" : String.valueOf(r.get("rpt_batch")).trim();
+            List<Long> rr = jdbc.queryForList(
+                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=?"
+                            + " AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND (? = N'' OR ISNULL([批次号],N'') = ?)"
+                            + " ORDER BY id", Long.class, wo, ((Number) r.get("own_xc")).intValue(),
+                    rptBatch, rptBatch);
+            if (rr.size() == 1) return rr.get(0);
+        }
+        return null;
+    }
+
+    /**
+     * **提交审批前**的行锚点校验(2026-11-01 用户口径:
+     * 「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」)。
+     *
+     * <p>为什么前置:行锚点(工单号+工单行号 / gd_id)决定这条报工记到哪一行、走哪条路线,
+     * 属于**编制环节**就该填对的数据。原实现只在 {@link #complete}(审核 / 审批通过)才校验:
+     * 编制者带着坏数据提交审批,审批人点「审批通过」才被拦(用户截图那句
+     * 「报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能审核」),还得先审批驳回、
+     * 回草稿改完再重提。现在提交审批先按同一判据({@link #anchorRowId})校验,锚不到行直接拒绝送审。
+     *
+     * <p>审核路径的守卫**保留**(历史已送审单据 / 直连审核仍需兜底),正常流程不会再到那一步。
+     *
+     * @param action 报错文案里的动作名(提交审批 / 审核),两处文案同源、只差一个词
+     */
+    public void assertRowAnchors(String panelCode, String no, String action) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        // 与审核同源:先尽力补一次行号(按 gd_id / 工单号+批次号 唯一命中才补,补不到不猜)
+        stampRowNo(panelCode, no);
+        for (Map<String, Object> r : rows(no)) {
+            if (anchorRowId(r) == null) {
+                throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能" + action);
+            }
+        }
     }
 
     /** 审核 → 本单 scjl 行 wgzt='Y'+wgsj,补 jc_no 与排产镜像。 */
@@ -148,24 +210,9 @@ public class WoReportService {
         //   ① 本单已带 gd_id(=plang_pc.id,重审/再报时)→ plang_pc.plang_id
         //   ② 本单带 工单行号(scjl.工单行号,界面可见)→ (工单号 + 行号) 定位该行
         //   ⚠ 优先取 ①:gd_id 是排产行级别的精确锚,行号可能对应多个物理行。
-        Long wantRowId = null;
-        double ownGd = num(r.get("gd_id"));
-        if (ownGd > 0) {
-            List<Long> rr = jdbc.queryForList(
-                    "SELECT TOP 1 pc.plang_id FROM dbo.plang_pc pc"
-                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                            + " WHERE pc.id=?", Long.class, (long) ownGd);
-            if (!rr.isEmpty()) wantRowId = rr.get(0);
-        }
-        if (wantRowId == null && r.get("own_xc") != null) {
-            List<Long> rr = jdbc.queryForList(
-                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=?"
-                            + " AND ISNULL(asp_cancel,'N')<>'Y'"
-                            + " AND (? = N'' OR ISNULL([批次号],N'') = ?)"
-                            + " ORDER BY id", Long.class, wo, ((Number) r.get("own_xc")).intValue(),
-                    rptBatch, rptBatch);
-            if (rr.size() == 1) wantRowId = rr.get(0);   // 恰命中 1 行才认,多行不猜(退回批次/FIFO)
-        }
+        //   ⚠ 2026-11-01:判据抽到 {@link #anchorRowId},与「提交审批」前置校验共用同一份
+        //     (用户口径「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」)。
+        Long wantRowId = anchorRowId(r);
         // ── 工序报工必须跟随工单的**工艺路线**(2026-10-05 用户口径:报工按当前工单路线执行,选错工序会报错)──
         //   ① 报工的工序必须在 plang.工艺路线 的工序明细内;
         //   ② 不得跳序:路线中排在该工序之前的工序若尚无**已审核**报工 → 拦截(提示先报前道)。

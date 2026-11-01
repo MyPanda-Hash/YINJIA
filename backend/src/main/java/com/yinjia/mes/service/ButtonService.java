@@ -2411,6 +2411,12 @@ public class ButtonService {
         // 修改态(文件类:申请修改经管理员审批通过)同样可提交审批,通过后 finalizeModify 再归档
         if (!"草稿".equals(st.get("status")) && !"修改中".equals(st.get("status")))
             throw new IllegalStateException("仅草稿或修改中状态可提交审批");
+        // 工序报工单:行锚点校验前移到**提交审批**(2026-11-01 用户口径:
+        //   「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」)。
+        //   行锚点(工单号+工单行号 / gd_id)是编制环节该填对的数据;原实现只在审核(complete)
+        //   校验 ⇒ 审批人点「审批通过」才被拦(截图:「报工缺少唯一工单行锚点…不能审核」),
+        //   还得先驳回才能回草稿改。判据与审核共用 WoReportService.anchorRowId,不放宽只前移。
+        woReport.assertRowAnchors(def.code(), no, "提交审批");
         String operator = currentUserName();
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
