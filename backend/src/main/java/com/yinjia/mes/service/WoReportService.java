@@ -81,14 +81,32 @@ public class WoReportService {
      * (见 WorkOrderDayPlanService.actualByDate)⇒ 这张单已审核了,日期格上却查不到实际值
      * (实测 BG-2026-11-0001:wgsj=2026-11-01,wgzt=Y,sc_date=NULL ⇒ 11-01 格只有计划 2)。
      *
-     * <p>口径:只在**为空**时补,已填的日期(含补录历史单)一律不动;日期取**应用本地日期**
+     * <p>口径:只在**为空**时补,已填的日期一律不动;日期取**应用本地日期**
      * (与 wgsj 同一把墙钟 —— SQL Server 在 Docker 里是 UTC,不能直接 GETDATE() 取日期)。
-     * 保存时补一次(草稿期就能看到日期),审核时再兜一次(历史草稿/外部直写单)。
+     * 草稿保存/审核(直审)时兜底;**提交审批那一刻**的正式取值见 {@link #stampSubmitDate}。
      */
     public void stampDocDate(String panelCode, String no) {
         if (!posts(panelCode) || no == null || no.isBlank()) return;
         jdbc.update("UPDATE dbo.scjl SET sc_date = ? WHERE [报工单号]=? AND sc_date IS NULL"
                         + " AND ISNULL(asp_cancel,'N')<>'Y'",
+                java.sql.Date.valueOf(java.time.LocalDate.now()), no);
+    }
+
+    /**
+     * **提交审批**时自动生成单据日期(2026-11-01 用户口径:
+     * 「当前工序报工的单据日期应该在提交审批的时候自动生成」)。
+     *
+     * <p>为什么在提交审批这一步**覆盖写**而不是只补空:单据日期 = 这张报工单实际送审的日期,
+     * 是报工事实的一部分(排产看板日期列、「完工明细/报工记录」都按它归日)。草稿可能存几天
+     * 才送审(或先存草稿再改数量),保存时的日期不是报工日 ⇒ 送审这一刻以**提交当天**为准。
+     * 取应用本地日期(与 wgsj 同一把墙钟,不用 GETDATE —— Docker 里库是 UTC)。
+     *
+     * <p>审核/审批通过不再改它(core field 已定稿):{@link #post} 只在为空时兜底,
+     * 正常流程(提交审批 → 审批通过)日期保持提交日不变。
+     */
+    public void stampSubmitDate(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        jdbc.update("UPDATE dbo.scjl SET sc_date = ? WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'",
                 java.sql.Date.valueOf(java.time.LocalDate.now()), no);
     }
 

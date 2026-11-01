@@ -2420,6 +2420,10 @@ public class ButtonService {
         //   工单存在·未结案·已排产),见 WoReportService.validateRow。原实现只在审核(审批通过)才跑
         //   ⇒ 编制者带坏数据提交,审批人点「审批通过」才被拦,还得先驳回回草稿改。
         woReport.validateBeforeSubmit(def.code(), no);
+        // 工序报工单:单据日期在**提交审批这一刻**自动生成(= 提交当天,覆盖草稿期日期)
+        //   2026-11-01 用户口径「当前工序报工的单据日期应该在提交审批的时候自动生成」。
+        //   排产看板日期列/完工明细都按它归日,草稿存放几天再送审时以送审日为准。
+        woReport.stampSubmitDate(def.code(), no);
         String operator = currentUserName();
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
