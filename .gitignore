@@ -216,3 +216,6 @@ _scratch/
 # 属业务数据,与「参考（不上传仓库）/」同一约定:不入库、不上传。
 # ⚠ 历史上已入库的那一个 xlsx 保持原样(已跟踪文件不受本规则影响,不会被动删)。
 /backend/uploads/attachments/
+
+# 打印代理 -Mode Pdf 的输出目录(生成物,不入库)
+tools/printing/print-out/

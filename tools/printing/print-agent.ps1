@@ -45,14 +45,26 @@ param(
     [switch]$Install,
     [switch]$Uninstall,
     [int]$Port = 18777,
-    [string]$Printer = ''
+    [string]$Printer = '',
+    # 出纸方式(2026-11-01 加):
+    #   Printer = 调系统打印机真出纸(默认,现场有打印机时用这个);
+    #   Pdf     = **不碰打印机**,把同样版式的标签输出成一个 PDF 文件(暂时没打印机时用)。
+    # 两个模式打印**同一套版式**(同一个 Send-LabelToPrinter),所以有打印机后
+    # 只要把 -Mode 换回 Printer 重启代理,版式不用重调。
+    [ValidateSet('Printer', 'Pdf')]
+    [string]$Mode = 'Printer',
+    # PDF 输出目录(仅 -Mode Pdf 用);空 = 脚本同级 print-out\
+    [string]$PdfDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
-$AgentVersion = '1.0.0'
+$AgentVersion = '1.1.0'
 $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $RunName = 'YinjiaMesPrintAgent'
 $ScriptPath = $PSCommandPath
+
+# PDF 输出目录:默认放在脚本同级的 print-out\(不污染仓库根)
+if (-not $PdfDir) { $PdfDir = Join-Path (Split-Path -Parent $ScriptPath) 'print-out' }
 
 # ── 自启注册 / 注销 ────────────────────────────────────────────────
 if ($Uninstall) {
@@ -65,7 +77,7 @@ if ($Uninstall) {
 }
 
 if ($Install) {
-    $cmd = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Port $Port"
+    $cmd = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Port $Port -Mode $Mode"
     # ⚠ 只在**不存在**时创建:对已存在的注册表键用 `New-Item -Force` 会抛
     #   「The data area passed to a system call is too small」(2026-11-01 实测踩到,
     #   直接导致 -Install 整个失败、代理也没起来)。Run 键几乎必然存在,所以这里基本不建。
@@ -103,7 +115,9 @@ function Send-LabelToPrinter {
         [string]$ProductName,
         [string]$Spec,
         [string]$QrText,
-        [string]$PrinterName
+        [string]$PrinterName,
+        # 非空 = 不走打印机,改用 "Microsoft Print to PDF" 静默落成这个 PDF 文件(2026-11-01)
+        [string]$PdfPath = ''
     )
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 
@@ -125,9 +139,24 @@ function Send-LabelToPrinter {
     )
 
     $doc = New-Object System.Drawing.Printing.PrintDocument
-    if ($PrinterName) { $doc.PrinterSettings.PrinterName = $PrinterName }
-    if (-not $doc.PrinterSettings.IsValid) {
-        throw "打印机不可用:[$PrinterName](检查打印机名称,或在网页里留空使用系统默认打印机)"
+
+    # ── PDF 模式(2026-11-01):不碰真打印机 ─────────────────────────────
+    # 借 Windows 自带的「Microsoft Print to PDF」虚拟打印机 + PrintToFile 把同一版式
+    # **静默**落成 PDF —— 不会弹"另存为"对话框(那是普通用户点打印才有的行为)。
+    # 关键三件:PrinterName 指向虚拟打印机、PrintToFile=$true、PrintFileName 给死路径。
+    if ($PdfPath) {
+        $pdfPrinter = 'Microsoft Print to PDF'
+        $doc.PrinterSettings.PrinterName = $pdfPrinter
+        if (-not $doc.PrinterSettings.IsValid) {
+            throw "找不到虚拟打印机「$pdfPrinter」:请在 Windows「打印机和传真」里启用它(系统自带,可能被关掉了)"
+        }
+        $doc.PrinterSettings.PrintToFile = $true
+        $doc.PrinterSettings.PrintFileName = $PdfPath
+    } else {
+        if ($PrinterName) { $doc.PrinterSettings.PrinterName = $PrinterName }
+        if (-not $doc.PrinterSettings.IsValid) {
+            throw "打印机不可用:[$PrinterName](检查打印机名称,或在网页里留空使用系统默认打印机)"
+        }
     }
     $doc.DocumentName = "YINJIA-MES $Title $WoNo"
     # StandardPrintController = 不显示进度对话框 ⇒ 真静默
@@ -172,9 +201,24 @@ function Invoke-PrintJob {
     if (-not $printerN) { $printerN = $Printer }
     if (-not $printerN) { $printerN = Get-SystemPrinterName }
 
+    # ── PDF 模式:不出纸,落成 PDF 文件 ──────────────────────────────
+    # 文件名用「工单号_行号_时间戳」:ASCII 安全(工单号本身是 GD-/LL- 这种),
+    # 不用中文/空格,免得到 Windows 路径或后续脚本里出转义问题。
+    if ($Mode -eq 'Pdf') {
+        if (-not (Test-Path $PdfDir)) { New-Item -ItemType Directory -Path $PdfDir -Force | Out-Null }
+        $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
+        $safeWo = ($woNo -replace '[^\w\-\.]', '_')
+        if (-not $safeWo) { $safeWo = 'label' }
+        $name = "$safeWo" + "_L$woLine" + "_$stamp.pdf"
+        $pdfPath = Join-Path $PdfDir $name
+        Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
+                            -Spec $spec -QrText $qrText -PdfPath $pdfPath
+        return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir }
+    }
+
     Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                         -Spec $spec -QrText $qrText -PrinterName $printerN
-    return @{ ok = $true; mode = 'text'; printer = $printerN }
+    return @{ ok = $true; mode = 'printer'; printer = $printerN }
 }
 
 function Write-JsonResponse {
@@ -230,7 +274,8 @@ try {
                 $res.StatusCode = 204
             }
             elseif ($req.HttpMethod -eq 'GET' -and $path -eq '/health') {
-                Write-JsonResponse $res @{ ok = $true; version = $AgentVersion; printer = $effective }
+                # mode 让网页知道这台代理现在是"真出纸"还是"落 PDF"
+                Write-JsonResponse $res @{ ok = $true; version = $AgentVersion; mode = $Mode; printer = $effective; pdfDir = $PdfDir }
             }
             elseif ($req.HttpMethod -eq 'POST' -and $path -eq '/print') {
                 $reader = New-Object System.IO.StreamReader($req.InputStream, [System.Text.Encoding]::UTF8)
@@ -238,8 +283,12 @@ try {
                 $reader.Close()
                 $job = $raw | ConvertFrom-Json
                 $r = Invoke-PrintJob -Job $job
-                Write-JsonResponse $res @{ ok = $true; mode = $r.mode; printer = $r.printer }
-                Write-Host "[打印] $($job.'工单号') #$($job.'工单行号') → $($r.printer)" -ForegroundColor Green
+                Write-JsonResponse $res @{ ok = $true; mode = $r.mode; printer = $r.printer; pdfPath = $r.pdfPath }
+                if ($r.mode -eq 'pdf') {
+                    Write-Host "[PDF ] $($job.'工单号') #$($job.'工单行号') -> $($r.pdfPath)" -ForegroundColor Cyan
+                } else {
+                    Write-Host "[打印] $($job.'工单号') #$($job.'工单行号') -> $($r.printer)" -ForegroundColor Green
+                }
             }
             elseif ($req.HttpMethod -eq 'POST' -and $path -eq '/test') {
                 $r = Invoke-PrintJob -Job ([pscustomobject]@{
@@ -250,8 +299,9 @@ try {
                     规格型号 = '75x100mm'
                     二维码内容 = '0@TEST-0001@1001'
                 })
-                Write-JsonResponse $res @{ ok = $true; mode = $r.mode; printer = $r.printer }
-                Write-Host '[测试] 已发送一张测试标签' -ForegroundColor Yellow
+                Write-JsonResponse $res @{ ok = $true; mode = $r.mode; printer = $r.printer; pdfPath = $r.pdfPath }
+                if ($r.mode -eq 'pdf') { Write-Host "[测试] 已生成测试 PDF: $($r.pdfPath)" -ForegroundColor Yellow }
+                else { Write-Host '[测试] 已发送一张测试标签' -ForegroundColor Yellow }
             }
             else {
                 Write-JsonResponse $res @{ ok = $false; error = 'not found' } 404

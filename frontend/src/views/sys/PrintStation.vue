@@ -86,14 +86,30 @@
         <span>{{ tt('打印代理') }}</span>
         <b :class="agentOk ? 'ok' : 'warn'">{{ agentOk ? tt('已连接') : tt('未连接') }}</b>
       </div>
+      <!-- 代理模式(2026-11-01):printer=真出纸 / pdf=只落 PDF 文件 -->
+      <div class="ps-kv">
+        <span>{{ tt('代理出纸方式') }}</span>
+        <b :class="agentMode === 'pdf' ? 'warn' : 'ok'">
+          {{ agentMode === 'pdf' ? tt('生成 PDF 文件(不出纸)') : tt('直接打印') }}
+        </b>
+      </div>
+      <div v-if="agentMode === 'pdf'" class="ps-kv">
+        <span>{{ tt('PDF 存放目录') }}</span>
+        <b class="mono">{{ agentPdfDir || '—' }}</b>
+      </div>
+      <div v-if="lastPdfPath" class="ps-kv">
+        <span>{{ tt('最近生成') }}</span>
+        <b class="mono">{{ lastPdfPath }}</b>
+      </div>
 
       <div class="ps-agent">
         <div class="ps-agent-title">{{ tt('本地打印代理') }}</div>
         <div class="ps-agent-body">
           <p>{{ tt('浏览器标准打印一定会弹出打印对话框,做不到「零点击」。真正的自动出纸需要本机代理程序:') }}</p>
           <ol>
-            <li>{{ tt('在这台电脑上运行 tools/printing/print-agent.ps1') }}</li>
-            <li>{{ tt('用 -Install 参数跑一次即可设为开机自启(需管理员)') }}</li>
+            <li>{{ tt('无打印机时:print-agent.ps1 -Mode Pdf(只生成 PDF 文件,不出纸)') }}</li>
+            <li>{{ tt('有打印机时:print-agent.ps1 -Mode Printer(直接打系统打印机)') }}</li>
+            <li>{{ tt('加 -Install 参数跑一次即可设为开机自启') }}</li>
             <li>{{ tt('开着本页,代理连上后状态会变成「已连接」') }}</li>
           </ol>
           <p class="ps-agent-note">
@@ -147,6 +163,15 @@ const printerName = ref(localStorage.getItem(LS_PRINTER) || '')
 const queueSize = ref(0)
 const state = ref({})
 const agentOk = ref(false)
+/**
+ * 最近一次生成的 PDF 路径(2026-11-01)。
+ * 代理跑在 -Mode Pdf 时不出纸、只落文件,这里把路径显出来,现场才知道去哪儿拿。
+ */
+const lastPdfPath = ref('')
+/** 代理的出纸方式:printer=真出纸 / pdf=只落 PDF(来自代理 /health) */
+const agentMode = ref('printer')
+/** 代理的 PDF 输出目录(来自代理 /health) */
+const agentPdfDir = ref('')
 const recent = ref([])
 const errText = ref('')
 const savingCfg = ref(false)
@@ -206,13 +231,23 @@ async function loopOnce() {
 }
 
 /**
- * 探本地代理:连得上 = 真正的静默打印可用。
+ * 探本地代理:连得上 = 真正的静默输出可用。
  * 探测失败不弹错(大多数电脑上还没装,属于常态)。
+ *
+ * 2026-11-01:同时读回代理的**出纸方式**(printer/pdf)与 PDF 目录 ——
+ * 没打印机时跑 -Mode Pdf,页面要能一眼看出"现在是落文件、不是出纸"。
  */
 async function probeAgent() {
   try {
     const r = await fetch(AGENT_URL, { method: 'GET', cache: 'no-store' })
     agentOk.value = r.ok
+    if (r.ok) {
+      try {
+        const j = await r.json()
+        agentMode.value = String(j?.mode || '').toLowerCase() === 'pdf' ? 'pdf' : 'printer'
+        agentPdfDir.value = String(j?.pdfDir || '')
+      } catch { /* 老版本代理没有这些字段 */ }
+    }
   } catch {
     agentOk.value = false
   }
@@ -228,8 +263,19 @@ async function runTask(task) {
         body: JSON.stringify({ ...task, printer: printerName.value || '' }),
       })
       if (!r.ok) throw new Error(`代理返回 ${r.status}`)
+      // 代理可能处于两种模式(2026-11-01):
+      //   printer = 真出纸;pdf = 落一个 PDF 文件(暂时没打印机时用)。
+      // 文案要能看出来,否则现场会以为"打了但没出纸"。
+      let payload = {}
+      try { payload = await r.json() } catch { /* 老版本代理不返回 JSON 体 */ }
       await ackTask({ taskId: task.id, ok: true, printer: printerName.value, ...pickAck(task) })
-      pushRecent(task, '已出纸')
+      if (payload && payload.mode === 'pdf') {
+        const name = String(payload.pdfPath || '').split(/[\\/]/).pop() || 'PDF'
+        lastPdfPath.value = payload.pdfPath || ''
+        pushRecent(task, tt('已生成 PDF') + ':' + name)
+      } else {
+        pushRecent(task, tt('已出纸'))
+      }
       return
     } catch (e) {
       // 代理中途挂了 ⇒ 降级
