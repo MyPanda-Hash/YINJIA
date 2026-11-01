@@ -1,5 +1,6 @@
 import java.math.BigDecimal;
 import java.sql.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -24,13 +25,14 @@ import java.util.*;
  */
 public class QcRegen {
 
-    static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=15";
-    static final String USER = "yinjia";
-    static final String PASS = System.getenv().getOrDefault("YINJIA_SQL_PASS", "Yinjia@2026");
+    static final String URL = env("YINJIA_SQL_URL",
+            "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=15");
+    static final String USER = env("YINJIA_SQL_USER", "yinjia");
+    static final String PASS = env("YINJIA_SQL_PASS", "Yinjia@2026");
 
     static final String REVIEWER = "冯敏";
-    static final String NY = "2026-10";
-    static final String BATCH_DATE = "2026-10-21";
+    static final String NY = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+    static final String BATCH_DATE = LocalDate.now().toString();
 
     static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -40,6 +42,11 @@ public class QcRegen {
                 long lineId, String materialCode, String materialName, String spec, String desc,
                 BigDecimal qty, BigDecimal price, String unit, String orderLine, String lineBatch,
                 String remark, String category) {}
+
+    static String env(String k, String def) {
+        String v = System.getenv(k);
+        return v == null || v.isBlank() ? def : v.trim();
+    }
 
     public static void main(String[] args) throws Exception {
         boolean apply = Arrays.asList(args).contains("--apply");

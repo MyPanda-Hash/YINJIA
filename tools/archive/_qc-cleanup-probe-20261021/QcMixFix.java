@@ -26,24 +26,25 @@ import java.util.*;
  */
 public class QcMixFix {
 
-    static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=15";
-    static final String USER = "yinjia";
-    static final String PASS = System.getenv().getOrDefault("YINJIA_SQL_PASS", "Yinjia@2026");
+    static final String URL = env("YINJIA_SQL_URL",
+            "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=15");
+    static final String USER = env("YINJIA_SQL_USER", "yinjia");
+    static final String PASS = env("YINJIA_SQL_PASS", "Yinjia@2026");
     static final String REVIEWER = "冯敏";
     static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /** 判不合格的 (检验单号, 物料编码)；其余 11 行判合格。 */
-    static final Set<String> FAIL = Set.of(
-            "IJ-2026-10-0205|YJ-XH-002",
-            "IJ-2026-10-0208|YJ-YKRS-009",
-            "IJ-2026-10-0211|YJ-XH-002",
-            "IJ-2026-10-0214|YJ-YPS-002",
-            "IJ-2026-10-0216|Y-S-Z");
+    /** 运行时按物料配额选出的不合格行（检验单号|物料编码）。 */
+    static Set<String> FAIL = Set.of();
 
     record Insp(String no, String date) {}
     record Det(long id, String inspNo, String date, String materialCode, String materialName,
                String spec, String desc, BigDecimal qty, BigDecimal price, String unit,
                String orderLine, String batch, Integer batchId, String category, String supplier) {}
+
+    static String env(String k, String def) {
+        String v = System.getenv(k);
+        return v == null || v.isBlank() ? def : v.trim();
+    }
 
     public static void main(String[] args) throws Exception {
         boolean apply = Arrays.asList(args).contains("--apply");
@@ -62,9 +63,10 @@ public class QcMixFix {
     static void run(Connection c, boolean apply) throws Exception {
         List<Insp> insps = loadInsps(c);
         List<Det> dets = loadDets(c);
-        if (insps.size() != 12 || dets.size() != 16) {
-            throw new IllegalStateException("当前数据不是预期 12 张检验单/16 行，实际 " + insps.size() + "/" + dets.size());
+        if (insps.isEmpty() || dets.isEmpty()) {
+            throw new IllegalStateException("当前没有可处理的检验单/明细；请先执行 QcRegen --apply");
         }
+        FAIL = chooseFails(dets);
         long pass = dets.stream().filter(d -> !isFail(d)).count();
         long fail = dets.size() - pass;
         System.out.println("[plan] 检验单=" + insps.size() + " 明细=" + dets.size()
@@ -185,6 +187,30 @@ public class QcMixFix {
 
         System.out.println("[returns] 保留并审批 " + kept + " 张，删除 " + deleted + " 张");
         verify(c, (int) pass, (int) fail, kept);
+    }
+
+    static Set<String> chooseFails(List<Det> dets) {
+        // 物料配额：优先让真实业务里更容易出问题的物料承担不合格，且总不合格行数不超过 5。
+        Map<String, Integer> quota = new LinkedHashMap<>();
+        quota.put("YJ-XH-002", 2);
+        quota.put("YJ-YKRS-009", 1);
+        quota.put("YJ-YPS-002", 1);
+        quota.put("Y-S-Z", 1);
+        Set<String> fail = new LinkedHashSet<>();
+        int target = Math.min(5, dets.size());
+        for (Det d : dets) {
+            int q = quota.getOrDefault(d.materialCode, 0);
+            if (q > 0 && fail.size() < target) {
+                fail.add(d.inspNo + "|" + d.materialCode);
+                quota.put(d.materialCode, q - 1);
+            }
+        }
+        // 物料不齐时按顺序补足，保证至少有 1 行不合格、总行数可控。
+        for (Det d : dets) {
+            if (fail.size() >= target) break;
+            fail.add(d.inspNo + "|" + d.materialCode);
+        }
+        return fail;
     }
 
     static boolean isFail(Det d) { return FAIL.contains(d.inspNo + "|" + d.materialCode); }
