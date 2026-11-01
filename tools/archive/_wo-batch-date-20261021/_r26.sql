@@ -1,0 +1,21 @@
+SET NOCOUNT ON;
+SELECT N'scjl.gldh 09' k, COUNT(*) n FROM dbo.scjl WHERE gldh LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'scjl.gldh 10', COUNT(*) FROM dbo.scjl WHERE gldh LIKE N'GD-2026-10-%'
+UNION ALL SELECT N'scjl.tm 09', COUNT(*) FROM dbo.scjl WHERE tm LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'wo_progress 09', COUNT(*) FROM dbo.wo_progress WHERE [单据编号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'wo_progress 10', COUNT(*) FROM dbo.wo_progress WHERE [单据编号] LIKE N'GD-2026-10-%'
+UNION ALL SELECT N'qc_first 09', COUNT(*) FROM dbo.qc_first_insp_head WHERE [工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'qc_proc 09', COUNT(*) FROM dbo.qc_proc_insp_head WHERE [工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'qc_asm 09', COUNT(*) FROM dbo.qc_asm_insp_head WHERE [工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'finish_in 09', COUNT(*) FROM dbo.bd_finish_in WHERE [加工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'material_out 09', COUNT(*) FROM dbo.bd_material_out WHERE [加工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'material_out_src 09', COUNT(*) FROM dbo.bd_material_out WHERE [来源单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'bl_material_out 09', COUNT(*) FROM dbo.bl_material_out WHERE [加工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'plang_pc 09', COUNT(*) FROM dbo.plang_pc WHERE pl_no LIKE N'GD-2026-09-%'
+UNION ALL SELECT N's_allno 09', COUNT(*) FROM dbo.s_allno WHERE dh LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'form_flow target 09', COUNT(*) FROM dbo.form_flow_link WHERE target_form_no LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'form_flow source 09', COUNT(*) FROM dbo.form_flow_link WHERE source_form_no LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'usage_log 09', COUNT(*) FROM dbo.yj_usage_log WHERE doc_no LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'wo_process_line 09', COUNT(*) FROM dbo.wo_process_line WHERE [工单号] LIKE N'GD-2026-09-%'
+UNION ALL SELECT N'wo_transfer_log 09', COUNT(*) FROM dbo.wo_transfer_log WHERE pl_no LIKE N'GD-2026-09-%';
+GO
