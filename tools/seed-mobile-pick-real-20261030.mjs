@@ -1,4 +1,4 @@
-﻿/**
+/**
  * seed-mobile-pick-real-20261030.mjs — 走**真实流程**生成各环节测试数据
  *
  * 用户口径(2026-10-30 最终版):
@@ -40,6 +40,13 @@ const MAX_QTY = Number(process.env.YJ_MAXQTY || 30000)
 
 const MODE_PLAN = process.argv.includes('--plan')
 const MODE_RUN = process.argv.includes('--run')
+/**
+ * 只造工单、不生单(--orders-only)。
+ *
+ * 结转 + 排产后就停,留给人工去「生成工单领料/退料单」里自己点生成。
+ * 用途:要测"生成领料单"这一步时,需要一批**还没有领料单**的工单。
+ */
+const MODE_ORDERS_ONLY = process.argv.includes('--orders-only')
 
 const STAGES = [
   { key: 'G1', label: '已开单未领', steps: ['create'] },
@@ -121,11 +128,28 @@ async function plan() {
       // ⚠ 必须用普通字符串拼接,不要用模板字符串:
       //   本文件曾被 PowerShell 双引号展开改坏过一次,模板里的 ${x.code} 被当成变量求值成空,
       //   结果 SQL 里写进去一排 (N''),建 BOM 时全部指向空产品。
-      const vals = list.map((x) => "  (N'" + x.code + "')").join(',\n')
-      const patched = sql.replace(/\(N'__PLACEHOLDER__'\)|\n  \(N'[^']*'\)(?:,\n  \(N'[^']*'\))*;/, vals + ';')
-      if (patched !== sql) {
-        writeFileSync(sqlPath, patched, 'utf8')
-        console.log('       已同步写入 SQL 的产品清单区')
+      //
+      // 🔴 用**按行定位**替换,不要用多行正则:
+      //   正则版在 CRLF 文件上屡次只吃掉第一行、把几十个旧产品原样留下,
+      //   导致 #plan 出现重复键(实测报「违反了 PRIMARY KEY 约束」)。
+      //   按行找 `INSERT INTO #plan (dm) VALUES` → 往下找到以 `;` 结尾的行为止,整段换掉。
+      const vals = list.map((x) => "  (N'" + x.code + "')")
+      const srcLines = sql.split(/\r?\n/)
+      const headIdx = srcLines.findIndex((l) => /INSERT INTO #plan\s*\(dm\)\s*VALUES/i.test(l))
+      let changed = false
+      if (headIdx >= 0) {
+        let tailIdx = headIdx + 1
+        while (tailIdx < srcLines.length && !/;\s*$/.test(srcLines[tailIdx])) tailIdx++
+        if (tailIdx < srcLines.length) {
+          const body = vals.map((v, i) => (i < vals.length - 1 ? v + ',' : v + ';'))
+          srcLines.splice(headIdx + 1, tailIdx - headIdx, ...body)
+          sql = srcLines.join('\r\n')
+          changed = true
+        }
+      }
+      if (changed) {
+        writeFileSync(sqlPath, sql, 'utf8')
+        console.log(`       已同步写入 SQL 的产品清单区(${vals.length} 个产品)`)
       } else {
         console.log('       ⚠ SQL 里没找到清单占位区,请手工核对')
       }
@@ -147,6 +171,7 @@ function readPlan() {
 
 /** ② 推各个环节 */
 async function run() {
+  const ORDERS_ONLY = MODE_ORDERS_ONLY
   const products = readPlan()
   console.log(`[目标] ${BASE}  工厂=${FACTORY}  产线=${PROD_LINE}`)
   console.log(`[清单] ${products.length} 个产品(来自 ${PLAN_FILE})`)
@@ -160,8 +185,12 @@ async function run() {
    *   订单结转支持「生单数量 < 剩余数量」分次转 ⇒ 把每条订单行**拆成 4 份**,
    *   每环节用一份。这样才能用有限的真实订单铺满 4 个环节,而不是第一节就把额度用光。
    *   (实测:只按整条转 ⇒ 42 条订单行只够 G1 的 40 张,G2~G4 全跳过。)
+   *
+   * ⚠ --orders-only 只跑一轮(每产品 1 张工单),所以拆分份数要按**实际要跑的轮数**算,
+   *   否则每张工单只拿到 1/4 数量,白浪费订单额度。
    */
-  const SPLIT = STAGES.length
+  const stagesToRun = ORDERS_ONLY ? [STAGES[0]] : STAGES
+  const SPLIT = stagesToRun.length
   const poolByCode = new Map()
   for (const r of rows) {
     const code = String(r.物料编码 || '').trim()
@@ -179,7 +208,7 @@ async function run() {
   console.log(`[池] 可用工单名额 ${total} 个(每条订单行拆 ${SPLIT} 份),覆盖 ${poolByCode.size}/${products.length} 个产品`)
 
   const stat = { ok: 0, fail: 0 }
-  for (const stage of STAGES) {
+  for (const stage of stagesToRun) {
     console.log(`\n══ ${stage.key} · ${stage.label} ═══`)
     for (const code of products) {
       const slot = (poolByCode.get(code) || []).shift()
@@ -212,6 +241,15 @@ async function run() {
         must(await call('POST', '/api/px/scheduleBoard/assign', {
           rows: [{ 加工单号: woNo, 生产线: PROD_LINE }],
         }, token), '排产')
+
+        // ---- --orders-only:到这里就结束,不生单 ----
+        // 用户要测的是"生成领料单"这一步,得留下一批**还没开单**的工单。
+        if (ORDERS_ONLY) {
+          stat.ok++
+          console.log(`  ✓ 工单 ${woNo}#${line}  ${code}  已排产·未开单`)
+          await sleep(120)
+          continue
+        }
 
         // ④ 生单(明细数量 = BOM 单件用量 × 工单数量)
         const gen = must(await call('POST', '/api/px/mobilePick/create/batch',
@@ -286,11 +324,12 @@ async function run() {
 
 if (MODE_PLAN) {
   plan().catch((e) => { console.error('[FATAL] ' + e.message); process.exit(1) })
-} else if (MODE_RUN) {
+} else if (MODE_RUN || MODE_ORDERS_ONLY) {
   run().catch((e) => { console.error('[FATAL] ' + e.message); process.exit(1) })
 } else {
   console.log('用法:')
-  console.log('  node tools/seed-mobile-pick-real-20261030.mjs --plan   选出产品清单')
+  console.log('  node tools/seed-mobile-pick-real-20261030.mjs --plan          选出产品清单')
   console.log('  跑 tools/seed-mobile-pick-real-20261030.sql 建 BOM')
-  console.log('  node tools/seed-mobile-pick-real-20261030.mjs --run    推各环节')
+  console.log('  node tools/seed-mobile-pick-real-20261030.mjs --orders-only   只造工单(结转+排产,不生单)')
+  console.log('  node tools/seed-mobile-pick-real-20261030.mjs --run           工单 + 推各环节')
 }
