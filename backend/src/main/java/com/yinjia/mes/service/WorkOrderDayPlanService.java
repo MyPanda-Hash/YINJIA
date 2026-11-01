@@ -165,7 +165,11 @@ public class WorkOrderDayPlanService {
             }
             row.put("人工指定", manualOut);
             row.put("超分配", DayPlanSpread.overAllocated(opCaps.getOrDefault(key, 0d), m));
+            // 排产区间(2026-11-01):前端用它给「区间外的日期格」画斜杠 ——
+            //   区间 = 开工日 → 计划完工日(与 DayPlanSpread 摊分的区间同一份来源);
+            //   为空 = 该端未定(前端就不在那一端画杠,历史单不受影响)。
             row.put("计划开工日期", r.start == null ? "" : r.start.toString());
+            row.put("计划完工日期", r.due == null ? "" : r.due.toString());
             rows.add(row);
         }
         out.put("行", rows);

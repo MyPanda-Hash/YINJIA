@@ -161,6 +161,10 @@
           <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
                            :controls="false" :min="0" class="dp-input" autofocus
                            @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
+          <!-- 区间外(开工日~计划完工日之外)且当天无计划/实报:画「/」——这一天不归本行排
+               (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
+          <span v-else-if="isOutCell(row, d)" class="dp-out"
+                :title="tt('不在本行排产区间(开工日~计划完工日)内')">/</span>
           <span v-else class="dp-plan" :class="{ manual: isManual(row, d), actual: dayCell(row, d).isActual }"
                 :title="dayTitle(row, d)" @click="startQtyEdit(row, d)">
             {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
@@ -274,7 +278,7 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
-import { qtyText, dayColState, isToday, dayCellQty } from '@/business/dayPlan'
+import { qtyText, dayColState, isToday, dayCellQty, isOutOfPlanRange } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
@@ -443,6 +447,14 @@ function overTitle(row) {
 function dayCell(row, d) {
   return dayCellQty((row.日计划 || {})[d], (row.日报工 || {})[d])
 }
+/** 本行排产区间(开工日~计划完工日)之外的空白格:画「/」(2026-11-01 用户口径,
+ *  例:开工日改成 11-02 后,11-01 那格要画 /)。有计划/实报/人工指定的格子照旧显示数字。 */
+function isOutCell(row, d) {
+  const p = Number((row.日计划 || {})[d] || 0)
+  const a = Number((row.日报工 || {})[d] || 0)
+  if (p > 0 || a > 0) return false
+  return isOutOfPlanRange(d, row.计划开工日期 || '', row.计划完工日期 || '')
+}
 /** 格 tooltip:计划 / 实报都摆出来,但不占版面 */
 function dayTitle(row, d) {
   const p = Number((row.日计划 || {})[d] || 0)
@@ -498,7 +510,9 @@ async function loadDayPlan() {
       if (p) {
         for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
           '7天需交付', '15天需交付', '大于15天需交付',
-          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计']) row[k] = p[k]
+          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计',
+          // 排产区间(画斜杠用):与后端摊分日计划同一份开工/完工日期
+          '计划开工日期', '计划完工日期']) row[k] = p[k]
       }
     }
   } catch (e) { err(e, '查询失败') }
@@ -880,6 +894,9 @@ onActivated(() => {
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
 /* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */
 .dp-plan.actual { color: #529b2e; }
+/* 2026-11-01:本行排产区间(开工日~计划完工日)之外的空白格画「/」——
+   一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
+.dp-out { color: #c0c4cc; font-weight: 400; line-height: 1.2; user-select: none; }
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
 .dp-plan.manual { color: #b88230; }

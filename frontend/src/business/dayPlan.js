@@ -83,3 +83,44 @@ export function dayCellQty(plan, actual) {
   if (a > 0) return { qty: a, isActual: true }
   return { qty: p, isActual: false }
 }
+
+/**
+ * 日期格是否**落在本行排产区间之外**(2026-11-01 用户口径:
+ * 「如果改行的日期不再整个的排产中就要有斜杆在这个日期表下,就比如我修改最下面一条的开工日期为
+ *  11.02 号了,那么今日的那行就要画/」)。
+ *
+ * <p>区间 = **开工日 → 计划完工日**(与后端 `DayPlanSpread` 摊分用的区间同一份来源:
+ * `plang.st_date` / `plang.cp_date`)。落在区间外的那一格画「/」,表示"这一天不归本行排"。
+ *
+ * <p>两端**各自独立**判定:开工日为空(历史单常态)不在左端画杠;计划完工日为空不在右端画杠 ——
+ * 不拿"今天"去猜,免得老单满屏斜杠。
+ *
+ * <p>两个数据坑(2026-11-01 实测正式库):
+ * <ul>
+ *   <li><b>1900-01-01 哨兵</b>:老数据把"没填"写成 1900-01-01 ⇒ 当空处理,否则整行满屏斜杠;</li>
+ *   <li><b>完工日早于开工日</b>(录入反了,如 GD-2026-10-0202:10-11 → 10-10):与后端
+ *       {@code DayPlanSpread} 同口径收成单日窗口(终点 = 开工日),不然整行区间为空、全被画杠。</li>
+ * </ul>
+ *
+ * <p>⚠ 只有"空着的格子"才画杠:有日计划 / 有已审报工 / 有「手」人工指定的格子永远显示数字
+ * (那些是真实的排产事实,哪怕落在区间外);调用方先判有值再调本函数。
+ *
+ * @param {string} date  列头日期(yyyy-MM-dd)
+ * @param {string} start 本行计划开工日期(可空)
+ * @param {string} due   本行计划完工日期(可空)
+ * @returns {boolean} true = 不在区间内(该画斜杠)
+ */
+export function isOutOfPlanRange(date, start, due) {
+  const norm = (s) => {
+    const t = String(s == null ? '' : s).slice(0, 10)
+    return !t || t < '1900-01-02' ? '' : t   // 1900-01-01 = 老数据"没填"
+  }
+  const d = norm(date)
+  if (!d) return false
+  const s = norm(start)
+  let e = norm(due)
+  if (s && e && e < s) e = s                // 完工日早于开工日 ⇒ 与摊分一致:单日窗口
+  if (s && d < s) return true
+  if (e && d > e) return true
+  return false
+}
