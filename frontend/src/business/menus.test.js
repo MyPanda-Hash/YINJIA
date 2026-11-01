@@ -426,7 +426,7 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
  * 菜单侧只挂出其中一部分(库存状况 STOCK_STATUS / 往来单位 PARTNER 早在 2026-09-17 就下线;
  * 客户分组 CUSGRP / 物料分组 MATGRP / 供应商分组 SUPGRP / 检验项目 QC_ITEM / 检验计划 QC_PLAN /
  * 烧结公差 RD_SINTER_TOL 与明细面板 ERPLG_ROW 本就没有菜单项),
- * 故 27 = 字段管理 + 数据字典 + 迁来的 25 张。
+ * 故 28 = 字段管理 + 数据字典 + 迁来的 25 张 + 组装物料清单(2026-10-30 新增,挂「生产」组)。
  * ⚠ 「ERP导入日志 ERPLG」已按 2026-10-18 后续口径迁到一级目录「ERP系统集成」,不再计入数据建模。
  */
 test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每张只挂一次)', () => {
@@ -444,13 +444,37 @@ test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每
   for (const code of moved) {
     assert.ok(dmCodes.includes(code), `系统管理平台迁来的面板 ${code} 应在数据建模下`)
   }
-  assert.equal(dmCodes.length, 27, `数据建模应有 27 张面板入口,实际 ${dmCodes.length}`)
-  assert.equal(new Set(dmCodes).size, 27, '数据建模内不应有重复面板')
+  assert.equal(dmCodes.length, 28, `数据建模应有 28 张面板入口,实际 ${dmCodes.length}`)
+  assert.equal(new Set(dmCodes).size, 28, '数据建模内不应有重复面板')
   // 2026-10-20:设备维护整组搬进系统管理平台 ⇒ base 下允许 EQUIP_CHECK / MAINT_PLAN 两张,
   //   基础资料那 32 张仍不许回来
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
   assert.deepEqual([...new Set(baseCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'],
     '系统管理平台只应挂设备维护两张(2026-10-20 迁入)')
+})
+
+/**
+ * 2026-10-30 用户口径:「组装物料清单需要单独分出来放在数据建模中生产部分」。
+ * 落点 = 数据建模(dm) → 生产(bprod) 组,面板码 ASM_BOM,地址 /panelx/list/ASM_BOM;
+ * 全树只挂一次(不许在基础档案/WMS 里再挂一份),否则同一张单会出现两个入口。
+ */
+test('组装物料清单 ASM_BOM 挂在「数据建模 → 生产」且全树只挂一次', () => {
+  const dm = menuTree.find((n) => n.code === 'dm')
+  const prod = (dm.children || []).find((n) => n.code === 'bprod')
+  assert.ok(prod, '数据建模下应有「生产」分组')
+  const leaf = (prod.children || []).find((c) => c.panelCode === 'ASM_BOM')
+  assert.ok(leaf, '「生产」组下应有组装物料清单 ASM_BOM')
+  assert.equal(leaf.path, '/panelx/list/ASM_BOM')
+  assert.equal(leaf.title, '组装物料清单')
+  const acc = []
+  const walk = (n) => {
+    if (Array.isArray(n)) return n.forEach(walk)
+    if (!n || typeof n !== 'object') return
+    if (n.panelCode) acc.push(n.panelCode)
+    ;(n.children || []).forEach(walk)
+  }
+  walk(menuTree)
+  assert.equal(acc.filter((c) => c === 'ASM_BOM').length, 1, 'ASM_BOM 在菜单树里只应挂一次')
 })
 
 /**
