@@ -183,7 +183,11 @@ export async function refPanelName(field) {
 //   PanelConfigService 的定义是**明细列**（`fieldsAt("detail")`），而本弹窗的数据来自
 //   `queryFormDataList`，返回的是**单据头行**。两者不同源 ⇒ 每格都取不到值，弹窗整片空白
 //   （实测：产品信息表 2026-10-29 新增 BOM 明细列后，只剩前端造的「开发状态」有值）。
-//   判据统一收到 `@core/ref/refColumns` 的纯函数里（单测 5 条钉住优先级）。
+// ⚠ 2026-11-01 再修（用户报障「工序报工单的选择…只有备注列」）：上面那次把"优先表头字段"
+//   写成了无条件，但**档案(archive)面板**的 dataSchema 恒为规范占位「备注」，参照行却是
+//   明细展平行 ⇒ 所有档案参照（工序/职员/客户/商品…）弹窗只剩一列「备注」。判据因此按
+//   `metadata.singleDoc` 分流（单单据/档案取网格列，普通单据取表头），两处都在
+//   `@core/ref/refColumns` 的纯函数里（单测 9 条钉住优先级）。
 export async function refColumns(field) {
   const r = normRef(field)
   if (r.refColumns && r.refColumns.length) return r.refColumns
