@@ -51,8 +51,8 @@ param(
     #   Pdf     = **不碰打印机**,把同样版式的标签输出成一个 PDF 文件(暂时没打印机时用)。
     # 两个模式打印**同一套版式**(同一个 Send-LabelToPrinter),所以有打印机后
     # 只要把 -Mode 换回 Printer 重启代理,版式不用重调。
-    [ValidateSet('Printer', 'Pdf')]
-    [string]$Mode = 'Printer',
+    [ValidateSet('Auto', 'Printer', 'Pdf')]
+    [string]$Mode = 'Auto',
     # PDF 输出目录(仅 -Mode Pdf 用);空 = 脚本同级 print-out\
     [string]$PdfDir = ''
 )
@@ -101,6 +101,50 @@ function Get-SystemPrinterName {
 }
 
 <#
+ * 虚拟打印机名单:这些"打印机"其实不落纸(存文件/发传真),
+ * Auto 模式**绝不能**把它们当成"有打印机"—— 否则用户以为在出纸,实际弹了个保存对话框,
+ * 或者干脆静默存成文件、产线上什么都没有。
+#>
+$VirtualPrinterNames = @(
+    'Microsoft Print to PDF',
+    'Microsoft XPS Document Writer',
+    'OneNote',
+    'OneNote (Desktop)',
+    'Fax',
+    'Send To OneNote'
+)
+
+function Test-VirtualPrinter {
+    param([string]$Name)
+    if (-not $Name) { return $true }
+    foreach ($v in $VirtualPrinterNames) {
+        if ($Name -eq $v -or $Name -like "$v*") { return $true }
+    }
+    return $false
+}
+
+<#
+ * 找一台**能真出纸**的打印机(2026-11-01 Auto 模式用)。
+ *
+ * 优先系统默认(但必须是真机),否则按名字取第一台在线的真机。
+ * 返回值空 = 这台电脑没有可用打印机 ⇒ Auto 直接走 PDF 兜底。
+#>
+function Get-RealPrinterName {
+    param([string]$Prefer)
+    if ($Prefer -and -not (Test-VirtualPrinter $Prefer)) { return $Prefer }
+    $def = Get-SystemPrinterName
+    if ($def -and -not (Test-VirtualPrinter $def)) { return $def }
+    try {
+        $all = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop |
+               Where-Object { $_.WorkOffline -ne $true }
+        foreach ($p in $all) {
+            if (-not (Test-VirtualPrinter $p.Name)) { return $p.Name }
+        }
+    } catch { }
+    return ''
+}
+
+<#
   把一张工单标签送到打印机(**不弹任何对话框**)。
 
   用 System.Drawing.Printing —— .NET 自带能力,不需要装任何东西。
@@ -117,9 +161,28 @@ function Send-LabelToPrinter {
         [string]$QrText,
         [string]$PrinterName,
         # 非空 = 不走打印机,改用 "Microsoft Print to PDF" 静默落成这个 PDF 文件(2026-11-01)
-        [string]$PdfPath = ''
+        [string]$PdfPath = '',
+        # 二维码图的 dataURL(2026-11-01):前端用 qrcode 库生成好传上来,这里直接贴进标签。
+        # 空 = 不贴码(退回纯文字版,不让整张标签因为缺图而失败)。
+        [string]$QrImage = ''
     )
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+
+    # 把 dataURL 解成 Image 对象(只解一次,PrintPage 回调里复用)
+    $qrImg = $null
+    if ($QrImage) {
+        try {
+            $b64 = $QrImage
+            $comma = $b64.IndexOf(',')
+            if ($comma -ge 0) { $b64 = $b64.Substring($comma + 1) }
+            $bytes = [Convert]::FromBase64String($b64)
+            $ms = New-Object System.IO.MemoryStream(,$bytes)
+            $qrImg = [System.Drawing.Image]::FromStream($ms)
+        } catch {
+            Write-Host "[WARN] 二维码图解码失败,本轮只打文字: $($_.Exception.Message)" -ForegroundColor Yellow
+            $qrImg = $null
+        }
+    }
 
     # ⚠ 先算成变量:PowerShell 的 "…$(if (…) {"…"} else {…})…" 嵌套双引号极易被咬掉,
     #   实测报「字符串缺少终止符」。一律先赋值再插值。
@@ -163,11 +226,17 @@ function Send-LabelToPrinter {
     $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
 
     $script:labelLines = $lines
+    $script:labelQr = $qrImg
     $doc.add_PrintPage({
         param($sender, $e)
         $font     = New-Object System.Drawing.Font('Microsoft YaHei', 13)
         $fontBig  = New-Object System.Drawing.Font('Microsoft YaHei', 18, [System.Drawing.FontStyle]::Bold)
         $y = 50
+        # 有二维码就把它画在**右上角**(180x180),文字区相应收窄,
+        # 这样纵向空间不被吃掉,标签还是原来那么高。
+        if ($script:labelQr) {
+            $e.Graphics.DrawImage($script:labelQr, 360, 60, 180, 180)
+        }
         for ($i = 0; $i -lt $script:labelLines.Count; $i++) {
             $l = $script:labelLines[$i]
             $f = if ($i -eq 0) { $fontBig } else { $font }
@@ -178,6 +247,7 @@ function Send-LabelToPrinter {
         $fontBig.Dispose()
     })
     $doc.Print()
+    if ($qrImg) { $qrImg.Dispose() }
 }
 
 function Invoke-PrintJob {
@@ -189,6 +259,7 @@ function Invoke-PrintJob {
     $product  = [string]($Job.'产品名称')
     $spec     = [string]($Job.'规格型号')
     $qrText   = [string]($Job.'二维码内容')
+    $qrImage  = [string]($Job.'二维码图')
     $printerN = [string]($Job.'printer')
     if (-not $qrText) {
         if ($woNo) {
@@ -201,24 +272,54 @@ function Invoke-PrintJob {
     if (-not $printerN) { $printerN = $Printer }
     if (-not $printerN) { $printerN = Get-SystemPrinterName }
 
-    # ── PDF 模式:不出纸,落成 PDF 文件 ──────────────────────────────
-    # 文件名用「工单号_行号_时间戳」:ASCII 安全(工单号本身是 GD-/LL- 这种),
-    # 不用中文/空格,免得到 Windows 路径或后续脚本里出转义问题。
-    if ($Mode -eq 'Pdf') {
+    # 落 PDF 的公共动作(Printer 模式失败后也复用它做兜底)
+    $doPdf = {
         if (-not (Test-Path $PdfDir)) { New-Item -ItemType Directory -Path $PdfDir -Force | Out-Null }
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
         $safeWo = ($woNo -replace '[^\w\-\.]', '_')
         if (-not $safeWo) { $safeWo = 'label' }
         $name = "$safeWo" + "_L$woLine" + "_$stamp.pdf"
-        $pdfPath = Join-Path $PdfDir $name
+        $path = Join-Path $PdfDir $name
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
-                            -Spec $spec -QrText $qrText -PdfPath $pdfPath
+                            -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path
+        return $path
+    }
+
+    # ── Pdf 模式:不出纸,只落 PDF 文件 ──────────────────────────────
+    # 文件名用「工单号_行号_时间戳」:ASCII 安全(工单号本身是 GD-/LL- 这种),
+    # 不用中文/空格,免得到 Windows 路径或后续脚本里出转义问题。
+    if ($Mode -eq 'Pdf') {
+        $pdfPath = & $doPdf
         return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir }
     }
 
-    Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
-                        -Spec $spec -QrText $qrText -PrinterName $printerN
-    return @{ ok = $true; mode = 'printer'; printer = $printerN }
+    # ── Printer 模式:真出纸 ────────────────────────────────────────
+    if ($Mode -eq 'Printer') {
+        Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
+                            -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN
+        return @{ ok = $true; mode = 'printer'; printer = $printerN }
+    }
+
+    # ── Auto(默认):有**真打印机**就出纸,否则/失败就落 PDF 兜底 ──────────
+    # 用户口径(2026-11-01):「打印机和 pdf 可以实现切换(没链接打印机的话,pdf 是兜底)」。
+    # 判"能不能打"两条:① 排除虚拟打印机(PDF/XPS/OneNote/Fax,它们不落纸);
+    # ② 真打一次,失败(离线/缺纸/驱动报错)也降级 —— 现场不会"点了没反应"。
+    try {
+        $real = Get-RealPrinterName -Prefer $printerN
+        if (-not $real) {
+            Write-Host '[兜底] 本机没有可用打印机,改落 PDF' -ForegroundColor Yellow
+            $pdfPath = & $doPdf
+            return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir; fallback = 'no-printer' }
+        }
+        Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
+                            -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real
+        return @{ ok = $true; mode = 'printer'; printer = $real }
+    } catch {
+        $why = $_.Exception.Message
+        Write-Host "[兜底] 打印失败,改落 PDF:$why" -ForegroundColor Yellow
+        $pdfPath = & $doPdf
+        return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir; fallback = $why }
+    }
 }
 
 function Write-JsonResponse {
@@ -276,6 +377,35 @@ try {
             elseif ($req.HttpMethod -eq 'GET' -and $path -eq '/health') {
                 # mode 让网页知道这台代理现在是"真出纸"还是"落 PDF"
                 Write-JsonResponse $res @{ ok = $true; version = $AgentVersion; mode = $Mode; printer = $effective; pdfDir = $PdfDir }
+            }
+            elseif ($path -eq '/config') {
+                # 运行时配置(2026-11-01):让网页能改**出纸方式**和 **PDF 存放目录**,
+                # 不用去动命令行参数、也不用重启代理。改完立即生效,但**不写注册表** ——
+                # 开机自启仍按当初 -Install 时的那套参数,避免网页误改把自启搞乱。
+                if ($req.HttpMethod -eq 'GET') {
+                    Write-JsonResponse $res @{ ok = $true; mode = $Mode; pdfDir = $PdfDir; printer = $effective }
+                } else {
+                    $reader = New-Object System.IO.StreamReader($req.InputStream, [System.Text.Encoding]::UTF8)
+                    $raw = $reader.ReadToEnd()
+                    $reader.Close()
+                    $cfg = $raw | ConvertFrom-Json
+                    if ($cfg.PSObject.Properties.Name -contains 'mode') {
+                        $m = [string]$cfg.mode
+                        if ($m -in @('Auto', 'Printer', 'Pdf')) { $script:Mode = $m }
+                    }
+                    if ($cfg.PSObject.Properties.Name -contains 'pdfDir') {
+                        $d = [string]$cfg.pdfDir
+                        if ($d) {
+                            if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+                            $script:PdfDir = $d
+                        } else {
+                            # 传空 = 还原脚本默认目录(不能让"清空"变成"什么都不做",那样清不掉)
+                            $script:PdfDir = Join-Path (Split-Path -Parent $ScriptPath) 'print-out'
+                        }
+                    }
+                    Write-JsonResponse $res @{ ok = $true; mode = $Mode; pdfDir = $PdfDir; printer = $effective }
+                    Write-Host "[配置] mode=$Mode pdfDir=$PdfDir" -ForegroundColor Cyan
+                }
             }
             elseif ($req.HttpMethod -eq 'POST' -and $path -eq '/print') {
                 $reader = New-Object System.IO.StreamReader($req.InputStream, [System.Text.Encoding]::UTF8)

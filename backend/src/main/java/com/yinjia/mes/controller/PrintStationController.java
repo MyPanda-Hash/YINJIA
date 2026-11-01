@@ -79,12 +79,16 @@ public class PrintStationController {
 
     /** 一条打印任务(不可变;取走即出队) */
     private record PrintTask(long id, String 标题, String 二维码内容, String 工单号, int 工单行号,
-                             String 产品名称, String 规格型号, String 来源, String 发起人, String 时间) {
+                             String 产品名称, String 规格型号, String 来源, String 发起人, String 时间,
+                             // 二维码 PNG 的 dataURL(base64)。前端用 qrcode 库生成后随任务送上来,
+                             // 打印电脑直接贴进标签/PDF —— 代理是纯 PowerShell,自己画 QR 不现实。
+                             String 二维码图) {
         Map<String, Object> json() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", id);
             m.put("标题", 标题);
             m.put("二维码内容", 二维码内容);
+            m.put("二维码图", 二维码图);
             m.put("工单号", 工单号);
             m.put("工单行号", 工单行号);
             m.put("产品名称", 产品名称);
@@ -140,7 +144,8 @@ public class PrintStationController {
 
         PrintTask t = new PrintTask(SEQ.getAndIncrement(), str1(body.get("标题"), "生产领料单"),
                 qr, woNo, line, str(body.get("产品名称")), str(body.get("规格型号")),
-                str1(body.get("来源"), "mobile"), currentUserName(), LocalDateTime.now().format(TS));
+                str1(body.get("来源"), "mobile"), currentUserName(), LocalDateTime.now().format(TS),
+                str(body.get("二维码图")));
         QUEUE.add(t);
         // 上限保护:超了挤掉最旧的(内存安全;现场重打一次即可)
         while (QUEUE.size() > MAX_TASKS) QUEUE.poll();
@@ -193,7 +198,7 @@ public class PrintStationController {
         synchronized (DONE) {
             DONE.addFirst(new PrintTask(id, str(body.get("标题")), "", str(body.get("工单号")),
                     toInt(body.get("工单行号")), "", "", ok ? "已出纸" : "失败",
-                    str(body.get("发起人")), LocalDateTime.now().format(TS)));
+                    str(body.get("发起人")), LocalDateTime.now().format(TS), ""));
             while (DONE.size() > 20) DONE.removeLast();
         }
         return ApiResult.ok(null);

@@ -75,6 +75,41 @@
           @change="savePrinter"
         />
       </div>
+
+      <!-- 输出方式 / PDF 目录(2026-11-01):这两项改的是**代理的运行参数**,
+           不是本机 localStorage —— 因为真正决定"出纸还是落文件"的是代理。 -->
+      <div class="ps-row">
+        <div class="ps-row-main">
+          <div class="ps-row-title">{{ tt('输出方式') }}</div>
+          <div class="ps-row-sub">{{ tt('自动 = 有打印机就出纸,打不出来自动存 PDF') }}</div>
+        </div>
+        <el-select
+          v-model="modeSel"
+          class="ps-name"
+          size="large"
+          :disabled="!agentOk"
+          @change="saveAgentConfig"
+        >
+          <el-option value="Auto" :label="tt('自动(推荐)')" />
+          <el-option value="Printer" :label="tt('直接打印')" />
+          <el-option value="Pdf" :label="tt('只生成 PDF')" />
+        </el-select>
+      </div>
+
+      <div class="ps-row">
+        <div class="ps-row-main">
+          <div class="ps-row-title">{{ tt('PDF 存放目录') }}</div>
+          <div class="ps-row-sub">{{ tt('仅「自动/只生成 PDF」时使用;留空 = 代理默认 print-out') }}</div>
+        </div>
+        <el-input
+          v-model="pdfDirInput"
+          class="ps-name"
+          :placeholder="tt('如 D:\\MES-PDF')"
+          size="large"
+          :disabled="!agentOk"
+          @change="saveAgentConfig"
+        />
+      </div>
     </section>
 
     <!-- 连接状态 + 代理 -->
@@ -86,14 +121,14 @@
         <span>{{ tt('打印代理') }}</span>
         <b :class="agentOk ? 'ok' : 'warn'">{{ agentOk ? tt('已连接') : tt('未连接') }}</b>
       </div>
-      <!-- 代理模式(2026-11-01):printer=真出纸 / pdf=只落 PDF 文件 -->
+      <!-- 代理模式(2026-11-01):auto=有打印机就出纸/否则落PDF · printer=只出纸 · pdf=只落文件 -->
       <div class="ps-kv">
         <span>{{ tt('代理出纸方式') }}</span>
-        <b :class="agentMode === 'pdf' ? 'warn' : 'ok'">
-          {{ agentMode === 'pdf' ? tt('生成 PDF 文件(不出纸)') : tt('直接打印') }}
+        <b :class="agentMode === 'printer' ? 'ok' : 'warn'">
+          {{ agentMode === 'pdf' ? tt('只生成 PDF 文件') : (agentMode === 'auto' ? tt('自动(有打印机出纸,否则存 PDF)') : tt('直接打印')) }}
         </b>
       </div>
-      <div v-if="agentMode === 'pdf'" class="ps-kv">
+      <div v-if="agentMode !== 'printer'" class="ps-kv">
         <span>{{ tt('PDF 存放目录') }}</span>
         <b class="mono">{{ agentPdfDir || '—' }}</b>
       </div>
@@ -168,10 +203,16 @@ const agentOk = ref(false)
  * 代理跑在 -Mode Pdf 时不出纸、只落文件,这里把路径显出来,现场才知道去哪儿拿。
  */
 const lastPdfPath = ref('')
-/** 代理的出纸方式:printer=真出纸 / pdf=只落 PDF(来自代理 /health) */
+/** 代理的出纸方式:auto=自动兜底 / printer=直接打印 / pdf=只落 PDF(来自代理 /health) */
 const agentMode = ref('printer')
 /** 代理的 PDF 输出目录(来自代理 /health) */
 const agentPdfDir = ref('')
+/** 页面上选择的输出方式与 PDF 目录(保存时下发给代理,不存 localStorage) */
+const modeSel = ref('Auto')
+const pdfDirInput = ref('')
+/** 用户是否手工动过这两个控件 —— 动过就别在轮询时被代理值覆盖 */
+let modeSelTouched = false
+let pdfDirTouched = false
 const recent = ref([])
 const errText = ref('')
 const savingCfg = ref(false)
@@ -244,8 +285,12 @@ async function probeAgent() {
     if (r.ok) {
       try {
         const j = await r.json()
-        agentMode.value = String(j?.mode || '').toLowerCase() === 'pdf' ? 'pdf' : 'printer'
+        const m = String(j?.mode || '').toLowerCase()
+        agentMode.value = m === 'pdf' ? 'pdf' : (m === 'auto' ? 'auto' : 'printer')
         agentPdfDir.value = String(j?.pdfDir || '')
+        // 首次连上(或用户没动过)时,用代理的当前值回填页面控件
+        if (!modeSelTouched) modeSel.value = String(j?.mode || 'Auto')
+        if (!pdfDirTouched) pdfDirInput.value = agentPdfDir.value
       } catch { /* 老版本代理没有这些字段 */ }
     }
   } catch {
@@ -350,6 +395,35 @@ async function saveStationName() {
 function savePrinter() {
   localStorage.setItem(LS_PRINTER, printerName.value || '')
   ElMessage.success(tt('已保存到本机'))
+}
+
+/**
+ * 保存「输出方式 / PDF 目录」到**本地代理**(2026-11-01)。
+ *
+ * 为什么存代理而不是 localStorage:真正决定"出纸还是落文件、落到哪个目录"的是代理进程,
+ * 网页只是它的遥控器。存 localStorage 会造成"页面显示已改、实际没变"的假象。
+ * 代理没连上时这两项置灰 —— 改不了就别让人改。
+ */
+async function saveAgentConfig() {
+  if (!agentOk.value) return
+  modeSelTouched = true
+  pdfDirTouched = true
+  try {
+    const r = await fetch('http://127.0.0.1:18777/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: modeSel.value, pdfDir: pdfDirInput.value || '' }),
+    })
+    if (!r.ok) throw new Error('代理返回 ' + r.status)
+    const j = await r.json()
+    agentMode.value = String(j?.mode || '').toLowerCase() === 'pdf' ? 'pdf' : (String(j?.mode || '').toLowerCase() === 'auto' ? 'auto' : 'printer')
+    agentPdfDir.value = String(j?.pdfDir || '')
+    pdfDirInput.value = agentPdfDir.value
+    modeSel.value = String(j?.mode || 'Auto')
+    ElMessage.success(tt('已保存到打印代理'))
+  } catch (e) {
+    ElMessage.error(tt('保存失败') + ':' + (e?.message || e))
+  }
 }
 </script>
 

@@ -17,6 +17,35 @@
  */
 
 import request from '@core/request'
+import * as QRCodeMod from 'qrcode'
+
+/**
+ * 把二维码渲染成 dataURL(PNG,base64)。
+ *
+ * <p>为什么要前端生成再传给打印电脑(2026-11-01 用户口径「要有二维码显示,和工单同个二维码」):
+ * 打印代理是纯 PowerShell,自己画 QR 要么带第三方 DLL、要么手写 QR 编码器,都不现实;
+ * 而前端本来就有 `qrcode` 库(标签/工单打印都在用),**同一份算法、同一个内容**,
+ * 生成的码天然与工单二维码一致。
+ *
+ * <p>失败返回空串 —— 代理那边会退回"只有文字、不贴码",不让整条打印失败。
+ *
+ * @param {string} text 二维码内容
+ * @returns {Promise<string>} 形如 data:image/png;base64,...
+ */
+async function qrDataUrl(text) {
+  const content = String(text || '').trim()
+  if (!content) return ''
+  try {
+    // CJS 互操作:不同打包方式下 toDataURL 可能挂在 .default 上(与 print-formats.js 同一处理)
+    const lib = typeof QRCodeMod?.toDataURL === 'function'
+      ? QRCodeMod
+      : (typeof QRCodeMod?.default?.toDataURL === 'function' ? QRCodeMod.default : null)
+    if (!lib) return ''
+    return await lib.toDataURL(content, { margin: 1, width: 260, errorCorrectionLevel: 'M' })
+  } catch {
+    return ''
+  }
+}
 
 /**
  * 把一条打印任务送进站点队列。
@@ -33,6 +62,8 @@ export async function queueToPrintStation(payload) {
     const res = await request.post('/px/print/enqueue', {
       标题: payload?.标题 || '生产领料单',
       二维码内容: payload?.二维码内容 || '',
+      // 二维码图随任务一起走,打印电脑直接贴进 PDF/标签(见 qrDataUrl 注释)
+      二维码图: await qrDataUrl(payload?.二维码内容),
       工单号: payload?.工单号 || '',
       工单行号: Number(payload?.工单行号) || 0,
       产品名称: payload?.产品名称 || '',
