@@ -66,7 +66,10 @@ if ($Uninstall) {
 
 if ($Install) {
     $cmd = "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Port $Port"
-    New-Item -Path $RunKey -Force | Out-Null
+    # ⚠ 只在**不存在**时创建:对已存在的注册表键用 `New-Item -Force` 会抛
+    #   「The data area passed to a system call is too small」(2026-11-01 实测踩到,
+    #   直接导致 -Install 整个失败、代理也没起来)。Run 键几乎必然存在,所以这里基本不建。
+    if (-not (Test-Path $RunKey)) { New-Item -Path $RunKey -Force | Out-Null }
     Set-ItemProperty -Path $RunKey -Name $RunName -Value $cmd
     Write-Host "[OK] 已设为开机自启: $RunName"
     Write-Host "     $cmd"
