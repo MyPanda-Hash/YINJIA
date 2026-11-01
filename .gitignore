@@ -216,3 +216,16 @@ _scratch/
 # 属业务数据,与「参考（不上传仓库）/」同一约定:不入库、不上传。
 # ⚠ 历史上已入库的那一个 xlsx 保持原样(已跟踪文件不受本规则影响,不会被动删)。
 /backend/uploads/attachments/
+
+# ── AI 会话工作区与多语言合并暂存不入库(2026-11-01 审查增)──────────────
+# .zcode/ = AI 会话工作区(workflow-drafts / workflow-runs / tmp 需求文档,实测 33 个文件 4.5MB),
+#   按 AGENTS「根层边跑边写的工作区不是仓库内容」口径不入库(README 另见 .zcodeignore)。
+# .ja_head.mjs = 多语言冲突「ours+theirs 词条并集」自动合并暂存,只供人工核对,不是运行时文件。
+.zcode/
+/.ja_head.mjs
+
+# ── tools/archive 里的派生副本与探针 PDF 不入库(2026-11-01 审查增)──────
+# _en-staged.js = 为生成 static 暂存的 en.js 副本(与真源重复,312KB,任务已结束);
+# print-*.pdf = 检验单打印探针产物,按既有口径「探针产出的 PDF / Excel 只留本地作证据」不入库。
+tools/archive/_oc-columns-20261029/_en-staged.js
+tools/archive/_qc-proc-print-20261021/*.pdf
