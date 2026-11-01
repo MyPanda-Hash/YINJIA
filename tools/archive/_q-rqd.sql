@@ -1,4 +1,0 @@
-SET NOCOUNT ON;
-GO
-SELECT panel_code, LEFT(ISNULL(metadata,''), 200) AS md FROM yj_panel WHERE panel_code IN (N'STOCK_LEDGER',N'STOCK_SUMMARY',N'STOCK_BALANCE');
-GO
