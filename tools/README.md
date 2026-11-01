@@ -16,7 +16,7 @@ tools/
 │                    + pull-sync.bat(git pull + DbSync 增量同步)
 │                    + db-legacy-whitelist.txt(数据库规范:冻结/豁免/棘轮登记)
 ├── scripts/         正式运维脚本:verify-api.ps1、audit-*.ps1、trigger-mt.ps1、
-│                    enable-mixed-auth.ps1、build-hot-update.ps1、start-backend.bat 等
+│                    enable-mixed-auth.ps1、build-hot-update.ps1、apply-frontend-only.ps1、start-backend.bat 等
 ├── gen/             历史数据生成器 gen-*.{cjs,py} + 数据文件(*.tsv/*.jsonl)
 │                    + 数据库表清单生成器(GenDbCatalogDump.java + gen-db-catalog.cjs)
 │                    + 冻结登记生成器(gen-legacy-whitelist.sql)
@@ -52,6 +52,7 @@ tools/
 | **桌面看板 e2e**(概览口径 / 销售取数与界面 / 折线可分辨性 / 顶栏) | `node verify\dashboard-overview-api-e2e.cjs`、`dashboard-overview-ui-e2e.cjs`、`dashboard-sales-api-e2e.cjs`、`dashboard-sales-ui-e2e.cjs`、`dashboard-line-ui-e2e.cjs`、`dashboard-topbar-e2e.cjs`(需 8090 已启动;`*-api-*` 只读,`*-ui-*` 走 CDP 无头浏览器) |
 | **组织架构 e2e**(重置密码 / 权限配置态返回 / userSave 自锁守卫) | `node verify\orgadmin-password-reset-e2e.cjs`、`orgadmin-perm-back-e2e.cjs`、`user-save-guard-e2e.cjs` ⚠ 最后一个会**写测试账套**(YJ_TEST)并自带夹具与还原 —— 守住「不能停用自己 / 不能自我降权 / 不能停用降权最后一个可用管理员」三条自锁护栏,别在 HSDZ_MES 上跑 |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
+| **只换前端增量发布**(不动数据库、不编译后端 class) | `pwsh -File scripts\apply-frontend-only.ps1`(在仓库根运行;`-DryRun` 只检查前置、`-NoBuild` 复用已有 dist、`-Package` 另存 `deploy\app.jar`;做法与坑见脚本头注释) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |
 | **刷新数据库表清单**(表结构变更后必跑) | `java -cp lib\mssql-jdbc.jar gen\GenDbCatalogDump.java` → `node gen\gen-db-catalog.cjs`(重写 `docs\development\数据库表清单.md`) |
 | **表使用面审计**(判定「哪些表项目没用」;导入外部数据库包/定期体检时跑) | ① `java -cp lib\mssql-jdbc.jar archive\_TableAudit.java archive\_table-audit HSDZ_MES`(导实库对象/面板/依赖) ② `node archive\_table-refs.cjs`(扫运行期代码 SQL 引用) ③ `node archive\_table-classify.cjs`(四源分类) ④ `node archive\_table-drop-risk.cjs`(待删风险面);产物落 `archive\_table-audit\`,`在册台账 tools\db-inuse-tables.txt` 由 ⑤ `node archive\_gen-inuse-tables.cjs` 生成 |
