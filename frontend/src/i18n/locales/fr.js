@@ -1440,6 +1440,7 @@ export default {
     '成型配方': 'Formule de Moulage',
     '规格书': 'Spécification',
     '组装BOM表': 'Nomenclature Assemblage',
+    '组装物料清单': 'Liste des matériaux d\'assemblage',
     '组装工艺清单': 'Liste des Procédés d\'Assemblage',
     '出货检验计划表': 'Plan d\'Inspection Expédition',
     '加标水配置记录表': 'Préparation d\'Eau Étalon',

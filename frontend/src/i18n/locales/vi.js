@@ -1430,6 +1430,7 @@ export default {
     '成型配方': 'Công thức ép khuôn',
     '规格书': 'Quy cách kỹ thuật',
     '组装BOM表': 'BOM lắp ráp',
+    '组装物料清单': 'Danh sách vật tư lắp ráp',
     '组装工艺清单': 'Danh sách công nghệ lắp ráp',
     '出货检验计划表': 'Kế hoạch kiểm tra xuất hàng',
     '加标水配置记录表': 'Sổ pha nước chuẩn',

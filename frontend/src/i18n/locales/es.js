@@ -1440,6 +1440,7 @@ export default {
     '成型配方': 'Fórmula de Moldeo',
     '规格书': 'Especificación',
     '组装BOM表': 'BOM de Ensamblaje',
+    '组装物料清单': 'Lista de materiales de ensamblaje',
     '组装工艺清单': 'Lista de Procesos de Ensamblaje',
     '出货检验计划表': 'Plan de Inspección de Salida',
     '加标水配置记录表': 'Preparación de Agua Patrón',

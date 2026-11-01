@@ -1440,6 +1440,7 @@ export default {
     '成型配方': 'Formrezeptur',
     '规格书': 'Spezifikation',
     '组装BOM表': 'Montage-Stückliste',
+    '组装物料清单': 'Montagematerialliste',
     '组装工艺清单': 'Montageprozessliste',
     '出货检验计划表': 'Warenprüfplan',
     '加标水配置记录表': 'Standardwasser-Herstellung',
