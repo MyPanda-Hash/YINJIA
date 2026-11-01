@@ -56,7 +56,7 @@
       <div class="mp-row mp-row-gap">
         <el-input
           v-model="locateText"
-          :placeholder="tt('扫工单号直接打开对应单据')"
+          :placeholder="tt('扫工单号/领料单号,或直接输入后点打开')"
           size="large"
           clearable
           @keyup.enter="locate"
@@ -64,6 +64,7 @@
         <el-button size="large" :loading="locateLoading" @click="locate">{{ tt('打开单据') }}</el-button>
         <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
       </div>
+      <div class="mp-hint">{{ tt('已完成和未完成的单据都能打开;括号里带上工单行号(如 0@GD-…@1001)可精确定位') }}</div>
     </section>
 
     <!-- ③ 未完成 -->
@@ -311,7 +312,13 @@ async function locate(line) {
       openOpen.value = true
       return
     }
-    showErr(tt('该工单行还没有开过领料单:请在上面「生成工单领料/退料单」里扫一次工单') + ' (' + kw + ')')
+    // 分情况说清楚(2026-11-01):现场最容易混淆的是"单据不存在"和"单据已作废"
+    if (d.hint === 'voided') {
+      showErr(tt('这张单据已作废,不能再打开') + ' (' + kw + ')')
+      return
+    }
+    showErr(tt('没有找到这个工单/单据') + ' (' + kw + '):' +
+      tt('工单要先生成领料单;已完成、未完成的单据都可以直接打开'))
   } catch (e) {
     showErr(errMsgOf(e) || tt('查询失败'))
   } finally {

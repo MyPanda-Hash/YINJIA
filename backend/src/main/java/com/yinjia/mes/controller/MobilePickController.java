@@ -544,6 +544,35 @@ public class MobilePickController {
         if (no.isEmpty()) throw new IllegalArgumentException("请先扫描或输入工单号");
 
         Map<String, Object> out = new LinkedHashMap<>();
+
+        // 🔴 2026-11-01 用户口径:「已经完成领料的单扫码扫不到,这个需要为查询已完成单据用的」。
+        //
+        // 两件事一起补:
+        //   ① 输入/扫到的若是**领料单号**(LL-…),直接按它打开 —— 现场拿着那张单据来查最直接,
+        //      而且已完成/未完成都能打开(found 判据只看"有没有这条台账",不看状态);
+        //   ② 无法命中时**回一句更准确的 reason**,让前端能说清是"工单没开过单"还是"单据已作废",
+        //      不再一律"扫不到"。
+        // ⚠ 这里**不过滤状态**:已完成单据必须能扫到、能打开(退料也在已完成单上做)。
+        if (looksLikeOutNo(no)) {
+            List<Long> ids = jdbc.queryForList(
+                    "SELECT id FROM dbo.wo_pick_doc WHERE 领料单号 = ? AND 状态 <> ? ORDER BY id DESC",
+                    Long.class, no, WoPickDocService.STATE_VOID);
+            if (!ids.isEmpty()) {
+                out.put("found", true);
+                out.put("id", ids.get(0));
+                out.put("by", "领料单号");
+                return ApiResult.ok(out);
+            }
+            // 单据号在台账里完全没有(或已作废)—— 明确告诉前端
+            long anyDoc = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM dbo.wo_pick_doc WHERE 领料单号 = ?",
+                    Long.class, no);
+            out.put("found", false);
+            out.put("candidates", List.of());
+            out.put("hint", anyDoc > 0 ? "voided" : "no-doc");
+            return ApiResult.ok(out);
+        }
+
         WoPickDocService.PickDoc hit = null;
         if (line != null && line > 0) {
             hit = docs.findActive(no, line);
@@ -557,7 +586,7 @@ public class MobilePickController {
             }
             if (hit == null) {
                 List<Map<String, Object>> many = jdbc.queryForList(
-                        "SELECT id, 工单行号 FROM dbo.wo_pick_doc WHERE 工单号 = ? AND 状态 <> ? ORDER BY 工单行号",
+                        "SELECT id, 工单行号, 状态 FROM dbo.wo_pick_doc WHERE 工单号 = ? AND 状态 <> ? ORDER BY 工单行号",
                         no, WoPickDocService.STATE_VOID);
                 out.put("found", false);
                 out.put("candidates", many);
@@ -573,7 +602,26 @@ public class MobilePickController {
         }
         out.put("found", true);
         out.put("id", hit.id());
+        out.put("by", "工单号");
         return ApiResult.ok(out);
+    }
+
+    /**
+     * 这一串像不像**领料单号**(而不是工单号)。
+     *
+     * <p>判据取前缀字母段:`LL-2026-11-0008` → 前缀 `LL`;`GD-2026-11-0018` → `GD`。
+     * 两者的**中段年月与尾号长得一模一样**,只能靠前缀区分,所以按"不是 GD 开头"判定,
+     * 而不是写死 LL(MATERIAL_OUT 的号池前缀可由 `yj_panel.prefix` 配置,改了就认不出)。
+     */
+    private static boolean looksLikeOutNo(String s) {
+        if (s == null) return false;
+        String t = s.trim().toUpperCase();
+        int dash = t.indexOf('-');
+        if (dash <= 0) return false;
+        String prefix = t.substring(0, dash);
+        if (!prefix.matches("[A-Z]{1,4}")) return false;
+        // 工单号前缀固定是 GD(plang.pl_no);其余「字母-年-月-流水」形态都按单据号试
+        return !"GD".equals(prefix);
     }
 
     // ══════════════════════════ ③ 单据详情 ══════════════════════════
