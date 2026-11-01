@@ -13,6 +13,9 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './styles/index.css'
+// 换肤令牌必须在 index.css 之后:两边的选择器特异性是 html[data-skin] > :root,
+// 但同层规则仍按加载顺序决胜,顺序反了会留下零星的"默认绿"。
+import './styles/skins.css'
 import * as sqlPanelRuntime from './business/engine'
 import { installAppContext, installPanelRuntime } from './core/panel-runtime'
 import { i18n, registerDictFetcher, ensureLocalePack } from './i18n'

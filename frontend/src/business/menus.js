@@ -5,7 +5,9 @@ export const menuTree = [
     code: 'dashboard',
     title: '我的桌面',
     path: '/dashboard',
-    icon: 'HomeFilled',
+    // 图标体系（2026-10-31）：同一列模块图标只用线框那一套。原来是 HomeFilled（实心），
+    // 与下面 MagicStick / Notebook / Monitor 这些线框图标混排 —— 一排里唯一的实心会显得偏重。
+    icon: 'House',
     panelCode: 'DASHBOARD', // 权限化:组织架构「通用·我的桌面」勾可见才显示(admin 恒可见)
   },
   {
@@ -56,8 +58,15 @@ export const menuTree = [
       {
         code: 'rdFiles', title: '产品文件', icon: 'FolderOpened', children: [
           { code: 'rdProdInfo', title: '产品信息表', path: '/panelx/list/RD_PROD_INFO', panelCode: 'RD_PROD_INFO', icon: 'Tickets' },
-          // 成型工艺清单 = 页1 工艺清单 + 页2 成型配方(2026-09-11 起 RD_MOLD_FORMULA 并入其第 2 页签)
-          { code: 'rdMoldProc', title: '成型工艺清单', path: '/panelx/list/RD_MOLD_PROC', panelCode: 'RD_MOLD_PROC', icon: 'SetUp' },
+          // 2026-10-30 用户口径:「系统上现有的成型文件内容就是改成<烧结工艺清单>入口」
+          //   ⇒ 只改**显示名**,panel_code 仍是 RD_MOLD_PROC(全前端 94 处引用它,改 code 会连锁 403/参照断链)。
+          // 同日第二轮口径(用户看了效果后):「把这个x烧结面板放到烧结面板里面去,做成一个双面板设计的
+          //   一个总面板……最外的导航栏还是成型工艺清单,但是里面是两个不同的操作的面板」
+          //   ⇒ **只保留这一个入口**,X烧结工艺清单不再单独占菜单项,而是本页面内的第二个 Tab
+          //   (容器组件 @core/views/MoldProcPanel.vue,两条静态路由都指向它)。
+          //   3 页不变:成型工艺清单 / 成型配方 / 修订记录。
+          // 成型工艺清单(原显示名) = 页1 工艺清单 + 页2 成型配方(2026-09-11 起 RD_MOLD_FORMULA 并入其第 2 页签)
+          { code: 'rdMoldProc', title: '烧结工艺清单', path: '/panelx/list/RD_MOLD_PROC', panelCode: 'RD_MOLD_PROC', icon: 'SetUp' },
           // 2026-09-11 下线(并入 RD_MOLD_PROC 第 2 页签):yj_panel/yj_field/yj_role_panel 行保留,
           // 面板配置与保存链路都还在,需要恢复入口时放开本行即可。
           // { code: 'rdMoldFormula', title: '成型配方', path: '/panelx/list/RD_MOLD_FORMULA', panelCode: 'RD_MOLD_FORMULA', icon: 'Coin' },
@@ -410,7 +419,7 @@ export const menuTree = [
       { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
       { code: 'woCompletionList', title: '完工明细', path: '/panelx/list/WO_COMPLETION_LIST', panelCode: 'WO_COMPLETION_LIST', icon: 'List' },
       // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
-      { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
+      { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'Warning' },
       // ── 原「生产记录」6 项 ──
       { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
       { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
@@ -624,7 +633,7 @@ export const menuTree = [
         icon: 'Cpu',
         children: [
           { code: 'equip', title: '设备', path: '/panelx/list/EQUIP', icon: 'Cpu', panelCode: 'EQUIP', operationName: '新增流程' },
-          { code: 'team', title: '班组', path: '/panelx/list/TEAM', icon: 'UserFilled', panelCode: 'TEAM', operationName: '新增流程' },
+          { code: 'team', title: '班组', path: '/panelx/list/TEAM', icon: 'User', panelCode: 'TEAM', operationName: '新增流程' },
           { code: 'wc', title: '工作中心', path: '/panelx/list/WC', icon: 'Odometer', panelCode: 'WC', operationName: '新增流程' },
           // 生产线档案(2026-09-23 归位基础资料):排产指派对象,日产能=负荷/超载基准;原「产线产能」(生产计划组)收编下线
           { code: 'prodLine', title: '生产线', path: '/panelx/list/PROD_LINE', icon: 'DCaret', panelCode: 'PROD_LINE', operationName: '新增流程' },
@@ -742,6 +751,12 @@ export const menuTree = [
         children: [
           { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
           { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
+          // 生产模具表（2026-10-30 用户口径）：「在设备维护下边加上一个新面板，叫生产模具表…
+          //   不需要审批，就是一个维护表，不需要多单据，就放一张表就行，根据现在系统上有的进行设计」。
+          // 面板 PROD_MOLD（mode='archive'，维护表形态）复用已有的 rd_sinter_tolerance
+          // （烧结尺寸表那 60 行模具数据），只补了「模具数量」一列 —— 见
+          // tools/migrate-prod-mold-panel-20261030.sql 头部说明。车间按现有数据原样保留（1/1-3/3/4…）。
+          { code: 'prodMold', title: '生产模具表', path: '/panelx/list/PROD_MOLD', panelCode: 'PROD_MOLD', icon: 'Setter', operationName: '新增流程' },
         ],
       },
     ],

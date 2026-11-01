@@ -25,6 +25,7 @@ const read = (p) => readFileSync(new URL(p, root), 'utf8')
 
 const flowSvc = read('backend/src/main/java/com/yinjia/mes/service/RdProjectFlowService.java')
 const buttonSvc = read('backend/src/main/java/com/yinjia/mes/service/ButtonService.java')
+const dashSvc = read('backend/src/main/java/com/yinjia/mes/service/DashboardStatsService.java')
 
 /** 取某个方法/长字符串片段的源码(找不到返回空串，让断言失败而不是抛错) */
 function slice(src, from, to, len = 4000) {
@@ -66,7 +67,7 @@ test('③ 进度行孤儿清理：作废(canceled=Y)的源单据等同于"已删
   assert.match(apSub, /yj_doc_status/, 'rd_approval 子查询没排除作废单 ⇒ 进度行永远清不掉')
 })
 
-test('③a 孤儿清理的判据要带 [说明] = [项目编号] 守卫，别把四级行误清', () => {
+test('③a 孤儿清理的判据要带 [说明] = [项目编号] 守卫，四级行不该进 ① 分支', () => {
   const seg = slice(buttonSvc, 'private int pruneProgressRows(', 'if (n > 0)', 4000)
   assert.match(
     seg,
@@ -75,9 +76,45 @@ test('③a 孤儿清理的判据要带 [说明] = [项目编号] 守卫，别把
   )
 })
 
-test('③b 孤儿清理不能只认「说明」：四级测试单行把来源单号存在「项目编号」', () => {
+test('③b 四级行不走「说明」判活：改由 ①b 无条件清理（2026-10-30 口径变更）', () => {
   const seg = slice(buttonSvc, 'private int pruneProgressRows(', 'if (n > 0)', 4000)
-  assert.match(seg, /\[项目编号\]/, '四级行(来源=测试申请单)的键在「项目编号」上，只认「说明」会漏判')
+  assert.match(seg, /\[项目层级\] = N'四级'/, '要能识别四级行')
+  assert.match(
+    seg,
+    /asp_user1/,
+    '四级行的清理判据要用 asp_user1(旧版 syncTestDocsToProgress 的 sync 落库标记)，不能按源单据判活',
+  )
+})
+
+test('⑤ 测试申请单(RD_DOM_TEST)不再同步进项目进度查询', () => {
+  // 【需求来源·用户原文 2026-10-30】
+  //   「测试申请单不在这个项目进度查询里面显示，那个不是在测试申请单的汇总里面显示吗？修复这个问题」
+  // 旧实现(syncTestDocsToProgress，2026-09-30 引入)会把 RD_DOM_TEST 的每张单同步成一条
+  // 「项目层级=四级」的进度行 ⇒ 服务器上出现「立项申请里根本没有单据，进度查询却有 DT-xxx 两行」。
+  const seg = slice(buttonSvc, 'public Map<String, Object> syncAllPlansToProgress(', 'out.put("清理孤儿行"', 3000)
+  assert.ok(seg, 'syncAllPlansToProgress 要能找到')
+  assert.doesNotMatch(seg, /syncTestDocsToProgress\(\)/, '测试申请单不得再同步进进度查询')
+  assert.doesNotMatch(
+    buttonSvc,
+    /private Map<String, Object> syncTestDocsToProgress\(/,
+    '旧同步方法要整段删掉，否则点「同步进度」又会把 DT-xxx 写回进度查询',
+  )
+})
+
+test('⑥ 桌面看板「面板单据量」必须与面板列表同口径（排除 canceled=Y）', () => {
+  // 【需求来源·用户原文 2026-10-30】
+  //   「服务器上的单据与看板的数据对的上吗？」
+  // 实测服务器:rd_approval 19 张全活着(asp_cancel='N'),但 yj_doc_status 19/19 canceled='Y';
+  //   面板列表(QueryService.queryDocs 排除 canceled)⇒ 0 张,
+  //   看板 docStats 只按 asp_cancel 判活 ⇒ 19 张。两边差 19。
+  const seg = slice(dashSvc, 'private List<Map<String, Object>> docStats(', 'return docStats', 3000)
+  assert.ok(seg, 'docStats 要能找到')
+  assert.match(
+    seg,
+    /yj_doc_status/,
+    '看板只按 asp_cancel 判活 ⇒ 已作废单据仍被计数，与面板列表对不上（实测 19 vs 0）',
+  )
+  assert.match(seg, /canceled/, '必须判 yj_doc_status.canceled')
 })
 
 test('④ 作废/删除单据后立刻清理进度行（不用等下一次同步）', () => {

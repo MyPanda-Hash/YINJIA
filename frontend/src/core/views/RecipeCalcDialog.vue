@@ -99,24 +99,42 @@
                    allow-create 保留:档案里没有的编号/名称照样能手打输入。 -->
               <el-select v-model="r['物料编号']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
                          remote :debounce="300" :remote-method="(q) => searchInv(i, '物料编号', q)"
-                         :loading="!!invOptLoading[optKey(i, '物料编号')]" :title="optHint(i, '物料编号')"
+                         :loading="!!invOptLoading[optKey(i, '物料编号')]"
                          @change="onMaterialPick(i, '物料编号')">
-                <el-option v-for="o in optList(i, '物料编号')" :key="o.value" :label="o.label" :value="o.value" />
+                <!-- 选中后**只回显编号**（2026-10-30 用户口径，与 X烧结 同一口径）：右边紧邻的就是
+                     「物料名称」列，两格都带名字等于同一行写两遍，还把编号挤成省略号。
+                     下拉里仍然给「编号 — 名称」（候选 label），编号与名称两头都能搜。 -->
+                <template #label="{ value }">{{ value }}</template>
+                <el-option v-for="o in optSlice(i, '物料编号').items" :key="o.value" :label="o.label" :value="o.value" />
                 <!-- remote 下拉必须给 empty 槽:否则"没候选"时下拉整个不弹(点了没反应),
                      用户根本看不到"先选种类"这句提示(Element Plus 的 dropdownMenuVisible 依赖它有槽) -->
                 <template #empty>
                   <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
+                </template>
+                <!-- 候选超过一页 ⇒ 页脚翻页（2026-10-30 用户口径「明明有这个物料但是因为下拉框限制找不到」）。
+                     只有一页时不出现，免得白占一格。 -->
+                <template v-if="optSlice(i, '物料编号').pages > 1" #footer>
+                  <SelectPager :page="optSlice(i, '物料编号').page" :pages="optSlice(i, '物料编号').pages"
+                               :from="optSlice(i, '物料编号').from" :to="optSlice(i, '物料编号').to"
+                               :total="optSlice(i, '物料编号').total"
+                               @go="(p) => setOptPage(i, '物料编号', p)" />
                 </template>
               </el-select>
             </td>
             <td>
               <el-select v-model="r['物料名称']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
                          remote :debounce="300" :remote-method="(q) => searchInv(i, '物料名称', q)"
-                         :loading="!!invOptLoading[optKey(i, '物料名称')]" :title="optHint(i, '物料名称')"
+                         :loading="!!invOptLoading[optKey(i, '物料名称')]"
                          @change="onMaterialPick(i, '物料名称')">
-                <el-option v-for="o in optList(i, '物料名称')" :key="o.value" :label="o.label" :value="o.value" />
+                <el-option v-for="o in optSlice(i, '物料名称').items" :key="o.value" :label="o.label" :value="o.value" />
                 <template #empty>
                   <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
+                </template>
+                <template v-if="optSlice(i, '物料名称').pages > 1" #footer>
+                  <SelectPager :page="optSlice(i, '物料名称').page" :pages="optSlice(i, '物料名称').pages"
+                               :from="optSlice(i, '物料名称').from" :to="optSlice(i, '物料名称').to"
+                               :total="optSlice(i, '物料名称').total"
+                               @go="(p) => setOptPage(i, '物料名称', p)" />
                 </template>
               </el-select>
             </td>
@@ -250,9 +268,11 @@ import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
   slot1RowIndex, slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop,
   sinterRowsFromQuery, unfilledDesignRows } from '@/core/mold/recipeSheet.js'
-import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialFillFor,
+import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialClearFor, materialFillFor,
   uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
+import { slicePage } from '@/core/ui/selectPage.js'
+import SelectPager from '@/core/ui/SelectPager.vue'
 import { invRowsOf } from '@/core/panel/invCarry.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
@@ -323,25 +343,28 @@ const sinterHint = computed(() => (sinterRow.value ? (sinterLengthWarning(sinter
 function onSinterWorkshopChange() { sinterModel.value = '' }
 
 async function loadSinterRows() {
-  sinterTip.value = tt('正在读取烧结尺寸表…')
+  sinterTip.value = tt('正在读取生产模具表…')
   try {
     const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'RD_SINTER_TOL', condition: {}, pageNo: 1, pageSize: 500,
+      // 2026-10-30 面板合并：烧结尺寸表(RD_SINTER_TOL)已并入「生产模具表」PROD_MOLD（同一张物理表）。
+      // 列名改成用户口径（炭棒尺寸/外模规格/…），行键由 recipeSheet.sinterRowsFromQuery 归一化回原名，
+      // 下游按 型号/模具尺寸/… 读代码一个字都不用改。
+      panelCode: 'PROD_MOLD', condition: {}, pageNo: 1, pageSize: 500,
     })
     sinterRows.value = sinterRowsFromQuery(res)
     sinterTip.value = sinterRows.value.length
-      ? `· ${tt('来自烧结尺寸表')} ${sinterRows.value.length} ${tt('个型号')}`
+      ? `· ${tt('来自生产模具表')} ${sinterRows.value.length} ${tt('个型号')}`
       : `· ${tt('尺寸表没有可用行')}`
   } catch {
     // 权限/接口异常都按"读不到"处理:退回单据上手填,不阻断计算(探测过的 403 场景)
     sinterRows.value = []
-    sinterTip.value = `· ${tt('读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填')}`
+    sinterTip.value = `· ${tt('读不到生产模具表（可能没有该面板权限），尺寸按单据上手填')}`
   }
 }
 
 /** 维护入口:直接开那个档案面板(它没有侧栏菜单,入口就放在用它的人手边) */
 function openSinterTable() {
-  const url = `${location.origin}${location.pathname}#/panelx/list/RD_SINTER_TOL`
+  const url = `${location.origin}${location.pathname}#/panelx/list/PROD_MOLD`
   window.open(url, '_blank')
 }
 
@@ -528,16 +551,21 @@ const fillingAt = ref(null)            // 正在被"对侧带出"写入的行号
 const invCodeOf = (r) => String(r?.['存货编码'] ?? '').trim()
 const optKey = (i, field) => `${i}|${field}`
 const optList = (i, field) => invOpts.value[optKey(i, field)]?.options || []
-/** 候选被 cap 截断时的提示(挂在控件 title 上:继续输入就能缩小) */
-const optHint = (i, field) => {
-  const r = invOpts.value[optKey(i, field)]
-  return r && r.matched > r.options.length
-    ? tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(r.matched))
-    : ''
+/** 该格的页码（1 起；换关键字/换种类时回到 1） */
+const invPages = ref({})
+const optPage = (i, field) => invPages.value[optKey(i, field)] || 1
+function setOptPage(i, field, page) {
+  invPages.value = { ...invPages.value, [optKey(i, field)]: Number(page) || 1 }
 }
+/**
+ * 这一格**当前页**的候选（过滤在取数那一步做完，这里只切页）。
+ * 候选本身**不封顶**（invSearchOptions 传 cap=0）：被截掉的那部分在界面上等于不存在，
+ * 用户会以为档案里没有这个料 —— 2026-10-30 用户口径「明明有这个物料但是因为下拉框限制找不到」。
+ */
+const optSlice = (i, field) => slicePage(optList(i, field), optPage(i, field))
 function setOpts(key, val) { invOpts.value = { ...invOpts.value, [key]: val } }
 /** 行结构变了(加行/删行)⇒ 行号做键的候选表整体作废 */
-function resetRowOptions() { invOpts.value = {}; invOptLoading.value = {} }
+function resetRowOptions() { invOpts.value = {}; invOptLoading.value = {}; invPages.value = {} }
 
 /** 把取回来的档案行并进"见过"的缓存(按 编码+名称 去重:同码不同名是真重码,必须保留两条给唯一命中判据用) */
 function rememberRows(rows) {
@@ -563,8 +591,12 @@ async function ensureKindRows(kind) {
   if (kindPending.has(k)) return kindPending.get(k)
   const p = (async () => {
     try {
-      const res = await request.post('/px/queryFormDataList', {
-        panelCode: 'INV', condition: { 所属类别: k }, pageNo: 1, pageSize: INV_PAGE_SIZE,
+      // ⚠ 走 `/px/invOptions`（按**本面板** RD_MOLD_PROC 的查看权校验），
+      //   不再用 `/px/queryFormDataList(panelCode='INV')` —— 后者按 INV 面板自身的权限校验，
+      //   研发角色（文件负责人/研发审核）对 INV 没有授权 ⇒ 403 ⇒ 物料下拉全空
+      //   （2026-10-30 用户报障：刘磊的两个配方计算器都不能引用物料，管理员正常）。
+      const res = await request.get('/px/invOptions', {
+        params: { panelCode: 'RD_MOLD_PROC', kind: k },
       })
       const raw = invRowsOf(res?.data)
       rememberRows(raw)
@@ -583,10 +615,11 @@ async function ensureKindRows(kind) {
   kindPending.set(k, p)
   return p
 }
-/** 没选种类时的远程搜索:服务端 keyword(编码/名称一起模糊)。空关键字不发请求 */
+/** 没选种类时的远程搜索:服务端 keyword(编码/名称一起模糊)。空关键字不发请求。
+ *  同 ensureKindRows:走 `/px/invOptions` 按本面板权限校验，避免研发角色因缺 INV 授权而搜不到。 */
 async function remoteInvSearch(kw) {
-  const res = await request.post('/px/queryFormDataList', {
-    panelCode: 'INV', keyword: kw, condition: {}, pageNo: 1, pageSize: 50,
+  const res = await request.get('/px/invOptions', {
+    params: { panelCode: 'RD_MOLD_PROC', keyword: kw },
   })
   const rows = invRowsOf(res?.data)
   rememberRows(rows)
@@ -607,7 +640,9 @@ async function searchInv(i, field, kw) {
   try {
     const rows = kind ? await ensureKindRows(kind) : await remoteInvSearch(q)
     if (invSearchSeq.get(key) !== seq) return       // 这一格已经发起了更新的一次搜索 ⇒ 本次结果作废
-    setOpts(key, invSearchOptions(rows, field, q))
+    // cap=0 = 不封顶：命中多少给多少，界面上按 50 条一页翻（core/ui/selectPage.js）
+    setOpts(key, invSearchOptions(rows, field, q, 0))
+    setOptPage(i, field, 1)                         // 换了关键字 ⇒ 回到第 1 页
   } catch {
     if (invSearchSeq.get(key) === seq) setOpts(key, { options: [], matched: 0 })   // 读不到就只剩手打
   } finally {
@@ -626,9 +661,17 @@ function onKindChange(i) {
   delete next[optKey(i, '物料编号')]
   delete next[optKey(i, '物料名称')]
   invOpts.value = next
+  // 清空种类 ⇒ 同行的编号/名称跟着退回空白（2026-10-30 用户口径「叉掉分类、编号、名称自己退回空白」）。
+  // 候选范围本来就是靠它收窄的，种类没了还留着那对值 = 假装这颗料仍属于刚被清掉的类别。
+  // 反过来**选上**种类只作废旧候选，绝不动已经录好的物料（那一步是补分类，不是改物料）。
+  if (!kind) {
+    const clear = materialClearFor(editRows.value[i], '物料种类')
+    if (Object.keys(clear).length) Object.assign(editRows.value[i], clear)
+    invKindTip.value = ''
+    return
+  }
   // 预取只是热身:两格的候选由下拉**打开/输入**时经 remote-method 填(那时种类池已在缓存里,零请求)
-  if (kind) ensureKindRows(kind).catch(() => {})
-  else invKindTip.value = ''
+  ensureKindRows(kind).catch(() => {})
 }
 /**
  * 挑中/手填一格后,拿**唯一命中**的档案行。
@@ -644,8 +687,10 @@ async function lookupInvRow(field, value) {
   if (local) return local
   if (invSeen.value.filter((r) => String(r?.[col] ?? '').trim() === want).length > 1) return null
   try {
-    const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'INV', condition: { [col]: want }, pageNo: 1, pageSize: 50,
+    // 同 ensureKindRows：走 `/px/invOptions`（按 RD_MOLD_PROC 权限），不走 INV 面板权限，
+    // 否则研发角色手打编号后带不出名称/类别（2026-10-30 同批修复）。
+    const res = await request.get('/px/invOptions', {
+      params: { panelCode: 'RD_MOLD_PROC', keyword: want },
     })
     const rows = invRowsOf(res?.data)
     rememberRows(rows)
@@ -666,7 +711,18 @@ async function onMaterialPick(i, field) {
   const row = editRows.value[i]
   const typed = String(row?.[field] ?? '').trim()
   invTip.value = ''
-  if (!typed) return
+  // 清空一格（点下拉里的 ✕ / 退格清光）⇒ 兄弟格一起退回空白（2026-10-30 用户口径
+  // 「叉掉分类、编号、名称自己退回空白」，与 X烧结 同一口径）。
+  // 原来这里直接 return，于是"编号清掉了、名称还留着"—— 屏幕上还是那袋料，
+  // 存回单据就是旧名字配空编号，属于静默错数。
+  if (!typed) {
+    const clear = materialClearFor(row, field)
+    if (Object.keys(clear).length) {
+      fillingAt.value = i
+      try { Object.assign(editRows.value[i], clear) } finally { fillingAt.value = null }
+    }
+    return
+  }
   const inv = await lookupInvRow(field, typed)
   // 等请求期间用户又改了这一格 ⇒ 这次带出作废(异步竞态不许把旧结果写回去)
   if (String(editRows.value[i]?.[field] ?? '').trim() !== typed) return
@@ -799,7 +855,7 @@ async function saveParams() {
 /* ── 按产品规格一键带出(2026-09-21)────────────────────────────────────────
    做同一产品的第二张单时,炭棒规格/烧结型号/密度范围本来都要重敲;这三样都能从已有数据推出来:
      · 炭棒规格 1/2/3 ← 产品信息表 RD_PROD_INFO(炭棒外径/炭棒内径/炭棒长度);
-     · 烧结型号       ← 按外径/内径在烧结尺寸表里匹配(先看单据车间,匹配不到不猜);
+     · 烧结型号       ← 按外径/内径在生产模具表里匹配(先看单据车间,匹配不到不猜);
      · 密度上下限     ← **该产品最近一张已保存的成型工艺清单**(只有「密度管控要求」文本也能解析)。
    取不到就如实提示,**绝不编造密度**(质量口径的数不能猜);已填的格一律不动(specCarryFrom 有单测)。
    放在 ③ 区头:算不出来时(blockReason)它就在眼前。 */
@@ -936,3 +992,4 @@ function apply() {
   .rcd-two { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
+

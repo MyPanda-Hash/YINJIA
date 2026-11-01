@@ -459,11 +459,14 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
   color: var(--t-primary);
 }
 .gi {
-  font-size: 16px;
+  font-size: var(--ic-main, 16px);
 }
+/* 展开箭头（2026-10-31 图标体系）：尺寸走附属档 12px，颜色必须**比标签浅一档** ——
+   原来它继承正文字色，一个纯提示性的小三角跟"研发管理"四个字一样黑，抢视线。 */
 .arrow {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--ic-sub, 12px);
+  color: var(--t-text-3);
   transition: transform 0.2s;
 }
 .arrow.down {
@@ -506,8 +509,10 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
   background: var(--t-hover-bg);
   color: var(--t-primary);
 }
+/* 二级菜单入口的小箭头：同上，附属档尺寸 + 弱化色 */
 .mi {
-  font-size: 12px;
+  font-size: var(--ic-sub, 12px);
+  color: var(--t-text-3);
 }
 .fly-card {
   position: absolute;
@@ -779,7 +784,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     color: var(--t-primary);
   }
   .mn-ic {
-    font-size: 17px;
+    font-size: var(--ic-main, 16px);
     color: var(--t-text-2);
     flex-shrink: 0;
   }
@@ -790,7 +795,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateCardPosition))
     white-space: nowrap;
   }
   .mn-arrow {
-    font-size: 14px;
+    font-size: var(--ic-sub, 12px);
     color: var(--t-text-3);
     flex-shrink: 0;
   }

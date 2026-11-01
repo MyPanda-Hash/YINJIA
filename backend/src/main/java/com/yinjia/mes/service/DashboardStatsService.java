@@ -257,8 +257,15 @@ public class DashboardStatsService {
                 if (table == null || col == null || table.isBlank() || col.isBlank()
                         || !table.matches("[\\p{L}\\p{N}_]+") || !col.matches("[\\p{L}\\p{N}_]+")) continue;
                 // 单数去掉空单号:COUNT(DISTINCT '') 会把「一堆空单号」算成 1 张单(WO_REPORT 实测 7 行空号)
+                // ⚠ 必须与面板列表(QueryService.queryDocs)同口径:那里除了 asp_cancel 还排掉
+                //   yj_doc_status.canceled='Y' 的单据。2026-10-30 用户报「看板 19 张立项申请,
+                //   打开面板却是 0 张」—— 根因就是这里只看 asp_cancel,而作废/删除只写状态表
+                //   (rd_approval.asp_cancel 全是 'N',状态表却 19/19 canceled='Y') ⇒ 看板虚高。
                 int docs = count("SELECT COUNT(DISTINCT [" + col + "]) FROM " + table
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(RTRIM([" + col + "]),'')<>''");
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(RTRIM([" + col + "]),'')<>''"
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
+                        + " AND s.doc_no = CAST([" + col + "] AS nvarchar(100)) AND s.canceled = 'Y')",
+                        def.code());
                 // 已审核(2026-10-18 修正):必须只数**头表里还在的单据**。
                 //   原先直接数 yj_doc_status 留痕行 —— 删掉的历史单(实测 PURCHASE_IN 19 张、
                 //   QC_INSP_REC 12 张)仍被算作已审核 ⇒ 面板「草稿 = 单数 − 已审核」出负数

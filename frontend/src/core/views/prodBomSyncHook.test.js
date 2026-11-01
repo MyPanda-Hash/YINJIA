@@ -65,7 +65,7 @@ test('② 只在产品信息表触发,别的面板归档不能碰物料清单', 
 })
 
 test('③ 覆盖更新:同一产品编号先删旧子件再写新(不新建第二张单)', () => {
-  const body = methodBody(btn, 'private void syncProdBomToMaterialList(')
+  const body = methodBody(btn, 'private String syncProdBomToMaterialList(')
   assert.match(body, /DELETE\s+FROM\s+\[?mate\]?/i, '要先删旧子件(覆盖语义)')
   assert.match(body, /INSERT\s+INTO\s+\[?mate\]?/i, '再写入新子件')
   // 覆盖的定位键必须是产品编号(m_no)
@@ -73,7 +73,7 @@ test('③ 覆盖更新:同一产品编号先删旧子件再写新(不新建第�
 })
 
 test('④ 字段映射:m_no←产品编号 / bzl←数量 / wzdm2←物料编号 / wzmc2←物料名称 / gg2←尺寸规格', () => {
-  const body = methodBody(btn, 'private void syncProdBomToMaterialList(')
+  const body = methodBody(btn, 'private String syncProdBomToMaterialList(')
   for (const col of ['m_no', 'm_date', 'wzdm1', 'wzmc1', 'wzdm2', 'wzmc2', 'gg2', 'bzl']) {
     assert.match(body, new RegExp(col, 'i'), `映射缺少 ${col}`)
   }
@@ -84,7 +84,7 @@ test('④ 字段映射:m_no←产品编号 / bzl←数量 / wzdm2←物料编号
 })
 
 test('⑤ 同步失败不能拖垮归档(try/catch 兜住,只记日志)', () => {
-  const body = methodBody(btn, 'private void syncProdBomToMaterialList(')
+  const body = methodBody(btn, 'private String syncProdBomToMaterialList(')
   assert.match(body, /catch\s*\(/, '必须有 catch —— BOM 写失败不能让归档失败')
   assert.match(body, /warn|log\./i, '失败要留日志')
   // 不能有 throw 冒泡
@@ -92,28 +92,35 @@ test('⑤ 同步失败不能拖垮归档(try/catch 兜住,只记日志)', () => 
 })
 
 test('⑥ 空产品编号 / 无 BOM 明细时安静跳过(不造空单)', () => {
-  const body = methodBody(btn, 'private void syncProdBomToMaterialList(')
+  const body = methodBody(btn, 'private String syncProdBomToMaterialList(')
   assert.match(body, /isBlank|isEmpty/, '要判空')
   assert.match(body, /return/, '空值直接返回')
 })
 
-test('⑦ 只在归档时同步(用户 2026-10-29 选 A):保存路径不得调用同步', () => {
-  // 全类里 syncProdBomToMaterialList 只允许出现两处:定义 1 次 + markArchived 里调用 1 次。
-  // 一旦有人在 saveDoc / approve / audit 里再加一处,这里立刻红 ——
-  // 用户口径是「BOM 未定稿不进物料清单」,草稿态同步会把半成品 BOM 灌进去。
+test('⑦ 同步只在两处:归档(markArchived) + 提交保存(markSaved 口径)', () => {
+  // 2026-10-29 口径(A)是「只在归档时同步,BOM 未定稿不进物料清单」;
+  // **2026-10-30 用户改口径**：「产品信息表处于审批的时候，物料清单是草稿状态；
+  //   审批通过归档的时候物料清单也同时归档」⇒ 保存(提交审批) 时也要同步一次,但状态落**草稿**。
+  // 故这里允许 **3 处**:定义 1 + markArchived 调用 1 + save(提交口径) 调用 1。
   const hits = [...btn.matchAll(/syncProdBomToMaterialList\s*\(/g)]
-  assert.equal(hits.length, 2,
-    `syncProdBomToMaterialList 应只出现 2 次(定义 + markArchived 调用),实际 ${hits.length} 次 —— 有人在保存/审批路径里加了同步`)
+  assert.equal(hits.length, 3,
+    `syncProdBomToMaterialList 应只出现 3 次(定义 + 归档调用 + 提交保存调用),实际 ${hits.length} 次 —— 别在别处再加`)
 
-  // 并且那唯一一处调用必须在 markArchived 方法体内
   const arch = methodBody(btn, 'private void markArchived(')
-  assert.match(arch, /syncProdBomToMaterialList\s*\(/, '调用点必须在 markArchived(唯一归档入口)')
+  assert.match(arch, /syncProdBomToMaterialList\s*\([^)]*true\s*\)/, '归档那处必须传 archived=true(物料清单 = 已归档)')
 
-  // 反向确认:保存类方法里不能出现它
-  for (const fn of ['saveDoc', 'approve', 'audit']) {
-    try {
-      const b = methodBody(btn, fn + '(')
-      assert.ok(!/syncProdBomToMaterialList/.test(b), `${fn} 里不该有同步调用`)
-    } catch { /* 该重载/签名不存在就跳过 */ }
-  }
+  // 保存那处:必须挂在 markSaved(真提交)上 —— 纯存草稿不能把填一半的 BOM 灌进物料清单
+  const saveLine = btn.split(/\r?\n/).find((ln) => /syncProdBomToMaterialList\s*\([^)]*false\s*\)/.test(ln))
+  assert.ok(saveLine, '找不到"保存 → 物料清单草稿"那一处调用(应为 archived=false)')
+  assert.match(saveLine, /markSaved/, '保存那处必须带 markSaved 判断(存草稿不动物料清单)')
+  assert.match(saveLine, /RD_PROD_INFO/, '保存那处必须只对产品信息表生效')
 })
+
+test('⑧ 归档/弃审两条状态位成对存在(物料清单是产品信息表的从属单据)', () => {
+  // 归档 ⇒ 已归档；弃审 ⇒ 退回草稿；两侧都只写 yj_doc_status，不碰 mate 行
+  assert.match(btn, /private void markMaterialListArchived\(/, '缺 markMaterialListArchived')
+  assert.match(btn, /private void markMaterialListDraft\(/, '缺 markMaterialListDraft(弃审回草稿)')
+  const unaudit = methodBody(btn, 'private Map<String, Object> unaudit(')
+  assert.match(unaudit, /markMaterialListDraft\s*\(/, '弃审里要把物料清单退回草稿(2026-10-30 用户口径)')
+})
+

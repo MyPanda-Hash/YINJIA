@@ -1253,6 +1253,7 @@ export default {
     '浏览器拦截了新窗口，请允许弹出窗口': 'The browser blocked the new tab, please allow pop-ups',
     '正在生成打印件…': 'Generating print copy...',
     '已打开打印件（共 {n} 张），可直接打印': 'Print copy opened ({n} pages), ready to print',
+    '已打开打印预览（共 {n} 张），可直接打印': 'Print preview opened ({n} pages), ready to print',
     '浏览器拦截了新窗口，已改为下载 PDF': 'The browser blocked the new tab; the PDF was downloaded instead',
     '在本行下方插入一行': 'Insert a row below this one',
     '选择关联单据': 'Select linked document',
@@ -1900,6 +1901,18 @@ export default {
     '界面设置': 'UI Settings',
     '切换亮色': 'Light mode',
     '换肤（暗色）': 'Dark mode',
+    // 换肤（2026-10-30）：皮肤体系的显示层文案
+    '换肤': 'Skins',
+    '外观皮肤': 'Appearance',
+    '明色': 'Light',
+    '暗色': 'Dark',
+    '暖砂': 'Warm Sand',
+    '深海': 'Deep Sea',
+    '松墨': 'Pine Ink',
+    '暖纸底 + 陶土强调': 'Warm paper with a terracotta accent',
+    '冷白底 + 靛蓝强调': 'Cool white with an indigo accent',
+    '原制造绿，最稳': 'The original manufacturing green',
+    '皮肤按浏览器记住，换一台电脑需要重新选。': 'Skins are remembered per browser — pick again on another computer.',
     '工作台设置': 'Workspace Settings',
     '初始化向导': 'Setup Wizard',
     '账号': 'Account',
@@ -3183,6 +3196,8 @@ export default {
     '检验项目及标准': 'Inspection Items & Standards',
     '成品及包装运输': 'Packaging & Transportation',
     '4.产品性能检验项目及检验标准': '4. Product Performance Inspection Items & Standards',
+    '产品性能检验项目及检验标准': 'Product Performance Inspection Items & Standards',
+    '成品及包装运输': 'Finished Product, Packaging & Transport',
     '5.关键物料列表': '5. Key Material List',
     '6.包装方式': '6. Packaging',
     '7.运输要求': '7. Shipping Requirements',
@@ -3805,12 +3820,16 @@ export default {
     '维护尺寸表': 'Maintain Size Table',
     /* 该面板纸面版式的标题条(recordSheetConfigs.RD_SINTER_TOL.plainTitle) */
     '烧结尺寸表': 'Sintering Size Table',
+    '生产模具表': 'Production Mold Table',
     '未选型号 —— 尺寸按单据上的炭棒规格': 'No model selected — sizes come from the document spec',
     '正在读取烧结尺寸表…': 'Loading sintering size table…',
     '来自烧结尺寸表': 'from the sintering size table:',
+    '正在读取生产模具表…': 'Loading the production mold table…',
+    '来自生产模具表': 'from the production mold table:',
     '个型号': 'models',
     '尺寸表没有可用行': 'the size table has no usable rows',
     '读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the sintering size table (panel permission missing?) — enter sizes on the document instead',
+    '读不到生产模具表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the production mold table (panel permission missing?) — enter sizes on the document instead',
     /* 从标准库勾选/标准库维护 的措辞与既有页面一致(此前只有机翻兜底) */
     '从标准库勾选': 'Pick from Library',
     /* ── 成型工艺清单(页1)按设计图重排:纸面新标签(数据键不变,改名走 yj_field.alias) ── */
@@ -5126,6 +5145,40 @@ export default {
     '在浏览器新窗口打开服务端受控表单 PDF，可直接打印':
       'Open the server-side controlled-form PDF in a new browser window for direct printing',
 
+    // ---- 以下为远端新增(X烧结配方计算器表头 + 图标体系),与上面的本地词条互不重复 ----
+    // X烧结配方计算器：输入参数/计算结果的表头（2026-10-30 用户口径
+    // 「不太清楚每个代表什么，麻烦按我那个标识清楚」—— 原先 :show-header="false" 把标签全藏了，
+    // 改回显示表头后这些标签必须都有译名，否则切英文会露出中文）。
+    // ⚠ tt() 是**扁平查找** dict[text]，不能套子对象，全部平铺在 biz 下。
+    '参数': 'Parameter',
+    '项目': 'Item',
+    '炭棒外径 mm': 'Rod OD (mm)',
+    '炭棒内径 mm': 'Rod ID (mm)',
+    '炭棒出货长度 mm': 'Rod Ship Length (mm)',
+    '模具出料口内径 mm': 'Die Outlet ID (mm)',
+    '中心杆外径 mm': 'Center Rod OD (mm)',
+    '颗粒物料折算系数': 'Granule Conversion Factor',
+    '成型修正长度参数 mm': 'Forming Length Correction (mm)',
+    '密度参数下限': 'Density Lower Limit',
+    '密度参数上限': 'Density Upper Limit',
+    '炭棒体积 cm³': 'Rod Volume (cm³)',
+    '切割长度中间值 mm': 'Cut Length (mid, mm)',
+    '折算物料重量 g': 'Converted Material Weight (g)',
+    '单支总重 g': 'Total Weight per Piece (g)',
+    '比例合计': 'Ratio Total',
+    '成型切炭长度 mm（下限/中间值/上限）': 'Forming Cut Length mm (low/mid/high)',
+    '成型冷却长度 mm（下限/中间值/上限）': 'Forming Cool Length mm (low/mid/high)',
+    '炭棒重量 g（下限/中间值/上限）': 'Rod Weight g (low/mid/high)',
+    'X烧结配方计算': 'X-Sinter Recipe Calculation',
+    '一、输入参数': '1. Input Parameters',
+    '二、物料信息录入': '2. Material Entry',
+    '三、计算结果': '3. Result',
+    '选择或直接输入编号': 'Select or type code',
+    '加载中…': 'Loading…',
+    '手填物料编号': 'Type material code',
+    '自动倒推': 'Auto-calculated',
+    '还不能计算，请先补全：': 'Cannot calculate yet, please fill in: ',
+    '填入单据': 'Fill into document',
   },
 
 }

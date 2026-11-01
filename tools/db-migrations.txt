@@ -4477,3 +4477,77 @@ migrate-plang-batch-date-closed-20261021.sql
 #   同批更新存有工单号的各链路列(plang/plang_pc/scjl/wo_progress/三检验/入库/领料/预排/号池占用/日志)。
 #   ⚠ 补登记:同上,两账套 2026-10-21 已执行并登记 yj_schema_log,本清单补上以便新库按序重放。
 migrate-plang-no-month-closed-20261021.sql
+
+# ══════ 以下为远端分支(2026-10-30 X烧结/生产模具/产品信息表修复)新增条目,合并时按原顺序接在本地链尾 ══════
+# 2026-10-30 测试申请单(RD_DOM_TEST)不再进「项目进度查询」(用户口径「测试申请单不在这个项目
+#   进度查询里面显示,那个不是在测试申请单的汇总里面显示吗?修复这个问题」)。
+#   2026-09-30 的 syncTestDocsToProgress 会把每张测试单同步成一条「项目层级=四级」进度行
+#   (asp_user1='sync'),导致服务器上「立项申请里没有 DT-xxx 单据,进度查询却显示两行」——
+#   四级分支的源头本来就是测试申请单,不是立项申请。
+#   代码已整段删除该方法;pruneProgressRows 的 ①b 改按 asp_user1='sync' 清理四级行。
+#   本脚本清**存量**四级同步行(软删,可幂等复跑)。两账套都执行。
+migrate-drop-test-progress-20261030.sql
+
+# 2026-10-30 「状态表已作废」与「业务表 asp_cancel」口径对齐。作废/删除只写
+#   yj_doc_status.canceled='Y' 不动 asp_cancel ⇒ 面板列表(排 canceled)看不到、看板(只看
+#   asp_cancel)却算得出来,服务器实测立项申请 19 vs 0。代码侧四处判活已补状态表过滤,
+#   本脚本补**存量**:状态表里已作废的研发单据,业务表也置 asp_cancel='Y'。
+#   用户 2026-10-30 确认「是,确实要清掉」—— 这批是 10-10~10-30 逐个删除的,不恢复。
+#   幂等;自检「canceled=Y 但 asp_cancel<>Y」必须 0,否则整体回滚。两账套都执行。
+migrate-align-canceled-to-aspcancel-20261030.sql
+
+# 2026-10-30 产品信息表「三、产品BOM表」补物理列与元数据字段(用户报障「填了 BOM 保存后
+#   三行全是 /」)。2026-10-29 新版设计加了 BOM 节(recordSheetConfigs.js RD_PROD_INFO.dataTables,
+#   5 列=序号|物料编号|物料名称|尺寸规格|数量),但 rd_prod_info_detail 没有任何业务列、
+#   yj_field 也没有 detail 字段 ⇒ 后端按元数据认列全丢弃,只插了空明细行。
+#   本脚本补 5 个物理列 + 5 条 yj_field detail 字段(译名已存在)+ 列中文注释。
+#   幂等;自检「列 5/5 且 字段 5/5」不满足整体回滚。两账套都执行。
+migrate-prodinfo-bom-detail-20261030.sql
+
+# 2026-10-30 产品规格书「4.产品性能检验项目及检验标准」补「检验子项」列。
+#   排查研发管理同类问题(比对 前端 dataTables cols ↔ yj_field.label ↔ 物理列)时发现:
+#   recordSheetConfigs.js:1649 有 `{ key: '检验子项' }`,但 yj_field 与 rd_spec_doc_detail
+#   都没有它 ⇒ 该列填的内容保存时被丢弃。groupSub 是设计遗留属性(无代码消费),不是豁免理由。
+#   本脚本补物理列 + yj_field(seq=75,夹在 检验项目70 / 检验要求80 之间) + 10 种语言译名。
+#   幂等;自检「列1/1、字段1/1、译名10/10」不满足整体回滚。两账套都执行。
+migrate-specdoc-subitem-20261030.sql
+
+# 2026-10-30 产品信息表表头补登记 4 个字段（项目编号/项目名称/客户名称/应用场景）。
+#   2026-10-29 新版纸面新增了这 4 个输入格（recordSheetConfigs.js:1234-1250），
+#   rd_prod_info_head 的物理列与 10 种语言译名**都已存在**，唯独 yj_field 没登记
+#   ⇒ 后端认不到这 4 个键，用户填了保存时被丢弃。本脚本只补 yj_field(place='header')。
+#   幂等；自检「字段4/4、列4/4、译名4/4」不满足整体回滚。两账套都执行。
+migrate-prodinfo-head-extra-20261030.sql
+
+# 2026-10-30 X烧结工艺清单（RD_X_SINTER）建表。设计源《X烧结工单模板-261029.xlsx》
+#   「产品工单打印输出模版」页 + 《T205-X冰箱炭棒-26102901.xlsx》真实单据（验证计算器）。
+#   两张表：rd_x_sinter_head（产品基本信息 + 模具参数 + 计算输出五段 + 管控要求）
+#          rd_x_sinter_detail（表区=配方表 10 行物料 / 修订记录）。
+#   为什么不复用 rd_mold_proc_*：既有面板 3 页、承载工序分段版式；X烧结是配方计算器驱动的
+#   单页工艺卡，字段重合度极低。已有面板只改**显示名**（见 migrate-mold-proc-rename）。
+#   计算字段一律落库（保存时前端算好）：历史单据数值不随日后改公式而变。两账套都执行。
+migrate-x-sinter-tables-20261030.sql
+
+# 2026-10-30 X烧结工艺清单（RD_X_SINTER）面板与字段元数据：yj_panel 1 行 + header 37 +
+#   detail 13 + 面板/字段译名。计算输出 12 格全部 editable（用户口径「所有文本框可手工二次修改」）。
+#   ⚠ 译名走「表变量 + NOT EXISTS」：yj_translation 有 uq_translation(scope,ref_key,locale)，
+#   同词条（如「配料要求」）别处已存在时直接 VALUES 会整批失败。两账套都执行。
+migrate-x-sinter-panel-20261030.sql
+
+# 2026-10-30 「成型工艺清单」→「烧结工艺清单」显示名变更（用户口径「现有成型文件内容就是
+#   改成<烧结工艺清单>入口」）。**只改 yj_panel.panel_name**，panel_code 仍是 RD_MOLD_PROC
+#   （全前端 94 处引用，改 code 会断参照链/门禁/分发/-tb 后缀）。3 页不变。
+#   刻意不动：RD_CHANGE「变更文件」勾选项里的字面值 '成型工艺清单'（历史数据键，改了老单据对不上）。
+#   两账套都执行。
+migrate-mold-proc-rename-20261030.sql
+
+# 2026-10-30 X烧结工艺清单的「产品编号」改为**参照**产品信息表(用户口径「这个新增的面板和
+#   之前的成型面板一样是可以关联规格书的数据的,就是通过产品编号进行关联,带入规格书的对应数据」)。
+#   规格书联动的触发点就是选这个格:只有 data_type='参照' 时前端才渲染参照弹窗、选中后才走
+#   /px/specByProductForXSinter 带出链路(建面板时写的 '文本' ⇒ 带不出任何东西)。
+#   照抄 RD_MOLD_PROC 的同一行配置(ref_panel=RD_PROD_INFO / ref_field=产品编号 / display_field=产品名称)。
+#   幂等;自检「data_type=参照 且 ref_panel=RD_PROD_INFO」不满足整体回滚。两账套都执行。
+migrate-x-sinter-spec-ref-20261030.sql
+migrate-prod-mold-panel-20261030.sql
+migrate-prod-mold-retire-old-20261030.sql
+migrate-bom-material-list-status-20261030.sql
