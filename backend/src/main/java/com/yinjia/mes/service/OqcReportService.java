@@ -138,6 +138,15 @@ public class OqcReportService {
         String firstNo = docOf("QC_FIRST_INSP", woNo, woLine);
         String procNo = docOf("QC_PROC_INSP", woNo, woLine);
 
+        // 生产日期(2026-11-01 补):此前**固定写 NULL**(2026-10-30 设计口径「业务未录 → 纸上留空」),
+        // 所以即使批次号带进来了,生产日期也是空的。报告现已锚定生产批次 ⇒ 生产日期应随批次带入:
+        //   ① 工单行完工时间(plang.完工时间)—— 批次号本身就是"完工日"标签(实测 20261017 ↔ 2026-10-17);
+        //   ② 批次号可解析为 yyyyMMdd → 用该日期(旧数据没有完工时间时的等价来源);
+        //   ③ 首件检验单.生产日期(同 工单号+工单行号)兜底(可能早于完工日);
+        //   仍然取不到 → NULL(纸上留空,不造数据)。
+        LocalDate prodDate = resolveProductionDate(woNo, woLine, lotNo, firstNo);
+        java.sql.Date prodDateSql = prodDate == null ? null : java.sql.Date.valueOf(prodDate);
+
         // 生产批次锚(2026-11-01,用户口径「只需要实现第一步」):报告头落 工单号 + 工单行号 ——
         // 唯一身份 = (工单号, 工单行号);`批次号` 只是完工日日期标签(会跨工单重复),不能当批身份。
         // 解析不到成品检验单(无工单行)时两列留空,不阻塞生成(历史口径不变)。
@@ -148,7 +157,7 @@ public class OqcReportService {
                 + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
                 no, outDate.isBlank() ? today : outDate, nv(cust), nv(prodCode), nv(prodName), nv(spec), nv(lotNo),
                 nv(woNo), woLine,
-                null, qty, today, null, nv(outNo), lineId, nv(asmNo), nv(firstNo), nv(procNo),
+                prodDateSql, qty, today, null, nv(outNo), lineId, nv(asmNo), nv(firstNo), nv(procNo),
                 nv(user), null, nv(user));
 
         // ② 行:标准层(计划表视图)
@@ -213,8 +222,48 @@ public class OqcReportService {
         return any.isEmpty() ? null : any.get(0);
     }
 
-    private String docOf(String panel, String woNo, Integer woLine) {
-        if (woNo == null || woNo.isBlank() || woLine == null) return null;
+    /**
+     * 生产日期取值(2026-11-01 补,用户报「带入了批次号为什么连生产日期都没有」)。
+     *
+     * <p>此前 createOne 把 生产日期 **固定写 NULL**(2026-10-30 设计口径「业务未录 → 纸上留空」);
+     * 而报告取数的成品检验单(qc_asm_insp_head)**没有生产日期列**,所以批次号带进来了、生产日期却一直空。
+     * 报告现已锚定生产批次,生产日期应随批次带入,按下列优先级取:</p>
+     * <ol>
+     *   <li><b>工单行完工时间</b>({@code plang.完工时间})—— 批次号本身就是「完工时自动生成的完工日标签」,
+     *       实测 批次 20261017 ↔ 完工时间 2026-10-17 17:00,两者同一天;</li>
+     *   <li><b>批次号可解析为 yyyyMMdd</b>(如 20261017) → 该日期(旧数据没有完工时间时的等价来源);</li>
+     *   <li><b>首件检验单.生产日期</b>(同 工单号+工单行号)—— 兜底;首件可能早于完工日(是成型首批的日期);</li>
+     *   <li>都取不到 → {@code null}(纸上留空,不造数据)。</li>
+     * </ol>
+     */
+    private LocalDate resolveProductionDate(String woNo, Integer woLine, String lotNo, String firstNo) {
+        // ① 工单行完工时间(按 工单号 + 工单行号 定位;找不到/未完工则往下走)
+        if (woNo != null && !woNo.isBlank() && woLine != null) {
+            List<java.sql.Date> done = jdbc.queryForList(
+                    "SELECT CONVERT(date, 完工时间) FROM dbo.plang"
+                            + " WHERE pl_no = ? AND ISNULL(pl_xc,0) = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + "   AND 完工时间 IS NOT NULL", java.sql.Date.class, woNo, woLine);
+            if (!done.isEmpty() && done.get(0) != null) return done.get(0).toLocalDate();
+        }
+        // ② 批次号 = yyyyMMdd(完工日标签)
+        if (lotNo != null && lotNo.trim().matches("\\d{8}")) {
+            try {
+                return LocalDate.parse(lotNo.trim(), java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+            } catch (Exception ignored) {
+                // 非法日期(如 20261399)→ 落到 ③
+            }
+        }
+        // ③ 首件检验单的生产日期(同工单行)
+        if (firstNo != null && !firstNo.isBlank()) {
+            List<java.sql.Date> d = jdbc.queryForList(
+                    "SELECT CONVERT(date, 生产日期) FROM dbo.qc_first_insp_head"
+                            + " WHERE 单据编号 = ? AND 生产日期 IS NOT NULL", java.sql.Date.class, firstNo);
+            if (!d.isEmpty() && d.get(0) != null) return d.get(0).toLocalDate();
+        }
+        return null;
+    }
+
+    private String docOf(String panel, String woNo, Integer woLine) {        if (woNo == null || woNo.isBlank() || woLine == null) return null;
         String table = switch (panel) {
             case "QC_FIRST_INSP" -> "qc_first_insp_head";
             case "QC_PROC_INSP" -> "qc_proc_insp_head";

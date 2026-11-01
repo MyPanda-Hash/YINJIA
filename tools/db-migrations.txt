@@ -4447,3 +4447,8 @@ migrate-scjl-report-date-20261101.sql
 #   qc_oqc_head +工单号/+工单行号(唯一身份=工单号+工单行号;批次号只是完工日日期标签)+ 查询索引;
 #   生成时由 OqcReportService 写入;历史报告按 成品检验单号 回填;yj_field/译名/注明齐。两账套执行。
 migrate-oqc-batch-anchor-20261101.sql
+
+# 2026-11-01 出厂检验报告「生产日期随生产批次带入」(用户报:带了批次号却没有生产日期)。
+#   根因:createOne 固定写 NULL + 成品检验单无生产日期列;新生成由 resolveProductionDate 写入
+#   (工单行完工时间 → 批次号 yyyyMMdd → 首件检验单生产日期),本脚本回填存量。两账套执行。
+migrate-oqc-prod-date-20261101.sql
