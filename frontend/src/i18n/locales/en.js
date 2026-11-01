@@ -2708,6 +2708,10 @@ export default {
     '新增子件': 'Add Component',
     '删除子件': 'Delete Component',
     '子件编码': 'Subcomponent Code',
+    // 工序报工「组装物料」(2026-11-01:只有组装工序有 BOM,选中组装时显示该工单的组装物料)
+    '组装物料': 'Assembly Materials',
+    '该产品还没有维护组装BOM': 'No assembly BOM maintained for this product yet',
+    '本次需求': 'Required Qty',
     '子件计量单位': 'Sub-unit of measurement',
     '定额数量': 'Quota quantity',
     '损耗率%': 'Loss rate%',
