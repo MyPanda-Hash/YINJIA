@@ -64,15 +64,22 @@
     <section v-if="!readOnly" class="mp-card">
       <div class="mp-sec">
         <!-- 已完成 = 退料(生成其他入库单);未完成 = 领料。标题跟着状态走,不让人误会 -->
-        <span>{{ isDone ? tt('扫物料码 · 退料') : tt('扫物料码 · 领料') }}</span>
+        <span>{{ isDone ? (outAudited ? tt('扫物料码 · 退料') : tt('扫物料码')) : tt('扫物料码 · 领料') }}</span>
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
-        <span v-if="isDone" class="mp-sec-note">{{ tt('这张单已完成:扫码即退料,提交后生成其他入库单') }}</span>
+        <span v-if="isDone && outAudited" class="mp-sec-note">{{ tt('这张单已完成:扫码即退料,提交后生成其他入库单') }}</span>
+        <span v-if="isDone && !outAudited" class="mp-sec-note">{{ tt('待仓管审批材料出库单,审批通过后才能退料') }}</span>
+      </div>
+
+      <!-- 已完成但材料出库单还没审批:还没扣库存,这时不能扫码退料 -->
+      <div v-if="isDone && !outAudited" class="mp-hint">
+        {{ tt('这张单已提交,材料出库单正在等仓管审批。审批通过(库存扣减)之后,再来这里扫码退料。') }}
       </div>
 
         <!-- 已完成的单**直接进退料模式**(loadDoc 里按状态设 returnMode=true)——
              用户口径「已完成的进去扫码应该是其他入库才对」,不再需要先点一次「开始退料」。
-             扫物料码解锁:数量框只有扫到物料后才出现,写入/取消后重新锁定。 -->
-        <div class="mp-row">
+             扫物料码解锁:数量框只有扫到物料后才出现,写入/取消后重新锁定。
+             ⚠ 已完成但材料出库单未审批时**整块隐藏**:那时既不能领也不能退。 -->
+        <div v-if="!isDone || outAudited" class="mp-row">
           <el-input
             ref="matInput"
             v-model="matText"
@@ -223,6 +230,12 @@
         >
           {{ tt('提交转材料出库单') }}
         </el-button>
+        <!-- 已完成单:分两种状态(2026-11-01)
+             提交只生成**待审批**的材料出库单,库存要等仓管审批才扣;
+             未审批时不能退料(退了等于凭空把料退进仓库),所以这里不给按钮,只提示等审批。 -->
+        <el-button v-else-if="!outAudited" type="info" size="large" disabled>
+          {{ tt('待仓管审批材料出库单') }}
+        </el-button>
         <el-button v-else type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
       </template>
     </div>
@@ -311,6 +324,15 @@ const submittingReturn = ref(false)
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 
 const isDone = computed(() => String(doc.value.状态 || '') === '已完成')
+
+/**
+ * 材料出库单是否已被仓管审批(2026-11-01)。
+ *
+ * 提交只生成**待审批**的材料出库单,库存要等仓管在「材料出库单」里审核才扣;
+ * 未审批就退料 = 凭空把料退进仓库,所以这个状态决定底部给「开始退料」还是「待仓管审批」。
+ * 后端同样有硬闸门(requireReturnable),这里只是别让人点了才被拒。
+ */
+const outAudited = computed(() => doc.value.出库已审批 === true)
 /** 这张单是否含退料(抬头「退料单号」非空 = 退过料) */
 /**
  * 这张单是否含退料(抬头「含退料」徽标 + 退料单号)。
@@ -420,7 +442,10 @@ async function loadDoc() {
     //   原来要先点一下「开始退料」才切模式,而完成态下扫码框默认走的是**领料**分支 ——
     //   用户直接扫就会调错接口(scanMaterial side='pick'),像是"还能领料"。
     //   领料只应发生在**未完成**的单上;已完成 = 已过账,之后只能退(生成其他入库单)。
-    if (String(d.状态 || '') === '已完成') {
+    // 🔴 2026-11-01:只有「已完成 **且** 材料出库单已被仓管审批」才自动进退料模式。
+    //   提交只生成待审批的出库单,库存还没扣;这时进退料等于凭空退料进仓。
+    const done = String(d.状态 || '') === '已完成'
+    if (done && d.出库已审批 === true) {
       returnMode.value = true
       returnQty.value = {}
     } else {
@@ -602,7 +627,10 @@ function cancelLock() {
 }
 
 /** 进入退料模式 */
-function startReturn() {  if (!isDone.value) { errText.value = tt('这张单还没提交完成,不能退料'); return }
+function startReturn() {
+  if (!isDone.value) { errText.value = tt('这张单还没提交完成,不能退料'); return }
+  // 材料出库单还没被仓管审批 ⇒ 库存没扣,不能退(后端 requireReturnable 同样拦)
+  if (!outAudited.value) { errText.value = tt('材料出库单还没审批,不能退料:请先让仓管审核'); return }
   returnMode.value = true
   returnQty.value = {}
   clearMsg()
