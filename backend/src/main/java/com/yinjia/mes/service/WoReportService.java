@@ -106,27 +106,24 @@ public class WoReportService {
     }
 
     /**
-     * **提交审批前**的行锚点校验(2026-11-01 用户口径:
-     * 「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」)。
+     * **提交审批前**的整行校验(2026-11-01 用户口径:
+     * 「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/「当前这个也是」)。
      *
-     * <p>为什么前置:行锚点(工单号+工单行号 / gd_id)决定这条报工记到哪一行、走哪条路线,
-     * 属于**编制环节**就该填对的数据。原实现只在 {@link #complete}(审核 / 审批通过)才校验:
-     * 编制者带着坏数据提交审批,审批人点「审批通过」才被拦(用户截图那句
-     * 「报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能审核」),还得先审批驳回、
-     * 回草稿改完再重提。现在提交审批先按同一判据({@link #anchorRowId})校验,锚不到行直接拒绝送审。
+     * <p>为什么前置:报工单的企业数据(工单号+工单行号锚点、工序是否在本行工艺路线内、是否跳序、
+     * 数量是否超上限、工单是否已结案/未排产)都是**编制环节**就该填对的东西。原实现只在
+     * {@link #complete}(审核 / 审批通过共用)才校验:编制者带着坏数据提交审批没人拦,审批人点
+     * 「审批通过」才被拒(用户两次截图:「报工缺少唯一工单行锚点…不能审核」/
+     * 「工序「OP-CX」不在工单…的工艺路线…内」),还得先审批驳回、回草稿改完再重提。
      *
-     * <p>审核路径的守卫**保留**(历史已送审单据 / 直连审核仍需兜底),正常流程不会再到那一步。
-     *
-     * @param action 报错文案里的动作名(提交审批 / 审核),两处文案同源、只差一个词
+     * <p>现在提交审批先按**审核同一份判据**({@link #validateRow})逐行校验,坏数据直接拒绝送审;
+     * 审核路径的守卫**保留**(历史已送审单据 / 管理员直审仍需兜底),正常流程不会再走到那一步。
      */
-    public void assertRowAnchors(String panelCode, String no, String action) {
+    public void validateBeforeSubmit(String panelCode, String no) {
         if (!posts(panelCode) || no == null || no.isBlank()) return;
         // 与审核同源:先尽力补一次行号(按 gd_id / 工单号+批次号 唯一命中才补,补不到不猜)
         stampRowNo(panelCode, no);
         for (Map<String, Object> r : rows(no)) {
-            if (anchorRowId(r) == null) {
-                throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能" + action);
-            }
+            validateRow(r, "提交审批");
         }
     }
 
@@ -197,8 +194,27 @@ public class WoReportService {
                         + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
     }
 
-    /** 审核完成化:守卫 + 镜像补全 + wgzt/jc_no。草稿行由面板保存时已带 gldh/gxdm/sl。 */
+    /** 审核完成化:先走 {@link #validateRow}(与「提交审批」同一份判据),再补镜像/锚定/完成态。 */
     private void complete(Map<String, Object> r, String user) {
+        Integer rowId = (Integer) r.get("id");
+        String wo = String.valueOf(r.get("gldh")).trim();
+        // 校验与「提交审批」前置校验共用同一份判据;审核时再校验一次
+        // (提交之后数据可能又变:同工序别人先报了、工单被结案…)。
+        Map<String, Object> t = validateRow(r, "审核");
+        writeComplete(t, rowId, wo, user);
+    }
+
+    /**
+     * 行校验(**只读**,不写库)—— 审核(complete)与「提交审批」前置校验共用同一份判据。
+     * 通过时返回**落点行**(plang_pc × plang 镜像),失败直接抛 IllegalStateException。
+     *
+     * <p>2026-11-01 用户口径:「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/
+     * 「当前这个也是」—— 报工单的锚点、工序是否在本行路线内、是否跳序、数量上限、工单结案/排产,
+     * 全是编制环节的数据校验,统一前移到提交审批;审核侧保留同一判据兜底(历史已送审单据)。
+     *
+     * @param action 报错文案里的动作名(审核 / 提交审批),只影响"锚点缺失"那一句措辞
+     */
+    private Map<String, Object> validateRow(Map<String, Object> r, String action) {
         Integer rowId = (Integer) r.get("id");
         String wo = String.valueOf(r.get("gldh")).trim();
         String op = String.valueOf(r.get("gxdm")).trim();
@@ -224,7 +240,7 @@ public class WoReportService {
         //   (正确工序被拒 / 错误工序被放行)。现改为取**本行**(工单行id → 批次兜底)的路线。
         Long repRowId = wantRowId;
         if (repRowId == null) {
-            throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能审核");
+            throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能" + action);
         }
         List<String> rtRows = repRowId != null
                 ? jdbc.queryForList("SELECT ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?"
@@ -336,12 +352,17 @@ public class WoReportService {
         double reported = opSum == null ? 0 : opSum;
         double allowed = cap * 1.01d;
         if (cap <= 0) {
-            throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能审核报工");
+            throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能报工");
         }
         if (reported + qty > allowed + 0.0001d) {
             throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]计划量 " + cap
                     + ",允许至 " + allowed + ",已报 " + reported + ",本次 " + qty + ")");
         }
+        return t;
+    }
+
+    /** 审核落库(校验已在 {@link #validateRow} 通过):补 jc_no / 排产镜像 / 锚定 / wgzt=Y。 */
+    private void writeComplete(Map<String, Object> t, Integer rowId, String wo, String user) {
         // jc_no 产成品流水(产线--yyMMdd-8位,按 线+日 递增)
         String scx = String.valueOf(t.get("pc_scx"));
         String day = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));

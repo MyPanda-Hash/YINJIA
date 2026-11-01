@@ -4424,3 +4424,12 @@ migrate-plang-order-demand-20261031.sql
 #   前端 QcOqcSheet 卫生安全结果列可填、打印/导出报表按填写值印出(空=留空,不再固定印「见型式检验报告」)。
 #   无表结构以外改动;两账套均执行(先正式、后测试)。
 migrate-oqc-hygiene-results-20261101.sql
+
+# 2026-11-01 工序报工单「工序」参照改落**工序名称**(修「选完存成编码 OP-CX,路线校验拦报工」)。
+#   用户报障:选工序后单里是 OP-CX,提交/审核被「工序「OP-CX」不在工艺路线内(成型→切炭→组装)」拦下;
+#   口径「当前报工的原先是名称不是编码,选择后填入当前的应该是工序名称」。
+#   ① yj_field:WO_REPORT / WO_REPORT_LIST / WO_COMPLETION_LIST 的 gxdm 参照 ref_field/display_field
+#      改「工序名称」(原 ref_field=工序编码,scjl.gxdm 的业务口径一直是名称,全库仅 1 行编码值);
+#   ② 存量修数:scjl.gxdm 恰好等于(唯一)bs_op.工序编码 的行改成对应 工序名称。
+#   幂等;两账套均执行(先正式、后测试)。
+migrate-wo-report-op-name-20261101.sql

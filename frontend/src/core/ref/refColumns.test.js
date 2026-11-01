@@ -122,3 +122,13 @@ test('⑨ refField / displayField 提到最前（弹窗 880px，关键列不能�
     '选一行时最需要的是「编号 + 名称」，必须第一屏可见',
   )
 })
+
+test('⑩ refField 与 displayField 同名时不重复出列（工序参照:工序名称/工序名称）', () => {
+  // 2026-11-01 实测「工序报工单 → 工序」弹窗列头印成:
+  //   工序名称 / 工序名称 / 工序编码 / … —— refField 与 displayField 都是「工序名称」时被提了两次。
+  const c = cfg({ head: ['备注'], singleDoc: true, grid: ['工序编码', '工序名称', '默认车间'] })
+  assert.deepEqual(
+    pickRefColumns(c, { refField: '工序名称', displayField: '工序名称' }),
+    ['工序名称', '工序编码', '默认车间'],
+  )
+})

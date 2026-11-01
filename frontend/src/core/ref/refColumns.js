@@ -62,9 +62,12 @@ function tidy(list, { skipHidden = false } = {}) {
   return out
 }
 
-/** 把 keyCols 提到最前(只保留确实存在于 cols 里的) */
+/** 把 keyCols 提到最前(只保留确实存在于 cols 里的;同名去重)
+ *  ⚠ 2026-11-01:refField 与 displayField 常常**同名**(如「工序」参照 = 工序名称/工序名称、
+ *    生产线 = 生产线/生产线),不去重会把同一列在弹窗里印两遍(实测工序参照列头:
+ *    「工序名称」「工序名称」「工序编码」…)。 */
 function promote(cols, keyCols) {
-  const keys = keyCols.filter((k) => k && cols.includes(k))
+  const keys = [...new Set(keyCols.filter((k) => k && cols.includes(k)))]
   if (!keys.length) return cols
   const rest = cols.filter((c) => !keys.includes(c))
   return [...keys, ...rest]
