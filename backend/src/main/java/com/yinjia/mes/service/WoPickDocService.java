@@ -237,10 +237,17 @@ public class WoPickDocService {
             String like = "%" + kw + "%";
             for (int i = 0; i < 5; i++) args.add(like);
         }
-        // 未完成按"最早开单的先处理"排(现场先开先领),已完成按"最近提交的在上"
+        // 🔴 2026-11-01 用户口径:「不管是生成的领料单还是已经完成的领料单,
+        //   ……都要按生成单据的最新时间排序」⇒ 一律**最新的在上**。
+        //
+        // 改造前未完成是 `创建时间 ASC`(最早开单的先处理),结果刚生成的单排在最下面,
+        // 现场要翻到底才找得到自己刚扫出来的那张 —— 用户报障的正是这个。
+        //
+        // 已完成取 `ISNULL(提交时间, 创建时间)`:已完成单的"最新"是它完成的时刻,
+        // 用提交时间才能让刚提交的单浮上来;没有提交时间的(异常数据)退回创建时间。
         sql.append(STATE_DONE.equals(state)
-                ? " ORDER BY 提交时间 DESC, id DESC"
-                : " ORDER BY 创建时间 ASC, id ASC");
+                ? " ORDER BY ISNULL(提交时间, 创建时间) DESC, id DESC"
+                : " ORDER BY 创建时间 DESC, id DESC");
 
         List<Map<String, Object>> raw = jdbc.queryForList(sql.toString(), args.toArray());
         List<Map<String, Object>> out = new ArrayList<>(raw.size());

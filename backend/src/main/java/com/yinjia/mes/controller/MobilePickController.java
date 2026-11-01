@@ -195,7 +195,7 @@ public class MobilePickController {
 
         String kw = keyword == null ? "" : keyword.trim();
         StringBuilder sql = new StringBuilder(
-                "SELECT TOP (200) p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
+                "SELECT TOP (500) p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.dm,N'') AS 产品编号, ISNULL(p.mc,N'') AS 产品名称,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.scx,N'') AS 生产线,"
                         + " ISNULL(p.完工状态,N'') AS 完工状态,"
@@ -211,8 +211,18 @@ public class MobilePickController {
             String like = "%" + kw + "%";
             args.add(like); args.add(like); args.add(like);
         }
-        // 未开单的排前面(这才是开单工作台要干的事),同组内按工单号
-        sql.append(" ORDER BY CASE WHEN d.id IS NULL THEN 0 ELSE 1 END, p.pl_no, p.pl_xc");
+        // 🔴 2026-11-01 排序口径:「已经开单和未开单的工单都要按生成单据的最新时间排序」。
+        //
+        // 仍保留「未开单在前」(开单工作台就是要先看到待开的),但**组内一律最新在上**:
+        //   · 已开单 —— 按它那张领料单的创建时间倒序(这就是"生成单据的时间");
+        //   · 未开单 —— 还没有单据,按**工单号倒序**(单号里带年月+流水,倒序即最新在前)。
+        //
+        // ⚠ 未开单这里**不能**用 p.id 排序:同一工单的多行可能分几次插入
+        //   (订单结转会把多行并进一张工单),按行 id 排会出现
+        //   「0018 → 0007#5 → 0017」这种跳号的怪顺序(实测踩到)。
+        sql.append(" ORDER BY CASE WHEN d.id IS NULL THEN 0 ELSE 1 END,"
+                + " CASE WHEN d.id IS NOT NULL THEN d.创建时间 END DESC,"
+                + " p.pl_no DESC, p.pl_xc DESC");
 
         List<Map<String, Object>> raw = jdbc.queryForList(sql.toString(), args.toArray());
         List<Map<String, Object>> out = new ArrayList<>(raw.size());
