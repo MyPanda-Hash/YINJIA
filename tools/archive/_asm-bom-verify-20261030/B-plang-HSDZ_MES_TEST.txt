@@ -1,0 +1,47 @@
+==> SET NOCOUNT ON; SELECT 'plang行数' AS what, COUNT(*) AS cnt FROM plang;
+what | cnt
+----------
+plang行数 | 38
+(1 行)
+==> SELECT 'plang-asp_cancel分布' AS what, ISNULL(asp_cancel,'<NULL>') AS v, COUNT(*) AS cnt FROM plang GROUP BY asp_cancel ORDER BY cnt DESC;
+what | v | cnt
+--------------
+plang-asp_cancel分布 | Y | 26
+plang-asp_cancel分布 | N | 12
+(2 行)
+==> SELECT 'distinct dm 全部' AS what, COUNT(DISTINCT dm) AS cnt FROM plang;
+what | cnt
+----------
+distinct dm 全部 | 33
+(1 行)
+==> SELECT 'distinct dm 非Y' AS what, COUNT(DISTINCT dm) AS cnt FROM plang WHERE ISNULL(asp_cancel,'') <> 'Y';
+what | cnt
+----------
+distinct dm 非Y | 12
+(1 行)
+==> SELECT 'distinct dm 非Y且非空' AS what, COUNT(DISTINCT dm) AS cnt FROM plang WHERE ISNULL(asp_cancel,'') <> 'Y' AND NULLIF(LTRIM(RTRIM(dm)),'') IS NOT NULL;
+what | cnt
+----------
+distinct dm 非Y且非空 | 12
+(1 行)
+==> SELECT 'distinct dm 仅asp_cancel为NULL' AS what, COUNT(DISTINCT dm) AS cnt FROM plang WHERE asp_cancel IS NULL AND NULLIF(LTRIM(RTRIM(dm)),'') IS NOT NULL;
+what | cnt
+----------
+distinct dm 仅asp_cancel为NULL | 0
+(1 行)
+==> SELECT 'distinct dm 非Y(清单)' AS what, dm FROM plang WHERE ISNULL(asp_cancel,'') <> 'Y' AND NULLIF(LTRIM(RTRIM(dm)),'') IS NOT NULL GROUP BY dm ORDER BY dm;
+what | dm
+----------
+distinct dm 非Y(清单) | 1.5T-1-M-B黄铜
+distinct dm 非Y(清单) | 1501
+distinct dm 非Y(清单) | 20200040001
+distinct dm 非Y(清单) | 20200040002
+distinct dm 非Y(清单) | 6
+distinct dm 非Y(清单) | B-70-01
+distinct dm 非Y(清单) | C5191H-0D20X15D8-AE
+distinct dm 非Y(清单) | C-75-35
+distinct dm 非Y(清单) | C-87-05
+distinct dm 非Y(清单) | T042
+distinct dm 非Y(清单) | T270
+distinct dm 非Y(清单) | T387
+(12 行)

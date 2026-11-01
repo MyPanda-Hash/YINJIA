@@ -1,0 +1,25 @@
+复验 ③ 构建产物核查 — 2026-10-30 14:41~14:43(只读;未运行构建,核查 Lead 的 `npm run build` 产物)
+
+依据:Lead 修复 fr.js(#1443 撇号转义)后执行 `npm run build`,dist 重建于 2026-10-30 14:40:54。
+
+1) 产物完整性与新鲜度
+   - frontend/dist/index.html  mtime 2026-10-30 14:40:54(9351 字节)
+   - frontend/dist 文件总数 = 150;除 favicon.svg(07:34,静态旧文件)外,149 个文件时间戳全部为 14:40,
+     即本次 build 完整重建(emptyOutDir 后重新写出,不存在旧 chunk 残留)
+   - index.html 引用资源 5 个,逐个存在,缺失 = []
+   - assets/*.js 79 个;入口 chunks:index-BF3-j8JE.js / index-BGbQGMFM.js / index-CtWw5mJq.js /
+     index-CxhUHD0O.js / index-DfN5Y3wF.js
+
+2) 修复是否进入构建产物
+   - dist/assets/fr-CL5W97mF.js 内含 `Liste des matériaux d'assemblage`(撇号正确 ⇒ 修复后的词条已打包)
+   - 10 个语言包 chunk 全在:zh-TW/en/ja/ko/es/fr/de/ru/vi/th 各 1 个
+   - 入口 index-CxhUHD0O.js 内含 `ASM_BOM`(1 处)、`组装物料清单`、`panelx/list/ASM_BOM`
+     ⇒ 本次菜单改动在构建产物中
+
+3) 报错判据
+   - 未发现单独构建日志文件(工作区 14:40 后仅 db-migrations.txt 改动,无 build log);
+     完整性反证:vite build 在模块解析/打包阶段报错时不会写出完整 index.html + 全部 chunk,
+     而本次 dist 为完整重建 ⇒ 构建成功
+   - 独立解析器旁证:esbuild.transformSync(fr.js) OK;node --check 10/10 OK(见 R2-locale-check.txt)
+
+结论:PASS —— 构建产物完整、含修复后 fr 词条与 ASM_BOM 菜单,无报错迹象。

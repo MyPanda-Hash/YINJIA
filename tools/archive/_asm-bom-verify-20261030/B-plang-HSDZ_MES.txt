@@ -1,0 +1,279 @@
+==> SET NOCOUNT ON; SELECT 'plang行数' AS what, COUNT(*) AS cnt FROM plang;
+what | cnt
+----------
+plang行数 | 476
+(1 行)
+==> SELECT 'plang-asp_cancel分布' AS what, ISNULL(asp_cancel,'<NULL>') AS v, COUNT(*) AS cnt FROM plang GROUP BY asp_cancel ORDER BY cnt DESC;
+what | v | cnt
+--------------
+plang-asp_cancel分布 | N | 395
+plang-asp_cancel分布 | Y | 81
+(2 行)
+==> SELECT 'distinct dm 全部' AS what, COUNT(DISTINCT dm) AS cnt FROM plang;
+what | cnt
+----------
+distinct dm 全部 | 282
+(1 行)
+==> SELECT 'distinct dm 非Y' AS what, COUNT(DISTINCT dm) AS cnt FROM plang WHERE ISNULL(asp_cancel,'') <> 'Y';
+what | cnt
+----------
+distinct dm 非Y | 244
+(1 行)
+==> SELECT 'distinct dm 非Y且非空' AS what, COUNT(DISTINCT dm) AS cnt FROM plang WHERE ISNULL(asp_cancel,'') <> 'Y' AND NULLIF(LTRIM(RTRIM(dm)),'') IS NOT NULL;
+what | cnt
+----------
+distinct dm 非Y且非空 | 244
+(1 行)
+==> SELECT 'distinct dm 仅asp_cancel为NULL' AS what, COUNT(DISTINCT dm) AS cnt FROM plang WHERE asp_cancel IS NULL AND NULLIF(LTRIM(RTRIM(dm)),'') IS NOT NULL;
+what | cnt
+----------
+distinct dm 仅asp_cancel为NULL | 0
+(1 行)
+==> SELECT 'distinct dm 非Y(清单)' AS what, dm FROM plang WHERE ISNULL(asp_cancel,'') <> 'Y' AND NULLIF(LTRIM(RTRIM(dm)),'') IS NOT NULL GROUP BY dm ORDER BY dm;
+what | dm
+----------
+distinct dm 非Y(清单) | A-32-09
+distinct dm 非Y(清单) | A-32-11
+distinct dm 非Y(清单) | A-32-13
+distinct dm 非Y(清单) | A-32-17
+distinct dm 非Y(清单) | A-32-25
+distinct dm 非Y(清单) | A-32-26
+distinct dm 非Y(清单) | A-32-27
+distinct dm 非Y(清单) | A-32-28
+distinct dm 非Y(清单) | A-32-30
+distinct dm 非Y(清单) | A-32-31
+distinct dm 非Y(清单) | A-32-32
+distinct dm 非Y(清单) | A-32-33
+distinct dm 非Y(清单) | A-32-34
+distinct dm 非Y(清单) | A-42-04
+distinct dm 非Y(清单) | A-45-01
+distinct dm 非Y(清单) | A-48-01
+distinct dm 非Y(清单) | A-48-02
+distinct dm 非Y(清单) | A-48-09
+distinct dm 非Y(清单) | A-48-10
+distinct dm 非Y(清单) | A-48-11
+distinct dm 非Y(清单) | A-48-12
+distinct dm 非Y(清单) | A-48-16
+distinct dm 非Y(清单) | A-48-17
+distinct dm 非Y(清单) | A-48-18
+distinct dm 非Y(清单) | A-48-19
+distinct dm 非Y(清单) | A-48-20
+distinct dm 非Y(清单) | A-48-21
+distinct dm 非Y(清单) | A-48-23
+distinct dm 非Y(清单) | A-48-24
+distinct dm 非Y(清单) | A-48-25
+distinct dm 非Y(清单) | A-48-30
+distinct dm 非Y(清单) | A-48-35
+distinct dm 非Y(清单) | A-48-36
+distinct dm 非Y(清单) | A-48-41
+distinct dm 非Y(清单) | A-48-42
+distinct dm 非Y(清单) | A-52-01
+distinct dm 非Y(清单) | A-52-02
+distinct dm 非Y(清单) | A-54-16
+distinct dm 非Y(清单) | A-55-01
+distinct dm 非Y(清单) | A-55-02
+distinct dm 非Y(清单) | A-55-03
+distinct dm 非Y(清单) | B-34-02
+distinct dm 非Y(清单) | B-34-12
+distinct dm 非Y(清单) | B-34-13
+distinct dm 非Y(清单) | B-34-14
+distinct dm 非Y(清单) | B-34-15
+distinct dm 非Y(清单) | B-37-06
+distinct dm 非Y(清单) | B-46-03
+distinct dm 非Y(清单) | B-46-04
+distinct dm 非Y(清单) | B-46-07
+distinct dm 非Y(清单) | B-46-07-1
+distinct dm 非Y(清单) | B-46-09-1
+distinct dm 非Y(清单) | B-46-11-2
+distinct dm 非Y(清单) | B-46-16
+distinct dm 非Y(清单) | B-46-22-3
+distinct dm 非Y(清单) | B-47-13
+distinct dm 非Y(清单) | B-47-20
+distinct dm 非Y(清单) | B-47-27
+distinct dm 非Y(清单) | B-47-28
+distinct dm 非Y(清单) | B-47-29
+distinct dm 非Y(清单) | B-50-01
+distinct dm 非Y(清单) | B-58-07
+distinct dm 非Y(清单) | B-58-08
+distinct dm 非Y(清单) | B-58-10
+distinct dm 非Y(清单) | B-58-11
+distinct dm 非Y(清单) | B-58-12
+distinct dm 非Y(清单) | B-65-04
+distinct dm 非Y(清单) | B-70-04
+distinct dm 非Y(清单) | B-70-05
+distinct dm 非Y(清单) | B-70-07
+distinct dm 非Y(清单) | B-70-09
+distinct dm 非Y(清单) | B-72-02
+distinct dm 非Y(清单) | B-72-05
+distinct dm 非Y(清单) | B-75-05
+distinct dm 非Y(清单) | B-76-05
+distinct dm 非Y(清单) | B-80-05
+distinct dm 非Y(清单) | B-80-08
+distinct dm 非Y(清单) | B-81-02
+distinct dm 非Y(清单) | B-84-13
+distinct dm 非Y(清单) | B-85-06
+distinct dm 非Y(清单) | B-85-07
+distinct dm 非Y(清单) | B-88-05
+distinct dm 非Y(清单) | B-88-13
+distinct dm 非Y(清单) | B-88-16
+distinct dm 非Y(清单) | B-92-02
+distinct dm 非Y(清单) | B-92-03
+distinct dm 非Y(清单) | B-92-05
+distinct dm 非Y(清单) | B-92-06
+distinct dm 非Y(清单) | B-92-12
+distinct dm 非Y(清单) | B-92-16
+distinct dm 非Y(清单) | C-103-02
+distinct dm 非Y(清单) | C-105-02
+distinct dm 非Y(清单) | C-105-03
+distinct dm 非Y(清单) | C-105-04
+distinct dm 非Y(清单) | C-108-02
+distinct dm 非Y(清单) | C-109-05
+distinct dm 非Y(清单) | C-109-06
+distinct dm 非Y(清单) | C-110-01
+distinct dm 非Y(清单) | C-110-03
+distinct dm 非Y(清单) | C-110-04
+distinct dm 非Y(清单) | C-20-01
+distinct dm 非Y(清单) | C-23-01
+distinct dm 非Y(清单) | C-32-02
+distinct dm 非Y(清单) | C-32-03
+distinct dm 非Y(清单) | C-32-04
+distinct dm 非Y(清单) | C-40-09
+distinct dm 非Y(清单) | C-40-10
+distinct dm 非Y(清单) | C-40-14
+distinct dm 非Y(清单) | C-53-01
+distinct dm 非Y(清单) | C-53-03
+distinct dm 非Y(清单) | C-53-05
+distinct dm 非Y(清单) | C-53-06
+distinct dm 非Y(清单) | C-58-11
+distinct dm 非Y(清单) | C-58-12
+distinct dm 非Y(清单) | C-58-13
+distinct dm 非Y(清单) | C-58-15
+distinct dm 非Y(清单) | C-68-01
+distinct dm 非Y(清单) | C-68-04
+distinct dm 非Y(清单) | C-75-01
+distinct dm 非Y(清单) | C-75-20
+distinct dm 非Y(清单) | C-75-27
+distinct dm 非Y(清单) | C-75-28
+distinct dm 非Y(清单) | C-75-35
+distinct dm 非Y(清单) | C-78-09
+distinct dm 非Y(清单) | C-78-10
+distinct dm 非Y(清单) | C-78-11
+distinct dm 非Y(清单) | C-78-21
+distinct dm 非Y(清单) | C-78-31
+distinct dm 非Y(清单) | C-78-32
+distinct dm 非Y(清单) | C-83-02
+distinct dm 非Y(清单) | C-84-01
+distinct dm 非Y(清单) | C-84-02
+distinct dm 非Y(清单) | C-84-03
+distinct dm 非Y(清单) | C-89-03
+distinct dm 非Y(清单) | C-89-04
+distinct dm 非Y(清单) | C-93-01
+distinct dm 非Y(清单) | C-95-01
+distinct dm 非Y(清单) | C-95-02
+distinct dm 非Y(清单) | C-95-03
+distinct dm 非Y(清单) | C-95-04
+distinct dm 非Y(清单) | C-95-07
+distinct dm 非Y(清单) | C-95-12
+distinct dm 非Y(清单) | C-95-22
+distinct dm 非Y(清单) | C-95-23
+distinct dm 非Y(清单) | C-95-27
+distinct dm 非Y(清单) | C-95-28
+distinct dm 非Y(清单) | C-95-29
+distinct dm 非Y(清单) | C-95-31
+distinct dm 非Y(清单) | C-95-32
+distinct dm 非Y(清单) | C-95-33
+distinct dm 非Y(清单) | C-95-36
+distinct dm 非Y(清单) | C-95-39
+distinct dm 非Y(清单) | C-95-41
+distinct dm 非Y(清单) | C-95-43
+distinct dm 非Y(清单) | C-95-48
+distinct dm 非Y(清单) | C-95-49
+distinct dm 非Y(清单) | D-01-08
+distinct dm 非Y(清单) | D-01-13
+distinct dm 非Y(清单) | D-01-14
+distinct dm 非Y(清单) | D-01-18
+distinct dm 非Y(清单) | D-01-21
+distinct dm 非Y(清单) | D-01-25
+distinct dm 非Y(清单) | D-01-35
+distinct dm 非Y(清单) | D-01-49
+distinct dm 非Y(清单) | D-01-50
+distinct dm 非Y(清单) | D-01-61
+distinct dm 非Y(清单) | D-01-70
+distinct dm 非Y(清单) | D-03-05
+distinct dm 非Y(清单) | D-053
+distinct dm 非Y(清单) | D-18-06
+distinct dm 非Y(清单) | D-18-07
+distinct dm 非Y(清单) | D-18-10
+distinct dm 非Y(清单) | D-25-01
+distinct dm 非Y(清单) | D-53-01
+distinct dm 非Y(清单) | D-58-01
+distinct dm 非Y(清单) | F-01-11
+distinct dm 非Y(清单) | S011-2
+distinct dm 非Y(清单) | S011-4
+distinct dm 非Y(清单) | S022-1
+distinct dm 非Y(清单) | S022-2
+distinct dm 非Y(清单) | S022-3
+distinct dm 非Y(清单) | S031-1
+distinct dm 非Y(清单) | S031-2
+distinct dm 非Y(清单) | S031-3
+distinct dm 非Y(清单) | S031-4
+distinct dm 非Y(清单) | S032-2
+distinct dm 非Y(清单) | S042-1
+distinct dm 非Y(清单) | S042-2
+distinct dm 非Y(清单) | S051-1
+distinct dm 非Y(清单) | S051-2
+distinct dm 非Y(清单) | S051-4
+distinct dm 非Y(清单) | S062
+distinct dm 非Y(清单) | S062-1
+distinct dm 非Y(清单) | S062-11
+distinct dm 非Y(清单) | S062-2
+distinct dm 非Y(清单) | S071-2
+distinct dm 非Y(清单) | S091-1
+distinct dm 非Y(清单) | S091-2
+distinct dm 非Y(清单) | S092-2
+distinct dm 非Y(清单) | S101-1
+distinct dm 非Y(清单) | S102-1
+distinct dm 非Y(清单) | S111-1
+distinct dm 非Y(清单) | S111-2
+distinct dm 非Y(清单) | S112
+distinct dm 非Y(清单) | T035-6
+distinct dm 非Y(清单) | T042
+distinct dm 非Y(清单) | T042-2
+distinct dm 非Y(清单) | T042-4
+distinct dm 非Y(清单) | T042-5
+distinct dm 非Y(清单) | T042-6
+distinct dm 非Y(清单) | T042-7
+distinct dm 非Y(清单) | T042-7-1
+distinct dm 非Y(清单) | T042-8
+distinct dm 非Y(清单) | T062-1
+distinct dm 非Y(清单) | T062-2
+distinct dm 非Y(清单) | T073
+distinct dm 非Y(清单) | T073-1
+distinct dm 非Y(清单) | T111
+distinct dm 非Y(清单) | T201
+distinct dm 非Y(清单) | T205
+distinct dm 非Y(清单) | T206
+distinct dm 非Y(清单) | T208
+distinct dm 非Y(清单) | T210
+distinct dm 非Y(清单) | T211-2
+distinct dm 非Y(清单) | T211-6
+distinct dm 非Y(清单) | T223
+distinct dm 非Y(清单) | T233
+distinct dm 非Y(清单) | T268
+distinct dm 非Y(清单) | T269
+distinct dm 非Y(清单) | T270
+distinct dm 非Y(清单) | T275
+distinct dm 非Y(清单) | T302
+distinct dm 非Y(清单) | T305
+distinct dm 非Y(清单) | T307
+distinct dm 非Y(清单) | T312
+distinct dm 非Y(清单) | T322
+distinct dm 非Y(清单) | T329
+distinct dm 非Y(清单) | T330
+distinct dm 非Y(清单) | T338
+distinct dm 非Y(清单) | T343
+distinct dm 非Y(清单) | T358
+distinct dm 非Y(清单) | T377
+distinct dm 非Y(清单) | T384
+distinct dm 非Y(清单) | T387
+(244 行)

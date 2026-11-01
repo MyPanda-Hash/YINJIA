@@ -1,0 +1,49 @@
+what | cnt
+----------
+R2-panel | 1
+(1 行)
+what | cnt | miss_col
+---------------------
+R2-field | 19 | 0
+(1 行)
+what | rows_cnt | docs | prods
+------------------------------
+R2-rows | 1085 | 236 | 236
+(1 行)
+what | cnt
+----------
+R2-工序非组装 | 0
+(1 行)
+what | cnt
+----------
+R2-用量偏差 | 0
+(1 行)
+what | cnt
+----------
+R2-行序异常单 | 0
+(1 行)
+what | cnt
+----------
+R2-一单多产品 | 0
+(1 行)
+what | cnt
+----------
+R2-面板译名语言数 | 9
+(1 行)
+what | cnt
+----------
+R2-字段缺en | 0
+(1 行)
+what | cnt
+----------
+R2-授权行 | 13
+(1 行)
+what | cnt
+----------
+R2-角色数 | 13
+(1 行)
+what | script_name | content_hash
+---------------------------------
+R2-schema_log | migrate-asm-bom-20261030.sql | 257943daf05f4dc0d1b04017890364adc9358819f7e3ad5a045a120ad6a74dac
+R2-schema_log | migrate-asm-bom-data-20261030.sql | 70ea33338937b8c45dfb639415ee64bf542d3b71340f88b43633f5bac4637050
+(2 行)

@@ -1,0 +1,246 @@
+==> SET NOCOUNT ON; SELECT 'A1-列数' AS what, CAST(COUNT(*) AS varchar(20)) AS val FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bs_asm_bom');
+what | val
+----------
+A1-列数 | 47
+(1 行)
+==> SELECT 'A1-审计列' AS what, c.name AS col, t.name AS typ, c.is_nullable AS nullable FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id WHERE c.object_id = OBJECT_ID('dbo.bs_asm_bom') AND c.name IN (N'asp_user1', N'asp_time1', N'asp_user2', N'asp_time2', N'asp_cancel') ORDER BY c.name;
+what | col | typ | nullable
+---------------------------
+A1-审计列 | asp_cancel | nvarchar | false
+A1-审计列 | asp_time1 | datetime2 | true
+A1-审计列 | asp_time2 | datetime2 | true
+A1-审计列 | asp_user1 | nvarchar | true
+A1-审计列 | asp_user2 | nvarchar | true
+(5 行)
+==> SELECT 'A1-索引' AS what, i.name AS idx, i.type_desc, i.is_primary_key, i.is_unique, i.is_disabled, i.has_filter FROM sys.indexes i WHERE i.object_id = OBJECT_ID('dbo.bs_asm_bom') AND i.type > 0 ORDER BY i.is_primary_key DESC, i.name;
+what | idx | type_desc | is_primary_key | is_unique | is_disabled | has_filter
+------------------------------------------------------------------------------
+A1-索引 | pk_bs_asm_bom | CLUSTERED | true | true | false | false
+A1-索引 | ix_bs_asm_bom_prod_process | NONCLUSTERED | false | false | false | false
+A1-索引 | uq_bs_asm_bom_doc_line | NONCLUSTERED | false | true | false | true
+(3 行)
+==> SELECT 'A1-索引键列' AS what, i.name AS idx, ic.index_column_id, c.name AS col, ic.is_included_column FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE i.object_id = OBJECT_ID('dbo.bs_asm_bom') AND i.type > 0 ORDER BY i.name, ic.index_column_id;
+what | idx | index_column_id | col | is_included_column
+-------------------------------------------------------
+A1-索引键列 | ix_bs_asm_bom_prod_process | 1 | 产品编码 | false
+A1-索引键列 | ix_bs_asm_bom_prod_process | 2 | 工序 | false
+A1-索引键列 | ix_bs_asm_bom_prod_process | 3 | 子件编码 | true
+A1-索引键列 | ix_bs_asm_bom_prod_process | 4 | 标准用量 | true
+A1-索引键列 | ix_bs_asm_bom_prod_process | 5 | 用量分子 | true
+A1-索引键列 | ix_bs_asm_bom_prod_process | 6 | 用量分母 | true
+A1-索引键列 | pk_bs_asm_bom | 1 | id | false
+A1-索引键列 | uq_bs_asm_bom_doc_line | 1 | 单据编号 | false
+A1-索引键列 | uq_bs_asm_bom_doc_line | 2 | 行序 | false
+(9 行)
+==> SELECT 'A2-表注明' AS what, COUNT(*) AS cnt, MAX(CAST(ep.value AS nvarchar(400))) AS descr FROM sys.extended_properties ep WHERE ep.major_id = OBJECT_ID('dbo.bs_asm_bom') AND ep.minor_id = 0 AND ep.name = 'MS_Description';
+what | cnt | descr
+------------------
+A2-表注明 | 1 | 组装物料清单(工序BOM子件行;单表 doc 模式按 单据编号 分组,一行=一个产品某工序的一个子件;工序列本期=组装,成型/切炭后续同表追加;来源=金蝶BOM引出列表_20261019174847)
+(1 行)
+==> SELECT 'A2-缺注列' AS what, COUNT(*) AS cnt FROM sys.columns c WHERE c.object_id = OBJECT_ID('dbo.bs_asm_bom') AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class = 1 AND ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = 'MS_Description');
+what | cnt
+----------
+A2-缺注列 | 0
+(1 行)
+==> SELECT 'A2-列注明数' AS what, COUNT(*) AS cnt FROM sys.extended_properties ep WHERE ep.class = 1 AND ep.major_id = OBJECT_ID('dbo.bs_asm_bom') AND ep.name = 'MS_Description';
+what | cnt
+----------
+A2-列注明数 | 48
+(1 行)
+==> SELECT 'A2-空文案列' AS what, COUNT(*) AS cnt FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID('dbo.bs_asm_bom') AND ep.name='MS_Description' AND (ep.value IS NULL OR LTRIM(RTRIM(CAST(ep.value AS nvarchar(400)))) = '');
+what | cnt
+----------
+A2-空文案列 | 0
+(1 行)
+==> SELECT c.column_id, c.name AS col, LEFT(CAST(ep.value AS nvarchar(200)), 50) AS descr FROM sys.columns c LEFT JOIN sys.extended_properties ep ON ep.class=1 AND ep.major_id=c.object_id AND ep.minor_id=c.column_id AND ep.name='MS_Description' WHERE c.object_id = OBJECT_ID('dbo.bs_asm_bom') ORDER BY c.column_id;
+column_id | col | descr
+-----------------------
+1 | id | 自增主键
+2 | 单据编号 | BOM 单据编号(=金蝶 BOM 编码,如 A-32-01_V0009;面板按它分组,一单一版)
+3 | 产品编码 | 父件产品编码(=bs_inv.存货编码;工单 plang.dm 同口径)
+4 | 产品名称 | 父件产品名称
+5 | 规格型号 | 父件规格型号
+6 | 工序 | 工序(本期=组装;成型/切炭后续同表追加;扫码领料按 产品编码+工序 取清单)
+7 | 版本号 | BOM 版本号(取自单据编号的 _V 后缀,如 V0009)
+8 | 默认BOM | 是否默认 BOM(金蝶「默认BOM」列:是/空)
+9 | 工艺路线名称 | 金蝶工艺路线名称(如「烧结炭棒1切1组装装箱」;仅来源留痕,MES 侧路线仍以 bs_route/p
+10 | 来源 | 数据来源(本次=金蝶BOM引出列表_20261019174847;导入脚本按此值幂等重灌)
+11 | 状态 | BOM 使用状态(金蝶「使用状态」列,本期全部=启用)
+12 | 行序 | 子件行序(同单内 1..n,保持 Excel 原顺序)
+13 | 子件编码 | 子件物料编码(=bs_inv.存货编码;含 **TB 半成品本体行)
+14 | 子件名称 | 子件物料名称
+15 | 子件规格 | 子件规格型号
+16 | 计量单位 | 子件计量单位(导入后从 bs_inv.计量单位 带出)
+17 | 标准用量 | 标准用量(=ROUND(用量分子/用量分母,4);生产 1 个单位成品的子件用量)
+18 | 用量分子 | 金蝶用量分子(原值;如包装料 1/124 的 1)
+19 | 用量分母 | 金蝶用量分母(原值;如包装料 1/124 的 124;空按 1)
+20 | 损耗量 | 损耗量(金蝶引出表无此列,本期=0)
+21 | 行备注 | 子件行备注(金蝶「行备注」原样)
+22 | asp_user1 | 创建人
+23 | asp_time1 | 创建时间
+24 | asp_user2 | 最后修改人
+25 | asp_time2 | 最后修改时间
+26 | asp_cancel | 软删标志(Y=已删除,与旧 ASPMIS 约定一致)
+27 | 备用1 | 预留扩展字段(未绑定)
+28 | 备用2 | 预留扩展字段(未绑定)
+29 | 备用3 | 预留扩展字段(未绑定)
+30 | 备用4 | 预留扩展字段(未绑定)
+31 | 备用5 | 预留扩展字段(未绑定)
+32 | 备用6 | 预留扩展字段(未绑定)
+33 | 备用7 | 预留扩展字段(未绑定)
+34 | 备用8 | 预留扩展字段(未绑定)
+35 | 备用9 | 预留扩展字段(未绑定)
+36 | 备用10 | 预留扩展字段(未绑定)
+37 | 备用11 | 预留扩展字段(未绑定)
+38 | 备用12 | 预留扩展字段(未绑定)
+39 | 备用13 | 预留扩展字段(未绑定)
+40 | 备用14 | 预留扩展字段(未绑定)
+41 | 备用15 | 预留扩展字段(未绑定)
+42 | 备用16 | 预留扩展字段(未绑定)
+43 | 备用17 | 预留扩展字段(未绑定)
+44 | 备用18 | 预留扩展字段(未绑定)
+45 | 备用19 | 预留扩展字段(未绑定)
+46 | 备用20 | 预留扩展字段(未绑定)
+47 | 备注 | 整单备注(BOM 级;行级备注见 行备注)
+(47 行)
+==> SELECT 'A3-panel' AS what, panel_code, panel_name, panel_name_en, category, mode, line_table, ISNULL(head_table, '<NULL>') AS head_table, group_col, pk_col, code_col, prefix, ISNULL(date_col, '<NULL>') AS date_col, page_size, detail_key, module_group FROM yj_panel WHERE panel_code = 'ASM_BOM';
+what | panel_code | panel_name | panel_name_en | category | mode | line_table | head_table | group_col | pk_col | code_col | prefix | date_col | page_size | detail_key | module_group
+------------------------------------------------------------------------------------------------------------------------
+A3-panel | ASM_BOM | 组装物料清单 | Assembly BOM | 基础档案 | doc | bs_asm_bom | <NULL> | 单据编号 | id | 单据编号 | BOM | <NULL> | 100 | items | 数据建模
+(1 行)
+==> SELECT 'A4-字段数' AS what, COUNT(*) AS cnt FROM yj_field WHERE panel_code = 'ASM_BOM';
+what | cnt
+----------
+A4-字段数 | 19
+(1 行)
+==> SELECT id, col_name, label, data_type, place, seq, width, editable, required, hidden, visible, CASE WHEN COL_LENGTH('dbo.bs_asm_bom', col_name) IS NULL THEN N'!!列不存在' ELSE N'OK' END AS phys FROM yj_field WHERE panel_code = 'ASM_BOM' ORDER BY seq, id;
+id | col_name | label | data_type | place | seq | width | editable | required | hidden | visible | phys
+-------------------------------------------------------------------------------------------------------
+18753 | 单据编号 | 单据编号 | 文本 | query,header | 10 | 150 | false | true | false | true | OK
+18754 | 产品编码 | 产品编码 | 文本 | query,header | 20 | 130 | false | true | false | true | OK
+18755 | 产品名称 | 产品名称 | 文本 | header | 30 | 200 | false | false | false | true | OK
+18756 | 规格型号 | 规格型号 | 文本 | header | 40 | 160 | false | false | false | true | OK
+18757 | 工序 | 工序 | 下拉框 | query,header | 50 | 90 | false | true | false | true | OK
+18758 | 版本号 | 版本号 | 文本 | header | 60 | 80 | false | false | false | true | OK
+18759 | 默认BOM | 默认BOM | 文本 | header | 70 | 80 | false | false | false | true | OK
+18760 | 工艺路线名称 | 工艺路线名称 | 文本 | header | 80 | 180 | false | false | false | true | OK
+18761 | 来源 | 来源 | 文本 | header | 85 | 200 | false | false | false | true | OK
+18762 | 状态 | 状态 | 文本 | query,header | 90 | 80 | false | false | false | true | OK
+18763 | 备注 | 备注 | 文本 | header | 100 | 200 | false | false | false | true | OK
+18764 | 行序 | 行序 | 整数 | detail | 110 | 60 | false | false | false | true | OK
+18765 | 子件编码 | 子件编码 | 文本 | query,detail | 120 | 140 | true | true | false | true | OK
+18766 | 子件名称 | 子件名称 | 文本 | detail | 130 | 180 | true | false | false | true | OK
+18767 | 子件规格 | 子件规格 | 文本 | detail | 140 | 160 | true | false | false | true | OK
+18768 | 计量单位 | 计量单位 | 文本 | detail | 150 | 80 | true | false | false | true | OK
+18769 | 标准用量 | 标准用量 | 小数 | detail | 160 | 90 | true | true | false | true | OK
+18770 | 损耗量 | 损耗量 | 小数 | detail | 170 | 80 | true | false | false | true | OK
+18771 | 行备注 | 行备注 | 文本 | detail | 180 | 200 | true | false | false | true | OK
+(19 行)
+==> SELECT 'A4-物理列缺失' AS what, COUNT(*) AS cnt FROM yj_field WHERE panel_code='ASM_BOM' AND COL_LENGTH('dbo.bs_asm_bom', col_name) IS NULL;
+what | cnt
+----------
+A4-物理列缺失 | 0
+(1 行)
+==> SELECT 'A4-非法place' AS what, COUNT(*) AS cnt FROM yj_field WHERE panel_code='ASM_BOM' AND (place IS NULL OR place NOT IN (N'query', N'header', N'detail', N'query,header', N'query,detail', N'header,detail', N'query,header,detail'));
+what | cnt
+----------
+A4-非法place | 0
+(1 行)
+==> SELECT 'A4-同col多place' AS what, COUNT(*) AS cnt FROM ( SELECT col_name FROM yj_field WHERE panel_code='ASM_BOM' GROUP BY col_name HAVING COUNT(DISTINCT place) > 1) x;
+what | cnt
+----------
+A4-同col多place | 0
+(1 行)
+==> SELECT 'A4-完全重复(panel,col,place,seq)' AS what, COUNT(*) AS cnt FROM ( SELECT col_name, place, seq FROM yj_field WHERE panel_code='ASM_BOM' GROUP BY col_name, place, seq HAVING COUNT(*) > 1) x;
+what | cnt
+----------
+A4-完全重复(panel,col,place,seq) | 0
+(1 行)
+==> SELECT 'A4-重复col' AS what, COUNT(*) AS cnt FROM ( SELECT col_name FROM yj_field WHERE panel_code='ASM_BOM' GROUP BY col_name HAVING COUNT(*) > 1) x;
+what | cnt
+----------
+A4-重复col | 0
+(1 行)
+==> SELECT 'A4-place分布' AS what, place, COUNT(*) AS cnt FROM yj_field WHERE panel_code='ASM_BOM' GROUP BY place ORDER BY place;
+what | place | cnt
+------------------
+A4-place分布 | detail | 7
+A4-place分布 | header | 7
+A4-place分布 | query,detail | 1
+A4-place分布 | query,header | 4
+(4 行)
+==> SELECT 'A5-面板译名' AS what, locale, text FROM yj_translation WHERE scope='panel' AND ref_key=N'组装物料清单' ORDER BY locale;
+what | locale | text
+--------------------
+A5-面板译名 | de | Montage-BOM
+A5-面板译名 | en | Assembly BOM
+A5-面板译名 | es | BOM de ensamblaje
+A5-面板译名 | fr | Nomenclature d'assemblage
+A5-面板译名 | ja | 組立BOM
+A5-面板译名 | ko | 조립 BOM
+A5-面板译名 | ru | Спецификация сборки
+A5-面板译名 | th | BOM การประกอบ
+A5-面板译名 | vi | BOM lắp ráp
+(9 行)
+==> SELECT 'A5-面板译名语言数' AS what, COUNT(DISTINCT locale) AS cnt FROM yj_translation WHERE scope='panel' AND ref_key=N'组装物料清单';
+what | cnt
+----------
+A5-面板译名语言数 | 9
+(1 行)
+==> SELECT 'A5-字段缺en' AS what, label FROM ( SELECT DISTINCT label FROM yj_field f WHERE f.panel_code='ASM_BOM' AND NOT EXISTS (SELECT 1 FROM yj_translation t WHERE t.scope='field' AND t.ref_key=f.label AND t.locale='en')) x ORDER BY label;
+what | label
+------------
+(0 行)
+==> SELECT 'A5-字段en清单' AS what, f.label, (SELECT TOP 1 text FROM yj_translation t WHERE t.scope='field' AND t.ref_key=f.label AND t.locale='en') AS en FROM yj_field f WHERE f.panel_code='ASM_BOM' GROUP BY f.label ORDER BY f.label;
+what | label | en
+-----------------
+A5-字段en清单 | 版本号 | Version number
+A5-字段en清单 | 备注 | Remark
+A5-字段en清单 | 标准用量 | Standard Usage
+A5-字段en清单 | 产品编码 | Product code
+A5-字段en清单 | 产品名称 | Product Name
+A5-字段en清单 | 单据编号 | Document Number
+A5-字段en清单 | 工序 | Process step
+A5-字段en清单 | 工艺路线名称 | Route Name
+A5-字段en清单 | 规格型号 | Specification
+A5-字段en清单 | 计量单位 | Unit of measurement
+A5-字段en清单 | 来源 | Source
+A5-字段en清单 | 默认BOM | Default BOM
+A5-字段en清单 | 损耗量 | Loss Qty
+A5-字段en清单 | 行备注 | Line Remark
+A5-字段en清单 | 行序 | Line Seq
+A5-字段en清单 | 状态 | Status
+A5-字段en清单 | 子件编码 | Component Code
+A5-字段en清单 | 子件规格 | Component Specification
+A5-字段en清单 | 子件名称 | Component Name
+(19 行)
+==> SELECT 'A6-角色数' AS what, COUNT(*) AS cnt FROM yj_role;
+what | cnt
+----------
+A6-角色数 | 13
+(1 行)
+==> SELECT 'A6-授权行' AS what, COUNT(*) AS cnt FROM yj_role_panel WHERE panel_code='ASM_BOM';
+what | cnt
+----------
+A6-授权行 | 13
+(1 行)
+==> SELECT 'A6-视图行' AS what, COUNT(*) AS cnt FROM yj_role_panel WHERE panel_code='ASM_BOM' AND perms LIKE '%view%';
+what | cnt
+----------
+A6-视图行 | 13
+(1 行)
+==> SELECT 'A6-query行' AS what, COUNT(*) AS cnt FROM yj_role_panel WHERE panel_code='ASM_BOM' AND perms LIKE '%query%';
+what | cnt
+----------
+A6-query行 | 13
+(1 行)
+==> SELECT 'A6-未授权角色' AS what, COUNT(*) AS cnt FROM yj_role r WHERE NOT EXISTS (SELECT 1 FROM yj_role_panel rp WHERE rp.panel_code='ASM_BOM' AND rp.role_id=r.id);
+what | cnt
+----------
+A6-未授权角色 | 0
+(1 行)
+==> SELECT 'A6-perms明细' AS what, perms, COUNT(*) AS cnt FROM yj_role_panel WHERE panel_code='ASM_BOM' GROUP BY perms;
+what | perms | cnt
+------------------
+A6-perms明细 | view,query | 13
+(1 行)

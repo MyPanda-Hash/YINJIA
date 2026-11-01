@@ -1,0 +1,61 @@
+==> SELECT COUNT(*) AS cnt_rows, COUNT(DISTINCT 单据编号) AS cnt_docs, COUNT(DISTINCT 产品编码) AS cnt_prods FROM dbo.bs_asm_bom;
+cnt_rows | cnt_docs | cnt_prods
+-------------------------------
+1085 | 236 | 236
+(1 行)
+==> SELECT 来源, COUNT(*) AS cnt, COUNT(DISTINCT 单据编号) AS docs, COUNT(DISTINCT 产品编码) AS prods FROM dbo.bs_asm_bom GROUP BY 来源 ORDER BY 来源;
+来源 | cnt | docs | prods
+-----------------------
+金蝶BOM引出列表_20261019174847 | 1085 | 236 | 236
+(1 行)
+==> SELECT COUNT(*) AS missing_unit FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND (计量单位 IS NULL OR 计量单位 = N'');
+missing_unit
+------------
+0
+(1 行)
+==> SELECT COUNT(*) AS bad_seq_docs FROM (SELECT 单据编号 FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' GROUP BY 单据编号 HAVING COUNT(*) <> MAX(行序) OR MIN(行序) <> 1) t;
+bad_seq_docs
+------------
+0
+(1 行)
+==> SELECT COUNT(*) AS not_asm FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND 工序 <> N'组装';
+not_asm
+----------
+0
+(1 行)
+==> SELECT COUNT(*) AS bad_version FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND 单据编号 NOT LIKE N'%\_'+版本号 ESCAPE N'\';
+bad_version
+-----------
+0
+(1 行)
+==> SELECT COUNT(*) AS bad_std FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND ABS(标准用量 - ROUND(用量分子 / 用量分母, 4)) > 0.00005;
+bad_std
+----------
+0
+(1 行)
+==> SELECT COUNT(*) AS bad_loss FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND 损耗量 <> 0;
+bad_loss
+----------
+0
+(1 行)
+==> SELECT COUNT(*) AS bad_audit FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND (asp_user1 <> N'金蝶BOM导入' OR asp_cancel <> N'N' OR asp_time1 IS NULL);
+bad_audit
+----------
+0
+(1 行)
+==> SELECT 产品编码, 单据编号, COUNT(*) AS 子件数 FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND 产品编码 IN (N'A-32-09',N'A-42-04',N'D-01-49',N'S051-2',N'T201') GROUP BY 产品编码, 单据编号 ORDER BY 产品编码;
+产品编码 | 单据编号 | 子件数
+-----------------
+A-32-09 | A-32-09_V0002 | 2
+A-42-04 | A-42-04_V0002 | 7
+D-01-49 | D-01-49_V0002 | 2
+S051-2 | S051-2_V0002 | 10
+T201 | T201_V0001 | 3
+(5 行)
+==> SELECT TOP 3 单据编号, 产品名称, 子件名称, 行备注 FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' ORDER BY 单据编号, 行序;
+单据编号 | 产品名称 | 子件名称 | 行备注
+------------------------
+A-32-09_V0002 | A+级烧结炭棒/滤芯 | A+级炭棒 | 
+A-32-09_V0002 | A+级烧结炭棒/滤芯 | PE袋 | 
+A-32-11_V0001 | A+级烧结炭棒/滤芯 | A+级烧结炭棒/滤芯 | 
+(3 行)

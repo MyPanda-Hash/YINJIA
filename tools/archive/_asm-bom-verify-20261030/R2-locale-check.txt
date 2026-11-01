@@ -1,0 +1,10 @@
+frontend/src/i18n/locales/en.js => OK
+frontend/src/i18n/locales/ja.js => OK
+frontend/src/i18n/locales/de.js => OK
+frontend/src/i18n/locales/es.js => OK
+frontend/src/i18n/locales/fr.js => OK
+frontend/src/i18n/locales/ko.js => OK
+frontend/src/i18n/locales/ru.js => OK
+frontend/src/i18n/locales/th.js => OK
+frontend/src/i18n/locales/vi.js => OK
+frontend/src/i18n/locales/zh-TW.js => OK

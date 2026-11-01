@@ -1,0 +1,62 @@
+=== 数据库规范体检 @ HSDZ_MES ===
+(豁免登记:table 53, panel 2, col 67, dupkey 90, count 3, skiplabel 27)
+
+[PASS] 01 表命名合规(白名单外)
+[PASS] 02 表级中文注明(白名单外)
+[PASS] 03 拼音/英文列名的列注明(共 0 列;存量收敛)
+[PASS] 04 业务表主键与审计四件套
+[PASS] 05 元数据漂移(字段不在其所在对象里)
+[PASS] 06 面板指向不存在的表/视图
+[PASS] 07 完全重复的字段登记行
+[WARN] 08 同一列多标签(数据键不唯一;已登记 81 组) —— 11 处
+        PURCHASE_IN.仓位编码
+        WO_SCHEDULE.产品编码
+        WO_SCHEDULE.产品名称
+        WO_SCHEDULE.工单号
+        WO_SCHEDULE.工单状态
+        WO_SCHEDULE.交期
+        WO_SCHEDULE.交期紧迫度
+        WO_SCHEDULE.客户
+        WO_SCHEDULE.生产车间
+        WO_SCHEDULE.未完成数量
+        WO_SCHEDULE.销售订单号
+[FAIL] 09 缺 en 译名(面板 17 / 字段标签 202) —— 实际 219,超过存量基线 0(棘轮:只许降不许升)
+        面板缺: 17 个;字段标签缺: 202 个
+        Z-G-C批次
+        Z-HP-C批次
+        安装车间
+        保养内容
+        保养情况
+        保养人
+        保养责任人
+        保养周期
+        保养周期(天)
+        本次结算金额本位币
+        本期出库金额
+        本期出库数量
+        …(还有 190 项)
+        补齐:tools/scripts/trigger-mt.ps1;免译标签登记见 §5
+[FAIL] 10 备份/临时表(应清零) —— 实际 33,超过存量基线 0(棘轮:只许降不许升)
+        _bak_qccat_detail_20261021
+        _bak_qcinsp_empty_20261021
+        _bak_qcinsp_empty_approval_20261021
+        _bak_qcinsp_empty_detail_20261021
+        _bak_qcinsp_empty_flow_20261021
+        _bak_qcinsp_empty_status_20261021
+        …(还有 27 项)
+[PASS] 11 ≥10 万行且无非聚集索引的表(现存 0 张大表)
+[FAIL] 12 迁移链清单 ↔ 文件一致(清单 663 / 文件 696) —— 10 处
+        未登记的脚本: check-mobile-write-20261020.sql
+        未登记的脚本: cleanup-rd-prod-20261029.sql
+        未登记的脚本: migrate-enable-rcsi-20261018.sql
+        未登记的脚本: migrate-free-pick-rid-20261020.sql
+        未登记的脚本: migrate-plang-batch-date-closed-20261021.sql
+        未登记的脚本: migrate-plang-no-month-closed-20261021.sql
+        未登记的脚本: migrate-record-group-20261028.sql
+        未登记的脚本: rollback-finish-in-wo-backfill-20261022.sql
+        未登记的脚本: rollback-prod-pick-outh-20261022.sql
+        未登记的脚本: rollback-wo-mixing-list.sql
+[PASS] 13 面板引用对象缺 pk_col / asp_cancel(打开即 500)
+
+=== 汇总: FAIL 3 / WARN 1 ===
+RESULT: FAIL-3
