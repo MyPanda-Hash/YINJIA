@@ -169,9 +169,15 @@ export const qcSheetCfgs = {
       { label: '填写日期', key: '单据日期', kind: 'date' },
     ],
     rows: [
+      // 2026-11-01 用户口径「不合格报告(制程)要关联制程检验单…不需要自动生单,能实现关联对应的单号
+      //   然后带入数据即可」⇒ 第一行补「制程检验单号」参照格(QC_PROC_INSP.单据编号)。
+      //   异名带入挂 refCarry(同名如 客户名称/产品名称 走后端 refMap 自动带回);
+      //   refAllStatus = 参照候选不按「单据状态=已审核」过滤(该列对制程检验单是历史遗留列,见 engine 注释)。
       { kind: 'pairs', cells: [
         { label: '检验工站', key: '检验工站', flex: 1 },
         { label: '客户', key: '客户名称', flex: 1 },
+        { label: '制程检验单号', key: '制程检验单号', flex: 1.2, refAllStatus: true,
+          refCarry: { '检验工站': ['工序'], '异常产品规格': ['规格型号'], '异常时间': ['单据日期'] } },
       ] },
       { kind: 'pairs', cells: [
         { label: '异常时间', key: '异常时间', kind: 'date', flex: 1 },
@@ -212,9 +218,19 @@ export const qcSheetCfgs = {
         { label: '不合格品数量', key: '不合格品数量', flex: 0.9 },
         { label: '不合格品比例', key: '不合格品比例', flex: 0.9 },
       ] },
+      // 2026-11-01 用户口径「不合格品处理单(制程)要关联不合格报告(制程)…带入数据即可」⇒ 补
+      //   「不合格报告单号」参照格(QC_BHG.单据编号)。**放第 3 行**(第 1 行已有 3 格,再挤成 4 格
+      //   会把 客户/产品编码/产品名称 压到只剩"点/测试…"——实测截图确认);第 3 行原只有 2 格,放这里
+      //   版式不挤、行高不变(不加行 ⇒ 打印分页不变)。
+      //   同一报告的 客户名称/产品名称/不合格品数量/原因分析 由后端 refMap 同名自动带回;
+      //   异名(产品规格←异常产品规格、问题描述←异常描述)挂 refCarry。
+      //   refExclude 文档编号:后端同名 refMap 会把 BHG 的「文档编号(YJ-QR-11)」带过来,本单必须是 YJ-QR-59。
       { kind: 'pairs', cells: [
         { label: '问题来源', key: '问题来源', kind: 'checks', options: ['成型', '组装'], flex: 1.5 },
         { label: '责任人', key: '责任人', flex: 1 },
+        { label: '不合格报告单号', key: '不合格报告单号', flex: 1.3, refAllStatus: true,
+          refExclude: ['文档编号'],
+          refCarry: { '产品规格': ['异常产品规格'], '问题描述': ['异常描述'] } },
       ] },
       { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, sign: '责任人' },
       { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, sign: '责任人' },

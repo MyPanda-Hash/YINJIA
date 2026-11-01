@@ -3212,6 +3212,9 @@ export default {
     '控制标准及要求': 'Control Standard & Requirements',
     '检验': 'Inspection',
     '不合格应对措施': 'Nonconformity Response',
+    /* ── 质量单据·关联单号(2026-11-01 不合格报告→制程检验单 / 不合格品处理单→不合格报告) ── */
+    '制程检验单号': 'In-Process Inspection No.',
+    '不合格报告单号': 'Nonconformance Report No.',
     '检测频率': 'Inspection Frequency',
     '取样方式': 'Sampling Method',
     '检验类别': 'Inspection Category',

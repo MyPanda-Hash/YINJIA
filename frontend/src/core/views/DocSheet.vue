@@ -646,7 +646,7 @@
         />
       </div>
     </div>
-    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
+    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :skip-audit-filter="prodRefSkipAudit" @confirm="onProdRefConfirm" />
   </div>
 </template>
 
@@ -980,6 +980,20 @@ function setCheck(key, o) {
 }
 
 // ── 参照字段(文档编号 → 立项申请右上角编号):点击右上角弹参照,确认后按 refMap 带回(密级等) ──
+// 2026-11-01:纸面格子还支持三项配置(quality 单据「关联单号」用):
+//   · refAllStatus:true —— 参照弹窗跳过「单据状态=已审核」自动过滤(纸面单据该列是历史遗留列,不可靠;
+//     见 engine.queryRefRows 的同名注释);
+//   · refCarry:{本单字段: 来源字段|来源字段数组} —— 显式声明**异名**带入(如 检验工站←工序),
+//     同名带入仍走后端下发的 refMap;数组取第一个有值的;
+//   · refExclude:['字段'] —— 后端同名 refMap 会带过来的字段里,本格不该被来源单覆盖的(如 文档编号=本单模板号)。
+function cfgCellOf(key) {
+  for (const row of props.config?.rows || []) {
+    for (const c of row.cells || []) {
+      if (c && c.key === key) return c
+    }
+  }
+  return null
+}
 function isRefKey(key) {
   if (!key) return false
   const f = fieldMap.value.get(key)
@@ -987,21 +1001,34 @@ function isRefKey(key) {
 }
 const prodRefVisible = ref(false)
 const prodRefKey = ref('')
+const prodRefSkipAudit = ref(false)
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
 function openProdRef(key) {
   if (!props.editable || !isRefKey(key)) return
   prodRefKey.value = key
+  prodRefSkipAudit.value = !!cfgCellOf(key)?.refAllStatus
   prodRefVisible.value = true
 }
 function onProdRefConfirm(rows) {
   const f = prodRefField.value
   const source = rows?.[0]
   if (!f || !source) return
+  const cell = cfgCellOf(prodRefKey.value) || {}
+  // 排除键:先记下本单当前值,refMap 全部回填后再还原(否则选一次报告就把本单的文档编号刷成来源单的)
+  const keep = {}
+  for (const k of cell.refExclude || []) keep[k] = props.head[k]
   const refField = f.refField || f.dataName
   props.head[prodRefKey.value] = source[refField] ?? ''
   for (const m of f.refMap || []) {
     if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
   }
+  // 纸面显式声明的异名带入(同名带入已由后端 refMap 完成)
+  for (const [to, froms] of Object.entries(cell.refCarry || {})) {
+    const cand = Array.isArray(froms) ? froms : [froms]
+    const v = cand.map((k) => source[k]).find((x) => x !== undefined && x !== null && String(x).trim() !== '')
+    if (v !== undefined) props.head[to] = v
+  }
+  for (const [k, v] of Object.entries(keep)) props.head[k] = v
   prodRefVisible.value = false
   emit('dirty')
 }

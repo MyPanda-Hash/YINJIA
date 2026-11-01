@@ -213,7 +213,13 @@ function resolveFilterValue(expected, row) {
 }
 
 // 拉取引用面板数据（SQL 后端）
-export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null } = {}) {
+// skipAuditFilter(2026-11-01):调用方声明「不要自动加『单据状态=已审核』候选过滤」。
+//   背景:纸面单据(不合格报告 QC_BHG / 不合格品处理单 QC_BHC 等)的表头「单据状态」是**历史遗留列**,
+//   MES 侧从不维护(真源 yj_doc_status,列表/纸面显示的是派生值);实测 qc_proc_insp_head 433 张单只有
+//   1 张写着「已审核」⇒ 一加该过滤,「关联制程检验单」的候选就只剩 1 条,等于不可用。
+//   弹窗里仍按派生状态显示「单据状态」列,由用户自己认单。仅 DocSheet 纸面格子(refAllStatus)显式开启,
+//   其余所有参照行为逐字不变。
+export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null, skipAuditFilter = false } = {}) {
   const r = normRef(field)
   // 级联过滤(2026-10-09):filter 值支持 `$字段` 占位,按本行取值;
   //   解析不出值(没选上级字段/没传本行)⇒ 直接无候选,避免把全库仓位倒给用户选。
@@ -235,7 +241,8 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200, row = 
   // filter/keyword 在展平后的明细行上应用
   const cond = singleDoc || hasAlternativeFilter ? {} : { ...filter }
   // 2026-08-25：参照面板有「审核」流程（单据类面板）时，仅已审核来源单据可选（对齐 T+：已审核才能选择生单）
-  if (!cond['单据状态']) {
+  // 2026-11-01：skipAuditFilter 时跳过（见函数头注释;纸面单据的该列不可靠,不能据此过滤）
+  if (!skipAuditFilter && !cond['单据状态']) {
     try {
       const hasAudit = (refConfig?.metadata?.buttonGroups || []).some((g) =>
         (g.actions || []).some((a) => ['审核', '提交审批'].includes(a)))
