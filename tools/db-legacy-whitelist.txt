@@ -76,8 +76,6 @@ col:bd_purchase_in.整单折扣率%
 col:bd_sale_out.ivc_status 
 col:bd_sale_out.整单折扣率%
 col:bd_tax_type.税率%
-col:bl_manu_order.累计汇报套数(工序单位)
-col:bl_manu_order.齐套数量(主)
 col:bl_pu_order.折扣%
 col:bl_pu_order.税率%
 col:bl_pu_req.税率%
@@ -144,13 +142,6 @@ col:sl_recv_detail.税率%
 
 # ---- 同一物理列多标签(数据键不唯一,待收敛:告警不阻断) ----
 dupkey:KHDD.je
-dupkey:MANU_ORDER.余量
-dupkey:MANU_ORDER.入库数量
-dupkey:MANU_ORDER.单价
-dupkey:MANU_ORDER.批号
-dupkey:MANU_ORDER.排产数量
-dupkey:MANU_ORDER.金额
-dupkey:MANU_ORDER.需求数量
 dupkey:MATERIAL_OUT_DETAIL.材料名称
 dupkey:MATERIAL_OUT_STATS.材料名称
 dupkey:PURCHASE_IN.批次号
