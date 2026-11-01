@@ -4418,3 +4418,9 @@ migrate-oqc-itemmap-seed-20261030.sql
 #   代码侧:QuickScheduleService.createFromOrderLine 改为每次转单一张新工单 + 行号=订单行号。
 #   两账套均执行(先正式、后测试)。
 migrate-plang-order-demand-20261031.sql
+
+# 2026-11-01 出厂检验报告:卫生安全 15 项「结果」改为可填写(用户口径「这些红框内容要能填写」)。
+#   qc_oqc_head 加 15 个可空文本列(卫生_<项目>)+ 列级中文注明 + yj_field 15 行(hidden)+ en 译名;
+#   前端 QcOqcSheet 卫生安全结果列可填、打印/导出报表按填写值印出(空=留空,不再固定印「见型式检验报告」)。
+#   无表结构以外改动;两账套均执行(先正式、后测试)。
+migrate-oqc-hygiene-results-20261101.sql

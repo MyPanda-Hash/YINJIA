@@ -7305,9 +7305,36 @@ function fetchOqcReportBlob(fmt) {
     responseType: 'blob',
   })
 }
+/** 卫生安全 15 项结果列键(与 qc_oqc_head 的 15 个 `卫生_*` 列、QcOqcSheet.HYGIENE_ROWS 同源) */
+const OQC_HYGIENE_KEYS = [
+  '卫生_浑浊度', '卫生_臭和味', '卫生_肉眼可见物', '卫生_PH', '卫生_溶解性总固体',
+  '卫生_耗氧量', '卫生_砷', '卫生_铬', '卫生_铝', '卫生_铅',
+  '卫生_汞', '卫生_铁', '卫生_锰', '卫生_铜', '卫生_锌',
+]
+/**
+ * 卫生安全 15 项结果补存(2026-11-01 用户口径「这些红框内容要能填写」)。
+ *
+ * <p>为什么通用「保存」不够:后端 ButtonService.labelsToCols 把**空串归一成 null 并跳过**
+ * (历史口径「空值不清列」)⇒ 已填过的结果改回空白时清不掉,刷新又变回旧值。
+ * 这里在通用保存成功之后,把 15 列原样(含空串)交给专用接口 `/api/oqc/hygieneResults`,
+ * 由它按白名单显式写(空串→NULL)。<b>必须在 load() 之前调用</b> —— load 会把库里的值读回来。</p>
+ */
+async function saveOqcHygieneResults(no, head) {
+  if (!no || !head) return
+  const 结果 = {}
+  for (const k of OQC_HYGIENE_KEYS) 结果[k] = String(head[k] ?? '')
+  try {
+    const body = await request.post('/oqc/hygieneResults', { 单据编号: no, 结果 })
+    if (body && typeof body === 'object' && body.code != null && body.code !== 200) {
+      throw new Error(body.message || '')
+    }
+  } catch (e) {
+    // 通用保存已成功(表头/明细) —— 这里失败只提示,不回滚、不把整次保存报成失败
+    ElMessage.warning(tt('卫生安全结果保存失败，请重试') + (engine.errMsg(e) ? '：' + engine.errMsg(e) : ''))
+  }
+}
 /** 下载服务端受控表单(PDF/Excel) */
-async function downloadOqcReport(fmt) {
-  if (!curDocNo.value) { ElMessage.warning(tt('未找到可导出的单据')); return }
+async function downloadOqcReport(fmt) {  if (!curDocNo.value) { ElMessage.warning(tt('未找到可导出的单据')); return }
   const loading = ElMessage({ message: tt(fmt === 'xlsx' ? '正在生成 Excel…' : '正在生成 PDF…'), duration: 0 })
   try {
     const blob = await fetchOqcReportBlob(fmt)
@@ -8897,6 +8924,11 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
     })    // 旧客户端口径的兜底提示:后端在"既没声明改动行、也没声明整档"时会跳过缺席行软删
     if (res && Number(res['未全量跳过软删']) > 0) {
       ElMessage.warning(tt('当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除'))
+    }
+    // 出厂检验报告(QC_OQC_REPORT):卫生安全 15 项结果**补存**(通用保存跳过空串 ⇒ 改回空白清不掉;
+    // 见 saveOqcHygieneResults 注释)。必须在 load() 之前 —— load 会重新拉库,把刚清空的值读回来。
+    if (String(panelCode.value) === 'QC_OQC_REPORT') {
+      await saveOqcHygieneResults(documentNo, cur.value)
     }
     await load()
     const index = list.value.findIndex((item) => item['编号'] === documentNo)

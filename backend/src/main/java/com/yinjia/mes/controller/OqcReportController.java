@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -116,6 +117,65 @@ public class OqcReportController {
 
     private String str(Object o) {
         return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /** 卫生安全结果列白名单(与 qc_oqc_head 的 15 个 `卫生_*` 列一一对应;顺序同受控表单) */
+    private static final List<String> HYGIENE_COLS = List.of(
+            "卫生_浑浊度", "卫生_臭和味", "卫生_肉眼可见物", "卫生_PH", "卫生_溶解性总固体",
+            "卫生_耗氧量", "卫生_砷", "卫生_铬", "卫生_铝", "卫生_铅",
+            "卫生_汞", "卫生_铁", "卫生_锰", "卫生_铜", "卫生_锌");
+
+    /**
+     * 卫生安全 15 项「结果」保存(2026-11-01 用户口径「这些红框内容要能填写」)。
+     *
+     * <p>为什么单开一个接口、不让通用「保存」顺手写:通用保存把**空串归一成 null 并跳过**
+     * (ButtonService.labelsToCols,历史口径:空值不清列)⇒ 纸面上已经填过的结果改回空白时**清不掉**,
+     * 刷新后又变回旧值。这里按白名单显式写 15 列(空串→NULL),只允许**草稿态**、需「保存」权限。</p>
+     *
+     * <p>请求体:{@code { "单据编号": "OQC-2026-11-0003", "结果": { "卫生_浑浊度": "0.12", ... } }};
+     * 只认 15 个白名单列(键不存在/多余键一律忽略),值截断 50 字。返回保存的列数。</p>
+     */
+    @PostMapping("/hygieneResults")
+    public ApiResult<Map<String, Object>> saveHygieneResults(@RequestBody Map<String, Object> body,
+                                                             Principal principal) {
+        perm.requireButton(PANEL, "保存");
+        String no = str(body.get("单据编号"));
+        if (no.isEmpty()) return ApiResult.error(400, "单据编号不能为空");
+        Map<String, String> cols = new LinkedHashMap<>();
+        Object raw = body.get("结果");
+        if (raw instanceof Map<?, ?> m) {
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                String key = str(e.getKey());
+                if (!HYGIENE_COLS.contains(key)) continue;
+                String v = str(e.getValue());
+                cols.put(key, v.length() > 50 ? v.substring(0, 50) : v);
+            }
+        }
+        if (cols.isEmpty()) return ApiResult.error(400, "没有需要保存的卫生安全结果");
+        // 草稿态守卫:单据存在、未作废、未审核、未归档(审核后纸面只读,后端同口径拒绝)
+        Integer editable = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM qc_oqc_head h LEFT JOIN yj_doc_status s"
+                        + "  ON s.panel_code = N'" + PANEL + "' AND s.doc_no = h.单据编号"
+                        + " WHERE h.单据编号 = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                        + "   AND ISNULL(s.shr,'') = '' AND ISNULL(s.archived,'') <> 'Y'"
+                        + "   AND ISNULL(s.canceled,'N') <> 'Y'",
+                Integer.class, no);
+        if (editable == null || editable == 0) return ApiResult.error(400, "单据不存在或已审核，不能修改");
+        StringBuilder set = new StringBuilder();
+        List<Object> args = new ArrayList<>();
+        for (Map.Entry<String, String> e : cols.entrySet()) {
+            if (set.length() > 0) set.append(", ");
+            set.append("[").append(e.getKey()).append("] = ?");
+            args.add(e.getValue().isBlank() ? null : e.getValue());
+        }
+        set.append(", asp_user2 = ?, asp_time2 = GETDATE()");
+        args.add(principal == null || principal.getName() == null ? "system" : principal.getName());
+        args.add(no);
+        int n = jdbc.update("UPDATE qc_oqc_head SET " + set + " WHERE 单据编号 = ?", args.toArray());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("单据编号", no);
+        out.put("保存列数", n > 0 ? cols.size() : 0);
+        return ApiResult.ok(out);
     }
 
     private Long longOf(Object o) {

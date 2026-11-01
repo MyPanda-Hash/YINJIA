@@ -196,11 +196,23 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="h in HYGIENE_ROWS" :key="h.item">
+            <tr v-for="h in HYGIENE_ROWS" :key="h.key">
               <td class="oqc-center">{{ tt(h.item) }}</td>
               <td class="oqc-center">{{ tt(h.requirement) }}</td>
-              <!-- 本列本轮不录数:统一印「见型式检验报告」(与受控表单/服务端报表同口径) -->
-              <td class="oqc-center">{{ tt('见型式检验报告') }}</td>
+              <!-- 结果列(2026-11-01 用户口径「这些红框内容要能填写」):草稿态可填,落 qc_oqc_head.卫生_<项目>;
+                   只读态显示已填值。空 = 未录(纸面留空,不再固定印「见型式检验报告」) -->
+              <td class="oqc-center">
+                <el-input
+                  v-if="canEdit(h.key)"
+                  :model-value="head[h.key] ?? ''"
+                  size="small"
+                  class="oqc-cell oqc-hygiene-input"
+                  maxlength="50"
+                  :placeholder="tt('填写')"
+                  @update:model-value="(v) => setHead(h.key, v)"
+                />
+                <span v-else class="oqc-ro">{{ head[h.key] || '' }}</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -292,25 +304,27 @@ const COLUMNS = [
 ]
 
 /**
- * 卫生安全 15 行(静态纸面内容,不随单据变化;卫生要求文字照受控表单第二页)。
- * 结果列固定印「见型式检验报告」—— 本轮不录数,也不拿样张里的 0.12/1.79/ND 假值充数。
+ * 卫生安全 15 行(纸面内容固定;卫生要求文字照受控表单第二页)。
+ * 结果列 = **手填**(2026-11-01 用户口径「这些红框内容要能填写」):每行一个头表字段
+ * `卫生_<项目>`(qc_oqc_head 上 15 个可空文本列,yj_field 已登记、hidden=1 只作数据管道),
+ * 草稿态渲染成输入框、只读态显示已填值;空 = 未录(留空,不再固定印「见型式检验报告」)。
  */
 const HYGIENE_ROWS = [
-  { item: '浑浊度', requirement: '增加量≤0.2NTU' },
-  { item: '臭和味', requirement: '浸泡后水无异臭、异味' },
-  { item: '肉眼可见物', requirement: '浸泡后水不产生任何肉眼可见的碎片杂物等' },
-  { item: 'PH', requirement: '改变量≤0.5' },
-  { item: '溶解性总固体', requirement: '/' },
-  { item: '耗氧量（以O2计）', requirement: '增加量≤1 mg/L' },
-  { item: '砷', requirement: '增加量≤0.001 mg/L' },
-  { item: '铬', requirement: '增加量≤0.005 mg/L' },
-  { item: '铝', requirement: '增加量≤0.02 mg/L' },
-  { item: '铅', requirement: '增加量≤0.001 mg/L' },
-  { item: '汞', requirement: '增加量≤0.0001 mg/L' },
-  { item: '铁', requirement: '增加量≤0.06 mg/L' },
-  { item: '锰', requirement: '增加量≤0.02 mg/L' },
-  { item: '铜', requirement: '增加量≤0.2 mg/L' },
-  { item: '锌', requirement: '增加量≤0.2 mg/L' },
+  { key: '卫生_浑浊度', item: '浑浊度', requirement: '增加量≤0.2NTU' },
+  { key: '卫生_臭和味', item: '臭和味', requirement: '浸泡后水无异臭、异味' },
+  { key: '卫生_肉眼可见物', item: '肉眼可见物', requirement: '浸泡后水不产生任何肉眼可见的碎片杂物等' },
+  { key: '卫生_PH', item: 'PH', requirement: '改变量≤0.5' },
+  { key: '卫生_溶解性总固体', item: '溶解性总固体', requirement: '/' },
+  { key: '卫生_耗氧量', item: '耗氧量（以O2计）', requirement: '增加量≤1 mg/L' },
+  { key: '卫生_砷', item: '砷', requirement: '增加量≤0.001 mg/L' },
+  { key: '卫生_铬', item: '铬', requirement: '增加量≤0.005 mg/L' },
+  { key: '卫生_铝', item: '铝', requirement: '增加量≤0.02 mg/L' },
+  { key: '卫生_铅', item: '铅', requirement: '增加量≤0.001 mg/L' },
+  { key: '卫生_汞', item: '汞', requirement: '增加量≤0.0001 mg/L' },
+  { key: '卫生_铁', item: '铁', requirement: '增加量≤0.06 mg/L' },
+  { key: '卫生_锰', item: '锰', requirement: '增加量≤0.02 mg/L' },
+  { key: '卫生_铜', item: '铜', requirement: '增加量≤0.2 mg/L' },
+  { key: '卫生_锌', item: '锌', requirement: '增加量≤0.2 mg/L' },
 ]
 
 /** 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与其它纸张同口径) */
@@ -471,6 +485,16 @@ function setCell(row, key, v) {
 }
 .oqc-center {
   text-align: center;
+}
+/* 卫生安全「结果」格(2026-11-01 可填写):输入框铺满格宽、居中;屏上 12px,打印收到 10px(见打印块) */
+.oqc-hygiene-input {
+  width: 100%;
+}
+.oqc-hygiene-input :deep(.el-input__inner) {
+  text-align: center;
+  font-size: 12px;
+  height: 24px;
+  line-height: 24px;
 }
 .oqc-left {
   text-align: left;
@@ -706,6 +730,21 @@ function setCell(row, key, v) {
   }
   body.approval-printing .oqc-grid tbody tr {
     height: auto !important;
+  }
+  /* 卫生安全「结果」输入框(2026-11-01 可填写):打印时与表体同字号、去掉控件高度/内边距,
+     否则 24px 高的 el-input 会把这一列撑得比纸面其它格高一截;输入框里的值照常打印 */
+  body.approval-printing .oqc-hygiene-table .el-input__inner {
+    font-size: 10px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: 1.3 !important;
+    padding: 0 !important;
+    text-align: center !important;
+  }
+  body.approval-printing .oqc-hygiene-input .el-input__wrapper {
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: transparent !important;
   }
   body.approval-printing .oqc-title {
     font-size: 20px !important;

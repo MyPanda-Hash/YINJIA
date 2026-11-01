@@ -26,8 +26,8 @@
           为什么不用 summary：JR 6.21 里 summary 单独起页时**不打印 pageHeader**(实测),第 2 页会丢 logo 页眉;
           groupFooter 起的续页会正常打印页眉,与原件第 2 页一致。
        ⑤ pageFooter 带 = 公司地址/网址/邮箱/电话 + 打印时间 + 页码(第 X 页 / 共 Y 页 紧邻,不拉到纸两端)
-     卫生安全表:项目/卫生要求为静态文字;**结果列本轮不录数**,统一印「见型式检验报告」
-       (不把样张里的 0.12 / 1.79 / ND 等样例值写死成真实数据)。
+     卫生安全表:项目/卫生要求为静态文字;**结果列 = qc_oqc_head.卫生_<项目> 15 个可填列**
+       (2026-11-01 用户口径「这些红框内容要能填写」;空=未录,纸面留空,不把样张里的 0.12/1.79/ND 假值充数)。
      数据行为空(如尚未录入实测值)时各格留空,不打印 null。
      ============================================================================ -->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
@@ -112,6 +112,36 @@
   <parameter name="检验结论" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="备注" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="单据状态" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「浑浊度」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_浑浊度" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「臭和味」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_臭和味" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「肉眼可见物」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_肉眼可见物" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「PH」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_PH" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「溶解性总固体」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_溶解性总固体" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「耗氧量」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_耗氧量" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「砷」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_砷" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「铬」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_铬" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「铝」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_铝" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「铅」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_铅" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「汞」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_汞" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「铁」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_铁" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「锰」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_锰" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「铜」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_铜" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 卫生安全「锌」结果(2026-11-01 起可填写,手工录入;空=未录,纸面留空) -->
+  <parameter name="卫生_锌" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="打印时间" class="java.lang.Object" isForPrompting="false"/>
 
   <!-- 数据源字段 = 明细 label(中文名;ReportService.detailRows 原样下发) -->
@@ -147,52 +177,97 @@
         <staticText><reportElement style="sqHead" x="169" y="69" width="245" height="18"/><text><![CDATA[卫生要求]]></text></staticText>
         <staticText><reportElement style="sqHead" x="414" y="69" width="102" height="18"/><text><![CDATA[结果]]></text></staticText>
   
-        <!-- 15 行(项目/卫生要求静态;结果本轮统一写「见型式检验报告」,不写样例值) -->
+        <!-- 15 行(项目/卫生要求静态;结果取 $P{卫生_<项目>},空则留空 —— 2026-11-01 起可填写) -->
         <staticText><reportElement style="sqCell" x="46" y="87" width="123" height="16"/><text><![CDATA[浑浊度]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="87" width="245" height="16"/><text><![CDATA[增加量≤0.2NTU]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="87" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="87" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_浑浊度} == null ? "" : String.valueOf($P{卫生_浑浊度})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="103" width="123" height="16"/><text><![CDATA[臭和味]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="103" width="245" height="16"/><text><![CDATA[浸泡后水无异臭、异味]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="103" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="103" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_臭和味} == null ? "" : String.valueOf($P{卫生_臭和味})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="119" width="123" height="16"/><text><![CDATA[肉眼可见物]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="119" width="245" height="16"/><text><![CDATA[浸泡后水不产生任何肉眼可见的碎片杂物等]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="119" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="119" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_肉眼可见物} == null ? "" : String.valueOf($P{卫生_肉眼可见物})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="135" width="123" height="16"/><text><![CDATA[PH]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="135" width="245" height="16"/><text><![CDATA[改变量≤0.5]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="135" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="135" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_PH} == null ? "" : String.valueOf($P{卫生_PH})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="151" width="123" height="16"/><text><![CDATA[溶解性总固体]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="151" width="245" height="16"/><text><![CDATA[/]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="151" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="151" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_溶解性总固体} == null ? "" : String.valueOf($P{卫生_溶解性总固体})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="167" width="123" height="16"/><text><![CDATA[耗氧量（以O2计）]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="167" width="245" height="16"/><text><![CDATA[增加量≤1 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="167" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="167" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_耗氧量} == null ? "" : String.valueOf($P{卫生_耗氧量})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="183" width="123" height="16"/><text><![CDATA[砷]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="183" width="245" height="16"/><text><![CDATA[增加量≤0.001 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="183" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="183" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_砷} == null ? "" : String.valueOf($P{卫生_砷})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="199" width="123" height="16"/><text><![CDATA[铬]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="199" width="245" height="16"/><text><![CDATA[增加量≤0.005 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="199" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="199" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_铬} == null ? "" : String.valueOf($P{卫生_铬})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="215" width="123" height="16"/><text><![CDATA[铝]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="215" width="245" height="16"/><text><![CDATA[增加量≤0.02 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="215" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="215" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_铝} == null ? "" : String.valueOf($P{卫生_铝})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="231" width="123" height="16"/><text><![CDATA[铅]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="231" width="245" height="16"/><text><![CDATA[增加量≤0.001 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="231" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="231" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_铅} == null ? "" : String.valueOf($P{卫生_铅})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="247" width="123" height="16"/><text><![CDATA[汞]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="247" width="245" height="16"/><text><![CDATA[增加量≤0.0001 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="247" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="247" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_汞} == null ? "" : String.valueOf($P{卫生_汞})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="263" width="123" height="16"/><text><![CDATA[铁]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="263" width="245" height="16"/><text><![CDATA[增加量≤0.06 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="263" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="263" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_铁} == null ? "" : String.valueOf($P{卫生_铁})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="279" width="123" height="16"/><text><![CDATA[锰]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="279" width="245" height="16"/><text><![CDATA[增加量≤0.02 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="279" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="279" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_锰} == null ? "" : String.valueOf($P{卫生_锰})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="295" width="123" height="16"/><text><![CDATA[铜]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="295" width="245" height="16"/><text><![CDATA[增加量≤0.2 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="295" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="295" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_铜} == null ? "" : String.valueOf($P{卫生_铜})]]></textFieldExpression>
+        </textField>
         <staticText><reportElement style="sqCell" x="46" y="311" width="123" height="16"/><text><![CDATA[锌]]></text></staticText>
         <staticText><reportElement style="sqCell" x="169" y="311" width="245" height="16"/><text><![CDATA[增加量≤0.2 mg/L]]></text></staticText>
-        <staticText><reportElement style="sqCell" x="414" y="311" width="102" height="16"/><text><![CDATA[见型式检验报告]]></text></staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="sqCell" x="414" y="311" width="102" height="16"/>
+          <textFieldExpression><![CDATA[$P{卫生_锌} == null ? "" : String.valueOf($P{卫生_锌})]]></textFieldExpression>
+        </textField>
         <textField>
           <reportElement style="sign" x="51" y="329" width="186" height="17"/>
           <textFieldExpression><![CDATA["检验员：" + ($P{检验员} == null || String.valueOf($P{检验员}).isBlank() ? "________________" : String.valueOf($P{检验员}))]]></textFieldExpression>
