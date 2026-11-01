@@ -4442,3 +4442,8 @@ migrate-wo-report-op-name-20261101.sql
 #      取数侧同时 COALESCE(sc_date, wgsj, asp_time1) 兜底。
 #   幂等;两账套均执行(先正式、后测试)。
 migrate-scjl-report-date-20261101.sql
+
+# 2026-11-01 出厂检验报告「生产批次锚」(用户口径:只做第一步,不做自动生成/发送客户)。
+#   qc_oqc_head +工单号/+工单行号(唯一身份=工单号+工单行号;批次号只是完工日日期标签)+ 查询索引;
+#   生成时由 OqcReportService 写入;历史报告按 成品检验单号 回填;yj_field/译名/注明齐。两账套执行。
+migrate-oqc-batch-anchor-20261101.sql

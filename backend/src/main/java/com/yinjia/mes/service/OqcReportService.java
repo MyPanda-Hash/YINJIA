@@ -138,11 +138,16 @@ public class OqcReportService {
         String firstNo = docOf("QC_FIRST_INSP", woNo, woLine);
         String procNo = docOf("QC_PROC_INSP", woNo, woLine);
 
+        // 生产批次锚(2026-11-01,用户口径「只需要实现第一步」):报告头落 工单号 + 工单行号 ——
+        // 唯一身份 = (工单号, 工单行号);`批次号` 只是完工日日期标签(会跨工单重复),不能当批身份。
+        // 解析不到成品检验单(无工单行)时两列留空,不阻塞生成(历史口径不变)。
         jdbc.update("INSERT INTO qc_oqc_head (单据编号, 单据日期, 客户名称, 产品编码, 产品名称, 规格型号, 批次号,"
+                + " 工单号, 工单行号,"
                 + " 生产日期, 生产数量, 检测日期, AQL, 出库单号, 出库行号, 成品检验单号, 首件检验单号, 制程检验单号,"
                 + " 检验员, 单据状态, asp_user1, asp_time1)"
-                + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
+                + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
                 no, outDate.isBlank() ? today : outDate, nv(cust), nv(prodCode), nv(prodName), nv(spec), nv(lotNo),
+                nv(woNo), woLine,
                 null, qty, today, null, nv(outNo), lineId, nv(asmNo), nv(firstNo), nv(procNo),
                 nv(user), null, nv(user));
 
