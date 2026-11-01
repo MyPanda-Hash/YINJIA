@@ -234,3 +234,30 @@ cd tools/archive/_oqc-form-20261101
 `oqc-sheet-final-en-screen.png`(英文)、`oqc-sheet-final-print.pdf`(干净单打印 2 页)、
 `oqc-sheet-final-audited.png`(已审核只读态)、`print-to-pdf.mjs`(通用 `Page.printToPDF` 工具)。
 测试账套演示数据只保留 `OQC-2026-11-0003`(B-92-25,15 行)/ `OQC-2026-11-0004`(C-23-11,10 行)。
+
+## 11. 2026-11-01 第四轮:卫生安全 15 项「结果」可填写
+
+**用户口径(2026-11-01 08:42,截图红框圈住卫生安全表「结果」整列)**:「这些红框内容要能填写」
+⇒ 卫生安全 15 项结果由静态「见型式检验报告」改为**手填 + 落库**;纸面直接填,打印/导出报表按填写值印出。
+(取代设计 Q5/Q8「本轮不录数」旧口径。)
+
+### 11.1 改动
+
+| 件 | 说明 |
+| --- | --- |
+| `tools/migrate-oqc-hygiene-results-20261101.sql`(新) | `qc_oqc_head` 加 15 个可空文本列 `卫生_<项目>` + 15 列中文注明 + `yj_field` 15 行(hidden)+ 15 条 en 译名;自检;已登记 `db-migrations.txt`,两账套均执行(执行 1 / 失败 0) |
+| `frontend/src/core/qc/QcOqcSheet.vue` | 卫生安全「结果」列:草稿态 `el-input` 绑定 `head['卫生_<项目>']`、只读态显示值;打印 CSS 把输入框收到 10px 去掉控件外观 |
+| `backend/.../controller/OqcReportController.java` | 新增 `POST /api/oqc/hygieneResults`:按 15 列白名单显式写(空串→NULL)、草稿态守卫、需「保存」权限 —— 通用保存对空串跳过 ⇒ 已填值改回空白清不掉,这个接口专门解决「清空」 |
+| `frontend/src/core/views/PanelxList.vue` | 保存成功后(`load()` 之前)对 QC_OQC_REPORT 调上述接口补存 15 列 |
+| `backend/src/main/resources/reports/qc_oqc.jrxml` | 15 个 `$P{卫生_<项目>}` 参数;卫生安全表结果列 staticText → textField(空→留空) |
+| `en.js` | 「填写」/「卫生安全结果保存失败，请重试」 |
+
+### 11.2 验证(`e2e-hygiene.mjs` + 渲染件)
+
+| 场景 | 结果 |
+| --- | --- |
+| 纸面填 15 项(0.12/无/无/1.79/20/0.46/ND×9)→ 保存 → 刷新回读 | 15 个值全部回读一致(落 `qc_oqc_head`) |
+| 清空 15 项 → 保存 → 刷新回读 | 15 个值全部清空(**专用接口把空串写成 NULL**;通用保存单独做不到) |
+| 打印(CDP printToPDF,同侧栏「打印」) | 第 2 页卫生安全表结果列印出填写值;`e2e-hygiene-print.pdf` |
+| 「导出报表 → PDF」服务端 Jasper | 结果列同样印出填写值;`e2e-hygiene-report.pdf` |
+| 旧报告(迁移前) | 15 列为 NULL ⇒ 该列留空(不再印「见型式检验报告」) |
