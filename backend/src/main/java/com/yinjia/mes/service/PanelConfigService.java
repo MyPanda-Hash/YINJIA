@@ -315,10 +315,17 @@ public class PanelConfigService {
                 //   **一字不动**,只给销售出库单的工具栏补一颗入口:
                 //   点击 → 勾选出库明细行 → /api/oqc/generate 建报告草稿 → 前端跳到 QC_OQC_REPORT
                 //   并打开第一张新单继续填/审批/打印。
-                // 独立成组、插在「打印」组之前(先生成报告,再到报告面板打印);动作名=按钮名(中文数据键,
-                // ADR-0001 永不翻译);`def.code()` 判定保证**其余面板的按钮下发面为 0 变化**。
+                // ⚠ 2026-11-01 09:46 用户口径(截图圈住独立的「生成出厂检验报告」)：「把销售出库单里这个
+                //   改到当前的打印按钮里面」⇒ 不再单独成组,改为**放进「打印」组的下拉**
+                //   (主按钮仍是「打印」;下拉 = 预览 / 导出 / 生成出厂检验报告)。
+                //   动作名=按钮名(中文数据键,ADR-0001 永不翻译);def.code() 判定保证其它面板下发面 0 变化。
                 if ("SALE_OUT".equals(def.code()) && "打印".equals(g[0])) {
-                    buttonGroups.add(group("生成出厂检验报告", List.of("生成出厂检验报告")));
+                    // ⚠ panda 数组口径 = {组名, 动作1, 动作2, ...} ⇒ actions 取 subList(1) 再追加
+                    // (动作1 与组名同名「打印」,主按钮仍是「打印」;下拉 = 预览 / 导出 / 生成出厂检验报告)
+                    List<String> acts = new ArrayList<>(List.of(g).subList(1, g.length));
+                    acts.add("生成出厂检验报告");
+                    buttonGroups.add(group(g[0], acts));
+                    continue;
                 }
                 buttonGroups.add(group(g[0], List.of(g).subList(1, g.length)));
                 if ("选单".equals(g[0]) && !SELECT_FLOWS.containsKey(def.code())) {
