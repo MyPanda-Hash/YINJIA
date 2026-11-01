@@ -78,8 +78,9 @@
         <!-- 已完成的单**直接进退料模式**(loadDoc 里按状态设 returnMode=true)——
              用户口径「已完成的进去扫码应该是其他入库才对」,不再需要先点一次「开始退料」。
              扫物料码解锁:数量框只有扫到物料后才出现,写入/取消后重新锁定。
-             ⚠ 已完成但材料出库单未审批时**整块隐藏**:那时既不能领也不能退。 -->
-        <div v-if="!isDone || outAudited" class="mp-row">
+             ⚠ 2026-11-01:扫码区**始终显示**,未审批时"扫了再提示为什么不能退"
+               (上一版整块隐藏,用户报障「扫码…没有了」)。 -->
+        <div class="mp-row">
           <el-input
             ref="matInput"
             v-model="matText"
@@ -497,6 +498,14 @@ async function scanMaterial(scanBatch) {
   cur.value = null
   batchRows.value = []
   if (!code) { errText.value = tt('请先扫描或输入物料编码'); return }
+  // 🔴 2026-11-01 用户报障「扫码…没有了」的修正:
+  //   上一版把「已完成但材料出库单未审批」时的**扫码区整块隐藏**了 ——
+  //   业务上没错(未审批不能退料),但现场看到的是"扫码框凭空消失",像是功能坏了。
+  //   改成:扫码区**一直显示**,扫了再明确告诉他为什么现在不能退。
+  if (isDone.value && !outAudited.value) {
+    errText.value = tt('材料出库单还没审批,暂时不能退料:请先让仓管在「材料出库单」里审核通过')
+    return
+  }
   matLoading.value = true
   try {
     if (returnMode.value) {
