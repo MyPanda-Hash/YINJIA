@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -142,10 +143,20 @@ public class PrintStationController {
         }
         if (qr.isEmpty()) throw new IllegalArgumentException("打印内容为空:请提供二维码内容或工单号");
 
+        // 🔴 2026-11-01 后端兜底出图。
+        //
+        // 正常路径是**前端**用 qrcode 库渲好 dataURL 随任务送上来(与工单打印同一份算法)。
+        // 但现场一定会有"客户端是旧版"的情况 —— 旧 APK、浏览器缓存了旧 chunk —— 那时
+        // `二维码图` 为空,打出来就是一张没有码的标签(用户实测报障:PDF 里没二维码)。
+        // ⇒ 这里用 ZXing(pom 里已有,报表 QRCode 在用)自己补一张,**任何客户端都能出图**。
+        // 码的内容与前端完全一致(同一个 qr 字符串),所以不存在"两个码不一样"的问题。
+        String qrImg = str(body.get("二维码图"));
+        if (qrImg.isEmpty()) qrImg = qrDataUrl(qr);
+
         PrintTask t = new PrintTask(SEQ.getAndIncrement(), str1(body.get("标题"), "生产领料单"),
                 qr, woNo, line, str(body.get("产品名称")), str(body.get("规格型号")),
                 str1(body.get("来源"), "mobile"), currentUserName(), LocalDateTime.now().format(TS),
-                str(body.get("二维码图")));
+                qrImg);
         QUEUE.add(t);
         // 上限保护:超了挤掉最旧的(内存安全;现场重打一次即可)
         while (QUEUE.size() > MAX_TASKS) QUEUE.poll();
@@ -342,6 +353,47 @@ public class PrintStationController {
 
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /**
+     * 把二维码内容渲成 PNG 的 dataURL(后端兜底,2026-11-01)。
+     *
+     * <p>用 pom 里已有的 ZXing(报表 QRCode 组件也用它),不引新依赖;
+     * 不用 `MatrixToImageWriter`(那在 zxing-javase 包里,本项目没引),
+     * 直接拿 BitMatrix 逐像素画到 BufferedImage —— 几十行代码,零额外依赖。
+     *
+     * <p>纠错级别 M、留白 1 模块,与前端 `qrcode` 库那次的参数一致,
+     * 保证两端出图在视觉上一致(内容本来就是同一个字符串)。
+     *
+     * @param content 二维码内容
+     * @return `data:image/png;base64,...`;失败返回空串(代理会退回纯文字标签,不影响出纸)
+     */
+    private static String qrDataUrl(String content) {
+        if (content == null || content.isBlank()) return "";
+        try {
+            Map<com.google.zxing.EncodeHintType, Object> hints = new java.util.EnumMap<>(
+                    com.google.zxing.EncodeHintType.class);
+            hints.put(com.google.zxing.EncodeHintType.MARGIN, 1);
+            hints.put(com.google.zxing.EncodeHintType.CHARACTER_SET, "UTF-8");
+            com.google.zxing.common.BitMatrix matrix = new com.google.zxing.qrcode.QRCodeWriter()
+                    .encode(content, com.google.zxing.BarcodeFormat.QR_CODE, 260, 260, hints);
+            int w = matrix.getWidth();
+            int h = matrix.getHeight();
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                    w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    img.setRGB(x, y, matrix.get(x, y) ? 0xFF000000 : 0xFFFFFFFF);
+                }
+            }
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(img, "png", bos);
+            return "data:image/png;base64," + Base64.getEncoder().encodeToString(bos.toByteArray());
+        } catch (Exception e) {
+            // 出图失败不该阻断打印:代理收到空图会只打文字
+            log.warn("后端生成二维码失败,本次标签不带码:{}", e.toString());
+            return "";
+        }
     }
 
     private static String str1(Object o, String dft) {
