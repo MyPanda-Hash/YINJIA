@@ -219,3 +219,6 @@ _scratch/
 
 # 打印代理 -Mode Pdf 的输出目录(生成物,不入库)
 tools/printing/print-out/
+
+# 部署包的 PDF 输出目录(生成物,不入库)
+deploy/print-agent/print-out/
