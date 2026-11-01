@@ -200,7 +200,8 @@
               <td class="oqc-center">{{ tt(h.item) }}</td>
               <td class="oqc-center">{{ tt(h.requirement) }}</td>
               <!-- 结果列(2026-11-01 用户口径「这些红框内容要能填写」):草稿态可填,落 qc_oqc_head.卫生_<项目>;
-                   只读态显示已填值。空 = 未录(纸面留空,不再固定印「见型式检验报告」) -->
+                   只读态显示已填值。空 = 未录 = **格内空白**(2026-11-01 09:24 用户口径「空白的就可以」:
+                   不再显示「填写」占位文字,和纸质表单一样留空白格) -->
               <td class="oqc-center">
                 <el-input
                   v-if="canEdit(h.key)"
@@ -208,7 +209,6 @@
                   size="small"
                   class="oqc-cell oqc-hygiene-input"
                   maxlength="50"
-                  :placeholder="tt('填写')"
                   @update:model-value="(v) => setHead(h.key, v)"
                 />
                 <span v-else class="oqc-ro">{{ head[h.key] || '' }}</span>

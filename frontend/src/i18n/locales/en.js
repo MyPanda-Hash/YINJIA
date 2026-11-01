@@ -101,7 +101,7 @@ export default {
       "Printing the saved version; unsaved changes are not included",
     "（{n} 行）": " ({n} row(s))",
     // 出厂检验报告 · 卫生安全结果可填写(2026-11-01 用户口径「这些红框内容要能填写」)
-    "填写": "Enter",
+    // 注:2026-11-01 09:24 用户口径「空白的就可以」⇒ 结果格不显示占位文字,故不再需要「填写」词条
     "卫生安全结果保存失败，请重试": "Failed to save hygiene safety results, please retry",
     "取成型工艺清单": "Fetch from Molding Process Sheet",
     "该产品没有成型工艺清单": "No molding process sheet for this product",
