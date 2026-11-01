@@ -1,0 +1,68 @@
+
+=== 表 ===  A(HSDZ_MES_SRV1849)=248  B(HSDZ_MES)=276  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 列 ===  A(HSDZ_MES_SRV1849)=10822  B(HSDZ_MES)=12251  | 仅A(服务器) 14  仅B(本地) 12
+  [仅A/服务器] dbo.mate.m_no | nvarchar(30) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.rd_mold_formula_detail.单支物料含量 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_mold_formula_detail.实际添加比例 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_mold_formula_detail.设计添加量 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_cancel | varchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_print | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time1 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time2 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time3 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time4 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_user1 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user2 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user3 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user4 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.bs_qc_plan.适用单据 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.mate.m_no | nvarchar(14) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.单支物料含量 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.实际添加比例 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.设计添加量 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_cancel | nvarchar(2) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_time4 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_user1 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_user2 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_user4 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+
+=== 默认约束 ===  A(HSDZ_MES_SRV1849)=734  B(HSDZ_MES)=725  | 仅A(服务器) 10  仅B(本地) 1
+  [仅A/服务器] dbo.rd_mold_formula_detail.单支物料含量 | DF_rd_mold_formula_detail_单支物料含量 = ((0))
+  [仅A/服务器] dbo.rd_mold_formula_detail.实际添加比例 | DF_rd_mold_formula_detail_实际添加比例 = ((0))
+  [仅A/服务器] dbo.rd_mold_formula_detail.设计添加量 | DF_rd_mold_formula_detail_设计添加量 = ((0))
+  [仅A/服务器] dbo.wo_mixing_list.asp_cancel | DF_wo_mixing_list_asp_cancel = ('N')
+  [仅A/服务器] dbo.wo_mixing_list.asp_print | DF_wo_mixing_list_asp_print = ((0))
+  [仅A/服务器] dbo.wo_mixing_list.asp_time1 | DF_wo_mixing_list_asp_time1_1 = (getdate())
+  [仅A/服务器] dbo.wo_mixing_list.asp_user1 | DF_wo_mixing_list_asp_user1 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user2 | DF_wo_mixing_list_asp_user2 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user3 | DF_wo_mixing_list_asp_user3 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user4 | DF_wo_mixing_list_asp_user4 = ('')
+  [仅B/本地]   dbo.wo_mixing_list.asp_cancel | DF__wo_mixing__asp_c__218FE0DE = (N'N')
+
+=== 索引 ===  A(HSDZ_MES_SRV1849)=362  B(HSDZ_MES)=362  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 主键/唯一键 ===  A(HSDZ_MES_SRV1849)=253  B(HSDZ_MES)=253  | 仅A(服务器) 0  仅B(本地) 0
+
+=== CHECK约束 ===  A(HSDZ_MES_SRV1849)=1  B(HSDZ_MES)=1  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 触发器 ===  A(HSDZ_MES_SRV1849)=2  B(HSDZ_MES)=2  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 视图 ===  A(HSDZ_MES_SRV1849)=111  B(HSDZ_MES)=111  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 存储过程 ===  A(HSDZ_MES_SRV1849)=31  B(HSDZ_MES)=31  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 扩展属性 ===  A(HSDZ_MES_SRV1849)=10155  B(HSDZ_MES)=10153  | 仅A(服务器) 5  仅B(本地) 3
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_mold_formula_detail | MS_Description = 「成型配方」明细行表 （禁用）
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_mold_formula_head | MS_Description = 「成型配方」头表（禁用）
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.asp_print | MS_Description = 打印次数
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.asp_time3 | MS_Description = 审核时间
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.asp_user3 | MS_Description = 审核人
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.bs_qc_plan.适用单据 | MS_Description = 适用单据（检验单面板代号，逗号分隔：QC_FIRST_INSP=首件检验单 / QC_PROC_INSP=制程检验单 / QC_ASM_INSP=组装成品检验单；空 = 未归档，默认不混进任一单据的标准库列表，勾「显示全部单据的方案」可维护）
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_mold_formula_detail | MS_Description = 「成型配方」明细行表（禁用，成型配方数据存放在实际在成型工艺表中）
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_mold_formula_head | MS_Description = 「成型配方」头表
+
+TOTAL-DIFF-LINES=45
+RESULT: DIFF

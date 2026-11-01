@@ -92,7 +92,9 @@ test('管理员保存 = 送审（pending=Y），不再 markArchived —— 但�
 })
 
 test('管理员自己提交自己审批仍然放行（编制与审批分离对管理员豁免）', () => {
-  assert.match(buttonService, /if \(!isAdminUser\(operator\) && operator\.equals\(submitter\)\)/,
+  // 2026-10-28 加了面板级「本人自审」后,条件尾部多了 `&& !selfAudit` —— 豁免仍在,
+  // 只是非管理员的本人自审要另看 selfaudit 权限(默认禁),管理员始终免检。
+  assert.match(buttonService, /if \(!isAdminUser\(operator\) && operator\.equals\(submitter\)(?: && !selfAudit)?\)/,
     '这个豁免是本轮"管理员可以自己提交自己审批"的唯一开关，删了管理员就批不了自己的单')
 })
 

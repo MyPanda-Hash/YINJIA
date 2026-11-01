@@ -1,0 +1,60 @@
+
+=== 表 ===  A(HSDZ_MES_SRV1021)=248  B(HSDZ_MES)=255  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 列 ===  A(HSDZ_MES_SRV1021)=10822  B(HSDZ_MES)=11029  | 仅A(服务器) 13  仅B(本地) 10
+  [仅A/服务器] dbo.rd_mold_formula_detail.单支物料含量 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_mold_formula_detail.实际添加比例 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_mold_formula_detail.设计添加量 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_cancel | varchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_print | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time1 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time2 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time3 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time4 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_user1 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user2 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user3 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user4 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.单支物料含量 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.实际添加比例 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.设计添加量 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_cancel | nvarchar(2) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_time4 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_user1 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_user2 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_user4 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+
+=== 默认约束 ===  A(HSDZ_MES_SRV1021)=734  B(HSDZ_MES)=725  | 仅A(服务器) 10  仅B(本地) 1
+  [仅A/服务器] dbo.rd_mold_formula_detail.单支物料含量 | DF_rd_mold_formula_detail_单支物料含量 = ((0))
+  [仅A/服务器] dbo.rd_mold_formula_detail.实际添加比例 | DF_rd_mold_formula_detail_实际添加比例 = ((0))
+  [仅A/服务器] dbo.rd_mold_formula_detail.设计添加量 | DF_rd_mold_formula_detail_设计添加量 = ((0))
+  [仅A/服务器] dbo.wo_mixing_list.asp_cancel | DF_wo_mixing_list_asp_cancel = ('N')
+  [仅A/服务器] dbo.wo_mixing_list.asp_print | DF_wo_mixing_list_asp_print = ((0))
+  [仅A/服务器] dbo.wo_mixing_list.asp_time1 | DF_wo_mixing_list_asp_time1_1 = (getdate())
+  [仅A/服务器] dbo.wo_mixing_list.asp_user1 | DF_wo_mixing_list_asp_user1 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user2 | DF_wo_mixing_list_asp_user2 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user3 | DF_wo_mixing_list_asp_user3 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user4 | DF_wo_mixing_list_asp_user4 = ('')
+  [仅B/本地]   dbo.wo_mixing_list.asp_cancel | DF__wo_mixing__asp_c__218FE0DE = (N'N')
+
+=== 索引 ===  A(HSDZ_MES_SRV1021)=362  B(HSDZ_MES)=362  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 主键/唯一键 ===  A(HSDZ_MES_SRV1021)=253  B(HSDZ_MES)=253  | 仅A(服务器) 0  仅B(本地) 0
+
+=== CHECK约束 ===  A(HSDZ_MES_SRV1021)=1  B(HSDZ_MES)=1  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 触发器 ===  A(HSDZ_MES_SRV1021)=2  B(HSDZ_MES)=2  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 视图 ===  A(HSDZ_MES_SRV1021)=111  B(HSDZ_MES)=111  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 存储过程 ===  A(HSDZ_MES_SRV1021)=31  B(HSDZ_MES)=31  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 扩展属性 ===  A(HSDZ_MES_SRV1021)=10155  B(HSDZ_MES)=10152  | 仅A(服务器) 3  仅B(本地) 0
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.asp_print | MS_Description = 打印次数
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.asp_time3 | MS_Description = 审核时间
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.asp_user3 | MS_Description = 审核人
+
+TOTAL-DIFF-LINES=37
+RESULT: DIFF

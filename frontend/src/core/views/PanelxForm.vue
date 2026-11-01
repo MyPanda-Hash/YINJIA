@@ -714,7 +714,7 @@ const editable = computed(() => !isEdit.value || status.value === '草稿' || st
 /** 附件上传闸门(与 PanelxList 同口径 2026-09-20):**凡配了附件列位的单据,已审核/已完成也允许补附件**
  *  (佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单本来就是已审核);仅「已作废」禁止 */
 const ATTACH_EDIT_PANELS = new Set([
-  'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
+  'PU_ORDER', 'SO_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
   'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
   // 2026-10-18 调拨单/盘点单:与出入库单对齐——留存根/签字单等佐证材料,审核后也要能补
   'TRANSFER', 'STOCKTAKE',
@@ -1354,7 +1354,15 @@ async function onButton(action) {
         emit('saved', res)
         return
       }
-      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
+      if (res.gotoPanel === 'WORK_ORDER_LIST') {
+        // 单轨(2026-09-26):生产工单落 plang,前往生产工单列表页(独立路由,非 panelx 面板)
+        ElMessage.success(`已生成生产工单：${(res['编号清单'] || [res['编号']]).join('、')}`)
+        tabsStore.close(route.path)
+        router.push('/prod/plan/workOrderList')
+        tabsStore.open({ path: '/prod/plan/workOrderList', title: '生产工单' })
+        return
+      }
+      ElMessage.success(`已生成${res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
       const targetPath = `/panelx/list/${res.gotoPanel}`
       tabsStore.close(route.path) // 关闭当前源表单页签（页签被目标面板替换）
       router.push(targetPath)

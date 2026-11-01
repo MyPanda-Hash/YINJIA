@@ -262,7 +262,34 @@ export function sinterRowsFromQuery(data) {
     else if (m && typeof m === 'object') rows.push(m)
   })
   const isOff = (v) => v === true || v === 1 || v === '1' || v === 'Y' || v === '是' || String(v ?? '').trim() === 'True'
-  return rows.filter((r) => !isOff(r['停用']))
+  return rows.map(normalizeSinterRow).filter((r) => !isOff(r['停用']))
+}
+
+/**
+ * 行键归一化：面板「生产模具表 PROD_MOLD」的列名是**用户口径**（炭棒尺寸 / 外模规格 /
+ * 中心杆规格 / 炭棒外径尺寸 / 炭棒内径尺寸 / 可生产炭棒长度范围），而配方计算这一侧
+ * 一直按物理列名（型号 / 模具尺寸 / 中心杆尺寸 / 炭棒外径 / 炭棒内径 / 长度范围）取值。
+ *
+ * 2026-10-30 两块面板合并（旧的 烧结尺寸表 RD_SINTER_TOL 撤掉，配方计算与维护入口都指 PROD_MOLD）
+ * 时加的这层：把新名补回旧名，下游 sinterRowsForWorkshop / sinterLengthWarning / 回填四格
+ * 的代码一行未改。只补缺、不覆盖 —— 两个名字都在时以旧名为准。
+ */
+const SINTER_ROW_ALIAS = {
+  炭棒尺寸: '型号',
+  外模规格: '模具尺寸',
+  中心杆规格: '中心杆尺寸',
+  炭棒外径尺寸: '炭棒外径',
+  炭棒内径尺寸: '炭棒内径',
+  可生产炭棒长度范围: '长度范围',
+}
+export function normalizeSinterRow(row) {
+  if (!row || typeof row !== 'object') return row
+  for (const [from, to] of Object.entries(SINTER_ROW_ALIAS)) {
+    if (row[to] === undefined || row[to] === null || row[to] === '') {
+      if (row[from] !== undefined) row[to] = row[from]
+    }
+  }
+  return row
 }
 
 /** 按车间挑行:表里 `1/3` 这种写法表示两个车间共用该型号,所以按 '/' 拆开匹配 */

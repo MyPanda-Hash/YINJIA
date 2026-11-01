@@ -178,6 +178,11 @@ public class SysAdminController {
             // 给哪个面板勾上,该角色就能配那个面板的预警数量(只改出库审批的拦截阈值,不动业务单据)。
             // 服务端同源闸门 = PanelPermissionService.requireWarnConfig(warn 词)。
             {"warn",    "预警配置"},
+            // 本人自审(2026-10-28 用户口径:「本人可以提出审核后自己审核确认,增加一个这个权限设置,
+            //   保留原来的本人提交审核后不能本人自己审核的逻辑」)——
+            // 只是**解除**「编制与审批分离」对本人提交单的限制,**不等于审批权**:该面板的「审批」列
+            // 仍要勾(否则连审批按钮都没有)。服务端同源闸门 = ButtonService.canSelfAudit(selfaudit 词)。
+            {"selfaudit", "本人自审"},
     };
 
     /**
@@ -185,6 +190,8 @@ public class SysAdminController {
      * 申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族/自定义字段)。
      * 相对通用 11 项只少 `print`(文书式面板没有打印按钮)与 `warn`(不涉及库存预警阈值)
      * —— **子集关系**由 `frontend/src/core/auth/permWordDrift.test.js` 钉住,防止再分叉出第二套词。
+     * 2026-10-28:补 `selfaudit`(本人自审)—— 研发文书同样有"本人提交、本人审批"的现实需求,
+     *   两套动作集保持同一列,矩阵才不会出现"通用面板有这列、文书面板没有"的缺口。
      */
     public static final String[][] FILE_PANEL_ACTIONS = {
             {"view",    "可见"},
@@ -196,6 +203,7 @@ public class SysAdminController {
             {"export",  "导出打印"},
             {"audit",   "审批"},
             {"field",   "自定义字段"},
+            {"selfaudit", "本人自审"},
     };
 
     @GetMapping("/role/{id}/panels")

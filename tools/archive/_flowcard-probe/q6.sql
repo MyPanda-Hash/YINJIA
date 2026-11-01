@@ -1,0 +1,13 @@
+SET NOCOUNT ON;
+PRINT '--- scjl cols ---';
+SELECT c.name, t.name AS type, c.max_length FROM sys.columns c JOIN sys.types t ON c.user_type_id=t.user_type_id WHERE c.object_id=OBJECT_ID('dbo.scjl') ORDER BY c.column_id;
+PRINT '--- wo_progress cols ---';
+SELECT c.name, t.name AS type, c.max_length FROM sys.columns c JOIN sys.types t ON c.user_type_id=t.user_type_id WHERE c.object_id=OBJECT_ID('dbo.wo_progress') ORDER BY c.column_id;
+PRINT '--- plang_pc cols ---';
+SELECT c.name, t.name AS type, c.max_length FROM sys.columns c JOIN sys.types t ON c.user_type_id=t.user_type_id WHERE c.object_id=OBJECT_ID('dbo.plang_pc') ORDER BY c.column_id;
+PRINT '--- sample plang rows ---';
+SELECT TOP 5 id, pl_no, pl_xc, dm, mc, lot_no, pl_sl, scx, ja, pl_date FROM plang ORDER BY id DESC;
+PRINT '--- sample scjl rows ---';
+SELECT TOP 5 * FROM scjl ORDER BY 1 DESC;
+PRINT '--- counts ---';
+SELECT (SELECT COUNT(*) FROM plang) plang, (SELECT COUNT(*) FROM scjl) scjl, (SELECT COUNT(*) FROM wo_progress) wo_progress, (SELECT COUNT(*) FROM plang_pc) plang_pc;

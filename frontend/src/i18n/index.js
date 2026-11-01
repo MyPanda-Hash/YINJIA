@@ -18,13 +18,26 @@ export const DEFAULT_LOCALE = 'zh-CN'
  * then the default. Per-user memory (yj_user.locale) is applied by the locale
  * store after login once the backend endpoint lands (P3).
  */
+/**
+ * 🔴 2026-10-21 修:已保存的外语**必须能识别出来**。
+ *
+ * 原实现只认 SUPPORTED = ['zh-CN','zh-TW','en'] —— 它是一份**过时的硬编码名单**(那是只有 3 个
+ * 静态包的年代;现在 PACKS 有 10 个)。后果:用户把语言切成 ja/ko/es/fr/de/ru/vi/th 并刷新页面后,
+ * `detectLocale()` 认为 ja "不支持" ⇒ 回落到 zh-CN ⇒ **静态语言包根本不加载**,
+ * 界面看起来"这些语言的翻译没生效"(只有 tt() 未命中后走机翻的零星词条能出来;
+ * 本机 backend/.env 缺失、机翻降级时就是整屏中文)。
+ * 现改为以 PACKS 为真源(STATIC_PACKED),SUPPORTED 只保留对外语义(含动态扩展语言)。
+ */
 export function detectLocale() {
   try {
     const saved = localStorage.getItem(LOCALE_KEY)
-    if (saved && SUPPORTED.includes(saved)) return saved
+    if (saved && STATIC_PACKED.includes(saved)) return saved
   } catch { /* localStorage unavailable — fall through */ }
   const nav = String(navigator.language || '').toLowerCase()
   if (nav.startsWith('en')) return 'en'
+  // 浏览器语言命中静态包(如 ja / ko / fr)时直接用,不再一律回落中文
+  const hit = STATIC_PACKED.find((l) => l !== 'zh-CN' && (nav === l || nav.startsWith(l.split('-')[0] + '-')))
+  if (hit) return hit
   return DEFAULT_LOCALE
 }
 

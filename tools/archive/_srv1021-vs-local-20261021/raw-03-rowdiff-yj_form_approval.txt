@@ -1,0 +1,24 @@
+== 表 yj_form_approval ==
+公共列 9  键 [id]  比对列 8
+行数: 服务器=5082  本地=5085  键数: 5082/5085
+
+---- ① 仅A(键只在服务器) ----
+   (无)
+
+---- ② 仅B(键只在本地) ----
+   11733   [form_no=SJ-2026-10-0167, panel_code=QC_FIRST_INSP, id=11733]
+   11734   [form_no=SJ-2026-10-0167, panel_code=QC_FIRST_INSP, id=11734]
+   11735   [form_no=SJ-2026-10-0167, panel_code=QC_FIRST_INSP, id=11735]
+
+---- ③ 同键内容不同 ----
+   11732   [form_no=SD-2026-10-0005, panel_code=RD_SPEC_DOC, id=11732]
+        panel_code: RD_SPEC_DOC -> QC_FIRST_INSP
+        form_no: SD-2026-10-0005 -> SJ-2026-10-0167
+        action: MODIFY_REQ -> AUDIT
+        result: PENDING -> APPROVED
+        operator: yangmaolin -> admin
+        opinion: 物料清单 -> <NULL>
+        create_time: 2026-10-21 08:43:54.515 -> 2026-10-21 02:23:25.779
+   同键行数不同(重复行/改键)=0 键;  内容不同的行=1
+   按列统计(命中行数): {action=1, create_time=1, form_no=1, operator=1, opinion=1, panel_code=1, result=1}
+RESULT: DONE

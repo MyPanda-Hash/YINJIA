@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "file": "views/modules/plan/ProcFlowCard.vue",
+      "literals": 47,
+      "missingEn": [],
+      "missingJa": []
+    },
+    {
+      "file": "views/modules/plan/procFlowCardEditor.vue",
+      "literals": 33,
+      "missingEn": [],
+      "missingJa": []
+    },
+    {
+      "file": "views/modules/plan/procFlowCardPhotos.vue",
+      "literals": 18,
+      "missingEn": [],
+      "missingJa": []
+    },
+    {
+      "file": "views/modules/plan/procFlowCardTable.vue",
+      "literals": 17,
+      "missingEn": [],
+      "missingJa": []
+    },
+    {
+      "file": "views/modules/plan/procFlowCardTrace.vue",
+      "literals": 30,
+      "missingEn": [],
+      "missingJa": []
+    },
+    {
+      "file": "views/modules/plan/procFlowCardApi.js",
+      "literals": 1,
+      "missingEn": [],
+      "missingJa": []
+    }
+  ],
+  "missingEn": [],
+  "missingJa": [],
+  "total": 146,
+  "ok": true
+}

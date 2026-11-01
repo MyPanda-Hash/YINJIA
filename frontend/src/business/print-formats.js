@@ -24,6 +24,8 @@ import { sumKeepScale } from '../core/panel/sumTotals.js'
 // 打印通道(2026-10-20):与面板单据打印同一条路 —— 主页面打印层 + window.print(),不弹窗。
 // 与 sumTotals 同理写相对路径 + 扩展名:`node --test` 直接加载本文件时不认 Vite 别名。
 import { printInPage } from '../core/panel/printChannel.js'
+// 公司代码常量(2026-10-21 抽出到 core/panel/companyCode.js):三处二维码同源,别再写字面量 '0'。
+import { COMPANY_CODE } from '../core/panel/companyCode.js'
 
 /** qrcode 库兼容取用:CJS 互操作下 toDataURL 可能挂在 .default 上 */
 function qrLib() {
@@ -39,15 +41,15 @@ const COMPANY = {
   fax: '0752-5583930',
   // 银嘉采购订单 抬头行
   brand: 'AGPLUS 银嘉',
-  // 公司代码(2026-09-28 物料二维码口径):取旧系统 plang.comm,全库唯一值 '0';
-  // 标识卡二维码前缀=公司代码@物料编码[@批号],与旧系统扫码解析口径一致
-  companyCode: '0',
+  // 公司代码(2026-09-28 物料二维码口径):取旧系统 plang.comm,全库唯一值 '0'(常量已下沉到
+  // core/panel/companyCode.js,材料仓条码二维码也用同一份);标识卡二维码前缀=公司代码@物料编码[@批号],
+  // 与旧系统扫码解析口径一致
+  companyCode: COMPANY_CODE,
   // 需方签章框
   buyer: { 单位名称: '惠州市银嘉环保科技有限公司', 联系人: '孙郝聪', 联系方式: '13718162430' },
-  // 生产任务单(打印工单)固定表头文字
+  // 生产任务单(打印工单)固定表头文字:纸面页头只有标题
+  //  (2026-10-21 用户口径:不印打印日期、不印制单人、线体也不印 ⇒ 原 woPreparedBy / woLineLabel 两常量已删)
   woTitle: '生产任务单',
-  woLineLabel: '线体',
-  woPreparedBy: '制单',
   woColumns: ['序', '客户', '成品品名', '批号', '规格', '重点管控', 'PO单号', '排产数量', '每箱数量', '盘数', '交期', '备注', '二维码'],
   // 银嘉采购订单 注意事项(固定条款,转录自用户提供的纸面格式)
   notes: [
@@ -74,10 +76,11 @@ const PRINT_FAIL_MSG = '打印失败:浏览器阻止了打印,请允许本页面
 //   **不要再往回加 window.open 打印**(单测里没有 window.open,写回去立刻 TypeError)。
 
 /**
- * 生产任务单三模板(2026-09-27 用户截图版式,生产工单列表/工单排产看板共用):
- *   成型生产任务单——横向 A4,列含 成型折算后数量;组装生产任务单——同列结构无折算列;
+ * 生产任务单模板(2026-09-27 用户截图版式,生产工单列表/工单排产看板共用;2026-10-21 加「切炭」):
+ *   成型生产任务单——横向 A4,列含 成型折算后数量;切炭 / 组装生产任务单——同列结构、无折算列(只差标题);
  *   行尾二维码 = 公司代码@工单号@(1000+工单行号)(woQrText,2026-10-09 规则改版;旧 工单号|批号|物料编码|排产数量|生产线 作废)。
- * @param title '成型生产任务单' | '组装生产任务单'
+ *   🔴 纸面页头只有标题(2026-10-21 用户口径:不印打印日期、不印制单人、线体也不印)。
+ * @param title '成型生产任务单' | '切炭生产任务单' | '组装生产任务单'
  * @param rows  [{单据编号,公司代码?,工单行号?,是否重点管控产品,商品编码,商品名称,规格型号,订单数量,成型折算后数量,计划完工日期,批号,物料编码,排产数量,生产线}]
  */
 /** 工单二维码内容(2026-10-09 规则改版):公司代码@工单号@(1000+工单行号),行号 3 位不足补 0。
@@ -92,17 +95,21 @@ export function woQrText(wo) {
 
 const TASK_SHEET_COLUMNS = {
   '成型生产任务单': ['单据编号', '是否重点管控产品', '商品编码', '商品名称', '规格型号', '订单数量', '成型折算后数量', '计划完工日期'],
+  // 切炭(2026-10-21 用户口径「增加一种打印为切炭打印」):与组装同列结构,只差标题;
+  //   要印「切炭工序量」是另一个口径(像成型那样按工艺路线折算),需要时再加列。
+  '切炭生产任务单': ['单据编号', '是否重点管控产品', '商品编码', '商品名称', '规格型号', '订单数量', '计划完工日期'],
   '组装生产任务单': ['单据编号', '是否重点管控产品', '商品编码', '商品名称', '规格型号', '订单数量', '计划完工日期'],
 }
 
-export async function printWorkTaskSheet(title, rows, opts = {}) {
+export async function printWorkTaskSheet(title, rows) {
   const cols = TASK_SHEET_COLUMNS[title]
   if (!cols) return false
   const list = (Array.isArray(rows) ? rows : []).filter((r) => r && r['单据编号'])
   if (!list.length) return false
-  const line = opts.line || ''
-  const user = opts.preparedBy || ''
-  const stamp = (() => { const n = new Date(); return `${n.getFullYear()}/${n.getMonth() + 1}/${n.getDate()} ${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}:${String(n.getSeconds()).padStart(2, '0')}` })()
+  // 纸面页头只有标题(2026-10-21 用户口径):不印打印日期、不印制单人、**线体也不印**——
+  //   原来那行 `线体: xxx … 制单: 用户名 yyyy/M/d HH:mm:ss` 整行都没了。
+  //   ⚠ 别加回来(单测 wo-qr.test.js 有守门断言);打印留痕另有去处:
+  //     plang.打印人/打印时间 + asp_print(见 printStamp 接口),纸面不需要。
   const trs = []
   for (let i = 0; i < list.length; i++) {
     const r = list[i]
@@ -125,17 +132,14 @@ export async function printWorkTaskSheet(title, rows, opts = {}) {
   const body = '<style>'
     + '@page{size:A4 landscape;margin:8mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111;font-size:12px}'
-    + '.hd{display:flex;align-items:baseline;gap:18px;margin-bottom:6px}'
-    + '.hd .t{flex:1;text-align:center;font-size:20px;font-weight:700;letter-spacing:6px}'
-    + '.hd .s{font-size:12px;color:#333;white-space:nowrap}'
+    + '.hd{text-align:center;margin-bottom:6px}'
+    + '.hd .t{font-size:20px;font-weight:700;letter-spacing:6px}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
     + 'th{background:#f2f2f2;font-weight:600}'
     + 'td.qr{text-align:center;padding:2px}td.qr img{width:64px;height:64px}'
     + '</style>'
-    + '<div class="hd"><span class="s">' + esc(COMPANY.woLineLabel) + ': ' + esc(line) + '</span>'
-    + '<span class="t">' + esc(title) + '</span>'
-    + '<span class="s">' + esc(COMPANY.woPreparedBy) + ': ' + esc(user) + '　' + esc(stamp) + '</span></div>'
+    + '<div class="hd"><span class="t">' + esc(title) + '</span></div>'
     + '<table><thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
   // 🔴 2026-10-19:改走**页面内打印**(与面板单据打印同一条路),不再弹窗。
   //   现场实测:打印工单(哪怕只有 1 张)后整页僵死、刷新无效、只能关标签 —— 弹窗与主页面共用渲染进程,
@@ -419,17 +423,14 @@ export async function printLocationCards(rows) {
  * 生产任务单(打印工单) — 横向 A4,一行=一张工单,行尾二维码;工单排产看板与生产工单面板共用本实现。
  * 二维码内容=公司代码@工单号@(1000+工单行号)(woQrText,2026-10-09 规则改版;扫码报工/领料入口口径)。
  * @param rows [{加工单号,公司代码?,工单行号?,客户,产品名称,批号,规格型号,重点管控,客户PO,排产数量,每箱数量,箱数,计划完工日期,备注,生产线}]
- * @param opts {line?:string, preparedBy?:string}
+ * 纸面页头只有标题(2026-10-21 用户口径:不印打印日期/制单人/线体);原 opts(line/preparedBy)参数已删。
  * @return Promise<boolean> true=已交给浏览器打印(页面内打印层,不弹窗)
  */
-export async function printProductionTask(rows, opts = {}) {
+export async function printProductionTask(rows) {
   const list = (Array.isArray(rows) ? rows : []).filter((r) => r && r['加工单号'])
   if (!list.length) return false
-  const line = opts.line || list[0]['生产线'] || ''
-  const user = opts.preparedBy || ''
-  const now = new Date()
-  const stamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} `
-    + `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+  // 纸面页头只有标题(同 printWorkTaskSheet 的 2026-10-21 用户口径):不印打印日期/制单人/线体。
+  //   打印留痕仍在后端:plang.打印人/打印时间 + asp_print(调用方打印后打 /px/scheduleBoard/printStamp)。
   const trs = []
   for (let i = 0; i < list.length; i++) {
     const r = list[i]
@@ -450,17 +451,14 @@ export async function printProductionTask(rows, opts = {}) {
   const body = '<style>'
     + '@page{size:A4 landscape;margin:8mm}'
     + 'body{font-family:system-ui,"Microsoft YaHei",sans-serif;margin:0;color:#111}'
-    + '.hd{display:flex;align-items:baseline;gap:18px;margin-bottom:6px}'
-    + '.hd .t{flex:1;text-align:center;font-size:20px;font-weight:700;letter-spacing:6px}'
-    + '.hd .s{font-size:12px;color:#333;white-space:nowrap}'
+    + '.hd{text-align:center;margin-bottom:6px}'
+    + '.hd .t{font-size:20px;font-weight:700;letter-spacing:6px}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
     + 'th{background:#f2f2f2;font-weight:600}'
     + 'td.qr{text-align:center;padding:2px}td.qr img{width:64px;height:64px}'
     + '</style>'
-    + '<div class="hd"><span class="s">' + esc(COMPANY.woLineLabel) + ': ' + esc(line) + '</span>'
-    + '<span class="t">' + esc(COMPANY.woTitle) + '</span>'
-    + '<span class="s">' + esc(COMPANY.woPreparedBy) + ': ' + esc(user) + '　' + esc(stamp) + '</span></div>'
+    + '<div class="hd"><span class="t">' + esc(COMPANY.woTitle) + '</span></div>'
     + '<table><thead><tr>'
     + COMPANY.woColumns.map((h) => `<th>${esc(h)}</th>`).join('')
     + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
@@ -523,5 +521,134 @@ export async function printWoQr(payload, opts = {}) {
 
   // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调
   if (!printInPage(title, body, opts)) { alert(PRINT_FAIL_MSG); return false }
+  return true
+}
+
+/**
+ * 成型车间排单计划(2026-10-31)—— 照纸表《成型车间排单计划》出的整张报表。
+ *
+ * <p>用户口径:「这个需要能打出这样的报表形式,就在当前工单排产处实现即可,
+ * 这样就不需要根据那个产线进行处理了」⇒ 取数走 `/px/scheduleBoard/planSheet`(**全部产线一张表**),
+ * 版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 成型车间 / 未完成总数 / 生产计划数量 /
+ * 实际完成数量 / 成型交期 / 成型交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
+ *
+ * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001);日期列默认从**今天起 7 天**
+ * (纸表也只印 3~5 天;列太多会挤成一团,可用 opts.days 调)。
+ */
+const PLAN_SHEET_BASE_COLS = [
+  { t: '客户等级', w: 2, k: (r) => r['客户等级'] },
+  { t: '客户名称', w: 9, k: (r) => r['客户'] },
+  // 主要信息(2026-11-01 用户口径「不是两张纸,当前同一行融合起来」):工单号融进本行
+  { t: '单据编号', w: 10, k: (r) => r['加工单号'] },
+  { t: '产品编号', w: 6, k: (r) => r['物料编码'] },
+  { t: '型号', w: 6, k: (r) => r['规格型号'] },
+  { t: '成型车间', w: 5, k: (r) => r['生产线'] },
+  { t: '未完成总数', w: 5, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
+  { t: '生产计划数量', w: 5, k: (r) => fmtNum(r['排产数量']), n: true },
+  { t: '实际完成数量', w: 5, k: (r) => fmtNum(r['当前工序完工量']), n: true },
+  { t: '成型交期', w: 5, k: (r) => monthDay(r['交期'] || r['计划完工日期']) },
+  { t: '成型交期紧迫度', w: 5, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true },
+  { t: '7天', w: 3, k: (r) => fmtNum(r['7天已排']), n: true },
+  { t: '15天', w: 3, k: (r) => fmtNum(r['15天已排']), n: true },
+  { t: '大于15', w: 4, k: (r) => fmtNum(r['大于15天已排']), n: true },
+]
+
+/** yyyy-MM-dd → M月D日(纸表写法);非法/空 → '' */
+function monthDay(v) {
+  const s = String(v ?? '').slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  return m ? `${Number(m[2])}月${Number(m[3])}日` : s
+}
+
+/** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天 */
+export function planSheetDates(dates, today, days = 5) {
+  const list = (Array.isArray(dates) ? dates : []).filter(Boolean).slice().sort()
+  if (!list.length) return []
+  const from = list.filter((d) => !today || d >= today)
+  const pick = (from.length ? from : list).slice(0, days)
+  return pick
+}
+
+/**
+ * 生成排单计划 HTML(纯函数,便于单测;真正出纸见 {@link printSchedPlanSheet})。
+ * @param {Array} rows  /px/scheduleBoard/planSheet 的 `行`
+ * @param {Array} dates 日期列(`日期`)
+ * @param {Object} [opts] { today, days }
+ */
+export async function schedPlanSheetHtml(rows, dates, opts = {}) {
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  const ds = planSheetDates(dates, opts.today || '', opts.days || 5)
+  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0)
+  // 日期列:按剩余均分,但不低于 4%(否则「10月31日」列头和千位数会被挤成两行);
+  // 列多时按 4% 走,表格整体略超宽由浏览器压缩(比断字好看)
+  const dateW = ds.length ? Math.max(4, Math.floor((100 - baseW) / ds.length)) : 0
+  const colgroup = '<colgroup>'
+    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${c.w}%"/>`).join('')
+    + ds.map(() => `<col style="width:${dateW}%"/>`).join('')
+    + '<col style="width:5%"/>'                       // 二维码(行尾)
+    + '</colgroup>'
+  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.t)}</th>`).join('')
+    + ds.map((d) => `<th>${esc(monthDay(d))}</th>`).join('')
+    + '<th>二维码</th>'
+  // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
+  const qrs = await Promise.all(list.map((r) => woQrImg({
+    公司代码: r['公司代码'] || '', 工单号: r['加工单号'], 工单行号: r['工单行号'],
+  })))
+  const trs = list.map((r, i) => {
+    const plan = r['日计划'] || {}
+    return '<tr>'
+      + PLAN_SHEET_BASE_COLS.map((c) => {
+        const v = c.k(r)
+        return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
+      }).join('')
+      + ds.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
+      + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
+      + '</tr>'
+  }).join('')
+  return '<style>'
+    + '@page{size:A4 landscape;margin:6mm}'
+    + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
+    + '.hd{text-align:center;margin:0 0 4px}'
+    + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + 'th,td{border:1px solid #333;padding:2px 3px;font-size:9.5px;line-height:1.25;word-break:break-all;vertical-align:middle}'
+    + 'th{background:#f2f2f2;font-weight:600;text-align:center;font-size:9px;line-height:1.15}'
+    + 'td.r{text-align:right;white-space:nowrap}'
+    + 'td.qr{text-align:center;padding:1px}td.qr img{width:34px;height:34px}'
+    + 'tbody tr{height:38px}'
+    + '</style>'
+    + '<div class="hd"><span class="t">成型车间排单计划</span></div>'
+    + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
+}
+
+/** 工单二维码(与「打印工单」同一内容:公司代码@工单号@1000+行号);失败返回 '' */
+async function woQrImg(row) {
+  try {
+    const lib = qrLib()
+    if (!lib) throw new Error('qrcode lib unavailable')
+    return await lib.toDataURL(woQrText(row), { margin: 1, errorCorrectionLevel: 'M' })
+  } catch (e) {
+    console.warn('[print-formats] 排单计划二维码生成失败:', e?.message || e)
+    return ''
+  }
+}
+
+/**
+ * 排单计划整张 HTML(**单张纸**:纸表列 + 单据编号 + 行尾二维码,主要信息全融在同一行);
+ * 单独导出便于单测/预览。用户口径:「不是这样实现,是当前同一行融合起来」。
+ */
+export async function schedPlanPrintHtml(rows, dates, opts = {}) {
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  if (!list.length) return ''
+  return await schedPlanSheetHtml(list, dates, opts)
+}
+
+export async function printSchedPlanSheet(rows, dates, opts = {}) {
+  const body = await schedPlanPrintHtml(rows, dates, opts)
+  if (!body) return false
+  if (!printInPage('成型车间排单计划', body)) {
+    alert(PRINT_FAIL_MSG)
+    return false
+  }
   return true
 }

@@ -6,6 +6,7 @@ import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
 import com.yinjia.mes.service.ProcessTaskService;
+import com.yinjia.mes.service.WorkOrderDayPlanService;
 import com.yinjia.mes.service.WorkOrderTransferService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +20,7 @@ import java.util.Map;
 /**
  * 排产工作台(实现总结 V1.0 §5):待排产池/统计/批量排入/撤销排产/今日已排产。
  *
- * <p>权限(2026-10-16 改挂**页面面板**,原为借 MANU_ORDER 的 view + 保存):
+ * <p>权限(2026-10-16 起挂**页面面板**;2026-10-28 生产加工单 MANU_ORDER 下架后不再有旧面板授权):
  * 见 {@link PagePanelRegistry}。本控制器同时服务三个页面,故读端点按「任一命中」放行、
  * 写端点按各自页面的动作词判定:
  * <ul>
@@ -48,15 +49,19 @@ public class ScheduleBoardController {
     private final ProcessTaskService processTask;
     /** 手机端/外部报工吸收(2026-10-17):外部直写 scjl 的完工行 → 补镜像 + 推进 + 转序 */
     private final ExternalReportAbsorbService absorbService;
+    /** 工单日排产(2026-10-29):生产工单/工单排产两页表格内的日期列 —— 读计划 + 写计划(不另记完成量) */
+    private final WorkOrderDayPlanService dayPlanService;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
                                    WorkOrderTransferService transferService, ProcessTaskService processTask,
-                                   ExternalReportAbsorbService absorbService) {
+                                   ExternalReportAbsorbService absorbService,
+                                   WorkOrderDayPlanService dayPlanService) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
         this.processTask = processTask;
         this.absorbService = absorbService;
+        this.dayPlanService = dayPlanService;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -161,19 +166,116 @@ public class ScheduleBoardController {
         return ApiResult.ok(rows);
     }
 
-    /** 批量调线:勾选已排工单 → 目标生产线(停用线拒绝) */
+    /**
+     * **工单日排产·读**(2026-10-29):生产工单 / 工单排产 两页表格内「日期列」的数据。
+     *
+     * <p>用户口径:「在当前的表格内容处插入当前设定的日排产数量,修改需要针对当前生产工单和
+     * 工单排产中都要实现」⇒ 不加任何新表格/块,两页各自在现有明细表里追加列,共用本接口:
+     * <ul>
+     *   <li>生产工单页:传 {@code 行id}(当前表格行),工序取各行「当前工序」;</li>
+     *   <li>工单排产页:传 {@code 生产线}+{@code scope},工序取所选产线的车间工序。</li>
+     * </ul>
+     * 返回窗口内每行的「日计划」(2026-10-31 起为**自动均摊的派生值**,见 DayPlanSpread,
+     * 不再读/写 wo_day_plan)与「日报工」(scjl 已审核,含手机端吸收);
+     * 日期格只读(用户口径「当前不需要手填,能自动算就可以了」)。只读接口 ⇒ 只校验页面「可见」。
+     */
+    @PostMapping("/dayPlan/data")
+    public ApiResult<Map<String, Object>> dayPlanData(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Object d = b.get("未来天数");
+        Integer future = d instanceof Number n ? n.intValue() : null;
+        return ApiResult.ok(dayPlanService.data(longList(b.get("行id列表")), str(b.get("生产线")),
+                str(b.get("scope")), future, workshop()));
+    }
+
+    /**
+     * **工单日排产·写**(2026-10-29;2026-10-31 语义更新为「人工指定覆盖」):
+     * 数量 &gt; 0 = 指定该天(该天不再自动摊);0/空 = 软删该格 = **恢复自动**。
+     * 超分配不再整笔回滚(返回「超分配」清单,前端提示)。动作词 dayplan(两页任一授予即可)。
+     */
+    @PostMapping("/dayPlan/save")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> dayPlanSave(@RequestBody Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
+                "日排产");
+        List<Map<String, Object>> cells = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(dayPlanService.save(cells, currentUser()));
+    }
+
+    /**
+     * **改排产日期**(2026-10-31):就地改「计划开工日 / 预定完成日」。
+     *
+     * <p>body: {@code { 行id, 计划开工日期?, 交期? }} —— 只传改动的那一个也行;
+     * 写 plang(真源)+ 镜像 plang_pc + 同步 wo_process_line 当前工序的计划区间
+     * (用户口径「该日期要同步吧」:日期列窗口来自那些区间,不同步会把新日期藏起来)。
+     * 动作词 **日排产**(dayplan) —— 两页动作集里都有、且改数量用的也是它;不用 assign:
+     * 工单排产页(WORK_ORDER_BOARD)的动作集里没有 assign,挂它等于该页永远点不动。
+     */
+    @PostMapping("/rowDates")
+    public ApiResult<Map<String, Object>> rowDates(@RequestBody Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
+                "日排产");
+        Object ido = body.get("行id");
+        long rowId;
+        try {
+            rowId = ido instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(ido).trim());
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("缺少工单行id");
+        }
+        return ApiResult.ok(service.updateRowDates(rowId, str(body.get("计划开工日期")),
+                str(body.get("交期")), currentUser()));
+    }
+
+    /**
+     * **成型车间排单计划**(2026-10-31 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,
+     * 不需要根据产线处理」):全产线一张报表的取数 —— 全部在册排产行 + 各行日计划(只读)。
+     * body: {@code { scope, 生产线? }};传产线则只打这条线(2026-11-01 用户口径);动作词 打印(两页任一授予即可)。
+     */
+    @PostMapping("/planSheet")
+    public ApiResult<Map<String, Object>> planSheet(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButtonAny(new String[]{PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST},
+                "打印");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(dayPlanService.planSheet(str(b.get("scope")), str(b.get("生产线")), workshop()));
+    }
+
+    private static List<Long> longList(Object o) {
+        if (!(o instanceof List<?> list) || list.isEmpty()) return List.of();
+        List<Long> out = new java.util.ArrayList<>();
+        for (Object x : list) {
+            if (x instanceof Number n) out.add(n.longValue());
+            else {
+                try { out.add(Long.valueOf(String.valueOf(x).trim())); } catch (NumberFormatException ignore) { }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 批量调线(旧入口,2026-10-29 起**并入调拨口径**)。
+     *
+     * <p>原实现只改产线:不写轨迹、不做工序校验 —— 等于给「调拨只能调拨到当前工序的产线中」
+     * 留了一条绕过口。前端已无调用方(本页调拨走 /transfer),保留 URL 只为兼容老调用方;
+     * 实现直接转 {@link WorkOrderTransferService#transfer}(同一套工序守卫 + 轨迹 + 可撤回),
+     * 从此**只有一条改线路径**。
+     */
     @PostMapping("/reassign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> reassign(@RequestBody Map<String, Object> body) {
         perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "调拨");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
-        return ApiResult.ok(service.reassign(rows, str(body.get("目标生产线")), currentUser()));
+        return ApiResult.ok(transferService.transfer(rows, str(body.get("目标生产线")), null,
+                "批量调线", currentUser()));
     }
 
     // ══════════ 工单调拨(9.29 生产管理批次 ②,2026-10-05):产线/车间两级目标 + 轨迹 + 可撤回 ══════════
     // 与 /reassign(只改产线、无轨迹)的区别:本组写 wo_transfer_log 轨迹并支持按轨迹撤回。
-    // 权限:面板查看 + MANU_ORDER「保存」词表。
+    // 权限:页面面板查看 + 「调拨/撤回调拨」动作词。
 
     /** 车间下拉(启用产线的车间 + 该车间产线数;调拨弹窗用) */
     @PostMapping("/workshops")
@@ -192,6 +294,23 @@ public class ScheduleBoardController {
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(transferService.transfer(rows, str(body.get("目标生产线")), str(body.get("目标车间")),
                 str(body.get("原因")), currentUser()));
+    }
+
+    /**
+     * **调拨候选**(2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」):弹窗的目标车间/产线下拉数据。
+     *
+     * <p>与 {@link WorkOrderTransferService#transfer} 的守卫**同一处口径**
+     * ({@code ProcessTaskService.currentProcess} + {@code lineScope}),前端只展示、不自己拼;
+     * 多行勾选时返回**交集**候选(不同工序没有共同合法目标 → 可调拨=false + 提示)。
+     */
+    @PostMapping("/transferTargets")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> transferTargets(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_BOARD, "调拨");
+        List<Map<String, Object>> rows = body == null ? List.of()
+                : (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(transferService.targets(rows));
     }
 
     /** 撤回调拨:按工单最后一条生效轨迹把产线调回原线(轨迹标撤销,留痕不删) */
@@ -216,8 +335,8 @@ public class ScheduleBoardController {
     @PostMapping("/trace")
     public ApiResult<Map<String, Object>> trace(@RequestBody Map<String, Object> body) {
         // 追溯弹窗(WorkOrderTraceDialog)挂在工单排产看板与生产工单列表两处;
-        // MANU_ORDER 保留为放行来源 —— 生产工单面板(RD 前的旧入口)也共用本组件。
-        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD, "MANU_ORDER");
+        // 2026-10-28 生产加工单 MANU_ORDER 下架后不再作为放行来源。
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD);
         return ApiResult.ok(service.trace(str(body.get("工单号")), longOf(body.get("工单行id") != null ? body.get("工单行id") : body.get("行id"))));
     }
 

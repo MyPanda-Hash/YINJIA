@@ -118,7 +118,8 @@ test('其它面板的既有默认值不变:进度查询=工程技术中心,数�
 
 test('未知面板:不做任何写入', () => {
   const form = {}
-  applyDocDefaults('MANU_ORDER', form, USER, { isNew: true, today: T })
+  // 2026-10-28:MANU_ORDER 已下架,改用确定不在默认表里的面板码
+  applyDocDefaults('LEGACY_UNKNOWN', form, USER, { isNew: true, today: T })
   assert.deepEqual(form, {})
 })
 

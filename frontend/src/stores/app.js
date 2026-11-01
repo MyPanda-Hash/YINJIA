@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { DESK_QUICK_VERSION, upgradeDeskSettings as upgradeQuick } from '@core/dashboard/deskQuick'
+import { readSkin, applySkin } from '@core/ui/skins.js'
 
 const DESK_DEFAULT = {
-  quick: ['newOrder', 'quickReport', 'board'],
+  quick: ['newOrder'],
   showKpi: true,
   showProgress: true,
   showTodo: true,
@@ -15,8 +16,8 @@ const DESK_DEFAULT = {
  *   · 管理员:全局视角 —— 生产执行核心 + 质量待办 + 事件流/数据内核都在,快捷入口带
  *     研发两个入口(项目申请/产品开发) —— 填表是管理员的日常起点;
  *   · 普通用户:聚焦「要我做/要我看」—— 首屏 KPI + 质量与待办为主,生产执行核心默认收起
- *     (它是长列表+图表,对仓管/工艺员这类角色日常价值低),快捷入口只留「新建加工单」,
- *     研发两个入口默认不勾(车间账号用不上,且多无该面板权限,勾了也点不动)。
+ *     (它是长列表+图表,对仓管/工艺员这类角色日常价值低),快捷入口只留「新建加工单」
+ *     (2026-10-28 起指向现役生产工单页面),研发两个入口不勾(车间账号用不上,且多无该面板权限)。
  * 用户在工作台设置里改过之后就不再覆盖(以 localStorage 里的保存值为准)。
  * 注:快速报工/生产看板已于 2026-09-22 从候选中下架(无对应功能),预设里不再出现。
  */
@@ -44,6 +45,8 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     collapsed: localStorage.getItem('mes_collapsed') === '1',
     dark: localStorage.getItem('mes_dark') === '1',
+    // 换肤(2026-10-30):皮肤 id 存在本机;颜色全在 styles/skins.css,这里只记"选了哪套"
+    skin: readSkin(),
     menuMode: localStorage.getItem('mes_menu_mode') || 'accordion',
     fullscreen: false,
     deskSettings: loadDeskSettings(),
@@ -68,6 +71,13 @@ export const useAppStore = defineStore('app', {
     setMenuMode(mode) {
       this.menuMode = mode
       localStorage.setItem('mes_menu_mode', mode)
+    },
+    /**
+     * 切皮肤:落 `<html data-skin>` + localStorage,并回写 store(脏值会被 applySkin 纠正,
+     * 所以要用它的返回值,不能让界面选中态停在用户点的那个不存在的 id 上)。
+     */
+    setSkin(id) {
+      this.skin = applySkin(id)
     },
     toggleFullscreen() {
       if (!document.fullscreenElement) {

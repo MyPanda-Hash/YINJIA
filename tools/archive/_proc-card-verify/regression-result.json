@@ -1,0 +1,81 @@
+{
+  "checks": [
+    {
+      "name": "/api/auth/perms.pagePerms 含 PROC_FLOW_CARD",
+      "pass": true,
+      "detail": "值=\"*\"（admin=*）"
+    },
+    {
+      "name": "登录用户 pagePerms.PROC_FLOW_CARD 非空(有权限词)",
+      "pass": true,
+      "detail": "\"*\""
+    },
+    {
+      "name": "生产工单页打开且有数据行",
+      "pass": true,
+      "detail": "行数=1(keyword=GD-2026-10-0211)"
+    },
+    {
+      "name": "按工单号定位到 GD-2026-10-0211 并点开追溯",
+      "pass": true,
+      "detail": "{\"ok\":true}"
+    },
+    {
+      "name": "生产工单页点工单号 → 工单详情·追溯弹窗打开",
+      "pass": true,
+      "detail": "true"
+    },
+    {
+      "name": "追溯弹窗无「对象名无效」报错",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "追溯弹窗质检段有数据(检验单行 > 0)",
+      "pass": true,
+      "detail": "质检行=3 汇总=应检工序: 成型 / 组装 ｜ 已检工序: 成型 / 组装 ｜ 缺检工序: - ｜ 检验单数: 3 ｜ 结论: 全部合格"
+    },
+    {
+      "name": "质检段出现现役检验类型(首件/制程/组装成品)",
+      "pass": true,
+      "detail": "[\"首件检验\",\"制程检验\",\"组装成品检验\"]"
+    },
+    {
+      "name": "工序报工页(PROD_REPORT)打开且渲染表格",
+      "pass": true,
+      "detail": "[]"
+    },
+    {
+      "name": "工单排产页打开且渲染内容",
+      "pass": true,
+      "detail": "工单排产 · YINJIA-MES rows=12"
+    }
+  ],
+  "errors": [],
+  "shots": [
+    "regression-workorder-list.png",
+    "regression-workorder-trace.png",
+    "regression-prod-report.png",
+    "regression-workorder-board.png"
+  ],
+  "woTraceDialog": {
+    "open": true,
+    "blocks": [
+      "工序进度 按工单行工单行号 1 ｜ 批次号 20261016工艺路线: GY-CB-STD ｜ 计划数量: 3950 ｜ 产出: 3950（100%） ｜ 当前工序: 组装",
+      "流转时间线按工单行",
+      "排产数据整单",
+      "完工数据按工单行",
+      "质检数据 按工单行应检工序: 成型 / 组装 ｜ 已检工序: 成型 / 组装 ｜ 缺检工序: - ｜ 检验单数: 3 ｜ 结论: 全部合格",
+      "领料数据按工单行"
+    ],
+    "qcRows": [
+      "SJ-2026-10-0146首件检验成型已审核合格3950395039500陈秀丽2026-10-1420261016BG-2026-10-0327合格转序",
+      "ZC-2026-10-0112制程检验成型已审核合格3950395039500陈秀丽2026-10-1420261016BG-2026-10-0327合格转序",
+      "ZJ-2026-10-0120组装成品检验组装已审核3950395039500冯敏2026-10-1620261016BG-2026-10-0329合格转库存(FI-2026-10-0107)"
+    ],
+    "qcSummary": "应检工序: 成型 / 组装 ｜ 已检工序: 成型 / 组装 ｜ 缺检工序: - ｜ 检验单数: 3 ｜ 结论: 全部合格",
+    "qcCount": 3,
+    "hasInvalidObject": false
+  },
+  "failCount": 0
+}

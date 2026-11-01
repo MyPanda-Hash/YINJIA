@@ -992,7 +992,7 @@ function panelTitle(panel) {
   return {
     PURCHASE_IN: '采购入库单', QUOTE_ORDER: '报价单', CUSTOMER_TRACE_SETTINGS: '客户追溯设置',
     TRACE_PRINT_TEMPLATE: '追溯打印模板', COMPANY_TRACE_SETTINGS: '企业追溯设置', QC_ITEM: '质检项目',
-    MANU_ORDER: '生产工单', SO_ORDER: '销售订单', PROCESS_REPORT: '工序汇报单',
+    SO_ORDER: '销售订单', PROCESS_REPORT: '工序汇报单',
     FINISH_IN: '产成品入库单', SALE_OUT: '销售出库单', DEPT: '部门档案',
   }[panel] || panel || '业务单据'
 }
@@ -1220,20 +1220,37 @@ function go(path, title) {
   font-weight: 650;
 }
 
+/* 在线呼吸点(2026-10-30 性能改)：原来 `animation` 每帧改 box-shadow —— box-shadow 不是合成属性，
+   每一帧都要重绘这个点和它外扩的那一圈。首页有 3 个这样的点、永不停止 ⇒ 等于给所有页面挂了一份
+   常驻重绘负载（弱机/远程桌面上就是"总觉得有点卡"，而且它跟用户在看什么都无关）。
+   改成在 ::after 上做 transform + opacity：这两样只走合成层，不重绘、不回流。
+   节奏与观感照旧（2.6s 一轮、缓慢淡出），只是不再花 CPU。 */
 .live-chip i,
 .data-link i {
+  position: relative;
   width: 7px;
   height: 7px;
   display: inline-block;
   border-radius: 50%;
   background: #3e9d74;
   box-shadow: 0 0 0 4px rgba(62, 157, 116, 0.12);
-  animation: live-pulse 1.8s ease-out infinite;
 }
 
-@keyframes live-pulse {
-  0%, 45% { box-shadow: 0 0 0 0 rgba(62, 157, 116, 0.28); }
-  100% { box-shadow: 0 0 0 7px rgba(62, 157, 116, 0); }
+.live-chip i::after,
+.data-link i::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1.5px solid #3e9d74;
+  opacity: 0;
+  pointer-events: none;
+  animation: live-ring 2.6s ease-out infinite;
+}
+
+@keyframes live-ring {
+  0%, 70% { transform: scale(0.9); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
 }
 
 /* 生产执行核心 */
@@ -1680,12 +1697,18 @@ function go(path, title) {
 
 .event-axis i.pulse {
   background: #3e9d74;
-  animation: event-pulse 1.8s ease-out infinite;
 }
 
-@keyframes event-pulse {
-  0%, 45% { box-shadow: 0 0 0 1px #3e9d74; }
-  100% { box-shadow: 0 0 0 7px rgba(62, 157, 116, 0); }
+/* 同上：呼吸环挪到 ::after，只动 transform/opacity（见文件上面 .live-chip i 的说明） */
+.event-axis i.pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid #3e9d74;
+  opacity: 0;
+  pointer-events: none;
+  animation: live-ring 2.6s ease-out infinite;
 }
 
 .event-icon {
@@ -1854,8 +1877,8 @@ function go(path, title) {
   padding: 16px 20px;
   overflow: hidden;
   border: 0;
-  border-left: 4px solid #e0a83a;
-  background: #173f38;
+  border-left: 4px solid var(--t-plate-accent, #e0a83a);
+  background: var(--t-plate-bg, #173f38);
   color: #fff;
   box-shadow: 0 5px 15px rgba(19, 61, 53, 0.13);
 }
@@ -1912,13 +1935,13 @@ function go(path, title) {
   color: var(--t-primary);
 }
 .quick .el-button--primary {
-  border-color: #e0a83a;
-  background: #e0a83a;
+  border-color: var(--t-plate-accent, #e0a83a);
+  background: var(--t-plate-accent, #e0a83a);
   color: #1f302b;
 }
 .quick .el-button--primary:hover {
-  border-color: #edba54;
-  background: #edba54;
+  border-color: var(--t-plate-accent, #edba54);
+  background: var(--t-plate-accent, #edba54);
   color: #1f302b;
 }
 
@@ -2605,20 +2628,10 @@ html.dark .dashboard {
   background: var(--t-border);
 }
 
-/* 动效收敛:脉冲放慢变淡,整页只保留这一处呼吸 */
-.live-chip i,
-.data-link i,
-.event-axis i.pulse {
-  animation-duration: 2.6s;
-}
-@keyframes live-pulse {
-  0%, 70% { box-shadow: 0 0 0 0 rgba(62, 157, 116, 0.22); }
-  100% { box-shadow: 0 0 0 6px rgba(62, 157, 116, 0); }
-}
-@keyframes event-pulse {
-  0%, 70% { box-shadow: 0 0 0 1px rgba(62, 157, 116, 0.9); }
-  100% { box-shadow: 0 0 0 6px rgba(62, 157, 116, 0); }
-}
+/* 动效收敛(2026-10-30)：原来这里用 `animation-duration: 2.6s` 放慢三个呼吸点，并**又定义了一遍**
+   live-pulse / event-pulse —— 同名 keyframes 在同一个样式表里后写的赢，等于前面那对悄悄失效，
+   改其中一处永远改不到实际生效的那一处。现在只有一条 `live-ring`（transform/opacity 合成动画），
+   时长直接写在动画上，这里不再重复定义。 */
 
 /* 交互件(已按钮化):补外观、hover/active/focus-visible/disabled */
 .rd-item,

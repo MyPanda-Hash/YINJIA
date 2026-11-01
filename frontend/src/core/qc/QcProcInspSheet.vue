@@ -259,11 +259,16 @@ const rowsForRender = computed(() => (items.value.length ? items.value : [null])
 /** 空表提示行要跨的列数(右四列 + 操作列) */
 const emptyColspan = computed(() => 4 + (props.editable ? 1 : 0))
 
-/** 稳定的行键(v-for key 用;行是被 markRaw 的原对象,加个不可枚举的 uid) */
+/** 稳定的行键(v-for key 用)。**用 WeakMap 记,不往行对象上挂字段**:
+ *  原实现 `row.__uid = 'q'+n` 是**可枚举**属性 ⇒ ① 被 JSON.stringify 带进"未保存修改"快照,
+ *  一打开制程检验单就被判脏(切单/翻页/左目录点行每次都弹「未保存提示」,2026-10-21 接入左栏时暴露);
+ *  ② 保存时这个键还会跟着明细一起提交给后端。WeakMap 不污染行、天然随行对象回收。 */
+const uidMap = new WeakMap()
 let uidSeq = 0
 function uidOf(row) {
-  if (!row.__uid) row.__uid = 'q' + (++uidSeq)
-  return row.__uid
+  let v = uidMap.get(row)
+  if (!v) { v = 'q' + (++uidSeq); uidMap.set(row, v) }
+  return v
 }
 
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
@@ -594,9 +599,164 @@ defineExpose({ exportProcInspExcel })
   display: inline-block;
   min-height: 18px;
 }
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     打印整张:只保留纸张(与首件检验单 / 检验数据记录表 / 检验目录 同口径)
+     ══════════════════════════════════════════════════════════════════════════
+     🔴 2026-10-21 修 —— 此前本组件**没有**这段,点「打印」出来是**空白页**:
+        公共打印样式(DocSheet.vue 的非 scoped 块)把 `body.approval-printing .portal` 整体
+        `visibility: hidden`,再逐个 whitelist 纸张根类名 —— 名单里只有 `.approval-sheet`
+        / `.progress-sheet` / `.catalog-sheet` / `.qc-rec-sheet` / `.rsp-sheet`,
+        外加首件检验单自己补的 `.fi-sheet`,**唯独漏了制程检验单的 `.qr-sheet`**
+        ⇒ print 媒体下 `.qr-sheet` 的 computed visibility = hidden(实测),
+        用 Page.printToPDF 出纸只有 1.9KB / 3 页空白,而首件那张是 380KB / 2 页正常。
+      ⚠ 与首件同一套写法(visibility 白名单 + 定位到左上 + 收窄表格 + 打印字号),
+        但**不抄它的具名页**:制程检验单是纵向表、列少,用横向 A4 会把字缩得极小,
+        这里用竖向 A4(纸面本身也是竖的)。
+     ⚠ 别用 `display:none` 去藏 .portal 里的别的纸:同页可能同时挂着别的面板(keep-alive),
+        只藏 `.approval-side` 这类操作栏即可,纸张由 visibility 白名单挑。 -->
+<style>
 @media print {
-  .no-print {
+  body.approval-printing .portal {
+    visibility: hidden;
+  }
+  body.approval-printing .topbar,
+  body.approval-printing .func-zone,
+  body.approval-printing .tabsbar,
+  body.approval-printing .help-panel,
+  body.approval-printing .nav-mask,
+  body.approval-printing .approval-side,
+  body.approval-printing .tools,
+  body.approval-printing .doc-select-rail {
     display: none !important;
+  }
+  body.approval-printing .portal-body,
+  body.approval-printing .portal-main,
+  body.approval-printing .portal-content,
+  body.approval-printing .panelx-list,
+  body.approval-printing .approval-layout {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+  }
+  body.approval-printing .qr-sheet {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 1px solid #8a8a8a !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body.approval-printing .qr-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* 纸面缩到一页(与首件/检验目录同一套口径):12px→9px、内边距压到 1px、允许换行。
+     🔴 2026-10-21 修「检验要求/检验方法被压成竖排文字」:
+        `.qr-grid` 是 table-layout:fixed,`<colgroup>` 把前四列定死 118/118/104/104(=444px),
+        后两列(检验要求/检验方法)是**弹性列**。A4 纵向内容宽 ≈ 733px,再减右两列 150+96+操作列 34
+        ⇒ 弹性列各只剩 **0px**,于是每个汉字单独占一行(实测 cols = 118,118,104,104,0,0,150,96,34)。
+        修法:打印时**重排列宽** —— 前四列按纸宽比例收窄、把宽度让给两个文本列。
+        ⚠ 必须用 `table-layout:fixed` + `<col>` 之外的 `td:first-child…` 无法覆盖 colgroup,
+          所以这里改用「按列序给 th/td 定宽」的 !important 规则(colgroup 的 width 优先级更低)。 */
+  body.approval-printing .qr-grid {
+    table-layout: fixed !important;
+    width: 100% !important;
+    font-size: 9px !important;
+  }
+  body.approval-printing .qr-grid col {
+    width: auto !important;
+  }
+  /* 列宽(合计 100%):客户名称 11% | 产品编码 11% | 型号 9% | 批号 9%
+     | 检验要求 26% | 检验方法 24% | 产线结果 7% | 结果判断 7%(操作列打印时隐藏) */
+  body.approval-printing .qr-grid thead th:nth-child(1),
+  body.approval-printing .qr-grid tbody td:nth-child(1) { width: 11% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(2),
+  body.approval-printing .qr-grid tbody td:nth-child(2) { width: 11% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(3),
+  body.approval-printing .qr-grid tbody td:nth-child(3) { width: 9% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(4),
+  body.approval-printing .qr-grid tbody td:nth-child(4) { width: 9% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(5),
+  body.approval-printing .qr-grid tbody td:nth-child(5) { width: 26% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(6),
+  body.approval-printing .qr-grid tbody td:nth-child(6) { width: 24% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(7),
+  body.approval-printing .qr-grid tbody td:nth-child(7) { width: 7% !important; }
+  body.approval-printing .qr-grid thead th:nth-child(8),
+  body.approval-printing .qr-grid tbody td:nth-child(8) { width: 7% !important; }
+  /* 文字列按正常横排断行(不再是「一字一行」):允许在词内换行,但不要 word-break:break-all 那种
+     按字符硬断;中文本身逐字可断,关键是**列要有宽度** */
+  body.approval-printing .qr-grid td.c-req,
+  body.approval-printing .qr-grid td.c-mtd,
+  body.approval-printing .qr-grid th.c-sub {
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+    writing-mode: horizontal-tb !important;
+  }
+  body.approval-printing .qr-grid td.c-req .qr-cell-wrap,
+  body.approval-printing .qr-grid td.c-mtd .qr-cell-wrap,
+  body.approval-printing .qr-grid td.c-req .el-textarea__inner,
+  body.approval-printing .qr-grid td.c-mtd .el-textarea__inner {
+    writing-mode: horizontal-tb !important;
+    white-space: pre-wrap !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+    width: 100% !important;
+  }
+  body.approval-printing .qr-head-table,
+  body.approval-printing .qr-foot-table {
+    font-size: 9px !important;
+  }
+  body.approval-printing .qr-grid th,
+  body.approval-printing .qr-grid td,
+  body.approval-printing .qr-head-table th,
+  body.approval-printing .qr-head-table td,
+  body.approval-printing .qr-foot-table th,
+  body.approval-printing .qr-foot-table td {
+    font-size: 9px !important;
+    padding: 1px 2px !important;
+    height: auto !important;
+    line-height: 1.25 !important;
+  }
+  body.approval-printing .qr-title {
+    font-size: 17px !important;
+    letter-spacing: 2px !important;
+  }
+  body.approval-printing .qr-band {
+    font-size: 10px !important;
+  }
+  /* 录入框在纸上要像"印好的格子":去边框/底色,文字同正文 */
+  body.approval-printing .qr-sheet .el-input__inner,
+  body.approval-printing .qr-sheet .el-textarea__inner {
+    font-size: 9px !important;
+    height: auto !important;
+    line-height: 1.25 !important;
+  }
+  body.approval-printing .qr-sheet .el-input__wrapper,
+  body.approval-printing .qr-sheet .el-textarea__inner {
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  /* 编辑态才有的东西(新增项/删除列/拖动把手)不进纸 */
+  body.approval-printing .qr-sheet .no-print,
+  body.approval-printing .qr-sheet .c-op {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
   }
 }
 </style>

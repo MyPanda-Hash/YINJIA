@@ -52,3 +52,33 @@ export function parseDimensionRequirement(text) {
   }
   return out
 }
+
+/**
+ * 同一句「炭棒尺寸」，但落到 **X烧结工艺清单**(RD_X_SINTER) 的三格。  2026-10-30
+ *
+ * 与 {@link parseDimensionRequirement} 的三处刻意差异（不要混用）：
+ *   ① **输出键是 X烧结的字段名**：炭棒外径 / 炭棒内径 / 炭棒出货长度
+ *      —— 成型工艺清单那边是 外径mm/内径mm；两面板格名不同，键写错会静默不生效；
+ *   ② **要长度**：成型工艺清单没有"名义长度"格（它那三段是脱模的长度**范围**），
+ *      而 X烧结的「炭棒出货长度」是计算的必要输入（切割长度 = 出货长度 + 修正参数），非带不可；
+ *   ③ **不要公差**：X烧结的 炭棒外径公差/内径公差 由**模具表**带入，不是规格书。
+ *
+ * 解析不出来的格**一个键都不出现**（与上面同一条口径：绝不写半截值）。
+ *
+ * @param {string|null|undefined} text 规格书「检验项目=尺寸/炭棒尺寸」那行的检验要求整句
+ * @returns {Record<string,string>} 形如 { 炭棒外径:'30', 炭棒内径:'12', 炭棒出货长度:'116' }
+ */
+export function parseRodSizeRequirement(text) {
+  const out = {}
+  const s = toHalfWidth(text)
+  if (!s.trim()) return out
+  const DIM = '([0-9]+(?:\\.[0-9]+)?)'
+  const outer = s.match(new RegExp('外径\\s*[:：]?\\s*' + DIM))
+  if (outer) out['炭棒外径'] = outer[1]
+  const inner = s.match(new RegExp('内径\\s*[:：]?\\s*' + DIM))
+  if (inner) out['炭棒内径'] = inner[1]
+  // 长的关键词排前面，避免「出货长度」被「长度」截半
+  const len = s.match(new RegExp('(?:出货长度|总长|长度)\\s*[:：]?\\s*' + DIM))
+  if (len) out['炭棒出货长度'] = len[1]
+  return out
+}

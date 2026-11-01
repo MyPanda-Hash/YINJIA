@@ -1,0 +1,15 @@
+SET NOCOUNT ON;
+IF OBJECT_ID('tempdb..#dbg2') IS NOT NULL DROP TABLE #dbg2;
+CREATE TABLE #dbg2(t sysname);
+DECLARE @t sysname;
+DECLARE cur CURSOR FOR SELECT name FROM sys.tables WHERE name IN (N'plang',N'scjl');
+OPEN cur;
+FETCH NEXT FROM cur INTO @t;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  INSERT #dbg2 VALUES(@t);
+  FETCH NEXT FROM cur INTO @t;
+END
+CLOSE cur; DEALLOCATE cur;
+SELECT * FROM #dbg2;
+GO

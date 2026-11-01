@@ -1,6 +1,8 @@
 import request from '@core/request'
 import { unwrap, unwrapStrict, errMsg } from '@core/panel-engine'
 import { fetchAllRows } from './pagedQuery.js'
+// 参照弹窗「显示哪几列」的判据（纯函数,单测见 core/ref/refColumns.test.js）
+import { pickRefColumns } from '@core/ref/refColumns'
 
 // 通用层函数继续对外导出（保持既有调用方兼容）
 export { unwrap, unwrapStrict, errMsg }
@@ -174,19 +176,28 @@ export async function refPanelName(field) {
   }
 }
 
-// 弹窗表格列：优先字段 refColumns，其次引用面板网格列，最后 refField/displayField
+// 弹窗表格列：优先字段 refColumns，其次引用面板的**表头字段**，再退网格列，最后 refField/displayField
+//
+// ⚠ 2026-10-30 修（用户报障「产品文件里面的面板点击选择框的弹窗都没有显示信息」）：
+//   原实现直接取 `panelPageDto.tablePages[0].gridTabs[0].columns` —— 那一份按后端
+//   PanelConfigService 的定义是**明细列**（`fieldsAt("detail")`），而本弹窗的数据来自
+//   `queryFormDataList`，返回的是**单据头行**。两者不同源 ⇒ 每格都取不到值，弹窗整片空白
+//   （实测：产品信息表 2026-10-29 新增 BOM 明细列后，只剩前端造的「开发状态」有值）。
+// ⚠ 2026-11-01 再修（用户报障「工序报工单的选择…只有备注列」）：上面那次把"优先表头字段"
+//   写成了无条件，但**档案(archive)面板**的 dataSchema 恒为规范占位「备注」，参照行却是
+//   明细展平行 ⇒ 所有档案参照（工序/职员/客户/商品…）弹窗只剩一列「备注」。判据因此按
+//   `metadata.singleDoc` 分流（单单据/档案取网格列，普通单据取表头），两处都在
+//   `@core/ref/refColumns` 的纯函数里（单测 9 条钉住优先级）。
 export async function refColumns(field) {
   const r = normRef(field)
   if (r.refColumns && r.refColumns.length) return r.refColumns
-  let cols = null
+  let cfg = null
   try {
-    const cfg = await getRefPanelConfig(r.refPanel)
-    cols = cfg?.metadata?.panelPageDto?.tablePages?.[0]?.gridTabs?.[0]?.columns
+    cfg = await getRefPanelConfig(r.refPanel)
   } catch (e) {
     /* SQL 后端无该面板时使用兜底列 */
   }
-  if (cols && cols.length) return cols
-  return [...new Set([r.refField, r.displayField].filter(Boolean))]
+  return pickRefColumns(cfg, r)
 }
 
 /** 参照过滤值里的 `$字段` 占位 → 取**本行**该字段的值(用于「仓位随仓库收窄」这类级联)。
@@ -202,7 +213,13 @@ function resolveFilterValue(expected, row) {
 }
 
 // 拉取引用面板数据（SQL 后端）
-export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null } = {}) {
+// skipAuditFilter(2026-11-01):调用方声明「不要自动加『单据状态=已审核』候选过滤」。
+//   背景:纸面单据(不合格报告 QC_BHG / 不合格品处理单 QC_BHC 等)的表头「单据状态」是**历史遗留列**,
+//   MES 侧从不维护(真源 yj_doc_status,列表/纸面显示的是派生值);实测 qc_proc_insp_head 433 张单只有
+//   1 张写着「已审核」⇒ 一加该过滤,「关联制程检验单」的候选就只剩 1 条,等于不可用。
+//   弹窗里仍按派生状态显示「单据状态」列,由用户自己认单。仅 DocSheet 纸面格子(refAllStatus)显式开启,
+//   其余所有参照行为逐字不变。
+export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null, skipAuditFilter = false } = {}) {
   const r = normRef(field)
   // 级联过滤(2026-10-09):filter 值支持 `$字段` 占位,按本行取值;
   //   解析不出值(没选上级字段/没传本行)⇒ 直接无候选,避免把全库仓位倒给用户选。
@@ -224,7 +241,8 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200, row = 
   // filter/keyword 在展平后的明细行上应用
   const cond = singleDoc || hasAlternativeFilter ? {} : { ...filter }
   // 2026-08-25：参照面板有「审核」流程（单据类面板）时，仅已审核来源单据可选（对齐 T+：已审核才能选择生单）
-  if (!cond['单据状态']) {
+  // 2026-11-01：skipAuditFilter 时跳过（见函数头注释;纸面单据的该列不可靠,不能据此过滤）
+  if (!skipAuditFilter && !cond['单据状态']) {
     try {
       const hasAudit = (refConfig?.metadata?.buttonGroups || []).some((g) =>
         (g.actions || []).some((a) => ['审核', '提交审批'].includes(a)))

@@ -45,7 +45,7 @@ test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 �
   assert.ok(!JSON.stringify(menuTree).includes('内部委托测试申请单'), '旧菜单名不应残留')
 })
 
-test('产品文件组 7 张(2026-09-30 下架 样品编号表)', () => {
+test('产品文件组 7 张(2026-10-30 X烧结并入烧结工艺清单的双模板 Tab,不单独占菜单)', () => {
   assert.deepEqual(leafCodes(group('rdFiles')), [
     'RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_ASM_PROC', 'RD_INSP_PLAN',
     'RD_PROD_DOCLIST', 'RD_CHANGE',
@@ -205,6 +205,9 @@ test('研发管理 24 个面板一个不少(含新增 项目流程管控)', () =
   assert.equal(codes.length, 24)
   assert.equal(new Set(codes).size, 24)
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
+  // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,
+  // 由 @core/views/MoldProcPanel.vue 承载 ⇒ **不占菜单项**,这里也不该出现。
+  assert.ok(!codes.includes('RD_X_SINTER'), 'X烧结工艺清单不单独占菜单入口（已并入烧结工艺清单页）')
 })
 
 /**
@@ -227,7 +230,8 @@ test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护�
   const base = menuTree.find((n) => n.code === 'base')
   const device = (base.children || []).find((c) => c.code === 'device')
   assert.equal(device?.title, '设备维护')
-  assert.deepEqual((device.children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN'])
+  // 2026-10-30 追加「生产模具表」PROD_MOLD（维护表，复用 rd_sinter_tolerance）
+  assert.deepEqual((device.children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'])
   assert.ok(!(plan.children || []).some((c) => c.code === 'device'), '生产计划下不应再有设备维护')
   assert.ok(!(proc.children || []).some((c) => c.code === 'device'), '生产计划下不应再有设备维护')
 })
@@ -270,10 +274,12 @@ test('手机扫码:与生产计划平级的一级目录,下挂生产领料 / 工
 
 /**
  * 2026-10-18 用户口径「把生产制造模块里面的生产执行和生产记录合并一下改为生产过程」。
- * 合并只改菜单分组,**10 个面板入口与顺序保持原样**:原生产执行 4 项在前、原生产记录 6 项在后。
+ * 合并只改菜单分组,面板入口与顺序保持原样:原生产执行 4 项在前、原生产记录 6 项在后。
  * 顺序被钉住是为了防止合并时不小心丢项或重排(用户按现有位置找菜单)。
+ * 2026-10-22:新增只读报表「混料记录」WO_MIXING_LIST,按用户口径插在「物料混合记录」之后
+ *   (原 6 项 → 7 项),其余 10 项顺序不动。
  */
-test('生产过程组 = 原生产执行 4 项 + 原生产记录 6 项,顺序不变', () => {
+test('生产过程组 = 原生产执行 4 项 + 原生产记录 7 项,顺序不变', () => {
   const proc = menuTree.find((n) => n.code === 'prodProcess')
   // 2026-10-22:新增「混料记录」WO_MIXING_LIST,钉在「物料混合记录」之后(混料业务挨在一起)
   assert.deepEqual((proc.children || []).map((c) => c.panelCode), [
@@ -322,10 +328,11 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
   //   (migrate-drop-manu-order-report-panels-20261017.sql),故从本断言里移除。
   // 2026-10-22 补:2026-10-20/21 新增的两张页面级面板(生产领料 PROD_PICK / 工序报工 PROD_REPORT)
   //   当时只改了 menus.js,没同步本断言 ⇒ 这里长期红着;按现有菜单顺序补回来。
-  // 2026-10-30:**这两张已迁到新一级目录「手机扫码」(MOBILE_PICK / MOBILE_REPORT)**,不再属于生产计划;
-  //   本断言同步移除,改由下方「手机扫码」用例另钉。
+  // 2026-10-30:**生产领料 / 工序报工 两张已迁到新一级目录「手机扫码」(MOBILE_PICK / MOBILE_REPORT)**,
+  //   不再属于生产计划;本断言同步移除,改由下方「手机扫码」用例另钉。
+  // 2026-10-29 补(合并远端):工序流程追踪卡 PROC_FLOW_CARD 仍留在「生产计划」组,紧跟工单排产。
   assert.deepEqual((group().children || []).map((c) => c.panelCode).filter(Boolean),
-    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'LINE_LOAD'])
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROC_FLOW_CARD', 'LINE_LOAD'])
   // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
   const all = JSON.stringify(plan)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {
@@ -449,11 +456,11 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
   assert.deepEqual((sysFunc.children || []).filter((c) => c.adminOnly).map((c) => c.code), ['sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'])
   const topTitles = menuTree.map((n) => n.title)
   assert.ok(!topTitles.includes('基础档案'), '一级菜单不应再有「基础档案」')
-  // 迁出后只剩 sysFunc(无面板)+ device(2026-10-20 搬来的设备维护:点检记录 / 保养计划)
-  assert.deepEqual((base.children[1].children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN'])
-  // 32 张基础资料面板仍不许回来(口径见下一条测试),整枝只允许 device 这两个码
+  // 迁出后只剩 sysFunc(无面板)+ device(设备维护:点检记录 / 保养计划 / 生产模具表)
+  assert.deepEqual((base.children[1].children || []).map((c) => c.panelCode), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'])
+  // 32 张基础资料面板仍不许回来(口径见下一条测试),整枝只允许 device 这三个码
   const panelCodes = [...JSON.stringify(base).matchAll(/"panelCode":"([A-Z0-9_]+)"/g)].map((m) => m[1])
-  assert.deepEqual([...new Set(panelCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'])
+  assert.deepEqual([...new Set(panelCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'])
 })
 
 /**
@@ -461,7 +468,7 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
  * 菜单侧只挂出其中一部分(库存状况 STOCK_STATUS / 往来单位 PARTNER 早在 2026-09-17 就下线;
  * 客户分组 CUSGRP / 物料分组 MATGRP / 供应商分组 SUPGRP / 检验项目 QC_ITEM / 检验计划 QC_PLAN /
  * 烧结公差 RD_SINTER_TOL 与明细面板 ERPLG_ROW 本就没有菜单项),
- * 故 27 = 字段管理 + 数据字典 + 迁来的 25 张。
+ * 故 28 = 字段管理 + 数据字典 + 迁来的 25 张 + 组装物料清单(2026-10-30 新增,挂「生产」组)。
  * ⚠ 「ERP导入日志 ERPLG」已按 2026-10-18 后续口径迁到一级目录「ERP系统集成」,不再计入数据建模。
  */
 test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每张只挂一次)', () => {
@@ -479,13 +486,37 @@ test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每
   for (const code of moved) {
     assert.ok(dmCodes.includes(code), `系统管理平台迁来的面板 ${code} 应在数据建模下`)
   }
-  assert.equal(dmCodes.length, 27, `数据建模应有 27 张面板入口,实际 ${dmCodes.length}`)
-  assert.equal(new Set(dmCodes).size, 27, '数据建模内不应有重复面板')
+  assert.equal(dmCodes.length, 28, `数据建模应有 28 张面板入口,实际 ${dmCodes.length}`)
+  assert.equal(new Set(dmCodes).size, 28, '数据建模内不应有重复面板')
   // 2026-10-20:设备维护整组搬进系统管理平台 ⇒ base 下允许 EQUIP_CHECK / MAINT_PLAN 两张,
   //   基础资料那 32 张仍不许回来
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
-  assert.deepEqual([...new Set(baseCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN'],
-    '系统管理平台只应挂设备维护两张(2026-10-20 迁入)')
+  assert.deepEqual([...new Set(baseCodes)].sort(), ['EQUIP_CHECK', 'MAINT_PLAN', 'PROD_MOLD'],
+    '系统管理平台只应挂设备维护三张(2026-10-20 迁入两张 + 2026-10-30 生产模具表)')
+})
+
+/**
+ * 2026-10-30 用户口径:「组装物料清单需要单独分出来放在数据建模中生产部分」。
+ * 落点 = 数据建模(dm) → 生产(bprod) 组,面板码 ASM_BOM,地址 /panelx/list/ASM_BOM;
+ * 全树只挂一次(不许在基础档案/WMS 里再挂一份),否则同一张单会出现两个入口。
+ */
+test('组装物料清单 ASM_BOM 挂在「数据建模 → 生产」且全树只挂一次', () => {
+  const dm = menuTree.find((n) => n.code === 'dm')
+  const prod = (dm.children || []).find((n) => n.code === 'bprod')
+  assert.ok(prod, '数据建模下应有「生产」分组')
+  const leaf = (prod.children || []).find((c) => c.panelCode === 'ASM_BOM')
+  assert.ok(leaf, '「生产」组下应有组装物料清单 ASM_BOM')
+  assert.equal(leaf.path, '/panelx/list/ASM_BOM')
+  assert.equal(leaf.title, '组装物料清单')
+  const acc = []
+  const walk = (n) => {
+    if (Array.isArray(n)) return n.forEach(walk)
+    if (!n || typeof n !== 'object') return
+    if (n.panelCode) acc.push(n.panelCode)
+    ;(n.children || []).forEach(walk)
+  }
+  walk(menuTree)
+  assert.equal(acc.filter((c) => c === 'ASM_BOM').length, 1, 'ASM_BOM 在菜单树里只应挂一次')
 })
 
 /**
@@ -508,7 +539,7 @@ test('filterMenuTree:非管理员看不到 adminOnly 叶子,管理员全量可�
   // 2026-10-23:菜单设计(sysMenuDesign)再往后接一格,同样管理员专属
   assert.deepEqual(adminGroups, [
     { code: 'sysFunc', kids: ['sysConsole', 'sysOrg', 'sysUsage', 'sysBackup', 'sysMenuDesign'] },
-    { code: 'device', kids: ['equipCheck', 'maintPlan'] },
+    { code: 'device', kids: ['equipCheck', 'maintPlan', 'prodMold'] },
   ])
 })
 
@@ -585,12 +616,12 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
   for (const t of ['成型检验单', '切炭检验单', '成品检验规范']) {
     assert.ok(!all.includes(t), `菜单树里不应再有「${t}」标题`)
   }
-  // 制程品质组现役 = 首件 / 制程 / 组装成品 三张;质量单据组现役 = 7 张
+  // 制程品质组现役 = 首件 / 制程 / 组装成品 / 出厂检验报告 四张(2026-10-30 增 QC_OQC_REPORT);质量单据组现役 = 7 张
   // (2026-10-23:该组 code 由 'process' 改为 'qcProcess' —— 与「工序 OP」叶子重名,菜单覆盖表要求 code 全树唯一)
   const qc = menuTree.find((n) => n.code === 'qc')
   const group = (code) => (qc.children || []).find((c) => c.code === code)
   assert.deepEqual((group('qcProcess').children || []).map((c) => c.panelCode),
-    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP'])
+    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_OQC_REPORT'])
   assert.equal((group('qcDoc').children || []).length, 7)
 })
 
@@ -628,3 +659,4 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   assert.equal(woPick.panelCode, 'WORK_ORDER_PICK')
   assert.equal(woPick.title, '工单扫码领料')
 })
+

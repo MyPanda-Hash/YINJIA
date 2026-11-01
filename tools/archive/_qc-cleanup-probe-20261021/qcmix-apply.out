@@ -1,0 +1,19 @@
+[plan] 检验单=12 明细=16 合格=11 不合格=5
+  [不合格] IJ-2026-10-0205 YJ-XH-002 4000.0000kg
+  [不合格] IJ-2026-10-0208 YJ-YKRS-009 1000.0000kg
+  [不合格] IJ-2026-10-0211 YJ-XH-002 4000.0000kg
+  [不合格] IJ-2026-10-0214 YJ-YPS-002 100.0000kg
+  [不合格] IJ-2026-10-0216 Y-S-Z 100.0000kg
+[backup] _bak_qcmix_20261021_qc_insp
+[backup] _bak_qcmix_20261021_qc_insp_detail
+[backup] _bak_qcmix_20261021_qc_insp_rec
+[backup] _bak_qcmix_20261021_qc_insp_rec_detail
+[backup] _bak_qcmix_20261021_qc_catalog_detail
+[backup] _bak_qcmix_20261021_qc_return
+[backup] _bak_qcmix_20261021_qc_return_detail
+[backup] _bak_qcmix_20261021_yj_doc_status
+[backup] _bak_qcmix_20261021_form_flow_link
+[backup] _bak_qcmix_20261021_yj_form_approval
+[pi] 删除本次检验单对应的草稿采购入库单 0 张
+[returns] 保留并审批 5 张，删除 7 张
+[verify] 明细合格=11/11 不合格=5/5 检验单合格=7 不合格=5 退料单=5/5 明细=5 已审核=5 已转ERP=5 活跃入库链=0 目录合格/不合格=11/5 记录合格/不合格=11/5

@@ -7,17 +7,33 @@ import { sortRows } from '../sort/rowSort.js'
 
 /**
  * 构建栏目设置数组。
- * @param {string[]} columns - 面板全部字段名列表
+ *
+ * 顺序口径(2026-10-29 增,列设置支持"调整列顺序"):
+ *   · 已保存的 `columns[]` **顺序即用户调好的列顺序** ⇒ 优先按它排列(只保留当前仍存在的列);
+ *   · 当前面板里新增、保存里没有的列,按传入 `columns` 的默认顺序追加在后面(不丢列);
+ *   · 保存里没有的列默认 visible=true;保存里的 prop 去重(防脏数据把同一列排两次)。
+ *   —— 报表面板此前只用 visible/排序(visibleProps 只做 contains 判定),故顺序变化对它们无影响。
+ *
+ * @param {string[]} columns - 面板全部字段名列表(默认顺序)
  * @param {Object|null} saved - 后端保存的设置
  * @returns {{prop:string, label:string, visible:boolean}[]}
  */
 export function buildReportColumnSettings(columns = [], saved = null) {
-  const savedByProp = new Map((saved?.columns || []).map((column) => [column.prop, column]))
-  return columns.map((prop) => ({
-    prop,
-    label: savedByProp.get(prop)?.label || prop,
-    visible: savedByProp.has(prop) ? savedByProp.get(prop).visible : true
-  }))
+  const savedCols = Array.isArray(saved?.columns) ? saved.columns.filter((c) => c && c.prop) : []
+  const savedByProp = new Map()
+  for (const c of savedCols) if (!savedByProp.has(c.prop)) savedByProp.set(c.prop, c)
+  const known = new Set(columns)
+  const ordered = []
+  for (const c of savedCols) if (known.has(c.prop) && !ordered.includes(c.prop)) ordered.push(c.prop)
+  for (const prop of columns) if (!ordered.includes(prop)) ordered.push(prop)
+  return ordered.map((prop) => {
+    const hit = savedByProp.get(prop)
+    return {
+      prop,
+      label: hit?.label || prop,
+      visible: savedByProp.has(prop) ? hit.visible !== false : true
+    }
+  })
 }
 
 /**

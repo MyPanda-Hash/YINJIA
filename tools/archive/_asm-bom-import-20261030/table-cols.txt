@@ -1,0 +1,55 @@
+==> SELECT OBJECT_ID('dbo.bs_asm_bom') AS oid;
+oid
+----------
+1231603726
+(1 行)
+==> SELECT c.column_id, c.name, t.name AS typ, c.max_length, c.precision, c.scale, c.is_nullable, c.is_identity FROM sys.columns c JOIN sys.types t ON c.user_type_id=t.user_type_id WHERE c.object_id=OBJECT_ID('dbo.bs_asm_bom') ORDER BY c.column_id;
+column_id | name | typ | max_length | precision | scale | is_nullable | is_identity
+-----------------------------------------------------------------------------------
+1 | id | bigint | 8 | 19 | 0 | false | true
+2 | 单据编号 | nvarchar | 100 | 0 | 0 | false | false
+3 | 产品编码 | nvarchar | 200 | 0 | 0 | false | false
+4 | 产品名称 | nvarchar | 400 | 0 | 0 | true | false
+5 | 规格型号 | nvarchar | 400 | 0 | 0 | true | false
+6 | 工序 | nvarchar | 40 | 0 | 0 | false | false
+7 | 版本号 | nvarchar | 40 | 0 | 0 | true | false
+8 | 默认BOM | nvarchar | 20 | 0 | 0 | true | false
+9 | 工艺路线名称 | nvarchar | 200 | 0 | 0 | true | false
+10 | 来源 | nvarchar | 200 | 0 | 0 | true | false
+11 | 状态 | nvarchar | 40 | 0 | 0 | true | false
+12 | 行序 | int | 4 | 10 | 0 | false | false
+13 | 子件编码 | nvarchar | 200 | 0 | 0 | false | false
+14 | 子件名称 | nvarchar | 400 | 0 | 0 | true | false
+15 | 子件规格 | nvarchar | 400 | 0 | 0 | true | false
+16 | 计量单位 | nvarchar | 40 | 0 | 0 | true | false
+17 | 标准用量 | decimal | 9 | 18 | 4 | false | false
+18 | 用量分子 | decimal | 9 | 18 | 4 | false | false
+19 | 用量分母 | decimal | 9 | 18 | 4 | false | false
+20 | 损耗量 | decimal | 9 | 18 | 4 | false | false
+21 | 行备注 | nvarchar | 1000 | 0 | 0 | true | false
+22 | asp_user1 | nvarchar | 100 | 0 | 0 | true | false
+23 | asp_time1 | datetime2 | 8 | 27 | 7 | true | false
+24 | asp_user2 | nvarchar | 100 | 0 | 0 | true | false
+25 | asp_time2 | datetime2 | 8 | 27 | 7 | true | false
+26 | asp_cancel | nvarchar | 2 | 0 | 0 | false | false
+27 | 备用1 | nvarchar | 1000 | 0 | 0 | true | false
+28 | 备用2 | nvarchar | 1000 | 0 | 0 | true | false
+29 | 备用3 | nvarchar | 1000 | 0 | 0 | true | false
+30 | 备用4 | nvarchar | 1000 | 0 | 0 | true | false
+31 | 备用5 | nvarchar | 1000 | 0 | 0 | true | false
+32 | 备用6 | nvarchar | 1000 | 0 | 0 | true | false
+33 | 备用7 | nvarchar | 1000 | 0 | 0 | true | false
+34 | 备用8 | nvarchar | 1000 | 0 | 0 | true | false
+35 | 备用9 | nvarchar | 1000 | 0 | 0 | true | false
+36 | 备用10 | nvarchar | 1000 | 0 | 0 | true | false
+37 | 备用11 | nvarchar | 1000 | 0 | 0 | true | false
+38 | 备用12 | nvarchar | 1000 | 0 | 0 | true | false
+39 | 备用13 | nvarchar | 1000 | 0 | 0 | true | false
+40 | 备用14 | nvarchar | 1000 | 0 | 0 | true | false
+41 | 备用15 | nvarchar | 1000 | 0 | 0 | true | false
+42 | 备用16 | nvarchar | 1000 | 0 | 0 | true | false
+43 | 备用17 | nvarchar | 1000 | 0 | 0 | true | false
+44 | 备用18 | nvarchar | 1000 | 0 | 0 | true | false
+45 | 备用19 | nvarchar | 1000 | 0 | 0 | true | false
+46 | 备用20 | nvarchar | 1000 | 0 | 0 | true | false
+(46 行)

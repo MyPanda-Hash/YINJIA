@@ -1190,6 +1190,235 @@ export const recordSheetConfigs = {
   },
 // 产品信息表:14 字段纯表单升级为文书面板(纸张式,与产品文件家族同视觉语言);
   // 网格 4 列(标签130/值260×2),报告头带单据日期信息块;下拉走 yj_field 字典,长文本不写 type 即多行域
+  // ══════════════════════════════════════════════════════════════════════
+  // X烧结工艺清单(RD_X_SINTER) —— 2026-10-30 新增
+  //
+  // 设计源:《X烧结工单模板-261029.xlsx》「产品工单打印输出模版」页(A1:M37)。
+  // 两页(用户口径「新加的面板X烧结面板就2页」):
+  //   页0 X烧结配方工艺管控清单   页1 修订记录
+  //
+  // 与既有 RD_MOLD_PROC 的关系(用户口径「两个入口在产品文件里面是属于同一份文件,
+  // 只是模板不一样」「一个产品可能有两个工艺也可能就只有一个工艺」):
+  //   · RD_MOLD_PROC = 「烧结工艺清单」,3 页(成型工艺清单/成型配方/修订记录),本批只改**显示名**;
+  //   · RD_X_SINTER  = 「X烧结工艺清单」,2 页,配方计算器驱动。
+  //   两者各自独立建单,互不排斥 —— 同一产品可以只有一张,也可以两张都有。
+  //
+  // 网格 12 列(A~L)。⚠ 2026-10-30 用户口径「太宽了,应该是和之前的烧结工艺清单一样」:
+  //   总宽由 1040 收到 **780** —— 正好等于 RD_MOLD_PROC 的 grid 合计
+  //   (98+68+68+64+52+58+58+75+52+94+93)。两个模板在同一 Tab 条下切换,
+  //   纸面宽度必须一致,否则切 Tab 会看到纸面忽宽忽窄。
+  //   52+52+56+56+56+56+56+86+76+76+79+79 = 780
+  // Excel 的 M 列是开发者备注,不上纸面。
+  // 计算输出那 12 格(切炭/冷却/重量/密度 各三值)全部可编辑 —— 用户口径
+  //   「所有文本框可手工二次输入修改」;计算器算完只是把值填进来,不锁死。
+  // ══════════════════════════════════════════════════════════════════════
+  RD_X_SINTER: {
+    headMode: 'report',
+    staticTitle: 'X烧结配方工艺管控清单',
+    info: [
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'select' },
+      { label: '使用范围', key: '使用范围', type: 'select' },
+      { label: '版本号', key: '版本号', type: 'text' },
+    ],
+    grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50],
+    // 报告头三段跨度 7+2+3 = 12
+    head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    pages: [
+      { title: 'X烧结配方工艺管控清单', grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50], showHead: true },
+      // 修订记录页不出报告头(同 RD_MOLD_PROC 页2:只有居中大标题 + 一行表头,由 dt.pageTitle 出标题)
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50] },
+    ],
+    sections: [
+      /* ── 一、产品基本信息(标签行 + 值行 两行式,照 Excel row7/row8)── */
+      { page: 0, bar: '一、产品基本信息', rows: [
+        { grid: [
+          { label: '炭棒编号', span: 2 },
+          { label: '产品名称', span: 2 },
+          { label: '炭棒规格', span: 3 },
+          { label: '产品管控类型' },
+          { label: '产品形态', span: 2 },
+          { label: '生产车间', span: 2 },
+        ]},
+        { grid: [
+          // ⚠ 纸面写「炭棒编号」，数据键用**产品编号** —— 与 RD_MOLD_PROC 完全同一做法
+          //   （那边注释写明「只是纸面的字：数据键仍是 产品编号」）。
+          //   必须用 产品编号 做键，`autoFillSpec.fromKey` 才选得中它可以带规格书；
+          //   元数据里的「炭棒编号」字段保留（编辑面板可填），只是不上这张纸。
+          { key: '产品编号', span: 2 },
+          // 产品名称可能很长（实测「高效除重金属炭棒滤芯 YKRS-200」）——单行 el-input 会截断成
+          // 「高效除重金属炭棒滤芯 ＼」（2026-10-30 用户报障「这个没有自动换行」）。
+          // 加 area 走多行域(autosize minRows 1)：短名字仍是一行高，长名字自动换行撑高整行。
+          { key: '产品名称', span: 2, area: true },
+          // 「炭棒规格」三格 = 外径 / 内径 / 出货长度(Excel E8/F8/G8 ← 计算器 E4/F4/G4)
+          { key: '炭棒外径' },
+          { key: '炭棒内径' },
+          { key: '炭棒出货长度' },
+          { key: '产品管控类型', type: 'select' },
+          { key: '产品形态', type: 'select', span: 2 },
+          { key: '生产车间', type: 'select', span: 2 },
+        ]},
+      ]},
+      /* ── 配料要求(Excel A22)── */
+      { page: 0, bar: '配料要求', rows: [
+        { grid: [{ key: '配料要求', span: 12, area: true }] },
+      ]},
+      /* ── 成型管控要求(Excel A23 + 五段;每段「标签行 + 值行」)── */
+      { page: 0, bar: '成型管控要求', rows: [
+        // 模具段:模具尺寸 竖跨两行;外径/内径 各「值|公差」两格
+        { grid: [
+          { label: '模具尺寸', rowspan: 2, span: 2 },
+          { label: '模具出料口', span: 2 },
+          { label: '中心杆', span: 4 },
+          { label: '外径(值/公差)', span: 2 },
+          { label: '内径(值/公差)', span: 2 },
+        ]},
+        { grid: [
+          { key: '模具出料口内径', span: 2 },
+          { key: '中心杆外径', span: 4 },
+          { key: '炭棒外径' },
+          { key: '炭棒外径公差' },
+          { key: '炭棒内径' },
+          { key: '炭棒内径公差' },
+        ]},
+        // 成型切炭长度
+        { grid: [
+          { label: '成型切炭长度', rowspan: 2, span: 2 },
+          { label: '下限mm', span: 2 },
+          { label: '中间值mm', span: 4 },
+          { label: '上限mm', span: 4 },
+        ]},
+        { grid: [
+          { key: '切炭长度下限mm', span: 2 },
+          { key: '切炭长度中间值mm', span: 4 },
+          { key: '切炭长度上限mm', span: 4 },
+        ]},
+        // 成型冷却长度
+        { grid: [
+          { label: '成型冷却长度', rowspan: 2, span: 2 },
+          { label: '下限mm', span: 2 },
+          { label: '中间值mm', span: 4 },
+          { label: '上限mm', span: 4 },
+        ]},
+        { grid: [
+          { key: '冷却长度下限mm', span: 2 },
+          { key: '冷却长度中间值mm', span: 4 },
+          { key: '冷却长度上限mm', span: 4 },
+        ]},
+        // 炭棒重量
+        { grid: [
+          { label: '炭棒重量', rowspan: 2, span: 2 },
+          { label: '下限g', span: 2 },
+          { label: '中间值g', span: 4 },
+          { label: '上限g', span: 4 },
+        ]},
+        { grid: [
+          { key: '炭棒重量下限g', span: 2 },
+          { key: '炭棒重量中间值g', span: 4 },
+          { key: '炭棒重量上限g', span: 4 },
+        ]},
+        // 密度要求
+        { grid: [
+          { label: '密度要求', rowspan: 2, span: 2 },
+          { label: '下限', span: 2 },
+          { label: '中间值', span: 4 },
+          { label: '上限', span: 4 },
+        ]},
+        { grid: [
+          { key: '密度要求下限', span: 2 },
+          { key: '密度要求中间值', span: 4 },
+          { key: '密度要求上限', span: 4 },
+        ]},
+      ]},
+      /* ── 特殊管控要求(Excel A34)── */
+      { page: 0, bar: '特殊管控要求', rows: [
+        { grid: [{ key: '特殊管控要求', span: 12, area: true }] },
+      ]},
+    ],
+    // 两张逻辑表共用 rd_x_sinter_detail ⇒ 各自必须带 filterKey:'表区' + filterVal,少一条就串表
+    dataTables: [
+      {
+        page: 0,
+        bar: '配方表',
+        filterKey: '表区', filterVal: '配方表',
+        // 2026-10-30 用户口径（截图圈注）：「应该是把配方表放到特殊管控上边」
+        //                          「配方表应该在管控要求上面」「产品基本信息区域下面」
+        // ⇒ 靠 tablesAfterBar 把表夹在「一、产品基本信息」之后（机制见 RecordSheetPanels
+        //   的 isAtOrBeforeTableAnchor：章节被拆成"表前/表后"两段渲染，本节点不需要别的标记）。
+        //   最终版式：一、产品基本信息 → 【配方表】 → 配料要求 → 成型管控要求 → 特殊管控要求。
+        tablesAfterBar: '一、产品基本信息',
+        // 2026-10-30 用户补齐：「这个面板也是默认10行带序号的」（照 RD_MOLD_PROC 的配方表同一套）。
+        //   blankRows 是**按表**铺空行的机制（RecordSheetPanels 的 watch，键 = 单据号+表区，
+        //   只在本表区为空时铺一次，且只带 表区 + 序号，不编造物料/比例）；
+        //   autoSeqBar 让「序号」列自动编号 1..10 —— 少这一条就铺出 10 行但没有序号。
+        autoSeqBar: true,
+        blankRows: 10,
+        // 纸面右上出「🧮 配方计算」按钮 → 打开 XsinterCalcDialog（RecordSheetPanels 按
+        // panelCode 分流；成型工艺清单走它自己那套 RecipeCalcDialog，两者公式体系不同，不能共用）。
+        recipeCalc: true,
+        // ⚠ 不写 fixedRows:它是**布尔**(真 = 隐藏「＋/×」增删按钮),不是行数 ——
+        //   写 `fixedRows: 10` 只会静默隐藏增删按钮、且**一行都不会多出来**。
+        //   配方表默认 10 行的职能交给计算器(录入物料后铺行),人手补行用「＋」。
+        // ⚠ 列宽合计**必须等于纸面 grid 合计 780**，否则表格比上面的 sections 宽出来一截
+        //   （2026-10-30 用户实测：「配方表要和上边的对齐呀，现在上面窄下面宽」——
+        //    上一版 70+150+300+315+105+105=1045，比 grid 多 265px）。
+        //   60+130+215+230+72+73 = 780。
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '序号', label: 'No.', w: 60, align: 'center' },
+          { key: '物料种类', label: '物料种类', w: 130 },
+          { key: '物料编号', label: '物料编号', w: 215 },
+          { key: '物料名称', label: '物料名称', w: 230 },
+          { key: '添加比例', label: '添加比例%', w: 72 },
+          { key: '单支含量g', label: '单支含量g', w: 73 },
+        ],
+      },
+      {
+        page: 1,
+        pageTitle: '修订记录',
+        filterKey: '表区', filterVal: '修订记录',
+        noVariant: true,
+        design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          // 同上：合计 60+220+170+100+90+140 = 780，与 grid 对齐
+          { key: '序号', label: '序号', w: 60, align: 'center' },
+          { key: '更改内容', label: '更改内容', w: 220, area: true },
+          { key: '更改原因', label: '更改原因', w: 170 },
+          { key: '更改时间', label: '更改时间', w: 100 },
+          { key: '责任人', label: '责任人', w: 90 },
+          { key: '备注', label: '备注', w: 140, area: true },
+        ],
+      },
+    ],
+    // ══════════════════════════════════════════════════════════════════
+    // 规格书联动（2026-10-30 用户口径：「这个新增的面板和之前的成型面板一样是可以
+    //   关联规格书的数据的，就是通过产品编号进行关联，带入规格书的对应数据」）
+    //
+    // 链路与成型工艺清单同源（core/insp/specCarry.js 头注）：
+    //   选「产品编号」→ onProdRefConfirm() → autoFillFromSpec()
+    //   → 后端 GET /px/specByProductForXSinter?code=  ← **按本面板权限校验**
+    //     （借 /specByProductForMold 会因为缺 RD_MOLD_PROC 权限 403）
+    //   → 只带回**已审核/已归档**规格书的「检验要求」表区（未审批 ⇒ 一格不带 + 弹提示）
+    //
+    // 与成型工艺清单的差异：X烧结要的是**炭棒名义尺寸**（外径/内径/出货长度 ——
+    //   出货长度是计算器里「切割长度 = 出货长度 + 修正参数」的必要输入），**不要公差**
+    //   （X烧结的公差由模具表带入）⇒ 用 parse:'rodSize'
+    //   （见 core/insp/dimensionSpec.js 的 parseRodSizeRequirement）。
+    // 配方表**不从规格书带**：用户已明确配方表由配方计算器填写后填入
+    //   （与 RD_MOLD_PROC 2026-10-15 同一口径）。
+    // ══════════════════════════════════════════════════════════════════
+    autoFillSpec: {
+      fromKey: '产品编号',
+      endpoint: '/px/specByProductForXSinter',
+      // 本面板明细是「配方表」不是「检验项目」，比规格书变动只会误报
+      specDrift: false,
+      headFromDetail: [
+        // 规格书里该检验项目实测有「炭棒尺寸」「尺寸」两种写法，按优先级择一
+        { parse: 'rodSize', matchProject: ['炭棒尺寸', '尺寸'] },
+      ],
+    },
+  },
   RD_PROD_INFO: {
     headMode: 'report',
     staticTitle: '产品信息表',
@@ -1549,8 +1778,10 @@ export const recordSheetConfigs = {
         // 显示文案照设计加括号;数据键仍是「客户项目名称」,不动。
         { label: '客户（项目）名称', key: '客户项目名称' },
         { label: '应用场景', key: '应用场景' },
-        { label: '整体规格参数', key: '整体规格参数' },
-        { label: '产品主要性能', key: '产品主要性能' },
+        // 这两格实测会写成多行/长句（「去除余氯、阻垢率　黑水量≤3」「外径 33mm ±0.5 / 内径 …」），
+        // 单行 input 会横向溢出 ⇒ area 走多行域（2026-10-30 用户报障「数据长换不了行」）
+        { label: '整体规格参数', key: '整体规格参数', area: true },
+        { label: '产品主要性能', key: '产品主要性能', area: true },
         { label: '版  本', key: '版本' },
       ],
       // 设计 B17/B18:三组「角色/日期」签订栏,姓名与日期**合写一格**(如 陈秀丽/2026/06/24)——
@@ -1568,6 +1799,13 @@ export const recordSheetConfigs = {
       { title: '检验项目及标准' },
       { title: '成品及包装运输' },
     ],
+    /**
+     * 页级标题（印在该页纸面最上方，居中大字，与修订记录页的大标题同一视觉层级）。
+     * 2026-10-30 用户口径：「在关键物料列表顶部加上一个『成品及包装运输』标题，是这一页的标题」——
+     * 「1.关键物料列表」是**表区小节**、不是页名，页名原本只在页签条上（打印时页签条不印）。
+     * 按页号配置；没配的页不画（页 0 封面自带大标题、页 1 修订记录用 pageTitle、页 2 有表头小节）。
+     */
+    pagePrintTitle: { 3: '成品及包装运输' },
     // 网格宽 = 真实 A4 纸宽(210mm @96dpi = 794px):封面/修订记录/检验项目及标准/成品及包装运输
     // 全部按 k=网格宽÷各自设计宽 等比缩放,整份规格书以 A4 原比例呈现(字体不出框)
     // coverTailReserve:与封面**同页**、渲染在封面之下的区块预留高度(封面画布按 A4 高减去这块)。
@@ -1639,17 +1877,22 @@ export const recordSheetConfigs = {
           { key: '备注', label: '备注', w: 161 },
         ]},
       // 检验项目及标准:分组式(序号|检验项目(组+子项目,检验项目表头跨 2 列)|检验要求|检验方法|检验依据)
-      // 列宽=设计图 695×1019 画布测量(43/93/73/129/241/83);行高由文本驱动;标准库=测试项目汇总.xlsx 26 组 48 子项
-      { page: 2, bar: '4.产品性能检验项目及检验标准', filterKey: '表区', filterVal: '检验要求', lib: true,
+      // 列宽合计 = 网格 794（2026-10-30 用户口径「规格书这一页有点窄了，可以加宽一点，就这一页加宽就行」）：
+      //   原 43+93+73+129+241+83=662 ⇒ designK=794/662=1.199，字号被放大到 15.6px、每行能塞的字反而更少，
+      //   整表更高 ⇒ 打印时又被高度压小。现在列宽直接按纸宽配平、designK=1、字号回到 13px，
+      //   文字列(检验要求/检验方法)拿到多出来的宽度后换行显著减少 ⇒ 整页变矮、印出来更大更清楚。
+      //   46+100+80+180+300+88 = 794
+      // 2026-10-30 标题去掉序号「4.」（用户口径：「把规格书的产品性能检验项目及检验标准的 4 去掉」）
+      { page: 2, bar: '产品性能检验项目及检验标准', filterKey: '表区', filterVal: '检验要求', lib: true,
         design: { headerH: 32, fontSize: 13, groupCol: true },
         cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 43 },
-          { key: '序号', label: '序号', w: 43, align: 'center' },
-          { key: '检验项目', label: '检验项目', w: 93, align: 'center' },
-          { key: '检验子项', label: '检验子项', w: 73, align: 'center', groupSub: true },
-          { key: '检验要求', label: '检验要求', w: 129, align: 'left', area: true },
-          { key: '检验方法', label: '检验方法', w: 241, align: 'left', area: true },
-          { key: '检验依据', label: '检验依据', w: 83, align: 'left', area: true },
+          { key: '序号', label: '序号', w: 46, align: 'center' },
+          { key: '检验项目', label: '检验项目', w: 100, align: 'center' },
+          { key: '检验子项', label: '检验子项', w: 80, align: 'center', groupSub: true },
+          { key: '检验要求', label: '检验要求', w: 180, align: 'left', area: true },
+          { key: '检验方法', label: '检验方法', w: 300, align: 'left', area: true },
+          { key: '检验依据', label: '检验依据', w: 88, align: 'left', area: true },
         ]},
       // 第 4 页 1.关键物料列表:表头照设计 B6 = 序号|物料编码|物料名称|规格参数|数量|备注。
       // ⚠ **不要给这张表加 bar**:它的标题已由上面 page:3 那个 sections 块出(为了排在表格之前),
@@ -2106,34 +2349,4 @@ export const recordSheetConfigs = {
     dataTables: [],
   },
 
-  // 烧结尺寸表 —— 无头表(整表即行表)。yj_panel: head_table=NULL, line_table=rd_sinter_tolerance,
-  //                                          detail_key=items, page_size=25
-  // 10 个字段全部 place 含 'detail';车间/型号另含 'query'(进查询区)且 required=1。
-  //
-  // ⚠ 版式必须是 **plain**(2026-10-15 用户报障「配方计算里点『维护尺寸表』打开的视图有问题」):
-  //   这张表不是纸面文书(没有报告头,也没有 密级/报告编号 那套「数据记录表」抬头),走 report 版式会同时踩两个坑:
-  //     ① `effInfo` 在 `cfg.info === undefined` 时回落 DEFAULT_INFO ⇒ 纸上凭空多出
-  //        「YJ-PD-01 密级 适用范围 测试负责人 报告编号 审核人」这一整块属于数据记录表的抬头(实测);
-  //     ② 本面板未声明 `grid` ⇒ `gridW = 0`,而 `.rs-t` 是 `table-layout:fixed` ⇒ **整张纸塌成一条竖线**
-  //        (实测 1600×1000 截图:10 个列名与 62 行全挤在一列里,与 keys.test.js 断言⑥ 记的坑同源)。
-  //   plain 版式不渲报告头,表宽直接取 `plainW = Σcols[].w`,故这里**逐列给宽**(取该字段 yj_field.width)。
-  RD_SINTER_TOL: {
-    headMode: 'plain',
-    plainTitle: '烧结尺寸表',
-    sections: [],
-    dataTables: [
-      { bar: '烧结尺寸', cols: [
-        { key: '车间', label: '车间', w: 90 },
-        { key: '型号', label: '型号', w: 130 },
-        { key: '模具尺寸', label: '模具尺寸', w: 100 },
-        { key: '中心杆尺寸', label: '中心杆尺寸', w: 110 },
-        { key: '炭棒外径', label: '炭棒外径', w: 100 },
-        { key: '炭棒外径公差', label: '炭棒外径公差', w: 110 },
-        { key: '炭棒内径', label: '炭棒内径', w: 100 },
-        { key: '炭棒内径公差', label: '炭棒内径公差', w: 110 },
-        { key: '长度范围', label: '长度范围', w: 170 },
-        { key: '停用', label: '停用', type: 'bool', w: 80 },
-      ]},
-    ],
-  },
 }

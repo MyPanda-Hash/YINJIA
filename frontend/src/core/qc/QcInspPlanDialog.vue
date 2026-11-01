@@ -23,7 +23,8 @@
     <!-- 来源切换(2026-10-17):用户口径「维护检验项目可以根据当前出货检验计划来获取」
          —— 弹窗多一个**只读**来源:按本单「产品编码」读《出货检验计划表》RD_INSP_PLAN 里**已经填好**的
          检验项目,勾选后带入本单明细。计划是单据事实、标准库是标准,两者各自独立:这个来源只读,
-         不改 bs_qc_item、也不改计划本身。默认仍是标准库,没开这个来源的面板连切换条都不显示。
+         不改 bs_qc_item、也不改计划本身。2026-10-30 用户口径:开了这个来源的面板**默认就停在这一页**
+         (「把当前这个出货检验计划的页签放在默认进入的第一个」);没开这个来源的面板连切换条都不显示。
          2026-10-18 开到组装成品检验单 + 制程检验单(见 PanelxList SHIP_PLAN_SOURCE_PANELS)。 -->
     <el-radio-group v-if="shipSource" v-model="source" size="small" class="qcplan-src" @change="onSourceChange">
       <el-radio-button value="lib">{{ tt('检验标准库') }}</el-radio-button>
@@ -37,6 +38,8 @@
       {{ tt('上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。') }}
       <br />
       {{ tt('检验类型 = 项目分类（如 外观检测/重量检测）：一个方案 = 一类项目，带入检验单后它就是横表的「表区」。项目的检验数量可留空；填了 N，带入后该项目在横表里就有 N 格、列头「＋」加不过它。') }}
+      <br />
+      {{ tt('方案按「适用单据」分套：首件检验单 / 制程检验单 / 组装成品检验单各看自己适用的方案；勾「显示全部单据的方案」可维护所有方案（未填适用单据的旧方案也只在全部里显示）。') }}
     </div>
 
     <!-- ═══ ① 检验方案(主表) ═══ -->
@@ -47,6 +50,9 @@
         <span class="qcplan-sub">{{ tt('一个产品/一类物料一套方案；点一行选中，下方就是它下面的检验项目') }}</span>
         <span class="qcplan-gap" />
         <el-checkbox v-model="showDisabled" size="small" @change="loadPlans">{{ tt('显示停用') }}</el-checkbox>
+        <el-checkbox v-if="panelCode" v-model="showAllDocs" size="small" @change="loadPlans">
+          {{ tt('显示全部单据的方案') }}
+        </el-checkbox>
         <el-button size="small" type="primary" @click="openPlanForm(null)">{{ tt('新增方案') }}</el-button>
         <el-button size="small" :disabled="!curPlan" @click="openPlanForm(curPlan)">{{ tt('编辑') }}</el-button>
         <el-button size="small" :disabled="!curPlan" @click="togglePlan">
@@ -60,17 +66,21 @@
       </div>
       <el-table :data="plans" size="small" border height="190" highlight-current-row
                 :current-row-key="curPlan?.id" row-key="id" @current-change="onPlanRow">
-        <el-table-column :label="tt('方案编码')" prop="方案编码" width="130" />
-        <el-table-column :label="tt('方案名称')" prop="方案名称" min-width="200" show-overflow-tooltip />
-        <el-table-column :label="tt('适用存货')" prop="适用存货" width="120" show-overflow-tooltip />
-        <el-table-column :label="tt('适用存货类别')" prop="适用存货类别" width="130" show-overflow-tooltip />
-        <el-table-column :label="tt('检验方式')" prop="检验方式" width="80" />
+        <el-table-column :label="tt('方案编码')" prop="方案编码" width="110" />
+        <el-table-column :label="tt('方案名称')" prop="方案名称" min-width="170" show-overflow-tooltip />
+        <el-table-column :label="tt('适用存货')" prop="适用存货" width="100" show-overflow-tooltip />
+        <el-table-column :label="tt('适用存货类别')" prop="适用存货类别" width="110" show-overflow-tooltip />
+        <el-table-column :label="tt('检验方式')" prop="检验方式" width="70" />
         <!-- 2026-10-16 用户口径:「不需要绑定文件编码,而是设定当前检验的类型」——
              原来这一列是受控文件号(文件编码 YJ-Q-125);现在 = 方案的**项目分类**(外观检测/重量检测…) -->
-        <el-table-column :label="tt('检验类型')" prop="检验类型" width="120" show-overflow-tooltip />
-        <el-table-column :label="tt('取样规则')" prop="取样规则" min-width="190" show-overflow-tooltip />
-        <el-table-column :label="tt('项目数')" prop="项目数" width="70" align="right" />
-        <el-table-column :label="tt('状态')" width="80">
+        <el-table-column :label="tt('检验类型')" prop="检验类型" width="110" show-overflow-tooltip />
+        <!-- 2026-10-21:方案按单据分套(首件/制程/组装各看各的);空 = 未归档 -->
+        <el-table-column :label="tt('适用单据')" width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ docLabelsOf(row['适用单据'], tt) || tt('未指定') }}</template>
+        </el-table-column>
+        <el-table-column :label="tt('取样规则')" prop="取样规则" min-width="150" show-overflow-tooltip />
+        <el-table-column :label="tt('项目数')" prop="项目数" width="60" align="right" />
+        <el-table-column :label="tt('状态')" width="70">
           <template #default="{ row }">{{ row['停用'] ? tt('已停用') : tt('启用') }}</template>
         </el-table-column>
       </el-table>
@@ -223,6 +233,20 @@
             <el-option v-for="t in typeOptions" :key="t" :label="t" :value="t" />
           </el-select>
         </el-form-item>
+        <!-- 2026-10-21:适用单据(可多选)。空 = 未归档,默认不显示在任一单据的标准库列表里 -->
+        <el-form-item :label="tt('适用单据')">
+          <el-select
+            v-model="planForm.适用单据"
+            style="width: 420px"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            clearable
+            :placeholder="tt('不选 = 未归档（默认不显示在任一单据）')"
+          >
+            <el-option v-for="d in QC_PLAN_DOC_OPTIONS" :key="d.value" :label="tt(d.label)" :value="d.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="tt('执行标准')">
           <el-input v-model="planForm.执行标准" />
         </el-form-item>
@@ -320,15 +344,19 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import { QC_PLAN_DOC_OPTIONS, docCodesOf, docCodesToText, docLabelsOf } from './qcPlanApplicableDocs.js'
+import { defaultShipRows, shipRowType } from './shipPlanDefaults.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   /** 本单「产品编码」:出货检验计划来源按它取数(取不到就提示先填表头) */
   productCode: { type: String, default: '' },
+  /** 当前检验单面板代号(2026-10-21):标准库方案按「适用单据」分套,弹窗默认只显示本单适用的方案 */
+  panelCode: { type: String, default: '' },
   /** 是否给出「出货检验计划」这个只读来源(2026-10-17 先只开给组装成品检验单 QC_ASM_INSP;
    *  2026-10-18 起制程检验单 QC_PROC_INSP 也开,见 PanelxList SHIP_PLAN_SOURCE_PANELS) */
   shipSource: { type: Boolean, default: false },
@@ -395,12 +423,33 @@ async function loadShip() {
     // row-key 必须唯一:同产品同名项目可能重复,故带上下标(纯视图用,不入库)
     shipRows.value = (d.rows || []).map((x, i) => ({ ...x, __k: i }))
     shipMeta.value = { planNo: d.planNo || '', title: d.title || '', version: d.version || '' }
+    await applyDefaultShipSelection()
   } catch (e) {
     if (seq !== shipSeq) return
     err(e, '取出货检验计划失败')
   } finally {
     if (seq === shipSeq) shipLoading.value = false
   }
+}
+
+/**
+ * 打开「出货检验计划」页签时把**默认勾选**刷到表格上(2026-10-30 用户口径):
+ *   · 组装成品检验 = 外观/尺寸/出货重量 三类默认勾选,其余默认不勾(还列着,要带手动勾);
+ *   · 制程检验     = 反过来,这三类默认不勾、其余(性能/功能性测试…)默认勾选。
+ * 规则本体在 shipPlanDefaults.js(纯函数 + 单测),这里只负责把勾选态落到 el-table。
+ * 每次取数(打开弹窗 / 切来源 / 点刷新)都重刷默认勾选 —— 与「打开即复位来源」同一口径,
+ * 用户手改过的勾选在刷新时回到默认(要保留就点完直接「带入明细」)。
+ * 表格还没渲染(来源停在标准库、或没取到行)时静默跳过。
+ */
+async function applyDefaultShipSelection() {
+  const rows = shipRows.value
+  if (!rows.length) return
+  await nextTick()
+  const table = shipTable.value
+  if (!table) return
+  const want = new Set(defaultShipRows(props.panelCode, rows).map((r) => r.__k))
+  table.clearSelection()
+  for (const r of rows) if (want.has(r.__k)) table.toggleRowSelection(r, true)
 }
 
 /**
@@ -415,7 +464,9 @@ function confirmPickShip() {
     // 类别:后端把计划表里**填了但界面隐藏**的「检验内容」(外观/重要尺寸/重量/性能)映射成 表区 / 检验类型,
     // 它决定本单明细归到哪一类(组装成品检验单就是明细第一列「检验类型」,打印报表也按它归组),
     // 故照样带过去 —— 本单没有这一列时 applyInspItems 会自己跳过;组装成品检验单还会按三类归一。
-    检验内容: r['表区'] || '',
+    // 2026-10-30:「检验内容」这一列库里普遍为空(实测两张计划全 NULL)⇒ 回退按检验项目名判三类
+    // (shipRowType:含 外观/尺寸/重量),否则成品明细的「检验类型」会落成「检验项目」这种占位值。
+    检验内容: r['表区'] || shipRowType(r) || '',
     检验标准: r['检验要求'] || '',
     检验方法: r['检验方法'] || '',
     检查频率: r['检查频率'] || '',
@@ -432,8 +483,18 @@ function confirmPick() {
   // 2026-10-16 拍板:带入时把**当前方案的「检验类型」**贴到每一行上 ——
   // 它是这批项目在检验单横表里所属的「表区」(方案 = 一类项目);
   // 方案没填类型时照旧按项目自己的「检验内容」分类,老数据行为不变。
-  const type = String(curPlan.value?.['检验类型'] ?? '').trim()
-  emit('pick', picked.value.map((it) => (type ? { ...it, 检验类型: type } : { ...it })))
+  //
+  // 2026-10-21 收敛:组装成品检验单的置顶方案把「检验类型」写成三类合并的
+  // 「外观、尺寸、重量」,而它下面三条项目各自带类别(外观/尺寸/重量)。
+  // 若照旧整批贴方案类型,applyInspItems 会按 normInspType 把三行都归成「外观」。
+  // ⇒ 项目自己填了「检验内容」就尊重项目;只有没填时才回退方案类型;
+  //    方案类型本身是「多类合并」写法(含分隔符)时也不贴,避免把合并词当单一类别。
+  const raw = String(curPlan.value?.['检验类型'] ?? '').trim()
+  const type = /[、,，;；]/.test(raw) ? '' : raw
+  emit('pick', picked.value.map((it) => {
+    const own = String(it['检验内容'] ?? '').trim()
+    return (type && !own ? { ...it, 检验类型: type } : { ...it })
+  }))
   emit('update:modelValue', false)
 }
 
@@ -443,6 +504,8 @@ const items = ref([])
 const curPlan = ref(null)
 const curItem = ref(null)
 const showDisabled = ref(true)
+/** 2026-10-21:默认只看本单适用的方案;勾上才把全部单据/未归档的旧方案列出来维护 */
+const showAllDocs = ref(false)
 const saving = ref(false)
 
 const planFormVisible = ref(false)
@@ -491,7 +554,14 @@ const err = (e, dft) => ElMessage.error(e?.response?.data?.message || e?.message
 
 async function loadPlans() {
   try {
-    const r = await request.get(`${API}/plans`, { params: { all: showDisabled.value ? 1 : '' } })
+    const r = await request.get(`${API}/plans`, {
+      params: {
+        all: showDisabled.value ? 1 : '',
+        // 2026-10-21:传当前面板代号 ⇒ 后端只回本单适用的方案;勾「显示全部单据」时 docScope=all
+        panelCode: props.panelCode || '',
+        docScope: showAllDocs.value ? 'all' : '',
+      },
+    })
     plans.value = r.data || []
     // 保持选中:优先原方案编码,否则第一条
     const keep = curPlan.value ? plans.value.find((p) => p['方案编码'] === curPlan.value['方案编码']) : null
@@ -514,12 +584,16 @@ function load() {
   picked.value = []
   shipPicked.value = []
   shipTable.value?.clearSelection()
+  // 2026-10-21:默认回到「只看本单」—— 组件被所有面板共用(keep-alive),
+  // 上一张单勾过「显示全部单据」的话不重置,换面板就会把别的单据方案也列出来。
+  showAllDocs.value = false
   loadPlans()
   // 打开即复位来源与计划数据(2026-10-18):
-  //   · 面板开了「出货检验计划」来源 ⇒ 按**最新**表头产品编码重取一次(编码可能在弹窗外刚改过);
-  //     编码为空时 loadShip 自己会停在"不发请求"上,表里只剩提示语。
+  //   · 面板开了「出货检验计划」来源 ⇒ **默认就停在该来源**(2026-10-30 用户口径「把当前这个出货
+  //     检验计划的页签放在默认进入的第一个」),并按**最新**表头产品编码重取一次(编码可能在弹窗外
+  //     刚改过);编码为空时 loadShip 自己会停在"不发请求"上,表里只剩提示语。
   //   · 面板没开 ⇒ 来源拉回标准库 + 清掉上一个面板留下的计划行,否则会串到别的检验单上。
-  if (props.shipSource) loadShip()
+  if (props.shipSource) { source.value = 'ship'; loadShip() }
   else { source.value = 'lib'; resetShip() }
 }
 
@@ -532,8 +606,12 @@ async function onPlanRow(row) {
 
 function openPlanForm(row) {
   planForm.value = row
-    ? { ...row, 抽检比例: row['抽检比例'] ?? '' }
-    : { 检验方式: '抽检', 方案编码: '', 方案名称: '' }
+    ? { ...row, 抽检比例: row['抽检比例'] ?? '', 适用单据: docCodesOf(row['适用单据']) }
+    : {
+        检验方式: '抽检', 方案编码: '', 方案名称: '',
+        // 从哪张单进来就默认归哪张单 —— 新方案不用再手选一次
+        适用单据: props.panelCode ? [props.panelCode] : [],
+      }
   planFormVisible.value = true
 }
 
@@ -543,7 +621,8 @@ async function savePlan() {
   if (!String(f['方案名称'] || '').trim()) return ElMessage.warning(tt('请填写方案名称'))
   saving.value = true
   try {
-    await request.post(`${API}/planSave`, f)
+    // 多选数组 → 后端约定的逗号串(空 = 未归档)
+    await request.post(`${API}/planSave`, { ...f, 适用单据: docCodesToText(f['适用单据']) })
     ElMessage.success(tt('已保存'))
     planFormVisible.value = false
     const keepCode = f['方案编码']
@@ -599,12 +678,15 @@ async function destroyPlan() {
 function openItemForm(row) {
   // 新增项目时「检验内容(类别)」默认继承当前方案的「检验类型」(方案 = 一类项目,2026-10-16)——
   // 用户口径「让当前的检验类型格决定…」:类型定在上方方案格上,下方项目跟着走,不用再各填一次。
+  // 2026-10-21:方案类型是多类合并写法(如 外观、尺寸、重量)时不继承 —— 项目必须各自选类别。
+  const planType = String(curPlan.value?.['检验类型'] ?? '').trim()
+  const defaultCategory = /[、,，;；]/.test(planType) ? '' : planType
   itemForm.value = row
     ? { ...row, 标准下限: row['标准下限'] ?? '', 标准上限: row['标准上限'] ?? '', 序号: row['序号'] ?? '', 检验数量: row['检验数量'] ?? '' }
     : {
         数据类型: '定量', 判定规则: '符合标准', 项目编码: '', 项目名称: '',
         序号: (items.value.length + 1) * 10,
-        检验内容: String(curPlan.value?.['检验类型'] ?? '').trim(),
+        检验内容: defaultCategory,
         检验数量: '',
       }
   itemFormVisible.value = true

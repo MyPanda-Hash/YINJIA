@@ -5,18 +5,25 @@
  * 页面组件(views/scm/ScanPick.vue)只负责交互与请求。
  *
  * 业务背景:
- *   · 条码管理三个面板的码内容固定为 `存货编码|批号`(见 v_barcode_material 视图);
+ *   · 条码管理面板的标签码:材料仓 = `公司代码@存货编码@批号`(2026-10-21),半成品/成品 = `存货编码|批号`
+ *     (见 v_barcode_material / v_barcode_wip / v_barcode_finished 与 barcodeLabel.barcodeQrText);
  *   · 用户在「材料出库单」里选商品会看到「没有库存」—— 那是库存状况表按(物料,仓库)
  *     聚合、且此前只回填前 500 行的毛病(已另修 fillCurrentStock);仓库作业真正要的是
  *     **批号级可用量**,对应视图 `v_stock_pick`(kucun 三键: 物料/仓库/批号,只出有货的行)。
  *   · 所以扫码领料必须按「码里带出来的批号」查可用量,而不是按商品合计。
  */
+import { COMPANY_CODE } from '../core/panel/companyCode.js'
 
 /**
  * 解析条码标签的码内容。
  *
- * 码内容格式固定 `存货编码|批号`。批号可能为空(不分批物料),但不允许出现第三段
- * —— 那通常说明扫到了别的码(比如箱码/托盘码还没实现),必须当场拦下而不是猜。
+ * 两种现役形态(2026-10-21 起并存):
+ *   ① **材料仓条码管理标签** = `公司代码@存货编码@批号`(批号空 → `公司代码@存货编码` 两段),
+ *      与标识卡/工单码同一公司代码前缀。改动原因见 barcodeLabel.barcodeQrText。
+ *   ② 旧式/半成品/成品标签 = `存货编码|批号`(条码管理另两个面板仍出这种码)。
+ * 只认**公司代码开头**的 @ 形式,别把供应商贴码的 `编码@数量` 误当公司码(首段不是公司代码)。
+ * 批号可能为空(不分批物料),但不允许出现第三段 —— 那通常说明扫到了别的码,
+ * 必须当场拦下而不是猜。
  *
  * @param {string} raw 扫码枪或手工输入的原串
  * @returns {{ ok: boolean, code: string, batch: string, reason?: 'empty'|'no-code'|'too-many' }}
@@ -24,6 +31,15 @@
 export function parseBarcode(raw) {
   const text = String(raw == null ? '' : raw).trim()
   if (!text) return { ok: false, code: '', batch: '', reason: 'empty' }
+  // ① 公司代码前缀式(材料仓条码 2026-10-21):公司代码@存货编码[@批号]
+  if (text.startsWith(COMPANY_CODE + '@')) {
+    const parts = text.split('@').map((p) => p.trim())
+    if (parts.length > 3) return { ok: false, code: parts[1] || '', batch: '', reason: 'too-many' }
+    const code = parts[1] || ''
+    if (!code) return { ok: false, code: '', batch: '', reason: 'no-code' }
+    return { ok: true, code, batch: parts[2] || '' }
+  }
+  // ② 旧式:存货编码|批号
   const parts = text.split('|')
   const code = (parts[0] || '').trim()
   const batch = (parts[1] || '').trim()

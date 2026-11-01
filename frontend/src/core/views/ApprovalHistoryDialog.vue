@@ -6,9 +6,11 @@
         <template #default="{ $index }">{{ $index + 1 }}</template>
       </el-table-column>
       <el-table-column label="节点" prop="nodeNo" width="60" align="center" />
-      <el-table-column label="动作" width="110">
+      <el-table-column label="动作" width="150">
         <template #default="{ row }">
           <el-tag size="small" :type="tagType(row)">{{ actionLabel(row) }}</el-tag>
+          <!-- 2026-10-28「本人自审」:编制人=审批人的通过必须一眼可辨,不能与正常他人审批长得一样 -->
+          <el-tag v-if="row.selfAudit" size="small" type="warning" style="margin-left:4px">{{ tt('自审') }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作人" prop="operator" width="110" />

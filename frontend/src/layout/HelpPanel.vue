@@ -115,7 +115,7 @@ const faqs = [
   { q: '如何新建一张生产工单？', a: '点击左侧菜单「单据查询/新增单据」或在生产管理模块打开「生产工单」，点击工具栏「新增流程」按钮，填写合同号、批号等必填项后提交。' },
   { q: '单据状态是如何流转的？', a: '草稿 → 提交后待审核 → 审核通过进入「已审核」→ 开工后「生产中」→ 完工后「已完工」→ 归档「已关闭」。草稿状态可编辑删除，审核后可弃审回退。' },
   { q: '如何切换工厂（账套）？', a: '点击顶栏左侧工厂名称下拉，选择目标工厂即可切换，业务数据按工厂隔离。' },
-  { q: '暗色模式如何开启？', a: '点击顶栏右侧用户头像下拉菜单，选择「换肤（暗色）」，或在「界面设置」中切换。' },
+  { q: '换肤（皮肤/暗色）怎么用？', a: '点击顶栏右侧用户头像下拉菜单，选「换肤」，在「外观皮肤」里点一张色卡即可整套换掉（暖砂/深海/松墨）；上方「明色/暗色」是同一套皮肤的两面。选择按浏览器记住。' },
   { q: '找不到某个功能菜单怎么办？', a: '使用顶栏「搜索-产品功能」输入菜单关键字全局搜索，点击结果直达对应页面。' },
 ]
 
@@ -126,10 +126,11 @@ const guide = [
   { title: '开始日常业务', desc: '从生产工单开始，按 报工→出入库→质检 的流程运转。' },
 ]
 
+// 2026-10-28:旧「生产加工单 MANU_ORDER」下架,两个加工单快捷入口移除;
+//   生产工单改为工作台页面(菜单「生产计划 → 生产工单」),不在帮助面板里重复放入口。
 const shortcuts = [
-  { title: '新建加工单', icon: 'DocumentAdd', path: '/panelx/form/MANU_ORDER?new=1', tabPath: '/panelx/form/MANU_ORDER', tabTitle: '新增加工单' },
-  { title: '打开加工单列表', icon: 'List', path: '/panelx/list/MANU_ORDER', tabPath: '/panelx/list/MANU_ORDER', tabTitle: '生产工单' },
-  { title: '我的桌面', icon: 'HomeFilled', path: '/dashboard', tabPath: '/dashboard', tabTitle: '我的桌面' },
+  // 保留本地口径(MANU_ORDER 已下架 ⇒ 两个加工单入口不放回),采纳远端的线框图标 House
+  { title: '我的桌面', icon: 'House', path: '/dashboard', tabPath: '/dashboard', tabTitle: '我的桌面' },
 ]
 
 function doShortcut(s) {

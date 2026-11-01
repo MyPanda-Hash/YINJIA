@@ -89,6 +89,39 @@
             <span class="mp-qty-unit">{{ wo ? wo.计量单位 : '' }}</span>
           </div>
 
+          <!-- 组装物料(2026-11-01 用户口径):只有「组装」工序有 BOM —— 选中组装时才显示
+               当前工单产品对应的组装物料清单;其它工序与此无关,不显示。 -->
+          <div v-if="showAsmBom" class="mp-bom">
+            <div class="mp-bom-head">
+              <span class="mp-bom-title">{{ tt('组装物料') }}</span>
+              <span v-if="asmBom && asmBom.BOM编号" class="mp-bom-doc">
+                {{ asmBom.BOM编号 }}<template v-if="asmBom.版本号"> · {{ asmBom.版本号 }}</template>
+              </span>
+            </div>
+            <div v-if="!bomRows.length" class="mp-empty">{{ tt('该产品还没有维护组装BOM') }}</div>
+            <table v-else class="mp-bom-tbl">
+              <thead>
+                <tr>
+                  <th>{{ tt('子件编码') }}</th>
+                  <th>{{ tt('子件名称') }}</th>
+                  <th class="num">{{ tt('标准用量') }}</th>
+                  <th class="num">{{ tt('本次需求') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in bomRows" :key="i">
+                  <td class="mono">{{ r.子件编码 }}</td>
+                  <td>
+                    {{ r.子件名称 || '—' }}
+                    <span v-if="r.子件规格" class="mp-bom-spec">{{ r.子件规格 }}</span>
+                  </td>
+                  <td class="num">{{ fmt(r.标准用量) }}<span v-if="r.计量单位" class="mp-bom-uom">{{ r.计量单位 }}</span></td>
+                  <td class="num">{{ fmt(r.本次需求) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <div class="mp-row mp-submit">
             <el-button type="primary" size="large" :disabled="!canSubmit" :loading="saving" @click="submit">
               {{ tt('提交报工') }}
@@ -142,6 +175,9 @@ const pickedOp = ref('')
 const qty = ref(0)
 const saving = ref(false)
 const errText = ref('')
+/** 组装物料清单(2026-11-01):后端 /workReport/context 按工单行产品下发的 bs_asm_bom 内容;
+ *  只有「组装」工序才有 BOM,其它工序与此无关 ⇒ 仅当选中的工序=组装 时才展示。 */
+const asmBom = ref(null)
 
 const fmt = (n) => {
   const v = Number(n)
@@ -161,6 +197,17 @@ function opLabel(name) {
 }
 
 const picked = computed(() => ops.value.find((o) => o.工序 === pickedOp.value) || null)
+/** 只有选中「组装」工序才显示组装物料清单(其它工序的 BOM 与组装无关 —— 用户口径 2026-11-01) */
+const showAsmBom = computed(() => !!wo.value && String(pickedOp.value || '').trim() === '组装')
+/** 组装物料行 + 本次需求 = 标准用量 × 完工数量(随数量输入实时联动) */
+const bomRows = computed(() => {
+  const rows = Array.isArray(asmBom.value?.行) ? asmBom.value.行 : []
+  const q = Number(qty.value) || 0
+  return rows.map((r) => ({
+    ...r,
+    本次需求: Math.round((Number(r.标准用量) || 0) * q * 10000) / 10000,
+  }))
+})
 const canSubmit = computed(() => !!wo.value && !!picked.value && Number(qty.value) > 0 && !saving.value)
 const submitHint = computed(() => {
   if (!picked.value) return tt('请先选择工序')
@@ -218,6 +265,7 @@ async function loadWo(line) {
   today.value = []
   pickedOp.value = ''
   qty.value = 0
+  asmBom.value = null
   if (!kw) {
     errText.value = tt('请先扫描或输入工单号')
     return
@@ -229,6 +277,8 @@ async function loadWo(line) {
     wo.value = data.工单 || null
     ops.value = Array.isArray(data.工序台账) ? data.工序台账 : []
     today.value = Array.isArray(data.今日报工) ? data.今日报工 : []
+    // 组装物料(2026-11-01):后端按工单行产品编码下发;只有选中「组装」工序时才展示
+    asmBom.value = data.组装物料 || null
     // 默认选中「当前工序」,没有就选第一道未做满的
     const cur = String(wo.value?.当前工序 || '').trim()
     const hit = ops.value.find((o) => o.工序 === cur)
@@ -387,6 +437,18 @@ async function submit() {
 .mp-qty-label { flex: none; font-size: 13px; color: var(--el-text-color-regular); }
 .mp-qty :deep(.el-input-number) { flex: none; width: 116px; }
 .mp-qty-unit { flex: none; min-width: 24px; font-size: 13px; color: var(--el-text-color-secondary); }
+/* 组装物料(2026-11-01):仅选中「组装」工序时出现;窄屏用表格,列少(编码/名称/标准用量/本次需求) */
+.mp-bom { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--el-border-color-lighter); }
+.mp-bom-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.mp-bom-title { font-size: 13px; font-weight: 600; }
+.mp-bom-doc { font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
+.mp-bom-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mp-bom-tbl th,
+.mp-bom-tbl td { padding: 4px 6px; border-bottom: 1px solid var(--el-border-color-lighter); text-align: left; vertical-align: top; }
+.mp-bom-tbl th { color: var(--el-text-color-secondary); font-weight: 500; }
+.mp-bom-tbl .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mp-bom-spec { display: block; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
+.mp-bom-uom { margin-left: 2px; font-size: 11px; color: var(--el-text-color-secondary); }
 .mp-submit { margin-top: 12px; }
 .mp-submit :deep(.el-button) { flex: 1; }
 

@@ -9,8 +9,20 @@ import { parseBarcode, matchPickRows, checkPickQty, buildMaterialOutForm, batchD
  * ② 匹配必须全等(编码有 M-001 / XM-001 这种前缀包含);③ 领用数量不能超批号级现存量。
  */
 
-test('码内容:正常两段', () => {
+test('码内容:旧式 存货编码|批号 仍然合法(半成品/成品标签)', () => {
   assert.deepEqual(parseBarcode('C5191H-0D20|20260826'), { ok: true, code: 'C5191H-0D20', batch: '20260826' })
+})
+
+test('码内容:材料仓新码 公司代码@存货编码@批号(2026-10-21)', () => {
+  assert.deepEqual(parseBarcode('0@Y-S-Z@20261021004'), { ok: true, code: 'Y-S-Z', batch: '20261021004' })
+  // 批号空 → 两段
+  assert.deepEqual(parseBarcode('0@Y-S-Z'), { ok: true, code: 'Y-S-Z', batch: '' })
+  assert.deepEqual(parseBarcode('  0@Y-S-Z@20261021004  '), { ok: true, code: 'Y-S-Z', batch: '20261021004' })
+})
+
+test('码内容:公司代码式异常形态 → no-code / too-many', () => {
+  assert.equal(parseBarcode('0@').reason, 'no-code')
+  assert.equal(parseBarcode('0@A@B@C').reason, 'too-many')
 })
 
 test('码内容:只有编码(不分批物料)也算合法', () => {

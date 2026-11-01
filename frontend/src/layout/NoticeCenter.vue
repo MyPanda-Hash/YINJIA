@@ -332,19 +332,21 @@ onBeforeUnmount(() => {
 
 .nc-ref {
   position: relative;
-  width: 34px;
-  height: 32px;
+  width: var(--ic-hit, 32px);
+  height: var(--ic-hit, 32px);
   display: grid;
   place-items: center;
   margin: 0;
   padding: 0;
   appearance: none;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--t-navbar-text);
   font: inherit;
-  font-size: 17px;
+  /* 图标体系（2026-10-31）：与顶栏其它纯图标按钮同尺寸 16px、同命中区 32、同圆角 ——
+     原来这一组是 17px / 34×32 / 圆角 4，紧邻全屏与帮助按钮，一排里两种规格。 */
+  font-size: var(--ic-main, 16px);
   cursor: pointer;
   outline: none;
 }

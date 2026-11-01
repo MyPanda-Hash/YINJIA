@@ -31,8 +31,7 @@ const routes = [
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', component: () => import('@/views/dashboard/index.vue'), meta: { title: '我的桌面' } },
-      { path: 'prod/manufacture/order', redirect: '/panelx/list/MANU_ORDER' },
-      { path: 'prod/manufacture/orderForm', redirect: '/panelx/form/MANU_ORDER' },
+      // 2026-10-28:旧生产加工单 MANU_ORDER 下架,prod/manufacture/order(Form) 两条重定向一并移除
       { path: 'prod/manufacture/board', component: () => import('@/views/modules/board/ManufactureBoard.vue'), meta: { title: '生产看板', code: 'manufactureBoard' } },
       { path: 'prod/shop/reworkDesk', component: () => import('@/views/modules/rework/ReworkDesk.vue'), meta: { title: '返修工作台', code: 'reworkDesk' } },
       { path: 'top/solution', component: () => import('@/views/modules/solution/SolutionCenter.vue'), meta: { title: '方案中心', code: 'solutionCenter' } },
@@ -149,6 +148,30 @@ const routes = [
         path: 'panelx/list/MOBILE_REPORT', component: () => import('@/views/mobile/MobileReport.vue'),
         meta: { title: '工序报工', code: 'mobileReport', panelCode: 'MOBILE_REPORT' },
       },
+      // 工序流程追踪卡(2026-10-29,生产计划):日期大批次 → 小批次(工单行)→ 工序照片 → 按卡追溯。
+      //   页面级虚拟面板 PROC_FLOW_CARD(定义见后端 PagePanelRegistry,不是 yj_panel 单据表);
+      //   菜单项同名挂 panelCode,meta.panelCode 供路由守卫拦「直接敲 URL」。
+      { path: 'prod/plan/procFlowCard', component: () => import('@/views/modules/plan/ProcFlowCard.vue'), meta: { title: '工序流程追踪卡', code: 'procFlowCard', panelCode: 'PROC_FLOW_CARD' } },
+      // 烧结工艺清单 = **一个导航入口 + 两个模板 Tab**(2026-10-30 用户口径「把这个x烧结面板放到
+      //   烧结面板里面去,做成一个双面板设计的一个总面板……最外的导航栏还是成型工艺清单,
+      //   但是里面是两个不同的操作的面板」)。
+      //   两个模板绑**不同的表**(rd_mold_proc_* / rd_x_sinter_*),各自独立建单 ——
+      //   同一产品可以只填一个,也可以两个都填,所以不是一张单的两个页签。
+      //   两条静态路由都指向同一容器组件 ⇒ **必须排下面 `panelx/list/:panelCode` 参数路由之前**;
+      //   地址随 Tab 走(容器内 router.replace) ⇒ 刷新/收藏/分享都落在同一个 Tab。
+      {
+        path: 'panelx/list/RD_MOLD_PROC',
+        component: () => import('@core/views/MoldProcPanel.vue'),
+        props: { panelCode: 'RD_MOLD_PROC' },
+        meta: { title: '烧结工艺清单', panelCode: 'RD_MOLD_PROC' },
+      },
+      {
+        path: 'panelx/list/RD_X_SINTER',
+        component: () => import('@core/views/MoldProcPanel.vue'),
+        props: { panelCode: 'RD_X_SINTER' },
+        meta: { title: 'X烧结工艺清单', panelCode: 'RD_X_SINTER' },
+      },
+      // ── 以上为远端新增(X烧结并入烧结工艺清单为双模板 Tab),与本地「工序流程追踪卡」互不冲突,两条都保留 ──
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()

@@ -84,7 +84,12 @@
     <!-- ③ 抬头四对:全部可填(产品编号/产品型号 支持参照或手填;生产日期用日期选择;组别取生产线)
          ⚠ 生产日期那一格给**固定宽 240px**(用户口径 2026-10-16 第五轮「增长当前生产日期框体长度
            让当前控件不会超出距离」):日期控件自带 220px 默认宽,格子按 `table-layout:fixed` 平摊时
-           只有 ~150px ⇒ 控件会顶出格线、压到「组别」上。其余各列照旧平摊。 -->
+           只有 ~150px ⇒ 控件会顶出格线、压到「组别」上。其余各列照旧平摊。
+         ⚠ 2026-10-29 用户口径(截图红框)「当前首件检验单中的内容超出当前行无法实现自动换行」:
+           抬头(产品型号)的值是 `32*12*112.2序号:Z045物料编码:T123` 这种长串,格宽只有 ~150px;
+           原实现是**单行 el-input**(文本横向滚,格线一裁就只见半截),故值格一律改
+           **textarea + autosize** ⇒ 文本在本格内换行、行高随之长高,整行内容都看得见;
+           只读态(span)同样按词换行,见样式 `.fi-head td > span`。 -->
     <table class="fi-head"><tbody><tr>
       <template v-for="f in HEAD_FIELDS" :key="f.key">
         <th>{{ tt(f.label) }}</th>
@@ -102,6 +107,8 @@
           <el-input
             v-else-if="editable && !isLocked(f.key)"
             v-model="head[f.key]"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 4 }"
             size="small"
             class="fi-cell"
             maxlength="200"
@@ -1029,6 +1036,27 @@ defineExpose({ exportFirstInspExcel })
   min-width: 0;
   box-sizing: border-box;
 }
+/* 抬头值格**必须会换行**(2026-10-29 用户报「内容超出当前行无法实现自动换行」):
+   值控件已改 textarea+autosize(见模板 ③),这里把 paper 观感与换行规则补齐 ——
+   `word-break: break-word` + `overflow-wrap: anywhere` 是给 `32*12*112.2序号:Z045物料编码:T123`
+   这种**没有空格的长串**用的(textarea 默认只在词边界换行,长串会横向溢出再被裁)。 */
+.fi-head td .fi-cell :deep(.el-textarea__inner) {
+  width: 100%;
+  min-height: 22px;
+  line-height: 1.35;
+  padding: 1px 2px;
+  resize: none;
+  text-align: center;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+/* 只读态(span):长值同样在格内换行,别让 td 把文字裁掉 */
+.fi-head td > span {
+  display: block;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
 .fi-head td :deep(.el-date-editor.el-input),
 .fi-head td :deep(.el-date-editor .el-input__wrapper) {
   width: 100%;
@@ -1155,6 +1183,8 @@ defineExpose({ exportFirstInspExcel })
   body.approval-printing .fi-grid .el-input__inner,
   body.approval-printing .fi-grid .el-textarea__inner,
   body.approval-printing .fi-head .el-input__inner,
+  /* 抬头值格已改 textarea(2026-10-29 换行),打印字号要同步收 10px,否则抬头比表体大一号 */
+  body.approval-printing .fi-head .el-textarea__inner,
   body.approval-printing .fi-check,
   body.approval-printing .fi-stdtext {
     font-size: 10px !important;

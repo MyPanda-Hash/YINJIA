@@ -4369,3 +4369,40 @@ migrate-wo-pick-return-flag-field-20261030.sql
 #   导致前端默认领用数量退化成库存上限(实测 需求 3 → 默认 12000)。
 #   本脚本按 工单行 → 产品 → 最新组装工艺清单 反查用量,拼回备注;幂等。
 fix-mobile-pick-note-20261030.sql
+
+# ── 以下条目由远端(origin/main)合并带入,原文件里没有 ──
+migrate-drop-bak-snapshots-20261021.sql
+migrate-kucun-recalc-today-20261021.sql
+migrate-qc-plan-applicable-doc-20261021.sql
+migrate-wo-completion-sort-20261021.sql
+migrate-route-workshop-options-20261021.sql
+migrate-form-approval-self-audit-20261028.sql
+migrate-drop-manu-order-20261028.sql
+migrate-wo-day-plan-20261029.sql
+migrate-wo-proc-card-20261029.sql
+migrate-wo-process-line-plan-start-20261029.sql
+migrate-asm-bom-20261030.sql
+migrate-asm-bom-data-20261030.sql
+migrate-oqc-report-20261030.sql
+migrate-oqc-itemmap-seed-20261030.sql
+migrate-plang-order-demand-20261031.sql
+migrate-oqc-hygiene-results-20261101.sql
+migrate-wo-report-op-name-20261101.sql
+migrate-scjl-report-date-20261101.sql
+migrate-oqc-batch-anchor-20261101.sql
+migrate-oqc-prod-date-20261101.sql
+migrate-qc-bhg-bhc-link-20261101.sql
+migrate-plang-batch-date-closed-20261021.sql
+migrate-plang-no-month-closed-20261021.sql
+migrate-drop-test-progress-20261030.sql
+migrate-align-canceled-to-aspcancel-20261030.sql
+migrate-prodinfo-bom-detail-20261030.sql
+migrate-specdoc-subitem-20261030.sql
+migrate-prodinfo-head-extra-20261030.sql
+migrate-x-sinter-tables-20261030.sql
+migrate-x-sinter-panel-20261030.sql
+migrate-mold-proc-rename-20261030.sql
+migrate-x-sinter-spec-ref-20261030.sql
+migrate-prod-mold-panel-20261030.sql
+migrate-prod-mold-retire-old-20261030.sql
+migrate-bom-material-list-status-20261030.sql

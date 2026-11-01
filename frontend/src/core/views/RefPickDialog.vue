@@ -79,6 +79,10 @@ const props = defineProps({
   // 本行数据(2026-10-09):供参照过滤里的 `$字段` 占位取值 —— 仓位(ref_filter=`仓库=$仓库`)
   // 之类级联字段据此把候选收窄到本行仓库;非级联字段传不传都一样。
   row: { type: Object, default: null },
+  // 跳过「单据状态=已审核」候选过滤(2026-11-01,纸面单据关联单号专用):
+  // 纸面单据(不合格报告/不合格品处理单等)表头 单据状态 是历史遗留列、MES 不维护,
+  // 按它过滤会把候选砍到只剩零星几条(实测 433→1) ⇒ 由 DocSheet 的纸面格子(refAllStatus)声明后透传。
+  skipAuditFilter: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'update:visible', 'confirm'])
 
@@ -148,7 +152,7 @@ async function open() {
   rows.value = []
   try {
     columns.value = await engine.refColumns(props.field)
-    const list = await engine.queryRefRows(props.field, { keyword: keyword.value, row: props.row })
+    const list = await engine.queryRefRows(props.field, { keyword: keyword.value, row: props.row, skipAuditFilter: props.skipAuditFilter })
     if (showDevStatus.value) {
       const codes = list.map((r) => r['产品编号']).filter((v) => v !== undefined && v !== null && v !== '')
       try {

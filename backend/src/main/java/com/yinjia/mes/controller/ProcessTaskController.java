@@ -16,13 +16,21 @@ import java.util.Map;
 /**
  * 工序任务(路线驱动,A 项 2026-10-05):一道工序一份待加工队列,可排序(急单/交期/排序号)、
  * 可派工到产线,报工回写完成量。前端页 /prod/plan/processQueue。
- * 权限:面板查看 = MANU_ORDER 可见;派工/排序 = MANU_ORDER「保存」词表。
- * 例外(2026-10-16):/routes 与 /detail 是**弹窗共用接口**,改按调用页面面板「任一命中」放行
+ * 权限(2026-10-28 生产加工单 MANU_ORDER 下架后改挂页面面板):查看 = 生产工单/工单排产/快速排产任一可见;
+ * 派工/排序/补生成/重算/撤回 = 生产工单或快速排产的「排产」词。原先是借 MANU_ORDER 的权限当闸门。
+ * 例外(2026-10-16):/routes 与 /detail 是**弹窗共用接口**,按调用页面面板「任一命中」放行
  * (订单结转 / 快速排产 / 工单排产 / 生产工单),见 {@link PagePanelRegistry}。
  */
 @RestController
 @RequestMapping("/api/px/processTask")
 public class ProcessTaskController {
+
+    /** 工序任务属于生产域:三个生产页面任一可见即放行查看 */
+    private static final String[] TASK_ENTRIES = {
+            PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.SCHEDULE_BOARD};
+    /** 写动作(派工/排序/补生成/重算/撤回)挂「排产」词:生产工单或快速排产任一授予即可 */
+    private static final String[] TASK_WRITE_ENTRIES = {
+            PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.SCHEDULE_BOARD};
 
     private final ProcessTaskService service;
     private final PanelPermissionService perm;
@@ -35,7 +43,7 @@ public class ProcessTaskController {
     /** 工序任务队列(筛选:工序/生产车间/生产线/状态/关键字;排序:急单→计划完工日→排序号→工单号) */
     @PostMapping("/queue")
     public ApiResult<List<Map<String, Object>>> queue(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(TASK_ENTRIES);
         Map<String, Object> b = body == null ? Map.of() : body;
         return ApiResult.ok(service.queue(str(b.get("工序")), str(b.get("生产车间")), str(b.get("生产线")),
                 str(b.get("状态")), str(b.get("keyword"))));
@@ -44,7 +52,7 @@ public class ProcessTaskController {
     /** 下拉选项(工序/状态/生产车间/产线/路线) */
     @PostMapping("/meta")
     public ApiResult<Map<String, Object>> meta() {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(TASK_ENTRIES);
         return ApiResult.ok(service.meta());
     }
 
@@ -52,8 +60,8 @@ public class ProcessTaskController {
     @PostMapping("/assign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> assign(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(TASK_ENTRIES);
+        perm.requireButtonAny(TASK_WRITE_ENTRIES, "排产");
         return ApiResult.ok(service.assign((List<Object>) body.getOrDefault("ids", List.of()),
                 str(body.get("生产线")), currentUser()));
     }
@@ -62,8 +70,8 @@ public class ProcessTaskController {
     @PostMapping("/prioritize")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> prioritize(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(TASK_ENTRIES);
+        perm.requireButtonAny(TASK_WRITE_ENTRIES, "排产");
         Object so = body.get("排序号");
         Integer sortNo = so == null || String.valueOf(so).isBlank() ? null : Integer.valueOf(String.valueOf(so));
         return ApiResult.ok(service.prioritize((List<Object>) body.getOrDefault("ids", List.of()),
@@ -73,8 +81,8 @@ public class ProcessTaskController {
     /** 按工单生成工序任务(转工单会自动生成;此处供历史工单补生成) */
     @PostMapping("/generate")
     public ApiResult<Map<String, Object>> generate(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(TASK_ENTRIES);
+        perm.requireButtonAny(TASK_WRITE_ENTRIES, "排产");
         String plNo = str(body.get("工单号"));
         int n = service.generateForWorkOrder(plNo, currentUser());
         return ApiResult.ok(Map.of("工单号", String.valueOf(plNo), "生成任务数", n));
@@ -83,8 +91,8 @@ public class ProcessTaskController {
     /** 按已审核报工重算某工单任务完成量(对账/修复) */
     @PostMapping("/rebuild")
     public ApiResult<Map<String, Object>> rebuild(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(TASK_ENTRIES);
+        perm.requireButtonAny(TASK_WRITE_ENTRIES, "排产");
         return ApiResult.ok(service.rebuild(str(body.get("工单号")), currentUser()));
     }
 
@@ -122,7 +130,7 @@ public class ProcessTaskController {
     @PostMapping("/nextProcess")
     @SuppressWarnings("unchecked")
     public ApiResult<List<Map<String, Object>>> nextProcess(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(TASK_ENTRIES);
         Map<String, Object> b = body == null ? Map.of() : body;
         Object nos = b.get("工单号列表");
         List<String> list = nos instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
@@ -132,7 +140,7 @@ public class ProcessTaskController {
     /** 工序总览:按工序(成型/切炭/组装)汇总待加工/在加工/已完工/未完成量(只读视图) */
     @PostMapping("/board")
     public ApiResult<List<Map<String, Object>>> board() {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelViewAny(TASK_ENTRIES);
         return ApiResult.ok(service.board());
     }
 
@@ -143,8 +151,8 @@ public class ProcessTaskController {
      */
     @PostMapping("/detail")
     public ApiResult<Map<String, Object>> detail(@RequestBody Map<String, Object> body) {
-        // 工单详情/追溯共用组件挂在工单排产看板与生产工单列表两处;MANU_ORDER 保留(旧入口同组件)
-        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD, "MANU_ORDER");
+        // 工单详情/追溯共用组件挂在工单排产看板与生产工单列表两处
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD);
         Object rid = body.get("工单行id");
         Long rowId = null;
         if (rid instanceof Number n) rowId = n.longValue();
@@ -158,8 +166,8 @@ public class ProcessTaskController {
     @PostMapping("/unassign")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> unassign(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(TASK_ENTRIES);
+        perm.requireButtonAny(TASK_WRITE_ENTRIES, "排产");
         return ApiResult.ok(service.unassign((List<Object>) body.getOrDefault("ids", List.of()), currentUser()));
     }
 

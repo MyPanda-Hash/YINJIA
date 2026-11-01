@@ -91,6 +91,14 @@
                             <span v-if="devStatus && devKey === fd.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                             <el-icon class="rs-ref-ico"><Search /></el-icon>
                           </div>
+                          <!-- 长文本格(2026-10-30 用户报障「规格书在编辑的时候数据长换不了行」):
+                               整体规格参数/产品主要性能 这类格在编辑态是单行 input、高度还写死 38px,
+                               长了只能横向溢出(截图里「去除余氯、阻垢率 黑水量≤3」顶出右框)。
+                               fd.area ⇒ 多行域,行高随内容长,封面其它行自然下移。 -->
+                          <el-input v-else-if="editable && fd.area" v-model="head[fd.key]" type="textarea"
+                                    :autosize="{ minRows: 1, maxRows: 6 }" size="small"
+                                    class="rsp-cover-input rsp-cover-area" :class="{ 'rs-focus': isFocus(fd.key) }"
+                                    :maxlength="fd.max || 2000" @input="emit('dirty')" />
                           <el-input v-else-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
                           <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
                         </td>
@@ -221,6 +229,16 @@
           </tr>
         </template>
         </template>
+      </tbody>
+    </table>
+
+    <!-- ═══ 页级标题(按页配置 cfg.pagePrintTitle;规格书第 4 页「成品及包装运输」) ═══
+         2026-10-30 用户口径：「在关键物料列表顶部加上一个『成品及包装运输』标题，是这一页的标题」——
+         页签条打印时不印，纸面上原本只有「1.关键物料列表」这种表区小节名，看不出这是哪一页。 -->
+    <table v-if="curPagePrintTitle" class="rs-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in effGrid" :key="'pt' + i" :style="{ width: w + 'px' }" /></colgroup>
+      <tbody>
+        <tr><td :colspan="nCols" class="rsp-page-title rsp-ptitle">{{ tt(curPagePrintTitle) }}</td></tr>
       </tbody>
     </table>
 
@@ -616,12 +634,29 @@
                  依次**右移两列**——于是子项目列、检验要求列看着空白,而「除余氯寿命」跑到检验方法列、
                  「寿命920L，全程加标」跑到检验依据列。行首两格必须由 rowspan 覆盖,不能重复输出。 -->
             <template v-if="dt.design?.groupCol">
-              <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design">
+              <!-- 点行 = 指定「从标准库勾选」的落点（2026-10-30 用户口径：
+                   「我可以直接选到这个位置，然后再从标准库引用…它就可以弹出在这个位置」） -->
+              <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design"
+                  :class="{ 'rsp-row-sel': libInsertAt === r.idx }"
+                  @click="libInsertAt = r.idx">
                 <template v-if="r.groupFirst">
                   <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.group.count">{{ r.seq }}</td>
-                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">{{ tt(r.group.label) }}</td>
+                  <!-- 检验项目:组首行渲染(跨整组)。2026-10-30 用户口径「检测项目栏写入之后可以编辑」
+                       ⇒ 从只读文本改成**多行域**（先试过单行 input，实测「跌落强度（裸…」被截断/盖住，
+                       项目名和子项名都可能很长）；@change(失焦/回车)才提交，避免每敲一个字就重算分组顶掉光标。 -->
+                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">
+                    <el-input v-if="editable" :model-value="r.group.label" type="textarea"
+                              :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in rsp-center"
+                              @change="(v) => renameGroup(dt, r, v)" />
+                    <span v-else>{{ tt(r.group.label) }}</span>
+                  </td>
                 </template>
-                <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">{{ tt(r.sub || '') }}</td>
+                <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">
+                  <el-input v-if="editable" :model-value="r.sub" type="textarea"
+                            :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in rsp-center"
+                            @change="(v) => renameSub(r, v)" />
+                  <span v-else>{{ tt(r.sub || '') }}</span>
+                </td>
                 <td class="rs-td" :style="designTdStyle(dt, 'req')">
                   <el-input v-if="editable" v-model="r.row['检验要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
                   <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验要求'] || ' / ' }}</span>
@@ -1536,6 +1571,8 @@
 
     <!-- ═══ 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表;输入不落库) ═══ -->
     <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="onRecipeApplied" />
+<!-- X烧结工艺清单(RD_X_SINTER):另一套公式体系的计算器(见 core/xsinter/calcEngine.js) -->
+<XsinterCalcDialog v-model="xSinterVisible" :head="head" :rows="xSinterRows" @applied="onXSinterApplied" />
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
@@ -1616,12 +1653,16 @@ import FileAttachCell from './FileAttachCell.vue'
 // 纸面只读值格:按「标注笔/橡皮擦」的标注切段着色(屏幕与打印同一套 DOM ⇒ 打印带色)
 import AnnotatedText from './AnnotatedText.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
+// 2026-10-30 X烧结工艺清单的配方计算器:公式体系与 RecipeCalcDialog 不同,独立组件
+import XsinterCalcDialog from '@/core/xsinter/XsinterCalcDialog.vue'
 // 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 // 日期/时间格:控件种类按 yj_field.data_type 决定,取值归一同上(纯函数 + 单测)
 import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/panel/sheetDateCells'
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
+// X烧结「炭棒规格」三格的三层兜底(独立字段 → 异名键 → 整串解析),单测见 core/xsinter/
+import { rodSpecFromProdInfo } from '@/core/xsinter/rodSpecFromProdInfo.js'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
 import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, invSearchRequest, pickInvCarry, pickInvKind } from '@/core/panel/invCarry'
 import { GOODS_FACETS, facetValues, matchGoods, goodsToDetail } from '@/core/panel/goodsPick'
@@ -1912,6 +1953,11 @@ const showReportHead = computed(() => {
 const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
 const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
+/**
+ * 当前页的页级标题(印在纸面最上方)。按页号配置:cfg.pagePrintTitle = { 3: '成品及包装运输' }。
+ * 2026-10-30 用户口径:「在关键物料列表顶部加上一个『成品及包装运输』标题，是这一页的标题」。
+ */
+const curPagePrintTitle = computed(() => String((cfg.value?.pagePrintTitle || {})[activePage.value] || ''))
 /** 报告头左侧公司名(7 张数据记录表 + 其它文书面板的纸面首行文字,逐张一致;尾随空格不计) */
 const COMPANY_NAME = '惠州市银嘉环保科技有限公司'
 /** 报告头第 1 行「公司名格 | 编号格」的分列 —— 优先按**设计原表的 !merges**显式切分:
@@ -2595,6 +2641,43 @@ function colsOf(dt) {
 // ── 标准库勾选(规格书检验要求 26 组分组标准库 / 出货检验计划 必测项+型式项) ──
 const libVisible = ref(false)
 const libChecked = ref([])
+/**
+ * 「从标准库勾选」的落点行号：**用户点过的那一行**在 rowsOf(dt) 里的下标（-1 = 没点，追加到末尾）。
+ * 2026-10-30 用户口径：「我可以直接选到这个位置，然后再从标准库引用……它就可以弹出在这个位置，
+ * 就是先填充上边的新增空白栏」。原先 confirmLib 一律 arr.push 追加到末尾，想补一条中途漏掉的
+ * 检验项目就只能追加到最后再手动挪。
+ */
+const libInsertAt = ref(-1)
+
+/** 检验项目改名 = 改整组（组是合并显示的）。老口径 `组名·子项` 要保留 `·` 后面那段。 */
+function renameGroup(dt, r, newLabel) {
+  const v = String(newLabel ?? '').trim()
+  const old = String(r.group.label ?? '')
+  if (!v || v === old) return
+  const arr = touch()
+  for (const row of arr) {
+    const cur = String(row['检验项目'] ?? '')
+    const dot = cur.indexOf('·')
+    const curGroup = dot >= 0 ? cur.slice(0, dot) : cur
+    if (curGroup !== old) continue
+    row['检验项目'] = dot >= 0 ? v + cur.slice(dot) : v
+  }
+  emit('dirty')
+}
+
+/** 检验子项改名：写独立列「检验子项」；老口径若还在项目名里拼着子项，顺手拆掉（改由独立列承载）。 */
+function renameSub(r, newVal) {
+  const s = String(newVal ?? '').trim()
+  if (s === String(r.sub ?? '').trim()) return
+  const arr = touch()
+  const i = arr.indexOf(r.row)
+  if (i < 0) return
+  arr[i]['检验子项'] = s
+  const cur = String(arr[i]['检验项目'] ?? '')
+  const dot = cur.indexOf('·')
+  if (dot >= 0) arr[i]['检验项目'] = cur.slice(0, dot)
+  emit('dirty')
+}
 const libRows = ref([])
 async function openLib(dt) {
   libTargetDt.value = dt
@@ -3066,13 +3149,16 @@ function confirmLib() {
     return
   }
   const grouped = libRows.value.length && Array.isArray(libRows.value[0].subs)
+  // 勾选出来的行先攒在这里，最后统一「落位」（2026-10-30）：
+  // 原来两个分支都是一律 arr.push 追加到末尾，用户想补一条中途漏掉的检验项目就只能追加到最后再手挪。
+  const newRows = []
   if (grouped) {
     for (const key of libChecked.value) {
       const [gi, si] = key.split(':').map(Number)
       const g = libRows.value[gi]
       const s = g && g.subs[si]
       if (!g || !s) continue
-      arr.push({
+      newRows.push({
         '表区': dt.filterVal,
         '检验项目': s.name ? g.name + '·' + s.name : g.name,
         '检验要求': s.req || '',
@@ -3091,12 +3177,51 @@ function confirmLib() {
       // proj 的值(条目正文的真实内容)也不让分组名去覆盖,故先判 undefined 再写。
       const grp = flatGroupOf(row)
       if (dt.libGroupKey && grp && out[dt.libGroupKey] === undefined) out[dt.libGroupKey] = grp
-      arr.push(out)
+      newRows.push(out)
     }
   }
+  placeLibRows(arr, dt, newRows)
   libChecked.value = []
   libVisible.value = false
   emit('dirty')
+}
+
+/**
+ * 「从标准库勾选」的落位（2026-10-30 用户口径）：
+ *   「我可以直接选到这个位置，然后再从标准库引用……它就可以弹出在这个位置，
+ *     就是先填充上边的新增空白栏」。
+ *
+ * 三步：
+ *   ① 从用户点的那一行**往上**收集「空白行」（检验项目/子项/要求都空），按行序排；
+ *   ② 勾出来的行先**就地填**进这些空行（保住原有的 表区 等列，不新起一行）；
+ *   ③ 剩下的行插到落点那一行**之前**；没点过行（libInsertAt<0）就照旧追加到末尾。
+ */
+function placeLibRows(arr, dt, newRows) {
+  if (!newRows.length) return
+  const rows = rowsOf(dt)
+  const at = Number(libInsertAt.value)
+  const validAt = Number.isFinite(at) && at >= 0 && at < rows.length
+  const blankRow = (r) => !String(r['检验项目'] ?? '').trim()
+    && !String(r['检验子项'] ?? '').trim()
+    && !String(r['检验要求'] ?? '').trim()
+  const slots = []
+  if (validAt) {
+    for (let i = at; i >= 0; i--) {
+      const idx = arr.indexOf(rows[i])
+      if (idx >= 0 && blankRow(rows[i])) slots.push(idx)
+    }
+    slots.reverse()          // 按行序从前到后填
+  }
+  let k = 0
+  for (; k < newRows.length && k < slots.length; k++) {
+    arr[slots[k]] = { ...arr[slots[k]], ...newRows[k] }
+  }
+  const rest = newRows.slice(k)
+  if (rest.length) {
+    const pos = validAt ? Math.max(0, arr.indexOf(rows[at])) : arr.length
+    arr.splice(pos < 0 ? arr.length : pos, 0, ...rest)
+  }
+  libInsertAt.value = -1     // 落位用完复位，下次不会粘在上一张表
 }
 
 /** 数据表列宽是否自持(列带 w 时数据表用自己的 colgroup,与全页网格解耦——出货检验计划/规格书) */
@@ -3153,20 +3278,31 @@ function designInputStyle(dt) {
   return { fontSize: dpx(dt, dt.design.fontSize || 11) + 'px', textAlign: 'center' }
 }
 
-// ── 分组式设计表(检验项目及标准):行按「组·子项」前缀分组,组跨行、序号按组编号 ──
+// ── 分组式设计表(检验项目及标准):行按「组·子项」分组,组跨行、序号按组编号 ──
+// ⚠ 两种数据形态都要认(2026-10-30 用户报障「这些都合并不了，应该是按第二张图来展示才对」)：
+//   ① **新口径**：检验项目 / 检验子项 **分两列**存 —— 项目=`*黑水及颗粒物测试`、子项=`初始黑水测试`；
+//   ② **老口径**：两样合在「检验项目」一列里用 `·` 拼 —— 项目=`*黑水及颗粒物测试·（裸棒）`，子项列空。
+//   原实现只认 ②（一律按 `·` 拆），于是 ① 的整组被当成 standalone ⇒ 每行各占一格、
+//   检验项目显示三遍、检验子项列反而空着（就是用户截图里那个样子）。
+//   ⇒ 判据改成：**子项列有值就用它**，没有才回退 `·` 拆分；两者都没有才算 standalone(跨两列独占)。
 function designGroupRows(dt) {
   const out = []
   let g = null
-  for (const row of rowsOf(dt)) {
-    const label = row['检验项目'] || ''
+  const rows = rowsOf(dt)
+  for (let idx = 0; idx < rows.length; idx++) {
+    const row = rows[idx]
+    const label = String(row['检验项目'] ?? '')
     const dot = label.indexOf('·')
     const gLabel = dot >= 0 ? label.slice(0, dot) : label
-    const sub = dot >= 0 ? label.slice(dot + 1) : ''
+    // 子项:优先「检验子项」列(新口径),空则回退到项目名里 `·` 之后那段(老口径)
+    const subCol = String(row['检验子项'] ?? '').trim()
+    const sub = subCol || (dot >= 0 ? label.slice(dot + 1) : '')
     if (!g || g.label !== gLabel) {
       g = { label: gLabel, count: 0, seq: out.filter((x) => x.groupFirst).length + 1 }
     }
     g.count++
-    out.push({ key: 'gr' + out.length, row, group: g, groupFirst: g.count === 1, sub, standalone: dot < 0, seq: g.seq })
+    // idx = 该行在 rowsOf(dt) 里的原始下标 —— 「从标准库勾选」要知道用户指的是哪一行
+    out.push({ key: 'gr' + out.length, idx, row, group: g, groupFirst: g.count === 1, sub, standalone: !sub, seq: g.seq })
   }
   return out
 }
@@ -3232,7 +3368,7 @@ const prodRefKey = ref('')
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
 
 // ── 产品开发状态角标(2026-09-09):本面板的产品键已下发时,在单元格标注 未开发 / 已开发 ──
-const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
 const devStatus = ref('')
 const devKey = computed(() => {
   for (const k of ['产品编号', '编号']) {
@@ -3321,6 +3457,15 @@ function onProdRefConfirm(rows) {
   // 空的不写 —— 半截的 `外：` 不许落格)。只在有这三个格的成型工艺面板上动手。
   for (const [k, v] of Object.entries(carbonSpecFrom(source, fieldMap.value.has('炭棒规格1')))) {
     props.head[k] = v
+  }
+  // X烧结工艺清单(RD_X_SINTER):refMap 只带「参照行里存在的键」，长度那格常缺
+  //（用户 2026-10-30 报障「炭棒规格没带全」：33/12 有、长度空）⇒ 三层兜底
+  //  独立字段 → 改过名的键 → 「炭棒尺寸/产品整体尺寸」整串解析；已填的格不覆盖。
+  //  纯函数 + 单测：core/xsinter/rodSpecFromProdInfo.js
+  if (String(props.panelCode) === 'RD_X_SINTER') {
+    for (const [k, v] of Object.entries(rodSpecFromProdInfo(source, props.head))) {
+      props.head[k] = v
+    }
   }
   prodRefVisible.value = false
   emit('dirty')
@@ -3837,7 +3982,14 @@ const blankRowsSeeded = new Set()
 watch(() => [props.editable, props.head, cfg.value], ([v]) => {
   const tables = cfg.value?.dataTables || []
   if (!v || !tables.length) return
-  if (!props.head || !props.head['单据编号']) return
+  if (!props.head) return
+  // ⚠ 2026-10-30 修正：原来这里还有一条 `if (!props.head['单据编号']) return`。
+  //   单据编号是**保存后才由后端分配**的 ⇒ 刚点「新增」时那格是空的(纸面显示"—"),
+  //   于是新建单永远铺不出默认行，用户看到的就是「一张新单配方表只有一行 —」
+  //   （口径：「这个面板也是默认10行带序号的，你刚才没改到这个」）。
+  //   现在改成：没有编号也铺，只是**不记账**（下面 memoKey 置 null）——
+  //   新建单每次都是新的 head 对象，靠「本表区为空」这一条判空就够了。
+  const docNo = props.head['单据编号']
   for (const dt of tables) {
     const want = Number(dt.blankRows) || 0
     if (want <= 0) continue
@@ -3846,9 +3998,10 @@ watch(() => [props.editable, props.head, cfg.value], ([v]) => {
     // ①b 同一张单只铺一次:本 watch 的依赖含 cfg(配置刷新会重入),
     //     而空行落进 touch() 后 rowsOf 仍可能读到 0 行(行还没被 items 认领的瞬间)⇒ 用单据号+表区记账。
     //     不改这个键,用户手动删光 10 行后也不会被"贴心"地补回来(那不是用户要的)。
-    const memoKey = `${props.head['单据编号']}::${dt.filterKey || ''}::${dt.filterVal || ''}`
-    if (blankRowsSeeded.has(memoKey)) continue
-    blankRowsSeeded.add(memoKey)
+    //     新建单(无单据号)不记账 —— 见上面那条说明。
+    const memoKey = docNo ? `${docNo}::${dt.filterKey || ''}::${dt.filterVal || ''}` : null
+    if (memoKey && blankRowsSeeded.has(memoKey)) continue
+    if (memoKey) blankRowsSeeded.add(memoKey)
     const arr = touch()
     for (let i = 1; i <= want; i++) {
       const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
@@ -4259,7 +4412,16 @@ async function carryBomFromProdBom(prodRow) {
 const recipeCalcVisible = ref(false)
 const recipeCalcRows = ref([])
 const recipeCalcDt = ref(null)
+// X烧结工艺清单(RD_X_SINTER)用**另一套**计算器：公式体系与成型工艺清单不同
+// （X烧结是「圆柱体积×密度 + 粉料1 倒推 + 颗粒料按克数」，见 core/xsinter/calcEngine.js）。
 function openRecipeCalc(dt) {
+  // ⚠ 本组件的面板码在 **props** 上（不是 computed ref），别写成 panelCode.value
+  if (String(props.panelCode) === 'RD_X_SINTER') {
+    xSinterDt.value = dt
+    xSinterRows.value = rowsOf(dt)
+    xSinterVisible.value = true
+    return
+  }
   recipeCalcDt.value = dt
   recipeCalcRows.value = rowsOf(dt)
   recipeCalcVisible.value = true
@@ -4271,6 +4433,36 @@ function onRecipeApplied(payload) {
   if (dt) {
     const arr = touch()
     if (dt.filterKey) for (const r of rows) r[dt.filterKey] = dt.filterVal
+    const kept = dt.filterKey
+      ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
+      : []
+    arr.splice(0, arr.length, ...kept, ...rows)
+  }
+  emit('dirty')
+}
+
+// ---------- X烧结配方计算(RD_X_SINTER):头 18 格 + 配方表 10 行 ----------
+const xSinterVisible = ref(false)
+const xSinterRows = ref([])
+const xSinterDt = ref(null)
+/**
+ * X烧结计算器「填入单据」：
+ *   头 —— 把算出来的 18 格（模具/参数/切炭/冷却/重量/密度）写进单据头，**覆盖**同名键；
+ *   明细 —— 与本文件其它「整表替换」同一口径：先剔除本表区的旧行，再整体塞入新 10 行。
+ * 输入参数（折算系数/修正长度/密度上下限）同时回落单头 —— 历史单据要能追溯当时用的参数，
+ * 否则日后改了公式或默认值就没法复算。
+ */
+function onXSinterApplied(payload) {
+  const dt = xSinterDt.value
+  const headPatch = payload?.head || {}
+  const h = props.head || {}
+  for (const [k, v] of Object.entries(headPatch)) {
+    if (v !== undefined && v !== null) h[k] = String(v)
+  }
+  const detail = Array.isArray(payload?.detail) ? payload.detail : []
+  if (dt) {
+    const arr = touch()
+    const rows = detail.map((r) => ({ ...r, [dt.filterKey]: dt.filterVal }))
     const kept = dt.filterKey
       ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
       : []
@@ -4573,9 +4765,12 @@ function chartOf(dt) {
 }
 .rs-ref-text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 只读格 = 打印口径：**整段显示**，不再用省略号吞字。
+     2026-10-30 打印体检：这是全站唯一一类"真截断"（nowrap + ellipsis），
+     引用型字段（产品编号/名称这类）一长就在纸面上变成「阻垢炭棒滤…」。 */
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-size: 12.5px;
   color: #333;
 }
@@ -4717,6 +4912,10 @@ function chartOf(dt) {
   font-weight: 700;
   padding: 5px 10px;
   text-align: center;
+  /* 章节条标题一律不折行（2026-10-30）：实测纸面宽 794，正常装得下；
+     但打印栅格化那一步若把列宽算窄了，折行会让标题**压到下一行表格上**（用户截图
+     「1.关键物料列 / 表」并盖住表头）。不折行时最坏是横向溢出，不会压行。 */
+  white-space: nowrap;
 }
 .rs-t > tbody > tr:first-child .rs-sectionbar {
   border-top: 1px solid #7f7f7f;
@@ -4731,6 +4930,12 @@ function chartOf(dt) {
   letter-spacing: 6px;
   padding: 16px 0 12px;
   text-align: center;
+}
+/* 页级标题(规格书第 4 页「成品及包装运输」)：字距不要 6px —— 那套是给 4 字大标题留的呼吸,
+   5 个字以上会松散到像分开的两个词 */
+.rsp-ptitle {
+  letter-spacing: 2px;
+  padding: 10px 0 8px;
 }
 
 /* ═══ 表尾静态附表(cfg.tailTables:纸面固定附录,只读) ═══
@@ -5406,6 +5611,25 @@ function chartOf(dt) {
   width: 100%;
   height: calc(38px * var(--cvy));
 }
+/* 长文本格的编辑态:去掉写死高度,行高交给 autosize(2026-10-30) */
+.rsp-cover-input.rsp-cover-area {
+  height: auto;
+  min-height: calc(38px * var(--cvy));
+}
+/* 「从标准库勾选」的落点行:点过哪一行就把哪一行标出来,否则用户不知道会插到哪(2026-10-30) */
+.rsp-design.rsp-row-sel > td {
+  background: #e8f2ff;
+}
+/* 检验项目/子项的多行域:文字居中(这两列一直是 center 对齐),并压掉 textarea 默认的上下留白 */
+.rsp-center :deep(.el-textarea__inner) {
+  text-align: center;
+  padding: 2px 4px;
+  line-height: 1.4;
+}
+.rsp-cover-input.rsp-cover-area :deep(.el-textarea__inner) {
+  padding: 2px calc(8px * var(--cok));
+  line-height: 1.5;
+}
 /* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
    并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径) */
 .rsp-cover-input :deep(.el-input__wrapper) {
@@ -5524,6 +5748,12 @@ function chartOf(dt) {
 .rsp-docval {
   font-family: 'SimSun', 'Songti SC', serif;
 }
+/* 2026-10-30 用户报「最后一页字体还乱了 / 左右被切」：
+   doc 行的值格是 flex 子项，默认 min-width:auto ⇒ 遇到长串（40*11.5*209±0.5mm 这类
+   不含空格/句读、浏览器不给断点的字符串）时**整行撑出纸宽**，打印时被左右裁掉。
+   这两条把行宽锁在格子里：标签不参与压缩、值格可缩+可任意断行。 */
+.rsp-docrow .rsp-doclabel { flex: none; white-space: nowrap; }
+.rsp-docrow .rsp-docval { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 
 /* ═══ 标准库勾选按钮 ═══ */
 .mp-kids {
@@ -5539,6 +5769,9 @@ function chartOf(dt) {
   background: #f4f9ff;
   cursor: pointer;
   user-select: none;
+  /* 2026-10-30(X烧结对齐):窄格子里「⧉ 标准库维护」曾折成两行、把整行行高撑高,
+     与左侧标签行对不齐。一律不折行 ⇒ 行高只由标签决定。 */
+  white-space: nowrap;
 }
 .rs-lib-btn:hover {
   background: #e8f2ff;

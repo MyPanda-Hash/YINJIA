@@ -32,7 +32,9 @@
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button v-if="canDo('split')" size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
-      <!-- 工单排产弹窗(2026-10-05 用户口径):**一次只排一行**(勾多行会提示"请只勾选一张工单",与切单同范式);
+      <!-- 工单排产(2026-10-30 用户口径):勾 1 行 = 原内嵌快速排产单行流程;勾 N 行 = 仍打开内嵌
+           快速排产页(①池收敛成勾选的行并默认全选)→「批量排产」= 多个工单排入同一组产线、数量逐行算。
+           已排产/已结案/已完工的行先点名跳过。
            「排产」与快速排产页同一个动作词 assign —— 两处任一授予即可(与后端 requireButtonAny 同口径) -->
       <el-button v-if="canSchedule" size="small" type="success" plain :disabled="!checked.length && !currentRow" @click="openSchedule">{{ tt('排产') }}</el-button>
       <el-button v-if="canDo('split')" size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
@@ -41,6 +43,7 @@
         {{ tt('打印工单') }}
         <template #dropdown>
           <el-dropdown-item command="成型生产任务单">{{ tt('成型生产任务单') }}</el-dropdown-item>
+          <el-dropdown-item command="切炭生产任务单">{{ tt('切炭生产任务单') }}</el-dropdown-item>
           <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
         </template>
       </el-dropdown>
@@ -48,6 +51,9 @@
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
+      <!-- 日排产(2026-10-29):表格内的日期列 —— 列由后端按数据生成。
+           2026-10-31 用户口径「**当前不需要手填,能自动算就可以了**」⇒ 「保存日排产」按钮已撤(含均摊弹窗),
+           日期格改为<b>只读</b>:计划由后端按「工序计划量 ÷ 开工日→交期」自动均摊算出。 -->
     </div>
 
     <!-- 产线筛选条 -->
@@ -94,6 +100,8 @@
       <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="180" show-overflow-tooltip />
       <el-table-column :label="tt('规格型号')" prop="规格型号" min-width="160" show-overflow-tooltip />
       <el-table-column :label="tt('客户')" prop="客户" min-width="120" show-overflow-tooltip />
+      <el-table-column :label="tt('订单号')" prop="订单号" width="150" show-overflow-tooltip />
+      <el-table-column :label="tt('订单行号')" prop="订单行号" width="90" align="right" />
       <el-table-column :label="tt('生产线')" prop="生产线" width="110" show-overflow-tooltip />
       <el-table-column :label="tt('需求数量')" prop="需求数量" width="100" align="right" sortable />
       <el-table-column :label="tt('转单数量')" prop="排产数量" width="95" align="right" />
@@ -109,6 +117,61 @@
       <el-table-column :label="tt('当前工序')" width="100" sortable prop="当前工序">
         <template #default="{ row }">
           <span :class="{ 'wol-closed': row.当前工序 === '组装' }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
+        </template>
+      </el-table-column>
+      <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),位置即用户截图标红处
+           (「当前工序」之后、「工序进度」之前)。每个日期格都可改计划(含今天以前的日期);
+           格下方小字 = 该天已审核报工量(含手机端),只读。 -->
+      <!-- 排产日期(2026-10-31):双击弹出「排产快速调整」,在那里集中改 数量/开工日/完工日
+           (后端同步 plang + plang_pc + 当前工序台账区间 —— 用户口径「该日期要同步吧」)。 -->
+      <el-table-column :label="tt('计划开工日期')" prop="计划开工日期" width="112">
+        <template #default="{ row }">
+          <span class="dp-date-cell" :title="tt('双击可改排产日期')"
+                @dblclick="openQuick(row, planToday)">{{ row.计划开工日期 || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="112">
+        <template #default="{ row }">
+          <span class="dp-date-cell" :title="tt('双击可改排产日期')"
+                @dblclick="openQuick(row, planToday)">{{ row.计划完工日期 || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
+      <el-table-column :label="tt('7天需交付')" prop="7天需交付" width="92" align="right" />
+      <el-table-column :label="tt('15天需交付')" prop="15天需交付" width="96" align="right" />
+      <el-table-column :label="tt('大于15天需交付')" prop="大于15天需交付" width="112" align="right" />
+      <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
+      <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
+      <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
+      <!-- ⚠ 2026-10-31 用户口径「格子里两个数堆在一起分不清谁是谁」:
+           上方计划量/ 下方报工量(只读,加「实」标识 + 绿色);列头「今」标今天、过去列灰底。
+           ⚠ 二次修正(「不要这样在右下角显示」):计划与报工两行**居中对齐**。
+           ⚠ 三次修正(「当前不需要手填,能自动算就可以了」):格子默认只读,自动均摊。
+           ⚠ 五次修正(「还是改成弹窗」):**双击日期格 → 弹「排产快速调整」**,在那里集中改
+             数量/开工日/完工日(生产工单页不带调线)。人工指定的格子带「手」角标。 -->
+      <el-table-column v-for="d in planDates" :key="d" :label="d.slice(5)" width="82" align="center"
+                       :label-class-name="'dp-col-' + dayColState(d, planToday)"
+                       :class-name="'dp-col-' + dayColState(d, planToday)">
+        <template #header>
+          <div class="dp-head" :class="dayColState(d, planToday)" :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊;双击数量弹出调整')">
+            <span class="dp-date">{{ d.slice(5) }}</span>
+            <span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span>
+          </div>
+        </template>
+        <template #default="{ row }">
+          <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
+                           :controls="false" :min="0" class="dp-input" autofocus
+                           @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
+          <!-- 区间外(开工日~计划完工日之外)且当天无计划/实报:画「/」——这一天不归本行排
+               (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
+          <span v-else-if="isOutCell(row, d)" class="dp-out"
+                :title="tt('不在本行排产区间(开工日~计划完工日)内')">/</span>
+          <span v-else class="dp-plan" :class="{ manual: isManual(row, d), actual: dayCell(row, d).isActual }"
+                :title="dayTitle(row, d)" @click="startQtyEdit(row, d)">
+            {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
+                :class="{ over: Number(row.超分配 || 0) > 0 }"
+                :title="overTitle(row)">{{ tt('手') }}</span>
+          </span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('工序进度')" width="120" align="right">
@@ -137,16 +200,22 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,按「工单号+工单行号」筛选 ⇒ 只显示这一行 -->
-    <el-dialog v-model="schedVisible" :title="tt('工单排产（快速排产）')" width="94%" top="4vh" append-to-body destroy-on-close
+    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**。
+         单行:按「工单号+工单行号」收敛 ⇒ 只显示这一行;
+         多行(2026-10-30):按「行id列表」把①池收敛成勾选的这些行并默认全选,勾多行点「批量排产」。 -->
+    <el-dialog v-model="schedVisible" :title="schedTitle" width="94%" top="4vh" append-to-body destroy-on-close
                @closed="load">
       <div style="height: 76vh; overflow: hidden">
-        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" embedded />
+        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" :行id列表="schedIds" :工单号列表="schedNos" embedded />
       </div>
     </el-dialog>
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
+
+    <!-- 排产快速调整(2026-10-31):双击日期格弹出;本页不出「调线」块(用户口径 A) -->
+    <ScheduleQuickEditDialog v-model="quickVisible" :row="quickRow" :date="quickDate"
+                             :line="quickRow.生产线 || ''" @saved="afterQuickSaved" />
 
     <!-- 获取当前工单行的研发配方并保存投料快照 -->
     <el-dialog v-model="mixingVisible" :title="tt('获取混料配方')" width="760px" append-to-body :close-on-click-modal="false">
@@ -208,7 +277,10 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
+import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
+import { qtyText, dayColState, isToday, dayCellQty, isOutOfPlanRange } from '@/business/dayPlan'
+import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -278,44 +350,57 @@ const traceVisible = ref(false)
 const traceNo = ref('')
 /** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
 const traceRowId = ref(null)
-/** 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产 */
+/** 工单排产弹窗(2026-10-05 用户口径):带**这一行**的快速排产(单行) */
 const schedVisible = ref(false)
 const schedNo = ref('')
 /** 弹窗要预筛的工单行号(2026-10-15):带上它 ⇒ 快速排产只出这一行,而不是同工单所有行 */
 const schedXc = ref(null)
+/** 多行批量排产(2026-10-30):勾选的行 id / 工单号 —— 带给内嵌快速排产页收敛①池与②已排产 */
+const schedIds = ref([])
+const schedNos = ref([])
+const schedTitle = computed(() => (schedIds.value.length > 1 ? tt('批量排产（快速排产）') : tt('工单排产（快速排产）')))
 /**
- * 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产。
- *
- * <p>2026-10-15 用户拍板:**排产一次只能勾一行** —— 勾多行时不动手,直接提示"请只勾选一张工单"
- * (与「切单」的 splitTarget 同一范式)。理由:排产要逐道工序选线,一次只能针对一行做决策;
- * 批量排产应当去「快速排产」页自己勾(那里有多选批量排入)。
- * ⚠ 上一版曾试图支持"勾 N 行弹窗出 N 行"(加过 `限定行id` 列表通道),按用户口径**已回退**。
+ * 工单排产入口(2026-10-30 用户口径改版):
+ *   · 勾 1 行 = 原流程:内嵌快速排产按「工单号#行号」收敛,再点「排产」逐道选线;
+ *   · 勾 N 行 = 仍打开**内嵌快速排产页**(复用原页面,不新建页面):①池收敛成这 N 行并默认全选,
+ *     点「批量排产」= 多个工单排入同一组产线,排产数量逐行按各行自己算。
+ * 先在前端点名排除不可排的行(已排产/已结案/已完工),避免打开后才发现行在池子里凭空消失。
  */
-function scheduleTarget() {
+function openSchedule() {
   // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
   const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
   const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
   const list = alive.length ? alive : (cur ? [cur] : [])
-  if (list.length !== 1) {
-    ElMessage.warning(list.length === 0 ? tt('请先勾选一张工单')
-      : `${tt('请只勾选一张工单')}（${tt('当前已勾选')} ${list.length} ${tt('张')}）`)
-    return null
-  }
-  const r = list[0]
-  if (r['生产线']) {
-    ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`)
-    return null
-  }
-  return r
-}
+  if (!list.length) { ElMessage.warning(tt('请先勾选要排产的工单')); return }
 
-function openSchedule() {
-  const r = scheduleTarget()
-  if (!r) return
-  schedNo.value = r['工单号']
-  // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
-  //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
-  schedXc.value = r['工单行号'] ?? null
+  const bad = []
+  const ok = []
+  for (const r of list) {
+    const key = `${r['工单号']}${r['工单行号'] != null ? '#' + r['工单行号'] : ''}`
+    if (String(r['生产线'] || '').trim()) bad.push(`${key}（${tt('已排产')}：${r['生产线']}）`)
+    else if (r['结案'] === 'Y') bad.push(`${key}（${tt('已结案')}）`)
+    else if (r['生产状态'] === '完工') bad.push(`${key}（${tt('已完工')}）`)
+    else ok.push(r)
+  }
+  if (bad.length) ElMessage.warning(`${tt('以下工单行不能排产，已跳过')}：${bad.join('、')}`)
+  if (!ok.length) return
+
+  if (ok.length === 1) {
+    const r = ok[0]
+    schedIds.value = []
+    schedNos.value = []
+    schedNo.value = r['工单号']
+    // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
+    //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
+    schedXc.value = r['工单行号'] ?? null
+    schedVisible.value = true
+    return
+  }
+  // 多行:关键字表达不了多张单 ⇒ 不预置 keyword,改把 行id/工单号 列表交给内嵌页收敛
+  schedNo.value = ''
+  schedXc.value = null
+  schedIds.value = ok.map((r) => r['行id']).filter((x) => x != null)
+  schedNos.value = [...new Set(ok.map((r) => r['工单号']).filter(Boolean))]
   schedVisible.value = true
 }
 
@@ -329,6 +414,114 @@ const paged = computed(() => filtered.value)
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
+// ───────── 日排产(2026-10-29):直接长在本页明细表的日期列 ─────────
+// 用户口径:「生产工单中需要能实现对后面日期的排产量设定……在当前的表格内容处插入当前设定的
+// 日排产数量,修改需要针对当前生产工单和工单排产中都要实现」⇒ 不新增表格/块,窗口内每天一列。
+// 2026-10-31 口径演进:①自动算(工序计划量 ÷ 开工日→交期);②**双击弹出「排产快速调整」**,
+//   在那里集中改 当天数量(人工指定/恢复自动)、计划开工日、预定完成日;
+//   改过的那天存 wo_day_plan 当「人工指定」,其余天按剩余量重摊(守恒);
+//   格下方绿色小字 = 当天已审核报工量(只读对照)。
+// 数据接口与工单排产同一套(/px/scheduleBoard/dayPlan/*),两页行为一致。
+const planDates = ref([])
+const planToday = ref('')
+/** 「日排产」权(改当天数量/日期):两页任一授予即可 */
+const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
+/** 排产快速调整弹窗(生产工单页不带「调线」块 —— 用户口径 A:该页不需要调线) */
+const quickVisible = ref(false)
+const quickRow = ref({})
+const quickDate = ref('')
+function openQuick(row, d) {
+  quickRow.value = row
+  quickDate.value = d || planToday.value
+  quickVisible.value = true
+}
+/** 弹窗保存后:整表重拉(数量/日期/产线都可能变),日计划后端会重算 */
+function afterQuickSaved() { load() }
+
+function isManual(row, d) { return ((row.人工指定 || {})[d] ?? null) != null }
+function overTitle(row) {
+  const over = Number(row.超分配 || 0)
+  return over > 0 ? `${tt('人工指定')} · ${tt('超分配')} ${qtyText(over)}` : tt('人工指定')
+}
+
+/** 格内显示一个数:计划 ∪ 实际融合(未达成显示实际;没报工显示计划) —— 见 business/dayPlan.js */
+function dayCell(row, d) {
+  return dayCellQty((row.日计划 || {})[d], (row.日报工 || {})[d])
+}
+/** 本行排产区间(开工日~计划完工日)之外的空白格:画「/」(2026-11-01 用户口径,
+ *  例:开工日改成 11-02 后,11-01 那格要画 /)。有计划/实报/人工指定的格子照旧显示数字。 */
+function isOutCell(row, d) {
+  const p = Number((row.日计划 || {})[d] || 0)
+  const a = Number((row.日报工 || {})[d] || 0)
+  if (p > 0 || a > 0) return false
+  return isOutOfPlanRange(d, row.计划开工日期 || '', row.计划完工日期 || '')
+}
+/** 格 tooltip:计划 / 实报都摆出来,但不占版面 */
+function dayTitle(row, d) {
+  const p = Number((row.日计划 || {})[d] || 0)
+  const a = Number((row.日报工 || {})[d] || 0)
+  let t = `${tt('计划')} ${qtyText(p)}`
+  if (a > 0) t += ` · ${tt('实报')} ${qtyText(a)}` + (a < p ? ` (${tt('差')} ${qtyText(p - a)})` : '')
+  return t + ' · ' + tt('双击直接填当天数量;清空恢复自动')
+}
+
+/** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
+const qtyEdit = ref('')
+const qtyDraft = ref(0)
+function qtyKey(row, d) { return `${row.行id}|${d}` }
+function startQtyEdit(row, d) {
+  if (!canDayPlan.value) return
+  qtyEdit.value = qtyKey(row, d)
+  qtyDraft.value = Number(dayCell(row, d).qty || 0) || undefined
+}
+function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
+async function commitQty(row, d) {
+  if (qtyEdit.value !== qtyKey(row, d)) return
+  const v = Number(qtyDraft.value || 0)
+  const before = Number(dayCell(row, d).qty || 0)
+  qtyEdit.value = ''
+  if (v === before) return
+  try {
+    const r = await saveDayPlan([{ 工单行id: row.行id, 工序: row.工序日 || row.当前工序 || '',
+      生产线: row.生产线 || '', 计划日期: d, 计划数量: v }])
+    const o = (r['超分配'] || []).find((x) => String(x['工单行id']) === String(row.行id))
+    if (o) ElMessage.warning(`${tt('人工指定已超出工序计划量')}: ${qtyText(o['超出'])}${tt('(只提示,不拦保存)')}`)
+    await loadDayPlan()
+  } catch (e) { err(e, '保存失败') }
+}
+
+async function loadDayPlan() {
+  const ids = rows.value.map((r) => r.行id).filter((x) => x != null)
+  if (!ids.length) { planDates.value = []; planToday.value = ''; return }
+  try {
+    const data = await fetchDayPlan({ 行id列表: ids })
+    planDates.value = data['日期'] || []
+    planToday.value = data['今天'] || ''
+    const byId = new Map()
+    for (const p of data['行'] || []) byId.set(String(p['行id']), p)
+    for (const row of rows.value) {
+      const p = byId.get(String(row.行id))
+      row.工序日 = p ? p['工序'] : (row.当前工序 || '')
+      row.日计划 = { ...((p && p['日计划']) || {}) }
+      row.日报工 = { ...((p && p['日报工']) || {}) }
+      row.人工指定 = { ...((p && p['人工指定']) || {}) }
+      row.超分配 = p ? Number(p['超分配'] || 0) : 0
+      row.工序计划量 = p ? Number(p['工序计划量'] || 0) : 0
+      // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
+      if (p) {
+        for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
+          '7天需交付', '15天需交付', '大于15天需交付',
+          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计',
+          // 排产区间(画斜杠用):与后端摊分日计划同一份开工/完工日期
+          '计划开工日期', '计划完工日期']) row[k] = p[k]
+      }
+    }
+  } catch (e) { err(e, '查询失败') }
+}
+
+// ⚠ 2026-10-31 最终口径:日计划默认由系统自动均摊,只允许「就地改某一天」(其余天按剩余量重摊);
+//   不再有「全量手填 + 保存日排产」那套入口(2026-10-30 删掉的均摊弹窗也不恢复)。
+
 async function load() {  try {
     const cond = {}
     if (dateFrom.value) cond['日期从'] = dateFrom.value
@@ -336,13 +529,18 @@ async function load() {  try {
     if (qText.value.trim()) cond['keyword'] = qText.value.trim()
     if (lineFilter.value) cond['生产线'] = lineFilter.value
     const res = await request.post('/px/workOrderList', cond)
-    rows.value = (res.data || []).map((r) => ({ ...r, rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)) }))
+    rows.value = (res.data || []).map((r) => ({
+      ...r,
+      rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)),
+      日计划: {}, 日报工: {},
+    }))
     // 2026-10-05 修复:刷新后清掉旧勾选 —— reserve-selection 会保留"已从列表消失的行"的勾选(且无法手动取消),
     // 造成切单/撤回切单永久提示「请先勾选一张工单」。
     checked.value = []
     currentRow.value = null
     tableRef.value?.clearSelection?.()
     applyLineMeta()
+    await loadDayPlan()
   } catch (e) { err(e, '查询失败') }
 }
 
@@ -450,7 +648,8 @@ async function doPrintTask(mode) {
       批号: r.批号 || '', 物料编码: r.物料编码 || '',
       排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
     }))
-    const okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
+    // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
+    const okPrint = await printWorkTaskSheet(mode, rowsToPrint)
     if (okPrint) {
       await request.post('/px/workOrderList/printStamp', {
         rows: src.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
@@ -639,7 +838,7 @@ function openTrace(row) {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '生产线', '需求数量', '转单数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '订单号', '订单行号', '生产线', '需求数量', '转单数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')
@@ -692,6 +891,33 @@ onActivated(() => {
 .wol-sep { color: #909399; }
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
+/* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
+.dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
+/* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */
+.dp-plan.actual { color: #529b2e; }
+/* 2026-11-01:本行排产区间(开工日~计划完工日)之外的空白格画「/」——
+   一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
+.dp-out { color: #c0c4cc; font-weight: 400; line-height: 1.2; user-select: none; }
+.dp-input { width: 66px; }
+/* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
+.dp-plan.manual { color: #b88230; }
+.dp-hand { margin-left: 2px; padding: 0 2px; font-size: 10px; font-weight: 700; color: #fff;
+  background: #e6a23c; border-radius: 3px; vertical-align: top; }
+.dp-hand.over { background: #f56c6c; }
+.dp-input { width: 66px; }
+/* 2026-10-31:就地改排产日期(双击计划开工日/计划完工日) */
+.dp-date-cell { cursor: text; }
+.dp-date-cell:hover { color: #1e6fb8; text-decoration: underline dotted; }
+/* 2026-10-31:格内两个数分清 —— 计划(深色,可编辑) / 报工(绿色 + 「实」标,只读)*/
+.dp-act { font-size: 11px; color: #529b2e; line-height: 1.1; }
+.dp-act-lb { margin-right: 1px; font-weight: 700; }
+/* 日期列分段:今天列标「今」+ 浅蓝底;过去列 = 历史对照段,灰底(只影响显示,照样可填)*/
+.dp-head { line-height: 1.15; }
+.dp-head.past .dp-date { color: #909399; font-weight: 500; }
+.dp-head.today .dp-date { color: #1e6fb8; }
+.dp-today { margin-left: 2px; font-size: 10px; font-weight: 700; color: #1e6fb8; }
+:deep(th.dp-col-past), :deep(td.dp-col-past) { background: #f5f6f8; }
+:deep(th.dp-col-today), :deep(td.dp-col-today) { background: #eef6ff; }
 .wol-closed { color: #f56c6c; font-weight: 600; }
 .wol-split { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .wol-split-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

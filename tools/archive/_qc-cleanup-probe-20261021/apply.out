@@ -1,0 +1,28 @@
+[source] 暂收单 12 张 / 明细 16 行（已排除已作废暂收单）
+  SL-2026-10-0121  日期=2026-09-15  供应商=福建鑫恒碳业有限公司  批次=XH-20260915  行=2
+  SL-2026-10-0124  日期=2026-09-19  供应商=韶关英克瑞斯新材料有限公司  批次=YKRS-20260919  行=1
+  SL-2026-10-0125  日期=2026-09-21  供应商=福建鑫恒碳业有限公司  批次=XH-20260921  行=1
+  SL-2026-10-0127  日期=2026-09-27  供应商=韶关英克瑞斯新材料有限公司  批次=YKRS-20260927  行=1
+  SL-2026-10-0128  日期=2026-09-27  供应商=韶关英克瑞斯新材料有限公司  批次=YKRS-20260927  行=1
+  SL-2026-10-0085  日期=2026-10-05  供应商=江苏亨斯曼新材料科技有限公司  批次=HSM-20261005  行=1
+  SL-2026-10-0129  日期=2026-10-05  供应商=福建鑫恒碳业有限公司  批次=XH-20261005  行=2
+  SL-2026-10-0130  日期=2026-10-13  供应商=福建鑫恒碳业有限公司  批次=XH-20261013  行=1
+  SL-2026-10-0011  日期=2026-10-19  供应商=依品晟活性炭(宁德)有限公司  批次=YPS  行=1
+  SL-2026-10-0012  日期=2026-10-19  供应商=依品晟活性炭(宁德)有限公司  批次=YPS-20261019  行=1
+  SL-2026-10-0015  日期=2026-10-19  供应商=江苏文茹科技化工有限公司  批次=WR-20261019  行=2
+  SL-2026-10-0131  日期=2026-10-20  供应商=江苏文茹科技化工有限公司  批次=20261020  行=2
+[delete] QC_INSP=7 QC_RETURN=7 QC_INSP_REC=7 QC_CATALOG=1 自动草稿采购入库=3 [PI-2026-10-0024, PI-2026-10-0025, PI-2026-10-0026]
+[backup] _bak_qcregen_20261021_qc_insp
+[backup] _bak_qcregen_20261021_qc_insp_detail
+[backup] _bak_qcregen_20261021_qc_catalog
+[backup] _bak_qcregen_20261021_qc_catalog_detail
+[backup] _bak_qcregen_20261021_qc_insp_rec
+[backup] _bak_qcregen_20261021_qc_insp_rec_detail
+[backup] _bak_qcregen_20261021_qc_return
+[backup] _bak_qcregen_20261021_qc_return_detail
+[backup] _bak_qcregen_20261021_yj_doc_status
+[backup] _bak_qcregen_20261021_form_flow_link
+[backup] _bak_qcregen_20261021_bd_purchase_in
+[backup] _bak_qcregen_20261021_bl_purchase_in
+[done] 检验单=12 明细=16 数据记录=16 记录明细=73 退料单=12 退料明细=16 目录=JYML-2026-10-0001(16行)
+[verify] insp=12/12 detail=16/16 rec=16/16 recDetail=73 ret=12/12 retDetail=16 catalog=1/16 audited=12 PI活跃链=0

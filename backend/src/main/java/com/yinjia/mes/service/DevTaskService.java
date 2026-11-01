@@ -47,12 +47,51 @@ public class DevTaskService {
         //    本顺序即矩阵列序(devPanelMeta),产品文件列表与桌面「产品开发」矩阵都按它排;
         //    计数/受控推导/分发落库都按 panelCode 取值,与顺序无关(受控日期取各文件归档时点的 MAX)。
         DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "产品编号", "规格书"});
-        DEV_PANELS.put("RD_MOLD_PROC", new String[]{"rd_mold_proc_head", "产品编号", "成型工艺清单"});
+        DEV_PANELS.put("RD_MOLD_PROC", new String[]{"rd_mold_proc_head", "产品编号", "烧结工艺清单"});
         DEV_PANELS.put("RD_ASM_PROC", new String[]{"rd_asm_proc_head", "产品编号", "组装工艺清单"});
         DEV_PANELS.put("RD_INSP_PLAN", new String[]{"rd_insp_plan_head", "产品编号", "出货检验计划表"});
         // ⚠ 产品键列名逐面板不同:规格书那列 2026-09-30 由「编号」改名「产品编号」
         //   (旧键名被引擎当单据标识用,值会被单据号覆盖,见 migrate-rd-specdoc-prodno-2026-09-30.sql)
         DEV_PANELS.forEach((code, v) -> PRODUCT_KEY.put(code, v[1]));
+    }
+
+    /**
+     * **同族文件**：同一份产品文件的不同模板 —— 分发只发一行、状态只占一格，
+     * 但两个面板各自建单（2026-10-30 用户口径「两个入口在产品文件里面是属于同一份文件，
+     * 只是模板不一样」「一个产品可能有两个工艺也可能就只有一个工艺」）。
+     *
+     * <p>键 = 同族模板，值 = 它跟随的**主文件面板码**。落地三处：
+     * <ul>
+     *   <li>分发责任人：只发 {@code RD_MOLD_PROC} 一行，{@code RD_X_SINTER} 沿用同一个责任人；</li>
+     *   <li>编辑门禁：{@code ButtonService.devFileEditVerdict} 用主文件的负责人判定，
+     *       否则「不在开发文件清单里 ⇒ 门禁不适用」会让**任何人**都能改 X烧结；</li>
+     *   <li>文件列表矩阵：烧结那一格取两个模板里**状态更好**的那个（任一归档即开发完毕）。</li>
+     * </ul>
+     *
+     * <p>⚠ 不要把同族模板塞进 {@link #DEV_PANELS}：那个 map 是**分发行**与**矩阵列**的唯一真源，
+     * 塞进去会多出一列、把 totalCount 撑大，导致「只填一个模板」的产品永远到不了开发完毕。
+     */
+    private static final Map<String, String> FILE_ALIAS = Map.of("RD_X_SINTER", "RD_MOLD_PROC");
+
+    /** 该面板跟随的主文件面板码（自身不是同族模板时原样返回） */
+    public static String fileOwnerPanelOf(String panelCode) {
+        String c = panelCode == null ? "" : panelCode.trim();
+        return FILE_ALIAS.getOrDefault(c, c);
+    }
+
+    /** 该面板是否属于「开发文件」范畴（含同族模板）；编辑门禁据此决定要不要拦 */
+    public static boolean isDevFilePanel(String panelCode) {
+        return DEV_PANELS.containsKey(fileOwnerPanelOf(panelCode));
+    }
+
+    /** 某个主文件涵盖的全部面板码（主文件在前，同族模板随后）；矩阵取状态时遍历它 */
+    public static List<String> panelsOfFile(String mainPanel) {
+        List<String> out = new ArrayList<>();
+        out.add(mainPanel);
+        FILE_ALIAS.forEach((alias, owner) -> {
+            if (owner.equals(mainPanel)) out.add(alias);
+        });
+        return out;
     }
 
     public static final String STATUS_NONE = "未开发";
@@ -376,6 +415,37 @@ public class DevTaskService {
         return Map.of("lvl", lvl, "docNo", no == null ? "" : String.valueOf(no));
     }
 
+    /**
+     * 主文件 + 同族模板里**状态最好**的那一份（矩阵那一格用它）。
+     *
+     * <p>排序口径与 {@link #statusAndDocNo} 一致：已归档(3) &gt; 审批中(2) &gt; 有单(1) &gt; 无单(0)。
+     * 同级别时优先「有单据号」的那份 —— 前端点状态要能直达那张单，取不到单号点了没反应。
+     *
+     * <p>例：某产品只填了 X烧结且已归档 ⇒ 烧结那一格显示「开发完毕」、点进去是 X烧结那张单；
+     * 两个模板都建了单时，取归档的那份（都归档则取主文件 RD_MOLD_PROC）。
+     */
+    private Map<String, String> bestOfFile(String productCode, String mainPanel) {
+        Map<String, String> best = null;
+        for (String p : panelsOfFile(mainPanel)) {
+            Map<String, String> sd = statusAndDocNo(productCode, p);
+            if (best == null || lvlRank(sd.get("lvl")) > lvlRank(best.get("lvl"))
+                    || (lvlRank(sd.get("lvl")) == lvlRank(best.get("lvl"))
+                        && String.valueOf(best.get("docNo")).isBlank() && !sd.get("docNo").isBlank())) {
+                best = sd;
+            }
+        }
+        return best == null ? Map.of("lvl", "0", "docNo", "") : best;
+    }
+
+    /** "3"/"2"/"1"/"0" → 可比较的整数（无法识别按 0 处理，不抛错） */
+    private static int lvlRank(String lvl) {
+        try {
+            return Integer.parseInt(String.valueOf(lvl).trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     /** 状态级别 → 文案(口径:已归档 → 开发完毕 | 审批中 → 开发审核中 | 有单 → 开发中 | 无单 → 未开发) */
     private static String statusTextOf(String lvl) {
         return switch (lvl == null ? "0" : lvl) {
@@ -458,7 +528,10 @@ public class DevTaskService {
             int done = 0;
             int doing = 0;
             for (String panel : DEV_PANELS.keySet()) {
-                Map<String, String> sd = statusAndDocNo(productCode, panel);
+                // 同族文件(烧结工艺清单 + X烧结工艺清单)：取两个模板里**状态更好**的那个 ——
+                // 用户口径「属于同一份文件，只是模板不一样」⇒ 任一归档即算这一份开发完毕。
+                // 只填一个模板的产品不会因此卡在「开发中」。
+                Map<String, String> sd = bestOfFile(productCode, panel);
                 String st = statusTextOf(sd.get("lvl"));
                 cells.put(panel, st);
                 if (!STATUS_NONE.equals(st) && !sd.get("docNo").isBlank()) docNos.put(panel, sd.get("docNo"));

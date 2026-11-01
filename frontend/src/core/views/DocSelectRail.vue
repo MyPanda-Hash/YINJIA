@@ -16,7 +16,7 @@
         <el-button size="small" type="primary" plain @click="apply">{{ tt('查找') }}</el-button>
       </div>
       <div class="dsr-count">
-        {{ tt('共有数据') }}: {{ total }} {{ tt('条') }}
+        {{ tt('共有数据: {n} 条').replace('{n}', String(total)) }}
         <span v-if="keyword" class="dsr-count-sub">（{{ tt('模糊搜索') }}: {{ keyword }}）</span>
       </div>
       <!-- 勾选摘要(2026-10-31 批量生单):「勾了哪几张」必须一眼看见,否则多页翻着勾很容易糊 -->

@@ -80,6 +80,55 @@ public class OrderConvertService {
                     // 结转只剩转工单一条出口(转采购走采购订单/金蝶,不在此处占用)。
                     // 2026-10-09 合并修正:该次下架只删了 OUTER APPLY,漏删 SELECT 里的 p.linked
                     // ⇒ 订单结转页 500(无法绑定 p.linked);此处连带把残留引用一并清掉。
+                    // ── 条39「转工单带上次工艺路线」(2026-10-25 定稿方案 v2)────────────────────────
+                    // 每个物料取**最近一次转出的工单**所用路线,一次扫描 plang 的派生表(LEFT JOIN rn=1,
+                    // 至多 1:1,不膨胀行数 ⇒ 共享本 FROM 的 pendingAgg/stats 聚合口径零影响):
+                    //   · 键   = plang.dm(=结转行 bl_so_order.存货编码 = pending 的 物料编码);
+                    //   · 源   = plang(转工单直落的工单主表),过滤 未作废 且 工艺路线非空
+                    //     (asp_cancel 在转单 INSERT 里写 'N',QuickScheduleService.createFromOrderLine);
+                    //   · 排序 = pl_date DESC(转工单时 GETDATE() 写入;实测 468 行 0 空、2026-09-02~10-20、
+                    //     无回填污染 ⇒ 唯一可信排序键),同分按 plang.id DESC;
+                    //   · 取   = 第 1 行的 [工艺路线](存 bs_route.工艺路线编码)+ pl_no 作「上次路线来源单」
+                    //     + pl_date 作「上次日期」(前端 tooltip 带出 来源单+日期);
+                    //   · 上次路线审核状态按 rs(绑定路线)同式 CASE 走 yj_doc_status(panel='ROUTE'),
+                    //     ⚠ 判空分支基于 lastroute.上次工艺路线:无历史返回**空串**而非'未选择'
+                    //     (冷读#6:'未选择'属于绑定列 rv.工艺路线,不复制到 rs2,避免无历史行 tooltip 红显噪音)。
+                    // 优先级定稿=「上次 > 档案绑定」(需求原文「带出之前选过的」);实现语义由前端
+                    // applyRouteDefaults(frontend/src/business/routeDefaults.js)=「计算 default 后整行写入」
+                    // (冷读#1 拍板,非"仅补空值");上次路线须 ∈ bs_route 候选才预填(后端不校验候选,前端守)。
+                    // 2026-10-29 增第二档:同物料无历史时用「同品名同规格」族兜底(见下方 specroute 段)。
+                    + " LEFT JOIN (SELECT p.dm, p.[工艺路线] AS 上次工艺路线, p.pl_no AS 上次路线来源单,"
+                    + "             CONVERT(varchar(10), p.pl_date, 120) AS 上次日期,"
+                    + "             ROW_NUMBER() OVER (PARTITION BY p.dm ORDER BY p.pl_date DESC, p.id DESC) AS rn"
+                    + "      FROM plang p"
+                    + "      WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.[工艺路线],N'') <> N'') lastroute"
+                    + "   ON lastroute.dm = l.[存货编码] AND lastroute.rn = 1"
+                    + " LEFT JOIN yj_doc_status rs2 ON rs2.panel_code = 'ROUTE' AND rs2.doc_no = lastroute.上次工艺路线"
+                    // ── 「同品名同规格」族兜底(2026-10-29 用户口径)────────────────────────────
+                    // 用户原话:「需要放到的是要同规格通品名的产品实现,不然当前只是根据上次的随便一条
+                    // 转工单的工艺路线就没有实际存在的意义实现了。」
+                    // 只按物料编码取"上次"的问题:同一款产品在系统里按客户/供应商拆成多个存货编码,
+                    // 各编码历史互不相干 —— 实测待结转 226 行 = 144 个「品名+型号」家庭,其中 13 个家庭
+                    // 跨多个编码、4 个家庭里不同编码的"上次路线"互相矛盾(= 用户说的"随便一条")。
+                    // 这一档把**同品名 + 同规格型号**的全部历史合成一个家庭,取家庭最近一次转单的路线:
+                    //   · 键   = plang.mc(名称) + ISNULL(plang.gg,N'')(规格) —— 转单时从订单行原样复制
+                    //     (QuickScheduleService INSERT: mc=存货名称, gg=规格型号),与结转行 l 同源可直连;
+                    //   · 排序 = pl_date DESC, id DESC(与同物料档同式);
+                    //   · 空名称不参与(mc 空会把风马牛不相及的行并成一族),故过滤 mc<>'';
+                    //     空规格只与同为空的同品名行匹配(不跨规格),已由 ISNULL(gg,'') 等价键保证。
+                    // 优先级(2026-10-29 用户拍板):**同物料 > 同品名同规格 > 档案绑定**
+                    //   —— 先认这个编码自己的最近一次,只有它没历史/路线已删时才用族兜底
+                    //   (实现见前端 applyRouteDefaults;后端只带出事实,不替前端做取舍)。
+                    // 仍保证至多 1:1(rn=1),不膨胀行数 ⇒ 共享本 FROM 的 pendingAgg/stats 聚合口径不变。
+                    + " LEFT JOIN (SELECT p.mc, ISNULL(p.gg,N'') AS gg, p.[工艺路线] AS 同品名同规格上次工艺路线,"
+                    + "             p.pl_no AS 同品名同规格上次来源单,"
+                    + "             CONVERT(varchar(10), p.pl_date, 120) AS 同品名同规格上次日期,"
+                    + "             ROW_NUMBER() OVER (PARTITION BY p.mc, ISNULL(p.gg,N'') ORDER BY p.pl_date DESC, p.id DESC) AS rn"
+                    + "      FROM plang p"
+                    + "      WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.[工艺路线],N'') <> N''"
+                    + "        AND ISNULL(p.mc,N'') <> N'') specroute"
+                    + "   ON specroute.mc = l.[存货名称] AND specroute.gg = ISNULL(l.[规格型号],N'') AND specroute.rn = 1"
+                    + " LEFT JOIN yj_doc_status rs3 ON rs3.panel_code = 'ROUTE' AND rs3.doc_no = specroute.同品名同规格上次工艺路线"
                     + " WHERE ISNULL(o.asp_cancel,'N') <> 'Y'"
                     + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) > 0.0001";
 
@@ -99,6 +148,7 @@ public class OrderConvertService {
      * @param dateFrom/dateTo 下单日期范围(含端点,yyyy-MM-dd;null/空=不限)。
      *   2026-10-06 用户口径:左上角日期查询默认「单日」= 最近有数据的一天,可切近 3/7/14/30 天 ——
      *   此前无日期条件,一进页面把**全部历史**待结转行一次拉回,数据一多页面就卡死。
+     *   2026-10-29 用户口径:前端控件改为**日期范围选择**(默认 [今天,今天]),本方法的 from/to 语义不变。
      */
     public List<Map<String, Object>> pending(String keyword, String dateFrom, String dateTo) {
         String kw = keyword == null ? "" : keyword.trim();
@@ -115,6 +165,10 @@ public class OrderConvertService {
                         + " COALESCE(pt.往来单位名称, dk.mc, o.[客户]) AS 客户,"
                         + " ISNULL(pt.[客户价格等级], N'') AS 客户等级,"
                         + " l.[存货编码] AS 物料编码, l.[存货名称] AS 品名, ISNULL(l.[规格型号], N'') AS 型号,"
+                        // 产品名称列(2026-10-29 用户口径「在当前的型号旁边增加产品名称」):
+                        // 与 品名 同源(订单行 存货名称)—— 品名 继续供「订单资料」堆叠格使用,
+                        // 这里单列一个 产品名称 数据键,让表格列与列设置(显/隐)按列独立配置。
+                        + " ISNULL(l.[存货名称], N'') AS 产品名称,"
                         + " ISNULL(l.[客户订单号], N'') AS 客户订单号, ISNULL(l.[批次号], N'') AS 批号,"
                         + " ISNULL(备注_管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(l.[数量], 0) AS 需求数量,"
@@ -131,7 +185,30 @@ public class OrderConvertService {
                         + "      WHEN rs.shr IS NOT NULL AND ISNULL(rs.canceled,'N')<>'Y'"
                         + "        AND ISNULL(rs.stopped,'N')<>'Y' AND ISNULL(rs.deleting,'N')<>'Y'"
                         + "        AND ISNULL(rs.modify_state,'N')<>'Y' THEN N'已审核'"
-                        + "      ELSE N'未审核' END AS 路线审核状态"
+                        + "      ELSE N'未审核' END AS 路线审核状态,"
+                        // 条39「上次」三列(2026-10-25 定稿方案 v2;口径注释见 PENDING_FROM 的 lastroute 段):
+                        // 后端只**带出事实**,预填判断(上次 ∈ bs_route 候选、上次>绑定)由前端
+                        // applyRouteDefaults 做 —— 后端审核闸(requireRouteAudited)零改动。
+                        // 上次路线审核状态的判空分支基于 上次工艺路线:无历史=空串(不是'未选择',冷读#6)。
+                        + " ISNULL(lastroute.上次工艺路线, N'') AS 上次工艺路线,"
+                        + " ISNULL(lastroute.上次路线来源单, N'') AS 上次路线来源单,"
+                        + " ISNULL(lastroute.上次日期, N'') AS 上次日期,"
+                        + " CASE WHEN ISNULL(lastroute.上次工艺路线, N'') = N'' THEN N''"
+                        + "      WHEN rs2.shr IS NOT NULL AND ISNULL(rs2.canceled,'N')<>'Y'"
+                        + "        AND ISNULL(rs2.stopped,'N')<>'Y' AND ISNULL(rs2.deleting,'N')<>'Y'"
+                        + "        AND ISNULL(rs2.modify_state,'N')<>'Y' THEN N'已审核'"
+                        + "      ELSE N'未审核' END AS 上次路线审核状态,"
+                        // 「同品名同规格」族兜底四列(2026-10-29 用户口径;口径注释见 PENDING_FROM 的 specroute 段):
+                        // 后端只带出事实,预填判断(是否 ∈ bs_route 候选、优先级)全在前端 applyRouteDefaults;
+                        // 无家庭历史时路线列回空串(不制造'未选择'红显噪音,与同物料档同式)。
+                        + " ISNULL(specroute.同品名同规格上次工艺路线, N'') AS 同品名同规格上次工艺路线,"
+                        + " ISNULL(specroute.同品名同规格上次来源单, N'') AS 同品名同规格上次来源单,"
+                        + " ISNULL(specroute.同品名同规格上次日期, N'') AS 同品名同规格上次日期,"
+                        + " CASE WHEN ISNULL(specroute.同品名同规格上次工艺路线, N'') = N'' THEN N''"
+                        + "      WHEN rs3.shr IS NOT NULL AND ISNULL(rs3.canceled,'N')<>'Y'"
+                        + "        AND ISNULL(rs3.stopped,'N')<>'Y' AND ISNULL(rs3.deleting,'N')<>'Y'"
+                        + "        AND ISNULL(rs3.modify_state,'N')<>'Y' THEN N'已审核'"
+                        + "      ELSE N'未审核' END AS 同品名同规格上次审核状态"
                         // 排序(2026-10-18 用户口径「新的在上、旧的在下面」):此前按单据日期升序,
                         // 新单据沉在列表底部;现改**日期倒序 → 单据编号倒序 → 行id 升序**
                         // (同一张单内行号仍从上到下,不因倒序把 1/2/3 行翻过来)。

@@ -14,7 +14,7 @@
  *
  * 【本次覆盖范围】
  *   `mode='archive'` 的面板在 RD_ 命名空间下**只有 2 张**:
- *     RD_SHARE_FILE(共享文件库) / RD_SINTER_TOL(烧结尺寸表)。
+ *     RD_SHARE_FILE(共享文件库)；RD_SINTER_TOL(烧结尺寸表) 已于 2026-10-30 并入 PROD_MOLD。
  *   全库 archive 共 36 张,其余 34 张的数据键不走 recordSheetConfigs.js(走 ArchivePanel 系列),
  *   不在本文件范围。见 AGENTS 任务记录「archive 面板数据键断言」。
  *
@@ -27,7 +27,8 @@ import { execFileSync } from 'node:child_process'
 import { recordSheetConfigs } from './recordSheetConfigs.js'
 
 /** 2026-10-xx 实测:RD_ 命名空间下 mode='archive' 的面板 = 恰好这 2 张 */
-const ARCHIVE_PANELS = ['RD_SHARE_FILE', 'RD_SINTER_TOL']
+// 2026-10-30：烧结尺寸表 RD_SINTER_TOL 已并入生产模具表 PROD_MOLD（旧面板撤掉），这里只剩共享文件库
+const ARCHIVE_PANELS = ['RD_SHARE_FILE']
 
 /**
  * 每个 archive 面板的**期望字段键** = 该面板当前 yj_field.label 全集。
@@ -176,3 +177,4 @@ function collectKeys(cfg) {
   }
   return keys
 }
+

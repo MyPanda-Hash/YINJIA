@@ -25,6 +25,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const list = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
+// 2026-10-30：纸张尺寸/边距/96dpi 三个常量搬到 core/panel/sheetPrintHtml.js（打印页 HTML 与
+// 导出 PDF 共用一份真源），故这里同时读那个模块来核实际数值。
+const paper = readFileSync(new URL('../panel/sheetPrintHtml.js', import.meta.url), 'utf8')
 
 /** buildSheetPdfBlob 函数体(到下一个顶层函数为止),**去掉注释行**后再断言 ——
  *  否则解释"为什么不能这么做"的注释里的反例会把自己判红(2026-10-29 实测踩到)。 */
@@ -44,8 +47,11 @@ function blobFn() {
 
 test('① 页面尺寸固定 A4 竖向,不再按内容尺寸出纸', () => {
   const fn = blobFn()
-  assert.match(fn, /const\s+PAGE_W\s*=\s*210/, '要声明 A4 宽 210mm')
-  assert.match(fn, /const\s+PAGE_H\s*=\s*297/, '要声明 A4 高 297mm')
+  assert.match(fn, /const\s+PAGE_W\s*=\s*SHEET_PAGE_W/, '宽度取共用的 A4 常量')
+  assert.match(fn, /const\s+PAGE_H\s*=\s*SHEET_PAGE_H/, '高度取共用的 A4 常量')
+  // 真源数值仍必须是 A4（改这里会同时影响打印页与导出件）
+  assert.match(paper, /SHEET_PAGE_W = 210/, 'A4 宽 210mm')
+  assert.match(paper, /SHEET_PAGE_H = 297/, 'A4 高 297mm')
   assert.ok(!/format:\s*\[\s*first\.w0/.test(fn),
     '不能再用首张截图的尺寸当 PDF 页面(format: [first.w0*MM, ...])')
   assert.ok(!/addPage\(\[pw,\s*ph\]/.test(fn),
@@ -61,7 +67,8 @@ test('② 每一页都是 portrait(不能再按 pw > ph 判定方向)', () => {
 
 test('③ 内容等比缩放并居中(不拉伸、不贴边)', () => {
   const fn = blobFn()
-  assert.match(fn, /const\s+MARGIN\s*=/, '要有页边距')
+  assert.match(fn, /const\s+MARGIN\s*=\s*SHEET_MARGIN/, '页边距取共用常量')
+  assert.match(paper, /SHEET_MARGIN = 8/, '页边距 8mm（与 CSS @page 同口径）')
   assert.match(fn, /Math\.min\(/, '缩放比例取 min(宽比, 高比) —— 等比且不越界')
   // 居中:x = MARGIN + (可用宽 - 实际宽) / 2
   assert.match(fn, /\(\s*contentW\s*-\s*w\s*\)\s*\/\s*2/, '水平居中')
@@ -69,6 +76,7 @@ test('③ 内容等比缩放并居中(不拉伸、不贴边)', () => {
 
 test('④ 仍是 mm 单位 + 96dpi 换算(px→mm 的既有口径不变)', () => {
   const fn = blobFn()
-  assert.match(fn, /const\s+MM\s*=\s*25\.4\s*\/\s*96/, 'px→mm 换算保留')
+  assert.match(fn, /const\s+MM\s*=\s*SHEET_MM/, 'px→mm 换算取共用常量')
+  assert.match(paper, /SHEET_MM = 25\.4 \/ 96/, '96dpi：1px = 25.4/96 mm')
   assert.match(fn, /unit:\s*'mm'/, '单位仍是 mm')
 })

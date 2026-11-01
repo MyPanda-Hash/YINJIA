@@ -1,0 +1,120 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== recon1.sql ==
+  | 0-cols | yj_role | 1 | id | int | 
+  | 0-cols | yj_role | 2 | role_code | nvarchar | 
+  | 0-cols | yj_role | 3 | role_name | nvarchar | 
+  | 0-cols | yj_role | 4 | remark | nvarchar | 
+  | 0-cols | yj_role | 5 | is_admin | char | 
+  | 0-cols | yj_schema_log | 1 | script_name | nvarchar | 
+  | 0-cols | yj_schema_log | 2 | content_hash | char | 
+  | 0-cols | yj_schema_log | 3 | applied_at | datetime2 | 
+  | 1-yj_panel | PROD_PICK_LIST | 生产领料 | 报表 | flat | v_prod_pick_list | null | null | id | null | null | 单据日期 | 50 | items | WMS管理系统 | null | null | Production Picking | 
+  | 2-yj_field | 18537 | PROD_PICK_LIST | 单据编号 | 单据编号 | 文本 | null | null | null | null | query,detail | 10 | 210 | 0 | 0 | 0 | null | 1 | Document No. | null | null | null | 
+  | 2-yj_field | 18539 | PROD_PICK_LIST | 单据日期 | 单据日期 | 日期 | null | null | null | null | query,detail | 20 | 110 | 0 | 0 | 0 | null | 1 | Document Date | null | null | null | 
+  | 2-yj_field | 18538 | PROD_PICK_LIST | 单据类型 | 单据类型 | 文本 | null | null | null | null | detail | 30 | 110 | 0 | 0 | 0 | null | 0 | Document Type | null | null | null | 
+  | 2-yj_field | 18545 | PROD_PICK_LIST | 物料编码 | 物料编码 | 文本 | null | null | null | null | query,detail | 40 | 150 | 0 | 0 | 0 | null | 1 | Material Code | null | null | null | 
+  | 2-yj_field | 18546 | PROD_PICK_LIST | 物料名称 | 物料名称 | 文本 | null | null | null | null | query,detail | 50 | 220 | 0 | 0 | 0 | null | 1 | Material Name | null | null | null | 
+  | 2-yj_field | 18540 | PROD_PICK_LIST | 规格型号 | 规格型号 | 文本 | null | null | null | null | detail | 60 | 200 | 0 | 0 | 0 | null | 1 | Spec / Model | null | null | null | 
+  | 2-yj_field | 18541 | PROD_PICK_LIST | 计量单位 | 计量单位 | 文本 | null | null | null | null | detail | 70 | 90 | 0 | 0 | 0 | null | 1 | UOM | null | null | null | 
+  | 2-yj_field | 18533 | PROD_PICK_LIST | 仓库编码 | 仓库编码 | 文本 | null | null | null | null | detail | 80 | 110 | 0 | 0 | 0 | null | 0 | Warehouse Code | null | null | null | 
+  | 2-yj_field | 18534 | PROD_PICK_LIST | 仓库名称 | 仓库名称 | 文本 | null | null | null | null | query,detail | 90 | 160 | 0 | 0 | 0 | null | 1 | Warehouse | null | null | null | 
+  | 2-yj_field | 18543 | PROD_PICK_LIST | 批号 | 批号 | 文本 | null | null | null | null | query,detail | 100 | 140 | 0 | 0 | 0 | null | 1 | Lot No. | null | null | null | 
+  | 2-yj_field | 18544 | PROD_PICK_LIST | 数量 | 数量 | 小数 | null | null | null | null | detail | 110 | 110 | 0 | 0 | 0 | null | 1 | Quantity | null | null | null | 
+  | 2-yj_field | 18535 | PROD_PICK_LIST | 成本单价 | 成本单价 | 小数 | null | null | null | null | detail | 120 | 110 | 0 | 0 | 0 | null | 1 | Cost Price | null | null | null | 
+  | 2-yj_field | 18536 | PROD_PICK_LIST | 成本金额 | 成本金额 | 小数 | null | null | null | null | detail | 130 | 120 | 0 | 0 | 0 | null | 1 | Cost Amount | null | null | null | 
+  | 2-yj_field | 18542 | PROD_PICK_LIST | 经手人 | 经手人 | 文本 | null | null | null | null | detail | 140 | 100 | 0 | 0 | 0 | null | 0 | Handler | null | null | null | 
+  | 2-yj_field | 18531 | PROD_PICK_LIST | asp_user1 | 创建人 | 文本 | null | null | null | null | query,detail | 150 | 100 | 0 | 0 | 0 | null | 1 | Created By | null | null | null | 
+  | 2-yj_field | 18529 | PROD_PICK_LIST | asp_time1 | 创建时间 | 日期 | null | null | null | null | query,detail | 160 | 170 | 0 | 0 | 0 | null | 1 | Created At | null | null | null | 
+  | 2-yj_field | 18532 | PROD_PICK_LIST | asp_user3 | 审核人 | 文本 | null | null | null | null | detail | 170 | 100 | 0 | 0 | 0 | null | 0 | Auditor | null | null | null | 
+  | 2-yj_field | 18530 | PROD_PICK_LIST | asp_time3 | 审核时间 | 日期时间 | null | null | null | null | detail | 180 | 170 | 0 | 0 | 0 | null | 0 | Audit Time | null | null | null | 
+  | 3-view-def | 
+CREATE   VIEW dbo.v_prod_pick_list
+AS
+SELECT o.id,
+       o.[单据编号], o.[单据类型], o.[单据日期],
+       o.[物料编码], o.[物料名称], o.[规格型号], o.[计量单位],
+       o.[仓库编码], o.[仓库名称], o.[批号], o.[数量],
+       o.[成本单价], o.[成本金额], o.[经手人],
+       o.asp_user1, o.[单据日期] AS asp_time1, o.asp_user3, o.asp_time3
+  FROM dbo.outh o
+ WHERE o.src = 6
+   AND ISNULL(o.asp_cancel, N'N') <> N'Y'; | 
+  | 3-view-cols | 1 | id | bigint | 8 | 
+  | 3-view-cols | 2 | 单据编号 | nvarchar | 100 | 
+  | 3-view-cols | 3 | 单据类型 | nvarchar | 100 | 
+  | 3-view-cols | 4 | 单据日期 | datetime | 8 | 
+  | 3-view-cols | 5 | 物料编码 | nvarchar | 100 | 
+  | 3-view-cols | 6 | 物料名称 | nvarchar | 400 | 
+  | 3-view-cols | 7 | 规格型号 | nvarchar | 400 | 
+  | 3-view-cols | 8 | 计量单位 | nvarchar | 40 | 
+  | 3-view-cols | 9 | 仓库编码 | nvarchar | 100 | 
+  | 3-view-cols | 10 | 仓库名称 | nvarchar | 200 | 
+  | 3-view-cols | 11 | 批号 | nvarchar | 120 | 
+  | 3-view-cols | 12 | 数量 | decimal | 9 | 
+  | 3-view-cols | 13 | 成本单价 | decimal | 9 | 
+  | 3-view-cols | 14 | 成本金额 | decimal | 9 | 
+  | 3-view-cols | 15 | 经手人 | nvarchar | 100 | 
+  | 3-view-cols | 16 | asp_user1 | nvarchar | 80 | 
+  | 3-view-cols | 17 | asp_time1 | datetime | 8 | 
+  | 3-view-cols | 18 | asp_user3 | nvarchar | 40 | 
+  | 3-view-cols | 19 | asp_time3 | datetime2 | 8 | 
+  | 3-view-desc | 生产领料只读视图：dbo.outh 中 src=6（材料出库）且未删除的出库流水行，字段与「生产领料」面板(PROD_PICK_LIST)一一对应；源表 outh 不做任何改动。 | 
+  | 4-role-panel | 5703 | 1 | PROD_PICK_LIST | N | view,query,export | 
+  | 4-role-panel | 5704 | 2 | PROD_PICK_LIST | N | view,query,export | 
+  | 4-role-panel | 5705 | 1029 | PROD_PICK_LIST | N | view,query,export | 
+  | 4-role-panel | 5706 | 1031 | PROD_PICK_LIST | N | view,query,export | 
+  | 4-roles | 1 | admin | 管理员 | 全部面板与审批权限 | Y | 
+  | 4-roles | 2 | user | 普通用户 | 按角色授权面板 | N | 
+  | 4-roles | 1029 | xiaoshou | 销售 |  | N | 
+  | 4-roles | 1031 | ckgl | 仓库管理 |  | N | 
+  | 5-trans | 9657 | field | 仓库编码 | de | Warehouse-Codierung | manual | 2026-09-23 23:41:39.9807432 | 2026-09-23 23:41:39.9807432 | 
+  | 5-trans | 7892 | field | 仓库编码 | en | Warehouse code | manual | 2026-09-23 23:41:37.0408551 | 2026-09-23 23:41:37.0408551 | 
+  | 5-trans | 9389 | field | 仓库编码 | es | Codificación de almacén | manual | 2026-09-23 23:41:39.3997061 | 2026-09-23 23:41:39.3997061 | 
+  | 5-trans | 9525 | field | 仓库编码 | fr | Codage d'entrep?t | manual | 2026-09-23 23:41:39.6863006 | 2026-09-23 23:41:39.6863006 | 
+  | 5-trans | 9117 | field | 仓库编码 | ja | 倉庫コード | manual | 2026-09-23 23:41:38.8063217 | 2026-09-23 23:41:38.8063217 | 
+  | 5-trans | 9253 | field | 仓库编码 | ko | ?? ?? | manual | 2026-09-23 23:41:39.1173255 | 2026-09-23 23:41:39.1173255 | 
+  | 5-trans | 9789 | field | 仓库编码 | ru | Кодирование склада | manual | 2026-09-23 23:41:40.2630060 | 2026-09-23 23:41:40.2630060 | 
+  | 5-trans | 10061 | field | 仓库编码 | th | ?????????????? | manual | 2026-09-23 23:41:40.8186528 | 2026-09-23 23:41:40.8186528 | 
+  | 5-trans | 9925 | field | 仓库编码 | vi | M? kho hàng | manual | 2026-09-23 23:41:40.5367582 | 2026-09-23 23:41:40.5367582 | 
+  | 5-trans | 8645 | field | 仓库名称 | de | Lagername | manual | 2026-09-23 23:41:37.1390743 | 2026-09-23 23:41:37.1390743 | 
+  | 5-trans | 7895 | field | 仓库名称 | en | Warehouse Name | manual | 2026-09-23 23:41:37.0408551 | 2026-09-23 23:41:37.0408551 | 
+  | 5-trans | 8467 | field | 仓库名称 | es | Nombre de almacén | manual | 2026-09-23 23:41:37.1227205 | 2026-09-23 23:41:37.1227205 | 
+  | 5-trans | 8556 | field | 仓库名称 | fr | Nom d'entrep?t | manual | 2026-09-23 23:41:37.1308961 | 2026-09-23 23:41:37.1308961 | 
+  | 5-trans | 8289 | field | 仓库名称 | ja | 倉庫名 | manual | 2026-09-23 23:41:37.1063288 | 2026-09-23 23:41:37.1063288 | 
+  | 5-trans | 8378 | field | 仓库名称 | ko | ??? | manual | 2026-09-23 23:41:37.1145457 | 2026-09-23 23:41:37.1145457 | 
+  | 5-trans | 8734 | field | 仓库名称 | ru | Название склада | manual | 2026-09-23 23:41:37.1431677 | 2026-09-23 23:41:37.1431677 | 
+  | 5-trans | 8912 | field | 仓库名称 | th | ???????? | manual | 2026-09-23 23:41:37.1554262 | 2026-09-23 23:41:37.1554262 | 
+  | 5-trans | 8823 | field | 仓库名称 | vi | Tên kho | manual | 2026-09-23 23:41:37.1472561 | 2026-09-23 23:41:37.1472561 | 
+  | 5-trans | 14848 | field | 仓库名称 | zh-TW | 倉庫名稱 | manual | 2026-10-15 19:38:19.7901692 | 2026-10-15 19:38:19.7901692 | 
+  | 5-trans | 15374 | field | 成本单价 | en | Cost Price | manual | 2026-10-21 16:58:08.9167267 | 2026-10-21 16:58:08.9167267 | 
+  | 5-trans | 11605 | field | 成本金额 | de | Kostenbetrag | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11475 | field | 成本金额 | en | Cost amount | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11488 | field | 成本金额 | es | Importe de coste | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11419 | field | 成本金额 | fr | Montant du co?t | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11534 | field | 成本金额 | ja | 原価金額 | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11604 | field | 成本金额 | ko | ?? ?? | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11312 | field | 成本金额 | ru | Сумма затрат | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11445 | field | 成本金额 | th | ??????????????? | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11330 | field | 成本金额 | vi | T?ng giá v?n | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 12342 | field | 创建人 | en | Created By | manual | 2026-09-23 23:45:46.7175433 | 2026-09-23 23:45:46.7175433 | 
+  | 5-trans | 14300 | field | 创建人 | ja | 作成者 | manual | 2026-10-05 07:57:41.1424456 | 2026-10-05 07:57:41.1424456 | 
+  | 5-trans | 11500 | field | 创建时间 | de | Erstellt am | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11317 | field | 创建时间 | en | Created at | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11484 | field | 创建时间 | es | Fecha de creación | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11360 | field | 创建时间 | fr | Créé le | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11469 | field | 创建时间 | ja | 作成時間 | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11499 | field | 创建时间 | ko | ?? ?? | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11299 | field | 创建时间 | ru | Время создания | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11373 | field | 创建时间 | th | ????????? | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 11668 | field | 创建时间 | vi | Th?i gian t?o | manual | 2026-09-23 23:44:33.7358204 | 2026-09-23 23:44:33.7358204 | 
+  | 5-trans | 10712 | field | 单据编号 | de | Dokumentennummer | manual | 2026-09-23 23:42:51.9108458 | 2026-09-23 23:42:51.9108458 | 
+  | 5-trans | 7917 | field | 单据编号 | en | Document Number | manual | 2026-09-23 23:41:37.0408551 | 2026-09-23 23:41:37.0408551 | 
+  | 5-trans | 10410 | field | 单据编号 | es | Número de documento | manual | 2026-09-23 23:42:51.2770868 | 2026-09-23 23:42:51.2770868 | 
+  | 5-trans | 10561 | field | 单据编号 | fr | Numéro de document | manual | 2026-09-23 23:42:51.5919764 | 2026-09-23 23:42:51.5919764 | 
+  | 5-trans | 10108 | field | 单据编号 | ja | 伝票番号 | manual | 2026-09-23 23:42:50.6434135 | 2026-09-23 23:42:50.6434135 | 
+  | 5-trans | 10259 | field | 单据编号 | ko | ?? ?? | manual | 2026-09-23 23:42:50.9663620 | 2026-09-23 23:42:50.9663620 | 
+  | 5-trans | 10863 | field | 单据编号 | ru | Номер документа | manual | 2026-09-23 23:42:52.2506635 | 2026-09-23 23:42:52.2506635 | 
+  | 5-trans | 11166 | field | 单据编号 | th | ????????????? | manual | 2026-09-23 23:42:52.8974780 | 2026-09-23 23:42:52.8974780 | 
+  | 5-trans | 11015 | field | 单据编号 | vi | S? ch?ng t? | manual | 2026-09-23 23:42:52.5784746 | 2026-09-23 23:42:52.5784746 | 
+  | 5-trans | 14681 | field | 单据类型 | en | Doc Type | manual | 2026-10-10 14:47:21.7709239 | 2026-10-10 14:47:21.7709239 | 
+[OK] recon1.sql (1 batches)

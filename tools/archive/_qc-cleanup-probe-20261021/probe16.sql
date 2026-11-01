@@ -1,0 +1,3 @@
+SET NOCOUNT ON;
+SELECT TOP 5 * FROM bs_emp WHERE 员工名称=N'冯敏';
+GO

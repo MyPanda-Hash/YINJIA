@@ -43,8 +43,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useTabsStore } from '@/stores/tabs'
 import { useUnsavedStore, tabClosePlan } from '@/stores/unsaved'
 import { useAppStore } from '@/stores/app'
-import { apiPageManuOrders } from '@/business/api'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 
 const tabs = useTabsStore()
@@ -60,8 +59,6 @@ watch(
   { immediate: true }
 )
 const ctx = ref({ tab: null, x: 0, y: 0 })
-const findPop = ref(false)
-const findNo = ref('')
 
 function go(t) {
   tabs.setActive(t.path)
@@ -178,26 +175,8 @@ function onMore(cmd) {
   }
 }
 
-// 快速查找单据：按编号搜索生产加工单（T+ searchVoucher 对应能力）
-async function quickFind() {
-  const no = findNo.value.trim()
-  if (!no) return ElMessage.warning('请输入单据编号')
-  try {
-    const res = await apiPageManuOrders({ orderNo: no, pageNo: 1, pageSize: 5 })
-    const hit = res.records?.[0] || res.list?.[0]
-    if (!hit) {
-      ElMessage.warning(`未找到单据：${no}`)
-      return
-    }
-    const path = `/panelx/form/MANU_ORDER?id=${hit.id}`
-    tabs.open({ title: `加工单 ${hit.orderNo}`, path: '/panelx/form/MANU_ORDER', query: { id: hit.id } })
-    router.push(path)
-    findPop.value = false
-    findNo.value = ''
-  } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '查询失败')
-  }
-}
+// 2026-10-28:旧「快速查找生产加工单」整段删除 —— 模板里从来没有输入框,且它调的
+// /manu/order/page 后端无此接口(遗留死代码),随生产加工单 MANU_ORDER 下架一并清理。
 </script>
 
 <style scoped>

@@ -13,7 +13,7 @@ import java.util.Map;
  * ⇒ 这三个页面**在权限界面里根本没得勾**;生产工单列表页同样没挂面板码。
  * 后果:四条菜单项在 {@code menus.js} 里没有 panelCode,而 {@code filterMenuTree} 对
  * 「无 panelCode 的叶子」一律放行 ⇒ 任何登录账号都能看到并进入这四个页面;
- * 后端只是"借" SO_ORDER / MANU_ORDER 的权限当闸门,且 {@code /px/workOrderList} 列表接口
+ * 后端原先只是"借" SO_ORDER / MANU_ORDER 的权限当闸门(2026-10-28 MANU_ORDER 已下架,生产域改挂本表页面码),且 {@code /px/workOrderList} 列表接口
  * 此前**完全没有校验**(登录即可读全部工单/客户/数量)。
  *
  * <p>做法沿用既有先例「虚拟面板 DASHBOARD(我的桌面)」:
@@ -175,6 +175,17 @@ public final class PagePanelRegistry {
      * **不是** yj_panel 单据面板 ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
      */
     public static final String PROJECT_FLOW = "PROJECT_FLOW";
+    /**
+     * 工序流程追踪卡(2026-10-29,用户口述《新建 DOCX 文档 (2).docx》「生产相关」):
+     * 日期大批次下挂小批次(一张卡=一个小批次=一个工单行),每道工序挂现场照片(电脑选图/手机拍照),
+     * 卡的工序行**挂载到工序台账与已审核报工**(完成量/完成时间取 scjl 现算),按卡追溯。
+     *
+     * <p>数据 = {@code wo_proc_card_head} / {@code wo_proc_card_detail} + 照片复用 {@code yj_attachment};
+     * 页面是专用 Vue(`views/modules/plan/ProcFlowCard.vue`),**不是 yj_panel 单据面板** ⇒
+     * 按页面级虚拟面板登记:授权落 {@code yj_role_panel},菜单按 panelCode 显隐,后端闸门走本表动作词。
+     * 动作集按页面真实能力裁剪(录入照片/确认完成是写动作;查询/列表/批次追溯只读)。
+     */
+    public static final String PROC_FLOW_CARD = "PROC_FLOW_CARD";
 
     private static final String[][] ORDER_CONVERT_ACTIONS = {
             {"view",    "可见"},
@@ -197,6 +208,8 @@ public final class PagePanelRegistry {
             {"revoke",   "撤回调拨"},
             {"unclose",  "取消结案"},
             {"print",    "打印"},
+            // 2026-10-29:表格内「日排产」日期列(计划可填)—— 与生产工单页同一动作词
+            {"dayplan",  "日排产"},
     };
 
     private static final String[][] WORK_ORDER_LIST_ACTIONS = {
@@ -209,6 +222,8 @@ public final class PagePanelRegistry {
             {"recipe",  "获取混料配方"},
             {"export",  "导出"},
             {"assign",  "排产"},
+            // 2026-10-29:表格内「日排产」日期列(计划可填)—— 与工单排产页同一动作词
+            {"dayplan", "日排产"},
     };
 
     /**
@@ -370,6 +385,17 @@ public final class PagePanelRegistry {
             {"view",  "可见"},
             {"query", "查询"},
     };
+    /**
+     * 工序流程追踪卡(2026-10-29):录入照片 = 建卡/上传删除照片(动作词 entry);
+     * 确认完成 = 卡状态置「已完成」(动作词 confirm,前置=全部工序已完工且每道至少一张照片)。
+     * 列表/批次追溯只读,挂 query。
+     */
+    private static final String[][] PROC_FLOW_CARD_ACTIONS = {
+            {"view",    "可见"},
+            {"query",   "查询"},
+            {"entry",   "录入照片"},
+            {"confirm", "确认完成"},
+    };
 
     /** 全部页面面板(顺序 = 矩阵内展示顺序;模块名与 {@code ReportService.NAV_GROUP_ORDER} 一致) */
     public static final List<PagePanelDef> ALL = List.of(
@@ -388,6 +414,9 @@ public final class PagePanelRegistry {
             new PagePanelDef(MOBILE_PICK, "生产领料", "手机扫码", MOBILE_PICK_ACTIONS),
             new PagePanelDef(MOBILE_REPORT, "工序报工", "手机扫码", PROD_REPORT_ACTIONS),
             new PagePanelDef(PRINT_STATION, "自动打印", "手机扫码", PRINT_STATION_ACTIONS),
+            // 2026-10-29:工序流程追踪卡(批次 → 小批次 → 工序照片 → 追溯)。
+            // 它属于「生产计划」组(工序维度的看板),不随生产领料/工序报工迁到「手机扫码」。
+            new PagePanelDef(PROC_FLOW_CARD, "工序流程追踪卡", "生产计划", PROC_FLOW_CARD_ACTIONS),
             new PagePanelDef(ERP_INTEG, "ERP集成配置清单", "ERP系统集成", ERP_INTEG_ACTIONS),
             // 2026-10-20 补登:数采平台三页 + 扫码领料(此前菜单里无面板码 ⇒ 矩阵里缺这几个)
             new PagePanelDef(DC_CONFIG, "IOT设备配置", "数采平台", DC_CONFIG_ACTIONS),

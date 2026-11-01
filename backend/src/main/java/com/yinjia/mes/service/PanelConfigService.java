@@ -309,6 +309,24 @@ public class PanelConfigService {
             buttonGroups.add(group("更多", flatMoreActions(def.code())));
         } else if (doc && panda != null) {
             for (String[] g : panda) {
+                // 出厂检验报告入口(2026-11-01):用户口径「同时当前实现方式不改变,让当前勾选对应的
+                // 销售出库单时候能转跳到当前这个出厂检验报告来进行操作这种实现我感觉会好一点。」
+                // ⇒ 2026-10-30 的后端生成逻辑(OqcReportService / OqcReportController,一份报告=一个产品)
+                //   **一字不动**,只给销售出库单的工具栏补一颗入口:
+                //   点击 → 勾选出库明细行 → /api/oqc/generate 建报告草稿 → 前端跳到 QC_OQC_REPORT
+                //   并打开第一张新单继续填/审批/打印。
+                // ⚠ 2026-11-01 09:46 用户口径(截图圈住独立的「生成出厂检验报告」)：「把销售出库单里这个
+                //   改到当前的打印按钮里面」⇒ 不再单独成组,改为**放进「打印」组的下拉**
+                //   (主按钮仍是「打印」;下拉 = 预览 / 导出 / 生成出厂检验报告)。
+                //   动作名=按钮名(中文数据键,ADR-0001 永不翻译);def.code() 判定保证其它面板下发面 0 变化。
+                if ("SALE_OUT".equals(def.code()) && "打印".equals(g[0])) {
+                    // ⚠ panda 数组口径 = {组名, 动作1, 动作2, ...} ⇒ actions 取 subList(1) 再追加
+                    // (动作1 与组名同名「打印」,主按钮仍是「打印」;下拉 = 预览 / 导出 / 生成出厂检验报告)
+                    List<String> acts = new ArrayList<>(List.of(g).subList(1, g.length));
+                    acts.add("生成出厂检验报告");
+                    buttonGroups.add(group(g[0], acts));
+                    continue;
+                }
                 buttonGroups.add(group(g[0], List.of(g).subList(1, g.length)));
                 if ("选单".equals(g[0]) && !SELECT_FLOWS.containsKey(def.code())) {
                     disabledActions.addAll(List.of(g).subList(1, g.length));
@@ -335,13 +353,15 @@ public class PanelConfigService {
             // 位置:第一个动作 = 侧边栏主按钮,其余进 ▼ 下拉 ⇒ 主按钮仍是「保存」(即提交),
             //   草稿落在下拉,不改变既有主路径的点击习惯(与 PANDA_BUTTONS 各单据的写法一致)。
             buttonGroups.add(group("保存", List.of("保存", "保存为草稿")));
-            // 删除组:四张工序检验单(成型/切炭/组装/制程)额外给「删除单据」——
-            // 用户 2026-10-14 口径「为当前的四张检验单增加删除中的删除单据的按钮」。
-            // 语义区别:「删除」= 进入明细行勾选删除模式(删行);「删除单据」= 删整张单据
+            // 删除组:「删除」= 进入明细行勾选删除模式(删行);「删除单据」= 删整张单据
             // (前端 engine.deleteForms → ButtonService.delete:doc 面板草稿直接作废,
             //  已审核抛「仅草稿状态可删除(已审核请先弃审)」,不会误删已审核单)。
-            // 只放开这四张单,其余无 PANDA 基准的面板维持原样(不扩大改动面)。
-            buttonGroups.add(group("删除", WO_INSP_PANELS.contains(def.code())
+            // 额外下发「删除单据」的面板见 DELETE_DOC_PANELS:
+            //   · 三张工序检验单(2026-10-14 用户口径「为当前的检验单增加删除中的删除单据的按钮」;
+            //     当时四张,2026-10-16 成型/切炭下架后剩组装/制程/首件);
+            //   · 工艺路线 ROUTE(2026-10-29 用户口径「给这个工艺路线下发删除单据」)。
+            // 其余无 PANDA 基准的面板维持原样(不扩大改动面)。
+            buttonGroups.add(group("删除", DELETE_DOC_PANELS.contains(def.code())
                     ? List.of("删除", "删除单据")
                     : List.of("删除")));
             // 2026-10-21 用户口径(物料清单):「把物料清单的审批换成修改」——
@@ -363,6 +383,11 @@ public class PanelConfigService {
             }
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
+            // ⚠ 出厂检验报告(QC_OQC_REPORT)不在这里补「打印」组:2026-11-01 第三轮该面板已改为
+            // approval-layout 纸面(前端 QcOqcSheet.vue,与首件检验单同形态)—— 工具栏整条不渲染,
+            // 打印走侧栏「打印」(printApprovalSheet,打的就是屏幕上那张受控表单纸),
+            // 导出 PDF/Excel 走「导出」弹窗 → 服务端受控表单报表(reports/qc_oqc.jrxml)。
+            // 上一轮加的那组「打印|预览」因此是死配置(按钮永远不渲染),已删,别再补回来。
             buttonGroups.add(group("刷新", List.of("刷新")));
             // 物料清单(WLBOM)的 Excel 批量导入(2026-10-21):扫码领料要按 BOM 展开「该领哪些料」,
             // 而金蝶侧 BOM 接口实测 count=0(3878 个商品一个 BOM 都没建)、MES 自建 bs_bom 已下架、
@@ -413,14 +438,6 @@ public class PanelConfigService {
         tablePage.put("topBarBtn", panelButtons);
         tablePage.put("rowOperationBarBtn", List.of());
         tablePage.put("events", List.of());
-        // 生产加工单(2026-09-24,用户拍板参考旧系统工单列表):主表预览表格=扁平工单列表形态,
-        // 前端 PanelxList 据此渲染 mainGrid + 产线筛选条(产线下拉/未排产·已排产·未完工·已完工/追溯)
-        if ("MANU_ORDER".equals(def.code())) {
-            tablePage.put("mainTable", Map.of(
-                    "label", "生产加工单",
-                    "columns", List.of("合同号", "单据日期", "客户", "生产线", "预开工日", "预完工日",
-                            "需求数量", "排产数量", "入库数量", "余量", "批号", "重点管控")));
-        }
 
         Map<String, Object> pageDto = new LinkedHashMap<>();
         pageDto.put("tablePages", List.of(tablePage));
@@ -605,7 +622,11 @@ public class PanelConfigService {
             for (Object a : list) {
                 String action = String.valueOf(a);
                 String t = pushTarget(def.code(), action);
-                if (t != null && !disabledActions.contains(action)) pushTargets.put(action, t);
+                // 目标必须是真实面板:2026-10-28 起 SO_ORDER「生成生产工单」的目标是页面 WORK_ORDER_LIST
+                // (不是 yj_panel),它只用于前端「是否需要分批送料弹窗」判断 —— 页面码不满足该判断,不登记。
+                // ⚠ 必须用 find():panel() 找不到是抛异常,写成 panel(t) != null 会当场 400 把整个面板配置打挂
+                //   (2026-10-28~10-30 销售订单左栏恒 0 条、右栏空白就是这个)。
+                if (t != null && !disabledActions.contains(action) && registry.find(t) != null) pushTargets.put(action, t);
             }
         }
         if (!pushTargets.isEmpty()) metadata.put("pushTargets", pushTargets);
@@ -879,6 +900,14 @@ public class PanelConfigService {
             Map.entry("供应商名称", List.of("供应商")),
             // 产品信息表 炭棒尺寸(整串) → 产品文件面板异名规格字段;三窄格 炭棒规格1/2/3 由前端拆分回填
             Map.entry("炭棒尺寸", List.of("炭棒规格", "滤芯尺寸")),
+            // X烧结工艺清单(2026-10-30 用户报障「数据没带全」):refMap 只按 **label 同名** + 本表生成,
+            //   而 X烧结的格名与产品信息表不一致 ⇒ 选产品编号后这两格一直是空的。
+            //   实测:产品信息表 炭棒长度=110 / 产品管控等级=A类,
+            //         X烧结 炭棒出货长度 / 产品管控类型 ⇒ 不同名,带不回来。
+            //   「产品管控类型」在 RD_MOLD_PROC 也有同名 label,那边本来就显式配了参照,
+            //   多这一条只是再兜一次同值,不会覆盖已填内容。
+            Map.entry("炭棒长度", List.of("炭棒出货长度")),
+            Map.entry("产品管控等级", List.of("产品管控类型")),
             // 立项申请 项目等级(审核人定级) → 项目实施计划的 项目定级(异名同义):
             // 计划按「文档编号」参照立项申请时自动把等级带过来 —— 等级因此成为后续立项/进度流程的属性
             // (2026-09-21 用户口径:全链路一/二/三/四级)
@@ -1270,24 +1299,7 @@ public class PanelConfigService {
                     new String[]{"导入", "导入"})),
             // 委外三单:OUTSOURCE_IN / OUTSOURCE_ISSUE 于 2026-10-08 下架(面板+表+视图+菜单),
             // 只留 委外加工单 OUTSOURCE_ORDER(其「生成委外发料单」动作随之改为通用「生单」占位)。
-            java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),            // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
-            java.util.Map.entry("MANU_ORDER", List.of(
-                    new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选销售订单"},
-                    new String[]{"修改", "修改"},
-                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
-                    new String[]{"删除", "删除", "删除单据"},
-                    new String[]{"审批", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
-                    new String[]{"生单", "生成产成品入库单"},
-                    // 2026-09-24 用户拍板(参考旧系统工单列表样式收敛):列表特殊按钮只保留
-                    // 打印工单(生产任务单固定版式)/排产(本单快捷排线,弹窗选产线,复用排产工作台
-                    // assign 守卫守恒留痕)/结案/取消结案(ManuCloseHandler);
-                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成产品批号下线出列表;
-                    // 「生成采购申请」(原 ManuPurchaseReqHandler 按 BOM×排产−库存结转)已随 BOM 下架移除(2026-10-04)
-                    // —— 2026-10-06 同采购订单口径:主按钮即生产任务单固定版式(打印留痕一并写入;下拉保留原「打印工单」入口),通用表格打印走「预览」
-                    new String[]{"打印", "打印工单", "预览", "导出", "打印工单"},
-                    new String[]{"排产", "排产", "结案", "取消结案"},
-                    new String[]{"更多", "打印工单二维码", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
+            java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER)             // 委外加工单:选单=销售订单;生单=产成品入库单(已实现)
     )));
 
     /**
@@ -1305,9 +1317,9 @@ public class PanelConfigService {
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             // 「PU_REQ|生成采购订单」已随请购单下架移除(2026-10-08):请购单不需要,采购订单不再有该上游
             java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
-            java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
+            // 2026-10-28 生产加工单 MANU_ORDER 下架:工单实体=plang,页面=WORK_ORDER_LIST(ManuScheduleHandler 实际落 plang)
+            java.util.Map.entry("SO_ORDER|生成生产工单", "WORK_ORDER_LIST"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
-            java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             // 暂收单生单(2026-10-05):按行分流到 来料检验单 / 采购入库单 —— 见上方注释(值仅为路由标记)
             java.util.Map.entry("QC_RECV|生成检验或入库单", "QC_INSP")
             // 「WO_ORDER|生成领料单」→ MATERIAL_OUT 已随 BOM 下架移除(2026-10-04):
@@ -1333,8 +1345,7 @@ public class PanelConfigService {
 
     /** 表单底部按钮(PANDA bottomOperationBarBtn:保存,删除,审核,弃审,+中止类,+放弃)。 */
     private static final Map<String, List<String>> FORM_BOTTOM = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "SO_ORDER", List.of("保存", "删除", "审核", "弃审", "整单中止", "放弃"),
-            "MANU_ORDER", List.of("保存", "删除", "审核", "弃审", "中止执行", "草稿", "放弃")
+            "SO_ORDER", List.of("保存", "删除", "审核", "弃审", "整单中止", "放弃")
     )));
     private static final List<String> FORM_BOTTOM_DEFAULT = List.of("保存", "删除", "审核", "弃审", "放弃");
 
@@ -1342,23 +1353,22 @@ public class PanelConfigService {
     private static final Map<String, String> SELECT_FLOWS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             java.util.Map.entry("PURCHASE_IN", "QC_RECV"),           // 送料暂收单 → 采购入库单(2026-09-22:原 采购订单,
                                                                      //   免检直达已取消,来源收敛到暂收单;见 PUSH_TARGETS 注释)
-            java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产工单 → 材料出库单
-            java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产工单 → 产成品入库单
-            java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产工单 → 工序派工单
+            // 2026-10-28 生产加工单 MANU_ORDER 下架:材料出库单 / 产成品入库单 / 工序派工单 不再以它作选单来源 ——
+            //   材料出库单由生产工单列表「转领料单」直接生成;产成品入库单由组装成品检验单审核自动生成;
+            //   工序派工单(DISPATCH)菜单早已下架。这四条来源面板在改造后一直是 0 行,选单弹窗本来就是空的。
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             // OUTSOURCE_ISSUE / OUTSOURCE_IN 两条「委外加工单 → 委外发料单/入库单」已随两张面板下架移除(2026-10-08)
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
-            java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产工单(销售-生产链)
             // 「PU_ORDER ← PU_REQ」已随请购单下架移除(2026-10-08):采购订单现无上游可选单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER")              // 销售订单 → 生产工单(计划层:选单生单)
-   // 2026-10-14 其他入库/其他出库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
-   //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库);其他出库 ← 生产工单(与材料出库单同源:生产领用类出库)。
-   //   ⚠ 这两条是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
+   // 2026-10-14 其他入库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
+   //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库)。
+   //   ⚠ 这是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
+   //   其他出库原 ← MANU_ORDER,随 2026-10-28 生产加工单下架一并移除(与材料出库单同源,来源已不存在)。
    , java.util.Map.entry("OTHER_IN", "PU_ORDER")
-   , java.util.Map.entry("OTHER_OUT", "MANU_ORDER")
             // 2026-10-18 调拨单/盘点单:来源不是单据,而是**库存可用量**(批号级 kucun 视图 v_stock_pick)。
             // 用户口径「功能和界面要和出入库单对齐」—— 出入库单的「选单」挑的是上游单据,这两张单挑的是"货",
             // 所以来源登记成平表面板 STOCK_PICK(只读、无菜单入口、仅作选单来源)。
@@ -1455,16 +1465,12 @@ public class PanelConfigService {
             // "PU_ORDER|PURCHASE_IN"({单据编号→采购订单号});该免检直达链远端已取消
             // (采购入库单现在只从「送料暂收单」选单,采购订单号随链带入,见上行注释),
             // 本地那条属悬空登记,无实际链路生效。
-            // 销售订单 → 生产工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
-            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空)
-            "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},
             // 销售订单 → 销售出库单(2026-10-15 用户口径:「销售出库单是从销售订单生单或者选单过来的,
             // 要带有销售订单号和销售订单行号」)。头映射的自动同名规则带不到它 —— 来源头的单号标签是
             // 「单据编号」、目标头要的是「销售订单号」,属异名,必须显式登记;
             // 而通用 hmap 的 `单据编号 → 来源单号` 落的是「来源单号」列,不是「销售订单号」。
             // 行上的「销售订单行号」由 FLOW_DETAIL_SYNONYMS 的 {行号 → 销售订单行号} 承担。
             "SO_ORDER|SALE_OUT", new String[][]{{"单据编号", "销售订单号"}},
-            "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
             // + 批次号(2026-10-04 口径:号在生单那一刻定稿,逐站继承 —— 这里是同名直通的兜底登记,
@@ -2181,6 +2187,22 @@ public class PanelConfigService {
      */
     private static final java.util.Set<String> WO_INSP_PANELS =
             java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
+
+    /**
+     * 「删除」组额外下发「删除单据」动作的面板(2026-10-29 从 WO_INSP_PANELS 抽出)。
+     *
+     * <p>与 {@link #WO_INSP_PANELS} **刻意分开**:那张表还用来给「检验项目维护」入口定位面板
+     * (见 buildDocConfig 里的 WO_INSP_PANELS 注入),把工艺路线塞进去会连维护入口一起下发。
+     *
+     * <p>工艺路线(ROUTE)2026-10-29 用户口径:「给这个工艺路线下发删除单据」——
+     * 它是 doc 面板(表头 + 工序明细,head_table=NULL 单表式)但没有 PANDA_BUTTONS 基准,
+     * 走兜底分支时原来只给「删除」(勾选明细行删除),整张路线单没有删除入口。
+     * 引擎侧能力本已具备(前端 engine.deleteForms → /api/px/deleteForms → ButtonService.delete),
+     * 这里只补下发。注意语义:仅**草稿**可整单删除(已审核需先弃审),且作废的是单据状态,
+     * 不替代明细行删除。
+     */
+    private static final java.util.Set<String> DELETE_DOC_PANELS = java.util.Set.of(
+            "QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP", "ROUTE");
 
     /**
      * 「取出货检验计划」(RD_INSP_PLAN)入口下发的面板集 —— **不含首件检验单**:

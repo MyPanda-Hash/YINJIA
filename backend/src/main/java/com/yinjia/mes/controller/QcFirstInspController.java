@@ -8,7 +8,6 @@ import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.WoInspGateGuard;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -241,7 +240,9 @@ public class QcFirstInspController {
             if (!shop.isEmpty() && !shop.get(0).isBlank()) head.put("生产车间", shop.get(0));
         }
         if (items.docNo() != null) head.put("工艺清单单号", items.docNo());
-        head.put("检验员", currentUser());
+        // 检验员不在这里预填(2026-10-21 用户口径「默认当前电脑端的用户」):统一由
+        // ButtonService.defaultQcInspector 在保存时按**当前登录人姓名**填(空值/历史 system 占位才填);
+        // 这里再写账号名会把姓名盖成 username。
         head.put("detail", Map.of("items", items.rows()));
         Map<String, Object> saved = buttonService.save(registry.panel(PANEL), head, false);
         return ApiResult.ok(created(str(saved.get("编号")), false));
@@ -270,11 +271,6 @@ public class QcFirstInspController {
         } catch (NumberFormatException e) {
             return null;
         }
-    }
-
-    private static String currentUser() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth == null || auth.getName() == null || auth.getName().isBlank() ? "system" : auth.getName();
     }
 
     /** 调用方 IP(门禁留痕用;与 PxController 同一写法) */

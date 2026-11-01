@@ -1,0 +1,35 @@
+== 表 yj_role_panel ==
+公共列 5  键 [role_id, panel_code]  比对列 3
+行数: 服务器=1155  本地=762  键数: 1155/762
+
+---- ① 仅A(键只在服务器) ----
+   1042~BARCODE_FIN   [panel_code=BARCODE_FIN, role_id=1042]
+   1042~BARCODE_MAT   [panel_code=BARCODE_MAT, role_id=1042]
+   1042~BARCODE_SCAN_PICK   [panel_code=BARCODE_SCAN_PICK, role_id=1042]
+   1042~BARCODE_WIP   [panel_code=BARCODE_WIP, role_id=1042]
+   1042~CGD   [panel_code=CGD, role_id=1042]
+   ...(共 423 个键,已截断)
+
+---- ② 仅B(键只在本地) ----
+   1029~BARCODE_SCAN_PICK   [panel_code=BARCODE_SCAN_PICK, role_id=1029]
+   1031~BARCODE_SCAN_PICK   [panel_code=BARCODE_SCAN_PICK, role_id=1031]
+   1031~CGD   [panel_code=CGD, role_id=1031]
+   1031~DC_CONFIG   [panel_code=DC_CONFIG, role_id=1031]
+   1031~DC_MONITOR   [panel_code=DC_MONITOR, role_id=1031]
+   ...(共 30 个键,已截断)
+
+---- ③ 同键内容不同 ----
+   1029~BARCODE_FIN   [panel_code=BARCODE_FIN, role_id=1029]
+        id: 6141 -> 5472
+   1029~BARCODE_MAT   [panel_code=BARCODE_MAT, role_id=1029]
+        id: 6157 -> 5488
+   1029~BARCODE_WIP   [panel_code=BARCODE_WIP, role_id=1029]
+        id: 6169 -> 5500
+   1029~DASHBOARD   [panel_code=DASHBOARD, role_id=1029]
+        id: 6109 -> 5441
+   1029~DC_CONFIG   [panel_code=DC_CONFIG, role_id=1029]
+        id: 6174 -> 5636
+   同键行数不同(重复行/改键)=0 键;  内容不同的行=138
+   (上面只列了前 5 行)
+   按列统计(命中行数): {can_approve=15, id=138, perms=15}
+RESULT: DONE

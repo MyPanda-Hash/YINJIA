@@ -100,7 +100,7 @@ const modules = [
     code: 'prod', name: '生产管理', icon: 'SetUp', color: '#2f6fed',
     nodes: [
       { code: 'SO_ORDER', label: '销售订单' },
-      { code: 'MANU_ORDER', label: '生产工单' },
+      { code: 'WORK_ORDER_LIST', label: '生产工单' },
       { code: 'PROCESS_REPORT', label: '工序汇报单' },
       { code: 'TRANSFER', label: '调拨单' },
       { code: 'MATERIAL_REQ', label: '领料申请单' },
@@ -109,26 +109,26 @@ const modules = [
       { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
     ],
     edges: [
-      { from: 'SO_ORDER', to: 'MANU_ORDER' },
-      { from: 'MANU_ORDER', to: 'PROCESS_REPORT' },
-      { from: 'MANU_ORDER', to: 'MATERIAL_REQ' },
-      { from: 'MANU_ORDER', to: 'TRANSFER' },
-      { from: 'MANU_ORDER', to: 'MATERIAL_OUT' },
-      { from: 'MANU_ORDER', to: 'FINISH_IN' },
-      { from: 'MANU_ORDER', to: 'PU_REQ_ANALYSIS' },
+      { from: 'SO_ORDER', to: 'WORK_ORDER_LIST' },
+      { from: 'WORK_ORDER_LIST', to: 'PROCESS_REPORT' },
+      { from: 'WORK_ORDER_LIST', to: 'MATERIAL_REQ' },
+      { from: 'WORK_ORDER_LIST', to: 'TRANSFER' },
+      { from: 'WORK_ORDER_LIST', to: 'MATERIAL_OUT' },
+      { from: 'WORK_ORDER_LIST', to: 'FINISH_IN' },
+      { from: 'WORK_ORDER_LIST', to: 'PU_REQ_ANALYSIS' },
       { from: 'MATERIAL_REQ', to: 'TRANSFER' },
       { from: 'MATERIAL_REQ', to: 'MATERIAL_OUT' },
       { from: 'TRANSFER', to: 'MATERIAL_OUT' },
     ],
     pos: {
       SO_ORDER: [470, 60],
-      MANU_ORDER: [470, 180],
+      WORK_ORDER_LIST: [470, 180],
       TRANSFER: [20, 330], PROCESS_REPORT: [920, 330], FINISH_IN: [1220, 330],
       MATERIAL_REQ: [470, 480], PU_REQ_ANALYSIS: [920, 480],
       MATERIAL_OUT: [20, 630],
     },
     docs: [
-      { code: 'MANU_ORDER', label: '生产工单' }, { code: 'PROCESS_REPORT', label: '工序汇报单' },
+      { code: 'WORK_ORDER_LIST', label: '生产工单' }, { code: 'PROCESS_REPORT', label: '工序汇报单' },
       { code: 'TRANSFER', label: '调拨单' }, { code: 'MATERIAL_REQ', label: '领料申请单' },
       { code: 'MATERIAL_OUT', label: '材料出库单' }, { code: 'FINISH_IN', label: '产成品入库单' },
       { code: 'SO_ORDER', label: '销售订单' }, { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
@@ -381,7 +381,7 @@ const modules = [
       { code: 'ARRIVAL_IN', label: '到货单' },
       { code: 'INSPECTION', label: '来料/成品检验单' },
       { code: 'PURCHASE_IN', label: '采购入库单' },
-      { code: 'MANU_ORDER', label: '生产工单' },
+      { code: 'WORK_ORDER_LIST', label: '生产工单' },
       { code: 'FINISH_INSPECT', label: '成品报检单' },
       { code: 'FINISH_IN', label: '产成品入库单' },
       { code: 'FIRST_INSPECT', label: '首件报检单' },
@@ -393,17 +393,17 @@ const modules = [
       { from: 'PU_ORDER', to: 'ARRIVAL_IN' },
       { from: 'ARRIVAL_IN', to: 'INSPECTION' },
       { from: 'INSPECTION', to: 'PURCHASE_IN' },
-      { from: 'MANU_ORDER', to: 'FINISH_INSPECT' },
+      { from: 'WORK_ORDER_LIST', to: 'FINISH_INSPECT' },
       { from: 'FINISH_INSPECT', to: 'INSPECTION' },
       { from: 'INSPECTION', to: 'FINISH_IN' },
-      { from: 'MANU_ORDER', to: 'FIRST_INSPECT' },
+      { from: 'WORK_ORDER_LIST', to: 'FIRST_INSPECT' },
       { from: 'FIRST_INSPECT', to: 'INSPECTION' },
       { from: 'PROCESS_REPORT', to: 'PROCESS_INSPECT_APPLY' },
       { from: 'PROCESS_INSPECT_APPLY', to: 'PROCESS_INSPECTION' },
     ],
     pos: {
       PU_ORDER: [40, 80], ARRIVAL_IN: [360, 80], INSPECTION: [690, 190], PURCHASE_IN: [1030, 80],
-      MANU_ORDER: [40, 260], FINISH_INSPECT: [360, 220], FINISH_IN: [1030, 260],
+      WORK_ORDER_LIST: [40, 260], FINISH_INSPECT: [360, 220], FINISH_IN: [1030, 260],
       FIRST_INSPECT: [360, 360], PROCESS_REPORT: [40, 500], PROCESS_INSPECT_APPLY: [360, 500], PROCESS_INSPECTION: [690, 500],
     },
     docs: [
@@ -471,8 +471,16 @@ function onNodeClick({ node }) {
   go(node.data.code)
 }
 
+/** 页面级虚拟面板(无 yj_panel 行,不是 /panelx/list/<code> 页面)—— 2026-10-28 生产工单迁到列表页后必须有映射 */
+const PAGE_ROUTES = {
+  WORK_ORDER_LIST: '/prod/plan/workOrderList',
+  ORDER_CONVERT: '/prod/plan/orderConvert',
+  SCHEDULE_BOARD: '/prod/plan/scheduleBoard',
+  WORK_ORDER_BOARD: '/prod/plan/workOrderBoard',
+}
+
 function go(code) {
-  const path = '/panelx/list/' + code
+  const path = PAGE_ROUTES[code] || '/panelx/list/' + code
   router.push(path)
   tabs.open({ path, title: code })
 }

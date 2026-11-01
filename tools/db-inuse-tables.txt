@@ -1,4 +1,4 @@
-﻿# tools/db-inuse-tables.txt — 「确定下来的后台表」在册登记
+# tools/db-inuse-tables.txt — 「确定下来的后台表」在册登记
 #
 # 依据:2026-09-29 四源审计(①) yj_panel 面板绑定且面板在运营 ② 在运营视图依赖 ③ backend/src/main/java
 #   + frontend/src 运行期 SQL 引用 ④ 业务数据行)。判定口径与逐表证据:tools/archive/_table-audit/
@@ -289,3 +289,16 @@ table:bs_dc_sample   # 数采采集流水(网关上报的实时数据,只增不�
 table:bs_dc_alarm   # 数采报警记录(阈值超限等 + 处理留痕)
 table:bs_dc_status_log   # 数采在线状态日志(在线率统计依据)
 table:wo_pick_line   # 手机扫码·生产领料 领料明细(2026-11-01:一行=领料单的一项用料;需求数量=BOM单件用量×工单数量,实领数量=扫码确认后才写;提交后才据此生成材料出库单;**不参与库存增减**)
+
+# ── 以下条目由远端(origin/main)合并带入,原文件里没有 ──
+table:rd_x_sinter_detail   # X烧结工艺清单行表(面板 RD_X_SINTER,2026-10-30 新增):表区=配方表(10 行物料)/修订记录
+table:rd_x_sinter_head   # X烧结工艺清单头表(2026-10-30 新增):产品基本信息+模具参数+配方计算器输出五段+管控要求
+table:wo_day_plan   # 工单日排产(2026-10-29:生产工单/工单排产两页表格内的日期列;一行=工单行×工序×计划日期→计划数量,实际完成量仍取报工 scjl)
+table:wo_proc_card_head   # 工序流程追踪卡·卡头(2026-10-29:一张卡=日期大批次下的一个小批次=一个工单行;照片挂 yj_attachment,完成情况按已审核报工 scjl 现算)
+table:wo_proc_card_detail   # 工序流程追踪卡·工序行(卡的各道工序,来源=工序台账 wo_process_line;完成量/状态/完成时间不落库,查询现算)
+view:v_prod_pick_list   # 生产领料只读视图(dbo.outh src=6 材料出库未删除流水行;PROD_PICK_LIST。2026-10-22 链外建置、脚本遗失,2026-10-25 由 migrate-prod-pick-outh-20261022.sql 补登记进链)
+table:bs_asm_bom   # 组装物料清单(工序BOM子件行;单表 doc 模式按 BOM编码 分组,一行=产品某工序的一个子件;本期工序=组装;数据来源=金蝶BOM引出列表_20261019174847)
+table:qc_oqc_head       # 出厂检验报告头表(一份=一个产品;销售出库勾选触发生成;取三张检验单并集)
+table:qc_oqc_detail     # 出厂检验报告行表(序号/检验项目/要求/抽样标准/抽检量/测量值1..5/结果/判定/数据来源)
+table:qc_oqc_item_map   # 出厂检验项目对齐表(报告项目 ← 源面板+源表区+源项目名,按优先级取第一个有值的)
+view:v_oqc_std          # 出厂检验标准层只读视图(取自 rd_insp_plan_head/_detail;不改计划表任何一列)

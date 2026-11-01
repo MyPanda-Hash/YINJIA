@@ -1,0 +1,17 @@
+what | 子件编码 | inv_rows | inv_rows_with_unit
+-------------------------------------------
+test-bs_inv命中 | B-85-07**TB | 0 | 0
+test-bs_inv命中 | YJ-GL-047 | 0 | 0
+test-bs_inv命中 | YJ-GL-048 | 0 | 0
+test-bs_inv命中 | YJ-GL-049 | 0 | 0
+test-bs_inv命中 | YJ-JPL-068 | 0 | 0
+test-bs_inv命中 | YJ-KG-JC-B03 | 0 | 0
+test-bs_inv命中 | YJ-TB-011 | 0 | 0
+test-bs_inv命中 | YJ-TB-012 | 0 | 0
+test-bs_inv命中 | YJ-TB-013 | 0 | 0
+test-bs_inv命中 | YJ-YCYX-055 | 0 | 0
+(10 行)
+what | cnt
+----------
+test-bs_inv总行 | 3899
+(1 行)
