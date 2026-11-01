@@ -147,6 +147,9 @@ const locateText = ref('')
 const locateLoading = ref(false)
 const errText = ref('')
 const okText = ref('')
+/** 点了「扫码」后是否还在等壳回调 —— 用来兜底提示"没收到扫码结果"(2026-11-01) */
+let scanPending = false
+let scanTimer = null
 const openOpen = ref(true)
 const openDone = ref(false)
 
@@ -161,14 +164,24 @@ const baseUrl = (() => {
 /** 本页只有一种扫码目标:**定位单据**(生单已移到独立面板) */
 function scanInto() {
   if (!(window.YjNative && typeof window.YjNative.scan === 'function')) {
-    errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+    showErr(tt('调不起相机,请改用输入框扫码枪或手工输入'))
     return
   }
   try {
     window.YjNative.scan()
   } catch {
-    errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+    showErr(tt('调不起相机,请改用输入框扫码枪或手工输入'))
+    return
   }
+  // ── 兜底:壳里回调可能根本不来(相机权限被拒、原生扫码页崩了、WebView 被回收…)
+  //    那时页面就是"点了扫码,什么也没发生"。等 10 秒还没回调,主动告诉人一声。
+  scanPending = true
+  if (scanTimer) clearTimeout(scanTimer)
+  scanTimer = setTimeout(() => {
+    if (!scanPending) return
+    scanPending = false
+    showErr(tt('没有收到扫码结果:请确认相机权限已允许;也可以直接用扫码枪扫进输入框'))
+  }, 10000)
 }
 
 /**
@@ -181,14 +194,44 @@ function applyScan(code) {
   const text = String(code || '').trim()
   if (!text) return
   const p = parseWorkOrderCode(text)
-  if (!p.ok) { errText.value = tt('这个码里没有工单号'); return }
+  if (!p.ok) { showErr(tt('这个码里没有工单号') + ':' + text); return }
   locateText.value = p.wo
   locate(p.line)
 }
 
+/**
+ * 顶部的红字提示 —— 同时**把页面滚到顶部**。
+ *
+ * 用户 2026-11-01 报障「扫码后没反应」:提示本来写在页面顶部的 `mp-err` 里,
+ * 但现场人是在**中间那条扫码框**上操作,手机屏小、提示常常在视野之外,
+ * 于是"其实提示了、他看不见" ⇒ 看起来就是没反应。
+ * 所以这里除了写提示,还要把人拽回顶部;手机壳里再补一声 toast(更显眼)。
+ */
+function showErr(msg) {
+  errText.value = msg
+  clearOk()
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch { /* 老 WebView 没有 options */ }
+  try {
+    if (window.YjNative && typeof window.YjNative.toast === 'function') window.YjNative.toast(msg)
+  } catch { /* 壳里没有 toast 也不影响 */ }
+}
+
+function clearOk() { okText.value = '' }
+
 onMounted(() => {
+  /**
+   * 扫码壳回调(Android MainActivity 在 onActivityResult 里 evaluateJavascript 调它)。
+   *
+   * ⚠ `ok=false` 分支**不能静默 return**(2026-11-01):相机取消、码没识别出来、
+   * 权限被拒,many 种情况都会走到这里,静默就是"点了扫码啥也没发生"。
+   */
   window.__yjScanResult = (code, ok) => {
-    if (!ok || !code) return
+    scanPending = false
+    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
+    if (!ok || !String(code || '').trim()) {
+      showErr(tt('没有识别到二维码,请重试;也可以直接用扫码枪扫进下面的输入框'))
+      return
+    }
     applyScan(code)
   }
   loadList()
@@ -247,7 +290,7 @@ async function loadList() {
 async function locate(line) {
   const kw = String(locateText.value || '').trim()
   clearMsg()
-  if (!kw) { errText.value = tt('请先扫描或输入工单号'); return }
+  if (!kw) { showErr(tt('请先扫描或输入工单号')); return }
   locateLoading.value = true
   try {
     const res = await request.get('/px/mobilePick/locate', {
@@ -260,7 +303,7 @@ async function locate(line) {
     }
     if (d.hint === 'multi-line' && Array.isArray(d.candidates) && d.candidates.length) {
       // 工单号下有多行,且都开过单 ⇒ 让用户选一行(不替他猜)
-      errText.value = `${tt('该工单有多个工单行已开单,请点下面任意一行打开')}`
+      showErr(`${tt('该工单有多个工单行已开单,请点下面任意一行打开')}`)
       list.open = d.candidates.map((c) => ({
         id: c.id, 工单号: kw, 工单行号: c.工单行号, 领料单号: '', 状态: tt('未完成'),
         已领项数: 0, 物料项数: 0, 产品名称: '', 创建人: '', 创建时间: '',
@@ -268,9 +311,9 @@ async function locate(line) {
       openOpen.value = true
       return
     }
-    errText.value = tt('该工单行还没有开过领料单:请在上面「生成工单领料/退料单」里扫一次工单')
+    showErr(tt('该工单行还没有开过领料单:请在上面「生成工单领料/退料单」里扫一次工单') + ' (' + kw + ')')
   } catch (e) {
-    errText.value = errMsgOf(e) || tt('查询失败')
+    showErr(errMsgOf(e) || tt('查询失败'))
   } finally {
     locateLoading.value = false
   }
