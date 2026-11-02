@@ -164,7 +164,12 @@ function Send-LabelToPrinter {
         [string]$PdfPath = '',
         # 二维码图的 dataURL(2026-11-01):前端用 qrcode 库生成好传上来,这里直接贴进标签。
         # 空 = 不贴码(退回纯文字版,不让整张标签因为缺图而失败)。
-        [string]$QrImage = ''
+        [string]$QrImage = '',
+        # 纸面「领料单」用的抬头与明细(2026-11-02):明细行 = 材料名称/规格/单位/请领数量/实发数量/备注
+        [string]$OutNo = '',
+        [string]$Dept = '',
+        [string]$PrintDate = '',
+        [array]$Rows = @()
     )
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 
@@ -241,63 +246,118 @@ function Send-LabelToPrinter {
     $script:pSpec  = $Spec
     $script:pQrTxt = $QrText
     $script:labelQr = $qrImg
+    $script:pOutNo = $OutNo
+    $script:pDept  = $Dept
+    $script:pDate  = $PrintDate
+    $script:pRows  = @($Rows)
 
     $doc.add_PrintPage({
         param($sender, $e)
+        try {
         $g = $e.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
-        $W = $script:W100
-        $H = $script:H100
+        $pageW = 827   # 210mm
+        $pageH = 583   # 148mm
+        $black = [System.Drawing.Brushes]::Black
+        $gray  = [System.Drawing.Brushes]::DimGray
 
-        # ① 边框(红框):二维码与所有文字都画在框内,留 16 的内边距
-        $margin = 16
-        $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(210, 30, 30), 3)
-        $g.DrawRectangle($pen, $margin, $margin, $W - 2 * $margin, $H - 2 * $margin)
-        $pen.Dispose()
-
-        $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei', 22, [System.Drawing.FontStyle]::Bold)
-        $fontLabel = New-Object System.Drawing.Font('Microsoft YaHei', 12)
-        $fontValue = New-Object System.Drawing.Font('Microsoft YaHei', 13, [System.Drawing.FontStyle]::Bold)
-        $fontSmall = New-Object System.Drawing.Font('Microsoft YaHei', 10)
-
-        # ② 标题(整幅居中)
+        $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei', 24, [System.Drawing.FontStyle]::Bold)
+        $fontNo    = New-Object System.Drawing.Font('Microsoft YaHei', 13, [System.Drawing.FontStyle]::Bold)
+        $fontHead  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5, [System.Drawing.FontStyle]::Bold)
+        $fontCell  = New-Object System.Drawing.Font('Microsoft YaHei', 10)
+        $fontFoot  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5)
+        $penLine   = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 1.6)
         $fmtC = New-Object System.Drawing.StringFormat
         $fmtC.Alignment = [System.Drawing.StringAlignment]::Center
-        $titleRect = New-Object System.Drawing.RectangleF(0, 40, $W, 60)
-        $g.DrawString($script:pTitle, $fontTitle, [System.Drawing.Brushes]::Black, $titleRect, $fmtC)
+        $fmtL = New-Object System.Drawing.StringFormat
+        $fmtL.Alignment = [System.Drawing.StringAlignment]::Near
 
-        # ③ 二维码:放右侧(框内),200x200
-        $qrSize = 200
-        $qrX = $W - $margin - 40 - $qrSize
-        $qrY = 120
-        if ($script:labelQr) {
-            $g.DrawImage($script:labelQr, $qrX, $qrY, $qrSize, $qrSize)
+        # ① 左上角二维码(用户样张的"红框"位置):码 + 细红框
+        $qrSize = 132
+        if ($script:labelQr) { $g.DrawImage($script:labelQr, 26, 20, $qrSize, $qrSize) }
+        # 二维码外框:纸表风格细黑框(样张上的红框是用户标注,纸面本身是黑线表格)
+        $g.DrawRectangle($penLine, 22, 16, $qrSize + 8, $qrSize + 8)
+
+        # ② 标题居中 + 右上 No 单号
+        $titleRect = New-Object System.Drawing.RectangleF(0, 26, $pageW, 60)
+        $g.DrawString($script:pTitle, $fontTitle, $black, $titleRect, $fmtC)
+        $noText = 'No ' + $script:pOutNo
+        $g.DrawString($noText, $fontNo, $black, 590, 40)
+
+        # ③ 领料部门 / 日期
+        $g.DrawString('领料部门:', $fontFoot, $gray, 26, 166)
+        $g.DrawString($script:pDept, $fontCell, $black, 112, 166)
+        $g.DrawString('日期:', $fontFoot, $gray, 590, 166)
+        $g.DrawString($script:pDate, $fontCell, $black, 638, 166)
+
+        # ④ 明细表格:七列,行数按明细补足到 8 行(纸表是固定格子)
+        $x0 = 22
+        $y0 = 200
+        $colW = @(110, 200, 130, 55, 100, 100, 85)
+        $totalW = 0
+        foreach ($cw in $colW) { $totalW += $cw }
+        $headH = 40
+        $rows = @($script:pRows)
+        $rowCount = [Math]::Max(8, $rows.Count)
+        if ($rowCount -gt 12) { $rowCount = 12 }
+        $tableH = $pageH - 70 - $y0
+        $rowH = [Math]::Floor(($tableH - $headH) / $rowCount)
+
+        $g.DrawRectangle($penLine, $x0, $y0, $totalW, $headH + $rowH * $rowCount)
+        $cx = $x0
+        for ($i = 0; $i -lt $colW.Count - 1; $i++) {
+            $cx += $colW[$i]
+            $g.DrawLine($penLine, $cx, $y0, $cx, $y0 + $headH + $rowH * $rowCount)
+        }
+        $g.DrawLine($penLine, $x0, $y0 + $headH, $x0 + $totalW, $y0 + $headH)
+        for ($ri = 1; $ri -lt $rowCount; $ri++) {
+            $yy = $y0 + $headH + $rowH * $ri
+            $g.DrawLine($penLine, $x0, $yy, $x0 + $totalW, $yy)
         }
 
-        # ④ 左侧字段(标签灰、值黑加粗;用固定列宽对齐,不用制表符)
-        $xLabel = 60
-        $xValue = 175
-        $y = 130
-        $rowGap = 52
-        $fields = @(
-            @{ k = '工单号';   v = $script:pWoNo },
-            @{ k = '工单行号'; v = $script:pLine },
-            @{ k = '产　　品'; v = $script:pProd },
-            @{ k = '规　　格'; v = $script:pSpec }
-        )
-        foreach ($f in $fields) {
-            $g.DrawString(($f.k + ':'), $fontLabel, [System.Drawing.Brushes]::DimGray, $xLabel, $y)
-            $g.DrawString($f.v, $fontValue, [System.Drawing.Brushes]::Black, $xValue, $y - 1)
-            $y += $rowGap
+        $heads = @('订单号', '材料名称', '规格', '单位', '请领数量', '实发数量', '备注')
+        $cx = $x0
+        for ($i = 0; $i -lt $heads.Count; $i++) {
+            $rect = New-Object System.Drawing.RectangleF($cx, ($y0 + 9), ($colW[$i]), ($headH - 12))
+            $g.DrawString($heads[$i], $fontHead, $black, $rect, $fmtC)
+            $cx += $colW[$i]
         }
 
-        # ⑤ 底部扫码内容(框内左下)
-        $g.DrawString('扫码内容(与工单二维码同值):', $fontSmall, [System.Drawing.Brushes]::DimGray, $xLabel, $H - 110)
-        $g.DrawString($script:pQrTxt, $fontSmall, [System.Drawing.Brushes]::Black, $xLabel, $H - 82)
+        for ($ri = 0; $ri -lt $rowCount; $ri++) {
+            $yy = $y0 + $headH + $rowH * $ri
+            $vals = @('', '', '', '', '', '', '')
+            if ($ri -lt $rows.Count) {
+                $row = $rows[$ri]
+                $q1 = ''
+                $q2 = ''
+                if ([double]$row.'请领数量' -gt 0) { $q1 = [string]$row.'请领数量' }
+                if ([double]$row.'实发数量' -gt 0) { $q2 = [string]$row.'实发数量' }
+                $vals = @($script:pWoNo, [string]$row.'材料名称', [string]$row.'规格', [string]$row.'单位', $q1, $q2, [string]$row.'备注')
+            }
+            $cx = $x0
+            for ($i = 0; $i -lt 7; $i++) {
+                $rect = New-Object System.Drawing.RectangleF(($cx + 4), ($yy + 7), ($colW[$i] - 8), ($rowH - 10))
+                $g.DrawString($vals[$i], $fontCell, $black, $rect, $fmtL)
+                $cx += $colW[$i]
+            }
+        }
 
-        $fmtC.Dispose()
-        $fontTitle.Dispose(); $fontLabel.Dispose(); $fontValue.Dispose(); $fontSmall.Dispose()
+        # ⑤ 底部四栏签名
+        $fy = $y0 + $headH + $rowH * $rowCount + 20
+        $g.DrawString('部门主管:', $fontFoot, $gray, 26, $fy)
+        $g.DrawString('仓库主管:', $fontFoot, $gray, 230, $fy)
+        $g.DrawString('领料人:', $fontFoot, $gray, 440, $fy)
+        $g.DrawString('仓管员:', $fontFoot, $gray, 630, $fy)
+
+        $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose()
+        $fontTitle.Dispose(); $fontNo.Dispose(); $fontHead.Dispose(); $fontCell.Dispose(); $fontFoot.Dispose()
+        } catch {
+            $msg = $_.Exception.Message
+            Write-Host "[绘制失败] $msg" -ForegroundColor Red
+            Write-Host "  堆栈: $($_.ScriptStackTrace)" -ForegroundColor DarkYellow
+            throw
+        }
     })
     $doc.Print()
     if ($qrImg) { $qrImg.Dispose() }
@@ -313,6 +373,13 @@ function Invoke-PrintJob {
     $spec     = [string]($Job.'规格型号')
     $qrText   = [string]($Job.'二维码内容')
     $qrImage  = [string]($Job.'二维码图')
+    # 纸面抬头与明细(2026-11-02):没有就留空,表格照画(纸表永远有格子)
+    $outNo    = [string]($Job.'领料单号')
+    $dept     = [string]($Job.'领料部门')
+    $printDt  = [string]($Job.'打印日期')
+    if (-not $printDt) { $printDt = (Get-Date -Format 'yyyy-MM-dd') }
+    $rows     = @()
+    if ($Job.'明细') { $rows = @($Job.'明细') }
     $printerN = [string]($Job.'printer')
     if (-not $qrText) {
         if ($woNo) {
@@ -334,7 +401,8 @@ function Invoke-PrintJob {
         $name = "$safeWo" + "_L$woLine" + "_$stamp.pdf"
         $path = Join-Path $PdfDir $name
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
-                            -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path
+                            -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path `
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
         return $path
     }
 
@@ -349,7 +417,8 @@ function Invoke-PrintJob {
     # ── Printer 模式:真出纸 ────────────────────────────────────────
     if ($Mode -eq 'Printer') {
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
-                            -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN
+                            -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN `
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
         return @{ ok = $true; mode = 'printer'; printer = $printerN }
     }
 
@@ -365,7 +434,8 @@ function Invoke-PrintJob {
             return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir; fallback = 'no-printer' }
         }
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
-                            -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real
+                            -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real `
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
         return @{ ok = $true; mode = 'printer'; printer = $real }
     } catch {
         $why = $_.Exception.Message

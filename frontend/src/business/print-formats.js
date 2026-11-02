@@ -492,40 +492,65 @@ export async function printWoQr(payload, opts = {}) {
     qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
   } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
 
-  const title = String(p['标题'] ?? '').trim() || '生产领料单'
+  const title = String(p['标题'] ?? '').trim() || '领料单'
   const line = Number(p['工单行号']) || 0
-  const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
+  const outNo = String(p['领料单号'] ?? '').trim()
+  const dept = String(p['领料部门'] ?? '').trim()
+  const printDate = String(p['打印日期'] ?? '').trim() || new Date().toISOString().slice(0, 10)
+  // 明细行(纸表七列);后端 /mobilePick/reprint 已带「明细」,旧载荷没有就当空表
+  const rows = Array.isArray(p['明细']) ? p['明细'] : []
+  const cell = (v) => (v === 0 || v ? esc(String(v)) : '')
+  const fmtQty = (v) => (Number(v) > 0 ? String(Math.round(Number(v) * 10000) / 10000) : '')
+  const bodyRows = []
+  for (let i = 0; i < Math.max(8, Math.min(12, rows.length)); i++) {
+    const r = rows[i] || {}
+    bodyRows.push('<tr>'
+      + `<td>${esc(woNo)}</td>`
+      + `<td>${cell(r['材料名称'])}</td>`
+      + `<td>${cell(r['规格'])}</td>`
+      + `<td>${cell(r['单位'])}</td>`
+      + `<td class="num">${fmtQty(r['请领数量'])}</td>`
+      + `<td class="num">${fmtQty(r['实发数量'])}</td>`
+      + `<td>${cell(r['备注'])}</td>`
+      + '</tr>')
+  }
+  // 🔴 2026-11-02 用户口径:照**纸质领料单**的样子出(用户给了样张照片)——
+  //   左上角放二维码、标题「领 料 单」+ 右上 No 单号、七列明细表格、底部四栏签名。
+  //   纸张 = 中一刀 210mm x 148.5mm 横打。
   const body = '<style>'
-    // 🔴 2026-11-02 用户口径:「改成图片的样式,二维码放在红框内;打印大小是中一刀,A4 一半,横打」。
-    //   中一刀 = 210mm × 148.5mm 横版;红框画在纸内,二维码与所有文字都压在框里。
-    //   与本地打印代理(tools/printing/print-agent.ps1)同一套版式 ——
-    //   代理用「A5 横放」(210×148) 出 PDF/纸,浏览器打印这里用 210×148.5mm 自定义页。
     + '@page{size:210mm 148.5mm;margin:0}'
-    + '.card{width:210mm;height:148.5mm;box-sizing:border-box;border:1mm solid #d02020;'
-    + 'padding:6mm 8mm;position:relative;page-break-after:always;background:#fff;'
-    + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#111}'
+    + '.card{width:210mm;height:148.5mm;box-sizing:border-box;padding:5mm 6mm;'
+    + 'position:relative;page-break-after:always;background:#fff;'
+    + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#000}'
     + '.card:last-child{page-break-after:auto}'
-    + '.card .t{font-size:20pt;font-weight:700;text-align:center;letter-spacing:3mm;margin:2mm 0 5mm}'
-    + '.card .fields{width:120mm}'   // 给右侧二维码让位
-    + '.card .f{display:flex;align-items:flex-end;margin:3.6mm 0;line-height:1.3;font-size:12pt}'
-    + '.card .f .lb{flex:none;white-space:nowrap;color:#555}'
-    + '.card .f .v{flex:1 1 auto;border-bottom:0.3mm solid #333;padding:0 1mm 0.6mm;'
-    + 'font-size:12.5pt;font-weight:700;word-break:break-all;overflow-wrap:anywhere}'
-    // 二维码放右上,坐标都在红框内(框内边距 6mm/8mm)
-    + '.card .qr{position:absolute;right:9mm;top:26mm;width:52mm;height:52mm}'
-    + '.card .qr img{width:52mm;height:52mm;display:block}'
-    + '.card .code{position:absolute;left:9mm;bottom:8mm;font-size:9pt;color:#444;'
-    + 'max-width:110mm;word-break:break-all}'
+    + '.qr{position:absolute;left:6mm;top:5mm;width:34mm;height:34mm;border:0.35mm solid #000}'
+    + '.qr img{width:100%;height:100%;display:block}'
+    + '.t{text-align:center;font-size:22pt;font-weight:700;letter-spacing:5mm;margin:1mm 0 0}'
+    + '.no{position:absolute;right:8mm;top:7mm;font-size:12pt;font-weight:700}'
+    + '.meta{margin:2mm 0 1.5mm 38mm;font-size:10.5pt}'
+    + '.meta .d{float:right;margin-right:2mm}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:9.5pt;'
+    + 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
+    + 'th{font-weight:700;text-align:center;height:7mm}'
+    + 'td{height:6.4mm}'
+    + 'td.num{text-align:right}'
+    + '.sign{margin-top:2.5mm;font-size:10.5pt;display:flex;justify-content:space-between}'
     + 'body{margin:0;background:#fff}'
     + '</style>'
     + '<div class="card">'
-    + `<div class="t">${esc(title)}</div>`
-    + '<div class="fields">'
-    + f('工单号', woNo) + f('工单行号', line ? `#${line}` : '')
-    + f('产　　品', p['产品名称']) + f('规　　格', p['规格型号'])
-    + '</div>'
     + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
-    + `<div class="code">扫码内容(与工单二维码同值): ${esc(qrText)}</div>`
+    + `<div class="no">No ${esc(outNo || '-')}</div>`
+    + `<div class="t">${esc(title)}</div>`
+    + `<div class="meta">领料部门:${esc(dept)}<span class="d">日期:${esc(printDate)}</span></div>`
+    + '<table>'
+    + '<colgroup><col style="width:13%"><col style="width:25%"><col style="width:16%">'
+    + '<col style="width:7%"><col style="width:12%"><col style="width:12%"><col style="width:15%"></colgroup>'
+    + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
+    + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
+    + `<tbody>${bodyRows.join('')}</tbody>`
+    + '</table>'
+    + '<div class="sign"><span>部门主管:</span><span>仓库主管:</span><span>领料人:</span><span>仓管员:</span></div>'
     + '</div>'
 
   // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调

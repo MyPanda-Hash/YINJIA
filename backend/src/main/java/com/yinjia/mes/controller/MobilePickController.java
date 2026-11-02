@@ -454,7 +454,7 @@ public class MobilePickController {
         // 这里只把"要打什么"回给前端 —— 真正的出纸由前端打印通道或打印站点完成,
         // 服务端不持有打印机(服务端也可能在另一台机器上)。
         out.put("打印", wantPrint
-                ? printPayload(lineWoNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")))
+                ? printPayload(lineWoNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")), id)
                 : null);
         return out;
     }
@@ -660,7 +660,7 @@ public class MobilePickController {
         out.put("创建时间", d.createAt() == null ? "" : d.createAt().toLocalDateTime().toString().replace('T', ' '));
         out.put("提交人", d.submitter());
         out.put("提交时间", d.submitAt() == null ? "" : d.submitAt().toLocalDateTime().toString().replace('T', ' '));
-        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), ""));
+        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), "", d.id()));
 
         // 工单行信息(抬头区显示产品/产线/排产数量)
         List<Map<String, Object>> woRows = jdbc.queryForList(
@@ -1306,7 +1306,7 @@ public class MobilePickController {
         if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
         docs.bumpPrint(id, currentUserName());
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), ""));
+        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), "", d.id()));
         return ApiResult.ok(out);
     }
 
@@ -1712,7 +1712,18 @@ public class MobilePickController {
     }
 
     /** 打印载荷:工单二维码内容 + 抬头信息(前端按这个渲染标签/走打印站点) */
-    private Map<String, Object> printPayload(String woNo, int line, String productName, String spec) {
+    /**
+     * 打印载荷(纸面「领料单」用的全量数据)。
+     *
+     * <p>🔴 2026-11-02 用户口径:「改成图片的样式,二维码放在红框内;打印大小中一刀,A4 一半,横打」——
+     * 给的样张是一张**纸质领料单**:左上角红框放码、标题「领 料 单」+ No 单号、
+     * 七列表格(订单号/材料名称/规格/单位/请领数量/实发数量/备注)、底部四栏签名。
+     * 所以载荷除了抬头与二维码,**必须带明细行** —— 否则打出来只是一张空表头的纸。
+     *
+     * @param docId 台账主键;非空时按它取明细(请领=BOM需求,实发=已领)。生单/重打都传,
+     *              只有在还没有台账的极少数路径下才为空(那时明细为空,纸面就是空白表)
+     */
+    private Map<String, Object> printPayload(String woNo, int line, String productName, String spec, Long docId) {
         Map<String, Object> m = new LinkedHashMap<>();
         // 与 print-formats.woQrText 同口径:公司代码@工单号@(1000+行号);公司代码全库为 '0'
         m.put("二维码内容", "0@" + woNo + "@" + (1000 + Math.max(1, line)));
@@ -1721,7 +1732,34 @@ public class MobilePickController {
         m.put("产品名称", productName);
         m.put("规格型号", spec);
         m.put("标题", "生产领料单");
+        // 纸面抬头的「No」= 领料单号、「日期」= 单据日期
+        Map<String, String> head = new LinkedHashMap<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (docId != null) {
+            WoPickDocService.PickDoc d = docs.byId(docId);
+            if (d != null) {
+                m.put("领料单号", d.outNo());
+                m.put("状态", d.state());
+                m.put("打印日期", java.time.LocalDate.now().toString());
+                // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
+                for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("材料名称", str(it.get("名称")));
+                    row.put("规格", str(it.get("规格")));
+                    row.put("单位", str(it.get("单位")));
+                    row.put("请领数量", num(it.get("BOM用量")));
+                    row.put("实发数量", num(it.get("数量")));
+                    row.put("备注", str(it.get("批号")));
+                    rows.add(row);
+                }
+            }
+        }
+        m.put("明细", rows);
         return m;
+    }
+
+    private Map<String, Object> printPayload(String woNo, int line, String productName, String spec) {
+        return printPayload(woNo, line, productName, spec, null);
     }
 
     /**
