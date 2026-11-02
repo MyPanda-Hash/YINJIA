@@ -234,7 +234,7 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -344,24 +344,39 @@ function clearAll() {
 
 onMounted(() => {
   nextTick(() => woInput.value?.focus?.())
-  window.__yjScanResult = (code, ok) => { if (ok && code) applyScan(code) }
+  bindScan()
   loadWoStatus()
 })
+
+/** 本页的扫码回调(具名,便于按引用撤销别人的绑定) */
+function onScanResult(code, ok) { if (ok && code) applyScan(code) }
+
+function bindScan() {
+  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
+}
 
 /**
  * 回到本页时自动重拉(2026-11-01)。
  *
  * <p>keep-alive 会保留实例:从生产领料页返回时「已开单/未开单」还是旧的分组,
  * 刚生成过单据的工单仍显示在"未开单"里。首次挂载已由 mounted 加载,这里跳过。
+ *
+ * <p>🔴 2026-11-02:激活时必须重新绑定本页回调 —— 三个手机页共用一个
+ * `window.__yjScanResult` 槽,旧页面的回调留着会让本页扫码走错解析逻辑。
  */
 let activatedOnce = false
 onActivated(() => {
+  bindScan()
   if (!activatedOnce) { activatedOnce = true; return }
   loadWoStatus()
 })
 
+onDeactivated(() => {
+  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+})
+
 onBeforeUnmount(() => {
-  try { delete window.__yjScanResult } catch { /* ignore */ }
+  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
 })
 
 /** 刷新按钮:重拉工单列表并清提示 */

@@ -496,27 +496,36 @@ export async function printWoQr(payload, opts = {}) {
   const line = Number(p['工单行号']) || 0
   const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
   const body = '<style>'
-    + '@page{size:75mm 100mm;margin:0}'
-    + '.card{width:75mm;height:100mm;box-sizing:border-box;border:0.35mm solid #000;'
-    + 'padding:5mm 5mm 26mm 5mm;position:relative;page-break-after:always;background:#fff;'
+    // 🔴 2026-11-02 用户口径:「改成图片的样式,二维码放在红框内;打印大小是中一刀,A4 一半,横打」。
+    //   中一刀 = 210mm × 148.5mm 横版;红框画在纸内,二维码与所有文字都压在框里。
+    //   与本地打印代理(tools/printing/print-agent.ps1)同一套版式 ——
+    //   代理用「A5 横放」(210×148) 出 PDF/纸,浏览器打印这里用 210×148.5mm 自定义页。
+    + '@page{size:210mm 148.5mm;margin:0}'
+    + '.card{width:210mm;height:148.5mm;box-sizing:border-box;border:1mm solid #d02020;'
+    + 'padding:6mm 8mm;position:relative;page-break-after:always;background:#fff;'
     + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#111}'
-    + '.card .t{font-size:13pt;font-weight:700;text-align:center;letter-spacing:2mm;margin-bottom:4mm}'
-    + '.card .f{display:flex;align-items:flex-end;margin:2.2mm 0;line-height:1.3;font-size:10pt}'
-    + '.card .f .lb{flex:none;white-space:nowrap}'
-    + '.card .f .v{flex:0 1 auto;min-width:22mm;border-bottom:0.25mm solid #000;padding:0 1mm 0.4mm;'
-    + 'font-size:9.5pt;word-break:break-all;overflow-wrap:anywhere}'
-    + '.card .qr{position:absolute;right:6mm;bottom:6mm;width:20mm;height:20mm}'
-    + '.card .qr img{width:20mm;height:20mm;display:block}'
-    + '.card .code{position:absolute;left:5mm;bottom:10mm;font-size:7pt;color:#444;'
-    + 'max-width:40mm;word-break:break-all}'
+    + '.card:last-child{page-break-after:auto}'
+    + '.card .t{font-size:20pt;font-weight:700;text-align:center;letter-spacing:3mm;margin:2mm 0 5mm}'
+    + '.card .fields{width:120mm}'   // 给右侧二维码让位
+    + '.card .f{display:flex;align-items:flex-end;margin:3.6mm 0;line-height:1.3;font-size:12pt}'
+    + '.card .f .lb{flex:none;white-space:nowrap;color:#555}'
+    + '.card .f .v{flex:1 1 auto;border-bottom:0.3mm solid #333;padding:0 1mm 0.6mm;'
+    + 'font-size:12.5pt;font-weight:700;word-break:break-all;overflow-wrap:anywhere}'
+    // 二维码放右上,坐标都在红框内(框内边距 6mm/8mm)
+    + '.card .qr{position:absolute;right:9mm;top:26mm;width:52mm;height:52mm}'
+    + '.card .qr img{width:52mm;height:52mm;display:block}'
+    + '.card .code{position:absolute;left:9mm;bottom:8mm;font-size:9pt;color:#444;'
+    + 'max-width:110mm;word-break:break-all}'
     + 'body{margin:0;background:#fff}'
     + '</style>'
     + '<div class="card">'
     + `<div class="t">${esc(title)}</div>`
+    + '<div class="fields">'
     + f('工单号', woNo) + f('工单行号', line ? `#${line}` : '')
     + f('产　　品', p['产品名称']) + f('规　　格', p['规格型号'])
-    + `<div class="code">${esc(qrText)}</div>`
+    + '</div>'
     + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
+    + `<div class="code">扫码内容(与工单二维码同值): ${esc(qrText)}</div>`
     + '</div>'
 
   // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调

@@ -248,7 +248,7 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -379,10 +379,17 @@ function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 function goBack() { router.push('/panelx/list/MOBILE_PICK') }
 
 onMounted(() => {
-  window.__yjScanResult = (code, ok) => { if (ok && code) applyScan(code) }
+  bindScan()
   loadDoc()
   nextTick(() => matInput.value?.focus?.())
 })
+
+/** 本页的扫码回调(具名,便于按引用撤销别人的绑定) */
+function onScanResult(code, ok) { if (ok && code) applyScan(code) }
+
+function bindScan() {
+  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
+}
 
 /**
  * 回到本页时自动重拉(2026-11-01)。
@@ -390,9 +397,14 @@ onMounted(() => {
  * <p>keep-alive 会保留实例,从别处回来时 onMounted 不再执行;
  * 而"仓管批了没""别处退了多少"都是**外部**改的状态,不重拉就一直是旧的。
  * 首次挂载已由 mounted 加载,这里跳过以免开页面发两次请求。
+ *
+ * <p>🔴 2026-11-02:激活时**必须重新绑定本页的扫码回调**。全局只有一个
+ * `window.__yjScanResult` 槽,三个手机页都会覆盖它;从明细返回列表时
+ * 若是本页的回调还留在槽里,列表页扫工单码会被按"物料"找 ⇒ 报"找不到"。
  */
 let activatedOnce = false
 onActivated(() => {
+  bindScan()
   if (!activatedOnce) { activatedOnce = true; return }
   loadDoc()
 })
@@ -428,8 +440,12 @@ function softReset() {
   clearMsg()
 }
 
+onDeactivated(() => {
+  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+})
+
 onBeforeUnmount(() => {
-  try { delete window.__yjScanResult } catch { /* ignore */ }
+  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
 })
 
 function scanInto() {

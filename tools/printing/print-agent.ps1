@@ -189,21 +189,9 @@ function Send-LabelToPrinter {
     $lineText = ''
     if ($WoLine -gt 0) { $lineText = '#' + $WoLine }
 
-    $lines = @(
-        $Title,
-        '',
-        ('工单号: '   + $WoNo),
-        ('工单行号: ' + $lineText),
-        ('产　　品: ' + $ProductName),
-        ('规　　格: ' + $Spec),
-        '',
-        '扫码内容(与工单二维码同值):',
-        $QrText
-    )
-
     $doc = New-Object System.Drawing.Printing.PrintDocument
 
-    # ── PDF 模式(2026-11-01):不碰真打印机 ─────────────────────────────
+        # ── PDF 模式(2026-11-01):不碰真打印机 ─────────────────────────────
     # 借 Windows 自带的「Microsoft Print to PDF」虚拟打印机 + PrintToFile 把同一版式
     # **静默**落成 PDF —— 不会弹"另存为"对话框(那是普通用户点打印才有的行为)。
     # 关键三件:PrinterName 指向虚拟打印机、PrintToFile=$true、PrintFileName 给死路径。
@@ -224,27 +212,92 @@ function Send-LabelToPrinter {
     $doc.DocumentName = "YINJIA-MES $Title $WoNo"
     # StandardPrintController = 不显示进度对话框 ⇒ 真静默
     $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
+# 🔴 2026-11-02 用户口径:「打印的大小是中一刀,A4纸的一半,横打」。
+    #   中一刀 = 210mm × 148.5mm。本来想用自定义 PaperSize(827×585) 直接设,但实测
+    #   **Microsoft Print to PDF 会把自定义纸型丢掉、仍输出 A4**(读回 PaperSize 是对的,
+    #   PDF 的 /MediaBox 却是 595x842pt)⇒ 换成等价的标准纸:
+    #   **A5(148×210) 横放 = 210×148mm**,正好是中一刀。标准纸型所有驱动都认。
+    $script:W100 = 827   # 横向 210mm ≈ 8.27in(1/100 英寸)
+    $script:H100 = 583   # 纵向 148mm ≈ 5.83in(A5 短边)
+    try {
+        $a5 = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq 'A5' } | Select-Object -First 1
+        if (-not $a5) { $a5 = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match 'A5' } | Select-Object -First 1 }
+        if ($a5) {
+            $doc.DefaultPageSettings.PaperSize = $a5
+            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5 转 90° = 210×148
+            $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+        } else {
+            Write-Host '[WARN] 打印机没有 A5 纸型,按默认纸输出' -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "[WARN] 设置中一刀(A5 横版)失败,按默认纸输出: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 
-    $script:labelLines = $lines
+    # 版式数据交给回调(script 作用域,PrintPage 里能读到)
+    $script:pTitle = $Title
+    $script:pWoNo  = $WoNo
+    $script:pLine  = $lineText
+    $script:pProd  = $ProductName
+    $script:pSpec  = $Spec
+    $script:pQrTxt = $QrText
     $script:labelQr = $qrImg
+
     $doc.add_PrintPage({
         param($sender, $e)
-        $font     = New-Object System.Drawing.Font('Microsoft YaHei', 13)
-        $fontBig  = New-Object System.Drawing.Font('Microsoft YaHei', 18, [System.Drawing.FontStyle]::Bold)
-        $y = 50
-        # 有二维码就把它画在**右上角**(180x180),文字区相应收窄,
-        # 这样纵向空间不被吃掉,标签还是原来那么高。
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+        $W = $script:W100
+        $H = $script:H100
+
+        # ① 边框(红框):二维码与所有文字都画在框内,留 16 的内边距
+        $margin = 16
+        $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(210, 30, 30), 3)
+        $g.DrawRectangle($pen, $margin, $margin, $W - 2 * $margin, $H - 2 * $margin)
+        $pen.Dispose()
+
+        $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei', 22, [System.Drawing.FontStyle]::Bold)
+        $fontLabel = New-Object System.Drawing.Font('Microsoft YaHei', 12)
+        $fontValue = New-Object System.Drawing.Font('Microsoft YaHei', 13, [System.Drawing.FontStyle]::Bold)
+        $fontSmall = New-Object System.Drawing.Font('Microsoft YaHei', 10)
+
+        # ② 标题(整幅居中)
+        $fmtC = New-Object System.Drawing.StringFormat
+        $fmtC.Alignment = [System.Drawing.StringAlignment]::Center
+        $titleRect = New-Object System.Drawing.RectangleF(0, 40, $W, 60)
+        $g.DrawString($script:pTitle, $fontTitle, [System.Drawing.Brushes]::Black, $titleRect, $fmtC)
+
+        # ③ 二维码:放右侧(框内),200x200
+        $qrSize = 200
+        $qrX = $W - $margin - 40 - $qrSize
+        $qrY = 120
         if ($script:labelQr) {
-            $e.Graphics.DrawImage($script:labelQr, 360, 60, 180, 180)
+            $g.DrawImage($script:labelQr, $qrX, $qrY, $qrSize, $qrSize)
         }
-        for ($i = 0; $i -lt $script:labelLines.Count; $i++) {
-            $l = $script:labelLines[$i]
-            $f = if ($i -eq 0) { $fontBig } else { $font }
-            $e.Graphics.DrawString($l, $f, [System.Drawing.Brushes]::Black, 50, $y)
-            $y += if ($i -eq 0) { 46 } else { 30 }
+
+        # ④ 左侧字段(标签灰、值黑加粗;用固定列宽对齐,不用制表符)
+        $xLabel = 60
+        $xValue = 175
+        $y = 130
+        $rowGap = 52
+        $fields = @(
+            @{ k = '工单号';   v = $script:pWoNo },
+            @{ k = '工单行号'; v = $script:pLine },
+            @{ k = '产　　品'; v = $script:pProd },
+            @{ k = '规　　格'; v = $script:pSpec }
+        )
+        foreach ($f in $fields) {
+            $g.DrawString(($f.k + ':'), $fontLabel, [System.Drawing.Brushes]::DimGray, $xLabel, $y)
+            $g.DrawString($f.v, $fontValue, [System.Drawing.Brushes]::Black, $xValue, $y - 1)
+            $y += $rowGap
         }
-        $font.Dispose()
-        $fontBig.Dispose()
+
+        # ⑤ 底部扫码内容(框内左下)
+        $g.DrawString('扫码内容(与工单二维码同值):', $fontSmall, [System.Drawing.Brushes]::DimGray, $xLabel, $H - 110)
+        $g.DrawString($script:pQrTxt, $fontSmall, [System.Drawing.Brushes]::Black, $xLabel, $H - 82)
+
+        $fmtC.Dispose()
+        $fontTitle.Dispose(); $fontLabel.Dispose(); $fontValue.Dispose(); $fontSmall.Dispose()
     })
     $doc.Print()
     if ($qrImg) { $qrImg.Dispose() }

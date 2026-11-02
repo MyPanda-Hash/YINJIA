@@ -138,7 +138,7 @@
 </template>
 
 <script setup>
-import { onActivated, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -237,23 +237,30 @@ async function refreshAll() {
 }
 
 onMounted(() => {
-  /**
-   * 扫码壳回调(Android MainActivity 在 onActivityResult 里 evaluateJavascript 调它)。
-   *
-   * ⚠ `ok=false` 分支**不能静默 return**(2026-11-01):相机取消、码没识别出来、
-   * 权限被拒,many 种情况都会走到这里,静默就是"点了扫码啥也没发生"。
-   */
-  window.__yjScanResult = (code, ok) => {
-    scanPending = false
-    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
-    if (!ok || !String(code || '').trim()) {
-      showErr(tt('没有识别到二维码,请重试;也可以直接用扫码枪扫进下面的输入框'))
-      return
-    }
-    applyScan(code)
-  }
+  bindScan()
   loadList()
 })
+
+/**
+ * 本页的扫码回调(具名,便于 onDeactivated 按引用撤销)。
+ *
+ * ⚠ `ok=false` 分支**不能静默 return**(2026-11-01):相机取消、码没识别出来、
+ * 权限被拒,many 种情况都会走到这里,静默就是"点了扫码啥也没发生"。
+ */
+function onScanResult(code, ok) {
+  scanPending = false
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
+  if (!ok || !String(code || '').trim()) {
+    showErr(tt('没有识别到二维码,请重试;也可以直接用扫码枪扫进下面的输入框'))
+    return
+  }
+  applyScan(code)
+}
+
+/** 把本页的回调挂到壳上 */
+function bindScan() {
+  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
+}
 
 /**
  * 🔴 keep-alive 下**必须**自己判断"是不是又被激活"。
@@ -264,15 +271,26 @@ onMounted(() => {
  * 用户 2026-11-01 口径:「手机端应该有一个刷新按钮,不然会出现旧缓存没跟新状态问题」。
  *
  * <p>首次挂载时 mounted 已经加载过一次,这里跳过,避免开页面就发两次请求。
+ *
+ * <p>🔴 2026-11-02 用户报障「扫一次之后再扫就显示找不到那个编码的单据,关掉 App 重进又好了」:
+ * 根因就是**这个全局回调只有一个槽,三个手机页都在 onMounted 里无条件覆盖它**。
+ * 列表 → 明细(明细页把回调换成"按物料找") → 返回列表(keep-alive,列表的 mounted 不重跑)
+ * ⇒ 回调还停在明细页的,拿着工单码去按物料找,自然"找不到";重启 App 列表页重新 mounted 才对。
+ * 故:**每次被激活都重新绑定自己的回调**,离开时按引用撤销(撤销要判引用,别把别人的删掉)。
  */
 let activatedOnce = false
 onActivated(() => {
+  bindScan()
   if (!activatedOnce) { activatedOnce = true; return }
   loadList()
 })
 
+onDeactivated(() => {
+  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+})
+
 onBeforeUnmount(() => {
-  try { delete window.__yjScanResult } catch { /* ignore */ }
+  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
 })
 
 function clearMsg() {
