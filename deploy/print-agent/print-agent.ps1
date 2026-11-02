@@ -272,6 +272,8 @@ function Send-LabelToPrinter {
         $fmtC.Alignment = [System.Drawing.StringAlignment]::Center
         $fmtL = New-Object System.Drawing.StringFormat
         $fmtL.Alignment = [System.Drawing.StringAlignment]::Near
+        # 不换行:纸表格子高度有限,换行会被切掉半截(实测订单号只显示 "GD-2026-11-")
+        $fmtL.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
 
         # ① 左上角二维码(用户样张的"红框"位置):码 + 细红框
         $qrSize = 132
@@ -294,7 +296,8 @@ function Send-LabelToPrinter {
         # ④ 明细表格:七列,行数按明细补足到 8 行(纸表是固定格子)
         $x0 = 22
         $y0 = 200
-        $colW = @(110, 200, 130, 55, 100, 100, 85)
+        # 列宽(总 780):订单号必须放得下 "GD-2026-11-0016#1",给到 168
+        $colW = @(168, 172, 118, 45, 92, 92, 93)
         $totalW = 0
         foreach ($cw in $colW) { $totalW += $cw }
         $headH = 40
@@ -326,14 +329,14 @@ function Send-LabelToPrinter {
 
         for ($ri = 0; $ri -lt $rowCount; $ri++) {
             $yy = $y0 + $headH + $rowH * $ri
-            $vals = @('', '', '', '', '', '', '')
+            $vals = @(($script:pWoNo + $script:pLine), '', '', '', '', '', '')
             if ($ri -lt $rows.Count) {
                 $row = $rows[$ri]
                 $q1 = ''
                 $q2 = ''
                 if ([double]$row.'请领数量' -gt 0) { $q1 = [string]$row.'请领数量' }
                 if ([double]$row.'实发数量' -gt 0) { $q2 = [string]$row.'实发数量' }
-                $vals = @($script:pWoNo, [string]$row.'材料名称', [string]$row.'规格', [string]$row.'单位', $q1, $q2, [string]$row.'备注')
+                $vals = @(($script:pWoNo + $script:pLine), [string]$row.'材料名称', [string]$row.'规格', [string]$row.'单位', $q1, $q2, [string]$row.'备注')
             }
             $cx = $x0
             for ($i = 0; $i -lt 7; $i++) {

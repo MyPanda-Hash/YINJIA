@@ -505,7 +505,7 @@ export async function printWoQr(payload, opts = {}) {
   for (let i = 0; i < Math.max(8, Math.min(12, rows.length)); i++) {
     const r = rows[i] || {}
     bodyRows.push('<tr>'
-      + `<td>${esc(woNo)}</td>`
+      + `<td>${esc(woNo + (line ? '#' + line : ''))}</td>`
       + `<td>${cell(r['材料名称'])}</td>`
       + `<td>${cell(r['规格'])}</td>`
       + `<td>${cell(r['单位'])}</td>`
@@ -544,8 +544,8 @@ export async function printWoQr(payload, opts = {}) {
     + `<div class="t">${esc(title)}</div>`
     + `<div class="meta">领料部门:${esc(dept)}<span class="d">日期:${esc(printDate)}</span></div>`
     + '<table>'
-    + '<colgroup><col style="width:13%"><col style="width:25%"><col style="width:16%">'
-    + '<col style="width:7%"><col style="width:12%"><col style="width:12%"><col style="width:15%"></colgroup>'
+    + '<colgroup><col style="width:20%"><col style="width:22%"><col style="width:15%">'
+    + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
     + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
     + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
     + `<tbody>${bodyRows.join('')}</tbody>`
