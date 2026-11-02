@@ -1638,6 +1638,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Document } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import { buildCoverPatch } from './prodPickCarry.js'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
 import { sectionLibText } from './sectionLibText'
@@ -4308,6 +4309,10 @@ function onProdPickRowClick(row) {
 /**
  * 确认引用:按 prodPick.map 逐项写回封面,空值**不回填**(同 autoFillSpec 口径 ——
  * 拿空串去冲掉已录内容等于丢数据),最后提示带入了多少项,让用户知道成不成功。
+ *
+ * 落值本身抽到 core/views/prodPickCarry.js(buildCoverPatch,纯函数+单测):
+ * 口径①空值不回填 ②`from` 可写数组、按序取第一个非空(客户（项目）名称那种"封面一格、源表两列")
+ * ③带动项数 = 真正有值的格数。这里只管调用与提示。
  */
 async function confirmProdPick() {
   const pp = prodPickCfg.value
@@ -4318,11 +4323,10 @@ async function confirmProdPick() {
     return
   }
   const key = pp.targetKey || '产品编号'
+  const patch = buildCoverPatch(row, pp.map)
   let filled = 0
-  for (const m of pp.map || []) {
-    const v = row[m.from]
-    if (v === undefined || v === null || String(v).trim() === '') continue
-    props.head[m.to || m.from] = String(v)
+  for (const [k, v] of Object.entries(patch)) {
+    props.head[k] = v
     filled++
   }
   // 产品编号是**键**,即使配置里忘了写进 map 也必须落值(不然后续一律按它取数)
