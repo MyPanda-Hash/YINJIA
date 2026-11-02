@@ -22,7 +22,7 @@ import { execFileSync } from 'node:child_process';
 const ROOT = process.cwd();
 const TOOLS = join(ROOT, 'tools');
 const DEPLOY = join(ROOT, 'deploy');
-const TAG = '20261102';
+const TAG = ((process.argv.find((a) => a.startsWith('--tag=')) || '').slice('--tag='.length).trim()) || '20261102';
 const PKG = join(DEPLOY, `pkg-incr-${TAG}`);
 const HERE = join(TOOLS, 'archive', `_deploy-${TAG}`);
 const TORUN_SRC = join(HERE, `to-run-${TAG}.txt`);
