@@ -118,6 +118,42 @@ public class DevTaskService {
         return PRODUCT_KEY.get(panelCode);
     }
 
+    /**
+     * 剥掉「成型工艺清单」产品编号的 -tb 后缀，还原成原始产品编号。
+     *
+     * <p>【为什么需要它】2026-10-27 用户口径「选产品编号后自动加 -tb」——前端
+     * {@code core/panel/productCodeSuffix.js} 的 {@code productCodeWithSuffix} 会把
+     * {@code A-54-12} 写成 {@code A-54-12-tb} 存进 {@code rd_mold_proc_head}。而
+     * {@code rd_dev_task} / {@code rd_prod_info_head} / {@code rd_spec_assign} 里存的
+     * **永远是原始编号**。凡是「拿单据上的产品编号去查这三张表」的读取方都必须先过这一层。
+     *
+     * <p>⚠ 不过这一层**不会报错，只会查不到**，表现成两类故障：
+     * <ul>
+     *   <li>四文件编辑门禁误判「尚未分发责任人」⇒ 该文件**真正的责任人**被挡在保存之外
+     *       （2026-11-02 用户报障：刘磊是 A-54-12 的烧结工艺责任人，却存不了草稿，admin 可以）；</li>
+     *   <li>规格书漂移提示、产品开发进度矩阵一律取不到单据（静默缺功能，不报错）。</li>
+     * </ul>
+     *
+     * <p>与前端 {@code rawProductCode} 同一口径：只剥**结尾**一层，大小写不敏感，容忍前后空格；
+     * 空值返回空串（绝不产出只有后缀的脏值）。
+     */
+    public static String baseProductCode(String code) {
+        if (code == null) return "";
+        String s = code.trim();
+        if (s.isEmpty()) return "";
+        return s.replaceFirst("(?i)-tb$", "").trim();
+    }
+
+    /**
+     * 同一个产品的两种写法（原始 / 原始-tb），供「按产品编号去查 head 表」的 SQL 用
+     * {@code IN (?,?)} 兜底 —— 老单据存原值、新单据存带后缀值，两种都得认。
+     */
+    public static List<String> productCodeForms(String code) {
+        String base = baseProductCode(code);
+        if (base.isEmpty()) return List.of();
+        return List.of(base, base + "-tb");
+    }
+
     public static List<Map<String, String>> devPanelMeta() {
         List<Map<String, String>> out = new ArrayList<>();
         DEV_PANELS.forEach((code, v) -> {
@@ -131,20 +167,22 @@ public class DevTaskService {
 
     /** 该产品是否已下发过(按产品编号判定,不按单据) */
     public boolean dispatched(String productCode) {
-        if (productCode == null || productCode.isBlank()) return false;
+        String code = baseProductCode(productCode);   // 单据上的 A-54-12-tb → rd_dev_task 里的 A-54-12
+        if (code.isEmpty()) return false;
         Integer n = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM rd_dev_task WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                Integer.class, productCode);
+                Integer.class, code);
         return n != null && n > 0;
     }
 
     /** 该产品已下发的目标面板集合 */
     public Set<String> dispatchedPanels(String productCode) {
         Set<String> out = new LinkedHashSet<>();
-        if (productCode == null || productCode.isBlank()) return out;
+        String code = baseProductCode(productCode);
+        if (code.isEmpty()) return out;
         jdbc.queryForList(
                         "SELECT 目标面板 FROM rd_dev_task WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                        String.class, productCode)
+                        String.class, code)
                 .forEach(out::add);
         return out;
     }
@@ -194,20 +232,25 @@ public class DevTaskService {
 
     /** 该产品×面板的活任务行 id(无则 0) */
     private int rowIdOf(String productCode, String panel) {
+        String code = baseProductCode(productCode);
+        if (code.isEmpty()) return 0;
         List<Integer> ids = jdbc.queryForList(
                 "SELECT TOP 1 id FROM rd_dev_task WHERE 产品编号 = ? AND 目标面板 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
-                Integer.class, productCode, panel);
+                Integer.class, code, panel);
         return ids.isEmpty() || ids.get(0) == null ? 0 : ids.get(0);
     }
 
     /** 该产品的四文件分工:{ 面板编码: 责任人账号 }(未分发/挂起时该面板不在表里或值为 null) */
     public Map<String, String> assignsOf(String productCode) {
         Map<String, String> out = new LinkedHashMap<>();
-        if (productCode == null || productCode.isBlank()) return out;
+        // ⚠ 必过 baseProductCode:烧结工艺清单单据存 A-54-12-tb,rd_dev_task 存 A-54-12。
+        //   不过这一层 ⇒ 门禁判成「尚未分发责任人」,责任人也存不了单(2026-11-02 报障)
+        String code = baseProductCode(productCode);
+        if (code.isEmpty()) return out;
         jdbc.query("SELECT 目标面板, 负责人 FROM rd_dev_task WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
                 rs -> {
                     out.put(rs.getString("目标面板"), rs.getString("负责人"));
-                }, productCode);
+                }, code);
         return out;
     }
 
@@ -260,21 +303,23 @@ public class DevTaskService {
      * 产品信息改负责人后,这里返回的是新负责人(权限判定用它,不用 rd_spec_assign 里的旧快照)。
      */
     public String supervisorOf(String productCode) {
-        if (productCode == null || productCode.isBlank()) return null;
+        // 与 assignsOf 同源:单据上的 A-54-12-tb 必须还原成 A-54-12 才能命中 rd_dev_task / 产品信息表
+        final String code = baseProductCode(productCode);
+        if (code.isEmpty()) return null;
         List<String> cur = jdbc.queryForList(
                 "SELECT TOP 1 负责人 FROM rd_dev_task WHERE 产品编号 = ? AND 负责人 IS NOT NULL"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
-                String.class, productCode);
+                String.class, code);
         if (!cur.isEmpty()) return String.valueOf(cur.get(0)).trim();
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT TOP 1 责任人 FROM rd_prod_info_head WHERE 产品编号 = ? AND 责任人 IS NOT NULL"
-                        + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", productCode);
+                        + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", code);
         if (rows.isEmpty()) return null;
         Object nm = rows.get(0).get("责任人");
         if (nm == null || String.valueOf(nm).isBlank()) return null;
         String account = resolveUsername(String.valueOf(nm));
         if (account != null) {
-            jdbc.update("UPDATE rd_dev_task SET 负责人 = ? WHERE 产品编号 = ? AND 负责人 IS NULL", account, productCode);
+            jdbc.update("UPDATE rd_dev_task SET 负责人 = ? WHERE 产品编号 = ? AND 负责人 IS NULL", account, code);
         }
         return account;
     }
@@ -290,16 +335,18 @@ public class DevTaskService {
     /** 规格书分配总览:某产品已分发的全部规格书单(负责人弹窗用;assigns 含单据状态) */
     public Map<String, Object> specAssignState(String productCode) {
         Map<String, Object> out = new LinkedHashMap<>();
-        if (productCode == null || productCode.isBlank()) {
+        // 单据上可能是 A-54-12-tb,这张表存原始编号 ⇒ 统一还原后再查
+        final String code = baseProductCode(productCode);
+        if (code.isEmpty()) {
             out.put("assigns", List.of());
             return out;
         }
         out.put("productCode", productCode);
-        out.put("dispatched", dispatched(productCode));
-        fillSupervisor(out, productCode);
+        out.put("dispatched", dispatched(code));
+        fillSupervisor(out, code);
         List<Map<String, Object>> p = jdbc.queryForList(
                 "SELECT TOP 1 产品名称 FROM rd_prod_info_head WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + " ORDER BY id DESC", productCode);
+                        + " ORDER BY id DESC", code);
         out.put("productName", p.isEmpty() || p.get(0).get("产品名称") == null ? "" : String.valueOf(p.get(0).get("产品名称")));
         out.put("assigns", jdbc.queryForList(
                 "SELECT a.单据编号, a.规格书种类, a.责任人, a.负责人, ISNULL(u.real_name, N'') AS ownerName,"
@@ -395,6 +442,9 @@ public class DevTaskService {
         if (meta == null || productCode == null || productCode.isBlank()) {
             return Map.of("lvl", "0", "docNo", "");
         }
+        // 这一层查的是 **head 表**(成型工艺清单存的是 A-54-12-tb),而入参是原始编号 ⇒ 两种形态都认
+        List<String> forms = productCodeForms(productCode);
+        if (forms.isEmpty()) return Map.of("lvl", "0", "docNo", "");
         String table = meta[0];
         String key = meta[1];
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -402,11 +452,11 @@ public class DevTaskService {
                         + " ISNULL(s.archived,'N') AS arc, ISNULL(s.pending,'N') AS pend "
                         + "FROM " + table + " h "
                         + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.[单据编号] "
-                        + "WHERE h." + key + " = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' "
+                        + "WHERE h." + key + " IN (?, ?) AND ISNULL(h.asp_cancel,'N') <> 'Y' "
                         + "AND ISNULL(s.canceled,'N') <> 'Y' "
                         + "ORDER BY CASE WHEN ISNULL(s.archived,'N')='Y' THEN 3"
                         + " WHEN ISNULL(s.pending,'N')='Y' THEN 2 ELSE 1 END DESC, h.id DESC",
-                panelCode, productCode);
+                panelCode, forms.get(0), forms.get(1));
         if (rows.isEmpty() || rows.get(0) == null) return Map.of("lvl", "0", "docNo", "");
         Map<String, Object> r = rows.get(0);
         String lvl = "Y".equals(String.valueOf(r.get("arc"))) ? "3"
@@ -797,7 +847,10 @@ public class DevTaskService {
      *                  两处都用**参数化** [表区] = ?,不拼串。
      */
     public Map<String, Object> specByProduct(String productCode, String sheetArea) {
-        String code = productCode == null ? "" : productCode.trim();
+        // ⚠ 必过 baseProductCode:烧结工艺清单(RD_MOLD_PROC)单上的产品编号带 -tb,
+        //   而 rd_spec_assign / rd_spec_doc_head 存的是原始编号 ⇒ 不剥就一个候选都取不到,
+        //   「规格书已更新请核对」黄条与「带入规格书」都会静默失效(不报错)。
+        String code = baseProductCode(productCode);
         String area = sheetArea == null || sheetArea.isBlank() ? SPEC_SHEET_AREA_INSPECT : sheetArea.trim();
 
         Map<String, Object> out = new LinkedHashMap<>();

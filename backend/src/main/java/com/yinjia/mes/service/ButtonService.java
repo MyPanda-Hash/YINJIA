@@ -6661,12 +6661,16 @@ public class ButtonService {
 
     /** 某产品编号对应的产品信息表单据号(未作废/未作废单,取最新一张);取不到回空串 */
     private String prodInfoNoOf(String productCode) {
+        // ⚠ 入参可能来自烧结工艺清单单据(A-54-12-tb),而产品信息表存原始编号 ⇒ 先还原,
+        //   否则「产品信息表变了请核对」这条黄条对烧结工艺清单永远不出现(静默失效)
+        String code = DevTaskService.baseProductCode(productCode);
+        if (code.isEmpty()) return "";
         try {
             List<String> rows = jdbc.queryForList(
                     "SELECT TOP 1 h.[单据编号] FROM rd_prod_info_head h"
                             + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_PROD_INFO' AND s.doc_no = h.[单据编号]"
                             + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
-                            + " AND h.[产品编号] = ? ORDER BY h.id DESC", String.class, productCode);
+                            + " AND h.[产品编号] = ? ORDER BY h.id DESC", String.class, code);
             return rows.isEmpty() || rows.get(0) == null ? "" : rows.get(0).trim();
         } catch (Exception e) {
             return "";
