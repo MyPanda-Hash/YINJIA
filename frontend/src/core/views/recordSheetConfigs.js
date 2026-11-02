@@ -898,7 +898,13 @@ export const recordSheetConfigs = {
         grid: [46, 116, 80, 188, 218, 311, 104, 104, 92],
         // 设计 merges:B2:E2 公司名 = 4 列 / 空 F..I = 4 列 / J2 编号 = 1 列;
         // 大标题 B3:H5 = 7 列 + 标签 I + 值 J
-        head: { title: 7, infoLabel: 1, infoValue: 1, noSpan: 1, noGapSpan: 4, docnoPrefix: false },
+        // ⚠ 2026-11-02 偏离设计(用户口径「这个编号有点挤到一起了,把框拉长对齐到文件管理员前边」):
+        //   设计里编号格只占 J 一列(92px),那会儿纸面印的是 6 位受控表单号 YJ-XS002;
+        //   2026-10-29 起这一格改印 15 位单据号(DT-2026-10-0002)⇒ 92px 必然折成两行。
+        //   现改为 noSpan 2 / noGapSpan 3:编号格盖住「标签+值」两列(I+J=196px),
+        //   左边缘正好落在「文件管理员」标签列的左边缘;公司名格仍 4 列、信息区仍占满整行。
+        //   钉子:recordSheetConfigs.docno.test.js「销售端页 编号格加宽…」。
+        head: { title: 7, infoLabel: 1, infoValue: 1, noSpan: 2, noGapSpan: 3, docnoPrefix: false },
         showHead: true,
       },
       {
