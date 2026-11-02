@@ -59,12 +59,12 @@
           <span class="as-info-label">{{ tt(info.label) }}</span>
           <span class="as-info-value">
             <template v-if="info.kind === 'static'">{{ tt(info.text || '') }}</template>
-            <div v-else-if="editable && isRefKey(info.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(info.key)">
+            <div v-else-if="editable && !infoLocked(info) && isRefKey(info.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(info.key)">
               <span class="as-ref-text">{{ head[info.key] || tt('点击选择') }}</span>
               <el-icon class="as-ref-ico"><Search /></el-icon>
             </div>
             <el-date-picker
-              v-else-if="editable && info.kind === 'date'"
+              v-else-if="editable && !infoLocked(info) && info.kind === 'date'"
               v-model="head[info.key]"
               type="date"
               value-format="YYYY-MM-DD"
@@ -74,7 +74,7 @@
               @change="emit('dirty')"
             />
             <el-select
-              v-else-if="editable && (info.kind === 'select' || selectOptions(info.key).length)"
+              v-else-if="editable && !infoLocked(info) && (info.kind === 'select' || selectOptions(info.key).length)"
               v-model="head[info.key]"
               size="small"
               class="as-cell-input"
@@ -84,7 +84,7 @@
               <el-option v-for="o in selectOptions(info.key)" :key="o.value" :label="o.label" :value="o.value" />
             </el-select>
             <el-input
-              v-else-if="editable"
+              v-else-if="editable && !infoLocked(info)"
               v-model="head[info.key]"
               size="small"
               maxlength="50"
@@ -948,6 +948,19 @@ function signKeyLocked(c) {
   return !!(fieldMap.value.get(key) || {}).readonly
 }
 
+/**
+ * 右上信息表格子的字段级只读(2026-11-02)。
+ *
+ * 此前信息表只认 sheet 级 `editable`(草稿态),**不看 yj_field.editable** ——
+ * 于是 QC_BHG(不合格报告·制程)的「填写人」(元数据 editable=0,值由后端在建单/提交时
+ * 按登录人写入)在纸面上是个可输入的框:用户改了也存不进去(save() 会剥掉该键),
+ * 表现为「填了白填 / 关掉再开又空了」。口径与签名格 {@link signKeyLocked} 一致:
+ * 元数据只读 ⇒ 只显示值,不给编辑控件。
+ */
+function infoLocked(info) {
+  return !!(fieldMap.value.get(info && info.key) || {}).readonly
+}
+
 // 右上信息表:未配置 config.info 时保持 文件管理人/密级/文件使用范围 三行(立项申请/实施计划原样)
 const DEFAULT_INFO = [
   { label: '文件管理人', key: '文件管理人' },
@@ -1280,11 +1293,27 @@ defineExpose({ focusField })
 }
 .as-info-value {
   flex: 1;
+  min-width: 0;   /* 参照控件必须能收缩,否则按 content 撑宽、把信息表顶出纸面 */
   display: flex;
   align-items: center;
   padding-left: 8px;
   border-left: 1px solid #c9c9c9;
   font-size: 13px;
+}
+/* 参照控件落在右上信息表里时:宽度交给格子(2026-11-02 用户报障
+ * 「填写部门中的点击选择的框体明细超出表格」)。
+ * 根因:.as-ref-ctl 自身写死 width:200px(那是顶栏「文档编号」小格的尺寸),而信息表
+ *   值区只有 250 - 100(标签) - 1(竖线) - 8(左内距) ≈ 141px ⇒ 虚线框右侧直接顶出纸面边框。
+ * 修法与 .q-value .as-ref-ctl 同款三条:width:100% + flex-basis 归零 + min-width:0,
+ *   缺一条都会按内容宽撑开。 */
+.as-info-value .as-ref-ctl {
+  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.as-info-value .as-ref-text {
+  text-align: left;
 }
 
 /* ═══ ③ 内容表 ═══ */

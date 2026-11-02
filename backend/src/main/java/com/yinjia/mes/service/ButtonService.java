@@ -563,6 +563,10 @@ public class ButtonService {
                 putHeadDefaults(def, table, cols);
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
+                // 纯落款「编制」格(2026-11-02 用户口径「填写人应该默认当前创建的账号名称」):
+                // 建单那一刻按创建人姓名补上(仅空值)—— 同段之上 putEditorCols 的理由:本分支直接
+                // return,走不到保存末尾那次调用。字段仍只读、save() 仍剥离入参,故不会变成可手改。
+                prefillPreparerName(def, no, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
                 if (CHANGE_PANEL.equals(def.code())) ensureChangeDeptRows(def, no, user);
                 // 四个受控文件的编辑门禁在**空草稿分支也要过**(2026-09-21 全流程走查发现的门禁洞):
@@ -786,6 +790,9 @@ public class ButtonService {
             jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     realNameOf(user), no);
         }
+        // 纯落款「编制」格的创建人预填(2026-11-02):见 prefillPreparerName 注释。
+        // 落库后执行 ⇒ 同一次保存即可在纸面上看到;只在为空时写,不覆盖已有/用户已确认的值。
+        prefillPreparerName(def, no, user);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
@@ -2971,6 +2978,44 @@ public class ButtonService {
     private String preparerEditableColOf(String panelCode) {
         return panelCode != null && PREPARER_EDITABLE_PANELS.contains(panelCode)
                 ? QC_DOC_PREPARER.getOrDefault(panelCode, "") : "";
+    }
+
+    /**
+     * 「编制」格是**纯落款**、但建单/首次保存时也要先带出**创建人姓名**的面板(2026-11-02 用户口径)。
+     *
+     * <p>用户原话:「不合格处理中的填写人应该默认当前创建的账号名称」。
+     * QC_BHG(YJ-QR-11 不合格报告·制程)纸面右上「填写人」与底部落款「编制」是**同一列**
+     * (`qc_bhg.填写人`);该字段 yj_field.editable=0 且登记在 {@link #QC_DOC_PREPARER},
+     * 所以是纯落款:save() 会把该键从入参剥掉、用户改不了,而原来**只有提交审批那一刻**
+     * (submitApproval → writeBackSignCell)才写值 ⇒ 草稿期纸面上一直是空的。
+     *
+     * <p>这里补的是「建单/首次保存时**只填空值**带出创建人姓名」:纸面立刻有名字、
+     * 落库后重开也还在;用户依然改不了(保持只读),提交审批时仍按 2026-10-04 口径
+     * 刷成**提交人**(谁提交谁就是编制人)—— 两处不冲突,后者在后、是最终值。
+     *
+     * <p>与 {@link #PREPARER_EDITABLE_PANELS} 的区别:那边是"预填且用户可改",
+     * 这边是"预填但用户不可改"。要扩大范围只改本集合。
+     */
+    private static final java.util.Set<String> PREPARER_CREATOR_PREFILL = java.util.Set.of("QC_BHG");
+
+    /**
+     * 纯落款「编制」格的**创建人预填**(只在为空时写,绝不覆盖已有值)。
+     *
+     * <p>两个调用点缺一不可(与 putEditorCols 同一踩坑记录):空白草稿分支在建单后直接 return,
+     * 走不到保存末尾的那段,所以两处各调一次。
+     */
+    private void prefillPreparerName(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || no == null || !PREPARER_CREATOR_PREFILL.contains(def.code())) return;
+        String col = preparerColOf(def.code());
+        if (col.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + col + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ([" + col + "] IS NULL OR LTRIM(RTRIM([" + col + "])) = '')",
+                    realNameOf(user), currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[编制格] 预填 {} 失败 no={}: {}", def.code(), no, e.getMessage());
+        }
     }
 
     /**
