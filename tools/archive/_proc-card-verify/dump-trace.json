@@ -1,0 +1,90 @@
+{
+  "card": "LZK-GD-2026-10-0223-1",
+  "trace": {
+    "卡": {
+      "卡号": "LZK-GD-2026-10-0223-1",
+      "大批次号": "20261019",
+      "小批次号": "GD-2026-10-0223-1",
+      "批次来源": "工单日期",
+      "工单号": "GD-2026-10-0223",
+      "工单行号": 1,
+      "工单行id": 1168,
+      "产品编码": "T035-6",
+      "产品名称": "S阻垢炭棒/滤芯",
+      "规格型号": "大T33",
+      "计划数量": 100,
+      "生产线": "1号机",
+      "工艺路线": "GY-CB-STD",
+      "卡状态": "录入中",
+      "确认人": "",
+      "确认时间": "",
+      "备注": "验证留痕-可删",
+      "照片数": 0,
+      "可确认完成": false
+    },
+    "工序进度": [
+      {
+        "id": 1,
+        "工序序": 1,
+        "工序": "成型",
+        "工序编码": "OP-CX",
+        "生产车间": "成型",
+        "计划数量": 100,
+        "已报工": 10,
+        "待审核": 0,
+        "状态": "进行中",
+        "完成时间": "2026-10-20 01:10:53",
+        "报工人": "Admin",
+        "报工单数": 1,
+        "照片数": 0,
+        "可确认": false
+      },
+      {
+        "id": 2,
+        "工序序": 2,
+        "工序": "切炭",
+        "工序编码": "OP-QT",
+        "生产车间": "切炭",
+        "计划数量": 100,
+        "已报工": 0,
+        "待审核": 0,
+        "状态": "未开始",
+        "完成时间": "",
+        "报工人": "",
+        "报工单数": 0,
+        "照片数": 0,
+        "可确认": false
+      },
+      {
+        "id": 3,
+        "工序序": 3,
+        "工序": "组装",
+        "工序编码": "OP-ZZ",
+        "生产车间": "组装",
+        "计划数量": 100,
+        "已报工": 0,
+        "待审核": 0,
+        "状态": "未开始",
+        "完成时间": "",
+        "报工人": "",
+        "报工单数": 0,
+        "照片数": 0,
+        "可确认": false
+      }
+    ],
+    "报工记录": [
+      {
+        "报工单号": "",
+        "工序": "成型",
+        "报工数量": 10,
+        "报工人": "Admin",
+        "完工状态": "Y",
+        "单据日期": "2026-10-20 01:10:53"
+      }
+    ],
+    "照片": {},
+    "工单追溯": {
+      "错误": "工单追溯取数失败:PreparedStatementCallback; uncategorized SQLException for SQL [SELECT h.单据编号 AS 检验单号, N'成型检验' AS 检验类型, ISNULL(h.工序,N'') AS 工序, CONVERT(varchar(10), h.单据日期, 120) AS 检验日期, CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'      WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中'      WHEN s.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS 单据状态, ISNULL(h.总结论,N'') AS 总结论, ISNULL(h.报工数量,0) AS 送检数量, ISNULL(h.检验数量,0) AS 检验数量, CASE WHEN ISNULL(h.检验数量,0) <= 0 THEN NULL      WHEN ISNULL(h.检验数量,0) - ISNULL(d.不合格数量,0) < 0 THEN 0      ELSE ISNULL(h.检验数量,0) - ISNULL(d.不合格数量,0) END AS 合格数量, ISNULL(d.不合格数量,0) AS 不合格数量, ISNULL(h.检验员,N'') AS 检验员, ISNULL(h.批次号,N'') AS 批次号, ISNULL(h.报工单号,N'') AS 报工单号, ISNULL(h.处理方式,N'') AS 处理方式, ISNULL((SELECT TOP 1 l.target_form_no FROM dbo.form_flow_link l          WHERE l.source_panel_code=? AND l.source_form_no=h.单据编号            AND l.link_status='ACTIVE' ORDER BY l.id), N'') AS 下游单号 FROM dbo.qc_mold_insp_head h LEFT JOIN dbo.yj_doc_status s ON s.panel_code=? AND s.doc_no=h.单据编号 LEFT JOIN (SELECT 单据编号,      SUM(ISNULL(不合格数量,0)) AS 不合格数量    FROM dbo.qc_mold_insp_detail   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY 单据编号) d   ON d.单据编号 = h.单据编号 WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND h.工单号=? AND h.[工单行号] = ?]; SQL state [S0002]; error code [208]; Invalid object name 'dbo.qc_mold_insp_head'."
+    }
+  }
+}

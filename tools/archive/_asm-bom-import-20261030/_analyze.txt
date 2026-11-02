@@ -1,0 +1,31 @@
+data rows: 3641
+blocks: 827
+orphan rows (before first block): []
+distinct products: 817
+blocks per product distribution: {1: 807, 2: 10}
+codes None: 0; duplicates: []
+codes not matching _V<digits>: 0 sample []
+code prefix != product code: 0 sample []
+默认BOM values: {'None': 814, '是': 13}
+使用状态 values: {'启用': 827}
+blocks with 0 children: 0
+child rows with empty 物料编码: 1
+child counts: total=3641, min=1, max=12, avg=4.40
+分子 distinct 40: [('1', 3009), ('2', 408), ('8', 117), ('14', 13), ('0.243', 10), ('10', 9), ('32', 9), ('4', 6), ('3', 5), ('0.47', 5), ('18', 4), ('0.05', 4)]
+分母 distinct 120: [('1', 2698), ('25', 235), ('50', 47), ('80', 42), ('162', 35), ('18', 33), ('200', 31), ('100', 30)]
+non-numeric 分子/分母: 1 sample [('T410', 'T410_V0001', {'物料编码': None, '物料名称': None, '子件规格': None, '单位': None, '分子': None, '分母': None, '行备注': None})]
+blocks missing 产品名称: 0, 规格型号: 32, 工艺路线名称: 34, 默认BOM: 814
+SAMPLE block: A-32-01 | S阻垢炭棒/滤芯 | spec=40.5*16*80 | 编码=A-32-01_V0009 | 默认=None | 状态=启用 | route=烧结炭棒1切3组装装箱 | children=7
+SAMPLE block: A-32-02 | PP复合A级炭棒/滤芯 | spec=28*12*216 | 编码=A-32-02_V0001 | 默认=None | 状态=启用 | route=烧结炭棒1切1组装装箱 | children=7
+SAMPLE block: A-32-03 | PP复合阻垢炭棒/滤芯 | spec=28*12*216 | 编码=A-32-03_V0001 | 默认=None | 状态=启用 | route=烧结炭棒1切1组装装箱 | children=6
+products with multiple blocks: 10
+  MULTI A-48-05 -> [('A-48-05_V0001', None, 6), ('A-48-05_V0002', None, 9)]
+  MULTI A-48-34 -> [('A-48-34_V0002', None, 6), ('A-48-34_V0003', None, 7)]
+  MULTI B-35-03 -> [('B-35-03_V0001', None, 5), ('B-35-03_V0002', None, 6)]
+  MULTI B-49-01-1 -> [('B-49-01-1_V0001', None, 7), ('B-49-01-1_V0002', None, 7)]
+  MULTI B-88-12 -> [('B-88-12_V0001', None, 3), ('B-88-12_V0002', None, 3)]
+  MULTI C-103-03 -> [('C-103-03_V0001', None, 5), ('C-103-03_V0002', None, 5)]
+  MULTI D-01-49 -> [('D-01-49_V0001', None, 2), ('D-01-49_V0002', None, 2)]
+  MULTI S051-2 -> [('S051-2_V0001', None, 10), ('S051-2_V0002', None, 10)]
+  MULTI T073-3 -> [('T073-3_V0002', None, 6), ('T073-3_V0003', None, 7)]
+  MULTI T123-2 -> [('T123-2_V0001', None, 5), ('T123-2_V0002', None, 5)]

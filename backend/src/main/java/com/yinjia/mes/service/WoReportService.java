@@ -43,6 +43,10 @@ public class WoReportService {
      *
      * <p>解析口径(与 {@link #reportRows} 同源,取不到**不猜**):① 已有 gd_id → 经 plang_pc 反查 pl_xc;
      * ② 否则按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空(等审核时按行锚定)。
+     *
+     * <p>⚠ 2026-11-01:「工单行号 = 0」也算**未解析**(前端新增明细行的整数格默认填 0;
+     * 只判 IS NULL 的话这类行永远补不上,行锚点一直挂空 —— 用户报障的
+     * 「报工缺少唯一工单行锚点…不能审核」正是这么来的)。两条 UPDATE 一并按 ISNULL(col,0)=0 判。
      */
     public void stampRowNo(String panelCode, String no) {
         if (!posts(panelCode) || no == null || no.isBlank()) return;
@@ -53,7 +57,7 @@ public class WoReportService {
                         + "   JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + "   WHERE pc.id = s.gd_id) x"
                         + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                        + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) > 0", no);
+                        + "   AND ISNULL(s.[工单行号],0) = 0 AND ISNULL(s.gd_id,0) > 0", no);
         // ② 没有 gd_id(草稿期常态)→ 按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空。
         //    ⚠ 必须用 CTE + HAVING COUNT(*)=1 的形态:T-SQL 的 `UPDATE … FROM … GROUP BY` 是**语法错**
         //      (实测 "Incorrect syntax near the keyword 'GROUP'"),与迁移脚本 migrate-scjl-wo-line-20261015.sql 同款。
@@ -63,9 +67,104 @@ public class WoReportService {
                         + "  JOIN dbo.plang p ON p.pl_no = s.gldh AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
                         + "       AND ISNULL(p.asp_cancel,'N') <> 'Y'"
                         + "  WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                        + "    AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') <> N''"
+                        + "    AND ISNULL(s.[工单行号],0) = 0 AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') <> N''"
                         + "  GROUP BY s.id HAVING COUNT(*) = 1)"
                         + " UPDATE s SET s.[工单行号] = c.xc FROM dbo.scjl s JOIN cand c ON c.sid = s.id", no);
+    }
+
+    /**
+     * 报工单**单据日期**补默认(2026-11-01 用户报障:
+     * 「我报工了这一条为什么没有显示当前日期的实际报工数量」)。
+     *
+     * <p>根因:报工单的「单据日期」没人填时 {@code scjl.sc_date} 落成 NULL;而
+     * 工单排产/生产工单的**日期列**是拿 sc_date 把「已审核报工」分到当天的
+     * (见 WorkOrderDayPlanService.actualByDate)⇒ 这张单已审核了,日期格上却查不到实际值
+     * (实测 BG-2026-11-0001:wgsj=2026-11-01,wgzt=Y,sc_date=NULL ⇒ 11-01 格只有计划 2)。
+     *
+     * <p>口径:只在**为空**时补,已填的日期一律不动;日期取**应用本地日期**
+     * (与 wgsj 同一把墙钟 —— SQL Server 在 Docker 里是 UTC,不能直接 GETDATE() 取日期)。
+     * 草稿保存/审核(直审)时兜底;**提交审批那一刻**的正式取值见 {@link #stampSubmitDate}。
+     */
+    public void stampDocDate(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        jdbc.update("UPDATE dbo.scjl SET sc_date = ? WHERE [报工单号]=? AND sc_date IS NULL"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'",
+                java.sql.Date.valueOf(java.time.LocalDate.now()), no);
+    }
+
+    /**
+     * **提交审批**时自动生成单据日期(2026-11-01 用户口径:
+     * 「当前工序报工的单据日期应该在提交审批的时候自动生成」)。
+     *
+     * <p>为什么在提交审批这一步**覆盖写**而不是只补空:单据日期 = 这张报工单实际送审的日期,
+     * 是报工事实的一部分(排产看板日期列、「完工明细/报工记录」都按它归日)。草稿可能存几天
+     * 才送审(或先存草稿再改数量),保存时的日期不是报工日 ⇒ 送审这一刻以**提交当天**为准。
+     * 取应用本地日期(与 wgsj 同一把墙钟,不用 GETDATE —— Docker 里库是 UTC)。
+     *
+     * <p>审核/审批通过不再改它(core field 已定稿):{@link #post} 只在为空时兜底,
+     * 正常流程(提交审批 → 审批通过)日期保持提交日不变。
+     */
+    public void stampSubmitDate(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        jdbc.update("UPDATE dbo.scjl SET sc_date = ? WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                java.sql.Date.valueOf(java.time.LocalDate.now()), no);
+    }
+
+    /**
+     * 报工行的**行锚点**解析(取不到返回 null = 不猜):
+     *   ① 本单已带 gd_id(=plang_pc.id,重审/再报时)→ plang_pc.plang_id;
+     *   ② 本单带 工单行号(scjl.工单行号,界面可见)→ (工单号 + 行号 [+批次]) 恰命中 1 行。
+     *
+     * <p>供 {@link #complete}(审核既有判据)与 {@link #assertRowAnchors}(提交审批前置)共用,
+     * 保证「提交审批放行的」与「审核能落点的」是同一份判据(不会出现送审能过、审核必炸的错位)。
+     */
+    private Long anchorRowId(Map<String, Object> r) {
+        // ① gd_id(= plang_pc.id,重审/再报时)→ plang_pc.plang_id
+        double ownGd = num(r.get("gd_id"));
+        if (ownGd > 0) {
+            List<Long> rr = jdbc.queryForList(
+                    "SELECT TOP 1 pc.plang_id FROM dbo.plang_pc pc"
+                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " WHERE pc.id=?", Long.class, (long) ownGd);
+            if (!rr.isEmpty()) return rr.get(0);
+        }
+        // ② 工单号 + 工单行号(+批次)恰命中 1 行才认,多行不猜
+        if (r.get("own_xc") != null) {
+            String wo = String.valueOf(r.get("gldh") == null ? "" : r.get("gldh")).trim();
+            String rptBatch = r.get("rpt_batch") == null ? "" : String.valueOf(r.get("rpt_batch")).trim();
+            List<Long> rr = jdbc.queryForList(
+                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=?"
+                            + " AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND (? = N'' OR ISNULL([批次号],N'') = ?)"
+                            + " ORDER BY id", Long.class, wo, ((Number) r.get("own_xc")).intValue(),
+                    rptBatch, rptBatch);
+            if (rr.size() == 1) return rr.get(0);
+        }
+        return null;
+    }
+
+    /**
+     * **提交审批前**的整行校验(2026-11-01 用户口径:
+     * 「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/「当前这个也是」)。
+     *
+     * <p>为什么前置:报工单的企业数据(工单号+工单行号锚点、工序是否在本行工艺路线内、是否跳序、
+     * 数量是否超上限、工单是否已结案/未排产)都是**编制环节**就该填对的东西。原实现只在
+     * {@link #complete}(审核 / 审批通过共用)才校验:编制者带着坏数据提交审批没人拦,审批人点
+     * 「审批通过」才被拒(用户两次截图:「报工缺少唯一工单行锚点…不能审核」/
+     * 「工序「OP-CX」不在工单…的工艺路线…内」),还得先审批驳回、回草稿改完再重提。
+     *
+     * <p>现在提交审批先按**审核同一份判据**({@link #validateRow})逐行校验,坏数据直接拒绝送审;
+     * 审核路径的守卫**保留**(历史已送审单据 / 管理员直审仍需兜底),正常流程不会再走到那一步。
+     */
+    public void validateBeforeSubmit(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        // 与审核同源:先尽力补一次行号(按 gd_id / 工单号+批次号 唯一命中才补,补不到不猜)
+        stampRowNo(panelCode, no);
+        // 单据日期也补一次:日期列(排产看板「日报工」)按它分桶,空着会让已审报工在日期上消失
+        stampDocDate(panelCode, no);
+        for (Map<String, Object> r : rows(no)) {
+            validateRow(r, "提交审批");
+        }
     }
 
     /** 审核 → 本单 scjl 行 wgzt='Y'+wgsj,补 jc_no 与排产镜像。 */
@@ -74,6 +173,8 @@ public class WoReportService {
         // 审核前先补行号(2026-10-15):complete() 的锚定与工序校验都读 scjl.[工单行号];
         //   若本单是"直接审核"(没走过保存)或行号尚未解析,这里补一次,保证按「工单号+工单行号」落点。
         stampRowNo(panelCode, no);
+        // 单据日期同样补一次(2026-11-01):空着的话排产看板日期列查不到这条已审报工的「实际值」
+        stampDocDate(panelCode, no);
         for (Map<String, Object> r : rows(no)) {
             complete(r, user);
         }
@@ -135,8 +236,27 @@ public class WoReportService {
                         + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
     }
 
-    /** 审核完成化:守卫 + 镜像补全 + wgzt/jc_no。草稿行由面板保存时已带 gldh/gxdm/sl。 */
+    /** 审核完成化:先走 {@link #validateRow}(与「提交审批」同一份判据),再补镜像/锚定/完成态。 */
     private void complete(Map<String, Object> r, String user) {
+        Integer rowId = (Integer) r.get("id");
+        String wo = String.valueOf(r.get("gldh")).trim();
+        // 校验与「提交审批」前置校验共用同一份判据;审核时再校验一次
+        // (提交之后数据可能又变:同工序别人先报了、工单被结案…)。
+        Map<String, Object> t = validateRow(r, "审核");
+        writeComplete(t, rowId, wo, user);
+    }
+
+    /**
+     * 行校验(**只读**,不写库)—— 审核(complete)与「提交审批」前置校验共用同一份判据。
+     * 通过时返回**落点行**(plang_pc × plang 镜像),失败直接抛 IllegalStateException。
+     *
+     * <p>2026-11-01 用户口径:「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/
+     * 「当前这个也是」—— 报工单的锚点、工序是否在本行路线内、是否跳序、数量上限、工单结案/排产,
+     * 全是编制环节的数据校验,统一前移到提交审批;审核侧保留同一判据兜底(历史已送审单据)。
+     *
+     * @param action 报错文案里的动作名(审核 / 提交审批),只影响"锚点缺失"那一句措辞
+     */
+    private Map<String, Object> validateRow(Map<String, Object> r, String action) {
         Integer rowId = (Integer) r.get("id");
         String wo = String.valueOf(r.get("gldh")).trim();
         String op = String.valueOf(r.get("gxdm")).trim();
@@ -148,24 +268,9 @@ public class WoReportService {
         //   ① 本单已带 gd_id(=plang_pc.id,重审/再报时)→ plang_pc.plang_id
         //   ② 本单带 工单行号(scjl.工单行号,界面可见)→ (工单号 + 行号) 定位该行
         //   ⚠ 优先取 ①:gd_id 是排产行级别的精确锚,行号可能对应多个物理行。
-        Long wantRowId = null;
-        double ownGd = num(r.get("gd_id"));
-        if (ownGd > 0) {
-            List<Long> rr = jdbc.queryForList(
-                    "SELECT TOP 1 pc.plang_id FROM dbo.plang_pc pc"
-                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                            + " WHERE pc.id=?", Long.class, (long) ownGd);
-            if (!rr.isEmpty()) wantRowId = rr.get(0);
-        }
-        if (wantRowId == null && r.get("own_xc") != null) {
-            List<Long> rr = jdbc.queryForList(
-                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=?"
-                            + " AND ISNULL(asp_cancel,'N')<>'Y'"
-                            + " AND (? = N'' OR ISNULL([批次号],N'') = ?)"
-                            + " ORDER BY id", Long.class, wo, ((Number) r.get("own_xc")).intValue(),
-                    rptBatch, rptBatch);
-            if (rr.size() == 1) wantRowId = rr.get(0);   // 恰命中 1 行才认,多行不猜(退回批次/FIFO)
-        }
+        //   ⚠ 2026-11-01:判据抽到 {@link #anchorRowId},与「提交审批」前置校验共用同一份
+        //     (用户口径「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」)。
+        Long wantRowId = anchorRowId(r);
         // ── 工序报工必须跟随工单的**工艺路线**(2026-10-05 用户口径:报工按当前工单路线执行,选错工序会报错)──
         //   ① 报工的工序必须在 plang.工艺路线 的工序明细内;
         //   ② 不得跳序:路线中排在该工序之前的工序若尚无**已审核**报工 → 拦截(提示先报前道)。
@@ -177,7 +282,7 @@ public class WoReportService {
         //   (正确工序被拒 / 错误工序被放行)。现改为取**本行**(工单行id → 批次兜底)的路线。
         Long repRowId = wantRowId;
         if (repRowId == null) {
-            throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能审核");
+            throw new IllegalStateException("报工缺少唯一工单行锚点(请先选择工单号+工单行号),不能" + action);
         }
         List<String> rtRows = repRowId != null
                 ? jdbc.queryForList("SELECT ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?"
@@ -289,12 +394,17 @@ public class WoReportService {
         double reported = opSum == null ? 0 : opSum;
         double allowed = cap * 1.01d;
         if (cap <= 0) {
-            throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能审核报工");
+            throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能报工");
         }
         if (reported + qty > allowed + 0.0001d) {
             throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]计划量 " + cap
                     + ",允许至 " + allowed + ",已报 " + reported + ",本次 " + qty + ")");
         }
+        return t;
+    }
+
+    /** 审核落库(校验已在 {@link #validateRow} 通过):补 jc_no / 排产镜像 / 锚定 / wgzt=Y。 */
+    private void writeComplete(Map<String, Object> t, Integer rowId, String wo, String user) {
         // jc_no 产成品流水(产线--yyMMdd-8位,按 线+日 递增)
         String scx = String.valueOf(t.get("pc_scx"));
         String day = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));

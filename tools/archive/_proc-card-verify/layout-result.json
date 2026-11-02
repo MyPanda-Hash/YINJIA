@@ -1,0 +1,88 @@
+{
+  "desktop-1440x900": {
+    "innerW": 1440,
+    "innerH": 900,
+    "docScrollW": 1440,
+    "bodyScrollW": 1440,
+    "pageHorizontalScroll": false,
+    "pfc": {
+      "scrollW": 1224,
+      "clientW": 1224,
+      "hScroll": false
+    },
+    "listTable": {
+      "scrollW": 625,
+      "clientW": 625
+    },
+    "tableInnerScroll": {
+      "scrollW": 1036,
+      "clientW": 625,
+      "hScroll": true
+    },
+    "bar": {
+      "right": 1414,
+      "overflowRight": -26
+    },
+    "tabs": {
+      "right": 1414,
+      "overflowRight": -26
+    },
+    "tabItems": [
+      {
+        "t": "录入",
+        "right": 258
+      },
+      {
+        "t": "卡片列表",
+        "right": 354
+      },
+      {
+        "t": "批次追溯",
+        "right": 430
+      }
+    ]
+  },
+  "narrow-390x844": {
+    "innerW": 390,
+    "innerH": 844,
+    "docScrollW": 390,
+    "bodyScrollW": 390,
+    "pageHorizontalScroll": false,
+    "pfc": {
+      "scrollW": 370,
+      "clientW": 370,
+      "hScroll": false
+    },
+    "listTable": {
+      "scrollW": 350,
+      "clientW": 350
+    },
+    "tableInnerScroll": {
+      "scrollW": 1036,
+      "clientW": 350,
+      "hScroll": true
+    },
+    "bar": {
+      "right": 370,
+      "overflowRight": -20
+    },
+    "tabs": {
+      "right": 370,
+      "overflowRight": -20
+    },
+    "tabItems": [
+      {
+        "t": "录入",
+        "right": 68
+      },
+      {
+        "t": "卡片列表",
+        "right": 164
+      },
+      {
+        "t": "批次追溯",
+        "right": 240
+      }
+    ]
+  }
+}

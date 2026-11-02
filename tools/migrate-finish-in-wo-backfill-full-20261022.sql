@@ -52,6 +52,10 @@ BEGIN TRY
     IF OBJECT_ID('tempdb..#q') IS NOT NULL DROP TABLE #q;
     IF OBJECT_ID('tempdb..#c') IS NOT NULL DROP TABLE #c;
     IF OBJECT_ID('tempdb..#plan') IS NOT NULL DROP TABLE #plan;
+    /* ⚠ #out 必须一起清:DbSync 整轮同步共用一条连接,上一支脚本
+       migrate-finish-in-wo-backfill-20261022.sql 结束时也留下同名 #out(列里没有「档」)
+       ⇒ 否则本脚本编译期就报「Invalid column name '档'」(2026-10-29 合并远端后实测复现)。 */
+    IF OBJECT_ID('tempdb..#out') IS NOT NULL DROP TABLE #out;
 
     CREATE TABLE #r (单据编号 nvarchar(400) NOT NULL PRIMARY KEY,
                      单据日期 date NULL, 产品数 int NULL);

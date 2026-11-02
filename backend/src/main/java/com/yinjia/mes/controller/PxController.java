@@ -57,6 +57,11 @@ public class PxController {
     private final com.yinjia.mes.service.WorkOrderPickService woPick;
     /** 工单扫码领料的逐笔留痕(2026-10-21):扫了哪些料/各多少/什么时候 */
     private final com.yinjia.mes.service.WoPickScanLogService woPickLog;
+    /**
+     * 统一生单对话框里"自己算行"的那个动作(2026-10-31):
+     * 送料暂收单按商品档案分流({@link com.yinjia.mes.panel.QcRecvGenerateHandler}),见 generateByAction。
+     */
+    private final com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -74,7 +79,8 @@ public class PxController {
                         com.yinjia.mes.service.QueryService queryService,
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.service.WorkOrderPickService woPick,
-                        com.yinjia.mes.service.WoPickScanLogService woPickLog) {
+                        com.yinjia.mes.service.WoPickScanLogService woPickLog,
+                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -93,6 +99,7 @@ public class PxController {
         this.rdFlow = rdFlow;
         this.woPick = woPick;
         this.woPickLog = woPickLog;
+        this.qcRecvGenerate = qcRecvGenerate;
     }
 
     // ============ 工单扫码领料取数(2026-10-21,手机端) ============
@@ -777,6 +784,126 @@ public class PxController {
         out.put("batch", batchService.batchOf(batchNo));
         out.put("links", batchService.linksOfBatch(batchNo));
         return ApiResult.ok(out);
+    }
+
+    // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
+    /**
+     * 生单预览:勾选的来源单据(**一张 = 原「生单」,多张 = 新「批量生单」**)各自的明细行,
+     * 带 数量/已生单/剩余/可生单上限 + (分批链路)批次号预告。
+     *
+     * 用户口径:「非定制化的生单只要可以勾选和选择数量就可以」;「批量生单」= 左栏勾多张单 →
+     * 打开一个界面列出这些单据的明细行 → 再挑行/填量 → 转单。
+     * 分批链路(采购订单→送料暂收单)与普通推式生单在这里返回同一份行契约,前端一套表渲染。
+     */
+    @PostMapping("/push/lines")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> pushLines(@RequestBody Map<String, Object> body) {
+        String sourcePanel = String.valueOf(body.getOrDefault("panelCode", ""));
+        String action = String.valueOf(body.getOrDefault("action", ""));
+        perm.requirePanelView(sourcePanel);
+        return ApiResult.ok(pushGenerateHandler.pushPreview(sourcePanel, action, strList(body.get("sourceNos"))));
+    }
+
+    /**
+     * 生单:按「勾选的行 + 本次数量」生成目标草稿(单张/多张同一入口)。
+     *
+     * 逐张按**独立事务**生成(见 {@code PushGenerateHandler.generateOne}),某张失败不回滚已成功的那几张 ——
+     * 返回 {生成:[{sourceNo,编号,面板,批次号}], 失败:[{sourceNo,原因}]},界面据此逐条说明。
+     */
+    @PostMapping("/push/generate")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> pushGenerate(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        String sourcePanel = String.valueOf(body.getOrDefault("panelCode", ""));
+        String action = String.valueOf(body.getOrDefault("action", ""));
+        String target = configService.pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalArgumentException("该动作没有可用的生单目标:" + action);
+        perm.requirePanelView(sourcePanel);
+        perm.requireButton(target, "保存");   // 与 /batchFlow/generate 同一道门(目标面板保存权)
+        String user = SecurityContextHolder.getContext().getAuthentication() == null
+                ? "system" : SecurityContextHolder.getContext().getAuthentication().getName();
+        List<Map<String, Object>> made = new java.util.ArrayList<>();
+        List<Map<String, Object>> failed = new java.util.ArrayList<>();
+        Object rawDocs = body.get("docs");
+        if (rawDocs instanceof List<?> docList) {
+            for (Object o : docList) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String sourceNo = String.valueOf(m.get("sourceNo") == null ? "" : m.get("sourceNo"));
+                if (sourceNo.isBlank()) continue;
+                Map<String, Double> qtyByLine = new java.util.LinkedHashMap<>();
+                Object rawLines = m.get("lines");
+                if (rawLines instanceof List<?> lineList) {
+                    for (Object lo : lineList) {
+                        if (!(lo instanceof Map<?, ?> lm)) continue;
+                        Object key = lm.get("lineKey");
+                        if (key == null) continue;
+                        qtyByLine.put(String.valueOf(key), lm.get("qty") == null ? 0d
+                                : Double.parseDouble(String.valueOf(lm.get("qty"))));
+                    }
+                }
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("sourceNo", sourceNo);
+                try {
+                    Map<String, Object> res = generateByAction(sourcePanel, action, sourceNo, user,
+                            qtyByLine.isEmpty() ? null : qtyByLine,
+                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")));
+                    row.put("编号", res.get("编号"));
+                    row.put("面板", res.getOrDefault("gotoPanel", target));
+                    row.put("批次号", res.get("批次号"));
+                    // 一条动作两个去向的生单(暂收单 → 检验/入库):把「生成清单」原样带给界面,
+                    // 否则用户只看到一张单的号,以为另一张漏了(见 QcRecvGenerateHandler)
+                    if (res.get("生成清单") instanceof List<?> made2) row.put("生成清单", made2);
+                    if (res.get("未登记商品") instanceof List<?> missing) row.put("未登记商品", missing);
+                    if (res.get("编号清单") instanceof List<?> nos) row.put("编号清单", nos);
+                    made.add(row);
+                } catch (Exception e) {
+                    row.put("原因", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                    failed.add(row);
+                }
+            }
+        }
+        if (made.isEmpty() && failed.isEmpty()) throw new IllegalArgumentException("没有要生单的来源单据");
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("targetPanel", target);
+        out.put("生成", made);
+        out.put("失败", failed);
+        // 使用记录:整批记一笔(单据号 = 生成清单的编号)
+        recordUsage(sourcePanel, action,
+                made.stream().map(r -> String.valueOf(r.get("编号"))).collect(java.util.stream.Collectors.joining(",")),
+                request);
+        return ApiResult.ok(out);
+    }
+
+    /** 请求体里的字符串数组(容忍 null / 逗号串 / 单值) */
+    private static List<String> strList(Object raw) {
+        List<String> out = new java.util.ArrayList<>();
+        if (raw instanceof List<?> list) {
+            for (Object o : list) if (o != null && !String.valueOf(o).isBlank()) out.add(String.valueOf(o).trim());
+        } else if (raw != null) {
+            for (String s : String.valueOf(raw).split("[,，]")) if (!s.isBlank()) out.add(s.trim());
+        }
+        return out;
+    }
+
+    /**
+     * 按动作分派「一张来源单的生单」。
+     *
+     * <p>绝大多数动作走通用处理器({@link PushGenerateHandler#generateOne},内部再分分批/普通两条);
+     * 只有**送料暂收单 → 检验或入库单**这一个由自己算行(与 {@link PushGenerateHandler} 的
+     * CUSTOM_OWNED 同一份清单):它要按商品档案「来料检验」把行**分成两组各出一张**
+     * ({@link com.yinjia.mes.panel.QcRecvGenerateHandler#generateSelected})。
+     *
+     * <p>销售订单 → 生产工单**不经过这里**:用户口径(2026-10-31)「销售订单 → 生产工单、
+     * 生产工单 → 产成品入库单这两个保持原来的不变」⇒ 它仍走原来的 callButton → ManuScheduleHandler,
+     * 不进统一生单对话框;生产工单 → 产成品入库单同样保持原来的一键整单(generateBatch)。
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> generateByAction(String sourcePanel, String action, String sourceNo, String user,
+                                                 Map<String, Double> qtyByLine, String batchNo) {
+        if (com.yinjia.mes.panel.QcRecvGenerateHandler.PANEL.equals(sourcePanel)
+                && com.yinjia.mes.panel.QcRecvGenerateHandler.ACTION.equals(action)) {
+            return qcRecvGenerate.generateSelected(sourceNo, user, qtyByLine);
+        }
+        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo);
     }
 
     /** 报表栏目设置读取(报表表头筛选与排序补丁) */    @GetMapping("/reportColumnSettings")

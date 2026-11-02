@@ -49,6 +49,47 @@ public class ProcessTaskService {
         this.scheduleBoard = scheduleBoard;
     }
 
+    // ──────────────── 工序 ↔ 产线 的**软判据**(2026-10-28 用户口径) ────────────────
+    // 用户口径:「之后任意一个不是当前三个工序名称的工序,也要能选到生产线 —— 如果这个工序
+    //   没有对应的产线类型,就把全部产线显示出来让他选。」
+    // 落到代码只有一句:**只有"认得 + 车间真的有线"才拦,其余一律不拦。**
+    //   ① 工序没登记固定车间(工序档案里以后的封箱/喷码/包装…、遗留路线的下料/车削/检验)
+    //      ⇒ 不设限 ⇒ 排线弹窗列全部启用线、保存/派工/转序都放行;
+    //   ② 登记了固定车间,但该车间在产线档案里**一条启用线都没有**(还没建线 / 路线写着历史车间名)
+    //      ⇒ 同样不设限 —— 否则弹窗一条线都列不出来、保存必被拒,新工序直接被卡死;
+    //   ③ 只有 ① 与 ② 都不成立(成型/切炭/组装/装箱 且车间真的有线)才要求线的车间一致
+    //      —— 2026-10-21「装箱归组装」的口径照旧生效。
+    // 返回 null = 不设限;返回车间名 = 必须进该车间。调用点不要再各写一套 if。
+
+    /**
+     * 这道工序**必须**进哪个车间(2026-10-28);{@code null} = 不设限(全部启用产线都可选)。
+     *
+     * @param op        工序名(路线/任务上的原始值)
+     * @param routeShop 路线上登记的车间(自由文本,可为空)
+     */
+    private String requiredShop(String op, String routeShop) {
+        if (!ProcessShop.hasFixedShop(op)) return null;
+        String want = ProcessShop.resolve(op, routeShop);
+        if (want.isEmpty()) return null;
+        return hasEnabledLine(want) ? want : null;
+    }
+
+    /** 该车间在产线档案里有没有**启用**线(停用/作废不算) */
+    private boolean hasEnabledLine(String shop) {
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND ISNULL(停用,0)=0 AND ISNULL(生产车间,N'')=?", Integer.class, shop);
+        return n != null && n > 0;
+    }
+
+    /** 全部启用产线(不设限时的候选线;字段与产线档案下拉同口径) */
+    private List<Map<String, Object>> allEnabledLines() {
+        return jdbc.queryForList(
+                "SELECT 生产线, ISNULL(生产车间,N'') AS 生产车间, ISNULL(日产能,0) AS 日产能"
+                        + " FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
+                        + " ORDER BY ISNULL(排序,999), 生产线");
+    }
+
     // ────────────────────────── 生成 ──────────────────────────
 
     /**
@@ -72,6 +113,8 @@ public class ProcessTaskService {
                             + " FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " ORDER BY 加工顺序", route);
             for (Map<String, Object> op : ops) {
+                // 归口车间(2026-10-21):装箱归组装,路线上的车间空着/写成工序名也照样能判(见 ProcessShop)
+                String opShop = ProcessShop.resolve(str(op.get("工序")), str(op.get("生产车间")));
                 Integer dup = jdbc.queryForObject(
                         "SELECT COUNT(*) FROM dbo.wo_progress WHERE 单据编号=? AND 工单行id=? AND 工序=?"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
@@ -83,7 +126,7 @@ public class ProcessTaskService {
                                 + " 产品编码, 产品名称, 规格型号, asp_cancel, asp_user1, asp_time1)"
                                 + " VALUES (?,?,?,0,?,?,?,?,?,N'待加工',N'普通',?,?,?,?,N'N',?,GETDATE())",
                         plNo, op.get("工序"), r.get("计划数量"), "路线 " + route,
-                        r.get("id"), r.get("批次号"), op.get("加工顺序"), op.get("生产车间"),
+                        r.get("id"), r.get("批次号"), op.get("加工顺序"), opShop,
                         blankToNull(r.get("计划完工日期")), r.get("产品编码"), r.get("产品名称"), r.get("规格型号"),
                         user);
             }
@@ -141,16 +184,101 @@ public class ProcessTaskService {
                 if (rate <= 0) rate = 1;
                 // 首道 = 已落实(现场第一道就开始做),其余 = 计划;计划生产线留空等排产派线
                 String state = seq == 1 ? "已落实" : "计划";
+                // 🔴 2026-10-30 用户报障(工序路线排线截图:「未进行排产就已经有实际开工日期」):
+                //   **落实时间 = 实际开工,只能是真实发生的时刻**(报工/转序),不能在这里"建台账顺手写一个"。
+                //   原实现写 `new java.util.Date()`(JVM 本地时间)⇒ 结转那一刻就成了首道的「实际开工」,
+                //   工单还没排产、车间还没动工,弹窗里却已显示实际开工;而且它与 GETDATE()(库为 UTC)
+                //   相差 8 小时,同一行两个时间口径打架(实测 GD-2026-10-0229:pl_date 03:22 / 落实时间 11:22)。
+                //   ⇒ 这里一律留空,由 {@link #applyNextProcess} 在**真的达标转序**时写真实时间。
                 created += jdbc.update(
                         "INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
                                 + " 计划数量, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
-                                + " VALUES (?,?,?,?,NULL,NULL,?,?,?,N'N',?,GETDATE())",
+                                + " VALUES (?,?,?,?,NULL,NULL,?,?,NULL,N'N',?,GETDATE())",
                         plNo, rowId, op.get("工序"), seq,
-                        round(plan * rate), state,
-                        seq == 1 ? new java.util.Date() : null, user);
+                        round(plan * rate), state, user);
             }
         }
         return created;
+    }
+
+    /**
+     * 按**新的排产数量**重算某工单行各道工序台账的「计划数量」(2026-10-30 切单用)。
+     *
+     * <p>口径与 {@link #preplanManual}(预排全程线)**完全一致**:计划数量 = 排产数量 × 该道自己的换算率
+     * (各道分开算、不累乘);只改数量,不动状态/生产线/日期 —— 切单不是重新排线。
+     *
+     * <p>不重算的后果(2026-10-30 用户报障,服务器 GD-2026-10-0234):切单只改了 plang.pl_sl,
+     * 台账还是切单前的旧量(排产 776、当前工序计划量仍 976);报工封顶按 pl_sl×换算率(776),
+     * 而转序判据按台账(976)⇒ 该道永远达不到 976、也报不过 776,父单永久卡在切炭工序。
+     */
+    @Transactional
+    public void rescaleRowLedger(Object rowId, String route, double newQty, String user) {
+        if (rowId == null || !(newQty > 0)) return;
+        String rt = route == null ? "" : route.trim();
+        if (rt.isEmpty()) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT id, ISNULL([工艺路线],N'') AS 工艺路线, ISNULL(dm,N'') AS 产品编码 FROM dbo.plang WHERE id=?",
+                    rowId);
+            if (rows.isEmpty()) return;
+            rt = routeOfRow(rows.get(0));
+        }
+        jdbc.update("UPDATE w SET w.计划数量 = ? * ISNULL((SELECT MAX(ISNULL(r.换算率,1)) FROM dbo.bs_route r"
+                        + "   WHERE r.工艺路线编码=? AND r.工序名称=w.工序 AND ISNULL(r.asp_cancel,'N')<>'Y'),1),"
+                        + " w.asp_user2=?, w.asp_time2=GETDATE()"
+                        + " FROM dbo.wo_process_line w"
+                        + " WHERE w.工单行id=? AND ISNULL(w.asp_cancel,'N')<>'Y'",
+                newQty, rt, user, rowId);
+    }
+
+    /**
+     * **切单专用:把父行的预排台账复制成子单台账**(2026-10-30)。
+     *
+     * <p>🔴 为什么不能再用 {@link #ensureLedgerForWorkOrder}:它按路线**新建**一套台账,`计划生产线` 一律留空
+     * (那是「结转过但还没排产」的形态)。切单的子单是**继承父单排产**的,如果照它建,子单台账计划线为空 ⇒
+     * 第一道报完该转序时 {@link #applyNextProcess} 直接返回「下一道未预排线,请人工派线」,子单卡死在首道
+     * (2026-10-30 实测本机切单对 GD-2026-10-0226:父子两行台账的计划线都是空)。
+     *
+     * <p>口径:工序 / 工序序 / **计划生产线** / 计划开工完工日期 全部照抄父行;计划数量 = 切出量 × 该道换算率
+     * (各道分开算,不累乘);状态按「首道已落实、其余计划」重来(子单是自己的一份未生产量),
+     * 落实时间留空 —— 实际开工只由真转序/报工写。
+     *
+     * @return 复制的台账行数;父行没有台账时退回 {@link #ensureLedgerForWorkOrder}(计划线为空,由人工派线)
+     */
+    @Transactional
+    public int cloneRowLedger(Object parentRowId, Object childRowId, String childNo, double childQty,
+                              String route, String user) {
+        if (parentRowId == null || childRowId == null || !(childQty > 0)) return 0;
+        List<Map<String, Object>> src = jdbc.queryForList(
+                "SELECT 工序, ISNULL(工序序,999) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
+                        + " 计划开工日期, 计划完工日期 FROM dbo.wo_process_line"
+                        + " WHERE 工单行id=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " ORDER BY ISNULL(工序序,999), id", parentRowId);
+        if (src.isEmpty()) {
+            // 父行没有预排台账(结转过但没排过线):只能按路线新建,计划线留空等人工派线
+            return ensureLedgerForWorkOrder(childNo, route, user);
+        }
+        String rt = route == null ? "" : route.trim();
+        int seq = 0;
+        for (Map<String, Object> r : src) {
+            seq++;
+            String op = str(r.get("工序"));
+            double rate = 1;
+            if (!rt.isEmpty()) {
+                Double v = jdbc.queryForObject(
+                        "SELECT MAX(ISNULL(换算率,1)) FROM dbo.bs_route WHERE 工艺路线编码=? AND 工序名称=?"
+                                + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, rt, op);
+                if (v != null && v > 0) rate = v;
+            }
+            String line = str(r.get("计划生产线"));
+            jdbc.update("INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
+                            + " 计划数量, 计划开工日期, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,NULL,?,?,?,?,NULL,N'N',?,GETDATE())",
+                    childNo, childRowId, op, r.get("工序序"), line == null || line.isBlank() ? null : line,
+                    round(childQty * rate),
+                    r.get("计划开工日期"), r.get("计划完工日期"),
+                    seq == 1 ? "已落实" : "计划", user);
+        }
+        return seq;
     }
 
     private String routeOfRow(Map<String, Object> row) {
@@ -228,7 +356,9 @@ public class ProcessTaskService {
                 + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, line.trim());
         if (dis != null && dis == 1) throw new IllegalArgumentException("生产线「" + line + "」已停用,不可派工");
         // 工序↔产线挂钩的**服务端硬约束**(2026-10-05):产线的「生产车间」= 工序/工艺(成型/切炭/组装),
-        // 必须与任务的工序一致 —— 前端下拉只是便利,接口层不能靠它兜底
+        // 必须与任务的工序一致 —— 前端下拉只是便利,接口层不能靠它兜底。
+        // 台账口径(2026-10-21 ProcessShop):装箱归组装 —— 装箱任务可派到组装车间下的任一条线
+        // (组装线 / 装箱线),但进不了成型、切炭线。
         String lineShop = jdbc.queryForObject("SELECT ISNULL(生产车间,N'') FROM dbo.bs_prod_line"
                 + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", String.class, line.trim());
         List<String> done = new ArrayList<>();
@@ -242,10 +372,16 @@ public class ProcessTaskService {
                 if (rows.isEmpty()) throw new IllegalStateException("任务不存在或已作废");
                 String st = String.valueOf(rows.get(0).get("状态"));
                 if ("已完工".equals(st)) throw new IllegalStateException("已完工,无需派工");
-                String taskShop = String.valueOf(rows.get(0).get("生产车间"));
-                if (!taskShop.isBlank() && !taskShop.equals(lineShop == null ? "" : lineShop)) {
+                String op = String.valueOf(rows.get(0).get("工序"));
+                // 工序↔产线软判据(2026-10-28):requiredShop 返回 null = 这道工序没固定车间/该车间没线
+                // ⇒ 不拦(新工序也能派工);只有 成型/切炭/组装/装箱 且车间有线时才要求一致。
+                String needShop = requiredShop(op, String.valueOf(rows.get(0).get("生产车间")));
+                String taskShop = needShop == null
+                        ? ProcessShop.resolve(op, String.valueOf(rows.get(0).get("生产车间")))
+                        : needShop;
+                if (needShop != null && !needShop.equals(lineShop == null ? "" : lineShop.trim())) {
                     throw new IllegalStateException("生产线「" + line.trim() + "」属于「" + lineShop + "」,"
-                            + "与任务的工序「" + taskShop + "」不一致");
+                            + "与任务的工序「" + op + "」(应进「" + taskShop + "」车间)不一致");
                 }
                 jdbc.update("UPDATE dbo.wo_progress SET 生产线=?, 状态=N'在加工', asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                         line.trim(), user, id);
@@ -406,9 +542,17 @@ public class ProcessTaskService {
                 "SELECT 单号, 工艺路线, ISNULL(下一道工序,N'') AS 下一道工序, ISNULL(生产车间,N'') AS 生产车间"
                         + " FROM dbo.v_wo_next_process WHERE 单号 IN (" + in + ")", nos.toArray());
         for (Map<String, Object> r : rows) {
-            String shop = String.valueOf(r.get("生产车间"));
+            // 归口车间(2026-10-21 ProcessShop):装箱归组装 ⇒ 装箱的候选线是组装车间下的线,不是"装箱车间"
+            // 2026-10-28:requiredShop 为 null(工序没登记固定车间 / 该车间没建线)⇒ 候选线 = 全部启用线,
+            //   不再返回空列表(原先空列表 ⇒ 前端下拉一条都看不到,新工序无法调拨/排线)。
+            String op = str(r.get("下一道工序"));
+            String needShop = requiredShop(op, str(r.get("生产车间")));
+            String shop = needShop != null ? needShop : ProcessShop.resolve(op, str(r.get("生产车间")));
             String rt = String.valueOf(r.get("工艺路线"));
-            r.put("候选产线", shop.isBlank() ? List.of() : jdbc.queryForList(
+            r.put("生产车间", shop);
+            r.put("候选产线", needShop == null ? allEnabledLines().stream()
+                    .map(m -> String.valueOf(m.get("生产线"))).toList()
+                    : jdbc.queryForList(
                     "SELECT 生产线 FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
                             + " AND ISNULL(生产车间,N'')=? ORDER BY ISNULL(排序,999), 生产线", String.class, shop));
             // 该路线的完整工序序列(按加工顺序):前端「工序/工艺」下拉直接按它出选项与顺序
@@ -417,6 +561,55 @@ public class ProcessTaskService {
                             + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", String.class, rt));
         }
         return rows;
+    }
+
+    /**
+     * 该**工单行**的「当前工序」—— 与工单排产看板「当前工序」列 / 生产工单列表**同一口径**。
+     *
+     * <p>口径(2026-10-07 定、2026-10-15 收口到行级):预排台账 {@code wo_process_line} 里
+     * **最后一道「已落实」**(工序序倒序)优先;台账缺失回落**本行** {@code plang.[当前工序]}。
+     *
+     * <p>2026-10-29 用户口径「调拨只能调拨到当前工序的产线中」:调拨守卫({@code WorkOrderTransferService})
+     * 与调拨候选线都读这一处 —— 若各写一套 SQL,会出现「看板显示切炭、调拨却按成型判」的两套口径
+     * (与 2026-10-05 的产线口径分叉同类事故)。
+     *
+     * @param plNo  工单号
+     * @param rowId 工单行id(= {@code plang.id};唯一键 = 工单号 + 工单行)
+     * @return 工序名;判不出(无台账且本行状态为空)返回 {@code null} = 不设限
+     */
+    public String currentProcess(String plNo, Long rowId) {
+        if (!notBlank(plNo) || rowId == null) return null;
+        List<String> ops = jdbc.queryForList(
+                "SELECT TOP 1 工序 FROM dbo.wo_process_line"
+                        + " WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + "   AND (工单行id=? OR 工单行id IS NULL) AND ISNULL(状态,N'')=N'已落实'"
+                        + " ORDER BY ISNULL(工序序,999) DESC, id DESC", String.class, plNo.trim(), rowId);
+        if (!ops.isEmpty() && notBlank(ops.get(0))) return ops.get(0).trim();
+        List<String> fallback = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL([当前工序],N'') FROM dbo.plang WHERE id=?", String.class, rowId);
+        return fallback.isEmpty() || !notBlank(fallback.get(0)) ? null : fallback.get(0).trim();
+    }
+
+    /**
+     * 某道工序**可去的产线**(调拨候选线的唯一出处):与 {@link #nextProcess} 同一套软判据 ——
+     * 认得的工序(成型/切炭/组装/装箱)且该车间真有启用线 ⇒ 只出该车间的线;
+     * 其余(新工序、该车间没建线、工序为空)⇒ 全部启用线(不猜也不拦,见 {@link #requiredShop})。
+     *
+     * @param op        工序名;{@code null}/空 = 不设限
+     * @param routeShop 路线登记的车间(自由文本,可空;只对"不认识的新工序"有意义)
+     * @return {@code {工序, 限定车间, 产线:[{生产线,生产车间,日产能}]}};限定车间 = null 表示不设限
+     */
+    public Map<String, Object> lineScope(String op, String routeShop) {
+        String needShop = requiredShop(op, routeShop);
+        List<Map<String, Object>> lines = needShop == null ? allEnabledLines() : jdbc.queryForList(
+                "SELECT 生产线, ISNULL(生产车间,N'') AS 生产车间, ISNULL(日产能,0) AS 日产能"
+                        + " FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
+                        + " AND ISNULL(生产车间,N'')=? ORDER BY ISNULL(排序,999), 生产线", needShop);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("工序", op == null ? "" : op.trim());
+        out.put("限定车间", needShop);
+        out.put("产线", lines);
+        return out;
     }
 
     /**
@@ -722,22 +915,103 @@ public class ProcessTaskService {
                 //   计划数量(工序 i) = 本行排产数量 × 该工序换算率;
                 //   ❌ 不逐道累乘(否则 成型7×切炭2 会把切炭算成 14 倍,转序门槛也跟着虚高,完成报工也不转序)。
                 Map<String, Object> s = new LinkedHashMap<>(r);
+                // 归口车间(2026-10-21 ProcessShop):弹窗每道的候选线按它过滤 —— 装箱→组装,
+                //   路线上的车间空着也照样只出组装车间下的线(此前空值 ⇒ 弹窗把全部产线都摆出来,
+                //   装箱能被排到成型线)。
+                // 2026-10-28 用户口径:「之后任意一个不是当前三个工序名称的工序也要能选产线」——
+                //   只有 requiredShop 非 null(工序登记过固定车间 **且** 该车间真有启用线)才限定;
+                //   否则 弹窗列**全部启用产线**(前端按「限定车间」这个开关决定,别在前端再猜)。
+                String needShop = requiredShop(str(r.get("工序")), str(r.get("生产车间")));
+                s.put("生产车间", needShop != null ? needShop
+                        : ProcessShop.resolve(str(r.get("工序")), str(r.get("生产车间"))));
+                s.put("限定车间", needShop != null);
                 s.put("计划数量", round(baseQty * rate));
                 s.put("计划完工日期", head.get("交期"));
                 steps.add(s);
             }
         }
+        // 计划链(2026-10-29 用户口径):上一道「计划完工日期」= 下一道「计划开工日期」;
+        //   首道默认今天(排产当天开工)。实际开工/实际完工另给:
+        //   **实际开工 = 该道已审核报工的最早时间**(2026-10-30 用户口径「只有真报工才显示」;
+        //   原口径取台账 落实时间,而 落实时间 曾被「建台账/排产」顺手写成当时时刻 ⇒ 没开工也显示开工),
+        //   实际完工 = 该道已审报工的最大完工时间 —— 计划与实际本来就不一致,分开展示。
+        String todayText = java.time.LocalDate.now().toString();
+        String prevDue = null;
+        for (Map<String, Object> s : steps) {
+            String start = prevDue == null ? todayText : prevDue;
+            String due = str(s.get("计划完工日期"));
+            // 逾期工单(交期已过)不能给「开工今天、完工昨天」这种自相矛盾的默认值 ⇒ 完工日拉到开工日
+            if (due != null && java.time.LocalDate.parse(due).isBefore(java.time.LocalDate.parse(start))) due = start;
+            s.put("计划开工日期", start);
+            if (due != null) s.put("计划完工日期", due);
+            prevDue = due == null ? start : due;
+            s.put("实际完工", doneTimeText(no, rowId, str(s.get("工序"))));
+        }
         // 已有台账(未作废):改线时回填
+        // 「实际开工」= **该道已审核报工的最早时间**(2026-10-30 用户口径「只有真报工才显示」),
+        //   不再直接读 落实时间 —— 落实时间历史上被「建台账/排产」顺手写成当时时刻(见 ensureLedgerForWorkOrder
+        //   与 preplanManual 的注释),那些是**假的实际开工**:实测 GD-2026-10-0229 工单 10-30 才建、
+        //   却显示 11:22 实际开工,而该工单一条报工都没有。改成按报工事实取最早时刻,
+        //   既修好新数据,也把存量脏时间一并"盖掉"(不需要改库)。
         List<Map<String, Object>> planned = jdbc.queryForList(
                 "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
                         + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(计划数量,0) AS 计划数量,"
-                        + " CONVERT(varchar(10), 计划完工日期, 120) AS 计划完工日期, ISNULL(状态,N'') AS 状态"
-                        + " FROM dbo.wo_process_line WHERE 工单号=? AND (? IS NULL OR 工单行id=?)"
-                        + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY ISNULL(工序序,999), id", no, lineId, lineId);
+                        + " CONVERT(varchar(10), 计划开工日期, 120) AS 计划开工日期,"
+                        + " CONVERT(varchar(10), 计划完工日期, 120) AS 计划完工日期,"
+                        + " CONVERT(varchar(16), (SELECT MIN(COALESCE(s.kssj, s.wgsj, s.sc_date)) FROM dbo.scjl s"
+                        + "    WHERE s.gldh = w.工单号 AND ISNULL(s.gxdm,N'') = ISNULL(w.工序,N'')"
+                        + "      AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "      AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = w.工单行id)"
+                        + "           OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "               (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id = w.工单行id)))), 120) AS 实际开工,"
+                        + " ISNULL(状态,N'') AS 状态"
+                        + " FROM dbo.wo_process_line w WHERE w.工单号=? AND (? IS NULL OR w.工单行id=?)"
+                        + " AND ISNULL(w.asp_cancel,'N')<>'Y' ORDER BY ISNULL(w.工序序,999), w.id", no, lineId, lineId);
+        // ── 条7「排产带上次产线」(2026-10-25 定稿方案 v2)────────────────────────────────────
+        // lastBasis(键=物料编码,用户拍板):
+        //   · 【上次首道】键=plang_pc.dm(=本工单行 plang.dm);源=plang_pc 排产台账,
+        //     过滤 未作废 且 scx 非空;排序=pl_date DESC,同分 plang_pc.id DESC;取=scx(上次首道线)。
+        //   · 【上次各道】键=(plang.dm, wo_process_line.工序);源=wo_process_line 预排台账,
+        //     过滤 台账未作废 且 工单行id 非空 JOIN plang.id 且 **plang 未作废**(作废工单的历史线不作数,
+        //     2026-10-25 实测:不带该过滤 12 个组合、带 5 物料/14 组合为正式口径,_v4.sql H)
+        //     且 COALESCE(NULLIF(实际生产线,N''),计划生产线,N'') 非空;
+        //     排序=父工单 plang.pl_date DESC,同分 wo_process_line.id DESC;
+        //     取=COALESCE(NULLIF(实际生产线,N''),计划生产线)(实际跑过的线优先,未落实取预排线)。
+        //   ⚠ 排序键取舍留痕(冷读#5,类比【上线前改写】纪律,防后人当 bug 改回 asp_time1):
+        //     plang_pc.pl_date 是 WorkOrderScheduleRecord.create 经 INSERT…SELECT 从 plang 复制的
+        //     **转单日期**,不是排产动作时间 —— asp_time1 才是排入时间,但实测 430 行中 418 行 =
+        //     2026-10-18 07:46 同分钟批量回填(tools/archive/_plan-verify-lastdefaults/_v4.sql I),不可用;
+        //     pl_date 实测 468 行 0 空、2026-09-02~10-20 ⇒ 唯一可信排序键。
+        //     ⇒ 口径实为「该物料最近一次**转出**的工单当前排的线」,老工单昨天刚重排不会因此变「最近」。
+        //   预填判断(∈归口车间启用线、仅填空行)由前端 applyLineDefaults(frontend/src/business/routeDefaults.js)
+        //   做;本服务 preplanManual 的 requiredShop/停用校验等守卫不受影响(2026-10-28 已收口成软判据)。
+        String dm = String.valueOf(head.get("产品编码")).trim();
+        List<Map<String, Object>> lastFirst = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(pc.scx,N'') AS 上次首道线, ISNULL(p.pl_no,N'') AS 工单号,"
+                        + " CONVERT(varchar(10), pc.pl_date, 120) AS 日期"
+                        + " FROM dbo.plang_pc pc LEFT JOIN dbo.plang p ON p.id = pc.plang_id"
+                        + " WHERE ISNULL(pc.asp_cancel,'N') <> 'Y' AND ISNULL(pc.scx,N'') <> N''"
+                        + "   AND ISNULL(pc.dm,N'') = ?"
+                        + " ORDER BY pc.pl_date DESC, pc.id DESC", dm);
+        List<Map<String, Object>> lastLines = jdbc.queryForList(
+                "SELECT t.工序, t.上次生产线, t.工单号, t.日期 FROM ("
+                        + " SELECT ISNULL(wl.工序,N'') AS 工序,"
+                        + "        COALESCE(NULLIF(wl.实际生产线,N''), ISNULL(wl.计划生产线,N'')) AS 上次生产线,"
+                        + "        ISNULL(p.pl_no,N'') AS 工单号, CONVERT(varchar(10), p.pl_date, 120) AS 日期,"
+                        + "        ROW_NUMBER() OVER (PARTITION BY p.dm, wl.工序"
+                        + "                          ORDER BY p.pl_date DESC, wl.id DESC) AS rn"
+                        + " FROM dbo.wo_process_line wl"
+                        + " JOIN dbo.plang p ON p.id = wl.工单行id AND ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + " WHERE ISNULL(wl.asp_cancel,'N') <> 'Y'"
+                        + "   AND COALESCE(NULLIF(wl.实际生产线,N''), ISNULL(wl.计划生产线,N''), N'') <> N''"
+                        + "   AND ISNULL(p.dm,N'') = ?) t"
+                        + " WHERE t.rn = 1 ORDER BY t.工序", dm);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("表头", headOut);
         out.put("工序步骤", steps);
         out.put("已排台账", planned);
+        out.put("上次首道", lastFirst.isEmpty() ? Map.of() : lastFirst.get(0));
+        out.put("上次产线", lastLines);
         return out;
     }
 
@@ -747,7 +1021,8 @@ public class ProcessTaskService {
      *   · 全路线写台账 {@code wo_process_line}:首道置「已落实」,其余「计划」,等前道报工完工后自动转序;
      *   · 幂等:先作废该工单旧台账再重写(改线 = 重新提交)。
      *
-     * <p>守卫:每道都必须选线 · 线存在且未停用 · **线的生产车间必须等于该工序的车间**(与选线口径一致)·
+     * <p>守卫:每道都必须选线 · 线存在且未停用 · **线的生产车间必须等于该工序的归口车间**
+     * ({@link ProcessShop}:装箱与组装同属组装车间;与选线口径一致)·
      * 工单未结案 · 未排产(scx 空;已排产的换线请先撤销排产)。
      *
      * @param steps [{工序, 生产线, 计划完工日期?(yyyy-MM-dd), 计划数量?(忽略,一律按换算率算)}]
@@ -798,8 +1073,17 @@ public class ProcessTaskService {
             if (ls.isEmpty()) throw new IllegalArgumentException("生产线「" + line + "」不存在");
             if (num(ls.get(0).get("停用")) == 1) throw new IllegalArgumentException("生产线「" + line + "」已停用");
             String lineShop = String.valueOf(ls.get(0).get("生产车间"));
-            if (!shop.isBlank() && !shop.equals(lineShop))
-                throw new IllegalArgumentException("生产线「" + line + "」属于「" + lineShop + "」,与工序「" + op + "」(" + shop + ")不一致");
+            // 工序↔产线的服务端校验(2026-10-05 起;2026-10-28 收口成**软判据**):
+            //   归口车间的唯一口径在 ProcessShop(2026-10-21 用户口径「组装和装箱工序都是同样进入组装
+            //   生产线才对」):装箱→组装,所以装箱能选组装车间下的组装线/装箱线,但选不了成型/切炭线。
+            //   ⚠ 2026-10-28 用户口径「之后任意一个不是当前三个工序名称的工序,也要能选到生产线」⇒
+            //   只有 requiredShop 非 null(工序登记过固定车间 **且** 该车间真有启用线)才校验;
+            //   工序不在 ProcessShop 表里 / 它的车间一条线都没有 ⇒ **不拦**,任一条启用线都能保存
+            //   (否则弹窗列不出线、这里又必拒 ⇒ 新工序永远排不进去)。
+            String needShop = requiredShop(op, shop);
+            if (needShop != null && !needShop.equals(lineShop == null ? "" : lineShop.trim()))
+                throw new IllegalArgumentException("生产线「" + line + "」属于「" + lineShop + "」,与工序「" + op
+                        + "」应进的「" + needShop + "」车间不一致(装箱与组装同属组装车间)");
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("工序", op);
             p.put("工序序", rt.get("工序序"));
@@ -810,7 +1094,28 @@ public class ProcessTaskService {
             double stepRate = num(rt.get("换算率"));
             if (stepRate <= 0) stepRate = 1;
             p.put("计划数量", round(qty * stepRate));
-            p.put("计划完工日期", str(given.get("计划完工日期")) != null ? str(given.get("计划完工日期")) : rt.get("计划完工日期"));
+            // 计划开工/完工(2026-10-29):**上一道的计划完工日 = 下一道的计划开工日**(计划链,服务端强制);
+            //   下一道完工日早于这个开工日的,按它原来的计划时长(完工-开工)整体顺延,不报错
+            //   (历史台账日期各排各的,不能把计划链打断)。
+            String givenStart = str(given.get("计划开工日期"));
+            String givenDue = str(given.get("计划完工日期"));
+            String due = givenDue != null ? givenDue : str(rt.get("计划完工日期"));
+            String prevDue = plan.isEmpty() ? null : str(plan.get(plan.size() - 1).get("计划完工日期"));
+            String start = prevDue != null ? prevDue : givenStart;
+            if (start == null) start = java.time.LocalDate.now().toString();
+            if (due == null) due = start;
+            if (java.time.LocalDate.parse(due).isBefore(java.time.LocalDate.parse(start))) {
+                long dur = 0;
+                if (givenStart != null && givenDue != null) {
+                    try {
+                        dur = java.time.temporal.ChronoUnit.DAYS.between(
+                                java.time.LocalDate.parse(givenStart), java.time.LocalDate.parse(givenDue));
+                    } catch (RuntimeException ignore) { dur = 0; }
+                }
+                due = java.time.LocalDate.parse(start).plusDays(Math.max(0, dur)).toString();
+            }
+            p.put("计划开工日期", start);
+            p.put("计划完工日期", due);
             plan.add(p);
         }
         // ① 工单级排产:首道线(复用现有排产口径;该行未排产才可排;该行已排产=改线,首道线必须仍是该行当前线)
@@ -826,6 +1131,8 @@ public class ProcessTaskService {
             assignRow.put("生产线", firstPlan);
             assignRow.put("排产数量", qty);        // 2026-10-16:人工给定的排产数量(assign 写 plang.pl_sl + plang_pc 镜像)
             if (str(team) != null) assignRow.put("排产班组", str(team));
+            // 计划开工/完工(2026-10-29):首道的计划开工日写 plang.st_date / plang_pc.st_date(看板「开工日期」同源)
+            if (plan.get(0).get("计划开工日期") != null) assignRow.put("预开工日", plan.get(0).get("计划开工日期"));
             if (plan.get(0).get("计划完工日期") != null) assignRow.put("预完工日", plan.get(0).get("计划完工日期"));
             Map<String, Object> assigned = scheduleBoard.assign(List.of(assignRow), user);
             List<String> headFailed = castList(assigned.get("失败行"));
@@ -846,13 +1153,21 @@ public class ProcessTaskService {
             Map<String, Object> p = plan.get(i);
             boolean first = i == 0;
             jdbc.update("INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
-                            + " 计划数量, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
-                            + " VALUES (?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
+                            + " 计划数量, 计划开工日期, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
                     no, rowId == null ? null : ((Number) rowId).longValue(), p.get("工序"),
                     p.get("工序序") == null ? null : ((Number) p.get("工序序")).intValue(),
                     p.get("生产线"), first ? p.get("生产线") : null,
-                    p.get("计划数量"), p.get("计划完工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划完工日期"))),
-                    first ? "已落实" : "计划", first ? new java.util.Date() : null, user);
+                    p.get("计划数量"),
+                    p.get("计划开工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划开工日期"))),
+                    p.get("计划完工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划完工日期"))),
+                    // 落实时间(实际开工)= 留空(2026-10-30):排产只是"计划",不是"实际开工"。
+                    //   原实现写 new java.util.Date() ⇒ 排产那一刻就成了实际开工,而它还是 JVM 本地时间,
+                    //   与库 GETDATE()(UTC)差 8 小时。实际开工一律由 {@link #applyNextProcess} 在真转序时写。
+                    first ? "已落实" : "计划", null, user);
+            // ⚠ 2026-10-30 用户口径「把当前这个按日期均摊的功能删除,没啥用」:
+            //   这里原有一句 autoFillDayPlan(按「计划开工~计划完工」把计划数量均摊进 wo_day_plan)。
+            //   已删除 —— 日计划只由排产员在「生产工单 / 工单排产」两页的日期列里手工填、手工保存。
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工单号", no);
@@ -921,7 +1236,8 @@ public class ProcessTaskService {
      *   <li>该道「已审核报工量 ≥ 该道计划数量」= **已达标** ⇒ 台账置「已落实」+ 补实际生产线;</li>
      *   <li>第一道**未达标**的 = **当前该做的道**:台账还是「计划」⇒ 置「已落实」,
      *       并按它的「计划生产线」把工单切过去(写 {@code plang.scx} + {@code plang_pc.scx} + 轨迹
-     *       {@code wo_transfer_log});计划线为空 ⇒ 只提示"请人工派线",**不瞎切**;</li>
+     *       {@code wo_transfer_log});计划线为空 ⇒ 只提示"请人工派线",**不瞎切**;
+     *       计划线的车间配不上这道工序({@link ProcessShop})⇒ 同样只提示重新排线,**不越界切**;</li>
      *   <li>计划线 == 当前线 ⇒ 记「沿用当前线」,**照样把该道置「已落实」**
      *       —— 不落实的话看板的「当前工序」会一直停在上一道,这正是"工单没有进入下一个预排产处";</li>
      *   <li>整条路线都达标 ⇒ 不动(生产完工由 {@link #syncWorkOrderState} 判)。</li>
@@ -963,19 +1279,24 @@ public class ProcessTaskService {
         List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE id=?", String.class, row);
         String cur = cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
         int steps = 0;
+        String prevOp = null;
         for (Map<String, Object> r : rows) {
             String op = String.valueOf(r.get("工序")).trim();
+            String prevOpForThis = prevOp;
+            prevOp = op;
             double plan = num(r.get("计划数量"));
             double d = reportedQty(no, row, op);
             String st = String.valueOf(r.get("状态"));
             // ① 该道已达标(已审完工量 ≥ 该道计划量)⇒ 台账落实(补实际生产线),继续看下一道
             if (plan > 0 && d + 0.0001 >= plan) {
                 if (!"已落实".equals(st)) {
+                    // 实际完成时间(2026-10-29 用户口径「实际开工 = 上一道实际完工时间」):
+                    //   落实时间优先取该道**已审报工的最大完工时间**(真实做完那一刻),取不到才用当前时间。
                     jdbc.update("UPDATE dbo.wo_process_line SET 状态=N'已落实',"
                                     + " 实际生产线=COALESCE(NULLIF(实际生产线,N''), NULLIF(计划生产线,N''), NULLIF(?,N'')),"
-                                    + " 落实时间=COALESCE(落实时间,GETDATE()), asp_user2=?, asp_time2=GETDATE()"
+                                    + " 落实时间=COALESCE(落实时间, ?, GETDATE()), asp_user2=?, asp_time2=GETDATE()"
                                     + " WHERE id=?",
-                            cur, user, r.get("id"));
+                            cur, reportedDoneTime(no, rowId, op), user, r.get("id"));
                     steps++;
                 }
                 continue;
@@ -988,6 +1309,18 @@ public class ProcessTaskService {
             out.put("计划量", plan);
             if (planLine.isEmpty()) {
                 out.put("提示", "下一道(" + op + ")未预排线,请人工派线");
+                return out;
+            }
+            // 计划线的车间必须配得上这道工序(2026-10-21 ProcessShop:装箱归组装):
+            // **存量台账**里可能已经排了跨车间的线(实测 GD-2026-10-0202 行6:装箱→2号车间/成型线)——
+            // 自动转序只做对的事,不替人越界派线 ⇒ 原地提示重新排线,工单保持不动。
+            // 2026-10-28:requiredShop 为 null(工序没登记固定车间 / 该车间没建线)⇒ 不拦,按预排线直接转,
+            //   否则新工序排了线也永远转不过去(用户报障的另一半)。
+            String needShop = requiredShop(op, null);
+            if (needShop != null && !needShop.equals(shopOfLine(planLine))) {
+                out.put("提示", "下一道(" + op + ")的计划线「" + planLine + "」属于「" + shopOfLine(planLine)
+                        + "」车间,与工序应进的「" + needShop + "」车间不一致;"
+                        + "请撤销该行排产后重新排线");
                 return out;
             }
             if (!planLine.equals(cur)) {
@@ -1007,9 +1340,10 @@ public class ProcessTaskService {
                 out.put("提示", "下一道(" + op + ")沿用当前线");
             }
             // 当前道落实(含"沿用当前线":不落实会导致看板当前工序一直停在上一道)
+            // 实际开工(落实时间)= **上一道实际完工时间**(2026-10-29 用户口径);取不到才用当前时间
             jdbc.update("UPDATE dbo.wo_process_line SET 状态=N'已落实', 实际生产线=?,"
-                            + " 落实时间=COALESCE(落实时间,GETDATE()), asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                    planLine, user, r.get("id"));
+                            + " 落实时间=COALESCE(落实时间, ?, GETDATE()), asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                    planLine, reportedDoneTime(no, row, prevOpForThis), user, r.get("id"));
             steps++;
             out.put("推进道数", steps);
             return out;
@@ -1068,6 +1402,35 @@ public class ProcessTaskService {
     private double reportedQty(String plNo, Long rowId, String op) {
         return WoInspGate.reportedQty(jdbc, plNo, rowId, op);
     }
+
+    /**
+     * 该道工序**已审报工的最大完工时间**(= 实际完工;没有则 null)。
+     * 2026-10-29 用户口径「实际的开工日期要在当前实际的完工日期时间处进行」——
+     * 转序时下一道的落实时间(实际开工)取上一道的这个方法,而不是"看板打开那一刻"。
+     */
+    private java.sql.Timestamp reportedDoneTime(String plNo, Long rowId, String op) {
+        if (!notBlank(plNo) || !notBlank(op) || rowId == null) return null;
+        List<java.sql.Timestamp> ts = jdbc.queryForList(
+                "SELECT MAX(s.wgsj) AS t FROM dbo.scjl s"
+                        + " WHERE s.gldh=? AND ISNULL(s.gxdm,N'')=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "   AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=s.gd_id AND pc.plang_id=?)"
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "            (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id=?)))",
+                java.sql.Timestamp.class, plNo.trim(), op.trim(), rowId, rowId);
+        return ts.isEmpty() ? null : ts.get(0);
+    }
+
+    /** 实际完工时间(展示文本 yyyy-MM-dd HH:mm;没有则 null) */
+    private String doneTimeText(String plNo, Long rowId, String op) {
+        java.sql.Timestamp t = reportedDoneTime(plNo, rowId, op);
+        return t == null ? null
+                : t.toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+    }
+
+    // ⚠ 2026-10-30 已删除 autoFillDayPlan(按「计划开工~计划完工」把计划数量均摊成每日计划)。
+    //   用户口径:「把当前这个按日期均摊的功能删除,没啥用」。日计划(wo_day_plan)现在只由
+    //   「生产工单 / 工单排产」两页的日期列**手工填写 + 保存日排产**产生(见 WorkOrderDayPlanService.save)。
 
     /** 产线所属车间(取不到返回 null) */
     private String shopOfLine(String line) {

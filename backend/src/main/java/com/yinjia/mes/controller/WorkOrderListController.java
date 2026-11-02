@@ -45,6 +45,24 @@ public class WorkOrderListController {
             PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD};
     private static final String[] PRINT_ENTRIES = CLOSE_ENTRIES;
 
+    /**
+     * 本工单行自己的订单占用合计(2026-10-30):form_flow_link 按 `工单号#行号` 命中,
+     * 兼容历史 `工单号#行号#批次号` 键(与 ScheduleBoardService.ROW_USED 同一口径)。
+     */
+    private static final String ROW_USED = "(SELECT SUM(l.linked_quantity) FROM form_flow_link l"
+            + " WHERE l.target_panel_code='PLANG' AND l.target_form_no=p.pl_no"
+            + " AND (l.target_line_key = p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0))"
+            + "      OR l.target_line_key LIKE p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0)) + N'#%')"
+            + " AND l.link_status='ACTIVE')";
+
+    /**
+     * **余量 = 行级**(2026-10-30):本工单行需求 − **本工单行自己**的占用,不足 0 记 0。
+     * 原口径是「本行需求 − 整条订单行占用」,切单拆成父子两行后双双变负数(用户报障 −10/−90);
+     * 切单已把占用链按行拆账(WorkOrderSplitService.splitLink),父子合计 = 订单行剩余。
+     */
+    private static final String ROW_YL = "CASE WHEN ISNULL(p.xq_sl,0) <= ISNULL(" + ROW_USED + ",0)"
+            + " THEN 0 ELSE ISNULL(p.xq_sl,0) - ISNULL(" + ROW_USED + ",0) END";
+
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
     private final WorkOrderSplitService splitService;
@@ -122,11 +140,13 @@ public class WorkOrderListController {
             args.add(String.valueOf(b.get("生产线")).trim());
         }
         // 单框模糊搜索(2026-09-26 用户拍板):关键字在 工单号/物料编码/产品名称/客户代码/客户名称 多列 OR
+        // 2026-10-31 补「订单号」:工单带订单追溯后,按销售订单号反查生产工单是现场常见用法
         String kw = b.get("keyword") == null ? "" : String.valueOf(b.get("keyword")).trim();
         if (!kw.isEmpty()) {
             String like = "%" + kw + "%";
-            w.append(" AND (p.pl_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,N'') LIKE ?)");
-            for (int i = 0; i < 5; i++) args.add(like);
+            w.append(" AND (p.pl_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,N'') LIKE ?"
+                    + " OR ISNULL(p.od_no,N'') LIKE ?)");
+            for (int i = 0; i < 6; i++) args.add(like);
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.comm AS 公司代码, p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
@@ -135,6 +155,13 @@ public class WorkOrderListController {
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
                         + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
+                        // 订单追溯(2026-10-31 用户口径「工单里要有订单ID或订单号,订单行号,能够保持订单的追溯」):
+                        //   · 订单号 = plang.od_no(转单时从销售订单带入);
+                        //   · 订单行号 = {@link com.yinjia.mes.service.PlangOrderLine}(按 od_xc 行 id 精确解析,
+                        //     过期时按「同订单同物料唯一行」兜底;解析不出的显示空,不硬凑)。
+                        //   工单行号 pl_xc 本身也等于订单行号(每次转单一张新工单、单行),这里显式给出便于核对。
+                        + " ISNULL(p.od_no, N'') AS 订单号,"
+                        + " " + com.yinjia.mes.service.PlangOrderLine.expr("p") + " AS 订单行号,"
                         + " ISNULL(p.scx, N'') AS 生产线,"
                         + " ISNULL(p.[打印人], N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
                         // 切单父子关联(9.29 批次①,2026-10-05):子单带 源工单号/拆分序号,列表直接可见「由谁切出」
@@ -187,18 +214,17 @@ public class WorkOrderListController {
                         + " ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(r.换算率,1) FROM dbo.bs_route r"
                         + "   WHERE r.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r.工序名称 = cop.当前工序"
                         + "     AND ISNULL(r.asp_cancel,'N')<>'Y'), 0) AS 当前工序计划量,"
-                        // 余量(2026-09-28 用户定稿)=订单结转的剩余数量:订单行需求 − 已转出占用
-                        // (form_flow_link ACTIVE 占用,与订单结转页「剩余可转」同源;转工单/转采购都占)
-                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l"
-                        + "   WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no"
-                        + "     AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc))"
-                        + "     AND l.link_status = 'ACTIVE'), 0) AS 余量,"
+                        // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用,不足 0 记 0
+                        + " " + ROW_YL + " AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
+                        + " CONVERT(varchar(10), p.st_date, 120) AS 计划开工日期,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
                         + " FROM dbo.plang p"
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
+                        // 订单追溯(2026-10-31):od_xc 存销售订单行 id ⇒ 反查行号(见 SELECT 段注释)。
+                        + com.yinjia.mes.service.PlangOrderLine.join("p")
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress prg ON prg.单号 = p.pl_no`:

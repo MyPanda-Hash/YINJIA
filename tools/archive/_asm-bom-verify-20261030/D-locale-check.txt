@@ -1,0 +1,17 @@
+frontend/src/i18n/locales/en.js => OK
+frontend/src/i18n/locales/ja.js => OK
+frontend/src/i18n/locales/de.js => OK
+frontend/src/i18n/locales/es.js => OK
+frontend/src/i18n/locales/fr.js => D:\workspace\yinjia\frontend\src\i18n\locales\fr.js:1443
+    '组装物料清单': 'Liste des matériaux d'assemblage',
+                                     ^^^^^^^^^^
+
+SyntaxError: Unexpected identifier 'assemblage'
+    at checkSyntax (node:internal/main/check_syntax:74:5)
+
+Node.js v22.20.0
+frontend/src/i18n/locales/ko.js => OK
+frontend/src/i18n/locales/ru.js => OK
+frontend/src/i18n/locales/th.js => OK
+frontend/src/i18n/locales/vi.js => OK
+frontend/src/i18n/locales/zh-TW.js => OK

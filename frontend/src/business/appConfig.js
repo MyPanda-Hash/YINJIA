@@ -22,13 +22,33 @@ export const API_ORIGIN = 'http://36.140.66.163:8090'
 export const API_ORIGIN_KEY = 'mes_api_origin'
 
 /**
- * 当前生效的后端地址:优先用 App 内设置过的,否则用默认。
+ * 当前生效的后端地址。
  *
- * 只接受 http(s):// 开头的合法地址,防止误填导致所有请求打到相对路径。
+ * <p>🔴 2026-11-01 修:**原生存在 SharedPreferences 的地址要优先**。
+ * <p>原来的坑:顶部原生工具条「设置」写的是 SharedPreferences(`YjNative.getBaseUrl()`),
+ * 而这里只读 localStorage ⇒ **两套存储互不相认**:用户在原生条改的地址,网页根本不认,
+ * 请求还按 localStorage 里的旧值(或默认公网地址)发出去。
+ * 这也正是用户看到"上下两个连接设置"却改哪个都不对劲的根因。
+ *
+ * <p>取值优先级(改地址只需改一处 = 顶部原生条的「设置」):
+ * <ol>
+ *   <li>**原生 `YjNative.getBaseUrl()`** —— 壳内唯一真源;</li>
+ *   <li>localStorage(网页版 / 老装机升级后的兼容值);</li>
+ *   <li>默认值 {@link API_ORIGIN}。</li>
+ * </ol>
  *
  * @returns {string} 形如 http://192.168.0.238:8090(不带尾斜杠)
  */
 export function apiOrigin() {
+  // ① 壳内:读原生 SharedPreferences(顶部工具条「设置」写的就是它)
+  try {
+    const nat = typeof window !== 'undefined' && window.YjNative
+      && typeof window.YjNative.getBaseUrl === 'function'
+      ? String(window.YjNative.getBaseUrl() || '').trim()
+      : ''
+    if (nat && /^https?:\/\//i.test(nat)) return nat.replace(/\/+$/, '')
+  } catch { /* 桥不可用时继续往下退 */ }
+  // ② localStorage
   try {
     const saved = localStorage.getItem(API_ORIGIN_KEY)
     if (saved && /^https?:\/\//i.test(saved.trim())) return saved.trim().replace(/\/+$/, '')
@@ -36,12 +56,34 @@ export function apiOrigin() {
   return API_ORIGIN
 }
 
-/** 保存自定义服务器地址(传空串 = 恢复默认) */
+/**
+ * 保存自定义服务器地址(传空串 = 恢复默认)。
+ *
+ * <p>🔴 2026-11-01:壳内要**同时写原生**(`YjNative.setBaseUrl`)。
+ * 因为 {@link apiOrigin} 现在优先读原生 SharedPreferences —— 只写 localStorage 会"改了不生效"
+ * (下次读还是原生里的旧值),这种"看起来保存成功、实际没变"的坑最难查。
+ *
+ * @param {string} v 形如 http://192.168.1.10:8090(传空串恢复默认)
+ * @returns {boolean} 是否成功
+ */
 export function setApiOrigin(v) {
   try {
     const s = String(v == null ? '' : v).trim().replace(/\/+$/, '')
-    if (!s) localStorage.removeItem(API_ORIGIN_KEY)
-    else localStorage.setItem(API_ORIGIN_KEY, s)
+    if (!s) {
+      localStorage.removeItem(API_ORIGIN_KEY)
+      try {
+        if (window.YjNative && typeof window.YjNative.setBaseUrl === 'function') {
+          window.YjNative.setBaseUrl('')
+        }
+      } catch { /* 桥没实现就算了 */ }
+    } else {
+      localStorage.setItem(API_ORIGIN_KEY, s)
+      try {
+        if (window.YjNative && typeof window.YjNative.setBaseUrl === 'function') {
+          window.YjNative.setBaseUrl(s)
+        }
+      } catch { /* 桥没实现就算了 */ }
+    }
     return true
   } catch {
     return false
@@ -49,20 +91,37 @@ export function setApiOrigin(v) {
 }
 
 /**
- * 是否运行在 Capacitor 原生壳里。
+ * 是否运行在**原生壳**里(APK 内)。
  *
- * Capacitor 会在 window 上挂 Capacitor 对象,并带 isNativePlatform();
- * 但浏览器里某些构建也可能有该对象,故双重判定(必须有平台名且非 web)。
+ * <p>🔴 2026-11-01 修:原来只认 Capacitor,漏了本仓库实际使用的**手搓壳 `window.YjNative`**。
+ * <p>后果(实测踩到):手搓壳里 `isNative()` 返回 false ⇒ `apiBase()` 返回空串 ⇒
+ * axios 的 baseURL 变成相对路径 `/api`;而 APK 页面跑在 `file:///android_asset/www/` 下,
+ * 相对路径会解析成 `file:///api/...` ⇒ **所有接口必然失败**,界面上表现就是
+ * 「工厂信息加载失败,请检查服务后重试」。这不是网络问题,是取址逻辑认错了壳。
+ *
+ * <p>三种壳都要认:
+ * <ol>
+ *   <li>Capacitor(`window.Capacitor`);</li>
+ *   <li>**手搓壳(`window.YjNative`)—— 本仓库 android/ 用的就是它**;</li>
+ *   <li>直接用 `file://` 打开(兜底,同样没有同源后端)。</li>
+ * </ol>
  *
  * @returns {boolean}
  */
 export function isNative() {
   try {
-    const cap = typeof window !== 'undefined' ? window.Capacitor : null
-    if (!cap) return false
-    if (typeof cap.isNativePlatform === 'function') return cap.isNativePlatform()
-    const p = typeof cap.getPlatform === 'function' ? cap.getPlatform() : ''
-    return !!p && p !== 'web'
+    if (typeof window === 'undefined') return false
+    // ① 手搓壳:有 YjNative 桥就一定是 APK 内
+    if (window.YjNative) return true
+    // ② Capacitor 壳:有对象且平台名不是 web
+    const cap = window.Capacitor
+    if (cap) {
+      if (typeof cap.isNativePlatform === 'function') return !!cap.isNativePlatform()
+      const p = typeof cap.getPlatform === 'function' ? cap.getPlatform() : ''
+      if (p && p !== 'web') return true
+    }
+    // ③ 兜底:file:// 打开 = 打包进壳的静态页
+    return typeof location !== 'undefined' && location.protocol === 'file:'
   } catch {
     return false
   }

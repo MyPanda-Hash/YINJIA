@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT TOP 20 * FROM yj_schema_log ORDER BY 1 DESC;

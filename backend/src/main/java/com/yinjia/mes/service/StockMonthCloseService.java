@@ -263,8 +263,15 @@ public class StockMonthCloseService {
         }
         log.info("[月结] {} 结转行 {} 条(已清其它期间结转行 {} 条)", p, carryRows, deletedOther);
 
-        // ⑤ kucun:有则改、无则增(幂等重算到期末)
-        int[] kc = reconcileKucun(endEx, user);
+        // ⑤ kucun:有则改、无则增(幂等重算)——🔴 **重算到今天,不是重算到期末**(2026-10-21 修)
+        //   此前传的是 endEx(期末次日)⇒ 月结把结存缓存写回"截至期末":期末之后已经发生的流水被踢出结存。
+        //   实测(2026-09 月结,10-19 跑):库里 10 月已有 1,359 行流水(净 −163,919.70),月结后
+        //   kucun 与"≤9/30 流水净额"逐键 0 差异、与全量流水差 163,919.70/556 键
+        //   ⇒《库存明细》停在 9 月末、"有单据有流水却查不到"。详见
+        //   docs/development/库存状况异常-当前取证与提交影响-20261021.md §2.2 / §七。
+        //   ⚠ 期初/本期/结转行仍按**期间**算(①~④ 用的是 endEx),只有"结存缓存"按今天算。
+        LocalDate cacheEnd = LocalDate.now().plusDays(1);
+        int[] kc = reconcileKucun(cacheEnd, user);
 
         // ⑥ 月结头/行表
         Long headId = upsertHead(p, no, carryDate, lines.size(), sumIn, sumOut, sumEnd, user);
@@ -511,18 +518,22 @@ public class StockMonthCloseService {
         //   重算只做 upsert、不清旧键 ⇒ 同一批货会在新旧两个键上各算一次(实测正式库 260 行 / +135 万)。
         //   这里把这类行**清零**(不删除,留痕:asp_user2 记为 who/when 清过),q/c 来源(不良品处理不走流水,
         //   见坑 4)与期初导入行**不动**。
+        //   🔴 2026-10-21 修 bug:判据此前带 `AND x.单据日期 < 期末` —— 于是"流水全部落在期末之后"的
+        //     真实库存也被当成残影清零(实测 434 键、其中 289 键其实有货 349,496.10;用户报
+        //     「采购入库单 CGRK-20261011-03389 在《库存明细》里查不到」就是它)。按本方法的原意,
+        //     残影 = **任何日期都没有流水**,故去掉日期条件。
         int purged = jdbc.update(
                 "UPDATE kucun SET rkl = 0, ckl = 0, yl = 0, update_date = GETDATE(), asp_user2 = ?, asp_time2 = GETDATE()"
                         + " WHERE ISNULL(asp_user1, N'') LIKE 'stock:%'"
                         + "   AND NOT EXISTS (SELECT 1 FROM inh x WHERE ISNULL(RTRIM(x.物料编码),N'') = kucun.wzdm"
                         + "        AND ISNULL(RTRIM(x.仓库编码),N'') = kucun.ckdm"
                         + "        AND ISNULL(RTRIM(x.批号),N'') = ISNULL(RTRIM(kucun.lot_no),N'')"
-                        + "        AND ISNULL(x.asp_cancel,'N') <> 'Y' AND ISNULL(x.单据类型,'') <> N'" + CARRY_TYPE + "' AND x.单据日期 < ?)"
+                        + "        AND ISNULL(x.asp_cancel,'N') <> 'Y' AND ISNULL(x.单据类型,'') <> N'" + CARRY_TYPE + "')"
                         + "   AND NOT EXISTS (SELECT 1 FROM outh y WHERE ISNULL(RTRIM(y.物料编码),N'') = kucun.wzdm"
                         + "        AND ISNULL(RTRIM(y.仓库编码),N'') = kucun.ckdm"
                         + "        AND ISNULL(RTRIM(y.批号),N'') = ISNULL(RTRIM(kucun.lot_no),N'')"
-                        + "        AND ISNULL(y.asp_cancel,'N') <> 'Y' AND y.单据日期 < ?)",
-                "orphan-purge:" + user, endEx, endEx);
+                        + "        AND ISNULL(y.asp_cancel,'N') <> 'Y')",
+                "orphan-purge:" + user);
         return new int[]{ins, upd, purged, zeroPurged};
     }
 

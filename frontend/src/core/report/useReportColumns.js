@@ -3,8 +3,13 @@ import { buildReportColumnSettings, sortReportRows, visibleReportColumns } from 
 import request from '@core/request'
 
 /**
- * 通用报表栏目 composable(报表表头筛选与排序补丁)。
+ * 通用「列设置」composable(报表表头筛选与排序补丁;2026-10-29 起也被自建工作台页复用)。
  * 任何组件调用即可获得栏目显隐、表头筛选、升序降序、后端持久化能力。
+ *
+ * 显隐口径(2026-10-29 补,自建页 ORDER_CONVERT「列设置」需要):
+ *   · {@link init} 在页面挂载时把后端已保存的显隐**先应用上**(此前只有打开弹窗才生效,
+ *     刷新后表格仍是全部列 —— 那是"列设置"从未真正落地的一个缺口);
+ *   · 未保存过 = 全部可见(回退契约不变)。
  *
  * @param {Ref<string>} panelCode - 当前面板编码
  * @param {ComputedRef<string[]>} columns - 当前报表全部字段名列表
@@ -103,26 +108,57 @@ export function useReportColumns(panelCode, columns, rows) {
   async function openDialog() {
     const saved = await loadSaved()
     applySaved(saved)
+    if (!columnDraft.value.length) columnDraft.value = buildReportColumnSettings(columns.value, null)
     columnCurrent.value = null
     columnVisible.value = true
   }
 
-  /** 保存栏目设置到后端 */
+  /**
+   * 页面挂载时应用已保存的列设置(2026-10-29 自建页复用):
+   * 不打开弹窗也要按保存的显隐渲染;没保存过 / 读取失败 ⇒ 草稿=全部可见(与旧回退契约一致)。
+   * 幂等:loadSaved 自身带 settingsLoaded 缓存,重复调用只命中一次后端。
+   */
+  async function init() {
+    const saved = await loadSaved()
+    applySaved(saved)
+    if (!columnDraft.value.length) columnDraft.value = buildReportColumnSettings(columns.value, null)
+  }
+
+  /** 恢复默认(全部可见;只改草稿,点「保存」才落库) */
+  function resetDraft() {
+    columnDraft.value = buildReportColumnSettings(columns.value, null)
+  }
+
+  /**
+   * 保存栏目设置到后端。
+   * @returns {Promise<boolean>} true=已落库(调用方可据此提示成败;失败时草稿保持不变、serverSaved 不动,
+   *   下次「取消」会回退到真正持久化的那份,不会出现"提示已保存、刷新却回退")
+   */
   async function saveDialog() {
-    const settings = { columns: columnDraft.value, sort: { ...sort } }
+    // 深拷贝一份:别把草稿数组本身存进 serverSaved(否则两者是同一个引用,后续勾选会互相污染)
+    const settings = { columns: columnDraft.value.map((c) => ({ ...c })), sort: { ...sort } }
+    let ok = true
     try {
       await request.post('/px/reportColumnSettings', {
         panelCode: panelCode.value, settings
       })
-    } catch { /* 保存失败不阻断本地效果 */ }
+    } catch {
+      ok = false
+    }
+    // 2026-10-29:保存成功才同步本地缓存 —— 否则再次打开弹窗(或点取消)会按 init 时读到的
+    // 旧 serverSaved 重建草稿,把本次保存的显隐又覆盖回去。
+    if (ok) serverSaved.value = settings
     columnVisible.value = false
     columnCurrent.value = null
+    return ok
   }
 
-  /** 取消栏目设置(不保存) */
+  /** 取消栏目设置(不保存):丢弃本次草稿,回到后端已保存的那份 */
   function cancelDialog() {
     columnVisible.value = false
-    columnDraft.value = []
+    // 2026-10-29:此前是清空草稿(visibleProps 回退成"全部可见"),取消一次就把已保存的
+    // 隐藏列全部放出来;改为按 serverSaved 重建,与打开弹窗时的初始状态一致。
+    columnDraft.value = buildReportColumnSettings(columns.value, serverSaved.value)
     columnCurrent.value = null
   }
 
@@ -141,7 +177,7 @@ export function useReportColumns(panelCode, columns, rows) {
     sort, headerFilters,
     visibleProps, sortedRows, selectedCount,
     distinctValues, isFiltered, clearFilter, setSort,
-    openDialog, saveDialog, cancelDialog,
+    openDialog, saveDialog, cancelDialog, init, resetDraft,
     filterVisible, filterProp, openFilter, applyFilter,
   }
 }

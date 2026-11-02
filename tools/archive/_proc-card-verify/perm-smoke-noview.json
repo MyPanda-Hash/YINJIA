@@ -1,0 +1,87 @@
+{
+  "mode": "noview",
+  "checks": [
+    {
+      "name": "临时账号 pfc_verify 登录成功(非 admin)",
+      "pass": true,
+      "detail": "http=200 isAdmin=false"
+    },
+    {
+      "name": "pagePerms.PROC_FLOW_CARD 为空(无查看权)",
+      "pass": true,
+      "detail": "\"\""
+    },
+    {
+      "name": "无权限: /api/procCard/meta → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/batches → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/lines → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/create → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/detail → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/save → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/list → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/batchTrace → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: /api/procCard/trace → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板的查看权限：PROC_FLOW_CARD"
+    },
+    {
+      "name": "无权限: attachment/list → 403(查看权闸门)",
+      "pass": true,
+      "detail": "http=200 code=403"
+    },
+    {
+      "name": "无任何面板权限时 POST /attachment/upload 实测",
+      "observed": "http=200(既有接口无写权限校验;有 cardNo 即可写附件登记行)"
+    },
+    {
+      "name": "无权限: attachment/{id}/download → 403(查看权闸门)",
+      "pass": true,
+      "detail": "http=200 code=403"
+    },
+    {
+      "name": "清理:删除本脚本上传的验证照片",
+      "pass": true,
+      "detail": "http=200"
+    }
+  ],
+  "pagePerms": {
+    "PROC_FLOW_CARD": ""
+  },
+  "uploadAsNoPerm": {
+    "http": 200,
+    "id": 2027
+  },
+  "failCount": 0
+}

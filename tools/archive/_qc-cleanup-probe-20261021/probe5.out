@@ -1,0 +1,101 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== probe5.sql ==
+  | === qc_insp_rec_detail columns === | 
+  | id | int | 4 | 10 | 0 | 0 | 
+  | 单据编号 | nvarchar | 120 | 0 | 0 | 0 | 
+  | 检验项 | nvarchar | 400 | 0 | 0 | 1 | 
+  | 检测标准 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 检测结果 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 单项判定 | nvarchar | 40 | 0 | 0 | 1 | 
+  | asp_user1 | nvarchar | 100 | 0 | 0 | 1 | 
+  | asp_time1 | datetime2 | 8 | 27 | 7 | 1 | 
+  | asp_user2 | nvarchar | 100 | 0 | 0 | 1 | 
+  | asp_time2 | datetime2 | 8 | 27 | 7 | 1 | 
+  | asp_cancel | char | 1 | 0 | 0 | 1 | 
+  | 备用1 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用2 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用3 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用4 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用5 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用6 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用7 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用8 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用9 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用10 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用11 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用12 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用13 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用14 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用15 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用16 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用17 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用18 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用19 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | 备用20 | nvarchar | 1000 | 0 | 0 | 1 | 
+  | === qc_insp_rec_detail rows === | 
+  | 93 | JYSJ-2026-10-0004 | 外径1 | 1 | null | null | admin | 2026-10-19 12:47:58.6683893 | admin | 2026-10-19 12:48:04.3822760 | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 94 | JYSJ-2026-10-0004 | 外径2 | 1 | null | null | admin | 2026-10-19 12:47:58.6704568 | admin | 2026-10-19 12:48:04.3843428 | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 95 | JYSJ-2026-10-0004 | 高度 | 1 | null | null | admin | 2026-10-19 12:47:58.6704568 | admin | 2026-10-19 12:48:04.3853931 | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 96 | JYSJ-2026-10-0006 | 检验数据1 | x | null | null | admin | 2026-10-19 14:28:38.7033682 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 97 | JYSJ-2026-10-0006 | 检验操作1 | x | null | null | admin | 2026-10-19 14:28:38.7033682 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | === qc_insp_req === | 
+  | 88 | 折叠棉 | YJ-KBL-021 | null | null | null | null | null | null | 按图纸 | 按图纸 | 按图纸 | null | 按图纸 | 按图纸 | 按图纸 | null | null | 标称值±3% | null | 按图纸 | null | null | null | null | null | 按图纸 | null | null | null | null | null | null | null | admin | 2026-10-14 21:43:53.0000000 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | QR-QC-001 | GB/T 2828.1 抽样检验 | 
+  | 89 | 自定义检验要求 | YJ-XH-001 | null | null | null | null | null | null | 按图纸 | 按图纸 | 按图纸 | null | 按图纸 | 按图纸 | 按图纸 | null | null | 标称值±3% | null | 按图纸 | null | null | null | null | null | 按图纸 | null | null | null | null | null | null | null | admin | 2026-10-14 21:43:53.0000000 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | QR-QC-001 | GB/T 2828.1 抽样检验 | 
+  | 90 | 自定义检验要求 | YJ-XH-002 | null | null | null | null | null | null | 按图纸 | 按图纸 | 按图纸 | null | 按图纸 | 按图纸 | 按图纸 | null | null | 标称值±3% | null | 按图纸 | null | null | null | null | null | 按图纸 | null | null | null | null | null | null | null | admin | 2026-10-14 21:43:53.0000000 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | QR-QC-001 | GB/T 2828.1 抽样检验 | 
+  | 91 | 自定义检验要求 | YJ-YKRS-009 | null | null | null | null | null | null | 按图纸 | 按图纸 | 按图纸 | null | 按图纸 | 按图纸 | 按图纸 | null | null | 标称值±3% | null | 按图纸 | null | null | null | null | null | 按图纸 | null | null | null | null | null | null | null | admin | 2026-10-14 21:43:53.0000000 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | QR-QC-001 | GB/T 2828.1 抽样检验 | 
+  | 92 | 自定义检验要求 | YJ-YKRS-014 | null | null | null | null | null | null | 按图纸 | 按图纸 | 按图纸 | null | 按图纸 | 按图纸 | 按图纸 | null | null | 标称值±3% | null | 按图纸 | null | null | null | null | null | 按图纸 | null | null | null | null | null | null | null | admin | 2026-10-14 21:43:53.0000000 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | QR-QC-001 | GB/T 2828.1 抽样检验 | 
+  | 93 | 端盖 | YJ-SX-025 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 1 | 1 | 1 | null | null | null | null | null | null | null | admin | 2026-10-19 12:47:32.9414211 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 123 | 
+  | === qc_insp_req cols === | 
+  | id | int | 4 | 
+  | 物料类别 | nvarchar | 40 | 
+  | 物料编号 | nvarchar | 120 | 
+  | 折叠棉 | nvarchar | 400 | 
+  | 炭棒 | nvarchar | 400 | 
+  | 实配炭棒后外径 | nvarchar | 200 | 
+  | 折数 | nvarchar | 200 | 
+  | 折高 | nvarchar | 200 | 
+  | 叠高 | nvarchar | 200 | 
+  | 外径 | nvarchar | 200 | 
+  | 内径 | nvarchar | 200 | 
+  | 厚度 | nvarchar | 200 | 
+  | 实配端盖效果 | nvarchar | 400 | 
+  | 材质 | nvarchar | 200 | 
+  | 长 | nvarchar | 200 | 
+  | 宽 | nvarchar | 200 | 
+  | 克数 | nvarchar | 200 | 
+  | 宽度 | nvarchar | 200 | 
+  | 克重 | nvarchar | 200 | 
+  | 颜色（白/黑） | nvarchar | 100 | 
+  | 尺寸 | nvarchar | 400 | 
+  | 实配端盖 | nvarchar | 400 | 
+  | 接口牢固度 | nvarchar | 400 | 
+  | 破损、切斜 | nvarchar | 400 | 
+  | 外径1 | nvarchar | 200 | 
+  | 外径2 | nvarchar | 200 | 
+  | 高度 | nvarchar | 200 | 
+  | 外径（+密封圈） | nvarchar | 200 | 
+  | 出水口堵孔、批锋 | nvarchar | 400 | 
+  | 变形、破损 | nvarchar | 400 | 
+  | 实配炭棒 | nvarchar | 400 | 
+  | 切面（平整、无歪斜） | nvarchar | 400 | 
+  | 破损、变形 | nvarchar | 400 | 
+  | 脏污、头发丝 | nvarchar | 400 | 
+  | asp_user1 | nvarchar | 100 | 
+  | asp_time1 | datetime2 | 8 | 
+  | asp_user2 | nvarchar | 100 | 
+  | asp_time2 | datetime2 | 8 | 
+  | asp_cancel | char | 1 | 
+  | 备用1 | nvarchar | 1000 | 
+  | 备用2 | nvarchar | 1000 | 
+  | 备用3 | nvarchar | 1000 | 
+  | 备用4 | nvarchar | 1000 | 
+  | 备用5 | nvarchar | 1000 | 
+  | 备用6 | nvarchar | 1000 | 
+  | 备用7 | nvarchar | 1000 | 
+  | 备用8 | nvarchar | 1000 | 
+  | 备用9 | nvarchar | 1000 | 
+  | 备用10 | nvarchar | 1000 | 
+  | 备用11 | nvarchar | 1000 | 
+  | === qc_insp_req_series === | 
+  | 1 | 原料来料 | Y-S-Z | admin | 2026-10-19 14:28:23.5415204 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | x | x | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 123 | 123 | 
+[SQL FAIL] Invalid column name 'dict_code'.

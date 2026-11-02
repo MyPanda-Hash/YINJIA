@@ -1,0 +1,92 @@
+{
+  "mode": "view",
+  "checks": [
+    {
+      "name": "临时账号 pfc_verify 登录成功(非 admin)",
+      "pass": true,
+      "detail": "http=200 isAdmin=false"
+    },
+    {
+      "name": "pagePerms.PROC_FLOW_CARD 含 view",
+      "pass": true,
+      "detail": "view"
+    },
+    {
+      "name": "pagePerms.PROC_FLOW_CARD 不含 entry",
+      "pass": true,
+      "detail": "view"
+    },
+    {
+      "name": "有 view 权: /api/procCard/meta → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 权: /api/procCard/batches → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 权: /api/procCard/lines → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 权: /api/procCard/detail → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 权: /api/procCard/list → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 权: /api/procCard/batchTrace → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 权: /api/procCard/trace → 200",
+      "pass": true,
+      "detail": "http=200 code=200 success"
+    },
+    {
+      "name": "有 view 无 entry: /api/procCard/create → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板「entry」权限，无法执行「创建流程卡」"
+    },
+    {
+      "name": "有 view 无 entry: /api/procCard/save → 403",
+      "pass": true,
+      "detail": "http=200 code=403 msg=当前角色无该面板「entry」权限，无法执行「保存」"
+    },
+    {
+      "name": "设计 §6#5「有 view 无 entry 上传照片 → 403」实测",
+      "observed": "http=200(契约要求 403;复用既有 /attachment/upload,该接口无面板权限校验)"
+    },
+    {
+      "name": "有 view 权: attachment/list → 200(缩略图墙取数可用)",
+      "pass": true,
+      "detail": "http=200 n=1"
+    },
+    {
+      "name": "有 view 权: attachment/{id}/download → 200(预览可用)",
+      "pass": true,
+      "detail": "http=200 bytes=237"
+    },
+    {
+      "name": "清理:删除本脚本上传的验证照片",
+      "pass": true,
+      "detail": "http=200"
+    }
+  ],
+  "pagePerms": {
+    "PROC_FLOW_CARD": "view"
+  },
+  "uploadAsViewOnly": {
+    "http": 200,
+    "id": 2025
+  },
+  "failCount": 0
+}

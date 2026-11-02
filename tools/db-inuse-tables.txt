@@ -44,7 +44,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin/供应商编码=供应商门户账号的归属标签,2026-10-24 加)
 
-# ---- MES 自有业务表(173 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(175 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -184,8 +184,8 @@ table:rd_instr_use_detail   # 仪器使用记录表行表
 table:rd_instr_use_head   # 仪器使用记录表头表
 table:rd_mineral_detail   # 矿化测试行表
 table:rd_mineral_head   # 矿化测试头表
-table:rd_mold_proc_detail   # 成型工艺清单行表(2026-10-30 显示名改「烧结工艺清单」,panel_code 未变)
-table:rd_mold_proc_head   # 成型工艺清单头表(同上;3 页:成型工艺清单/成型配方/修订记录)
+table:rd_mold_proc_detail   # 成型工艺清单行表
+table:rd_mold_proc_head   # 成型工艺清单头表
 table:rd_mold_formula_detail   # 成型配方行表(面板 RD_MOLD_FORMULA;2026-09-11 并入成型工艺清单第2页签、菜单下线;当前空表)
 table:rd_mold_formula_head   # 成型配方头表(面板 RD_MOLD_FORMULA;后端文书归档集合与 DevTaskService 仍引用,历史 rd_dev_task 行留审计;当前空表)
 table:rd_plan   # 项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)
@@ -210,8 +210,6 @@ table:rd_spec_doc_detail   # 规格书行表
 table:rd_spec_doc_head   # 规格书头表(按规格书种类页签)
 table:rd_spike_water_detail   # 加标水配置记录表行表
 table:rd_spike_water_head   # 加标水配置记录表头表
-table:rd_x_sinter_detail   # X烧结工艺清单行表(面板 RD_X_SINTER,2026-10-30 新增):表区=配方表(10 行物料)/修订记录
-table:rd_x_sinter_head   # X烧结工艺清单头表(2026-10-30 新增):产品基本信息+模具参数+配方计算器输出五段+管控要求
 table:report_column_settings   # 报表列设置(用户自定义列布局,按panel_code存JSON)
 table:s_allno   # 单据编号
 table:sample_req   # 样品申请单头表(录入/审核/执行三级)
@@ -227,6 +225,8 @@ table:wo_split_log   # 切单操作日志(9.29 批次①:谁/何时/从哪单切
 table:wo_process_line   # 工序—产线预排台账(2026-10-07:一行=一工单行×一工序;计划生产线=排产时人工按工艺路线逐道选定,实际生产线=报工完工转序时落实;撤销排产按行作废)
 table:wo_mixing_head     # 生产工单混料配方快照头表(工单行绑定配方、混料数量、版本)
 table:wo_mixing_detail   # 生产工单混料配方快照行表(物料、配料比、单支含量、计划用量)
+table:wo_pick_return   # 手机扫码·生产领料 退料台账(2026-10-30:一行=一次退料;领料单号+物料+本次退多少+退料单号;「已退数量」唯一真源,累计可退=已领−已退;**不参与库存增减**)
+table:wo_pick_doc   # 手机扫码·生产领料 配对台账(2026-10-30:一行=一工单行的一对「生产领料单+生产退料单」;记单号/状态/已领项数,唯一约束排除已作废行;**不参与库存增减**)
 
 # ---- 经典 HSDZ 遗留但仍在用(15 张;改动前须评估面板影响,新功能禁止再用) ----
 table:dm_ck   # 仓库代码
@@ -288,3 +288,17 @@ table:bs_dc_rule   # 数采规则(定时采集/变化上报/阈值报警)
 table:bs_dc_sample   # 数采采集流水(网关上报的实时数据,只增不改)
 table:bs_dc_alarm   # 数采报警记录(阈值超限等 + 处理留痕)
 table:bs_dc_status_log   # 数采在线状态日志(在线率统计依据)
+table:wo_pick_line   # 手机扫码·生产领料 领料明细(2026-11-01:一行=领料单的一项用料;需求数量=BOM单件用量×工单数量,实领数量=扫码确认后才写;提交后才据此生成材料出库单;**不参与库存增减**)
+
+# ── 以下条目由远端(origin/main)合并带入,原文件里没有 ──
+table:rd_x_sinter_detail   # X烧结工艺清单行表(面板 RD_X_SINTER,2026-10-30 新增):表区=配方表(10 行物料)/修订记录
+table:rd_x_sinter_head   # X烧结工艺清单头表(2026-10-30 新增):产品基本信息+模具参数+配方计算器输出五段+管控要求
+table:wo_day_plan   # 工单日排产(2026-10-29:生产工单/工单排产两页表格内的日期列;一行=工单行×工序×计划日期→计划数量,实际完成量仍取报工 scjl)
+table:wo_proc_card_head   # 工序流程追踪卡·卡头(2026-10-29:一张卡=日期大批次下的一个小批次=一个工单行;照片挂 yj_attachment,完成情况按已审核报工 scjl 现算)
+table:wo_proc_card_detail   # 工序流程追踪卡·工序行(卡的各道工序,来源=工序台账 wo_process_line;完成量/状态/完成时间不落库,查询现算)
+view:v_prod_pick_list   # 生产领料只读视图(dbo.outh src=6 材料出库未删除流水行;PROD_PICK_LIST。2026-10-22 链外建置、脚本遗失,2026-10-25 由 migrate-prod-pick-outh-20261022.sql 补登记进链)
+table:bs_asm_bom   # 组装物料清单(工序BOM子件行;单表 doc 模式按 BOM编码 分组,一行=产品某工序的一个子件;本期工序=组装;数据来源=金蝶BOM引出列表_20261019174847)
+table:qc_oqc_head       # 出厂检验报告头表(一份=一个产品;销售出库勾选触发生成;取三张检验单并集)
+table:qc_oqc_detail     # 出厂检验报告行表(序号/检验项目/要求/抽样标准/抽检量/测量值1..5/结果/判定/数据来源)
+table:qc_oqc_item_map   # 出厂检验项目对齐表(报告项目 ← 源面板+源表区+源项目名,按优先级取第一个有值的)
+view:v_oqc_std          # 出厂检验标准层只读视图(取自 rd_insp_plan_head/_detail;不改计划表任何一列)

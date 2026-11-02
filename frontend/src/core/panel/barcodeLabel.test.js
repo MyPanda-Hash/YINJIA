@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { BARCODE_PANELS, barcodeLabelOf, barcodeLabelsOf } from './barcodeLabel.js'
+import { BARCODE_PANELS, barcodeLabelOf, barcodeLabelsOf, barcodeQrText } from './barcodeLabel.js'
 
 test('三面板编码与后端/迁移脚本一致', () => {
   assert.deepEqual(BARCODE_PANELS, ['BARCODE_MAT', 'BARCODE_WIP', 'BARCODE_FIN'])
@@ -8,11 +8,11 @@ test('三面板编码与后端/迁移脚本一致', () => {
 
 test('材料仓:名称取存货名称、数量取「数量」、单据取单据编号+单据日期', () => {
   const lb = barcodeLabelOf('BARCODE_MAT', {
-    码内容: 'YJ-TS-033|PC0000', 存货名称: 'PP棉', 规格型号: '40±1*30+1*497.5±0.5',
+    码内容: 'YJ-TS-033|PC0000', 存货编码: 'YJ-TS-033', 存货名称: 'PP棉', 规格型号: '40±1*30+1*497.5±0.5',
     批号: 'PC0000', 数量: 2645, 计量单位: '支', 单据编号: 'CGRK-20261014-03414', 单据日期: '2026-10-14',
   })
   assert.equal(lb.code, 'YJ-TS-033|PC0000')
-  assert.equal(lb.qrText, lb.code, '二维码文本=码内容(一批一码)')
+  assert.equal(lb.qrText, '0@YJ-TS-033@PC0000', '二维码=公司代码@物料编码@批号(2026-10-21 用户口径)')
   assert.equal(lb.name, 'PP棉 40±1*30+1*497.5±0.5')
   assert.equal(lb.lot, 'PC0000')
   assert.equal(lb.qty, 2645)
@@ -20,17 +20,31 @@ test('材料仓:名称取存货名称、数量取「数量」、单据取单据�
   assert.equal(lb.doc, 'CGRK-20261014-03414 2026-10-14')
 })
 
+test('材料仓二维码:批号空 → 两段 公司代码@物料编码;行上有公司代码则优先用它', () => {
+  assert.equal(barcodeQrText('BARCODE_MAT', { 存货编码: 'Y-S-Z', 批号: '' }, 'Y-S-Z|'), '0@Y-S-Z')
+  assert.equal(barcodeQrText('BARCODE_MAT', { 公司代码: '0', 存货编码: 'Y-S-Z', 批号: '20261021004' }, 'x'), '0@Y-S-Z@20261021004')
+  assert.equal(barcodeQrText('BARCODE_MAT', { 公司代码: '9', 存货编码: 'Y-S-Z' }, 'x'), '9@Y-S-Z')
+  // 兜底:行上取不到存货编码时退回码内容,不让标签变成空白码
+  assert.equal(barcodeQrText('BARCODE_MAT', { 存货编码: '' }, 'A|1'), 'A|1')
+})
+
+test('半成品/成品二维码不变:仍是码内容(编码|批号)', () => {
+  assert.equal(barcodeQrText('BARCODE_WIP', { 存货编码: 'X', 批号: 'B' }, 'X|B'), 'X|B')
+  assert.equal(barcodeQrText('BARCODE_FIN', { 存货编码: 'X', 批号: 'B' }, 'X|B'), 'X|B')
+})
+
 test('材料仓标签:带仓库(映射后)/供应商;仓位列存在但值为空 ⇒ 空串(标签不显示)', () => {
   const lb = barcodeLabelOf('BARCODE_MAT', {
-    码内容: 'YJ-TS-033|20261014001', 存货名称: 'PP棉', 数量: 1, 批号: '20261014001',
+    码内容: 'YJ-TS-033|20261014001', 存货编码: 'YJ-TS-033', 存货名称: 'PP棉', 数量: 1, 批号: '20261014001',
     仓库映射: '材料仓', 供应商: '深圳市陶氏水处理设备技术开发有限公司', 仓位: '',
   })
   assert.equal(lb.warehouse, '材料仓')
   assert.equal(lb.supplier, '深圳市陶氏水处理设备技术开发有限公司')
   assert.equal(lb.bin, '', '没有仓位数据 → 空串,标签模板据此不渲染')
+  assert.equal(lb.qrText, '0@YJ-TS-033@20261014001')
 })
 
-test('成品仓标签:只有仓库名;供应商与仓库一律空串', () => {
+test('成品仓标签:只有仓库名;供应商与仓库一律空串,二维码仍是码内容', () => {
   const lb = barcodeLabelOf('BARCODE_FIN', {
     码内容: 'TS45|20261014001', 产品名称: 'TS45', 批号: '20261014001', 实收数量: 123,
     计量单位: 'kg', 单据编号: 'CPRK-20261014-00005', 单据日期: '2026-10-14', 仓库名称: '恒亿仓',
@@ -38,9 +52,10 @@ test('成品仓标签:只有仓库名;供应商与仓库一律空串', () => {
   assert.equal(lb.warehouse, '恒亿仓')
   assert.equal(lb.supplier, '')
   assert.equal(lb.bin, '')
+  assert.equal(lb.qrText, 'TS45|20261014001')
 })
 
-test('半成品仓标签:仓库/供应商/仓位都没有(报工派生)→ 全空串', () => {
+test('半成品仓标签:仓库/供应商/仓位都没有(报工派生)→ 全空串,二维码仍是码内容', () => {
   const lb = barcodeLabelOf('BARCODE_WIP', {
     码内容: 'S022-4|20261014', 产品名称: 'A+级烧结炭棒/滤芯', 批号: '20261014',
     报工数量: 160, 计量单位: '支', 报工单号: 'BG-2026-10-0001', 生产日期: '2026-10-16',
@@ -48,6 +63,7 @@ test('半成品仓标签:仓库/供应商/仓位都没有(报工派生)→ 全�
   assert.equal(lb.warehouse, '')
   assert.equal(lb.supplier, '')
   assert.equal(lb.bin, '')
+  assert.equal(lb.qrText, 'S022-4|20261014')
 })
 
 test('空码行返回 null;批量映射丢弃空码并保持顺序', () => {

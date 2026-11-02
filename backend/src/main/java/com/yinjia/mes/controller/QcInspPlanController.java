@@ -82,22 +82,33 @@ public class QcInspPlanController {
     // ══════════════════════════ 方案 ══════════════════════════
 
     /**
-     * 方案列表:GET /plans?keyword=&all=1。
-     * all=1 连**停用**方案一起下发并带 enabled(维护界面要显示灰显行并恢复启用);默认只给启用。
+     * 方案列表:GET /plans?keyword=&all=1&panelCode=QC_ASM_INSP&docScope=all。
+     *
+     * <p>all=1 连**停用**方案一起下发并带 enabled(维护界面要显示灰显行并恢复启用);默认只给启用。</p>
      *
      * <p>2026-10-16:下发字段由「文件编码」换成「检验类型」(用户口径「不需要绑定文件编码,
-     * 而是设定当前检验的类型」)—— 文件编码列还在库里(老方案的值原样留着),只是不再进界面。
+     * 而是设定当前检验的类型」)—— 文件编码列还在库里(老方案的值原样留着),只是不再进界面。</p>
+     *
+     * <p>2026-10-21(用户口径「当前组装检验单的各个单据的检验项目高度雷同……差异化修改」):
+     * 方案按「适用单据」分套。传了 {@code panelCode} 且 {@code docScope} 不是 all ⇒ 只下发
+     * 适用单据里含该面板代号的方案(逗号分隔,精确匹配);没传 panelCode ⇒ 保持旧行为返回全部
+     * (兼容旧前端/其它调用点)。「适用单据」为空 = 未归档,默认不混进任一单据,勾「显示全部单据」
+     * 时用 docScope=all 维护。</p>
      */
     @GetMapping("/plans")
     public ApiResult<List<Map<String, Object>>> plans(@RequestParam(required = false) String keyword,
-                                                      @RequestParam(required = false) String all) {
+                                                      @RequestParam(required = false) String all,
+                                                      @RequestParam(required = false) String panelCode,
+                                                      @RequestParam(required = false) String docScope) {
         requireAnyPanelView();
         boolean withDisabled = truthy(all);
+        boolean allDocs = "all".equalsIgnoreCase(docScope) || panelCode == null || panelCode.isBlank();
         StringBuilder sql = new StringBuilder(
                 "SELECT id, 方案编码, 方案名称, ISNULL(适用存货,N'') AS 适用存货,"
                         + " ISNULL(适用存货类别,N'') AS 适用存货类别, ISNULL(检验方式,N'') AS 检验方式,"
                         + " [抽检比例%] AS 抽检比例, ISNULL(取样规则,N'') AS 取样规则,"
-                        + " ISNULL(检验类型,N'') AS 检验类型, ISNULL(执行标准,N'') AS 执行标准,"
+                        + " ISNULL(检验类型,N'') AS 检验类型, ISNULL(适用单据,N'') AS 适用单据,"
+                        + " ISNULL(执行标准,N'') AS 执行标准,"
                         + " ISNULL(备注,N'') AS 备注, ISNULL(停用,0) AS 停用,"
                         + " CASE WHEN ISNULL(停用,0)=1 THEN 0 ELSE 1 END AS enabled,"
                         + " (SELECT COUNT(*) FROM dbo.bs_qc_item i WHERE i.方案编码 = p.方案编码"
@@ -105,6 +116,11 @@ public class QcInspPlanController {
                         + " FROM dbo.bs_qc_plan p WHERE ISNULL(p.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
         if (!withDisabled) sql.append(" AND ISNULL(p.停用,0)=0");
+        if (!allDocs) {
+            // 精确按逗号分隔的代号匹配:QC_ASM_INSP 不会误命中 QC_ASM_INSP_OLD
+            sql.append(" AND CHARINDEX(N',' + ? + N',', N',' + REPLACE(ISNULL(p.适用单据,N''), N' ', N'') + N',') > 0");
+            args.add(panelCode.trim());
+        }
         if (keyword != null && !keyword.isBlank()) {
             sql.append(" AND (p.方案编码 LIKE ? OR p.方案名称 LIKE ? OR ISNULL(p.适用存货,N'') LIKE ?)");
             String like = "%" + keyword.trim() + "%";
@@ -114,7 +130,7 @@ public class QcInspPlanController {
         return ApiResult.ok(jdbc.queryForList(sql.toString(), args.toArray()));
     }
 
-    /** 新增/修改方案:POST {id?, 方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, 抽检比例, 取样规则, 检验类型, 执行标准, 备注} */
+    /** 新增/修改方案:POST {id?, 方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, 抽检比例, 取样规则, 检验类型, 适用单据, 执行标准, 备注} */
     @PostMapping("/planSave")
     public ApiResult<Map<String, Object>> planSave(@RequestBody Map<String, Object> body) {
         requireAnyPanelView();
@@ -132,21 +148,24 @@ public class QcInspPlanController {
 
         // ⚠ 文件编码已退场(2026-10-16):INSERT 不再写它(留 NULL)、UPDATE 也不碰它
         //   —— 老方案上已填的受控文件号原样留在库里,不因维护动作被清空。
+        // 2026-10-21:适用单据(逗号分隔面板代号;空 = 未归档)随方案一起保存。
+        String applicable = codeList(body.get("适用单据"));
         Object[] vals = {
                 code, name, nn(body.get("适用存货")), nn(body.get("适用存货类别")),
                 nv(body.get("检验方式"), "抽检"), dec(body.get("抽检比例")),
-                nn(body.get("取样规则")), nn(body.get("检验类型")), nn(body.get("执行标准")),
-                nn(body.get("备注")), user};
+                nn(body.get("取样规则")), nn(body.get("检验类型")), nn(applicable),
+                nn(body.get("执行标准")), nn(body.get("备注")), user};
         if (id == null) {
             jdbc.update("INSERT INTO dbo.bs_qc_plan (方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, [抽检比例%],"
-                            + " 取样规则, 检验类型, 执行标准, 备注, 状态, asp_user1, asp_time1)"
-                            + " VALUES (?,?,?,?,?,?,?,?,?,?, N'启用', ?, SYSDATETIME())", vals);
+                            + " 取样规则, 检验类型, 适用单据, 执行标准, 备注, 状态, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?, N'启用', ?, SYSDATETIME())", vals);
             id = jdbc.queryForObject("SELECT MAX(id) FROM dbo.bs_qc_plan WHERE 方案编码=?", Long.class, code);
         } else {
             jdbc.update("UPDATE dbo.bs_qc_plan SET 方案编码=?, 方案名称=?, 适用存货=?, 适用存货类别=?, 检验方式=?,"
-                            + " [抽检比例%]=?, 取样规则=?, 检验类型=?, 执行标准=?, 备注=?, asp_user2=?, asp_time2=SYSDATETIME()"
+                            + " [抽检比例%]=?, 取样规则=?, 检验类型=?, 适用单据=?, 执行标准=?, 备注=?,"
+                            + " asp_user2=?, asp_time2=SYSDATETIME()"
                             + " WHERE id=?", vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
-                    vals[8], vals[9], user, id);
+                    vals[8], vals[9], vals[10], user, id);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
@@ -424,6 +443,26 @@ public class QcInspPlanController {
 
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /**
+     * 「适用单据」收口:前端可能传数组(多选)或逗号分隔字符串。
+     * 统一成逗号分隔、去重、去空、去空格 —— 与 {@link #plans} 的 CHARINDEX 精确匹配同一种存储形状。
+     */
+    private static String codeList(Object o) {
+        List<String> out = new ArrayList<>();
+        if (o instanceof List<?> list) {
+            for (Object x : list) {
+                String s = str(x).replace(" ", "");
+                if (!s.isEmpty() && !out.contains(s)) out.add(s);
+            }
+        } else {
+            for (String s : str(o).replace("，", ",").replace(";", ",").split(",")) {
+                String v = s.trim().replace(" ", "");
+                if (!v.isEmpty() && !out.contains(v)) out.add(v);
+            }
+        }
+        return String.join(",", out);
     }
 
     /** 必填文本:空 → 原样空串(交给上层校验) */

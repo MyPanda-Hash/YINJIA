@@ -59,29 +59,5 @@ export async function apiReadAllMessages() {
   return res?.data ?? res
 }
 
-export async function apiPageManuOrders(params) {
-  const res = await request.get('/manu/order/page', { params })
-  return res?.data ?? res
-}
-
-export async function apiGetManuOrder(id) {
-  const res = await request.get(`/manu/order/${id}`)
-  return res?.data ?? res
-}
-
-export async function apiSaveManuOrder(data) {
-  const res = data.id
-    ? await request.put(`/manu/order/${data.id}`, data)
-    : await request.post('/manu/order', data)
-  return res?.data ?? res
-}
-
-export async function apiDeleteManuOrder(id) {
-  const res = await request.delete(`/manu/order/${id}`)
-  return res?.data ?? res
-}
-
-export async function apiManuOrderAction(id, action) {
-  const res = await request.post(`/manu/order/${id}/${action}`)
-  return res?.data ?? res
-}
+// 2026-10-28:旧生产加工单 MANU_ORDER 下架,其 /manu/order/* 五个接口封装一并删除
+// (后端从来没有这些端点;唯一调用方 TabsBar 的「快速查找」也已移除)。

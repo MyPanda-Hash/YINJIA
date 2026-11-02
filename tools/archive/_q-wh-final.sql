@@ -1,1 +1,0 @@
-SET NOCOUNT ON; SELECT panel_code, col_name, place, data_type, ref_panel, required, hidden FROM yj_field WHERE panel_code IN ('PURCHASE_IN','SALE_OUT','SO_ORDER') AND col_name=N'仓库' ORDER BY panel_code;

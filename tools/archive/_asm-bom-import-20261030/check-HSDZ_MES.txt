@@ -1,0 +1,35 @@
+==> SELECT COUNT(*) AS cnt_rows, COUNT(DISTINCT 单据编号) AS cnt_docs, COUNT(DISTINCT 产品编码) AS cnt_prods FROM dbo.bs_asm_bom;
+cnt_rows | cnt_docs | cnt_prods
+-------------------------------
+1085 | 236 | 236
+(1 行)
+==> SELECT 来源, COUNT(*) AS cnt, COUNT(DISTINCT 单据编号) AS docs, COUNT(DISTINCT 产品编码) AS prods FROM dbo.bs_asm_bom GROUP BY 来源 ORDER BY 来源;
+来源 | cnt | docs | prods
+-----------------------
+金蝶BOM引出列表_20261019174847 | 1085 | 236 | 236
+(1 行)
+==> SELECT COUNT(*) AS missing_unit FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND (计量单位 IS NULL OR 计量单位 = N'');
+missing_unit
+------------
+0
+(1 行)
+==> SELECT 子件编码, COUNT(*) AS cnt FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND (计量单位 IS NULL OR 计量单位 = N'') GROUP BY 子件编码 ORDER BY 子件编码;
+子件编码 | cnt
+----------
+(0 行)
+==> SELECT COUNT(*) AS bad_std FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND ABS(标准用量 - ROUND(用量分子 / 用量分母, 4)) > 0.00005;
+bad_std
+----------
+0
+(1 行)
+==> SELECT TOP 4 单据编号, 行序, 子件编码, 标准用量, 用量分子, 用量分母, 计量单位 FROM dbo.bs_asm_bom WHERE 来源 = N'金蝶BOM引出列表_20261019174847' AND 产品编码 = N'A-32-09' ORDER BY 行序;
+单据编号 | 行序 | 子件编码 | 标准用量 | 用量分子 | 用量分母 | 计量单位
+--------------------------------------------
+A-32-09_V0002 | 1 | A-32-09**TB | 1.0000 | 1.0000 | 1.0000 | 支
+A-32-09_V0002 | 2 | YJ-KBL-012 | 0.0026 | 1.0000 | 384.0000 | 个
+(2 行)
+==> SELECT script_name, applied_at FROM yj_schema_log WHERE script_name = N'migrate-asm-bom-data-20261030.sql';
+script_name | applied_at
+------------------------
+migrate-asm-bom-data-20261030.sql | 2026-10-30 06:32:50.3577189
+(1 行)

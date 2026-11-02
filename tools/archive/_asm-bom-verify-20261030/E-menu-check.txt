@@ -1,0 +1,11 @@
+dm = 数据建模 / dm
+bprod = 生产 / bprod
+[PASS] leaf.title = "组装物料清单"
+[PASS] leaf.path = "/panelx/list/ASM_BOM"
+[PASS] leaf.code = "asmBom"
+[PASS] leaf.operationName = "新增流程"
+[PASS] 全树 panelCode=ASM_BOM 次数 = 1
+[PASS] 全树 path=/panelx/list/ASM_BOM 次数 = 1
+bprod 子项(9): equip=EQUIP, team=TEAM, wc=WC, prodLine=PROD_LINE, process=OP, routing=ROUTE, opTime=OP_TIME, asmBom=ASM_BOM, reject=REJECT
+挂载路径: 数据建模 → 生产 → 组装物料清单
+RESULT: PASS

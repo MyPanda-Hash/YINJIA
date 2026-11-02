@@ -1,0 +1,89 @@
+=== 数据库规范体检 @ HSDZ_MES_TEST ===
+(豁免登记:table 53, panel 2, col 67, dupkey 90, count 3, skiplabel 27)
+
+[FAIL] 01 表命名合规(白名单外) —— 1 处
+        _zz_idx_test
+[FAIL] 02 表级中文注明(白名单外) —— 1 处
+        _zz_idx_test
+[FAIL] 03 拼音/英文列名的列注明(共 4 列;存量收敛) —— 实际 4,超过存量基线 0(棘轮:只许降不许升)
+        _zz_idx_test.code
+        bl_pu_order.kf_period
+        bs_inv.parent_name
+        bs_inv.is_show_aux_barcode
+[PASS] 04 业务表主键与审计四件套
+[FAIL] 05 元数据漂移(字段不在其所在对象里) —— 14 处
+        DISPATCH_STATS.部门(query → v_dispatch_stats)
+        PURCHASE_IN_DETAIL.单价2(detail → v_purchase_in_detail)
+        SALES_ORDER_STATS.客户编码(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.客户(query,detail → v_sales_order_stats)
+        SALES_ORDER_STATS.部门(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.业务员(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.存货编码(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.存货(query,detail → v_sales_order_stats)
+        SALES_ORDER_STATS.主单位(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.单据数(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.数量(主单位)(detail → v_sales_order_stats)
+        SALES_ORDER_STATS.单价(detail → v_sales_order_stats)
+        …(还有 2 项)
+[PASS] 06 面板指向不存在的表/视图
+[PASS] 07 完全重复的字段登记行
+[WARN] 08 同一列多标签(数据键不唯一;已登记 81 组) —— 47 处
+        MANU_ORDER.单价
+        MANU_ORDER.金额
+        MANU_ORDER.排产数量
+        MANU_ORDER.批号
+        MANU_ORDER.入库数量
+        MANU_ORDER.需求数量
+        MANU_ORDER.余量
+        MANU_SCHEDULE.产品编码
+        MANU_SCHEDULE.产品名称
+        MANU_SCHEDULE.成型完成
+        MANU_SCHEDULE.单据日期
+        MANU_SCHEDULE.工序交期
+        …(还有 35 项)
+[FAIL] 09 缺 en 译名(面板 17 / 字段标签 205) —— 实际 222,超过存量基线 0(棘轮:只许降不许升)
+        面板缺: 17 个;字段标签缺: 205 个
+        asp_time1
+        asp_user1
+        Z-G-C批次
+        Z-HP-C批次
+        安装车间
+        保养内容
+        保养情况
+        保养人
+        保养责任人
+        保养周期
+        保养周期(天)
+        本次结算金额本位币
+        …(还有 193 项)
+        补齐:tools/scripts/trigger-mt.ps1;免译标签登记见 §5
+[FAIL] 10 备份/临时表(应清零) —— 实际 11,超过存量基线 0(棘轮:只许降不许升)
+        _bak_qccat_detail_20261021
+        _bak_qcinsp_empty_20261021
+        _bak_qcinsp_empty_approval_20261021
+        _bak_qcinsp_empty_detail_20261021
+        _bak_qcinsp_empty_flow_20261021
+        _bak_qcinsp_empty_status_20261021
+        …(还有 5 项)
+[PASS] 11 ≥10 万行且无非聚集索引的表(现存 0 张大表)
+[FAIL] 12 迁移链清单 ↔ 文件一致(清单 663 / 文件 696) —— 10 处
+        未登记的脚本: check-mobile-write-20261020.sql
+        未登记的脚本: cleanup-rd-prod-20261029.sql
+        未登记的脚本: migrate-enable-rcsi-20261018.sql
+        未登记的脚本: migrate-free-pick-rid-20261020.sql
+        未登记的脚本: migrate-plang-batch-date-closed-20261021.sql
+        未登记的脚本: migrate-plang-no-month-closed-20261021.sql
+        未登记的脚本: migrate-record-group-20261028.sql
+        未登记的脚本: rollback-finish-in-wo-backfill-20261022.sql
+        未登记的脚本: rollback-prod-pick-outh-20261022.sql
+        未登记的脚本: rollback-wo-mixing-list.sql
+[FAIL] 13 面板引用对象缺 pk_col / asp_cancel(打开即 500) —— 6 处
+        MATERIAL_OUT_DETAIL → v_material_out_detail 缺 id
+        MATERIAL_OUT_STATS → v_material_out_stats 缺 id
+        PURCHASE_IN_DETAIL → v_purchase_in_detail 缺 id
+        PURCHASE_IN_STATS → v_purchase_in_stats 缺 id
+        SALE_OUT_DETAIL → v_sale_out_detail 缺 id
+        SALE_OUT_STATS → v_sale_out_stats 缺 id
+
+=== 汇总: FAIL 8 / WARN 1 ===
+RESULT: FAIL-8

@@ -1,0 +1,13 @@
+SET NOCOUNT ON;
+PRINT '--- distinct lot_no on scjl (top 30) ---';
+SELECT TOP 30 lot_no, COUNT(*) n, MIN(sc_date) mn, MAX(sc_date) mx FROM scjl WHERE lot_no IS NOT NULL AND lot_no<>'' GROUP BY lot_no ORDER BY mx DESC;
+PRINT '--- distinct lot_no on plang ---';
+SELECT TOP 20 lot_no, COUNT(*) n FROM plang GROUP BY lot_no ORDER BY n DESC;
+PRINT '--- gxdm + gx name ---';
+SELECT gxdm, COUNT(*) n FROM scjl GROUP BY gxdm ORDER BY n DESC;
+PRINT '--- tables like gx/process/route ---';
+SELECT name FROM sys.tables WHERE name LIKE N'%gx%' OR name LIKE N'%route%' OR name LIKE N'%process%' OR name LIKE N'%op%' ORDER BY name;
+PRINT '--- yj_lot_seq sample ---';
+SELECT TOP 10 * FROM yj_lot_seq ORDER BY 1 DESC;
+PRINT '--- qr_batch_registry sample ---';
+SELECT TOP 5 * FROM qr_batch_registry ORDER BY id DESC;

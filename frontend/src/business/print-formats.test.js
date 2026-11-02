@@ -47,7 +47,8 @@ globalThis.window = {
 globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
-const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText } = await import('./print-formats.js')
+const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -166,4 +167,62 @@ test('打印采购订单回归:抽取公共版式块后仍保留金额列(输出
   assert.ok(html.includes('<th>单价</th>') && html.includes('<th>小计</th>'), '订单版式仍含单价/小计列')
   assert.ok(html.includes('是否含税'), '订单版式仍含是否含税')
   assert.ok(html.includes('付款方式'), '订单版式仍含付款方式')
+})
+
+
+// ── 成型车间排单计划(2026-10-31) ────────────────────────────────────────────
+// 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,不需要根据产线处理」⇒
+//   版式照纸表:客户等级/客户名称/产品编号/型号/成型车间/未完成总数/生产计划数量/实际完成数量/
+//   成型交期/成型交期紧迫度/7天/15天/大于15/日期列(=日计划)。纯函数 schedPlanSheetHtml 可直接断言。
+
+test('planSheetDates:从今天起取 5 天(纸表也就 3~5 天);今天以后没有就退化取最后几天', () => {
+  const dates = ['2026-10-20', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03',
+    '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09']
+  assert.deepEqual(planSheetDates(dates, '2026-10-31'), ['2026-10-31', '2026-11-01', '2026-11-02',
+    '2026-11-03', '2026-11-04'], '从今天起 5 天(过去日期不印)')
+  assert.deepEqual(planSheetDates(['2026-10-01', '2026-10-02'], '2026-10-31'), ['2026-10-01', '2026-10-02'],
+    '全是过去日期时退化取最后几天(否则一张空表)')
+  assert.deepEqual(planSheetDates([], '2026-10-31'), [])
+})
+
+test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async () => {
+  const rows = [{
+    客户等级: '', 客户: '张莉', 加工单号: 'GD-2026-10-0226-1', 工单行号: 1, 公司代码: '0',
+    物料编码: 'S031-3', 规格型号: '28*12*178', 生产线: '1号机',
+    未交量: 10, 排产数量: 10, 当前工序完工量: 0,
+    交期: '2026-11-05', 交期紧迫度: 5, '7天已排': 10, '15天已排': 10, '大于15天已排': 0,
+    日计划: { '2026-10-31': 2, '2026-11-01': 2, '2026-11-05': 3 },
+  }]
+  const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31' })
+  for (const h of ['客户等级', '客户名称', '产品编号', '型号', '成型车间', '未完成总数',
+    '生产计划数量', '实际完成数量', '成型交期', '成型交期紧迫度', '7天', '15天', '大于15']) {
+    assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
+  }
+  assert.ok(html.includes('10月31日') && html.includes('11月5日'), '日期列头用 月日 写法')
+  assert.ok(html.includes('张莉') && html.includes('S031-3') && html.includes('28*12*178') && html.includes('1号机'))
+  assert.ok(/>10</.test(html), '未完成总数/排产数量应出现')
+  assert.ok(html.includes('@page{size:A4 landscape'), '横向 A4')
+  assert.ok(html.includes('成型车间排单计划'), '标题')
+  // 2026-11-01 用户口径「不是两张纸,当前同一行融合起来」:单据编号 + 二维码都在同一行里
+  assert.ok(html.includes('>单据编号</th>'), '同一行带单据编号列')
+  assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
+  assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
+  assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+test('printSchedPlanSheet:空数据不出纸;有数据出**一张**(计划+单据编号+二维码同一行)', async () => {
+  const before = captured.printed
+  assert.equal(await printSchedPlanSheet([], []), false, '空数据返回 false,不打印')
+  assert.equal(captured.printed, before, '空数据不应触发 window.print')
+  const ok = await printSchedPlanSheet([{
+    客户: 'A', 生产线: '1号机', 加工单号: 'GD-1', 工单行号: 1, 公司代码: '0',
+    物料编码: 'S031-3', 产品名称: '滤芯', 规格型号: '28*12', 需求数量: 10, 排产数量: 10,
+    计划完工日期: '2026-11-05', 日计划: { '2026-10-31': 1 },
+  }], ['2026-10-31'], { today: '2026-10-31' })
+  assert.equal(ok, true)
+  assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
+  assert.ok(captured.html.includes('成型车间排单计划'), '标题:排单计划')
+  assert.ok(!captured.html.includes('成型生产任务单'), '不再另起一张任务单')
+  assert.ok(/data:image\/png/.test(captured.html), '同一行行尾二维码')
+  assert.ok(captured.html.includes('GD-1') && captured.html.includes('S031-3'), '同一行主要信息(单据编号/商品编码)')
 })

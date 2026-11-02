@@ -391,6 +391,16 @@ public class PanelRegistry {
         return def;
     }
 
+    /**
+     * 存在性查询:不存在返回 null(**不抛**)。给"目标可能是页面码而非面板"的场景用 ——
+     * {@link #panel(String)} 找不到是抛 IllegalArgumentException,写成 {@code panel(x) != null}
+     * 会在 x 不存在时当场抛出(2026-10-28 SO_ORDER「生成生产工单」指页面码 WORK_ORDER_LIST,
+     * 就是把整个面板配置打成 400 的那一处)。
+     */
+    public PanelDef find(String panelCode) {
+        return panelCode == null ? null : snapshot().get(panelCode);
+    }
+
     public List<PanelDef> all() {
         return new ArrayList<>(snapshot().values());
     }

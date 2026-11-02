@@ -1,0 +1,17 @@
+== 表 yj_user ==
+公共列 27  键 [id]  比对列 26
+行数: 服务器=26  本地=25  键数: 26/25
+
+---- ① 仅A(键只在服务器) ----
+   43   [id=43]
+
+---- ② 仅B(键只在本地) ----
+   (无)
+
+---- ③ 同键内容不同 ----
+   6   [id=6]
+        MobId: oORgGxqAVkBPaUEJGUcHC8v87NW0 -> oORgGxl49SrkJOkEwrHQCjYu9K6A
+        phoneNo: 17876647324 -> 18927330634
+   同键行数不同(重复行/改键)=0 键;  内容不同的行=1
+   按列统计(命中行数): {MobId=1, phoneNo=1}
+RESULT: DONE

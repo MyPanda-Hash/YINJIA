@@ -375,16 +375,23 @@ public class PushGenerateHandler implements PanelActionHandler {
         return rows;
     }
 
-    /** 行骨架(两类行共用的展示字段) */
+    /**
+     * 行骨架(两类行共用的展示字段)。
+     *
+     * <p>物料口径按**候选字段**取(2026-10-31):各面板对同一件事的叫法不一样 ——
+     * 采购订单/暂收单叫「物料编码·物料名称·单位」,销售订单叫「存货编码·存货名称」,
+     * 生产工单叫「产品编码·产品名称」。此前写死「物料编码」,于是 销售订单→销售出库单 /
+     * 生产工单→产成品入库单 的对话框里物料列整列是空的(看着像"没数据")。
+     */
     private Map<String, Object> baseRow(Map<String, Object> it, String lineKey, Object id) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("lineKey", lineKey);
         row.put("id", id);
         row.put("行号", it.get("行号"));
-        row.put("物料编码", it.get("物料编码"));
-        row.put("物料名称", it.get("物料名称"));
+        row.put("物料编码", firstOf(it, SRC_CODE_FIELDS));
+        row.put("物料名称", firstOf(it, SRC_NAME_FIELDS));
         row.put("规格型号", it.get("规格型号"));
-        row.put("计量单位", it.get("计量单位") != null ? it.get("计量单位") : it.get("单位"));
+        row.put("计量单位", it.get("计量单位") != null ? it.get("计量单位") : firstOf(it, SRC_UNIT_FIELDS));
         return row;
     }
 
@@ -733,8 +740,336 @@ public class PushGenerateHandler implements PanelActionHandler {
         return out;
     }
 
+    // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
+
+    /**
+     * 「统一生单对话框」的候选行(勾选 + 本次数量)。
+     *
+     * <p>用户口径(2026-10-31):「**生单**也要变成可以勾选的和选择数量的(现在只有采购订单的生单做了特殊处理),
+     * 非定制化的生单只要可以勾选和选择数量就可以」;并要一个「**批量生单**」——
+     * 在左侧单据选择栏勾多张来源单 → 打开一个界面列出这些单据的明细行 → 再勾行/填量 → 转单。
+     * 第二轮补充:「所有单据只要有生单和批量生单这个按钮的,都要实现 —— **送料暂收就不能批量,
+     * 而且生单也没有勾选**」。
+     *
+     * <p>所以本方法把「一张来源单能生什么」摊平成同一份行契约,**分批链路与普通推式生单共用**:
+     * <ul>
+     *   <li><b>分批链路</b>(目标面板配了表头「批次号」,如 采购订单→送料暂收单):直接复用
+     *       {@link #batchRows} —— 订单行(数量已切走已打印量)+ 已打印隔离行,已送/已退回/剩余/可送上限全在内,
+     *       批次号与服务端预告的 nextBatchNo 一并给出(生单即定号);</li>
+     *   <li><b>普通推式生单</b>(如 销售订单→销售出库单、送料暂收→检验/入库):按
+     *       {@code form_flow_link} 的**行级**已生单量算剩余({{@link BatchService#sentByLineKey}}),
+     *       于是「先送一部分行、剩下的以后再生」是可行的 —— 这正是"可以勾选和选择数量"的前提;</li>
+     *   <li>行键统一 {@code {来源单号}#{来源明细行id}}(与选单/分批同一约定),前端只认它。</li>
+     * </ul>
+     *
+     * <p>「销售订单 → 生产工单」「生产工单 → 产成品入库单」按用户口径**保持原来的不变**
+     * (不进本对话框,前端也不给这两个动作出「批量生单」),故这里不必为它们做特殊处理。
+     *
+     * @param sourceNos 勾选的来源单据号(单张 = 原「生单」,多张 = 新「批量生单」)
+     */
+    public Map<String, Object> pushPreview(String sourcePanel, String action, List<String> sourceNos) {
+        String target = pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
+        boolean batchFlow = isBatchTarget(target);
+        String[] filter = configService.detailFilter(sourcePanel, action);
+        List<Map<String, Object>> docs = new ArrayList<>();
+        for (String no : sourceNos) {
+            if (no == null || no.isBlank()) continue;
+            docs.add(previewDoc(sourcePanel, action, target, no, batchFlow, filter));
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("sourcePanel", sourcePanel);
+        out.put("action", action);
+        out.put("targetPanel", target);
+        out.put("targetName", targetNameOf(sourcePanel, action, target));
+        out.put("sourceName", registry.panel(sourcePanel).displayName(false));
+        out.put("batchFlow", batchFlow);
+        out.put("overRatio", batchService.overRatio());
+        out.put("docs", docs);
+        return out;
+    }
+
+    /**
+     * 对话框标题上的目标名。
+     *
+     * <p>送料暂收单的「生单」是**一条动作两个去向**(按商品档案「来料检验」逐行分流到
+     * 来料检验单 / 采购入库单,见 {@link QcRecvGenerateHandler}),而 PUSH_TARGETS 里登记的
+     * QC_INSP 只是**路由标记** —— 照它显示会变成「生单 → 来料检验单」,可实际还会生成采购入库单,
+     * 用户会以为单子漏了。故这一条把两个去向都写出来。
+     */
+    private String targetNameOf(String sourcePanel, String action, String target) {
+        if (QcRecvGenerateHandler.PANEL.equals(sourcePanel) && QcRecvGenerateHandler.ACTION.equals(action)) {
+            String a = registry.panel("QC_INSP").displayName(false);
+            String b = registry.panel("PURCHASE_IN").displayName(false);
+            return a + " / " + b;
+        }
+        return registry.panel(target).displayName(false);
+    }
+
+    /** 一张来源单的生单候选(头 + 行 + 批次预告),见 {@link #pushPreview} 的行契约说明 */
+    private Map<String, Object> previewDoc(String sourcePanel, String action, String target, String sourceNo,
+                                           boolean batchFlow, String[] filter) {
+        PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
+        Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
+        if (src == null || src.isEmpty()) throw new IllegalStateException("来源单据不存在:" + sourceNo);
+        Map<String, Object> head = new LinkedHashMap<>(src);
+        head.remove("detail");
+        // 单据已被别人删掉/作废(列表是几秒前的快照)时,loadOneDoc 只回一个 {编号, 单据状态} 的空壳 ——
+        // 不拦就会在对话框里显示一段"没有明细"的空单,或者生单时被"仅已审核单据可生单,当前状态:草稿"
+        // 这种与用户所见(列表里写着已审核)对不上的话误导。这里直接说清"单据不在了"。
+        if (looksEmptyDoc(head)) throw new IllegalStateException("来源单据不存在或已被删除:" + sourceNo);
+        List<Map<String, Object>> items = applyDetailFilter(new ArrayList<>(itemsOf(src)), filter);
+
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("sourceNo", sourceNo);
+        doc.put("status", str(buttonService.docStatus(sourcePanel, sourceNo).get("status")));
+        doc.put("header", head);
+        doc.put("batchFlow", batchFlow);
+        if (batchFlow) {
+            Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo);
+            Map<String, Double> returned = batchService.returnedByOrderLine(sourceNo);
+            doc.put("lines", batchRows(sourcePanel, sourceNo, items, sent, returned, batchService.overRatio()));
+            // 与服务端 generateBatch 同一公式:来源单已有号 → 继承(下游站),否则按当天取号(链路头一跳)
+            String srcBatch = str(src.get("批次号"));
+            doc.put("batchInherited", !srcBatch.isEmpty());
+            doc.put("nextBatchNo", srcBatch.isEmpty() ? BatchService.buildBatchNo(java.time.LocalDate.now()) : srcBatch);
+            doc.put("batches", batchService.batches(sourcePanel, sourceNo));
+        } else {
+            doc.put("lines", genericRows(items, sourceNo, batchService.sentByLineKey(sourcePanel, sourceNo)));
+            doc.put("batchInherited", false);
+            doc.put("nextBatchNo", "");
+            doc.put("batches", List.of());
+        }
+        return doc;
+    }
+
+    /** 生单动作的行过滤(与 {@link #handle} 同一口径;无登记则原样返回) */
+    private List<Map<String, Object>> applyDetailFilter(List<Map<String, Object>> items, String[] filter) {
+        if (filter == null) return items;
+        List<Map<String, Object>> out = items.stream().filter(it -> {
+            Object v = it.get(filter[0]);
+            boolean eq = filter[2].equals(v == null ? "" : String.valueOf(v));
+            return "=".equals(filter[1]) ? eq : !eq;
+        }).collect(java.util.stream.Collectors.toList());
+        return out;
+    }
+
+    /** 来源行数量的字段候选(与 VoucherFlowService.QTY_FIELDS / 分批的 数量 同口径) */
+    private static final List<String> SRC_QTY_FIELDS = List.of(
+            "数量", "实收数量", "送检数量", "计划数量", "派工数量", "需用数量", "领料数量");
+    private static final List<String> SRC_CODE_FIELDS = List.of(
+            "物料编码", "存货编码", "产品编码", "材料编码");
+    private static final List<String> SRC_NAME_FIELDS = List.of(
+            "物料名称", "存货名称", "产品名称", "材料名称");
+    private static final List<String> SRC_UNIT_FIELDS = List.of(
+            "计量单位", "单位", "销售单位");
+
+    /** 取第一个非空字段值(优先给定顺序;都没有返回 null) */
+    private static Object firstOf(Map<String, Object> row, List<String> fields) {
+        if (row == null) return null;
+        for (String f : fields) {
+            Object v = row.get(f);
+            if (v != null && !String.valueOf(v).trim().isEmpty()) return v;
+        }
+        return null;
+    }
+
+    /**
+     * 普通推式生单的候选行:每行给 数量 / 已生单 / 已退回(普通链路恒 0) / 剩余 / 可生单上限。
+     * 与分批行保持**同一套键**(数量/已送数量/已退回数量/剩余数量/可送上限/rowKind),
+     * 前端一张表就能同时渲染两种链路 —— 两套键名迟早会漂。
+     */
+    private List<Map<String, Object>> genericRows(List<Map<String, Object>> items, String sourceNo,
+                                                  Map<String, Double> sent) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> it : items) {
+            Object id = it.get("id");
+            String lineKey = sourceNo + "#" + (id == null ? "" : String.valueOf(id));
+            double qty = round2(numOf(firstOf(it, SRC_QTY_FIELDS)));
+            double used = round2(sent == null ? 0d : sent.getOrDefault(lineKey, 0d));
+            double left = round2(Math.max(0d, qty - used));
+            Map<String, Object> row = baseRow(it, lineKey, id);
+            row.put("rowKind", "order");
+            row.put("订单数量", qty);
+            row.put("数量", qty);
+            row.put("已送数量", used);          // 普通链路 = 已生成数量(按行级占用求和)
+            row.put("已退回数量", 0d);
+            row.put("剩余数量", left);
+            row.put("可送上限", left);
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    /**
+     * 「按勾选行 + 本次数量」生单(**统一入口**:单张=原「生单」,多张=「批量生单」)。
+     *
+     * <p>分批链路交给 {@link #generateBatch}(批次号/超送/材料码隔离行那一整套口径一条不改);
+     * 其余链路走 {@link #generateLines}(整单映射 → 只映射勾选行、数量取本次填的值)。
+     *
+     * <p>为什么拆成"一张单一个事务"(由调用方逐张调用,各自 @Transactional):
+     * 批量生单里某一张失败(比如已被别人送满)不该把已经生成好的单一起回滚 ——
+     * 调用方(PxController)逐张收集「生成 / 失败」两张清单回给界面。
+     */
+    @Transactional
+    public Map<String, Object> generateOne(String sourcePanel, String action, String sourceNo, String user,
+                                           Map<String, Double> qtyByLineKey, String batchNo) {
+        String target = pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
+        if (isBatchTarget(target)) {
+            return generateBatch(sourcePanel, target, sourceNo, user, qtyByLineKey, null, batchNo);
+        }
+        return generateLines(sourcePanel, action, target, sourceNo, user, qtyByLineKey);
+    }
+
+    /**
+     * 普通推式生单的「按行/按量」版本(非分批链路)。
+     *
+     * <p>与 {@link #handle} 的区别只有两点,其余(状态闸门/头行映射/保存/占用留痕)完全同源:
+     * <ol>
+     *   <li>只映射**勾选的行**(qtyByLineKey 的键),数量取本次填的值 —— 不勾的行不进新单;</li>
+     *   <li>占用按**行级本次量**写({@link VoucherFlowService#linkBatch}),于是剩余量可逐次核减:
+     *       先送 300、剩下 200 之后再送,不再是"整单只能用一次"。</li>
+     * </ol>
+     * 校验与 {@link #pushPreview} 共用同一份候选行口径(剩余量 = 数量 − 行级已生单量),
+     * 「对话框里看到的」与「真正校验用的」永远是同一份数。
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> generateLines(String sourcePanel, String action, String target,
+                                              String sourceNo, String user, Map<String, Double> qtyByLineKey) {
+        // 1) 来源必须已审核(与整单推式生单同一句话,前端置灰 + 后端兜底)
+        String status = str(buttonService.docStatus(sourcePanel, sourceNo).get("status"));
+        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
+
+        // 2) 载入来源单(头 + 行),并按生单动作过滤
+        PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
+        PanelRegistry.PanelDef tgtDef = registry.panel(target);
+        Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
+        Map<String, Object> head = new LinkedHashMap<>(src);
+        head.remove("detail");
+        if (looksEmptyDoc(head)) throw new IllegalStateException("来源单据不存在或已被删除:" + sourceNo);
+        List<Map<String, Object>> srcItems = applyDetailFilter(new ArrayList<>(itemsOf(src)),
+                configService.detailFilter(sourcePanel, action));
+        if (srcItems.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生单");
+
+        // 3) 候选行(与预览同一口径) + 本次数量校验
+        Map<String, Map<String, Object>> byKey = new LinkedHashMap<>();
+        for (Map<String, Object> r : genericRows(srcItems, sourceNo,
+                batchService.sentByLineKey(sourcePanel, sourceNo))) {
+            byKey.put(str(r.get("lineKey")), r);
+        }
+        List<Map<String, Object>> picked = new ArrayList<>();   // {item, row, qty}
+        if (qtyByLineKey != null) {
+            for (Map.Entry<String, Double> e : qtyByLineKey.entrySet()) {
+                String lineKey = e.getKey();
+                double qty = e.getValue() == null ? 0d : e.getValue();
+                if (qty <= 0.000001) continue;                   // 本次不生单
+                Map<String, Object> r = byKey.get(lineKey);
+                if (r == null) throw new IllegalStateException("生单行不存在或已失效:" + lineKey);
+                double cap = numOf(r.get("可送上限"));
+                if (qty > cap + 0.000001) {
+                    // 行号可能为空(部分面板的明细没有 seq),别把提示写成「第 null 行」
+                    String label = r.get("行号") == null || String.valueOf(r.get("行号")).isBlank()
+                            ? "物料 " + str(r.get("物料编码")) + " 这一行"
+                            : "第 " + r.get("行号") + " 行";
+                    throw new IllegalStateException(label + "本次生单数量 " + round2(qty)
+                            + " 超出剩余可生单量 " + round2(cap)
+                            + "(该行数量 " + round2(numOf(r.get("数量"))) + " − 已生单 "
+                            + round2(numOf(r.get("已送数量"))) + ")");
+                }
+                Map<String, Object> m = sourceItemOf(srcItems, lineKey);
+                if (m == null) throw new IllegalStateException("生单行对应的来源明细已不存在:" + lineKey);
+                Map<String, Object> p = new LinkedHashMap<>();
+                p.put("item", m);
+                p.put("row", r);
+                p.put("qty", qty);
+                picked.add(p);
+            }
+        }
+        if (picked.isEmpty()) throw new IllegalStateException("请至少勾选一行并填写本次生单数量");
+
+        // 4) 头/行映射(与选单/整单推式生单共用 buildSelectConfig 的 headerMap/detailMap)
+        Map<String, Object> maps = configService.flowMaps(sourcePanel, target);
+        if (maps == null) throw new IllegalStateException("目标面板未配置流转来源:" + target);
+        List<Map<String, String>> headerMap = (List<Map<String, String>>) maps.get("headerMap");
+        List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");
+        String tgtQtyLabel = qtyLabelOf(tgtDef, "detail");
+
+        Map<String, Object> targetHead = new LinkedHashMap<>();
+        for (Map<String, String> m : headerMap) {
+            Object v = head.get(m.get("from"));
+            if (v != null) targetHead.put(m.get("to"), v);
+        }
+        targetHead.put("来源单据", srcDef.name());
+        targetHead.put("来源单号", sourceNo);
+        String dateLabel = "单据日期";
+        if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
+            PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
+            if (df != null) dateLabel = df.label();
+        }
+        targetHead.put(dateLabel, java.time.LocalDate.now().toString());
+
+        List<Map<String, Object>> targetItems = new ArrayList<>();
+        for (Map<String, Object> p : picked) {
+            Map<String, Object> item = (Map<String, Object>) p.get("item");
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (Map<String, String> m : detailMap) {
+                Object v = item.get(m.get("from"));
+                if (v != null) row.put(m.get("to"), v);
+            }
+            // 本次数量**压掉**映射带过来的整行数量(这正是"可以选择数量"的落点)
+            row.put(tgtQtyLabel, round2((double) p.get("qty")));
+            applySourceFlags(sourcePanel, target, item, row);
+            targetItems.add(row);
+        }
+
+        // 5) 保存为目标草稿(复用通用保存语义:头行分表/默认值/号池取号)
+        Map<String, Object> formData = new LinkedHashMap<>(targetHead);
+        formData.put("detail", Map.of("items", targetItems));
+        Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
+        String newNo = String.valueOf(saved.get("编号"));
+
+        // 5b) 检验目录联动(任何来源生成了来料检验单都要建报告草稿 + 目录行)
+        if ("QC_INSP".equals(target)) qcCatalog.syncFromInspection(newNo, user);
+
+        // 6) 行级占用:按本次量写(form_flow_link.source_line_key = 行键),剩余量据此逐次核减
+        List<VoucherFlowService.BatchLine> links = new ArrayList<>();
+        for (Map<String, Object> p : picked) {
+            Map<String, Object> item = (Map<String, Object>) p.get("item");
+            Map<String, Object> r = (Map<String, Object>) p.get("row");
+            Object inv = firstOf(item, SRC_CODE_FIELDS);
+            links.add(new VoucherFlowService.BatchLine(
+                    str(r.get("lineKey")), null,
+                    inv == null ? null : String.valueOf(inv),
+                    numOf(r.get("数量")), (double) p.get("qty")));
+        }
+        voucherFlow.linkBatch(sourcePanel, sourceNo, target, newNo, null, null, links);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", newNo);
+        out.put("单据状态", "草稿");
+        out.put("gotoPanel", target);
+        return out;
+    }
+
     /** 非空字符串(去空白);null → 空串 */
     private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
+
+    /**
+     * 「这张单其实不存在」的判据:单头里除了 编号/单据状态/saved 这些**由查询层兜底填的壳**之外,
+     * 一个非空业务值都没有(见 {@link #previewDoc} 的调用点注释)。
+     * 真实单据的单据日期/往来单位等必有值,不会被误判。
+     */
+    private static boolean looksEmptyDoc(Map<String, Object> head) {
+        if (head == null) return true;
+        for (Map.Entry<String, Object> e : head.entrySet()) {
+            String k = e.getKey();
+            if ("编号".equals(k) || "单据状态".equals(k) || "saved".equals(k)) continue;
+            Object v = e.getValue();
+            if (v != null && !String.valueOf(v).trim().isEmpty()) return false;
+        }
+        return true;
+    }
 
     /**
      * 只在目标面板**注册了该字段**时才写入(未注册的键会被通用保存静默丢弃,先判一下更直观)。

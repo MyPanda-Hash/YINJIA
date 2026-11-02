@@ -16,8 +16,13 @@
         <el-button size="small" type="primary" plain @click="apply">{{ tt('查找') }}</el-button>
       </div>
       <div class="dsr-count">
-        {{ tt('共有数据') }}: {{ total }} {{ tt('条') }}
+        {{ tt('共有数据: {n} 条').replace('{n}', String(total)) }}
         <span v-if="keyword" class="dsr-count-sub">（{{ tt('模糊搜索') }}: {{ keyword }}）</span>
+      </div>
+      <!-- 勾选摘要(2026-10-31 批量生单):「勾了哪几张」必须一眼看见,否则多页翻着勾很容易糊 -->
+      <div v-if="selectable" class="dsr-picked">
+        <span>{{ tt('已勾选') }} <b>{{ checked.length }}</b> {{ tt('张') }}</span>
+        <el-button v-if="checked.length" link type="primary" size="small" @click="$emit('checkAll', { nos: checked, checked: false })">{{ tt('清空') }}</el-button>
       </div>
     </div>
     <!-- 翻页条(选择栏**上方**唯一一条,2026-09-20):整页翻 50 条/页,与左栏内容同一数据源(后端分页页号) -->
@@ -29,6 +34,17 @@
       <table ref="tableEl">
         <thead>
           <tr>
+            <!-- 勾选列(2026-10-31):「批量生单」靠它挑来源单 —— 全选框只作用于**本页**,
+                 跨页勾选由父组件按单号保留(checked) -->
+            <th v-if="selectable" class="dsr-check">
+              <el-checkbox
+                :model-value="allOnPage"
+                :indeterminate="someOnPage && !allOnPage"
+                :disabled="!pageNos.length"
+                :title="tt('全选本页')"
+                @change="(v) => $emit('checkAll', { nos: pageNos, checked: v })"
+              />
+            </th>
             <th v-for="c in cols" :key="c.label" :class="c.align === 'center' ? 'a-center' : 'a-left'">{{ tt(c.label) }}</th>
           </tr>
         </thead>
@@ -39,6 +55,13 @@
             :class="{ active: r.no === currentNo }"
             @click="$emit('select', r.idx)"
           >
+            <td v-if="selectable" class="dsr-check" @click.stop>
+              <el-checkbox
+                :model-value="checked.includes(r.no)"
+                :disabled="!r.no"
+                @change="(v) => $emit('check', { no: r.no, checked: v })"
+              />
+            </td>
             <td
               v-for="(c, ci) in cols"
               :key="c.label"
@@ -50,7 +73,7 @@
             </td>
           </tr>
           <tr v-if="!viewRows.length">
-            <td :colspan="cols.length" class="dsr-empty">{{ tt('暂无数据') }}</td>
+            <td :colspan="cols.length + (selectable ? 1 : 0)" class="dsr-empty">{{ tt('暂无数据') }}</td>
           </tr>
         </tbody>
       </table>
@@ -84,8 +107,13 @@ const props = defineProps({
   /** 列配置(按单据定制):[{label, keys(候选行键,取首个非空), align, tag(状态标签), no(单号样式)}];
    *  约定首列=单号、次列=日期、末列=审核状态(tag),中间列由挂载方按单据挑重要字段 */
   columns: { type: Array, default: null },
+  /** 勾选列(2026-10-31「批量生单」):为真时每行一个勾选框 + 表头全选本页;
+   *  勾选状态由父组件按**单号**保管(翻页/切单据都不丢),本组件只负责展示与上报 */
+  selectable: { type: Boolean, default: false },
+  /** 已勾选的单号(PanelxList 是唯一真源) */
+  checked: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['select', 'toggle', 'page', 'search'])
+const emit = defineEmits(['select', 'toggle', 'page', 'search', 'check', 'checkAll'])
 
 /** 总页数:按总张数与每页条数算,至少 1 页 */
 const pageCount = computed(() => Math.max(1, Math.ceil((props.total || 0) / Math.max(1, props.pageSize))))
@@ -124,6 +152,12 @@ function apply() { emit('search', (kw.value || '').trim()) }
 const viewRows = computed(() => props.rows.map((row, idx) => ({
   key: noOf(row) + '#' + idx, idx, no: noOf(row), cells: cols.value.map((c) => colValue(row, c)),
 })))
+
+/** 本页可勾的单号(空单号不参与 —— 勾了也没法拿去生单) */
+const pageNos = computed(() => viewRows.value.map((r) => r.no).filter(Boolean))
+/** 本页是否已全勾 / 有部分勾(表头全选框的两态) */
+const allOnPage = computed(() => pageNos.value.length > 0 && pageNos.value.every((no) => props.checked.includes(no)))
+const someOnPage = computed(() => pageNos.value.some((no) => props.checked.includes(no)))
 
 /** 状态标签色彩(沿用系统制造绿体系:主色=已审核,青蓝=已完成(与已审核区分),
  *  中性灰=草稿,琥珀=流转中,红=作废/驳回) */
@@ -243,6 +277,13 @@ onBeforeUnmount(detachDrag)
 .dsr-kw { display: flex; gap: 6px; margin-top: 8px; }
 .dsr-count { margin-top: 8px; font-size: 12px; color: var(--t-text-2, #5d6c67); }
 .dsr-count-sub { margin-left: 6px; color: var(--t-text-3, #8b9893); }
+/* 勾选摘要(批量生单):已勾几张 + 清空 */
+.dsr-picked { margin-top: 6px; font-size: 12px; color: var(--t-text-2, #5d6c67); display: flex; align-items: center; gap: 6px; }
+.dsr-picked b { color: var(--t-primary, #116a5b); }
+/* 勾选列:窄一列,复选框缩到 12px 的视觉密度(侧栏字号 11px,默认尺寸会把行撑高) */
+.dsr-check { width: 22px; text-align: center; padding: 2px 0 !important; }
+.dsr-check :deep(.el-checkbox) { height: auto; margin-right: 0; }
+.dsr-check :deep(.el-checkbox__inner) { transform: scale(0.85); }
 
 /* 表格外层:宽度跟随侧栏(100%);表格超宽即出横向滚动条(常显),绝不溢出侧栏。
    max-height 钉在视口内(约减去 工具栏+单号行+栏头/筛选 的高度):行数多时列表在侧栏内部

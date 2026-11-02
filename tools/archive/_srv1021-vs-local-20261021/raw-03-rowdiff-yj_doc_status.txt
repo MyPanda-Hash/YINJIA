@@ -1,0 +1,49 @@
+== 表 yj_doc_status ==
+公共列 31  键 [id]  比对列 30
+行数: 服务器=5756  本地=5750  键数: 5756/5750
+
+---- ① 仅A(键只在服务器) ----
+   25366   [doc_no=SJ-2026-10-0055, panel_code=QC_FIRST_INSP, id=25366]
+   25367   [doc_no=SJ-2026-10-0056, panel_code=QC_FIRST_INSP, id=25367]
+   25368   [doc_no=SJ-2026-10-0057, panel_code=QC_FIRST_INSP, id=25368]
+   25371   [doc_no=SJ-2026-10-0058, panel_code=QC_FIRST_INSP, id=25371]
+   25372   [doc_no=SJ-2026-10-0059, panel_code=QC_FIRST_INSP, id=25372]
+   25373   [doc_no=SJ-2026-10-0060, panel_code=QC_FIRST_INSP, id=25373]
+   ...(共 9 个键,已截断)
+
+---- ② 仅B(键只在本地) ----
+   30560   [doc_no=ZJ-2026-10-0013, panel_code=QC_ASM_INSP, id=30560]
+   30561   [doc_no=ZJ-2026-10-0014, panel_code=QC_ASM_INSP, id=30561]
+   30562   [doc_no=ZJ-2026-10-0009, panel_code=QC_ASM_INSP, id=30562]
+
+---- ③ 同键内容不同 ----
+   25261   [doc_no=ZL-20260928-02, panel_code=SO_ORDER, id=25261]
+        update_at: 2026-10-21 08:47:03.440 -> 2026-10-18 19:52:53.190
+        erp_close_state: S -> <NULL>
+   25382   [doc_no=ZL-20261013-06, panel_code=SO_ORDER, id=25382]
+        shr: 王光珍 -> 冯加劲
+        shsj: 2026-10-17 08:51:26.000 -> 2026-10-15 17:00:43.000
+        update_at: 2026-10-21 08:52:03.920 -> 2026-10-16 16:17:18.347
+        erp_close_state: S -> <NULL>
+   26414   [doc_no=ZJ-2026-10-0015, panel_code=QC_ASM_INSP, id=26414]
+        canceled: N -> Y
+        cancel_by: <NULL> -> admin
+        cancel_at: <NULL> -> 2026-10-21 02:30:03.087
+        update_at: 2026-10-18 07:09:00.700 -> 2026-10-21 02:30:03.087
+   30447   [doc_no=SJ-2026-10-0167, panel_code=QC_FIRST_INSP, id=30447]
+        update_at: 2026-10-19 15:23:00.100 -> 2026-10-21 02:23:49.197
+        saved: N -> Y
+        archived: N -> <NULL>
+   30514   [doc_no=ZL-20261020-02, panel_code=SO_ORDER, id=30514]
+        update_at: 2026-10-21 08:57:04.063 -> 2026-10-20 16:02:24.273
+        erp_close_state: S -> <NULL>
+   30528   [doc_no=SD-2026-10-0005, panel_code=RD_SPEC_DOC, id=30528]
+        update_at: 2026-10-21 08:43:54.510 -> 2026-10-20 19:45:24.297
+        modify_state: R -> <NULL>
+        modify_req_by: yangmaolin -> <NULL>
+        modify_req_at: 2026-10-21 08:43:54.5100000 -> <NULL>
+        modify_reason: 物料清单 -> <NULL>
+   同键行数不同(重复行/改键)=0 键;  内容不同的行=8
+   (上面只列了前 6 行)
+   按列统计(命中行数): {archived=1, cancel_at=3, cancel_by=3, canceled=2, doc_no=2, erp_close_state=3, modify_reason=1, modify_req_at=1, modify_req_by=1, modify_state=1, panel_code=2, saved=2, shr=2, shsj=2, stopped=1, update_at=8}
+RESULT: DONE

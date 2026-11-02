@@ -992,7 +992,7 @@ function panelTitle(panel) {
   return {
     PURCHASE_IN: '采购入库单', QUOTE_ORDER: '报价单', CUSTOMER_TRACE_SETTINGS: '客户追溯设置',
     TRACE_PRINT_TEMPLATE: '追溯打印模板', COMPANY_TRACE_SETTINGS: '企业追溯设置', QC_ITEM: '质检项目',
-    MANU_ORDER: '生产工单', SO_ORDER: '销售订单', PROCESS_REPORT: '工序汇报单',
+    SO_ORDER: '销售订单', PROCESS_REPORT: '工序汇报单',
     FINISH_IN: '产成品入库单', SALE_OUT: '销售出库单', DEPT: '部门档案',
   }[panel] || panel || '业务单据'
 }

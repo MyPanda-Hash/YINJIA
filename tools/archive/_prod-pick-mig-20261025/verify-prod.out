@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== verify.sql ==
+  | schema-log | migrate-prod-pick-outh-20261022.sql | 2026-10-24 17:05:52.0713244 | 
+  | counts | 18 | 4 | 2 | 18 | 2094 | 
+[OK] verify.sql (1 batches)

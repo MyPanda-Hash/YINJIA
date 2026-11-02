@@ -183,7 +183,11 @@ export async function refPanelName(field) {
 //   PanelConfigService 的定义是**明细列**（`fieldsAt("detail")`），而本弹窗的数据来自
 //   `queryFormDataList`，返回的是**单据头行**。两者不同源 ⇒ 每格都取不到值，弹窗整片空白
 //   （实测：产品信息表 2026-10-29 新增 BOM 明细列后，只剩前端造的「开发状态」有值）。
-//   判据统一收到 `@core/ref/refColumns` 的纯函数里（单测 5 条钉住优先级）。
+// ⚠ 2026-11-01 再修（用户报障「工序报工单的选择…只有备注列」）：上面那次把"优先表头字段"
+//   写成了无条件，但**档案(archive)面板**的 dataSchema 恒为规范占位「备注」，参照行却是
+//   明细展平行 ⇒ 所有档案参照（工序/职员/客户/商品…）弹窗只剩一列「备注」。判据因此按
+//   `metadata.singleDoc` 分流（单单据/档案取网格列，普通单据取表头），两处都在
+//   `@core/ref/refColumns` 的纯函数里（单测 9 条钉住优先级）。
 export async function refColumns(field) {
   const r = normRef(field)
   if (r.refColumns && r.refColumns.length) return r.refColumns
@@ -209,7 +213,13 @@ function resolveFilterValue(expected, row) {
 }
 
 // 拉取引用面板数据（SQL 后端）
-export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null } = {}) {
+// skipAuditFilter(2026-11-01):调用方声明「不要自动加『单据状态=已审核』候选过滤」。
+//   背景:纸面单据(不合格报告 QC_BHG / 不合格品处理单 QC_BHC 等)的表头「单据状态」是**历史遗留列**,
+//   MES 侧从不维护(真源 yj_doc_status,列表/纸面显示的是派生值);实测 qc_proc_insp_head 433 张单只有
+//   1 张写着「已审核」⇒ 一加该过滤,「关联制程检验单」的候选就只剩 1 条,等于不可用。
+//   弹窗里仍按派生状态显示「单据状态」列,由用户自己认单。仅 DocSheet 纸面格子(refAllStatus)显式开启,
+//   其余所有参照行为逐字不变。
+export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null, skipAuditFilter = false } = {}) {
   const r = normRef(field)
   // 级联过滤(2026-10-09):filter 值支持 `$字段` 占位,按本行取值;
   //   解析不出值(没选上级字段/没传本行)⇒ 直接无候选,避免把全库仓位倒给用户选。
@@ -231,7 +241,8 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200, row = 
   // filter/keyword 在展平后的明细行上应用
   const cond = singleDoc || hasAlternativeFilter ? {} : { ...filter }
   // 2026-08-25：参照面板有「审核」流程（单据类面板）时，仅已审核来源单据可选（对齐 T+：已审核才能选择生单）
-  if (!cond['单据状态']) {
+  // 2026-11-01：skipAuditFilter 时跳过（见函数头注释;纸面单据的该列不可靠,不能据此过滤）
+  if (!skipAuditFilter && !cond['单据状态']) {
     try {
       const hasAudit = (refConfig?.metadata?.buttonGroups || []).some((g) =>
         (g.actions || []).some((a) => ['审核', '提交审批'].includes(a)))
@@ -606,6 +617,26 @@ export async function puLabelVoid(docNo) {
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
 }
+
+// ==================== 统一生单对话框(2026-10-31 用户口径) ====================
+/**
+ * 生单预览:勾选的来源单据(一张 = 原「生单」,多张 = 「批量生单」)各自的明细行。
+ * 返回 { targetPanel, targetName, batchFlow, overRatio, docs:[{sourceNo,status,header,lines,nextBatchNo,batches}] };
+ * 分批链路(采购订单→送料暂收单)与普通推式生单返回**同一份行契约**(数量/已送数量/剩余数量/可送上限/rowKind)。
+ *
+ * ⚠ 用 unwrapStrict(与 puLabelReprint 同款):权限拒绝是 **HTTP 200 + body code 403**,
+ *   走 unwrap 时后端那句"当前角色无该面板「可见」权限"不会抛错 ⇒ 对话框只是空的,
+ *   用户看到的像"这张单没有明细"(2026-10-29 那类误判)。
+ */
+export async function pushFlowLines({ panelCode, action, sourceNos }) {
+  return unwrapStrict(await request.post('/px/push/lines', { panelCode, action, sourceNos }))
+}
+
+/** 生单:按「勾选的行 + 本次数量」逐张生成(单张/多张同一入口),返回 { 生成:[], 失败:[] } */
+export async function pushFlowGenerate({ panelCode, action, docs, overRatio }) {
+  return unwrapStrict(await request.post('/px/push/generate', { panelCode, action, docs, overRatio }))
+}
+
 
 
 /**
