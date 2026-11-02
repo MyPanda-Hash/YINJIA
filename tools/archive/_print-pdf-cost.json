@@ -1,0 +1,19 @@
+{
+  "baselineMs": 1054,
+  "rows": [
+    {
+      "label": "打印采购订单",
+      "nodes": 122,
+      "htmlLen": 3581,
+      "imgs": 0,
+      "costMs": 635
+    },
+    {
+      "label": "打印订单无金额",
+      "nodes": 105,
+      "htmlLen": 3220,
+      "imgs": 0,
+      "costMs": 699
+    }
+  ]
+}

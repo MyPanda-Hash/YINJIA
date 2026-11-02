@@ -83,13 +83,20 @@ public class PrintStationController {
                              String 产品名称, String 规格型号, String 来源, String 发起人, String 时间,
                              // 二维码 PNG 的 dataURL(base64)。前端用 qrcode 库生成后随任务送上来,
                              // 打印电脑直接贴进标签/PDF —— 代理是纯 PowerShell,自己画 QR 不现实。
-                             String 二维码图) {
+                             String 二维码图,
+                             // 纸面「领料单」的抬头与明细(2026-11-02):不随任务走的话打印代理只能画出空表格
+                             String 领料单号, String 领料部门, String 打印日期,
+                             java.util.List<java.util.Map<String, Object>> 明细) {
         Map<String, Object> json() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", id);
             m.put("标题", 标题);
             m.put("二维码内容", 二维码内容);
             m.put("二维码图", 二维码图);
+            m.put("领料单号", 领料单号);
+            m.put("领料部门", 领料部门);
+            m.put("打印日期", 打印日期);
+            m.put("明细", 明细 == null ? java.util.List.of() : 明细);
             m.put("工单号", 工单号);
             m.put("工单行号", 工单行号);
             m.put("产品名称", 产品名称);
@@ -156,7 +163,11 @@ public class PrintStationController {
         PrintTask t = new PrintTask(SEQ.getAndIncrement(), str1(body.get("标题"), "生产领料单"),
                 qr, woNo, line, str(body.get("产品名称")), str(body.get("规格型号")),
                 str1(body.get("来源"), "mobile"), currentUserName(), LocalDateTime.now().format(TS),
-                qrImg);
+                qrImg,
+                str(body.get("领料单号")), str(body.get("领料部门")), str(body.get("打印日期")),
+                // 明细透传(2026-11-02):纸表要把每项用料打进表格
+                body.get("明细") instanceof java.util.List<?> dl
+                        ? (java.util.List<java.util.Map<String, Object>>) dl : java.util.List.of());
         QUEUE.add(t);
         // 上限保护:超了挤掉最旧的(内存安全;现场重打一次即可)
         while (QUEUE.size() > MAX_TASKS) QUEUE.poll();
@@ -209,7 +220,8 @@ public class PrintStationController {
         synchronized (DONE) {
             DONE.addFirst(new PrintTask(id, str(body.get("标题")), "", str(body.get("工单号")),
                     toInt(body.get("工单行号")), "", "", ok ? "已出纸" : "失败",
-                    str(body.get("发起人")), LocalDateTime.now().format(TS), ""));
+                    str(body.get("发起人")), LocalDateTime.now().format(TS), "",
+                    "", "", "", java.util.List.of()));
             while (DONE.size() > 20) DONE.removeLast();
         }
         return ApiResult.ok(null);

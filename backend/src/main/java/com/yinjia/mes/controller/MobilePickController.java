@@ -319,17 +319,17 @@ public class MobilePickController {
             return existingResult(exist);
         }
 
-        // 按产品编号取最新一张未作废的组装BOM表头 → 其明细行
+        // 按产品编号取该产品的组装 BOM 表头 → 其明细行
         String productCode = str(wo.get("物料编码"));
         Map<String, Object> bomHead = latestAsmBom(productCode);
         if (bomHead == null) {
             throw new IllegalStateException("该工单的产品(" + (productCode.isEmpty() ? "未填产品编号" : productCode)
-                    + ")在《组装BOM表》里还没有维护用料,无法生成领料单:"
-                    + "请先到 研发管理 → 产品文件 → 组装BOM表 维护该产品的物料清单");
+                    + ")在《组装物料清单》里还没有维护用料,无法生成领料单:"
+                    + "请先到 数据建模 → 生产 → 组装物料清单 维护该产品的物料清单");
         }
         List<Map<String, Object>> bomLines = bomDetail(str(bomHead.get("单据编号")));
         if (bomLines.isEmpty()) {
-            throw new IllegalStateException("《组装BOM表》" + str(bomHead.get("单据编号"))
+            throw new IllegalStateException("《组装物料清单》" + str(bomHead.get("单据编号"))
                     + " 没有明细行(该产品没维护物料),无法生成领料单");
         }
         // 单位缺失时**在生单前**就给出点名提示(而不是让 ButtonService 抛"明细第 N 行计量单位不能为空")
@@ -454,7 +454,7 @@ public class MobilePickController {
         // 这里只把"要打什么"回给前端 —— 真正的出纸由前端打印通道或打印站点完成,
         // 服务端不持有打印机(服务端也可能在另一台机器上)。
         out.put("打印", wantPrint
-                ? printPayload(lineWoNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")))
+                ? printPayload(lineWoNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")), id)
                 : null);
         return out;
     }
@@ -660,7 +660,7 @@ public class MobilePickController {
         out.put("创建时间", d.createAt() == null ? "" : d.createAt().toLocalDateTime().toString().replace('T', ' '));
         out.put("提交人", d.submitter());
         out.put("提交时间", d.submitAt() == null ? "" : d.submitAt().toLocalDateTime().toString().replace('T', ' '));
-        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), ""));
+        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), "", d.id()));
 
         // 工单行信息(抬头区显示产品/产线/排产数量)
         List<Map<String, Object>> woRows = jdbc.queryForList(
@@ -1306,7 +1306,7 @@ public class MobilePickController {
         if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
         docs.bumpPrint(id, currentUserName());
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), ""));
+        out.put("打印", printPayload(d.woNo(), d.woLine(), d.productName(), "", d.id()));
         return ApiResult.ok(out);
     }
 
@@ -1371,50 +1371,52 @@ public class MobilePickController {
 
     /**
      * 取该产品**最新一张**《组装工艺清单》的表头(用于领料展开与追溯留痕)。
-     *
-     * <p>🔴 2026-10-30 重要修正:此前取的是 {@code rd_asm_bom_head}(组装BOM表)—— **取错表了**。
+     * <p>🔴 2026-11-02 用户口径:「生成生产领料单的 bom,关联改为用数据建模的生产里面的组装物料清单」。
      * <ul>
-     *   <li>{@code RD_ASM_BOM}(组装BOM表)**面板菜单早已下线**(2026-09-11 并入组装工艺清单第 2 页签,
-     *       见 menus.test.js 的钉死断言);它当前 0 行,我造的演示数据放进去后
-     *       用户在界面上打开「组装工艺清单」看到 BOM 表**是空的**,而领料单却领着料 ——
-     *       两边对不上,这是用户 2026-10-30 反馈的第三个问题的根因;</li>
-     *   <li>现在界面里维护 BOM 的位置是**组装工艺清单 → 页签1「组装BOM表」**,
-     *       物理落点是 {@code rd_asm_proc_detail}(三张逻辑表共用该行表,用 {@code 表区='物料清单'} 区分,
-     *       见 frontend `recordSheetConfigs.js` 的 RD_ASM_PROC_DT_BOM)。</li>
+     *   <li>数据源从 {@code rd_asm_proc_head/_detail}(研发管理 → 组装工艺清单 → 页签1「组装BOM表」)
+     *       **迁到** {@code bs_asm_bom}(数据建模 → 生产 → 组装物料清单,面板 ASM_BOM,单表 doc 模式)。</li>
+     *   <li>为什么换:两处各维护一份组装用料,现场在「组装物料清单」里改完,
+     *       领料单还按「组装工艺清单」那一份走 ⇒ 领的料与工艺不一致;</li>
+     *   <li>取数口径:同一产品可能有多版 BOM(单据编号形如 {@code T387_V0001}),
+     *       **优先 默认BOM='是'**,否则取单据编号最大的一张(版本号含在编号里);</li>
+     *   <li>只认 {@code 工序='组装'}:这张单表还承载成型/切炭等工序的用料,不过滤会串料。</li>
      * </ul>
-     * ⇒ 取数改为按**产品编号**找最新的 {@code rd_asm_proc_head},再取其
-     * {@code rd_asm_proc_detail} 里 {@code 表区='物料清单'} 的行。
      */
     private Map<String, Object> latestAsmBom(String productCode) {
         if (productCode == null || productCode.isBlank()) return null;
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP 1 单据编号, 产品编号, 产品名称, ISNULL(版本号,N'') AS 版本号"
-                        + " FROM dbo.rd_asm_proc_head"
-                        + " WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + " ORDER BY ISNULL(单据日期,'') DESC, id DESC",
+                "SELECT TOP 1 单据编号, 产品编码 AS 产品编号, 产品名称,"
+                        + " ISNULL(版本号,N'') AS 版本号, ISNULL(默认BOM,N'') AS 默认BOM"
+                        + " FROM dbo.bs_asm_bom"
+                        + " WHERE 产品编码 = ? AND 工序 = N'组装' AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + "   AND ISNULL(状态,N'') <> N'作废'"
+                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'') = N'是' THEN 0 ELSE 1 END, 单据编号 DESC",
                 productCode.trim());
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     /**
-     * 组装工艺清单里「组装BOM表」页签的明细行(物料编号/物料名/物料规格/用量)。
+     * 组装物料清单(ASM_BOM)里这张 BOM 的明细行(物料编号/物料名/物料规格/用量)。
      *
-     * <p>🔴 数据源 = {@code rd_asm_proc_detail} 且 {@code 表区='物料清单'}。
-     * 为什么必须带表区过滤:这张行表由**三张逻辑表共用**(修订记录 / 物料清单 / 关键控制清单),
-     * 不带过滤会把修订记录、工序控制点也当成领料用料。
+     * <p>🔴 数据源 = {@code bs_asm_bom}(2026-11-02 起;此前是 {@code rd_asm_proc_detail} 的
+     * {@code 表区='物料清单'} 行)。这张表本来就是「一行一个子件」的单表结构,不需要表区过滤。
      *
-     * <p>⚠ 计量单位:BOM 表本身没有单位列,而材料出库单的计量单位是必填 ⇒
-     * 从存货档案 {@code bs_inv} 带出(与材料出库单里手选商品的取值同源)。
+     * <p>⚠ 用量取 {@code 标准用量}(导入时已按 用量分子/用量分母 折算成 4 位小数),
+     * 不用分子分母再算一遍 —— 两边口径必须一致,否则领料数量与清单对不上。
+     *
+     * <p>⚠ 计量单位:清单里这一列允许为空(导入时先空、由存货档案回填) ⇒
+     * 空时退回 {@code bs_inv.计量单位};两边都空时上层会点名报错(材料出库单该列必填)。
      */
     private List<Map<String, Object>> bomDetail(String bomNo) {
         List<Map<String, Object>> raw = jdbc.queryForList(
-                "SELECT ISNULL(d.物料编号,N'') AS 物料编号, ISNULL(d.物料名,N'') AS 物料名,"
-                        + " ISNULL(d.物料规格,N'') AS 物料规格, ISNULL(d.用量,N'') AS 用量,"
-                        + " ISNULL(i.计量单位,N'') AS 计量单位, ISNULL(i.规格型号,N'') AS 档案规格"
-                        + " FROM dbo.rd_asm_proc_detail d"
-                        + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = d.物料编号 AND ISNULL(i.asp_cancel,'N') <> 'Y'"
-                        + " WHERE d.单据编号 = ? AND d.表区 = N'物料清单' AND ISNULL(d.asp_cancel,'N') <> 'Y'"
-                        + " ORDER BY TRY_CAST(d.序号 AS int), d.id", bomNo);
+                "SELECT ISNULL(d.子件编码,N'') AS 物料编号, ISNULL(d.子件名称,N'') AS 物料名,"
+                        + " ISNULL(d.子件规格,N'') AS 物料规格, ISNULL(d.标准用量,0) AS 用量,"
+                        + " ISNULL(NULLIF(ISNULL(d.计量单位,N''),N''), ISNULL(i.计量单位,N'')) AS 计量单位,"
+                        + " ISNULL(i.规格型号,N'') AS 档案规格"
+                        + " FROM dbo.bs_asm_bom d"
+                        + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = d.子件编码 AND ISNULL(i.asp_cancel,'N') <> 'Y'"
+                        + " WHERE d.单据编号 = ? AND ISNULL(d.asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY d.行序, d.id", bomNo);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : raw) {
             if (str(r.get("物料编号")).isEmpty()) continue;   // 没有物料编号的行不参与领料
@@ -1710,7 +1712,18 @@ public class MobilePickController {
     }
 
     /** 打印载荷:工单二维码内容 + 抬头信息(前端按这个渲染标签/走打印站点) */
-    private Map<String, Object> printPayload(String woNo, int line, String productName, String spec) {
+    /**
+     * 打印载荷(纸面「领料单」用的全量数据)。
+     *
+     * <p>🔴 2026-11-02 用户口径:「改成图片的样式,二维码放在红框内;打印大小中一刀,A4 一半,横打」——
+     * 给的样张是一张**纸质领料单**:左上角红框放码、标题「领 料 单」+ No 单号、
+     * 七列表格(订单号/材料名称/规格/单位/请领数量/实发数量/备注)、底部四栏签名。
+     * 所以载荷除了抬头与二维码,**必须带明细行** —— 否则打出来只是一张空表头的纸。
+     *
+     * @param docId 台账主键;非空时按它取明细(请领=BOM需求,实发=已领)。生单/重打都传,
+     *              只有在还没有台账的极少数路径下才为空(那时明细为空,纸面就是空白表)
+     */
+    private Map<String, Object> printPayload(String woNo, int line, String productName, String spec, Long docId) {
         Map<String, Object> m = new LinkedHashMap<>();
         // 与 print-formats.woQrText 同口径:公司代码@工单号@(1000+行号);公司代码全库为 '0'
         m.put("二维码内容", "0@" + woNo + "@" + (1000 + Math.max(1, line)));
@@ -1719,7 +1732,34 @@ public class MobilePickController {
         m.put("产品名称", productName);
         m.put("规格型号", spec);
         m.put("标题", "生产领料单");
+        // 纸面抬头的「No」= 领料单号、「日期」= 单据日期
+        Map<String, String> head = new LinkedHashMap<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        if (docId != null) {
+            WoPickDocService.PickDoc d = docs.byId(docId);
+            if (d != null) {
+                m.put("领料单号", d.outNo());
+                m.put("状态", d.state());
+                m.put("打印日期", java.time.LocalDate.now().toString());
+                // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
+                for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("材料名称", str(it.get("名称")));
+                    row.put("规格", str(it.get("规格")));
+                    row.put("单位", str(it.get("单位")));
+                    row.put("请领数量", num(it.get("BOM用量")));
+                    row.put("实发数量", num(it.get("数量")));
+                    row.put("备注", str(it.get("批号")));
+                    rows.add(row);
+                }
+            }
+        }
+        m.put("明细", rows);
         return m;
+    }
+
+    private Map<String, Object> printPayload(String woNo, int line, String productName, String spec) {
+        return printPayload(woNo, line, productName, spec, null);
     }
 
     /**

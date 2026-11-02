@@ -492,31 +492,65 @@ export async function printWoQr(payload, opts = {}) {
     qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
   } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
 
-  const title = String(p['标题'] ?? '').trim() || '生产领料单'
+  const title = String(p['标题'] ?? '').trim() || '领料单'
   const line = Number(p['工单行号']) || 0
-  const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
+  const outNo = String(p['领料单号'] ?? '').trim()
+  const dept = String(p['领料部门'] ?? '').trim()
+  const printDate = String(p['打印日期'] ?? '').trim() || new Date().toISOString().slice(0, 10)
+  // 明细行(纸表七列);后端 /mobilePick/reprint 已带「明细」,旧载荷没有就当空表
+  const rows = Array.isArray(p['明细']) ? p['明细'] : []
+  const cell = (v) => (v === 0 || v ? esc(String(v)) : '')
+  const fmtQty = (v) => (Number(v) > 0 ? String(Math.round(Number(v) * 10000) / 10000) : '')
+  const bodyRows = []
+  for (let i = 0; i < Math.max(8, Math.min(12, rows.length)); i++) {
+    const r = rows[i] || {}
+    bodyRows.push('<tr>'
+      + `<td>${esc(woNo + (line ? '#' + line : ''))}</td>`
+      + `<td>${cell(r['材料名称'])}</td>`
+      + `<td>${cell(r['规格'])}</td>`
+      + `<td>${cell(r['单位'])}</td>`
+      + `<td class="num">${fmtQty(r['请领数量'])}</td>`
+      + `<td class="num">${fmtQty(r['实发数量'])}</td>`
+      + `<td>${cell(r['备注'])}</td>`
+      + '</tr>')
+  }
+  // 🔴 2026-11-02 用户口径:照**纸质领料单**的样子出(用户给了样张照片)——
+  //   左上角放二维码、标题「领 料 单」+ 右上 No 单号、七列明细表格、底部四栏签名。
+  //   纸张 = 中一刀 210mm x 148.5mm 横打。
   const body = '<style>'
-    + '@page{size:75mm 100mm;margin:0}'
-    + '.card{width:75mm;height:100mm;box-sizing:border-box;border:0.35mm solid #000;'
-    + 'padding:5mm 5mm 26mm 5mm;position:relative;page-break-after:always;background:#fff;'
-    + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#111}'
-    + '.card .t{font-size:13pt;font-weight:700;text-align:center;letter-spacing:2mm;margin-bottom:4mm}'
-    + '.card .f{display:flex;align-items:flex-end;margin:2.2mm 0;line-height:1.3;font-size:10pt}'
-    + '.card .f .lb{flex:none;white-space:nowrap}'
-    + '.card .f .v{flex:0 1 auto;min-width:22mm;border-bottom:0.25mm solid #000;padding:0 1mm 0.4mm;'
-    + 'font-size:9.5pt;word-break:break-all;overflow-wrap:anywhere}'
-    + '.card .qr{position:absolute;right:6mm;bottom:6mm;width:20mm;height:20mm}'
-    + '.card .qr img{width:20mm;height:20mm;display:block}'
-    + '.card .code{position:absolute;left:5mm;bottom:10mm;font-size:7pt;color:#444;'
-    + 'max-width:40mm;word-break:break-all}'
+    + '@page{size:210mm 148.5mm;margin:0}'
+    + '.card{width:210mm;height:148.5mm;box-sizing:border-box;padding:5mm 6mm;'
+    + 'position:relative;page-break-after:always;background:#fff;'
+    + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#000}'
+    + '.card:last-child{page-break-after:auto}'
+    + '.qr{position:absolute;left:6mm;top:5mm;width:34mm;height:34mm;border:0.35mm solid #000}'
+    + '.qr img{width:100%;height:100%;display:block}'
+    + '.t{text-align:center;font-size:22pt;font-weight:700;letter-spacing:5mm;margin:1mm 0 0}'
+    + '.no{position:absolute;right:8mm;top:7mm;font-size:12pt;font-weight:700}'
+    + '.meta{margin:2mm 0 1.5mm 38mm;font-size:10.5pt}'
+    + '.meta .d{float:right;margin-right:2mm}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:9.5pt;'
+    + 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
+    + 'th{font-weight:700;text-align:center;height:7mm}'
+    + 'td{height:6.4mm}'
+    + 'td.num{text-align:right}'
+    + '.sign{margin-top:2.5mm;font-size:10.5pt;display:flex;justify-content:space-between}'
     + 'body{margin:0;background:#fff}'
     + '</style>'
     + '<div class="card">'
-    + `<div class="t">${esc(title)}</div>`
-    + f('工单号', woNo) + f('工单行号', line ? `#${line}` : '')
-    + f('产　　品', p['产品名称']) + f('规　　格', p['规格型号'])
-    + `<div class="code">${esc(qrText)}</div>`
     + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
+    + `<div class="no">No ${esc(outNo || '-')}</div>`
+    + `<div class="t">${esc(title)}</div>`
+    + `<div class="meta">领料部门:${esc(dept)}<span class="d">日期:${esc(printDate)}</span></div>`
+    + '<table>'
+    + '<colgroup><col style="width:20%"><col style="width:22%"><col style="width:15%">'
+    + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
+    + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
+    + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
+    + `<tbody>${bodyRows.join('')}</tbody>`
+    + '</table>'
+    + '<div class="sign"><span>部门主管:</span><span>仓库主管:</span><span>领料人:</span><span>仓管员:</span></div>'
     + '</div>'
 
   // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调
