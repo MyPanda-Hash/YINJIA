@@ -492,7 +492,14 @@ try {
         if ($origin) { $res.Headers.Add('Access-Control-Allow-Origin', $origin) }
         else { $res.Headers.Add('Access-Control-Allow-Origin', '*') }
         $res.Headers.Add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-        $res.Headers.Add('Access-Control-Allow-Headers', 'Content-Type')
+        # 🔴 2026-11-03 关键:页面开在**服务器地址**上(http://36.140.66.163:8090)时,
+        #   浏览器把它当"公网页面",而代理在 127.0.0.1 —— 这属于 Chrome 的
+        #   Private Network Access:公网→本机的请求**必须**由本机服务显式许可,
+        #   否则 fetch 直接被拦,页面永远显示「代理未连接」(实测就是这个原因)。
+        #   许可方式 = 响应里带 Access-Control-Allow-Private-Network: true。
+        $res.Headers.Add('Access-Control-Allow-Headers', 'Content-Type, Access-Control-Request-Private-Network')
+        $res.Headers.Add('Access-Control-Allow-Private-Network', 'true')
+        $res.Headers.Add('Access-Control-Max-Age', '600')
 
         try {
             $path = $req.Url.AbsolutePath
