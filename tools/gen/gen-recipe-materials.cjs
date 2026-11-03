@@ -1,15 +1,21 @@
 /**
  * gen-recipe-materials.cjs — 由设计源《20267月22日-最新烧结配方模板-1.xlsx》sheet「物料清单」
- * 生成 `tools/migrate-recipe-materials.sql`(84 种配方物料 + 含水率)。
+ * 生成两个迁移脚本:
+ *   `tools/migrate-recipe-materials.sql`               —— 建列 + 按需播种 84 种物料 + 登记字段/译名
+ *   `tools/migrate-recipe-materials-backfill-20261103.sql` —— 给已有行**补含水率**(bug 修复,见脚本头注)
  *
  * 为什么要有这个脚本而不是手写 84 行 INSERT:
  *   设计源是**权威清单**(物料种类/物料编号/物料名称/水分含量),手抄一遍必然出错且无人能复核;
  *   脚本把"从源到库"这一步变成可重跑、可 diff 的确定性过程。
  *
+ * 为什么要拆出 backfill:第一个脚本的 UPDATE 写在 `ELSE` 分支里,而它在服务器上是被
+ *   **baseline(只登记不执行)** 收进 yj_schema_log 的 ⇒ 那 84 行 UPDATE 一次都没跑,
+ *   3949 行金蝶商品的水分含量全空 ⇒ 配方计算器算出的理论水分恒为 0.00%。
+ *   backfill 独立成文,才能单独进 to-run 强制执行。
+ *
  * 源文件 = tools/archive/_walk/src-moldFormula-物料清单.txt(表格 walk 的产物,R2~R85 共 84 行)。
  *
  * 用法:node tools/gen/gen-recipe-materials.cjs
- * 产出:tools/migrate-recipe-materials.sql(幂等:有则只补空的水分含量,绝不覆盖已维护的值)
  */
 'use strict'
 
@@ -19,6 +25,7 @@ const path = require('node:path')
 const ROOT = path.join(__dirname, '..', '..')
 const SRC = path.join(ROOT, 'tools', 'archive', '_walk', 'src-moldFormula-物料清单.txt')
 const OUT = path.join(ROOT, 'tools', 'migrate-recipe-materials.sql')
+const OUT_BACKFILL = path.join(ROOT, 'tools', 'migrate-recipe-materials-backfill-20261103.sql')
 
 const text = fs.readFileSync(SRC, 'utf8')
 const rows = []
@@ -124,5 +131,82 @@ GO
 
 fs.writeFileSync(OUT, lines.join('\n'), 'utf8')
 console.log(`已生成 ${path.relative(ROOT, OUT)}`)
+
+/* ── 补数脚本(2026-11-03 bug 修复)──────────────────────────────────────────────
+   背景见本文件头注:第一个脚本被 baseline 跳过 ⇒ 84 行 UPDATE 没跑 ⇒ 含水率全空。
+   本脚本只做"按编码补空",不覆盖人工维护值,可重复执行。 */
+const bf = []
+bf.push(`/* ============================================================================
+   migrate-recipe-materials-backfill-20261103.sql —— 84 种配方物料含水率**补数**
+   ============================================================================
+   ⚠ 本文件由 tools/gen/gen-recipe-materials.cjs 从设计源自动生成,不要手改。
+     重新生成:node tools/gen/gen-recipe-materials.cjs
+     设计源:《20267月22日-最新烧结配方模板-1.xlsx》sheet「物料清单」(A1:D85,84 行)
+
+   ── 为什么需要这一条 ───────────────────────────────────────────────────────
+   migrate-recipe-materials.sql 是**幂等"按需播种"**:编码已存在就只走
+   \`ELSE UPDATE ... AND 水分含量 IS NULL\`。但它在服务器上是走 **baseline(只登记、不执行)**
+   进 yj_schema_log 的(\`applied_at = 2026-11-02 12:29:38\`,同批 692 条一起;
+   见 tools/archive/_deploy-20261102/steps.md §3:to-run 只有 6 条,其余全 baseline)。
+   于是:列建了、yj_field 登记了、译名写了,**唯独 UPDATE 一次都没跑**。
+
+   后果(2026-11-03 实测 HSDZ_MES):bs_inv 3961 行金蝶商品水分含量**全为 NULL**,
+   只有 GF-001 / FRT 两个"库里本来没有、由那条 INSERT 新建"的编码带值
+   ⇒ 配方计算器 powder_avg 恒为 0 ⇒ 单据「理论水分」永远 0.00%。
+
+   ── 本脚本的口径 ───────────────────────────────────────────────────────────
+   把设计源的含水率**按存货编码**写进 bs_inv,**不按数据来源收窄** ——
+   同一编码可能既有金蝶同步行又有种子行,而含水率是物料的固有属性,与来源无关。
+   仍然**不覆盖人工维护过的值**:只写 \`水分含量 IS NULL\` 的行。
+   与旧脚本的差别只有一处:旧脚本的 UPDATE 藏在 ELSE 分支里(编码存在才走到),
+   本脚本独立成文,可单独进 to-run **强制执行**。
+
+   幂等:可重复执行(第二遍 0 行受影响)。
+   两账套都要跑:先 HSDZ_MES、后 HSDZ_MES_TEST。
+   ============================================================================ */
+
+SET NOCOUNT ON;
+GO
+
+PRINT N'=== migrate-recipe-materials-backfill-20261103:补 ${withMoisture.length} 种配方物料含水率 ===';
+GO
+
+/* ── 前置:列不存在就没得补(防御性告警,不静默跳过) ── */
+IF COL_LENGTH('bs_inv', N'水分含量') IS NULL
+BEGIN
+    RAISERROR(N'bs_inv.水分含量 列不存在 —— 请先执行 migrate-recipe-materials.sql', 16, 1);
+END
+GO
+
+/* ── 主体:逐个编码补空(只碰 NULL,绝不动已人工维护的值) ── */`)
+
+for (const r of withMoisture) {
+  bf.push(`UPDATE bs_inv SET [水分含量] = ${r.moisture} WHERE RTRIM([存货编码]) = ${q(r.code)} AND [水分含量] IS NULL;`)
+}
+
+bf.push(`GO
+`)
+
+bf.push(`/* ── 核验:这 ${withMoisture.length} 个编码里还有几个是空的(应 = 0 才算补齐) ── */
+SELECT COUNT(*) AS 仍为空的编码数
+FROM bs_inv
+WHERE RTRIM([存货编码]) IN (${withMoisture.map((r) => q(r.code)).join(',\n    ')})
+  AND [水分含量] IS NULL;
+GO
+
+/* ── 核验:金蝶同步行里补到值的条数(按来源看修复面) ── */
+SELECT ISNULL([数据来源], N'<NULL>') AS 来源,
+       COUNT(*) AS 总行数,
+       SUM(CASE WHEN [水分含量] IS NOT NULL THEN 1 ELSE 0 END) AS 有含水率
+FROM bs_inv
+GROUP BY ISNULL([数据来源], N'<NULL>')
+ORDER BY 总行数 DESC;
+GO
+`)
+
+fs.writeFileSync(OUT_BACKFILL, bf.join('\n'), 'utf8')
+console.log(`已生成 ${path.relative(ROOT, OUT_BACKFILL)}`)
 console.log(`  物料 ${rows.length} 种:${Object.entries(byKind).map(([k, v]) => `${k} ${v}`).join(' / ')}`)
-console.log(`  其中带含水率 ${withMoisture.length} 种(${withMoisture.map((r) => r.code).length} 个编号),其余 ${rows.length - withMoisture.length} 种设计源未给(不参与湿重换算)`)
+console.log(`  其中带含水率 ${withMoisture.length} 种,其余 ${rows.length - withMoisture.length} 种设计源未给(不参与湿重换算)`)
+console.log(`  ⇒ 补数脚本含 ${withMoisture.length} 条 UPDATE(全部带 "AND 水分含量 IS NULL" 守卫)`)
+

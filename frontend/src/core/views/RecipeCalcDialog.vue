@@ -480,14 +480,17 @@ const resultRows = computed(() => {
     { label: '理论最低灌料重量g', value: fixed(r.pour_weights.low, 1) },
     { label: '理论灌料中间值g', value: fixed(r.pour_weights.std, 1) },
     { label: '理论最高灌料重量g', value: fixed(r.pour_weights.high, 1) },
-    { label: '理论水分', value: `${fixed(r.moisture.powder_avg * 100, 2)}%` },
+    // 纸面只有一个水分格 ⇒ 它显示/回填的是**实际水分**(2026-11-03 用户口径,
+    // 见 core/mold/recipeSheet.js 的 buildPatch 注释);物料平均水分仍作为参考行列出,
+    // 让工艺员看得见灌料湿重是按哪个含水率换算的。
+    { label: '理论水分', value: `${fixed(r.actual_moisture * 100, 2)}%` },
     { label: '最短长度mm', value: fixed(r.lengths.low, 1) },
     { label: '中间值mm', value: fixed(r.lengths.std, 1) },
     { label: '最长长度mm', value: fixed(r.lengths.high, 1) },
     { label: '最低重量g', value: fixed(r.demold.low, 1) },
     { label: '中间值g', value: fixed(r.demold.mid, 1) },
     { label: '最高重量g', value: fixed(r.demold.high, 1) },
-    { label: '实际水分', value: `${fixed(r.actual_moisture * 100, 2)}%` },
+    { label: '物料平均水分（参考）', value: `${fixed(r.moisture.powder_avg * 100, 2)}%` },
   ]
 })
 const headDiff = computed(() => (patch.value ? Object.entries(patch.value.head)

@@ -302,11 +302,14 @@ test('引擎结果 → 回填补丁:页 1 十一个格 + 配方表两列,位数�
   const patch = buildPatch(result, slots)
 
   // 这些期望值来自 exe 当年算的同一条记录(calc_history #14),不是照实现反填的
+  // 例外:「理论水分」= **实际水分**(1 − 脱模中值/灌料标准湿,2026-11-03 用户口径),
+  //       exe 那条记录里该格存的是物料平均水分 3.72;powder_avg 仍是灌料湿重的分母,
+  //       只是不再落这一格 ⇒ 这里按 actual_moisture 取 3.74。
   assert.deepEqual(patch.head, {
     理论最低灌料重量g: '242.0',
     理论灌料中间值g: '243.8',
     理论最高灌料重量g: '245.5',
-    理论水分: '3.72',
+    理论水分: '3.74',
     最短长度mm: '253.5',
     中间值mm: '256.0',
     最长长度mm: '258.5',
@@ -331,4 +334,33 @@ test('回填补丁只针对有行或有值的料位,空料位不产生行补丁'
     slots.map((s) => ({ design_ratio: s.designRatio, amount_g: s.amountG, moisture: 0.05 })))
   const patch = buildPatch(result, slots)
   assert.deepEqual(patch.rows.map((r) => r.rowIndex), [0, 1])
+})
+
+/**
+ * 2026-11-03 用户口径:「理论水分」这一格 = **实际水分**(1 − 脱模中值/灌料标准湿),
+ * 不是物料平均水分 powder_avg。理由是纸面只有一个水分格,而「实际灌料重量计算公式」
+ * `(1-理论水分%)/(1-实际水分%)` 要的就是它 —— 填 powder_avg 会让公式分母取不到数。
+ * 这条钉子防的是"以后有人觉得 powder_avg 更像个'理论'值又改回去"。
+ */
+test('「理论水分」格落的是实际水分(不是物料平均水分),且能被公式用上', () => {
+  const { slots } = slotsFromRows(rows14)
+  slots.forEach((s) => { s.moisture = s.group === '折算料' ? 0.08 : 0.06 })
+  const { params } = paramsFromHead(
+    { 炭棒规格1: '59.5', 炭棒规格2: '39.5', 炭棒规格3: '120', 实际密度管控下限: '0.58', 实际密度管控上限: '0.60' },
+    { cavities: 2, conversion_ratio: 0.5 })
+  const result = compute(params, slots.map((s) => ({ design_ratio: s.designRatio, amount_g: s.amountG, moisture: s.moisture })))
+  const patch = buildPatch(result, slots)
+
+  const actualPct = (result.actual_moisture * 100).toFixed(2)
+  const powderPct = (result.moisture.powder_avg * 100).toFixed(2)
+  // 两者在这一单里恰好接近(3.74 vs 3.72)⇒ 必须断言"等于哪个",不能只断言"是个数"
+  assert.notEqual(actualPct, powderPct, '这单两个水分不同源,断言才有区分力')
+  assert.equal(patch.head.理论水分, actualPct)
+  assert.notEqual(patch.head.理论水分, powderPct)
+  // 公式闭环:回填进「理论水分」的值就是 (1-理论水分%)/(1-实际水分%) 里的分母,
+  // 用它和灌料中间值能反推出实际水分 ⇒ 说明这一格确实承担了公式里的角色
+  const pourMid = Number(patch.head.理论灌料中间值g)
+  const back = (1 - (Number(patch.head.理论水分) / 100))
+  assert.ok(Math.abs(pourMid * back - result.demold.mid) < 0.06,
+    `灌料中间值 ${pourMid} × (1-理论水分%) = ${(pourMid * back).toFixed(2)} 应约等于脱模中间值 ${result.demold.mid.toFixed(2)}`)
 })

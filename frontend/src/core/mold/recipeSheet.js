@@ -512,7 +512,11 @@ export function buildPatch(result, slots, extraHead) {
   const engineHead = {
     理论最低灌料重量g: fixed(result.pour_weights.low, 1),    理论灌料中间值g: fixed(result.pour_weights.std, 1),
     理论最高灌料重量g: fixed(result.pour_weights.high, 1),
-    理论水分: fixed(result.moisture.powder_avg * 100, 2),
+    // 「理论水分」写的是**实际水分**(= 1 − 脱模中值/灌料标准湿),不是物料平均水分 powder_avg。
+    // 2026-11-03 用户口径:纸面只有一个水分格,而「实际灌料重量计算公式」用的就是这一个 ——
+    // 填 powder_avg 会让公式里「实际水分」无处可取(那正是当初 0.00 的表象来源之一)。
+    // powder_avg 仍是灌料湿重的分母(引擎内用),只是不再落这一格。
+    理论水分: fixed(result.actual_moisture * 100, 2),
     最短长度mm: fixed(result.lengths.low, 1),
     中间值mm: fixed(result.lengths.std, 1),
     最长长度mm: fixed(result.lengths.high, 1),

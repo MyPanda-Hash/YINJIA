@@ -802,6 +802,21 @@ migrate-mold-calcparam.sql
 #   QUOTED_IDENTIFIER 报错 —— 同一个脚本在测试库能过、在正式库失败,就是这个坑)。
 # 前端:core/mold/recipeSheet.js 的 applyArchiveMoisture(有单测)+ RecipeCalcDialog 自动带出并标「档案」来源。
 migrate-recipe-materials.sql
+# ── 2026-11-03 配方物料含水率「补数」(修 2026-11-02 的漏执行) ─────────────────────────
+# 事故:migrate-recipe-materials.sql 在服务器上是走 **baseline(只登记不执行)** 进的
+#   yj_schema_log(applied_at=2026-11-02 12:29:38,同批 692 条;to-run 只有 6 条),于是
+#   列建了、yj_field 登记了、译名写了,但 84 行 ELSE UPDATE ... 水分含量 IS NULL 一次没跑。
+#   后果:bs_inv 3961 行金蝶商品含水率全空 ⇒ 配方计算器 powder_avg 恒 0
+#   ⇒ 单据「理论水分」永远 0.00%(2026-11-03 用户报障,服务器实测复现)。
+# migrate-recipe-materials-backfill-20261103.sql —— 41 个带含水率的物料编号**逐个补空**
+#   (UPDATE ... WHERE RTRIM(存货编码)=N'x' AND 水分含量 IS NULL)。
+#   口径:按编码定位,**不按数据来源收窄**(同码可能同时有金蝶行与种子行,含水率是固有属性);
+#   只碰 NULL,不覆盖人工维护过的值;幂等(第二遍 0 行)。
+#   ⚠ 与旧脚本的差别只有一处:旧脚本的 UPDATE 藏在 ELSE 分支(编码已存在才走到,却被 baseline 跳过);
+#   本脚本独立成文,可单独进 to-run **强制执行** —— 这正是它必须单独登记的原因。
+# 来源:同 tools/gen/gen-recipe-materials.cjs(一起生成,不要手改):
+#     node tools/gen/gen-recipe-materials.cjs
+migrate-recipe-materials-backfill-20261103.sql
 
 # ── 2026-09-21 烧结尺寸表(60 行模具↔炭棒内外径公差对照)+ 档案面板 ─────────────────────
 # 用途:配方计算弹窗按「车间 + 型号」从这张表带出炭棒外径/内径与公差 ⇒ 回填页 1
