@@ -128,6 +128,11 @@ public class RdDevProductService {
         n.put("done", false);
         n.put("reaudited", false);
         if (productCode == null || productCode.isBlank()) return n;
+        // ⚠ 这里入参是**原始产品编号**(产品信息表/rd_dev_task 侧),而本层查的是 head 表 ——
+        //   烧结工艺清单(RD_MOLD_PROC)存的是 `原值-tb`。只认一种形态 ⇒ 该类节点永远显示「未开始」,
+        //   不报错、看起来像"还没建单"(2026-11-02 同类排查发现)。
+        List<String> forms = DevTaskService.productCodeForms(productCode);
+        if (forms.isEmpty()) return n;
         try {
             PanelRegistry.PanelDef def = registry.panel(panelCode);
             if (def == null || !hasColumn(def.headTable(), "产品编号")) return n;
@@ -135,8 +140,8 @@ public class RdDevProductService {
                     "SELECT TOP 1 h.[单据编号] AS no FROM " + def.headTable() + " h"
                             + " LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.[单据编号]"
                             + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
-                            + " AND h.[产品编号] = ? ORDER BY h.id DESC",
-                    panelCode, productCode);
+                            + " AND h.[产品编号] IN (?, ?) ORDER BY h.id DESC",
+                    panelCode, forms.get(0), forms.get(1));
             if (ds.isEmpty()) return n;
             String no = str(ds.get(0).get("no"));
             String st = statusOf(panelCode, no);

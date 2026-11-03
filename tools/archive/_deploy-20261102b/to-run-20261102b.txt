@@ -1,0 +1,6 @@
+migrate-wo-pick-doc-20261030.sql
+i18n-mobile-scan-20261030.sql
+migrate-mobile-pick-create-panel-20261030.sql
+migrate-wo-pick-return-20261030.sql
+migrate-wo-pick-return-flag-field-20261030.sql
+fix-mobile-pick-note-20261030.sql

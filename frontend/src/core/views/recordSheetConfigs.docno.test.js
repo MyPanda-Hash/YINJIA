@@ -87,3 +87,23 @@ test('三条不比设计松的通用约束:三段跨度=grid 列数、编号格�
   }
   assert.deepEqual(problems, [], '\n' + problems.join('\n'))
 })
+
+// ── 测试申请单·销售端页:编号格必须一行放下 DT-YYYY-MM-NNNN(2026-11-02 用户报障) ──
+// 报障原话:「这个编号有点挤到一起了,把框拉长对齐到文件管理员前边」。
+// 实测:该页编号格原先只占最后 1 列(grid 末列 = 92px),`DT-2026-10-0002` 被折成
+// 「DT-2026-」/「10-0002」两行。设计原表 J2 本来也是 1 列,但那时纸面印的是 6 位受控表单号
+// (YJ-XS002),2026-10-29 起这一格改印 15 位的单据号 ⇒ 按原宽度必然折行。
+test('RD_DOM_TEST 销售端页 编号格加宽到「文件管理员」左边缘,单据号不再折行', () => {
+  const page = recordSheetConfigs.RD_DOM_TEST.pages.find((p) => p.title === '销售端-测试/检测申请表')
+  assert.ok(page, '销售端页配置必须存在')
+  const nCols = page.grid.length
+  const h = page.head
+  assert.equal(h.title + h.infoLabel + h.infoValue, nCols,
+    '大标题 + 标签 + 值 必须铺满整行(否则信息区右边会缺一截)')
+  // 编号格左边缘落在 infoLabel 列上 ⇒ 与下面「文件管理员」的左边缘对齐
+  assert.equal(nCols - h.noSpan, h.title,
+    '编号格左边缘应与信息区标签列对齐(用户口径「对齐到文件管理员前边」)')
+  assert.equal(h.noSpan, 2, '编号格要盖住「标签 + 值」两列才够一行')
+  const w = page.grid.slice(nCols - h.noSpan).reduce((a, b) => a + b, 0)
+  assert.ok(w >= 190, `编号格宽 ${w}px 放不下 DT-2026-10-0002(92px 时实测折成两行)`)
+})
