@@ -4,6 +4,7 @@ import {
   SLOT_GROUPS, groupOfMaterialType, parseRatio, parseDensityRange, moisturePercent,
   slotsFromRows, paramsFromHead, buildPatch, applyArchiveMoisture,
   parseLengthRange, sinterRowsFromQuery, sinterRowsForWorkshop, sinterParams, sinterPatch, sinterLengthWarning,
+  matchSinterModel,
 } from './recipeSheet.js'
 import { compute } from './recipeEngine.js'
 
@@ -158,6 +159,22 @@ test('选了模具后长度越界要提示(设计源的长度范围就是干这�
   assert.ok(sinterLengthWarning(sinterRow(), 301)?.includes('超过'))
   assert.ok(sinterLengthWarning(sinterRow(), 9)?.includes('小于'))
   assert.equal(sinterLengthWarning(sinterRow({ 长度范围: '（只可做低精度）' }), 999), null)  // 解析不出范围就不提示
+})
+
+/* ── 2026-11-03 用户报障:「烧结工艺清单导进来的炭棒规格带文字,导致后续计算有问题,还得手动删掉」──
+   落格已改为裸数字(core/panel/carbonSpec.js),但**存量单据里仍有 `外：56.5` 这种值** ——
+   这两条钉住"带前缀也要照常算",否则老单据又得手删。 */
+
+test('带纸面前缀的炭棒规格:长度越界照常提示(不许静默消失)', () => {
+  assert.ok(sinterLengthWarning(sinterRow(), '长：301')?.includes('超过'), '带前缀的 301 应判超过')
+  assert.ok(sinterLengthWarning(sinterRow(), '长: 9')?.includes('小于'), '半角冒号前缀同样要认')
+  assert.equal(sinterLengthWarning(sinterRow(), '长：'), null, '只有前缀没有数字 ⇒ 不提示、也不报 NaN')
+})
+
+test('带纸面前缀的炭棒规格:烧结型号仍能按外径/内径自动匹配', () => {
+  assert.equal(matchSinterModel([sinterRow()], '1', '外：56.5', '内：29.5'), sinterRow()['型号'])
+  assert.equal(matchSinterModel([sinterRow()], '1', '56.5', '29.5'), sinterRow()['型号'], '裸数字同样要能匹配')
+  assert.equal(matchSinterModel([sinterRow()], '1', '外：999', '内：29.5'), '', '不匹配就是空,不许瞎选')
 })
 
 test('回填补丁可以带上烧结尺寸四格(与引擎算出的项合并,不互相覆盖)', () => {

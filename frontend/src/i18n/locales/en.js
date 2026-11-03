@@ -3133,6 +3133,10 @@ export default {
     '理论灌料中间值g': 'Theoretical Mid Fill Weight (g)',
     '理论最高灌料重量g': 'Theoretical Max Fill Weight (g)',
     '理论水分': 'Theoretical Moisture',
+    // 炭棒规格三格的**纸面前缀**(recordSheetConfigs 的 pre;数据里存裸数字,前缀只做显示)
+    '外：': 'OD: ',
+    '内：': 'ID: ',
+    '长：': 'L: ',
     '实际灌料重量计算公式': 'Actual Fill Weight Formula',
     '烧结': 'Sintering',
     '烧结炉参数': 'Sintering Furnace Params',

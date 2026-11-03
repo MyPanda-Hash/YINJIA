@@ -314,11 +314,19 @@ export function sinterPatch(row) {
   return { 外径mm: pick('炭棒外径'), 外径公差: pick('炭棒外径公差'), 内径mm: pick('炭棒内径'), 内径公差: pick('炭棒内径公差') }
 }
 
-/** 文本 → 数字(空/非数字给 null,别把 null 当 0 比) */
+/**
+ * 文本 → 数字(空/非数字给 null,别把 null 当 0 比)。
+ *
+ * ⚠ 容忍纸面前缀(2026-11-03):`炭棒规格1/2/3` 历史上曾被写成 `外：56.5` / `长：250`
+ * (见 core/panel/carbonSpec.js 头注的旧口径),存量单据里仍可能有这种值。
+ * 本函数拿它去和烧结尺寸表的**裸数字**比 ⇒ 不剥前缀就是 NaN ⇒ 型号永远选不中。
+ * 冒号前必须**没有数字**才算前缀,免得把 `12:30` 这类值当标签。
+ */
 function numOf(v) {
   const s = String(v ?? '').trim()
   if (!s) return null
-  const n = Number(s)
+  const body = s.replace(/^[^0-9]*[：:]\s*/, '')
+  const n = Number(body)
   return Number.isFinite(n) ? n : null
 }
 
@@ -399,11 +407,13 @@ export function specCarryFrom(product, history, head) {
   return { patch, skipped, missing }
 }
 
-/** 长度越界提示(设计源的「长度范围」就是干这个的);解析不出范围或长度不可数则不提示 */
+/** 长度越界提示(设计源的「长度范围」就是干这个的);解析不出范围或长度不可数则不提示。
+ *  ⚠ 长度走 parseSpecNumber:单据上的「炭棒规格3」可能是 `长：250`(旧口径落格文本),
+ *  直接 Number() 得 NaN ⇒ 这条提示会**静默消失**(用户报障「带文字导致后续计算有问题」之一)。 */
 export function sinterLengthWarning(row, length) {
   const range = parseLengthRange(row?.['长度范围'])
-  const len = Number(length)
-  if (!range || !Number.isFinite(len)) return null
+  const len = parseSpecNumber(length)
+  if (!range || len === null) return null
   if (len > range[1]) return `长度 ${len} 超过该模具的可做范围 ${range[0]}-${range[1]}`
   if (len < range[0]) return `长度 ${len} 小于该模具的可做范围 ${range[0]}-${range[1]}`
   return null

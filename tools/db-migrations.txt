@@ -817,6 +817,16 @@ migrate-recipe-materials.sql
 # 来源:同 tools/gen/gen-recipe-materials.cjs(一起生成,不要手改):
 #     node tools/gen/gen-recipe-materials.cjs
 migrate-recipe-materials-backfill-20261103.sql
+# ── 2026-11-03 炭棒规格三格去纸面前缀(存量数据清理) ───────────────────────────────
+# 事故:core/panel/carbonSpec.js 曾把纸面显示前缀 外：/内：/长： 写进 炭棒规格1/2/3,
+#   导致 matchSinterModel(烧结型号自动匹配)、sinterLengthWarning(长度越界提示) 里
+#   Number('外：56.5') = NaN ⇒ 静默失效;界面上只能看到脏文本,用户只好手删
+#   (用户 2026-11-03 原话「导进来的炭棒规格带文字,导致后续计算有问题,还得我手动删掉」)。
+# migrate-mold-spec-strip-prefix-20261103.sql —— 剥掉存量值里的冒号前缀,只留裸数字。
+#   只动 rd_mold_proc_head;只动"冒号前无数字且冒号后可转数字"的值(12:30 不动);
+#   剥完核验仍带冒号的格数必须 = 0,否则 RAISERROR 中止。幂等。
+# 前端同批改动:落格改裸数字 + 纸面按 recordSheetConfigs 的 pre 渲染前缀 + 消费端容错。
+migrate-mold-spec-strip-prefix-20261103.sql
 
 # ── 2026-09-21 烧结尺寸表(60 行模具↔炭棒内外径公差对照)+ 档案面板 ─────────────────────
 # 用途:配方计算弹窗按「车间 + 型号」从这张表带出炭棒外径/内径与公差 ⇒ 回填页 1

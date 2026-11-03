@@ -381,8 +381,18 @@
                   </span>
                 </template>
                 <template v-else-if="editable && c.key && !c.ro">
-                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
-                  <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <!-- 带纸面前缀的格(如炭棒规格1/2/3 的 外：/内：/长：):
+                       前缀是**渲染**出来的,head 里只存裸数字(2026-11-03 口径,
+                       见 core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model -->
+                  <span v-if="c.pre" class="rs-pre-cell">
+                    <span class="rs-pre">{{ tt(c.pre) }}</span>
+                    <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                    <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  </span>
+                  <template v-else>
+                    <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                    <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  </template>
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
                 </template>
@@ -392,6 +402,10 @@
                 <span v-else-if="!editable && c.type === 'checks' && c.link && checkList(head[c.key]).length" class="rs-file-links no-print">
                   <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
                              @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
+                </span>
+                <span v-else-if="c.pre" class="rs-pre-cell">
+                  <span class="rs-pre">{{ tt(c.pre) }}</span>
+                  <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
                 </span>
                 <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
@@ -983,8 +997,18 @@
                   </span>
                 </template>
                 <template v-else-if="editable && c.key && !c.ro">
-                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
-                  <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <!-- 带纸面前缀的格(如炭棒规格1/2/3 的 外：/内：/长：):
+                       前缀是**渲染**出来的,head 里只存裸数字(2026-11-03 口径,
+                       见 core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model -->
+                  <span v-if="c.pre" class="rs-pre-cell">
+                    <span class="rs-pre">{{ tt(c.pre) }}</span>
+                    <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                    <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  </span>
+                  <template v-else>
+                    <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                    <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  </template>
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
                   <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
                 </template>
@@ -994,6 +1018,10 @@
                 <span v-else-if="!editable && c.type === 'checks' && c.link && checkList(head[c.key]).length" class="rs-file-links no-print">
                   <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
                              @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
+                </span>
+                <span v-else-if="c.pre" class="rs-pre-cell">
+                  <span class="rs-pre">{{ tt(c.pre) }}</span>
+                  <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
                 </span>
                 <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
               </td>
@@ -4582,6 +4610,26 @@ function chartOf(dt) {
 .rs-t {
   border-collapse: collapse;
   table-layout: fixed;
+}
+/* 纸面前缀格(炭棒规格1/2/3 的 外：/内：/长：,2026-11-03):
+   前缀 inline 排在被渲染值/输入框左侧,输入框占余下宽度。
+   前缀只在这里出现,**不进 head**(数据存裸数字,理由见 core/panel/carbonSpec.js 头注)。 */
+.rs-pre-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 0;
+}
+.rs-pre-cell > .el-input,
+.rs-pre-cell > .rs-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rs-pre {
+  flex: none;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #333;
 }
 .rs-t :deep(.el-input__wrapper),
 .rs-t :deep(.el-input__wrapper.is-focus),
