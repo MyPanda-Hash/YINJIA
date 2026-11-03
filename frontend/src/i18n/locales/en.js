@@ -770,12 +770,13 @@ export default {
     // 本文件历史遗留缺词(2026-10-15 补齐,使 WorkOrderTraceDialog 词条 0 缺失)
     '工单详情 · 追溯': 'Work Order Detail · Trace',
     '绿=已完工': 'Green = Completed',
-    '蓝=进行中': 'Blue = In Progress',
+    // 2026-11-03:Element Plus 的 el-step「进行中」实际渲染是 #303133(黑),图例口径随之改为「黑=进行中」
+    '黑=进行中': 'Black = In Progress',
     '灰=未开始': 'Grey = Not Started',
     // ---- 工序步骤状态着色(2026-10-16:四态 + 待审量)----
     '超产': 'Over-produced',
     '待审': 'Pending review',
-    '待审=草稿报工未审核,只算已开始(蓝),不计入产出与转序': 'Pending = draft report not yet approved; it only marks the step as started (blue) and does not count toward output or hand-over',
+    '待审=草稿报工未审核,只算已开始(黑),不计入产出与转序': 'Pending = draft report not yet approved; it only marks the step as started (black) and does not count toward output or hand-over',
     '该工单还没有工序进度': 'This work order has no process progress yet',
     '血缘': 'Lineage',
     // ---- 检验方案/检验项目维护:主从层级(2026-10-09)----
