@@ -57,6 +57,12 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
+// 炭棒规格三格的纸面前缀(外：/内：/长：)。
+// ⚠ 2026-11-03:前缀**只在这里渲染**,数据里存裸数字 —— 与 core/panel/carbonSpec.js 同源,
+//   那边写值、这边显示,不许任何一侧自己再拼一遍(混进数据的后果见 carbonSpec.js 头注)。
+// ⚠ 用**相对路径 + .js 扩展名**(不用 `@/` 别名):node --test 直接跑源码时不认 Vite 别名,
+//   与上面 specTestLib 同一条纪律。
+import { SPEC_PREFIX } from '../panel/carbonSpec.js'
 // ⚠ 配方表「物料种类」**不再是下拉**(2026-10-16 用户口径:「把填写框的物料种类的下拉框改为普通文本框」):
 //   词表 MATERIAL_KINDS(core/mold/materialKinds.js)仍归**配方计算弹窗**用 —— 那里它是"按类别收窄
 //   物料编号/物料名称候选"的前置筛选。页 2 这格的类别改由 手填物料编号 → 商品档案 带出
@@ -243,9 +249,11 @@ const RD_MOLD_PROC_SEC0 = [
         { grid: [
           { key: '产品编号', span: 2 },
           { key: '产品名称', span: 2 },
-          { key: '炭棒规格1' },
-          { key: '炭棒规格2' },
-          { key: '炭棒规格3' },
+          // 「炭棒规格」三窄格:纸上显示 外：/内：/长：,但**数据只存裸数字**
+          // (pre = 渲染前缀,不进 head;见 core/panel/carbonSpec.js 头注的 2026-11-03 口径)
+          { key: '炭棒规格1', pre: SPEC_PREFIX['炭棒规格1'] },
+          { key: '炭棒规格2', pre: SPEC_PREFIX['炭棒规格2'] },
+          { key: '炭棒规格3', pre: SPEC_PREFIX['炭棒规格3'] },
           { key: '产品管控类型', type: 'select', span: 2 },
           { key: '外观要求', type: 'select' },
           { key: '生产车间', type: 'select' },
@@ -343,7 +351,9 @@ const RD_MOLD_PROC_SEC0 = [
           { label: '炭棒内径公差mm', span: 3 },
         ]},
         { grid: [
-          { key: '外径mm', span: 2 },
+          // moldPick:这一格渲染成「按生产车间筛型号」的下拉,选型号 → 一次填这四格
+          //   (2026-11-04 用户口径:炭棒尺寸要按车间模具型号+公差带出)。落地见 RecordSheetPanels.applyMoldModel。
+          { key: '外径mm', span: 2, moldPick: true },
           { key: '外径公差', span: 3 },
           { key: '内径mm', span: 2 },
           { key: '内径公差', span: 3 },
@@ -1180,6 +1190,11 @@ export const recordSheetConfigs = {
       fromKey: '产品编号',
       endpoint: '/px/specByProductForMold',
       specDrift: false,
+      // 「无数据填 '/'」(用户 2026-11-04 口径,录单流程第 4 步):
+      //   「确认跌落强度、抗压强度、压降 几项的自动填充情况,如没有数据填充,则填充 '/' 符号」。
+      // 只列**块内那一格"要求"**(整句/数值),不列 高度/次数/间距/流速 —— 那些是解析出来的机构参数,
+      // 填 '/' 会让配方计算出 NaN。落地见 core/insp/specCarry.slashFillHead(只填空格、只填点名的格)。
+      slashWhenEmpty: ['跌落要求', '强度要求kgf', '压降标准kpa'],
       headFromDetail: [
         // 跌落:先认「跌落强度」(标准库里 强度 组下的子项名),用户那版规格书选的是「（裸棒）」
         { parse: 'drop', matchProject: ['跌落强度', '裸棒'] },
@@ -1899,6 +1914,11 @@ export const recordSheetConfigs = {
       //   文字列(检验要求/检验方法)拿到多出来的宽度后换行显著减少 ⇒ 整页变矮、印出来更大更清楚。
       //   46+100+80+180+300+88 = 794
       // 2026-10-30 标题去掉序号「4.」（用户口径：「把规格书的产品性能检验项目及检验标准的 4 去掉」）
+      //
+      // ⚠ 2026-11-04 第一次修错了方向（曾在此加 autoSeqBar + blankRows:10 让新建草稿铺 10 行空行），
+      //   已被用户否掉：「新建草稿现在会铺 10 行空行这个不要」—— 这一页的录入方式是
+      //   「从标准库勾选」灌行，不是空白手填，铺空行会污染草稿。已回退。
+      //   真正的问题见下面 cols 里「检验项目」列的那条注释（该列是**分组列**，被渲染成只读）。
       { page: 2, bar: '产品性能检验项目及检验标准', filterKey: '表区', filterVal: '检验要求', lib: true,
         design: { headerH: 32, fontSize: 13, groupCol: true },
         cols: [

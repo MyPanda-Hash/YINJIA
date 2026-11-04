@@ -399,6 +399,8 @@ import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
+// 「删除」结果提示口径(2026-11-04):只认服务端回写的真实状态,不许无条件报"已删除"
+import { deleteOutcome } from './deleteOutcome.js'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -1369,7 +1371,18 @@ async function onButton(action) {
       tabsStore.open({ path: targetPath, title: res.gotoPanel })
       return
     }
-    ElMessage.success(`「${action}」成功`)
+    // ⚠ 2026-11-04 修(用户报障「陈秀丽账号删除单据时显示删除成功了,但实际上还没有删除成功」):
+    //   文件类面板的「删除」对**非管理员、非草稿**单据**不会真删** —— 服务端
+    //   ButtonService.deleteDocFile 只落一条「删除申请」(yj_doc_status.deleting='Y'),
+    //   等管理员审批通过才作废。此前这里无条件弹「「删除」成功」⇒ 用户以为删掉了。
+    //   判据只认服务端回写的真实状态,文案口径见 core/views/deleteOutcome.js(有单测)。
+    if (action === '删除') {
+      const o = deleteOutcome(res?.['单据状态'])
+      const msg = tt(o.key) + (o.fallback ? o.fallback : '')
+      ElMessage[o.level](msg)
+    } else {
+      ElMessage.success(`「${action}」成功`)
+    }
     if (action === '新增流程' && !isEdit.value) {
       back()
       return

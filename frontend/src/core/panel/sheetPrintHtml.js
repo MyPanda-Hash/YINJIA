@@ -16,6 +16,8 @@
  *   （那里是 jsPDF 的 mm 布局），保证打印件与导出件逐 mm 一致。
  */
 
+import { PRINT_HOST_ID } from './printChannel.js'
+
 export const SHEET_PAGE_W = 210        // A4 竖向宽(mm)
 export const SHEET_PAGE_H = 297        // A4 竖向高(mm)
 export const SHEET_MARGIN = 8          // 页边距(mm),与 CSS @page { margin } 同口径
@@ -77,17 +79,15 @@ export function sheetImageMm(shot, contentH = SHEET_PAGE_H - SHEET_MARGIN * 2 - 
   return { w: iw * k, h: ih * k }
 }
 
-/**
- * 截图数组 → 完整 HTML 文档字符串。
- * @param {Array<{dataUrl:string,w0:number,h0:number}>} shots 每张纸一张（页序即打印顺序）
- * @param {string} title 文档名（<title> + 工具条文字）
- * @param {string} printLabel 「打印」按钮文字（调用方传 tt('打印')，本模块不碰 i18n）
- */
-export function sheetPrintHtml(shots, title, printLabel) {
+/** 内容区高度(mm)：比真实内容区矮 1mm，防亚像素舍入把最后一张挤到下一页、印出空白纸 */
+const CONTENT_H = SHEET_PAGE_H - SHEET_MARGIN * 2 - 1
+
+/** 每张纸一个 `.pg` 块（两个出口共用这一份，版式不许各写一份） */
+function pagesHtml(shots) {
   const list = Array.isArray(shots) ? shots : []
   // 页框比内容区矮 1mm：高度正好等于内容区时，亚像素舍入会把最后一张挤到下一页、印出空白页
-  const contentH = SHEET_PAGE_H - SHEET_MARGIN * 2 - 1
-  const pages = list.map((s) => {
+  const contentH = CONTENT_H
+  return list.map((s) => {
     const { w, h } = sheetImageMm(s, contentH)
     // ⚠ width 用 mm 写死（与导出 PDF 逐 mm 对齐），但必须带 max-width:100%：
     //   打印对话框里的纸张/页边距是**用户环境**决定的（实测有 1 英寸 = 25.5mm 边距的），
@@ -96,7 +96,44 @@ export function sheetPrintHtml(shots, title, printLabel) {
     //   height 交给 auto，等比跟着缩，绝不变形。
     return `<div class="pg"><img src="${s.dataUrl}" style="width:${w.toFixed(2)}mm;height:auto;max-width:100%" alt="" data-h="${h.toFixed(2)}mm"></div>`
   }).join('')
-  // 顶部工具条只在屏幕上显示：自动唤打印被浏览器压住时（窗口未聚焦等），用户还能自己点
+}
+
+/**
+ * 截图数组 → 打印正文片段（`<style>…</style>` + 每张纸一个 `.pg`），交给 `printInPage` 用。
+ *
+ * 2026-11-04 新增：出纸通道从「子窗口 + win.print()」改成**页面内打印层**。
+ *   客户现场实测：把站点加进浏览器「允许弹出窗口」白名单后，tap 页打印**仍然**报
+ *   「浏览器拦截了新窗口」⇒ `window.open` 这条路在客户环境根本走不通（广告拦截插件、
+ *   企业策略 DefaultPopupsSetting、内嵌 WebView 都能挡，白名单管不到）。
+ * 分页算术与 sheetPrintHtml 共用 pagesHtml，没有第二份实现。
+ *
+ * ⚠ 样式选择器一律收在 `#yj-print-host` 下：这段 CSS 进的是**主页面**文档，
+ *   不收窄就会和全局样式/其它打印层撞车（《开发与质量》M4）。
+ */
+export function sheetPrintBody(shots) {
+  const host = `#${PRINT_HOST_ID}`
+  return `<style>
+@page{size:${SHEET_PAGE_W}mm ${SHEET_PAGE_H}mm;margin:${SHEET_MARGIN}mm}
+${host} .pg{height:${CONTENT_H}mm;display:flex;justify-content:center;align-items:flex-start;page-break-after:always;break-after:page}
+${host} .pg:last-child{page-break-after:auto;break-after:auto}
+${host} .pg img{display:block}
+</style>${pagesHtml(shots)}`
+}
+
+/**
+ * 截图数组 → 完整 HTML 文档字符串。
+ *
+ * ⚠ 2026-11-04 起**生产代码不再用它**（出纸改走 printInPage，只需 body 片段），
+ *   保留是因为单测把它当「分页算术的规格」逐条断言（@page / 一页一纸 / 末页不分页）。
+ *   谁想再开子窗口打印，先读《开发与质量》M1 与 PanelxList.vue 的 openSheetPrint 注释。
+ * @param {Array<{dataUrl:string,w0:number,h0:number}>} shots 每张纸一张（页序即打印顺序）
+ * @param {string} title 文档名（<title> + 工具条文字）
+ * @param {string} printLabel 「打印」按钮文字（调用方传 tt('打印')，本模块不碰 i18n）
+ */
+export function sheetPrintHtml(shots, title, printLabel) {
+  const contentH = CONTENT_H
+  const pages = pagesHtml(shots)
+  // 顶部工具条只在屏幕上显示：自动唤打印被压住时（窗口未聚焦等），用户还能自己点
   const bar = '<div class="bar"><span class="tt">' + escHtml(title) + '</span>'
     + `<button type="button" onclick="window.print()">${escHtml(printLabel)}</button></div>`
   return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'

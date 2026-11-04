@@ -271,6 +271,9 @@ import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisture
 import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialClearFor, materialFillFor,
   uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
+// 产品编号带 -tb 后缀(成型工艺清单/烧结工艺清单,见 core/panel/productCodeSuffix.js):
+// 查产品信息表/规格书必须用**原始编号**,否则 condition 走 LIKE '%…-tb%' 一条都命中不到。
+import { rawProductCode } from '@/core/panel/productCodeSuffix.js'
 import { slicePage } from '@/core/ui/selectPage.js'
 import SelectPager from '@/core/ui/SelectPager.vue'
 import { invRowsOf } from '@/core/panel/invCarry.js'
@@ -480,14 +483,17 @@ const resultRows = computed(() => {
     { label: '理论最低灌料重量g', value: fixed(r.pour_weights.low, 1) },
     { label: '理论灌料中间值g', value: fixed(r.pour_weights.std, 1) },
     { label: '理论最高灌料重量g', value: fixed(r.pour_weights.high, 1) },
-    { label: '理论水分', value: `${fixed(r.moisture.powder_avg * 100, 2)}%` },
+    // 纸面只有一个水分格 ⇒ 它显示/回填的是**实际水分**(2026-11-03 用户口径,
+    // 见 core/mold/recipeSheet.js 的 buildPatch 注释);物料平均水分仍作为参考行列出,
+    // 让工艺员看得见灌料湿重是按哪个含水率换算的。
+    { label: '理论水分', value: `${fixed(r.actual_moisture * 100, 2)}%` },
     { label: '最短长度mm', value: fixed(r.lengths.low, 1) },
     { label: '中间值mm', value: fixed(r.lengths.std, 1) },
     { label: '最长长度mm', value: fixed(r.lengths.high, 1) },
     { label: '最低重量g', value: fixed(r.demold.low, 1) },
     { label: '中间值g', value: fixed(r.demold.mid, 1) },
     { label: '最高重量g', value: fixed(r.demold.high, 1) },
-    { label: '实际水分', value: `${fixed(r.actual_moisture * 100, 2)}%` },
+    { label: '物料平均水分（参考）', value: `${fixed(r.moisture.powder_avg * 100, 2)}%` },
   ]
 })
 const headDiff = computed(() => (patch.value ? Object.entries(patch.value.head)
@@ -889,7 +895,11 @@ async function findDensityHistory(code) {
 }
 async function carrySpec() {
   if (carrying.value) return
-  const code = productCode.value
+  // 2026-11-04 修:本面板的产品编号存的是 `YJ-CB-2026-001-tb` 形态,
+  //   直接拿去查产品信息表(RD_PROD_INFO 存原始编号)命中 0 行 ⇒ 规格/密度"一键带出"总是空。
+  //   实测 SQL:`产品编号 LIKE '%YJ-CB-2026-001-tb%'` = 0 行,剥后缀才命中。
+  //   密度历史查询仍用原样 code(listDocNos('RD_MOLD_PROC', …) 查的是本面板自己的单,存的就是带后缀值)。
+  const code = rawProductCode(productCode.value)
   if (!code) { ElMessage.warning(tt('请先在页 1 产品基本信息里选「炭棒编号」')); return }
   carrying.value = true
   try {
