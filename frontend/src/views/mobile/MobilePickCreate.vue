@@ -153,6 +153,12 @@
             <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
             <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
           </div>
+          <!-- 未开单同样列出 物料编码/规格型号/计量单位(与已开单一致,2026-11-04) -->
+          <div class="mp-wo-l2b">
+            <span><i>{{ tt('物料编码') }}</i>{{ w.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ w.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ w.产品单位 || '—' }}</span>
+          </div>
         </div>
       </template>
 
@@ -178,6 +184,14 @@
             <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
             <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
           </div>
+          <!-- 🔴 2026-11-04 用户口径:「外面的信息不够,没有物料编码单位名称规格型号,但是明细是有的」。
+               列表原来只显示产品名称 + 排产数量,编码/规格/单位要等点开明细才看得到;
+               这里补一行:产品编号 · 规格型号 · 计量单位(缺值显示 —,不留空)。 -->
+          <div class="mp-wo-l2b">
+            <span><i>{{ tt('物料编码') }}</i>{{ w.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ w.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ w.产品单位 || '—' }}</span>
+          </div>
           <div class="mp-wo-l3">
             <span class="mono">{{ w.领料单号 }}</span>
             <span class="mp-wo-prog">{{ tt('已领') }} {{ w.已领项数 || 0 }}/{{ w.物料项数 || 0 }}</span>
@@ -202,7 +216,8 @@
       v-model="detailOpen"
       :title="detail.领料单号 || tt('领料明细')"
       direction="rtl"
-      size="620px"
+      :size="drawerSize"
+      class="mp-dv-drawer"
       :destroy-on-close="true"
     >
       <div v-if="detailLoading" class="mp-empty">{{ tt('加载中') }}</div>
@@ -216,10 +231,18 @@
         </div>
         <div class="mp-dv-title">{{ tt('领料明细') }}</div>
         <div v-if="!(detail.领料明细 || []).length" class="mp-empty">{{ tt('没有明细') }}</div>
+        <!-- 🔴 2026-11-04 用户口径:「表头是要带物料编码和规格型号和计量单位的,信息不完全」。
+             原来是「名称 + 编码·规格·仓库 一行小字 + 右侧 已领/需求」,手机上看不清编码与规格;
+             改成:名称/数量一行,下面三行标签对(物料编码 / 规格型号 / 计量单位),再加仓库。 -->
         <div v-for="r in (detail.领料明细 || [])" :key="r.行号" class="mp-dv-line">
           <div class="mp-dv-main">
             <div class="mp-dv-name">{{ r.名称 || r.编码 }}</div>
-            <div class="mp-dv-meta">{{ r.编码 }} · {{ r.规格 || '—' }}<template v-if="r.仓库"> · {{ r.仓库 }}</template></div>
+            <dl class="mp-dv-fields">
+              <div><dt>{{ tt('物料编码') }}</dt><dd>{{ r.编码 || '—' }}</dd></div>
+              <div><dt>{{ tt('规格型号') }}</dt><dd>{{ r.规格 || '—' }}</dd></div>
+              <div><dt>{{ tt('计量单位') }}</dt><dd>{{ r.单位 || '—' }}</dd></div>
+              <div v-if="r.仓库"><dt>{{ tt('仓库') }}</dt><dd>{{ r.仓库 }}</dd></div>
+            </dl>
           </div>
           <div class="mp-dv-qty">
             <b class="num">{{ fmtQty(r.数量) }}</b><span class="mp-dv-sep">/</span>
@@ -266,6 +289,17 @@ const woList = ref([])
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref({})
+
+/**
+ * 看明细抽屉的宽度(2026-11-04)。
+ *
+ * <p>🔴 原来写死 `size="620px"` —— 手机屏宽才 375~430px,抽屉比屏幕还宽,
+ * 内容被挤到屏外、右侧数量看不全,就是用户报的「电脑端正常但手机端显示异常」。
+ * 改成:手机(≤640px)占满屏宽,桌面仍 620px;监听 resize 以免旋转/切窗口后不更新。
+ */
+const winW = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const drawerSize = computed(() => (winW.value <= 640 ? '100%' : '620px'))
+function onWinResize() { winW.value = window.innerWidth }
 
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 const baseUrl = (() => {
@@ -346,6 +380,7 @@ onMounted(() => {
   nextTick(() => woInput.value?.focus?.())
   bindScan()
   loadWoStatus()
+  window.addEventListener('resize', onWinResize)
 })
 
 /** 本页的扫码回调(具名,便于按引用撤销别人的绑定) */
@@ -377,6 +412,7 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+  window.removeEventListener('resize', onWinResize)
 })
 
 /** 刷新按钮:重拉工单列表并清提示 */
@@ -620,6 +656,10 @@ async function loadWoStatus() {
 .mp-wo-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
 .mp-wo-p { flex: 1; min-width: 0; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-wo-qty { flex: none; color: var(--el-text-color-placeholder); font-variant-numeric: tabular-nums; }
+/* 产品编码/规格型号/单位那一行(2026-11-04):手机窄屏用 flex-wrap 自动换行,不挤成横向滚动 */
+.mp-wo-l2b { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-wo-l2b > span { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; max-width: 100%; }
+.mp-wo-l2b > span > i { font-style: normal; flex: none; color: var(--el-text-color-placeholder); }
 .mp-wo-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; font-size: 12px; }
 .mp-wo-l3 .mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mp-wo-prog { flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
@@ -634,7 +674,17 @@ async function loadWoStatus() {
 }
 .mp-dv-main { flex: 1; min-width: 0; }
 .mp-dv-name { font-size: 14px; }
-.mp-dv-meta { margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
+/* 明细字段对(2026-11-04):物料编码 / 规格型号 / 计量单位 各占一行,不再挤成一行小字 */
+.mp-dv-fields { margin: 4px 0 0; padding: 0; }
+.mp-dv-fields > div { display: grid; grid-template-columns: 68px 1fr; gap: 6px; line-height: 1.5; }
+.mp-dv-fields dt { margin: 0; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-dv-fields dd { margin: 0; font-size: 12px; color: var(--el-text-color-regular); word-break: break-all; }
+/* 手机:抽屉占满屏宽(原 620px 在 375px 屏上必然溢出,这就是"手机端显示异常") */
+@media (max-width: 640px) {
+  :deep(.mp-dv-drawer) { width: 100% !important; max-width: 100% !important; }
+  .mp-dv-line { align-items: flex-start; }
+  .mp-dv-qty { font-size: 13px; }
+}
 .mp-dv-qty { flex: none; text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
 .mp-dv-qty b { font-weight: 600; }
 .mp-dv-sep { margin: 0 2px; color: var(--el-text-color-placeholder); }

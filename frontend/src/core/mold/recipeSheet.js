@@ -26,6 +26,7 @@
  */
 import { SLOT_COUNT, POWDER_SLOTS, GLUE_SLOTS, CONVERTED_SLOTS, DEFAULT_LENGTH_TOL } from './recipeConstants.js'
 import { detailRowsOf } from '../panel/detailRows.js'
+import { workshopMatches } from './workshopNo.js'
 
 export const SLOT_GROUPS = { POWDER: '粉料', GLUE: '胶粉', CONVERTED: '折算料' }
 
@@ -292,11 +293,20 @@ export function normalizeSinterRow(row) {
   return row
 }
 
-/** 按车间挑行:表里 `1/3` 这种写法表示两个车间共用该型号,所以按 '/' 拆开匹配 */
+/** 按车间挑行:表里 `1/3` 这种写法表示两个车间共用该型号,所以按 '/' 拆开匹配
+ *
+ *  2026-11-04(用户口径 A「两边都不改,代码做映射」):
+ *    单据的「生产车间」来自部门档案(`1#车间`),模具表存裸号(`1`) —— 原实现只做**字符串精确比较**,
+ *    所以选完车间永远筛出 0 行、型号下拉全空。现在两级:
+ *      ① 先按原样字符串比(写法完全一致时行为与改造前**一字不差**);
+ *      ② 一个都没命中时,再按**车间号**比(`1#车间` ≡ `1`,`1/3` 两段都算)。
+ *    归一规则见 core/mold/workshopNo.js。 */
 export function sinterRowsForWorkshop(rows, workshop) {
   const w = String(workshop ?? '').trim()
   if (!w) return rows || []
-  return (rows || []).filter((r) => String(r?.['车间'] ?? '').split('/').map((s) => s.trim()).includes(w))
+  const exact = (rows || []).filter((r) => String(r?.['车间'] ?? '').split('/').map((s) => s.trim()).includes(w))
+  if (exact.length) return exact
+  return (rows || []).filter((r) => workshopMatches(r?.['车间'], w))
 }
 
 /** 选中行 → 引擎要的外径/内径(取不到给 null,交给 paramsFromHead 回退单据) */
@@ -314,11 +324,19 @@ export function sinterPatch(row) {
   return { 外径mm: pick('炭棒外径'), 外径公差: pick('炭棒外径公差'), 内径mm: pick('炭棒内径'), 内径公差: pick('炭棒内径公差') }
 }
 
-/** 文本 → 数字(空/非数字给 null,别把 null 当 0 比) */
+/**
+ * 文本 → 数字(空/非数字给 null,别把 null 当 0 比)。
+ *
+ * ⚠ 容忍纸面前缀(2026-11-03):`炭棒规格1/2/3` 历史上曾被写成 `外：56.5` / `长：250`
+ * (见 core/panel/carbonSpec.js 头注的旧口径),存量单据里仍可能有这种值。
+ * 本函数拿它去和烧结尺寸表的**裸数字**比 ⇒ 不剥前缀就是 NaN ⇒ 型号永远选不中。
+ * 冒号前必须**没有数字**才算前缀,免得把 `12:30` 这类值当标签。
+ */
 function numOf(v) {
   const s = String(v ?? '').trim()
   if (!s) return null
-  const n = Number(s)
+  const body = s.replace(/^[^0-9]*[：:]\s*/, '')
+  const n = Number(body)
   return Number.isFinite(n) ? n : null
 }
 
@@ -399,11 +417,13 @@ export function specCarryFrom(product, history, head) {
   return { patch, skipped, missing }
 }
 
-/** 长度越界提示(设计源的「长度范围」就是干这个的);解析不出范围或长度不可数则不提示 */
+/** 长度越界提示(设计源的「长度范围」就是干这个的);解析不出范围或长度不可数则不提示。
+ *  ⚠ 长度走 parseSpecNumber:单据上的「炭棒规格3」可能是 `长：250`(旧口径落格文本),
+ *  直接 Number() 得 NaN ⇒ 这条提示会**静默消失**(用户报障「带文字导致后续计算有问题」之一)。 */
 export function sinterLengthWarning(row, length) {
   const range = parseLengthRange(row?.['长度范围'])
-  const len = Number(length)
-  if (!range || !Number.isFinite(len)) return null
+  const len = parseSpecNumber(length)
+  if (!range || len === null) return null
   if (len > range[1]) return `长度 ${len} 超过该模具的可做范围 ${range[0]}-${range[1]}`
   if (len < range[0]) return `长度 ${len} 小于该模具的可做范围 ${range[0]}-${range[1]}`
   return null
@@ -512,7 +532,11 @@ export function buildPatch(result, slots, extraHead) {
   const engineHead = {
     理论最低灌料重量g: fixed(result.pour_weights.low, 1),    理论灌料中间值g: fixed(result.pour_weights.std, 1),
     理论最高灌料重量g: fixed(result.pour_weights.high, 1),
-    理论水分: fixed(result.moisture.powder_avg * 100, 2),
+    // 「理论水分」写的是**实际水分**(= 1 − 脱模中值/灌料标准湿),不是物料平均水分 powder_avg。
+    // 2026-11-03 用户口径:纸面只有一个水分格,而「实际灌料重量计算公式」用的就是这一个 ——
+    // 填 powder_avg 会让公式里「实际水分」无处可取(那正是当初 0.00 的表象来源之一)。
+    // powder_avg 仍是灌料湿重的分母(引擎内用),只是不再落这一格。
+    理论水分: fixed(result.actual_moisture * 100, 2),
     最短长度mm: fixed(result.lengths.low, 1),
     中间值mm: fixed(result.lengths.std, 1),
     最长长度mm: fixed(result.lengths.high, 1),

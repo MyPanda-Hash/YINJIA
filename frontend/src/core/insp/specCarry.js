@@ -226,6 +226,39 @@ export function headFromSpecDetail(afs, items) {
 }
 
 /**
+ * 「无数据填 '/'」—— 用户 2026-11-04 口径(烧结工艺清单录单流程第 4 步):
+ *   「确认跌落强度、抗压强度、压降几项的自动填充情况,**如没有数据填充,则填充 '/' 符号**」。
+ *
+ * 为什么是 '/' 而不是留空:纸面那三格(跌落要求 / 强度要求kgf / 压降标准kpa)空着会被
+ *   读成「漏填」,生产/品质看不出是"没要求"还是"没填";'/' 是工艺上明确的"此项无要求"。
+ *
+ * 边界(三条,缺一条就会误伤):
+ *   ① **只填空格**:已有值(包括用户自己填的 '/'、规格书带出来的整句)一律不动;
+ *   ② **只填配置里点名的格**(afs.slashWhenEmpty):不猜、不推广到别的面板;
+ *   ③ 不看规格书有没有:没审批、没这张规格书、解析为空 —— 三种情况都补 '/'
+ *      (调用方把它放在 finally 里,见 RecordSheetPanels.autoFillFromSpec)。
+ *
+ * @param {{slashWhenEmpty?: string[]}|null} afs  「自动填充规格书」配置
+ * @param {Record<string, any>} head 单据表头(就地写)
+ * @returns {string[]} 本次真正补上 '/' 的键(给单测/日志用;没补到返回空数组)
+ */
+export function slashFillHead(afs, head) {
+  const keys = Array.isArray(afs?.slashWhenEmpty) ? afs.slashWhenEmpty : []
+  if (!head || typeof head !== 'object' || !keys.length) return []
+  const filled = []
+  for (const k of keys) {
+    const key = String(k ?? '').trim()
+    if (!key) continue
+    const cur = head[key]
+    if (cur === undefined || cur === null || String(cur).trim() === '') {
+      head[key] = '/'
+      filled.push(key)
+    }
+  }
+  return filled
+}
+
+/**
  * autoFillSpec.detail(整表替换型落点:出货检验计划表/组装BOM表)的行构造。
  *
  * ⚠ 2026-10-16 增补 `indexWhenEmpty`(用户报障「出货检验记录表前面缺失序号」):

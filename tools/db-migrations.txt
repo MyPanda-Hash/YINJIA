@@ -802,6 +802,31 @@ migrate-mold-calcparam.sql
 #   QUOTED_IDENTIFIER 报错 —— 同一个脚本在测试库能过、在正式库失败,就是这个坑)。
 # 前端:core/mold/recipeSheet.js 的 applyArchiveMoisture(有单测)+ RecipeCalcDialog 自动带出并标「档案」来源。
 migrate-recipe-materials.sql
+# ── 2026-11-03 配方物料含水率「补数」(修 2026-11-02 的漏执行) ─────────────────────────
+# 事故:migrate-recipe-materials.sql 在服务器上是走 **baseline(只登记不执行)** 进的
+#   yj_schema_log(applied_at=2026-11-02 12:29:38,同批 692 条;to-run 只有 6 条),于是
+#   列建了、yj_field 登记了、译名写了,但 84 行 ELSE UPDATE ... 水分含量 IS NULL 一次没跑。
+#   后果:bs_inv 3961 行金蝶商品含水率全空 ⇒ 配方计算器 powder_avg 恒 0
+#   ⇒ 单据「理论水分」永远 0.00%(2026-11-03 用户报障,服务器实测复现)。
+# migrate-recipe-materials-backfill-20261103.sql —— 41 个带含水率的物料编号**逐个补空**
+#   (UPDATE ... WHERE RTRIM(存货编码)=N'x' AND 水分含量 IS NULL)。
+#   口径:按编码定位,**不按数据来源收窄**(同码可能同时有金蝶行与种子行,含水率是固有属性);
+#   只碰 NULL,不覆盖人工维护过的值;幂等(第二遍 0 行)。
+#   ⚠ 与旧脚本的差别只有一处:旧脚本的 UPDATE 藏在 ELSE 分支(编码已存在才走到,却被 baseline 跳过);
+#   本脚本独立成文,可单独进 to-run **强制执行** —— 这正是它必须单独登记的原因。
+# 来源:同 tools/gen/gen-recipe-materials.cjs(一起生成,不要手改):
+#     node tools/gen/gen-recipe-materials.cjs
+migrate-recipe-materials-backfill-20261103.sql
+# ── 2026-11-03 炭棒规格三格去纸面前缀(存量数据清理) ───────────────────────────────
+# 事故:core/panel/carbonSpec.js 曾把纸面显示前缀 外：/内：/长： 写进 炭棒规格1/2/3,
+#   导致 matchSinterModel(烧结型号自动匹配)、sinterLengthWarning(长度越界提示) 里
+#   Number('外：56.5') = NaN ⇒ 静默失效;界面上只能看到脏文本,用户只好手删
+#   (用户 2026-11-03 原话「导进来的炭棒规格带文字,导致后续计算有问题,还得我手动删掉」)。
+# migrate-mold-spec-strip-prefix-20261103.sql —— 剥掉存量值里的冒号前缀,只留裸数字。
+#   只动 rd_mold_proc_head;只动"冒号前无数字且冒号后可转数字"的值(12:30 不动);
+#   剥完核验仍带冒号的格数必须 = 0,否则 RAISERROR 中止。幂等。
+# 前端同批改动:落格改裸数字 + 纸面按 recordSheetConfigs 的 pre 渲染前缀 + 消费端容错。
+migrate-mold-spec-strip-prefix-20261103.sql
 
 # ── 2026-09-21 烧结尺寸表(60 行模具↔炭棒内外径公差对照)+ 档案面板 ─────────────────────
 # 用途:配方计算弹窗按「车间 + 型号」从这张表带出炭棒外径/内径与公差 ⇒ 回填页 1
@@ -4363,9 +4388,6 @@ migrate-wo-pick-return-20261030.sql
 # migrate-wo-pick-return-flag-field-20261030.sql:
 #   把 退料标志 登记进 yj_field(OTHER_IN 面板 header/只读/可见)+ 9 语言译名。
 #   ⚠ 不登记就没用:ButtonService.save 只写 yj_field 里登记过的字段,列加了也落不了库。
-# 2026-10-30 清理「空退料单」遗留脏数据(预建空草稿那版留下的,幂等)
-migrate-wo-pick-return-cleanup-20261030.sql
-
 migrate-wo-pick-return-flag-field-20261030.sql
 # fix-mobile-pick-note-20261030.sql:
 #   补救:writeQty 曾用 SET 明细备注=? 整块覆盖,冲掉了生单时写入的「(需求 N)」,
@@ -4410,8 +4432,13 @@ migrate-prod-mold-panel-20261030.sql
 migrate-prod-mold-retire-old-20261030.sql
 migrate-bom-material-list-status-20261030.sql
 
+# 2026-10-30 清理「空退料单」遗留脏数据(预建空草稿那版留下的,幂等)
+migrate-wo-pick-return-cleanup-20261030.sql
+
 # 2026-11-01 生产领料独立成「领料明细」wo_pick_line;提交后才生成材料出库单(依赖 migrate-wo-pick-doc-20261030)
 migrate-wo-pick-line-20261101.sql
+migrate-clean-blank-prodinfo-and-dept-20261104.sql
+migrate-sinter-workshop-deptname-20261104.sql
 
 # 2026-11-04 组装物料清单(ASM_BOM)表头可维护:表头 8 字段 editable 0→1、产品编码/子件编码 改参照 INV、
 #   默认BOM 改下拉框(是/否)、yj_panel.config 写 headDefaults 状态=启用;零 DDL、零业务数据变更,脚本幂等。

@@ -1222,6 +1222,11 @@ export default {
     '上传成功': 'Uploaded',
     '保存成功': 'Saved',
     '删除成功': 'Deleted',
+    // 删除结果的三档提示(2026-11-04,见 core/views/deleteOutcome.js 头注):
+    // 文件类面板非管理员删已归档单只落「删除申请」,前端不许谎报"已删除"。
+    '单据已删除': 'Document deleted',
+    '删除申请已提交，待管理员审批通过后才会真正删除': 'Deletion request submitted — the document is removed only after an admin approves it',
+    '「删除」已提交': '"Delete" submitted',
     '上传失败': 'Upload failed',
     '加载分类失败': 'Failed to load categories',
     '加载文件失败': 'Failed to load files',
@@ -1258,6 +1263,8 @@ export default {
     '正在生成打印件…': 'Generating print copy...',
     '已打开打印件（共 {n} 张），可直接打印': 'Print copy opened ({n} pages), ready to print',
     '已打开打印预览（共 {n} 张），可直接打印': 'Print preview opened ({n} pages), ready to print',
+    '已生成打印页（共 {n} 张），在打印对话框里直接打印即可': 'Print pages ready ({n} pages); print them directly in the print dialog',
+    '打印失败：浏览器阻止了打印对话框，请改用「导出 PDF」': 'Printing failed: the browser blocked the print dialog. Use "Export PDF" instead',
     '浏览器拦截了新窗口，已改为下载 PDF': 'The browser blocked the new tab; the PDF was downloaded instead',
     '在本行下方插入一行': 'Insert a row below this one',
     '选择关联单据': 'Select linked document',
@@ -3137,6 +3144,10 @@ export default {
     '理论灌料中间值g': 'Theoretical Mid Fill Weight (g)',
     '理论最高灌料重量g': 'Theoretical Max Fill Weight (g)',
     '理论水分': 'Theoretical Moisture',
+    // 炭棒规格三格的**纸面前缀**(recordSheetConfigs 的 pre;数据里存裸数字,前缀只做显示)
+    '外：': 'OD: ',
+    '内：': 'ID: ',
+    '长：': 'L: ',
     '实际灌料重量计算公式': 'Actual Fill Weight Formula',
     '烧结': 'Sintering',
     '烧结炉参数': 'Sintering Furnace Params',
@@ -3834,6 +3845,11 @@ export default {
     '尺寸表没有可用行': 'the size table has no usable rows',
     '读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the sintering size table (panel permission missing?) — enter sizes on the document instead',
     '读不到生产模具表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the production mold table (panel permission missing?) — enter sizes on the document instead',
+    /* 检验要求 · 炭棒尺寸的「选型号」下拉(2026-11-04:按生产车间筛型号 → 一次填四格) */
+    '选型号（按生产车间筛）': 'Pick model (filtered by workshop)',
+    '该车间没有可用型号，请先在生产模具表维护': 'No model for this workshop — maintain the production mold table first',
+    '已按型号 {m} 填入炭棒内外径与公差': 'Filled rod OD/ID and tolerances from model {m}',
+    '手填或规格书带出的值，未匹配到型号': 'Manually entered or carried from the spec — no matching model',
     /* 从标准库勾选/标准库维护 的措辞与既有页面一致(此前只有机翻兜底) */
     '从标准库勾选': 'Pick from Library',
     /* ── 成型工艺清单(页1)按设计图重排:纸面新标签(数据键不变,改名走 yj_field.alias) ── */
