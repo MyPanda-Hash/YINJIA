@@ -50,8 +50,6 @@ const LAYER_JS = `(() => {
     n: trs.length,
     heads: ths,
     qrCss: (() => { const img = host && host.querySelector('td.qr img'); return img ? getComputedStyle(img).width : '' })(),
-    pgs: host ? host.querySelectorAll('.pg').length : 0,
-    pageSubs: host ? [...host.querySelectorAll('.hd-sub')].map((x) => (x.innerText || '').trim()) : [],
     rows: trs.map(tr => [...tr.querySelectorAll('td')].map(td => (td.innerText||'').trim())),
   })
 })()`
@@ -139,35 +137,6 @@ try {
   const png2 = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
   await fs.writeFile(new URL('./shot-range-print-one.png', import.meta.url), Buffer.from(png2.result.data, 'base64'))
   console.log('[written] shot-range-print-one.png')
-
-
-  // ── 场景 3:1号机 16 天 ⇒ A4 横向自动拆页(每页 8 天,页眉标「第 x/2 页 · 日期区间」)──
-  await s.navigate(BASE + '/#/prod/plan/workOrderBoard', 2500); await sleep(7000)
-  console.log('场景3 选线', await s.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('.wb-line')].find(x => ((x.querySelector('.wb-line-name') || {}).innerText || '').trim() === '1号机')
-    if (!hit) return 'no-node'; (hit.querySelector('.wb-line-name') || hit).click(); return 'clicked'
-  })()`)); await sleep(6500)
-  const n3 = await s.evaluate(`(() => {
-    const rows = [...document.querySelectorAll('.wb-block .el-table__body tbody tr, .wb-block .el-table__body-wrapper tbody tr')]
-    let n = 0
-    for (const tr of rows) { const box = tr.querySelector('td:first-child .el-checkbox'); if (box) { (box.querySelector('input') || box).click(); n++ } }
-    window.print = function () { window.__printed = (window.__printed || 0) + 1 }
-    return n
-  })()`); await sleep(900)
-  console.log('场景3 勾选行数 =', n3)
-  console.log('场景3 点按钮 =', await s.evaluate(`(() => { const b = ${BTN_JS}; if (!b) return 'no-button'; b.click(); return 'clicked' })()`))
-  await sleep(3500)
-  const L3 = JSON.parse(await s.evaluate(LAYER_JS))
-  const dateHeads3 = L3.heads.filter((h) => /^\d{1,2}\/\d{1,2}$/.test(h))
-  console.log('场景3 分页数 =', L3.pgs, '| 页眉 =', JSON.stringify(L3.pageSubs), '| 日期列 =', dateHeads3.length)
-  check('1号机 16 天 ⇒ 自动拆成 2 页', L3.pgs === 2, 'pgs=' + L3.pgs)
-  check('每页页眉标页码 + 日期区间', (L3.pageSubs || []).length === 2 && /第 1\/2 页 · 10月20日~10月27日/.test(L3.pageSubs[0]), JSON.stringify(L3.pageSubs))
-  check('两页合计 16 个日期列（一个不丢）', dateHeads3.length === 16, 'dateCols=' + dateHeads3.length)
-  check('每页都带二维码列（哪页都能扫）', (L3.heads.filter((h) => h === '二维码') || []).length === 2, 'qrHeads=' + L3.heads.filter((h) => h === '二维码').length)
-
-  const png3 = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
-  await fs.writeFile(new URL('./shot-range-print-paged.png', import.meta.url), Buffer.from(png3.result.data, 'base64'))
-  console.log('[written] shot-range-print-paged.png')
 
   if (s.logs.length) console.log('页面错误日志:', s.logs.slice(0, 5))
   console.log('RESULT:', fail === 0 ? 'PASS' : 'FAIL', `(pass=${pass}, fail=${fail})`)

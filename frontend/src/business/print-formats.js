@@ -769,106 +769,63 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     ? opts.dates.filter(Boolean).slice()
     : planSheetDates(dates, opts.today || '', opts.days || 5)
   const n = ds.length
-
+  // 列多时自适应(实测 2号车间=10 天、1号机=16 天):日期列变窄 → 表头改「10/29」紧凑写法、字号降一档;
+  //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
+  const compact = n > 7
+  const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
   // 二维码列宽/像素(2026-11-04 用户口径「二维码太小」):按**物理尺寸**给,不跟着列数缩 ——
-  //   行少(≤5)给 60px≈15.9mm 最好扫,行多逐渐收到 52/44/36px。
+  //   行少(≤5)给 60px≈15.9mm 最好扫,行多逐渐收到 52/44/36px,保证一张 A4 装得下
+  //   (之前 compact 模式跟着列数缩到 28px≈7mm,纸面根本扫不动)。
   const qrPx = list.length <= 5 ? 60 : list.length <= 8 ? 52 : list.length <= 14 ? 44 : 36
+  const qrW = list.length <= 5 ? 7.5 : (compact ? 6.5 : 6)
   const rowH = Math.max(38, qrPx + 6)
-
-  // ── A4 横向自动拆页(2026-11-04 用户口径「日期列太窄 / 纸张大小固定怎么办」)────────────
-  //   纸张宽度是硬的:日期列数一多,单页必然把日期列压到 7mm 上下(表头和 4 位数字挤成一竖条)。
-  //   做法 = 横向分页:每页「固定列 + 二维码 + 一页日期列(每列 ≥ ~9mm)」,跨页重复标题与固定列,
-  //   页眉标「第 x/y 页 · 本期日期区间」;日期列总数不超过一页容量时仍是单页(与之前完全一样)。
-  const BASE_W = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0)   // 73
-  const PAGED_FIXED_SCALE = 0.85                                      // 拆页时固定列收紧到这个比例
-  // A4 横向的"一页到底能放几天"是固定的:固定列(0.85×73%≈62%)+二维码(6.5~7.5%)
-  //   ⇒ 剩 ~30%,按每日期列 ≥3.3%(≈9.4mm)算,一页最多 9 天。
-  //   ≤10 天时单页仍够看(每列 7.7mm 以上),不无谓拆页;>10 天才按 9 天/页拆、各页尽量平均。
-  const SINGLE_MAX_DAYS = 10
-  const DAYS_PER_PAGE = 9
-  const pages = []
-  if (n > SINGLE_MAX_DAYS) {
-    const pageCount = Math.ceil(n / DAYS_PER_PAGE)
-    const per = Math.ceil(n / pageCount)                             // 16 天 ⇒ 8+8,22 天 ⇒ 8+8+6,11 天 ⇒ 6+5
-    for (let i = 0; i < n; i += per) pages.push(ds.slice(i, i + per))
-  } else {
-    pages.push(ds)
-  }
-  const multipage = pages.length > 1
-
-  // 每页的列宽:单页沿用原自适应;多页按 0.85 收紧固定列,日期列均分剩余宽度
-  function layout(pageDates) {
-    const m = pageDates.length
-    const compact = multipage ? true : m > 7
-    const fixedScale = multipage ? PAGED_FIXED_SCALE : (compact ? Math.max(0.52, 1 - (m - 7) * 0.035) : 1)
-    const baseW = BASE_W * fixedScale
-    const qrW = list.length <= 5 ? 7.5 : (compact ? 6.5 : 6)
-    const dateW = m ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / m) : 0
-    return { m, compact, fixedScale, baseW, qrW, dateW }
-  }
-
+  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0) * fixedScale
+  // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
+  const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
+  const colgroup = '<colgroup>'
+    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${(c.w * fixedScale).toFixed(2)}%"/>`).join('')
+    + ds.map(() => `<col style="width:${dateW.toFixed(2)}%"/>`).join('')
+    + `<col style="width:${qrW}%"/>`                  // 二维码(行尾)
+    + '</colgroup>'
+  // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
+  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
+    + ds.map((d) => (compact
+      ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
+      : `<th>${esc(monthDay(d))}</th>`)).join('')
+    + '<th>二维码</th>'
   // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
   const qrs = await Promise.all(list.map((r) => woQrImg({
     公司代码: r['公司代码'] || '', 工单号: r['加工单号'], 工单行号: r['工单行号'],
   })))
-
-  /** 渲染一页(固定列 + 该页日期列 + 二维码);多页时页眉带页码与日期区间 */
-  function pageHtml(pageDates, pageIdx) {
-    const L = layout(pageDates)
-    const colgroup = '<colgroup>'
-      + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${(c.w * L.fixedScale).toFixed(2)}%"/>`).join('')
-      + pageDates.map(() => `<col style="width:${L.dateW.toFixed(2)}%"/>`).join('')
-      + `<col style="width:${L.qrW}%"/>`                            // 二维码(行尾)
-      + '</colgroup>'
-    // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
-    const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
-      + pageDates.map((d) => (L.compact
-        ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
-        : `<th>${esc(monthDay(d))}</th>`)).join('')
-      + '<th>二维码</th>'
-    const trs = list.map((r, i) => {
-      const plan = r['日计划'] || {}
-      return '<tr>'
-        + PLAN_SHEET_BASE_COLS.map((c) => {
-          const v = c.k(r)
-          return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
-        }).join('')
-        + pageDates.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
-        + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
-        + '</tr>'
-    }).join('')
-    const period = pageDates.length
-      ? `${monthDay(pageDates[0])}~${monthDay(pageDates[pageDates.length - 1])}`
-      : ''
-    const sub = multipage
-      ? `<span class="hd-sub">第 ${pageIdx + 1}/${pages.length} 页 · ${esc(period)}</span>`
-      : ''
-    return '<div class="pg"><div class="hd"><span class="t">' + esc(title) + '</span>' + sub + '</div>'
-      + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table></div>'
-  }
-
-  // 字号/内边距随列数微调(compact 时 8px / 表头 7px,否则保持原版 9.5px / 9px)
-  const first = layout(pages[0])
-  const fs = first.compact ? '8px' : '9.5px'
-  const thFs = first.compact ? '7px' : '9px'
-  const pad = first.compact ? '2px 1px' : '2px 3px'
+  const trs = list.map((r, i) => {
+    const plan = r['日计划'] || {}
+    return '<tr>'
+      + PLAN_SHEET_BASE_COLS.map((c) => {
+        const v = c.k(r)
+        return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
+      }).join('')
+      + ds.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
+      + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
+      + '</tr>'
+  }).join('')
+  // 字号/内边距随列数微调(compact 时 8.5px / 表头 7.5px,否则保持原版 9.5px / 9px)
+  const fs = compact ? '8px' : '9.5px'
+  const thFs = compact ? '7px' : '9px'
+  const pad = compact ? '2px 1px' : '2px 3px'
   return '<style>'
     + '@page{size:A4 landscape;margin:6mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
     + '.hd{text-align:center;margin:0 0 4px}'
     + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
-    + '.hd-sub{margin-left:10px;font-size:10px;font-weight:400;letter-spacing:0;color:#555}'
-    + '.pg{break-after:page;page-break-after:always}'
-    + '.pg:last-child{break-after:auto;page-break-after:auto}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'thead{display:table-header-group}'                     // 行多跨页时表头重复
     + `th,td{border:1px solid #333;padding:${pad};font-size:${fs};line-height:1.25;word-break:break-all;vertical-align:middle}`
     + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.15}`
     + 'td.r{text-align:right;white-space:nowrap}'
     + `td.qr{text-align:center;padding:1px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
     + `tbody tr{height:${rowH}px}`
     + '</style>'
-    + pages.map((pds, i) => pageHtml(pds, i)).join('')
+    + `<div class="hd"><span class="t">${esc(title)}</span></div>`
+    + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
 }
 
 /** 工单二维码(与「打印工单」同一内容:公司代码@工单号@1000+行号);失败返回 '' */

@@ -341,30 +341,6 @@ test('schedPlanSheetHtml:二维码按物理尺寸(行少 52px / 行多 44→36px
   assert.ok(h3.includes('tbody tr{height:42px}'), '行高 42px')
 })
 
-// 2026-11-04 用户口径「日期列太窄,但纸张大小固定怎么办」⇒ A4 横向自动拆页:
-//   每页固定列 + 二维码 + 一页日期列(每列 ≥ ~9mm),跨页重复标题/固定列/二维码,页眉标页码与日期区间。
-test('schedPlanSheetHtml:日期列超过一页容量时自动拆页(每页重复固定列+二维码,标注页码/区间)', async () => {
-  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0',
-    日计划: { '2026-10-20': 10, '2026-11-04': 90 } })
-  const dates16 = planSheetDatesFromRows([mk(1)], '2026-11-04', 5)
-  assert.equal(dates16.length, 16, '10-20 ~ 11-04 共 16 天')
-  const html = await schedPlanSheetHtml([mk(1), mk(2)], [], { dates: dates16 })
-  assert.equal((html.match(/<div class="pg">/g) || []).length, 2, '16 天 ⇒ 拆成 2 页')
-  assert.ok(html.includes('第 1/2 页 · 10月20日~10月27日'), '第 1 页:页码 + 日期区间')
-  assert.ok(html.includes('第 2/2 页 · 10月28日~11月4日'), '第 2 页:页码 + 日期区间')
-  assert.equal((html.match(/title="\d{4}-\d{2}-\d{2}"/g) || []).length, 16, '16 个日期列一个不丢')
-  assert.equal((html.match(/>二维码<\/th>/g) || []).length, 2, '每页都带二维码列(哪页都能扫)')
-  const page1 = html.split('<div class="pg">')[1]
-  assert.equal((page1.match(/title="\d{4}-\d{2}-\d{2}"/g) || []).length, 8, '第 1 页 8 天(列宽回到 ~11mm)')
-  assert.ok(html.includes('page-break-after:always'), '打印时按页断开')
-
-  // 10 天仍是单页(与之前一致,不无谓多页)
-  const wide10 = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
-  const h10 = await schedPlanSheetHtml([mk(3)], [], { dates: wide10 })
-  assert.ok(!h10.includes('第 1/'), '10 天仍是单页')
-  assert.equal((h10.match(/<div class="pg">/g) || []).length, 1, '单页')
-})
-
 test('pickPlanSheetRows:只留勾选行、保持页面顺序;没勾选=空(不悄悄退回整线全打)', () => {
   const rows = [
     { 行id: 11, 加工单号: 'GD-A' }, { 行id: 12, 加工单号: 'GD-B' }, { 行id: 13, 加工单号: 'GD-C' },
