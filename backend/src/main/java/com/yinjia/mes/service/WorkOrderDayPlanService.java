@@ -98,7 +98,8 @@ public class WorkOrderDayPlanService {
         out.put("日期", dates);
         // 产能可见(2026-10-31 用户口径「产能只显示、不拦截」):
         //   · 产线产能 = bs_prod_line.日产能(0/空 = 未配 ⇒ 不判超载,沿用列注明「0=不判超载」);
-        //   · 每日已排 = 该线**全部在册行**(plang.scx,不分页签)的自动日计划按日合计;
+        //   · 每日已排 = 该线**未完工且未结案**的行(plang.scx,不分页签)的日计划按日合计
+        //     (2026-11-04:完工/结案行不算负荷 —— 与左侧「未交量」同口径,见 lineDailyPlan);
         //   只对「工单排产页」(按产线)出这两项;生产工单页(按行 id)返回结构不变(前端不用即忽略)。
         boolean lineMode = (ids == null || ids.isEmpty()) && !str(line).isEmpty();
         out.put("产线产能", lineMode ? dayCapacity(str(line)) : 0d);
@@ -464,23 +465,30 @@ public class WorkOrderDayPlanService {
     /**
      * 该线**每天已排**合计(日期列头「已排/日产能」、顶部「今日超载」):按 {@code plang.scx}(当前归属)算。
      *
-     * <p>2026-10-31 起日计划 = 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge}),这里把**整条线全部
-     * 在册行**(不分页签 —— 产能账是整条线的)逐行合并一遍再按日合计:与格子里的日计划、行上的
-     * 7天/15天已排**同一把尺**。2026-10-31 下午补:人工改过的格子也要算进来,否则改完数量产能数会偏。
+     * <p>2026-10-31 起日计划 = 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge}),这里把该线
+     * **未完工且未结案**的行(不分页签 —— 产能账是整条线的活)逐行合并一遍再按日合计:与格子里的
+     * 日计划、行上的 7天/15天已排**同一把尺**。2026-10-31 下午补:人工改过的格子也要算进来,
+     * 否则改完数量产能数会偏。
      *
      * <p>按 {@code plang.scx} 而不是 {@code wo_day_plan.生产线}:调拨只改 plang/plang_pc/wo_process_line,
      * 以"活跟工单走"为准。
+     *
+     * <p><b>2026-11-04 口径修正</b>(与 {@code ScheduleBoardService.dayPlanTodayByLine} 同步):
+     * 只算**未完工且未结案**的行。此前"整条线全部在册行"连已完工/已结案也算 —— 完工单的交期若还在
+     * 未来(或开工日为空,自动摊分从今天起),列头「已排/日产能」就会把早已做完的活算成今天的负荷,
+     * 与左侧「未交量=0」自相矛盾(用户报障 2026-11-04)。
      */
     private Map<String, Double> lineDailyPlan(String line, List<String> dates, LocalDate today) {
         Map<String, Double> sums = new LinkedHashMap<>();
         String ln = str(line);
         if (ln.isEmpty()) return sums;
-        // 该线各行的人工指定(一次查完,别逐行 N+1)
+        // 该线各行的人工指定(一次查完,别逐行 N+1;只取未完工未结案的行)
         Map<Long, Map<LocalDate, Double>> manual = new HashMap<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT w.工单行id AS rid, w.计划日期 AS d, SUM(w.计划数量) AS q"
                         + " FROM dbo.wo_day_plan w JOIN dbo.plang p ON p.id = w.工单行id"
                         + " WHERE w.asp_cancel='N' AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?"
+                        + "   AND " + PlangClose.notClosed("p") + " AND NOT (" + PlangDone.done("p") + ")"
                         + " GROUP BY w.工单行id, w.计划日期", ln)) {
             if (!(r.get("rid") instanceof Number rid)) continue;
             LocalDate d = toDate(r.get("d"));
@@ -491,7 +499,9 @@ public class WorkOrderDayPlanService {
                 "SELECT p.id AS id, ISNULL(p.[当前工序],N'') AS op, ISNULL(p.[工艺路线],N'') AS route,"
                         + " ISNULL(p.pl_sl,0) AS plan_qty, p.st_date AS st, p.cp_date AS cp"
                         + " FROM dbo.plang p"
-                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?", ln);
+                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?"
+                        // 2026-11-04:完工/结案行不算负荷(否则列头「已排」会把做完的活算进来)
+                        + "   AND " + PlangClose.notClosed("p") + " AND NOT (" + PlangDone.done("p") + ")", ln);
         // 当前工序为空的行:回落到台账当前道(换算率要靠它);批量查,别 N+1
         List<Long> noOp = new ArrayList<>();
         for (Map<String, Object> r : rows) {

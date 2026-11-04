@@ -409,15 +409,22 @@ public class ScheduleBoardService {
      * 改完数量产能数会偏)。与「生产工单/工单排产」页面格子里是**同一把尺**。
      *
      * <p>只算「今天」:产能判超载看的是当天负荷(用户口径「产能只显示、不拦截」)。
+     *
+     * <p><b>2026-11-04 口径修正(用户报障「未完工量已经为 0,今日已排还有数」)</b>:只算
+     * **未完工且未结案**的行 —— 与左侧「未交量」({@link #linesSummary})同一批行。此前只过滤了
+     * 作废/空线,已完工/已结案的行照样参与摊分:完工单的「开工日→交期」区间若还盖着今天
+     * (典型:交期写在未来、或开工日为空 ⇒ {@link DayPlanSpread} 从今天起摊),它就会一直往
+     * 「今日已排」里加数,而「未交量」早已把它剔除 ⇒ 同一块侧栏两个数自相矛盾。
      */
     private Map<String, Double> dayPlanTodayByLine(java.time.LocalDate today) {
         Map<String, Double> out = new LinkedHashMap<>();
-        // 人工指定(一次查完;只有"在册且已排线"的行才参与产能账)
+        // 人工指定(一次查完;只有"在册、已排线、且未完工未结案"的行才参与产能账)
         Map<Long, Map<java.time.LocalDate, Double>> manual = new HashMap<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT w.工单行id AS rid, w.计划日期 AS d, SUM(w.计划数量) AS q"
                         + " FROM dbo.wo_day_plan w JOIN dbo.plang p ON p.id = w.工单行id"
                         + " WHERE w.asp_cancel='N' AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
+                        + "   AND " + NOT_CLOSED + " AND NOT (" + DONE_ROW + ")"
                         + " GROUP BY w.工单行id, w.计划日期")) {
             if (!(r.get("rid") instanceof Number rid)) continue;
             java.time.LocalDate d = toDate(r.get("d"));
@@ -430,7 +437,9 @@ public class ScheduleBoardService {
                         + " ISNULL(p.[工艺路线],N'') AS route, ISNULL(p.pl_sl,0) AS plan_qty,"
                         + " p.st_date AS st, p.cp_date AS cp"
                         + " FROM dbo.plang p"
-                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''");
+                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
+                        // 2026-11-04:已完工/已结案的行不算今日负荷(与未交量同口径,见方法头注释)
+                        + "   AND " + NOT_CLOSED + " AND NOT (" + DONE_ROW + ")");
         // 当前工序为空的行:回落到台账当前道(换算率要靠它);一次批量查,别 N+1
         List<Long> noOp = new ArrayList<>();
         for (Map<String, Object> r : rows) {
