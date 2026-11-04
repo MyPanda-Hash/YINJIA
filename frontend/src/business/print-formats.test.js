@@ -346,24 +346,26 @@ test('schedPlanSheetHtml:二维码尺寸(行少 52px 不缩太小 / 行多 48→
   assert.ok(h3.includes('tbody tr{height:42px}'), '行高 42px')
 })
 
-// 2026-11-04 用户口径「日期排太长就挤成竖条」:>12 天表头改**竖排**,不再被横向「10/29」撑窄;
-//   列数很多时二维码也自适应该收就收(>16 天 44px、>22 天 40px)。
-test('schedPlanSheetHtml:日期列很多(23 天)⇒ 表头竖排 + 二维码自适应缩小到 40px', async () => {
+// 2026-11-04 用户口径「日期不要竖排」:日期表头**始终横排**,列窄时降字号 + nowrap(绝不折成竖条);
+//   列数很多时二维码自适应该收就收(>16 天 44px、>22 天 40px)。
+test('schedPlanSheetHtml:日期列很多(23 天)⇒ 表头仍横排(nowrap+降字号),二维码收到 40px', async () => {
   const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
   const rows = [mk(1), mk(2), mk(3)]
   const d23 = planSheetWindow('2026-10-29', 23)
   assert.equal(d23.length, 23)
   const h = await schedPlanSheetHtml(rows, [], { dates: d23 })
-  assert.equal((h.match(/<th class="v"/g) || []).length, 23, '23 个日期表头全部竖排')
-  assert.ok(h.includes('th.v{writing-mode:vertical-rl'), '竖排样式在样式表里')
+  assert.ok(!h.includes('writing-mode'), '日期表头不再竖排')
+  assert.equal((h.match(/<th class="dt"/g) || []).length, 23, '23 个日期表头(横排)')
+  assert.ok(h.includes('th.dt{white-space:nowrap'), '日期表头禁止折行(不会变竖条)')
+  assert.ok(h.includes('>10/29</th>'), '日期按「10/29」横排写法')
   assert.ok(h.includes('td.qr img{width:40px;height:40px}'), '列很多 ⇒ 二维码收到 40px(≈10.6mm,仍可扫)')
   assert.ok(h.includes('width:4.6%'), '二维码列 4.6%(把宽度让给日期列)')
-  assert.ok(/width:2\.5\d%/.test(h), '日期列仍有 ~2.56%(≈7.3mm),4 位数字放得下')
+  assert.ok(/width:2\.4\d%/.test(h), '日期列仍有 ~2.41%(≈6.9mm),4 位数字放得下')
 
-  // 10 天:仍横排(不竖排)
-  const d10 = planSheetWindow('2026-10-29', 10)
-  const h10 = await schedPlanSheetHtml(rows, [], { dates: d10 })
-  assert.ok(!h10.includes('class="v"'), '10 天仍是横排表头')
+  // 31 天:更窄 ⇒ 日期表头再降一档 6px(仍横排)
+  const d31 = planSheetWindow('2026-10-01', 31)
+  const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
+  assert.ok(h31.includes('th.dt{white-space:nowrap;padding:2px 0;font-size:6px'), '31 天 ⇒ 表头 6px')
 })
 
 test('schedPlanSheetHtml:日期列 31 天(极窄)⇒ 格内数字降一档字号,避免压到邻列', async () => {

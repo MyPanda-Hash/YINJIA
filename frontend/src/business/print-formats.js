@@ -772,10 +772,9 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   // 列多时自适应(实测 2号车间=10 天、1号机=16 天):日期列变窄 → 表头改「10/29」紧凑写法、字号降一档;
   //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
   const compact = n > 7
-  // 2026-11-04 用户口径「日期排太长就挤成竖条」:列很多(>12 天)时**表头改竖排**(writing-mode),
-  //   每列不再需要为横向的「10/29」留宽度,窄列也能读;列数越多固定列越收紧(下限 0.46)。
-  const vHead = compact && n > 12
-  const fixedScale = compact ? Math.max(vHead ? 0.46 : 0.52, 1 - (n - 7) * 0.035) : 1
+  // 2026-11-04 用户口径「日期不要竖排」:日期表头**始终横排**,列很窄时靠"降字号 + 禁止折行"保住一行,
+  //   绝不允许折成竖条;列数越多固定列越收紧(与最小宽度配合,见下)。
+  const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
   // 二维码尺寸(口径演进:28px「太小」→ 60 → 52「略小」→ 再按**列数**自适应缩):
   //   行少(≤5)52px、≤8 行 48px、≤14 行 42px、更多 36px;
   //   日期列 >16 天收到 44px、>22 天收到 40px(≈10.6mm,仍可扫),把宽度让给日期列。
@@ -784,9 +783,9 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const qrPx = n > 22 ? 40 : (n > 16 ? Math.min(qrBase, 44) : qrBase)
   const qrW = n > 22 ? 4.6 : (n > 16 ? 5 : (list.length <= 5 ? 6 : (compact ? 6.5 : 6)))
   const rowH = Math.max(38, qrPx + 6)
-  // 固定列宽度 = max(按比例 (w×scale), 竖排/极窄模式下的最小可读宽度)
+  // 固定列宽度 = max(按比例 (w×scale), 最小可读宽度)
   //   2026-11-04 用户报障:23 天时数字列被压到 1.4%,「6000」放不下直接和邻列叠在一起 ⇒ 给下限。
-  const fixedW = PLAN_SHEET_BASE_COLS.map((c) => (vHead && c.min ? Math.max(c.w * fixedScale, c.min) : c.w * fixedScale))
+  const fixedW = PLAN_SHEET_BASE_COLS.map((c) => (c.min ? Math.max(c.w * fixedScale, c.min) : c.w * fixedScale))
   const baseW = fixedW.reduce((a, b) => a + b, 0)
   // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
   const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
@@ -798,13 +797,12 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     + `<col style="width:${qrW}%"/>`                  // 二维码(行尾)
     + '</colgroup>'
   // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
+  // 日期表头的字号:列越窄越小(仍横排且 nowrap,不再折成竖条)
+  const dateHeadFs = dateW > 0 && dateW < 2.15 ? '6px' : (compact ? '7px' : '9px')
   const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
-    + ds.map((d) => {
-      if (vHead) return `<th class="v" title="${esc(d)}">${esc(shortMonthDay(d))}</th>`  // 竖排,窄列可读
-      return compact
-        ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
-        : `<th>${esc(monthDay(d))}</th>`
-    }).join('')
+    + ds.map((d) => (compact
+      ? `<th class="dt" title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
+      : `<th>${esc(monthDay(d))}</th>`)).join('')
     + '<th>二维码</th>'
   // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
   const qrs = await Promise.all(list.map((r) => woQrImg({
@@ -833,7 +831,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + `th,td{border:1px solid #333;padding:${pad};font-size:${fs};line-height:1.25;word-break:break-all;vertical-align:middle}`
     + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.15}`
-    + 'th.v{writing-mode:vertical-rl;text-orientation:mixed;height:52px;padding:2px 0;line-height:1.05;letter-spacing:.5px}'
+    + `th.dt{white-space:nowrap;padding:2px 0;font-size:${dateHeadFs};line-height:1.1;letter-spacing:0}`
     + 'td.r{text-align:right;white-space:nowrap}'
     + 'td.d{font-size:7px;padding:1px 0}'
     + `td.qr{text-align:center;padding:1px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
