@@ -191,11 +191,16 @@
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
         <div class="mp-line-main">
           <div class="mp-line-name">{{ r.名称 || r.编码 }}</div>
-          <div class="mp-line-meta">
-            {{ r.编码 }} · {{ r.规格 || '—' }}
-            <template v-if="r.批号"> · {{ r.批号 }}</template>
-            <template v-if="returnMode"> · {{ tt('可退') }} {{ fmtQty(canReturnOf(r)) }}</template>
-          </div>
+          <!-- 🔴 2026-11-04 用户口径:「表头是要带物料编码和规格型号和计量单位的,信息不完全」。
+               原来是「编码 · 规格 · 批号」挤成一行小字,手机上一挤就看不全;改成三行标签对,
+               编码/规格型号/单位各自成列,缺值显示 — (不省略行,避免看着像"没这个信息")。 -->
+          <dl class="mp-line-fields">
+            <div><dt>{{ tt('物料编码') }}</dt><dd>{{ r.编码 || '—' }}</dd></div>
+            <div><dt>{{ tt('规格型号') }}</dt><dd>{{ r.规格 || '—' }}</dd></div>
+            <div><dt>{{ tt('计量单位') }}</dt><dd>{{ r.单位 || '—' }}</dd></div>
+            <template v-if="r.批号"><div><dt>{{ tt('批号') }}</dt><dd>{{ r.批号 }}</dd></div></template>
+            <template v-if="returnMode"><div><dt>{{ tt('可退') }}</dt><dd>{{ fmtQty(canReturnOf(r)) }}</dd></div></template>
+          </dl>
         </div>
         <!-- 退料:本次要退多少 -->
         <span v-if="returnMode" class="mp-line-qty num is-ret">
@@ -903,7 +908,12 @@ async function submit() {
 .mp-line-dot.on { background: var(--el-color-success); }
 .mp-line-main { flex: 1; min-width: 0; }
 .mp-line-name { font-size: 14px; }
-.mp-line-meta { margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
+/* 明细行的字段对(2026-11-04):编码/规格型号/单位各占一行,标签灰、值黑。
+   手机屏窄,用 grid 两列(标签 68px 固定 + 值自适应),值过长自动换行不溢出。 */
+.mp-line-fields { margin: 4px 0 0; padding: 0; }
+.mp-line-fields > div { display: grid; grid-template-columns: 68px 1fr; gap: 6px; line-height: 1.5; }
+.mp-line-fields dt { margin: 0; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-line-fields dd { margin: 0; font-size: 12px; color: var(--el-text-color-regular); word-break: break-all; }
 .mp-line-qty { flex: none; min-width: 84px; text-align: right; font-size: 14px; font-weight: 600; }
 .mp-line-qty.is-ret { color: var(--el-color-warning-dark-2); }
 .mp-line-qty.ok { color: var(--el-color-success); }
