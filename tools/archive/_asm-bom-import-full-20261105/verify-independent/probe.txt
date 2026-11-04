@@ -1,0 +1,96 @@
+sheets = ['列表数据']
+dims = 3642 73
+--- HEADERS ---
+0 "产品名称"
+1 "产品编码"
+2 "规格型号"
+3 "物料编码"
+4 "物料名称"
+5 "规格型号"
+6 "备注"
+7 "单位"
+8 "质量管控点"
+9 "编码"
+10 "用量:分子"
+11 "分子单位"
+12 "用量:分母"
+13 "审核状态"
+14 "使用状态"
+15 "默认BOM"
+16 "BOM类型"
+17 "产品物料类别"
+18 "物料属性"
+19 "可用库存"
+20 "即时库存"
+21 "制单人"
+22 "修改人"
+23 "基本单位"
+24 "工艺路线编码"
+25 "工艺路线名称"
+26 "特殊配方及工艺"
+27 "炭棒尺寸"
+28 "BOM用途"
+29 "制单时间"
+30 "修改时间"
+31 "行备注"
+32 "条形码"
+33 "产地"
+34 "主产品助记码"
+35 "辅助属性"
+36 "SKU编码"
+37 "产品描述"
+38 "品牌"
+39 "BOM分组编码"
+40 "BOM分组"
+41 "附件数"
+42 "审核人"
+43 "审核时间"
+44 "物料图片"
+45 "产地"
+46 "表体SKU编码"
+47 "辅助属性"
+48 "条形码"
+49 "固定损耗"
+50 "变动损耗率"
+51 "工序名称"
+52 "位号"
+53 "行备注1"
+54 "行备注2"
+55 "替代件编码"
+56 "替代件名称"
+57 "替代件规格型号"
+58 "变更次数"
+59 "其他要求"
+60 "已经同步"
+61 "可替代"
+62 "替代方案"
+63 "当前节点"
+64 "审批进度"
+65 "上一步处理人"
+66 "上一步处理意见"
+67 "源配置BOM"
+68 "配置组编码"
+69 "配置项编码"
+70 "配置项名称"
+71 "配置项是否必选"
+72 "计划策略"
+--- FIRST 8 DATA ROWS (repr) ---
+["'S阻垢炭棒/滤芯'", "'A-32-01'", "'40.5*16*80'", "'A-32-01**TB'", "'S阻垢炭棒/滤芯'", "'40.5*16*80'", 'None', "'支'", 'None', "'A-32-01_V0009'", '1', "'支'", '1', "'已审核'", "'启用'", 'None', "'标准BOM'", "'成品'", "'自制'", 'None', 'None', "'王光珍'", "'王光珍'", "'支'", "'GYLX-0006'", "'烧结炭棒1切3组装装箱'", 'None', "'40.5*16*80'", "'通用'", 'datetime.datetime(2026, 8, 14, 11, 17, 55)', 'datetime.datetime(2026, 8, 14, 11, 18, 31)', 'None', 'None', 'None', "'Szgtb/lx'", 'None', 'None', 'None', 'None', "'BOMf-20250325-00000002'", "'成品'", 'None', "'王光珍'", 'datetime.datetime(2026, 8, 14, 11, 18, 31)', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-SX-005-1'", "'端盖'", "'SX复合上盖'", 'None', 'None', 'None', 'None', '1', "'个'", '1', 'None', 'None', 'None', 'None', 'None', 'None', '9200', '9200', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-SX-005-2'", "'端盖'", "'SX复合下盖'", 'None', 'None', 'None', 'None', '1', "'个'", '1', 'None', 'None', 'None', 'None', 'None', 'None', '7800', '7800', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-XWR-014'", "'白色无纺布100g'", "'77*55'", 'None', 'None', 'None', 'None', '1', "'张'", '1', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-AJ-005'", "'PP棉'", "'53*41*80'", 'None', 'None', 'None', 'None', '1', "'支'", '1', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-KBL-012'", "'PE袋'", "'100*120'", 'None', 'None', 'None', 'None', '1', "'个'", '124', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-GL-002'", "'纸箱'", "'46.5*29*46.5'", 'None', 'None', 'None', 'None', '1', "'个'", '124', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+["'PP复合A级炭棒/滤芯'", "'A-32-02'", "'28*12*216'", "'A-32-02**TB'", "'PP复合A级炭棒/滤芯'", "'28*12*216'", 'None', "'支'", 'None', "'A-32-02_V0001'", '1', "'支'", '1', "'已审核'", "'启用'", 'None', "'标准BOM'", "'成品'", "'自制'", 'None', 'None', "'廖小姐'", "'王光珍'", "'支'", "'GYLX-0001'", "'烧结炭棒1切1组装装箱'", 'None', "'28*12*216'", "'通用'", 'datetime.datetime(2025, 4, 19, 14, 47, 25)', 'datetime.datetime(2025, 4, 23, 11, 12, 21)', 'None', 'None', 'None', "'PPfhAjtb/lx'", 'None', 'None', 'None', 'None', "'BOMf-20250325-00000002'", "'成品'", 'None', "'王光珍'", 'datetime.datetime(2025, 4, 23, 11, 12, 21)', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None']
+--- LAST 5 ROWS ---
+['None', 'None', 'None', "'YJ-JH-001'", "'纤维棉'", "'87*63*18'", 'None', 'None', 'None', 'None', '1', "'PCS'", '1', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-JH-002'", "'纤维棉'", "'39*18'", 'None', 'None', 'None', 'None', '1', "'PCS'", '1', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-ZXS-001'", "'椰壳颗粒炭'", "'8-20目'", 'None', 'None', 'None', 'None', '0.26', "'kg'", '1', 'None', 'None', 'None', 'None', 'None', 'None', '335', '335', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'单支：260g'", 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+['None', 'None', 'None', "'YJ-TB-009'", "'密封圈'", "'92*3.5'", 'None', 'None', 'None', 'None', '1', "'PCS'", '1', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', "'MRP'"]
+["'合计'", 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None']
+--- col0 stats ---
+data rows = 3641
+col0 null/empty = 2813
+col0 nonempty distinct = 247
+fully-empty rows = 0

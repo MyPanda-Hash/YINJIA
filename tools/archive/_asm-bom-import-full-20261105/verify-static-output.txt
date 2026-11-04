@@ -1,0 +1,6 @@
+[INFO] Excel 期望: 3640 行 / 827 单 / 817 产品
+[INFO] SQL 解析出: 3640 行,列 26
+[INFO] 语句检查: DELETE 按来源幂等清理=OK, bs_inv 计量单位覆盖 UPDATE=OK, 建表守卫=OK, 自检 PASS 分支=OK, 自检 FAIL 分支(severity 16)=OK, 无 BOM=OK
+[INFO] SQL 内: 3640 行 / 827 单 / 817 产品
+
+[PASS] static 核对通过: SQL 与 Excel 逐行逐字段一致,语句检查全 OK

@@ -4425,3 +4425,11 @@ migrate-asm-bom-maintainable-20261104.sql
 #   回填存量空工序行。报障:「这个产品编码要可以自己编辑,且当前的工序都为组装的 bom 不需要设定工序了」。
 #   ⚠ 本脚本必须晚于 migrate-asm-bom-maintainable-20261104.sql(整链重放按顺序收敛;勿单独重跑那条)。
 migrate-asm-bom-product-manual-20261104.sql
+
+# 2026-11-05 组装物料清单(ASM_BOM)**全量**导入:金蝶 BOM 引出表 827 块 / 817 产品 / 3640 行,
+#   覆盖上一版 migrate-asm-bom-data-20261030.sql 的 236 在产产品(1085 行)并补齐其余 581 个产品;
+#   同一产品多版本(10 个产品)全部保留,各成一张单据。用户口径:「导入到当前本地全部导入,
+#   同时这个脚本要能导入到服务器中去」。
+#   ⚠ 幂等:只 DELETE 来源=金蝶BOM引出列表_20261019174847 的行再全量插入,不碰面板手工新建的 BOM;
+#   须晚于 migrate-asm-bom-20261030.sql(建表)。两账套已执行(RESULT: 23 batches + 自检 PASS)。
+migrate-asm-bom-data-full-20261105.sql
