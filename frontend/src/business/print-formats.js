@@ -559,16 +559,69 @@ export async function printWoQr(payload, opts = {}) {
 }
 
 /**
- * 成型车间排单计划(2026-10-31)—— 照纸表《成型车间排单计划》出的整张报表。
+ * 排单计划纸表(2026-10-31;2026-11-04 标题/车间列头改为**按工序产线动态**)—— 照纸表出的整张报表。
  *
- * <p>用户口径:「这个需要能打出这样的报表形式,就在当前工单排产处实现即可,
- * 这样就不需要根据那个产线进行处理了」⇒ 取数走 `/px/scheduleBoard/planSheet`(**全部产线一张表**),
- * 版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 成型车间 / 未完成总数 / 生产计划数量 /
- * 实际完成数量 / 成型交期 / 成型交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
+ * <p>用户口径演化:
+ * <ul>
+ *   <li>2026-10-31「这个需要能打出这样的报表形式,就在当前工单排产处实现即可,
+ *       这样就不需要根据那个产线进行处理了」⇒ 取数走 `/px/scheduleBoard/planSheet`;</li>
+ *   <li>2026-11-04「**当前在不同的工序产线显示的这个工序名称也要不同**」⇒ 纸表标题与「车间」列头
+ *       不再写死「成型车间」,而是跟着**所打印产线的 生产车间**走:
+ *       成型车间排单计划 / 切炭车间排单计划 / 组装车间排单计划…,列头同理(成型车间/切炭车间/组装车间)。
+ *       解析见 {@link planSheetShop} / {@link planSheetTitle};取不到唯一车间时退回通用的
+ *       「排单计划 / 生产车间」,不冒充某个车间。</li>
+ * </ul>
+ *
+ * <p>版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 车间(产线) / 未完成总数 / 生产计划数量 /
+ * 实际完成数量 / 交期 / 交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
  *
  * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001);日期列默认从**今天起 7 天**
  * (纸表也只印 3~5 天;列太多会挤成一团,可用 opts.days 调)。
  */
+
+/**
+ * 排单计划该印哪个「车间/工序」名称(2026-11-04)。
+ *
+ * <p>取值优先级:① 调用方显式 `opts.shop`(工单排产页按**选中产线**的 `生产车间` 传,最准);
+ * ② 行内若**唯一**有产线/工序归属(`生产车间` → `当前工序` → `工序` 依次取第一个非空值);
+ * ③ 都取不到(或混打多个工序)⇒ 空串,由 {@link planSheetTitle} 退回通用标题 —— 不写死「成型」。
+ *
+ * @param {Array} rows 要打印的行
+ * @param {Object} [opts] { shop }
+ * @returns {string} 车间名(如「成型」「切炭」「组装」);未知时 ''
+ */
+export function planSheetShop(rows, opts = {}) {
+  const explicit = String(opts?.shop ?? '').trim()
+  if (explicit) return explicit
+  const set = new Set()
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r) continue
+    for (const k of ['生产车间', '当前工序', '工序']) {
+      const v = String(r[k] ?? '').trim()
+      if (v) { set.add(v); break }
+    }
+  }
+  return set.size === 1 ? [...set][0] : ''
+}
+
+/** 车间词的**裸名**:去掉可能自带的「车间」后缀(档案里两种写法都出现过),避免「成型车间车间排单计划」 */
+function planSheetShopWord(shop) {
+  const s = String(shop || '').trim()
+  return s.endsWith('车间') ? s.slice(0, -2).trim() : s
+}
+
+/** 纸表标题:车间已知 ⇒ 「<车间>车间排单计划」(例:切炭车间排单计划);未知 ⇒ 通用「排单计划」 */
+export function planSheetTitle(shop) {
+  const w = planSheetShopWord(shop)
+  return w ? `${w}车间排单计划` : '排单计划'
+}
+
+/** 纸表「车间」列头:车间已知 ⇒ 切炭车间;未知 ⇒ 生产车间 */
+function planSheetShopColumn(shop) {
+  const w = planSheetShopWord(shop)
+  return w ? `${w}车间` : '生产车间'
+}
+
 const PLAN_SHEET_BASE_COLS = [
   { t: '客户等级', w: 2, k: (r) => r['客户等级'] },
   { t: '客户名称', w: 9, k: (r) => r['客户'] },
@@ -576,12 +629,14 @@ const PLAN_SHEET_BASE_COLS = [
   { t: '单据编号', w: 10, k: (r) => r['加工单号'] },
   { t: '产品编号', w: 6, k: (r) => r['物料编码'] },
   { t: '型号', w: 6, k: (r) => r['规格型号'] },
-  { t: '成型车间', w: 5, k: (r) => r['生产线'] },
+  // 车间(产线)列:表头随所打印的工序产线变 —— 成型车间 / 切炭车间 / 组装车间(2026-11-04)
+  { t: '生产车间', w: 5, k: (r) => r['生产线'], tOf: planSheetShopColumn },
   { t: '未完成总数', w: 5, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
   { t: '生产计划数量', w: 5, k: (r) => fmtNum(r['排产数量']), n: true },
   { t: '实际完成数量', w: 5, k: (r) => fmtNum(r['当前工序完工量']), n: true },
-  { t: '成型交期', w: 5, k: (r) => monthDay(r['交期'] || r['计划完工日期']) },
-  { t: '成型交期紧迫度', w: 5, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true },
+  // 交期两列标题也随工序走(成型交期/切炭交期/组装交期…),旧写死「成型」会让切炭/组装的纸对不上
+  { t: '交期', w: 5, k: (r) => monthDay(r['交期'] || r['计划完工日期']), tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期` : '交期' } },
+  { t: '交期紧迫度', w: 5, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true, tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期紧迫度` : '交期紧迫度' } },
   { t: '7天', w: 3, k: (r) => fmtNum(r['7天已排']), n: true },
   { t: '15天', w: 3, k: (r) => fmtNum(r['15天已排']), n: true },
   { t: '大于15', w: 4, k: (r) => fmtNum(r['大于15天已排']), n: true },
@@ -699,10 +754,14 @@ export function pickPlanSheetRows(rows, ids) {
  * 生成排单计划 HTML(纯函数,便于单测;真正出纸见 {@link printSchedPlanSheet})。
  * @param {Array} rows  /px/scheduleBoard/planSheet 的 `行`
  * @param {Array} dates 日期列(`日期`)
- * @param {Object} [opts] { today, days }
+ * @param {Object} [opts] { today, days, shop, title } —— shop = 工序/车间名(2026-11-04 标题与车间列头随之变);
+ *   title 可整串覆盖;都不传时从行内唯一 生产车间/当前工序/工序 推导,推导不到用通用标题
  */
 export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  // 2026-11-04 用户口径「当前在不同的工序产线显示的这个工序名称也要不同」⇒ 纸表标题/车间列头跟着工序产线走
+  const shop = planSheetShop(list, opts)
+  const title = String(opts?.title ?? '').trim() || planSheetTitle(shop)
   // 2026-11-04 用户口径:日期列 = **勾选行「最前一个日期 → 最后一个日期」**(不再从今天起)。
   //   opts.dates 由 WorkOrderBoard 用 planSheetDatesFromRows() 算好传进来(逐字用);
   //   不传时保留旧行为(今天起 days 天)—— 旧调用/单测不受影响。
@@ -723,7 +782,8 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     + ds.map(() => `<col style="width:${dateW.toFixed(2)}%"/>`).join('')
     + `<col style="width:${qrW}%"/>`                  // 二维码(行尾)
     + '</colgroup>'
-  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.t)}</th>`).join('')
+  // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
+  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
     + ds.map((d) => (compact
       ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
       : `<th>${esc(monthDay(d))}</th>`)).join('')
@@ -759,7 +819,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     + `td.qr{text-align:center;padding:1px}td.qr img{width:${compact ? 28 : 34}px;height:${compact ? 28 : 34}px}`
     + 'tbody tr{height:38px}'
     + '</style>'
-    + '<div class="hd"><span class="t">成型车间排单计划</span></div>'
+    + `<div class="hd"><span class="t">${esc(title)}</span></div>`
     + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
 }
 
@@ -788,7 +848,10 @@ export async function schedPlanPrintHtml(rows, dates, opts = {}) {
 export async function printSchedPlanSheet(rows, dates, opts = {}) {
   const body = await schedPlanPrintHtml(rows, dates, opts)
   if (!body) return false
-  if (!printInPage('成型车间排单计划', body)) {
+  // 2026-11-04:浏览器打印标题也跟工序产线走(与纸表标题同一份推导),不再固定「成型车间排单计划」
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  const title = String(opts?.title ?? '').trim() || planSheetTitle(planSheetShop(list, opts))
+  if (!printInPage(title, body)) {
     alert(PRINT_FAIL_MSG)
     return false
   }

@@ -32,8 +32,13 @@ function makeEl(tag) {
 }
 const head = makeEl('head')
 const body = makeEl('body')
+// document.title 赋值记录(2026-11-04):打印通道会临时改浏览器标题当作打印页眉/PDF 默认文件名,
+// 排单计划要求它随工序产线变 —— 这里记下每一次赋值供断言。
+const documentTitleLog = []
+let documentTitle = ''
 globalThis.document = {
-  title: '',
+  get title() { return documentTitle },
+  set title(v) { documentTitle = String(v ?? ''); documentTitleLog.push(documentTitle) },
   head, body,
   createElement: makeEl,
   getElementById: () => null,     // 清理阶段取不到 → 什么都不做
@@ -49,6 +54,7 @@ globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
   schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows,
+  planSheetShop, planSheetTitle,
   planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
@@ -233,7 +239,8 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     交期: '2026-11-05', 交期紧迫度: 5, '7天已排': 10, '15天已排': 10, '大于15天已排': 0,
     日计划: { '2026-10-31': 2, '2026-11-01': 2, '2026-11-05': 3 },
   }]
-  const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31' })
+  // 2026-11-04 起标题/车间列头按工序产线动态 ⇒ 显式传 shop=成型,保持原纸表版式断言
+  const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31', shop: '成型' })
   for (const h of ['客户等级', '客户名称', '产品编号', '型号', '成型车间', '未完成总数',
     '生产计划数量', '实际完成数量', '成型交期', '成型交期紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
@@ -248,6 +255,47 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
   assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+// 2026-11-04 用户口径「当前在不同的工序产线显示的这个工序名称也要不同」
+//   ⇒ 纸表标题与「车间」列头(含交期两列)跟着工序产线变,不再一律「成型」。
+test('排单计划:标题/车间列头按工序产线动态(成型/切炭/组装…),混打多工序退回通用', async () => {
+  assert.equal(planSheetShop([{ 当前工序: '切炭' }, { 当前工序: '切炭' }]), '切炭', '行内唯一工序 ⇒ 切炭')
+  assert.equal(planSheetShop([{ 当前工序: '成型' }, { 当前工序: '切炭' }]), '', '混打多工序 ⇒ 空(不冒充某个车间)')
+  assert.equal(planSheetShop([{ 当前工序: '切炭' }], { shop: '组装' }), '组装', 'opts.shop 优先')
+  assert.equal(planSheetShop([{ 生产线: '切炭(自动)', 生产车间: '切炭' }]), '切炭', '行内 生产车间 优先于工序')
+  assert.equal(planSheetTitle('切炭'), '切炭车间排单计划')
+  assert.equal(planSheetTitle('切炭车间'), '切炭车间排单计划', '车间名自带「车间」后缀时不得叠成「车间车间」')
+  assert.equal(planSheetTitle(''), '排单计划', '车间未知 ⇒ 通用标题(不写死成型)')
+
+  const row = (op, line) => ({
+    客户: 'A', 加工单号: 'GD-' + op, 工单行号: 1, 公司代码: '0', 物料编码: 'S031-3',
+    规格型号: '28*12', 生产线: line, 当前工序: op, 交期: '2026-11-05', 交期紧迫度: 3,
+    未交量: 10, 排产数量: 10, 当前工序完工量: 0, 日计划: { '2026-10-31': 1 },
+  })
+  const cut = await schedPlanSheetHtml([row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31' })
+  assert.ok(cut.includes('切炭车间排单计划'), '切炭线标题应为 切炭车间排单计划')
+  assert.ok(!cut.includes('成型车间排单计划'), '切炭纸不再出现「成型车间排单计划」')
+  for (const h of ['切炭车间', '切炭交期', '切炭交期紧迫度']) {
+    assert.ok(cut.includes('>' + h + '</th>'), '切炭纸列头应含 ' + h)
+  }
+  assert.ok(!cut.includes('>成型交期</th>'), '切炭纸不应出现「成型交期」')
+  assert.ok(cut.includes('切炭(自动)'), '车间列的值(产线)照常印')
+
+  const asm = await schedPlanSheetHtml([row('组装', '组装(自动)')], ['2026-10-31'], { today: '2026-10-31' })
+  assert.ok(asm.includes('组装车间排单计划') && asm.includes('>组装车间</th>'), '组装线同理')
+
+  const mixed = await schedPlanSheetHtml([row('成型', '1号机'), row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31' })
+  assert.ok(mixed.includes('>排单计划</span>'), '混打多工序 ⇒ 通用标题「排单计划」')
+  for (const h of ['生产车间', '交期', '交期紧迫度']) {
+    assert.ok(mixed.includes('>' + h + '</th>'), '混打 ⇒ 通用列头 ' + h)
+  }
+
+  // 真正出纸入口:浏览器标题(打印页眉/另存 PDF 的默认文件名)也随工序变
+  const beforeTitle = documentTitleLog.length
+  await printSchedPlanSheet([row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31', dates: ['2026-10-31'] })
+  assert.ok(documentTitleLog.slice(beforeTitle).includes('切炭车间排单计划'),
+    '打印标题随工序:切炭车间排单计划(实际记录 ' + JSON.stringify(documentTitleLog.slice(beforeTitle)) + ')')
 })
 
 test('schedPlanSheetHtml:opts.dates = 勾选行 最前→最后(历史窗口照印);列多时表头改紧凑写法', async () => {
@@ -291,7 +339,7 @@ test('printSchedPlanSheet:空数据不出纸;有数据出**一张**(计划+单�
     客户: 'A', 生产线: '1号机', 加工单号: 'GD-1', 工单行号: 1, 公司代码: '0',
     物料编码: 'S031-3', 产品名称: '滤芯', 规格型号: '28*12', 需求数量: 10, 排产数量: 10,
     计划完工日期: '2026-11-05', 日计划: { '2026-10-31': 1 },
-  }], ['2026-10-31'], { today: '2026-10-31' })
+  }], ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
   assert.equal(ok, true)
   assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
   assert.ok(captured.html.includes('成型车间排单计划'), '标题:排单计划')

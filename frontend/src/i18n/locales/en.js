@@ -921,8 +921,9 @@ export default {
     '请先选择一张单据': 'Select a document first',
     '未取到单据数据': 'Document data not found',
     '打印失败': 'Print failed',
-    // 成型车间排单计划(2026-10-31):工单排产页「排单计划」按钮,整张纸表出纸;
-    //   2026-11-03:只打**勾选行**(勾几张打几张),未勾选按钮置灰
+    // 排单计划纸表(2026-10-31):工单排产页「排单计划」按钮,整张纸表出纸;
+    //   2026-11-03:只打**勾选行**(勾几张打几张),未勾选按钮置灰;
+    //   2026-11-04:纸表标题/车间列头随工序产线(成型/切炭/组装…)动态,纸面文字不入翻译层
     '排单计划': 'Scheduling Plan',
     '勾选工单后打印排单计划,只打印勾选的工单': 'Print the scheduling plan of the checked work orders (checked rows only)',
     '请先勾选要打印的工单': 'Select the work orders to print first',
