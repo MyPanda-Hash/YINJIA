@@ -318,6 +318,29 @@ test('schedPlanSheetHtml:opts.dates = 勾选行 最前→最后(历史窗口照�
   assert.ok(h2.includes('title="2026-10-29"'), '紧凑表头保留完整日期 tooltip')
 })
 
+// 2026-11-04 用户口径「这个当前二维码太小了」:二维码按物理尺寸出纸(52px≈13.8mm),不再跟着列数缩;
+//   行数多时才适度收一点,保证一张 A4 装得下。
+test('schedPlanSheetHtml:二维码按物理尺寸(行少 52px / 行多 44→36px),列宽给足', async () => {
+  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
+  const h1 = await schedPlanSheetHtml([mk(1)], [], { dates: ['2026-10-29'] })
+  assert.ok(h1.includes('td.qr img{width:60px;height:60px}'), '行少(≤5)⇒ 二维码 60px(≈15.9mm)')
+  assert.ok(h1.includes('tbody tr{height:66px}'), '行高跟着二维码(60+6)')
+  assert.ok(h1.includes('width:7.5%'), '行少:二维码列 7.5%')
+
+  const wide = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
+  const h2 = await schedPlanSheetHtml([mk(2)], [], { dates: wide })
+  assert.ok(h2.includes('td.qr img{width:60px;height:60px}'), '10 列但只有 1 行 ⇒ 仍给 60px')
+  assert.ok(h2.includes('width:7.5%'), '二维码列 7.5%(给 60px 留位置)')
+
+  const mid = await schedPlanSheetHtml(Array.from({ length: 8 }, (_, i) => mk(i)), [], { dates: wide })
+  assert.ok(mid.includes('td.qr img{width:52px;height:52px}'), '8 行 ⇒ 收到 52px')
+
+  const many = Array.from({ length: 16 }, (_, i) => mk(i))
+  const h3 = await schedPlanSheetHtml(many, [], { dates: wide })
+  assert.ok(h3.includes('td.qr img{width:36px;height:36px}'), '16 行 ⇒ 收到 36px 保证一页')
+  assert.ok(h3.includes('tbody tr{height:42px}'), '行高 42px')
+})
+
 test('pickPlanSheetRows:只留勾选行、保持页面顺序;没勾选=空(不悄悄退回整线全打)', () => {
   const rows = [
     { 行id: 11, 加工单号: 'GD-A' }, { 行id: 12, 加工单号: 'GD-B' }, { 行id: 13, 加工单号: 'GD-C' },

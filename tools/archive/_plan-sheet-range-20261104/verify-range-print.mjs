@@ -49,6 +49,7 @@ const LAYER_JS = `(() => {
     title: document.title,
     n: trs.length,
     heads: ths,
+    qrCss: (() => { const img = host && host.querySelector('td.qr img'); return img ? getComputedStyle(img).width : '' })(),
     rows: trs.map(tr => [...tr.querySelectorAll('td')].map(td => (td.innerText||'').trim())),
   })
 })()`
@@ -88,9 +89,10 @@ try {
   const L1 = JSON.parse(await s.evaluate(LAYER_JS))
   const dateHeads1 = L1.heads.filter((h) => /^\d{1,2}\/\d{1,2}$/.test(h) || /月.*日$/.test(h))
   console.log('打印层表头 =', JSON.stringify(L1.heads))
-  console.log('日期列 =', JSON.stringify(dateHeads1), '行数 =', L1.n)
+  const expectN = rowNos.length
+  console.log('日期列 =', JSON.stringify(dateHeads1), '行数 =', L1.n, '二维码宽 =', L1.qrCss)
   check('点一次按钮调用 window.print 1 次', L1.printed === 1, 'printed=' + L1.printed)
-  check('打印层行数 = 勾选 4 张', L1.n === 4, 'rows=' + L1.n)
+  check('打印层行数 = 勾选张数 ' + expectN, L1.n === expectN, 'rows=' + L1.n)
   check('标题仍是 成型车间排单计划', L1.title === '成型车间排单计划', L1.title)
   check('日期列 = 10 列(勾选行最前 10-29 → 最后 11-07),不再从今天 11-04 起', dateHeads1.length === 10, JSON.stringify(dateHeads1))
   check('首列是 10/29(历史日期照印)', dateHeads1[0] === '10/29', String(dateHeads1[0]))
@@ -102,6 +104,8 @@ try {
   const cells0227 = r0227 ? r0227.slice(firstDateIdx, firstDateIdx + 10) : []
   console.log('0227 日期格 =', JSON.stringify(cells0227))
   check('0227 历史三格 2000/2000/2000 照印(旧实现全空)', cells0227.slice(0, 3).join(',') === '2000,2000,2000', cells0227.slice(0, 3).join(','))
+  // 2026-11-04 用户口径「二维码太小」:行少时二维码 60px(≈15.9mm),不再跟列数缩成 28px
+  check('二维码按物理尺寸放大(行少 ⇒ 60px ≈15.9mm)', L1.qrCss === '60px', 'qr=' + L1.qrCss)
 
   const png = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
   await fs.writeFile(new URL('./shot-range-print-all4.png', import.meta.url), Buffer.from(png.result.data, 'base64'))

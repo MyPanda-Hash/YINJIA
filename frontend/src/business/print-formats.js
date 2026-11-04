@@ -773,7 +773,12 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
   const compact = n > 7
   const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
-  const qrW = compact ? 4 : 5
+  // 二维码列宽/像素(2026-11-04 用户口径「二维码太小」):按**物理尺寸**给,不跟着列数缩 ——
+  //   行少(≤5)给 60px≈15.9mm 最好扫,行多逐渐收到 52/44/36px,保证一张 A4 装得下
+  //   (之前 compact 模式跟着列数缩到 28px≈7mm,纸面根本扫不动)。
+  const qrPx = list.length <= 5 ? 60 : list.length <= 8 ? 52 : list.length <= 14 ? 44 : 36
+  const qrW = list.length <= 5 ? 7.5 : (compact ? 6.5 : 6)
+  const rowH = Math.max(38, qrPx + 6)
   const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0) * fixedScale
   // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
   const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
@@ -816,8 +821,8 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     + `th,td{border:1px solid #333;padding:${pad};font-size:${fs};line-height:1.25;word-break:break-all;vertical-align:middle}`
     + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.15}`
     + 'td.r{text-align:right;white-space:nowrap}'
-    + `td.qr{text-align:center;padding:1px}td.qr img{width:${compact ? 28 : 34}px;height:${compact ? 28 : 34}px}`
-    + 'tbody tr{height:38px}'
+    + `td.qr{text-align:center;padding:1px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
+    + `tbody tr{height:${rowH}px}`
     + '</style>'
     + `<div class="hd"><span class="t">${esc(title)}</span></div>`
     + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
