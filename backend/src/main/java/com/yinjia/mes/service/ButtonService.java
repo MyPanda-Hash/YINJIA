@@ -31,12 +31,16 @@ import java.util.Set;
 public class ButtonService {
 
     /**
-     * 「单表式:表头值优先」白名单(2026-10-05):这些面板保存时,**头字段最后覆盖行内同名值**。
-     * 背景:单表式面板的明细行会携带头字段列(如工艺路线的 工艺路线名称/生效日期/失效日期),
+     * 「单表式:表头值优先」白名单(2026-10-05;2026-11-04 扩到组装物料清单):这些面板保存时,
+     * **头字段最后覆盖行内同名值**。
+     * 背景:单表式面板的明细行会携带头字段列(如工艺路线的 工艺路线名称/生效日期/失效日期,
+     *   组装物料清单的 产品编码/产品名称/规格型号/工序/版本号/默认BOM/工艺路线名称/备注),
      *   前端提交的行内旧值会把表头刚改的新值盖回去 ⇒ 表现为"表头改了保存不下来"。
-     * 只放行用户明确要求的面板(当前仅工艺路线 ROUTE),其余单表式面板行为保持不变。
+     * 2026-11-04 用户报障「组装物料清单的表头无法填写」:同一病根 —— 表头改可填后(元数据 editable=1),
+     *   明细行是保存前从库里查出来的、带着旧表头值,保存时行内旧值又把新值盖回去。
+     * 只放行用户明确要求的面板(当前 ROUTE、ASM_BOM),其余单表式面板行为保持不变。
      */
-    private static final java.util.Set<String> SINGLE_HEAD_WINS_PANELS = java.util.Set.of("ROUTE");
+    private static final java.util.Set<String> SINGLE_HEAD_WINS_PANELS = java.util.Set.of("ROUTE", "ASM_BOM");
 
     private static final Logger log = LoggerFactory.getLogger(ButtonService.class);
 
@@ -561,6 +565,16 @@ public class ButtonService {
                 // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
                 // 只补没有值的列 ⇒ 用户手改过的不会被抢回默认值。
                 putHeadDefaults(def, table, cols);
+                // 单表式单据的明细「行序」:空白草稿也占一行,写 1 而不是让列默认值 0 落地
+                // (2026-11-04,组装物料清单 ASM_BOM;见 assignNewLineSeq 注释)。
+                // 纯排序/展示口径:唯一索引只要求同单内不重复,先占 1 是为了让用户随后「新增数据」的
+                // 第一行补到 2,视觉上仍是 1、2、3 连续;不改表结构(该列本就有 DEFAULT(0))。
+                if (!split) {
+                    PanelRegistry.FieldDef seqDef = def.byLabel("行序");
+                    if (seqDef != null && tableCols(table).contains(seqDef.col()) && !cols.containsKey(seqDef.col())) {
+                        cols.put(seqDef.col(), 1);
+                    }
+                }
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // 纯落款「编制」格(2026-11-02 用户口径「填写人应该默认当前创建的账号名称」):
@@ -671,16 +685,26 @@ public class ButtonService {
         // 采购入库单 / 产成品入库单的明细批号为空或金蝶默认占位 PC0000 时,保存即取号写入;
         // 已有真实批号一律不动 —— 号池 yj_lot_seq 按日重置(见 LotSeqService),基准日取单据日期。
         ensureBatchNoByDate(def, head, items);
+        // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
+        assignNewLineSeq(def, items, no);
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);
         } else {
             // 单表式:头字段并入每行
+            // 2026-11-04(ASM_BOM 表头可维护,用户报障「表头无法填写」):headWins 分支**只并入真表头字段标签**。
+            // 表头字段改成「参照 INV」后,前端选料会把 refMap 带回的异名/多余键(如 子件名称、子件规格、
+            // 计量单位 —— 明细字段被同义词映射命中)顺手写进表头对象 cur;这些 stray 键若按原逻辑
+            // 全量并进每行,会把每行真实的子件名称/规格/单位冲掉。
+            // 对 ROUTE 是纯收紧(ROUTE 表头没有 stray 键),不改变 headWins 其它语义(空值仍不覆盖已有值)。
+            Set<String> headLabels = new HashSet<>();
+            for (PanelRegistry.FieldDef hf : def.fieldsAt("header")) headLabels.add(hf.label());
             for (Map<String, Object> item : items) {
                 boolean headWins = SINGLE_HEAD_WINS_PANELS.contains(def.code());
                 Map<String, Object> merged = new LinkedHashMap<>(headWins ? item : head);
                 if (headWins) {
                     for (Map.Entry<String, Object> e : head.entrySet()) {
+                        if (!headLabels.contains(e.getKey())) continue;
                         Object v = e.getValue();
                         if (v != null && !String.valueOf(v).isBlank()) merged.put(e.getKey(), v);
                     }
@@ -1604,6 +1628,73 @@ public class ButtonService {
                     user, no);
         } catch (Exception e) {
             log.warn("[受控] 写受控标记失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
+    }
+
+    /**
+     * 明细「行序」自动补号(2026-11-04,用户报障「组装物料清单保存不了/新增两行报唯一键冲突」)。
+     *
+     * <p>病根:{@code bs_asm_bom} 上有过滤唯一索引
+     * {@code uq_bs_asm_bom_doc_line(单据编号, 行序) WHERE asp_cancel<>'Y'},而前端「新增数据」
+     * 建的新行 行序 恒为默认值 0(该字段 editable=0、界面不提供录入)⇒ 同一张单加两行 = 两个 0,
+     * 保存时先插入第一行成功、第二行必撞索引。
+     *
+     * <p>口径:只给**没有 id 的新行**按提交顺序补号(基线 = 该单存活行的 MAX(行序)),既有行一律不动。
+     * <b>不能整单重排</b>:把存量行压缩成 1..N 会先写新值,而旧值此刻还被**尚未软删的旧行**占着
+     * ({@code softDeleteMissing} 在 upsert 之后才执行),唯一索引上会瞬时冲突;只往上加号则永远
+     * 落在已占用区间之外,而且删行留下的空号无害(索引只要求不重复)。
+     *
+     * <p>通用实现(不写死面板码):仅当「面板登记了 行序 字段 + 行表真有该列」才执行。
+     * ⚠ 2026-11-04 复核更正:实际命中**两个**面板 —— ASM_BOM(行序=列 行序)与
+     * WLBOM(物料清单,行序字段物理列 {@code xc},行表 mate 有 xc+asp_cancel)。
+     * 对 WLBOM 同样只是「给新行补递增号」:mate 没有 (m_no,xc) 唯一索引、补号只影响排序值,
+     * 不改变保存结果(复核时 mate 0 行,无实害)。此句以前写成「全库只有 ASM_BOM…零影响」,不准确。
+     *
+     * <p>基线取不到(查询异常)时不阻断保存:退化为「只用提交载荷里的既有行抬升 max」——
+     * 正常整单提交时载荷就带全部既有行,补号结果与查库一致;只有「部分提交 + 库查询同时失败」这种
+     * 双重异常才可能出现与库里旧行撞号,由唯一索引兜底报错(此时保存本来就该失败,不必掩盖)。
+     */
+    private void assignNewLineSeq(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String no) {
+        if (def == null || items == null || items.isEmpty() || no == null) return;
+        if (def.lineTable() == null || def.lineTable().isBlank()
+                || def.groupCol() == null || def.groupCol().isBlank()) return;
+        PanelRegistry.FieldDef seq = def.byLabel("行序");
+        if (seq == null || !tableCols(def.lineTable()).contains(seq.col())) return;
+        int max = 0;
+        try {
+            Integer dbMax = jdbc.queryForObject(
+                    "SELECT ISNULL(MAX([" + seq.col() + "]), 0) FROM " + def.lineTable()
+                            + " WHERE [" + def.groupCol() + "] = ? AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    Integer.class, no);
+            max = dbMax == null ? 0 : dbMax;
+        } catch (Exception e) {
+            // 取不到基线就按 0 起补号:行序只影响排序/唯一性,不能因为一次查询异常把整单保存搞挂
+            log.warn("[行序] 取存量最大值失败,按 0 起补号 panel={} no={}: {}", def.code(), no, e.getMessage());
+        }
+        for (Map<String, Object> item : items) {
+            if (item == null) continue;
+            Object id = item.get("id");
+            boolean existing = id != null && !String.valueOf(id).isBlank();
+            if (existing) {
+                // 既有行(判据与 upsertLineRows 一致)只参与基线抬升:前端改大过的 行序 不能被新行撞上
+                max = Math.max(max, intValueOf(item.get(seq.label())));
+            } else {
+                max = max + 1;
+                item.put(seq.label(), max);
+            }
+        }
+    }
+
+    /** 整数键解析(行序/加工顺序这类):兼容 Integer/Long/Double/String;空白/非法按 0 */
+    private static int intValueOf(Object v) {
+        if (v == null) return 0;
+        if (v instanceof Number n) return n.intValue();
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return 0;
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            try { return (int) Double.parseDouble(s); } catch (NumberFormatException ignored) { return 0; }
         }
     }
 

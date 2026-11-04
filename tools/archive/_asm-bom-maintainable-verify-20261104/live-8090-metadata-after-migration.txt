@@ -1,0 +1,14 @@
+=== 线上 8090(旧 jar,元数据已落库)getPanelConfig 只读取证 2026-11-04 14:27:30 ===
+factory= YJ
+{"k":"产品编码","dataType":"参照","refPanel":"INV","options":[]}
+{"k":"产品名称","dataType":"文本","options":[]}
+{"k":"规格型号","dataType":"文本","options":[]}
+{"k":"工序","dataType":"下拉框","options":["组装","成型","切炭"]}
+{"k":"版本号","dataType":"文本","options":[]}
+{"k":"默认BOM","dataType":"下拉框","options":["是","否"]}
+{"k":"工艺路线名称","dataType":"文本","options":[]}
+{"k":"备注","dataType":"文本","options":[]}
+{"k":"单据编号","readonly":true,"dataType":"文本","options":[]}
+{"k":"来源","readonly":true,"dataType":"文本","options":[]}
+{"k":"状态","readonly":true,"dataType":"文本","options":[]}
+headDefaults= {"状态":"启用"}
