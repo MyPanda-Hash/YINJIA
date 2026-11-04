@@ -380,6 +380,25 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
+                <!-- 检验要求 · 炭棒尺寸:按**生产车间**从生产模具表筛型号,选型号 → 一次填四格
+                     (2026-11-04 用户口径:「选择生产车间…炭棒尺寸要筛选到对应车间的模具型号和公差信息」
+                      「手工选择下拉列表填充炭棒内外径及公差数据」)。
+                     数据源 = 生产模具表 PROD_MOLD(rd_sinter_tolerance,60 行);
+                     车间两套写法的归一在 core/mold/workshopNo.js。 -->
+                <template v-else-if="editable && c.moldPick">
+                  <div class="rs-mold-pick">
+                    <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                               :placeholder="tt('选型号（按生产车间筛）')"
+                               :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                               @update:model-value="applyMoldModel">
+                      <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                                 :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                                 :value="r['型号']" />
+                    </el-select>
+                    <span v-if="!moldModelOfHead() && head[c.key]" class="rs-mold-fallback"
+                          :title="tt('手填或规格书带出的值，未匹配到型号')">{{ head[c.key] }}</span>
+                  </div>
+                </template>
                 <template v-else-if="editable && c.key && !c.ro">
                   <!-- 带纸面前缀的格(如炭棒规格1/2/3 的 外：/内：/长：):
                        前缀是**渲染**出来的,head 里只存裸数字(2026-11-03 口径,
@@ -655,20 +674,29 @@
                   @click="libInsertAt = r.idx">
                 <template v-if="r.groupFirst">
                   <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.group.count">{{ r.seq }}</td>
-                  <!-- 检验项目:组首行渲染(跨整组)。2026-10-30 用户口径「检测项目栏写入之后可以编辑」
-                       ⇒ 从只读文本改成**多行域**（先试过单行 input，实测「跌落强度（裸…」被截断/盖住，
-                       项目名和子项名都可能很长）；@change(失焦/回车)才提交，避免每敲一个字就重算分组顶掉光标。 -->
+                  <!-- 检验项目(组名):组首行渲染,跨整组。
+                       2026-10-30 用户口径「检测项目栏写入之后可以编辑」⇒ 多行域。
+                       ⚠ 2026-11-04 修(用户第二次报障「检验项目那一列…行头的表格内容不能编辑,
+                         其他表格内容是可以编辑的」):
+                         原来用 `:model-value="r.group.label"` + `@change` —— **单向绑定**。
+                         用户一敲字,DOM 的 value 立刻被 Vue 用旧 model-value 覆盖回去;
+                         而 @change 对 textarea 要**失焦**才触发 ⇒ 失焦前改动根本留不住,
+                         表现就是"点了没反应/打不进去"。同一行的检验要求/方法/依据用的是
+                         v-model(双向)所以能编辑 —— 差别只在这一个绑定方式上。
+                         现在改成 v-model 绑到行数据上的真值 + @input 实时把改动同步回
+                         「检验项目」数据键(整组同步的语义仍由 renameGroup 决定)。 -->
                   <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">
-                    <el-input v-if="editable" :model-value="r.group.label" type="textarea"
+                    <el-input v-if="editable" v-model="r.groupLabel" type="textarea"
                               :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in rsp-center"
-                              @change="(v) => renameGroup(dt, r, v)" />
+                              @input="(v) => renameGroup(dt, r, v)" />
                     <span v-else>{{ tt(r.group.label) }}</span>
                   </td>
                 </template>
                 <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">
-                  <el-input v-if="editable" :model-value="r.sub" type="textarea"
+                  <!-- 检验子项:同组名的毛病同一批修(v-model + @input) -->
+                  <el-input v-if="editable" v-model="r.subLabel" type="textarea"
                             :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in rsp-center"
-                            @change="(v) => renameSub(r, v)" />
+                            @input="(v) => renameSub(r, v)" />
                   <span v-else>{{ tt(r.sub || '') }}</span>
                 </td>
                 <td class="rs-td" :style="designTdStyle(dt, 'req')">
@@ -1660,7 +1688,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, nextTick } from 'vue'
+import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Document } from '@element-plus/icons-vue'
@@ -1674,7 +1702,7 @@ import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
-import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -1690,6 +1718,7 @@ import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/panel/sheetDateCells'
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
+import { sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
 // X烧结「炭棒规格」三格的三层兜底(独立字段 → 异名键 → 整串解析),单测见 core/xsinter/
 import { rodSpecFromProdInfo } from '@/core/xsinter/rodSpecFromProdInfo.js'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
@@ -2678,18 +2707,39 @@ const libChecked = ref([])
  */
 const libInsertAt = ref(-1)
 
-/** 检验项目改名 = 改整组（组是合并显示的）。老口径 `组名·子项` 要保留 `·` 后面那段。 */
+/**
+ * 检验项目改名 = 改整组（组是合并显示的）。老口径 `组名·子项` 要保留 `·` 后面那段。
+ *
+ * ⚠ 2026-11-04:触发时机从 @change(失焦) 改成 @input(实时)。
+ *   实时输入时 `r.group.label` 是**上一次渲染**的旧组名，逐字符改会一次一次拿旧名去比，
+ *   从第二个字符起就匹配不上(`*炭` 时组名已是 `*炭`,再敲成 `*炭棒` 时 old 还是 `*炭`,
+ *   但行里的值已经是 `*炭` ⇒ 能匹配;真正的问题是**用户全选替换**这种一次到位的编辑)。
+ *   为让两种输入方式都稳,这里以「本行当前实际值」为准反推组名锚点:
+ *     · 先用 r.group.label 试匹配(整组改名);
+ *     · 匹配不到时退回「只改本行」(r.row 那一行)—— 保证用户敲进去的字一定落得下来。
+ *   不这么做的话,任何一次"匹配不上"都会让输入框看起来被打回去(正是用户报的不能编辑)。
+ */
 function renameGroup(dt, r, newLabel) {
   const v = String(newLabel ?? '').trim()
   const old = String(r.group.label ?? '')
   if (!v || v === old) return
   const arr = touch()
+  let hit = 0
   for (const row of arr) {
     const cur = String(row['检验项目'] ?? '')
     const dot = cur.indexOf('·')
     const curGroup = dot >= 0 ? cur.slice(0, dot) : cur
     if (curGroup !== old) continue
     row['检验项目'] = dot >= 0 ? v + cur.slice(dot) : v
+    hit++
+  }
+  // 一个都没匹配上(实时输入下组名已变) ⇒ 至少让本行落值,否则用户的白敲
+  if (!hit && r.row) {
+    const cur = String(r.row['检验项目'] ?? '')
+    const dot = cur.indexOf('·')
+    r.row['检验项目'] = dot >= 0 ? v + cur.slice(dot) : v
+    // 组名同步给 r,下一字符的匹配基准才不会继续停在旧值
+    if (r.group) r.group.label = v
   }
   emit('dirty')
 }
@@ -3331,7 +3381,15 @@ function designGroupRows(dt) {
     }
     g.count++
     // idx = 该行在 rowsOf(dt) 里的原始下标 —— 「从标准库勾选」要知道用户指的是哪一行
-    out.push({ key: 'gr' + out.length, idx, row, group: g, groupFirst: g.count === 1, sub, standalone: !sub, seq: g.seq })
+    //
+    // ⚠ groupLabel / subLabel 是给 v-model 用的**可写初值**(2026-11-04):
+    //   本函数每次渲染都重建 r,若模板直接 v-model 到派生的 r.group.label(对象在组内共享),
+    //   敲字会污染同组所有行;绑到 r 自己的这两个字段则只动当前行,
+    //   再由 @input 里的 renameGroup / renameSub 把改动落到真正的数据键上。
+    out.push({
+      key: 'gr' + out.length, idx, row, group: g, groupFirst: g.count === 1, sub, standalone: !sub, seq: g.seq,
+      groupLabel: gLabel, subLabel: sub,
+    })
   }
   return out
 }
@@ -3542,7 +3600,21 @@ function autoFillTargetDt(afs) {
  * 【审批门禁】规格书没填写提交审批完(草稿/审批中/…)时后端一个格都不带回,这里只把
  *   payload.reason 翻成人话:not_approved ⇒ 按该链自己的措辞提示(afs.notApprovedTip)。
  */
+/** 对外入口 = inner(原实现)+ 「无数据填 '/'」兜底(2026-11-04 用户口径)。
+ *  为什么放在 finally:规格书没批、没这张单、解析为空也要补 '/'(见 core/insp/specCarry.slashFillHead 的三条边界);
+ *  正常带出时那三格已有值,slashFill 只填空格 ⇒ 不会覆盖规格书带来的整句。 */
 async function autoFillFromSpec(code, afs) {
+  try {
+    await autoFillFromSpecInner(code, afs)
+  } finally {
+    if (props.editable) {
+      const filled = slashFillHead(afs, props.head)
+      if (filled.length) emit('dirty')
+    }
+  }
+}
+
+async function autoFillFromSpecInner(code, afs) {
   const key = afs?.fromKey
   // ⚠ 2026-10-27:成型工艺清单的产品编号带 -tb 后缀,而规格书是按**原始产品编号**分发的
   //   ⇒ 取规格书前必须剥后缀,否则一律返回 found=false(用户看到"该产品编号还没有对应的规格书")。
@@ -4436,6 +4508,58 @@ async function carryBomFromProdBom(prodRow) {
   }
 }
 
+// ---------- 检验要求 · 炭棒尺寸 ← 生产模具表(按生产车间筛型号) ----------
+// 口径(用户 2026-11-04):纸面那四格(外径mm/外径公差/内径mm/内径公差)不再靠手敲,
+//   选一个**型号**就一次填满;型号候选只列**本单生产车间**的(车间两套写法由 workshopNo 归一:
+//   单据 1#车间 / 模具表 1、1/3)。
+// 为什么按配置开关(cell.moldPick)而不是写死面板码:以后别的工艺清单也要这一格时只改配置。
+const moldRows = ref([])
+const moldLoaded = ref(false)
+/** 本面板是否有「选型号填尺寸」的格 */
+function moldPickEnabled() {
+  for (const sec of cfg.value?.sections || []) {
+    for (const row of sec.rows || []) {
+      for (const c of row.grid || []) if (c?.moldPick) return true
+    }
+  }
+  return false
+}
+async function loadMoldRows() {
+  if (moldLoaded.value || !moldPickEnabled()) return
+  moldLoaded.value = true
+  try {
+    const res = await request.post('/px/queryFormDataList', { panelCode: 'PROD_MOLD', condition: {}, pageNo: 1, pageSize: 500 })
+    // 停用的型号不进候选(表里 停用=1)
+    moldRows.value = sinterRowsFromQuery(res).filter((r) => String(r?.['停用'] ?? '').trim() !== '1')
+  } catch {
+    // 权限/接口异常:按"读不到"处理 —— 四格仍可手填,不阻断录单
+    moldRows.value = []
+  }
+}
+/** 本单生产车间下的型号候选 */
+const moldRowsInWorkshop = computed(() => sinterRowsForWorkshop(moldRows.value, String(props.head?.['生产车间'] ?? '')))
+/** 当前四格对应的型号(用 外径+内径 反查;对不上返回 '' —— 可能是手填/规格书带出的值) */
+function moldModelOfHead() {
+  const od = String(props.head?.['外径mm'] ?? '').trim()
+  const id = String(props.head?.['内径mm'] ?? '').trim()
+  if (!od || !id) return ''
+  const hit = moldRowsInWorkshop.value.find((r) => String(r?.['炭棒外径'] ?? '').trim() === od
+    && String(r?.['炭棒内径'] ?? '').trim() === id)
+  return hit ? String(hit['型号'] ?? '').trim() : ''
+}
+/** 选中型号 → 写四格(外径mm/外径公差/内径mm/内径公差) */
+function applyMoldModel(model) {
+  const m = String(model ?? '').trim()
+  if (!m) return
+  const row = moldRowsInWorkshop.value.find((r) => String(r?.['型号'] ?? '').trim() === m)
+  if (!row) return
+  for (const [k, v] of Object.entries(sinterPatch(row))) props.head[k] = v
+  emit('dirty')
+  ElMessage.success(tt('已按型号 {m} 填入炭棒内外径与公差').replace('{m}', m))
+}
+onMounted(() => { if (props.editable) loadMoldRows() })
+watch(() => props.editable, (v) => { if (v) loadMoldRows() })
+
 // ---------- 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表) ----------
 // 口径见 CONTEXT.md「配方计算器」与 docs/adr/0004:公式固定(与设计器 exe 逐位一致)、
 // 弹窗输入不落库不打印,只有回填进单据字段的值随单据保存。逻辑全在 core/mold/,这里只负责把行喂给它。
@@ -4599,6 +4723,12 @@ function chartOf(dt) {
 </script>
 
 <style scoped>
+/* 检验要求 · 炭棒尺寸的「选型号」格(2026-11-04):下拉占满格宽;
+   手填/规格书带出的值在型号对不上时以灰字挂在右侧,避免"看不见值" */
+.rs-mold-pick { display: flex; align-items: center; gap: 4px; width: 100%; }
+.rs-mold-pick :deep(.el-select) { flex: 1 1 auto; min-width: 0; }
+.rs-mold-fallback { flex: 0 0 auto; color: #909399; font-size: 11.5px; white-space: nowrap; }
+
 /* ═══ 纸张/表基础(与功能性滤效同一视觉语言;宽度=网格列宽总和,竖线全页对齐) ═══ */
 .record-sheet {
   width: fit-content;
