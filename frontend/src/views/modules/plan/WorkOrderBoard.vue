@@ -273,7 +273,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
-import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows } from '@/business/print-formats'
+import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetDatesFromRows } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
@@ -593,7 +593,11 @@ async function printPlanSheet() {
     // 2026-11-03:只出勾选行(勾几张打几张);过滤是纯函数,单测在 print-formats.test.js
     const rows = pickPlanSheetRows(d['行'], picked.map((r) => r.行id))
     if (!rows.length) { ElMessage.warning(tt('没有可打印的排产行')); return }
-    await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: 5 })
+    // 2026-11-04 用户口径:「打印的就按这些勾选的表中最前面的日期到最后的一个日期就行」⇒
+    //   日期列 = 勾选行日计划从最早到最晚(中间空列照留),不再固定"今天起 5 天";
+    //   历史/跨月计划直接补打得出来。纯函数 planSheetDatesFromRows 有单测。
+    const dates = planSheetDatesFromRows(rows, d['今天'] || '', 5)
+    await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: 5, dates })
   } catch (e) { err(e, '打印失败') }
 }
 

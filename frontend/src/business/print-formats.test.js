@@ -48,7 +48,8 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows,
+  planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -185,6 +186,45 @@ test('planSheetDates:从今天起取 5 天(纸表也就 3~5 天);今天以后没
   assert.deepEqual(planSheetDates([], '2026-10-31'), [])
 })
 
+// ── 2026-11-04 用户口径:「打印的就按这些勾选的表中最前面的日期到最后的一个日期就行」──────────
+//    日期列 = 勾选行的日计划从最早 → 最晚(连续、含中间空列),不再锚定"今天"。纯函数直测。
+test('planSheetDatesFromRows:勾选行 最前日期→最后日期,连续补空列,历史日期不再被切掉', () => {
+  const rows = [
+    { 日计划: { '2026-10-29': 2000, '2026-10-30': 2000, '2026-10-31': 2000 } },
+    { 日计划: { '2026-10-30': 223, '2026-11-07': 222 } },
+  ]
+  assert.deepEqual(planSheetDatesFromRows(rows, '2026-11-04', 5),
+    ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02',
+      '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07'],
+    '10-29~11-07 连续 10 天(中间 11-01~11-06 没计划的也留列)')
+  assert.deepEqual(planSheetDatesFromRows([{ 日计划: { '2026-11-04': 0 } }], '2026-11-04', 5),
+    ['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'],
+    '勾选行一个非零计划都没有 ⇒ 退回今天起 5 天(不打出没有日期列的空表)')
+  assert.deepEqual(planSheetDatesFromRows([{ 日计划: { '2026-11-04': 3 } }], '2026-11-04', 5),
+    ['2026-11-04'], '只有一天 ⇒ 只出 1 列')
+  assert.deepEqual(planSheetDatesFromRows([], '2026-11-04', 3),
+    ['2026-11-04', '2026-11-05', '2026-11-06'], '没有行 ⇒ 兜底窗口')
+})
+
+test('planSheetDatesFromRows:跨度超上限时截成最近 MAX_SHEET_DAYS 天(防脏数据撑爆纸面)', () => {
+  const rows = [{ 日计划: { '2026-01-01': 1, '2026-12-31': 1 } }]
+  const ds = planSheetDatesFromRows(rows, '2026-11-04', 5)
+  assert.equal(ds.length, MAX_SHEET_DAYS, '最多 31 列')
+  assert.equal(ds[ds.length - 1], '2026-12-31', '保留最新那段(结尾 = 最后一个计划日)')
+  assert.equal(ds[0], ymdAddDays('2026-12-31', -(MAX_SHEET_DAYS - 1)))
+})
+
+test('planSheetWindow/ymdAddDays:连续窗口、跨月、非法输入', () => {
+  assert.deepEqual(planSheetWindow('2026-10-30', 5),
+    ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03'], '跨月')
+  assert.deepEqual(planSheetWindow('2026-02-26', 4),
+    ['2026-02-26', '2026-02-27', '2026-02-28', '2026-03-01'], '平年跨月')
+  assert.deepEqual(planSheetWindow('', 5), [], '非法起始 ⇒ 空')
+  assert.equal(planSheetWindow('2026-11-04', 99).length, MAX_SHEET_DAYS, '天数夹到上限')
+  assert.equal(ymdAddDays('2026-11-04', -3), '2026-11-01')
+  assert.equal(ymdAddDays('bad', 1), '')
+})
+
 test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async () => {
   const rows = [{
     客户等级: '', 客户: '张莉', 加工单号: 'GD-2026-10-0226-1', 工单行号: 1, 公司代码: '0',
@@ -208,6 +248,26 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
   assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+test('schedPlanSheetHtml:opts.dates = 勾选行 最前→最后(历史窗口照印);列多时表头改紧凑写法', async () => {
+  const rows = [{
+    客户: '张莉', 加工单号: 'GD-2026-10-0227', 工单行号: 1, 公司代码: '0', 物料编码: 'B-58-07',
+    规格型号: '48*30*264.5', 生产线: '2号车间', 未交量: 6000, 排产数量: 6000, 当前工序完工量: 0,
+    交期: '2026-10-31', 交期紧迫度: -4, '7天已排': 6000, '15天已排': 6000, '大于15天已排': 0,
+    日计划: { '2026-10-29': 2000, '2026-10-30': 2000, '2026-10-31': 2000 },
+  }]
+  const dates = planSheetDatesFromRows(rows, '2026-11-04', 5)
+  assert.deepEqual(dates, ['2026-10-29', '2026-10-30', '2026-10-31'], '历史 3 天')
+  const html = await schedPlanSheetHtml(rows, [], { dates })
+  for (const h of ['10月29日', '10月30日', '10月31日']) assert.ok(html.includes('>' + h + '</th>'), '历史日期列表头: ' + h)
+  assert.ok(html.includes('>2000</td>'), '历史计划的量要印出来(不再被"今天"切掉)')
+  // 10 列(>7)⇒ 紧凑表头 M/D + tooltip 带完整日期
+  const wide = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
+  assert.equal(wide.length, 10)
+  const h2 = await schedPlanSheetHtml([{ 客户: 'A', 加工单号: 'GD-2', 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } }], [], { dates: wide })
+  assert.ok(h2.includes('>10/29</th>'), '列多时表头用 M/D 紧凑写法')
+  assert.ok(h2.includes('title="2026-10-29"'), '紧凑表头保留完整日期 tooltip')
 })
 
 test('pickPlanSheetRows:只留勾选行、保持页面顺序;没勾选=空(不悄悄退回整线全打)', () => {

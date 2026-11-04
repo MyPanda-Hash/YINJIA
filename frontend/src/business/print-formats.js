@@ -594,7 +594,81 @@ function monthDay(v) {
   return m ? `${Number(m[2])}月${Number(m[3])}日` : s
 }
 
-/** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天 */
+/** yyyy-MM-dd → M/D(日期列多时的紧凑表头,例:10/29 —— 列宽只有 2%~3% 时"M月D日"排不下) */
+function shortMonthDay(v) {
+  const s = String(v ?? '').slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  return m ? `${Number(m[2])}/${Number(m[3])}` : s
+}
+
+/**
+ * yyyy-MM-dd 加/减 N 天 → yyyy-MM-dd。
+ * ⚠ 用 Date.UTC 算,**别**用 `new Date(s)` + 本地时区再 `toISOString().slice(0,10)`
+ *   —— 东八区会差一天(`toISOString` 是 UTC;页面「开工日期」的默认值就踩过这个坑)。
+ */
+export function ymdAddDays(v, n) {
+  const s = String(v ?? '').slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!m) return ''
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+  dt.setUTCDate(dt.getUTCDate() + Number(n || 0))
+  return dt.toISOString().slice(0, 10)
+}
+
+/** 一张排单计划最多印多少天(防脏数据/超长交期把表撑爆;正常工单 1~16 天) */
+export const MAX_SHEET_DAYS = 31
+
+/** 连续日期窗口:start 起 days 天;start 非法 → 空数组 */
+export function planSheetWindow(start, days = 5) {
+  const s = String(start || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return []
+  const n = Math.min(Math.max(Math.trunc(Number(days) || 5), 1), MAX_SHEET_DAYS)
+  const out = []
+  for (let i = 0; i < n; i++) out.push(ymdAddDays(s, i))
+  return out
+}
+
+/**
+ * 排单计划要印的日期列(2026-11-04 用户口径:「**打印的就按这些勾选的表中最前面的日期到最后的一个日期就行**」)。
+ *
+ * <p>= 勾选行(`pickPlanSheetRows` 之后的行)的 `日计划` 里出现过的日期,取**最前一个 → 最后一个**,
+ * 中间没计划的日子也保留(空列,纸表可手填);**不再从今天起算**,所以历史计划(例:0227 的
+ * 10-29~10-31)、跨月、以及未来都按数据自己说话。
+ *
+ * <p>边界:
+ * <ul>
+ *   <li>勾选行一个日计划都没有(例如刚排产、数量全空) ⇒ 退回「今天起 days 天」,不打出没有日期列的空表;</li>
+ *   <li>跨度超过 {@link MAX_SHEET_DAYS} 天(脏数据/超长交期) ⇒ 截到**最近</b>的 31 天(保留最新进度);</li>
+ *   <li>只认非零计划值:被清空的格子不算日期(与格子里显示的空一致)。</li>
+ * </ul>
+ *
+ * @param {Array} rows  勾选后的行(每行带 `日计划`)
+ * @param {string} today 后端返回的 `今天`(仅空计划时兜底用)
+ * @param {number} days  兜底窗口天数(默认 5)
+ */
+export function planSheetDatesFromRows(rows, today = '', days = 5) {
+  const ds = new Set()
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const plan = r?.['日计划'] || {}
+    for (const [d, v] of Object.entries(plan)) {
+      const s = String(d || '').slice(0, 10)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s) && Number(v || 0) !== 0) ds.add(s)
+    }
+  }
+  const list = [...ds].sort()
+  if (!list.length) return planSheetWindow(String(today || '').slice(0, 10), days)
+  const first = list[0]
+  const last = list[list.length - 1]
+  // 跨度超上限 ⇒ 从"最后一个日期"往回取 MAX_SHEET_DAYS 天(保留最新进度,而不是最早那一段)
+  const span = Math.round((Date.parse(last + 'T00:00:00Z') - Date.parse(first + 'T00:00:00Z')) / 86400000) + 1
+  const start = span > MAX_SHEET_DAYS ? ymdAddDays(last, -(MAX_SHEET_DAYS - 1)) : first
+  const out = []
+  for (let d = start; out.length < MAX_SHEET_DAYS && d && d <= last; d = ymdAddDays(d, 1)) out.push(d)
+  return out
+}
+
+/** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天
+ *  (2026-11-04 起出纸改走 {@link planSheetDatesFromRows};本函数保留给旧调用/兜底) */
 export function planSheetDates(dates, today, days = 5) {
   const list = (Array.isArray(dates) ? dates : []).filter(Boolean).slice().sort()
   if (!list.length) return []
@@ -629,18 +703,30 @@ export function pickPlanSheetRows(rows, ids) {
  */
 export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
-  const ds = planSheetDates(dates, opts.today || '', opts.days || 5)
-  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0)
-  // 日期列:按剩余均分,但不低于 4%(否则「10月31日」列头和千位数会被挤成两行);
-  // 列多时按 4% 走,表格整体略超宽由浏览器压缩(比断字好看)
-  const dateW = ds.length ? Math.max(4, Math.floor((100 - baseW) / ds.length)) : 0
+  // 2026-11-04 用户口径:日期列 = **勾选行「最前一个日期 → 最后一个日期」**(不再从今天起)。
+  //   opts.dates 由 WorkOrderBoard 用 planSheetDatesFromRows() 算好传进来(逐字用);
+  //   不传时保留旧行为(今天起 days 天)—— 旧调用/单测不受影响。
+  const ds = Array.isArray(opts.dates) && opts.dates.length
+    ? opts.dates.filter(Boolean).slice()
+    : planSheetDates(dates, opts.today || '', opts.days || 5)
+  const n = ds.length
+  // 列多时自适应(实测 2号车间=10 天、1号机=16 天):日期列变窄 → 表头改「10/29」紧凑写法、字号降一档;
+  //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
+  const compact = n > 7
+  const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
+  const qrW = compact ? 4 : 5
+  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0) * fixedScale
+  // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
+  const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
   const colgroup = '<colgroup>'
-    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${c.w}%"/>`).join('')
-    + ds.map(() => `<col style="width:${dateW}%"/>`).join('')
-    + '<col style="width:5%"/>'                       // 二维码(行尾)
+    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${(c.w * fixedScale).toFixed(2)}%"/>`).join('')
+    + ds.map(() => `<col style="width:${dateW.toFixed(2)}%"/>`).join('')
+    + `<col style="width:${qrW}%"/>`                  // 二维码(行尾)
     + '</colgroup>'
   const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.t)}</th>`).join('')
-    + ds.map((d) => `<th>${esc(monthDay(d))}</th>`).join('')
+    + ds.map((d) => (compact
+      ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
+      : `<th>${esc(monthDay(d))}</th>`)).join('')
     + '<th>二维码</th>'
   // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
   const qrs = await Promise.all(list.map((r) => woQrImg({
@@ -657,16 +743,20 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
       + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
       + '</tr>'
   }).join('')
+  // 字号/内边距随列数微调(compact 时 8.5px / 表头 7.5px,否则保持原版 9.5px / 9px)
+  const fs = compact ? '8px' : '9.5px'
+  const thFs = compact ? '7px' : '9px'
+  const pad = compact ? '2px 1px' : '2px 3px'
   return '<style>'
     + '@page{size:A4 landscape;margin:6mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
     + '.hd{text-align:center;margin:0 0 4px}'
     + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'th,td{border:1px solid #333;padding:2px 3px;font-size:9.5px;line-height:1.25;word-break:break-all;vertical-align:middle}'
-    + 'th{background:#f2f2f2;font-weight:600;text-align:center;font-size:9px;line-height:1.15}'
+    + `th,td{border:1px solid #333;padding:${pad};font-size:${fs};line-height:1.25;word-break:break-all;vertical-align:middle}`
+    + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.15}`
     + 'td.r{text-align:right;white-space:nowrap}'
-    + 'td.qr{text-align:center;padding:1px}td.qr img{width:34px;height:34px}'
+    + `td.qr{text-align:center;padding:1px}td.qr img{width:${compact ? 28 : 34}px;height:${compact ? 28 : 34}px}`
     + 'tbody tr{height:38px}'
     + '</style>'
     + '<div class="hd"><span class="t">成型车间排单计划</span></div>'

@@ -4,3 +4,7 @@
 
 # 迁移清单为混合行尾的历史文件,禁用行尾转换避免整文件假重写(autocrlf坑)
 tools/db-migrations.txt -text
+
+# 排单计划模板为历史 CRLF 文件(2026-11-04 前仓库内一直是 CRLF;autocrlf 会把它整文件假重写)。
+# 禁用该文件的行尾转换,改动只显示真实差异(同 db-migrations.txt 的处理)。
+frontend/src/business/print-formats.js -text
