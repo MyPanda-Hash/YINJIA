@@ -623,23 +623,23 @@ function planSheetShopColumn(shop) {
 }
 
 const PLAN_SHEET_BASE_COLS = [
-  { t: '客户等级', w: 2, k: (r) => r['客户等级'] },
-  { t: '客户名称', w: 9, k: (r) => r['客户'] },
+  { t: '客户等级', w: 2, min: 1.6, k: (r) => r['客户等级'] },
+  { t: '客户名称', w: 9, min: 3.8, k: (r) => r['客户'] },
   // 主要信息(2026-11-01 用户口径「不是两张纸,当前同一行融合起来」):工单号融进本行
-  { t: '单据编号', w: 10, k: (r) => r['加工单号'] },
-  { t: '产品编号', w: 6, k: (r) => r['物料编码'] },
-  { t: '型号', w: 6, k: (r) => r['规格型号'] },
+  { t: '单据编号', w: 10, min: 4.3, k: (r) => r['加工单号'] },
+  { t: '产品编号', w: 6, min: 2.8, k: (r) => r['物料编码'] },
+  { t: '型号', w: 6, min: 2.8, k: (r) => r['规格型号'] },
   // 车间(产线)列:表头随所打印的工序产线变 —— 成型车间 / 切炭车间 / 组装车间(2026-11-04)
-  { t: '生产车间', w: 5, k: (r) => r['生产线'], tOf: planSheetShopColumn },
-  { t: '未完成总数', w: 5, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
-  { t: '生产计划数量', w: 5, k: (r) => fmtNum(r['排产数量']), n: true },
-  { t: '实际完成数量', w: 5, k: (r) => fmtNum(r['当前工序完工量']), n: true },
+  { t: '生产车间', w: 5, min: 2.4, k: (r) => r['生产线'], tOf: planSheetShopColumn },
+  { t: '未完成总数', w: 5, min: 2.2, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
+  { t: '生产计划数量', w: 5, min: 2.2, k: (r) => fmtNum(r['排产数量']), n: true },
+  { t: '实际完成数量', w: 5, min: 2.2, k: (r) => fmtNum(r['当前工序完工量']), n: true },
   // 交期两列标题也随工序走(成型交期/切炭交期/组装交期…),旧写死「成型」会让切炭/组装的纸对不上
-  { t: '交期', w: 5, k: (r) => monthDay(r['交期'] || r['计划完工日期']), tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期` : '交期' } },
-  { t: '交期紧迫度', w: 5, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true, tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期紧迫度` : '交期紧迫度' } },
-  { t: '7天', w: 3, k: (r) => fmtNum(r['7天已排']), n: true },
-  { t: '15天', w: 3, k: (r) => fmtNum(r['15天已排']), n: true },
-  { t: '大于15', w: 4, k: (r) => fmtNum(r['大于15天已排']), n: true },
+  { t: '交期', w: 5, min: 2.4, k: (r) => monthDay(r['交期'] || r['计划完工日期']), tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期` : '交期' } },
+  { t: '交期紧迫度', w: 5, min: 2.0, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true, tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期紧迫度` : '交期紧迫度' } },
+  { t: '7天', w: 3, min: 2.2, k: (r) => fmtNum(r['7天已排']), n: true },
+  { t: '15天', w: 3, min: 2.2, k: (r) => fmtNum(r['15天已排']), n: true },
+  { t: '大于15', w: 4, min: 2.2, k: (r) => fmtNum(r['大于15天已排']), n: true },
 ]
 
 /** yyyy-MM-dd → M月D日(纸表写法);非法/空 → '' */
@@ -772,27 +772,39 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   // 列多时自适应(实测 2号车间=10 天、1号机=16 天):日期列变窄 → 表头改「10/29」紧凑写法、字号降一档;
   //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
   const compact = n > 7
-  const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
-  // 二维码尺寸(2026-11-04 口径演进:28px「太小」→ 60px → **再缩一点但别太小**):
-  //   行少(≤5)52px≈13.8mm、≤8 行 48px、≤14 行 42px、更多 36px;列宽同步收 1.5%(给日期列让位)。
-  //   ⚠ 能不能扫不只取决于显示大小:woQrImg 把**底图**提到 300px、白边(margin)加到 2 个模块 ——
-  //     以前底图只有 108px、白边 1 模块,打印放大后边缘发虚,才是「有的行能扫、有的扫不到」的主因。
-  const qrPx = list.length <= 5 ? 52 : list.length <= 8 ? 48 : list.length <= 14 ? 42 : 36
-  const qrW = list.length <= 5 ? 6 : (compact ? 6.5 : 6)
+  // 2026-11-04 用户口径「日期排太长就挤成竖条」:列很多(>12 天)时**表头改竖排**(writing-mode),
+  //   每列不再需要为横向的「10/29」留宽度,窄列也能读;列数越多固定列越收紧(下限 0.46)。
+  const vHead = compact && n > 12
+  const fixedScale = compact ? Math.max(vHead ? 0.46 : 0.52, 1 - (n - 7) * 0.035) : 1
+  // 二维码尺寸(口径演进:28px「太小」→ 60 → 52「略小」→ 再按**列数**自适应缩):
+  //   行少(≤5)52px、≤8 行 48px、≤14 行 42px、更多 36px;
+  //   日期列 >16 天收到 44px、>22 天收到 40px(≈10.6mm,仍可扫),把宽度让给日期列。
+  //   ⚠ 能不能扫不只取决于大小:woQrImg 底图 300px、静区 2 模块(以前 108px/1 模块,打印发虚常扫不出)。
+  const qrBase = list.length <= 5 ? 52 : list.length <= 8 ? 48 : list.length <= 14 ? 42 : 36
+  const qrPx = n > 22 ? 40 : (n > 16 ? Math.min(qrBase, 44) : qrBase)
+  const qrW = n > 22 ? 4.6 : (n > 16 ? 5 : (list.length <= 5 ? 6 : (compact ? 6.5 : 6)))
   const rowH = Math.max(38, qrPx + 6)
-  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0) * fixedScale
+  // 固定列宽度 = max(按比例 (w×scale), 竖排/极窄模式下的最小可读宽度)
+  //   2026-11-04 用户报障:23 天时数字列被压到 1.4%,「6000」放不下直接和邻列叠在一起 ⇒ 给下限。
+  const fixedW = PLAN_SHEET_BASE_COLS.map((c) => (vHead && c.min ? Math.max(c.w * fixedScale, c.min) : c.w * fixedScale))
+  const baseW = fixedW.reduce((a, b) => a + b, 0)
   // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
   const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
+  // 列多到日期列 <2.3%(≈6.5mm)时,格内数字再降一档字号(7px),否则 4 位数会压到邻列
+  const tinyDates = dateW > 0 && dateW < 2.3
   const colgroup = '<colgroup>'
-    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${(c.w * fixedScale).toFixed(2)}%"/>`).join('')
+    + fixedW.map((w) => `<col style="width:${w.toFixed(2)}%"/>`).join('')
     + ds.map(() => `<col style="width:${dateW.toFixed(2)}%"/>`).join('')
     + `<col style="width:${qrW}%"/>`                  // 二维码(行尾)
     + '</colgroup>'
   // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
   const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
-    + ds.map((d) => (compact
-      ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
-      : `<th>${esc(monthDay(d))}</th>`)).join('')
+    + ds.map((d) => {
+      if (vHead) return `<th class="v" title="${esc(d)}">${esc(shortMonthDay(d))}</th>`  // 竖排,窄列可读
+      return compact
+        ? `<th title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
+        : `<th>${esc(monthDay(d))}</th>`
+    }).join('')
     + '<th>二维码</th>'
   // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
   const qrs = await Promise.all(list.map((r) => woQrImg({
@@ -805,7 +817,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
         const v = c.k(r)
         return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
       }).join('')
-      + ds.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
+      + ds.map((d) => `<td class="r${tinyDates ? ' d' : ''}">${esc(fmtNum(plan[d]))}</td>`).join('')
       + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
       + '</tr>'
   }).join('')
@@ -821,7 +833,9 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + `th,td{border:1px solid #333;padding:${pad};font-size:${fs};line-height:1.25;word-break:break-all;vertical-align:middle}`
     + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.15}`
+    + 'th.v{writing-mode:vertical-rl;text-orientation:mixed;height:52px;padding:2px 0;line-height:1.05;letter-spacing:.5px}'
     + 'td.r{text-align:right;white-space:nowrap}'
+    + 'td.d{font-size:7px;padding:1px 0}'
     + `td.qr{text-align:center;padding:1px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
     + `tbody tr{height:${rowH}px}`
     + '</style>'
