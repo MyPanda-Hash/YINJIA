@@ -1,0 +1,41 @@
+=== HSDZ_MES(正式) CHECK-after 2026-11-04 18:38:17 ===
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== CHECK-after.sql ==
+  | HSDZ_MES | 1 产品编码 数据/可编辑/必填/无参照 | 文本 / editable=1 / required=1 / ref=NULL | 文本 / 1 / 1 / NULL | PASS | 
+  | HSDZ_MES | 2 工序 place(不得含 header) | query | query | PASS | 
+  | HSDZ_MES | 3 工序 表头行数 | 0 | 0 | PASS | 
+  | HSDZ_MES | 4 工序 editable/required | 0 / 0 | 0 / 0 | PASS | 
+  | HSDZ_MES | 5 headDefaults.状态 | 启用 | 启用 | PASS | 
+  | HSDZ_MES | 6 headDefaults.工序 | 组装 | 组装 | PASS | 
+  | HSDZ_MES | 7 空工序行数 | 0 | 0 | PASS | 
+  | HSDZ_MES | 8 非组装工序行数(现状) | 0 | 0 | PASS | 
+  | HSDZ_MES | 9 面板字段总数 | >=19 | 19 | PASS | 
+  | HSDZ_MES | 10 表头字段数 | 10(装配后) | 10 | PASS | 
+  | HSDZ_MES | 11 bs_asm_bom 列数 | >=47 | 47 | PASS | 
+  | HSDZ_MES | 12 bs_asm_bom.备注 列 | 存在 | 存在 | PASS | 
+  | HSDZ_MES | 13 面板形态 | doc / bs_asm_bom / head_table NULL | doc / bs_asm_bom / NULL | PASS | 
+  | HSDZ_MES | 14 迁移登记行数 | 1 | 1 | PASS | 
+  | 900 | 违规项数(violations) | 0 | 0 | PASS | 
+  | 999 | == RESULT == | PASS | 全部 14 项通过 | RESULT: PASS | 
+[OK] CHECK-after.sql (3 batches)
+
+=== HSDZ_MES_TEST(测试) CHECK-after 2026-11-04 18:38:18 ===
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== CHECK-after.sql ==
+  | HSDZ_MES_TEST | 1 产品编码 数据/可编辑/必填/无参照 | 文本 / editable=1 / required=1 / ref=NULL | 文本 / 1 / 1 / NULL | PASS | 
+  | HSDZ_MES_TEST | 2 工序 place(不得含 header) | query | query | PASS | 
+  | HSDZ_MES_TEST | 3 工序 表头行数 | 0 | 0 | PASS | 
+  | HSDZ_MES_TEST | 4 工序 editable/required | 0 / 0 | 0 / 0 | PASS | 
+  | HSDZ_MES_TEST | 5 headDefaults.状态 | 启用 | 启用 | PASS | 
+  | HSDZ_MES_TEST | 6 headDefaults.工序 | 组装 | 组装 | PASS | 
+  | HSDZ_MES_TEST | 7 空工序行数 | 0 | 0 | PASS | 
+  | HSDZ_MES_TEST | 8 非组装工序行数(现状) | 0 | 0 | PASS | 
+  | HSDZ_MES_TEST | 9 面板字段总数 | >=19 | 19 | PASS | 
+  | HSDZ_MES_TEST | 10 表头字段数 | 10(装配后) | 10 | PASS | 
+  | HSDZ_MES_TEST | 11 bs_asm_bom 列数 | >=47 | 47 | PASS | 
+  | HSDZ_MES_TEST | 12 bs_asm_bom.备注 列 | 存在 | 存在 | PASS | 
+  | HSDZ_MES_TEST | 13 面板形态 | doc / bs_asm_bom / head_table NULL | doc / bs_asm_bom / NULL | PASS | 
+  | HSDZ_MES_TEST | 14 迁移登记行数 | 1 | 1 | PASS | 
+  | 900 | 违规项数(violations) | 0 | 0 | PASS | 
+  | 999 | == RESULT == | PASS | 全部 14 项通过 | RESULT: PASS | 
+[OK] CHECK-after.sql (3 batches)

@@ -4419,3 +4419,9 @@ migrate-wo-pick-line-20261101.sql
 #   取证/演练/上线顺序:tools/archive/_asm-bom-maintainable-verify-20261104/README.md;
 #   报告:docs/development/组装物料清单-表头可维护-20261104.md
 migrate-asm-bom-maintainable-20261104.sql
+
+# 2026-11-04(晚) 组装物料清单(ASM_BOM)使用性调整:产品编码改「文本」可手输(去掉参照 INV)、
+#   工序移出表头(place 只剩 query,保留查询条件)且不再必填;yj_panel.config.headDefaults 增加 工序=组装;
+#   回填存量空工序行。报障:「这个产品编码要可以自己编辑,且当前的工序都为组装的 bom 不需要设定工序了」。
+#   ⚠ 本脚本必须晚于 migrate-asm-bom-maintainable-20261104.sql(整链重放按顺序收敛;勿单独重跑那条)。
+migrate-asm-bom-product-manual-20261104.sql
