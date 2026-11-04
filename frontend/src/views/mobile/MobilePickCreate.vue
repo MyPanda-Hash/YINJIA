@@ -153,6 +153,12 @@
             <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
             <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
           </div>
+          <!-- 未开单同样列出 物料编码/规格型号/计量单位(与已开单一致,2026-11-04) -->
+          <div class="mp-wo-l2b">
+            <span><i>{{ tt('物料编码') }}</i>{{ w.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ w.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ w.产品单位 || '—' }}</span>
+          </div>
         </div>
       </template>
 
@@ -177,6 +183,14 @@
           <div class="mp-wo-l2">
             <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
             <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
+          </div>
+          <!-- 🔴 2026-11-04 用户口径:「外面的信息不够,没有物料编码单位名称规格型号,但是明细是有的」。
+               列表原来只显示产品名称 + 排产数量,编码/规格/单位要等点开明细才看得到;
+               这里补一行:产品编号 · 规格型号 · 计量单位(缺值显示 —,不留空)。 -->
+          <div class="mp-wo-l2b">
+            <span><i>{{ tt('物料编码') }}</i>{{ w.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ w.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ w.产品单位 || '—' }}</span>
           </div>
           <div class="mp-wo-l3">
             <span class="mono">{{ w.领料单号 }}</span>
@@ -642,6 +656,10 @@ async function loadWoStatus() {
 .mp-wo-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
 .mp-wo-p { flex: 1; min-width: 0; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-wo-qty { flex: none; color: var(--el-text-color-placeholder); font-variant-numeric: tabular-nums; }
+/* 产品编码/规格型号/单位那一行(2026-11-04):手机窄屏用 flex-wrap 自动换行,不挤成横向滚动 */
+.mp-wo-l2b { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-wo-l2b > span { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; max-width: 100%; }
+.mp-wo-l2b > span > i { font-style: normal; flex: none; color: var(--el-text-color-placeholder); }
 .mp-wo-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; font-size: 12px; }
 .mp-wo-l3 .mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mp-wo-prog { flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
