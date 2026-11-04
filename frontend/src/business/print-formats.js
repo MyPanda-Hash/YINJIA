@@ -623,7 +623,8 @@ function planSheetShopColumn(shop) {
 }
 
 const PLAN_SHEET_BASE_COLS = [
-  { t: '客户等级', w: 2, min: 1.6, k: (r) => r['客户等级'] },
+  // 现役 dm_kh.khjb 全空(2026-11-04 用户口径):勾选行这一列都没值时**默认不印**(hideIfEmpty)
+  { t: '客户等级', w: 2, min: 1.6, hideIfEmpty: true, k: (r) => r['客户等级'] },
   { t: '客户名称', w: 9, min: 3.8, k: (r) => r['客户'] },
   // 主要信息(2026-11-01 用户口径「不是两张纸,当前同一行融合起来」):工单号融进本行
   { t: '单据编号', w: 10, min: 4.3, k: (r) => r['加工单号'] },
@@ -769,6 +770,10 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
     ? opts.dates.filter(Boolean).slice()
     : planSheetDates(dates, opts.today || '', opts.days || 5)
   const n = ds.length
+  // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:
+  //   勾选行(本次要打的那些行)在该列**全部为空** ⇒ 这一列默认不印(不浪费纸面宽度)。
+  const isEmptyCell = (v) => v == null || String(v).trim() === ''
+  const cols = PLAN_SHEET_BASE_COLS.filter((c) => !(c.hideIfEmpty && list.every((r) => isEmptyCell(c.k(r)))))
   // 列多时自适应(实测 2号车间=10 天、1号机=16 天):日期列变窄 → 表头改「10/29」紧凑写法、字号降一档;
   //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
   const compact = n > 7
@@ -785,7 +790,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const rowH = Math.max(38, qrPx + 6)
   // 固定列宽度 = max(按比例 (w×scale), 最小可读宽度)
   //   2026-11-04 用户报障:23 天时数字列被压到 1.4%,「6000」放不下直接和邻列叠在一起 ⇒ 给下限。
-  const fixedW = PLAN_SHEET_BASE_COLS.map((c) => (c.min ? Math.max(c.w * fixedScale, c.min) : c.w * fixedScale))
+  const fixedW = cols.map((c) => (c.min ? Math.max(c.w * fixedScale, c.min) : c.w * fixedScale))
   const baseW = fixedW.reduce((a, b) => a + b, 0)
   // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
   const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
@@ -799,7 +804,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
   // 日期表头的字号:列越窄越小(仍横排且 nowrap,不再折成竖条)
   const dateHeadFs = dateW > 0 && dateW < 2.15 ? '6px' : (compact ? '7px' : '9px')
-  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
+  const ths = cols.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
     + ds.map((d) => (compact
       ? `<th class="dt" title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
       : `<th>${esc(monthDay(d))}</th>`)).join('')
@@ -811,7 +816,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const trs = list.map((r, i) => {
     const plan = r['日计划'] || {}
     return '<tr>'
-      + PLAN_SHEET_BASE_COLS.map((c) => {
+      + cols.map((c) => {
         const v = c.k(r)
         return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
       }).join('')

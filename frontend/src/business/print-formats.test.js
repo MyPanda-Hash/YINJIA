@@ -241,10 +241,17 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   }]
   // 2026-11-04 起标题/车间列头按工序产线动态 ⇒ 显式传 shop=成型,保持原纸表版式断言
   const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31', shop: '成型' })
-  for (const h of ['客户等级', '客户名称', '产品编号', '型号', '成型车间', '未完成总数',
+  for (const h of ['客户名称', '产品编号', '型号', '成型车间', '未完成总数',
     '生产计划数量', '实际完成数量', '成型交期', '成型交期紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
+  // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
+  assert.ok(!html.includes('>客户等级</th>'), '客户等级全空 ⇒ 默认隐藏该列')
+  // 有值时才印(甲/乙/丙…)——用同一行补一个非空等级再生成一次
+  const rowsWithGrade = [{ ...rows[0], 客户等级: '甲' }]
+  const html2 = await schedPlanSheetHtml(rowsWithGrade, ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(html2.includes('>客户等级</th>'), '有值 ⇒ 客户等级列照印')
+  assert.ok(/>甲</.test(html2), '等级值要印出来')
   assert.ok(html.includes('10月31日') && html.includes('11月5日'), '日期列头用 月日 写法')
   assert.ok(html.includes('张莉') && html.includes('S031-3') && html.includes('28*12*178') && html.includes('1号机'))
   assert.ok(/>10</.test(html), '未完成总数/排产数量应出现')
