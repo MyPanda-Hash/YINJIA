@@ -52,5 +52,7 @@
 
 - 已同步 `frontend/dist → backend/src/main/resources/static`（chore 提交）；
 - **服务器尚未部署**：要生效需重打 jar/前端静态 + 增量部署（`deploy/部署说明.md`），并按 `deploy/部署台账.md` 记账；
-- 本地 5173（vite 源码）已可看效果；本地 8090 仍跑旧 jar（有个重启循环看着它），
-  要本地 8090 也换新需 `tools\scripts\rebuild-prod.ps1`。
+- **本地 8090 已重建并重启**（`tools\scripts\rebuild-prod.ps1`；app.jar SHA256 `A3641AE0…DED2AEFD`、
+  入口 chunk `index-i-DXcJnl.js`）：`probe.mjs`（今日已排口径）**6/6 PASS**、
+  `verify-range-print.mjs` 对着它实跑 **9/9 PASS**；
+- 本地 5173（vite 源码）随时可看效果。
