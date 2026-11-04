@@ -1218,6 +1218,11 @@ export default {
     '上传成功': 'Uploaded',
     '保存成功': 'Saved',
     '删除成功': 'Deleted',
+    // 删除结果的三档提示(2026-11-04,见 core/views/deleteOutcome.js 头注):
+    // 文件类面板非管理员删已归档单只落「删除申请」,前端不许谎报"已删除"。
+    '单据已删除': 'Document deleted',
+    '删除申请已提交，待管理员审批通过后才会真正删除': 'Deletion request submitted — the document is removed only after an admin approves it',
+    '「删除」已提交': '"Delete" submitted',
     '上传失败': 'Upload failed',
     '加载分类失败': 'Failed to load categories',
     '加载文件失败': 'Failed to load files',

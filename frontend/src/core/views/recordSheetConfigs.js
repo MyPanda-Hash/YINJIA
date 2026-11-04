@@ -1907,7 +1907,16 @@ export const recordSheetConfigs = {
       //   文字列(检验要求/检验方法)拿到多出来的宽度后换行显著减少 ⇒ 整页变矮、印出来更大更清楚。
       //   46+100+80+180+300+88 = 794
       // 2026-10-30 标题去掉序号「4.」（用户口径：「把规格书的产品性能检验项目及检验标准的 4 去掉」）
+      //
+      // ⚠ 2026-11-04 补 blankRows + autoSeqBar（用户报障：
+      //   「产品规格书的填写过程中，在草稿状态的时候就是不能编辑检验项目这个格的内容」）。
+      //   根因不是"锁了"，而是**这张表一行都没有**：铺空行的机制(RecordSheetPanels 的
+      //   blankRows watch)只对 `blankRows > 0` 的表生效 ⇒ 新建草稿这一页只有一个「—」，
+      //   没有任何输入框可点，只能靠「⧉ 从标准库勾选」批量灌行，手填一行没有办法。
+      //   行数取与成型工艺清单配方表同一口径(10)，铺的是空行（只带 表区 + 序号，不编造检验项）：
+      //   用户口径「没有的留空就行」。
       { page: 2, bar: '产品性能检验项目及检验标准', filterKey: '表区', filterVal: '检验要求', lib: true,
+        autoSeqBar: true, blankRows: 10,
         design: { headerH: 32, fontSize: 13, groupCol: true },
         cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 43 },
