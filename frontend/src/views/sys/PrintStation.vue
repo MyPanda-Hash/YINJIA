@@ -119,7 +119,11 @@
       <div class="ps-kv"><span>{{ tt('最近心跳') }}</span><b>{{ state.lastHeartbeat || '—' }}</b></div>
       <div class="ps-kv">
         <span>{{ tt('打印代理') }}</span>
-        <b :class="agentOk ? 'ok' : 'warn'">{{ agentOk ? tt('已连接') : tt('未连接') }}</b>
+        <!-- 2026-11-03:公网部署下这一项**必然显示未连接** —— 浏览器禁止公网页面访问 127.0.0.1。
+             真正判"能不能打"的是上面的「最近心跳」;这里改成中性说明,不再当成故障。 -->
+        <b :class="agentOk ? 'ok' : 'muted'">
+          {{ agentOk ? tt('已连接(本机页面可直接控制)') : tt('由打印电脑自行取任务,不受本页面控制') }}
+        </b>
       </div>
       <!-- 代理模式(2026-11-01):auto=有打印机就出纸/否则落PDF · printer=只出纸 · pdf=只落文件 -->
       <div class="ps-kv">
@@ -221,13 +225,25 @@ const fallbackTask = ref(null)
 let timer = null
 let polling = false
 
+/**
+ * 顶部状态徽标(2026-11-03 重写)。
+ *
+ * <p>🔴 关键:系统上服务器后,**页面在公网 HTTP 上时浏览器一律禁止访问 127.0.0.1**
+ * (非安全上下文 → loopback),所以 `agentOk`(本机代理探测)**必然是 false**。
+ * 以前徽标只认 agentOk ⇒ 永远挂「代理未连接」的警告,其实打印一切正常,
+ * 白白让人以为坏了。
+ *
+ * <p>改用**服务端心跳**(state.online)判断:那才代表"真有一台打印电脑在取任务"。
+ */
 const statusClass = computed(() => {
   if (!autoEnabled.value) return 'off'
-  return agentOk.value ? 'on' : 'warn'
+  if (state.value.online || agentOk.value) return 'on'
+  return 'warn'
 })
 const statusText = computed(() => {
   if (!autoEnabled.value) return tt('未启用')
-  return agentOk.value ? tt('打印中就绪') : tt('代理未连接')
+  if (state.value.online || agentOk.value) return tt('打印中就绪')
+  return tt('没有在线的打印电脑')
 })
 
 function clearErr() { errText.value = '' }
@@ -472,6 +488,7 @@ async function saveAgentConfig() {
 .ps-kv > b { font-weight: 500; }
 .ps-kv > b.ok { color: var(--el-color-success); }
 .ps-kv > b.warn { color: var(--el-color-warning); }
+.ps-kv > b.muted { color: var(--el-text-color-secondary); font-weight: 400; }
 
 .ps-agent {
   margin-top: 12px; padding: 12px; border-radius: 6px;

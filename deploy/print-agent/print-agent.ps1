@@ -54,7 +54,16 @@ param(
     [ValidateSet('Auto', 'Printer', 'Pdf')]
     [string]$Mode = 'Auto',
     # PDF 输出目录(仅 -Mode Pdf 用);空 = 脚本同级 print-out\
-    [string]$PdfDir = ''
+    [string]$PdfDir = '',
+    # 🔴 2026-11-03 「代理自己去服务器取任务」(解决公网页面连不上本机代理)
+    #   背景:页面开在公网 HTTP 地址上时,浏览器**禁止**它访问 127.0.0.1(非安全上下文),
+    #   连 CORS 预检都不发 ⇒ 页面永远「代理未连接」。与其跟浏览器较劲,不如让代理主动拉:
+    #   代理自己登录服务器、轮询 /pending、打印、回 /ack —— 全程不需要浏览器。
+    [string]$Server = '',
+    [string]$User = 'admin',
+    [string]$Pass = '',
+    [string]$Factory = 'YJ',
+    [string]$Station = '打印电脑'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -470,6 +479,90 @@ try {
     Write-Host '       可能已有一个代理在跑;如需换端口,同时改 src/business/printStation.js 的 AGENT_URL。'
     exit 1
 }
+# ══════════════════════════════════════════════════════════════════════
+# 🔴 2026-11-03 「代理主动去服务器拉任务」—— 绕开浏览器的 localhost 限制
+# ══════════════════════════════════════════════════════════════════════
+# 为什么必须这么做:系统上服务器后,页面地址是**公网 HTTP**(如 http://36.140.66.163:8090),
+#   而代理在 127.0.0.1。Chrome 对这种组合的报错是:
+#     "The request client is not a secure context and the resource is in
+#      more-private address space `loopback`"
+#   —— 连 CORS 预检都不发,直接拒。补 PNA 头也没用,因为卡在"非安全上下文"这一关。
+#   ⇒ 与其跟浏览器较劲,不如让代理**自己**登录服务器、轮询 /pending、打印、回 /ack。
+#     浏览器页面那套(点开关、看队列)仍然保留,只是不再承担"取任务"的职责。
+#
+# 用法:powershell -File print-agent.ps1 -Server http://36.140.66.163:8090 -User admin -Pass 密码 -Station 一车间打印点
+#   给了 -Server 才会启动轮询;不给则维持原来"等页面推任务"的模式。
+if ($Server) {
+    $srvBase = $Server.TrimEnd('/')
+    $pollArgs = @($srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer)
+    $script:pollJob = Start-Job -ScriptBlock {
+        param($Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX)
+        # ⚠ 全部走 Invoke-WebRequest + 手动 UTF-8 解码,不用 Invoke-RestMethod ——
+        #   实测 PS 5.1 的 Invoke-RestMethod 会把 JSON 响应按 Latin1 解,中文键名全变乱码
+        #   ("二维码内容" → "äºç»´ç å å®¹"),后面 $task.'二维码内容' 就永远取不到值,
+        #   症状是代理报「缺少打印内容(二维码内容与工单号都为空)」。
+        $base = "$Srv/api"
+        function Read-Utf8Json($resp) {
+            $buf = $resp.RawContentStream.ToArray()
+            return ([System.Text.Encoding]::UTF8.GetString($buf) | ConvertFrom-Json)
+        }
+        function Api-Get($url, $headers) {
+            $r = Invoke-WebRequest -Uri $url -Headers $headers -UseBasicParsing -TimeoutSec 30
+            return Read-Utf8Json $r
+        }
+        function Api-Post($url, $headers, $obj, $timeout) {
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json -Depth 8 -Compress))
+            $r = Invoke-WebRequest -Uri $url -Method Post -Headers $headers -Body $bytes `
+                 -ContentType 'application/json; charset=utf-8' -UseBasicParsing -TimeoutSec $timeout
+            return Read-Utf8Json $r
+        }
+        function Login-Once {
+            $o = @{ userName = $Usr; password = $Pwd; factory = $Fac }
+            $r = Api-Post "$base/auth/login" @{} $o 30
+            return $r.data.token
+        }
+        $token = ''
+        while (-not $token) {
+            try { $token = Login-Once; Write-Output "[轮询] 已登录 $Srv(站点:$Sta)" }
+            catch { Write-Output "[轮询] 登录失败,10 秒后重试: $($_.Exception.Message)"; Start-Sleep -Seconds 10 }
+        }
+        $st = [uri]::EscapeDataString($Sta)
+        while ($true) {
+            try {
+                $hd = @{ Authorization = "Bearer $token" }
+                $pend = Api-Get "$base/px/print/pending?station=$st" $hd
+                if ($pend.data.task) {
+                    $task = $pend.data.task
+                    $pr = $null
+                    try { $pr = Api-Post "http://127.0.0.1:$AgentPort/print" @{} $task 180 }
+                    catch { Write-Output "[轮询] 本机打印失败(id=$($task.id)): $($_.Exception.Message)" }
+                    $ack = @{
+                        taskId = $task.id
+                        ok = [bool]($pr -and $pr.ok)
+                        printer = $(if ($pr) { [string]$pr.printer } else { '' })
+                        标题 = [string]$task.标题
+                        工单号 = [string]$task.工单号
+                        工单行号 = [int]$task.工单行号
+                        发起人 = [string]$task.发起人
+                    }
+                    try {
+                        Api-Post "$base/px/print/ack" $hd $ack 30 | Out-Null
+                        Write-Output "[轮询] 任务 $($task.id) 完成 → $(if ($pr) { $pr.mode } else { '失败' })"
+                    } catch { Write-Output "[轮询] 回执失败: $($_.Exception.Message)" }
+                }
+            } catch {
+                $msg = "$($_.Exception.Message)"
+                if ($msg -match '401|403|未授权|Forbidden') {
+                    try { $token = Login-Once; Write-Output '[轮询] token 过期,已重新登录' } catch { }
+                }
+            }
+            Start-Sleep -Seconds 4
+        }
+    } -ArgumentList $pollArgs
+    Write-Host "[轮询] 已启动:每 4 秒去 $srvBase 拉一次任务(站点:$Station)" -ForegroundColor Cyan
+    Write-Host '[轮询] 这个模式下**不需要**浏览器页面开着;页面只用来开关/看队列。' -ForegroundColor DarkGray
+}
+
 
 $defaultPrinter = Get-SystemPrinterName
 $effective = if ($Printer) { $Printer } elseif ($defaultPrinter) { "$defaultPrinter(系统默认)" } else { '(未检测到默认打印机!)' }
@@ -492,7 +585,14 @@ try {
         if ($origin) { $res.Headers.Add('Access-Control-Allow-Origin', $origin) }
         else { $res.Headers.Add('Access-Control-Allow-Origin', '*') }
         $res.Headers.Add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-        $res.Headers.Add('Access-Control-Allow-Headers', 'Content-Type')
+        # 🔴 2026-11-03 关键:页面开在**服务器地址**上(http://36.140.66.163:8090)时,
+        #   浏览器把它当"公网页面",而代理在 127.0.0.1 —— 这属于 Chrome 的
+        #   Private Network Access:公网→本机的请求**必须**由本机服务显式许可,
+        #   否则 fetch 直接被拦,页面永远显示「代理未连接」(实测就是这个原因)。
+        #   许可方式 = 响应里带 Access-Control-Allow-Private-Network: true。
+        $res.Headers.Add('Access-Control-Allow-Headers', 'Content-Type, Access-Control-Request-Private-Network')
+        $res.Headers.Add('Access-Control-Allow-Private-Network', 'true')
+        $res.Headers.Add('Access-Control-Max-Age', '600')
 
         try {
             $path = $req.Url.AbsolutePath

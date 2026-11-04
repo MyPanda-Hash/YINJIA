@@ -4431,5 +4431,11 @@ migrate-x-sinter-spec-ref-20261030.sql
 migrate-prod-mold-panel-20261030.sql
 migrate-prod-mold-retire-old-20261030.sql
 migrate-bom-material-list-status-20261030.sql
+
+# 2026-10-30 清理「空退料单」遗留脏数据(预建空草稿那版留下的,幂等)
+migrate-wo-pick-return-cleanup-20261030.sql
+
+# 2026-11-01 生产领料独立成「领料明细」wo_pick_line;提交后才生成材料出库单(依赖 migrate-wo-pick-doc-20261030)
+migrate-wo-pick-line-20261101.sql
 migrate-clean-blank-prodinfo-and-dept-20261104.sql
 migrate-sinter-workshop-deptname-20261104.sql
