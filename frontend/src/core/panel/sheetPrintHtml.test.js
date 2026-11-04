@@ -11,7 +11,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W,
-  escHtml, planSheetPages, sheetImageMm, sheetPrintHtml,
+  escHtml, planSheetPages, sheetImageMm, sheetPrintBody, sheetPrintHtml,
 } from './sheetPrintHtml.js'
 
 const shot = (w0, h0) => ({ dataUrl: `data:image/png;base64,AAA${w0}x${h0}`, w0, h0 })
@@ -112,6 +112,34 @@ test('⑪ 长表按宽度铺满分张：26 组检验项那种高页不能整张�
   assert.ok(Math.abs(last.y + last.h - 3000) < 1e-6, '最后一张必须取到表尾')
   // 每张的高度换算成 mm 都不能超过内容区（否则会多印空白纸）
   for (const p of plan) assert.ok(p.h * SHEET_MM * p.k <= 281 + 0.01, '单张不得高过纸面内容区')
+})
+
+/* ── sheetPrintBody（2026-11-04 页面内打印层的正文片段）── */
+test('⑬ sheetPrintBody = body 片段不是整份文档，样式必须收在 #yj-print-host 下', () => {
+  const body = sheetPrintBody([shot(1041, 260), shot(1041, 471)])
+  // 页面内打印层把它 innerHTML 进主文档：不许自带 <html>/<head>/<body>（那会毁掉整个主界面）
+  assert.ok(!/<html|<head|<body/i.test(body), '只能是片段，不能是整份文档')
+  assert.match(body, /^<style>/, '片段自带 <style>')
+  // 选择器必须收窄：这段 CSS 进的是主页面，不收窄会和全局样式撞车（《开发与质量》M4）
+  assert.match(body, /#yj-print-host \.pg\{/, '页框样式要收在 #yj-print-host 下')
+  assert.ok(!/(^|[},])\.pg\{/.test(body), '不许出现裸的 .pg 选择器')
+  // 分页口径与整份文档版完全一致
+  assert.match(body, /@page\{size:210mm 297mm;margin:8mm\}/, 'A4 与边距同口径')
+  assert.equal((body.match(/<div class="pg">/g) || []).length, 2, '2 张纸 = 2 个页块')
+  assert.match(body, /\.pg:last-child\{page-break-after:auto/, '末页不分页')
+})
+
+test('⑭ sheetPrintBody 与 sheetPrintHtml 的每页尺寸逐字一致（两个出口不许各算一份）', () => {
+  // ⚠ 长页切张不在这里做：planSheetPages 在 PanelxList.shotsForPages 里先切好
+  //   （切图要用 canvas，纯函数做不到），所以两个出口收到的都是"已切好"的截图数组。
+  const shots = [shot(794, 700), shot(1041, 260), shot(600, 4000)]
+  const body = sheetPrintBody(shots)
+  const html = sheetPrintHtml(shots, 'x', '打印')
+  const imgsOf = (s) => [...s.matchAll(/style="width:[\d.]+mm;height:auto;max-width:100%"/g)].map((m) => m[0])
+  assert.equal(imgsOf(body).length, 3)
+  assert.deepEqual(imgsOf(body), imgsOf(html), '图片毫米尺寸必须同源')
+  const hs = [...body.matchAll(/data-h="([\d.]+)mm"/g)].map((m) => Number(m[1]))
+  assert.deepEqual(hs, [...html.matchAll(/data-h="([\d.]+)mm"/g)].map((m) => Number(m[1])), '页高也必须同源')
 })
 
 test('⑫ 多张截图各算各的（封面矮、检验表长，互不影响）', () => {

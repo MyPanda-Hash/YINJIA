@@ -2503,7 +2503,8 @@ import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaul
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
-import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintHtml } from '@core/panel/sheetPrintHtml'
+import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintBody } from '@core/panel/sheetPrintHtml'
+import { printInPage } from '@core/panel/printChannel'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
 import { useUnsavedStore } from '@/stores/unsaved'
 
@@ -7480,59 +7481,44 @@ async function buildSheetPdfBlob() {
   return { blob: pdf.output('blob'), name: `${r.name}.pdf` }
 }
 
-/* ══════════ 打印 / 打印预览：不再依赖浏览器 PDF 阅读器（2026-10-30 二次修正）══════════
+/* ══════════ 打印 / 打印预览：页面内打印层，**不开窗**（2026-11-04 三次修正）══════════
  *
- * 【为什么放弃"新窗口打开 PDF blob"】用户回帖：「然后还会显示浏览器拦截了打印，改为下载，
- *   是因为我现在没有连接打印机吗？但是不应该是有那个打印页面吗？」，截图里新标签页停在
- *   **about:blank**。这说明窗口开出来了（同步开窗已生效），但浏览器**拒绝把 blob PDF 内联渲染**、
- *   直接当下载处理 —— 典型是 Chrome/Edge 的「下载 PDF 文件，而不是自动在浏览器中打开」设置
- *   （或企业策略 AlwaysOpenPdfExternally）。这跟有没有接打印机**无关**：打印对话框由浏览器提供，
- *   没装打印机时会给出「另存为 PDF」目标。
+ * 【一修】新窗口打开 PDF blob ⇒ 用户机器「下载 PDF 而不是打开」策略把预览变下载，标签停在 about:blank。
+ * 【二修】改成同步开窗 + document.write(HTML) + win.print() ⇒ 绕过了 PDF 阅读器。
+ * 【三修·2026-11-04 客户现场】客户把站点加进「设置 → 网站权限 → 弹出窗口和重定向 →
+ *   允许发送弹出窗口」后，tap 页打印**仍然**弹「浏览器拦截了新窗口，请允许弹出窗口」
+ *   ⇒ 同步开窗 + 白名单这条组合在客户环境根本走不通：广告拦截插件、企业策略
+ *   (DefaultPopupsSetting)、内嵌 WebView 都能挡 `window.open`，白名单只管"站点弹窗"，管不到这些。
+ *   ⇒ 干脆**不开窗**：改用全系统唯一出纸通道 `printInPage`（页面内打印层 + window.print()），
+ *     与《开发与质量》M1「全系统只有一条出纸通道 = printInPage，不许再新写 window.open 打印」对齐。
+ *     M1 记的正是"子窗口打印把主页面一起拖死"的三次事故，这条路径本来就该收编。
  *
- * 【现在的做法】把每页截图直接写进那个新窗口（A4 版面 + 每张纸一页），再唤 `win.print()`：
- *   · 全程不经过 PDF 阅读器 ⇒ 上面那条设置/策略再也影响不到；
- *   · 看到的就是浏览器**原生打印预览**（可打印、可另存为 PDF、可缩放）；
- *   · 走纸版式与"导出 PDF"仍用同一份截图与同一套 mm 换算，两者观感一致。
- *
- * 【分页算术去哪了】挪到 core/panel/sheetPrintHtml.js（纯函数 + 9 条单测）：纸张/边距/96dpi
- *   三个常量也在那里，导出 PDF 的 jsPDF 布局直接复用，不再各写一份。
+ * 【分页算术】在 core/panel/sheetPrintHtml.js（纯函数 + 单测）：纸张/边距/96dpi 三个常量
+ *   也在那里，导出 PDF 的 jsPDF 布局直接复用；`sheetPrintBody` 产出打印正文片段。
  */
 /**
- * 打开「打印预览」窗口。
- * ⚠ 窗口必须**同步**先开（调用方在点击事件里立即调用本函数）：截图要好几秒，
- *   await 之后再 window.open 会被浏览器当弹窗拦掉。
+ * 打印全部页签/分组：逐页截图 → 页面内打印层 → 原生打印预览。
  * @param {string} loadingText 生成中的提示文案（走 tt()）
  */
 async function openSheetPrint(loadingText) {
-  const win = window.open('', '_blank')
   const loadingMsg = ElMessage({ message: tt(loadingText), duration: 0 })
   try {
     const r = await collectSheetShots()
     if (!r) {
-      if (win && !win.closed) win.close()
       ElMessage.warning(tt('未找到可导出的单据'))
       return
     }
-    if (!win || win.closed) {
-      // 同步开窗基本不会被拦；真被拦了不能装作成功（旧实现的"改为下载"就是这么来的）
-      ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
-      return
+    // printInPage 自己会等图片解码完再唤 window.print()（见 printChannel.js），这里不再重复等
+    const ok = printInPage(r.name, sheetPrintBody(r.shots), {
+      onDone: () => ElMessage.success(
+        tt('已生成打印页（共 {n} 张），在打印对话框里直接打印即可').replace('{n}', String(r.shots.length)),
+      ),
+    })
+    if (!ok) {
+      // 连打印对话框都拉不起来（极少数内嵌 WebView）：如实说，别装作成功
+      ElMessage.warning(tt('打印失败：浏览器阻止了打印对话框，请改用「导出 PDF」'))
     }
-    const doc = win.document
-    doc.open()
-    doc.write(sheetPrintHtml(r.shots, r.name, tt('打印')))
-    doc.close()
-    // 等图片解码完再唤打印：data URL 多半是同步的，但不等就可能印出空白页
-    await Promise.all(Array.from(doc.images).map((im) => (
-      im.complete && im.naturalWidth
-        ? Promise.resolve()
-        : new Promise((res) => { im.onload = res; im.onerror = res })
-    )))
-    win.focus()
-    win.print()
-    ElMessage.success(tt('已打开打印预览（共 {n} 张），可直接打印').replace('{n}', String(r.shots.length)))
   } catch (e) {
-    if (win && !win.closed) win.close()
     console.error('sheet-print failed', e)
     ElMessage.error(tt('打印失败') + ':' + (e?.message || ''))
   } finally {

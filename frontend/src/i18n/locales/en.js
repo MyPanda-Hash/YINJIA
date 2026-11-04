@@ -1259,6 +1259,8 @@ export default {
     '正在生成打印件…': 'Generating print copy...',
     '已打开打印件（共 {n} 张），可直接打印': 'Print copy opened ({n} pages), ready to print',
     '已打开打印预览（共 {n} 张），可直接打印': 'Print preview opened ({n} pages), ready to print',
+    '已生成打印页（共 {n} 张），在打印对话框里直接打印即可': 'Print pages ready ({n} pages); print them directly in the print dialog',
+    '打印失败：浏览器阻止了打印对话框，请改用「导出 PDF」': 'Printing failed: the browser blocked the print dialog. Use "Export PDF" instead',
     '浏览器拦截了新窗口，已改为下载 PDF': 'The browser blocked the new tab; the PDF was downloaded instead',
     '在本行下方插入一行': 'Insert a row below this one',
     '选择关联单据': 'Select linked document',
