@@ -320,20 +320,25 @@ test('schedPlanSheetHtml:opts.dates = 勾选行 最前→最后(历史窗口照�
 
 // 2026-11-04 用户口径「这个当前二维码太小了」:二维码按物理尺寸出纸(52px≈13.8mm),不再跟着列数缩;
 //   行数多时才适度收一点,保证一张 A4 装得下。
-test('schedPlanSheetHtml:二维码按物理尺寸(行少 52px / 行多 44→36px),列宽给足', async () => {
+test('schedPlanSheetHtml:二维码尺寸(行少 52px 不缩太小 / 行多 48→36px) + 底图 300px 打印清晰', async () => {
   const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
   const h1 = await schedPlanSheetHtml([mk(1)], [], { dates: ['2026-10-29'] })
-  assert.ok(h1.includes('td.qr img{width:60px;height:60px}'), '行少(≤5)⇒ 二维码 60px(≈15.9mm)')
-  assert.ok(h1.includes('tbody tr{height:66px}'), '行高跟着二维码(60+6)')
-  assert.ok(h1.includes('width:7.5%'), '行少:二维码列 7.5%')
+  assert.ok(h1.includes('td.qr img{width:52px;height:52px}'), '行少(≤5)⇒ 52px(≈13.8mm,比 60 小一点但不至于扫不动)')
+  assert.ok(h1.includes('tbody tr{height:58px}'), '行高跟着二维码(52+6)')
+  assert.ok(h1.includes('width:6%'), '行少:二维码列 6%(给日期列让 1.5% 宽度)')
+  // 底图分辨率:PNG IHDR 的 width(偏移 16)应为 300 —— 打印才能清晰(以前 108px 放大发虚)
+  const url = (h1.match(/src="(data:image\/png;base64,[^"]+)"/) || [])[1]
+  assert.ok(url, '应带二维码图片')
+  const png = Buffer.from(url.split(',')[1], 'base64')
+  assert.equal(png.readUInt32BE(16), 300, '二维码底图 300px(打印等效 500+dpi)')
 
   const wide = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
   const h2 = await schedPlanSheetHtml([mk(2)], [], { dates: wide })
-  assert.ok(h2.includes('td.qr img{width:60px;height:60px}'), '10 列但只有 1 行 ⇒ 仍给 60px')
-  assert.ok(h2.includes('width:7.5%'), '二维码列 7.5%(给 60px 留位置)')
+  assert.ok(h2.includes('td.qr img{width:52px;height:52px}'), '10 列但只有 1 行 ⇒ 仍 52px')
+  assert.ok(h2.includes('width:6%'), '二维码列 6%')
 
   const mid = await schedPlanSheetHtml(Array.from({ length: 8 }, (_, i) => mk(i)), [], { dates: wide })
-  assert.ok(mid.includes('td.qr img{width:52px;height:52px}'), '8 行 ⇒ 收到 52px')
+  assert.ok(mid.includes('td.qr img{width:48px;height:48px}'), '8 行 ⇒ 收到 48px')
 
   const many = Array.from({ length: 16 }, (_, i) => mk(i))
   const h3 = await schedPlanSheetHtml(many, [], { dates: wide })

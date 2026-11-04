@@ -773,11 +773,12 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
   const compact = n > 7
   const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
-  // 二维码列宽/像素(2026-11-04 用户口径「二维码太小」):按**物理尺寸**给,不跟着列数缩 ——
-  //   行少(≤5)给 60px≈15.9mm 最好扫,行多逐渐收到 52/44/36px,保证一张 A4 装得下
-  //   (之前 compact 模式跟着列数缩到 28px≈7mm,纸面根本扫不动)。
-  const qrPx = list.length <= 5 ? 60 : list.length <= 8 ? 52 : list.length <= 14 ? 44 : 36
-  const qrW = list.length <= 5 ? 7.5 : (compact ? 6.5 : 6)
+  // 二维码尺寸(2026-11-04 口径演进:28px「太小」→ 60px → **再缩一点但别太小**):
+  //   行少(≤5)52px≈13.8mm、≤8 行 48px、≤14 行 42px、更多 36px;列宽同步收 1.5%(给日期列让位)。
+  //   ⚠ 能不能扫不只取决于显示大小:woQrImg 把**底图**提到 300px、白边(margin)加到 2 个模块 ——
+  //     以前底图只有 108px、白边 1 模块,打印放大后边缘发虚,才是「有的行能扫、有的扫不到」的主因。
+  const qrPx = list.length <= 5 ? 52 : list.length <= 8 ? 48 : list.length <= 14 ? 42 : 36
+  const qrW = list.length <= 5 ? 6 : (compact ? 6.5 : 6)
   const rowH = Math.max(38, qrPx + 6)
   const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0) * fixedScale
   // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
@@ -833,7 +834,9 @@ async function woQrImg(row) {
   try {
     const lib = qrLib()
     if (!lib) throw new Error('qrcode lib unavailable')
-    return await lib.toDataURL(woQrText(row), { margin: 1, errorCorrectionLevel: 'M' })
+    // width=300:按 13.8mm 打印仍等效 500+dpi(以前 108px 底图放大发虚);
+    // margin=2:静区留 2 个模块,手机扫更稳(1 个模块时表格线贴着码,常扫不出)。
+    return await lib.toDataURL(woQrText(row), { margin: 2, errorCorrectionLevel: 'M', width: 300 })
   } catch (e) {
     console.warn('[print-formats] 排单计划二维码生成失败:', e?.message || e)
     return ''

@@ -104,8 +104,8 @@ try {
   const cells0227 = r0227 ? r0227.slice(firstDateIdx, firstDateIdx + 10) : []
   console.log('0227 日期格 =', JSON.stringify(cells0227))
   check('0227 历史三格 2000/2000/2000 照印(旧实现全空)', cells0227.slice(0, 3).join(',') === '2000,2000,2000', cells0227.slice(0, 3).join(','))
-  // 2026-11-04 用户口径「二维码太小」:行少时二维码 60px(≈15.9mm),不再跟列数缩成 28px
-  check('二维码按物理尺寸放大(行少 ⇒ 60px ≈15.9mm)', L1.qrCss === '60px', 'qr=' + L1.qrCss)
+  // 2026-11-04 口径:行少 52px(≈13.8mm,比 60px 略小但不至于扫不动);底图另提 300px(见单测)
+  check('二维码行少 ⇒ 52px ≈13.8mm(略缩小但保留可扫)', L1.qrCss === '52px', 'qr=' + L1.qrCss)
 
   const png = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
   await fs.writeFile(new URL('./shot-range-print-all4.png', import.meta.url), Buffer.from(png.result.data, 'base64'))
