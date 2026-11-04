@@ -26,6 +26,7 @@
  */
 import { SLOT_COUNT, POWDER_SLOTS, GLUE_SLOTS, CONVERTED_SLOTS, DEFAULT_LENGTH_TOL } from './recipeConstants.js'
 import { detailRowsOf } from '../panel/detailRows.js'
+import { workshopMatches } from './workshopNo.js'
 
 export const SLOT_GROUPS = { POWDER: '粉料', GLUE: '胶粉', CONVERTED: '折算料' }
 
@@ -292,11 +293,20 @@ export function normalizeSinterRow(row) {
   return row
 }
 
-/** 按车间挑行:表里 `1/3` 这种写法表示两个车间共用该型号,所以按 '/' 拆开匹配 */
+/** 按车间挑行:表里 `1/3` 这种写法表示两个车间共用该型号,所以按 '/' 拆开匹配
+ *
+ *  2026-11-04(用户口径 A「两边都不改,代码做映射」):
+ *    单据的「生产车间」来自部门档案(`1#车间`),模具表存裸号(`1`) —— 原实现只做**字符串精确比较**,
+ *    所以选完车间永远筛出 0 行、型号下拉全空。现在两级:
+ *      ① 先按原样字符串比(写法完全一致时行为与改造前**一字不差**);
+ *      ② 一个都没命中时,再按**车间号**比(`1#车间` ≡ `1`,`1/3` 两段都算)。
+ *    归一规则见 core/mold/workshopNo.js。 */
 export function sinterRowsForWorkshop(rows, workshop) {
   const w = String(workshop ?? '').trim()
   if (!w) return rows || []
-  return (rows || []).filter((r) => String(r?.['车间'] ?? '').split('/').map((s) => s.trim()).includes(w))
+  const exact = (rows || []).filter((r) => String(r?.['车间'] ?? '').split('/').map((s) => s.trim()).includes(w))
+  if (exact.length) return exact
+  return (rows || []).filter((r) => workshopMatches(r?.['车间'], w))
 }
 
 /** 选中行 → 引擎要的外径/内径(取不到给 null,交给 paramsFromHead 回退单据) */

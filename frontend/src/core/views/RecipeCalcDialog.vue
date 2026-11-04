@@ -271,6 +271,9 @@ import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisture
 import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialClearFor, materialFillFor,
   uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
+// 产品编号带 -tb 后缀(成型工艺清单/烧结工艺清单,见 core/panel/productCodeSuffix.js):
+// 查产品信息表/规格书必须用**原始编号**,否则 condition 走 LIKE '%…-tb%' 一条都命中不到。
+import { rawProductCode } from '@/core/panel/productCodeSuffix.js'
 import { slicePage } from '@/core/ui/selectPage.js'
 import SelectPager from '@/core/ui/SelectPager.vue'
 import { invRowsOf } from '@/core/panel/invCarry.js'
@@ -892,7 +895,11 @@ async function findDensityHistory(code) {
 }
 async function carrySpec() {
   if (carrying.value) return
-  const code = productCode.value
+  // 2026-11-04 修:本面板的产品编号存的是 `YJ-CB-2026-001-tb` 形态,
+  //   直接拿去查产品信息表(RD_PROD_INFO 存原始编号)命中 0 行 ⇒ 规格/密度"一键带出"总是空。
+  //   实测 SQL:`产品编号 LIKE '%YJ-CB-2026-001-tb%'` = 0 行,剥后缀才命中。
+  //   密度历史查询仍用原样 code(listDocNos('RD_MOLD_PROC', …) 查的是本面板自己的单,存的就是带后缀值)。
+  const code = rawProductCode(productCode.value)
   if (!code) { ElMessage.warning(tt('请先在页 1 产品基本信息里选「炭棒编号」')); return }
   carrying.value = true
   try {

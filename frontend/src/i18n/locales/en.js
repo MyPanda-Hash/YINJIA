@@ -3841,6 +3841,11 @@ export default {
     '尺寸表没有可用行': 'the size table has no usable rows',
     '读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the sintering size table (panel permission missing?) — enter sizes on the document instead',
     '读不到生产模具表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the production mold table (panel permission missing?) — enter sizes on the document instead',
+    /* 检验要求 · 炭棒尺寸的「选型号」下拉(2026-11-04:按生产车间筛型号 → 一次填四格) */
+    '选型号（按生产车间筛）': 'Pick model (filtered by workshop)',
+    '该车间没有可用型号，请先在生产模具表维护': 'No model for this workshop — maintain the production mold table first',
+    '已按型号 {m} 填入炭棒内外径与公差': 'Filled rod OD/ID and tolerances from model {m}',
+    '手填或规格书带出的值，未匹配到型号': 'Manually entered or carried from the spec — no matching model',
     /* 从标准库勾选/标准库维护 的措辞与既有页面一致(此前只有机翻兜底) */
     '从标准库勾选': 'Pick from Library',
     /* ── 成型工艺清单(页1)按设计图重排:纸面新标签(数据键不变,改名走 yj_field.alias) ── */
