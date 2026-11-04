@@ -48,7 +48,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -208,6 +208,19 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
   assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+test('pickPlanSheetRows:只留勾选行、保持页面顺序;没勾选=空(不悄悄退回整线全打)', () => {
+  const rows = [
+    { 行id: 11, 加工单号: 'GD-A' }, { 行id: 12, 加工单号: 'GD-B' }, { 行id: 13, 加工单号: 'GD-C' },
+  ]
+  assert.deepEqual(pickPlanSheetRows(rows, [13, 11]).map((r) => r.加工单号), ['GD-A', 'GD-C'],
+    '只留勾选的 2 行,顺序仍按页面(不是按勾选先后)')
+  assert.deepEqual(pickPlanSheetRows(rows, []), [], '没勾选 ⇒ 空数组(由调用方提示先勾选)')
+  assert.deepEqual(pickPlanSheetRows(rows, ['12']).map((r) => r.加工单号), ['GD-B'], '字符串 id 也认')
+  assert.deepEqual(pickPlanSheetRows(rows, [null, '']), [], '空 id 不算勾选')
+  assert.deepEqual(pickPlanSheetRows([], [11]), [], '接口没行 ⇒ 空')
+  assert.deepEqual(pickPlanSheetRows(rows, [99]), [], '勾选行已不在返回里 ⇒ 空(不打出别人)')
 })
 
 test('printSchedPlanSheet:空数据不出纸;有数据出**一张**(计划+单据编号+二维码同一行)', async () => {

@@ -96,10 +96,14 @@
                 {{ tt('撤回调拨') }}
               </el-button>
               <!-- 成型车间排单计划(2026-10-31 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,
-                   这样就不需要根据那个产线进行处理了」):整张表出纸,**全部产线一张**、不依赖左侧选线。 -->
-              <el-button v-if="canDo('print')" size="small" type="warning" plain :title="tt('打印当前选中产线的排单计划;未选线=全部产线')"
+                   这样就不需要根据那个产线进行处理了」):整张纸表出纸。
+                   2026-11-03 用户口径「**不是点击排单计划把目前生产线的所有单据打印,而是选择勾选几个打印几个**」
+                   ⇒ 只出勾选行(勾 0 张按钮置灰,与「打印工单」同一套勾选;表头全选 = 整条产线)。 -->
+              <el-button v-if="canDo('print')" size="small" type="warning" plain
+                         :disabled="!checkedSched.length"
+                         :title="tt('勾选工单后打印排单计划,只打印勾选的工单')"
                          @click="printPlanSheet">
-                {{ tt('排单计划') }}
+                {{ tt('排单计划') }}（{{ checkedSched.length }}）
               </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
@@ -269,7 +273,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
-import { printWorkTaskSheet, printSchedPlanSheet } from '@/business/print-formats'
+import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
@@ -572,15 +576,22 @@ function openTrace(noParam) {
   traceVisible.value = true
 }
 
-// ── 成型车间排单计划(2026-10-31):整张报表出纸,取全部产线(与左侧选中哪条线无关) ──
+// ── 成型车间排单计划(2026-10-31):整张纸表出纸 ──
+//   2026-11-01 口径「一个产线打印的排单计划只存在当前的产线东西内容」⇒ 取数带当前选中产线;
+//   2026-11-03 口径「不是把当前产线的所有单据打印,而是勾选几个打印几个」⇒ 出纸前按**勾选行**过滤。
+//   ⚠ 过滤放在前端做:接口仍按 (scope, 产线) 取数,不新增入参 —— 这是纯出纸选择交互,
+//     不值得为它改后端 jar(8090 现役实例不重启也能在 5173 上验到)。
 async function printPlanSheet() {
+  const picked = checkedSched.value
+  if (!picked.length) { ElMessage.warning(tt('请先勾选要打印的工单')); return }
   try {
     // 2026-11-01 用户口径「一个产线打印的排单计划只存在当前的产线东西内容」:
-    //   带了产线 ⇒ 只打这条线;没选线(左侧未点)⇒ 退回全部产线(不让人打出一张空表)
+    //   带了产线 ⇒ 只取这条线;没选线(左侧未点)⇒ 退回全部产线(不让人打出一张空表)
     const res = await request.post('/px/scheduleBoard/planSheet',
       { scope: scope.value, 生产线: sel.line || undefined })
     const d = res.data || {}
-    const rows = d['行'] || []
+    // 2026-11-03:只出勾选行(勾几张打几张);过滤是纯函数,单测在 print-formats.test.js
+    const rows = pickPlanSheetRows(d['行'], picked.map((r) => r.行id))
     if (!rows.length) { ElMessage.warning(tt('没有可打印的排产行')); return }
     await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: 5 })
   } catch (e) { err(e, '打印失败') }

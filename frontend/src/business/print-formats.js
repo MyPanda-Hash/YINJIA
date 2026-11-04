@@ -604,6 +604,24 @@ export function planSheetDates(dates, today, days = 5) {
 }
 
 /**
+ * 排单计划·**勾选打印**(2026-11-03 用户口径「不是点击排单计划把目前生产线的所有单据打印,
+ * 而是选择勾选几个打印几个」)—— 从接口返回的行里挑出**勾选的那些行**再出纸。
+ *
+ * <p>保持接口返回的行序(= 页面排产明细的顺序),不按勾选顺序重排;勾选为空 ⇒ 返回空数组
+ * (由调用方提示"请先勾选",绝不悄悄退回"整条产线全打")。
+ *
+ * @param {Array} rows /px/scheduleBoard/planSheet 的 `行`(每行带 `行id`)
+ * @param {Array} ids  勾选行的 `行id`(数字/字符串都认)
+ */
+export function pickPlanSheetRows(rows, ids) {
+  const set = new Set((Array.isArray(ids) ? ids : [])
+    .filter((x) => x != null && x !== '')
+    .map((x) => String(x)))
+  if (!set.size) return []
+  return (Array.isArray(rows) ? rows : []).filter((r) => r && set.has(String(r['行id'])))
+}
+
+/**
  * 生成排单计划 HTML(纯函数,便于单测;真正出纸见 {@link printSchedPlanSheet})。
  * @param {Array} rows  /px/scheduleBoard/planSheet 的 `行`
  * @param {Array} dates 日期列(`日期`)
