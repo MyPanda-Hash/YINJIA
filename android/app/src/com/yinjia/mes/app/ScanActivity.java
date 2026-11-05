@@ -351,6 +351,9 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         ui.post(new Runnable() {
             @Override public void run() {
                 multiPanel.setVisibility(View.VISIBLE);
+                // 2026-11-05 用户报「提示框挡住按钮了」:hint 与面板都贴底,且 hint 在 later 绘制 ⇒ 盖住按钮。
+                // 面板自己有标题,底部提示这时没必要显示,直接藏掉。
+                hint.setVisibility(View.GONE);
                 int n = snapshot.size();
                 if (multiMode) {
                     multiTitle.setText("已识别 " + n + " 个码 · 已选 " + picked.size() + " 个(默认全选,点一行可取消)");
@@ -443,7 +446,8 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             for (String c : sortedCodes()) if (picked.contains(c)) out.add(c);
         }
         if (out.isEmpty()) {
-            hint.setText("还没勾选任何码:点一行勾上,或点『全选』");
+            vibrate(60);
+            multiTitle.setText("还没勾选任何码:点一行勾上,或点『全选』");
             return;
         }
         found = true;
@@ -462,6 +466,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         }
         panelShown = false;
         multiPanel.setVisibility(View.GONE);
+        hint.setVisibility(View.VISIBLE);
         multiList.removeAllViews();
         frameSkip = 0;
         hint.setText(multiMode
