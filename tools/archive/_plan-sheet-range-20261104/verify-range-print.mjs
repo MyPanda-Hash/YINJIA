@@ -1,25 +1,23 @@
 /**
- * verify-range-print.mjs —— 验证「排单计划」日期列 = 勾选行最前→最后(2026-11-04 用户口径)
+ * verify-range-print.mjs —— 验证「排单计划」只印 N 天(默认 3,可设置)(2026-11-05 客户口径)
  *
- * 用户口径:「当前想法是打印的就按这些勾选的表中最前面的日期到最后的一个日期就行」。
+ * 客户原话:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置。」
+ * ⇒ 日期列 = 勾选行最早日期起 N 天;N 由「排单计划」右侧小设置按钮配置(默认 3,1~10)。
  *
- * 做法(CDP,对着 5173 源码实例跑;后端用 8090 现役 jar,/planSheet 接口本轮未改):
- *   1. 登录 → 工单排产页 → 选「2号车间」(未完工 4 张);
- *   2. 打桩 window.print → 勾选全部 4 行 → 点「排单计划」→ 读页面内打印层:
- *      - 日期列表头 = 10/29 … 11/7(最前→最后,共 10 列;**不再从今天 11-04 起**);
- *      - 0227 行的 10-29/30/31 三格 = 2000(历史量照印,旧实现这三格全空);
- *      - 行数 = 4、标题照旧、window.print 只调 1 次;
- *   3. 只勾 0227 一行再打一次:日期列收窄成 10月29日~10月31日(3 列、M月D日 写法);
- *   4. 截图落 shot-range-print.png。
+ * 做法(CDP,对着 8090 现役构建跑):
+ *   1. 登录 → 工单排产 → 选「2号车间」→ 全选 → 打桩 window.print → 点「排单计划」→ 读打印层:
+ *      日期列 = **3 列**(默认)、行数 = 勾选数、标题/二维码照旧、「客户等级」列已隐藏;
+ *   2. 点右侧设置按钮 → 弹窗里把默认天数改成 5 → 保存 → 再打一次 ⇒ 日期列 = **5 列**;
+ *   3. 只勾一行 ⇒ 日期列仍是 3 列(从该行最早日期起)。
  *
- * 用法: node verify-range-print.mjs [base]   (默认 http://localhost:5173)
+ * 用法: node verify-range-print.mjs [base]
  */
 import { createRequire } from 'node:module'
 import fs from 'node:fs/promises'
 const require = createRequire('D:/workspace/yinjia/tools/archive/')
 const { launch, sleep } = require('./_cdpclient.cjs')
 
-const BASE = process.argv[2] || 'http://localhost:5173'
+const BASE = process.argv[2] || 'http://127.0.0.1:8090'
 const LINE = '2号车间'
 
 const LOGIN_JS = `(() => {
@@ -30,28 +28,39 @@ const LOGIN_JS = `(() => {
   if (!btn) return 'no-button'; btn.click(); return 'clicked'
 })()`
 
-const s = await launch({ port: 9482 })
-let pass = 0, fail = 0
-const check = (name, ok, extra = '') => {
-  console.log((ok ? '[PASS] ' : '[FAIL] ') + name + (extra ? '  ' + extra : ''))
-  ok ? pass++ : fail++
-}
 const BTN_JS = `(() => [...document.querySelectorAll('button')].find(b => (b.innerText || '').replace(/\\s+/g,'').startsWith('排单计划')))()`
 
-/** 读页面内打印层 */
 const LAYER_JS = `(() => {
   const host = document.getElementById('yj-print-host')
   const trs = host ? [...host.querySelectorAll('tbody tr')] : []
   const ths = host ? [...host.querySelectorAll('thead th')].map(t => (t.innerText||'').trim()) : []
   return JSON.stringify({
     printed: window.__printed || 0,
-    hasLayer: !!host,
     title: document.title,
     n: trs.length,
     heads: ths,
-    qrCss: (() => { const img = host && host.querySelector('td.qr img'); return img ? getComputedStyle(img).width : '' })(),
     rows: trs.map(tr => [...tr.querySelectorAll('td')].map(td => (td.innerText||'').trim())),
+    qrCss: (() => { const img = host && host.querySelector('td.qr img'); return img ? getComputedStyle(img).width : '' })(),
   })
+})()`
+const isDateHead = (h) => /^\d{1,2}\/\d{1,2}$/.test(h) || /^\d{1,2}月\d{1,2}日$/.test(h)
+
+const s = await launch({ port: 9490 })
+let pass = 0, fail = 0
+const check = (name, ok, extra = '') => {
+  console.log((ok ? '[PASS] ' : '[FAIL] ') + name + (extra ? '  ' + extra : ''))
+  ok ? pass++ : fail++
+}
+const selLine = (line) => `(() => {
+  const hit = [...document.querySelectorAll('.wb-line')].find(x => ((x.querySelector('.wb-line-name') || {}).innerText || '').trim() === ${JSON.stringify(line)})
+  if (!hit) return 'no-node'; (hit.querySelector('.wb-line-name') || hit).click(); return 'clicked'
+})()`
+const pickAll = `(() => {
+  const rows = [...document.querySelectorAll('.wb-block .el-table__body tbody tr, .wb-block .el-table__body-wrapper tbody tr')]
+  let n = 0
+  for (const tr of rows) { const box = tr.querySelector('td:first-child .el-checkbox'); if (box) { (box.querySelector('input') || box).click(); n++ } }
+  window.print = function () { window.__printed = (window.__printed || 0) + 1 }
+  return n
 })()`
 
 try {
@@ -59,84 +68,73 @@ try {
   await s.navigate(BASE + '/#/login', 2000); await sleep(2500)
   console.log('登录', await s.evaluate(LOGIN_JS)); await sleep(4500)
   await s.navigate(BASE + '/#/prod/plan/workOrderBoard', 3000); await sleep(9000)
+  console.log('选线', await s.evaluate(selLine(LINE))); await sleep(7000)
 
-  console.log('选线', await s.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('.wb-line')].find(x => ((x.querySelector('.wb-line-name') || {}).innerText || '').trim() === ${JSON.stringify(LINE)})
-    if (!hit) return 'no-node'; (hit.querySelector('.wb-line-name') || hit).click(); return 'clicked'
-  })()`))
-  await sleep(7000)
-
-  const rowNos = JSON.parse(await s.evaluate(`(() => {
-    const rows = [...document.querySelectorAll('.wb-block .el-table__body tbody tr, .wb-block .el-table__body-wrapper tbody tr')]
-    return JSON.stringify(rows.map(tr => { const c = [...tr.querySelectorAll('td')].map(td => (td.innerText||'').trim()); return c[1] }))
-  })()`))
-  console.log('该线工单号 =', JSON.stringify(rowNos))
-
-  // 勾全部 4 行
-  console.log('勾选 =', await s.evaluate(`(() => {
-    const rows = [...document.querySelectorAll('.wb-block .el-table__body tbody tr, .wb-block .el-table__body-wrapper tbody tr')]
-    let n = 0
-    for (const tr of rows) { const box = tr.querySelector('td:first-child .el-checkbox'); if (box) { (box.querySelector('input') || box).click(); n++ } }
-    return JSON.stringify({ clicked: n })
-  })()`))
-  await sleep(1000)
-
-  // 打桩 print,保留打印层
-  await s.evaluate(`(() => { window.print = function () { window.__printed = (window.__printed || 0) + 1 }; return 'ok' })()`)
-  console.log('点按钮(4行) =', await s.evaluate(`(() => { const b = ${BTN_JS}; if (!b) return 'no-button'; b.click(); return 'clicked' })()`))
+  // ── 场景 1:默认只印 3 天 ──
+  const picked1 = await s.evaluate(pickAll); await sleep(900)
+  console.log('勾选行数 =', picked1)
+  console.log('点「排单计划」=', await s.evaluate(`(() => { const b = ${BTN_JS}; if (!b) return 'no-button'; b.click(); return 'clicked' })()`))
   await sleep(3500)
-
   const L1 = JSON.parse(await s.evaluate(LAYER_JS))
-  const dateHeads1 = L1.heads.filter((h) => /^\d{1,2}\/\d{1,2}$/.test(h) || /月.*日$/.test(h))
-  console.log('打印层表头 =', JSON.stringify(L1.heads))
-  const expectN = rowNos.length
-  console.log('日期列 =', JSON.stringify(dateHeads1), '行数 =', L1.n, '二维码宽 =', L1.qrCss)
-  check('点一次按钮调用 window.print 1 次', L1.printed === 1, 'printed=' + L1.printed)
-  check('打印层行数 = 勾选张数 ' + expectN, L1.n === expectN, 'rows=' + L1.n)
-  check('标题仍是 成型车间排单计划', L1.title === '成型车间排单计划', L1.title)
-  check('日期列 = 10 列(勾选行最前 10-29 → 最后 11-07),不再从今天 11-04 起', dateHeads1.length === 10, JSON.stringify(dateHeads1))
-  check('首列是 10/29(历史日期照印)', dateHeads1[0] === '10/29', String(dateHeads1[0]))
-  check('末列是 11/7(最后一天)', dateHeads1[dateHeads1.length - 1] === '11/7', String(dateHeads1.at(-1)))
-  const r0227 = L1.rows.find((r) => JSON.stringify(r).includes('GD-2026-10-0227'))
-  const planCells = r0227 ? r0227.slice(r0227.findIndex((v) => v === '0' || v === '') , r0227.length) : []
-  // 0227 行的日期格(日期列紧跟在固定列后面):直接按日期列起点断言更稳 —— 表头里第一个日期列的下标
-  const firstDateIdx = L1.heads.findIndex((h) => h === '10/29')
-  const cells0227 = r0227 ? r0227.slice(firstDateIdx, firstDateIdx + 10) : []
-  console.log('0227 日期格 =', JSON.stringify(cells0227))
-  check('0227 历史三格 2000/2000/2000 照印(旧实现全空)', cells0227.slice(0, 3).join(',') === '2000,2000,2000', cells0227.slice(0, 3).join(','))
-  // 2026-11-04 口径:行少 52px(≈13.8mm,比 60px 略小但不至于扫不动);底图另提 300px(见单测)
-  check('二维码行少 ⇒ 52px ≈13.8mm(略缩小但保留可扫)', L1.qrCss === '52px', 'qr=' + L1.qrCss)
+  const d1 = L1.heads.filter(isDateHead)
+  console.log('日期列 =', JSON.stringify(d1), '| 行数 =', L1.n, '| 表头 =', JSON.stringify(L1.heads))
+  check('默认打印 3 天(日期列 = 3)', d1.length === 3, 'dateCols=' + d1.length)
+  check('打印层行数 = 勾选张数', L1.n === picked1, 'rows=' + L1.n)
+  check('标题仍是「…车间排单计划」', /排单计划$/.test(L1.title), L1.title)
+  check('客户等级列全空 ⇒ 已隐藏', !L1.heads.includes('客户等级'), JSON.stringify(L1.heads.slice(0, 3)))
+  check('二维码照常出纸(按物理尺寸)', L1.qrCss === '52px', 'qr=' + L1.qrCss)
+  const png1 = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  await fs.writeFile(new URL('./shot-print-3days.png', import.meta.url), Buffer.from(png1.result.data, 'base64'))
+  console.log('[written] shot-print-3days.png')
 
-  const png = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
-  await fs.writeFile(new URL('./shot-range-print-all4.png', import.meta.url), Buffer.from(png.result.data, 'base64'))
-  console.log('[written] shot-range-print-all4.png')
+  // ── 场景 2:通过右侧设置按钮改成 5 天,再打 ⇒ 5 列 ──
+  console.log('点设置按钮 =', await s.evaluate(`(() => { const b = document.querySelector('.wb-print-set'); if (!b) return 'no-button'; b.click(); return 'clicked' })()`))
+  await sleep(1200)
+  const dlg = JSON.parse(await s.evaluate(`(() => {
+    const d = [...document.querySelectorAll('.el-dialog')].find(x => (x.innerText||'').includes('排单计划打印设置'))
+    const inp = d && d.querySelector('.el-input-number input')
+    return JSON.stringify({ open: !!d, title: d ? (d.querySelector('.el-dialog__title')||{}).innerText : '', days: inp ? inp.value : null })
+  })()`))
+  console.log('设置弹窗 =', JSON.stringify(dlg))
+  check('右侧小设置按钮能打开「排单计划打印设置」', dlg.open === true, JSON.stringify(dlg.title))
+  check('弹窗里默认天数 = 3', String(dlg.days) === '3', 'days=' + dlg.days)
+  await s.evaluate(`(() => {
+    const d = [...document.querySelectorAll('.el-dialog')].find(x => (x.innerText||'').includes('排单计划打印设置'))
+    const inp = d && d.querySelector('.el-input-number input')
+    if (!inp) return 'no-input'
+    const set = (el, v) => { el.focus(); const dd = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value'); dd && dd.set ? dd.set.call(el, v) : (el.value = v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })) }
+    set(inp, '5')
+    inp.dispatchEvent(new Event('blur', { bubbles: true }))
+    const btn = [...d.querySelectorAll('button')].find(b => (b.innerText||'').trim() === '保存')
+    if (btn) btn.click()
+    return 'saved'
+  })()`); await sleep(1500)
+  console.log('再点「排单计划」=', await s.evaluate(`(() => { const b = ${BTN_JS}; if (!b) return 'no-button'; b.click(); return 'clicked' })()`))
+  await sleep(3500)
+  const L2 = JSON.parse(await s.evaluate(LAYER_JS))
+  const d2 = L2.heads.filter(isDateHead)
+  console.log('设置 5 天后日期列 =', JSON.stringify(d2))
+  check('设置 5 天后打印 5 天(日期列 = 5)', d2.length === 5, 'dateCols=' + d2.length)
+  check('日期列从原最早日期接着往后排', d2[0] === d1[0], `${d2[0]} vs ${d1[0]}`)
+  const png2 = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+  await fs.writeFile(new URL('./shot-print-5days.png', import.meta.url), Buffer.from(png2.result.data, 'base64'))
+  console.log('[written] shot-print-5days.png')
 
-  // 场景 2:只勾 0227 一行 → 3 列 M月D日
-  await s.evaluate(`(() => { const b = ${BTN_JS}; return 'ok' })()`)
+  // ── 场景 3:单行 ⇒ 仍 3 列(从该行最早日期起)──
   await s.navigate(BASE + '/#/prod/plan/workOrderBoard', 2500); await sleep(7000)
-  console.log('重进后选线', await s.evaluate(`(() => {
-    const hit = [...document.querySelectorAll('.wb-line')].find(x => ((x.querySelector('.wb-line-name') || {}).innerText || '').trim() === ${JSON.stringify(LINE)})
-    if (!hit) return 'no-node'; (hit.querySelector('.wb-line-name') || hit).click(); return 'clicked'
-  })()`)); await sleep(6500)
+  await s.evaluate(selLine(LINE)); await sleep(6500)
   await s.evaluate(`(() => {
     const rows = [...document.querySelectorAll('.wb-block .el-table__body tbody tr, .wb-block .el-table__body-wrapper tbody tr')]
-    const tr = rows.find(x => (x.innerText || '').includes('GD-2026-10-0227'))
-    const box = tr && tr.querySelector('td:first-child .el-checkbox')
-    if (box) (box.querySelector('input') || box).click()
+    if (rows[0]) { const box = rows[0].querySelector('td:first-child .el-checkbox'); if (box) (box.querySelector('input') || box).click() }
     window.print = function () { window.__printed = (window.__printed || 0) + 1 }
     return 'ok'
   })()`); await sleep(800)
-  console.log('点按钮(单行 0227) =', await s.evaluate(`(() => { const b = ${BTN_JS}; if (!b) return 'no-button'; b.click(); return 'clicked' })()`))
-  await sleep(3000)
-  const L2 = JSON.parse(await s.evaluate(LAYER_JS))
-  const dateHeads2 = L2.heads.filter((h) => /^\d{1,2}\/\d{1,2}$/.test(h) || /月.*日$/.test(h))
-  console.log('单行日期列 =', JSON.stringify(dateHeads2), '行数 =', L2.n)
-  check('单行 0227:日期列收窄成 3 列 10月29日~10月31日', JSON.stringify(dateHeads2) === JSON.stringify(['10月29日', '10月30日', '10月31日']), JSON.stringify(dateHeads2))
-  check('单行 0227:行数 = 1', L2.n === 1, 'rows=' + L2.n)
-
-  const png2 = await s.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
-  await fs.writeFile(new URL('./shot-range-print-one.png', import.meta.url), Buffer.from(png2.result.data, 'base64'))
-  console.log('[written] shot-range-print-one.png')
+  await s.evaluate(`(() => { const b = ${BTN_JS}; if (b) b.click(); return 'ok' })()`); await sleep(3200)
+  const L3 = JSON.parse(await s.evaluate(LAYER_JS))
+  const d3 = L3.heads.filter(isDateHead)
+  console.log('单行日期列 =', JSON.stringify(d3), '行数 =', L3.n)
+  // 前面把默认天数改成了 5(存 localStorage)⇒ 单行也应继续按 5 天(顺带验证设置持久生效)
+  check('设置 5 天持久生效:单行也按 5 天出纸', d3.length === 5 && L3.n === 1, `cols=${d3.length}, rows=${L3.n}`)
 
   if (s.logs.length) console.log('页面错误日志:', s.logs.slice(0, 5))
   console.log('RESULT:', fail === 0 ? 'PASS' : 'FAIL', `(pass=${pass}, fail=${fail})`)

@@ -925,6 +925,11 @@ export default {
     //   2026-11-03:只打**勾选行**(勾几张打几张),未勾选按钮置灰;
     //   2026-11-04:纸表标题/车间列头随工序产线(成型/切炭/组装…)动态,纸面文字不入翻译层
     '排单计划': 'Scheduling Plan',
+    // 排单计划打印设置(2026-11-05 客户口径:打印只显示 3~4 天,天数自己设)
+    '排单计划打印设置': 'Scheduling plan print settings',
+    '排单计划打印设置(默认打印天数)': 'Scheduling plan print settings (default print days)',
+    '默认打印天数': 'Default print days',
+    '纸表日期列 = 勾选行「最早日期」起 N 天(中间没计划的格子留空);默认 3 天。': 'Date columns start from the earliest date of the checked rows, N days long (empty cells for days without a plan). Default: 3 days.',
     '勾选工单后打印排单计划,只打印勾选的工单': 'Print the scheduling plan of the checked work orders (checked rows only)',
     '请先勾选要打印的工单': 'Select the work orders to print first',
     '没有可打印的排产行': 'No scheduled rows to print',

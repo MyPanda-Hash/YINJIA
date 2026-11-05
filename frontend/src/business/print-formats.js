@@ -723,6 +723,32 @@ export function planSheetDatesFromRows(rows, today = '', days = 5) {
   return out
 }
 
+/** 排单计划默认打印天数(2026-11-05 用户口径:「打印就显示 3 天(或 3~4 天),我们自己可以设置」) */
+export const PLAN_SHEET_DEFAULT_DAYS = 3
+
+/**
+ * 排单计划**实际要印的日期列**(2026-11-05 用户口径,取代 2026-11-04 的"最前→最后")。
+ *
+ * <p>客户原话:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置。」
+ * ⇒ 起点仍取勾选行日计划里**最早的日期**(历史计划照样补打),但往后**只连续印 N 天**;
+ * N 由工单排产页「排单计划」右侧的设置按钮配置(默认 {@link PLAN_SHEET_DEFAULT_DAYS}=3,夹 1~10)。
+ *
+ * <p>为什么不再印整段:日期一多,A4 上只能把每列压到 5~7mm(表头折竖条/数字挤在一起),
+ * 客户明确说"不需要这个超级长而且很丑的排版"。
+ *
+ * @param {Array} rows  勾选后的行(每行带 `日计划`)
+ * @param {string} today 后端 `今天`(勾选行没有任何计划时从这里起算)
+ * @param {number} days  打印天数(1~10,默认 3)
+ * @returns {string[]} 连续 N 个 YYYY-MM-DD
+ */
+export function planSheetPrintDates(rows, today = '', days = PLAN_SHEET_DEFAULT_DAYS) {
+  const num = Number(days)
+  const n = Math.min(Math.max(Math.trunc(Number.isFinite(num) && num > 0 ? num : PLAN_SHEET_DEFAULT_DAYS), 1), 10)
+  const all = planSheetDatesFromRows(rows, today, n)
+  const start = all[0] || String(today || '').slice(0, 10)
+  return planSheetWindow(start, n)
+}
+
 /** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天
  *  (2026-11-04 起出纸改走 {@link planSheetDatesFromRows};本函数保留给旧调用/兜底) */
 export function planSheetDates(dates, today, days = 5) {

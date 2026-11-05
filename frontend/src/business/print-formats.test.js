@@ -55,7 +55,8 @@ globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
   schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows,
   planSheetShop, planSheetTitle,
-  planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS } = await import('./print-formats.js')
+  planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS,
+  planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -262,6 +263,22 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
   assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+// 2026-11-05 客户口径:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置」
+//   ⇒ 日期列 = 勾选行最早日期起,连续只印 N 天(默认 3,可设 1~10),不再印"最前→最后"的长表。
+test('planSheetPrintDates:默认只印 3 天(从勾选行最早日期起),天数可设 1~10', () => {
+  const rows = [{ 日计划: { '2026-10-29': 2000, '2026-10-30': 2000, '2026-11-07': 222 } }]
+  assert.equal(PLAN_SHEET_DEFAULT_DAYS, 3, '默认 3 天')
+  assert.deepEqual(planSheetPrintDates(rows, '2026-11-05'),
+    ['2026-10-29', '2026-10-30', '2026-10-31'], '默认 3 天,从最早日期起')
+  assert.deepEqual(planSheetPrintDates(rows, '2026-11-05', 4),
+    ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01'], '可设 4 天(第 4 天没计划也留空列)')
+  assert.deepEqual(planSheetPrintDates(rows, '2026-11-05', 1), ['2026-10-29'], '最少 1 天')
+  assert.equal(planSheetPrintDates(rows, '2026-11-05', 99).length, 10, '最多 10 天')
+  assert.equal(planSheetPrintDates(rows, '2026-11-05', 'bad').length, 3, '非法天数 ⇒ 回默认 3 天')
+  assert.deepEqual(planSheetPrintDates([], '2026-11-05'),
+    ['2026-11-05', '2026-11-06', '2026-11-07'], '勾选行没有计划 ⇒ 今天起 3 天')
 })
 
 // 2026-11-04 用户口径「当前在不同的工序产线显示的这个工序名称也要不同」

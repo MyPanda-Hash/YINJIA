@@ -107,6 +107,12 @@
                          @click="printPlanSheet">
                 {{ tt('排单计划') }}（{{ checkedSched.length }}）
               </el-button>
+              <!-- 打印设置(2026-11-05 客户口径:「打印就显示 3 天或 3~4 天,这样子我们自己可以去设置」):
+                   小设置按钮 → 改默认打印天数(1~10),存本机(按账号),只影响日期列数量,不影响取数。 -->
+              <el-button v-if="canDo('print')" size="small" plain class="wb-print-set"
+                         :title="tt('排单计划打印设置(默认打印天数)')" @click="openPrintSet">
+                <el-icon><Setting /></el-icon>
+              </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
             </div>
@@ -219,6 +225,22 @@
       </div>
     </div>
 
+    <!-- 排单计划打印设置(2026-11-05):默认打印天数 —— 客户要"打印就显示 3 天/3~4 天,自己可设" -->
+    <el-dialog v-model="printSetVisible" :title="tt('排单计划打印设置')" width="380px" append-to-body>
+      <el-form label-width="116px" class="wb-print-set-form">
+        <el-form-item :label="tt('默认打印天数')">
+          <el-input-number v-model="printDaysDraft" :min="1" :max="10" size="small" />
+          <div class="wb-print-set-hint">
+            {{ tt('纸表日期列 = 勾选行「最早日期」起 N 天(中间没计划的格子留空);默认 3 天。') }}
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="printSetVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="savePrintSet">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 调拨弹窗(9.29 批次②;2026-10-29 收口「调拨只能调拨到当前工序的产线中」;
          2026-10-30 排版:改**两列表单**(标签定宽右对齐 + 控件一列对齐 + 行距 14px),
          不再把标签和下拉挨着摆 —— 原先 inline-flex 各写各的宽度,标签一长一短就挤成一团 -->
@@ -275,7 +297,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
-import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetDatesFromRows } from '@/business/print-formats'
+import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS } from '@/business/print-formats'
+import { Setting } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
@@ -301,6 +324,29 @@ const checkedSched = ref([])
 const s = ref({})
 /** 刷新按钮 loading(2026-10-17):loadAll 期间置真,避免连点 */
 const loading = ref(false)
+
+// ── 排单计划打印设置(2026-11-05 客户口径:「打印就显示 3 天或 3~4 天,这样子我们自己可以去设置」)──
+//   只影响日期列数量(默认 3 天,1~10);按登录账号存 localStorage,刷新/重开浏览器仍生效。
+const PLAN_DAYS_KEY = 'yj.planSheet.printDays'
+const printDays = ref(PLAN_SHEET_DEFAULT_DAYS)
+const printDaysDraft = ref(PLAN_SHEET_DEFAULT_DAYS)
+const printSetVisible = ref(false)
+function printDaysKey() { return PLAN_DAYS_KEY + '.' + (permUser.account || 'default') }
+function readPrintDays() {
+  try {
+    const v = Number(localStorage.getItem(printDaysKey()))
+    return Number.isFinite(v) && v >= 1 && v <= 10 ? Math.trunc(v) : PLAN_SHEET_DEFAULT_DAYS
+  } catch { return PLAN_SHEET_DEFAULT_DAYS }
+}
+function openPrintSet() { printDaysDraft.value = printDays.value; printSetVisible.value = true }
+function savePrintSet() {
+  const v = Math.min(Math.max(Math.trunc(Number(printDaysDraft.value) || PLAN_SHEET_DEFAULT_DAYS), 1), 10)
+  printDays.value = v
+  try { localStorage.setItem(printDaysKey(), String(v)) } catch { /* 隐私模式忽略 */ }
+  printSetVisible.value = false
+  ElMessage.success(tt('已保存') + '：' + tt('排单计划') + ' ' + v + ' ' + tt('天'))
+}
+printDays.value = readPrintDays()
 
 const raVisible = ref(false)
 const raLine = ref('')
@@ -598,14 +644,14 @@ async function printPlanSheet() {
     // 2026-11-03:只出勾选行(勾几张打几张);过滤是纯函数,单测在 print-formats.test.js
     const rows = pickPlanSheetRows(d['行'], picked.map((r) => r.行id))
     if (!rows.length) { ElMessage.warning(tt('没有可打印的排产行')); return }
-    // 2026-11-04 用户口径:「打印的就按这些勾选的表中最前面的日期到最后的一个日期就行」⇒
-    //   日期列 = 勾选行日计划从最早到最晚(中间空列照留),不再固定"今天起 5 天";
-    //   历史/跨月计划直接补打得出来。纯函数 planSheetDatesFromRows 有单测。
-    const dates = planSheetDatesFromRows(rows, d['今天'] || '', 5)
+    // 2026-11-05 客户口径:「打印的就显示 3 天或 3~4 天,这样子我们自己可以去设置」⇒
+    //   起点 = 勾选行日计划里最早的日期,往后**只印 N 天**(N=右上设置按钮里的默认天数,1~10);
+    //   不再印"最前→最后"的超长表(日期一多 A4 上只能压成 5~7mm,表头/数字都挤坏)。
+    const dates = planSheetPrintDates(rows, d['今天'] || '', printDays.value)
     // 2026-11-04:纸表「工序名称」= 本次产线的 生产车间(车间是产线的属性,bs_prod_line.生产车间);
     //   左侧选了线就用该线的车间,没选线则交给 print-formats 从勾选行的工序里推导唯一值。
     const shop = lineSummary.value.find((l) => l.生产线 === (sel.line || rows[0]?.['生产线']))?.生产车间 || ''
-    await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: 5, dates, shop })
+    await printSchedPlanSheet(rows, d['日期'] || [], { today: d['今天'] || '', days: printDays.value, dates, shop })
   } catch (e) { err(e, '打印失败') }
 }
 
@@ -794,6 +840,9 @@ onMounted(() => {
 .wb-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; flex-wrap: wrap; }
 .wb-block-title { font-weight: 600; font-size: 13px; color: #303133; }
 .wb-actions { margin-left: auto; }
+.wb-print-set { padding: 5px 7px; }
+.wb-print-set-form { padding-top: 4px; }
+.wb-print-set-hint { margin-top: 6px; font-size: 12px; line-height: 1.6; color: #909399; }
 .wb-closed { color: #f56c6c; font-weight: 600; }
 .wb-trace-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .wb-trace-no { font-size: 16px; font-weight: 700; color: #1e6fb8; }
