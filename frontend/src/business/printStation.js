@@ -84,6 +84,14 @@ export async function queueToPrintStation(payload) {
       工单行号: Number(payload?.工单行号) || 0,
       产品名称: payload?.产品名称 || '',
       规格型号: payload?.规格型号 || '',
+      // 🔴 2026-11-04 补:纸面「领料单」的 No 单号与七列表格靠这几个字段,
+      //   以前这里**只转发了抬头+二维码**,后端/代理收到的任务没有明细 ⇒ 打出来是一张
+      //   空表头的纸(用户 2026-11-02 要的"纸质领料单"样式一直缺表格)。
+      //   载荷本来就在 payload 里(`/px/mobilePick/reprint` 的 `打印`),照原样透传即可。
+      领料单号: payload?.领料单号 || '',
+      领料部门: payload?.领料部门 || '',
+      打印日期: payload?.打印日期 || '',
+      明细: Array.isArray(payload?.明细) ? payload.明细 : [],
       来源: payload?.来源 || 'mobile',
     })
     const d = res.data?.data || res.data || {}
