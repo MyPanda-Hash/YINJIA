@@ -4439,7 +4439,6 @@ migrate-wo-pick-return-cleanup-20261030.sql
 migrate-wo-pick-line-20261101.sql
 migrate-clean-blank-prodinfo-and-dept-20261104.sql
 migrate-sinter-workshop-deptname-20261104.sql
-migrate-sinter-workshop-deptname-20261104.sql
 migrate-print-station-20261104.sql
 
 # 2026-11-04 组装物料清单(ASM_BOM)表头可维护:表头 8 字段 editable 0→1、产品编码/子件编码 改参照 INV、
@@ -4478,6 +4477,7 @@ migrate-oqc-report-tpl-20261104.sql
 #   同时这个脚本要能导入到服务器中去」。
 #   ⚠ 幂等:只 DELETE 来源=金蝶BOM引出列表_20261019174847 的行再全量插入,不碰面板手工新建的 BOM;
 #   须晚于 migrate-asm-bom-20261030.sql(建表)。两账套已执行(RESULT: 23 batches + 自检 PASS)。
+migrate-drop-bak-qc-snapshots-20261102.sql
 migrate-asm-bom-data-full-20261105.sql
 
 # 2026-11-05 生产工单「转领料单」下架(用户口径:「把当前这个转领料单的按钮删除,记得把权限设置中的也去除掉,
