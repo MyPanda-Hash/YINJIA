@@ -170,7 +170,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         });
 
         hint.setText(multiMode
-                ? "对准整张任务单:可一次扫多个码,勾选后点『生成』"
+                ? "对准整张任务单:可一次扫多个码,勾选后点『确定』"
                 : "对准二维码 / 条形码;点屏幕开关手电;返回键取消");
     }
 
@@ -283,7 +283,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
                 if (ctr != null) { c.px = ctr[0]; c.py = ctr[1]; }
             }
 
-            if (cands.size() >= 2) {
+            if (cands.size() >= (multiMode ? 1 : 2)) {
                 if (!panelShown) { panelShown = true; vibrate(80); }
                 if (added) refreshPanel();
                 return;
@@ -347,14 +347,14 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
                 int n = snapshot.size();
                 if (multiMode) {
                     multiTitle.setText("已识别 " + n + " 个码 · 已选 " + picked.size() + " 个(默认全选,点一行可取消)");
-                    hint.setText("勾选要生成工单领料单的工单,点右下『生成』");
+                    hint.setText("勾选要生成工单领料单的工单,点右下『确定』");
                 } else {
                     multiTitle.setText("已识别 " + n + " 个码 · 按纸面顺序排列,点一条选用");
                     hint.setText("可以在下面点选,也可以继续对准让更多码进来");
                 }
                 btnAll.setVisibility(multiMode ? View.VISIBLE : View.GONE);
                 btnPick.setVisibility(multiMode ? View.VISIBLE : View.GONE);
-                btnPick.setText("生成(" + picked.size() + ")");
+                btnPick.setText("确定(" + picked.size() + ")");
                 btnAll.setText(picked.size() >= n ? "全不选" : "全选");
 
                 multiList.removeAllViews();
@@ -452,7 +452,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         multiList.removeAllViews();
         frameSkip = 0;
         hint.setText(multiMode
-                ? "对准整张任务单:可一次扫多个码,勾选后点『生成』"
+                ? "对准整张任务单:可一次扫多个码,勾选后点『确定』"
                 : "对准二维码 / 条形码;点屏幕开关手电;返回键取消");
     }
 

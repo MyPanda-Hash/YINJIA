@@ -52,17 +52,14 @@
         />
         <el-button size="large" @click="addQueue">{{ tt('添加') }}</el-button>
         <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
-        <!-- 多选扫码(2026-11-05 用户口径「这个界面的扫码能不能支持多选,可以多个订单生成一对一的领料单」):
-             一次扫一沓工单码,勾选后整批进待生成队列,点「批量生成」就是一张工单一对领料/退料单。 -->
-        <el-button v-if="nativeMultiScan" size="large" type="primary" plain @click="scanMultiInto">
-          {{ tt('扫多张') }}
-        </el-button>
       </div>
       <div class="mp-hint">
         {{ tt('按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码') }}
       </div>
+      <!-- 2026-11-05 用户口径:「只要扫码一个按钮,然后扫码界面变成勾选确认就可以了,因为生成保持批量生成」。
+           ⇒ 不再单独放「扫多张」:扫码按钮直接进**多选确认**界面(勾选 → 确定 → 一起进待生成队列)。 -->
       <div v-if="nativeMultiScan" class="mp-hint">
-        {{ tt('「扫多张」= 一次扫多个工单码(按纸面顺序列出、可勾选),它们会一起进下面的待生成队列,再点「批量生成」逐张建单') }}
+        {{ tt('「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单') }}
       </div>
 
       <!-- 待生成队列 -->
@@ -501,21 +498,23 @@ async function refreshAll() {
   okText.value = tt('已刷新')
 }
 
+/**
+ * 扫码(2026-11-05 用户口径:「只要扫码一个按钮,然后扫码界面变成勾选确认就可以了,
+ * 因为生成保持批量生成」)。
+ *
+ * <p>⇒ 这一个按钮统一走**多选确认**:新版 APK 调 `scanMulti()`(扫码页里勾选 → 确定,
+ * 可一次带回多个工单码);老 APK 没有这个能力就退回单码 `scan()`,行为与以前一致。
+ */
 function scanInto() {
-  if (!(window.YjNative && typeof window.YjNative.scan === 'function')) {
+  const yj = (typeof window !== 'undefined') ? window.YjNative : null
+  if (!yj || (typeof yj.scanMulti !== 'function' && typeof yj.scan !== 'function')) {
     errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
     return
   }
-  try { window.YjNative.scan() } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
-}
-
-/** 多选扫码:一次扫多个工单码(需要新版 APK 的 scanMulti;老版本给一句人话提示) */
-function scanMultiInto() {
-  if (!(window.YjNative && typeof window.YjNative.scanMulti === 'function')) {
-    errText.value = tt('当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上')
-    return
-  }
-  try { window.YjNative.scanMulti() } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
+  try {
+    if (typeof yj.scanMulti === 'function') yj.scanMulti()
+    else yj.scan()
+  } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
 }
 
 /** 扫到的工单码 → 解析工单号 + 行号 → 进队列 */

@@ -1,7 +1,7 @@
 ﻿# 银嘉 MES · 安卓壳(`android/`)
 
 > **日期**:2026-10-20
-> **产物**:`android/dist/yinjia-mes-1.0.3.apk`(自签名,可直接侧载)
+> **产物**:`android/dist/yinjia-mes-1.0.4.apk`(自签名,可直接侧载)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
 脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
 
-**手机安装**:把 `android/dist/yinjia-mes-1.0.3.apk` 拷到手机点安装(需允许「安装未知应用」)。
+**手机安装**:把 `android/dist/yinjia-mes-1.0.4.apk` 拷到手机点安装(需允许「安装未知应用」)。
 
 > ⚠ 签名是 `debug.keystore`(自签名,脚本首次运行自动生成,不入库)。**内部侧载够用**;
 > 若要上应用市场/企业分发,换成正式 keystore 并妥善保管(丢了就没法覆盖升级)。
@@ -172,3 +172,11 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
   勾选的码逐个解析成「工单号 + 行号」进待生成队列(重复的跳过并报数),
   再点「批量生成」——后端 `/create/batch` 本来就是**一张工单一对领料/退料单**;
 - 版本:`1.0.3`(versionCode 4)。旧 APK 里没有 `scanMulti` ⇒ 按钮不出现(不会报错)。
+### 8.3 第四轮(2026-11-05):只留一个「扫码」按钮
+
+> 用户:「只要扫码一个按钮,然后扫码界面变成勾选确认就可以了。因为生成保持批量生成」
+
+- 「生成工单领料/退料单」页只剩一个「扫码」,内部优先 `YjNative.scanMulti()`;
+  老 APK 无此方法时退回单码 `scan()`;
+- 多选模式下**收到第一个码就出勾选面板**(不再等第 2 个),底部按钮 `确定(N)`;
+- 版本 `1.0.4`(versionCode 5)。

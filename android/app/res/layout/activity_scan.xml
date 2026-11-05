@@ -70,7 +70,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:textSize="13sp"
-                android:text="生成" />
+                android:text="确定" />
 
             <Button
                 android:id="@+id/multiRescan"
