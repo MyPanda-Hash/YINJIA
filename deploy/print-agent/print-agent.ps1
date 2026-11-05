@@ -178,7 +178,10 @@ function Send-LabelToPrinter {
         [string]$OutNo = '',
         [string]$Dept = '',
         [string]$PrintDate = '',
-        [array]$Rows = @()
+        [array]$Rows = @(),
+        # 纸张(2026-11-05,按每台电脑在「自动打印」页配置):A5=中一刀 210×148.5 横(默认) / A4=297×210 横。
+        # ⚠ 只换纸不缩放:绘制坐标永远是 210×148mm,内容大小与版面一个像素都不变。
+        [string]$Paper = 'A5'
     )
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 
@@ -231,20 +234,29 @@ function Send-LabelToPrinter {
     #   **Microsoft Print to PDF 会把自定义纸型丢掉、仍输出 A4**(读回 PaperSize 是对的,
     #   PDF 的 /MediaBox 却是 595x842pt)⇒ 换成等价的标准纸:
     #   **A5(148×210) 横放 = 210×148mm**,正好是中一刀。标准纸型所有驱动都认。
+    #
+    # 🔴 2026-11-05 用户口径:「能不能设定打印的纸张大小(如 A4 或 A5),但是表格实际占用大小不变」。
+    #   ⇒ 纸张由「自动打印」页**按每台电脑**配置,服务端随任务下发 `纸张`(A5 / A4):
+    #     · A5(默认)= 中一刀 210×148.5mm 横打,与以前一字不差;
+    #     · A4      = A4 横 297×210mm —— **只换纸、不缩放**:下面的绘制坐标仍是 210×148mm,
+    #                 内容从纸张左上角起画(表格/字号一个都不变),多出来的部分是空白。
+    #   注意:这里只能选**标准纸型**;自定义纸型会被 PDF 驱动丢掉(上面那条踩坑)。
     $script:W100 = 827   # 横向 210mm ≈ 8.27in(1/100 英寸)
     $script:H100 = 583   # 纵向 148mm ≈ 5.83in(A5 短边)
+    $paperKind = if (([string]$Paper).Trim().ToUpper() -eq 'A4') { 'A4' } else { 'A5' }
     try {
-        $a5 = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq 'A5' } | Select-Object -First 1
-        if (-not $a5) { $a5 = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match 'A5' } | Select-Object -First 1 }
-        if ($a5) {
-            $doc.DefaultPageSettings.PaperSize = $a5
-            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5 转 90° = 210×148
+        $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq $paperKind } | Select-Object -First 1
+        if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match $paperKind } | Select-Object -First 1 }
+        if ($ps) {
+            $doc.DefaultPageSettings.PaperSize = $ps
+            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5→210×148 / A4→297×210
             $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+            Write-Host ("[版面] 纸张 = {0} 横打(内容仍 210×148mm,不缩放)" -f $paperKind) -ForegroundColor DarkGray
         } else {
-            Write-Host '[WARN] 打印机没有 A5 纸型,按默认纸输出' -ForegroundColor Yellow
+            Write-Host ("[WARN] 打印机没有 {0} 纸型,按默认纸输出" -f $paperKind) -ForegroundColor Yellow
         }
     } catch {
-        Write-Host "[WARN] 设置中一刀(A5 横版)失败,按默认纸输出: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host ("[WARN] 设置纸张({0} 横版)失败,按默认纸输出: {1}" -f $paperKind, $_.Exception.Message) -ForegroundColor Yellow
     }
 
     # 版式数据交给回调(script 作用域,PrintPage 里能读到)
@@ -259,6 +271,14 @@ function Send-LabelToPrinter {
     $script:pDept  = $Dept
     $script:pDate  = $PrintDate
     $script:pRows  = @($Rows)
+
+    # 🔴 2026-11-05 分页:用户问「打印行数会有限制吗?如果大于 9 行,还能打印吗」。
+    #   改前是 `if ($rowCount -gt 12) { $rowCount = 12 }` —— 一页最多 12 行,**第 13 行起
+    #   直接被丢掉**,现场看到的是一张"少料"的领料单,比打不出来更危险。
+    #   现在:一页放 PER_PAGE 行,超出自动续页(每页都重复抬头/表格线/签名),没有上限。
+    $script:pPage = 0
+    $script:pPerPage = 10      # 一页 10 行时行高 ≈ 30px,仍然好读;再多就续页
+    $script:pTotalPages = [Math]::Max(1, [int][Math]::Ceiling((@($script:pRows).Count) / $script:pPerPage))
 
     $doc.add_PrintPage({
         param($sender, $e)
@@ -284,9 +304,25 @@ function Send-LabelToPrinter {
         # 不换行:纸表格子高度有限,换行会被切掉半截(实测订单号只显示 "GD-2026-11-")
         $fmtL.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
 
-        # ① 左上角二维码(用户样张的"红框"位置):码 + 细红框
-        $qrSize = 132
-        if ($script:labelQr) { $g.DrawImage($script:labelQr, 26, 20, $qrSize, $qrSize) }
+        # 本页要画哪些明细(2026-11-05 分页):按页号切片,页内至少 8 行格子(纸表是固定格式)
+        $pageIdx = [int]$script:pPage
+        $script:pPage = $pageIdx + 1
+        $allRows = @($script:pRows)
+        $startAt = $pageIdx * [int]$script:pPerPage
+        $pageRows = @()
+        if ($startAt -lt $allRows.Count) {
+            $takeN = [Math]::Min([int]$script:pPerPage, $allRows.Count - $startAt)
+            $pageRows = @($allRows[$startAt..($startAt + $takeN - 1)])
+        }
+
+        # ① 左上角二维码(用户样张的"红框"位置):码 + 细黑框
+        # 🔴 2026-11-05 用户口径「二维码过大」:132 → 96。原文按 132 画,占了整张中一刀的
+        #   近 1/6 面积,标题被挤到右边、表格也被压窄;96(≈24mm)扫码完全够用。
+        $qrSize = 96
+        if ($script:labelQr) {
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.DrawImage($script:labelQr, 26, 20, $qrSize, $qrSize)
+        }
         # 二维码外框:纸表风格细黑框(样张上的红框是用户标注,纸面本身是黑线表格)
         $g.DrawRectangle($penLine, 22, 16, $qrSize + 8, $qrSize + 8)
 
@@ -296,23 +332,27 @@ function Send-LabelToPrinter {
         $noText = 'No ' + $script:pOutNo
         $g.DrawString($noText, $fontNo, $black, 590, 40)
 
-        # ③ 领料部门 / 日期
-        $g.DrawString('领料部门:', $fontFoot, $gray, 26, 166)
-        $g.DrawString($script:pDept, $fontCell, $black, 112, 166)
-        $g.DrawString('日期:', $fontFoot, $gray, 590, 166)
-        $g.DrawString($script:pDate, $fontCell, $black, 638, 166)
+        # ③ 领料部门 / 日期(随二维码缩小上移,让表格多吃两行)
+        $g.DrawString('领料部门:', $fontFoot, $gray, 26, 134)
+        $g.DrawString($script:pDept, $fontCell, $black, 112, 134)
+        $g.DrawString('日期:', $fontFoot, $gray, 590, 134)
+        $g.DrawString($script:pDate, $fontCell, $black, 638, 134)
+        # 多页时右上角标"第 n/N 页"(单页不画,免得多余)
+        if ([int]$script:pTotalPages -gt 1) {
+            $pgText = '第 ' + ($pageIdx + 1) + '/' + $script:pTotalPages + ' 页'
+            $g.DrawString($pgText, $fontFoot, $gray, 590, 96)
+        }
 
-        # ④ 明细表格:七列,行数按明细补足到 8 行(纸表是固定格子)
+        # ④ 明细表格:七列,行数 = max(8, 本页实际行数)
         $x0 = 22
-        $y0 = 200
+        $y0 = 166
         # 列宽(总 780):订单号必须放得下 "GD-2026-11-0016#1",给到 168
         $colW = @(168, 172, 118, 45, 92, 92, 93)
         $totalW = 0
         foreach ($cw in $colW) { $totalW += $cw }
         $headH = 40
-        $rows = @($script:pRows)
+        $rows = @($pageRows)
         $rowCount = [Math]::Max(8, $rows.Count)
-        if ($rowCount -gt 12) { $rowCount = 12 }
         $tableH = $pageH - 70 - $y0
         $rowH = [Math]::Floor(($tableH - $headH) / $rowCount)
 
@@ -338,7 +378,10 @@ function Send-LabelToPrinter {
 
         for ($ri = 0; $ri -lt $rowCount; $ri++) {
             $yy = $y0 + $headH + $rowH * $ri
-            $vals = @(($script:pWoNo + $script:pLine), '', '', '', '', '', '')
+            # 🔴 2026-11-05 用户报障「明细只有 3 行,却给了多行的数据」:
+            #   以前空行也填「订单号」(GD-…-#1),看上去像 8 行明细全是同一张单。
+            #   现在**只有真有数据的行**才写订单号,空行就是空格子(纸表留白)。
+            $vals = @('', '', '', '', '', '', '')
             if ($ri -lt $rows.Count) {
                 $row = $rows[$ri]
                 $q1 = ''
@@ -361,6 +404,9 @@ function Send-LabelToPrinter {
         $g.DrawString('仓库主管:', $fontFoot, $gray, 230, $fy)
         $g.DrawString('领料人:', $fontFoot, $gray, 440, $fy)
         $g.DrawString('仓管员:', $fontFoot, $gray, 630, $fy)
+
+        # ⑥ 还有下一行没画完 ⇒ 让打印框架再调一次本回调(续页,抬头/表格线/签名都重画)
+        if (($pageIdx + 1) -lt [int]$script:pTotalPages) { $e.HasMorePages = $true }
 
         $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose()
         $fontTitle.Dispose(); $fontNo.Dispose(); $fontHead.Dispose(); $fontCell.Dispose(); $fontFoot.Dispose()
@@ -392,6 +438,9 @@ function Invoke-PrintJob {
     if (-not $printDt) { $printDt = (Get-Date -Format 'yyyy-MM-dd') }
     $rows     = @()
     if ($Job.'明细') { $rows = @($Job.'明细') }
+    # 纸张(2026-11-05):由「自动打印」页按**每台电脑**配置,服务端派单时随任务下发(A5/A4)。
+    # 缺省 A5(中一刀),与以前完全一致。
+    $paper    = [string]($Job.'纸张')
     $printerN = [string]($Job.'printer')
     if (-not $qrText) {
         if ($woNo) {
@@ -414,7 +463,7 @@ function Invoke-PrintJob {
         $path = Join-Path $PdfDir $name
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
         return $path
     }
 
@@ -430,7 +479,7 @@ function Invoke-PrintJob {
     if ($Mode -eq 'Printer') {
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
         return @{ ok = $true; mode = 'printer'; printer = $printerN }
     }
 
@@ -447,7 +496,7 @@ function Invoke-PrintJob {
         }
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
         return @{ ok = $true; mode = 'printer'; printer = $real }
     } catch {
         $why = $_.Exception.Message

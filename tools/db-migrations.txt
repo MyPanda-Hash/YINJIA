@@ -4439,3 +4439,4 @@ migrate-wo-pick-return-cleanup-20261030.sql
 migrate-wo-pick-line-20261101.sql
 migrate-clean-blank-prodinfo-and-dept-20261104.sql
 migrate-sinter-workshop-deptname-20261104.sql
+migrate-print-station-20261104.sql

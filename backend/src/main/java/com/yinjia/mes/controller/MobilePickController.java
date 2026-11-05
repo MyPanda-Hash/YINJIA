@@ -197,11 +197,17 @@ public class MobilePickController {
         StringBuilder sql = new StringBuilder(
                 "SELECT TOP (500) p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.dm,N'') AS 产品编号, ISNULL(p.mc,N'') AS 产品名称,"
+                        // 🔴 2026-11-04 用户口径:「外面的信息不够,没有物料编码单位名称规格型号」——
+                        //   列表原来只有 产品编号/产品名称/排产数量,规格型号与计量单位根本没查。
+                        //   这两个在 plang 上不存在,要回到物料档案 bs_inv(存货编码) 取。
+                        + " ISNULL(i.规格型号,N'') AS 产品规格, ISNULL(i.计量单位,N'') AS 产品单位,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.scx,N'') AS 生产线,"
                         + " ISNULL(p.完工状态,N'') AS 完工状态,"
                         + " d.id AS 台账id, ISNULL(d.领料单号,N'') AS 领料单号, ISNULL(d.状态,N'') AS 状态,"
                         + " ISNULL(d.已领项数,0) AS 已领项数, ISNULL(d.物料项数,0) AS 物料项数"
                         + " FROM dbo.plang p"
+                        // LEFT JOIN:物料档案可能没建档,这时显示空而不是把工单丢掉
+                        + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = p.dm"
                         + " LEFT JOIN dbo.wo_pick_doc d"
                         + "   ON d.工单号 = p.pl_no AND d.工单行号 = p.pl_xc AND d.状态 <> N'已作废'"
                         + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y'");
@@ -232,6 +238,9 @@ public class MobilePickController {
             m.put("工单行号", r.get("工单行号"));
             m.put("产品编号", r.get("产品编号"));
             m.put("产品名称", r.get("产品名称"));
+            // 规格型号 / 计量单位(2026-11-04):取自物料档案,供列表直接显示,免得点开明细才知道
+            m.put("产品规格", r.get("产品规格"));
+            m.put("产品单位", r.get("产品单位"));
             m.put("排产数量", r.get("排产数量"));
             m.put("生产线", r.get("生产线"));
             m.put("已开单", r.get("台账id") != null);

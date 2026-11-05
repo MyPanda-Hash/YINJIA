@@ -59,6 +59,10 @@ public class MainActivity extends Activity {
     public static final String DEFAULT_BASE = "http://192.168.1.10:8090";
 
     private static final int REQ_SCAN = 1001;
+    /** 多选扫码(2026-11-05):一次扫多个码,回调 window.__yjScanResultMulti([...]) */
+    private static final int REQ_SCAN_MULTI = 1002;
+    /** 申请相机权限时记一下"这一趟是不是多选模式",授权回来后接着开 */
+    private boolean pendingMultiScan = false;
 
     private WebView web;
     private TextView baseLabel;
@@ -188,13 +192,23 @@ public class MainActivity extends Activity {
 
     // ───────────────────────── 扫码 ─────────────────────────
 
-    private void startScan() {
+    private void startScan() { startScan(false); }
+
+    /**
+     * 打开扫码页。
+     *
+     * @param multi true = 多选模式(可勾选多个码一次回传,给「生成工单领料/退料单」批量生单用)
+     */
+    private void startScan(boolean multi) {
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.CAMERA)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            pendingMultiScan = multi;
             requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_SCAN);
             return;
         }
-        startActivityForResult(new Intent(this, ScanActivity.class), REQ_SCAN);
+        Intent i = new Intent(this, ScanActivity.class);
+        i.putExtra("multi", multi);
+        startActivityForResult(i, multi ? REQ_SCAN_MULTI : REQ_SCAN);
     }
 
     @Override
@@ -202,7 +216,7 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_SCAN) {
             if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                startActivityForResult(new Intent(this, ScanActivity.class), REQ_SCAN);
+                startScan(pendingMultiScan);
             } else {
                 Toast.makeText(this, "没有相机权限,扫不了码;可在系统设置里开启", Toast.LENGTH_LONG).show();
             }
@@ -212,6 +226,25 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // ② 多选:把勾选的码数组回传给网页(__yjScanResultMulti)
+        if (requestCode == REQ_SCAN_MULTI) {
+            java.util.ArrayList<String> codes = (resultCode == RESULT_OK && data != null)
+                    ? data.getStringArrayListExtra("codes") : null;
+            StringBuilder arr = new StringBuilder("[");
+            if (codes != null) {
+                for (int i = 0; i < codes.size(); i++) {
+                    if (i > 0) arr.append(',');
+                    arr.append(quote(codes.get(i)));
+                }
+            }
+            arr.append(']');
+            final String js = "window.__yjScanResultMulti && window.__yjScanResultMulti(" + arr + ")";
+            runOnUiThread(new Runnable() {
+                @Override public void run() { web.evaluateJavascript(js, null); }
+            });
+            return;
+        }
+        // ① 单选(原路径)
         if (requestCode != REQ_SCAN) return;
         final String code = (resultCode == RESULT_OK && data != null) ? data.getStringExtra("code") : "";
         final String js = "window.__yjScanResult && window.__yjScanResult(" + quote(code) + ", " + (code != null && code.length() > 0) + ")";
@@ -251,7 +284,21 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void scan() {
             runOnUiThread(new Runnable() {
-                @Override public void run() { startScan(); }
+                @Override public void run() { startScan(false); }
+            });
+        }
+
+        /**
+         * 多选扫码(2026-11-05)。结果回调 {@code window.__yjScanResultMulti(codes)}。
+         *
+         * <p>用户口径:「生成工单领料和退料单这个界面的扫码能不能支持多选,可以多个订单
+         * 生成一对一的领料单」—— 扫一张任务单上的多个工单码,勾选后一次带回页面,
+         * 页面逐张入队,再批量生成(后端本来就是一对一建单)。
+         */
+        @JavascriptInterface
+        public void scanMulti() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { startScan(true); }
             });
         }
 
@@ -275,7 +322,13 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String appVersion() {
-            return "1.0.0";
+            // 2026-11-05:不再写死 —— 直接读 APK 的 versionName(唯一真源 = build.ps1 的 $version),
+            // 否则每发一版就要改三处(脚本/Manifest/这里),现场问"我装的是哪一版"就答不上来。
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception ignored) {
+                return "1.0.0";
+            }
         }
     }
 }

@@ -98,6 +98,14 @@
             <span class="mp-doc-p">{{ d.产品名称 || d.产品编号 || '—' }}</span>
             <span class="mp-doc-t">{{ d.创建人 || '' }} {{ d.创建时间 || '' }}</span>
           </div>
+          <!-- 🔴 2026-11-04 用户口径:「生产领料也要更新」——
+               与开单工作台同一口径:卡片上直接给出 物料编码 / 规格型号 / 计量单位,
+               不必点进单据才知道。缺值显示 —。 -->
+          <div class="mp-doc-l4">
+            <span><i>{{ tt('物料编码') }}</i>{{ d.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ d.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ d.产品单位 || '—' }}</span>
+          </div>
         </div>
       </template>
     </section>
@@ -130,6 +138,12 @@
           <div class="mp-doc-l3">
             <span class="mp-doc-p">{{ d.产品名称 || d.产品编号 || '—' }}</span>
             <span class="mp-doc-t">{{ d.提交人 || '' }} {{ d.提交时间 || '' }}</span>
+          </div>
+          <!-- 已完成同样列出 物料编码/规格型号/计量单位(2026-11-04) -->
+          <div class="mp-doc-l4">
+            <span><i>{{ tt('物料编码') }}</i>{{ d.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ d.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ d.产品单位 || '—' }}</span>
           </div>
         </div>
       </template>
@@ -491,6 +505,10 @@ function openDoc(id) {
 .mp-doc-wo i { font-style: normal; color: var(--el-text-color-secondary); }
 .mp-doc-prog { margin-left: auto; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
 .mp-doc-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
+/* 产品编码/规格型号/单位(2026-11-04):窄屏 flex-wrap 自动换行 */
+.mp-doc-l4 { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 3px; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-doc-l4 > span { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; max-width: 100%; }
+.mp-doc-l4 > span > i { font-style: normal; flex: none; color: var(--el-text-color-placeholder); }
 .mp-doc-p { flex: 1; min-width: 0; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-doc-t { flex: none; color: var(--el-text-color-placeholder); font-size: 11px; }
 

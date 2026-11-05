@@ -56,6 +56,11 @@
       <div class="mp-hint">
         {{ tt('按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码') }}
       </div>
+      <!-- 2026-11-05 用户口径:「只要扫码一个按钮,然后扫码界面变成勾选确认就可以了,因为生成保持批量生成」。
+           ⇒ 不再单独放「扫多张」:扫码按钮直接进**多选确认**界面(勾选 → 确定 → 一起进待生成队列)。 -->
+      <div v-if="nativeMultiScan" class="mp-hint">
+        {{ tt('「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单') }}
+      </div>
 
       <!-- 待生成队列 -->
       <div v-if="queue.length" class="mp-queue">
@@ -153,6 +158,12 @@
             <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
             <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
           </div>
+          <!-- 未开单同样列出 物料编码/规格型号/计量单位(与已开单一致,2026-11-04) -->
+          <div class="mp-wo-l2b">
+            <span><i>{{ tt('物料编码') }}</i>{{ w.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ w.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ w.产品单位 || '—' }}</span>
+          </div>
         </div>
       </template>
 
@@ -178,6 +189,14 @@
             <span class="mp-wo-p">{{ w.产品名称 || w.产品编号 || '—' }}</span>
             <span class="mp-wo-qty">{{ tt('排产') }} {{ fmtQty(w.排产数量) }}</span>
           </div>
+          <!-- 🔴 2026-11-04 用户口径:「外面的信息不够,没有物料编码单位名称规格型号,但是明细是有的」。
+               列表原来只显示产品名称 + 排产数量,编码/规格/单位要等点开明细才看得到;
+               这里补一行:产品编号 · 规格型号 · 计量单位(缺值显示 —,不留空)。 -->
+          <div class="mp-wo-l2b">
+            <span><i>{{ tt('物料编码') }}</i>{{ w.产品编号 || '—' }}</span>
+            <span><i>{{ tt('规格型号') }}</i>{{ w.产品规格 || '—' }}</span>
+            <span><i>{{ tt('计量单位') }}</i>{{ w.产品单位 || '—' }}</span>
+          </div>
           <div class="mp-wo-l3">
             <span class="mono">{{ w.领料单号 }}</span>
             <span class="mp-wo-prog">{{ tt('已领') }} {{ w.已领项数 || 0 }}/{{ w.物料项数 || 0 }}</span>
@@ -202,29 +221,56 @@
       v-model="detailOpen"
       :title="detail.领料单号 || tt('领料明细')"
       direction="rtl"
-      size="620px"
+      :size="drawerSize"
+      class="mp-dv-drawer"
       :destroy-on-close="true"
     >
       <div v-if="detailLoading" class="mp-empty">{{ tt('加载中') }}</div>
       <template v-else>
+        <!-- 🔴 2026-11-04 用户口径:「生产领料和生成生产领料这两个面板的**主物料**都没有标明
+             物料编码和规格型号和计量单位,信息不完全」。
+             ⇒ 抬头补上主物料(工单行产品)的编码 / 规格型号 / 计量单位,与明细行同一口径:
+               物料编码取台账快照(生单那一刻的产品编号),规格型号与单位取工单行(plang.gg/jldw)。
+               缺值一律显示 —,不省略整行(否则看着像"没这个信息")。 -->
         <div class="mp-dv-head">
           <div class="mp-kv"><span>{{ tt('工单号') }}</span><b>{{ detail.工单号 }}<i v-if="detail.工单行号"> #{{ detail.工单行号 }}</i></b></div>
           <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ detail.产品名称 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('物料编码') }}</span><b class="mono">{{ detail.产品编号 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('规格型号') }}</span><b>{{ detailWo.规格型号 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('计量单位') }}</span><b>{{ detailWo.计量单位 || '—' }}</b></div>
           <div class="mp-kv"><span>{{ tt('状态') }}</span><b :class="{ ok: String(detail.状态) === '已完成' }">{{ detail.状态 }}</b></div>
           <div class="mp-kv"><span>{{ tt('领料进度') }}</span><b>{{ detail.已领项数 || 0 }} / {{ detail.物料项数 || 0 }}</b></div>
           <div v-if="detail.退料单号" class="mp-kv"><span>{{ tt('退料单号') }}</span><b>{{ detail.退料单号 }}</b></div>
         </div>
         <div class="mp-dv-title">{{ tt('领料明细') }}</div>
         <div v-if="!(detail.领料明细 || []).length" class="mp-empty">{{ tt('没有明细') }}</div>
+        <!-- 🔴 2026-11-04 用户口径:「表头是要带物料编码和规格型号和计量单位的,信息不完全」。
+             原来是「名称 + 编码·规格·仓库 一行小字 + 右侧 已领/需求」,手机上看不清编码与规格;
+             改成:名称/数量一行,下面三行标签对(物料编码 / 规格型号 / 计量单位),再加仓库。 -->
         <div v-for="r in (detail.领料明细 || [])" :key="r.行号" class="mp-dv-line">
           <div class="mp-dv-main">
             <div class="mp-dv-name">{{ r.名称 || r.编码 }}</div>
-            <div class="mp-dv-meta">{{ r.编码 }} · {{ r.规格 || '—' }}<template v-if="r.仓库"> · {{ r.仓库 }}</template></div>
+            <dl class="mp-dv-fields">
+              <div><dt>{{ tt('物料编码') }}</dt><dd>{{ r.编码 || '—' }}</dd></div>
+              <div><dt>{{ tt('规格型号') }}</dt><dd>{{ r.规格 || '—' }}</dd></div>
+              <div><dt>{{ tt('计量单位') }}</dt><dd>{{ r.单位 || '—' }}</dd></div>
+              <div v-if="r.仓库"><dt>{{ tt('仓库') }}</dt><dd>{{ r.仓库 }}</dd></div>
+            </dl>
           </div>
           <div class="mp-dv-qty">
-            <b class="num">{{ fmtQty(r.数量) }}</b><span class="mp-dv-sep">/</span>
-            <span class="num mp-dv-need">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</span>
-            <i>{{ r.单位 }}</i>
+            <!-- 🔴 2026-11-04 用户口径:「需求数量在明细里面没有写清楚,在外面就有」。
+                 原来这里是 "0/100 支"(裸数字 + 斜杠),抽屉里又没有"已领/需求"列头 ⇒ 两个数字
+                 谁是谁全靠猜。改成两行各带标签:需求 x 支 / 已领 y 支。 -->
+            <div class="mp-q-row">
+              <span class="mp-q-lab">{{ tt('需求') }}</span>
+              <b class="num">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</b>
+              <i>{{ r.单位 }}</i>
+            </div>
+            <div class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && Number(r.数量) >= Number(r.BOM用量) }">
+              <span class="mp-q-lab">{{ tt('已领') }}</span>
+              <b class="num">{{ fmtQty(r.数量) }}</b>
+              <i>{{ r.单位 }}</i>
+            </div>
           </div>
         </div>
         <div class="mp-dv-note">{{ tt('只读查看:领料与退料请到「生产领料」里操作') }}</div>
@@ -240,7 +286,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
 import { printWoQr } from '@/business/print-formats'
-import { queueToPrintStation } from '@/business/printStation'
+import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
 const router = useRouter()
 
@@ -267,7 +313,29 @@ const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref({})
 
+/**
+ * 抽屉抬头用的工单行信息(2026-11-04)。
+ *
+ * <p>`/px/mobilePick/doc` 除了台账字段,还下发一个 `工单` 子对象(plang 那一行的
+ * 产品名称 / 规格型号 / 计量单位 / 生产线 / 排产数量)。主物料的规格型号与计量单位
+ * 就在这个子对象里 —— 抬头要显示它们,数据源不能换成明细行(明细是子件)。
+ */
+const detailWo = computed(() => detail.value.工单 || {})
+
+/**
+ * 看明细抽屉的宽度(2026-11-04)。
+ *
+ * <p>🔴 原来写死 `size="620px"` —— 手机屏宽才 375~430px,抽屉比屏幕还宽,
+ * 内容被挤到屏外、右侧数量看不全,就是用户报的「电脑端正常但手机端显示异常」。
+ * 改成:手机(≤640px)占满屏宽,桌面仍 620px;监听 resize 以免旋转/切窗口后不更新。
+ */
+const winW = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const drawerSize = computed(() => (winW.value <= 640 ? '100%' : '620px'))
+function onWinResize() { winW.value = window.innerWidth }
+
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
+/** 多选扫码(2026-11-05):只有新版 APK 才有 scanMulti;旧 APK / 浏览器里不显示这个按钮 */
+const nativeMultiScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scanMulti)
 const baseUrl = (() => {
   try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
 })()
@@ -346,13 +414,49 @@ onMounted(() => {
   nextTick(() => woInput.value?.focus?.())
   bindScan()
   loadWoStatus()
+  window.addEventListener('resize', onWinResize)
 })
 
 /** 本页的扫码回调(具名,便于按引用撤销别人的绑定) */
 function onScanResult(code, ok) { if (ok && code) applyScan(code) }
 
+/**
+ * 多选扫码回调(2026-11-05):原生一次带回多个码 → 逐个解析成「工单号 + 行号」进待生成队列。
+ *
+ * <p>用户口径:「生成工单领料和退料单这个界面的扫码能不能支持多选,可以多个订单
+ * 生成一对一的领料单」—— 这里只负责**排队**;真正建单仍是后面的「批量生成」
+ * (后端 `/create/batch` 逐张独立生成,失败的点名,不会整批回滚)。
+ *
+ * <p>重复的(同工单号+行号已在队列里)静默跳过,并报一声"跳过了几张"。
+ */
+function onScanMultiResult(codes) {
+  const list = Array.isArray(codes) ? codes : []
+  clearMsg()
+  if (!list.length) return
+  let added = 0
+  let skipped = 0
+  for (const raw of list) {
+    const p = parseWorkOrderCode(String(raw || '').trim())
+    if (!p.ok) { skipped++; continue }
+    const dup = queue.value.some((q) => q.woNo === p.wo && q.line === (Number(p.line) || 0))
+    if (dup) { skipped++; continue }
+    queue.value.push({ woNo: p.wo, line: Number(p.line) || 0 })
+    added++
+  }
+  woText.value = ''
+  if (added) {
+    okText.value = `${tt('已加入')} ${added} ${tt('张工单')}${skipped ? ' · ' + tt('跳过') + ' ' + skipped : ''}`
+  } else {
+    errText.value = tt('没有可加入的工单码')
+  }
+  nextTick(() => woInput.value?.focus?.())
+}
+
 function bindScan() {
-  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
+  if (typeof window !== 'undefined') {
+    window.__yjScanResult = onScanResult
+    window.__yjScanResultMulti = onScanMultiResult
+  }
 }
 
 /**
@@ -372,11 +476,18 @@ onActivated(() => {
 })
 
 onDeactivated(() => {
-  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+  try {
+    if (window.__yjScanResult === onScanResult) delete window.__yjScanResult
+    if (window.__yjScanResultMulti === onScanMultiResult) delete window.__yjScanResultMulti
+  } catch { /* ignore */ }
 })
 
 onBeforeUnmount(() => {
-  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+  try {
+    if (window.__yjScanResult === onScanResult) delete window.__yjScanResult
+    if (window.__yjScanResultMulti === onScanMultiResult) delete window.__yjScanResultMulti
+  } catch { /* ignore */ }
+  window.removeEventListener('resize', onWinResize)
 })
 
 /** 刷新按钮:重拉工单列表并清提示 */
@@ -387,12 +498,23 @@ async function refreshAll() {
   okText.value = tt('已刷新')
 }
 
+/**
+ * 扫码(2026-11-05 用户口径:「只要扫码一个按钮,然后扫码界面变成勾选确认就可以了,
+ * 因为生成保持批量生成」)。
+ *
+ * <p>⇒ 这一个按钮统一走**多选确认**:新版 APK 调 `scanMulti()`(扫码页里勾选 → 确定,
+ * 可一次带回多个工单码);老 APK 没有这个能力就退回单码 `scan()`,行为与以前一致。
+ */
 function scanInto() {
-  if (!(window.YjNative && typeof window.YjNative.scan === 'function')) {
+  const yj = (typeof window !== 'undefined') ? window.YjNative : null
+  if (!yj || (typeof yj.scanMulti !== 'function' && typeof yj.scan !== 'function')) {
     errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
     return
   }
-  try { window.YjNative.scan() } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
+  try {
+    if (typeof yj.scanMulti === 'function') yj.scanMulti()
+    else yj.scan()
+  } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
 }
 
 /** 扫到的工单码 → 解析工单号 + 行号 → 进队列 */
@@ -467,7 +589,7 @@ async function autoPrintAll() {
   for (const r of results.value) {
     if (r.重复 || !r.打印) continue
     try {
-      const queued = await queueToPrintStation({ ...r.打印, 来源: 'mobilePick.create' })
+      const queued = await queueToPrintStation({ ...r.打印, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.create' })
       if (!(queued && queued.online)) await printWoQr(r.打印)
     } catch {
       // 打印失败只在控制台账:生单本身已成功
@@ -620,6 +742,10 @@ async function loadWoStatus() {
 .mp-wo-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
 .mp-wo-p { flex: 1; min-width: 0; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-wo-qty { flex: none; color: var(--el-text-color-placeholder); font-variant-numeric: tabular-nums; }
+/* 产品编码/规格型号/单位那一行(2026-11-04):手机窄屏用 flex-wrap 自动换行,不挤成横向滚动 */
+.mp-wo-l2b { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-wo-l2b > span { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; max-width: 100%; }
+.mp-wo-l2b > span > i { font-style: normal; flex: none; color: var(--el-text-color-placeholder); }
 .mp-wo-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; font-size: 12px; }
 .mp-wo-l3 .mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mp-wo-prog { flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
@@ -627,6 +753,14 @@ async function loadWoStatus() {
 
 /* 明细抽屉(就地查看,不跳页) */
 .mp-dv-head { margin-bottom: 12px; }
+/* 抬头字段对(2026-11-04):原来 .mp-kv 没有布局样式,一排 `<div><span>标签</span><b>值</b></div>`
+   在块级里首尾相连,读出「工单号GD-2026-10-0241 #4」这种标签黏着值的句子。
+   改成两列网格:标签 76px 灰、值自适应换行 —— 与「生产领料」详情页同一口径。 */
+.mp-kv { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 2px 0; font-size: 13px; }
+.mp-kv > span { color: var(--el-text-color-secondary); }
+.mp-kv > b { font-weight: 500; min-width: 0; word-break: break-all; }
+.mp-kv > b.ok { color: var(--el-color-success); }
+.mp-kv > b i { font-style: normal; font-weight: 400; color: var(--el-text-color-secondary); }
 .mp-dv-title { margin: 10px 0 6px; font-size: 13px; font-weight: 600; }
 .mp-dv-line {
   display: flex; align-items: center; gap: 10px; padding: 8px 0;
@@ -634,15 +768,25 @@ async function loadWoStatus() {
 }
 .mp-dv-main { flex: 1; min-width: 0; }
 .mp-dv-name { font-size: 14px; }
-.mp-dv-meta { margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary); word-break: break-all; }
-.mp-dv-qty { flex: none; text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
-.mp-dv-qty b { font-weight: 600; }
-.mp-dv-sep { margin: 0 2px; color: var(--el-text-color-placeholder); }
-.mp-dv-need { color: var(--el-text-color-secondary); }
-.mp-dv-qty i { font-style: normal; margin-left: 3px; font-size: 11px; color: var(--el-text-color-secondary); }
+/* 明细字段对(2026-11-04):物料编码 / 规格型号 / 计量单位 各占一行,不再挤成一行小字 */
+.mp-dv-fields { margin: 4px 0 0; padding: 0; }
+.mp-dv-fields > div { display: grid; grid-template-columns: 68px 1fr; gap: 6px; line-height: 1.5; }
+.mp-dv-fields dt { margin: 0; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-dv-fields dd { margin: 0; font-size: 12px; color: var(--el-text-color-regular); word-break: break-all; }
+/* 手机:抽屉占满屏宽(原 620px 在 375px 屏上必然溢出,这就是"手机端显示异常") */
+@media (max-width: 640px) {
+  :deep(.mp-dv-drawer) { width: 100% !important; max-width: 100% !important; }
+  .mp-dv-line { align-items: flex-start; }
+  .mp-dv-qty { font-size: 13px; }
+}
+/* 需求 / 已领 两行(2026-11-04):标签 + 右对齐等宽数字 + 小字单位,两行纵向对齐 */
+.mp-dv-qty { flex: none; display: grid; gap: 1px; min-width: 104px; font-size: 14px; }
+.mp-q-row { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; line-height: 1.35; }
+.mp-q-row > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.mp-q-row.ok > b { color: var(--el-color-success); }
+.mp-q-lab { font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-dv-qty i { font-style: normal; font-size: 11px; color: var(--el-text-color-secondary); }
 .mp-dv-note { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
-.mp-kv > b.ok { color: var(--el-color-success); }
-.mp-kv > b i { font-style: normal; color: var(--el-text-color-secondary); }
 
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }

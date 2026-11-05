@@ -222,11 +222,18 @@ public class WoPickDocService {
      */
     public List<Map<String, Object>> list(String state, String keyword, int pageSize) {
         if (!tableReady()) return List.of();
+        // 🔴 2026-11-04 用户口径:「生产领料也要更新」——
+        //   列表卡片原来只有 产品名称,规格型号与计量单位要回物料档案 bs_inv 取。
+        //   用 LEFT JOIN:台账里存的是开单当时的编号快照,物料档案被删/改名也不该让单据消失。
         StringBuilder sql = new StringBuilder(
-                "SELECT TOP (?) id, 工单号, 工单行号, 产品编号, 产品名称, 领料单号, 退料单号, 状态,"
-                        + " 物料项数, 已领项数, 打印次数, 创建人, CONVERT(varchar(19), 创建时间, 120) AS 创建时间,"
-                        + " 提交人, CONVERT(varchar(19), 提交时间, 120) AS 提交时间"
-                        + " FROM dbo.wo_pick_doc WHERE 状态 = ?");
+                "SELECT TOP (?) d.id, d.工单号, d.工单行号, d.产品编号, d.产品名称, d.领料单号, d.退料单号, d.状态,"
+                        + " d.物料项数, d.已领项数, d.打印次数, d.创建人,"
+                        + " CONVERT(varchar(19), d.创建时间, 120) AS 创建时间,"
+                        + " d.提交人, CONVERT(varchar(19), d.提交时间, 120) AS 提交时间,"
+                        + " ISNULL(i.规格型号,N'') AS 产品规格, ISNULL(i.计量单位,N'') AS 产品单位"
+                        + " FROM dbo.wo_pick_doc d"
+                        + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = d.产品编号"
+                        + " WHERE d.状态 = ?");
         List<Object> args = new ArrayList<>();
         args.add(Math.max(1, Math.min(pageSize, 500)));
         args.add(state);
@@ -246,8 +253,8 @@ public class WoPickDocService {
         // 已完成取 `ISNULL(提交时间, 创建时间)`:已完成单的"最新"是它完成的时刻,
         // 用提交时间才能让刚提交的单浮上来;没有提交时间的(异常数据)退回创建时间。
         sql.append(STATE_DONE.equals(state)
-                ? " ORDER BY ISNULL(提交时间, 创建时间) DESC, id DESC"
-                : " ORDER BY 创建时间 DESC, id DESC");
+                ? " ORDER BY ISNULL(d.提交时间, d.创建时间) DESC, d.id DESC"
+                : " ORDER BY d.创建时间 DESC, d.id DESC");
 
         List<Map<String, Object>> raw = jdbc.queryForList(sql.toString(), args.toArray());
         List<Map<String, Object>> out = new ArrayList<>(raw.size());
@@ -268,6 +275,9 @@ public class WoPickDocService {
             m.put("创建时间", r.get("创建时间"));
             m.put("提交人", r.get("提交人"));
             m.put("提交时间", r.get("提交时间"));
+            // 规格型号 / 计量单位(2026-11-04,来自 bs_inv):列表卡片直接显示,与开单工作台同一口径
+            m.put("产品规格", r.get("产品规格"));
+            m.put("产品单位", r.get("产品单位"));
             out.add(m);
         }
         return out;

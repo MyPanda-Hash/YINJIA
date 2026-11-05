@@ -48,7 +48,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickSlipHtml, printWoQr } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -225,4 +225,44 @@ test('printSchedPlanSheet:空数据不出纸;有数据出**一张**(计划+单�
   assert.ok(!captured.html.includes('成型生产任务单'), '不再另起一张任务单')
   assert.ok(/data:image\/png/.test(captured.html), '同一行行尾二维码')
   assert.ok(captured.html.includes('GD-1') && captured.html.includes('S031-3'), '同一行主要信息(单据编号/商品编码)')
+})
+
+// ══════════════════════════════════════════════════════════════════
+// 纸面「生产领料单」(浏览器打印层;2026-11-05 抽出 pickSlipHtml 便于单测)
+// 用户口径:「明细只有 3 行,却给了多行的数据,并且二维码过大」「大于 9 行还能打印吗」
+// ══════════════════════════════════════════════════════════════════
+const slipRows = (n) => Array.from({ length: n }, (_, i) => ({
+  材料名称: '材料' + (i + 1), 规格: '100*200', 单位: '张', 请领数量: (i + 1) * 2, 实发数量: i + 1, 备注: '',
+}))
+const slipPayload = (n) => ({
+  标题: '生产领料单', 工单号: 'GD-T-1', 工单行号: 1, 领料单号: 'LL-T-1', 领料部门: '成型1线',
+  打印日期: '2026-11-05', 明细: slipRows(n),
+})
+
+test('pickSlipHtml:空行不印订单号(3 行明细就只出现 3 次单号)+ 二维码 24mm 不压表格', () => {
+  const html = pickSlipHtml(slipPayload(3), 'data:image/png;base64,AA')
+  assert.equal((html.match(/GD-T-1#1/g) || []).length, 3, '3 行数据 → 单号只印 3 次(空行不重复)')
+  assert.ok(html.includes('<td></td><td></td><td></td><td></td>'), '空行整行留白')
+  assert.ok(html.includes('材料3') && !html.includes('材料4'), '只有 3 行数据')
+  assert.ok(html.includes('width:24mm'), '二维码缩到 24mm')
+  assert.ok(!html.includes('left:6mm;top:5mm'), '二维码不再绝对定位压在表格上')
+  assert.ok(html.includes('@page{size:210mm 148.5mm'), '中一刀 210×148.5 横打')
+  assert.ok(!html.includes('第 1/1 页'), '单页不印页码')
+})
+
+test('pickSlipHtml:超过 10 行自动换页,一行都不丢(13 行 → 2 页)', () => {
+  const html = pickSlipHtml(slipPayload(13), '')
+  assert.equal((html.match(/<div class="card">/g) || []).length, 2, '13 行 → 2 张纸')
+  assert.ok(html.includes('第 1/2 页') && html.includes('第 2/2 页'), '每页标页码')
+  for (let i = 1; i <= 13; i++) assert.ok(html.includes('材料' + i), '第 ' + i + ' 行必须在纸上(旧版 13 行会被截掉)')
+  assert.equal((html.match(/GD-T-1#1/g) || []).length, 13, '13 行数据 → 单号 13 次')
+})
+
+test('printWoQr:带明细的载荷走同一套版式(打印层收到的是新 HTML)', async () => {
+  const before = captured.printed
+  const ok = await printWoQr(slipPayload(3))
+  assert.equal(ok, true)
+  assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
+  assert.ok(captured.html.includes('width:24mm'), '新二维码尺寸')
+  assert.equal((captured.html.match(/GD-T-1#1/g) || []).length, 3, '空行不印单号')
 })
