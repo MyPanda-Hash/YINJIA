@@ -275,7 +275,13 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String appVersion() {
-            return "1.0.0";
+            // 2026-11-05:不再写死 —— 直接读 APK 的 versionName(唯一真源 = build.ps1 的 $version),
+            // 否则每发一版就要改三处(脚本/Manifest/这里),现场问"我装的是哪一版"就答不上来。
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception ignored) {
+                return "1.0.0";
+            }
         }
     }
 }

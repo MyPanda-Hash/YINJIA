@@ -1,7 +1,7 @@
-# 银嘉 MES · 安卓壳(`android/`)
+﻿# 银嘉 MES · 安卓壳(`android/`)
 
 > **日期**:2026-10-20
-> **产物**:`android/dist/yinjia-mes-1.0.0.apk`(自签名,可直接侧载)
+> **产物**:`android/dist/yinjia-mes-1.0.1.apk`(自签名,可直接侧载)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
 脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
 
-**手机安装**:把 `android/dist/yinjia-mes-1.0.0.apk` 拷到手机点安装(需允许「安装未知应用」)。
+**手机安装**:把 `android/dist/yinjia-mes-1.0.1.apk` 拷到手机点安装(需允许「安装未知应用」)。
 
 > ⚠ 签名是 `debug.keystore`(自签名,脚本首次运行自动生成,不入库)。**内部侧载够用**;
 > 若要上应用市场/企业分发,换成正式 keystore 并妥善保管(丢了就没法覆盖升级)。
@@ -127,3 +127,20 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 3. 没有做「离线缓存 / 断网重试」;没有做 App 内自动升级(需要的话加个版本检查接口);
 4. 扫码只回传**一段文本**(码内容)。工单码内容是 `工单号`(或 `公司代码@工单号@行号`),物料码是 `存货编码|批号` —— 解析交回网页(`parseBarcode` 已实现);
 5. 若以后要在网页里用摄像头(不装 App),必须先给 MES 配 **HTTPS**。
+## 8. 2026-11-05:一屏多个码时可以选择
+
+用户口径:「手机扫码遇到多码不能选择」。
+
+- **改前**:`MultiFormatReader.decodeWithState()` 一帧只解一个码,解到谁就回传谁 ——
+  一沓工单码、一箱多袋料时,想扫指定那个必须先挪开别的;
+- **改后**:改用 `GenericMultipleBarcodeReader`(整图 + 四象限递归)一帧找多个:
+  - 一帧只有 1 个码 ⇒ 连续命中 **2 次**才回传(≈0.3 秒,够快,也不会误扫刚入镜的邻码);
+  - 一帧 **≥2 个码** ⇒ **暂停解码 + 弹选择框**,每项显示 `工单 · GD-… 行1` /
+    `物料 · YJ-… 批号 20261021` 这样的摘要,点哪个回传哪个;点「继续扫」回到取景继续扫;
+- 行号仍按「1000 + 行号」还原(与网页 `scanCode.js` 同口径);选择框只是"选哪一个",解析仍在网页;
+- 版本:`1.0.1`(versionCode 2)。`window.YjNative.appVersion()` 改成**直接读 APK 的 versionName**
+  —— 以后发布只改 `build.ps1` 里 `$version` 一处,不用再同步 Manifest / MainActivity;
+- 构建验证:`aapt2 / javac / d8 / zipalign / apksigner` 全绿;dex 里可见
+  `GenericMultipleBarcodeReader`、`decodeMultiple` 与「扫到 N 个码,请选择」文案;
+- ⚠ 仍属**未真机验证**:多码识别的实际速度取决于机型和镜头距离(标定 1280×720 预览),
+  现场若觉得慢,把 `ScanActivity.FRAME_SKIP` 调小(现在 4)。
