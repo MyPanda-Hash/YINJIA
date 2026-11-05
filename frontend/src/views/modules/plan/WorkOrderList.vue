@@ -1,8 +1,13 @@
 <!-- WorkOrderList.vue — 生产工单(2026-09-26 用户拍板:纯查询页,数据=参考库工单表 plang)
-     顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/切单/排产/撤回切单/打印工单(勾选多个=批量)/转领料单/导出/刷新;
+     顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/切单/排产/撤回切单/打印工单(勾选多个=批量)/导出/刷新;
      产线筛选 + 未完工/已完工/追溯;明细大表(勾选)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。
-     转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单)=勾选工单 → 按工单号生成「材料出库单(领料单)」
-     草稿(加工单号=工单号;**明细留空由仓库补**,系统内已无 BOM/配方数据可自动展开),审核出库后自动回写工单领料单号。
+     转领料单按钮已下架(2026-11-05 用户口径:「把当前这个转领料单的按钮删除,记得把权限设置中的也去除掉,
+     不需要删除当前的工单和领料的实现,只需要完成对这个按钮的去除即可」)——
+     前端入口已删;组织架构「角色与面板权限」矩阵列已由 PagePanelRegistry.WORK_ORDER_LIST_ACTIONS 去掉;
+     库里 yj_role_panel 的 picking 授权词由 migrate-drop-wol-picking-perm-20261105.sql 清理。
+     **后端实现原样保留**:/px/workOrderList/toPicking + WorkOrderPickingService(含回写)不动,
+     端点闸门仍认 picking 词(见 PanelPermissionService.BUTTON_PERMS_OVERRIDE 的说明);
+     领料单改由「材料出库单」面板手工建单,审核出库后照旧回写工单「领料单号」(ManuWritebackService)。
      取数窗口:默认预填最近 15 天(2026-10-05 用户口径,防单据累积后卡),清空日期框=查全量。 -->
 <template>
   <div class="wol-page">
@@ -21,8 +26,9 @@
     <!-- 按钮条(2026-09-28 用户拍板:生产工单=纯汇总视图——数据只由订单结转产生,排产唯一入口=快速排产;
          撤排产按钮防中间节点误操作;保留 查询/筛选/打印/结案留痕)
          页面级权限(2026-10-16):本页挂页面面板 WORK_ORDER_LIST
-         (可见/查询/打印/结案/切单/转领料单/导出/排产;词表见后端 PagePanelRegistry),
-         无该动作词的角色不显示按钮 —— 此前本页连列表接口都没有校验(登录即可读全部工单/客户/数量)。 -->
+         (可见/查询/打印/结案/切单/导出/排产;词表见后端 PagePanelRegistry),
+         无该动作词的角色不显示按钮 —— 此前本页连列表接口都没有校验(登录即可读全部工单/客户/数量)。
+         2026-11-05:「转领料单」按钮下架(picking 词已从矩阵动作集移除),后端实现保留。 -->
     <div class="wol-btns">
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
@@ -47,7 +53,6 @@
           <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
         </template>
       </el-dropdown>
-      <el-button v-if="canDo('picking')" size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
@@ -282,23 +287,22 @@ import ScheduleBoard from './ScheduleBoard.vue'
 import { qtyText, dayColState, isToday, dayCellQty, isOutOfPlanRange } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
-import { useTabsStore } from '@/stores/tabs'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
 
 /**
  * 页面级动作权限(2026-10-16):页面面板 WORK_ORDER_LIST
- * (可见/查询/打印/结案/切单/转领料单/导出/排产;词表见后端 PagePanelRegistry)。
+ * (可见/查询/打印/结案/切单/导出/排产;词表见后端 PagePanelRegistry)。
  * 「排产」与快速排产页共用 assign 词 —— 两处任一授予即可(后端 requireButtonAny 同口径)。
  * 「查找/刷新/追溯」是只读查看,归「可见」,不另设动作。
+ * 2026-11-05:原「转领料单」按钮已下架 ⇒ 矩阵不再下发 picking 词,本页无需再判它(后端端点保留)。
  */
 const permUser = useUserStore()
 const canDo = (word) => canDoPerm(permUser, 'WORK_ORDER_LIST', word)
 const canSchedule = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'SCHEDULE_BOARD'], 'assign'))
 
-/** 转领料单生成后跳「材料出库单」用(与其它页 gotoPanel 同一范式:tabs.open + router.push) */
+/** 路由:applyRouteKeyword 用 route 读 keyword、router.replace 清查询串 */
 const router = useRouter()
 const route = useRoute()
-const tabs = useTabsStore()
 
 /**
  * 从我的桌面「单据入口」点最近工单跳进来(2026-10-18):/prod/plan/workOrderList?keyword=<工单号>
@@ -659,64 +663,10 @@ async function doPrintTask(mode) {
   } catch (e) { err(e, '打印失败') }
 }
 
-/**
- * 转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单,打印入口不再保留)。
- * 勾选工单行 → 逐个生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号 + **工单行号**
- * (审核出库后后端 ManuWritebackService 按行回写工单「领料单号」,本页该列随之逐行点亮)。
- * ⚠ **先排产后领料**(用户口径 2026-10-18:「先要完成排产才进入到领料」):
- *   勾选行必须已排入产线(生产线非空)且排产数量>0;本页先挡一道给出可读提示,
- *   后端 WorkOrderPickingService 同口径再兜一层(并发撤销排产也拦得住)。
- * ⚠ **标识 = 工单号 + 工单行号**(用户口径 2026-10-15:「就是当前的工单号加工单行号作为标识,
- *   每个独立进行」+「工单号+工单行号 就为当前的**一个新的单**的模式」):
- *   一批勾选里同一标识只转一张(plang 里同一标识可能有多个物理行——同订单行分批转单,批次号不同);
- *   **再次点击=再开一张**:2026-10-18 用户口径「一个生产工单可以对应多个领料单据」,
- *   同一工单行可同时存在多张草稿,不再有「已有未审核领料单」的拦截。
- * ⚠ **明细留空**:MES 自建 BOM 已下架(2026-10-04),配方/工艺清单表全空、遗留 mate 是光缆旧数据,
- *   系统内没有可自动展开的材料来源 ⇒ 材料行由仓库在材料出库单面板按实发补填。
- * 后端守卫:未排产(产线空或排产数量 0)/已结案 不给转(见 WorkOrderPickingService)。
- */
-async function toPicking() {
-  // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
-  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
-  if (!alive.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
-  // 计数按**标识**去重(标识 = 工单号 + 工单行号;同标识的多物理行只算一个、只转一张)
-  const keys = [...new Set(alive.map((r) => `${r.工单号}#${r.工单行号}`))]
-  // 排产前置(2026-10-18):未排入产线 / 排产数量 0 的行直接点名拦下 —— 别等后端逐行回执
-  const unscheduled = keys.filter((k) => {
-    const r = alive.find((x) => `${x.工单号}#${x.工单行号}` === k)
-    return !String(r?.['生产线'] || '').trim() || Number(r?.['排产数量'] || 0) <= 0
-  })
-  if (unscheduled.length) {
-    ElMessage.warning(`${tt('以下工单行未排产(未排入产线),请先在「快速排产」排入产线后再转领料单')}:${unscheduled.join('、')}`)
-    return
-  }
-  try {
-    await ElMessageBox.confirm(
-      `${tt('确认为选中的')} ${keys.length} ${tt('个工单行转领料单')}?`,
-      tt('转领料单'),
-      { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
-  } catch { return }
-  try {
-    const res = await request.post('/px/workOrderList/toPicking', {
-      rows: alive.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 行id: r.行id, 工单行号: r.工单行号, 批次号: r.批次号 })),
-    })
-    const d = res.data || {}
-    const list = d['单号清单'] || []
-    ElMessage.success(`${tt('已生成领料单')} ${list.join('、')}（${tt('材料明细请在材料出库单里补填,审核后自动回写工单领料单号')};${tt('同一工单行可继续再转多张')}）`)
-    if ((d['失败行'] || []).length) ElMessage.warning(`${tt('未转成功')}：${d['失败行'].join('; ')}`)
-    load()
-    // 生成后可直接去材料出库单补材料明细(不强制:也可稍后自己进面板)
-    try {
-      await ElMessageBox.confirm(
-        tt('领料单已生成,现在去「材料出库单」补材料明细吗?'),
-        tt('转领料单'),
-        { confirmButtonText: tt('去补明细'), cancelButtonText: tt('稍后'), type: 'success' })
-    } catch { return }
-    const path = '/panelx/list/MATERIAL_OUT'
-    router.push(path)
-    tabs.open({ path, title: '材料出库单' })
-  } catch (e) { err(e, '转领料单失败') }
-}
+// 「转领料单」前端入口已下架(2026-11-05 用户口径,原 toPicking() 函数同步删除)。
+// 后端实现原样保留:/px/workOrderList/toPicking + WorkOrderPickingService(含 ManuWritebackService 回写);
+// 端点仍按 picking 词做闸门(PanelPermissionService.BUTTON_PERMS_OVERRIDE 保留该词映射)。
+// 领料单改由「材料出库单」面板手工建单,审核出库后照旧回写工单「领料单号」。
 
 /** 切单(9.29 批次①):勾选/当前行必须恰为一张工单 → 后端预览可切上限 → 弹窗输入切出数量 */
 function splitTarget() {

@@ -40,7 +40,15 @@ public final class PagePanelRegistry {
     public static final String SCHEDULE_BOARD = "SCHEDULE_BOARD";
     /** 工单排产:产线骨架看板 → 调拨/撤回调拨/取消结案/打印生产任务单 */
     public static final String WORK_ORDER_BOARD = "WORK_ORDER_BOARD";
-    /** 生产工单(列表页):工单查询 + 结案/切单/转领料单/打印/导出,并可原地弹出快速排产排入 */
+    /**
+     * 生产工单(列表页):工单查询 + 结案/切单/打印/导出,并可原地弹出快速排产排入。
+     *
+     * <p>2026-11-05 用户口径「把当前这个转领料单的按钮删除,记得把权限设置中的也去除掉,
+     * 不需要删除当前的工单和领料的实现」⇒ 动作集里去掉 {@code picking} 词,
+     * 组织架构「角色与面板权限」矩阵随之不再出现「转领料单」列;
+     * **后端实现不动**:{@code WorkOrderListController.toPicking} / {@code WorkOrderPickingService}
+     * 仍在,端点闸门仍认 picking 词(见 {@code PanelPermissionService} 的保留说明)。
+     */
     public static final String WORK_ORDER_LIST = "WORK_ORDER_LIST";
     /**
      * ERP 集成配置清单(2026-10-18):导入 / 转出两向 × 分类的接口、设备、字段映射统一配置页。
@@ -218,7 +226,8 @@ public final class PagePanelRegistry {
             {"print",   "打印"},
             {"close",   "结案"},
             {"split",   "切单"},
-            {"picking", "转领料单"},
+            // 2026-11-05:{"picking","转领料单"} 已移除(前端按钮下架,矩阵不再下发该词);
+            //   后端 /px/workOrderList/toPicking + WorkOrderPickingService 保留,端点闸门仍认 picking。
             {"recipe",  "获取混料配方"},
             {"export",  "导出"},
             {"assign",  "排产"},

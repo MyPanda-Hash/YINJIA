@@ -4477,3 +4477,11 @@ migrate-oqc-report-tpl-20261104.sql
 #   ⚠ 幂等:只 DELETE 来源=金蝶BOM引出列表_20261019174847 的行再全量插入,不碰面板手工新建的 BOM;
 #   须晚于 migrate-asm-bom-20261030.sql(建表)。两账套已执行(RESULT: 23 batches + 自检 PASS)。
 migrate-asm-bom-data-full-20261105.sql
+
+# 2026-11-05 生产工单「转领料单」下架(用户口径:「把当前这个转领料单的按钮删除,记得把权限设置中的也去除掉,
+#   不需要删除当前的工单和领料的实现,只需要完成对这个按钮的去除即可」)。
+#   前端按钮 + 只被它调用的 toPicking() 已删;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS 删 {"picking","转领料单"}
+#   ⇒ 组织架构矩阵不再有该列;本脚本清 yj_role_panel 里 WORK_ORDER_LIST 的 picking 授权词(整词修剪,其余词与顺序不动)。
+#   **后端实现保留**:/px/workOrderList/toPicking + WorkOrderPickingService + ManuWritebackService 回写不动,
+#   端点闸门仍认 picking(PanelPermissionService.BUTTON_PERMS_OVERRIDE 保留)。幂等;两账套均执行;末尾自检残留 = 0。
+migrate-drop-wol-picking-perm-20261105.sql
