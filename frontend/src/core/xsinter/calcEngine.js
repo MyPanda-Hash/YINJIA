@@ -102,10 +102,27 @@ export function computeXsinter(input = {}) {
     + weightMid * glueSum
     + designs.slice(GRANULE_FROM).reduce((a, b) => a + b, 0)
 
-  // ⑦ 每行的实际比例与单支含量
-  //    G 列 = 设计添加量（粉料1 用倒推值）；G 列再倒推一次 H9 = G9*F19 已在下面统一处理
-  const actual = designs.map((d) => r6(d))
-  const perPiece = actual.map((g) => r6(g * totalWeight))
+  // ⑦ 每行的**实际**比例与单支含量（Excel G / H 列 —— 与 F 列「添加重量」不是同一列）
+  //    · 粉料2..5  G10..G13 = E10..E13（设计比例直接沿用）
+  //    · 胶粉1..2  G14 = F14/F19（中间值×比例 ÷ 单支总重）
+  //    · 颗粒料1..3 G16 = F16/F19（**克数 ÷ 单支总重**；旧实现直接拿 9 克当比例 × 总重 = 722，是错的）
+  //    · 粉料1     G9 = 1 − SUM(G10:G18)（倒推，保证比例合计恒为 1）
+  //    · 单支含量 H9 = G9*F19（所以 H 的合计 = F19）
+  const gramRows = designs.slice(GRANULE_FROM).reduce((a, b) => a + b, 0)
+  const safeTotal = totalWeight !== 0 ? totalWeight : 0
+  // 先按**未舍入**的比例算含量，再各自舍入 —— 先舍比例再乘总重会把颗粒料 9 克放大成 9.000005。
+  const ratioRaw = Array.from({ length: ROW_KINDS.length }, (_, i) => {
+    if (safeTotal === 0) return 0
+    if (i >= GRANULE_FROM) return designs[i] / safeTotal                        // 颗粒料：克数 ÷ 总重
+    if (i >= 5) return (weightMid * designs[i]) / safeTotal                     // 胶粉：添加重量 ÷ 总重
+    return designs[i]                                                           // 粉料2..5：设计比例
+  })
+  // H 列：颗粒料 = 克数本身（Excel H16 = 9）；其余 = 比例 × 总重；粉料1 吃零头
+  const perPiece = ratioRaw.map((g, i) => (i >= GRANULE_FROM ? r6(designs[i]) : r6(g * safeTotal)))
+  perPiece[0] = r6(safeTotal - perPiece.slice(1).reduce((a, b) => a + b, 0))
+  // G 列：显示用比例；粉料1 仍按 1 − 其余 倒推（保证「比例合计」恰好 1）
+  const actual = ratioRaw.map((g) => r6(g))
+  actual[0] = r6(1 - actual.slice(1).reduce((a, b) => a + b, 0))
 
   const rows = ROW_KINDS.map((kind, i) => ({
     kind,
@@ -125,7 +142,13 @@ export function computeXsinter(input = {}) {
     /* 纸面「成型管控要求」五段 */
     cut: { low: r6(cutMid - lengthFix), mid: r6(cutMid), high: r6(cutMid + lengthFix) },
     cool: { low: r6(cutMid - 2 * lengthFix), mid: r6(cutMid - lengthFix), high: r6(cutMid) },
-    weight: { low: r6(weightLow), mid: r6(weightMid), high: r6(weightHigh) },
+    // 纸面「炭棒重量」是**成型重量**（Excel I14/J14/K14 = 标准重量 − 折算量 + 颗粒料克数），
+    // 不是 I10/J10/K10 的"标准重量"—— 旧实现直接给了标准重量，纸面差一个颗粒料差。
+    weight: {
+      low: r6(weightLow - convWeight + gramRows),
+      mid: r6(weightMid - convWeight + gramRows),
+      high: r6(weightHigh - convWeight + gramRows),
+    },
     density: { low: r6(densLow), mid: r6(densMid), high: r6(densHigh) },
     rows,
   }

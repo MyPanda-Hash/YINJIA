@@ -43,10 +43,16 @@
     </div>
 
     <!-- 抬头 -->
+    <!-- 🔴 2026-11-04 用户口径:「生产领料和生成工单领料这两个面板的**主物料**都没有标明
+         物料编码和规格型号和计量单位,信息不完全」。
+         ⇒ 抬头里的产品 = 这张单的主物料,编码/规格型号/计量单位三件套必须和明细行同一口径
+           (原来只有「规格」且名称不统一、编码与单位压根没显示)。 -->
     <section class="mp-card">
       <div class="mp-kv"><span>{{ tt('工单号') }}</span><b>{{ doc.工单号 }}<i v-if="doc.工单行号"> #{{ doc.工单行号 }}</i></b></div>
-      <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ doc.产品名称 || '—' }}</b></div>
-      <div class="mp-kv"><span>{{ tt('规格') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
+      <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ doc.产品名称 || wo.产品名称 || '—' }}</b></div>
+      <div class="mp-kv"><span>{{ tt('物料编码') }}</span><b class="mono">{{ doc.产品编号 || '—' }}</b></div>
+      <div class="mp-kv"><span>{{ tt('规格型号') }}</span><b>{{ wo.规格型号 || '—' }}</b></div>
+      <div class="mp-kv"><span>{{ tt('计量单位') }}</span><b>{{ wo.计量单位 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('领料单号') }}</span><b class="mono">{{ doc.领料单号 || '—' }}</b></div>
       <!-- 退料标志(2026-10-30 第三轮):退过料就把退料单号列出来,一眼看到"这张含退料" -->
@@ -174,11 +180,8 @@
       <div class="mp-sec">
         <span>{{ returnMode ? tt('选择要退的物料') : tt('领料明细') }}</span>
         <span class="mp-sec-num">{{ rows.length }}</span>
-        <!-- 列头(2026-10-30 用户口径「这里应该加个 已领/需求」):
-             两侧数字各自有含义,不写列头会让人以为"0"是需求没填 -->
-        <span v-if="!returnMode" class="mp-sec-note mp-colhint">
-          {{ tt('已领') }} / {{ tt('需求') }}
-        </span>
+        <!-- 每行自己带「需求 / 已领」标签(见下方明细行),标题栏不再挂列头 ——
+             原来那句「已领 / 需求」挂在标题栏上,离行太远、手机上还会换行,看不出哪个数字是需求。 -->
       </div>
       <div v-if="!rows.length" class="mp-empty">{{ tt('没有明细') }}</div>
       <div
@@ -206,11 +209,21 @@
         <span v-if="returnMode" class="mp-line-qty num is-ret">
           {{ qtyOf(r.编码) > 0 ? '-' + fmtQty(qtyOf(r.编码)) : '—' }} <i>{{ r.单位 }}</i>
         </span>
-        <!-- 领料:已领 / 需求(BOM 用量)。之前只显示单个"0",看不出还差多少 —— 用户 2026-10-30 报障 -->
-        <span v-else class="mp-line-qty num" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
-          {{ fmtQty(r.数量) }}<span class="mp-sep">/</span>{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}
-          <i>{{ r.单位 }}</i>
-        </span>
+        <!-- 领料:需求(BOM 用量)与已领**各带标签、各占一行**(2026-11-04)。
+             原来只显示 "0/100" 两个裸数字:需求数量要靠外面的列头才猜得出来 —— 用户报障
+             「需求数量在明细里面没有写清楚」。两行都写清"这一项该领多少、已经领了多少"。 -->
+        <div v-else class="mp-line-qty">
+          <div class="mp-q-row">
+            <span class="mp-q-lab">{{ tt('需求') }}</span>
+            <b class="num">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</b>
+            <i>{{ r.单位 }}</i>
+          </div>
+          <div class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
+            <span class="mp-q-lab">{{ tt('已领') }}</span>
+            <b class="num">{{ fmtQty(r.数量) }}</b>
+            <i>{{ r.单位 }}</i>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -261,7 +274,7 @@ import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
 import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
 import { printWoQr } from '@/business/print-formats'
-import { queueToPrintStation } from '@/business/printStation'
+import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
 const route = useRoute()
 const router = useRouter()
@@ -758,8 +771,11 @@ async function reprint() {
   try {
     const res = await request.post('/px/mobilePick/reprint', { id: docId.value })
     const payload = (res.data?.data || res.data || {}).打印 || {}
-    const queued = await queueToPrintStation({ ...payload, 来源: 'mobilePick.doc' })
+    // 类型 = 生产领料单(2026-11-04):服务端按类型派单,只有勾了这个类型的电脑才会出纸
+    const queued = await queueToPrintStation({ ...payload, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.doc' })
     if (queued && queued.online) { okText.value = tt('已发送到打印电脑'); return }
+    // 没有电脑订阅/开关关着 ⇒ 退回本机打印层(现场至少打得出来)
+    if (queued && queued.message) errText.value = queued.message
     await printWoQr(payload)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('打印失败')
@@ -914,12 +930,16 @@ async function submit() {
 .mp-line-fields > div { display: grid; grid-template-columns: 68px 1fr; gap: 6px; line-height: 1.5; }
 .mp-line-fields dt { margin: 0; font-size: 11px; color: var(--el-text-color-secondary); }
 .mp-line-fields dd { margin: 0; font-size: 12px; color: var(--el-text-color-regular); word-break: break-all; }
-.mp-line-qty { flex: none; min-width: 84px; text-align: right; font-size: 14px; font-weight: 600; }
+/* 需求 / 已领 两行(2026-11-04):每行自带标签 + 数字右对齐等宽,单位小字。
+   桌面端明细行右侧就是一个"两项对齐"的小表,手机端也不会挤成一串看不懂的数字。 */
+.mp-line-qty { flex: none; min-width: 104px; display: grid; gap: 1px; font-size: 14px; font-weight: 600; }
 .mp-line-qty.is-ret { color: var(--el-color-warning-dark-2); }
-.mp-line-qty.ok { color: var(--el-color-success); }
-.mp-line-qty.zero { color: var(--el-text-color-placeholder); }
+.mp-q-row { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; line-height: 1.35; }
+.mp-q-row > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.mp-q-row.ok > b { color: var(--el-color-success); }
+.mp-q-row.zero > b { color: var(--el-text-color-placeholder); }
+.mp-q-lab { font-size: 11px; font-weight: 400; color: var(--el-text-color-secondary); }
 .mp-sep { margin: 0 1px; color: var(--el-text-color-placeholder); font-weight: 400; }
-.mp-colhint { margin-left: auto; }
 .mp-line-qty i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--el-text-color-secondary); }
 
 /* 已完成单的退料引导 */

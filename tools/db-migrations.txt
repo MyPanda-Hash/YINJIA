@@ -4439,6 +4439,8 @@ migrate-wo-pick-return-cleanup-20261030.sql
 migrate-wo-pick-line-20261101.sql
 migrate-clean-blank-prodinfo-and-dept-20261104.sql
 migrate-sinter-workshop-deptname-20261104.sql
+migrate-sinter-workshop-deptname-20261104.sql
+migrate-print-station-20261104.sql
 
 # 2026-11-04 组装物料清单(ASM_BOM)表头可维护:表头 8 字段 editable 0→1、产品编码/子件编码 改参照 INV、
 #   默认BOM 改下拉框(是/否)、yj_panel.config 写 headDefaults 状态=启用;零 DDL、零业务数据变更,脚本幂等。

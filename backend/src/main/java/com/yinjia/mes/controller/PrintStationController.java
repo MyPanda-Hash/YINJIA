@@ -1,8 +1,8 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
-import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
+import com.yinjia.mes.service.PagePanelRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,47 +14,80 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
- * 自动打印站点 + 打印任务队列(2026-10-30)。
+ * 自动打印站点 + 打印任务队列(2026-10-30 建,2026-11-04 改「按电脑 + 按打印类型」分发)。
  *
  * <h3>用户口径(原话)</h3>
- * 「关于打印还有单独配一个自动打印的面版(这个面版是电脑上的)。只要这个面版配置参数并且设置成打开,
- *  然后在手机打印的时候就可以关联这个打开了面版参数的电脑,这台电脑连接的打印机就会自动打印」。
+ * 建面板时:「关于打印还有单独配一个自动打印的面版(这个面版是电脑上的)。只要这个面版配置参数
+ *  并且设置成打开,然后在手机打印的时候就可以关联这个打开了面版参数的电脑,这台电脑连接的打印机就会自动打印」。
  * 二次确认:「采用2的方式(写本地打印代理),但是不是所有登录这个系统的电脑都打印,
  *  需要做个设置(来配置需要用到打印的电脑,实现连接的电脑自动打印)」。
  *
- * <h3>架构:手机只管"发",这台电脑只管"取"</h3>
+ * <p>2026-11-04 报障(触发本次改造)原话:
+ * <blockquote>
+ * 「现在的自动打印有问题……我是想要设置的电脑开启自动打印,没有设置的电脑就不开启,
+ *  但是在服务器上开启是固定的。能不能在自动打印的面版加个参数来限定电脑。
+ *  还有我想加个勾选打印类型的。现在自动打印只有生产领料单。但如果后面也有多个电脑
+ *  每个电脑又不同打印要求,需要面版能够勾选打印的需求报表。」
+ * </blockquote>
+ *
+ * <h3>改造前为什么"不设的电脑也会打"</h3>
+ * 旧实现只有一个**全局**开关 {@code print.auto_enabled} + 一条**共享**队列:
+ * 任何一台电脑只要在轮询(打印代理或浏览器页面),就 {@code poll()} 取走队列里的任务 ——
+ * 「谁先轮到谁打印」,于是没配置过的电脑也会抢着出纸;而且一台电脑只认"全打"或"全不打",
+ * 无法表达"这台只打领料单、那台只打报工单"。
+ *
+ * <h3>现在的分发口径(两条规则,别混)</h3>
+ * <ol>
+ *   <li><b>按电脑</b>:每台打印电脑是一个**站点**,以<b>站点名称</b>为键 ——
+ *       就是打印代理 {@code -Station} 的那个名字(代理每 4 秒 {@code /pending?station=<站点名>}
+ *       拉任务),也是「自动打印」页面上配置的那个名字。站点在库里有一行配置
+ *       ({@code print.station.<站点名>.enabled/.types}),**只有开关打开**的站点才会被排进任务的
+ *       {@code targets};没设置过的站点默认**关闭** —— 正是用户要的「没有设置的电脑就不开启」。</li>
+ *   <li><b>按类型</b>:任务带 {@code 类型}(见 {@link #PRINT_TYPES});站点在配置里勾选自己要打的报表。
+ *       同一类型多台电脑都勾了 ⇒ **都会打**(每台各自出一张);一台都没勾/都不在线 ⇒
+ *       手机端收到 {@code queued:false} 并降级为本机打印。</li>
+ * </ol>
+ *
+ * <p>服务端**没有总闸**:用户口径「在服务器上开启是固定的」—— 判断"能不能打"的依据只有
+ * 站点配置 + 在线心跳,不再有"全局开关忘了开"这种故障。(历史参数 {@code print.auto_enabled}
+ * 不再参与分发,只保留在库里不删,免得回滚时找不到行。)
+ *
+ * <h3>为什么键是"站点名称"而不是随机 id</h3>
+ * 真正出纸的是本机打印代理({@code tools/printing/print-agent.ps1})—— 它 2026-11-03 起
+ * **自己**登录服务器拉任务,网页不必开着。它的身份就只有命令行里那个 {@code -Station} 名字,
+ * 拿不到浏览器 localStorage 里的随机 id。⇒ 站点必须以这个名字为键,面板配置才可能作用到代理。
+ * 代价:同一实例的两台电脑不能用同一个站点名(面板上会提示)。
+ *
+ * <h3>配置存哪</h3>
+ * 站点配置写在 {@code yj_app_setting}({@code print.station.<名字>.enabled} / {@code .types}),
+ * 因为**代理在跑、页面可能没开**:只存内存的话,服务端一重启配置就没了 ——
+ * 现场表现是"昨天还好好的,今天不打了",很难查。内存里另有一份缓存(每 15 秒被心跳刷新)。
+ *
+ * <h3>架构:手机只管"发",目标电脑各自"取"</h3>
  * <pre>
- *   手机(生产领料单据)               服务端(本类)              打印站点电脑(PrintStation.vue + 本地代理)
- *   POST /enqueue  ──── 任务 ────▶  [内存队列]  ◀──── 轮询 /pending ────  取出 → 交本地代理静默出纸
- *                                      ▲                                      │
- *                                      └──────── /ack(已打印)◀────────────────┘
+ *   手机(生产领料单据)               服务端(本类)                     打印站点电脑 A / B
+ *   POST /enqueue {类型} ─── 任务 ──▶ [队列 + targets]  ◀── /pending ──  A 开了且勾该类型 ⇒ 取到
+ *                                        │                             B 没开/没勾    ⇒ 取不到
+ *                                        └── /ack(已打印)◀──────────── A 回报
  * </pre>
- *
- * <h3>为什么队列在内存里,不进数据库</h3>
- * <ul>
- *   <li>打印任务是**秒级时效**的东西(领完料立刻出工单二维码),堆积下来反而错乱;
- *       服务端重启丢掉的几条,现场重打一次即可(单据上就有「打印」按钮);</li>
- *   <li>打印任务里含产品名/工单号,落库会与「打印留痕」这件正经事混在一起
- *       (留痕已经在 {@code wo_pick_doc.打印次数} 里,真正需要追溯的是那个);</li>
- *   <li>队列只保留最近 {@link #MAX_TASKS} 条,超了挤掉最旧的 —— 内存不会无限涨。</li>
- * </ul>
- *
- * <h3>为什么"哪台电脑在打印"不进库</h3>
- * 打印机名/站点名是**每台电脑各自的**(一个账号可能登录多台电脑),存库里就变成"一台盖住所有"。
- * 故本机配置在浏览器 localStorage(PrintStation.vue),库里只留 3 个全局参数:
- * {@code print.auto_enabled / print.station_name / print.last_heartbeat}。
  */
 @RestController
 @RequestMapping("/api/px/print")
@@ -66,30 +99,101 @@ public class PrintStationController {
 
     /** 队列上限:只保留最近这么多条,超了挤掉最旧的(内存安全) */
     private static final int MAX_TASKS = 200;
-    /** 心跳多久算"在线"(秒)。打印站点页每 15 秒刷新一次,留 3 个周期容错 */
+    /** 心跳多久算"在线"(秒)。打印代理每 4 秒拉一次、面板页每 15 秒一次,留够容错 */
     private static final long ONLINE_SECONDS = 90;
+    /** 一条任务最多在队列里躺多久(秒)。过期单据打出来只会误事 */
+    private static final long TASK_TTL_SECONDS = 300;
+    /** 已出纸记录保留条数(概览显示"刚打印了什么") */
+    private static final int MAX_DONE = 20;
+    /** 站点配置在系统参数表里的键前缀/后缀 */
+    private static final String CFG_PREFIX = "print.station.";
+    private static final String CFG_ENABLED = ".enabled";
+    private static final String CFG_TYPES = ".types";
+    /** 纸张:2026-11-05 用户口径「能不能设定打印的纸张大小(如 A4 或 A5),但是表格实际占用大小不变」 */
+    private static final String CFG_PAPER = ".paper";
+    /** 支持的纸张(只收标准纸型:自定义纸型会被 PDF 驱动丢掉,见 print-agent.ps1 的踩坑注释) */
+    private static final Set<String> PAPERS = Set.of("A5", "A4");
+    private static final String PAPER_DEFAULT = "A5";
+
+    /**
+     * 打印类型注册表(唯一真源)。
+     *
+     * <p>新增一种可自动打印的报表 = ①这里加一行(code → 中文名),②产出方在
+     * {@code POST /enqueue} 的 {@code 类型} 里带上这个 code,③若纸面版式不同,
+     * 再给 {@code tools/printing/print-agent.ps1} 加一段绘制分支。
+     * 面板的勾选框由 {@code GET /station} 下发,前端不硬编码类型清单。
+     *
+     * <p>⚠ 只登记**已经能打出来的**类型:没接通的报表不进这里 ——
+     * 面板上出现一个勾了却没反应的选项,比没有这个选项更糟。
+     */
+    private static final Map<String, String> PRINT_TYPES = new LinkedHashMap<>();
+    static {
+        PRINT_TYPES.put("PICK_SLIP", "生产领料单");
+    }
+    /** 手机端没带 {@code 类型} 时的默认值(旧调用方兼容;现役只有领料单会入队) */
+    private static final String DEFAULT_TYPE = "PICK_SLIP";
 
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
 
-    /** 打印任务队列:id 自增;一台站点取了就从队列移走(不重复出纸) */
-    private static final ConcurrentLinkedQueue<PrintTask> QUEUE = new ConcurrentLinkedQueue<>();
-    /** 已出纸记录(只用于概览显示"刚打印了什么"),同样有上限 */
+    /**
+     * 在线站点表:key = 站点名称(打印代理的 {@code -Station} / 面板里配的名字)。
+     *
+     * <p>配置(开关/类型)是**库里**那份决定的,这里只是缓存 + 心跳时间;
+     * 站点第一次出现时从库里读,库里没有 ⇒ 默认**关闭**(用户口径:没设置的不开)。
+     */
+    private static final Map<String, Station> STATIONS = new ConcurrentHashMap<>();
+
+    /** 打印任务队列(每条任务自带 targets,谁订阅了谁能取) */
+    private static final ConcurrentLinkedDeque<PrintTask> QUEUE = new ConcurrentLinkedDeque<>();
+    /** 已出纸记录 */
     private static final Deque<PrintTask> DONE = new ArrayDeque<>();
     private static final java.util.concurrent.atomic.AtomicLong SEQ = new java.util.concurrent.atomic.AtomicLong(1);
 
-    /** 一条打印任务(不可变;取走即出队) */
-    private record PrintTask(long id, String 标题, String 二维码内容, String 工单号, int 工单行号,
+    /**
+     * 一台打印电脑的在线视图。
+     *
+     * @param name    站点名称(唯一键:代理的 -Station,安装时默认取计算机名)
+     * @param enabled 自动打印开关(来自库里的站点配置;关着 ⇒ 在线也不派单)
+     * @param types   勾选的打印类型 code 集合
+     * @param paper   纸张(A5=中一刀 210×148.5 横 / A4=297×210 横;**只换纸不缩放**)
+     * @param seen    最后一次心跳(epoch millis);0 = 只在面板上登记过、代理还没连上来
+     * @param source  谁在轮询:agent=本机打印代理 / page=自动打印页面(排查用)
+     * @param ip      轮询方的来源 IP(帮现场认出"这是哪一台电脑";带 X-Forwarded-For 时取第一个)
+     */
+    private record Station(String name, boolean enabled, Set<String> types, String paper, long seen, String source, String ip) {
+        Map<String, Object> json() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", name);
+            m.put("enabled", enabled);
+            m.put("types", new ArrayList<>(types));
+            m.put("paper", paper == null || paper.isBlank() ? PAPER_DEFAULT : paper);
+            m.put("online", true);
+            m.put("source", source);
+            m.put("ip", ip == null ? "" : ip);
+            // seen == 0 = 从没连过(面板上预登记的名字):显示空串,别显示 1970 年误导人
+            m.put("lastSeen", seen <= 0 ? "" : LocalDateTime
+                    .ofInstant(Instant.ofEpochMilli(seen), ZoneId.systemDefault()).format(TS));
+            return m;
+        }
+    }
+
+    /** 一条打印任务(不可变载荷 + 可变的"已投递站点"集合) */
+    private record PrintTask(long id, String 类型, String 标题, String 二维码内容, String 工单号, int 工单行号,
                              String 产品名称, String 规格型号, String 来源, String 发起人, String 时间,
-                             // 二维码 PNG 的 dataURL(base64)。前端用 qrcode 库生成后随任务送上来,
-                             // 打印电脑直接贴进标签/PDF —— 代理是纯 PowerShell,自己画 QR 不现实。
                              String 二维码图,
-                             // 纸面「领料单」的抬头与明细(2026-11-02):不随任务走的话打印代理只能画出空表格
                              String 领料单号, String 领料部门, String 打印日期,
-                             java.util.List<java.util.Map<String, Object>> 明细) {
+                             java.util.List<java.util.Map<String, Object>> 明细,
+                             /** 这条任务该给哪些站点(入队那一刻算好:在线 + 开关开 + 订阅了该类型) */
+                             Set<String> targets,
+                             /** 已经投递给哪些站点(每个站点只投一次;全部投完就出队) */
+                             Set<String> delivered,
+                             /** 入队时刻(过期丢弃) */
+                             long createdAt) {
         Map<String, Object> json() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", id);
+            m.put("类型", 类型);
             m.put("标题", 标题);
             m.put("二维码内容", 二维码内容);
             m.put("二维码图", 二维码图);
@@ -104,6 +208,7 @@ public class PrintStationController {
             m.put("来源", 来源);
             m.put("发起人", 发起人);
             m.put("时间", 时间);
+            m.put("目标站点", new ArrayList<>(targets));
             return m;
         }
     }
@@ -116,28 +221,36 @@ public class PrintStationController {
     // ══════════════════════════ 手机端:发任务 ══════════════════════════
 
     /**
-     * 手机端点「打印」→ 把任务放进队列,由在线的打印站点电脑取走静默出纸。
+     * 手机端点「打印」→ 按**类型 + 站点配置**算出目标电脑,把任务放进队列。
      *
      * <p>用户口径「在手机打印的时候就可以关联这个打开了面版参数的电脑,这台电脑连接的打印机就会自动打印」。
-     * 没有在线站点时**不报错**,返回 {@code online:false} —— 前端据此降级为手机自带打印层打印,
-     * 现场至少还能打出来,不会因为"打印电脑没开"就卡住生产。
+     * 没有任何目标电脑时**不报错**,返回 {@code online:false} 并给出**具体原因** ——
+     * 前端据此降级为手机自带打印层打印,现场至少还能打出来,不会因为"打印电脑没开"就卡住生产。
      *
-     * @param body {标题, 二维码内容(或 工单号+工单行号), 产品名称, 规格型号, 来源}
+     * @param body {类型?, 标题, 二维码内容(或 工单号+工单行号), 产品名称, 规格型号, 来源,
+     *             领料单号?, 领料部门?, 打印日期?, 明细?}
      */
     @PostMapping("/enqueue")
     public ApiResult<Map<String, Object>> enqueue(@RequestBody Map<String, Object> body) {
         perm.requirePanelView(PANEL_SELF);
-        boolean online = isStationOnline();
-        Map<String, Object> m = new LinkedHashMap<>();
+        sweep();
 
-        // 没开自动打印 / 没有在线站点 ⇒ 只回状态,不入队(否则任务会在队列里躺到天荒地老)
-        if (!autoEnabled() || !online) {
+        String type = typeOf(body.get("类型"));
+        List<Station> subscribed = onlineStations().stream()
+                .filter((s) -> s.types().contains(type)).toList();
+        List<Station> targets = subscribed.stream().filter(Station::enabled).toList();
+
+        Map<String, Object> m = new LinkedHashMap<>();
+        if (targets.isEmpty()) {
             m.put("online", false);
             m.put("queued", false);
-            m.put("reason", !autoEnabled() ? "auto-disabled" : "no-station");
-            m.put("message", !autoEnabled()
-                    ? "自动打印没打开:请在打印电脑上打开「自动打印」页面并开启开关"
-                    : "没有在线的打印电脑:请确认那台电脑上「自动打印」页面开着");
+            // 原因分三种,现场按提示就能自己修(不让人猜"为什么没打")
+            m.put("reason", subscribed.isEmpty() ? "no-subscriber" : "station-off");
+            m.put("message", subscribed.isEmpty()
+                    ? typeLabel(type) + "没有可用的打印电脑:请在打印电脑上打开「自动打印」页,"
+                            + "把该电脑的开关打开并勾上「" + typeLabel(type) + "」"
+                    : "打印电脑「" + names(subscribed) + "」的自动打印开关是关着的:请在「自动打印」页上打开");
+            m.put("类型", type);
             return ApiResult.ok(m);
         }
 
@@ -156,56 +269,81 @@ public class PrintStationController {
         // 但现场一定会有"客户端是旧版"的情况 —— 旧 APK、浏览器缓存了旧 chunk —— 那时
         // `二维码图` 为空,打出来就是一张没有码的标签(用户实测报障:PDF 里没二维码)。
         // ⇒ 这里用 ZXing(pom 里已有,报表 QRCode 在用)自己补一张,**任何客户端都能出图**。
-        // 码的内容与前端完全一致(同一个 qr 字符串),所以不存在"两个码不一样"的问题。
         String qrImg = str(body.get("二维码图"));
         if (qrImg.isEmpty()) qrImg = qrDataUrl(qr);
 
-        PrintTask t = new PrintTask(SEQ.getAndIncrement(), str1(body.get("标题"), "生产领料单"),
+        Set<String> targetNames = new LinkedHashSet<>();
+        for (Station s : targets) targetNames.add(s.name());
+
+        PrintTask t = new PrintTask(SEQ.getAndIncrement(), type, str1(body.get("标题"), typeLabel(type)),
                 qr, woNo, line, str(body.get("产品名称")), str(body.get("规格型号")),
                 str1(body.get("来源"), "mobile"), currentUserName(), LocalDateTime.now().format(TS),
                 qrImg,
                 str(body.get("领料单号")), str(body.get("领料部门")), str(body.get("打印日期")),
-                // 明细透传(2026-11-02):纸表要把每项用料打进表格
                 body.get("明细") instanceof java.util.List<?> dl
-                        ? (java.util.List<java.util.Map<String, Object>>) dl : java.util.List.of());
-        QUEUE.add(t);
+                        ? (java.util.List<java.util.Map<String, Object>>) dl : java.util.List.of(),
+                targetNames, ConcurrentHashMap.newKeySet(), System.currentTimeMillis());
+        QUEUE.addLast(t);
         // 上限保护:超了挤掉最旧的(内存安全;现场重打一次即可)
-        while (QUEUE.size() > MAX_TASKS) QUEUE.poll();
+        while (QUEUE.size() > MAX_TASKS) QUEUE.pollFirst();
 
         m.put("online", true);
         m.put("queued", true);
         m.put("taskId", t.id());
-        m.put("station", stationName());
-        m.put("message", "已发送到打印电脑「" + stationNameOrDefault() + "」");
+        m.put("类型", type);
+        m.put("station", names(targets));
+        m.put("targets", targetNames);
+        m.put("message", "已发送到打印电脑「" + names(targets) + "」");
         return ApiResult.ok(m);
     }
 
-    // ══════════════════════════ 打印站点电脑:取任务 / 回报 ══════════════════════════
+    // ══════════════════════════ 打印电脑:取任务 / 回报 ══════════════════════════
 
     /**
-     * 打印站点页轮询:取一条待打印任务(**取走即出队**,不会两台电脑打同一张)。
+     * 打印电脑轮询:刷新本站点心跳 → 取**派给本站点**的一条任务。
      *
-     * <p>同时刷新 {@code print.last_heartbeat} —— 手机端就是靠它判断"有没有在线的打印电脑"。
+     * <p>🔴 2026-11-04 起**不再"谁先轮询谁取走"**:任务入队时就算好了 targets,
+     * 没勾该类型 / 站点开关关着 / 不在这条任务的目标里 ⇒ 一台都拿不到。
+     * 同一站点开两个标签页也只会打一次({@code delivered} 去重)。
      *
-     * @return {task:{...}} 或 {task:null}(没任务)
+     * <p>调用方有两类,都用 {@code ?station=<站点名>} 自报家门:
+     * ① 本机打印代理({@code print-agent.ps1},每 4 秒,{@code source=agent});
+     * ② 「自动打印」页面(每 15 秒,{@code source=page},给没装代理的机器兜底)。
+     *
+     * @param station 站点名称(必填;与代理 {@code -Station} 一致)
+     * @param source  agent / page(仅排查用,不影响派单)
      */
     @GetMapping("/pending")
-    public ApiResult<Map<String, Object>> pending(@RequestParam(required = false) String station) {
+    public ApiResult<Map<String, Object>> pending(@RequestParam(required = false) String station,
+                                                  @RequestParam(required = false) String source,
+                                                  jakarta.servlet.http.HttpServletRequest req) {
         perm.requirePanelView(PANEL_SELF);
-        touchHeartbeat(station);
+        sweep();
 
-        PrintTask t = QUEUE.poll();
+        Station me = heartbeat(station, source, clientIp(req));
+        PrintTask t = me == null ? null : takeFor(me.name());
+
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("task", t == null ? null : t.json());
+        // 纸张(2026-11-05)是**按站点**的配置,不是任务属性(同一张单可能派给多台电脑、纸不一样),
+        // 所以在派单这一刻把本站点的纸张塞进任务里,代理照它选纸型 —— 只换纸不缩放。
+        Map<String, Object> taskJson = t == null ? null : t.json();
+        if (taskJson != null && me != null) taskJson.put("纸张", me.paper());
+        out.put("task", taskJson);
         out.put("queueSize", QUEUE.size());
-        out.put("autoEnabled", autoEnabled());
+        // 服务端总闸:固定开(用户口径「在服务器上开启是固定的」)—— 兼容旧前端字段
+        out.put("autoEnabled", true);
+        out.put("station", me == null ? "" : me.name());
+        out.put("stationEnabled", me != null && me.enabled());
+        out.put("stationOnline", me != null);
+        out.put("stations", stationList());
+        out.put("types", typeList());
         return ApiResult.ok(out);
     }
 
     /**
-     * 打印站点页回报"这张已出纸"(或失败)。
+     * 打印电脑回报"这张已出纸"(或失败)。
      *
-     * @param body {taskId, ok:true/false, error?:文案, printer?:打印机名}
+     * @param body {taskId, ok:true/false, error?:文案, printer?:打印机名, 标题?, 类型?, 工单号?, 工单行号?, 发起人?}
      */
     @PostMapping("/ack")
     public ApiResult<Void> ack(@RequestBody Map<String, Object> body) {
@@ -216,111 +354,314 @@ public class PrintStationController {
         if (!ok) {
             log.warn("打印站点出纸失败 task={} printer={} error={}", id, printer, str(body.get("error")));
         }
-        // 最近出纸记录(概览显示用),同样有上限
         synchronized (DONE) {
-            DONE.addFirst(new PrintTask(id, str(body.get("标题")), "", str(body.get("工单号")),
-                    toInt(body.get("工单行号")), "", "", ok ? "已出纸" : "失败",
-                    str(body.get("发起人")), LocalDateTime.now().format(TS), "",
-                    "", "", "", java.util.List.of()));
-            while (DONE.size() > 20) DONE.removeLast();
+            DONE.addFirst(new PrintTask(id, typeOf(body.get("类型")), str(body.get("标题")), "",
+                    str(body.get("工单号")), toInt(body.get("工单行号")), "", "",
+                    ok ? "已出纸" : "失败", str(body.get("发起人")), LocalDateTime.now().format(TS), "",
+                    "", "", "", java.util.List.of(),
+                    Set.of(), Set.of(), System.currentTimeMillis()));
+            while (DONE.size() > MAX_DONE) DONE.removeLast();
         }
         return ApiResult.ok(null);
     }
 
-    /** 站点概览:开关状态 / 站点名 / 是否在线 / 队列长度 / 最近出纸 */
+    /**
+     * 站点概览(「自动打印」页首屏/刷新):总闸 / 站点清单(含各自开关与类型) / 类型清单 / 队列 / 最近出纸。
+     *
+     * @param station 可选:传了就顺手登记一次心跳(页面自报"我是哪台电脑")
+     */
     @GetMapping("/station")
-    public ApiResult<Map<String, Object>> station() {
+    public ApiResult<Map<String, Object>> station(@RequestParam(required = false) String station,
+                                                  jakarta.servlet.http.HttpServletRequest req) {
         perm.requirePanelView(PANEL_SELF);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("autoEnabled", autoEnabled());
-        out.put("stationName", stationName());
-        out.put("online", isStationOnline());
-        out.put("lastHeartbeat", getSetting("print.last_heartbeat"));
-        out.put("queueSize", QUEUE.size());
-        List<Map<String, Object>> recent;
-        synchronized (DONE) { recent = DONE.stream().map(PrintTask::json).toList(); }
-        out.put("recent", recent);
-        return ApiResult.ok(out);
+        sweep();
+        Station me = heartbeat(station, "page", clientIp(req));
+        return ApiResult.ok(stateOf(me));
     }
 
     /**
-     * 开关自动打印 / 改站点名(电脑上那一页的「打开」开关)。
+     * 保存**某一个站点**的配置(开关 + 勾选的打印类型)。
      *
-     * <p>这条改动的是**全局**开关:打开后手机端才允许把任务发给打印电脑。
-     * 用户口径「只要这个面版配置参数并且设置成打开」—— 这个"打开"就是这里。
+     * <p>🔴 2026-11-04:**这条不再是"全局开关"**。旧实现这里写的是
+     * {@code print.auto_enabled}(一台电脑点一下,所有电脑都开/关),正是用户报障的根因:
+     * 「我是想要设置的电脑开启自动打印,没有设置的电脑就不开启」。
+     * 现在按站点名写配置,别的电脑一点不受影响。
      *
-     * @param body {autoEnabled?:bool, stationName?:string}
+     * @param body {stationName(必填), enabled?, types?:[code...], paper?:'A5'|'A4'}
      */
     @PostMapping("/station")
     public ApiResult<Map<String, Object>> saveStation(@RequestBody Map<String, Object> body) {
         perm.requirePanelView(PANEL_SELF);
         perm.requireAnyPerm(PANEL_SELF, "配置打印机", "config");
-        if (body.containsKey("autoEnabled")) {
-            boolean on = !Boolean.FALSE.equals(body.get("autoEnabled"));
-            setSetting("print.auto_enabled", on ? "Y" : "N");
+        String name = str(body.get("stationName"));
+        if (name.isEmpty()) {
+            throw new IllegalArgumentException("缺少站点名称:请先填「站点名称」(与打印代理的 -Station 一致)再保存");
         }
-        if (body.containsKey("stationName")) {
-            setSetting("print.station_name", str(body.get("stationName")));
-        }
-        if (body.containsKey("printer")) {
-            // 打印机名只做留痕展示(真正的本机打印机在浏览器 localStorage);不覆盖本机设置
-            log.info("打印站点配置打印机:{} by {}", str(body.get("printer")), currentUserName());
-        }
-        return station();
+        List<String> raw = body.get("types") instanceof java.util.List<?> l
+                ? l.stream().map(String::valueOf).toList() : List.of();
+        Set<String> types = parseTypes(String.join(",", raw));
+        boolean enabled = !Boolean.FALSE.equals(body.get("enabled"));
+        // 纸张(2026-11-05):没带这个字段 = 保留原值(改开关/类型不该把纸张冲回默认)
+        Station cur = STATIONS.get(name);
+        String paper = body.get("paper") == null
+                ? paperOf(cur == null ? getSetting(CFG_PREFIX + name + CFG_PAPER) : cur.paper())
+                : paperOf(str(body.get("paper")));
+        saveConfig(name, enabled, types, paper);
+        log.info("打印站点配置更新:{} 开关={} 类型={} 纸张={} by {}", name, enabled, types, paper, currentUserName());
+        // 只返回该站点最新状态(顺带刷新清单),不去碰心跳 —— 在 A 电脑配 B 电脑不该让 B 显示"在线"
+        Station s = STATIONS.get(name);
+        return ApiResult.ok(stateOf(s));
     }
 
     /**
-     * 站点页的心跳(页面每 15 秒调一次)。单独一个轻量接口,便于本地代理也用它探活。
+     * 站点页的心跳(页面每 15 秒调一次;打印代理用自己的 /pending 承担心跳)。
+     *
+     * @param body {station?}
      */
     @PostMapping("/heartbeat")
-    public ApiResult<Map<String, Object>> heartbeat(@RequestBody(required = false) Map<String, Object> body) {
+    public ApiResult<Map<String, Object>> heartbeatApi(@RequestBody(required = false) Map<String, Object> body,
+                                                       jakarta.servlet.http.HttpServletRequest req) {
         perm.requirePanelView(PANEL_SELF);
-        touchHeartbeat(body == null ? null : str(body.get("station")));
+        Station me = heartbeat(body == null ? null : str(body.get("station")), "page", clientIp(req));
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("autoEnabled", autoEnabled());
+        out.put("autoEnabled", true);
         out.put("queueSize", QUEUE.size());
+        out.put("station", me == null ? "" : me.name());
+        out.put("stations", stationList());
         return ApiResult.ok(out);
     }
 
-    // ══════════════════════════ 内部 ══════════════════════════
-
-    /** 全局自动打印开关(Y/N;表里没有这个键时按 N —— 不替用户擅自打开) */
-    private boolean autoEnabled() {
-        return "Y".equalsIgnoreCase(getSetting("print.auto_enabled"));
+    /**
+     * 来电 IP(帮现场认出"这是哪一台电脑")。
+     *
+     * <p>优先 {@code X-Forwarded-For}(有反向代理时 {@code getRemoteAddr} 只会是代理地址);
+     * 取第一个地址,非 IPv4/IPv6 的串一律丢掉。取不到就返回空串,不编造。
+     */
+    private static String clientIp(jakarta.servlet.http.HttpServletRequest req) {
+        if (req == null) return "";
+        String xff = req.getHeader("X-Forwarded-For");
+        String ip = "";
+        if (xff != null && !xff.isBlank()) {
+            ip = xff.split(",")[0].trim();
+        } else {
+            ip = str(req.getRemoteAddr());
+        }
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) ip = "127.0.0.1";
+        if (ip.startsWith("127.")) ip = "127.0.0.1";
+        return ip.length() > 60 ? "" : ip;
     }
 
-    private String stationName() {
-        return getSetting("print.station_name");
+    // ══════════════════════════ 内部:心跳 / 配置 / 派单 / 过期 ══════════════════════════
+
+    /**
+     * 刷新一个站点的心跳(第一次出现时从库里读配置;库里没有 ⇒ 默认关闭)。
+     *
+     * @return 站点视图;名字为空时返回 null(不注册"无名站点")
+     */
+    private Station heartbeat(String name, String source, String ip) {
+        String n = str(name);
+        if (n.isEmpty()) return null;
+        Station old = STATIONS.get(n);
+        if (old == null) {
+            boolean[] en = {false};
+            String[] pp = {PAPER_DEFAULT};
+            Set<String> types = loadConfig(n, en, pp);
+            old = new Station(n, en[0], types, pp[0], 0L, "", "");
+        }
+        Station s = new Station(n, old.enabled(), old.types(), old.paper(),
+                System.currentTimeMillis(), str1(source, old.source().isEmpty() ? "agent" : old.source()),
+                str(ip).isEmpty() ? old.ip() : str(ip));
+        STATIONS.put(n, s);
+        // 运维展示用(不参与派单):最近心跳时间 + 最近出现的站点名
+        setSetting("print.last_heartbeat", LocalDateTime.now().format(TS));
+        if (getSetting("print.station_name").isEmpty()) setSetting("print.station_name", n);
+        return s;
     }
 
-    private String stationNameOrDefault() {
-        String s = stationName();
-        return s.isEmpty() ? "自动打印" : s;
+    /** 读站点配置:内存缓存优先,其次系统参数;都没有 ⇒ enabled=false(没设置的不开) */
+    private Set<String> loadConfig(String name, boolean[] enabledOut, String[] paperOut) {
+        String en = getSetting(CFG_PREFIX + name + CFG_ENABLED);
+        String tp = getSetting(CFG_PREFIX + name + CFG_TYPES);
+        String pv = getSetting(CFG_PREFIX + name + CFG_PAPER);
+        enabledOut[0] = "Y".equalsIgnoreCase(en);
+        if (paperOut != null && paperOut.length > 0) paperOut[0] = paperOf(pv);
+        return parseTypes(tp);
+    }
+
+    /** 写站点配置(内存 + 系统参数,重载/重启后仍在) */
+    private void saveConfig(String name, boolean enabled, Set<String> types, String paper) {
+        setSetting(CFG_PREFIX + name + CFG_ENABLED, enabled ? "Y" : "N");
+        setSetting(CFG_PREFIX + name + CFG_TYPES, String.join(",", types));
+        setSetting(CFG_PREFIX + name + CFG_PAPER, paperOf(paper));
+        Station old = STATIONS.get(name);
+        STATIONS.put(name, new Station(name, enabled, types, paperOf(paper),
+                old == null ? 0L : old.seen(), old == null ? "" : old.source(), old == null ? "" : old.ip()));
+    }
+
+    /** 纸张归一:只认 A5 / A4,其余一律按默认 A5(旧数据没有这个键 ⇒ A5,行为不变) */
+    private static String paperOf(String raw) {
+        String v = str(raw).toUpperCase(Locale.ROOT);
+        return PAPERS.contains(v) ? v : PAPER_DEFAULT;
     }
 
     /**
-     * 有没有在线的打印电脑:心跳在 {@link #ONLINE_SECONDS} 内。
+     * 从队列里取一条**派给这个站点**的任务。
      *
-     * <p>心跳存 nvarchar(ISO 格式):{@code yj_app_setting.setting_value} 是 nvarchar,
-     * 存字符串最省事,也方便运维直接看。
+     * <ul>
+     *   <li>只取 {@code targets} 含本站点、且 {@code delivered} 里还没有本站点的(取到即去重);</li>
+     *   <li>{@code delivered} 覆盖了全部 targets ⇒ 这条任务已经发完,出队(不再占队列);</li>
+     *   <li>过期({@link #TASK_TTL_SECONDS})的任务在 {@link #sweep()} 里丢掉。</li>
+     * </ul>
      */
-    private boolean isStationOnline() {
-        String hb = getSetting("print.last_heartbeat");
-        if (hb.isEmpty()) return false;
-        try {
-            LocalDateTime t = LocalDateTime.parse(hb.trim().replace(' ', 'T'));
-            return java.time.Duration.between(t, LocalDateTime.now()).getSeconds() <= ONLINE_SECONDS;
-        } catch (RuntimeException e) {
-            return false;
+    private PrintTask takeFor(String name) {
+        Station me = STATIONS.get(name);
+        if (me == null || !me.enabled() || me.types().isEmpty()) return null;
+        for (PrintTask t : QUEUE) {
+            if (!t.targets().contains(name)) continue;
+            if (!t.delivered().add(name)) continue;   // 本站点已经取过这条了
+            if (t.delivered().containsAll(t.targets())) QUEUE.remove(t);
+            return t;
         }
+        return null;
     }
 
-    private void touchHeartbeat(String station) {
-        setSetting("print.last_heartbeat", LocalDateTime.now().format(TS));
-        if (station != null && !station.isBlank() && stationName().isEmpty()) {
-            setSetting("print.station_name", station.trim());
+    /** 丢掉过期任务 + 清掉太久没心跳的站点(内存不留垃圾) */
+    private void sweep() {
+        long now = System.currentTimeMillis();
+        long ttl = TASK_TTL_SECONDS * 1000L;
+        for (PrintTask t : QUEUE) {
+            if (now - t.createdAt() > ttl) QUEUE.remove(t);
         }
+        // 站点条目保留 30 分钟:面板要把"刚才还在、现在离线"的电脑也列出来
+        long keep = 30 * 60 * 1000L;
+        STATIONS.entrySet().removeIf((e) -> now - e.getValue().seen() > keep);
     }
+
+    private List<Station> onlineStations() {
+        long now = System.currentTimeMillis();
+        long win = ONLINE_SECONDS * 1000L;
+        List<Station> out = new ArrayList<>();
+        for (Station s : STATIONS.values()) {
+            if (now - s.seen() <= win) out.add(s);
+        }
+        out.sort((a, b) -> a.name().compareTo(b.name()));
+        return out;
+    }
+
+    /**
+     * 站点清单(给面板显示"哪台电脑开没开、各自订什么")。
+     *
+     * <p>🔴 2026-11-05:清单 = **内存里在跑的** ∪ **库里有配置的**。
+     * 只取内存的话,「面板上新增一台电脑」(它还没连过来、seen=0)会立刻被
+     * {@link #sweep()} 当"太久没心跳"清掉,登记完就消失 —— 用户会以为没加成功。
+     * 补上库里的配置行,新登记的电脑就能以"离线/从没连过"的形态一直留在清单里,
+     * 等它的代理连上来再变在线(服务端重启后也一样)。
+     */
+    private List<Map<String, Object>> stationList() {
+        long now = System.currentTimeMillis();
+        long win = ONLINE_SECONDS * 1000L;
+        Map<String, Station> all = new LinkedHashMap<>(STATIONS);
+        // 库里有配置、但内存里没有(从没连过 / 服务端重启后):补一行"离线占位"
+        for (String name : configuredNames()) {
+            if (all.containsKey(name)) continue;
+            boolean[] en = {false};
+            String[] pp = {PAPER_DEFAULT};
+            Set<String> types = loadConfig(name, en, pp);
+            all.put(name, new Station(name, en[0], types, pp[0], 0L, "", ""));
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        List<Station> list = new ArrayList<>(all.values());
+        list.sort((a, b) -> a.name().compareTo(b.name()));
+        for (Station s : list) {
+            Map<String, Object> m = s.json();
+            m.put("online", now - s.seen() <= win);
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** 库里登记过的站点名(print.station.&lt;名字&gt;.enabled 的键名里取名字);读不到就当空表 */
+    private List<String> configuredNames() {
+        List<String> names = new ArrayList<>();
+        try {
+            List<String> keys = jdbc.queryForList(
+                    "SELECT setting_key FROM yj_app_setting WHERE setting_key LIKE ?",
+                    String.class, CFG_PREFIX + "%.enabled");
+            for (String k : keys) {
+                if (k == null) continue;
+                String rest = k.substring(CFG_PREFIX.length());
+                int dot = rest.lastIndexOf('.');
+                if (dot > 0) names.add(rest.substring(0, dot));
+            }
+        } catch (RuntimeException e) {
+            // 读不到不影响在跑的站点显示
+        }
+        return names;
+    }
+
+    private List<Map<String, Object>> typeList() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map.Entry<String, String> e : PRINT_TYPES.entrySet()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("code", e.getKey());
+            m.put("label", e.getValue());
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** 站点页要的整块状态(我 / 所有站点 / 队列 / 最近出纸) */
+    private Map<String, Object> stateOf(Station me) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        // 服务端总闸:固定开(用户口径「在服务器上开启是固定的」);保留字段给旧前端
+        out.put("autoEnabled", true);
+        out.put("serverGate", "Y");
+        out.put("stationName", me == null ? "" : me.name());
+        out.put("stationEnabled", me != null && me.enabled());
+        out.put("stationTypes", me == null ? List.of() : new ArrayList<>(me.types()));
+        out.put("stationPaper", me == null ? PAPER_DEFAULT : paperOf(me.paper()));
+        out.put("stationOnline", me != null && isOnline(me));
+        out.put("stations", stationList());
+        out.put("types", typeList());
+        out.put("queueSize", QUEUE.size());
+        out.put("lastHeartbeat", getSetting("print.last_heartbeat"));
+        List<Map<String, Object>> recent;
+        synchronized (DONE) { recent = DONE.stream().map(PrintTask::json).toList(); }
+        out.put("recent", recent);
+        return out;
+    }
+
+    private static boolean isOnline(Station s) {
+        return System.currentTimeMillis() - s.seen() <= ONLINE_SECONDS * 1000L;
+    }
+
+    private static String names(List<Station> list) {
+        List<String> ns = new ArrayList<>();
+        for (Station s : list) ns.add(s.name());
+        return String.join("、", ns);
+    }
+
+    /** 类型 code 归一:不在注册表里的一律按默认类型(旧客户端没带类型) */
+    private static String typeOf(Object raw) {
+        String t = str(raw).toUpperCase(Locale.ROOT);
+        return PRINT_TYPES.containsKey(t) ? t : DEFAULT_TYPE;
+    }
+
+    private static String typeLabel(String code) {
+        return PRINT_TYPES.getOrDefault(code, code);
+    }
+
+    private static Set<String> parseTypes(String csv) {
+        Set<String> out = new LinkedHashSet<>();
+        if (csv == null) return out;
+        for (String p : csv.split(",")) {
+            String t = p.trim().toUpperCase(Locale.ROOT);
+            if (PRINT_TYPES.containsKey(t)) out.add(t);
+        }
+        return out;
+    }
+
+    // ══════════════════════════ 内部:系统参数 ══════════════════════════
 
     /** 读系统参数;表/键不存在时返回空串(不抛 —— 参数缺失不该让整页 500) */
     private String getSetting(String key) {
@@ -354,11 +695,26 @@ public class PrintStationController {
         }
     }
 
+    /**
+     * 参数的 remark:一眼看出这行是"哪个站点"的配置(运维直接开表就能读)。
+     * 站点配置的键形如 {@code print.station.<站点名>.enabled}。
+     */
     private static String remarkOf(String key) {
+        if (key.startsWith(CFG_PREFIX)) {
+            String rest = key.substring(CFG_PREFIX.length());
+            int dot = rest.lastIndexOf('.');
+            String name = dot > 0 ? rest.substring(0, dot) : rest;
+            String field = dot > 0 ? rest.substring(dot) : "";
+            return CFG_TYPES.equals(field)
+                    ? "打印站点「" + name + "」勾选的打印类型(逗号分隔的 code;PICK_SLIP=生产领料单)"
+                    : (CFG_PAPER.equals(field)
+                        ? "打印站点「" + name + "」的纸张(A5=中一刀 210×148.5 横 / A4=297×210 横;只换纸不缩放)"
+                        : "打印站点「" + name + "」的自动打印开关(Y=这台电脑出纸,N=不出)");
+        }
         return switch (key) {
-            case "print.auto_enabled" -> "自动打印总开关(Y=允许手机端把打印任务发给「自动打印」站点电脑)";
-            case "print.station_name" -> "打印机站点的显示名(手机端选机时看到的名字)";
-            case "print.last_heartbeat" -> "打印站点最后一次心跳时间(手机端据此判断有没有在线的打印电脑)";
+            case "print.auto_enabled" -> "【已停用】旧全局自动打印开关:2026-11-04 起改为按站点的开关,本键不再参与分发";
+            case "print.station_name" -> "最近一次心跳的打印站点名(仅运维展示)";
+            case "print.last_heartbeat" -> "打印站点最后一次心跳时间(仅运维展示)";
             default -> key;
         };
     }
@@ -373,9 +729,6 @@ public class PrintStationController {
      * <p>用 pom 里已有的 ZXing(报表 QRCode 组件也用它),不引新依赖;
      * 不用 `MatrixToImageWriter`(那在 zxing-javase 包里,本项目没引),
      * 直接拿 BitMatrix 逐像素画到 BufferedImage —— 几十行代码,零额外依赖。
-     *
-     * <p>纠错级别 M、留白 1 模块,与前端 `qrcode` 库那次的参数一致,
-     * 保证两端出图在视觉上一致(内容本来就是同一个字符串)。
      *
      * @param content 二维码内容
      * @return `data:image/png;base64,...`;失败返回空串(代理会退回纯文字标签,不影响出纸)
