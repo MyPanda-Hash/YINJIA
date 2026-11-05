@@ -5324,6 +5324,7 @@ export default {
     '成型修正长度参数 mm': 'Forming Length Correction (mm)',
     '密度参数下限': 'Density Lower Limit',
     '密度参数上限': 'Density Upper Limit',
+    '计算过程': 'Calculation Steps',
     '炭棒体积 cm³': 'Rod Volume (cm³)',
     '切割长度中间值 mm': 'Cut Length (mid, mm)',
     '折算物料重量 g': 'Converted Material Weight (g)',

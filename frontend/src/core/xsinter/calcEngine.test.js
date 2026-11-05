@@ -149,3 +149,60 @@ test('⑭ 空/脏输入不抛错、不返回 NaN（纸面刚建单时的常态�
     assert.equal(r.rows.length, 10)
   }
 })
+
+/**
+ * ⑮~⑱ 带**颗粒料**的配方（HP-12 9克×32.5/16×204，2026-11-05 报障的这组）
+ *
+ * 期望值来自《X烧结261105测试系统和原本对应输出是否一致.xlsx》sheet「配方计算器」缓存值。
+ * 这组的关键差异：颗粒料是**克数**，不能当比例乘总重；粉料1 的实际比例是「1 − 其余行」，
+ * 不是设计值；「炭棒重量」是成型重量（标准重量 − 折算量 + 颗粒料），不是标准重量。
+ */
+const HP12 = {
+  rodOuter: 32.5, rodInner: 16, shipLength: 204,
+  dieOutlet: 32.5, rodDiameter: 17,
+  granuleFactor: 0.65, lengthFix: 0.5,
+  densLow: 0.585, densHigh: 0.615,
+  // 粉料1 倒推 0.55；胶粉1 0.45；颗粒料1 = 9 克
+  designs: [0, 0, 0, 0, 0, 0.45, 0, 9, 0, 0],
+}
+
+test('⑮ 折算物料重量与单支总重（Excel I8 / F19）', () => {
+  const r = computeXsinter(HP12)
+  assert.ok(near(r.convWeight, 5.85), '折算量 ' + r.convWeight + '，期望 5.85')
+  assert.ok(near(r.totalWeight, 80.229679875), '单支总重 ' + r.totalWeight + '，期望 80.229679875')
+})
+
+test('⑯ 实际添加比例：粉料1 = 1 − 其余（Excel G9）、胶粉/颗粒料 = 含量 ÷ 总重（G14/G16）', () => {
+  const r = computeXsinter(HP12)
+  const byKind = Object.fromEntries(r.rows.map((x) => [x.kind, x]))
+  assert.ok(near(byKind['粉料1'].actual, 0.455490087810225),
+    '粉料1 实际比例 ' + byKind['粉料1'].actual + '，期望 0.455490087810225')
+  assert.ok(near(byKind['胶粉1'].actual, 0.432331974872535),
+    '胶粉1 实际比例 ' + byKind['胶粉1'].actual + '，期望 0.432331974872535')
+  assert.ok(near(byKind['颗粒料1'].actual, 0.11217793731724),
+    '颗粒料1 实际比例 ' + byKind['颗粒料1'].actual + '，期望 0.11217793731724')
+  assert.ok(near(r.totalRatio, 1), '比例合计 ' + r.totalRatio + '，期望 1（旧实现把 9 克当比例，合计 10）')
+})
+
+test('⑰ 单支含量：颗粒料是 9 克本身，不是 9 × 总重（Excel H16 / H9 / H14）', () => {
+  const r = computeXsinter(HP12)
+  const byKind = Object.fromEntries(r.rows.map((x) => [x.kind, x]))
+  assert.ok(near(byKind['颗粒料1'].perPiece, 9),
+    '颗粒料1 含量 ' + byKind['颗粒料1'].perPiece + '，期望 9（旧实现给 722.067）')
+  assert.ok(near(byKind['粉料1'].perPiece, 36.54382393125),
+    '粉料1 含量 ' + byKind['粉料1'].perPiece + '，期望 36.54382393125（旧实现给 44.126）')
+  assert.ok(near(byKind['胶粉1'].perPiece, 34.68585594375),
+    '胶粉1 含量 ' + byKind['胶粉1'].perPiece + '，期望 34.68585594375')
+  const sum = r.rows.reduce((a, x) => a + x.perPiece, 0)
+  assert.ok(near(sum, r.totalWeight), '含量合计 ' + sum + ' 应等于总重 ' + r.totalWeight)
+})
+
+test('⑱ 炭棒重量是**成型重量**（标准重量 − 折算量 + 颗粒料，Excel I14/J14/K14）', () => {
+  const r = computeXsinter(HP12)
+  assert.ok(near(r.weight.low, 78.302687878125), '下限 ' + r.weight.low + '，期望 78.302687878125')
+  assert.ok(near(r.weight.mid, 80.229679875), '中间 ' + r.weight.mid + '，期望 80.229679875（旧实现给 77.07968）')
+  assert.ok(near(r.weight.high, 82.156671871875), '上限 ' + r.weight.high + '，期望 82.156671871875')
+  // 中间值必须等于单支总重（Excel J14 = F19）
+  assert.ok(near(r.weight.mid, r.totalWeight))
+})
+
