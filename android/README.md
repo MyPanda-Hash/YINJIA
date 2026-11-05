@@ -1,7 +1,7 @@
 ﻿# 银嘉 MES · 安卓壳(`android/`)
 
 > **日期**:2026-10-20
-> **产物**:`android/dist/yinjia-mes-1.0.4.apk`(自签名,可直接侧载)
+> **产物**:`android/dist/yinjia-mes-1.0.5.apk`(自签名,可直接侧载)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
 脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
 
-**手机安装**:把 `android/dist/yinjia-mes-1.0.4.apk` 拷到手机点安装(需允许「安装未知应用」)。
+**手机安装**:把 `android/dist/yinjia-mes-1.0.5.apk` 拷到手机点安装(需允许「安装未知应用」)。
 
 > ⚠ 签名是 `debug.keystore`(自签名,脚本首次运行自动生成,不入库)。**内部侧载够用**;
 > 若要上应用市场/企业分发,换成正式 keystore 并妥善保管(丢了就没法覆盖升级)。

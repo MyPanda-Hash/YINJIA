@@ -285,7 +285,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
             if (cands.size() >= (multiMode ? 1 : 2)) {
                 if (!panelShown) { panelShown = true; vibrate(80); }
-                if (added) refreshPanel();
+                if (added) refreshPanel(true);   // 新码:滚到最新一条
                 return;
             }
             if (!panelShown) {
@@ -338,9 +338,16 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         return list;
     }
 
-    /** 把当前候选刷进面板(边扫边加行) */
-    private void refreshPanel() {
+    /**
+     * 把当前候选刷进面板(边扫边加行)。
+     *
+     * @param scrollToEnd true = 有新码进来,滚到最新一行;false = 只是勾选/取消勾选,
+     *                    **保持用户当前看到的位置**(2026-11-05 用户报「取消勾选后会自动下跳」:
+     *                    旧实现每次重排都 {@code fullScroll(FOCUS_DOWN)},所以点一下就跳到底)。
+     */
+    private void refreshPanel(final boolean scrollToEnd) {
         final List<String> snapshot = sortedCodes();
+        final int keepY = multiScroll.getScrollY();
         ui.post(new Runnable() {
             @Override public void run() {
                 multiPanel.setVisibility(View.VISIBLE);
@@ -394,7 +401,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
                         @Override public void onClick(View v) {
                             if (multiMode) {
                                 if (picked.contains(code)) picked.remove(code); else picked.add(code);
-                                refreshPanel();
+                                refreshPanel(false);
                             } else {
                                 onDecoded(code);
                             }
@@ -408,7 +415,13 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
                     multiList.addView(divider);
                 }
                 multiScroll.post(new Runnable() {
-                    @Override public void run() { multiScroll.fullScroll(View.FOCUS_DOWN); }
+                    @Override public void run() {
+                        if (scrollToEnd) {
+                            multiScroll.fullScroll(View.FOCUS_DOWN);          // 新码进来:跟到最新一条
+                        } else {
+                            multiScroll.scrollTo(0, keepY);                   // 只是勾选:回到原位置,不跳
+                        }
+                    }
                 });
             }
         });
@@ -420,7 +433,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             if (picked.size() >= cands.size()) picked.clear();
             else picked.addAll(cands.keySet());
         }
-        refreshPanel();
+        refreshPanel(false);
     }
 
     /** 多选模式:把勾选的码一次回传(生成工单领料/退料单页据此批量入队) */
