@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   YINJIA-MES 本地打印代理(2026-10-30)
 
@@ -260,6 +260,14 @@ function Send-LabelToPrinter {
     $script:pDate  = $PrintDate
     $script:pRows  = @($Rows)
 
+    # 🔴 2026-11-05 分页:用户问「打印行数会有限制吗?如果大于 9 行,还能打印吗」。
+    #   改前是 `if ($rowCount -gt 12) { $rowCount = 12 }` —— 一页最多 12 行,**第 13 行起
+    #   直接被丢掉**,现场看到的是一张"少料"的领料单,比打不出来更危险。
+    #   现在:一页放 PER_PAGE 行,超出自动续页(每页都重复抬头/表格线/签名),没有上限。
+    $script:pPage = 0
+    $script:pPerPage = 10      # 一页 10 行时行高 ≈ 30px,仍然好读;再多就续页
+    $script:pTotalPages = [Math]::Max(1, [int][Math]::Ceiling((@($script:pRows).Count) / $script:pPerPage))
+
     $doc.add_PrintPage({
         param($sender, $e)
         try {
@@ -284,9 +292,25 @@ function Send-LabelToPrinter {
         # 不换行:纸表格子高度有限,换行会被切掉半截(实测订单号只显示 "GD-2026-11-")
         $fmtL.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
 
-        # ① 左上角二维码(用户样张的"红框"位置):码 + 细红框
-        $qrSize = 132
-        if ($script:labelQr) { $g.DrawImage($script:labelQr, 26, 20, $qrSize, $qrSize) }
+        # 本页要画哪些明细(2026-11-05 分页):按页号切片,页内至少 8 行格子(纸表是固定格式)
+        $pageIdx = [int]$script:pPage
+        $script:pPage = $pageIdx + 1
+        $allRows = @($script:pRows)
+        $startAt = $pageIdx * [int]$script:pPerPage
+        $pageRows = @()
+        if ($startAt -lt $allRows.Count) {
+            $takeN = [Math]::Min([int]$script:pPerPage, $allRows.Count - $startAt)
+            $pageRows = @($allRows[$startAt..($startAt + $takeN - 1)])
+        }
+
+        # ① 左上角二维码(用户样张的"红框"位置):码 + 细黑框
+        # 🔴 2026-11-05 用户口径「二维码过大」:132 → 96。原文按 132 画,占了整张中一刀的
+        #   近 1/6 面积,标题被挤到右边、表格也被压窄;96(≈24mm)扫码完全够用。
+        $qrSize = 96
+        if ($script:labelQr) {
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.DrawImage($script:labelQr, 26, 20, $qrSize, $qrSize)
+        }
         # 二维码外框:纸表风格细黑框(样张上的红框是用户标注,纸面本身是黑线表格)
         $g.DrawRectangle($penLine, 22, 16, $qrSize + 8, $qrSize + 8)
 
@@ -296,23 +320,27 @@ function Send-LabelToPrinter {
         $noText = 'No ' + $script:pOutNo
         $g.DrawString($noText, $fontNo, $black, 590, 40)
 
-        # ③ 领料部门 / 日期
-        $g.DrawString('领料部门:', $fontFoot, $gray, 26, 166)
-        $g.DrawString($script:pDept, $fontCell, $black, 112, 166)
-        $g.DrawString('日期:', $fontFoot, $gray, 590, 166)
-        $g.DrawString($script:pDate, $fontCell, $black, 638, 166)
+        # ③ 领料部门 / 日期(随二维码缩小上移,让表格多吃两行)
+        $g.DrawString('领料部门:', $fontFoot, $gray, 26, 134)
+        $g.DrawString($script:pDept, $fontCell, $black, 112, 134)
+        $g.DrawString('日期:', $fontFoot, $gray, 590, 134)
+        $g.DrawString($script:pDate, $fontCell, $black, 638, 134)
+        # 多页时右上角标"第 n/N 页"(单页不画,免得多余)
+        if ([int]$script:pTotalPages -gt 1) {
+            $pgText = '第 ' + ($pageIdx + 1) + '/' + $script:pTotalPages + ' 页'
+            $g.DrawString($pgText, $fontFoot, $gray, 590, 96)
+        }
 
-        # ④ 明细表格:七列,行数按明细补足到 8 行(纸表是固定格子)
+        # ④ 明细表格:七列,行数 = max(8, 本页实际行数)
         $x0 = 22
-        $y0 = 200
+        $y0 = 166
         # 列宽(总 780):订单号必须放得下 "GD-2026-11-0016#1",给到 168
         $colW = @(168, 172, 118, 45, 92, 92, 93)
         $totalW = 0
         foreach ($cw in $colW) { $totalW += $cw }
         $headH = 40
-        $rows = @($script:pRows)
+        $rows = @($pageRows)
         $rowCount = [Math]::Max(8, $rows.Count)
-        if ($rowCount -gt 12) { $rowCount = 12 }
         $tableH = $pageH - 70 - $y0
         $rowH = [Math]::Floor(($tableH - $headH) / $rowCount)
 
@@ -338,7 +366,10 @@ function Send-LabelToPrinter {
 
         for ($ri = 0; $ri -lt $rowCount; $ri++) {
             $yy = $y0 + $headH + $rowH * $ri
-            $vals = @(($script:pWoNo + $script:pLine), '', '', '', '', '', '')
+            # 🔴 2026-11-05 用户报障「明细只有 3 行,却给了多行的数据」:
+            #   以前空行也填「订单号」(GD-…-#1),看上去像 8 行明细全是同一张单。
+            #   现在**只有真有数据的行**才写订单号,空行就是空格子(纸表留白)。
+            $vals = @('', '', '', '', '', '', '')
             if ($ri -lt $rows.Count) {
                 $row = $rows[$ri]
                 $q1 = ''
@@ -361,6 +392,9 @@ function Send-LabelToPrinter {
         $g.DrawString('仓库主管:', $fontFoot, $gray, 230, $fy)
         $g.DrawString('领料人:', $fontFoot, $gray, 440, $fy)
         $g.DrawString('仓管员:', $fontFoot, $gray, 630, $fy)
+
+        # ⑥ 还有下一行没画完 ⇒ 让打印框架再调一次本回调(续页,抬头/表格线/签名都重画)
+        if (($pageIdx + 1) -lt [int]$script:pTotalPages) { $e.HasMorePages = $true }
 
         $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose()
         $fontTitle.Dispose(); $fontNo.Dispose(); $fontHead.Dispose(); $fontCell.Dispose(); $fontFoot.Dispose()
