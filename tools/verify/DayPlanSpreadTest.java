@@ -34,12 +34,14 @@ public class DayPlanSpreadTest {
         Map<LocalDate, Double> b = DayPlanSpread.mergeReported(104, 0, today, today.plusDays(7), today, Map.of());
         check("没报工 + 开工=今天 ⇒ 与旧口径逐日一致", a.equals(b), a + " vs " + b);
 
-        // 2) 没报工 + 开工在过去 ⇒ 历史**不再留计划**(未报工的量全部后移),今天起合计=总量
+        // 2) 没报工 + 开工在过去 ⇒ 历史格**照旧显示原计划**(留痕),但未报工的量不占用排产数量、全部后移
         LocalDate startPast = today.minusDays(2);
+        Map<LocalDate, Double> full = DayPlanSpread.merge(80, startPast, today.plusDays(3), today, Map.of());
         Map<LocalDate, Double> r2 = DayPlanSpread.mergeReported(80, 0, startPast, today.plusDays(3), today, Map.of());
-        check("没报工 + 历史有排产 ⇒ 历史格不再留「计划」(未报工一律后移)",
-                r2.keySet().stream().noneMatch(d -> d.isBefore(today)), r2.toString());
-        check("没报工 + 历史有排产 ⇒ 今天起合计 = 总量 80(后面能排完)",
+        check("历史格照旧显示原计划(留痕,不重算)",
+                eq(r2.get(today.minusDays(2)), full.get(today.minusDays(2)))
+                        && eq(r2.get(today.minusDays(1)), full.get(today.minusDays(1))), r2 + " / full=" + full);
+        check("未报工的量不占用排产数量 ⇒ 今天起合计 = 总量 80(全部后移)",
                 eq(sumFrom(r2, today), 80), "future=" + sumFrom(r2, today));
 
         // 3) 报工多了:计划 104(13×8 天),今天已报 30 ⇒ 今天起只摊 74
@@ -60,12 +62,12 @@ public class DayPlanSpreadTest {
         check("未来人工指定优先(明天=20),其余摊 54 ⇒ 未来合计 74",
                 eq(r5.get(today.plusDays(1)), 20d) && eq(sumFrom(r5, today), 74), r5.toString());
 
-        // 6) 历史人工指定视为已过期计划 ⇒ 不占历史格,进剩余后今天起重摊(80 − 已报 10 = 70)
+        // 6) 历史人工指定仍显示在历史格(留痕);剩余 = 80 − 已报 10 = 70 从今天起重摊
         Map<LocalDate, Double> manualPast = new LinkedHashMap<>();
         manualPast.put(today.minusDays(1), 7d);
         Map<LocalDate, Double> r6 = DayPlanSpread.mergeReported(80, 10, startPast, today.plusDays(3), today, manualPast);
-        check("历史人工指定不再占历史格,剩余按今天起重摊(70)",
-                r6.get(today.minusDays(1)) == null && eq(sumFrom(r6, today), 70), r6.toString());
+        check("历史人工指定仍显示,剩余按今天起重摊(70)",
+                eq(r6.get(today.minusDays(1)), 7d) && eq(sumFrom(r6, today), 70), r6.toString());
 
         // 7) 没报工 + 开工在未来 ⇒ 与旧口径完全一致(没影响)
         LocalDate startFuture = today.plusDays(2);
@@ -73,11 +75,11 @@ public class DayPlanSpreadTest {
         Map<LocalDate, Double> m7b = DayPlanSpread.mergeReported(60, 0, startFuture, today.plusDays(6), today, Map.of());
         check("没报工 + 未开工 ⇒ 与旧口径一致", m7a.equals(m7b), m7a + " vs " + m7b);
 
-        // 8) 用户截图场景:正常 开工日→计划完工日 区间内,过去几天没报工 ⇒ 全部后移到今天以后
-        //    开工 = today-5,计划完工 = today+4(10 天),计划 1000,没报工 ⇒ 今天起 5 天各 200
+        // 8) 用户截图场景:正常 开工日→计划完工日 区间内,过去 5 天没报工 ⇒
+        //    历史格照旧显示原计划(100/天,留痕),未报工的 1000 不占用、全部后移(today..+4 各 200)
         Map<LocalDate, Double> r8 = DayPlanSpread.mergeReported(1000, 0, today.minusDays(5), today.plusDays(4), today, Map.of());
-        check("过去 5 天没报工 ⇒ 1000 全部后移(today..+4 各 200,历史格为空)",
-                r8.keySet().stream().noneMatch(d -> d.isBefore(today))
+        check("过去 5 天没报工 ⇒ 历史格仍显示原计划(100/天),但量全部后移(今天起各 200、合计 1000)",
+                eq(r8.get(today.minusDays(5)), 100d) && eq(r8.get(today.minusDays(1)), 100d)
                         && eq(r8.get(today), 200d) && eq(r8.get(today.plusDays(4)), 200d)
                         && eq(sumFrom(r8, today), 1000), r8.toString());
 

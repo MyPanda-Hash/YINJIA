@@ -124,3 +124,15 @@ export function isOutOfPlanRange(date, start, due) {
   if (e && d > e) return true
   return false
 }
+
+/**
+ * 历史日期「排了计划但没报工」的提示(2026-11-05 用户口径):
+ * 「历史格如果没报工就不再占用排单计划的数量」——历史格照旧显示原计划做对照,
+ * 但这部分量已计入剩余、从今天起重新排,不再占用排产数量。tooltip 里说明一句,避免误读。
+ */
+export function isHistoryUnreported(date, today, plan, actual) {
+  const d = String(date || '').slice(0, 10)
+  const t = String(today || '').slice(0, 10)
+  if (!d || !t || d >= t) return false
+  return Number(plan || 0) > 0 && Number(actual || 0) <= 0
+}

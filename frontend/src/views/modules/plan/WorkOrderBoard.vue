@@ -302,7 +302,7 @@ import { Setting } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
-import { qtyText, isOverCapacity, dayColState, isToday, dayCellQty, isOutOfPlanRange } from '@/business/dayPlan'
+import { qtyText, isOverCapacity, dayColState, isToday, dayCellQty, isOutOfPlanRange, isHistoryUnreported } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -473,6 +473,8 @@ function dayTitle(row, d) {
   const a = Number((row.日报工 || {})[d] || 0)
   let t = `${tt('计划')} ${qtyText(p)}`
   if (a > 0) t += ` · ${tt('实报')} ${qtyText(a)}` + (a < p ? ` (${tt('差')} ${qtyText(p - a)})` : '')
+  // 2026-11-05:历史格没报工的计划量不占用排产数量(已后移) —— 提示一句,免得以为"还留在历史里"
+  if (isHistoryUnreported(d, planToday.value, p, a)) t += ' · ' + tt('未报工部分已后移到今天以后(不再占用排产数量)')
   return t + ' · ' + tt('双击直接填当天数量;清空恢复自动')
 }
 
