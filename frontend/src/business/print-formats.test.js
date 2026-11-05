@@ -56,7 +56,7 @@ const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount
   schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows,
   planSheetShop, planSheetTitle,
   planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS,
-  planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS } = await import('./print-formats.js')
+  planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -242,8 +242,10 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   }]
   // 2026-11-04 起标题/车间列头按工序产线动态 ⇒ 显式传 shop=成型,保持原纸表版式断言
   const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31', shop: '成型' })
-  for (const h of ['客户名称', '产品编号', '型号', '成型车间', '未完成总数',
-    '生产计划数量', '实际完成数量', '成型交期', '成型交期紧迫度', '7天', '15天', '大于15']) {
+  // 2026-11-05 版式重排:长表头用**显式换行**(断点固定,不再出现「生产计划数/量」掉单字);
+  //   表头 HTML 里就是 <br>,这里按最终表头逐字断言。
+  for (const h of ['客户名称', '产品编号', '型号', '成型车间', '未完成<br>总数',
+    '生产计划<br>数量', '实际完成<br>数量', '成型交期', '成型交期<br>紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
   // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
@@ -300,7 +302,7 @@ test('排单计划:标题/车间列头按工序产线动态(成型/切炭/组装
   const cut = await schedPlanSheetHtml([row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31' })
   assert.ok(cut.includes('切炭车间排单计划'), '切炭线标题应为 切炭车间排单计划')
   assert.ok(!cut.includes('成型车间排单计划'), '切炭纸不再出现「成型车间排单计划」')
-  for (const h of ['切炭车间', '切炭交期', '切炭交期紧迫度']) {
+  for (const h of ['切炭车间', '切炭交期', '切炭交期<br>紧迫度']) {
     assert.ok(cut.includes('>' + h + '</th>'), '切炭纸列头应含 ' + h)
   }
   assert.ok(!cut.includes('>成型交期</th>'), '切炭纸不应出现「成型交期」')
@@ -311,7 +313,7 @@ test('排单计划:标题/车间列头按工序产线动态(成型/切炭/组装
 
   const mixed = await schedPlanSheetHtml([row('成型', '1号机'), row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31' })
   assert.ok(mixed.includes('>排单计划</span>'), '混打多工序 ⇒ 通用标题「排单计划」')
-  for (const h of ['生产车间', '交期', '交期紧迫度']) {
+  for (const h of ['生产车间', '交期', '交期<br>紧迫度']) {
     assert.ok(mixed.includes('>' + h + '</th>'), '混打 ⇒ 通用列头 ' + h)
   }
 
@@ -343,13 +345,14 @@ test('schedPlanSheetHtml:opts.dates = 勾选行 最前→最后(历史窗口照�
 })
 
 // 2026-11-04 用户口径「这个当前二维码太小了」:二维码按物理尺寸出纸(52px≈13.8mm),不再跟着列数缩;
-//   行数多时才适度收一点,保证一张 A4 装得下。
-test('schedPlanSheetHtml:二维码尺寸(行少 52px 不缩太小 / 行多 48→36px) + 底图 300px 打印清晰', async () => {
+//   行数多时才适度收一点(48/44/38),保证一张 A4 装得下。
+// 2026-11-05 版式重排:二维码列宽固定 5.5%,行高 = 二维码 + 8px 留白(最少 42px)。
+test('schedPlanSheetHtml:二维码尺寸(行少 52px 不缩 / 行多 48→38px) + 底图 300px 打印清晰', async () => {
   const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
   const h1 = await schedPlanSheetHtml([mk(1)], [], { dates: ['2026-10-29'] })
-  assert.ok(h1.includes('td.qr img{width:52px;height:52px}'), '行少(≤5)⇒ 52px(≈13.8mm,比 60 小一点但不至于扫不动)')
-  assert.ok(h1.includes('tbody tr{height:58px}'), '行高跟着二维码(52+6)')
-  assert.ok(h1.includes('width:6%'), '行少:二维码列 6%(给日期列让 1.5% 宽度)')
+  assert.ok(h1.includes('td.qr img{width:52px;height:52px}'), '行少(≤5)⇒ 52px(≈13.8mm)')
+  assert.ok(h1.includes('tbody tr{height:60px}'), '行高跟着二维码(52+8)')
+  assert.ok(h1.includes('<col style="width:5.5%"/>'), '二维码列固定 5.5%')
   // 底图分辨率:PNG IHDR 的 width(偏移 16)应为 300 —— 打印才能清晰(以前 108px 放大发虚)
   const url = (h1.match(/src="(data:image\/png;base64,[^"]+)"/) || [])[1]
   assert.ok(url, '应带二维码图片')
@@ -359,46 +362,66 @@ test('schedPlanSheetHtml:二维码尺寸(行少 52px 不缩太小 / 行多 48→
   const wide = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
   const h2 = await schedPlanSheetHtml([mk(2)], [], { dates: wide })
   assert.ok(h2.includes('td.qr img{width:52px;height:52px}'), '10 列但只有 1 行 ⇒ 仍 52px')
-  assert.ok(h2.includes('width:6%'), '二维码列 6%')
 
   const mid = await schedPlanSheetHtml(Array.from({ length: 8 }, (_, i) => mk(i)), [], { dates: wide })
   assert.ok(mid.includes('td.qr img{width:48px;height:48px}'), '8 行 ⇒ 收到 48px')
+  assert.ok(mid.includes('tbody tr{height:56px}'), '8 行 ⇒ 行高 56px')
 
   const many = Array.from({ length: 16 }, (_, i) => mk(i))
   const h3 = await schedPlanSheetHtml(many, [], { dates: wide })
-  assert.ok(h3.includes('td.qr img{width:36px;height:36px}'), '16 行 ⇒ 收到 36px 保证一页')
-  assert.ok(h3.includes('tbody tr{height:42px}'), '行高 42px')
+  assert.ok(h3.includes('td.qr img{width:38px;height:38px}'), '16 行 ⇒ 收到 38px 保证一页')
+  assert.ok(h3.includes('tbody tr{height:46px}'), '行高 46px(38+8)')
 })
 
-// 2026-11-04 用户口径「日期不要竖排」:日期表头**始终横排**,列窄时降字号 + nowrap(绝不折成竖条);
-//   列数很多时二维码自适应该收就收(>16 天 44px、>22 天 40px)。
-test('schedPlanSheetHtml:日期列很多(23 天)⇒ 表头仍横排(nowrap+降字号),二维码收到 40px', async () => {
+// 2026-11-05 版式重排(用户口径「不需要实现那么多天数,调整优化一下表格和设计,不需要那么窄」):
+//   ① 日期列**先**按每天 6% 给(3 天 18%),剩余宽度全给固定列 —— 天数越少固定列越宽;
+//   ② 长表头显式换行,断点固定;日期表头始终横排 nowrap;
+//   ③ 正文字号 10.5px / 表头 9.5px(旧版为了 16~31 天压到 9.5/9px),A4 横向页边距 8mm/6mm。
+test('schedPlanSheetHtml:2026-11-05 版式 — 日期先占 6%/天,固定列拿剩余宽度,字号加大', async () => {
   const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
   const rows = [mk(1), mk(2), mk(3)]
-  const d23 = planSheetWindow('2026-10-29', 23)
-  assert.equal(d23.length, 23)
-  const h = await schedPlanSheetHtml(rows, [], { dates: d23 })
-  assert.ok(!h.includes('writing-mode'), '日期表头不再竖排')
-  assert.equal((h.match(/<th class="dt"/g) || []).length, 23, '23 个日期表头(横排)')
-  assert.ok(h.includes('th.dt{white-space:nowrap'), '日期表头禁止折行(不会变竖条)')
-  assert.ok(h.includes('>10/29</th>'), '日期按「10/29」横排写法')
-  assert.ok(h.includes('td.qr img{width:40px;height:40px}'), '列很多 ⇒ 二维码收到 40px(≈10.6mm,仍可扫)')
-  assert.ok(h.includes('width:4.6%'), '二维码列 4.6%(把宽度让给日期列)')
-  assert.ok(/width:2\.4\d%/.test(h), '日期列仍有 ~2.41%(≈6.9mm),4 位数字放得下')
-
-  // 31 天:更窄 ⇒ 日期表头再降一档 6px(仍横排)
-  const d31 = planSheetWindow('2026-10-01', 31)
-  const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
-  assert.ok(h31.includes('th.dt{white-space:nowrap;padding:2px 0;font-size:6px'), '31 天 ⇒ 表头 6px')
+  const h3d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29', '2026-10-30', '2026-10-31'] })
+  assert.ok(h3d.includes('<col style="width:6.00%"/>'), '3 天 ⇒ 每天 6%(≈65px,4 位数字 + 横排表头都放得下)')
+  // 固定列按剩余宽度分:客户名称/单据编号拿 10.49%(旧的压窄算法只有 9%/10%)
+  assert.ok(h3d.includes('<col style="width:10.49%"/>'), '客户名称/单据编号 各 10.49%')
+  assert.ok(h3d.includes('padding:3px 3px;font-size:10.5px'), '正文 10.5px(≈7.9pt)、内边距 3px')
+  assert.ok(h3d.includes('font-weight:600;text-align:center;font-size:9.5px'), '表头 9.5px')
+  assert.ok(h3d.includes('@page{size:A4 landscape;margin:8mm 6mm}'), 'A4 横向,上下 8mm / 左右 6mm')
+  assert.ok(h3d.includes('table{width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid #222}'),
+    '表外框加粗一档(出纸不显得单薄)')
+  // 1 天 ⇒ 固定列拿到更多宽度(日期少,固定列更宽,这就是"不再那么窄"的来源)
+  const h1d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29'] })
+  const w1 = [...h1d.matchAll(/<col style="width:([\d.]+)%"\/>/g)].map((m) => Number(m[1]))
+  const w3 = [...h3d.matchAll(/<col style="width:([\d.]+)%"\/>/g)].map((m) => Number(m[1]))
+  assert.ok(w1[0] > w3[0], '1 天时客户名称列比 3 天时更宽')
+  assert.equal(w1.length, w3.length - 2, '固定列数不变(只差 2 个日期列)')
+  // 各列百分比加起来就是 100%(浏览器按 colgroup 铺满纸宽)
+  for (const ws of [w1, w3]) {
+    assert.ok(Math.abs(ws.reduce((a, b) => a + b, 0) - 100) < 0.5, '列宽合计 ≈100%')
+  }
 })
 
-test('schedPlanSheetHtml:日期列 31 天(极窄)⇒ 格内数字降一档字号,避免压到邻列', async () => {
-  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-01': 1 } })
-  const rows = [mk(1), mk(2)]
+// 2026-11-04 用户口径「日期不要竖排」:日期表头**始终横排 nowrap**(绝不折成竖条);
+//   2026-11-05 起打印天数最多 10 列,超出的入参只印前 10 列(防脏数据把版式压回挤窄形态)。
+test('schedPlanSheetHtml:日期表头始终横排;超过 10 列只印前 10 列', async () => {
+  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
+  const rows = [mk(1), mk(2), mk(3)]
+  assert.equal(PLAN_SHEET_MAX_PRINT_DAYS, 10, '一张纸最多 10 个日期列')
+  const d10 = planSheetWindow('2026-10-29', 10)
+  const h = await schedPlanSheetHtml(rows, [], { dates: d10 })
+  assert.ok(!h.includes('writing-mode'), '日期表头不再竖排')
+  assert.equal((h.match(/<th class="dt"/g) || []).length, 10, '10 个日期表头(横排)')
+  assert.ok(h.includes('th.dt{white-space:nowrap'), '日期表头禁止折行(不会变竖条)')
+  assert.ok(h.includes('>10/29</th>'), '列多时日期按「10/29」紧凑横排写法')
+  assert.ok(h.includes('title="2026-10-29"'), 'date 表头保留完整日期 tooltip')
+  assert.ok(h.includes('font-size:8px'), '8 天以上表头降一档字号(9px/8px),但不再压到 6px')
+
   const d31 = planSheetWindow('2026-10-01', 31)
-  const h = await schedPlanSheetHtml(rows, [], { dates: d31 })
-  assert.ok(h.includes('td.d{font-size:7px'), '极窄日期列:数字字号降一档')
-  assert.equal((h.match(/class="r d"/g) || []).length, 31 * 2, '31 列 × 2 行都带窄格样式')
+  const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
+  assert.equal((h31.match(/<th class="dt"/g) || []).length, 10, '31 天入参也只印前 10 列')
+  // 每行日期格 10 个 + 数字列 7 个(未完成总数/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
+  assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 7), '每行 10 个日期格 + 7 个数字列')
+  assert.ok(!h31.includes('td.d{font-size:7px'), '不再需要「极窄格降字号」那套补丁')
 })
 
 test('pickPlanSheetRows:只留勾选行、保持页面顺序;没勾选=空(不悄悄退回整线全打)', () => {

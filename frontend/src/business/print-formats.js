@@ -575,8 +575,22 @@ export async function printWoQr(payload, opts = {}) {
  * <p>版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 车间(产线) / 未完成总数 / 生产计划数量 /
  * 实际完成数量 / 交期 / 交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
  *
- * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001);日期列默认从**今天起 7 天**
- * (纸表也只印 3~5 天;列太多会挤成一团,可用 opts.days 调)。
+ * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001)。
+ *
+ * <p><b>2026-11-05 版式重排</b>(用户口径:「当前这个报表已经调整不需要实现那么多天数,
+ * 可以调整优化一下当前的这个表格和设计,不需要那么窄,看着很丑」)。
+ * 起因:打印天数已收敛到 **1~10 天**(默认 3,见 {@link planSheetPrintDates}),但列宽算法还是
+ * 为 16~31 天写的 —— 固定列被 `fixedScale` 一路压紧、长表头被挤成「生产计划数 / 量」这种断字竖条。
+ * 现在按「少日期」重排:
+ * <ul>
+ *   <li><b>列宽</b>:日期列每天先给 ~6%(3~4 天时表头/4 位数字都放得下),剩余宽度**全给固定列**
+ *       —— 天数越少固定列越宽(不再像 20+ 天那样每列只有 5~7mm);</li>
+ *   <li><b>表头</b>:长表头用显式换行(生产计划/数量、实际完成/数量、成型交期/紧迫度),
+ *       断行位置固定、不再出现掉单字的竖条;日期表头始终横排 nowrap;</li>
+ *   <li><b>字号/行高/留白</b>:正文 10.5px(≈7.9pt)、表头 9.5px,行高跟二维码走,数字右对齐留内边距,
+ *       表框加粗一档(A4 横向、页边距 8mm/6mm) —— 出纸不再是一堆贴边的 7px 小字;</li>
+ *   <li>天数 >10 的入参一律只印前 10 列(打印入口本来就夹 1~10,这里再兜一层防脏数据)。</li>
+ * </ul>
  */
 
 /**
@@ -622,25 +636,37 @@ function planSheetShopColumn(shop) {
   return w ? `${w}车间` : '生产车间'
 }
 
+/**
+ * 固定列定义(2026-11-05 重排口径)。
+ *
+ * `w` = 基准宽度占比(固定列之间按比例分剩余宽度);`min` = 最小可读占比(内容长时保底);
+ * `n` = 数字列(右对齐);`h` / `hOf(shop)` = 表头 HTML(**显式 `<br>` 换行** —— 断点固定,
+ * 不再让浏览器把「生产计划数量」挤成「生产计划数/量」);`tOf(shop)` = 动态单行表头。
+ */
 const PLAN_SHEET_BASE_COLS = [
   // 现役 dm_kh.khjb 全空(2026-11-04 用户口径):勾选行这一列都没值时**默认不印**(hideIfEmpty)
-  { t: '客户等级', w: 2, min: 1.6, hideIfEmpty: true, k: (r) => r['客户等级'] },
-  { t: '客户名称', w: 9, min: 3.8, k: (r) => r['客户'] },
+  { t: '客户等级', w: 3, min: 2.6, hideIfEmpty: true, k: (r) => r['客户等级'] },
+  { t: '客户名称', w: 10.5, min: 7.5, k: (r) => r['客户'] },
   // 主要信息(2026-11-01 用户口径「不是两张纸,当前同一行融合起来」):工单号融进本行
-  { t: '单据编号', w: 10, min: 4.3, k: (r) => r['加工单号'] },
-  { t: '产品编号', w: 6, min: 2.8, k: (r) => r['物料编码'] },
-  { t: '型号', w: 6, min: 2.8, k: (r) => r['规格型号'] },
+  { t: '单据编号', w: 10.5, min: 8, k: (r) => r['加工单号'] },
+  { t: '产品编号', w: 5.8, min: 4.6, k: (r) => r['物料编码'] },
+  { t: '型号', w: 7.2, min: 5.6, k: (r) => r['规格型号'] },
   // 车间(产线)列:表头随所打印的工序产线变 —— 成型车间 / 切炭车间 / 组装车间(2026-11-04)
-  { t: '生产车间', w: 5, min: 2.4, k: (r) => r['生产线'], tOf: planSheetShopColumn },
-  { t: '未完成总数', w: 5, min: 2.2, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
-  { t: '生产计划数量', w: 5, min: 2.2, k: (r) => fmtNum(r['排产数量']), n: true },
-  { t: '实际完成数量', w: 5, min: 2.2, k: (r) => fmtNum(r['当前工序完工量']), n: true },
+  { t: '生产车间', w: 5.2, min: 4, k: (r) => r['生产线'], tOf: planSheetShopColumn },
+  { t: '未完成总数', h: '未完成<br>总数', w: 5, min: 3.8, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
+  { t: '生产计划数量', h: '生产计划<br>数量', w: 5.4, min: 4, k: (r) => fmtNum(r['排产数量']), n: true },
+  { t: '实际完成数量', h: '实际完成<br>数量', w: 5.4, min: 4, k: (r) => fmtNum(r['当前工序完工量']), n: true },
   // 交期两列标题也随工序走(成型交期/切炭交期/组装交期…),旧写死「成型」会让切炭/组装的纸对不上
-  { t: '交期', w: 5, min: 2.4, k: (r) => monthDay(r['交期'] || r['计划完工日期']), tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期` : '交期' } },
-  { t: '交期紧迫度', w: 5, min: 2.0, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true, tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期紧迫度` : '交期紧迫度' } },
-  { t: '7天', w: 3, min: 2.2, k: (r) => fmtNum(r['7天已排']), n: true },
-  { t: '15天', w: 3, min: 2.2, k: (r) => fmtNum(r['15天已排']), n: true },
-  { t: '大于15', w: 4, min: 2.2, k: (r) => fmtNum(r['大于15天已排']), n: true },
+  { t: '交期', w: 5.4, min: 4,
+    k: (r) => monthDay(r['交期'] || r['计划完工日期']),
+    tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期` : '交期' } },
+  { t: '交期紧迫度', w: 5.4, min: 4,
+    k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true,
+    tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期紧迫度` : '交期紧迫度' },
+    hOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${esc(w)}交期<br>紧迫度` : '交期<br>紧迫度' } },
+  { t: '7天', w: 3.4, min: 2.6, k: (r) => fmtNum(r['7天已排']), n: true },
+  { t: '15天', w: 3.4, min: 2.6, k: (r) => fmtNum(r['15天已排']), n: true },
+  { t: '大于15', w: 4, min: 3, k: (r) => fmtNum(r['大于15天已排']), n: true },
 ]
 
 /** yyyy-MM-dd → M月D日(纸表写法);非法/空 → '' */
@@ -727,6 +753,14 @@ export function planSheetDatesFromRows(rows, today = '', days = 5) {
 export const PLAN_SHEET_DEFAULT_DAYS = 3
 
 /**
+ * 排单计划一张纸最多印几个日期列(2026-11-05 重排时锁定上限 = 10)。
+ *
+ * <p>打印入口 {@link planSheetPrintDates} 已把天数夹在 1~10;这里给 {@link schedPlanSheetHtml}
+ * 兜第二层 —— 万一有调用方直接塞超长 dates,也只印前 10 列,不会把版式压回 20+ 天的挤窄形态。
+ */
+export const PLAN_SHEET_MAX_PRINT_DAYS = 10
+
+/**
  * 排单计划**实际要印的日期列**(2026-11-05 用户口径,取代 2026-11-04 的"最前→最后")。
  *
  * <p>客户原话:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置。」
@@ -778,6 +812,12 @@ export function pickPlanSheetRows(rows, ids) {
 }
 
 /**
+ * 二维码列宽(百分比)。二维码本身尺寸由行数定(见下),列宽只需略大于码宽 + 内边距。
+ * 2026-11-05 重排前它随天数在 4.6%~6.5% 间跳,现固定一档,版式才稳定。
+ */
+const QR_COL_W = 5.5
+
+/**
  * 生成排单计划 HTML(纯函数,便于单测;真正出纸见 {@link printSchedPlanSheet})。
  * @param {Array} rows  /px/scheduleBoard/planSheet 的 `行`
  * @param {Array} dates 日期列(`日期`)
@@ -789,51 +829,46 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   // 2026-11-04 用户口径「当前在不同的工序产线显示的这个工序名称也要不同」⇒ 纸表标题/车间列头跟着工序产线走
   const shop = planSheetShop(list, opts)
   const title = String(opts?.title ?? '').trim() || planSheetTitle(shop)
-  // 2026-11-04 用户口径:日期列 = **勾选行「最前一个日期 → 最后一个日期」**(不再从今天起)。
-  //   opts.dates 由 WorkOrderBoard 用 planSheetDatesFromRows() 算好传进来(逐字用);
-  //   不传时保留旧行为(今天起 days 天)—— 旧调用/单测不受影响。
-  const ds = Array.isArray(opts.dates) && opts.dates.length
+  // 日期列:opts.dates 由 WorkOrderBoard 用 planSheetPrintDates() 算好传进来(逐字用);
+  //   不传时退回旧行为(今天起 days 天)。2026-11-05:打印天数已收敛到 1~10,这里再兜一层上限。
+  const ds = (Array.isArray(opts.dates) && opts.dates.length
     ? opts.dates.filter(Boolean).slice()
-    : planSheetDates(dates, opts.today || '', opts.days || 5)
+    : planSheetDates(dates, opts.today || '', opts.days || 5)).slice(0, PLAN_SHEET_MAX_PRINT_DAYS)
   const n = ds.length
   // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:
   //   勾选行(本次要打的那些行)在该列**全部为空** ⇒ 这一列默认不印(不浪费纸面宽度)。
   const isEmptyCell = (v) => v == null || String(v).trim() === ''
   const cols = PLAN_SHEET_BASE_COLS.filter((c) => !(c.hideIfEmpty && list.every((r) => isEmptyCell(c.k(r)))))
-  // 列多时自适应(实测 2号车间=10 天、1号机=16 天):日期列变窄 → 表头改「10/29」紧凑写法、字号降一档;
-  //   固定列按比例收紧,否则固定列吃掉 73% 后日期列只剩 2% 出头,表头全折行。
+  // ── 列宽(2026-11-05 重排)──
+  // 口径:日期列**先给**每天 ~6%(3 天 18%、4 天 24%,表头横排 + 4 位数字都放得下;8 天以上总宽封顶 30%);
+  //   剩下的宽度全给固定列 —— 天数越少固定列越宽,这就是"不再那么窄"的来源。
+  //   旧算法反过来先按固定列吃满再分日期列,为 16~31 天让路时会把每列压到 5~7mm。
   const compact = n > 7
-  // 2026-11-04 用户口径「日期不要竖排」:日期表头**始终横排**,列很窄时靠"降字号 + 禁止折行"保住一行,
-  //   绝不允许折成竖条;列数越多固定列越收紧(与最小宽度配合,见下)。
-  const fixedScale = compact ? Math.max(0.52, 1 - (n - 7) * 0.035) : 1
-  // 二维码尺寸(口径演进:28px「太小」→ 60 → 52「略小」→ 再按**列数**自适应缩):
-  //   行少(≤5)52px、≤8 行 48px、≤14 行 42px、更多 36px;
-  //   日期列 >16 天收到 44px、>22 天收到 40px(≈10.6mm,仍可扫),把宽度让给日期列。
+  const dateTotal = n ? Math.min(n * 6, 30) : 0
+  const dateW = n ? dateTotal / n : 0
+  const baseTotal = 100 - QR_COL_W - dateTotal
+  const wSum = cols.reduce((a, c) => a + c.w, 0) || 1
+  const scale = baseTotal / wSum
+  // 最小可读宽度保底(2026-11-04 报障:23 天时数字列被压到 1.4%,「6000」压到邻列);保底后总和超了再等比缩回
+  let fixedW = cols.map((c) => Math.max(c.w * scale, c.min || 0))
+  const fwSum = fixedW.reduce((a, b) => a + b, 0)
+  if (fwSum > baseTotal) fixedW = fixedW.map((w) => (w * baseTotal) / fwSum)
+  // 二维码尺寸(口径演进:28px「太小」→ 60 → 52「略小」):行少 52px(≈13.8mm)不缩,行多时按行数适度收;
+  //   行高跟二维码走(码 + 上下内边距),最少 42px —— 客户名/长型号折两行也放得下。
   //   ⚠ 能不能扫不只取决于大小:woQrImg 底图 300px、静区 2 模块(以前 108px/1 模块,打印发虚常扫不出)。
-  const qrBase = list.length <= 5 ? 52 : list.length <= 8 ? 48 : list.length <= 14 ? 42 : 36
-  const qrPx = n > 22 ? 40 : (n > 16 ? Math.min(qrBase, 44) : qrBase)
-  const qrW = n > 22 ? 4.6 : (n > 16 ? 5 : (list.length <= 5 ? 6 : (compact ? 6.5 : 6)))
-  const rowH = Math.max(38, qrPx + 6)
-  // 固定列宽度 = max(按比例 (w×scale), 最小可读宽度)
-  //   2026-11-04 用户报障:23 天时数字列被压到 1.4%,「6000」放不下直接和邻列叠在一起 ⇒ 给下限。
-  const fixedW = cols.map((c) => (c.min ? Math.max(c.w * fixedScale, c.min) : c.w * fixedScale))
-  const baseW = fixedW.reduce((a, b) => a + b, 0)
-  // 日期列:均分剩余宽度;不设硬下限(列多时必须让路),由浏览器按 colgroup 百分比压缩
-  const dateW = n ? Math.max(compact ? 2 : 4, (100 - baseW - qrW) / n) : 0
-  // 列多到日期列 <2.3%(≈6.5mm)时,格内数字再降一档字号(7px),否则 4 位数会压到邻列
-  const tinyDates = dateW > 0 && dateW < 2.3
+  const qrPx = list.length <= 5 ? 52 : list.length <= 8 ? 48 : list.length <= 14 ? 44 : 38
+  const rowH = Math.max(42, qrPx + 8)
   const colgroup = '<colgroup>'
     + fixedW.map((w) => `<col style="width:${w.toFixed(2)}%"/>`).join('')
     + ds.map(() => `<col style="width:${dateW.toFixed(2)}%"/>`).join('')
-    + `<col style="width:${qrW}%"/>`                  // 二维码(行尾)
+    + `<col style="width:${QR_COL_W}%"/>`                 // 二维码(行尾)
     + '</colgroup>'
-  // 表头:固定列支持 tOf(shop) 动态列名(2026-11-04:成型车间 / 切炭车间 / 组装车间 + 交期两列 同理)
-  // 日期表头的字号:列越窄越小(仍横排且 nowrap,不再折成竖条)
-  const dateHeadFs = dateW > 0 && dateW < 2.15 ? '6px' : (compact ? '7px' : '9px')
-  const ths = cols.map((c) => `<th>${esc(c.tOf ? c.tOf(shop) : c.t)}</th>`).join('')
-    + ds.map((d) => (compact
-      ? `<th class="dt" title="${esc(d)}">${esc(shortMonthDay(d))}</th>`
-      : `<th>${esc(monthDay(d))}</th>`)).join('')
+  // 表头:固定列 h/hOf 用**显式换行**(断点固定,不再出现「生产计划数/量」这种掉单字的竖条);
+  //   日期表头**始终横排 nowrap**(2026-11-04 用户口径「日期不要竖排」),8 天以上改 M/D 紧凑写法。
+  const headOf = (c) => (c.hOf ? c.hOf(shop) : (c.h || esc(c.tOf ? c.tOf(shop) : c.t)))
+  const dateHeadFs = compact ? '8px' : '9.5px'
+  const ths = cols.map((c) => `<th>${headOf(c)}</th>`).join('')
+    + ds.map((d) => `<th class="dt" title="${esc(d)}">${esc(compact ? shortMonthDay(d) : monthDay(d))}</th>`).join('')
     + '<th>二维码</th>'
   // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
   const qrs = await Promise.all(list.map((r) => woQrImg({
@@ -846,26 +881,25 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
         const v = c.k(r)
         return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
       }).join('')
-      + ds.map((d) => `<td class="r${tinyDates ? ' d' : ''}">${esc(fmtNum(plan[d]))}</td>`).join('')
+      + ds.map((d) => `<td class="r">${esc(fmtNum(plan[d]))}</td>`).join('')
       + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
       + '</tr>'
   }).join('')
-  // 字号/内边距随列数微调(compact 时 8.5px / 表头 7.5px,否则保持原版 9.5px / 9px)
-  const fs = compact ? '8px' : '9.5px'
-  const thFs = compact ? '7px' : '9px'
-  const pad = compact ? '2px 1px' : '2px 3px'
+  // 字号/内边距:常规(≤7 天)正文 10.5px / 表头 9.5px;8 天以上降一档保一行(compact)
+  const fs = compact ? '9px' : '10.5px'
+  const thFs = compact ? '8px' : '9.5px'
+  const pad = compact ? '2px 1px' : '3px 3px'
   return '<style>'
-    + '@page{size:A4 landscape;margin:6mm}'
+    + '@page{size:A4 landscape;margin:8mm 6mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
-    + '.hd{text-align:center;margin:0 0 4px}'
-    + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
-    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + `th,td{border:1px solid #333;padding:${pad};font-size:${fs};line-height:1.25;word-break:break-all;vertical-align:middle}`
-    + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.15}`
-    + `th.dt{white-space:nowrap;padding:2px 0;font-size:${dateHeadFs};line-height:1.1;letter-spacing:0}`
-    + 'td.r{text-align:right;white-space:nowrap}'
-    + 'td.d{font-size:7px;padding:1px 0}'
-    + `td.qr{text-align:center;padding:1px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
+    + '.hd{text-align:center;margin:0 0 6px}'
+    + '.hd .t{font-size:20px;font-weight:700;letter-spacing:5px}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid #222}'
+    + `th,td{border:1px solid #666;padding:${pad};font-size:${fs};line-height:1.3;word-break:break-all;vertical-align:middle}`
+    + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.25;border-bottom:1.5px solid #222}`
+    + `th.dt{white-space:nowrap;padding:3px 0;font-size:${dateHeadFs};line-height:1.15;letter-spacing:0}`
+    + 'td.r{text-align:right;white-space:nowrap;padding-right:4px}'
+    + `td.qr{text-align:center;padding:2px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
     + `tbody tr{height:${rowH}px}`
     + '</style>'
     + `<div class="hd"><span class="t">${esc(title)}</span></div>`
