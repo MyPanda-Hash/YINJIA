@@ -281,7 +281,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
 import { printWoQr } from '@/business/print-formats'
-import { queueToPrintStation } from '@/business/printStation'
+import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
 const router = useRouter()
 
@@ -530,7 +530,7 @@ async function autoPrintAll() {
   for (const r of results.value) {
     if (r.重复 || !r.打印) continue
     try {
-      const queued = await queueToPrintStation({ ...r.打印, 来源: 'mobilePick.create' })
+      const queued = await queueToPrintStation({ ...r.打印, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.create' })
       if (!(queued && queued.online)) await printWoQr(r.打印)
     } catch {
       // 打印失败只在控制台账:生单本身已成功

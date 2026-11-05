@@ -1,101 +1,145 @@
 <!--
-  PrintStation.vue — 自动打印(打印站点配置页,电脑上打开),2026-10-30
+  PrintStation.vue — 自动打印(打印电脑配置页,2026-10-30 建 / 2026-11-04 改按电脑+按类型)
 
-  【用户口径】(原话)
+  【用户口径】
+  建面板时(原话):
   「关于打印还有单独配一个自动打印的面版(这个面版是电脑上的)。只要这个面版配置参数并且设置成打开,
     然后在手机打印的时候就可以关联这个打开了面版参数的电脑,这台电脑连接的打印机就会自动打印」
   二次确认:「需要做个设置(来配置需要用到打印的电脑,实现连接的电脑自动打印)」。
 
-  【本页做什么】
-   ① **选本机打印机** + 打开「自动打印」开关 —— 开关存服务端(全局),打印机名存**本机 localStorage**
-      (一个账号可能登录多台电脑,打印机是每台各自的);
-   ② 开着这一页时每 15 秒轮询打印队列,拿到任务就**交给本地打印代理静默出纸**;
-   ③ 没有代理时降级为浏览器打印层 —— 但那会弹对话框,不是"自动",页面上会写清楚。
+  2026-11-04 报障(触发本次改造):
+  「现在的自动打印有问题,我是想要设置的电脑开启自动打印,没有设置的电脑就不开启,
+    但是在服务器上开启是固定的。能不能在自动打印的面版加个参数来限定电脑。
+    还有我想加个勾选打印类型的。现在自动打印只有生产领料单。但如果后面也有多个电脑
+    每个电脑又不同打印要求,需要面版能够勾选打印的需求报表。」
 
-  【为什么必须有本地代理才能真正"自动"】
-  浏览器标准 `window.print()` **一定**弹打印对话框,没有任何参数能让它静默。
-  真正的零点击出纸只有本机程序调系统打印才能做到 —— 即 `tools/printing/print-agent.ps1`
-  (在打印电脑上装一次、设成开机自启)。本页只负责"取任务 + 调用它",不假装浏览器能静默。
+  【改前为什么"没设置的电脑也会打"】
+  旧版只有一个**全局**开关(存在服务端)+ 一条**共享**队列:任何一台电脑只要在轮询
+  (打印代理或本页),就取走队列里的任务 —— 谁先轮到谁打,于是没配置过的电脑也抢着出纸;
+  而且只能"全打/全不打",表达不了"这台只打领料单、那台只打报工单"。
 
-  【布局说明】
-  这一页**平时是开在那台电脑上的常驻页**,所以做成"状态一眼可见 + 配置折叠"的形态:
-  顶部大标题 + 开关 + 在线/队列;下面折叠的配置区;再下面最近出纸记录。
+  【现在这一页是什么】
+  一张**打印电脑清单** —— 每台跑着打印代理的电脑是一行(站点名 = 代理的 -Station),
+  每行自己一个开关 + 一组打印类型勾选:
+   · 开关打开 ⇒ 这台电脑才会收到派单;没设置过的电脑默认关闭(用户口径:没设置的不开);
+   · 勾了哪个类型 ⇒ 只收那个类型的任务;同一类型多台都勾了,那几台都会打印;
+   · 服务端总闸固定常开(用户口径「在服务器上开启是固定的」),这里只作状态展示。
+
+  【谁去取任务】
+  不是本页 —— 是**本机打印代理**(`tools/printing/print-agent.ps1`),它每 4 秒自己
+  登录服务器拉 `/pending` 并静默出纸(2026-11-03 起的架构:页面开在公网地址时浏览器
+  禁止它访问本机代理,所以取任务这件事只能由代理自己做)。本页只负责"告诉服务器
+  哪台电脑该打、打哪些类型",以及展示代理状态。
+
+  【配置存哪】
+  服务端 `yj_app_setting` 的 `print.station.<站点名>.enabled/.types` —— 代理在跑、
+  页面可能没开,只存浏览器 localStorage 的话服务端一重启就丢,现场表现是"昨天还好好的,
+  今天不打了",极难排查。
 -->
 <template>
   <div class="ps">
     <div class="ps-top">
       <div class="ps-head">
         <span class="ps-title">{{ tt('自动打印') }}</span>
-        <span class="ps-sub">{{ tt('在这台电脑上打开,手机打印时会自动出纸') }}</span>
+        <span class="ps-sub">{{ tt('哪台电脑打什么报表,在这里勾选;没勾的电脑不会出纸') }}</span>
       </div>
       <span class="ps-badge" :class="statusClass">{{ statusText }}</span>
     </div>
 
     <div v-if="errText" class="ps-err">{{ errText }}</div>
 
-    <!-- 开关 -->
+    <!-- ① 打印电脑清单(本页的主体:按电脑限定 + 按类型勾选) -->
     <section class="ps-card">
-      <div class="ps-row">
-        <div class="ps-row-main">
-          <div class="ps-row-title">{{ tt('启用自动打印') }}</div>
-          <div class="ps-row-sub">{{ tt('打开后,手机端点打印会发到这台电脑') }}</div>
-        </div>
-        <el-switch
-          :model-value="autoEnabled"
-          :loading="savingCfg"
-          size="large"
-          @change="toggleAuto"
-        />
+      <div class="ps-sec">
+        <span>{{ tt('打印电脑') }}</span>
+        <span class="ps-sec-num">{{ stationRows.length }}</span>
+        <span class="ps-sec-note">{{ tt('站点名 = 安装打印代理时填的 -Station') }}</span>
+        <el-button class="ps-refresh" size="small" :loading="loading" @click="refreshState">{{ tt('刷新') }}</el-button>
       </div>
 
-      <div class="ps-row">
-        <div class="ps-row-main">
-          <div class="ps-row-title">{{ tt('站点名称') }}</div>
-          <div class="ps-row-sub">{{ tt('手机端看到的就是这个名字') }}</div>
-        </div>
-        <el-input
-          v-model="stationName"
-          class="ps-name"
-          :placeholder="tt('例如:一车间打印点')"
-          size="large"
-          @change="saveStationName"
-        />
+      <div class="ps-kv">
+        <span>{{ tt('服务端总闸') }}</span>
+        <b class="ok">{{ tt('常开(由服务器固定,不需要在这里开)') }}</b>
       </div>
 
-      <div class="ps-row">
-        <div class="ps-row-main">
-          <div class="ps-row-title">{{ tt('打印机') }}</div>
-          <div class="ps-row-sub">{{ tt('本机配置,只在这台电脑生效') }}</div>
+      <div v-if="!stationRows.length" class="ps-empty">
+        {{ tt('还没有打印电脑报上来:请确认那台电脑的打印代理在运行(每 4 秒会自己拉一次任务)') }}
+      </div>
+
+      <div v-for="s in stationRows" :key="s.name" class="ps-station" :class="{ off: !s.online }">
+        <div class="ps-station-head">
+          <span class="ps-dot" :class="{ on: s.online && s.enabled }"></span>
+          <span class="ps-station-name">{{ s.name }}</span>
+          <span class="ps-station-tag" :class="{ on: s.online, warn: !s.enabled }">
+            {{ s.online ? tt('在线') : tt('离线') }}
+          </span>
+          <span v-if="!s.enabled" class="ps-station-tag warn">{{ tt('未启用') }}</span>
+          <el-switch
+            class="ps-station-switch"
+            :model-value="s.enabled"
+            :loading="savingName === s.name"
+            @change="(v) => saveStation(s, { enabled: !!v })"
+          />
         </div>
-        <el-input
-          v-model="printerName"
-          class="ps-name"
-          :placeholder="tt('留空 = 系统默认打印机')"
-          size="large"
-          @change="savePrinter"
-        />
+        <div class="ps-station-body">
+          <div class="ps-station-label">{{ tt('打印类型') }}</div>
+          <el-checkbox-group
+            :model-value="s.types || []"
+            class="ps-types"
+            @change="(v) => saveStation(s, { types: v })"
+          >
+            <el-checkbox v-for="t in typeOptions" :key="t.code" :value="t.code">{{ tt(t.label) }}</el-checkbox>
+          </el-checkbox-group>
+          <div v-if="s.enabled && !(s.types || []).length" class="ps-hint ps-hint-warn">
+            {{ tt('开关打开了,但一个打印类型都没勾 —— 这台电脑不会收到任何打印任务') }}
+          </div>
+        </div>
+      </div>
+
+      <div class="ps-hint">
+        {{ tt('勾选的类型才会发到这台电脑;同一类型多台电脑都勾了,那几台都会打印') }}
+      </div>
+    </section>
+
+    <!-- ② 本机打印代理(运行参数;代理没连上时置灰) -->
+    <section class="ps-card">
+      <div class="ps-sec">{{ tt('本机打印代理') }}</div>
+      <div class="ps-kv">
+        <span>{{ tt('打印代理') }}</span>
+        <!-- 2026-11-03:公网部署下这一项**必然显示未连接** —— 浏览器禁止公网页面访问 127.0.0.1。
+             真正判"能不能打"的是上面清单里的「在线」;代理要不要出纸由它自己轮询决定。 -->
+        <b :class="agentOk ? 'ok' : 'muted'">
+          {{ agentOk ? tt('已连接(本机页面可直接控制)') : tt('由打印电脑自行取任务,不受本页面控制') }}
+        </b>
+      </div>
+      <div class="ps-kv">
+        <span>{{ tt('代理出纸方式') }}</span>
+        <b :class="agentMode === 'printer' ? 'ok' : 'warn'">{{ agentModeText }}</b>
+      </div>
+      <div class="ps-kv"><span>{{ tt('队列待打印') }}</span><b class="num">{{ queueSize }}</b></div>
+      <div class="ps-kv"><span>{{ tt('最近心跳') }}</span><b>{{ state.lastHeartbeat || '—' }}</b></div>
+      <div v-if="agentMode !== 'printer'" class="ps-kv">
+        <span>{{ tt('PDF 存放目录') }}</span>
+        <b class="mono">{{ agentPdfDir || '—' }}</b>
+      </div>
+      <div v-if="lastPdfPath" class="ps-kv">
+        <span>{{ tt('最近生成') }}</span>
+        <b class="mono">{{ lastPdfPath }}</b>
       </div>
 
       <!-- 输出方式 / PDF 目录(2026-11-01):这两项改的是**代理的运行参数**,
-           不是本机 localStorage —— 因为真正决定"出纸还是落文件"的是代理。 -->
+           不是浏览器配置 —— 真正决定"出纸还是落文件"的是代理进程。 -->
       <div class="ps-row">
         <div class="ps-row-main">
           <div class="ps-row-title">{{ tt('输出方式') }}</div>
           <div class="ps-row-sub">{{ tt('自动 = 有打印机就出纸,打不出来自动存 PDF') }}</div>
         </div>
-        <el-select
-          v-model="modeSel"
-          class="ps-name"
-          size="large"
-          :disabled="!agentOk"
-          @change="saveAgentConfig"
-        >
+        <el-select v-model="modeSel" class="ps-name" size="large" :disabled="!agentOk" @change="saveAgentConfig">
           <el-option value="Auto" :label="tt('自动(推荐)')" />
           <el-option value="Printer" :label="tt('直接打印')" />
           <el-option value="Pdf" :label="tt('只生成 PDF')" />
         </el-select>
       </div>
-
       <div class="ps-row">
         <div class="ps-row-main">
           <div class="ps-row-title">{{ tt('PDF 存放目录') }}</div>
@@ -110,36 +154,6 @@
           @change="saveAgentConfig"
         />
       </div>
-    </section>
-
-    <!-- 连接状态 + 代理 -->
-    <section class="ps-card">
-      <div class="ps-sec">{{ tt('连接状态') }}</div>
-      <div class="ps-kv"><span>{{ tt('队列待打印') }}</span><b class="num">{{ queueSize }}</b></div>
-      <div class="ps-kv"><span>{{ tt('最近心跳') }}</span><b>{{ state.lastHeartbeat || '—' }}</b></div>
-      <div class="ps-kv">
-        <span>{{ tt('打印代理') }}</span>
-        <!-- 2026-11-03:公网部署下这一项**必然显示未连接** —— 浏览器禁止公网页面访问 127.0.0.1。
-             真正判"能不能打"的是上面的「最近心跳」;这里改成中性说明,不再当成故障。 -->
-        <b :class="agentOk ? 'ok' : 'muted'">
-          {{ agentOk ? tt('已连接(本机页面可直接控制)') : tt('由打印电脑自行取任务,不受本页面控制') }}
-        </b>
-      </div>
-      <!-- 代理模式(2026-11-01):auto=有打印机就出纸/否则落PDF · printer=只出纸 · pdf=只落文件 -->
-      <div class="ps-kv">
-        <span>{{ tt('代理出纸方式') }}</span>
-        <b :class="agentMode === 'printer' ? 'ok' : 'warn'">
-          {{ agentMode === 'pdf' ? tt('只生成 PDF 文件') : (agentMode === 'auto' ? tt('自动(有打印机出纸,否则存 PDF)') : tt('直接打印')) }}
-        </b>
-      </div>
-      <div v-if="agentMode !== 'printer'" class="ps-kv">
-        <span>{{ tt('PDF 存放目录') }}</span>
-        <b class="mono">{{ agentPdfDir || '—' }}</b>
-      </div>
-      <div v-if="lastPdfPath" class="ps-kv">
-        <span>{{ tt('最近生成') }}</span>
-        <b class="mono">{{ lastPdfPath }}</b>
-      </div>
 
       <div class="ps-agent">
         <div class="ps-agent-title">{{ tt('本地打印代理') }}</div>
@@ -149,16 +163,16 @@
             <li>{{ tt('无打印机时:print-agent.ps1 -Mode Pdf(只生成 PDF 文件,不出纸)') }}</li>
             <li>{{ tt('有打印机时:print-agent.ps1 -Mode Printer(直接打系统打印机)') }}</li>
             <li>{{ tt('加 -Install 参数跑一次即可设为开机自启') }}</li>
-            <li>{{ tt('开着本页,代理连上后状态会变成「已连接」') }}</li>
+            <li>{{ tt('代理自己每 4 秒拉任务,不需要一直开着本页') }}</li>
           </ol>
           <p class="ps-agent-note">
-            {{ tt('没有代理时,打印会降级为浏览器打印(需要人点一次对话框)。') }}
+            {{ tt('没有代理时,手机端会退回自己弹打印(需要人点一次对话框)。') }}
           </p>
         </div>
       </div>
     </section>
 
-    <!-- 最近出纸 -->
+    <!-- ③ 最近出纸 -->
     <section class="ps-card">
       <div class="ps-sec">
         <span>{{ tt('最近出纸') }}</span>
@@ -168,16 +182,9 @@
       <div v-for="(r, i) in recent" :key="i" class="ps-line">
         <span class="ps-line-t">{{ r.时间 }}</span>
         <span class="ps-line-n">{{ r.工单号 || '—' }}<i v-if="r.工单行号"> #{{ r.工单行号 }}</i></span>
-        <span class="ps-line-s" :class="{ bad: r.来源 === '失败' }">{{ r.来源 || '已出纸' }}</span>
+        <span class="ps-line-s" :class="{ bad: r.来源 === '失败' }">{{ r.来源 || tt('已出纸') }}</span>
       </div>
     </section>
-
-    <!-- 降级打印:浏览器打印层(代理没连上时的兜底) -->
-    <div v-if="fallbackTask" class="ps-fallback">
-      <span>{{ tt('代理未连接:有 1 张单要打印') }} · {{ fallbackTask.工单号 }}</span>
-      <el-button size="small" @click="printFallback">{{ tt('用浏览器打印') }}</el-button>
-      <el-button size="small" text @click="fallbackTask = null">{{ tt('忽略') }}</el-button>
-    </div>
   </div>
 </template>
 
@@ -185,28 +192,23 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
-import { fetchPendingTask, ackTask, fetchStationState, saveStationConfig } from '@/business/printStation'
-import { printWoQr } from '@/business/print-formats'
+import { fetchStationState, saveStationConfig } from '@/business/printStation'
 
-/** localStorage 键:打印机与站点配置**绑本机**(不绑账号 —— 一个账号可能登录多台电脑) */
-const LS_PRINTER = 'yj.printStation.printer'
-const LS_STATION = 'yj.printStation.stationName'
 /** 本地代理的探活地址(代理默认监听本机 18777,见 tools/printing/print-agent.ps1) */
 const AGENT_URL = 'http://127.0.0.1:18777/health'
-/** 轮询间隔:15 秒(手机端"有没有在线打印电脑"按 90 秒心跳判定,3 个周期容错) */
-const POLL_MS = 15000
+/** 刷新间隔:15 秒(代理每 4 秒心跳一次,页面只是"看板",不需要更密) */
+const REFRESH_MS = 15000
 
-const autoEnabled = ref(false)
-const stationName = ref(localStorage.getItem(LS_STATION) || '')
-const printerName = ref(localStorage.getItem(LS_PRINTER) || '')
-const queueSize = ref(0)
 const state = ref({})
+const queueSize = ref(0)
+/** 服务端登记的打印类型清单(唯一真源;前端不硬编码) */
+const typeOptions = ref([])
+const loading = ref(false)
+const savingName = ref('')
+const errText = ref('')
+const recent = ref([])
+
 const agentOk = ref(false)
-/**
- * 最近一次生成的 PDF 路径(2026-11-01)。
- * 代理跑在 -Mode Pdf 时不出纸、只落文件,这里把路径显出来,现场才知道去哪儿拿。
- */
-const lastPdfPath = ref('')
 /** 代理的出纸方式:auto=自动兜底 / printer=直接打印 / pdf=只落 PDF(来自代理 /health) */
 const agentMode = ref('printer')
 /** 代理的 PDF 输出目录(来自代理 /health) */
@@ -214,36 +216,32 @@ const agentPdfDir = ref('')
 /** 页面上选择的输出方式与 PDF 目录(保存时下发给代理,不存 localStorage) */
 const modeSel = ref('Auto')
 const pdfDirInput = ref('')
+/** 最近一次生成的 PDF 路径(2026-11-01):代理跑 -Mode Pdf 时不出纸,要让人知道文件在哪 */
+const lastPdfPath = ref('')
 /** 用户是否手工动过这两个控件 —— 动过就别在轮询时被代理值覆盖 */
 let modeSelTouched = false
 let pdfDirTouched = false
-const recent = ref([])
-const errText = ref('')
-const savingCfg = ref(false)
-const fallbackTask = ref(null)
 
 let timer = null
-let polling = false
+
+/** 打印电脑清单(含各自开关与类型) */
+const stationRows = computed(() => (Array.isArray(state.value.stations) ? state.value.stations : []))
+const onlineCount = computed(() => stationRows.value.filter((s) => s.online && s.enabled).length)
 
 /**
- * 顶部状态徽标(2026-11-03 重写)。
- *
- * <p>🔴 关键:系统上服务器后,**页面在公网 HTTP 上时浏览器一律禁止访问 127.0.0.1**
- * (非安全上下文 → loopback),所以 `agentOk`(本机代理探测)**必然是 false**。
- * 以前徽标只认 agentOk ⇒ 永远挂「代理未连接」的警告,其实打印一切正常,
- * 白白让人以为坏了。
- *
- * <p>改用**服务端心跳**(state.online)判断:那才代表"真有一台打印电脑在取任务"。
+ * 顶部徽标:服务端总闸固定开,所以只说"现在有几台电脑在打"。
+ * ⚠ 不拿 `agentOk` 判断 —— 公网地址下浏览器必然连不上本机代理(非安全上下文),
+ * 那会让正常的现场永远挂着「代理未连接」的红字(2026-11-03 的教训)。
  */
-const statusClass = computed(() => {
-  if (!autoEnabled.value) return 'off'
-  if (state.value.online || agentOk.value) return 'on'
-  return 'warn'
-})
-const statusText = computed(() => {
-  if (!autoEnabled.value) return tt('未启用')
-  if (state.value.online || agentOk.value) return tt('打印中就绪')
-  return tt('没有在线的打印电脑')
+const statusClass = computed(() => (onlineCount.value ? 'on' : 'off'))
+const statusText = computed(() => (onlineCount.value
+  ? tt('打印中就绪') + ' · ' + onlineCount.value
+  : tt('没有启用的打印电脑')))
+
+const agentModeText = computed(() => {
+  if (agentMode.value === 'pdf') return tt('只生成 PDF 文件')
+  if (agentMode.value === 'auto') return tt('自动(有打印机出纸,否则存 PDF)')
+  return tt('直接打印')
 })
 
 function clearErr() { errText.value = '' }
@@ -252,7 +250,7 @@ function errMsgOf(e) { return e?.response?.data?.message || e?.message || '' }
 onMounted(async () => {
   await refreshState()
   await probeAgent()
-  nextTickLoop()
+  loop()
 })
 
 onBeforeUnmount(() => {
@@ -260,39 +258,18 @@ onBeforeUnmount(() => {
   timer = null
 })
 
-function nextTickLoop() {
+function loop() {
   if (timer) clearTimeout(timer)
-  timer = setTimeout(loopOnce, POLL_MS)
-}
-
-/** 一轮轮询:探代理 + 取任务 + 有任务就打印 + 回报 */
-async function loopOnce() {
-  if (polling) { nextTickLoop(); return }
-  polling = true
-  try {
+  timer = setTimeout(async () => {
     await probeAgent()
-    if (autoEnabled.value) {
-      const d = await fetchPendingTask(stationName.value || undefined)
-      const task = d?.task || null
-      queueSize.value = Number(d?.queueSize) || 0
-      if (task) await runTask(task)
-      else await refreshState()
-    }
-  } catch (e) {
-    // 网络抖动不算错:下一轮会重试;只有持续失败才值得让用户看到
-    if (e?.response?.status === 403) errText.value = tt('没有自动打印的权限:请联系管理员在组织架构里授权')
-  } finally {
-    polling = false
-    nextTickLoop()
-  }
+    await refreshState()
+    loop()
+  }, REFRESH_MS)
 }
 
 /**
- * 探本地代理:连得上 = 真正的静默输出可用。
- * 探测失败不弹错(大多数电脑上还没装,属于常态)。
- *
- * 2026-11-01:同时读回代理的**出纸方式**(printer/pdf)与 PDF 目录 ——
- * 没打印机时跑 -Mode Pdf,页面要能一眼看出"现在是落文件、不是出纸"。
+ * 探本地代理:连得上 = 这台机器上"可以直接控制代理"(局域网/本机打开本页时才有)。
+ * 探测失败不弹错(公网地址下必然失败,属于常态)。
  */
 async function probeAgent() {
   try {
@@ -314,111 +291,62 @@ async function probeAgent() {
   }
 }
 
-/** 打印一张任务:有代理走代理(静默),没代理降级(浏览器对话框,需人点) */
-async function runTask(task) {
-  if (agentOk.value) {
-    try {
-      const r = await fetch('http://127.0.0.1:18777/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...task, printer: printerName.value || '' }),
-      })
-      if (!r.ok) throw new Error(`代理返回 ${r.status}`)
-      // 代理可能处于两种模式(2026-11-01):
-      //   printer = 真出纸;pdf = 落一个 PDF 文件(暂时没打印机时用)。
-      // 文案要能看出来,否则现场会以为"打了但没出纸"。
-      let payload = {}
-      try { payload = await r.json() } catch { /* 老版本代理不返回 JSON 体 */ }
-      await ackTask({ taskId: task.id, ok: true, printer: printerName.value, ...pickAck(task) })
-      if (payload && payload.mode === 'pdf') {
-        const name = String(payload.pdfPath || '').split(/[\\/]/).pop() || 'PDF'
-        lastPdfPath.value = payload.pdfPath || ''
-        pushRecent(task, tt('已生成 PDF') + ':' + name)
-      } else {
-        pushRecent(task, tt('已出纸'))
-      }
-      return
-    } catch (e) {
-      // 代理中途挂了 ⇒ 降级
-      agentOk.value = false
-      errText.value = tt('打印代理出错,已降级为浏览器打印') + ':' + (e?.message || e)
-    }
-  }
-  fallbackTask.value = task
-}
-
-function pickAck(task) {
-  return { 标题: task.标题, 工单号: task.工单号, 工单行号: task.工单行号, 发起人: task.发起人 }
-}
-
-async function printFallback() {
-  const task = fallbackTask.value
-  if (!task) return
-  try {
-    const ok = await printWoQr(task)
-    await ackTask({ taskId: task.id, ok: !!ok, printer: printerName.value || '', ...pickAck(task) })
-    pushRecent(task, ok ? '浏览器打印' : '失败')
-    fallbackTask.value = null
-  } catch (e) {
-    errText.value = errMsgOf(e) || tt('打印失败')
-  }
-}
-
-function pushRecent(task, how) {
-  recent.value = [{
-    时间: new Date().toLocaleString(), 工单号: task.工单号, 工单行号: task.工单行号, 来源: how,
-  }, ...recent.value].slice(0, 20)
-}
-
+/** 拉一次站点状态(打印电脑清单 + 类型清单 + 队列 + 最近出纸) */
 async function refreshState() {
+  loading.value = true
   try {
     const d = await fetchStationState()
     state.value = d || {}
-    autoEnabled.value = !!d?.autoEnabled
     queueSize.value = Number(d?.queueSize) || 0
-    if (Array.isArray(d?.recent) && d.recent.length) recent.value = d.recent
+    if (Array.isArray(d?.types)) typeOptions.value = d.types
+    if (Array.isArray(d?.recent)) recent.value = d.recent
   } catch (e) {
     if (e?.response?.status === 403) errText.value = tt('没有自动打印的权限:请联系管理员在组织架构里授权')
+  } finally {
+    loading.value = false
   }
 }
 
-/** 开关自动打印(写服务端全局参数) */
-async function toggleAuto(v) {
-  savingCfg.value = true
+/**
+ * 保存**某一台打印电脑**的开关 / 打印类型(2026-11-04)。
+ *
+ * <p>🔴 旧版这里写的是全局开关 —— 点一下所有电脑一起变,正是用户报障
+ * 「我是想要设置的电脑开启自动打印,没有设置的电脑就不开启」的根因。
+ * 现在按站点名写,只影响那一台。
+ */
+async function saveStation(s, patch) {
+  const name = s?.name
+  if (!name) return
+  const enabled = patch.enabled === undefined ? !!s.enabled : !!patch.enabled
+  const types = patch.types === undefined ? (s.types || []) : patch.types
+  savingName.value = name
   clearErr()
+  // 先乐观更新,失败再回读(勾选/开关手感不能等一个请求)
+  const next = stationRows.value.map((x) => (x.name === name ? { ...x, enabled, types } : x))
+  state.value = { ...state.value, stations: next }
   try {
-    const d = await saveStationConfig({ autoEnabled: !!v, stationName: stationName.value })
-    autoEnabled.value = !!d?.autoEnabled
-    ElMessage.success(v ? tt('已开启自动打印') : tt('已关闭自动打印'))
+    const d = await saveStationConfig({ stationName: name, enabled, types })
+    state.value = { ...state.value, ...(d || {}) }
+    if (patch.enabled !== undefined) {
+      ElMessage.success(enabled ? tt('已开启这台电脑的自动打印') : tt('已关闭这台电脑的自动打印'))
+    } else if (!types.length) {
+      ElMessage.warning(tt('没有勾选任何打印类型:这台电脑不会收到打印任务'))
+    } else {
+      ElMessage.success(tt('已保存'))
+    }
   } catch (e) {
     errText.value = errMsgOf(e) || tt('保存失败')
     await refreshState()   // 回读真实状态,别让开关停在假的"已开"
   } finally {
-    savingCfg.value = false
+    savingName.value = ''
   }
-}
-
-async function saveStationName() {
-  localStorage.setItem(LS_STATION, stationName.value || '')
-  try {
-    await saveStationConfig({ autoEnabled: autoEnabled.value, stationName: stationName.value })
-  } catch (e) {
-    errText.value = errMsgOf(e) || tt('保存失败')
-  }
-}
-
-/** 打印机名只存本机:换电脑不该带着别的电脑的打印机名走 */
-function savePrinter() {
-  localStorage.setItem(LS_PRINTER, printerName.value || '')
-  ElMessage.success(tt('已保存到本机'))
 }
 
 /**
  * 保存「输出方式 / PDF 目录」到**本地代理**(2026-11-01)。
  *
- * 为什么存代理而不是 localStorage:真正决定"出纸还是落文件、落到哪个目录"的是代理进程,
- * 网页只是它的遥控器。存 localStorage 会造成"页面显示已改、实际没变"的假象。
- * 代理没连上时这两项置灰 —— 改不了就别让人改。
+ * 为什么存代理而不是服务端:真正决定"出纸还是落文件、落到哪个目录"的是代理进程,
+ * 网页只是它的遥控器。代理没连上时这两项置灰 —— 改不了就别让人改。
  */
 async function saveAgentConfig() {
   if (!agentOk.value) return
@@ -432,7 +360,8 @@ async function saveAgentConfig() {
     })
     if (!r.ok) throw new Error('代理返回 ' + r.status)
     const j = await r.json()
-    agentMode.value = String(j?.mode || '').toLowerCase() === 'pdf' ? 'pdf' : (String(j?.mode || '').toLowerCase() === 'auto' ? 'auto' : 'printer')
+    const m = String(j?.mode || '').toLowerCase()
+    agentMode.value = m === 'pdf' ? 'pdf' : (m === 'auto' ? 'auto' : 'printer')
     agentPdfDir.value = String(j?.pdfDir || '')
     pdfDirInput.value = agentPdfDir.value
     modeSel.value = String(j?.mode || 'Auto')
@@ -446,7 +375,7 @@ async function saveAgentConfig() {
 <style scoped>
 .ps {
   box-sizing: border-box;
-  max-width: 860px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 16px 16px 32px;
 }
@@ -460,32 +389,56 @@ async function saveAgentConfig() {
   margin-left: auto; padding: 4px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap;
 }
 .ps-badge.on { background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2); }
-.ps-badge.warn { background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2); }
 .ps-badge.off { background: var(--el-fill-color); color: var(--el-text-color-secondary); }
 
 .ps-card {
   margin-bottom: 14px; padding: 16px;
   background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
 }
-.ps-sec { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.ps-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 10px; flex-wrap: wrap; }
+.ps-sec-note { font-size: 11px; font-weight: 400; color: var(--el-text-color-secondary); }
 .ps-sec-num {
-  margin-left: 8px; padding: 0 6px; border-radius: 10px; font-size: 12px; font-weight: 400;
+  padding: 0 6px; border-radius: 10px; font-size: 12px; font-weight: 400;
   background: var(--el-color-primary-light-9); color: var(--el-color-primary);
 }
+.ps-refresh { margin-left: auto; }
+
+/* 打印电脑行(2026-11-04):一行一台电脑,行内 = 名称/在线 + 开关 + 类型勾选 */
+.ps-station {
+  padding: 10px 12px; margin-top: 8px; border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+}
+.ps-station.off { opacity: .72; }
+.ps-station-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ps-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--el-border-color); }
+.ps-dot.on { background: var(--el-color-success); }
+.ps-station-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; word-break: break-all; }
+.ps-station-tag {
+  flex: none; padding: 0 6px; border-radius: 4px; font-size: 11px;
+  background: var(--el-fill-color); color: var(--el-text-color-secondary);
+}
+.ps-station-tag.on { background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2); }
+.ps-station-tag.warn { background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2); }
+.ps-station-switch { flex: none; margin-left: 4px; }
+.ps-station-body { margin-top: 6px; padding-left: 16px; }
+.ps-station-label { font-size: 12px; color: var(--el-text-color-secondary); }
+.ps-types { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 18px; }
+.ps-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
+.ps-hint-warn { color: var(--el-color-warning-dark-2); }
 
 .ps-row {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 0; border-bottom: 1px dashed var(--el-border-color-lighter);
+  padding: 10px 0; border-top: 1px dashed var(--el-border-color-lighter);
 }
-.ps-row:last-child { border-bottom: 0; }
 .ps-row-main { flex: 1; min-width: 0; }
 .ps-row-title { font-size: 14px; }
 .ps-row-sub { margin-top: 2px; font-size: 12px; color: var(--el-text-color-secondary); }
 .ps-name { flex: none; width: 260px; }
 
 .ps-kv { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 13px; }
-.ps-kv > span { width: 88px; flex: none; color: var(--el-text-color-secondary); }
-.ps-kv > b { font-weight: 500; }
+.ps-kv > span { width: 92px; flex: none; color: var(--el-text-color-secondary); }
+.ps-kv > b { font-weight: 500; min-width: 0; word-break: break-all; }
 .ps-kv > b.ok { color: var(--el-color-success); }
 .ps-kv > b.warn { color: var(--el-color-warning); }
 .ps-kv > b.muted { color: var(--el-text-color-secondary); font-weight: 400; }
@@ -509,16 +462,15 @@ async function saveAgentConfig() {
 
 .ps-empty { padding: 16px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .num { font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
 
 .ps-err {
   margin-bottom: 12px; padding: 10px 12px; border-radius: 6px; font-size: 13px;
   background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2);
 }
 
-.ps-fallback {
-  position: sticky; bottom: 0;
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  background: var(--el-color-warning-light-9); border-radius: 8px; font-size: 13px;
+@media (max-width: 640px) {
+  .ps-name { width: 100%; }
+  .ps-row { flex-wrap: wrap; }
 }
-.ps-fallback span { flex: 1; min-width: 0; }
 </style>

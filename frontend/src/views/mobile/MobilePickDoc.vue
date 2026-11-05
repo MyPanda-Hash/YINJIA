@@ -274,7 +274,7 @@ import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
 import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
 import { printWoQr } from '@/business/print-formats'
-import { queueToPrintStation } from '@/business/printStation'
+import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
 const route = useRoute()
 const router = useRouter()
@@ -771,8 +771,11 @@ async function reprint() {
   try {
     const res = await request.post('/px/mobilePick/reprint', { id: docId.value })
     const payload = (res.data?.data || res.data || {}).打印 || {}
-    const queued = await queueToPrintStation({ ...payload, 来源: 'mobilePick.doc' })
+    // 类型 = 生产领料单(2026-11-04):服务端按类型派单,只有勾了这个类型的电脑才会出纸
+    const queued = await queueToPrintStation({ ...payload, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.doc' })
     if (queued && queued.online) { okText.value = tt('已发送到打印电脑'); return }
+    // 没有电脑订阅/开关关着 ⇒ 退回本机打印层(现场至少打得出来)
+    if (queued && queued.message) errText.value = queued.message
     await printWoQr(payload)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('打印失败')
