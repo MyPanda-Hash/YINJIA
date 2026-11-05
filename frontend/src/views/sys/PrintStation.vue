@@ -81,6 +81,13 @@
             @change="(v) => saveStation(s, { enabled: !!v })"
           />
         </div>
+        <!-- 认机信息(2026-11-05 用户问「怎么才能知道这个是哪一台电脑」):
+             站点名 + 最近心跳 + 来源 IP。站点名就是那台电脑安装代理时填的名字(默认计算机名)。 -->
+        <div class="ps-station-meta">
+          <span v-if="s.lastSeen">{{ tt('最近心跳') }} {{ s.lastSeen }}</span>
+          <span v-else class="ps-meta-warn">{{ tt('这台电脑还没有连过:代理没装或没启动') }}</span>
+          <span v-if="s.ip">· {{ tt('来源 IP') }} <b class="mono">{{ s.ip }}</b></span>
+        </div>
         <div class="ps-station-body">
           <div class="ps-station-label">{{ tt('打印类型') }}</div>
           <el-checkbox-group
@@ -98,6 +105,30 @@
 
       <div class="ps-hint">
         {{ tt('勾选的类型才会发到这台电脑;同一类型多台电脑都勾了,那几台都会打印') }}
+      </div>
+      <div class="ps-hint">
+        {{ tt('离线 = 90 秒内没收到那台电脑的心跳(电脑关机 / 打印代理没运行 / 代理不是带 -Server 启动的);离线时不派单,手机端会退回自己弹打印') }}
+      </div>
+
+      <!-- 新增打印电脑(2026-11-05 用户问「怎么才能增加电脑」):
+           列表是代理"自己报上来"的,所以新增 = 先把名字登记好,再去那台电脑装代理用同一个名字。 -->
+      <div class="ps-add">
+        <div class="ps-add-title">{{ tt('新增打印电脑') }}</div>
+        <div class="ps-add-row">
+          <el-input
+            v-model="newName"
+            size="large"
+            :placeholder="tt('填那台电脑的站点名(默认就是计算机名)')"
+            clearable
+            @keyup.enter="addStation"
+          />
+          <el-button size="large" :loading="adding" :disabled="!newName.trim()" @click="addStation">
+            {{ tt('添加') }}
+          </el-button>
+        </div>
+        <div class="ps-hint">
+          {{ tt('在那台电脑上双击「安装.bat」装打印代理,「这台打印机的名字」填成同一个名字(回车 = 计算机名);代理连上后这一行会自动变成在线,再打开开关、勾上要打的报表。') }}
+        </div>
       </div>
     </section>
 
@@ -207,6 +238,9 @@ const loading = ref(false)
 const savingName = ref('')
 const errText = ref('')
 const recent = ref([])
+/** 新增/预登记一台打印电脑时输入的名字(= 那台电脑装代理时填的站点名) */
+const newName = ref('')
+const adding = ref(false)
 
 const agentOk = ref(false)
 /** 代理的出纸方式:auto=自动兜底 / printer=直接打印 / pdf=只落 PDF(来自代理 /health) */
@@ -304,6 +338,37 @@ async function refreshState() {
     if (e?.response?.status === 403) errText.value = tt('没有自动打印的权限:请联系管理员在组织架构里授权')
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 新增/预登记一台打印电脑(2026-11-05)。
+ *
+ * <p>清单里的行是**打印代理自己报上来**的,所以"增加电脑"只有一条正路:
+ * 先在这里登记名字(= 那台电脑装代理时填的站点名),再去那台电脑装/启代理,
+ * 它一连上这一行就变在线(默认关闭,还要打开开关、勾类型才会派单)。
+ *
+ * <p>登记时**故意先关闭**:用户口径「没有设置的电脑就不开启」——
+ * 一台还没连过的电脑不该因为"名字被登记"就开始抢任务。
+ */
+async function addStation() {
+  const name = String(newName.value || '').trim()
+  if (!name) { ElMessage.warning(tt('请先填站点名')); return }
+  if (stationRows.value.some((s) => s.name === name)) {
+    ElMessage.warning(tt('已经有同名电脑了'))
+    return
+  }
+  adding.value = true
+  clearErr()
+  try {
+    await saveStationConfig({ stationName: name, enabled: false, types: [] })
+    newName.value = ''
+    ElMessage.success(tt('已登记:等那台电脑的打印代理连上来就会显示在线'))
+    await refreshState()
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('保存失败')
+  } finally {
+    adding.value = false
   }
 }
 
@@ -421,11 +486,22 @@ async function saveAgentConfig() {
 .ps-station-tag.on { background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2); }
 .ps-station-tag.warn { background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2); }
 .ps-station-switch { flex: none; margin-left: 4px; }
+/* 认机信息(2026-11-05):最近心跳 + 来源 IP —— 现场据此认出是哪一台电脑 */
+.ps-station-meta { margin-top: 2px; padding-left: 16px; font-size: 11px; color: var(--el-text-color-secondary); display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.ps-station-meta b { font-weight: 400; }
+.ps-meta-warn { color: var(--el-color-warning-dark-2); }
 .ps-station-body { margin-top: 6px; padding-left: 16px; }
 .ps-station-label { font-size: 12px; color: var(--el-text-color-secondary); }
 .ps-types { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 18px; }
 .ps-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
 .ps-hint-warn { color: var(--el-color-warning-dark-2); }
+
+/* 新增打印电脑(2026-11-05):登记名字 → 那台电脑装代理用同一个名字 → 自动上线 */
+.ps-add { margin-top: 12px; padding: 12px; border-radius: 6px; background: var(--el-fill-color-lighter); }
+.ps-add-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.ps-add-row { display: flex; align-items: center; gap: 8px; }
+.ps-add-row :deep(.el-input) { flex: 1; min-width: 0; }
+.ps-add-row :deep(.el-button) { flex: none; height: 40px; margin-left: 0; }
 
 .ps-row {
   display: flex; align-items: center; gap: 12px;

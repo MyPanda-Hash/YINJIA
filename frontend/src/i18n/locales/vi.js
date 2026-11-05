@@ -2676,6 +2676,15 @@ export default {
     '没有启用的打印电脑': 'Chưa bật máy in nào',
     '已开启这台电脑的自动打印': 'Đã bật in tự động cho máy này',
     '已关闭这台电脑的自动打印': 'Đã tắt in tự động cho máy này',
+    '这台电脑还没有连过:代理没装或没启动': 'Máy này chưa từng kết nối: chưa cài hoặc chưa chạy agent',
+    '来源 IP': 'IP nguồn',
+    '离线 = 90 秒内没收到那台电脑的心跳(电脑关机 / 打印代理没运行 / 代理不是带 -Server 启动的);离线时不派单,手机端会退回自己弹打印': 'Ngoại tuyến = 90 giây không có tín hiệu (máy tắt / agent không chạy / agent không có -Server). Ngoại tuyến không nhận lệnh, điện thoại tự in',
+    '新增打印电脑': 'Thêm máy in',
+    '填那台电脑的站点名(默认就是计算机名)': 'Nhập tên trạm của máy đó (mặc định là tên máy tính)',
+    '在那台电脑上双击「安装.bat」装打印代理,「这台打印机的名字」填成同一个名字(回车 = 计算机名);代理连上后这一行会自动变成在线,再打开开关、勾上要打的报表。': 'Cài agent trên máy đó bằng «安装.bat» với cùng tên (Enter = tên máy). Khi kết nối, dòng này sẽ online; bật công tắc và chọn báo biểu.',
+    '请先填站点名': 'Vui lòng nhập tên trạm trước',
+    '已经有同名电脑了': 'Đã có máy trùng tên',
+    '已登记:等那台电脑的打印代理连上来就会显示在线': 'Đã đăng ký: sẽ online khi agent của máy đó kết nối',
   },
 
 }

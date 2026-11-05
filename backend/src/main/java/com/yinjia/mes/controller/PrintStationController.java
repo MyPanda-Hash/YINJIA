@@ -148,13 +148,14 @@ public class PrintStationController {
     /**
      * 一台打印电脑的在线视图。
      *
-     * @param name    站点名称(唯一键:代理的 -Station / 面板配置名)
+     * @param name    站点名称(唯一键:代理的 -Station,安装时默认取计算机名)
      * @param enabled 自动打印开关(来自库里的站点配置;关着 ⇒ 在线也不派单)
      * @param types   勾选的打印类型 code 集合
-     * @param seen    最后一次心跳(epoch millis)
+     * @param seen    最后一次心跳(epoch millis);0 = 只在面板上登记过、代理还没连上来
      * @param source  谁在轮询:agent=本机打印代理 / page=自动打印页面(排查用)
+     * @param ip      轮询方的来源 IP(帮现场认出"这是哪一台电脑";带 X-Forwarded-For 时取第一个)
      */
-    private record Station(String name, boolean enabled, Set<String> types, long seen, String source) {
+    private record Station(String name, boolean enabled, Set<String> types, long seen, String source, String ip) {
         Map<String, Object> json() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", name);
@@ -162,7 +163,10 @@ public class PrintStationController {
             m.put("types", new ArrayList<>(types));
             m.put("online", true);
             m.put("source", source);
-            m.put("lastSeen", LocalDateTime.ofInstant(Instant.ofEpochMilli(seen), ZoneId.systemDefault()).format(TS));
+            m.put("ip", ip == null ? "" : ip);
+            // seen == 0 = 从没连过(面板上预登记的名字):显示空串,别显示 1970 年误导人
+            m.put("lastSeen", seen <= 0 ? "" : LocalDateTime
+                    .ofInstant(Instant.ofEpochMilli(seen), ZoneId.systemDefault()).format(TS));
             return m;
         }
     }
@@ -304,11 +308,12 @@ public class PrintStationController {
      */
     @GetMapping("/pending")
     public ApiResult<Map<String, Object>> pending(@RequestParam(required = false) String station,
-                                                  @RequestParam(required = false) String source) {
+                                                  @RequestParam(required = false) String source,
+                                                  jakarta.servlet.http.HttpServletRequest req) {
         perm.requirePanelView(PANEL_SELF);
         sweep();
 
-        Station me = heartbeat(station, source);
+        Station me = heartbeat(station, source, clientIp(req));
         PrintTask t = me == null ? null : takeFor(me.name());
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -355,10 +360,11 @@ public class PrintStationController {
      * @param station 可选:传了就顺手登记一次心跳(页面自报"我是哪台电脑")
      */
     @GetMapping("/station")
-    public ApiResult<Map<String, Object>> station(@RequestParam(required = false) String station) {
+    public ApiResult<Map<String, Object>> station(@RequestParam(required = false) String station,
+                                                  jakarta.servlet.http.HttpServletRequest req) {
         perm.requirePanelView(PANEL_SELF);
         sweep();
-        Station me = heartbeat(station, "page");
+        Station me = heartbeat(station, "page", clientIp(req));
         return ApiResult.ok(stateOf(me));
     }
 
@@ -397,15 +403,36 @@ public class PrintStationController {
      * @param body {station?}
      */
     @PostMapping("/heartbeat")
-    public ApiResult<Map<String, Object>> heartbeatApi(@RequestBody(required = false) Map<String, Object> body) {
+    public ApiResult<Map<String, Object>> heartbeatApi(@RequestBody(required = false) Map<String, Object> body,
+                                                       jakarta.servlet.http.HttpServletRequest req) {
         perm.requirePanelView(PANEL_SELF);
-        Station me = heartbeat(body == null ? null : str(body.get("station")), "page");
+        Station me = heartbeat(body == null ? null : str(body.get("station")), "page", clientIp(req));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("autoEnabled", true);
         out.put("queueSize", QUEUE.size());
         out.put("station", me == null ? "" : me.name());
         out.put("stations", stationList());
         return ApiResult.ok(out);
+    }
+
+    /**
+     * 来电 IP(帮现场认出"这是哪一台电脑")。
+     *
+     * <p>优先 {@code X-Forwarded-For}(有反向代理时 {@code getRemoteAddr} 只会是代理地址);
+     * 取第一个地址,非 IPv4/IPv6 的串一律丢掉。取不到就返回空串,不编造。
+     */
+    private static String clientIp(jakarta.servlet.http.HttpServletRequest req) {
+        if (req == null) return "";
+        String xff = req.getHeader("X-Forwarded-For");
+        String ip = "";
+        if (xff != null && !xff.isBlank()) {
+            ip = xff.split(",")[0].trim();
+        } else {
+            ip = str(req.getRemoteAddr());
+        }
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) ip = "127.0.0.1";
+        if (ip.startsWith("127.")) ip = "127.0.0.1";
+        return ip.length() > 60 ? "" : ip;
     }
 
     // ══════════════════════════ 内部:心跳 / 配置 / 派单 / 过期 ══════════════════════════
@@ -415,17 +442,18 @@ public class PrintStationController {
      *
      * @return 站点视图;名字为空时返回 null(不注册"无名站点")
      */
-    private Station heartbeat(String name, String source) {
+    private Station heartbeat(String name, String source, String ip) {
         String n = str(name);
         if (n.isEmpty()) return null;
         Station old = STATIONS.get(n);
         if (old == null) {
             boolean[] en = {false};
             Set<String> types = loadConfig(n, en);
-            old = new Station(n, en[0], types, 0L, "");
+            old = new Station(n, en[0], types, 0L, "", "");
         }
         Station s = new Station(n, old.enabled(), old.types(),
-                System.currentTimeMillis(), str1(source, old.source().isEmpty() ? "agent" : old.source()));
+                System.currentTimeMillis(), str1(source, old.source().isEmpty() ? "agent" : old.source()),
+                str(ip).isEmpty() ? old.ip() : str(ip));
         STATIONS.put(n, s);
         // 运维展示用(不参与派单):最近心跳时间 + 最近出现的站点名
         setSetting("print.last_heartbeat", LocalDateTime.now().format(TS));
@@ -447,7 +475,7 @@ public class PrintStationController {
         setSetting(CFG_PREFIX + name + CFG_TYPES, String.join(",", types));
         Station old = STATIONS.get(name);
         STATIONS.put(name, new Station(name, enabled, types,
-                old == null ? 0L : old.seen(), old == null ? "" : old.source()));
+                old == null ? 0L : old.seen(), old == null ? "" : old.source(), old == null ? "" : old.ip()));
     }
 
     /**
@@ -494,19 +522,54 @@ public class PrintStationController {
         return out;
     }
 
-    /** 站点清单(给面板显示"哪台电脑开没开、各自订什么");离线的也列,但 online=false */
+    /**
+     * 站点清单(给面板显示"哪台电脑开没开、各自订什么")。
+     *
+     * <p>🔴 2026-11-05:清单 = **内存里在跑的** ∪ **库里有配置的**。
+     * 只取内存的话,「面板上新增一台电脑」(它还没连过来、seen=0)会立刻被
+     * {@link #sweep()} 当"太久没心跳"清掉,登记完就消失 —— 用户会以为没加成功。
+     * 补上库里的配置行,新登记的电脑就能以"离线/从没连过"的形态一直留在清单里,
+     * 等它的代理连上来再变在线(服务端重启后也一样)。
+     */
     private List<Map<String, Object>> stationList() {
         long now = System.currentTimeMillis();
         long win = ONLINE_SECONDS * 1000L;
+        Map<String, Station> all = new LinkedHashMap<>(STATIONS);
+        // 库里有配置、但内存里没有(从没连过 / 服务端重启后):补一行"离线占位"
+        for (String name : configuredNames()) {
+            if (all.containsKey(name)) continue;
+            boolean[] en = {false};
+            Set<String> types = loadConfig(name, en);
+            all.put(name, new Station(name, en[0], types, 0L, "", ""));
+        }
         List<Map<String, Object>> out = new ArrayList<>();
-        List<Station> all = new ArrayList<>(STATIONS.values());
-        all.sort((a, b) -> a.name().compareTo(b.name()));
-        for (Station s : all) {
+        List<Station> list = new ArrayList<>(all.values());
+        list.sort((a, b) -> a.name().compareTo(b.name()));
+        for (Station s : list) {
             Map<String, Object> m = s.json();
             m.put("online", now - s.seen() <= win);
             out.add(m);
         }
         return out;
+    }
+
+    /** 库里登记过的站点名(print.station.&lt;名字&gt;.enabled 的键名里取名字);读不到就当空表 */
+    private List<String> configuredNames() {
+        List<String> names = new ArrayList<>();
+        try {
+            List<String> keys = jdbc.queryForList(
+                    "SELECT setting_key FROM yj_app_setting WHERE setting_key LIKE ?",
+                    String.class, CFG_PREFIX + "%.enabled");
+            for (String k : keys) {
+                if (k == null) continue;
+                String rest = k.substring(CFG_PREFIX.length());
+                int dot = rest.lastIndexOf('.');
+                if (dot > 0) names.add(rest.substring(0, dot));
+            }
+        } catch (RuntimeException e) {
+            // 读不到不影响在跑的站点显示
+        }
+        return names;
     }
 
     private List<Map<String, Object>> typeList() {

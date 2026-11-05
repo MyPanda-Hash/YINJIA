@@ -5400,6 +5400,15 @@ export default {
     '没有启用的打印电脑': 'No print computer enabled',
     '已开启这台电脑的自动打印': 'Auto print enabled for this computer',
     '已关闭这台电脑的自动打印': 'Auto print disabled for this computer',
+    '这台电脑还没有连过:代理没装或没启动': 'This computer has never checked in: agent not installed or not running',
+    '来源 IP': 'Source IP',
+    '离线 = 90 秒内没收到那台电脑的心跳(电脑关机 / 打印代理没运行 / 代理不是带 -Server 启动的);离线时不派单,手机端会退回自己弹打印': 'Offline = no heartbeat from that computer within 90 s (machine off / agent not running / agent not started with -Server). Offline stations get no jobs; the phone falls back to its own print dialog',
+    '新增打印电脑': 'Add print computer',
+    '填那台电脑的站点名(默认就是计算机名)': 'Enter that computer\'s station name (defaults to its computer name)',
+    '在那台电脑上双击「安装.bat」装打印代理,「这台打印机的名字」填成同一个名字(回车 = 计算机名);代理连上后这一行会自动变成在线,再打开开关、勾上要打的报表。': 'Install the print agent on that computer with "安装.bat" and give it the same name (Enter = computer name). Once it connects, this row turns online — then switch it on and tick the reports.',
+    '请先填站点名': 'Enter a station name first',
+    '已经有同名电脑了': 'A computer with this name already exists',
+    '已登记:等那台电脑的打印代理连上来就会显示在线': 'Registered: it turns online once that computer\'s print agent connects',
   },
 
 }

@@ -2671,6 +2671,15 @@ export default {
     '没有启用的打印电脑': 'Kein Druckrechner aktiviert',
     '已开启这台电脑的自动打印': 'Automatischer Druck für diesen Rechner aktiviert',
     '已关闭这台电脑的自动打印': 'Automatischer Druck für diesen Rechner deaktiviert',
+    '这台电脑还没有连过:代理没装或没启动': 'Dieser Rechner hat sich nie gemeldet: Agent fehlt oder läuft nicht',
+    '来源 IP': 'Quell-IP',
+    '离线 = 90 秒内没收到那台电脑的心跳(电脑关机 / 打印代理没运行 / 代理不是带 -Server 启动的);离线时不派单,手机端会退回自己弹打印': 'Offline = 90 s kein Heartbeat (Rechner aus / Agent gestoppt / Agent ohne -Server). Offline bekommt keine Aufträge; das Handy druckt selbst',
+    '新增打印电脑': 'Druckrechner hinzufügen',
+    '填那台电脑的站点名(默认就是计算机名)': 'Stationsname des Rechners (Standard: Computername)',
+    '在那台电脑上双击「安装.bat」装打印代理,「这台打印机的名字」填成同一个名字(回车 = 计算机名);代理连上后这一行会自动变成在线,再打开开关、勾上要打的报表。': 'Dort den Agenten mit „安装.bat" installieren und denselben Namen vergeben (Enter = Computername). Nach der Verbindung wird die Zeile online; dann einschalten und Berichte ankreuzen.',
+    '请先填站点名': 'Bitte zuerst den Stationsnamen eingeben',
+    '已经有同名电脑了': 'Ein Rechner mit diesem Namen existiert bereits',
+    '已登记:等那台电脑的打印代理连上来就会显示在线': 'Registriert: wird online, sobald der Agent dort verbindet',
   },
 
 }
