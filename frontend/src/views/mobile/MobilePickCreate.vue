@@ -222,9 +222,17 @@
     >
       <div v-if="detailLoading" class="mp-empty">{{ tt('加载中') }}</div>
       <template v-else>
+        <!-- 🔴 2026-11-04 用户口径:「生产领料和生成生产领料这两个面板的**主物料**都没有标明
+             物料编码和规格型号和计量单位,信息不完全」。
+             ⇒ 抬头补上主物料(工单行产品)的编码 / 规格型号 / 计量单位,与明细行同一口径:
+               物料编码取台账快照(生单那一刻的产品编号),规格型号与单位取工单行(plang.gg/jldw)。
+               缺值一律显示 —,不省略整行(否则看着像"没这个信息")。 -->
         <div class="mp-dv-head">
           <div class="mp-kv"><span>{{ tt('工单号') }}</span><b>{{ detail.工单号 }}<i v-if="detail.工单行号"> #{{ detail.工单行号 }}</i></b></div>
           <div class="mp-kv"><span>{{ tt('产品') }}</span><b>{{ detail.产品名称 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('物料编码') }}</span><b class="mono">{{ detail.产品编号 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('规格型号') }}</span><b>{{ detailWo.规格型号 || '—' }}</b></div>
+          <div class="mp-kv"><span>{{ tt('计量单位') }}</span><b>{{ detailWo.计量单位 || '—' }}</b></div>
           <div class="mp-kv"><span>{{ tt('状态') }}</span><b :class="{ ok: String(detail.状态) === '已完成' }">{{ detail.状态 }}</b></div>
           <div class="mp-kv"><span>{{ tt('领料进度') }}</span><b>{{ detail.已领项数 || 0 }} / {{ detail.物料项数 || 0 }}</b></div>
           <div v-if="detail.退料单号" class="mp-kv"><span>{{ tt('退料单号') }}</span><b>{{ detail.退料单号 }}</b></div>
@@ -245,9 +253,19 @@
             </dl>
           </div>
           <div class="mp-dv-qty">
-            <b class="num">{{ fmtQty(r.数量) }}</b><span class="mp-dv-sep">/</span>
-            <span class="num mp-dv-need">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</span>
-            <i>{{ r.单位 }}</i>
+            <!-- 🔴 2026-11-04 用户口径:「需求数量在明细里面没有写清楚,在外面就有」。
+                 原来这里是 "0/100 支"(裸数字 + 斜杠),抽屉里又没有"已领/需求"列头 ⇒ 两个数字
+                 谁是谁全靠猜。改成两行各带标签:需求 x 支 / 已领 y 支。 -->
+            <div class="mp-q-row">
+              <span class="mp-q-lab">{{ tt('需求') }}</span>
+              <b class="num">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</b>
+              <i>{{ r.单位 }}</i>
+            </div>
+            <div class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && Number(r.数量) >= Number(r.BOM用量) }">
+              <span class="mp-q-lab">{{ tt('已领') }}</span>
+              <b class="num">{{ fmtQty(r.数量) }}</b>
+              <i>{{ r.单位 }}</i>
+            </div>
           </div>
         </div>
         <div class="mp-dv-note">{{ tt('只读查看:领料与退料请到「生产领料」里操作') }}</div>
@@ -289,6 +307,15 @@ const woList = ref([])
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref({})
+
+/**
+ * 抽屉抬头用的工单行信息(2026-11-04)。
+ *
+ * <p>`/px/mobilePick/doc` 除了台账字段,还下发一个 `工单` 子对象(plang 那一行的
+ * 产品名称 / 规格型号 / 计量单位 / 生产线 / 排产数量)。主物料的规格型号与计量单位
+ * 就在这个子对象里 —— 抬头要显示它们,数据源不能换成明细行(明细是子件)。
+ */
+const detailWo = computed(() => detail.value.工单 || {})
 
 /**
  * 看明细抽屉的宽度(2026-11-04)。
@@ -667,6 +694,14 @@ async function loadWoStatus() {
 
 /* 明细抽屉(就地查看,不跳页) */
 .mp-dv-head { margin-bottom: 12px; }
+/* 抬头字段对(2026-11-04):原来 .mp-kv 没有布局样式,一排 `<div><span>标签</span><b>值</b></div>`
+   在块级里首尾相连,读出「工单号GD-2026-10-0241 #4」这种标签黏着值的句子。
+   改成两列网格:标签 76px 灰、值自适应换行 —— 与「生产领料」详情页同一口径。 */
+.mp-kv { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 2px 0; font-size: 13px; }
+.mp-kv > span { color: var(--el-text-color-secondary); }
+.mp-kv > b { font-weight: 500; min-width: 0; word-break: break-all; }
+.mp-kv > b.ok { color: var(--el-color-success); }
+.mp-kv > b i { font-style: normal; font-weight: 400; color: var(--el-text-color-secondary); }
 .mp-dv-title { margin: 10px 0 6px; font-size: 13px; font-weight: 600; }
 .mp-dv-line {
   display: flex; align-items: center; gap: 10px; padding: 8px 0;
@@ -685,14 +720,14 @@ async function loadWoStatus() {
   .mp-dv-line { align-items: flex-start; }
   .mp-dv-qty { font-size: 13px; }
 }
-.mp-dv-qty { flex: none; text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
-.mp-dv-qty b { font-weight: 600; }
-.mp-dv-sep { margin: 0 2px; color: var(--el-text-color-placeholder); }
-.mp-dv-need { color: var(--el-text-color-secondary); }
-.mp-dv-qty i { font-style: normal; margin-left: 3px; font-size: 11px; color: var(--el-text-color-secondary); }
+/* 需求 / 已领 两行(2026-11-04):标签 + 右对齐等宽数字 + 小字单位,两行纵向对齐 */
+.mp-dv-qty { flex: none; display: grid; gap: 1px; min-width: 104px; font-size: 14px; }
+.mp-q-row { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; line-height: 1.35; }
+.mp-q-row > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.mp-q-row.ok > b { color: var(--el-color-success); }
+.mp-q-lab { font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-dv-qty i { font-style: normal; font-size: 11px; color: var(--el-text-color-secondary); }
 .mp-dv-note { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
-.mp-kv > b.ok { color: var(--el-color-success); }
-.mp-kv > b i { font-style: normal; color: var(--el-text-color-secondary); }
 
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
