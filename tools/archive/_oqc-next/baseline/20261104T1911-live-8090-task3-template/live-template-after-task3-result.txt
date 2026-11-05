@@ -1,0 +1,18 @@
+FACT  参数  -- {"base":"http://127.0.0.1:8090","factory":"YINJIA-MES","docNo":"OQC-2026-11-0004","expect":"drift","outDir":"D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1911-live-8090-task3-template","prefix":"live-template-after-task3"}
+PASS  登录成功(admin/YINJIA-MES)  -- realName=系统管理员
+FACT  左栏列表 totalSize  -- 0
+PASS  报表模板 API 含 qc_oqc(出厂检验报告)  -- [{"code":"qc_oqc","panelCode":"QC_OQC_REPORT","name":"出厂检验报告","formats":["pdf","xlsx"]}]
+PASS  导出 PDF HTTP 200 + content-type=pdf  -- status=200 ct=application/pdf bytes=81689
+PASS  PDF 首字节 %PDF-  -- "%PDF-1.5"
+PASS  PDF 字节数 > 10KB  -- 81689 bytes
+PASS  PDF 文本层可抽取(页数/字符数)  -- pages=1 chars=1086
+PASS  PDF 含标题「出厂检验报告」
+PASS  PDF 含模板编号 YJ-QR-05/A1
+FACT  页脚标记是否齐全(drift 记录)  -- false
+FACT  签署 审核 下划线 / 批准 下划线(drift 记录)  -- {"审核下划线":true,"批准下划线":true,"审核":"审核：________________批准：_","批准":"批准：________________YJ-Q"}
+PASS  导出 XLSX HTTP 200 + PK 头  -- status=200 ct=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet bytes=27152
+PASS  XLSX 字节数 > 5KB  -- 27152 bytes
+FACT  XLSX 旧页脚标记是否齐全(drift 记录)  -- false
+FACT  XLSX 文本长度  -- 431
+
+RESULT: PASS (PASS 10 / FAIL 0)

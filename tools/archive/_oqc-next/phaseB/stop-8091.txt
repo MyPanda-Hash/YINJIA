@@ -1,0 +1,34 @@
+== 8091 stop evidence 2026-11-04 19:16:49 ==
+-- before:
+  TCP    0.0.0.0:8091           0.0.0.0:0              LISTENING       33588
+  TCP    127.0.0.1:8091         127.0.0.1:54195        TIME_WAIT       0
+  TCP    127.0.0.1:8091         127.0.0.1:54196        TIME_WAIT       0
+[stop-8091] 已尝试停止 pid=1447
+-- after:
+  TCP    127.0.0.1:8091         127.0.0.1:54195        TIME_WAIT       0
+  TCP    127.0.0.1:8091         127.0.0.1:54196        TIME_WAIT       0
+  TCP    127.0.0.1:8091         127.0.0.1:54197        TIME_WAIT       0
+(空=已停)
+
+== 8091-app.log 末尾 20 行(停前) ==
+2026-11-04 19:09:36.810 INFO  [main] com.yinjia.mes.MesApplication - Starting MesApplication v0.1.0 using Java 25.0.4.1 with PID 33588 (D:\workspace\yinjia\.tmp\oqc-verify\backend-build\target\yinjia-mes-backend-0.1.0.jar started by vigna in D:\workspace\yinjia)
+2026-11-04 19:09:36.811 INFO  [main] com.yinjia.mes.MesApplication - No active profile set, falling back to 1 default profile: "default"
+2026-11-04 19:09:37.992 INFO  [main] o.apache.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8091"]
+2026-11-04 19:09:37.996 INFO  [main] o.apache.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-04 19:09:37.996 INFO  [main] org.apache.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.42]
+2026-11-04 19:09:38.033 INFO  [main] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-04 19:09:38.288 INFO  [main] c.yinjia.mes.service.TranslationService - translation-service: AK NOT configured (endpoint=ocr-api.cn-hangzhou.aliyuncs.com)
+2026-11-04 19:09:39.301 WARN  [main] o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: (redacted)
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-11-04 19:09:39.676 INFO  [main] o.apache.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8091"]
+2026-11-04 19:09:39.732 INFO  [main] com.yinjia.mes.MesApplication - Started MesApplication in 3.409 seconds (process running for 3.864)
+2026-11-04 19:09:39.841 WARN  [main] com.yinjia.mes.service.InvCostService - 库存成本重算:流水里有 823 行的「收入金额」为空(视图入库段裸 CAST,in h.金额 为 NULL),本次按 0 计入加权成本 —— 这些行的成本口径需要补数据(见 docs/development/库存表清单.md §2)
+[YINJIA-MES] 库存成本物化表与流水不一致，已全量重算 5574 行
+2026-11-04 19:09:40.265 INFO  [http-nio-8091-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-04 19:09:40.314 WARN  [main] com.yinjia.mes.service.InvCostService - [库存对账] 发现 820 个三键不一致,前 10 个:M-003|CK01|INIT-M-003(结存=419.0 流水=838.0) M-004|CK01|INIT-M-004(结存=317.0 流水=634.0) M-005|CK01|INIT-M-005(结存=845.0 流水=1690.0) M-007|CK01|INIT-M-007(结存=973.0 流水=1946.0) M-010|CK01|INIT-M-010(结存=112.0 流水=224.0) M-015|CK01|INIT-M-015(结存=373.0 流水=746.0) M-017|CK01|INIT-M-017(结存=414.0 流水=828.0) M-004|CK02|INIT-M-004(结存=809.0 流水=1618.0) M-005|CK02|INIT-M-005(结存=290.0 流水=580.0) M-010|CK02|INIT-M-010(结存=927.0 流水=1854.0)
+2026-11-04 19:11:14.996 WARN  [http-nio-8091-exec-2] com.yinjia.mes.config.SlowRequestLogger - [慢请求] GET /api/report/export 2793ms status=200 （≥2000ms；并发/锁等待线索）
+status: 8091 未监听

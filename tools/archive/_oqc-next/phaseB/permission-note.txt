@@ -1,0 +1,2 @@
+QC_OQC_REPORT can_approve=Y roles: [{"role_code":"ceshizhuanyong","role_name":"测试专用角色","can_approve":"Y"}]
+QC_OQC_REPORT yj_role_panel rows: [{"n":13}]

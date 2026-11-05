@@ -407,7 +407,7 @@
               </div>
               <!-- 审批闭环(2026-10-16 侧栏整理:从「申请修改 ▼」下拉与 hasApprovalBtns 特例里**提出来**,独立成一段)
                    —— 门禁逐条与原来一致,只是不再按面板藏:
-                     · 提交审批:仅标准流文书面板(QC_INSP_REC / RD_DOM_TEST / 品质单据)需要显式提交 ——
+                     · 提交审批:仅标准流文书面板(QC_INSP_REC / RD_DOM_TEST / 品质单据 / 出厂检验报告)需要显式提交 ——
                        归档一族是「保存=送审(普通用户)/归档(管理员)」,没有这一步;
                      · 审批通过 / 审批驳回:状态∈{审批中,待二级审批} + 有审批权者(管理员 ∪ 角色勾了审核反审核);
                        一级节点排除提交人本人(服务端 ButtonService 编制与审批分离必拒,这里提前禁用并说明原因);
@@ -441,7 +441,7 @@
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」;
                    2026-10-18 首件检验单同口径放开):
-                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的 8 张质量单据、
+                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的质量单据一族(8 张质量单据 + 出厂检验报告)、
                    也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
                    有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
                    ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
@@ -4117,24 +4117,29 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  * 测试申请单(RD_DOM_TEST,2026-09-30 用户口径)同 QC_INSP_REC 口径:它也是归档一族
  * (保存=普通用户自动送审 / 管理员直接归档),此前审批动作只藏在「申请修改」组的下拉里,
  * 用户要求把动作组直接放出来 —— 归档闭环本身不动(「申请修改/修改记录」照旧保留)。
+ * 出厂检验报告(QC_OQC_REPORT,2026-11-04 用户口径「检验员=编制 / 审核=一级审批人 / 批准=超级管理员」):
+ * 并入质量单据两级审批(L2_DOC_PANELS)⇒ 侧栏必须放出「提交审批」与「弃审」(此前只有管理员直审,
+ * 直审已按后端 ADMIN_L2_PANELS 撤掉)。它的纸面由 QcOqcSheet 接管、不在 qcSheetCfgs 里,故单独登记;
+ * 这里只管**显示**,每个动作能不能点/能不能落地仍由 isDisabled + 后端 ButtonService 裁决。
  */
 const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_INSP_REC'
+  || String(panelCode.value) === 'QC_OQC_REPORT'
   || String(panelCode.value) === 'RD_DOM_TEST')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
  *
  * 为什么单开一个名单,而不是加进 hasApprovalBtns:
  *   · hasApprovalBtns 那一组是「提交审批 / 审批通过 / 审批驳回 / 弃审 / 审批情况」——适用于**走审批流**的面板;
- *   · 工序检验单(制程/成型/切炭/组装/首件)既不在两级审批的 8 张质量单据(QC_DOC_PREPARER)里,
- *     也没有审批流配置 ⇒ 给它们一键直审才走得通(草稿 → 已审核)。
+ *   · 工序检验单(制程/成型/切炭/组装/首件)既不在两级审批的质量单据一族(8 张质量单据 + 出厂检验报告,
+ *     QC_DOC_PREPARER)里,也没有审批流配置 ⇒ 给它们一键直审才走得通(草稿 → 已审核)。
  * 权限:**仅管理员**。2026-09-22「直审收权」后,前端审批组不再给非管理员直审入口,后端
  * ButtonService.audit() 也硬拒非管理员(「其他角色请走提交审批」)——这里与后端同口径,
  * 否则非管理员点了只会拿到 403。要给某个检验单放开:把面板码加进本名单即可。
  *
  * ⚠ 2026-10-18(用户口径「为当前的首件检验单增加审核功能,审核功能实现参照当前的制程检验单」):
  *   首件检验单(QC_FIRST_INSP)与制程检验单同属工序检验单一族(同样是报工驱动的检验记录、
- *   既不进两级审批的 8 张质量单据、也没有审批流)⇒ 同一口径放开。放开即同时获得:
+ *   既不进两级审批的质量单据一族(8 张质量单据 + 出厂检验报告)、也没有审批流)⇒ 同一口径放开。放开即同时获得:
  *   ① 侧栏「审核 / 弃审」(仅管理员);② 直审留痕(后端 ButtonService.audit() → yj_form_approval
  *   的 AUDIT/APPROVED 行)⇒ 侧栏「审批情况」查得到谁审的/什么时候/审核意见;
  *   ③ 审核后单据锁定(单据状态=已审核 ⇒ draftEditable 为假、纸面只读);
@@ -4143,11 +4148,17 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  *
  * ⚠ 2026-11-01(用户口径「出厂检验报告实现和首件检验单相同的形式」):
  *   出厂检验报告(QC_OQC_REPORT)本轮改成 approval-layout 纸面后,和首件/制程同属「报工-检验」一族、
- *   不进两级审批的 8 张质量单据、也没有审批流 ⇒ 同一口径放开「审核 / 弃审」(仅管理员)。
+ *   当时既不属两级审批的质量单据一族(8 张质量单据 + 出厂检验报告,其中本单 2026-11-04 起并入)、
+ *   也没有审批流 ⇒ 同一口径放开「审核 / 弃审」(仅管理员)。**[本段 2026-11-04 作废,见下段]**
  *   后端 ButtonService.audit() 是通用 doc 面板直审,**无需改后端**(仅 ADMIN_L2_PANELS 会被拒,
  *   QC_OQC_REPORT 不在其中);审核后 yj_doc_status.shr 有值 ⇒ 纸面「审核人」格与导出报表都带出留痕。
+ * ⚠ 2026-11-04(用户口径「检验员=编制 / 审核=一级审批人 / 批准=超级管理员」,**取代** 11-01 段):
+ *   出厂检验报告并入质量单据两级审批(见 L2_DOC_PANELS),**撤出本名单** —— 后端
+ *   ButtonService.ADMIN_L2_PANELS 已含该面板 ⇒ 直审(audit)必被拒
+ *   「走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核」;
+ *   ⇒ 不再给「审核 / 弃审」直审入口,审批与弃审改由上面的统一审批组/危险操作段(按节点显隐)承担。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP', 'QC_OQC_REPORT']
+const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -4342,7 +4353,10 @@ const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!dev
 // 二级 = **超级管理员**(yj_user.is_admin='Y'),不选人、不是角色。
 // ⚠ 两级**必须各点一次**(同一个人也要两次),故按钮分节点显隐,不给"一次动作跨两级"的入口。
 // ⚠ 清单必须与后端 ButtonService.ADMIN_L2_PANELS 一致(那边是 QC_DOC_PREPARER 的键集)。
-const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY']
+// 2026-11-04 起 9 张:8 张质量单据 + 出厂检验报告(QC_OQC_REPORT)。
+//   QC_OQC_REPORT 原走「管理员直审」(见 DIRECT_AUDIT_PANELS 的 2026-11-01 段),用户 2026-11-04 口径
+//   「检验员=编制 / 审核=一级审批人 / 批准=超级管理员」⇒ 并入质量单据两级审批,直审入口撤掉(后端会拒)。
+const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT']
 const isQcL2Panel = computed(() => L2_DOC_PANELS.includes(String(panelCode.value)))
 /** 一级审核节点(节点 1):状态还是「审批中」 */
 const qcL2Node = computed(() => isQcL2Panel.value && curDocStatus.value === '待二级审批')

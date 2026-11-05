@@ -1,0 +1,143 @@
+{
+ "title": "OQC UI new/draft @ http://127.0.0.1:8091 docNo=OQC-2026-11-0010",
+ "startedAt": "2026-11-04T11:15:54.614Z",
+ "endedAt": "2026-11-04T11:16:04.372Z",
+ "pass": 19,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YINJIA-MES\",\"docNo\":\"OQC-2026-11-0010\",\"expect\":\"new\",\"state\":\"draft\",\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\ui\\\\draft\"}"
+  },
+  {
+   "name": "登录页可见(frontend 可访问)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/login"
+  },
+  {
+   "name": "登录工厂下拉选中 YINJIA-MES",
+   "ok": true,
+   "detail": "{\"ok\":true,\"picked\":\"YINJIA-MES\",\"texts\":[\"简体中文\",\"English (en)\",\"日本語 (ja)\",\"한국어 (ko)\",\"Español (es)\",\"Français (fr)\",\"Deutsch (de)\",\"Русский (ru)\",\"Tiếng Việt (vi)\",\"ไทย (th)\",\"YINJIA-MES\",\"YINJIA-MES·测试库\"]}"
+  },
+  {
+   "name": "UI 登录成功并进入桌面(#/dashboard)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/dashboard"
+  },
+  {
+   "name": "打开纸张面板(.oqc-sheet 渲染)",
+   "ok": true,
+   "detail": "hash=#/panelx/list/QC_OQC_REPORT approvalLayout=true"
+  },
+  {
+   "name": "纸面截图",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\ui\\\\draft\\\\ui-draft-paper.png\""
+  },
+  {
+   "name": "纸面事实",
+   "ok": null,
+   "detail": "{\"hasFooter\":false,\"footerText\":\"\",\"signText\":\"检验员：\",\"signValues\":[\"\",\"\"],\"blankCells\":0,\"sheetInputs\":31,\"preparerInput\":false,\"sideBtns\":[\"查询单据\",\"模糊搜索\",\"单据预览\",\"新增\",\"保存\",\"保存为草稿\",\"提交审批\",\"审批情况\",\"打印\",\"导出报表\",\"导出\",\"扫描填单\",\"字段管理\",\"删除\",\"弃审\"],\"disabledBtns\":[\"弃审\"]}"
+  },
+  {
+   "name": "新口径:纸面不存在 .oqc-footer",
+   "ok": true,
+   "detail": "footerText="
+  },
+  {
+   "name": "新口径:侧栏无「审核」直审入口",
+   "ok": true,
+   "detail": "侧栏=查询单据/模糊搜索/单据预览/新增/保存/保存为草稿/提交审批/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审"
+  },
+  {
+   "name": "弃审按钮是否存在(统一审批组,按状态显隐)",
+   "ok": null,
+   "detail": "true"
+  },
+  {
+   "name": "草稿态:有「提交审批」按钮",
+   "ok": true,
+   "detail": "侧栏=查询单据/模糊搜索/单据预览/新增/保存/保存为草稿/提交审批/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审"
+  },
+  {
+   "name": "草稿态:无可用「弃审」入口(统一审批组按节点显隐;草稿态若显示则必须 disabled)",
+   "ok": true,
+   "detail": "弃审 disabled=true"
+  },
+  {
+   "name": "草稿态:签署行 检验员/审核/批准 无落值",
+   "ok": true,
+   "detail": "signValues=[\"\",\"\"]"
+  },
+  {
+   "name": "检验员格只读(纸面无 检验员 input)",
+   "ok": true,
+   "detail": "sheetInputs=31 preparerInput=false"
+  },
+  {
+   "name": "「导出报表」弹窗打开",
+   "ok": true,
+   "detail": "导出报表报表模板出厂检验报告📄导出 PDF服务端正式报表：含公司抬头、页眉页脚与页码🖨打印预览在浏览器新窗口内打开 PDF，可直接打印📊导出 Excel（"
+  },
+  {
+   "name": "弹窗模板下拉含「出厂检验报告」",
+   "ok": true,
+   "detail": "出厂检验报告"
+  },
+  {
+   "name": "弹窗有 导出 PDF / 打印预览 / 导出 Excel 三项",
+   "ok": true,
+   "detail": "/模板管理/取消"
+  },
+  {
+   "name": "导出报表→导出 PDF:命中 /api/report/export 且 %PDF-",
+   "ok": true,
+   "detail": "url=http://127.0.0.1:8091/api/report/export?code=qc_oqc&panelCode=QC_OQC_REPORT&docNo=OQC-2026-11-0010&format=pdf bytes=83925 file=D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft-export.pdf"
+  },
+  {
+   "name": "导出 PDF 证据",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\ui\\\\draft\\\\ui-draft-export.pdf\""
+  },
+  {
+   "name": "打印预览:发起 /api/report/export 请求",
+   "ok": true,
+   "detail": "{\"clicked\":true,\"hasRes\":true,\"url\":\"http://127.0.0.1:8091/api/report/export?code=qc_oqc&panelCode=QC_OQC_REPORT&docNo=OQC-2026-11-0010&format=pdf\",\"disposition\":\"attachment; filename=\\\"=?UTF-8?Q?=E5=87=BA=E5=8E=82=E6=A3=80=E9=AA=8C=E6=8A=A5=E5=91=8A-OQC-2026-11-0010.pdf?=\\\"; filename*=UTF-8''%E5%87%BA%E5%8E%82%E6%A3%80%E9%AA%8C%E6%8A%A5%E5%91%8A-OQC-2026-11-0010.pdf\",\"newPage\":true,\"status\":200}"
+  },
+  {
+   "name": "打印预览:disposition=inline 或打开新窗口",
+   "ok": true,
+   "detail": "disposition=attachment; filename=\"=?UTF-8?Q?=E5=87=BA=E5=8E=82=E6=A3=80=E9=AA=8C=E6=8A=A5=E5=91=8A-OQC-2026-11-0010.pdf?=\"; filename*=UTF-8''%E5%87%BA%E5%8E%82%E6%A3%80%E9%AA%8C%E6%8A%A5%E5%91%8A-OQC-2026-11-0010.pdf newPage=true"
+  },
+  {
+   "name": "「导出」弹窗打开(选择导出格式)",
+   "ok": true,
+   "detail": "选择导出格式🖨打印预览在浏览器新窗口打开服务端受控表单 PDF，可直接打印📄导出 PDF服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）📊导出 Excel（.xlsx）服务端受"
+  },
+  {
+   "name": "「导出」弹窗含 导出 Excel（.xlsx）",
+   "ok": true,
+   "detail": "选择导出格式🖨打印预览在浏览器新窗口打开服务端受控表单 PDF，可直接打印📄导出 PDF服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）📊导出 Excel（.xlsx）服务端受控表单版式（与「导出报表」同一份模板，按"
+  },
+  {
+   "name": "导出→导出 Excel:命中 /api/report/export 且 PK 头",
+   "ok": true,
+   "detail": "url=http://127.0.0.1:8091/api/report/export?code=qc_oqc&panelCode=QC_OQC_REPORT&docNo=OQC-2026-11-0010&format=xlsx bytes=27546 file=D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft-export.xlsx"
+  },
+  {
+   "name": "导出 XLSX 证据",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\ui\\\\draft\\\\ui-draft-export.xlsx\""
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YINJIA-MES",
+  "docNo": "OQC-2026-11-0010",
+  "expect": "new",
+  "state": "draft",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft"
+ }
+}

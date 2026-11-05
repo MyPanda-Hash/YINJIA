@@ -1,0 +1,27 @@
+FACT  参数  -- {"base":"http://127.0.0.1:8091","factory":"YINJIA-MES","docNo":"OQC-2026-11-0010","expect":"new","state":"draft","outDir":"D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft"}
+PASS  登录页可见(frontend 可访问)  -- http://127.0.0.1:8091/#/login
+PASS  登录工厂下拉选中 YINJIA-MES  -- {"ok":true,"picked":"YINJIA-MES","texts":["简体中文","English (en)","日本語 (ja)","한국어 (ko)","Español (es)","Français (fr)","Deutsch (de)","Русский (ru)","Tiếng Việt (vi)","ไทย (th)","YINJIA-MES","YINJIA-MES·测试库"]}
+PASS  UI 登录成功并进入桌面(#/dashboard)  -- http://127.0.0.1:8091/#/dashboard
+PASS  打开纸张面板(.oqc-sheet 渲染)  -- hash=#/panelx/list/QC_OQC_REPORT approvalLayout=true
+FACT  纸面截图  -- "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft-paper.png"
+FACT  纸面事实  -- {"hasFooter":false,"footerText":"","signText":"检验员：","signValues":["",""],"blankCells":0,"sheetInputs":31,"preparerInput":false,"sideBtns":["查询单据","模糊搜索","单据预览","新增","保存","保存为草稿","提交审批","审批情况","打印","导出报表","导出","扫描填单","字段管理","删除","弃审"],"disabledBtns":["弃审"]}
+PASS  新口径:纸面不存在 .oqc-footer  -- footerText=
+PASS  新口径:侧栏无「审核」直审入口  -- 侧栏=查询单据/模糊搜索/单据预览/新增/保存/保存为草稿/提交审批/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审
+FACT  弃审按钮是否存在(统一审批组,按状态显隐)  -- true
+PASS  草稿态:有「提交审批」按钮  -- 侧栏=查询单据/模糊搜索/单据预览/新增/保存/保存为草稿/提交审批/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审
+PASS  草稿态:无可用「弃审」入口(统一审批组按节点显隐;草稿态若显示则必须 disabled)  -- 弃审 disabled=true
+PASS  草稿态:签署行 检验员/审核/批准 无落值  -- signValues=["",""]
+PASS  检验员格只读(纸面无 检验员 input)  -- sheetInputs=31 preparerInput=false
+PASS  「导出报表」弹窗打开  -- 导出报表报表模板出厂检验报告📄导出 PDF服务端正式报表：含公司抬头、页眉页脚与页码🖨打印预览在浏览器新窗口内打开 PDF，可直接打印📊导出 Excel（
+PASS  弹窗模板下拉含「出厂检验报告」  -- 出厂检验报告
+PASS  弹窗有 导出 PDF / 打印预览 / 导出 Excel 三项  -- /模板管理/取消
+PASS  导出报表→导出 PDF:命中 /api/report/export 且 %PDF-  -- url=http://127.0.0.1:8091/api/report/export?code=qc_oqc&panelCode=QC_OQC_REPORT&docNo=OQC-2026-11-0010&format=pdf bytes=83925 file=D:\workspace\yinjia\tools\archive\_oqc-next\phaseB\ui\draft\ui-draft-export.pdf
+FACT  导出 PDF 证据  -- "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft-export.pdf"
+PASS  打印预览:发起 /api/report/export 请求  -- {"clicked":true,"hasRes":true,"url":"http://127.0.0.1:8091/api/report/export?code=qc_oqc&panelCode=QC_OQC_REPORT&docNo=OQC-2026-11-0010&format=pdf","disposition":"attachment; filename=\"=?UTF-8?Q?=E5=87=BA=E5=8E=82=E6=A3=80=E9=AA=8C=E6=8A=A5=E5=91=8A-OQC-2026-11-0010.pdf?=\"; filename*=UTF-8''%E5%87%BA%E5%8E%82%E6%A3%80%E9%AA%8C%E6%8A%A5%E5%91%8A-OQC-2026-11-0010.pdf","newPage":true,"status":200}
+PASS  打印预览:disposition=inline 或打开新窗口  -- disposition=attachment; filename="=?UTF-8?Q?=E5=87=BA=E5=8E=82=E6=A3=80=E9=AA=8C=E6=8A=A5=E5=91=8A-OQC-2026-11-0010.pdf?="; filename*=UTF-8''%E5%87%BA%E5%8E%82%E6%A3%80%E9%AA%8C%E6%8A%A5%E5%91%8A-OQC-2026-11-0010.pdf newPage=true
+PASS  「导出」弹窗打开(选择导出格式)  -- 选择导出格式🖨打印预览在浏览器新窗口打开服务端受控表单 PDF，可直接打印📄导出 PDF服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）📊导出 Excel（.xlsx）服务端受
+PASS  「导出」弹窗含 导出 Excel（.xlsx）  -- 选择导出格式🖨打印预览在浏览器新窗口打开服务端受控表单 PDF，可直接打印📄导出 PDF服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）📊导出 Excel（.xlsx）服务端受控表单版式（与「导出报表」同一份模板，按
+PASS  导出→导出 Excel:命中 /api/report/export 且 PK 头  -- url=http://127.0.0.1:8091/api/report/export?code=qc_oqc&panelCode=QC_OQC_REPORT&docNo=OQC-2026-11-0010&format=xlsx bytes=27546 file=D:\workspace\yinjia\tools\archive\_oqc-next\phaseB\ui\draft\ui-draft-export.xlsx
+FACT  导出 XLSX 证据  -- "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft-export.xlsx"
+
+RESULT: PASS (PASS 19 / FAIL 0)

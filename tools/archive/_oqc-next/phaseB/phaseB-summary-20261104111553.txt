@@ -1,0 +1,57 @@
+PASS  8091 登录成功(YINJIA-MES)  -- realName=系统管理员 / API=http://127.0.0.1:8091
+PASS  DB 连接且库名符合预期(HSDZ_MES/HSDZ_MES_TEST)  -- HSDZ_MES
+PASS  DB:qc_oqc_head 已有 审批人/审批时间 列  -- 审批人,审批时间
+PASS  元数据:审批人/审批时间已登记 yj_field  -- 检验员,审核人,审核时间,审批人,审批时间
+PASS  元数据:检验员 editable=0(编制格只读)  -- editable=false
+PASS  元数据:审核人/审批人均只读
+PASS  模板已入库:yj_report_template 有 qc_oqc 行且 enabled=Y  -- [{"template_code":"qc_oqc","panel_code":"QC_OQC_REPORT","enabled":"Y","len":"31292"}]
+PASS  报表模板 API 下发 qc_oqc  -- [{"code":"qc_oqc","panelCode":"QC_OQC_REPORT","name":"出厂检验报告","formats":["pdf","xlsx"]}]
+PASS  面板配置:审批人/审批时间字段下发且只读
+PASS  面板配置:检验员 readonly(editable=0 生效)  -- readonly=true
+PASS  新建 OQC 草稿(调用「保存」按钮)  -- code=200 no=OQC-2026-11-0010 msg=success
+FACT  测试单号  -- "OQC-2026-11-0010"
+PASS  草稿已落库(客户/产品/2 行明细)  -- 客户=AUTO_验证客户_20261104111553 明细行=2
+PASS  草稿态 检验员为空(建草稿不写登录账号)  -- 检验员=null
+PASS  草稿态 审核人/审批人为空
+PASS  yj_panel 查询能列出该测试单  -- totalSize=1
+PASS  直接「审核」对 OQC 被拒且提示走两级审批  -- code=409 msg=出厂检验报告走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核
+PASS  直审被拒后单据仍在草稿(未变已审核)
+PASS  UI[draft]:PASS 19/FAIL 0  -- D:\workspace\yinjia\tools\archive\_oqc-next\phaseB\ui\draft\ui-draft.json
+PASS  提交审批成功  -- code=200 msg=success
+PASS  提交后状态=审批中(pending=Y,node=1)  -- {"pending":"Y","node":1,"shr":"","shsj":null}
+PASS  提交后 检验员=提交人姓名「系统管理员」(编制自动写)  -- 检验员="系统管理员"
+PASS  提交后 审核人/审批人为空
+PASS  留痕:SUBMIT/PENDING  -- SUBMIT/PENDING
+PASS  一级审批通过成功  -- code=200 msg=success
+PASS  一级通过后状态=待二级审批(pending=Y,node=2)  -- {"pending":"Y","node":2,"shr":"","shsj":null}
+PASS  一级通过后 审核人=「系统管理员」  -- 审核人="系统管理员"
+PASS  一级通过后 审核时间非空  -- 审核时间="2026-11-04T19:16:04.000Z"
+PASS  一级通过后 审批人仍为空
+PASS  留痕:APPROVE_L1(node=1)  -- SUBMIT@1,APPROVE_L1@1
+PASS  UI[pending2]:PASS 22/FAIL 0  -- D:\workspace\yinjia\tools\archive\_oqc-next\phaseB\ui\pending2\ui-pending2.json
+PASS  二级审批通过成功  -- code=200 msg=success
+PASS  二级通过后状态=已审核(pending=N,node=0)  -- {"pending":"N","node":0,"shr":"admin","shsj":"2026-11-04T11:16:15.530Z"}
+PASS  二级通过后 审批人=「系统管理员」(超级管理员)  -- 审批人="系统管理员"
+PASS  二级通过后 审批时间非空  -- 审批时间="2026-11-04T19:16:15.000Z"
+PASS  留痕:APPROVE(node=2) 存在  -- SUBMIT@1,APPROVE_L1@1,APPROVE@2
+PASS  留痕:APPROVE_L1 仍在(未被覆盖)
+PASS  API 导出 PDF:HTTP200 + %PDF- + >10KB  -- status=200 bytes=84922
+PASS  PDF 文本可抽取(页数/字符)  -- pages=1 chars=1253
+PASS  PDF 页脚:water-agplus/惠州大亚湾/5583930 全部消失  -- water-agplus=false 惠州大亚湾=false 5583930=false
+PASS  PDF 签署:检验员落值「系统管理员」  -- 检验员：系统管理员审核：系统管理
+PASS  PDF 签署:审核落值「系统管理员」  -- 审核：系统管理员批准：系统管理
+PASS  PDF 签署:批准落值「系统管理员」  -- 批准：系统管理员YJ-QR-0
+PASS  PDF 含受控表单编号 YJ-QR-05/A1
+FACT  PDF 证据  -- {"pdf":"D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\export-OQC-2026-11-0010.pdf","text":"D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\export-OQC-2026-11-0010.txt"}
+PASS  API 导出 XLSX:%PK + >10KB  -- status=200 bytes=27561
+PASS  XLSX 旧页脚地址串消失  -- water-agplus=false 惠州大亚湾=false 5583930=false
+PASS  XLSX 含 检验员/审核/批准 标签  -- 文本长度=477
+PASS  XLSX 含落值人「系统管理员」
+FACT  XLSX 证据  -- "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\export-OQC-2026-11-0010.xlsx"
+PASS  UI[audited]:PASS 21/FAIL 0  -- D:\workspace\yinjia\tools\archive\_oqc-next\phaseB\ui\audited\ui-audited.json
+PASS  清理:测试单 0 残留(head/detail/status/approval)  -- {"OQC-2026-11-0010":{"head":0,"detail":0,"status":0,"approval":0}}
+PASS  清理:AUTO_ 标记数据 0 残留  -- {"h":0,"a":0}
+
+UI 用例:draft(PASS 19/FAIL 0)  pending2(PASS 22/FAIL 0)  audited(PASS 21/FAIL 0)
+
+RESULT: PASS (PASS 50 / FAIL 0)

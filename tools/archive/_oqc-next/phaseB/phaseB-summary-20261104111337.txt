@@ -1,0 +1,33 @@
+PASS  8091 登录成功(YINJIA-MES)  -- realName=系统管理员 / API=http://127.0.0.1:8091
+PASS  DB 连接且库名符合预期(HSDZ_MES/HSDZ_MES_TEST)  -- HSDZ_MES
+PASS  DB:qc_oqc_head 已有 审批人/审批时间 列  -- 审批人,审批时间
+PASS  元数据:审批人/审批时间已登记 yj_field  -- 检验员,审核人,审核时间,审批人,审批时间
+PASS  元数据:检验员 editable=0(编制格只读)  -- editable=false
+PASS  元数据:审核人/审批人均只读
+PASS  模板已入库:yj_report_template 有 qc_oqc 行且 enabled=Y  -- [{"template_code":"qc_oqc","panel_code":"QC_OQC_REPORT","enabled":"Y","len":"31292"}]
+PASS  报表模板 API 下发 qc_oqc  -- [{"code":"qc_oqc","panelCode":"QC_OQC_REPORT","name":"出厂检验报告","formats":["pdf","xlsx"]}]
+PASS  面板配置:审批人/审批时间字段下发且只读
+PASS  面板配置:检验员 readonly(editable=0 生效)  -- readonly=true
+PASS  新建 OQC 草稿(调用「保存」按钮)  -- code=200 no=OQC-2026-11-0008 msg=success
+FACT  测试单号  -- "OQC-2026-11-0008"
+PASS  草稿已落库(客户/产品/2 行明细)  -- 客户=AUTO_验证客户_20261104111337 明细行=2
+PASS  草稿态 检验员为空(建草稿不写登录账号)  -- 检验员=null
+PASS  草稿态 审核人/审批人为空
+PASS  yj_panel 查询能列出该测试单  -- totalSize=1
+PASS  直接「审核」对 OQC 被拒且提示走两级审批  -- code=409 msg=出厂检验报告走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核
+PASS  直审被拒后单据仍在草稿(未变已审核)
+FAIL  UI[draft]:PASS 18/FAIL 1  -- D:\workspace\yinjia\tools\archive\_oqc-next\phaseB\ui\draft\ui-draft.json
+FAIL  编排过程未抛异常  -- TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at async callButton (file:///D:/workspace/yinjia/tools/archive/_oqc-next/_phaseB.mjs:60:15)
+    at async phaseApproval (file:///D:/workspace/yinjia/tools/archive/_oqc-next/_phaseB.mjs:174:18)
+    at async main (file:///D:/workspace/yinjia/tools/archive/_oqc-next/_phaseB.mjs:301:5)
+FAIL  清理执行(0 残留)  -- RequestError: Incorrect syntax near 'DB_NAME'.
+    at handleError (D:\workspace\yinjia\tests\e2e\node_modules\mssql\lib\tedious\request.js:384:15)
+    at Connection.emit (node:events:519:28)
+    at Connection.emit (D:\workspace\yinjia\tests\e2e\node_modules\tedious\lib\connection.js:959:18)
+    at RequestTokenHandler.onErrorMessage (D:\workspace\yinjia\tests\e2e\node_modules\tedious\lib\token\hand
+
+UI 用例:draft(PASS 18/FAIL 1)
+
+RESULT: FAIL (PASS 17 / FAIL 3)

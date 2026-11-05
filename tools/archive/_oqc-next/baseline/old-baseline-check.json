@@ -1,0 +1,70 @@
+{
+ "title": "OQC 改前基线复核",
+ "startedAt": "2026-11-04T11:05:29.509Z",
+ "endedAt": "2026-11-04T11:05:29.853Z",
+ "pass": 8,
+ "fail": 0,
+ "items": [
+  {
+   "name": "模板注册快照来源",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\baseline\\\\20261104T1857-old-8090\\\\report-templates-baseline.json.txt\""
+  },
+  {
+   "name": "旧环境:面板级 templates API 有 qc_oqc(classpath 注册表)",
+   "ok": true,
+   "detail": "{\"code\":200,\"message\":\"success\",\"data\":[{\"code\":\"qc_oqc\",\"panelCode\":\"QC_OQC_REPORT\",\"name\":\"出厂检验报告\",\"formats\":[\"pdf\",\"xlsx\"]}]}"
+  },
+  {
+   "name": "旧环境:模板管理全量列表无 qc_oqc(当时 DB yj_report_template 无行)",
+   "ok": true,
+   "detail": "{\"code\":200,\"message\":\"success\",\"data\":[{\"id\":1,\"code\":\"so_order\",\"panelCode\":\"SO_ORDER\",\"name\":\"销售订单\",\"enabled\":true,\"updateBy\":null},{\"id\":3,\"code\":\"qc_proc_i"
+  },
+  {
+   "name": "旧版式重渲染件",
+   "ok": null,
+   "detail": "{\"pdf\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\baseline\\\\20261104T1904-old-template-HEAD\\\\old-layout-0003.pdf\",\"pages\":2,\"chars\":2792}"
+  },
+  {
+   "name": "旧版式重渲染:页脚三标记齐全",
+   "ok": true,
+   "detail": "water-agplus=true 惠州大亚湾=true 5583930=true"
+  },
+  {
+   "name": "旧版式重渲染:审核/批准 仍是静态下划线",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "旧版式重渲染:检验员格取头字段值(数据 OQC-2026-11-0003 检验员=admin)",
+   "ok": true,
+   "detail": "检验员：admin审核：________________批准：________________YJ-QR-05/A1惠州大亚湾区龙海二路303号www.water-agplus.cominfo@water-agplus.com0752-5583930打印时间：2026-11-0419:04第2页/共2页"
+  },
+  {
+   "name": "HEAD jrxml 含页脚静态串 water-agplus",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "HEAD jrxml 含静态「审核：________________」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "HEAD jrxml 含静态「批准：________________」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "HEAD jrxml 长度",
+   "ok": null,
+   "detail": "30667"
+  }
+ ],
+ "result": "PASS",
+ "files": {
+  "templateSnapshot": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1857-old-8090\\report-templates-baseline.json.txt",
+  "oldTemplatePdf": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1904-old-template-HEAD\\old-layout-0003.pdf",
+  "oldTemplateJrxml": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1904-old-template-HEAD\\qc_oqc.HEAD.jrxml"
+ }
+}
