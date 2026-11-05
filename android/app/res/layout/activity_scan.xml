@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 扫码页:全屏预览 + 中间取景框提示 + 底部说明 -->
+<!-- 扫码页:全屏预览 + 底部说明 + 「多码选择」面板(2026-11-05 加:一屏多个码时实时累积、可点选) -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -9,6 +9,67 @@
         android:id="@+id/preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <!-- 多码选择面板:不挡取景(只占下半屏),**边扫边加行** ——
+         用户 2026-11-05 反馈「9 个码只弹了 7 个就弹窗」,根因是旧实现弹模态框后就不再解码;
+         现在面板是常驻覆盖层,解码不停,新码自动追加。 -->
+    <LinearLayout
+        android:id="@+id/multiPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:background="#E6000000"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/multiTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="6dp"
+            android:text="已识别 0 个码,点一条选用(继续对准可继续加)"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
+
+        <ScrollView
+            android:id="@+id/multiScroll"
+            android:layout_width="match_parent"
+            android:layout_height="320dp">
+
+            <LinearLayout
+                android:id="@+id/multiList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp">
+
+            <Button
+                android:id="@+id/multiRescan"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="重新扫" />
+
+            <Button
+                android:id="@+id/multiCancel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="取消" />
+        </LinearLayout>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/hint"

@@ -1,7 +1,7 @@
 ﻿# 银嘉 MES · 安卓壳(`android/`)
 
 > **日期**:2026-10-20
-> **产物**:`android/dist/yinjia-mes-1.0.1.apk`(自签名,可直接侧载)
+> **产物**:`android/dist/yinjia-mes-1.0.2.apk`(自签名,可直接侧载)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
 脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
 
-**手机安装**:把 `android/dist/yinjia-mes-1.0.1.apk` 拷到手机点安装(需允许「安装未知应用」)。
+**手机安装**:把 `android/dist/yinjia-mes-1.0.2.apk` 拷到手机点安装(需允许「安装未知应用」)。
 
 > ⚠ 签名是 `debug.keystore`(自签名,脚本首次运行自动生成,不入库)。**内部侧载够用**;
 > 若要上应用市场/企业分发,换成正式 keystore 并妥善保管(丢了就没法覆盖升级)。
@@ -144,3 +144,15 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
   `GenericMultipleBarcodeReader`、`decodeMultiple` 与「扫到 N 个码,请选择」文案;
 - ⚠ 仍属**未真机验证**:多码识别的实际速度取决于机型和镜头距离(标定 1280×720 预览),
   现场若觉得慢,把 `ScanActivity.FRAME_SKIP` 调小(现在 4)。
+### 8.1 第二轮(对着《成型生产任务单》一页 9 个码实测)
+
+> 用户:「实际上是 9 个码,但扫完后就弹出来 7 个码,扫到部分码就弹窗了,而且码和信息很难对应是哪一条的」
+
+- **弹模态框就停了取景解码** ⇒ 只收到先入镜的那几个。现在改成**常驻覆盖面板**(占下半屏,
+  `activity_scan.xml` 的 `multiPanel`):解码**不停**,边扫边往列表里追加,9 个能集齐;
+- 每行**两段**:第一段 `工单 · GD-… 行N`(预判类型 + 关键字段),第二段 = **原始码全文**,
+  和纸上「单据编号」列一致,照着纸就能挑;
+- 面板出现后**不再自动回传**(只有单个码时才连续命中 2 次自动回传);
+- 「重新扫」清空重来;返回键先收面板、再退出;
+- 纸面配套:同一轮把《成型生产任务单》的「单据编号」列定宽并 `nowrap`,
+  不再被折成 `GD-2026-11-001 / 8`(见 `tools/archive/_print-sheet-cols-20261105/`)。

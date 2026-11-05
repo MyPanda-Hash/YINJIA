@@ -120,7 +120,7 @@ export async function printWorkTaskSheet(title, rows) {
       qr = await lib.toDataURL(woQrText(r), { margin: 1, errorCorrectionLevel: 'M' })
     } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
     trs.push('<tr><td>' + (i + 1) + '</td>'
-      + `<td>${esc(r['单据编号'])}</td><td>${esc(r['是否重点管控产品'])}</td>`
+      + `<td class="no">${esc(r['单据编号'])}</td><td>${esc(r['是否重点管控产品'])}</td>`
       + `<td>${esc(r['商品编码'])}</td><td>${esc(r['商品名称'])}</td><td>${esc(r['规格型号'])}</td>`
       + `<td class="r">${esc(fmtNum(r['订单数量']))}</td>`
       + (title === '成型生产任务单' ? `<td class="r">${esc(fmtNum(r['成型折算后数量']))}</td>` : '')
@@ -129,6 +129,14 @@ export async function printWorkTaskSheet(title, rows) {
   }
   const ths = '<th>序号</th><th>单据编号</th><th>是否重点管控产品</th><th>商品编码</th><th>商品名称</th><th>规格型号</th><th>订单数量</th>'
     + (title === '成型生产任务单' ? '<th>成型折算后数量</th>' : '') + '<th>计划完工日期</th><th>二维码</th>'
+  // 🔴 2026-11-05:列宽定死 + 单据编号不折行。
+  //   用户反馈「扫出来的码和信息很难对应是哪一条」——纸面上「GD-2026-11-0018」被
+  //   `word-break:break-all` + 等分列切成「GD-2026-11-001 / 8」,跟扫码列表里的
+  //   单据编号对不上眼。固定列宽后 14% ≈ 39mm,11px 字号放得下完整单号。
+  const colW = title === '成型生产任务单'
+    ? ['4%', '14%', '8%', '9%', '17%', '11%', '7%', '8%', '9%', '13%']
+    : ['4%', '15%', '9%', '10%', '19%', '12%', '8%', '9%', '14%']
+  const colgroup = '<colgroup>' + colW.map((w) => `<col style="width:${w}">`).join('') + '</colgroup>'
   const body = '<style>'
     + '@page{size:A4 landscape;margin:8mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111;font-size:12px}'
@@ -137,10 +145,11 @@ export async function printWorkTaskSheet(title, rows) {
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
     + 'th{background:#f2f2f2;font-weight:600}'
+    + 'td.no{white-space:nowrap;overflow:hidden}'
     + 'td.qr{text-align:center;padding:2px}td.qr img{width:64px;height:64px}'
     + '</style>'
     + '<div class="hd"><span class="t">' + esc(title) + '</span></div>'
-    + '<table><thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
+    + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
   // 🔴 2026-10-19:改走**页面内打印**(与面板单据打印同一条路),不再弹窗。
   //   现场实测:打印工单(哪怕只有 1 张)后整页僵死、刷新无效、只能关标签 —— 弹窗与主页面共用渲染进程,
   //   打印预览/虚拟打印机一卡就一起死。页面内打印走 window.print(),和"打单据"完全一致。
