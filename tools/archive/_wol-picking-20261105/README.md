@@ -41,3 +41,20 @@ YINJIA_SQL_PASS='Yinjia@2026' "$JAVA" -Dstdout.encoding=UTF-8 -cp lib/mssql-jdbc
 - 复跑两库均 `执行 0 / 失败 0`;`DbSync run migrate-drop-wol-picking-perm-20261105.sql` 再跑一遍
   也是 0 行变更(幂等证据)。
 - yj_role_panel.perms 列中文注明已刷新(标明 picking 2026-11-05 起只留给后端端点鉴权)。
+
+## 界面 / 权限设置取证(2026-11-05,Lead 收尾)
+
+`_verify-ui.mjs`(无头 Edge + CDP;**只读**,不改任何数据)在 **5173(源码态)** 与
+**8090(重打 jar 后的打包产物)** 各跑一遍,均 **11/11 PASS**:
+
+| 检查 | 结果 |
+|---|---|
+| 权限设置(接口 `GET /api/sys/role/{id}/panels` 的 WORK_ORDER_LIST.actions) | `view,query,print,close,split,recipe,export,assign,dayplan` —— **无 picking**,矩阵不再有「转领料单」列;其余动作照旧 |
+| 生产工单页按钮条 | `结案/取消结案/结案回正/切单/排产/撤回切单/打印工单/获取混料配方/导出/刷新` —— **无「转领料单」**;列表 11 行照常 |
+| 工单排产 →「排单计划」(勾 2 行) | 打印层 2 行、标题「成型车间排单计划」、正文 **10.5px**、日期列 **3 天 × 6%**、长表头显式换行(生产计划/数量),与新版式一致 |
+
+截图:`ui-workorder-buttons.png`(按钮条)、`ui-plan-sheet.png`(出纸打印层)。
+
+构建/生效:前端 `npm run build` + static 同步 + `mvn package` 由 `tools/scripts/rebuild-prod.ps1`
+一次跑完(8090 已重建并重启,jar 内 static 已含本次前端改动);DB 由 `sync-db.bat` 复核
+`执行 0 / 失败 0`(迁移早已落库)。
