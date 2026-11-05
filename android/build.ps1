@@ -39,7 +39,7 @@ if (-not $javaHome -or -not (Test-Path (Join-Path $javaHome 'bin\javac.exe'))) {
 }
 if (-not $javaHome) { throw '找不到 JDK 25(设 JAVA_HOME)' }
 
-$version = '1.0.2'
+$version = '1.0.3'
 $zxing = Join-Path $proj 'libs\zxing-core-3.5.3.jar'
 if (-not (Test-Path $zxing)) { throw "缺少 ZXing:$zxing(可从 Maven Central 下 core-3.5.3.jar)" }
 
@@ -69,7 +69,7 @@ Write-Host '[3/7] 资源链接 + 生成 R.java(aapt2 link)'
   -R (Join-Path $build 'res.zip') `
   --java (Join-Path $build 'gen') `
   --min-sdk-version 24 --target-sdk-version 34 `
-  --version-code 3 --version-name $version --auto-add-overlay
+  --version-code 4 --version-name $version --auto-add-overlay
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 link 失败' }
 
 Write-Host '[4/7] 编译 Java(javac)'

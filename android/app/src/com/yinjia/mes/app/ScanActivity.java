@@ -26,46 +26,52 @@ import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.PlanarYUVLuminanceSource;
 import com.google.zxing.Result;
+import com.google.zxing.ResultPoint;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.multi.GenericMultipleBarcodeReader;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * 原生扫码页(2026-10-20 建;2026-11-05 两次迭代:一屏多码可选取 → 边扫边累积)。
+ * 原生扫码页(2026-10-20 建;2026-11-05 三轮迭代)。
  *
  * 为什么不用网页里的 getUserMedia:
  *   安卓 WebView 把 http:// 视为**不安全上下文**,`navigator.mediaDevices` 直接不存在
  *   (和 Chrome 一个规则)。工厂内网是 http://IP:8090,没证书 ⇒ 网页调不起摄像头。
- *   所以扫码放在原生层做,解出字符串再回传给网页 —— 网页那边只负责把码填进输入框。
+ *   所以扫码放在原生层做,解出字符串再回传给网页。
  *
  * 支持:QR / CODE_128 / CODE_39 / CODE_93 / EAN_13 / EAN_8 / ITF / DATA_MATRIX。
  * 交互:对准即扫;扫中震动;点屏幕切换手电;返回键取消。
  *
- * <h3>一屏多个码怎么办(用户 2026-11-05 两轮反馈)</h3>
- * 第一轮:「手机扫码遇到多码不能选择」⇒ 改成 {@link GenericMultipleBarcodeReader} 一帧找多个 + 弹选择框。
- * 第二轮(对着《成型生产任务单》一页 9 个码实测):
- * <blockquote>「实际上是 9 个码,但扫完后就弹出来 7 个码,扫到部分码就弹窗了,
- *   而且码和信息很难对应是哪一条的」</blockquote>
- * 根因与改法:
+ * <h3>迭代史(都是现场反馈推着改的)</h3>
  * <ol>
- *   <li><b>弹模态框就停止了取景解码</b> ⇒ 只看到先入镜的那几个。
- *       现在改成**常驻覆盖面板**:不解码暂停,边扫边往列表里追加,9 个能集齐;</li>
- *   <li><b>每行只有「工单 · 号 行N」</b>,纸上一行行长得像,分不清是哪条。
- *       现在每行两段:第一段 = 预判类型 + 关键字段,第二段 = **原始码全文**(和纸上
- *       「单据编号」列、标签上的码一致),照着纸上的编号就能挑;</li>
- *   <li>面板出现后**不再自动回传** —— 一旦出现第二个码,就等用户点选,避免抢跑。</li>
+ *   <li><b>2026-11-05 一轮</b>「手机扫码遇到多码不能选择」⇒ 一帧找多个 + 弹选择框;</li>
+ *   <li><b>二轮</b>「9 个码只弹了 7 个(扫到部分码就弹窗);码和信息很难对应是哪一条」⇒
+ *       ① 模态框改成**常驻面板**(解码不停,边扫边追加);② 每行补**原始码全文**;</li>
+ *   <li><b>三轮(本轮)</b>「下边的提示框能不能按图片里的顺序对应」⇒ 列表改为按**屏幕上
+ *       从上到下、从左到右**排序(用 ZXing 给出的条码中心点),不再按"谁先解出来";
+ *       另加**多选模式**(生成工单领料单页用):勾选多张工单,一次回去批量生单。</li>
  * </ol>
+ *
+ * <h3>排序怎么还原纸面顺序</h3>
+ * 竖屏 + {@code setDisplayOrientation(90)}:缓冲区像素 (x,y) 显示到屏幕上是
+ * (screenX, screenY) = (H-1-y, x)。所以"屏幕行"随 buffer **x 增大**而往下,
+ * "屏幕列"随 buffer **y 增大**而往左 ⇒ 排序键 = (x 升序, y 降序)。
+ * 这样手机对着纸上那一列码时,列表顺序 = 纸上序号顺序(1、2、3…)。
  */
 public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
     private static final String TAG = "YjScan";
 
-    /** 单码场景:同一个码连续命中多少次才自动回传(≈0.3 秒,够快又不会误扫刚入镜的邻码) */
+    /** 单码场景:同一个码连续命中多少次才自动回传(≈0.3 秒) */
     private static final int CONFIRM_HITS = 2;
     /** 每隔几帧解一次(省电;多码解码比单码慢) */
     private static final int FRAME_SKIP = 4;
@@ -78,27 +84,33 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
     private boolean found = false;
     private boolean torchOn = false;
 
-    /** 多码面板(2026-11-05):常驻覆盖层,边扫边加行,不解码暂停 */
+    /** 多码面板 */
     private View multiPanel;
     private TextView multiTitle;
     private LinearLayout multiList;
     private ScrollView multiScroll;
+    private Button btnAll, btnPick, btnRescan;
+
+    /** 多选模式(生成工单领料/退料单页):勾选多张工单,一次回传多个码 */
+    private boolean multiMode = false;
 
     private final MultiFormatReader reader = new MultiFormatReader();
     private GenericMultipleBarcodeReader multi;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private int frameSkip = 0;
 
-    /** 候选码(按发现顺序):text → {命中次数, 码型} */
+    /** 候选:码文本 → {命中数, 码型, 中心点(缓冲区坐标)} */
     private final Map<String, Cand> cands = new LinkedHashMap<String, Cand>();
-    private final List<String> order = new ArrayList<String>();
-    /** 面板是否已显示(显示后不再自动回传,一律等用户点) */
+    /** 已勾选的码(仅多选模式用;默认全选) */
+    private final Set<String> picked = new HashSet<String>();
     private boolean panelShown = false;
 
     private static class Cand {
         int hits;
         BarcodeFormat format;
-        Cand(BarcodeFormat f) { this.format = f; this.hits = 0; }
+        float px;
+        float py;
+        Cand(BarcodeFormat f) { this.format = f; }
     }
 
     @Override
@@ -107,15 +119,25 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(com.yinjia.mes.app.R.layout.activity_scan);
 
+        multiMode = getIntent() != null && getIntent().getBooleanExtra("multi", false);
+
         surface = (SurfaceView) findViewById(com.yinjia.mes.app.R.id.preview);
         hint = (TextView) findViewById(com.yinjia.mes.app.R.id.hint);
         multiPanel = findViewById(com.yinjia.mes.app.R.id.multiPanel);
         multiTitle = (TextView) findViewById(com.yinjia.mes.app.R.id.multiTitle);
         multiList = (LinearLayout) findViewById(com.yinjia.mes.app.R.id.multiList);
         multiScroll = (ScrollView) findViewById(com.yinjia.mes.app.R.id.multiScroll);
+        btnAll = (Button) findViewById(com.yinjia.mes.app.R.id.multiAll);
+        btnPick = (Button) findViewById(com.yinjia.mes.app.R.id.multiPick);
+        btnRescan = (Button) findViewById(com.yinjia.mes.app.R.id.multiRescan);
 
-        Button rescan = (Button) findViewById(com.yinjia.mes.app.R.id.multiRescan);
-        rescan.setOnClickListener(new View.OnClickListener() {
+        btnAll.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { toggleAll(); }
+        });
+        btnPick.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { returnPicked(); }
+        });
+        btnRescan.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { restartScan(); }
         });
         Button cancel = (Button) findViewById(com.yinjia.mes.app.R.id.multiCancel);
@@ -141,13 +163,15 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
         hints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
         reader.setHints(hints);
-        // 多码阅读器:内部先对整图调 delegate.decode,再对四个象限递归 —— 单码也走这条路
         multi = new GenericMultipleBarcodeReader(reader);
 
-        // 点屏幕:手电开关(仓库光线差时用)
         surface.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { toggleTorch(); }
         });
+
+        hint.setText(multiMode
+                ? "对准整张任务单:可一次扫多个码,勾选后点『生成』"
+                : "对准二维码 / 条形码;点屏幕开关手电;返回键取消");
     }
 
     private void toggleTorch() {
@@ -182,7 +206,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             camera.setPreviewDisplay(h);
             camera.setPreviewCallback(new Camera.PreviewCallback() {
                 @Override public void onPreviewFrame(byte[] data, Camera cam) {
-                    // ⚠ 多码面板打开时**也要继续解码**(2026-11-05 修:旧版暂停解码导致"9 个只收到 7 个")
+                    // 面板打开时也**继续解码**(2026-11-05 修:旧版暂停导致"9 个只收到 7 个")
                     if (decoding || found || data == null) return;
                     if ((frameSkip++ % FRAME_SKIP) != 0) return;
                     decoding = true;
@@ -207,7 +231,6 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         if (sizes == null || sizes.isEmpty()) return null;
         Camera.Size best = sizes.get(0);
         for (Camera.Size s : sizes) {
-            // 目标 1280×720 左右:分辨率够解码,又不至于太慢
             boolean better = Math.abs(s.width * s.height - 1280 * 720) < Math.abs(best.width * best.height - 1280 * 720);
             if (better) best = s;
         }
@@ -223,15 +246,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         }); } catch (Exception ignore) { }
     }
 
-    /**
-     * 解一帧:一次找**多个**码,结果累积到 {@link #cands}。
-     *
-     * <ul>
-     *   <li>累计到第 2 个不同码 ⇒ 弹出多码面板(**不暂停解码**,后面扫到的继续追加);</li>
-     *   <li>只有 1 个码且面板没弹出 ⇒ 连续命中 {@link #CONFIRM_HITS} 次自动回传;</li>
-     *   <li>面板已显示 ⇒ 一律等用户点,绝不自动回传。</li>
-     * </ul>
-     */
+    /** 解一帧:一次找多个码,结果累积;≥2 个就进面板(不暂停),单码且面板没开就自动回传 */
     private void decode(byte[] data, int width, int height) {
         PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(data, width, height, 0, 0, width, height, false);
         BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
@@ -245,82 +260,148 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         }
         if (results == null || results.length == 0) return;
 
-        // 一帧内的去重(同一个码可能被整图+象限各解一次)
-        LinkedHashMap<String, BarcodeFormat> frame = new LinkedHashMap<String, BarcodeFormat>();
-        for (Result r : results) {
-            if (r == null) continue;
-            String text = r.getText();
-            if (text == null) continue;
-            text = text.trim();
-            if (text.length() == 0) continue;
-            if (!frame.containsKey(text)) frame.put(text, r.getBarcodeFormat());
-        }
-        if (frame.isEmpty()) return;
-
         boolean added = false;
         synchronized (cands) {
-            for (Map.Entry<String, BarcodeFormat> e : frame.entrySet()) {
-                Cand c = cands.get(e.getKey());
+            for (Result r : results) {
+                if (r == null) continue;
+                String text = r.getText();
+                if (text == null) continue;
+                text = text.trim();
+                if (text.length() == 0) continue;
+
+                Cand c = cands.get(text);
                 if (c == null) {
-                    c = new Cand(e.getValue());
-                    cands.put(e.getKey(), c);
-                    order.add(e.getKey());
+                    c = new Cand(r.getBarcodeFormat());
+                    cands.put(text, c);
+                    picked.add(text);           // 多选模式默认全选
                     added = true;
                 }
-                c.format = e.getValue();
+                c.format = r.getBarcodeFormat();
                 c.hits++;
+                // 记中心点(缓冲区坐标),用于"按屏幕顺序"排序
+                float[] ctr = centerOf(r);
+                if (ctr != null) { c.px = ctr[0]; c.py = ctr[1]; }
             }
 
-            // ② 有第二个码 ⇒ 常驻面板(解码继续,后面扫到的自动追加)
-            if (order.size() >= 2) {
+            if (cands.size() >= 2) {
                 if (!panelShown) { panelShown = true; vibrate(80); }
                 if (added) refreshPanel();
                 return;
             }
-
-            // ① 只有 1 个码、面板没弹 ⇒ 连续命中就回传
             if (!panelShown) {
-                String only = frame.keySet().iterator().next();
+                String only = cands.keySet().iterator().next();
                 Cand c = cands.get(only);
                 if (c != null && c.hits >= CONFIRM_HITS) onDecoded(only);
             }
         }
     }
 
-    /** 把当前累积的码刷进面板(边扫边加行,2026-11-05) */
+    /** 码在图像里的中心点;取不到返回 null */
+    private static float[] centerOf(Result r) {
+        try {
+            ResultPoint[] pts = r.getResultPoints();
+            if (pts == null || pts.length == 0) return null;
+            float sx = 0, sy = 0;
+            int n = 0;
+            for (ResultPoint p : pts) {
+                if (p == null) continue;
+                sx += p.getX();
+                sy += p.getY();
+                n++;
+            }
+            if (n == 0) return null;
+            return new float[] { sx / n, sy / n };
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * 当前候选按**屏幕顺序**排:上→下、左→右(2026-11-05 第三轮用户口径「按图片里的顺序对应」)。
+     *
+     * <p>竖屏 + displayOrientation(90):buffer(x,y) → screenX = H-1-y、screenY = x,
+     * 所以屏幕行随 **x 增大**,屏幕列随 **y 增大而变左** ⇒ 排序键 (x↑, y↓)。
+     * 这样手机对着纸上那一列码,列表顺序与纸上序号一致。
+     */
+    private List<String> sortedCodes() {
+        List<String> list = new ArrayList<String>(cands.keySet());
+        Collections.sort(list, new Comparator<String>() {
+            @Override public int compare(String a, String b) {
+                Cand ca = cands.get(a), cb = cands.get(b);
+                float ax = ca == null ? 0 : ca.px, ay = ca == null ? 0 : ca.py;
+                float bx = cb == null ? 0 : cb.px, by = cb == null ? 0 : cb.py;
+                if (Math.abs(ax - bx) > 24f) return ax < bx ? -1 : 1;   // 不同行:上→下
+                if (Math.abs(ay - by) > 8f) return ay > by ? -1 : 1;    // 同一行:右→左(y 大 = 屏左)
+                return a.compareTo(b);
+            }
+        });
+        return list;
+    }
+
+    /** 把当前候选刷进面板(边扫边加行) */
     private void refreshPanel() {
-        final List<String> snapshot = new ArrayList<String>(order);
+        final List<String> snapshot = sortedCodes();
         ui.post(new Runnable() {
             @Override public void run() {
                 multiPanel.setVisibility(View.VISIBLE);
-                multiTitle.setText("已识别 " + snapshot.size() + " 个码 · 点一条选用(继续对准会自动加)");
-                hint.setText("可以在下面点选,也可以继续对准让更多码进来");
+                int n = snapshot.size();
+                if (multiMode) {
+                    multiTitle.setText("已识别 " + n + " 个码 · 已选 " + picked.size() + " 个(默认全选,点一行可取消)");
+                    hint.setText("勾选要生成工单领料单的工单,点右下『生成』");
+                } else {
+                    multiTitle.setText("已识别 " + n + " 个码 · 按纸面顺序排列,点一条选用");
+                    hint.setText("可以在下面点选,也可以继续对准让更多码进来");
+                }
+                btnAll.setVisibility(multiMode ? View.VISIBLE : View.GONE);
+                btnPick.setVisibility(multiMode ? View.VISIBLE : View.GONE);
+                btnPick.setText("生成(" + picked.size() + ")");
+                btnAll.setText(picked.size() >= n ? "全不选" : "全选");
+
                 multiList.removeAllViews();
-                for (int i = 0; i < snapshot.size(); i++) {
+                for (int i = 0; i < n; i++) {
                     final String code = snapshot.get(i);
-                    final int no = i + 1;
+                    final boolean on = picked.contains(code);
                     LinearLayout row = new LinearLayout(ScanActivity.this);
-                    row.setOrientation(LinearLayout.VERTICAL);
-                    row.setPadding(dp(16), dp(10), dp(16), dp(10));
-                    row.setBackgroundColor(Color.parseColor("#1AFFFFFF"));
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setPadding(dp(12), dp(10), dp(12), dp(10));
+                    row.setBackgroundColor(Color.parseColor(on ? "#3322AA55" : "#1AFFFFFF"));
+
+                    TextView mark = new TextView(ScanActivity.this);
+                    mark.setText(multiMode ? (on ? "☑" : "☐") : (i + 1) + ".");
+                    mark.setTextColor(Color.WHITE);
+                    mark.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+                    mark.setPadding(0, 0, dp(8), 0);
+                    row.addView(mark);
+
+                    LinearLayout col = new LinearLayout(ScanActivity.this);
+                    col.setOrientation(LinearLayout.VERTICAL);
 
                     TextView t1 = new TextView(ScanActivity.this);
-                    t1.setText(no + ". " + describe(code));
+                    // 序号用纸面顺序(=屏幕顺序);后面跟预判类型 + 关键字段
+                    t1.setText((i + 1) + ". " + describe(code));
                     t1.setTextColor(Color.WHITE);
                     t1.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-                    row.addView(t1);
+                    col.addView(t1);
 
-                    // 第二行显示原始码全文 —— 照纸上的「单据编号」/标签上的码就能对上号
                     TextView t2 = new TextView(ScanActivity.this);
-                    t2.setText(code);
+                    t2.setText(code);   // 原始码全文,便于和纸上「单据编号」核对
                     t2.setTextColor(Color.parseColor("#B3FFFFFF"));
                     t2.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-                    row.addView(t2);
+                    col.addView(t2);
 
+                    row.addView(col);
                     row.setOnClickListener(new View.OnClickListener() {
-                        @Override public void onClick(View v) { onDecoded(code); }
+                        @Override public void onClick(View v) {
+                            if (multiMode) {
+                                if (picked.contains(code)) picked.remove(code); else picked.add(code);
+                                refreshPanel();
+                            } else {
+                                onDecoded(code);
+                            }
+                        }
                     });
                     multiList.addView(row);
+
                     View divider = new View(ScanActivity.this);
                     divider.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
                     divider.setBackgroundColor(Color.parseColor("#33FFFFFF"));
@@ -333,29 +414,53 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         });
     }
 
-    /** 清空候选、收起面板,继续扫(「重新扫」按钮) */
+    /** 全选 / 全不选 */
+    private void toggleAll() {
+        synchronized (cands) {
+            if (picked.size() >= cands.size()) picked.clear();
+            else picked.addAll(cands.keySet());
+        }
+        refreshPanel();
+    }
+
+    /** 多选模式:把勾选的码一次回传(生成工单领料/退料单页据此批量入队) */
+    private void returnPicked() {
+        List<String> out = new ArrayList<String>();
+        synchronized (cands) {
+            for (String c : sortedCodes()) if (picked.contains(c)) out.add(c);
+        }
+        if (out.isEmpty()) {
+            hint.setText("还没勾选任何码:点一行勾上,或点『全选』");
+            return;
+        }
+        found = true;
+        vibrate(60);
+        Intent data = new Intent();
+        data.putStringArrayListExtra("codes", new ArrayList<String>(out));
+        setResult(RESULT_OK, data);
+        finish();
+    }
+
+    /** 清空候选、收起面板,继续扫 */
     private void restartScan() {
         synchronized (cands) {
             cands.clear();
-            order.clear();
+            picked.clear();
         }
         panelShown = false;
         multiPanel.setVisibility(View.GONE);
         multiList.removeAllViews();
         frameSkip = 0;
-        hint.setText("对准二维码 / 条形码;点屏幕开关手电;返回键取消");
+        hint.setText(multiMode
+                ? "对准整张任务单:可一次扫多个码,勾选后点『生成』"
+                : "对准二维码 / 条形码;点屏幕开关手电;返回键取消");
     }
 
     private int dp(int v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    /**
-     * 把码翻译成人看得懂的一行(工单/物料 + 关键字段),给面板用。
-     *
-     * <p>码型口径与网页 `scanCode.js` 一致:`0@GD-2026-10-0221@1001`(**1000+行号**)、
-     * `0@YJ-ZZ-001`(物料)、`0@YJ-ZZ-001@20261021`(物料 + 批次);老标签用 `|` 分隔。
-     */
+    /** 码 → 人看得懂的一行(工单/物料 + 关键字段),口径与网页 scanCode.js 一致 */
     private static String describe(String text) {
         String kind = "码";
         String detail = text;
@@ -366,7 +471,6 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             for (String s : segs) {
                 if (s != null && s.trim().length() > 0) parts.add(s.trim());
             }
-            // 首段是 ≤3 位纯数字的占位(典型就是 0),丢掉
             if (parts.size() > 1 && parts.get(0).matches("^\\d{1,3}$")) parts.remove(0);
             if (!parts.isEmpty()) {
                 String first = parts.get(0);
@@ -385,7 +489,6 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
                     kind = "物料";
                     detail = first + " 批号 " + parts.get(1);
                 } else {
-                    kind = "码";
                     detail = first;
                 }
             }
@@ -400,6 +503,7 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         } catch (Exception ignore) { }
     }
 
+    /** 单码模式:回传这一个码 */
     private void onDecoded(final String text) {
         if (found || text == null || text.trim().length() == 0) return;
         found = true;
@@ -417,7 +521,6 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     public void onBackPressed() {
-        // 面板开着时,返回键先收起面板(不直接退出扫码页)
         if (panelShown) { restartScan(); return; }
         setResult(RESULT_CANCELED);
         super.onBackPressed();

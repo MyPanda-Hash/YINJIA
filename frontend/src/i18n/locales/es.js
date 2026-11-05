@@ -2685,6 +2685,14 @@ export default {
     'A4 横 297×210(内容大小不变)': 'A4 horizontal 297×210 (tamaño del contenido sin cambios)',
     '纸张已改为': 'Papel cambiado a',
     '(内容大小不变)': '(tamaño del contenido sin cambios)',
+    '扫多张': 'Escanear varios',
+    '「扫多张」= 一次扫多个工单码(按纸面顺序列出、可勾选),它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '«Escanear varios» = lee varios códigos de OT a la vez (en el orden de la hoja, seleccionables); van a la cola inferior y con «Crear por lote» se crea un vale por OT',
+    '已加入': 'Añadidos',
+    '张工单': 'órdenes',
+    '跳过': 'omitidos',
+    '没有可加入的工单码': 'No hay códigos de OT utilizables',
+    '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Esta versión no admite escaneo múltiple: actualice a 1.0.2 o superior',
+    '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Busca el BOM de ensamble del producto de la línea, crea un vale de retirada y uno de devolución (cant. 0) e imprime el QR una vez',
   },
 
 }

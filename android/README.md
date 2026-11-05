@@ -1,7 +1,7 @@
 ﻿# 银嘉 MES · 安卓壳(`android/`)
 
 > **日期**:2026-10-20
-> **产物**:`android/dist/yinjia-mes-1.0.2.apk`(自签名,可直接侧载)
+> **产物**:`android/dist/yinjia-mes-1.0.3.apk`(自签名,可直接侧载)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
 脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
 
-**手机安装**:把 `android/dist/yinjia-mes-1.0.2.apk` 拷到手机点安装(需允许「安装未知应用」)。
+**手机安装**:把 `android/dist/yinjia-mes-1.0.3.apk` 拷到手机点安装(需允许「安装未知应用」)。
 
 > ⚠ 签名是 `debug.keystore`(自签名,脚本首次运行自动生成,不入库)。**内部侧载够用**;
 > 若要上应用市场/企业分发,换成正式 keystore 并妥善保管(丢了就没法覆盖升级)。
@@ -156,3 +156,19 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 - 「重新扫」清空重来;返回键先收面板、再退出;
 - 纸面配套:同一轮把《成型生产任务单》的「单据编号」列定宽并 `nowrap`,
   不再被折成 `GD-2026-11-001 / 8`(见 `tools/archive/_print-sheet-cols-20261105/`)。
+### 8.2 第三轮(2026-11-05):按纸面顺序排列 + 多选扫码
+
+> 用户:「下边的提示框能不能实现,按照图片中的顺序来对应的。生成工单领料和退料单
+> 这个界面的扫码能不能支持多选。可以多个订单生成一对一的领料单。」
+
+- **按纸面顺序**:列表不再按"谁先解出来"排,改成按条码在画面里的位置
+  (上→下、左→右)排 —— 竖屏 `setDisplayOrientation(90)` 下 buffer(x,y) 映射到
+  屏幕是 `(H-1-y, x)`,故排序键 = (x 升序, y 降序)。手机对着纸上那一列码,
+  列表顺序就等于纸上序号;
+- **多选扫码**:新增原生方法 `YjNative.scanMulti()`,以 `multi` 模式打开扫码页 ——
+  面板每行可勾选(默认全选)、有「全选 / 重扫 / 取消」,确认后一次回传
+  `window.__yjScanResultMulti([...])`;
+- **网页侧**(「生成工单领料/退料单」页):多一个「扫多张」按钮(仅新版 APK 显示),
+  勾选的码逐个解析成「工单号 + 行号」进待生成队列(重复的跳过并报数),
+  再点「批量生成」——后端 `/create/batch` 本来就是**一张工单一对领料/退料单**;
+- 版本:`1.0.3`(versionCode 4)。旧 APK 里没有 `scanMulti` ⇒ 按钮不出现(不会报错)。

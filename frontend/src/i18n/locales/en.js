@@ -5414,6 +5414,12 @@ export default {
     'A4 横 297×210(内容大小不变)': 'A4 landscape 297×210 (content size unchanged)',
     '纸张已改为': 'Paper changed to',
     '(内容大小不变)': '(content size unchanged)',
+    '扫多张': 'Scan many',
+    '「扫多张」= 一次扫多个工单码(按纸面顺序列出、可勾选),它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '"Scan many" = scan several work-order codes at once (listed in sheet order, tick to choose); they all go into the pending queue below, then tap "Batch create" to create one slip per work order',
+    '已加入': 'Added',
+    '没有可加入的工单码': 'No usable work-order code found',
+    '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'This app version cannot scan multiple codes: please upgrade to 1.0.2 or later',
+    '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Looks up the Assembly BOM for that line\'s product, creates one picking slip and one return slip (return qty 0), and auto-prints the work-order QR once',
   },
 
 }

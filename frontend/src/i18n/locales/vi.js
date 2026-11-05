@@ -2690,6 +2690,14 @@ export default {
     'A4 横 297×210(内容大小不变)': 'A4 ngang 297×210 (kích thước nội dung giữ nguyên)',
     '纸张已改为': 'Đã đổi khổ giấy sang',
     '(内容大小不变)': '(kích thước nội dung giữ nguyên)',
+    '扫多张': 'Quét nhiều',
+    '「扫多张」= 一次扫多个工单码(按纸面顺序列出、可勾选),它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '"Quét nhiều" = quét nhiều mã lệnh sản xuất cùng lúc (theo thứ tự trên giấy, chọn được); vào hàng đợi bên dưới, bấm "Tạo hàng loạt" để tạo phiếu từng lệnh',
+    '已加入': 'Đã thêm',
+    '张工单': 'lệnh',
+    '跳过': 'bỏ qua',
+    '没有可加入的工单码': 'Không có mã lệnh sản xuất dùng được',
+    '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Bản app này không hỗ trợ quét nhiều: vui lòng nâng lên 1.0.2 trở lên',
+    '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Lấy BOM lắp ráp, tạo phiếu xuất và phiếu trả (số lượng 0) và in mã QR một lần',
   },
 
 }

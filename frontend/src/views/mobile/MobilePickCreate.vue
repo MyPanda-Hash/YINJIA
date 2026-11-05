@@ -52,9 +52,17 @@
         />
         <el-button size="large" @click="addQueue">{{ tt('添加') }}</el-button>
         <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
+        <!-- 多选扫码(2026-11-05 用户口径「这个界面的扫码能不能支持多选,可以多个订单生成一对一的领料单」):
+             一次扫一沓工单码,勾选后整批进待生成队列,点「批量生成」就是一张工单一对领料/退料单。 -->
+        <el-button v-if="nativeMultiScan" size="large" type="primary" plain @click="scanMultiInto">
+          {{ tt('扫多张') }}
+        </el-button>
       </div>
       <div class="mp-hint">
         {{ tt('按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码') }}
+      </div>
+      <div v-if="nativeMultiScan" class="mp-hint">
+        {{ tt('「扫多张」= 一次扫多个工单码(按纸面顺序列出、可勾选),它们会一起进下面的待生成队列,再点「批量生成」逐张建单') }}
       </div>
 
       <!-- 待生成队列 -->
@@ -329,6 +337,8 @@ const drawerSize = computed(() => (winW.value <= 640 ? '100%' : '620px'))
 function onWinResize() { winW.value = window.innerWidth }
 
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
+/** 多选扫码(2026-11-05):只有新版 APK 才有 scanMulti;旧 APK / 浏览器里不显示这个按钮 */
+const nativeMultiScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scanMulti)
 const baseUrl = (() => {
   try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
 })()
@@ -413,8 +423,43 @@ onMounted(() => {
 /** 本页的扫码回调(具名,便于按引用撤销别人的绑定) */
 function onScanResult(code, ok) { if (ok && code) applyScan(code) }
 
+/**
+ * 多选扫码回调(2026-11-05):原生一次带回多个码 → 逐个解析成「工单号 + 行号」进待生成队列。
+ *
+ * <p>用户口径:「生成工单领料和退料单这个界面的扫码能不能支持多选,可以多个订单
+ * 生成一对一的领料单」—— 这里只负责**排队**;真正建单仍是后面的「批量生成」
+ * (后端 `/create/batch` 逐张独立生成,失败的点名,不会整批回滚)。
+ *
+ * <p>重复的(同工单号+行号已在队列里)静默跳过,并报一声"跳过了几张"。
+ */
+function onScanMultiResult(codes) {
+  const list = Array.isArray(codes) ? codes : []
+  clearMsg()
+  if (!list.length) return
+  let added = 0
+  let skipped = 0
+  for (const raw of list) {
+    const p = parseWorkOrderCode(String(raw || '').trim())
+    if (!p.ok) { skipped++; continue }
+    const dup = queue.value.some((q) => q.woNo === p.wo && q.line === (Number(p.line) || 0))
+    if (dup) { skipped++; continue }
+    queue.value.push({ woNo: p.wo, line: Number(p.line) || 0 })
+    added++
+  }
+  woText.value = ''
+  if (added) {
+    okText.value = `${tt('已加入')} ${added} ${tt('张工单')}${skipped ? ' · ' + tt('跳过') + ' ' + skipped : ''}`
+  } else {
+    errText.value = tt('没有可加入的工单码')
+  }
+  nextTick(() => woInput.value?.focus?.())
+}
+
 function bindScan() {
-  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
+  if (typeof window !== 'undefined') {
+    window.__yjScanResult = onScanResult
+    window.__yjScanResultMulti = onScanMultiResult
+  }
 }
 
 /**
@@ -434,11 +479,17 @@ onActivated(() => {
 })
 
 onDeactivated(() => {
-  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+  try {
+    if (window.__yjScanResult === onScanResult) delete window.__yjScanResult
+    if (window.__yjScanResultMulti === onScanMultiResult) delete window.__yjScanResultMulti
+  } catch { /* ignore */ }
 })
 
 onBeforeUnmount(() => {
-  try { if (window.__yjScanResult === onScanResult) delete window.__yjScanResult } catch { /* ignore */ }
+  try {
+    if (window.__yjScanResult === onScanResult) delete window.__yjScanResult
+    if (window.__yjScanResultMulti === onScanMultiResult) delete window.__yjScanResultMulti
+  } catch { /* ignore */ }
   window.removeEventListener('resize', onWinResize)
 })
 
@@ -456,6 +507,15 @@ function scanInto() {
     return
   }
   try { window.YjNative.scan() } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
+}
+
+/** 多选扫码:一次扫多个工单码(需要新版 APK 的 scanMulti;老版本给一句人话提示) */
+function scanMultiInto() {
+  if (!(window.YjNative && typeof window.YjNative.scanMulti === 'function')) {
+    errText.value = tt('当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上')
+    return
+  }
+  try { window.YjNative.scanMulti() } catch { errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
 }
 
 /** 扫到的工单码 → 解析工单号 + 行号 → 进队列 */

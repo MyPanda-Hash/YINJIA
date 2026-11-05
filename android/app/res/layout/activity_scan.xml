@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 扫码页:全屏预览 + 底部说明 + 「多码选择」面板(2026-11-05 加:一屏多个码时实时累积、可点选) -->
+<!-- 扫码页:全屏预览 + 底部说明 + 「多码选择」面板
+     2026-11-05 第三轮:面板增加「全选 / 生成(N)」—— 多选模式用于
+     「生成工单领料/退料单」页一次扫多张工单、勾选后批量生单。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -10,9 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- 多码选择面板:不挡取景(只占下半屏),**边扫边加行** ——
-         用户 2026-11-05 反馈「9 个码只弹了 7 个就弹窗」,根因是旧实现弹模态框后就不再解码;
-         现在面板是常驻覆盖层,解码不停,新码自动追加。 -->
+    <!-- 多码面板:不挡取景(占下半屏),边扫边加行,新码自动追加 -->
     <LinearLayout
         android:id="@+id/multiPanel"
         android:layout_width="match_parent"
@@ -31,7 +31,7 @@
             android:paddingLeft="16dp"
             android:paddingRight="16dp"
             android:paddingBottom="6dp"
-            android:text="已识别 0 个码,点一条选用(继续对准可继续加)"
+            android:text="已识别 0 个码"
             android:textSize="15sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF" />
@@ -39,7 +39,7 @@
         <ScrollView
             android:id="@+id/multiScroll"
             android:layout_width="match_parent"
-            android:layout_height="320dp">
+            android:layout_height="300dp">
 
             <LinearLayout
                 android:id="@+id/multiList"
@@ -52,21 +52,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp">
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:paddingTop="4dp">
+
+            <Button
+                android:id="@+id/multiAll"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="13sp"
+                android:text="全选" />
+
+            <Button
+                android:id="@+id/multiPick"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="13sp"
+                android:text="生成" />
 
             <Button
                 android:id="@+id/multiRescan"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="重新扫" />
+                android:textSize="13sp"
+                android:text="重扫" />
 
             <Button
                 android:id="@+id/multiCancel"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:textSize="13sp"
                 android:text="取消" />
         </LinearLayout>
     </LinearLayout>

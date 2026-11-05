@@ -2685,6 +2685,14 @@ export default {
     'A4 横 297×210(内容大小不变)': 'A4 paysage 297×210 (taille du contenu inchangée)',
     '纸张已改为': 'Papier changé en',
     '(内容大小不变)': '(taille du contenu inchangée)',
+    '扫多张': 'Scanner plusieurs',
+    '「扫多张」= 一次扫多个工单码(按纸面顺序列出、可勾选),它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '« Scanner plusieurs » = lit plusieurs codes d\'OF (dans l\'ordre de la feuille, cochables) ; ils vont dans la file ci-dessous, puis « Créer par lot » fait un bon par OF',
+    '已加入': 'Ajoutés',
+    '张工单': 'OF',
+    '跳过': 'ignorés',
+    '没有可加入的工单码': 'Aucun code d\'OF exploitable',
+    '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Cette version ne gère pas le scan multiple : passez à 1.0.2 ou plus',
+    '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Recherche la nomenclature d\'assemblage, crée un bon de prélèvement et un de retour (qté 0) et imprime le QR une fois',
   },
 
 }
