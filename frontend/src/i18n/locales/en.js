@@ -925,8 +925,6 @@ export default {
     //   2026-11-03:只打**勾选行**(勾几张打几张),未勾选按钮置灰;
     //   2026-11-04:纸表标题/车间列头随工序产线(成型/切炭/组装…)动态,纸面文字不入翻译层
     '排单计划': 'Scheduling Plan',
-    // 报工抵扣重摊(2026-11-05):历史格没报工的计划量不占用排产数量(已后移)
-    '未报工部分已后移到今天以后(不再占用排产数量)': 'Unreported quantity has been moved to today or later (no longer counts against the scheduled quantity)',
     // 排单计划打印设置(2026-11-05 客户口径:打印只显示 3~4 天,天数自己设)
     '排单计划打印设置': 'Scheduling plan print settings',
     '排单计划打印设置(默认打印天数)': 'Scheduling plan print settings (default print days)',
