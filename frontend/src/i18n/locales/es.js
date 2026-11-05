@@ -2680,6 +2680,11 @@ export default {
     '请先填站点名': 'Escriba primero el nombre del puesto',
     '已经有同名电脑了': 'Ya existe un equipo con ese nombre',
     '已登记:等那台电脑的打印代理连上来就会显示在线': 'Registrado: pasará a en línea cuando se conecte el agente de ese equipo',
+    '纸张': 'Papel',
+    'A5 · 中一刀 210×148.5 横': 'A5 · medio corte 210×148.5 horizontal',
+    'A4 横 297×210(内容大小不变)': 'A4 horizontal 297×210 (tamaño del contenido sin cambios)',
+    '纸张已改为': 'Papel cambiado a',
+    '(内容大小不变)': '(tamaño del contenido sin cambios)',
   },
 
 }

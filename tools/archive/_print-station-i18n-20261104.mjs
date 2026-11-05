@@ -114,6 +114,13 @@ const ROWS = [
   ['请先填站点名', 'Enter a station name first', '先にステーション名を入力してください', '먼저 스테이션 이름을 입력하세요', 'Escriba primero el nombre del puesto', 'Saisissez d\'abord un nom de poste', 'Bitte zuerst den Stationsnamen eingeben', 'Сначала введите имя станции', 'Vui lòng nhập tên trạm trước', 'กรุณาใส่ชื่อสถานีก่อน'],
   ['已经有同名电脑了', 'A computer with this name already exists', '同名のパソコンが既にあります', '같은 이름의 PC가 이미 있습니다', 'Ya existe un equipo con ese nombre', 'Un poste de ce nom existe déjà', 'Ein Rechner mit diesem Namen existiert bereits', 'Компьютер с таким именем уже есть', 'Đã có máy trùng tên', 'มีเครื่องชื่อนี้อยู่แล้ว'],
   ['已登记:等那台电脑的打印代理连上来就会显示在线', 'Registered: it turns online once that computer\'s print agent connects', '登録しました。そのパソコンのエージェントが接続するとオンラインになります', '등록했습니다. 해당 PC의 에이전트가 연결되면 온라인이 됩니다', 'Registrado: pasará a en línea cuando se conecte el agente de ese equipo', 'Enregistré : la ligne passera en ligne dès que l\'agent se connectera', 'Registriert: wird online, sobald der Agent dort verbindet', 'Зарегистрировано: станет онлайн, когда агент подключится', 'Đã đăng ký: sẽ online khi agent của máy đó kết nối', 'ลงทะเบียนแล้ว จะเป็นออนไลน์เมื่อเอเจนต์ของเครื่องนั้นเชื่อมต่อ'],
+
+  // ── 2026-11-05 第四轮:按电脑设「纸张」(只换纸不缩放)──
+  ['纸张', 'Paper', '用紙', '용지', 'Papel', 'Papier', 'Papier', 'Бумага', 'Khổ giấy', 'กระดาษ'],
+  ['A5 · 中一刀 210×148.5 横', 'A5 · half-cut 210×148.5 landscape', 'A5 · 中一刀 210×148.5 横', 'A5 · 중도절단 210×148.5 가로', 'A5 · medio corte 210×148.5 horizontal', 'A5 · demi-coupe 210×148.5 paysage', 'A5 · halber Schnitt 210×148.5 quer', 'A5 · половинный рез 210×148.5 альбомная', 'A5 · cắt đôi 210×148.5 ngang', 'A5 · ครึ่งแผ่น 210×148.5 แนวนอน'],
+  ['A4 横 297×210(内容大小不变)', 'A4 landscape 297×210 (content size unchanged)', 'A4 横 297×210(内容サイズは変わらない)', 'A4 가로 297×210(내용 크기 동일)', 'A4 horizontal 297×210 (tamaño del contenido sin cambios)', 'A4 paysage 297×210 (taille du contenu inchangée)', 'A4 quer 297×210 (Inhalt unverändert)', 'A4 альбомная 297×210 (размер содержимого не меняется)', 'A4 ngang 297×210 (kích thước nội dung giữ nguyên)', 'A4 แนวนอน 297×210 (ขนาดเนื้อหาเท่าเดิม)'],
+  ['纸张已改为', 'Paper changed to', '用紙を変更:', '용지를 변경:', 'Papel cambiado a', 'Papier changé en', 'Papier geändert auf', 'Бумага изменена на', 'Đã đổi khổ giấy sang', 'เปลี่ยนกระดาษเป็น'],
+  ['(内容大小不变)', '(content size unchanged)', '(内容サイズは変わらない)', '(내용 크기 동일)', '(tamaño del contenido sin cambios)', '(taille du contenu inchangée)', '(Inhalt unverändert)', '(размер содержимого не меняется)', '(kích thước nội dung giữ nguyên)', '(ขนาดเนื้อหาเท่าเดิม)'],
 ]
 
 const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")

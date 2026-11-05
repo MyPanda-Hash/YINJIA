@@ -124,14 +124,20 @@ export async function fetchStationState() {
 }
 
 /**
- * 保存**某一台打印电脑**的配置(开关 + 勾选的打印类型)。
+ * 保存**某一台打印电脑**的配置(开关 + 勾选的打印类型 + 纸张)。
  *
  * <p>2026-11-04:这条不再写全局开关 —— 只写 {@code stationName} 那一行,
  * 别的电脑一点不受影响(用户口径「没有设置的电脑就不开启」)。
+ *
+ * <p>2026-11-05:加 {@code paper}(A5=中一刀 / A4=整张横)。**只换纸不缩放** ——
+ * 代理端画的永远是 210×148mm 的内容,选 A4 只是纸更大、多出来是空白。
  */
-export async function saveStationConfig({ stationName, enabled, types } = {}) {
+export async function saveStationConfig({ stationName, enabled, types, paper } = {}) {
   const res = await request.post('/px/print/station', {
-    stationName: stationName || '', enabled: !!enabled, types: Array.isArray(types) ? types : [],
+    stationName: stationName || '',
+    enabled: !!enabled,
+    types: Array.isArray(types) ? types : [],
+    paper: paper || undefined,
   })
   return res.data?.data || res.data || {}
 }

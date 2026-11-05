@@ -89,6 +89,21 @@
           <span v-if="s.ip">· {{ tt('来源 IP') }} <b class="mono">{{ s.ip }}</b></span>
         </div>
         <div class="ps-station-body">
+          <!-- 纸张(2026-11-05 用户口径「能不能设定打印的纸张大小(如 A4 或 A5),但是表格实际占用大小不变」):
+               只换纸、不缩放 —— 代理画的永远是 210×148mm 的内容,选 A4 只是纸更大、多出来是空白。 -->
+          <div class="ps-station-line">
+            <span class="ps-station-label">{{ tt('纸张') }}</span>
+            <el-select
+              :model-value="s.paper || 'A5'"
+              size="small"
+              class="ps-paper"
+              :loading="savingName === s.name"
+              @change="(v) => saveStation(s, { paper: v })"
+            >
+              <el-option value="A5" :label="tt('A5 · 中一刀 210×148.5 横')" />
+              <el-option value="A4" :label="tt('A4 横 297×210(内容大小不变)')" />
+            </el-select>
+          </div>
           <div class="ps-station-label">{{ tt('打印类型') }}</div>
           <el-checkbox-group
             :model-value="s.types || []"
@@ -384,16 +399,19 @@ async function saveStation(s, patch) {
   if (!name) return
   const enabled = patch.enabled === undefined ? !!s.enabled : !!patch.enabled
   const types = patch.types === undefined ? (s.types || []) : patch.types
+  const paper = patch.paper === undefined ? (s.paper || 'A5') : patch.paper
   savingName.value = name
   clearErr()
   // 先乐观更新,失败再回读(勾选/开关手感不能等一个请求)
-  const next = stationRows.value.map((x) => (x.name === name ? { ...x, enabled, types } : x))
+  const next = stationRows.value.map((x) => (x.name === name ? { ...x, enabled, types, paper } : x))
   state.value = { ...state.value, stations: next }
   try {
-    const d = await saveStationConfig({ stationName: name, enabled, types })
+    const d = await saveStationConfig({ stationName: name, enabled, types, paper })
     state.value = { ...state.value, ...(d || {}) }
     if (patch.enabled !== undefined) {
       ElMessage.success(enabled ? tt('已开启这台电脑的自动打印') : tt('已关闭这台电脑的自动打印'))
+    } else if (patch.paper !== undefined) {
+      ElMessage.success(tt('纸张已改为') + ' ' + paper + tt('(内容大小不变)'))
     } else if (!types.length) {
       ElMessage.warning(tt('没有勾选任何打印类型:这台电脑不会收到打印任务'))
     } else {
@@ -491,6 +509,8 @@ async function saveAgentConfig() {
 .ps-station-meta b { font-weight: 400; }
 .ps-meta-warn { color: var(--el-color-warning-dark-2); }
 .ps-station-body { margin-top: 6px; padding-left: 16px; }
+.ps-station-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ps-paper { flex: none; width: 260px; }
 .ps-station-label { font-size: 12px; color: var(--el-text-color-secondary); }
 .ps-types { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 18px; }
 .ps-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }

@@ -2685,6 +2685,11 @@ export default {
     '请先填站点名': 'Vui lòng nhập tên trạm trước',
     '已经有同名电脑了': 'Đã có máy trùng tên',
     '已登记:等那台电脑的打印代理连上来就会显示在线': 'Đã đăng ký: sẽ online khi agent của máy đó kết nối',
+    '纸张': 'Khổ giấy',
+    'A5 · 中一刀 210×148.5 横': 'A5 · cắt đôi 210×148.5 ngang',
+    'A4 横 297×210(内容大小不变)': 'A4 ngang 297×210 (kích thước nội dung giữ nguyên)',
+    '纸张已改为': 'Đã đổi khổ giấy sang',
+    '(内容大小不变)': '(kích thước nội dung giữ nguyên)',
   },
 
 }

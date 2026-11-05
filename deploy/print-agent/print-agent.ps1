@@ -178,7 +178,10 @@ function Send-LabelToPrinter {
         [string]$OutNo = '',
         [string]$Dept = '',
         [string]$PrintDate = '',
-        [array]$Rows = @()
+        [array]$Rows = @(),
+        # 纸张(2026-11-05,按每台电脑在「自动打印」页配置):A5=中一刀 210×148.5 横(默认) / A4=297×210 横。
+        # ⚠ 只换纸不缩放:绘制坐标永远是 210×148mm,内容大小与版面一个像素都不变。
+        [string]$Paper = 'A5'
     )
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 
@@ -231,20 +234,29 @@ function Send-LabelToPrinter {
     #   **Microsoft Print to PDF 会把自定义纸型丢掉、仍输出 A4**(读回 PaperSize 是对的,
     #   PDF 的 /MediaBox 却是 595x842pt)⇒ 换成等价的标准纸:
     #   **A5(148×210) 横放 = 210×148mm**,正好是中一刀。标准纸型所有驱动都认。
+    #
+    # 🔴 2026-11-05 用户口径:「能不能设定打印的纸张大小(如 A4 或 A5),但是表格实际占用大小不变」。
+    #   ⇒ 纸张由「自动打印」页**按每台电脑**配置,服务端随任务下发 `纸张`(A5 / A4):
+    #     · A5(默认)= 中一刀 210×148.5mm 横打,与以前一字不差;
+    #     · A4      = A4 横 297×210mm —— **只换纸、不缩放**:下面的绘制坐标仍是 210×148mm,
+    #                 内容从纸张左上角起画(表格/字号一个都不变),多出来的部分是空白。
+    #   注意:这里只能选**标准纸型**;自定义纸型会被 PDF 驱动丢掉(上面那条踩坑)。
     $script:W100 = 827   # 横向 210mm ≈ 8.27in(1/100 英寸)
     $script:H100 = 583   # 纵向 148mm ≈ 5.83in(A5 短边)
+    $paperKind = if (([string]$Paper).Trim().ToUpper() -eq 'A4') { 'A4' } else { 'A5' }
     try {
-        $a5 = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq 'A5' } | Select-Object -First 1
-        if (-not $a5) { $a5 = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match 'A5' } | Select-Object -First 1 }
-        if ($a5) {
-            $doc.DefaultPageSettings.PaperSize = $a5
-            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5 转 90° = 210×148
+        $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq $paperKind } | Select-Object -First 1
+        if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match $paperKind } | Select-Object -First 1 }
+        if ($ps) {
+            $doc.DefaultPageSettings.PaperSize = $ps
+            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5→210×148 / A4→297×210
             $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+            Write-Host ("[版面] 纸张 = {0} 横打(内容仍 210×148mm,不缩放)" -f $paperKind) -ForegroundColor DarkGray
         } else {
-            Write-Host '[WARN] 打印机没有 A5 纸型,按默认纸输出' -ForegroundColor Yellow
+            Write-Host ("[WARN] 打印机没有 {0} 纸型,按默认纸输出" -f $paperKind) -ForegroundColor Yellow
         }
     } catch {
-        Write-Host "[WARN] 设置中一刀(A5 横版)失败,按默认纸输出: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host ("[WARN] 设置纸张({0} 横版)失败,按默认纸输出: {1}" -f $paperKind, $_.Exception.Message) -ForegroundColor Yellow
     }
 
     # 版式数据交给回调(script 作用域,PrintPage 里能读到)
@@ -426,6 +438,9 @@ function Invoke-PrintJob {
     if (-not $printDt) { $printDt = (Get-Date -Format 'yyyy-MM-dd') }
     $rows     = @()
     if ($Job.'明细') { $rows = @($Job.'明细') }
+    # 纸张(2026-11-05):由「自动打印」页按**每台电脑**配置,服务端派单时随任务下发(A5/A4)。
+    # 缺省 A5(中一刀),与以前完全一致。
+    $paper    = [string]($Job.'纸张')
     $printerN = [string]($Job.'printer')
     if (-not $qrText) {
         if ($woNo) {
@@ -448,7 +463,7 @@ function Invoke-PrintJob {
         $path = Join-Path $PdfDir $name
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
         return $path
     }
 
@@ -464,7 +479,7 @@ function Invoke-PrintJob {
     if ($Mode -eq 'Printer') {
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
         return @{ ok = $true; mode = 'printer'; printer = $printerN }
     }
 
@@ -481,7 +496,7 @@ function Invoke-PrintJob {
         }
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
         return @{ ok = $true; mode = 'printer'; printer = $real }
     } catch {
         $why = $_.Exception.Message

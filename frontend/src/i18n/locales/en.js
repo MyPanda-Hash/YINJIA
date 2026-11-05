@@ -5409,6 +5409,11 @@ export default {
     '请先填站点名': 'Enter a station name first',
     '已经有同名电脑了': 'A computer with this name already exists',
     '已登记:等那台电脑的打印代理连上来就会显示在线': 'Registered: it turns online once that computer\'s print agent connects',
+    '纸张': 'Paper',
+    'A5 · 中一刀 210×148.5 横': 'A5 · half-cut 210×148.5 landscape',
+    'A4 横 297×210(内容大小不变)': 'A4 landscape 297×210 (content size unchanged)',
+    '纸张已改为': 'Paper changed to',
+    '(内容大小不变)': '(content size unchanged)',
   },
 
 }

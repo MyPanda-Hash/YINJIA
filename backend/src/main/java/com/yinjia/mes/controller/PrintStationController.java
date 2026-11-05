@@ -109,6 +109,11 @@ public class PrintStationController {
     private static final String CFG_PREFIX = "print.station.";
     private static final String CFG_ENABLED = ".enabled";
     private static final String CFG_TYPES = ".types";
+    /** 纸张:2026-11-05 用户口径「能不能设定打印的纸张大小(如 A4 或 A5),但是表格实际占用大小不变」 */
+    private static final String CFG_PAPER = ".paper";
+    /** 支持的纸张(只收标准纸型:自定义纸型会被 PDF 驱动丢掉,见 print-agent.ps1 的踩坑注释) */
+    private static final Set<String> PAPERS = Set.of("A5", "A4");
+    private static final String PAPER_DEFAULT = "A5";
 
     /**
      * 打印类型注册表(唯一真源)。
@@ -151,16 +156,18 @@ public class PrintStationController {
      * @param name    站点名称(唯一键:代理的 -Station,安装时默认取计算机名)
      * @param enabled 自动打印开关(来自库里的站点配置;关着 ⇒ 在线也不派单)
      * @param types   勾选的打印类型 code 集合
+     * @param paper   纸张(A5=中一刀 210×148.5 横 / A4=297×210 横;**只换纸不缩放**)
      * @param seen    最后一次心跳(epoch millis);0 = 只在面板上登记过、代理还没连上来
      * @param source  谁在轮询:agent=本机打印代理 / page=自动打印页面(排查用)
      * @param ip      轮询方的来源 IP(帮现场认出"这是哪一台电脑";带 X-Forwarded-For 时取第一个)
      */
-    private record Station(String name, boolean enabled, Set<String> types, long seen, String source, String ip) {
+    private record Station(String name, boolean enabled, Set<String> types, String paper, long seen, String source, String ip) {
         Map<String, Object> json() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", name);
             m.put("enabled", enabled);
             m.put("types", new ArrayList<>(types));
+            m.put("paper", paper == null || paper.isBlank() ? PAPER_DEFAULT : paper);
             m.put("online", true);
             m.put("source", source);
             m.put("ip", ip == null ? "" : ip);
@@ -317,7 +324,11 @@ public class PrintStationController {
         PrintTask t = me == null ? null : takeFor(me.name());
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("task", t == null ? null : t.json());
+        // 纸张(2026-11-05)是**按站点**的配置,不是任务属性(同一张单可能派给多台电脑、纸不一样),
+        // 所以在派单这一刻把本站点的纸张塞进任务里,代理照它选纸型 —— 只换纸不缩放。
+        Map<String, Object> taskJson = t == null ? null : t.json();
+        if (taskJson != null && me != null) taskJson.put("纸张", me.paper());
+        out.put("task", taskJson);
         out.put("queueSize", QUEUE.size());
         // 服务端总闸:固定开(用户口径「在服务器上开启是固定的」)—— 兼容旧前端字段
         out.put("autoEnabled", true);
@@ -376,7 +387,7 @@ public class PrintStationController {
      * 「我是想要设置的电脑开启自动打印,没有设置的电脑就不开启」。
      * 现在按站点名写配置,别的电脑一点不受影响。
      *
-     * @param body {stationName(必填), enabled?, types?:[code...]}
+     * @param body {stationName(必填), enabled?, types?:[code...], paper?:'A5'|'A4'}
      */
     @PostMapping("/station")
     public ApiResult<Map<String, Object>> saveStation(@RequestBody Map<String, Object> body) {
@@ -390,8 +401,13 @@ public class PrintStationController {
                 ? l.stream().map(String::valueOf).toList() : List.of();
         Set<String> types = parseTypes(String.join(",", raw));
         boolean enabled = !Boolean.FALSE.equals(body.get("enabled"));
-        saveConfig(name, enabled, types);
-        log.info("打印站点配置更新:{} 开关={} 类型={} by {}", name, enabled, types, currentUserName());
+        // 纸张(2026-11-05):没带这个字段 = 保留原值(改开关/类型不该把纸张冲回默认)
+        Station cur = STATIONS.get(name);
+        String paper = body.get("paper") == null
+                ? paperOf(cur == null ? getSetting(CFG_PREFIX + name + CFG_PAPER) : cur.paper())
+                : paperOf(str(body.get("paper")));
+        saveConfig(name, enabled, types, paper);
+        log.info("打印站点配置更新:{} 开关={} 类型={} 纸张={} by {}", name, enabled, types, paper, currentUserName());
         // 只返回该站点最新状态(顺带刷新清单),不去碰心跳 —— 在 A 电脑配 B 电脑不该让 B 显示"在线"
         Station s = STATIONS.get(name);
         return ApiResult.ok(stateOf(s));
@@ -448,10 +464,11 @@ public class PrintStationController {
         Station old = STATIONS.get(n);
         if (old == null) {
             boolean[] en = {false};
-            Set<String> types = loadConfig(n, en);
-            old = new Station(n, en[0], types, 0L, "", "");
+            String[] pp = {PAPER_DEFAULT};
+            Set<String> types = loadConfig(n, en, pp);
+            old = new Station(n, en[0], types, pp[0], 0L, "", "");
         }
-        Station s = new Station(n, old.enabled(), old.types(),
+        Station s = new Station(n, old.enabled(), old.types(), old.paper(),
                 System.currentTimeMillis(), str1(source, old.source().isEmpty() ? "agent" : old.source()),
                 str(ip).isEmpty() ? old.ip() : str(ip));
         STATIONS.put(n, s);
@@ -462,20 +479,29 @@ public class PrintStationController {
     }
 
     /** 读站点配置:内存缓存优先,其次系统参数;都没有 ⇒ enabled=false(没设置的不开) */
-    private Set<String> loadConfig(String name, boolean[] enabledOut) {
+    private Set<String> loadConfig(String name, boolean[] enabledOut, String[] paperOut) {
         String en = getSetting(CFG_PREFIX + name + CFG_ENABLED);
         String tp = getSetting(CFG_PREFIX + name + CFG_TYPES);
+        String pv = getSetting(CFG_PREFIX + name + CFG_PAPER);
         enabledOut[0] = "Y".equalsIgnoreCase(en);
+        if (paperOut != null && paperOut.length > 0) paperOut[0] = paperOf(pv);
         return parseTypes(tp);
     }
 
     /** 写站点配置(内存 + 系统参数,重载/重启后仍在) */
-    private void saveConfig(String name, boolean enabled, Set<String> types) {
+    private void saveConfig(String name, boolean enabled, Set<String> types, String paper) {
         setSetting(CFG_PREFIX + name + CFG_ENABLED, enabled ? "Y" : "N");
         setSetting(CFG_PREFIX + name + CFG_TYPES, String.join(",", types));
+        setSetting(CFG_PREFIX + name + CFG_PAPER, paperOf(paper));
         Station old = STATIONS.get(name);
-        STATIONS.put(name, new Station(name, enabled, types,
+        STATIONS.put(name, new Station(name, enabled, types, paperOf(paper),
                 old == null ? 0L : old.seen(), old == null ? "" : old.source(), old == null ? "" : old.ip()));
+    }
+
+    /** 纸张归一:只认 A5 / A4,其余一律按默认 A5(旧数据没有这个键 ⇒ A5,行为不变) */
+    private static String paperOf(String raw) {
+        String v = str(raw).toUpperCase(Locale.ROOT);
+        return PAPERS.contains(v) ? v : PAPER_DEFAULT;
     }
 
     /**
@@ -539,8 +565,9 @@ public class PrintStationController {
         for (String name : configuredNames()) {
             if (all.containsKey(name)) continue;
             boolean[] en = {false};
-            Set<String> types = loadConfig(name, en);
-            all.put(name, new Station(name, en[0], types, 0L, "", ""));
+            String[] pp = {PAPER_DEFAULT};
+            Set<String> types = loadConfig(name, en, pp);
+            all.put(name, new Station(name, en[0], types, pp[0], 0L, "", ""));
         }
         List<Map<String, Object>> out = new ArrayList<>();
         List<Station> list = new ArrayList<>(all.values());
@@ -592,6 +619,7 @@ public class PrintStationController {
         out.put("stationName", me == null ? "" : me.name());
         out.put("stationEnabled", me != null && me.enabled());
         out.put("stationTypes", me == null ? List.of() : new ArrayList<>(me.types()));
+        out.put("stationPaper", me == null ? PAPER_DEFAULT : paperOf(me.paper()));
         out.put("stationOnline", me != null && isOnline(me));
         out.put("stations", stationList());
         out.put("types", typeList());
@@ -679,7 +707,9 @@ public class PrintStationController {
             String field = dot > 0 ? rest.substring(dot) : "";
             return CFG_TYPES.equals(field)
                     ? "打印站点「" + name + "」勾选的打印类型(逗号分隔的 code;PICK_SLIP=生产领料单)"
-                    : "打印站点「" + name + "」的自动打印开关(Y=这台电脑出纸,N=不出)";
+                    : (CFG_PAPER.equals(field)
+                        ? "打印站点「" + name + "」的纸张(A5=中一刀 210×148.5 横 / A4=297×210 横;只换纸不缩放)"
+                        : "打印站点「" + name + "」的自动打印开关(Y=这台电脑出纸,N=不出)");
         }
         return switch (key) {
             case "print.auto_enabled" -> "【已停用】旧全局自动打印开关:2026-11-04 起改为按站点的开关,本键不再参与分发";
