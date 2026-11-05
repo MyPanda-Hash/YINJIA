@@ -447,6 +447,11 @@ public class ScheduleBoardService {
         }
         Map<Long, String> fallback = noOp.isEmpty() ? java.util.Map.of()
                 : WorkOrderDayPlanService.ledgerCurrentOp(jdbc, noOp);
+        // 2026-11-05 重摊:报工抵扣(与页面格子/日期列头同一把尺;见 DayPlanSpread.mergeReported)
+        List<Long> ids = new ArrayList<>();
+        for (Map<String, Object> r : rows) if (r.get("id") instanceof Number n) ids.add(n.longValue());
+        Map<String, Double> reported = ids.isEmpty() ? new LinkedHashMap<>()
+                : WorkOrderDayPlanService.reportedTotals(WorkOrderDayPlanService.actualByDate(jdbc, ids));
         Map<String, Double> rateCache = new HashMap<>();          // 路线|工序 → 换算率
         for (Map<String, Object> r : rows) {
             if (!(r.get("id") instanceof Number idn)) continue;
@@ -457,7 +462,9 @@ public class ScheduleBoardService {
             double rate = rateCache.computeIfAbsent(route + "|" + op,
                     k -> WorkOrderDayPlanService.rateOf(jdbc, route, op));
             double total = r4(Num.of(r.get("plan_qty")) * rate);
-            Map<java.time.LocalDate, Double> merged = DayPlanSpread.merge(total, toDate(r.get("st")),
+            String opKey = idn.longValue() + "|" + op;
+            Map<java.time.LocalDate, Double> merged = DayPlanSpread.mergeReported(total,
+                    reported.getOrDefault(opKey, 0d), toDate(r.get("st")),
                     toDate(r.get("cp")), today, manual.getOrDefault(idn.longValue(), java.util.Map.of()));
             Double q = merged.get(today);
             if (q != null && q != 0) out.merge(line, q, Double::sum);

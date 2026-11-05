@@ -124,6 +124,57 @@ public final class DayPlanSpread {
         return new LinkedHashMap<>(sorted);
     }
 
+    /**
+     * **报工抵扣 + 未报工后移**的日计划(2026-11-05 用户口径,第二次修正)。
+     *
+     * <p>用户口径(原话):「当前正常开工日期到计划完工日期的排单计算……当前天数未进行报工的数量就会向后排单,
+     * 而不是在之前的历史中停留,确保后面可以排完这些数量。」
+     *
+     * <p>规则:
+     * <ol>
+     *   <li><b>剩余</b> = {@code total − 已审报工 − Σ未来人工指定}(不足 0 记 0);</li>
+     *   <li><b>历史日期(&lt; today)不再输出"计划"</b> —— 历史只认已审报工那本账({@code 日报工});
+     *       历史排产但没报工的量全部进入"剩余",被排到今天以后(后移/挤压),确保后面能把 total 排完;</li>
+     *   <li><b>今天起(或开工日,取较晚者)→ 交期</b> 摊这份剩余,再用未来的人工指定覆盖;</li>
+     *   <li>完全没报工、且开工日不早于今天 ⇒ 结果与 {@link #merge} **逐日一致**(报工不影响)。</li>
+     * </ol>
+     *
+     * <p>与 {@link #merge} 一样**总数守恒**(已报工的算作已完成):未来合计 = 剩余;
+     * 报工超过总量(现场允许超产 1%)⇒ 未来全 0,不再产生负数。
+     *
+     * @param total    工序计划量(排产数量 × 该道换算率)
+     * @param reported 该行该工序**已审报工合计**(全部日期)
+     * @param start    计划开工日(空 = 今天)
+     * @param due      交期/计划完工日(空 = 单日)
+     * @param today    今天(由调用方传,便于测试/跨零点一致)
+     * @param manual   人工指定(日期 → 数量);历史的人工指定视为已过期的计划,进剩余后重排
+     * @return 日期 → 当天计划(按日期升序;**只含今天及以后**)
+     */
+    public static Map<LocalDate, Double> mergeReported(double total, double reported, LocalDate start, LocalDate due,
+                                                        LocalDate today, Map<LocalDate, Double> manual) {
+        if (today == null) return new LinkedHashMap<>();
+        Map<LocalDate, Double> m = manual == null ? Map.of() : manual;
+        // 未来的人工指定:优先保留,并从剩余里扣掉(历史人工指定不进未来,进剩余后重排)
+        Map<LocalDate, Double> manualFuture = new java.util.LinkedHashMap<>();
+        double manualFutureSum = 0;
+        for (Map.Entry<LocalDate, Double> e : m.entrySet()) {
+            if (e.getKey() != null && e.getValue() != null && !e.getKey().isBefore(today)) {
+                manualFuture.put(e.getKey(), e.getValue());
+                manualFutureSum += e.getValue();
+            }
+        }
+        double remain = round(Math.max(0d, total - Math.max(0d, reported) - manualFutureSum));
+        LocalDate s0 = start == null ? today : start;
+        LocalDate spreadStart = s0.isBefore(today) ? today : s0;      // 历史已过 ⇒ 从今天起
+        Map<LocalDate, Double> out = new java.util.LinkedHashMap<>();
+        for (Map.Entry<LocalDate, Double> e : of(remain, spreadStart, due, today, manualFuture.keySet()).entrySet()) {
+            out.put(e.getKey(), e.getValue());
+        }
+        out.putAll(manualFuture);
+        Map<LocalDate, Double> sorted = new java.util.TreeMap<>(out);
+        return new LinkedHashMap<>(sorted);
+    }
+
     /** 人工指定合计(= S) */
     public static double manualSum(Map<LocalDate, Double> manual) {
         double s = 0;
