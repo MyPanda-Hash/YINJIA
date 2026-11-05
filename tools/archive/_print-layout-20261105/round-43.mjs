@@ -1,0 +1,15 @@
+// round-43: 滚动到第 2 页再截(Chrome PDF 查看器不认 #page=)
+const task = await taskSpace(1)
+const page = task.page('p1')
+await page.goto('file:///D:/YINJIA-main/deploy/print-agent/print-out/GD-LAYOUT-13_L1_20261105-105251-778.pdf', { timeout: 30000 })
+await page.waitForTimeout(3500)
+await page.mouse.move(760, 400)
+await page.mouse.click(760, 400, { label: 'focus pdf viewer' })
+await page.keyboard.press('PageDown')
+await page.waitForTimeout(600)
+await page.keyboard.press('PageDown')
+await page.waitForTimeout(1200)
+try {
+  const s = await page.screenshot({ path: 'C:/Users/Lenovo/ego/pick-main-material-20261104/pdf-13rows-p2.png' })
+  console.log({ shot: s })
+} catch (e) { console.log('shot fail: ' + e.message) }

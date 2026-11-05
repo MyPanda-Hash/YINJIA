@@ -120,7 +120,7 @@ export async function printWorkTaskSheet(title, rows) {
       qr = await lib.toDataURL(woQrText(r), { margin: 1, errorCorrectionLevel: 'M' })
     } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
     trs.push('<tr><td>' + (i + 1) + '</td>'
-      + `<td>${esc(r['单据编号'])}</td><td>${esc(r['是否重点管控产品'])}</td>`
+      + `<td class="no">${esc(r['单据编号'])}</td><td>${esc(r['是否重点管控产品'])}</td>`
       + `<td>${esc(r['商品编码'])}</td><td>${esc(r['商品名称'])}</td><td>${esc(r['规格型号'])}</td>`
       + `<td class="r">${esc(fmtNum(r['订单数量']))}</td>`
       + (title === '成型生产任务单' ? `<td class="r">${esc(fmtNum(r['成型折算后数量']))}</td>` : '')
@@ -129,6 +129,14 @@ export async function printWorkTaskSheet(title, rows) {
   }
   const ths = '<th>序号</th><th>单据编号</th><th>是否重点管控产品</th><th>商品编码</th><th>商品名称</th><th>规格型号</th><th>订单数量</th>'
     + (title === '成型生产任务单' ? '<th>成型折算后数量</th>' : '') + '<th>计划完工日期</th><th>二维码</th>'
+  // 🔴 2026-11-05:列宽定死 + 单据编号不折行。
+  //   用户反馈「扫出来的码和信息很难对应是哪一条」——纸面上「GD-2026-11-0018」被
+  //   `word-break:break-all` + 等分列切成「GD-2026-11-001 / 8」,跟扫码列表里的
+  //   单据编号对不上眼。固定列宽后 14% ≈ 39mm,11px 字号放得下完整单号。
+  const colW = title === '成型生产任务单'
+    ? ['4%', '14%', '8%', '9%', '17%', '11%', '7%', '8%', '9%', '13%']
+    : ['4%', '15%', '9%', '10%', '19%', '12%', '8%', '9%', '14%']
+  const colgroup = '<colgroup>' + colW.map((w) => `<col style="width:${w}">`).join('') + '</colgroup>'
   const body = '<style>'
     + '@page{size:A4 landscape;margin:8mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111;font-size:12px}'
@@ -137,10 +145,11 @@ export async function printWorkTaskSheet(title, rows) {
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
     + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
     + 'th{background:#f2f2f2;font-weight:600}'
+    + 'td.no{white-space:nowrap;overflow:hidden}'
     + 'td.qr{text-align:center;padding:2px}td.qr img{width:64px;height:64px}'
     + '</style>'
     + '<div class="hd"><span class="t">' + esc(title) + '</span></div>'
-    + '<table><thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
+    + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
   // 🔴 2026-10-19:改走**页面内打印**(与面板单据打印同一条路),不再弹窗。
   //   现场实测:打印工单(哪怕只有 1 张)后整页僵死、刷新无效、只能关标签 —— 弹窗与主页面共用渲染进程,
   //   打印预览/虚拟打印机一卡就一起死。页面内打印走 window.print(),和"打单据"完全一致。
@@ -493,69 +502,115 @@ export async function printWoQr(payload, opts = {}) {
   } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
 
   const title = String(p['标题'] ?? '').trim() || '领料单'
+  const body = pickSlipHtml(p, qr)
+
+  // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调
+  if (!printInPage(title, body, opts)) { alert(PRINT_FAIL_MSG); return false }
+  return true
+}
+
+/**
+ * 纸面「生产领料单」的 HTML(纯函数,2026-11-05 从 {@link printWoQr} 抽出来便于单测)。
+ *
+ * <p>这一版是**浏览器打印层**用的(手机/电脑上没接打印代理时的兜底)。2026-11-05 用户
+ * 截图报「预览没变化」——他当时走的是浏览器打印,而当天修的版式只在打印代理那份 PDF 里;
+ * 所以这里同步成同一套口径:
+ * <ul>
+ *   <li>**空行不印订单号**:纸表固定补到 8 行,以前空行也印 `GD-…-#1`,看着像有 8 行明细;</li>
+ *   <li>**二维码缩小**:34mm → 24mm,并且从"绝对定位压在表格左上角"改成**表头左侧独立一块**
+ *       (旧版二维码直接盖住表格前几行的订单号,截图里第一行看不见单号就是它);</li>
+ *   <li>**行数不再截断**:旧代码 `Math.min(12, rows.length)` 把第 13 行起丢掉;
+ *       现在一页 10 行、超出换页(每页重复抬头/表头/签名),右上角标「第 n/N 页」。</li>
+ * </ul>
+ *
+ * @param {object} payload 与 printWoQr 同一份载荷(标题/工单号/工单行号/领料单号/领料部门/打印日期/明细)
+ * @param {string} [qr] 二维码 dataURL(可空:空则只留框)
+ * @returns {string} 可直接塞进打印层的 HTML(含 <style>)
+ */
+export function pickSlipHtml(payload, qr = '') {
+  const p = payload || {}
+  const woNo = String(p['工单号'] ?? '').trim()
   const line = Number(p['工单行号']) || 0
+  const title = String(p['标题'] ?? '').trim() || '领料单'
   const outNo = String(p['领料单号'] ?? '').trim()
   const dept = String(p['领料部门'] ?? '').trim()
   const printDate = String(p['打印日期'] ?? '').trim() || new Date().toISOString().slice(0, 10)
-  // 明细行(纸表七列);后端 /mobilePick/reprint 已带「明细」,旧载荷没有就当空表
   const rows = Array.isArray(p['明细']) ? p['明细'] : []
   const cell = (v) => (v === 0 || v ? esc(String(v)) : '')
   const fmtQty = (v) => (Number(v) > 0 ? String(Math.round(Number(v) * 10000) / 10000) : '')
-  const bodyRows = []
-  for (let i = 0; i < Math.max(8, Math.min(12, rows.length)); i++) {
-    const r = rows[i] || {}
-    bodyRows.push('<tr>'
-      + `<td>${esc(woNo + (line ? '#' + line : ''))}</td>`
-      + `<td>${cell(r['材料名称'])}</td>`
-      + `<td>${cell(r['规格'])}</td>`
-      + `<td>${cell(r['单位'])}</td>`
-      + `<td class="num">${fmtQty(r['请领数量'])}</td>`
-      + `<td class="num">${fmtQty(r['实发数量'])}</td>`
-      + `<td>${cell(r['备注'])}</td>`
-      + '</tr>')
+  const woTag = woNo + (line ? '#' + line : '')
+
+  const perPage = 10
+  const pageCount = Math.max(1, Math.ceil(rows.length / perPage))
+  const cards = []
+  for (let pg = 0; pg < pageCount; pg++) {
+    const slice = rows.slice(pg * perPage, (pg + 1) * perPage)
+    // 纸表是固定 8 行格子:不足 8 行补空格子,**空行连订单号都不印**
+    const n = Math.max(8, slice.length)
+    let tbody = ''
+    for (let i = 0; i < n; i++) {
+      const r = slice[i]
+      if (!r) {
+        tbody += '<tr><td></td><td></td><td></td><td></td>'
+          + '<td class="num"></td><td class="num"></td><td></td></tr>'
+        continue
+      }
+      tbody += '<tr>'
+        + `<td>${esc(woTag)}</td>`
+        + `<td>${cell(r['材料名称'])}</td>`
+        + `<td>${cell(r['规格'])}</td>`
+        + `<td>${cell(r['单位'])}</td>`
+        + `<td class="num">${fmtQty(r['请领数量'])}</td>`
+        + `<td class="num">${fmtQty(r['实发数量'])}</td>`
+        + `<td>${cell(r['备注'])}</td>`
+        + '</tr>'
+    }
+    cards.push('<div class="card">'
+      + '<div class="hd">'
+      + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
+      + '<div class="hm">'
+      + `<div class="no">No ${esc(outNo || '-')}</div>`
+      + `<div class="t">${esc(title)}</div>`
+      + `<div class="meta"><span>领料部门:${esc(dept)}</span><span>日期:${esc(printDate)}</span></div>`
+      + '</div>'
+      + '</div>'
+      + '<table>'
+      + '<colgroup><col style="width:20%"><col style="width:22%"><col style="width:15%">'
+      + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
+      + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
+      + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
+      + `<tbody>${tbody}</tbody>`
+      + '</table>'
+      + '<div class="sign"><span>部门主管:</span><span>仓库主管:</span><span>领料人:</span><span>仓管员:</span></div>'
+      + (pageCount > 1 ? `<div class="pg">第 ${pg + 1}/${pageCount} 页</div>` : '')
+      + '</div>')
   }
-  // 🔴 2026-11-02 用户口径:照**纸质领料单**的样子出(用户给了样张照片)——
-  //   左上角放二维码、标题「领 料 单」+ 右上 No 单号、七列明细表格、底部四栏签名。
-  //   纸张 = 中一刀 210mm x 148.5mm 横打。
-  const body = '<style>'
+
+  // 纸张 = 中一刀 210mm x 148.5mm 横打(2026-11-02 用户口径)
+  const style = '<style>'
     + '@page{size:210mm 148.5mm;margin:0}'
     + '.card{width:210mm;height:148.5mm;box-sizing:border-box;padding:5mm 6mm;'
     + 'position:relative;page-break-after:always;background:#fff;'
     + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#000}'
     + '.card:last-child{page-break-after:auto}'
-    + '.qr{position:absolute;left:6mm;top:5mm;width:34mm;height:34mm;border:0.35mm solid #000}'
+    + '.hd{display:flex;gap:3mm;align-items:flex-start}'
+    + '.qr{flex:none;width:24mm;height:24mm;border:0.35mm solid #000}'
     + '.qr img{width:100%;height:100%;display:block}'
-    + '.t{text-align:center;font-size:22pt;font-weight:700;letter-spacing:5mm;margin:1mm 0 0}'
-    + '.no{position:absolute;right:8mm;top:7mm;font-size:12pt;font-weight:700}'
-    + '.meta{margin:2mm 0 1.5mm 38mm;font-size:10.5pt}'
-    + '.meta .d{float:right;margin-right:2mm}'
-    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + '.hm{flex:1;min-width:0;position:relative}'
+    + '.t{text-align:center;font-size:20pt;font-weight:700;letter-spacing:4mm;margin:1mm 0 0}'
+    + '.no{position:absolute;right:0;top:2mm;font-size:11pt;font-weight:700}'
+    + '.meta{display:flex;justify-content:space-between;margin-top:4mm;font-size:10.5pt}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:1mm}'
     + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:9.5pt;'
     + 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
     + 'th{font-weight:700;text-align:center;height:7mm}'
     + 'td{height:6.4mm}'
     + 'td.num{text-align:right}'
     + '.sign{margin-top:2.5mm;font-size:10.5pt;display:flex;justify-content:space-between}'
+    + '.pg{position:absolute;right:6mm;bottom:3.5mm;font-size:9pt}'
     + 'body{margin:0;background:#fff}'
     + '</style>'
-    + '<div class="card">'
-    + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
-    + `<div class="no">No ${esc(outNo || '-')}</div>`
-    + `<div class="t">${esc(title)}</div>`
-    + `<div class="meta">领料部门:${esc(dept)}<span class="d">日期:${esc(printDate)}</span></div>`
-    + '<table>'
-    + '<colgroup><col style="width:20%"><col style="width:22%"><col style="width:15%">'
-    + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
-    + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
-    + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
-    + `<tbody>${bodyRows.join('')}</tbody>`
-    + '</table>'
-    + '<div class="sign"><span>部门主管:</span><span>仓库主管:</span><span>领料人:</span><span>仓管员:</span></div>'
-    + '</div>'
-
-  // 与其它标签同一条打印通道(页面内打印层 + window.print);opts.onDone 在 afterprint 后回调
-  if (!printInPage(title, body, opts)) { alert(PRINT_FAIL_MSG); return false }
-  return true
+  return style + cards.join('')
 }
 
 /**

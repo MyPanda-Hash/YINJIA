@@ -1,23 +1,36 @@
 /**
- * printStation.js — 把打印任务发给「自动打印」站点电脑(2026-10-30)
+ * printStation.js — 「自动打印」面板与打印任务队列(2026-10-30 建,2026-11-04 改按电脑+按类型)
  *
  * 用户口径(2026-10-30):
  *   「关于打印还有单独配一个自动打印的面版(这个面版是电脑上的)。只要这个面版配置参数并且设置成打开,
  *    然后在手机打印的时候就可以关联这个打开了面版参数的电脑,这台电脑连接的打印机就会自动打印」
  *   二次确认:「需要做个设置(来配置需要用到打印的电脑,实现连接的电脑自动打印)」。
  *
+ * 用户口径(2026-11-04,本次改造):
+ *   「我是想要设置的电脑开启自动打印,没有设置的电脑就不开启,但是在服务器上开启是固定的。
+ *    能不能在自动打印的面版加个参数来限定电脑。还有我想加个勾选打印类型的。」
+ *
  * 分工(为什么前端只管"发"):
- *   · **手机端(本文件)**:把「打什么」交给服务端队列,一句 {@link queueToPrintStation} 的事;
- *   · **服务端**:队列 + 心跳判定"有没有在线的打印电脑"(见后端 PrintStationController);
- *   · **打印电脑**:`views/sys/PrintStation.vue` 常驻轮询取任务 → 交本地打印代理静默出纸。
+ *   · **手机端(本文件)**:把「打什么(类型)+ 内容」交给服务端队列,一句 {@link queueToPrintStation};
+ *   · **服务端**:按「哪台电脑开了开关、勾了这个类型」派单(见后端 PrintStationController);
+ *   · **打印电脑**:本机代理 `tools/printing/print-agent.ps1` 自己每 4 秒拉 `/pending` 并出纸
+ *     —— 页面**不参与取任务**,只用来配置和看状态(2026-11-03 起就是这个架构)。
  *
  * ⚠ 为什么浏览器不能自己静默打印:标准 `window.print()` **一定**弹打印对话框。
- *   真正的零点击出纸只有本地代理能做到(`tools/printing/print-agent.ps1`),
- *   故本模块只负责"把任务送到那台电脑",不假装能静默。
+ *   真正的零点击出纸只有本机代理能做到,故本模块只负责"把任务送到服务端的队列里"。
  */
 
 import request from '@core/request'
 import * as QRCodeMod from 'qrcode'
+
+/**
+ * 打印类型 code —— **必须与后端 `PrintStationController.PRINT_TYPES` 的键一致**。
+ *
+ * <p>新增一种报表:后端注册表加一行,这里加一个常量,并在产出该报表的地方
+ * （如 `MobilePickDoc.reprint`）把它作为 {@code 类型} 传给 {@link queueToPrintStation}。
+ * 面板上的勾选框由后端下发（`/px/print/station` 的 `types`），前端不维护第二份清单。
+ */
+export const PRINT_TYPE_PICK_SLIP = 'PICK_SLIP'   // 生产领料单(工单二维码 + 领料明细)
 
 /**
  * 把二维码渲染成 dataURL(PNG,base64)。
@@ -48,18 +61,21 @@ async function qrDataUrl(text) {
 }
 
 /**
- * 把一条打印任务送进站点队列。
+ * 把一条打印任务送进站点队列,由**开了开关且勾了这个类型**的打印电脑取走。
  *
  * **永不抛错**:打印是次要动作,调用方(生单/领料)不该因为打印失败而回滚业务。
  * 失败时返回 `{ online: false, queued: false, reason }`,调用方据此降级为本机打印层。
  *
- * @param {{标题?:string, 二维码内容?:string, 工单号?:string, 工单行号?:number,
+ * @param {{类型?:string, 标题?:string, 二维码内容?:string, 工单号?:string, 工单行号?:number,
  *          产品名称?:string, 规格型号?:string, 来源?:string}} payload
- * @returns {Promise<{online:boolean, queued:boolean, reason?:string, message?:string, taskId?:number}>}
+ * @returns {Promise<{online:boolean, queued:boolean, reason?:string, message?:string,
+ *                    taskId?:number, station?:string, targets?:string[]}>}
  */
 export async function queueToPrintStation(payload) {
   try {
     const res = await request.post('/px/print/enqueue', {
+      // 打印类型(2026-11-04):决定这条任务发给哪几台电脑(见后端 PRINT_TYPES)
+      类型: payload?.类型 || PRINT_TYPE_PICK_SLIP,
       标题: payload?.标题 || '生产领料单',
       二维码内容: payload?.二维码内容 || '',
       // 二维码图随任务一起走,打印电脑直接贴进 PDF/标签(见 qrDataUrl 注释)
@@ -68,6 +84,14 @@ export async function queueToPrintStation(payload) {
       工单行号: Number(payload?.工单行号) || 0,
       产品名称: payload?.产品名称 || '',
       规格型号: payload?.规格型号 || '',
+      // 🔴 2026-11-04 补:纸面「领料单」的 No 单号与七列表格靠这几个字段,
+      //   以前这里**只转发了抬头+二维码**,后端/代理收到的任务没有明细 ⇒ 打出来是一张
+      //   空表头的纸(用户 2026-11-02 要的"纸质领料单"样式一直缺表格)。
+      //   载荷本来就在 payload 里(`/px/mobilePick/reprint` 的 `打印`),照原样透传即可。
+      领料单号: payload?.领料单号 || '',
+      领料部门: payload?.领料部门 || '',
+      打印日期: payload?.打印日期 || '',
+      明细: Array.isArray(payload?.明细) ? payload.明细 : [],
       来源: payload?.来源 || 'mobile',
     })
     const d = res.data?.data || res.data || {}
@@ -78,6 +102,7 @@ export async function queueToPrintStation(payload) {
       message: d.message || '',
       taskId: d.taskId,
       station: d.station || '',
+      targets: Array.isArray(d.targets) ? d.targets : [],
     }
   } catch (e) {
     // 网络/权限问题都按"没走成站点打印"处理 —— 交给调用方降级
@@ -90,28 +115,29 @@ export async function queueToPrintStation(payload) {
   }
 }
 
-/** 站点状态(打印电脑页用):开关 / 在线 / 队列长度 / 最近出纸 */
+/**
+ * 站点状态(「自动打印」页):服务端总闸 / 打印电脑清单(各自开关+类型) / 类型清单 / 队列 / 最近出纸。
+ */
 export async function fetchStationState() {
   const res = await request.get('/px/print/station')
   return res.data?.data || res.data || {}
 }
 
-/** 取一条待打印任务(打印电脑页轮询;取走即出队) */
-export async function fetchPendingTask(station) {
-  const res = await request.get('/px/print/pending', { params: station ? { station } : {} })
-  return res.data?.data || res.data || { task: null }
-}
-
-/** 回报已出纸 / 失败 */
-export async function ackTask({ taskId, ok, error, printer, 标题, 工单号, 工单行号, 发起人 }) {
-  await request.post('/px/print/ack', {
-    taskId, ok, error: error || '', printer: printer || '',
-    标题, 工单号, 工单行号, 发起人,
+/**
+ * 保存**某一台打印电脑**的配置(开关 + 勾选的打印类型 + 纸张)。
+ *
+ * <p>2026-11-04:这条不再写全局开关 —— 只写 {@code stationName} 那一行,
+ * 别的电脑一点不受影响(用户口径「没有设置的电脑就不开启」)。
+ *
+ * <p>2026-11-05:加 {@code paper}(A5=中一刀 / A4=整张横)。**只换纸不缩放** ——
+ * 代理端画的永远是 210×148mm 的内容,选 A4 只是纸更大、多出来是空白。
+ */
+export async function saveStationConfig({ stationName, enabled, types, paper } = {}) {
+  const res = await request.post('/px/print/station', {
+    stationName: stationName || '',
+    enabled: !!enabled,
+    types: Array.isArray(types) ? types : [],
+    paper: paper || undefined,
   })
-}
-
-/** 保存站点配置(全局开关 + 站点名) */
-export async function saveStationConfig({ autoEnabled, stationName }) {
-  const res = await request.post('/px/print/station', { autoEnabled, stationName })
   return res.data?.data || res.data || {}
 }
