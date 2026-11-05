@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
-const TOOLS = 'D:/workspace/yinjia/deploy/pkg-incr-20261103/tools'
+const TOOLS = 'D:/workspace/yinjia/tools'
 const manifest = fs.readFileSync(path.join(TOOLS, 'db-migrations.txt'), 'utf8')
   .split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
 
