@@ -383,8 +383,21 @@
                  —— row.hint 原先是**既当占位词、又渲染成这一行固定文字**(输入框/下拉里灰字 + 下面一行黑字,
                  同一句话在格子里出现两次)。现在只留占位词:输入/文本域用 :placeholder,下拉用它当未选中提示。 -->
             <div class="as-fill-main">
+              <!-- 参照型字段（2026-11-06 用户报障「立项申请的客户下拉没做」）：
+                   yj_field.ref_panel 有值时走参照控件（点击弹候选、带回数据），而不是纯文本框。
+                   ⚠ 此前只有 rows[].cells[] 那条分支判了 isRefKey，**num 型单字段行漏了** ——
+                   于是「客户名」明明配了 KHDA.mc 参照源，界面上仍是普通输入框。 -->
+              <div
+                v-if="editable && !signLocked(row) && row.kind === 'input' && isRefKey(row.key)"
+                class="as-ref-ctl as-fill-ref"
+                :title="tt('点击选择')"
+                @click="openProdRef(row.key)"
+              >
+                <span class="as-ref-text">{{ head[row.key] || tt('点击选择') }}</span>
+                <el-icon class="as-ref-ico"><Search /></el-icon>
+              </div>
               <el-input
-                v-if="editable && !signLocked(row) && row.kind === 'input'"
+                v-else-if="editable && !signLocked(row) && row.kind === 'input'"
                 v-model="head[row.key]"
                 type="text"
                 :maxlength="row.max || 50"

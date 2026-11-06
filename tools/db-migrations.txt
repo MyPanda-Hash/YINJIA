@@ -4496,3 +4496,5 @@ migrate-sample-dev-panels-20261106.sql
 migrate-spike-water-layout-20261106.sql
 # 2026-11-06 修正加标水结构迁移：条目名写回 item_code（content 只存结构 JSON，下拉不再显示 JSON）
 migrate-spike-water-layout-fix-20261106.sql
+# 2026-11-06 修正立项申请客户参照：data_type 必须为「参照」后端才下发 refPanel
+migrate-approval-customer-ref-fix-20261106.sql
