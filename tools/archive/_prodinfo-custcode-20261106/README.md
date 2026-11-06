@@ -61,3 +61,14 @@ cd tools && YINJIA_SQL_PASS=*** java -cp lib/mssql-jdbc.jar SqlRunner.java \
   - `prodInfoBomSheet.test.js`：第一节字段序列（含客户编码行）、封面 10 行（设计 9 + 客户编码）；
   - `specCarryMap.test.js`：`RD_SPEC_DOC.prodPick.map` 显式加 `客户编码`/`客户名称` 两条来源，
     并加两条断言「引用产品信息表时客户编码/名称一起带回」「空值不回填」。
+
+## 生产部署实况（2026-11-06 15:00）
+
+- `deploy_src.py --ref 07f4e1730`：`BUILD-OK` → 备份 `pre-deploy-20261106-145852.bak` →
+  `JAR-SWAPPED sha=DDCEAED7…` → 登录验证通过；
+  验收 `jar DDCEAED7… / chunk assets/index-CfhSneVf.js / ledger 746 → 749`。
+- 三条迁移在**两个账套**手工直连执行后补登 `yj_schema_log`（正式 →749，测试 →629）。
+- 服务器实测：产品信息表纸面 `客户编码` 参照格 + `产品形态 | 应用场景` 同排（`prod-8090-prodinfo.png` / `round-42.mjs`）；
+  检验项目标准库弹窗 **27 个组头**、1..26 = Excel 序、第 27 = 抗堵性能（`prod-8090-testlib.png` / `round-43.mjs`）。
+- 测试库 `HSDZ_MES_TEST` 是旧快照（`RD_PROD_INFO` 只有 29 字段、无「客户名称」），迁移里对该步做了
+  「字段不存在则 SKIP」分流；正式库守卫不受影响（`[FAIL] … 命中 0 行` 是先报出来才改的，见提交说明）。

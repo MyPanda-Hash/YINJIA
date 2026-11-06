@@ -48,11 +48,21 @@ IF NOT EXISTS (SELECT 1 FROM sys.extended_properties ep JOIN sys.columns c
 GO
 
 -- ── 2. 产品信息表：客户名称 改参照 + 新增客户编码（紧跟客户名称之后） ─────────
-DECLARE @n1 INT;
-UPDATE yj_field SET data_type = N'参照', ref_panel = N'KHDA', ref_field = N'mc', display_field = N'mc'
-WHERE panel_code = N'RD_PROD_INFO' AND label = N'客户名称';
-SET @n1 = @@ROWCOUNT;
-IF @n1 <> 1 RAISERROR(N'[FAIL] RD_PROD_INFO.客户名称 改参照命中 %d 行(期望 1)', 12, 1, @n1) WITH NOWAIT;
+-- ⚠ 测试库 HSDZ_MES_TEST 是旧快照(实测 RD_PROD_INFO 只有 29 个字段、连「客户名称」都没有),
+--   所以这一步**按字段是否存在分流**:有就改(并守住"必须命中 1 行"),没有就跳过并报一声 ——
+--   不为了迁就陈旧测试库而放松正式库的守卫。
+DECLARE @n1 INT = 0, @hasCustName BIT = 0;
+IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'客户名称')
+  SET @hasCustName = 1;
+IF @hasCustName = 1
+BEGIN
+  UPDATE yj_field SET data_type = N'参照', ref_panel = N'KHDA', ref_field = N'mc', display_field = N'mc'
+  WHERE panel_code = N'RD_PROD_INFO' AND label = N'客户名称';
+  SET @n1 = @@ROWCOUNT;
+  IF @n1 <> 1 RAISERROR(N'[FAIL] RD_PROD_INFO.客户名称 改参照命中 %d 行(期望 1)', 12, 1, @n1) WITH NOWAIT;
+END
+ELSE
+  RAISERROR(N'[SKIP] 本库 RD_PROD_INFO 没有「客户名称」字段(测试库旧快照),只加「客户编码」', 10, 1) WITH NOWAIT;
 GO
 
 -- 客户项目名称 从 42 挪到 43，给客户编码腾出 42（只在仍是旧值时动，重跑不会一路加）
@@ -96,8 +106,9 @@ GO
 IF COL_LENGTH(N'rd_prod_info_head', N'客户编码') IS NULL OR COL_LENGTH(N'rd_spec_doc_head', N'客户编码') IS NULL
   RAISERROR(N'[FAIL] 客户编码物理列缺失', 12, 1) WITH NOWAIT;
 GO
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'客户名称'
-               AND data_type = N'参照' AND ref_panel = N'KHDA' AND ref_field = N'mc')
+IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'客户名称')
+   AND NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'客户名称'
+                   AND data_type = N'参照' AND ref_panel = N'KHDA' AND ref_field = N'mc')
   RAISERROR(N'[FAIL] RD_PROD_INFO.客户名称 未改成参照 KHDA.mc', 12, 1) WITH NOWAIT;
 GO
 IF (SELECT COUNT(*) FROM yj_field WHERE label = N'客户编码' AND panel_code IN (N'RD_PROD_INFO', N'RD_SPEC_DOC')) <> 2
