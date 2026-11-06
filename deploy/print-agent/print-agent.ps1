@@ -191,6 +191,32 @@ function Get-CellLines {
         $i++
     }
     if ($cur.Length -gt 0) { [void]$lines.Add($cur) }
+    # 折成 2 行时尽量"对半分":贪心会把第一行塞满、第二行只剩个"）"这种尾巴,纸面很难看。
+    # 这里再按字符数对半试一次,两半都放得下就用它(中文基本对得齐,纯 ASCII 也只会更均衡)。
+    if ($lines.Count -eq 2 -and $Text.Length -ge 4) {
+        $half = [int][Math]::Ceiling($Text.Length / 2)
+        # ① 优先在**空格**处断(别把 "12.7*2.82" 这种数字拆成两半):挑离中间最近、且两半都放得下的空格
+        $best = -1
+        for ($k = 0; $k -lt $Text.Length; $k++) {
+            if ($Text[$k] -ne ' ') { continue }
+            $a = $Text.Substring(0, $k)
+            $bTxt = $Text.Substring($k + 1)
+            if (-not $bTxt) { continue }
+            if ($Graphics.MeasureString($a, $Font).Width -le $MaxWidth -and
+                $Graphics.MeasureString($bTxt, $Font).Width -le $MaxWidth) {
+                if ($best -lt 0 -or [Math]::Abs($k - $half) -lt [Math]::Abs($best - $half)) { $best = $k }
+            }
+        }
+        if ($best -ge 0) {
+            return @($Text.Substring(0, $best), $Text.Substring($best + 1))
+        }
+        # ② 没有空格(纯中文/规格串):按字数对半
+        $a = $Text.Substring(0, $half)
+        $bTxt = $Text.Substring($half)
+        if ($Graphics.MeasureString($a, $Font).Width -le $MaxWidth -and $Graphics.MeasureString($bTxt, $Font).Width -le $MaxWidth) {
+            return @($a, $bTxt)
+        }
+    }
     return $lines
 }
 function Send-LabelToPrinter {
@@ -330,6 +356,8 @@ function Send-LabelToPrinter {
         # 🔴 2026-11-06 用户口径「打印效果不好,字被挡住、没有显示完整」:
         #   格子字号 10 → 8.5,并把「材料名称 / 规格」两列改成**允许换行**(见 $fmtW)。
         $fontCell  = New-Object System.Drawing.Font('Microsoft YaHei', 8)
+        # 自适应字号阶梯:8 → 7.5 → 7 → 6.5 → 6(放不下才折行,见明细绘制处)
+        $cellFonts = @(8, 7.5, 7, 6.5, 6) | ForEach-Object { New-Object System.Drawing.Font('Microsoft YaHei', $_) }
         $fontFoot  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5)
         $penLine   = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 1.6)
         $fmtC = New-Object System.Drawing.StringFormat
@@ -388,7 +416,7 @@ function Send-LabelToPrinter {
         # 列宽(总 780)。2026-11-06 重排:订单号从 168 收到 130(足够放 "GD-2026-11-0018#1"),
         #   省下来的宽度给「规格」(118→165)和「材料名称」(172→150),单位 45→45,
         #   避免 "滤芯内盖（闭孔）" 这类被截成 "滤芯内盖（闭孔"。
-        $colW = @(130, 150, 165, 45, 85, 85, 120)
+        $colW = @(130, 138, 150, 70, 85, 85, 122)
         $totalW = 0
         foreach ($cw in $colW) { $totalW += $cw }
         $headH = 40
@@ -433,20 +461,30 @@ function Send-LabelToPrinter {
             }
             $cx = $x0
             for ($i = 0; $i -lt 7; $i++) {
-                if ($i -eq 1 -or $i -eq 2) {
-                    # 材料名称(1)/规格(2):按宽度**手动折行**(最多 2 行),每行单独绘制 ⇒ 不会被裁
-                    #   2026-11-06 用户报「字被挡住、没显示完整」:GDI+ 只在空格处换行,
-                    #   "38.5*38.5*26（超长规格…" 这种中英混排无空格串从不断行,整段被矩形裁掉。
-                    $lines = Get-CellLines $g $vals[$i] $fontCell ([double]($colW[$i] - 12)) 2
+                # 🔴 2026-11-06 第二轮(用户报「报表还是会省略,如计量单位这边」):
+                #   以前只给「材料名称/规格」折行,**其它列仍单行硬裁** —— 单位 "支（成型前）" 6 个字
+                #   在 45(≈11mm) 里只放得下 "支 (",后半截直接没了。
+                #   现在**每一列都走同一套自适应**:先按 8→7.5→7→6.5→6 逐级缩字号,还放不下就折成 2 行。
+                #   这样任何列都不会再出现"被省略"的情况。
+                $avail = [double]($colW[$i] - 10)
+                $drawn = $false
+                foreach ($f in $cellFonts) {
+                    if ($g.MeasureString($vals[$i], $f).Width -le $avail) {
+                        $rect = New-Object System.Drawing.RectangleF(($cx + 4), ($yy + 6), ($colW[$i] - 8), ($rowH - 9))
+                        $g.DrawString($vals[$i], $f, $black, $rect, $fmtL)
+                        $drawn = $true
+                        break
+                    }
+                }
+                if (-not $drawn -and $vals[$i]) {
+                    $small = $cellFonts[$cellFonts.Count - 1]
+                    $lines = Get-CellLines $g $vals[$i] $small $avail 2
                     $ly = $yy + 5
                     foreach ($ln in $lines) {
-                        $rect = New-Object System.Drawing.RectangleF(($cx + 4), $ly, ($colW[$i] - 8), 13)
-                        $g.DrawString($ln, $fontCell, $black, $rect, $fmtL)
-                        $ly += 12
+                        $rect = New-Object System.Drawing.RectangleF(($cx + 4), $ly, ($colW[$i] - 8), 12)
+                        $g.DrawString($ln, $small, $black, $rect, $fmtL)
+                        $ly += 10
                     }
-                } else {
-                    $rect = New-Object System.Drawing.RectangleF(($cx + 4), ($yy + 6), ($colW[$i] - 8), ($rowH - 9))
-                    $g.DrawString($vals[$i], $fontCell, $black, $rect, $fmtL)
                 }
                 $cx += $colW[$i]
             }
@@ -462,7 +500,7 @@ function Send-LabelToPrinter {
         # ⑥ 还有下一行没画完 ⇒ 让打印框架再调一次本回调(续页,抬头/表格线/签名都重画)
         if (($pageIdx + 1) -lt [int]$script:pTotalPages) { $e.HasMorePages = $true }
 
-        $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose(); $fmtW.Dispose()
+        $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose(); $fmtW.Dispose(); $cellFonts | ForEach-Object { $_.Dispose() }
         $fontTitle.Dispose(); $fontNo.Dispose(); $fontHead.Dispose(); $fontCell.Dispose(); $fontFoot.Dispose()
         } catch {
             $msg = $_.Exception.Message
