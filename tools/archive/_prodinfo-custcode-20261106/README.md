@@ -47,3 +47,17 @@ cd tools && YINJIA_SQL_PASS=*** java -cp lib/mssql-jdbc.jar SqlRunner.java \
   "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false" yinjia env migrate-prodinfo-cust-code-20261106.sql
 # 前端：npm run build → 同步 static → 换 jar（本目录 round-36..40.mjs 用 ego 浏览器跑）
 ```
+
+## 追加调整（同日）：产品形态 / 应用场景 并到一行
+
+用户口径：「调整一下，应用场景和产品形态放在同一行」。
+
+- 改前：`产品形态`、`应用场景` 各占一整行（`vspan:3`）。
+- 改后：一行两格 —— 左「产品形态」下拉（标准库 `prod.form`，带「⧉ 标准库维护」）、右「应用场景」文本。
+  产品基本信息区由 6 行回到 5 行。
+- 证据：`prodinfo-row-merged.png` / `round-41.mjs`（按 `<tr>` 读出的标签序列：
+  `产品形态 | 滤芯⧉ 标准库维护 | 应用场景 | `）。
+- 连带补的两处配置断言（因上一步加字段/加封面行而变红）：
+  - `prodInfoBomSheet.test.js`：第一节字段序列（含客户编码行）、封面 10 行（设计 9 + 客户编码）；
+  - `specCarryMap.test.js`：`RD_SPEC_DOC.prodPick.map` 显式加 `客户编码`/`客户名称` 两条来源，
+    并加两条断言「引用产品信息表时客户编码/名称一起带回」「空值不回填」。
