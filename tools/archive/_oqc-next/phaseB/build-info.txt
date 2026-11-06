@@ -1,0 +1,48 @@
+== build/instance evidence (2026-11-04 19:16:39) ==
+git HEAD: 1b36909ae feat: 组装物料清单产品编码改手输 + 工序移出表头(新建默认组装,保留查询条件)
+jar: 4e6d681131709c5bf92e8ae97916bfda31f9e6b3818f71146a7db19f06169977  size=97798852  path=.tmp/oqc-verify/backend-build/target/yinjia-mes-backend-0.1.0.jar
+jar static entry: BOOT-INF/classes/static/assets/index-B9i_S5xx.js
+jar BOOT-INF/lib count: 128
+8091 listen:   TCP    0.0.0.0:8091           0.0.0.0:0              LISTENING       33588
+
+== workspace dirty (other tasks, for traceability) ==
+ M backend/src/main/java/com/yinjia/mes/controller/AuthController.java
+ M backend/src/main/java/com/yinjia/mes/service/ButtonService.java
+ M backend/src/main/java/com/yinjia/mes/service/OqcReportService.java
+ M backend/src/main/java/com/yinjia/mes/service/QueryService.java
+ M backend/src/main/resources/reports/qc_oqc.jrxml
+ M backend/src/main/resources/reports/report-templates.properties
+ D deploy/hotfix-stock-kucun-20261021/README.md
+ D deploy/hotfix-stock-kucun-20261021/SHA256SUMS.txt
+ D deploy/hotfix-stock-kucun-20261021/apply-db.bat
+ D deploy/hotfix-stock-kucun-20261021/migrate-kucun-recalc-today-20261021.sql
+ D deploy/hotfix-wo-completion-sort-20261021/README.md
+ D deploy/hotfix-wo-completion-sort-20261021/SHA256SUMS.txt
+ D deploy/hotfix-wo-completion-sort-20261021/apply-db.bat
+ D deploy/hotfix-wo-completion-sort-20261021/check-sort.sql
+ D deploy/hotfix-wo-completion-sort-20261021/migrate-wo-completion-sort-20261021.sql
+ D deploy/hotupdate-prune-voided-20261030/README.md
+ D deploy/hotupdate-prune-voided-20261030/apply-update.bat
+ D deploy/hotupdate-prune-voided-20261030/migrate-prune-voided-progress-20261030.sql
+ D deploy/hotupdate-rdfix-20261021/README.md
+ D deploy/hotupdate-rdfix-20261021/apply-update.bat
+ D deploy/incr-finish-in-wo-backfill-20261022/README-AI.md
+ D deploy/incr-finish-in-wo-backfill-20261022/apply.ps1
+ D deploy/incr-finish-in-wo-backfill-20261022/rollback.ps1
+ D deploy/incr-prod-pick-outh-20261022/README-AI.md
+ D deploy/incr-prod-pick-outh-20261022/apply.ps1
+ D deploy/incr-prod-pick-outh-20261022/rollback.ps1
+ D deploy/incr-wo-mixing-20261022/README-AI.md
+ D deploy/incr-wo-mixing-20261022/apply.ps1
+ D deploy/incr-wo-mixing-20261022/rollback.ps1
+ M docs/design/出厂检验报告-从三张检验单并集生成.md
+ M docs/development/数据库表清单.md
+ M frontend/src/core/qc/QcOqcSheet.vue
+ M frontend/src/core/views/PanelxList.vue
+ M tools/db-migrations.txt
+ D 安装.ps1
+?? docs/development/测试方案.md
+?? tools/archive/_gen-oqc-tpl-sql.mjs
+?? tools/archive/_oqc-next/
+?? tools/migrate-drop-bak-qc-snapshots-20261102.sql
+?? tools/migrate-oqc-report-tpl-20261104.sql

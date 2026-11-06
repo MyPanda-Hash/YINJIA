@@ -1,0 +1,13 @@
+### 第 1 次执行 HSDZ_MES
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-asm-bom-data-full-20261105.sql ==
+  [print] [INFO] asm-bom full import: rows=3640 docs=827 prods=817 missing_unit=0 blank_sub=0 bad_seq_doc=0 bad_std=0 bad_proc=0 bad_loss=0 bad_cancel=0
+  [print] [PASS] asm-bom full import self-check OK (expect rows=3640 docs=827 prods=817)
+  [OK] 23 batches
+
+### 第 2 次执行(幂等复跑)HSDZ_MES
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-asm-bom-data-full-20261105.sql ==
+  [print] [INFO] asm-bom full import: rows=3640 docs=827 prods=817 missing_unit=0 blank_sub=0 bad_seq_doc=0 bad_std=0 bad_proc=0 bad_loss=0 bad_cancel=0
+  [print] [PASS] asm-bom full import self-check OK (expect rows=3640 docs=827 prods=817)
+  [OK] 23 batches

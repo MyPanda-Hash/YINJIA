@@ -21,6 +21,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { recordSheetConfigs } from './recordSheetConfigs.js'
+import { buildCoverPatch } from './prodPickCarry.js'
 
 const spec = recordSheetConfigs.RD_SPEC_DOC
 const coverKeys = spec.cover.fields.map((f) => f.key)
@@ -69,3 +70,28 @@ test('客户（项目）名称 两列都要认（客户项目名称空时回落�
   assert.deepEqual(m.from, ['客户项目名称', '客户名称'],
     '产品信息表把客户/项目分两列；封面是一格 ⇒ 按 [客户项目名称, 客户名称] 顺序取第一个非空')
 })
+
+/**
+ * 2026-11-05 用户报障（服务器上）：规格书封面选中产品编号 A-48-38 后，
+ * 「产品类别」那格仍然是空的；产品信息表里这一列本身是 NULL，
+ * 真正的值是填在「产品功能类别」里的（生产库实测：42 条产品信息，
+ * `产品类别` 非空 0 条、`产品功能类别` 非空 23 条）。
+ * ⇒ 封面「产品类别」必须优先取产品信息表的「产品功能类别」，回落「产品类别」。
+ */
+test('产品类别 ← 产品功能类别（源表那列才是真填的），回落同名列', () => {
+  const m = (spec.prodPick.map || []).find((x) => (x.to || x.from) === '产品类别')
+  assert.ok(m, '封面有「产品类别」这一行 ⇒ 必须有映射')
+  const froms = Array.isArray(m.from) ? m.from : [m.from]
+  assert.equal(froms[0], '产品功能类别',
+    '生产库里 `产品类别` 一列 42 行全 NULL，值都在 `产品功能类别` ⇒ 优先取它')
+  assert.ok(froms.includes('产品类别'), '同名列保留作回落（历史数据里若真有值也带得回来）')
+})
+
+test('引用 A-48-38 这种行：产品类别那格要拿到 PFOA PFOS，而不是空', () => {
+  const patch = buildCoverPatch(
+    { 产品编号: 'A-48-38', 产品名称: 'A+级后置碳棒滤芯', 产品类别: null, 产品功能类别: 'PFOA PFOS' },
+    spec.prodPick.map,
+  )
+  assert.equal(patch['产品类别'], 'PFOA PFOS')
+})
+

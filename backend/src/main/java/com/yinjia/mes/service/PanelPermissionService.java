@@ -62,6 +62,9 @@ public class PanelPermissionService {
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),
             Map.entry("unclose", "取消结案"), Map.entry("print", "打印"), Map.entry("close", "结案"),
+            // 2026-11-05:「转领料单」前端按钮与权限矩阵列已下架,**picking 词本身保留** ——
+            //   /px/workOrderList/toPicking 后端实现不删,该端点仍按 picking 鉴权(见下方 BUTTON_PERMS_OVERRIDE);
+            //   只是新矩阵授不出该词(PagePanelRegistry.WORK_ORDER_LIST_ACTIONS 已去掉)。
             Map.entry("split", "切单"), Map.entry("picking", "转领料单"), Map.entry("recipe", "获取混料配方"),
             // 供应商权限配置(2026-10-25):组织架构里给角色勾上这个词即可维护供应商账号
             Map.entry("supplier", "配置供应商账号"));
@@ -173,6 +176,9 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|取消结案", new String[]{"close"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|切单", new String[]{"split"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|撤回切单", new String[]{"split"});
+        // 2026-11-05:本映射**保留**(端点闸门 = 二道闸;后端 toPicking 实现不删)。
+        //   前端按钮已删、矩阵已不出现「转领料单」列 ⇒ 新勾选授不出该词,历史库里残留的 picking 词
+        //   已由 migrate-drop-wol-picking-perm-20261105.sql 清掉(此后该端点只有管理员恒过)。
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|转领料单", new String[]{"picking"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|获取混料配方", new String[]{"recipe"});
         // 「排产」两个入口(快速排产页 / 生产工单页弹出的内嵌快速排产)同挂 assign 词:

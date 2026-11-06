@@ -1,0 +1,3 @@
+{"batch":1,"rs":0,"columns":[""],"rows":[["rows=3640 docs=827 prods=817 missing_unit=0 bad_seq_docs=0"]]}
+{"batch":2,"rs":0,"columns":[""],"rows":[["schema_log=1 multi_version_products=10 other_source_rows=2"]]}
+{"batch":3,"rs":0,"columns":[""],"rows":[["panel_docs=829"]]}

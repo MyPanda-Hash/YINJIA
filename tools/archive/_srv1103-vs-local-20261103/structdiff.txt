@@ -1,0 +1,703 @@
+
+=== 表 ===  A(HSDZ_MES_SRV1103)=296  B(HSDZ_MES)=255  | 仅A(服务器) 10  仅B(本地) 1
+  [仅A/服务器] dbo.bd_manu_order
+  [仅A/服务器] dbo.bl_manu_order
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022
+  [仅B/本地]   dbo.wo_pick_line
+
+=== 列 ===  A(HSDZ_MES_SRV1103)=12567  B(HSDZ_MES)=10912  | 仅A(服务器) 421  仅B(本地) 32
+  [仅A/服务器] dbo.bd_manu_order.asp_cancel | char(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.id | int | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.余量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.入库单号 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.入库数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.单价 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.单据日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.单据类型 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.合同号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用1 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用10 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用11 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用12 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用13 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用14 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用15 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用16 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用17 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用18 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用19 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用2 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用20 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用3 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用4 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用5 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用6 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用7 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用8 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.备用9 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.外包单号 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.完工日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.客户 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.客户编码 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.开工日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.打印人 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.打印时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.打印次数 | int | null=0 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.批号 | nvarchar(100) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.拆分序号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.排产数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.排产班组 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.操作员 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.是否手工修改单据编码 | bit | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.机构 | nvarchar(100) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.来料单号 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.来料性质 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.模具类型 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.测试程序 | nvarchar(100) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.混料批次号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.源工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.生产线 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.结案 | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.结案人 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.结案时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.负责人 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.采购入库单号 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.重点管控 | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.重量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.金额 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.销售订单号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.附件1 | nvarchar | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.附件2 | nvarchar | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.附件3 | nvarchar | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.附件4 | nvarchar | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.附件5 | nvarchar | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.附件6 | nvarchar | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.需求数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.预完工日 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.预开工日 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.领料单号 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.首件完成 | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bd_manu_order.首件完成时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bd_manu_order.首件通知人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.asp_cancel | char(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.id | int | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.产品名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.产品编码 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.余量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.入库数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.单价 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.单重 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.可用量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.合同号 | nvarchar(100) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.图号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.型号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用1 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用10 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用11 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用12 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用13 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用14 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用15 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用16 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用17 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用18 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用19 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用2 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用20 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用3 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用4 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用5 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用6 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用7 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用8 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.备用9 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.存货图片 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.总重 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.批号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.排产数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.每箱数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.现存量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.生产单位 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.累计汇报套数(工序单位) | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.规格型号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.金额 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.需求令号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.bl_manu_order.需求数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.bl_manu_order.齐套数量(主) | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.不合格数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.备注 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.实测数值 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.标准 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.样品序号 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.检查频率 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.检验列 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.检验方法 | nvarchar(1000) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.检验要求 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.检验项目 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.测量值1 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.测量值2 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.测量值3 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.测量值4 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.测量值5 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.结果判断 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.行类型 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.表区 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_20261021.项目分组 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.不合格数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.备注 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.实测数值 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.标准 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.样品序号 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.检查频率 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.检验列 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.检验方法 | nvarchar(1000) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.检验要求 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.检验项目 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.测量值1 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.测量值2 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.测量值3 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.测量值4 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.测量值5 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.结果判断 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.行类型 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.表区 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_detail_bak_ng_20261022.项目分组 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.产品名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.产品编码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.使用范围 | nvarchar(60) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.单据日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.单据状态 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.审核人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.审核时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.客户代码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.客户名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.密级 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.工单行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.工序 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.工艺清单单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.总结论 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.执行标准 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.批次号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.报工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.报工数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.文件编码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.检验员 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.检验数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.检验方案 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.检验日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.生产日期 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.生产线 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.生产车间 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.表单管理人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_20261021.规格型号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.产品名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.产品编码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.使用范围 | nvarchar(60) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.单据日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.单据状态 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.审核人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.审核时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.客户代码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.客户名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.密级 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.工单行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.工序 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.工艺清单单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.总结论 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.执行标准 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.批次号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.报工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.报工数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.文件编码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.检验员 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.检验数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.检验方案 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.检验日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.生产日期 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.生产线 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.生产车间 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.表单管理人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_first_insp_head_bak_ng_20261022.规格型号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.不合格应对措施 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.不良数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.产线常规功能性结果 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.单项判定 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.备注 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.备注2 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.实测数值 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.抽检量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.格数 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.格数上限 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.检查频率 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.检验仪器 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.检验方法 | nvarchar(1000) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.检验要求 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.检验项目 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值1 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值10 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值2 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值3 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值4 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值5 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值6 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值7 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值8 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.测量值9 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.结果判断 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_20261022.表区 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.不合格应对措施 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.不良数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.产线常规功能性结果 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.单项判定 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.备注 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.备注2 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.实测数值 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.抽检量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.格数 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.格数上限 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.检查频率 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.检验仪器 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.检验方法 | nvarchar(1000) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.检验要求 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.检验项目 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值1 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值10 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值2 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值3 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值4 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值5 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值6 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值7 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值8 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.测量值9 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.结果判断 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_detail_bak_ng_20261022.表区 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.产品名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.产品编码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.列数 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.单据日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.单据状态 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.审核人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.审核时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.客户名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.工单行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.工序 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.总结论 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.执行标准 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.批次号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.报工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.报工数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.抽检总量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.文件编码 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.检验员 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.检验数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.检验方案 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.检验日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.检验时间 | nvarchar(30) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.检验类别 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.生产线 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.生产车间 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_20261021.规格型号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.asp_cancel | nvarchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.asp_user1 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.asp_user2 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.id | bigint | null=0 | ident=1 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.产品名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.产品编码 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.列数 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.单据日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.单据状态 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.单据编号 | nvarchar(50) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.处理方式 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.审核人 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.审核时间 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.客户名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.工单行号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.工序 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.总结论 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.执行标准 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.批次号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.报工单号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.报工数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.抽检总量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.文件编码 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.检验员 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.检验数量 | decimal(18,4) | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.检验方案 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.检验日期 | date | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.检验时间 | nvarchar(30) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.检验类别 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.生产线 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.生产车间 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.qc_proc_insp_head_bak_ng_20261022.规格型号 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.rd_mold_formula_detail.单支物料含量 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_mold_formula_detail.实际添加比例 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_mold_formula_detail.设计添加量 | float | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_prod_info_detail.尺寸规格 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.rd_prod_info_detail.序号 | int | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.rd_prod_info_detail.物料名称 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.rd_prod_info_detail.物料编号 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_cancel | varchar(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_time1 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time2 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_time4 | datetime | null=1 | ident=0 | computed=0 | coll=
+  [仅A/服务器] dbo.wo_mixing_list.asp_user1 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user2 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅A/服务器] dbo.wo_mixing_list.asp_user4 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.单支物料含量 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.实际添加比例 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_mold_formula_detail.设计添加量 | nvarchar(50) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_prod_info_detail.尺寸规格 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_prod_info_detail.序号 | nvarchar(20) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_prod_info_detail.物料名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.rd_prod_info_detail.物料编号 | nvarchar(120) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_cancel | nvarchar(2) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_time4 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_mixing_list.asp_user1 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_user2 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_mixing_list.asp_user4 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.asp_cancel | char(1) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.asp_time1 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_pick_line.asp_time2 | datetime2(7) | null=1 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_pick_line.asp_user1 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.asp_user2 | nvarchar(100) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.id | int | null=0 | ident=1 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_pick_line.仓库 | nvarchar(120) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.仓库编码 | nvarchar(60) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.单头id | int | null=0 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_pick_line.实领数量 | decimal(18,4) | null=0 | ident=0 | computed=0 | coll=
+  [仅B/本地]   dbo.wo_pick_line.批号 | nvarchar(120) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.明细备注 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.物料名称 | nvarchar(200) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.物料编码 | nvarchar(120) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.行号 | nvarchar(20) | null=0 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.规格型号 | nvarchar(500) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.计量单位 | nvarchar(40) | null=1 | ident=0 | computed=0 | coll=Chinese_PRC_CI_AS
+  [仅B/本地]   dbo.wo_pick_line.需求数量 | decimal(18,4) | null=0 | ident=0 | computed=0 | coll=
+
+=== 默认约束 ===  A(HSDZ_MES_SRV1103)=775  B(HSDZ_MES)=765  | 仅A(服务器) 18  仅B(本地) 8
+  [仅A/服务器] dbo.bd_manu_order.asp_cancel | DF__bd_manu_o__asp_c__256A9363 = ('N')
+  [仅A/服务器] dbo.bd_manu_order.打印次数 | DF__bd_manu_or__打印次数__3B64C17A = ((0))
+  [仅A/服务器] dbo.bl_manu_order.asp_cancel | DF__bl_manu_o__asp_c__0F46481A = ('N')
+  [仅A/服务器] dbo.rd_mold_formula_detail.单支物料含量 | DF_rd_mold_formula_detail_单支物料含量 = ((0))
+  [仅A/服务器] dbo.rd_mold_formula_detail.实际添加比例 | DF_rd_mold_formula_detail_实际添加比例 = ((0))
+  [仅A/服务器] dbo.rd_mold_formula_detail.设计添加量 | DF_rd_mold_formula_detail_设计添加量 = ((0))
+  [仅A/服务器] dbo.rd_mold_proc_detail.单支物料含量 | DF__rd_mold_p__单支物料含__6BF2EA3C = ((0))
+  [仅A/服务器] dbo.rd_mold_proc_detail.实际添加比例 | DF__rd_mold_p__实际添加比__6AFEC603 = ((0))
+  [仅A/服务器] dbo.rd_mold_proc_detail.设计添加量 | DF__rd_mold_p__设计添加量__6CE70E75 = ((0))
+  [仅A/服务器] dbo.rd_x_sinter_detail.asp_cancel | DF__rd_x_sint__asp_c__14F4FFCF = ('N')
+  [仅A/服务器] dbo.rd_x_sinter_head.asp_cancel | DF__rd_x_sint__asp_c__12189324 = ('N')
+  [仅A/服务器] dbo.wo_mixing_list.asp_cancel | DF_wo_mixing_list_asp_cancel = ('N')
+  [仅A/服务器] dbo.wo_mixing_list.asp_print | DF_wo_mixing_list_asp_print = ((0))
+  [仅A/服务器] dbo.wo_mixing_list.asp_time1 | DF_wo_mixing_list_asp_time1_1 = (getdate())
+  [仅A/服务器] dbo.wo_mixing_list.asp_user1 | DF_wo_mixing_list_asp_user1 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user2 | DF_wo_mixing_list_asp_user2 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user3 | DF_wo_mixing_list_asp_user3 = ('')
+  [仅A/服务器] dbo.wo_mixing_list.asp_user4 | DF_wo_mixing_list_asp_user4 = ('')
+  [仅B/本地]   dbo.rd_x_sinter_detail.asp_cancel | DF__rd_x_sint__asp_c__74532613 = ('N')
+  [仅B/本地]   dbo.rd_x_sinter_head.asp_cancel | DF__rd_x_sint__asp_c__7176B968 = ('N')
+  [仅B/本地]   dbo.wo_mixing_list.asp_cancel | DF__wo_mixing__asp_c__218FE0DE = (N'N')
+  [仅B/本地]   dbo.wo_pick_line.asp_cancel | DF__wo_pick_l__asp_c__1B6CF334 = ('N')
+  [仅B/本地]   dbo.wo_pick_line.实领数量 | DF__wo_pick_li__实领数量__1A78CEFB = ((0))
+  [仅B/本地]   dbo.wo_pick_line.物料编码 | DF__wo_pick_li__物料编码__18908689 = (N'')
+  [仅B/本地]   dbo.wo_pick_line.行号 | DF__wo_pick_line__行号__179C6250 = (N'')
+  [仅B/本地]   dbo.wo_pick_line.需求数量 | DF__wo_pick_li__需求数量__1984AAC2 = ((0))
+
+=== 索引 ===  A(HSDZ_MES_SRV1103)=402  B(HSDZ_MES)=403  | 仅A(服务器) 6  仅B(本地) 7
+  [仅A/服务器] dbo.bd_manu_order | PK__bd_manu___3213E83F2576C5D8 | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅A/服务器] dbo.bl_manu_order | PK__bl_manu___3213E83FE7484A79 | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅A/服务器] dbo.rd_x_sinter_detail | PK__rd_x_sin__3213E83F00ECE04A | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅A/服务器] dbo.rd_x_sinter_head | PK__rd_x_sin__3213E83F3431E5E5 | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅A/服务器] dbo.wo_proc_card_head | IX_wo_proc_card_head_batch | NONCLUSTERED | uniq=0 | pk=0 | uq=0 | keys=3:大批次号,15:卡状态 | incl=工单行id,工单号,工单行号,产品编码,产品名称,计划数量 | filter=
+  [仅A/服务器] dbo.wo_proc_card_head | UX_wo_proc_card_head_line | NONCLUSTERED | uniq=1 | pk=0 | uq=0 | keys=8:工单行id | incl= | filter=([asp_cancel]=N'N')
+  [仅B/本地]   dbo.rd_x_sinter_detail | PK__rd_x_sin__3213E83FBD048BC1 | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅B/本地]   dbo.rd_x_sinter_head | PK__rd_x_sin__3213E83FF1541E82 | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅B/本地]   dbo.wo_pick_line | IX_wo_pick_line_doc | NONCLUSTERED | uniq=0 | pk=0 | uq=0 | keys=2:单头id,3:行号 | incl= | filter=
+  [仅B/本地]   dbo.wo_pick_line | IX_wo_pick_line_mat | NONCLUSTERED | uniq=0 | pk=0 | uq=0 | keys=4:物料编码 | incl= | filter=
+  [仅B/本地]   dbo.wo_pick_line | PK_wo_pick_line | CLUSTERED | uniq=1 | pk=1 | uq=0 | keys=1:id | incl= | filter=
+  [仅B/本地]   dbo.wo_proc_card_head | IX_wo_proc_card_head_batch | NONCLUSTERED | uniq=0 | pk=0 | uq=0 | keys=3:大批次号,14:卡状态 | incl=工单行id,工单号,工单行号,产品编码,产品名称,计划数量 | filter=
+  [仅B/本地]   dbo.wo_proc_card_head | UX_wo_proc_card_head_line | NONCLUSTERED | uniq=1 | pk=0 | uq=0 | keys=7:工单行id | incl= | filter=([asp_cancel]=N'N')
+
+=== 主键/唯一键 ===  A(HSDZ_MES_SRV1103)=267  B(HSDZ_MES)=266  | 仅A(服务器) 4  仅B(本地) 3
+  [仅A/服务器] dbo.bd_manu_order | PK__bd_manu___3213E83F2576C5D8 | PRIMARY_KEY_CONSTRAINT | id
+  [仅A/服务器] dbo.bl_manu_order | PK__bl_manu___3213E83FE7484A79 | PRIMARY_KEY_CONSTRAINT | id
+  [仅A/服务器] dbo.rd_x_sinter_detail | PK__rd_x_sin__3213E83F00ECE04A | PRIMARY_KEY_CONSTRAINT | id
+  [仅A/服务器] dbo.rd_x_sinter_head | PK__rd_x_sin__3213E83F3431E5E5 | PRIMARY_KEY_CONSTRAINT | id
+  [仅B/本地]   dbo.rd_x_sinter_detail | PK__rd_x_sin__3213E83FBD048BC1 | PRIMARY_KEY_CONSTRAINT | id
+  [仅B/本地]   dbo.rd_x_sinter_head | PK__rd_x_sin__3213E83FF1541E82 | PRIMARY_KEY_CONSTRAINT | id
+  [仅B/本地]   dbo.wo_pick_line | PK_wo_pick_line | PRIMARY_KEY_CONSTRAINT | id
+
+=== CHECK约束 ===  A(HSDZ_MES_SRV1103)=1  B(HSDZ_MES)=1  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 触发器 ===  A(HSDZ_MES_SRV1103)=2  B(HSDZ_MES)=2  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 视图 ===  A(HSDZ_MES_SRV1103)=113  B(HSDZ_MES)=112  | 仅A(服务器) 1  仅B(本地) 0
+  [仅A/服务器] dbo.v_manu_schedule | 7CED8E237B810C1970368DD4A07CB2FDDB5EA1D86B9E2CB126CD79526A4BAB0F | len=5420
+
+=== 存储过程 ===  A(HSDZ_MES_SRV1103)=31  B(HSDZ_MES)=31  | 仅A(服务器) 0  仅B(本地) 0
+
+=== 扩展属性 ===  A(HSDZ_MES_SRV1103)=10410  B(HSDZ_MES)=10305  | 仅A(服务器) 137  仅B(本地) 32
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order | MS_Description = 生产加工单头表(经典遗留面板)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.asp_cancel | MS_Description = asp_cancel
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.asp_time1 | MS_Description = asp_time1
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.asp_time2 | MS_Description = asp_time2
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.asp_user1 | MS_Description = asp_user1
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.asp_user2 | MS_Description = asp_user2
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.余量 | MS_Description = 余量=排产数量-入库数量(参考库 plang_pc.yl)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.入库单号 | MS_Description = 入库单号(完工入库回填,参考库 plang_pc.rk_no)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.入库数量 | MS_Description = 已入库数量(完工入库回填,参考库 plang_pc.rk_sl)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.单价 | MS_Description = 单价(参考库 plang_pc.dj)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.单据日期 | MS_Description = 单据日期
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.单据类型 | MS_Description = 单据类型(参考库 plang_pc.djlx;如 自制/委外/返工)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.合同号 | MS_Description = 合同号
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备注 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用1 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用10 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用11 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用12 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用13 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用14 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用15 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用16 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用17 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用18 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用19 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用2 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用20 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用3 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用4 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用5 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用6 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用7 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用8 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.备用9 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.外包单号 | MS_Description = 外包单号(委外加工关联,参考库 plang_pc.wb_no)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.完工日期 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.客户 | MS_Description = 客户
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.客户编码 | MS_Description = 客户编码
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.开工日期 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.打印人 | MS_Description = 打印人(最近一次打印生产任务单的操作员;旧系统 ProSchedList 列表列)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.打印时间 | MS_Description = 打印时间(最近一次打印生产任务单的时刻;与 打印次数/打印人 配套)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.打印次数 | MS_Description = 打印次数(参考库 plang.asp_print;两套纸质工单打印/重打计数,默认 0)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.批号 | MS_Description = 批号
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.拆分序号 | MS_Description = 拆单序号(源工单的第几拆,从 1 起)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.排产数量 | MS_Description = 排产数量(头级汇总=明细排产数量之和,参考库 plang_pc.pl_sl)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.排产班组 | MS_Description = 排产班组(参考图班别;排产工作台指派,下拉=班组档案)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.操作员 | MS_Description = 操作员(参考库 plang_pc.pl_man)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.是否手工修改单据编码 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.机构 | MS_Description = 机构
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.来料单号 | MS_Description = 来料单号(参考库 plang_pc.lldh;承接送料暂收/来料检验)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.来料性质 | MS_Description = 来料性质(参考库 plang_pc.llxz;新货/返工/客退等)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.模具类型 | MS_Description = 模具类型(参考库 plang.mjlx;成型工单使用模具标识:备料备模/首件对照/异常分析锚点,先手填模号,有编码体系后可换参照)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.测试程序 | MS_Description = 测试程序
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.混料批次号 | MS_Description = 混料批次号(批次链:混料工序按日发放→成型领料绑定→本单记录领用的混料批次;组装沿用碳棒批号)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.源工单号 | MS_Description = 拆单源工单号(空=原始工单;V2.0 §3.2 拆单父子关联)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.生产线 | MS_Description = 生产线(参考库 plang_pc.scx;排产时指派)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.结案 | MS_Description = 结案标记 Y/N(参考库 plang_pc.ja;结案后不再参与需求统计)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.结案人 | MS_Description = 结案人(执行「结案」的操作员;取消结案时清空。旧系统 ProSchedList 列表列)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.结案时间 | MS_Description = 结案时间(「结案」落库时刻;取消结案时清空)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.负责人 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.采购入库单号 | MS_Description = 采购入库单号(参考库 plang_pc.cgrkdh)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.重点管控 | MS_Description = 重点管控(排单计划表「是否重点管控产品」;是/否,排产时勾选,银嘉口径)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.重量 | MS_Description = 重量/kg(面板字段列)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.金额 | MS_Description = 金额(参考库 plang_pc.jine)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.销售订单号 | MS_Description = 销售订单号
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.附件1 | MS_Description = 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.附件2 | MS_Description = 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.附件3 | MS_Description = 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.附件4 | MS_Description = 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.附件5 | MS_Description = 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.附件6 | MS_Description = 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.需求数量 | MS_Description = 需求数量(来源订单转入,参考库 plang_pc.xq_sl)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.预完工日 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.预开工日 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.领料单号 | MS_Description = 领料单号(生产领料回填,参考库 plang_pc.ll_no2)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.首件完成 | MS_Description = 首件完成(是/否;生产出第一批时点「首件完成通知」,站内消息提醒品质取样测试)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.首件完成时间 | MS_Description = 首件完成时间(点「首件完成通知」自动落值)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bd_manu_order.首件通知人 | MS_Description = 首件通知人(点「首件完成通知」的操作人)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order | MS_Description = 生产加工单行表(经典遗留面板)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.asp_cancel | MS_Description = asp_cancel
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.asp_time1 | MS_Description = asp_time1
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.asp_time2 | MS_Description = asp_time2
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.asp_user1 | MS_Description = asp_user1
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.asp_user2 | MS_Description = asp_user2
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.产品名称 | MS_Description = 产品名称
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.产品编码 | MS_Description = 产品编码
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.余量 | MS_Description = 余量=排产数量-入库数量
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.入库数量 | MS_Description = 已入库数量(完工入库回填)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.单价 | MS_Description = 单价(来源订单单价)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.单重 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.可用量 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.合同号 | MS_Description = 合同号
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.图号 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.型号 | MS_Description = 型号
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备注 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用1 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用10 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用11 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用12 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用13 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用14 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用15 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用16 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用17 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用18 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用19 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用2 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用20 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用3 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用4 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用5 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用6 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用7 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用8 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.备用9 | MS_Description = 预留扩展字段(未绑定)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.存货图片 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.总重 | MS_Description = 总重
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.批号 | MS_Description = 批号(产品/来料批号,参考库 plang_pc.lot_no)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.排产数量 | MS_Description = 排产数量(排产确认数量,参考库 plang_pc.pl_sl)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.数量 | MS_Description = 数量
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.每箱数量 | MS_Description = 每箱数量(装箱规格;银嘉口径替代旧「每盘数量」,箱数=排产数量÷每箱数量)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.现存量 | MS_Description = 现存量
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.生产单位 | MS_Description = 生产单位
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.累计汇报套数(工序单位) | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.规格型号 | MS_Description = 规格型号
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.金额 | MS_Description = 金额
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.需求令号 | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.需求数量 | MS_Description = 需求数量(=订单数量,选单/生单带入)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.bl_manu_order.齐套数量(主) | MS_Description = 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_mold_formula_detail | MS_Description = 「成型配方」明细行表 （禁用）
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_mold_formula_head | MS_Description = 「成型配方」头表（禁用）
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.尺寸规格 | MS_Description = 产品BOM:尺寸规格
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.序号 | MS_Description = 产品BOM行序号(纸面隐藏,供排序/追溯)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.数量 | MS_Description = 产品BOM:数量(可带单位,不参与计算)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.物料名称 | MS_Description = 产品BOM:物料名称
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.物料编号 | MS_Description = 产品BOM:物料编号(商品档案存货编码)
+  [仅A/服务器] OBJECT_OR_COLUMN | dbo.wo_mixing_list.实际用量 | MS_Description = 现场实际投料量
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_mold_formula_detail | MS_Description = 「成型配方」明细行表（禁用，成型配方数据存放在成型工艺表中）
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_mold_formula_head | MS_Description = 「成型配方」头表（禁用，成型配方数据存放在成型工艺表中）
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.尺寸规格 | MS_Description = BOM 尺寸规格(含尺寸公差)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.序号 | MS_Description = 序号
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.数量 | MS_Description = BOM 用量
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.物料名称 | MS_Description = BOM 物料名称
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.rd_prod_info_detail.物料编号 | MS_Description = BOM 物料编号(可从物料清单引用)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.id | MS_Description = 主键
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.单据编号 | MS_Description = 混料单号
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.实际用量 | MS_Description = 电子称自动获取的实际用量
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.工单号 | MS_Description = 生产工单号
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.工单行id | MS_Description = 生产工单物理行主键(plang.id)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.工单行号 | MS_Description = 工单行显示序号
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.序号 | MS_Description = 单内物料行号
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.物料名称 | MS_Description = 物料名称
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.物料种类 | MS_Description = 物料种类
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.设计添加量 | MS_Description = 配方设计添加量
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.配方单号 | MS_Description = 成型配方/工艺清单单号
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_mixing_list.配方版本 | MS_Description = 配方版本
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line | MS_Description = 生产领料明细(手机扫码);一行 = 一张领料单的一项用料。需求数量=BOM单件用量×工单数量,实领数量=现场扫码确认后才写。提交后才据此生成材料出库单。
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.仓库 | MS_Description = 领用仓库(按库存最大仓预填)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.仓库编码 | MS_Description = 仓库编码
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.单头id | MS_Description = 指向 wo_pick_doc.id(这张明细属于哪张领料单)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.实领数量 | MS_Description = 实领= 现场扫码确认后写入;0 表示还没领。领料进度按它算
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.批号 | MS_Description = 领用批号(先进先出拆批后记录)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.明细备注 | MS_Description = 留痕:BOM 单号 + 用量 × 工单 = 需求;扫码后追加批次串
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.物料名称 | MS_Description = 领用物料名称
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.物料编码 | MS_Description = 领用物料编码
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.行号 | MS_Description = 明细行号,从 1 开始
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.规格型号 | MS_Description = 物料规格(BOM 上的写法优先,没有则取存货档案)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.计量单位 | MS_Description = 计量单位,取自存货档案(材料出库单必填)
+  [仅B/本地]   OBJECT_OR_COLUMN | dbo.wo_pick_line.需求数量 | MS_Description = 应领= BOM单件用量 × 工单排产数量,生单时算好,用于扫码预填
+
+TOTAL-DIFF-LINES=680
+RESULT: DIFF

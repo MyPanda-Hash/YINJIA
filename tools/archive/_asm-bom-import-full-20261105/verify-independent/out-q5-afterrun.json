@@ -1,0 +1,5 @@
+{"batch":1,"rs":0,"columns":["obj","type_desc","create_date","modify_date"],"rows":[["bs_asm_bom","USER_TABLE","2026-10-30T06:27:44.560","2026-10-30T06:29:20.763"]]}
+{"batch":2,"rs":0,"columns":["msdesc_cnt"],"rows":[["48"]]}
+{"batch":3,"rs":0,"columns":["panel_code","config"],"rows":[["ASM_BOM","{\"headDefaults\":{\"状态\":\"启用\",\"工序\":\"组装\"}}"]]}
+{"batch":4,"rs":0,"columns":["trigger_cnt"],"rows":[["0"]]}
+{"batch":5,"rs":0,"columns":["单据编号","产品编码","产品名称","工序","版本号","状态","行序","子件编码","标准用量","asp_user1","asp_time1","asp_user2","asp_time2","asp_cancel"],"rows":[["BOM-2026-10-0001","",null,"组装","V2026-10-30-01",null,"0","","0.0000","admin","2026-10-30T14:48:55.702449400","migrate-asm-bom-product-manual-20261104","2026-11-04T10:37:13.551293500","N"],["BOM-2026-11-0001","",null,"组装","V2026-11-04-01","启用","1","","0.0000","admin","2026-11-04T18:32:53.923189500","migrate-asm-bom-product-manual-20261104","2026-11-04T10:37:13.551293500","N"]]}

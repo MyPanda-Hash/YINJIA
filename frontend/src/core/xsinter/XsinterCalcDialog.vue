@@ -157,8 +157,8 @@
       </el-table-column>
       <el-table-column :label="tt('添加比例%')" width="120" align="right">
         <template #default="{ row, $index }">
-          <!-- 粉料/胶粉给百分数（0.45 → 45）；颗粒料没有比例，按克数显示并带 g -->
-          <span class="xc-out">{{ ratioText(row.kind, $index === 0 ? calc.rows[0]?.actual : calc.rows[$index]?.actual) }}</span>
+          <!-- 一律给实际比例的百分数（0.4555 → 45.55）；颗粒料同样有比例（克数 ÷ 总重） -->
+          <span class="xc-out">{{ ratioText(calc.rows[$index]?.actual) }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('单支含量g')" width="130" align="right">
@@ -171,8 +171,9 @@
     <!-- ── 计算结果 ── -->
     <div class="xc-sec">{{ tt('三、计算结果') }}</div>
     <el-table :data="[1]" border size="small" class="xc-grid">
+      <!-- 这一行混的是体积/切割中值/折算量/单支总重/比例合计，不是「切割长度」一项 -->
       <el-table-column :label="tt('项目')" width="96" align="center">
-        <template #default><span class="xc-lab">{{ tt('切割长度') }}</span></template>
+        <template #default><span class="xc-lab">{{ tt('计算过程') }}</span></template>
       </el-table-column>
       <el-table-column :label="tt('炭棒体积 cm³')">
         <template #default><span class="xc-out">{{ fmt(calc.volume) }}</span></template>
@@ -280,9 +281,12 @@ const fmt = (v) => {
   return String(Math.round(n * 1e6) / 1e6)
 }
 
-/** 「添加比例%」格：比例行给百分数，颗粒料行给克数（它没有比例） */
-function ratioText(kind, actual) {
-  if (isGramRow(kind)) return `${fmt(actual)} g`
+/**
+ * 「添加比例%」格：一律给**实际比例**的百分数。
+ * 颗粒料也有比例（Excel G16 = 克数 ÷ 单支总重），不再是"没有比例只显示克数"——
+ * 2026-11-05 报障：颗粒料那格显示 "9 g"、并被当成比例乘总重，导致含量 722 与比例合计 10。
+ */
+function ratioText(actual) {
   return fmt(percentOf(actual))
 }
 
@@ -468,7 +472,8 @@ function apply() {
       // 落**百分数**而不是比例：纸面「添加比例%」那列直接印数字（45 而不是 0.45），
       // 重新打开计算器读回来也还是同一个值（'45' → 0.45 的容错在 designUnits）。
       设计添加量: fmt(gram ? design : percentOf(design)),
-      添加比例: fmt(gram ? actual : percentOf(actual)),
+      // 添加比例恒存百分数：颗粒料现在也有实际比例（克数 ÷ 总重），旧口径存的是 9 克本身
+      添加比例: fmt(percentOf(actual)),
       '单支含量g': fmt(c.rows[i]?.perPiece),
     }
   })

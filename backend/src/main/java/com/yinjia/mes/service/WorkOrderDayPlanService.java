@@ -89,8 +89,11 @@ public class WorkOrderDayPlanService {
         Map<String, Double> opCaps = new LinkedHashMap<>();
         for (RowRef r : refs) opCaps.put(rowKey(r.id, r.op), round(r.planQty * rateOf(jdbc, r.route(), r.op())));
         Map<String, Map<LocalDate, Double>> manual = manualByDate(rowIds);
-        Map<String, Map<String, Double>> plans = mergedPlans(refs, opCaps, manual, today);
-        Map<String, Map<String, Double>> actuals = actualByDate(rowIds);
+        // 2026-11-05 用户口径「报工多了就影响今天和后面,历史数据不影响;历史排产没报工的往后挤压」:
+        //   先取每行每道**已审报工合计**,日计划 = (工序计划量 − 已报工) 从今天起重摊,历史格子原样保留。
+        Map<String, Map<String, Double>> actuals = actualByDate(jdbc, rowIds);
+        Map<String, Double> reportedTotals = reportedTotals(actuals);
+        Map<String, Map<String, Double>> plans = mergedPlans(refs, opCaps, manual, today, reportedTotals);
         // 日期列**按数据生成**(2026-10-29 用户口径「不存在当前日期的时候不显示这些数据列」):
         //   = 这些行的自动日计划/日报工出现过的日期 ∪ 各工序「计划开工~计划完工」区间;
         //   不再给「今天-14 ~ 今天+14」的固定窗口(那样会满屏空列)。
@@ -98,7 +101,8 @@ public class WorkOrderDayPlanService {
         out.put("日期", dates);
         // 产能可见(2026-10-31 用户口径「产能只显示、不拦截」):
         //   · 产线产能 = bs_prod_line.日产能(0/空 = 未配 ⇒ 不判超载,沿用列注明「0=不判超载」);
-        //   · 每日已排 = 该线**全部在册行**(plang.scx,不分页签)的自动日计划按日合计;
+        //   · 每日已排 = 该线**未完工且未结案**的行(plang.scx,不分页签)的日计划按日合计
+        //     (2026-11-04:完工/结案行不算负荷 —— 与左侧「未交量」同口径,见 lineDailyPlan);
         //   只对「工单排产页」(按产线)出这两项;生产工单页(按行 id)返回结构不变(前端不用即忽略)。
         boolean lineMode = (ids == null || ids.isEmpty()) && !str(line).isEmpty();
         out.put("产线产能", lineMode ? dayCapacity(str(line)) : 0d);
@@ -111,10 +115,16 @@ public class WorkOrderDayPlanService {
             String key = rowKey(r.id, r.op);
             Map<String, Double> planAll = plans.getOrDefault(key, Map.of());
             Map<String, Double> doneAll = actuals.getOrDefault(key, Map.of());
+            // 2026-11-05:计划合计 = **今天及以后**的日计划合计(剩余已排);历史格子只做对照、不进汇总
             double plannedTotal = 0;
-            for (double v : planAll.values()) plannedTotal += v;
+            for (Map.Entry<String, Double> p : planAll.entrySet()) {
+                LocalDate d = parseDate(p.getKey());
+                if (d == null || d.isBefore(today)) continue;
+                plannedTotal += p.getValue();
+            }
             double doneTotal = 0;
             for (double v : doneAll.values()) doneTotal += v;
+            double reported = reportedTotals.getOrDefault(key, 0d);
 
             // 需交付三桶:按交期落桶(逾期归 7 天;无交期归 大于15天)
             double due7 = 0, due15 = 0, dueOver = 0;
@@ -130,7 +140,8 @@ public class WorkOrderDayPlanService {
             double plan7 = 0, plan15 = 0, planOver = 0;
             for (Map.Entry<String, Double> p : planAll.entrySet()) {
                 LocalDate d = parseDate(p.getKey());
-                if (d == null) continue;
+                // 2026-11-05:只统计今天及以后(历史计划已由报工抵扣/挤压,不再进"已排"汇总)
+                if (d == null || d.isBefore(today)) continue;
                 if (!d.isAfter(d7)) plan7 += p.getValue();
                 if (!d.isAfter(d15)) plan15 += p.getValue();
                 else planOver += p.getValue();
@@ -157,6 +168,9 @@ public class WorkOrderDayPlanService {
             row.put("日报工", slice(doneAll, dates));
             row.put("计划合计", plannedTotal);
             row.put("完工合计", doneTotal);
+            // 2026-11-05:已审报工合计 / 剩余待排(= 工序计划量 − 已报工,不足 0 记 0)
+            row.put("已报工", reported);
+            row.put("剩余量", round(Math.max(0d, opCaps.getOrDefault(key, 0d) - reported)));
             // 人工指定 + 超分配(2026-10-31):前端拿它画「手」角标、清空即恢复自动;超分配只提示不拦。
             Map<LocalDate, Double> m = manual.getOrDefault(key, Map.of());
             Map<String, Double> manualOut = new LinkedHashMap<>();
@@ -464,23 +478,30 @@ public class WorkOrderDayPlanService {
     /**
      * 该线**每天已排**合计(日期列头「已排/日产能」、顶部「今日超载」):按 {@code plang.scx}(当前归属)算。
      *
-     * <p>2026-10-31 起日计划 = 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge}),这里把**整条线全部
-     * 在册行**(不分页签 —— 产能账是整条线的)逐行合并一遍再按日合计:与格子里的日计划、行上的
-     * 7天/15天已排**同一把尺**。2026-10-31 下午补:人工改过的格子也要算进来,否则改完数量产能数会偏。
+     * <p>2026-10-31 起日计划 = 「人工指定 ∪ 自动摊剩余」({@link DayPlanSpread#merge}),这里把该线
+     * **未完工且未结案**的行(不分页签 —— 产能账是整条线的活)逐行合并一遍再按日合计:与格子里的
+     * 日计划、行上的 7天/15天已排**同一把尺**。2026-10-31 下午补:人工改过的格子也要算进来,
+     * 否则改完数量产能数会偏。
      *
      * <p>按 {@code plang.scx} 而不是 {@code wo_day_plan.生产线}:调拨只改 plang/plang_pc/wo_process_line,
      * 以"活跟工单走"为准。
+     *
+     * <p><b>2026-11-04 口径修正</b>(与 {@code ScheduleBoardService.dayPlanTodayByLine} 同步):
+     * 只算**未完工且未结案**的行。此前"整条线全部在册行"连已完工/已结案也算 —— 完工单的交期若还在
+     * 未来(或开工日为空,自动摊分从今天起),列头「已排/日产能」就会把早已做完的活算成今天的负荷,
+     * 与左侧「未交量=0」自相矛盾(用户报障 2026-11-04)。
      */
     private Map<String, Double> lineDailyPlan(String line, List<String> dates, LocalDate today) {
         Map<String, Double> sums = new LinkedHashMap<>();
         String ln = str(line);
         if (ln.isEmpty()) return sums;
-        // 该线各行的人工指定(一次查完,别逐行 N+1)
+        // 该线各行的人工指定(一次查完,别逐行 N+1;只取未完工未结案的行)
         Map<Long, Map<LocalDate, Double>> manual = new HashMap<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT w.工单行id AS rid, w.计划日期 AS d, SUM(w.计划数量) AS q"
                         + " FROM dbo.wo_day_plan w JOIN dbo.plang p ON p.id = w.工单行id"
                         + " WHERE w.asp_cancel='N' AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?"
+                        + "   AND " + PlangClose.notClosed("p") + " AND NOT (" + PlangDone.done("p") + ")"
                         + " GROUP BY w.工单行id, w.计划日期", ln)) {
             if (!(r.get("rid") instanceof Number rid)) continue;
             LocalDate d = toDate(r.get("d"));
@@ -491,7 +512,14 @@ public class WorkOrderDayPlanService {
                 "SELECT p.id AS id, ISNULL(p.[当前工序],N'') AS op, ISNULL(p.[工艺路线],N'') AS route,"
                         + " ISNULL(p.pl_sl,0) AS plan_qty, p.st_date AS st, p.cp_date AS cp"
                         + " FROM dbo.plang p"
-                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?", ln);
+                        + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') = ?"
+                        // 2026-11-04:完工/结案行不算负荷(否则列头「已排」会把做完的活算进来)
+                        + "   AND " + PlangClose.notClosed("p") + " AND NOT (" + PlangDone.done("p") + ")", ln);
+        // 2026-11-05:产能(今日已排/日期列头)也按「剩余量」算 —— 与格子同一把尺(DayPlanSpread.mergeReported)
+        List<Long> rowIds = new ArrayList<>();
+        for (Map<String, Object> r : rows) if (r.get("id") instanceof Number n) rowIds.add(n.longValue());
+        Map<String, Double> reported = rowIds.isEmpty() ? Map.of()
+                : reportedTotals(actualByDate(jdbc, rowIds));
         // 当前工序为空的行:回落到台账当前道(换算率要靠它);批量查,别 N+1
         List<Long> noOp = new ArrayList<>();
         for (Map<String, Object> r : rows) {
@@ -506,7 +534,9 @@ public class WorkOrderDayPlanService {
             final String route = str(r.get("route"));
             double rate = rateCache.computeIfAbsent(route + "|" + op, k -> rateOf(jdbc, route, op));
             double total = round(num(r.get("plan_qty")) * rate);
-            Map<LocalDate, Double> merged = DayPlanSpread.merge(total, toDate(r.get("st")), toDate(r.get("cp")),
+            String opKey = rowKey(idn.longValue(), op);
+            Map<LocalDate, Double> merged = DayPlanSpread.mergeReported(total,
+                    reported.getOrDefault(opKey, 0d), toDate(r.get("st")), toDate(r.get("cp")),
                     today, manual.getOrDefault(idn.longValue(), Map.of()));
             for (Map.Entry<LocalDate, Double> e : merged.entrySet()) {
                 sums.merge(e.getKey().toString(), e.getValue(), Double::sum);
@@ -728,12 +758,14 @@ public class WorkOrderDayPlanService {
     private static Map<String, Map<String, Double>> mergedPlans(List<RowRef> refs,
                                                                 Map<String, Double> opCaps,
                                                                 Map<String, Map<LocalDate, Double>> manual,
-                                                                LocalDate today) {
+                                                                LocalDate today,
+                                                                Map<String, Double> reportedTotals) {
         Map<String, Map<String, Double>> out = new LinkedHashMap<>();
         for (RowRef r : refs) {
             String key = rowKey(r.id, r.op);
             Map<String, Double> m = new LinkedHashMap<>();
-            for (Map.Entry<LocalDate, Double> e : DayPlanSpread.merge(opCaps.getOrDefault(key, 0d),
+            for (Map.Entry<LocalDate, Double> e : DayPlanSpread.mergeReported(opCaps.getOrDefault(key, 0d),
+                    reportedTotals.getOrDefault(key, 0d),
                     r.start(), r.due(), today, manual.getOrDefault(key, Map.of())).entrySet()) {
                 m.put(e.getKey().toString(), e.getValue());
             }
@@ -775,7 +807,7 @@ public class WorkOrderDayPlanService {
      * 日计划 11-01 格只有计划 2,没有实际值)。补日期见
      * {@link WoReportService#stampDocDate}(保存/审核时补 sc_date)。
      */
-    private Map<String, Map<String, Double>> actualByDate(List<Long> ids) {
+    static Map<String, Map<String, Double>> actualByDate(JdbcTemplate jdbc, List<Long> ids) {
         Map<String, Map<String, Double>> out = new LinkedHashMap<>();
         if (ids.isEmpty()) return out;
         List<String> nos = jdbc.queryForList(
@@ -801,6 +833,18 @@ public class WorkOrderDayPlanService {
             out.computeIfAbsent(rowKey(((Number) r.get("rid")).longValue(), str(r.get("op"))),
                             k -> new LinkedHashMap<>())
                     .merge(str(r.get("d")), num(r.get("q")), Double::sum);
+        }
+        return out;
+    }
+
+    /** 每行每道工序的**已审报工合计**(全部日期,不限窗口):key = 行id|工序 */
+    static Map<String, Double> reportedTotals(Map<String, Map<String, Double>> actuals) {
+        Map<String, Double> out = new LinkedHashMap<>();
+        if (actuals == null) return out;
+        for (Map.Entry<String, Map<String, Double>> e : actuals.entrySet()) {
+            double t = 0;
+            for (double v : e.getValue().values()) t += v;
+            out.put(e.getKey(), round(t));
         }
         return out;
     }

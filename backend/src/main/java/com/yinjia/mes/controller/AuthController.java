@@ -388,7 +388,7 @@ public class AuthController {
      *
      * <p>兜底口径:该面板**除我之外没有别的启用审批人** ⇒ 允许自审;这与
      * {@code ButtonService.canSelfAudit} 的第二条判定一一对应(展示层/服务端同源)。
-     * 两级面板(RD_PROD_INFO + 8 张质量单据)不兜底——它们本就有确定的第二级,不存在死路。
+     * 两级面板(RD_PROD_INFO + 8 张质量单据 + 出厂检验报告)不兜底——它们本就有确定的第二级,不存在死路。
      */
     private List<String> selfAuditPanelsFull(boolean admin, Object roleId, String username) {
         if (admin) return List.of("*");

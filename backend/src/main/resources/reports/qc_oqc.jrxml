@@ -7,7 +7,7 @@
        JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo),
                                     new JRMapCollectionDataSource(detailRows))
        · 参数 = 头字段 label(中文名):单据编号/单据日期/客户名称/产品编码/产品名称/规格型号/
-         批次号/生产日期/生产数量/检测日期/AQL/检验员/检验结论/备注 + 打印时间;
+         批次号/生产日期/生产数量/检测日期/AQL/检验员/审核人/审批人/检验结论/备注 + 打印时间;
          日期字段经 QueryService.dateWallText 已是 'yyyy-MM-dd' 文本,生产数量是 BigDecimal。
        · 数据源字段 = 明细 label:序号/检验项目/检验要求/检验方法/抽样标准/抽检量/测量值1..5/
          结果/判定/数据来源/来源项目名/是否手填/行号。抽样标准/抽检量为手填,当前可能为 NULL。
@@ -22,10 +22,13 @@
        ③ detail 带 = 明细逐行;检验要求/结果长文本 textAdjust="StretchHeight" 自动撑高,
           全行 7 格 stretchType="RelativeToTallestObject" 等高对齐(边框连续成表);splitType=Prevent 整行不拆
        ④ group reportTail(表达式 Boolean.TRUE,效果=表尾一次)= groupFooter 里一整套表尾:
-          检验结论+备注 / 卫生安全 15 项表 / 签署行 + YJ-QR-05/A1。
+          检验结论+备注 / 卫生安全 15 项表 / 签署行(检验员=编制、审核=一级审批人、批准=二级审批人;
+          三格全按头字段动态落值,空则印下划线占位) + YJ-QR-05/A1。
           为什么不用 summary：JR 6.21 里 summary 单独起页时**不打印 pageHeader**(实测),第 2 页会丢 logo 页眉;
           groupFooter 起的续页会正常打印页眉,与原件第 2 页一致。
-       ⑤ pageFooter 带 = 公司地址/网址/邮箱/电话 + 打印时间 + 页码(第 X 页 / 共 Y 页 紧邻,不拉到纸两端)
+       ⑤ pageFooter 带 = 打印时间 + 页码(第 X 页 / 共 Y 页 紧邻,不拉到纸两端)。
+          2026-11-04 用户口径:去掉红框内的页脚内容 ⇒ 原「公司地址/网址/邮箱/电话」整行删除,
+          打印时间与页码上移到 band 顶部 y=0;band 高度保持 90 不变(避免整单分页变化)。
      卫生安全表:项目/卫生要求为静态文字;**结果列 = qc_oqc_head.卫生_<项目> 15 个可填列**
        (2026-11-01 用户口径「这些红框内容要能填写」;空=未录,纸面留空,不把样张里的 0.12/1.79/ND 假值充数)。
      数据行为空(如尚未录入实测值)时各格留空,不打印 null。
@@ -86,7 +89,6 @@
   <style name="sectTitle" style="base" fontSize="12" hAlign="Left" vAlign="Middle"/>
   <style name="sign" style="base" fontSize="12" hAlign="Left" vAlign="Middle"/>
   <style name="signR" style="base" fontSize="12" hAlign="Right" vAlign="Middle"/>
-  <style name="footerNote" style="base" fontSize="9" hAlign="Center" vAlign="Middle" forecolor="#555555"/>
   <style name="pager" style="base" fontSize="9" hAlign="Left" vAlign="Middle" forecolor="#555555"/>
   <style name="pagerR" style="pager" hAlign="Right"/>
 
@@ -109,6 +111,12 @@
   <parameter name="首件检验单号" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="制程检验单号" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="检验员" class="java.lang.Object" isForPrompting="false"/>
+  <!-- 两级审批签署值(2026-11-04):审核人 = 一级审批通过的人,审批人 = 二级批准(超级管理员)。
+       ReportService.headParams 把全部头字段 label 转为参数 ⇒ yj_field 注册这两列后自动有值;
+       未提交/未审批时为空 ⇒ 下方签署行印下划线占位。
+       (参数名必须与 yj_field.label 完全一致,否则取不到值。) -->
+  <parameter name="审核人" class="java.lang.Object" isForPrompting="false"/>
+  <parameter name="审批人" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="检验结论" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="备注" class="java.lang.Object" isForPrompting="false"/>
   <parameter name="单据状态" class="java.lang.Object" isForPrompting="false"/>
@@ -268,17 +276,20 @@
           <reportElement style="sqCell" x="414" y="311" width="102" height="16"/>
           <textFieldExpression><![CDATA[$P{卫生_锌} == null ? "" : String.valueOf($P{卫生_锌})]]></textFieldExpression>
         </textField>
+        <!-- 签署行(2026-11-04 用户口径):检验员=编制(提交审批时后端自动写提交人,元数据 editable=0 ⇒ 只读)、
+             审核=一级审批人、批准=超级管理员(二级通过才落值);空(未提交/未审批)印下划线占位。
+             三格都是头字段动态落值,参数见上方 $P{检验员}/$P{审核人}/$P{审批人}。 -->
         <textField>
           <reportElement style="sign" x="51" y="329" width="186" height="17"/>
           <textFieldExpression><![CDATA["检验员：" + ($P{检验员} == null || String.valueOf($P{检验员}).isBlank() ? "________________" : String.valueOf($P{检验员}))]]></textFieldExpression>
         </textField>
         <textField>
           <reportElement style="sign" x="237" y="329" width="162" height="17"/>
-          <textFieldExpression><![CDATA["审核：________________"]]></textFieldExpression>
+          <textFieldExpression><![CDATA["审核：" + ($P{审核人} == null || String.valueOf($P{审核人}).isBlank() ? "________________" : String.valueOf($P{审核人}))]]></textFieldExpression>
         </textField>
         <textField>
           <reportElement style="sign" x="399" y="329" width="159" height="17"/>
-          <textFieldExpression><![CDATA["批准：________________"]]></textFieldExpression>
+          <textFieldExpression><![CDATA["批准：" + ($P{审批人} == null || String.valueOf($P{审批人}).isBlank() ? "________________" : String.valueOf($P{审批人}))]]></textFieldExpression>
         </textField>
         <textField>
           <reportElement style="signR" x="418" y="360" width="78" height="17"/>
@@ -404,26 +415,23 @@
     </band>
   </detail>
 
-  <!-- ============ ⑥ 页脚:地址/网址/邮箱/电话 + 打印时间 + 页码 ============ -->
+  <!-- ============ ⑥ 页脚:打印时间 + 页码(2026-11-04 用户口径:去掉红框内的地址/网址/邮箱/电话行) ============ -->
   <pageFooter>
+    <!-- 地址行整行删除后,时间/页码上移到 band 顶部 y=0;band 高度保持 90(旧版带高)⇒ 不改变整单分页。 -->
     <band height="90">
-      <textField>
-        <reportElement style="footerNote" x="51" y="0" width="436" height="13"/>
-        <textFieldExpression><![CDATA["惠州大亚湾区龙海二路 303 号    www.water-agplus.com    info@water-agplus.com    0752-5583930"]]></textFieldExpression>
-      </textField>
       <textField isBlankWhenNull="true">
-        <reportElement style="pager" x="51" y="15" width="300" height="13"/>
+        <reportElement style="pager" x="51" y="0" width="300" height="13"/>
         <textFieldExpression><![CDATA["打印时间：" + ($P{打印时间} == null ? "" : String.valueOf($P{打印时间}))]]></textFieldExpression>
       </textField>
       <!-- 页码 = 两个紧邻字段拼成「第 X 页 / 共 Y 页」:左边一个 evaluationTime=Now(当前页)、
            右边一个 evaluationTime=Report(总页数);交界点都在 x=444(左字段右对齐、右字段左对齐),
            不再像旧写法 x=278 / x=418 那样被撑到纸张左右两端 -->
       <textField evaluationTime="Now">
-        <reportElement style="pagerR" x="400" y="15" width="44" height="13"/>
+        <reportElement style="pagerR" x="400" y="0" width="44" height="13"/>
         <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
       </textField>
       <textField evaluationTime="Report">
-        <reportElement style="pager" x="444" y="15" width="114" height="13"/>
+        <reportElement style="pager" x="444" y="0" width="114" height="13"/>
         <textFieldExpression><![CDATA[" / 共 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
       </textField>
     </band>
