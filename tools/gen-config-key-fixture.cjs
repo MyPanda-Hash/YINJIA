@@ -62,13 +62,21 @@ function runJdbc() {
   fs.writeFileSync(tmp, `${SQL} FOR JSON PATH;\n`, 'utf8')
   try {
     const buf = execFileSync('java', [
-      '-Dstdout.encoding=UTF-8', '-cp', 'lib\\mssql-jdbc.jar', 'SqlRunner.java',
+      // -cp 用 path.join 拼(2026-11-06):这里原先写死 'lib\\mssql-jdbc.jar',Windows 下是分隔符、
+      //   macOS/Linux 下反斜杠不是分隔符 ⇒ 类路径整条失效,脚本只能在 Windows 跑。
+      '-Dstdout.encoding=UTF-8', '-cp', path.join('lib', 'mssql-jdbc.jar'), 'SqlRunner.java',
       url, process.env.YINJIA_SQL_USER || 'yinjia', process.env.YINJIA_SQL_PASSWORD || 'Yinjia@2026', tmp,
     ], { cwd: tools, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
     const text = decodeOutput(buf)
-    const line = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l.startsWith('|') && l.includes('[{"'))
-    if (!line) throw new Error('SqlRunner 输出里没有 JSON 结果:\n' + text.slice(0, 400))
-    return JSON.parse(line.replace(/^\|\s*/, '').replace(/\s*\|\s*$/, ''))
+    // ⚠ JSON 结果可能是**多行分块**(2026-11-06 macOS 实测:同一 SELECT 的 FOR JSON 被拆成
+    //   若干 ~2KB 的 `| ... |` 行,按行取第一条会截断 ⇒ JSON.parse 报 Unterminated string)。
+    //   故把**所有**结果行按顺序拼回来(每行去首尾 '|' 与空白)再解析。
+    const chunks = text.split(/\r?\n/).map((l) => l.trim())
+      .filter((l) => l.startsWith('|') && l.endsWith('|') && l.length > 2)
+      .map((l) => l.replace(/^\|\s*/, '').replace(/\s*\|$/, ''))
+    const joined = chunks.join('')
+    if (!joined.startsWith('[')) throw new Error('SqlRunner 输出里没有 JSON 结果:\n' + text.slice(0, 400))
+    return JSON.parse(joined)
   } finally {
     try { fs.unlinkSync(tmp) } catch { /* 临时文件清理失败不影响结果 */ }
   }

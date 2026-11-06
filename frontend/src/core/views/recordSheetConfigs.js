@@ -1497,13 +1497,21 @@ export const recordSheetConfigs = {
           { label: '产品编号', key: '产品编号', type: 'text' },
           { label: '客户名称', key: '客户名称', type: 'text' },
         ]},
+        // 2026-11-06 用户口径:「产品信息表的客户名称下边加上一个客户编码字段,然后可以通过客户编码下拉
+        //   或者客户名称下拉,客户里面的信息带入这两个字段的数据就不需要手动填写」。
+        // 两格都是**参照 KHDA(客户档案)**:客户名称 ref=mc、客户编码 ref=dm(见
+        //   tools/migrate-prodinfo-cust-code-20261106.sql),后端 buildRefMap 的同名带回会把另一个
+        //   一起填上 —— 选编码带名称、选名称带编码,前端不再写单向联动。
         { pairs: [
+          { label: '客户编码', key: '客户编码', type: 'text' },
           { label: '客户料号', key: '客户料号', type: 'text' },
-          { label: '产品管控等级', key: '产品管控等级', type: 'select' },
         ]},
         { pairs: [
+          { label: '产品管控等级', key: '产品管控等级', type: 'select' },
           { label: '产品功能类别', key: '产品功能类别', type: 'select' },
-          { label: '产品形态', key: '产品形态', type: 'select' },
+        ]},
+        { pairs: [
+          { label: '产品形态', key: '产品形态', type: 'select', vspan: 3 },
         ]},
         { pairs: [
           { label: '应用场景', key: '应用场景', type: 'text', vspan: 3 },
@@ -1824,6 +1832,10 @@ export const recordSheetConfigs = {
         // 2026-10-29 新版设计**去掉**「客户名称」这一行(设计只有 9 行,客户维度由下一行承担)。
         // 只是不上纸面;RD_SPEC_DOC.客户名 的库里历史值原样保留,编辑面板仍可见。
         { label: '客户料号', key: '客户料号' },
+        // 2026-11-06 用户口径:「后面那些规格书等单据如果有客户编码的也同步关联上,产品编码引用的时候
+        //   也带过去」—— 规格书封面加「客户编码」(参照 KHDA.dm);选「产品编号」引用产品信息表时,
+        //   客户名称 + 客户编码 由 buildRefMap 同名带回一起落到本单。
+        { label: '客户编码', key: '客户编码' },
         // 显示文案照设计加括号;数据键仍是「客户项目名称」,不动。
         { label: '客户（项目）名称', key: '客户项目名称' },
         { label: '应用场景', key: '应用场景' },
