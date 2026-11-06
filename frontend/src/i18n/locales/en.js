@@ -3946,6 +3946,11 @@ export default {
     '该物料未维护来料检验要求': 'No incoming inspection requirement is maintained for this material',
     '共 {n} 行': '{n} row(s) in total',
     '另有 {n} 行物料类别不在检验要求模板中': '{n} more row(s) whose material category is not in the requirement template',
+    // 2026-11-06:归不进现役页签的行(物料类别已下线/脏值)改为渲染成「未归类」只读页签,不再只计数
+    '另有 {n} 行物料类别不在检验要求模板中（{cats}），已按「未归类」页签显示': '{n} more row(s) whose material category is not in the requirement template ({cats}); shown under an "Unclassified" tab',
+    '{c} · 未归类': '{c} · Unclassified',
+    '未填写物料类别': 'Material category not set',
+    '未归类': 'Unassigned',
 
     /* 检验报告·按物料编码从「来料检验要求」带入检验项/检测标准(2026-10-04 用户口径:
        检验项=要求表里上方的列名,检测标准=该列在命中行里的数据;只补缺失项) */
