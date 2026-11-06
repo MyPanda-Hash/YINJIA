@@ -1022,6 +1022,25 @@ function openProdRef(key) {
   prodRefSkipAudit.value = !!cfgCellOf(key)?.refAllStatus
   prodRefVisible.value = true
 }
+/**
+ * 立项申请表「编号自动填写」规则（2026-11-06 用户口径）：
+ *   「立项申请表的编号自动填写，规则为客户编码+日期」
+ *   「到时候一选择右上角编号就自行填写进来」，日期格式 20261106。
+ *
+ * 落点 = head['文档编号']（右上角那格；RD_APPROVAL 的 DOCNO_LABEL 就是「项目编号」）。
+ * 只在**选中客户之后**写，且**不覆盖已有值** —— 老单据的号是既成事实，换客户重选才重算。
+ */
+function applyApprovalDocNo(source) {
+  if (String(props.panelCode || '') !== 'RD_APPROVAL') return
+  const code = String(source?.客户编码 ?? source?.dm ?? '').trim()
+  if (!code) return
+  const d = new Date()
+  const ymd = String(d.getFullYear())
+    + String(d.getMonth() + 1).padStart(2, '0')
+    + String(d.getDate()).padStart(2, '0')
+  props.head['文档编号'] = code + ymd
+}
+
 function onProdRefConfirm(rows) {
   const f = prodRefField.value
   const source = rows?.[0]
@@ -1042,6 +1061,8 @@ function onProdRefConfirm(rows) {
     if (v !== undefined) props.head[to] = v
   }
   for (const [k, v] of Object.entries(keep)) props.head[k] = v
+  // 立项申请表：选中客户即按「客户编码+日期」自动填右上角编号（2026-11-06 用户口径）
+  applyApprovalDocNo(source)
   prodRefVisible.value = false
   emit('dirty')
 }

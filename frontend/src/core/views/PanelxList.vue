@@ -2562,7 +2562,7 @@ import { recordSheetConfigs } from './recordSheetConfigs'
 import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
-import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
+import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
@@ -2616,7 +2616,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   'QC_PROC_INSP', 'QC_FIRST_INSP',
   // 出厂检验报告(2026-11-01 用户口径):「和首件检验单相同的形式」——
   // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
-  'QC_OQC_REPORT', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+  'QC_OQC_REPORT',
+  // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
+  // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
  * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
@@ -2641,7 +2645,12 @@ const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
 const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
-const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
+const docSheetConfig = computed(() => {
+  // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
+  if (panelCode.value === 'RD_SAMPLE_EXT') return sampleExtSheetCfg
+  if (panelCode.value === 'RD_SAMPLE_INT') return sampleIntSheetCfg
+  return qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg)
+})
 
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 20 })
 const condition = reactive({})
@@ -9813,8 +9822,34 @@ function warnDisabled(action) {
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
 // 流程规范：新增时当前页面未保存的内容直接剔除,不弹确认——
 //   新增未保存过的占位单 → 撤回(防垃圾空单残留);已保存单据的未保存修改 → 随 load 放弃。
+/**
+ * 立项申请表「最多显示一张新增单据」（2026-11-06 用户口径）：
+ *   「立项申请点击进来显示的是新增单据，最多显示一张新增单据，防止反复多次进入出现多张新增单据」
+ *
+ * 判据：该面板下**已存在一张未保存过的空白草稿**（saved='N' 且客户名/立项背景/文档编号全空）
+ * ⇒ 直接打开它，不再新建。反复进出点「新增」都落回同一张，库里不会堆一串空草稿。
+ * 只看 RD_APPROVAL：其它文书面板（实施计划等）的「新增」行为逐字不变。
+ */
+function reusableBlankApproval() {
+  if (String(panelCode.value || '') !== 'RD_APPROVAL') return null
+  return (list.value || []).find((it) => {
+    const saved = String(it['saved'] ?? '').toUpperCase()
+    const blank = !String(it['客户名'] ?? '').trim()
+      && !String(it['立项背景'] ?? '').trim()
+      && !String(it['文档编号'] ?? '').trim()
+    return saved === 'N' && blank
+  }) || null
+}
 async function directAdd() {
   try {
+    // 立项申请表：已有空白草稿就复用，不再建第二张（2026-11-06 用户口径）
+    const reuse = reusableBlankApproval()
+    if (reuse) {
+      const idx = list.value.findIndex((item) => item['编号'] === reuse['编号'])
+      if (idx >= 0) curIdx.value = idx
+      ElMessage.info(tt('已有一张未填写的立项申请草稿，直接打开它'))
+      return
+    }
     const formData = {}
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
@@ -10987,6 +11022,18 @@ async function onButton(action) {
     }
     ElMessage.success(`「${action}」执行成功`)
     await load()
+    // 立项申请表：提交审批成功后自动跳「项目流程管控」（2026-11-06 用户口径
+    //   「填写提交之后自动跳转到项目流程管控」）。
+    // 跳转带上该立项单号 —— 流程页按 ?docNo= 直接定位到这张项目的 10 步时间轴，
+    // 不用用户再搜一次。关掉当前页签再开流程页，与既有 gotoPanel 分支同一做法。
+    if (action === '提交审批' && panelCode.value === 'RD_APPROVAL') {
+      const flowNo = actionDocumentNo || ''
+      const targetPath = '/rd/projectFlow'
+      tabs.close(route.path)
+      router.push({ path: targetPath, query: flowNo ? { docNo: flowNo } : {} })
+      tabs.open({ path: targetPath, title: tt('项目流程管控') })
+      return
+    }
     const actionIndex = list.value.findIndex((item) => (
       (item['编号'] || item['单据编号'] || item['锭号']) === actionDocumentNo
     ))

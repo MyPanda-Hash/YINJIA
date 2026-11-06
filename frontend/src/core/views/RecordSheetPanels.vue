@@ -160,7 +160,10 @@
                    现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
                    与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
                    留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
-              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+              <!-- ⚠ 2026-11-06 起 docNoStatic 优先级最高：声明了受控表单编号的面板，编辑态也不出
+                   参照控件/输入框（否则点开还能改，与"固定"自相矛盾）。 -->
+              <template v-if="docNoStatic"><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span><span class="rs-docno-static">{{ docNoStatic }}</span></template>
+              <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
                 <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
                 <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
                 <el-icon class="rs-ref-ico"><Search /></el-icon>
@@ -180,6 +183,12 @@
                    原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
                    cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
                    两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
+              <!-- 受控表单编号(2026-11-06 用户口径 A)：「产品文件右上角全部是文件编号，固定的」
+                   —— 产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 /
+                   规格书 YJ-QR-153。声明了 pages[i].docNoStatic 的面板，这一格印常量文本（编辑态与
+                   只读态一致、不出输入框、不可改）；单据自身编号（SD-…/MP-…）仍在左侧选单栏与
+                   产品文件列表里，两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联」）。
+                   未声明 docNoStatic 的面板逐字不变。 -->
               <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
@@ -594,10 +603,14 @@
             <tr v-if="!effPlain && cfg.variantKey && !dt.noVariant">
               <td :colspan="variantSpan(dt)" class="rsp-subtitle-row rsp-left">
                 <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
-                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
+                <!-- 加标水（2026-11-06）：切换「测试项目」要**立刻换表头** —— 每个标准库条目
+                     存着自己的列结构（见 core/panel/spikeWaterLayout.js），换条目 = 换表格样式。 -->
+                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="onVariantChanged">
                   <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
                 <span v-if="editable && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.variantKey))">⧉ {{ tt('标准库维护') }}</span>
+                <!-- 加标水专属：把选中条目的表格结构拿出来可视化编辑（加/删列、改列名、设分格） -->
+                <span v-if="editable && isSpikeWater && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openLayoutEditor">⊞ {{ tt('表格结构') }}</span>
                 <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
               </td>
               <td :colspan="Math.max(1, totalSpan(dt) - variantSpan(dt))" class="rsp-subtitle-row rsp-quiet"></td>
@@ -1684,6 +1697,13 @@
         <el-button @click="sheetViewVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 加标水表格结构编辑器（2026-11-06）：编辑当前「测试项目」条目的列定义 -->
+    <StdLibLayoutEditor
+      v-if="isSpikeWater"
+      ref="layoutEditorRef"
+      @saved="onLayoutSaved"
+    />
   </div>
 </template>
 
@@ -1700,6 +1720,8 @@ import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSu
 import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
+import { parseLayout } from '@/core/panel/spikeWaterLayout.js'
+import StdLibLayoutEditor from './StdLibLayoutEditor.vue'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
@@ -2056,7 +2078,12 @@ const docnoPrefix = computed(() => !!docnoPrefixText.value)
  * 声明了它 ⇒ 该格渲染这段常量文本(编辑态与只读态一致),与头字段解耦。
  * 未声明 pages[i].docNoStatic 的面板逐字不变(仍按 head[docNoKey] || docNoDefault)。
  */
-const docNoStatic = computed(() => String(activePageMeta.value?.docNoStatic || ''))
+const docNoStatic = computed(() => String(
+  // 2026-11-06：页级优先（测试申请单两页不同号 YJ-RIR001/YJ-XS002），
+  // 未声明页级时取**面板级** cfg.docNoStatic —— 产品文件四单（产品信息表/烧结/X烧结/规格书）
+  // 是多页面板但整份用同一个固定表单编号，逐页重复写没有意义。
+  activePageMeta.value?.docNoStatic || cfg.value?.docNoStatic || '',
+))
 
 /** 右上角编号格占末尾几列:末尾列宽不足时向左并列凑到 ≥160px——
  *  现有最长编号 YJ-AB-SAMPLE-1 实测 98px,加参照图标/间距约 145px;
@@ -2692,7 +2719,67 @@ function plainW(dt) {
   if (activePageMeta.value?.grid) return gridW.value
   return colsOf(dt).reduce((s, c) => s + (c.w || 100), 0)
 }
+/**
+ * 加标水自定义表格结构（2026-11-06 用户口径）。
+ *
+ * 「测试项目」是标准库字段；选中的条目在 yj_std_lib.content 里存着这套表的列定义（JSON）。
+ * 这里把它取出来解析成列集 —— 于是**一个标准库条目 = 一套表格样式**，
+ * 加一种测试项目只要在「⧉ 标准库维护」里加一条（内容填列定义），不用改代码、不用发版。
+ *
+ * 非加标水面板恒返回 null（colsOf 走原路径，逐字不变）。
+ */
+const spikeWaterLayout = ref(null)   // { cols, ok, reason }
+const spikeWaterCols = computed(() => (
+  String(props.panelCode || '') === 'RD_SPIKE_WATER' && spikeWaterLayout.value
+    ? spikeWaterLayout.value.cols
+    : null
+))
+
+/** 本面板是不是加标水（结构由标准库条目决定） */
+const isSpikeWater = computed(() => String(props.panelCode || '') === 'RD_SPIKE_WATER')
+
+const layoutEditorRef = ref(null)
+/** 打开表格结构编辑器：编辑当前「测试项目」那个条目的列定义 */
+function openLayoutEditor() {
+  const lib = stdLibOf('测试项目')
+  const picked = String(props.head?.['测试项目'] || '').trim()
+  if (!lib || !picked) return
+  layoutEditorRef.value?.open(lib, picked)
+}
+/** 结构存回去之后重新取一遍，纸面立刻用新表头 */
+async function onLayoutSaved() {
+  await loadSpikeWaterLayout()
+  emit('refresh-config')
+}
+/** 切「测试项目」后重新取结构（换条目 = 换表头） */
+async function onVariantChanged() {
+  emit('dirty')
+  await loadSpikeWaterLayout()
+}
+/** 拉「测试项目」那条标准库条目的 content 并解析成列集（失败退回内置列集，见 parseLayout） */
+async function loadSpikeWaterLayout() {
+  if (String(props.panelCode || '') !== 'RD_SPIKE_WATER') return
+  const lib = stdLibOf('测试项目')
+  const picked = String(props.head?.['测试项目'] || '').trim()
+  if (!lib || !picked) { spikeWaterLayout.value = null; return }
+  try {
+    const res = await request.get('/stdlib/list', { params: { lib, all: 1 } })
+    const rows = (res?.data ?? res ?? []).filter((r) => r.enabled !== 0 && r.enabled !== false)
+    const hit = rows.find((r) => String(r.content || '').trim().startsWith('{') &&
+      String(r.item_code || r.item || '').trim() === picked)
+      || rows.find((r) => String(r.item_code || r.item || '').trim() === picked)
+    spikeWaterLayout.value = parseLayout(hit ? hit.content : null)
+  } catch (e) {
+    spikeWaterLayout.value = parseLayout(null)
+  }
+}
 function colsOf(dt) {
+  // 加标水（RD_SPIKE_WATER，2026-11-06 用户口径「可以自定义面板格式……和标准库绑定，
+  // 一个标准库条目对应一个设计的表格样式」）：列集**由「测试项目」那个标准库条目的 content 决定**。
+  // 选中哪个条目，就用它存的 { cols:[{key,label,w,group,rowspan}] } 当列定义；
+  // 结构写坏/条目没配 → parseLayout 退回内置列集，单据照常出（不白屏）。
+  const layout = spikeWaterCols.value
+  if (layout) return layout
   return activeVariant.value?.cols || dt.cols || []
 }
 
@@ -4557,7 +4644,12 @@ function applyMoldModel(model) {
   emit('dirty')
   ElMessage.success(tt('已按型号 {m} 填入炭棒内外径与公差').replace('{m}', m))
 }
-onMounted(() => { if (props.editable) loadMoldRows() })
+onMounted(() => {
+  if (props.editable) loadMoldRows()
+  // 加标水：进面板就按当前「测试项目」条目取表结构（2026-11-06）
+  if (isSpikeWater.value) loadSpikeWaterLayout()
+})
+watch(() => props.head?.['测试项目'], () => { if (isSpikeWater.value) loadSpikeWaterLayout() })
 watch(() => props.editable, (v) => { if (v) loadMoldRows() })
 
 // ---------- 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表) ----------
@@ -5813,14 +5905,20 @@ function chartOf(dt) {
   line-height: 1.5;
 }
 /* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
-   并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径) */
-.rsp-cover-input :deep(.el-input__wrapper) {
+   并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径)。
+   ⚠ 2026-11-06 用户报障「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」:
+   封面整块渲染在 table.rs-t.rs-head-t 里,而通用规则
+   `.rs-t :deep(.el-input__inner){font-size:13.5px}` 给它下面的**所有**输入框定字号。
+   两条规则同特异性、`.rs-t` 那条在样式表里更靠后 ⇒ 草稿态（值格是 el-input）被压成 13.5px,
+   审批后（值格是纯 span 走 .rsp-cover-val）又回到 27.3px×cok ⇒ 同一页两种字号。
+   修法：给这两条规则加 `.rs-t` 前缀提升特异性（通用规则不能删，别的表区要靠它）。 */
+.rs-t .rsp-cover-input :deep(.el-input__wrapper) {
   padding: 0;
   box-shadow: none;
   background: transparent;
   border-radius: 0;
 }
-.rsp-cover-input :deep(.el-input__inner) {
+.rs-t .rsp-cover-input :deep(.el-input__inner) {
   height: calc(38px * var(--cvy));
   font-size: calc(27.3px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
@@ -5884,12 +5982,14 @@ function chartOf(dt) {
   font-family: 'SimSun', 'Songti SC', serif;
   word-break: break-all;
 }
-.rsp-sign-input :deep(.el-input__wrapper) {
+/* 签字栏同封面：这两条也必须带 .rs-t 前缀，否则被通用 `.rs-t :deep(.el-input__inner)`
+   的 13.5px 压掉（2026-11-06 同一根因；签字栏目标字号 12px×cok 比 13.5px 还小，压掉反而变大）。 */
+.rs-t .rsp-sign-input :deep(.el-input__wrapper) {
   padding: 0 2px;
   box-shadow: none;
   background: transparent;
 }
-.rsp-sign-input :deep(.el-input__inner) {
+.rs-t .rsp-sign-input :deep(.el-input__inner) {
   text-align: center;
   font-size: calc(12px * var(--cok));
   line-height: 1.5;

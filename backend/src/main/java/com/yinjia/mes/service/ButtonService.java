@@ -2417,6 +2417,11 @@ public class ButtonService {
                     + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
             clearAuditSignCells(def, no);
         }
+        // 规格书:弃审回草稿 ⇒ 「审核 / 批准」两格随审批作废清空（「制订」保留 —— 谁编的单没变）
+        if ("RD_SPEC_DOC".equals(def.code())) {
+            writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, null);
+            writeSpecSignCell(def.code(), no, SPEC_SIGN_APPROVE, null);
+        }
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         // 产品入库单 / 其他入库单 / 其他出库单 2026-10-14 接入转ERP,同批纳入本联动
         // 暂收退料单 2026-10-19 接入(《10.19 问题》第 8 条),同样纳入
@@ -2619,6 +2624,12 @@ public class ButtonService {
                 writeBackSignCell(def, no, prep, null, operator);
             }
         }
+        // 规格书(RD_SPEC_DOC):「制订」格 = **提交审批的人**（2026-11-06 用户口径
+        // 「规格书的底部的首先制定是填写提交审批的账号名字和日期」）。
+        // 与质量单据同一时机（提交这一刻），但落的是单列合写「姓名/yyyy.M.d」。
+        if ("RD_SPEC_DOC".equals(def.code())) {
+            writeSpecSignCell(def.code(), no, SPEC_SIGN_MAKE, operator);
+        }
         // 消息:提交审批 → 该面板审批人
         notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
                 Map.of("docNo", no, "actor", operator), operator));
@@ -2707,6 +2718,12 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 1, selfAudit);
+        // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
+        // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
+        // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
+        if ("RD_SPEC_DOC".equals(def.code())) {
+            writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, operator);
+        }
         // 立项申请:审批与定级是**同一步骤的两个动作**(2026-10-08 用户口径②「冯总审核及定级」)——
         // 审批弹窗里一并选项目等级,通过即定级,省掉"审完再点一次项目定级"。载荷没带等级时跳过
         // (兼容旧前端/老单:仍可事后用侧栏「项目定级」按钮补定级)。
@@ -2880,6 +2897,11 @@ public class ButtonService {
         recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, node);
         String rejectBy = currentUserName();
         // 质量单据:驳回即回草稿 —— 纸面「审核/批准」两格随审批作废清空(编制格保留,人没变)
+        if ("RD_SPEC_DOC".equals(def.code())) {
+            // 规格书驳回 ⇒ 「审核 / 批准」清空（「制订」保留）
+            writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, null);
+            writeSpecSignCell(def.code(), no, SPEC_SIGN_APPROVE, null);
+        }
         if (ADMIN_L2_PANELS.contains(def.code())) {
             clearAuditSignCells(def, no);
             final String l1f = l1Before;
@@ -3058,6 +3080,26 @@ public class ButtonService {
      *   用户口径「检验员=编制(提交审批时自动写提交人、只读)」⇒ 按编制格处理:
      *   提交审批时写 qc_oqc_head.[检验员],yj_field 已由 migrate-oqc-twolevel-20261104.sql 置 editable=0。
      */
+    /**
+     * 产品规格书(RD_SPEC_DOC)纸面「制订 / 审核 / 批准」三格自动落值（2026-11-06 用户口径）。
+     *
+     * 与质量单据那套的区别：
+     *   · 三格在库里是**单列合写**（制订日期 / 审核日期 / 批准日期，nvarchar(200)，
+     *     历史值就是「陈秀丽/2026.11.5」这种姓名+日期串），不是「审核人 + 审核时间」两列；
+     *   · **不走两级审批** —— 用户口径「规格书一级审批就回填」，一级通过即写「审核」；
+     *   · 「批准」由产品文件列表的独立「批准」按钮触发（独立权限词，见 PanelPermissionService），
+     *     不在审批流里。
+     *
+     * 列名 → 语义：制订 = 提交审批的人；审核 = 一级审批通过的人；批准 = 点批准按钮的人。
+     */
+    private static final String SPEC_SIGN_MAKE = "制订日期";
+    private static final String SPEC_SIGN_AUDIT = "审核日期";
+    private static final String SPEC_SIGN_APPROVE = "批准日期";
+
+    /** 规格书这类「姓名/日期合写一格」的落款格式（与历史值一致：陈秀丽/2026.11.5） */
+    private static final java.time.format.DateTimeFormatter SIGN_DATE_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy.M.d");
+
     private static final Map<String, String> QC_DOC_PREPARER = Map.of(
             "QC_TC_IN", "编制人",   // YJ-QR-60 特采申请单
             "QC_LYB", "编制人",     // YJ-QR-119 来料异常分析报告
@@ -3301,6 +3343,27 @@ public class ButtonService {
             log.warn("[两级审批] 取提交人失败 panel={} no={}: {}", def.code(), no, e.getMessage());
         }
         return authorOfDoc(def, no);
+    }
+
+    /**
+     * 规格书(RD_SPEC_DOC)三格落款的**统一写入口**。
+     *
+     * @param which  {@link #SPEC_SIGN_MAKE} / {@link #SPEC_SIGN_AUDIT} / {@link #SPEC_SIGN_APPROVE}
+     * @param account 要落的人（空 ⇒ 该格置空，用于驳回/弃审回草稿）
+     *
+     * 列缺失/面板不对时静默跳过，不阻断审批（与 {@link #writeBackSignCell} 同一容错口径）。
+     */
+    private void writeSpecSignCell(String panelCode, String no, String which, String account) {
+        if (!"RD_SPEC_DOC".equals(panelCode) || no == null || no.isBlank()) return;
+        try {
+            String val = account == null || account.isBlank()
+                    ? null
+                    : signNameOf(account) + "/" + LocalDateTime.now().format(SIGN_DATE_FMT);
+            jdbc.update("UPDATE rd_spec_doc_head SET [" + which + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", val, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[规格书落款] 写回 {} 失败 no={}: {}", which, no, e.getMessage());
+        }
     }
 
     /** 一级审批的通过人账号(取最近一条 APPROVE_L1 留痕);没批过返回空串 */

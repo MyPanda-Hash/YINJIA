@@ -535,6 +535,24 @@ public class PxController {
         return ApiResult.ok(out);
     }
 
+    /**
+     * 产品文件列表 · 规格书「批准」（2026-11-06 用户口径）：
+     *   「在产品文件列表里面的规格书的状态的已开发的右边加上一个批准按钮，谁点击了批准按钮
+     *     （给这个面板加上一个批准的单独权限，可以在组织架构里面的角色权限找到并进行配置，
+     *      管理员默认拥有）就回填进批准这一栏，也是账号名加日期」。
+     *
+     * 真闸门 = PanelPermissionService 的 specapprove 词（requireAnyPerm 内含管理员恒放行）。
+     * 落款写 rd_spec_doc_head.批准日期（单列合写「姓名/yyyy.M.d」，与制订/审核同格式）。
+     * 幂等：已批准的再点只刷新落款人，不报错（用户可能只是看错点第二次）。
+     */
+    @PostMapping("/specApprove")
+    public ApiResult<Map<String, Object>> specApprove(@RequestBody Map<String, Object> body) {
+        perm.requireAnyPerm("RD_SPEC_DOC", "规格书批准", "specapprove");
+        String no = body.get("docNo") == null ? "" : String.valueOf(body.get("docNo")).trim();
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少单据编号");
+        return ApiResult.ok(devTaskService.specApprove(no));
+    }
+
     /** 产品开发:参照标注(某面板下,这批产品是 未开发 / 已开发) */
     @PostMapping("/rdDev/annotate")
     @SuppressWarnings("unchecked")

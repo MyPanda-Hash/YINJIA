@@ -74,6 +74,23 @@
                 <span class="pds-badge" :class="toneOf(statusOf(row, c.panelCode))">
                   {{ tt(statusOf(row, c.panelCode)) }}
                 </span>
+                <!-- 2026-11-06 用户口径：「在产品文件列表里面的规格书的状态的已开发的右边加上一个
+                     批准按钮，谁点击了批准按钮（给这个面板加上一个批准的单独权限…管理员默认拥有）
+                     就回填进批准这一栏，也是账号名加日期」。
+                     只给**规格书**那一列出（RD_SPEC_DOC），且必须有 specapprove 词才渲染
+                     （没有权限的人看不到按钮，与"点了才 403"相比更早暴露）。 -->
+                <button
+                  v-if="canApprove(c) && statusOf(row, c.panelCode) === '开发完毕'"
+                  class="pds-approve"
+                  :title="approveTitle(row, c)"
+                  :disabled="approving === docNoOf(row, c.panelCode)"
+                  @click.stop="onApprove(row, c)"
+                >
+                  {{ tt('批准') }}
+                </button>
+                <span v-else-if="canApprove(c) && approvedAt(row)" class="pds-approved">
+                  {{ approvedAt(row) }}
+                </span>
               </td>
             </template>
             <td class="pds-c-owner">{{ row['产品负责人'] || '' }}</td>
@@ -155,6 +172,55 @@ function docNoOf(row, panelCode) {
 
 function canView(panelCode) {
   return canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, panelCode)
+}
+
+/**
+ * 该列是不是「规格书」那一列（2026-11-06：只有规格书有「批准」动作）。
+ * RD_X_SINTER 在 DevTaskService 里是 RD_MOLD_PROC 的别名，不参与批准。
+ */
+function isSpecColumn(c) {
+  return String(c?.panelCode || '') === 'RD_SPEC_DOC'
+}
+
+/**
+ * 当前登录用户能否点「批准」= 持有 RD_SPEC_DOC 的 specapprove 词（管理员恒有）。
+ * 与后端 PanelPermissionService.requireAnyPerm('specapprove') 同一口径 —— 前端不渲染按钮，
+ * 后端仍会拦（两处都要：只靠前端可绕过，只靠后端则按钮看得见点不动）。
+ */
+function canApprove(c) {
+  if (!isSpecColumn(c)) return false
+  if (user?.isAdmin) return true
+  const p = user?.pagePerms || {}
+  const csv = p.RD_SPEC_DOC || ''
+  return String(csv).split(',').map((s) => s.trim()).includes('specapprove')
+}
+
+/** 已批准时那格显示的落款（后端 board 回填 批准日期：姓名/yyyy.M.d） */
+function approvedAt(row) {
+  return row?.批准日期 || ''
+}
+
+const approving = ref('')
+
+/** 点「批准」→ 后端写 rd_spec_doc_head.批准日期，刷新本表 */
+async function onApprove(row, c) {
+  const no = docNoOf(row, c.panelCode)
+  if (!no) {
+    ElMessage.warning(tt('这张规格书还没有单据号，无法批准'))
+    return
+  }
+  approving.value = no
+  try {
+    const res = await request.post('/px/specApprove', { docNo: no })
+    const stamp = res?.data?.['批准日期'] || ''
+    if (stamp) row.批准日期 = stamp
+    ElMessage.success(tt('已批准') + '：' + stamp)
+    await load()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || e?.message || tt('批准失败'))
+  } finally {
+    approving.value = ''
+  }
 }
 
 /** 状态格的悬停提示:说清点了会发生什么(含"没有查看权限"这一种) */
@@ -277,6 +343,23 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 
 .pds-c-no { min-width: 112px; font-weight: 600; color: var(--pds-ink); }
 .pds-c-file { min-width: 108px; white-space: nowrap; color: var(--pds-ink-2); }
+/* 2026-11-06 规格书「批准」按钮：紧贴状态标签右侧，体量小于标签（它是动作不是状态） */
+.pds-approve {
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 18px;
+  color: #2f6f4e;
+  background: #f2f9f5;
+  border: 1px solid #b7d9c5;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.pds-approve:hover:not(:disabled) { background: #e4f3ea; border-color: #8fc4a6; }
+.pds-approve:disabled { opacity: .5; cursor: default; }
+/* 已批准的落款（姓名/日期）比状态标签更弱：它是留痕，不是当前状态 */
+.pds-approved { margin-left: 6px; font-size: 11px; color: #8a9099; }
+
 .pds-c-status { min-width: 96px; text-align: center; }
 /* 状态格可点：跳该文件面板查看（无权限时给提示）—— 只做极轻的反馈，不抢眼 */
 .pds-c-jump { cursor: pointer; }
