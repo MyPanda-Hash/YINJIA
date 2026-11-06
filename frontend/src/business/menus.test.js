@@ -14,9 +14,21 @@ const rd = menuTree.find((node) => node.code === 'rd')
 const group = (code) => (rd.children || []).find((node) => node.code === code)
 const leafCodes = (node) => (node.children || []).map((child) => child.panelCode || child.code)
 
-test('研发管理四个二级分组,顺序=项目管理/测试记录/产品文件/共享文件', () => {
-  assert.deepEqual((rd.children || []).map((c) => c.code), ['rdProject', 'rdTest', 'rdFiles', 'rdShare'])
-  assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '测试记录', '产品文件', '共享文件'])
+/**
+ * 2026-11-06 用户口径：「现在要加新面板，这个单独做一个二级目录：样品就在研发管理里面」
+ * ⇒ 二级分组由 4 个变 5 个，「样品」插在「项目管理」之后、「测试记录」之前
+ *   （研发流程顺序：立项 → 打样 → 测试 → 出文件）。
+ */
+test('研发管理五个二级分组,顺序=项目管理/样品/测试记录/产品文件/共享文件', () => {
+  assert.deepEqual((rd.children || []).map((c) => c.code), ['rdProject', 'rdSample', 'rdTest', 'rdFiles', 'rdShare'])
+  assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '样品', '测试记录', '产品文件', '共享文件'])
+})
+
+test('样品组：外部-开发样品 / 内部-开发样品 两张单', () => {
+  assert.deepEqual(leafCodes(group('rdSample')), ['RD_SAMPLE_EXT', 'RD_SAMPLE_INT'])
+  const ext = group('rdSample').children.find((c) => c.panelCode === 'RD_SAMPLE_EXT')
+  assert.equal(ext.title, '外部-开发样品')
+  assert.equal(ext.path, '/panelx/list/RD_SAMPLE_EXT')
 })
 
 /**
@@ -197,13 +209,14 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
  * 2026-09-21:新增 产品变更申请单 RD_CHANGE ⇒ 23 → 24 张。
  * 2026-09-30:下架 样品编号表 RD_SAMPLE_NO(用户口径「样品编号表删掉」)⇒ 24 → 23 张。
  * 2026-10-20:新增 项目流程管控 PROJECT_FLOW(只读盯单页)⇒ 23 → 24 张。
+ * 2026-11-06:新增 外部/内部开发样品申请单(RD_SAMPLE_EXT / RD_SAMPLE_INT)⇒ 24 → 26 张。
  * 计数断言保留价值:防止面板被误删/误加而不自知。
  */
-test('研发管理 24 个面板一个不少(含新增 项目流程管控)', () => {
+test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两张样品单)', () => {
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 24)
-  assert.equal(new Set(codes).size, 24)
+  assert.equal(codes.length, 26)
+  assert.equal(new Set(codes).size, 26)
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
   // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,
   // 由 @core/views/MoldProcPanel.vue 承载 ⇒ **不占菜单项**,这里也不该出现。
