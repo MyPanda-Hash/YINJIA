@@ -8,6 +8,8 @@ import {
   isCanonical,
   CANONICAL_KEYS,
   orderSpecGroups,
+  specMotherOf,
+  clusterSpecGroups,
 } from './testItemLib.js'
 
 /**
@@ -139,4 +141,49 @@ test('排序不改原数组(调用方还拿着它做别的)', () => {
   const out = orderSpecGroups(lib, [])
   assert.deepEqual(lib.map((g) => g.name), ['b', 'a'])
   assert.deepEqual(out.map((g) => g.name), ['a', 'b'])
+})
+
+/**
+ * 母项归拢(用户口径 2026-11-06 追加):
+ * 「新增录进去不会变体归拢到一起,所以会出现一个母项下的变体到处跑,都找不到,要根据组名来进行归拢」
+ *
+ * 现行库里的组名是**业务上同一项的不同写法**(生产库实测 37 组:尺寸/整体尺寸/*炭棒尺寸;
+ * 余氯性能测试/*余氯去除性能;阻垢去除性能/阻垢去除性能测试/*阻垢去除率测试;
+ * *PFOA&PFOS去除性能测试/*PFOA/PFOS去除测试/PFOA&PFOS去除性能测试 …)。
+ * 只按组名字符串分组 ⇒ 一个母项散成 2~3 块、还被 seq 甩到列表末尾。
+ * 口径:按《测试项目汇总.xlsx》的 26 个「检验项目」做母项,组名→母项查表(SPEC_MOTHERS);
+ *   表里没有的组名照旧独立成组、排在最后(不猜、不错并)。
+ */
+test('组名 → 母项:变体写法都归到 Excel 的同一项', () => {
+  assert.equal(specMotherOf('*炭棒尺寸')?.no, 2)
+  assert.equal(specMotherOf('整体尺寸')?.no, 2)
+  assert.equal(specMotherOf('尺寸')?.name, '尺寸')
+  assert.equal(specMotherOf('余氯性能测试')?.no, 11)
+  assert.equal(specMotherOf('*余氯去除性能')?.no, 11)
+  assert.equal(specMotherOf('阻垢去除率测试')?.no, 13)
+  assert.equal(specMotherOf('*PFOA/PFOS去除测试')?.no, 22)
+  assert.equal(specMotherOf('抗堵性能'), null)
+})
+
+test('归拢:同母项的变体合成一组,组序=Excel 序号,变体名挂在行上', () => {
+  const lib = [
+    { name: '*余氯去除性能', seq: 430, subs: [{ name: '初始去除率', req: 'R1' }, { name: '除余氯寿命', req: 'R2' }] },
+    { name: '余氯性能测试', seq: 0, subs: [{ name: '', req: 'R0' }] },
+    { name: '*炭棒尺寸', seq: 20, subs: [{ name: '', req: '外径' }, { name: '', req: '内径' }] },
+    { name: '尺寸', seq: 0, subs: [{ name: '', req: '产品尺寸' }] },
+    { name: '整体尺寸', seq: 0, subs: [{ name: '', req: '整体' }] },
+  ]
+  const out = clusterSpecGroups(lib)
+  assert.deepEqual(out.map((g) => g.name), ['尺寸', '余氯性能测试'])
+  assert.equal(out[0].subs.length, 4)
+  // 母项同名的行不加前缀;变体行带「变体名 · 」
+  assert.deepEqual(out[0].subs.map((s) => s.groupLabel), ['', '整体尺寸', '炭棒尺寸', '炭棒尺寸'])
+  assert.deepEqual(out[1].subs.map((s) => s.groupLabel), ['', '余氯去除性能', '余氯去除性能'])
+})
+
+test('归拢:表里没有的组名独立成组,排在 26 项之后(不猜、不并)', () => {
+  const lib = [{ name: '抗堵性能', seq: 630, subs: [{ name: '', req: 'X' }] },
+    { name: '*外观', seq: 10, subs: [{ name: '', req: 'Y' }] }]
+  const out = clusterSpecGroups(lib)
+  assert.deepEqual(out.map((g) => g.name), ['外观', '抗堵性能'])
 })

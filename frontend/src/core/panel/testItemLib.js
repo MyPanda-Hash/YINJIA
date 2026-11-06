@@ -137,6 +137,114 @@ export function orderSpecGroups(groups, constOrder = []) {
     String((a && a.name) || '').localeCompare(String((b && b.name) || '')))
 }
 
+/**
+ * 母项表(用户口径 2026-11-06 追加:「新增录进去不会变体归拢到一起,一个母项下的变体到处跑,
+ * 都找不到,要根据组名来进行归拢」)。
+ *
+ * 母项 = 《测试项目汇总.xlsx》sheet「规格书检验项目汇总」的「序 号」1..26;`groups` 是归到该母项下的
+ * **库组名写法**(同一项在生产库里可能有 1~3 种写法:尺寸/整体尺寸/*炭棒尺寸、余氯性能测试/*余氯去除性能、
+ * 阻垢去除性能/阻垢去除性能测试/*阻垢去除率测试、*PFOA&PFOS去除性能测试/*PFOA/PFOS去除测试/…)。
+ * 查表按**归一化名**匹配(去 `*`/`#`/空白、全角括号转半角),所以表里写不写星号都行。
+ *
+ * ⚠ 表里**没有**的组名一律独立成组、排在 26 项之后 —— 不做模糊猜测,避免把两项并错
+ *   (实测字符相似度会把「*一级颗粒物去除率」判给「黑水及颗粒物测试」,把「浊度测试」判给「强度测试」)。
+ *   新写法要归拢:把它加进对应母项的 groups 即可。
+ */
+export const SPEC_MOTHERS = [
+  { no: 1, name: '外观', groups: ['外观', '*外观'] },
+  { no: 2, name: '尺寸', groups: ['尺寸', '整体尺寸', '炭棒尺寸'] },
+  { no: 3, name: '重量', groups: ['重量', '炭棒重量'] },
+  { no: 4, name: '强度测试', groups: ['强度', '强度测试'] },
+  { no: 5, name: '初始流速及压降测试', groups: ['初始流速及压降测试', '压降测试', '压降'] },
+  { no: 6, name: '黑水及颗粒物测试', groups: ['黑水及颗粒物测试', '黑水测试（无需无黑）', '黑水及颗粒物测试 （无黑后）'] },
+  { no: 7, name: '黄水测试', groups: ['黄水测试'] },
+  { no: 8, name: '炭棒过滤精度测试', groups: ['炭棒过滤精度测试', '过滤精度测试', '一级颗粒物去除率', '炭棒浊度测试', '浊度测试'] },
+  { no: 9, name: '隔夜浸泡口感/气味及浊度测试', groups: ['隔夜浸泡口感/气味', '隔夜浸泡口感/气味及浊度测试'] },
+  { no: 10, name: '浸泡口感测试', groups: ['浸泡口感测试'] },
+  { no: 11, name: '余氯性能测试', groups: ['余氯性能测试', '余氯去除性能'] },
+  { no: 12, name: 'COD性能测试', groups: ['COD性能测试'] },
+  { no: 13, name: '阻垢性能测试', groups: ['阻垢性能测试', '阻垢去除性能', '阻垢去除性能测试', '阻垢去除率测试'] },
+  { no: 14, name: '抑菌性能测试', groups: ['抑菌性能测试'] },
+  { no: 15, name: '过流杀菌性能测试', groups: ['过流杀菌性能测试'] },
+  { no: 16, name: '碱性性能测试', groups: ['碱性性能测试'] },
+  { no: 17, name: '矿化（富锶或微矿化）性能测试', groups: ['矿化（富锶或微矿化）性能测试', '矿化性能测试'] },
+  { no: 18, name: 'VOC性能测试', groups: ['VOC性能测试'] },
+  { no: 19, name: '除铅性能测试（PH8.5&6.5)', groups: ['除铅性能测试（PH8.5&6.5)'] },
+  { no: 20, name: '除汞性能测试（PH8.5&6.5)', groups: ['除汞性能测试（PH8.5&6.5)'] },
+  { no: 21, name: 'Cyst去除测试', groups: ['Cyst去除测试', 'Cyst去除性能测试'] },
+  { no: 22, name: 'PFOA&PFOS去除性能测试', groups: ['PFOA&PFOS去除性能测试', 'PFOA/PFOS去除测试', 'PFOA&PFOS去除测试'] },
+  { no: 23, name: 'NSF401（三组）去除性能测试', groups: ['NSF401（三组）去除性能测试', 'NSF401去除性能测试'] },
+  { no: 24, name: '毒杀芬去除性能', groups: ['毒杀芬去除性能'] },
+  { no: 25, name: 'MTBE去除性能', groups: ['MTBE去除性能'] },
+  { no: 26, name: '卫生浸泡', groups: ['卫生浸泡', '卫生安全'] },
+]
+
+/** 组名归一化:去 `*`/`#`/空白,全角括号→半角(只用于查母项,不改显示名) */
+export function normGroupName(name) {
+  return String(name === undefined || name === null ? '' : name)
+    .replace(/[*#＊＃\s]/g, '').replace(/（/g, '(').replace(/）/g, ')')
+}
+
+const MOTHER_INDEX = (() => {
+  const m = new Map()
+  for (const mother of SPEC_MOTHERS) {
+    m.set(normGroupName(mother.name), mother)
+    for (const g of mother.groups) m.set(normGroupName(g), mother)
+  }
+  return m
+})()
+
+/** 组名 → 母项(Excel 序 1..26);表里没有的返回 null(调用方按独立组处理) */
+export function specMotherOf(groupName) {
+  const k = normGroupName(groupName)
+  return k ? (MOTHER_INDEX.get(k) || null) : null
+}
+
+/**
+ * 按母项**归拢**并排序:同母项的变体并成一组(组名=母项名,行上带 `groupLabel`=原变体名),
+ * 组序 = Excel 序号 1..26,表里没有的组排最后。返回新数组,不改入参。
+ *
+ * @param {Array<{name: string, seq?: number|null, subs?: Array<object>}>} groups 按库条目归好的组
+ */
+export function clusterSpecGroups(groups) {
+  // 注意:这里 seq=0 **算有效值**(生产库有 12 组从没排过序),不能像 orderSpecGroups 那样当缺失 ——
+  // 否则那批组会排到同母项变体的最后,把「母项在前、变体在后」的顺序打乱。
+  const seqOf = (g) => {
+    const n = Number(g && g.seq)
+    return g && g.seq !== null && g.seq !== undefined && Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER
+  }
+  // 先按「组的 seq → 组名长度 → 组名」定变体先后(seq 并列时靠名字,保证稳定)
+  const ordered = [...(groups || [])].sort((a, b) =>
+    (seqOf(a) - seqOf(b)) ||
+    String(a && a.name || '').length - String(b && b.name || '').length ||
+    String(a && a.name || '').localeCompare(String(b && b.name || '')))
+  const clusters = []
+  for (const g of ordered) {
+    const mother = specMotherOf(g && g.name)
+    const key = mother ? 'm' + mother.no : 'x' + normGroupName(g && g.name)
+    let c = clusters.find((x) => x.key === key)
+    if (!c) {
+      c = {
+        key,
+        name: mother ? mother.name : String((g && g.name) || ''),
+        seq: null,
+        motherNo: mother ? mother.no : Number.MAX_SAFE_INTEGER,
+        at: clusters.length, // 未收录组保持调用方给的先后(通常是 seq 序),不在这里重排
+        subs: [],
+      }
+      clusters.push(c)
+    }
+    const variant = String((g && g.name) || '')
+    // 行上挂变体名:与母项同名(或就是母项)时不加前缀,免得每行都重复一遍组名
+    const groupLabel = normGroupName(variant) === normGroupName(c.name) ? '' : variant.replace(/^[*#＊＃\s]+/, '')
+    const seq = Number(g && g.seq)
+    if (Number.isFinite(seq) && seq > 0 && (c.seq == null || seq < c.seq)) c.seq = seq
+    for (const s of (g && g.subs) || []) c.subs.push({ ...s, groupLabel })
+  }
+  clusters.sort((a, b) => (a.motherNo - b.motherNo) || (a.at - b.at) || String(a.name).localeCompare(String(b.name)))
+  return clusters.map((c) => ({ name: c.name, seq: c.seq, subs: c.subs }))
+}
+
 function str(v) {
   return v === undefined || v === null ? '' : String(v).trim()
 }

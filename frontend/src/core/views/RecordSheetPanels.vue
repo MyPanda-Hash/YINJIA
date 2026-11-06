@@ -1417,7 +1417,7 @@
                   :disabled="s.off"
                   @change="(v) => toggleLib(gi + ':' + si, !!v)"
                 >
-                  <span class="lib-sub-name" :class="{ 'lib-sub-name-off': s.off }">{{ (s.name ? tt(s.name) : tt('（项目）')) + (s.off ? '（' + tt('已停用') + '）' : '') }}</span>
+                  <span class="lib-sub-name" :class="{ 'lib-sub-name-off': s.off }">{{ (s.groupLabel ? tt(s.groupLabel) + ' · ' : '') + (s.name ? tt(s.name) : tt('（项目）')) + (s.off ? '（' + tt('已停用') + '）' : '') }}</span>
                   <span class="lib-sub-req">{{ String(s.req || '').split('\n')[0].slice(0, 26) }}</span>
                 </el-checkbox>
                 <span v-if="s.dbId && !s.off" class="lib-sub-del" :title="tt('停用')" @click.stop="stopLibRow(s.dbId)">✕</span>
@@ -1430,7 +1430,16 @@
         <div class="lib-custom">
           <div class="lib-custom-title">{{ tt('补充自定义检验项') }}({{ tt('存入后长期可用') }})</div>
           <div class="lib-custom-form">
-            <el-input v-model="libCGroup" size="small" :readonly="!!libCEditId" :title="libCEditId ? tt('组名是条目的归属(item_code)，编辑接口不改它；要换组请新建条目') : ''" :placeholder="tt('检验项目(组名)')" />
+            <!-- 组名用来**归拢**条目(同母项的变体并成一组),所以不给纯手打:候选 = 《测试项目汇总.xlsx》
+                 的 26 个检验项目 + 库里已有的组名;要新建也能直接输入(allow-create)。 -->
+            <el-select
+              v-model="libCGroup" size="small" filterable allow-create default-first-option clearable
+              :disabled="!!libCEditId"
+              :title="libCEditId ? tt('组名是条目的归属(item_code)，编辑接口不改它；要换组请新建条目') : tt('同母项的变体填同一个组名就会归到一起')"
+              :placeholder="tt('检验项目(组名)')"
+            >
+              <el-option v-for="o in libGroupOptions" :key="o" :label="o" :value="o" />
+            </el-select>
             <el-input v-model="libCSub" size="small" :placeholder="tt('子项目(可空)')" />
             <!-- 长文本字段自适应:autosize 随内容增高(编辑带入长值不再挤在 2 行小框里),宽度加宽 -->
             <el-input v-model="libCReq" size="small" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" class="lib-wide" :placeholder="tt('检验要求')" />
@@ -1738,7 +1747,7 @@ import { buildCoverPatch } from './prodPickCarry.js'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
 import { sectionLibText } from './sectionLibText'
-import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry, orderSpecGroups } from '@/core/panel/testItemLib'
+import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry, orderSpecGroups, clusterSpecGroups, SPEC_MOTHERS } from '@/core/panel/testItemLib'
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
 import { parseLayout } from '@/core/panel/spikeWaterLayout.js'
 import StdLibTemplateManager from './StdLibTemplateManager.vue'
@@ -2940,7 +2949,9 @@ async function openLib(dt) {
           if (Number.isFinite(seq) && seq > 0 && (g.seq == null || seq < g.seq)) g.seq = seq
           g.subs.push({ ...toSpecSub(e), __entry: e, dbId: r.id, off: Number(r.enabled) === 0 })
         }
-        libRows.value = orderSpecGroups(groups, order)
+        // 归拢:同母项的变体(尺寸/整体尺寸/炭棒尺寸、余氯性能测试/*余氯去除性能 …)并成一组,
+        // 组序 = 《测试项目汇总.xlsx》序号 1..26(见 core/panel/testItemLib.js 的 SPEC_MOTHERS)。
+        libRows.value = clusterSpecGroups(orderSpecGroups(groups, order))
       }
     } else {
       // 兜底:库里一条都没有(未跑种子的环境)才用内置常量展示(无 dbId → 不可编辑/停用,跑种子后即全量可维护)
@@ -2974,6 +2985,21 @@ const libTargetDt = ref(null)
 const libCEditId = ref(null) // 分组形态(规格书):子项表单
 const libCEditEntry = ref(null) // 正在编辑条目的规范结构(保存时打底,含表单没有的字段)
 const libCGroup = ref('')
+/** 「检验项目(组名)」候选:26 个母项名 + 当前库里已有的组名(去重,母项在前) —— 见 SPEC_MOTHERS */
+const libGroupOptions = computed(() => {
+  const seen = new Set()
+  const out = []
+  const push = (n) => {
+    const v = String(n || '').trim()
+    if (v && !seen.has(v)) { seen.add(v); out.push(v) }
+  }
+  for (const m of SPEC_MOTHERS) push(m.name)
+  for (const g of (Array.isArray(libRows.value) ? libRows.value : [])) {
+    push(g && g.name)
+    for (const s of (g && g.subs) || []) push(s && s.groupLabel)
+  }
+  return out
+})
 const libCSub = ref('')
 const libCReq = ref('')
 const libCMethod = ref('')
