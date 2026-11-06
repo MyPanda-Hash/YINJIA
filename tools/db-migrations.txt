@@ -4440,5 +4440,53 @@ migrate-wo-pick-line-20261101.sql
 migrate-clean-blank-prodinfo-and-dept-20261104.sql
 migrate-sinter-workshop-deptname-20261104.sql
 migrate-print-station-20261104.sql
+
+# 2026-11-04 组装物料清单(ASM_BOM)表头可维护:表头 8 字段 editable 0→1、产品编码/子件编码 改参照 INV、
+#   默认BOM 改下拉框(是/否)、yj_panel.config 写 headDefaults 状态=启用;零 DDL、零业务数据变更,脚本幂等。
+#   报障:「组装物料清单中的表头无法填写」。配套代码修复见 ButtonService/PanelConfigService(同批提交)。
+#   取证/演练/上线顺序:tools/archive/_asm-bom-maintainable-verify-20261104/README.md;
+#   报告:docs/development/组装物料清单-表头可维护-20261104.md
+migrate-asm-bom-maintainable-20261104.sql
+
+# 2026-11-04(晚) 组装物料清单(ASM_BOM)使用性调整:产品编码改「文本」可手输(去掉参照 INV)、
+#   工序移出表头(place 只剩 query,保留查询条件)且不再必填;yj_panel.config.headDefaults 增加 工序=组装;
+#   回填存量空工序行。报障:「这个产品编码要可以自己编辑,且当前的工序都为组装的 bom 不需要设定工序了」。
+#   ⚠ 本脚本必须晚于 migrate-asm-bom-maintainable-20261104.sql(整链重放按顺序收敛;勿单独重跑那条)。
+migrate-asm-bom-product-manual-20261104.sql
+
+# 2026-11-04 出厂检验报告(QC_OQC_REPORT)接入质量单据两级审批(参考特采单 QC_TC_IN):
+#   用户口径「出厂检验中增加二级审批,二级审批相关实现参考特菜单(特采单)中的实现进行处理即可」。
+#   口径 = 检验员格即「编制」(提交审批时自动写提交人、只读)、审核 = 一级审批人、批准 = 超级管理员(二级通过才落值)。
+#   本脚本只改元数据:qc_oqc_head +[审批人]+[审批时间] 两列(中文注明)、yj_field 登记 2 行 + 检验员 editable=0、
+#   5 个签署列中文注明改写、译名核对;零业务数据变更。配套代码:ButtonService.QC_DOC_PREPARER 增 QC_OQC_REPORT→检验员。
+#   ⚠ 幂等;两账套均执行。
+migrate-oqc-twolevel-20261104.sql
+
+# 2026-11-04 出厂检验报告报表(reports/qc_oqc.jrxml)改版 + 「导出报表」模板入库:
+#   用户口径「去除红框内的内容」「同时增加当前页面的报表让当前页面可以使用导出pdf、打印预览、导出excel」
+#   + 追问「增加在当前导出报表中进行,没有设定的话原有格式应该是错误的,帮我查看一下」。
+#   ① 去掉页脚公司地址/网址/邮箱/电话整行;② 签署行 审核/批准 由静态下划线改为按头字段动态落值;
+#   ③ 把 qc_oqc 写入 yj_report_template(此前只有 classpath 注册表 → 模板管理里"没有设定"),
+#      DB 优先 ⇒ 导出报表下拉/模板管理可见、改版式立即生效。脚本由
+#      `node tools/archive/_gen-oqc-tpl-sql.mjs` 从 .jrxml 生成(勿手改);幂等;两账套均执行。
+migrate-oqc-report-tpl-20261104.sql
+
+# 2026-11-05 组装物料清单(ASM_BOM)**全量**导入:金蝶 BOM 引出表 827 块 / 817 产品 / 3640 行,
+#   覆盖上一版 migrate-asm-bom-data-20261030.sql 的 236 在产产品(1085 行)并补齐其余 581 个产品;
+#   同一产品多版本(10 个产品)全部保留,各成一张单据。用户口径:「导入到当前本地全部导入,
+#   同时这个脚本要能导入到服务器中去」。
+#   ⚠ 幂等:只 DELETE 来源=金蝶BOM引出列表_20261019174847 的行再全量插入,不碰面板手工新建的 BOM;
+#   须晚于 migrate-asm-bom-20261030.sql(建表)。两账套已执行(RESULT: 23 batches + 自检 PASS)。
+migrate-drop-bak-qc-snapshots-20261102.sql
+migrate-asm-bom-data-full-20261105.sql
+
+# 2026-11-05 生产工单「转领料单」下架(用户口径:「把当前这个转领料单的按钮删除,记得把权限设置中的也去除掉,
+#   不需要删除当前的工单和领料的实现,只需要完成对这个按钮的去除即可」)。
+#   前端按钮 + 只被它调用的 toPicking() 已删;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS 删 {"picking","转领料单"}
+#   ⇒ 组织架构矩阵不再有该列;本脚本清 yj_role_panel 里 WORK_ORDER_LIST 的 picking 授权词(整词修剪,其余词与顺序不动)。
+#   **后端实现保留**:/px/workOrderList/toPicking + WorkOrderPickingService + ManuWritebackService 回写不动,
+#   端点闸门仍认 picking(PanelPermissionService.BUTTON_PERMS_OVERRIDE 保留)。幂等;两账套均执行;末尾自检残留 = 0。
+migrate-drop-wol-picking-perm-20261105.sql
+
 # 2026-11-06 立项申请表「客户名」改指客户档案 KHDA.mc（下拉选客户；选中后前端按 客户编码+日期 填编号）
 migrate-approval-customer-ref-20261106.sql

@@ -32,8 +32,13 @@ function makeEl(tag) {
 }
 const head = makeEl('head')
 const body = makeEl('body')
+// document.title 赋值记录(2026-11-04):打印通道会临时改浏览器标题当作打印页眉/PDF 默认文件名,
+// 排单计划要求它随工序产线变 —— 这里记下每一次赋值供断言。
+const documentTitleLog = []
+let documentTitle = ''
 globalThis.document = {
-  title: '',
+  get title() { return documentTitle },
+  set title(v) { documentTitle = String(v ?? ''); documentTitleLog.push(documentTitle) },
   head, body,
   createElement: makeEl,
   getElementById: () => null,     // 清理阶段取不到 → 什么都不做
@@ -48,7 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickSlipHtml, printWoQr } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, printWoQr } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -185,6 +190,45 @@ test('planSheetDates:从今天起取 5 天(纸表也就 3~5 天);今天以后没
   assert.deepEqual(planSheetDates([], '2026-10-31'), [])
 })
 
+// ── 2026-11-04 用户口径:「打印的就按这些勾选的表中最前面的日期到最后的一个日期就行」──────────
+//    日期列 = 勾选行的日计划从最早 → 最晚(连续、含中间空列),不再锚定"今天"。纯函数直测。
+test('planSheetDatesFromRows:勾选行 最前日期→最后日期,连续补空列,历史日期不再被切掉', () => {
+  const rows = [
+    { 日计划: { '2026-10-29': 2000, '2026-10-30': 2000, '2026-10-31': 2000 } },
+    { 日计划: { '2026-10-30': 223, '2026-11-07': 222 } },
+  ]
+  assert.deepEqual(planSheetDatesFromRows(rows, '2026-11-04', 5),
+    ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02',
+      '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07'],
+    '10-29~11-07 连续 10 天(中间 11-01~11-06 没计划的也留列)')
+  assert.deepEqual(planSheetDatesFromRows([{ 日计划: { '2026-11-04': 0 } }], '2026-11-04', 5),
+    ['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'],
+    '勾选行一个非零计划都没有 ⇒ 退回今天起 5 天(不打出没有日期列的空表)')
+  assert.deepEqual(planSheetDatesFromRows([{ 日计划: { '2026-11-04': 3 } }], '2026-11-04', 5),
+    ['2026-11-04'], '只有一天 ⇒ 只出 1 列')
+  assert.deepEqual(planSheetDatesFromRows([], '2026-11-04', 3),
+    ['2026-11-04', '2026-11-05', '2026-11-06'], '没有行 ⇒ 兜底窗口')
+})
+
+test('planSheetDatesFromRows:跨度超上限时截成最近 MAX_SHEET_DAYS 天(防脏数据撑爆纸面)', () => {
+  const rows = [{ 日计划: { '2026-01-01': 1, '2026-12-31': 1 } }]
+  const ds = planSheetDatesFromRows(rows, '2026-11-04', 5)
+  assert.equal(ds.length, MAX_SHEET_DAYS, '最多 31 列')
+  assert.equal(ds[ds.length - 1], '2026-12-31', '保留最新那段(结尾 = 最后一个计划日)')
+  assert.equal(ds[0], ymdAddDays('2026-12-31', -(MAX_SHEET_DAYS - 1)))
+})
+
+test('planSheetWindow/ymdAddDays:连续窗口、跨月、非法输入', () => {
+  assert.deepEqual(planSheetWindow('2026-10-30', 5),
+    ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03'], '跨月')
+  assert.deepEqual(planSheetWindow('2026-02-26', 4),
+    ['2026-02-26', '2026-02-27', '2026-02-28', '2026-03-01'], '平年跨月')
+  assert.deepEqual(planSheetWindow('', 5), [], '非法起始 ⇒ 空')
+  assert.equal(planSheetWindow('2026-11-04', 99).length, MAX_SHEET_DAYS, '天数夹到上限')
+  assert.equal(ymdAddDays('2026-11-04', -3), '2026-11-01')
+  assert.equal(ymdAddDays('bad', 1), '')
+})
+
 test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async () => {
   const rows = [{
     客户等级: '', 客户: '张莉', 加工单号: 'GD-2026-10-0226-1', 工单行号: 1, 公司代码: '0',
@@ -193,11 +237,21 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     交期: '2026-11-05', 交期紧迫度: 5, '7天已排': 10, '15天已排': 10, '大于15天已排': 0,
     日计划: { '2026-10-31': 2, '2026-11-01': 2, '2026-11-05': 3 },
   }]
-  const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31' })
-  for (const h of ['客户等级', '客户名称', '产品编号', '型号', '成型车间', '未完成总数',
-    '生产计划数量', '实际完成数量', '成型交期', '成型交期紧迫度', '7天', '15天', '大于15']) {
+  // 2026-11-04 起标题/车间列头按工序产线动态 ⇒ 显式传 shop=成型,保持原纸表版式断言
+  const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31', shop: '成型' })
+  // 2026-11-05 版式重排:长表头用**显式换行**(断点固定,不再出现「生产计划数/量」掉单字);
+  //   表头 HTML 里就是 <br>,这里按最终表头逐字断言。
+  for (const h of ['客户名称', '产品编号', '型号', '成型车间', '未完成<br>总数',
+    '生产计划<br>数量', '实际完成<br>数量', '成型交期', '成型交期<br>紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
+  // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
+  assert.ok(!html.includes('>客户等级</th>'), '客户等级全空 ⇒ 默认隐藏该列')
+  // 有值时才印(甲/乙/丙…)——用同一行补一个非空等级再生成一次
+  const rowsWithGrade = [{ ...rows[0], 客户等级: '甲' }]
+  const html2 = await schedPlanSheetHtml(rowsWithGrade, ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(html2.includes('>客户等级</th>'), '有值 ⇒ 客户等级列照印')
+  assert.ok(/>甲</.test(html2), '等级值要印出来')
   assert.ok(html.includes('10月31日') && html.includes('11月5日'), '日期列头用 月日 写法')
   assert.ok(html.includes('张莉') && html.includes('S031-3') && html.includes('28*12*178') && html.includes('1号机'))
   assert.ok(/>10</.test(html), '未完成总数/排产数量应出现')
@@ -210,6 +264,176 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
 })
 
+// 2026-11-05 客户口径:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置」
+//   ⇒ 日期列 = 勾选行最早日期起,连续只印 N 天(默认 3,可设 1~10),不再印"最前→最后"的长表。
+test('planSheetPrintDates:默认只印 3 天(从勾选行最早日期起),天数可设 1~10', () => {
+  const rows = [{ 日计划: { '2026-10-29': 2000, '2026-10-30': 2000, '2026-11-07': 222 } }]
+  assert.equal(PLAN_SHEET_DEFAULT_DAYS, 3, '默认 3 天')
+  assert.deepEqual(planSheetPrintDates(rows, '2026-11-05'),
+    ['2026-10-29', '2026-10-30', '2026-10-31'], '默认 3 天,从最早日期起')
+  assert.deepEqual(planSheetPrintDates(rows, '2026-11-05', 4),
+    ['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01'], '可设 4 天(第 4 天没计划也留空列)')
+  assert.deepEqual(planSheetPrintDates(rows, '2026-11-05', 1), ['2026-10-29'], '最少 1 天')
+  assert.equal(planSheetPrintDates(rows, '2026-11-05', 99).length, 10, '最多 10 天')
+  assert.equal(planSheetPrintDates(rows, '2026-11-05', 'bad').length, 3, '非法天数 ⇒ 回默认 3 天')
+  assert.deepEqual(planSheetPrintDates([], '2026-11-05'),
+    ['2026-11-05', '2026-11-06', '2026-11-07'], '勾选行没有计划 ⇒ 今天起 3 天')
+})
+
+// 2026-11-04 用户口径「当前在不同的工序产线显示的这个工序名称也要不同」
+//   ⇒ 纸表标题与「车间」列头(含交期两列)跟着工序产线变,不再一律「成型」。
+test('排单计划:标题/车间列头按工序产线动态(成型/切炭/组装…),混打多工序退回通用', async () => {
+  assert.equal(planSheetShop([{ 当前工序: '切炭' }, { 当前工序: '切炭' }]), '切炭', '行内唯一工序 ⇒ 切炭')
+  assert.equal(planSheetShop([{ 当前工序: '成型' }, { 当前工序: '切炭' }]), '', '混打多工序 ⇒ 空(不冒充某个车间)')
+  assert.equal(planSheetShop([{ 当前工序: '切炭' }], { shop: '组装' }), '组装', 'opts.shop 优先')
+  assert.equal(planSheetShop([{ 生产线: '切炭(自动)', 生产车间: '切炭' }]), '切炭', '行内 生产车间 优先于工序')
+  assert.equal(planSheetTitle('切炭'), '切炭车间排单计划')
+  assert.equal(planSheetTitle('切炭车间'), '切炭车间排单计划', '车间名自带「车间」后缀时不得叠成「车间车间」')
+  assert.equal(planSheetTitle(''), '排单计划', '车间未知 ⇒ 通用标题(不写死成型)')
+
+  const row = (op, line) => ({
+    客户: 'A', 加工单号: 'GD-' + op, 工单行号: 1, 公司代码: '0', 物料编码: 'S031-3',
+    规格型号: '28*12', 生产线: line, 当前工序: op, 交期: '2026-11-05', 交期紧迫度: 3,
+    未交量: 10, 排产数量: 10, 当前工序完工量: 0, 日计划: { '2026-10-31': 1 },
+  })
+  const cut = await schedPlanSheetHtml([row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31' })
+  assert.ok(cut.includes('切炭车间排单计划'), '切炭线标题应为 切炭车间排单计划')
+  assert.ok(!cut.includes('成型车间排单计划'), '切炭纸不再出现「成型车间排单计划」')
+  for (const h of ['切炭车间', '切炭交期', '切炭交期<br>紧迫度']) {
+    assert.ok(cut.includes('>' + h + '</th>'), '切炭纸列头应含 ' + h)
+  }
+  assert.ok(!cut.includes('>成型交期</th>'), '切炭纸不应出现「成型交期」')
+  assert.ok(cut.includes('切炭(自动)'), '车间列的值(产线)照常印')
+
+  const asm = await schedPlanSheetHtml([row('组装', '组装(自动)')], ['2026-10-31'], { today: '2026-10-31' })
+  assert.ok(asm.includes('组装车间排单计划') && asm.includes('>组装车间</th>'), '组装线同理')
+
+  const mixed = await schedPlanSheetHtml([row('成型', '1号机'), row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31' })
+  assert.ok(mixed.includes('>排单计划</span>'), '混打多工序 ⇒ 通用标题「排单计划」')
+  for (const h of ['生产车间', '交期', '交期<br>紧迫度']) {
+    assert.ok(mixed.includes('>' + h + '</th>'), '混打 ⇒ 通用列头 ' + h)
+  }
+
+  // 真正出纸入口:浏览器标题(打印页眉/另存 PDF 的默认文件名)也随工序变
+  const beforeTitle = documentTitleLog.length
+  await printSchedPlanSheet([row('切炭', '切炭(自动)')], ['2026-10-31'], { today: '2026-10-31', dates: ['2026-10-31'] })
+  assert.ok(documentTitleLog.slice(beforeTitle).includes('切炭车间排单计划'),
+    '打印标题随工序:切炭车间排单计划(实际记录 ' + JSON.stringify(documentTitleLog.slice(beforeTitle)) + ')')
+})
+
+test('schedPlanSheetHtml:opts.dates = 勾选行 最前→最后(历史窗口照印);列多时表头改紧凑写法', async () => {
+  const rows = [{
+    客户: '张莉', 加工单号: 'GD-2026-10-0227', 工单行号: 1, 公司代码: '0', 物料编码: 'B-58-07',
+    规格型号: '48*30*264.5', 生产线: '2号车间', 未交量: 6000, 排产数量: 6000, 当前工序完工量: 0,
+    交期: '2026-10-31', 交期紧迫度: -4, '7天已排': 6000, '15天已排': 6000, '大于15天已排': 0,
+    日计划: { '2026-10-29': 2000, '2026-10-30': 2000, '2026-10-31': 2000 },
+  }]
+  const dates = planSheetDatesFromRows(rows, '2026-11-04', 5)
+  assert.deepEqual(dates, ['2026-10-29', '2026-10-30', '2026-10-31'], '历史 3 天')
+  const html = await schedPlanSheetHtml(rows, [], { dates })
+  for (const h of ['10月29日', '10月30日', '10月31日']) assert.ok(html.includes('>' + h + '</th>'), '历史日期列表头: ' + h)
+  assert.ok(html.includes('>2000</td>'), '历史计划的量要印出来(不再被"今天"切掉)')
+  // 10 列(>7)⇒ 紧凑表头 M/D + tooltip 带完整日期
+  const wide = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
+  assert.equal(wide.length, 10)
+  const h2 = await schedPlanSheetHtml([{ 客户: 'A', 加工单号: 'GD-2', 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } }], [], { dates: wide })
+  assert.ok(h2.includes('>10/29</th>'), '列多时表头用 M/D 紧凑写法')
+  assert.ok(h2.includes('title="2026-10-29"'), '紧凑表头保留完整日期 tooltip')
+})
+
+// 2026-11-04 用户口径「这个当前二维码太小了」:二维码按物理尺寸出纸(52px≈13.8mm),不再跟着列数缩;
+//   行数多时才适度收一点(48/44/38),保证一张 A4 装得下。
+// 2026-11-05 版式重排:二维码列宽固定 5.5%,行高 = 二维码 + 8px 留白(最少 42px)。
+test('schedPlanSheetHtml:二维码尺寸(行少 52px 不缩 / 行多 48→38px) + 底图 300px 打印清晰', async () => {
+  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
+  const h1 = await schedPlanSheetHtml([mk(1)], [], { dates: ['2026-10-29'] })
+  assert.ok(h1.includes('td.qr img{width:52px;height:52px}'), '行少(≤5)⇒ 52px(≈13.8mm)')
+  assert.ok(h1.includes('tbody tr{height:60px}'), '行高跟着二维码(52+8)')
+  assert.ok(h1.includes('<col style="width:5.5%"/>'), '二维码列固定 5.5%')
+  // 底图分辨率:PNG IHDR 的 width(偏移 16)应为 300 —— 打印才能清晰(以前 108px 放大发虚)
+  const url = (h1.match(/src="(data:image\/png;base64,[^"]+)"/) || [])[1]
+  assert.ok(url, '应带二维码图片')
+  const png = Buffer.from(url.split(',')[1], 'base64')
+  assert.equal(png.readUInt32BE(16), 300, '二维码底图 300px(打印等效 500+dpi)')
+
+  const wide = planSheetDatesFromRows([{ 日计划: { '2026-10-29': 1, '2026-11-07': 1 } }], '2026-11-04', 5)
+  const h2 = await schedPlanSheetHtml([mk(2)], [], { dates: wide })
+  assert.ok(h2.includes('td.qr img{width:52px;height:52px}'), '10 列但只有 1 行 ⇒ 仍 52px')
+
+  const mid = await schedPlanSheetHtml(Array.from({ length: 8 }, (_, i) => mk(i)), [], { dates: wide })
+  assert.ok(mid.includes('td.qr img{width:48px;height:48px}'), '8 行 ⇒ 收到 48px')
+  assert.ok(mid.includes('tbody tr{height:56px}'), '8 行 ⇒ 行高 56px')
+
+  const many = Array.from({ length: 16 }, (_, i) => mk(i))
+  const h3 = await schedPlanSheetHtml(many, [], { dates: wide })
+  assert.ok(h3.includes('td.qr img{width:38px;height:38px}'), '16 行 ⇒ 收到 38px 保证一页')
+  assert.ok(h3.includes('tbody tr{height:46px}'), '行高 46px(38+8)')
+})
+
+// 2026-11-05 版式重排(用户口径「不需要实现那么多天数,调整优化一下表格和设计,不需要那么窄」):
+//   ① 日期列**先**按每天 6% 给(3 天 18%),剩余宽度全给固定列 —— 天数越少固定列越宽;
+//   ② 长表头显式换行,断点固定;日期表头始终横排 nowrap;
+//   ③ 正文字号 10.5px / 表头 9.5px(旧版为了 16~31 天压到 9.5/9px),A4 横向页边距 8mm/6mm。
+test('schedPlanSheetHtml:2026-11-05 版式 — 日期先占 6%/天,固定列拿剩余宽度,字号加大', async () => {
+  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
+  const rows = [mk(1), mk(2), mk(3)]
+  const h3d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29', '2026-10-30', '2026-10-31'] })
+  assert.ok(h3d.includes('<col style="width:6.00%"/>'), '3 天 ⇒ 每天 6%(≈65px,4 位数字 + 横排表头都放得下)')
+  // 固定列按剩余宽度分:客户名称/单据编号拿 10.49%(旧的压窄算法只有 9%/10%)
+  assert.ok(h3d.includes('<col style="width:10.49%"/>'), '客户名称/单据编号 各 10.49%')
+  assert.ok(h3d.includes('padding:3px 3px;font-size:10.5px'), '正文 10.5px(≈7.9pt)、内边距 3px')
+  assert.ok(h3d.includes('font-weight:600;text-align:center;font-size:9.5px'), '表头 9.5px')
+  assert.ok(h3d.includes('@page{size:A4 landscape;margin:8mm 6mm}'), 'A4 横向,上下 8mm / 左右 6mm')
+  assert.ok(h3d.includes('table{width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid #222}'),
+    '表外框加粗一档(出纸不显得单薄)')
+  // 1 天 ⇒ 固定列拿到更多宽度(日期少,固定列更宽,这就是"不再那么窄"的来源)
+  const h1d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29'] })
+  const w1 = [...h1d.matchAll(/<col style="width:([\d.]+)%"\/>/g)].map((m) => Number(m[1]))
+  const w3 = [...h3d.matchAll(/<col style="width:([\d.]+)%"\/>/g)].map((m) => Number(m[1]))
+  assert.ok(w1[0] > w3[0], '1 天时客户名称列比 3 天时更宽')
+  assert.equal(w1.length, w3.length - 2, '固定列数不变(只差 2 个日期列)')
+  // 各列百分比加起来就是 100%(浏览器按 colgroup 铺满纸宽)
+  for (const ws of [w1, w3]) {
+    assert.ok(Math.abs(ws.reduce((a, b) => a + b, 0) - 100) < 0.5, '列宽合计 ≈100%')
+  }
+})
+
+// 2026-11-04 用户口径「日期不要竖排」:日期表头**始终横排 nowrap**(绝不折成竖条);
+//   2026-11-05 起打印天数最多 10 列,超出的入参只印前 10 列(防脏数据把版式压回挤窄形态)。
+test('schedPlanSheetHtml:日期表头始终横排;超过 10 列只印前 10 列', async () => {
+  const mk = (no) => ({ 客户: 'A', 加工单号: 'GD-' + no, 工单行号: 1, 公司代码: '0', 日计划: { '2026-10-29': 1 } })
+  const rows = [mk(1), mk(2), mk(3)]
+  assert.equal(PLAN_SHEET_MAX_PRINT_DAYS, 10, '一张纸最多 10 个日期列')
+  const d10 = planSheetWindow('2026-10-29', 10)
+  const h = await schedPlanSheetHtml(rows, [], { dates: d10 })
+  assert.ok(!h.includes('writing-mode'), '日期表头不再竖排')
+  assert.equal((h.match(/<th class="dt"/g) || []).length, 10, '10 个日期表头(横排)')
+  assert.ok(h.includes('th.dt{white-space:nowrap'), '日期表头禁止折行(不会变竖条)')
+  assert.ok(h.includes('>10/29</th>'), '列多时日期按「10/29」紧凑横排写法')
+  assert.ok(h.includes('title="2026-10-29"'), 'date 表头保留完整日期 tooltip')
+  assert.ok(h.includes('font-size:8px'), '8 天以上表头降一档字号(9px/8px),但不再压到 6px')
+
+  const d31 = planSheetWindow('2026-10-01', 31)
+  const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
+  assert.equal((h31.match(/<th class="dt"/g) || []).length, 10, '31 天入参也只印前 10 列')
+  // 每行日期格 10 个 + 数字列 7 个(未完成总数/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
+  assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 7), '每行 10 个日期格 + 7 个数字列')
+  assert.ok(!h31.includes('td.d{font-size:7px'), '不再需要「极窄格降字号」那套补丁')
+})
+
+test('pickPlanSheetRows:只留勾选行、保持页面顺序;没勾选=空(不悄悄退回整线全打)', () => {
+  const rows = [
+    { 行id: 11, 加工单号: 'GD-A' }, { 行id: 12, 加工单号: 'GD-B' }, { 行id: 13, 加工单号: 'GD-C' },
+  ]
+  assert.deepEqual(pickPlanSheetRows(rows, [13, 11]).map((r) => r.加工单号), ['GD-A', 'GD-C'],
+    '只留勾选的 2 行,顺序仍按页面(不是按勾选先后)')
+  assert.deepEqual(pickPlanSheetRows(rows, []), [], '没勾选 ⇒ 空数组(由调用方提示先勾选)')
+  assert.deepEqual(pickPlanSheetRows(rows, ['12']).map((r) => r.加工单号), ['GD-B'], '字符串 id 也认')
+  assert.deepEqual(pickPlanSheetRows(rows, [null, '']), [], '空 id 不算勾选')
+  assert.deepEqual(pickPlanSheetRows([], [11]), [], '接口没行 ⇒ 空')
+  assert.deepEqual(pickPlanSheetRows(rows, [99]), [], '勾选行已不在返回里 ⇒ 空(不打出别人)')
+})
+
 test('printSchedPlanSheet:空数据不出纸;有数据出**一张**(计划+单据编号+二维码同一行)', async () => {
   const before = captured.printed
   assert.equal(await printSchedPlanSheet([], []), false, '空数据返回 false,不打印')
@@ -218,7 +442,7 @@ test('printSchedPlanSheet:空数据不出纸;有数据出**一张**(计划+单�
     客户: 'A', 生产线: '1号机', 加工单号: 'GD-1', 工单行号: 1, 公司代码: '0',
     物料编码: 'S031-3', 产品名称: '滤芯', 规格型号: '28*12', 需求数量: 10, 排产数量: 10,
     计划完工日期: '2026-11-05', 日计划: { '2026-10-31': 1 },
-  }], ['2026-10-31'], { today: '2026-10-31' })
+  }], ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
   assert.equal(ok, true)
   assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
   assert.ok(captured.html.includes('成型车间排单计划'), '标题:排单计划')

@@ -1,0 +1,378 @@
+# 事务内演练输出 — 2026-11-04(两账套)
+#
+# 做法:同一个 JDBC 连接、setAutoCommit(false)、按 GO 分批执行:
+#   第 1 遍 执行 migrate-asm-bom-maintainable-20261104.sql → 第 2 遍 重跑(验证幂等:各段影响行数应全 0)
+#   → 跑 CHECK-after.sql(15 项断言)→ 打印 @@TRANCOUNT → ROLLBACK(未提交,库零改动)
+# 结论:两账套均 15/15 PASS、违规项 0、@@TRANCOUNT 1→0;**未落库**,真正落库待 Lead 统一安排。
+# 命令:cd tools && java -cp lib\mssql-jdbc.jar archive\_asm-bom-maintainable-verify-20261104\_RollbackRehearsal.java <DB> migrate-asm-bom-maintainable-20261104.sql archive\_asm-bom-maintainable-verify-20261104\CHECK-after.sql <输出文件>
+#
+
+########## HSDZ_MES(正式库)##########
+====================================================================================================
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+[rehearsal] 全程在事务内,结束时 ROLLBACK(库不会变)
+
+========== 第 1 遍:执行迁移脚本 ==========
+db_name | label | place | data_type | ref_panel | ref_field | display_field | editable
+--------------------------------------------------------------------------------------
+HSDZ_MES | 单据编号 | query,header | 文本 |  |  |  | false
+HSDZ_MES | 产品编码 | query,header | 文本 |  |  |  | false
+HSDZ_MES | 产品名称 | header | 文本 |  |  |  | false
+HSDZ_MES | 规格型号 | header | 文本 |  |  |  | false
+HSDZ_MES | 工序 | query,header | 下拉框 |  |  |  | false
+HSDZ_MES | 版本号 | header | 文本 |  |  |  | false
+HSDZ_MES | 默认BOM | header | 文本 |  |  |  | false
+HSDZ_MES | 工艺路线名称 | header | 文本 |  |  |  | false
+HSDZ_MES | 来源 | header | 文本 |  |  |  | false
+HSDZ_MES | 状态 | query,header | 文本 |  |  |  | false
+HSDZ_MES | 备注 | header | 文本 |  |  |  | false
+(11 行)
+  [print] == 0. 改前快照:ASM_BOM 表头字段(yj_field.place 含 header)==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES | 0 | 11 | 19 | 47 | 0 | <NULL>
+(1 行)
+  [print] == 0b. 改前统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 1. 表头可填写:8 个字段 editable 0 -> 1 ==
+  [print] 影响行数(首次 8 / 重跑 0):8
+  [print] == 2. 仍保持只读的 3 个表头字段(单据编号=自动取号;来源=金蝶导入留痕;状态=新建默认启用,由 §5 写)==
+  [print] 影响行数(期望 0;非 0 说明这 3 个曾被误开,已拉回):0
+  [print] == 3. 选料参照:产品编码 / 子件编码 → 参照 INV(存货编码/存货名称)==
+  [print] 影响行数(首次 2 / 重跑 0):2
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+子件编码 | query,detail | 参照 | INV | 存货编码 | 存货名称 | true
+(2 行)
+  [print] == 3b. 参照配置对照(产品编码 在表头、子件编码 在明细)==
+  [print] == 4. 默认BOM 改下拉框(是/否)==
+  [print] 影响行数(首次 1 / 重跑 0):1
+label | data_type | dict_sql | editable
+---------------------------------------
+默认BOM | 下拉框 | SELECT N'是' AS v UNION ALL SELECT N'否' | true
+(1 行)
+  [print] == 4b. 默认BOM 现状 ==
+  [print] == 5. 新建默认值:yj_panel.config 合并 headDefaults(状态=启用)==
+  [print] config 原为空,已写入(首次 1 / 重跑 0):1
+panel_code | panel_name | mode | line_table | head_table | group_col | prefix | config
+--------------------------------------------------------------------------------------
+ASM_BOM | 组装物料清单 | doc | bs_asm_bom | <NULL> | 单据编号 | BOM | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 5b. 面板 config 现状 ==
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+单据编号 | query,header | 文本 |  |  |  | false
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+产品名称 | header | 文本 |  |  |  | true
+规格型号 | header | 文本 |  |  |  | true
+工序 | query,header | 下拉框 |  |  |  | true
+版本号 | header | 文本 |  |  |  | true
+默认BOM | header | 下拉框 |  |  |  | true
+工艺路线名称 | header | 文本 |  |  |  | true
+来源 | header | 文本 |  |  |  | false
+状态 | query,header | 文本 |  |  |  | false
+备注 | header | 文本 |  |  |  | true
+(11 行)
+  [print] == 6. 改后对照:ASM_BOM 表头字段 ==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES | 8 | 3 | 19 | 47 | 2 | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 6b. 改后统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 7. 自检 ==
+  [print] == 自检全部 PASS:表头8可编辑/3只读、参照2(INV)、默认BOM下拉框、config.headDefaults 状态=启用、字段19、表47列、面板形态未变 ==
+  [OK] 14 batches(事务内)
+
+========== 第 2 遍:重跑迁移脚本(验证幂等:各段影响行数应全为 0)==========
+db_name | label | place | data_type | ref_panel | ref_field | display_field | editable
+--------------------------------------------------------------------------------------
+HSDZ_MES | 单据编号 | query,header | 文本 |  |  |  | false
+HSDZ_MES | 产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+HSDZ_MES | 产品名称 | header | 文本 |  |  |  | true
+HSDZ_MES | 规格型号 | header | 文本 |  |  |  | true
+HSDZ_MES | 工序 | query,header | 下拉框 |  |  |  | true
+HSDZ_MES | 版本号 | header | 文本 |  |  |  | true
+HSDZ_MES | 默认BOM | header | 下拉框 |  |  |  | true
+HSDZ_MES | 工艺路线名称 | header | 文本 |  |  |  | true
+HSDZ_MES | 来源 | header | 文本 |  |  |  | false
+HSDZ_MES | 状态 | query,header | 文本 |  |  |  | false
+HSDZ_MES | 备注 | header | 文本 |  |  |  | true
+(11 行)
+  [print] == 0. 改前快照:ASM_BOM 表头字段(yj_field.place 含 header)==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES | 8 | 3 | 19 | 47 | 2 | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 0b. 改前统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 1. 表头可填写:8 个字段 editable 0 -> 1 ==
+  [print] 影响行数(首次 8 / 重跑 0):0
+  [print] == 2. 仍保持只读的 3 个表头字段(单据编号=自动取号;来源=金蝶导入留痕;状态=新建默认启用,由 §5 写)==
+  [print] 影响行数(期望 0;非 0 说明这 3 个曾被误开,已拉回):0
+  [print] == 3. 选料参照:产品编码 / 子件编码 → 参照 INV(存货编码/存货名称)==
+  [print] 影响行数(首次 2 / 重跑 0):0
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+子件编码 | query,detail | 参照 | INV | 存货编码 | 存货名称 | true
+(2 行)
+  [print] == 3b. 参照配置对照(产品编码 在表头、子件编码 在明细)==
+  [print] == 4. 默认BOM 改下拉框(是/否)==
+  [print] 影响行数(首次 1 / 重跑 0):0
+label | data_type | dict_sql | editable
+---------------------------------------
+默认BOM | 下拉框 | SELECT N'是' AS v UNION ALL SELECT N'否' | true
+(1 行)
+  [print] == 4b. 默认BOM 现状 ==
+  [print] == 5. 新建默认值:yj_panel.config 合并 headDefaults(状态=启用)==
+  [print] config 已含 headDefaults,未覆盖(幂等跳过)
+panel_code | panel_name | mode | line_table | head_table | group_col | prefix | config
+--------------------------------------------------------------------------------------
+ASM_BOM | 组装物料清单 | doc | bs_asm_bom | <NULL> | 单据编号 | BOM | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 5b. 面板 config 现状 ==
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+单据编号 | query,header | 文本 |  |  |  | false
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+产品名称 | header | 文本 |  |  |  | true
+规格型号 | header | 文本 |  |  |  | true
+工序 | query,header | 下拉框 |  |  |  | true
+版本号 | header | 文本 |  |  |  | true
+默认BOM | header | 下拉框 |  |  |  | true
+工艺路线名称 | header | 文本 |  |  |  | true
+来源 | header | 文本 |  |  |  | false
+状态 | query,header | 文本 |  |  |  | false
+备注 | header | 文本 |  |  |  | true
+(11 行)
+  [print] == 6. 改后对照:ASM_BOM 表头字段 ==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES | 8 | 3 | 19 | 47 | 2 | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 6b. 改后统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 7. 自检 ==
+  [print] == 自检全部 PASS:表头8可编辑/3只读、参照2(INV)、默认BOM下拉框、config.headDefaults 状态=启用、字段19、表47列、面板形态未变 ==
+  [OK] 14 batches(事务内)
+
+========== 断言:执行 CHECK-after.sql ==========
+seq | item | expected | actual | verdict
+----------------------------------------
+1 | 表头 editable=1 条数 | 8 | 8 | PASS
+2 | 表头可编辑集合(=8 字段,双向差集 0) | 0 差异 | 0 | PASS
+3 | 仍只读表头集合(= 单据编号/来源/状态) | 0 差异 | 0 | PASS
+4 | 参照字段条数(data_type=参照) | 2 | 2 | PASS
+5 | 参照配置集合(=产品编码/子件编码,INV 存货编码->存货名称) | 0 差异 | 0 | PASS
+6 | 默认BOM data_type | 下拉框 | 下拉框 | PASS
+7 | 默认BOM 字典(dict_sql 含 是/否) | 含 是 + 否 | SELECT N'是' AS v UNION ALL SELECT N'否' | PASS
+8 | 默认BOM editable | 1(true) | 1 | PASS
+9 | yj_panel.config 含 headDefaults | 1 | 1 | PASS
+10 | yj_panel.config 含 状态/启用 | 1 | 1 | PASS
+11 | 面板字段总数 | 19 | 19 | PASS
+12 | 面板行数与形态(doc/bs_asm_bom/head_table NULL/单据编号) | 1 行且形态不变 | 1 行 | PASS
+13 | bs_asm_bom 列数(本迁移不改表结构) | 47 | 47 | PASS
+14 | bs_asm_bom.备注 列存在 | 1 | 1 | PASS
+15 | 子件编码 明细可编辑 | 1 | 1 | PASS
+900 | 违规项数(violations) | 0 | 0 | PASS
+999 | == RESULT == | PASS | 15/15 项通过 | RESULT: PASS
+(17 行)
+db_name | script_name | content_hash | applied_at
+-------------------------------------------------
+HSDZ_MES | migrate-asm-bom-maintainable-20261104.sql | <未登记>                                                         | 
+(1 行)
+  [OK] 3 batches(事务内)
+
+@@TRANCOUNT 回滚前 = 1(应 ≥ 1),回滚后 = 0(应 0)
+=== ROLLBACK 完成:本次演练未改动数据库(迁移真正落库请用 DbSync run)===
+
+########## HSDZ_MES_TEST(测试库)##########
+====================================================================================================
+[connected] Microsoft SQL Server @ HSDZ_MES_TEST as yinjia
+[rehearsal] 全程在事务内,结束时 ROLLBACK(库不会变)
+
+========== 第 1 遍:执行迁移脚本 ==========
+db_name | label | place | data_type | ref_panel | ref_field | display_field | editable
+--------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 单据编号 | query,header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 产品编码 | query,header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 产品名称 | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 规格型号 | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 工序 | query,header | 下拉框 |  |  |  | false
+HSDZ_MES_TEST | 版本号 | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 默认BOM | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 工艺路线名称 | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 来源 | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 状态 | query,header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 备注 | header | 文本 |  |  |  | false
+(11 行)
+  [print] == 0. 改前快照:ASM_BOM 表头字段(yj_field.place 含 header)==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 0 | 11 | 19 | 47 | 0 | <NULL>
+(1 行)
+  [print] == 0b. 改前统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 1. 表头可填写:8 个字段 editable 0 -> 1 ==
+  [print] 影响行数(首次 8 / 重跑 0):8
+  [print] == 2. 仍保持只读的 3 个表头字段(单据编号=自动取号;来源=金蝶导入留痕;状态=新建默认启用,由 §5 写)==
+  [print] 影响行数(期望 0;非 0 说明这 3 个曾被误开,已拉回):0
+  [print] == 3. 选料参照:产品编码 / 子件编码 → 参照 INV(存货编码/存货名称)==
+  [print] 影响行数(首次 2 / 重跑 0):2
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+子件编码 | query,detail | 参照 | INV | 存货编码 | 存货名称 | true
+(2 行)
+  [print] == 3b. 参照配置对照(产品编码 在表头、子件编码 在明细)==
+  [print] == 4. 默认BOM 改下拉框(是/否)==
+  [print] 影响行数(首次 1 / 重跑 0):1
+label | data_type | dict_sql | editable
+---------------------------------------
+默认BOM | 下拉框 | SELECT N'是' AS v UNION ALL SELECT N'否' | true
+(1 行)
+  [print] == 4b. 默认BOM 现状 ==
+  [print] == 5. 新建默认值:yj_panel.config 合并 headDefaults(状态=启用)==
+  [print] config 原为空,已写入(首次 1 / 重跑 0):1
+panel_code | panel_name | mode | line_table | head_table | group_col | prefix | config
+--------------------------------------------------------------------------------------
+ASM_BOM | 组装物料清单 | doc | bs_asm_bom | <NULL> | 单据编号 | BOM | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 5b. 面板 config 现状 ==
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+单据编号 | query,header | 文本 |  |  |  | false
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+产品名称 | header | 文本 |  |  |  | true
+规格型号 | header | 文本 |  |  |  | true
+工序 | query,header | 下拉框 |  |  |  | true
+版本号 | header | 文本 |  |  |  | true
+默认BOM | header | 下拉框 |  |  |  | true
+工艺路线名称 | header | 文本 |  |  |  | true
+来源 | header | 文本 |  |  |  | false
+状态 | query,header | 文本 |  |  |  | false
+备注 | header | 文本 |  |  |  | true
+(11 行)
+  [print] == 6. 改后对照:ASM_BOM 表头字段 ==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 8 | 3 | 19 | 47 | 2 | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 6b. 改后统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 7. 自检 ==
+  [print] == 自检全部 PASS:表头8可编辑/3只读、参照2(INV)、默认BOM下拉框、config.headDefaults 状态=启用、字段19、表47列、面板形态未变 ==
+  [OK] 14 batches(事务内)
+
+========== 第 2 遍:重跑迁移脚本(验证幂等:各段影响行数应全为 0)==========
+db_name | label | place | data_type | ref_panel | ref_field | display_field | editable
+--------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 单据编号 | query,header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+HSDZ_MES_TEST | 产品名称 | header | 文本 |  |  |  | true
+HSDZ_MES_TEST | 规格型号 | header | 文本 |  |  |  | true
+HSDZ_MES_TEST | 工序 | query,header | 下拉框 |  |  |  | true
+HSDZ_MES_TEST | 版本号 | header | 文本 |  |  |  | true
+HSDZ_MES_TEST | 默认BOM | header | 下拉框 |  |  |  | true
+HSDZ_MES_TEST | 工艺路线名称 | header | 文本 |  |  |  | true
+HSDZ_MES_TEST | 来源 | header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 状态 | query,header | 文本 |  |  |  | false
+HSDZ_MES_TEST | 备注 | header | 文本 |  |  |  | true
+(11 行)
+  [print] == 0. 改前快照:ASM_BOM 表头字段(yj_field.place 含 header)==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 8 | 3 | 19 | 47 | 2 | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 0b. 改前统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 1. 表头可填写:8 个字段 editable 0 -> 1 ==
+  [print] 影响行数(首次 8 / 重跑 0):0
+  [print] == 2. 仍保持只读的 3 个表头字段(单据编号=自动取号;来源=金蝶导入留痕;状态=新建默认启用,由 §5 写)==
+  [print] 影响行数(期望 0;非 0 说明这 3 个曾被误开,已拉回):0
+  [print] == 3. 选料参照:产品编码 / 子件编码 → 参照 INV(存货编码/存货名称)==
+  [print] 影响行数(首次 2 / 重跑 0):0
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+子件编码 | query,detail | 参照 | INV | 存货编码 | 存货名称 | true
+(2 行)
+  [print] == 3b. 参照配置对照(产品编码 在表头、子件编码 在明细)==
+  [print] == 4. 默认BOM 改下拉框(是/否)==
+  [print] 影响行数(首次 1 / 重跑 0):0
+label | data_type | dict_sql | editable
+---------------------------------------
+默认BOM | 下拉框 | SELECT N'是' AS v UNION ALL SELECT N'否' | true
+(1 行)
+  [print] == 4b. 默认BOM 现状 ==
+  [print] == 5. 新建默认值:yj_panel.config 合并 headDefaults(状态=启用)==
+  [print] config 已含 headDefaults,未覆盖(幂等跳过)
+panel_code | panel_name | mode | line_table | head_table | group_col | prefix | config
+--------------------------------------------------------------------------------------
+ASM_BOM | 组装物料清单 | doc | bs_asm_bom | <NULL> | 单据编号 | BOM | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 5b. 面板 config 现状 ==
+label | place | data_type | ref_panel | ref_field | display_field | editable
+----------------------------------------------------------------------------
+单据编号 | query,header | 文本 |  |  |  | false
+产品编码 | query,header | 参照 | INV | 存货编码 | 存货名称 | true
+产品名称 | header | 文本 |  |  |  | true
+规格型号 | header | 文本 |  |  |  | true
+工序 | query,header | 下拉框 |  |  |  | true
+版本号 | header | 文本 |  |  |  | true
+默认BOM | header | 下拉框 |  |  |  | true
+工艺路线名称 | header | 文本 |  |  |  | true
+来源 | header | 文本 |  |  |  | false
+状态 | query,header | 文本 |  |  |  | false
+备注 | header | 文本 |  |  |  | true
+(11 行)
+  [print] == 6. 改后对照:ASM_BOM 表头字段 ==
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | panel_config
+---------------------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 8 | 3 | 19 | 47 | 2 | {"headDefaults":{"状态":"启用"}}
+(1 行)
+  [print] == 6b. 改后统计:表头 editable=1 / editable=0 条数;全面板字段数;物理表列数 ==
+  [print] == 7. 自检 ==
+  [print] == 自检全部 PASS:表头8可编辑/3只读、参照2(INV)、默认BOM下拉框、config.headDefaults 状态=启用、字段19、表47列、面板形态未变 ==
+  [OK] 14 batches(事务内)
+
+========== 断言:执行 CHECK-after.sql ==========
+seq | item | expected | actual | verdict
+----------------------------------------
+1 | 表头 editable=1 条数 | 8 | 8 | PASS
+2 | 表头可编辑集合(=8 字段,双向差集 0) | 0 差异 | 0 | PASS
+3 | 仍只读表头集合(= 单据编号/来源/状态) | 0 差异 | 0 | PASS
+4 | 参照字段条数(data_type=参照) | 2 | 2 | PASS
+5 | 参照配置集合(=产品编码/子件编码,INV 存货编码->存货名称) | 0 差异 | 0 | PASS
+6 | 默认BOM data_type | 下拉框 | 下拉框 | PASS
+7 | 默认BOM 字典(dict_sql 含 是/否) | 含 是 + 否 | SELECT N'是' AS v UNION ALL SELECT N'否' | PASS
+8 | 默认BOM editable | 1(true) | 1 | PASS
+9 | yj_panel.config 含 headDefaults | 1 | 1 | PASS
+10 | yj_panel.config 含 状态/启用 | 1 | 1 | PASS
+11 | 面板字段总数 | 19 | 19 | PASS
+12 | 面板行数与形态(doc/bs_asm_bom/head_table NULL/单据编号) | 1 行且形态不变 | 1 行 | PASS
+13 | bs_asm_bom 列数(本迁移不改表结构) | 47 | 47 | PASS
+14 | bs_asm_bom.备注 列存在 | 1 | 1 | PASS
+15 | 子件编码 明细可编辑 | 1 | 1 | PASS
+900 | 违规项数(violations) | 0 | 0 | PASS
+999 | == RESULT == | PASS | 15/15 项通过 | RESULT: PASS
+(17 行)
+db_name | script_name | content_hash | applied_at
+-------------------------------------------------
+HSDZ_MES_TEST | migrate-asm-bom-maintainable-20261104.sql | <未登记>                                                         | 
+(1 行)
+  [OK] 3 batches(事务内)
+
+@@TRANCOUNT 回滚前 = 1(应 ≥ 1),回滚后 = 0(应 0)
+=== ROLLBACK 完成:本次演练未改动数据库(迁移真正落库请用 DbSync run)===
+
+########## 回滚后复核(正式库:表头可编辑数/参照数/默认BOM下拉/config/登记数 都应与改前一致)##########
+====================================================================================================
+==> SET NOCOUNT ON; SELECT DB_NAME() AS db_name, (SELECT COUNT(*) FROM yj_field WHERE panel_code='ASM_BOM' AND place LIKE N'%header%' AND editable=1) AS hdr_editable_1, (SELECT COUNT(*) FROM yj_field WHERE panel_code='ASM_BOM' AND data_type=N'参照') AS ref_fields, (SELECT COUNT(*) FROM yj_field WHERE panel_code='ASM_BOM' AND label=N'默认BOM' AND data_type=N'下拉框') AS bom_dropdown, (SELECT ISNULL(config,N'<NULL>') FROM yj_panel WHERE panel_code='ASM_BOM') AS config, (SELECT COUNT(*) FROM yj_schema_log WHERE script_name=N'migrate-asm-bom-maintainable-20261104.sql') AS script_logged;
+db_name | hdr_editable_1 | ref_fields | bom_dropdown | config | script_logged
+-----------------------------------------------------------------------------
+HSDZ_MES | 0 | 0 | 0 | <NULL> | 0
+(1 行)
+
+########## 回滚后复核(测试库)##########
+====================================================================================================
+==> SET NOCOUNT ON; SELECT DB_NAME() AS db_name, (SELECT COUNT(*) FROM yj_field WHERE panel_code='ASM_BOM' AND place LIKE N'%header%' AND editable=1) AS hdr_editable_1, (SELECT COUNT(*) FROM yj_field WHERE panel_code='ASM_BOM' AND data_type=N'参照') AS ref_fields, (SELECT COUNT(*) FROM yj_field WHERE panel_code='ASM_BOM' AND label=N'默认BOM' AND data_type=N'下拉框') AS bom_dropdown, (SELECT ISNULL(config,N'<NULL>') FROM yj_panel WHERE panel_code='ASM_BOM') AS config, (SELECT COUNT(*) FROM yj_schema_log WHERE script_name=N'migrate-asm-bom-maintainable-20261104.sql') AS script_logged;
+db_name | hdr_editable_1 | ref_fields | bom_dropdown | config | script_logged
+-----------------------------------------------------------------------------
+HSDZ_MES_TEST | 0 | 0 | 0 | <NULL> | 0
+(1 行)

@@ -1,0 +1,4 @@
+[sev16] SQLException = com.microsoft.sqlserver.jdbc.SQLServerException | msg=independent verify: deliberate severity 16 | errorCode=50000
+[sev10] warning#1 code=50000 sqlState=S0001 msg=[PASS] independent verify severity 10 info
+[sev10] warnings=1
+[sev16-in-batch] SQLException as expected: batch-continue-test

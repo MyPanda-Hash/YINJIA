@@ -1,0 +1,3 @@
+# 大体积原始导出/解析结果(可由 IDump.java / analyze_excel.py / compare.py 重跑生成,不入库)
+out-q1-*.json
+excel-parsed.json

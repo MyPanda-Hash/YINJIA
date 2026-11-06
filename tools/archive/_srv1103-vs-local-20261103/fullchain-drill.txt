@@ -1,0 +1,28 @@
+[connected] Microsoft SQL Server @ HSDZ_MES_REHEARSAL as yinjia
+[变更] migrate-panel-modules.sql(内容与上次执行时不同,重新执行)
+== migrate-panel-modules.sql ==
+  [OK] 4 batches
+[变更] i18n-p3-updates.sql(内容与上次执行时不同,重新执行)
+== i18n-p3-updates.sql ==
+  [OK] 1 batches
+[变更] i18n-translation-table.sql(内容与上次执行时不同,重新执行)
+== i18n-translation-table.sql ==
+  [OK] 6 batches
+[变更] i18n-fix-refkey.sql(内容与上次执行时不同,重新执行)
+== i18n-fix-refkey.sql ==
+  [OK] 3 batches
+[变更] i18n-seed-languages.sql(内容与上次执行时不同,重新执行)
+== i18n-seed-languages.sql ==
+  [OK] 11 batches
+[变更] _bs_part1_tables.sql(内容与上次执行时不同,重新执行)
+== _bs_part1_tables.sql ==
+  (0 rows)
+  [OK] 18 batches
+[变更] _bs_part2_meta.sql(内容与上次执行时不同,重新执行)
+== _bs_part2_meta.sql ==
+  [OK] 1 batches
+[变更] _bs_part3_data.sql(内容与上次执行时不同,重新执行)
+== _bs_part3_data.sql ==
+  [SQLʧ��] Cannot insert duplicate key row in object 'dbo.bs_op' with unique index 'ux_bs_op_code'. The duplicate key value is (PX001).
+[SQL FAIL] _bs_part3_data.sql �� ��ֹ,�����ű�δִ��
+=== 同步完成: 执行 7, 跳过 9, 失败 1 ===

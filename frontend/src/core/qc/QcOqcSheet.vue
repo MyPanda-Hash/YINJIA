@@ -13,14 +13,17 @@
          表尾   : 检验结论 / 备注(都在**同一张主表**里,label 跨前 2 列、值跨后 5 列 ⇒ 列宽天然对齐)
          卫生安全: 按《生活饮用水输配水设备及防护材料卫生安全评价规范》的 15 行静态表
                   (结果列统一印「见型式检验报告」,只读)
-         签署   : 检验员 / 审核 / 批准 + 表单编号 YJ-QR-05/A1
-         页脚   : 地址 / 网址 / 邮箱 / 电话
+         签署   : 检验员(编制) / 审核(一级审批人) / 批准(超级管理员) + 表单编号 YJ-QR-05/A1
 
        ⚠ 用户口径(2026-11-01 07:28):「我是说当前的出厂检验报告实现当前和首件检验单相同的
          形式」—— 即本面板和 QC_FIRST_INSP 一样:整页 A4 纸居中、左侧单据选择栏、右侧按钮竖栏,
          纸上直接填;不再是「表头字段 + 17 列明细表格」的数据页。
          服务端 Jasper 版式(reports/qc_oqc.jrxml)**保留不动**,只用于「导出报表 → PDF/Excel」
          与「导出」弹窗(PanelxList 对 QC_OQC_REPORT 的 PDF/Excel 一律改走服务端报表)。
+
+       ⚠ 用户口径(2026-11-04):「去除红框内页脚内容」—— 页脚(地址/网址/邮箱/电话)整块删除;
+         签署三格按两级审批落值:检验员=编制(提交审批时后端自动写提交人、只读)、
+         审核=一级审批人(head['审核人'])、批准=超级管理员(head['审批人'],二级审批通过才落值)。
 
        ⚠ 写法照 QcFirstInspSheet.vue:defineProps({ head, fields, editable }) +
          defineEmits(['dirty'])、明细行取 props.head.detail.items、v-model 直绑 +
@@ -178,7 +181,7 @@
       </tbody>
     </table>
 
-    <!-- ⑤ 卫生安全块 + 签署 + 页脚(整体不拆页:打印时给 .oqc-tail 加 break-inside:avoid) -->
+    <!-- ⑤ 卫生安全块 + 签署(整体不拆页:打印时给 .oqc-tail 加 break-inside:avoid) -->
     <div class="oqc-tail">
       <div class="oqc-hygiene">
         <div class="oqc-hygiene-title">{{ tt('按《生活饮用水输配水设备及防护材料卫生安全评价规范》') }}</div>
@@ -218,12 +221,18 @@
         </table>
       </div>
 
-      <!-- ⑥ 签署行:检验员(头字段,草稿态可填) / 审核(头字段 审核人,后端按审批状态下发,只读)
-           / 批准(留空线);右下角是受控表单编号 -->
+      <!-- ⑥ 签署行(2026-11-04 用户口径:检验员=编制 / 审核=一级审批人 / 批准=超级管理员):
+            检验员 : **编制格**。canEdit 分支保留(与其它纸张同构),但 yj_field 已由后端迁移
+                     (tools/migrate-oqc-twolevel-20261104.sql)置 editable=0 ⇒ 实际只读;
+                     值由后端「提交审批」那一刻自动写提交人,纸面不接收手改。
+            审核   : 一级审批通过的人(head['审核人'],后端按审批状态下发,只读)。
+            批准   : 超级管理员(head['审批人'],二级审批通过才落值,不再是空线)。
+            右下角是受控表单编号。 -->
       <div class="oqc-sign">
         <div class="oqc-sign-row">
           <span class="oqc-sign-item">
             {{ tt('检验员') }}：
+            <!-- 元数据 editable=0 ⇒ 实际只读;后端「提交审批」时写提交人(编制) -->
             <el-input
               v-if="canEdit('检验员')"
               v-model="head['检验员']"
@@ -238,18 +247,10 @@
             {{ tt('审 核') }}：<span class="oqc-sign-val">{{ head['审核人'] || '' }}</span>
           </span>
           <span class="oqc-sign-item">
-            {{ tt('批 准') }}：<span class="oqc-blank"></span>
+            {{ tt('批 准') }}：<span class="oqc-sign-val">{{ head['审批人'] || '' }}</span>
           </span>
         </div>
         <div class="oqc-form-no">YJ-QR-05/A1</div>
-      </div>
-
-      <!-- ⑦ 页脚:公司地址 / 网址 / 邮箱 / 电话(原件页脚) -->
-      <div class="oqc-footer">
-        <span>{{ tt('惠州大亚湾区龙海二路 303 号') }}</span>
-        <span>www.water-agplus.com</span>
-        <span>info@water-agplus.com</span>
-        <span>0752-5583930</span>
       </div>
     </div>
   </div>
@@ -547,7 +548,7 @@ function setCell(row, key, v) {
   min-width: 72px;
   display: inline-block;
   text-align: center;
-  /* 审核人/检验员是「签在线上」:留空时也画一条线,纸上不会出现一个没有落笔处的空位 */
+  /* 检验员(编制)/审核/批准三格都是「签在线上」:留空时也画一条线,纸上不会出现一个没有落笔处的空位 */
   border-bottom: 1px solid #666;
   padding: 0 6px;
   transform: translateY(-1px);
@@ -555,31 +556,12 @@ function setCell(row, key, v) {
 .oqc-sign-input {
   width: 110px;
 }
-.oqc-blank {
-  display: inline-block;
-  width: 110px;
-  border-bottom: 1px solid #666;
-  transform: translateY(-3px);
-}
 .oqc-form-no {
   margin-top: 10px;
   text-align: right;
   font-size: 12.5px;
   color: #333;
   letter-spacing: 0.5px;
-}
-
-/* ── 页脚 ── */
-.oqc-footer {
-  display: flex;
-  justify-content: center;
-  gap: 34px;
-  margin-top: 18px;
-  padding-top: 8px;
-  border-top: 1px solid #ddd;
-  color: #888;
-  font-size: 11.5px;
-  flex-wrap: wrap;
 }
 
 /* ── 格内直编:去边框、白纸观感(照 QcFirstInspSheet 的 .fi-cell 口径) ── */
@@ -763,11 +745,6 @@ function setCell(row, key, v) {
   body.approval-printing .oqc-form-no {
     font-size: 9.5px !important;
   }
-  body.approval-printing .oqc-footer {
-    font-size: 8.5px !important;
-    margin-top: 8px !important;
-    padding-top: 4px !important;
-  }
   /* 屏幕上的浅底色在纸上淡到几乎看不见:原件本来就是白纸,打印统一白底(更接近受控表单) */
   body.approval-printing .oqc-head th,
   body.approval-printing .oqc-grid thead th,
@@ -781,7 +758,7 @@ function setCell(row, key, v) {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
-  /* 表尾(卫生安全 + 签署 + 页脚)整块不拆页 */
+  /* 表尾(卫生安全 + 签署)整块不拆页 */
   body.approval-printing .oqc-tail {
     break-inside: avoid !important;
     page-break-inside: avoid !important;

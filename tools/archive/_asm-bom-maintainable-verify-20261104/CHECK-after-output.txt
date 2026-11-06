@@ -1,0 +1,45 @@
+=== HSDZ_MES(正式) CHECK-after 2026-11-04 14:39:30 ===
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== CHECK-after.sql ==
+  | 1 | 表头 editable=1 条数 | 8 | 8 | PASS | 
+  | 2 | 表头可编辑集合(=8 字段,双向差集 0) | 0 差异 | 0 | PASS | 
+  | 3 | 仍只读表头集合(= 单据编号/来源/状态) | 0 差异 | 0 | PASS | 
+  | 4 | 参照字段条数(data_type=参照) | 2 | 2 | PASS | 
+  | 5 | 参照配置集合(=产品编码/子件编码,INV 存货编码->存货名称) | 0 差异 | 0 | PASS | 
+  | 6 | 默认BOM data_type | 下拉框 | 下拉框 | PASS | 
+  | 7 | 默认BOM 字典(dict_sql 含 是/否) | 含 是 + 否 | SELECT N'是' AS v UNION ALL SELECT N'否' | PASS | 
+  | 8 | 默认BOM editable | 1(true) | 1 | PASS | 
+  | 9 | yj_panel.config 含 headDefaults | 1 | 1 | PASS | 
+  | 10 | yj_panel.config 含 状态/启用 | 1 | 1 | PASS | 
+  | 11 | 面板字段总数 | 19 | 19 | PASS | 
+  | 12 | 面板行数与形态(doc/bs_asm_bom/head_table NULL/单据编号) | 1 行且形态不变 | 1 行 | PASS | 
+  | 13 | bs_asm_bom 列数(本迁移不改表结构) | 47 | 47 | PASS | 
+  | 14 | bs_asm_bom.备注 列存在 | 1 | 1 | PASS | 
+  | 15 | 子件编码 明细可编辑 | 1 | 1 | PASS | 
+  | 900 | 违规项数(violations) | 0 | 0 | PASS | 
+  | 999 | == RESULT == | PASS | 15/15 项通过 | RESULT: PASS | 
+  | HSDZ_MES | migrate-asm-bom-maintainable-20261104.sql | c775ad4b3340c04893637f7075100063071c70e119012ddce98d1dd276547092 | 2026-11-04 06:39:24 | 
+[OK] CHECK-after.sql (4 batches)
+
+=== HSDZ_MES_TEST(测试) CHECK-after 2026-11-04 14:39:31 ===
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== CHECK-after.sql ==
+  | 1 | 表头 editable=1 条数 | 8 | 8 | PASS | 
+  | 2 | 表头可编辑集合(=8 字段,双向差集 0) | 0 差异 | 0 | PASS | 
+  | 3 | 仍只读表头集合(= 单据编号/来源/状态) | 0 差异 | 0 | PASS | 
+  | 4 | 参照字段条数(data_type=参照) | 2 | 2 | PASS | 
+  | 5 | 参照配置集合(=产品编码/子件编码,INV 存货编码->存货名称) | 0 差异 | 0 | PASS | 
+  | 6 | 默认BOM data_type | 下拉框 | 下拉框 | PASS | 
+  | 7 | 默认BOM 字典(dict_sql 含 是/否) | 含 是 + 否 | SELECT N'是' AS v UNION ALL SELECT N'否' | PASS | 
+  | 8 | 默认BOM editable | 1(true) | 1 | PASS | 
+  | 9 | yj_panel.config 含 headDefaults | 1 | 1 | PASS | 
+  | 10 | yj_panel.config 含 状态/启用 | 1 | 1 | PASS | 
+  | 11 | 面板字段总数 | 19 | 19 | PASS | 
+  | 12 | 面板行数与形态(doc/bs_asm_bom/head_table NULL/单据编号) | 1 行且形态不变 | 1 行 | PASS | 
+  | 13 | bs_asm_bom 列数(本迁移不改表结构) | 47 | 47 | PASS | 
+  | 14 | bs_asm_bom.备注 列存在 | 1 | 1 | PASS | 
+  | 15 | 子件编码 明细可编辑 | 1 | 1 | PASS | 
+  | 900 | 违规项数(violations) | 0 | 0 | PASS | 
+  | 999 | == RESULT == | PASS | 15/15 项通过 | RESULT: PASS | 
+  | HSDZ_MES_TEST | migrate-asm-bom-maintainable-20261104.sql | c775ad4b3340c04893637f7075100063071c70e119012ddce98d1dd276547092 | 2026-11-04 06:39:25 | 
+[OK] CHECK-after.sql (4 batches)

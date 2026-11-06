@@ -39,16 +39,17 @@ import java.util.Map;
  *  (并且已完成和未完成都可以展开和收缩)。
  *  生产退料与领料一致,只是退料默认数量为0。可以不进行退料操作,退料生成的应该是其他入库单,并且写好备注。」
 
- * <h3>BOM 来源(2026-10-30 二次确认)</h3>
+ * <h3>BOM 来源(2026-10-30 二次确认;2026-11-02 换表)</h3>
  * 用户二次确认:「就是组装BOM表(RD_ASM_BOM),我去把数据录进去」。
- * 故取数口径 = 按工单行的**产品编号**取 {@code rd_asm_bom_head} 里最新一张未作废的表头,
- * 再取其 {@code rd_asm_bom_detail} 的 {@code 物料编号 / 物料名 / 物料规格 / 用量}。
- * （注:该表结构与面板都在册且有数据录入界面,只是当前 0 行 —— 用户去录。）
+ * ⚠ 2026-11-02 起数据源已迁到 {@code bs_asm_bom}(数据建模 → 生产 → 组装物料清单,面板 ASM_BOM,
+ * 单表 doc 模式;取数与明细见 {@code latestAsmBom} / {@code bomDetail} 的方法注释)。
+ * 取数口径 = 按工单行的**产品编号 + 工序=N'组装'**取最新一版 BOM(默认BOM='是' 优先,其次版本号最大),
+ * 再取该单 {@code 子件编码 / 子件名称 / 子件规格 / 标准用量}。
  *
  * <h3>为什么物料来源不能是「成型工艺清单」</h3>
  * {@code rd_mold_proc_detail} 的列是「物料种类/实际添加比例/单支物料含量/设计添加量」——
  * 那是**配比**不是可直接领用的数量,且当前 0 行;换算口径需要额外约定。
- * 组装BOM表直接就是「物料编号 + 用量」,与本页语义一一对应。
+ * 组装物料清单直接就是「子件编码 + 标准用量」,与本页语义一一对应。
  *
  * <h3>本控制器不做的事</h3>
  * <ul>
@@ -325,7 +326,7 @@ public class MobilePickController {
         // 已开过单就不重开 —— 用户第二次扫同一行时应当"进到那张单",而不是再开一对空单
         WoPickDocService.PickDoc exist = docs.findActive(lineWoNo, line);
         if (exist != null) {
-            return existingResult(exist);
+            return existingResult(exist, lineWoNo, line, wo, wantPrint);
         }
 
         // 按产品编号取该产品的组装 BOM 表头 → 其明细行
@@ -443,7 +444,7 @@ public class MobilePickController {
             WoPickDocService.PickDoc raced = docs.findActive(lineWoNo, line);
             if (raced != null) {
                 log.warn("手机扫码生单并发撞唯一约束:{}/{};已回落到既有台账 {}", lineWoNo, line, raced.id(), e);
-                return existingResult(raced);
+                return existingResult(raced, lineWoNo, line, wo, wantPrint);
             }
             throw e;
         }
@@ -1339,16 +1340,26 @@ public class MobilePickController {
         }
     }
 
-    /** 已经开过单时的返回(重复扫同一工单行走这里,不再新建) */
-    private Map<String, Object> existingResult(WoPickDocService.PickDoc d) {
+    /**
+     * 已经开过单时的返回(重复扫同一工单行走这里,**不再新建**,但照样给打印载荷)。
+     *
+     * <p>🔴 2026-11-06 用户口径:「现在扫码后已存在的领料单,是不在打印的。但是现在是需要给他打印,
+     * 只是不生成领料单」⇒ 以前这里 {@code 打印 = null},重复扫码什么都不打;
+     * 现在把**那张已存在单据**的打印载荷原样返回(明细取 wo_pick_line / 材料出库单,
+     * 与新建时同一个 {@code printPayload}),前端就能"只打印、不生单"。
+     */
+    private Map<String, Object> existingResult(WoPickDocService.PickDoc d, String woNo, int line,
+                                               Map<String, Object> wo, boolean wantPrint) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", d.id());
         out.put("领料单号", d.outNo());
         out.put("退料单号", d.backNo());
         out.put("状态", d.state());
         out.put("物料项数", d.itemCount());
-        out.put("重复", true);      // 前端据此提示"该工单行已经开过单,已帮你打开"
-        out.put("打印", null);      // 重复时不重复打印
+        out.put("重复", true);      // 前端据此提示"该工单行已经开过单,已帮你打开(并重打这张单)"
+        out.put("打印", wantPrint && wo != null
+                ? printPayload(woNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")), d.id())
+                : null);
         return out;
     }
 
@@ -1386,8 +1397,14 @@ public class MobilePickController {
      *       **迁到** {@code bs_asm_bom}(数据建模 → 生产 → 组装物料清单,面板 ASM_BOM,单表 doc 模式)。</li>
      *   <li>为什么换:两处各维护一份组装用料,现场在「组装物料清单」里改完,
      *       领料单还按「组装工艺清单」那一份走 ⇒ 领的料与工艺不一致;</li>
-     *   <li>取数口径:同一产品可能有多版 BOM(单据编号形如 {@code T387_V0001}),
-     *       **优先 默认BOM='是'**,否则取单据编号最大的一张(版本号含在编号里);</li>
+     *   <li>取数口径(2026-11-04 起与工序报工端 WorkReportController.asmBomOf **同口径**):
+     *       同一产品可能有多版 BOM —— **优先 默认BOM='是'**,其次 **版本号最大**,最后 单据编号 DESC 兜底
+     *       (同版本时排序稳定,tie-break 用)。</li>
+     *   <li>⚠ 为什么不再按「单据编号最大 = 最新版本」推断(2026-11-04):表头可维护后,现场新增的
+     *       BOM 走 MES 自动号 {@code BOM-yyyy-MM-nnnn},其字符串序**恒小于**金蝶历史号
+     *       {@code T387_V0001} / {@code A-32-09_V0002} ⇒ 旧口径(单号 DESC)会把新版本判成旧单:
+     *       工序报工端按版本号取到新 BOM、扫码领料端却取旧 BOM,两份数据不一致、可能领错料。
+     *       版本号列是 nvarchar,{@code V0001}/{@code V2026-…} 的字符串序即版本序(与报工端同一假设)。</li>
      *   <li>只认 {@code 工序='组装'}:这张单表还承载成型/切炭等工序的用料,不过滤会串料。</li>
      * </ul>
      */
@@ -1399,7 +1416,10 @@ public class MobilePickController {
                         + " FROM dbo.bs_asm_bom"
                         + " WHERE 产品编码 = ? AND 工序 = N'组装' AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + "   AND ISNULL(状态,N'') <> N'作废'"
-                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'') = N'是' THEN 0 ELSE 1 END, 单据编号 DESC",
+                        // 2026-11-04 与 WorkReportController.asmBomOf 同口径:默认BOM 优先 → 版本号最大 →
+                        // 单据编号兜底。历史「单号最大=最新版本」对 MES 自动号(BOM-2026-…)失效,见方法注释。
+                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'') = N'是' THEN 0 ELSE 1 END,"
+                        + " 版本号 DESC, 单据编号 DESC",
                 productCode.trim());
         return rows.isEmpty() ? null : rows.get(0);
     }

@@ -770,12 +770,13 @@ export default {
     // 本文件历史遗留缺词(2026-10-15 补齐,使 WorkOrderTraceDialog 词条 0 缺失)
     '工单详情 · 追溯': 'Work Order Detail · Trace',
     '绿=已完工': 'Green = Completed',
-    '蓝=进行中': 'Blue = In Progress',
+    // 2026-11-03:Element Plus 的 el-step「进行中」实际渲染是 #303133(黑),图例口径随之改为「黑=进行中」
+    '黑=进行中': 'Black = In Progress',
     '灰=未开始': 'Grey = Not Started',
     // ---- 工序步骤状态着色(2026-10-16:四态 + 待审量)----
     '超产': 'Over-produced',
     '待审': 'Pending review',
-    '待审=草稿报工未审核,只算已开始(蓝),不计入产出与转序': 'Pending = draft report not yet approved; it only marks the step as started (blue) and does not count toward output or hand-over',
+    '待审=草稿报工未审核,只算已开始(黑),不计入产出与转序': 'Pending = draft report not yet approved; it only marks the step as started (black) and does not count toward output or hand-over',
     '该工单还没有工序进度': 'This work order has no process progress yet',
     '血缘': 'Lineage',
     // ---- 检验方案/检验项目维护:主从层级(2026-10-09)----
@@ -920,9 +921,17 @@ export default {
     '请先选择一张单据': 'Select a document first',
     '未取到单据数据': 'Document data not found',
     '打印失败': 'Print failed',
-    // 成型车间排单计划(2026-10-31):工单排产页「排单计划」按钮,整张纸表出纸(全产线一张)
+    // 排单计划纸表(2026-10-31):工单排产页「排单计划」按钮,整张纸表出纸;
+    //   2026-11-03:只打**勾选行**(勾几张打几张),未勾选按钮置灰;
+    //   2026-11-04:纸表标题/车间列头随工序产线(成型/切炭/组装…)动态,纸面文字不入翻译层
     '排单计划': 'Scheduling Plan',
-    '打印当前选中产线的排单计划;未选线=全部产线': 'Print the scheduling plan of the selected line (all lines if none selected)',
+    // 排单计划打印设置(2026-11-05 客户口径:打印只显示 3~4 天,天数自己设)
+    '排单计划打印设置': 'Scheduling plan print settings',
+    '排单计划打印设置(默认打印天数)': 'Scheduling plan print settings (default print days)',
+    '默认打印天数': 'Default print days',
+    '纸表日期列 = 勾选行「最早日期」起 N 天(中间没计划的格子留空);默认 3 天。': 'Date columns start from the earliest date of the checked rows, N days long (empty cells for days without a plan). Default: 3 days.',
+    '勾选工单后打印排单计划,只打印勾选的工单': 'Print the scheduling plan of the checked work orders (checked rows only)',
+    '请先勾选要打印的工单': 'Select the work orders to print first',
     '没有可打印的排产行': 'No scheduled rows to print',
     // 计划/实报融合显示(2026-10-31 用户口径「当前太丑了…没达成再填入实际的数量」):
     //   一格只显示一个数 —— 没报工显示计划、未达成显示实际(橙色)、达成显示计划;tooltip 里两值都给
@@ -5422,6 +5431,11 @@ export default {
     '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'This app version cannot scan multiple codes: please upgrade to 1.0.2 or later',
     '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Looks up the Assembly BOM for that line\'s product, creates one picking slip and one return slip (return qty 0), and auto-prints the work-order QR once',
     '「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '"Scan" can read several work-order codes at once: listed in sheet order, tick and confirm — they all go into the queue below, then "Batch create" makes one slip per work order',
+    '删除打印电脑': 'Delete print computer',
+    '确定删除打印电脑「': 'Delete print computer "',
+    '」吗?它现在离线;删掉后再连上来需要重新添加': '"? It is offline now; after deleting, it must be re-added when it reconnects',
+    '已存在·已打印': 'Exists · printed',
+    '已开过单的按原单重打': 'existing slips reprinted',
   },
 
 }

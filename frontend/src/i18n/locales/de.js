@@ -2694,6 +2694,11 @@ export default {
     '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Diese App-Version kann nicht mehrfach scannen: bitte auf 1.0.2+ aktualisieren',
     '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Liest die Montage-BOM, erstellt Entnahme- und Rückgabeschein (Menge 0) und druckt den QR einmal',
     '「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '„Scannen" liest mehrere Auftrags-QR (Blattreihenfolge, ankreuzen und bestätigen); sie landen in der Warteschlange, „Sammel-Erstellen" erzeugt je Auftrag einen Beleg',
+    '删除打印电脑': 'Druck-PC löschen',
+    '确定删除打印电脑「': 'Druck-PC „',
+    '」吗?它现在离线;删掉后再连上来需要重新添加': '“ löschen? Er ist offline; beim nächsten Verbinden muss er neu hinzugefügt werden',
+    '已存在·已打印': 'Vorhanden · gedruckt',
+    '已开过单的按原单重打': 'bestehende Belege erneut gedruckt',
   },
 
 }

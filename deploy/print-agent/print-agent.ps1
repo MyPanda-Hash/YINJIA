@@ -160,6 +160,39 @@ function Get-RealPrinterName {
   真实打印机 / XPS / PDF 虚拟打印机都一样对待:PrintController 设成 StandardPrintController,
   这样连"正在打印…"进度框都不会冒出来,才是真正的静默。
 #>
+<#
+  Get-CellLines — 按宽度把文本贪心折成最多 N 行(2026-11-06)
+
+  为什么自己折:GDI+ 的自动换行只在**空格**处断,而"规格"里全是中英混排、
+  没有空格的串(如 38.5*38.5*26（超长规格文字测试）),它压根不断 ⇒ 整段被矩形裁掉,
+  纸面上就是"字被挡住"。这里按字符测宽、逐字累加,保证每行都放得下。
+#>
+function Get-CellLines {
+    param($Graphics, [string]$Text, $Font, [double]$MaxWidth, [int]$MaxLines = 2)
+    if (-not $Text) { return @('') }
+    $lines = New-Object System.Collections.ArrayList
+    $cur = ''
+    $i = 0
+    $chars = $Text.ToCharArray()
+    while ($i -lt $chars.Length) {
+        $probe = $cur + $chars[$i]
+        $tooWide = ($cur.Length -gt 0) -and ($Graphics.MeasureString($probe, $Font).Width -gt $MaxWidth)
+        if ($tooWide) {
+            [void]$lines.Add($cur)
+            $cur = ''
+            if ($lines.Count -ge ($MaxLines - 1)) {
+                # 已经是最后一行:剩下的全塞进去(真放不下时由绘制矩形裁掉,不会挤到隔壁格子)
+                $cur = -join $chars[$i..($chars.Length - 1)]
+                break
+            }
+            continue
+        }
+        $cur = $probe
+        $i++
+    }
+    if ($cur.Length -gt 0) { [void]$lines.Add($cur) }
+    return $lines
+}
 function Send-LabelToPrinter {
     param(
         [string]$Title,
@@ -293,16 +326,22 @@ function Send-LabelToPrinter {
 
         $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei', 24, [System.Drawing.FontStyle]::Bold)
         $fontNo    = New-Object System.Drawing.Font('Microsoft YaHei', 13, [System.Drawing.FontStyle]::Bold)
-        $fontHead  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5, [System.Drawing.FontStyle]::Bold)
-        $fontCell  = New-Object System.Drawing.Font('Microsoft YaHei', 10)
+        $fontHead  = New-Object System.Drawing.Font('Microsoft YaHei', 9.5, [System.Drawing.FontStyle]::Bold)
+        # 🔴 2026-11-06 用户口径「打印效果不好,字被挡住、没有显示完整」:
+        #   格子字号 10 → 8.5,并把「材料名称 / 规格」两列改成**允许换行**(见 $fmtW)。
+        $fontCell  = New-Object System.Drawing.Font('Microsoft YaHei', 8)
         $fontFoot  = New-Object System.Drawing.Font('Microsoft YaHei', 10.5)
         $penLine   = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 1.6)
         $fmtC = New-Object System.Drawing.StringFormat
         $fmtC.Alignment = [System.Drawing.StringAlignment]::Center
         $fmtL = New-Object System.Drawing.StringFormat
         $fmtL.Alignment = [System.Drawing.StringAlignment]::Near
-        # 不换行:纸表格子高度有限,换行会被切掉半截(实测订单号只显示 "GD-2026-11-")
+        # 短列(订单号/单位/数量/备注)不换行:纸表格子高度有限,换行会被切掉半截
         $fmtL.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
+        # 长文本列(材料名称、规格)**允许折行**:宁可两行显示全,也不要被截成 "滤芯内盖(闭孔"
+        $fmtW = New-Object System.Drawing.StringFormat
+        $fmtW.Alignment = [System.Drawing.StringAlignment]::Near
+        $fmtW.FormatFlags = [System.Drawing.StringFormatFlags]::LineLimit
 
         # 本页要画哪些明细(2026-11-05 分页):按页号切片,页内至少 8 行格子(纸表是固定格式)
         $pageIdx = [int]$script:pPage
@@ -346,8 +385,10 @@ function Send-LabelToPrinter {
         # ④ 明细表格:七列,行数 = max(8, 本页实际行数)
         $x0 = 22
         $y0 = 166
-        # 列宽(总 780):订单号必须放得下 "GD-2026-11-0016#1",给到 168
-        $colW = @(168, 172, 118, 45, 92, 92, 93)
+        # 列宽(总 780)。2026-11-06 重排:订单号从 168 收到 130(足够放 "GD-2026-11-0018#1"),
+        #   省下来的宽度给「规格」(118→165)和「材料名称」(172→150),单位 45→45,
+        #   避免 "滤芯内盖（闭孔）" 这类被截成 "滤芯内盖（闭孔"。
+        $colW = @(130, 150, 165, 45, 85, 85, 120)
         $totalW = 0
         foreach ($cw in $colW) { $totalW += $cw }
         $headH = 40
@@ -392,8 +433,21 @@ function Send-LabelToPrinter {
             }
             $cx = $x0
             for ($i = 0; $i -lt 7; $i++) {
-                $rect = New-Object System.Drawing.RectangleF(($cx + 4), ($yy + 7), ($colW[$i] - 8), ($rowH - 10))
-                $g.DrawString($vals[$i], $fontCell, $black, $rect, $fmtL)
+                if ($i -eq 1 -or $i -eq 2) {
+                    # 材料名称(1)/规格(2):按宽度**手动折行**(最多 2 行),每行单独绘制 ⇒ 不会被裁
+                    #   2026-11-06 用户报「字被挡住、没显示完整」:GDI+ 只在空格处换行,
+                    #   "38.5*38.5*26（超长规格…" 这种中英混排无空格串从不断行,整段被矩形裁掉。
+                    $lines = Get-CellLines $g $vals[$i] $fontCell ([double]($colW[$i] - 12)) 2
+                    $ly = $yy + 5
+                    foreach ($ln in $lines) {
+                        $rect = New-Object System.Drawing.RectangleF(($cx + 4), $ly, ($colW[$i] - 8), 13)
+                        $g.DrawString($ln, $fontCell, $black, $rect, $fmtL)
+                        $ly += 12
+                    }
+                } else {
+                    $rect = New-Object System.Drawing.RectangleF(($cx + 4), ($yy + 6), ($colW[$i] - 8), ($rowH - 9))
+                    $g.DrawString($vals[$i], $fontCell, $black, $rect, $fmtL)
+                }
                 $cx += $colW[$i]
             }
         }
@@ -408,7 +462,7 @@ function Send-LabelToPrinter {
         # ⑥ 还有下一行没画完 ⇒ 让打印框架再调一次本回调(续页,抬头/表格线/签名都重画)
         if (($pageIdx + 1) -lt [int]$script:pTotalPages) { $e.HasMorePages = $true }
 
-        $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose()
+        $penLine.Dispose(); $fmtC.Dispose(); $fmtL.Dispose(); $fmtW.Dispose()
         $fontTitle.Dispose(); $fontNo.Dispose(); $fontHead.Dispose(); $fontCell.Dispose(); $fontFoot.Dispose()
         } catch {
             $msg = $_.Exception.Message
@@ -577,11 +631,13 @@ if ($Server) {
         }
         $st = [uri]::EscapeDataString($Sta)
         while ($true) {
+            $did = $false
             try {
                 $hd = @{ Authorization = "Bearer $token" }
                 $pend = Api-Get "$base/px/print/pending?station=$st" $hd
                 if ($pend.data.task) {
                     $task = $pend.data.task
+                    $did = $true
                     $pr = $null
                     try { $pr = Api-Post "http://127.0.0.1:$AgentPort/print" @{} $task 180 }
                     catch { Write-Output "[轮询] 本机打印失败(id=$($task.id)): $($_.Exception.Message)" }
@@ -605,7 +661,9 @@ if ($Server) {
                     try { $token = Login-Once; Write-Output '[轮询] token 过期,已重新登录' } catch { }
                 }
             }
-            Start-Sleep -Seconds 4
+            # 🔴 2026-11-06 用户口径「多单生成没有连续打印」:一批 9 张单以前要 9×4 秒才轮到底。
+            #   改法:刚打完一张就**立刻取下一张**(不再固定睡 4 秒);队列空了才等 4 秒。
+            if ($did) { Start-Sleep -Milliseconds 300 } else { Start-Sleep -Seconds 4 }
         }
     } -ArgumentList $pollArgs
     Write-Host "[轮询] 已启动:每 4 秒去 $srvBase 拉一次任务(站点:$Station)" -ForegroundColor Cyan

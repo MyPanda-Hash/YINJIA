@@ -1,0 +1,4 @@
+== /api/report/templates?panelCode=QC_OQC_REPORT (baseline before DB row)
+{"code":200,"message":"success","data":[{"code":"qc_oqc","panelCode":"QC_OQC_REPORT","name":"出厂检验报告","formats":["pdf","xlsx"]}]}
+== /api/report/templates?all=true (templateManageList baseline)
+{"code":200,"message":"success","data":[{"id":1,"code":"so_order","panelCode":"SO_ORDER","name":"销售订单","enabled":true,"updateBy":null},{"id":3,"code":"qc_proc_insp","panelCode":"QC_PROC_INSP","name":"制程检验记录表","enabled":true,"updateBy":"2026-10-15 22:04"}]}

@@ -235,3 +235,11 @@ deploy/print-agent/print-out/
 # print-*.pdf = 检验单打印探针产物,按既有口径「探针产出的 PDF / Excel 只留本地作证据」不入库。
 tools/archive/_oc-columns-20261029/_en-staged.js
 tools/archive/_qc-proc-print-20261021/*.pdf
+# 组装物料清单(ASM_BOM)全量导入一次性包(2026-11-05):包里的 SQL 副本 / tools\ /
+# SHA256SUMS.txt 都是派生物(由 tools/archive/_assemble-asm-bom-full-pkg.ps1 从仓库真源重建),
+# zip 不入库(deploy/*.zip 已覆盖)。
+/deploy/incr-asm-bom-full-*/migrate-asm-bom-data-full-20261105.sql
+/deploy/incr-asm-bom-full-*/tools/
+/deploy/incr-asm-bom-full-*/SHA256SUMS.txt
+/deploy/incr-asm-bom-full-*/logs/
+/deploy/incr-asm-bom-full-*.zip

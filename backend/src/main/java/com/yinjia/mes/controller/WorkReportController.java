@@ -161,7 +161,13 @@ public class WorkReportController {
                         + " WHERE 产品编码=? AND 工序=N'组装' AND ISNULL(asp_cancel,'N')<>'Y'"
                         + "   AND ISNULL(状态,N'启用')<>N'停用'"
                         + " GROUP BY 单据编号, 版本号, 默认BOM, 来源"
-                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'')=N'是' THEN 0 ELSE 1 END, 版本号 DESC",
+                        // 2026-11-04 与 MobilePickController.latestAsmBom 对齐为**同一套三段排序**:
+                        //   默认BOM='是' 优先 → 版本号 DESC → 单据编号 DESC(tie-break)。
+                        //   补最后一段的理由:bs_asm_bom 没有「单据日期」列 ⇒ nextVersionNo 对同日新建的多张 BOM
+                        //   恒产出 V<当天>-01,同产品两版**版本号可能相同**;此时只按 版本号 DESC 两端会拿到不同
+                        //   的一张(报工端/领料端不一致)。单号 DESC 兜底让两端结果确定且一致。
+                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'')=N'是' THEN 0 ELSE 1 END,"
+                        + " 版本号 DESC, 单据编号 DESC",
                 code);
         if (docs.isEmpty()) return out;
         Map<String, Object> doc = docs.get(0);

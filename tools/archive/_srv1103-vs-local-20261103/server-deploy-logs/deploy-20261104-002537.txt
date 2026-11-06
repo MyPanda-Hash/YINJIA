@@ -1,0 +1,41 @@
+=== deploy-incremental MODE=GO SUB= 2026/11/04 жэхЩ  0:25:37.47 === 
+[1] preflight 
+CHECKED=744 MISSING=0 BAD=0
+RESULT: PACKAGE-OK
+[1] preflight OK - sql files 733 
+RESULT: PREFLIGHT-OK 
+[2] stop app 
+Ёи╧╕: ╪ф╩╝хннЯ "YINJIA-MES" ря╬╜╠╩Ёи╧╕жуж╧║ё
+╢МнС: нч╥╗жуж╧╫ЬЁл "java.exe"ё╛фД PID н╙ 20976║ё
+т╜рР: ц╩сп╢кхннЯ╣дй╣юЩтзткпп║ё
+RESULT: APP-STOPPED 
+[3] backup 
+ря╢╕юМ╟ы╥жж╝ 25║ё
+ря╢╕юМ╟ы╥жж╝ 50║ё
+ря╢╕юМ╟ы╥жж╝ 75║ё
+ря╢╕юМ╟ы╥жж╝ 100║ё
+рян╙йЩ╬щ©Б 'HSDZ_MES'ё╛нд╪Ч 'ASPSMT' (н╩сзнд╪Ч 1 ио)╢╕юМак 26040 рЁ║ё
+рян╙йЩ╬щ©Б 'HSDZ_MES'ё╛нд╪Ч 'ASPSMT_log' (н╩сзнд╪Ч 1 ио)╢╕юМак 1 рЁ║ё
+BACKUP DATABASE Ёи╧╕╢╕юМак 26041 рЁё╛╩╗╥я 2.292 цК(88.760 MB/цК)║ё
+RESULT: BACKUP-GATE-PASSED bak=215048704 
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-wo-mixing-list-20261022.sql ==
+  [OK] 1 batches
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-wo-pick-return-cleanup-20261030.sql ==
+  [OK] 4 batches
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-wo-pick-line-20261101.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 8 batches
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+=== baseline Е╝▄Ф┬░: Ф√╟Ф═┤Х╝╟ 0 Д╦╙Х└ Ф°╛(Ф∙╟Ф█╝Е╨⌠Ф°╙Ф■╧Е┼╗)===
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+=== Е░▄Ф╜╔Е╝▄Ф┬░: Ф┴╖Х║▄ 0, Х╥ЁХ©┤ 694, Е╓╠Х╢╔ 0 ===
+RESULT: MIGRATIONS-OK 
+ря╦╢жф         1 ╦Жнд╪Ч║ё
+ря╦╢жф         1 ╦Жнд╪Ч║ё
+RESULT: NEW-JAR-IN-PLACE old=backup\app-20261104-002537.jar 
+Ёи╧╕: Ё╒йтткпп "YINJIA-MES"║ё
+RESULT: APP-STARTED 

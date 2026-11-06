@@ -1,0 +1,103 @@
+{
+ "title": "OQC 报表 drift @ http://127.0.0.1:8090 docNo=OQC-2026-11-0004",
+ "startedAt": "2026-11-04T11:05:32.915Z",
+ "endedAt": "2026-11-04T11:05:33.369Z",
+ "pass": 10,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8090\",\"factory\":\"YINJIA-MES\",\"docNo\":\"OQC-2026-11-0004\",\"expect\":\"drift\",\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\baseline\\\\20261104T1911-live-8090-task3-template\",\"prefix\":\"live-template-after-task3\"}"
+  },
+  {
+   "name": "登录成功(admin/YINJIA-MES)",
+   "ok": true,
+   "detail": "realName=系统管理员"
+  },
+  {
+   "name": "左栏列表 totalSize",
+   "ok": null,
+   "detail": "0"
+  },
+  {
+   "name": "报表模板 API 含 qc_oqc(出厂检验报告)",
+   "ok": true,
+   "detail": "[{\"code\":\"qc_oqc\",\"panelCode\":\"QC_OQC_REPORT\",\"name\":\"出厂检验报告\",\"formats\":[\"pdf\",\"xlsx\"]}]"
+  },
+  {
+   "name": "导出 PDF HTTP 200 + content-type=pdf",
+   "ok": true,
+   "detail": "status=200 ct=application/pdf bytes=81689"
+  },
+  {
+   "name": "PDF 首字节 %PDF-",
+   "ok": true,
+   "detail": "\"%PDF-1.5\""
+  },
+  {
+   "name": "PDF 字节数 > 10KB",
+   "ok": true,
+   "detail": "81689 bytes"
+  },
+  {
+   "name": "PDF 文本层可抽取(页数/字符数)",
+   "ok": true,
+   "detail": "pages=1 chars=1086"
+  },
+  {
+   "name": "PDF 含标题「出厂检验报告」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "PDF 含模板编号 YJ-QR-05/A1",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "页脚标记是否齐全(drift 记录)",
+   "ok": null,
+   "detail": "false"
+  },
+  {
+   "name": "签署 审核 下划线 / 批准 下划线(drift 记录)",
+   "ok": null,
+   "detail": "{\"审核下划线\":true,\"批准下划线\":true,\"审核\":\"审核：________________批准：_\",\"批准\":\"批准：________________YJ-Q\"}"
+  },
+  {
+   "name": "导出 XLSX HTTP 200 + PK 头",
+   "ok": true,
+   "detail": "status=200 ct=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet bytes=27152"
+  },
+  {
+   "name": "XLSX 字节数 > 5KB",
+   "ok": true,
+   "detail": "27152 bytes"
+  },
+  {
+   "name": "XLSX 旧页脚标记是否齐全(drift 记录)",
+   "ok": null,
+   "detail": "false"
+  },
+  {
+   "name": "XLSX 文本长度",
+   "ok": null,
+   "detail": "431"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8090",
+  "factory": "YINJIA-MES",
+  "docNo": "OQC-2026-11-0004",
+  "expect": "drift",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1911-live-8090-task3-template",
+  "prefix": "live-template-after-task3"
+ },
+ "files": {
+  "pdf": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1911-live-8090-task3-template\\live-template-after-task3.pdf",
+  "xlsx": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1911-live-8090-task3-template\\live-template-after-task3.xlsx",
+  "pdfText": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\baseline\\20261104T1911-live-8090-task3-template\\live-template-after-task3.txt"
+ }
+}

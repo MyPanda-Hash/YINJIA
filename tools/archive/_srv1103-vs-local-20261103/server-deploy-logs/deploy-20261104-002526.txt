@@ -1,0 +1,10 @@
+=== deploy-incremental MODE=CHECK SUB= 2026/11/04 周三  0:25:26.07 === 
+[1] preflight 
+CHECKED=744 MISSING=0 BAD=0
+RESULT: PACKAGE-OK
+[1] preflight OK - sql files 733 
+RESULT: PREFLIGHT-OK 
+[CHECK] current jar hash: 
+SHA256 的 C:\yinjia\app.jar 哈希:
+c4c04b55ebd89f2bf7d3b7ef0d861769d49d6f89576c6425a884ead5c06ce990
+CertUtil: -hashfile 命令成功完成。

@@ -1,0 +1,162 @@
+{
+ "db": "HSDZ_MES",
+ "at": "2026-11-04T11:16:41.391Z",
+ "headCols": {
+  "检验员": true,
+  "审核人": true,
+  "审核时间": true,
+  "审批人": true,
+  "审批时间": true
+ },
+ "docs": [
+  {
+   "单据编号": "OQC-2026-11-0004",
+   "单据日期": "2026-11-04",
+   "客户名称": null,
+   "产品名称": null,
+   "检验员": null,
+   "审核人": null,
+   "审核时间": null
+  },
+  {
+   "单据编号": "OQC-2026-11-0003",
+   "单据日期": "2026-11-01",
+   "客户名称": null,
+   "产品名称": null,
+   "检验员": null,
+   "审核人": null,
+   "审核时间": null
+  },
+  {
+   "单据编号": "OQC-2026-11-0002",
+   "单据日期": "2026-11-01",
+   "客户名称": null,
+   "产品名称": null,
+   "检验员": null,
+   "审核人": null,
+   "审核时间": null
+  },
+  {
+   "单据编号": "OQC-2026-11-0001",
+   "单据日期": "2026-11-01",
+   "客户名称": null,
+   "产品名称": null,
+   "检验员": null,
+   "审核人": null,
+   "审核时间": null
+  }
+ ],
+ "docStatus": [
+  {
+   "panel_code": "QC_OQC_REPORT",
+   "doc_no": "OQC-2026-11-0004",
+   "pending": "N",
+   "approve_node": 0,
+   "shr": "",
+   "shsj": null,
+   "l2_approver": "",
+   "update_at": "2026-11-04T10:24:07.047Z"
+  },
+  {
+   "panel_code": "QC_OQC_REPORT",
+   "doc_no": "OQC-2026-11-0003",
+   "pending": "N",
+   "approve_node": 0,
+   "shr": "",
+   "shsj": null,
+   "l2_approver": "",
+   "update_at": "2026-11-01T05:17:26.737Z"
+  },
+  {
+   "panel_code": "QC_OQC_REPORT",
+   "doc_no": "OQC-2026-11-0001",
+   "pending": "N",
+   "approve_node": 0,
+   "shr": "",
+   "shsj": null,
+   "l2_approver": "",
+   "update_at": "2026-11-01T05:15:39.770Z"
+  },
+  {
+   "panel_code": "QC_OQC_REPORT",
+   "doc_no": "OQC-2026-11-0002",
+   "pending": "N",
+   "approve_node": 0,
+   "shr": "",
+   "shsj": null,
+   "l2_approver": "",
+   "update_at": "2026-11-01T05:15:33.290Z"
+  }
+ ],
+ "approvals": [],
+ "templates": [
+  {
+   "template_code": "qc_oqc",
+   "panel_code": "QC_OQC_REPORT",
+   "name": "出厂检验报告",
+   "enabled": "Y",
+   "len_jrxml": "31292",
+   "update_at": "2026-11-04 11:01:11.357"
+  }
+ ],
+ "fields": [
+  {
+   "id": 18788,
+   "label": "检验员",
+   "place": "query,header",
+   "seq": 110,
+   "editable": false,
+   "required": false,
+   "hidden": false,
+   "visible": true
+  },
+  {
+   "id": 18791,
+   "label": "审核人",
+   "place": "header",
+   "seq": 140,
+   "editable": false,
+   "required": false,
+   "hidden": false,
+   "visible": true
+  },
+  {
+   "id": 18792,
+   "label": "审核时间",
+   "place": "header",
+   "seq": 150,
+   "editable": false,
+   "required": false,
+   "hidden": false,
+   "visible": true
+  },
+  {
+   "id": 18927,
+   "label": "审批人",
+   "place": "header",
+   "seq": 210,
+   "editable": false,
+   "required": false,
+   "hidden": false,
+   "visible": true
+  },
+  {
+   "id": 18928,
+   "label": "审批时间",
+   "place": "header",
+   "seq": 211,
+   "editable": false,
+   "required": false,
+   "hidden": false,
+   "visible": true
+  }
+ ],
+ "autoResidue": [
+  {
+   "oqc_head": 0,
+   "oqc_detail": 0,
+   "doc_status": 0,
+   "approval": 0
+  }
+ ]
+}

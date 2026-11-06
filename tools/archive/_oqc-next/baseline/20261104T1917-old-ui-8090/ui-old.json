@@ -1,0 +1,118 @@
+{
+ "title": "OQC UI old @ http://127.0.0.1:8090 docNo=OQC-2026-11-0004",
+ "startedAt": "2026-11-04T11:06:39.276Z",
+ "endedAt": "2026-11-04T11:07:47.789Z",
+ "pass": 12,
+ "fail": 5,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8090\",\"factory\":\"YINJIA-MES\",\"docNo\":\"OQC-2026-11-0004\",\"expect\":\"old\",\"state\":\"\",\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\.tmp\\\\oqc-verify\\\\ui-probe\"}"
+  },
+  {
+   "name": "登录页可见(frontend 可访问)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8090/#/login"
+  },
+  {
+   "name": "登录工厂下拉选中 YINJIA-MES",
+   "ok": true,
+   "detail": "{\"ok\":true,\"picked\":\"YINJIA-MES\",\"texts\":[\"简体中文\",\"English (en)\",\"日本語 (ja)\",\"한국어 (ko)\",\"Español (es)\",\"Français (fr)\",\"Deutsch (de)\",\"Русский (ru)\",\"Tiếng Việt (vi)\",\"ไทย (th)\",\"YINJIA-MES\",\"YINJIA-MES·测试库\"]}"
+  },
+  {
+   "name": "UI 登录成功并进入桌面(#/dashboard)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8090/#/dashboard"
+  },
+  {
+   "name": "打开纸张面板(.oqc-sheet 渲染)",
+   "ok": true,
+   "detail": "hash=#/panelx/list/QC_OQC_REPORT approvalLayout=true"
+  },
+  {
+   "name": "纸面截图",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\.tmp\\\\oqc-verify\\\\ui-probe\\\\ui-old-paper.png\""
+  },
+  {
+   "name": "纸面事实",
+   "ok": null,
+   "detail": "{\"hasFooter\":true,\"footerText\":\"惠州大亚湾区龙海二路 303 号www.water-agplus.cominfo@water-agplus.com0752-5583930\",\"signText\":\"检验员：\",\"signValues\":[\"\",\"\"],\"blankCells\":1,\"sheetInputs\":0,\"preparerInput\":false,\"sideBtns\":[\"查询单据\",\"模糊搜索\",\"单据预览\",\"新增\",\"审批情况\",\"审核\",\"弃审\",\"打印\",\"导出报表\",\"导出\",\"扫描填单\",\"字段管理\",\"删除\"]}"
+  },
+  {
+   "name": "基线:纸面存在 .oqc-footer",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "基线:页脚含 water-agplus/惠州大亚湾/5583930",
+   "ok": true,
+   "detail": "惠州大亚湾区龙海二路 303 号www.water-agplus.cominfo@water-agplus.com0752-5583930"
+  },
+  {
+   "name": "基线:侧栏有直审入口 审核/弃审",
+   "ok": true,
+   "detail": "查询单据/模糊搜索/单据预览/新增/审批情况/审核/弃审/打印/导出报表/导出/扫描填单/字段管理/删除"
+  },
+  {
+   "name": "基线:签署行 审核/批准 为空白线(无落值)",
+   "ok": false,
+   "detail": "signText=检验员： blankCells=1"
+  },
+  {
+   "name": "「导出报表」弹窗打开",
+   "ok": true,
+   "detail": "导出报表报表模板出厂检验报告📄导出 PDF服务端正式报表：含公司抬头、页眉页脚与页码🖨打印预览在浏览器新窗口内打开 PDF，可直接打印📊导出 Excel（"
+  },
+  {
+   "name": "弹窗模板下拉含「出厂检验报告」",
+   "ok": true,
+   "detail": "出厂检验报告"
+  },
+  {
+   "name": "弹窗有 导出 PDF / 打印预览 / 导出 Excel 三项",
+   "ok": true,
+   "detail": "/模板管理/取消"
+  },
+  {
+   "name": "导出报表→导出 PDF:命中 /api/report/export 且 %PDF-",
+   "ok": false,
+   "detail": "未捕获响应 {\"ok\":true,\"text\":\"导出 PDF\"}"
+  },
+  {
+   "name": "打印预览:发起 /api/report/export 请求",
+   "ok": false,
+   "detail": "{\"clicked\":true,\"hasRes\":false,\"disposition\":\"\",\"newPage\":false}"
+  },
+  {
+   "name": "打印预览:disposition=inline 或打开新窗口",
+   "ok": false,
+   "detail": "disposition= newPage=false"
+  },
+  {
+   "name": "「导出」弹窗打开(选择导出格式)",
+   "ok": true,
+   "detail": "选择导出格式🖨打印预览在浏览器新窗口打开服务端受控表单 PDF，可直接打印📄导出 PDF服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）📊导出 Excel（.xlsx）服务端受"
+  },
+  {
+   "name": "「导出」弹窗含 导出 Excel（.xlsx）",
+   "ok": true,
+   "detail": "选择导出格式🖨打印预览在浏览器新窗口打开服务端受控表单 PDF，可直接打印📄导出 PDF服务端受控表单 PDF（与「导出报表」同一份模板，按 A4 分页）📊导出 Excel（.xlsx）服务端受控表单版式（与「导出报表」同一份模板，按"
+  },
+  {
+   "name": "导出→导出 Excel:命中 /api/report/export 且 PK 头",
+   "ok": false,
+   "detail": "未捕获 xlsx 响应 {\"ok\":true,\"text\":\"导出 Excel（.xlsx）\"}"
+  }
+ ],
+ "result": "FAIL",
+ "env": {
+  "base": "http://127.0.0.1:8090",
+  "factory": "YINJIA-MES",
+  "docNo": "OQC-2026-11-0004",
+  "expect": "old",
+  "state": "",
+  "outDir": "D:\\workspace\\yinjia\\.tmp\\oqc-verify\\ui-probe"
+ }
+}

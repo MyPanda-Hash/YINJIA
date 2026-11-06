@@ -556,13 +556,13 @@ export function pickSlipHtml(payload, qr = '') {
         continue
       }
       tbody += '<tr>'
-        + `<td>${esc(woTag)}</td>`
+        + `<td class="nw">${esc(woTag)}</td>`
         + `<td>${cell(r['材料名称'])}</td>`
         + `<td>${cell(r['规格'])}</td>`
-        + `<td>${cell(r['单位'])}</td>`
-        + `<td class="num">${fmtQty(r['请领数量'])}</td>`
-        + `<td class="num">${fmtQty(r['实发数量'])}</td>`
-        + `<td>${cell(r['备注'])}</td>`
+        + `<td class="nw">${cell(r['单位'])}</td>`
+        + `<td class="num nw">${fmtQty(r['请领数量'])}</td>`
+        + `<td class="num nw">${fmtQty(r['实发数量'])}</td>`
+        + `<td class="nw">${cell(r['备注'])}</td>`
         + '</tr>'
     }
     cards.push('<div class="card">'
@@ -575,7 +575,8 @@ export function pickSlipHtml(payload, qr = '') {
       + '</div>'
       + '</div>'
       + '<table>'
-      + '<colgroup><col style="width:20%"><col style="width:22%"><col style="width:15%">'
+      // 2026-11-06:列宽重排 —— 订单号收窄、材料名称/规格加宽,长文本折行显示全(不再被省略号截断)
+      + '<colgroup><col style="width:17%"><col style="width:19%"><col style="width:21%">'
       + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
       + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
       + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
@@ -601,10 +602,10 @@ export function pickSlipHtml(payload, qr = '') {
     + '.no{position:absolute;right:0;top:2mm;font-size:11pt;font-weight:700}'
     + '.meta{display:flex;justify-content:space-between;margin-top:4mm;font-size:10.5pt}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:1mm}'
-    + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:9.5pt;'
-    + 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
+    + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:8.5pt}'
     + 'th{font-weight:700;text-align:center;height:7mm}'
-    + 'td{height:6.4mm}'
+    + 'td{height:6.4mm;word-break:break-all}'                       // 材料名称/规格:长了就折行,不再省略号截断
+    + 'td.nw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + 'td.num{text-align:right}'
     + '.sign{margin-top:2.5mm;font-size:10.5pt;display:flex;justify-content:space-between}'
     + '.pg{position:absolute;right:6mm;bottom:3.5mm;font-size:9pt}'
@@ -614,32 +615,114 @@ export function pickSlipHtml(payload, qr = '') {
 }
 
 /**
- * 成型车间排单计划(2026-10-31)—— 照纸表《成型车间排单计划》出的整张报表。
+ * 排单计划纸表(2026-10-31;2026-11-04 标题/车间列头改为**按工序产线动态**)—— 照纸表出的整张报表。
  *
- * <p>用户口径:「这个需要能打出这样的报表形式,就在当前工单排产处实现即可,
- * 这样就不需要根据那个产线进行处理了」⇒ 取数走 `/px/scheduleBoard/planSheet`(**全部产线一张表**),
- * 版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 成型车间 / 未完成总数 / 生产计划数量 /
- * 实际完成数量 / 成型交期 / 成型交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
+ * <p>用户口径演化:
+ * <ul>
+ *   <li>2026-10-31「这个需要能打出这样的报表形式,就在当前工单排产处实现即可,
+ *       这样就不需要根据那个产线进行处理了」⇒ 取数走 `/px/scheduleBoard/planSheet`;</li>
+ *   <li>2026-11-04「**当前在不同的工序产线显示的这个工序名称也要不同**」⇒ 纸表标题与「车间」列头
+ *       不再写死「成型车间」,而是跟着**所打印产线的 生产车间**走:
+ *       成型车间排单计划 / 切炭车间排单计划 / 组装车间排单计划…,列头同理(成型车间/切炭车间/组装车间)。
+ *       解析见 {@link planSheetShop} / {@link planSheetTitle};取不到唯一车间时退回通用的
+ *       「排单计划 / 生产车间」,不冒充某个车间。</li>
+ * </ul>
  *
- * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001);日期列默认从**今天起 7 天**
- * (纸表也只印 3~5 天;列太多会挤成一团,可用 opts.days 调)。
+ * <p>版式照纸表:客户等级 / 客户名称 / 产品编号 / 型号 / 车间(产线) / 未完成总数 / 生产计划数量 /
+ * 实际完成数量 / 交期 / 交期紧迫度 / 7天 / 15天 / 大于15 / 日期列(手写那几列 = 我们的日计划)。
+ *
+ * <p>纸面是**固定版式事实**,文字不入 tt() 翻译层(ADR-0001)。
+ *
+ * <p><b>2026-11-05 版式重排</b>(用户口径:「当前这个报表已经调整不需要实现那么多天数,
+ * 可以调整优化一下当前的这个表格和设计,不需要那么窄,看着很丑」)。
+ * 起因:打印天数已收敛到 **1~10 天**(默认 3,见 {@link planSheetPrintDates}),但列宽算法还是
+ * 为 16~31 天写的 —— 固定列被 `fixedScale` 一路压紧、长表头被挤成「生产计划数 / 量」这种断字竖条。
+ * 现在按「少日期」重排:
+ * <ul>
+ *   <li><b>列宽</b>:日期列每天先给 ~6%(3~4 天时表头/4 位数字都放得下),剩余宽度**全给固定列**
+ *       —— 天数越少固定列越宽(不再像 20+ 天那样每列只有 5~7mm);</li>
+ *   <li><b>表头</b>:长表头用显式换行(生产计划/数量、实际完成/数量、成型交期/紧迫度),
+ *       断行位置固定、不再出现掉单字的竖条;日期表头始终横排 nowrap;</li>
+ *   <li><b>字号/行高/留白</b>:正文 10.5px(≈7.9pt)、表头 9.5px,行高跟二维码走,数字右对齐留内边距,
+ *       表框加粗一档(A4 横向、页边距 8mm/6mm) —— 出纸不再是一堆贴边的 7px 小字;</li>
+ *   <li>天数 >10 的入参一律只印前 10 列(打印入口本来就夹 1~10,这里再兜一层防脏数据)。</li>
+ * </ul>
+ */
+
+/**
+ * 排单计划该印哪个「车间/工序」名称(2026-11-04)。
+ *
+ * <p>取值优先级:① 调用方显式 `opts.shop`(工单排产页按**选中产线**的 `生产车间` 传,最准);
+ * ② 行内若**唯一**有产线/工序归属(`生产车间` → `当前工序` → `工序` 依次取第一个非空值);
+ * ③ 都取不到(或混打多个工序)⇒ 空串,由 {@link planSheetTitle} 退回通用标题 —— 不写死「成型」。
+ *
+ * @param {Array} rows 要打印的行
+ * @param {Object} [opts] { shop }
+ * @returns {string} 车间名(如「成型」「切炭」「组装」);未知时 ''
+ */
+export function planSheetShop(rows, opts = {}) {
+  const explicit = String(opts?.shop ?? '').trim()
+  if (explicit) return explicit
+  const set = new Set()
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r) continue
+    for (const k of ['生产车间', '当前工序', '工序']) {
+      const v = String(r[k] ?? '').trim()
+      if (v) { set.add(v); break }
+    }
+  }
+  return set.size === 1 ? [...set][0] : ''
+}
+
+/** 车间词的**裸名**:去掉可能自带的「车间」后缀(档案里两种写法都出现过),避免「成型车间车间排单计划」 */
+function planSheetShopWord(shop) {
+  const s = String(shop || '').trim()
+  return s.endsWith('车间') ? s.slice(0, -2).trim() : s
+}
+
+/** 纸表标题:车间已知 ⇒ 「<车间>车间排单计划」(例:切炭车间排单计划);未知 ⇒ 通用「排单计划」 */
+export function planSheetTitle(shop) {
+  const w = planSheetShopWord(shop)
+  return w ? `${w}车间排单计划` : '排单计划'
+}
+
+/** 纸表「车间」列头:车间已知 ⇒ 切炭车间;未知 ⇒ 生产车间 */
+function planSheetShopColumn(shop) {
+  const w = planSheetShopWord(shop)
+  return w ? `${w}车间` : '生产车间'
+}
+
+/**
+ * 固定列定义(2026-11-05 重排口径)。
+ *
+ * `w` = 基准宽度占比(固定列之间按比例分剩余宽度);`min` = 最小可读占比(内容长时保底);
+ * `n` = 数字列(右对齐);`h` / `hOf(shop)` = 表头 HTML(**显式 `<br>` 换行** —— 断点固定,
+ * 不再让浏览器把「生产计划数量」挤成「生产计划数/量」);`tOf(shop)` = 动态单行表头。
  */
 const PLAN_SHEET_BASE_COLS = [
-  { t: '客户等级', w: 2, k: (r) => r['客户等级'] },
-  { t: '客户名称', w: 9, k: (r) => r['客户'] },
+  // 现役 dm_kh.khjb 全空(2026-11-04 用户口径):勾选行这一列都没值时**默认不印**(hideIfEmpty)
+  { t: '客户等级', w: 3, min: 2.6, hideIfEmpty: true, k: (r) => r['客户等级'] },
+  { t: '客户名称', w: 10.5, min: 7.5, k: (r) => r['客户'] },
   // 主要信息(2026-11-01 用户口径「不是两张纸,当前同一行融合起来」):工单号融进本行
-  { t: '单据编号', w: 10, k: (r) => r['加工单号'] },
-  { t: '产品编号', w: 6, k: (r) => r['物料编码'] },
-  { t: '型号', w: 6, k: (r) => r['规格型号'] },
-  { t: '成型车间', w: 5, k: (r) => r['生产线'] },
-  { t: '未完成总数', w: 5, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
-  { t: '生产计划数量', w: 5, k: (r) => fmtNum(r['排产数量']), n: true },
-  { t: '实际完成数量', w: 5, k: (r) => fmtNum(r['当前工序完工量']), n: true },
-  { t: '成型交期', w: 5, k: (r) => monthDay(r['交期'] || r['计划完工日期']) },
-  { t: '成型交期紧迫度', w: 5, k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true },
-  { t: '7天', w: 3, k: (r) => fmtNum(r['7天已排']), n: true },
-  { t: '15天', w: 3, k: (r) => fmtNum(r['15天已排']), n: true },
-  { t: '大于15', w: 4, k: (r) => fmtNum(r['大于15天已排']), n: true },
+  { t: '单据编号', w: 10.5, min: 8, k: (r) => r['加工单号'] },
+  { t: '产品编号', w: 5.8, min: 4.6, k: (r) => r['物料编码'] },
+  { t: '型号', w: 7.2, min: 5.6, k: (r) => r['规格型号'] },
+  // 车间(产线)列:表头随所打印的工序产线变 —— 成型车间 / 切炭车间 / 组装车间(2026-11-04)
+  { t: '生产车间', w: 5.2, min: 4, k: (r) => r['生产线'], tOf: planSheetShopColumn },
+  { t: '未完成总数', h: '未完成<br>总数', w: 5, min: 3.8, k: (r) => fmtNum(r['未交量'] ?? r['需求数量']), n: true },
+  { t: '生产计划数量', h: '生产计划<br>数量', w: 5.4, min: 4, k: (r) => fmtNum(r['排产数量']), n: true },
+  { t: '实际完成数量', h: '实际完成<br>数量', w: 5.4, min: 4, k: (r) => fmtNum(r['当前工序完工量']), n: true },
+  // 交期两列标题也随工序走(成型交期/切炭交期/组装交期…),旧写死「成型」会让切炭/组装的纸对不上
+  { t: '交期', w: 5.4, min: 4,
+    k: (r) => monthDay(r['交期'] || r['计划完工日期']),
+    tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期` : '交期' } },
+  { t: '交期紧迫度', w: 5.4, min: 4,
+    k: (r) => (r['交期紧迫度'] == null ? '' : String(r['交期紧迫度'])), n: true,
+    tOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${w}交期紧迫度` : '交期紧迫度' },
+    hOf: (shop) => { const w = planSheetShopWord(shop); return w ? `${esc(w)}交期<br>紧迫度` : '交期<br>紧迫度' } },
+  { t: '7天', w: 3.4, min: 2.6, k: (r) => fmtNum(r['7天已排']), n: true },
+  { t: '15天', w: 3.4, min: 2.6, k: (r) => fmtNum(r['15天已排']), n: true },
+  { t: '大于15', w: 4, min: 3, k: (r) => fmtNum(r['大于15天已排']), n: true },
 ]
 
 /** yyyy-MM-dd → M月D日(纸表写法);非法/空 → '' */
@@ -649,7 +732,115 @@ function monthDay(v) {
   return m ? `${Number(m[2])}月${Number(m[3])}日` : s
 }
 
-/** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天 */
+/** yyyy-MM-dd → M/D(日期列多时的紧凑表头,例:10/29 —— 列宽只有 2%~3% 时"M月D日"排不下) */
+function shortMonthDay(v) {
+  const s = String(v ?? '').slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  return m ? `${Number(m[2])}/${Number(m[3])}` : s
+}
+
+/**
+ * yyyy-MM-dd 加/减 N 天 → yyyy-MM-dd。
+ * ⚠ 用 Date.UTC 算,**别**用 `new Date(s)` + 本地时区再 `toISOString().slice(0,10)`
+ *   —— 东八区会差一天(`toISOString` 是 UTC;页面「开工日期」的默认值就踩过这个坑)。
+ */
+export function ymdAddDays(v, n) {
+  const s = String(v ?? '').slice(0, 10)
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!m) return ''
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+  dt.setUTCDate(dt.getUTCDate() + Number(n || 0))
+  return dt.toISOString().slice(0, 10)
+}
+
+/** 一张排单计划最多印多少天(防脏数据/超长交期把表撑爆;正常工单 1~16 天) */
+export const MAX_SHEET_DAYS = 31
+
+/** 连续日期窗口:start 起 days 天;start 非法 → 空数组 */
+export function planSheetWindow(start, days = 5) {
+  const s = String(start || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return []
+  const n = Math.min(Math.max(Math.trunc(Number(days) || 5), 1), MAX_SHEET_DAYS)
+  const out = []
+  for (let i = 0; i < n; i++) out.push(ymdAddDays(s, i))
+  return out
+}
+
+/**
+ * 排单计划要印的日期列(2026-11-04 用户口径:「**打印的就按这些勾选的表中最前面的日期到最后的一个日期就行**」)。
+ *
+ * <p>= 勾选行(`pickPlanSheetRows` 之后的行)的 `日计划` 里出现过的日期,取**最前一个 → 最后一个**,
+ * 中间没计划的日子也保留(空列,纸表可手填);**不再从今天起算**,所以历史计划(例:0227 的
+ * 10-29~10-31)、跨月、以及未来都按数据自己说话。
+ *
+ * <p>边界:
+ * <ul>
+ *   <li>勾选行一个日计划都没有(例如刚排产、数量全空) ⇒ 退回「今天起 days 天」,不打出没有日期列的空表;</li>
+ *   <li>跨度超过 {@link MAX_SHEET_DAYS} 天(脏数据/超长交期) ⇒ 截到**最近</b>的 31 天(保留最新进度);</li>
+ *   <li>只认非零计划值:被清空的格子不算日期(与格子里显示的空一致)。</li>
+ * </ul>
+ *
+ * @param {Array} rows  勾选后的行(每行带 `日计划`)
+ * @param {string} today 后端返回的 `今天`(仅空计划时兜底用)
+ * @param {number} days  兜底窗口天数(默认 5)
+ */
+export function planSheetDatesFromRows(rows, today = '', days = 5) {
+  const ds = new Set()
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const plan = r?.['日计划'] || {}
+    for (const [d, v] of Object.entries(plan)) {
+      const s = String(d || '').slice(0, 10)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s) && Number(v || 0) !== 0) ds.add(s)
+    }
+  }
+  const list = [...ds].sort()
+  if (!list.length) return planSheetWindow(String(today || '').slice(0, 10), days)
+  const first = list[0]
+  const last = list[list.length - 1]
+  // 跨度超上限 ⇒ 从"最后一个日期"往回取 MAX_SHEET_DAYS 天(保留最新进度,而不是最早那一段)
+  const span = Math.round((Date.parse(last + 'T00:00:00Z') - Date.parse(first + 'T00:00:00Z')) / 86400000) + 1
+  const start = span > MAX_SHEET_DAYS ? ymdAddDays(last, -(MAX_SHEET_DAYS - 1)) : first
+  const out = []
+  for (let d = start; out.length < MAX_SHEET_DAYS && d && d <= last; d = ymdAddDays(d, 1)) out.push(d)
+  return out
+}
+
+/** 排单计划默认打印天数(2026-11-05 用户口径:「打印就显示 3 天(或 3~4 天),我们自己可以设置」) */
+export const PLAN_SHEET_DEFAULT_DAYS = 3
+
+/**
+ * 排单计划一张纸最多印几个日期列(2026-11-05 重排时锁定上限 = 10)。
+ *
+ * <p>打印入口 {@link planSheetPrintDates} 已把天数夹在 1~10;这里给 {@link schedPlanSheetHtml}
+ * 兜第二层 —— 万一有调用方直接塞超长 dates,也只印前 10 列,不会把版式压回 20+ 天的挤窄形态。
+ */
+export const PLAN_SHEET_MAX_PRINT_DAYS = 10
+
+/**
+ * 排单计划**实际要印的日期列**(2026-11-05 用户口径,取代 2026-11-04 的"最前→最后")。
+ *
+ * <p>客户原话:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置。」
+ * ⇒ 起点仍取勾选行日计划里**最早的日期**(历史计划照样补打),但往后**只连续印 N 天**;
+ * N 由工单排产页「排单计划」右侧的设置按钮配置(默认 {@link PLAN_SHEET_DEFAULT_DAYS}=3,夹 1~10)。
+ *
+ * <p>为什么不再印整段:日期一多,A4 上只能把每列压到 5~7mm(表头折竖条/数字挤在一起),
+ * 客户明确说"不需要这个超级长而且很丑的排版"。
+ *
+ * @param {Array} rows  勾选后的行(每行带 `日计划`)
+ * @param {string} today 后端 `今天`(勾选行没有任何计划时从这里起算)
+ * @param {number} days  打印天数(1~10,默认 3)
+ * @returns {string[]} 连续 N 个 YYYY-MM-DD
+ */
+export function planSheetPrintDates(rows, today = '', days = PLAN_SHEET_DEFAULT_DAYS) {
+  const num = Number(days)
+  const n = Math.min(Math.max(Math.trunc(Number.isFinite(num) && num > 0 ? num : PLAN_SHEET_DEFAULT_DAYS), 1), 10)
+  const all = planSheetDatesFromRows(rows, today, n)
+  const start = all[0] || String(today || '').slice(0, 10)
+  return planSheetWindow(start, n)
+}
+
+/** 取要打印的日期列:从今天起(含)最多 days 天;今天以后没有就退化成最后 days 天
+ *  (2026-11-04 起出纸改走 {@link planSheetDatesFromRows};本函数保留给旧调用/兜底) */
 export function planSheetDates(dates, today, days = 5) {
   const list = (Array.isArray(dates) ? dates : []).filter(Boolean).slice().sort()
   if (!list.length) return []
@@ -659,25 +850,81 @@ export function planSheetDates(dates, today, days = 5) {
 }
 
 /**
+ * 排单计划·**勾选打印**(2026-11-03 用户口径「不是点击排单计划把目前生产线的所有单据打印,
+ * 而是选择勾选几个打印几个」)—— 从接口返回的行里挑出**勾选的那些行**再出纸。
+ *
+ * <p>保持接口返回的行序(= 页面排产明细的顺序),不按勾选顺序重排;勾选为空 ⇒ 返回空数组
+ * (由调用方提示"请先勾选",绝不悄悄退回"整条产线全打")。
+ *
+ * @param {Array} rows /px/scheduleBoard/planSheet 的 `行`(每行带 `行id`)
+ * @param {Array} ids  勾选行的 `行id`(数字/字符串都认)
+ */
+export function pickPlanSheetRows(rows, ids) {
+  const set = new Set((Array.isArray(ids) ? ids : [])
+    .filter((x) => x != null && x !== '')
+    .map((x) => String(x)))
+  if (!set.size) return []
+  return (Array.isArray(rows) ? rows : []).filter((r) => r && set.has(String(r['行id'])))
+}
+
+/**
+ * 二维码列宽(百分比)。二维码本身尺寸由行数定(见下),列宽只需略大于码宽 + 内边距。
+ * 2026-11-05 重排前它随天数在 4.6%~6.5% 间跳,现固定一档,版式才稳定。
+ */
+const QR_COL_W = 5.5
+
+/**
  * 生成排单计划 HTML(纯函数,便于单测;真正出纸见 {@link printSchedPlanSheet})。
  * @param {Array} rows  /px/scheduleBoard/planSheet 的 `行`
  * @param {Array} dates 日期列(`日期`)
- * @param {Object} [opts] { today, days }
+ * @param {Object} [opts] { today, days, shop, title } —— shop = 工序/车间名(2026-11-04 标题与车间列头随之变);
+ *   title 可整串覆盖;都不传时从行内唯一 生产车间/当前工序/工序 推导,推导不到用通用标题
  */
 export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
-  const ds = planSheetDates(dates, opts.today || '', opts.days || 5)
-  const baseW = PLAN_SHEET_BASE_COLS.reduce((a, c) => a + c.w, 0)
-  // 日期列:按剩余均分,但不低于 4%(否则「10月31日」列头和千位数会被挤成两行);
-  // 列多时按 4% 走,表格整体略超宽由浏览器压缩(比断字好看)
-  const dateW = ds.length ? Math.max(4, Math.floor((100 - baseW) / ds.length)) : 0
+  // 2026-11-04 用户口径「当前在不同的工序产线显示的这个工序名称也要不同」⇒ 纸表标题/车间列头跟着工序产线走
+  const shop = planSheetShop(list, opts)
+  const title = String(opts?.title ?? '').trim() || planSheetTitle(shop)
+  // 日期列:opts.dates 由 WorkOrderBoard 用 planSheetPrintDates() 算好传进来(逐字用);
+  //   不传时退回旧行为(今天起 days 天)。2026-11-05:打印天数已收敛到 1~10,这里再兜一层上限。
+  const ds = (Array.isArray(opts.dates) && opts.dates.length
+    ? opts.dates.filter(Boolean).slice()
+    : planSheetDates(dates, opts.today || '', opts.days || 5)).slice(0, PLAN_SHEET_MAX_PRINT_DAYS)
+  const n = ds.length
+  // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:
+  //   勾选行(本次要打的那些行)在该列**全部为空** ⇒ 这一列默认不印(不浪费纸面宽度)。
+  const isEmptyCell = (v) => v == null || String(v).trim() === ''
+  const cols = PLAN_SHEET_BASE_COLS.filter((c) => !(c.hideIfEmpty && list.every((r) => isEmptyCell(c.k(r)))))
+  // ── 列宽(2026-11-05 重排)──
+  // 口径:日期列**先给**每天 ~6%(3 天 18%、4 天 24%,表头横排 + 4 位数字都放得下;8 天以上总宽封顶 30%);
+  //   剩下的宽度全给固定列 —— 天数越少固定列越宽,这就是"不再那么窄"的来源。
+  //   旧算法反过来先按固定列吃满再分日期列,为 16~31 天让路时会把每列压到 5~7mm。
+  const compact = n > 7
+  const dateTotal = n ? Math.min(n * 6, 30) : 0
+  const dateW = n ? dateTotal / n : 0
+  const baseTotal = 100 - QR_COL_W - dateTotal
+  const wSum = cols.reduce((a, c) => a + c.w, 0) || 1
+  const scale = baseTotal / wSum
+  // 最小可读宽度保底(2026-11-04 报障:23 天时数字列被压到 1.4%,「6000」压到邻列);保底后总和超了再等比缩回
+  let fixedW = cols.map((c) => Math.max(c.w * scale, c.min || 0))
+  const fwSum = fixedW.reduce((a, b) => a + b, 0)
+  if (fwSum > baseTotal) fixedW = fixedW.map((w) => (w * baseTotal) / fwSum)
+  // 二维码尺寸(口径演进:28px「太小」→ 60 → 52「略小」):行少 52px(≈13.8mm)不缩,行多时按行数适度收;
+  //   行高跟二维码走(码 + 上下内边距),最少 42px —— 客户名/长型号折两行也放得下。
+  //   ⚠ 能不能扫不只取决于大小:woQrImg 底图 300px、静区 2 模块(以前 108px/1 模块,打印发虚常扫不出)。
+  const qrPx = list.length <= 5 ? 52 : list.length <= 8 ? 48 : list.length <= 14 ? 44 : 38
+  const rowH = Math.max(42, qrPx + 8)
   const colgroup = '<colgroup>'
-    + PLAN_SHEET_BASE_COLS.map((c) => `<col style="width:${c.w}%"/>`).join('')
-    + ds.map(() => `<col style="width:${dateW}%"/>`).join('')
-    + '<col style="width:5%"/>'                       // 二维码(行尾)
+    + fixedW.map((w) => `<col style="width:${w.toFixed(2)}%"/>`).join('')
+    + ds.map(() => `<col style="width:${dateW.toFixed(2)}%"/>`).join('')
+    + `<col style="width:${QR_COL_W}%"/>`                 // 二维码(行尾)
     + '</colgroup>'
-  const ths = PLAN_SHEET_BASE_COLS.map((c) => `<th>${esc(c.t)}</th>`).join('')
-    + ds.map((d) => `<th>${esc(monthDay(d))}</th>`).join('')
+  // 表头:固定列 h/hOf 用**显式换行**(断点固定,不再出现「生产计划数/量」这种掉单字的竖条);
+  //   日期表头**始终横排 nowrap**(2026-11-04 用户口径「日期不要竖排」),8 天以上改 M/D 紧凑写法。
+  const headOf = (c) => (c.hOf ? c.hOf(shop) : (c.h || esc(c.tOf ? c.tOf(shop) : c.t)))
+  const dateHeadFs = compact ? '8px' : '9.5px'
+  const ths = cols.map((c) => `<th>${headOf(c)}</th>`).join('')
+    + ds.map((d) => `<th class="dt" title="${esc(d)}">${esc(compact ? shortMonthDay(d) : monthDay(d))}</th>`).join('')
     + '<th>二维码</th>'
   // 二维码与「打印工单」同内容(公司代码@工单号@1000+行号),但**融进同一行**,不再另起一张纸
   const qrs = await Promise.all(list.map((r) => woQrImg({
@@ -686,7 +933,7 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
   const trs = list.map((r, i) => {
     const plan = r['日计划'] || {}
     return '<tr>'
-      + PLAN_SHEET_BASE_COLS.map((c) => {
+      + cols.map((c) => {
         const v = c.k(r)
         return `<td${c.n ? ' class="r"' : ''}>${esc(v == null ? '' : v)}</td>`
       }).join('')
@@ -694,19 +941,24 @@ export async function schedPlanSheetHtml(rows, dates, opts = {}) {
       + `<td class="qr">${qrs[i] ? `<img src="${qrs[i]}"/>` : ''}</td>`
       + '</tr>'
   }).join('')
+  // 字号/内边距:常规(≤7 天)正文 10.5px / 表头 9.5px;8 天以上降一档保一行(compact)
+  const fs = compact ? '9px' : '10.5px'
+  const thFs = compact ? '8px' : '9.5px'
+  const pad = compact ? '2px 1px' : '3px 3px'
   return '<style>'
-    + '@page{size:A4 landscape;margin:6mm}'
+    + '@page{size:A4 landscape;margin:8mm 6mm}'
     + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111}'
-    + '.hd{text-align:center;margin:0 0 4px}'
-    + '.hd .t{font-size:18px;font-weight:700;letter-spacing:6px}'
-    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'th,td{border:1px solid #333;padding:2px 3px;font-size:9.5px;line-height:1.25;word-break:break-all;vertical-align:middle}'
-    + 'th{background:#f2f2f2;font-weight:600;text-align:center;font-size:9px;line-height:1.15}'
-    + 'td.r{text-align:right;white-space:nowrap}'
-    + 'td.qr{text-align:center;padding:1px}td.qr img{width:34px;height:34px}'
-    + 'tbody tr{height:38px}'
+    + '.hd{text-align:center;margin:0 0 6px}'
+    + '.hd .t{font-size:20px;font-weight:700;letter-spacing:5px}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid #222}'
+    + `th,td{border:1px solid #666;padding:${pad};font-size:${fs};line-height:1.3;word-break:break-all;vertical-align:middle}`
+    + `th{background:#f2f2f2;font-weight:600;text-align:center;font-size:${thFs};line-height:1.25;border-bottom:1.5px solid #222}`
+    + `th.dt{white-space:nowrap;padding:3px 0;font-size:${dateHeadFs};line-height:1.15;letter-spacing:0}`
+    + 'td.r{text-align:right;white-space:nowrap;padding-right:4px}'
+    + `td.qr{text-align:center;padding:2px}td.qr img{width:${qrPx}px;height:${qrPx}px}`
+    + `tbody tr{height:${rowH}px}`
     + '</style>'
-    + '<div class="hd"><span class="t">成型车间排单计划</span></div>'
+    + `<div class="hd"><span class="t">${esc(title)}</span></div>`
     + '<table>' + colgroup + '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table>'
 }
 
@@ -715,7 +967,9 @@ async function woQrImg(row) {
   try {
     const lib = qrLib()
     if (!lib) throw new Error('qrcode lib unavailable')
-    return await lib.toDataURL(woQrText(row), { margin: 1, errorCorrectionLevel: 'M' })
+    // width=300:按 13.8mm 打印仍等效 500+dpi(以前 108px 底图放大发虚);
+    // margin=2:静区留 2 个模块,手机扫更稳(1 个模块时表格线贴着码,常扫不出)。
+    return await lib.toDataURL(woQrText(row), { margin: 2, errorCorrectionLevel: 'M', width: 300 })
   } catch (e) {
     console.warn('[print-formats] 排单计划二维码生成失败:', e?.message || e)
     return ''
@@ -735,7 +989,10 @@ export async function schedPlanPrintHtml(rows, dates, opts = {}) {
 export async function printSchedPlanSheet(rows, dates, opts = {}) {
   const body = await schedPlanPrintHtml(rows, dates, opts)
   if (!body) return false
-  if (!printInPage('成型车间排单计划', body)) {
+  // 2026-11-04:浏览器打印标题也跟工序产线走(与纸表标题同一份推导),不再固定「成型车间排单计划」
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean)
+  const title = String(opts?.title ?? '').trim() || planSheetTitle(planSheetShop(list, opts))
+  if (!printInPage(title, body)) {
     alert(PRINT_FAIL_MSG)
     return false
   }

@@ -1,0 +1,12 @@
+-- 清理 2026-11-04 task-4 E2E 测试数据(run=20261104111553)
+-- 硬闸门:仅允许本机开发库(HSDZ_MES / HSDZ_MES_TEST);删除范围 = 显式单号白名单
+DECLARE @db sysname = DB_NAME();
+IF @db IN ('HSDZ_MES','HSDZ_MES_TEST')
+BEGIN
+  -- 单号白名单(1):OQC-2026-11-0010
+  DELETE FROM qc_oqc_detail WHERE 单据编号 IN ('OQC-2026-11-0010')
+  DELETE FROM qc_oqc_head WHERE 单据编号 IN ('OQC-2026-11-0010')
+  DELETE FROM yj_doc_status WHERE panel_code='QC_OQC_REPORT' AND doc_no IN ('OQC-2026-11-0010')
+  DELETE FROM yj_form_approval WHERE panel_code='QC_OQC_REPORT' AND form_no IN ('OQC-2026-11-0010')
+END
+ELSE RAISERROR('cleanup refused: DB_NAME()=%s',16,1,@db);

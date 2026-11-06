@@ -1,0 +1,248 @@
+# CHECK-before 实测输出 — 2026-11-04(两账套)
+#
+# 环境:SQL Server 127.0.0.1:1433(JDBC 直连;@@SERVERNAME=7e136db97189,容器/宿主端口映射)
+# 执行:cd tools && java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar archive\_1019-questions\Q.java <DB> archive\_asm-bom-maintainable-verify-20261104\CHECK-before.sql
+# JDK:C:\Users\vigna\.jdks\ms-25.0.4(JDK 25)
+# 用途:①证明迁移前「表头 11 个字段全部只读」的报障现场 ②记录数据影响面基线 ③事后证明演练 ROLLBACK 后库未变
+#
+
+########## HSDZ_MES(正式库)##########
+====================================================================================================
+==> -- ============================================================================ -- CHECK-before:组装物料清单(ASM_BOM)表头可维护 · 迁移前只读取证(2026-11-04) -- -- 用途:在服务器/开发机执行迁移**之前**跑一遍,证明「表头 11 个字段全部只读」的报障现场, -- 并记录字段/面板/物理表/config 的改前基线,便于迁移后对照。 -- 只读:全部是 SELECT,不写任何表。 -- 用法(在 tools 目录;Q.java 为只读查询器,按 GO 分批执行并打印结果集): -- java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar archive\_1019-questions\Q.java HSDZ_MES archive\_asm-bom-maintainable-verify-20261104\CHECK-before.sql -- java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar archive\_1019-questions\Q.java HSDZ_MES_TEST archive\_asm-bom-maintainable-verify-20261104\CHECK-before.sql -- 也可贴进 SSMS 查询窗口逐段执行。 -- ============================================================================ SET NOCOUNT ON;
+[-1 行受影响]
+==> -- 0. 环境 SELECT DB_NAME() AS db_name, @@SERVERNAME AS server_name, SUSER_SNAME() AS login_name, CONVERT(varchar(19), GETDATE(), 120) AS run_at, N'CHECK-before' AS purpose;
+db_name | server_name | login_name | run_at | purpose
+-----------------------------------------------------
+HSDZ_MES | 7e136db97189 | yinjia | 2026-11-04 06:17:24 | CHECK-before
+(1 行)
+==> -- 1. 面板行(yj_panel):单表 doc 模式;改前 config 应为 NULL(或至少不含 headDefaults) SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, ISNULL(head_table, N'<NULL>') AS head_table, group_col, pk_col, code_col, prefix, ISNULL(date_col, N'<NULL>') AS date_col, page_size, detail_key, module_group, ISNULL(config, N'<NULL>') AS config FROM yj_panel WHERE panel_code = 'ASM_BOM';
+panel_code | panel_name | panel_name_en | category | mode | line_table | head_table | group_col | pk_col | code_col | prefix | date_col | page_size | detail_key | module_group | config
+------------------------------------------------------------------------------------------------------------------------
+ASM_BOM | 组装物料清单 | Assembly BOM | 基础档案 | doc | bs_asm_bom | <NULL> | 单据编号 | id | 单据编号 | BOM | <NULL> | 100 | items | 数据建模 | <NULL>
+(1 行)
+==> -- 2. 19 个字段全量(改前基线;editable 全部应为 0 / 明细 7 个为 1) SELECT id, label, col_name, place, data_type, seq, width, editable, required, hidden, visible, ISNULL(ref_panel, N'') AS ref_panel, ISNULL(ref_field, N'') AS ref_field, ISNULL(display_field, N'') AS display_field, ISNULL(dict_sql, N'') AS dict_sql FROM yj_field WHERE panel_code = 'ASM_BOM' ORDER BY seq, id;
+id | label | col_name | place | data_type | seq | width | editable | required | hidden | visible | ref_panel | ref_field | display_field | dict_sql
+------------------------------------------------------------------------------------------------------------------------
+18753 | 单据编号 | 单据编号 | query,header | 文本 | 10 | 150 | false | true | false | true |  |  |  | 
+18754 | 产品编码 | 产品编码 | query,header | 文本 | 20 | 130 | false | true | false | true |  |  |  | 
+18755 | 产品名称 | 产品名称 | header | 文本 | 30 | 200 | false | false | false | true |  |  |  | 
+18756 | 规格型号 | 规格型号 | header | 文本 | 40 | 160 | false | false | false | true |  |  |  | 
+18757 | 工序 | 工序 | query,header | 下拉框 | 50 | 90 | false | true | false | true |  |  |  | SELECT N'组装' AS v UNION ALL SELECT N'成型' UNION ALL SELECT N'切炭'
+18758 | 版本号 | 版本号 | header | 文本 | 60 | 80 | false | false | false | true |  |  |  | 
+18759 | 默认BOM | 默认BOM | header | 文本 | 70 | 80 | false | false | false | true |  |  |  | 
+18760 | 工艺路线名称 | 工艺路线名称 | header | 文本 | 80 | 180 | false | false | false | true |  |  |  | 
+18761 | 来源 | 来源 | header | 文本 | 85 | 200 | false | false | false | true |  |  |  | 
+18762 | 状态 | 状态 | query,header | 文本 | 90 | 80 | false | false | false | true |  |  |  | 
+18763 | 备注 | 备注 | header | 文本 | 100 | 200 | false | false | false | true |  |  |  | 
+18764 | 行序 | 行序 | detail | 整数 | 110 | 60 | false | false | false | true |  |  |  | 
+18765 | 子件编码 | 子件编码 | query,detail | 文本 | 120 | 140 | true | true | false | true |  |  |  | 
+18766 | 子件名称 | 子件名称 | detail | 文本 | 130 | 180 | true | false | false | true |  |  |  | 
+18767 | 子件规格 | 子件规格 | detail | 文本 | 140 | 160 | true | false | false | true |  |  |  | 
+18768 | 计量单位 | 计量单位 | detail | 文本 | 150 | 80 | true | false | false | true |  |  |  | 
+18769 | 标准用量 | 标准用量 | detail | 小数 | 160 | 90 | true | true | false | true |  |  |  | 
+18770 | 损耗量 | 损耗量 | detail | 小数 | 170 | 80 | true | false | false | true |  |  |  | 
+18771 | 行备注 | 行备注 | detail | 文本 | 180 | 200 | true | false | false | true |  |  |  | 
+(19 行)
+==> -- 3. 按 place 分组的 editable 分布(改前期望:表头 11 个 = editable 0) SELECT place, editable, COUNT(*) AS cnt FROM yj_field WHERE panel_code = 'ASM_BOM' GROUP BY place, editable ORDER BY place, editable;
+place | editable | cnt
+----------------------
+detail | false | 1
+detail | true | 6
+header | false | 7
+query,detail | true | 1
+query,header | false | 4
+(5 行)
+==> -- 4. 表头字段清单 + 条数(改前期望 hdr_editable_1 = 0、hdr_editable_0 = 11) SELECT label, place, data_type, editable FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%' ORDER BY seq, id;
+label | place | data_type | editable
+------------------------------------
+单据编号 | query,header | 文本 | false
+产品编码 | query,header | 文本 | false
+产品名称 | header | 文本 | false
+规格型号 | header | 文本 | false
+工序 | query,header | 下拉框 | false
+版本号 | header | 文本 | false
+默认BOM | header | 文本 | false
+工艺路线名称 | header | 文本 | false
+来源 | header | 文本 | false
+状态 | query,header | 文本 | false
+备注 | header | 文本 | false
+(11 行)
+==> SELECT DB_NAME() AS db_name, COUNT(*) AS hdr_fields, SUM(CASE WHEN editable = 1 THEN 1 ELSE 0 END) AS hdr_editable_1, SUM(CASE WHEN editable = 0 THEN 1 ELSE 0 END) AS hdr_editable_0 FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%';
+db_name | hdr_fields | hdr_editable_1 | hdr_editable_0
+------------------------------------------------------
+HSDZ_MES | 11 | 0 | 11
+(1 行)
+==> -- 5. 选料参照现状(改前期望:产品编码/子件编码 都是「文本」,参照字段 0 个) SELECT label, place, data_type, ISNULL(ref_panel, N'') AS ref_panel, ISNULL(ref_field, N'') AS ref_field, ISNULL(display_field, N'') AS display_field FROM yj_field WHERE panel_code = 'ASM_BOM' AND label IN (N'产品编码', N'子件编码') ORDER BY seq;
+label | place | data_type | ref_panel | ref_field | display_field
+-----------------------------------------------------------------
+产品编码 | query,header | 文本 |  |  | 
+子件编码 | query,detail | 文本 |  |  | 
+(2 行)
+==> SELECT DB_NAME() AS db_name, (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND data_type = N'参照') AS ref_fields_total;
+db_name | ref_fields_total
+--------------------------
+HSDZ_MES | 0
+(1 行)
+==> -- 6. 默认BOM 现状(改前期望:data_type=文本、dict_sql 空、editable=0) SELECT label, data_type, ISNULL(dict_sql, N'') AS dict_sql, editable FROM yj_field WHERE panel_code = 'ASM_BOM' AND label = N'默认BOM';
+label | data_type | dict_sql | editable
+---------------------------------------
+默认BOM | 文本 |  | false
+(1 行)
+==> -- 7. 规模基线:面板字段 19、物理表 47 列;**本迁移脚本是否已登记**(改前期望 0) SELECT DB_NAME() AS db_name, (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM') AS panel_fields, (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bs_asm_bom')) AS asm_bom_cols, (SELECT COUNT(*) FROM yj_schema_log WHERE script_name = N'migrate-asm-bom-maintainable-20261104.sql') AS script_logged;
+db_name | panel_fields | asm_bom_cols | script_logged
+-----------------------------------------------------
+HSDZ_MES | 19 | 47 | 0
+(1 行)
+==> -- 7b. 数据影响面(只读;迁移只改元数据,业务数据不动 —— 这里留改前基线供报告/对照) -- 单据数 = COUNT(DISTINCT 单据编号);行数含已作废行;默认BOM/状态 分布来自金蝶导入口径。 SELECT DB_NAME() AS db_name, COUNT(*) AS rows_total, SUM(CASE WHEN ISNULL(asp_cancel, N'N') <> N'Y' THEN 1 ELSE 0 END) AS rows_live, COUNT(DISTINCT [单据编号]) AS docs_total FROM dbo.bs_asm_bom;
+db_name | rows_total | rows_live | docs_total
+---------------------------------------------
+HSDZ_MES | 1086 | 1086 | 237
+(1 行)
+==> SELECT N'默认BOM 分布' AS what, ISNULL([默认BOM], N'<NULL>') AS val, COUNT(*) AS cnt FROM dbo.bs_asm_bom GROUP BY ISNULL([默认BOM], N'<NULL>') ORDER BY cnt DESC, val;
+what | val | cnt
+----------------
+默认BOM 分布 | <NULL> | 1063
+默认BOM 分布 | 是 | 23
+(2 行)
+==> SELECT N'状态 分布' AS what, ISNULL([状态], N'<NULL>') AS val, COUNT(*) AS cnt FROM dbo.bs_asm_bom GROUP BY ISNULL([状态], N'<NULL>') ORDER BY cnt DESC, val;
+what | val | cnt
+----------------
+状态 分布 | 启用 | 1085
+状态 分布 | <NULL> | 1
+(2 行)
+==> -- 关键列可空性(说明:产品编码/工序/子件编码 均 NOT NULL;空白草稿建单由后端 -- insertRow 的 fillRequiredDefaults 给 NOT NULL 无默认值列补 ''/0,不需要改表结构) SELECT c.name AS col, t.name AS typ, c.is_nullable, c.max_length FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id WHERE c.object_id = OBJECT_ID('dbo.bs_asm_bom') AND c.name IN (N'单据编号', N'产品编码', N'工序', N'子件编码', N'行序', N'默认BOM', N'状态') ORDER BY c.column_id;
+col | typ | is_nullable | max_length
+------------------------------------
+单据编号 | nvarchar | false | 100
+产品编码 | nvarchar | false | 200
+工序 | nvarchar | false | 40
+默认BOM | nvarchar | true | 20
+状态 | nvarchar | true | 40
+行序 | int | false | 4
+子件编码 | nvarchar | false | 200
+(7 行)
+==> -- 8. 结论:BEFORE-STATE 判定(表头确实全只读 ⇒ 与 2026-11-04 报障现场一致,可执行迁移) DECLARE @hdrOn int, @hdrOff int, @fields int, @cols int, @refs int, @cfg nvarchar(max); SELECT @hdrOn = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%' AND editable = 1; SELECT @hdrOff = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%' AND editable = 0; SELECT @fields = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM'; SELECT @cols = COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bs_asm_bom'); SELECT @refs = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND data_type = N'参照'; SELECT @cfg = config FROM yj_panel WHERE panel_code = 'ASM_BOM'; SELECT DB_NAME() AS db_name, @hdrOn AS hdr_editable_1, @hdrOff AS hdr_editable_0, @fields AS panel_fields, @cols AS asm_bom_cols, @refs AS ref_fields, ISNULL(@cfg, N'<NULL>') AS config, CASE WHEN @hdrOn = 0 AND @hdrOff = 11 AND @fields = 19 AND @cols = 47 AND @refs = 0 THEN N'BEFORE-STATE PASS:表头 11 个字段全只读(与 2026-11-04 报障现场一致),可执行迁移' ELSE N'注意:现状与「表头全只读」不符(可能已执行过迁移或被手改),先逐项核对再决定' END AS before_verdict;
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | config | before_verdict
+--------------------------------------------------------------------------------------------------------------
+HSDZ_MES | 0 | 11 | 19 | 47 | 0 | <NULL> | BEFORE-STATE PASS:表头 11 个字段全只读(与 2026-11-04 报障现场一致),可执行迁移
+(1 行)
+
+########## HSDZ_MES_TEST(测试库)##########
+====================================================================================================
+==> -- ============================================================================ -- CHECK-before:组装物料清单(ASM_BOM)表头可维护 · 迁移前只读取证(2026-11-04) -- -- 用途:在服务器/开发机执行迁移**之前**跑一遍,证明「表头 11 个字段全部只读」的报障现场, -- 并记录字段/面板/物理表/config 的改前基线,便于迁移后对照。 -- 只读:全部是 SELECT,不写任何表。 -- 用法(在 tools 目录;Q.java 为只读查询器,按 GO 分批执行并打印结果集): -- java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar archive\_1019-questions\Q.java HSDZ_MES archive\_asm-bom-maintainable-verify-20261104\CHECK-before.sql -- java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar archive\_1019-questions\Q.java HSDZ_MES_TEST archive\_asm-bom-maintainable-verify-20261104\CHECK-before.sql -- 也可贴进 SSMS 查询窗口逐段执行。 -- ============================================================================ SET NOCOUNT ON;
+[-1 行受影响]
+==> -- 0. 环境 SELECT DB_NAME() AS db_name, @@SERVERNAME AS server_name, SUSER_SNAME() AS login_name, CONVERT(varchar(19), GETDATE(), 120) AS run_at, N'CHECK-before' AS purpose;
+db_name | server_name | login_name | run_at | purpose
+-----------------------------------------------------
+HSDZ_MES_TEST | 7e136db97189 | yinjia | 2026-11-04 06:17:25 | CHECK-before
+(1 行)
+==> -- 1. 面板行(yj_panel):单表 doc 模式;改前 config 应为 NULL(或至少不含 headDefaults) SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, ISNULL(head_table, N'<NULL>') AS head_table, group_col, pk_col, code_col, prefix, ISNULL(date_col, N'<NULL>') AS date_col, page_size, detail_key, module_group, ISNULL(config, N'<NULL>') AS config FROM yj_panel WHERE panel_code = 'ASM_BOM';
+panel_code | panel_name | panel_name_en | category | mode | line_table | head_table | group_col | pk_col | code_col | prefix | date_col | page_size | detail_key | module_group | config
+------------------------------------------------------------------------------------------------------------------------
+ASM_BOM | 组装物料清单 | Assembly BOM | 基础档案 | doc | bs_asm_bom | <NULL> | 单据编号 | id | 单据编号 | BOM | <NULL> | 100 | items | 数据建模 | <NULL>
+(1 行)
+==> -- 2. 19 个字段全量(改前基线;editable 全部应为 0 / 明细 7 个为 1) SELECT id, label, col_name, place, data_type, seq, width, editable, required, hidden, visible, ISNULL(ref_panel, N'') AS ref_panel, ISNULL(ref_field, N'') AS ref_field, ISNULL(display_field, N'') AS display_field, ISNULL(dict_sql, N'') AS dict_sql FROM yj_field WHERE panel_code = 'ASM_BOM' ORDER BY seq, id;
+id | label | col_name | place | data_type | seq | width | editable | required | hidden | visible | ref_panel | ref_field | display_field | dict_sql
+------------------------------------------------------------------------------------------------------------------------
+12025 | 单据编号 | 单据编号 | query,header | 文本 | 10 | 150 | false | true | false | true |  |  |  | 
+12026 | 产品编码 | 产品编码 | query,header | 文本 | 20 | 130 | false | true | false | true |  |  |  | 
+12027 | 产品名称 | 产品名称 | header | 文本 | 30 | 200 | false | false | false | true |  |  |  | 
+12028 | 规格型号 | 规格型号 | header | 文本 | 40 | 160 | false | false | false | true |  |  |  | 
+12029 | 工序 | 工序 | query,header | 下拉框 | 50 | 90 | false | true | false | true |  |  |  | SELECT N'组装' AS v UNION ALL SELECT N'成型' UNION ALL SELECT N'切炭'
+12030 | 版本号 | 版本号 | header | 文本 | 60 | 80 | false | false | false | true |  |  |  | 
+12031 | 默认BOM | 默认BOM | header | 文本 | 70 | 80 | false | false | false | true |  |  |  | 
+12032 | 工艺路线名称 | 工艺路线名称 | header | 文本 | 80 | 180 | false | false | false | true |  |  |  | 
+12033 | 来源 | 来源 | header | 文本 | 85 | 200 | false | false | false | true |  |  |  | 
+12034 | 状态 | 状态 | query,header | 文本 | 90 | 80 | false | false | false | true |  |  |  | 
+12035 | 备注 | 备注 | header | 文本 | 100 | 200 | false | false | false | true |  |  |  | 
+12036 | 行序 | 行序 | detail | 整数 | 110 | 60 | false | false | false | true |  |  |  | 
+12037 | 子件编码 | 子件编码 | query,detail | 文本 | 120 | 140 | true | true | false | true |  |  |  | 
+12038 | 子件名称 | 子件名称 | detail | 文本 | 130 | 180 | true | false | false | true |  |  |  | 
+12039 | 子件规格 | 子件规格 | detail | 文本 | 140 | 160 | true | false | false | true |  |  |  | 
+12040 | 计量单位 | 计量单位 | detail | 文本 | 150 | 80 | true | false | false | true |  |  |  | 
+12041 | 标准用量 | 标准用量 | detail | 小数 | 160 | 90 | true | true | false | true |  |  |  | 
+12042 | 损耗量 | 损耗量 | detail | 小数 | 170 | 80 | true | false | false | true |  |  |  | 
+12043 | 行备注 | 行备注 | detail | 文本 | 180 | 200 | true | false | false | true |  |  |  | 
+(19 行)
+==> -- 3. 按 place 分组的 editable 分布(改前期望:表头 11 个 = editable 0) SELECT place, editable, COUNT(*) AS cnt FROM yj_field WHERE panel_code = 'ASM_BOM' GROUP BY place, editable ORDER BY place, editable;
+place | editable | cnt
+----------------------
+detail | false | 1
+detail | true | 6
+header | false | 7
+query,detail | true | 1
+query,header | false | 4
+(5 行)
+==> -- 4. 表头字段清单 + 条数(改前期望 hdr_editable_1 = 0、hdr_editable_0 = 11) SELECT label, place, data_type, editable FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%' ORDER BY seq, id;
+label | place | data_type | editable
+------------------------------------
+单据编号 | query,header | 文本 | false
+产品编码 | query,header | 文本 | false
+产品名称 | header | 文本 | false
+规格型号 | header | 文本 | false
+工序 | query,header | 下拉框 | false
+版本号 | header | 文本 | false
+默认BOM | header | 文本 | false
+工艺路线名称 | header | 文本 | false
+来源 | header | 文本 | false
+状态 | query,header | 文本 | false
+备注 | header | 文本 | false
+(11 行)
+==> SELECT DB_NAME() AS db_name, COUNT(*) AS hdr_fields, SUM(CASE WHEN editable = 1 THEN 1 ELSE 0 END) AS hdr_editable_1, SUM(CASE WHEN editable = 0 THEN 1 ELSE 0 END) AS hdr_editable_0 FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%';
+db_name | hdr_fields | hdr_editable_1 | hdr_editable_0
+------------------------------------------------------
+HSDZ_MES_TEST | 11 | 0 | 11
+(1 行)
+==> -- 5. 选料参照现状(改前期望:产品编码/子件编码 都是「文本」,参照字段 0 个) SELECT label, place, data_type, ISNULL(ref_panel, N'') AS ref_panel, ISNULL(ref_field, N'') AS ref_field, ISNULL(display_field, N'') AS display_field FROM yj_field WHERE panel_code = 'ASM_BOM' AND label IN (N'产品编码', N'子件编码') ORDER BY seq;
+label | place | data_type | ref_panel | ref_field | display_field
+-----------------------------------------------------------------
+产品编码 | query,header | 文本 |  |  | 
+子件编码 | query,detail | 文本 |  |  | 
+(2 行)
+==> SELECT DB_NAME() AS db_name, (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND data_type = N'参照') AS ref_fields_total;
+db_name | ref_fields_total
+--------------------------
+HSDZ_MES_TEST | 0
+(1 行)
+==> -- 6. 默认BOM 现状(改前期望:data_type=文本、dict_sql 空、editable=0) SELECT label, data_type, ISNULL(dict_sql, N'') AS dict_sql, editable FROM yj_field WHERE panel_code = 'ASM_BOM' AND label = N'默认BOM';
+label | data_type | dict_sql | editable
+---------------------------------------
+默认BOM | 文本 |  | false
+(1 行)
+==> -- 7. 规模基线:面板字段 19、物理表 47 列;**本迁移脚本是否已登记**(改前期望 0) SELECT DB_NAME() AS db_name, (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM') AS panel_fields, (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bs_asm_bom')) AS asm_bom_cols, (SELECT COUNT(*) FROM yj_schema_log WHERE script_name = N'migrate-asm-bom-maintainable-20261104.sql') AS script_logged;
+db_name | panel_fields | asm_bom_cols | script_logged
+-----------------------------------------------------
+HSDZ_MES_TEST | 19 | 47 | 0
+(1 行)
+==> -- 7b. 数据影响面(只读;迁移只改元数据,业务数据不动 —— 这里留改前基线供报告/对照) -- 单据数 = COUNT(DISTINCT 单据编号);行数含已作废行;默认BOM/状态 分布来自金蝶导入口径。 SELECT DB_NAME() AS db_name, COUNT(*) AS rows_total, SUM(CASE WHEN ISNULL(asp_cancel, N'N') <> N'Y' THEN 1 ELSE 0 END) AS rows_live, COUNT(DISTINCT [单据编号]) AS docs_total FROM dbo.bs_asm_bom;
+db_name | rows_total | rows_live | docs_total
+---------------------------------------------
+HSDZ_MES_TEST | 1085 | 1085 | 236
+(1 行)
+==> SELECT N'默认BOM 分布' AS what, ISNULL([默认BOM], N'<NULL>') AS val, COUNT(*) AS cnt FROM dbo.bs_asm_bom GROUP BY ISNULL([默认BOM], N'<NULL>') ORDER BY cnt DESC, val;
+what | val | cnt
+----------------
+默认BOM 分布 | <NULL> | 1062
+默认BOM 分布 | 是 | 23
+(2 行)
+==> SELECT N'状态 分布' AS what, ISNULL([状态], N'<NULL>') AS val, COUNT(*) AS cnt FROM dbo.bs_asm_bom GROUP BY ISNULL([状态], N'<NULL>') ORDER BY cnt DESC, val;
+what | val | cnt
+----------------
+状态 分布 | 启用 | 1085
+(1 行)
+==> -- 关键列可空性(说明:产品编码/工序/子件编码 均 NOT NULL;空白草稿建单由后端 -- insertRow 的 fillRequiredDefaults 给 NOT NULL 无默认值列补 ''/0,不需要改表结构) SELECT c.name AS col, t.name AS typ, c.is_nullable, c.max_length FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id WHERE c.object_id = OBJECT_ID('dbo.bs_asm_bom') AND c.name IN (N'单据编号', N'产品编码', N'工序', N'子件编码', N'行序', N'默认BOM', N'状态') ORDER BY c.column_id;
+col | typ | is_nullable | max_length
+------------------------------------
+单据编号 | nvarchar | false | 100
+产品编码 | nvarchar | false | 200
+工序 | nvarchar | false | 40
+默认BOM | nvarchar | true | 20
+状态 | nvarchar | true | 40
+行序 | int | false | 4
+子件编码 | nvarchar | false | 200
+(7 行)
+==> -- 8. 结论:BEFORE-STATE 判定(表头确实全只读 ⇒ 与 2026-11-04 报障现场一致,可执行迁移) DECLARE @hdrOn int, @hdrOff int, @fields int, @cols int, @refs int, @cfg nvarchar(max); SELECT @hdrOn = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%' AND editable = 1; SELECT @hdrOff = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND place LIKE N'%header%' AND editable = 0; SELECT @fields = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM'; SELECT @cols = COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.bs_asm_bom'); SELECT @refs = COUNT(*) FROM yj_field WHERE panel_code = 'ASM_BOM' AND data_type = N'参照'; SELECT @cfg = config FROM yj_panel WHERE panel_code = 'ASM_BOM'; SELECT DB_NAME() AS db_name, @hdrOn AS hdr_editable_1, @hdrOff AS hdr_editable_0, @fields AS panel_fields, @cols AS asm_bom_cols, @refs AS ref_fields, ISNULL(@cfg, N'<NULL>') AS config, CASE WHEN @hdrOn = 0 AND @hdrOff = 11 AND @fields = 19 AND @cols = 47 AND @refs = 0 THEN N'BEFORE-STATE PASS:表头 11 个字段全只读(与 2026-11-04 报障现场一致),可执行迁移' ELSE N'注意:现状与「表头全只读」不符(可能已执行过迁移或被手改),先逐项核对再决定' END AS before_verdict;
+db_name | hdr_editable_1 | hdr_editable_0 | panel_fields | asm_bom_cols | ref_fields | config | before_verdict
+--------------------------------------------------------------------------------------------------------------
+HSDZ_MES_TEST | 0 | 11 | 19 | 47 | 0 | <NULL> | BEFORE-STATE PASS:表头 11 个字段全只读(与 2026-11-04 报障现场一致),可执行迁移
+(1 行)

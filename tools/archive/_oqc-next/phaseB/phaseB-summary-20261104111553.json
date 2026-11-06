@@ -1,0 +1,330 @@
+{
+ "title": "OQC 阶段B E2E (8091 新代码) run=20261104111553",
+ "startedAt": "2026-11-04T11:15:53.887Z",
+ "endedAt": "2026-11-04T11:16:26.529Z",
+ "pass": 50,
+ "fail": 0,
+ "items": [
+  {
+   "name": "8091 登录成功(YINJIA-MES)",
+   "ok": true,
+   "detail": "realName=系统管理员 / API=http://127.0.0.1:8091"
+  },
+  {
+   "name": "DB 连接且库名符合预期(HSDZ_MES/HSDZ_MES_TEST)",
+   "ok": true,
+   "detail": "HSDZ_MES"
+  },
+  {
+   "name": "DB:qc_oqc_head 已有 审批人/审批时间 列",
+   "ok": true,
+   "detail": "审批人,审批时间"
+  },
+  {
+   "name": "元数据:审批人/审批时间已登记 yj_field",
+   "ok": true,
+   "detail": "检验员,审核人,审核时间,审批人,审批时间"
+  },
+  {
+   "name": "元数据:检验员 editable=0(编制格只读)",
+   "ok": true,
+   "detail": "editable=false"
+  },
+  {
+   "name": "元数据:审核人/审批人均只读",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "模板已入库:yj_report_template 有 qc_oqc 行且 enabled=Y",
+   "ok": true,
+   "detail": "[{\"template_code\":\"qc_oqc\",\"panel_code\":\"QC_OQC_REPORT\",\"enabled\":\"Y\",\"len\":\"31292\"}]"
+  },
+  {
+   "name": "报表模板 API 下发 qc_oqc",
+   "ok": true,
+   "detail": "[{\"code\":\"qc_oqc\",\"panelCode\":\"QC_OQC_REPORT\",\"name\":\"出厂检验报告\",\"formats\":[\"pdf\",\"xlsx\"]}]"
+  },
+  {
+   "name": "面板配置:审批人/审批时间字段下发且只读",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "面板配置:检验员 readonly(editable=0 生效)",
+   "ok": true,
+   "detail": "readonly=true"
+  },
+  {
+   "name": "新建 OQC 草稿(调用「保存」按钮)",
+   "ok": true,
+   "detail": "code=200 no=OQC-2026-11-0010 msg=success"
+  },
+  {
+   "name": "测试单号",
+   "ok": null,
+   "detail": "\"OQC-2026-11-0010\""
+  },
+  {
+   "name": "草稿已落库(客户/产品/2 行明细)",
+   "ok": true,
+   "detail": "客户=AUTO_验证客户_20261104111553 明细行=2"
+  },
+  {
+   "name": "草稿态 检验员为空(建草稿不写登录账号)",
+   "ok": true,
+   "detail": "检验员=null"
+  },
+  {
+   "name": "草稿态 审核人/审批人为空",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "yj_panel 查询能列出该测试单",
+   "ok": true,
+   "detail": "totalSize=1"
+  },
+  {
+   "name": "直接「审核」对 OQC 被拒且提示走两级审批",
+   "ok": true,
+   "detail": "code=409 msg=出厂检验报告走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核"
+  },
+  {
+   "name": "直审被拒后单据仍在草稿(未变已审核)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "UI[draft]:PASS 19/FAIL 0",
+   "ok": true,
+   "detail": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft.json"
+  },
+  {
+   "name": "提交审批成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "提交后状态=审批中(pending=Y,node=1)",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":1,\"shr\":\"\",\"shsj\":null}"
+  },
+  {
+   "name": "提交后 检验员=提交人姓名「系统管理员」(编制自动写)",
+   "ok": true,
+   "detail": "检验员=\"系统管理员\""
+  },
+  {
+   "name": "提交后 审核人/审批人为空",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "留痕:SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "一级审批通过成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "一级通过后状态=待二级审批(pending=Y,node=2)",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":2,\"shr\":\"\",\"shsj\":null}"
+  },
+  {
+   "name": "一级通过后 审核人=「系统管理员」",
+   "ok": true,
+   "detail": "审核人=\"系统管理员\""
+  },
+  {
+   "name": "一级通过后 审核时间非空",
+   "ok": true,
+   "detail": "审核时间=\"2026-11-04T19:16:04.000Z\""
+  },
+  {
+   "name": "一级通过后 审批人仍为空",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "留痕:APPROVE_L1(node=1)",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1"
+  },
+  {
+   "name": "UI[pending2]:PASS 22/FAIL 0",
+   "ok": true,
+   "detail": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\pending2\\ui-pending2.json"
+  },
+  {
+   "name": "二级审批通过成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "二级通过后状态=已审核(pending=N,node=0)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":0,\"shr\":\"admin\",\"shsj\":\"2026-11-04T11:16:15.530Z\"}"
+  },
+  {
+   "name": "二级通过后 审批人=「系统管理员」(超级管理员)",
+   "ok": true,
+   "detail": "审批人=\"系统管理员\""
+  },
+  {
+   "name": "二级通过后 审批时间非空",
+   "ok": true,
+   "detail": "审批时间=\"2026-11-04T19:16:15.000Z\""
+  },
+  {
+   "name": "留痕:APPROVE(node=2) 存在",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1,APPROVE@2"
+  },
+  {
+   "name": "留痕:APPROVE_L1 仍在(未被覆盖)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "API 导出 PDF:HTTP200 + %PDF- + >10KB",
+   "ok": true,
+   "detail": "status=200 bytes=84922"
+  },
+  {
+   "name": "PDF 文本可抽取(页数/字符)",
+   "ok": true,
+   "detail": "pages=1 chars=1253"
+  },
+  {
+   "name": "PDF 页脚:water-agplus/惠州大亚湾/5583930 全部消失",
+   "ok": true,
+   "detail": "water-agplus=false 惠州大亚湾=false 5583930=false"
+  },
+  {
+   "name": "PDF 签署:检验员落值「系统管理员」",
+   "ok": true,
+   "detail": "检验员：系统管理员审核：系统管理"
+  },
+  {
+   "name": "PDF 签署:审核落值「系统管理员」",
+   "ok": true,
+   "detail": "审核：系统管理员批准：系统管理"
+  },
+  {
+   "name": "PDF 签署:批准落值「系统管理员」",
+   "ok": true,
+   "detail": "批准：系统管理员YJ-QR-0"
+  },
+  {
+   "name": "PDF 含受控表单编号 YJ-QR-05/A1",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "PDF 证据",
+   "ok": null,
+   "detail": "{\"pdf\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\export-OQC-2026-11-0010.pdf\",\"text\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\export-OQC-2026-11-0010.txt\"}"
+  },
+  {
+   "name": "API 导出 XLSX:%PK + >10KB",
+   "ok": true,
+   "detail": "status=200 bytes=27561"
+  },
+  {
+   "name": "XLSX 旧页脚地址串消失",
+   "ok": true,
+   "detail": "water-agplus=false 惠州大亚湾=false 5583930=false"
+  },
+  {
+   "name": "XLSX 含 检验员/审核/批准 标签",
+   "ok": true,
+   "detail": "文本长度=477"
+  },
+  {
+   "name": "XLSX 含落值人「系统管理员」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "XLSX 证据",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_oqc-next\\\\phaseB\\\\export-OQC-2026-11-0010.xlsx\""
+  },
+  {
+   "name": "UI[audited]:PASS 21/FAIL 0",
+   "ok": true,
+   "detail": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\audited\\ui-audited.json"
+  },
+  {
+   "name": "清理:测试单 0 残留(head/detail/status/approval)",
+   "ok": true,
+   "detail": "{\"OQC-2026-11-0010\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0}}"
+  },
+  {
+   "name": "清理:AUTO_ 标记数据 0 残留",
+   "ok": true,
+   "detail": "{\"h\":0,\"a\":0}"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YINJIA-MES",
+  "db": "HSDZ_MES",
+  "runId": "20261104111553",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB"
+ },
+ "testDocs": [
+  "OQC-2026-11-0010"
+ ],
+ "uiRuns": [
+  {
+   "tag": "draft",
+   "state": "draft",
+   "exit": 0,
+   "summaryPath": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\draft\\ui-draft.json",
+   "pass": 19,
+   "fail": 0
+  },
+  {
+   "tag": "pending2",
+   "state": "pending2",
+   "exit": 0,
+   "summaryPath": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\pending2\\ui-pending2.json",
+   "pass": 22,
+   "fail": 0
+  },
+  {
+   "tag": "audited",
+   "state": "audited",
+   "exit": 0,
+   "summaryPath": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\ui\\audited\\ui-audited.json",
+   "pass": 21,
+   "fail": 0
+  }
+ ],
+ "cleanup": {
+  "docs": [
+   "OQC-2026-11-0010"
+  ],
+  "extraDocs": [],
+  "residue": {
+   "OQC-2026-11-0010": {
+    "head": 0,
+    "detail": 0,
+    "status": 0,
+    "approval": 0
+   }
+  },
+  "sqlFile": "D:\\workspace\\yinjia\\tools\\archive\\_oqc-next\\phaseB\\cleanup-20261104111553.sql",
+  "autoResidue": {
+   "h": 0,
+   "a": 0
+  }
+ }
+}

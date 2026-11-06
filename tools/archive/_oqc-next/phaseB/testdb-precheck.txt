@@ -1,0 +1,16 @@
+== DB=HSDZ_MES_TEST @ 2026-11-04T11:17:08.521Z
+[1] qc_oqc_head 关注列: {"检验员":true,"审核人":true,"审核时间":true,"审批人":true,"审批时间":true}
+[2] 报告单 3 张(最近):
+     {"单据编号":"OQC-2026-11-0012","单据日期":"2026-11-01","客户名称":"伊可普","产品名称":"PP棉复合A级炭棒","检验员":"admin","审核人":null,"审核时间":null}
+     {"单据编号":"OQC-2026-11-0004","单据日期":"2026-11-01","客户名称":"伊可普","产品名称":"PP棉复合A级炭棒","检验员":"admin","审核人":null,"审核时间":null}
+     {"单据编号":"OQC-2026-11-0003","单据日期":"2026-11-01","客户名称":"伊可普","产品名称":"碱性炭棒(1018项目)","检验员":"admin","审核人":null,"审核时间":null}
+[3] yj_doc_status(QC_OQC_REPORT) 3 行:
+     {"panel_code":"QC_OQC_REPORT","doc_no":"OQC-2026-11-0003","pending":"N","approve_node":0,"shr":"","shsj":null,"l2_approver":"","update_at":"2026-11-01T00:51:24.777Z"}
+     {"panel_code":"QC_OQC_REPORT","doc_no":"OQC-2026-11-0004","pending":"N","approve_node":0,"shr":"","shsj":null,"l2_approver":"","update_at":"2026-10-31T23:58:21.260Z"}
+     {"panel_code":"QC_OQC_REPORT","doc_no":"OQC-2026-11-0012","pending":"N","approve_node":0,"shr":"","shsj":null,"l2_approver":"","update_at":"2026-10-31T23:58:18.010Z"}
+[4] yj_form_approval 留痕 2 条:
+     {"id":11655,"panel_code":"QC_OQC_REPORT","form_no":"OQC-2026-11-0004","action":"UNAUDIT","result":"PENDING","node_no":1,"operator":"admin","opinion":"","create_time":"2026-10-31 23:58:21.272"}
+     {"id":11654,"panel_code":"QC_OQC_REPORT","form_no":"OQC-2026-11-0004","action":"AUDIT","result":"APPROVED","node_no":1,"operator":"admin","opinion":"","create_time":"2026-10-31 23:58:15.096"}
+[5] yj_report_template: [{"template_code":"qc_oqc","panel_code":"QC_OQC_REPORT","name":"出厂检验报告","enabled":"Y","len_jrxml":"31292","update_at":"2026-11-04 11:01:14.367"}]
+[6] yj_field: [{"id":12060,"label":"检验员","place":"query,header","seq":110,"editable":false,"required":false,"hidden":false,"visible":true},{"id":12063,"label":"审核人","place":"header","seq":140,"editable":false,"required":false,"hidden":false,"visible":true},{"id":12064,"label":"审核时间","place":"header","seq":150,"editable":false,"required":false,"hidden":false,"visible":true},{"id":13198,"label":"审批人","place":"header","seq":210,"editable":false,"required":false,"hidden":false,"visible":true},{"id":13199,"label":"审批时间","place":"header","seq":211,"editable":false,"required":false,"hidden":false,"visible":true}]
+[7] AUTO_ 残留: [{"oqc_head":0,"oqc_detail":0,"doc_status":0,"approval":0}]

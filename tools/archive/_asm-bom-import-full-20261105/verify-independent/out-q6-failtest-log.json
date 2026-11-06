@@ -1,0 +1,2 @@
+{"batch":1,"rs":0,"columns":["failtest_log_rows"],"rows":[["0"]]}
+{"batch":2,"rs":0,"columns":["script_name","content_hash"],"rows":[["migrate-asm-bom-data-20261030.sql","70ea33338937b8c45dfb639415ee64bf542d3b71340f88b43633f5bac4637050"],["migrate-asm-bom-data-full-20261105.sql","9717cd04a5a04cf54cee4cfc0f99bf3c939f8592a6e9db80e2d385f6c77d4c3a"]]}

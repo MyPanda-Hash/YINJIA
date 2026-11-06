@@ -1,0 +1,3 @@
+{"batch":1,"rs":0,"columns":["panel_code","doc_no","saved","canceled"],"rows":[["ASM_BOM","BOM-2026-10-0001","Y","Y"],["ASM_BOM","BOM-2026-11-0001","Y","Y"]]}
+{"batch":2,"rs":0,"columns":["asm_bom_status_rows"],"rows":[["2"]]}
+{"batch":3,"rs":0,"columns":["plain_docs"],"rows":[["829"]]}
