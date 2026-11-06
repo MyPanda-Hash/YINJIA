@@ -4520,3 +4520,5 @@ migrate-sample-ext-detail-20261106.sql
 migrate-prodinfo-cust-code-20261106.sql
 # 2026-11-06 「生产车间」统一成标准库 mold.workshop（1#~7#，可增删维护）：烧结工艺清单(含成型配方页)/X烧结工艺清单
 migrate-mold-workshop-stdlib-20261106.sql
+# 2026-11-06 内部开发样品申请单改成「共享表」：单表长列表(rd_sample_int_head) · 无审批 · 行可增删 · 列可筛选 · 每页 10/20/50
+migrate-sample-int-flat-20261106.sql
