@@ -149,3 +149,30 @@ test('产品文件四单的右上角是固定表单编号（2026-11-06 用户口
   assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-146-1', 'X烧结工艺清单')
   assert.equal(recordSheetConfigs.RD_SPEC_DOC.docNoStatic, 'YJ-QR-153', '规格书')
 })
+/**
+ * 2026-11-06 用户报障：「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」。
+ *
+ * 【根因】封面的值格在**草稿态**走 el-input（可编辑），在**审批后**走纯 span。
+ *   通用表格规则 `.rs-t :deep(.el-input__inner){font-size:13.5px}`（给普通表区输入框定的）
+ *   也命中了封面 —— 而封面的 `--cok` 缩放字号写在 `.rsp-cover-input :deep(.el-input__inner)`，
+ *   两条规则同特异性、后写的赢，`.rs-t` 那条在样式表里更靠后 ⇒ 草稿态封面被压成 13.5px，
+ *   审批后恢复 27.3px×cok ⇒ 同一页两种字号。
+ *
+ * 修法：给封面/签字栏的输入框规则加 `.rs-t` 前缀提升特异性（不改通用规则，别的表区要靠它）。
+ */
+test('封面输入框字号必须压过通用表区 13.5px（草稿态与只读态同字号）', () => {
+  const src = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.ok(/\.rs-t :deep\(\.el-input__inner\)/.test(src), '通用表区输入框规则不应被删')
+  const coverRule = src.match(/\.rsp-cover-input\s*:deep\(\.el-input__inner\)\s*\{([^}]*)\}/)
+  assert.ok(coverRule, '缺少 .rsp-cover-input 的输入框字号规则')
+  assert.ok(/font-size:\s*calc\([^)]*var\(--cok\)/.test(coverRule[1]),
+    '封面输入框字号必须用 --cok 缩放（否则草稿态与只读态不一致）')
+})
+
+test('封面输入框规则的 CSS 特异性高于通用 .rs-t 规则（否则被静默压掉）', () => {
+  const src = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  const m = src.match(/(\.rs-t\s+\.rsp-cover-input[^{]*)\{(?=[^}]*font-size)/)
+  assert.ok(m, '封面输入框字号规则必须带 .rs-t 前缀（否则与通用规则同特异性、被后者压掉）')
+  const classes = (m[1].match(/\.[a-zA-Z-]+/g) || []).length
+  assert.ok(classes >= 3, '选择器只有 ' + classes + ' 个类，压不过 .rs-t :deep(.el-input__inner)')
+})

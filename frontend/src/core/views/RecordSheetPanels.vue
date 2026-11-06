@@ -5827,14 +5827,20 @@ function chartOf(dt) {
   line-height: 1.5;
 }
 /* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
-   并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径) */
-.rsp-cover-input :deep(.el-input__wrapper) {
+   并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径)。
+   ⚠ 2026-11-06 用户报障「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」:
+   封面整块渲染在 table.rs-t.rs-head-t 里,而通用规则
+   `.rs-t :deep(.el-input__inner){font-size:13.5px}` 给它下面的**所有**输入框定字号。
+   两条规则同特异性、`.rs-t` 那条在样式表里更靠后 ⇒ 草稿态（值格是 el-input）被压成 13.5px,
+   审批后（值格是纯 span 走 .rsp-cover-val）又回到 27.3px×cok ⇒ 同一页两种字号。
+   修法：给这两条规则加 `.rs-t` 前缀提升特异性（通用规则不能删，别的表区要靠它）。 */
+.rs-t .rsp-cover-input :deep(.el-input__wrapper) {
   padding: 0;
   box-shadow: none;
   background: transparent;
   border-radius: 0;
 }
-.rsp-cover-input :deep(.el-input__inner) {
+.rs-t .rsp-cover-input :deep(.el-input__inner) {
   height: calc(38px * var(--cvy));
   font-size: calc(27.3px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
@@ -5898,12 +5904,14 @@ function chartOf(dt) {
   font-family: 'SimSun', 'Songti SC', serif;
   word-break: break-all;
 }
-.rsp-sign-input :deep(.el-input__wrapper) {
+/* 签字栏同封面：这两条也必须带 .rs-t 前缀，否则被通用 `.rs-t :deep(.el-input__inner)`
+   的 13.5px 压掉（2026-11-06 同一根因；签字栏目标字号 12px×cok 比 13.5px 还小，压掉反而变大）。 */
+.rs-t .rsp-sign-input :deep(.el-input__wrapper) {
   padding: 0 2px;
   box-shadow: none;
   background: transparent;
 }
-.rsp-sign-input :deep(.el-input__inner) {
+.rs-t .rsp-sign-input :deep(.el-input__inner) {
   text-align: center;
   font-size: calc(12px * var(--cok));
   line-height: 1.5;
