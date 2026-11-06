@@ -4494,3 +4494,5 @@ migrate-approval-customer-ref-20261106.sql
 migrate-sample-dev-panels-20261106.sql
 # 2026-11-06 加标水：表格结构（列/列名/分格）存进 lab.test_item 标准库条目，一个条目=一套表样式
 migrate-spike-water-layout-20261106.sql
+# 2026-11-06 修正加标水结构迁移：条目名写回 item_code（content 只存结构 JSON，下拉不再显示 JSON）
+migrate-spike-water-layout-fix-20261106.sql
