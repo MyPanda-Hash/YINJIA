@@ -1642,13 +1642,20 @@
       </template>
     </el-dialog>
     <!-- 标准库维护(可增/可编辑/可停用/可恢复启用;打印时隐藏) -->
-    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibName)" width="680px" append-to-body>
-      <!-- 加标水（2026-11-06）：结构编辑放进「改标准库条目」这个语义里，入口稳定可见 -->
-      <div v-if="isSpikeWater" class="slv-entry">
-        <el-button size="small" type="primary" plain @click="openLayoutEditor">⊞ {{ tt('编辑表格结构') }}</el-button>
-        <span class="slv-entry-hint">{{ tt('改的是「选中这个条目时表格长什么样」：几列、列名叫啥、哪些列合并成一个分格。') }}</span>
-      </div>
-      <StdLibManager :lib="stdLibCode" @changed="onStdLibChanged" />
+    <!-- 加标水用 900px：模版清单多了「列数 / 分格 / 设计·停用·删除」三列，680px 会把
+         最右边的删除按钮挤出可视区（实测点不到）—— 其它面板的 StdLibManager 仍是 680px。 -->
+    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibName)" :width="isSpikeWater ? '900px' : '680px'" append-to-body>
+      <!-- 加标水（2026-11-06 第二轮）：标准库条目正文是**表格结构 JSON**，用通用 StdLibManager
+           会把一坨 JSON 直接摊给用户（「这个设计得人家就不会操作」）⇒ 换成模版清单：
+           名称/列数/分格/状态 + 「设计/停用/删除」，「新增模版」= 为一种测试项目建一张表。 -->
+      <StdLibTemplateManager
+        v-if="isSpikeWater"
+        :lib="stdLibCode"
+        :panel-code="panelCode"
+        @changed="onStdLibChanged"
+        @saved="onTemplateSaved"
+      />
+      <StdLibManager v-else :lib="stdLibCode" @changed="onStdLibChanged" />
       <template #footer>
         <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
       </template>
@@ -1715,12 +1722,8 @@
       </template>
     </el-dialog>
 
-    <!-- 加标水表格结构编辑器（2026-11-06）：编辑当前「测试项目」条目的列定义 -->
-    <StdLibLayoutEditor
-      v-if="isSpikeWater"
-      ref="layoutEditorRef"
-      @saved="onLayoutSaved"
-    />
+    <!-- 加标水表格模版设计器/清单都收在「标准库维护」弹窗里（见上面的 StdLibTemplateManager），
+         这里不再另挂一份独立对话框（两处入口会打架）。 -->
   </div>
 </template>
 
@@ -1738,7 +1741,7 @@ import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry, orderSpecGroups } from '@/core/panel/testItemLib'
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
 import { parseLayout } from '@/core/panel/spikeWaterLayout.js'
-import StdLibLayoutEditor from './StdLibLayoutEditor.vue'
+import StdLibTemplateManager from './StdLibTemplateManager.vue'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
@@ -2758,20 +2761,11 @@ const spikeWaterCols = computed(() => (
     : null
 ))
 
-/** 本面板是不是加标水（结构由标准库条目决定） */
-const layoutEditorRef = ref(null)
-/** 打开表格结构编辑器：编辑当前「测试项目」那个条目的列定义 */
-function openLayoutEditor() {
-  const lib = stdLibOf('测试项目')
-  const picked = String(props.head?.['测试项目'] || '').trim()
-  // 必须先在单据上选好「测试项目」—— 结构是挂在某个标准库条目上的，没选条目就没有可编辑的对象。
-  // 静默返回会让人以为按钮坏了，所以给出明确提示。
-  if (!lib) { ElMessage.warning(tt('该字段没有绑定标准库，无法编辑表格结构')); return }
-  if (!picked) { ElMessage.warning(tt('请先在单据上选择「测试项目」，再编辑它对应的表格结构')); return }
-  layoutEditorRef.value?.open(lib, picked)
-}
-/** 结构存回去之后重新取一遍，纸面立刻用新表头 */
-async function onLayoutSaved() {
+/**
+ * 模版存进标准库之后（2026-11-06 第二轮）：重取当前「测试项目」的列结构，纸面立刻用新表头；
+ * 同时让外层重拉面板配置 —— 新模版要立刻出现在「测试项目」下拉里（下拉选项来自后端 fieldSpec）。
+ */
+async function onTemplateSaved() {
   await loadSpikeWaterLayout()
   emit('refresh-config')
 }
@@ -5965,10 +5959,6 @@ function chartOf(dt) {
   line-height: calc(38px * var(--cvy));
   padding: 0;
 }
-/* 加标水：标准库维护弹窗里的「编辑表格结构」入口（2026-11-06） */
-.slv-entry { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.slv-entry-hint { font-size: 12px; color: #909399; line-height: 1.5; }
-
 /* 只读值:设计正文 宋体 20.5pt ≈ 27.3 设计px(与标签列同号) */
 .rsp-cover-val {
   font-size: calc(27.3px * var(--cok));
