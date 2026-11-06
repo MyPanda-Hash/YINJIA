@@ -205,7 +205,7 @@
                因为产品名称是下游 4 张文件靠「产品编号」参照带回的源头(见 PanelConfigService.buildRefMap)。
                只读态显示该字段的值;值为空时回落到印死的表单名,老单据观感不变。
                高亮:cfg.titleKey 也进 pageOfKeyIn(第 0 页),校验缺必填时这格会闪 rs-focus。 -->
-          <td class="rs-td rs-topic-cell" :class="{ 'rs-focus': cfg.titleKey && isFocus(cfg.titleKey) }"
+          <td class="rs-td rs-topic-cell" :class="{ 'rs-focus': cfg.titleKey && isFocus(cfg.titleKey), 'rs-req': !!cfg.titleKey && isReq(cfg.titleKey) }"
               :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
             <el-input v-if="editable && cfg.titleKey" v-model="head[cfg.titleKey]" size="small" class="rs-topic-input"
                       :placeholder="tt(cfg.titleKeyPh || cfg.titleKey)" @input="emit('dirty')" />
@@ -217,7 +217,7 @@
             <span v-else class="rs-topic">{{ (cfg.titleKey ? head[cfg.titleKey] : '') || (effStaticTitle ? tt(effStaticTitle) : (derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder))) }}</span>
           </td>
           <template v-if="infoSpan">
-            <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
+            <td class="rs-td rs-info-label" :class="{ 'rs-req': isReq(effInfo[0].key) }" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
             <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
               <!-- readonly(2026-10-28):报告头里由系统带入的格(产品信息表 编辑人 / 组装工艺清单 表单管理人)
                    只显示值、不出控件 —— 值由前端监视器与后端保存回写,放开手填会被下一次保存覆盖 -->
@@ -231,7 +231,7 @@
         </tr>
         <template v-if="infoSpan > 1">
           <tr v-for="ii in infoSpan - 1" :key="'hi' + ii">
-            <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
+            <td class="rs-td rs-info-label" :class="{ 'rs-req': isReq(effInfo[ii].key) }" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
             <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
               <!-- readonly 同上:系统带入的格只显示值 -->
               <el-select v-if="editable && !effInfo[ii].readonly && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
