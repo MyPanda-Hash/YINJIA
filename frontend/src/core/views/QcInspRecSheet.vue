@@ -245,8 +245,17 @@
       </template>
     </el-dialog>
 
-    <!-- 来料检验要求·按本单物料编码查看(只读;内容取自品质管理 > 来料检验要求) -->
-    <QcInspReqViewDialog v-model="reqViewVisible" :material-code="materialCode" />
+    <!-- 来料检验要求·按本单物料编码查看(只读;内容取自品质管理 > 来料检验要求)。
+         弹窗里也带「⧉ 带入检验要求」(2026-11-06 用户口径):保存后(仍是草稿)可带入,
+         提交审批/审核后置灰并给出原因,弃审退回草稿后自动恢复。 -->
+    <QcInspReqViewDialog
+      v-model="reqViewVisible"
+      :material-code="materialCode"
+      :can-carry="editable"
+      :carrying="carrying"
+      :blocked-hint="carryBlockedHint"
+      @carry="onDialogCarry"
+    />
 
     <!-- 商品参照(物料名称 / 物料编码 → 商品档案 INV):勾一条商品确定后,两个字段一并填入 -->
     <RefPickDialog v-model="refPickVisible" :field="refPickField" mode="header" @confirm="onRefConfirm" />
@@ -415,6 +424,30 @@ function openReqView() {
     return
   }
   reqViewVisible.value = true
+}
+
+/** 单据当前状态(草稿/审批中/已审核…)—— 用来解释「为什么现在不能带入」 */
+const docStatusText = computed(() => String(props.head?.['单据状态'] ?? '').trim())
+/** 不可带入的具体原因:按状态说清下一步该做什么(比通用文案有用,现场不用再问) */
+const carryBlockedHint = computed(() => {
+  const st = docStatusText.value
+  if (st === '审批中' || st === '待二级审批' || st === '会签中') {
+    return tt('该单正在审批，审批中不可带入；请先驳回或弃审退回草稿再带入')
+  }
+  if (st === '已审核' || st === '已归档' || st === '已生效') {
+    return tt('该单已审核，不可带入；请先点「弃审」退回草稿再带入')
+  }
+  if (st === '修改申请中' || st === '删除申请中') {
+    return tt('该单正在申请修改，审批通过退回「修改中」后才可带入')
+  }
+  if (st === '已作废' || st === '已中止') return tt('该单已作废/中止，不可带入')
+  return tt('仅草稿或修改中可带入')
+})
+
+/** 弹窗里的「带入检验要求」:表头那个按钮的同一个动作;真带进来了才关弹窗,让用户直接看到表体 */
+async function onDialogCarry() {
+  const n = await carryFromReq()
+  if (n > 0) reqViewVisible.value = false
 }
 
 /**

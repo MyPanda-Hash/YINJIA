@@ -146,3 +146,17 @@ test('页面接线:检验数据记录组件必须有入口,且弹窗只读嵌入
   assert.match(dlg, /show-toolbar="false"|:show-toolbar="false"/, '弹窗里嵌入的检验要求表必须隐藏维护工具栏')
   assert.match(dlg, /:editable="false"/, '弹窗里必须是只读')
 })
+
+/* 2026-11-06 用户口径:弹窗里也要能「带入检验要求」—— 草稿(含保存后)可带入;
+ * 提交审批/审核后不可;弃审退回草稿后恢复。判定 = 本单可编辑(editable),不另立一套状态表。 */
+test('页面接线:检验要求弹窗自带「带入」按钮,并按单据状态置灰', () => {
+  const dlg = readFileSync(new URL('../views/QcInspReqViewDialog.vue', import.meta.url), 'utf8')
+  assert.match(dlg, /emit\('carry'\)/, '弹窗只发事件,真正带入由父级(报告表)执行')
+  assert.match(dlg, /:disabled="!canCarry"/, '不可编辑时必须置灰')
+  assert.match(dlg, /blockedHint/, '置灰要说明原因')
+  const rec = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
+  assert.match(rec, /:can-carry="editable"/, '可带入 = 本单可编辑(草稿/修改中)')
+  assert.match(rec, /@carry="onDialogCarry"/, '弹窗的带入要接到同一个 carryFromReq')
+  assert.match(rec, /单据状态/, '不可带入的原因按单据状态给出')
+  assert.match(rec, /已审核/, '审核后不可带入要说出来')
+})

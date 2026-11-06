@@ -3962,6 +3962,13 @@ export default {
     '检验项已与来料检验要求一致，无需带入': 'The inspection items already match the incoming inspection requirements; nothing to load',
     '已按来料检验要求带入 {n} 项检验项': 'Loaded {n} inspection item(s) from the incoming inspection requirements',
     '带入检验要求失败': 'Failed to load the inspection requirements',
+    // 2026-11-06:带入的可用状态(草稿/修改中可带入,提交审批与审核后不可,弃审退回恢复)
+    '仅草稿或修改中可带入': 'Only drafts or in-revision documents can load requirements',
+    '提交审批或审核后不可带入；请先弃审退回草稿': 'Not allowed after submission or approval; un-approve the document to return it to draft first',
+    '该单正在审批，审批中不可带入；请先驳回或弃审退回草稿再带入': 'The document is under approval; reject it or un-approve it back to draft before loading',
+    '该单已审核，不可带入；请先点「弃审」退回草稿再带入': 'The document is approved; click "Un-approve" to return it to draft before loading',
+    '该单正在申请修改，审批通过退回「修改中」后才可带入': 'A change request is pending; loading is available once it is approved and the document returns to "In revision"',
+    '该单已作废/中止，不可带入': 'The document is voided/aborted; nothing can be loaded',
 
     /* 来料检验要求(系列)面板 + 10 张全自定义表(2026-10-04:表太多,从「来料检验要求」拆出来独立成一个面板) */
     '来料检验要求(系列)': 'Incoming Inspection Requirements (Series)',

@@ -49,6 +49,20 @@
     </template>
     <div v-else class="req-view-tip">{{ tt('该物料未维护来料检验要求') }}</div>
     <template #footer>
+      <!-- 带入检验要求(2026-11-06 用户口径):**在弹窗里也能导入** —— 保存后(仍是草稿)可导,
+           提交审批/审核后置灰;弃审退回草稿后自动恢复可点。判定由父级给(canCarry=单据可编辑),
+           这里只负责显隐与置灰原因,不自己判状态(状态真源在 PanelxList 的 draftEditable)。 -->
+      <el-button
+        class="req-view-carry"
+        type="primary"
+        :loading="carrying"
+        :disabled="!canCarry"
+        :title="canCarry
+          ? tt('按物料编码从来料检验要求带入检验项与检测标准（只补缺失项，已填的检测结果不动）')
+          : (blockedHint || tt('仅草稿或修改中可带入；提交审批或审核后请先弃审退回草稿'))"
+        @click="emit('carry')"
+      >⧉ {{ carrying ? tt('带入中…') : tt('带入检验要求') }}</el-button>
+      <span v-if="!canCarry" class="req-view-carry-hint">{{ blockedHint || tt('仅草稿或修改中可带入') }}</span>
       <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
     </template>
   </el-dialog>
@@ -66,8 +80,16 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   /** 本单的物料编码(检验数据记录抬头);空则不应打开弹窗 */
   materialCode: { type: String, default: '' },
+  /** 能否从本弹窗「带入检验要求」= 本单当前可编辑(草稿 / 修改中)。
+   *  由父级(QcInspRecSheet)传,口径与表头那个「⧉ 带入检验要求」完全一致 ——
+   *  提交审批(审批中/待二级审批)、已审核/已归档一律不可;弃审退回草稿后自动恢复。 */
+  canCarry: { type: Boolean, default: false },
+  /** 带入进行中(父级在跑,防重复点) */
+  carrying: { type: Boolean, default: false },
+  /** 不可带入的具体原因(按单据状态给,比通用文案更有用) */
+  blockedHint: { type: String, default: '' },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'carry'])
 
 const code = computed(() => normCode(props.materialCode))
 const title = computed(() => tt('来料检验要求') + (code.value ? ' · ' + code.value : ''))
@@ -205,5 +227,15 @@ watch(
   font-size: 13px;
   font-weight: 600;
   color: #1c4f8a;
+}
+/* 弹窗页脚:带入按钮靠左,右侧是关闭;不可带入时旁边给出原因(按单据状态) */
+.req-view-carry {
+  float: left;
+}
+.req-view-carry-hint {
+  float: left;
+  margin: 6px 0 0 8px;
+  font-size: 12px;
+  color: #c08a00;
 }
 </style>
