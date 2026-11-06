@@ -556,13 +556,13 @@ export function pickSlipHtml(payload, qr = '') {
         continue
       }
       tbody += '<tr>'
-        + `<td>${esc(woTag)}</td>`
+        + `<td class="nw">${esc(woTag)}</td>`
         + `<td>${cell(r['材料名称'])}</td>`
         + `<td>${cell(r['规格'])}</td>`
-        + `<td>${cell(r['单位'])}</td>`
-        + `<td class="num">${fmtQty(r['请领数量'])}</td>`
-        + `<td class="num">${fmtQty(r['实发数量'])}</td>`
-        + `<td>${cell(r['备注'])}</td>`
+        + `<td class="nw">${cell(r['单位'])}</td>`
+        + `<td class="num nw">${fmtQty(r['请领数量'])}</td>`
+        + `<td class="num nw">${fmtQty(r['实发数量'])}</td>`
+        + `<td class="nw">${cell(r['备注'])}</td>`
         + '</tr>'
     }
     cards.push('<div class="card">'
@@ -575,7 +575,8 @@ export function pickSlipHtml(payload, qr = '') {
       + '</div>'
       + '</div>'
       + '<table>'
-      + '<colgroup><col style="width:20%"><col style="width:22%"><col style="width:15%">'
+      // 2026-11-06:列宽重排 —— 订单号收窄、材料名称/规格加宽,长文本折行显示全(不再被省略号截断)
+      + '<colgroup><col style="width:17%"><col style="width:19%"><col style="width:21%">'
       + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
       + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
       + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
@@ -601,10 +602,10 @@ export function pickSlipHtml(payload, qr = '') {
     + '.no{position:absolute;right:0;top:2mm;font-size:11pt;font-weight:700}'
     + '.meta{display:flex;justify-content:space-between;margin-top:4mm;font-size:10.5pt}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:1mm}'
-    + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:9.5pt;'
-    + 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
+    + 'th,td{border:0.3mm solid #000;padding:0.8mm 1.2mm;font-size:8.5pt}'
     + 'th{font-weight:700;text-align:center;height:7mm}'
-    + 'td{height:6.4mm}'
+    + 'td{height:6.4mm;word-break:break-all}'                       // 材料名称/规格:长了就折行,不再省略号截断
+    + 'td.nw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + 'td.num{text-align:right}'
     + '.sign{margin-top:2.5mm;font-size:10.5pt;display:flex;justify-content:space-between}'
     + '.pg{position:absolute;right:6mm;bottom:3.5mm;font-size:9pt}'
