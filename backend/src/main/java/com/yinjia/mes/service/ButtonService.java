@@ -1712,7 +1712,8 @@ public class ButtonService {
         for (Map<String, Object> item : items) {
             calcRuleService.applyRules(calcRules, item);
             Object id = item.get("id");
-            Map<String, Object> cols = labelsToCols(def.fields(), item);
+            // 更新口径:清空一格的空串要落成 NULL(否则"删成空再保存会变回原值");插入时再把 null 去掉
+            Map<String, Object> cols = labelsToCols(def.fields(), item, true);
             // 行表没有的列不参与行 upsert:参照带回按同名标签回填(如表头 place 的 数据来源 被
             // INV 存货行带入明细),拼进 INSERT/UPDATE 即 207;单表式列全在行表,此处为空操作
             cols.keySet().retainAll(tableCols(def.lineTable()));
@@ -1721,7 +1722,7 @@ public class ButtonService {
                 liveIds.add(id);
                 updateRow(def.lineTable(), def.pkCol(), id, cols, user);
             } else {
-                Object newId = insertRow(def.lineTable(), cols, user);
+                Object newId = insertRow(def.lineTable(), withoutNulls(cols), user);
                 if (newId != null) liveIds.add(newId);
             }
         }
@@ -1746,7 +1747,8 @@ public class ButtonService {
     /** 头表 upsert(头行式):按 group_col 定位 */
     private void upsertHeadRow(PanelRegistry.PanelDef def, Map<String, Object> head, String no, String user) {
         List<PanelRegistry.FieldDef> fields = def.fieldsAt("header");
-        Map<String, Object> cols = labelsToCols(fields, head);
+        // 更新口径:清空一格的空串要落成 NULL(2026-11-06,见 labelsToCols 的说明);插入前再剥掉 null
+        Map<String, Object> cols = labelsToCols(fields, head, true);
         // 新建默认值:主保存路径也要补(2026-10-29 用户报障「两个审核人没显示出来」的真因之一)。
         // 原先 putHeadDefaults 只挂在**空白草稿分支**(directAdd),而「新增 → 填数据 → 保存」
         // 走的是本方法 ⇒ 那两格默认值从来没写进去过。这里补上,口径同款:只填空列,不覆盖已有值。
@@ -1757,8 +1759,9 @@ public class ButtonService {
         if (existing != null && existing > 0) {
             updateRow(def.headTable(), "id", null, cols, user, def.groupCol(), no);
         } else {
-            cols.put(def.groupCol(), no);
-            insertRow(def.headTable(), cols, user);
+            Map<String, Object> ins = withoutNulls(cols);
+            ins.put(def.groupCol(), no);
+            insertRow(def.headTable(), ins, user);
         }
     }
 
@@ -1805,7 +1808,10 @@ public class ButtonService {
         Set<Object> liveIds = new HashSet<>();
         for (Map<String, Object> item : items) {
             Object id = item.get("id");
-            Map<String, Object> cols = labelsToCols(def.fields(), item);
+            // 更新口径:清空一格的空串要落成 NULL —— 2026-11-06 用户报障「已写好的数据删成空,
+            // 保存又变回原值;改成别的值却能存住」:根因是本方法原先只传「插入口径」的 cols,
+            // 空串被归一成 null 后**整列被丢弃**,UPDATE 语句里没有这一列 ⇒ 库里原值原样留着。
+            Map<String, Object> cols = labelsToCols(def.fields(), item, true);
             // 派生列不回写(2026-10-18,数据建模·字段管理 FIELDMGR):「面板名称」是 panel_code 关联 yj_panel
             // 带出的显示值,表上根本没有这一列 —— 不清掉就会 INSERT/UPDATE 报「列名无效」。
             // 判定是通用的:该表没有同名的物理列 ⇒ 该字段只读派生(见 QueryService.derivedPanelNameLabel)。
@@ -1814,7 +1820,7 @@ public class ButtonService {
                 liveIds.add(id);
                 updateRow(def.lineTable(), def.pkCol(), id, cols, user);
             } else {
-                Object newId = insertRow(def.lineTable(), cols, user);
+                Object newId = insertRow(def.lineTable(), withoutNulls(cols), user);
                 if (newId != null) liveIds.add(newId);
             }
         }
@@ -1996,16 +2002,44 @@ public class ButtonService {
 
     /** 标签键 -> 列名键(仅取字段定义内的列,忽略 id/__no 等保留键)。
      *  归一化后为 null(空串)的值同样跳过——否则 NOT NULL 列(如 币种)会被显式插 NULL 报错,
-     *  交由 fillRequiredDefaults 补默认值。 */
+     *  交由 fillRequiredDefaults 补默认值。
+     *
+     *  <p>⚠ 这个「跳过空值」的口径**只适用于插入**。更新时它会带来一个静默的数据 bug
+     *  (2026-11-06 用户报障「已写好的数据删成空,保存又变回原值;改值却正常」):
+     *  用户把单元格清空 ⇒ 前端提交 {@code ""} ⇒ 这里归一成 null 并被丢弃 ⇒
+     *  UPDATE 语句里**根本没有这一列** ⇒ 库里原值原样留着。更新路径请用
+     *  {@link #labelsToCols(List, Map, boolean) labelsToCols(fields, row, true)}。 */
     private Map<String, Object> labelsToCols(List<PanelRegistry.FieldDef> fields, Map<String, Object> row) {
+        return labelsToCols(fields, row, false);
+    }
+
+    /**
+     * 标签键 -> 列名键(带「清空」语义开关)。
+     *
+     * @param keepClearedAsNull true = **更新**口径:行里带了这一格但值是空(空串/null)时,
+     *        以 {@code null} 保留该列 —— 这才是"用户清空了它"的正确表达,由
+     *        {@link #dropNullsOnNotNull} 兜住 NOT NULL 列(那些列收到 null 会被剔除,保留库中原值,
+     *        不会报"不允许为 Null")。false = **插入**口径(原行为):空值跳过,交给默认值补齐。
+     *        ⚠ 判据是 {@code row.containsKey(label)}:行里**没带**这一格 = 没提交 = 一律不动库里原值,
+     *        所以局部提交(参照带回、只补缺失项等)不会被误清。
+     */
+    private Map<String, Object> labelsToCols(List<PanelRegistry.FieldDef> fields, Map<String, Object> row,
+                                            boolean keepClearedAsNull) {
         Map<String, Object> out = new LinkedHashMap<>();
         for (PanelRegistry.FieldDef f : fields) {
+            if (keepClearedAsNull && !row.containsKey(f.label())) continue;
             Object v = row.get(f.label());
-            if (v != null) {
-                Object normalized = normalizeByType(f, v);
-                if (normalized != null) out.put(f.col(), normalized);
-            }
+            Object normalized = v == null ? null : normalizeByType(f, v);
+            if (normalized != null) out.put(f.col(), normalized);
+            else if (keepClearedAsNull) out.put(f.col(), null);   // 清空:显式写 NULL
         }
+        return out;
+    }
+
+    /** 插入用:去掉 null 列 —— 空值不显式写 NULL,留给缺省值/默认值补齐(与历史插入口径一致) */
+    private static Map<String, Object> withoutNulls(Map<String, Object> cols) {
+        Map<String, Object> out = new LinkedHashMap<>(cols);
+        out.values().removeIf(java.util.Objects::isNull);
         return out;
     }
 
