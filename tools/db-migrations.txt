@@ -4504,3 +4504,15 @@ migrate-spike-water-layout-20261106.sql
 #   同批前端：归不进现役页签的行渲染成「{类别} · 未归类」只读页签，不再只计数。
 #   取证 tools/archive/_qc-insp-req-hint-20261106/。两账套均执行（正式库 4 行、测试库 0 行）。
 migrate-qc-insp-req-retire-custom-cat-20261106.sql
+# 2026-11-06 修正加标水结构迁移：条目名写回 item_code（content 只存结构 JSON，下拉不再显示 JSON）
+migrate-spike-water-layout-fix-20261106.sql
+# 2026-11-06 修正立项申请客户参照：data_type 必须为「参照」后端才下发 refPanel
+migrate-approval-customer-ref-fix-20261106.sql
+# 2026-11-06 规格书检验项目标准库：spec.test 各条 seq 按《测试项目汇总.xlsx》「序 号」重编号（组序=Excel 序号）
+migrate-testlib-spec-order-20261106.sql
+# 2026-11-06 样品申请单流程：内部单补申请人列 + 两张单角色授权（此前 0 行授权 ⇒ 非管理员打不开）
+migrate-sample-flow-20261106.sql
+# 2026-11-06 规格书检验项目标准库：按《测试项目汇总.xlsx》原文补齐库里缺的 8 项（黄水/浸泡口感/COD/阻垢/抑菌/过流杀菌/碱性/矿化）
+migrate-testlib-spec-add-missing-20261106.sql
+# 2026-11-06 外部样品申请单总表+子表：明细表补 8 列 + 字段 place=detail + 存量搬成一条明细行
+migrate-sample-ext-detail-20261106.sql

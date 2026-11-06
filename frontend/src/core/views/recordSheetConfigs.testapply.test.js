@@ -143,11 +143,17 @@ test('申请单类型的两个字典值与 汇总表 分类映射表一一对应
  *   产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 / 规格书 YJ-QR-153。
  * 单据自身编号（PI-…/MP-…/SD-…）仍在选单栏与产品文件列表；单据之间靠「产品编号」关联。
  */
-test('产品文件四单的右上角是固定表单编号（2026-11-06 用户口径 A）', () => {
+test('产品文件**六张单**的右上角都是固定表单编号（2026-11-06 用户口径 A）', () => {
+  // 用户原话：「产品信息表:YJ-QR-152 烧结工艺清单:YJ-QR-146-1 x烧结工艺清单:YJ-QR-146-1
+  //   规格书:YJ-QR-153 组装工艺清单:YJ-QR-144 出货检验计划表:YJ-QR-145
+  //   这些右上角固定的编号你也没有改全，这些又不影响流程就是显示而已」
+  // ⇒ 六张单一个都不能漏（上一版只改了 4 张，组装/出货检验两张还在显示流水号 AP-…/IP-…）
   assert.equal(recordSheetConfigs.RD_PROD_INFO.docNoStatic, 'YJ-QR-152', '产品信息表')
   assert.equal(recordSheetConfigs.RD_MOLD_PROC.docNoStatic, 'YJ-QR-146-1', '烧结工艺清单')
   assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-146-1', 'X烧结工艺清单')
   assert.equal(recordSheetConfigs.RD_SPEC_DOC.docNoStatic, 'YJ-QR-153', '规格书')
+  assert.equal(recordSheetConfigs.RD_ASM_PROC.docNoStatic, 'YJ-QR-144', '组装工艺清单')
+  assert.equal(recordSheetConfigs.RD_INSP_PLAN.docNoStatic, 'YJ-QR-145', '出货检验计划表')
 })
 /**
  * 2026-11-06 用户报障：「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」。

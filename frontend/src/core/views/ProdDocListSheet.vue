@@ -26,9 +26,18 @@
       <div class="pds-title">{{ tt('产品文件列表') }}</div>
     </div>
 
-    <!-- ③ 说明段 -->
+    <!-- ③ 说明段 + 视图切换(2026-11-06 用户口径:「加入一个隐藏切换入口可以像项目流程管控一样,
+         可以全览得看到流程到哪里了」)——
+         入口刻意做小、放在说明行右端:主视图仍是矩阵,流程全览是给"想看整体进度"的人按需打开的。 -->
     <div class="pds-note">
-      {{ tt('可通过产品编号直接搜索；状态由各文件面板的单据实时推导（未开发 / 开发中 / 开发审核中 / 开发完毕）。') }}
+      <span class="pds-note-txt">
+        {{ flowMode
+          ? tt('全览每个产品走到哪一步：产品信息表 + 4 张文件的单据状态、单号与待重走标记，一眼看出卡在哪')
+          : tt('可通过产品编号直接搜索；状态由各文件面板的单据实时推导（未开发 / 开发中 / 开发审核中 / 开发完毕）。') }}
+      </span>
+      <span class="pds-view-toggle" :title="flowMode ? tt('回到产品文件矩阵') : tt('全览流程进度')" @click="toggleFlow">
+        {{ flowMode ? tt('矩阵视图') : tt('流程全览') }}
+      </span>
     </div>
 
     <!-- ③′ 筛选中横幅(侧栏模糊搜索/查询产品/产品预览 → 本表按产品行筛选) -->
@@ -40,8 +49,41 @@
       <span class="pds-filter-clear" @click="emit('clear-filter')">✕ {{ tt('清除筛选') }}</span>
     </div>
 
+    <!-- ③″ 流程全览(只读):每行一个产品,展开看「产品信息表 → 4 张文件」五步走到哪;
+         数据源 = GET /px/rdDevOverview(与「项目进度查询 · 开发产品」同一份事实,不另造口径)。 -->
+    <div v-if="flowMode" class="pds-scroll pds-flow">
+      <div v-if="flowLoading" class="pds-flow-empty">{{ tt('加载流程进度…') }}</div>
+      <div v-else-if="!flowRows.length" class="pds-flow-empty">{{ tt('没有可展示的产品') }}</div>
+      <template v-else>
+        <div v-for="r in flowRows" :key="r.产品编号" class="pds-flow-row" :class="{ 'is-target': r.产品编号 === focusProduct }">
+          <div class="pds-flow-main" @click="toggleFlowRow(r.产品编号)">
+            <span class="pds-flow-caret">{{ expanded.has(r.产品编号) ? '▾' : '▸' }}</span>
+            <span class="pds-flow-code">{{ r.产品编号 || '—' }}</span>
+            <span class="pds-flow-name">{{ r.产品名称 || '—' }}</span>
+            <span class="pds-flow-link">{{ r.立项文档编号 || '—' }}</span>
+            <span class="pds-flow-state" :class="'tone-' + toneOfState(r.state)">{{ tt(r.state || '草稿') }}</span>
+            <span class="pds-flow-progress">{{ r.doneCount }}/{{ r.nodes.length }}</span>
+            <span class="pds-flow-done" :class="{ on: r.allDone }">{{ r.allDone ? tt('已开发完毕') : tt('进行中') }}</span>
+          </div>
+          <ol v-if="expanded.has(r.产品编号)" class="pds-flow-steps">
+            <li class="pds-flow-step" :class="'is-' + toneOfState(r.state)">
+              <span class="pds-step-name">{{ tt('产品信息表') }}</span>
+              <span class="pds-step-no">{{ r.单据编号 || '—' }}</span>
+              <span class="pds-step-state">{{ tt(r.state || '草稿') }}</span>
+            </li>
+            <li v-for="n in r.nodes" :key="n.panel" class="pds-flow-step" :class="n.done ? 'is-done' : (n.state && n.state !== '未开始' ? 'is-doing' : 'is-none')">
+              <span class="pds-step-name">{{ tt(n.label) }}</span>
+              <span class="pds-step-no">{{ n.docNo || '—' }}</span>
+              <span class="pds-step-state">{{ tt(n.state || '未开始') }}</span>
+              <span v-if="n.reaudited" class="pds-step-flag">{{ tt('待重走') }}</span>
+            </li>
+          </ol>
+        </div>
+      </template>
+    </div>
+
     <!-- ④ 矩阵表 -->
-    <div class="pds-scroll">
+    <div v-else class="pds-scroll">
       <table class="pds-table">
         <thead>
           <tr>
@@ -113,7 +155,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -136,6 +178,61 @@ const { user } = useAppContext()
 
 const columns = ref([])
 const rows = ref([])
+
+/* ── 流程全览(2026-11-06) ─────────────────────────────────────────────────
+   用户口径:「产品信息表在提交审批之后跳转到产品文件列表，可以查看流程信息；现在给这个产品文件列表
+   更新一下，加入一个隐藏切换入口可以像项目流程管控一样，可以全览得看到流程到哪里了」。
+   做法:同一面板内二选一视图 —— 矩阵(默认) ⇄ 流程全览。
+   数据源复用 GET /px/rdDevOverview(「项目进度查询 · 开发产品」的同一份事实:每个产品
+   产品信息表状态 + 4 张文件节点的 单号/状态/是否完成/是否反审核待重走)，不新增后端端点、
+   不另立口径。无 RD_PROGRESS 权限时接口 403,这里降级成一句提示,不影响矩阵视图。 */
+const FLOW_KEY = 'pds.flowMode'
+const flowMode = ref(false)
+const flowLoading = ref(false)
+const flowRows = ref([])
+const flowDenied = ref(false)
+const expanded = ref(new Set())
+/** 从产品信息表提交审批跳过来时带的产品编号(高亮那一行) */
+const focusProduct = ref('')
+
+function toggleFlow() {
+  flowMode.value = !flowMode.value
+  try { localStorage.setItem(FLOW_KEY, flowMode.value ? '1' : '0') } catch { /* 隐私模式下存不了,不影响本次会话 */ }
+  if (flowMode.value) loadFlow()
+}
+
+function toggleFlowRow(code) {
+  const next = new Set(expanded.value)
+  if (next.has(code)) next.delete(code)
+  else next.add(code)
+  expanded.value = next
+}
+
+/** 状态 → 色调(与矩阵矩阵列的 tone 同一套语义) */
+function toneOfState(st) {
+  const s = String(st || '')
+  if (s === '已归档' || s === '已审核' || s === '已生效') return 'done'
+  if (s === '审批中' || s === '待二级审批' || s === '开发审核中') return 'review'
+  if (s === '修改中' || s === '开发中') return 'doing'
+  return 'none'
+}
+
+async function loadFlow() {
+  if (flowLoading.value) return
+  flowLoading.value = true
+  flowDenied.value = false
+  try {
+    const res = await request.get('/px/rdDevOverview')
+    const list = (res && res.data && res.data.products) || []
+    flowRows.value = list.filter((r) => String(r.产品编号 || '').trim() !== '')
+    emit('rows', rows.value, columns.value)
+  } catch (e) {
+    flowRows.value = []
+    flowDenied.value = true
+  } finally {
+    flowLoading.value = false
+  }
+}
 
 /** 生效中的筛选(横幅与"没有符合条件的产品"空态都看它) */
 const activeFilter = computed(() => (props.filter && props.filter.valid ? props.filter : null))
@@ -256,7 +353,21 @@ async function load() {
   emit('rows', rows.value, columns.value)
 }
 
-onMounted(load)
+onMounted(async () => {
+  try { flowMode.value = localStorage.getItem(FLOW_KEY) === '1' } catch { /* 忽略 */ }
+  const q = router.currentRoute.value.query || {}
+  if (String(q.flow || '') === '1') flowMode.value = true
+  focusProduct.value = String(q.product || '').trim()
+  if (flowMode.value && focusProduct.value) expanded.value = new Set([focusProduct.value])
+  await load()
+  if (flowMode.value) await loadFlow()
+  // 从产品信息表提交审批跳过来时,流程全览里把该产品展开并滚到眼前
+  if (focusProduct.value && flowMode.value) {
+    await nextTick()
+    const el = document.querySelector('.pds-flow-row.is-target')
+    if (el) el.scrollIntoView({ block: 'center' })
+  }
+})
 // 单据切换(单单据面板下通常只有一张)或面板编码变化时重取
 watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 </script>
@@ -286,6 +397,58 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
   color: var(--pds-ink);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── 说明行 + 视图切换(流程全览的"隐藏"入口:小字弱化,悬停才明显) ── */
+.pds-note {
+  display: flex; align-items: baseline; gap: 12px;
+}
+.pds-note-txt { flex: 1; min-width: 0; }
+.pds-view-toggle {
+  flex: none; cursor: pointer; font-size: 12px; color: var(--pds-ink-3);
+  padding: 2px 8px; border: 1px solid var(--pds-line); border-radius: 10px;
+  transition: color .15s ease, border-color .15s ease, background-color .15s ease;
+}
+.pds-view-toggle:hover { color: #1668dc; border-color: #bcd2f5; background: #f2f7ff; }
+
+/* ── 流程全览 ── */
+.pds-flow { display: flex; flex-direction: column; gap: 6px; }
+.pds-flow-empty { padding: 28px 4px; color: var(--pds-ink-3); text-align: center; }
+.pds-flow-row { border: 1px solid var(--pds-line); border-radius: 6px; padding: 0 10px; }
+.pds-flow-row.is-target { border-color: #bcd2f5; background: #f7faff; }
+.pds-flow-main {
+  display: grid; align-items: center; gap: 10px; padding: 9px 0; cursor: pointer;
+  grid-template-columns: 14px 116px minmax(140px, 1.4fr) 120px 84px 46px 84px;
+  font-size: 13px;
+}
+.pds-flow-caret { color: var(--pds-ink-3); }
+.pds-flow-code { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pds-flow-name { color: var(--pds-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pds-flow-link { color: var(--pds-ink-2); font-variant-numeric: tabular-nums; }
+.pds-flow-state, .pds-flow-done {
+  font-size: 12px; padding: 1px 7px; border-radius: 9px; text-align: center;
+  border: 1px solid var(--pds-line); color: var(--pds-ink-2); background: var(--pds-surface);
+}
+.pds-flow-state.tone-done { color: #237804; border-color: #b7eb8f; background: #f6ffed; }
+.pds-flow-state.tone-review { color: #0958d9; border-color: #adc6ff; background: #f0f5ff; }
+.pds-flow-state.tone-doing { color: #ad6800; border-color: #ffe58f; background: #fffbe6; }
+.pds-flow-progress { color: var(--pds-ink-2); font-variant-numeric: tabular-nums; text-align: right; }
+.pds-flow-done.on { color: #237804; border-color: #b7eb8f; background: #f6ffed; }
+.pds-flow-steps {
+  list-style: none; margin: 0 0 10px; padding: 8px 0 0 24px;
+  border-top: 1px dashed var(--pds-line);
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.pds-flow-step {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  padding: 3px 8px; border-radius: 6px; border: 1px solid var(--pds-line); background: #fff;
+}
+.pds-flow-step.is-done { border-color: #b7eb8f; background: #f6ffed; }
+.pds-flow-step.is-review { border-color: #adc6ff; background: #f0f5ff; }
+.pds-flow-step.is-doing { border-color: #ffe58f; background: #fffbe6; }
+.pds-step-name { color: var(--pds-ink); font-weight: 600; }
+.pds-step-no { color: var(--pds-ink-3); font-variant-numeric: tabular-nums; }
+.pds-step-state { color: var(--pds-ink-2); }
+.pds-step-flag { color: #cf1322; font-weight: 600; }
 
 /* ── 抬头 ── */
 .pds-topbar {

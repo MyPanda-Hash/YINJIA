@@ -20,7 +20,13 @@
  * 1242 = 产品变更申请单收窄后的纸宽(用户指定的口径),这两张纸与它对齐。
  * 单位 px,值是**纸**(.approval-sheet)的宽,不含右侧 176px 操作栏。
  */
-export const FIXED_SHEET_W = { RD_APPROVAL: 1242, RD_PLAN: 1242 }
+export const FIXED_SHEET_W = {
+  RD_APPROVAL: 1242,
+  RD_PLAN: 1242,
+  // 样品两张单（2026-11-06 表格式纸面）：纸宽 = 模板各列宽之和，否则外层 flex 会把列宽拉伸变形
+  RD_SAMPLE_EXT: 1188,
+  RD_SAMPLE_INT: 1450,
+}
 
 /** 该面板的定死纸宽(px);0 = 保持自适应弹性宽(其余文书面板) */
 export function fixedSheetWidth(panelCode) {
@@ -488,80 +494,95 @@ export const qcSheetCfgs = {
  *   sheet1「（外部）开发样品申请单」→ RD_SAMPLE_EXT
  *   sheet2「（内部）开发样品申请单-模板」→ RD_SAMPLE_INT
  *
- * 【版式口径】按 sheet 逐格复刻；对不合理处做了三处调整（用户授权「可以对其不合理的适当调整」）：
- *   ① 外部单 sheet 的 A3:M4 是六个并排的说明格，每格内既有标签又有大段提示词。
- *      实现把「标签」留在行首、提示词降为 hint —— 纸面读起来是「标签 → 填写区」，
- *      不再把说明文字印进填写区（那会让录入内容与提示混在一起）。
- *   ② 内部单的「样品状态」由确认人维护，做成下拉而不是自由文本，避免状态词各写各的。
- *   ③ 两张单的「样品编号」规则相同（申请人姓名缩写+年月日+序号），由前端自动生成。
+ * 【版式口径 2026-11-06 第二轮：用户口径「样品申请单这些使用 xlsx 里面的模版要像素级复刻」】
+ *   上一版做成「左标签 / 右填写」的竖向蓝底文书（DocSheet 默认版式），被用户否掉（「你这个改动得
+ *   不好看」）。本版改为 **layout:'grid'** —— DocSheet 新增的「表格式纸面」：
+ *   ① 外部单：信息条（样品单编号/客户名称/费用/下单日期/期望交期）+ **模板原样的 8 列横排表体**
+ *      （产品整体规格 306 / 炭棒规格 136 / 样品数量 136 / 组装要求 136 / 产品功能 68 / 背景 134 /
+ *        性能要求 136 / 配方及工艺要求 136 = 1188px，列宽取自 Excel 列宽 px = round(w*7+5)）
+ *      + 底部 申请/审核/确认 三格；模板里的提示词降为单元格 placeholder（不印进填写区）。
+ *   ② 内部单：模板是 13 列「每单一行」的列表版式 ⇒ 同样一张横排表，13 列一次铺满。
+ *   ③ 两张表的表体值仍绑表头字段（一条申请单 = 一个样品），与 yj_field 的 place='header' 一致。
  *
- * 【与 approvalSheetCfg 的关系】行型（num/label/key/h/kind）完全沿用立项申请那一套，
- * DocSheet 无需改动即可渲染。
+ * 【行高口径】DocSheet 的 h = 设计磅值 × 4/3（96dpi）；这里表体给 150px（≈ 模板 112.5pt），
+ *   信息条 48px、标题 84px（模板 62pt）、签名条 52px（模板 39pt）。
  */
 export const sampleExtSheetCfg = {
+  layout: 'grid',
   titlePart1: '（外部）',
   titlePart2: '开发样品申请单',
   titlePart3: '',
-  seq: 'num',
+  // 模板 row2：样品单编号 / 客户名称 / 费用 / 下单日期 / 期望交期（合并列宽见 xlsx 列宽 115/191/68…）
+  // 信息条与表体**同属一张表**（2026-11-06 用户口径「线框要对齐」），所以这里给的是**跨列数**
+  // （colspan，按表体 8 列的列边界归并）：306 | 272 | 136 | 202 | 272 = 1188，
+  // 分割线分别落在表体的 1/3/4/6 列边界上，竖线与下方表头逐条对齐。
   info: [
-    { label: '客户名称', key: '客户名称' },
-    { label: '费用', key: '费用' },
-    { label: '下单日期', key: '单据日期', kind: 'date' },
-    { label: '期望交期', key: '期望交期', kind: 'date' },
+    { label: '样品单编号', key: '单据编号', span: 1, kind: 'docno' },
+    { label: '客户名称', key: '客户名称', span: 2 },
+    { label: '费用', key: '费用', span: 1 },
+    { label: '下单日期', key: '单据日期', span: 2, kind: 'date' },
+    { label: '期望交期', key: '期望交期', span: 2, kind: 'date' },
   ],
-  remark: { label: '备注', key: '备注', max: 1000 },
-  rows: [
-    { num: '一', label: '产品整体规格', key: '产品整体规格', max: 500, h: 80, kind: 'textarea',
-      hint: '写组装后炭棒总长度或其他明确的尺寸要求' },
-    { num: '二', label: '炭棒规格', key: '炭棒规格', max: 500, h: 100, kind: 'textarea',
-      hint: '需注明公差要求，如 34*16*180 外径±0.5 内径±0.5 长度±0.5' },
-    { num: '三', label: '样品数量', key: '样品数量', max: 50, h: 45, kind: 'input' },
-    { num: '四', label: '组装要求', key: '组装要求', max: 500, h: 90, kind: 'textarea',
-      hint: '已有的组装耗材明确相关物料编码；未在库存的需明确尺寸需求与性能需求' },
-    { num: '五', label: '产品功能', key: '产品功能', max: 200, h: 45, kind: 'input' },
-    { num: '六', label: '背景', key: '背景', max: 500, h: 90, kind: 'textarea',
-      hint: '打样背景（如：客户因***事项需求样品）' },
-    { num: '七', label: '性能要求', key: '性能要求', max: 500, h: 100, kind: 'textarea',
-      hint: '1.前置/后置/台面机（或其他） 2.详细性能要求或明确客户测试条件' },
-    { num: '八', label: '配方及工艺要求', key: '配方及工艺要求', max: 500, h: 100, kind: 'textarea',
-      hint: '审核人根据相关信息确认配方和实现工艺' },
-  ],
+  grid: {
+    // 总表+子表（2026-11-06 用户口径）：一张样品单下可加多个样品 ⇒ 行源 = head.detail.items，
+    // 一行一个样品、可增删；行级必填由引擎明细校验负责（空行跳过，非空行逐格校验）。
+    rows: 'detail',
+    rowH: 120,
+    addLabel: '新增样品',
+    // 列宽 = 模板 A:B / C:D / E:F / G:H / I / J / K:L / M:N 的合并宽度（px，1:1）
+    // hint = 模板 row4 原句，作为单元格 placeholder（纸面只印标签，不把说明印进填写区）
+    cols: [
+      { key: '产品整体规格', label: '产品整体规格', w: 306, hint: '写组装后炭棒总长度或其他明确的尺寸要求' },
+      { key: '炭棒规格', label: '炭棒规格', w: 136, hint: '注明公差，如 34*16*100（外径±0.5/内径±0.5/长度±0.5）' },
+      { key: '样品数量', label: '样品数量', w: 136 },
+      { key: '组装要求', label: '组装要求', w: 136, hint: '耗材给物料编码；库存没有的给尺寸与性能需求' },
+      { key: '产品功能', label: '产品功能', w: 68 },
+      { key: '背景', label: '背景', w: 134, hint: '打样背景（如：客户因***事项需求样品）' },
+      { key: '性能要求', label: '性能要求', w: 136, hint: '1.前置/后置/台面机 2.性能要求或客户测试条件' },
+      { key: '配方及工艺要求', label: '配方及工艺要求', w: 136, hint: '审核人根据相关信息确认配方和实现工艺' },
+    ],
+  },
+  // 模板 row7：申请 / 审核 / 确认。跨列数按表体列边界归并（1 | 4 | 3 = 8），
+  // 即 306 | 476 | 406 —— 两条竖线正好压在「产品整体规格/炭棒规格」与「产品功能/背景」的列缝上。
   signCells: [
-    { label: '申请', key: '申请', w: 202, type: 'text', flex: 40 },
-    { label: '审核', key: '审核', w: 202, type: 'text', flex: 30 },
-    { label: '确认', key: '确认', w: 202, type: 'text', flex: 30 },
+    { label: '申请', key: '申请', span: 1, type: 'text' },
+    { label: '审核', key: '审核', span: 4, type: 'text' },
+    { label: '确认', key: '确认', span: 3, type: 'text' },
   ],
 }
 
+/**
+ * 内部开发样品申请单（RD_SAMPLE_INT）
+ *
+ * 模板 sheet2：A2:M2 一行表头（申请日期/申请人/样品编号/项目名/炭棒尺寸/数量/样品背景/配方要求/
+ * 工艺要求/物料批次要求/期望交期/确认人/样品状态），每张申请单往下填一行。
+ * 纸面因此 = **13 列横排表**：表头一行 + 当前单据一行（列表里的多张单由左侧单据列表承担）。
+ * 列宽：模板默认 68px 的列（样品背景/配方要求/工艺要求等）放不下一句话 ⇒ 按「同源模板、可读优先」
+ * 给最小可写宽（≥100px），列序与列名一字不改。
+ */
 export const sampleIntSheetCfg = {
+  layout: 'grid',
   titlePart1: '内部',
   titlePart2: '开发样品申请单',
   titlePart3: '',
-  seq: 'num',
-  info: [
-    { label: '申请日期', key: '单据日期', kind: 'date' },
-    { label: '期望交期', key: '期望交期', kind: 'date' },
-  ],
-  remark: { label: '备注', key: '备注', max: 1000 },
-  rows: [
-    { num: '一', label: '项目名', key: '项目名', max: 200, h: 45, kind: 'input' },
-    { num: '二', label: '炭棒尺寸', key: '炭棒尺寸', max: 200, h: 45, kind: 'input',
-      hint: '如 33*12*110（外径*内径*长度）' },
-    { num: '三', label: '数量', key: '数量', max: 50, h: 45, kind: 'input' },
-    { num: '四', label: '样品背景', key: '样品背景', max: 500, h: 100, kind: 'textarea' },
-    { num: '五', label: '配方要求', key: '配方要求', max: 500, h: 100, kind: 'textarea' },
-    { num: '六', label: '工艺要求', key: '工艺要求', max: 500, h: 100, kind: 'textarea' },
-    { num: '七', label: '物料批次要求', key: '物料批次要求', max: 500, h: 90, kind: 'textarea' },
-    { num: '八', label: '样品状态', key: '样品状态', max: 0, h: 45, kind: 'select',
-      options: [
-        { value: '待确认', label: '待确认' },
-        { value: '已确认', label: '已确认' },
-        { value: '已安排', label: '已安排' },
-        { value: '已完成', label: '已完成' },
-      ] },
-  ],
-  signCells: [
-    { label: '确认人', key: '确认人', w: 202, type: 'text', flex: 100 },
-  ],
+  info: [],
+  grid: {
+    rowH: 120,
+    cols: [
+      { key: '单据日期', label: '申请日期', w: 110, kind: 'date' },
+      { key: '申请人', label: '申请人', w: 80, ro: true },
+      { key: '单据编号', label: '样品编号', w: 140, kind: 'docno' },
+      { key: '项目名', label: '项目名', w: 110 },
+      { key: '炭棒尺寸', label: '炭棒尺寸', w: 110 },
+      { key: '数量', label: '数量', w: 70 },
+      { key: '样品背景', label: '样品背景', w: 140 },
+      { key: '配方要求', label: '配方要求', w: 130 },
+      { key: '工艺要求', label: '工艺要求', w: 130 },
+      { key: '物料批次要求', label: '物料批次要求', w: 140 },
+      { key: '期望交期', label: '期望交期', w: 110, kind: 'date' },
+      { key: '确认人', label: '确认人', w: 80, ro: true },
+      { key: '样品状态', label: '样品状态', w: 100, kind: 'select', options: ['待确认', '已确认', '已安排', '已完成'] },
+    ],
+  },
+  signCells: [],
 }
-

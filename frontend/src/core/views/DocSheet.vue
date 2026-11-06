@@ -30,8 +30,8 @@
     <!-- ① 顶部条 -->
     <div class="as-topbar">
       <div class="as-company">惠州市银嘉环保科技有限公司</div>
-      <!-- 右上角:配置为参照时(项目实施计划→立项申请右上角编号)点击弹参照;否则保持手填(默认 YJ-XS002 模板号) -->
-      <div class="as-docno">
+      <!-- 表格式纸面(样品申请单 layout:'grid'):编号在信息条里(模板 row2 第一格),顶栏不再重复一格 -->
+      <div v-if="!isGrid" class="as-docno">
         <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
           <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt(docnoLabelText) }}</span>
           <el-icon class="as-ref-ico"><Search /></el-icon>
@@ -53,8 +53,8 @@
 
     <!-- ② 标题行:大标题 + 右上信息表(config.info 未配置时保持 文件管理人/密级/文件使用范围 原样) -->
     <div class="as-title-row">
-      <div class="as-title">{{ tt(config.titlePart1) }}<template v-if="config.titlePart2">（{{ tt(config.titlePart2) }}）</template><template v-if="config.titlePart3">{{ tt(config.titlePart3) }}</template></div>
-      <div class="as-info-table">
+      <div class="as-title" :class="{ 'sg-title': isGrid }">{{ tt(config.titlePart1) }}<template v-if="config.titlePart2">（{{ tt(config.titlePart2) }}）</template><template v-if="config.titlePart3">{{ tt(config.titlePart3) }}</template></div>
+      <div v-if="!isGrid" class="as-info-table">
         <div v-for="info in infoRows" :key="info.key || info.label" class="as-info-row">
           <span class="as-info-label">{{ tt(info.label) }}</span>
           <span class="as-info-value">
@@ -97,6 +97,122 @@
       </div>
     </div>
 
+    <!-- ②c 表格式纸面(2026-11-06 样品申请单:config.layout='grid')
+         设计依据《新系统-样品流程和相关表格式.xlsx》两张 sheet 的表格版式:
+           · 信息条 = sheet1 row2(样品单编号/客户名称/费用/下单日期/期望交期),一格一字段;
+           · 表体   = sheet1 row3-6 的 8 列横排(sheet2 为 13 列);列宽 px 取自 Excel 列宽合并值;
+           · 签名条 = sheet1 row7(申请/审核/确认)。
+         与蓝底文书式的区别:这里**不印序号列/蓝格标签**,标签就是表头,值就是单元格 —— 与设计原表一致。
+         子表行:config.grid.rows='detail' 时行源取 head.detail.items(一单多样品),否则取表头自身单行。 -->
+    <template v-if="isGrid">
+      <!-- 单表结构（2026-11-06 用户口径「线框要对齐」）：信息条 / 表头 / 数据行 / 签名条**同属一张表**，
+           共用同一份 colgroup ⇒ 所有竖线必然落在同一组列边界上（按 colspan 归并分组）。
+           此前三者各用 flex 百分比排，边界差 3~30px，纸面上就是「线框错位」。
+           模板原表本身也是一整张网格（row2 信息 / row3-6 表体 / row7 签名），这样才真正逐格对齐。 -->
+      <table class="sg-table" :style="{ width: gridW + 'px' }">
+        <colgroup>
+          <col v-for="c in gridCols" :key="'c-' + (c.key || c.label)" :style="{ width: c.w + 'px' }">
+        </colgroup>
+        <tbody>
+          <!-- ① 信息条（模板 row2）：样品单编号 / 客户名称 / 费用 / 下单日期 / 期望交期 -->
+          <tr v-if="gridInfo.length" class="sg-info-row">
+            <td
+              v-for="f in gridInfo" :key="'i-' + (f.key || f.label)"
+              :colspan="f.span || 1" :style="{ height: gridInfoH + 'px' }"
+            >
+              <span class="sg-info-line">
+              <span class="sg-info-label">{{ tt(f.label) }}：</span>
+              <span class="sg-info-value">
+                <el-input
+                  v-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
+                  maxlength="30" class="as-docno-input sg-info-input" @input="emit('dirty')"
+                />
+                <el-date-picker
+                  v-else-if="editable && f.kind === 'date'" v-model="head[f.key]" type="date"
+                  value-format="YYYY-MM-DD" size="small" class="as-date sg-info-date" :clearable="false"
+                  @change="emit('dirty')"
+                />
+                <div
+                  v-else-if="editable && isRefKey(f.key)" class="as-ref-ctl sg-info-ref"
+                  :title="tt('点击选择')" @click="openProdRef(f.key)"
+                >
+                  <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
+                  <el-icon class="as-ref-ico"><Search /></el-icon>
+                </div>
+                <el-select
+                  v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
+                  v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
+                  @change="emit('dirty')"
+                >
+                  <el-option v-for="o in selectOptions(f.key)" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <el-input
+                  v-else-if="editable" v-model="head[f.key]" size="small" maxlength="100"
+                  class="as-cell-input sg-info-input" @input="emit('dirty')"
+                />
+                <span v-else class="sg-ro">{{ head[f.key] || '' }}</span>
+              </span>
+              </span>
+            </td>
+          </tr>
+          <!-- ② 表头（模板 row3） -->
+          <tr class="sg-head-row">
+            <th v-for="c in gridCols" :key="'h-' + (c.key || c.label)" :style="{ height: gridHeadH + 'px' }">{{ tt(c.label) }}</th>
+          </tr>
+          <!-- ③ 数据行（模板 row4-6）：一行一个样品 -->
+          <tr v-for="(row, ri) in gridRows" :key="'r-' + ri" :style="{ height: gridRowH + 'px' }">
+            <td v-for="(c, ci) in gridCols" :key="'d-' + ri + '-' + (c.key || c.label)" class="sg-td">
+              <!-- 子表行：删除本行（只读态/仅剩一行时不出现；打印不出现） -->
+              <span
+                v-if="rowDeletable && ci === gridCols.length - 1"
+                class="sg-rowdel no-print" :title="tt('删除本行')" @click.stop="removeGridRow(ri)"
+              >✕</span>
+              <el-date-picker
+                v-if="editable && c.kind === 'date'" v-model="row[c.key]" type="date"
+                value-format="YYYY-MM-DD" size="small" class="as-date sg-cell-date" :clearable="false"
+                @change="emit('dirty')"
+              />
+              <el-select
+                v-else-if="editable && c.kind === 'select'" v-model="row[c.key]" size="small"
+                class="as-cell-input sg-cell-input" :clearable="false" @change="emit('dirty')"
+              >
+                <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
+              </el-select>
+              <el-input
+                v-else-if="editable && c.kind === 'docno'" v-model="row[c.key]" size="small"
+                maxlength="30" class="as-docno-input sg-cell-input" @input="emit('dirty')"
+              />
+              <!-- 长文本列一律文本域:模板给的行高(150px)足够写多行,单行输入框会显得空 -->
+              <el-input
+                v-else-if="editable && c.ro !== true" v-model="row[c.key]" type="textarea"
+                :maxlength="c.max || 500" :rows="gridTextRows" resize="none"
+                class="as-fill-input sg-cell-area" :placeholder="c.hint ? tt(c.hint) : ''" @input="emit('dirty')"
+              />
+              <span v-else class="sg-ro">{{ row[c.key] || '' }}</span>
+            </td>
+          </tr>
+          <!-- ④ 签名条（模板 row7）：申请 / 审核 / 确认 -->
+          <tr v-if="gridSign.length" class="sg-sign-row">
+            <td
+              v-for="c in gridSign" :key="'s-' + (c.key || c.label)"
+              :colspan="c.span || 1" :style="{ height: gridSignH + 'px' }"
+            >
+              <span class="sg-sign-line">
+              <span class="sg-sign-label">{{ tt(c.label) }}：</span>
+              <el-input
+                v-if="editable && !signLocked(c)" v-model="head[c.key]" size="small" maxlength="50"
+                class="as-cell-input sg-sign-input" @input="emit('dirty')"
+              />
+              <span v-else class="sg-sign-val">{{ head[c.key] || '' }}</span>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="editable && gridAddable" class="sg-addrow no-print" @click="addGridRow">＋ {{ tt(gridAddLabel) }}</div>
+    </template>
+
+    <template v-else>
     <!-- ②b 附件条(2026-10-19 用户口径:「特采单的上传附件的链接放在右边会影响单据的陈列,放在上面吧」)
          只有「有附件字段、但没有备注列」的文书(特采单)走这里 —— 横向一条贴在标题下方,
          不再占右侧 250px 的备注列:那列会把纸面表格压窄、整张单的版式跟着走形。
@@ -383,8 +499,21 @@
                  —— row.hint 原先是**既当占位词、又渲染成这一行固定文字**(输入框/下拉里灰字 + 下面一行黑字,
                  同一句话在格子里出现两次)。现在只留占位词:输入/文本域用 :placeholder,下拉用它当未选中提示。 -->
             <div class="as-fill-main">
+              <!-- 参照型字段（2026-11-06 用户报障「立项申请的客户下拉没做」）：
+                   yj_field.ref_panel 有值时走参照控件（点击弹候选、带回数据），而不是纯文本框。
+                   ⚠ 此前只有 rows[].cells[] 那条分支判了 isRefKey，**num 型单字段行漏了** ——
+                   于是「客户名」明明配了 KHDA.mc 参照源，界面上仍是普通输入框。 -->
+              <div
+                v-if="editable && !signLocked(row) && row.kind === 'input' && isRefKey(row.key)"
+                class="as-ref-ctl as-fill-ref"
+                :title="tt('点击选择')"
+                @click="openProdRef(row.key)"
+              >
+                <span class="as-ref-text">{{ head[row.key] || tt('点击选择') }}</span>
+                <el-icon class="as-ref-ico"><Search /></el-icon>
+              </div>
               <el-input
-                v-if="editable && !signLocked(row) && row.kind === 'input'"
+                v-else-if="editable && !signLocked(row) && row.kind === 'input'"
                 v-model="head[row.key]"
                 type="text"
                 :maxlength="row.max || 50"
@@ -646,6 +775,7 @@
         />
       </div>
     </div>
+    </template>
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :skip-audit-filter="prodRefSkipAudit" @confirm="onProdRefConfirm" />
   </div>
 </template>
@@ -726,11 +856,87 @@ function gotoLink(row) {
  */
 const sheetStyle = computed(() => {
   const w = fixedSheetWidth(props.panelCode)
-  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none' } : null
+  // 表格式纸面（样品申请单）：@media print 用 `width: var(--sg-print-w)` 定死纸宽 —— 两张纸宽度不同
+  // （1188 / 1450），不能像 QC 那样在 CSS 里写死像素。
+  const printVar = isGrid.value ? { '--sg-print-w': gridW.value + 'px' } : {}
+  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar } : (isGrid.value ? printVar : null)
 })
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
+
+/* ═══════════════════════════════════════════════════════════════════
+   表格式纸面(2026-11-06 样品申请单 layout:'grid')
+   设计依据:《新系统-样品流程和相关表格式.xlsx》;列宽/行高口径见 docSheetConfigs 里两张 cfg 的注释。
+   与蓝底文书式的差别:这里没有序号列/蓝格标签 —— 标签就是表头行、值就是单元格,与设计原表同构。
+   行源两种:
+     · config.grid.rows === 'detail' ⇒ 行来自 head.detail.items(一单多样品,可增删行);
+     · 其余 ⇒ 只有一行,直接绑表头字段(一条申请单 = 一个样品)。
+   ⚠ 写值一律 v-model + emit('dirty'),与 DocSheet 其余 37 处同款(本组件没有 getter/setter 层)。
+   ═══════════════════════════════════════════════════════════════════ */
+const isGrid = computed(() => props.config?.layout === 'grid')
+const gridCfg = computed(() => props.config?.grid || {})
+const gridInfo = computed(() => props.config?.info || [])
+const gridCols = computed(() => gridCfg.value.cols || [])
+const gridW = computed(() => gridCols.value.reduce((s, c) => s + (c.w || 0), 0))
+const gridInfoH = computed(() => gridCfg.value.infoH || 48)
+const gridSignH = computed(() => gridCfg.value.signH || 52)
+const gridHeadH = computed(() => gridCfg.value.headH || 44)
+const gridRowH = computed(() => gridCfg.value.rowH || 150)
+/** 文本域行数:按行高折算(每行 ≈ 21px),至少 2 行 */
+const gridTextRows = computed(() => Math.max(2, Math.floor((gridRowH.value - 18) / 21)))
+const gridSign = computed(() => props.config?.signCells || [])
+const gridAddable = computed(() => gridCfg.value.rows === 'detail' && gridCfg.value.addable !== false)
+const gridAddLabel = computed(() => gridCfg.value.addLabel || '新增样品')
+/** 子表行可删：可编辑 + detail 行源 + 至少留一行（一张单至少一个样品） */
+const rowDeletable = computed(() => props.editable && gridCfg.value.rows === 'detail' && gridRows.value.length > 1)
+/**
+ * 表体行。detail 模式返回 detail.items(父组件传的是整行 cur,cur.detail.items 恒存在;
+ * 保存走 currentFormData → detail_key='items',后端 upsertLineRows 已支持增/改/软删,无需改保存链路)。
+ * 表头模式返回 [head] 单行 —— 用数组包一层,模板里两模式同一套写法。
+ */
+const gridRows = computed(() => {
+  if (gridCfg.value.rows === 'detail') {
+    const d = props.head?.detail
+    if (!d) return []
+    if (!Array.isArray(d.items)) d.items = []
+    return d.items
+  }
+  return [props.head]
+})
+/**
+ * 子表模式下一张新单必须至少有 1 行可填（用户口径「单个样品单下面可以添加多个样品」）：
+ * 进入编辑态且明细为空时自动补一行空行，不让用户先点「＋」才能开始填。
+ * 不 emit('dirty')：空行只是编辑便利，用户没填内容不算改动。
+ */
+watch(
+  () => [props.editable, props.head?.['单据编号'], gridRows.value.length],
+  () => {
+    if (!props.editable || gridCfg.value.rows !== 'detail') return
+    const d = props.head?.detail
+    if (!d) return
+    if (!Array.isArray(d.items)) d.items = []
+    if (d.items.length === 0) d.items.push({})
+  },
+  { immediate: true },
+)
+
+/** 新增明细行:空对象即可(列键由 yj_field 的 place='detail' 决定,后端按列名落库) */
+function addGridRow() {
+  if (!props.editable || !gridAddable.value) return
+  const d = props.head?.detail || (props.head.detail = {})
+  if (!Array.isArray(d.items)) d.items = []
+  d.items.push({})
+  emit('dirty')
+}
+/** 删除明细行(仅 detail 模式;留最后一行时不允许删空 —— 一张单至少一个样品) */
+function removeGridRow(idx) {
+  if (!props.editable || !gridAddable.value) return
+  const items = props.head?.detail?.items
+  if (!Array.isArray(items) || items.length <= 1) return
+  items.splice(idx, 1)
+  emit('dirty')
+}
 
 /**
  * 右上角编号格的**标识文案**(2026-10-28 用户口径「立项申请的右上角的文件编号名字改为项目编号」)。
@@ -1032,13 +1238,22 @@ function openProdRef(key) {
  */
 function applyApprovalDocNo(source) {
   if (String(props.panelCode || '') !== 'RD_APPROVAL') return
-  const code = String(source?.客户编码 ?? source?.dm ?? '').trim()
+  // 客户编码的键名在不同取数路径下可能不同（参照行按字段 label 给键：
+  // 档案面板 KHDA 的「客户编码」/ 有的路径给物理列 dm / 显示名 客户代码），逐个兜底取第一个非空。
+  const CODE_KEYS = ['客户编码', '客户代码', 'dm', '客户编号', '编码']
+  let code = ''
+  for (const k of CODE_KEYS) {
+    const v = source?.[k]
+    if (v !== undefined && v !== null && String(v).trim() !== '') { code = String(v).trim(); break }
+  }
   if (!code) return
   const d = new Date()
   const ymd = String(d.getFullYear())
     + String(d.getMonth() + 1).padStart(2, '0')
     + String(d.getDate()).padStart(2, '0')
+  // 规则：客户编码 + 日期（2026-11-06 用户口径，日期形如 20261106）
   props.head['文档编号'] = code + ymd
+  emit('dirty')
 }
 
 function onProdRefConfirm(rows) {
@@ -1099,6 +1314,125 @@ defineExpose({ focusField })
   font-size: 14px;
   color: #222;
 }
+
+/* ═══ 表格式纸面（2026-11-06 样品申请单）：白底黑框、宋体，与设计原表同构 ═══
+   · 标题按模板（sheet1 A1）= 宋体 24pt 粗体居中黑字（24pt×4/3 = 32px），不套文书式的蓝字；
+   · 列宽：模板 Excel 的列宽 px 直接作列宽（1:1）；行高 = 磅值×4/3；
+   · 线宽/底色：白底 + 1px 黑框（模板无填充、无蓝格）；
+   · 长文本单元格靠文本域自己滚动，不撑破行高。 */
+.approval-sheet .as-title.sg-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: 2px;
+}
+/* 信息条 / 表头 / 数据行 / 签名条 同属一张表（colspan 归并）⇒ 竖线由表格自身保证逐条对齐 */
+.sg-table td { border: 1px solid #333; }
+/* 信息条/签名条：单元格内部走 flex 单行（标签固定宽、控件吃掉余量），
+   否则 el-input 的 width:100% 会把值挤到第二行（实测「样品单编号：」标签占满 306px 列）。 */
+.sg-table tr.sg-info-row td,
+.sg-table tr.sg-sign-row td {
+  padding: 0 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.sg-info-line,
+.sg-sign-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  min-width: 0;
+}
+.sg-info-value { flex: 1; min-width: 0; display: flex; align-items: center; }
+.sg-info-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111;
+  white-space: nowrap;
+  flex: none;
+}
+.sg-info-value { flex: 1; min-width: 0; display: flex; align-items: center; }
+.sg-info-input,
+.sg-info-date,
+.sg-info-ref { width: 100%; min-width: 0; }
+.sg-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: 'SimSun', 'Songti SC', serif;
+}
+.sg-table th {
+  border: 1px solid #333;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111;
+  text-align: center;
+  padding: 0 4px;
+  background: #fff;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.sg-table td.sg-td {
+  border: 1px solid #333;
+  padding: 4px 4px;
+  vertical-align: top;
+  overflow: hidden;
+}
+.sg-table .sg-cell-area { width: 100%; }
+.sg-table .sg-cell-area :deep(.el-textarea__inner) {
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 2px 4px;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+  resize: none;
+}
+.sg-table .sg-cell-input :deep(.el-input__wrapper) {
+  box-shadow: none;
+  background: transparent;
+  padding: 0 2px;
+}
+.sg-table .sg-cell-date { width: 100%; }
+.sg-ro {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #111;
+  min-height: 18px;
+}
+.sg-td { position: relative; }
+.sg-rowdel {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  z-index: 2;
+  font-size: 12px;
+  line-height: 14px;
+  color: #c0c4cc;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.sg-rowdel:hover { color: #f56c6c; }
+.sg-addrow {
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  font-size: 13px;
+  color: #1677ff;
+  border: 1px dashed #a9c7f5;
+  border-top: none;
+  cursor: pointer;
+  user-select: none;
+}
+.sg-addrow:hover { background: #f0f7ff; }
+.sg-table tr.sg-sign-row td { padding: 0 10px; }
+.sg-sign-label { font-size: 13px; font-weight: 700; white-space: nowrap; flex: none; color: #111; }
+.sg-sign-input { flex: 1; min-width: 0; }
+.sg-sign-val { font-size: 13px; color: #111; }
 .approval-sheet :deep(.as-cell-input) {
   width: 100%;
 }
@@ -2072,6 +2406,24 @@ defineExpose({ focusField })
     /* 分页兜底:纸面本身是不可分割的整块,任何情况下优先整体成页,不做拦腰截断 */
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+  /* 表格式纸面（样品申请单 layout:'grid'，2026-11-06）：
+   * 两张纸 1188/1450px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
+   * 由 PanelxList.printApprovalSheet 注入 `@page{size:A4 landscape}`（281mm ≈ 1062px）并把
+   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1450 ⇒ 0.73），这里只负责定宽 + 缩放 + 不截断。
+   * ⚠ 纸宽走 --sg-print-w（内联在 .approval-sheet 上，由 sheetStyle 给），不写死 —— 两张纸宽度不同。 */
+  body.approval-printing .approval-sheet:has(.sg-table) {
+    width: var(--sg-print-w, 1188px) !important;
+    max-width: none !important;
+    flex: none !important;
+    zoom: var(--print-zoom, 0.89) !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* 表格式纸面：模板提示词只是**录入引导**（placeholder），打印件上必须留白 */
+  body.approval-printing .approval-sheet .sg-table textarea::placeholder,
+  body.approval-printing .approval-sheet .sg-table input::placeholder {
+    color: transparent !important;
   }
   /* 打印态值区文字:**放不下就换行**,既不省略也不溢出(2026-10-28 修正)。
    * 演变记录(两次都被用户打回,留档避免再来一遍):
