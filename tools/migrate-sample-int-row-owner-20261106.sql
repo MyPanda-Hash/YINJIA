@@ -18,6 +18,10 @@ IF DB_NAME() = N'master' USE HSDZ_MES;
 SET NOCOUNT ON;
 GO
 
+-- 按**角色能力**授予,不写死 role_id:正式库的角色 id 与本地/测试库不同
+-- (实测正式:管理员=1 / 文件负责人=1025 / 研发审核=1026;本地曾是 1/3/4)——
+-- 口径:凡在该面板有审批/管理能力(can_approve='Y',即角色被勾了「审批」或「申请修改」等)的角色,
+--       都算「有更改权限的人」;普通用户(can_approve='N')不给,只能改自己作为申请人的行。
 UPDATE yj_role_panel
 SET perms = CASE
         WHEN perms IS NULL OR LTRIM(RTRIM(perms)) = N'' THEN N'edit_others'
@@ -25,13 +29,13 @@ SET perms = CASE
         ELSE perms + N',edit_others'
     END
 WHERE panel_code = N'RD_SAMPLE_INT'
-  AND role_id IN (1, 3, 4);
+  AND ISNULL(can_approve, 'N') = 'Y';
 GO
 
--- 自检：三个角色都应带该词
-IF (SELECT COUNT(*) FROM yj_role_panel WHERE panel_code = N'RD_SAMPLE_INT'
-    AND role_id IN (1, 3, 4) AND perms LIKE N'%edit_others%') <> 3
-  RAISERROR(N'[FAIL] RD_SAMPLE_INT 的 改他人行 授权未落到 3 个角色', 12, 1) WITH NOWAIT;
+-- 自检:所有有审批能力的角色都带该词
+IF EXISTS (SELECT 1 FROM yj_role_panel WHERE panel_code = N'RD_SAMPLE_INT'
+           AND ISNULL(can_approve, 'N') = 'Y' AND ISNULL(perms, N'') NOT LIKE N'%edit_others%')
+  RAISERROR(N'[FAIL] RD_SAMPLE_INT 仍有管理角色缺 edit_others 授权', 12, 1) WITH NOWAIT;
 GO
 SELECT role_id, panel_code, can_approve, perms FROM yj_role_panel WHERE panel_code = N'RD_SAMPLE_INT' ORDER BY role_id;
 GO
