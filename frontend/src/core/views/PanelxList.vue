@@ -249,7 +249,8 @@
              FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
-          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -4176,6 +4177,11 @@ const isSelfMaintainedPanel = computed(() => !!cfgCache.value?.metadata?.selfMai
 // 2026-11-06:外部开发样品申请单也要有「修改记录」——用户口径「有一个修改记录记录谁修改的什么时候」。
 // 它不是 docArchive 一族(不走申请修改闭环),但直接修改这条路径同样写 yj_doc_modify_log,
 // 后端 `修改记录` 动作(modifyHistory)对任何面板都可用,所以这里放开入口即可。
+// 「改他人行」权限(2026-11-06 内部样品单):组织架构·角色里勾了 edit_others 的面板才为 true。
+// 只做入口/单元格显隐,真闸门在 ButtonService.applySampleIntRowRules。
+const canEditOtherRowsHere = computed(() => user.isAdmin === true
+  || (Array.isArray(user.editOtherRowsPanels) && user.editOtherRowsPanels.includes(String(panelCode.value))))
+
 const isModLogPanel = computed(() => isDocArchivePanel.value
   || String(panelCode.value) === 'QC_CATALOG'
   || String(panelCode.value) === 'RD_SAMPLE_EXT')

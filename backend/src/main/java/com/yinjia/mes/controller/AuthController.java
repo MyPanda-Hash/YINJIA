@@ -120,6 +120,9 @@ public class AuthController {
             // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
             // PanelPermissionService.requireWarnConfig(同词 = warn)。
             user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
+            // 内部样品单「改他人行」权限面板(2026-11-06):管理员=全部;其余=角色勾了 edit_others 的面板。
+            // 前端据此把别人已保存的行锁成只读;真闸门在 ButtonService.applySampleIntRowRules(同词)。
+            user.put("editOtherRowsPanels", panelsWithPerm(admin, u.get("role_id"), "edit_others"));
             // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
             // 前端据此把「审批通过」对提交人本人放开;真闸门 ButtonService.canSelfAudit(同词)。
             user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));

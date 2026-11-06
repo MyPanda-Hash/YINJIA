@@ -573,6 +573,8 @@ export const sampleIntSheetCfg = {
     rows: 'detail',
     rowH: 120,
     addLabel: '新增样品',
+    // 2026-11-06 用户口径:「可以新增行数进行填写，多了就切页，20 行就切」
+    pageSize: 20,
     cols: [
       { key: '申请日期', label: '申请日期', w: 100, kind: 'date' },
       { key: '申请人', label: '申请人', w: 70 },

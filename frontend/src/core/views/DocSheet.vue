@@ -160,7 +160,7 @@
             <th v-for="c in gridCols" :key="'h-' + (c.key || c.label)" :style="{ height: gridHeadH + 'px' }">{{ tt(c.label) }}</th>
           </tr>
           <!-- ③ 数据行（模板 row4-6）：一行一个样品 -->
-          <tr v-for="(row, ri) in gridRows" :key="'r-' + ri" :style="{ height: gridRowH + 'px' }">
+          <tr v-for="({ row, idx: ri }) in gridRowsPage" :key="'r-' + ri" :style="{ height: gridRowH + 'px' }">
             <td v-for="(c, ci) in gridCols" :key="'d-' + ri + '-' + (c.key || c.label)" class="sg-td">
               <!-- 子表行：删除本行（只读态/仅剩一行时不出现；打印不出现） -->
               <span
@@ -184,7 +184,7 @@
               />
               <!-- 长文本列一律文本域:模板给的行高(150px)足够写多行,单行输入框会显得空 -->
               <el-input
-                v-else-if="editable && c.ro !== true" v-model="row[c.key]" type="textarea"
+                v-else-if="editable && c.ro !== true && !cellLocked(row, c)" v-model="row[c.key]" type="textarea"
                 :maxlength="c.max || 500" :rows="gridTextRows" resize="none"
                 class="as-fill-input sg-cell-area" :placeholder="c.hint ? tt(c.hint) : ''" @input="emit('dirty')"
               />
@@ -210,6 +210,13 @@
         </tbody>
       </table>
       <div v-if="editable && gridAddable" class="sg-addrow no-print" @click="addGridRow">＋ {{ tt(gridAddLabel) }}</div>
+      <!-- 分页条(2026-11-06):一行一样品,超过 grid.pageSize 行就切页,避免一页太长 -->
+      <div v-if="gridPaged && gridRows.length > gridPageSize" class="sg-pager no-print">
+        <span class="sg-pager-btn" :class="{ off: gridPage <= 1 }" @click="gridPage = Math.max(1, gridPage - 1)">◀</span>
+        <span class="sg-pager-no">{{ gridPage }} / {{ gridPageCount }}</span>
+        <span class="sg-pager-btn" :class="{ off: gridPage >= gridPageCount }" @click="gridPage = Math.min(gridPageCount, gridPage + 1)">▶</span>
+        <span class="sg-pager-tip">{{ tt('每页') }} {{ gridPageSize }} {{ tt('行') }} · {{ tt('共') }} {{ gridRows.length }} {{ tt('行') }}</span>
+      </div>
     </template>
 
     <template v-else>
@@ -812,6 +819,12 @@ const props = defineProps({
    *  2026-10-16 用户要立项申请能上传附件,而他那张单是已审核的 ⇒ 只跟 editable 走就会"还是没有入口")。
    */
   attachCanEdit: { type: Boolean, default: false },
+  /**
+   * 「改他人行」权限(2026-11-06 内部样品单):组织架构·角色里勾了 edit_others 才为 true。
+   * 只影响**已保存行**的「申请人」格是否可编辑 + 是否允许改别人行的内容;
+   * 真闸门在 ButtonService.applySampleIntRowRules(同一份 yj_role_panel.perms)。
+   */
+  canEditOthers: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'term-changed'])
 
@@ -904,6 +917,24 @@ const gridRows = computed(() => {
   }
   return [props.head]
 })
+/* ── 纸面表格分页(2026-11-06 内部样品单「多了就切页,20 行就切」)──
+   config.grid.pageSize 有值才分页;分页只影响**渲染**,行数据仍是 head.detail.items 全量,
+   保存走 currentFormData(整表),所以不会因为翻页丢行。 */
+const gridPageSize = computed(() => Number(gridCfg.value.pageSize || 0))
+const gridPage = ref(1)
+const gridPageCount = computed(() => (gridPageSize.value > 0
+  ? Math.max(1, Math.ceil(gridRows.value.length / gridPageSize.value)) : 1))
+const gridPaged = computed(() => gridPageSize.value > 0)
+const gridRowsPage = computed(() => {
+  if (!gridPaged.value) return gridRows.value.map((row, idx) => ({ row, idx }))
+  const start = (gridPage.value - 1) * gridPageSize.value
+  return gridRows.value.slice(start, start + gridPageSize.value).map((row, i) => ({ row, idx: start + i }))
+})
+watch(gridRows, () => { if (gridPage.value > gridPageCount.value) gridPage.value = gridPageCount.value })
+/** 申请人格:已保存的行(有 id)默认锁定,除非有「改他人行」权限 */
+function cellLocked(row, c) {
+  return String(c?.key || '') === '申请人' && !!row?.id && props.canEditOthers !== true
+}
 /**
  * 子表模式下一张新单必须至少有 1 行可填（用户口径「单个样品单下面可以添加多个样品」）：
  * 进入编辑态且明细为空时自动补一行空行，不让用户先点「＋」才能开始填。
@@ -916,7 +947,10 @@ watch(
     const d = props.head?.detail
     if (!d) return
     if (!Array.isArray(d.items)) d.items = []
-    if (d.items.length === 0) d.items.push({})
+    if (d.items.length === 0) {
+      const me = String(props.user?.realName || '').trim()
+      d.items.push(me ? { 申请人: me } : {})
+    }
   },
   { immediate: true },
 )
@@ -926,7 +960,11 @@ function addGridRow() {
   if (!props.editable || !gridAddable.value) return
   const d = props.head?.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  d.items.push({})
+  // 「谁填写的申请人就是谁」:新增行当场带当前登录人(未保存前仍可改,保存后由后端锁定)
+  const me = String(props.user?.realName || '').trim()
+  d.items.push(me ? { 申请人: me } : {})
+  // 跳到新行所在页,不让用户以为"没加上"
+  if (gridPageSize.value > 0) gridPage.value = Math.ceil(d.items.length / gridPageSize.value)
   emit('dirty')
 }
 /** 删除明细行(仅 detail 模式;留最后一行时不允许删空 —— 一张单至少一个样品) */
@@ -1417,6 +1455,27 @@ defineExpose({ focusField })
   padding: 0 2px;
 }
 .sg-rowdel:hover { color: #f56c6c; }
+.sg-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #5b6472;
+  border-top: 1px dashed #d8dde5;
+}
+.sg-pager-btn {
+  cursor: pointer;
+  padding: 0 6px;
+  border: 1px solid #d8dde5;
+  border-radius: 4px;
+  background: #fff;
+  line-height: 20px;
+}
+.sg-pager-btn.off { opacity: .4; cursor: not-allowed; }
+.sg-pager-no { font-variant-numeric: tabular-nums; }
+.sg-pager-tip { margin-left: auto; opacity: .75; }
+
 .sg-addrow {
   height: 30px;
   line-height: 30px;

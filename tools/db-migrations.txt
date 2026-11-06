@@ -4557,3 +4557,5 @@ migrate-proc-insp-plan-editable-20261106.sql
 migrate-drop-bak-tables-20261106.sql
 # 2026-11-06 内部样品单改回 Excel 纸面 + 底部「新增样品」行（明细补 13 列 + 存量回填 + 恢复头行式）
 migrate-sample-int-paper-rows-20261106.sql
+# 2026-11-06 内部样品单行级归属：给 RD_SAMPLE_INT 的管理员/文件负责人/研发审核角色补「改他人行」(edit_others)词
+migrate-sample-int-row-owner-20261106.sql
