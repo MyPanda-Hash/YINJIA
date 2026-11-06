@@ -533,6 +533,24 @@ export const sampleExtSheetCfg = {
   ],
 }
 
+/**
+ * 内部开发样品申请单（RD_SAMPLE_INT）
+ *
+ * ⚠ 2026-11-06 重做：用户口径「按人家给的模版来就行，你这个改动得不好看」。
+ *   上一版做成「标签|值」纵向表单，而设计《新系统-样品流程和相关表格式.xlsx》sheet2
+ *   是**横向 13 列表格**：A2:M2 一行表头（申请日期/申请人/样品编号/项目名/炭棒尺寸/数量/
+ *   样品背景/配方要求/工艺要求/物料批次要求/期望交期/确认人/样品状态），下面每张单填一行。
+ *   现按模板逐列复刻 —— 表头一行、填写一行，与设计同构。
+ */
+/**
+ * 内部开发样品申请单（RD_SAMPLE_INT）
+ *
+ * ⚠ 2026-11-06 重做：用户口径「按人家给的模版来就行，你这个改动得不好看」。
+ *   上一版做成「标签在左、值在右」的纵向长表单；而设计《新系统-样品流程和相关表格式.xlsx》
+ *   sheet2 是**横向 13 列**：A2:M2 一行表头，下面每张单填一行。
+ *   现用 pairs 行型（DocSheet 既有的「标签|值 并排」网格）表达 —— 一行里 4 组标签/值，
+ *   连续 4 行铺满 13 列，与设计的横向观感一致，且不新增渲染器代码。
+ */
 export const sampleIntSheetCfg = {
   titlePart1: '内部',
   titlePart2: '开发样品申请单',
@@ -540,28 +558,39 @@ export const sampleIntSheetCfg = {
   seq: 'num',
   info: [
     { label: '申请日期', key: '单据日期', kind: 'date' },
-    { label: '期望交期', key: '期望交期', kind: 'date' },
+    { label: '申请人', key: '申请人' },
   ],
   remark: { label: '备注', key: '备注', max: 1000 },
   rows: [
-    { num: '一', label: '项目名', key: '项目名', max: 200, h: 45, kind: 'input' },
-    { num: '二', label: '炭棒尺寸', key: '炭棒尺寸', max: 200, h: 45, kind: 'input',
-      hint: '如 33*12*110（外径*内径*长度）' },
-    { num: '三', label: '数量', key: '数量', max: 50, h: 45, kind: 'input' },
-    { num: '四', label: '样品背景', key: '样品背景', max: 500, h: 100, kind: 'textarea' },
-    { num: '五', label: '配方要求', key: '配方要求', max: 500, h: 100, kind: 'textarea' },
-    { num: '六', label: '工艺要求', key: '工艺要求', max: 500, h: 100, kind: 'textarea' },
-    { num: '七', label: '物料批次要求', key: '物料批次要求', max: 500, h: 90, kind: 'textarea' },
-    { num: '八', label: '样品状态', key: '样品状态', max: 0, h: 45, kind: 'select',
-      options: [
+    // 第 1 行：样品编号 / 项目名 / 炭棒尺寸 / 数量（设计 A..F 区）
+    { kind: 'pairs', h: 48, cells: [
+      { label: '样品编号', key: '单据编号', kind: 'input' },
+      { label: '项目名', key: '项目名', kind: 'input', max: 200 },
+      { label: '炭棒尺寸', key: '炭棒尺寸', kind: 'input', max: 200 },
+      { label: '数量', key: '数量', kind: 'input', max: 50 },
+    ] },
+    // 第 2 行：期望交期 / 确认人 / 样品状态（设计 J..M 区）
+    { kind: 'pairs', h: 48, cells: [
+      { label: '期望交期', key: '期望交期', kind: 'date' },
+      { label: '确认人', key: '确认人', kind: 'input', max: 100 },
+      { label: '样品状态', key: '样品状态', kind: 'select', options: [
         { value: '待确认', label: '待确认' },
         { value: '已确认', label: '已确认' },
         { value: '已安排', label: '已安排' },
         { value: '已完成', label: '已完成' },
       ] },
+    ] },
+    // 第 3 行：三块长文本（设计 G/H/I 区，各占一段）
+    { kind: 'pairs', h: 130, cells: [
+      { label: '样品背景', key: '样品背景', kind: 'textarea', max: 500 },
+      { label: '配方要求', key: '配方要求', kind: 'textarea', max: 500 },
+      { label: '工艺要求', key: '工艺要求', kind: 'textarea', max: 500 },
+    ] },
+    // 第 4 行：物料批次要求（设计 J 区，单独一行给足宽度）
+    { kind: 'pairs', h: 90, cells: [
+      { label: '物料批次要求', key: '物料批次要求', kind: 'textarea', max: 500, span: 3 },
+    ] },
   ],
-  signCells: [
-    { label: '确认人', key: '确认人', w: 202, type: 'text', flex: 100 },
-  ],
+  signCells: [],
 }
 
