@@ -175,6 +175,22 @@ id=89 的内容(这就是弹窗里看不到的那份要求):
 
 单测:`qcInspReqLookup.test.js` 增「弹窗自带带入按钮并按状态置灰」接线断言,15 条全绿。
 
+## 8090(本地打包实例)为什么看不到按钮 —— 已修并验证
+
+用户 2026-11-06 报「带入按钮在哪,我在本地也没找到」,截图地址是 **127.0.0.1:8090**。
+
+- 根因:**8090 的前端在 jar 里**(`BOOT-INF/classes/static`),只在打包/换 jar 时变化;
+  当时 jar 的 `index.html` 指向 `assets/index-BAMtJVFY.js`(旧),而新构建是 `index-BErWVBjm.js`。
+  上一轮我只把前端同步进仓库(并提交 `backend/src/main/resources/static`),没有换 jar、没重启,
+  所以 8090 上自然没有按钮 —— **5173 上一直是新的**。
+- 处理:`npm run build` → 同步 static → `start-prod.ps1 -Stop` → `jar uf target\yinjia-mes-backend-0.1.0.jar
+  -C <stage> BOOT-INF` → `start-prod.ps1` 重启。现入口 = `index-BErWVBjm.js`。
+- 验证(round-20.mjs + round-20-8090.png,ego 浏览器直连 8090 并登录正式库):
+  草稿单 JYSJ-2026-10-0077 弹窗页脚出现「⧉ 带入检验要求」(可点),与 5173 一致。
+- ⚠ 浏览器缓存:换 jar 后旧 `index.html` 可能还在缓存里,要 **Ctrl+F5** 强制刷新才看得到。
+- ⚠ 启动日志里 `[ERROR] DB sync failed` 是既存的 2026-11-02 清理脚本闸门(见上文「环境现状」),
+  与本次改动无关,不阻断启动。
+
 ⚠ 顺带确认(不是 bug):草稿单**打开时**若表体为空,`物料编码` 变化会触发 600ms 去抖的**自动带入**
 (2026-10-04 口径,只补缺失项) —— 所以很多单"打开就已经有检验项了",弹窗里的按钮主要用于
 "要求表后来补了项,在已保存的单上再补一次"。
