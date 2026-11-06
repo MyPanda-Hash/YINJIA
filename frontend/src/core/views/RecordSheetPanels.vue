@@ -60,7 +60,12 @@
                 <!-- 2026-10-28 用户口径②「原来的产品编号的位置改为自动生成的单据编号，现在的单据编号
                      不是看不到吗？」⇒ 该格改绑「单据编号」(引擎自动号 SD-…),不再放 prodPick 引用控件;
                      产品编号本身已移进下方封面字段表第一行(引用能力跟着搬过去,仍可弹产品信息表)。 -->
-                <span class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '—' }}</span>
+                <!-- 受控表单编号（2026-11-06 用户口径 A「规格书:YJ-QR-153」）：
+                     封面这一格走的是**独立分支**（.rsp-cover-docno），不走下面报告头那个
+                     .rs-docno-static ⇒ 只声明 cfg.docNoStatic 封面仍会印流水号 SD-…（实测踩过）。
+                     这里优先渲染 docNoStatic；未声明的面板逐字不变。 -->
+                <span v-if="docNoStatic" class="rsp-cover-docno-val rs-docno-static">{{ docNoStatic }}</span>
+                <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '—' }}</span>
               </div>
               <div class="rsp-cover-title"
                    :style="{ top: (COVER_TITLE_TOP * coverVy) + 'px', height: (COVER_TITLE_H * coverVy) + 'px' }">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
@@ -5983,9 +5988,14 @@ function chartOf(dt) {
 .rsp-sign-t td {
   border: calc(1.5px * var(--cok)) solid #000;
 }
+/* 签字栏表头（制订/日期 · 审核/日期 · 批准/日期）
+   ⚠ 2026-11-06 用户报障「规格书表格内字体还没有统一，还是有大有小」：
+   原来表头 16px、内容 12px，差 4px 肉眼明显；且输入框走的是 el-input 默认 Arial，
+   与其余宋体不一致。现统一为 **12px 宋体**（表头与内容同号同族），
+   字号随 --cok 缩放，纸面整体比例不变。 */
 .rsp-sign-th {
   height: calc(44px * var(--cvy));
-  font-size: calc(16px * var(--cok));
+  font-size: calc(12px * var(--cok));
   font-weight: 400;
   font-family: 'SimSun', 'Songti SC', serif;
   color: #111;
@@ -6013,6 +6023,8 @@ function chartOf(dt) {
 .rs-t .rsp-sign-input :deep(.el-input__inner) {
   text-align: center;
   font-size: calc(12px * var(--cok));
+  /* el-input 默认 Arial，与封面宋体不一致（2026-11-06 用户口径「字体要统一」） */
+  font-family: 'SimSun', 'Songti SC', serif;
   line-height: 1.5;
 }
 /* 只读态值沿用 .rsp-cover-val(封面大字段 31.3px)会出框,签名格内覆盖为小字号 */

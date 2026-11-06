@@ -1631,7 +1631,9 @@ export const recordSheetConfigs = {
     // 信息栏照设计 F5:G8(D5:E5..D8:E8)= 表单管理人/密级/使用范围/版本号,
     // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
     grid: [130, 260, 130, 260],
+    // 2026-11-06 用户口径 A：组装工艺清单 = YJ-QR-144（固定表单编号；单据号 AP-… 仍在选单栏/产品文件列表）
     head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    docNoStatic: 'YJ-QR-144',
     info: [
       // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
       //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
@@ -2028,7 +2030,9 @@ export const recordSheetConfigs = {
       { label: '密级', key: '密级', type: 'select' },
     ],
     grid: [144, 144, 144, 144, 294, 165, 152],
+    // 2026-11-06 用户口径 A：出货检验计划表 = YJ-QR-145（固定表单编号；单据号 IP-… 仍在选单栏）
     head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    docNoStatic: 'YJ-QR-145',
     // 表头三行照设计 r5/r6/r7 逐格对位(每行 3 对 = 7 格;产品编号/产品功能类别/编写人 的值格跨 C:D):
     //   r5 [产品编号 | 客户项目名称 | 使用范围]
     //   r6 [产品功能类别 | 产品整体尺寸 | 版本号]
