@@ -513,12 +513,15 @@ export const sampleExtSheetCfg = {
   titlePart2: '开发样品申请单',
   titlePart3: '',
   // 模板 row2：样品单编号 / 客户名称 / 费用 / 下单日期 / 期望交期（合并列宽见 xlsx 列宽 115/191/68…）
+  // 信息条与表体**同属一张表**（2026-11-06 用户口径「线框要对齐」），所以这里给的是**跨列数**
+  // （colspan，按表体 8 列的列边界归并）：306 | 272 | 136 | 202 | 272 = 1188，
+  // 分割线分别落在表体的 1/3/4/6 列边界上，竖线与下方表头逐条对齐。
   info: [
-    { label: '样品单编号', key: '单据编号', w: 306, kind: 'docno' },
-    { label: '客户名称', key: '客户名称', w: 300 },
-    { label: '费用', key: '费用', w: 160 },
-    { label: '下单日期', key: '单据日期', w: 200, kind: 'date' },
-    { label: '期望交期', key: '期望交期', w: 222, kind: 'date' },
+    { label: '样品单编号', key: '单据编号', span: 1, kind: 'docno' },
+    { label: '客户名称', key: '客户名称', span: 2 },
+    { label: '费用', key: '费用', span: 1 },
+    { label: '下单日期', key: '单据日期', span: 2, kind: 'date' },
+    { label: '期望交期', key: '期望交期', span: 2, kind: 'date' },
   ],
   grid: {
     rowH: 150,
@@ -535,11 +538,12 @@ export const sampleExtSheetCfg = {
       { key: '配方及工艺要求', label: '配方及工艺要求', w: 136, hint: '审核人根据相关信息确认配方和实现工艺' },
     ],
   },
-  // 模板 row7：申请 / 审核 / 确认（申请格最宽，审核居中，确认靠右）
+  // 模板 row7：申请 / 审核 / 确认。跨列数按表体列边界归并（1 | 4 | 3 = 8），
+  // 即 306 | 476 | 406 —— 两条竖线正好压在「产品整体规格/炭棒规格」与「产品功能/背景」的列缝上。
   signCells: [
-    { label: '申请', key: '申请', flex: 26, type: 'text' },
-    { label: '审核', key: '审核', flex: 34, type: 'text' },
-    { label: '确认', key: '确认', flex: 40, type: 'text' },
+    { label: '申请', key: '申请', span: 1, type: 'text' },
+    { label: '审核', key: '审核', span: 4, type: 'text' },
+    { label: '确认', key: '确认', span: 3, type: 'text' },
   ],
 }
 

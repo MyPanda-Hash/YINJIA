@@ -105,52 +105,61 @@
          与蓝底文书式的区别:这里**不印序号列/蓝格标签**,标签就是表头,值就是单元格 —— 与设计原表一致。
          子表行:config.grid.rows='detail' 时行源取 head.detail.items(一单多样品),否则取表头自身单行。 -->
     <template v-if="isGrid">
-      <div class="sg-info" :style="{ width: gridW + 'px' }">
-        <div v-for="f in gridInfo" :key="f.key || f.label" class="sg-info-cell" :style="{ width: f.w + 'px' }">
-          <span class="sg-info-label">{{ tt(f.label) }}：</span>
-          <span class="sg-info-value">
-            <el-input
-              v-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
-              maxlength="30" class="as-docno-input sg-info-input" @input="emit('dirty')"
-            />
-            <el-date-picker
-              v-else-if="editable && f.kind === 'date'" v-model="head[f.key]" type="date"
-              value-format="YYYY-MM-DD" size="small" class="as-date sg-info-date" :clearable="false"
-              @change="emit('dirty')"
-            />
-            <div
-              v-else-if="editable && isRefKey(f.key)" class="as-ref-ctl sg-info-ref"
-              :title="tt('点击选择')" @click="openProdRef(f.key)"
-            >
-              <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
-              <el-icon class="as-ref-ico"><Search /></el-icon>
-            </div>
-            <el-select
-              v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
-              v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in selectOptions(f.key)" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-input
-              v-else-if="editable" v-model="head[f.key]" size="small" maxlength="100"
-              class="as-cell-input sg-info-input" @input="emit('dirty')"
-            />
-            <span v-else class="sg-ro">{{ head[f.key] || '' }}</span>
-          </span>
-        </div>
-      </div>
-
+      <!-- 单表结构（2026-11-06 用户口径「线框要对齐」）：信息条 / 表头 / 数据行 / 签名条**同属一张表**，
+           共用同一份 colgroup ⇒ 所有竖线必然落在同一组列边界上（按 colspan 归并分组）。
+           此前三者各用 flex 百分比排，边界差 3~30px，纸面上就是「线框错位」。
+           模板原表本身也是一整张网格（row2 信息 / row3-6 表体 / row7 签名），这样才真正逐格对齐。 -->
       <table class="sg-table" :style="{ width: gridW + 'px' }">
         <colgroup>
           <col v-for="c in gridCols" :key="'c-' + (c.key || c.label)" :style="{ width: c.w + 'px' }">
         </colgroup>
-        <thead>
-          <tr>
+        <tbody>
+          <!-- ① 信息条（模板 row2）：样品单编号 / 客户名称 / 费用 / 下单日期 / 期望交期 -->
+          <tr v-if="gridInfo.length" class="sg-info-row">
+            <td
+              v-for="f in gridInfo" :key="'i-' + (f.key || f.label)"
+              :colspan="f.span || 1" :style="{ height: gridInfoH + 'px' }"
+            >
+              <span class="sg-info-line">
+              <span class="sg-info-label">{{ tt(f.label) }}：</span>
+              <span class="sg-info-value">
+                <el-input
+                  v-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
+                  maxlength="30" class="as-docno-input sg-info-input" @input="emit('dirty')"
+                />
+                <el-date-picker
+                  v-else-if="editable && f.kind === 'date'" v-model="head[f.key]" type="date"
+                  value-format="YYYY-MM-DD" size="small" class="as-date sg-info-date" :clearable="false"
+                  @change="emit('dirty')"
+                />
+                <div
+                  v-else-if="editable && isRefKey(f.key)" class="as-ref-ctl sg-info-ref"
+                  :title="tt('点击选择')" @click="openProdRef(f.key)"
+                >
+                  <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
+                  <el-icon class="as-ref-ico"><Search /></el-icon>
+                </div>
+                <el-select
+                  v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
+                  v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
+                  @change="emit('dirty')"
+                >
+                  <el-option v-for="o in selectOptions(f.key)" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <el-input
+                  v-else-if="editable" v-model="head[f.key]" size="small" maxlength="100"
+                  class="as-cell-input sg-info-input" @input="emit('dirty')"
+                />
+                <span v-else class="sg-ro">{{ head[f.key] || '' }}</span>
+              </span>
+              </span>
+            </td>
+          </tr>
+          <!-- ② 表头（模板 row3） -->
+          <tr class="sg-head-row">
             <th v-for="c in gridCols" :key="'h-' + (c.key || c.label)" :style="{ height: gridHeadH + 'px' }">{{ tt(c.label) }}</th>
           </tr>
-        </thead>
-        <tbody>
+          <!-- ③ 数据行（模板 row4-6）：一行一个样品 -->
           <tr v-for="(row, ri) in gridRows" :key="'r-' + ri" :style="{ height: gridRowH + 'px' }">
             <td v-for="c in gridCols" :key="'d-' + ri + '-' + (c.key || c.label)" class="sg-td">
               <el-date-picker
@@ -177,20 +186,25 @@
               <span v-else class="sg-ro">{{ row[c.key] || '' }}</span>
             </td>
           </tr>
+          <!-- ④ 签名条（模板 row7）：申请 / 审核 / 确认 -->
+          <tr v-if="gridSign.length" class="sg-sign-row">
+            <td
+              v-for="c in gridSign" :key="'s-' + (c.key || c.label)"
+              :colspan="c.span || 1" :style="{ height: gridSignH + 'px' }"
+            >
+              <span class="sg-sign-line">
+              <span class="sg-sign-label">{{ tt(c.label) }}：</span>
+              <el-input
+                v-if="editable && !signLocked(c)" v-model="head[c.key]" size="small" maxlength="50"
+                class="as-cell-input sg-sign-input" @input="emit('dirty')"
+              />
+              <span v-else class="sg-sign-val">{{ head[c.key] || '' }}</span>
+              </span>
+            </td>
+          </tr>
         </tbody>
       </table>
       <div v-if="editable && gridAddable" class="sg-addrow no-print" @click="addGridRow">＋ {{ tt(gridAddLabel) }}</div>
-
-      <div v-if="gridSign.length" class="sg-sign" :style="{ width: gridW + 'px' }">
-        <div v-for="c in gridSign" :key="'s-' + (c.key || c.label)" class="sg-sign-item" :style="{ flex: c.flex || 1 }">
-          <span class="sg-sign-label">{{ tt(c.label) }}：</span>
-          <el-input
-            v-if="editable && !signLocked(c)" v-model="head[c.key]" size="small" maxlength="50"
-            class="as-cell-input sg-sign-input" @input="emit('dirty')"
-          />
-          <span v-else class="sg-sign-val">{{ head[c.key] || '' }}</span>
-        </div>
-      </div>
     </template>
 
     <template v-else>
@@ -860,6 +874,8 @@ const gridCfg = computed(() => props.config?.grid || {})
 const gridInfo = computed(() => props.config?.info || [])
 const gridCols = computed(() => gridCfg.value.cols || [])
 const gridW = computed(() => gridCols.value.reduce((s, c) => s + (c.w || 0), 0))
+const gridInfoH = computed(() => gridCfg.value.infoH || 48)
+const gridSignH = computed(() => gridCfg.value.signH || 52)
 const gridHeadH = computed(() => gridCfg.value.headH || 44)
 const gridRowH = computed(() => gridCfg.value.rowH || 150)
 /** 文本域行数:按行高折算(每行 ≈ 21px),至少 2 行 */
@@ -1286,24 +1302,25 @@ defineExpose({ focusField })
   color: #111;
   letter-spacing: 2px;
 }
-.sg-info {
-  display: flex;
-  border: 1px solid #333;
-  border-bottom: none;
-  box-sizing: border-box;
-  font-family: 'SimSun', 'Songti SC', serif;
+/* 信息条 / 表头 / 数据行 / 签名条 同属一张表（colspan 归并）⇒ 竖线由表格自身保证逐条对齐 */
+.sg-table td { border: 1px solid #333; }
+/* 信息条/签名条：单元格内部走 flex 单行（标签固定宽、控件吃掉余量），
+   否则 el-input 的 width:100% 会把值挤到第二行（实测「样品单编号：」标签占满 306px 列）。 */
+.sg-table tr.sg-info-row td,
+.sg-table tr.sg-sign-row td {
+  padding: 0 6px;
+  vertical-align: middle;
+  white-space: nowrap;
 }
-.sg-info-cell {
+.sg-info-line,
+.sg-sign-line {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 48px;
-  padding: 0 6px;
-  box-sizing: border-box;
-  border-right: 1px solid #333;
+  height: 100%;
   min-width: 0;
 }
-.sg-info-cell:last-child { border-right: none; }
+.sg-info-value { flex: 1; min-width: 0; display: flex; align-items: center; }
 .sg-info-label {
   font-size: 13px;
   font-weight: 700;
@@ -1375,24 +1392,7 @@ defineExpose({ focusField })
   user-select: none;
 }
 .sg-addrow:hover { background: #f0f7ff; }
-.sg-sign {
-  display: flex;
-  border: 1px solid #333;
-  border-top: none;
-  box-sizing: border-box;
-  font-family: 'SimSun', 'Songti SC', serif;
-}
-.sg-sign-item {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 52px;
-  padding: 0 10px;
-  box-sizing: border-box;
-  border-right: 1px solid #333;
-  min-width: 0;
-}
-.sg-sign-item:last-child { border-right: none; }
+.sg-table tr.sg-sign-row td { padding: 0 10px; }
 .sg-sign-label { font-size: 13px; font-weight: 700; white-space: nowrap; flex: none; color: #111; }
 .sg-sign-input { flex: 1; min-width: 0; }
 .sg-sign-val { font-size: 13px; color: #111; }
