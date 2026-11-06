@@ -5929,9 +5929,20 @@ function chartOf(dt) {
   padding: 2px 4px;
   line-height: 1.4;
 }
-.rsp-cover-input.rsp-cover-area :deep(.el-textarea__inner) {
-  padding: 2px calc(8px * var(--cok));
-  line-height: 1.5;
+/* 封面的多行域(整体规格参数/产品主要性能,即 fd.area)必须与单行格**同号同族**。
+   ⚠ 2026-11-06 第二次报障「规格书框内字体大小不一致，草稿状态也要一致的」:
+   上一轮给单行输入框加了 `.rs-t` 前缀,但 textarea 的内层是 `.el-textarea__inner`(**不是**
+   `.el-input__inner`),仍被通用 `.rs-t :deep(.el-textarea__inner){font-size:13.5px}` 命中
+   —— 实测草稿态(8090,规格书 A-54-12):其它格 28.26px 宋体,这两格 13.5px Helvetica Neue,
+   正是用户看到的"大小不一致"。
+   左右内边距给 0:值格的留白由 td(.rsp-cover-vl)自己给,textarea 再加一层会让字左边缘比
+   上下行缩进 8px、对不齐;上下留白按「行高差的一半」给,单行时字与相邻 input 同一水平线。 */
+.rs-t .rsp-cover-input.rsp-cover-area :deep(.el-textarea__inner) {
+  font-size: calc(27.3px * var(--cok));
+  font-family: 'SimSun', 'Songti SC', serif;
+  line-height: 1.15;
+  padding: calc((38px * var(--cvy) - 27.3px * var(--cok) * 1.15) / 2) 0;
+  color: #1a1a1a;
 }
 /* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
    并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径)。
