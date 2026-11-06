@@ -1045,13 +1045,22 @@ function openProdRef(key) {
  */
 function applyApprovalDocNo(source) {
   if (String(props.panelCode || '') !== 'RD_APPROVAL') return
-  const code = String(source?.客户编码 ?? source?.dm ?? '').trim()
+  // 客户编码的键名在不同取数路径下可能不同（参照行按字段 label 给键：
+  // 档案面板 KHDA 的「客户编码」/ 有的路径给物理列 dm / 显示名 客户代码），逐个兜底取第一个非空。
+  const CODE_KEYS = ['客户编码', '客户代码', 'dm', '客户编号', '编码']
+  let code = ''
+  for (const k of CODE_KEYS) {
+    const v = source?.[k]
+    if (v !== undefined && v !== null && String(v).trim() !== '') { code = String(v).trim(); break }
+  }
   if (!code) return
   const d = new Date()
   const ymd = String(d.getFullYear())
     + String(d.getMonth() + 1).padStart(2, '0')
     + String(d.getDate()).padStart(2, '0')
+  // 规则：客户编码 + 日期（2026-11-06 用户口径，日期形如 20261106）
   props.head['文档编号'] = code + ymd
+  emit('dirty')
 }
 
 function onProdRefConfirm(rows) {
