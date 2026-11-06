@@ -408,11 +408,55 @@ public class DevTaskService {
         return out;
     }
 
+    /**
+     * 该产品规格书的「批准」落款（rd_spec_doc_head.批准日期；未批准/无规格书 = 空串）。
+     * 2026-11-06 用户口径：批准那格是「账号名加日期」，列表里已批准的产品直接显示它。
+     */
+    private String specApprovedOf(String productCode) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 批准日期 FROM rd_spec_doc_head WHERE 产品编号 = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY 单据编号 DESC", String.class, productCode);
+            return rows.isEmpty() || rows.get(0) == null ? "" : String.valueOf(rows.get(0)).trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** 当前登录账号（与 PanelPermissionService.currentUserName 同口径，这里只做落款取人） */
+    private String currentUserNameOf() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
+    }
+
     private String realNameOf(String username) {
         if (username == null || username.isBlank()) return "";
         List<String> rows = jdbc.queryForList(
                 "SELECT real_name FROM yj_user WHERE username = ?", String.class, username);
         return rows.isEmpty() || rows.get(0) == null ? "" : String.valueOf(rows.get(0));
+    }
+
+    /**
+     * 产品文件列表 · 规格书「批准」落款（2026-11-06 用户口径）。
+     *
+     * 「谁点击了批准按钮就回填进批准这一栏，也是账号名加日期」——写
+     * rd_spec_doc_head.批准日期（单列合写「姓名/yyyy.M.d」，与制订/审核同格式）。
+     * 权限闸门在 controller（specapprove 词），本方法只负责落款。
+     *
+     * @return 落款结果 {docNo, 批准日期}
+     */
+    public Map<String, Object> specApprove(String docNo) {
+        String who = currentUserNameOf();
+        String name = realNameOf(who);
+        String stamp = (name.isBlank() ? who : name) + "/"
+                + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy.M.d"));
+        int n = jdbc.update("UPDATE rd_spec_doc_head SET 批准日期 = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", stamp, who, docNo);
+        if (n == 0) throw new IllegalStateException("规格书不存在或已作废：" + docNo);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("docNo", docNo);
+        out.put("批准日期", stamp);
+        return out;
     }
 
     private boolean isAdmin(String user) {
@@ -597,6 +641,8 @@ public class DevTaskService {
             // 产品负责人(2026-10-19 用户口径:「产品文件列表的产品负责人填写对应的产品编号的
             //   规格书的负责人」)—— 此前 board() 压根没这个键,列表那一列一直是空的。
             row.put("产品负责人", specOwnerNameOf(productCode));
+            // 规格书「批准」落款（2026-11-06）：已批准的产品在列表里显示「姓名/日期」而不是按钮。
+            row.put("批准日期", specApprovedOf(productCode));
             out.add(row);
         }
         return out;
