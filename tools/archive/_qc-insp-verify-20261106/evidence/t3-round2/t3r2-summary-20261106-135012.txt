@@ -1,0 +1,23 @@
+FACT  参数  -- {"base":"http://127.0.0.1:8091","factory":"YJ_TEST","db":"HSDZ_MES_TEST","run":"20261106-135012","fixture":{"roleId":4,"roleName":"研发审核","approverUser":"cp","approverName":"陈秀丽","negativeUser":"wangguangzhen","negativeName":"王光珍","panels":["QC_PROC_INSP","QC_FIRST_INSP"]}}
+PASS  8091 登录成功(admin/cp)  -- admin=系统管理员 cp=陈秀丽(login)
+PASS  夹具生效:cp approvePanels 含 QC_PROC_INSP  -- ["RD_DROP_PREC","RD_MINERAL","RD_RO_PROTECT","RD_ALKALINE","RD_APPROVAL","RD_SCALE","RD_ANTIBACT","RD_SOAK","RD_FILTER_EFF","DISPATCH","MANU_ORDER","OUTSOURCE_ORDER","ROUTE","QC_PROC_INSP","QC_FIRST_INSP"]
+PASS  建草稿  -- ZC-2026-11-0020
+PASS  回归:直接「审核」仍被拒(两级审批)  -- code=409 msg=制程检验单走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核
+PASS  提交审批成功  -- code=200 msg=success
+PASS  提交后 pending=Y, approve_node=1  -- {"pending":"Y","node":"1","shr":"","shsj":null,"pending_by":"admin"}
+PASS  提交后 检验员=提交人姓名「系统管理员」  -- 检验员="系统管理员"
+PASS  一级审批通过(cp 夹具)  -- code=200 msg=success
+PASS  一级后 pending=Y, approve_node=2  -- {"pending":"Y","node":"2","shr":"","shsj":null,"pending_by":"admin"}
+PASS  一级后 审核人=「陈秀丽」、审核时间非空、审批人空  -- {"l1":"陈秀丽","l1Time":"2026-11-06T13:50:13.000Z","l2":null}
+PASS  留痕 APPROVE_L1(node=1)  -- SUBMIT@1,APPROVE_L1@1
+PASS  二级批准通过(admin)  -- code=200 msg=success
+PASS  批准后 已审核(pending=N, approve_node 空, shr=admin)  -- {"pending":"N","node":"","shr":"admin","shsj":"2026-11-06T05:50:13.610Z","pending_by":"admin"}
+PASS  批准后 审批人=「系统管理员」、审批时间非空  -- {"l2":"系统管理员","l2Time":"2026-11-06T13:50:13.000Z"}
+PASS  留痕 APPROVE(node=2) 且 APPROVE_L1 仍在  -- SUBMIT@1,APPROVE_L1@1,APPROVE@2
+PASS  descriptor 审核人=陈秀丽、审批人=系统管理员  -- {"审核人":"陈秀丽","审批人":"系统管理员"}
+PASS  UI 已审核态纸面断言通过(表尾 检验人/审核人/批准)  -- exit=0 D:\workspace\yinjia\tools\archive\_qc-insp-verify-20261106\evidence\t3-round2\ui-t3r2-audited-20261106-135012.json
+PASS  清理:测试单 5 表 0 残留  -- {"QC_PROC_INSP:ZC-2026-11-0020":{"head":0,"detail":0,"status":0,"approval":0,"msg":0}}
+PASS  夹具还原:角色 4 两面板 can_approve/perms 恢复原值  -- [{"panel_code":"QC_FIRST_INSP","can_approve":"N","perms":"view,query,add,modify,modlog,del,export"},{"panel_code":"QC_PROC_INSP","can_approve":"N","perms":"view,query,add,modify,modlog,del,export"}]
+PASS  兜底清理:残留测试单已清  -- ["QC_PROC_INSP:ZC-2026-11-0020"]
+
+RESULT: PASS (PASS 20 / FAIL 0)

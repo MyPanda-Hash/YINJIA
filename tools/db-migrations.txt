@@ -4500,3 +4500,11 @@ migrate-drop-wol-picking-perm-20261105.sql
 migrate-proc-insp-form-20261106.sql
 migrate-qc-insp-twolevel-20261106.sql
 migrate-qc-proc-insp-tpl-20261106.sql
+
+# 2026-11-06 用户第二轮口径(截图红框「检验方案 = 出货控制计划执行」):「这个检验方案需要能够默认为这个的情况下
+#   也能进行修改」—— 放开 2026-11-06 首轮"只读固定值"的过度收紧:
+#   yj_field「检验方案」editable 0→1(默认值「出货控制计划执行」由后端**仅空值兜底**写入,不再每次保存强制覆盖);
+#   历史空值行补默认值,已填/已改的值不动;列注明改写为"默认值可修改"口径。
+#   代码同批:ButtonService.save() 改"空值兜底默认";QcInspAutoService 自动出单仍写默认值(初值)。
+#   幂等;两账套均执行。不改已执行过的 migrate-proc-insp-form-20261106.sql 字节(避免哈希变更重跑)。
+migrate-proc-insp-plan-editable-20261106.sql

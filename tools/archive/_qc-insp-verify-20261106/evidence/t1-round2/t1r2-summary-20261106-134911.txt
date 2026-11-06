@@ -1,0 +1,31 @@
+FACT  参数  -- {"base":"http://127.0.0.1:8091","factory":"YJ_TEST","db":"HSDZ_MES_TEST","run":"20261106-134911","defaultPlan":"出货控制计划执行","uiPlan":"E2E-方案-UI-20261106-134911","apiPlan":"E2E-方案-API-20261106-134911"}
+PASS  8091 登录成功(测试账套 YJ_TEST)  -- realName=系统管理员
+PASS  T1R2[配置] 「检验方案」**不是只读**(readonly 缺省/false),dataType=文本  -- {"dataName":"检验方案","dataType":"文本","width":160,"isRequired":false}
+PASS  T1R2[配置] 回归:「工序」仍不可见(hidden=true)  -- {"dataName":"工序","dataType":"文本","width":90,"hidden":true,"visible":false,"isRequired":false}
+PASS  T1R2[配置] 回归:明细「结果判断」仍是下拉框(合格/不合格)  -- {"dataName":"结果判断","dataType":"下拉框","width":100,"options":["合格","不合格"],"isRequired":false}
+PASS  T1R2[DB] yj_field 检验方案 editable=1 / required=0 / hidden=0 / visible=1 / data_type=文本  -- {"editable":true,"required":false,"hidden":false,"visible":true,"data_type":"文本"}
+PASS  T1R2[DB] 回归:yj_field 工序 hidden=1 / visible=0  -- {"hidden":true,"visible":false}
+PASS  T1R2[DB] 迁移后全表无空检验方案行(历史空值已补默认)  -- 空值行=0
+FACT  T1R2[DB] 当前非默认方案行数(用户手改值保留;本轮测试前)  -- 0
+PASS  T1R2 建草稿A(API 不传检验方案)  -- 单号=ZC-2026-11-0016
+PASS  T1R2[API+DB] 建单不传检验方案 → 落库默认「出货控制计划执行」  -- DB值="出货控制计划执行"
+PASS  T1R2[DB] 单据A为草稿  -- {"pending":"N","node":"","shr":"","shsj":null,"pending_by":""}
+PASS  T1R2[UI-1] UI 断言通过(输入框/默认值/改值/结果判断/保存)  -- exit=0 D:\workspace\yinjia\tools\archive\_qc-insp-verify-20261106\evidence\t1-round2\ui-t1r2-A1-20261106-134911.json
+PASS  T1R2[DB] UI 改成自定义方案并保存 → **落用户改值**(未被强刷回默认)  -- DB值="E2E-方案-UI-20261106-134911" 期望=E2E-方案-UI-20261106-134911
+PASS  T1R2[DB] 回归:UI 结果判断选「不合格」保存落库  -- {"结果判断":"不合格"}
+PASS  T1R2[UI] 纸张 Excel 导出含 自定义检验方案 + 结果判断值  -- 文本长度=350
+FAIL  T1R2[UI-2] 重开纸张再保存 UI 断言通过  -- exit=1
+PASS  T1R2[DB] 再点一次保存后 检验方案仍=用户改值(不被覆盖)  -- DB值="E2E-方案-UI-20261106-134911"
+PASS  T1R2[DB] 第二次保存结果判断=合格(顺带验证保存链路)  -- {"结果判断":"合格"}
+FAIL  T1R2[UI-3] 清空检验方案 UI 操作通过  -- exit=1
+PASS  T1R2[DB] 清空检验方案后保存 → 空值兜底恢复默认「出货控制计划执行」  -- DB值="出货控制计划执行"
+PASS  T1R2 建草稿B(API 不传检验方案)  -- 单号=ZC-2026-11-0017
+PASS  T1R2[DB] 单据B默认值  -- DB值="出货控制计划执行"
+PASS  T1R2[API] 保存自定义检验方案  -- code=200 msg=success
+PASS  T1R2[DB] API 保存自定义方案 → 落库自定义值  -- DB值="E2E-方案-API-20261106-134911"
+PASS  T1R2[API] 再次保存(同载荷)  -- code=200 msg=success
+PASS  T1R2[DB] API 再次保存后仍=自定义值(不再强制固定值)  -- DB值="E2E-方案-API-20261106-134911"
+PASS  T1R2 清理:测试单 5 表 0 残留  -- {"QC_PROC_INSP:ZC-2026-11-0016":{"head":0,"detail":0,"status":0,"approval":0,"msg":0},"QC_PROC_INSP:ZC-2026-11-0017":{"head":0,"detail":0,"status":0,"approval":0,"msg":0}}
+PASS  T1R2 清理:AUTO_QCVER_ 标记 0 残留  -- {"QC_PROC_INSP":0}
+
+RESULT: FAIL (PASS 25 / FAIL 2)

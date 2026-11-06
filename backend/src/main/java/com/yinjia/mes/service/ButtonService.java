@@ -351,10 +351,15 @@ public class ButtonService {
         }
 
         String no = noObj == null || String.valueOf(noObj).isBlank() ? null : String.valueOf(noObj);
-        // 制程检验单「检验方案」固定写(2026-11-06 用户口径「抽检方案固定写(出货控制计划执行)」):
-        // 字段已置只读(迁移 migrate-proc-insp-form-20261106.sql),固定值真源=这里 + QcInspAutoService 自动生单
-        // (自动出单与「选生产工单」建单都走本 save(),两处同源;手工新建/历史单保存时同样归一)。
-        if ("QC_PROC_INSP".equals(def.code())) body.put("检验方案", "出货控制计划执行");
+        // 制程检验单「检验方案」**默认值**「出货控制计划执行」(2026-11-06 用户口径「抽检方案固定写(出货控制计划执行)」;
+        //   同日第二轮口径:「这个检验方案需要能够默认为这个的情况下也能进行修改」⇒ 字段**可编辑**,
+        //   这里只做"空值兜底默认",**绝不覆盖用户已填/已改的值**)。
+        // 自动出单(QcInspAutoService.procInspHead)同样写这个默认值 —— 两处各一处字面量(本类不能反向引用那边),
+        // 改口径两处一起改;默认值只影响新建/空值,历史单与人工改过的值一律保留。
+        if ("QC_PROC_INSP".equals(def.code())) {
+            Object plan = body.get("检验方案");
+            if (plan == null || String.valueOf(plan).isBlank()) body.put("检验方案", "出货控制计划执行");
+        }
         if (def.isDoc()) {
             return saveDoc(def, body, items, no, user, markSaved);
         }

@@ -42,6 +42,9 @@ const OUT = path.resolve(ROOT, String(arg('out', 'tools/archive/_qc-insp-verify-
 const PREFIX = String(arg('prefix', TASK))
 const FILL = (() => { try { return JSON.parse(String(arg('fill', '{}'))) } catch { return {} } })()
 const DO_SAVE = flag('save')
+// 2026-11-06 第二轮追加变更:检验方案由"只读固定值"改为"默认值 + 可修改"。
+//   --expect-plan=editable(默认,当前口径) / fixed(首轮历史口径,保留以便复跑旧证据)
+const EXPECT_PLAN = String(arg('expect-plan', 'editable'))
 const EXPECT = {
   preparer: String(arg('expect-preparer', '')),
   l1: String(arg('expect-l1', '')),
@@ -265,6 +268,15 @@ try {
         hasWorkOrderRowNo: labels.includes('工单行号'),
         planKind: map['检验方案'] ? map['检验方案'].kind : null,
         planText: map['检验方案'] ? map['检验方案'].text : '',
+        // 输入框/只读文本两种形态都取"当前显示值"
+        planValue: (() => {
+          const ths = [...document.querySelectorAll('.qr-head-table th')]
+          const th = ths.find((x) => (x.textContent || '').trim() === '检验方案')
+          const td = th?.nextElementSibling
+          if (!td) return ''
+          const inp = td.querySelector('input,textarea')
+          return inp ? String(inp.value || '') : (td.textContent || '').replace(/\s+/g, ' ').trim()
+        })(),
         hasInspectorInput: !!document.querySelector('.qr-insp-input'),
         rowCount: dataRows.length,
         verdictSelects, verdictInputs,
@@ -276,9 +288,21 @@ try {
     const shotPaper = await shot(page, 'paper')
     r.fact('制程纸面事实', { ...facts, ...side, shot: shotPaper, errors })
     r.check('T1[UI] 表头**没有**「工序」', !facts.hasGongxu, '表头标签=' + facts.headLabels.join('|'))
-    r.check('T1[UI] 「检验方案」是只读文本(不是输入框)', facts.planKind === 'text',
-      'kind=' + facts.planKind + ' 文本=' + facts.planText)
-    r.check('T1[UI] 「检验方案」固定显示「出货控制计划执行」', facts.planText.includes('出货控制计划执行'), '文本=' + facts.planText)
+    if (EXPECT_PLAN === 'fixed') {
+      // 首轮历史口径(2026-11-06 第一轮,已被第二轮取代):只读固定文本
+      r.check('T1[UI] 「检验方案」是只读文本(不是输入框)[历史口径]', facts.planKind === 'text',
+        'kind=' + facts.planKind + ' 文本=' + facts.planText)
+      r.check('T1[UI] 「检验方案」固定显示「出货控制计划执行」[历史口径]', facts.planText.includes('出货控制计划执行'), '文本=' + facts.planText)
+    } else {
+      // 第二轮口径:默认值可修改 —— 纸张上是可编辑输入框,新建/自动草稿默认显示「出货控制计划执行」
+      r.check('T1[UI] 「检验方案」是可编辑输入框(不是纯文本)', facts.planKind === 'input',
+        'kind=' + facts.planKind + ' 值=' + facts.planValue)
+      // 仅"新建/自动草稿"那一轮断言默认值(重开已改值的单/清空验证轮不适用)
+      if (flag('expect-default-plan')) {
+        r.check('T1[UI] 新建/自动草稿「检验方案」默认显示「出货控制计划执行」',
+          String(facts.planValue || '').trim() === '出货控制计划执行', '当前值=' + JSON.stringify(facts.planValue))
+      }
+    }
     r.check('T1[UI] 「单据编号」按元数据只读(纯文本,非输入框)', facts.docNoKind === 'text', 'kind=' + facts.docNoKind)
     r.check('T1[UI] 「工单行号」(hidden=1)不进纸面表头', !facts.hasWorkOrderRowNo, '表头=' + facts.headLabels.join('|'))
     r.check('T1[UI] 「检验员」草稿态仍可编辑(回归:不能被 isLocked 误锁)', facts.hasInspectorInput === true,
@@ -286,6 +310,33 @@ try {
     r.check('T1[UI] 明细「结果判断」是 el-select 下拉(非普通输入框)',
       facts.verdictSelects.length > 0 && facts.verdictSelects.every(Boolean) && facts.verdictInputs.every((x) => !x),
       `行数=${facts.rowCount} select=${JSON.stringify(facts.verdictSelects)} input=${JSON.stringify(facts.verdictInputs)}`)
+
+    // 检验方案(第二轮:可编辑)—— 支持显式赋任意值/空串清空
+    if (EXPECT_PLAN === 'editable' && Object.prototype.hasOwnProperty.call(FILL, '检验方案')) {
+      const planVal = String(FILL['检验方案'])
+      // ⚠ 只填「检验方案」自己的 td:纸张表头一行是 [th,td,th,td] 两对,
+      //   按"整行第一个 input"会填到同一行的另一个字段(实测把「检验日期」填成中文 → save 500 日期转换失败)。
+      const planFilled = await page.evaluate((val) => {
+        const ths = [...document.querySelectorAll('.qr-head-table th')]
+        const th = ths.find((x) => (x.textContent || '').trim() === '检验方案')
+        const inp = th?.nextElementSibling?.querySelector('input,textarea')
+        if (!inp) return false
+        inp.focus()
+        inp.value = val
+        inp.dispatchEvent(new Event('input', { bubbles: true }))
+        inp.dispatchEvent(new Event('change', { bubbles: true }))
+        return true
+      }, planVal)
+      r.check('T1[UI] 在「检验方案」输入框填入 ' + JSON.stringify(planVal), planFilled)
+      await sleep(400)
+      const shown = await page.evaluate(() => {
+        const ths = [...document.querySelectorAll('.qr-head-table th')]
+        const th = ths.find((x) => (x.textContent || '').trim() === '检验方案')
+        const inp = th?.nextElementSibling?.querySelector('input,textarea')
+        return inp ? String(inp.value || '') : ''
+      })
+      r.check('T1[UI] 检验方案输入后格内值正确', shown === planVal, '格内=' + JSON.stringify(shown))
+    }
 
     // 选「不合格」+ 保存(真实 Playwright 点击;失败再退回 DOM 事件)
     if (FILL['结果判断']) {
@@ -304,7 +355,8 @@ try {
       await sleep(800)
       let optionClicked = false
       try {
-        const opt = page.locator('.el-select-dropdown__item').filter({ hasText: FILL['结果判断'] }).last()
+        // ⚠ 必须**精确**匹配选项文本:'合格' 用 substring 会命中 '不合格'(list 里两个都有)。
+        const opt = page.getByRole('option', { name: FILL['结果判断'], exact: true }).last()
         await opt.click({ timeout: 6000 })
         optionClicked = true
       } catch { /* JS 兜底 */ }
@@ -324,12 +376,13 @@ try {
       }
       r.check('T1[UI] 「结果判断」下拉选中「' + FILL['结果判断'] + '」', target && optionClicked,
         `target=${target} optionClicked=${optionClicked}`)
-      await sleep(600)
+      await sleep(1200)
       const afterPick = await page.evaluate(() => {
         const sel = document.querySelector('.qr-grid tbody tr td.c-verdict .el-select')
         return (sel?.textContent || '').replace(/\s+/g, ' ').trim()
       })
-      r.check('T1[UI] 结果判断格显示已选值 = ' + FILL['结果判断'], afterPick.includes(FILL['结果判断']), '格内文本=' + afterPick)
+      r.check('T1[UI] 结果判断格显示已选值 = ' + FILL['结果判断'],
+        String(afterPick || '').trim() === String(FILL['结果判断']), '格内文本=' + JSON.stringify(afterPick))
     }
     if (DO_SAVE) {
       const respP = page.waitForResponse((res) => res.url().includes('/api/px/callButton') && res.request().method() === 'POST', { timeout: 30000 }).catch(() => null)
@@ -353,10 +406,17 @@ try {
       r.fact('T1[UI] 保存后截图', shotSaved)
       // 保存后 DB 值由父脚本断言;此处再抓一次纸面显示
       const afterSave = await page.evaluate(() => {
+        const txt = (el) => (el?.textContent || '').replace(/\s+/g, ' ').trim()
         const sel = document.querySelector('.qr-grid tbody tr td.c-verdict .el-select')
-        return (sel?.textContent || '').replace(/\s+/g, ' ').trim()
+        const ths = [...document.querySelectorAll('.qr-head-table th')]
+        const th = ths.find((x) => txt(x) === '检验方案')
+        const inp = th?.nextElementSibling?.querySelector('input,textarea')
+        return {
+          结果判断: txt(sel),
+          检验方案: inp ? String(inp.value || '') : (th?.nextElementSibling ? txt(th.nextElementSibling) : ''),
+        }
       })
-      r.fact('T1[UI] 保存后结果判断格显示', afterSave)
+      r.fact('T1[UI] 保存后纸面显示(结果判断/检验方案)', afterSave)
     }
     if (flag('export-excel')) {
       const ex = await exportSheetExcel()

@@ -1,0 +1,122 @@
+{
+ "title": "T3-R2 两级审批快速回归(制程) @ http://127.0.0.1:8091 run=20261106-135012",
+ "startedAt": "2026-11-06T05:50:12.545Z",
+ "endedAt": "2026-11-06T05:50:47.691Z",
+ "pass": 20,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"db\":\"HSDZ_MES_TEST\",\"run\":\"20261106-135012\",\"fixture\":{\"roleId\":4,\"roleName\":\"研发审核\",\"approverUser\":\"cp\",\"approverName\":\"陈秀丽\",\"negativeUser\":\"wangguangzhen\",\"negativeName\":\"王光珍\",\"panels\":[\"QC_PROC_INSP\",\"QC_FIRST_INSP\"]}}"
+  },
+  {
+   "name": "8091 登录成功(admin/cp)",
+   "ok": true,
+   "detail": "admin=系统管理员 cp=陈秀丽(login)"
+  },
+  {
+   "name": "夹具生效:cp approvePanels 含 QC_PROC_INSP",
+   "ok": true,
+   "detail": "[\"RD_DROP_PREC\",\"RD_MINERAL\",\"RD_RO_PROTECT\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_SCALE\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_FILTER_EFF\",\"DISPATCH\",\"MANU_ORDER\",\"OUTSOURCE_ORDER\",\"ROUTE\",\"QC_PROC_INSP\",\"QC_FIRST_INSP\"]"
+  },
+  {
+   "name": "建草稿",
+   "ok": true,
+   "detail": "ZC-2026-11-0020"
+  },
+  {
+   "name": "回归:直接「审核」仍被拒(两级审批)",
+   "ok": true,
+   "detail": "code=409 msg=制程检验单走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核"
+  },
+  {
+   "name": "提交审批成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "提交后 pending=Y, approve_node=1",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":\"1\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "提交后 检验员=提交人姓名「系统管理员」",
+   "ok": true,
+   "detail": "检验员=\"系统管理员\""
+  },
+  {
+   "name": "一级审批通过(cp 夹具)",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "一级后 pending=Y, approve_node=2",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":\"2\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "一级后 审核人=「陈秀丽」、审核时间非空、审批人空",
+   "ok": true,
+   "detail": "{\"l1\":\"陈秀丽\",\"l1Time\":\"2026-11-06T13:50:13.000Z\",\"l2\":null}"
+  },
+  {
+   "name": "留痕 APPROVE_L1(node=1)",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1"
+  },
+  {
+   "name": "二级批准通过(admin)",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "批准后 已审核(pending=N, approve_node 空, shr=admin)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"admin\",\"shsj\":\"2026-11-06T05:50:13.610Z\",\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "批准后 审批人=「系统管理员」、审批时间非空",
+   "ok": true,
+   "detail": "{\"l2\":\"系统管理员\",\"l2Time\":\"2026-11-06T13:50:13.000Z\"}"
+  },
+  {
+   "name": "留痕 APPROVE(node=2) 且 APPROVE_L1 仍在",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1,APPROVE@2"
+  },
+  {
+   "name": "descriptor 审核人=陈秀丽、审批人=系统管理员",
+   "ok": true,
+   "detail": "{\"审核人\":\"陈秀丽\",\"审批人\":\"系统管理员\"}"
+  },
+  {
+   "name": "UI 已审核态纸面断言通过(表尾 检验人/审核人/批准)",
+   "ok": true,
+   "detail": "exit=0 D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3-round2\\ui-t3r2-audited-20261106-135012.json"
+  },
+  {
+   "name": "清理:测试单 5 表 0 残留",
+   "ok": true,
+   "detail": "{\"QC_PROC_INSP:ZC-2026-11-0020\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0}}"
+  },
+  {
+   "name": "夹具还原:角色 4 两面板 can_approve/perms 恢复原值",
+   "ok": true,
+   "detail": "[{\"panel_code\":\"QC_FIRST_INSP\",\"can_approve\":\"N\",\"perms\":\"view,query,add,modify,modlog,del,export\"},{\"panel_code\":\"QC_PROC_INSP\",\"can_approve\":\"N\",\"perms\":\"view,query,add,modify,modlog,del,export\"}]"
+  },
+  {
+   "name": "兜底清理:残留测试单已清",
+   "ok": true,
+   "detail": "[\"QC_PROC_INSP:ZC-2026-11-0020\"]"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "db": "HSDZ_MES_TEST",
+  "run": "20261106-135012",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3-round2"
+ }
+}

@@ -23,10 +23,11 @@
           · **两级审批**:检验人=编制(提交审批时后端自动写提交人、空值兜底)/ 审核=一级审批人 /
             批准=超级管理员(二级审批通过才落值) ⇒ 表尾补「批准」格(head['审批人'],恒只读);
           · **工序已隐去**(yj_field hidden=1,后端元数据过滤,前端无需特判);
-          · **检验方案固定**「出货控制计划执行」(字段置只读,后端保存时强制写值);
+          · **检验方案默认值「出货控制计划执行」、可修改**(2026-11-06 同日第二轮口径「默认为这个的情况下
+            也能进行修改」:后端只在空值兜底写默认值,不覆盖人工改值 ⇒ 字段 editable=1,本纸渲染成输入框);
           · **明细「结果判断」改下拉**(合格/不合格,值取自 yj_field.dataType=下拉框 的 options,
             选项是**存储数据键**,不翻译、不 tt();没有 options 时退回文本输入);
-          · 单据编号/工单行号/检验方案/审核人/审核时间/审批人/审批时间 一律按元数据只读
+          · 单据编号/工单行号/审核人/审核时间/审批人/审批时间 一律按元数据只读
             (后端契约:yj_field.editable=0 下发的是 `readonly:true`,见 isLockedKey)。
        ⚠ Excel 导出:版式在 `core/qc/qcProcInspExport.js`(纯函数 + 单测),本组件只做 aoa_to_sheet + writeFile,
          入口 = 面板右侧「文档输出 → 导出」→「导出 Excel（.xlsx）」(PanelxList 按面板码路由到 exportProcInspExcel)。
@@ -406,8 +407,9 @@ function isDateKey(k) {
 /** 只读判定:后端契约 —— yj_field.editable=0 在 dataSchema 里下发的是 **`readonly:true`**
  *  (不是 editable:false;PanelConfigService.fieldSpec:`if (!f.editable()) m.put("readonly", true)`)。
  *  ⚠ 2026-11-06 修:此前只判 editable===false/0 ⇒ 恒为 false(死代码),
- *    单据编号/工单行号/检验方案/审核人/审核时间/审批人/审批时间 全成了可填框。
- *    未登记 ≠ 锁定(与其它纸张同口径);检验员(yj_field.editable=1)保持可填。 */
+ *    单据编号/工单行号/审核人/审核时间/审批人/审批时间 全成了可填框。
+ *    未登记 ≠ 锁定(与其它纸张同口径);检验员(yj_field.editable=1)保持可填;
+ *    「检验方案」2026-11-06 同日第二轮改为**默认值可修改**(editable=1)⇒ 这里也不锁。 */
 function isLockedKey(k) {
   const f = fieldMap.value.get(k)
   return !!f && (f.readonly === true || f.editable === false || f.editable === 0)

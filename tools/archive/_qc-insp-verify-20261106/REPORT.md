@@ -12,6 +12,11 @@
 | 附:改前基线(8090 旧 jar + 测试库未迁移口径) | **PASS 20 / FAIL 0** | `evidence/stage1/baseline-8090-20261106-120000.*` |
 | **合计** | **PASS 182 / FAIL 0** | 见 §7 证据索引 |
 
+> **2026-11-06 追加变更(用户第二轮口径:「这个检验方案需要能够默认为这个的情况下也能进行修改」)** ——
+> 「检验方案」由「只读固定值」改为「**默认值 + 可修改**」。重跑结果:**T1-R2 PASS 27/0、T3-R2 回归 PASS 20/0**
+> (合计 47/0),详见 **§9**。本报告 §2 中两条旧断言(「检验方案 readonly/只读文本」「保存时强制写固定值」)
+> **已被本轮追加变更取代**,旧证据/结论原样保留为历史记录。
+
 > 设备/实例:8091 = 从当前工作区源码打包的**新代码** jar(见 §1 指纹),库 = 同机 SQL Server 两个账套。
 > 写操作**只在** `HSDZ_MES_TEST`(测试账套);`HSDZ_MES` 只读。宿主 8090 旧实例仅用于改前基线(只读打开纸张/取报表)。
 
@@ -219,3 +224,107 @@ bash tools/archive/_qc-insp-verify-20261106/_start-8091.sh stop
   无提交审批→有、OQC 产品编码只读→可填、旧报表无批准→有批准);
 - 清场复核:测试单 5 表 0 残留、AUTO_QCVER_ 标记 0、夹具原值还原、`yj_form_approval/yj_doc_status` 无残留;
 - 未发现产品侧缺陷;§6 两个观察项(产品编码必填、首件检验人非输入框)属既有口径,待 Lead 确认。
+
+---
+
+## 9. 2026-11-06 追加变更:检验方案「默认值 + 可修改」第二轮验证
+
+### 9.1 变更内容(Lead 已实现;本报告 §2 的两条断言被本轮取代)
+
+**用户第二轮口径**(截图红框「检验方案 = 出货控制计划执行」):
+「**这个检验方案需要能够默认为这个的情况下也能进行修改**」——
+即「检验方案」不再是只读固定值,而是**默认值「出货控制计划执行」+ 可编辑修改**。
+
+| 层 | 改动 |
+|---|---|
+| DB(两账套已执行,已登记 db-migrations.txt) | 新增 `tools/migrate-proc-insp-plan-editable-20261106.sql`:yj_field QC_PROC_INSP.检验方案 `editable 0→1`、required=0、hidden=0、visible=1、data_type 仍「文本」;历史空值行补默认;列注明改口径。DbSync 正式库「执行 1、失败 0」、测试库「执行 1、失败 0」。未改首轮迁移字节 |
+| 后端 | `ButtonService.save()` 由「每次保存强制写固定值」改为「**仅空值兜底默认**,不覆盖用户已填/已改值」;`QcInspAutoService.procInspHead` 自动出单仍写默认值(=初值语义) |
+| 前端 | 零功能改动(元数据驱动,editable=1 后纸张「检验方案」自动变输入框),只更新注释;重新 `npm run build` 并同步 static(入口 `index-D8V0JTYj.js`) |
+
+**本报告中被本轮取代的旧断言(旧证据保留在 `evidence/t1/` 作为历史):**
+1. ~~「T1[配置] 检验方案只读(readonly=true)」~~ → 本轮改为「**无 readonly**,dataType=文本」;
+2. ~~「保存时强制写固定值(载荷塞错误值仍落默认)」/「全表非固定值行数=0」~~ → 本轮改为「**落用户改值且再保存不覆盖;仅空值兜底默认**」。
+
+### 9.2 构建指纹(需要新 jar,已重新打包)
+
+`evidence/stage2/build-info-r2.txt`:
+
+```
+built_at:        2026-11-06T13:48:07+08:00
+git HEAD:        9da79e8fe(工作区含第二轮未提交改动)
+jar sha256:      9a041d5feee45190e17eda4c25a9122c20c97ec2b40241ac97d7f1e206d7d376
+jar size:        97,837,829 字节(94MB);BOOT-INF/lib 128 个
+jar 前端入口:    assets/index-D8V0JTYj.js(与 Lead 同步进工作区 static 的一致;API 实测首页引用同值)
+新代码特征:      javap 反汇编 ButtonService:字面量「检验方案」后为 `Map.get`(=读取入参+空值兜底;
+                 round-1 旧代码此处是 `Map.put` 强制写)→ jar 自检新增该校验(GET_PLAN=1 才通过)
+```
+
+### 9.3 T1-R2 结果:**PASS 27 / FAIL 0**(`evidence/t1-round2/t1r2-summary-20261106-134946.{json,txt}`)
+
+| # | 验收点(第二轮口径) | 实测(PASS) |
+|---|---|---|
+| 1 | `getPanelConfig`:检验方案**无 readonly**,dataType=文本 | `{"dataName":"检验方案","dataType":"文本","isRequired":false}`(无 readonly 字段) |
+| 2 | `yj_field`:editable=1 / required=0 / hidden=0 / visible=1 / data_type=文本 | `{"editable":true,"required":false,"hidden":false,"visible":true,"data_type":"文本"}` |
+| 3 | UI 纸张:检验方案是**可编辑输入框**(不是纯文本) | kind=input;新建/自动草稿默认显示「出货控制计划执行」 |
+| 4 | UI 改成自定义值 `E2E-方案-UI-<run>` → 保存 → DB = 自定义值 | DB `qc_proc_insp_head.检验方案 = E2E-方案-UI-20261106-134946`(**未被强刷回默认**) |
+| 5 | 重开纸张再保存一次 → 检验方案仍=自定义值 | 再保存后 DB 仍 `E2E-方案-UI-…`(不被覆盖);顺带结果判断改「合格」落库 |
+| 6 | 清空检验方案 → 保存 → 空值兜底恢复默认 | DB 回到「出货控制计划执行」 |
+| 7 | API 建单**不传**检验方案 → 落库默认 | DB = 「出货控制计划执行」 |
+| 8 | API 保存自定义 `E2E-方案-API-<run>`;再次保存仍保留 | 两次保存后 DB 均 = `E2E-方案-API-20261106-134946` |
+| 9 | 回归:工序仍 hidden(hidden=1/visible=0,纸面无工序) | ✅ |
+| 10 | 回归:结果判断仍下拉,选「不合格/合格」并保存落库 | ✅(第二次保存后=合格) |
+| 11 | 回归:单据编号仍只读、工单行号不进表头、检验员仍可编辑 | ✅ |
+| 12 | 纸张 Excel 导出含自定义检验方案 + 结果判断值 | ✅(`evidence/t1-round2/ui-t1r2-A1-*-sheet-export.xlsx`) |
+| 13 | 清理(单号白名单) | ✅ 测试单 5 表 0 残留;AUTO_QCVER_ 0 |
+
+### 9.4 T3-R2 快速回归结果:**PASS 20 / FAIL 0**(`evidence/t3-round2/t3r2-summary-20261106-135012.{json,txt}`)
+
+证明 save() 改动未破坏两级审批(制程面板全链):
+
+- 直审仍被拒(409「走两级审批…不支持直接审核」)→ 提交审批 → `pending=Y, approve_node=1`、检验员=提交人;
+- 一级审批通过(测试库夹具 cp/陈秀丽,非提交人)→ `approve_node=2`、审核人=陈秀丽+审核时间、留痕 `APPROVE_L1@1`;
+- 二级 admin 批准 → `pending=N, shr=admin`、审批人=系统管理员+审批时间、留痕 `APPROVE@2`(APPROVE_L1 仍在);
+- `getFormDescriptor` 审核人=陈秀丽、审批人=系统管理员;UI 已审核态表尾三格 = 检验人 系统管理员 / 审核人 陈秀丽 / 批准 系统管理员;
+- 清理 0 残留;**夹具原值还原 `same=true`**(`evidence/t3-round2/fixture-{grant,restore}.sql`、`fixture-restore-20261106-135012.json`)。
+
+### 9.5 脚本迭代记录(FACT,非产品缺陷)
+
+- `134818` 轮 PASS 21/FAIL 6:验证脚本自身问题——①「检验方案」填充按整行 first-input 定位,填到了同一行的
+  「检验日期」日期控件 → 保存 500(日期转换失败);②下拉选项用 substring 匹配「合格」会命中「不合格」;
+  ③「默认值」断言在"重开已改值单/清空验证"轮被误用。修正:精确按 th→next td 定位、选项精确匹配、
+  默认值断言只在新建轮(`--expect-default-plan`)。
+- `134911` 轮 PASS 25/FAIL 2(默认值断言未加轮次门控)→ 修正后 `134946` 轮 **PASS 27/0**。
+- 以上各轮 summary 均保留在 `evidence/t1-round2/` 供追溯;首轮旧 T1 证据仍在 `evidence/t1/`。
+
+### 9.6 收尾
+
+- 8091(新 jar)跑完后**已停**;8090 未动(停后 `/api/base/factory/list` 仍 200):`evidence/stage2/stop-8091-r2.txt`;
+- 测试库复核:客户名称 `AUTO_QCVER_%` 残留 0、`ZC-2026-11-%` 的 yj_form_approval/yj_doc_status 残留 0、
+  夹具 role 4 两面板 `can_approve=N` 原值;全表 检验方案分布 = 43 行「出货控制计划执行」;
+- 只写 HSDZ_MES_TEST;正式库只读;未 git commit。
+
+### 9.7 本轮证据索引
+
+```
+tools/archive/_qc-insp-verify-20261106/
+├─ _e2e-t1-r2.mjs                 # T1 第二轮(默认值+可修改)验证脚本
+├─ _e2e-t3-regress.mjs            # T3 两级审批快速回归脚本
+├─ _build-8091.sh                 # 增补 javap「检验方案→Map.get」round-2 强特征自检
+└─ evidence/
+   ├─ stage2/build-info-r2.txt    # 第二轮 jar 指纹
+   ├─ stage2/stop-8091-r2.txt
+   ├─ t1-round2/
+   │  ├─ t1r2-summary-20261106-134946.{json,txt}   # PASS 27/0(最终)
+   │  ├─ t1r2-summary-20261106-{134818,134911}.*    # 脚本迭代留档(FAIL)
+   │  ├─ ui-t1r2-A{1,2,3}-20261106-134946-{paper,saved}.png / .json
+   │  ├─ ui-t1r2-A1-20261106-134946-sheet-export.xlsx  # 纸张 Excel(自定义方案+结果判断)
+   │  └─ cleanup-20261106-134946.sql
+   └─ t3-round2/
+      ├─ t3r2-summary-20261106-135012.{json,txt}    # PASS 20/0
+      ├─ ui-t3r2-audited-20261106-135012-{paper.png,json}
+      ├─ fixture-grant.sql / fixture-restore.sql / fixture-restore-20261106-135012.json(same=true)
+      └─ cleanup-20261106-135012.sql
+```
+
+**追加变更结论:用户第二轮口径已满足 —— 检验方案默认为「出货控制计划执行」且可人工修改、修改值保存后不被后端覆盖、
+清空后保存空值兜底恢复默认;同时未破坏两级审批/工序隐藏/结果判断下拉/单据编号只读/检验员可编辑。**

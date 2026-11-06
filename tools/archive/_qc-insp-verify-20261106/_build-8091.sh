@@ -85,13 +85,28 @@ LIBS=$(unzip -l "$JAR" | grep -c 'BOOT-INF/lib/.*\.jar' || true)
 HIT_PROC=$(unzip -p "$JAR" BOOT-INF/classes/com/yinjia/mes/service/ButtonService.class 2>/dev/null | grep -c 'QC_PROC_INSP' || true)
 HIT_FIXED=$(unzip -p "$JAR" BOOT-INF/classes/com/yinjia/mes/service/ButtonService.class 2>/dev/null | grep -c '出货控制计划执行' || true)
 HIT_JRXML=$(unzip -p "$JAR" BOOT-INF/classes/reports/qc_proc_insp.jrxml 2>/dev/null | grep -c '审批人' || true)
+# ── 第二轮(2026-11-06 追加变更)强特征:save() 由"强制写固定值"改成"仅空值兜底默认" ──
+# 判据:字节码里「检验方案」字面量后紧跟 Map.get(round-2 读入参)而不是 Map.put(round-1 无条件写)。
+# ⚠ javap 在 Windows 默认按 GBK 输出,中文匹配不到 ⇒ 必须 -J-Dstdout.encoding=UTF-8。
+JAVAP="$JAVA_HOME/bin/javap.exe"; [ -x "$JAVAP" ] || JAVAP="$JAVA_HOME/bin/javap"
+CLASS_DIR="$WORK/classes-check"
+rm -rf "$CLASS_DIR"; mkdir -p "$CLASS_DIR/com/yinjia/mes/service"
+unzip -p "$JAR" BOOT-INF/classes/com/yinjia/mes/service/ButtonService.class > "$CLASS_DIR/com/yinjia/mes/service/ButtonService.class" 2>/dev/null || true
+GET_PLAN=0
+if [ -s "$CLASS_DIR/com/yinjia/mes/service/ButtonService.class" ] && [ -x "$JAVAP" ]; then
+  GET_PLAN=$("$JAVAP" -J-Dstdout.encoding=UTF-8 -p -c -cp "$CLASS_DIR" com.yinjia.mes.service.ButtonService 2>/dev/null \
+    | grep -A3 '// String 检验方案' | grep -c 'Map.get' || true)
+fi
 echo "[build] jar: $JAR"
 echo "[build] 大小: $SIZE 字节 ($(du -h "$JAR" | cut -f1));BOOT-INF/lib 依赖 $LIBS 个"
 echo "[build] 新代码特征: ButtonService 含 QC_PROC_INSP=$HIT_PROC, 含「出货控制计划执行」=$HIT_FIXED;qc_proc_insp.jrxml 含 审批人=$HIT_JRXML"
+echo "[build] 追加变更特征(检验方案仅空值兜底): 字节码「检验方案」后 Map.get 次数=$GET_PLAN(round-2 应 ≥1;round-1 是 Map.put)"
 [ "$SIZE" -gt 50000000 ] || { echo "[build][FAIL] jar 只有 $SIZE 字节(疑似瘦 jar),应为 50MB+"; exit 1; }
 [ "$LIBS" -ge 100 ] || { echo "[build][FAIL] BOOT-INF/lib 条目过少=$LIBS(疑似瘦 jar)"; exit 1; }
 [ "$HIT_PROC" -ge 1 ] || { echo "[build][FAIL] jar 内 ButtonService 不含 QC_PROC_INSP"; exit 1; }
-# 强特征:旧 jar 的 ButtonService.class 里**没有**「出货控制计划执行」(只有本轮 save() 强制固定值才写进 class)
+# 强特征:默认值字面量(空值兜底/自动出单都会写);round-2 仍保留
 [ "$HIT_FIXED" -ge 1 ] || { echo "[build][FAIL] jar 内 ButtonService 不含「出货控制计划执行」——不是本轮新代码"; exit 1; }
 [ "$HIT_JRXML" -ge 1 ] || { echo "[build][FAIL] jar 内 qc_proc_insp.jrxml 不含「审批人」——报表模板不是本轮新代码"; exit 1; }
+# 追加变更强特征:检验方案 = 读取入参 + 空值兜底(不是无条件覆盖)。旧 round-1 class 此处为 Map.put。
+[ "$GET_PLAN" -ge 1 ] || { echo "[build][FAIL] jar 内 ButtonService 的「检验方案」不是读取入参+空值兜底(疑似旧 round-1 代码,会覆盖用户改值)"; exit 1; }
 echo "[build] OK: $JAR"
