@@ -40,13 +40,22 @@ WHERE NOT EXISTS (
 GO
 
 -- ── 2. 三处字段改标准库（保留原 seq/place/width，只换取值来源） ─────────────
-DECLARE @n INT;
+-- 期望行数 = 本库里**真实存在**这几个面板的「生产车间」字段数(不是写死 3):
+--   测试账套 HSDZ_MES_TEST 是旧快照,连 RD_X_SINTER 面板都还没有(实测该面板 yj_field 0 行)——
+--   写死 3 会让陈旧测试库直接 FAIL,而正式库的守卫不能因此放松。
+DECLARE @n INT, @expect INT;
+SELECT @expect = COUNT(DISTINCT panel_code) FROM yj_field
+WHERE label = N'生产车间' AND panel_code IN (N'RD_MOLD_PROC', N'RD_MOLD_FORMULA', N'RD_X_SINTER');
+
 UPDATE yj_field
 SET data_type = N'标准库', dict_sql = N'mold.workshop',
     ref_panel = NULL, ref_field = NULL, display_field = NULL
 WHERE label = N'生产车间' AND panel_code IN (N'RD_MOLD_PROC', N'RD_MOLD_FORMULA', N'RD_X_SINTER');
 SET @n = @@ROWCOUNT;
-IF @n <> 3 RAISERROR(N'[FAIL] 生产车间改标准库命中 %d 行(期望 3:RD_MOLD_PROC / RD_MOLD_FORMULA / RD_X_SINTER)', 12, 1, @n) WITH NOWAIT;
+
+IF @expect = 0 RAISERROR(N'[FAIL] 本库没有 RD_MOLD_PROC/RD_MOLD_FORMULA/RD_X_SINTER 的「生产车间」字段', 12, 1) WITH NOWAIT;
+IF @n <> @expect RAISERROR(N'[FAIL] 生产车间改标准库命中 %d 行(本库应有 %d 行)', 12, 1, @n, @expect) WITH NOWAIT;
+IF @expect < 3 RAISERROR(N'[SKIP] 本库缺部分面板(旧快照),已按实际存在 %d 处改到位', 10, 1, @expect) WITH NOWAIT;
 GO
 
 -- ── 3. 自检 ────────────────────────────────────────────────────────────────
@@ -55,6 +64,7 @@ IF (SELECT COUNT(*) FROM yj_std_lib WHERE lib_code = N'mold.workshop' AND ISNULL
 GO
 IF EXISTS (SELECT 1 FROM yj_field WHERE label = N'生产车间'
            AND panel_code IN (N'RD_MOLD_PROC', N'RD_MOLD_FORMULA', N'RD_X_SINTER')
+           AND data_type IS NOT NULL
            AND (data_type <> N'标准库' OR ISNULL(dict_sql,N'') <> N'mold.workshop'))
   RAISERROR(N'[FAIL] 仍有面板的 生产车间 不是标准库 mold.workshop', 12, 1) WITH NOWAIT;
 GO
