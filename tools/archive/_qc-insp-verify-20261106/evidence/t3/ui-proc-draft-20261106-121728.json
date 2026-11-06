@@ -1,0 +1,69 @@
+{
+ "title": "UI t3-paper/draft @ http://127.0.0.1:8091 panel=QC_PROC_INSP doc=ZC-2026-11-0011",
+ "startedAt": "2026-11-06T04:17:30.445Z",
+ "endedAt": "2026-11-06T04:17:34.028Z",
+ "pass": 7,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"panel\":\"QC_PROC_INSP\",\"docNo\":\"ZC-2026-11-0011\",\"task\":\"t3-paper\",\"state\":\"draft\",\"fill\":{},\"save\":false,\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\"}"
+  },
+  {
+   "name": "UI 登录工厂选中 YJ_TEST",
+   "ok": true,
+   "detail": "{\"ok\":true,\"picked\":\"YINJIA-MES·测试库\"}"
+  },
+  {
+   "name": "UI 登录工厂与期望账套一致(测试库)",
+   "ok": true,
+   "detail": "picked=YINJIA-MES·测试库"
+  },
+  {
+   "name": "UI 登录成功并进入桌面",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/dashboard"
+  },
+  {
+   "name": "纸张面板已渲染(.qr-sheet)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/panelx/list/QC_PROC_INSP"
+  },
+  {
+   "name": "审批态纸面事实",
+   "ok": null,
+   "detail": "{\"paperText\":\"制程检验记录表单据编号ZC-2026-11-0011单据日期检验类别工单号产品名称抽检总量检验日期检验方案出货控制计划执行检验结果＋ 新增检验项⧉ 带入检验项目客户名称产品编码型号（mm）批号检验人员：产线常规功能性结果结果判断检验要求检验方法合格×合格×检验结论处理意见检验人审核人批准\",\"qrFoot\":{\"检验结论\":\"\",\"处理意见\":\"\",\"检验人\":\"\",\"审核人\":\"\",\"批准\":\"\"},\"fiFoot\":{},\"oqcSign\":[],\"sheetEmpty\":false,\"sideBtns\":[\"查询单据\",\"模糊搜索\",\"单据预览\",\"新增\",\"保存\",\"保存为草稿\",\"选生产工单\",\"取出货检验计划\",\"检验项目/检验方案\",\"提交审批\",\"审批情况\",\"打印\",\"导出报表\",\"导出\",\"扫描填单\",\"字段管理\",\"删除\",\"弃审\"],\"disabledBtns\":[\"弃审\"],\"status\":\"草稿\",\"shot\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\ui-proc-draft-20261106-121728-paper.png\",\"errors\":[]}"
+  },
+  {
+   "name": "表尾签名格",
+   "ok": null,
+   "detail": "{\"检验结论\":\"\",\"处理意见\":\"\",\"检验人\":\"\",\"审核人\":\"\",\"批准\":\"\"}"
+  },
+  {
+   "name": "T3[UI] 草稿态:侧栏有「提交审批」",
+   "ok": true,
+   "detail": "侧栏=查询单据/模糊搜索/单据预览/新增/保存/保存为草稿/选生产工单/取出货检验计划/检验项目/检验方案/提交审批/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审"
+  },
+  {
+   "name": "T3[UI] 草稿态:侧栏**无**「审核」直审入口(直审已撤)",
+   "ok": true,
+   "detail": "侧栏=查询单据/模糊搜索/单据预览/新增/保存/保存为草稿/选生产工单/取出货检验计划/检验项目/检验方案/提交审批/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审"
+  },
+  {
+   "name": "T3[UI] 草稿态:表尾 审核人/批准 无落值",
+   "ok": true,
+   "detail": "{\"检验结论\":\"\",\"处理意见\":\"\",\"检验人\":\"\",\"审核人\":\"\",\"批准\":\"\"}"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "panel": "QC_PROC_INSP",
+  "docNo": "ZC-2026-11-0011",
+  "task": "t3-paper",
+  "state": "draft",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3"
+ }
+}

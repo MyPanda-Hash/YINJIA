@@ -19,7 +19,11 @@
  *   → 表头 2 行:客户名称|产品编码|型号（mm）|批号|检验人员：<值>(跨 检验要求+检验方法)|产线常规功能性结果|结果判断
  *                以下检验要求/检验方法自动填充出货检验计划表
  *   → 数据行:一行一个检验项目(左侧四列的**列名**合并表头两行、**取值**合并整个表体)
- *   → 结论区:检验结论 / 处理意见 / 检验人+审核人
+ *   → 结论区:检验结论 / 处理意见 / 检验人+审核人+批准
+ *
+ * ⚠ 2026-11-06 表尾扩第三对「批准」(与纸面/服务端报表同口径):两张工序检验单并入质量单据
+ *   两级审批 —— 检验人=编制(提交审批人)/审核=一级审批人/批准=超级管理员;
+ *   取值键仍用真实数据键 审批人(head['审批人'],二级审批通过才落值),不是本表的物理列名。
  */
 
 /** 纸面列(顺序即 Excel 列序;`head` = 该列取的头字段键,缺省与 label 同名) */
@@ -37,7 +41,12 @@ export const PROC_INSP_COLS = [
 export const PROC_INSP_FOOT = [
   { label: '检验结论', key: '总结论', big: true },
   { label: '处理意见', key: '处理方式', big: true },
-  { label: '检验人', key: '检验员', secondLabel: '审核人', secondKey: '审核人' },
+  // 最后一行三对(2026-11-06 补「批准」):检验人=编制 / 审核=一级审批人 / 批准=超级管理员
+  {
+    label: '检验人', key: '检验员',
+    secondLabel: '审核人', secondKey: '审核人',
+    thirdLabel: '批准', thirdKey: '审批人',
+  },
 ]
 
 /**
@@ -123,7 +132,12 @@ export function buildProcInspExport({ title = '制程检验记录表', subtitle 
   // ── 结论区 ──
   for (const f of PROC_INSP_FOOT) {
     const r = aoa.length
-    if (f.secondLabel) {
+    if (f.thirdLabel) {
+      // 三对一行(8 列):检验人(0)|值(1-2) 审核人(3)|值(4-5) 批准(6)|值(7)
+      aoa.push([f.label, text(head[f.key]), '', f.secondLabel, text(head[f.secondKey]), '', f.thirdLabel, text(head[f.thirdKey])])
+      merges.push({ s: { r, c: 1 }, e: { r, c: 2 } })
+      merges.push({ s: { r, c: 4 }, e: { r, c: 5 } })
+    } else if (f.secondLabel) {
       aoa.push([f.label, text(head[f.key]), '', '', f.secondLabel, text(head[f.secondKey]), '', ''])
       merges.push({ s: { r, c: 1 }, e: { r, c: 3 } })
       merges.push({ s: { r, c: 5 }, e: { r, c: 7 } })

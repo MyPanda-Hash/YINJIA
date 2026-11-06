@@ -6,8 +6,8 @@
  *   ② 两层表头:第一级分组跨本组各列、第二级测试项目,左上角斜线格纵向合并两行;
  *   ③ 标准行取值与列同源;
  *   ④ 1#..8# 八个样品行,**每组只在自己那一对样品行上有值**、其余格写 `/`(与纸面同源);
- *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人|审核人 三组都在(审核人 2026-10-18 补,
- *      随首件检验单开直接审核);
+ *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人|审核人|批准 四组都在(审核人 2026-10-18 补、
+ *      批准 2026-11-06 随并入质量单据两级审批补);
  *   ⑥ 所有合并区**都不越界**(行列号都在 aoa 范围内)。
  */
 import { test } from 'node:test'
@@ -48,6 +48,8 @@ const build = (over = {}) => {
         resultLabel: '检验结果', result: '合格',
         byLabel: '检验人', by: '张三',
         auditorLabel: '审核人', auditor: '李四',
+        // 2026-11-06 两级审批:批准 = 超级管理员(二级审批通过写 head['审批人'])
+        approverLabel: '批准', approver: '王五',
       },
       ...over,
     }),
@@ -130,7 +132,7 @@ test('④ 八个样品行:可填范围与纸面同源(前两列只 1#/2#,其余�
   }
 })
 
-test('⑤ 相关要求逐条一行且横向合并;表尾三组(检验结果|检验人|审核人)都在', () => {
+test('⑤ 相关要求逐条一行且横向合并;表尾四组(检验结果|检验人|审核人|批准)都在', () => {
   const { aoa, merges, marks } = build()
   assert.equal(aoa[marks.reqTitleRow][0], '相关要求：')
   assert.equal(marks.reqRows.length, 6)
@@ -139,16 +141,21 @@ test('⑤ 相关要求逐条一行且横向合并;表尾三组(检验结果|检�
   for (const r of marks.reqRows) {
     assert.ok(merges.some((m) => m.s.r === r && m.s.c === 0 && m.e.c === marks.colCount - 1), `第 ${r} 行要合并全宽`)
   }
-  // 表尾三段等分(2026-10-18 起三段:N=11 ⇒ 每段 3 列:0|1-2、3|4-5、6|7-10)
+  // 表尾四段(2026-11-06 起四段:N=11 ⇒ 段宽 3/3/3/2,标签列 0/3/6/9)
   const N = marks.colCount
-  const pairW = Math.max(2, Math.floor(N / 3))
   const foot = aoa[marks.footRow]
   assert.equal(foot[0], '检验结果')
   assert.equal(foot[1], '合格')
-  assert.equal(foot[pairW], '检验人')
-  assert.equal(foot[pairW + 1], '张三')
-  assert.equal(foot[pairW * 2], '审核人')
-  assert.equal(foot[pairW * 2 + 1], '李四')
+  assert.equal(foot[3], '检验人')
+  assert.equal(foot[4], '张三')
+  assert.equal(foot[6], '审核人')
+  assert.equal(foot[7], '李四')
+  assert.equal(foot[9], '批准')
+  assert.equal(foot[10], '王五')
+  // 前三段的值各跨 2 列(1-2 / 4-5 / 7-8),末段单列
+  for (const [s, e] of [[1, 2], [4, 5], [7, 8]]) {
+    assert.ok(merges.some((m) => m.s.r === marks.footRow && m.s.c === s && m.e.c === e), `值格合并 ${s}-${e}`)
+  }
 })
 
 test('⑥ 所有合并区都在 aoa 范围内(不越界)', () => {

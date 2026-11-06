@@ -1,0 +1,166 @@
+{
+ "title": "T2 出厂检验报告产品编码可填 @ http://127.0.0.1:8091 run=20261106-121503",
+ "startedAt": "2026-11-06T04:15:03.832Z",
+ "endedAt": "2026-11-06T04:15:10.481Z",
+ "pass": 20,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"db\":\"HSDZ_MES_TEST\",\"run\":\"20261106-121503\",\"uiProductCode\":\"AUTO-UI-PROD-20261106-121503\"}"
+  },
+  {
+   "name": "8091 登录成功(测试账套)",
+   "ok": true,
+   "detail": "realName=系统管理员"
+  },
+  {
+   "name": "T2[DB] 产品编码 yj_field.editable=1(可填)",
+   "ok": true,
+   "detail": "{\"label\":\"产品编码\",\"editable\":true,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[DB] 单据编号 yj_field.editable=0(只读)",
+   "ok": true,
+   "detail": "{\"label\":\"单据编号\",\"editable\":false,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[DB] 检验员 yj_field.editable=0(只读)",
+   "ok": true,
+   "detail": "{\"label\":\"检验员\",\"editable\":false,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[DB] 审核人 yj_field.editable=0(只读)",
+   "ok": true,
+   "detail": "{\"label\":\"审核人\",\"editable\":false,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[DB] 审核时间 yj_field.editable=0(只读)",
+   "ok": true,
+   "detail": "{\"label\":\"审核时间\",\"editable\":false,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[DB] 审批人 yj_field.editable=0(只读)",
+   "ok": true,
+   "detail": "{\"label\":\"审批人\",\"editable\":false,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[DB] 审批时间 yj_field.editable=0(只读)",
+   "ok": true,
+   "detail": "{\"label\":\"审批时间\",\"editable\":false,\"hidden\":false,\"data_type\":\"文本\"}"
+  },
+  {
+   "name": "T2[配置] getPanelConfig:产品编码 可编辑(readonly!=true)",
+   "ok": true,
+   "detail": "{\"dataName\":\"产品编码\",\"dataType\":\"文本\",\"width\":120,\"isRequired\":true}"
+  },
+  {
+   "name": "T2[配置] getPanelConfig:检验员/审核人/审批人 readonly=true",
+   "ok": true,
+   "detail": "检验员=true 审核人=true 审批人=true"
+  },
+  {
+   "name": "T2 getPanelConfig 抬头字段",
+   "ok": null,
+   "detail": "[{\"dataName\":\"单据编号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"单据日期\",\"dataType\":\"日期\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"客户名称\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"产品编码\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"产品名称\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"规格型号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"批次号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"工单号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"工单行号\",\"dataType\":\"整数\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"生产日期\",\"dataType\":\"日期\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"生产数量\",\"dataType\":\"小数\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"检测日期\",\"dataType\":\"日期\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"AQL\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"出库单号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"出库行号\",\"dataType\":\"整数\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"成品检验单号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"首件检验单号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"制程检验单号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"检验员\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"检验结论\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"单据状态\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"审核人\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"审核时间\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"备注\",\"dataType\":\"多行文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"卫生_浑浊度\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_臭和味\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_肉眼可见物\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_PH\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_溶解性总固体\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_耗氧量\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_砷\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_铬\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_铝\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_铅\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_汞\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_铁\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_锰\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_铜\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"卫生_锌\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"审批人\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"审批时间\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true}]"
+  },
+  {
+   "name": "T2 建出厂检验报告草稿(API 新增+保存)",
+   "ok": true,
+   "detail": "单号=OQC-2026-11-0016 save={\"httpStatus\":200,\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"OQC-2026-11-0016\"}}"
+  },
+  {
+   "name": "T2[DB] 草稿「产品编码」初始值已落库(必填字段)",
+   "ok": true,
+   "detail": "DB值=\"AUTO-INIT-20261106-121503\""
+  },
+  {
+   "name": "T2 产品编码必填现状",
+   "ok": null,
+   "detail": "\"yj_field.isRequired=true → 新建保存必须给值;本用例验证\\\"草稿态可改并落库\\\",不验证\\\"草稿可空\\\"\""
+  },
+  {
+   "name": "T2 草稿明细行数",
+   "ok": null,
+   "detail": "2"
+  },
+  {
+   "name": "T2[UI] UI 子进程全部断言通过",
+   "ok": true,
+   "detail": "exit=0 证据=D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t2\\ui-t2-20261106-121503.json"
+  },
+  {
+   "name": "T2[DB] UI 输入「产品编码」并保存后落库",
+   "ok": true,
+   "detail": "DB值=\"AUTO-UI-PROD-20261106-121503\" 期望=AUTO-UI-PROD-20261106-121503"
+  },
+  {
+   "name": "T2[UI] 抬头可填字段清单",
+   "ok": null,
+   "detail": "{\"fillable\":[\"客户名\",\"产品名称\",\"产品规格\",\"生产日期\",\"生产量\",\"检测日期\",\"AQL\",\"产品编码\"],\"readonly\":[\"报告编号\"]}"
+  },
+  {
+   "name": "T2[需求比对] 抬头可填 = 客户名/产品名称/产品规格/生产量/AQL/生产日期/检测日期(日期控件)",
+   "ok": true,
+   "detail": "实际=客户名,产品名称,产品规格,生产日期,生产量,检测日期,AQL,产品编码"
+  },
+  {
+   "name": "T2[需求比对] 抬头只读 = 报告编号",
+   "ok": true,
+   "detail": "只读=报告编号"
+  },
+  {
+   "name": "T2[需求比对] 审批区(检验员/审核/批准)在签署区为只读文本(无输入框)",
+   "ok": true,
+   "detail": "[\"检验员：\",\"审 核：\",\"批 准：\"]"
+  },
+  {
+   "name": "T2[需求比对] 明细/检验结论/备注/卫生安全 均可填",
+   "ok": true,
+   "detail": "明细控件=14 结论=1 备注=1 卫生=15"
+  },
+  {
+   "name": "T2 清理:测试单 5 表 0 残留",
+   "ok": true,
+   "detail": "{\"QC_OQC_REPORT:OQC-2026-11-0016\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0}}"
+  },
+  {
+   "name": "T2 清理:AUTO_QCVER_ 标记 0 残留",
+   "ok": true,
+   "detail": "{\"QC_OQC_REPORT\":0}"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "db": "HSDZ_MES_TEST",
+  "run": "20261106-121503",
+  "docs": [
+   {
+    "panel": "QC_OQC_REPORT",
+    "no": "OQC-2026-11-0016",
+    "marker": "20261106-121503"
+   }
+  ],
+  "cleanup": {
+   "list": [
+    "QC_OQC_REPORT:OQC-2026-11-0016"
+   ],
+   "residue": {
+    "QC_OQC_REPORT:OQC-2026-11-0016": {
+     "head": 0,
+     "detail": 0,
+     "status": 0,
+     "approval": 0,
+     "msg": 0
+    }
+   },
+   "autoResidue": {
+    "QC_OQC_REPORT": 0
+   },
+   "zero": true
+  }
+ }
+}

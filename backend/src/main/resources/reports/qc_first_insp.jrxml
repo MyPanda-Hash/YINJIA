@@ -17,12 +17,22 @@
   段位(严格按 XSD 顺序 title → columnHeader → detail → pageFooter → summary):
     <title>     公司抬头 + 大标题 + 抬头四对(产品编号/产品型号/生产日期/组别,值走 $P{})
     (生成段)    <columnHeader> 两级表头   <detail> 标准行 + 1#..8# 样品行
-    <summary>   《相关要求》6 条(纸面固定文案) + 表尾(检验结果/检验人/审核人,值走 $P{})
+    <summary>   《相关要求》6 条(纸面固定文案) + 表尾(检验结果/检验人/审核人/批准,值走 $P{})
     <pageFooter> 页码 + 打印时间
 
-  参数契约(由生成器声明,这里只用到固定几个):
-    产品编号 / 产品型号 / 生产日期 / 组别 / 总结论 / 检验员 / 审核人 / 打印时间
+  ⚠ 2026-11-06 两级审批口径(用户需求 3):QC_FIRST_INSP 由「管理员直接审核」改为
+    「提交审批 → 一级审批 → 超级管理员批准」⇒ 表尾 3 段改 **4 段**:
+      检验结果($P{总结论})| 检验人($P{检验员})| 审核人($P{审核人},一级审批人)|
+      批准($P{审批人},超级管理员,二级通过才落值)
+    审核人/审批人在两级口径下都是**表内真值**(一级通过写「审核人」、二级批准写「审批人」;
+    存量单表内为空时 QueryService 退回 yj_doc_status.shr 兜底),由 ReportService.headParams
+    按 yj_field.label **自动下发** ⇒ 模板只取值,不必改 ReportService。
+
+  参数契约(由生成器 QcFirstInspReportSupport 在 <title> 前插入,本骨架**不声明** <parameter>):
+    产品编号 / 产品型号 / 生产日期 / 组别 / 总结论 / 检验员 / 审核人 / 审批人 / 打印时间
     + 生成的:表头列名 N1..Nn、标准 STD1..STDn、每格 V{样品}_{列}
+    ⚠ 别在本骨架里补 <parameter> —— 会与生成段重复声明,JR 6.21.3 解析即报
+      "Duplicate declaration of parameter: xxx",整张报表编译失败(2026-11-06 实测)。
   ⚠ columnWidth 必须 = pageWidth − 左右边距(842 − 30×2 = 782),否则表体会被截。
 -->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
@@ -111,22 +121,27 @@
       <staticText><reportElement style="req" x="0" y="56" width="782" height="14"/><text><![CDATA[4. 炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。]]></text></staticText>
       <staticText><reportElement style="req" x="0" y="70" width="782" height="14"/><text><![CDATA[5. 测试样品需保留至本班次生产完成。]]></text></staticText>
       <staticText><reportElement style="req" x="0" y="84" width="782" height="14"/><text><![CDATA[6. C-95客户相关产品脱模后立马进行首件检验。]]></text></staticText>
-      <!-- 表尾:检验结果 | 检验人 | 审核人(与面板表尾同口径)
-           ⚠ 2026-10-18 补第三组「审核人」:首件检验单与制程检验单同批开了**直接审核**
-             (见 PanelxList 的 DIRECT_AUDIT_PANELS),制程那张纸的表尾就是「检验人 | 审核人」
-             —— 首件不补的话,审完打印出来看不出谁审的。
-             值 = $P{审核人},由 ReportService.headParams 从单据的虚拟字段「审核人」下发
-             (QueryService 对非两级审批面板用 yj_doc_status.shr 覆盖;未审核时为空串)。
-             三段均分 782:每段「标签 78 + 值 182/184」。 -->
-      <staticText><reportElement style="metaL" x="0" y="102" width="78" height="20"/><text><![CDATA[检验结果]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="78" y="102" width="182" height="20"/>
+      <!-- 表尾:检验结果 | 检验人 | 审核人 | 批准(与面板表尾、Excel 导出同口径)
+           ⚠ 2026-10-18 补第三组「审核人」(当时首件/制程同批开了**直接审核**);
+             ⚠ 2026-11-06 起两单改为**两级审批**(提交审批 → 一级审批 → 超级管理员批准)⇒
+             再补第四组「批准」:审核人 = $P{审核人}(一级审批人)、批准 = $P{审批人}(超级管理员,
+             二级通过才落值;审批中/未批准为空串 ⇒ isBlankWhenNull 印空白)。
+             两值在两级口径下都是**表内真值**,由 ReportService.headParams 按 yj_field.label 自动下发
+             (参数在本骨架不声明,由 QcFirstInspReportSupport 的生成段统一声明)。
+             四段精确铺满 782(标签 70 + 值 125/125/125/127):
+               x = 0 / 195 / 390 / 585,段末 = 195 / 390 / 585 / 782,不重叠、末段不越界。 -->
+      <staticText><reportElement style="metaL" x="0" y="102" width="70" height="20"/><text><![CDATA[检验结果]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="70" y="102" width="125" height="20"/>
         <textFieldExpression><![CDATA[$P{总结论}]]></textFieldExpression></textField>
-      <staticText><reportElement style="metaL" x="260" y="102" width="78" height="20"/><text><![CDATA[检验人]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="338" y="102" width="182" height="20"/>
+      <staticText><reportElement style="metaL" x="195" y="102" width="70" height="20"/><text><![CDATA[检验人]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="265" y="102" width="125" height="20"/>
         <textFieldExpression><![CDATA[$P{检验员}]]></textFieldExpression></textField>
-      <staticText><reportElement style="metaL" x="520" y="102" width="78" height="20"/><text><![CDATA[审核人]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="598" y="102" width="184" height="20"/>
+      <staticText><reportElement style="metaL" x="390" y="102" width="70" height="20"/><text><![CDATA[审核人]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="460" y="102" width="125" height="20"/>
         <textFieldExpression><![CDATA[$P{审核人}]]></textFieldExpression></textField>
+      <staticText><reportElement style="metaL" x="585" y="102" width="70" height="20"/><text><![CDATA[批准]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="655" y="102" width="127" height="20"/>
+        <textFieldExpression><![CDATA[$P{审批人}]]></textFieldExpression></textField>
     </band>
   </summary>
 </jasperReport>

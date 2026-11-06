@@ -1,0 +1,13 @@
+FACT  参数  -- {"base":"http://127.0.0.1:8091","factory":"YJ_TEST","panel":"QC_PROC_INSP","docNo":"ZC-2026-11-0011","task":"t3-paper","state":"pending2","fill":{},"save":false,"outDir":"D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3"}
+PASS  UI 登录工厂选中 YJ_TEST  -- {"ok":true,"picked":"YINJIA-MES·测试库"}
+PASS  UI 登录工厂与期望账套一致(测试库)  -- picked=YINJIA-MES·测试库
+PASS  UI 登录成功并进入桌面  -- http://127.0.0.1:8091/#/dashboard
+PASS  纸张面板已渲染(.qr-sheet)  -- http://127.0.0.1:8091/#/panelx/list/QC_PROC_INSP
+FACT  UI 等待单据载入超时  -- "DOC_NO=ZC-2026-11-0011"
+FACT  审批态纸面事实  -- {"paperText":"制程检验记录表单据编号ZC-2026-11-0011单据日期2026-11-06检验类别首件工单号AUTO_20261106-121728-proc产品名称AUTO_验证产品抽检总量检验日期2026-11-06检验方案出货控制计划执行检验结果客户名称产品编码型号（mm）批号检验人员：系统管理员产线常规功能性结果结果判断检验要求检验方法AUTO_QCVER_20261106-121728-procAUTO-PROD-001AUTO-SPECAUTO-20261106-121728-proc无破损目视合格合格公差内卡尺合格合格检验结论处理意见检验人系统管理员审核人陈秀丽批准","qrFoot":{"检验结论":"","处理意见":"","检验人":"系统管理员","审核人":"陈秀丽","批准":""},"fiFoot":{},"oqcSign":[],"sheetEmpty":false,"sideBtns":["查询单据","模糊搜索","单据预览","新增","选生产工单","取出货检验计划","检验项目/检验方案","批准通过","批准驳回","审批情况","打印","导出报表","导出","扫描填单","字段管理","删除","弃审"],"disabledBtns":["弃审"],"status":"待二级审批","shot":"D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3\\ui-proc-pending2-20261106-121728-paper.png","errors":[]}
+FACT  表尾签名格  -- {"检验结论":"","处理意见":"","检验人":"系统管理员","审核人":"陈秀丽","批准":""}
+PASS  T3[UI] 待二级审批态:侧栏按钮文案=批准通过/批准驳回  -- 侧栏=查询单据/模糊搜索/单据预览/新增/选生产工单/取出货检验计划/检验项目/检验方案/批准通过/批准驳回/审批情况/打印/导出报表/导出/扫描填单/字段管理/删除/弃审
+PASS  T3[UI] 待二级审批态:表尾「审核人」= 一级审批人 陈秀丽  -- {"检验结论":"","处理意见":"","检验人":"系统管理员","审核人":"陈秀丽","批准":""}
+PASS  T3[UI] 待二级审批态:表尾「批准」仍为空  -- {"检验结论":"","处理意见":"","检验人":"系统管理员","审核人":"陈秀丽","批准":""}
+
+RESULT: PASS (PASS 7 / FAIL 0)

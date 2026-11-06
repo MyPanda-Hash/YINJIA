@@ -1,0 +1,181 @@
+{
+ "title": "T1 制程检验单字段改造 @ http://127.0.0.1:8091 run=20261106-121356",
+ "startedAt": "2026-11-06T04:13:56.254Z",
+ "endedAt": "2026-11-06T04:14:05.668Z",
+ "pass": 20,
+ "fail": 1,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"db\":\"HSDZ_MES_TEST\",\"run\":\"20261106-121356\",\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1\"}"
+  },
+  {
+   "name": "8091 登录成功(测试账套 YJ_TEST)",
+   "ok": true,
+   "detail": "realName=系统管理员 factory=YJ_TEST"
+  },
+  {
+   "name": "admin 账号",
+   "ok": null,
+   "detail": "{\"userName\":\"admin\",\"realName\":\"系统管理员\",\"isAdmin\":true}"
+  },
+  {
+   "name": "getPanelConfig 表头字段",
+   "ok": null,
+   "detail": "[{\"dataName\":\"单据编号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"单据日期\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"检验时间\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"工单行号\",\"dataType\":\"整数\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"检验类别\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"工单号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"报工单号\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"工序\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"批次号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"客户名称\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"产品编码\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"产品名称\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"规格型号\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"生产线\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"生产车间\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"报工数量\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"抽检总量\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"检验数量\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"检验员\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"检验日期\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"总结论\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"检验方案\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":true},{\"dataName\":\"文件编码\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"执行标准\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"处理方式\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":false},{\"dataName\":\"备注\",\"dataType\":\"文本\",\"hidden\":false,\"readonly\":false},{\"dataName\":\"单据状态\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"审核人\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"审批人\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"审核时间\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"审批时间\",\"dataType\":\"文本\",\"hidden\":true,\"readonly\":true},{\"dataName\":\"列数\",\"dataType\":\"整数\",\"hidden\":true,\"readonly\":false}]"
+  },
+  {
+   "name": "getPanelConfig 明细字段",
+   "ok": null,
+   "detail": "[{\"dataName\":\"表区\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"行号\",\"dataType\":\"整数\",\"options\":null},{\"dataName\":\"检验项目\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"检验要求\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"检验方法\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"检查频率\",\"dataType\":\"标准库\",\"options\":[\"每批次\",\"1PCS/一个生产批次\",\"2PCS/一个生产批次\",\"生产量*1%\",\"每2小时1PCS\",\"每班1PCS\",\"每班2PCS\",\"每天1PCS\",\"每周1PCS\",\"每月1PCS\",\"每季度1PCS\",\"型式检验\",\"型式检验半年一次\",\"型式检验一年一次\",\"全检\",\"免检\"]},{\"dataName\":\"检验仪器\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"抽检量\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"实测数值\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"测量值1\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值2\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值3\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值4\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值5\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"单项判定\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"格数\",\"dataType\":\"整数\",\"options\":null},{\"dataName\":\"测量值6\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值7\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值8\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值9\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"测量值10\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"格数上限\",\"dataType\":\"整数\",\"options\":null},{\"dataName\":\"不合格应对措施\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"不良数量\",\"dataType\":\"小数\",\"options\":null},{\"dataName\":\"产线常规功能性结果\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"结果判断\",\"dataType\":\"下拉框\",\"options\":[\"合格\",\"不合格\"]},{\"dataName\":\"备注2\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"处理方式\",\"dataType\":\"文本\",\"options\":null},{\"dataName\":\"备注\",\"dataType\":\"文本\",\"options\":null}]"
+  },
+  {
+   "name": "T1[配置] dataSchema.fields 中「工序」不可见(hidden=true 或未下发)",
+   "ok": true,
+   "detail": "字段={\"dataName\":\"工序\",\"dataType\":\"文本\",\"width\":90,\"hidden\":true,\"visible\":false,\"isRequired\":false}"
+  },
+  {
+   "name": "T1[配置] 「检验方案」只读(readonly=true)",
+   "ok": true,
+   "detail": "字段={\"dataName\":\"检验方案\",\"dataType\":\"文本\",\"width\":160,\"readonly\":true,\"isRequired\":false}"
+  },
+  {
+   "name": "T1[配置] 明细「结果判断」dataType=下拉框",
+   "ok": true,
+   "detail": "{\"dataName\":\"结果判断\",\"dataType\":\"下拉框\",\"width\":100,\"options\":[\"合格\",\"不合格\"],\"isRequired\":false}"
+  },
+  {
+   "name": "T1[配置] 「结果判断」options = 合格/不合格",
+   "ok": true,
+   "detail": "[\"合格\",\"不合格\"]"
+  },
+  {
+   "name": "T1[DB] yj_field:工序 hidden=1 且 visible=0",
+   "ok": true,
+   "detail": "{\"label\":\"工序\",\"data_type\":\"文本\",\"editable\":true,\"hidden\":true,\"visible\":false,\"dict_sql\":\"\"}"
+  },
+  {
+   "name": "T1[DB] yj_field:检验方案 editable=0",
+   "ok": true,
+   "detail": "{\"label\":\"检验方案\",\"data_type\":\"文本\",\"editable\":false,\"hidden\":false,\"visible\":true,\"dict_sql\":\"\"}"
+  },
+  {
+   "name": "T1[DB] yj_field:结果判断 data_type=下拉框 且 dict_sql 含 合格/不合格",
+   "ok": true,
+   "detail": "{\"label\":\"结果判断\",\"data_type\":\"下拉框\",\"editable\":true,\"hidden\":false,\"visible\":true,\"dict_sql\":\"SELECT v FROM (VALUES (N'合格'),(N'不合格')) AS t(v)\"}"
+  },
+  {
+   "name": "T1[DB] 物理列 qc_proc_insp_head.工序 保留",
+   "ok": true,
+   "detail": "列数=1"
+  },
+  {
+   "name": "T1[DB] 历史「工序」数据保留(有值行数>0)",
+   "ok": true,
+   "detail": "有值行数=25"
+  },
+  {
+   "name": "T1 工序物理数据",
+   "ok": null,
+   "detail": "{\"columnExists\":1,\"nonEmptyRows\":25}"
+  },
+  {
+   "name": "T1 建草稿(API 新增+保存)",
+   "ok": true,
+   "detail": "单号=ZC-2026-11-0008 save={\"httpStatus\":200,\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"ZC-2026-11-0008\"}}"
+  },
+  {
+   "name": "T1[API+DB] 保存时「检验方案」被强制写为「出货控制计划执行」(载荷故意传「错误值_应被覆盖」)",
+   "ok": true,
+   "detail": "DB值=\"出货控制计划执行\" 载荷=错误值_应被覆盖"
+  },
+  {
+   "name": "T1[DB] 草稿明细行已落库(2 行)",
+   "ok": true,
+   "detail": "明细行=2"
+  },
+  {
+   "name": "T1[DB] 新建单为草稿(pending≠Y)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"\"}"
+  },
+  {
+   "name": "T1[DB] 全表(含历史/自动生成的草稿)「检验方案」非固定值行数 = 0",
+   "ok": true,
+   "detail": "非固定值行数=0"
+  },
+  {
+   "name": "T1[UI] UI 子进程全部断言通过",
+   "ok": true,
+   "detail": "exit=0 证据=D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t1\\ui-t1-20261106-121356.json"
+  },
+  {
+   "name": "T1[UI] 纸张 Excel 里「结果判断」列与值正常(含 合格/不合格)",
+   "ok": false,
+   "detail": "文本长度=0"
+  },
+  {
+   "name": "T1 纸张 Excel 证据",
+   "ok": null,
+   "detail": "\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1\\\\ui-t1-20261106-121356-sheet-export.xlsx\""
+  },
+  {
+   "name": "T1[DB] UI 选「不合格」保存后明细 结果判断 落值=不合格",
+   "ok": true,
+   "detail": "{\"行号\":1,\"结果判断\":\"不合格\"}"
+  },
+  {
+   "name": "T1[DB] UI 保存后「检验方案」仍为固定值",
+   "ok": true,
+   "detail": "DB值=\"出货控制计划执行\""
+  },
+  {
+   "name": "T1[DB] 本单工序值(界面已无该输入,物理列保留)",
+   "ok": null,
+   "detail": "\"\""
+  },
+  {
+   "name": "T1 清理:测试单 5 表 0 残留",
+   "ok": true,
+   "detail": "{\"QC_PROC_INSP:ZC-2026-11-0008\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0}}"
+  },
+  {
+   "name": "T1 清理:AUTO_QCVER_ 标记 0 残留",
+   "ok": true,
+   "detail": "{\"QC_PROC_INSP\":0}"
+  }
+ ],
+ "result": "FAIL",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "db": "HSDZ_MES_TEST",
+  "run": "20261106-121356",
+  "docs": [
+   {
+    "panel": "QC_PROC_INSP",
+    "no": "ZC-2026-11-0008",
+    "marker": "20261106-121356"
+   }
+  ],
+  "cleanup": {
+   "list": [
+    "QC_PROC_INSP:ZC-2026-11-0008"
+   ],
+   "residue": {
+    "QC_PROC_INSP:ZC-2026-11-0008": {
+     "head": 0,
+     "detail": 0,
+     "status": 0,
+     "approval": 0,
+     "msg": 0
+    }
+   },
+   "autoResidue": {
+    "QC_PROC_INSP": 0
+   },
+   "zero": true
+  }
+ }
+}

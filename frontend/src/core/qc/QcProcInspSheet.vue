@@ -19,6 +19,15 @@
          2026-10-17 口径「当前超出当前行的内容框体要边长才行」+「将当前一开始的框体就变大一点」。
        ⚠ 手工新增的行:检验要求 填了内容而 检验项目 还空着时,顺手把同一段文字写进 检验项目
          (行的身份键,列表页按它显示;带入的行两者都有,不受影响)。
+       ⚠ 2026-11-06(承接用户口径「制程检验单接入两级审批」)本纸同批改动:
+          · **两级审批**:检验人=编制(提交审批时后端自动写提交人、空值兜底)/ 审核=一级审批人 /
+            批准=超级管理员(二级审批通过才落值) ⇒ 表尾补「批准」格(head['审批人'],恒只读);
+          · **工序已隐去**(yj_field hidden=1,后端元数据过滤,前端无需特判);
+          · **检验方案固定**「出货控制计划执行」(字段置只读,后端保存时强制写值);
+          · **明细「结果判断」改下拉**(合格/不合格,值取自 yj_field.dataType=下拉框 的 options,
+            选项是**存储数据键**,不翻译、不 tt();没有 options 时退回文本输入);
+          · 单据编号/工单行号/检验方案/审核人/审核时间/审批人/审批时间 一律按元数据只读
+            (后端契约:yj_field.editable=0 下发的是 `readonly:true`,见 isLockedKey)。
        ⚠ Excel 导出:版式在 `core/qc/qcProcInspExport.js`(纯函数 + 单测),本组件只做 aoa_to_sheet + writeFile,
          入口 = 面板右侧「文档输出 → 导出」→「导出 Excel（.xlsx）」(PanelxList 按面板码路由到 exportProcInspExcel)。
        ═══════════════════════════════════════════════════════════════════ -->
@@ -165,12 +174,23 @@
       </tbody>
     </table>
 
-    <!-- ⑤ 结论区(照旧不动) -->
+    <!-- ⑤ 结论区(2026-11-06 由 4 列改 6 列:结论/处理意见各跨 5 列;末行 检验人|审核人|批准 三对)
+         ⚠ 两级审批口径:检验人 = 编制(可填,提交审批时后端自动写提交人、空值兜底);
+           审核人 = 一级审批人(yj_doc_status.shr 虚拟字段,只读);批准 = 超级管理员
+           (head['审批人'],二级审批通过才落值,只读)。 -->
     <table class="qr-foot-table">
+      <colgroup>
+        <col style="width: 96px" />
+        <col />
+        <col style="width: 96px" />
+        <col />
+        <col style="width: 96px" />
+        <col />
+      </colgroup>
       <tbody>
         <tr>
           <th class="qr-label">{{ tt('检验结论') }}</th>
-          <td class="qr-value" colspan="3">
+          <td class="qr-value" colspan="5">
             <el-input
               v-if="editable"
               v-model="head['总结论']"
@@ -184,7 +204,7 @@
         </tr>
         <tr>
           <th class="qr-label">{{ tt('处理意见') }}</th>
-          <td class="qr-value" colspan="3">
+          <td class="qr-value" colspan="5">
             <el-input
               v-if="editable"
               v-model="head['处理方式']"
@@ -199,11 +219,19 @@
         <tr>
           <th class="qr-label">{{ tt('检验人') }}</th>
           <td class="qr-value">
-            <el-input v-if="editable" v-model="head['检验员']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <el-input
+              v-if="editable && !isLockedKey('检验员')"
+              v-model="head['检验员']"
+              size="small"
+              class="qr-cell-input"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ head['检验员'] || '' }}</span>
           </td>
           <th class="qr-label">{{ tt('审核人') }}</th>
           <td class="qr-value"><span class="qr-cell-text">{{ head['审核人'] || '' }}</span></td>
+          <th class="qr-label">{{ tt('批准') }}</th>
+          <td class="qr-value"><span class="qr-cell-text">{{ head['审批人'] || '' }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -438,10 +466,12 @@ async function exportProcInspExcel() {
   for (let r = headerRow2 + 1; r < headerRow2 + 1 + Math.max(items.value.length, 1); r++) {
     for (const c of [4, 5]) style(r, c, wrap)
   }
-  // 结论区
+  // 结论区(2026-11-06 最后一行三对:检验人 0 / 审核人 3 / 批准 6)
   for (let r = aoa.length - PROC_INSP_FOOT.length; r < aoa.length; r++) {
+    const f = PROC_INSP_FOOT[r - (aoa.length - PROC_INSP_FOOT.length)]
     style(r, 0, labelFill)
-    if (PROC_INSP_FOOT[r - (aoa.length - PROC_INSP_FOOT.length)]?.secondLabel) style(r, 4, labelFill)
+    if (f?.secondLabel) style(r, 3, labelFill)
+    if (f?.thirdLabel) style(r, 6, labelFill)
   }
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, tt('制程检验记录表').slice(0, 28))

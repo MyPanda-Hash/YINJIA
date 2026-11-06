@@ -301,12 +301,16 @@ public class ButtonService {
         if ("RD_PLAN".equals(def.code())) {
             ensurePlanOwnerAcked(blankSafe(noObj), formData);
         }
-        // 质量单据(2026-10-04,特采单 + 质量单据一族;2026-11-04 起含出厂检验报告):
+        // 质量单据(2026-10-04,特采单 + 质量单据一族;2026-11-04 起含出厂检验报告;
+        //   2026-11-06 起含首件检验单/制程检验单):
         // 纸面「编制/审核/批准」三格由审批流自动落值
         // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
         // 否则"手改编制人"就能绕过"编制=提交人"的口径。字段在 yj_field 里已 editable=0(前端只读)。
-        // 出厂检验报告的编制格列名是「检验员」(受控表单 YJ-QR-05/A1 第一格就这么印),由 QC_DOC_PREPARER 登记。
-        // ⚠ 例外:QC_BHC/QC_BHZ/QC_SCP 的「责任人」格是**预填型**(用户口径「预填,让他自己修改」)
+        // 出厂检验报告的编制格列名是「检验员」(受控表单 YJ-QR-05/A1 第一格就这么印),由 QC_DOC_PREPARER 登记;
+        // 首件/制程检验单的编制格同样是「检验员」(纸面表尾第一格=检验人),但「检验员」本身是**检验人业务值**
+        // (默认当前电脑端登录人,defaultQcInspector 保存时只填空值)⇒ 归 PREPARER_EDITABLE_PANELS 例外类:
+        // 该键照常收下(下面的 remove(prepCol) 对它不生效),提交审批只在为空时兜底写提交人。
+        // ⚠ 例外:QC_BHC/QC_BHZ/QC_SCP 的「责任人」格也是**预填型**(用户口径「预填,让他自己修改」)
         //   —— 该键照常收下,不然用户改的值存不进去。
         String prepCol = preparerColOf(def.code());
         if (!prepCol.isBlank() && preparerEditableColOf(def.code()).isBlank()) {
@@ -2214,6 +2218,7 @@ public class ButtonService {
         if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
         // 质量单据(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
         // 直审会让二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
+        // 2026-11-04 出厂检验报告、2026-11-06 首件/制程检验单加入后自动继承本拦截(靠 ADMIN_L2_PANELS)。
         if (ADMIN_L2_PANELS.contains(def.code()))
             throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
         // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
@@ -2611,11 +2616,13 @@ public class ButtonService {
                     realNameOf(operator), no);
         }
         // 质量单据:纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径;
-        // 2026-11-04 出厂检验报告加入,它的编制格列名是「检验员」)。
+        // 2026-11-04 出厂检验报告加入,它的编制格列名是「检验员」;2026-11-06 首件/制程检验单加入,
+        //   编制格同样是「检验员」,但那是检验人业务值 ⇒ 归 PREPARER_EDITABLE_PANELS,仅空值兜底)。
         // 落点在提交这一刻而非保存 —— 编制格各表绑的列不同(编制人/填写人/责任人/检测人/检验员,
         // 见 QC_DOC_PREPARER);谁提交谁就是编制人;驳回后换人重提也随之更新。
-        // ⚠ 预填型(QC_BHC/QC_BHZ/QC_SCP 的责任人)例外:**只在为空时**兜底填提交人 ——
-        //   用户已经自己填/改过的值不许被审批动作抹掉(那些是"产品负责人"业务值)。
+        // ⚠ 预填型(QC_BHC/QC_BHZ/QC_SCP 的责任人、QC_PROC_INSP/QC_FIRST_INSP 的检验员)例外:
+        //   **只在为空时**兜底填提交人 —— 用户已经自己填/改过的值不许被审批动作抹掉
+        //   (那些是"产品负责人"/"实际检验人"业务值)。
         String prep = preparerColOf(def.code());
         if (!prep.isBlank()) {
             boolean editable = !preparerEditableColOf(def.code()).isBlank();
@@ -2636,8 +2643,10 @@ public class ButtonService {
      *   通过 → 转「待二级审批」(pending 仍为 'Y',approve_node=2),**不归档**。
      *   · RD_PROD_INFO:**必须选取二级审核人**(载荷 key「二级审批人」= 账号,候选=全部启用账号;
      *     被选中即授权,不要求角色审批权),写回纸面「审核人（二级审批人）」,被选人收 APPROVAL_L2_ASSIGNED。
-     *   · 质量单据一族({@link #ADMIN_L2_PANELS},2026-10-04 起 8 张、2026-11-04 起含出厂检验报告共 9 张;
-     *     特采单 QC_TC_IN / 7 张质量单据 / 出厂检验报告 QC_OQC_REPORT):第二级**固定为超级管理员**,
+     *   · 质量单据一族({@link #ADMIN_L2_PANELS},2026-10-04 起 8 张、2026-11-04 起含出厂检验报告、
+     *     2026-11-06 起含首件检验单/制程检验单共 11 张;
+     *     特采单 QC_TC_IN / 7 张质量单据 / 出厂检验报告 QC_OQC_REPORT / 首件检验单 QC_FIRST_INSP /
+     *     制程检验单 QC_PROC_INSP):第二级**固定为超级管理员**,
      *     一级不选人;写回纸面「审核」格 = 一级通过人,超级管理员收 APPROVAL_L2_PENDING。
      * 二级(节点 2):RD_PROD_INFO = **被选定的二级审核人本人 ∪ 管理员**;
      *   质量单据一族 = **仅超级管理员**。
@@ -2670,7 +2679,7 @@ public class ButtonService {
         String opinion = opinionOf(formData);
         // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
-            // 固定二级面板(质量单据一族,含出厂检验报告):第二级恒为超级管理员,一级不选人;
+            // 固定二级面板(质量单据一族,含出厂检验报告/首件/制程检验单):第二级恒为超级管理员,一级不选人;
             // 其余两级面板(RD_PROD_INFO)仍须选人
             boolean fixedAdminL2 = ADMIN_L2_PANELS.contains(def.code());
             String l2 = fixedAdminL2 ? "" : pickOf(formData, "二级审批人");
@@ -2784,10 +2793,11 @@ public class ButtonService {
 
     /**
      * 二级审批通过:被选定的二级审核人 ∪ 管理员 → 归档(归档面板)/已审核。
-     * 固定二级面板({@link #ADMIN_L2_PANELS}:特采单 + 7 张质量单据 + 出厂检验报告)的第二级
+     * 固定二级面板({@link #ADMIN_L2_PANELS}:特采单 + 7 张质量单据 + 出厂检验报告 + 2026-11-06 起的
+     * 首件检验单/制程检验单,共 11 张)的第二级
      * = **超级管理员**(即管理员本人),故不查 l2_approver;且**必须真真切切点满两次**
      * (一级一次、二级一次)——同一个人(管理员)也要两次,不允许一次动作跨越两级(2026-10-04 用户口径;
-     * 出厂检验报告 2026-11-04 接入,口径同)。
+     * 出厂检验报告 2026-11-04 接入、首件/制程检验单 2026-11-06 接入,口径同)。
      */
     private Map<String, Object> approveSecond(PanelRegistry.PanelDef def, String no, String operator, Map<String, Object> formData) {
         if (ADMIN_L2_PANELS.contains(def.code())) {
@@ -2848,7 +2858,8 @@ public class ButtonService {
 
     /** 审批驳回:仅审批中/待二级审批 → 草稿(意见必填,驳回后修改可重新提交)
      *  2026-09-20:两级面板任一级驳回都直接回草稿并通知制单人(口径:不退回上一级),节点标记一并清空。
-     *  2026-10-04 质量单据一族(特采单 + 7 张质量单据;2026-11-04 起含出厂检验报告):
+     *  2026-10-04 质量单据一族(特采单 + 7 张质量单据;2026-11-04 起含出厂检验报告;
+     *    2026-11-06 起含首件检验单/制程检验单):
      *    驳回同样回草稿,并清空纸面「审核/批准」两格;
      *    通知面扩为 提交人(编制人) + (二级驳回时)一级审核人 —— 两端都知道这张单被退了。 */
     private Map<String, Object> rejectApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -3006,8 +3017,8 @@ public class ButtonService {
      *   <li>它**只解除**「编制与审批分离」对**本人提交的单**的限制,不放宽审批权 ——
      *       {@code requireApprover} 仍要求该面板 audit 权,两者都满足才能自审;</li>
      *   <li>管理员本就豁免该限制,这里返回 true 只是让调用点写法统一;</li>
-     *   <li>只作用于**单节点**面板;两级面板(RD_PROD_INFO / 8 张质量单据 + 出厂检验报告)不兜底 ——
-     *       它们本来就有确定的第二级(超管或被选中的二级审核人),不存在死路;</li>
+     *   <li>只作用于**单节点**面板;两级面板(RD_PROD_INFO / 质量单据一族共 11 张,含出厂检验报告、
+     *       首件/制程检验单)不兜底 —— 它们本来就有确定的第二级(超管或被选中的二级审核人),不存在死路;</li>
      *   <li>只管**一级审批通过**;二级审批人仍不能选提交人(见 approveApproval 的 l2 校验)。</li>
      * </ul>
      */
@@ -3047,10 +3058,12 @@ public class ButtonService {
     //   尚未赋值的 ADMIN_L2_PANELS(null),启动时直接 ExceptionInInitializerError(2026-10-04 实测踩到)。
 
     /**
-     * 质量单据(品质管理·质量单据一族 + 来料品质·特采单 + 品质管理·出厂检验报告)
+     * 质量单据(品质管理·质量单据一族 + 来料品质·特采单 + 品质管理·出厂检验报告
+     * + 品质管理·首件检验单/制程检验单)
      * **纸面底部落款第一格「编制」绑的字段名**。
      *
-     * 这些纸面(YJ-QR-05/A1、YJ-QR-11/59/60/64/92/118/119/120)底部都是「编制 / 审核 / 批准」三格,
+     * 这些纸面(YJ-QR-05/A1、YJ-QR-11/59/60/64/92/118/119/120、首件检验记录表、制程检验记录表)
+     * 底部都是「编制 / 审核 / 批准」三格,
      * 但「编制」那一格各表绑的列不同 —— 有的是 编制人、有的是 责任人 / 填写人 / 检测人 / 检验员,
      * 故逐面板登记;不在此表内的面板 = 不走「编制 = 提交人」的自动落值,两级也退化为单节点。
      *
@@ -3061,21 +3074,39 @@ public class ButtonService {
      * ⚠ 出厂检验报告(2026-11-04):纸面第一格受控表单上印的是「检验员」(不是「编制人」),
      *   用户口径「检验员=编制(提交审批时自动写提交人、只读)」⇒ 按编制格处理:
      *   提交审批时写 qc_oqc_head.[检验员],yj_field 已由 migrate-oqc-twolevel-20261104.sql 置 editable=0。
+     *
+     * ⚠ 首件检验单 QC_FIRST_INSP / 制程检验单 QC_PROC_INSP(2026-11-06 用户口径:
+     *   「首件检验单和制程检验单要实现审批流程」):两张单纸面表尾第一格是「检验人(检验员)」,
+     *   语义 = **编制** ⇒ 按编制格登记,提交审批时写 qc_first_insp_head / qc_proc_insp_head 的 [检验员]。
+     *   审批口径与出厂检验报告(OQC)完全一致,三格落值同源:
+     *     编制 = 提交审批的人、**审核 = 一级审批人**、**批准 = 超级管理员**(二级审批通过才落值),
+     *     直审一律拒绝(见 audit 的 ADMIN_L2_PANELS 拦截),两级必须各点一次。
+     *   ⚠ 与 OQC 的唯一差别:这两张的「检验员」同时是**检验人业务值**(默认当前电脑端登录人,
+     *     见 defaultQcInspector),所以不能当纯落款刷成提交人 ⇒ 另登记在 {@link #PREPARER_EDITABLE_PANELS}:
+     *     save() 不剥离该键、提交审批**只在为空时**兜底写提交人(详见该常量注释)。
+     *
+     * ⚠ 本 Map 的 **key 集就是 {@link #ADMIN_L2_PANELS}**,而 {@link #TWO_LEVEL_PANELS} 又由它派生
+     *   —— 加面板只改这一处,不要再另外去改那两个常量(它们不是独立清单,
+     *   见紧邻本常量声明上方的「声明顺序即初始化顺序」踩坑记录)。
+     * ⚠ 条目数已超 10,必须用 Map.ofEntries —— Map.of 最多 10 对,第 11 对编译期即报错。
      */
-    private static final Map<String, String> QC_DOC_PREPARER = Map.of(
-            "QC_TC_IN", "编制人",   // YJ-QR-60 特采申请单
-            "QC_LYB", "编制人",     // YJ-QR-119 来料异常分析报告
-            "QC_SCY", "编制人",     // YJ-QR-120 生产异常分析报告
-            "QC_BHG", "填写人",     // YJ-QR-11  不合格报告(制程)
-            "QC_BHC", "责任人",     // YJ-QR-59  不合格品处理单(制程)
-            "QC_BHZ", "责任人",     // YJ-QR-64  不合格品处理单(自制物料)
-            "QC_JJF", "检测人",     // YJ-QR-92  紧急放行申请单
-            "QC_SCP", "责任人",     // YJ-QR-118 试产材料使用申请单
-            "QC_OQC_REPORT", "检验员");  // YJ-QR-05/A1 出厂检验报告(2026-11-04 加入:纸面第一格=检验员=编制)
+    private static final Map<String, String> QC_DOC_PREPARER = Map.ofEntries(
+            Map.entry("QC_TC_IN", "编制人"),      // YJ-QR-60 特采申请单
+            Map.entry("QC_LYB", "编制人"),        // YJ-QR-119 来料异常分析报告
+            Map.entry("QC_SCY", "编制人"),        // YJ-QR-120 生产异常分析报告
+            Map.entry("QC_BHG", "填写人"),        // YJ-QR-11  不合格报告(制程)
+            Map.entry("QC_BHC", "责任人"),        // YJ-QR-59  不合格品处理单(制程)
+            Map.entry("QC_BHZ", "责任人"),        // YJ-QR-64  不合格品处理单(自制物料)
+            Map.entry("QC_JJF", "检测人"),        // YJ-QR-92  紧急放行申请单
+            Map.entry("QC_SCP", "责任人"),        // YJ-QR-118 试产材料使用申请单
+            Map.entry("QC_OQC_REPORT", "检验员"), // YJ-QR-05/A1 出厂检验报告(2026-11-04:纸面第一格=检验员=编制)
+            Map.entry("QC_PROC_INSP", "检验员"),  // 制程检验记录表(2026-11-06:表尾第一格=检验人=编制)
+            Map.entry("QC_FIRST_INSP", "检验员")); // 首件检验记录表(2026-11-06:表尾第一格=检验人=编制)
 
     /**
      * {@link #ADMIN_L2_PANELS} 里「编制」格**不是**纯落款、同时充当业务格的那几张 ——
-     * QC_BHC / QC_BHZ / QC_SCP 的「责任人」(= 表头「产品负责人」格)。
+     * QC_BHC / QC_BHZ / QC_SCP 的「责任人」(= 表头「产品负责人」格),
+     * 以及 2026-11-06 起加入的首件检验单 / 制程检验单的「检验员」(= 检验人业务值)。
      *
      * 用户口径(2026-10-04):「责任人预填,让他自己修改」。故这几张与其余质量单据不同:
      *   · 字段保持 **editable=1**(前端是可编辑输入框,DocSheet 按 yj_field 元数据判只读);
@@ -3083,8 +3114,21 @@ public class ButtonService {
      *   · **新增草稿时预填**当前用户姓名(只在没有值时写,永不覆盖用户已填/已改的值);
      *   · 提交审批时同样**只在为空时**兜底填提交人(覆盖两级口径上线前建的老草稿)。
      * 其余面板的「编制」格(编制人 / 填写人 / 检测人)= 纯落款,仍为「提交审批时自动写 + 只读」。
+     *
+     * <p>⚠ 2026-11-06 首件检验单 QC_FIRST_INSP / 制程检验单 QC_PROC_INSP
+     *   (用户口径「首件检验单和制程检验单要实现审批流程」):
+     *   纸面表尾第一格是「检验人(检验员)」= 编制格,但「检验员」本身是**检验人业务值**
+     *   (默认值 = 当前电脑端登录人,{@link #defaultQcInspector} 保存时只填空值/历史 system 占位)。
+     *   若按其余质量单据的「纯落款」处理(save 剥离 + 提交审批刷成提交人),会把**实际检验人**
+     *   覆盖成提交人姓名 —— 而这两张单的检验人通常就是填单的检验员本人,只是两者未必同一账号。
+     *   故这两张登记在此,口径与 QC_BHC/QC_BHZ/QC_SCP 的「责任人」一致:
+     *   · save() **不剥离**「检验员」(用户可以自己填/改真实检验人);
+     *   · 提交审批时**只在为空时**兜底写提交人(空草稿兜底;已有检验人一律不动);
+     *   · 「审核人/审核时间/审批人/审批时间」仍由 save() 剥离 —— 那四格只由审批流动作写。
+     *   ⚠ yj_field 的「检验员」保持 editable=1(前端可编辑);不要照 OQC 把它置只读。
      */
-    private static final java.util.Set<String> PREPARER_EDITABLE_PANELS = java.util.Set.of("QC_BHC", "QC_BHZ", "QC_SCP");
+    private static final java.util.Set<String> PREPARER_EDITABLE_PANELS =
+            java.util.Set.of("QC_BHC", "QC_BHZ", "QC_SCP", "QC_PROC_INSP", "QC_FIRST_INSP");
 
     /** 该面板的「编制」格是否可手改(= 预填型);非此类返回空串 */
     private String preparerEditableColOf(String panelCode) {
@@ -3132,20 +3176,24 @@ public class ButtonService {
 
     /**
      * 两级审批的第二种形态:第二级**固定为超级管理员**(不选人)= 质量单据一族
-     * (2026-10-04 特采单 + 7 张质量单据 = 8 张;2026-11-04 起加入出厂检验报告 = 9 张)。
+     * (2026-10-04 特采单 + 7 张质量单据 = 8 张;2026-11-04 起加入出厂检验报告;
+     *  2026-11-06 起加入首件检验单 QC_FIRST_INSP / 制程检验单 QC_PROC_INSP = 11 张)。
      * 判据是 yj_user.is_admin='Y',存量的 l2_approver 列对这些面板保持 NULL(前后端都按 is_admin 判)。
      * 与 RD_PROD_INFO 的「一级选人、被选中即授权」并列。
      * public:QueryService 的「审核人」虚拟字段例外共用这一份清单(避免两处各写一套名单)。
+     * ⚠ 本常量是 {@link #QC_DOC_PREPARER}.keySet() 的视图,**不是**独立清单 —— 加面板改 Map,别改这里。
      */
     public static final java.util.Set<String> ADMIN_L2_PANELS = QC_DOC_PREPARER.keySet();
 
     /**
      * 走两级审批的面板(其余面板单节点路径逐字不变)。
      * - RD_PROD_INFO(2026-09-20):一级通过时必须**选取**二级审核人(候选=全部启用账号);
-     * - 质量单据一族(2026-10-04,{@link #ADMIN_L2_PANELS};2026-11-04 起含出厂检验报告):
+     * - 质量单据一族(2026-10-04,{@link #ADMIN_L2_PANELS};2026-11-04 起含出厂检验报告;
+     *   2026-11-06 起含首件检验单/制程检验单):
      *   第二级**固定为超级管理员**,一级不选人。
      *   纸面(YJ-QR 体系)底部都是「编制 / 审核 / 批准」三格:编制=提交审批的人、
-     *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告纸面第一格印「检验员」,口径同为编制)。
+     *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告、首件/制程检验单纸面第一格印
+     *   「检验员」/「检验人」,语义同为编制)。
      */
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
@@ -3230,11 +3278,13 @@ public class ButtonService {
     // ---- 质量单据纸面「编制 / 审核 / 批准」三格自动落值(2026-10-04) ----
     //
     // 口径(用户 2026-10-04,适用于品质管理·质量单据一族 + 特采单;
-    //       2026-11-04 起含出厂检验报告 —— 它的第一格受控表单印「检验员」,语义同为编制):
+    //       2026-11-04 起含出厂检验报告 —— 它的第一格受控表单印「检验员」,语义同为编制;
+    //       2026-11-06 起含首件检验单/制程检验单 —— 表尾第一格印「检验人(检验员)」,语义同为编制):
     //   编制 = 提交审批的人;审核 = 一级审批通过的人;批准 = 超级管理员(二级审批通过的人)。
     // 三格在 yj_field 里 editable=0(readonly),前端 DocSheet 按字段只读渲染成纯文本;
     // 且 save() 剥离这些键的入参 —— 真源只有审批流动作一个。
-    // 表列口径(逐面板不同):编制格 = QC_DOC_PREPARER 登记的列(出厂检验报告 = 检验员);
+    // 表列口径(逐面板不同):编制格 = QC_DOC_PREPARER 登记的列(出厂检验报告/首件/制程 = 检验员);
+    // ⚠ 首件/制程的「检验员」是例外:它是检验人业务值,归 PREPARER_EDITABLE_PANELS(可填、只在空时兜底)。
 
     /** 该面板纸面「编制」格绑的字段(非质量单据返回空串) */
     private String preparerColOf(String panelCode) {

@@ -1,0 +1,84 @@
+{
+ "title": "UI t1-proc-draft @ http://127.0.0.1:8091 panel=QC_PROC_INSP doc=ZC-2026-11-0001",
+ "startedAt": "2026-11-06T04:07:52.692Z",
+ "endedAt": "2026-11-06T04:08:29.999Z",
+ "pass": 6,
+ "fail": 4,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"panel\":\"QC_PROC_INSP\",\"docNo\":\"ZC-2026-11-0001\",\"task\":\"t1-proc-draft\",\"state\":\"\",\"fill\":{\"结果判断\":\"不合格\"},\"save\":true,\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1\"}"
+  },
+  {
+   "name": "UI 登录工厂选中 YJ_TEST",
+   "ok": true,
+   "detail": "{\"ok\":true,\"picked\":\"YINJIA-MES\"}"
+  },
+  {
+   "name": "UI 登录成功并进入桌面",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/dashboard"
+  },
+  {
+   "name": "纸张面板已渲染(.qr-sheet)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/panelx/list/QC_PROC_INSP"
+  },
+  {
+   "name": "制程纸面事实",
+   "ok": null,
+   "detail": "{\"headLabels\":[\"单据编号\",\"单据日期\",\"检验类别\",\"工单号\",\"产品名称\",\"抽检总量\",\"检验日期\",\"检验方案\"],\"hasGongxu\":false,\"headControls\":{\"单据编号\":{\"kind\":\"ZC-2026-11-0001\",\"text\":\"ZC-2026-11-0001\"},\"单据日期\":{\"kind\":\"input\",\"text\":\"\"},\"检验类别\":{\"kind\":\"input\",\"text\":\"\"},\"工单号\":{\"kind\":\"input\",\"text\":\"\"},\"产品名称\":{\"kind\":\"input\",\"text\":\"\"},\"抽检总量\":{\"kind\":\"input\",\"text\":\"\"},\"检验日期\":{\"kind\":\"input\",\"text\":\"\"},\"检验方案\":{\"kind\":\"出货控制计划执行\",\"text\":\"出货控制计划执行\"}},\"planKind\":\"出货控制计划执行\",\"planText\":\"出货控制计划执行\",\"rowCount\":1,\"verdictSelects\":[false],\"verdictInputs\":[false],\"foot\":{\"检验结论\":\"\",\"处理意见\":\"\",\"检验人\":\"\",\"审核人\":\"\",\"批准\":\"\"},\"paperText\":\"制程检验记录表单据编号ZC-2026-11-0001单据日期检验类别工单号产品名称抽检总量检验日期检验方案出货控制计划执行检验结果＋ 新增检验项⧉ 带入检验项目客户名称产品编码型号（mm）批号检验人员：产线常规功能性结果结果判断检验要求检验方法暂无检验项，点右上「⧉带入检验项目」或「＋新增检验项」开始检验结论处理意见检验人审核人批准\",\"sideBtns\":[\"查询单据\",\"模糊搜索\",\"单据预览\",\"新增\",\"保存\",\"保存为草稿\",\"选生产工单\",\"取出货检验计划\",\"检验项目/检验方案\",\"提交审批\",\"审批情况\",\"打印\",\"导出报表\",\"导出\",\"扫描填单\",\"字段管理\",\"删除\",\"弃审\"],\"disabledBtns\":[\"弃审\"],\"status\":\"草稿\",\"shot\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1\\\\ui-t1-20261106-120751-paper.png\",\"errors\":[]}"
+  },
+  {
+   "name": "T1[UI] 表头**没有**「工序」",
+   "ok": true,
+   "detail": "表头标签=单据编号|单据日期|检验类别|工单号|产品名称|抽检总量|检验日期|检验方案"
+  },
+  {
+   "name": "T1[UI] 「检验方案」是只读文本(不是输入框)",
+   "ok": true,
+   "detail": "kind=出货控制计划执行 文本=出货控制计划执行"
+  },
+  {
+   "name": "T1[UI] 「检验方案」固定显示「出货控制计划执行」",
+   "ok": true,
+   "detail": "文本=出货控制计划执行"
+  },
+  {
+   "name": "T1[UI] 明细「结果判断」是 el-select 下拉(非普通输入框)",
+   "ok": false,
+   "detail": "行数=1 select=[false] input=[false]"
+  },
+  {
+   "name": "T1[UI] 「结果判断」下拉选中「不合格」",
+   "ok": false,
+   "detail": "{\"ok\":false,\"seen\":[\"全部事件\",\"产品开发业务流\"]}"
+  },
+  {
+   "name": "T1[UI] 结果判断格显示已选值 = 不合格",
+   "ok": false,
+   "detail": "格内文本="
+  },
+  {
+   "name": "T1[UI] 点击侧栏「保存」并收到 callButton 响应",
+   "ok": false,
+   "detail": "clicked=true http=null body=null msg="
+  },
+  {
+   "name": "T1[UI] 保存后截图",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1\\\\ui-t1-20261106-120751-saved.png\""
+  }
+ ],
+ "result": "FAIL",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "panel": "QC_PROC_INSP",
+  "docNo": "ZC-2026-11-0001",
+  "task": "t1-proc-draft",
+  "state": "",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t1"
+ }
+}

@@ -441,12 +441,11 @@
               </template>
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」;
-                   2026-10-18 首件检验单同口径放开):
-                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的质量单据一族(8 张质量单据 + 出厂检验报告)、
-                   也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
-                   有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
-                   ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
-                     上面统一审批块已经有一条同名弱化条目(同一个动作、同一个只读历史弹窗)。 -->
+                   2026-10-18 首件检验单同口径放开)。
+                   ⚠ 2026-11-06 起**直审入口整体撤掉**:制程/首件两张单并入质量单据两级审批
+                     (见 DIRECT_AUDIT_PANELS 已清空、L2_DOC_PANELS 已登记),后端会拒直审 ⇒
+                     审批与弃审改由上面的统一审批组 / ⑤危险操作段承担;本块保留只为将来某个工序
+                     检验单确要走直审时把面板码加回名单即可。 -->
               <template v-if="canDirectAuditHere">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('审核') }" @click="onSideAction('审核')">{{ tt('审核') }}</div>
                 <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
@@ -4122,10 +4121,18 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  * 并入质量单据两级审批(L2_DOC_PANELS)⇒ 侧栏必须放出「提交审批」与「弃审」(此前只有管理员直审,
  * 直审已按后端 ADMIN_L2_PANELS 撤掉)。它的纸面由 QcOqcSheet 接管、不在 qcSheetCfgs 里,故单独登记;
  * 这里只管**显示**,每个动作能不能点/能不能落地仍由 isDisabled + 后端 ButtonService 裁决。
+ *
+ * ⚠ 2026-11-06(承接用户口径「制程/首件检验单接入质量单据两级审批」):
+ *   制程检验单(QC_PROC_INSP)/首件检验单(QC_FIRST_INSP)同批并入(L2_DOC_PANELS),纸面表尾
+ *   由「检验人|审核人」扩成「检验人|审核人|批准」⇒ 侧栏必须给出「提交审批/审批通过/审批驳回/审批情况」
+ *   (此前这两张单只有管理员直审入口,没有提交审批这一步)。后端权威清单 = ButtonService.QC_DOC_PREPARER
+ *   (= ADMIN_L2_PANELS);**两处必须同步**,否则会出现"前端给了按钮、后端按直审/非两级审批拒掉"的错位。
  */
 const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_INSP_REC'
   || String(panelCode.value) === 'QC_OQC_REPORT'
+  || String(panelCode.value) === 'QC_PROC_INSP'
+  || String(panelCode.value) === 'QC_FIRST_INSP'
   || String(panelCode.value) === 'RD_DOM_TEST')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
@@ -4158,8 +4165,16 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  *   ButtonService.ADMIN_L2_PANELS 已含该面板 ⇒ 直审(audit)必被拒
  *   「走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核」;
  *   ⇒ 不再给「审核 / 弃审」直审入口,审批与弃审改由上面的统一审批组/危险操作段(按节点显隐)承担。
+ *
+ * ⚠ 2026-11-06(用户口径「制程检验单/首件检验单接入两级审批」,**取代** 2026-10-17/10-18 段):
+ *   制程检验单(QC_PROC_INSP)/首件检验单(QC_FIRST_INSP)并入质量单据两级审批(见 L2_DOC_PANELS),
+ *   后端 ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS 同批登记 ⇒ 直审(audit)必被拒
+ *   「走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核」;
+ *   ⇒ 本名单清空,**不再给管理员直审入口**;提交审批/审批通过/审批驳回/弃审/审批情况
+ *   全部由上面的统一审批组与危险操作段承担(弃审在⑤危险操作,仅已审核可点)。
+ *   保留本常量与 canDirectAuditHere 计算:将来若某个工序检验单确要走直审,只把面板码加回来即可。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
+const DIRECT_AUDIT_PANELS = []
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -4357,7 +4372,12 @@ const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!dev
 // 2026-11-04 起 9 张:8 张质量单据 + 出厂检验报告(QC_OQC_REPORT)。
 //   QC_OQC_REPORT 原走「管理员直审」(见 DIRECT_AUDIT_PANELS 的 2026-11-01 段),用户 2026-11-04 口径
 //   「检验员=编制 / 审核=一级审批人 / 批准=超级管理员」⇒ 并入质量单据两级审批,直审入口撤掉(后端会拒)。
-const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT']
+// ⚠ 2026-11-06 起 11 张:再加 **制程检验单 QC_PROC_INSP / 首件检验单 QC_FIRST_INSP**(用户口径
+//   「两张检验单接入质量单据两级审批,检验人=编制 / 审核=一级审批人 / 批准=超级管理员」)。
+//   这两张原走管理员直审(DIRECT_AUDIT_PANELS 已清空),后端 ButtonService.QC_DOC_PREPARER 同批登记 ⇒
+//   **本清单必须与后端 ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS 的 key 集一致**,
+//   否则前端按直审/非两级判显隐、后端按两级审批判节点,必错位(按钮点了被拒)。
+const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT', 'QC_PROC_INSP', 'QC_FIRST_INSP']
 const isQcL2Panel = computed(() => L2_DOC_PANELS.includes(String(panelCode.value)))
 /** 一级审核节点(节点 1):状态还是「审批中」 */
 const qcL2Node = computed(() => isQcL2Panel.value && curDocStatus.value === '待二级审批')
