@@ -6143,6 +6143,28 @@ function stripBlankAutoRows(detail) {
   return out
 }
 
+/**
+ * 样品申请单（RD_SAMPLE_EXT 子表，2026-11-06）：**没填内容的新增行不落库**。
+ *
+ * 为什么需要：纸面进入编辑态会自动补 1 行空行（方便直接开填），用户加了行又没写东西时，
+ * 空行会照样进 upsert（INSERT 一行只有单据编号的脏行）。校验只管"全空 ⇒ 报至少一行"，
+ * 不会把空行剔掉；这里在提交前一刀切掉：**有 id 的老行永远保留**（它可能只是被清空，语义是"清空"），
+ * 无 id 且除单据编号外全空 ⇒ 视为没加过这一行。
+ */
+const SAMPLE_DETAIL_PANELS = new Set(['RD_SAMPLE_EXT'])
+function stripBlankSampleRows(detail) {
+  if (!SAMPLE_DETAIL_PANELS.has(String(panelCode.value))) return detail
+  const out = {}
+  for (const [k, arr] of Object.entries(detail || {})) {
+    if (!Array.isArray(arr)) { out[k] = arr; continue }
+    out[k] = arr.filter((r) => {
+      if (!r || r.id != null) return true
+      return Object.entries(r).some(([key, v]) => key !== '单据编号' && v != null && String(v).trim() !== '')
+    })
+  }
+  return out
+}
+
 // ═══ 档案大表分页渲染(2026-09-16):数据全量驻留内存(保存语义"缺席行=已删除"不变),
 // DOM 只渲染当前页 —— 商品等几千行×几十列的档案页全量渲染会把 DOM 撑到十几万格导致整页卡死;
 // 全部 singleDoc 档案面板(INV/KHDA/GFDA/EMP/WH/PARTNER/DEPT/UOM/REGION/ZDGL…)走同一通道自动生效。
@@ -9189,7 +9211,7 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
       payload = currentFormData(detail)
     } else {
       // 检验单族:提交前把"自动补的固定项行里仍全空"的行剔除(用户 2026-10-15 口径:不预铺脏数据)
-      payload = currentFormData(stripBlankAutoRows({ ...(cur.value.detail || {}) }))
+      payload = currentFormData(stripBlankAutoRows(stripBlankSampleRows({ ...(cur.value.detail || {}) })))
     }
     const res = await engine.callButton({
       panelCode: panelCode.value,
