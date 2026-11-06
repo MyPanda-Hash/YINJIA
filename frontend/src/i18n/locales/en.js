@@ -1402,6 +1402,11 @@ export default {
     '处理意见': 'Disposition',
     '表单审核人': 'Form Reviewer',
     '账号登录人自动生成': 'Auto-filled from the signed-in user',
+    // 2026-11-06 用户口径「只把说明文字说清」:空值提示改成描述真实规则(新增那刻按登录账号写一次)
+    '新增时按登录人生成': 'Filled from the signed-in user when created',
+    '新增时按登录账号填入，之后不再随保存变更': 'Filled from the signed-in account when the document is created; later saves do not change it',
+    '这格在「新增」那一刻按登录账号填入，之后不再随保存/编辑变更；不是从新增建出的草稿会一直为空':
+      'This cell is filled from the signed-in account when the document is created and never changes afterwards; drafts not created via "New" stay empty',
     '检验项来自数据库选择，可在此维护': 'Inspection items come from a database selection — maintain them here',
     '暂无检验项，点击下方按钮新增': 'No inspection item yet — use the button below to add one',
     '新增检验项': 'Add Inspection Item',

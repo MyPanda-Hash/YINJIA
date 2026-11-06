@@ -217,7 +217,7 @@
             <span v-else class="qr-cell-text">{{ head[cell.key] || '' }}</span>
           </td>
         </tr>
-        <!-- 签名行:检验人=账号登录人自动生成(锁定) / 审核人=固定:冯敏(落库列 表单审核人) -->
+        <!-- 签名行:检验人=新增时按登录人生成(锁定) / 审核人=固定:冯敏(落库列 表单审核人) -->
         <tr>
           <template v-for="cell in QC_INSP_REC_SIGN_ROW" :key="cell.key">
             <th class="qr-label">{{ tt(cell.label) }}</th>
@@ -230,7 +230,8 @@
                 maxlength="50"
                 @input="emit('dirty')"
               />
-              <span v-else class="qr-cell-text qr-sign">{{ signText(cell) }}</span>
+              <!-- 空值提示带 title:说清"这格记的是谁、什么时候写、之后会不会变" -->
+              <span v-else class="qr-cell-text qr-sign" :title="signHint(cell)">{{ signText(cell) }}</span>
             </td>
           </template>
         </tr>
@@ -370,14 +371,28 @@ function onRefConfirm(rows) {
 
 /**
  * 签名行取值(只读态):
- * · 检验人(锁定,原表「账号登录人自动生成」)——未落值时显示说明文案;
+ * · 检验人(锁定)——**空值**时显示一句说明,说清它到底是什么时候写的、记的是谁;
  * · 审核人(原表「固定:冯敏」)——落库键是 表单审核人;单据真审核后另有虚拟键 审核人(=yj_doc_status.shr)兜底。
+ *
+ * 【2026-11-06 用户口径:行为不改,只把说明文字说清】
+ *   原模板写的是「账号登录人自动生成」,容易被读成"保存时会按真正的填表人生成"——不是。
+ *   实际规则(见 @core/panel/docDefaults 的 LOCKED_PERSON 与 ButtonService 的编制格名单):
+ *     · 只在「新增那一刻」按**当前登录账号**写入;
+ *     · 之后任何保存/编辑/审批都**不改**它(该格 yj_field.editable=0,后端也不回写);
+ *     · 不是从新增建出来的草稿(或新增后没保存就断了)会一直是空,保存也不会补 ——
+ *       所以看到的这串字是「空值说明」而不是数据。
+ *   想改成"保存时写当前登录人/提交时写提交人",要另开任务改口径(见 2026-11-06 的讨论记录)。
  */
-/** 签名行取值(只读态):见 signText 注释;取值走 headVal,避免与模板里的 props.head 同名遮蔽 */
 function signText(cell) {
   const v = headVal(cell.key) || (cell.auditKey ? headVal(cell.auditKey) : '')
   if (v) return v
-  return cell.locked ? tt('账号登录人自动生成') : ''
+  return cell.locked ? tt('新增时按登录人生成') : ''
+}
+/** 空值格的悬停说明(把规则一次讲全,避免再被理解成"保存时才生成") */
+function signHint(cell) {
+  if (!cell.locked) return ''
+  if (headVal(cell.key)) return tt('新增时按登录账号填入，之后不再随保存变更')
+  return tt('这格在「新增」那一刻按登录账号填入，之后不再随保存/编辑变更；不是从新增建出的草稿会一直为空')
 }
 function headVal(key) {
   const v = props.head?.[key]
