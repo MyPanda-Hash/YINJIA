@@ -2672,10 +2672,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   'QC_OQC_REPORT',
   // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
   // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
-  // ⚠ 2026-11-06 起**只有外部单**是这个版式：内部单按用户口径改成「共享表」——
-  //   单表长列表（mode=archive）、不审批、行内增删、表头列可筛选、每页 10/20/50
-  //   （见 tools/migrate-sample-int-flat-20261106.sql），不能再走 DocSheet 分支。
-  'RD_SAMPLE_EXT',
+  // ⚠ 2026-11-06 第二轮：内部单**恢复纸面版式**（用户纠正「格式还是要和 Excel 一样的，只是行操作
+  //   和外部单底部的新增样品一样，而不是表格类的面板」）⇒ 两张单都走 DocSheet；
+  //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
+  //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版改成 archive 数据面板的做法已撤销。
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
   ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**

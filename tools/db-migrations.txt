@@ -4522,3 +4522,5 @@ migrate-prodinfo-cust-code-20261106.sql
 migrate-mold-workshop-stdlib-20261106.sql
 # 2026-11-06 内部开发样品申请单改成「共享表」：单表长列表(rd_sample_int_head) · 无审批 · 行可增删 · 列可筛选 · 每页 10/20/50
 migrate-sample-int-flat-20261106.sql
+# 2026-11-06 内部样品单**改回 Excel 纸面**（撤上一版的单表档案式）：明细补 13 列 + 存量回填 + 面板恢复头行式 + 字段归位
+migrate-sample-int-paper-rows-20261106.sql
