@@ -25,6 +25,14 @@
          签署三格按两级审批落值:检验员=编制(提交审批时后端自动写提交人、只读)、
          审核=一级审批人(head['审核人'])、批准=超级管理员(head['审批人'],二级审批通过才落值)。
 
+       ⚠ 用户口径(2026-11-06):「产品编码无法填写;除去下拉框/日期控件与审批处外都能填写」——
+         · 抬头「产品编码」由硬编码只读 span 改为**草稿态可填**(canEdit('产品编码'));
+         · 报告编号(单据编号)保持只读(系统发号;元数据 editable=0 ⇒ readonly:true 自动生效);
+         · 检验员/审核/批准 属审批区,恒只读;其余抬头 9 格 / 主表 7 列(序号除外)/
+           检验结论 / 备注 / 卫生安全 15 行结果格,草稿态全部可填。
+         · isLocked 修成同时认 `readonly:true`(后端 yj_field.editable=0 的下发口径),否则
+           "该只读的能改、该能填的看着像只读"两种毛病同时存在。
+
        ⚠ 写法照 QcFirstInspSheet.vue:defineProps({ head, fields, editable }) +
          defineEmits(['dirty'])、明细行取 props.head.detail.items、v-model 直绑 +
          @input=emit('dirty')。明细行可能是 markRaw(非响应式)⇒ 改值后 bump++ 强制重渲。
@@ -49,8 +57,9 @@
     <!-- ③ 抬头 9 格:4 列网格(标签|值 成对) + 产品编码整行
          列宽取原件 twips(694+1182 / 1008+2202 / 1125+884 / 3411+663 = 16.79% / 28.74% / 17.98% / 36.49%),
          与主表的 7 列**同源** ⇒ 上下两张表的外框与中间列线对得上。
-         可编辑(草稿态):客户名称/产品名称/规格型号/生产日期/生产数量/检测日期/AQL;
-         单据编号(报告编号)/产品编码 恒只读(编号由系统发号,产品编码由销售出库行带入)。 -->
+         可编辑(草稿态):客户名称/产品名称/规格型号/生产日期/生产数量/检测日期/AQL/**产品编码**;
+         单据编号(报告编号)恒只读(编号由系统发号;字段元数据 editable=0 下发 readonly:true),
+         审核/批准两格在签署行恒只读(审批流落值)。 -->
     <table class="oqc-head">
       <colgroup>
         <col style="width: 16.79%" />
@@ -64,7 +73,7 @@
             <th>{{ tt(cell.label) }}</th>
             <td>
               <el-date-picker
-                v-if="canEdit(cell.key) && cell.type === 'date'"
+                v-if="canEditCell(cell) && cell.type === 'date'"
                 v-model="head[cell.key]"
                 type="date"
                 size="small"
@@ -74,7 +83,7 @@
                 @change="emit('dirty')"
               />
               <el-input-number
-                v-else-if="canEdit(cell.key) && cell.type === 'number'"
+                v-else-if="canEditCell(cell) && cell.type === 'number'"
                 v-model="head[cell.key]"
                 size="small"
                 :controls="false"
@@ -83,7 +92,7 @@
                 @change="emit('dirty')"
               />
               <el-input
-                v-else-if="canEdit(cell.key)"
+                v-else-if="canEditCell(cell)"
                 v-model="head[cell.key]"
                 size="small"
                 class="oqc-cell"
@@ -94,9 +103,23 @@
             </td>
           </template>
         </tr>
+        <!-- 产品编码整行:2026-11-06 用户报障「产品编码无法填写」——
+             原实现是硬编码只读 span(注释说"由销售出库行带入"),但用户口径要求草稿态可填;
+             现在按字段元数据 canEdit('产品编码') 渲染输入框(yj_field.editable=1),只读态仍显文本。
+             ⚠ 这一格**不是**审批/发号格,别再写死成只读。 -->
         <tr>
           <th>{{ tt('产品编码') }}</th>
-          <td colspan="3"><span class="oqc-ro">{{ head['产品编码'] || '' }}</span></td>
+          <td colspan="3">
+            <el-input
+              v-if="canEdit('产品编码')"
+              v-model="head['产品编码']"
+              size="small"
+              class="oqc-cell"
+              maxlength="100"
+              @input="emit('dirty')"
+            />
+            <span v-else class="oqc-ro">{{ head['产品编码'] || '' }}</span>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -328,13 +351,22 @@ const HYGIENE_ROWS = [
   { key: '卫生_锌', item: '锌', requirement: '增加量≤0.2 mg/L' },
 ]
 
-/** 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与其它纸张同口径) */
+/** 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与其它纸张同口径)。
+ *  ⚠ 2026-11-06:后端契约 —— yj_field.editable=0 在 dataSchema 里下发的是 **`readonly:true`**
+ *    (PanelConfigService.fieldSpec:`if (!f.editable()) m.put("readonly", true)`),不是 editable:false;
+ *    原实现只判 editable===false/0 ⇒ 恒 false(死代码),单据编号/检验员等"本该只读"的格子仍可改。
+ *    现在同时认 readonly / editable 两种口径。 */
 function isLocked(key) {
   const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
-  return !!f && (f.editable === false || f.editable === 0)
+  return !!f && (f.readonly === true || f.editable === false || f.editable === 0)
 }
 function canEdit(key) {
   return props.editable && !isLocked(key)
+}
+/** 抬头格是否可填:字段元数据可编辑 **且** 该格不声明只读(报告编号=系统发号,恒只读;
+ *  产品编码草稿态可填 —— 2026-11-06 用户报障「产品编码无法填写」)。 */
+function canEditCell(cell) {
+  return !cell?.readonly && canEdit(cell?.key)
 }
 
 /** 表头字段改动:直绑 + 置脏 */

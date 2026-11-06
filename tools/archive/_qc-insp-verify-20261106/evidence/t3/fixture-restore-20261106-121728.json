@@ -1,0 +1,16 @@
+{
+ "same": true,
+ "now": [
+  {
+   "panel_code": "QC_FIRST_INSP",
+   "can_approve": "N",
+   "perms": "view,query,add,modify,modlog,del,export"
+  },
+  {
+   "panel_code": "QC_PROC_INSP",
+   "can_approve": "N",
+   "perms": "view,query,add,modify,modlog,del,export"
+  }
+ ],
+ "sql": "-- 测试夹具还原(把 E2E 临时授予的审批权改回原值)\nDECLARE @db sysname = DB_NAME();\nIF @db <> 'HSDZ_MES_TEST' RAISERROR('fixture restore refused: %s', 16, 1, @db);\nELSE BEGIN\n  UPDATE yj_role_panel SET can_approve='N', perms=N'view,query,add,modify,modlog,del,export' WHERE role_id=4 AND panel_code='QC_FIRST_INSP';\n  UPDATE yj_role_panel SET can_approve='N', perms=N'view,query,add,modify,modlog,del,export' WHERE role_id=4 AND panel_code='QC_PROC_INSP';\nEND"
+}

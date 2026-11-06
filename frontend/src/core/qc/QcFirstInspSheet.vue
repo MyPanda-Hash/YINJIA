@@ -14,7 +14,8 @@
                     强度 5#/6#、浊度及压降 7#/8#(见 firstInspCols.GROUP_SAMPLES);
                     本组那一对格子空白可填(并铺了底色),其余格打「/」= 本格无需填写
          相关要求 : 图片底部那 6 条(第 3/4/6 条按业务文案原样带出)
-         表尾     : 检验结果 | 检验人
+         表尾     : 检验结果 | 检验人 | 审核人 | 批准(2026-10-18 补审核人;2026-11-06 并入质量单据
+                    两级审批后再补批准 —— 检验人=编制 / 审核=一级审批人 / 批准=超级管理员)
 
        ⚠ 用户口径(2026-10-15 第二轮):「测试项目需要可新增,也就是新增列即可」
          ⇒ 每个测试项目 = **一列**(列模型纯函数在 core/qc/firstInspCols.js,有单测);
@@ -266,12 +267,15 @@
       </ol>
     </div>
 
-    <!-- ⑥ 表尾:检验结果 | 检验人 | 审核人
+    <!-- ⑥ 表尾:检验结果 | 检验人 | 审核人 | 批准(四段)
          ⚠ 2026-10-18 补「审核人」(用户口径「为当前的首件检验单增加审核功能,审核功能实现参照当前的
            制程检验单」):制程那张纸的表尾是「检验人 | 审核人」(QcProcInspSheet.vue),首件同口径。
            取值 = head['审核人'],**不是本表物理列** —— 后端 QueryService 按「非两级审批面板」把
-           yj_doc_status.shr/shsj 覆盖到虚拟字段 审核人/审核时间(保存时 ButtonService 又会把这两个键
-           从 body 里摘掉,不会误写列)。故这里恒只读,审核后自动显形。 -->
+           yj_doc_status.shr/shsj 覆盖到虚拟字段 审核人/审核时间。
+         ⚠ 2026-11-06 再补「批准」:两张工序检验单并入质量单据两级审批(撤管理员直审)——
+           检验人 = 编制(提交审批时后端自动写提交人)/ 审核 = 一级审批人(yj_doc_status.shr)/
+           批准 = 超级管理员(head['审批人'],二级审批通过才落值)。后两格恒只读、审批后自动显形;
+           保存时 ButtonService 会把审核/审批这几个键从 body 摘掉,不会误写列。 -->
     <table class="fi-foot"><tbody><tr>
       <th>{{ tt('检验结果') }}</th>
       <td>
@@ -282,6 +286,8 @@
       <td>{{ head['检验员'] || '' }}</td>
       <th>{{ tt('审核人') }}</th>
       <td>{{ head['审核人'] || '' }}</td>
+      <th>{{ tt('批准') }}</th>
+      <td>{{ head['审批人'] || '' }}</td>
     </tr></tbody></table>
   </div>
 </template>
@@ -478,6 +484,8 @@ async function exportFirstInspExcel() {
       byLabel: tt('检验人'), by: String(head['检验员'] || ''),
       // 审核人(2026-10-18):虚拟字段,后端取自 yj_doc_status.shr —— 与纸面/服务端报表表尾同口径
       auditorLabel: tt('审核人'), auditor: String(head['审核人'] || ''),
+      // 批准(2026-11-06):两级审批的二级(超级管理员)通过后写 qc_first_insp_head.审批人
+      approverLabel: tt('批准'), approver: String(head['审批人'] || ''),
     },
   })
   const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -512,10 +520,13 @@ const HEAD_FIELDS = [
   { key: '生产线', label: '组别' },
 ]
 
-/** 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与其它纸张同口径) */
+/** 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与其它纸张同口径)。
+ *  ⚠ 2026-11-06:后端契约 —— yj_field.editable=0 在 dataSchema 里下发的是 **`readonly:true`**
+ *    (PanelConfigService.fieldSpec:`if (!f.editable()) m.put("readonly", true)`),不是 editable:false;
+ *    原实现只判 editable===false/0 ⇒ 恒 false(死代码)。现在同时认 readonly / editable 两种口径。 */
 function isLocked(key) {
   const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
-  return !!f && (f.editable === false || f.editable === 0)
+  return !!f && (f.readonly === true || f.editable === false || f.editable === 0)
 }
 
 /**
@@ -1090,13 +1101,14 @@ defineExpose({ exportFirstInspExcel })
   margin: 2px 0 0 20px;
   padding: 0;
 }
-/* 表尾:三组「标签 96px + 值列」(检验结果 | 检验人 | 审核人,2026-10-18 补第三组);
-   标签格定宽(表格 table-layout:fixed),三个值列平分剩余宽度 —— 与纸面/服务端报表同口径 */
+/* 表尾:四组「标签 96px + 值列」(检验结果 | 检验人 | 审核人 | 批准,2026-11-06 补第四组);
+   标签格定宽(表格 table-layout:fixed),四个值列平分剩余宽度 —— 与纸面/服务端报表同口径 */
 .fi-foot th {
   width: 96px;
 }
 .fi-foot th:nth-child(3),
-.fi-foot th:nth-child(5) {
+.fi-foot th:nth-child(5),
+.fi-foot th:nth-child(7) {
   text-align: center;
 }
 .fi-foot td {

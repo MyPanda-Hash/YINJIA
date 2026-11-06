@@ -21,8 +21,10 @@
  *   → 标准行(来自《成型工艺清单》)
  *   → 1#..8# 八个样品行:**每组只在自己那一对样品行上有值**,其余格照纸面写 `/`
  *   → 相关要求 6 条
- *   → 表尾:检验结果 | 检验人 | 审核人(审核人 2026-10-18 随「首件检验单开直接审核」补,
- *          与服务端报表 reports/qc_first_insp.jrxml 的表尾同口径)
+ *   → 表尾:检验结果 | 检验人 | 审核人 | 批准(四段等分)
+ *          审核人 2026-10-18 随「首件检验单开直接审核」补;**批准 2026-11-06 随并入质量单据两级审批补**
+ *          (检验人=编制 / 审核=一级审批人 / 批准=超级管理员,取值 head['审批人']),
+ *          与服务端报表 reports/qc_first_insp.jrxml 的表尾同口径
  */
 import {
   groupsOf, isFillableCell, columnHeadText, ROW_STANDARD, ROW_SAMPLE,
@@ -45,7 +47,9 @@ const LABEL_COL_WCH = 14
  * @param {Array<object>} p.items   明细行(长表:行类型/样品序号/检验列/标准/实测数值)
  * @param {string[]} p.requirements 纸面《相关要求》6 条(已翻译的文本)
  * @param {{resultLabel?:string,result?:string,byLabel?:string,by?:string,
- *          auditorLabel?:string,auditor?:string}} p.foot 表尾(检验结果 | 检验人 | 审核人;审核人 2026-10-18 补)
+ *          auditorLabel?:string,auditor?:string,
+ *          approverLabel?:string,approver?:string}} p.foot 表尾
+ *          (检验结果 | 检验人 | 审核人 | 批准;审核人 2026-10-18 补、批准 2026-11-06 补)
  * @returns {{aoa:Array<Array<any>>, cols:Array<{wch:number}>, merges:Array<object>, marks:object}}
  */
 export function buildFirstInspExport({
@@ -140,27 +144,42 @@ export function buildFirstInspExport({
     reqRows.push(row)
   }
 
-  // ── 表尾:检验结果 | 检验人 | 审核人 ──
+  // ── 表尾:检验结果 | 检验人 | 审核人 | 批准 ──
   //    ⚠ 2026-10-18 补「审核人」:首件检验单与制程检验单同批开了**直接审核**(见 PanelxList 的
   //      DIRECT_AUDIT_PANELS),制程那张纸的表尾就是「检验人 | 审核人」——首件这张纸要同口径,
   //      否则审完打印出来看不出谁审的(值取 head.审核人,后端取自 yj_doc_status.shr)。
-  //      三段等分(每段至少 2 列);N 太小时顺延,不覆盖前一段(极端情况行会比 N 略长,不影响 xlsx)。
+  //    ⚠ 2026-11-06 再补「批准」:两张工序检验单**并入质量单据两级审批**(撤直审),
+  //      检验人=编制 / 审核=一级审批人 / 批准=超级管理员(值取 head.审批人)⇒ 表尾四段。
+  //      四段等分(每段至少 2 列 = 标签+值);N 太小时顺延,不覆盖前一段(极端情况行会比 N 略长,不影响 xlsx)。
   push([])
   const footRow = aoa.length
-  const pairW = Math.max(2, Math.floor(N / 3))
-  const b1 = 0
-  const b2 = pairW
-  const b3 = Math.max(b2 + 2, Math.min(N - 2, pairW * 2))
+  const footPairs = [
+    [text(foot.resultLabel) || '检验结果', text(foot.result)],
+    [text(foot.byLabel) || '检验人', text(foot.by)],
+    [text(foot.auditorLabel) || '审核人', text(foot.auditor)],
+    [text(foot.approverLabel) || '批准', text(foot.approver)],
+  ]
+  // 段首列:前 rem 段各多分 1 列(N ≥ 8 时可用);N < 8 放不下四段 ⇒ 按最小 2 列顺延
+  const bounds = []
+  if (N >= 8) {
+    const base = Math.floor(N / 4)
+    const rem = N % 4
+    bounds.push(0)
+    for (let i = 0; i < 3; i++) bounds.push(bounds[i] + base + (i < rem ? 1 : 0))
+  } else {
+    const step = Math.max(2, Math.round(N / 4))
+    bounds.push(0, step, step * 2, step * 3)
+  }
   const footLine = new Array(N).fill('')
-  footLine[b1] = text(foot.resultLabel) || '检验结果'
-  footLine[b1 + 1] = text(foot.result)
-  if (b2 - 1 > b1 + 1) merges.push({ s: { r: footRow, c: b1 + 1 }, e: { r: footRow, c: b2 - 1 } })
-  footLine[b2] = text(foot.byLabel) || '检验人'
-  footLine[b2 + 1] = text(foot.by)
-  if (b3 - 1 > b2 + 1) merges.push({ s: { r: footRow, c: b2 + 1 }, e: { r: footRow, c: b3 - 1 } })
-  footLine[b3] = text(foot.auditorLabel) || '审核人'
-  footLine[b3 + 1] = text(foot.auditor)
-  if (N - 1 > b3 + 1) merges.push({ s: { r: footRow, c: b3 + 1 }, e: { r: footRow, c: N - 1 } })
+  footPairs.forEach(([label, value], i) => {
+    const b = bounds[i]
+    footLine[b] = label
+    footLine[b + 1] = value
+    // 值格合并到下一段之前(末段并到表尾右缘);只在真的还剩列时才并(不产生越界/倒挂的合并区)
+    const nextB = i + 1 < footPairs.length ? bounds[i + 1] : N
+    const end = Math.min(nextB - 1, N - 1)
+    if (end > b + 1) merges.push({ s: { r: footRow, c: b + 1 }, e: { r: footRow, c: end } })
+  })
   push(footLine)
 
   return {

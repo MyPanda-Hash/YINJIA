@@ -1,0 +1,99 @@
+{
+ "title": "UI t2-oqc-draft @ http://127.0.0.1:8091 panel=QC_OQC_REPORT doc=OQC-2026-11-0016",
+ "startedAt": "2026-11-06T04:15:04.965Z",
+ "endedAt": "2026-11-06T04:15:10.399Z",
+ "pass": 12,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"panel\":\"QC_OQC_REPORT\",\"docNo\":\"OQC-2026-11-0016\",\"task\":\"t2-oqc-draft\",\"state\":\"\",\"fill\":{\"产品编码\":\"AUTO-UI-PROD-20261106-121503\"},\"save\":true,\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t2\"}"
+  },
+  {
+   "name": "UI 登录工厂选中 YJ_TEST",
+   "ok": true,
+   "detail": "{\"ok\":true,\"picked\":\"YINJIA-MES·测试库\"}"
+  },
+  {
+   "name": "UI 登录工厂与期望账套一致(测试库)",
+   "ok": true,
+   "detail": "picked=YINJIA-MES·测试库"
+  },
+  {
+   "name": "UI 登录成功并进入桌面",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/dashboard"
+  },
+  {
+   "name": "纸张面板已渲染(.oqc-sheet)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/panelx/list/QC_OQC_REPORT"
+  },
+  {
+   "name": "出厂检验报告纸面事实",
+   "ok": null,
+   "detail": "{\"heads\":{\"客户名\":{\"kind\":\"input\",\"text\":\"\"},\"报告编号\":{\"kind\":\"text\",\"text\":\"OQC-2026-11-0016\"},\"产品名称\":{\"kind\":\"input\",\"text\":\"\"},\"产品规格\":{\"kind\":\"input\",\"text\":\"\"},\"生产日期\":{\"kind\":\"date\",\"text\":\"\"},\"生产量\":{\"kind\":\"number\",\"text\":\"\"},\"检测日期\":{\"kind\":\"date\",\"text\":\"\"},\"AQL\":{\"kind\":\"input\",\"text\":\"\"},\"产品编码\":{\"kind\":\"input\",\"text\":\"\"}},\"productCode\":{\"kind\":\"input\",\"text\":\"\"},\"sign\":[\"检验员：\",\"审 核：\",\"批 准：\"],\"signInputs\":0,\"gridInputs\":14,\"hygieneInputs\":15,\"sumRow\":1,\"remarkRow\":1,\"detailRows\":4,\"hasReportNoInput\":false,\"paperText\":\"AGplus Technologies Pte Ltd.惠州市银嘉环保科技有限公司出厂检验报告编制日期：2026-11-06客户名报告编号OQC-2026-11-0016产品名称产品规格生产日期生产量检测日期AQL产品编码序号检验项目检验要求抽样标准抽检量结果判定12检验结论备注按《生活饮用水输配水设备及防护材料卫生安全评价规范》项目卫生要求结果浑浊度增加量≤0.2NTU臭和味浸泡后水无异臭、异味肉眼可见物浸泡后水不产生任何肉眼可见的碎片杂物等PH改变量≤0.5溶解性总固体/耗氧量（以O2计）增加量≤1 mg/L砷增加量≤0.001 mg/L铬增加量≤0.005 mg/L铝增加量≤0.02 mg/L铅增加量≤0.001 mg/L汞增加量≤0.0001 mg/L铁增加量≤0.06 mg/L锰增加量≤0.02 mg/L铜增加量≤0.2 mg/L锌增加量≤0.2 mg/L检验员： 审 核：批 准：YJ-QR-05/A1\",\"sideBtns\":[\"查询单据\",\"模糊搜索\",\"单据预览\",\"新增\",\"保存\",\"保存为草稿\",\"提交审批\",\"审批情况\",\"打印\",\"导出报表\",\"导出\",\"扫描填单\",\"字段管理\",\"删除\",\"弃审\"],\"disabledBtns\":[\"弃审\"],\"status\":\"草稿\",\"shot\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t2\\\\ui-t2-20261106-121503-paper.png\",\"errors\":[]}"
+  },
+  {
+   "name": "T2[UI] 「产品编码」是输入框(草稿态可填)",
+   "ok": true,
+   "detail": "{\"kind\":\"input\",\"text\":\"\"}"
+  },
+  {
+   "name": "T2[UI] 「报告编号」只读文本",
+   "ok": true,
+   "detail": "{\"kind\":\"text\",\"text\":\"OQC-2026-11-0016\"}"
+  },
+  {
+   "name": "T2[UI] 签署区 检验员/审核/批准 只读文本(无输入框)",
+   "ok": true,
+   "detail": "signInputs=0 sign=[\"检验员：\",\"审 核：\",\"批 准：\"]"
+  },
+  {
+   "name": "T2[UI] 抬头其余字段草稿态可填(客户名/产品名称/产品规格/生产量/AQL 输入框;生产日期/检测日期 日期控件)",
+   "ok": true,
+   "detail": "{\"客户名\":{\"kind\":\"input\",\"text\":\"\"},\"报告编号\":{\"kind\":\"text\",\"text\":\"OQC-2026-11-0016\"},\"产品名称\":{\"kind\":\"input\",\"text\":\"\"},\"产品规格\":{\"kind\":\"input\",\"text\":\"\"},\"生产日期\":{\"kind\":\"date\",\"text\":\"\"},\"生产量\":{\"kind\":\"number\",\"text\":\"\"},\"检测日期\":{\"kind\":\"date\",\"text\":\"\"},\"AQL\":{\"kind\":\"input\",\"text\":\"\"},\"产品编码\":{\"kind\":\"input\",\"text\":\"\"}}"
+  },
+  {
+   "name": "T2[UI] 明细/检验结论/备注/卫生安全 草稿态可填",
+   "ok": true,
+   "detail": "明细行=4 明细控件=14 结论=1 备注=1 卫生=15"
+  },
+  {
+   "name": "T2[UI] 可填写控件清单",
+   "ok": null,
+   "detail": "{\"抬头\":{\"客户名\":{\"kind\":\"input\",\"text\":\"\"},\"报告编号\":{\"kind\":\"text\",\"text\":\"OQC-2026-11-0016\"},\"产品名称\":{\"kind\":\"input\",\"text\":\"\"},\"产品规格\":{\"kind\":\"input\",\"text\":\"\"},\"生产日期\":{\"kind\":\"date\",\"text\":\"\"},\"生产量\":{\"kind\":\"number\",\"text\":\"\"},\"检测日期\":{\"kind\":\"date\",\"text\":\"\"},\"AQL\":{\"kind\":\"input\",\"text\":\"\"},\"产品编码\":{\"kind\":\"input\",\"text\":\"\"}},\"产品编码\":{\"kind\":\"input\",\"text\":\"\"},\"明细控件数\":14,\"检验结论控件\":1,\"备注控件\":1,\"卫生安全控件\":15,\"签署区\":[\"检验员：\",\"审 核：\",\"批 准：\"]}"
+  },
+  {
+   "name": "T2[UI] 在「产品编码」输入框填入 AUTO-UI-PROD-20261106-121503",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "T2[UI] 输入后格内值正确",
+   "ok": true,
+   "detail": "格内=AUTO-UI-PROD-20261106-121503"
+  },
+  {
+   "name": "T2[UI] 点击侧栏「保存」并收到 callButton 响应",
+   "ok": true,
+   "detail": "clicked=true http=200 body={\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"OQC-2026-11-0016\"}} msg="
+  },
+  {
+   "name": "T2[UI] 保存后截图",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t2\\\\ui-t2-20261106-121503-saved.png\""
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "panel": "QC_OQC_REPORT",
+  "docNo": "OQC-2026-11-0016",
+  "task": "t2-oqc-draft",
+  "state": "",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t2"
+ }
+}

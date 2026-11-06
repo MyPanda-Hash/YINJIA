@@ -1,0 +1,10 @@
+built_at: 2026-11-06T12:07:35+08:00
+git HEAD: 418143865
+git dirty files: 142
+jar: .tmp/qc-insp-verify/backend-build/target/yinjia-mes-backend-0.1.0.jar
+jar sha256: 5425b9ed242059b2e3356e759d9a3897a4f43e2694640c067143b93165f97de7
+jar size: 97837745
+BOOT-INF/lib count: 128
+jar static entry: assets/index-BvsSlhjj.js
+ButtonService 出货控制计划执行: 1
+jrxml 审批人: 8

@@ -69,8 +69,11 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1
 powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 ```
 
-前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
-脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
+前置:Android SDK、JDK(脚本优先 `JAVA_HOME`;本机用 JDK 23 出包通过)、
+`android/libs/zxing-core-3.5.3.jar`(已随仓库提供,离线可构建)。
+SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
+`%LOCALAPPDATA%\Android\Sdk` → **各盘根目录的 `\SDK` / `\Android\Sdk` / `\android-sdk` 等**
+(本机 SDK 就在 `E:\SDK`,不必再手工设环境变量)。
 
 **手机安装**:把 `android/dist/yinjia-mes-1.0.6.apk` 拷到手机点安装(需允许「安装未知应用」)。
 
@@ -180,3 +183,31 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
   老 APK 无此方法时退回单码 `scan()`;
 - 多选模式下**收到第一个码就出勾选面板**(不再等第 2 个),底部按钮 `确定(N)`;
 - 版本 `1.0.4`(versionCode 5)。
+
+### 8.4 2026-11-06:适配本机 SDK(E:\SDK)并用 1.0.6 重新出包
+
+> 用户:「帮我使用当前本地的 Android sdk 打包」
+
+- **为什么动脚本**:本机 SDK 在 `E:\SDK`(build-tools 34.0.0 / 35.0.0 / 35.0.1、
+  platforms android-34 / 35、platform-tools;无 cmdline-tools),旧脚本两处会卡:
+  ① 只认 `ANDROID_HOME` / `%LOCALAPPDATA%\Android\Sdk` ⇒ 报「找不到 Android SDK」;
+  ② d8 写死按 `36.1.0 → 37.0.0 → 34.0.0` 找的旧逻辑回落到 **34.0.0 的 d8 8.2.2**,
+  在 JDK 23 上直接崩:`Compilation failed with an internal error: ... String.length() ... null`。
+- **改法**:① 新增 [`sdk.ps1`](sdk.ps1) 里的 `Get-AndroidSdk`,`build.ps1` / `install.ps1`
+  共用,探测链补上各盘根目录;② d8 改为**按 build-tools 版本号倒序取最新**
+  (本机取到 35.0.1 的 **8.6.2**;34.0.0 继续负责 aapt2 / zipalign / apksigner);
+  ③ platform 优先 android-34,没有则取现有最高。
+- **产物**:`dist/yinjia-mes-1.0.6.apk` **2.53 MB**,
+  versionCode **7** / versionName **1.0.6**,`minSdk 24` / `targetSdk 34`,
+  包名 `com.yinjia.mes.app`,label「银嘉MES」。
+- **验证(不需要手机的部分全绿)**:`apksigner verify` 通过(v2+v3,`CN=Yinjia MES Debug`);
+  `zipalign -c 4` 通过;dex **327 类**(36 个自有类 + 291 个 ZXing 类,含
+  `GenericMultipleBarcodeReader` 与 `scanMulti`);`assets/www` **159 个文件**、0 条反斜杠条目、
+  `index.html` 与 `frontend/dist` **逐字节一致**(入口 chunk `index-u8jisrf6.js`);
+  manifest 的 `usesCleartextTraffic=true` 与 `networkSecurityConfig` 均在。
+  前端产物沿用已入库的 `frontend/dist`(与 `backend/src/main/resources/static` 逐字节一致),
+  本次未重新 `npm run build`。
+- **仍未真机验证**:`adb devices` 为空。手机插上后跑
+  `powershell -ExecutionPolicy Bypass -File android\install.ps1` 覆盖安装即可
+  (签名仍是同一把 `debug.keystore`,可直接覆盖 1.0.x 旧包)。
+

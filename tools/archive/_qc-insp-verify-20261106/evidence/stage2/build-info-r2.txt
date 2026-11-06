@@ -1,0 +1,11 @@
+== 2026-11-06 第二轮追加变更(检验方案可修改)构建指纹 ==
+built_at: 2026-11-06T13:48:07+08:00
+git HEAD: 9da79e8fe
+git dirty files: 131
+jar: .tmp/qc-insp-verify/backend-build/target/yinjia-mes-backend-0.1.0.jar
+jar sha256: 9a041d5feee45190e17eda4c25a9122c20c97ec2b40241ac97d7f1e206d7d376
+jar size: 97837829
+BOOT-INF/lib count: 128
+jar static entry: assets/index-D8V0JTYj.js
+ButtonService 出货控制计划执行: 1
+检验方案仅空值兜底(javap Map.get): 1(见 build 日志)
