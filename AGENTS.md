@@ -203,6 +203,19 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
     `jar uf` 只覆盖 `BOOT-INF/classes`(**排除 `static`**),这样前端一个字节不动、界面不会莫名变化。
     事故全过程与取证脚本见 `tools/archive/_wo-trace-500-20261016/README.md`(踩坑台账 G12)。
 
+## 🔴 界面验证一律用 ego 浏览器(2026-11-06 起生效,不可豁免)
+
+用户口径:「以后测试和点击都默认在 ego 浏览器上操作。写入 skill」。
+
+- **看效果 / 点击 / 填表 / 走流程 / 截图取证** ⇒ 先 `skill('ego-browser')`,再用
+  `.dsh/skills/ego-browser-default/SKILL.md` 里那套固定写法(`taskSpace` + `page.goto` +
+  截图前 `setWindowBounds normal`);**不要**让用户自己点,也不要用 curl 假装点了 UI。
+- 证据要可复跑:脚本放 `C:/Users/Lenovo/ego/<task-space>/round-NN.mjs`,脚本与截图拷进
+  `tools/archive/_<任务>-<日期>/` 随任务提交。
+- 地址优先级:**先 5173(vite,源码即时生效)**,再看 8090(jar 内 static);登录工厂
+  `YJ` = 正式库、`YJ_TEST` = 测试库(接口里传库名如 `HSDZ_MES_TEST` 会静默落回正式库)。
+- 只读排查(看代码/查库/算哈希)不需要开浏览器。
+
 ## 🔴 两账套(正式库 / 测试库)纪律(2026-09-22 起生效,不可豁免)
 
 系统有**两个账套**,登录页「登录工厂」选择即切换(ADR-0003,已接通):
