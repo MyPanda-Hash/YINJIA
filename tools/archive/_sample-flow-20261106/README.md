@@ -34,9 +34,34 @@
 | 权限 | 申请人只能看自己的单；审核人/单据管理人看全部 | `yj_role_panel` 授权：user=view/query/add/modify；rd_review、rd_file_owner=+audit(can_approve=Y)；admin=全量 |
 | 打印 | 提供打印服务 | 横向 A4（`@page{size:A4 landscape}` 动态注入）+ `zoom = 1062/纸宽`（1188⇒0.894、1450⇒0.732） |
 
-未做（明确留待下一轮）：模板 row12 的「总表+子表（一单多样品）」仍是**一单一样品**（表头 8 列即该样品）；
-「不同用户只看自己的单」的服务端行级过滤尚未实现（当前靠角色授权 + 列表查询，无 ownDocs 过滤，
-`QueryService.queryDocs` 里没有创建人条件）；样品仓库/制备环节未建单据（现由「单据状态 + 样品状态」表达）。
+## 三、总表 + 子表（2026-11-06 第三轮，用户确认要做）
+
+- 数据模型：`rd_sample_ext_detail` 补 8 列（产品整体规格/炭棒规格/样品数量/组装要求/产品功能/背景/性能要求/
+  配方及工艺要求），yj_field 里这 8 个字段从 `place='header'` 迁到 `place='detail'`（seq 10..80 = 模板列序），
+  迁移 `tools/migrate-sample-ext-detail-20261106.sql`（幂等；存量单据的表头旧值搬成一条明细行）。
+- 纸面：`grid.rows='detail'` ⇒ 行源 = `head.detail.items`，一行一个样品；可「＋ 新增样品」加行、
+  行内右上角 ✕ 删行（末行不可删）；新增单据进入编辑态自动补 1 行空行。
+- 校验/保存：引擎既有链路 —— 空行跳过、非空行逐格必填；保存走 `currentFormData` → `upsertLineRows`
+  （有 id 更新 / 无 id 插入 / 缺席行 `asp_cancel='Y'` 软删），后端零改动。
+- 打印：多行同表，模板提示词（placeholder）打印时置透明，纸面留白。
+
+实测（ego，5174）：SPW-2026-11-0006 两行 → 删一行保存 → 重载仍 1 行 → 提交→审核→确认 → 已审核；
+`detail-print.png` 两行样张（1062×457，一页）。DB 复核：`rd_sample_ext_detail` 2 行、删除行 `asp_cancel='Y'`。
+
+## 四、单据可见范围（2026-11-06 第三轮，用户口径）
+
+「只能看自己的申请单，由填写人账号来进行限制，管理员可不受限制」：
+- 服务端 SQL 收口（`QueryService`）：`OWN_DOCS_PANELS = {RD_SAMPLE_EXT, RD_SAMPLE_INT}`，
+  `queryDocs` 追加 `ISNULL(RTRIM(t.[asp_user1]),'') = 当前登录账号`；管理员（yj_user.is_admin='Y'）不追加条件。
+  `loadOneDoc` 另拦「知道单号直接取」的旁路（403）。
+- 判据 `asp_user1` = 创建人账号（insertRow 在新增那一刻写入，之后只动 asp_user2）。
+- 实测（round-21 API + round-22 UI）：sampler（普通用户，仅 1~2 张自己的单）看列表只看到自己的；
+  admin 看到全部 7 张；sampler 直接 `getFormDescriptor` 取 admin 的单据 → 「只能查看本人填写的申请单：SPW-2026-11-0006」。
+  测试账号 `sampler/123456`（真实名「打样员」，角色=普通用户）留在库里做回归用，可在组织架构停用。
+
+## 未做
+
+样品仓库/制备环节未建单据（现由「单据状态 + 样品状态」表达）。
 
 ## 三、证据（ego 浏览器实跑，5174 源码版）
 

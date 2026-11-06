@@ -161,7 +161,12 @@
           </tr>
           <!-- ③ 数据行（模板 row4-6）：一行一个样品 -->
           <tr v-for="(row, ri) in gridRows" :key="'r-' + ri" :style="{ height: gridRowH + 'px' }">
-            <td v-for="c in gridCols" :key="'d-' + ri + '-' + (c.key || c.label)" class="sg-td">
+            <td v-for="(c, ci) in gridCols" :key="'d-' + ri + '-' + (c.key || c.label)" class="sg-td">
+              <!-- 子表行：删除本行（只读态/仅剩一行时不出现；打印不出现） -->
+              <span
+                v-if="rowDeletable && ci === gridCols.length - 1"
+                class="sg-rowdel no-print" :title="tt('删除本行')" @click.stop="removeGridRow(ri)"
+              >✕</span>
               <el-date-picker
                 v-if="editable && c.kind === 'date'" v-model="row[c.key]" type="date"
                 value-format="YYYY-MM-DD" size="small" class="as-date sg-cell-date" :clearable="false"
@@ -883,6 +888,8 @@ const gridTextRows = computed(() => Math.max(2, Math.floor((gridRowH.value - 18)
 const gridSign = computed(() => props.config?.signCells || [])
 const gridAddable = computed(() => gridCfg.value.rows === 'detail' && gridCfg.value.addable !== false)
 const gridAddLabel = computed(() => gridCfg.value.addLabel || '新增样品')
+/** 子表行可删：可编辑 + detail 行源 + 至少留一行（一张单至少一个样品） */
+const rowDeletable = computed(() => props.editable && gridCfg.value.rows === 'detail' && gridRows.value.length > 1)
 /**
  * 表体行。detail 模式返回 detail.items(父组件传的是整行 cur,cur.detail.items 恒存在;
  * 保存走 currentFormData → detail_key='items',后端 upsertLineRows 已支持增/改/软删,无需改保存链路)。
@@ -897,6 +904,23 @@ const gridRows = computed(() => {
   }
   return [props.head]
 })
+/**
+ * 子表模式下一张新单必须至少有 1 行可填（用户口径「单个样品单下面可以添加多个样品」）：
+ * 进入编辑态且明细为空时自动补一行空行，不让用户先点「＋」才能开始填。
+ * 不 emit('dirty')：空行只是编辑便利，用户没填内容不算改动。
+ */
+watch(
+  () => [props.editable, props.head?.['单据编号'], gridRows.value.length],
+  () => {
+    if (!props.editable || gridCfg.value.rows !== 'detail') return
+    const d = props.head?.detail
+    if (!d) return
+    if (!Array.isArray(d.items)) d.items = []
+    if (d.items.length === 0) d.items.push({})
+  },
+  { immediate: true },
+)
+
 /** 新增明细行:空对象即可(列键由 yj_field 的 place='detail' 决定,后端按列名落库) */
 function addGridRow() {
   if (!props.editable || !gridAddable.value) return
@@ -1380,6 +1404,19 @@ defineExpose({ focusField })
   color: #111;
   min-height: 18px;
 }
+.sg-td { position: relative; }
+.sg-rowdel {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  z-index: 2;
+  font-size: 12px;
+  line-height: 14px;
+  color: #c0c4cc;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.sg-rowdel:hover { color: #f56c6c; }
 .sg-addrow {
   height: 30px;
   line-height: 30px;
@@ -2382,6 +2419,11 @@ defineExpose({ focusField })
     zoom: var(--print-zoom, 0.89) !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+  /* 表格式纸面：模板提示词只是**录入引导**（placeholder），打印件上必须留白 */
+  body.approval-printing .approval-sheet .sg-table textarea::placeholder,
+  body.approval-printing .approval-sheet .sg-table input::placeholder {
+    color: transparent !important;
   }
   /* 打印态值区文字:**放不下就换行**,既不省略也不溢出(2026-10-28 修正)。
    * 演变记录(两次都被用户打回,留档避免再来一遍):

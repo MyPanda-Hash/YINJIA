@@ -524,7 +524,11 @@ export const sampleExtSheetCfg = {
     { label: '期望交期', key: '期望交期', span: 2, kind: 'date' },
   ],
   grid: {
-    rowH: 150,
+    // 总表+子表（2026-11-06 用户口径）：一张样品单下可加多个样品 ⇒ 行源 = head.detail.items，
+    // 一行一个样品、可增删；行级必填由引擎明细校验负责（空行跳过，非空行逐格校验）。
+    rows: 'detail',
+    rowH: 120,
+    addLabel: '新增样品',
     // 列宽 = 模板 A:B / C:D / E:F / G:H / I / J / K:L / M:N 的合并宽度（px，1:1）
     // hint = 模板 row4 原句，作为单元格 placeholder（纸面只印标签，不把说明印进填写区）
     cols: [

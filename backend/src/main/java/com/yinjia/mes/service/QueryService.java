@@ -21,6 +21,40 @@ import java.util.Map;
 public class QueryService {
 
     /**
+     * 「只能看自己填写的单据」的面板（2026-11-06 用户口径）。
+     *
+     * 原话：「只能看自己的申请单，由填写人账号来进行限制，管理员可不受限制」。
+     * 判据 = 表内 asp_user1（创建人登录账号；ButtonService.insertRow 在新增那一刻写入，
+     *   此后任何保存只动 asp_user2，不会被改成「最后修改人」）。
+     * 收口位置在**服务端 SQL**（queryDocs 的 WHERE + loadOneDoc 的单据归属校验），
+     *   前端传什么条件都绕不过去（与供应商门户 enforceSupplierScope 同一思路）。
+     * 管理员（yj_user.is_admin='Y'）恒放行。
+     */
+    private static final java.util.Set<String> OWN_DOCS_PANELS = java.util.Set.of(
+            "RD_SAMPLE_EXT",   // 外部开发样品申请单
+            "RD_SAMPLE_INT");  // 内部开发样品申请单
+
+    /** 当前登录账号（无会话返回 null） */
+    private String currentLogin() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : null;
+    }
+
+    /** 当前登录人是否管理员（查 yj_user.is_admin；无会话/查不到按非管理员处理） */
+    private boolean isAdminLogin() {
+        String u = currentLogin();
+        if (u == null) return false;
+        try {
+            java.util.List<String> r = jdbc.queryForList(
+                    "SELECT CASE WHEN is_admin = 'Y' THEN 'Y' ELSE 'N' END FROM yj_user WHERE username = ?",
+                    String.class, u);
+            return !r.isEmpty() && "Y".equals(r.get(0));
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
      * 两级审批面板(2026-10-04;2026-11-04 起含出厂检验报告):纸面「审核」= 一级审批通过的人、
      * 「批准」= 超级管理员,两个值分别写进表内的 审核人 / 审批人 列 —— 与 ButtonService 同一份口径
      * (直接引用 {@code ButtonService.ADMIN_L2_PANELS}:二级固定超级管理员的那一族 = 全部质量单据)。
@@ -581,6 +615,18 @@ public class QueryService {
                 .append(g).append("] AS nvarchar(100)) AND s.canceled = 'Y')");
         args.add(statusPanel);
 
+        // 单据可见范围（2026-11-06 用户口径）：样品申请单只看自己填写的；管理员不受限。
+        // 与供应商门户同口径：范围由服务端强制追加，前端条件改不动它。
+        if (OWN_DOCS_PANELS.contains(def.code())) {
+            String me = currentLogin();
+            if (me == null) {
+                where.append(" AND 1 = 0");
+            } else if (!isAdminLogin()) {
+                where.append(" AND ISNULL(RTRIM(t.[asp_user1]),'') = ?");
+                args.add(me);
+            }
+        }
+
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(DISTINCT t.[" + g + "]) FROM " + docTable + " t " + where,
                 Integer.class, args.toArray());
@@ -729,6 +775,22 @@ public class QueryService {
 
     /** 取一张单据(getFormDescriptor 用) */
     public Map<String, Object> loadOneDoc(PanelRegistry.PanelDef def, String docNo) {
+        // 只看自己的单据（2026-11-06）：列表已按 asp_user1 过滤，这里再拦「知道单号直接取」的旁路。
+        if (OWN_DOCS_PANELS.contains(def.code()) && docNo != null && !docNo.isBlank() && !isAdminLogin()) {
+            String me = currentLogin();
+            String owner = null;
+            try {
+                java.util.List<String> rows = jdbc.queryForList(
+                        "SELECT ISNULL(RTRIM(asp_user1),'') FROM " + def.headTable()
+                                + " WHERE " + def.groupCol() + " = ?", String.class, docNo);
+                if (!rows.isEmpty()) owner = rows.get(0);
+            } catch (RuntimeException ignore) {
+                // 表/列缺失时不阻断（与 writeBackSignCell 同一容错口径），列表侧仍有一道过滤
+            }
+            if (me == null || owner == null || !owner.equals(me)) {
+                throw new org.springframework.security.access.AccessDeniedException("只能查看本人填写的申请单：" + docNo);
+            }
+        }
         List<Map<String, Object>> docs = loadDocs(def, List.of(docNo));
         if (docs.isEmpty()) throw new IllegalArgumentException("表单数据不存在：" + docNo);
         return docs.get(0);
