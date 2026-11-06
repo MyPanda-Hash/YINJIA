@@ -4494,6 +4494,16 @@ migrate-approval-customer-ref-20261106.sql
 migrate-sample-dev-panels-20261106.sql
 # 2026-11-06 加标水：表格结构（列/列名/分格）存进 lab.test_item 标准库条目，一个条目=一套表样式
 migrate-spike-water-layout-20261106.sql
+
+# 2026-11-06 来料检验要求：作废挂在已下线页签「自定义检验要求」上的 4 行遗留数据（id 89~92，
+#   物料 YJ-XH-001 / YJ-XH-002 / YJ-YKRS-009 / YJ-YKRS-014，admin 2026-10-14 21:43 落入）。
+#   报障：检验数据记录 →「⧉ 检验要求」弹窗提示「另有 1 行物料类别不在检验要求模板中」。
+#   该页签 2026-10-04 随面板拆分下线（migrate-qc-insp-req-drop-custom-tab.sql），这 4 行晚于下线出现 ⇒
+#   现役 17 个页签都归不进去：维护面板里看不见也改不了、弹窗只计数，而「带入检验要求」仍会把
+#   「外径=按图纸」等 9 项带进报告。作废=asp_cancel='Y'（内容保留、可回溯，重跑 0 行）。
+#   同批前端：归不进现役页签的行渲染成「{类别} · 未归类」只读页签，不再只计数。
+#   取证 tools/archive/_qc-insp-req-hint-20261106/。两账套均执行（正式库 4 行、测试库 0 行）。
+migrate-qc-insp-req-retire-custom-cat-20261106.sql
 # 2026-11-06 修正加标水结构迁移：条目名写回 item_code（content 只存结构 JSON，下拉不再显示 JSON）
 migrate-spike-water-layout-fix-20261106.sql
 # 2026-11-06 修正立项申请客户参照：data_type 必须为「参照」后端才下发 refPanel
