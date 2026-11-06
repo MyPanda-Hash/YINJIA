@@ -9799,8 +9799,34 @@ function warnDisabled(action) {
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
 // 流程规范：新增时当前页面未保存的内容直接剔除,不弹确认——
 //   新增未保存过的占位单 → 撤回(防垃圾空单残留);已保存单据的未保存修改 → 随 load 放弃。
+/**
+ * 立项申请表「最多显示一张新增单据」（2026-11-06 用户口径）：
+ *   「立项申请点击进来显示的是新增单据，最多显示一张新增单据，防止反复多次进入出现多张新增单据」
+ *
+ * 判据：该面板下**已存在一张未保存过的空白草稿**（saved='N' 且客户名/立项背景/文档编号全空）
+ * ⇒ 直接打开它，不再新建。反复进出点「新增」都落回同一张，库里不会堆一串空草稿。
+ * 只看 RD_APPROVAL：其它文书面板（实施计划等）的「新增」行为逐字不变。
+ */
+function reusableBlankApproval() {
+  if (String(panelCode.value || '') !== 'RD_APPROVAL') return null
+  return (list.value || []).find((it) => {
+    const saved = String(it['saved'] ?? '').toUpperCase()
+    const blank = !String(it['客户名'] ?? '').trim()
+      && !String(it['立项背景'] ?? '').trim()
+      && !String(it['文档编号'] ?? '').trim()
+    return saved === 'N' && blank
+  }) || null
+}
 async function directAdd() {
   try {
+    // 立项申请表：已有空白草稿就复用，不再建第二张（2026-11-06 用户口径）
+    const reuse = reusableBlankApproval()
+    if (reuse) {
+      const idx = list.value.findIndex((item) => item['编号'] === reuse['编号'])
+      if (idx >= 0) curIdx.value = idx
+      ElMessage.info(tt('已有一张未填写的立项申请草稿，直接打开它'))
+      return
+    }
     const formData = {}
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
@@ -10973,6 +10999,18 @@ async function onButton(action) {
     }
     ElMessage.success(`「${action}」执行成功`)
     await load()
+    // 立项申请表：提交审批成功后自动跳「项目流程管控」（2026-11-06 用户口径
+    //   「填写提交之后自动跳转到项目流程管控」）。
+    // 跳转带上该立项单号 —— 流程页按 ?docNo= 直接定位到这张项目的 10 步时间轴，
+    // 不用用户再搜一次。关掉当前页签再开流程页，与既有 gotoPanel 分支同一做法。
+    if (action === '提交审批' && panelCode.value === 'RD_APPROVAL') {
+      const flowNo = actionDocumentNo || ''
+      const targetPath = '/rd/projectFlow'
+      tabs.close(route.path)
+      router.push({ path: targetPath, query: flowNo ? { docNo: flowNo } : {} })
+      tabs.open({ path: targetPath, title: tt('项目流程管控') })
+      return
+    }
     const actionIndex = list.value.findIndex((item) => (
       (item['编号'] || item['单据编号'] || item['锭号']) === actionDocumentNo
     ))
