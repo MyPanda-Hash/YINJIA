@@ -5431,6 +5431,11 @@ export default {
     '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'This app version cannot scan multiple codes: please upgrade to 1.0.2 or later',
     '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Looks up the Assembly BOM for that line\'s product, creates one picking slip and one return slip (return qty 0), and auto-prints the work-order QR once',
     '「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '"Scan" can read several work-order codes at once: listed in sheet order, tick and confirm — they all go into the queue below, then "Batch create" makes one slip per work order',
+    '删除打印电脑': 'Delete print computer',
+    '确定删除打印电脑「': 'Delete print computer "',
+    '」吗?它现在离线;删掉后再连上来需要重新添加': '"? It is offline now; after deleting, it must be re-added when it reconnects',
+    '已存在·已打印': 'Exists · printed',
+    '已开过单的按原单重打': 'existing slips reprinted',
   },
 
 }

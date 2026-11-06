@@ -74,6 +74,20 @@
             {{ s.online ? tt('在线') : tt('离线') }}
           </span>
           <span v-if="!s.enabled" class="ps-station-tag warn">{{ tt('未启用') }}</span>
+          <!-- 删除离线电脑(2026-11-06 用户口径「自动打印界面,要可以删除离线的电脑」):
+               换机/改名/代理站点名填错之后,那一行会永久挂在面板上显示离线。
+               在线的不给删(服务端也会拦):先停那台机的代理,等它离线再删。 -->
+          <el-button
+            v-if="!s.online"
+            class="ps-station-del"
+            size="small"
+            text
+            type="danger"
+            :loading="deletingName === s.name"
+            @click="removeStation(s)"
+          >
+            {{ tt('删除') }}
+          </el-button>
           <el-switch
             class="ps-station-switch"
             :model-value="s.enabled"
@@ -236,9 +250,9 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
-import { fetchStationState, saveStationConfig } from '@/business/printStation'
+import { deleteStationConfig, fetchStationState, saveStationConfig } from '@/business/printStation'
 
 /** 本地代理的探活地址(代理默认监听本机 18777,见 tools/printing/print-agent.ps1) */
 const AGENT_URL = 'http://127.0.0.1:18777/health'
@@ -251,6 +265,8 @@ const queueSize = ref(0)
 const typeOptions = ref([])
 const loading = ref(false)
 const savingName = ref('')
+/** 正在删除的站点名(按钮 loading) */
+const deletingName = ref('')
 const errText = ref('')
 const recent = ref([])
 /** 新增/预登记一台打印电脑时输入的名字(= 那台电脑装代理时填的站点名) */
@@ -422,6 +438,41 @@ async function saveStation(s, patch) {
     await refreshState()   // 回读真实状态,别让开关停在假的"已开"
   } finally {
     savingName.value = ''
+  }
+}
+
+/**
+ * 删除一台**离线**的打印电脑(2026-11-06 用户口径「自动打印界面,要可以删除离线的电脑」)。
+ *
+ * <p>为什么要这个:站点名列的是"内存里跑过的 ∪ 库里配过的";换机、改名、代理站点名填错之后,
+ * 那一行会永远挂在面板上显示离线(截图里那个 `?????` 就是这么来的),现场以为还有一台在等出纸。
+ *
+ * <p>服务端还有一道闸:90 秒内有心跳(在线)的直接拒绝 —— 那说明代理还活着,
+ * 下一次心跳就会把它写回来,删了也白删。
+ */
+async function removeStation(s) {
+  const name = s?.name
+  if (!name) return
+  try {
+    await ElMessageBox.confirm(
+      tt('确定删除打印电脑「') + name + tt('」吗?它现在离线;删掉后再连上来需要重新添加'),
+      tt('删除打印电脑'),
+      { type: 'warning', confirmButtonText: tt('删除'), cancelButtonText: tt('取消') },
+    )
+  } catch {
+    return   // 用户取消
+  }
+  deletingName.value = name
+  clearErr()
+  try {
+    const d = await deleteStationConfig(name)
+    state.value = { ...state.value, ...(d || {}) }
+    ElMessage.success(tt('已删除') + ' ' + name)
+    await refreshState()
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('删除失败')
+  } finally {
+    deletingName.value = ''
   }
 }
 

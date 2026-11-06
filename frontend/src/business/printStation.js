@@ -141,3 +141,14 @@ export async function saveStationConfig({ stationName, enabled, types, paper } =
   })
   return res.data?.data || res.data || {}
 }
+
+/**
+ * 删除一台**离线**的打印电脑(2026-11-06)。
+ *
+ * <p>用户在「自动打印」页看到换机/改名留下的幽灵站点(如 `?????`)一直挂着离线,
+ * 要求能删掉。在线(90 秒内有心跳)服务端会拒绝 —— 删了它下一次心跳又写回来。
+ */
+export async function deleteStationConfig(stationName) {
+  const res = await request.post('/px/print/station/delete', { stationName: stationName || '' })
+  return res.data?.data || res.data || {}
+}

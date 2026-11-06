@@ -326,7 +326,7 @@ public class MobilePickController {
         // 已开过单就不重开 —— 用户第二次扫同一行时应当"进到那张单",而不是再开一对空单
         WoPickDocService.PickDoc exist = docs.findActive(lineWoNo, line);
         if (exist != null) {
-            return existingResult(exist);
+            return existingResult(exist, lineWoNo, line, wo, wantPrint);
         }
 
         // 按产品编号取该产品的组装 BOM 表头 → 其明细行
@@ -444,7 +444,7 @@ public class MobilePickController {
             WoPickDocService.PickDoc raced = docs.findActive(lineWoNo, line);
             if (raced != null) {
                 log.warn("手机扫码生单并发撞唯一约束:{}/{};已回落到既有台账 {}", lineWoNo, line, raced.id(), e);
-                return existingResult(raced);
+                return existingResult(raced, lineWoNo, line, wo, wantPrint);
             }
             throw e;
         }
@@ -1340,16 +1340,26 @@ public class MobilePickController {
         }
     }
 
-    /** 已经开过单时的返回(重复扫同一工单行走这里,不再新建) */
-    private Map<String, Object> existingResult(WoPickDocService.PickDoc d) {
+    /**
+     * 已经开过单时的返回(重复扫同一工单行走这里,**不再新建**,但照样给打印载荷)。
+     *
+     * <p>🔴 2026-11-06 用户口径:「现在扫码后已存在的领料单,是不在打印的。但是现在是需要给他打印,
+     * 只是不生成领料单」⇒ 以前这里 {@code 打印 = null},重复扫码什么都不打;
+     * 现在把**那张已存在单据**的打印载荷原样返回(明细取 wo_pick_line / 材料出库单,
+     * 与新建时同一个 {@code printPayload}),前端就能"只打印、不生单"。
+     */
+    private Map<String, Object> existingResult(WoPickDocService.PickDoc d, String woNo, int line,
+                                               Map<String, Object> wo, boolean wantPrint) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", d.id());
         out.put("领料单号", d.outNo());
         out.put("退料单号", d.backNo());
         out.put("状态", d.state());
         out.put("物料项数", d.itemCount());
-        out.put("重复", true);      // 前端据此提示"该工单行已经开过单,已帮你打开"
-        out.put("打印", null);      // 重复时不重复打印
+        out.put("重复", true);      // 前端据此提示"该工单行已经开过单,已帮你打开(并重打这张单)"
+        out.put("打印", wantPrint && wo != null
+                ? printPayload(woNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")), d.id())
+                : null);
         return out;
     }
 

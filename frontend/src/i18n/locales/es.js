@@ -2694,6 +2694,11 @@ export default {
     '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Esta versión no admite escaneo múltiple: actualice a 1.0.2 o superior',
     '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Busca el BOM de ensamble del producto de la línea, crea un vale de retirada y uno de devolución (cant. 0) e imprime el QR una vez',
     '「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '«Escanear» lee varios códigos de OT a la vez (orden de la hoja, marcar y confirmar); van a la cola inferior y «Crear por lote» crea un vale por OT',
+    '删除打印电脑': 'Eliminar equipo de impresión',
+    '确定删除打印电脑「': '¿Eliminar el equipo "',
+    '」吗?它现在离线;删掉后再连上来需要重新添加': '"? Ahora está desconectado; si vuelve, habrá que añadirlo de nuevo',
+    '已存在·已打印': 'Existe · impreso',
+    '已开过单的按原单重打': 'vales existentes reimpresos',
   },
 
 }

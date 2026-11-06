@@ -2694,6 +2694,11 @@ export default {
     '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Cette version ne gère pas le scan multiple : passez à 1.0.2 ou plus',
     '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Recherche la nomenclature d\'assemblage, crée un bon de prélèvement et un de retour (qté 0) et imprime le QR une fois',
     '「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '« Scanner » lit plusieurs codes d\'OF (ordre de la feuille, cocher puis confirmer) ; ils vont dans la file ; « Créer par lot » fait un bon par OF',
+    '删除打印电脑': 'Supprimer le poste d\'impression',
+    '确定删除打印电脑「': 'Supprimer le poste « ',
+    '」吗?它现在离线;删掉后再连上来需要重新添加': ' » ? Il est hors ligne ; une fois reconnecté il faudra le rajouter',
+    '已存在·已打印': 'Existe · imprimé',
+    '已开过单的按原单重打': 'bons existants réimprimés',
   },
 
 }
