@@ -681,6 +681,10 @@ public class QueryService {
             String statusText = docStatus(st);
             doc.put("单据状态", statusText);
             doc.put("saved", st != null ? st.get("saved") : null);
+            // 「二级审核人」= yj_doc_status.l2_approver（一级审批通过时选定的人）。
+            // 2026-11-06 外部开发样品申请单接入两级审批后，前端靠这一格判断「我是不是本单的确认人」
+            // （PanelxList.l2ApproverNow）：没有它，非管理员的确认人在「待二级审批」节点看不到按钮。
+            doc.put("二级审核人", st == null ? null : st.get("l2_approver"));
             doc.put("detail", Map.of("items", items));
             // 「发起人」= 提交审批的人(2026-10-29 用户口径「发起人应该是提交审批的人的账号名,
             // 以提交审批的为准,草稿的可以覆盖」)。

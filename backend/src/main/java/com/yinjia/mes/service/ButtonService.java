@@ -2603,6 +2603,9 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
         recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
+        // 样品申请单(2026-11-06):纸面落款「申请」(外部单)/「申请人」(内部单) = 提交审批的人。
+        // 模板《新系统-样品流程和相关表格式.xlsx》:「申请人录完之后提交」⇒ 申请格落提交人。
+        writeSampleSign(def.code(), no, SAMPLE_SIGN_APPLY, operator);
         // 申请立项人 = 提交审批的人(2026-10-09 用户口径:「申请立项人是一开始提交审批的人」)。
         // 与「保存=送审」两条路同口径(本文件 :468-500 那两处);前端新增单据时按登录用户预填的姓名
         // 只是草稿期的显示兜底,提交这一刻以操作人为准。下游按这一格认人:项目实施计划的一级审批门禁
@@ -2699,6 +2702,8 @@ public class ButtonService {
             } else {
                 writeBackL2Approver(def.code(), no, l2);
             }
+            // 样品申请单(外部单,两级):纸面「审核」格 = 一级审批通过的人(审核人=刘磊)
+            writeSampleSign(def.code(), no, SAMPLE_SIGN_AUDIT, operator);
             recordApproval(def.code(), no, "APPROVE_L1", "L1_PASSED", opinion, 1, selfAudit);
             final String l2f = l2;
             final String op1 = operator;
@@ -2724,6 +2729,8 @@ public class ButtonService {
         if ("RD_SPEC_DOC".equals(def.code())) {
             writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, operator);
         }
+        // 内部开发样品申请单(单节点:提交 → 确认人确认 → 制备):纸面「确认人」= 审批通过的人
+        writeSampleSign(def.code(), no, SAMPLE_SIGN_CONFIRM, operator);
         // 立项申请:审批与定级是**同一步骤的两个动作**(2026-10-08 用户口径②「冯总审核及定级」)——
         // 审批弹窗里一并选项目等级,通过即定级,省掉"审完再点一次项目定级"。载荷没带等级时跳过
         // (兼容旧前端/老单:仍可事后用侧栏「项目定级」按钮补定级)。
@@ -2817,6 +2824,8 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
+        // 外部开发样品申请单(两级):纸面「确认」格 = 二级确认通过的人(确认人=冯总)
+        writeSampleSign(def.code(), no, SAMPLE_SIGN_CONFIRM, operator);
         // 2026-10-15:二级(最终)审批通过同样要跑生产报工的审核后副作用 —— 见 approveApproval 的同款注释
         runWoAuditHooks(def, no, operator);
         inspAutoPurchaseIn(def.code(), no, operator);
@@ -3096,6 +3105,51 @@ public class ButtonService {
     private static final String SPEC_SIGN_AUDIT = "审核日期";
     private static final String SPEC_SIGN_APPROVE = "批准日期";
 
+    /**
+     * 开发样品申请单纸面落款（2026-11-06）。
+     *
+     * 设计依据：《新系统-样品流程和相关表格式.xlsx》sheet1 底部「申请 / 审核 / 确认」三格、
+     * sheet2「申请人 / 确认人」两列。真源是审批流：谁提交/谁审/谁确认由 yj_doc_status 留痕决定，
+     * 纸面这三格**只读**（yj_field.editable=0），只能由本方法回写 —— 否则手填的姓名会与审批记录打架。
+     *
+     * 列映射按面板登记（未登记的面板直接跳过；某格为空串 = 该单没有这一格）：
+     *   RD_SAMPLE_EXT：申请(提交人) / 审核(一级通过人) / 确认(二级通过人)
+     *   RD_SAMPLE_INT：申请人(提交人) / — / 确认人(审批通过人)
+     * 值格式与规格书同款：姓名/yyyy.M.d（列宽 200 足够）。
+     */
+    private static final String SAMPLE_SIGN_APPLY = "申请";
+    private static final String SAMPLE_SIGN_AUDIT = "审核";
+    private static final String SAMPLE_SIGN_CONFIRM = "确认";
+    private static final Map<String, String[]> SAMPLE_SIGN_COLUMNS = Map.of(
+            "RD_SAMPLE_EXT", new String[]{"申请", "审核", "确认"},
+            "RD_SAMPLE_INT", new String[]{"申请人", "", "确认人"});
+    private static final Map<String, String> SAMPLE_SIGN_TABLES = Map.of(
+            "RD_SAMPLE_EXT", "rd_sample_ext_head",
+            "RD_SAMPLE_INT", "rd_sample_int_head");
+
+    /** 样品申请单落款写入（列名走白名单，不拼外部输入；表缺失/列缺失静默跳过，不阻断审批） */
+    private void writeSampleSign(String panelCode, String no, String which, String account) {
+        if (no == null || no.isBlank()) return;
+        String table = SAMPLE_SIGN_TABLES.get(panelCode);
+        String[] cols = SAMPLE_SIGN_COLUMNS.get(panelCode);
+        if (table == null || cols == null) return;
+        String col = switch (which == null ? "" : which) {
+            case SAMPLE_SIGN_APPLY -> cols[0];
+            case SAMPLE_SIGN_AUDIT -> cols[1];
+            default -> cols[2];
+        };
+        if (col == null || col.isBlank()) return;
+        try {
+            String val = account == null || account.isBlank()
+                    ? null
+                    : signNameOf(account) + "/" + LocalDateTime.now().format(SIGN_DATE_FMT);
+            jdbc.update("UPDATE " + table + " SET [" + col + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", val, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[样品申请单落款] 写回 {} 失败 panel={} no={}: {}", col, panelCode, no, e.getMessage());
+        }
+    }
+
     /** 规格书这类「姓名/日期合写一格」的落款格式（与历史值一致：陈秀丽/2026.11.5） */
     private static final java.time.format.DateTimeFormatter SIGN_DATE_FMT =
             java.time.format.DateTimeFormatter.ofPattern("yyyy.M.d");
@@ -3180,6 +3234,10 @@ public class ButtonService {
     /**
      * 走两级审批的面板(其余面板单节点路径逐字不变)。
      * - RD_PROD_INFO(2026-09-20):一级通过时必须**选取**二级审核人(候选=全部启用账号);
+     * - RD_SAMPLE_EXT 外部开发样品申请单(2026-11-06):同「一级选人」形态 —— 设计文件写
+     *   「申请人 → 审核人(刘磊) → 确认人(冯总)确认信息并进行补充 ⇒ 执行制备、入样品仓库」,
+     *   故一级(审核)通过时必须选二级(确认)人;纸面「审核」= 一级通过人、「确认」= 二级通过人。
+     *   ⚠ 内部开发样品申请单(RD_SAMPLE_INT)只有「确认人」一步 ⇒ **不进本集合**,走单节点路径。
      * - 质量单据一族(2026-10-04,{@link #ADMIN_L2_PANELS};2026-11-04 起含出厂检验报告):
      *   第二级**固定为超级管理员**,一级不选人。
      *   纸面(YJ-QR 体系)底部都是「编制 / 审核 / 批准」三格:编制=提交审批的人、
@@ -3187,10 +3245,11 @@ public class ButtonService {
      */
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
-    /** 两级面板集合 = RD_PROD_INFO(一级选人)+ 质量单据一族(二级固定超级管理员) */
+    /** 两级面板集合 = RD_PROD_INFO / RD_SAMPLE_EXT(一级选人)+ 质量单据一族(二级固定超级管理员) */
     private static java.util.Set<String> twoLevelPanels() {
         java.util.Set<String> s = new java.util.LinkedHashSet<>(ADMIN_L2_PANELS);
         s.add("RD_PROD_INFO");
+        s.add("RD_SAMPLE_EXT");
         return java.util.Set.copyOf(s);
     }
 

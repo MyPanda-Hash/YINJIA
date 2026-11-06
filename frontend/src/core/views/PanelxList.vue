@@ -4134,7 +4134,13 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
 const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_INSP_REC'
   || String(panelCode.value) === 'QC_OQC_REPORT'
-  || String(panelCode.value) === 'RD_DOM_TEST')
+  || String(panelCode.value) === 'RD_DOM_TEST'
+  // 开发样品申请单两张（2026-11-06 用户口径「里面的对应流程已经给出了，把这个流程也跑通」）：
+  //   外部单 提交 → 审核(一级,选确认人) → 确认(二级) → 已审核；
+  //   内部单 提交 → 确认(单节点) → 已审核。
+  // 只放开**显示**：能不能点仍由 isDisabled(状态×身份) + 后端 ButtonService 裁决。
+  || String(panelCode.value) === 'RD_SAMPLE_EXT'
+  || String(panelCode.value) === 'RD_SAMPLE_INT')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
  *
@@ -4352,8 +4358,23 @@ async function onDevDispatch() {
   await openDevAssign()
 }
 
-/** 本单据一级选定的二级审核人 = 当前登录人(二级节点才由他审批;被选中即授权) */
-const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!devDispatch.isL2)
+/**
+ * 本单据一级选定的二级审核人 = 当前登录人(二级节点才由他审批;被选中即授权)。
+ *
+ * 2026-11-06 外部开发样品申请单接入两级审批（审核=刘磊 → 确认=冯总），补第二种真源：
+ *   RD_PROD_INFO 的真源是 /px/rdDev/buttonState（按产品编号算）；样品单没有产品编号，
+ *   改读列表行的虚拟字段「二级审核人」（QueryService 从 yj_doc_status.l2_approver 下发）。
+ *   判据与后端 approveSecond 一致：状态=待二级审批 且 l2_approver 是本账号。
+ */
+const l2ApproverNow = computed(() => {
+  if (panelCode.value === 'RD_PROD_INFO') return !!devDispatch.isL2
+  if (String(panelCode.value) === 'RD_SAMPLE_EXT') {
+    const acct = String(user.account || user.userName || '')
+    const picked = String(cur.value?.['二级审核人'] || '')
+    return !!acct && !!picked && picked === acct && cur.value?.['单据状态'] === '待二级审批'
+  }
+  return false
+})
 
 // ── 质量单据两级审批(2026-10-04 用户口径:品质管理·质量单据一族 + 来料品质·特采单)──
 // 纸面(YJ-QR 体系)底部都是「编制 / 审核 / 批准」三格,系统口径与之一一对应:
@@ -6817,6 +6838,9 @@ const l2PickUser = ref('')
 const l2PickOpinion = ref('')
 const l2PickUsers = ref([])
 const l2PickDocNo = ref('')
+/** 发起「选取二级审核人」的面板码（2026-11-06：RD_PROD_INFO 与 RD_SAMPLE_EXT 共用同一个弹窗，
+ *  原实现把 'RD_PROD_INFO' 写死在确认回调里，样品单选人会打到产品信息表上）。 */
+const l2PickPanel = ref('')
 /** 弹窗内联报错:失败时把后端原话留在框里(此前只弹 toast,框不关,用户以为"又让我选人") */
 const l2PickError = ref('')
 /** 被排除的提交人账号(非管理员时提交人不能当二级审核人,后端 ButtonService:1826 必拒) */
@@ -6832,6 +6856,7 @@ const l2PickOptions = computed(() => {
 })
 /** 一级审批通过入口:产品信息表的一级节点必须先选二级审核人,其余面板/二级节点走原确认框 */
 async function openL2Pick(no) {
+  l2PickPanel.value = String(panelCode.value || 'RD_PROD_INFO')
   l2PickDocNo.value = no
   l2PickUser.value = ''
   l2PickOpinion.value = ''
@@ -6854,7 +6879,7 @@ async function confirmL2Pick() {
   l2PickError.value = ''
   try {
     await engine.callButton({
-      panelCode: 'RD_PROD_INFO', buttonName: '审批通过',
+      panelCode: l2PickPanel.value || 'RD_PROD_INFO', buttonName: '审批通过',
       formData: { 编号: l2PickDocNo.value, 二级审批人: l2PickUser.value, ...(l2PickOpinion.value ? { 审批意见: l2PickOpinion.value } : {}) },
       buttonParam: {},
     })
@@ -7791,11 +7816,22 @@ async function printApprovalSheet() {
    * 算法:zoom = 纸宽 ÷ A4 内容宽,上限 1(窄表不放大),下限 0.32(约 5px 字,再小就没意义)。
    *   结果写到 <html> 的 CSS 变量上,样式侧用 var(--print-zoom) 取值 ⇒ 一处算、一处用。
    */
-  const A4_CONTENT_PX = Math.round((210 - 16) / 25.4 * 96)   // 194mm @96dpi ≈ 733px
+  let A4_CONTENT_PX = Math.round((210 - 16) / 25.4 * 96)   // 194mm @96dpi ≈ 733px
+  // 表格式纸面（2026-11-06 样品申请单）：两张纸 1188 / 1450px，竖向 A4 只能装 733px ⇒ 缩到 0.5，
+  // 字小到看不清。改走**横向 A4**（297-16=281mm ≈ 1062px），zoom ≈ 0.73~0.89，字号才保得住。
+  // @page 不认类选择器 ⇒ 只能动态注入一条规则；收尾时按 id 移除（与 prepareDocPrint 同款做法）。
+  let sgPageStyle = null
   const paperEl = document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
     + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .record-sheet')
+  if (paperEl && paperEl.querySelector('.sg-table')) {
+    A4_CONTENT_PX = Math.round((297 - 16) / 25.4 * 96)    // 281mm @96dpi ≈ 1062px
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'sg-print-page'
+    sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  }
   const paperW = paperEl ? Math.max(paperEl.scrollWidth, paperEl.offsetWidth) : 0
   const printZoom = paperW > 0
     ? Math.max(0.32, Math.min(1, A4_CONTENT_PX / paperW))
@@ -7804,6 +7840,7 @@ async function printApprovalSheet() {
   const restore = () => {
     document.body.classList.remove('approval-printing')
     document.documentElement.style.removeProperty('--print-zoom')
+    if (sgPageStyle) { sgPageStyle.remove(); sgPageStyle = null }
     window.removeEventListener('afterprint', restore)
   }
   window.addEventListener('afterprint', restore)
@@ -10859,7 +10896,9 @@ async function onButton(action) {
         return ElMessage.warning('仅审批中或待二级审批状态可审批通过')
       }
       // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
-      if (action === '审批通过' && panelCode.value === 'RD_PROD_INFO' && current.value['单据状态'] === '审批中') {
+      // 外部开发样品申请单（2026-11-06）：同一套「一级选二级(确认)人」弹窗
+      if (action === '审批通过' && ['RD_PROD_INFO', 'RD_SAMPLE_EXT'].includes(String(panelCode.value))
+        && current.value['单据状态'] === '审批中') {
         if (draftEditable.value) {
           const saved = await saveInlineDraft('保存', { silent: true })
           if (!saved) return

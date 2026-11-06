@@ -1079,7 +1079,10 @@ public class PxController {
         // 2026-09-20 例外:产品信息表的二级节点——被一级选定的二级审核人即使没有 audit 词
         //   (如 cp 这类普通账号)也可「审批通过/审批驳回」,否则两级审批第二级无人能点。
         Map<String, Object> formData0 = (Map<String, Object>) body.getOrDefault("formData", Map.of());
-        if (!perm.isL2ApproverOf("RD_PROD_INFO", panelCode, buttonName, formData0)) {
+        // 2026-11-06:首参改成**当前面板码**（原写死 "RD_PROD_INFO"）。isL2ApproverOf 内部本就按
+        //   `panelCode.equals(targetPanel)` 判等 —— 写死会让外部开发样品申请单（一级选人、二级确认）
+        //   的确认人在「待二级审批」节点被前门 403。改成 panelCode 后对其它面板零影响。
+        if (!perm.isL2ApproverOf(panelCode, panelCode, buttonName, formData0)) {
             perm.requireButton(panelCode, buttonName);
         }
         Map<String, Object> formData = formData0;
