@@ -28,6 +28,16 @@ export const menuTree = [
           { code: 'rdFlow', title: '项目流程管控', path: '/rd/projectFlow', icon: 'Connection', panelCode: 'PROJECT_FLOW' },
         ],
       },
+      // 2026-11-06 用户口径：「现在要加新面板，这个单独做一个二级目录：样品就在研发管理里面」
+      //   两张开发样品申请单（外部/内部）按《新系统-样品流程和相关表格式.xlsx》复刻。
+      //   外部单走「申请→审核(刘磊)→确认(冯总)→制备→入样品仓库」，收费样品涉财务流程；
+      //   内部单走「申请→确认(刘磊)」，确认后进制备、申请人不能再改。
+      {
+        code: 'rdSample', title: '样品', icon: 'Box', children: [
+          { code: 'rdSampleExt', title: '外部-开发样品', path: '/panelx/list/RD_SAMPLE_EXT', panelCode: 'RD_SAMPLE_EXT', icon: 'DocumentAdd', operationName: '申请样品' },
+          { code: 'rdSampleInt', title: '内部-开发样品', path: '/panelx/list/RD_SAMPLE_INT', panelCode: 'RD_SAMPLE_INT', icon: 'Document', operationName: '申请样品' },
+        ],
+      },
       {
         code: 'rdTest', title: '测试记录', icon: 'Notebook', children: [
           {

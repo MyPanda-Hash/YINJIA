@@ -4490,3 +4490,5 @@ migrate-drop-wol-picking-perm-20261105.sql
 
 # 2026-11-06 立项申请表「客户名」改指客户档案 KHDA.mc（下拉选客户；选中后前端按 客户编码+日期 填编号）
 migrate-approval-customer-ref-20261106.sql
+# 2026-11-06 研发管理新增「样品」二级目录 + 外部/内部开发样品申请单（两张新表 + 面板元数据 + 译名）
+migrate-sample-dev-panels-20261106.sql

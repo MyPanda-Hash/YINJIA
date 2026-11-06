@@ -481,3 +481,87 @@ export const qcSheetCfgs = {
     signCells: qcSignStd('编制人'),
   },
 }
+
+/**
+ * ═══ 研发管理 · 样品（2026-11-06 新增二级目录下的两张开发样品申请单）═══
+ * 设计依据：《新系统-样品流程和相关表格式.xlsx》
+ *   sheet1「（外部）开发样品申请单」→ RD_SAMPLE_EXT
+ *   sheet2「（内部）开发样品申请单-模板」→ RD_SAMPLE_INT
+ *
+ * 【版式口径】按 sheet 逐格复刻；对不合理处做了三处调整（用户授权「可以对其不合理的适当调整」）：
+ *   ① 外部单 sheet 的 A3:M4 是六个并排的说明格，每格内既有标签又有大段提示词。
+ *      实现把「标签」留在行首、提示词降为 hint —— 纸面读起来是「标签 → 填写区」，
+ *      不再把说明文字印进填写区（那会让录入内容与提示混在一起）。
+ *   ② 内部单的「样品状态」由确认人维护，做成下拉而不是自由文本，避免状态词各写各的。
+ *   ③ 两张单的「样品编号」规则相同（申请人姓名缩写+年月日+序号），由前端自动生成。
+ *
+ * 【与 approvalSheetCfg 的关系】行型（num/label/key/h/kind）完全沿用立项申请那一套，
+ * DocSheet 无需改动即可渲染。
+ */
+export const sampleExtSheetCfg = {
+  titlePart1: '（外部）',
+  titlePart2: '开发样品申请单',
+  titlePart3: '',
+  seq: 'num',
+  info: [
+    { label: '客户名称', key: '客户名称' },
+    { label: '费用', key: '费用' },
+    { label: '下单日期', key: '单据日期', kind: 'date' },
+    { label: '期望交期', key: '期望交期', kind: 'date' },
+  ],
+  remark: { label: '备注', key: '备注', max: 1000 },
+  rows: [
+    { num: '一', label: '产品整体规格', key: '产品整体规格', max: 500, h: 80, kind: 'textarea',
+      hint: '写组装后炭棒总长度或其他明确的尺寸要求' },
+    { num: '二', label: '炭棒规格', key: '炭棒规格', max: 500, h: 100, kind: 'textarea',
+      hint: '需注明公差要求，如 34*16*180 外径±0.5 内径±0.5 长度±0.5' },
+    { num: '三', label: '样品数量', key: '样品数量', max: 50, h: 45, kind: 'input' },
+    { num: '四', label: '组装要求', key: '组装要求', max: 500, h: 90, kind: 'textarea',
+      hint: '已有的组装耗材明确相关物料编码；未在库存的需明确尺寸需求与性能需求' },
+    { num: '五', label: '产品功能', key: '产品功能', max: 200, h: 45, kind: 'input' },
+    { num: '六', label: '背景', key: '背景', max: 500, h: 90, kind: 'textarea',
+      hint: '打样背景（如：客户因***事项需求样品）' },
+    { num: '七', label: '性能要求', key: '性能要求', max: 500, h: 100, kind: 'textarea',
+      hint: '1.前置/后置/台面机（或其他） 2.详细性能要求或明确客户测试条件' },
+    { num: '八', label: '配方及工艺要求', key: '配方及工艺要求', max: 500, h: 100, kind: 'textarea',
+      hint: '审核人根据相关信息确认配方和实现工艺' },
+  ],
+  signCells: [
+    { label: '申请', key: '申请', w: 202, type: 'text', flex: 40 },
+    { label: '审核', key: '审核', w: 202, type: 'text', flex: 30 },
+    { label: '确认', key: '确认', w: 202, type: 'text', flex: 30 },
+  ],
+}
+
+export const sampleIntSheetCfg = {
+  titlePart1: '内部',
+  titlePart2: '开发样品申请单',
+  titlePart3: '',
+  seq: 'num',
+  info: [
+    { label: '申请日期', key: '单据日期', kind: 'date' },
+    { label: '期望交期', key: '期望交期', kind: 'date' },
+  ],
+  remark: { label: '备注', key: '备注', max: 1000 },
+  rows: [
+    { num: '一', label: '项目名', key: '项目名', max: 200, h: 45, kind: 'input' },
+    { num: '二', label: '炭棒尺寸', key: '炭棒尺寸', max: 200, h: 45, kind: 'input',
+      hint: '如 33*12*110（外径*内径*长度）' },
+    { num: '三', label: '数量', key: '数量', max: 50, h: 45, kind: 'input' },
+    { num: '四', label: '样品背景', key: '样品背景', max: 500, h: 100, kind: 'textarea' },
+    { num: '五', label: '配方要求', key: '配方要求', max: 500, h: 100, kind: 'textarea' },
+    { num: '六', label: '工艺要求', key: '工艺要求', max: 500, h: 100, kind: 'textarea' },
+    { num: '七', label: '物料批次要求', key: '物料批次要求', max: 500, h: 90, kind: 'textarea' },
+    { num: '八', label: '样品状态', key: '样品状态', max: 0, h: 45, kind: 'select',
+      options: [
+        { value: '待确认', label: '待确认' },
+        { value: '已确认', label: '已确认' },
+        { value: '已安排', label: '已安排' },
+        { value: '已完成', label: '已完成' },
+      ] },
+  ],
+  signCells: [
+    { label: '确认人', key: '确认人', w: 202, type: 'text', flex: 100 },
+  ],
+}
+

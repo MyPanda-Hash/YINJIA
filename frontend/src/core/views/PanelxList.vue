@@ -2562,7 +2562,7 @@ import { recordSheetConfigs } from './recordSheetConfigs'
 import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
-import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
+import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
@@ -2616,7 +2616,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   'QC_PROC_INSP', 'QC_FIRST_INSP',
   // 出厂检验报告(2026-11-01 用户口径):「和首件检验单相同的形式」——
   // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
-  'QC_OQC_REPORT', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+  'QC_OQC_REPORT',
+  // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
+  // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
  * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
@@ -2641,7 +2645,12 @@ const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
 const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
-const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
+const docSheetConfig = computed(() => {
+  // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
+  if (panelCode.value === 'RD_SAMPLE_EXT') return sampleExtSheetCfg
+  if (panelCode.value === 'RD_SAMPLE_INT') return sampleIntSheetCfg
+  return qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg)
+})
 
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 20 })
 const condition = reactive({})
