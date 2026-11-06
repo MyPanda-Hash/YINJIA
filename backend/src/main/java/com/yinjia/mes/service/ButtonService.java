@@ -347,6 +347,10 @@ public class ButtonService {
         }
 
         String no = noObj == null || String.valueOf(noObj).isBlank() ? null : String.valueOf(noObj);
+        // 制程检验单「检验方案」固定写(2026-11-06 用户口径「抽检方案固定写(出货控制计划执行)」):
+        // 字段已置只读(迁移 migrate-proc-insp-form-20261106.sql),固定值真源=这里 + QcInspAutoService 自动生单
+        // (自动出单与「选生产工单」建单都走本 save(),两处同源;手工新建/历史单保存时同样归一)。
+        if ("QC_PROC_INSP".equals(def.code())) body.put("检验方案", "出货控制计划执行");
         if (def.isDoc()) {
             return saveDoc(def, body, items, no, user, markSaved);
         }

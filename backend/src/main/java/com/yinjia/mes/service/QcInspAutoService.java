@@ -252,6 +252,12 @@ public class QcInspAutoService {
             if (shop != null) head.put("生产车间", shop);
         }
         head.put("检验类别", "制程检验");
+        // 「检验方案」固定值(2026-11-06 用户口径「抽检方案固定写(出货控制计划执行)」):
+        // 字段已只读(yj_field.editable=0,迁移 migrate-proc-insp-form-20261106.sql),
+        // 自动出单在这里写、人工建单/保存走 ButtonService.save() 写的是**同一个固定值**(两边各一处字面量,
+        // 因本类被 ButtonService 依赖、不能反向引用那边;改口径两处一起改)——
+        // 这张单的「检验方案」没有任何人工选择面,别再给它加选项/参照。
+        head.put("检验方案", "出货控制计划执行");
         head.put("detail", Map.of("items", List.of()));
         return head;
     }

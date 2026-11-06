@@ -128,8 +128,20 @@
           </template>
           <template v-if="row">
             <td v-for="c in cellCols" :key="c.k" :class="c.cls">
+              <!-- 2026-11-06:字段元数据 dataType='下拉框' 且有 options 的列(「结果判断」合格/不合格)
+                   渲染成 el-select;选项值 = 存储数据键(合格/不合格),**不做 tt() 翻译** -->
+              <el-select
+                v-if="editable && optionsOf(c.k).length"
+                :model-value="cellText(row, c.k)"
+                size="small"
+                clearable
+                class="qr-cell-input"
+                @change="(v) => setCell(row, c.k, v ?? '')"
+              >
+                <el-option v-for="o in optionsOf(c.k)" :key="o" :label="o" :value="o" />
+              </el-select>
               <el-input
-                v-if="editable"
+                v-else-if="editable"
                 :model-value="cellText(row, c.k)"
                 size="small"
                 class="qr-cell-input qr-cell-wrap"
@@ -206,7 +218,10 @@ import { PROC_INSP_COLS, PROC_INSP_FOOT, buildProcInspExport } from '@/core/qc/q
 
 const props = defineProps({
   head: { type: Object, required: true },
+  /** 表头字段元数据(yj_field 下发,已过滤 hidden) */
   fields: { type: Array, default: () => [] },
+  /** 明细字段元数据(yj_field 下发;纸面只消费「下拉框」的 options,如「结果判断」合格/不合格) */
+  detailFields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'open-items'])
@@ -272,13 +287,17 @@ function uidOf(row) {
 }
 
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
-/** 抬头排除:左侧四列已在本表显示 + 已在表头格显示(检验员) + 已在结论区显示 + 系统/明细列 */
+const detailFieldMap = computed(() => new Map((props.detailFields || []).map((f) => [f.dataName, f])))
+/** 抬头排除:左侧四列已在本表显示 + 已在表头格显示(检验员) + 已在结论区显示 + 系统/明细列
+ *  ⚠ 2026-11-06:审批人/审批时间 放在纸张表尾(index 末行)/属系统字段,不进抬头区
+ *    (它们 hidden=1,后端下发时已过滤;这里再兜一层,免得将来放开 hidden 后又漏进抬头)。 */
 const HEAD_SKIP = new Set([
   ...headCols.map((c) => c.key),
   '单据状态', '处理方式', '表区', '行号', '检验项目', '检验要求',
   '检验方法', '检查频率', '检验仪器', '抽检量', '实测数值', ...MEASURE, '单项判定',
   '不合格应对措施', '不良数量', '产线常规功能性结果',
   '结果判断', '备注2', '备注', '总结论', '检验员', '审核人', '审核时间',
+  '审批人', '审批时间',
   '格数', '格数上限', '列数',
 ])
 const headRows = computed(() => {
@@ -356,10 +375,23 @@ function isDateKey(k) {
   const t = fieldMap.value.get(k)?.dataType
   return t === '日期' || t === '日期时间'
 }
-/** 只读判定:**登记过**且明确 editable=false 才算锁定(未登记 ≠ 锁定) */
+/** 只读判定:后端契约 —— yj_field.editable=0 在 dataSchema 里下发的是 **`readonly:true`**
+ *  (不是 editable:false;PanelConfigService.fieldSpec:`if (!f.editable()) m.put("readonly", true)`)。
+ *  ⚠ 2026-11-06 修:此前只判 editable===false/0 ⇒ 恒为 false(死代码),
+ *    单据编号/工单行号/检验方案/审核人/审核时间/审批人/审批时间 全成了可填框。
+ *    未登记 ≠ 锁定(与其它纸张同口径);检验员(yj_field.editable=1)保持可填。 */
 function isLockedKey(k) {
   const f = fieldMap.value.get(k)
-  return !!f && (f.editable === false || f.editable === 0)
+  return !!f && (f.readonly === true || f.editable === false || f.editable === 0)
+}
+
+/** 明细列的可选值:字段元数据 dataType='下拉框' 时后端下发 options(字符串数组)。
+ *  options 是**存储数据键**(如 合格/不合格),渲染时不做 tt() 翻译、也不做大小写/别名映射。
+ *  明细字段走 detailFields(props.detailFields;表头 fields 里没有 detail 级字段)。 */
+function optionsOf(key) {
+  const f = detailFieldMap.value.get(key) || fieldMap.value.get(key)
+  if (!f || f.dataType !== '下拉框' || !Array.isArray(f.options)) return []
+  return f.options
 }
 
 /**
@@ -579,6 +611,30 @@ defineExpose({ exportProcInspExcel })
   height: 20px;
   line-height: 20px;
 }
+/* 明细「下拉框」列(2026-11-06:结果判断 合格/不合格):控件观感与同格输入框一致 ——
+   无边框、贴合格线;选中值按格子的 text-align 居中/居左 */
+.qr-cell-input :deep(.el-select__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0 2px;
+  min-height: 20px;
+}
+.qr-cell-input :deep(.el-select__wrapper:hover),
+.qr-cell-input :deep(.el-select__wrapper.is-focused) {
+  background: #f2f8ff;
+  box-shadow: none;
+}
+.qr-cell-input :deep(.el-select__selected-item),
+.qr-cell-input :deep(.el-select__placeholder) {
+  font-size: 12px;
+  line-height: 20px;
+}
+/* 单选的显示值/占位词在 .el-select__placeholder 上(EP 2.14);按格子的 text-align 居中 */
+.qr-grid td.c-verdict .qr-cell-input :deep(.el-select__placeholder),
+.qr-grid td.c-func .qr-cell-input :deep(.el-select__placeholder) {
+  text-align: center;
+}
 .qr-grid td.c-req .qr-cell-input :deep(.el-input__inner),
 .qr-grid td.c-mtd .qr-cell-input :deep(.el-input__inner) {
   text-align: left;
@@ -748,6 +804,27 @@ defineExpose({ exportProcInspExcel })
     box-shadow: none !important;
     background: transparent !important;
     padding: 0 !important;
+  }
+  /* 明细下拉(2026-11-06「结果判断」合格/不合格):纸上只印选中的值,不印下拉箭头/边框 */
+  body.approval-printing .qr-sheet .el-select__wrapper {
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+  body.approval-printing .qr-sheet .el-select__caret,
+  body.approval-printing .qr-sheet .el-select__suffix {
+    display: none !important;
+  }
+  /* 占位提示词「请选择」不该印在纸上(EP 2.14:空值时 .el-select__placeholder.is-transparent);
+     选中值那个 placeholder **没有** is-transparent,只藏占位、别把真值一起藏了 */
+  body.approval-printing .qr-sheet .el-select__placeholder.is-transparent {
+    visibility: hidden !important;
+  }
+  body.approval-printing .qr-sheet .el-select__selected-item,
+  body.approval-printing .qr-sheet .el-select__placeholder {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
   }
   /* 编辑态才有的东西(新增项/删除列/拖动把手)不进纸 */
   body.approval-printing .qr-sheet .no-print,

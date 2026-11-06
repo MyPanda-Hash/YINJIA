@@ -172,7 +172,8 @@
         <QcProcInspSheet
           v-else-if="panelCode === 'QC_PROC_INSP'"
           ref="approvalSheetRef"
-          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          :head="cur" :fields="headerFields" :detail-fields="sheetDetailFields"
+          :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
         />
@@ -4763,11 +4764,8 @@ onMounted(() => {
   })
 })
 /** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
-const sheetAllFields = computed(() => {
-  const header = headerFields.value || []
-  const detail = cfgCache.value?.detail?.tabs?.[0]?.fields || []
-  return [...header, ...detail]
-})
+const sheetDetailFields = computed(() => cfgCache.value?.detail?.tabs?.[0]?.fields || [])
+const sheetAllFields = computed(() => [...(headerFields.value || []), ...sheetDetailFields.value])
 const queryDialogFields = computed(() => {
   // 档案/单单据面板(基础资料):表头只剩「备注」,查询条件取元数据登记的常规字段(queryFields,每面板 ≤6 个)
   const fields = (reportMode.value || singleDocMode.value) ? queryFields.value : headerEditFields.value

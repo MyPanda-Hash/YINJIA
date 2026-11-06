@@ -4487,3 +4487,10 @@ migrate-asm-bom-data-full-20261105.sql
 #   **后端实现保留**:/px/workOrderList/toPicking + WorkOrderPickingService + ManuWritebackService 回写不动,
 #   端点闸门仍认 picking(PanelPermissionService.BUTTON_PERMS_OVERRIDE 保留)。幂等;两账套均执行;末尾自检残留 = 0。
 migrate-drop-wol-picking-perm-20261105.sql
+
+# 2026-11-06 用户需求①(制程检验单字段调整):
+#   「工序」从界面删除(元数据 hidden=1;物理列/数据保留 —— 报工带入、报表/参照仍取值);
+#   「检验方案」固定写「出货控制计划执行」(字段置只读 + 历史单归一;后端 save()/自动生单同批强制写);
+#   明细「结果判断」改下拉框(合格/不合格,与出厂检验报告「判定」同口径)。
+#   ⚠ 幂等;两账套均执行(先正式 HSDZ_MES 后测试 HSDZ_MES_TEST)。
+migrate-proc-insp-form-20261106.sql
