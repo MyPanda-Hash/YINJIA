@@ -603,10 +603,14 @@
             <tr v-if="!effPlain && cfg.variantKey && !dt.noVariant">
               <td :colspan="variantSpan(dt)" class="rsp-subtitle-row rsp-left">
                 <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
-                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
+                <!-- 加标水（2026-11-06）：切换「测试项目」要**立刻换表头** —— 每个标准库条目
+                     存着自己的列结构（见 core/panel/spikeWaterLayout.js），换条目 = 换表格样式。 -->
+                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="onVariantChanged">
                   <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
                 <span v-if="editable && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.variantKey))">⧉ {{ tt('标准库维护') }}</span>
+                <!-- 加标水专属：把选中条目的表格结构拿出来可视化编辑（加/删列、改列名、设分格） -->
+                <span v-if="editable && isSpikeWater && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openLayoutEditor">⊞ {{ tt('表格结构') }}</span>
                 <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
               </td>
               <td :colspan="Math.max(1, totalSpan(dt) - variantSpan(dt))" class="rsp-subtitle-row rsp-quiet"></td>
@@ -1693,6 +1697,13 @@
         <el-button @click="sheetViewVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 加标水表格结构编辑器（2026-11-06）：编辑当前「测试项目」条目的列定义 -->
+    <StdLibLayoutEditor
+      v-if="isSpikeWater"
+      ref="layoutEditorRef"
+      @saved="onLayoutSaved"
+    />
   </div>
 </template>
 
@@ -1709,6 +1720,8 @@ import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSu
 import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
+import { parseLayout } from '@/core/panel/spikeWaterLayout.js'
+import StdLibLayoutEditor from './StdLibLayoutEditor.vue'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
@@ -2706,7 +2719,67 @@ function plainW(dt) {
   if (activePageMeta.value?.grid) return gridW.value
   return colsOf(dt).reduce((s, c) => s + (c.w || 100), 0)
 }
+/**
+ * 加标水自定义表格结构（2026-11-06 用户口径）。
+ *
+ * 「测试项目」是标准库字段；选中的条目在 yj_std_lib.content 里存着这套表的列定义（JSON）。
+ * 这里把它取出来解析成列集 —— 于是**一个标准库条目 = 一套表格样式**，
+ * 加一种测试项目只要在「⧉ 标准库维护」里加一条（内容填列定义），不用改代码、不用发版。
+ *
+ * 非加标水面板恒返回 null（colsOf 走原路径，逐字不变）。
+ */
+const spikeWaterLayout = ref(null)   // { cols, ok, reason }
+const spikeWaterCols = computed(() => (
+  String(props.panelCode || '') === 'RD_SPIKE_WATER' && spikeWaterLayout.value
+    ? spikeWaterLayout.value.cols
+    : null
+))
+
+/** 本面板是不是加标水（结构由标准库条目决定） */
+const isSpikeWater = computed(() => String(props.panelCode || '') === 'RD_SPIKE_WATER')
+
+const layoutEditorRef = ref(null)
+/** 打开表格结构编辑器：编辑当前「测试项目」那个条目的列定义 */
+function openLayoutEditor() {
+  const lib = stdLibOf('测试项目')
+  const picked = String(props.head?.['测试项目'] || '').trim()
+  if (!lib || !picked) return
+  layoutEditorRef.value?.open(lib, picked)
+}
+/** 结构存回去之后重新取一遍，纸面立刻用新表头 */
+async function onLayoutSaved() {
+  await loadSpikeWaterLayout()
+  emit('refresh-config')
+}
+/** 切「测试项目」后重新取结构（换条目 = 换表头） */
+async function onVariantChanged() {
+  emit('dirty')
+  await loadSpikeWaterLayout()
+}
+/** 拉「测试项目」那条标准库条目的 content 并解析成列集（失败退回内置列集，见 parseLayout） */
+async function loadSpikeWaterLayout() {
+  if (String(props.panelCode || '') !== 'RD_SPIKE_WATER') return
+  const lib = stdLibOf('测试项目')
+  const picked = String(props.head?.['测试项目'] || '').trim()
+  if (!lib || !picked) { spikeWaterLayout.value = null; return }
+  try {
+    const res = await request.get('/stdlib/list', { params: { lib, all: 1 } })
+    const rows = (res?.data ?? res ?? []).filter((r) => r.enabled !== 0 && r.enabled !== false)
+    const hit = rows.find((r) => String(r.content || '').trim().startsWith('{') &&
+      String(r.item_code || r.item || '').trim() === picked)
+      || rows.find((r) => String(r.item_code || r.item || '').trim() === picked)
+    spikeWaterLayout.value = parseLayout(hit ? hit.content : null)
+  } catch (e) {
+    spikeWaterLayout.value = parseLayout(null)
+  }
+}
 function colsOf(dt) {
+  // 加标水（RD_SPIKE_WATER，2026-11-06 用户口径「可以自定义面板格式……和标准库绑定，
+  // 一个标准库条目对应一个设计的表格样式」）：列集**由「测试项目」那个标准库条目的 content 决定**。
+  // 选中哪个条目，就用它存的 { cols:[{key,label,w,group,rowspan}] } 当列定义；
+  // 结构写坏/条目没配 → parseLayout 退回内置列集，单据照常出（不白屏）。
+  const layout = spikeWaterCols.value
+  if (layout) return layout
   return activeVariant.value?.cols || dt.cols || []
 }
 
@@ -4571,7 +4644,12 @@ function applyMoldModel(model) {
   emit('dirty')
   ElMessage.success(tt('已按型号 {m} 填入炭棒内外径与公差').replace('{m}', m))
 }
-onMounted(() => { if (props.editable) loadMoldRows() })
+onMounted(() => {
+  if (props.editable) loadMoldRows()
+  // 加标水：进面板就按当前「测试项目」条目取表结构（2026-11-06）
+  if (isSpikeWater.value) loadSpikeWaterLayout()
+})
+watch(() => props.head?.['测试项目'], () => { if (isSpikeWater.value) loadSpikeWaterLayout() })
 watch(() => props.editable, (v) => { if (v) loadMoldRows() })
 
 // ---------- 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表) ----------
