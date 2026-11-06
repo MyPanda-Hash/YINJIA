@@ -9063,6 +9063,22 @@ function focusMissingField(key) {
 }
 
 /**
+ * 一次高亮**多个**缺必填的格(2026-11-06 用户口径:「所有的必填项在保存提交审批的时候要有高亮
+ * 提示哪一个还没有填写」)。原先只定位第一个缺失项 —— 用户补完一个又冒下一个,来回试好几轮。
+ * 与 focusMissingField 同款:可选链 + try,定位失败绝不改变校验结果。
+ * @param {string[]} keys 缺必填的数据键(顺序即提示顺序)
+ */
+function focusMissingFields(keys) {
+  const list = (keys || []).filter(Boolean)
+  if (!list.length) return
+  try {
+    const sheet = approvalSheetRef.value
+    if (sheet?.focusFields) sheet.focusFields(list)
+    else sheet?.focusField?.(list[0])
+  } catch { /* 定位失败不影响校验 */ }
+}
+
+/**
  * 唯一键查重(2026-10-16,起点需求:工序档案「相同工序编码不允许出现重复」)。
  *
  * 声明来源 = 面板配置 `metadata.uniqueKeys`(后端由 `yj_panel.config` 下发,与 ButtonService
@@ -9099,6 +9115,8 @@ function validateArchiveUniqueKeys() {
 }
 
 function validateInlineDraft() {
+  /** 缺失项:{key(数据键), text(人话)} —— 明细页签整表必填时 key 是页签键 */
+  const missing = []
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
@@ -9108,28 +9126,17 @@ function validateInlineDraft() {
         continue
       }
       if (key === '单据编号' || key === '规格书种类') continue
-      // 先跳到该字段所在页签并高亮,再返回提示(用户才看得到要填哪里)
-      focusMissingField(key)
-      return `${headerFieldLabel(field)}不能为空`
+      missing.push({ key, text: headerFieldLabel(field) + '不能为空' })
     }
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
     const rows = cur.value.detail?.[tab.key] || []
-    if (tab.isRequired && !rows.length) {
-      // 整张明细页签为空:按**页签键**跳(配置里查得到就翻过去,查不到静默跳过,不硬编页码)
-      focusMissingField(tab.key)
-      return `请至少添加一行${tab.label || '明细'}`
-    }
-    // 2026-10-05 修复(用户报障「明细第 2 行工序控制不能为空」,而第 2 行根本没录入数据):
-    //   编辑器会给明细**预置空白行**,原实现逐行逐格校必填 ⇒ 空白行被判缺必填、拦在保存上。
-    //   口径:**空行视为"未录入"**,不参与必填校验;若整张明细全是空行,按"请至少添加一行"处理。
+    const tabName = tab.label || '明细'
     let nonEmpty = 0
+    let rowMissing = false
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index] || {}
-      // 空行判定(2026-10-05 二次修正):预置空行的布尔开关默认 false、数值默认 0/null 都会被
-      // String() 变成 "false"/"0" 而**看起来"有值"** ⇒ 空行被判成有数据的行,继续跑必填校验
-      // (用户报障:第 2 行没录任何东西也报"明细第 2 行工序控制不能为空")。
-      // 口径:boolean、以及 "false"/"true"/"0"/"Y"/"N"/"是"/"否" 一律视为**未录入**。
+      // 空行判定(2026-10-05):预置空行的布尔/0/null 不算"有数据的行",不参与必填校验
       const rowEmpty = (tab.fields || []).every((f) => {
         const v = row[f.dataName]
         if (emptyFieldValue(v)) return true
@@ -9141,17 +9148,22 @@ function validateInlineDraft() {
       nonEmpty++
       for (const field of tab.fields || []) {
         if (field.isRequired && emptyFieldValue(row[field.dataName])) {
-          focusMissingField(field.dataName)
-          return `${tab.label || '明细'}第 ${index + 1} 行${field.dataName}不能为空`
+          missing.push({ key: field.dataName, text: `${tabName}第 ${index + 1} 行${field.dataName}不能为空` })
+          rowMissing = true
         }
       }
     }
-    if (tab.isRequired && nonEmpty === 0) {
-      focusMissingField(tab.key)
-      return `请至少添加一行${tab.label || '明细'}`
+    if (tab.isRequired && nonEmpty === 0 && !rowMissing) {
+      missing.push({ key: tab.key, text: `请至少添加一行${tabName}` })
     }
   }
-  return ''
+  if (!missing.length) return ''
+  // 一次把**所有**缺失格点亮(翻到第一个缺失项所在页;其它页的格回到那页时仍在高亮期)
+  focusMissingFields(missing.map((m) => m.key))
+  // 提示文案:一项直说;多项列前 5 条 + 总数 —— 弹窗窄,不铺整串
+  if (missing.length === 1) return missing[0].text
+  const shown = missing.slice(0, 5).map((m) => m.text).join('、')
+  return `还有 ${missing.length} 项必填没填：${shown}${missing.length > 5 ? ' 等' : ''}`
 }
 
 /**
@@ -11046,6 +11058,19 @@ async function onButton(action) {
       formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
     })
+    // 产品信息表提交审批后:**跳到「产品文件列表 · 流程全览」**并把该产品展开(2026-11-06 用户口径:
+    //   「产品信息表在提交审批之后跳转到产品文件列表，可以查看流程信息」)。
+    // 为什么带 flow=1 + product=<编号>:产品文件列表默认是矩阵视图,流程全览才是这个动作想要的落点;
+    //   带产品编号过去会高亮那一行并自动展开它的五个节点,不用再找。
+    if (action === '提交审批' && String(panelCode.value) === 'RD_PROD_INFO') {
+      const prod = String(current.value?.['产品编号'] || '').trim()
+      ElMessage.success(tt('已提交审批，正在打开产品文件列表的流程全览'))
+      tabs.close(route.path)
+      const target = { path: '/panelx/list/RD_PROD_DOCLIST', query: prod ? { product: prod, flow: '1' } : { flow: '1' } }
+      router.push(target)
+      tabs.open({ path: target.path, title: tt('产品文件列表') })
+      return
+    }
     // 送料暂收单「生单」按商品基本档案「来料检验」**逐行分流**(2026-10-05 用户口径):
     // 一张暂收单可能同时产出 来料检验单 + 采购入库单,后端把实际生成的清单放在 res['生成清单'] —— 这里逐张说清,
     // 再跳到第一张(通用 gotoPanel 分支只会报一张,会把"其实还生成了另一张"瞒掉)。

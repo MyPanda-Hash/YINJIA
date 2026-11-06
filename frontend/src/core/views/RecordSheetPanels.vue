@@ -298,7 +298,7 @@
         <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair), 'rs-req': isPairReq(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
@@ -358,7 +358,7 @@
                故由**配置逐格**声明,零波及面) -->
           <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
-              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+              <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
               </td>
@@ -449,13 +449,13 @@
           <!-- 工序阶段行(成型工艺):左端 stage 纵向合并 + 参数键值对(可两对) -->
           <tr v-else-if="sec.stage">
             <td v-if="row.stage" class="rs-td rs-label rsp-stage" :rowspan="stageSpan(sec, ri)" :colspan="2">{{ tt(row.stage) }}</td>
-            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <td class="rs-td rs-label" :class="{ 'rs-req': isReq(row.key) }">{{ tt(row.label) }}</td>
             <td class="rs-td" :colspan="row.label2 ? 2 : 5">
               <el-input v-if="editable" v-model="head[row.key]" size="small" :maxlength="row.max || 500" class="rs-t-in" @input="emit('dirty')" />
               <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </td>
             <template v-if="row.label2">
-              <td class="rs-td rs-label">{{ tt(row.label2) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-req': isReq(row.key2) }">{{ tt(row.label2) }}</td>
               <td class="rs-td" colspan="2">
                 <el-input v-if="editable" v-model="head[row.key2]" size="small" :maxlength="row.max2 || 500" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[row.key2] || ''" :field-key="String(row.key2 || '')" />
@@ -465,7 +465,7 @@
 
           <!-- 常规单标签行 -->
           <tr v-else>
-            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <td class="rs-td rs-label" :class="{ 'rs-req': isReq(row.key) }">{{ tt(row.label) }}</td>
             <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#,Excel B:D/E:G/H:K 合并) -->
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
@@ -676,7 +676,7 @@
             <template v-else>
               <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
                 <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}<span v-if="editable && libOfCol(g.key)" class="rs-lib-pick" :title="tt('维护该列的标准库下拉内容')" @click.stop="openStdLib(libOfCol(g.key))">⌄</span></th>
+                  <th v-if="g.kind === 'plain'" class="rs-th" :class="{ 'rs-req': isReq(g.key) }" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}<span v-if="editable && libOfCol(g.key)" class="rs-lib-pick" :title="tt('维护该列的标准库下拉内容')" @click.stop="openStdLib(libOfCol(g.key))">⌄</span></th>
                   <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
                 </template>
                 <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
@@ -952,7 +952,7 @@
         <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair), 'rs-req': isPairReq(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
@@ -1012,7 +1012,7 @@
                故由**配置逐格**声明,零波及面) -->
           <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
-              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+              <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
               </td>
@@ -1084,13 +1084,13 @@
           <!-- 工序阶段行(成型工艺):左端 stage 纵向合并 + 参数键值对(可两对) -->
           <tr v-else-if="sec.stage">
             <td v-if="row.stage" class="rs-td rs-label rsp-stage" :rowspan="stageSpan(sec, ri)" :colspan="2">{{ tt(row.stage) }}</td>
-            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <td class="rs-td rs-label" :class="{ 'rs-req': isReq(row.key) }">{{ tt(row.label) }}</td>
             <td class="rs-td" :colspan="row.label2 ? 2 : 5">
               <el-input v-if="editable" v-model="head[row.key]" size="small" :maxlength="row.max || 500" class="rs-t-in" @input="emit('dirty')" />
               <AnnotatedText v-else class="rs-txt" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </td>
             <template v-if="row.label2">
-              <td class="rs-td rs-label">{{ tt(row.label2) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-req': isReq(row.key2) }">{{ tt(row.label2) }}</td>
               <td class="rs-td" colspan="2">
                 <el-input v-if="editable" v-model="head[row.key2]" size="small" :maxlength="row.max2 || 500" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[row.key2] || ''" :field-key="String(row.key2 || '')" />
@@ -1100,7 +1100,7 @@
 
           <!-- 常规单标签行 -->
           <tr v-else>
-            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <td class="rs-td rs-label" :class="{ 'rs-req': isReq(row.key) }">{{ tt(row.label) }}</td>
             <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#,Excel B:D/E:G/H:K 合并) -->
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
@@ -1218,7 +1218,7 @@
                ⚠ 与上面 sections 的网格行是**同一套格语义**,改一边要同步另一边(源契约测试已钉)。 -->
           <template v-if="row.grid">
             <template v-for="(c, ci) in row.grid" :key="'tg' + ci">
-              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+              <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
               </td>
@@ -2642,7 +2642,9 @@ function isLockedCell(dt, row, c) {
  * 空串 = 无高亮。注意是**键**不是纸面文案:同名字段两者可能不同(版  本 / 物料名),
  * 用文案去比模板里的 key 会全落空 —— 这正是 2026-10-13 这次改造的核心。
  */
-const focusKey = ref('')
+const focusKeys = ref(new Set())
+/** 当前高亮的第一个键(纸面上没匹配到时,scrollToFocus 用它按标签文案兜底定位) */
+const focusKeyFirst = () => (focusKeys.value.size ? [...focusKeys.value][0] : '')
 /** 定位查询只在本组件内做(document 里可能同时存在别的文书面板实例,查全局会闪错格子) */
 const rootEl = ref(null)
 /**
@@ -2654,8 +2656,20 @@ const rootEl = ref(null)
 let focusTimer = null
 let clearFocusOf = null
 /** 该数据键此刻是否是高亮目标(模板绑定用) */
-function isFocus(key) { return !!key && focusKey.value === String(key) }
+function isFocus(key) { return !!key && focusKeys.value.has(String(key)) }
 /** 键值对行的标签格:整对里任意一格(key 或 cells 的某一格)命中即高亮标签 */
+/** 该数据键是否**必填**(yj_field.required 经 fieldSpec 下发为 isRequired)——
+ *  纸面标签格据此打星号(2026-11-06 用户口径:「所有的必填项…要打*号」)。 */
+function isReq(key) {
+  if (!key) return false
+  const f = fieldMap.value.get(String(key))
+  return !!(f && (f.isRequired === true || f.isRequired === 1))
+}
+/** 键值对行的标签格:整对里任意一格必填就打星号(值格在 cells 里的那种) */
+function isPairReq(pair) {
+  if (!pair) return false
+  return isReq(pair.key) || (pair.cells || []).some((c) => isReq(c.key))
+}
 function isPairFocus(pair) {
   if (!pair) return false
   return isFocus(pair.key) || (pair.cells || []).some((c) => isFocus(c.key))
@@ -2679,7 +2693,7 @@ function scrollToFocus() {
     hit.scrollIntoView({ behavior: 'smooth', block: 'center' })
     return
   }
-  const label = focusKey.value
+  const label = focusKeyFirst()
   const all = [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb, td.rs-td, th')].filter(visible)
   const el = all.find((e) => (e.textContent || '').trim() === label)
     || [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb')].filter(visible)
@@ -2706,15 +2720,42 @@ async function focusField(key) {
   if (focusTimer) { clearTimeout(focusTimer); focusTimer = null }
   clearFocusOf?.()
   if (pageList.value.length) activePage.value = target
-  focusKey.value = name
-  clearFocusOf = () => { focusKey.value = '' }
+  focusKeys.value = new Set([name])
+  clearFocusOf = () => { focusKeys.value = new Set() }
   await nextTick()
   scrollToFocus()
-  focusTimer = setTimeout(() => { focusKey.value = ''; focusTimer = null; clearFocusOf = null }, 3000)
+  focusTimer = setTimeout(() => { focusKeys.value = new Set(); focusTimer = null; clearFocusOf = null }, 3000)
+  return true
+}
+
+/**
+ * 一次高亮**多个**缺必填的格(2026-11-06 用户口径:「所有的必填项在保存提交审批的时候要有高亮提示
+ * 哪一个还没有填写」)。原来只高亮**第一个**缺失项(validateInlineDraft 命中即 return),
+ * 用户补完一个又冒下一个,得来回试好几轮。
+ *
+ * 行为:翻到"第一个缺失键"所在页签(其它键可能在别的页,翻不过去没关系 —— 回到那一页时
+ *   rs-focus 仍在,3 秒后才熄),然后集合内所有键一起打 rs-focus。
+ * @param {string[]} keys 缺必填的数据键(顺序即提示顺序)
+ */
+async function focusFields(keys) {
+  const list = [...new Set((keys || []).map((k) => String(k ?? '').trim()).filter(Boolean))]
+  if (!list.length) return false
+  let target = pageOfKey(list[0])
+  if (target < 0) target = pageOfLabel(list[0])
+  if (target === null || target < 0) target = 0
+  if (focusTimer) { clearTimeout(focusTimer); focusTimer = null }
+  clearFocusOf?.()
+  if (pageList.value.length) activePage.value = target
+  focusKeys.value = new Set(list)
+  clearFocusOf = () => { focusKeys.value = new Set() }
+  await nextTick()
+  scrollToFocus()
+  focusTimer = setTimeout(() => { focusKeys.value = new Set(); focusTimer = null; clearFocusOf = null }, 4000)
   return true
 }
 defineExpose({
   focusField,
+  focusFields,
   pageOfKey,
   // 多页导出用(2026-10-28):整份文书导出「所有页面」时,由 PanelxList 逐页切页签再截图。
   //   pageCount  = 本面板页签数(单页 = 1);
@@ -4929,6 +4970,15 @@ function chartOf(dt) {
   text-align: center;
   font-weight: 500;
 }
+/* 必填星号(2026-11-06 用户口径「要打*号」):挂在标签格上,伪元素出星,不改模板文案 */
+.rs-req::after {
+  content: '*';
+  margin-left: 3px;
+  color: #f56c6c;
+  font-weight: 700;
+  vertical-align: top;
+}
+
 /* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时跳转提示) */
 @keyframes rsFieldBlink {
   0%, 100% { box-shadow: none; }

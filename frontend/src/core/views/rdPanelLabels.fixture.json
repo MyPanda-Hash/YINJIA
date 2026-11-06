@@ -76,7 +76,194 @@
    "原水TDS",
    "水温",
    "备注"
-  ]
+  ],
+  "req": {
+   "测试时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试流速（L/min）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "杯数(接水量100ml)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "水温（℃）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "RO水PH": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "RO水TDS": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "滤芯出水PH": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "滤芯出水TDS": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "PH提升值": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "钠": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "镁": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "钾": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "钙": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "累积流量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "累积流量（L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次实验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试仪器": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及工位": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "测试方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水自来水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水超纯水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水RO纯水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水PH": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水TDS": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "水温": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_ANTIBACT": {
   "cols": {
@@ -132,7 +319,134 @@
    "测试方法",
    "数据结论",
    "备注"
-  ]
+  ],
+  "req": {
+   "测试日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "累计流量（L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原液浓度（cfu/ml）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "活性氧化铝（cfu/ml）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率（%）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次实验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "试验用水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置/设备": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "冲水方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "数据结论": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_APPROVAL": {
   "cols": {
@@ -184,7 +498,124 @@
    "项目责任人",
    "责任人确认",
    "确认收到时间"
-  ]
+  ],
+  "req": {
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "立项背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "机型及应用位置": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "滤芯/炭棒规格或结构": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目开发目标": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目输出": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "开发周期要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "其它要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请立项人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请立项日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "项目等级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "附件1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "对接人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "项目责任人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "责任人确认": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "确认收到时间": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_ASM_BOM": {
   "cols": {
@@ -230,7 +661,109 @@
    "整体规格（外径）",
    "整体规格（长度）",
    "成品重量"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改原因": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "责任人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "外观要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "用量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品种类": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "整体规格（外径）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "整体规格（长度）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "成品重量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_ASM_PROC": {
   "cols": {
@@ -308,7 +841,184 @@
    "是否受控",
    "受控日期",
    "变更来源单号"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "工序": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "工序控制内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "管控要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检查比例": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "版本号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "外观要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "用量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改原因": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "责任人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "客户项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品功能类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "工艺形态": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品整体尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": true,
+    "hidden": false
+   },
+   "产品种类": {
+    "required": false,
+    "hidden": false
+   },
+   "整体规格（外径）": {
+    "required": false,
+    "hidden": false
+   },
+   "整体规格（长度）": {
+    "required": false,
+    "hidden": false
+   },
+   "成品重量": {
+    "required": false,
+    "hidden": false
+   },
+   "表单管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否受控": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "受控日期": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "变更来源单号": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_CHANGE": {
   "cols": {
@@ -378,7 +1088,169 @@
    "文件使用范围",
    "变更来源单号",
    "备注"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "部门": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更后内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "签字": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "标题": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请部门": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "性质": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更类型": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更事由": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "验证数据": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更文件": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "相关变更": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "需会签": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "会签人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原料数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原料处理方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "半成品数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "半成品处理方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "成品数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "成品处理方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更来源单号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_DOM_TEST": {
   "cols": {
@@ -450,7 +1322,174 @@
    "密级",
    "文件使用范围",
    "测试负责人"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）背景/目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配方": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）目标": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "组装方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测完后样品样品处理": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "紧急程度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "期望完成日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "预计完成日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "生产批次": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "发起人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试（检测）目标/要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否要求送样/支数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否需要提供报告": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "申请单类型": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "文件管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_DROP_PREC": {
   "cols": {
@@ -508,7 +1547,139 @@
    "测试方法",
    "测试用仪器/检出限",
    "表单审核人"
-  ]
+  ],
+  "req": {
+   "测试时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配方": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试水温（℃）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试流速（L/min）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "前压（kpa)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "后压（kpa)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压差（kpa)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "0.5-1μm颗粒物去除率-2min（%）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试用仪器/检出限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_EQUIP_USE": {
   "cols": {
@@ -534,19 +1705,71 @@
    "单据编号",
    "单据日期",
    "设备名称"
-  ]
+  ],
+  "req": {
+   "使用日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试项目": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用工位": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "设备状态\\n（检查管路、阀门、启动是否正常）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "设备名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_FILTER_EFF": {
   "cols": {
    "冲水时间": "冲水时间",
+   "压力样品1": "压力（PSI)样品1",
+   "压力样品2": "压力（PSI)样品2",
    "累计进水L": "累计进水（L）",
    "水温": "水温",
-   "压力样品1": "压力（PSI)样品1",
    "压力（PSI)样品3": "压力（PSI)样品3",
    "压力（PSI)样品4": "压力（PSI)样品4",
    "压力（PSI)样品5": "压力（PSI)样品5",
    "压力（PSI)样品6": "压力（PSI)样品6",
-   "压力样品2": "压力（PSI)样品2",
    "流速样品1": "流速（L/min)样品1",
    "流速（L/min)样品3": "流速（L/min)样品3",
    "流速（L/min)样品4": "流速（L/min)样品4",
@@ -615,14 +1838,14 @@
   },
   "labels": [
    "冲水时间",
+   "压力（PSI)样品1",
+   "压力（PSI)样品2",
    "累计进水（L）",
    "水温（℃）",
-   "压力（PSI)样品1",
    "压力（PSI)样品3",
    "压力（PSI)样品4",
    "压力（PSI)样品5",
    "压力（PSI)样品6",
-   "压力（PSI)样品2",
    "流速（L/min)样品1",
    "流速（L/min)样品3",
    "流速（L/min)样品4",
@@ -689,7 +1912,382 @@
    "自来水加氯浓度",
    "水温",
    "备注"
-  ]
+  ],
+  "req": {
+   "冲水时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品1": {
+    "required": false,
+    "hidden": true
+   },
+   "压力（PSI)样品2": {
+    "required": false,
+    "hidden": true
+   },
+   "累计进水（L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "水温（℃）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "流速（L/min)样品1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "流速（L/min)样品3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "流速（L/min)样品4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "流速（L/min)样品5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "流速（L/min)样品6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "流速（L/min)样品2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水含量（ug/L）5号缸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水含量（ug/L）样品3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水含量（ug/L）样品4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水含量（ug/L）样品5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水含量（ug/L）样品6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水含量（ug/L）样品1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水含量（ug/L）样品2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率%样品3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率%样品4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率%样品5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率%样品6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率%样品1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "去除率%样品2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品配方6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品信息6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次实验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号4": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号5": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置及编号6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "加标方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "冲水方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试用仪器/检出限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水自来水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水纯水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水超纯水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水PH": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水TDS": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "缸内自来水VOC浓度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "自来水加氯浓度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "水温": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_INSP_PLAN": {
   "cols": {
@@ -763,7 +2361,179 @@
    "是否受控",
    "受控日期",
    "变更来源单号"
-  ]
+  ],
+  "req": {
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "控制项目": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "质量控制内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检测仪器": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "控制标准及要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "不合格应对措施": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检测频率": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "取样方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "控制方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "标题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "版本号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "主要性能": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品功能类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品整体尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "滤芯尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "授权使用人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "编写人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "审核人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否受控": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "受控日期": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "变更来源单号": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_INSTR_USE": {
   "cols": {
@@ -793,7 +2563,69 @@
    "单据编号",
    "单据日期",
    "仪器名称/型号"
-  ]
+  ],
+  "req": {
+   "使用日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "起止时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "仪器状态\\n√/×": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否内校\\n√/-": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目名称/内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "用途": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "仪器名称/型号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_MINERAL": {
   "cols": {
@@ -845,7 +2677,124 @@
    "表单审核人",
    "测试方法",
    "备注"
-  ]
+  ],
+  "req": {
+   "指标": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "累计流量L": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "RO出水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浸泡30min": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浸泡30min煮沸晾凉": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次试验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试仪器": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_MOLD_FORMULA": {
   "cols": {
@@ -897,7 +2846,124 @@
    "生产车间",
    "配料要求",
    "备注"
-  ]
+  ],
+  "req": {
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料种类": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "实际添加比例": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单支物料含量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "设计添加量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "表单管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "版本号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品管控类型": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "外观要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "生产车间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配料要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_MOLD_PROC": {
   "cols": {
@@ -1077,7 +3143,444 @@
    "压降是否测试",
    "配料要求",
    "变更来源单号"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料种类": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "实际添加比例": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单支物料含量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "设计添加量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改原因": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "责任人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "表单管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "版本号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品管控类型": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "外观要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "生产车间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "理论最低灌料重量g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "理论灌料中间值g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "理论最高灌料重量g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "理论水分": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "实际灌料重量计算公式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "灌料要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否受控": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "烧结炉参数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "工序": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "工序管控要求": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "灌料": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "烧结": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "烧结时间/调速器参数": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "热压": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "受控日期": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "冷却": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "脱模": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "烧结时间调速器参数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "热压要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "冷却参数设置": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "长度要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "重量要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "最短长度mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "中间值mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "最长长度mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "最低重量g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "中间值g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "最高重量g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "外径mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "外径公差": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "内径mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "内径公差": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "内孔要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度管控要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度管控": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "管控要求": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "实际密度管控下限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "实际密度管控上限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "跌落高度cm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "跌落次数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "跌落强度": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "高度cm": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "跌落要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "要求": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "测试间距mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "抗压强度": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "压头下降速度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压头下降速度mm/min": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "强度要求kgf": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压降测试管路": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压降": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "测试管路": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "压降测试流速": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试流速L/min": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "压降标准kpa": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压降是否测试": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配料要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更来源单号": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_PLAN": {
   "cols": {
@@ -1237,7 +3740,344 @@
    "阶段10_计划完成",
    "阶段10_实际完成",
    "阶段10_责任人"
-  ]
+  ],
+  "req": {
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "项目名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "项目定级": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试产品打样要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目标": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试条件": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试计划": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段1": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段2": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段3": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段4": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段5": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段6": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段7": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段8": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段9": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "阶段10": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "编制日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "阶段1_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段1_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段1_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段1_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段1_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段2_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段2_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段2_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段2_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段2_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段3_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段3_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段3_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段3_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段3_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段4_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段4_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段4_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段4_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段4_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段5_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段5_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段5_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段5_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段5_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段6_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段6_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段6_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段6_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段6_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段7_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段7_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段7_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段7_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段7_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段8_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段8_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段8_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段8_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段8_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段9_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段9_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段9_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段9_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段9_责任人": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段10_计划内容": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段10_计划开始": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段10_计划完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段10_实际完成": {
+    "required": false,
+    "hidden": true
+   },
+   "阶段10_责任人": {
+    "required": false,
+    "hidden": true
+   }
+  }
  },
  "RD_PROD_DOCLIST": {
   "cols": {
@@ -1261,7 +4101,53 @@
    "文件管理人",
    "文档编号",
    "备注"
-  ]
+  ],
+  "req": {
+   "序号": {
+    "required": false,
+    "hidden": true
+   },
+   "产品编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_PROD_INFO": {
   "cols": {
@@ -1275,19 +4161,19 @@
    "产品编号": "产品编号",
    "项目编号": "项目编号",
    "项目名称": "项目名称",
+   "客户名称": "客户名称",
    "立项文档编号": "立项文档编号",
    "产品名称": "产品名称",
-   "客户名称": "客户名称",
    "客户编码": "客户编码",
    "客户项目名称": "客户项目名称",
    "产品管控等级": "产品管控等级",
    "产品功能类别": "产品功能类别",
-   "应用场景": "应用场景",
    "编辑人": "编辑人",
    "产品类别": "产品类别",
    "产品类型": "产品类型",
    "产品整体尺寸": "产品整体尺寸",
    "客户料号": "客户料号",
+   "应用场景": "应用场景",
    "炭棒尺寸": "炭棒尺寸",
    "炭棒外径": "炭棒外径",
    "炭棒内径": "炭棒内径",
@@ -1314,19 +4200,19 @@
    "产品编号",
    "项目编号",
    "项目名称",
+   "客户名称",
    "立项文档编号",
    "产品名称",
-   "客户名称",
    "客户编码",
    "客户项目名称",
    "产品管控等级",
    "产品功能类别",
-   "应用场景",
    "编辑人",
    "产品类别",
    "产品类型",
    "产品整体尺寸",
    "客户料号",
+   "应用场景",
    "炭棒尺寸",
    "炭棒外径",
    "炭棒内径",
@@ -1341,7 +4227,194 @@
    "审核人（二级审批人）",
    "审核人",
    "备注"
-  ]
+  ],
+  "req": {
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "尺寸规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "项目编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "立项文档编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "客户编码": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品管控等级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品功能类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "编辑人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品类型": {
+    "required": true,
+    "hidden": true,
+    "visible": true
+   },
+   "产品整体尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户料号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "应用场景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "炭棒外径": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒内径": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒长度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "主要性能描述": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "下单数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品分类": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "产品形态": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户图纸或规格书": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "审核人（一级审批人）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "审核人（二级审批人）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "审核人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_PROGRESS": {
   "cols": {
@@ -1427,7 +4500,206 @@
    "文件使用范围",
    "文档编号",
    "备注"
-  ]
+  ],
+  "req": {
+   "项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目定级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "子项目/尺寸": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "说明": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目级": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "项目负责": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "实施进度": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "里程完成": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "状态": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试员": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "谁来批准": {
+    "required": false,
+    "hidden": true
+   },
+   "谁来检验": {
+    "required": false,
+    "hidden": true
+   },
+   "未批准原因": {
+    "required": false,
+    "hidden": true
+   },
+   "项目编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "开发复杂度": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "重要程度": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "紧急程度": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "项目发起人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "立项日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "预计完成日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目定及变更": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "测试情况": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "技术目标达成": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "是否市场转化": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "未转换原因": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "项目(一/二级)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试产品打样要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目标": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试条件": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文件使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_RO_PROTECT": {
   "cols": {
@@ -1493,10 +4765,167 @@
    "配方/工艺",
    "测试结论",
    "备注"
-  ]
+  ],
+  "req": {
+   "样品": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "累计流量（L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "膜前压（MPa）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "纯水流速(mL/min)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "废水流速(L/min)": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "衰减率": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "原水（tds）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "纯水（tds）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "脱盐率": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试背景/目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次实验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "试验用水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置/设备": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "冲水方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名/规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配方/工艺": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试结论": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_SAMPLE_EXT": {
   "cols": {
+   "单据编号": "单据编号",
+   "单据日期": "单据日期",
+   "客户名称": "客户名称",
+   "费用": "费用",
+   "期望交期": "期望交期",
    "产品整体规格": "产品整体规格",
    "炭棒规格": "炭棒规格",
    "样品数量": "样品数量",
@@ -1505,17 +4934,17 @@
    "背景": "背景",
    "性能要求": "性能要求",
    "配方及工艺要求": "配方及工艺要求",
-   "单据编号": "单据编号",
-   "单据日期": "单据日期",
-   "客户名称": "客户名称",
-   "费用": "费用",
-   "期望交期": "期望交期",
    "申请": "申请",
    "审核": "审核",
    "确认": "确认",
    "备注": "备注"
   },
   "labels": [
+   "单据编号",
+   "单据日期",
+   "客户名称",
+   "费用",
+   "期望交期",
    "产品整体规格",
    "炭棒规格",
    "样品数量",
@@ -1524,22 +4953,103 @@
    "背景",
    "性能要求",
    "配方及工艺要求",
-   "单据编号",
-   "单据日期",
-   "客户名称",
-   "费用",
-   "期望交期",
    "申请",
    "审核",
    "确认",
    "备注"
-  ]
+  ],
+  "req": {
+   "单据编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "费用": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "期望交期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品整体规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒规格": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品数量": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "组装要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品功能": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "性能要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配方及工艺要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "申请": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "审核": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "确认": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_SAMPLE_INT": {
   "cols": {
    "单据编号": "单据编号",
    "单据日期": "单据日期",
-   "申请人": "申请人",
    "项目名": "项目名",
    "炭棒尺寸": "炭棒尺寸",
    "数量": "数量",
@@ -1555,7 +5065,6 @@
   "labels": [
    "单据编号",
    "单据日期",
-   "申请人",
    "项目名",
    "炭棒尺寸",
    "数量",
@@ -1567,7 +5076,74 @@
    "样品状态",
    "确认人",
    "备注"
-  ]
+  ],
+  "req": {
+   "单据编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目名": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "数量": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "样品背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配方要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "工艺要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料批次要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "期望交期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "样品状态": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "确认人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_SCALE": {
   "cols": {
@@ -1631,7 +5207,154 @@
    "加标水配置",
    "测试方法",
    "备注"
-  ]
+  ],
+  "req": {
+   "测试日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "累计流量（L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "水温（℃）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "加标水硬度H0": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "加标水烧开后硬度H1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水硬度（0.8mm-8g(1:2)）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水硬度（0.8mm-8g(1.1:1)）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出水硬度（1.2mm-12g(1.1:1)）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "阻垢率（0.8mm-8g(1:2)）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "阻垢率（0.8mm-8g(1.1:1)）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "阻垢率（1.2mm-12g(1.1:1)）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "特殊配方1": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "特殊配方2": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "特殊配方3": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次实验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "加标水配置": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_SHARE_FILE": {
   "cols": {
@@ -1639,7 +5362,14 @@
   },
   "labels": [
    "文件"
-  ]
+  ],
+  "req": {
+   "文件": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_SOAK": {
   "cols": {
@@ -1727,7 +5457,214 @@
    "检出限（重金属）",
    "实验结论",
    "备注"
-  ]
+  ],
+  "req": {
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "卫生要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "需求2（30*10*113）增加/改变值": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "需求2（35*13*107）增加/改变值": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "需求4（40.5*10*114）增加/改变值": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "报告编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "文档编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试主题": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试目的/背景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试标准": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "本次实验目的": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浸泡水配置": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单审核人": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "炭棒尺寸（1）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸（2）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒尺寸（3）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浸泡液用量（1）ml": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浸泡液用量（2）ml": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浸泡液用量（3）ml": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "仪器名称（PH）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "品牌型号（PH）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检出限（PH）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "仪器名称（TDS）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "品牌型号（TDS）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检出限（TDS）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "仪器名称（浊度）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "品牌型号（浊度）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检出限（浊度）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "仪器名称（重金属）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "品牌型号（重金属）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检出限（重金属）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "实验结论": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_SPEC_DOC": {
   "cols": {
@@ -1819,7 +5756,224 @@
    "是否受控",
    "受控日期",
    "变更来源单号"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改原因": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "责任人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验项目": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验子项": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验方法": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "检验依据": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编码": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "规格参数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "数量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "规格书种类": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "应用场景": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户编码": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户料号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "版本": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "制订日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "审核日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "适用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "整体规格参数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品主要性能": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒处理要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "包装方式": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "出货检验报告": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "运输要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "存储环境": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "是否受控": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "受控日期": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "变更来源单号": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   }
+  }
  },
  "RD_SPIKE_WATER": {
   "cols": {
@@ -1875,7 +6029,134 @@
    "单据日期",
    "测试项目",
    "备注"
-  ]
+  ],
+  "req": {
+   "测试日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "项目名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试装置": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "测试工位": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配水量\\n（L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配置用水": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "硫酸镁": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "二水氯化钙": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "碳酸氢钠": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "4%次氯酸钠": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "盐酸或氢氧化钠": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "可溶性铅": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "不可溶性铅": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "汞标准溶液 \\n1000mg/L": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "氯化钠（g）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "三氯甲烷储备液\\n（1000mg/L）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "PH\\n8.5±0.25": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "TDS（mg/L）200-500mg/L": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "水温（℃）\\n20±2.5℃": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "浊度值（NTU）\\n＜1NTU": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "负责人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "测试项目": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  },
  "RD_X_SINTER": {
   "cols": {
@@ -1979,6 +6260,253 @@
    "配料要求",
    "特殊管控要求",
    "变更来源单号"
-  ]
+  ],
+  "req": {
+   "表区": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "序号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料种类": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "物料名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "设计添加量": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "添加比例": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单支含量g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改内容": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改原因": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "更改时间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "责任人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "表单管理人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密级": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "使用范围": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "版本号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品名称": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒外径": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒内径": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒出货长度": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品管控类型": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "产品形态": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "生产车间": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "模具出料口内径": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "中心杆外径": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒外径公差": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒内径公差": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "颗粒物料折算系数": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "成型修正长度参数mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度参数下限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度参数上限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "切炭长度下限mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "切炭长度中间值mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "切炭长度上限mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "冷却长度下限mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "冷却长度中间值mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "冷却长度上限mm": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒重量下限g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒重量中间值g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "炭棒重量上限g": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度要求下限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度要求中间值": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "密度要求上限": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "配料要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "特殊管控要求": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "变更来源单号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   }
+  }
  }
 }
