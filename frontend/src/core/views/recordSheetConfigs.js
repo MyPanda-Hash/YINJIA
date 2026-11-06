@@ -57,12 +57,12 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
-// 炭棒规格三格的纸面前缀(外：/内：/长：)。
-// ⚠ 2026-11-03:前缀**只在这里渲染**,数据里存裸数字 —— 与 core/panel/carbonSpec.js 同源,
-//   那边写值、这边显示,不许任何一侧自己再拼一遍(混进数据的后果见 carbonSpec.js 头注)。
-// ⚠ 用**相对路径 + .js 扩展名**(不用 `@/` 别名):node --test 直接跑源码时不认 Vite 别名,
-//   与上面 specTestLib 同一条纪律。
-import { SPEC_PREFIX } from '../panel/carbonSpec.js'
+// 炭棒规格三格(炭棒规格1/2/3)的纸面前缀 `外：/内：/长：` —— **2026-11-06 退役**
+// (用户口径「研发管理的烧结工艺清单的炭棒规格的外：、内：、长：,这些表格内背景词去掉」):
+// 数据本就存裸数字(2026-11-03 起,见 core/panel/carbonSpec.js 头注),现在**纸面也只留数字输入框**。
+// ⚠ 渲染能力(`cell.pre` / RecordSheetPanels 的 .rs-pre)保留着给别的单用,**不要再挂回这三格** ——
+//   回归症状是那三个灰字 reappear,录入/导入的人会以为要连文字一起填(正是 2026-11-03 事故的成因)。
+//   单测钉着:core/views/recordSheetConfigs.rodSpec.test.js
 // ⚠ 配方表「物料种类」**不再是下拉**(2026-10-16 用户口径:「把填写框的物料种类的下拉框改为普通文本框」):
 //   词表 MATERIAL_KINDS(core/mold/materialKinds.js)仍归**配方计算弹窗**用 —— 那里它是"按类别收窄
 //   物料编号/物料名称候选"的前置筛选。页 2 这格的类别改由 手填物料编号 → 商品档案 带出
@@ -249,11 +249,12 @@ const RD_MOLD_PROC_SEC0 = [
         { grid: [
           { key: '产品编号', span: 2 },
           { key: '产品名称', span: 2 },
-          // 「炭棒规格」三窄格:纸上显示 外：/内：/长：,但**数据只存裸数字**
-          // (pre = 渲染前缀,不进 head;见 core/panel/carbonSpec.js 头注的 2026-11-03 口径)
-          { key: '炭棒规格1', pre: SPEC_PREFIX['炭棒规格1'] },
-          { key: '炭棒规格2', pre: SPEC_PREFIX['炭棒规格2'] },
-          { key: '炭棒规格3', pre: SPEC_PREFIX['炭棒规格3'] },
+          // 「炭棒规格」三窄格 = 外径 / 内径 / 长度。**纸上只有数字**:不带 `外：/内：/长：` 前缀,
+          // 也不带提示词(2026-11-06 用户口径「这些表格内背景词去掉」)—— 与数据口径对齐
+          // (head 里本来就存裸数字,见 core/panel/carbonSpec.js 头注),导入时直接落数字即可。
+          { key: '炭棒规格1' },
+          { key: '炭棒规格2' },
+          { key: '炭棒规格3' },
           { key: '产品管控类型', type: 'select', span: 2 },
           { key: '外观要求', type: 'select' },
           { key: '生产车间', type: 'select' },

@@ -414,9 +414,10 @@
                   </div>
                 </template>
                 <template v-else-if="editable && c.key && !c.ro">
-                  <!-- 带纸面前缀的格(如炭棒规格1/2/3 的 外：/内：/长：):
-                       前缀是**渲染**出来的,head 里只存裸数字(2026-11-03 口径,
-                       见 core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model -->
+                  <!-- 带纸面前缀的格:前缀是**渲染**出来的,head 里只存裸数字(口径见
+                       core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model。
+                       ⚠ 炭棒规格1/2/3 的 外：/内：/长： 已于 2026-11-06 退役(那三格不再挂 pre,
+                       用户口径「这些表格内背景词去掉」),本能力保留给别的单用 -->
                   <span v-if="c.pre" class="rs-pre-cell">
                     <span class="rs-pre">{{ tt(c.pre) }}</span>
                     <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
@@ -1048,9 +1049,10 @@
                   </span>
                 </template>
                 <template v-else-if="editable && c.key && !c.ro">
-                  <!-- 带纸面前缀的格(如炭棒规格1/2/3 的 外：/内：/长：):
-                       前缀是**渲染**出来的,head 里只存裸数字(2026-11-03 口径,
-                       见 core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model -->
+                  <!-- 带纸面前缀的格:前缀是**渲染**出来的,head 里只存裸数字(口径见
+                       core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model。
+                       ⚠ 炭棒规格1/2/3 的 外：/内：/长： 已于 2026-11-06 退役(那三格不再挂 pre,
+                       用户口径「这些表格内背景词去掉」),本能力保留给别的单用 -->
                   <span v-if="c.pre" class="rs-pre-cell">
                     <span class="rs-pre">{{ tt(c.pre) }}</span>
                     <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
@@ -4855,7 +4857,8 @@ function chartOf(dt) {
   border-collapse: collapse;
   table-layout: fixed;
 }
-/* 纸面前缀格(炭棒规格1/2/3 的 外：/内：/长：,2026-11-03):
+/* 纸面前缀格(2026-11-03 为炭棒规格1/2/3 的 外：/内：/长： 而加;
+   ⚠ 2026-11-06 那三格退役了(用户口径「这些表格内背景词去掉」),样式保留给别的单用):
    前缀 inline 排在被渲染值/输入框左侧,输入框占余下宽度。
    前缀只在这里出现,**不进 head**(数据存裸数字,理由见 core/panel/carbonSpec.js 头注)。 */
 .rs-pre-cell {
