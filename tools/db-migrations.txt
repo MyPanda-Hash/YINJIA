@@ -4506,3 +4506,7 @@ migrate-sample-flow-20261106.sql
 migrate-testlib-spec-add-missing-20261106.sql
 # 2026-11-06 外部样品申请单总表+子表：明细表补 8 列 + 字段 place=detail + 存量搬成一条明细行
 migrate-sample-ext-detail-20261106.sql
+# 2026-11-06 产品信息表加「客户编码」（参照 KHDA），客户编码/客户名称互为下拉；规格书加客户编码并随产品编号带回
+migrate-prodinfo-cust-code-20261106.sql
+# 2026-11-06 「生产车间」统一成标准库 mold.workshop（1#~7#，可增删维护）：烧结工艺清单(含成型配方页)/X烧结工艺清单
+migrate-mold-workshop-stdlib-20261106.sql
