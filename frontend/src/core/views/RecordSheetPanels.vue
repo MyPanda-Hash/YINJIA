@@ -609,9 +609,14 @@
                   <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
                 <span v-if="editable && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.variantKey))">⧉ {{ tt('标准库维护') }}</span>
-                <!-- 加标水专属：把选中条目的表格结构拿出来可视化编辑（加/删列、改列名、设分格） -->
-                <span v-if="editable && isSpikeWater && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openLayoutEditor">⊞ {{ tt('表格结构') }}</span>
-                <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
+                <!-- 加标水专属（2026-11-06）：把选中条目的表格结构拿出来可视化编辑（加/删列、改列名、设分格）。
+                     ⚠ 必须紧跟在上面的 v-if 之后、且在 v-else 之前 —— v-else 只认**紧邻**的那个 v-if，
+                     把新 span 插在 v-if 与 v-else 之间会让 v-else 改挂到新 span 上（实测踩过：
+                     「表格结构」不显示且「标准库维护」的 else 分支被吃掉）。 -->
+                <!-- 加标水「表格结构」入口：做成「标准库维护」弹窗里的一个按钮（2026-11-06）。
+                     不单独放行内按钮 —— 那一行已有两个控件，再加一个容易挤；而结构编辑本来
+                     就是"改标准库条目"的一种，放进维护弹窗里语义更顺、入口也一定可见。 -->
+                <span v-if="!editable" class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
               </td>
               <td :colspan="Math.max(1, totalSpan(dt) - variantSpan(dt))" class="rsp-subtitle-row rsp-quiet"></td>
               <td v-if="editable" class="rsp-op-pad"></td>
@@ -1631,6 +1636,11 @@
     </el-dialog>
     <!-- 标准库维护(可增/可编辑/可停用/可恢复启用;打印时隐藏) -->
     <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibName)" width="680px" append-to-body>
+      <!-- 加标水（2026-11-06）：结构编辑放进「改标准库条目」这个语义里，入口稳定可见 -->
+      <div v-if="isSpikeWater" class="slv-entry">
+        <el-button size="small" type="primary" plain @click="openLayoutEditor">⊞ {{ tt('编辑表格结构') }}</el-button>
+        <span class="slv-entry-hint">{{ tt('改的是「选中这个条目时表格长什么样」：几列、列名叫啥、哪些列合并成一个分格。') }}</span>
+      </div>
       <StdLibManager :lib="stdLibCode" @changed="onStdLibChanged" />
       <template #footer>
         <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
@@ -1802,6 +1812,12 @@ const props = defineProps({
 const emit = defineEmits(['dirty', 'refresh-config', 'open-file'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
+/** 本面板是不是加标水（表格结构由标准库条目决定，2026-11-06）。
+ *  ⚠ 必须声明在 cfg 旁边：模板里多处用它做 v-if，声明在文件后半段时
+ *  编译产物里 const 的 TDZ 顺序会让模板首次求值拿到 undefined（实测按钮不出现）。 */
+const isSpikeWater = computed(() => props.panelCode === 'RD_SPIKE_WATER')
+/** 模板里用的同义判断：直接读 props，不经 computed（排除响应式包装带来的求值问题） */
+function spikeWaterPanel() { return props.panelCode === 'RD_SPIKE_WATER' }
 // 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
 // 单据类面板编辑期间那格永远空白;见 @/core/panel/sheetDocNo 的说明)
 // ⚠ 2026-10-29:**面板可显式声明** head.docNoKey 覆盖自动推断。自动推断只看「head 里有没有
@@ -2736,14 +2752,15 @@ const spikeWaterCols = computed(() => (
 ))
 
 /** 本面板是不是加标水（结构由标准库条目决定） */
-const isSpikeWater = computed(() => String(props.panelCode || '') === 'RD_SPIKE_WATER')
-
 const layoutEditorRef = ref(null)
 /** 打开表格结构编辑器：编辑当前「测试项目」那个条目的列定义 */
 function openLayoutEditor() {
   const lib = stdLibOf('测试项目')
   const picked = String(props.head?.['测试项目'] || '').trim()
-  if (!lib || !picked) return
+  // 必须先在单据上选好「测试项目」—— 结构是挂在某个标准库条目上的，没选条目就没有可编辑的对象。
+  // 静默返回会让人以为按钮坏了，所以给出明确提示。
+  if (!lib) { ElMessage.warning(tt('该字段没有绑定标准库，无法编辑表格结构')); return }
+  if (!picked) { ElMessage.warning(tt('请先在单据上选择「测试项目」，再编辑它对应的表格结构')); return }
   layoutEditorRef.value?.open(lib, picked)
 }
 /** 结构存回去之后重新取一遍，纸面立刻用新表头 */
@@ -5925,6 +5942,10 @@ function chartOf(dt) {
   line-height: calc(38px * var(--cvy));
   padding: 0;
 }
+/* 加标水：标准库维护弹窗里的「编辑表格结构」入口（2026-11-06） */
+.slv-entry { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.slv-entry-hint { font-size: 12px; color: #909399; line-height: 1.5; }
+
 /* 只读值:设计正文 宋体 20.5pt ≈ 27.3 设计px(与标签列同号) */
 .rsp-cover-val {
   font-size: calc(27.3px * var(--cok));

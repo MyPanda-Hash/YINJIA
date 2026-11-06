@@ -4,13 +4,14 @@
       {{ tt('这里编辑的是「表格长什么样」：有几列、每列叫什么、哪些列归到同一个分格下面。保存后写进标准库条目，选中该条目的单据就用这套表头。') }}
     </div>
 
-    <el-table :data="rows" size="small" border class="slv-t">
+    <!-- 列多了要能滚：表格限高，避免把下方的预览挤出视口（17 列时实测会挤掉） -->
+    <el-table :data="rows" size="small" border class="slv-t" max-height="320">
       <el-table-column :label="tt('列名')" min-width="160">
         <template #default="{ row }">
           <el-input v-model="row.label" size="small" :placeholder="tt('如：硫酸镁')" @input="syncKey(row)" />
         </template>
       </el-table-column>
-      <el-table-column :label="tt('列宽')" width="96">
+      <el-table-column :label="tt('列宽(px)')" width="104">
         <template #default="{ row }">
           <el-input v-model.number="row.w" size="small" />
         </template>
@@ -182,7 +183,7 @@ defineExpose({ open })
 .slv-t { margin-bottom: 10px; }
 .slv-actions { display: flex; align-items: center; gap: 10px; }
 .slv-hint { font-size: 12px; color: #909399; }
-.slv-preview { margin-top: 16px; }
+.slv-preview { margin-top: 16px; max-height: 220px; overflow: auto; }
 .slv-pv-label { font-size: 12px; color: #606266; margin-bottom: 6px; }
 .slv-pv { border-collapse: collapse; width: 100%; table-layout: fixed; }
 .slv-pv th {
