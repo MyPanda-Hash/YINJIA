@@ -160,7 +160,10 @@
                    现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
                    与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
                    留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
-              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+              <!-- ⚠ 2026-11-06 起 docNoStatic 优先级最高：声明了受控表单编号的面板，编辑态也不出
+                   参照控件/输入框（否则点开还能改，与"固定"自相矛盾）。 -->
+              <template v-if="docNoStatic"><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span><span class="rs-docno-static">{{ docNoStatic }}</span></template>
+              <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
                 <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
                 <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
                 <el-icon class="rs-ref-ico"><Search /></el-icon>
@@ -180,6 +183,12 @@
                    原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
                    cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
                    两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
+              <!-- 受控表单编号(2026-11-06 用户口径 A)：「产品文件右上角全部是文件编号，固定的」
+                   —— 产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 /
+                   规格书 YJ-QR-153。声明了 pages[i].docNoStatic 的面板，这一格印常量文本（编辑态与
+                   只读态一致、不出输入框、不可改）；单据自身编号（SD-…/MP-…）仍在左侧选单栏与
+                   产品文件列表里，两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联」）。
+                   未声明 docNoStatic 的面板逐字不变。 -->
               <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
@@ -2056,7 +2065,12 @@ const docnoPrefix = computed(() => !!docnoPrefixText.value)
  * 声明了它 ⇒ 该格渲染这段常量文本(编辑态与只读态一致),与头字段解耦。
  * 未声明 pages[i].docNoStatic 的面板逐字不变(仍按 head[docNoKey] || docNoDefault)。
  */
-const docNoStatic = computed(() => String(activePageMeta.value?.docNoStatic || ''))
+const docNoStatic = computed(() => String(
+  // 2026-11-06：页级优先（测试申请单两页不同号 YJ-RIR001/YJ-XS002），
+  // 未声明页级时取**面板级** cfg.docNoStatic —— 产品文件四单（产品信息表/烧结/X烧结/规格书）
+  // 是多页面板但整份用同一个固定表单编号，逐页重复写没有意义。
+  activePageMeta.value?.docNoStatic || cfg.value?.docNoStatic || '',
+))
 
 /** 右上角编号格占末尾几列:末尾列宽不足时向左并列凑到 ≥160px——
  *  现有最长编号 YJ-AB-SAMPLE-1 实测 98px,加参照图标/间距约 145px;
