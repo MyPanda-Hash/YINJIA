@@ -7,6 +7,7 @@ import {
   toInspRow,
   isCanonical,
   CANONICAL_KEYS,
+  orderSpecGroups,
 } from './testItemLib.js'
 
 /**
@@ -102,4 +103,40 @@ test('规范结构的键集合稳定(CANONICAL_KEYS 是唯一真源,新增字段
   const e = emptyEntry()
   assert.deepEqual(Object.keys(e).sort(), [...CANONICAL_KEYS].sort())
   assert.equal(e.v, 2)
+})
+
+/**
+ * 规格书标准库「组序」——用户口径 2026-11-06:
+ * 「把研发管理的规格书的检验项目的标准库里面的内容的排序按《测试项目汇总.xlsx》进行排序」
+ *
+ * 组序的真源是 `yj_std_lib.seq`(迁移 tools/migrate-testlib-spec-order-20261106.sql 按 Excel
+ * 「序 号」列重编号:序号 n 的组 → seq 段 n*100,组内第 k 项 → n*100 + k*10)。
+ * 内置常量(SPEC_TEST_LIB)的既有次序只作兜底:未跑种子的空库、或某组还没入库时用。
+ * 之前只按常量排序,库里的 seq 完全不起作用 ⇒ 用户按 Excel 找「余氯性能测试」时,
+ * 它排在 18 个组的第 17 位(Excel 是第 11 项),找不着。
+ */
+test('组序按库里的 seq(Excel 序号):余氯排在隔夜浸泡之后、VOC 之前', () => {
+  const lib = [
+    { name: '*外观', seq: 110 },
+    { name: '*黑水及颗粒物测试', seq: 610 },
+    { name: '隔夜浸泡口感/气味', seq: 910 },
+    { name: '*余氯去除性能', seq: 1110 },
+    { name: 'VOC性能测试', seq: 1810 },
+    { name: '*卫生安全', seq: 2610 },
+  ]
+  const order = ['*外观', '*黑水及颗粒物测试', '隔夜浸泡口感/气味', 'VOC性能测试', '*余氯去除性能', '*卫生安全']
+  assert.deepEqual(orderSpecGroups(lib, order).map((g) => g.name),
+    ['*外观', '*黑水及颗粒物测试', '隔夜浸泡口感/气味', '*余氯去除性能', 'VOC性能测试', '*卫生安全'])
+})
+
+test('组序兜底:没有 seq 的组按内置常量次序,再按组名;常量里没有的缀后', () => {
+  const lib = [{ name: '新自定义组' }, { name: 'B组', seq: null }, { name: 'A组' }]
+  assert.deepEqual(orderSpecGroups(lib, ['B组', 'A组']).map((g) => g.name), ['B组', 'A组', '新自定义组'])
+})
+
+test('排序不改原数组(调用方还拿着它做别的)', () => {
+  const lib = [{ name: 'b', seq: 20 }, { name: 'a', seq: 10 }]
+  const out = orderSpecGroups(lib, [])
+  assert.deepEqual(lib.map((g) => g.name), ['b', 'a'])
+  assert.deepEqual(out.map((g) => g.name), ['a', 'b'])
 })

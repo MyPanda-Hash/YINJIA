@@ -4498,3 +4498,5 @@ migrate-spike-water-layout-20261106.sql
 migrate-spike-water-layout-fix-20261106.sql
 # 2026-11-06 修正立项申请客户参照：data_type 必须为「参照」后端才下发 refPanel
 migrate-approval-customer-ref-fix-20261106.sql
+# 2026-11-06 规格书检验项目标准库：spec.test 各条 seq 按《测试项目汇总.xlsx》「序 号」重编号（组序=Excel 序号）
+migrate-testlib-spec-order-20261106.sql

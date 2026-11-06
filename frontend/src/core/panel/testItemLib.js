@@ -108,6 +108,35 @@ export function toContentJson(e) {
   return JSON.stringify({ ...emptyEntry(), ...e })
 }
 
+/**
+ * 规格书标准库「组序」——提交给 /stdlib/add|update 之外,渲染层也用它定组的先后。
+ *
+ * 用户口径 2026-11-06:「把研发管理的规格书·检验项目标准库里面的内容的排序按
+ * 《测试项目汇总.xlsx》进行排序,现在有点乱,不好找对应的在哪里」。
+ * 因此组序的真源改为 **`yj_std_lib.seq`**(迁移 tools/migrate-testlib-spec-order-20261106.sql
+ * 按 Excel「序 号」列重编号:序号 n 的组 → seq 段 n*100,组内第 k 项 → n*100 + k*10);
+ * 内置常量 SPEC_TEST_LIB 的既有次序**只作兜底**(未跑种子的空库 / 还没入库的组)。
+ *
+ * 排序键依次:① seq 升序(缺失或非法值排最后);② 常量里的位置(同 seq 时保持旧观感);
+ * ③ 组名(完全不认识的组也不能互相抖动)。返回新数组,不改入参。
+ *
+ * @param {Array<{name: string, seq?: number|null}>} groups 已按库条目归好的组
+ * @param {string[]} constOrder 内置常量里的组名次序(兜底)
+ */
+export function orderSpecGroups(groups, constOrder = []) {
+  const posOf = (n) => {
+    const i = constOrder.indexOf(n)
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i
+  }
+  const seqOf = (g) => {
+    const n = Number(g && g.seq)
+    return Number.isFinite(n) && n > 0 ? n : Number.MAX_SAFE_INTEGER
+  }
+  return [...(groups || [])].sort((a, b) =>
+    (seqOf(a) - seqOf(b)) || (posOf(a && a.name) - posOf(b && b.name)) ||
+    String((a && a.name) || '').localeCompare(String((b && b.name) || '')))
+}
+
 function str(v) {
   return v === undefined || v === null ? '' : String(v).trim()
 }

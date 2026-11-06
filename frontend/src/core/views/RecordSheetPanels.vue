@@ -1735,7 +1735,7 @@ import { buildCoverPatch } from './prodPickCarry.js'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
 import { sectionLibText } from './sectionLibText'
-import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
+import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry, orderSpecGroups } from '@/core/panel/testItemLib'
 import { docNoKeyOf, docNoKeyFor, docnoPrefixOf } from '@/core/panel/sheetDocNo'
 import { parseLayout } from '@/core/panel/spikeWaterLayout.js'
 import StdLibLayoutEditor from './StdLibLayoutEditor.vue'
@@ -2925,24 +2925,28 @@ async function openLib(dt) {
           return { ...toInspRow(e), __entry: e, dbId: r.id, off: Number(r.enabled) === 0 }
         })
       } else {
-        // 规格书(分组):组名取自规范结构的 group(旧 item_code 兜底);组序沿用内置常量的
-        // 既有顺序(Excel 业务序),库里的新组缀后;停用条目同入组(off:checkbox 禁用+划线+可恢复)。
+        // 规格书(分组):组名取自规范结构的 group(旧 item_code 兜底);停用条目同入组
+        // (off:checkbox 禁用+划线+可恢复)。
+        // **组序按库里的 seq**(= 《测试项目汇总.xlsx》「序 号」,见
+        // tools/migrate-testlib-spec-order-20261106.sql);内置常量次序只作兜底 ——
+        // 用户口径 2026-11-06:「库里的排序有点乱,找不到对应的在哪里」,原先只按常量排,
+        // seq 完全不起作用(余氯性能测试实际是 Excel 第 11 项,却排在 18 组里的第 17 位)。
         const order = (cfg.value.testLib || []).map((g) => g.name)
         const groups = []
         const grpOf = (name) => {
           let g = groups.find((x) => x.name === name)
-          if (!g) { g = { name, subs: [] }; groups.push(g) }
+          if (!g) { g = { name, subs: [], seq: null }; groups.push(g) }
           return g
         }
         for (const r of rows) {
           const e = toCanonical(r.content, r.item)
-          grpOf(e.group || r.item).subs.push({ ...toSpecSub(e), __entry: e, dbId: r.id, off: Number(r.enabled) === 0 })
+          const g = grpOf(e.group || r.item)
+          // 组的 seq = 组内最小 seq(种子/重排脚本给同组连续号;新增条目取库内最大 +10 ⇒ 仍缀在最后)
+          const seq = Number(r.seq)
+          if (Number.isFinite(seq) && seq > 0 && (g.seq == null || seq < g.seq)) g.seq = seq
+          g.subs.push({ ...toSpecSub(e), __entry: e, dbId: r.id, off: Number(r.enabled) === 0 })
         }
-        groups.sort((a, b) => {
-          const ia = order.indexOf(a.name); const ib = order.indexOf(b.name)
-          return (ia < 0 ? 9999 : ia) - (ib < 0 ? 9999 : ib)
-        })
-        libRows.value = groups
+        libRows.value = orderSpecGroups(groups, order)
       }
     } else {
       // 兜底:库里一条都没有(未跑种子的环境)才用内置常量展示(无 dbId → 不可编辑/停用,跑种子后即全量可维护)
