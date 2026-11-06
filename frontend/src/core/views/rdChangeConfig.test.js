@@ -183,7 +183,11 @@ test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
   assert.match(rec, /v-if="editable && cfg\.titleKey"[\s\S]{0,220}?:placeholder="tt\(cfg\.titleKeyPh \|\| cfg\.titleKey\)"/,
     '标题格要按 titleKey 渲染输入框 + 提示词')
-  assert.match(rec, /:class="\{ 'rs-focus': cfg\.titleKey && isFocus\(cfg\.titleKey\) \}"/,
+  // 2026-11-06:标题格在同一批改动里又挂了 'rs-req'(缺必填红框),原正则要求 class 对象
+  // 正好到 isFocus(...) 就收尾 ⇒ 这条在 origin/main 上本来就是红的(实测 worktree 复跑同样 FAIL)。
+  // 这里只钉「标题格参与 rs-focus 高亮」这件事,后面再挂别的 class 不会被误判
+  // (rs-req 由 recordSheetConfigs.requiredRendered 那份 fixtures 基线在管)。
+  assert.match(rec, /'rs-focus': cfg\.titleKey && isFocus\(cfg\.titleKey\)/,
     '标题格要参与缺必填高亮(rs-focus)')
 })
 

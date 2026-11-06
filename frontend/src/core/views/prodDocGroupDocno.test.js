@@ -97,11 +97,15 @@ test('⑦ 产品文件列表(自定义视图)不印「单据编号：」—— �
   //     连同「密级 / 文件使用范围」两个空格一起占掉抬头最显眼的位置。
   //   ⇒ 现在的口径 = **不显示**(props.head 仍保留,只当 load() 的刷新触发器)。
   //   断言的是"渲染出来的东西":先剥掉模板注释(注释里会解释为什么去掉,自然写着这几个字)。
-  const tpl = prodDocList
+  // 2026-11-06 补充:模板里新增了「流程全览」块,它**要**显示每个产品在自己各文件面板上的单号
+  //   (`r.单据编号` = 产品信息表那张单的号,与本节说的"本面板自己的单据号"不是一回事)。
+  //   所以断言范围收窄到抬头区(流程全览块之前),口径不变:抬头不许印「单据编号：」。
+  const headPart = prodDocList
     .slice(0, prodDocList.indexOf('<script'))
+    .split('③″ 流程全览')[0] // ⚠ 先切块再去注释:切块标记本身就在注释里
     .replace(/<!--[\s\S]*?-->/g, '')
-  assert.ok(!/单据编号/.test(tpl), 'ProdDocListSheet 的模板里不该再出现「单据编号」字样')
-  assert.ok(!/密级|文件使用范围/.test(tpl), '连同「密级 / 文件使用范围」两个空格一起去掉了')
+  assert.ok(!/单据编号/.test(headPart), 'ProdDocListSheet 抬头区不该再出现「单据编号」字样')
+  assert.ok(!/密级|文件使用范围/.test(headPart), '连同「密级 / 文件使用范围」两个空格一起去掉了')
   assert.ok(/props\.head && props\.head\['单据编号'\]/.test(prodDocList),
     'head 里的单据编号仍要参与 watch —— 它是切换单据时重新取数的触发器,删掉就不会刷新')
 })

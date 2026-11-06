@@ -92,7 +92,7 @@
         class="rsp-page-tab"
         :class="{ active: activeTab === ti }"
         @click="activeTab = ti"
-      >{{ tt(t.key) }}</div>
+      >{{ t.label || tt(t.key) }}</div>
     </div>
     <!-- 页签集还没就绪(全自定义面板:物料类别词典未取回) -->
     <div v-else class="qc-tabs-loading">{{ tt('加载中…') }}</div>
@@ -106,7 +106,7 @@
         </colgroup>
         <tbody>
           <!-- 大标题行(Excel 第 1 行) -->
-          <tr><td :colspan="colsOf(tab).length" class="qc-title">{{ tt(tab.sheetTitle) }}</td></tr>
+          <tr><td :colspan="colsOf(tab).length" class="qc-title">{{ tab.title || tt(tab.sheetTitle) }}</td></tr>
           <!-- 两行分组表头:独立列纵向合并(rowspan=2),分组列上=组名下=子列。
                自定义页签的列没有分组 ⇒ 只有一行表头(见 hasGroupRow) -->
           <tr class="rs-grp">
@@ -234,6 +234,10 @@ const props = defineProps({
   showToolbar: { type: Boolean, default: true },
   /** 只渲染指定页签(数组;空=全部页签)。弹窗里只显示命中该物料的那几个页签。 */
   tabKeys: { type: Array, default: () => [] },
+  /** 额外页签(只读嵌入时由父级给):用于「归不进任何现役页签」的行 —— 物料类别已下线/脏值/
+   *  词典没取回时,照样把这个类别显示成一个「{类别} · 未归类」只读页签,内容不静默丢掉。
+   *  只读模式生效(编辑模式下不渲染:这些行没有合法的 物料类别 可写回,给了也存不进去)。 */
+  extraTabs: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['dirty', 'save', 'refresh', 'refresh-config'])
 const engine = usePanelRuntime()
@@ -272,8 +276,10 @@ function colsOf(t) {
 function hasGroupRow(t) {
   return groupCols(t).length > 0
 }
-/** 「自定义字段」弹窗的「所属页签」候选 = 本面板全部页签 */
-const tabOptions = computed(() => tabs.value.map((t) => ({ value: t.key, label: t.key })))
+/** 「自定义字段」弹窗的「所属页签」候选 = 本面板**配置**页签(不含未归类页签 ——
+ *  未归类页签的类别本身不是合法取值,不能拿去建列) */
+const panelTabs = computed(() => tabsOfPanel(props.panelCode, apiTabs.value))
+const tabOptions = computed(() => panelTabs.value.map((t) => ({ value: t.key, label: t.key })))
 /** 「自定义字段」弹窗的「父字段」候选:该页签固定列已有的分组 + 该页签已用的父 */
 function parentOptions(tabKey) {
   return parentOptionsOfTab(tabs.value.find((t) => t.key === tabKey) || null, extFields.value)
@@ -281,13 +287,16 @@ function parentOptions(tabKey) {
 /** 自定义页签还没定义任何列(只有匹配键列,没得可填)—— 界面提示先去加列 */
 const tabDynamicEmpty = computed(() => !!tab.value?.dynamicCols && colsOf(tab.value).length <= 1)
 
-/** 页签集:面板决定(固定表=配置;全自定义=物料类别词典);tabKeys 非空时按命中页签收窄(只读弹窗用) */
+/** 页签集:面板决定(固定表=配置;全自定义=物料类别词典);tabKeys 非空时按命中页签收窄(只读弹窗用);
+ *  只读嵌入时再把父级给的「未归类」页签接在后面(见 extraTabs 注释) */
 const tabs = computed(() => {
-  const all = tabsOfPanel(props.panelCode, apiTabs.value)
-  const keys = props.tabKeys
-  if (!Array.isArray(keys) || !keys.length) return all
+  const all = panelTabs.value
+  const extras = (!props.editable && Array.isArray(props.extraTabs)) ? props.extraTabs.slice() : []
+  const keys = Array.isArray(props.tabKeys) ? props.tabKeys : []
+  if (!keys.length) return extras.length ? extras : all
   const filtered = all.filter((t) => keys.includes(t.key))
-  return filtered.length ? filtered : all
+  if (filtered.length) return [...filtered, ...extras]
+  return extras.length ? extras : all
 })
 const activeTab = ref(0)
 /** 当前页签;**全自定义面板的页签集来自接口**,首帧还没回来时给个空页签兜底 ——

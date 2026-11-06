@@ -23,7 +23,13 @@
       <div class="req-view-sub">
         {{ tt('物料编号') }}：<b>{{ code }}</b>
         <span class="req-view-count">（{{ tt('共 {n} 行').replace('{n}', String(totalRows)) }}）</span>
-        <span v-if="unknownRows" class="req-view-warn">{{ tt('另有 {n} 行物料类别不在检验要求模板中').replace('{n}', String(unknownRows)) }}</span>
+        <!-- 归不进现役页签的行(物料类别已下线/脏值):现在**照样渲染成「{类别} · 未归类」只读页签**,
+             这里只说清有几行、是什么类别 —— 提示与显示必须一致,不能"只计数不显示"(2026-11-06) -->
+        <span v-if="orphanCount" class="req-view-warn">{{
+          tt('另有 {n} 行物料类别不在检验要求模板中（{cats}），已按「未归类」页签显示')
+            .replace('{n}', String(orphanCount))
+            .replace('{cats}', orphanCats.join('、'))
+        }}</span>
       </div>
       <!-- 两个面板各一段:要求可能维护在「来料检验要求」(固定 7 张表)或「来料检验要求(系列)」(10 张自定义表) -->
       <div v-for="sec in sections" :key="sec.panelCode" class="req-view-sec">
@@ -37,11 +43,26 @@
           :panel-code="sec.panelCode"
           :show-toolbar="false"
           :tab-keys="sec.tabKeys"
+          :extra-tabs="sec.extras"
         />
       </div>
     </template>
     <div v-else class="req-view-tip">{{ tt('该物料未维护来料检验要求') }}</div>
     <template #footer>
+      <!-- 带入检验要求(2026-11-06 用户口径):**在弹窗里也能导入** —— 保存后(仍是草稿)可导,
+           提交审批/审核后置灰;弃审退回草稿后自动恢复可点。判定由父级给(canCarry=单据可编辑),
+           这里只负责显隐与置灰原因,不自己判状态(状态真源在 PanelxList 的 draftEditable)。 -->
+      <el-button
+        class="req-view-carry"
+        type="primary"
+        :loading="carrying"
+        :disabled="!canCarry"
+        :title="canCarry
+          ? tt('按物料编码从来料检验要求带入检验项与检测标准（只补缺失项，已填的检测结果不动）')
+          : (blockedHint || tt('仅草稿或修改中可带入；提交审批或审核后请先弃审退回草稿'))"
+        @click="emit('carry')"
+      >⧉ {{ carrying ? tt('带入中…') : tt('带入检验要求') }}</el-button>
+      <span v-if="!canCarry" class="req-view-carry-hint">{{ blockedHint || tt('仅草稿或修改中可带入') }}</span>
       <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
     </template>
   </el-dialog>
@@ -52,15 +73,23 @@ import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { fetchReqRowsOfPanel, fetchExtOverview } from '@core/qc/qcInspReqApi'
-import { lookupReqGroups, normCode, reqTabKeysOf } from '@core/qc/qcInspReqLookup'
+import { lookupReqGroups, normCode, orphanColsOf, orphanGroupsOf, reqTabKeysOf } from '@core/qc/qcInspReqLookup'
 import { qcInspReqTabs, tabsOfPanel, QC_INSP_REQ_PANEL as PANEL_A, QC_INSP_REQ_SERIES_PANEL as PANEL_B } from './qcInspReqConfig'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   /** 本单的物料编码(检验数据记录抬头);空则不应打开弹窗 */
   materialCode: { type: String, default: '' },
+  /** 能否从本弹窗「带入检验要求」= 本单当前可编辑(草稿 / 修改中)。
+   *  由父级(QcInspRecSheet)传,口径与表头那个「⧉ 带入检验要求」完全一致 ——
+   *  提交审批(审批中/待二级审批)、已审核/已归档一律不可;弃审退回草稿后自动恢复。 */
+  canCarry: { type: Boolean, default: false },
+  /** 带入进行中(父级在跑,防重复点) */
+  carrying: { type: Boolean, default: false },
+  /** 不可带入的具体原因(按单据状态给,比通用文案更有用) */
+  blockedHint: { type: String, default: '' },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'carry'])
 
 const code = computed(() => normCode(props.materialCode))
 const title = computed(() => tt('来料检验要求') + (code.value ? ' · ' + code.value : ''))
@@ -74,7 +103,14 @@ const seriesTabs = ref([])
 /** 面板名(标题只在两个面板都有命中时才显示,单一命中时不啰嗦) */
 const PANEL_NAMES = { [PANEL_A]: '来料检验要求', [PANEL_B]: '来料检验要求(系列)' }
 
-/** 每段 = 一个面板:只喂落在**该面板页签**上的行(配置外类别另行提示,不让它悄悄消失) */
+/**
+ * 每段 = 一个面板。行分两类:
+ *   · 归页签(groups 里 tab 非空)—— 按页签正常显示;
+ *   · **归不进本面板页签**(tab=null,物料类别已下线/脏值/词典没取回)—— 2026-11-06 起不再"只计数"，
+ *     而是单独成「{类别} · 未归类」只读页签照样显示内容(用户不需要的"看不见"比"看起来脏"严重得多)。
+ * 注意判据是**按面板**算的:某行挂 炭粉 却存在固定表(qc_insp_req)里,旧算法按两面板页签并集判会当"已知",
+ * 结果两个面板都不渲染它 —— 也一并由本段逻辑收口。
+ */
 const sections = computed(() => {
   const panels = [
     { panelCode: PANEL_A, tabs: qcInspReqTabs },
@@ -85,26 +121,47 @@ const sections = computed(() => {
     const mine = rows.value.filter((r) => String(r?.['__panel'] || '') === p.panelCode)
     const groups = lookupReqGroups(mine, code.value, p.tabs)
     const hitRows = groups.filter((g) => g.tab).flatMap((g) => g.rows)
-    if (!hitRows.length) continue
+    const extras = orphanGroupsOf(groups).map((g) => orphanTabOf(g))
+    if (!hitRows.length && !extras.length) continue
+    const all = [...hitRows, ...extras.flatMap((e) => e.rows)]
     out.push({
       panelCode: p.panelCode,
       panelName: PANEL_NAMES[p.panelCode],
-      rows: hitRows,
+      rows: all,
+      extras,
       tabKeys: reqTabKeysOf(groups),
-      head: { detail: { items: hitRows } },
+      head: { detail: { items: all } },
     })
   }
   return out
 })
-const unknownRows = computed(() => {
-  const known = new Set([...qcInspReqTabs.map((t) => t.key), ...seriesTabs.value])
-  return rows.value.filter((r) => !known.has(String(r?.['物料类别'] || '').trim())).length
+/** 未归类行的只读页签:key=物料类别原文(空类别='' ⇒ 与行上的空值精确相等,仍能分流),
+ *  标题走 tt('{c} · 未归类'),列按行自身字段名(orphanColsOf,与带入的兜底列同源) */
+function orphanTabOf(g) {
+  const label = g.key ? tt(g.key) : tt('未填写物料类别')
+  return {
+    key: g.key,
+    label,
+    title: tt('{c} · 未归类').replace('{c}', label),
+    cols: orphanColsOf(g.rows),
+    rows: g.rows,
+    orphan: true,
+  }
+}
+/** 未归类行总数 / 涉及的物料类别(供提示说明"是哪一类归不进去") */
+const orphanCount = computed(() => sections.value.reduce((n, s) => n + s.extras.reduce((m, e) => m + e.rows.length, 0), 0))
+const orphanCats = computed(() => {
+  const out = []
+  for (const s of sections.value) {
+    for (const e of s.extras) {
+      const c = e.key || tt('未填写物料类别')
+      if (!out.includes(c)) out.push(c)
+    }
+  }
+  return out
 })
-/** 命中行总数(含配置外类别,如实计数) */
-const totalRows = computed(() => rows.value.filter((r) => {
-  const k = String(r?.['物料类别'] || '').trim()
-  return qcInspReqTabs.some((t) => t.key === k) || seriesTabs.value.includes(k)
-}).length)
+/** 命中行总数 = 两个面板取回的全部行(含未归类行 —— 它们现在也显示在「未归类」页签里) */
+const totalRows = computed(() => rows.value.length)
 
 /** 打开即取数:两个面板各取一次(档案面板一次全量,量小),行上打 __panel 标签便于分段显示。
  *  取数走 @core/qc/qcInspReqApi(与检验报告的「带入检验要求」同一入口,两处所见必须一致) */
@@ -170,5 +227,15 @@ watch(
   font-size: 13px;
   font-weight: 600;
   color: #1c4f8a;
+}
+/* 弹窗页脚:带入按钮靠左,右侧是关闭;不可带入时旁边给出原因(按单据状态) */
+.req-view-carry {
+  float: left;
+}
+.req-view-carry-hint {
+  float: left;
+  margin: 6px 0 0 8px;
+  font-size: 12px;
+  color: #c08a00;
 }
 </style>

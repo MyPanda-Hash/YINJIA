@@ -100,7 +100,8 @@
       <div v-for="r in results" :key="'ok' + r.工单号 + r.工单行号" class="mp-res is-ok">
         <div class="mp-res-l1">
           <span class="mp-res-wo">{{ r.工单号 }}<i v-if="r.工单行号"> #{{ r.工单行号 }}</i></span>
-          <span class="mp-res-tag">{{ r.重复 ? tt('已存在') : tt('已生成') }}</span>
+          <!-- 2026-11-06:已存在的单不再"跳过不打印",而是**按原单重打一次** -->
+          <span class="mp-res-tag">{{ r.重复 ? tt('已存在·已打印') : tt('已生成') }}</span>
         </div>
         <div class="mp-res-l2 mono">{{ r.领料单号 || '—' }}</div>
       </div>
@@ -566,7 +567,11 @@ async function generateBatch() {
     queue.value = []
 
     if (results.value.length) {
-      okText.value = `${tt('成功')} ${d.成功数 || results.value.length}${(d.失败数 || 0) > 0 ? ' · ' + tt('失败') + ' ' + d.失败数 : ''}`
+      // 已开过单的那几张:不生单、但按原单重打(2026-11-06 用户口径)
+      const dupN = results.value.filter((r) => r.重复).length
+      okText.value = `${tt('成功')} ${d.成功数 || results.value.length}`
+        + (dupN > 0 ? ' · ' + tt('已开过单的按原单重打') + ' ' + dupN : '')
+        + ((d.失败数 || 0) > 0 ? ' · ' + tt('失败') + ' ' + d.失败数 : '')
       if (autoPrint.value) await autoPrintAll()
     } else if (failures.value.length) {
       errText.value = `${tt('全部失败')}:${failures.value[0].原因 || ''}`
@@ -584,10 +589,14 @@ async function generateBatch() {
  *
  * 优先发给「自动打印」站点电脑;没有在线站点就退回本机打印层。
  * **逐张打印、失败不阻断** —— 单已经建好了,现场可以在单据里重打。
+ *
+ * <p>🔴 2026-11-06 用户口径:「现在扫码后已存在的领料单,是不在打印的。但是现在是需要给他打印,
+ * 只是不生成领料单」⇒ **已存在的单也打**(后端会把那张已存在单据的打印载荷一起回给你),
+ * 跳过条件只剩"没有打印载荷"(例如关掉了自动打印)。
  */
 async function autoPrintAll() {
   for (const r of results.value) {
-    if (r.重复 || !r.打印) continue
+    if (!r.打印) continue
     try {
       const queued = await queueToPrintStation({ ...r.打印, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.create' })
       if (!(queued && queued.online)) await printWoQr(r.打印)

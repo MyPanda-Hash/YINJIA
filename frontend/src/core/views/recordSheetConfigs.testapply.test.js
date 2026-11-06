@@ -136,3 +136,49 @@ test('申请单类型的两个字典值与 汇总表 分类映射表一一对应
   const dictValues = ['内部委托', '销售端']
   assert.deepEqual(Object.keys(cfg.pages[2].ledger.cols[4].map), dictValues)
 })
+
+/**
+ * 2026-11-06 用户口径 A（截图「11.5 问题点汇总」第 1 条）：
+ *   「产品文件右上角全部是文件编号，固定的」
+ *   产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 / 规格书 YJ-QR-153。
+ * 单据自身编号（PI-…/MP-…/SD-…）仍在选单栏与产品文件列表；单据之间靠「产品编号」关联。
+ */
+test('产品文件**六张单**的右上角都是固定表单编号（2026-11-06 用户口径 A）', () => {
+  // 用户原话：「产品信息表:YJ-QR-152 烧结工艺清单:YJ-QR-146-1 x烧结工艺清单:YJ-QR-146-1
+  //   规格书:YJ-QR-153 组装工艺清单:YJ-QR-144 出货检验计划表:YJ-QR-145
+  //   这些右上角固定的编号你也没有改全，这些又不影响流程就是显示而已」
+  // ⇒ 六张单一个都不能漏（上一版只改了 4 张，组装/出货检验两张还在显示流水号 AP-…/IP-…）
+  assert.equal(recordSheetConfigs.RD_PROD_INFO.docNoStatic, 'YJ-QR-152', '产品信息表')
+  assert.equal(recordSheetConfigs.RD_MOLD_PROC.docNoStatic, 'YJ-QR-146-1', '烧结工艺清单')
+  assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-146-1', 'X烧结工艺清单')
+  assert.equal(recordSheetConfigs.RD_SPEC_DOC.docNoStatic, 'YJ-QR-153', '规格书')
+  assert.equal(recordSheetConfigs.RD_ASM_PROC.docNoStatic, 'YJ-QR-144', '组装工艺清单')
+  assert.equal(recordSheetConfigs.RD_INSP_PLAN.docNoStatic, 'YJ-QR-145', '出货检验计划表')
+})
+/**
+ * 2026-11-06 用户报障：「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」。
+ *
+ * 【根因】封面的值格在**草稿态**走 el-input（可编辑），在**审批后**走纯 span。
+ *   通用表格规则 `.rs-t :deep(.el-input__inner){font-size:13.5px}`（给普通表区输入框定的）
+ *   也命中了封面 —— 而封面的 `--cok` 缩放字号写在 `.rsp-cover-input :deep(.el-input__inner)`，
+ *   两条规则同特异性、后写的赢，`.rs-t` 那条在样式表里更靠后 ⇒ 草稿态封面被压成 13.5px，
+ *   审批后恢复 27.3px×cok ⇒ 同一页两种字号。
+ *
+ * 修法：给封面/签字栏的输入框规则加 `.rs-t` 前缀提升特异性（不改通用规则，别的表区要靠它）。
+ */
+test('封面输入框字号必须压过通用表区 13.5px（草稿态与只读态同字号）', () => {
+  const src = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.ok(/\.rs-t :deep\(\.el-input__inner\)/.test(src), '通用表区输入框规则不应被删')
+  const coverRule = src.match(/\.rsp-cover-input\s*:deep\(\.el-input__inner\)\s*\{([^}]*)\}/)
+  assert.ok(coverRule, '缺少 .rsp-cover-input 的输入框字号规则')
+  assert.ok(/font-size:\s*calc\([^)]*var\(--cok\)/.test(coverRule[1]),
+    '封面输入框字号必须用 --cok 缩放（否则草稿态与只读态不一致）')
+})
+
+test('封面输入框规则的 CSS 特异性高于通用 .rs-t 规则（否则被静默压掉）', () => {
+  const src = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  const m = src.match(/(\.rs-t\s+\.rsp-cover-input[^{]*)\{(?=[^}]*font-size)/)
+  assert.ok(m, '封面输入框字号规则必须带 .rs-t 前缀（否则与通用规则同特异性、被后者压掉）')
+  const classes = (m[1].match(/\.[a-zA-Z-]+/g) || []).length
+  assert.ok(classes >= 3, '选择器只有 ' + classes + ' 个类，压不过 .rs-t :deep(.el-input__inner)')
+})

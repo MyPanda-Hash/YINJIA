@@ -2699,6 +2699,11 @@ export default {
     '当前 App 版本不支持多选扫码:请升级到 1.0.2 及以上': 'Bản app này không hỗ trợ quét nhiều: vui lòng nâng lên 1.0.2 trở lên',
     '按工单行的产品取《组装BOM表》,生成一张领料单和一张退料单(退料数量默认 0),并自动打印一次工单二维码': 'Lấy BOM lắp ráp, tạo phiếu xuất và phiếu trả (số lượng 0) và in mã QR một lần',
     '「扫码」可一次扫多个工单码:按纸面顺序列出、勾选后确定,它们会一起进下面的待生成队列,再点「批量生成」逐张建单': '"Quét" đọc nhiều mã lệnh sản xuất cùng lúc (theo thứ tự giấy, chọn rồi xác nhận); vào hàng đợi, "Tạo hàng loạt" tạo phiếu từng lệnh',
+    '删除打印电脑': 'Xóa máy in',
+    '确定删除打印电脑「': 'Xóa máquina in "',
+    '」吗?它现在离线;删掉后再连上来需要重新添加': '"? Hiện đang ngoại tuyến; khi kết nối lại phải thêm lại',
+    '已存在·已打印': 'Đã có · đã in',
+    '已开过单的按原单重打': 'phiếu đã có được in lại',
   },
 
 }

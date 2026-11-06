@@ -4488,6 +4488,40 @@ migrate-asm-bom-data-full-20261105.sql
 #   端点闸门仍认 picking(PanelPermissionService.BUTTON_PERMS_OVERRIDE 保留)。幂等;两账套均执行;末尾自检残留 = 0。
 migrate-drop-wol-picking-perm-20261105.sql
 
+# 2026-11-06 立项申请表「客户名」改指客户档案 KHDA.mc（下拉选客户；选中后前端按 客户编码+日期 填编号）
+migrate-approval-customer-ref-20261106.sql
+# 2026-11-06 研发管理新增「样品」二级目录 + 外部/内部开发样品申请单（两张新表 + 面板元数据 + 译名）
+migrate-sample-dev-panels-20261106.sql
+# 2026-11-06 加标水：表格结构（列/列名/分格）存进 lab.test_item 标准库条目，一个条目=一套表样式
+migrate-spike-water-layout-20261106.sql
+
+# 2026-11-06 来料检验要求：作废挂在已下线页签「自定义检验要求」上的 4 行遗留数据（id 89~92，
+#   物料 YJ-XH-001 / YJ-XH-002 / YJ-YKRS-009 / YJ-YKRS-014，admin 2026-10-14 21:43 落入）。
+#   报障：检验数据记录 →「⧉ 检验要求」弹窗提示「另有 1 行物料类别不在检验要求模板中」。
+#   该页签 2026-10-04 随面板拆分下线（migrate-qc-insp-req-drop-custom-tab.sql），这 4 行晚于下线出现 ⇒
+#   现役 17 个页签都归不进去：维护面板里看不见也改不了、弹窗只计数，而「带入检验要求」仍会把
+#   「外径=按图纸」等 9 项带进报告。作废=asp_cancel='Y'（内容保留、可回溯，重跑 0 行）。
+#   同批前端：归不进现役页签的行渲染成「{类别} · 未归类」只读页签，不再只计数。
+#   取证 tools/archive/_qc-insp-req-hint-20261106/。两账套均执行（正式库 4 行、测试库 0 行）。
+migrate-qc-insp-req-retire-custom-cat-20261106.sql
+# 2026-11-06 修正加标水结构迁移：条目名写回 item_code（content 只存结构 JSON，下拉不再显示 JSON）
+migrate-spike-water-layout-fix-20261106.sql
+# 2026-11-06 修正立项申请客户参照：data_type 必须为「参照」后端才下发 refPanel
+migrate-approval-customer-ref-fix-20261106.sql
+# 2026-11-06 规格书检验项目标准库：spec.test 各条 seq 按《测试项目汇总.xlsx》「序 号」重编号（组序=Excel 序号）
+migrate-testlib-spec-order-20261106.sql
+# 2026-11-06 样品申请单流程：内部单补申请人列 + 两张单角色授权（此前 0 行授权 ⇒ 非管理员打不开）
+migrate-sample-flow-20261106.sql
+# 2026-11-06 规格书检验项目标准库：按《测试项目汇总.xlsx》原文补齐库里缺的 8 项（黄水/浸泡口感/COD/阻垢/抑菌/过流杀菌/碱性/矿化）
+migrate-testlib-spec-add-missing-20261106.sql
+# 2026-11-06 外部样品申请单总表+子表：明细表补 8 列 + 字段 place=detail + 存量搬成一条明细行
+migrate-sample-ext-detail-20261106.sql
+# 2026-11-06 产品信息表加「客户编码」（参照 KHDA），客户编码/客户名称互为下拉；规格书加客户编码并随产品编号带回
+migrate-prodinfo-cust-code-20261106.sql
+# 2026-11-06 「生产车间」统一成标准库 mold.workshop（1#~7#，可增删维护）：烧结工艺清单(含成型配方页)/X烧结工艺清单
+migrate-mold-workshop-stdlib-20261106.sql
+# 2026-11-06 内部开发样品申请单改成「共享表」：单表长列表(rd_sample_int_head) · 无审批 · 行可增删 · 列可筛选 · 每页 10/20/50
+migrate-sample-int-flat-20261106.sql
 # 2026-11-06 用户三项需求中的 ①③(制程检验单字段 + 首件/制程两级审批 + 报表批准签名格):
 #   ①「工序」从制程检验单界面删除(元数据 hidden=1;物理列/数据保留 —— 报工带入、报表、QC_BHG 参照仍取值);
 #     「检验方案」固定写「出货控制计划执行」(字段置只读 + 历史单归一 + 后端每次保存强制写);

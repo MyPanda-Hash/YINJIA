@@ -1806,14 +1806,27 @@ public class PanelConfigService {
      * 标准库选项:字段 data_type=\u0027标准库\u0027 时,dict_sql 里存的是**标准库编码**(lib_code),
      * 不再是可执行 SQL;条目取自 yj_std_lib,可在界面上增删维护(StdLibController /api/stdlib/add|remove)。
      */
+    /**
+     * 标准库条目的**下拉候选**。
+     *
+     * 2026-11-06 加标水「一个条目 = 一套表格样式」之后，条目正文（content）存的是表格结构 JSON，
+     * 不能再当下拉文字 —— 否则下拉里显示的是一整段 JSON（实测踩过）。
+     * 口径：**item_code 不是占位名「默认」时优先用它**（它就是条目名），否则退回 content
+     * （实验室其它库仍是「item_code=默认 + 正文即条目名」的老口径，逐字不变）。
+     */
     public List<String> stdLibOptions(String libCode) {
         try {
             List<String> out = new ArrayList<>();
-            jdbc.query("SELECT content FROM yj_std_lib WHERE lib_code = ? AND enabled = 1"
-                            + " AND ISNULL(asp_cancel, \u0027N\u0027) <> \u0027Y\u0027 ORDER BY seq, id",
+            jdbc.query("SELECT content, item_code FROM yj_std_lib WHERE lib_code = ? AND enabled = 1"
+                            + " AND ISNULL(asp_cancel, 'N') <> 'Y' ORDER BY seq, id",
                     rs -> {
-                        Object v = rs.getObject(1);
-                        if (v != null && !out.contains(String.valueOf(v))) out.add(String.valueOf(v));
+                        Object content = rs.getObject(1);
+                        Object item = rs.getObject(2);
+                        String byItem = item == null ? "" : String.valueOf(item).trim();
+                        String v = (!byItem.isEmpty() && !"默认".equals(byItem))
+                                ? byItem
+                                : (content == null ? "" : String.valueOf(content));
+                        if (!v.isEmpty() && !out.contains(v)) out.add(v);
                     }, libCode);
             return out;
         } catch (Exception e) {

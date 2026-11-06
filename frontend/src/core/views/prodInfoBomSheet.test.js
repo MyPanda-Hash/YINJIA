@@ -32,16 +32,18 @@ test('产品信息表:五个章节带编号且顺序正确(三 = 产品BOM表)',
   ], '章节编号/顺序必须与新设计一致')
 })
 
-test('产品信息表:第一节的四格与整行「应用场景」', () => {
+test('产品信息表:第一节的字段与「产品形态|应用场景」同排一行', () => {
   const sec = (prod.sections || []).find((s) => s.bar === '一、产品基本信息')
   assert.ok(sec, '缺「一、产品基本信息」')
   const pairsOf = (row) => (row.pairs || []).map((p) => p.key)
   const rows = sec.rows.map(pairsOf)
   assert.deepEqual(rows[0], ['项目编号', '项目名称'], '第 1 行 = 项目编号 | 项目名称')
   assert.deepEqual(rows[1], ['产品编号', '客户名称'], '第 2 行 = 产品编号 | 客户名称')
-  assert.deepEqual(rows[2], ['客户料号', '产品管控等级'])
-  assert.deepEqual(rows[3], ['产品功能类别', '产品形态'])
-  assert.deepEqual(rows[4], ['应用场景'], '末行 = 整行「应用场景」')
+  // 2026-11-06 用户口径:「产品信息表的客户名称下边加上一个客户编码字段」—— 紧跟客户名称
+  assert.deepEqual(rows[2], ['客户编码', '客户料号'], '第 3 行 = 客户编码 | 客户料号')
+  assert.deepEqual(rows[3], ['产品管控等级', '产品功能类别'])
+  // 2026-11-06 用户口径:「应用场景和产品形态放在同一行」—— 原来两个各占整行,现在并列
+  assert.deepEqual(rows[4], ['产品形态', '应用场景'], '末行 = 产品形态 | 应用场景(同一行)')
   // 旧字段不再上纸面(库里的列与历史值保留,只是这张纸面不画)
   const flat = rows.flat()
   assert.ok(!flat.includes('立项文档编号'), '「立项文档编号」不再上纸面(项目进度查询还要用它的列)')
@@ -65,15 +67,19 @@ test('产品信息表:三、产品BOM表的列与宽度(可见列宽合计 = 纸
     `BOM 表可见列宽之和 ${visSum} ≠ 纸面网格 ${gridSum}(自带 colgroup 的表不铺满就比上边短一截)`)
 })
 
-test('产品规格书封面:9 行,第 2 行是产品名称(key=名称),没有「客户名称」', () => {
+test('产品规格书封面:10 行,第 2 行是产品名称(key=名称),没有「客户名称」但有「客户编码」', () => {
   const fields = spec?.cover?.fields || []
-  assert.equal(fields.length, 9, '封面字段表应为设计里的 9 行')
+  // 2026-11-06 用户口径:「后面那些规格书等单据如果有客户编码的也同步关联上」⇒ 设计 9 行 + 客户编码 = 10 行
+  assert.equal(fields.length, 10, '封面字段表 = 设计 9 行 + 客户编码 1 行')
   assert.equal(fields[0].key, '产品编号', '第 1 行 = 产品编号')
   assert.equal(fields[0].label, '产品编号')
   assert.equal(fields[1].key, '名称', '第 2 行 = 产品名称,数据键是 yj_field.label「名称」')
   assert.equal(fields[1].label, '产品名称', '纸面文案写「产品名称」')
   const labels = fields.map((f) => f.label)
   assert.ok(!labels.includes('客户名称'), '新版设计没有「客户名称」这一行')
-  assert.ok(labels.includes('客户（项目）名称'), '客户项目名称的纸面文案带括号')
+  assert.ok(labels.includes('客户编码'), '客户编码那一行在(客户料号之后)')
   assert.ok(fields.some((f) => f.key === '客户项目名称'), '数据键仍是「客户项目名称」')
+  assert.ok(fields.some((f) => f.key === '客户编码'), '客户编码的数据键 = label「客户编码」')
+  const idx = fields.findIndex((f) => f.key === '客户编码')
+  assert.equal(fields[idx - 1].key, '客户料号', '客户编码紧跟在客户料号之后')
 })

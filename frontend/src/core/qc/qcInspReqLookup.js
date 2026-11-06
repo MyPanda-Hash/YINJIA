@@ -68,6 +68,55 @@ export function reqTabKeysOf(groups) {
   return (Array.isArray(groups) ? groups : []).filter((g) => !!g.tab).map((g) => g.key)
 }
 
+/* ═══════════════ 归不进页签的行(orphan)——「库里有的,界面上必须看得到」(2026-11-06)═══════════════
+ * 场景(用户报障同批):某物料的检验要求行,「物料类别」写的是**已下线页签**的值(如 2026-10-04 拆面板后
+ * 下线的「自定义检验要求」)或干脆是脏值 —— 现役 17 个页签(7 固定 + 10 系列)一个都装不下它:
+ *   · 维护面板里永远看不到、也改不了(没有页签承载);
+ *   · 检验数据记录弹窗原先只把它**计个数**(「另有 N 行物料类别不在检验要求模板中」),不显示内容;
+ *   · 而「带入检验要求」却会按行自身字段名把它带进报告 ⇒ 弹窗看不见、报告带得进来。
+ * 故这里把这类行单独成组,由调用方渲染成「{类别} · 未归类」只读页签,并保留按 物料类别 的原始值分组
+ * (一个类别一个页签;空类别自成一组,key='')。
+ */
+
+/** 组集里「归不进页签」的行(tab=null 的组展平;顺序 = 组内 id 升序) */
+export function orphanRowsOf(groups) {
+  return (Array.isArray(groups) ? groups : [])
+    .filter((g) => g && !g.tab)
+    .flatMap((g) => (Array.isArray(g.rows) ? g.rows : []))
+}
+
+/**
+ * 未归类行 → 按「物料类别」原始值分组(供渲染成多个未归类页签)。
+ * @returns {Array<{key: string, rows: Array<object>}>} key = 物料类别原文(trim 后,空类别='')
+ */
+export function orphanGroupsOf(groups) {
+  const rows = orphanRowsOf(groups).slice().sort(byIdAsc)
+  const byCat = new Map()
+  for (const r of rows) {
+    const cat = normCode(r && r['物料类别'])
+    if (!byCat.has(cat)) byCat.set(cat, [])
+    byCat.get(cat).push(r)
+  }
+  return [...byCat.entries()].map(([key, list]) => ({ key, rows: list }))
+}
+
+/** 未归类页签的列:按行自身字段名(没有页签配置可用 —— 这是唯一不丢字段的取法,
+ *  与「带入检验要求」的兜底列序同源)。标识列在前,物料类别/主键/审计列剔除。
+ *  宽列(方法/标准/内容/要求/说明)给宽一点,否则验收说明这种长文本挤成一团。 */
+export function orphanColsOf(rows, { width = 140, wideWidth = 240 } = {}) {
+  const LEAD = ['物料编号', '文件编码', '检验依据']
+  const seen = []
+  for (const r of Array.isArray(rows) ? rows : []) {
+    for (const k of Object.keys(r || {})) {
+      // __panel 之类是前端内部标记(弹窗给行打的来源面板标签),不是业务列 —— 别渲染出来
+      if (!k || k === '物料类别' || k === 'id' || k.startsWith('asp_') || k.startsWith('__')) continue
+      if (!seen.includes(k)) seen.push(k)
+    }
+  }
+  const ordered = [...LEAD.filter((k) => seen.includes(k)), ...seen.filter((k) => !LEAD.includes(k))]
+  return ordered.map((key) => ({ key, w: /方法|标准|内容|要求|说明/.test(key) ? wideWidth : width }))
+}
+
 /**
  * 一行到位:全量行 + 物料编码 → 分组结果
  * @returns {Array<{key: string, tab: object|null, rows: Array<object>}>}

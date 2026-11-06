@@ -505,6 +505,62 @@ public class PrintStationController {
     }
 
     /**
+     * 删掉一台**不在线**的打印电脑(2026-11-06 用户口径:「自动打印界面,要可以删除离线的电脑」)。
+     *
+     * <p>为什么允许删:站点清单 = 内存里的 ∪ 库里有配置的;某台电脑换机/改名/代理装错站点名之后,
+     * 那一行会**永久挂在面板上显示"离线"**,现场以为还有一台在等它出纸。
+     *
+     * <p>护栏:
+     * <ul>
+     *   <li>**在线的不让删** —— 代理每 4 秒一次心跳,90 秒内有心跳就算在线;
+     *       想删在线的那台,先停它的代理(否则下一次心跳又把它写回来,等于白删);</li>
+     *   <li>顺手把它内存里的记录 {@code STATIONS.remove},队列里指向它的任务就地摘掉(免得 5 分钟后再冒出来);</li>
+     *   <li>只删本站点的三个参数行(enabled/types/paper),不动 {@code print.*} 其它键。</li>
+     * </ul>
+     *
+     * @param body {stationName}
+     */
+    @PostMapping("/station/delete")
+    public ApiResult<Map<String, Object>> deleteStation(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "配置打印机", "config");
+        String name = str(body.get("stationName"));
+        if (name.isEmpty()) throw new IllegalArgumentException("缺少站点名称");
+        Station s = STATIONS.get(name);
+        if (s != null && isOnline(s)) {
+            throw new IllegalStateException("「" + name + "」现在在线(90 秒内有心跳),不能删:"
+                    + "请先在那台电脑上停掉打印代理,等它变成离线再删");
+        }
+        STATIONS.remove(name);
+        // 队列里还有派给它的任务:把它的名字从 targets 里摘掉(否则这条任务会一直等一个不存在的站点)
+        for (PrintTask t : QUEUE) {
+            if (t.targets().remove(name)) {
+                if (t.targets().isEmpty()) QUEUE.remove(t);
+            }
+        }
+        int n = deleteConfig(name);
+        log.info("打印站点已删除:{}(清了 {} 行配置) by {}", name, n, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("stationName", name);
+        out.put("删除的配置行数", n);
+        out.put("stations", stationList());
+        return ApiResult.ok(out);
+    }
+
+    /** 删站点参数行;返回删掉的行数 */
+    private int deleteConfig(String name) {
+        int n = 0;
+        for (String suffix : new String[]{CFG_ENABLED, CFG_TYPES, CFG_PAPER}) {
+            try {
+                n += jdbc.update("DELETE FROM yj_app_setting WHERE setting_key = ?", CFG_PREFIX + name + suffix);
+            } catch (RuntimeException e) {
+                log.warn("删站点参数 {}{} 失败", name, suffix, e);
+            }
+        }
+        return n;
+    }
+
+    /**
      * 从队列里取一条**派给这个站点**的任务。
      *
      * <ul>

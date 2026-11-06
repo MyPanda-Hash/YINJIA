@@ -243,3 +243,6 @@ tools/archive/_qc-proc-print-20261021/*.pdf
 /deploy/incr-asm-bom-full-*/SHA256SUMS.txt
 /deploy/incr-asm-bom-full-*/logs/
 /deploy/incr-asm-bom-full-*.zip
+
+# 打印代理安装时写的运行配置(含账号密码,绝不入库;换服务器重跑 安装.bat 会自动更新)
+deploy/print-agent/print-agent.config.json
