@@ -27,6 +27,7 @@
 | `ego/round-13-paper.html` | 实际送进打印层的 HTML(纸张内容):被取消勾选的行不在纸上、改过的数量与小计按本次输入落纸、总计=所选行合计。 |
 | `ego/round-14-noamount.png` | 弹窗内「打印版式」切到无金额:单价/小计列与金额合计立即收起。 |
 | `ego/round-15-8090.png` | 8090(jar 内 `static`)同一功能可用,入口 chunk = `assets/index-DspAsTQ4.js`(换过 jar)。 |
+| `ego/round-16-en.png` | 切到 English 后弹窗全部为目标语言(Print Purchase Order / Ordered Qty / Print qty this time / With amounts / Without amounts / Confirm & Print),验收完已切回简体。 |
 
 `Q*.java` 是取明细字段/找多行订单的一次性只读探针(`java -cp lib\mssql-jdbc.jar ...` 在 `tools/` 下跑)。
 
