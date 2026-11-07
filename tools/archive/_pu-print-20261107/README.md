@@ -28,6 +28,7 @@
 | `ego/round-14-noamount.png` | 弹窗内「打印版式」切到无金额:单价/小计列与金额合计立即收起。 |
 | `ego/round-15-8090.png` | 8090(jar 内 `static`)同一功能可用,入口 chunk = `assets/index-DspAsTQ4.js`(换过 jar)。 |
 | `ego/round-16-en.png` | 切到 English 后弹窗全部为目标语言(Print Purchase Order / Ordered Qty / Print qty this time / With amounts / Without amounts / Confirm & Print),验收完已切回简体。 |
+| `ego/round-17.mjs` 输出 + `ego/round-17-supplier.png` | 供应商采购打印面板(`SUPPLIER_PU_ORDER`,工具栏只有「打印」)点打印走同一张弹窗;「清空」→ 已选 0、「确定并打印」→ 提示「请至少勾选一行明细」且弹窗不关、「全选」→ 恢复 7/7。 |
 
 `Q*.java` 是取明细字段/找多行订单的一次性只读探针(`java -cp lib\mssql-jdbc.jar ...` 在 `tools/` 下跑)。
 
