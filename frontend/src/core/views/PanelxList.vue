@@ -2305,6 +2305,14 @@
     </el-dialog>
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
+    <!-- 采购订单·打印(2026-11-07 用户口径「打印报表的时候需要能够编辑,像打印材料码的编辑一样,
+         要可以勾选打印和填写数量」):有金额/无金额两个报表共用这一张弹窗,确认后才出纸 -->
+    <PurchaseOrderPrintDialog
+      v-model="puPrintVisible"
+      :panel-code="String(panelCode)"
+      :doc-no="puPrintNo"
+      :with-amount="puPrintAmount"
+    />
 
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
@@ -2510,6 +2518,7 @@ import { useUnsavedStore } from '@/stores/unsaved'
 
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
+import PurchaseOrderPrintDialog from './PurchaseOrderPrintDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import { defaultShipRows, shipRowType } from '@core/qc/shipPlanDefaults'
@@ -5078,6 +5087,20 @@ const MATERIAL_LABEL_PANELS = ['PU_ORDER', 'SUPPLIER_PU_ORDER']
 function onMaterialLabelPrinted({ docNo, batchNo, count }) {
   ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批数量已从订单数量隔离出来，生单时在明细里直接勾选它')}`)
 }
+/**
+ * 采购订单·打印弹窗(2026-11-07):勾选明细行 + 填本次打印数量(有金额/无金额两个版式共用)。
+ * 与「打印材料码」弹窗同一套交互语言,但**不落库**(只影响这张报表,不改订单数据)。
+ */
+const puPrintVisible = ref(false)
+const puPrintNo = ref('')
+/** 打开时默认版式:true=有金额(打印采购订单),false=无金额(打印订单无金额) */
+const puPrintAmount = ref(true)
+/**
+ * 走「可编辑打印弹窗」的采购订单面板族 —— 与 MATERIAL_LABEL_PANELS 同口径:
+ * 供应商采购打印(SUPPLIER_PU_ORDER)与采购订单(PU_ORDER)是同一张 bd_pu_order 的两个面板编码,
+ * 取数与版式完全一致 ⇒ 必须走同一个弹窗,否则供应商点「打印」又退回老的无编辑直接出纸。
+ */
+const PU_PRINT_PANELS = ['PU_ORDER', 'SUPPLIER_PU_ORDER']
 const qrLabels = ref([])
 
 function openQrLabels() {
@@ -10357,6 +10380,22 @@ async function onButton(action) {
   // 出纸 = 页面内打印层(2026-10-20 起不再开子窗口,见 @core/panel/printChannel)
   // (无后端处理器,同 打印工单二维码 本地拦截先例)
   // 打印订单无金额(2026-09-28 用户澄清):采购订单的另一种报表,版式同款仅去 单价/小计/总计金额
+  //
+  // 🔴 2026-11-07 用户口径「采购订单的打印(两个报表一个有金额,一个没有金额),需要能够在打印报表的
+  //    时候编辑(像打印材料码的编辑一样),要可以勾选打印和填写数量」⇒ 采购订单两版**先开可编辑弹窗**
+  //    (PurchaseOrderPrintDialog:勾明细行 + 填本次打印数量,确认后才出纸),不再直接出纸。
+  //    判据用面板族 PU_PRINT_PANELS(供应商采购打印 SUPPLIER_PU_ORDER 是同一张单的另一个面板编码)。
+  //    下面的直接出纸分支保留给「打印退货单」以及万一别的面板也配了这两个动作的兜底。
+  if ((action === '打印采购订单' || action === '打印订单无金额')
+      && PU_PRINT_PANELS.includes(String(panelCode.value))) {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    puPrintNo.value = no
+    puPrintAmount.value = action === '打印采购订单'
+    puPrintVisible.value = true
+    return
+  }
   if (action === '打印采购订单' || action === '打印退货单' || action === '打印订单无金额') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || ''

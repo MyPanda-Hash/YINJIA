@@ -231,7 +231,11 @@ export function printPuOrder(doc, lines) {
     + '</tbody></table>'
     + PU_NOTES_HTML
     + PU_SIGN_HTML
-  if (!printInPage('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
+  // 返回「是否真的交给打印层」:打印弹窗据此决定关窗,还是留在窗里让用户重试
+  // (2026-11-07 采购订单打印弹窗)
+  const ok = printInPage('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)
+  if (!ok) alert(PRINT_FAIL_MSG)
+  return ok
 }
 
 /**
@@ -272,7 +276,9 @@ export function printPuOrderNoAmount(doc, lines) {
     + '</tbody></table>'
     + PU_NOTES_HTML
     + PU_SIGN_HTML
-  if (!printInPage('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
+  const ok = printInPage('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)
+  if (!ok) alert(PRINT_FAIL_MSG)
+  return ok
 }
 
 /**
