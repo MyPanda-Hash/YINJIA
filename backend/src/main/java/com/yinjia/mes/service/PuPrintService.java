@@ -1,0 +1,333 @@
+package com.yinjia.mes.service;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * 采购订单「报表打印记录」—— 有金额 / 无金额两个报表的打印留痕、重打与作废(2026-11-07)。
+ *
+ * <h3>为什么有这张表(用户口径)</h3>
+ * 用户问「弹窗有对已经打印的做记录吗」后选「像材料码那样」:
+ * 每次打印存一份快照(版式 / 勾了哪几行 / 每行本次数量 / 合计 / 打印人 / 时间),
+ * 弹窗底部列出来,可重打(原样再出纸、打印次数+1)、可作废(只作废这张纸)。
+ *
+ * <h3>与材料码({@link PuLabelService})的区别 —— 别混用</h3>
+ * <ul>
+ *   <li>材料码:一张单 = 一个批次号,<b>打印即预约</b>订单余量,作废要释放预约;</li>
+ *   <li>本服务:一次打印 = 一组「哪几行 × 各自数量」的<b>报表快照</b>,
+ *       <b>不占用订单量、不产生预约</b>，作废只是软删这张纸的记录;</li>
+ *   <li>两者表、接口、单号前缀(MQ / MP)都分开,避免报表打印污染材料码的预约口径。</li>
+ * </ul>
+ *
+ * <h3>口径</h3>
+ * <ul>
+ *   <li>「确定并打印」先落库再出纸:纸上内容 = 落库快照(见 {@link #print});</li>
+ *   <li>改过数量的行,小计 = 单价 × 本次数量(4 位小数);
+ *       <b>没改数量的行沿用订单原金额</b>(可能含折扣/整单分摊,不能被打印这一步抹掉);</li>
+ *   <li>重打只把 {@code 打印次数 + 1},不新增记录、不改任何数量;</li>
+ *   <li>作废 = 软删(asp_cancel='Y'),**没有预约要释放**;</li>
+ *   <li><b>不建面板</b>(同材料码):只在采购订单打印弹窗里反查;权限由 PxController 按
+ *       内部账号面板权 / 供应商逐单归属把关。</li>
+ * </ul>
+ */
+@Service
+public class PuPrintService {
+
+    /** 单号前缀:报表打印记录 → MP-yyyy-MM-nnnn(走 s_allno 号池;FormNoService 已登记本表) */
+    private static final String PREFIX = "MP";
+    /** 采购订单面板码 / 订单头表 / 订单行表 */
+    private static final String PANEL = "PU_ORDER";
+    private static final String ORDER_HEAD = "bd_pu_order";
+    private static final String ORDER_LINE = "bl_pu_order";
+    /** 本服务的打印记录头 / 行 */
+    private static final String HEAD = "bd_pu_print";
+    private static final String LINE = "bl_pu_print";
+    /** 版式取值:与前端「打印版式」两个单选一致(中文数据键,ADR-0001) */
+    public static final String FMT_AMOUNT = "有金额";
+    public static final String FMT_NO_AMOUNT = "无金额";
+
+    private final JdbcTemplate jdbc;
+    private final FormNoService formNoService;
+
+    public PuPrintService(JdbcTemplate jdbc, FormNoService formNoService) {
+        this.jdbc = jdbc;
+        this.formNoService = formNoService;
+    }
+
+    // ==================== ① 已打印记录(弹窗反查) ====================
+
+    /**
+     * 某张采购订单的打印记录(新的在上)。
+     *
+     * <p>只回**存活**记录(作废的软删行不再出现,与材料码弹窗同口径)。
+     * 字段:单据编号 / 打印版式 / 打印人 / 打印时间 / 打印次数 / 行数 / 数量合计 / 金额合计。
+     */
+    public List<Map<String, Object>> records(String orderNo) {
+        String no = str(orderNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少采购订单号");
+        return jdbc.queryForList(
+                "SELECT [单据编号] AS 单据编号, [打印版式] AS 打印版式, ISNULL([打印人],N'') AS 打印人,"
+                        + " CONVERT(varchar(19), [打印时间], 120) AS 打印时间, ISNULL([打印次数],0) AS 打印次数,"
+                        + " ISNULL([行数],0) AS 行数, ISNULL([数量合计],0) AS 数量合计, [金额合计] AS 金额合计"
+                        + " FROM " + HEAD
+                        + " WHERE [采购订单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY ISNULL([打印时间], CAST('1900-01-01' AS datetime2)) DESC, id DESC", no);
+    }
+
+    // ==================== ② 登记一次打印(先落库,再出纸) ====================
+
+    /**
+     * 登记一次打印:按「勾选的行 + 本次打印数量」落一份**快照**(1 条头 + N 条行),返回落纸行。
+     *
+     * <p>服务端**不信前端传的数量/金额**,一律回订单行重算:
+     * <ul>
+     *   <li>数量 = 前端本次填写值(必须 &gt; 0,否则拒 —— 不想打印的行应该取消勾选);</li>
+     *   <li>小计 = 数量改过 ? 单价 × 数量 : 订单行原金额(见类注释);</li>
+     *   <li>物料/规格/单位/税率/交期/备注 取订单行当前值做快照(订单以后改了不影响历史纸面)。</li>
+     * </ul>
+     *
+     * @param orderNo 采购订单号
+     * @param format  {@link #FMT_AMOUNT} / {@link #FMT_NO_AMOUNT}(其它值按有金额处理)
+     * @param rows    [{采购订单行id, 打印数量}]
+     * @param user    操作人
+     * @return 落纸所需:单据编号 / 打印版式 / 行数 / 数量合计 / 金额合计 / lines(纸面键:数量=本次打印数量、金额=小计)
+     */
+    @Transactional
+    public Map<String, Object> print(String orderNo, String format, List<Map<String, Object>> rows, String user) {
+        String no = str(orderNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少采购订单号");
+        String fmt = FMT_NO_AMOUNT.equals(str(format)) ? FMT_NO_AMOUNT : FMT_AMOUNT;
+        if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请至少勾选一行明细");
+        Map<String, Object> order = firstRow(
+                "SELECT [单据编号] AS no, ISNULL([供应商编码],N'') AS supplierCode,"
+                        + " CONVERT(varchar(10), [交货日期], 120) AS 交货日期"
+                        + " FROM " + ORDER_HEAD + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (order == null) throw new IllegalArgumentException("采购订单不存在:" + no);
+
+        List<Map<String, Object>> orderLines = jdbc.queryForList(
+                "SELECT id, [行号] AS 行号, [物料编码] AS 物料编码, [物料名称] AS 物料名称, [规格型号] AS 规格型号,"
+                        + " [单位] AS 单位, ISNULL([数量],0) AS 数量, [单价] AS 单价, [金额] AS 金额,"
+                        + " ISNULL([税率%],0) AS 税率, ISNULL([备注],N'') AS 备注,"
+                        + " CONVERT(varchar(10), [预计到货日期], 120) AS 预计到货日期"
+                        + " FROM " + ORDER_LINE + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
+        Map<Integer, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> l : orderLines) byId.put((int) num(l.get("id")), l);
+
+        Set<Integer> seen = new LinkedHashSet<>();
+        List<Map<String, Object>> outLines = new ArrayList<>();
+        double qtyTotal = 0d;
+        double amtTotal = 0d;
+        boolean hasAmt = false;
+        for (Map<String, Object> r : rows) {
+            int lineId = (int) num(r.get("采购订单行id"));
+            double qty = num(r.get("打印数量"));
+            if (lineId <= 0) throw new IllegalArgumentException("打印行缺少采购订单行id");
+            if (!seen.add(lineId)) {
+                throw new IllegalArgumentException("同一订单行在一次打印里出现了两次:行id " + lineId + "(请合并成一行)");
+            }
+            Map<String, Object> line = byId.get(lineId);
+            if (line == null) throw new IllegalArgumentException("采购订单行不存在或已作废:行id " + lineId);
+            if (!(qty > 0)) {
+                throw new IllegalArgumentException("第 " + str(line.get("行号")) + " 行的本次打印数量必须大于 0(不打印的行请取消勾选)");
+            }
+            double orderQty = num(line.get("数量"));
+            boolean changed = Math.abs(qty - orderQty) > 1e-9;
+            Double subtotal = null;
+            if (changed) {
+                double price = num(line.get("单价"));
+                subtotal = round4(price * qty);
+            } else if (line.get("金额") != null) {
+                subtotal = round4(num(line.get("金额")));
+            }
+            String due = str(line.get("预计到货日期"));
+            if (due.isEmpty()) due = str(order.get("交货日期"));
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("采购订单行id", lineId);
+            row.put("行号", line.get("行号"));
+            row.put("物料编码", line.get("物料编码"));
+            row.put("物料名称", line.get("物料名称"));
+            row.put("规格型号", line.get("规格型号"));
+            row.put("单位", line.get("单位"));
+            row.put("订单数量", round4(orderQty));
+            row.put("数量", round4(qty));          // 纸面「数量」列 = 本次打印数量
+            row.put("单价", line.get("单价"));
+            row.put("金额", subtotal);             // 纸面「小计」列
+            row.put("税率%", line.get("税率"));
+            row.put("预计到货日期", due);           // 纸面「交期要求」列
+            row.put("备注", str(line.get("备注")));
+            outLines.add(row);
+            qtyTotal += qty;
+            if (subtotal != null) { amtTotal += subtotal; hasAmt = true; }
+        }
+
+        String docNo = formNoService.next(PREFIX, user);
+        double qtySum = round4(qtyTotal);
+        Double amtSum = (FMT_AMOUNT.equals(fmt) && hasAmt) ? round4(amtTotal) : null;
+        jdbc.update("INSERT INTO " + HEAD + " ([单据编号],[单据日期],[采购订单号],[供应商编码],[打印版式],"
+                        + " [打印人],[打印时间],[打印次数],[行数],[数量合计],[金额合计],asp_user1,asp_time1,asp_cancel)"
+                        + " VALUES (?,?,?,?,?,?,SYSDATETIME(),1,?,?,?,?,SYSDATETIME(),'N')",
+                docNo, LocalDate.now(), no, str(order.get("supplierCode")), fmt, user,
+                outLines.size(), qtySum, amtSum, user);
+        for (Map<String, Object> l : outLines) {
+            jdbc.update("INSERT INTO " + LINE + " ([单据编号],[采购订单行id],[行号],[物料编码],[物料名称],"
+                            + " [规格型号],[单位],[订单数量],[打印数量],[单价],[小计],[税率%],[交期要求],[备注],"
+                            + " asp_user1,asp_time1,asp_cancel)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",
+                    docNo, l.get("采购订单行id"), l.get("行号"), l.get("物料编码"), l.get("物料名称"),
+                    l.get("规格型号"), l.get("单位"), l.get("订单数量"), l.get("数量"), l.get("单价"),
+                    l.get("金额"), l.get("税率%"), l.get("预计到货日期"), l.get("备注"), user);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("单据编号", docNo);
+        out.put("采购订单号", no);
+        out.put("打印版式", fmt);
+        out.put("打印人", user);
+        out.put("行数", outLines.size());
+        out.put("数量合计", qtySum);
+        out.put("金额合计", amtSum);
+        out.put("打印次数", 1);
+        out.put("lines", outLines);
+        return out;
+    }
+
+    // ==================== ③ 重打(同一张记录原样再打,只累加次数) ====================
+
+    /**
+     * 重打:把**同一张**打印记录原样再出纸(纸卡了/打歪了),只把 打印次数 +1。
+     *
+     * <p>不新增记录、不改数量/金额 —— 内容一律取落库快照(见 {@link #linesOf});
+     * 已作废的记录不能重打。
+     */
+    @Transactional
+    public Map<String, Object> reprint(String printNo, String user) {
+        String no = str(printNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印记录单号");
+        Map<String, Object> head = firstRow(
+                "SELECT [采购订单号] AS 采购订单号, [打印版式] AS 打印版式, ISNULL([供应商编码],N'') AS 供应商编码"
+                        + " FROM " + HEAD + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
+        List<Map<String, Object>> lines = linesOf(no);
+        if (lines.isEmpty()) throw new IllegalStateException("该打印记录没有存活行,无法重打:" + no);
+        jdbc.update("UPDATE " + HEAD + " SET [打印人] = ?, [打印时间] = SYSDATETIME(),"
+                + " [打印次数] = ISNULL([打印次数],0) + 1, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                + " WHERE [单据编号] = ?", user, user, no);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("单据编号", no);
+        out.put("采购订单号", head.get("采购订单号"));
+        out.put("打印版式", head.get("打印版式"));
+        Map<String, Object> counts = firstRow("SELECT ISNULL([打印次数],0) AS t, ISNULL([数量合计],0) AS q,"
+                + " [金额合计] AS a, ISNULL([行数],0) AS n FROM " + HEAD + " WHERE [单据编号] = ?", no);
+        out.put("打印次数", counts == null ? 1 : (int) num(counts.get("t")));
+        out.put("数量合计", counts == null ? 0d : round4(num(counts.get("q"))));
+        out.put("金额合计", counts == null ? null : counts.get("a"));
+        out.put("行数", counts == null ? lines.size() : (int) num(counts.get("n")));
+        out.put("lines", lines);
+        return out;
+    }
+
+    /** 某张打印记录的行(纸面键口径:数量=打印数量、金额=小计、预计到货日期=交期要求) */
+    private List<Map<String, Object>> linesOf(String printNo) {
+        List<Map<String, Object>> raw = jdbc.queryForList(
+                "SELECT [采购订单行id] AS 采购订单行id, [行号] AS 行号, [物料编码] AS 物料编码,"
+                        + " [物料名称] AS 物料名称, [规格型号] AS 规格型号, [单位] AS 单位,"
+                        + " ISNULL([订单数量],0) AS 订单数量, ISNULL([打印数量],0) AS 打印数量,"
+                        + " [单价] AS 单价, [小计] AS 小计, ISNULL([税率%],0) AS 税率,"
+                        + " ISNULL([交期要求],N'') AS 交期要求, ISNULL([备注],N'') AS 备注"
+                        + " FROM " + LINE + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", printNo);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : raw) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("采购订单行id", r.get("采购订单行id"));
+            m.put("行号", r.get("行号"));
+            m.put("物料编码", r.get("物料编码"));
+            m.put("物料名称", r.get("物料名称"));
+            m.put("规格型号", r.get("规格型号"));
+            m.put("单位", r.get("单位"));
+            m.put("订单数量", round4(num(r.get("订单数量"))));
+            m.put("数量", r.get("打印数量"));
+            m.put("单价", r.get("单价"));
+            m.put("金额", r.get("小计"));
+            m.put("税率%", r.get("税率"));
+            m.put("预计到货日期", r.get("交期要求"));
+            m.put("备注", r.get("备注"));
+            out.add(m);
+        }
+        return out;
+    }
+
+    // ==================== ④ 作废(软删,不释放任何预约) ====================
+
+    /**
+     * 作废一张打印记录:头 + 行一并软删(asp_cancel='Y')。
+     *
+     * <p>报表打印**不占用订单量**,所以作废**没有预约要释放**——只是让这张纸不再出现在
+     * 「已打印记录」里(与材料码作废的语义不同,别照抄那段释放逻辑)。
+     */
+    @Transactional
+    public Map<String, Object> voidPrint(String printNo, String user) {
+        String no = str(printNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印记录单号");
+        Map<String, Object> head = firstRow("SELECT [采购订单号] AS 采购订单号 FROM " + HEAD
+                + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
+        int n = jdbc.update("UPDATE " + LINE + " SET asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME()"
+                + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", user, no);
+        jdbc.update("UPDATE " + HEAD + " SET asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME() WHERE [单据编号] = ?", user, no);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("单据编号", no);
+        out.put("采购订单号", head.get("采购订单号"));
+        out.put("作废行数", n);
+        return out;
+    }
+
+    // ==================== ⑤ 归属反查(重打/作废的权限闸门用) ====================
+
+    /**
+     * 按打印记录单号反查它属于哪张采购订单(查不到/已作废 → 空串)。
+     * 用途:重打/作废接口收的是 MP-… 单号,供应商会话要据此核对归属。
+     */
+    public String orderNoOf(String printNo) {
+        String no = str(printNo);
+        if (no.isEmpty()) return "";
+        try {
+            String orderNo = jdbc.queryForObject(
+                    "SELECT TOP 1 ISNULL([采购订单号],N'') FROM " + HEAD
+                            + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
+            return orderNo == null ? "" : orderNo.trim();
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    // ==================== 小工具 ====================
+
+    private Map<String, Object> firstRow(String sql, Object... args) {
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, args);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private static double num(Object o) {
+        if (o instanceof Number n) return n.doubleValue();
+        if (o == null || String.valueOf(o).isBlank()) return 0d;
+        try { return Double.parseDouble(String.valueOf(o).trim()); } catch (NumberFormatException e) { return 0d; }
+    }
+
+    /** 4 位小数收口(与库内 decimal(18,4) 同口径) */
+    private static double round4(double v) { return Math.round(v * 10000.0) / 10000.0; }
+
+    private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
+
+    /** 本服务引用的面板码(权限闸门复用,PxController 里只写一处) */
+    public static String panel() { return PANEL; }
+}

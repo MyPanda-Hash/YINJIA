@@ -4516,3 +4516,5 @@ migrate-sample-flow-20261106.sql
 migrate-testlib-spec-add-missing-20261106.sql
 # 2026-11-06 外部样品申请单总表+子表：明细表补 8 列 + 字段 place=detail + 存量搬成一条明细行
 migrate-sample-ext-detail-20261106.sql
+# 2026-11-07 采购订单报表打印记录：新建 bd_pu_print（头）/ bl_pu_print（行），弹窗「已打印记录 + 重打/作废」
+migrate-pu-print-20261107.sql

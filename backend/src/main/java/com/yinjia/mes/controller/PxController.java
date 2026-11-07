@@ -43,6 +43,8 @@ public class PxController {
     private final com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler;
     private final com.yinjia.mes.service.BatchService batchService;
     private final com.yinjia.mes.service.PuLabelService puLabel;
+    /** 采购订单**报表打印记录**(2026-11-07):有金额/无金额两个报表的打印快照 + 重打/作废 */
+    private final com.yinjia.mes.service.PuPrintService puPrint;
     /** 条码标签打印留痕(材料/半成品/成品条码面板,2026-10-18) */
     private final com.yinjia.mes.service.BarcodeLabelService barcodeLabel;
     /**
@@ -75,6 +77,7 @@ public class PxController {
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
                         com.yinjia.mes.service.BatchService batchService,
                         com.yinjia.mes.service.PuLabelService puLabel,
+                        com.yinjia.mes.service.PuPrintService puPrint,
                         com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
                         com.yinjia.mes.service.QueryService queryService,
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
@@ -94,6 +97,7 @@ public class PxController {
         this.pushGenerateHandler = pushGenerateHandler;
         this.batchService = batchService;
         this.puLabel = puLabel;
+        this.puPrint = puPrint;
         this.barcodeLabel = barcodeLabel;
         this.queryService = queryService;
         this.rdFlow = rdFlow;
@@ -345,6 +349,92 @@ public class PxController {
         // 同上:供应商可作废自己打出来的码(预约量释放回余量)
         requireMaterialLabelAccessByLabelDoc(docNo);
         return ApiResult.ok(puLabel.voidDoc(docNo, currentUser()));
+    }
+
+    // ============ 采购订单报表打印记录(2026-11-07) ============
+    // 用户口径:有金额/无金额两个报表打印时要能勾选行/填数量,并且要像材料码那样**留下打印记录**,
+    // 可重打(原样再出纸、次数+1)、可作废(只作废这张纸)。与材料码的差别只有一处:
+    // 报表打印**不占用订单量**,所以作废没有预约要释放(只软删记录)。
+    // **不建面板**:四个端点挂既有 /px 运行时;权限内部按 PU_ORDER、供应商按**逐单归属**。
+
+    /** 某张采购订单的打印记录(弹窗底部「已打印记录」) */
+    @GetMapping("/puPrint/records")
+    public ApiResult<List<Map<String, Object>>> puPrintRecords(@RequestParam String orderNo) {
+        requirePrintRecordAccess(orderNo);
+        return ApiResult.ok(puPrint.records(orderNo));
+    }
+
+    /**
+     * 登记一次打印(**先落库再出纸**)。
+     *
+     * <p>返回体就是**纸面内容**:前端拿它出纸,保证「记录 = 纸」永远同源
+     * (改过数量的行小计=单价×数量,没改的沿用订单原金额,由服务端重算)。
+     */
+    @PostMapping("/puPrint/print")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> puPrintPrint(@RequestBody Map<String, Object> body) {
+        String orderNo = String.valueOf(body.getOrDefault("orderNo", ""));
+        requirePrintRecordAccess(orderNo);
+        String format = body.get("format") == null ? "" : String.valueOf(body.get("format"));
+        List<Map<String, Object>> lines = new java.util.ArrayList<>();
+        if (body.get("lines") instanceof List<?> l) {
+            for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
+        }
+        return ApiResult.ok(puPrint.print(orderNo, format, lines, currentUser()));
+    }
+
+    /** 重打:同一张打印记录原样再打一遍(只累加打印次数,不新增记录) */
+    @PostMapping("/puPrint/reprint")
+    public ApiResult<Map<String, Object>> puPrintReprint(@RequestBody Map<String, Object> body) {
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        requirePrintRecordAccessByPrintDoc(docNo);
+        return ApiResult.ok(puPrint.reprint(docNo, currentUser()));
+    }
+
+    /** 作废打印记录(软删;报表打印不占用订单量,没有预约要释放) */
+    @PostMapping("/puPrint/void")
+    public ApiResult<Map<String, Object>> puPrintVoid(@RequestBody Map<String, Object> body) {
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        requirePrintRecordAccessByPrintDoc(docNo);
+        return ApiResult.ok(puPrint.voidPrint(docNo, currentUser()));
+    }
+
+    /**
+     * 打印记录的取数/登记权限(与材料码弹窗同一口径):
+     * 内部账号按「采购订单」的查看权;供应商账号按**逐单归属**(只能动自己供应商的订单)。
+     */
+    private void requirePrintRecordAccess(String orderNo) {
+        String supplierCode = queryService.sessionSupplierCode();
+        if (supplierCode == null) {
+            perm.requirePanelView("PU_ORDER");
+            return;
+        }
+        if (supplierCode.isEmpty()
+                || !queryService.supplierMayReadDoc(com.yinjia.mes.service.QueryService.SUPPLIER_PANEL_CODE, orderNo)) {
+            throw new org.springframework.security.access.AccessDeniedException("该采购订单不属于当前供应商:" + orderNo);
+        }
+    }
+
+    /**
+     * 重打/作废的权限:收到的是**打印记录单号**(MP-…),先反查它属于哪张采购订单,再核对归属。
+     * 内部账号按 PU_ORDER 的修改权(作废是破坏性动作);供应商只能动自己订单下的记录。
+     */
+    private void requirePrintRecordAccessByPrintDoc(String printDocNo) {
+        String no = printDocNo == null ? "" : printDocNo.trim();
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印记录单号");
+        String supplierCode = queryService.sessionSupplierCode();
+        if (supplierCode == null) {
+            perm.requireButton("PU_ORDER", "修改");
+            return;
+        }
+        if (supplierCode.isEmpty()) {
+            throw new org.springframework.security.access.AccessDeniedException("供应商账号已停用");
+        }
+        String orderNo = puPrint.orderNoOf(no);
+        if (orderNo.isEmpty()
+                || !queryService.supplierMayReadDoc(com.yinjia.mes.service.QueryService.SUPPLIER_PANEL_CODE, orderNo)) {
+            throw new org.springframework.security.access.AccessDeniedException("该打印记录不属于当前供应商:" + no);
+        }
     }
 
     /** 当前操作人(与 batchFlow 各端点同口径:无认证上下文时记 system) */

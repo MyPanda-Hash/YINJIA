@@ -49,7 +49,11 @@ public class FormNoService {
      * <p>格式:{前缀, 表, 列}。新增同类来源(外部系统直写的单据表)在这里补一行即可。
      */
     private static final java.util.List<String[]> NUMBER_SOURCES = java.util.List.<String[]>of(
-            new String[]{"GD", "plang", "pl_no"}
+            new String[]{"GD", "plang", "pl_no"},
+            // 采购订单报表打印记录(2026-11-07):bd_pu_print 不是面板(不建 yj_panel),
+            // 不登记的话取号基准只认号池 ⇒ 号池万一没回登就会把已存在的 MP 号再发一次。
+            // 与材料码 MQ 同一先例(那张表也是零面板)。
+            new String[]{"MP", "bd_pu_print", "单据编号"}
     );
 
     private final JdbcTemplate jdbc;

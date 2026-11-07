@@ -613,6 +613,31 @@ export async function puLabelVoid(docNo) {
   return unwrapStrict(await request.post('/px/puLabel/void', { docNo }))
 }
 
+/* ── 采购订单「报表打印记录」(2026-11-07):有金额/无金额两个报表的打印快照 + 重打/作废 ──
+ * 与材料码的区别:报表打印**不占用订单量**,作废只软删记录;打印口径是「先落库再出纸」,
+ * 纸上内容 = 服务端返回的落纸行(改过数量的行小计=单价×数量,没改的沿用订单原金额)。 */
+
+/** 某张采购订单的打印记录(弹窗底部「已打印记录」) */
+export async function puPrintRecords(orderNo) {
+  return unwrap(await request.get('/px/puPrint/records', { params: { orderNo } }))
+}
+
+/** 登记一次打印:返回落纸行(服务端重算数量/小计,前端拿它出纸,保证「记录=纸」同源) */
+export async function puPrintSave(payload) {
+  // 写接口一律严格解析:403/校验失败必须抛错,不能像 v3.65 那样"提示成功但什么都没变"
+  return unwrapStrict(await request.post('/px/puPrint/print', payload))
+}
+
+/** 重打:同一张打印记录原样再打一遍(只累加打印次数,不新增记录) */
+export async function puPrintReprint(docNo) {
+  return unwrapStrict(await request.post('/px/puPrint/reprint', { docNo }))
+}
+
+/** 作废打印记录(软删):报表打印不占用订单量,没有预约要释放 */
+export async function puPrintVoid(docNo) {
+  return unwrapStrict(await request.post('/px/puPrint/void', { docNo }))
+}
+
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))

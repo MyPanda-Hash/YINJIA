@@ -1,15 +1,11 @@
 <template>
   <!-- 采购订单打印弹窗(2026-11-07)—— 用户口径:
        「采购订单的打印(两个报表一个有金额,一个没有金额),需要能够在打印报表的时候编辑
-        (像打印材料码的编辑一样),要可以勾选打印和填写数量」。
+        (像打印材料码的编辑一样),要可以勾选打印和填写数量」+「弹窗有对已经打印的做记录吗」
+       ⇒ 选「像材料码那样」:每次打印落一份快照,弹窗底部列「已打印记录」,可重打 / 作废。
 
-       与「打印材料码」弹窗同一套交互语言:上面一排单据信息、中间勾选表格、每行填本次数量、
-       下面合计 + 确定并打印。区别只有一点:**这里不落库** —— 材料码要登记批次号/预约数量,
-       而采购订单报表只是把订单打出来,勾选与数量只作用于**这一张纸**,不改动订单数据。
-       (所以没有"已打印记录/作废/重打",订单本身才是权威数据。)
-
-       版式二选一:有金额(printPuOrder)/ 无金额(printPuOrderNoAmount)—— 两个报表同一张弹窗,
-       从哪个菜单进来默认就是哪个版式,也可以在弹窗里随时切。 -->
+       与「打印材料码」弹窗同一套交互语言:上面单据信息、中间勾选表格、下面合计 + 已打印记录。
+       差别:报表打印**不占用订单量**(没有预约),所以作废只作废这张纸,不释放任何余量。 -->
   <el-dialog
     :model-value="modelValue"
     :title="title"
@@ -17,7 +13,7 @@
     append-to-body
     destroy-on-close
     @update:model-value="(v) => emit('update:modelValue', v)"
-    @open="load"
+    @open="onOpen"
   >
     <div v-loading="loading" class="pup">
       <div class="pup-bar">
@@ -34,7 +30,7 @@
       <!-- 这句话是口径本身,别删:用户最容易误解的就是"是不是改了订单数量" -->
       <div class="pup-tip">{{ tt('勾选要打印的明细行，并填写本次打印数量；只影响这张报表，不改动订单数据') }}</div>
 
-      <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" height="360"
+      <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" height="330"
         @selection-change="onPicked">
         <el-table-column type="selection" width="42" />
         <el-table-column prop="行号" :label="tt('行号')" width="64" />
@@ -66,6 +62,36 @@
           <span v-if="showAmount"> · {{ tt('金额合计') }}：<b>{{ moneyText(totalAmount) }}</b></span>
         </span>
       </div>
+
+      <!-- 已打印记录(2026-11-07 用户口径「像材料码那样」):每次打印一份快照,可重打/作废 -->
+      <div class="pup-rec">
+        <div class="pup-rec-title">
+          {{ tt('已打印记录（本订单）') }}
+          <span class="pup-tip">{{ tt('每次打印都会留一份记录；重打只累加次数，作废只作废这张纸') }}</span>
+        </div>
+        <el-table :data="records" border size="small" max-height="220">
+          <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
+          <el-table-column :label="tt('打印版式')" width="96" align="center">
+            <template #default="{ row }">{{ tt(row['打印版式']) }}</template>
+          </el-table-column>
+          <el-table-column prop="行数" :label="tt('行数')" width="64" align="right" />
+          <el-table-column prop="数量合计" :label="tt('数量合计')" width="96" align="right" />
+          <el-table-column :label="tt('金额合计')" width="104" align="right">
+            <template #default="{ row }">{{ row['金额合计'] == null ? '' : moneyText(row['金额合计']) }}</template>
+          </el-table-column>
+          <el-table-column prop="打印人" :label="tt('打印人')" width="96" show-overflow-tooltip />
+          <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
+          <el-table-column prop="打印次数" :label="tt('打印次数')" width="78" align="right" />
+          <el-table-column :label="tt('操作')" width="118" align="center">
+            <template #default="{ row }">
+              <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录 -->
+              <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
+              <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>{{ tt('该订单还没有打印记录') }}</template>
+        </el-table>
+      </div>
     </div>
     <template #footer>
       <el-button @click="fillOrderQty">{{ tt('按订单数量填充') }}</el-button>
@@ -78,26 +104,29 @@
 
 <script setup>
 /**
- * PurchaseOrderPrintDialog — 采购订单「打印时编辑」弹窗(2026-11-07)
+ * PurchaseOrderPrintDialog — 采购订单「打印时编辑 + 打印记录」弹窗(2026-11-07)
  *
  * 需求(用户原话):「采购订单的打印(两个报表一个有金额,一个没有金额),需要能够在打印报表的时候编辑
- * (像打印材料码的编辑一样),要可以勾选打印和填写数量」。
+ * (像打印材料码的编辑一样),要可以勾选打印和填写数量」;追问「弹窗有对已经打印的做记录吗」后
+ * 选「像材料码那样」⇒ 本弹窗增加「已打印记录」:每次打印落一份快照,可重打 / 作废。
  *
- * 与 MaterialLabelDialog(打印材料码)的分工:
- *   · 材料码:打印即**落库**(批次号权威登记 + 预约该行数量),所以有「已打印记录/作废/重打」;
- *   · 本弹窗:**只出纸**。勾选决定哪些明细行落纸、每行的「本次打印数量」覆盖纸面数量,
- *     关掉弹窗即丢,订单一个字段都不动(采购订单本身有保存/审核链路,不该被一次打印改写)。
+ * 口径:
+ *   · **先落库、再出纸**:纸面内容 = 服务端返回的落纸行(数量/小计/交期由服务端按订单行重算),
+ *     保证「记录 = 纸」永远同源;打印层挂不上时把刚落的记录作废掉,不留"有记录没纸";
+ *   · 勾选决定哪些行落纸;每行「本次打印数量」默认=订单数量,改过的行小计=单价×数量,
+ *     没改的行沿用订单原金额(折扣/分摊不会被打印抹掉);
+ *   · 重打只累加打印次数、不新增记录;作废只软删这张记录(报表打印不占用订单量,没有余量要释放);
+ *   · 与材料码弹窗的区别:材料码打印会**预约**订单余量,报表打印不会。
  *
- * 取数同「打印采购订单」的既有口径:`engine.getFormDescriptor`(已保存的最新行,不读编辑中的草稿)。
- * 落纸行由 core 层纯函数 `puOrderPrintRows` 生成(单测钉住"没勾的不打/改数量才重算小计"),
+ * 取数同「打印采购订单」既有口径:`engine.getFormDescriptor`(已保存的最新行,不读编辑中的草稿)。
  * 出纸复用 business/print-formats 的两个版式,经面板 runtime 下发(core 不直接 import business)。
  */
 import { computed, nextTick, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { sumKeepScale } from '@core/panel/sumTotals'
-import { puOrderPrintRows, puOrderLineAmount } from '@core/panel/puPrintRows'
+import { puOrderLineAmount } from '@core/panel/puPrintAmount'
 
 const engine = usePanelRuntime()
 
@@ -125,10 +154,12 @@ const showAmount = computed(() => fmt.value === 'amount')
 const dlgWidth = 'min(1150px, 96vw)'
 const tableRef = ref(null)
 const picked = ref([])
-/** 行键 → 本次打印数量(键由 keyOf 生成,与 puOrderPrintRows 同源) */
+/** 行键 → 本次打印数量(键由 keyOf 生成) */
 const qtyOf = reactive({})
+/** 本订单的打印记录(服务端落库快照;弹窗底部表格) */
+const records = ref([])
 
-/** 行键:优先数据库 id,其次行号,最后下标(与 core/panel/puPrintRows 的默认 keyOf 完全一致) */
+/** 行键:优先数据库 id,其次行号,最后下标 */
 const keyOf = (row, i) => String(row?.id ?? row?.['行号'] ?? i)
 /** 表格行:原始行 + 稳定行键(__key),不改原始字段 */
 const rows = computed(() => lines.value.map((l, i) => ({ ...l, __key: keyOf(l, i) })))
@@ -148,7 +179,7 @@ const moneyText = (v) => {
   if (v == null || v === '' || Number.isNaN(n)) return ''
   return String(Math.round(n * 10000) / 10000)
 }
-/** 纸面小计(与落纸口径同一个纯函数:没改数量就是原金额,改了才 单价×数量) */
+/** 纸面小计(与落库口径同一个纯函数:没改数量就是原金额,改了才 单价×数量) */
 function amountOf(row) {
   return puOrderLineAmount(row, qtyOf[row.__key])
 }
@@ -166,14 +197,20 @@ const totalAmount = computed(() => {
   return sumKeepScale(vals) ?? 0
 })
 
+/** 开窗:版式回到「入口动作」的默认值,再取数 */
+async function onOpen() {
+  fmt.value = props.withAmount ? 'amount' : 'noamount'
+  await load()
+}
+
 async function load() {
   if (!props.docNo) return
   loading.value = true
-  fmt.value = props.withAmount ? 'amount' : 'noamount'
   picked.value = []
-  // 每次开窗先清空:上一次的单据/明细不能残留(取数失败时宁可空表,也不要让人以为打的是新单)
+  // 每次开窗先清空:上一次的单据/明细/记录不能残留(取数失败时宁可空表)
   doc.value = {}
   lines.value = []
+  records.value = []
   Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
   try {
     const res = await engine.getFormDescriptor({ panelCode: props.panelCode, code: props.docNo })
@@ -193,10 +230,22 @@ async function load() {
     // 默认全选(与材料码弹窗同款便利):大部分打印就是整单打,勾选仍是权威
     await nextTick()
     selectAll()
+    await loadRecords()
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('打印失败'))
   } finally {
     loading.value = false
+  }
+}
+
+/** 只刷新「已打印记录」(不动勾选/数量);失败不挡住打印主体 */
+async function loadRecords() {
+  if (!props.docNo) return
+  try {
+    records.value = (await engine.puPrintRecords(props.docNo)) || []
+  } catch (e) {
+    records.value = []
+    console.warn('[pu-print] 打印记录加载失败:', e?.message || e)
   }
 }
 
@@ -225,29 +274,92 @@ function fillOrderQty() {
   selectAll()
 }
 
-function confirm() {
+/**
+ * 确定并打印 = **先落库、再出纸**:
+ *   ① 服务端按订单行重算并落一份快照,返回落纸行;
+ *   ② 用返回行出纸(纸面与记录同源);
+ *   ③ 打印层挂不上(浏览器拒绝)⇒ 把刚落的记录作废,避免"有记录没纸";
+ *   ④ 打印结束(afterprint)后再刷新记录,不在打印对话框开着时重绘(2026-10-29 卡顿口径)。
+ */
+async function confirm() {
   if (!picked.value.length) return ElMessage.warning(tt('请至少勾选一行明细'))
   const bad = picked.value.filter((r) => !(Number(qtyOf[r.__key]) > 0))
   if (bad.length) {
     return ElMessage.warning(tt('本次打印数量必须大于 0（不打印的行请取消勾选）'))
   }
-  const picks = {}
-  for (const r of picked.value) picks[r.__key] = Number(qtyOf[r.__key])
-  const printRows = puOrderPrintRows(lines.value, picks, keyOf)
-  if (!printRows.length) return ElMessage.warning(tt('请至少勾选一行明细'))
+  const picks = picked.value.map((r) => ({
+    采购订单行id: Number(r.id),
+    打印数量: Number(qtyOf[r.__key]),
+  }))
   busy.value = true
   try {
-    // 两个版式共用同一份落纸行;出纸走页面内打印层(print-formats,经 runtime 下发)
-    const ok = showAmount.value
-      ? engine.printPuOrder(doc.value, printRows)
-      : engine.printPuOrderNoAmount(doc.value, printRows)
-    // true = 已交给打印层 ⇒ 关窗(browser 打印对话框照常弹出);false = 已被提示,留在窗里重试
-    if (ok) {
-      emit('printed', { docNo: props.docNo, format: fmt.value, lines: printRows.length })
-      emit('update:modelValue', false)
+    const res = await engine.puPrintSave({
+      orderNo: props.docNo,
+      format: showAmount.value ? '有金额' : '无金额',
+      lines: picks,
+    })
+    const printRows = res?.['lines'] || []
+    if (!res?.['单据编号'] || !printRows.length) throw new Error('打印记录未返回落纸行')
+    const printFn = res['打印版式'] === '无金额' ? engine.printPuOrderNoAmount : engine.printPuOrder
+    let afterPrint = null
+    let printDone = false   // onDone 可能比下面的赋值先到(打印被拒/层摘得快)
+    const ok = printFn(doc.value, printRows, {
+      onDone: () => { printDone = true; if (afterPrint) afterPrint() },
+    })
+    if (!ok) {
+      // 打印层没挂上:撤掉刚落的记录(否则"记录说打过、纸上什么都没有")
+      try { await engine.puPrintVoid(res['单据编号']) } catch { /* 撤销失败也不改主流程提示 */ }
+      ElMessage.error(tt('打印失败'))
+      return
     }
+    ElMessage.success(`${tt('已登记打印记录')} ${res['单据编号']}`)
+    emit('printed', { docNo: props.docNo, printNo: res['单据编号'], format: res['打印版式'] })
+    afterPrint = () => { load() }
+    if (printDone || !document.getElementById('yj-print-host')) afterPrint()
   } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    ElMessage.error(engine.errMsg(e) || tt('打印登记失败'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 重打:同一张记录原样再打一遍(只累加打印次数,不新增记录) */
+async function doReprint(row) {
+  busy.value = true
+  try {
+    const res = await engine.puPrintReprint(row['单据编号'])
+    if (!res || !res['单据编号']) throw new Error(tt('打印记录不存在或已作废'))
+    const printRows = res['lines'] || []
+    const printFn = res['打印版式'] === '无金额' ? engine.printPuOrderNoAmount : engine.printPuOrder
+    let afterPrint = null
+    let printDone = false
+    await printFn(doc.value, printRows, {
+      onDone: () => { printDone = true; if (afterPrint) afterPrint() },
+    })
+    ElMessage.success(`${tt('已重打（第 {n} 次）').replace('{n}', res['打印次数'] ?? '')} ${res['单据编号']}`)
+    afterPrint = () => { loadRecords() }
+    if (printDone || !document.getElementById('yj-print-host')) afterPrint()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('重打失败'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 作废打印记录(只作废这张纸;报表打印不占用订单量,没有余量要释放) */
+async function doVoid(row) {
+  try {
+    await ElMessageBox.confirm(
+      `${tt('作废后这张打印记录不再显示（报表打印不占用订单量，没有余量要释放），确定继续吗？')}\n${tt('打印单号')} ${row['单据编号']} / ${tt('打印次数')} ${row['打印次数'] ?? 0}`,
+      tt('作废打印记录'), { type: 'warning' })
+  } catch { return }
+  busy.value = true
+  try {
+    await engine.puPrintVoid(row['单据编号'])
+    ElMessage.success(tt('已作废打印记录'))
+    await loadRecords()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('作废失败'))
   } finally {
     busy.value = false
   }
@@ -261,4 +373,8 @@ function confirm() {
 .pup-fmt { display: inline-flex; align-items: center; gap: 6px; }
 .pup-tip { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
+/* 已打印记录:与上方勾选表隔一道浅线,说明用途 */
+.pup-rec { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
+.pup-rec-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.pup-rec-title .pup-tip { background: none; border: none; padding: 0; }
 </style>

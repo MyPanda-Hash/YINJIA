@@ -257,6 +257,13 @@ export default {
     '按订单数量填充': 'Fill with ordered qty',
     '请至少勾选一行明细': 'Check at least one line',
     '本次打印数量必须大于 0（不打印的行请取消勾选）': 'The print qty must be greater than 0 (uncheck the lines you do not want to print)',
+    // 采购订单打印记录(2026-11-07):每次打印落一份快照,弹窗里可查、可重打/作废
+    '每次打印都会留一份记录；重打只累加次数，作废只作废这张纸': 'Every print leaves a record here; reprint only adds to the count, voiding only voids this sheet',
+    '该订单还没有打印记录': 'This order has no print records yet',
+    '已登记打印记录': 'Print record created',
+    '已作废打印记录': 'Print record voided',
+    '打印记录不存在或已作废': 'Print record does not exist or has been voided',
+    '作废后这张打印记录不再显示（报表打印不占用订单量，没有余量要释放），确定继续吗？': 'This print record will no longer be listed (report printing reserves no ordered qty, so nothing is released). Continue?',
     '作废打印记录': 'Void print record',
     '作废后该批次的预约量立即释放回余量（已打印的纸仍在供应商手里，请自行作废）。': 'Voiding releases the reserved qty back to the remaining qty immediately (the printed labels are still with the supplier — dispose of them yourself).',
     '已作废，预约量已释放': 'Voided; the reserved qty has been released',
