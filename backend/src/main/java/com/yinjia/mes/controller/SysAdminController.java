@@ -189,6 +189,16 @@ public class SysAdminController {
             {"specapprove", "规格书批准"},
     };
 
+    /** 内部开发样品申请单专属动作集 = 通用动作 + 「改他人行」(edit_others)。
+     *  2026-11-06 用户口径:「每个人只能改自己作为申请人的行数据…只能由有更改权限的人来改，
+     *  这个权限写进组织架构对应面板里面」⇒ 在「角色与面板权限」里逐面板勾选。 */
+    public static final String[][] SAMPLE_INT_ACTIONS;
+    static {
+        String[][] base = PERMISSION_ACTIONS;
+        SAMPLE_INT_ACTIONS = java.util.Arrays.copyOf(base, base.length + 1);
+        SAMPLE_INT_ACTIONS[base.length] = new String[]{"edit_others", "改他人行"};
+    }
+
     /**
      * 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
      * 申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族/自定义字段)。
@@ -252,8 +262,12 @@ public class SysAdminController {
             p.put("hasApproval", def.isDoc());
             // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 13 项
             // (warn「预警配置」只进通用集:它作用于库存 kucun.[预警数量] 阈值,RD_* 文书式面板没有该动作)
-            p.put("actions", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
-                    ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS);
+            // 内部开发样品申请单是「数据记录表」:行级归属 —— 除通用动作外多一个
+            // 「改他人行」(edit_others 词),勾了才能改别人已保存的行(2026-11-06 用户口径)。
+            p.put("actions", "RD_SAMPLE_INT".equals(def.code())
+                    ? SAMPLE_INT_ACTIONS
+                    : (ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
+                        ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS));
             byModule.computeIfAbsent(group, k -> new ArrayList<>()).add(p);
         }
         List<Map<String, Object>> modules = new ArrayList<>();

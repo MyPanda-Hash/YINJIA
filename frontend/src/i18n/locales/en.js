@@ -1617,6 +1617,8 @@ export default {
     '已对全部批次统一设置预警数量': 'Warning quantity applied to all batches',
     '统一设置预警数量失败': 'Failed to apply the warning to all batches',
     '预警配置': 'Warning Config',
+    '改他人行': 'Edit Others\' Rows',
+    '每页': 'Per page',
     '预警数量已保存': 'Warning quantity saved',
     '保存预警数量失败': 'Failed to save warning quantity',
     '低于预警': 'Below warning',

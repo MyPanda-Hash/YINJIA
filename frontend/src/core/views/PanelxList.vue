@@ -249,7 +249,8 @@
              FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
-          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -2672,10 +2673,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   'QC_OQC_REPORT',
   // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
   // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
-  // ⚠ 2026-11-06 起**只有外部单**是这个版式：内部单按用户口径改成「共享表」——
-  //   单表长列表（mode=archive）、不审批、行内增删、表头列可筛选、每页 10/20/50
-  //   （见 tools/migrate-sample-int-flat-20261106.sql），不能再走 DocSheet 分支。
-  'RD_SAMPLE_EXT',
+  // ⚠ 2026-11-06 第二轮：内部单**恢复纸面版式**（用户纠正「格式还是要和 Excel 一样的，只是行操作
+  //   和外部单底部的新增样品一样，而不是表格类的面板」）⇒ 两张单都走 DocSheet；
+  //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
+  //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
   ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
@@ -4175,6 +4177,11 @@ const isSelfMaintainedPanel = computed(() => !!cfgCache.value?.metadata?.selfMai
 // 2026-11-06:外部开发样品申请单也要有「修改记录」——用户口径「有一个修改记录记录谁修改的什么时候」。
 // 它不是 docArchive 一族(不走申请修改闭环),但直接修改这条路径同样写 yj_doc_modify_log,
 // 后端 `修改记录` 动作(modifyHistory)对任何面板都可用,所以这里放开入口即可。
+// 「改他人行」权限(2026-11-06 内部样品单):组织架构·角色里勾了 edit_others 的面板才为 true。
+// 只做入口/单元格显隐,真闸门在 ButtonService.applySampleIntRowRules。
+const canEditOtherRowsHere = computed(() => user.isAdmin === true
+  || (Array.isArray(user.editOtherRowsPanels) && user.editOtherRowsPanels.includes(String(panelCode.value))))
+
 const isModLogPanel = computed(() => isDocArchivePanel.value
   || String(panelCode.value) === 'QC_CATALOG'
   || String(panelCode.value) === 'RD_SAMPLE_EXT')

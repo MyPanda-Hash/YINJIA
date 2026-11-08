@@ -525,6 +525,86 @@ public class ButtonService {
         }
     }
 
+    /**
+     * 内部开发样品申请单的行级归属规则(2026-11-06)。
+     *
+     * <p>口径(用户原话):「谁填写的申请人就是谁,每个人只能改自己作为申请人的行数据,点击保存之后申请人就
+     * 不能改了,只能由有更改权限的人来改,这个权限写进组织架构对应面板里面;每一行数据就像一张独立的单据一样,
+     * 保存修改状态是不互通的。」</p>
+     *
+     * <p>为什么在落库前**改写 items** 而不是拒绝整单:一张单里有多人各自的行,一个人保存时如果用整单校验,
+     * 别人的行会把整单打回;这里改成"只动自己的行,别人的行原样回写",既保住内容也保住行不被缺席软删。</p>
+     */
+    private java.util.Set<String> applySampleIntRowRules(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
+                                                    String no, String actor) {
+        java.util.Set<String> none = java.util.Set.of();
+        if (!"RD_SAMPLE_INT".equals(def.code()) || items == null || items.isEmpty()) return none;
+        boolean canOthers = canEditOtherRows(def.code(), actor);
+        String me = realNameOf(actor);
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT * FROM " + def.lineTable() + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no)) {
+            byId.put(String.valueOf(r.get("id")), r);
+        }
+        // 列名 → 字段标签(用库里原值覆盖 items 时按标签回填)
+        Map<String, String> colToLabel = new LinkedHashMap<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("detail")) {
+            if (f.col() != null) colToLabel.put(f.col(), f.label());
+        }
+        for (Map<String, Object> it : items) {
+            Object idRaw = it.get("id");
+            Map<String, Object> stored = idRaw == null || String.valueOf(idRaw).isBlank()
+                    ? null : byId.get(String.valueOf(idRaw));
+            if (stored == null) {
+                if (!canOthers) it.put("申请人", me);
+                continue;
+            }
+            Object ownerRaw = stored.get("申请人");
+            String owner = ownerRaw == null ? "" : String.valueOf(ownerRaw).trim();
+            if (owner.isEmpty()) {
+                if (!canOthers) it.put("申请人", me);
+                continue;
+            }
+            if (!canOthers && !owner.equals(me)) {
+                for (Map.Entry<String, String> e : colToLabel.entrySet()) {
+                    if (stored.containsKey(e.getKey())) it.put(e.getValue(), stored.get(e.getKey()));
+                }
+                continue;
+            }
+            if (!canOthers) it.put("申请人", owner);
+        }
+        // 缺席=删除的兜底:别人的行不在本次载荷里也必须保留(行级保存状态不互通)。
+        // 做法是给 softDeleteMissing 一个"额外保留 id 集合",**不能**把别人的行补进 items ——
+        // 那样会撞必填校验(实测:补进来的行缺 炭棒尺寸,整单被 400 打回)。
+        java.util.Set<String> protect = new java.util.LinkedHashSet<>();
+        java.util.Set<String> submitted = new java.util.HashSet<>();
+        for (Map<String, Object> it : items) {
+            Object id = it.get("id");
+            if (id != null && !String.valueOf(id).isBlank()) submitted.add(String.valueOf(id));
+        }
+        for (Map.Entry<String, Map<String, Object>> e : byId.entrySet()) {
+            if (submitted.contains(e.getKey())) continue;
+            Object ownerRaw = e.getValue().get("申请人");
+            String owner = ownerRaw == null ? "" : String.valueOf(ownerRaw).trim();
+            if (!owner.isEmpty() && !owner.equals(me) && !canOthers) protect.add(e.getKey());
+        }
+        return protect;
+    }
+
+    /** 当前账号在该面板是否持有「改他人行」(edit_others)词 —— 管理员恒有 */
+    private boolean canEditOtherRows(String panelCode, String actor) {
+        if (isAdminUser(actor)) return true;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                            + " WHERE u.username = ? AND rp.panel_code = ? AND rp.perms LIKE '%edit_others%'",
+                    Integer.class, actor, panelCode);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** 表头「单据日期」→ LocalDate(取不到或格式不符则用今天;日期列可能是 date 或 文本两种口径)。 */
     private static java.time.LocalDate docDayOf(Map<String, Object> head) {
         Object v = head == null ? null : head.get("单据日期");
@@ -541,6 +621,14 @@ public class ButtonService {
         // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
         defaultQcInspector(def, head, user);
         boolean split = def.hasHeadTable();
+        // 内部开发样品申请单=「数据记录表」(2026-11-06 用户口径:「谁填写的申请人就是谁,每个人只能改自己
+        // 作为申请人的行数据;点保存之后申请人就不能改了,只能由有更改权限的人来改;每一行数据就像一张独立的
+        // 单据一样,保存修改状态是不互通的」) ⇒ 落库前逐行套归属规则:
+        //   · 新行:申请人 = 当前用户;
+        //   · 已存在且申请人是本人:内容可改,但申请人被锁回库里的值;
+        //   · 已存在且申请人是别人:整行按库里的原值回写(不改、也不软删——行级状态不互通);
+        //   · 有 edit_others 词(组织架构里勾了「改他人行」)/管理员:以上限制全部放开。
+        java.util.Set<String> protectRowIds = applySampleIntRowRules(def, items, no, user);
         if (no == null) {
             if (items.isEmpty()) {
                 // directAdd 语义:空表单 -> 建一张空白草稿单(头行式写头表,单表式写一行占位行)
@@ -709,7 +797,7 @@ public class ButtonService {
         assignNewLineSeq(def, items, no);
         if (split) {
             upsertHeadRow(def, head, no, user);
-            upsertLineRows(def, items, no, l2c, user);
+            upsertLineRows(def, items, no, l2c, user, protectRowIds);
         } else {
             // 单表式:头字段并入每行
             // 2026-11-04(ASM_BOM 表头可维护,用户报障「表头无法填写」):headWins 分支**只并入真表头字段标签**。
@@ -731,7 +819,7 @@ public class ButtonService {
                 } else { merged.putAll(item); }
                 item.putAll(merged);
             }
-            upsertLineRows(def, items, no, l2c, user);
+            upsertLineRows(def, items, no, l2c, user, protectRowIds);
         }
         // 批次号自洽(2026-10-04 口径:生单即定号,不再有入库审核回填):
         // 链路四单(送料暂收/来料检验/暂收退回/采购入库)保存后立刻把**单头**批次号同步到全部明细行,
@@ -1721,6 +1809,13 @@ public class ButtonService {
     /** 行表 upsert:有 id 更新,无 id 插入(回填自增 id),缺席行软删(asp_cancel='Y') */
     private void upsertLineRows(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
                                 String no, Map<String, String> l2c, String user) {
+        upsertLineRows(def, items, no, l2c, user, java.util.Set.of());
+    }
+
+    /** 同上;{@code protectIds} = 本次载荷**没带**、但也不许软删的行(内部样品单里别人的行)。 */
+    private void upsertLineRows(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
+                                String no, Map<String, String> l2c, String user,
+                                java.util.Set<String> protectIds) {
         Set<Object> liveIds = new HashSet<>();
         // 明细派生列(金额/含税单价/含税金额/税额/折扣金额/总重/损耗率…)在**落库前**由服务端重算一遍。
         // 改前只有前端在改单元格时算 ⇒ 生单(来料检验单审核自动生成采购入库单等)与保存两条路径
@@ -1745,6 +1840,11 @@ public class ButtonService {
             }
         }
         // 缺席行软删:本单中不在 liveIds 的存活行 -> asp_cancel='Y'
+        // (protectIds = 本次载荷没带、但也不许软删的行:内部样品单里"别人的行",行级保存状态不互通)
+        for (String pid : protectIds) {
+            if (pid == null || pid.isBlank()) continue;
+            try { liveIds.add(Long.valueOf(pid)); } catch (NumberFormatException ignore) { liveIds.add(pid); }
+        }
         softDeleteMissing(def.lineTable(), def.groupCol(), no, def.pkCol(), liveIds, user);
     }
 
