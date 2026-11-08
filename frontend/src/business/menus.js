@@ -559,10 +559,12 @@ export const menuTree = [
           // 本(工单号,批次号,工单行号)的**第一张报工**审核时自动出一张草稿,检验要求按
           // 《成型工艺清单》RD_MOLD_PROC 的检验要求区块预铺。置首位 = 流程上最早的一道检验。
           { code: 'qcFirstInsp', title: '首件检验单', path: '/panelx/list/QC_FIRST_INSP', icon: 'DocumentChecked', panelCode: 'QC_FIRST_INSP', operationName: '新增流程' },
-          // 制程检验单(2026-10-12 新增,面板 QC_PROC_INSP):按《生产相关品质检验.xlsx》第3步建。
+          // 出货检验单功能(原制程检验单,2026-10-12 新增,面板 QC_PROC_INSP):按《生产相关品质检验.xlsx》第3步建。
+          // 2026-11-08 用户口径:菜单/页签改名「出货检验单功能」,纸面标题改「出货检验记录表」
+          // (重命名不改面板代号/表结构/单据编号前缀 ZC,历史数据与审批状态原样保留)。
           // 表样=截图「制程检验」页签:外观/尺寸/出货重量 三组 + 出货检验功能性测试组(用「表区」区分)。
           // 检验类别字段区分「首件检验(第2步)」与「制程检验(第3步)」。
-          { code: 'qcProcInsp', title: '制程检验单', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
+          { code: 'qcProcInsp', title: '出货检验单功能', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
           // 组装成品检验单(9.29 批次④,2026-10-05):**组装**报工审核自动出单;含合格转库存/不合格待处理
           { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
           // 出厂检验报告(2026-10-30 新增,面板 QC_OQC_REPORT,前缀 OQC):用户口径「出厂检验报告的内容

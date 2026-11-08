@@ -1,7 +1,7 @@
 /**
- * qcProcInspExport.js — 制程检验单(QC_PROC_INSP)纸张表 → Excel(.xlsx)的**版式单一真源**。
+ * qcProcInspExport.js — 出货检验单功能(原「制程检验单」,面板 QC_PROC_INSP)纸张表 → Excel(.xlsx)的**版式单一真源**。
  *
- * 用户 2026-10-17 口径:「同时实现当前可excel导出」—— 指的是**当前这张纸**(制程检验记录表),
+ * 用户 2026-10-17 口径:「同时实现当前可excel导出」—— 指的是**当前这张纸**(出货检验记录表),
  * 不是列表页那套"头字段键值 + 全字段明细"的数据导出(那条路在 PanelxList.exportSheetExcel)。
  *
  * 只放**纯函数**(产出 aoa / 列宽 / 合并区),不 import xlsx ⇒ 可用 node:test 钉死版式;
@@ -52,14 +52,14 @@ export const PROC_INSP_FOOT = [
 /**
  * 组装导出的二维数组与合并区。
  * @param {object} p
- * @param {string} p.title 标题(制程检验记录表)
+ * @param {string} p.title 标题(出货检验记录表)
  * @param {string} p.subtitle 副标题(公司名 + 单据编号 + 单据状态)
  * @param {Array<Array<{label:string,value:string}>>} p.headPairs 抬头:每行 2 组(与纸面同一分行口径)
  * @param {object} p.head 单据头(取左侧四列 + 检验员 + 结论区)
  * @param {Array<object>} p.rows 明细行(一行一个检验项目)
  * @returns {{aoa:Array<Array<any>>, cols:Array<{wch:number}>, merges:Array<object>, headerRow1:number, headerRow2:number}}
  */
-export function buildProcInspExport({ title = '制程检验记录表', subtitle = '', headPairs = [], head = {}, rows = [] } = {}) {
+export function buildProcInspExport({ title = '出货检验记录表', subtitle = '', headPairs = [], head = {}, rows = [] } = {}) {
   const N = PROC_INSP_COLS.length
   const aoa = []
   const merges = []

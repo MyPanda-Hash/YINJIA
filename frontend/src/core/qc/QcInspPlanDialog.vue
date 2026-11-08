@@ -39,7 +39,7 @@
       <br />
       {{ tt('检验类型 = 项目分类（如 外观检测/重量检测）：一个方案 = 一类项目，带入检验单后它就是横表的「表区」。项目的检验数量可留空；填了 N，带入后该项目在横表里就有 N 格、列头「＋」加不过它。') }}
       <br />
-      {{ tt('方案按「适用单据」分套：首件检验单 / 制程检验单 / 组装成品检验单各看自己适用的方案；勾「显示全部单据的方案」可维护所有方案（未填适用单据的旧方案也只在全部里显示）。') }}
+      {{ tt('方案按「适用单据」分套：首件检验单 / 出货检验单功能 / 组装成品检验单各看自己适用的方案；勾「显示全部单据的方案」可维护所有方案（未填适用单据的旧方案也只在全部里显示）。') }}
     </div>
 
     <!-- ═══ ① 检验方案(主表) ═══ -->
@@ -157,8 +157,13 @@
       </div>
       <!-- 列与《出货检验计划表》面板上**看得见的那几列**一一对齐(2026-10-15 用户口径
            「可获取的内容就是当前出货检验计划里填写的内容」):序号/检验项目/检验要求/检验方法/
-           不合格应对措施/检查频率/备注。计划表里的隐藏列(检验类别、检验内容=表区、检验仪器)
-           不在界面上出现 —— 其中 表区 只在「带入明细」时按计划内容写到本单,不在这里展示。 -->
+           检查频率/备注。
+           2026-11-08 用户口径:「检验方案表格调整,不合格应对措施不显示,检查频率需显示」——
+           「不合格应对措施」列**从本弹窗移除**(计划表里该列与带入逻辑都不动,带入明细时仍照常写进
+           本单的「不合格应对措施」格,只是不在这里展示);「检查频率」列保留并显示计划表的
+           「检测频率」值(计划里填了才显示,空值就空着 —— 已与用户确认数据源口径)。
+           计划表里的隐藏列(检验类别、检验内容=表区、检验仪器)不在界面上出现 —— 其中 表区 只在
+           「带入明细」时按计划内容写到本单,不在这里展示。 -->
       <el-table ref="shipTable" v-loading="shipLoading" :data="shipRows" size="small" border height="430"
                 row-key="__k" :empty-text="shipEmptyText"
                 @selection-change="(r) => (shipPicked = r)">
@@ -167,7 +172,6 @@
         <el-table-column :label="tt('检验项目')" prop="检验项目" width="150" show-overflow-tooltip />
         <el-table-column :label="tt('检验要求')" prop="检验要求" min-width="230" show-overflow-tooltip />
         <el-table-column :label="tt('检验方法')" prop="检验方法" min-width="230" show-overflow-tooltip />
-        <el-table-column :label="tt('不合格应对措施')" prop="不合格应对措施" min-width="180" show-overflow-tooltip />
         <el-table-column :label="tt('检查频率')" prop="检查频率" width="140" show-overflow-tooltip />
         <el-table-column :label="tt('备注')" prop="备注" min-width="130" show-overflow-tooltip />
       </el-table>

@@ -8855,11 +8855,11 @@ async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
   const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
-  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成制程检验单'))
+  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成出货检验单功能'))
   const existed = res?.['已存在'] === true
   ElMessage.success(existed
-    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
-    : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
+    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有出货检验单功能')}：${no}`
+    : `${isFirst ? tt('已生成首件检验单') : tt('已生成出货检验单功能')}：${no}`)
   if (target === panelCode.value) {
     // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
     //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。

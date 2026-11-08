@@ -31,7 +31,7 @@
     <div class="wopick-tip">
       {{ isFirst
         ? tt('选择一条未完工的生产工单行（工单号 + 工单行号唯一确定）生成首件检验单草稿（明细按成型工艺清单预铺）。')
-        : tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。') }}
+        : tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成出货检验单功能草稿；已建单的行会标出来，重复选择不会重复建单。') }}
     </div>
     <!-- 列表门槛(制程,2026-10-18 用户口径「选取的生产工单应该至少排产完成[成]型才能出现」):
          后端 woLines 只回**已排产入线**(有预排台账的还要求成型那道已排)的工单行,见 WoInspGate.pickable。
@@ -234,7 +234,7 @@ async function submit(extra) {
     emit('update:modelValue', false)
     emit('picked', res.data || {})
   } catch (error) {
-    ElMessage.error(error?.message || (isFirst.value ? tt('生成首件检验单失败') : tt('生成制程检验单失败')))
+    ElMessage.error(error?.message || (isFirst.value ? tt('生成首件检验单失败') : tt('生成出货检验单功能失败')))
   } finally {
     saving.value = false
   }

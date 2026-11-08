@@ -39,14 +39,14 @@ test('纸面列 = 八列(左四列单据级 + 检验要求/检验方法/产线�
 
 test('标题 / 副标题 / 抬头 / 表头两行 / 数据行 / 结论区:整体骨架与列数', () => {
   const out = buildProcInspExport({
-    title: '制程检验记录表',
+    title: '出货检验记录表',
     subtitle: '惠州市银嘉环保科技有限公司　　单据编号：ZC-2026-10-0021　　单据状态：草稿',
     headPairs: [[{ label: '单据编号', value: 'ZC-2026-10-0021' }, { label: '单据日期', value: '2026-10-15' }]],
     head,
     rows,
   })
   const { aoa, cols, merges, headerRow1, headerRow2 } = out
-  assert.equal(aoa[0][0], '制程检验记录表')
+  assert.equal(aoa[0][0], '出货检验记录表')
   assert.ok(/单据编号/.test(aoa[1][0]))
   assert.equal(aoa[2].length, 0)                                  // 空行
   assert.equal(aoa[3][0], '单据编号')                              // 抬头第一格 = 标签

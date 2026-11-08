@@ -4566,3 +4566,5 @@ migrate-drop-bak-tables-20261106.sql
 #   不改 yj_panel、不改物理表列(scjl 的 wzdm/gg/khdm 镜像列早已存在且有数据);末段 RAISERROR 自检不符即失败。
 #   幂等;两账套均执行(先正式 HSDZ_MES、后测试 HSDZ_MES_TEST)。
 migrate-wo-report-list-product-cols-20261108.sql
+migrate-qc-proc-insp-rename-20261109.sql
+migrate-qc-proc-insp-tpl-20261109.sql

@@ -1,0 +1,62 @@
+{
+  "login": {
+    "http": 200,
+    "code": 200,
+    "hasToken": true,
+    "msg": "success"
+  },
+  "panelConfig": {
+    "http": 200,
+    "panelName": "出货检验单功能",
+    "hasOld": false,
+    "fieldCount": 0
+  },
+  "reportTemplates": {
+    "http": 200,
+    "templates": [
+      {
+        "code": "qc_proc_insp",
+        "name": "出货检验记录表"
+      }
+    ]
+  },
+  "fromShipPlan": {
+    "http": 200,
+    "planNo": "IP-2026-10-0008",
+    "rows": 10,
+    "rowsWithFreq": 10,
+    "freqSamples": [
+      {
+        "item": "*外观",
+        "freq": "生产量*1%",
+        "actionLen": 76
+      },
+      {
+        "item": "炭棒尺寸（裸棒）",
+        "freq": "生产量*1%",
+        "actionLen": 76
+      },
+      {
+        "item": "*整体尺寸 （内PP棉、外包布、套网、打端盖）",
+        "freq": "生产量*1%",
+        "actionLen": 76
+      },
+      {
+        "item": "跌落强度",
+        "freq": "1PCS/一个生产批次",
+        "actionLen": 76
+      },
+      {
+        "item": "初始流速及压降测试·*初始流速",
+        "freq": "1PCS/一个生产批次",
+        "actionLen": 76
+      }
+    ]
+  },
+  "reportPdf": {
+    "http": 200,
+    "contentType": "application/pdf",
+    "bytes": 75126,
+    "file": "D:/workspace/yinjia/.tmp/insp-rename-20261108/report-ZC-2026-11-0002.pdf"
+  }
+}

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-17 **纵向表版**)
+  出货检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-17 **纵向表版**)
   ============================================================================
+  2026-11-08 用户口径:面板「制程检验单」改名「出货检验单功能」,纸面/记录表标题改「出货检验记录表」
+  (只改显示名,面板代号 QC_PROC_INSP / 表结构 / 单据编号前缀 ZC / 历史数据全部不动)。
   用户 2026-10-17 口径:
     「好的当前制程检验形式错误了,这个内容进行修改实现……不需要那些外观什么的」
     「等下,表头内容可以不进行修改,当前针对检验结果处的格式进行修改即可」
@@ -139,7 +141,7 @@
       </textField>
       <textField>
         <reportElement style="docTitle" x="0" y="20" width="758" height="20"/>
-        <textFieldExpression><![CDATA["制程检验记录表"]]></textFieldExpression>
+        <textFieldExpression><![CDATA["出货检验记录表"]]></textFieldExpression>
       </textField>
 
       <!-- 抬头:5 行 × 2 组「标签|值」(与面板纸张表同序) -->

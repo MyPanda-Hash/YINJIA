@@ -1,6 +1,8 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表 · **纵向表版**(一行一个检验项目)
+       出货检验单功能(原「制程检验单」,面板 QC_PROC_INSP,2026-11-08 用户口径改名)
+       —— 纸张式可填写报表 · **纵向表版**(一行一个检验项目);
+       纸面标题同步改为「出货检验记录表」(页面/打印/Excel/PDF 报表同一标题)。
 
        用户口径(2026-10-17 第六轮):
          「好的当前制程检验形式错误了,这个内容进行修改实现,当前这个修改一下内容实现,不需要那些外观什么的」
@@ -35,7 +37,7 @@
   <div class="qr-sheet">
     <!-- ① 标题 -->
     <div class="qr-titlerow">
-      <div class="qr-title">{{ tt('制程检验记录表') }}</div>
+      <div class="qr-title">{{ tt('出货检验记录表') }}</div>
     </div>
 
     <!-- ② 抬头:一行 2 组「标签|值」(照旧不动) -->
@@ -425,17 +427,17 @@ function optionsOf(key) {
 }
 
 /**
- * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(制程检验记录表),不是列表页那套数据导出。
+ * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(出货检验记录表),不是列表页那套数据导出。
  * 版式(标题/抬头/表头两行/左侧四列合并/结论区)由 core/qc/qcProcInspExport.js 给(纯函数 + 单测),
  * 这里只做 xlsx 的 aoa_to_sheet + 样式 + writeFile(照 QcCatalogSheet 的写法)。
  * 入口:面板右侧「文档输出 → 导出 Excel」(PanelxList.exportSheetExcel 按面板码路由到本函数)。
  */
 async function exportProcInspExcel() {
   const XLSX = await import('xlsx')
-  const name = String(props.head?.['单据编号'] || props.head?.['编号'] || '制程检验记录表')
+  const name = String(props.head?.['单据编号'] || props.head?.['编号'] || '出货检验记录表')
   const pairs = headRows.value.map((row) => row.map((k) => ({ label: tt(k), value: String(props.head?.[k] ?? '') })))
   const { aoa, cols, merges, headerRow1, headerRow2 } = buildProcInspExport({
-    title: tt('制程检验记录表'),
+    title: tt('出货检验记录表'),
     subtitle: `惠州市银嘉环保科技有限公司　　${tt('单据编号')}：${name}　　${tt('单据状态')}：${tt(String(props.head?.['单据状态'] || ''))}`,
     headPairs: pairs,
     head: props.head || {},
@@ -476,8 +478,8 @@ async function exportProcInspExcel() {
     if (f?.thirdLabel) style(r, 6, labelFill)
   }
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, tt('制程检验记录表').slice(0, 28))
-  XLSX.writeFile(wb, `${tt('制程检验记录表')}-${name}.xlsx`)
+  XLSX.utils.book_append_sheet(wb, ws, tt('出货检验记录表').slice(0, 28))
+  XLSX.writeFile(wb, `${tt('出货检验记录表')}-${name}.xlsx`)
 }
 
 defineExpose({ exportProcInspExcel })
