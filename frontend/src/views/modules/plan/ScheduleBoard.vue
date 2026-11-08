@@ -124,7 +124,10 @@
         <el-table-column :label="tt('排产数量')" prop="排产数量" width="85" align="right" />
         <el-table-column :label="tt('需求数量')" prop="需求数量" width="85" align="right" />
         <el-table-column :label="tt('入库数量')" prop="入库数量" width="80" align="right" />
-        <el-table-column :label="tt('余量')" prop="余量" width="75" align="right" />
+        <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):该口径=本工单行需求 − 本行订单占用,
+             新口径下恒为 0(正式库 399 行里 397 行为 0),与"还剩多少没生产"无关、易误读;
+             后台字段照旧返回,界面不再展示。要恢复:把下面这行放开即可。 -->
+        <!-- <el-table-column :label="tt('余量')" prop="余量" width="75" align="right" /> -->
         <el-table-column :label="tt('预开工日')" prop="预开工日" width="90" />
         <el-table-column :label="tt('预完工日')" prop="预完工日" width="90" />
         <el-table-column :label="tt('计划线')" prop="计划线" min-width="220" show-overflow-tooltip />

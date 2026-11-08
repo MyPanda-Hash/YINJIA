@@ -111,7 +111,13 @@
       <el-table-column :label="tt('需求数量')" prop="需求数量" width="100" align="right" sortable />
       <el-table-column :label="tt('转单数量')" prop="排产数量" width="95" align="right" />
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-      <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
+      <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):该列 = 本工单行需求 − 本行订单占用
+           (form_flow_link SO→PLANG 的 linked_quantity) —— 新口径(需求=转单量、占用链也写同一个数)下恒为 0,
+           正式库实测 399 行里 397 行为 0;有值时也只是"占用链没记全"的数据异常信号,与「当前工序还剩多少
+           未生产」无关、极易误读。后台字段照旧返回,界面不再展示(CSV 导出同步去掉)。
+           要看"还剩多少":用「工序进度」列(当前工序完工量/计划量),或工单排产页的「未交量」(排产−入库)。
+           要恢复:把下面这行放开即可。 -->
+      <!-- <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" /> -->
       <!-- 领料单号(2026-10-18):一张工单可对应多张领料单,列里是逗号分隔的全部已审核单号 —— 加宽便于直接看 -->
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="200" show-overflow-tooltip />
       <el-table-column :label="tt('成型配方')" width="170" show-overflow-tooltip>
@@ -788,7 +794,8 @@ function openTrace(row) {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '订单号', '订单行号', '生产线', '需求数量', '转单数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  // 2026-11-08:「余量」列已隐藏(口径无业务意义,见模板内注释)⇒ 导出表头同步去掉,避免出现界面没有的列
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '订单号', '订单行号', '生产线', '需求数量', '转单数量', '入库数量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')

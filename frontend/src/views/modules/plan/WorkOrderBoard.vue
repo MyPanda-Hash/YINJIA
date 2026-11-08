@@ -221,7 +221,12 @@
             <el-table-column :label="tt('上道完工量')" prop="上道完工量" width="110" align="right" />
             <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数) -->
             <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
-            <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
+            <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):它是「本工单行需求 − 本行订单占用」
+                 (form_flow_link SO→PLANG)的口径 —— 新口径下需求=转单量、占用链也写同一个数,余量恒为 0
+                 (正式库实测 399 行里 397 行为 0),与「当前工序还剩多少未生产」无关、极易误读;
+                 后台字段照旧返回,只是界面不再展示。要看"还剩多少":用左侧「未交量」(排产−入库)
+                 或「当前工序计划量/当前工序完工量」。要恢复:把下面这行放开即可。 -->
+            <!-- <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" /> -->
             <el-table-column :label="tt('操作员')" prop="操作员" width="80" />
             <el-table-column :label="tt('备注')" prop="备注" min-width="100" show-overflow-tooltip />
             <el-table-column :label="tt('领料单号')" prop="领料单号" width="120" show-overflow-tooltip />
