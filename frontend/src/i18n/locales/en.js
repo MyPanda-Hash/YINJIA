@@ -5529,6 +5529,13 @@ export default {
     '」吗?它现在离线;删掉后再连上来需要重新添加': '"? It is offline now; after deleting, it must be re-added when it reconnects',
     '已存在·已打印': 'Exists · printed',
     '已开过单的按原单重打': 'existing slips reprinted',
+    // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
+    '超订单': 'Over order',
+    '本次转单数量超过订单剩余数量，将按备品转出': 'Transfer qty exceeds the order remaining; the excess will be transferred as spare parts',
+    '超出行数': 'Rows over order',
+    '合计超出数量': 'Total excess qty',
+    '将按备品转出，确认继续提交？': 'The excess will be transferred as spare parts. Continue?',
+    '备品超订单提示': 'Spare parts over order quantity',
   },
 
 }

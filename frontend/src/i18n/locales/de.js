@@ -2699,6 +2699,13 @@ export default {
     '」吗?它现在离线;删掉后再连上来需要重新添加': '“ löschen? Er ist offline; beim nächsten Verbinden muss er neu hinzugefügt werden',
     '已存在·已打印': 'Vorhanden · gedruckt',
     '已开过单的按原单重打': 'bestehende Belege erneut gedruckt',
+    // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
+    '超订单': 'Über Bestellung',
+    '本次转单数量超过订单剩余数量，将按备品转出': 'Die Transfermenge übersteigt den Auftragsrest; der Überschuss wird als Ersatzteil umgewandelt',
+    '超出行数': 'Zeilen über Bestellung',
+    '合计超出数量': 'Gesamtüberschuss',
+    '将按备品转出，确认继续提交？': 'Der Überschuss wird als Ersatzteil umgewandelt. Fortfahren?',
+    '备品超订单提示': 'Ersatzteil-Überbestellung',
   },
 
 }

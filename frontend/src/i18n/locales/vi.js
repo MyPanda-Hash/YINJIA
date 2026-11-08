@@ -2704,6 +2704,13 @@ export default {
     '」吗?它现在离线;删掉后再连上来需要重新添加': '"? Hiện đang ngoại tuyến; khi kết nối lại phải thêm lại',
     '已存在·已打印': 'Đã có · đã in',
     '已开过单的按原单重打': 'phiếu đã có được in lại',
+    // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
+    '超订单': 'Vượt đơn hàng',
+    '本次转单数量超过订单剩余数量，将按备品转出': 'Số lượng chuyển lần này vượt số còn lại của đơn hàng; phần vượt sẽ chuyển như phụ tùng',
+    '超出行数': 'Số dòng vượt đơn',
+    '合计超出数量': 'Tổng số lượng vượt',
+    '将按备品转出，确认继续提交？': 'Phần vượt sẽ chuyển như phụ tùng. Tiếp tục gửi?',
+    '备品超订单提示': 'Thông báo vượt đơn hàng (phụ tùng)',
   },
 
 }
