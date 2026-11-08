@@ -1,0 +1,5 @@
+[A] login pagePerms.WORK_ORDER_PROGRESS = "*" | 页面面板码总数 = 19
+[B] /auth/perms pagePerms.WORK_ORDER_PROGRESS = "*"
+[C] 权限矩阵是否含新面板 = true | 定义 = {"module":"生产计划","panelCode":"WORK_ORDER_PROGRESS","panelName":"生产工序进度看板","hasApproval":false,"actions":[["view","可见"],["query","查询"]]}
+[D] panelCounts = {"virtual":20,"expected":170,"yjRegistered":150}
+[E] 生产计划组面板 = ORDER_CONVERT,SCHEDULE_BOARD,WORK_ORDER_BOARD,WORK_ORDER_LIST,WORK_ORDER_PROGRESS,PROC_FLOW_CARD,WO_ORDER,OUTSOURCE_ORDER,WO_PROGRESS,DISPATCH_STATS,LINE_LOAD,WO_SCHEDULE,DISPATCH,DISPATCH_DETAIL,SAMPLE_REQ

@@ -1,0 +1,25 @@
+[INFO] /D:/workspace/yinjia/backend/src/main/java/com/yinjia/mes/service/PanelRegistry.java: �й���ϸ��Ϣ, ��ʹ�� -Xlint:deprecation ���±��롣
+[INFO] /D:/workspace/yinjia/backend/src/main/java/com/yinjia/mes/service/ButtonService.java: ĳЩ�����ļ�ʹ����δ�����򲻰�ȫ�Ĳ�����
+[INFO] /D:/workspace/yinjia/backend/src/main/java/com/yinjia/mes/service/ButtonService.java: �й���ϸ��Ϣ, ��ʹ�� -Xlint:unchecked ���±��롣
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ yinjia-mes-backend ---
+[INFO] skip non existing resourceDirectory D:\workspace\yinjia\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.14.0:testCompile (default-testCompile) @ yinjia-mes-backend ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.5.3:test (default-test) @ yinjia-mes-backend ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.4.2:jar (default-jar) @ yinjia-mes-backend ---
+[INFO] Building jar: D:\workspace\yinjia\backend\target\yinjia-mes-backend-0.1.0.jar
+[INFO] 
+[INFO] --- spring-boot:3.5.3:repackage (repackage) @ yinjia-mes-backend ---
+[INFO] Replacing main artifact D:\workspace\yinjia\backend\target\yinjia-mes-backend-0.1.0.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to D:\workspace\yinjia\backend\target\yinjia-mes-backend-0.1.0.jar.original
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  15.124 s
+[INFO] Finished at: 2026-11-08T16:04:55+08:00
+[INFO] ------------------------------------------------------------------------

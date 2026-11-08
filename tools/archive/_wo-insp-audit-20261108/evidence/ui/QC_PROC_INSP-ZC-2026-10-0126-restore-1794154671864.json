@@ -1,0 +1,97 @@
+{
+ "downstreamDeleted": {},
+ "links": {
+  "deleted": 0,
+  "restored": []
+ },
+ "restored": {
+  "head": {
+   "table": "qc_proc_insp_head",
+   "key": "ZC-2026-10-0126",
+   "restored": true,
+   "changed": [
+    "asp_user2",
+    "asp_time2"
+   ],
+   "stillDiff": []
+  },
+  "detail": [
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "270",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "271",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "272",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "273",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "274",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "275",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   }
+  ],
+  "workOrders": [],
+  "status": {
+   "deleted": 1
+  },
+  "approvalDeleted": 4,
+  "messageDeleted": 0
+ },
+ "residue": {
+  "statusAfter": "草稿",
+  "statusRowAfter": null,
+  "headDiff": [],
+  "approvalLeft": 0,
+  "downstreamLeft": {},
+  "linkCountNow": 0,
+  "linkCountPre": 0,
+  "statusRowRestored": true
+ }
+}

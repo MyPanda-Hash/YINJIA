@@ -1,0 +1,6 @@
+// 收尾:关闭本任务的 ego task space(证据已保存到 tools/archive/_wo-progress-board-20261108/)
+const task = await taskSpace('wo-progress-board-lead-final-20261108')
+const pages = await task.pages()
+console.log({ spaceId: task.spaceId, pages: pages.map((p) => p.label) })
+await task.finish({ keep: [] })
+console.log('SPACE_CLOSED')
