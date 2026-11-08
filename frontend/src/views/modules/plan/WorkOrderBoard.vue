@@ -120,14 +120,32 @@
           <el-table :data="schedRows" size="small" border height="100%" empty-text=""
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
-            <el-table-column :label="tt('工单号')" prop="加工单号" width="150" fixed />
+            <!-- ══════════ 冻结区(2026-11-08 用户口径)══════════
+                 用户原话:「排单界面物产品编码、产品规格、订单数量,显示在前面冻结,方便看。……进行修改还需要
+                 考虑当前冻结后如何显示其他的信息对其他信息进行处理要如何实现。」
+                 做法 = 把行身份拆成两块,按 el-table 的 fixed 列**声明在前即渲染在最左**:
+                   ① 工单身份:勾选 / 工单号 / 客户(原有冻结,保留);
+                   ② 产品身份:**产品编码 / 产品规格 / 订单数量**(新增冻结,宽度收到 110/120/84 —— 表格列已
+                      30+ 列,冻结区一宽会挤掉滚动区;长值一律走 show-overflow-tooltip/title,不靠拉宽列)。
+                 其余列(工单行号/排产日期/客户PO/产品名称/单位/批号/重点管控/日期列/工序/统计…)留在**横向滚动区**,
+                 滚到右边看日期/报工时左侧始终能看到"哪张工单、哪个产品、订单要多少";原来夹在滚动区里的
+                 「物料编码/规格型号/需求数量」三列随即删除(**位置前移,不复制**,避免同一信息出现两次)。
+                 ⚠ 订单数量 = plang.xq_sl(需求数量/本次转单量;2026-11-08 起备品场景可大于销售订单数量),
+                   表头 tooltip 写清,免得与旁边的「排产数量」混。 -->
+            <el-table-column :label="tt('工单号')" prop="加工单号" width="140" fixed />
+            <el-table-column :label="tt('产品编码')" prop="物料编码" width="110" fixed show-overflow-tooltip />
+            <el-table-column :label="tt('产品规格')" prop="规格型号" width="120" fixed show-overflow-tooltip />
+            <el-table-column prop="需求数量" width="84" align="right" fixed>
+              <template #header>
+                <span :title="tt('订单数量 = 本行需求数量(本次转单量);备品场景可大于销售订单数量')">{{ tt('订单数量') }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="tt('客户')" prop="客户" min-width="110" fixed show-overflow-tooltip />
+            <!-- ── 以下为横向滚动区(不冻结)── -->
             <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
-            <el-table-column :label="tt('客户')" prop="客户" min-width="130" fixed show-overflow-tooltip />
             <el-table-column :label="tt('排产日期')" prop="排产日期" width="95" />
             <el-table-column :label="tt('客户PO')" prop="客户PO" width="110" show-overflow-tooltip />
-            <el-table-column :label="tt('物料编码')" prop="物料编码" width="110" show-overflow-tooltip />
             <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="140" show-overflow-tooltip />
-            <el-table-column :label="tt('规格型号')" prop="规格型号" width="110" show-overflow-tooltip />
             <el-table-column :label="tt('单位')" prop="单位" width="55" />
             <el-table-column :label="tt('批号')" prop="批号" width="100" show-overflow-tooltip />
             <el-table-column :label="tt('重点管控')" prop="重点管控" width="80" />
@@ -147,7 +165,6 @@
             </el-table-column>
             <el-table-column :label="tt('实际完工日期')" prop="实际完工日期" width="105" />
             <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
-            <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
             <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
             <!-- 工序口径:当前工序 = 该行**现在该做的工序**(预排台账位置;在切炭线就显示切炭),
                  旁边给「上道工序 + 上道完工量」= 来料量(上一道已审报工量) -->
