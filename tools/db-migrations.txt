@@ -4556,3 +4556,13 @@ migrate-proc-insp-plan-editable-20261106.sql
 #   幂等(目标表不存在即跳过;闸门不过只报错不删);两账套均执行;回滚只能从 .bak 还原。
 migrate-drop-bak-tables-20261106.sql
 
+# 2026-11-08 报工记录(WO_REPORT_LIST,flat/scjl)增:产品编码/产品规格 显示列 + 产品编码/客户编码/产品规格 查询条件:
+#   用户口径「3 报工记录,需要显示产品编码、产品规格。4 报工记录,要能根据产品编码/客户编码/产品规格查询报工记录」。
+#   yj_field 幂等追加 3 行(按 panel_code+label 守卫):
+#     产品编码=wzdm 参照 INV.存货编码(seq 37)/产品规格=gg 文本(seq 38)/客户编码=khdm 参照 KHDA.dm(seq 39)。
+#     客户编码「只查询不显示列」= place='query' + visible=0(flat 报表列只按 visible 过滤,place 不参与;
+#     先例 MATERIAL_OUT_DETAIL/STATS 的「材料」查询字段);已存在行用窄条件 UPDATE 收敛 visible。
+#   yj_translation 幂等补译名:产品规格 9 语种(修正 en 历史占位「产品规格」→ Product Specification)、客户编码 9 语种。
+#   不改 yj_panel、不改物理表列(scjl 的 wzdm/gg/khdm 镜像列早已存在且有数据);末段 RAISERROR 自检不符即失败。
+#   幂等;两账套均执行(先正式 HSDZ_MES、后测试 HSDZ_MES_TEST)。
+migrate-wo-report-list-product-cols-20261108.sql
