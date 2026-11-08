@@ -4471,10 +4471,15 @@ const l2ApproverNow = computed(() => {
 //   「检验员=编制 / 审核=一级审批人 / 批准=超级管理员」⇒ 并入质量单据两级审批,直审入口撤掉(后端会拒)。
 // ⚠ 2026-11-06 起 11 张:再加 **制程检验单 QC_PROC_INSP / 首件检验单 QC_FIRST_INSP**(用户口径
 //   「两张检验单接入质量单据两级审批,检验人=编制 / 审核=一级审批人 / 批准=超级管理员」)。
-//   这两张原走管理员直审(DIRECT_AUDIT_PANELS 已清空),后端 ButtonService.QC_DOC_PREPARER 同批登记 ⇒
+//   ⚠ 上面 2026-11-06「接入两级审批」的口径**已被 2026-11-09 取代**(见下方新注释)。 这两张原走管理员直审(DIRECT_AUDIT_PANELS 已清空),后端 ButtonService.QC_DOC_PREPARER 同批登记 ⇒
 //   **本清单必须与后端 ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS 的 key 集一致**,
 //   否则前端按直审/非两级判显隐、后端按两级审批判节点,必错位(按钮点了被拒)。
-const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT', 'QC_PROC_INSP', 'QC_FIRST_INSP']
+// ⚠ 2026-11-09 用户口径:「首件 QC_FIRST_INSP、制程 QC_PROC_INSP …… 这两个只需要实现一级审批,
+//   和当前的来料检验一样的审批形式即可」⇒ 两张单**退出**两级审批名单(后端同步移出
+//   ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS):提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
+//   它们仍保留侧栏审批组显示(hasApprovalBtns 名单),只是不再走「一级/二级/批准」节点;
+//   本清单必须与后端 ADMIN_L2_PANELS 的 key 集一致,否则按钮点了被后端拒。
+const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT']
 const isQcL2Panel = computed(() => L2_DOC_PANELS.includes(String(panelCode.value)))
 /** 一级审核节点(节点 1):状态还是「审批中」 */
 const qcL2Node = computed(() => isQcL2Panel.value && curDocStatus.value === '待二级审批')

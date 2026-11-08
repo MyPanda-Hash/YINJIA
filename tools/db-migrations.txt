@@ -4560,6 +4560,15 @@ migrate-sample-int-paper-rows-20261106.sql
 # 2026-11-06 内部样品单行级归属：给 RD_SAMPLE_INT 的管理员/文件负责人/研发审核角色补「改他人行」(edit_others)词
 migrate-sample-int-row-owner-20261106.sql
 
+
+# 2026-11-08 新增「生产工序进度看板」页面级虚拟面板 WORK_ORDER_PROGRESS(只读 view/query):
+#   用户口径「生产工单进度需要做一个看板,方便直观查看工单各工序进度……点击其中订单行转跳到这个工单」。
+#   等价补授:已授生产工单 WORK_ORDER_LIST 可见的角色 + 管理员 → 补 WORK_ORDER_PROGRESS view,query;
+#   同步登记面板名 en 译名(页面级虚拟面板无 yj_panel 行,译名落 yj_translation scope='panel')。
+#   幂等;两账套均执行。前端菜单/路由/i18n 同批交付(不含库变更)。
+migrate-work-order-progress-panel-20261108.sql
+
+
 # 2026-11-08 报工记录(WO_REPORT_LIST,flat/scjl)增:产品编码/产品规格 显示列 + 产品编码/客户编码/产品规格 查询条件:
 #   用户口径「3 报工记录,需要显示产品编码、产品规格。4 报工记录,要能根据产品编码/客户编码/产品规格查询报工记录」。
 #   yj_field 幂等追加 3 行(按 panel_code+label 守卫):

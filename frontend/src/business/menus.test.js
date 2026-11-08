@@ -344,8 +344,9 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
   // 2026-10-30:**生产领料 / 工序报工 两张已迁到新一级目录「手机扫码」(MOBILE_PICK / MOBILE_REPORT)**,
   //   不再属于生产计划;本断言同步移除,改由下方「手机扫码」用例另钉。
   // 2026-10-29 补(合并远端):工序流程追踪卡 PROC_FLOW_CARD 仍留在「生产计划」组,紧跟工单排产。
+  // 2026-11-08 补:生产工序进度看板 WORK_ORDER_PROGRESS 紧跟「生产工单」,只读,动作 view/query。
   assert.deepEqual((group().children || []).map((c) => c.panelCode).filter(Boolean),
-    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROC_FLOW_CARD', 'LINE_LOAD'])
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'WORK_ORDER_PROGRESS', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD', 'PROC_FLOW_CARD', 'LINE_LOAD'])
   // 下架后不该再出现在菜单树里:防"删了数据库却漏删菜单",反之亦然
   const all = JSON.stringify(plan)
   for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS']) {

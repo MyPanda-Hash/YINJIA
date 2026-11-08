@@ -114,6 +114,11 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
+      // 生产工序进度看板(2026-11-08 用户口径「生产工单进度需要做一个看板,方便直观查看工单各工序进度」):
+      //   一行=一张工单行(工单号+工单行号),大屏/列表双视图;工序进度口径复用「工单详情·追溯」;
+      //   点行跳「生产工单」页并定位该工单(WorkOrderList 支持 ?keyword=&focus= 定位)。
+      //   页面级虚拟面板 WORK_ORDER_PROGRESS(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
+      { path: 'prod/plan/workOrderProgress', component: () => import('@/views/modules/plan/WorkOrderProgressBoard.vue'), meta: { title: '生产工序进度看板', code: 'workOrderProgress', panelCode: 'WORK_ORDER_PROGRESS' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」

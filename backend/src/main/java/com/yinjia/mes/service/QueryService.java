@@ -60,8 +60,15 @@ public class QueryService {
      * (直接引用 {@code ButtonService.ADMIN_L2_PANELS}:二级固定超级管理员的那一族 = 全部质量单据)。
      * 见 {@link #loadDocs} 里对虚拟字段「审核人」覆盖的例外。
      */
+    /**
+     * 纸面「审核人/审核时间」是**表内真值列**、不能被 yj_doc_status 虚拟字段覆盖的面板:
+     * ① 质量单据两级审批一族({@link ButtonService#ADMIN_L2_PANELS});
+     * ② 2026-11-09 起改为**单级审批**的首件/制程检验单({@link ButtonService#SINGLE_LEVEL_INSP_PANELS};
+     *   用户口径「和来料检验一样的审批形式」)—— 审批通过时仍写表内「审核人」,不能覆盖成账号名。
+     */
     private static boolean isTwoLevelSignPanel(String panelCode) {
-        return panelCode != null && ButtonService.ADMIN_L2_PANELS.contains(panelCode);
+        return panelCode != null && (ButtonService.ADMIN_L2_PANELS.contains(panelCode)
+                || ButtonService.SINGLE_LEVEL_INSP_PANELS.contains(panelCode));
     }
 
     private final PanelRegistry registry;

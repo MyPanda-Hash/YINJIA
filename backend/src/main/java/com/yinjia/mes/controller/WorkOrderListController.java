@@ -46,22 +46,13 @@ public class WorkOrderListController {
     private static final String[] PRINT_ENTRIES = CLOSE_ENTRIES;
 
     /**
-     * 本工单行自己的订单占用合计(2026-10-30):form_flow_link 按 `工单号#行号` 命中,
-     * 兼容历史 `工单号#行号#批次号` 键(与 ScheduleBoardService.ROW_USED 同一口径)。
-     */
-    private static final String ROW_USED = "(SELECT SUM(l.linked_quantity) FROM form_flow_link l"
-            + " WHERE l.target_panel_code='PLANG' AND l.target_form_no=p.pl_no"
-            + " AND (l.target_line_key = p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0))"
-            + "      OR l.target_line_key LIKE p.pl_no + N'#' + CONVERT(nvarchar(20), ISNULL(p.pl_xc,0)) + N'#%')"
-            + " AND l.link_status='ACTIVE')";
-
-    /**
-     * **余量 = 行级**(2026-10-30):本工单行需求 − **本工单行自己**的占用,不足 0 记 0。
-     * 原口径是「本行需求 − 整条订单行占用」,切单拆成父子两行后双双变负数(用户报障 −10/−90);
+     * **余量 = 行级**(2026-11-08 口径收口到 {@link com.yinjia.mes.service.PlangRowOccupancy}):
+     * 本工单行需求 − **本工单行自己**的占用(form_flow_link,仅 ACTIVE),不足 0 记 0 ——
+     * 与「生产工序进度看板」共用同一份 SQL,不再一个 Controller 一个 Service 各写一遍。
+     * 背景:原口径是「本行需求 − 整条订单行占用」,切单拆成父子两行后双双变负数(用户报障 −10/−90);
      * 切单已把占用链按行拆账(WorkOrderSplitService.splitLink),父子合计 = 订单行剩余。
      */
-    private static final String ROW_YL = "CASE WHEN ISNULL(p.xq_sl,0) <= ISNULL(" + ROW_USED + ",0)"
-            + " THEN 0 ELSE ISNULL(p.xq_sl,0) - ISNULL(" + ROW_USED + ",0) END";
+    private static final String ROW_YL = com.yinjia.mes.service.PlangRowOccupancy.yieldOf("p");
 
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;

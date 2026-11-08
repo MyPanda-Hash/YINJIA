@@ -407,6 +407,12 @@ export const menuTree = [
           // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
           // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
           { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', panelCode: 'WORK_ORDER_LIST', icon: 'Document' },
+          // 生产工序进度看板(2026-11-08 用户口径:「生产工单进度需要做一个看板,方便直观查看工单各工序进度,
+          //   如图所示……新增当前的这个看板视图查看,增加这个看板可以点击其中订单行转跳到这个工单」):
+          //   一行=一张工单行(工单号+工单行号),大屏环形进度 + 列表进度链双视图;工序进度口径复用
+          //   「工单详情·追溯」(ProcessTaskService.stepsSummary);点行跳生产工单页并定位该工单。
+          //   页面级虚拟面板 WORK_ORDER_PROGRESS(定义见后端 PagePanelRegistry)⇒ 菜单按权限显隐。
+          { code: 'workOrderProgress', title: '生产工序进度看板', path: '/prod/plan/workOrderProgress', panelCode: 'WORK_ORDER_PROGRESS', icon: 'TrendCharts' },
           // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
           // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
           { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', panelCode: 'SCHEDULE_BOARD', icon: 'AlarmClock' },
