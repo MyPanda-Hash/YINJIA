@@ -122,7 +122,7 @@ import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { applyLineDefaults, lineOptions } from '@/business/routeDefaults'
-import { cascadeDue, cascadeStart, normalizePlanChain } from '@/business/planChain'
+import { cascadeDue, cascadeStart, invertedPlanRows, normalizePlanChain } from '@/business/planChain'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -171,11 +171,19 @@ function lineNotInOptions(row) {
 /** 有没有「不限定车间」的行 —— 有就在表格下方提示一句,别让人以为筛选坏了 */
 const hasOpenLineRow = computed(() => rows.value.some((r) => !lineOptions(r, lines.value).limited))
 
-/** 计划完工日变化 → 下一道的计划开工日跟着变,并沿链一路往下传(2026-10-29 用户口径;
+/** 计划完工日变化 → 本道开工不得晚于完工,下一道的计划开工日跟着变,并沿链一路往下传(2026-10-29 用户口径;
  *  日期链纯逻辑在 business/planChain.js,与批量排产弹窗共用同一份) */
-function onDueChange(index, v) { cascadeDue(rows.value, index, v) }
+function onDueChange(index, v) {
+  const fixedStart = cascadeDue(rows.value, index, v)
+  // 2026-11-09 校验:原来改完工日早于本道开工日会留下「开工 11-09 / 完工 11-03」的倒挂,现在自动调平并明说
+  // (整句走语言包,`{d}` 换成本次被调平的日期)
+  if (fixedStart) ElMessage.warning(tt('计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}').replace('{d}', fixedStart))
+}
 /** 计划开工日晚于计划完工日时,把完工日拉到开工日(避免提交被后端拒),并继续向后传链 */
-function onStartChange(index, v) { cascadeStart(rows.value, index, v) }
+function onStartChange(index, v) {
+  const pushedDue = cascadeStart(rows.value, index, v)
+  if (pushedDue) ElMessage.warning(tt('计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}').replace('{d}', pushedDue))
+}
 
 async function load() {
   if (!no.value) return
@@ -233,6 +241,14 @@ async function submit() {
   const miss = rows.value.filter((r) => !r['生产线'])
   if (miss.length) {
     ElMessage.warning(`${tt('还有工序未选生产线')}：${miss.map((r) => r['工序']).join('、')}`)
+    return
+  }
+  // 计划日期硬校验(2026-11-09 用户口径「开工日期不得大于完工日期」):改日期时已自动调平,这里再兜一道
+  const badDates = invertedPlanRows(rows.value)
+  if (badDates.length) {
+    ElMessage.warning(`${tt('计划开工日期不能晚于计划完工日期')}: ${badDates
+      .map((b) => `${b.row['工序'] || ''} ${b.row['计划开工日期']} → ${b.row['计划完工日期']}`.trim())
+      .join('; ')}`)
     return
   }
   // 排产数量:前端只做"非空"这一层便利挡(上限由 el-input-number 的 :max 收口),

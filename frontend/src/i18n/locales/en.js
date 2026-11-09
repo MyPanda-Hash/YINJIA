@@ -2172,6 +2172,9 @@ export default {
     '计划合计': 'Planned total',
     // 工序路线排线·计划开工/实际开工(2026-10-29)
     '计划开工日期': 'Planned Start',
+    '计划开工日期不能晚于计划完工日期': 'Planned start cannot be later than planned finish',
+    '计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}': 'Planned start cannot be later than planned finish; planned start adjusted to {d}',
+    '计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}': 'Planned start cannot be later than planned finish; planned finish adjusted to {d}',
     '实际开工': 'Actual Start',
     '实际完工': 'Actual Finish',
     '上一道的计划完工日期 = 下一道的计划开工日期': "The previous step's planned finish = the next step's planned start",
