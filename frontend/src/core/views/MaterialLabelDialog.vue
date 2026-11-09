@@ -155,9 +155,9 @@
             <el-table-column :label="tt('操作')" width="150" align="center">
               <template #default="{ row }">
                 <!-- 2026-11-09 用户口径:按这张记录打过一次后按钮置灰,不能重复打 -->
-                <el-button link type="primary" :disabled="busy || usedSrcSet.has(String(row['单据编号']))"
+                <el-button link type="primary" :disabled="busy || isUsedSrc(row['单据编号'])"
                   @click="applyPoPrint(row)">
-                  {{ usedSrcSet.has(String(row['单据编号'])) ? tt('已打码') : tt('按这次打印打码') }}
+                  {{ isUsedSrc(row['单据编号']) ? tt('已打码') : tt('按这次打印打码') }}
                 </el-button>
               </template>
             </el-table-column>
@@ -228,6 +228,12 @@ const poPrints = ref([])
 const sourcePrintNo = ref('')
 /** 已打过材料码的打印记录(服务端下发;界面据此置灰,不能重复打) */
 const usedSrcSet = computed(() => new Set((data.value['已打码打印单'] || []).map(String)))
+/**
+ * 本窗口里刚打完的来源记录(2026-11-09「只可以对应打印一次」):服务端已落库,
+ * 但重载是异步的 —— 先在本地算已用,按钮立刻置灰,不给"连点两次"的窗口。
+ */
+const usedLocal = ref([])
+const isUsedSrc = (no) => usedSrcSet.value.has(String(no)) || usedLocal.value.includes(String(no))
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
 const totalQty = computed(() => {
@@ -272,6 +278,8 @@ async function load() {
   loading.value = true
   try {
     data.value = await engine.puLabelDialog(props.orderNo)
+    // 服务端已回「已打码打印单」⇒ 本地临时标记清空(作废后可重新用,以服务端为准)
+    usedLocal.value = []
     batchNo.value = String(data.value?.prefBatchNo || '')
     // 生产日期:取服务端回的可选预填(目前恒空,不猜),每次开窗重置,避免沿用上次的值
     prodDate.value = String(data.value?.['生产日期'] || '')
@@ -426,6 +434,10 @@ async function confirm() {
     emit('printed', {
       orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: docs.length,
     })
+    // 本地立刻标记来源已用(按钮马上置灰,不等异步重载),再按 1.5s 兜底刷新
+    if (sourcePrintNo.value && !usedLocal.value.includes(sourcePrintNo.value)) {
+      usedLocal.value = [...usedLocal.value, sourcePrintNo.value]
+    }
     // 刷新"剩余可打/已打印/已打码状态":打印对话框可能还开着 → 先挂起,onDone 里再执行。
     // 2026-11-09 用户反馈「要重新进入才会更新已打印状态」⇒ 加 1.5s 兜底定时器:
     // 浏览器不派发 afterprint / 打印层被系统摘掉时,也能自己刷新,不必关窗重进。
