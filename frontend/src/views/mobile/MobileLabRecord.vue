@@ -523,9 +523,22 @@ function addRow() {
   openRows[rowKeyOf(row)] = true   // 新加的行默认展开(等着填),已有行仍保持收缩
 }
 
-function removeRow(idx) {
+async function removeRow(idx) {
   if (!isDraft.value) { ElMessage.warning(tt('只有草稿才能删除行')); return }
   const gone = detailRows.value[idx]
+  // 防误触(用户口径 2026-11-09):手机上「删除行」一点就没了,必须先弹窗确认。
+  // 文案带上"第几行 + 这行填了什么",现场能一眼看出是不是点错了行(和删附件同一个弹窗风格)。
+  const summary = gone ? rowSummary(gone) : ''
+  const line = `${tt('第')} ${idx + 1} ${tt('行')}${summary ? ':' + summary : ''}`
+  try {
+    await ElMessageBox.confirm(
+      `${tt('确定删除')} ${line} ${tt('吗?删掉的行保存后才会从电脑端消失。')}`,
+      tt('删除行'),
+      { type: 'warning', confirmButtonText: tt('删除'), cancelButtonText: tt('取消') },
+    )
+  } catch (e) {
+    return   // 取消 = 什么都不做
+  }
   if (gone) {
     dropRowPendingAll(gone)
     delete openRows[rowKeyOf(gone)]

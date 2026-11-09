@@ -5665,6 +5665,8 @@ export default {
     '(未填)': '(empty)',
     '编辑记录': 'Editing record',
     '删除行': 'Delete row',
+    '确定删除': 'Delete',
+    '吗?删掉的行保存后才会从电脑端消失。': '? The row disappears from the PC only after you save.',
     '拍照/选图': 'Take / pick photo',
     '待上传': 'Pending upload',
     '取消这张': 'Remove this one',
