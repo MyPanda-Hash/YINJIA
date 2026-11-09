@@ -13,6 +13,8 @@
 | `q3-schema.sql` / `q3.out.txt` | 头表/明细表物理列(加列前的 35 列基线)+ 已有 `data_type='附件'` 字段清单 |
 | `q4.sql` / `q6.sql` / `q11.sql` / `q12.sql` | 加列前后核对(`COL_LENGTH`、列数 35→36、`yj_field` 3 条、`yj_translation` en) |
 | `q9.sql` | 手机端建单后的落库取证:head(`手机照片='test-photo.png'`)/ `yj_attachment` 行 / 明细行 |
+| `q13-edit.sql` | 改既有草稿(明细带 `id`):头备注更新、明细**按 id 原地更新**(不翻倍) |
+| `q14-noclobber.sql` | 改带照片的单且本次没传照片:`手机照片` 仍是 `test-photo.png`(保存不冲掉附件列) |
 | `q-config-equip.json` | `GET /px/getPanelConfig?panelCode=RD_EQUIP_USE` 的下发(含新增的「手机照片」附件字段) |
 | `q-newform-equip.json` | `GET /px/getNewFormPermMatrix`(`meta` 表头字段 + `detail.tabs[0].fields` 明细字段 + 默认值) |
 | `q-doc.json` | `GET /px/getFormDescriptor`(已有单据回填形状:`data` + `detailData.items[]` 带 id) |
