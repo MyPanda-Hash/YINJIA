@@ -148,7 +148,7 @@ export const CHAINS = [
             note: '成型累计报工达计划量后自动出草稿',
           },
           {
-            key: 'procinsp', name: '制程检验单(成型产出)', code: 'QC_PROC_INSP', route: '/panelx/list/QC_PROC_INSP',
+            key: 'procinsp', name: '出货检验单功能(成型产出)', code: 'QC_PROC_INSP', route: '/panelx/list/QC_PROC_INSP',
             main: { label: '单据数', ref: 'nodes.QC_PROC_INSP.docs' },
             subs: [
               { label: '合格数量', ref: 'nodes.QC_PROC_INSP.okQty' },

@@ -1,0 +1,129 @@
+{
+ "title": "UI t1-proc-draft @ http://127.0.0.1:8091 panel=QC_PROC_INSP doc=ZC-2026-11-0016",
+ "startedAt": "2026-11-06T05:49:12.767Z",
+ "endedAt": "2026-11-06T05:49:22.008Z",
+ "pass": 17,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"panel\":\"QC_PROC_INSP\",\"docNo\":\"ZC-2026-11-0016\",\"task\":\"t1-proc-draft\",\"state\":\"\",\"fill\":{\"检验方案\":\"E2E-方案-UI-20261106-134911\",\"结果判断\":\"不合格\"},\"save\":true,\"outDir\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1-round2\"}"
+  },
+  {
+   "name": "UI 登录工厂选中 YJ_TEST",
+   "ok": true,
+   "detail": "{\"ok\":true,\"picked\":\"YINJIA-MES·测试库\"}"
+  },
+  {
+   "name": "UI 登录工厂与期望账套一致(测试库)",
+   "ok": true,
+   "detail": "picked=YINJIA-MES·测试库"
+  },
+  {
+   "name": "UI 登录成功并进入桌面",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/dashboard"
+  },
+  {
+   "name": "纸张面板已渲染(.qr-sheet)",
+   "ok": true,
+   "detail": "http://127.0.0.1:8091/#/panelx/list/QC_PROC_INSP"
+  },
+  {
+   "name": "制程纸面事实",
+   "ok": null,
+   "detail": "{\"headLabels\":[\"单据编号\",\"单据日期\",\"检验类别\",\"工单号\",\"产品名称\",\"抽检总量\",\"检验日期\",\"检验方案\"],\"hasGongxu\":false,\"headControls\":{\"单据编号\":{\"kind\":\"text\",\"text\":\"ZC-2026-11-0016\"},\"单据日期\":{\"kind\":\"input\",\"text\":\"\"},\"检验类别\":{\"kind\":\"input\",\"text\":\"\"},\"工单号\":{\"kind\":\"input\",\"text\":\"\"},\"产品名称\":{\"kind\":\"input\",\"text\":\"\"},\"抽检总量\":{\"kind\":\"input\",\"text\":\"\"},\"检验日期\":{\"kind\":\"input\",\"text\":\"\"},\"检验方案\":{\"kind\":\"input\",\"text\":\"\"}},\"docNoKind\":\"text\",\"hasWorkOrderRowNo\":false,\"planKind\":\"input\",\"planText\":\"\",\"planValue\":\"出货控制计划执行\",\"hasInspectorInput\":true,\"rowCount\":2,\"verdictSelects\":[true,true],\"verdictInputs\":[false,false],\"foot\":{\"检验结论\":\"\",\"处理意见\":\"\",\"检验人\":\"\",\"审核人\":\"\",\"批准\":\"\"},\"paperText\":\"制程检验记录表单据编号ZC-2026-11-0016单据日期检验类别工单号产品名称抽检总量检验日期检验方案检验结果＋ 新增检验项⧉ 带入检验项目客户名称产品编码型号（mm）批号检验人员：产线常规功能性结果结果判断检验要求检验方法合格×合格×检验结论处理意见检验人审核人批准\",\"sideBtns\":[\"查询单据\",\"模糊搜索\",\"单据预览\",\"新增\",\"保存\",\"保存为草稿\",\"选生产工单\",\"取出货检验计划\",\"检验项目/检验方案\",\"提交审批\",\"审批情况\",\"打印\",\"导出报表\",\"导出\",\"扫描填单\",\"字段管理\",\"删除\",\"弃审\"],\"disabledBtns\":[\"弃审\"],\"status\":\"草稿\",\"shot\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1-round2\\\\ui-t1r2-A1-20261106-134911-paper.png\",\"errors\":[]}"
+  },
+  {
+   "name": "T1[UI] 表头**没有**「工序」",
+   "ok": true,
+   "detail": "表头标签=单据编号|单据日期|检验类别|工单号|产品名称|抽检总量|检验日期|检验方案"
+  },
+  {
+   "name": "T1[UI] 「检验方案」是可编辑输入框(不是纯文本)",
+   "ok": true,
+   "detail": "kind=input 值=出货控制计划执行"
+  },
+  {
+   "name": "T1[UI] 新建/自动草稿「检验方案」默认显示「出货控制计划执行」",
+   "ok": true,
+   "detail": "当前值=\"出货控制计划执行\""
+  },
+  {
+   "name": "T1[UI] 「单据编号」按元数据只读(纯文本,非输入框)",
+   "ok": true,
+   "detail": "kind=text"
+  },
+  {
+   "name": "T1[UI] 「工单行号」(hidden=1)不进纸面表头",
+   "ok": true,
+   "detail": "表头=单据编号|单据日期|检验类别|工单号|产品名称|抽检总量|检验日期|检验方案"
+  },
+  {
+   "name": "T1[UI] 「检验员」草稿态仍可编辑(回归:不能被 isLocked 误锁)",
+   "ok": true,
+   "detail": "hasInspectorInput=true"
+  },
+  {
+   "name": "T1[UI] 明细「结果判断」是 el-select 下拉(非普通输入框)",
+   "ok": true,
+   "detail": "行数=2 select=[true,true] input=[false,false]"
+  },
+  {
+   "name": "T1[UI] 在「检验方案」输入框填入 \"E2E-方案-UI-20261106-134911\"",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "T1[UI] 检验方案输入后格内值正确",
+   "ok": true,
+   "detail": "格内=\"E2E-方案-UI-20261106-134911\""
+  },
+  {
+   "name": "T1[UI] 「结果判断」下拉选中「不合格」",
+   "ok": true,
+   "detail": "target=true optionClicked=true"
+  },
+  {
+   "name": "T1[UI] 结果判断格显示已选值 = 不合格",
+   "ok": true,
+   "detail": "格内文本=\"不合格\""
+  },
+  {
+   "name": "T1[UI] 点击侧栏「保存」并收到 callButton 响应",
+   "ok": true,
+   "detail": "clicked=true http=200 body={\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"ZC-2026-11-0016\"}} msg="
+  },
+  {
+   "name": "T1[UI] 保存后截图",
+   "ok": null,
+   "detail": "\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1-round2\\\\ui-t1r2-A1-20261106-134911-saved.png\""
+  },
+  {
+   "name": "T1[UI] 保存后纸面显示(结果判断/检验方案)",
+   "ok": null,
+   "detail": "{\"结果判断\":\"不合格\",\"检验方案\":\"E2E-方案-UI-20261106-134911\"}"
+  },
+  {
+   "name": "T1[UI] 前端「导出→导出 Excel」下载成功(纸张 Excel)",
+   "ok": true,
+   "detail": "{\"clickedSide\":true,\"dialogText\":\"选择导出格式🖨打印预览在新窗口内打开这张纸的 PDF，可直接打印或另存为 PDF📄导出 PDF按纸张实际尺寸单页生成，直接下载，无需打印机📊导出 Excel（.xlsx）导出当前这张纸，版式与纸面一致取消\",\"clickedItem\":true,\"downloadPath\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1-round2\\\\ui-t1r2-A1-20261106-134911-sheet-expor"
+  },
+  {
+   "name": "T1[UI] 纸张 Excel 导出证据",
+   "ok": null,
+   "detail": "{\"clickedSide\":true,\"dialogText\":\"选择导出格式🖨打印预览在新窗口内打开这张纸的 PDF，可直接打印或另存为 PDF📄导出 PDF按纸张实际尺寸单页生成，直接下载，无需打印机📊导出 Excel（.xlsx）导出当前这张纸，版式与纸面一致取消\",\"clickedItem\":true,\"downloadPath\":\"D:\\\\workspace\\\\yinjia\\\\tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t1-round2\\\\ui-t1r2-A1-20261106-134911-sheet-export.xlsx\",\"error\":\"\"}"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "panel": "QC_PROC_INSP",
+  "docNo": "ZC-2026-11-0016",
+  "task": "t1-proc-draft",
+  "state": "",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t1-round2"
+ }
+}

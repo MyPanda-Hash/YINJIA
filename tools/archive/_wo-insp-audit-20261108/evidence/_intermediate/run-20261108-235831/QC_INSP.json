@@ -1,0 +1,504 @@
+{
+ "panel": "QC_INSP",
+ "name": "来料检验单",
+ "l2": false,
+ "docNo": "IJ-2026-09-0152",
+ "steps": [
+  {
+   "step": "提交审批",
+   "button": "提交审批",
+   "payload": {
+    "编号": "IJ-2026-09-0152"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "审批中",
+     "编号": "IJ-2026-09-0152"
+    }
+   },
+   "statusBefore": "草稿",
+   "statusAfter": "审批中",
+   "statusRow": {
+    "id": 26953,
+    "panel_code": "QC_INSP",
+    "doc_no": "IJ-2026-09-0152",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "Y",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:34.920Z",
+    "update_at": "2026-11-08T15:58:34.920Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12724,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": null
+  },
+  {
+   "step": "审批通过(一级/单节点)",
+   "button": "审批通过",
+   "payload": {
+    "编号": "IJ-2026-09-0152",
+    "审批意见": "E2E-0611 L1 同意"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "已审核",
+     "编号": "IJ-2026-09-0152"
+    }
+   },
+   "statusBefore": "审批中",
+   "statusAfter": "已审核",
+   "statusRow": {
+    "id": 26953,
+    "panel_code": "QC_INSP",
+    "doc_no": "IJ-2026-09-0152",
+    "shr": "admin",
+    "shsj": "2026-11-08T15:58:34.970Z",
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:34.920Z",
+    "update_at": "2026-11-08T15:58:34.970Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12724,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12725,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    }
+   ],
+   "headSigns": null
+  },
+  {
+   "step": "弃审(反审核)",
+   "button": "弃审",
+   "payload": {
+    "编号": "IJ-2026-09-0152"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "草稿",
+     "编号": "IJ-2026-09-0152"
+    }
+   },
+   "statusBefore": "已审核",
+   "statusAfter": "草稿",
+   "statusRow": {
+    "id": 26953,
+    "panel_code": "QC_INSP",
+    "doc_no": "IJ-2026-09-0152",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:34.920Z",
+    "update_at": "2026-11-08T15:58:35.120Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": null,
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12724,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12725,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    },
+    {
+     "id": 12726,
+     "action": "UNAUDIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": null
+  }
+ ],
+ "cleanup": {
+  "downstreamDeleted": {
+   "PURCHASE_IN": [
+    {
+     "no": "PI-2026-11-0002",
+     "line": 1,
+     "head": 1,
+     "status": 1,
+     "approval": 0,
+     "message": 0,
+     "links": 1
+    }
+   ],
+   "QC_RETURN": []
+  },
+  "links": {
+   "deleted": 0,
+   "restored": []
+  },
+  "restored": {
+   "head": {
+    "table": "qc_insp",
+    "key": "IJ-2026-09-0152",
+    "restored": true,
+    "changed": []
+   },
+   "detail": [
+    {
+     "table": "qc_insp_detail",
+     "key": 446,
+     "restored": true,
+     "changed": [
+      "入库单号",
+      "asp_time2"
+     ],
+     "stillDiff": []
+    }
+   ],
+   "workOrders": [],
+   "status": {
+    "deleted": 1
+   },
+   "approvalDeleted": 3,
+   "messageDeleted": 0
+  },
+  "residue": {
+   "statusAfter": "草稿",
+   "headDiff": [],
+   "approvalLeft": 0,
+   "downstreamLeft": {
+    "PURCHASE_IN": 0,
+    "QC_RETURN": 0
+   },
+   "linkCountNow": 2,
+   "linkCountPre": 2,
+   "statusRowRestored": true
+  }
+ },
+ "pre": {
+  "status": "草稿",
+  "head": {
+   "id": 152,
+   "单据编号": "IJ-2026-09-0152",
+   "单据日期": "2026-09-15",
+   "业务员": null,
+   "供应商代码": "YJ-KBL",
+   "供应商": "惠州市康佰利包装材料有限公司",
+   "部门": null,
+   "部门名称": "采购部",
+   "数量": null,
+   "附件1": null,
+   "附件2": null,
+   "附件3": null,
+   "附件4": null,
+   "附件5": null,
+   "附件6": null,
+   "备注": null,
+   "单据状态": "草稿",
+   "审核人": null,
+   "审核时间": "2026-09-15 12:00:00",
+   "审批人": null,
+   "审批时间": "2026-09-15 12:00:00",
+   "asp_user1": "admin",
+   "asp_time1": "2026-09-15T12:00:00.000Z",
+   "asp_user2": "admin",
+   "asp_time2": "2026-09-15T12:00:00.000Z",
+   "asp_cancel": "N",
+   "检验员": null,
+   "采购订单号": "YJ-20260915-12",
+   "批次号": "YJ-20260915-12-001",
+   "检验编号": null,
+   "执行标准": null,
+   "检验类型": null,
+   "暂收单号": "SL-2026-09-0189",
+   "批次键": 186,
+   "检验日期": "2026-09-15 12:00:00",
+   "检验方案": null,
+   "总结论": null,
+   "备用1": null,
+   "备用2": null,
+   "备用3": null,
+   "备用4": null,
+   "备用5": null,
+   "备用6": null,
+   "备用7": null,
+   "备用8": null,
+   "备用9": null,
+   "备用10": null,
+   "备用11": null,
+   "备用12": null,
+   "备用13": null,
+   "备用14": null,
+   "备用15": null,
+   "备用16": null,
+   "备用17": null,
+   "备用18": null,
+   "备用19": null,
+   "备用20": null,
+   "部门编码": null
+  },
+  "detailCount": 1,
+  "linkCount": 2,
+  "approvalMaxId": 11655
+ },
+ "downstream": {
+  "PURCHASE_IN": [
+   "PI-2026-11-0002"
+  ],
+  "QC_RETURN": []
+ },
+ "assertions": [
+  {
+   "name": "QC_INSP 选中文档",
+   "ok": null,
+   "detail": "{\"no\":\"IJ-2026-09-0152\",\"状态\":\"草稿\",\"明细行\":1,\"已有流程链\":2}"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 起点是草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 提交审批: 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"审批中\",\"编号\":\"IJ-2026-09-0152\"}"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 提交审批: 返回单据状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 提交审批: DB 派生状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 提交后 pending=Y / node=1",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":1}"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 提交后 pending_by=admin",
+   "ok": true,
+   "detail": "pending_by=admin"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 留痕 SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 审批通过(一级/单节点): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"已审核\",\"编号\":\"IJ-2026-09-0152\"}"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 审批通过(一级/单节点): 返回单据状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 审批通过(一级/单节点): DB 派生状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 单节点通过后 pending=N",
+   "ok": true,
+   "detail": "pending=N"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 单节点通过后 shr=admin",
+   "ok": true,
+   "detail": "shr=admin"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 留痕 APPROVE/APPROVED@1",
+   "ok": true,
+   "detail": "SUBMIT/PENDING@1,APPROVE/APPROVED@1"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 审核终态=已审核",
+   "ok": true,
+   "detail": "status=已审核"
+  },
+  {
+   "name": "QC_INSP 审核自动生成下游 PURCHASE_IN/PI-2026-11-0002 且为草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 弃审(反审核): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"草稿\",\"编号\":\"IJ-2026-09-0152\"}"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 弃审(反审核): 返回单据状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 弃审(反审核): DB 派生状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 弃审后 pending≠Y、shr 空",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"shr\":null,\"node\":1}"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 留痕 UNAUDIT/PENDING(ButtonService.unaudit 口径)",
+   "ok": true,
+   "detail": "SUBMIT/PENDING,APPROVE/APPROVED,UNAUDIT/PENDING"
+  },
+  {
+   "name": "QC_INSP 弃审联动: 下游 PURCHASE_IN/PI-2026-11-0002 已作废",
+   "ok": true,
+   "detail": "status=已作废"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 弃审终态=草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 还原:状态回草稿",
+   "ok": true,
+   "detail": "statusAfter=草稿"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 还原:头行全列与测前一致",
+   "ok": true,
+   "detail": "diff=[]"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 还原:本轮审批留痕已清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 还原:下游 PURCHASE_IN 测试单已物理清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 还原:下游 QC_RETURN 测试单已物理清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_INSP/IJ-2026-09-0152 还原:流程链条数恢复测前",
+   "ok": true,
+   "detail": "now=2 pre=2"
+  }
+ ],
+ "pass": 28,
+ "fail": 0
+}

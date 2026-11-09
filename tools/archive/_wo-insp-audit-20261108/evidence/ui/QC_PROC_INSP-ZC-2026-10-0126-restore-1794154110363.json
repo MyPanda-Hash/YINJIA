@@ -1,0 +1,132 @@
+{
+ "downstreamDeleted": {},
+ "links": {
+  "deleted": 0,
+  "restored": []
+ },
+ "restored": {
+  "head": {
+   "table": "qc_proc_insp_head",
+   "key": "ZC-2026-10-0126",
+   "restored": false,
+   "changed": [
+    "单据日期",
+    "检验日期",
+    "审核人",
+    "审核时间",
+    "asp_time1",
+    "asp_user2",
+    "asp_time2",
+    "审批人",
+    "审批时间"
+   ],
+   "stillDiff": [
+    "单据日期",
+    "检验日期",
+    "asp_time1",
+    "asp_time2"
+   ]
+  },
+  "detail": [
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "270",
+    "restored": false,
+    "changed": [
+     "asp_time1",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": [
+     "asp_time1"
+    ]
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "271",
+    "restored": false,
+    "changed": [
+     "asp_time1",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": [
+     "asp_time1"
+    ]
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "272",
+    "restored": false,
+    "changed": [
+     "asp_time1",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": [
+     "asp_time1"
+    ]
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "273",
+    "restored": false,
+    "changed": [
+     "asp_time1",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": [
+     "asp_time1"
+    ]
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "274",
+    "restored": false,
+    "changed": [
+     "asp_time1",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": [
+     "asp_time1"
+    ]
+   },
+   {
+    "table": "qc_proc_insp_detail",
+    "key": "275",
+    "restored": false,
+    "changed": [
+     "asp_time1",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": [
+     "asp_time1"
+    ]
+   }
+  ],
+  "workOrders": [],
+  "status": {
+   "deleted": 1
+  },
+  "approvalDeleted": 7,
+  "messageDeleted": 0
+ },
+ "residue": {
+  "statusAfter": "草稿",
+  "statusRowAfter": null,
+  "headDiff": [
+   "单据日期",
+   "检验日期",
+   "asp_time1",
+   "asp_time2"
+  ],
+  "approvalLeft": 0,
+  "downstreamLeft": {},
+  "linkCountNow": 0,
+  "linkCountPre": 0,
+  "statusRowRestored": true
+ }
+}

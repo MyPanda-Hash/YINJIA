@@ -61,6 +61,9 @@ public class PanelPermissionService {
             // 规格书批准(2026-11-06 用户口径):产品文件列表里规格书「已开发」右侧的「批准」按钮。
             // 与 audit 分开授权 —— 批准是落款动作(回填「批准/日期」那格)，不等于能审批这张单。
             Map.entry("specapprove", "规格书批准"),
+            // 改他人行(2026-11-06 内部开发样品申请单):该单是「数据记录表」,每行归属填写的申请人;
+            // 勾了这个词才能改别人已保存的行(ButtonService.applySampleIntRowRules 同源判定)。
+            Map.entry("edit_others", "改他人行"),
             Map.entry("warn", "预警配置"),
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),

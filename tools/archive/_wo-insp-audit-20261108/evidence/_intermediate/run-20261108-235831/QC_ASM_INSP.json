@@ -1,0 +1,602 @@
+{
+ "panel": "QC_ASM_INSP",
+ "name": "组装成品检验单",
+ "l2": false,
+ "docNo": "ZJ-2026-10-0135",
+ "steps": [
+  {
+   "step": "提交审批",
+   "button": "提交审批",
+   "payload": {
+    "编号": "ZJ-2026-10-0135"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "审批中",
+     "编号": "ZJ-2026-10-0135"
+    }
+   },
+   "statusBefore": "草稿",
+   "statusAfter": "审批中",
+   "statusRow": {
+    "id": 25895,
+    "panel_code": "QC_ASM_INSP",
+    "doc_no": "ZJ-2026-10-0135",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "Y",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:34.397Z",
+    "update_at": "2026-11-08T15:58:34.397Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "Y",
+    "archived": null,
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12721,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": null
+  },
+  {
+   "step": "审批通过(一级/单节点)",
+   "button": "审批通过",
+   "payload": {
+    "编号": "ZJ-2026-10-0135",
+    "审批意见": "E2E-0611 L1 同意"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "已审核",
+     "编号": "ZJ-2026-10-0135"
+    }
+   },
+   "statusBefore": "审批中",
+   "statusAfter": "已审核",
+   "statusRow": {
+    "id": 25895,
+    "panel_code": "QC_ASM_INSP",
+    "doc_no": "ZJ-2026-10-0135",
+    "shr": "admin",
+    "shsj": "2026-11-08T15:58:34.453Z",
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:34.397Z",
+    "update_at": "2026-11-08T15:58:34.453Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "Y",
+    "archived": null,
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12721,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12722,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    }
+   ],
+   "headSigns": null
+  },
+  {
+   "step": "弃审(反审核)",
+   "button": "弃审",
+   "payload": {
+    "编号": "ZJ-2026-10-0135"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "草稿",
+     "编号": "ZJ-2026-10-0135"
+    }
+   },
+   "statusBefore": "已审核",
+   "statusAfter": "草稿",
+   "statusRow": {
+    "id": 25895,
+    "panel_code": "QC_ASM_INSP",
+    "doc_no": "ZJ-2026-10-0135",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:34.397Z",
+    "update_at": "2026-11-08T15:58:34.580Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "Y",
+    "archived": null,
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12721,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12722,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    },
+    {
+     "id": 12723,
+     "action": "UNAUDIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": null
+  }
+ ],
+ "cleanup": {
+  "downstreamDeleted": {
+   "FINISH_IN": [
+    {
+     "no": "FI-2026-11-0002",
+     "line": 1,
+     "head": 1,
+     "status": 1,
+     "approval": 0,
+     "message": 0,
+     "links": 1
+    }
+   ]
+  },
+  "links": {
+   "deleted": 0,
+   "restored": []
+  },
+  "restored": {
+   "head": {
+    "table": "qc_asm_insp_head",
+    "key": "ZJ-2026-10-0135",
+    "restored": true,
+    "changed": [
+     "处理方式",
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   "detail": [
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "213",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "214",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "215",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "216",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "217",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "218",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "219",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "220",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "221",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "222",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "223",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "224",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "225",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "226",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "227",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "228",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "229",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "230",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "231",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_asm_insp_detail",
+     "key": "232",
+     "restored": true,
+     "changed": []
+    }
+   ],
+   "workOrders": [],
+   "status": {
+    "table": "yj_doc_status",
+    "key": 25895,
+    "restored": true,
+    "changed": [
+     "pending_by",
+     "pending_at",
+     "update_at",
+     "approve_node"
+    ],
+    "stillDiff": []
+   },
+   "approvalDeleted": 3,
+   "messageDeleted": 1
+  },
+  "residue": {
+   "statusAfter": "草稿",
+   "headDiff": [],
+   "approvalLeft": 0,
+   "downstreamLeft": {
+    "FINISH_IN": 0
+   },
+   "linkCountNow": 0,
+   "linkCountPre": 0,
+   "statusRowRestored": true
+  }
+ },
+ "pre": {
+  "status": "草稿",
+  "head": {
+   "id": "142",
+   "单据编号": "ZJ-2026-10-0135",
+   "单据日期": "2026-10-17T00:00:00.000Z",
+   "工单号": "GD-2026-10-0221",
+   "批次号": "20261017",
+   "报工单号": "BG-2026-10-0374",
+   "工序": "组装",
+   "产品编码": "\tB-92-25",
+   "产品名称": "S阻垢炭棒/滤芯",
+   "规格型号": "28*12*178",
+   "生产线": "组装1(老厂)",
+   "生产车间": "组装",
+   "报工数量": 100,
+   "检验数量": 100,
+   "检验员": "刘磊",
+   "检验日期": "2026-10-17T00:00:00.000Z",
+   "总结论": null,
+   "处理方式": "合格转库存(FI-2026-10-0122)",
+   "备注": null,
+   "审核人": null,
+   "审核时间": null,
+   "asp_user1": "wo-flow-20261018",
+   "asp_time1": "2026-10-18T07:46:29.547Z",
+   "asp_user2": "cs",
+   "asp_time2": "2026-10-30T11:08:19.343Z",
+   "asp_cancel": "N",
+   "单据状态": null,
+   "检验方案": null,
+   "文件编码": null,
+   "执行标准": null,
+   "工单行号": 1,
+   "客户名称": null,
+   "检验时间": null,
+   "抽检总量": null,
+   "合格数量": 100
+  },
+  "detailCount": 20,
+  "linkCount": 0,
+  "approvalMaxId": 11655
+ },
+ "downstream": {
+  "FINISH_IN": [
+   "FI-2026-11-0002"
+  ]
+ },
+ "assertions": [
+  {
+   "name": "QC_ASM_INSP 选中文档",
+   "ok": null,
+   "detail": "{\"no\":\"ZJ-2026-10-0135\",\"状态\":\"草稿\",\"明细行\":20,\"已有流程链\":0}"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 起点是草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 提交审批: 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"审批中\",\"编号\":\"ZJ-2026-10-0135\"}"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 提交审批: 返回单据状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 提交审批: DB 派生状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 提交后 pending=Y / node=1",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":1}"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 提交后 pending_by=admin",
+   "ok": true,
+   "detail": "pending_by=admin"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 留痕 SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 审批通过(一级/单节点): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"已审核\",\"编号\":\"ZJ-2026-10-0135\"}"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 审批通过(一级/单节点): 返回单据状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 审批通过(一级/单节点): DB 派生状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 单节点通过后 pending=N",
+   "ok": true,
+   "detail": "pending=N"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 单节点通过后 shr=admin",
+   "ok": true,
+   "detail": "shr=admin"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 留痕 APPROVE/APPROVED@1",
+   "ok": true,
+   "detail": "SUBMIT/PENDING@1,APPROVE/APPROVED@1"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 审核终态=已审核",
+   "ok": true,
+   "detail": "status=已审核"
+  },
+  {
+   "name": "QC_ASM_INSP 审核自动生成下游 FINISH_IN/FI-2026-11-0002 且为草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 弃审(反审核): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"草稿\",\"编号\":\"ZJ-2026-10-0135\"}"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 弃审(反审核): 返回单据状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 弃审(反审核): DB 派生状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 弃审后 pending≠Y、shr 空",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"shr\":null,\"node\":1}"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 留痕 UNAUDIT/PENDING(ButtonService.unaudit 口径)",
+   "ok": true,
+   "detail": "SUBMIT/PENDING,APPROVE/APPROVED,UNAUDIT/PENDING"
+  },
+  {
+   "name": "QC_ASM_INSP 弃审联动: 下游 FINISH_IN/FI-2026-11-0002 已作废",
+   "ok": true,
+   "detail": "status=已作废"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 弃审后「处理方式」回执清除",
+   "ok": true,
+   "detail": "处理方式="
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 弃审终态=草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 还原:状态回草稿",
+   "ok": true,
+   "detail": "statusAfter=草稿"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 还原:头行全列与测前一致",
+   "ok": true,
+   "detail": "diff=[]"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 还原:本轮审批留痕已清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 还原:下游 FINISH_IN 测试单已物理清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_ASM_INSP/ZJ-2026-10-0135 还原:流程链条数恢复测前",
+   "ok": true,
+   "detail": "now=0 pre=0"
+  }
+ ],
+ "pass": 28,
+ "fail": 0
+}

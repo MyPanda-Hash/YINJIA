@@ -22,7 +22,7 @@ test('docCodesToText:表单多选 → 后端逗号串;空数组 → 空串(未�
 
 test('docLabelsOf:代号 → 中文名;未知代号原样保留;多选顿号连接', () => {
   assert.equal(docLabelsOf('QC_ASM_INSP'), '组装成品检验单')
-  assert.equal(docLabelsOf('QC_FIRST_INSP,QC_PROC_INSP'), '首件检验单、制程检验单')
+  assert.equal(docLabelsOf('QC_FIRST_INSP,QC_PROC_INSP'), '首件检验单、出货检验单功能')
   assert.equal(docLabelsOf('QC_X_UNKNOWN'), 'QC_X_UNKNOWN')
   assert.equal(docLabelsOf(''), '')
   assert.equal(docLabelsOf('QC_ASM_INSP', (s) => (s === '组装成品检验单' ? 'Assembly Inspection' : s)), 'Assembly Inspection')

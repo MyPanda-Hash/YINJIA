@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-17 **纵向表版**)
+  出货检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-17 **纵向表版**)
   ============================================================================
+  2026-11-08 用户口径:面板「制程检验单」改名「出货检验单功能」,纸面/记录表标题改「出货检验记录表」
+  (只改显示名,面板代号 QC_PROC_INSP / 表结构 / 单据编号前缀 ZC / 历史数据全部不动)。
   用户 2026-10-17 口径:
     「好的当前制程检验形式错误了,这个内容进行修改实现……不需要那些外观什么的」
     「等下,表头内容可以不进行修改,当前针对检验结果处的格式进行修改即可」
@@ -15,6 +17,17 @@
       → 结论区:检验结论 / 处理意见 ; 页脚:检验员/审核/批准 + 页码 + 打印时间
   旧版式(外观/尺寸/出货重量 三组矩阵 + 尺寸_1..5/重量_1..5 定格参数)**已废弃** ——
   随之 ReportService 里那套「按表区归并/摊平成定格」的参数也不再产出(见该文件同批清理)。
+
+  ⚠ 2026-11-06 两级审批口径(用户需求 3):QC_PROC_INSP / QC_FIRST_INSP 由「管理员直接审核」
+    改为「提交审批 → 一级审批 → 超级管理员批准」⇒ 页脚签署区三格:
+      检验员 = $P{检验员}(编制/检验人)
+      审核   = $P{审核人}(一级审批人,表内真值;存量单表内为空时 QueryService 退回 yj_doc_status.shr 兜底)
+      批准   = $P{审批人}(超级管理员,二级通过才落值;未批准时 isBlankWhenNull 印空白)
+    「审批人」由 ReportService.headParams 按 yj_field.label **自动下发**(元数据迁移给
+    qc_proc_insp_head 加了 审批人/审批时间 列并登记 yj_field)⇒ 模板只声明参数、用 $P{审批人} 取值,
+    不必改 ReportService。⚠ 原模板「批准：」只有 staticText 标签、**没有取值格**(实测导出的 PDF
+    批准后面永远是空白),本次在标签右侧补 $P{审批人} 的 textField(x=550/宽 208,紧接标签 500+50,
+    合计 758 = columnWidth,不越界也不与「审核」值重叠)。
 
   ⚠ 数据契约(ReportService):
     · $P{...} = 头字段标量 headParams 按 yj_field.label 下发 + 单据编号/打印时间后端补;
@@ -95,6 +108,8 @@
   <parameter name="总结论" class="java.lang.String" isForPrompting="false"/>
   <parameter name="处理方式" class="java.lang.String" isForPrompting="false"/>
   <parameter name="审核人" class="java.lang.String" isForPrompting="false"/>
+  <!-- 批准(超级管理员/二级审批人):2026-11-06 两级审批新增;headParams 按 yj_field.label 自动下发 -->
+  <parameter name="审批人" class="java.lang.String" isForPrompting="false"/>
   <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
   <parameter name="公司名称" class="java.lang.String" isForPrompting="false">
     <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
@@ -126,7 +141,7 @@
       </textField>
       <textField>
         <reportElement style="docTitle" x="0" y="20" width="758" height="20"/>
-        <textFieldExpression><![CDATA["制程检验记录表"]]></textFieldExpression>
+        <textFieldExpression><![CDATA["出货检验记录表"]]></textFieldExpression>
       </textField>
 
       <!-- 抬头:5 行 × 2 组「标签|值」(与面板纸张表同序) -->
@@ -264,6 +279,13 @@
         <reportElement style="sign" x="500" y="14" width="50" height="14"/>
         <text><![CDATA[批准：]]></text>
       </staticText>
+      <!-- 批准值(2026-11-06 补):原版这里**只有标签没有取值格** —— 两级审批后必须能印出
+           「批准 = 超级管理员」,否则审核完打印出来看不出谁批的。x=550 紧接标签(500+50),
+           550+208=758=columnWidth ⇒ 不越界、不压到前面的「审核」值(310+130=440)。 -->
+      <textField isBlankWhenNull="true">
+        <reportElement style="sign" x="550" y="14" width="208" height="14"/>
+        <textFieldExpression><![CDATA[$P{审批人}]]></textFieldExpression>
+      </textField>
     </band>
   </pageFooter>
 

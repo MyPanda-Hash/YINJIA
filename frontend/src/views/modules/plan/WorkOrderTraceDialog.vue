@@ -188,7 +188,7 @@
           <el-table-column :label="tt('下游单号')" prop="下游单号" width="140" show-overflow-tooltip />
         </el-table>
         <div class="wb-trace-sub">
-          {{ tt('成型出首件检验单与制程检验单，组装出组装成品检验单；切炭/混料/装箱不出检验单') }}
+          {{ tt('成型出首件检验单与出货检验单功能，组装出组装成品检验单；切炭/混料/装箱不出检验单') }}
         </div>
       </div>
 

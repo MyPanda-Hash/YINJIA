@@ -1,0 +1,1210 @@
+{
+ "panel": "QC_FIRST_INSP",
+ "name": "首件检验单",
+ "l2": true,
+ "docNo": "SJ-2026-10-0153",
+ "steps": [
+  {
+   "step": "提交审批",
+   "button": "提交审批",
+   "payload": {
+    "编号": "SJ-2026-10-0153"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "审批中",
+     "编号": "SJ-2026-10-0153"
+    }
+   },
+   "statusBefore": "草稿",
+   "statusAfter": "审批中",
+   "statusRow": {
+    "id": 25890,
+    "panel_code": "QC_FIRST_INSP",
+    "doc_no": "SJ-2026-10-0153",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "Y",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T16:00:17.927Z",
+    "update_at": "2026-11-08T16:00:17.927Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12727,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "系统管理员",
+    "审核人": null,
+    "审核时间": null,
+    "审批人": null,
+    "审批时间": null
+   }
+  },
+  {
+   "step": "审批通过(一级/单节点)",
+   "button": "审批通过",
+   "payload": {
+    "编号": "SJ-2026-10-0153",
+    "审批意见": "E2E-0611 L1 同意"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "待二级审批",
+     "编号": "SJ-2026-10-0153"
+    }
+   },
+   "statusBefore": "审批中",
+   "statusAfter": "待二级审批",
+   "statusRow": {
+    "id": 25890,
+    "panel_code": "QC_FIRST_INSP",
+    "doc_no": "SJ-2026-10-0153",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "Y",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T16:00:17.927Z",
+    "update_at": "2026-11-08T16:00:18.010Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 2,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12727,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12728,
+     "action": "APPROVE_L1",
+     "result": "L1_PASSED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "系统管理员",
+    "审核人": "系统管理员",
+    "审核时间": "2026-11-09T00:00:18.000Z",
+    "审批人": null,
+    "审批时间": null
+   }
+  },
+  {
+   "step": "二级批准(超级管理员)",
+   "button": "审批通过",
+   "payload": {
+    "编号": "SJ-2026-10-0153",
+    "审批意见": "E2E-0611 L2 批准"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "已审核",
+     "编号": "SJ-2026-10-0153"
+    }
+   },
+   "statusBefore": "待二级审批",
+   "statusAfter": "已审核",
+   "statusRow": {
+    "id": 25890,
+    "panel_code": "QC_FIRST_INSP",
+    "doc_no": "SJ-2026-10-0153",
+    "shr": "admin",
+    "shsj": "2026-11-08T16:00:18.077Z",
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T16:00:17.927Z",
+    "update_at": "2026-11-08T16:00:18.077Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": null,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12727,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12728,
+     "action": "APPROVE_L1",
+     "result": "L1_PASSED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    },
+    {
+     "id": 12729,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 2,
+     "operator": "admin",
+     "opinion": "E2E-0611 L2 批准",
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "系统管理员",
+    "审核人": "系统管理员",
+    "审核时间": "2026-11-09T00:00:18.000Z",
+    "审批人": "系统管理员",
+    "审批时间": "2026-11-09T00:00:18.000Z"
+   }
+  },
+  {
+   "step": "弃审(反审核)",
+   "button": "弃审",
+   "payload": {
+    "编号": "SJ-2026-10-0153"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "草稿",
+     "编号": "SJ-2026-10-0153"
+    }
+   },
+   "statusBefore": "已审核",
+   "statusAfter": "草稿",
+   "statusRow": {
+    "id": 25890,
+    "panel_code": "QC_FIRST_INSP",
+    "doc_no": "SJ-2026-10-0153",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T16:00:17.927Z",
+    "update_at": "2026-11-08T16:00:18.170Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": null,
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": null,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12727,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12728,
+     "action": "APPROVE_L1",
+     "result": "L1_PASSED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    },
+    {
+     "id": 12729,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 2,
+     "operator": "admin",
+     "opinion": "E2E-0611 L2 批准",
+     "self_audit": null
+    },
+    {
+     "id": 12730,
+     "action": "UNAUDIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "系统管理员",
+    "审核人": null,
+    "审核时间": null,
+    "审批人": null,
+    "审批时间": null
+   }
+  }
+ ],
+ "cleanup": {
+  "downstreamDeleted": {},
+  "links": {
+   "deleted": 0,
+   "restored": []
+  },
+  "restored": {
+   "head": {
+    "table": "qc_first_insp_head",
+    "key": "SJ-2026-10-0153",
+    "restored": true,
+    "changed": [
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   "detail": [
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19821",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19822",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19823",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19824",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19825",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19826",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19827",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19828",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19829",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19830",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19831",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19832",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19833",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19834",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19835",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19836",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19837",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19838",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19839",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19840",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19841",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19842",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19843",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19844",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19845",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19846",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19847",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19848",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19849",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19850",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19851",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19852",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19853",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19854",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19855",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19856",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19857",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19858",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19859",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19860",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19861",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19862",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19863",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19864",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19865",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19866",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19867",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19868",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19869",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19870",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19871",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19872",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19873",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19874",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19875",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19876",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19877",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19878",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19879",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19880",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19881",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19882",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19883",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19884",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19885",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19886",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19887",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19888",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19889",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19890",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19891",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19892",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19893",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19894",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19895",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19896",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19897",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19898",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19899",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19900",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19901",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19902",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19903",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19904",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19905",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19906",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19907",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19908",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19909",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_first_insp_detail",
+     "key": "19910",
+     "restored": true,
+     "changed": []
+    }
+   ],
+   "workOrders": [],
+   "status": {
+    "table": "yj_doc_status",
+    "key": 25890,
+    "restored": true,
+    "changed": [
+     "pending_by",
+     "pending_at",
+     "update_at",
+     "archived"
+    ],
+    "stillDiff": []
+   },
+   "approvalDeleted": 4,
+   "messageDeleted": 0
+  },
+  "residue": {
+   "statusAfter": "草稿",
+   "statusRowAfter": {
+    "id": 25890,
+    "panel_code": "QC_FIRST_INSP",
+    "doc_no": "SJ-2026-10-0153",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": null,
+    "pending_at": null,
+    "update_at": "2026-10-30T08:15:39.793Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": null,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "headDiff": [],
+   "approvalLeft": 0,
+   "downstreamLeft": {},
+   "linkCountNow": 1,
+   "linkCountPre": 1,
+   "statusRowRestored": true
+  }
+ },
+ "pre": {
+  "status": "草稿",
+  "head": {
+   "id": "10174",
+   "单据编号": "SJ-2026-10-0153",
+   "单据日期": "2026-10-30T00:00:00.000Z",
+   "工单号": "E2E4-001-1",
+   "工单行号": 1,
+   "报工单号": "BG-2026-10-0186",
+   "工序": "成型",
+   "批次号": "20261030",
+   "客户名称": null,
+   "产品编码": "T270",
+   "产品名称": "X烧结炭棒",
+   "规格型号": "32*12*112",
+   "生产线": "1号车间",
+   "生产车间": "成型",
+   "报工数量": 60,
+   "检验数量": null,
+   "检验员": "系统管理员",
+   "检验日期": "2026-10-30T00:00:00.000Z",
+   "总结论": null,
+   "工艺清单单号": null,
+   "处理方式": null,
+   "备注": null,
+   "审核人": null,
+   "审核时间": null,
+   "单据状态": null,
+   "检验方案": null,
+   "文件编码": null,
+   "执行标准": null,
+   "asp_user1": "admin",
+   "asp_time1": "2026-10-30T16:15:39.694Z",
+   "asp_user2": "admin",
+   "asp_time2": "2026-10-30T08:15:40.050Z",
+   "asp_cancel": "N",
+   "表单管理人": null,
+   "密级": null,
+   "使用范围": null,
+   "生产日期": "2026-10-30",
+   "客户代码": null,
+   "审批人": null,
+   "审批时间": null
+  },
+  "detailCount": 90,
+  "linkCount": 1,
+  "approvalMaxId": 11655
+ },
+ "downstream": {},
+ "assertions": [
+  {
+   "name": "QC_FIRST_INSP 选中文档",
+   "ok": null,
+   "detail": "{\"no\":\"SJ-2026-10-0153\",\"状态\":\"草稿\",\"明细行\":90,\"已有流程链\":1}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 起点是草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交审批: 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"审批中\",\"编号\":\"SJ-2026-10-0153\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交审批: 返回单据状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交审批: DB 派生状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交后 pending=Y / node=1",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":1}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交后 pending_by=admin",
+   "ok": true,
+   "detail": "pending_by=admin"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 留痕 SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交后「检验员」有值(编制=提交人)",
+   "ok": true,
+   "detail": "检验员=系统管理员"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 提交后「审核人」「审批人」为空",
+   "ok": true,
+   "detail": "{\"l1\":null,\"l2\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 审批通过(一级/单节点): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"待二级审批\",\"编号\":\"SJ-2026-10-0153\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 审批通过(一级/单节点): 返回单据状态=待二级审批",
+   "ok": true,
+   "detail": "实际=待二级审批"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 审批通过(一级/单节点): DB 派生状态=待二级审批",
+   "ok": true,
+   "detail": "实际=待二级审批"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 一级通过后 pending=Y / node=2",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":2}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 一级通过后 shr 为空(尚未归档)",
+   "ok": true,
+   "detail": "shr="
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 留痕 APPROVE_L1/L1_PASSED@1",
+   "ok": true,
+   "detail": "SUBMIT/PENDING@1,APPROVE_L1/L1_PASSED@1"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 一级通过后「审核人」=「系统管理员」",
+   "ok": true,
+   "detail": "审核人=系统管理员"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 一级通过后「审核时间」有值",
+   "ok": true,
+   "detail": "审核时间=Mon Nov 09 2026 08:00:18 GMT+0800 (GMT+08:00)"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 一级通过后「审批人」为空",
+   "ok": true,
+   "detail": "审批人="
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级批准(超级管理员): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"已审核\",\"编号\":\"SJ-2026-10-0153\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级批准(超级管理员): 返回单据状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级批准(超级管理员): DB 派生状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级通过后 pending=N / shr=admin",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"shr\":\"admin\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级通过后 approve_node 清空",
+   "ok": true,
+   "detail": "node=null"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 留痕 APPROVE/APPROVED@2",
+   "ok": true,
+   "detail": "SUBMIT/PENDING@1,APPROVE_L1/L1_PASSED@1,APPROVE/APPROVED@2"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 一级留痕 APPROVE_L1 仍在",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级通过后「审批人」=「系统管理员」",
+   "ok": true,
+   "detail": "审批人=系统管理员"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 二级通过后「审批时间」有值",
+   "ok": true,
+   "detail": "审批时间=Mon Nov 09 2026 08:00:18 GMT+0800 (GMT+08:00)"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 审核终态=已审核",
+   "ok": true,
+   "detail": "status=已审核"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 弃审(反审核): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"草稿\",\"编号\":\"SJ-2026-10-0153\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 弃审(反审核): 返回单据状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 弃审(反审核): DB 派生状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 弃审后 pending≠Y、shr 空、approve_node 空",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"shr\":null,\"node\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 留痕 UNAUDIT/PENDING(ButtonService.unaudit 口径)",
+   "ok": true,
+   "detail": "SUBMIT/PENDING,APPROVE_L1/L1_PASSED,APPROVE/APPROVED,UNAUDIT/PENDING"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 弃审后「审核人」「审批人」清空",
+   "ok": true,
+   "detail": "{\"l1\":null,\"l2\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 弃审终态=草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 还原:状态回草稿",
+   "ok": true,
+   "detail": "statusAfter=草稿"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 还原:头行全列与测前一致",
+   "ok": true,
+   "detail": "diff=[]"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 还原:本轮审批留痕已清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_FIRST_INSP/SJ-2026-10-0153 还原:流程链条数恢复测前",
+   "ok": true,
+   "detail": "now=1 pre=1"
+  }
+ ],
+ "pass": 39,
+ "fail": 0
+}

@@ -120,6 +120,9 @@ public class AuthController {
             // 前端据此决定「预警数量」编辑入口显不显示;真闸门在服务端
             // PanelPermissionService.requireWarnConfig(同词 = warn)。
             user.put("warnPanels", panelsWithPerm(admin, u.get("role_id"), "warn"));
+            // 内部样品单「改他人行」权限面板(2026-11-06):管理员=全部;其余=角色勾了 edit_others 的面板。
+            // 前端据此把别人已保存的行锁成只读;真闸门在 ButtonService.applySampleIntRowRules(同词)。
+            user.put("editOtherRowsPanels", panelsWithPerm(admin, u.get("role_id"), "edit_others"));
             // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
             // 前端据此把「审批通过」对提交人本人放开;真闸门 ButtonService.canSelfAudit(同词)。
             user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));
@@ -388,7 +391,8 @@ public class AuthController {
      *
      * <p>兜底口径:该面板**除我之外没有别的启用审批人** ⇒ 允许自审;这与
      * {@code ButtonService.canSelfAudit} 的第二条判定一一对应(展示层/服务端同源)。
-     * 两级面板(RD_PROD_INFO + 8 张质量单据 + 出厂检验报告)不兜底——它们本就有确定的第二级,不存在死路。
+     * 两级面板(RD_PROD_INFO + 质量单据一族共 11 张:8 张质量单据 + 出厂检验报告 + 2026-11-06 起的首件/制程检验单)
+     * 不兜底——它们本就有确定的第二级,不存在死路。
      */
     private List<String> selfAuditPanelsFull(boolean admin, Object roleId, String username) {
         if (admin) return List.of("*");

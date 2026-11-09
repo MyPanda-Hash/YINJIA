@@ -1,0 +1,662 @@
+{
+ "title": "T3 首件/制程两级审批 @ http://127.0.0.1:8091 run=20261106-121728",
+ "startedAt": "2026-11-06T04:17:28.889Z",
+ "endedAt": "2026-11-06T04:20:28.110Z",
+ "pass": 121,
+ "fail": 0,
+ "items": [
+  {
+   "name": "参数",
+   "ok": null,
+   "detail": "{\"base\":\"http://127.0.0.1:8091\",\"factory\":\"YJ_TEST\",\"db\":\"HSDZ_MES_TEST\",\"run\":\"20261106-121728\",\"fixture\":{\"roleId\":4,\"roleName\":\"研发审核\",\"approver\":\"cp/陈秀丽\",\"negative\":\"wangguangzhen/王光珍\",\"panels\":[\"QC_PROC_INSP\",\"QC_FIRST_INSP\"]}}"
+  },
+  {
+   "name": "8091 登录成功(admin/cp/wangguangzhen;非admin 口令未知则自签)",
+   "ok": true,
+   "detail": "admin=系统管理员 cp=陈秀丽(login) neg=(自签)(self-signed)"
+  },
+  {
+   "name": "夹具原值(结束还原)",
+   "ok": null,
+   "detail": "[{\"panel_code\":\"QC_FIRST_INSP\",\"can_approve\":\"N\",\"perms\":\"view,query,add,modify,modlog,del,export\"},{\"panel_code\":\"QC_PROC_INSP\",\"can_approve\":\"N\",\"perms\":\"view,query,add,modify,modlog,del,export\"}]"
+  },
+  {
+   "name": "夹具:测试库角色 4/研发审核 两面板 can_approve=Y 已临时生效",
+   "ok": true,
+   "detail": "夹具 SQL: D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3\\fixture-grant.sql"
+  },
+  {
+   "name": "夹具生效:cp 的 approvePanels 含 QC_PROC_INSP / QC_FIRST_INSP(登录响应同源)",
+   "ok": true,
+   "detail": "[\"RD_DROP_PREC\",\"RD_MINERAL\",\"RD_RO_PROTECT\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_SCALE\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_FILTER_EFF\",\"DISPATCH\",\"MANU_ORDER\",\"OUTSOURCE_ORDER\",\"ROUTE\",\"QC_PROC_INSP\",\"QC_FIRST_INSP\"]"
+  },
+  {
+   "name": "负测:wangguangzhen 的 approvePanels 不含两面板",
+   "ok": true,
+   "detail": "[\"DISPATCH\",\"MANU_ORDER\",\"OUTSOURCE_ORDER\",\"ROUTE\"]"
+  },
+  {
+   "name": "正式库 HSDZ_MES 组织架构授权矩阵(GET /api/sys/role/{id}/panels)",
+   "ok": null,
+   "detail": "{\"1031\":[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"}],\"1033\":[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"}],\"1039\":[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"}],\"1040\":[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,field,warn\"}],\"1042\":[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit\"}]}"
+  },
+  {
+   "name": "正式库 HSDZ_MES 各账号 approvePanels(GET /api/auth/perms)",
+   "ok": null,
+   "detail": "{\"fm\":{\"pagePerms\":{\"ORDER_CONVERT\":\"\",\"SCHEDULE_BOARD\":\"\",\"WORK_ORDER_BOARD\":\"\",\"WORK_ORDER_LIST\":\"\",\"MOBILE_PICK_CREATE\":\"view,query,create,print\",\"MOBILE_PICK\":\"view,query,create,pick,print\",\"MOBILE_REPORT\":\"view,query,report\",\"PRINT_STATION\":\"\",\"PROC_FLOW_CARD\":\"view,query,entry,confirm\",\"ERP_INTEG\":\"\",\"DC_CONFIG\":\"view,query\",\"DC_MONITOR\":\"view,query,alarm\",\"DC_STATS\":\"view,query\",\"BARCODE_SCAN_PICK\":\"view,query,pick\",\"WORK_ORDER_PICK\":\"\",\"PROJECT_FLOW\":\"view,query\",\"SUPPLIER_PRINT\":\"\",\"SUPPLIER_ACCOUNT\":\"\"},\"visiblePanels\":[\"DASHBOARD\",\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"DC_CONFIG\",\"DC_MONITOR\",\"DC_STATS\",\"BARCODE_SCAN_PICK\",\"PROJECT_FLOW\",\"PROD_PICK\",\"PROD_REPORT\",\"PROC_FLOW_CARD\",\"ASM_BOM\",\"QC_OQC_REPORT\",\"QC_OQC_ITEMMAP\",\"RD_X_SINTER\",\"MOBILE_PICK\",\"MOBILE_REPORT\",\"MOBILE_PICK_CREATE\"],\"fieldPanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"],\"canConfigSupplierAccount\":false,\"approvePanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"],\"warnPanels\":[\"RD_SHARE_FILE\",\"RD_PROD_DOCLIST\",\"RD_PROGRESS\",\"RD_CHANGE\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\"],\"roleCode\":\"user\",\"selfAuditPanels\":[],\"supplierPanelPerms\":null,\"isAdmin\":false,\"supplierCode\":null},\"cmj\":{\"pagePerms\":{\"ORDER_CONVERT\":\"\",\"SCHEDULE_BOARD\":\"\",\"WORK_ORDER_BOARD\":\"\",\"WORK_ORDER_LIST\":\"\",\"MOBILE_PICK_CREATE\":\"view,query,create,print\",\"MOBILE_PICK\":\"view,query,create,pick,print\",\"MOBILE_REPORT\":\"view,query,report\",\"PRINT_STATION\":\"\",\"PROC_FLOW_CARD\":\"view,query,entry,confirm\",\"ERP_INTEG\":\"\",\"DC_CONFIG\":\"view,query\",\"DC_MONITOR\":\"view,query,alarm\",\"DC_STATS\":\"view,query\",\"BARCODE_SCAN_PICK\":\"view,query,pick\",\"WORK_ORDER_PICK\":\"\",\"PROJECT_FLOW\":\"view,query\",\"SUPPLIER_PRINT\":\"\",\"SUPPLIER_ACCOUNT\":\"\"},\"visiblePanels\":[\"DASHBOARD\",\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"DC_CONFIG\",\"DC_MONITOR\",\"DC_STATS\",\"BARCODE_SCAN_PICK\",\"PROJECT_FLOW\",\"PROD_PICK\",\"PROD_REPORT\",\"PROC_FLOW_CARD\",\"ASM_BOM\",\"QC_OQC_REPORT\",\"QC_OQC_ITEMMAP\",\"RD_X_SINTER\",\"MOBILE_PICK\",\"MOBILE_REPORT\",\"MOBILE_PICK_CREATE\"],\"fieldPanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"],\"canConfigSupplierAccount\":false,\"approvePanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"],\"warnPanels\":[\"RD_SHARE_FILE\",\"RD_PROD_DOCLIST\",\"RD_PROGRESS\",\"RD_CHANGE\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\"],\"roleCode\":\"user\",\"selfAuditPanels\":[],\"supplierPanelPerms\":null,\"isAdmin\":false,\"supplierCode\":null},\"TANCHENG\":{\"pagePerms\":{\"ORDER_CONVERT\":\"view,query,date,convert\",\"SCHEDULE_BOARD\":\"view,query,assign,unassign\",\"WORK_ORDER_BOARD\":\"view,query,transfer,revoke,unclose,print,dayplan\",\"WORK_ORDER_LIST\":\"view,query,print,close,recipe,export,assign,dayplan\",\"MOBILE_PICK_CREATE\":\"view,query,create,print\",\"MOBILE_PICK\":\"view,query,create,pick,print\",\"MOBILE_REPORT\":\"view,query,report\",\"PRINT_STATION\":\"\",\"PROC_FLOW_CARD\":\"view,query,entry,confirm\",\"ERP_INTEG\":\"\",\"DC_CONFIG\":\"view,query\",\"DC_MONITOR\":\"view,query,alarm\",\"DC_STATS\":\"view,query\",\"BARCODE_SCAN_PICK\":\"view,query,pick\",\"WORK_ORDER_PICK\":\"\",\"PROJECT_FLOW\":\"view,query\",\"SUPPLIER_PRINT\":\"\",\"SUPPLIER_ACCOUNT\":\"\"},\"visiblePanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"ORDER_CONVERT\",\"SCHEDULE_BOARD\",\"WORK_ORDER_BOARD\",\"WORK_ORDER_LIST\",\"GRAN_RECORD\",\"WO_ORDER\",\"DAY_REPORT\",\"EQUIP_CHECK\",\"OUTSOURCE_ORDER\",\"WO_COMPLETION_LIST\",\"WO_PROGRESS\",\"WO_REPORT\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"PACK_CONFIRM\",\"WH_RECORD\",\"MAINT_PLAN\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"DC_CONFIG\",\"DC_MONITOR\",\"DC_STATS\",\"BARCODE_SCAN_PICK\",\"PROJECT_FLOW\",\"WO_MIXING_LIST\",\"PROD_PICK\",\"PROD_REPORT\",\"PROC_FLOW_CARD\",\"ASM_BOM\",\"QC_OQC_REPORT\",\"QC_OQC_ITEMMAP\",\"MOBILE_PICK\",\"MOBILE_REPORT\",\"MOBILE_PICK_CREATE\"],\"fieldPanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"GRAN_RECORD\",\"WO_ORDER\",\"DAY_REPORT\",\"EQUIP_CHECK\",\"OUTSOURCE_ORDER\",\"WO_COMPLETION_LIST\",\"WO_PROGRESS\",\"WO_REPORT\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"PACK_CONFIRM\",\"WH_RECORD\",\"MAINT_PLAN\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"],\"canConfigSupplierAccount\":false,\"approvePanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"],\"warnPanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"GRAN_RECORD\",\"WO_ORDER\",\"DAY_REPORT\",\"EQUIP_CHECK\",\"OUTSOURCE_ORDER\",\"WO_COMPLETION_LIST\",\"WO_PROGRESS\",\"WO_REPORT\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"PACK_CONFIRM\",\"WH_RECORD\",\"MAINT_PLAN\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"],\"roleCode\":\"user\",\"selfAuditPanels\":[],\"supplierPanelPerms\":null,\"isAdmin\":false,\"supplierCode\":null},\"WANGGUANGZHEN\":{\"pagePerms\":{\"ORDER_CONVERT\":\"view,query,date,convert\",\"SCHEDULE_BOARD\":\"view,query,assign,unassign\",\"WORK_ORDER_BOARD\":\"view,query,transfer,revoke,unclose,print,dayplan\",\"WORK_ORDER_LIST\":\"view,query,print,close,recipe,export,assign,dayplan\",\"MOBILE_PICK_CREATE\":\"view,query,create,print\",\"MOBILE_PICK\":\"view,query,create,pick,print\",\"MOBILE_REPORT\":\"view,query,report\",\"PRINT_STATION\":\"\",\"PROC_FLOW_CARD\":\"view,query,entry,confirm\",\"ERP_INTEG\":\"\",\"DC_CONFIG\":\"view,query\",\"DC_MONITOR\":\"view,query,alarm\",\"DC_STATS\":\"view,query\",\"BARCODE_SCAN_PICK\":\"view,query,pick\",\"WORK_ORDER_PICK\":\"\",\"PROJECT_FLOW\":\"view,query\",\"SUPPLIER_PRINT\":\"\",\"SUPPLIER_ACCOUNT\":\"\"},\"visiblePanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"ORDER_CONVERT\",\"SCHEDULE_BOARD\",\"WORK_ORDER_BOARD\",\"WORK_ORDER_LIST\",\"GRAN_RECORD\",\"WO_ORDER\",\"DAY_REPORT\",\"EQUIP_CHECK\",\"OUTSOURCE_ORDER\",\"WO_COMPLETION_LIST\",\"WO_PROGRESS\",\"WO_REPORT\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"PACK_CONFIRM\",\"WH_RECORD\",\"MAINT_PLAN\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"DC_CONFIG\",\"DC_MONITOR\",\"DC_STATS\",\"BARCODE_SCAN_PICK\",\"PROJECT_FLOW\",\"WO_MIXING_LIST\",\"PROD_PICK\",\"PROD_REPORT\",\"PROC_FLOW_CARD\",\"ASM_BOM\",\"QC_OQC_REPORT\",\"QC_OQC_ITEMMAP\",\"MOBILE_PICK\",\"MOBILE_REPORT\",\"MOBILE_PICK_CREATE\"],\"fieldPanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"GRAN_RECORD\",\"WO_ORDER\",\"DAY_REPORT\",\"EQUIP_CHECK\",\"OUTSOURCE_ORDER\",\"WO_COMPLETION_LIST\",\"WO_PROGRESS\",\"WO_REPORT\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"PACK_CONFIRM\",\"WH_RECORD\",\"MAINT_PLAN\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"],\"canConfigSupplierAccount\":false,\"approvePanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"],\"warnPanels\":[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"GRAN_RECORD\",\"WO_ORDER\",\"DAY_REPORT\",\"EQUIP_CHECK\",\"OUTSOURCE_ORDER\",\"WO_COMPLETION_LIST\",\"WO_PROGRESS\",\"WO_REPORT\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"PACK_CONFIRM\",\"WH_RECORD\",\"MAINT_PLAN\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"],\"roleCode\":\"user\",\"selfAuditPanels\":[],\"supplierPanelPerms\":null,\"isAdmin\":false,\"supplierCode\":null},\"cs\":{\"pagePerms\":{\"ORDER_CONVERT\":\"view,query,date,convert\",\"SCHEDULE_BOARD\":\"view,query,assign,unassign\",\"WORK_ORDER_BOARD\":\"view,query,transfer,revoke,unclose,print,dayplan\",\"WORK_ORDER_LIST\":\"view,query,print,close,split,recipe,export,assign,dayplan\",\"MOBILE_PICK_CREATE\":\"view,query,create,print\",\"MOBILE_PICK\":\"view,query,create,pick,submit,print\",\"MOBILE_REPORT\":\"view,query,report\",\"PRINT_STATION\":\"view,config\",\"PROC_FLOW_CARD\":\"view,query,entry,confirm\",\"ERP_INTEG\":\"view\",\"DC_CONFIG\":\"view,query\",\"DC_MONITOR\":\"view,query,alarm\",\"DC_STATS\":\"view,query\",\"BARCODE_SCAN_PICK\":\"view,query,pick\",\"WORK_ORDER_PICK\":\"view,query,pick\",\"PROJECT_FLOW\":\"view,query\",\"SUPPLIER_PRINT\":\"view,query,print\",\"SUPPLIER_ACCOUNT\":\"view,supplier\"},\"visiblePanels\":[\"DASHBOARD\",\"PROJECT_FLOW\",\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_X_SINTER\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"SUPPLIER_PRINT\",\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SUPPLIER_PU_ORDER\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_TC_IN\",\"BARCODE_SCAN_PICK\",\"WORK_ORDER_PICK\",\"STOCK_SUMMARY\",\"FINISH_IN\",\"BARCODE_FIN\",\"OTHER_IN\",\"MATERIAL_OUT\",\"TRANSFER\",\"STOCKTAKE_STATS\",\"OTHER_OUT_DETAIL\",\"QC_RETURN\",\"STOCK_DETAIL\",\"FINISH_IN_STATS\",\"SALE_OUT_STATS\",\"SALE_OUT\",\"PURCHASE_IN\",\"PURCHASE_IN_STATS\",\"PURCHASE_IN_DETAIL\",\"OTHER_IN_DETAIL\",\"OTHER_OUT_STATS\",\"BARCODE_MAT\",\"OTHER_OUT\",\"OTHER_IN_STATS\",\"TRANSFER_STATS\",\"QC_RECV\",\"TRANSFER_DETAIL\",\"STOCK_PICK\",\"STOCK_STATUS\",\"STOCK_BALANCE\",\"SALE_OUT_DETAIL\",\"STOCKTAKE_DETAIL\",\"STOCKTAKE\",\"BARCODE_WIP\",\"FINISH_IN_DETAIL\",\"STOCK_LEDGER\",\"MATERIAL_OUT_DETAIL\",\"MATERIAL_OUT_STATS\",\"MOBILE_PICK_CREATE\",\"MOBILE_PICK\",\"MOBILE_REPORT\",\"PRINT_STATION\",\"ORDER_CONVERT\",\"SCHEDULE_BOARD\",\"WORK_ORDER_BOARD\",\"WORK_ORDER_LIST\",\"PROC_FLOW_CARD\",\"WO_ORDER\",\"OUTSOURCE_ORDER\",\"WO_PROGRESS\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"GRAN_RECORD\",\"DAY_REPORT\",\"WO_COMPLETION_LIST\",\"WO_REPORT\",\"WO_MIXING_LIST\",\"PACK_CONFIRM\",\"WH_RECORD\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_OQC_ITEMMAP\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_OQC_REPORT\",\"QC_INSP\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"ASM_BOM\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"EQUIP_CHECK\",\"PROD_MOLD\",\"MAINT_PLAN\",\"DC_CONFIG\",\"DC_MONITOR\",\"DC_STATS\",\"ERP_INTEG\",\"ERPLG\",\"ERPLG_ROW\",\"PROD_PICK_LIST\",\"SUPPLIER_ACCOUNT\"],\"fieldPanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_X_SINTER\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SUPPLIER_PU_ORDER\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_TC_IN\",\"STOCK_SUMMARY\",\"FINISH_IN\",\"BARCODE_FIN\",\"OTHER_IN\",\"MATERIAL_OUT\",\"TRANSFER\",\"STOCKTAKE_STATS\",\"OTHER_OUT_DETAIL\",\"QC_RETURN\",\"STOCK_DETAIL\",\"FINISH_IN_STATS\",\"SALE_OUT_STATS\",\"SALE_OUT\",\"PURCHASE_IN\",\"PURCHASE_IN_STATS\",\"PURCHASE_IN_DETAIL\",\"OTHER_IN_DETAIL\",\"OTHER_OUT_STATS\",\"BARCODE_MAT\",\"OTHER_OUT\",\"OTHER_IN_STATS\",\"TRANSFER_STATS\",\"QC_RECV\",\"TRANSFER_DETAIL\",\"STOCK_PICK\",\"STOCK_STATUS\",\"STOCK_BALANCE\",\"SALE_OUT_DETAIL\",\"STOCKTAKE_DETAIL\",\"STOCKTAKE\",\"BARCODE_WIP\",\"FINISH_IN_DETAIL\",\"STOCK_LEDGER\",\"MATERIAL_OUT_DETAIL\",\"MATERIAL_OUT_STATS\",\"WO_ORDER\",\"OUTSOURCE_ORDER\",\"WO_PROGRESS\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"GRAN_RECORD\",\"DAY_REPORT\",\"WO_COMPLETION_LIST\",\"WO_REPORT\",\"WO_MIXING_LIST\",\"PACK_CONFIRM\",\"WH_RECORD\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_OQC_ITEMMAP\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_OQC_REPORT\",\"QC_INSP\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"ASM_BOM\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"EQUIP_CHECK\",\"PROD_MOLD\",\"MAINT_PLAN\",\"ERPLG\",\"ERPLG_ROW\",\"PROD_PICK_LIST\"],\"canConfigSupplierAccount\":true,\"approvePanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_X_SINTER\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SUPPLIER_PU_ORDER\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_TC_IN\",\"STOCK_SUMMARY\",\"FINISH_IN\",\"BARCODE_FIN\",\"OTHER_IN\",\"MATERIAL_OUT\",\"TRANSFER\",\"STOCKTAKE_STATS\",\"OTHER_OUT_DETAIL\",\"QC_RETURN\",\"STOCK_DETAIL\",\"FINISH_IN_STATS\",\"SALE_OUT_STATS\",\"SALE_OUT\",\"PURCHASE_IN\",\"PURCHASE_IN_STATS\",\"PURCHASE_IN_DETAIL\",\"OTHER_IN_DETAIL\",\"OTHER_OUT_STATS\",\"BARCODE_MAT\",\"OTHER_OUT\",\"OTHER_IN_STATS\",\"TRANSFER_STATS\",\"QC_RECV\",\"TRANSFER_DETAIL\",\"STOCK_PICK\",\"STOCK_STATUS\",\"STOCK_BALANCE\",\"SALE_OUT_DETAIL\",\"STOCKTAKE_DETAIL\",\"STOCKTAKE\",\"BARCODE_WIP\",\"FINISH_IN_DETAIL\",\"STOCK_LEDGER\",\"MATERIAL_OUT_DETAIL\",\"MATERIAL_OUT_STATS\",\"WO_ORDER\",\"OUTSOURCE_ORDER\",\"WO_PROGRESS\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"GRAN_RECORD\",\"DAY_REPORT\",\"WO_COMPLETION_LIST\",\"WO_REPORT\",\"WO_MIXING_LIST\",\"PACK_CONFIRM\",\"WH_RECORD\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_OQC_ITEMMAP\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_OQC_REPORT\",\"QC_INSP\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"ASM_BOM\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"EQUIP_CHECK\",\"PROD_MOLD\",\"MAINT_PLAN\",\"ERPLG\",\"ERPLG_ROW\",\"PROD_PICK_LIST\"],\"warnPanels\":[\"RD_SHARE_FILE\",\"RD_PROD_DOCLIST\",\"RD_PROGRESS\",\"RD_CHANGE\",\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SUPPLIER_PU_ORDER\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_TC_IN\",\"STOCK_SUMMARY\",\"FINISH_IN\",\"BARCODE_FIN\",\"OTHER_IN\",\"MATERIAL_OUT\",\"TRANSFER\",\"STOCKTAKE_STATS\",\"OTHER_OUT_DETAIL\",\"QC_RETURN\",\"STOCK_DETAIL\",\"FINISH_IN_STATS\",\"SALE_OUT_STATS\",\"SALE_OUT\",\"PURCHASE_IN\",\"PURCHASE_IN_STATS\",\"PURCHASE_IN_DETAIL\",\"OTHER_IN_DETAIL\",\"OTHER_OUT_STATS\",\"BARCODE_MAT\",\"OTHER_OUT\",\"OTHER_IN_STATS\",\"TRANSFER_STATS\",\"QC_RECV\",\"TRANSFER_DETAIL\",\"STOCK_PICK\",\"STOCK_STATUS\",\"STOCK_BALANCE\",\"SALE_OUT_DETAIL\",\"STOCKTAKE_DETAIL\",\"STOCKTAKE\",\"BARCODE_WIP\",\"FINISH_IN_DETAIL\",\"STOCK_LEDGER\",\"MATERIAL_OUT_DETAIL\",\"MATERIAL_OUT_STATS\",\"WO_ORDER\",\"OUTSOURCE_ORDER\",\"WO_PROGRESS\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"GRAN_RECORD\",\"DAY_REPORT\",\"WO_COMPLETION_LIST\",\"WO_REPORT\",\"WO_MIXING_LIST\",\"PACK_CONFIRM\",\"WH_RECORD\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_OQC_ITEMMAP\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_OQC_REPORT\",\"QC_INSP\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"ASM_BOM\",\"REJECT\",\"WHLOC\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"EQUIP_CHECK\",\"PROD_MOLD\",\"MAINT_PLAN\",\"ERPLG\",\"ERPLG_ROW\",\"PROD_PICK_LIST\"],\"roleCode\":\"user\",\"selfAuditPanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_X_SINTER\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SUPPLIER_PU_ORDER\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_TC_IN\",\"STOCK_SUMMARY\",\"FINISH_IN\",\"BARCODE_FIN\",\"OTHER_IN\",\"MATERIAL_OUT\",\"TRANSFER\",\"STOCKTAKE_STATS\",\"OTHER_OUT_DETAIL\",\"QC_RETURN\",\"STOCK_DETAIL\",\"FINISH_IN_STATS\",\"SALE_OUT_STATS\",\"SALE_OUT\",\"PURCHASE_IN\",\"PURCHASE_IN_STATS\",\"PURCHASE_IN_DETAIL\",\"OTHER_IN_DETAIL\",\"OTHER_OUT_STATS\",\"BARCODE_MAT\",\"OTHER_OUT\",\"OTHER_IN_STATS\",\"TRANSFER_STATS\",\"QC_RECV\",\"TRANSFER_DETAIL\",\"STOCK_PICK\",\"STOCK_STATUS\",\"STOCK_BALANCE\",\"SALE_OUT_DETAIL\",\"STOCKTAKE_DETAIL\",\"STOCKTAKE\",\"BARCODE_WIP\",\"FINISH_IN_DETAIL\",\"STOCK_LEDGER\",\"MATERIAL_OUT_DETAIL\",\"MATERIAL_OUT_STATS\",\"WO_ORDER\",\"OUTSOURCE_ORDER\",\"WO_PROGRESS\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"GRAN_RECORD\",\"DAY_REPORT\",\"WO_COMPLETION_LIST\",\"WO_REPORT\",\"WO_MIXING_LIST\",\"PACK_CONFIRM\",\"WH_RECORD\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_OQC_ITEMMAP\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_OQC_REPORT\",\"QC_INSP\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"ASM_BOM\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"EQUIP_CHECK\",\"PROD_MOLD\",\"MAINT_PLAN\",\"ERPLG\",\"ERPLG_ROW\",\"PROD_PICK_LIST\"],\"supplierPanelPerms\":null,\"isAdmin\":false,\"supplierCode\":null},\"cxy\":{\"pagePerms\":{\"ORDER_CONVERT\":\"\",\"SCHEDULE_BOARD\":\"\",\"WORK_ORDER_BOARD\":\"\",\"WORK_ORDER_LIST\":\"\",\"MOBILE_PICK_CREATE\":\"view,query,create,print\",\"MOBILE_PICK\":\"view,query,create,pick,print\",\"MOBILE_REPORT\":\"view,query,report\",\"PRINT_STATION\":\"\",\"PROC_FLOW_CARD\":\"view,query,entry,confirm\",\"ERP_INTEG\":\"\",\"DC_CONFIG\":\"view,query\",\"DC_MONITOR\":\"view,query,alarm\",\"DC_STATS\":\"view,query\",\"BARCODE_SCAN_PICK\":\"view,query,pick\",\"WORK_ORDER_PICK\":\"\",\"PROJECT_FLOW\":\"view,query\",\"SUPPLIER_PRINT\":\"\",\"SUPPLIER_ACCOUNT\":\"\"},\"visiblePanels\":[\"DASHBOARD\",\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"DC_CONFIG\",\"DC_MONITOR\",\"DC_STATS\",\"BARCODE_SCAN_PICK\",\"PROJECT_FLOW\",\"PROD_PICK\",\"PROD_REPORT\",\"PROC_FLOW_CARD\",\"ASM_BOM\",\"QC_OQC_REPORT\",\"QC_OQC_ITEMMAP\",\"RD_X_SINTER\",\"MOBILE_PICK\",\"MOBILE_REPORT\",\"MOBILE_PICK_CREATE\"],\"fieldPanels\":[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"],\"canConfigSupplierAccount\":false,\"approvePanels\":[],\"warnPanels\":[\"RD_SHARE_FILE\",\"RD_PROD_DOCLIST\",\"RD_PROGRESS\",\"RD_CHANGE\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\"],\"roleCode\":\"user\",\"selfAuditPanels\":[],\"supplierPanelPerms\":null,\"isAdmin\":false,\"supplierCode\":null},\"admin\":{\"pagePerms\":{\"ORDER_CONVERT\":\"*\",\"SCHEDULE_BOARD\":\"*\",\"WORK_ORDER_BOARD\":\"*\",\"WORK_ORDER_LIST\":\"*\",\"MOBILE_PICK_CREATE\":\"*\",\"MOBILE_PICK\":\"*\",\"MOBILE_REPORT\":\"*\",\"PRINT_STATION\":\"*\",\"PROC_FLOW_CARD\":\"*\",\"ERP_INTEG\":\"*\",\"DC_CONFIG\":\"*\",\"DC_MONITOR\":\"*\",\"DC_STATS\":\"*\",\"BARCODE_SCAN_PICK\":\"*\",\"WORK_ORDER_PICK\":\"*\",\"PROJECT_FLOW\":\"*\",\"SUPPLIER_PRINT\":\"*\",\"SUPPLIER_ACCOUNT\":\"*\"},\"visiblePanels\":[\"*\"],\"fieldPanels\":[\"*\"],\"canConfigSupplierAccount\":true,\"approvePanels\":[\"*\"],\"warnPanels\":[\"*\"],\"roleCode\":\"admin\",\"selfAuditPanels\":[\"*\"],\"supplierPanelPerms\":null,\"isAdmin\":true,\"supplierCode\":null}}"
+  },
+  {
+   "name": "组织架构证据:正式库 fm 的 approvePanels 含两面板(角色授权真实驱动)",
+   "ok": true,
+   "detail": "[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"]"
+  },
+  {
+   "name": "组织架构证据:正式库 cmj 的 approvePanels 含两面板(角色授权真实驱动)",
+   "ok": true,
+   "detail": "[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"RD_X_SINTER\"]"
+  },
+  {
+   "name": "组织架构证据:正式库 TANCHENG 的 approvePanels 含两面板(角色授权真实驱动)",
+   "ok": true,
+   "detail": "[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"]"
+  },
+  {
+   "name": "组织架构证据:正式库 WANGGUANGZHEN 的 approvePanels 含两面板(角色授权真实驱动)",
+   "ok": true,
+   "detail": "[\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_INSP\",\"QC_TC_IN\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\"]"
+  },
+  {
+   "name": "组织架构证据:正式库 cs 的 approvePanels 含两面板(角色授权真实驱动)",
+   "ok": true,
+   "detail": "[\"RD_INSTR_USE\",\"RD_PROD_INFO\",\"RD_SHARE_FILE\",\"RD_DOM_TEST\",\"RD_MINERAL\",\"RD_PLAN\",\"RD_RO_PROTECT\",\"RD_MOLD_FORMULA\",\"RD_ANTIBACT\",\"RD_SOAK\",\"RD_ASM_BOM\",\"RD_PROD_DOCLIST\",\"RD_DROP_PREC\",\"RD_ASM_PROC\",\"RD_MOLD_PROC\",\"RD_INSP_PLAN\",\"RD_SPEC_DOC\",\"RD_X_SINTER\",\"RD_PROGRESS\",\"RD_SPIKE_WATER\",\"RD_ALKALINE\",\"RD_APPROVAL\",\"RD_EQUIP_USE\",\"RD_CHANGE\",\"RD_SCALE\",\"RD_FILTER_EFF\",\"SALES_ORDER_DETAIL\",\"PU_ORDER_DETAIL\",\"PU_ORDER\",\"SO_ORDER\",\"CGD\",\"SUPPLIER_PU_ORDER\",\"SALES_ORDER_STATS\",\"PU_ORDER_STATS\",\"KHDD\",\"QC_TC_IN\",\"STOCK_SUMMARY\",\"FINISH_IN\",\"BARCODE_FIN\",\"OTHER_IN\",\"MATERIAL_OUT\",\"TRANSFER\",\"STOCKTAKE_STATS\",\"OTHER_OUT_DETAIL\",\"QC_RETURN\",\"STOCK_DETAIL\",\"FINISH_IN_STATS\",\"SALE_OUT_STATS\",\"SALE_OUT\",\"PURCHASE_IN\",\"PURCHASE_IN_STATS\",\"PURCHASE_IN_DETAIL\",\"OTHER_IN_DETAIL\",\"OTHER_OUT_STATS\",\"BARCODE_MAT\",\"OTHER_OUT\",\"OTHER_IN_STATS\",\"TRANSFER_STATS\",\"QC_RECV\",\"TRANSFER_DETAIL\",\"STOCK_PICK\",\"STOCK_STATUS\",\"STOCK_BALANCE\",\"SALE_OUT_DETAIL\",\"STOCKTAKE_DETAIL\",\"STOCKTAKE\",\"BARCODE_WIP\",\"FINISH_IN_DETAIL\",\"STOCK_LEDGER\",\"MATERIAL_OUT_DETAIL\",\"MATERIAL_OUT_STATS\",\"WO_ORDER\",\"OUTSOURCE_ORDER\",\"WO_PROGRESS\",\"DISPATCH_STATS\",\"LINE_LOAD\",\"WO_SCHEDULE\",\"DISPATCH\",\"DISPATCH_DETAIL\",\"SAMPLE_REQ\",\"GRAN_RECORD\",\"DAY_REPORT\",\"WO_COMPLETION_LIST\",\"WO_REPORT\",\"WO_MIXING_LIST\",\"PACK_CONFIRM\",\"WH_RECORD\",\"PROD_ABN\",\"FEED_CONFIRM\",\"WO_REPORT_LIST\",\"MIX_RECORD\",\"QC_BHG\",\"QC_INSP_REQ\",\"QC_BHC\",\"QC_INSP_REC\",\"QC_PROC_INSP\",\"QC_BHZ\",\"QC_FIRST_INSP\",\"QC_SCP\",\"QC_SCY\",\"QC_JJF\",\"QC_OQC_ITEMMAP\",\"QC_CATALOG\",\"QC_INSP_REQ_SERIES\",\"QC_ASM_INSP\",\"QC_LYB\",\"QC_OQC_REPORT\",\"QC_INSP\",\"INV_PRICE\",\"PARTNER\",\"CUR\",\"PROD_LINE\",\"CUSGRP\",\"REGION\",\"ASM_BOM\",\"REJECT\",\"WHLOC\",\"WLBOM\",\"FIN_EXP\",\"DEPT\",\"PROJ\",\"TEAM\",\"ROUTE\",\"FIELDMGR\",\"OP_TIME\",\"SUPGRP\",\"MATGRP\",\"ZDGL\",\"EMP\",\"QC_ITEM\",\"KHDA\",\"QC_PLAN\",\"GFDA\",\"FIN_TAX\",\"WC\",\"INV\",\"WH\",\"SETTLE\",\"OP\",\"EQUIP\",\"FIN_ACC\",\"UOM\",\"EQUIP_CHECK\",\"PROD_MOLD\",\"MAINT_PLAN\",\"ERPLG\",\"ERPLG_ROW\",\"PROD_PICK_LIST\"]"
+  },
+  {
+   "name": "组织架构证据:正式库 cxy(质量检测,无审批权)approvePanels 不含两面板",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "组织架构证据:正式库角色 1031 两面板均有授权且 perms 含 audit(引擎审批词)",
+   "ok": true,
+   "detail": "[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"}]"
+  },
+  {
+   "name": "组织架构证据:正式库角色 1033 两面板均有授权且 perms 含 audit(引擎审批词)",
+   "ok": true,
+   "detail": "[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"}]"
+  },
+  {
+   "name": "组织架构证据:正式库角色 1039 两面板均有授权且 perms 含 audit(引擎审批词)",
+   "ok": true,
+   "detail": "[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn\"}]"
+  },
+  {
+   "name": "组织架构证据:正式库角色 1042 两面板均有授权且 perms 含 audit(引擎审批词)",
+   "ok": true,
+   "detail": "[{\"panelCode\":\"QC_PROC_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit\"},{\"panelCode\":\"QC_FIRST_INSP\",\"perms\":\"view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit\"}]"
+  },
+  {
+   "name": "存量直审单 QC_PROC_INSP/ZC-2026-09-0003:表内审核人为空 → descriptor「审核人」仍显示 shr 兜底「柴善银」",
+   "ok": true,
+   "detail": "审核人=\"柴善银\""
+  },
+  {
+   "name": "存量直审单 QC_FIRST_INSP/SJ-2026-09-0003:表内审核人为空 → descriptor「审核人」仍显示 shr 兜底「柴善银」",
+   "ok": true,
+   "detail": "审核人=\"柴善银\""
+  },
+  {
+   "name": "QC_PROC_INSP 前置:头表已有 审核人/审核时间/审批人/审批时间 列",
+   "ok": true,
+   "detail": "[\"审核人\",\"审核时间\",\"审批人\",\"审批时间\"]"
+  },
+  {
+   "name": "QC_PROC_INSP 前置:yj_field 登记 审批人/审批时间(editable=0 只读)",
+   "ok": true,
+   "detail": "[{\"label\":\"审批人\",\"editable\":false,\"hidden\":true,\"visible\":true},{\"label\":\"审批时间\",\"editable\":false,\"hidden\":true,\"visible\":true}]"
+  },
+  {
+   "name": "QC_PROC_INSP 前置:getPanelConfig 下发 审批人/审批时间 且 readonly",
+   "ok": true,
+   "detail": "{\"审批人\":{\"dataName\":\"审批人\",\"dataType\":\"文本\",\"width\":90,\"hidden\":true,\"readonly\":true,\"isRequired\":false},\"审批时间\":{\"dataName\":\"审批时间\",\"dataType\":\"文本\",\"width\":140,\"hidden\":true,\"readonly\":true,\"isRequired\":false}}"
+  },
+  {
+   "name": "QC_PROC_INSP 建草稿(API 新增+保存)",
+   "ok": true,
+   "detail": "单号=ZC-2026-11-0011 {\"httpStatus\":200,\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"ZC-2026-11-0011\"}}"
+  },
+  {
+   "name": "QC_PROC_INSP 草稿态:pending≠Y",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 直接「审核」被拒(文案含「两级审批」/「不支持直接审核」)",
+   "ok": true,
+   "detail": "code=409 msg=制程检验单走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核"
+  },
+  {
+   "name": "QC_PROC_INSP[UI] 草稿态纸面断言通过",
+   "ok": true,
+   "detail": "exit=0"
+  },
+  {
+   "name": "QC_PROC_INSP 提交审批成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP 提交后:审批中(pending=Y,approve_node=1)",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":\"1\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 提交后:检验员=提交人姓名「系统管理员」(编制格空值兜底)",
+   "ok": true,
+   "detail": "检验员=\"系统管理员\""
+  },
+  {
+   "name": "QC_PROC_INSP 提交后:审核人/审批人为空",
+   "ok": true,
+   "detail": "{\"l1\":null,\"l2\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP 留痕:SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "QC_PROC_INSP 负测:无审批权账号(wangguangzhen)审批被拒",
+   "ok": true,
+   "detail": "code=403 msg=当前角色无该面板「审批」权限，无法执行「审批通过」"
+  },
+  {
+   "name": "QC_PROC_INSP 负测:无审批权账号直审也被拒",
+   "ok": true,
+   "detail": "code=403 msg=当前角色无该面板「审批」权限，无法执行「审核」"
+  },
+  {
+   "name": "QC_PROC_INSP 一级审批通过(cp)",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP 一级通过后:待二级审批(pending=Y,approve_node=2)",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":\"2\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 一级通过后:审核人=「陈秀丽」",
+   "ok": true,
+   "detail": "审核人=\"陈秀丽\""
+  },
+  {
+   "name": "QC_PROC_INSP 一级通过后:审核时间非空、审批人仍为空",
+   "ok": true,
+   "detail": "{\"审核时间\":\"2026-11-06T12:17:34.000Z\",\"审批人\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP 留痕:APPROVE_L1(node=1)",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1"
+  },
+  {
+   "name": "QC_PROC_INSP descriptor:审核人=真实姓名「陈秀丽」、审批人仍空",
+   "ok": true,
+   "detail": "{\"审核人\":\"陈秀丽\"}"
+  },
+  {
+   "name": "QC_PROC_INSP[UI] 待二级审批态纸面断言通过",
+   "ok": true,
+   "detail": "exit=0"
+  },
+  {
+   "name": "QC_PROC_INSP 负测:二级节点非超级管理员审批被拒(提示含「超级管理员」)",
+   "ok": true,
+   "detail": "code=403 msg=制程检验单的批准（二级审批）仅超级管理员可执行"
+  },
+  {
+   "name": "QC_PROC_INSP 负测:二级节点非超级管理员驳回被拒",
+   "ok": true,
+   "detail": "code=403 msg=制程检验单的批准（二级审批）仅超级管理员可驳回"
+  },
+  {
+   "name": "QC_PROC_INSP 二级批准通过(admin)",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP 批准后:已审核(pending=N,approve_node 空,shr=admin)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"admin\",\"shsj\":\"2026-11-06T04:18:08.210Z\",\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 批准后:审批人=「系统管理员」、审批时间非空",
+   "ok": true,
+   "detail": "{\"审批人\":\"系统管理员\",\"审批时间\":\"2026-11-06T12:18:08.000Z\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 留痕:APPROVE(node=2) 且 APPROVE_L1 仍在",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1,APPROVE@2"
+  },
+  {
+   "name": "QC_PROC_INSP descriptor:审核人=「陈秀丽」、审批人=「系统管理员」(真实姓名)",
+   "ok": true,
+   "detail": "{\"审核人\":\"陈秀丽\",\"审批人\":\"系统管理员\"}"
+  },
+  {
+   "name": "QC_PROC_INSP[UI] 已审核态纸面断言通过",
+   "ok": true,
+   "detail": "exit=0"
+  },
+  {
+   "name": "QC_PROC_INSP 导出 PDF:HTTP200 + %PDF-",
+   "ok": true,
+   "detail": "status=200 bytes=77259"
+  },
+  {
+   "name": "QC_PROC_INSP PDF 表尾文本",
+   "ok": null,
+   "detail": "\"性结果结果判断检验人员：系统管理员检验要求检验方法AUTO_QCVER_20261106-AUTO-PROD-001AUTO-SPECAUTO-20261106-121728-无破损目视合格合格公差内卡尺合格合格检验结论处理意见第1页打印时间：2026-11-0612:18检验员：系统管理员审核：陈秀丽批准：系统管理员\""
+  },
+  {
+   "name": "QC_PROC_INSP PDF 显示 批准=「系统管理员」",
+   "ok": true,
+   "detail": "理员审核：陈秀丽批准：系统管理员"
+  },
+  {
+   "name": "QC_PROC_INSP PDF 显示 审核人(一级)=「陈秀丽」",
+   "ok": true,
+   "detail": "验员：系统管理员审核：陈秀丽批准：系统管理员"
+  },
+  {
+   "name": "QC_PROC_INSP PDF 显示 检验员=「系统管理员」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "QC_PROC_INSP 导出 XLSX:含 批准 标签与「系统管理员」",
+   "ok": true,
+   "detail": "PNG? bytes=7065 textLen=288"
+  },
+  {
+   "name": "QC_PROC_INSP 导出 XLSX:含一级审核人「陈秀丽」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "QC_PROC_INSP 导出证据",
+   "ok": null,
+   "detail": "{\"pdf\":\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\proc-ZC-2026-11-0011.pdf\",\"pdfText\":\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\proc-ZC-2026-11-0011.txt\",\"xlsx\":\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\proc-ZC-2026-11-0011.xlsx\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 弃审成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP 弃审后:回到草稿(pending≠Y)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_PROC_INSP 弃审后:审核人/审批人/审核时间/审批时间 清空",
+   "ok": true,
+   "detail": "{\"prep\":\"系统管理员\",\"l1\":null,\"l1Time\":null,\"l2\":null,\"l2Time\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP 弃审后:检验员保留「系统管理员」",
+   "ok": true,
+   "detail": "检验员=\"系统管理员\""
+  },
+  {
+   "name": "QC_PROC_INSP 留痕:UNAUDIT",
+   "ok": true,
+   "detail": "SUBMIT,APPROVE_L1,APPROVE,UNAUDIT"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 建草稿",
+   "ok": true,
+   "detail": "ZC-2026-11-0012"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 已清空检验员以模拟老草稿(提交前为空)",
+   "ok": true,
+   "detail": "检验员=null"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 无审批权但有编辑权的账号(wangguangzhen)可提交审批",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 提交后检验员=提交人姓名「王光珍」(空值兜底)",
+   "ok": true,
+   "detail": "检验员=\"王光珍\""
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 一级驳回成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 驳回后回到草稿",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"wangguangzhen\"}"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 驳回后 审核人/审批人 清空",
+   "ok": true,
+   "detail": "{\"prep\":\"王光珍\",\"l1\":null,\"l1Time\":null,\"l2\":null,\"l2Time\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP[驳回] 留痕 REJECT(node=1)",
+   "ok": true,
+   "detail": "SUBMIT@1,REJECT@1"
+  },
+  {
+   "name": "QC_PROC_INSP[自审] cp(有审批权)提交自己的单成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_PROC_INSP[自审] 提交人本人不能批自己(负测被拒)",
+   "ok": true,
+   "detail": "code=403 msg=审批人不能与提交人相同（编制与审批分离）：本单由 陈秀丽（cp）提交，请由他人完成一级审批"
+  },
+  {
+   "name": "QC_PROC_INSP 清理:本次测试单 0 残留",
+   "ok": true,
+   "detail": "{\"QC_PROC_INSP:ZC-2026-11-0011\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0},\"QC_PROC_INSP:ZC-2026-11-0012\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0},\"QC_PROC_INSP:ZC-2026-11-0013\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0}}"
+  },
+  {
+   "name": "QC_PROC_INSP 清理:AUTO_QCVER_ 标记 0 残留",
+   "ok": true,
+   "detail": "{\"QC_PROC_INSP\":0}"
+  },
+  {
+   "name": "QC_FIRST_INSP 前置:头表已有 审核人/审核时间/审批人/审批时间 列",
+   "ok": true,
+   "detail": "[\"审核人\",\"审核时间\",\"审批人\",\"审批时间\"]"
+  },
+  {
+   "name": "QC_FIRST_INSP 前置:yj_field 登记 审批人/审批时间(editable=0 只读)",
+   "ok": true,
+   "detail": "[{\"label\":\"审批人\",\"editable\":false,\"hidden\":true,\"visible\":true},{\"label\":\"审批时间\",\"editable\":false,\"hidden\":true,\"visible\":true}]"
+  },
+  {
+   "name": "QC_FIRST_INSP 前置:getPanelConfig 下发 审批人/审批时间 且 readonly",
+   "ok": true,
+   "detail": "{\"审批人\":{\"dataName\":\"审批人\",\"dataType\":\"文本\",\"width\":90,\"hidden\":true,\"readonly\":true,\"isRequired\":false},\"审批时间\":{\"dataName\":\"审批时间\",\"dataType\":\"文本\",\"width\":140,\"hidden\":true,\"readonly\":true,\"isRequired\":false}}"
+  },
+  {
+   "name": "QC_FIRST_INSP 建草稿(API 新增+保存)",
+   "ok": true,
+   "detail": "单号=SJ-2026-11-0002 {\"httpStatus\":200,\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"SJ-2026-11-0002\"}}"
+  },
+  {
+   "name": "QC_FIRST_INSP 草稿态:pending≠Y",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 直接「审核」被拒(文案含「两级审批」/「不支持直接审核」)",
+   "ok": true,
+   "detail": "code=409 msg=首件检验单走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核"
+  },
+  {
+   "name": "QC_FIRST_INSP[UI] 草稿态纸面断言通过",
+   "ok": true,
+   "detail": "exit=0"
+  },
+  {
+   "name": "QC_FIRST_INSP 提交审批成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP 提交后:审批中(pending=Y,approve_node=1)",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":\"1\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 提交后:检验员=提交人姓名「系统管理员」(编制格空值兜底)",
+   "ok": true,
+   "detail": "检验员=\"系统管理员\""
+  },
+  {
+   "name": "QC_FIRST_INSP 提交后:审核人/审批人为空",
+   "ok": true,
+   "detail": "{\"l1\":null,\"l2\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP 留痕:SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "QC_FIRST_INSP 负测:无审批权账号(wangguangzhen)审批被拒",
+   "ok": true,
+   "detail": "code=403 msg=当前角色无该面板「审批」权限，无法执行「审批通过」"
+  },
+  {
+   "name": "QC_FIRST_INSP 负测:无审批权账号直审也被拒",
+   "ok": true,
+   "detail": "code=403 msg=当前角色无该面板「审批」权限，无法执行「审核」"
+  },
+  {
+   "name": "QC_FIRST_INSP 一级审批通过(cp)",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP 一级通过后:待二级审批(pending=Y,approve_node=2)",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":\"2\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 一级通过后:审核人=「陈秀丽」",
+   "ok": true,
+   "detail": "审核人=\"陈秀丽\""
+  },
+  {
+   "name": "QC_FIRST_INSP 一级通过后:审核时间非空、审批人仍为空",
+   "ok": true,
+   "detail": "{\"审核时间\":\"2026-11-06T12:19:19.000Z\",\"审批人\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP 留痕:APPROVE_L1(node=1)",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1"
+  },
+  {
+   "name": "QC_FIRST_INSP descriptor:审核人=真实姓名「陈秀丽」、审批人仍空",
+   "ok": true,
+   "detail": "{\"审核人\":\"陈秀丽\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP[UI] 待二级审批态纸面断言通过",
+   "ok": true,
+   "detail": "exit=0"
+  },
+  {
+   "name": "QC_FIRST_INSP 负测:二级节点非超级管理员审批被拒(提示含「超级管理员」)",
+   "ok": true,
+   "detail": "code=403 msg=首件检验单的批准（二级审批）仅超级管理员可执行"
+  },
+  {
+   "name": "QC_FIRST_INSP 负测:二级节点非超级管理员驳回被拒",
+   "ok": true,
+   "detail": "code=403 msg=首件检验单的批准（二级审批）仅超级管理员可驳回"
+  },
+  {
+   "name": "QC_FIRST_INSP 二级批准通过(admin)",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP 批准后:已审核(pending=N,approve_node 空,shr=admin)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"admin\",\"shsj\":\"2026-11-06T04:19:53.247Z\",\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 批准后:审批人=「系统管理员」、审批时间非空",
+   "ok": true,
+   "detail": "{\"审批人\":\"系统管理员\",\"审批时间\":\"2026-11-06T12:19:53.000Z\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 留痕:APPROVE(node=2) 且 APPROVE_L1 仍在",
+   "ok": true,
+   "detail": "SUBMIT@1,APPROVE_L1@1,APPROVE@2"
+  },
+  {
+   "name": "QC_FIRST_INSP descriptor:审核人=「陈秀丽」、审批人=「系统管理员」(真实姓名)",
+   "ok": true,
+   "detail": "{\"审核人\":\"陈秀丽\",\"审批人\":\"系统管理员\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP[UI] 已审核态纸面断言通过",
+   "ok": true,
+   "detail": "exit=0"
+  },
+  {
+   "name": "QC_FIRST_INSP 导出 PDF:HTTP200 + %PDF-",
+   "ok": true,
+   "detail": "status=200 bytes=88380"
+  },
+  {
+   "name": "QC_FIRST_INSP PDF 表尾文本",
+   "ok": null,
+   "detail": "\"压降两项测试，可先测试初始浊度后再进行压降测试）。4.炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。5.测试样品需保留至本班次生产完成。6.C-95客户相关产品脱模后立马进行首件检验。检验结果检验人系统管理员审核人陈秀丽批准系统管理员第1页打印时间：2026-11-0612:20\""
+  },
+  {
+   "name": "QC_FIRST_INSP PDF 显示 批准=「系统管理员」",
+   "ok": true,
+   "detail": "理员审核人陈秀丽批准系统管理员第1页打印时间：2026-11"
+  },
+  {
+   "name": "QC_FIRST_INSP PDF 显示 审核人(一级)=「陈秀丽」",
+   "ok": true,
+   "detail": "检验人系统管理员审核人陈秀丽批准系统管理员第1页打印时间：2"
+  },
+  {
+   "name": "QC_FIRST_INSP 导出 XLSX:含 批准 标签与「系统管理员」",
+   "ok": true,
+   "detail": "PNG? bytes=7244 textLen=419"
+  },
+  {
+   "name": "QC_FIRST_INSP 导出 XLSX:含一级审核人「陈秀丽」",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "QC_FIRST_INSP 导出证据",
+   "ok": null,
+   "detail": "{\"pdf\":\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\first-SJ-2026-11-0002.pdf\",\"pdfText\":\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\first-SJ-2026-11-0002.txt\",\"xlsx\":\"tools\\\\archive\\\\_qc-insp-verify-20261106\\\\evidence\\\\t3\\\\first-SJ-2026-11-0002.xlsx\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 弃审成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP 弃审后:回到草稿(pending≠Y)",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"admin\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP 弃审后:审核人/审批人/审核时间/审批时间 清空",
+   "ok": true,
+   "detail": "{\"prep\":\"系统管理员\",\"l1\":null,\"l1Time\":null,\"l2\":null,\"l2Time\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP 弃审后:检验员保留「系统管理员」",
+   "ok": true,
+   "detail": "检验员=\"系统管理员\""
+  },
+  {
+   "name": "QC_FIRST_INSP 留痕:UNAUDIT",
+   "ok": true,
+   "detail": "SUBMIT,APPROVE_L1,APPROVE,UNAUDIT"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 建草稿",
+   "ok": true,
+   "detail": "SJ-2026-11-0003"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 已清空检验员以模拟老草稿(提交前为空)",
+   "ok": true,
+   "detail": "检验员=null"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 无审批权但有编辑权的账号(wangguangzhen)可提交审批",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 提交后检验员=提交人姓名「王光珍」(空值兜底)",
+   "ok": true,
+   "detail": "检验员=\"王光珍\""
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 一级驳回成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 驳回后回到草稿",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"node\":\"\",\"shr\":\"\",\"shsj\":null,\"pending_by\":\"wangguangzhen\"}"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 驳回后 审核人/审批人 清空",
+   "ok": true,
+   "detail": "{\"prep\":\"王光珍\",\"l1\":null,\"l1Time\":null,\"l2\":null,\"l2Time\":null}"
+  },
+  {
+   "name": "QC_FIRST_INSP[驳回] 留痕 REJECT(node=1)",
+   "ok": true,
+   "detail": "SUBMIT@1,REJECT@1"
+  },
+  {
+   "name": "QC_FIRST_INSP[自审] cp(有审批权)提交自己的单成功",
+   "ok": true,
+   "detail": "code=200 msg=success"
+  },
+  {
+   "name": "QC_FIRST_INSP[自审] 提交人本人不能批自己(负测被拒)",
+   "ok": true,
+   "detail": "code=403 msg=审批人不能与提交人相同（编制与审批分离）：本单由 陈秀丽（cp）提交，请由他人完成一级审批"
+  },
+  {
+   "name": "QC_FIRST_INSP 清理:本次测试单 0 残留",
+   "ok": true,
+   "detail": "{\"QC_FIRST_INSP:SJ-2026-11-0002\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0},\"QC_FIRST_INSP:SJ-2026-11-0003\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0},\"QC_FIRST_INSP:SJ-2026-11-0004\":{\"head\":0,\"detail\":0,\"status\":0,\"approval\":0,\"msg\":0}}"
+  },
+  {
+   "name": "QC_FIRST_INSP 清理:AUTO_QCVER_ 标记 0 残留",
+   "ok": true,
+   "detail": "{\"QC_FIRST_INSP\":0}"
+  },
+  {
+   "name": "夹具还原:角色 4 两面板 can_approve/perms 恢复原值",
+   "ok": true,
+   "detail": "[{\"panel_code\":\"QC_FIRST_INSP\",\"can_approve\":\"N\",\"perms\":\"view,query,add,modify,modlog,del,export\"},{\"panel_code\":\"QC_PROC_INSP\",\"can_approve\":\"N\",\"perms\":\"view,query,add,modify,modlog,del,export\"}]"
+  },
+  {
+   "name": "兜底清理:残留测试单已清",
+   "ok": true,
+   "detail": "[\"QC_PROC_INSP:ZC-2026-11-0011\",\"QC_PROC_INSP:ZC-2026-11-0012\",\"QC_PROC_INSP:ZC-2026-11-0013\",\"QC_FIRST_INSP:SJ-2026-11-0002\",\"QC_FIRST_INSP:SJ-2026-11-0003\",\"QC_FIRST_INSP:SJ-2026-11-0004\"]"
+  }
+ ],
+ "result": "PASS",
+ "env": {
+  "base": "http://127.0.0.1:8091",
+  "factory": "YJ_TEST",
+  "db": "HSDZ_MES_TEST",
+  "run": "20261106-121728",
+  "outDir": "D:\\workspace\\yinjia\\tools\\archive\\_qc-insp-verify-20261106\\evidence\\t3"
+ }
+}

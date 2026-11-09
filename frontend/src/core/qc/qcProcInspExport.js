@@ -1,7 +1,7 @@
 /**
- * qcProcInspExport.js — 制程检验单(QC_PROC_INSP)纸张表 → Excel(.xlsx)的**版式单一真源**。
+ * qcProcInspExport.js — 出货检验单功能(原「制程检验单」,面板 QC_PROC_INSP)纸张表 → Excel(.xlsx)的**版式单一真源**。
  *
- * 用户 2026-10-17 口径:「同时实现当前可excel导出」—— 指的是**当前这张纸**(制程检验记录表),
+ * 用户 2026-10-17 口径:「同时实现当前可excel导出」—— 指的是**当前这张纸**(出货检验记录表),
  * 不是列表页那套"头字段键值 + 全字段明细"的数据导出(那条路在 PanelxList.exportSheetExcel)。
  *
  * 只放**纯函数**(产出 aoa / 列宽 / 合并区),不 import xlsx ⇒ 可用 node:test 钉死版式;
@@ -19,7 +19,11 @@
  *   → 表头 2 行:客户名称|产品编码|型号（mm）|批号|检验人员：<值>(跨 检验要求+检验方法)|产线常规功能性结果|结果判断
  *                以下检验要求/检验方法自动填充出货检验计划表
  *   → 数据行:一行一个检验项目(左侧四列的**列名**合并表头两行、**取值**合并整个表体)
- *   → 结论区:检验结论 / 处理意见 / 检验人+审核人
+ *   → 结论区:检验结论 / 处理意见 / 检验人+审核人+批准
+ *
+ * ⚠ 2026-11-06 表尾扩第三对「批准」(与纸面/服务端报表同口径):两张工序检验单并入质量单据
+ *   两级审批 —— 检验人=编制(提交审批人)/审核=一级审批人/批准=超级管理员;
+ *   取值键仍用真实数据键 审批人(head['审批人'],二级审批通过才落值),不是本表的物理列名。
  */
 
 /** 纸面列(顺序即 Excel 列序;`head` = 该列取的头字段键,缺省与 label 同名) */
@@ -37,20 +41,25 @@ export const PROC_INSP_COLS = [
 export const PROC_INSP_FOOT = [
   { label: '检验结论', key: '总结论', big: true },
   { label: '处理意见', key: '处理方式', big: true },
-  { label: '检验人', key: '检验员', secondLabel: '审核人', secondKey: '审核人' },
+  // 最后一行三对(2026-11-06 补「批准」):检验人=编制 / 审核=一级审批人 / 批准=超级管理员
+  {
+    label: '检验人', key: '检验员',
+    secondLabel: '审核人', secondKey: '审核人',
+    thirdLabel: '批准', thirdKey: '审批人',
+  },
 ]
 
 /**
  * 组装导出的二维数组与合并区。
  * @param {object} p
- * @param {string} p.title 标题(制程检验记录表)
+ * @param {string} p.title 标题(出货检验记录表)
  * @param {string} p.subtitle 副标题(公司名 + 单据编号 + 单据状态)
  * @param {Array<Array<{label:string,value:string}>>} p.headPairs 抬头:每行 2 组(与纸面同一分行口径)
  * @param {object} p.head 单据头(取左侧四列 + 检验员 + 结论区)
  * @param {Array<object>} p.rows 明细行(一行一个检验项目)
  * @returns {{aoa:Array<Array<any>>, cols:Array<{wch:number}>, merges:Array<object>, headerRow1:number, headerRow2:number}}
  */
-export function buildProcInspExport({ title = '制程检验记录表', subtitle = '', headPairs = [], head = {}, rows = [] } = {}) {
+export function buildProcInspExport({ title = '出货检验记录表', subtitle = '', headPairs = [], head = {}, rows = [] } = {}) {
   const N = PROC_INSP_COLS.length
   const aoa = []
   const merges = []
@@ -123,7 +132,12 @@ export function buildProcInspExport({ title = '制程检验记录表', subtitle 
   // ── 结论区 ──
   for (const f of PROC_INSP_FOOT) {
     const r = aoa.length
-    if (f.secondLabel) {
+    if (f.thirdLabel) {
+      // 三对一行(8 列):检验人(0)|值(1-2) 审核人(3)|值(4-5) 批准(6)|值(7)
+      aoa.push([f.label, text(head[f.key]), '', f.secondLabel, text(head[f.secondKey]), '', f.thirdLabel, text(head[f.thirdKey])])
+      merges.push({ s: { r, c: 1 }, e: { r, c: 2 } })
+      merges.push({ s: { r, c: 4 }, e: { r, c: 5 } })
+    } else if (f.secondLabel) {
       aoa.push([f.label, text(head[f.key]), '', '', f.secondLabel, text(head[f.secondKey]), '', ''])
       merges.push({ s: { r, c: 1 }, e: { r, c: 3 } })
       merges.push({ s: { r, c: 5 }, e: { r, c: 7 } })

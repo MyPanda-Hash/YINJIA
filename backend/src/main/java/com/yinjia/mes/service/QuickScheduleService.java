@@ -23,6 +23,11 @@ import java.util.Map;
  * ⇒ 同一订单行分多次转单时,每张工单各自一行、行号稳定(不再出现 MAX(pl_xc)+1 的漂移),
  * 靠 od_no/od_xc 回溯销售订单行。每张工单的 需求数量/转单数量 都等于**本次转单数量**
  * (旧实现写整条订单行数量 ⇒ 同一订单行转两次就各带一份整单需求,需求被重复计)。
+ *
+ * <p>🔴 2026-11-08 用户口径(备品):订单结转页的「本次转单数量」**允许超过销售订单数量**
+ * (备品场景);该数量由 UI 明确给出(qtyOverride>0)时按原值落工单,不再截断到剩余可转量,
+ * 只有整单按行生成(qtyOverride 空)时才沿用「剩余全部」口径。详见
+ * {@link #createFromOrderLine(String, String, Double, String, String)} 的 javadoc 与方法内注释。
  */
 @Service
 public class QuickScheduleService {
@@ -98,7 +103,13 @@ public class QuickScheduleService {
      *   <li>占用链仍是行级 form_flow_link(SO 订单行 → 本工单行,数量 = 本次转单数量),
      *       订单结转页「已排产/剩余数量」口径不变。</li>
      * </ul>
-     * 严格「已审核」闸门;剩余=行数量−各通道占用;qtyOverride 空=剩余全部。
+     * 严格「已审核」闸门;剩余=行数量−各通道占用。
+     *
+     * <p>🔴 2026-11-08 用户口径(备品):行上**明确给出本次转单数量**(qtyOverride>0,订单结转页 生单数量)
+     * 时,允许该数量**超过销售订单数量 / 剩余可转数量**(备品),原样落库、不再 Math.min 截断、不再报
+     * 「超过剩余可转数量」,剩余为负/0 的行上给了数量也允许追加(备品追加);qtyOverride 为空/<=0
+     * (SO_ORDER 按钮整单按行生成)时保持原口径:qty=residual,residual<=0 报「已全部转出」。
+     * 实现见方法体内 2026-11-08 注释段。
      * 数据源单轨:不再写 bd_manu_order。SO_ORDER「生成生产工单」按钮与订单结转页共用本实现。
      */
     @Transactional
@@ -143,12 +154,28 @@ public class QuickScheduleService {
         // 订单行的剩余可转量现在只看 工单/排产(MANU_ORDER/PLANG)的占用
         double demand = Num.of(line.get("数量"));
         double residual = demand - (manu == null ? 0 : manu);
-        if (residual <= 0.0001) {
-            throw new IllegalStateException("该订单行已全部转出(剩余可转数量 0)");
+        // 🔴 2026-11-08 用户口径(备品):「本次转单数量」允许**超过销售订单数量**。
+        //   ① 行上明确给了数量(订单结转页传 生单数量 ⇒ qtyOverride>0)⇒ **以它为准原样落库**:
+        //      不再 Math.min 截断到剩余量、不再报「超过剩余可转数量」;剩余为负/0(该行已转满)
+        //      也允许追加 —— 这正是备品场景(备注:备品追加),超出部分同样计入本行占用
+        //      (form_flow_link.linked_quantity 落**实际转单量**,见下方 linkLine 调用)。
+        //   ② qtyOverride 为空/<=0(SO_ORDER 按钮整单按行生成 generateFromOrder 传 null)⇒ 保持原口径:
+        //      qty = residual,residual<=0 报「已全部转出」(整单生成不允许凭空多转)。
+        boolean uiQty = qtyOverride != null && qtyOverride > 0;
+        double qty;
+        if (uiQty) {
+            qty = qtyOverride;
+            if (qty > residual + 0.0001) {
+                log.info("[订单结转] 备品转单(2026-11-08 口径):订单 {}#{} 本次转单 {} 超过剩余可转 {}",
+                        sourceNo, lineId, qty, residual);
+            }
+        } else {
+            if (residual <= 0.0001) {
+                throw new IllegalStateException("该订单行已全部转出(剩余可转数量 0)");
+            }
+            qty = residual;
         }
-        double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
-        if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
         // ── 工单号 / 行号 / 数量(2026-10-31 新口径,口径说明见方法 javadoc)──────────────────────
         // 每次转单**直接取新工单号**:不再按 od_no 复用「该订单已有工单号」。
         // 旧实现(2026-09-27~2026-10-30)一张订单共用一张工单,复用时的行号只能取 MAX(pl_xc)+1 ⇒
@@ -189,6 +216,8 @@ public class QuickScheduleService {
         } catch (Exception e) {
             log.warn("[订单结转] 工单 {} 建工序台账失败(不阻断转单): {}", plNo, e.getMessage());
         }
+        // 行级占用链落**实际转单量** qty(2026-11-08 备品口径复核:超出订单数量时也按实际数计入,
+        // 不截断 ⇒ 备品转完后本行剩余为负,订单结转页按「剩余>0」过滤自然消失,无需额外改)。
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo, "");
         return plNo;

@@ -51,6 +51,14 @@ public final class PagePanelRegistry {
      */
     public static final String WORK_ORDER_LIST = "WORK_ORDER_LIST";
     /**
+     * 生产工序进度看板(2026-11-08,用户口径「生产工单进度需要做一个看板,方便直观查看工单各工序进度」):
+     * 一行 = 一张工单行(工单号+工单行号),按工艺路线显示各道工序的进度环/进度链,
+     * 点行跳「生产工单」并定位该工单。数据来自 plang/scjl/bs_route/wo_process_line,现算;
+     * 页面 = {@code views/modules/plan/WorkOrderProgressBoard.vue},**不是** yj_panel 单据面板
+     * ⇒ 页面级虚拟面板,授权落 {@code yj_role_panel};本页只读,动作只有 view/query。
+     */
+    public static final String WORK_ORDER_PROGRESS = "WORK_ORDER_PROGRESS";
+    /**
      * ERP 集成配置清单(2026-10-18):导入 / 转出两向 × 分类的接口、设备、字段映射统一配置页。
      * 数据源是三张配置表(erp_integ_api / _field / _device),**不是** yj_panel 单据面板,
      * 故同样按页面级虚拟面板登记 —— 授权落 yj_role_panel,页面菜单按 panelCode 显隐。
@@ -236,6 +244,15 @@ public final class PagePanelRegistry {
     };
 
     /**
+     * 生产工序进度看板(2026-11-08):**只读**盯单页 —— 按工单行看各道工序走到哪、完成多少。
+     * 页面本身不写任何单据(要排产/报工/结案回原页面操作),故动作只有可见 + 查询。
+     */
+    private static final String[][] WORK_ORDER_PROGRESS_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+    };
+
+    /**
      * ERP 集成配置清单:只有「可见」一个授权词。
      *
      * <p>2026-10-18 用户口径「保证这个面板除管理员只可看不可编辑」——
@@ -414,6 +431,8 @@ public final class PagePanelRegistry {
             new PagePanelDef(SCHEDULE_BOARD, "快速排产", "生产计划", SCHEDULE_BOARD_ACTIONS),
             new PagePanelDef(WORK_ORDER_BOARD, "工单排产", "生产计划", WORK_ORDER_BOARD_ACTIONS),
             new PagePanelDef(WORK_ORDER_LIST, "生产工单", "生产计划", WORK_ORDER_LIST_ACTIONS),
+            // 2026-11-08:生产工序进度看板(工单行 × 各道工序进度,点行跳生产工单定位)
+            new PagePanelDef(WORK_ORDER_PROGRESS, "生产工序进度看板", "生产计划", WORK_ORDER_PROGRESS_ACTIONS),
             // ══════════ 2026-10-30 新一级目录「手机扫码」(与「生产计划」平级)══════════
             // 生产领料(2026-10-20 首建 → 2026-10-30 重写并迁入本组)、工序报工(2026-10-21 → 迁入本组)
             // 与「自动打印」站点页同属一个一级目录,故 module 一律写「手机扫码」

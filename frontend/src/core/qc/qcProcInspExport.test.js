@@ -20,6 +20,8 @@ const head = {
   总结论: '合格',
   处理方式: '照常流转',
   审核人: '李四',
+  // 2026-11-06 两级审批:批准 = 超级管理员(二级审批通过写 head['审批人'])
+  审批人: '王五',
 }
 const rows = [
   { 检验要求: '+20目占比≤15%', 检验方法: '1.称取100g Y料成品，从上到下依次放20目、325目筛网进行震动筛分…', 产线常规功能性结果: '13%', 结果判断: '合格' },
@@ -37,14 +39,14 @@ test('纸面列 = 八列(左四列单据级 + 检验要求/检验方法/产线�
 
 test('标题 / 副标题 / 抬头 / 表头两行 / 数据行 / 结论区:整体骨架与列数', () => {
   const out = buildProcInspExport({
-    title: '制程检验记录表',
+    title: '出货检验记录表',
     subtitle: '惠州市银嘉环保科技有限公司　　单据编号：ZC-2026-10-0021　　单据状态：草稿',
     headPairs: [[{ label: '单据编号', value: 'ZC-2026-10-0021' }, { label: '单据日期', value: '2026-10-15' }]],
     head,
     rows,
   })
   const { aoa, cols, merges, headerRow1, headerRow2 } = out
-  assert.equal(aoa[0][0], '制程检验记录表')
+  assert.equal(aoa[0][0], '出货检验记录表')
   assert.ok(/单据编号/.test(aoa[1][0]))
   assert.equal(aoa[2].length, 0)                                  // 空行
   assert.equal(aoa[3][0], '单据编号')                              // 抬头第一格 = 标签
@@ -81,15 +83,21 @@ test('标题 / 副标题 / 抬头 / 表头两行 / 数据行 / 结论区:整体�
   for (const m of values) assert.equal(m.e.r, headerRow2 + rows.length)
   // 抬头值格跨 3 列
   assert.ok(merges.some((m) => m.s.r === 3 && m.s.c === 1 && m.e.c === 3))
-  // 结论区:检验人/审核人一行两格;检验结论跨余下全部列
+  // 结论区:最后一行三对(检验人|审核人|批准,2026-11-06 补第三对);检验结论跨余下全部列
   const foot = aoa.slice(-PROC_INSP_FOOT.length)
   assert.equal(foot[2][0], '检验人')
   assert.equal(foot[2][1], 'admin')
-  assert.equal(foot[2][4], '审核人')
-  assert.equal(foot[2][5], '李四')
+  assert.equal(foot[2][3], '审核人')
+  assert.equal(foot[2][4], '李四')
+  assert.equal(foot[2][6], '批准')
+  assert.equal(foot[2][7], '王五')
   assert.equal(foot[0][0], '检验结论')
   assert.equal(foot[0][1], '合格')
   assert.ok(merges.some((m) => m.s.c === 1 && m.e.c === 7))
+  // 三对的值格合并:检验人 1-2 / 审核人 4-5 / 批准单列 7(别再退回旧的 4 列口径)
+  const footRow = aoa.length - 1
+  assert.ok(merges.some((m) => m.s.r === footRow && m.s.c === 1 && m.e.c === 2))
+  assert.ok(merges.some((m) => m.s.r === footRow && m.s.c === 4 && m.e.c === 5))
 })
 
 test('空单:数据行也留一行(左边四列仍显示单据级值,不塌成没有表体)', () => {

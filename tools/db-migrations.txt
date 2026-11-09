@@ -4516,6 +4516,71 @@ migrate-sample-flow-20261106.sql
 migrate-testlib-spec-add-missing-20261106.sql
 # 2026-11-06 外部样品申请单总表+子表：明细表补 8 列 + 字段 place=detail + 存量搬成一条明细行
 migrate-sample-ext-detail-20261106.sql
+# 2026-11-06 产品信息表加「客户编码」（参照 KHDA），客户编码/客户名称互为下拉；规格书加客户编码并随产品编号带回
+migrate-prodinfo-cust-code-20261106.sql
+# 2026-11-06 「生产车间」统一成标准库 mold.workshop（1#~7#，可增删维护）：烧结工艺清单(含成型配方页)/X烧结工艺清单
+migrate-mold-workshop-stdlib-20261106.sql
+# 2026-11-06 内部开发样品申请单改成「共享表」：单表长列表(rd_sample_int_head) · 无审批 · 行可增删 · 列可筛选 · 每页 10/20/50
+migrate-sample-int-flat-20261106.sql
+# 2026-11-06 用户三项需求中的 ①③(制程检验单字段 + 首件/制程两级审批 + 报表批准签名格):
+#   ①「工序」从制程检验单界面删除(元数据 hidden=1;物理列/数据保留 —— 报工带入、报表、QC_BHG 参照仍取值);
+#     「检验方案」固定写「出货控制计划执行」(字段置只读 + 历史单归一 + 后端每次保存强制写);
+#     明细「结果判断」改下拉框(合格/不合格)。
+#   ③首件检验单(QC_FIRST_INSP)/制程检验单(QC_PROC_INSP)接入质量单据两级审批(参照出厂检验报告):
+#     头表加 审批人/审批时间 两列 + yj_field 登记(hidden=1,表尾/导出显式读取)+ 中文注明 + 译名补缺;
+#     只读校验组织架构审批权(正式库 4 个非 admin 角色 can_approve=Y,不改授权;测试旧快照只 WARN)。
+#   报表:制程检验记录表库内模板(qc_proc_insp)补「批准」签名格(批准=$P{审批人});首件模板不入库(jar 生效)。
+#   ⚠ 三支脚本均幂等;两账套均执行(先正式 HSDZ_MES 后测试 HSDZ_MES_TEST)。
+migrate-proc-insp-form-20261106.sql
+migrate-qc-insp-twolevel-20261106.sql
+migrate-qc-proc-insp-tpl-20261106.sql
+
+# 2026-11-06 用户第二轮口径(截图红框「检验方案 = 出货控制计划执行」):「这个检验方案需要能够默认为这个的情况下
+#   也能进行修改」—— 放开 2026-11-06 首轮"只读固定值"的过度收紧:
+#   yj_field「检验方案」editable 0→1(默认值「出货控制计划执行」由后端**仅空值兜底**写入,不再每次保存强制覆盖);
+#   历史空值行补默认值,已填/已改的值不动;列注明改写为"默认值可修改"口径。
+#   代码同批:ButtonService.save() 改"空值兜底默认";QcInspAutoService 自动出单仍写默认值(初值)。
+#   幂等;两账套均执行。不改已执行过的 migrate-proc-insp-form-20261106.sql 字节(避免哈希变更重跑)。
+migrate-proc-insp-plan-editable-20261106.sql
+
+# 2026-11-06 用户口径:「同时需要删除这些备份表,本地之前应该操作过的但是没有在服务器上执行」。
+#   服务器(HSDZ_MES,21:22 备份还原实测)残留 38 张备份/临时表:
+#     _bak_pc0000_*(5)/_bak_qcdraft_*(7)/_bak_qcmix_*(11)/_bak_qcregen_*(10)
+#     + 后缀式 qc_*_bak_*(7,服务器侧手工建的检验整表快照)。
+#   根因:前两支删备份表的脚本(20261021 / 20261102)在服务器被 baseline 成"只登记不执行",
+#     且它们**互相闸死** —— 20261021 的「名单外不得有其它备份表」被 qc 家族挡住,
+#     20261102 的同一闸门被 _bak_pc0000_* + qc_*_bak_* 挡住 ⇒ 单独跑哪支都过不去。
+#   本脚本把三族并成一张名单、一次判一次删,并新增两道闸门:
+#     ④ 后缀式快照必须「同名现役表存在且行数 ≥ 快照」;⑤ 不得有视图/过程/函数/触发器/外键依赖。
+#   删前取证(服务器备份还原的快照库实测):无代码引用、无依赖、现役表均为快照超集、草稿单回流 0。
+#   幂等(目标表不存在即跳过;闸门不过只报错不删);两账套均执行;回滚只能从 .bak 还原。
+migrate-drop-bak-tables-20261106.sql
+# 2026-11-06 内部样品单改回 Excel 纸面 + 底部「新增样品」行（明细补 13 列 + 存量回填 + 恢复头行式）
+migrate-sample-int-paper-rows-20261106.sql
+# 2026-11-06 内部样品单行级归属：给 RD_SAMPLE_INT 的管理员/文件负责人/研发审核角色补「改他人行」(edit_others)词
+migrate-sample-int-row-owner-20261106.sql
+
+
+# 2026-11-08 新增「生产工序进度看板」页面级虚拟面板 WORK_ORDER_PROGRESS(只读 view/query):
+#   用户口径「生产工单进度需要做一个看板,方便直观查看工单各工序进度……点击其中订单行转跳到这个工单」。
+#   等价补授:已授生产工单 WORK_ORDER_LIST 可见的角色 + 管理员 → 补 WORK_ORDER_PROGRESS view,query;
+#   同步登记面板名 en 译名(页面级虚拟面板无 yj_panel 行,译名落 yj_translation scope='panel')。
+#   幂等;两账套均执行。前端菜单/路由/i18n 同批交付(不含库变更)。
+migrate-work-order-progress-panel-20261108.sql
+
+
+# 2026-11-08 报工记录(WO_REPORT_LIST,flat/scjl)增:产品编码/产品规格 显示列 + 产品编码/客户编码/产品规格 查询条件:
+#   用户口径「3 报工记录,需要显示产品编码、产品规格。4 报工记录,要能根据产品编码/客户编码/产品规格查询报工记录」。
+#   yj_field 幂等追加 3 行(按 panel_code+label 守卫):
+#     产品编码=wzdm 参照 INV.存货编码(seq 37)/产品规格=gg 文本(seq 38)/客户编码=khdm 参照 KHDA.dm(seq 39)。
+#     客户编码「只查询不显示列」= place='query' + visible=0(flat 报表列只按 visible 过滤,place 不参与;
+#     先例 MATERIAL_OUT_DETAIL/STATS 的「材料」查询字段);已存在行用窄条件 UPDATE 收敛 visible。
+#   yj_translation 幂等补译名:产品规格 9 语种(修正 en 历史占位「产品规格」→ Product Specification)、客户编码 9 语种。
+#   不改 yj_panel、不改物理表列(scjl 的 wzdm/gg/khdm 镜像列早已存在且有数据);末段 RAISERROR 自检不符即失败。
+#   幂等;两账套均执行(先正式 HSDZ_MES、后测试 HSDZ_MES_TEST)。
+migrate-wo-report-list-product-cols-20261108.sql
+migrate-qc-proc-insp-rename-20261109.sql
+migrate-qc-proc-insp-tpl-20261109.sql
 # 2026-11-07 采购订单报表打印记录：新建 bd_pu_print（头）/ bl_pu_print（行），弹窗「已打印记录 + 重打/作废」
 migrate-pu-print-20261107.sql
 

@@ -438,6 +438,12 @@ export const menuTree = [
           // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
           // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
           { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', panelCode: 'WORK_ORDER_LIST', icon: 'Document' },
+          // 生产工序进度看板(2026-11-08 用户口径:「生产工单进度需要做一个看板,方便直观查看工单各工序进度,
+          //   如图所示……新增当前的这个看板视图查看,增加这个看板可以点击其中订单行转跳到这个工单」):
+          //   一行=一张工单行(工单号+工单行号),大屏环形进度 + 列表进度链双视图;工序进度口径复用
+          //   「工单详情·追溯」(ProcessTaskService.stepsSummary);点行跳生产工单页并定位该工单。
+          //   页面级虚拟面板 WORK_ORDER_PROGRESS(定义见后端 PagePanelRegistry)⇒ 菜单按权限显隐。
+          { code: 'workOrderProgress', title: '生产工序进度看板', path: '/prod/plan/workOrderProgress', panelCode: 'WORK_ORDER_PROGRESS', icon: 'TrendCharts' },
           // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
           // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
           { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', panelCode: 'SCHEDULE_BOARD', icon: 'AlarmClock' },
@@ -590,10 +596,12 @@ export const menuTree = [
           // 本(工单号,批次号,工单行号)的**第一张报工**审核时自动出一张草稿,检验要求按
           // 《成型工艺清单》RD_MOLD_PROC 的检验要求区块预铺。置首位 = 流程上最早的一道检验。
           { code: 'qcFirstInsp', title: '首件检验单', path: '/panelx/list/QC_FIRST_INSP', icon: 'DocumentChecked', panelCode: 'QC_FIRST_INSP', operationName: '新增流程' },
-          // 制程检验单(2026-10-12 新增,面板 QC_PROC_INSP):按《生产相关品质检验.xlsx》第3步建。
+          // 出货检验单功能(原制程检验单,2026-10-12 新增,面板 QC_PROC_INSP):按《生产相关品质检验.xlsx》第3步建。
+          // 2026-11-08 用户口径:菜单/页签改名「出货检验单功能」,纸面标题改「出货检验记录表」
+          // (重命名不改面板代号/表结构/单据编号前缀 ZC,历史数据与审批状态原样保留)。
           // 表样=截图「制程检验」页签:外观/尺寸/出货重量 三组 + 出货检验功能性测试组(用「表区」区分)。
           // 检验类别字段区分「首件检验(第2步)」与「制程检验(第3步)」。
-          { code: 'qcProcInsp', title: '制程检验单', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
+          { code: 'qcProcInsp', title: '出货检验单功能', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
           // 组装成品检验单(9.29 批次④,2026-10-05):**组装**报工审核自动出单;含合格转库存/不合格待处理
           { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
           // 出厂检验报告(2026-10-30 新增,面板 QC_OQC_REPORT,前缀 OQC):用户口径「出厂检验报告的内容

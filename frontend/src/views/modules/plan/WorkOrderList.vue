@@ -111,7 +111,13 @@
       <el-table-column :label="tt('需求数量')" prop="需求数量" width="100" align="right" sortable />
       <el-table-column :label="tt('转单数量')" prop="排产数量" width="95" align="right" />
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-      <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
+      <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):该列 = 本工单行需求 − 本行订单占用
+           (form_flow_link SO→PLANG 的 linked_quantity) —— 新口径(需求=转单量、占用链也写同一个数)下恒为 0,
+           正式库实测 399 行里 397 行为 0;有值时也只是"占用链没记全"的数据异常信号,与「当前工序还剩多少
+           未生产」无关、极易误读。后台字段照旧返回,界面不再展示(CSV 导出同步去掉)。
+           要看"还剩多少":用「工序进度」列(当前工序完工量/计划量),或工单排产页的「未交量」(排产−入库)。
+           要恢复:把下面这行放开即可。 -->
+      <!-- <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" /> -->
       <!-- 领料单号(2026-10-18):一张工单可对应多张领料单,列里是逗号分隔的全部已审核单号 —— 加宽便于直接看 -->
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="200" show-overflow-tooltip />
       <el-table-column :label="tt('成型配方')" width="170" show-overflow-tooltip>
@@ -275,7 +281,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -304,20 +310,53 @@ const canSchedule = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'SCHED
 const router = useRouter()
 const route = useRoute()
 
+/** 待定位的工单行id(2026-11-08):生产工序进度看板点行跳进来时带 ?focus=<行id>,加载完成后再定位 */
+const focusPending = ref('')
+
 /**
  * 从我的桌面「单据入口」点最近工单跳进来(2026-10-18):/prod/plan/workOrderList?keyword=<工单号>
  * 把关键词填进单框搜索,并**清空日期窗** —— 默认只查最近 15 天,而入口列的是最近 7 张工单,
  * 若目标工单早于窗口(或别人先改过日期)就会"跳进来却看不到那张单"。
+ *
+ * 2026-11-08 扩展:生产工序进度看板点行跳进来时还带 ?focus=<工单行id>(plang.id)。
+ * 一并摘掉 keyword/focus(用完即摘,keep-alive 再次切回时不该被旧值复写),focus 由
+ * {@link applyRouteFocus} 在 load() 完成后定位(高亮该行 + 自动打开该行追溯)。
  */
 function applyRouteKeyword() {
   const kw = String(route.query.keyword ?? '').trim()
-  if (!kw) return false
-  qText.value = kw
-  dateFrom.value = ''
-  dateTo.value = ''
+  const focus = String(route.query.focus ?? '').trim()
+  if (focus) focusPending.value = focus
+  if (!kw && !focus) return false
+  if (kw) {
+    qText.value = kw
+    dateFrom.value = ''
+    dateTo.value = ''
+  }
   // 用完即摘(?focus 同款口径):keep-alive 再次切回时不该被旧关键词复写
-  router.replace({ path: route.path, query: { ...route.query, keyword: undefined } })
-  return true
+  if (route.query.keyword !== undefined || route.query.focus !== undefined) {
+    router.replace({ path: route.path, query: { ...route.query, keyword: undefined, focus: undefined } })
+  }
+  return !!kw
+}
+
+/**
+ * 按 ?focus=<工单行id> 定位(2026-11-08):等 load() 完成、行已在内存后,
+ * 设当前行(高亮)+ 滚动到可视区 + 自动打开该行「工单详情·追溯」。
+ * 只认**行id**(plang.id):同工单号可多行,按单号定位会指错行(2026-10-15 口径)。
+ */
+async function applyRouteFocus() {
+  const id = String(focusPending.value || '').trim()
+  if (!id) return
+  focusPending.value = ''
+  const row = rows.value.find((r) => String(r.行id) === id)
+  if (!row) return
+  await nextTick()
+  tableRef.value?.setCurrentRow?.(row)
+  currentRow.value = row
+  // 表格 fixed 列 + 虚拟滚动都不保证行在视口内:直接找 current-row 的 tr 滚到中间
+  const tr = tableRef.value?.$el?.querySelector?.('.el-table__body tr.current-row')
+  tr?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+  openTrace(row)
 }
 
 const rows = ref([])
@@ -788,7 +827,8 @@ function openTrace(row) {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '订单号', '订单行号', '生产线', '需求数量', '转单数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  // 2026-11-08:「余量」列已隐藏(口径无业务意义,见模板内注释)⇒ 导出表头同步去掉,避免出现界面没有的列
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '订单号', '订单行号', '生产线', '需求数量', '转单数量', '入库数量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')
@@ -804,14 +844,18 @@ function dayStr(n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 从桌面「单据入口」带 keyword 进来优先(否则按默认 15 天窗口取数)
-  if (!applyRouteKeyword() && !dateFrom.value && !dateTo.value) {
+  const routed = applyRouteKeyword()
+  if (!routed && !dateFrom.value && !dateTo.value) {
     // 已填过值(如热更重挂)不覆盖用户输入
     dateFrom.value = dayStr(-(DEFAULT_WINDOW_DAYS - 1))
     dateTo.value = dayStr(0)
   }
-  load(); loadLines()
+  await load()
+  loadLines()
+  // 生产工序进度看板点行跳进来(?focus=行id):定位该行并自动打开追溯
+  await applyRouteFocus()
 })
 
 /**
@@ -824,13 +868,27 @@ onMounted(() => {
  * ⚠ 只认**切回**(首次 activate 跳过):首次挂载已由 onMounted 取数。
  */
 let firstActivate = true
-onActivated(() => {
+onActivated(async () => {
   if (firstActivate) { firstActivate = false; return }
-  // 桌面入口再次跳进来(路由 keyword 变了)也要落到那笔单:keep-alive 缓存下 onMounted 不会再跑
+  // 桌面入口/看板再次跳进来(路由 keyword/focus 变了)也要落到那笔单:keep-alive 缓存下 onMounted 不会再跑
   const routed = applyRouteKeyword()
-  if (routed) { load(); loadLines(); return }
-  load()
+  if (routed) {
+    await load()
+    loadLines()
+    await applyRouteFocus()
+    return
+  }
+  await load()
+  await applyRouteFocus()
 })
+
+/**
+ * keep-alive 下 append-to-body 弹窗不会随页面切走而隐藏(2026-11-08 实测):
+ * 从「生产工序进度看板」点行跳进来会自动打开「工单详情·追溯」,若用户直接切到别的页签,
+ * 该弹窗会浮在新页面上挡住点击(其它页面也是同一机制,但只有本页会**自动**打开弹窗)。
+ * ⇒ 切出本页时收起追溯弹窗;只关追溯,不改其它弹窗的既有行为。
+ */
+onDeactivated(() => { traceVisible.value = false })
 </script>
 
 <style scoped>

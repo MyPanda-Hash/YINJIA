@@ -8,7 +8,10 @@ param([int]$Timeout = 180)
 
 $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
-$sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
+# SDK 探测与 build.ps1 共用 sdk.ps1(环境变量 → %LOCALAPPDATA% → 各盘根,如本机 E:\SDK)
+. (Join-Path $here 'sdk.ps1')
+$sdk = Get-AndroidSdk
+if (-not $sdk) { throw '找不到 Android SDK(设 ANDROID_HOME,或把 SDK 放在 <盘>:\SDK / <盘>:\Android\Sdk)' }
 $adb = Join-Path $sdk 'platform-tools\adb.exe'
 if (-not (Test-Path $adb)) { throw "找不到 adb:$adb" }
 

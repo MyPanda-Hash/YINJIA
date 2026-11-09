@@ -1,0 +1,104 @@
+2026-11-06 三项需求 DB 快照 tag=before stamp=20261106-115841 elapsed=1035ms
+
+================ 正式库 HSDZ_MES(只读) / DB=HSDZ_MES ================
+[面板] [{"panel_code":"QC_FIRST_INSP","panel_name":"首件检验单","mode":"doc","head_table":"qc_first_insp_head","line_table":"qc_first_insp_detail"},{"panel_code":"QC_OQC_REPORT","panel_name":"出厂检验报告","mode":"doc","head_table":"qc_oqc_head","line_table":"qc_oqc_detail"},{"panel_code":"QC_PROC_INSP","panel_name":"制程检验单","mode":"doc","head_table":"qc_proc_insp_head","line_table":"qc_proc_insp_detail"}]
+[目标字段]
+  QC_FIRST_INSP	单据编号	type=文本	editable=false	hidden=false	visible=true	seq=10	dict=
+  QC_FIRST_INSP	工序	type=文本	editable=true	hidden=false	visible=true	seq=50	dict=
+  QC_FIRST_INSP	产品编码	type=文本	editable=true	hidden=false	visible=true	seq=70	dict=
+  QC_FIRST_INSP	检验员	type=文本	editable=true	hidden=false	visible=true	seq=140	dict=
+  QC_FIRST_INSP	结果判断	type=文本	editable=true	hidden=false	visible=true	seq=150	dict=
+  QC_FIRST_INSP	检验方案	type=参照	editable=true	hidden=false	visible=true	seq=155	dict=
+  QC_FIRST_INSP	审核人	type=文本	editable=false	hidden=false	visible=true	seq=200	dict=
+  QC_FIRST_INSP	审核时间	type=文本	editable=false	hidden=false	visible=true	seq=210	dict=
+  QC_FIRST_INSP	审批人	type=文本	editable=false	hidden=true	visible=true	seq=220	dict=
+  QC_FIRST_INSP	审批时间	type=文本	editable=false	hidden=true	visible=true	seq=230	dict=
+  QC_OQC_REPORT	单据编号	type=文本	editable=false	hidden=false	visible=true	seq=10	dict=
+  QC_OQC_REPORT	产品编码	type=文本	editable=true	hidden=false	visible=true	seq=40	dict=
+  QC_OQC_REPORT	检验员	type=文本	editable=false	hidden=false	visible=true	seq=110	dict=
+  QC_OQC_REPORT	审核人	type=文本	editable=false	hidden=false	visible=true	seq=140	dict=
+  QC_OQC_REPORT	审核时间	type=文本	editable=false	hidden=false	visible=true	seq=150	dict=
+  QC_OQC_REPORT	审批人	type=文本	editable=false	hidden=false	visible=true	seq=210	dict=
+  QC_OQC_REPORT	审批时间	type=文本	editable=false	hidden=false	visible=true	seq=211	dict=
+  QC_PROC_INSP	单据编号	type=文本	editable=false	hidden=false	visible=true	seq=10	dict=
+  QC_PROC_INSP	工序	type=文本	editable=true	hidden=true	visible=false	seq=70	dict=
+  QC_PROC_INSP	产品编码	type=文本	editable=true	hidden=false	visible=true	seq=100	dict=
+  QC_PROC_INSP	结果判断	type=下拉框	editable=true	hidden=false	visible=true	seq=100	dict=SELECT v FROM (VALUES (N'合格'),(N'不合格')) AS t(v)
+  QC_PROC_INSP	检验员	type=文本	editable=true	hidden=false	visible=true	seq=180	dict=
+  QC_PROC_INSP	检验方案	type=文本	editable=false	hidden=false	visible=true	seq=210	dict=
+  QC_PROC_INSP	审核人	type=文本	editable=false	hidden=true	visible=true	seq=270	dict=
+  QC_PROC_INSP	审批人	type=文本	editable=false	hidden=true	visible=true	seq=275	dict=
+  QC_PROC_INSP	审核时间	type=文本	editable=false	hidden=true	visible=true	seq=280	dict=
+  QC_PROC_INSP	审批时间	type=文本	editable=false	hidden=true	visible=true	seq=285	dict=
+[审批权 can_approve=Y 的面板×角色]
+  QC_FIRST_INSP	role=1031/ckgl/仓库管理	users_enabled=0	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn
+  QC_FIRST_INSP	role=1033/sc/生产	users_enabled=2	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn
+  QC_FIRST_INSP	role=1039/zhiliangshenhe/质量审核	users_enabled=2	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn
+  QC_FIRST_INSP	role=1042/ceshizhuanyong/测试专用角色	users_enabled=1	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit
+  QC_OQC_REPORT	role=1042/ceshizhuanyong/测试专用角色	users_enabled=1	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit
+  QC_PROC_INSP	role=1031/ckgl/仓库管理	users_enabled=0	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn
+  QC_PROC_INSP	role=1033/sc/生产	users_enabled=2	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn
+  QC_PROC_INSP	role=1039/zhiliangshenhe/质量审核	users_enabled=2	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn
+  QC_PROC_INSP	role=1042/ceshizhuanyong/测试专用角色	users_enabled=1	perms=view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit
+[目标账号审批权]
+  {"username":"admin","real_name":"系统管理员","role_id":1,"role_name":"管理员","PROC_approve":0,"FIRST_approve":0}
+  {"username":"fm","real_name":"冯敏","role_id":1039,"role_name":"质量审核","PROC_approve":1,"FIRST_approve":1}
+  {"username":"cmj","real_name":"车美晶","role_id":1039,"role_name":"质量审核","PROC_approve":1,"FIRST_approve":1}
+  {"username":"TANCHENG","real_name":"谭成","role_id":1033,"role_name":"生产","PROC_approve":1,"FIRST_approve":1}
+  {"username":"WANGGUANGZHEN","real_name":"王光珍","role_id":1033,"role_name":"生产","PROC_approve":1,"FIRST_approve":1}
+  {"username":"cs","real_name":"测试专用","role_id":1042,"role_name":"测试专用角色","PROC_approve":1,"FIRST_approve":1}
+  {"username":"cp","real_name":"陈秀丽","role_id":1026,"role_name":"研发审核","PROC_approve":0,"FIRST_approve":0}
+  {"username":"chaishanyin","real_name":"柴善银","role_id":1025,"role_name":"文件负责人","PROC_approve":0,"FIRST_approve":0}
+  {"username":"chenxiuli","real_name":"陈秀丽","role_id":1026,"role_name":"研发审核","PROC_approve":0,"FIRST_approve":0}
+  {"username":"fengmin","real_name":"冯敏","role_id":1025,"role_name":"文件负责人","PROC_approve":0,"FIRST_approve":0}
+  {"username":"WANGGUANGZHEN","real_name":"王光珍","role_id":1033,"role_name":"生产","PROC_approve":1,"FIRST_approve":1}
+[物理数据] {"qc_proc_insp_head":{"count":445},"qc_proc_insp_detail":{"count":2535},"qc_first_insp_head":{"count":433},"qc_first_insp_detail":{"count":38439},"qc_oqc_head":{"count":4},"qc_oqc_detail":{"count":0}}
+[审批列] {"qc_proc_insp_head":["检验员","审核人","审核时间","审批人","审批时间"],"qc_first_insp_head":["检验员","审核人","审核时间","审批人","审批时间"],"qc_oqc_head":["检验员","审核人","审核时间","审批人","审批时间"]}
+[制程单 工序/检验方案/结果判断] {"工序列存在":1,"工序有值行数":427,"检验方案分布":[{"v":"出货控制计划执行","n":445}],"结果判断分布":[{"v":"合格","n":2502},{"v":"(空)","n":31},{"v":"12","n":2}],"明细行数":2535}
+[单据状态] [{"panel_code":"QC_FIRST_INSP","pending":"N","n":433},{"panel_code":"QC_PROC_INSP","pending":"N","n":435},{"panel_code":"QC_OQC_REPORT","pending":"N","n":4}]
+[草稿候选] {"QC_PROC_INSP":[{"单据编号":"ZC-2026-11-0002","pending":"N","shr":""},{"单据编号":"ZC-2026-11-0001","pending":"N","shr":""},{"单据编号":"ZC-2026-10-0140","pending":"N","shr":""}],"QC_FIRST_INSP":[{"单据编号":"SJ-2026-11-0002","pending":"N","shr":""},{"单据编号":"SJ-2026-11-0001","pending":"N","shr":""},{"单据编号":"SJ-2026-10-0173","pending":"N","shr":""}],"QC_OQC_REPORT":[{"单据编号":"OQC-2026-11-0004","pending":"N","shr":""},{"单据编号":"OQC-2026-11-0003","pending":"N","shr":""},{"单据编号":"OQC-2026-11-0002","pending":"N","shr":""}]}
+
+================ 测试库 HSDZ_MES_TEST / DB=HSDZ_MES_TEST ================
+[面板] [{"panel_code":"QC_FIRST_INSP","panel_name":"首件检验单","mode":"doc","head_table":"qc_first_insp_head","line_table":"qc_first_insp_detail"},{"panel_code":"QC_OQC_REPORT","panel_name":"出厂检验报告","mode":"doc","head_table":"qc_oqc_head","line_table":"qc_oqc_detail"},{"panel_code":"QC_PROC_INSP","panel_name":"制程检验单","mode":"doc","head_table":"qc_proc_insp_head","line_table":"qc_proc_insp_detail"}]
+[目标字段]
+  QC_FIRST_INSP	单据编号	type=文本	editable=false	hidden=false	visible=true	seq=10	dict=
+  QC_FIRST_INSP	工序	type=文本	editable=true	hidden=false	visible=true	seq=50	dict=
+  QC_FIRST_INSP	产品编码	type=文本	editable=true	hidden=false	visible=true	seq=70	dict=
+  QC_FIRST_INSP	检验员	type=文本	editable=true	hidden=false	visible=true	seq=140	dict=
+  QC_FIRST_INSP	结果判断	type=文本	editable=true	hidden=false	visible=true	seq=150	dict=
+  QC_FIRST_INSP	检验方案	type=参照	editable=true	hidden=false	visible=true	seq=155	dict=
+  QC_FIRST_INSP	审核人	type=文本	editable=false	hidden=false	visible=true	seq=200	dict=
+  QC_FIRST_INSP	审核时间	type=文本	editable=false	hidden=false	visible=true	seq=210	dict=
+  QC_OQC_REPORT	单据编号	type=文本	editable=false	hidden=false	visible=true	seq=10	dict=
+  QC_OQC_REPORT	产品编码	type=文本	editable=true	hidden=false	visible=true	seq=40	dict=
+  QC_OQC_REPORT	检验员	type=文本	editable=false	hidden=false	visible=true	seq=110	dict=
+  QC_OQC_REPORT	审核人	type=文本	editable=false	hidden=false	visible=true	seq=140	dict=
+  QC_OQC_REPORT	审核时间	type=文本	editable=false	hidden=false	visible=true	seq=150	dict=
+  QC_OQC_REPORT	审批人	type=文本	editable=false	hidden=false	visible=true	seq=210	dict=
+  QC_OQC_REPORT	审批时间	type=文本	editable=false	hidden=false	visible=true	seq=211	dict=
+  QC_PROC_INSP	单据编号	type=文本	editable=false	hidden=false	visible=true	seq=10	dict=
+  QC_PROC_INSP	工序	type=文本	editable=true	hidden=false	visible=true	seq=70	dict=
+  QC_PROC_INSP	产品编码	type=文本	editable=true	hidden=false	visible=true	seq=100	dict=
+  QC_PROC_INSP	结果判断	type=文本	editable=true	hidden=false	visible=true	seq=100	dict=
+  QC_PROC_INSP	检验员	type=文本	editable=true	hidden=false	visible=true	seq=180	dict=
+  QC_PROC_INSP	检验方案	type=文本	editable=true	hidden=false	visible=true	seq=210	dict=
+  QC_PROC_INSP	审核人	type=文本	editable=false	hidden=true	visible=true	seq=270	dict=
+  QC_PROC_INSP	审核时间	type=文本	editable=false	hidden=true	visible=true	seq=280	dict=
+[审批权 can_approve=Y 的面板×角色]
+[目标账号审批权]
+  {"username":"admin","real_name":"系统管理员","role_id":1,"role_name":"管理员","PROC_approve":0,"FIRST_approve":0}
+  {"username":"fm","exists":false}
+  {"username":"cmj","exists":false}
+  {"username":"TANCHENG","exists":false}
+  {"username":"wangguangzhen","real_name":"王光珍","role_id":2,"role_name":"普通用户","PROC_approve":0,"FIRST_approve":0}
+  {"username":"cs","exists":false}
+  {"username":"cp","real_name":"陈秀丽","role_id":4,"role_name":"研发审核","PROC_approve":0,"FIRST_approve":0}
+  {"username":"chaishanyin","real_name":"柴善银","role_id":3,"role_name":"文件负责人","PROC_approve":0,"FIRST_approve":0}
+  {"username":"chenxiuli","real_name":"陈秀丽","role_id":2,"role_name":"普通用户","PROC_approve":0,"FIRST_approve":0}
+  {"username":"fengmin","real_name":"冯敏","role_id":2,"role_name":"普通用户","PROC_approve":0,"FIRST_approve":0}
+  {"username":"wangguangzhen","real_name":"王光珍","role_id":2,"role_name":"普通用户","PROC_approve":0,"FIRST_approve":0}
+[物理数据] {"qc_proc_insp_head":{"count":43},"qc_proc_insp_detail":{"count":143},"qc_first_insp_head":{"count":33},"qc_first_insp_detail":{"count":2520},"qc_oqc_head":{"count":3},"qc_oqc_detail":{"count":35}}
+[审批列] {"qc_proc_insp_head":["检验员","审核人","审核时间"],"qc_first_insp_head":["检验员","审核人","审核时间"],"qc_oqc_head":["检验员","审核人","审核时间","审批人","审批时间"]}
+[制程单 工序/检验方案/结果判断] {"工序列存在":1,"工序有值行数":25,"检验方案分布":[{"v":"(空)","n":43}],"结果判断分布":[{"v":"合格","n":138},{"v":"(空)","n":5}],"明细行数":143}
+[单据状态] [{"panel_code":"QC_FIRST_INSP","pending":"N","n":150},{"panel_code":"QC_OQC_REPORT","pending":"N","n":3},{"panel_code":"QC_PROC_INSP","pending":"N","n":43}]
+[草稿候选] {"QC_PROC_INSP":[{"单据编号":"ZC-2026-10-0126","pending":" ","shr":""},{"单据编号":"ZC-2026-10-0033","pending":"N","shr":""},{"单据编号":"ZC-2026-10-0032","pending":"N","shr":""}],"QC_FIRST_INSP":[{"单据编号":"SJ-2026-10-0160","pending":" ","shr":""},{"单据编号":"SJ-2026-10-0153","pending":"N","shr":""},{"单据编号":"SJ-2026-10-0152","pending":"N","shr":""}],"QC_OQC_REPORT":[{"单据编号":"OQC-2026-11-0012","pending":"N","shr":""},{"单据编号":"OQC-2026-11-0004","pending":"N","shr":""},{"单据编号":"OQC-2026-11-0003","pending":"N","shr":""}]}

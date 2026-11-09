@@ -143,6 +143,11 @@ public class ButtonService {
             case "删除审批驳回" -> rejectDelete(def, formData);
             // 文件类面板:归档后申请修改(管理员审批进入修改态,再审批归档+修改记录全量留痕)
             case "申请修改" -> modifyRequest(def, formData);
+            // 2026-11-06 用户口径:「一级审批人和管理员都能看到一个修改单据按钮，点击就可以进行修改，
+            //   修改完成点击保存回到归档状态，但是有一个修改记录记录谁修改的什么时候」——
+            //   归档后**免申请、免再审批**的直接修改:进入修改态(留痕开始) → 保存修改(落库+再归档+diff收尾)。
+            case "修改单据" -> openDirectModify(def, formData);
+            case "保存修改" -> saveDirectModify(def, formData);
             // 产品变更申请单:会签子流程(发起人勾「需会签」+选会签人 → 全部通过才进审核,2026-09-21)
             case "提交会签" -> submitSignoff(def, formData);
             case "会签通过" -> signoffApprove(def, formData);
@@ -308,12 +313,16 @@ public class ButtonService {
         if ("RD_PLAN".equals(def.code())) {
             ensurePlanOwnerAcked(blankSafe(noObj), formData);
         }
-        // 质量单据(2026-10-04,特采单 + 质量单据一族;2026-11-04 起含出厂检验报告):
+        // 质量单据(2026-10-04,特采单 + 质量单据一族;2026-11-04 起含出厂检验报告;
+        //   2026-11-06 起含首件检验单/制程检验单): // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
         // 纸面「编制/审核/批准」三格由审批流自动落值
         // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
         // 否则"手改编制人"就能绕过"编制=提交人"的口径。字段在 yj_field 里已 editable=0(前端只读)。
-        // 出厂检验报告的编制格列名是「检验员」(受控表单 YJ-QR-05/A1 第一格就这么印),由 QC_DOC_PREPARER 登记。
-        // ⚠ 例外:QC_BHC/QC_BHZ/QC_SCP 的「责任人」格是**预填型**(用户口径「预填,让他自己修改」)
+        // 出厂检验报告的编制格列名是「检验员」(受控表单 YJ-QR-05/A1 第一格就这么印),由 QC_DOC_PREPARER 登记;
+        // 首件/制程检验单的编制格同样是「检验员」(纸面表尾第一格=检验人),但「检验员」本身是**检验人业务值**
+        // (默认当前电脑端登录人,defaultQcInspector 保存时只填空值)⇒ 归 PREPARER_EDITABLE_PANELS 例外类:
+        // 该键照常收下(下面的 remove(prepCol) 对它不生效),提交审批只在为空时兜底写提交人。
+        // ⚠ 例外:QC_BHC/QC_BHZ/QC_SCP 的「责任人」格也是**预填型**(用户口径「预填,让他自己修改」)
         //   —— 该键照常收下,不然用户改的值存不进去。
         String prepCol = preparerColOf(def.code());
         if (!prepCol.isBlank() && preparerEditableColOf(def.code()).isBlank()) {
@@ -354,6 +363,15 @@ public class ButtonService {
         }
 
         String no = noObj == null || String.valueOf(noObj).isBlank() ? null : String.valueOf(noObj);
+        // 制程检验单「检验方案」**默认值**「出货控制计划执行」(2026-11-06 用户口径「抽检方案固定写(出货控制计划执行)」;
+        //   同日第二轮口径:「这个检验方案需要能够默认为这个的情况下也能进行修改」⇒ 字段**可编辑**,
+        //   这里只做"空值兜底默认",**绝不覆盖用户已填/已改的值**)。
+        // 自动出单(QcInspAutoService.procInspHead)同样写这个默认值 —— 两处各一处字面量(本类不能反向引用那边),
+        // 改口径两处一起改;默认值只影响新建/空值,历史单与人工改过的值一律保留。
+        if ("QC_PROC_INSP".equals(def.code())) {
+            Object plan = body.get("检验方案");
+            if (plan == null || String.valueOf(plan).isBlank()) body.put("检验方案", "出货控制计划执行");
+        }
         if (def.isDoc()) {
             return saveDoc(def, body, items, no, user, markSaved);
         }
@@ -514,6 +532,86 @@ public class ButtonService {
         }
     }
 
+    /**
+     * 内部开发样品申请单的行级归属规则(2026-11-06)。
+     *
+     * <p>口径(用户原话):「谁填写的申请人就是谁,每个人只能改自己作为申请人的行数据,点击保存之后申请人就
+     * 不能改了,只能由有更改权限的人来改,这个权限写进组织架构对应面板里面;每一行数据就像一张独立的单据一样,
+     * 保存修改状态是不互通的。」</p>
+     *
+     * <p>为什么在落库前**改写 items** 而不是拒绝整单:一张单里有多人各自的行,一个人保存时如果用整单校验,
+     * 别人的行会把整单打回;这里改成"只动自己的行,别人的行原样回写",既保住内容也保住行不被缺席软删。</p>
+     */
+    private java.util.Set<String> applySampleIntRowRules(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
+                                                    String no, String actor) {
+        java.util.Set<String> none = java.util.Set.of();
+        if (!"RD_SAMPLE_INT".equals(def.code()) || items == null || items.isEmpty()) return none;
+        boolean canOthers = canEditOtherRows(def.code(), actor);
+        String me = realNameOf(actor);
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT * FROM " + def.lineTable() + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no)) {
+            byId.put(String.valueOf(r.get("id")), r);
+        }
+        // 列名 → 字段标签(用库里原值覆盖 items 时按标签回填)
+        Map<String, String> colToLabel = new LinkedHashMap<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("detail")) {
+            if (f.col() != null) colToLabel.put(f.col(), f.label());
+        }
+        for (Map<String, Object> it : items) {
+            Object idRaw = it.get("id");
+            Map<String, Object> stored = idRaw == null || String.valueOf(idRaw).isBlank()
+                    ? null : byId.get(String.valueOf(idRaw));
+            if (stored == null) {
+                if (!canOthers) it.put("申请人", me);
+                continue;
+            }
+            Object ownerRaw = stored.get("申请人");
+            String owner = ownerRaw == null ? "" : String.valueOf(ownerRaw).trim();
+            if (owner.isEmpty()) {
+                if (!canOthers) it.put("申请人", me);
+                continue;
+            }
+            if (!canOthers && !owner.equals(me)) {
+                for (Map.Entry<String, String> e : colToLabel.entrySet()) {
+                    if (stored.containsKey(e.getKey())) it.put(e.getValue(), stored.get(e.getKey()));
+                }
+                continue;
+            }
+            if (!canOthers) it.put("申请人", owner);
+        }
+        // 缺席=删除的兜底:别人的行不在本次载荷里也必须保留(行级保存状态不互通)。
+        // 做法是给 softDeleteMissing 一个"额外保留 id 集合",**不能**把别人的行补进 items ——
+        // 那样会撞必填校验(实测:补进来的行缺 炭棒尺寸,整单被 400 打回)。
+        java.util.Set<String> protect = new java.util.LinkedHashSet<>();
+        java.util.Set<String> submitted = new java.util.HashSet<>();
+        for (Map<String, Object> it : items) {
+            Object id = it.get("id");
+            if (id != null && !String.valueOf(id).isBlank()) submitted.add(String.valueOf(id));
+        }
+        for (Map.Entry<String, Map<String, Object>> e : byId.entrySet()) {
+            if (submitted.contains(e.getKey())) continue;
+            Object ownerRaw = e.getValue().get("申请人");
+            String owner = ownerRaw == null ? "" : String.valueOf(ownerRaw).trim();
+            if (!owner.isEmpty() && !owner.equals(me) && !canOthers) protect.add(e.getKey());
+        }
+        return protect;
+    }
+
+    /** 当前账号在该面板是否持有「改他人行」(edit_others)词 —— 管理员恒有 */
+    private boolean canEditOtherRows(String panelCode, String actor) {
+        if (isAdminUser(actor)) return true;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                            + " WHERE u.username = ? AND rp.panel_code = ? AND rp.perms LIKE '%edit_others%'",
+                    Integer.class, actor, panelCode);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** 表头「单据日期」→ LocalDate(取不到或格式不符则用今天;日期列可能是 date 或 文本两种口径)。 */
     private static java.time.LocalDate docDayOf(Map<String, Object> head) {
         Object v = head == null ? null : head.get("单据日期");
@@ -530,6 +628,14 @@ public class ButtonService {
         // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
         defaultQcInspector(def, head, user);
         boolean split = def.hasHeadTable();
+        // 内部开发样品申请单=「数据记录表」(2026-11-06 用户口径:「谁填写的申请人就是谁,每个人只能改自己
+        // 作为申请人的行数据;点保存之后申请人就不能改了,只能由有更改权限的人来改;每一行数据就像一张独立的
+        // 单据一样,保存修改状态是不互通的」) ⇒ 落库前逐行套归属规则:
+        //   · 新行:申请人 = 当前用户;
+        //   · 已存在且申请人是本人:内容可改,但申请人被锁回库里的值;
+        //   · 已存在且申请人是别人:整行按库里的原值回写(不改、也不软删——行级状态不互通);
+        //   · 有 edit_others 词(组织架构里勾了「改他人行」)/管理员:以上限制全部放开。
+        java.util.Set<String> protectRowIds = applySampleIntRowRules(def, items, no, user);
         if (no == null) {
             if (items.isEmpty()) {
                 // directAdd 语义:空表单 -> 建一张空白草稿单(头行式写头表,单表式写一行占位行)
@@ -698,7 +804,7 @@ public class ButtonService {
         assignNewLineSeq(def, items, no);
         if (split) {
             upsertHeadRow(def, head, no, user);
-            upsertLineRows(def, items, no, l2c, user);
+            upsertLineRows(def, items, no, l2c, user, protectRowIds);
         } else {
             // 单表式:头字段并入每行
             // 2026-11-04(ASM_BOM 表头可维护,用户报障「表头无法填写」):headWins 分支**只并入真表头字段标签**。
@@ -720,7 +826,7 @@ public class ButtonService {
                 } else { merged.putAll(item); }
                 item.putAll(merged);
             }
-            upsertLineRows(def, items, no, l2c, user);
+            upsertLineRows(def, items, no, l2c, user, protectRowIds);
         }
         // 批次号自洽(2026-10-04 口径:生单即定号,不再有入库审核回填):
         // 链路四单(送料暂收/来料检验/暂收退回/采购入库)保存后立刻把**单头**批次号同步到全部明细行,
@@ -1710,6 +1816,13 @@ public class ButtonService {
     /** 行表 upsert:有 id 更新,无 id 插入(回填自增 id),缺席行软删(asp_cancel='Y') */
     private void upsertLineRows(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
                                 String no, Map<String, String> l2c, String user) {
+        upsertLineRows(def, items, no, l2c, user, java.util.Set.of());
+    }
+
+    /** 同上;{@code protectIds} = 本次载荷**没带**、但也不许软删的行(内部样品单里别人的行)。 */
+    private void upsertLineRows(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
+                                String no, Map<String, String> l2c, String user,
+                                java.util.Set<String> protectIds) {
         Set<Object> liveIds = new HashSet<>();
         // 明细派生列(金额/含税单价/含税金额/税额/折扣金额/总重/损耗率…)在**落库前**由服务端重算一遍。
         // 改前只有前端在改单元格时算 ⇒ 生单(来料检验单审核自动生成采购入库单等)与保存两条路径
@@ -1737,6 +1850,11 @@ public class ButtonService {
             }
         }
         // 缺席行软删:本单中不在 liveIds 的存活行 -> asp_cancel='Y'
+        // (protectIds = 本次载荷没带、但也不许软删的行:内部样品单里"别人的行",行级保存状态不互通)
+        for (String pid : protectIds) {
+            if (pid == null || pid.isBlank()) continue;
+            try { liveIds.add(Long.valueOf(pid)); } catch (NumberFormatException ignore) { liveIds.add(pid); }
+        }
         softDeleteMissing(def.lineTable(), def.groupCol(), no, def.pkCol(), liveIds, user);
     }
 
@@ -1833,6 +1951,20 @@ public class ButtonService {
                 liveIds.add(id);
                 updateRow(def.lineTable(), def.pkCol(), id, cols, user);
             } else {
+                // 档案面板自动编号(2026-11-06):「内部开发样品申请单」改成共享表(单表长列表)后要像单据一样
+                // 自动出号(SPN-…),而 saveArchive 原先只认前端传来的值 ⇒ 新行编号永远空着。
+                // 口径极窄:仅当面板**同时**声明了 code_col 与 prefix、且该行那一格为空时补号;
+                // 用户已填的号不动(要手填编号的档案照旧)。现存档案里只有共享文件库有 code_col(无 prefix)
+                // ⇒ 对其它面板零影响。
+                String codeCol = def.codeCol();
+                if (codeCol != null && !codeCol.isBlank()
+                        && def.prefix() != null && !def.prefix().isBlank()
+                        && tableCols(def.lineTable()).contains(codeCol)) {
+                    Object cur = cols.get(codeCol);
+                    if (cur == null || String.valueOf(cur).isBlank()) {
+                        cols.put(codeCol, formNoService.next(def.prefix(), user));
+                    }
+                }
                 Object newId = insertRow(def.lineTable(), withoutNulls(cols), user);
                 if (newId != null) liveIds.add(newId);
             }
@@ -2257,6 +2389,7 @@ public class ButtonService {
         if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
         // 质量单据(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
         // 直审会让二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
+        // 2026-11-04 出厂检验报告、2026-11-06 首件/制程检验单加入后自动继承本拦截(靠 ADMIN_L2_PANELS)。
         if (ADMIN_L2_PANELS.contains(def.code()))
             throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
         // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
@@ -2484,6 +2617,13 @@ public class ButtonService {
             jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
+        // 2026-11-09:首件/制程检验单单级审批弃审 ⇒ 纸面「审核人/审核时间」与两级节点标记一并清空
+        //   (历史两级单据的审批人/审批时间原样保留,不清)
+        if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) {
+            jdbc.update("UPDATE yj_doc_status SET approve_node = NULL, l2_approver = NULL, update_at = GETDATE()"
+                    + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+            clearAuditSignCells(def, no);
+        }
         // 生产工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
         // 重算以"已审核集合"为真源,挂钩早于状态清除会把弃审单仍按已审核计入,回填回旧值(2026-09-22 实测踩坑)
         manuWriteback.unpost(def.code(), no, currentUserName());
@@ -2662,11 +2802,13 @@ public class ButtonService {
                     realNameOf(operator), no);
         }
         // 质量单据:纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径;
-        // 2026-11-04 出厂检验报告加入,它的编制格列名是「检验员」)。
+        // 2026-11-04 出厂检验报告加入,它的编制格列名是「检验员」;2026-11-06 首件/制程检验单加入,
+        //   编制格同样是「检验员」,但那是检验人业务值 ⇒ 归 PREPARER_EDITABLE_PANELS,仅空值兜底)。
         // 落点在提交这一刻而非保存 —— 编制格各表绑的列不同(编制人/填写人/责任人/检测人/检验员,
         // 见 QC_DOC_PREPARER);谁提交谁就是编制人;驳回后换人重提也随之更新。
-        // ⚠ 预填型(QC_BHC/QC_BHZ/QC_SCP 的责任人)例外:**只在为空时**兜底填提交人 ——
-        //   用户已经自己填/改过的值不许被审批动作抹掉(那些是"产品负责人"业务值)。
+        // ⚠ 预填型(QC_BHC/QC_BHZ/QC_SCP 的责任人、QC_PROC_INSP/QC_FIRST_INSP 的检验员)例外:
+        //   **只在为空时**兜底填提交人 —— 用户已经自己填/改过的值不许被审批动作抹掉
+        //   (那些是"产品负责人"/"实际检验人"业务值)。
         String prep = preparerColOf(def.code());
         if (!prep.isBlank()) {
             boolean editable = !preparerEditableColOf(def.code()).isBlank();
@@ -2693,8 +2835,10 @@ public class ButtonService {
      *   通过 → 转「待二级审批」(pending 仍为 'Y',approve_node=2),**不归档**。
      *   · RD_PROD_INFO:**必须选取二级审核人**(载荷 key「二级审批人」= 账号,候选=全部启用账号;
      *     被选中即授权,不要求角色审批权),写回纸面「审核人（二级审批人）」,被选人收 APPROVAL_L2_ASSIGNED。
-     *   · 质量单据一族({@link #ADMIN_L2_PANELS},2026-10-04 起 8 张、2026-11-04 起含出厂检验报告共 9 张;
-     *     特采单 QC_TC_IN / 7 张质量单据 / 出厂检验报告 QC_OQC_REPORT):第二级**固定为超级管理员**,
+     *   · 质量单据一族({@link #ADMIN_L2_PANELS},2026-10-04 起 8 张、2026-11-04 起含出厂检验报告、
+     *     2026-11-06 起含首件检验单/制程检验单共 11 张; // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
+     *     特采单 QC_TC_IN / 7 张质量单据 / 出厂检验报告 QC_OQC_REPORT / 首件检验单 QC_FIRST_INSP /
+     *     制程检验单 QC_PROC_INSP):第二级**固定为超级管理员**,
      *     一级不选人;写回纸面「审核」格 = 一级通过人,超级管理员收 APPROVAL_L2_PENDING。
      * 二级(节点 2):RD_PROD_INFO = **被选定的二级审核人本人 ∪ 管理员**;
      *   质量单据一族 = **仅超级管理员**。
@@ -2725,11 +2869,17 @@ public class ButtonService {
             throw new org.springframework.security.access.AccessDeniedException(
                     "审批人不能与提交人相同（编制与审批分离）：本单由 " + realNameOf(submitter) + "（" + submitter + "）提交，请由他人完成一级审批");
         String opinion = opinionOf(formData);
+        // 2026-11-06 用户口径:「因为配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批时弹窗回填
+        //   这个字段，审批通过回填进去，再进二级审批(管理员)，管理员审批完成归档」。
+        // 落库时机放在状态迁移**之前**:写失败就直接失败,不会出现"已转二级但内容没写进"的半截状态。
+        applyL1Backfill(def, no, formData);
         // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
-            // 固定二级面板(质量单据一族,含出厂检验报告):第二级恒为超级管理员,一级不选人;
+            // 固定二级面板(质量单据一族,含出厂检验报告/首件/制程检验单):第二级恒为超级管理员,一级不选人;
             // 其余两级面板(RD_PROD_INFO)仍须选人
-            boolean fixedAdminL2 = ADMIN_L2_PANELS.contains(def.code());
+            // 2026-11-06 用户口径:「二级审批人只有管理员」⇒ 外部开发样品申请单的二级固定为超级管理员,
+            //   一级审批不再选人(与质量单据一族同款),载荷里也不需要「二级审批人」。
+            boolean fixedAdminL2 = ADMIN_L2_PANELS.contains(def.code()) || "RD_SAMPLE_EXT".equals(def.code());
             String l2 = fixedAdminL2 ? "" : pickOf(formData, "二级审批人");
             if (!fixedAdminL2) {
                 if (l2.isEmpty()) throw new IllegalStateException("一级审批通过前必须选取二级审核人");
@@ -2770,6 +2920,11 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 1, selfAudit);
+        // 2026-11-09:首件/制程检验单改为**单级审批** ⇒ 这一次审批通过即写纸面「审核」格(审批通过人),
+        //   不再有二级「批准」(审批人/审批时间列为历史字段,不再写)。与来料检验单的单节点形态一致。
+        if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) {
+            writeBackSignCell(def, no, "审核人", "审核时间", operator);
+        }
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
@@ -2851,10 +3006,11 @@ public class ButtonService {
 
     /**
      * 二级审批通过:被选定的二级审核人 ∪ 管理员 → 归档(归档面板)/已审核。
-     * 固定二级面板({@link #ADMIN_L2_PANELS}:特采单 + 7 张质量单据 + 出厂检验报告)的第二级
+     * 固定二级面板({@link #ADMIN_L2_PANELS}:特采单 + 7 张质量单据 + 出厂检验报告 + 2026-11-06 起的 // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
+     * 首件检验单/制程检验单,共 11 张)的第二级 // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
      * = **超级管理员**(即管理员本人),故不查 l2_approver;且**必须真真切切点满两次**
      * (一级一次、二级一次)——同一个人(管理员)也要两次,不允许一次动作跨越两级(2026-10-04 用户口径;
-     * 出厂检验报告 2026-11-04 接入,口径同)。
+     * 出厂检验报告 2026-11-04 接入、首件/制程检验单 2026-11-06 接入,口径同)。
      */
     private Map<String, Object> approveSecond(PanelRegistry.PanelDef def, String no, String operator, Map<String, Object> formData) {
         if (ADMIN_L2_PANELS.contains(def.code())) {
@@ -2917,7 +3073,8 @@ public class ButtonService {
 
     /** 审批驳回:仅审批中/待二级审批 → 草稿(意见必填,驳回后修改可重新提交)
      *  2026-09-20:两级面板任一级驳回都直接回草稿并通知制单人(口径:不退回上一级),节点标记一并清空。
-     *  2026-10-04 质量单据一族(特采单 + 7 张质量单据;2026-11-04 起含出厂检验报告):
+     *  2026-10-04 质量单据一族(特采单 + 7 张质量单据;2026-11-04 起含出厂检验报告;
+     *    2026-11-06 起含首件检验单/制程检验单): // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
      *    驳回同样回草稿,并清空纸面「审核/批准」两格;
      *    通知面扩为 提交人(编制人) + (二级驳回时)一级审核人 —— 两端都知道这张单被退了。 */
     private Map<String, Object> rejectApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -2951,6 +3108,8 @@ public class ButtonService {
                 + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, node);
+        // 2026-11-09:单级审批的首件/制程检验单被驳回 ⇒ 纸面「审核人/审核时间」随审批作废清空
+        if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) clearAuditSignCells(def, no);
         String rejectBy = currentUserName();
         // 质量单据:驳回即回草稿 —— 纸面「审核/批准」两格随审批作废清空(编制格保留,人没变)
         if ("RD_SPEC_DOC".equals(def.code())) {
@@ -3080,8 +3239,8 @@ public class ButtonService {
      *   <li>它**只解除**「编制与审批分离」对**本人提交的单**的限制,不放宽审批权 ——
      *       {@code requireApprover} 仍要求该面板 audit 权,两者都满足才能自审;</li>
      *   <li>管理员本就豁免该限制,这里返回 true 只是让调用点写法统一;</li>
-     *   <li>只作用于**单节点**面板;两级面板(RD_PROD_INFO / 8 张质量单据 + 出厂检验报告)不兜底 ——
-     *       它们本来就有确定的第二级(超管或被选中的二级审核人),不存在死路;</li>
+     *   <li>只作用于**单节点**面板;两级面板(RD_PROD_INFO / 质量单据一族共 11 张,含出厂检验报告、 // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
+     *       首件/制程检验单)不兜底 —— 它们本来就有确定的第二级(超管或被选中的二级审核人),不存在死路;</li>
      *   <li>只管**一级审批通过**;二级审批人仍不能选提交人(见 approveApproval 的 l2 校验)。</li>
      * </ul>
      */
@@ -3121,10 +3280,12 @@ public class ButtonService {
     //   尚未赋值的 ADMIN_L2_PANELS(null),启动时直接 ExceptionInInitializerError(2026-10-04 实测踩到)。
 
     /**
-     * 质量单据(品质管理·质量单据一族 + 来料品质·特采单 + 品质管理·出厂检验报告)
+     * 质量单据(品质管理·质量单据一族 + 来料品质·特采单 + 品质管理·出厂检验报告
+     * + 品质管理·首件检验单/制程检验单)
      * **纸面底部落款第一格「编制」绑的字段名**。
      *
-     * 这些纸面(YJ-QR-05/A1、YJ-QR-11/59/60/64/92/118/119/120)底部都是「编制 / 审核 / 批准」三格,
+     * 这些纸面(YJ-QR-05/A1、YJ-QR-11/59/60/64/92/118/119/120、首件检验记录表、制程检验记录表)
+     * 底部都是「编制 / 审核 / 批准」三格,
      * 但「编制」那一格各表绑的列不同 —— 有的是 编制人、有的是 责任人 / 填写人 / 检测人 / 检验员,
      * 故逐面板登记;不在此表内的面板 = 不走「编制 = 提交人」的自动落值,两级也退化为单节点。
      *
@@ -3135,6 +3296,21 @@ public class ButtonService {
      * ⚠ 出厂检验报告(2026-11-04):纸面第一格受控表单上印的是「检验员」(不是「编制人」),
      *   用户口径「检验员=编制(提交审批时自动写提交人、只读)」⇒ 按编制格处理:
      *   提交审批时写 qc_oqc_head.[检验员],yj_field 已由 migrate-oqc-twolevel-20261104.sql 置 editable=0。
+     *
+     * ⚠ 首件检验单 QC_FIRST_INSP / 制程检验单 QC_PROC_INSP(2026-11-06 用户口径:
+     *   「首件检验单和制程检验单要实现审批流程」):两张单纸面表尾第一格是「检验人(检验员)」,
+     *   语义 = **编制** ⇒ 按编制格登记,提交审批时写 qc_first_insp_head / qc_proc_insp_head 的 [检验员]。
+     *   审批口径与出厂检验报告(OQC)完全一致,三格落值同源:
+     *     编制 = 提交审批的人、**审核 = 一级审批人**、**批准 = 超级管理员**(二级审批通过才落值),
+     *     直审一律拒绝(见 audit 的 ADMIN_L2_PANELS 拦截),两级必须各点一次。
+     *   ⚠ 与 OQC 的唯一差别:这两张的「检验员」同时是**检验人业务值**(默认当前电脑端登录人,
+     *     见 defaultQcInspector),所以不能当纯落款刷成提交人 ⇒ 另登记在 {@link #PREPARER_EDITABLE_PANELS}:
+     *     save() 不剥离该键、提交审批**只在为空时**兜底写提交人(详见该常量注释)。
+     *
+     * ⚠ 本 Map 的 **key 集就是 {@link #ADMIN_L2_PANELS}**,而 {@link #TWO_LEVEL_PANELS} 又由它派生
+     *   —— 加面板只改这一处,不要再另外去改那两个常量(它们不是独立清单,
+     *   见紧邻本常量声明上方的「声明顺序即初始化顺序」踩坑记录)。
+     * ⚠ 条目数已超 10,必须用 Map.ofEntries —— Map.of 最多 10 对,第 11 对编译期即报错。
      */
     /**
      * 产品规格书(RD_SPEC_DOC)纸面「制订 / 审核 / 批准」三格自动落值（2026-11-06 用户口径）。
@@ -3201,20 +3377,25 @@ public class ButtonService {
     private static final java.time.format.DateTimeFormatter SIGN_DATE_FMT =
             java.time.format.DateTimeFormatter.ofPattern("yyyy.M.d");
 
-    private static final Map<String, String> QC_DOC_PREPARER = Map.of(
-            "QC_TC_IN", "编制人",   // YJ-QR-60 特采申请单
-            "QC_LYB", "编制人",     // YJ-QR-119 来料异常分析报告
-            "QC_SCY", "编制人",     // YJ-QR-120 生产异常分析报告
-            "QC_BHG", "填写人",     // YJ-QR-11  不合格报告(制程)
-            "QC_BHC", "责任人",     // YJ-QR-59  不合格品处理单(制程)
-            "QC_BHZ", "责任人",     // YJ-QR-64  不合格品处理单(自制物料)
-            "QC_JJF", "检测人",     // YJ-QR-92  紧急放行申请单
-            "QC_SCP", "责任人",     // YJ-QR-118 试产材料使用申请单
-            "QC_OQC_REPORT", "检验员");  // YJ-QR-05/A1 出厂检验报告(2026-11-04 加入:纸面第一格=检验员=编制)
+    // ⚠ 2026-11-09 用户口径:「首件 QC_FIRST_INSP、制程 QC_PROC_INSP …… 这两个只需要实现一级审批,
+    //   和当前的来料检验一样的审批形式即可」⇒ 两张单**退出**本表(不再两级审批),
+    //   ADMIN_L2_PANELS / TWO_LEVEL_PANELS 同步减为 9 张;其「检验员=编制 + 审核人签署格」的
+    //   单级路径见 SINGLE_LEVEL_INSP_PANELS / SINGLE_LEVEL_PREPARER。
+    private static final Map<String, String> QC_DOC_PREPARER = Map.ofEntries(
+            Map.entry("QC_TC_IN", "编制人"),      // YJ-QR-60 特采申请单
+            Map.entry("QC_LYB", "编制人"),        // YJ-QR-119 来料异常分析报告
+            Map.entry("QC_SCY", "编制人"),        // YJ-QR-120 生产异常分析报告
+            Map.entry("QC_BHG", "填写人"),        // YJ-QR-11  不合格报告(制程)
+            Map.entry("QC_BHC", "责任人"),        // YJ-QR-59  不合格品处理单(制程)
+            Map.entry("QC_BHZ", "责任人"),        // YJ-QR-64  不合格品处理单(自制物料)
+            Map.entry("QC_JJF", "检测人"),        // YJ-QR-92  紧急放行申请单
+            Map.entry("QC_SCP", "责任人"),        // YJ-QR-118 试产材料使用申请单
+            Map.entry("QC_OQC_REPORT", "检验员")); // YJ-QR-05/A1 出厂检验报告(2026-11-04:纸面第一格=检验员=编制)
 
     /**
      * {@link #ADMIN_L2_PANELS} 里「编制」格**不是**纯落款、同时充当业务格的那几张 ——
-     * QC_BHC / QC_BHZ / QC_SCP 的「责任人」(= 表头「产品负责人」格)。
+     * QC_BHC / QC_BHZ / QC_SCP 的「责任人」(= 表头「产品负责人」格),
+     * 以及 2026-11-06 起加入的首件检验单 / 制程检验单的「检验员」(= 检验人业务值)。 // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
      *
      * 用户口径(2026-10-04):「责任人预填,让他自己修改」。故这几张与其余质量单据不同:
      *   · 字段保持 **editable=1**(前端是可编辑输入框,DocSheet 按 yj_field 元数据判只读);
@@ -3222,11 +3403,50 @@ public class ButtonService {
      *   · **新增草稿时预填**当前用户姓名(只在没有值时写,永不覆盖用户已填/已改的值);
      *   · 提交审批时同样**只在为空时**兜底填提交人(覆盖两级口径上线前建的老草稿)。
      * 其余面板的「编制」格(编制人 / 填写人 / 检测人)= 纯落款,仍为「提交审批时自动写 + 只读」。
+     *
+     * <p>⚠ 2026-11-06 首件检验单 QC_FIRST_INSP / 制程检验单 QC_PROC_INSP
+     *   (用户口径「首件检验单和制程检验单要实现审批流程」):
+     *   纸面表尾第一格是「检验人(检验员)」= 编制格,但「检验员」本身是**检验人业务值**
+     *   (默认值 = 当前电脑端登录人,{@link #defaultQcInspector} 保存时只填空值/历史 system 占位)。
+     *   若按其余质量单据的「纯落款」处理(save 剥离 + 提交审批刷成提交人),会把**实际检验人**
+     *   覆盖成提交人姓名 —— 而这两张单的检验人通常就是填单的检验员本人,只是两者未必同一账号。
+     *   故这两张登记在此,口径与 QC_BHC/QC_BHZ/QC_SCP 的「责任人」一致:
+     *   · save() **不剥离**「检验员」(用户可以自己填/改真实检验人);
+     *   · 提交审批时**只在为空时**兜底写提交人(空草稿兜底;已有检验人一律不动);
+     *   · 「审核人/审核时间/审批人/审批时间」仍由 save() 剥离 —— 那四格只由审批流动作写。
+     *   ⚠ yj_field 的「检验员」保持 editable=1(前端可编辑);不要照 OQC 把它置只读。
      */
-    private static final java.util.Set<String> PREPARER_EDITABLE_PANELS = java.util.Set.of("QC_BHC", "QC_BHZ", "QC_SCP");
+    private static final java.util.Set<String> PREPARER_EDITABLE_PANELS =
+            java.util.Set.of("QC_BHC", "QC_BHZ", "QC_SCP");
+
+    /**
+     * **单级审批、但纸面仍有「检验人 / 审核人」签署格**的工序检验单(2026-11-09 用户口径)。
+     *
+     * <p>用户原话:「首件 QC_FIRST_INSP、制程 QC_PROC_INSP:两级审批 提交审批 → 一级审批通过（待二级）
+     * → 超级管理员批准（已审核）→ 弃审 → 草稿;这两个只需要实现一级审批和当前的来料检验一样的审批形式即可」。
+     *
+     * <p>⇒ 两张单**退出** {@link #QC_DOC_PREPARER}/{@link #ADMIN_L2_PANELS},审批形态与来料检验单
+     * {@code QC_INSP} 完全同形:**提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿**
+     * (不再有「一级/二级/批准」节点;历史两级批准的单据与「审批人/审批时间」列原样保留,只读展示)。
+     *
+     * <p>保留的两项纸面能力(与来料单同形、也是这两张单原有能力):
+     * <ul>
+     *   <li>检验员 = 编制:可手填,保存不剥离;提交审批时**为空才**兜底写提交人;</li>
+     *   <li>审批通过时把纸面「审核人/审核时间」写成审批人(表内真值列);驳回/弃审清空这两格
+     *       (「批准」格不再写,历史值保留)。</li>
+     * </ul>
+     */
+    public static final java.util.Set<String> SINGLE_LEVEL_INSP_PANELS =
+            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP");
+
+    /** 单级审批面板的「编制」格列名(检验人业务值,可手填) */
+    private static final Map<String, String> SINGLE_LEVEL_PREPARER = Map.of(
+            "QC_FIRST_INSP", "检验员", "QC_PROC_INSP", "检验员");
 
     /** 该面板的「编制」格是否可手改(= 预填型);非此类返回空串 */
     private String preparerEditableColOf(String panelCode) {
+        if (panelCode != null && SINGLE_LEVEL_INSP_PANELS.contains(panelCode))
+            return SINGLE_LEVEL_PREPARER.getOrDefault(panelCode, "");
         return panelCode != null && PREPARER_EDITABLE_PANELS.contains(panelCode)
                 ? QC_DOC_PREPARER.getOrDefault(panelCode, "") : "";
     }
@@ -3271,10 +3491,12 @@ public class ButtonService {
 
     /**
      * 两级审批的第二种形态:第二级**固定为超级管理员**(不选人)= 质量单据一族
-     * (2026-10-04 特采单 + 7 张质量单据 = 8 张;2026-11-04 起加入出厂检验报告 = 9 张)。
+     * (2026-10-04 特采单 + 7 张质量单据 = 8 张;2026-11-04 起加入出厂检验报告;
+     *  2026-11-06 起加入首件检验单 QC_FIRST_INSP / 制程检验单 QC_PROC_INSP = 11 张)。 // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
      * 判据是 yj_user.is_admin='Y',存量的 l2_approver 列对这些面板保持 NULL(前后端都按 is_admin 判)。
      * 与 RD_PROD_INFO 的「一级选人、被选中即授权」并列。
      * public:QueryService 的「审核人」虚拟字段例外共用这一份清单(避免两处各写一套名单)。
+     * ⚠ 本常量是 {@link #QC_DOC_PREPARER}.keySet() 的视图,**不是**独立清单 —— 加面板改 Map,别改这里。
      */
     public static final java.util.Set<String> ADMIN_L2_PANELS = QC_DOC_PREPARER.keySet();
 
@@ -3285,10 +3507,12 @@ public class ButtonService {
      *   「申请人 → 审核人(刘磊) → 确认人(冯总)确认信息并进行补充 ⇒ 执行制备、入样品仓库」,
      *   故一级(审核)通过时必须选二级(确认)人;纸面「审核」= 一级通过人、「确认」= 二级通过人。
      *   ⚠ 内部开发样品申请单(RD_SAMPLE_INT)只有「确认人」一步 ⇒ **不进本集合**,走单节点路径。
-     * - 质量单据一族(2026-10-04,{@link #ADMIN_L2_PANELS};2026-11-04 起含出厂检验报告):
+     * - 质量单据一族(2026-10-04,{@link #ADMIN_L2_PANELS};2026-11-04 起含出厂检验报告;
+     *   2026-11-06 起含首件检验单/制程检验单): // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
      *   第二级**固定为超级管理员**,一级不选人。
      *   纸面(YJ-QR 体系)底部都是「编制 / 审核 / 批准」三格:编制=提交审批的人、
-     *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告纸面第一格印「检验员」,口径同为编制)。
+     *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告、首件/制程检验单纸面第一格印
+     *   「检验员」/「检验人」,语义同为编制)。
      */
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
@@ -3374,14 +3598,19 @@ public class ButtonService {
     // ---- 质量单据纸面「编制 / 审核 / 批准」三格自动落值(2026-10-04) ----
     //
     // 口径(用户 2026-10-04,适用于品质管理·质量单据一族 + 特采单;
-    //       2026-11-04 起含出厂检验报告 —— 它的第一格受控表单印「检验员」,语义同为编制):
+    //       2026-11-04 起含出厂检验报告 —— 它的第一格受控表单印「检验员」,语义同为编制;
+    //       2026-11-06 起含首件检验单/制程检验单 —— 表尾第一格印「检验人(检验员)」,语义同为编制): // ⚠ 2026-11-09 起首件/制程改**单级审批**,已移出两级名单(见 SINGLE_LEVEL_INSP_PANELS)
     //   编制 = 提交审批的人;审核 = 一级审批通过的人;批准 = 超级管理员(二级审批通过的人)。
     // 三格在 yj_field 里 editable=0(readonly),前端 DocSheet 按字段只读渲染成纯文本;
     // 且 save() 剥离这些键的入参 —— 真源只有审批流动作一个。
-    // 表列口径(逐面板不同):编制格 = QC_DOC_PREPARER 登记的列(出厂检验报告 = 检验员);
+    // 表列口径(逐面板不同):编制格 = QC_DOC_PREPARER 登记的列(出厂检验报告/首件/制程 = 检验员);
+    // ⚠ 首件/制程的「检验员」是例外:它是检验人业务值,归 PREPARER_EDITABLE_PANELS(可填、只在空时兜底)。
 
     /** 该面板纸面「编制」格绑的字段(非质量单据返回空串) */
     private String preparerColOf(String panelCode) {
+        // 2026-11-09:首件/制程检验单改为单级审批后仍有「编制」格(检验员),其列名不在 QC_DOC_PREPARER
+        if (panelCode != null && SINGLE_LEVEL_INSP_PANELS.contains(panelCode))
+            return SINGLE_LEVEL_PREPARER.getOrDefault(panelCode, "");
         return panelCode == null ? "" : QC_DOC_PREPARER.getOrDefault(panelCode, "");
     }
 
@@ -3407,7 +3636,8 @@ public class ButtonService {
      * 表名取面板头表;列缺失/面板不对时静默跳过,不阻断审批。
      */
     private void writeBackSignCell(PanelRegistry.PanelDef def, String no, String whoCol, String timeCol, String account) {
-        if (def == null || whoCol == null || whoCol.isBlank() || !QC_DOC_PREPARER.containsKey(def.code())) return;
+        // 2026-11-09:首件/制程检验单改为单级审批后已移出 QC_DOC_PREPARER,但纸面「审核人/审核时间」仍要写 → 一并放行
+        if (def == null || (!QC_DOC_PREPARER.containsKey(def.code()) && !SINGLE_LEVEL_INSP_PANELS.contains(def.code()))) return;
         try {
             String sets = "[" + whoCol + "] = ?" + (timeCol == null ? "" : ", [" + timeCol + "] = ?");
             Object[] args = timeCol == null
@@ -3425,7 +3655,7 @@ public class ButtonService {
      * **编制格不清** —— 谁编的单没变;重新提交时会按新的提交人刷新。
      */
     private void clearAuditSignCells(PanelRegistry.PanelDef def, String no) {
-        if (def == null || !QC_DOC_PREPARER.containsKey(def.code())) return;
+        if (def == null || (!QC_DOC_PREPARER.containsKey(def.code()) && !SINGLE_LEVEL_INSP_PANELS.contains(def.code()))) return;
         try {
             jdbc.update("UPDATE " + def.headTable() + " SET 审核人 = NULL, 审核时间 = NULL, 审批人 = NULL, 审批时间 = NULL,"
                             + " asp_user2 = ?, asp_time2 = SYSDATETIME()"
@@ -7239,6 +7469,130 @@ public class ButtonService {
     }
 
     /** 申请修改:已归档/已审核 → 修改申请中(待管理员审批) */
+    /**
+     * 一级审批「回填」明细字段(2026-11-06 用户口径)。
+     *
+     * 背景:「配方及工艺要求」这类字段是**一级审批人**在审批时才定的,不是在申请人录单时填的。
+     * 用户口径:「一级审批的时候有一个回填弹窗就是写这个配方及工艺要求的，审批通过填写这个字段内容回填进去，
+     *  进入二级审批」。
+     *
+     * 载荷:{@code 明细回填 = [{id, 配方及工艺要求, 组装要求, 性能要求}]},只更新**白名单列**且只更非空值
+     * (空串表示"本次没改",不许把已填内容清掉)。仅对 RD_SAMPLE_EXT 生效 —— 别的面板没有这个动作语义,
+     * 多一条入口就是多一条误写数据的路。
+     */
+    private void applyL1Backfill(PanelRegistry.PanelDef def, String no, Map<String, Object> formData) {
+        if (!"RD_SAMPLE_EXT".equals(def.code()) || formData == null) return;
+        Object raw = formData.get("明细回填");
+        if (!(raw instanceof List<?> rows) || rows.isEmpty()) return;
+        Map<String, String> l2c = def.labelToCol();
+        java.util.Set<String> allowed = java.util.Set.of("配方及工艺要求", "组装要求", "性能要求");
+        int hit = 0;
+        for (Object o : rows) {
+            if (!(o instanceof Map<?, ?> m)) continue;
+            Object id = m.get("id");
+            if (id == null || String.valueOf(id).isBlank()) continue;
+            StringBuilder set = new StringBuilder();
+            List<Object> args = new ArrayList<>();
+            for (String label : allowed) {
+                Object v = m.get(label);
+                if (v == null) continue;
+                String col = l2c.get(label);
+                if (col == null || col.isBlank()) continue;
+                set.append(set.length() == 0 ? "" : ", ").append("[").append(col).append("] = ?");
+                args.add(String.valueOf(v));
+            }
+            if (set.length() == 0) continue;
+            args.add(id);
+            // ⚠ 必须同时按**本单号**限定:只按行 id 更新,一条载荷里的 id 打错(或跨单拼错)就会改到
+            //   别的单据的明细行(2026-11-06 点验时确实打成了他单的行 id,当场抓到)。
+            args.add(no);
+            hit += jdbc.update("UPDATE " + def.lineTable() + " SET " + set
+                    + " WHERE " + def.pkCol() + " = ? AND " + def.groupCol() + " = ?"
+                    + " AND ISNULL(asp_cancel,'N') <> 'Y'", args.toArray());
+        }
+        if (hit > 0) {
+            recordApproval(def.code(), no, "L1_BACKFILL", "FILLED", "一级审批回填配方及工艺要求（" + hit + " 行）");
+        }
+    }
+
+    /** 归档单据的「一级审批人 ∪ 管理员」直改权:管理员恒有;其余按**本单一级审批留痕**认人
+     *  (yj_form_approval node_no=1 的审批动作操作者),取不到再退回纸面「审核」格署名。 */
+    private boolean canDirectModify(PanelRegistry.PanelDef def, String no, String actor) {
+        if (isAdminUser(actor)) return true;
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_form_approval WHERE panel_code = ? AND form_no = ?"
+                            + " AND ISNULL(node_no,1) = 1 AND operator = ?"
+                            + " AND action IN ('APPROVE', 'APPROVE_L1')",
+                    Integer.class, def.code(), no, actor);
+            if (n != null && n > 0) return true;
+        } catch (Exception ignore) {
+            // 留痕表缺失/列缺失时退回纸面署名判断,不让直改能力整体失效
+        }
+        Map<String, String> head = headLabelSnapshot(def, no);
+        String sign = head.getOrDefault("审核", "");
+        String who = sign.contains("/") ? sign.substring(0, sign.indexOf('/')).trim() : sign.trim();
+        return !who.isEmpty() && who.equals(realNameOf(actor));
+    }
+
+    /** 「修改单据」:归档态 → 免申请进入修改态(记一条修改记录,申请＝审批＝本人,便于查"谁什么时候改的") */
+    private Map<String, Object> openDirectModify(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String actor = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已归档".equals(st) && !"已审核".equals(st)) throw new IllegalStateException("仅已归档单据可修改");
+        if (!canDirectModify(def, no, actor))
+            throw new org.springframework.security.access.AccessDeniedException("只有管理员或本单一级审批人可以修改归档单据");
+        boolean open = !jdbc.queryForList(
+                "SELECT id FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? AND rearchive_by IS NULL",
+                def.code(), no).isEmpty();
+        if (!open) {
+            jdbc.update("INSERT INTO yj_doc_modify_log (panel_code, doc_no, apply_by, apply_at, approve_by, approve_at, snapshot_head, snapshot_rows, modify_reason) "
+                            + "VALUES (?,?,?,?,?,?,?,?,?)",
+                    def.code(), no, actor, LocalDateTime.now(), actor, LocalDateTime.now(),
+                    toJson(headLabelSnapshot(def, no)), toJson(rowSnapshots(def, no)),
+                    "一级审批人/管理员直接修改（免申请）");
+        }
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                        + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                        + "WHEN MATCHED THEN UPDATE SET modify_state='Y', modify_appr_by=?, modify_appr_at=GETDATE(), archived='N', update_at=GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, modify_state, modify_appr_by, modify_appr_at, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
+                def.code(), no, actor, actor);
+        recordApproval(def.code(), no, "MODIFY_DIRECT", "MODIFYING", "一级审批人/管理员直接修改（免申请）");
+        return result(no, "修改中");
+    }
+
+    /** 「保存修改」:落库 → 修改记录 diff 收尾 → 回归归档态(状态不再走审批) */
+    private Map<String, Object> saveDirectModify(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String actor = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        if (!canDirectModify(def, no, actor))
+            throw new org.springframework.security.access.AccessDeniedException("只有管理员或本单一级审批人可以修改归档单据");
+        Map<String, Object> out = save(def, formData, true, null);
+        // 收尾:refreshModifyDiff + rearchive_by/at 盖章 + modify_state 归位 + archived='Y'
+        boolean closed = finalizeOpenModify(def, no, actor);
+        if (!closed) {
+            jdbc.update("UPDATE yj_doc_status SET modify_state=NULL, archived='Y', pending='N', update_at=GETDATE()"
+                    + " WHERE panel_code=? AND doc_no=?", def.code(), no);
+        }
+        // 时间戳一致化:申请/审批两格用的是 LocalDateTime.now()(JVM 本地时区),而 finalizeOpenModify
+        // 里写的 rearchive_at 是 DB 的 GETDATE()(本机 SQL 容器跑 UTC,实测差 8 小时)⇒ 同一条修改记录里
+        // 「申请 18:07 / 再归档 10:08」对不上。这里把再归档时间改回同一个时钟。
+        try {
+            jdbc.update("UPDATE yj_doc_modify_log SET rearchive_at = ? WHERE id = (SELECT MAX(id) FROM yj_doc_modify_log"
+                    + " WHERE panel_code = ? AND doc_no = ?)", LocalDateTime.now(), def.code(), no);
+        } catch (Exception ignore) {
+            // 时间戳美化失败不影响业务结果
+        }
+        recordApproval(def.code(), no, "MODIFY_SAVE", "ARCHIVED", "直接修改并保存（回归归档）");
+        out.put("编号", no);
+        out.put("单据状态", "已归档");
+        return out;
+    }
+
     private Map<String, Object> modifyRequest(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String user = currentUserName();
         String no = requireNo(formData);

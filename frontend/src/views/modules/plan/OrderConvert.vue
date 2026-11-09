@@ -16,7 +16,15 @@
          复用系统级列设置实现 useReportColumns + /px/reportColumnSettings(panelCode=ORDER_CONVERT,刷新后仍生效);
        ③「型号」列旁新增**「产品名称」**列(订单行 存货名称,与订单资料堆叠格同源);
        ④「订单资料」右侧新增**「物料编码」**单列(订单行 存货编码;堆叠格小字保留,列可随列设置显隐);
-       ⑤「列设置」除显隐外还支持**调整列顺序**(▲▼ 上移/下移,草稿即预览,保存后刷新仍按该顺序)。 -->
+       ⑤「列设置」除显隐外还支持**调整列顺序**(▲▼ 上移/下移,草稿即预览,保存后刷新仍按该顺序)。
+
+     2026-11-08 用户口径(备品):
+       ①「本次转单数量」**允许超过销售订单数量**(备品场景)—— 去掉输入的 :max=剩余数量 上限,
+         后端 QuickScheduleService.createFromOrderLine(有 UI 数量时)同步取消 Math.min 截断与超量报错;
+       ② 超出的行要有醒目提示:输入框红框 + 「超订单」小标 + tooltip 说明(文案走 tt);
+         提交时二次确认(列出超出行数与合计超出量),确认后照常提交;
+       ③ 默认值仍是剩余数量(原操作习惯不变);行级占用链 form_flow_link.linked_quantity 落实际转单量,
+         备品超出部分也计入占用(转满后本行剩余为负,按「剩余>0」过滤自然退出本页)。 -->
 <template>
   <div class="oc-page">
     <!-- 汇总条(蓝底白字,同参考) -->
@@ -110,7 +118,12 @@
         </el-table-column>
         <el-table-column :label="tt('本次转单数量')" width="125" fixed="right">
           <template #default="{ row }">
-            <el-input-number v-model="row.生单数量" :min="0" :max="Number(row.剩余数量)" :controls="false" size="small" style="width: 100%" />
+            <!-- 2026-11-08 用户口径(备品):本次转单数量**允许超过**订单剩余数量 ⇒ 不再设 :max 上限;
+                 超出时红框 + 「超订单」小标 + tooltip(默认值仍是剩余数量,见 loadPending 初始化)。 -->
+            <el-input-number v-model="row.生单数量" :min="0" :controls="false" size="small" style="width: 100%"
+                             :class="{ 'oc-over-qty': isOverOrder(row) }"
+                             :title="isOverOrder(row) ? overOrderTip(row) : ''" />
+            <div v-if="isOverOrder(row)" class="oc-over-tag" :title="overOrderTip(row)">{{ tt('超订单') }}</div>
           </template>
         </el-table-column>
         <!-- 空表提示:所选区间确实没有待结转单 —— 给"跳到最近有数据的一天"/"看近7天"两条近路
@@ -448,6 +461,30 @@ function routeAuditTip(row) {
   return `${row.工艺路线 || ''}\n${tt('该工艺路线未审核，不能转工单；请先在「基础设置→工艺路线」完成审核')}` + from
 }
 
+// ── 备品口径:本次转单数量允许超过订单数量(2026-11-08 用户口径)──────────────────────────
+// 口径:输入不再被 `:max=剩余数量` 钳死,备品场景可大于订单数量;但超出必须**看得见**
+// (红框 + 「超订单」小标 + tooltip)且**提交时二次确认**(convert 内,列出超出行数/合计超出量)。
+// 默认值仍是剩余数量 —— 不改变原有操作习惯;行级占用链与 SO 订单状态逻辑均不在前端改。
+/** 行剩余数量(数字兜底;列表口径 = 需求数量 − 已排产数量) */
+function residualQty(row) { return Number(row?.剩余数量) || 0 }
+/** 本次转单数量是否超过订单剩余数量(= 备品超订单;剩余已被前次转满为负/0 时按 0 比较) */
+function isOverOrder(row) {
+  const q = Number(row?.生单数量)
+  return Number.isFinite(q) && q > Math.max(0, residualQty(row)) + 0.0001
+}
+/** 超出量 = 本次转单数量 − 剩余数量(非超行返回 0;用于 tooltip 与确认框合计) */
+function overQty(row) {
+  const q = Number(row?.生单数量)
+  if (!Number.isFinite(q)) return 0
+  return Math.max(0, q - Math.max(0, residualQty(row)))
+}
+/** 去掉浮点尾巴(如 0.30000000000000004),最多保留 4 位小数 */
+function cleanQty(v) { return Number(Number(v || 0).toFixed(4)) }
+/** 超订单行 tip(订单号/数量是业务事实不翻译,说明文案走 tt) */
+function overOrderTip(row) {
+  return `${tt('本次转单数量超过订单剩余数量，将按备品转出')} (+${cleanQty(overQty(row))})`
+}
+
 async function convert(api, label) {
   const list = (checked.value || []).filter((r) => Number(r.生单数量) > 0)
   if (!list.length) { ElMessage.warning(tt('请先勾选要结转的订单行')); return }
@@ -468,11 +505,25 @@ async function convert(api, label) {
     return
   }
   const qty = list.reduce((a, r) => a + Number(r.生单数量 || 0), 0)
+  // 2026-11-08 用户口径(备品):本次转单数量 > 订单剩余数量 = 合法(备品),但提交前**二次确认**,
+  // 列出超出行数与合计超出量(确认后照常提交);没有超出行时维持原来的「合计确认」框不变。
+  const overRows = list.filter(isOverOrder)
   try {
-    await ElMessageBox.confirm(
-      `${tt('确认将选中的')} ${list.length} ${tt('行')}（${tt('合计')} ${qty}）${tt(label)}？`,
-      tt('订单结转'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') },
-    )
+    if (overRows.length) {
+      const overTotal = cleanQty(overRows.reduce((a, r) => a + overQty(r), 0))
+      // 超出行明细(前 5 行,订单号#行号 是业务事实不翻译)让用户知道具体是哪几行
+      const detail = overRows.slice(0, 5).map((r) => `${r['订单号']}#${r['行号'] ?? ''}`).join('、')
+      await ElMessageBox.confirm(
+        `${tt('超出行数')}: ${overRows.length} [${detail}${overRows.length > 5 ? '…' : ''}], `
+          + `${tt('合计超出数量')}: ${overTotal}; ${tt('将按备品转出，确认继续提交？')}`,
+        tt('备品超订单提示'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' },
+      )
+    } else {
+      await ElMessageBox.confirm(
+        `${tt('确认将选中的')} ${list.length} ${tt('行')}（${tt('合计')} ${qty}）${tt(label)}？`,
+        tt('订单结转'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') },
+      )
+    }
   } catch { return }
   try {
     const res = await request.post(`/px/orderConvert/${api}`, {
@@ -541,4 +592,9 @@ onMounted(async () => {
 :deep(.oc-row-warn) { color: #c0c4cc; background: #fafafa; }
 :deep(.oc-row-warn.el-table__row--current) { background: #fdf6ec; }
 :deep(.oc-date-dirty .el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
+/* 备品超订单(2026-11-08 用户口径):本次转单数量 > 剩余数量时红框 + 「超订单」小标;
+   只做醒目提示、不拦输入(提交时另有二次确认),避免把备品需求当成误操作挡掉 */
+:deep(.oc-over-qty .el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
+:deep(.oc-over-qty .el-input__inner) { color: #f56c6c; font-weight: 600; }
+.oc-over-tag { margin-top: 2px; font-size: 11px; line-height: 1.3; color: #f56c6c; font-weight: 600; }
 </style>

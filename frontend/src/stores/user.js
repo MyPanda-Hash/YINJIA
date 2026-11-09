@@ -21,6 +21,8 @@ export const useUserStore = defineStore('user', {
       // 可配置「预警配置」(库存预警数量)的面板(2026-10-15,同 fieldPanels 机制):
       // 管理员=['*'],其余=角色在该面板被勾了「预警配置」
       warnPanels: Array.isArray(ui?.warnPanels) ? ui.warnPanels : [],
+      // 「改他人行」权限面板(2026-11-06 内部样品单,机制同 fieldPanels/warnPanels)
+      editOtherRowsPanels: Array.isArray(ui?.editOtherRowsPanels) ? ui.editOtherRowsPanels : [],
       // 可「本人自审」的面板(2026-10-28):管理员=['*'],其余=角色在该面板被勾了「本人自审」。
       // 前端据此把「审批通过」对**提交人本人**放开(展示层);真闸门 ButtonService.canSelfAudit。
       selfAuditPanels: Array.isArray(ui?.selfAuditPanels) ? ui.selfAuditPanels : [],
@@ -83,6 +85,7 @@ export const useUserStore = defineStore('user', {
       this.approvePanels = Array.isArray(u?.approvePanels) ? u.approvePanels : []
       this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
       this.warnPanels = Array.isArray(u?.warnPanels) ? u.warnPanels : []
+      this.editOtherRowsPanels = Array.isArray(u?.editOtherRowsPanels) ? u.editOtherRowsPanels : []
       this.selfAuditPanels = Array.isArray(u?.selfAuditPanels) ? u.selfAuditPanels : []
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
       this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
@@ -100,6 +103,7 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = Array.isArray(p.visiblePanels) ? p.visiblePanels : []
       this.approvePanels = Array.isArray(p.approvePanels) ? p.approvePanels : []
       this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
+      this.editOtherRowsPanels = Array.isArray(p.editOtherRowsPanels) ? p.editOtherRowsPanels : this.editOtherRowsPanels || []
       this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       this.selfAuditPanels = Array.isArray(p.selfAuditPanels) ? p.selfAuditPanels : []
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}

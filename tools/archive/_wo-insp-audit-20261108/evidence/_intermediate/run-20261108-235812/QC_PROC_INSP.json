@@ -1,0 +1,663 @@
+{
+ "panel": "QC_PROC_INSP",
+ "name": "制程检验单",
+ "l2": true,
+ "docNo": "ZC-2026-10-0126",
+ "steps": [
+  {
+   "step": "提交审批",
+   "button": "提交审批",
+   "payload": {
+    "编号": "ZC-2026-10-0126"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "审批中",
+     "编号": "ZC-2026-10-0126"
+    }
+   },
+   "statusBefore": "草稿",
+   "statusAfter": "审批中",
+   "statusRow": {
+    "id": 26947,
+    "panel_code": "QC_PROC_INSP",
+    "doc_no": "ZC-2026-10-0126",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "Y",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:14.370Z",
+    "update_at": "2026-11-08T15:58:14.370Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 1,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12695,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "柴善银",
+    "审核人": null,
+    "审核时间": null,
+    "审批人": null,
+    "审批时间": null
+   }
+  },
+  {
+   "step": "审批通过(一级/单节点)",
+   "button": "审批通过",
+   "payload": {
+    "编号": "ZC-2026-10-0126",
+    "审批意见": "E2E-0611 L1 同意"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "待二级审批",
+     "编号": "ZC-2026-10-0126"
+    }
+   },
+   "statusBefore": "审批中",
+   "statusAfter": "待二级审批",
+   "statusRow": {
+    "id": 26947,
+    "panel_code": "QC_PROC_INSP",
+    "doc_no": "ZC-2026-10-0126",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "Y",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:14.370Z",
+    "update_at": "2026-11-08T15:58:14.437Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": 2,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12695,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12696,
+     "action": "APPROVE_L1",
+     "result": "L1_PASSED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "柴善银",
+    "审核人": "系统管理员",
+    "审核时间": "2026-11-08T23:58:14.000Z",
+    "审批人": null,
+    "审批时间": null
+   }
+  },
+  {
+   "step": "二级批准(超级管理员)",
+   "button": "审批通过",
+   "payload": {
+    "编号": "ZC-2026-10-0126",
+    "审批意见": "E2E-0611 L2 批准"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "已审核",
+     "编号": "ZC-2026-10-0126"
+    }
+   },
+   "statusBefore": "待二级审批",
+   "statusAfter": "已审核",
+   "statusRow": {
+    "id": 26947,
+    "panel_code": "QC_PROC_INSP",
+    "doc_no": "ZC-2026-10-0126",
+    "shr": "admin",
+    "shsj": "2026-11-08T15:58:14.490Z",
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:14.370Z",
+    "update_at": "2026-11-08T15:58:14.490Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": "N",
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": null,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12695,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12696,
+     "action": "APPROVE_L1",
+     "result": "L1_PASSED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    },
+    {
+     "id": 12697,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 2,
+     "operator": "admin",
+     "opinion": "E2E-0611 L2 批准",
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "柴善银",
+    "审核人": "系统管理员",
+    "审核时间": "2026-11-08T23:58:14.000Z",
+    "审批人": "系统管理员",
+    "审批时间": "2026-11-08T23:58:14.000Z"
+   }
+  },
+  {
+   "step": "弃审(反审核)",
+   "button": "弃审",
+   "payload": {
+    "编号": "ZC-2026-10-0126"
+   },
+   "response": {
+    "httpStatus": 200,
+    "code": 200,
+    "message": "success",
+    "data": {
+     "单据状态": "草稿",
+     "编号": "ZC-2026-10-0126"
+    }
+   },
+   "statusBefore": "已审核",
+   "statusAfter": "草稿",
+   "statusRow": {
+    "id": 26947,
+    "panel_code": "QC_PROC_INSP",
+    "doc_no": "ZC-2026-10-0126",
+    "shr": null,
+    "shsj": null,
+    "canceled": "N",
+    "cancel_by": null,
+    "cancel_at": null,
+    "pending": "N",
+    "pending_by": "admin",
+    "pending_at": "2026-11-08T15:58:14.370Z",
+    "update_at": "2026-11-08T15:58:14.550Z",
+    "stopped": null,
+    "stop_by": null,
+    "stop_at": null,
+    "saved": "N",
+    "archived": null,
+    "deleting": "N",
+    "delete_req_by": null,
+    "delete_req_at": null,
+    "modify_state": null,
+    "modify_req_by": null,
+    "modify_req_at": null,
+    "modify_appr_by": null,
+    "modify_appr_at": null,
+    "archived_at": null,
+    "approve_node": null,
+    "l2_approver": null,
+    "effective": null,
+    "erp_close_state": null,
+    "modify_reason": null
+   },
+   "approvalTrail": [
+    {
+     "id": 12695,
+     "action": "SUBMIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    },
+    {
+     "id": 12696,
+     "action": "APPROVE_L1",
+     "result": "L1_PASSED",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": "E2E-0611 L1 同意",
+     "self_audit": null
+    },
+    {
+     "id": 12697,
+     "action": "APPROVE",
+     "result": "APPROVED",
+     "node_no": 2,
+     "operator": "admin",
+     "opinion": "E2E-0611 L2 批准",
+     "self_audit": null
+    },
+    {
+     "id": 12698,
+     "action": "UNAUDIT",
+     "result": "PENDING",
+     "node_no": 1,
+     "operator": "admin",
+     "opinion": null,
+     "self_audit": null
+    }
+   ],
+   "headSigns": {
+    "检验员": "柴善银",
+    "审核人": null,
+    "审核时间": null,
+    "审批人": null,
+    "审批时间": null
+   }
+  }
+ ],
+ "cleanup": {
+  "downstreamDeleted": {},
+  "links": {
+   "deleted": 0,
+   "restored": []
+  },
+  "restored": {
+   "head": {
+    "table": "qc_proc_insp_head",
+    "key": "ZC-2026-10-0126",
+    "restored": true,
+    "changed": [
+     "asp_user2",
+     "asp_time2"
+    ],
+    "stillDiff": []
+   },
+   "detail": [
+    {
+     "table": "qc_proc_insp_detail",
+     "key": "270",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_proc_insp_detail",
+     "key": "271",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_proc_insp_detail",
+     "key": "272",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_proc_insp_detail",
+     "key": "273",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_proc_insp_detail",
+     "key": "274",
+     "restored": true,
+     "changed": []
+    },
+    {
+     "table": "qc_proc_insp_detail",
+     "key": "275",
+     "restored": true,
+     "changed": []
+    }
+   ],
+   "workOrders": [],
+   "status": {
+    "deleted": 1
+   },
+   "approvalDeleted": 4,
+   "messageDeleted": 0
+  },
+  "residue": {
+   "statusAfter": "草稿",
+   "headDiff": [],
+   "approvalLeft": 0,
+   "downstreamLeft": {},
+   "linkCountNow": 0,
+   "linkCountPre": 0,
+   "statusRowRestored": true
+  }
+ },
+ "pre": {
+  "status": "草稿",
+  "head": {
+   "id": "54",
+   "单据编号": "ZC-2026-10-0126",
+   "单据日期": "2026-10-15T00:00:00.000Z",
+   "检验时间": null,
+   "检验类别": "制程检验",
+   "工单号": "GD-2026-10-0221",
+   "工单行号": 1,
+   "报工单号": "BG-2026-10-0372",
+   "工序": "成型",
+   "批次号": "20261017",
+   "客户名称": null,
+   "产品编码": "S031-1",
+   "产品名称": "S阻垢炭棒/滤芯",
+   "规格型号": "28*12*178",
+   "生产线": "自动线3",
+   "生产车间": "成型",
+   "报工数量": 100,
+   "抽检总量": 100,
+   "检验数量": 100,
+   "检验员": "柴善银",
+   "检验日期": "2026-10-15T00:00:00.000Z",
+   "总结论": "合格",
+   "检验方案": "出货控制计划执行",
+   "文件编码": null,
+   "执行标准": null,
+   "处理方式": "合格转序",
+   "备注": null,
+   "单据状态": null,
+   "审核人": null,
+   "审核时间": null,
+   "asp_user1": "wo-insp-20261018",
+   "asp_time1": "2026-10-18T08:02:03.953Z",
+   "asp_user2": "migration",
+   "asp_time2": "2026-10-21T11:25:38.143Z",
+   "asp_cancel": "N",
+   "列数": null,
+   "审批人": null,
+   "审批时间": null
+  },
+  "detailCount": 6,
+  "linkCount": 0,
+  "approvalMaxId": 11655
+ },
+ "downstream": {},
+ "assertions": [
+  {
+   "name": "QC_PROC_INSP 选中文档",
+   "ok": null,
+   "detail": "{\"no\":\"ZC-2026-10-0126\",\"状态\":\"草稿\",\"明细行\":6,\"已有流程链\":0}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 起点是草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交审批: 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"审批中\",\"编号\":\"ZC-2026-10-0126\"}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交审批: 返回单据状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交审批: DB 派生状态=审批中",
+   "ok": true,
+   "detail": "实际=审批中"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交后 pending=Y / node=1",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":1}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交后 pending_by=admin",
+   "ok": true,
+   "detail": "pending_by=admin"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 留痕 SUBMIT/PENDING",
+   "ok": true,
+   "detail": "SUBMIT/PENDING"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交后「检验员」有值(编制=提交人)",
+   "ok": true,
+   "detail": "检验员=柴善银"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 提交后「审核人」「审批人」为空",
+   "ok": true,
+   "detail": "{\"l1\":null,\"l2\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 审批通过(一级/单节点): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"待二级审批\",\"编号\":\"ZC-2026-10-0126\"}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 审批通过(一级/单节点): 返回单据状态=待二级审批",
+   "ok": true,
+   "detail": "实际=待二级审批"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 审批通过(一级/单节点): DB 派生状态=待二级审批",
+   "ok": true,
+   "detail": "实际=待二级审批"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 一级通过后 pending=Y / node=2",
+   "ok": true,
+   "detail": "{\"pending\":\"Y\",\"node\":2}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 一级通过后 shr 为空(尚未归档)",
+   "ok": true,
+   "detail": "shr="
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 留痕 APPROVE_L1/L1_PASSED@1",
+   "ok": true,
+   "detail": "SUBMIT/PENDING@1,APPROVE_L1/L1_PASSED@1"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 一级通过后「审核人」=「系统管理员」",
+   "ok": true,
+   "detail": "审核人=系统管理员"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 一级通过后「审核时间」有值",
+   "ok": true,
+   "detail": "审核时间=Mon Nov 09 2026 07:58:14 GMT+0800 (GMT+08:00)"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 一级通过后「审批人」为空",
+   "ok": true,
+   "detail": "审批人="
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级批准(超级管理员): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"已审核\",\"编号\":\"ZC-2026-10-0126\"}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级批准(超级管理员): 返回单据状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级批准(超级管理员): DB 派生状态=已审核",
+   "ok": true,
+   "detail": "实际=已审核"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级通过后 pending=N / shr=admin",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"shr\":\"admin\"}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级通过后 approve_node 清空",
+   "ok": true,
+   "detail": "node=null"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 留痕 APPROVE/APPROVED@2",
+   "ok": true,
+   "detail": "SUBMIT/PENDING@1,APPROVE_L1/L1_PASSED@1,APPROVE/APPROVED@2"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 一级留痕 APPROVE_L1 仍在",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级通过后「审批人」=「系统管理员」",
+   "ok": true,
+   "detail": "审批人=系统管理员"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 二级通过后「审批时间」有值",
+   "ok": true,
+   "detail": "审批时间=Mon Nov 09 2026 07:58:14 GMT+0800 (GMT+08:00)"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 审核终态=已审核",
+   "ok": true,
+   "detail": "status=已审核"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 弃审(反审核): 接口成功",
+   "ok": true,
+   "detail": "code=200 msg=success data={\"单据状态\":\"草稿\",\"编号\":\"ZC-2026-10-0126\"}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 弃审(反审核): 返回单据状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 弃审(反审核): DB 派生状态=草稿",
+   "ok": true,
+   "detail": "实际=草稿"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 弃审后 pending≠Y、shr 空、approve_node 空",
+   "ok": true,
+   "detail": "{\"pending\":\"N\",\"shr\":null,\"node\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 留痕 UNAUDIT/PENDING(ButtonService.unaudit 口径)",
+   "ok": true,
+   "detail": "SUBMIT/PENDING,APPROVE_L1/L1_PASSED,APPROVE/APPROVED,UNAUDIT/PENDING"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 弃审后「审核人」「审批人」清空",
+   "ok": true,
+   "detail": "{\"l1\":null,\"l2\":null}"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 弃审终态=草稿",
+   "ok": true,
+   "detail": "status=草稿"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 还原:状态回草稿",
+   "ok": true,
+   "detail": "statusAfter=草稿"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 还原:头行全列与测前一致",
+   "ok": true,
+   "detail": "diff=[]"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 还原:本轮审批留痕已清除",
+   "ok": true,
+   "detail": "left=0"
+  },
+  {
+   "name": "QC_PROC_INSP/ZC-2026-10-0126 还原:流程链条数恢复测前",
+   "ok": true,
+   "detail": "now=0 pre=0"
+  }
+ ],
+ "pass": 39,
+ "fail": 0
+}

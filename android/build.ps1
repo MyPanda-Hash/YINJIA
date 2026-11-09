@@ -20,15 +20,35 @@ $app  = Join-Path $proj 'app'
 $build = Join-Path $proj 'build'
 $dist  = Join-Path $proj 'dist'
 
-$sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
-if (-not (Test-Path $sdk)) { throw "找不到 Android SDK:$sdk(设 ANDROID_HOME)" }
-$bt = Join-Path $sdk 'build-tools\34.0.0'
-# d8 单独取新版:34.0.0 自带的 d8(8.2.2)在 JDK 25 上会 NPE 崩溃(实测),36.1.0 正常
-$btD8 = @('36.1.0','37.0.0','34.0.0') | ForEach-Object { Join-Path $sdk "build-tools\$_" } | Where-Object { Test-Path (Join-Path $_ 'd8.bat') } | Select-Object -First 1
+# SDK:探测顺序见 sdk.ps1(环境变量 → %LOCALAPPDATA%\Android\Sdk → 各盘根常见安装名,
+# 如本机的 E:\SDK),不再要求手工设 ANDROID_HOME。
+. (Join-Path $here 'sdk.ps1')
+$sdk = Get-AndroidSdk
+if (-not $sdk) { throw '找不到 Android SDK(设 ANDROID_HOME,或把 SDK 放在 <盘>:\SDK / <盘>:\Android\Sdk)' }
+
+# 版本目录一律"优先已验版本,找不到就取现有最新",不再写死单一版本
+$btList = @(Get-ChildItem (Join-Path $sdk 'build-tools') -Directory -ErrorAction SilentlyContinue |
+  Sort-Object { try { [version]$_.Name } catch { [version]'0.0.0' } } -Descending)
+if ($btList.Count -eq 0) { throw "找不到 build-tools:$sdk\build-tools" }
+$btDir = $btList | Where-Object { $_.Name -eq '34.0.0' } | Select-Object -First 1
+if (-not $btDir) { $btDir = $btList | Where-Object { Test-Path (Join-Path $_.FullName 'aapt2.exe') } | Select-Object -First 1 }
+if (-not $btDir) { throw "找不到带 aapt2 的 build-tools:$sdk\build-tools" }
+$bt = $btDir.FullName
+# d8 必须取**新版**:34.0.0 自带的 d8(8.2.2)在 JDK 23/25 上会 NPE 崩溃(实测
+# "Compilation failed with an internal error"),35.0.1 的 8.6.2 正常。
+# ⇒ 按版本号倒序挑第一个带 d8.bat 的(36/37 等更高版本将来也自动可用)。
+$btD8 = @($btList | Where-Object { Test-Path (Join-Path $_.FullName 'd8.bat') } |
+  Sort-Object { try { [version]$_.Name } catch { [version]'0.0.0' } } -Descending) | Select-Object -First 1 -ExpandProperty FullName
 if (-not $btD8) { throw '找不到可用的 d8(build-tools)' }
-if (-not (Test-Path $bt)) { throw "找不到 build-tools 34.0.0:$bt" }
-$androidJar = Join-Path $sdk 'platforms\android-34\android.jar'
-if (-not (Test-Path $androidJar)) { throw "找不到 android-34 平台:$androidJar" }
+
+# 平台:优先 android-34(aapt2 link 的 targetSdk 就写 34),没有就取现有最高
+$plat = Join-Path $sdk 'platforms\android-34\android.jar'
+if (-not (Test-Path $plat)) {
+  $plat = Get-ChildItem (Join-Path $sdk 'platforms') -Directory | Sort-Object { try { [int]($_.Name -replace '\D', '') } catch { 0 } } -Descending |
+    ForEach-Object { Join-Path $_.FullName 'android.jar' } | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $plat) { throw "找不到 android.jar:$sdk\platforms" }
+$androidJar = $plat
 
 # JDK:优先 JAVA_HOME,其次 JDK 25 常见路径(与仓库其它脚本同一套探测)
 $javaHome = $env:JAVA_HOME

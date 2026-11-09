@@ -252,6 +252,11 @@ public class QcInspAutoService {
             if (shop != null) head.put("生产车间", shop);
         }
         head.put("检验类别", "制程检验");
+        // 「检验方案」**默认值**(2026-11-06 用户口径「抽检方案固定写(出货控制计划执行)」;
+        //   同日第二轮「默认为这个的情况下也能进行修改」⇒ 字段可编辑,这里只是自动出单的初值)：
+        // 自动出单在这里写默认值;人工建单/保存走 ButtonService.save() 的"空值兜底默认"(不覆盖用户改过的值)。
+        // 两处各一处字面量(本类被 ButtonService 依赖、不能反向引用那边),改口径两处一起改。
+        head.put("检验方案", "出货控制计划执行");
         head.put("detail", Map.of("items", List.of()));
         return head;
     }

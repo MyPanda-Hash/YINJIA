@@ -172,7 +172,8 @@
         <QcProcInspSheet
           v-else-if="panelCode === 'QC_PROC_INSP'"
           ref="approvalSheetRef"
-          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          :head="cur" :fields="headerFields" :detail-fields="sheetDetailFields"
+          :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
         />
@@ -248,7 +249,8 @@
              FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
-          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+          <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -440,12 +442,11 @@
               </template>
               <div class="as-side-btn sub" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               <!-- 直接「审核 / 弃审」入口(2026-10-17 用户口径「为当前制程检验单增加审核」;
-                   2026-10-18 首件检验单同口径放开):
-                   工序检验单一族(制程/首件,见 DIRECT_AUDIT_PANELS)不属两级审批的质量单据一族(8 张质量单据 + 出厂检验报告)、
-                   也没走审批流 ⇒ 给一键直审。**直审仅管理员**(后端 ButtonService.audit() 同口径拒绝非管理员;
-                   有审批权的角色走「提交审批 → 审批通过」)。置灰由 isDisabled 按单据状态判(草稿才可审、已审核才可弃审)。
-                   ⚠ 合并说明(2026-10-17 侧栏整理合并):本块原有的「审批情况」按钮**不再重复渲染** ——
-                     上面统一审批块已经有一条同名弱化条目(同一个动作、同一个只读历史弹窗)。 -->
+                   2026-10-18 首件检验单同口径放开)。
+                   ⚠ 2026-11-06 起**直审入口整体撤掉**:制程/首件两张单并入质量单据两级审批
+                     (见 DIRECT_AUDIT_PANELS 已清空、L2_DOC_PANELS 已登记),后端会拒直审 ⇒
+                     审批与弃审改由上面的统一审批组 / ⑤危险操作段承担;本块保留只为将来某个工序
+                     检验单确要走直审时把面板码加回名单即可。 -->
               <template v-if="canDirectAuditHere">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('审核') }" @click="onSideAction('审核')">{{ tt('审核') }}</div>
                 <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
@@ -479,6 +480,10 @@
                 <div class="as-side-btn primary" @click="onSideAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
                 <div class="as-side-btn" @click="onSideAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
               </template>
+              <!-- 修改单据(2026-11-06 用户口径「一级审批人和管理员都能看到一个修改单据按钮，点击就可以进行修改，
+                   修改完成点击保存回到归档状态，但是有一个修改记录记录谁修改的什么时候」)——
+                   归档态才出现;谁能改由后端 canDirectModify 判定(管理员 ∪ 本单一級审批人),前端只按身份/署名预判显示。 -->
+              <div class="as-side-btn" v-if="canDirectModifyDoc" @click="onSideAction('修改单据')">{{ tt('修改单据') }}</div>
               <div class="as-side-btn" v-if="isModLogPanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
               <!-- ③ 流程(2026-10-16 侧栏整理):本面板的**业务流转**按钮单独成段,与通用动作彻底分开。
                    数字 1/2/3 = 业务顺序(立项:定级 → 分发对接人 → 确认责任人;产品信息表:分发责任人 → 规格书分发),
@@ -2063,6 +2068,55 @@
     </el-dialog>
 
     <!-- 一级通过时选取二级审核人(2026-09-20 两级审批):被选人收到消息并完成二级签核 -->
+    <!-- 外部开发样品申请单 · 一级审批「回填配方及工艺要求」(2026-11-06 用户口径:
+         「因为配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批的时候有一个回填弹窗就是写这个配方及
+         工艺要求的，审批通过填写这个字段内容回填进去，进入二级审批」)。
+         同一张弹窗里既选二级审核人、又填审批回填内容 —— 一次提交两步完成。 -->
+    <el-dialog v-model="sampleL1Visible" :title="tt('一级审批 · 回填配方及工艺要求')" width="880px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">
+          {{ tt('配方及工艺要求由一级审批人在这里补齐；点「审批通过」后内容写入单据，再转二级审核人签核。') }}
+        </div>
+        <div v-if="l2PickHiddenSubmitter" class="mod-log-meta" style="margin-bottom:8px">{{ tt('已按「编制与审批分离」排除提交人：') }}{{ l2PickHiddenName }}</div>
+        <div v-if="sampleL1Error" class="dq-error">{{ sampleL1Error }}</div>
+        <!-- 2026-11-06 用户口径:「二级审批人只有管理员」—— 一级不再选人,这里只显示固定值 -->
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('二级审批人') }}</span>
+          <span>{{ tt('管理员（固定）') }}</span>
+        </div>
+        <div v-for="(r, ri) in sampleL1Rows" :key="'sl1' + ri" class="sl1-row">
+          <div class="sl1-row-head">
+            <span class="sl1-idx">{{ ri + 1 }}</span>
+            <span class="sl1-spec">{{ r.产品整体规格 || '—' }}</span>
+            <span class="sl1-spec">{{ r.炭棒规格 || '—' }}</span>
+            <span class="sl1-spec">{{ r.样品数量 || '—' }}</span>
+          </div>
+          <div class="sl1-field">
+            <span class="dq-label">{{ tt('配方及工艺要求') }}<i class="sl1-req">*</i></span>
+            <el-input v-model="r.配方及工艺要求" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :placeholder="tt('填写配方与实现工艺（审批通过后写入本行）')" />
+          </div>
+          <div class="sl1-two">
+            <div class="sl1-field">
+              <span class="dq-label">{{ tt('组装要求') }}</span>
+              <el-input v-model="r.组装要求" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" />
+            </div>
+            <div class="sl1-field">
+              <span class="dq-label">{{ tt('性能要求') }}</span>
+              <el-input v-model="r.性能要求" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" />
+            </div>
+          </div>
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="sampleL1Opinion" type="textarea" :rows="2" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="sampleL1Visible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="sampleL1Busy" @click="confirmSampleL1">{{ tt('审批通过并转二级') }}</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="l2PickVisible" :title="tt('选取二级审核人')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('一级审批通过后，由该审核人完成二级签核；二级通过即归档，随后由其分发责任人。') }}</div>
@@ -2630,6 +2684,10 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   'QC_OQC_REPORT',
   // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
   // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
+  // ⚠ 2026-11-06 第二轮：内部单**恢复纸面版式**（用户纠正「格式还是要和 Excel 一样的，只是行操作
+  //   和外部单底部的新增样品一样，而不是表格类的面板」）⇒ 两张单都走 DocSheet；
+  //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
+  //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
   'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
   ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
@@ -4134,7 +4192,17 @@ const isSelfMaintainedPanel = computed(() => !!cfgCache.value?.metadata?.selfMai
  * 检验目录(QC_CATALOG)不是归档面板,但其「修改」动作会把「已完成检验」回弹并写 yj_doc_modify_log
  * (2026-09-22 用户口径:修改记录要放在按钮栏处),故一并放开。
  */
-const isModLogPanel = computed(() => isDocArchivePanel.value || String(panelCode.value) === 'QC_CATALOG')
+// 2026-11-06:外部开发样品申请单也要有「修改记录」——用户口径「有一个修改记录记录谁修改的什么时候」。
+// 它不是 docArchive 一族(不走申请修改闭环),但直接修改这条路径同样写 yj_doc_modify_log,
+// 后端 `修改记录` 动作(modifyHistory)对任何面板都可用,所以这里放开入口即可。
+// 「改他人行」权限(2026-11-06 内部样品单):组织架构·角色里勾了 edit_others 的面板才为 true。
+// 只做入口/单元格显隐,真闸门在 ButtonService.applySampleIntRowRules。
+const canEditOtherRowsHere = computed(() => user.isAdmin === true
+  || (Array.isArray(user.editOtherRowsPanels) && user.editOtherRowsPanels.includes(String(panelCode.value))))
+
+const isModLogPanel = computed(() => isDocArchivePanel.value
+  || String(panelCode.value) === 'QC_CATALOG'
+  || String(panelCode.value) === 'RD_SAMPLE_EXT')
 /** 品质单据等标准流文书面板:非文件类(保存不自动提交审批),侧栏需显式审批动作组 */
 const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(qcSheetCfgs, String(panelCode.value)))
 /**
@@ -4148,17 +4216,24 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  * 并入质量单据两级审批(L2_DOC_PANELS)⇒ 侧栏必须放出「提交审批」与「弃审」(此前只有管理员直审,
  * 直审已按后端 ADMIN_L2_PANELS 撤掉)。它的纸面由 QcOqcSheet 接管、不在 qcSheetCfgs 里,故单独登记;
  * 这里只管**显示**,每个动作能不能点/能不能落地仍由 isDisabled + 后端 ButtonService 裁决。
+ *
+ * ⚠ 2026-11-06(承接用户口径「制程/首件检验单接入质量单据两级审批」):
+ *   制程检验单(QC_PROC_INSP)/首件检验单(QC_FIRST_INSP)同批并入(L2_DOC_PANELS),纸面表尾
+ *   由「检验人|审核人」扩成「检验人|审核人|批准」⇒ 侧栏必须给出「提交审批/审批通过/审批驳回/审批情况」
+ *   (此前这两张单只有管理员直审入口,没有提交审批这一步)。后端权威清单 = ButtonService.QC_DOC_PREPARER
+ *   (= ADMIN_L2_PANELS);**两处必须同步**,否则会出现"前端给了按钮、后端按直审/非两级审批拒掉"的错位。
  */
 const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_INSP_REC'
   || String(panelCode.value) === 'QC_OQC_REPORT'
+  || String(panelCode.value) === 'QC_PROC_INSP'
+  || String(panelCode.value) === 'QC_FIRST_INSP'
   || String(panelCode.value) === 'RD_DOM_TEST'
-  // 开发样品申请单两张（2026-11-06 用户口径「里面的对应流程已经给出了，把这个流程也跑通」）：
-  //   外部单 提交 → 审核(一级,选确认人) → 确认(二级) → 已审核；
-  //   内部单 提交 → 确认(单节点) → 已审核。
+  // 开发样品申请单（2026-11-06 用户口径「里面的对应流程已经给出了，把这个流程也跑通」）：
+  //   外部单 提交 → 审核(一级,选确认人) → 确认(二级) → 已审核。
   // 只放开**显示**：能不能点仍由 isDisabled(状态×身份) + 后端 ButtonService 裁决。
-  || String(panelCode.value) === 'RD_SAMPLE_EXT'
-  || String(panelCode.value) === 'RD_SAMPLE_INT')
+  // ⚠ 内部单 2026-11-06 起改成共享表（无审批），不在这里 —— 见 migrate-sample-int-flat-20261106.sql。
+  || String(panelCode.value) === 'RD_SAMPLE_EXT')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
  *
@@ -4190,8 +4265,16 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  *   ButtonService.ADMIN_L2_PANELS 已含该面板 ⇒ 直审(audit)必被拒
  *   「走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核」;
  *   ⇒ 不再给「审核 / 弃审」直审入口,审批与弃审改由上面的统一审批组/危险操作段(按节点显隐)承担。
+ *
+ * ⚠ 2026-11-06(用户口径「制程检验单/首件检验单接入两级审批」,**取代** 2026-10-17/10-18 段):
+ *   制程检验单(QC_PROC_INSP)/首件检验单(QC_FIRST_INSP)并入质量单据两级审批(见 L2_DOC_PANELS),
+ *   后端 ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS 同批登记 ⇒ 直审(audit)必被拒
+ *   「走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核」;
+ *   ⇒ 本名单清空,**不再给管理员直审入口**;提交审批/审批通过/审批驳回/弃审/审批情况
+ *   全部由上面的统一审批组与危险操作段承担(弃审在⑤危险操作,仅已审核可点)。
+ *   保留本常量与 canDirectAuditHere 计算:将来若某个工序检验单确要走直审,只把面板码加回来即可。
  */
-const DIRECT_AUDIT_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
+const DIRECT_AUDIT_PANELS = []
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -4404,6 +4487,16 @@ const l2ApproverNow = computed(() => {
 // 2026-11-04 起 9 张:8 张质量单据 + 出厂检验报告(QC_OQC_REPORT)。
 //   QC_OQC_REPORT 原走「管理员直审」(见 DIRECT_AUDIT_PANELS 的 2026-11-01 段),用户 2026-11-04 口径
 //   「检验员=编制 / 审核=一级审批人 / 批准=超级管理员」⇒ 并入质量单据两级审批,直审入口撤掉(后端会拒)。
+// ⚠ 2026-11-06 起 11 张:再加 **制程检验单 QC_PROC_INSP / 首件检验单 QC_FIRST_INSP**(用户口径
+//   「两张检验单接入质量单据两级审批,检验人=编制 / 审核=一级审批人 / 批准=超级管理员」)。
+//   ⚠ 上面 2026-11-06「接入两级审批」的口径**已被 2026-11-09 取代**(见下方新注释)。 这两张原走管理员直审(DIRECT_AUDIT_PANELS 已清空),后端 ButtonService.QC_DOC_PREPARER 同批登记 ⇒
+//   **本清单必须与后端 ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS 的 key 集一致**,
+//   否则前端按直审/非两级判显隐、后端按两级审批判节点,必错位(按钮点了被拒)。
+// ⚠ 2026-11-09 用户口径:「首件 QC_FIRST_INSP、制程 QC_PROC_INSP …… 这两个只需要实现一级审批,
+//   和当前的来料检验一样的审批形式即可」⇒ 两张单**退出**两级审批名单(后端同步移出
+//   ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS):提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
+//   它们仍保留侧栏审批组显示(hasApprovalBtns 名单),只是不再走「一级/二级/批准」节点;
+//   本清单必须与后端 ADMIN_L2_PANELS 的 key 集一致,否则按钮点了被后端拒。
 const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT']
 const isQcL2Panel = computed(() => L2_DOC_PANELS.includes(String(panelCode.value)))
 /** 一级审核节点(节点 1):状态还是「审批中」 */
@@ -4811,14 +4904,8 @@ onMounted(() => {
   })
 })
 /** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
-const sheetAllFields = computed(() => {
-  const header = headerFields.value || []
-  const detail = cfgCache.value?.detail?.tabs?.[0]?.fields || []
-  return [...header, ...detail]
-})
-/** 明细字段元数据(只明细那一份):RecordSheetPanels 靠它发现「明细里的附件字段」
- *  (2026-11-09 手机照片按下行存 → 纸面数据表末尾自动补一列;见该组件 rowAttachCols)。 */
 const sheetDetailFields = computed(() => cfgCache.value?.detail?.tabs?.[0]?.fields || [])
+const sheetAllFields = computed(() => [...(headerFields.value || []), ...sheetDetailFields.value])
 const queryDialogFields = computed(() => {
   // 档案/单单据面板(基础资料):表头只剩「备注」,查询条件取元数据登记的常规字段(queryFields,每面板 ≤6 个)
   const fields = (reportMode.value || singleDocMode.value) ? queryFields.value : headerEditFields.value
@@ -6204,8 +6291,9 @@ function stripBlankSampleRows(detail) {
 // DOM 只渲染当前页 —— 商品等几千行×几十列的档案页全量渲染会把 DOM 撑到十几万格导致整页卡死;
 // 全部 singleDoc 档案面板(INV/KHDA/GFDA/EMP/WH/PARTNER/DEPT/UOM/REGION/ZDGL…)走同一通道自动生效。
 // 分页器形态(用户口径):总数 + 每页条数下拉(默认100) + 左右箭头 + 输入跳页(不要数字页码按钮) ═══
-const archPageSize = ref(50)
-const ARCH_SIZE_OPTS = [50, 100, 200, 500]
+const archPageSize = ref(20)
+// 2026-11-06 用户口径:「可以设置 10行/20行/50行 进行页面切换，防止一页数据太多了」
+const ARCH_SIZE_OPTS = [10, 20, 50, 100, 200, 500]
 const archPage = ref(1)
 function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首页
 
@@ -6929,6 +7017,86 @@ async function openL2Pick(no) {
   l2PickHiddenSubmitter.value = (!user.isAdmin && curSubmitter.value) ? curSubmitter.value : ''
   l2PickVisible.value = true
 }
+/* ── 外部开发样品申请单:一级审批「回填配方及工艺要求」(2026-11-06) ──
+   用户口径:「配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批有一个回填弹窗写这个字段，
+   审批通过回填进去，进入二级审批(管理员)，管理员审批完成归档」。
+   为什么不再走 openL2Pick:那个弹窗只选二级审核人;这一版要把**内容**一起收上来,
+   所以同一张弹窗里既选人、又填配方及工艺要求/组装要求/性能要求,一次提交完成两步。 */
+const sampleL1Visible = ref(false)
+const sampleL1Busy = ref(false)
+const sampleL1Error = ref('')
+const sampleL1No = ref('')
+const sampleL1User = ref('')
+const sampleL1Opinion = ref('')
+const sampleL1Rows = ref([])
+
+/** 打开一级审批回填弹窗:把当前明细行(产品整体规格/炭棒规格/样品数量/配方及工艺要求…)抄一份进来 */
+async function openSampleL1(no) {
+  sampleL1No.value = no
+  sampleL1User.value = ''
+  sampleL1Opinion.value = ''
+  sampleL1Error.value = ''
+  sampleL1Visible.value = true
+  const rows = cur.value?.detail?.items || []
+  sampleL1Rows.value = rows.map((r, i) => ({
+    id: r.id,
+    产品整体规格: r['产品整体规格'] || '',
+    炭棒规格: r['炭棒规格'] || '',
+    样品数量: r['样品数量'] || '',
+    组装要求: r['组装要求'] || '',
+    性能要求: r['性能要求'] || '',
+    配方及工艺要求: r['配方及工艺要求'] || '',
+    __idx: i + 1,
+  }))
+}
+
+async function confirmSampleL1() {
+  const missing = sampleL1Rows.value.filter((r) => !String(r.配方及工艺要求 || '').trim())
+  if (missing.length) {
+    return ElMessage.warning(tt('配方及工艺要求不能为空（第 {n} 行）').replace('{n}', missing.map((r) => r.__idx).join('、')))
+  }
+  if (sampleL1Busy.value) return
+  sampleL1Busy.value = true
+  sampleL1Error.value = ''
+  try {
+    await engine.callButton({
+      panelCode: 'RD_SAMPLE_EXT',
+      buttonName: '审批通过',
+      formData: {
+        编号: sampleL1No.value,
+        ...(sampleL1Opinion.value ? { 审批意见: sampleL1Opinion.value } : {}),
+        明细回填: sampleL1Rows.value.map((r) => ({
+          id: r.id, 组装要求: r.组装要求, 性能要求: r.性能要求, 配方及工艺要求: r.配方及工艺要求,
+        })),
+      },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('已回填配方及工艺要求并转二级审核人'))
+    sampleL1Visible.value = false
+    await load()
+  } catch (e) {
+    sampleL1Error.value = String(engine.errMsg(e) || tt('审批失败'))
+    ElMessage.error(sampleL1Error.value)
+  } finally {
+    sampleL1Busy.value = false
+  }
+}
+
+/* ── 归档单据「修改单据」:一级审批人 ∪ 管理员(2026-11-06) ──
+   前端只做**显示预判**:管理员 ∪ 纸面「审核」格署名者 = 本人。真正的门禁在后端
+   canDirectModify(本单一级审批留痕 / 审核格署名 / 管理员),前端判错也只是"看不到按钮",不会误放行。 */
+/** 身份判据(与状态无关):管理员 ∪ 纸面「审核」格署名者 = 本单一级审批人 */
+const isSampleExtDirectEditor = computed(() => {
+  if (String(panelCode.value) !== 'RD_SAMPLE_EXT') return false
+  if (user.isAdmin) return true
+  const sign = String(cur.value?.['审核'] || '')
+  const who = sign.includes('/') ? sign.split('/')[0].trim() : sign.trim()
+  return !!who && !!user.realName && who === String(user.realName)
+})
+/** 侧栏「修改单据」按钮的显示条件 = 身份命中 + 当前是归档态 */
+const canDirectModifyDoc = computed(() => isSampleExtDirectEditor.value
+  && ['已归档', '已审核'].includes(String(curDocStatus.value || '')))
+
 async function confirmL2Pick() {
   if (!l2PickUser.value) return ElMessage.warning(tt('请选取二级审核人'))
   if (l2PickBusy.value) return
@@ -8742,11 +8910,11 @@ async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
   const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
-  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成制程检验单'))
+  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成出货检验单功能'))
   const existed = res?.['已存在'] === true
   ElMessage.success(existed
-    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
-    : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
+    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有出货检验单功能')}：${no}`
+    : `${isFirst ? tt('已生成首件检验单') : tt('已生成出货检验单功能')}：${no}`)
   if (target === panelCode.value) {
     // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
     //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。
@@ -9243,6 +9411,13 @@ function validateInlineDraft() {
  */
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false, reason = '' } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
+  // 归档单据「修改单据」后的保存 = 保存修改(2026-11-06 用户口径「修改完成点击保存回到归档状态」):
+  //   后端 saveDirectModify 落库后立刻做 修改记录 diff 收尾并把状态拨回 已归档 —— 不能走普通「保存」,
+  //   那样只会停在 修改中。
+  if (buttonName === '保存' && String(panelCode.value) === 'RD_SAMPLE_EXT'
+      && String(cur.value?.['单据状态'] || '') === '修改中' && isSampleExtDirectEditor.value) {
+    buttonName = '保存修改'
+  }
   const pre = reason ? tt('{a}前需先保存：').replace('{a}', tt(reason)) : ''
   // 唯一键查重(2026-10-16):「相同编码不允许重复」是**数据正确性**规则,不是"填没填全"——
   // 所以它不受 skipValidation 影响,"保存为草稿"同样不放行(否则草稿先把重复码存进去,
@@ -11016,7 +11191,11 @@ async function onButton(action) {
           const saved = await saveInlineDraft('保存', { silent: true })
           if (!saved) return
         }
-        return openL2Pick(current.value['编号'] || current.value['单据编号'] || '')
+        const no1 = current.value['编号'] || current.value['单据编号'] || ''
+        // 外部开发样品申请单:一级审批要**回填配方及工艺要求**(2026-11-06 用户口径) ⇒ 专用弹窗;
+        // 产品信息表仍走「只选二级审核人」的老弹窗。
+        if (String(panelCode.value) === 'RD_SAMPLE_EXT') return openSampleL1(no1)
+        return openL2Pick(no1)
       }
       // 立项申请表(2026-10-08 流程图②):审批通过与项目定级是同一步骤的两个动作 ⇒ 走「审批通过 + 定级」弹窗。
       // 其余面板保持原样(意见确认框)。
@@ -12110,6 +12289,21 @@ onUnmounted(() => {
   background: #eff6ff;
 }
 /* 查询单据弹窗 */
+/* 一级审批回填弹窗(外部样品单,2026-11-06):每个样品一行,配方及工艺要求必填 */
+.sl1-row {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  background: #fafbfc;
+}
+.sl1-row-head { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; }
+.sl1-idx { font-weight: 700; color: #1668dc; }
+.sl1-spec { font-size: 12px; color: #5b6472; font-variant-numeric: tabular-nums; }
+.sl1-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.sl1-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sl1-req { color: #f56c6c; font-style: normal; margin-left: 2px; }
+
 .dq-form {
   display: flex;
   flex-direction: column;

@@ -1,6 +1,8 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表 · **纵向表版**(一行一个检验项目)
+       出货检验单功能(原「制程检验单」,面板 QC_PROC_INSP,2026-11-08 用户口径改名)
+       —— 纸张式可填写报表 · **纵向表版**(一行一个检验项目);
+       纸面标题同步改为「出货检验记录表」(页面/打印/Excel/PDF 报表同一标题)。
 
        用户口径(2026-10-17 第六轮):
          「好的当前制程检验形式错误了,这个内容进行修改实现,当前这个修改一下内容实现,不需要那些外观什么的」
@@ -19,13 +21,23 @@
          2026-10-17 口径「当前超出当前行的内容框体要边长才行」+「将当前一开始的框体就变大一点」。
        ⚠ 手工新增的行:检验要求 填了内容而 检验项目 还空着时,顺手把同一段文字写进 检验项目
          (行的身份键,列表页按它显示;带入的行两者都有,不受影响)。
+       ⚠ 2026-11-06(承接用户口径「制程检验单接入两级审批」)本纸同批改动:
+          · **两级审批**:检验人=编制(提交审批时后端自动写提交人、空值兜底)/ 审核=一级审批人 /
+            批准=超级管理员(二级审批通过才落值) ⇒ 表尾补「批准」格(head['审批人'],恒只读);
+          · **工序已隐去**(yj_field hidden=1,后端元数据过滤,前端无需特判);
+          · **检验方案默认值「出货控制计划执行」、可修改**(2026-11-06 同日第二轮口径「默认为这个的情况下
+            也能进行修改」:后端只在空值兜底写默认值,不覆盖人工改值 ⇒ 字段 editable=1,本纸渲染成输入框);
+          · **明细「结果判断」改下拉**(合格/不合格,值取自 yj_field.dataType=下拉框 的 options,
+            选项是**存储数据键**,不翻译、不 tt();没有 options 时退回文本输入);
+          · 单据编号/工单行号/审核人/审核时间/审批人/审批时间 一律按元数据只读
+            (后端契约:yj_field.editable=0 下发的是 `readonly:true`,见 isLockedKey)。
        ⚠ Excel 导出:版式在 `core/qc/qcProcInspExport.js`(纯函数 + 单测),本组件只做 aoa_to_sheet + writeFile,
          入口 = 面板右侧「文档输出 → 导出」→「导出 Excel（.xlsx）」(PanelxList 按面板码路由到 exportProcInspExcel)。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="qr-sheet">
     <!-- ① 标题 -->
     <div class="qr-titlerow">
-      <div class="qr-title">{{ tt('制程检验记录表') }}</div>
+      <div class="qr-title">{{ tt('出货检验记录表') }}</div>
     </div>
 
     <!-- ② 抬头:一行 2 组「标签|值」(照旧不动) -->
@@ -128,8 +140,20 @@
           </template>
           <template v-if="row">
             <td v-for="c in cellCols" :key="c.k" :class="c.cls">
+              <!-- 2026-11-06:字段元数据 dataType='下拉框' 且有 options 的列(「结果判断」合格/不合格)
+                   渲染成 el-select;选项值 = 存储数据键(合格/不合格),**不做 tt() 翻译** -->
+              <el-select
+                v-if="editable && optionsOf(c.k).length"
+                :model-value="cellText(row, c.k)"
+                size="small"
+                clearable
+                class="qr-cell-input"
+                @change="(v) => setCell(row, c.k, v ?? '')"
+              >
+                <el-option v-for="o in optionsOf(c.k)" :key="o" :label="o" :value="o" />
+              </el-select>
               <el-input
-                v-if="editable"
+                v-else-if="editable"
                 :model-value="cellText(row, c.k)"
                 size="small"
                 class="qr-cell-input qr-cell-wrap"
@@ -153,12 +177,23 @@
       </tbody>
     </table>
 
-    <!-- ⑤ 结论区(照旧不动) -->
+    <!-- ⑤ 结论区(2026-11-06 由 4 列改 6 列:结论/处理意见各跨 5 列;末行 检验人|审核人|批准 三对)
+         ⚠ 两级审批口径:检验人 = 编制(可填,提交审批时后端自动写提交人、空值兜底);
+           审核人 = 一级审批人(yj_doc_status.shr 虚拟字段,只读);批准 = 超级管理员
+           (head['审批人'],二级审批通过才落值,只读)。 -->
     <table class="qr-foot-table">
+      <colgroup>
+        <col style="width: 96px" />
+        <col />
+        <col style="width: 96px" />
+        <col />
+        <col style="width: 96px" />
+        <col />
+      </colgroup>
       <tbody>
         <tr>
           <th class="qr-label">{{ tt('检验结论') }}</th>
-          <td class="qr-value" colspan="3">
+          <td class="qr-value" colspan="5">
             <el-input
               v-if="editable"
               v-model="head['总结论']"
@@ -172,7 +207,7 @@
         </tr>
         <tr>
           <th class="qr-label">{{ tt('处理意见') }}</th>
-          <td class="qr-value" colspan="3">
+          <td class="qr-value" colspan="5">
             <el-input
               v-if="editable"
               v-model="head['处理方式']"
@@ -187,11 +222,19 @@
         <tr>
           <th class="qr-label">{{ tt('检验人') }}</th>
           <td class="qr-value">
-            <el-input v-if="editable" v-model="head['检验员']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <el-input
+              v-if="editable && !isLockedKey('检验员')"
+              v-model="head['检验员']"
+              size="small"
+              class="qr-cell-input"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ head['检验员'] || '' }}</span>
           </td>
           <th class="qr-label">{{ tt('审核人') }}</th>
           <td class="qr-value"><span class="qr-cell-text">{{ head['审核人'] || '' }}</span></td>
+          <th class="qr-label">{{ tt('批准') }}</th>
+          <td class="qr-value"><span class="qr-cell-text">{{ head['审批人'] || '' }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -206,7 +249,10 @@ import { PROC_INSP_COLS, PROC_INSP_FOOT, buildProcInspExport } from '@/core/qc/q
 
 const props = defineProps({
   head: { type: Object, required: true },
+  /** 表头字段元数据(yj_field 下发,已过滤 hidden) */
   fields: { type: Array, default: () => [] },
+  /** 明细字段元数据(yj_field 下发;纸面只消费「下拉框」的 options,如「结果判断」合格/不合格) */
+  detailFields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'open-items'])
@@ -272,13 +318,17 @@ function uidOf(row) {
 }
 
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
-/** 抬头排除:左侧四列已在本表显示 + 已在表头格显示(检验员) + 已在结论区显示 + 系统/明细列 */
+const detailFieldMap = computed(() => new Map((props.detailFields || []).map((f) => [f.dataName, f])))
+/** 抬头排除:左侧四列已在本表显示 + 已在表头格显示(检验员) + 已在结论区显示 + 系统/明细列
+ *  ⚠ 2026-11-06:审批人/审批时间 放在纸张表尾(index 末行)/属系统字段,不进抬头区
+ *    (它们 hidden=1,后端下发时已过滤;这里再兜一层,免得将来放开 hidden 后又漏进抬头)。 */
 const HEAD_SKIP = new Set([
   ...headCols.map((c) => c.key),
   '单据状态', '处理方式', '表区', '行号', '检验项目', '检验要求',
   '检验方法', '检查频率', '检验仪器', '抽检量', '实测数值', ...MEASURE, '单项判定',
   '不合格应对措施', '不良数量', '产线常规功能性结果',
   '结果判断', '备注2', '备注', '总结论', '检验员', '审核人', '审核时间',
+  '审批人', '审批时间',
   '格数', '格数上限', '列数',
 ])
 const headRows = computed(() => {
@@ -356,24 +406,38 @@ function isDateKey(k) {
   const t = fieldMap.value.get(k)?.dataType
   return t === '日期' || t === '日期时间'
 }
-/** 只读判定:**登记过**且明确 editable=false 才算锁定(未登记 ≠ 锁定) */
+/** 只读判定:后端契约 —— yj_field.editable=0 在 dataSchema 里下发的是 **`readonly:true`**
+ *  (不是 editable:false;PanelConfigService.fieldSpec:`if (!f.editable()) m.put("readonly", true)`)。
+ *  ⚠ 2026-11-06 修:此前只判 editable===false/0 ⇒ 恒为 false(死代码),
+ *    单据编号/工单行号/审核人/审核时间/审批人/审批时间 全成了可填框。
+ *    未登记 ≠ 锁定(与其它纸张同口径);检验员(yj_field.editable=1)保持可填;
+ *    「检验方案」2026-11-06 同日第二轮改为**默认值可修改**(editable=1)⇒ 这里也不锁。 */
 function isLockedKey(k) {
   const f = fieldMap.value.get(k)
-  return !!f && (f.editable === false || f.editable === 0)
+  return !!f && (f.readonly === true || f.editable === false || f.editable === 0)
+}
+
+/** 明细列的可选值:字段元数据 dataType='下拉框' 时后端下发 options(字符串数组)。
+ *  options 是**存储数据键**(如 合格/不合格),渲染时不做 tt() 翻译、也不做大小写/别名映射。
+ *  明细字段走 detailFields(props.detailFields;表头 fields 里没有 detail 级字段)。 */
+function optionsOf(key) {
+  const f = detailFieldMap.value.get(key) || fieldMap.value.get(key)
+  if (!f || f.dataType !== '下拉框' || !Array.isArray(f.options)) return []
+  return f.options
 }
 
 /**
- * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(制程检验记录表),不是列表页那套数据导出。
+ * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(出货检验记录表),不是列表页那套数据导出。
  * 版式(标题/抬头/表头两行/左侧四列合并/结论区)由 core/qc/qcProcInspExport.js 给(纯函数 + 单测),
  * 这里只做 xlsx 的 aoa_to_sheet + 样式 + writeFile(照 QcCatalogSheet 的写法)。
  * 入口:面板右侧「文档输出 → 导出 Excel」(PanelxList.exportSheetExcel 按面板码路由到本函数)。
  */
 async function exportProcInspExcel() {
   const XLSX = await import('xlsx')
-  const name = String(props.head?.['单据编号'] || props.head?.['编号'] || '制程检验记录表')
+  const name = String(props.head?.['单据编号'] || props.head?.['编号'] || '出货检验记录表')
   const pairs = headRows.value.map((row) => row.map((k) => ({ label: tt(k), value: String(props.head?.[k] ?? '') })))
   const { aoa, cols, merges, headerRow1, headerRow2 } = buildProcInspExport({
-    title: tt('制程检验记录表'),
+    title: tt('出货检验记录表'),
     subtitle: `惠州市银嘉环保科技有限公司　　${tt('单据编号')}：${name}　　${tt('单据状态')}：${tt(String(props.head?.['单据状态'] || ''))}`,
     headPairs: pairs,
     head: props.head || {},
@@ -406,14 +470,16 @@ async function exportProcInspExcel() {
   for (let r = headerRow2 + 1; r < headerRow2 + 1 + Math.max(items.value.length, 1); r++) {
     for (const c of [4, 5]) style(r, c, wrap)
   }
-  // 结论区
+  // 结论区(2026-11-06 最后一行三对:检验人 0 / 审核人 3 / 批准 6)
   for (let r = aoa.length - PROC_INSP_FOOT.length; r < aoa.length; r++) {
+    const f = PROC_INSP_FOOT[r - (aoa.length - PROC_INSP_FOOT.length)]
     style(r, 0, labelFill)
-    if (PROC_INSP_FOOT[r - (aoa.length - PROC_INSP_FOOT.length)]?.secondLabel) style(r, 4, labelFill)
+    if (f?.secondLabel) style(r, 3, labelFill)
+    if (f?.thirdLabel) style(r, 6, labelFill)
   }
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, tt('制程检验记录表').slice(0, 28))
-  XLSX.writeFile(wb, `${tt('制程检验记录表')}-${name}.xlsx`)
+  XLSX.utils.book_append_sheet(wb, ws, tt('出货检验记录表').slice(0, 28))
+  XLSX.writeFile(wb, `${tt('出货检验记录表')}-${name}.xlsx`)
 }
 
 defineExpose({ exportProcInspExcel })
@@ -578,6 +644,30 @@ defineExpose({ exportProcInspExcel })
 .qr-cell-input :deep(.el-input__inner) {
   height: 20px;
   line-height: 20px;
+}
+/* 明细「下拉框」列(2026-11-06:结果判断 合格/不合格):控件观感与同格输入框一致 ——
+   无边框、贴合格线;选中值按格子的 text-align 居中/居左 */
+.qr-cell-input :deep(.el-select__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0 2px;
+  min-height: 20px;
+}
+.qr-cell-input :deep(.el-select__wrapper:hover),
+.qr-cell-input :deep(.el-select__wrapper.is-focused) {
+  background: #f2f8ff;
+  box-shadow: none;
+}
+.qr-cell-input :deep(.el-select__selected-item),
+.qr-cell-input :deep(.el-select__placeholder) {
+  font-size: 12px;
+  line-height: 20px;
+}
+/* 单选的显示值/占位词在 .el-select__placeholder 上(EP 2.14);按格子的 text-align 居中 */
+.qr-grid td.c-verdict .qr-cell-input :deep(.el-select__placeholder),
+.qr-grid td.c-func .qr-cell-input :deep(.el-select__placeholder) {
+  text-align: center;
 }
 .qr-grid td.c-req .qr-cell-input :deep(.el-input__inner),
 .qr-grid td.c-mtd .qr-cell-input :deep(.el-input__inner) {
@@ -748,6 +838,27 @@ defineExpose({ exportProcInspExcel })
     box-shadow: none !important;
     background: transparent !important;
     padding: 0 !important;
+  }
+  /* 明细下拉(2026-11-06「结果判断」合格/不合格):纸上只印选中的值,不印下拉箭头/边框 */
+  body.approval-printing .qr-sheet .el-select__wrapper {
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+  body.approval-printing .qr-sheet .el-select__caret,
+  body.approval-printing .qr-sheet .el-select__suffix {
+    display: none !important;
+  }
+  /* 占位提示词「请选择」不该印在纸上(EP 2.14:空值时 .el-select__placeholder.is-transparent);
+     选中值那个 placeholder **没有** is-transparent,只藏占位、别把真值一起藏了 */
+  body.approval-printing .qr-sheet .el-select__placeholder.is-transparent {
+    visibility: hidden !important;
+  }
+  body.approval-printing .qr-sheet .el-select__selected-item,
+  body.approval-printing .qr-sheet .el-select__placeholder {
+    font-size: 9px !important;
+    line-height: 1.25 !important;
   }
   /* 编辑态才有的东西(新增项/删除列/拖动把手)不进纸 */
   body.approval-printing .qr-sheet .no-print,
