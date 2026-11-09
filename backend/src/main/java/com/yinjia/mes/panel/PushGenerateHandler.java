@@ -347,7 +347,10 @@ public class PushGenerateHandler implements PanelActionHandler {
             row.put("已送数量", round2(used));
             row.put("已退回数量", round2(ret));
             row.put("剩余数量", round2(Math.max(0d, carved - used + ret)));
-            row.put("可送上限", round2(BatchService.overAllowance(carved, used, ret, ratio)));
+            // 可送上限按**该行单位精度**取整(2026-11-09):个/卷这类计件单位 → 整数,
+            // kg/米 → 3 位;不再出现 24×1.2−24=4.799999999999997 这种纸面小数。
+            int rowDecimals = intOf(row.get("小数位数"));
+            row.put("可送上限", BatchService.overAllowance(carved, used, ret, ratio, rowDecimals));
             rows.add(row);
 
             // 隔离行:每个存活打印记录一行(含已生单的,便于用户看见"这批已经用过了")
@@ -391,7 +394,11 @@ public class PushGenerateHandler implements PanelActionHandler {
         row.put("物料编码", firstOf(it, SRC_CODE_FIELDS));
         row.put("物料名称", firstOf(it, SRC_NAME_FIELDS));
         row.put("规格型号", it.get("规格型号"));
-        row.put("计量单位", it.get("计量单位") != null ? it.get("计量单位") : firstOf(it, SRC_UNIT_FIELDS));
+        Object unit = it.get("计量单位") != null ? it.get("计量单位") : firstOf(it, SRC_UNIT_FIELDS);
+        row.put("计量单位", unit);
+        // 该行单位的小数位数(超送取整用,2026-11-09):计件单位=0、kg/米=3;
+        // 前端拿它算本地可送上限与输入框精度,后端 batchRows/校验也按它取整 —— 两边同源。
+        row.put("小数位数", batchService.unitDecimals(unit == null ? "" : String.valueOf(unit)));
         return row;
     }
 

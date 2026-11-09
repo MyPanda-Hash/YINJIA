@@ -72,13 +72,16 @@ public class VoucherFlowService {
                 double ret = returned.getOrDefault(lineNoOf(item), 0.0);
                 double left = qty - used + ret;
                 // 可送上限(2026-09-22 口径):**按订单全部数量算** = 数量×(1+超送比例)−已送+已退回,
-                // 超送比例最高 50% —— 与 PushGenerateHandler.overAllowance / 前端 overAllowance 同公式;
-                // 旧口径 剩余×(1+比例) 会随分批把超送额度越算越少。
-                double cap = qty * (1 + Math.max(0d, Math.min(0.5d, overRatio))) - used + ret;
+                // 超送比例最高 50%;2026-11-09 起**按该行单位精度取整**(计件单位整数、kg/米 3 位),
+                // 与 PushGenerateHandler.batchRows / 前端 overAllowance 同口径。
+                Object unit = item.get("计量单位") != null ? item.get("计量单位") : item.get("单位");
+                int nd = batchService.unitDecimals(unit == null ? "" : String.valueOf(unit));
+                item.put("小数位数", nd);
+                double cap = BatchService.overAllowance(qty, used, ret, overRatio, nd);
                 item.put("已生单数量", round(used));
                 item.put("已退回数量", round(ret));
                 item.put("剩余数量", round(Math.max(0, left)));
-                item.put("可送上限", round(Math.max(0, cap)));
+                item.put("可送上限", cap);
                 // 行保留条件:还有剩余,或超送额度没用完(剩余=0 仍可收 订单数量×比例)
                 if (qty <= 0 || left > 0.000001 || cap > 0.000001) remain.add(item);
             }

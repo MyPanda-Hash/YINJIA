@@ -101,6 +101,8 @@ public class PuLabelService {
                         + " FROM " + LINE_TABLE + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", orderNo)) {
             int lineId = (int) num(it.get("id"));
             double qty = num(it.get("数量"));
+            // 该行单位精度(2026-11-09):超送/可打上限按它取整(个/卷=整数,kg/米=3 位)
+            int nd = batchService.unitDecimals(str(it.get("计量单位")));
             double used = sentByKey.getOrDefault(orderNo + "#" + lineId, 0d);
             double ret = returnedByLine.getOrDefault(str(it.get("行号")), 0d);
             List<Map<String, Object>> mine = byLine.getOrDefault(lineId, List.of());
@@ -108,7 +110,7 @@ public class PuLabelService {
             double printed = mine.stream().filter(r -> !isSupplement(r)).mapToDouble(r -> num(r.get("打印数量"))).sum();
             double marked = mine.stream().filter(PuLabelService::isSupplement)
                     .mapToDouble(r -> num(r.get("打印数量"))).sum();              // 已补登打印量
-            double allowed = batchService.overAllowance(qty, used, ret, ratio);   // 该行还能收多少(含超送)
+            double allowed = batchService.overAllowance(qty, used, ret, ratio, nd);   // 该行还能收多少(含超送)
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", lineId);
             row.put("行号", it.get("行号"));
@@ -116,16 +118,18 @@ public class PuLabelService {
             row.put("物料名称", it.get("物料名称"));
             row.put("规格型号", it.get("规格型号"));
             row.put("计量单位", it.get("计量单位"));
+            row.put("小数位数", nd);
             row.put("数量", qty);
-            row.put("已送数量", used);
-            row.put("已退回数量", ret);
-            row.put("已打印数量", printed);            // 累计待生单打印(不含补登)
-            row.put("已补登数量", round2(marked));      // 已生单补登打印量
-            row.put("未生单预约", reserved);
-            // 剩余可打 = 该行头寸 − 已被预约占住的部分;负数归 0(已预约满就打不了新的)
-            row.put("剩余可打", Math.max(0d, allowed - reserved));
+            row.put("已送数量", UnitPrecision.roundTo(used, nd));
+            row.put("已退回数量", UnitPrecision.roundTo(ret, nd));
+            row.put("已打印数量", UnitPrecision.roundTo(printed, nd));            // 累计待生单打印(不含补登)
+            row.put("已补登数量", UnitPrecision.roundTo(marked, nd));              // 已生单补登打印量
+            row.put("未生单预约", UnitPrecision.roundTo(reserved, nd));
+            // 剩余可打 = 该行头寸 − 已被预约占住的部分;负数归 0(已预约满就打不了新的)。
+            // 上限**向下取整到单位精度**(计件单位不给 4.8 这种"半个")。
+            row.put("剩余可打", UnitPrecision.floorTo(Math.max(0d, allowed - reserved), nd));
             // 可补登 = 该行**已收(已生单)但还没打码**的量 = 已送 − 已补登(不按批次拆的口径,仅用于概览)
-            row.put("可补登数量", round2(Math.max(0d, used - marked)));
+            row.put("可补登数量", UnitPrecision.roundTo(Math.max(0d, used - marked), nd));
             rows.add(row);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -199,6 +203,7 @@ public class PuLabelService {
                         + " [单位] AS 计量单位 FROM " + LINE_TABLE
                         + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", orderNo)) {
             int lineId = (int) num(it.get("id"));
+            int nd = batchService.unitDecimals(str(it.get("计量单位")));
             for (Map<String, Object> rec : received.values()) {
                 if (!String.valueOf(lineId).equals(str(rec.get("lineId")))) continue;
                 String batch = str(rec.get("批次号"));
@@ -212,11 +217,12 @@ public class PuLabelService {
                 row.put("物料名称", it.get("物料名称"));
                 row.put("规格型号", it.get("规格型号"));
                 row.put("计量单位", it.get("计量单位"));
+                row.put("小数位数", nd);
                 row.put("批次号", batch);
                 row.put("去向单据", rec.get("去向单据"));
-                row.put("已收数量", round2(got));
-                row.put("已补登数量", round2(done));
-                row.put("可补登数量", round2(can));      // 本次最多能补登这么多
+                row.put("已收数量", UnitPrecision.roundTo(got, nd));
+                row.put("已补登数量", UnitPrecision.roundTo(done, nd));
+                row.put("可补登数量", UnitPrecision.roundTo(can, nd));      // 本次最多能补登这么多
                 out.add(row);
             }
         }
@@ -372,14 +378,16 @@ public class PuLabelService {
                 double orderQty = num(line.get("数量"));
                 double used = sentByKey.getOrDefault(orderNo + "#" + lineId, 0d);
                 double ret = returnedByLine.getOrDefault(str(line.get("行号")), 0d);
-                double allowed = batchService.overAllowance(orderQty, used, ret, ratio);
+                // 上限按该行单位精度取整(2026-11-09):计件单位整数、kg/米 3 位 —— 与弹窗显示同源
+                int nd = batchService.unitDecimals(str(line.get("计量单位")));
+                double allowed = batchService.overAllowance(orderQty, used, ret, ratio, nd);
                 // 其它存活**待生单**打印行压着的量(补登行不预约,不算;本次请求里前面几行是别的订单行)
                 double others = 0d;
                 for (Map<String, Object> lb : labels) {
                     if ((int) num(lb.get("采购订单行id")) != lineId || isSupplement(lb)) continue;
                     others += num(lb.get("未生单量"));
                 }
-                double cap = allowed - others;
+                double cap = UnitPrecision.floorTo(allowed - others, nd);
                 if (qty > cap + 0.000001) {
                     over.add("第 " + str(line.get("行号")) + " 行:本次打印 " + trim(qty) + " 超出可打印量 " + trim(cap)
                             + "(订单数量 " + trim(orderQty) + " ×(1+超送比例 " + Math.round(ratio * 100) + "%)− 已送 "

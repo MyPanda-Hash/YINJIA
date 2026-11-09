@@ -64,6 +64,10 @@ public class BatchService {
      * 累计超送永远到不了订单总量的比例额;正确语义是"整张订单行**累计**最多收 数量×(1+比例)"。
      * 前端同公式:core/selection/batchSendLines.js 的 overAllowance(纯函数,有单测)。
      *
+     * <p>⚠ 本重载**不按单位取整**(保留给"不知道单位"的老调用方)。凡是有明细行的调用,
+     * 一律用 {@link #overAllowance(double, double, double, double, int)} 传单位精度 ——
+     * 否则计件单位(个/卷)会算出 4.799999999999997 这种小数(2026-11-09 用户报障)。
+     *
      * <p>2026-10-04 从 PushGenerateHandler 迁入本类:材料码预约(供应商自行打码)也要按同一口径算上限,
      * 而「送料批次口径」的家本来就在 BatchService —— 两处各写一份迟早对不上。
      */
@@ -73,12 +77,79 @@ public class BatchService {
         return v > 0 ? v : 0d;
     }
 
+    /**
+     * 按**计量单位精度**算的可送上限(2026-11-09 用户口径「要根据单位确定超送是否需要小数,
+     * 如果需要小数要确定位数」)。
+     *
+     * <p>两步:
+     * <ol>
+     *   <li>超送量 = 订单数量 × 比例,**按单位精度向下取整**(计件单位 → 整数;kg/米 → 3 位小数)
+     *       —— 收 24 个按 20% 超送只能收 4 个(4.8 取整),不能收 5 个(20.8% 已超比例);</li>
+     *   <li>上限 = 订单数量 + 超送量 − 已送 + 已退回,再落到同一精度(抹掉浮点尾差)。</li>
+     * </ol>
+     *
+     * @param decimals 该行单位的小数位数(见 {@link #unitDecimals(String)})
+     */
+    public static double overAllowance(double orderQty, double sent, double returned, double ratio, int decimals) {
+        double r = Math.max(0d, Math.min(MAX_OVER_RATIO, ratio));
+        int nd = UnitPrecision.clamp(decimals);
+        double extra = UnitPrecision.floorTo(orderQty * r, nd);          // 超送量:不超比例
+        double v = orderQty + extra - sent + returned;
+        return v > 0 ? UnitPrecision.floorTo(v, nd) : 0d;
+    }
+
+    /**
+     * 计量单位的小数位数(超送取整用):**优先 `bs_uom.[小数位数]`**(金蝶同步,个/卷/张=0、kg/米=3),
+     * 查不到再按 {@link UnitPrecision#guess} 兜底;30 秒缓存(与比例缓存同量级,改单位档案很快生效)。
+     *
+     * <p>为什么先查库:精度是**单位档案的事实**,写死在代码里迟早与金蝶/档案对不上;
+     * 但 bs_uom 里还有一批建面板时手填的种子行(如 U01/U02)没有精度,
+     * 那些只能靠兜底分类(计件 0 / 计量 3 / 未知 2)。
+     */
+    public int unitDecimals(String unit) {
+        String u = unit == null ? "" : unit.trim();
+        if (u.isEmpty()) return UnitPrecision.DEFAULT_DECIMALS;
+        Integer fromDb = unitDecimalsMap().get(u.toLowerCase(java.util.Locale.ROOT));
+        if (fromDb != null) return UnitPrecision.clamp(fromDb);
+        return UnitPrecision.guess(u);
+    }
+
+    /** 单位 → 小数位数(来自 bs_uom;名称与编码都收,键统一小写) */
+    private Map<String, Integer> unitDecimalsMap() {
+        long now = System.currentTimeMillis();
+        Map<String, Integer> m = unitDecimalsCache;
+        if (m != null && now - unitDecimalsAt < UNIT_DECIMALS_TTL_MS) return m;
+        Map<String, Integer> fresh = new HashMap<>();
+        try {
+            jdbc.query("SELECT [计量单位名称] AS n, [计量单位编码] AS c, [小数位数] AS d FROM bs_uom"
+                            + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND [小数位数] IS NOT NULL",
+                    rs -> {
+                        int d = rs.getInt("d");
+                        String n = rs.getString("n");
+                        String c = rs.getString("c");
+                        if (n != null && !n.isBlank()) fresh.put(n.trim().toLowerCase(java.util.Locale.ROOT), d);
+                        if (c != null && !c.isBlank()) fresh.put(c.trim().toLowerCase(java.util.Locale.ROOT), d);
+                    });
+        } catch (RuntimeException e) {
+            // bs_uom 不可用:全部走兜底分类,不阻断开单
+            fresh.clear();
+        }
+        unitDecimalsCache = fresh;
+        unitDecimalsAt = now;
+        return fresh;
+    }
+
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
 
     /** 超送比例缓存(30 秒,与 PanelRegistry TTL 同量级,避免每次生单查库) */
     private volatile double ratioCache = 0d;
     private volatile long ratioAt = 0L;
+
+    /** 计量单位精度缓存(2026-11-09,同 30 秒;键=单位名/编码小写) */
+    private static final long UNIT_DECIMALS_TTL_MS = 30_000L;
+    private volatile Map<String, Integer> unitDecimalsCache = null;
+    private volatile long unitDecimalsAt = 0L;
 
     public BatchService(JdbcTemplate jdbc, PanelRegistry registry) {
         this.jdbc = jdbc;

@@ -35,7 +35,7 @@
           <el-date-picker v-model="prodDate" type="date" size="small" class="mlq-prod-inp" clearable
             value-format="YYYY-MM-DD" :placeholder="tt('选择日期')" />
         </span>
-        <span class="mlq-chip mlq-tip">{{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单') }}</span>
+        <span class="mlq-chip mlq-tip">{{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单（超送量按计量单位取整）') }}</span>
       </div>
 
       <!-- 一次可以勾**多行**,但服务端会**每行各出一张打印单**(用户口径「作废不希望连坐」+
@@ -55,7 +55,7 @@
         <el-table-column :label="tt('本次打印数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.id]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
+              :disabled="!(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
@@ -90,7 +90,8 @@
           <el-table-column :label="tt('本次打印数量')" width="150">
             <template #default="{ row }">
               <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
-                :controls="false" :disabled="!(Number(row['可补登数量'] || 0) > 0)" :precision="2" style="width: 130px" />
+                :controls="false" :disabled="!(Number(row['可补登数量'] || 0) > 0)" :precision="precisionOf(row)"
+                style="width: 130px" />
             </template>
           </el-table-column>
         </el-table>
@@ -192,6 +193,11 @@ const totalQty = computed(() => {
 /** 该行本次最多能打多少(服务端算好的「剩余可打」;前端只做即时约束,后端还会重算一遍) */
 function capOf(row) {
   return Math.max(0, Number(row?.剩余可打 || 0))
+}
+/** 该行输入框精度 = 单位小数位数(2026-11-09:计件单位 0 位、kg/米 3 位;服务端逐行下发) */
+function precisionOf(row) {
+  const n = Number(row?.小数位数)
+  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.trunc(n))) : 2
 }
 /** 有可打量才让勾(打满的行不给勾) */
 function rowSelectable(row) {

@@ -231,6 +231,9 @@ export default {
     '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'The "{panelName} {docNo}" you reviewed at level 1 was rejected by {actor} and returned to draft. Comment: {opinion}',
     '已选 {n} 个商品，预览二维码标签？': '{n} item(s) selected. Preview QR code labels?',
     '打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单': 'Printable max = ordered qty × (1 + over-delivery ratio) − sent + returned − printed but not yet received',
+    // 超送量按计量单位取整(2026-11-09)
+    '打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单（超送量按计量单位取整）': 'Printable max = ordered qty × (1 + over-delivery ratio) − sent + returned − printed but not yet received (over-delivery rounded by UOM)',
+    '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%，超送量按计量单位取整）': 'Only checked lines are generated; max deliverable = ordered qty × (1 + over-delivery ratio) − sent + returned (up to 50%, over-delivery rounded by UOM)',
     // 打印材料码·生产日期(2026-10-23):批次号旁边填写,打印时印到材料码卡面「生产日期」栏
     '生产日期': 'Production Date',
     '选择日期': 'Select date',

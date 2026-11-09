@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  pickedKeySet, defaultPickKeys, buildBatchSendLines, sumPickedQty, overAllowance,
+  pickedKeySet, defaultPickKeys, buildBatchSendLines, sumPickedQty, overAllowance, floorTo,
 } from './batchSendLines.js'
 
 /**
@@ -100,6 +100,31 @@ test('负额度归 0(已送超过总额度,如人工调过参数)', () => {
   assert.equal(overAllowance(100, 110, 0, 5), 0)
 })
 
-test('小数精度:按两位归整', () => {
-  assert.equal(overAllowance(100.005, 0, 0, 5), 105.01)
+test('小数精度:缺省两位向下取整(上限只能少不能多)', () => {
+  // 100.005 × 5% = 5.00025 → 超送 5.00;105.005 → 上限 105.00(不是四舍五入的 105.01)
+  assert.equal(overAllowance(100.005, 0, 0, 5), 105)
+  assert.equal(overAllowance(10.5, 0, 0, 5, 1), 11)     // 10.5 × 5% = 0.525 → 0.5;上限 11.0
+  assert.equal(overAllowance(10.5, 0, 0, 5, 0), 10)     // 0 位:0.525 → 0;上限 10
+})
+
+// ── 2026-11-09 用户口径「超送要去整;要根据单位确定超送是否需要小数,如果需要小数要确定位数」──
+// 单位精度由服务端逐行下发(bs_uom.小数位数:个/卷/张=0、kg/米=3),前端按它算:
+test('计件单位(个/卷,0 位):超送量取整 —— 24 个 ×20% 只能超送 4 个,不再是 4.7999…', () => {
+  assert.equal(overAllowance(24, 24, 0, 20, 0), 4)      // 24×1.2=28.8 → 超送 4,上限 28
+  assert.equal(overAllowance(24, 0, 0, 20, 0), 28)
+  assert.equal(overAllowance(12, 12, 0, 20, 0), 2)      // 12×1.2=14.4 → 超送 2,上限 14
+  assert.equal(overAllowance(5000, 5000, 0, 20, 0), 1000)
+})
+
+test('计量单位(kg/米,3 位):超送保留 3 位小数,不出现浮点尾数', () => {
+  assert.equal(overAllowance(304.6, 304.6, 0, 20, 3), 60.92)
+  assert.equal(overAllowance(24.5, 24.5, 0, 20, 3), 4.9)
+  assert.equal(overAllowance(0.2, 0.2, 0, 20, 3), 0.04)
+})
+
+test('floorTo:按精度向下取整(1e-9 容差吃掉 4.7999…×100 的尾差)', () => {
+  assert.equal(floorTo(4.799999999999997, 0), 4)
+  assert.equal(floorTo(2.3999999999999986, 0), 2)
+  assert.equal(floorTo(60.92000000000001, 3), 60.92)
+  assert.equal(floorTo(-1.2, 0), -2)                    // 负数向下(不会出现:上限先 max 0)
 })
