@@ -401,6 +401,7 @@ import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 // 「删除」结果提示口径(2026-11-04):只认服务端回写的真实状态,不许无条件报"已删除"
 import { deleteOutcome } from './deleteOutcome.js'
+import { erpOutcome, erpOutcomeText } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -1380,6 +1381,12 @@ async function onButton(action) {
       const o = deleteOutcome(res?.['单据状态'])
       const msg = tt(o.key) + (o.fallback ? o.fallback : '')
       ElMessage[o.level](msg)
+    } else if (action === '转ERP') {
+      // 2026-11-09 用户报障「已转的还能再转、一直显示执行成功」:服务端对已转单据**不重复推送**,
+      // 只回一句「该单据已转入ERP」,这里原来无条件报成功 ⇒ 要按 core/views/erpOutcome.js 的口径提示。
+      const o = erpOutcome(res)
+      if (o.already) ElMessage.warning(erpOutcomeText(o, tt))
+      else ElMessage.success(`「${action}」成功`)
     } else {
       ElMessage.success(`「${action}」成功`)
     }

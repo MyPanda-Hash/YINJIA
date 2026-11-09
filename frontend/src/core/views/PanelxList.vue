@@ -2383,7 +2383,7 @@
         <el-table-column :label="tt('状态')" width="80">
           <template #default="{ row }">
             <el-tag v-if="row.result === 'ok'" type="success" size="small">{{ row.erpBillNo || '成功' }}</el-tag>
-            <el-tag v-else-if="row.result === 'skip'" type="info" size="small">已转</el-tag>
+            <el-tag v-else-if="row.result === 'skip'" type="info" size="small">{{ tt('已转') }}</el-tag>
             <el-tag v-else-if="row.result === 'fail'" type="danger" size="small">{{ tt('失败') }}</el-tag>
           </template>
         </el-table-column>
@@ -2578,6 +2578,7 @@ import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
+import { erpOutcome, erpOutcomeText } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { user, tabs, locale: localeStore } = useAppContext()
@@ -2847,12 +2848,19 @@ async function doBatchErp() {
   for (const row of batchErpSel.value) {
     try {
       const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '转ERP', formData: { 编号: row.单据编号, 单据编号: row.单据编号 }, buttonParam: {} })
-      if (res?.message?.includes('已转入ERP')) { row.result = 'skip'; skip++ }
-      else { row.result = 'ok'; row.erpBillNo = res?.ERP单号 || ''; ok++ }
+      // 已转判定统一走 erpOutcome(2026-11-09):弹窗列表是"查询可转ERP"的快照,
+      // 用户在别处已转/或同一单被选了两次时,这里必须是「已转·跳过」而不是「成功」。
+      const o = erpOutcome(res)
+      if (o.already) { row.result = 'skip'; row.erpBillNo = o.erpNo; skip++ }
+      else { row.result = 'ok'; row.erpBillNo = o.erpNo; ok++ }
     } catch { row.result = 'fail'; fail++ }
   }
   batchErpLoading.value = false
-  ElMessage.success(`批量转ERP完成: 成功${ok} 跳过${skip} 失败${fail}`)
+  // 有"已转跳过"时降级成 warning:别让整批报成功把"这几张其实没转"盖过去(同单张口径)
+  ElMessage[skip ? 'warning' : 'success'](
+    tt('批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}')
+      .replace('{ok}', String(ok)).replace('{skip}', String(skip)).replace('{fail}', String(fail))
+  )
   await load()
 }
 
@@ -11177,7 +11185,16 @@ async function onButton(action) {
       tabs.open({ path: targetPath, title: res.gotoPanel })
       return
     }
-    ElMessage.success(`「${action}」执行成功`)
+    // 2026-11-09 用户报障「已转的没弃审也能再转,而且一直显示转ERP执行成功」:
+    //   服务端对已转单据**不重复推送**,只在 data.message 里回一句「该单据已转入ERP」;
+    //   这里原来无条件弹「执行成功」⇒ 用户以为又转成功了。口径见 core/views/erpOutcome.js(有单测)。
+    if (action === '转ERP') {
+      const o = erpOutcome(res)
+      if (o.already) ElMessage.warning(erpOutcomeText(o, tt))
+      else ElMessage.success(`「${action}」执行成功`)
+    } else {
+      ElMessage.success(`「${action}」执行成功`)
+    }
     await load()
     // 立项申请表：提交审批成功后自动跳「项目流程管控」（2026-11-06 用户口径
     //   「填写提交之后自动跳转到项目流程管控」）。

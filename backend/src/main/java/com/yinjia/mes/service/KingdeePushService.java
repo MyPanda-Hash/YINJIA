@@ -217,12 +217,23 @@ public class KingdeePushService {
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
 
         // ① 是否已转ERP = 是 → 直接提示(防多次点击)
-        String pushed = String.valueOf(head.getOrDefault("是否已转ERP", ""));
+        //    2026-11-09 用户报障「已转的不用弃审也能再点转ERP,而且一直显示执行成功」:
+        //    这里**确实没有重复推送**(金蝶侧不会多一张),但返回体里只有一句中文 message,
+        //    前端把它当普通成功弹「执行成功」⇒ 用户以为又转成功了、也看不出"要先弃审再审核"。
+        //    现补机器可读的 `already=true`(前端 core/views/erpOutcome.js 依此弹 warning),
+        //    并把 ERP单号/操作人/时间与完整提示一并带回,不再有歧义。
+        //    ⚠ 前端**不能**用 是否已转ERP='是' 判断"已转":推送成功时同样回写'是'(见 ⑥)。
+        String pushed = str(head.get("是否已转ERP"));
         if ("是".equals(pushed)) {
+            String erpNo = str(head.get("ERP单号"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("是否已转ERP", "是");
-            out.put("ERP单号", String.valueOf(head.getOrDefault("ERP单号", "")));
-            out.put("message", "该单据已转入ERP，不可重复转入");
+            out.put("already", true);
+            out.put("ERP单号", erpNo);
+            out.put("转ERP操作人", str(head.get("转ERP操作人")));
+            out.put("转ERP时间", str(head.get("转ERP时间")));
+            out.put("message", "该单据已转入ERP" + (erpNo.isEmpty() ? "" : "（ERP单号 " + erpNo + "）")
+                    + "，不可重复转入；如需重新转ERP，请先「弃审」再「审核」");
             return out;
         }
 

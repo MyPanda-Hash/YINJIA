@@ -2024,6 +2024,8 @@ export default {
     '库存台账需选择一个仓库和一种存货': 'Das Inventar konto muss ein Lager und eine Art Inventar auswählen',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Das Folgende sind die Dokumente, die überprüft und nicht an ERP übertragen wurden. Klicken Sie nach dem Aktivieren auf "ERP-Übertragung starten".',
     '开始转ERP': 'ERP starten',
+    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Dieses Dokument wurde bereits ins ERP übertragen ({no}) und kann nicht erneut übertragen werden. Zum erneuten Übertragen zuerst die Freigabe zurücknehmen und dann erneut freigeben.',
+    '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Batch-Übertragung ins ERP abgeschlossen: erfolgreich {ok}, bereits übertragen übersprungen {skip}, fehlgeschlagen {fail}',
     '供应商/客户': 'Lieferant/Kunde',
     '暂无已审核且未转ERP的单据': 'Keine Dokumente, die überprüft und nicht ERP übertragen wurden',
     '材料二维码标签': 'Material QR-Code-Etikett',

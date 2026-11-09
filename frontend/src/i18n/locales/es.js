@@ -2024,6 +2024,8 @@ export default {
     '库存台账需选择一个仓库和一种存货': 'El libro mayor de inventario debe elegir un almacén y un inventario',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Los siguientes son documentos que han sido revisados y no transferidos a ERP, haga clic en "Iniciar ERP" después de marcar',
     '开始转ERP': 'Empieza a ERP',
+    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Este documento ya fue transferido a ERP ({no}) y no puede transferirse de nuevo. Para volver a transferirlo, anule primero la aprobación y vuelva a aprobarlo.',
+    '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Transferencia por lotes a ERP completada: correctos {ok}, ya transferidos omitidos {skip}, fallidos {fail}',
     '供应商/客户': 'Proveedor/cliente',
     '暂无已审核且未转ERP的单据': 'No hay documentos auditados y no transferidos a ERP',
     '材料二维码标签': 'Etiqueta de código QR de material',
