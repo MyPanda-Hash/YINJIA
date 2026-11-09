@@ -14,11 +14,11 @@
 | 层 | 文件 | 说明 |
 |---|---|---|
 | core(纯函数) | `frontend/src/core/panel/puPrintAmount.js` | `puOrderLineAmount`:弹窗「小计」预览口径(没改数量沿用订单原金额,改了=单价×数量/4 位);单测 `puPrintAmount.test.js`。 |
-| core(弹窗) | `frontend/src/core/views/PurchaseOrderPrintDialog.vue` | 勾选明细行 + 每行「本次打印数量」+「有金额/无金额」版式;底部**已打印记录**(打印单号/版式/行数/数量合计/金额合计/打印人/打印时间/打印次数 + 重打/作废)。**先落库再出纸**:纸面用服务端返回的落纸行(记录=纸同源);打印层挂不上会自动作废刚落的记录。 |
+| core(弹窗) | `frontend/src/core/views/PurchaseOrderPrintDialog.vue` | 勾选明细行 + 每行「本次打印数量」+「有金额/无金额」版式;底部**已打印记录**(打印单号/版式/行数/数量合计/金额合计/打印人/打印时间/打印次数 + 重打/作废)。**先落库再出纸**:纸面用服务端返回的落纸行(记录=纸同源);打印层挂不上会自动作废刚落的记录。2026-11-09 加「**点记录行看明细**」(只读弹窗:采购订单号/版式/打印人/时间/次数/合计 + 行明细 行号/物料/订单数量/打印数量/单价/小计/交期/备注)。 |
 | core(接线) | `frontend/src/core/views/PanelxList.vue` | `打印采购订单` / `打印订单无金额`(含 `SUPPLIER_PU_ORDER`)先开弹窗;「打印退货单」及兜底分支不变。 |
 | business | `frontend/src/business/print-formats.js` | 两个采购订单版式接受 `opts.onDone`(打印层摘掉后刷新记录);返回是否交给打印层。 |
-| 后端 | `backend/src/main/java/com/yinjia/mes/service/PuPrintService.java` | `print`(按订单行重算快照:改数量才重算小计、备注/税率/交期一并快照)、`reprint`(只 +1 次数)、`voidPrint`(软删,无预约可释放)、`records`、`orderNoOf`。 |
-| 后端 | `PxController` / `SupplierPortalGuardFilter` | `/px/puPrint/{records,print,reprint,void}` 四端点;内部按 PU_ORDER 权、供应商按逐单归属;过滤器放行四路径。 |
+| 后端 | `backend/src/main/java/com/yinjia/mes/service/PuPrintService.java` | `print`(按订单行重算快照:改数量才重算小计、备注/税率/交期一并快照)、`reprint`(只 +1 次数)、`voidPrint`(软删,无预约可释放)、`records`、`orderNoOf`、`detail`(记录明细,只读)。 |
+| 后端 | `PxController` / `SupplierPortalGuardFilter` | `/px/puPrint/{records,print,reprint,void,lines}` 五端点;内部按 PU_ORDER 权(明细=查看权)、供应商按逐单归属;过滤器放行五路径。 |
 | 后端 | `FormNoService` | `MP` 号段把 `bd_pu_print` 登记为业务表来源(零面板表同材料码 MQ 先例,防号池漏登重号)。 |
 | 数据库 | `tools/migrate-pu-print-20261107.sql` | 新建 `bd_pu_print`(18 列)/ `bl_pu_print`(20 列)+ 索引 + 表/列中文注明 + 收尾自检;两账套已执行。 |
 | i18n | `en.js` / `zh-TW.js` | 弹窗与「已打印记录」全部文案(打印版式/有金额/无金额/小计/交期要求/重打/作废/记录说明…)。 |
@@ -56,6 +56,8 @@
 | `ego/round-31-8090-records.png` | 8090(jar 内 `static`,入口 `assets/index-B3gaQyGp.js`)也已有「已打印记录」区。 |
 | `ego/round-32.mjs` 输出 | 实测完成后浏览器已恢复 admin 登录(`#/dashboard`)。 |
 | `ego/round-33~36.mjs` 输出 + `round-36-scrolled.png` | 2026-11-09 重启系统后的复验:发现弹窗加「已打印记录」后,在 707px 高的窗口里**底部按钮被顶出视口** ⇒ 内容区加 `max-height:66vh + overflow-y:auto`、弹窗 `top:5vh`;复验 `footerVisible=true`(按钮 bottom=606 < innerHeight 707)、记录区随内容滚动,底部三颗按钮常驻可见。 |
+| `ego/round-37-record-detail.png` + 输出 | **点记录行看明细**(2026-11-09 用户口径「这一行我想要点击可以看到明细」):admin 打印 2 行 → 记录 `MP-2026-11-0005` → 真实点击该行 → 明细弹窗 `打印记录明细 · MP-2026-11-0005`(采购订单号/版式/打印人/时间/次数/行数/数量合计/金额合计),行表 2 行 = 5000/4000,打印数量、单价、小计、交期、备注齐全;行内「重打/作废」按钮已 `@click.stop`,不会误触发明细。 |
+| `ego/round-38.mjs` 输出 + `round-38-detail-wide.png` | 明细弹窗宽度复验:1150px、表 `scrollWidth=clientWidth`(1150 弹窗内 1118)**无横向滚动**,「备注」列完整可见(表头右边界 1321 < 弹窗右边界 1337)。 |
 
 `Q*.java` 是一次性只读/清理探针(`java -cp lib\mssql-jdbc.jar ...` 在 `tools/` 下跑):
 `Q/Q2/Q3` 取明细字段与多行订单、`Q4` 供应商账号、`Q5/Q6` 校验新表(列数/注明/索引,两账套)、
@@ -63,10 +65,14 @@
 
 ## 测试数据清理
 
-接口与界面实测共产生 3 条打印记录(`MP-2026-11-0001`~`0003`,测试时已作废),
-已用 `Q7.java` **物理删除**(两账套 `bd_pu_print` / `bl_pu_print` 归零);
-`s_allno` 号池里的 MP 号保留不复用(号池是取号留痕,删了反而可能重号)。
-未改动任何业务单据(采购订单本身只读)。
+接口与界面实测产生的打印记录已全部清理:
+
+- `MP-2026-11-0001`~`0003`(2026-11-07 首轮)→ `Q7.java` **物理删除**;
+- `MP-2026-11-0005` / `MP-2026-11-0006`(2026-11-09 明细复验)→ `Q9.java` **物理删除**;
+- **`MP-2026-11-0004` 保留** —— 那是用户自己在「YJ-20261006-02」上点确定并打印产生的真实记录,
+  不删(2026-11-09 截图里的那条)。
+- `s_allno` 号池里的 MP 号保留不复用(号池是取号留痕,删了反而可能重号)。
+  未改动任何业务单据(采购订单本身只读)。
 
 ## 供应商账号(实测用哪个、有没有动数据)
 

@@ -25,11 +25,12 @@ const REQUIRED_METHODS = [
   'printLocationCards',
   'printProductionTask',
   'woQrText',
-  // 采购订单报表打印记录(2026-11-07):打印快照 + 重打/作废
+  // 采购订单报表打印记录(2026-11-07):打印快照 + 重打/作废;2026-11-09 加记录明细
   'puPrintRecords',
   'puPrintSave',
   'puPrintReprint',
   'puPrintVoid',
+  'puPrintDetail',
 ]
 
 /**

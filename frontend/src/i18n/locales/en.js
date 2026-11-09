@@ -260,6 +260,11 @@ export default {
     // 采购订单打印记录(2026-11-07):每次打印落一份快照,弹窗里可查、可重打/作废
     '每次打印都会留一份记录；重打只累加次数，作废只作废这张纸': 'Every print leaves a record here; reprint only adds to the count, voiding only voids this sheet',
     '该订单还没有打印记录': 'This order has no print records yet',
+    // 点记录行看明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」)
+    '点击记录行可查看明细': 'Click a record row to view its lines',
+    '打印记录明细': 'Print record details',
+    '打印记录明细加载失败': 'Failed to load print record details',
+    '该记录没有明细行': 'This record has no lines',
     '已登记打印记录': 'Print record created',
     '已作废打印记录': 'Print record voided',
     '打印记录不存在或已作废': 'Print record does not exist or has been voided',

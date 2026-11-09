@@ -638,6 +638,11 @@ export async function puPrintVoid(docNo) {
   return unwrapStrict(await request.post('/px/puPrint/void', { docNo }))
 }
 
+/** 打印记录明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」):只读快照行,不改打印次数 */
+export async function puPrintDetail(printNo) {
+  return unwrapStrict(await request.get('/px/puPrint/lines', { params: { docNo: printNo } }))
+}
+
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))

@@ -64,13 +64,16 @@
         </span>
       </div>
 
-      <!-- 已打印记录(2026-11-07 用户口径「像材料码那样」):每次打印一份快照,可重打/作废 -->
+      <!-- 已打印记录(2026-11-07 用户口径「像材料码那样」):每次打印一份快照,可重打/作废;
+           2026-11-09 用户口径「这一行我想要点击可以看到明细」⇒ 点整行打开记录明细 -->
       <div class="pup-rec">
         <div class="pup-rec-title">
           {{ tt('已打印记录（本订单）') }}
           <span class="pup-tip">{{ tt('每次打印都会留一份记录；重打只累加次数，作废只作废这张纸') }}</span>
+          <span class="pup-tip">{{ tt('点击记录行可查看明细') }}</span>
         </div>
-        <el-table :data="records" border size="small" max-height="220">
+        <el-table :data="records" border size="small" max-height="220" class="pup-rec-table"
+          @row-click="openRecordDetail">
           <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
           <el-table-column :label="tt('打印版式')" width="96" align="center">
             <template #default="{ row }">{{ tt(row['打印版式']) }}</template>
@@ -85,9 +88,10 @@
           <el-table-column prop="打印次数" :label="tt('打印次数')" width="78" align="right" />
           <el-table-column :label="tt('操作')" width="118" align="center">
             <template #default="{ row }">
-              <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录 -->
-              <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
-              <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
+              <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录。
+                   两颗按钮都必须 @click.stop,否则会连带触发"点整行看明细" -->
+              <el-button link type="primary" :disabled="busy" @click.stop="doReprint(row)">{{ tt('重打') }}</el-button>
+              <el-button link type="danger" :disabled="busy" @click.stop="doVoid(row)">{{ tt('作废') }}</el-button>
             </template>
           </el-table-column>
           <template #empty>{{ tt('该订单还没有打印记录') }}</template>
@@ -99,6 +103,48 @@
       <el-button @click="selectAll">{{ tt('全选') }}</el-button>
       <el-button @click="clearAll">{{ tt('清空') }}</el-button>
       <el-button type="primary" :loading="busy" @click="confirm">{{ tt('确定并打印') }}</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 打印记录明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」):
+       点「已打印记录」任一行打开,看这次打印具体打了哪几行、每行多少;只读,不改打印次数 -->
+  <el-dialog v-model="recDetailVisible" :title="detailTitle" :width="'min(1150px, 96vw)'" :top="'6vh'" append-to-body>
+    <div v-loading="recDetailLoading" class="pup-detail">
+      <div class="pup-bar">
+        <span class="pup-chip">{{ tt('采购订单号') }}：{{ recDetail['采购订单号'] || '—' }}</span>
+        <span class="pup-chip">{{ tt('打印版式') }}：{{ recDetail['打印版式'] ? tt(recDetail['打印版式']) : '—' }}</span>
+        <span class="pup-chip">{{ tt('打印人') }}：{{ recDetail['打印人'] || '—' }}</span>
+        <span class="pup-chip">{{ tt('打印时间') }}：{{ recDetail['打印时间'] || '—' }}</span>
+        <span class="pup-chip">{{ tt('打印次数') }}：{{ recDetail['打印次数'] ?? 0 }}</span>
+        <span class="pup-chip">{{ tt('行数') }}：{{ recDetail['行数'] ?? 0 }}</span>
+        <span class="pup-chip">{{ tt('数量合计') }}：{{ qtyText(recDetail['数量合计']) }}</span>
+        <span v-if="recDetail['金额合计'] != null" class="pup-chip">
+          {{ tt('金额合计') }}：{{ moneyText(recDetail['金额合计']) }}
+        </span>
+      </div>
+      <el-table :data="recDetail.lines || []" border size="small" max-height="400">
+        <el-table-column prop="行号" :label="tt('行号')" width="64" />
+        <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="单位" :label="tt('单位')" width="64" />
+        <el-table-column prop="订单数量" :label="tt('订单数量')" width="96" align="right" />
+        <el-table-column :label="tt('打印数量')" width="96" align="right">
+          <template #default="{ row }">{{ qtyText(row['数量']) }}</template>
+        </el-table-column>
+        <el-table-column v-if="detailHasAmount" prop="单价" :label="tt('单价')" width="92" align="right" />
+        <el-table-column v-if="detailHasAmount" :label="tt('小计')" width="104" align="right">
+          <template #default="{ row }">{{ row['金额'] == null ? '' : moneyText(row['金额']) }}</template>
+        </el-table-column>
+        <el-table-column :label="tt('交期要求')" width="104">
+          <template #default="{ row }">{{ row['预计到货日期'] || '' }}</template>
+        </el-table-column>
+        <el-table-column prop="备注" :label="tt('备注')" min-width="100" show-overflow-tooltip />
+        <template #empty>{{ tt('该记录没有明细行') }}</template>
+      </el-table>
+    </div>
+    <template #footer>
+      <el-button @click="recDetailVisible = false">{{ tt('关闭') }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -159,6 +205,16 @@ const picked = ref([])
 const qtyOf = reactive({})
 /** 本订单的打印记录(服务端落库快照;弹窗底部表格) */
 const records = ref([])
+
+/** 打印记录明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」):点记录行打开,只读 */
+const recDetailVisible = ref(false)
+const recDetailLoading = ref(false)
+const recDetail = ref({})
+const detailHasAmount = computed(() => recDetail.value['打印版式'] !== '无金额')
+const detailTitle = computed(() => {
+  const no = recDetail.value['单据编号']
+  return no ? `${tt('打印记录明细')} · ${no}` : tt('打印记录明细')
+})
 
 /** 行键:优先数据库 id,其次行号,最后下标 */
 const keyOf = (row, i) => String(row?.id ?? row?.['行号'] ?? i)
@@ -324,6 +380,27 @@ async function confirm() {
   }
 }
 
+/**
+ * 点「已打印记录」一行 → 看这次打印的明细(2026-11-09 用户口径)。
+ * 只读:取该记录的快照行,不改打印次数(重打是单独一颗按钮)。
+ */
+async function openRecordDetail(row) {
+  const no = row?.['单据编号']
+  if (!no) return
+  // 先拿列表里的汇总填满(弹窗立刻有内容),再拉明细行
+  recDetail.value = { ...row, lines: [] }
+  recDetailVisible.value = true
+  recDetailLoading.value = true
+  try {
+    const res = await engine.puPrintDetail(no)
+    if (res) recDetail.value = res
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('打印记录明细加载失败'))
+  } finally {
+    recDetailLoading.value = false
+  }
+}
+
 /** 重打:同一张记录原样再打一遍(只累加打印次数,不新增记录) */
 async function doReprint(row) {
   busy.value = true
@@ -380,4 +457,9 @@ async function doVoid(row) {
 .pup-rec { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
 .pup-rec-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .pup-rec-title .pup-tip { background: none; border: none; padding: 0; }
+/* 记录行可点击看明细:鼠标手型 + 悬停高亮提示(行内的重打/作废按钮已 @click.stop) */
+.pup-rec-table :deep(.el-table__row) { cursor: pointer; }
+.pup-rec-table :deep(.el-table__row:hover > td) { background: #eef6ff !important; }
+/* 记录明细弹窗 */
+.pup-detail { display: flex; flex-direction: column; gap: 8px; }
 </style>

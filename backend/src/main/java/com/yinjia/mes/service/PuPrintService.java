@@ -310,6 +310,29 @@ public class PuPrintService {
         }
     }
 
+    // ==================== ⑥ 记录明细(点记录行查看) ====================
+
+    /**
+     * 一张打印记录的明细(只读):单头汇总 + 落纸行。
+     *
+     * <p>用户口径(2026-11-09):「这一行我想要点击可以看到明细」—— 弹窗里点「已打印记录」的任一行,
+     * 能看到这次打印**具体打了哪几行、每行多少**(行号/物料/订单数量/本次打印数量/单价/小计/交期/备注)。
+     * 只读,不改打印次数(重打是另一颗按钮)。
+     */
+    public Map<String, Object> detail(String printNo) {
+        String no = str(printNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印记录单号");
+        Map<String, Object> head = firstRow(
+                "SELECT [采购订单号] AS 采购订单号, [打印版式] AS 打印版式, ISNULL([打印人],N'') AS 打印人,"
+                        + " CONVERT(varchar(19), [打印时间], 120) AS 打印时间, ISNULL([打印次数],0) AS 打印次数,"
+                        + " ISNULL([行数],0) AS 行数, ISNULL([数量合计],0) AS 数量合计, [金额合计] AS 金额合计"
+                        + " FROM " + HEAD + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
+        head.put("单据编号", no);
+        head.put("lines", linesOf(no));
+        return head;
+    }
+
     // ==================== 小工具 ====================
 
     private Map<String, Object> firstRow(String sql, Object... args) {

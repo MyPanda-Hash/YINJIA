@@ -400,6 +400,16 @@ public class PxController {
     }
 
     /**
+     * 打印记录明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」):
+     * 弹窗里点「已打印记录」任一行 → 看这次打印具体打了哪几行、每行多少。**只读**。
+     */
+    @GetMapping("/puPrint/lines")
+    public ApiResult<Map<String, Object>> puPrintLines(@RequestParam String docNo) {
+        requirePrintRecordRead(docNo);
+        return ApiResult.ok(puPrint.detail(docNo));
+    }
+
+    /**
      * 打印记录的取数/登记权限(与材料码弹窗同一口径):
      * 内部账号按「采购订单」的查看权;供应商账号按**逐单归属**(只能动自己供应商的订单)。
      */
@@ -425,6 +435,28 @@ public class PxController {
         String supplierCode = queryService.sessionSupplierCode();
         if (supplierCode == null) {
             perm.requireButton("PU_ORDER", "修改");
+            return;
+        }
+        if (supplierCode.isEmpty()) {
+            throw new org.springframework.security.access.AccessDeniedException("供应商账号已停用");
+        }
+        String orderNo = puPrint.orderNoOf(no);
+        if (orderNo.isEmpty()
+                || !queryService.supplierMayReadDoc(com.yinjia.mes.service.QueryService.SUPPLIER_PANEL_CODE, orderNo)) {
+            throw new org.springframework.security.access.AccessDeniedException("该打印记录不属于当前供应商:" + no);
+        }
+    }
+
+    /**
+     * 记录明细(只读)的权限:内部账号按 PU_ORDER 的**查看权**(不是修改权 —— 看明细不改任何东西),
+     * 供应商账号仍按逐单归属(只能看自己订单下的打印记录)。
+     */
+    private void requirePrintRecordRead(String printDocNo) {
+        String no = printDocNo == null ? "" : printDocNo.trim();
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印记录单号");
+        String supplierCode = queryService.sessionSupplierCode();
+        if (supplierCode == null) {
+            perm.requirePanelView("PU_ORDER");
             return;
         }
         if (supplierCode.isEmpty()) {

@@ -125,6 +125,8 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
         if (path.equals("/api/px/puPrint/print")) return true;
         if (path.equals("/api/px/puPrint/reprint")) return true;
         if (path.equals("/api/px/puPrint/void")) return true;
+        // 点记录行看明细(2026-11-09):只读快照行,归属核对在 PxController.requirePrintRecordRead
+        if (path.equals("/api/px/puPrint/lines")) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")
