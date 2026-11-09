@@ -10,7 +10,7 @@
     :model-value="modelValue"
     :title="title"
     :width="dlgWidth"
-    :top="'5vh'"
+    :top="'3vh'"
     append-to-body
     destroy-on-close
     @update:model-value="(v) => emit('update:modelValue', v)"
@@ -36,9 +36,7 @@
         <span v-if="overRatioPct != null" class="pup-ratio">{{ tt('超送比例') }} {{ overRatioPct }}%</span>
       </div>
 
-      <!-- 明细表:2026-11-09 用户口径「这个不能收缩,要全列出来」—— 不用固定 height(会截行/出内滚动条),
-           改成 max-height:行少时全展开、行多才滚动 -->
-      <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" max-height="420"
+      <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" :height="mainTableHeight"
         @selection-change="onPicked">
         <el-table-column type="selection" width="42" />
         <el-table-column prop="行号" :label="tt('行号')" width="64" />
@@ -297,6 +295,12 @@ const detailTitle = computed(() => {
 const keyOf = (row, i) => String(row?.id ?? row?.['行号'] ?? i)
 /** 表格行:原始行 + 稳定行键(__key),不改原始字段 */
 const rows = computed(() => lines.value.map((l, i) => ({ ...l, __key: keyOf(l, i) })))
+/**
+ * 明细表高度(2026-11-09 用户口径「要根据打印材料码的弹窗设计来」「要全列出来」):
+ * 随行数自适应 —— 行少时刚好铺满(不出内滚动条),行多到超过 480 才滚动;
+ * 这样 10 行的订单也不会只露 5 行。
+ */
+const mainTableHeight = computed(() => Math.min(42 + rows.value.length * 42, 480))
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.__key)))
 const title = computed(() => {
   const base = showAmount.value ? tt('打印采购订单') : tt('打印订单无金额')
@@ -645,7 +649,9 @@ async function doVoid(row) {
 <style scoped>
 /* 弹窗内容(勾选表 + 已打印记录)比原来高:矮屏(768/1080 笔记本)上会把底部按钮顶出视口。
    让**内容区自己滚动**、标题与底部按钮固定可见(2026-11-09 实测 707px 高时按钮被挡在视口外)。 */
-.pup { display: flex; flex-direction: column; gap: 8px; max-height: 66vh; overflow-y: auto; padding-right: 4px; }
+.pup { display: block; max-height: 82vh; overflow-y: auto; padding-right: 4px; }
+/* 明细表是定高组件,不能被外层 flex 压缩(否则 10 行只露 4 行);用相邻 margin 代替 gap */`.pup > * + * { margin-top: 8px; }
+.pup :deep(.el-table) { flex: none; }
 .pup-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12.5px; color: #46586e; }
 .pup-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
 .pup-fmt { display: inline-flex; align-items: center; gap: 6px; }
