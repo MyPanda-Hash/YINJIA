@@ -622,6 +622,11 @@ export async function puPrintRecords(orderNo) {
   return unwrap(await request.get('/px/puPrint/records', { params: { orderNo } }))
 }
 
+/** 打印额度(2026-11-09):每行「可打印上限」= 订单数量 ×(1+超送比例),超送量按计量单位取整 */
+export async function puPrintQuotas(orderNo) {
+  return unwrap(await request.get('/px/puPrint/quotas', { params: { orderNo } }))
+}
+
 /** 登记一次打印:返回落纸行(服务端重算数量/小计,前端拿它出纸,保证「记录=纸」同源) */
 export async function puPrintSave(payload) {
   // 写接口一律严格解析:403/校验失败必须抛错,不能像 v3.65 那样"提示成功但什么都没变"

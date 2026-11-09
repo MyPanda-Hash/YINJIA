@@ -260,6 +260,12 @@ export default {
     '按订单数量填充': 'Fill with ordered qty',
     '请至少勾选一行明细': 'Check at least one line',
     '本次打印数量必须大于 0（不打印的行请取消勾选）': 'The print qty must be greater than 0 (uncheck the lines you do not want to print)',
+    // 打印按超送上限(2026-11-09)
+    '可打印上限': 'Printable max',
+    '本次打印数量上限 = 订单数量 ×（1 + 超送比例），超送量按计量单位取整': 'Print qty max = ordered qty × (1 + over-delivery ratio); the over-delivery part is rounded by UOM',
+    '超送比例': 'Over-delivery ratio',
+    '本次打印数量超出可打印上限': 'the print qty exceeds the printable max',
+    '订单数量 ×（1 + 超送比例）': 'ordered qty × (1 + over-delivery ratio)',
     // 采购订单打印记录(2026-11-07):每次打印落一份快照,弹窗里可查、可重打/作废
     '每次打印都会留一份记录；重打只累加次数，作废只作废这张纸': 'Every print leaves a record here; reprint only adds to the count, voiding only voids this sheet',
     '该订单还没有打印记录': 'This order has no print records yet',

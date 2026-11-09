@@ -57,14 +57,20 @@ public class PuPrintService {
 
     private final JdbcTemplate jdbc;
     private final FormNoService formNoService;
+    /**
+     * 超送比例 + 计量单位精度(2026-11-09 用户口径:「打印的时候没有和材料码一样考虑到超送问题」)。
+     * 采购订单**打印**也要有上限:本次打印数量 ≤ 订单数量 ×(1 + 超送比例),
+     * 超送量按该行单位精度向下取整(个/卷=整数、kg/米=3 位),与材料码「剩余可打」同一套取整函数。
+     */
+    private final BatchService batchService;
 
-    public PuPrintService(JdbcTemplate jdbc, FormNoService formNoService) {
+    public PuPrintService(JdbcTemplate jdbc, FormNoService formNoService, BatchService batchService) {
         this.jdbc = jdbc;
         this.formNoService = formNoService;
+        this.batchService = batchService;
     }
 
     // ==================== ① 已打印记录(弹窗反查) ====================
-
     /**
      * 某张采购订单的打印记录(新的在上)。
      *
@@ -81,6 +87,40 @@ public class PuPrintService {
                         + " FROM " + HEAD
                         + " WHERE [采购订单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY ISNULL([打印时间], CAST('1900-01-01' AS datetime2)) DESC, id DESC", no);
+    }
+
+    // ==================== ①-2 打印额度(超送) ====================
+
+    /**
+     * 每行的「可打印上限」—— 2026-11-09 用户口径:
+     * 「打印的时候没有和材料码一样考虑到超送问题」⇒ 采购订单打印也要按超送算上限。
+     *
+     * <p>口径:**可打印上限 = 订单数量 ×(1 + 超送比例)**,超送量按该行计量单位向下取整
+     * (个/卷=整数、kg/米=3 位)。与材料码「剩余可打」用同一个 {@link BatchService#overAllowance(double, double, double, double, int)},
+     * 区别只是这里**不减已送/已打印**(打印是"给供应商的这张订单最多能写多少",不占订单量)。
+     *
+     * @return { 超送比例: 0.2, lines: [{采购订单行id, 行号, 小数位数, 可打印上限}] }
+     */
+    public Map<String, Object> quotas(String orderNo) {
+        String no = str(orderNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少采购订单号");
+        double ratio = batchService.overRatio();
+        List<Map<String, Object>> lines = new ArrayList<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT id, [行号] AS 行号, [单位] AS 单位, ISNULL([数量],0) AS 数量"
+                        + " FROM " + ORDER_LINE + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no)) {
+            int nd = batchService.unitDecimals(str(r.get("单位")));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("采购订单行id", (int) num(r.get("id")));
+            row.put("行号", r.get("行号"));
+            row.put("小数位数", nd);
+            row.put("可打印上限", BatchService.overAllowance(num(r.get("数量")), 0, 0, ratio, nd));
+            lines.add(row);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("超送比例", ratio);
+        out.put("lines", lines);
+        return out;
     }
 
     // ==================== ② 登记一次打印(先落库,再出纸) ====================
@@ -127,6 +167,8 @@ public class PuPrintService {
         double qtyTotal = 0d;
         double amtTotal = 0d;
         boolean hasAmt = false;
+        // 超送比例(每次打印取一次;与材料码/生单同一系统参数 receive_over_ratio)
+        double overRatio = batchService.overRatio();
         for (Map<String, Object> r : rows) {
             int lineId = (int) num(r.get("采购订单行id"));
             double qty = num(r.get("打印数量"));
@@ -140,6 +182,15 @@ public class PuPrintService {
                 throw new IllegalArgumentException("第 " + str(line.get("行号")) + " 行的本次打印数量必须大于 0(不打印的行请取消勾选)");
             }
             double orderQty = num(line.get("数量"));
+            // 超送上限(2026-11-09):本次打印数量 ≤ 订单数量 ×(1 + 超送比例),超送量按单位精度向下取整;
+            // 服务端强制,前端弹窗给的 max 只是即时体验(供应商面板同一口径)。
+            int nd = batchService.unitDecimals(str(line.get("单位")));
+            double printCap = BatchService.overAllowance(orderQty, 0, 0, overRatio, nd);
+            if (qty > printCap + 1e-6) {
+                throw new IllegalArgumentException("第 " + str(line.get("行号")) + " 行:本次打印 " + fmtNum(qty)
+                        + " 超出可打印上限 " + fmtNum(printCap) + "(订单数量 " + fmtNum(orderQty)
+                        + " ×(1+超送比例 " + Math.round(overRatio * 100) + "%),超送量按计量单位取整)");
+            }
             boolean changed = Math.abs(qty - orderQty) > 1e-9;
             Double subtotal = null;
             if (changed) {
@@ -348,6 +399,12 @@ public class PuPrintService {
 
     /** 4 位小数收口(与库内 decimal(18,4) 同口径) */
     private static double round4(double v) { return Math.round(v * 10000.0) / 10000.0; }
+
+    /** 数量显示:整数不带小数点,小数去掉尾随 0(错误提示里用,别出现 3600.0000) */
+    private static String fmtNum(double v) {
+        if (Math.abs(v - Math.rint(v)) < 1e-9) return String.valueOf((long) Math.rint(v));
+        return new java.math.BigDecimal(String.valueOf(v)).stripTrailingZeros().toPlainString();
+    }
 
     private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
 

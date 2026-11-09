@@ -410,6 +410,16 @@ public class PxController {
     }
 
     /**
+     * 打印额度(2026-11-09 用户口径「打印的时候没有和材料码一样考虑到超送问题」):
+     * 每行「可打印上限」= 订单数量 ×(1 + 超送比例),超送量按计量单位向下取整。
+     */
+    @GetMapping("/puPrint/quotas")
+    public ApiResult<Map<String, Object>> puPrintQuotas(@RequestParam String orderNo) {
+        requirePrintRecordAccess(orderNo);
+        return ApiResult.ok(puPrint.quotas(orderNo));
+    }
+
+    /**
      * 打印记录的取数/登记权限(与材料码弹窗同一口径):
      * 内部账号按「采购订单」的查看权;供应商账号按**逐单归属**(只能动自己供应商的订单)。
      */

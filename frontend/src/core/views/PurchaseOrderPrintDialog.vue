@@ -30,6 +30,11 @@
       </div>
       <!-- 这句话是口径本身,别删:用户最容易误解的就是"是不是改了订单数量" -->
       <div class="pup-tip">{{ tt('勾选要打印的明细行，并填写本次打印数量；只影响这张报表，不改动订单数据') }}</div>
+      <!-- 超送上限(2026-11-09 用户口径「打印的时候没有和材料码一样考虑到超送问题」) -->
+      <div class="pup-quota-tip">
+        {{ tt('本次打印数量上限 = 订单数量 ×（1 + 超送比例），超送量按计量单位取整') }}
+        <span v-if="overRatioPct != null" class="pup-ratio">{{ tt('超送比例') }} {{ overRatioPct }}%</span>
+      </div>
 
       <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" height="330"
         @selection-change="onPicked">
@@ -40,9 +45,13 @@
         <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="110" show-overflow-tooltip />
         <el-table-column prop="单位" :label="tt('单位')" width="64" />
         <el-table-column prop="数量" :label="tt('订单数量')" width="96" align="right" />
+        <el-table-column :label="tt('可打印上限')" width="104" align="right">
+          <template #default="{ row }">{{ capOf(row) == null ? '' : qtyText(capOf(row)) }}</template>
+        </el-table-column>
         <el-table-column :label="tt('本次打印数量')" width="132">
           <template #default="{ row }">
-            <el-input-number v-model="qtyOf[row.__key]" :min="0" :controls="false" style="width: 112px" />
+            <el-input-number v-model="qtyOf[row.__key]" :min="0" :max="capOf(row) ?? undefined"
+              :precision="precisionOf(row)" :controls="false" style="width: 112px" @change="onQtyChange(row)" />
           </template>
         </el-table-column>
         <!-- 单价/小计只属于"有金额"版式:无金额版纸面本来就没这两列,弹窗跟着收起,避免看成两张报表 -->
@@ -198,11 +207,15 @@ const lines = ref([])
 const fmt = ref('amount')
 const showAmount = computed(() => fmt.value === 'amount')
 /** 宽表(带金额 10 列)按 1150px 排;小屏退回 96vw,不出横向滚动条 */
-const dlgWidth = 'min(1150px, 96vw)'
+const dlgWidth = 'min(1250px, 96vw)'
 const tableRef = ref(null)
 const picked = ref([])
 /** 行键 → 本次打印数量(键由 keyOf 生成) */
 const qtyOf = reactive({})
+/** 采购订单行id → { 可打印上限, 小数位数 }(2026-11-09:打印数量按超送+单位精度封顶) */
+const quotaOf = ref({})
+/** 超送比例(百分数,来自系统参数 receive_over_ratio;取不到时 null) */
+const overRatioPct = ref(null)
 /** 本订单的打印记录(服务端落库快照;弹窗底部表格) */
 const records = ref([])
 
@@ -240,6 +253,29 @@ const moneyText = (v) => {
 function amountOf(row) {
   return puOrderLineAmount(row, qtyOf[row.__key])
 }
+/** 该行的可打印上限(订单数量 ×(1+超送比例),服务端已按单位精度取整);没取到 → null(不设限也行,后端会拒) */
+function capOf(row) {
+  const q = quotaOf.value[String(row?.id)]
+  return q ? Number(q['可打印上限']) : null
+}
+/** 该行数量输入精度 = 单位小数位数(个/卷=0、kg/米=3) */
+function precisionOf(row) {
+  const q = quotaOf.value[String(row?.id)]
+  const n = Number(q?.['小数位数'])
+  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.trunc(n))) : 2
+}
+/** 数量改完:按单位精度向下取整,再夹到可打印上限(与服务端同一方向) */
+function onQtyChange(row) {
+  const key = row?.__key
+  const v = Number(qtyOf[key])
+  if (!Number.isFinite(v)) return
+  const nd = precisionOf(row)
+  const p = Math.pow(10, nd)
+  let f = Math.floor(v * p + 1e-9) / p
+  const cap = capOf(row)
+  if (cap != null && f > cap) f = cap
+  if (f !== v) qtyOf[key] = f
+}
 function amountText(row) {
   return moneyText(amountOf(row))
 }
@@ -268,9 +304,27 @@ async function load() {
   doc.value = {}
   lines.value = []
   records.value = []
+  quotaOf.value = {}
+  overRatioPct.value = null
   Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
   try {
-    const res = await engine.getFormDescriptor({ panelCode: props.panelCode, code: props.docNo })
+    // 额度与单据**并发**取,但额度先落地再渲染明细:
+    // el-input-number 的 precision 只在首渲染时定形,若先渲染(精度缺省 2)再改 prop,
+    // 计件单位会一直显示 3000.00(实测)。
+    const [res, quota] = await Promise.all([
+      engine.getFormDescriptor({ panelCode: props.panelCode, code: props.docNo }),
+      engine.puPrintQuotas(props.docNo).catch((e) => {
+        console.warn('[pu-print] 打印额度加载失败:', e?.message || e)
+        return null
+      }),
+    ])
+    if (quota) {
+      const m = {}
+      for (const r of quota['lines'] || []) m[String(r['采购订单行id'])] = r
+      quotaOf.value = m
+      const pct = Number(quota['超送比例'])
+      overRatioPct.value = Number.isFinite(pct) ? Math.round(pct * 100) : null
+    }
     doc.value = res?.data || {}
     if (!doc.value['单据编号'] && !doc.value['单号'] && !doc.value['编号']) {
       ElMessage.warning(tt('未取到单据数据'))
@@ -284,6 +338,7 @@ async function load() {
       const q = Number(l['数量'])
       qtyOf[keyOf(l, i)] = Number.isFinite(q) ? q : undefined
     })
+    // 打印额度已在上面的 Promise.all 里取到并先行落地(见注释:precision 要赶在首渲染前)
     // 默认全选(与材料码弹窗同款便利):大部分打印就是整单打,勾选仍是权威
     await nextTick()
     selectAll()
@@ -343,6 +398,17 @@ async function confirm() {
   const bad = picked.value.filter((r) => !(Number(qtyOf[r.__key]) > 0))
   if (bad.length) {
     return ElMessage.warning(tt('本次打印数量必须大于 0（不打印的行请取消勾选）'))
+  }
+  // 超送上限(2026-11-09):本次打印数量 ≤ 订单数量 ×(1+超送比例);后端会再校验一遍
+  const over = picked.value.filter((r) => {
+    const cap = capOf(r)
+    return cap != null && Number(qtyOf[r.__key]) > cap + 1e-9
+  })
+  if (over.length) {
+    const r = over[0]
+    const cap = capOf(r)
+    return ElMessage.warning(`${tt('本次打印数量超出可打印上限')} ${qtyText(cap)}（${tt('订单数量 ×（1 + 超送比例）')}）`
+      + ` · ${tt('行号')} ${r['行号'] ?? ''}`)
   }
   const picks = picked.value.map((r) => ({
     采购订单行id: Number(r.id),
@@ -452,6 +518,8 @@ async function doVoid(row) {
 .pup-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
 .pup-fmt { display: inline-flex; align-items: center; gap: 6px; }
 .pup-tip { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
+.pup-quota-tip { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px dashed #f5e3b3; border-radius: 4px; padding: 3px 8px; }
+.pup-ratio { color: #1f6f4a; font-weight: 600; }
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
 /* 已打印记录:与上方勾选表隔一道浅线,说明用途 */
 .pup-rec { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
