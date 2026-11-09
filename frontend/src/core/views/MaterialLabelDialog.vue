@@ -415,6 +415,8 @@ async function confirm() {
     //   现在把刷新放到 onDone(打印层摘掉 / afterprint)之后。
     let afterPrint = null
     let printDone = false      // onDone 可能比下面的赋值先到(打印被浏览器拒/层摘得快)
+    let refreshed = false      // 只刷新一次(onDone 与兜底定时器都可能触发)
+    const refreshOnce = () => { if (refreshed) return; refreshed = true; load() }
     await printProductCards(cardsOf(res), { onDone: () => { printDone = true; if (afterPrint) afterPrint() } })
     const docs = res['单据编号列表'] || [res['单据编号']]
     const tail = `（${tt('批次号')} ${res['批次号']}${res['生产日期'] ? ` · ${tt('生产日期')} ${res['生产日期']}` : ''}）`
@@ -424,8 +426,11 @@ async function confirm() {
     emit('printed', {
       orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: docs.length,
     })
-    // 刷新"剩余可打"与"已打印记录":打印对话框可能还开着 → 先挂起,onDone 里再执行
-    afterPrint = () => { load() }
+    // 刷新"剩余可打/已打印/已打码状态":打印对话框可能还开着 → 先挂起,onDone 里再执行。
+    // 2026-11-09 用户反馈「要重新进入才会更新已打印状态」⇒ 加 1.5s 兜底定时器:
+    // 浏览器不派发 afterprint / 打印层被系统摘掉时,也能自己刷新,不必关窗重进。
+    afterPrint = refreshOnce
+    setTimeout(refreshOnce, 1500)
     // onDone 已来过 / 打印层已摘(打印被浏览器拒)⇒ 立即刷新,别傻等
     if (printDone || !document.getElementById('yj-print-host')) afterPrint()
   } catch (e) {

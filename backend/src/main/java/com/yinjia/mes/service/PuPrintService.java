@@ -320,10 +320,15 @@ public class PuPrintService {
                 "SELECT TOP 1 [单据编号] FROM " + HEAD
                         + " WHERE [采购订单号] = ? AND [打印版式] <> ? AND [单据编号] <> ?"
                         + "   AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        // 只跟**还没配对**的对方记录配(一对一):否则会把别人已配好的对照抢过来
+                        + "   AND [对应单号] IS NULL"
                         + " ORDER BY ISNULL([打印时间], CAST('1900-01-01' AS datetime2)) DESC, id DESC",
                 String.class, no, fmt, docNo);
         String twin = twins.isEmpty() ? null : twins.get(0);
         if (twin != null && !twin.isBlank()) {
+            // 一对一:先把别人指向 twin / docNo 的旧引用清掉,再互写,避免出现"两张都指着同一张"
+            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [对应单号] = ? AND [单据编号] <> ?", twin, docNo);
+            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [对应单号] = ? AND [单据编号] <> ?", docNo, twin);
             jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", twin, docNo);
             jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", docNo, twin);
         }
@@ -369,7 +374,10 @@ public class PuPrintService {
         }
         Map<String, Object> out = print(orderNo, target, req, user);
         String newNo = str(out.get("单据编号"));
-        // print() 会按「另一版式最近存活」自动找对照;这里再按来源单**兜底写死**,保证就是这张
+        // print() 会按「另一版式最近存活且未配对」自动找对照;这里按来源单**写死**,并清掉别的记录
+        // 指向新单的悬空/抢占引用(保证一对一,不会出现两张无金额都写"已打印成"同一张有金额)
+        jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [对应单号] = ? AND [单据编号] <> ?", newNo, no);
+        jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [对应单号] = ? AND [单据编号] <> ?", no, newNo);
         jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", no, newNo);
         jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", newNo, no);
         out.put("对应单号", no);
@@ -462,8 +470,8 @@ public class PuPrintService {
         List<String> twins = jdbc.queryForList(
                 "SELECT [对应单号] FROM " + HEAD + " WHERE [单据编号] = ? AND [对应单号] IS NOT NULL", String.class, no);
         if (!twins.isEmpty() && twins.get(0) != null && !twins.get(0).isBlank()) {
-            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [单据编号] = ? AND [对应单号] = ?",
-                    twins.get(0), no);
+            // 作废后**所有**指向这张纸的引用都清掉(可能不止一条,历史上有被抢占的对照)
+            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [对应单号] = ?", no);
         }
         jdbc.update("UPDATE " + HEAD + " SET asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME() WHERE [单据编号] = ?", user, no);
         Map<String, Object> out = new LinkedHashMap<>();

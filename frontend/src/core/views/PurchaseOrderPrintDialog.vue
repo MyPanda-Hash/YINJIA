@@ -82,8 +82,9 @@
 
       <!-- 已打印记录(2026-11-07 用户口径「像材料码那样」):每次打印一份快照,可重打/作废;
            2026-11-09 用户口径「这一行我想要点击可以看到明细」⇒ 点整行打开记录明细;
-           同日再收紧「有金额的,要单独做一个框来显示无金额的,两个都要独立的,不要过多显示;
-           已打是单独对已打的有金额做登记,不要把无金额包含进来」⇒ 两个版式各一个独立框。 -->
+           同日再收紧(用户口径):**两个版式不要混在一起、独立开来** ——
+             上框 = 对方版式已打印(可"打印成"本版式;打过后显示"已打印成…",不能再打);
+             下框 = 本版式已打印(可重打/作废;作废后对方那张又能重新"打印成"本版式)。 -->
       <div class="pup-rec">
         <div class="pup-rec-title">
           {{ tt('已打印记录（本订单）') }}
@@ -91,30 +92,53 @@
           <span class="pup-tip">{{ tt('点击记录行可查看明细') }}</span>
         </div>
         <div class="pup-rec-two">
-          <div v-for="grp in recordGroups" :key="grp.format" class="pup-rec-box" :class="{ 'pup-rec-active': grp.active }">
+          <!-- ① 对方版式已打印 → 可打印成本版式(打完置灰,不能重复) -->
+          <div class="pup-rec-box">
             <div class="pup-rec-boxtitle">
-              <span>{{ tt(grp.format) }}</span>
-              <span class="pup-rec-count">{{ grp.rows.length }}</span>
-              <span v-if="grp.active" class="pup-rec-cur">{{ tt('当前版式') }}</span>
+              <span>{{ tt('其它版式已打印') }}（{{ tt(otherFmt) }}）</span>
+              <span class="pup-rec-count">{{ otherRows.length }}</span>
+              <span class="pup-rec-cur">{{ tt('可打印成') }}{{ tt(fmtLabel()) }}</span>
             </div>
-            <el-table :data="grp.rows" border size="small" max-height="168" @row-click="openRecordDetail">
+            <el-table :data="otherRows" border size="small" max-height="168" @row-click="openRecordDetail">
               <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="132" />
-              <!-- 相互记录(2026-11-09):另一版式里的对照单号 -->
               <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="132" />
               <el-table-column :label="tt('金额合计')" width="88" align="right">
                 <template #default="{ row }">{{ row['金额合计'] == null ? '' : moneyText(row['金额合计']) }}</template>
               </el-table-column>
               <el-table-column prop="数量合计" :label="tt('数量合计')" width="84" align="right" />
               <el-table-column prop="打印时间" :label="tt('打印时间')" width="140" />
-              <el-table-column :label="tt('操作')" width="186" align="center">
+              <el-table-column :label="tt('操作')" width="170" align="center">
                 <template #default="{ row }">
-                  <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录。
-                       按钮都必须 @click.stop,否则会连带触发"点整行看明细" -->
-                  <el-button link type="primary" :disabled="busy" @click.stop="doReprint(row)">{{ tt('重打') }}</el-button>
-                  <!-- 对着另一版式打:按这张纸的行/数量出另一个版式,两张互写「对应单号」 -->
-                  <el-button link type="primary" :disabled="busy" @click.stop="doTwin(row)">
-                    {{ tt(grp.format === '无金额' ? '打有金额版' : '打无金额版') }}
+                  <!-- 已经对应打印成本版式 → 置灰,不能再打;作废本版式那张后会自动恢复可点 -->
+                  <el-button link type="primary" :disabled="busy || row.__converted" @click.stop="doTwin(row)">
+                    {{ row.__converted ? `${tt('已打印成')}${tt(fmtLabel())}` : `${tt('打印成')}${tt(fmtLabel())}` }}
                   </el-button>
+                </template>
+              </el-table-column>
+              <template #empty>{{ tt('该版式还没有打印记录') }}</template>
+            </el-table>
+          </div>
+
+          <!-- ② 本版式已打印 → 重打 / 作废 -->
+          <div class="pup-rec-box pup-rec-active">
+            <div class="pup-rec-boxtitle">
+              <span>{{ tt('本版式已打印') }}（{{ tt(fmtLabel()) }}）</span>
+              <span class="pup-rec-count">{{ ownRows.length }}</span>
+              <span class="pup-rec-cur">{{ tt('当前版式') }}</span>
+            </div>
+            <el-table :data="ownRows" border size="small" max-height="168" @row-click="openRecordDetail">
+              <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="132" />
+              <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="132" />
+              <el-table-column :label="tt('金额合计')" width="88" align="right">
+                <template #default="{ row }">{{ row['金额合计'] == null ? '' : moneyText(row['金额合计']) }}</template>
+              </el-table-column>
+              <el-table-column prop="数量合计" :label="tt('数量合计')" width="84" align="right" />
+              <el-table-column prop="打印时间" :label="tt('打印时间')" width="140" />
+              <el-table-column :label="tt('操作')" width="140" align="center">
+                <template #default="{ row }">
+                  <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录 -->
+                  <el-button link type="primary" :disabled="busy" @click.stop="doReprint(row)">{{ tt('重打') }}</el-button>
+                  <!-- 作废 = 这张纸作废;对方那张的「对应单号」会被清掉 ⇒ 对方又能打印成本版式 -->
                   <el-button link type="danger" :disabled="busy" @click.stop="doVoid(row)">{{ tt('作废') }}</el-button>
                 </template>
               </el-table-column>
@@ -236,15 +260,19 @@ const overRatioPct = ref(null)
 /** 本订单的打印记录(服务端落库快照;弹窗底部两个独立框) */
 const records = ref([])
 /**
- * 记录按打印版式拆成两个**独立**框(2026-11-09 用户口径:「有金额的要单独做一个框来显示无金额的,
- * 两个都要独立的,不要过多显示;已打是单独对已打的有金额做登记,不要把无金额包含进来」)。
- * 当前版式那块高亮并标「当前版式」;「打对方版式」按钮放在各自框里,标签固定。
+ * 记录区(2026-11-09 用户口径):
+ *   「有金额的,下面有一个框可以显示无金额的已打印,然后可以对这个无金额的已打印,打印成有金额的,
+ *     然后就显示已经对应打印成有金额的,不能再打印了;再下面有一个框显示有金额的,可以重打或者作废,
+ *     作废后可以重新打印已经记录的无金额的;有金额和无金额不要混在一起,独立开来」
+ * ⇒ 上框 = 对方版式已打印(可打印成本版式),下框 = 本版式已打印(重打/作废)。
  */
-const recordGroups = computed(() => ['有金额', '无金额'].map((f) => ({
-  format: f,
-  rows: records.value.filter((r) => String(r['打印版式']) === f),
-  active: fmtLabel() === f,
-})))
+const otherFmt = computed(() => (showAmount.value ? '无金额' : '有金额'))
+/** 存活记录单号集合:判断"对方那张是否已经打印成本版式" */
+const liveNos = computed(() => new Set(records.value.map((r) => String(r['单据编号']))))
+const otherRows = computed(() => records.value
+  .filter((r) => String(r['打印版式']) === otherFmt.value)
+  .map((r) => ({ ...r, __converted: !!r['对应单号'] && liveNos.value.has(String(r['对应单号'])) })))
+const ownRows = computed(() => records.value.filter((r) => String(r['打印版式']) === fmtLabel()))
 
 /** 打印记录明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」):点记录行打开,只读 */
 const recDetailVisible = ref(false)
@@ -618,9 +646,9 @@ async function doVoid(row) {
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
 /* 已打印记录:与上方勾选表隔一道浅线,说明用途 */
 .pup-rec { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
-/* 两个版式各一个独立框(2026-11-09);当前版式高亮,避免"两个混在一起看" */
-.pup-rec-two { display: flex; gap: 8px; align-items: stretch; }
-.pup-rec-box { flex: 1 1 0; min-width: 0; border: 1px solid #e3e9f0; border-radius: 6px; padding: 4px 6px 6px; background: #fff; }
+/* 两个版式上下各一个独立框(2026-11-09):上=对方版式(可打成本版式),下=本版式(重打/作废) */
+.pup-rec-two { display: flex; flex-direction: column; gap: 8px; }
+.pup-rec-box { border: 1px solid #e3e9f0; border-radius: 6px; padding: 4px 6px 6px; background: #fff; }
 .pup-rec-box.pup-rec-active { border-color: #1f6f4a; box-shadow: 0 0 0 1px rgba(31, 111, 74, .18) inset; }
 .pup-rec-boxtitle { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
 .pup-rec-count { min-width: 18px; padding: 0 5px; border-radius: 9px; background: #eef3f8; color: #5b6b7f; font-size: 11.5px; line-height: 18px; text-align: center; }
