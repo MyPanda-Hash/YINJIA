@@ -81,43 +81,47 @@
       </div>
 
       <!-- 已打印记录(2026-11-07 用户口径「像材料码那样」):每次打印一份快照,可重打/作废;
-           2026-11-09 用户口径「这一行我想要点击可以看到明细」⇒ 点整行打开记录明细 -->
+           2026-11-09 用户口径「这一行我想要点击可以看到明细」⇒ 点整行打开记录明细;
+           同日再收紧「有金额的,要单独做一个框来显示无金额的,两个都要独立的,不要过多显示;
+           已打是单独对已打的有金额做登记,不要把无金额包含进来」⇒ 两个版式各一个独立框。 -->
       <div class="pup-rec">
         <div class="pup-rec-title">
           {{ tt('已打印记录（本订单）') }}
-          <span class="pup-tip">{{ tt('每次打印都会留一份记录；重打只累加次数，作废只作废这张纸') }}</span>
+          <span class="pup-tip">{{ tt('两个版式各自一块、各自登记：已打印只统计本版式，重打只累加次数，作废只作废这张纸') }}</span>
           <span class="pup-tip">{{ tt('点击记录行可查看明细') }}</span>
         </div>
-        <el-table :data="records" border size="small" max-height="220" class="pup-rec-table"
-          @row-click="openRecordDetail">
-          <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
-          <el-table-column :label="tt('打印版式')" width="96" align="center">
-            <template #default="{ row }">{{ tt(row['打印版式']) }}</template>
-          </el-table-column>
-          <!-- 相互记录(2026-11-09 用户口径「有各自份额,但是要互相记录对方的对应信息」) -->
-          <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="150" />
-          <el-table-column prop="行数" :label="tt('行数')" width="64" align="right" />
-          <el-table-column prop="数量合计" :label="tt('数量合计')" width="96" align="right" />
-          <el-table-column :label="tt('金额合计')" width="104" align="right">
-            <template #default="{ row }">{{ row['金额合计'] == null ? '' : moneyText(row['金额合计']) }}</template>
-          </el-table-column>
-          <el-table-column prop="打印人" :label="tt('打印人')" width="96" show-overflow-tooltip />
-          <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
-          <el-table-column prop="打印次数" :label="tt('打印次数')" width="78" align="right" />
-          <el-table-column :label="tt('操作')" width="210" align="center">
-            <template #default="{ row }">
-              <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录。
-                   两颗按钮都必须 @click.stop,否则会连带触发"点整行看明细" -->
-              <el-button link type="primary" :disabled="busy" @click.stop="doReprint(row)">{{ tt('重打') }}</el-button>
-              <!-- 对着另一版式打(2026-11-09):按这张纸的行/数量出另一个版式,两张互写「对应单号」 -->
-              <el-button link type="primary" :disabled="busy" @click.stop="doTwin(row)">
-                {{ tt(row['打印版式'] === '无金额' ? '打有金额版' : '打无金额版') }}
-              </el-button>
-              <el-button link type="danger" :disabled="busy" @click.stop="doVoid(row)">{{ tt('作废') }}</el-button>
-            </template>
-          </el-table-column>
-          <template #empty>{{ tt('该订单还没有打印记录') }}</template>
-        </el-table>
+        <div class="pup-rec-two">
+          <div v-for="grp in recordGroups" :key="grp.format" class="pup-rec-box" :class="{ 'pup-rec-active': grp.active }">
+            <div class="pup-rec-boxtitle">
+              <span>{{ tt(grp.format) }}</span>
+              <span class="pup-rec-count">{{ grp.rows.length }}</span>
+              <span v-if="grp.active" class="pup-rec-cur">{{ tt('当前版式') }}</span>
+            </div>
+            <el-table :data="grp.rows" border size="small" max-height="168" @row-click="openRecordDetail">
+              <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="132" />
+              <!-- 相互记录(2026-11-09):另一版式里的对照单号 -->
+              <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="132" />
+              <el-table-column :label="tt('金额合计')" width="88" align="right">
+                <template #default="{ row }">{{ row['金额合计'] == null ? '' : moneyText(row['金额合计']) }}</template>
+              </el-table-column>
+              <el-table-column prop="数量合计" :label="tt('数量合计')" width="84" align="right" />
+              <el-table-column prop="打印时间" :label="tt('打印时间')" width="140" />
+              <el-table-column :label="tt('操作')" width="186" align="center">
+                <template #default="{ row }">
+                  <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录。
+                       按钮都必须 @click.stop,否则会连带触发"点整行看明细" -->
+                  <el-button link type="primary" :disabled="busy" @click.stop="doReprint(row)">{{ tt('重打') }}</el-button>
+                  <!-- 对着另一版式打:按这张纸的行/数量出另一个版式,两张互写「对应单号」 -->
+                  <el-button link type="primary" :disabled="busy" @click.stop="doTwin(row)">
+                    {{ tt(grp.format === '无金额' ? '打有金额版' : '打无金额版') }}
+                  </el-button>
+                  <el-button link type="danger" :disabled="busy" @click.stop="doVoid(row)">{{ tt('作废') }}</el-button>
+                </template>
+              </el-table-column>
+              <template #empty>{{ tt('该版式还没有打印记录') }}</template>
+            </el-table>
+          </div>
+        </div>
       </div>
     </div>
     <template #footer>
@@ -229,8 +233,18 @@ const qtyOf = reactive({})
 const quotaOf = ref({})
 /** 超送比例(百分数,来自系统参数 receive_over_ratio;取不到时 null) */
 const overRatioPct = ref(null)
-/** 本订单的打印记录(服务端落库快照;弹窗底部表格) */
+/** 本订单的打印记录(服务端落库快照;弹窗底部两个独立框) */
 const records = ref([])
+/**
+ * 记录按打印版式拆成两个**独立**框(2026-11-09 用户口径:「有金额的要单独做一个框来显示无金额的,
+ * 两个都要独立的,不要过多显示;已打是单独对已打的有金额做登记,不要把无金额包含进来」)。
+ * 当前版式那块高亮并标「当前版式」;「打对方版式」按钮放在各自框里,标签固定。
+ */
+const recordGroups = computed(() => ['有金额', '无金额'].map((f) => ({
+  format: f,
+  rows: records.value.filter((r) => String(r['打印版式']) === f),
+  active: fmtLabel() === f,
+})))
 
 /** 打印记录明细(2026-11-09 用户口径「这一行我想要点击可以看到明细」):点记录行打开,只读 */
 const recDetailVisible = ref(false)
@@ -604,6 +618,15 @@ async function doVoid(row) {
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
 /* 已打印记录:与上方勾选表隔一道浅线,说明用途 */
 .pup-rec { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
+/* 两个版式各一个独立框(2026-11-09);当前版式高亮,避免"两个混在一起看" */
+.pup-rec-two { display: flex; gap: 8px; align-items: stretch; }
+.pup-rec-box { flex: 1 1 0; min-width: 0; border: 1px solid #e3e9f0; border-radius: 6px; padding: 4px 6px 6px; background: #fff; }
+.pup-rec-box.pup-rec-active { border-color: #1f6f4a; box-shadow: 0 0 0 1px rgba(31, 111, 74, .18) inset; }
+.pup-rec-boxtitle { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
+.pup-rec-count { min-width: 18px; padding: 0 5px; border-radius: 9px; background: #eef3f8; color: #5b6b7f; font-size: 11.5px; line-height: 18px; text-align: center; }
+.pup-rec-cur { color: #1f6f4a; font-size: 11.5px; font-weight: 600; }
+.pup-rec-box :deep(.el-table__row) { cursor: pointer; }
+.pup-rec-box :deep(.el-table__row:hover > td) { background: #eef6ff !important; }
 .pup-rec-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .pup-rec-title .pup-tip { background: none; border: none; padding: 0; }
 /* 记录行可点击看明细:鼠标手型 + 悬停高亮提示(行内的重打/作废按钮已 @click.stop) */
