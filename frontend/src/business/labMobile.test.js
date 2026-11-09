@@ -321,6 +321,38 @@ test('templateDetailFields:列 → 明细字段(键=列名,label 缺省用键,�
   assert.equal(fs[2].dataType, '文本')
 })
 
+test('templateDetailFields:**类型从面板元数据继承**(日期列必须是日期,否则手机上没有日期选择器)', () => {
+  const meta = [
+    { dataName: '测试日期', name: '测试日期', dataType: '日期' },
+    { dataName: '配水量\\n（L）', name: '配水量\\n（L）', dataType: '文本', isNotNull: true },
+    { dataName: '负责人', name: '负责人', dataType: '文本' },
+    { dataName: '手机照片', name: '手机照片', dataType: '附件' },
+  ]
+  const fs = templateDetailFields([
+    { key: '测试日期', w: 90 },
+    // 列名去换行/空白后与元数据同名 ⇒ 也要能对上
+    { key: '配水量（L）', label: '配水量（L）', w: 80 },
+    { key: '碳酸氢钠', w: 70, group: '试剂用量（g）' },
+  ], meta)
+  assert.equal(fs[0].dataType, '日期', '测试日期必须继承「日期」——手机端据此渲染日期选择器')
+  assert.equal(fs[1].dataType, '文本')
+  assert.equal(fs[1].isNotNull, true, '必填标记也一起继承')
+  assert.equal(fs[2].dataType, '文本', '元数据里没有的列退回文本')
+})
+
+test('visibleDetailFields:模版列继承类型(整屏字段里测试日期是日期)', () => {
+  const meta = [
+    { dataName: '测试日期', dataType: '日期' },
+    { dataName: '手机照片', dataType: '附件' },
+  ]
+  const out = visibleDetailFields({
+    isTemplate: true,
+    layout: { cols: [{ key: '测试日期', w: 90 }, { key: '碳酸氢钠', w: 70 }], ok: true },
+    metaFields: meta,
+  })
+  assert.deepEqual(out.map((f) => `${f.dataName}:${f.dataType}`), ['测试日期:日期', '碳酸氢钠:文本', '手机照片:附件'])
+})
+
 test('visibleDetailFields:加标水 = 模版列 + 那个附件列;其它面板/未选项目 = 原样元数据', () => {
   const meta = [
     { dataName: '测试日期', dataType: '日期' },

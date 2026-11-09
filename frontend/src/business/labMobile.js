@@ -303,23 +303,47 @@ export function stdLibContentOf(rows, picked) {
   return hit ? rowContentOf(hit) : ''
 }
 
+/** 字段名归一(去掉表头里的字面量 `\n`/换行/空白),用于"模版列 ↔ 面板元数据字段"对号 */
+const normFieldName = (s) => String(s ?? '').replace(/\\n|\r?\n/g, '').replace(/\s+/g, '').trim()
+
 /**
  * 模版列 → 明细字段(页面按 `dataName` 取值,与面板元数据字段同一副形状,渲染路径不用分叉)。
+ *
+ * ⚠ **类型要从面板元数据继承**:列结构只描述"有哪些列、叫什么、多宽、怎么分格",不含 dataType;
+ *   手机端要按类型决定控件(日期 → 日期选择器)。这里原先一律写死「文本」,
+ *   结果加标水的「测试日期」在手机上只能手打、没有日期选择器(用户 2026-11-09 报障:
+ *   「手机端的测试日期没有时间选择器」)。所以按列名去面板元数据里找同名字段,继承 dataType/options。
+ *
  * @param {Array<{key:string,label?:string,w?:number,group?:string}>} cols parseLayout 的 cols
+ * @param {Array} [metaFields] 面板明细元数据字段(用于继承类型)
  * @returns {Array<{dataName:string,name:string,dataType:string,width:number,group?:string}>}
  */
-export function templateDetailFields(cols) {
+export function templateDetailFields(cols, metaFields = []) {
+  const meta = Array.isArray(metaFields) ? metaFields : []
+  const srcOf = (key, label) => {
+    const k = normFieldName(key)
+    const l = normFieldName(label)
+    return meta.find((f) => normFieldName(f?.dataName) === k)
+      || meta.find((f) => normFieldName(f?.dataName) === l)
+      || meta.find((f) => normFieldName(f?.name) === k)
+      || meta.find((f) => normFieldName(f?.name) === l)
+      || null
+  }
   return (Array.isArray(cols) ? cols : [])
     .filter((c) => c && String(c.key || '').trim())
     .map((c) => {
       const key = String(c.key).trim()
+      const label = String(c.label || key).trim() || key
+      const src = srcOf(key, label)
       const f = {
         dataName: key,
-        name: String(c.label || key).trim() || key,
-        dataType: '文本',
+        name: label,
+        dataType: String(src?.dataType || '文本').trim() || '文本',
         width: Number(c.w) > 0 ? Number(c.w) : 90,
         fromTemplate: true,
       }
+      if (Array.isArray(src?.options) && src.options.length) f.options = src.options.slice()
+      if (src?.isNotNull) f.isNotNull = src.isNotNull
       if (c.group) f.group = String(c.group)
       return f
     })
@@ -339,5 +363,5 @@ export function visibleDetailFields({ isTemplate, layout, metaFields }) {
   const cols = layout && Array.isArray(layout.cols) ? layout.cols : null
   if (!isTemplate || !cols || !cols.length) return meta
   const attach = meta.filter((f) => String(f?.dataType || '') === '附件')
-  return [...templateDetailFields(cols), ...attach]
+  return [...templateDetailFields(cols, meta), ...attach]
 }
