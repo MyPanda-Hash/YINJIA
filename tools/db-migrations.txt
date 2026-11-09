@@ -4521,3 +4521,6 @@ migrate-pu-print-20261107.sql
 
 # 2026-11-09 采购订单打印记录:bd_pu_print 加[对应单号](有金额↔无金额 相互对着打印)
 migrate-pu-print-twin-20261109.sql
+
+# 2026-11-09 材料码打印:bd_pu_label 加[来源打印单号](只认有金额打印记录,同一张只能打一次)
+migrate-pu-label-src-print-20261109.sql

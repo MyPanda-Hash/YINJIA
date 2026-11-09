@@ -143,6 +143,14 @@ public class PuLabelService {
         // 预填生产日期(2026-10-23):**不猜**,默认空由人工填 —— 生产日期是事实,不能由系统编,
         // 缺值时卡面该栏留空白手填线(与原行为一致)。前端只认 yyyy-MM-dd 字符串。
         out.put("生产日期", "");
+        // 已用过的「采购订单打印记录」(2026-11-09):界面把对应按钮置灰,不能重复打码
+        List<Map<String, Object>> usedSrc = jdbc.queryForList(
+                "SELECT DISTINCT [来源打印单号] AS no FROM bd_pu_label"
+                        + " WHERE [采购订单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND [来源打印单号] IS NOT NULL",
+                orderNo);
+        List<String> usedSrcNos = new ArrayList<>();
+        for (Map<String, Object> u : usedSrc) if (u.get("no") != null) usedSrcNos.add(str(u.get("no")));
+        out.put("已打码打印单", usedSrcNos);
         out.put("lines", rows);
         out.put("补登行", supplements);             // 下层表「已生单可补打」:按订单行×已生单批次号
         out.put("records", records(labels));      // 已有打印记录(取代查询面板的反查入口)
@@ -305,9 +313,45 @@ public class PuLabelService {
     @Transactional
     public Map<String, Object> print(String orderNo, String batchNo, String prodDate,
                                      List<Map<String, Object>> rows, String user) {
+        return print(orderNo, batchNo, prodDate, "", rows, user);
+    }
+
+    /**
+     * 登记一次打印(带来源打印记录,2026-11-09 用户口径
+     * 「按这个打印后,要把这个按钮变灰,不能重复打;而且只要记录有金额」)。
+     *
+     * <p>{@code sourcePrintNo} = 材料码是按哪张**采购订单打印记录(有金额)**带出来的:
+     * <ul>
+     *   <li>必须是本订单、存活、且版式为「有金额」的记录;</li>
+     *   <li>同一张记录只允许打一次材料码(按 bd_pu_label.[来源打印单号] 判重,作废后可重来);</li>
+     *   <li>落库到单头 {@code [来源打印单号]},界面据此把对应按钮置灰。</li>
+     * </ul>
+     */
+    @Transactional
+    public Map<String, Object> print(String orderNo, String batchNo, String prodDate, String sourcePrintNo,
+                                     List<Map<String, Object>> rows, String user) {
         if (orderNo == null || orderNo.isBlank()) throw new IllegalArgumentException("缺少采购订单号");
         String no = str(batchNo);
+        String srcPrint = str(sourcePrintNo);
         LocalDate prod = parseDate(prodDate);   // 格式不对直接拒(张冠李戴的日期比空值更坏)
+        // 来源打印记录校验(2026-11-09):只认本订单的「有金额」版式,且只能打一次
+        if (!srcPrint.isEmpty()) {
+            Map<String, Object> srcHead = firstRow(
+                    "SELECT [采购订单号] AS orderNo, [打印版式] AS fmt FROM bd_pu_print"
+                            + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", srcPrint);
+            if (srcHead == null) throw new IllegalArgumentException("采购订单打印记录不存在或已作废:" + srcPrint);
+            if (!orderNo.equals(str(srcHead.get("orderNo")))) {
+                throw new IllegalArgumentException("该打印记录不属于这张采购订单:" + srcPrint);
+            }
+            if (!"有金额".equals(str(srcHead.get("fmt")))) {
+                throw new IllegalArgumentException("只有「有金额」的采购订单打印记录才能带出材料码:" + srcPrint);
+            }
+            Integer used = jdbc.queryForObject("SELECT COUNT(*) FROM bd_pu_label"
+                    + " WHERE [来源打印单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, srcPrint);
+            if (used != null && used > 0) {
+                throw new IllegalArgumentException("该采购订单打印记录已经打过材料码,不能重复打印:" + srcPrint);
+            }
+        }
         // 顶部批次号可以为空 —— 只要**每一行都自带批次号**(补登行必须自带:它要跟已生单单据同号)。
         // 逐行的空值在下面的循环里判,避免"只勾补登行"被顶部的空号误伤。
         if (no.length() > BATCH_NO_MAX) throw new IllegalArgumentException("批次号过长(最多 " + BATCH_NO_MAX + " 个字符):" + no);
@@ -399,10 +443,11 @@ public class PuLabelService {
             // ★ 每行一张单:各自取号、各自建头(作废时才互不牵连)
             String docNo = formNoService.next(PREFIX, user);
             jdbc.update("INSERT INTO bd_pu_label ([单据编号],[单据日期],[采购订单号],[供应商编码],[批次号],[生产日期],"
-                            + " [打印人],[打印时间],[打印次数],asp_user1,asp_time1,asp_cancel)"
-                            + " VALUES (?,?,?,?,?,?,?,SYSDATETIME(),1,?,SYSDATETIME(),'N')",
+                            + " [来源打印单号],[打印人],[打印时间],[打印次数],asp_user1,asp_time1,asp_cancel)"
+                            + " VALUES (?,?,?,?,?,?,?,?,SYSDATETIME(),1,?,SYSDATETIME(),'N')",
                     docNo, LocalDate.now(), orderNo, str(head.get("supplierCode")), rowBatch,
-                    prod == null ? null : java.sql.Date.valueOf(prod), user, user);
+                    prod == null ? null : java.sql.Date.valueOf(prod),
+                    srcPrint.isEmpty() ? null : srcPrint, user, user);
             jdbc.update("INSERT INTO bl_pu_label ([单据编号],[采购订单行号],[采购订单行id],[物料编码],[物料名称],"
                             + " [规格型号],[计量单位],[打印数量],[补登],[去向单据],asp_user1,asp_time1,asp_cancel)"
                             + " VALUES (?,?,?,?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",

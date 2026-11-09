@@ -154,7 +154,11 @@
             <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
             <el-table-column :label="tt('操作')" width="150" align="center">
               <template #default="{ row }">
-                <el-button link type="primary" :disabled="busy" @click="applyPoPrint(row)">{{ tt('按这次打印打码') }}</el-button>
+                <!-- 2026-11-09 用户口径:按这张记录打过一次后按钮置灰,不能重复打 -->
+                <el-button link type="primary" :disabled="busy || usedSrcSet.has(String(row['单据编号']))"
+                  @click="applyPoPrint(row)">
+                  {{ usedSrcSet.has(String(row['单据编号'])) ? tt('已打码') : tt('按这次打印打码') }}
+                </el-button>
               </template>
             </el-table-column>
             <template #empty>{{ tt('该订单还没有打印过采购订单') }}</template>
@@ -220,6 +224,10 @@ const qtyOf = reactive({})
 const openPanels = ref([])
 /** 本订单的「打印采购订单」记录(2026-11-09:可看见、并能据此打材料码) */
 const poPrints = ref([])
+/** 本次是从哪张「有金额」采购订单打印记录带出来的(空=不是按记录打) */
+const sourcePrintNo = ref('')
+/** 已打过材料码的打印记录(服务端下发;界面据此置灰,不能重复打) */
+const usedSrcSet = computed(() => new Set((data.value['已打码打印单'] || []).map(String)))
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
 const totalQty = computed(() => {
@@ -280,7 +288,11 @@ async function load() {
     suppRef.value?.clearSelection()
     // 采购订单打印记录(2026-11-09):失败不影响打码主体,只是少一块参考
     engine.puPrintRecords(props.orderNo)
-      .then((list) => { poPrints.value = list || [] })
+      .then((list) => {
+        // 只要「有金额」的记录(用户口径:而且只要记录有金额);无金额版不参与带出材料码
+        poPrints.value = (list || []).filter((r) => String(r['打印版式']) === '有金额')
+        sourcePrintNo.value = ''
+      })
       .catch(() => { poPrints.value = [] })
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('材料码数据加载失败'))
@@ -345,6 +357,7 @@ async function applyPoPrint(row) {
       return
     }
     syncPick(ids)
+    sourcePrintNo.value = no     // 记下来源:打印时带给服务端,打过一次就不能再用这张记录
     const clamped = rows.value.some((r) => {
       const q = byLine.get(Number(r.id))
       return q != null && q > capOf(r)
@@ -394,6 +407,8 @@ async function confirm() {
       orderNo: props.orderNo, batchNo: String(batchNo.value).trim(),
       // 生产日期(2026-10-23):与批次号一起登记在单头,出纸时印到卡面「生产日期」栏;空串 = 不登记
       prodDate: String(prodDate.value || '').trim(), lines: all,
+      // 来源打印记录(2026-11-09):按「有金额」采购订单打印记录打码时带上,服务端防重复 + 界面置灰
+      ...(sourcePrintNo.value ? { sourcePrintNo: sourcePrintNo.value } : {}),
     })
     // ⚠ 打印层挂上后 window.print() 是**异步**返回的(打印对话框还开着)。
     //   原来这里紧接着 load() 刷新弹窗 ⇒ 打印对话框期间又发请求又重绘,界面像卡死(2026-10-29)。

@@ -316,11 +316,13 @@ public class PxController {
         requireMaterialLabelAccess(orderNo);
         String batchNo = body.get("batchNo") == null ? "" : String.valueOf(body.get("batchNo"));
         String prodDate = body.get("prodDate") == null ? "" : String.valueOf(body.get("prodDate"));
+        // 来源打印记录(2026-11-09):按某张「有金额」采购订单打印记录打码时带上,服务端据此防重复
+        String sourcePrintNo = body.get("sourcePrintNo") == null ? "" : String.valueOf(body.get("sourcePrintNo"));
         List<Map<String, Object>> lines = new java.util.ArrayList<>();
         if (body.get("lines") instanceof List<?> l) {
             for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
         }
-        return ApiResult.ok(puLabel.print(orderNo, batchNo, prodDate, lines, currentUser()));
+        return ApiResult.ok(puLabel.print(orderNo, batchNo, prodDate, sourcePrintNo, lines, currentUser()));
     }
 
     /** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */
