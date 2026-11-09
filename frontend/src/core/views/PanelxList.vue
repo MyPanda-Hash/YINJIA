@@ -238,7 +238,7 @@
           </div>
           <RecordSheetPanels
             ref="approvalSheetRef"
-            :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
+            :head="cur" :fields="sheetAllFields" :detail-fields="sheetDetailFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
             :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
@@ -1268,9 +1268,9 @@
               >
                 <template #default="{ row }">
                   <template v-if="archEditable(b) && !row._placeholder">
-                    <span v-if="c.field && c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
-                    <span v-else-if="isSelectField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
-                    <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-if="c.field && c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
+                    <span v-else-if="isSelectField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
+                    <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                     <template v-else-if="isActiveCell(row, b, c.prop)">
                       <el-select
                         v-if="isSelectField(c.field)"
@@ -1284,7 +1284,7 @@
                       </el-select>
                       <el-input v-else v-model="row[c.prop]" size="small" v-cell-focus @input="markInlineDirty()" />
                     </template>
-                    <span v-else class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-else class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                   </template>
                   <!-- 空态行(本区没有数据时撑出列头与空格):「检验项目」格显示**该区固定项名**
                        (端盖两头/管身两侧),其余格留空 —— **不可点、不加行**(用户口径:加行只在下方的
@@ -1292,7 +1292,7 @@
                   <template v-else-if="row._placeholder">
                     <span v-if="c.prop === '检验项目' && row['检验项目']" class="cell-preset">{{ row['检验项目'] }}</span>
                   </template>
-                  <span v-else>{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                  <span v-else>{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 </template>
               </el-table-column>
               <el-table-column v-if="detailEditable(b)" width="60" align="center" :label="tt('操作')">
@@ -1399,7 +1399,7 @@
             <template #default="{ row }">
               <!-- 列级虚拟化后,走到这里的都是可见列,不再需要单元格级占位(原 col-lazy-empty 分支已随五期机制下线) -->
               <template v-if="archEditable(b) && !row._placeholder">
-                <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 <!-- 批次号(分批链路单据):只由生单/随链写入、行随单头一致 —— 明细格只读,要改请在单头改 -->
                 <span v-else-if="detailBatchLocked(c.prop)" class="cell-locked" :title="tt('随单头批次号一致,不可修改')">{{ row[c.prop] ?? '' }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
@@ -1413,17 +1413,17 @@
                      单据页行数少,保持常驻(点即选)不变 -->
                 <div v-else-if="isReferenceField(c.field) && (!singleDocMode.value || isActiveCell(row, b, c.prop))" class="inline-ref-editor" :class="{ active: isActiveDetailRefRow(row, b, c.prop) }">
                   <el-input
-                    :model-value="formatFieldValue(c.field, row[c.prop])"
+                    :model-value="formatFieldValue(c.field, row[c.prop], row)"
                     readonly
                     :title="detailRefTrigger(c.field) === 'dblclick' ? tt('双击选择存货') : tt('点击选择')"
                     @click="openClickDetailRef(c.field, row, b)"
                   />
                   <el-icon v-if="detailRefTrigger(c.field) === 'dblclick' && isActiveDetailRefRow(row, b, c.prop)" class="list-ref-icon"><Search /></el-icon>
                 </div>
-                <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 <!-- 分区选择(2026-10-08):候选 = 本表 (大区,存储分区) 的实际数据去重并集,不落任何存储
                      ⇒ 点格**直接开**「仓位分区」弹窗(不进"激活编辑器"那一套),与参照列的交互形态一致 -->
-                <span v-else-if="isZonePickField(c.field)" class="cell-lazy zone-pick-cell" :title="tt('点击选择分区')" @click="openZonePick(row, b, c.field)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <span v-else-if="isZonePickField(c.field)" class="cell-lazy zone-pick-cell" :title="tt('点击选择分区')" @click="openZonePick(row, b, c.field)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
                      避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
                 <template v-else-if="isActiveCell(row, b, c.prop)">
@@ -1492,7 +1492,7 @@
                   class="cell-lazy"
                   :class="{ 'cell-multiline': isMultilineField(c.field) }"
                   @click="activateCell(row, b, c.prop)"
-                >{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                >{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
               </template>
               <span v-else :class="{ 'cell-multiline': isMultilineField(c.field) }">{{ tt(row[c.prop] ?? '') }}</span>
             </template>
@@ -2359,6 +2359,14 @@
     </el-dialog>
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
+    <!-- 采购订单·打印(2026-11-07 用户口径「打印报表的时候需要能够编辑,像打印材料码的编辑一样,
+         要可以勾选打印和填写数量」):有金额/无金额两个报表共用这一张弹窗,确认后才出纸 -->
+    <PurchaseOrderPrintDialog
+      v-model="puPrintVisible"
+      :panel-code="String(panelCode)"
+      :doc-no="puPrintNo"
+      :with-amount="puPrintAmount"
+    />
 
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
@@ -2429,7 +2437,7 @@
         <el-table-column :label="tt('状态')" width="80">
           <template #default="{ row }">
             <el-tag v-if="row.result === 'ok'" type="success" size="small">{{ row.erpBillNo || '成功' }}</el-tag>
-            <el-tag v-else-if="row.result === 'skip'" type="info" size="small">已转</el-tag>
+            <el-tag v-else-if="row.result === 'skip'" type="info" size="small">{{ tt('已转') }}</el-tag>
             <el-tag v-else-if="row.result === 'fail'" type="danger" size="small">{{ tt('失败') }}</el-tag>
           </template>
         </el-table-column>
@@ -2557,6 +2565,7 @@ import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaul
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
+import { qtyDecimalsOf, formatQtyByUnit, floorTo } from '@core/panel/unitPrecision'
 import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintBody } from '@core/panel/sheetPrintHtml'
 import { printInPage } from '@core/panel/printChannel'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
@@ -2564,6 +2573,7 @@ import { useUnsavedStore } from '@/stores/unsaved'
 
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
+import PurchaseOrderPrintDialog from './PurchaseOrderPrintDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import { defaultShipRows, shipRowType } from '@core/qc/shipPlanDefaults'
@@ -2622,6 +2632,7 @@ import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { user, tabs, locale: localeStore } = useAppContext()
@@ -2894,13 +2905,20 @@ async function doBatchErp() {
   let ok = 0, skip = 0, fail = 0
   for (const row of batchErpSel.value) {
     try {
-      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '转ERP', formData: { 编号: row.单据编号, 单据编号: row.单据编号 }, buttonParam: {} })
-      if (res?.message?.includes('已转入ERP')) { row.result = 'skip'; skip++ }
-      else { row.result = 'ok'; row.erpBillNo = res?.ERP单号 || ''; ok++ }
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '转ERP', formData: { 编号: row.单据编号, 单据编号: row.单据编号 }, buttonParam: {}, timeoutMs: ERP_CALL_TIMEOUT_MS })
+      // 已转判定统一走 erpOutcome(2026-11-09):弹窗列表是"查询可转ERP"的快照,
+      // 用户在别处已转/或同一单被选了两次时,这里必须是「已转·跳过」而不是「成功」。
+      const o = erpOutcome(res)
+      if (o.already) { row.result = 'skip'; row.erpBillNo = o.erpNo; skip++ }
+      else { row.result = 'ok'; row.erpBillNo = o.erpNo; ok++ }
     } catch { row.result = 'fail'; fail++ }
   }
   batchErpLoading.value = false
-  ElMessage.success(`批量转ERP完成: 成功${ok} 跳过${skip} 失败${fail}`)
+  // 有"已转跳过"时降级成 warning:别让整批报成功把"这几张其实没转"盖过去(同单张口径)
+  ElMessage[skip ? 'warning' : 'success'](
+    tt('批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}')
+      .replace('{ok}', String(ok)).replace('{skip}', String(skip)).replace('{fail}', String(fail))
+  )
   await load()
 }
 
@@ -5168,6 +5186,20 @@ const MATERIAL_LABEL_PANELS = ['PU_ORDER', 'SUPPLIER_PU_ORDER']
 function onMaterialLabelPrinted({ docNo, batchNo, count }) {
   ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批数量已从订单数量隔离出来，生单时在明细里直接勾选它')}`)
 }
+/**
+ * 采购订单·打印弹窗(2026-11-07):勾选明细行 + 填本次打印数量(有金额/无金额两个版式共用)。
+ * 与「打印材料码」弹窗同一套交互语言,但**不落库**(只影响这张报表,不改订单数据)。
+ */
+const puPrintVisible = ref(false)
+const puPrintNo = ref('')
+/** 打开时默认版式:true=有金额(打印采购订单),false=无金额(打印订单无金额) */
+const puPrintAmount = ref(true)
+/**
+ * 走「可编辑打印弹窗」的采购订单面板族 —— 与 MATERIAL_LABEL_PANELS 同口径:
+ * 供应商采购打印(SUPPLIER_PU_ORDER)与采购订单(PU_ORDER)是同一张 bd_pu_order 的两个面板编码,
+ * 取数与版式完全一致 ⇒ 必须走同一个弹窗,否则供应商点「打印」又退回老的无编辑直接出纸。
+ */
+const PU_PRINT_PANELS = ['PU_ORDER', 'SUPPLIER_PU_ORDER']
 const qrLabels = ref([])
 
 function openQrLabels() {
@@ -8093,7 +8125,7 @@ const docPrintCols = computed(() => {
       })
       continue
     }
-    out.push({ title: c.label, base: dpBaseW(c.prop), text: (r) => formatFieldValue(c.field, r[c.prop]) })
+    out.push({ title: c.label, base: dpBaseW(c.prop), text: (r) => formatFieldValue(c.field, r[c.prop], r) })
   }
   const total = out.reduce((s, c) => s + c.base, 0) || 1
   for (const c of out) c.pct = Math.round((c.base / total) * 1000) / 10
@@ -8586,9 +8618,20 @@ function fieldOptions(field) {
   ))
 }
 
-function formatFieldValue(field, value) {
+/**
+ * 数量类字段的小数位数(2026-11-09:数量按计量单位精度)。
+ * 精度表由后端随面板配置下发(`cfg.unitDecimals`);纯逻辑见 @core/panel/unitPrecision。
+ */
+function qtyDecimals(field, row) {
+  return qtyDecimalsOf(field?.label ?? field?.dataName ?? field?.name, row, cfgCache.value?.unitDecimals || {})
+}
+
+function formatFieldValue(field, value, row) {
   if (value === undefined || value === null || value === '') return ''
   if (isBooleanField(field)) return toBool(value) ? '是' : '否'
+  // 2026-11-09:数量类字段按该行计量单位精度显示(计件不带小数、kg/米最多 3 位,去掉尾随 0)
+  const nd = qtyDecimals(field, row)
+  if (nd != null) return formatQtyByUnit(value, nd)
   return String(value)
 }
 
@@ -9127,6 +9170,23 @@ function discardCreatedDetailRefRow(pick) {
 
 async function onInlineDetailChange(tabKey, row, field) {
   markInlineDirty() // 明细单元格任何值变更 → 未保存离开守卫置脏
+  // 2026-11-09:数量类字段按该行计量单位**向下取整**(个/卷=整数、kg/米=3 位)——
+  // 与后端保存/过账同一口径(用户口径:计件单位取整、与超送一致);取整后同步编辑格回显,
+  // 并放在 calculateDetailRow 之前,保证「金额=数量×单价」用的是取整后的数量。
+  const nd = qtyDecimals(field, row)
+  if (nd != null) {
+    const key = field?.label ?? field?.dataName
+    if (key && row && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+      const before = row[key]
+      const after = floorTo(before, nd)
+      if (Number(after) !== Number(before)) {
+        row[key] = after
+        if (activeCell.value && activeCell.value.row === row && activeCell.value.prop === key) {
+          activeCellEcho.value = after
+        }
+      }
+    }
+  }
   // ⚠ 档案行是 markRaw 的(去响应式优化,见 normalizeArchRaw):明细里的
   //   el-select / el-date-picker / el-switch 都用 `v-model="row[c.prop]"` 直写行对象,
   //   而 markRaw 行的写入**不产生响应依赖** ⇒ 控件自身的 modelValue 不更新,
@@ -10535,6 +10595,22 @@ async function onButton(action) {
   // 出纸 = 页面内打印层(2026-10-20 起不再开子窗口,见 @core/panel/printChannel)
   // (无后端处理器,同 打印工单二维码 本地拦截先例)
   // 打印订单无金额(2026-09-28 用户澄清):采购订单的另一种报表,版式同款仅去 单价/小计/总计金额
+  //
+  // 🔴 2026-11-07 用户口径「采购订单的打印(两个报表一个有金额,一个没有金额),需要能够在打印报表的
+  //    时候编辑(像打印材料码的编辑一样),要可以勾选打印和填写数量」⇒ 采购订单两版**先开可编辑弹窗**
+  //    (PurchaseOrderPrintDialog:勾明细行 + 填本次打印数量,确认后才出纸),不再直接出纸。
+  //    判据用面板族 PU_PRINT_PANELS(供应商采购打印 SUPPLIER_PU_ORDER 是同一张单的另一个面板编码)。
+  //    下面的直接出纸分支保留给「打印退货单」以及万一别的面板也配了这两个动作的兜底。
+  if ((action === '打印采购订单' || action === '打印订单无金额')
+      && PU_PRINT_PANELS.includes(String(panelCode.value))) {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    puPrintNo.value = no
+    puPrintAmount.value = action === '打印采购订单'
+    puPrintVisible.value = true
+    return
+  }
   if (action === '打印采购订单' || action === '打印退货单' || action === '打印订单无金额') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || ''
@@ -11239,6 +11315,8 @@ async function onButton(action) {
       buttonName: action,
       formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
+      // 转ERP 要连金蝶(取 token + 保存),15 s 默认值会把"推送成功但慢"错报成失败(见 erpOutcome.js)
+      ...(action === '转ERP' ? { timeoutMs: ERP_CALL_TIMEOUT_MS } : {}),
     })
     // 产品信息表提交审批后:**跳到「产品文件列表 · 流程全览」**并把该产品展开(2026-11-06 用户口径:
     //   「产品信息表在提交审批之后跳转到产品文件列表，可以查看流程信息」)。
@@ -11288,7 +11366,16 @@ async function onButton(action) {
       tabs.open({ path: targetPath, title: res.gotoPanel })
       return
     }
-    ElMessage.success(`「${action}」执行成功`)
+    // 2026-11-09 用户报障「已转的没弃审也能再转,而且一直显示转ERP执行成功」:
+    //   服务端对已转单据**不重复推送**,只在 data.message 里回一句「该单据已转入ERP」;
+    //   这里原来无条件弹「执行成功」⇒ 用户以为又转成功了。口径见 core/views/erpOutcome.js(有单测)。
+    if (action === '转ERP') {
+      const o = erpOutcome(res)
+      if (o.already) ElMessage.warning(erpOutcomeText(o, tt))
+      else ElMessage.success(`「${action}」执行成功`)
+    } else {
+      ElMessage.success(`「${action}」执行成功`)
+    }
     await load()
     // 立项申请表：提交审批成功后自动跳「项目流程管控」（2026-11-06 用户口径
     //   「填写提交之后自动跳转到项目流程管控」）。
@@ -11307,6 +11394,9 @@ async function onButton(action) {
     ))
     if (actionIndex >= 0) curIdx.value = actionIndex
   } catch (e) {
+    // 转ERP 超时不等于失败:服务端可能还在推(金蝶慢),提示"先刷新确认"而不是英文的 timeout 报错
+    const erpFail = action === '转ERP' ? erpFailureOutcome(e) : { key: '' }
+    if (erpFail.key) { ElMessage.warning(tt(erpFail.key)); return }
     const msg = engine.errMsg(e) || '按钮执行失败'
     // 按钮(保存/提交)被服务端必填拦下时,同样翻到缺失字段所在页并高亮
     focusMissingField(missingKeyFromMessage(msg))

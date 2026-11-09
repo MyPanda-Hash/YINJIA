@@ -1,0 +1,11 @@
+const task = await taskSpace('lab-mobile-record-20261109')
+const page = task.page('p1')
+await page.goto('http://localhost:5173/#/dashboard', { timeout: 30000 })
+await page.waitForTimeout(1200)
+await page.click('loc=role:button[name="YINJIA-MES"]')
+await page.waitForTimeout(1000)
+const items = await page.evaluate(() => [...document.querySelectorAll('.el-dropdown-menu__item, .el-select-dropdown__item, li')]
+  .map((e, i) => ({ i, cls: e.className, text: (e.textContent || '').replace(/\s+/g, ' ').trim() }))
+  .filter((x) => x.text))
+console.log(JSON.stringify(items, null, 2))
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/lab-mobile-record-20261109/round-04.png' })

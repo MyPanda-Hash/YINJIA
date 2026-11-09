@@ -59,7 +59,15 @@ if (-not $javaHome -or -not (Test-Path (Join-Path $javaHome 'bin\javac.exe'))) {
 }
 if (-not $javaHome) { throw '找不到 JDK 25(设 JAVA_HOME)' }
 
-$version = '1.0.6'
+$version = '1.0.12'
+# 1.0.11 = 12 ⇒ 本版(2026-11-09:保存后锁定设备名称 + 审批通过后整单只读)用 13。
+# 1.0.10 = 11 ⇒ 本版(2026-11-09:删除行加确认弹窗)用 12。
+# 1.0.9 = 10 ⇒ 本版(2026-11-09:手机端加标水「测试日期」缺日期选择器)用 11。
+# 1.0.8 = 9 ⇒ 本版(2026-11-09 第六轮:手机端加标水明细列随「测试项目」变)用 10。
+# 1.0.7 = 8 ⇒ 本版(2026-11-09 第四轮:原生拍照上传附件)用 9(versionCode 必须单调递增才能覆盖升级).
+# versionCode 必须**单调递增**:安卓只在它变大时才允许「覆盖安装」;签名还必须与上一版同一把钥匙
+# (debug.keystore 随仓库保留,丢了就只能卸载重装)。
+$versionCode = 13
 $zxing = Join-Path $proj 'libs\zxing-core-3.5.3.jar'
 if (-not (Test-Path $zxing)) { throw "缺少 ZXing:$zxing(可从 Maven Central 下 core-3.5.3.jar)" }
 
@@ -89,7 +97,7 @@ Write-Host '[3/7] 资源链接 + 生成 R.java(aapt2 link)'
   -R (Join-Path $build 'res.zip') `
   --java (Join-Path $build 'gen') `
   --min-sdk-version 24 --target-sdk-version 34 `
-  --version-code 7 --version-name $version --auto-add-overlay
+  --version-code $versionCode --version-name $version --auto-add-overlay
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 link 失败' }
 
 Write-Host '[4/7] 编译 Java(javac)'

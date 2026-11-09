@@ -69,6 +69,12 @@ public class ButtonService {
     /** 工序检验单的数据驱动出单(报工量达计划量即出单;报工审核与手机端吸收共用同一份判定) */
     private final QcInspAutoService qcInspAuto;
 
+    /**
+     * 数量按计量单位精度规整(2026-11-09 用户口径:WMS 单据/库存/供应链单据统一按单位精度)。
+     * 保存前把「*数量*」字段按该行单位向下取整(个/卷=整数,kg/米=3 位),金额/单价不动。
+     */
+    private final UnitQtyNormalizer unitQty;
+
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
@@ -78,7 +84,7 @@ public class ButtonService {
                          InvCostService invCost, QcCatalogService qcCatalog,
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
                          ProcessTaskService processTask, StockMonthCloseService monthCloseService,
-                         QcInspAutoService qcInspAuto) {
+                         QcInspAutoService qcInspAuto, UnitQtyNormalizer unitQty) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -97,6 +103,7 @@ public class ButtonService {
         this.processTask = processTask;
         this.monthCloseService = monthCloseService;
         this.qcInspAuto = qcInspAuto;
+        this.unitQty = unitQty;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -1823,6 +1830,9 @@ public class ButtonService {
         // bl_purchase_in 128/269 行)。规则与前端同一份(见 CalcRuleService)。
         List<CalcRuleService.Rule> calcRules = calcRuleService.rulesFor(def);
         for (Map<String, Object> item : items) {
+            // 2026-11-09:数量先按**该行计量单位**向下取整(个/卷=整数、kg/米=3 位),
+            // 再跑派生列(金额=数量×单价)—— 顺序反了会按未取整的数量算金额。
+            unitQty.normalizeRow(item);
             calcRuleService.applyRules(calcRules, item);
             Object id = item.get("id");
             // 更新口径:清空一格的空串要落成 NULL(否则"删成空再保存会变回原值");插入时再把 null 去掉
@@ -1865,6 +1875,9 @@ public class ButtonService {
     /** 头表 upsert(头行式):按 group_col 定位 */
     private void upsertHeadRow(PanelRegistry.PanelDef def, Map<String, Object> head, String no, String user) {
         List<PanelRegistry.FieldDef> fields = def.fieldsAt("header");
+        // 2026-11-09:表头若带单位列(如检验单的 检验数量 + 计量单位),数量按单位精度向下取整;
+        // 没有单位列的表头原样不动(UnitQtyNormalizer 内部判空)
+        unitQty.normalizeRow(head);
         // 更新口径:清空一格的空串要落成 NULL(2026-11-06,见 labelsToCols 的说明);插入前再剥掉 null
         Map<String, Object> cols = labelsToCols(fields, head, true);
         // 新建默认值:主保存路径也要补(2026-10-29 用户报障「两个审核人没显示出来」的真因之一)。

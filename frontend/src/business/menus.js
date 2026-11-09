@@ -353,23 +353,54 @@ export const menuTree = [
     title: '手机扫码',
     icon: 'FullScreen',
     children: [
-      // 生成工单领料/退料单(2026-10-30 第二轮用户口径:「还有少了一个『生成工单领料/退料单』这个面版,
-      //   这个面版的功能和生成领料是有区别的(不是一个面版),重新分析需求」)。
-      //   **电脑上的开单工作台**:扫多张工单批量生成一对领料/退料单 + 列表看已生成的单;
-      //   只管生单,生完引导去下面的「生产领料」领料 —— 故排在「生产领料」**之前**。
-      { code: 'mobilePickCreate', title: '生成工单领料/退料单', path: '/panelx/list/MOBILE_PICK_CREATE', panelCode: 'MOBILE_PICK_CREATE', icon: 'DocumentAdd' },
-      // 生产领料(2026-10-30 重写):未完成/已完成两组单据 + 扫码定位 + 单据内扫码核销 → 全部领完提交。
-      //   ⚠ **生单不在这一页**(见上面那张),本页只负责"领"。
-      { code: 'mobilePick', title: '生产领料', path: '/panelx/list/MOBILE_PICK', panelCode: 'MOBILE_PICK', icon: 'ShoppingCart' },
-      // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单码 → 选工序 → 填完工数量 →
-      //   提交即报工并审核;工序进度/当前工序由既有审核钩子推进。
-      { code: 'mobileReport', title: '工序报工', path: '/panelx/list/MOBILE_REPORT', panelCode: 'MOBILE_REPORT', icon: 'Memo' },
-      // 自动打印站点(2026-10-30,用户口径「单独配一个自动打印的面版(这个面版是电脑上的)。
-      //   只要这个面版配置参数并且设置成打开,然后在手机打印的时候就可以关联这个打开了面版参数的
-      //   电脑,这台电脑连接的打印机就会自动打印」):电脑上打开的一页,选打印机 + 开关自动打印 +
-      //   常驻轮询接单。**普通站点配置页** —— 每台电脑各自设置自己那台打印机,
-      //   故配置按浏览器 localStorage 绑本机,不用登录账号区分(一个账号可能登录多台电脑)。
-      { code: 'printStation', title: '自动打印', path: '/sys/printStation', panelCode: 'PRINT_STATION', icon: 'Printer' },
+      // ══ 生产扫码登记(2026-11-09 用户口径:「手机扫码下面原来的四个面版对加一个父目录叫生产扫码登记。
+      //    和实验室手机登记在同一级。」)══
+      // **只是加了一层分组**:四个叶子的 code / panelCode / path / 图标 / 顺序一个字节没动
+      // (菜单覆盖表 yj_menu_node 按 code 认、页签恢复按 path 认、权限按 panelCode 认,都不受影响)。
+      {
+        code: 'prodScanReg',
+        title: '生产扫码登记',
+        icon: 'Memo',
+        children: [
+          // 生成工单领料/退料单(2026-10-30 第二轮用户口径:「还有少了一个『生成工单领料/退料单』这个面版,
+          //   这个面版的功能和生成领料是有区别的(不是一个面版),重新分析需求」)。
+          //   **电脑上的开单工作台**:扫多张工单批量生成一对领料/退料单 + 列表看已生成的单;
+          //   只管生单,生完引导去下面的「生产领料」领料 —— 故排在「生产领料」**之前**。
+          { code: 'mobilePickCreate', title: '生成工单领料/退料单', path: '/panelx/list/MOBILE_PICK_CREATE', panelCode: 'MOBILE_PICK_CREATE', icon: 'DocumentAdd' },
+          // 生产领料(2026-10-30 重写):未完成/已完成两组单据 + 扫码定位 + 单据内扫码核销 → 全部领完提交。
+          //   ⚠ **生单不在这一页**(见上面那张),本页只负责"领"。
+          { code: 'mobilePick', title: '生产领料', path: '/panelx/list/MOBILE_PICK', panelCode: 'MOBILE_PICK', icon: 'ShoppingCart' },
+          // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单码 → 选工序 → 填完工数量 →
+          //   提交即报工并审核;工序进度/当前工序由既有审核钩子推进。
+          { code: 'mobileReport', title: '工序报工', path: '/panelx/list/MOBILE_REPORT', panelCode: 'MOBILE_REPORT', icon: 'Memo' },
+          // 自动打印站点(2026-10-30,用户口径「单独配一个自动打印的面版(这个面版是电脑上的)。
+          //   只要这个面版配置参数并且设置成打开,然后在手机打印的时候就可以关联这个打开了面版参数的
+          //   电脑,这台电脑连接的打印机就会自动打印」):电脑上打开的一页,选打印机 + 开关自动打印 +
+          //   常驻轮询接单。**普通站点配置页** —— 每台电脑各自设置自己那台打印机,
+          //   故配置按浏览器 localStorage 绑本机,不用登录账号区分(一个账号可能登录多台电脑)。
+          { code: 'printStation', title: '自动打印', path: '/sys/printStation', panelCode: 'PRINT_STATION', icon: 'Printer' },
+        ],
+      },
+      // ══ 实验室记录手机登记(2026-11-09 用户口径:「研发图片上的 3 个面版也要对应的做手机端,
+      //    在手机扫码下面,叫实验室记录手机登记。手机端只需要实现,可以拍照上传和可以填写对应字段的
+      //    内容就可以。再要一个模糊查询。还有数据要可以对应回填各自的面版,还有原来每个面版要增加一个
+      //    字段,来保存手机拍照上传的文件。」)══
+      // 三张 = 研发管理 › 测试记录 › 实验室使用记录表 里的**记录类**三张
+      // (加标水配置记录表 / 设备使用登记表 / 仪器使用记录表;「测试申请单」是三页签的申请单据,不在本组)。
+      // 🔴 **面板码复用 PC 那三份**(RD_SPIKE_WATER / RD_EQUIP_USE / RD_INSTR_USE):
+      //    手机端存的就是同一张单(保存为草稿)⇒ 数据天然回填到电脑端同一面板,不需要第二条同步链;
+      //    权限行/译名/参照关系也一并沿用,不必新增 PagePanelRegistry 页面码。
+      //    地址走 /panelx/list/MOBILE_LAB_*(router 里三条静态路由,共用一个手机页组件)。
+      {
+        code: 'labMobile',
+        title: '实验室记录手机登记',
+        icon: 'Flask',
+        children: [
+          { code: 'labMobSpikeWater', title: '加标水配置记录表', path: '/panelx/list/MOBILE_LAB_SPIKE_WATER', panelCode: 'RD_SPIKE_WATER', icon: 'Coin' },
+          { code: 'labMobEquipUse', title: '设备使用登记表', path: '/panelx/list/MOBILE_LAB_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
+          { code: 'labMobInstrUse', title: '仪器使用记录表', path: '/panelx/list/MOBILE_LAB_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
+        ],
+      },
     ],
   },
   // 2026-10-20 用户口径:「把生产制造的生产计划和生产过程提成一级目录,生产制造这个一级目录不要了;

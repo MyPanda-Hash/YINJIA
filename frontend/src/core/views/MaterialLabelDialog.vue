@@ -35,12 +35,18 @@
           <el-date-picker v-model="prodDate" type="date" size="small" class="mlq-prod-inp" clearable
             value-format="YYYY-MM-DD" :placeholder="tt('选择日期')" />
         </span>
-        <span class="mlq-chip mlq-tip">{{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单') }}</span>
+        <span class="mlq-chip mlq-tip">{{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单（超送量按计量单位取整）') }}</span>
       </div>
 
       <!-- 一次可以勾**多行**,但服务端会**每行各出一张打印单**(用户口径「作废不希望连坐」+
            追加「一次是可以打印多行的」)—— 多行并进一张单会让作废连坐,所以粒度落在单上,不在弹窗上 -->
       <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }}</div>
+      <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径);
+           「取消带入」放在记录表的操作列(用户口径:取消按钮直接在操作那里) -->
+      <div v-if="lockedBySource" class="mlq-lock">
+        {{ tt('已按采购订单打印记录带入：数量和行已锁定，只能修改上面的批次号和生产日期') }}
+        <span class="mlq-lock-no">{{ sourcePrintNo }}</span>
+      </div>
 
       <el-table ref="tableRef" :data="rows" row-key="id" border size="small" height="330" @selection-change="onPicked">
         <el-table-column type="selection" width="42" :selectable="rowSelectable" />
@@ -55,7 +61,7 @@
         <el-table-column :label="tt('本次打印数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.id]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
+              :disabled="lockedBySource || !(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
@@ -67,70 +73,111 @@
         </span>
       </div>
 
-      <!-- 下层:**已生单可补打**(2026-10-04 用户口径「还有已经生单的数据也应该可以打印」)——
-           货已经收了(暂收单都有号了)才想起来打码、或者先送了一批没打码后来补打。
-           这类打印**不预约、不产生隔离行**(量早就送过了,生单弹窗里不会多出一行),
-           批次号**取该行已生单单据上的号**(印在标签上必须与实物/单据同号,故这里只读)。 -->
-      <div v-if="suppRows.length" class="mlq-supp">
-        <div class="mlq-supp-title">
-          {{ tt('已生单可补打（已经收了的量还没打码）') }}
-          <span class="mlq-tip">{{ tt('补打只为留痕：不占用余量、不会在生单弹窗里多出一行；批次号取该批货单据上的号，不可改') }}</span>
-        </div>
-        <el-table ref="suppRef" :data="suppRows" row-key="suppKey" border size="small" max-height="200"
-          @selection-change="onSuppPicked">
-          <el-table-column type="selection" width="42" :selectable="suppSelectable" />
-          <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="行号" :label="tt('行号')" width="60" />
-          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="去向单据" :label="tt('去向单据')" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="已收数量" :label="tt('已收')" width="85" align="right" />
-          <el-table-column prop="已补登数量" :label="tt('已补打')" width="85" align="right" />
-          <el-table-column prop="可补登数量" :label="tt('可补打')" width="90" align="right" />
-          <el-table-column :label="tt('本次打印数量')" width="150">
-            <template #default="{ row }">
-              <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
-                :controls="false" :disabled="!(Number(row['可补登数量'] || 0) > 0)" :precision="2" style="width: 130px" />
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
+      <!-- 下层三块(2026-11-09 用户口径「下方会出现 3 个框,要求这 3 个框可以收缩,不要太冗杂」):
+           ① 已生单可补打 ② 材料码已打印记录 ③ 采购订单打印记录(可据此打材料码)。
+           默认全部收起,标题带条数,点开才展开;表格都留在 DOM 里(选行/ref 不受收缩影响)。 -->
+      <el-collapse v-model="openPanels" class="mlq-collapse">
+        <el-collapse-item v-if="suppRows.length" name="supp">
+          <template #title>
+            <span class="mlq-coll-title">{{ tt('已生单可补打（已经收了的量还没打码）') }}</span>
+            <span class="mlq-coll-count">{{ suppRows.length }}</span>
+          </template>
+          <div class="mlq-tip mlq-coll-tip">
+            {{ tt('补打只为留痕：不占用余量、不会在生单弹窗里多出一行；批次号取该批货单据上的号，不可改') }}
+          </div>
+          <el-table ref="suppRef" :data="suppRows" row-key="suppKey" border size="small" max-height="200"
+            @selection-change="onSuppPicked">
+            <el-table-column type="selection" width="42" :selectable="suppSelectable" />
+            <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="行号" :label="tt('行号')" width="60" />
+            <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="去向单据" :label="tt('去向单据')" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="已收数量" :label="tt('已收')" width="85" align="right" />
+            <el-table-column prop="已补登数量" :label="tt('已补打')" width="85" align="right" />
+            <el-table-column prop="可补登数量" :label="tt('可补打')" width="90" align="right" />
+            <el-table-column :label="tt('本次打印数量')" width="150">
+              <template #default="{ row }">
+                <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
+                  :controls="false" :disabled="lockedBySource || !(Number(row['可补登数量'] || 0) > 0)"
+                  :precision="precisionOf(row)" style="width: 130px" />
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-collapse-item>
 
-      <div class="mlq-records">
-        <div class="mlq-rec-title">{{ tt('已打印记录（本订单）') }}</div>
-        <el-table :data="data.records || []" border size="small" max-height="200">
-          <el-table-column prop="批次号" :label="tt('批次号')" min-width="160" />
-          <!-- 生产日期(2026-10-23):与批次号一期登记的,这里一并可查(重打也按它出纸) -->
-          <el-table-column prop="生产日期" :label="tt('生产日期')" width="110" />
-          <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
-          <el-table-column :label="tt('用途')" width="110" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row['补登'] ? 'info' : 'success'" size="small">
-                {{ tt(row['补登'] ? '已生单补登' : '待生单') }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="打印量合计" :label="tt('打印量')" width="90" align="right" />
-          <el-table-column prop="已生单合计" :label="tt('已生单')" width="90" align="right" />
-          <el-table-column prop="未生单合计" :label="tt('未生单')" width="90" align="right" />
-          <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
-          <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
-          <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
-          <el-table-column :label="tt('操作')" width="130" align="center">
-            <template #default="{ row }">
-              <!-- 重打 = 同一张单原样再打一遍(纸卡了/打歪了):只累加 打印次数,**不新增预约**
-                   (用同一行再打一次会被当成新打印而重复占量,所以"再打一遍"必须走这里) -->
-              <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
-              <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
-            </template>
-          </el-table-column>
-          <template #empty>{{ tt('该订单还没有打印过材料码') }}</template>
-        </el-table>
-      </div>
+        <el-collapse-item name="records">
+          <template #title>
+            <span class="mlq-coll-title">{{ tt('已打印记录（本订单）') }}</span>
+            <span class="mlq-coll-count">{{ (data.records || []).length }}</span>
+          </template>
+          <el-table :data="data.records || []" border size="small" max-height="200">
+            <el-table-column prop="批次号" :label="tt('批次号')" min-width="160" />
+            <el-table-column prop="生产日期" :label="tt('生产日期')" width="110" />
+            <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
+            <el-table-column :label="tt('用途')" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row['补登'] ? 'info' : 'success'" size="small">
+                  {{ tt(row['补登'] ? '已生单补登' : '待生单') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="打印量合计" :label="tt('打印量')" width="90" align="right" />
+            <el-table-column prop="已生单合计" :label="tt('已生单')" width="90" align="right" />
+            <el-table-column prop="未生单合计" :label="tt('未生单')" width="90" align="right" />
+            <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
+            <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
+            <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
+            <el-table-column :label="tt('操作')" width="130" align="center">
+              <template #default="{ row }">
+                <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
+                <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>{{ tt('该订单还没有打印过材料码') }}</template>
+          </el-table>
+        </el-collapse-item>
+
+        <!-- 2026-11-09 用户口径「在打印材料码那里要可以看见对相关打印采购订单,也可以针对已经打印的采购订单打印材料码」 -->
+        <el-collapse-item name="poPrints">
+          <template #title>
+            <span class="mlq-coll-title">{{ tt('打印采购订单记录（可据此打材料码）') }}</span>
+            <span class="mlq-coll-count">{{ poPrints.length }}</span>
+          </template>
+          <div class="mlq-tip mlq-coll-tip">
+            {{ tt('点「按这次打印打码」把这次采购订单纸上的数量带入上面各行的本次打印数量（取该版式的剩余可打封顶）') }}
+          </div>
+          <el-table :data="poPrints" border size="small" max-height="200" row-key="单据编号">
+            <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
+            <el-table-column :label="tt('打印版式')" width="96" align="center">
+              <template #default="{ row }">{{ tt(row['打印版式']) }}</template>
+            </el-table-column>
+            <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
+            <el-table-column prop="数量合计" :label="tt('数量合计')" width="96" align="right" />
+            <el-table-column prop="金额合计" :label="tt('金额合计')" width="96" align="right" />
+            <el-table-column prop="打印人" :label="tt('打印人')" width="96" />
+            <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
+            <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
+            <el-table-column :label="tt('操作')" width="150" align="center">
+              <template #default="{ row }">
+                <!-- 已带入的那张记录:操作列直接变「取消带入」(2026-11-09 用户口径:取消按钮直接在操作那里) -->
+                <el-button v-if="sourcePrintNo === String(row['单据编号'])" link type="danger" :disabled="busy"
+                  @click="cancelSource">{{ tt('取消带入') }}</el-button>
+                <!-- 2026-11-09 用户口径:按这张记录打过一次后按钮置灰,不能重复打 -->
+                <el-button v-else link type="primary" :disabled="busy || lockedBySource || isUsedSrc(row['单据编号'])"
+                  @click="applyPoPrint(row)">
+                  {{ isUsedSrc(row['单据编号']) ? tt('已打码') : tt('按这次打印打码') }}
+                </el-button>
+              </template>
+            </el-table-column>
+            <template #empty>{{ tt('该订单还没有打印过采购订单') }}</template>
+          </el-table>
+        </el-collapse-item>
+      </el-collapse>
     </div>
     <template #footer>
-      <el-button @click="fillRemaining">{{ tt('按剩余量填充') }}</el-button>
-      <el-button @click="clearAll">{{ tt('清空') }}</el-button>
+      <el-button :disabled="lockedBySource" @click="fillRemaining">{{ tt('按剩余量填充') }}</el-button>
+      <el-button :disabled="lockedBySource" @click="clearAll">{{ tt('清空') }}</el-button>
       <el-button type="primary" :loading="busy" @click="confirm">{{ tt('确定并打印') }}</el-button>
     </template>
   </el-dialog>
@@ -182,6 +229,29 @@ const tableRef = ref(null)
 /** **多选**:本次要打的行(勾选是权威;服务端会按**每行一张单**落库) */
 const picked = ref([])
 const qtyOf = reactive({})
+/** 下层三块(已生单可补打 / 材料码已打印记录 / 打印采购订单记录)默认全收起 —— 2026-11-09 用户口径「可收缩,不要太冗杂」 */
+const openPanels = ref([])
+/** 本订单的「打印采购订单」记录(2026-11-09:可看见、并能据此打材料码) */
+const poPrints = ref([])
+/** 本次是从哪张「有金额」采购订单打印记录带出来的(空=不是按记录打) */
+const sourcePrintNo = ref('')
+/** 已打过材料码的打印记录(服务端下发;界面据此置灰,不能重复打) */
+const usedSrcSet = computed(() => new Set((data.value['已打码打印单'] || []).map(String)))
+/**
+ * 本窗口里刚打完的来源记录(2026-11-09「只可以对应打印一次」):服务端已落库,
+ * 但重载是异步的 —— 先在本地算已用,按钮立刻置灰,不给"连点两次"的窗口。
+ */
+const usedLocal = ref([])
+const isUsedSrc = (no) => usedSrcSet.value.has(String(no)) || usedLocal.value.includes(String(no))
+/**
+ * 是否已按「采购订单打印记录」带入(2026-11-09 用户口径:
+ * 点击按这次打印打码后,不能改变数量和行号,只可以写上面的批次号和生产日期) ⇒ 锁定表格。
+ */
+const lockedBySource = computed(() => !!sourcePrintNo.value)
+/** 取消带入:解除锁定(数量/行恢复可改),来源清空,已勾选与数量保持当前值由用户自行调整 */
+function cancelSource() {
+  sourcePrintNo.value = ''
+}
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
 const totalQty = computed(() => {
@@ -193,9 +263,14 @@ const totalQty = computed(() => {
 function capOf(row) {
   return Math.max(0, Number(row?.剩余可打 || 0))
 }
-/** 有可打量才让勾(打满的行不给勾) */
+/** 该行输入框精度 = 单位小数位数(2026-11-09:计件单位 0 位、kg/米 3 位;服务端逐行下发) */
+function precisionOf(row) {
+  const n = Number(row?.小数位数)
+  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.trunc(n))) : 2
+}
+/** 有可打量才让勾(打满的行不给勾);按打印记录带入后**行锁定**,一律不许改勾选 */
 function rowSelectable(row) {
-  return capOf(row) > 0
+  return !lockedBySource.value && capOf(row) > 0
 }
 
 /* ── 下层「已生单可补打」:已收但还没打码的量(按 订单行 × 已生单批次号 一行) ── */
@@ -206,7 +281,8 @@ const suppQty = reactive({})
 const suppKeyOf = (row) => `${row['采购订单行id']}\u0001${row['批次号']}`
 const suppRows = computed(() => (data.value['补登行'] || []).map((r) => ({ ...r, suppKey: suppKeyOf(r) })))
 function suppSelectable(row) {
-  return Number(row['可补登数量'] || 0) > 0
+  // 按打印记录带入后,补登行也不许再勾(数量/行都锁定)
+  return !lockedBySource.value && Number(row['可补登数量'] || 0) > 0
 }
 function onSuppPicked(list) {
   suppPicked.value = list || []
@@ -221,6 +297,8 @@ async function load() {
   loading.value = true
   try {
     data.value = await engine.puLabelDialog(props.orderNo)
+    // 服务端已回「已打码打印单」⇒ 本地临时标记清空(作废后可重新用,以服务端为准)
+    usedLocal.value = []
     batchNo.value = String(data.value?.prefBatchNo || '')
     // 生产日期:取服务端回的可选预填(目前恒空,不猜),每次开窗重置,避免沿用上次的值
     prodDate.value = String(data.value?.['生产日期'] || '')
@@ -235,6 +313,14 @@ async function load() {
     syncPick(rows.value.filter((r) => capOf(r) > 0).map((r) => r.id))
     await nextTick()
     suppRef.value?.clearSelection()
+    // 采购订单打印记录(2026-11-09):失败不影响打码主体,只是少一块参考
+    engine.puPrintRecords(props.orderNo)
+      .then((list) => {
+        // 只要「有金额」的记录(用户口径:而且只要记录有金额);无金额版不参与带出材料码
+        poPrints.value = (list || []).filter((r) => String(r['打印版式']) === '有金额')
+        sourcePrintNo.value = ''
+      })
+      .catch(() => { poPrints.value = [] })
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('材料码数据加载失败'))
   } finally {
@@ -266,6 +352,53 @@ function fillRemaining() {
 function clearAll() {
   for (const r of rows.value) qtyOf[r.id] = 0
   syncPick([])
+}
+
+/**
+ * 按某次「打印采购订单」记录打材料码(2026-11-09 用户口径):
+ * 把那次纸上的每行打印数量带入上面各行的「本次打印数量」并勾上,封顶仍取该行剩余可打。
+ */
+async function applyPoPrint(row) {
+  const no = row?.['单据编号']
+  if (!no) return
+  busy.value = true
+  try {
+    const res = await engine.puPrintDetail(no)
+    const byLine = new Map()
+    for (const l of res?.lines || []) {
+      const id = Number(l['采购订单行id'])
+      // 打印记录明细里这一列叫「数量」(= 打印数量,见服务端 detail());兼容旧键
+      if (id) byLine.set(id, Number(l['数量'] ?? l['打印数量']) || 0)
+    }
+    const ids = []
+    for (const r of rows.value) {
+      const q = byLine.get(Number(r.id))
+      if (q == null) continue
+      const cap = capOf(r)
+      const v = cap > 0 ? Math.min(q, cap) : 0
+      qtyOf[r.id] = v
+      if (v > 0) ids.push(r.id)
+    }
+    if (!ids.length) {
+      ElMessage.warning(tt('这次打印的明细在这张订单里没有可打的量'))
+      return
+    }
+    syncPick(ids)
+    sourcePrintNo.value = no     // 记下来源:打印时带给服务端,打过一次就不能再用这张记录
+    // 带入后数量/行锁定(2026-11-09):补登区一并清空并锁住,只留批次号/生产日期可改
+    suppPicked.value = []
+    for (const k of Object.keys(suppQty)) suppQty[k] = 0
+    suppRef.value?.clearSelection()
+    const clamped = rows.value.some((r) => {
+      const q = byLine.get(Number(r.id))
+      return q != null && q > capOf(r)
+    })
+    ElMessage.success(`${tt('已按')} ${no} ${tt('带入打印数量')}${clamped ? tt('（超出剩余可打的已按上限收口）') : ''}`)
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('打印记录明细加载失败'))
+  } finally {
+    busy.value = false
+  }
 }
 
 /** 出纸:纸上的号 = 库里的号(先落库再打印);生产日期取**服务端回读的单头值**(不取输入框 ——
@@ -305,12 +438,16 @@ async function confirm() {
       orderNo: props.orderNo, batchNo: String(batchNo.value).trim(),
       // 生产日期(2026-10-23):与批次号一起登记在单头,出纸时印到卡面「生产日期」栏;空串 = 不登记
       prodDate: String(prodDate.value || '').trim(), lines: all,
+      // 来源打印记录(2026-11-09):按「有金额」采购订单打印记录打码时带上,服务端防重复 + 界面置灰
+      ...(sourcePrintNo.value ? { sourcePrintNo: sourcePrintNo.value } : {}),
     })
     // ⚠ 打印层挂上后 window.print() 是**异步**返回的(打印对话框还开着)。
     //   原来这里紧接着 load() 刷新弹窗 ⇒ 打印对话框期间又发请求又重绘,界面像卡死(2026-10-29)。
     //   现在把刷新放到 onDone(打印层摘掉 / afterprint)之后。
     let afterPrint = null
     let printDone = false      // onDone 可能比下面的赋值先到(打印被浏览器拒/层摘得快)
+    let refreshed = false      // 只刷新一次(onDone 与兜底定时器都可能触发)
+    const refreshOnce = () => { if (refreshed) return; refreshed = true; load() }
     await printProductCards(cardsOf(res), { onDone: () => { printDone = true; if (afterPrint) afterPrint() } })
     const docs = res['单据编号列表'] || [res['单据编号']]
     const tail = `（${tt('批次号')} ${res['批次号']}${res['生产日期'] ? ` · ${tt('生产日期')} ${res['生产日期']}` : ''}）`
@@ -320,8 +457,15 @@ async function confirm() {
     emit('printed', {
       orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: docs.length,
     })
-    // 刷新"剩余可打"与"已打印记录":打印对话框可能还开着 → 先挂起,onDone 里再执行
-    afterPrint = () => { load() }
+    // 本地立刻标记来源已用(按钮马上置灰,不等异步重载),再按 1.5s 兜底刷新
+    if (sourcePrintNo.value && !usedLocal.value.includes(sourcePrintNo.value)) {
+      usedLocal.value = [...usedLocal.value, sourcePrintNo.value]
+    }
+    // 刷新"剩余可打/已打印/已打码状态":打印对话框可能还开着 → 先挂起,onDone 里再执行。
+    // 2026-11-09 用户反馈「要重新进入才会更新已打印状态」⇒ 加 1.5s 兜底定时器:
+    // 浏览器不派发 afterprint / 打印层被系统摘掉时,也能自己刷新,不必关窗重进。
+    afterPrint = refreshOnce
+    setTimeout(refreshOnce, 1500)
     // onDone 已来过 / 打印层已摘(打印被浏览器拒)⇒ 立即刷新,别傻等
     if (printDone || !document.getElementById('yj-print-host')) afterPrint()
   } catch (e) {
@@ -382,10 +526,20 @@ async function doVoid(row) {
 .mlq-tip { color: #8b9893; }
 /* 多行提示条(浅黄底,说明"每行各出一张打印单;作废只影响对应那一行") */
 .mlq-oneline { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
+/* 按打印记录带入后的锁定提示(数量/行锁定,只能改批次号与生产日期) */
+.mlq-lock { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1f6f4a; background: #eef7f1; border: 1px dashed #9fd3b6; border-radius: 4px; padding: 3px 8px; }
+.mlq-lock-no { font-weight: 600; }
 .mlq-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .mlq-records { margin-top: 4px; }
 .mlq-rec-title { font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
 /* 下层「已生单可补打」:与上层隔一道浅线,说明它不是"待生单的预约" */
 .mlq-supp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
 .mlq-supp-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+/* 下层三块可收缩(2026-11-09):默认收起,标题给条数,展开才看到表格 */
+.mlq-collapse { margin-top: 6px; border-top: 1px dashed #dde5ee; }
+.mlq-collapse :deep(.el-collapse-item__header) { height: 34px; line-height: 34px; font-size: 12.5px; color: #46586e; }
+.mlq-collapse :deep(.el-collapse-item__content) { padding-bottom: 8px; }
+.mlq-coll-title { margin-right: 8px; }
+.mlq-coll-count { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: #eef3f8; color: #5b6b7f; font-size: 11.5px; line-height: 18px; text-align: center; }
+.mlq-coll-tip { margin-bottom: 6px; font-size: 12px; }
 </style>

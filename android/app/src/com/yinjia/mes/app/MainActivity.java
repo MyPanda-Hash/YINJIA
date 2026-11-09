@@ -16,6 +16,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -61,8 +62,15 @@ public class MainActivity extends Activity {
     private static final int REQ_SCAN = 1001;
     /** 多选扫码(2026-11-05):一次扫多个码,回调 window.__yjScanResultMulti([...]) */
     private static final int REQ_SCAN_MULTI = 1002;
+    /** 拍照(2026-11-09 第五轮):复用扫码页的相机拍一张,回调 window.__yjPhotoResult(dataUrl, name, err) */
+    private static final int REQ_PHOTO = 1003;
+    /** 网页 <input type=file> 的返回值(顺带补上 onShowFileChooser,可进相册/文件) */
+    private static final int REQ_FILE = 1004;
     /** 申请相机权限时记一下"这一趟是不是多选模式",授权回来后接着开 */
     private boolean pendingMultiScan = false;
+    /** 申请相机权限时记一下"这一趟是不是拍照" */
+    private boolean pendingPhoto = false;
+    private ValueCallback<Uri[]> pendingFileChooser;
 
     private WebView web;
     private TextView baseLabel;
@@ -111,6 +119,29 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() { request.grant(request.getResources()); }
                 });
+            }
+
+            /**
+             * 网页 {@code <input type=file>} 的支持(2026-11-09 第五轮)。
+             *
+             * <p>不给这个回调,WebView 点文件框**什么都不发生** —— 正是用户报的
+             * 「点击拍照上传附件,并没有调用摄像机」。这里开系统文件选择器(可进相册/文件);
+             * 真正的"拍照"走原生 {@code YjNative.takePhoto()}(复用扫码页那台相机),见 Bridge。
+             */
+            @Override public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb,
+                                                       FileChooserParams params) {
+                if (pendingFileChooser != null) { pendingFileChooser.onReceiveValue(null); }
+                pendingFileChooser = cb;
+                try {
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    startActivityForResult(Intent.createChooser(i, "选择文件"), REQ_FILE);
+                    return true;
+                } catch (Exception e) {
+                    pendingFileChooser = null;
+                    return false;
+                }
             }
         });
         web.addJavascriptInterface(new Bridge(), "YjNative");
@@ -216,16 +247,99 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_SCAN) {
             if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                startScan(pendingMultiScan);
+                if (pendingPhoto) { pendingPhoto = false; startPhoto(); }
+                else { startScan(pendingMultiScan); }
             } else {
-                Toast.makeText(this, "没有相机权限,扫不了码;可在系统设置里开启", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "没有相机权限,扫不了码/拍不了照;可在系统设置里开启", Toast.LENGTH_LONG).show();
+                if (pendingPhoto) { pendingPhoto = false; photoResultToJs("", "", "没有相机权限"); }
             }
         }
+    }
+
+    // ───────────────────────── 拍照(2026-11-09 第五轮) ─────────────────────────
+
+    /**
+     * 打开**拍照模式**的原生相机页(复用 ScanActivity:同一台相机、同样支持点屏幕开关手电)。
+     *
+     * <p>用户口径:「点击拍照上传附件,并没有调用摄像机,摄像机就同一沿用之前的就行。」
+     * 网页里的 {@code <input type=file capture>} 在 WebView 里调不起相机 ⇒ 必须原生拍:
+     * 拍完压到长边 ≤1280 / JPEG 80,存进 App 缓存目录,这里读出来转 base64 dataURL 回给网页
+     * ({@code window.__yjPhotoResult('data:image/jpeg;base64,…', 'yj_photo_xxx.jpg')}),
+     * 网页再当普通 File 走既有的 /attachment/upload。
+     */
+    private void startPhoto() {
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.CAMERA)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            pendingPhoto = true;
+            requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_SCAN);
+            return;
+        }
+        Intent i = new Intent(this, ScanActivity.class);
+        i.putExtra("photo", true);
+        startActivityForResult(i, REQ_PHOTO);
+    }
+
+    /** 把拍到的文件读成 dataURL 回给网页;path 为空 = 用户取消 */
+    private void deliverPhoto(final String path) {
+        if (path == null || path.trim().length() == 0) {
+            photoResultToJs("", "", "");
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String dataUrl = "";
+                String name = "photo.jpg";
+                try {
+                    java.io.File f = new java.io.File(path);
+                    byte[] bytes = new byte[(int) f.length()];
+                    java.io.FileInputStream in = new java.io.FileInputStream(f);
+                    try { int off = 0, n; while (off < bytes.length && (n = in.read(bytes, off, bytes.length - off)) > 0) off += n; }
+                    finally { try { in.close(); } catch (Exception ignore) { } }
+                    dataUrl = "data:image/jpeg;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+                    name = f.getName();
+                    try { f.delete(); } catch (Exception ignore) { }   // 字节已拿到,清缓存
+                } catch (Throwable t) {
+                    android.util.Log.e("YjPhoto", "读照片失败: " + t.getMessage());
+                }
+                photoResultToJs(dataUrl, name, dataUrl.length() == 0 ? "照片读取失败" : "");
+            }
+        }).start();
+    }
+
+    /** 回调网页:window.__yjPhotoResult(dataUrl, fileName, errText) */
+    private void photoResultToJs(String dataUrl, String name, String err) {
+        final String js = "window.__yjPhotoResult && window.__yjPhotoResult("
+                + quote(dataUrl == null ? "" : dataUrl) + ", "
+                + quote(name == null ? "" : name) + ", "
+                + quote(err == null ? "" : err) + ")";
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try { web.evaluateJavascript(js, null); } catch (Throwable ignore) { }
+            }
+        });
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // ③ 拍照:拿缓存文件路径 → 转 dataURL 回网页
+        if (requestCode == REQ_PHOTO) {
+            String path = (resultCode == RESULT_OK && data != null) ? data.getStringExtra("photoPath") : null;
+            deliverPhoto(path);
+            return;
+        }
+        // ③b 网页文件框(从相册/文件里选)
+        if (requestCode == REQ_FILE) {
+            if (pendingFileChooser != null) {
+                Uri[] uris = null;
+                if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                    uris = new Uri[]{ data.getData() };
+                }
+                pendingFileChooser.onReceiveValue(uris);
+                pendingFileChooser = null;
+            }
+            return;
+        }
         // ② 多选:把勾选的码数组回传给网页(__yjScanResultMulti)
         if (requestCode == REQ_SCAN_MULTI) {
             java.util.ArrayList<String> codes = (resultCode == RESULT_OK && data != null)
@@ -305,6 +419,26 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String getBaseUrl() {
             return getBase();
+        }
+
+        /**
+         * 拍照上传附件(2026-11-09 第五轮)。
+         *
+         * <p>用户口径:「点击拍照上传附件,并没有调用摄像机,摄像机就同一沿用之前的就行。」
+         * 这里**复用扫码页的相机**(ScanActivity 加 photo 模式),拍完回调
+         * {@code window.__yjPhotoResult(dataUrl, fileName, err)};网页当普通 File 上传。
+         */
+        @JavascriptInterface
+        public void takePhoto() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { startPhoto(); }
+            });
+        }
+
+        /** 网页探测用:壳是否支持原生拍照(网页据此决定用原生相机还是 <input type=file>) */
+        @JavascriptInterface
+        public boolean hasCamera() {
+            return true;
         }
 
         @JavascriptInterface

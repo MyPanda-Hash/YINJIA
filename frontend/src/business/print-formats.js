@@ -198,8 +198,11 @@ const PU_SIGN_HTML = '<div class="sign">'
  * 银嘉采购订单
  * @param doc  头数据(单据编号/单据日期/供应商编码/供应商/付款方式)
  * @param lines 行数据(物料编码/物料名称/规格型号/单价/单位/数量/金额/预计到货日期/备注/税率%)
+ * @param {{onDone?:Function}} [opts] 打印层摘掉(afterprint)后回调一次 —— 打印弹窗用它刷新「已打印记录」,
+ *        避免打印对话框还开着时重绘界面(2026-10-29 卡顿口径)
+ * @return {boolean} true=已交给打印层(弹窗据此决定是否撤销刚落的打印记录)
  */
-export function printPuOrder(doc, lines) {
+export function printPuOrder(doc, lines, opts) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
@@ -231,7 +234,11 @@ export function printPuOrder(doc, lines) {
     + '</tbody></table>'
     + PU_NOTES_HTML
     + PU_SIGN_HTML
-  if (!printInPage('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
+  // 返回「是否真的交给打印层」:打印弹窗据此决定关窗,还是留在窗里让用户重试
+  // (2026-11-07 采购订单打印弹窗)
+  const ok = printInPage('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body, opts)
+  if (!ok) alert(PRINT_FAIL_MSG)
+  return ok
 }
 
 /**
@@ -240,8 +247,10 @@ export function printPuOrder(doc, lines) {
  * 行表去 单价/小计 两列(交期要求保留),总计行只留数量合计。
  * @param doc  头数据(同 printPuOrder)
  * @param lines 行数据(同 printPuOrder:物料编码/物料名称/规格型号/单价/单位/数量/金额/预计到货日期/备注)
+ * @param {{onDone?:Function}} [opts] 打印层摘掉后回调一次(同 printPuOrder)
+ * @return {boolean} true=已交给打印层
  */
-export function printPuOrderNoAmount(doc, lines) {
+export function printPuOrderNoAmount(doc, lines, opts) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
@@ -272,7 +281,9 @@ export function printPuOrderNoAmount(doc, lines) {
     + '</tbody></table>'
     + PU_NOTES_HTML
     + PU_SIGN_HTML
-  if (!printInPage('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert(PRINT_FAIL_MSG)
+  const ok = printInPage('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body, opts)
+  if (!ok) alert(PRINT_FAIL_MSG)
+  return ok
 }
 
 /**

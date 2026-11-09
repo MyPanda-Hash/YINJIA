@@ -90,6 +90,19 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- 拍照按钮(2026-11-09 第四轮):只有「拍照模式」(photo=true)才显示,扫码模式下 GONE。
+         放在底部提示条上方,尺寸按现场戴手套也点得中。 -->
+    <Button
+        android:id="@+id/btn_shoot"
+        android:layout_width="200dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="84dp"
+        android:text="拍照"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/hint"
         android:layout_width="match_parent"

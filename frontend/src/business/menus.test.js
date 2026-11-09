@@ -253,13 +253,21 @@ test('生产制造已拆:生产计划 / 生产过程 升为一级,设备维护�
  * 2026-10-30 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』
  *   (和生产计划平级)导航下。工序报工不变。生产领料重写。」
  *
- * 钉住三件事:
+ * 2026-11-09 用户口径(本轮):「手机扫码下面原来的四个面版对加一个父目录叫生产扫码登记。
+ *   和实验室手机登记在同一级。」+「研发图片上的 3 个面版也要对应的做手机端,在手机扫码下面,
+ *   叫实验室记录手机登记。」
+ *   ⇒ 手机扫码下变成两个**同级分组**:
+ *       · 生产扫码登记 prodScanReg = 原来那 4 项(code/panelCode/path/顺序一个字节没动);
+ *       · 实验室记录手机登记 labMobile = 研发那三张记录表的手机版(面板码复用 PC 那三份)。
+ *
+ * 钉住四件事:
  *   ① 一级目录里有「手机扫码」(code=mobileScan),且与「生产计划」平级(同在 menuTree 顶层);
- *   ② 它的子项 = 生产领料 / 工序报工 / 自动打印,面板码换新为 MOBILE_* / PRINT_STATION;
- *   ③ 旧位置(生产计划组里)不得再残留 prodPick / prodReport —— 否则侧栏会出两个入口。
- * 旧地址重定向与后端旧码别名(PagePanelRegistry 的 PROD_PICK/PROD_REPORT)不在本文件断言范围。
+ *   ② 它的二级 = 生产扫码登记 / 实验室记录手机登记(顺序即菜单顺序);
+ *   ③ 生产扫码登记下仍是原来那 4 项,面板码/地址不变(旧入口不挪窝,只多包一层);
+ *   ④ 实验室记录手机登记下是 加标水/设备使用/仪器使用 三张,**面板码就是研发管理里那三张**
+ *      (手机端存同一张单 ⇒ 数据回填到同一面板),且旧位置不得残留第二个入口。
  */
-test('手机扫码:与生产计划平级的一级目录,下挂生产领料 / 工序报工 / 自动打印', () => {
+test('手机扫码:二级 = 生产扫码登记(原 4 项)+ 实验室记录手机登记(研发 3 张)', () => {
   const scan = menuTree.find((n) => n.code === 'mobileScan')
   assert.ok(scan, '应有一级目录 mobileScan(手机扫码)')
   assert.equal(scan.title, '手机扫码')
@@ -268,21 +276,58 @@ test('手机扫码:与生产计划平级的一级目录,下挂生产领料 / 工
   assert.ok(topCodes.includes('plan'), '生产计划应仍是一级目录')
   assert.ok(topCodes.indexOf('mobileScan') < topCodes.indexOf('plan'),
     '手机扫码应排在生产计划之前')
-  // 子项:面板码 + 地址 + 标题(顺序即菜单顺序,改菜单必须同步这里)
-  // 2026-10-30 第二轮:「生成工单领料/退料单」是**独立面板**,排在「生产领料」之前
-  //   (用户口径「这个面版的功能和生成领料是有区别的(不是一个面版)」)。
-  assert.deepEqual((scan.children || []).map((c) => c.code), ['mobilePickCreate', 'mobilePick', 'mobileReport', 'printStation'])
-  assert.deepEqual((scan.children || []).map((c) => c.panelCode), ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'MOBILE_REPORT', 'PRINT_STATION'])
-  assert.deepEqual((scan.children || []).map((c) => c.title), ['生成工单领料/退料单', '生产领料', '工序报工', '自动打印'])
-  assert.deepEqual((scan.children || []).map((c) => c.path), [
-    '/panelx/list/MOBILE_PICK_CREATE', '/panelx/list/MOBILE_PICK', '/panelx/list/MOBILE_REPORT', '/sys/printStation',
+
+  // ② 两个同级分组(2026-11-09:原 4 项包进「生产扫码登记」,与「实验室记录手机登记」同级)
+  assert.deepEqual((scan.children || []).map((c) => c.code), ['prodScanReg', 'labMobile'])
+  assert.deepEqual((scan.children || []).map((c) => c.title), ['生产扫码登记', '实验室记录手机登记'])
+
+  // ③ 生产扫码登记 = 原来那 4 项,面板码/标题/地址/顺序一律不变
+  const prod = scan.children.find((c) => c.code === 'prodScanReg')
+  assert.deepEqual((prod.children || []).map((c) => c.code),
+    ['mobilePickCreate', 'mobilePick', 'mobileReport', 'printStation'])
+  assert.deepEqual((prod.children || []).map((c) => c.panelCode),
+    ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'MOBILE_REPORT', 'PRINT_STATION'])
+  assert.deepEqual((prod.children || []).map((c) => c.title),
+    ['生成工单领料/退料单', '生产领料', '工序报工', '自动打印'])
+  assert.deepEqual((prod.children || []).map((c) => c.path), [
+    '/panelx/list/MOBILE_PICK_CREATE', '/panelx/list/MOBILE_PICK',
+    '/panelx/list/MOBILE_REPORT', '/sys/printStation',
   ])
+
+  // ④ 实验室记录手机登记 = 研发那三张记录表(面板码复用 ⇒ 数据回填到同一面板)
+  const lab = scan.children.find((c) => c.code === 'labMobile')
+  assert.equal(lab.title, '实验室记录手机登记')
+  assert.deepEqual((lab.children || []).map((c) => c.title),
+    ['加标水配置记录表', '设备使用登记表', '仪器使用记录表'])
+  assert.deepEqual((lab.children || []).map((c) => c.panelCode),
+    ['RD_SPIKE_WATER', 'RD_EQUIP_USE', 'RD_INSTR_USE'])
+  assert.deepEqual((lab.children || []).map((c) => c.path), [
+    '/panelx/list/MOBILE_LAB_SPIKE_WATER',
+    '/panelx/list/MOBILE_LAB_EQUIP_USE',
+    '/panelx/list/MOBILE_LAB_INSTR_USE',
+  ])
+  // 测试申请单是三页签的申请单据,不属于「实验室记录」手机端范围
+  assert.ok(!(lab.children || []).some((c) => c.panelCode === 'RD_DOM_TEST'))
+  // 三张记录表在研发管理里**仍保留电脑端入口**(手机端是并列入口,不是搬家)
+  const rdLab = (rd.children || []).find((c) => c.code === 'rdTest').children.find((c) => c.code === 'rdLab')
+  assert.deepEqual(leafCodes(rdLab), ['RD_SPIKE_WATER', 'RD_DOM_TEST', 'RD_EQUIP_USE', 'RD_INSTR_USE'])
+
   // 旧位置不得再残留(生产计划组里) —— 否则侧栏两个「生产领料」入口
   const plan = menuTree.find((n) => n.code === 'plan')
   assert.ok(!(plan.children || []).some((c) => c.code === 'prodPick' || c.code === 'prodReport'),
     '生产计划组里不应再有 prodPick/prodReport(已迁到手机扫码)')
   assert.ok(!JSON.stringify(plan).includes('"PROD_PICK"') && !JSON.stringify(plan).includes('"PROD_REPORT"'),
     '生产计划组里不应再有 PROD_PICK/PROD_REPORT 面板码')
+  // 叶子 code 必须全树唯一(Vue key / el-tree node-key / 菜单覆盖表主键都按 code)
+  const allLeafCodes = []
+  const walk2 = (n) => {
+    if (Array.isArray(n)) return n.forEach(walk2)
+    if (!n || typeof n !== 'object') return
+    if (!n.children) allLeafCodes.push(n.code)
+    ;(n.children || []).forEach(walk2)
+  }
+  walk2(scan)
+  assert.equal(new Set(allLeafCodes).size, allLeafCodes.length, '手机扫码内叶子 code 不得重复')
 })
 
 /**
@@ -360,8 +405,11 @@ test('生产计划(2026-10-20 起为一级目录)的明细/统计表挂在所属
 // 2026-10-20:生产计划 / 生产过程 由「生产制造」下的二级目录升为一级目录 ⇒ 它们的一级子项是
 //   带 panelCode 的**面板叶子**(不是再套一层分组),与 dc 同款但必须挂面板码。
 const PAGE_LEAF_GROUPS = new Set(['dc'])
-// 2026-10-30:新一级目录「手机扫码」同样是「带面板码的页面级叶子」(不是再套一层分组)。
-const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess', 'mobileScan'])
+// 2026-10-30:新一级目录「手机扫码」曾是「带面板码的页面级叶子」(不是再套一层分组)。
+// 2026-11-09 用户口径「手机扫码下面原来的四个面版对加一个父目录叫生产扫码登记。和实验室手机登记在同一级」
+//   ⇒ 手机扫码改为**带面板的二级分组**(生产扫码登记 / 实验室记录手机登记),走下面通用分支;
+//   分组内的叶子仍是带面板码的页面(断言在「手机扫码:二级 = …」那条用例里)。
+const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess'])
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
   for (const g of menuTree) {
     if (!g.children || !g.children.length) continue // 我的桌面 等暂无二级

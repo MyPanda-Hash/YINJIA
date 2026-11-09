@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -105,26 +106,83 @@ public class AttachmentService {
         return out;
     }
 
-    /** 同步头字段列 = 原文件名列表(、分隔)。头表/单号列取自 yj_panel,
-     *  字段键必须是该面板在 yj_field 注册过的列名(防动态列名注入),未注册则只存附件不同步。 */
+    /**
+     * 同步字段列 = 原文件名列表(、分隔)。头表/明细表与单号列取自 yj_panel,
+     * 字段键必须是该面板在 yj_field 注册过的列名(防动态列名注入),未注册则只存附件不同步。
+     *
+     * <p><b>明细行附件(2026-11-09)</b>:用户口径「附件…加在明细字段内,就是表格里面,每一行都有可能要拍照保存」
+     * ⇒ 三张实验室记录表的「手机照片」从表头下移到明细行,锚点键写成
+     * {@code 手机照片-<明细行 id>}(见 tools/migrate-lab-mobile-row-photo-20261109.sql)。
+     * 本方法据此分流:
+     * <ul>
+     *   <li>键里带 {@code -<数字>} 后缀、且去掉后缀的**基础字段**在 yj_field 登记为明细字段
+     *       ({@code place} 含 {@code detail}) ⇒ 只更新那一行({@code WHERE id=? AND 单据编号=?});</li>
+     *   <li>其余情况一律走原来的**头表**更新,既有面板(采购订单 附件1..6 等)行为一字不动。</li>
+     * </ul>
+     * 面板在 yj_panel 里查不到(页面级虚拟面板,如 PROC_FLOW_CARD)= 只存附件不同步。
+     */
     private void syncHeadField(String panelCode, String docNo, String fieldKey, String username) {
         String joined = joinedNames(panelCode, docNo, fieldKey);
-        // 2026-10-29:页面级虚拟面板(如工序流程追踪卡 PROC_FLOW_CARD)不在 yj_panel 里 ——
-        //   它们没有"单据头表/单号列",附件只做登记(元数据 + 磁盘文件),没有头字段可同步。
-        //   此前这里用 queryForMap 空结果会抛 EmptyResultDataAccessException ⇒ 上传直接 500;
-        //   改为"查不到面板 = 只存附件不同步",既有面板行为一字不动。
         List<Map<String, Object>> panels = jdbc.queryForList(
-                "SELECT head_table, group_col FROM yj_panel WHERE panel_code=?", panelCode);
+                "SELECT head_table, line_table, group_col, pk_col FROM yj_panel WHERE panel_code=?", panelCode);
         if (panels.isEmpty()) return;
         Map<String, Object> panel = panels.get(0);
-        String headTable = str(panel.get("head_table"));
         String groupCol = str(panel.get("group_col"));
-        if (headTable.isBlank() || groupCol.isBlank()) return;
-        Integer registered = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM yj_field WHERE panel_code=? AND col_name=?", Integer.class, panelCode, fieldKey);
-        if (registered == null || registered == 0) return;
-        jdbc.update("UPDATE [" + headTable + "] SET [" + fieldKey + "]=?, asp_user2=?, asp_time2=SYSDATETIME() "
+        if (groupCol.isBlank()) return;
+
+        // ① 字段键 → (基础字段, 明细行 id)。后缀只认「-数字」;整键已登记时不动它。
+        String baseKey = fieldKey;
+        String rowId = null;
+        if (registeredField(panelCode, fieldKey).isEmpty()) {
+            int dash = fieldKey.lastIndexOf('-');
+            if (dash > 0 && dash < fieldKey.length() - 1
+                    && fieldKey.substring(dash + 1).matches("\\d{1,10}")) {
+                String base = fieldKey.substring(0, dash);
+                if (!registeredField(panelCode, base).isEmpty()) {
+                    baseKey = base;
+                    rowId = fieldKey.substring(dash + 1);
+                }
+            }
+        }
+        Map<String, Object> field = registeredField(panelCode, baseKey);
+        String place = str(field.get("place"));
+
+        // ② 明细行附件:只更新该行(行 id 是锚点的一部分,换行/加行都不会串行)
+        if (rowId != null && place.contains("detail")) {
+            String lineTable = str(panel.get("line_table"));
+            String pkCol = str(panel.get("pk_col"));
+            if (lineTable.isBlank() || pkCol.isBlank()) return;
+            if (!lineTableCols(lineTable).contains(baseKey)) return;
+            jdbc.update("UPDATE [" + lineTable + "] SET [" + baseKey + "]=?, asp_user2=?, asp_time2=SYSDATETIME() "
+                            + "WHERE [" + pkCol + "]=? AND [" + groupCol + "]=?",
+                    joined, username, Long.valueOf(rowId), docNo);
+            return;
+        }
+
+        // ③ 表头附件(原逻辑,一字未动)
+        String headTable = str(panel.get("head_table"));
+        if (headTable.isBlank() || field.isEmpty()) return;
+        jdbc.update("UPDATE [" + headTable + "] SET [" + baseKey + "]=?, asp_user2=?, asp_time2=SYSDATETIME() "
                 + "WHERE [" + groupCol + "]=?", joined, username, docNo);
+    }
+
+    /** 该面板在 yj_field 登记过这个列名吗(返回 place/data_type,未登记 = 空 Map)。
+     *  列名走参数绑定,拼接只用于已登记过的列名 —— 防动态列名注入。 */
+    private Map<String, Object> registeredField(String panelCode, String colName) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT place, data_type, ref_panel FROM yj_field WHERE panel_code=? AND col_name=?",
+                panelCode, colName);
+        return rows.isEmpty() ? Map.of() : rows.get(0);
+    }
+
+    /** 表里的物理列名(只用于校验"登记的字段真有这一列",避免 UPDATE 撞不存在的列)。 */
+    private Set<String> lineTableCols(String table) {
+        try {
+            return new java.util.HashSet<>(jdbc.queryForList(
+                    "SELECT c.name FROM sys.columns c WHERE c.object_id=OBJECT_ID(?)", String.class, "dbo." + table));
+        } catch (Exception e) {
+            return Set.of();
+        }
     }
 
     private String joinedNames(String panelCode, String docNo, String fieldKey) {

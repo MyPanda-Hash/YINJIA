@@ -36,6 +36,12 @@ Write-Host '[1/4] 停正式实例 + 停掉它的重启监督进程 ...'
 & (Join-Path $PSScriptRoot 'start-prod.ps1') -Stop | Out-Null
 
 Write-Host '[2/4] 等进程退出 + jar 句柄释放 ...'
+# 打包前先记下旧 jar 的指纹与时间:下面必须**真的换了包**才算成功(2026-11-09 实测踩到 ——
+#   脚本一路打印「打包 OK」,磁盘上却还是上一次的 jar:服务被重启了,跑的还是旧 class/旧前端,
+#   界面表现"改了没生效",而日志没有任何报错)。判据用**时间**(mvn 重写 ⇒ 一定晚于本次开工),
+#   不单看哈希(同样的源码重复打包,哈希也可能恰好相同,那是合法情况)。
+$jarHashBefore = if (Test-Path $jar) { (Get-FileHash $jar -Algorithm SHA256).Hash } else { '' }
+$buildStart = Get-Date
 $ok = $false
 for ($i = 0; $i -lt 60; $i++) {
     $sup = Get-MesSupervisors
@@ -72,6 +78,23 @@ $jarExe = if ($env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\jar.exe")) { "$
 $libCnt = (& $jarExe tf $jar 2>$null | Select-String 'BOOT-INF/lib/' | Measure-Object).Count
 Write-Host "      fat jar 自检:BOOT-INF/lib = $libCnt 条"
 if ($libCnt -lt 50) { throw "打包产物不是 fat jar(BOOT-INF/lib 仅 $libCnt 条)⇒ repackage 很可能失败过,不要用它重启" }
+
+# 换包自检:jar 必须**被 mvn 重写过**(文件时间晚于本次开工)。没被重写说明 mvn 那步没落地
+# (打了别的目录 / 静默跳过 / clean 没删掉旧包),此时重启等于"用旧包冒充新包"。
+# 2026-11-09 实测这条是**偶发**的:同一条 mvn 命令、同一目录,5 次里 2 次没换包却退出 0
+# ⇒ 先自动重打一次(偶发时基本一次就好),仍不换包才失败,别让一次抖动把服务留在停机状态。
+$jarTimeAfter = (Get-Item $jar).LastWriteTime
+if ($jarTimeAfter -lt $buildStart) {
+    Write-Host "      [WARN] 打包产物没被重写(仍是 $jarTimeAfter),自动重打一次 ..." -ForegroundColor Yellow
+    if ($SkipFrontend) { & (Join-Path $root 'build-appjar.ps1') -SkipFrontend }
+    else               { & (Join-Path $root 'build-appjar.ps1') }
+    $jarTimeAfter = (Get-Item $jar).LastWriteTime
+}
+if ($jarTimeAfter -lt $buildStart) {
+    throw "打包产物没被重写(jar 时间 $jarTimeAfter 早于本次开工 $buildStart):mvn 没有真正换包(不是代码没改,是包没生成)。请检查 build-appjar.ps1 的 mvn 输出后重试,不要用这个 jar 重启。"
+}
+$jarHashAfter = (Get-FileHash $jar -Algorithm SHA256).Hash
+Write-Host "      换包自检:jar 已重写($jarTimeAfter)$(if ($jarHashBefore) { ",哈希 $($jarHashBefore.Substring(0,8))… → $($jarHashAfter.Substring(0,8))…" })"
 
 Write-Host '[4/4] 重启 ...'
 & (Join-Path $PSScriptRoot 'start-prod.ps1')

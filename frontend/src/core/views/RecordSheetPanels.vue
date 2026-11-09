@@ -18,6 +18,13 @@
       >{{ tt(pg.title) }}</div>
     </div>
 
+    <!-- ═══ 明细行的「手机照片」列(2026-11-09 第二轮)═══
+         用户口径:「1.附件,3 个面版都要有,而且加在明细字段内,就是表格里面,每一行都有可能要拍照保存。」
+         ⇒ 三张实验室记录表的「手机照片」从表头下移到**明细行**,纸面表格里就多出一列:
+           每行一个附件格(附件锚点 = 面板 + 单据编号 + `手机照片-<行id>`),
+           可拍照/选图、可点开、可删;保存时行值随明细一起提交(渲染在下方数据表的列循环里,
+           列来源见 rowAttachCols() —— 元数据驱动,不在三个配置里各写一遍)。 -->
+
     <!-- ═══ 报告头(report 版式):公司名 | 文档编号 + 大标题 | 信息块;规格书=文档式封面
          渲染条件 = 「本页是 report 版式」且「本页要报告头」(见 showReportHead / effPlain):
            · 单页面板 / 普通多页面板:报告头只在第 1 页(历史行为,如规格书的封面);
@@ -570,9 +577,16 @@
             <col v-if="editable" style="width:0" />
           </colgroup>
           <tbody>
-            <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：) -->
+            <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：)
+                 单据编号(2026-11-09 用户口径):「先查看原来的电脑面版是否有单据编号。如果没有加在标题的右下角。」
+                 —— plain 登记表纸面**原本没有单位置**(report 版式才在报告头右上角印),
+                 没有它就分不清"手上这张纸是哪一单"。故标题右下角补一个「编号：xx」;
+                 report 版式不受影响(它本来就印)。 -->
             <tr v-if="effPlain">
-              <td :colspan="totalSpan(dt)" class="rsp-plain-title">{{ tt(plainTitleOf) }}</td>
+              <td :colspan="totalSpan(dt)" class="rsp-plain-title">
+                {{ tt(plainTitleOf) }}
+                <span v-if="sheetDocNo" class="rsp-title-docno">{{ tt('编号') }}：{{ sheetDocNo }}</span>
+              </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <tr v-if="effPlain && cfg.subtitle">
@@ -740,7 +754,24 @@
             </template>
             <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }" :style="dt.rowH ? { height: dt.rowH + 'px' } : null">
               <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :class="{ 'rsp-locked': isLockedCell(dt, row, c) }" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
-                <el-input v-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+                <!-- 本行附件格(2026-11-09:明细行的「手机照片」):可编辑 + 有单号 → 能拍/选/删;
+                     只读或新单未保存 → 只列文件名(点不开时也能看到"这行有照片")。
+                     锚点 = 面板 + 单据编号 + `手机照片-<行id>`,服务端把文件名串写回本行这一列。 -->
+                <div v-if="c.type === 'file'" class="rs-file-cell">
+                  <FileAttachCell
+                    v-if="sheetDocNo && row.id"
+                    :panel-code="panelCode"
+                    :doc-no="sheetDocNo"
+                    :field-key="rowAttachKey(c, row)"
+                    :model-value="String(row[c.key] || '')"
+                    :can-edit="cellEditable(dt, row, c)"
+                    :hide-when-empty="!cellEditable(dt, row, c)"
+                    download-only
+                    @update:model-value="(v) => { row[c.key] = v; emit('dirty') }"
+                  />
+                  <span v-else class="rs-file-hint">{{ row[c.key] || tt('保存后可上传照片') }}</span>
+                </div>
+                <el-input v-else-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
                      静默认不出、把折算料当比例算(见 core/mold/materialKinds.js 注释)。
                      filterable+allow-create:预设档案类别(2026-10-15 起五个,含「折算物料」),
@@ -1818,6 +1849,9 @@ async function loadStdLibs() {
 const props = defineProps({
   head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
+  /** **明细字段元数据**(yj_field place=detail):用来发现「明细里的附件字段」并自动补一列
+   *  (2026-11-09 手机照片按下行存;见 rowAttachCols)。由 PanelxList 从 cfgCache.detail 传下来。 */
+  detailFields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
   panelCode: { type: String, required: true },
   // 行级编辑门禁(产品变更申请单「部门评审意见」):当前账号可填的纸面部门行清单 ——
@@ -1837,6 +1871,55 @@ const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 const isSpikeWater = computed(() => props.panelCode === 'RD_SPIKE_WATER')
 /** 模板里用的同义判断：直接读 props，不经 computed（排除响应式包装带来的求值问题） */
 function spikeWaterPanel() { return props.panelCode === 'RD_SPIKE_WATER' }
+/**
+ * 附件字段键：与 PanelxList.headerFieldKey 同一口径（表头字段用 `code`，明细字段用 `dataName`）。
+ */
+function attachKeyOf(f) {
+  return String(f?.code || f?.dataName || f?.label || '')
+}
+/** 附件锚点用的单号：与 PanelxList.curDocNo 同口径（单据编号 → 编号）。
+ *  plain 登记表纸面标题右下角也用它（2026-11-09：「如果没有[单据编号]加在标题的右下角」）。 */
+const sheetDocNo = computed(() => String(props.head?.['单据编号'] || props.head?.['编号'] || ''))
+/**
+ * 收集 recordSheetConfigs 里**已经声明过**的附件字段键（任何层级出现 `{type:'file', key}` 都算）。
+ * 声明过的照旧渲染在原格子里（如产品信息表·客户图纸或规格书）；这里只用来**排除**，免得同一字段出现两次。
+ */
+function declaredFileKeys(node, out) {
+  if (!node || typeof node !== 'object') return out
+  if (Array.isArray(node)) {
+    for (const v of node) declaredFileKeys(v, out)
+    return out
+  }
+  if (node.type === 'file' && node.key) out.add(String(node.key))
+  for (const v of Object.values(node)) {
+    if (v && typeof v === 'object') declaredFileKeys(v, out)
+  }
+  return out
+}
+/**
+ * **明细行的附件字段**（2026-11-09 第二轮）：
+ *   用户口径「附件,3 个面版都要有,而且加在明细字段内,就是表格里面,每一行都有可能要拍照保存。」
+ *   ⇒ yj_field 里 `data_type='附件'` 且登记在**明细**(`props.detailFields` 里出现)的字段，
+ *     在每张数据表末尾自动补一列(元数据驱动，不在三份 recordSheetConfigs 里各写一遍;
+ *     加标水那种"列集由标准库模版决定"的表格也能自动带上，配置里无处可写)。
+ *   已被配置显式声明成 `{type:'file'}` 的键跳过（避免同一字段两列）。
+ */
+const rowAttachCols = computed(() => {
+  const detail = Array.isArray(props.detailFields) ? props.detailFields : []
+  if (!detail.length) return []
+  const declared = declaredFileKeys(cfg.value, new Set())
+  return detail
+    .filter((f) => String(f?.dataType || '') === '附件')
+    .filter((f) => {
+      const k = attachKeyOf(f)
+      return !!k && !declared.has(k)
+    })
+    .map((f) => ({ key: attachKeyOf(f), label: String(f.label || f.dataName || f.code), w: 120, type: 'file' }))
+})
+/** 本行附件格的锚点：`手机照片-<行 id>`（行 id 是行身份的稳定凭据;新行未保存时没有 id ⇒ 不能传） */
+function rowAttachKey(c, row) {
+  return `${c?.key || ''}-${row?.id ?? ''}`
+}
 // 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
 // 单据类面板编辑期间那格永远空白;见 @/core/panel/sheetDocNo 的说明)
 // ⚠ 2026-10-29:**面板可显式声明** head.docNoKey 覆盖自动推断。自动推断只看「head 里有没有
@@ -4068,7 +4151,11 @@ function touch() {
 
 // ── 数据记录表渲染 ──
 function visCols(dt) {
-  return colsOf(dt).filter((c) => !c.hiddenCol)
+  // 明细附件字段自动补列(2026-11-09):放在最后,避免打乱既有列序/列宽设计。
+  // 已同名的列(配置里自己写了 手机照片)不重复追加。
+  const base = colsOf(dt).filter((c) => !c.hiddenCol)
+  const extra = rowAttachCols.value.filter((rc) => !base.some((c) => c.key === rc.key))
+  return extra.length ? [...base, ...extra] : base
 }
 function groupCols(dt) {
   return visCols(dt).filter((c) => c.group)
@@ -5754,6 +5841,19 @@ function chartOf(dt) {
 }
 
 /* ═══ 页签(规格书多页) ═══ */
+/* 明细行附件格(2026-11-09 第二轮):纸面表格里那一列「手机照片」。
+   与打印无冲突:纸面/打印看到的仍是该行 [手机照片] 列里的文件名串。 */
+.rs-file-cell {
+  min-height: 24px;
+  line-height: 1.4;
+}
+.rs-file-hint {
+  display: inline-block;
+  padding: 2px 0;
+  font-size: 12px;
+  color: #8a97a8;
+  word-break: break-all;
+}
 .rsp-pages {
   display: flex;
   gap: 2px;
@@ -6191,6 +6291,7 @@ function chartOf(dt) {
 
 /* ═══ plain 版式:标题条 + 副标题行 + 页脚须知 ═══ */
 .rsp-plain-title {
+  position: relative;
   border: 1px solid #7f7f7f;
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: 22px;
@@ -6207,6 +6308,18 @@ function chartOf(dt) {
   padding: 4px 10px;
   font-size: 14px;
   text-align: left;
+}
+/* 标题右下角的「编号：xxx」(2026-11-09):只补 plain 登记表这类**纸面本来没有单位置**的版式;
+   report 版式由报告头右上角印,不受影响。字号小于标题,不抢标题视觉。 */
+.rsp-title-docno {
+  position: absolute;
+  right: 10px;
+  bottom: 3px;
+  font-family: system-ui, -apple-system, 'Microsoft YaHei', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #33517a;
 }
 .rsp-subtitle-row.right {
   text-align: right;

@@ -117,6 +117,18 @@ public class SupplierPortalGuardFilter extends OncePerRequestFilter {
         // 归属核对在 PxController:同样是 requireMaterialLabelAccess(只能动自己订单下的打印单)。
         if (path.equals("/api/px/puLabel/reprint")) return true;
         if (path.equals("/api/px/puLabel/void")) return true;
+        // 采购订单报表打印记录(2026-11-07):供应商的「打印」组里同样有 打印采购订单 / 打印订单无金额,
+        // 弹窗要读「已打印记录」、每次打印要落快照,记录里还有「重打 / 作废」两颗按钮。
+        // 这四条不放行 ⇒ 供应商端打印不能用记录、重打/作废全 403(与上一版材料码同款坑)。
+        // 归属核对在 PxController.requirePrintRecordAccess(ByPrintDoc):只认自己供应商的订单/记录。
+        if (path.equals("/api/px/puPrint/records")) return true;
+        if (path.equals("/api/px/puPrint/print")) return true;
+        if (path.equals("/api/px/puPrint/reprint")) return true;
+        if (path.equals("/api/px/puPrint/void")) return true;
+        // 点记录行看明细(2026-11-09):只读快照行,归属核对在 PxController.requirePrintRecordRead
+        if (path.equals("/api/px/puPrint/lines")) return true;
+        if (path.equals("/api/px/puPrint/quotas")) return true;
+        if (path.equals("/api/px/puPrint/twin")) return true;
         return path.equals("/api/auth/logout")
                 || path.equals("/api/auth/changePassword")
                 || path.equals("/api/auth/perms")

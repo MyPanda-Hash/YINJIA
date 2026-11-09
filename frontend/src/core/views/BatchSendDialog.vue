@@ -76,14 +76,14 @@
         <el-table-column :label="tt('本次送料数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
+              :disabled="!(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
       </el-table>
       <div class="bsd-foot">
         <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
-        <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）') }}</span>
+        <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%，超送量按计量单位取整）') }}</span>
       </div>
 
       <!-- ② 下层:已打印的隔离行(2026-10-04 用户口径「打印后的那一行是已经从原来数量隔离出来的,
@@ -109,7 +109,7 @@
           <el-table-column :label="tt('本次送料数量')" width="150">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
-                :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
+                :disabled="!(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
             </template>
           </el-table-column>
           <el-table-column :label="tt('状态')" width="90" align="center">
@@ -205,7 +205,13 @@ const ratio = computed(() => Math.max(0, Math.min(50, Number(overRatioPct.value)
  */
 function capOf(row) {
   if (row?.rowKind === 'printed') return Math.max(0, Number(row.可送上限 || 0))
-  return overAllowance(row.数量, row.已送数量, row.已退回数量, overRatioPct.value)
+  // 2026-11-09:超送量按该行单位精度取整(计件单位整数、kg/米 3 位);精度由服务端逐行下发
+  return overAllowance(row.数量, row.已送数量, row.已退回数量, overRatioPct.value, row?.小数位数 ?? 2)
+}
+/** 该行输入框精度 = 单位小数位数(计件 0 位:不让填 0.5 个;kg/米 3 位) */
+function precisionOf(row) {
+  const n = Number(row?.小数位数)
+  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.trunc(n))) : 2
 }
 function recompute() {
   // 比例调小后可能低于已填数量 → 收敛到新上限,避免提交时被后端拒

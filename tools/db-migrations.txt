@@ -4581,3 +4581,20 @@ migrate-work-order-progress-panel-20261108.sql
 migrate-wo-report-list-product-cols-20261108.sql
 migrate-qc-proc-insp-rename-20261109.sql
 migrate-qc-proc-insp-tpl-20261109.sql
+# 2026-11-07 采购订单报表打印记录：新建 bd_pu_print（头）/ bl_pu_print（行），弹窗「已打印记录 + 重打/作废」
+migrate-pu-print-20261107.sql
+
+# 2026-11-09 采购订单打印记录:bd_pu_print 加[对应单号](有金额↔无金额 相互对着打印)
+migrate-pu-print-twin-20261109.sql
+
+# 2026-11-09 材料码打印:bd_pu_label 加[来源打印单号](只认有金额打印记录,同一张只能打一次)
+migrate-pu-label-src-print-20261109.sql
+
+# 2026-11-09 实验室记录手机登记:3 张记录表头加[手机照片]附件列 + yj_field(data_type=附件) + en 译名
+migrate-lab-mobile-20261109.sql
+
+# 2026-11-09 手机照片从表头下移到明细行:3 张明细表加列 + yj_field(place=detail)、撤表头列与表头字段、附件锚点改为 手机照片-行id
+migrate-lab-mobile-row-photo-20261109.sql
+
+# 2026-11-09 实验室「测试项目」标准库补齐服务器上的 4 条历史遗留条目(item_code=默认、名字写在 content 里;启用 2 条 NSF 42-余氯/NSF 42氯胺)
+migrate-lab-testitem-legacy-20261109.sql
