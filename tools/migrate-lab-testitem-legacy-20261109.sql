@@ -24,7 +24,8 @@
    【安全】
      · 只 INSERT,不改/不删任何现有条目;幂等:同 (lib_code, item_code, content) 已存在即跳过;
      · 不改任何单据数据、不改 yj_field/面板元数据;
-     · 末尾自检:`lab.test_item` 总数 = 7、启用的纯文本条目恰好 2 条(余氯/氯胺),不过即 THROW。
+     · 末尾自检:4 条老条目必须都在、启用的纯文本条目恰好 2 条(余氯/氯胺),不过即 THROW;
+       **不断言总数**(标准库允许人工新增条目 —— 2026-11-09 服务器实测 9 条,原「=7」硬断言已删除)。
      · 两账套都要跑(先 HSDZ_MES 后 HSDZ_MES_TEST)。
    ============================================================================ */
 
@@ -49,7 +50,7 @@ SELECT N'lab.test_item', N'默认', s.content, s.seq, s.enabled, N'migrate-lab-t
             AND x.content = s.content
        );
 
-DECLARE @total int, @legacyOn int;
+DECLARE @total int, @legacyOn int, @legacyAll int;
 SELECT @total = COUNT(*) FROM yj_std_lib WHERE lib_code = N'lab.test_item';
 SELECT @legacyOn = COUNT(*)
   FROM yj_std_lib
@@ -57,11 +58,27 @@ SELECT @legacyOn = COUNT(*)
    AND item_code = N'默认'
    AND enabled = '1'
    AND content NOT LIKE N'{%';
+/* 4 条历史遗留条目是否都在(按 content 判,不看总数) */
+SELECT @legacyAll = COUNT(*)
+  FROM @seed s
+ WHERE EXISTS (SELECT 1 FROM yj_std_lib x
+                WHERE x.lib_code = N'lab.test_item'
+                  AND x.item_code = N'默认'
+                  AND x.content = s.content);
 
-IF @total <> 7
-  RAISERROR(N'[FAIL] lab.test_item 应为 7 条(3 正规 + 4 老条目),实际 %d 条', 16, 1, @total);
+/* ⚠ 2026-11-09 现场事故(服务器首次部署 pkg-incr-20261109d 时第 6 条 FAIL-MIGRATIONS):
+   原来写死 `@total <> 7` —— 服务器账套在 07:15 之后有人**通过「标准库维护」人工新增了 2 条
+   正规条目**(`NSF 42-余氯` / `NSF 42-氯胺`,item_code=名字 + JSON content)⇒ 实际 9 条,
+   硬断言把整批 RAISERROR 回滚,应用被停、jar 未换。
+   ⇒ 总数**不该**做等值断言(标准库本来就允许人工新增);本脚本只保证「这 4 条老条目在」,
+      再校验「启用的纯文本老条目恰好 2 条」这个有业务含义的数量。 */
+IF @legacyAll <> 4
+  RAISERROR(N'[FAIL] 4 条历史遗留条目应全部存在(NSF 42-余氯 / NSF 42 氯胺… / NSF 42氯胺 / cs),实际只有 %d 条', 16, 1, @legacyAll);
 IF @legacyOn <> 2
   RAISERROR(N'[FAIL] 启用的纯文本老条目应为 2 条(NSF 42-余氯 / NSF 42氯胺),实际 %d 条', 16, 1, @legacyOn);
+
+PRINT N'[INFO] lab.test_item 现有 ' + CAST(@total AS nvarchar(10))
+    + N' 条(其中人工新增的 JSON 条目也算在内,不判失败)';
 
 COMMIT TRAN;
 
