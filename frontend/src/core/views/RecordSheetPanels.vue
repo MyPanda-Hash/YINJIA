@@ -766,6 +766,7 @@
                     :model-value="String(row[c.key] || '')"
                     :can-edit="cellEditable(dt, row, c)"
                     :hide-when-empty="!cellEditable(dt, row, c)"
+                    download-only
                     @update:model-value="(v) => { row[c.key] = v; emit('dirty') }"
                   />
                   <span v-else class="rs-file-hint">{{ row[c.key] || tt('保存后可上传照片') }}</span>

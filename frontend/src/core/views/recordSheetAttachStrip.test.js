@@ -42,9 +42,12 @@ test('RecordSheetPanels:每行一个附件格,锚点=手机照片-<行id>,保存
   assert.match(sheet, /function rowAttachKey\(c, row\) \{\s*\n\s*return `\$\{c\?\.key \|\| ''\}-\$\{row\?\.id \?\? ''\}`/,
     '行锚点必须是 `字段-行id`(后端按行只更新那一行)')
   assert.match(sheet, /<div v-if="c\.type === 'file'" class="rs-file-cell">/, '数据表格子里缺少附件格分支')
-  assert.match(sheet, /<FileAttachCell[\s\S]{0,400}?:field-key="rowAttachKey\(c, row\)"/,
+  assert.match(sheet, /<FileAttachCell[\s\S]{0,800}?:field-key="rowAttachKey\(c, row\)"/,
     '附件格的 field-key 必须按行走(不能整单一个键)')
-  assert.match(sheet, /<FileAttachCell[\s\S]{0,400}?@update:model-value="\(v\) => \{ row\[c\.key\] = v; emit\('dirty'\) \}"/,
+  // 2026-11-09 第三轮用户口径「附件可以下载,不支持预览」⇒ 纸面这一格必须标 download-only
+  assert.match(sheet, /<FileAttachCell[\s\S]{0,800}?download-only/,
+    '逐行附件格要 download-only(只下载不预览)')
+  assert.match(sheet, /<FileAttachCell[\s\S]{0,800}?@update:model-value="\(v\) => \{ row\[c\.key\] = v; emit\('dirty'\) \}"/,
     '选/删照片后要把文件名串写回本行这一列(否则保存不带这个值)')
   assert.match(sheet, /v-if="sheetDocNo && row\.id"/,
     '新行还没有行 id ⇒ 只能提示"保存后可上传照片",不能传(锚点缺行号)')

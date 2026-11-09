@@ -37,7 +37,7 @@ import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/core/request'
-import { openAttachmentPreview } from '@core/panel/attachmentPreview'
+import { openAttachmentPreview, triggerDownload } from '@core/panel/attachmentPreview'
 
 const props = defineProps({
   panelCode: { type: String, required: true },
@@ -59,6 +59,12 @@ const props = defineProps({
    * 可编辑时永远渲染(要露出「上传附件」入口)。
    */
   hideWhenEmpty: { type: Boolean, default: false },
+  /**
+   * 只下载、不预览(2026-11-09 用户口径「附件可以下载,不支持预览」)。
+   * 用于「实验室记录手机登记」纸面逐行照片格:现场照片只要取回原图,不需要在线渲染;
+   * 其它面板不传=false,行为与改造前逐字一致。
+   */
+  downloadOnly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'change'])
 
@@ -201,12 +207,25 @@ async function removeFile(a) {
   }
 }
 
-/** 点击文件名=**预览**(2026-10-28 用户口径「加预览,不用每次都下载再看,归档的也一样」):
+/**
+ * 点击文件名=**预览**(2026-10-28 用户口径「加预览,不用每次都下载再看,归档的也一样」):
  *  图片/PDF/文本/JSON 浏览器直开;.docx 用 docx-preview 渲染;.xlsx/.xls/.csv 用 SheetJS 转表格;
  *  老 .doc、压缩包等无原生渲染能力的类型保底下载。实现见 @core/panel/attachmentPreview.js。
  *  ⚠ 与 canEdit 无关:未保存新单里传的、审批中、已归档的附件都能点开 ——
- *    能不能看只由后端 requirePanelView(面板查看权)把关。 */
+ *    能不能看只由后端 requirePanelView(面板查看权)把关。
+ *  ⚠ downloadOnly(2026-11-09 用户口径「附件可以下载,不支持预览」):按「直接下载」处理,
+ *    不进预览窗。用于实验室记录手机登记的逐行照片格(现场照片只需要取回原图,不需要在线看)。
+ */
 async function openFile(a) {
+  if (props.downloadOnly) {
+    try {
+      const blob = await request.get(`/attachment/${a.id}/download`, { responseType: 'blob', timeout: 120000 })
+      triggerDownload(URL.createObjectURL(blob), a.fileName || 'attachment')
+    } catch (err) {
+      ElMessage.error(tt('附件下载失败'))
+    }
+    return
+  }
   await openAttachmentPreview(a, {
     loadBlob: () => request.get(`/attachment/${a.id}/download`, { responseType: 'blob', timeout: 120000 }),
     // 老 .doc(OLE2)前端解析不了 ⇒ 后端 HWPF 转 HTML 回来,直接写进预览窗

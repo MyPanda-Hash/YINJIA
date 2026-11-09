@@ -17,7 +17,8 @@
           <span>{{ tt('记录列表') }}</span>
           <span class="labm-sec-num">{{ total }}</span>
           <span class="labm-sec-gap"></span>
-          <el-button text size="small" @click="startNew">{{ tt('新增记录') }}</el-button>
+          <!-- 大按钮(2026-11-09 用户口径「框中的按钮要放大」):现场戴手套点得中 -->
+          <el-button size="large" type="primary" plain @click="startNew">{{ tt('新增记录') }}</el-button>
         </div>
 
         <div class="labm-row">
@@ -99,50 +100,60 @@
             <span>{{ tt('明细') }}</span>
             <span class="labm-sec-num">{{ detailRows.length }}</span>
             <span class="labm-sec-gap"></span>
-            <el-button text size="small" @click="addRow">{{ tt('加一行') }}</el-button>
+            <!-- 大按钮(2026-11-09 用户口径「框中的按钮要放大」) -->
+            <el-button size="large" type="primary" plain @click="addRow">{{ tt('加一行') }}</el-button>
           </div>
 
+          <!-- 明细行 = 可折叠卡片(2026-11-09 用户口径「明细可以收缩,默认是收缩的」):
+               收起时只露「第N行 + 摘要 + 附件数 + 删除行」,展开才显示字段与附件。
+               删除行保持小号按钮(用户口径「删除按钮不用放大」),且**只有草稿**能删(见 isDraft)。 -->
           <div v-for="(row, idx) in detailRows" :key="'d-' + rowKeyOf(row)" class="labm-drow">
-            <div class="labm-drow-head">
+            <div class="labm-drow-head" @click="toggleRow(row)">
+              <span class="labm-drow-caret">{{ isRowOpen(row) ? '▾' : '▸' }}</span>
               <span class="labm-drow-no">{{ tt('第') }} {{ idx + 1 }} {{ tt('行') }}</span>
-              <el-button text size="small" @click="removeRow(idx)">{{ tt('删除行') }}</el-button>
-            </div>
-            <div v-for="f in rowFields" :key="'d-' + idx + '-' + f.dataName" class="labm-field">
-              <label>{{ labelOf(f) }}</label>
-              <el-date-picker
-                v-if="isDate(f)"
-                v-model="row[f.dataName]"
-                type="date"
-                value-format="YYYY-MM-DD"
-                :placeholder="tt('选择日期')"
-                style="width: 100%"
-              />
-              <el-input v-else v-model="row[f.dataName]" :placeholder="labelOf(f)" />
+              <span v-if="!isRowOpen(row)" class="labm-drow-sum">{{ rowSummary(row) }}</span>
+              <span v-if="rowAttachCount(row)" class="labm-drow-badge">📎 {{ rowAttachCount(row) }}</span>
+              <span class="labm-sec-gap"></span>
+              <el-button text size="small" :disabled="!isDraft" :title="isDraft ? '' : tt('只有草稿才能删除行')" @click.stop="removeRow(idx)">{{ tt('删除行') }}</el-button>
             </div>
 
-            <!-- 本行照片(2026-11-09 第二轮):附件按**明细行**存 —— 每一行都可能要拍照。
-                 有行 id(已保存或在既有单里) → 选完即传,锚点 `手机照片-<行id>`;
-                 新行还没 id → 先排队(标「待上传」),保存拿到 id 后自动补传。 -->
-            <div class="labm-rowphoto">
-              <div class="labm-rowphoto-head">
-                <span class="labm-rowphoto-title">{{ tt('本行照片') }}</span>
-                <span v-if="!rowPhotoKey(row)" class="labm-rowphoto-hint">{{ tt('保存后自动上传') }}</span>
-                <span class="labm-sec-gap"></span>
-                <el-button text size="small" @click="pickRowPhoto(idx)">📷 {{ tt('拍照/选图') }}</el-button>
+            <div v-show="isRowOpen(row)" class="labm-drow-body">
+              <div v-for="f in rowFields" :key="'d-' + idx + '-' + f.dataName" class="labm-field">
+                <label>{{ labelOf(f) }}</label>
+                <el-date-picker
+                  v-if="isDate(f)"
+                  v-model="row[f.dataName]"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                  :placeholder="tt('选择日期')"
+                  style="width: 100%"
+                />
+                <el-input v-else v-model="row[f.dataName]" :placeholder="labelOf(f)" />
               </div>
-              <div class="labm-photos">
-                <div v-for="p in photosOfRow(row)" :key="'rp-' + p.id" class="labm-photo">
-                  <img v-if="thumbOf(p)" :src="thumbOf(p)" :alt="p.fileName" @click="preview(p)" />
-                  <div v-else class="labm-photo-name" @click="preview(p)">{{ p.fileName }}</div>
-                  <span class="labm-photo-del" :title="tt('删除照片')" @click.stop="removeRowPhoto(row, p)">✕</span>
-                </div>
-                <div v-for="(c, i) in pendingOfRow(row)" :key="'rpd-' + i" class="labm-photo is-pending">
-                  <img :src="c.url" :alt="c.name" />
-                  <span class="labm-photo-del" :title="tt('取消这张')" @click.stop="dropRowPending(row, i)">✕</span>
-                  <span class="labm-photo-wait">{{ tt('待上传') }}</span>
+
+              <!-- 本行附件(2026-11-09 第三轮):按**明细行**存,显示成**附件列表**(不是图片预览),
+                   点名字=下载原图(用户口径「附件可以下载,不支持预览」)。
+                   有行 id(已保存/既有单的行)→ 选完即传,锚点 `手机照片-<行id>`;
+                   新行还没 id → 先排队(标「待上传」),保存拿到 id 后自动补传。 -->
+              <div class="labm-rowphoto">
+                <div class="labm-rowphoto-head">
+                  <span class="labm-rowphoto-title">{{ tt('本行附件') }}</span>
+                  <span v-if="!rowPhotoKey(row)" class="labm-rowphoto-hint">{{ tt('保存后自动上传') }}</span>
+                  <span class="labm-sec-gap"></span>
+                  <el-button size="small" type="primary" plain @click.stop="pickRowPhoto(idx)">📷 {{ tt('拍照/上传附件') }}</el-button>
                 </div>
                 <div v-if="!photosOfRow(row).length && !pendingOfRow(row).length" class="labm-rowphoto-empty">
-                  {{ tt('这一行还没有照片') }}
+                  {{ tt('这一行还没有附件') }}
+                </div>
+                <div v-for="p in photosOfRow(row)" :key="'a-' + p.id" class="labm-att">
+                  <span class="labm-att-name" :title="tt('点击下载')" @click="downloadPhoto(p)">📎 {{ p.fileName }}</span>
+                  <span class="labm-att-size">{{ fmtSize(p.fileSize) }}</span>
+                  <span class="labm-att-del" :title="tt('删除附件')" @click.stop="removeRowPhoto(row, p)">✕</span>
+                </div>
+                <div v-for="(c, i) in pendingOfRow(row)" :key="'ap-' + i" class="labm-att is-pending">
+                  <span class="labm-att-name">📎 {{ c.name }}</span>
+                  <span class="labm-att-wait">{{ tt('待上传') }}</span>
+                  <span class="labm-att-del" :title="tt('取消这个附件')" @click.stop="dropRowPending(row, i)">✕</span>
                 </div>
               </div>
             </div>
@@ -162,10 +173,10 @@
             <el-button type="primary" size="large" :loading="saving" :disabled="!panel" @click="save()">
               {{ tt('保存草稿') }}
             </el-button>
-            <el-button size="large" :disabled="saving" @click="startNew">{{ tt('清空重填') }}</el-button>
+            <el-button size="large" :disabled="saving || !isDraft" :title="isDraft ? '' : tt('只有草稿才能清空重填')" @click="startNew">{{ tt('清空重填') }}</el-button>
           </div>
           <div class="labm-hint">
-            {{ tt('保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。照片按行存进表格里的「手机照片」列,电脑端该行点开即可看。') }}
+            {{ tt('保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。附件按行存进表格里的「手机照片」列,电脑端该行可下载。') }}
           </div>
         </template>
       </section>
@@ -211,9 +222,8 @@ import { computed, ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
-import { openAttachmentPreview } from '@core/panel/attachmentPreview'
 import {
-  PHOTO_FIELD, labPanelOf, rowTitleOf, rowMetaOf, photoCountOf, isImageName, baseNameOf,
+  PHOTO_FIELD, labPanelOf, rowTitleOf, rowMetaOf, photoCountOf, baseNameOf,
   emptyHeader, emptyDetailRow, headerValuesOf, detailRowsOf, buildSavePayload,
   rowPhotoKey, mergeRowIds,
 } from '@/business/labMobile'
@@ -256,6 +266,19 @@ function labelOf(f) {
 }
 
 const isDocNo = (f) => String(f?.code || f?.dataName || '') === '单据编号'
+/** 当前单据状态(草稿/审批中/已审核/已归档…)。用户口径(2026-11-09 第三轮):
+ *  「删除按钮和清空只能删除草稿」⇒ 只有草稿才放开「删除行」与「清空重填」。 */
+const docStatus = ref('草稿')
+const isDraft = computed(() => String(docStatus.value || '').trim() === '草稿')
+
+/** 明细行展开状态(用户口径「明细可以收缩,默认是收缩的」):key = 行 __k,true = 展开。
+ *  打开单据/换单时清空 ⇒ 全部收起;新加的那一行自动展开(要填)。 */
+const openRows = reactive({})
+function isRowOpen(row) { return !!openRows[rowKeyOf(row)] }
+function toggleRow(row) {
+  const k = rowKeyOf(row)
+  openRows[k] = !openRows[k]
+}
 const isDate = (f) => String(f?.dataType || '') === '日期'
 const optionList = (f) => (Array.isArray(f?.options) ? f.options : [])
 
@@ -274,6 +297,7 @@ function applyMeta(res) {
   tabKey.value = String(tab.key || 'items')
   detailFields.value = (Array.isArray(tab.fields) ? tab.fields : []).filter((f) => f?.dataName)
   defaults.value = res?.data && typeof res.data === 'object' ? res.data : {}
+  docStatus.value = String(defaults.value['单据状态'] || '草稿').trim() || '草稿'
 }
 
 async function loadMeta() {
@@ -327,6 +351,29 @@ function rowKeyOf(row) {
 /** 明细行里要渲染成输入框的字段:附件字段走行内照片区(不重复给输入框) */
 const rowFields = computed(() => (detailFields.value || []).filter((f) => String(f?.dataType || '') !== '附件'))
 
+/** 收起时的行摘要:取前两个**非空**的普通字段值(附件字段不算),空行显示「(未填)」 */
+function rowSummary(row) {
+  const parts = []
+  for (const f of rowFields.value) {
+    const v = String(row?.[f.dataName] ?? '').trim()
+    if (v) parts.push(v)
+    if (parts.length >= 2) break
+  }
+  return parts.length ? parts.join(' · ') : tt('(未填)')
+}
+/** 这一行有几份附件(已上传 + 待上传),给收起的卡片显示角标 */
+function rowAttachCount(row) {
+  return photosOfRow(row).length + pendingOfRow(row).length
+}
+/** 附件大小显示(与 FileAttachCell 同一口径) */
+function fmtSize(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v <= 0) return ''
+  if (v < 1024) return v + ' B'
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + ' KB'
+  return (v / 1024 / 1024).toFixed(2) + ' MB'
+}
+
 function resetForm() {
   const next = emptyHeader(headerFields.value, defaults.value)
   for (const k of Object.keys(form)) delete form[k]
@@ -340,9 +387,13 @@ function resetForm() {
 function startNew() {
   errText.value = ''
   editingNo.value = ''
+  docStatus.value = '草稿'
   clearPhotos()
   clearPending()
   resetForm()
+  // 新单默认只有一行,且这一行展开(要填);其余折叠状态清零
+  for (const k of Object.keys(openRows)) delete openRows[k]
+  for (const r of detailRows.value) openRows[rowKeyOf(r)] = true
 }
 
 async function openRecord(row) {
@@ -363,6 +414,9 @@ async function openRecord(row) {
     detailRows.value = list.length
       ? list.map((r) => ensureRowKey(r))
       : [ensureRowKey(emptyDetailRow(detailFields.value))]
+    // 用户口径「明细默认收缩」:打开一张单时全部收起,只露行摘要
+    for (const k of Object.keys(openRows)) delete openRows[k]
+    docStatus.value = String(data['单据状态'] || row['单据状态'] || '草稿').trim() || '草稿'
     await loadPhotos()
   } catch (e) {
     errText.value = apiErr(e, tt('打开记录失败'))
@@ -370,12 +424,18 @@ async function openRecord(row) {
 }
 
 function addRow() {
-  detailRows.value.push(ensureRowKey(emptyDetailRow(detailFields.value)))
+  const row = ensureRowKey(emptyDetailRow(detailFields.value))
+  detailRows.value.push(row)
+  openRows[rowKeyOf(row)] = true   // 新加的行默认展开(等着填),已有行仍保持收缩
 }
 
 function removeRow(idx) {
+  if (!isDraft.value) { ElMessage.warning(tt('只有草稿才能删除行')); return }
   const gone = detailRows.value[idx]
-  if (gone) dropRowPendingAll(gone)
+  if (gone) {
+    dropRowPendingAll(gone)
+    delete openRows[rowKeyOf(gone)]
+  }
   detailRows.value.splice(idx, 1)
   if (!detailRows.value.length) addRow()
 }
@@ -386,7 +446,6 @@ function removeRow(idx) {
 const photosByRow = reactive({})
 /** 排队待上传:key = 行 __k,value = [{file,name,url}] */
 const pendingByRow = reactive({})
-const thumbs = reactive({})
 const fileInput = ref(null)
 /** 这一次「拍照/选图」是给哪一行的(隐藏 input 只有一个) */
 const photoTargetIdx = ref(-1)
@@ -401,15 +460,7 @@ function clearPending() {
 }
 
 function clearPhotos() {
-  for (const k of Object.keys(thumbs)) {
-    try { URL.revokeObjectURL(thumbs[k]) } catch (e) { /* ignore */ }
-    delete thumbs[k]
-  }
   for (const k of Object.keys(photosByRow)) delete photosByRow[k]
-}
-
-function thumbOf(p) {
-  return isImageName(p?.fileName) ? thumbs[p.id] || '' : ''
 }
 
 function photosOfRow(row) {
@@ -429,13 +480,6 @@ async function loadRowPhotos(row) {
   if (!no || !field) return []
   const list = await listPhotos(panelCode, no, field)
   photosByRow[String(row.id)] = list
-  for (const p of list) {
-    if (!isImageName(p?.fileName) || thumbs[p.id]) continue
-    try {
-      const blob = await loadAttachmentBlob(p.id)
-      thumbs[p.id] = URL.createObjectURL(blob)
-    } catch (e) { /* 缩略图失败不影响其余 */ }
-  }
   return list
 }
 
@@ -536,17 +580,13 @@ function dropRowPendingAll(row) {
 
 async function removeRowPhoto(row, p) {
   try {
-    await ElMessageBox.confirm(`${tt('删除照片')}:${p.fileName}?`, tt('确认'), { type: 'warning' })
+    await ElMessageBox.confirm(`${tt('删除附件')}:${p.fileName}?`, tt('确认'), { type: 'warning' })
   } catch (e) {
     return
   }
   try {
     const res = await deletePhoto(p.id)
     if (res && typeof res.names === 'string') row[PHOTO_FIELD] = res.names
-    if (thumbs[p.id]) {
-      try { URL.revokeObjectURL(thumbs[p.id]) } catch (e) { /* ignore */ }
-      delete thumbs[p.id]
-    }
     await loadRowPhotos(row)
     await loadList()
     ElMessage.success(tt('已删除'))
@@ -555,15 +595,24 @@ async function removeRowPhoto(row, p) {
   }
 }
 
-function preview(p) {
-  openAttachmentPreview(
-    { id: p.id, fileName: p.fileName, contentType: p.contentType },
-    {
-      loadBlob: () => loadAttachmentBlob(p.id),
-      onInfo: (m) => ElMessage.info(m),
-      onError: (m) => ElMessage.error(m),
-    },
-  )
+/**
+ * 下载一份附件(2026-11-09 用户口径「附件可以下载,不支持预览」)。
+ * 走 blob + 触发下载:附件下载端点要 Bearer 令牌,直接 <a href> 打开会被 403。
+ */
+async function downloadPhoto(p) {
+  try {
+    const blob = await loadAttachmentBlob(p.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = String(p.fileName || 'attachment')
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch (e) {
+    errText.value = apiErr(e, tt('附件下载失败'))
+  }
 }
 
 /* ───────────── 保存 ───────────── */
@@ -762,19 +811,36 @@ defineExpose({ panelCode, panel })
 
 .labm-drow {
   margin-bottom: 10px;
-  padding: 10px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
+  overflow: hidden;
 }
+/* 行头 = 折叠开关(用户口径「明细可以收缩,默认是收缩的」):整行可点,收起时露摘要与附件数 */
 .labm-drow-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--el-fill-color-lighter);
+  cursor: pointer;
+  user-select: none;
 }
-.labm-drow-no { font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+.labm-drow-head:hover { background: var(--el-fill-color-light); }
+.labm-drow-caret { flex: none; width: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.labm-drow-no { flex: none; font-size: 13px; font-weight: 600; color: var(--el-text-color-regular); }
+.labm-drow-sum {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.labm-drow-badge { flex: none; font-size: 12px; color: var(--el-color-primary); }
+.labm-drow-body { padding: 10px 12px 12px; }
 
-/* 本行照片(2026-11-09 第二轮):附件按明细行存 —— 每行一块,拍照/看/删都在本行里 */
+/* 本行附件(2026-11-09 第三轮):显示成**附件列表**(文件形式),点名字=下载,不做图片预览 */
 .labm-rowphoto {
   margin-top: 2px;
   padding-top: 8px;
@@ -793,67 +859,36 @@ defineExpose({ panelCode, panel })
   font-size: 12px;
   color: var(--el-text-color-placeholder);
 }
-
-.labm-photos { display: flex; flex-wrap: wrap; gap: 8px; }
-.labm-photo {
-  position: relative;
-  width: 84px;
-  height: 84px;
+.labm-att {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 6px;
-  overflow: hidden;
-  background: var(--el-fill-color-lighter);
+  background: var(--el-bg-color);
+  font-size: 13px;
 }
-.labm-photo img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
-.labm-photo-name {
-  padding: 6px;
-  font-size: 11px;
-  line-height: 1.3;
-  color: var(--el-text-color-regular);
+.labm-att-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--el-color-primary);
   word-break: break-all;
   cursor: pointer;
 }
-.labm-photo-del {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 20px;
-  height: 20px;
-  line-height: 20px;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-.labm-photo-wait {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  padding: 2px 0;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
-  font-size: 10px;
-}
-.labm-photo.is-pending { border-style: dashed; border-color: var(--el-color-primary-light-5); }
-.labm-photo-add {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: 84px;
-  height: 84px;
-  border: 1px dashed var(--el-border-color);
-  border-radius: 6px;
+.labm-att-name:hover { text-decoration: underline; }
+.labm-att-size { flex: none; font-size: 11px; color: var(--el-text-color-secondary); }
+.labm-att-wait { flex: none; font-size: 11px; color: var(--el-color-warning); }
+.labm-att-del {
+  flex: none;
+  padding: 0 4px;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
-  font-size: 11px;
   cursor: pointer;
 }
-.labm-photo-plus { font-size: 20px; line-height: 1; }
-
+.labm-att-del:hover { color: var(--el-color-danger); }
+.labm-att.is-pending { border-style: dashed; border-color: var(--el-color-primary-light-5); }
 .labm-actions { display: flex; gap: 8px; margin-top: 14px; }
 .labm-actions :deep(.el-button) { flex: 1; margin-left: 0; }
 .labm-hint { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--el-text-color-secondary); }
