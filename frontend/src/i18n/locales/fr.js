@@ -2026,6 +2026,7 @@ export default {
     '开始转ERP': 'Commencer à tourner ERP',
     '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Ce document a déjà été transféré vers l\'ERP ({no}) et ne peut pas l\'être à nouveau. Pour le retransférer, annulez d\'abord l\'approbation puis approuvez-le de nouveau.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Transfert par lot vers l\'ERP terminé : réussis {ok}, déjà transférés ignorés {skip}, échecs {fail}',
+    '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'La requête de transfert vers l\'ERP a expiré : le serveur peut encore transférer. Actualisez la liste plus tard et vérifiez « Transféré vers l\'ERP » avant d\'agir ; ne recliquez pas immédiatement.',
     '供应商/客户': 'Fournisseur/Client',
     '暂无已审核且未转ERP的单据': 'Aucun reçu n\'a été examiné et n\'a pas été transféré à l\'ERP',
     '材料二维码标签': 'Étiquette de code QR de matériau',

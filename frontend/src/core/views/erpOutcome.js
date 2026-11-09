@@ -24,6 +24,19 @@
 export const ERP_ALREADY_KEY = '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」'
 
 /**
+ * 「转ERP」单次请求的超时(毫秒)。
+ *
+ * 为什么不是 request.js 的 15 s 默认值(2026-11-09 实测踩到):转ERP 要**先向金蝶取 app-token 再保存单据**,
+ * 冷启动那一发实测 >15 s ⇒ 前端弹「timeout of 15000ms exceeded」(英文、且**读起来像失败**),
+ * 而服务端其实在 15:36:03 推完并回写了 ERP单号。跟 2026-10-15「库存月结超时」是同一类坑:
+ * **服务端还在跑、前端先报错**。这里给足余量(金蝶侧慢时也够),别让"其实成功了"显示成失败。
+ */
+export const ERP_CALL_TIMEOUT_MS = 180000
+
+/** 请求超时提示的中文键(同上,译名见 i18n/locales/*.js biz) */
+export const ERP_TIMEOUT_KEY = '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点'
+
+/**
  * 判定一次「转ERP」调用的结果。
  * @param {any} res 服务端 `callButton` 返回的 data(可能为 null:老 jar / 异常路径)
  * @returns {{already:boolean, level:'success'|'warning', erpNo:string, key:string}}
@@ -50,4 +63,21 @@ export function erpOutcomeText(o, translate) {
   if (!o?.already) return ''
   const t = typeof translate === 'function' ? translate : (s) => s
   return t(o.key).replace('{no}', o.erpNo || '—')
+}
+
+/**
+ * 转ERP **失败**的提示口径 —— 把"超时"从"失败"里区分出来。
+ *
+ * 背景(2026-11-09 实测):冷启动那一次推送 >15 s,axios 先超时,前端弹
+ * `timeout of 15000ms exceeded`(英文,看着像"转ERP失败"),而服务端十几秒后推送成功并回写了 ERP单号。
+ * 这类超时**不等于失败**,提示必须让用户"先刷新看是否已转",而不是立刻再点一遍。
+ *
+ * @param {any} err 捕获到的异常
+ * @returns {{timeout:boolean, level:'warning'|'error', key:string}} key 为空串＝调用方按原样报错
+ */
+export function erpFailureOutcome(err) {
+  const msg = String(err?.message || err || '')
+  const isTimeout = err?.code === 'ECONNABORTED' || /timeout/i.test(msg)
+  if (isTimeout) return { timeout: true, level: 'warning', key: ERP_TIMEOUT_KEY }
+  return { timeout: false, level: 'error', key: '' }
 }

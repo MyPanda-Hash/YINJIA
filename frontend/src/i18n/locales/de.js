@@ -2026,6 +2026,7 @@ export default {
     '开始转ERP': 'ERP starten',
     '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Dieses Dokument wurde bereits ins ERP übertragen ({no}) und kann nicht erneut übertragen werden. Zum erneuten Übertragen zuerst die Freigabe zurücknehmen und dann erneut freigeben.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Batch-Übertragung ins ERP abgeschlossen: erfolgreich {ok}, bereits übertragen übersprungen {skip}, fehlgeschlagen {fail}',
+    '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'Zeitüberschreitung beim ERP-Übertragungsauftrag: Der Server überträgt möglicherweise noch. Aktualisieren Sie später die Liste und prüfen Sie „Ins ERP übertragen“, bevor Sie erneut handeln – bitte nicht sofort erneut klicken.',
     '供应商/客户': 'Lieferant/Kunde',
     '暂无已审核且未转ERP的单据': 'Keine Dokumente, die überprüft und nicht ERP übertragen wurden',
     '材料二维码标签': 'Material QR-Code-Etikett',

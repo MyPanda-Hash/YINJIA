@@ -401,7 +401,7 @@ import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 // 「删除」结果提示口径(2026-11-04):只认服务端回写的真实状态,不许无条件报"已删除"
 import { deleteOutcome } from './deleteOutcome.js'
-import { erpOutcome, erpOutcomeText } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -1350,6 +1350,8 @@ async function onButton(action) {
       buttonName: action,
       formData: rd,
       buttonParam: isEdit.value ? { code: form['编号'] } : {},
+      // 转ERP 连金蝶(取 token + 保存),默认 15 s 会把"推送成功但慢"错报成失败(见 erpOutcome.js)
+      ...(action === '转ERP' ? { timeoutMs: ERP_CALL_TIMEOUT_MS } : {}),
     })
     // 推式生单结果：直接跳转目标面板列表页（不弹窗、不新开标签页），新单按创建时间倒序显示在第一张（草稿内联可编辑）
     if (res?.gotoPanel) {
@@ -1406,6 +1408,9 @@ async function onButton(action) {
       }
     }
   } catch (e) {
+    // 转ERP 超时 ≠ 失败(金蝶侧慢;服务端可能已推完),提示先刷新确认,别弹英文 timeout
+    const erpFail = action === '转ERP' ? erpFailureOutcome(e) : { key: '' }
+    if (erpFail.key) { ElMessage.warning(tt(erpFail.key)); return }
     const msg = engine.errMsg(e) || '按钮执行失败'
     if (msg.includes('演示环境暂未实现')) ElMessage.info(msg)
     else ElMessage.error(msg)

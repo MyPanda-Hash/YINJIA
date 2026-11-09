@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { erpOutcome, erpOutcomeText, ERP_ALREADY_KEY } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_ALREADY_KEY, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
 
 /**
  * 「转ERP」结果提示(2026-11-09 用户报障):
@@ -65,4 +65,28 @@ test('erpOutcomeText:没有 ERP 单号时用占位符,不留裸 {no}', () => {
 test('erpOutcomeText:翻译函数生效(切英文后不出现中文)', () => {
   const text = erpOutcomeText(erpOutcome({ already: true, ERP单号: 'E1' }), () => 'Pushed to ERP ({no})')
   assert.equal(text, 'Pushed to ERP (E1)')
+})
+
+test('超时 ≠ 失败:给"先刷新确认"的警告,而不是英文 timeout 报错', () => {
+  // 2026-11-09 实测:冷启动那发推送 >15s,axios 超时弹「timeout of 15000ms exceeded」,
+  // 而服务端 15:36:03 其实推成功并回写了 ERP单号 ⇒ 用户看到的是"失败",实际是成功。
+  const f = erpFailureOutcome({ message: 'timeout of 15000ms exceeded', code: 'ECONNABORTED' })
+  assert.equal(f.timeout, true)
+  assert.equal(f.level, 'warning')
+  assert.ok(f.key.includes('超时'))
+  assert.ok(f.key.includes('是否已转ERP'), '要引导用户先刷新看是否已转')
+  assert.ok(f.key.includes('不要立刻重复点'))
+})
+
+test('普通失败(服务端报错)保持 error,不冒充超时', () => {
+  const f = erpFailureOutcome(new Error('转ERP失败: 请填写"材料分录"第1行:"仓库"'))
+  assert.equal(f.timeout, false)
+  assert.equal(f.level, 'error')
+  assert.equal(f.key, '')
+  assert.equal(erpFailureOutcome(null).key, '')
+  assert.equal(erpFailureOutcome(undefined).level, 'error')
+})
+
+test('转ERP 的请求超时必须比默认 15s 宽(金蝶取 token + 保存可能远超)', () => {
+  assert.ok(ERP_CALL_TIMEOUT_MS >= 60000, '15s 默认值会把"推成功但慢"错报成失败')
 })

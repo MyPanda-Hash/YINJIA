@@ -2578,7 +2578,7 @@ import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
-import { erpOutcome, erpOutcomeText } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { user, tabs, locale: localeStore } = useAppContext()
@@ -2847,7 +2847,7 @@ async function doBatchErp() {
   let ok = 0, skip = 0, fail = 0
   for (const row of batchErpSel.value) {
     try {
-      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '转ERP', formData: { 编号: row.单据编号, 单据编号: row.单据编号 }, buttonParam: {} })
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '转ERP', formData: { 编号: row.单据编号, 单据编号: row.单据编号 }, buttonParam: {}, timeoutMs: ERP_CALL_TIMEOUT_MS })
       // 已转判定统一走 erpOutcome(2026-11-09):弹窗列表是"查询可转ERP"的快照,
       // 用户在别处已转/或同一单被选了两次时,这里必须是「已转·跳过」而不是「成功」。
       const o = erpOutcome(res)
@@ -11136,6 +11136,8 @@ async function onButton(action) {
       buttonName: action,
       formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
+      // 转ERP 要连金蝶(取 token + 保存),15 s 默认值会把"推送成功但慢"错报成失败(见 erpOutcome.js)
+      ...(action === '转ERP' ? { timeoutMs: ERP_CALL_TIMEOUT_MS } : {}),
     })
     // 产品信息表提交审批后:**跳到「产品文件列表 · 流程全览」**并把该产品展开(2026-11-06 用户口径:
     //   「产品信息表在提交审批之后跳转到产品文件列表，可以查看流程信息」)。
@@ -11213,6 +11215,9 @@ async function onButton(action) {
     ))
     if (actionIndex >= 0) curIdx.value = actionIndex
   } catch (e) {
+    // 转ERP 超时不等于失败:服务端可能还在推(金蝶慢),提示"先刷新确认"而不是英文的 timeout 报错
+    const erpFail = action === '转ERP' ? erpFailureOutcome(e) : { key: '' }
+    if (erpFail.key) { ElMessage.warning(tt(erpFail.key)); return }
     const msg = engine.errMsg(e) || '按钮执行失败'
     // 按钮(保存/提交)被服务端必填拦下时,同样翻到缺失字段所在页并高亮
     focusMissingField(missingKeyFromMessage(msg))
