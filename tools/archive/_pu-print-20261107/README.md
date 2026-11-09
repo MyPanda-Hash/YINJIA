@@ -55,6 +55,7 @@
 | `ego/round-30-supplier-record.png` + 输出 | **打印记录(供应商 kbl01)**:同一套流程 —— 产生 `MP-2026-11-0003`(打印人 kbl01)→ 重打次数 2 → 作废后记录为空(证明过滤器放行 + 逐单归属闸门都通)。 |
 | `ego/round-31-8090-records.png` | 8090(jar 内 `static`,入口 `assets/index-B3gaQyGp.js`)也已有「已打印记录」区。 |
 | `ego/round-32.mjs` 输出 | 实测完成后浏览器已恢复 admin 登录(`#/dashboard`)。 |
+| `ego/round-33~36.mjs` 输出 + `round-36-scrolled.png` | 2026-11-09 重启系统后的复验:发现弹窗加「已打印记录」后,在 707px 高的窗口里**底部按钮被顶出视口** ⇒ 内容区加 `max-height:66vh + overflow-y:auto`、弹窗 `top:5vh`;复验 `footerVisible=true`(按钮 bottom=606 < innerHeight 707)、记录区随内容滚动,底部三颗按钮常驻可见。 |
 
 `Q*.java` 是一次性只读/清理探针(`java -cp lib\mssql-jdbc.jar ...` 在 `tools/` 下跑):
 `Q/Q2/Q3` 取明细字段与多行订单、`Q4` 供应商账号、`Q5/Q6` 校验新表(列数/注明/索引,两账套)、

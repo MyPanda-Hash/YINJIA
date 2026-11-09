@@ -10,6 +10,7 @@
     :model-value="modelValue"
     :title="title"
     :width="dlgWidth"
+    :top="'5vh'"
     append-to-body
     destroy-on-close
     @update:model-value="(v) => emit('update:modelValue', v)"
@@ -367,7 +368,9 @@ async function doVoid(row) {
 </script>
 
 <style scoped>
-.pup { display: flex; flex-direction: column; gap: 8px; }
+/* 弹窗内容(勾选表 + 已打印记录)比原来高:矮屏(768/1080 笔记本)上会把底部按钮顶出视口。
+   让**内容区自己滚动**、标题与底部按钮固定可见(2026-11-09 实测 707px 高时按钮被挡在视口外)。 */
+.pup { display: flex; flex-direction: column; gap: 8px; max-height: 66vh; overflow-y: auto; padding-right: 4px; }
 .pup-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12.5px; color: #46586e; }
 .pup-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
 .pup-fmt { display: inline-flex; align-items: center; gap: 6px; }
