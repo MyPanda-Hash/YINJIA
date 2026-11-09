@@ -1263,9 +1263,9 @@
               >
                 <template #default="{ row }">
                   <template v-if="archEditable(b) && !row._placeholder">
-                    <span v-if="c.field && c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
-                    <span v-else-if="isSelectField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
-                    <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-if="c.field && c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
+                    <span v-else-if="isSelectField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
+                    <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                     <template v-else-if="isActiveCell(row, b, c.prop)">
                       <el-select
                         v-if="isSelectField(c.field)"
@@ -1279,7 +1279,7 @@
                       </el-select>
                       <el-input v-else v-model="row[c.prop]" size="small" v-cell-focus @input="markInlineDirty()" />
                     </template>
-                    <span v-else class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-else class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                   </template>
                   <!-- 空态行(本区没有数据时撑出列头与空格):「检验项目」格显示**该区固定项名**
                        (端盖两头/管身两侧),其余格留空 —— **不可点、不加行**(用户口径:加行只在下方的
@@ -1287,7 +1287,7 @@
                   <template v-else-if="row._placeholder">
                     <span v-if="c.prop === '检验项目' && row['检验项目']" class="cell-preset">{{ row['检验项目'] }}</span>
                   </template>
-                  <span v-else>{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                  <span v-else>{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 </template>
               </el-table-column>
               <el-table-column v-if="detailEditable(b)" width="60" align="center" :label="tt('操作')">
@@ -1394,7 +1394,7 @@
             <template #default="{ row }">
               <!-- 列级虚拟化后,走到这里的都是可见列,不再需要单元格级占位(原 col-lazy-empty 分支已随五期机制下线) -->
               <template v-if="archEditable(b) && !row._placeholder">
-                <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 <!-- 批次号(分批链路单据):只由生单/随链写入、行随单头一致 —— 明细格只读,要改请在单头改 -->
                 <span v-else-if="detailBatchLocked(c.prop)" class="cell-locked" :title="tt('随单头批次号一致,不可修改')">{{ row[c.prop] ?? '' }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
@@ -1408,17 +1408,17 @@
                      单据页行数少,保持常驻(点即选)不变 -->
                 <div v-else-if="isReferenceField(c.field) && (!singleDocMode.value || isActiveCell(row, b, c.prop))" class="inline-ref-editor" :class="{ active: isActiveDetailRefRow(row, b, c.prop) }">
                   <el-input
-                    :model-value="formatFieldValue(c.field, row[c.prop])"
+                    :model-value="formatFieldValue(c.field, row[c.prop], row)"
                     readonly
                     :title="detailRefTrigger(c.field) === 'dblclick' ? tt('双击选择存货') : tt('点击选择')"
                     @click="openClickDetailRef(c.field, row, b)"
                   />
                   <el-icon v-if="detailRefTrigger(c.field) === 'dblclick' && isActiveDetailRefRow(row, b, c.prop)" class="list-ref-icon"><Search /></el-icon>
                 </div>
-                <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 <!-- 分区选择(2026-10-08):候选 = 本表 (大区,存储分区) 的实际数据去重并集,不落任何存储
                      ⇒ 点格**直接开**「仓位分区」弹窗(不进"激活编辑器"那一套),与参照列的交互形态一致 -->
-                <span v-else-if="isZonePickField(c.field)" class="cell-lazy zone-pick-cell" :title="tt('点击选择分区')" @click="openZonePick(row, b, c.field)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <span v-else-if="isZonePickField(c.field)" class="cell-lazy zone-pick-cell" :title="tt('点击选择分区')" @click="openZonePick(row, b, c.field)">{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
                 <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
                      避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
                 <template v-else-if="isActiveCell(row, b, c.prop)">
@@ -1487,7 +1487,7 @@
                   class="cell-lazy"
                   :class="{ 'cell-multiline': isMultilineField(c.field) }"
                   @click="activateCell(row, b, c.prop)"
-                >{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                >{{ formatFieldValue(c.field, row[c.prop], row) }}</span>
               </template>
               <span v-else :class="{ 'cell-multiline': isMultilineField(c.field) }">{{ tt(row[c.prop] ?? '') }}</span>
             </template>
@@ -2511,6 +2511,7 @@ import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaul
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
+import { qtyDecimalsOf, formatQtyByUnit, floorTo } from '@core/panel/unitPrecision'
 import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintBody } from '@core/panel/sheetPrintHtml'
 import { printInPage } from '@core/panel/printChannel'
 import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
@@ -7945,7 +7946,7 @@ const docPrintCols = computed(() => {
       })
       continue
     }
-    out.push({ title: c.label, base: dpBaseW(c.prop), text: (r) => formatFieldValue(c.field, r[c.prop]) })
+    out.push({ title: c.label, base: dpBaseW(c.prop), text: (r) => formatFieldValue(c.field, r[c.prop], r) })
   }
   const total = out.reduce((s, c) => s + c.base, 0) || 1
   for (const c of out) c.pct = Math.round((c.base / total) * 1000) / 10
@@ -8438,9 +8439,20 @@ function fieldOptions(field) {
   ))
 }
 
-function formatFieldValue(field, value) {
+/**
+ * 数量类字段的小数位数(2026-11-09:数量按计量单位精度)。
+ * 精度表由后端随面板配置下发(`cfg.unitDecimals`);纯逻辑见 @core/panel/unitPrecision。
+ */
+function qtyDecimals(field, row) {
+  return qtyDecimalsOf(field?.label ?? field?.dataName ?? field?.name, row, cfgCache.value?.unitDecimals || {})
+}
+
+function formatFieldValue(field, value, row) {
   if (value === undefined || value === null || value === '') return ''
   if (isBooleanField(field)) return toBool(value) ? '是' : '否'
+  // 2026-11-09:数量类字段按该行计量单位精度显示(计件不带小数、kg/米最多 3 位,去掉尾随 0)
+  const nd = qtyDecimals(field, row)
+  if (nd != null) return formatQtyByUnit(value, nd)
   return String(value)
 }
 
@@ -8979,6 +8991,23 @@ function discardCreatedDetailRefRow(pick) {
 
 async function onInlineDetailChange(tabKey, row, field) {
   markInlineDirty() // 明细单元格任何值变更 → 未保存离开守卫置脏
+  // 2026-11-09:数量类字段按该行计量单位**向下取整**(个/卷=整数、kg/米=3 位)——
+  // 与后端保存/过账同一口径(用户口径:计件单位取整、与超送一致);取整后同步编辑格回显,
+  // 并放在 calculateDetailRow 之前,保证「金额=数量×单价」用的是取整后的数量。
+  const nd = qtyDecimals(field, row)
+  if (nd != null) {
+    const key = field?.label ?? field?.dataName
+    if (key && row && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+      const before = row[key]
+      const after = floorTo(before, nd)
+      if (Number(after) !== Number(before)) {
+        row[key] = after
+        if (activeCell.value && activeCell.value.row === row && activeCell.value.prop === key) {
+          activeCellEcho.value = after
+        }
+      }
+    }
+  }
   // ⚠ 档案行是 markRaw 的(去响应式优化,见 normalizeArchRaw):明细里的
   //   el-select / el-date-picker / el-switch 都用 `v-model="row[c.prop]"` 直写行对象,
   //   而 markRaw 行的写入**不产生响应依赖** ⇒ 控件自身的 modelValue 不更新,

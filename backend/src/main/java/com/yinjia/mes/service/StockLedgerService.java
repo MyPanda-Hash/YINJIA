@@ -22,10 +22,17 @@ public class StockLedgerService {
 
     private final JdbcTemplate jdbc;
     private final StockFlowService stockFlow;
+    /**
+     * 过账数量按计量单位精度向下取整(2026-11-09 用户口径:库存也按单位精度)。
+     * 行上的 {@code uom}(各 loadRows 都带)决定精度:个/卷=整数、kg/米=3 位;
+     * 没有单位的行原样过账(不瞎取整)。
+     */
+    private final UnitQtyNormalizer unitQty;
 
-    public StockLedgerService(JdbcTemplate jdbc, StockFlowService stockFlow) {
+    public StockLedgerService(JdbcTemplate jdbc, StockFlowService stockFlow, UnitQtyNormalizer unitQty) {
         this.jdbc = jdbc;
         this.stockFlow = stockFlow;
+        this.unitQty = unitQty;
     }
 
     /**
@@ -126,6 +133,8 @@ public class StockLedgerService {
             boolean hasAlt = r.containsKey("lotAlt");           // 只有采购链的查询带 lotAlt 键
             String lotAlt = str(r.get("lotAlt"));
             double qty = num(r.get("qty"));
+            // 2026-11-09:按计量单位精度向下取整后再过账(个/卷不带小数、kg/米保留 3 位)
+            qty = unitQty.floorQty(qty, r);
             // 仓库(2026-09-23):**编码优先、名称兜底** —— 采购入库/销售出库的明细仓库由
             // 「参照选仓库」写进 仓库名称+仓库编码 两列(界面必填的是 仓库名称),旧列 [仓库]
             // 可能为空;只认 [仓库] 会抛「仓库档案不存在:[null]」导致审核不过
@@ -188,6 +197,8 @@ public class StockLedgerService {
             String code = str(r.get("code"));
             String lot = str(r.get("lot"));
             double qty = num(r.get("qty"));
+            // 2026-11-09:按计量单位精度向下取整后再过账(个/卷不带小数、kg/米保留 3 位)
+            qty = unitQty.floorQty(qty, r);
             if (code == null) throw new IllegalStateException("存在缺少[存货编码]的明细行,不能记账");
             // 零行:其余单据是"跳过"(历史上有红字冲回单留 0 行),但调拨单**没有数量就没有意义** ——
             // 选单带入后用户忘填数量是常见操作,静默跳过会让人以为"审核成功了却没动库存",故直接拒绝。
@@ -294,6 +305,8 @@ public class StockLedgerService {
                     throw new IllegalStateException("盘点单 " + no + " 存在未填[实盘数量]的明细行(存货 "
                             + code + "),不能审核");
                 }
+                // 2026-11-09:实盘数量也按该行计量单位精度向下取整(盘点差异随之精确到单位精度)
+                actual = unitQty.floorQty(actual, r);
                 Double bal = bal(code, ckdm, lot);
                 current = bal == null ? 0d : bal;
                 diff = actual - current;

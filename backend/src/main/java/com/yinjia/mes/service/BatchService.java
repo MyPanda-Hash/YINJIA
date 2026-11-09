@@ -114,6 +114,11 @@ public class BatchService {
         return UnitPrecision.guess(u);
     }
 
+    /** 单位 → 小数位数快照(下发给前端:数量输入/显示按单位精度;键=单位名/编码小写) */
+    public Map<String, Integer> unitDecimalsSnapshot() {
+        return new LinkedHashMap<>(unitDecimalsMap());
+    }
+
     /** 单位 → 小数位数(来自 bs_uom;名称与编码都收,键统一小写) */
     private Map<String, Integer> unitDecimalsMap() {
         long now = System.currentTimeMillis();

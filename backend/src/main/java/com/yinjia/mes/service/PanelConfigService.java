@@ -29,13 +29,19 @@ public class PanelConfigService {
     private final JdbcTemplate jdbc;
     private final TranslationService translations;
     private final CalcRuleService calcRules;
+    /**
+     * 单位精度快照(2026-11-09):随面板配置下发 `unitDecimals`(单位名/编码小写 → 小数位数),
+     * 前端数量输入/显示按它走 —— 个/卷=0、kg/米=3,与后端保存/过账的取整口径同源。
+     */
+    private final BatchService batchService;
 
     public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations,
-                              CalcRuleService calcRules) {
+                              CalcRuleService calcRules, BatchService batchService) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.translations = translations;
         this.calcRules = calcRules;
+        this.batchService = batchService;
     }
 
     /** 当前请求的目标语言键(en/ja/ko/...;zh 系=zh)。 */
@@ -66,8 +72,16 @@ public class PanelConfigService {
     }
 
     public Map<String, Object> buildConfig(PanelRegistry.PanelDef def) {
-        if ("archive".equals(def.mode())) return buildArchiveConfig(def);
-        return buildDocConfig(def);
+        Map<String, Object> out = "archive".equals(def.mode()) ? buildArchiveConfig(def) : buildDocConfig(def);
+        // 单位精度快照(2026-11-09):所有面板一份,前端数量输入/显示按单位小数位走。
+        // 放顶层而不是 metadata:metadata 在档案/单据两条构建路径里各有一份,这里一次挂全。
+        try {
+            out.put("unitDecimals", batchService.unitDecimalsSnapshot());
+        } catch (RuntimeException e) {
+            // 精度表取不到不阻断面板加载:前端按缺省 2 位显示
+            out.put("unitDecimals", Map.of());
+        }
+        return out;
     }
 
     /**
