@@ -41,10 +41,12 @@
       <!-- 一次可以勾**多行**,但服务端会**每行各出一张打印单**(用户口径「作废不希望连坐」+
            追加「一次是可以打印多行的」)—— 多行并进一张单会让作废连坐,所以粒度落在单上,不在弹窗上 -->
       <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }}</div>
-      <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径) -->
+      <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径);
+           但必须留一个「取消带入」的退路(用户口径「点击后,不能取消」) -->
       <div v-if="lockedBySource" class="mlq-lock">
         {{ tt('已按采购订单打印记录带入：数量和行已锁定，只能修改上面的批次号和生产日期') }}
         <span class="mlq-lock-no">{{ sourcePrintNo }}</span>
+        <el-button link type="primary" class="mlq-lock-cancel" @click="cancelSource">{{ tt('取消带入') }}</el-button>
       </div>
 
       <el-table ref="tableRef" :data="rows" row-key="id" border size="small" height="330" @selection-change="onPicked">
@@ -244,6 +246,10 @@ const isUsedSrc = (no) => usedSrcSet.value.has(String(no)) || usedLocal.value.in
  * 点击按这次打印打码后,不能改变数量和行号,只可以写上面的批次号和生产日期) ⇒ 锁定表格。
  */
 const lockedBySource = computed(() => !!sourcePrintNo.value)
+/** 取消带入:解除锁定(数量/行恢复可改),来源清空,已勾选与数量保持当前值由用户自行调整 */
+function cancelSource() {
+  sourcePrintNo.value = ''
+}
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
 const totalQty = computed(() => {
@@ -520,7 +526,7 @@ async function doVoid(row) {
 .mlq-oneline { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
 /* 按打印记录带入后的锁定提示(数量/行锁定,只能改批次号与生产日期) */
 .mlq-lock { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1f6f4a; background: #eef7f1; border: 1px dashed #9fd3b6; border-radius: 4px; padding: 3px 8px; }
-.mlq-lock-no { font-weight: 600; }
+.mlq-lock-no { font-weight: 600; }`r`n.mlq-lock-cancel { margin-left: auto; }
 .mlq-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .mlq-records { margin-top: 4px; }
 .mlq-rec-title { font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
