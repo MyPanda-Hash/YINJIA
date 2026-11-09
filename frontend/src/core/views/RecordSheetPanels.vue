@@ -18,6 +18,36 @@
       >{{ tt(pg.title) }}</div>
     </div>
 
+    <!-- ═══ 附件/照片条(2026-11-09):纸面配置**没消费**的附件字段在这里聚合成一条
+         「手机照片 / 附件」区 —— 元数据驱动(yj_field.data_type='附件'),不在配置里再写一遍。
+         起因(用户口径 2026-11-09):「手机扫码 → 实验室记录手机登记」的三张记录表
+         (加标水配置记录表 / 设备使用登记表 / 仪器使用记录表)各新增一列「手机照片」,
+         手机端拍的照片要能在电脑端纸面上点开看;这三张是 plain 登记表版式,
+         纸面没有通用 key-label 区可以挂 FileAttachCell。
+         ⚠ 与 PanelxList 的 attach-strip 同款口径(附件是元数据驱动的通用能力);
+           已在 recordSheetConfigs 里声明成 {type:'file'} 的字段(如产品信息表的客户图纸)照旧走原格子,
+           这里只兜「配置没写、但元数据里有」的那一类,不会重复渲染。
+         打印不参与(no-print):纸面上仍按「手机照片」列里的文件名串出纸。 ═══ -->
+    <div
+      v-if="spareAttachList.length && sheetDocNo"
+      class="rsp-attach-strip no-print"
+      :style="gridW > 0 ? { maxWidth: gridW + 'px' } : null"
+    >
+      <template v-for="f in spareAttachList" :key="'sa-' + attachKeyOf(f)">
+        <span class="rsp-attach-label">{{ tt(f.label || f.code) }}</span>
+        <div class="rsp-attach-slot">
+          <FileAttachCell
+            :panel-code="panelCode"
+            :doc-no="sheetDocNo"
+            :field-key="attachKeyOf(f)"
+            :model-value="String(head[attachKeyOf(f)] || '')"
+            :can-edit="editable"
+            @update:model-value="(v) => { head[attachKeyOf(f)] = v }"
+          />
+        </div>
+      </template>
+    </div>
+
     <!-- ═══ 报告头(report 版式):公司名 | 文档编号 + 大标题 | 信息块;规格书=文档式封面
          渲染条件 = 「本页是 report 版式」且「本页要报告头」(见 showReportHead / effPlain):
            · 单页面板 / 普通多页面板:报告头只在第 1 页(历史行为,如规格书的封面);
@@ -1837,6 +1867,52 @@ const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 const isSpikeWater = computed(() => props.panelCode === 'RD_SPIKE_WATER')
 /** 模板里用的同义判断：直接读 props，不经 computed（排除响应式包装带来的求值问题） */
 function spikeWaterPanel() { return props.panelCode === 'RD_SPIKE_WATER' }
+/**
+ * 附件字段键：与 PanelxList.headerFieldKey 同一口径（表头字段用 `code`，明细字段用 `dataName`）。
+ * 见下方「附件/照片条」注释（2026-11-09 实验室记录手机登记）。
+ */
+function attachKeyOf(f) {
+  return String(f?.code || f?.dataName || f?.label || '')
+}
+/** 附件锚点用的单号：与 PanelxList.curDocNo 同口径（单据编号 → 编号） */
+const sheetDocNo = computed(() => String(props.head?.['单据编号'] || props.head?.['编号'] || ''))
+/**
+ * 收集 recordSheetConfigs 里**已经声明过**的附件字段键（任何层级出现 `{type:'file', key}` 都算）。
+ * 声明过的照旧渲染在原纸面格子里（如产品信息表·客户图纸或规格书）；这里只用来**排除**，
+ * 免得同一个附件字段在纸面上出现两次（原格子 + 附件条）。
+ */
+function declaredFileKeys(node, out) {
+  if (!node || typeof node !== 'object') return out
+  if (Array.isArray(node)) {
+    for (const v of node) declaredFileKeys(v, out)
+    return out
+  }
+  if (node.type === 'file' && node.key) out.add(String(node.key))
+  for (const v of Object.values(node)) {
+    if (v && typeof v === 'object') declaredFileKeys(v, out)
+  }
+  return out
+}
+/**
+ * 「配置没消费的附件字段」= yj_field 里 data_type='附件' 且 recordSheetConfigs 没声明成 type:'file'。
+ *
+ * 2026-11-09 用户口径：「原来每个面版要增加一个字段，来保存手机拍照上传的文件。」
+ * ⇒ 三张实验室记录表各加了「手机照片」列 + yj_field(附件)。它们都是 plain 登记表版式，
+ *   纸面没有通用的「标签|值」区可挂 FileAttachCell，故在纸面上方聚合成一条附件区。
+ * 与 DocSheet 的 attachFieldOf 同一条设计：**附件是元数据驱动的通用能力**，
+ * 面板加一个附件字段就该自动有入口，不用逐面板改配置。
+ */
+const spareAttachList = computed(() => {
+  const fields = Array.isArray(props.fields) ? props.fields : []
+  if (!fields.length) return []
+  const declared = declaredFileKeys(cfg.value, new Set())
+  return fields
+    .filter((f) => String(f?.dataType || '') === '附件')
+    .filter((f) => {
+      const k = attachKeyOf(f)
+      return !!k && !declared.has(k)
+    })
+})
 // 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
 // 单据类面板编辑期间那格永远空白;见 @/core/panel/sheetDocNo 的说明)
 // ⚠ 2026-10-29:**面板可显式声明** head.docNoKey 覆盖自动推断。自动推断只看「head 里有没有
@@ -5754,6 +5830,31 @@ function chartOf(dt) {
 }
 
 /* ═══ 页签(规格书多页) ═══ */
+/* 附件/照片条(2026-11-09):纸面上方的「手机照片」区 —— 与纸面同宽,浅底、虚线分隔,
+   不进打印(no-print)。样式刻意低调:它是纸面之外的运营信息,不是受控表单的一部分。 */
+.rsp-attach-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 auto 8px;
+  padding: 6px 10px;
+  border: 1px dashed #b7c9dd;
+  border-radius: 6px;
+  background: #f7fafd;
+  font-size: 12px;
+  color: #33517a;
+}
+.rsp-attach-label {
+  flex: none;
+  font-weight: 600;
+}
+.rsp-attach-slot {
+  flex: 1;
+  min-width: 0;
+}
 .rsp-pages {
   display: flex;
   gap: 2px;

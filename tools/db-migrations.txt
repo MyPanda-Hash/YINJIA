@@ -4524,3 +4524,6 @@ migrate-pu-print-twin-20261109.sql
 
 # 2026-11-09 材料码打印:bd_pu_label 加[来源打印单号](只认有金额打印记录,同一张只能打一次)
 migrate-pu-label-src-print-20261109.sql
+
+# 2026-11-09 实验室记录手机登记:3 张记录表头加[手机照片]附件列 + yj_field(data_type=附件) + en 译名
+migrate-lab-mobile-20261109.sql

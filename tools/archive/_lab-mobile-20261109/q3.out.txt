@@ -1,0 +1,168 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q3-schema.sql ==
+  | rd_equip_use_head | 1 | id | int | 4 | 0 | 
+  | rd_equip_use_head | 2 | 单据编号 | nvarchar | 120 | 0 | 
+  | rd_equip_use_head | 3 | 单据日期 | nvarchar | 40 | 1 | 
+  | rd_equip_use_head | 4 | 设备名称 | nvarchar | 120 | 1 | 
+  | rd_equip_use_head | 5 | 备注 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 6 | asp_user1 | nvarchar | 100 | 1 | 
+  | rd_equip_use_head | 7 | asp_time1 | datetime2 | 8 | 1 | 
+  | rd_equip_use_head | 8 | asp_user2 | nvarchar | 100 | 1 | 
+  | rd_equip_use_head | 9 | asp_time2 | datetime2 | 8 | 1 | 
+  | rd_equip_use_head | 10 | asp_cancel | char | 1 | 1 | 
+  | rd_equip_use_head | 11 | asp_print | int | 4 | 1 | 
+  | rd_equip_use_head | 12 | asp_time3 | datetime2 | 8 | 1 | 
+  | rd_equip_use_head | 13 | asp_time4 | datetime2 | 8 | 1 | 
+  | rd_equip_use_head | 14 | asp_user3 | nvarchar | 40 | 1 | 
+  | rd_equip_use_head | 15 | asp_user4 | nvarchar | 40 | 1 | 
+  | rd_equip_use_head | 16 | 备用1 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 17 | 备用2 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 18 | 备用3 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 19 | 备用4 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 20 | 备用5 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 21 | 备用6 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 22 | 备用7 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 23 | 备用8 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 24 | 备用9 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 25 | 备用10 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 26 | 备用11 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 27 | 备用12 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 28 | 备用13 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 29 | 备用14 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 30 | 备用15 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 31 | 备用16 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 32 | 备用17 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 33 | 备用18 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 34 | 备用19 | nvarchar | 1000 | 1 | 
+  | rd_equip_use_head | 35 | 备用20 | nvarchar | 1000 | 1 | 
+  | rd_instr_use_head | 1 | id | int | 4 | 0 | 
+  | rd_instr_use_head | 2 | 单据编号 | nvarchar | 120 | 0 | 
+  | rd_instr_use_head | 3 | 单据日期 | nvarchar | 40 | 1 | 
+  | rd_instr_use_head | 4 | 仪器名称/型号 | nvarchar | 200 | 1 | 
+  | rd_instr_use_head | 5 | 备注 | nvarchar | 1000 | 1 | 
+  | rd_instr_use_head | 6 | asp_user1 | nvarchar | 100 | 1 | 
+  | rd_instr_use_head | 7 | asp_time1 | datetime2 | 8 | 1 | 
+  | rd_instr_use_head | 8 | asp_user2 | nvarchar | 100 | 1 | 
+  | rd_instr_use_head | 9 | asp_time2 | datetime2 | 8 | 1 | 
+  | rd_instr_use_head | 10 | asp_cancel | char | 1 | 1 | 
+  | rd_instr_use_head | 11 | asp_print | int | 4 | 1 | 
+  | rd_instr_use_head | 12 | asp_time3 | datetime2 | 8 | 1 | 
+  | rd_instr_use_head | 13 | asp_time4 | datetime2 | 8 | 1 | 
+  | rd_instr_use_head | 14 | asp_user3 | nvarchar | 40 | 1 | 
+  | rd_instr_use_head | 15 | asp_user4 | nvarchar | 40 | 1 | 
+  | rd_equip_use_detail | 1 | id | int | 
+  | rd_equip_use_detail | 2 | 单据编号 | nvarchar | 
+  | rd_equip_use_detail | 3 | 使用日期 | nvarchar | 
+  | rd_equip_use_detail | 4 | 测试项目 | nvarchar | 
+  | rd_equip_use_detail | 5 | 测试标准 | nvarchar | 
+  | rd_equip_use_detail | 6 | 使用工位 | nvarchar | 
+  | rd_equip_use_detail | 7 | 设备状态 | nvarchar | 
+  | rd_equip_use_detail | 8 | 使用人 | nvarchar | 
+  | rd_equip_use_detail | 9 | 备注 | nvarchar | 
+  | rd_equip_use_detail | 10 | asp_user1 | nvarchar | 
+  | rd_equip_use_detail | 11 | asp_time1 | datetime2 | 
+  | rd_equip_use_detail | 12 | asp_user2 | nvarchar | 
+  | rd_equip_use_detail | 13 | asp_time2 | datetime2 | 
+  | rd_equip_use_detail | 14 | asp_cancel | char | 
+  | rd_equip_use_detail | 15 | asp_print | int | 
+  | rd_equip_use_detail | 16 | asp_time3 | datetime2 | 
+  | rd_equip_use_detail | 17 | asp_time4 | datetime2 | 
+  | rd_equip_use_detail | 18 | asp_user3 | nvarchar | 
+  | rd_equip_use_detail | 19 | asp_user4 | nvarchar | 
+  | rd_equip_use_detail | 20 | 设备名称 | nvarchar | 
+  | rd_equip_use_detail | 21 | 备用1 | nvarchar | 
+  | rd_equip_use_detail | 22 | 备用2 | nvarchar | 
+  | rd_equip_use_detail | 23 | 备用3 | nvarchar | 
+  | rd_equip_use_detail | 24 | 备用4 | nvarchar | 
+  | rd_equip_use_detail | 25 | 备用5 | nvarchar | 
+  | rd_equip_use_detail | 26 | 备用6 | nvarchar | 
+  | rd_equip_use_detail | 27 | 备用7 | nvarchar | 
+  | rd_equip_use_detail | 28 | 备用8 | nvarchar | 
+  | rd_equip_use_detail | 29 | 备用9 | nvarchar | 
+  | rd_equip_use_detail | 30 | 备用10 | nvarchar | 
+  | rd_equip_use_detail | 31 | 备用11 | nvarchar | 
+  | rd_equip_use_detail | 32 | 备用12 | nvarchar | 
+  | rd_equip_use_detail | 33 | 备用13 | nvarchar | 
+  | rd_equip_use_detail | 34 | 备用14 | nvarchar | 
+  | rd_equip_use_detail | 35 | 备用15 | nvarchar | 
+  | rd_equip_use_detail | 36 | 备用16 | nvarchar | 
+  | rd_equip_use_detail | 37 | 备用17 | nvarchar | 
+  | rd_equip_use_detail | 38 | 备用18 | nvarchar | 
+  | rd_equip_use_detail | 39 | 备用19 | nvarchar | 
+  | rd_equip_use_detail | 40 | 备用20 | nvarchar | 
+  | rd_instr_use_detail | 1 | id | int | 
+  | rd_instr_use_detail | 2 | 单据编号 | nvarchar | 
+  | rd_instr_use_detail | 3 | 使用日期 | nvarchar | 
+  | rd_instr_use_detail | 4 | 起止时间 | nvarchar | 
+  | rd_instr_use_detail | 5 | 仪器状态 | nvarchar | 
+  | rd_instr_use_detail | 6 | 是否内校 | nvarchar | 
+  | rd_instr_use_detail | 7 | 项目名称/内容 | nvarchar | 
+  | rd_instr_use_detail | 8 | 用途 | nvarchar | 
+  | rd_instr_use_detail | 9 | 样品数量 | nvarchar | 
+  | rd_instr_use_detail | 10 | 使用人 | nvarchar | 
+  | RD_EQUIP_USE | detail | 70 | 7 | 
+  | RD_EQUIP_USE | header | 40 | 4 | 
+  | RD_EQUIP_USE | query | 10 | 1 | 
+  | RD_INSTR_USE | detail | 90 | 9 | 
+  | RD_INSTR_USE | header | 40 | 4 | 
+  | RD_INSTR_USE | query | 10 | 1 | 
+  | RD_SPIKE_WATER | detail | 210 | 21 | 
+  | RD_SPIKE_WATER | header | 40 | 4 | 
+  | RD_SPIKE_WATER | query | 10 | 1 | 
+  | RD_SPIKE_WATER | 测试项目 | 标准库 | lab.test_item | query | 10 | 
+  | RD_SPIKE_WATER | 测试项目 | 标准库 | lab.test_item | header | 30 | 
+  | RD_EQUIP_USE | 设备名称 | 标准库 | lab.device | query | 10 | 
+  | RD_EQUIP_USE | 设备名称 | 标准库 | lab.device | header | 30 | 
+  | RD_INSTR_USE | 仪器名称/型号 | 标准库 | lab.instrument | query | 10 | 
+  | RD_INSTR_USE | 仪器名称/型号 | 标准库 | lab.instrument | header | 30 | 
+  | RD_SHARE_FILE | 文件 | 文件 | 附件 | header | 
+  | PU_ORDER | 附件1 | 附件1 | 附件 | header | 
+  | PU_ORDER | 附件2 | 附件2 | 附件 | header | 
+  | PU_ORDER | 附件3 | 附件3 | 附件 | header | 
+  | PU_ORDER | 附件4 | 附件4 | 附件 | header | 
+  | PU_ORDER | 附件5 | 附件5 | 附件 | header | 
+  | PU_ORDER | 附件6 | 附件6 | 附件 | header | 
+  | SO_ORDER | 附件1 | 附件1 | 附件 | header | 
+  | SO_ORDER | 附件2 | 附件2 | 附件 | header | 
+  | SO_ORDER | 附件3 | 附件3 | 附件 | header | 
+  | SO_ORDER | 附件4 | 附件4 | 附件 | header | 
+  | SO_ORDER | 附件5 | 附件5 | 附件 | header | 
+  | SO_ORDER | 附件6 | 附件6 | 附件 | header | 
+  | MANU_ORDER | 附件1 | 附件1 | 附件 | header | 
+  | MANU_ORDER | 附件2 | 附件2 | 附件 | header | 
+  | MANU_ORDER | 附件3 | 附件3 | 附件 | header | 
+  | MANU_ORDER | 附件4 | 附件4 | 附件 | header | 
+  | MANU_ORDER | 附件5 | 附件5 | 附件 | header | 
+  | MANU_ORDER | 附件6 | 附件6 | 附件 | header | 
+  | OUTSOURCE_ORDER | 附件1 | 附件1 | 附件 | header | 
+  | OUTSOURCE_ORDER | 附件2 | 附件2 | 附件 | header | 
+  | OUTSOURCE_ORDER | 附件3 | 附件3 | 附件 | header | 
+  | OUTSOURCE_ORDER | 附件4 | 附件4 | 附件 | header | 
+  | OUTSOURCE_ORDER | 附件5 | 附件5 | 附件 | header | 
+  | OUTSOURCE_ORDER | 附件6 | 附件6 | 附件 | header | 
+  | WO_ORDER | 附件1 | 附件1 | 附件 | header | 
+  | WO_ORDER | 附件2 | 附件2 | 附件 | header | 
+  | WO_ORDER | 附件3 | 附件3 | 附件 | header | 
+  | WO_ORDER | 附件4 | 附件4 | 附件 | header | 
+  | WO_ORDER | 附件5 | 附件5 | 附件 | header | 
+  | WO_ORDER | 附件6 | 附件6 | 附件 | header | 
+  | KHDD | 附件1 | 附件1 | 附件 | header | 
+  | KHDD | 附件2 | 附件2 | 附件 | header | 
+  | KHDD | 附件3 | 附件3 | 附件 | header | 
+  | KHDD | 附件4 | 附件4 | 附件 | header | 
+  | KHDD | 附件5 | 附件5 | 附件 | header | 
+  | KHDD | 附件6 | 附件6 | 附件 | header | 
+  | QC_RETURN | 附件1 | 附件1 | 附件 | header | 
+  | QC_RETURN | 附件2 | 附件2 | 附件 | header | 
+  | QC_RETURN | 附件3 | 附件3 | 附件 | header | 
+  | QC_RETURN | 附件4 | 附件4 | 附件 | header | 
+  | QC_RETURN | 附件5 | 附件5 | 附件 | header | 
+  | QC_RETURN | 附件6 | 附件6 | 附件 | header | 
+  | SALE_OUT | 附件1 | 附件1 | 附件 | header | 
+  | SALE_OUT | 附件2 | 附件2 | 附件 | header | 
+  | SALE_OUT | 附件3 | 附件3 | 附件 | header | 
+  | SALE_OUT | 附件4 | 附件4 | 附件 | header | 
+  | SALE_OUT | 附件5 | 附件5 | 附件 | header | 
+  | SALE_OUT | 附件6 | 附件6 | 附件 | header | 
+  | QC_INSP | 附件1 | 附件1 | 附件 | header | 
+[OK] q3-schema.sql (6 batches)

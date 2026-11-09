@@ -148,6 +148,29 @@ const routes = [
         path: 'panelx/list/MOBILE_REPORT', component: () => import('@/views/mobile/MobileReport.vue'),
         meta: { title: '工序报工', code: 'mobileReport', panelCode: 'MOBILE_REPORT' },
       },
+      // ══════════ 实验室记录手机登记(2026-11-09 用户口径)══════════
+      // 「研发图片上的 3 个面版也要对应的做手机端,在手机扫码下面,叫实验室记录手机登记。
+      //   手机端只需要实现,可以拍照上传和可以填写对应字段的内容就可以。再要一个模糊查询。
+      //   还有数据要可以对应回填各自的面版…」
+      // 三页共用一个组件(views/mobile/MobileLabRecord.vue),面板码就是研发管理里那三张 PC 面板
+      // ⇒ **不是新表、新面板**:手机存的就是同一个面板里的同一张单(保存为草稿),电脑端直接看到。
+      // 因为面板码复用 PC 那三份,权限行/译名/参照链一律不动,也不需要往 PagePanelRegistry 加码。
+      // ⚠ 必须排在下面 `panelx/list/:panelCode` 参数路由**之前**(静态路径优先),否则会被当成面板码。
+      {
+        path: 'panelx/list/MOBILE_LAB_SPIKE_WATER',
+        component: () => import('@/views/mobile/MobileLabRecord.vue'),
+        meta: { title: '加标水配置记录表', code: 'mobileLabSpikeWater', panelCode: 'RD_SPIKE_WATER' },
+      },
+      {
+        path: 'panelx/list/MOBILE_LAB_EQUIP_USE',
+        component: () => import('@/views/mobile/MobileLabRecord.vue'),
+        meta: { title: '设备使用登记表', code: 'mobileLabEquipUse', panelCode: 'RD_EQUIP_USE' },
+      },
+      {
+        path: 'panelx/list/MOBILE_LAB_INSTR_USE',
+        component: () => import('@/views/mobile/MobileLabRecord.vue'),
+        meta: { title: '仪器使用记录表', code: 'mobileLabInstrUse', panelCode: 'RD_INSTR_USE' },
+      },
       // 工序流程追踪卡(2026-10-29,生产计划):日期大批次 → 小批次(工单行)→ 工序照片 → 按卡追溯。
       //   页面级虚拟面板 PROC_FLOW_CARD(定义见后端 PagePanelRegistry,不是 yj_panel 单据表);
       //   菜单项同名挂 panelCode,meta.panelCode 供路由守卫拦「直接敲 URL」。
