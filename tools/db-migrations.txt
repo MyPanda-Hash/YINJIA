@@ -4518,3 +4518,6 @@ migrate-testlib-spec-add-missing-20261106.sql
 migrate-sample-ext-detail-20261106.sql
 # 2026-11-07 采购订单报表打印记录：新建 bd_pu_print（头）/ bl_pu_print（行），弹窗「已打印记录 + 重打/作废」
 migrate-pu-print-20261107.sql
+
+# 2026-11-09 采购订单打印记录:bd_pu_print 加[对应单号](有金额↔无金额 相互对着打印)
+migrate-pu-print-twin-20261109.sql

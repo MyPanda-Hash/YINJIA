@@ -84,7 +84,8 @@ public class PuPrintService {
         return jdbc.queryForList(
                 "SELECT [单据编号] AS 单据编号, [打印版式] AS 打印版式, ISNULL([打印人],N'') AS 打印人,"
                         + " CONVERT(varchar(19), [打印时间], 120) AS 打印时间, ISNULL([打印次数],0) AS 打印次数,"
-                        + " ISNULL([行数],0) AS 行数, ISNULL([数量合计],0) AS 数量合计, [金额合计] AS 金额合计"
+                        + " ISNULL([行数],0) AS 行数, ISNULL([数量合计],0) AS 数量合计, [金额合计] AS 金额合计,"
+                        + " [对应单号] AS 对应单号"
                         + " FROM " + HEAD
                         + " WHERE [采购订单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY ISNULL([打印时间], CAST('1900-01-01' AS datetime2)) DESC, id DESC", no);
@@ -103,34 +104,57 @@ public class PuPrintService {
      *   <li>已送 / 已退回 取 {@link BatchService#sentByLineKey} / {@link BatchService#returnedByOrderLine} —— 与材料码同源;</li>
      *   <li>已打印 = 本订单该行**存活打印记录**(bd_pu_print/bl_pu_print,作废的不算)的打印数量合计 ——
      *       等价于材料码的「已打印预约」:打过的量已经从这张订单里划走了,再打就超了(要原样再出一张用「重打」);</li>
+     *   <li><b>按版式隔离(2026-11-09 用户口径「有金额和无金额切换打印同一个不一样,不要有版本限制」)</b>:
+     *       「已打印」只统计**同一打印版式**的记录 —— 有金额与无金额是两张不同的纸,
+     *       各打各的额度,打无金额不会吃掉有金额的剩余可打(反之亦然);</li>
      *   <li>超送量按该行计量单位向下取整(个/卷=整数、kg/米=3 位),负数归 0。</li>
      * </ul>
      *
-     * @return { 超送比例: 0.15, lines: [{采购订单行id, 行号, 单位, 小数位数, 订单数量, 已送数量, 已退回数量,
-     *          已打印数量, 剩余可打, 可打印上限}] }
+     * @param format {@link #FMT_AMOUNT} / {@link #FMT_NO_AMOUNT};null/空 = 不按版式隔离(汇总全部版式)
+     * @return { 超送比例: 0.15, 打印版式: ..., lines: [{采购订单行id, 行号, 单位, 小数位数, 订单数量,
+     *          已送数量, 已退回数量, 已打印数量, 剩余可打, 可打印上限}] }
      */
-    public Map<String, Object> quotas(String orderNo) {
+    public Map<String, Object> quotas(String orderNo, String format) {
         String no = str(orderNo);
         if (no.isEmpty()) throw new IllegalArgumentException("缺少采购订单号");
+        String fmt = normalizeFormat(format);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("超送比例", batchService.overRatio());
-        out.put("lines", quotaRows(no));
+        out.put("打印版式", fmt);
+        out.put("lines", quotaRows(no, fmt));
         return out;
     }
 
-    /** 额度行(内部/公开共用):口径见 {@link #quotas(String)};print() 校验也用它,保证弹窗与校验同源 */
-    public List<Map<String, Object>> quotaRows(String orderNo) {
+    /** 兼容旧调用(不按版式隔离) */
+    public Map<String, Object> quotas(String orderNo) {
+        return quotas(orderNo, null);
+    }
+
+    /**
+     * 额度行(内部/公开共用):口径见 {@link #quotas(String, String)};print() 校验也用它,保证弹窗与校验同源。
+     *
+     * @param format 只统计该打印版式的已打印量;null = 全部版式合计
+     */
+    public List<Map<String, Object>> quotaRows(String orderNo, String format) {
         String no = str(orderNo);
+        String fmt = normalizeFormat(format);
         double ratio = batchService.overRatio();
         Map<String, Double> sentByKey = batchService.sentByLineKey("PU_ORDER", no);
         Map<String, Double> returnedByLine = batchService.returnedByOrderLine(no);
         Map<Integer, Double> printedByLine = new HashMap<>();
-        for (Map<String, Object> r : jdbc.queryForList(
+        List<Object> args = new ArrayList<>();
+        args.add(no);
+        StringBuilder sql = new StringBuilder(
                 "SELECT l.[采购订单行id] AS id, SUM(l.[打印数量]) AS q FROM " + LINE + " l"
                         + " JOIN " + HEAD + " h ON h.[单据编号] = l.[单据编号]"
                         + " WHERE h.[采购订单号] = ? AND ISNULL(l.asp_cancel,'N') <> 'Y'"
-                        + "   AND ISNULL(h.asp_cancel,'N') <> 'Y' AND l.[采购订单行id] IS NOT NULL"
-                        + " GROUP BY l.[采购订单行id]", no)) {
+                        + "   AND ISNULL(h.asp_cancel,'N') <> 'Y' AND l.[采购订单行id] IS NOT NULL");
+        if (fmt != null) {
+            sql.append(" AND h.[打印版式] = ?");
+            args.add(fmt);
+        }
+        sql.append(" GROUP BY l.[采购订单行id]");
+        for (Map<String, Object> r : jdbc.queryForList(sql.toString(), args.toArray())) {
             printedByLine.put((int) num(r.get("id")), num(r.get("q")));
         }
         List<Map<String, Object>> out = new ArrayList<>();
@@ -209,7 +233,7 @@ public class PuPrintService {
         double overRatio = batchService.overRatio();
         // 每行剩余可打(与弹窗同源):订单数量×(1+超送比例)−已送+已退回−已打印
         Map<Integer, Map<String, Object>> quotaById = new HashMap<>();
-        for (Map<String, Object> q : quotaRows(no)) {
+        for (Map<String, Object> q : quotaRows(no, fmt)) {
             quotaById.put((int) num(q.get("采购订单行id")), q);
         }
         for (Map<String, Object> r : rows) {
@@ -290,12 +314,65 @@ public class PuPrintService {
         out.put("单据编号", docNo);
         out.put("采购订单号", no);
         out.put("打印版式", fmt);
+        // 相互记录(2026-11-09 用户口径「有各自份额,但是要互相记录对方的对应信息,可以相互对着打印」):
+        // 取**另一版式最近一张存活记录**做对照,双向写「对应单号」。
+        List<String> twins = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] FROM " + HEAD
+                        + " WHERE [采购订单号] = ? AND [打印版式] <> ? AND [单据编号] <> ?"
+                        + "   AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY ISNULL([打印时间], CAST('1900-01-01' AS datetime2)) DESC, id DESC",
+                String.class, no, fmt, docNo);
+        String twin = twins.isEmpty() ? null : twins.get(0);
+        if (twin != null && !twin.isBlank()) {
+            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", twin, docNo);
+            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", docNo, twin);
+        }
+        out.put("对应单号", twin);
         out.put("打印人", user);
         out.put("行数", outLines.size());
         out.put("数量合计", qtySum);
         out.put("金额合计", amtSum);
         out.put("打印次数", 1);
         out.put("lines", outLines);
+        return out;
+    }
+
+    // ==================== ②-2 对着另一版式打(数量/行取现有记录) ====================
+
+    /**
+     * 对着另一版式打印(2026-11-09 用户口径「可以相互对着打印」):
+     * 按这张记录的行与数量,用**另一个打印版式**再出一张(有金额 ↔ 无金额),
+     * 并把两张纸的「对应单号」互相写上 —— 新纸的额度仍按目标版式自己的剩余可打校验。
+     *
+     * @param printNo 现有打印记录单号
+     * @return 与 {@link #print} 同结构(落纸行 + 对应单号)
+     */
+    @Transactional
+    public Map<String, Object> twinPrint(String printNo, String user) {
+        String no = str(printNo);
+        if (no.isEmpty()) throw new IllegalArgumentException("缺少打印记录单号");
+        Map<String, Object> head = firstRow(
+                "SELECT [采购订单号] AS 采购订单号, [打印版式] AS 打印版式"
+                        + " FROM " + HEAD + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
+        String orderNo = str(head.get("采购订单号"));
+        String srcFmt = str(head.get("打印版式"));
+        String target = FMT_NO_AMOUNT.equals(srcFmt) ? FMT_AMOUNT : FMT_NO_AMOUNT;
+        List<Map<String, Object>> lines = linesOf(no);
+        if (lines.isEmpty()) throw new IllegalStateException("该打印记录没有存活行,无法对着打印:" + no);
+        List<Map<String, Object>> req = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("采购订单行id", (int) num(l.get("采购订单行id")));
+            r.put("打印数量", num(l.get("数量")));
+            req.add(r);
+        }
+        Map<String, Object> out = print(orderNo, target, req, user);
+        String newNo = str(out.get("单据编号"));
+        // print() 会按「另一版式最近存活」自动找对照;这里再按来源单**兜底写死**,保证就是这张
+        jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", no, newNo);
+        jdbc.update("UPDATE " + HEAD + " SET [对应单号] = ? WHERE [单据编号] = ?", newNo, no);
+        out.put("对应单号", no);
         return out;
     }
 
@@ -381,6 +458,13 @@ public class PuPrintService {
         if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
         int n = jdbc.update("UPDATE " + LINE + " SET asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME()"
                 + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", user, no);
+        // 作废后把对方的「对应单号」清掉(否则会指向一张已作废的纸;2026-11-09 互相对应机制)
+        List<String> twins = jdbc.queryForList(
+                "SELECT [对应单号] FROM " + HEAD + " WHERE [单据编号] = ? AND [对应单号] IS NOT NULL", String.class, no);
+        if (!twins.isEmpty() && twins.get(0) != null && !twins.get(0).isBlank()) {
+            jdbc.update("UPDATE " + HEAD + " SET [对应单号] = NULL WHERE [单据编号] = ? AND [对应单号] = ?",
+                    twins.get(0), no);
+        }
         jdbc.update("UPDATE " + HEAD + " SET asp_cancel='Y', asp_user2=?, asp_time2=SYSDATETIME() WHERE [单据编号] = ?", user, no);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("单据编号", no);
@@ -423,7 +507,8 @@ public class PuPrintService {
         Map<String, Object> head = firstRow(
                 "SELECT [采购订单号] AS 采购订单号, [打印版式] AS 打印版式, ISNULL([打印人],N'') AS 打印人,"
                         + " CONVERT(varchar(19), [打印时间], 120) AS 打印时间, ISNULL([打印次数],0) AS 打印次数,"
-                        + " ISNULL([行数],0) AS 行数, ISNULL([数量合计],0) AS 数量合计, [金额合计] AS 金额合计"
+                        + " ISNULL([行数],0) AS 行数, ISNULL([数量合计],0) AS 数量合计, [金额合计] AS 金额合计,"
+                        + " [对应单号] AS 对应单号"
                         + " FROM " + HEAD + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
         head.put("单据编号", no);
@@ -446,6 +531,13 @@ public class PuPrintService {
 
     /** 4 位小数收口(与库内 decimal(18,4) 同口径) */
     private static double round4(double v) { return Math.round(v * 10000.0) / 10000.0; }
+
+    /** 打印版式归一:空 → null(不按版式隔离);其它非「无金额」一律按「有金额」 */
+    private static String normalizeFormat(String format) {
+        String f = str(format);
+        if (f.isEmpty()) return null;
+        return FMT_NO_AMOUNT.equals(f) ? FMT_NO_AMOUNT : FMT_AMOUNT;
+    }
 
     /** 数量显示:整数不带小数点,小数去掉尾随 0(错误提示里用,别出现 3600.0000) */
     private static String fmtNum(double v) {

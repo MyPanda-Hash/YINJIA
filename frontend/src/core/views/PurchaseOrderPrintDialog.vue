@@ -22,7 +22,7 @@
         <span class="pup-chip">{{ tt('单据日期') }}：{{ head['单据日期'] || '—' }}</span>
         <span class="pup-chip pup-fmt">
           {{ tt('打印版式') }}：
-          <el-radio-group v-model="fmt" size="small">
+          <el-radio-group v-model="fmt" size="small" @change="onFormatChange">
             <el-radio-button value="amount">{{ tt('有金额') }}</el-radio-button>
             <el-radio-button value="noamount">{{ tt('无金额') }}</el-radio-button>
           </el-radio-group>
@@ -94,6 +94,8 @@
           <el-table-column :label="tt('打印版式')" width="96" align="center">
             <template #default="{ row }">{{ tt(row['打印版式']) }}</template>
           </el-table-column>
+          <!-- 相互记录(2026-11-09 用户口径「有各自份额,但是要互相记录对方的对应信息」) -->
+          <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="150" />
           <el-table-column prop="行数" :label="tt('行数')" width="64" align="right" />
           <el-table-column prop="数量合计" :label="tt('数量合计')" width="96" align="right" />
           <el-table-column :label="tt('金额合计')" width="104" align="right">
@@ -102,11 +104,15 @@
           <el-table-column prop="打印人" :label="tt('打印人')" width="96" show-overflow-tooltip />
           <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
           <el-table-column prop="打印次数" :label="tt('打印次数')" width="78" align="right" />
-          <el-table-column :label="tt('操作')" width="118" align="center">
+          <el-table-column :label="tt('操作')" width="210" align="center">
             <template #default="{ row }">
               <!-- 重打 = 同一张记录原样再打一遍(纸卡了/打歪了):只累加打印次数,不新增记录。
                    两颗按钮都必须 @click.stop,否则会连带触发"点整行看明细" -->
               <el-button link type="primary" :disabled="busy" @click.stop="doReprint(row)">{{ tt('重打') }}</el-button>
+              <!-- 对着另一版式打(2026-11-09):按这张纸的行/数量出另一个版式,两张互写「对应单号」 -->
+              <el-button link type="primary" :disabled="busy" @click.stop="doTwin(row)">
+                {{ tt(row['打印版式'] === '无金额' ? '打有金额版' : '打无金额版') }}
+              </el-button>
               <el-button link type="danger" :disabled="busy" @click.stop="doVoid(row)">{{ tt('作废') }}</el-button>
             </template>
           </el-table-column>
@@ -260,6 +266,8 @@ const moneyText = (v) => {
 function amountOf(row) {
   return puOrderLineAmount(row, qtyOf[row.__key])
 }
+/** 当前打印版式(服务端口径:有金额/无金额) */
+const fmtLabel = () => (showAmount.value ? '有金额' : '无金额')
 /** 该行的「剩余可打」(服务端已按单位精度取整:订单×(1+比例)−已送+已退回−已打印);没取到 → null */
 function capOf(row) {
   const q = quotaOf.value[String(row?.id)]
@@ -326,7 +334,7 @@ async function load() {
     // 计件单位会一直显示 3000.00(实测)。
     const [res, quota] = await Promise.all([
       engine.getFormDescriptor({ panelCode: props.panelCode, code: props.docNo }),
-      engine.puPrintQuotas(props.docNo).catch((e) => {
+      engine.puPrintQuotas(props.docNo, fmtLabel()).catch((e) => {
         console.warn('[pu-print] 打印额度加载失败:', e?.message || e)
         return null
       }),
@@ -363,6 +371,30 @@ async function load() {
     ElMessage.error(engine.errMsg(e) || tt('打印失败'))
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 切换打印版式(2026-11-09 用户口径「有金额和无金额切换打印同一个不一样,不要有版本限制」):
+ * 两个版式是两张不同的纸,额度**各打各的** —— 切过去重取该版式的剩余可打,并把本次打印数量复位成它,
+ * 这样同一张订单可以先打有金额、再打无金额,互不吃额度。
+ */
+async function onFormatChange() {
+  if (!props.docNo) return
+  try {
+    const q = await engine.puPrintQuotas(props.docNo, fmtLabel())
+    const m = {}
+    for (const r of q?.['lines'] || []) m[String(r['采购订单行id'])] = r
+    quotaOf.value = m
+    const pct = Number(q?.['超送比例'])
+    if (Number.isFinite(pct)) overRatioPct.value = Math.round(pct * 100)
+    for (const r of rows.value) {
+      const remain = m[String(r.id)]?.['剩余可打']
+      const v = remain != null ? Number(remain) : Number(r['数量'])
+      qtyOf[r.__key] = Number.isFinite(v) ? v : undefined
+    }
+  } catch (e) {
+    console.warn('[pu-print] 切换版式后额度加载失败:', e?.message || e)
   }
 }
 
@@ -502,6 +534,38 @@ async function doReprint(row) {
     if (printDone || !document.getElementById('yj-print-host')) afterPrint()
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('重打失败'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/**
+ * 对着另一版式打印(2026-11-09 用户口径「可以相互对着打印」):
+ * 按这张记录的行/数量,让服务端用**另一个版式**落一张新记录(额度按目标版式自己的剩余可打校验),
+ * 两张纸的「对应单号」互相写上;这里负责把返回的纸打出来。
+ */
+async function doTwin(row) {
+  busy.value = true
+  try {
+    const res = await engine.puPrintTwin(row['单据编号'])
+    if (!res || !res['单据编号']) throw new Error(tt('打印记录不存在或已作废'))
+    const printRows = res['lines'] || []
+    const printFn = res['打印版式'] === '无金额' ? engine.printPuOrderNoAmount : engine.printPuOrder
+    let afterPrint = null
+    let printDone = false
+    const ok = printFn(doc.value, printRows, {
+      onDone: () => { printDone = true; if (afterPrint) afterPrint() },
+    })
+    if (!ok) {
+      try { await engine.puPrintVoid(res['单据编号']) } catch { /* 撤销失败不改主流程提示 */ }
+      ElMessage.error(tt('打印失败'))
+      return
+    }
+    ElMessage.success(`${tt('已对着打印')} ${res['单据编号']}（${tt(res['打印版式'])}）`)
+    afterPrint = () => { loadRecords(); onFormatChange() }
+    if (printDone || !document.getElementById('yj-print-host')) afterPrint()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('对着打印失败'))
   } finally {
     busy.value = false
   }

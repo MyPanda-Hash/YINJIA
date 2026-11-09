@@ -383,6 +383,17 @@ public class PxController {
         return ApiResult.ok(puPrint.print(orderNo, format, lines, currentUser()));
     }
 
+    /**
+     * 对着另一版式打印(2026-11-09 用户口径「可以相互对着打印」):
+     * 按这张现有记录的行/数量,用**另一个打印版式**再出一张(有金额 ↔ 无金额),两张纸互写 对应单号。
+     */
+    @PostMapping("/puPrint/twin")
+    public ApiResult<Map<String, Object>> puPrintTwin(@RequestBody Map<String, Object> body) {
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        requirePrintRecordAccessByPrintDoc(docNo);
+        return ApiResult.ok(puPrint.twinPrint(docNo, currentUser()));
+    }
+
     /** 重打:同一张打印记录原样再打一遍(只累加打印次数,不新增记录) */
     @PostMapping("/puPrint/reprint")
     public ApiResult<Map<String, Object>> puPrintReprint(@RequestBody Map<String, Object> body) {
@@ -411,12 +422,16 @@ public class PxController {
 
     /**
      * 打印额度(2026-11-09 用户口径「打印的时候没有和材料码一样考虑到超送问题」):
-     * 每行「可打印上限」= 订单数量 ×(1 + 超送比例),超送量按计量单位向下取整。
+     * 每行「剩余可打」= 订单数量 ×(1 + 超送比例) − 已送 + 已退回 − 已打印,
+     * 并且**按打印版式隔离**(有金额/无金额各打各的额度,互不吃对方的已打印)。
+     *
+     * @param format 有金额 / 无金额;不传 = 不按版式隔离(汇总)
      */
     @GetMapping("/puPrint/quotas")
-    public ApiResult<Map<String, Object>> puPrintQuotas(@RequestParam String orderNo) {
+    public ApiResult<Map<String, Object>> puPrintQuotas(@RequestParam String orderNo,
+                                                        @RequestParam(required = false) String format) {
         requirePrintRecordAccess(orderNo);
-        return ApiResult.ok(puPrint.quotas(orderNo));
+        return ApiResult.ok(puPrint.quotas(orderNo, format));
     }
 
     /**

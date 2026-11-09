@@ -67,67 +67,100 @@
         </span>
       </div>
 
-      <!-- 下层:**已生单可补打**(2026-10-04 用户口径「还有已经生单的数据也应该可以打印」)——
-           货已经收了(暂收单都有号了)才想起来打码、或者先送了一批没打码后来补打。
-           这类打印**不预约、不产生隔离行**(量早就送过了,生单弹窗里不会多出一行),
-           批次号**取该行已生单单据上的号**(印在标签上必须与实物/单据同号,故这里只读)。 -->
-      <div v-if="suppRows.length" class="mlq-supp">
-        <div class="mlq-supp-title">
-          {{ tt('已生单可补打（已经收了的量还没打码）') }}
-          <span class="mlq-tip">{{ tt('补打只为留痕：不占用余量、不会在生单弹窗里多出一行；批次号取该批货单据上的号，不可改') }}</span>
-        </div>
-        <el-table ref="suppRef" :data="suppRows" row-key="suppKey" border size="small" max-height="200"
-          @selection-change="onSuppPicked">
-          <el-table-column type="selection" width="42" :selectable="suppSelectable" />
-          <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="行号" :label="tt('行号')" width="60" />
-          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="去向单据" :label="tt('去向单据')" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="已收数量" :label="tt('已收')" width="85" align="right" />
-          <el-table-column prop="已补登数量" :label="tt('已补打')" width="85" align="right" />
-          <el-table-column prop="可补登数量" :label="tt('可补打')" width="90" align="right" />
-          <el-table-column :label="tt('本次打印数量')" width="150">
-            <template #default="{ row }">
-              <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
-                :controls="false" :disabled="!(Number(row['可补登数量'] || 0) > 0)" :precision="precisionOf(row)"
-                style="width: 130px" />
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
+      <!-- 下层三块(2026-11-09 用户口径「下方会出现 3 个框,要求这 3 个框可以收缩,不要太冗杂」):
+           ① 已生单可补打 ② 材料码已打印记录 ③ 采购订单打印记录(可据此打材料码)。
+           默认全部收起,标题带条数,点开才展开;表格都留在 DOM 里(选行/ref 不受收缩影响)。 -->
+      <el-collapse v-model="openPanels" class="mlq-collapse">
+        <el-collapse-item v-if="suppRows.length" name="supp">
+          <template #title>
+            <span class="mlq-coll-title">{{ tt('已生单可补打（已经收了的量还没打码）') }}</span>
+            <span class="mlq-coll-count">{{ suppRows.length }}</span>
+          </template>
+          <div class="mlq-tip mlq-coll-tip">
+            {{ tt('补打只为留痕：不占用余量、不会在生单弹窗里多出一行；批次号取该批货单据上的号，不可改') }}
+          </div>
+          <el-table ref="suppRef" :data="suppRows" row-key="suppKey" border size="small" max-height="200"
+            @selection-change="onSuppPicked">
+            <el-table-column type="selection" width="42" :selectable="suppSelectable" />
+            <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="行号" :label="tt('行号')" width="60" />
+            <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="去向单据" :label="tt('去向单据')" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="已收数量" :label="tt('已收')" width="85" align="right" />
+            <el-table-column prop="已补登数量" :label="tt('已补打')" width="85" align="right" />
+            <el-table-column prop="可补登数量" :label="tt('可补打')" width="90" align="right" />
+            <el-table-column :label="tt('本次打印数量')" width="150">
+              <template #default="{ row }">
+                <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
+                  :controls="false" :disabled="!(Number(row['可补登数量'] || 0) > 0)" :precision="precisionOf(row)"
+                  style="width: 130px" />
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-collapse-item>
 
-      <div class="mlq-records">
-        <div class="mlq-rec-title">{{ tt('已打印记录（本订单）') }}</div>
-        <el-table :data="data.records || []" border size="small" max-height="200">
-          <el-table-column prop="批次号" :label="tt('批次号')" min-width="160" />
-          <!-- 生产日期(2026-10-23):与批次号一期登记的,这里一并可查(重打也按它出纸) -->
-          <el-table-column prop="生产日期" :label="tt('生产日期')" width="110" />
-          <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
-          <el-table-column :label="tt('用途')" width="110" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row['补登'] ? 'info' : 'success'" size="small">
-                {{ tt(row['补登'] ? '已生单补登' : '待生单') }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="打印量合计" :label="tt('打印量')" width="90" align="right" />
-          <el-table-column prop="已生单合计" :label="tt('已生单')" width="90" align="right" />
-          <el-table-column prop="未生单合计" :label="tt('未生单')" width="90" align="right" />
-          <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
-          <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
-          <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
-          <el-table-column :label="tt('操作')" width="130" align="center">
-            <template #default="{ row }">
-              <!-- 重打 = 同一张单原样再打一遍(纸卡了/打歪了):只累加 打印次数,**不新增预约**
-                   (用同一行再打一次会被当成新打印而重复占量,所以"再打一遍"必须走这里) -->
-              <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
-              <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
-            </template>
-          </el-table-column>
-          <template #empty>{{ tt('该订单还没有打印过材料码') }}</template>
-        </el-table>
-      </div>
+        <el-collapse-item name="records">
+          <template #title>
+            <span class="mlq-coll-title">{{ tt('已打印记录（本订单）') }}</span>
+            <span class="mlq-coll-count">{{ (data.records || []).length }}</span>
+          </template>
+          <el-table :data="data.records || []" border size="small" max-height="200">
+            <el-table-column prop="批次号" :label="tt('批次号')" min-width="160" />
+            <el-table-column prop="生产日期" :label="tt('生产日期')" width="110" />
+            <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
+            <el-table-column :label="tt('用途')" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row['补登'] ? 'info' : 'success'" size="small">
+                  {{ tt(row['补登'] ? '已生单补登' : '待生单') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="打印量合计" :label="tt('打印量')" width="90" align="right" />
+            <el-table-column prop="已生单合计" :label="tt('已生单')" width="90" align="right" />
+            <el-table-column prop="未生单合计" :label="tt('未生单')" width="90" align="right" />
+            <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
+            <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
+            <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
+            <el-table-column :label="tt('操作')" width="130" align="center">
+              <template #default="{ row }">
+                <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
+                <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>{{ tt('该订单还没有打印过材料码') }}</template>
+          </el-table>
+        </el-collapse-item>
+
+        <!-- 2026-11-09 用户口径「在打印材料码那里要可以看见对相关打印采购订单,也可以针对已经打印的采购订单打印材料码」 -->
+        <el-collapse-item name="poPrints">
+          <template #title>
+            <span class="mlq-coll-title">{{ tt('打印采购订单记录（可据此打材料码）') }}</span>
+            <span class="mlq-coll-count">{{ poPrints.length }}</span>
+          </template>
+          <div class="mlq-tip mlq-coll-tip">
+            {{ tt('点「按这次打印打码」把这次采购订单纸上的数量带入上面各行的本次打印数量（取该版式的剩余可打封顶）') }}
+          </div>
+          <el-table :data="poPrints" border size="small" max-height="200" row-key="单据编号">
+            <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="150" />
+            <el-table-column :label="tt('打印版式')" width="96" align="center">
+              <template #default="{ row }">{{ tt(row['打印版式']) }}</template>
+            </el-table-column>
+            <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
+            <el-table-column prop="数量合计" :label="tt('数量合计')" width="96" align="right" />
+            <el-table-column prop="金额合计" :label="tt('金额合计')" width="96" align="right" />
+            <el-table-column prop="打印人" :label="tt('打印人')" width="96" />
+            <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
+            <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
+            <el-table-column :label="tt('操作')" width="150" align="center">
+              <template #default="{ row }">
+                <el-button link type="primary" :disabled="busy" @click="applyPoPrint(row)">{{ tt('按这次打印打码') }}</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>{{ tt('该订单还没有打印过采购订单') }}</template>
+          </el-table>
+        </el-collapse-item>
+      </el-collapse>
     </div>
     <template #footer>
       <el-button @click="fillRemaining">{{ tt('按剩余量填充') }}</el-button>
@@ -183,6 +216,10 @@ const tableRef = ref(null)
 /** **多选**:本次要打的行(勾选是权威;服务端会按**每行一张单**落库) */
 const picked = ref([])
 const qtyOf = reactive({})
+/** 下层三块(已生单可补打 / 材料码已打印记录 / 打印采购订单记录)默认全收起 —— 2026-11-09 用户口径「可收缩,不要太冗杂」 */
+const openPanels = ref([])
+/** 本订单的「打印采购订单」记录(2026-11-09:可看见、并能据此打材料码) */
+const poPrints = ref([])
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
 const totalQty = computed(() => {
@@ -241,6 +278,10 @@ async function load() {
     syncPick(rows.value.filter((r) => capOf(r) > 0).map((r) => r.id))
     await nextTick()
     suppRef.value?.clearSelection()
+    // 采购订单打印记录(2026-11-09):失败不影响打码主体,只是少一块参考
+    engine.puPrintRecords(props.orderNo)
+      .then((list) => { poPrints.value = list || [] })
+      .catch(() => { poPrints.value = [] })
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('材料码数据加载失败'))
   } finally {
@@ -272,6 +313,48 @@ function fillRemaining() {
 function clearAll() {
   for (const r of rows.value) qtyOf[r.id] = 0
   syncPick([])
+}
+
+/**
+ * 按某次「打印采购订单」记录打材料码(2026-11-09 用户口径):
+ * 把那次纸上的每行打印数量带入上面各行的「本次打印数量」并勾上,封顶仍取该行剩余可打。
+ */
+async function applyPoPrint(row) {
+  const no = row?.['单据编号']
+  if (!no) return
+  busy.value = true
+  try {
+    const res = await engine.puPrintDetail(no)
+    const byLine = new Map()
+    for (const l of res?.lines || []) {
+      const id = Number(l['采购订单行id'])
+      // 打印记录明细里这一列叫「数量」(= 打印数量,见服务端 detail());兼容旧键
+      if (id) byLine.set(id, Number(l['数量'] ?? l['打印数量']) || 0)
+    }
+    const ids = []
+    for (const r of rows.value) {
+      const q = byLine.get(Number(r.id))
+      if (q == null) continue
+      const cap = capOf(r)
+      const v = cap > 0 ? Math.min(q, cap) : 0
+      qtyOf[r.id] = v
+      if (v > 0) ids.push(r.id)
+    }
+    if (!ids.length) {
+      ElMessage.warning(tt('这次打印的明细在这张订单里没有可打的量'))
+      return
+    }
+    syncPick(ids)
+    const clamped = rows.value.some((r) => {
+      const q = byLine.get(Number(r.id))
+      return q != null && q > capOf(r)
+    })
+    ElMessage.success(`${tt('已按')} ${no} ${tt('带入打印数量')}${clamped ? tt('（超出剩余可打的已按上限收口）') : ''}`)
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('打印记录明细加载失败'))
+  } finally {
+    busy.value = false
+  }
 }
 
 /** 出纸:纸上的号 = 库里的号(先落库再打印);生产日期取**服务端回读的单头值**(不取输入框 ——
@@ -394,4 +477,11 @@ async function doVoid(row) {
 /* 下层「已生单可补打」:与上层隔一道浅线,说明它不是"待生单的预约" */
 .mlq-supp { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
 .mlq-supp-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+/* 下层三块可收缩(2026-11-09):默认收起,标题给条数,展开才看到表格 */
+.mlq-collapse { margin-top: 6px; border-top: 1px dashed #dde5ee; }
+.mlq-collapse :deep(.el-collapse-item__header) { height: 34px; line-height: 34px; font-size: 12.5px; color: #46586e; }
+.mlq-collapse :deep(.el-collapse-item__content) { padding-bottom: 8px; }
+.mlq-coll-title { margin-right: 8px; }
+.mlq-coll-count { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: #eef3f8; color: #5b6b7f; font-size: 11.5px; line-height: 18px; text-align: center; }
+.mlq-coll-tip { margin-bottom: 6px; font-size: 12px; }
 </style>

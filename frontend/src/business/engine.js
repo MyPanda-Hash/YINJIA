@@ -622,9 +622,14 @@ export async function puPrintRecords(orderNo) {
   return unwrap(await request.get('/px/puPrint/records', { params: { orderNo } }))
 }
 
-/** 打印额度(2026-11-09):每行「可打印上限」= 订单数量 ×(1+超送比例),超送量按计量单位取整 */
-export async function puPrintQuotas(orderNo) {
-  return unwrap(await request.get('/px/puPrint/quotas', { params: { orderNo } }))
+/** 打印额度(2026-11-09):剩余可打 = 订单数量×(1+超送比例)−已送+已退回−已打印;按打印版式隔离(有金额/无金额各打各的) */
+export async function puPrintQuotas(orderNo, format) {
+  return unwrap(await request.get('/px/puPrint/quotas', { params: { orderNo, format } }))
+}
+
+/** 对着另一版式打印(2026-11-09):按现有记录的行/数量用另一版式再出一张,两张互写「对应单号」 */
+export async function puPrintTwin(docNo) {
+  return unwrapStrict(await request.post('/px/puPrint/twin', { docNo }))
 }
 
 /** 登记一次打印:返回落纸行(服务端重算数量/小计,前端拿它出纸,保证「记录=纸」同源) */
