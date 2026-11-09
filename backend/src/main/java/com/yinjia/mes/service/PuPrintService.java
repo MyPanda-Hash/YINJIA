@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -92,34 +93,71 @@ public class PuPrintService {
     // ==================== ①-2 打印额度(超送) ====================
 
     /**
-     * 每行的「可打印上限」—— 2026-11-09 用户口径:
-     * 「打印的时候没有和材料码一样考虑到超送问题」⇒ 采购订单打印也要按超送算上限。
+     * 每行的「剩余可打」—— 2026-11-09 用户口径:
+     * 「打印的时候没有和材料码一样考虑到超送问题」→「和材料码一样,这些都要有」(截图:订单数量/已送/已打印/剩余可打)。
      *
-     * <p>口径:**可打印上限 = 订单数量 ×(1 + 超送比例)**,超送量按该行计量单位向下取整
-     * (个/卷=整数、kg/米=3 位)。与材料码「剩余可打」用同一个 {@link BatchService#overAllowance(double, double, double, double, int)},
-     * 区别只是这里**不减已送/已打印**(打印是"给供应商的这张订单最多能写多少",不占订单量)。
+     * <p>口径与材料码弹窗**同一套**:
+     * <pre>剩余可打 = 订单数量 + floor(订单数量 × 超送比例, 单位精度) − 已送 + 已退回 − 已打印</pre>
+     * 其中:
+     * <ul>
+     *   <li>已送 / 已退回 取 {@link BatchService#sentByLineKey} / {@link BatchService#returnedByOrderLine} —— 与材料码同源;</li>
+     *   <li>已打印 = 本订单该行**存活打印记录**(bd_pu_print/bl_pu_print,作废的不算)的打印数量合计 ——
+     *       等价于材料码的「已打印预约」:打过的量已经从这张订单里划走了,再打就超了(要原样再出一张用「重打」);</li>
+     *   <li>超送量按该行计量单位向下取整(个/卷=整数、kg/米=3 位),负数归 0。</li>
+     * </ul>
      *
-     * @return { 超送比例: 0.2, lines: [{采购订单行id, 行号, 小数位数, 可打印上限}] }
+     * @return { 超送比例: 0.15, lines: [{采购订单行id, 行号, 单位, 小数位数, 订单数量, 已送数量, 已退回数量,
+     *          已打印数量, 剩余可打, 可打印上限}] }
      */
     public Map<String, Object> quotas(String orderNo) {
         String no = str(orderNo);
         if (no.isEmpty()) throw new IllegalArgumentException("缺少采购订单号");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("超送比例", batchService.overRatio());
+        out.put("lines", quotaRows(no));
+        return out;
+    }
+
+    /** 额度行(内部/公开共用):口径见 {@link #quotas(String)};print() 校验也用它,保证弹窗与校验同源 */
+    public List<Map<String, Object>> quotaRows(String orderNo) {
+        String no = str(orderNo);
         double ratio = batchService.overRatio();
-        List<Map<String, Object>> lines = new ArrayList<>();
+        Map<String, Double> sentByKey = batchService.sentByLineKey("PU_ORDER", no);
+        Map<String, Double> returnedByLine = batchService.returnedByOrderLine(no);
+        Map<Integer, Double> printedByLine = new HashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT l.[采购订单行id] AS id, SUM(l.[打印数量]) AS q FROM " + LINE + " l"
+                        + " JOIN " + HEAD + " h ON h.[单据编号] = l.[单据编号]"
+                        + " WHERE h.[采购订单号] = ? AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                        + "   AND ISNULL(h.asp_cancel,'N') <> 'Y' AND l.[采购订单行id] IS NOT NULL"
+                        + " GROUP BY l.[采购订单行id]", no)) {
+            printedByLine.put((int) num(r.get("id")), num(r.get("q")));
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT id, [行号] AS 行号, [单位] AS 单位, ISNULL([数量],0) AS 数量"
                         + " FROM " + ORDER_LINE + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no)) {
+            int lineId = (int) num(r.get("id"));
             int nd = batchService.unitDecimals(str(r.get("单位")));
+            double qty = num(r.get("数量"));
+            double used = sentByKey.getOrDefault(no + "#" + lineId, 0d);
+            double ret = returnedByLine.getOrDefault(str(r.get("行号")), 0d);
+            double printed = printedByLine.getOrDefault(lineId, 0d);
+            double allowed = BatchService.overAllowance(qty, used, ret, ratio, nd);      // 含超送的头寸
+            double remain = UnitPrecision.floorTo(Math.max(0d, allowed - printed), nd);  // 减去已打印的纸
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("采购订单行id", (int) num(r.get("id")));
+            row.put("采购订单行id", lineId);
             row.put("行号", r.get("行号"));
+            row.put("单位", r.get("单位"));
             row.put("小数位数", nd);
-            row.put("可打印上限", BatchService.overAllowance(num(r.get("数量")), 0, 0, ratio, nd));
-            lines.add(row);
+            row.put("订单数量", qty);
+            row.put("已送数量", UnitPrecision.roundTo(used, nd));
+            row.put("已退回数量", UnitPrecision.roundTo(ret, nd));
+            row.put("已打印数量", UnitPrecision.roundTo(printed, nd));
+            row.put("剩余可打", remain);
+            row.put("可打印上限", remain);
+            out.add(row);
         }
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("超送比例", ratio);
-        out.put("lines", lines);
         return out;
     }
 
@@ -169,6 +207,11 @@ public class PuPrintService {
         boolean hasAmt = false;
         // 超送比例(每次打印取一次;与材料码/生单同一系统参数 receive_over_ratio)
         double overRatio = batchService.overRatio();
+        // 每行剩余可打(与弹窗同源):订单数量×(1+超送比例)−已送+已退回−已打印
+        Map<Integer, Map<String, Object>> quotaById = new HashMap<>();
+        for (Map<String, Object> q : quotaRows(no)) {
+            quotaById.put((int) num(q.get("采购订单行id")), q);
+        }
         for (Map<String, Object> r : rows) {
             int lineId = (int) num(r.get("采购订单行id"));
             double qty = num(r.get("打印数量"));
@@ -182,14 +225,18 @@ public class PuPrintService {
                 throw new IllegalArgumentException("第 " + str(line.get("行号")) + " 行的本次打印数量必须大于 0(不打印的行请取消勾选)");
             }
             double orderQty = num(line.get("数量"));
-            // 超送上限(2026-11-09):本次打印数量 ≤ 订单数量 ×(1 + 超送比例),超送量按单位精度向下取整;
+            // 剩余可打(2026-11-09,与材料码同口径):超送量按单位精度向下取整,减去已送/已退回/已打印。
             // 服务端强制,前端弹窗给的 max 只是即时体验(供应商面板同一口径)。
-            int nd = batchService.unitDecimals(str(line.get("单位")));
-            double printCap = BatchService.overAllowance(orderQty, 0, 0, overRatio, nd);
-            if (qty > printCap + 1e-6) {
-                throw new IllegalArgumentException("第 " + str(line.get("行号")) + " 行:本次打印 " + fmtNum(qty)
-                        + " 超出可打印上限 " + fmtNum(printCap) + "(订单数量 " + fmtNum(orderQty)
-                        + " ×(1+超送比例 " + Math.round(overRatio * 100) + "%),超送量按计量单位取整)");
+            Map<String, Object> q = quotaById.get(lineId);
+            if (q != null) {
+                double cap = num(q.get("剩余可打"));
+                if (qty > cap + 1e-6) {
+                    throw new IllegalArgumentException("第 " + str(line.get("行号")) + " 行:本次打印 " + fmtNum(qty)
+                            + " 超出剩余可打 " + fmtNum(cap) + "(订单数量 " + fmtNum(num(q.get("订单数量")))
+                            + " ×(1+超送比例 " + Math.round(overRatio * 100) + "%)− 已送 " + fmtNum(num(q.get("已送数量")))
+                            + " + 已退回 " + fmtNum(num(q.get("已退回数量"))) + " − 已打印 " + fmtNum(num(q.get("已打印数量")))
+                            + ",超送量按计量单位取整)");
+                }
             }
             boolean changed = Math.abs(qty - orderQty) > 1e-9;
             Double subtotal = null;

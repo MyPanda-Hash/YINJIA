@@ -30,9 +30,9 @@
       </div>
       <!-- 这句话是口径本身,别删:用户最容易误解的就是"是不是改了订单数量" -->
       <div class="pup-tip">{{ tt('勾选要打印的明细行，并填写本次打印数量；只影响这张报表，不改动订单数据') }}</div>
-      <!-- 超送上限(2026-11-09 用户口径「打印的时候没有和材料码一样考虑到超送问题」) -->
+      <!-- 超送上限(2026-11-09 用户口径:和材料码一样,已送/已打印/剩余可打都要有) -->
       <div class="pup-quota-tip">
-        {{ tt('本次打印数量上限 = 订单数量 ×（1 + 超送比例），超送量按计量单位取整') }}
+        {{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印（超送量按计量单位取整）') }}
         <span v-if="overRatioPct != null" class="pup-ratio">{{ tt('超送比例') }} {{ overRatioPct }}%</span>
       </div>
 
@@ -43,10 +43,17 @@
         <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
         <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="140" show-overflow-tooltip />
         <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="110" show-overflow-tooltip />
-        <el-table-column prop="单位" :label="tt('单位')" width="64" />
-        <el-table-column prop="数量" :label="tt('订单数量')" width="96" align="right" />
-        <el-table-column :label="tt('可打印上限')" width="104" align="right">
-          <template #default="{ row }">{{ capOf(row) == null ? '' : qtyText(capOf(row)) }}</template>
+        <el-table-column prop="单位" :label="tt('单位')" width="56" />
+        <el-table-column prop="数量" :label="tt('订单数量')" width="90" align="right" />
+        <!-- 2026-11-09 用户口径「和材料码一样,这些都要有」:已送/已打印/剩余可打三列与材料码弹窗同口径 -->
+        <el-table-column :label="tt('已送')" width="76" align="right">
+          <template #default="{ row }">{{ rowText(row, '已送数量') }}</template>
+        </el-table-column>
+        <el-table-column :label="tt('已打印')" width="80" align="right">
+          <template #default="{ row }">{{ rowText(row, '已打印数量') }}</template>
+        </el-table-column>
+        <el-table-column :label="tt('剩余可打')" width="96" align="right">
+          <template #default="{ row }">{{ rowText(row, '剩余可打') }}</template>
         </el-table-column>
         <el-table-column :label="tt('本次打印数量')" width="132">
           <template #default="{ row }">
@@ -108,7 +115,7 @@
       </div>
     </div>
     <template #footer>
-      <el-button @click="fillOrderQty">{{ tt('按订单数量填充') }}</el-button>
+      <el-button @click="fillOrderQty">{{ tt('按剩余可打填充') }}</el-button>
       <el-button @click="selectAll">{{ tt('全选') }}</el-button>
       <el-button @click="clearAll">{{ tt('清空') }}</el-button>
       <el-button type="primary" :loading="busy" @click="confirm">{{ tt('确定并打印') }}</el-button>
@@ -206,8 +213,8 @@ const lines = ref([])
 /** 版式:amount=有金额,noamount=无金额(两个报表同一张弹窗) */
 const fmt = ref('amount')
 const showAmount = computed(() => fmt.value === 'amount')
-/** 宽表(带金额 10 列)按 1150px 排;小屏退回 96vw,不出横向滚动条 */
-const dlgWidth = 'min(1250px, 96vw)'
+/** 宽表(带金额 13 列,含 已送/已打印/剩余可打)按 1460px 排;小屏退回 96vw */
+const dlgWidth = 'min(1460px, 96vw)'
 const tableRef = ref(null)
 const picked = ref([])
 /** 行键 → 本次打印数量(键由 keyOf 生成) */
@@ -253,10 +260,16 @@ const moneyText = (v) => {
 function amountOf(row) {
   return puOrderLineAmount(row, qtyOf[row.__key])
 }
-/** 该行的可打印上限(订单数量 ×(1+超送比例),服务端已按单位精度取整);没取到 → null(不设限也行,后端会拒) */
+/** 该行的「剩余可打」(服务端已按单位精度取整:订单×(1+比例)−已送+已退回−已打印);没取到 → null */
 function capOf(row) {
   const q = quotaOf.value[String(row?.id)]
-  return q ? Number(q['可打印上限']) : null
+  return q ? Number(q['剩余可打']) : null
+}
+/** 额度列文字(已送/已打印/剩余可打):按服务端给的数显示,取不到留空 */
+function rowText(row, field) {
+  const q = quotaOf.value[String(row?.id)]
+  if (!q || q[field] === undefined || q[field] === null) return ''
+  return qtyText(q[field])
 }
 /** 该行数量输入精度 = 单位小数位数(个/卷=0、kg/米=3) */
 function precisionOf(row) {
@@ -335,8 +348,11 @@ async function load() {
       .filter((l) => l && (l['物料编码'] || l['物料名称']))
     if (!lines.value.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
     lines.value.forEach((l, i) => {
-      const q = Number(l['数量'])
-      qtyOf[keyOf(l, i)] = Number.isFinite(q) ? q : undefined
+      // 2026-11-09 用户口径「和材料码一样」:默认填「剩余可打」(订单×(1+超送)−已送+已退回−已打印),
+      // 取不到额度时退回订单数量,不让弹窗空着。
+      const remain = quotaOf.value[String(l.id)]?.['剩余可打']
+      const v = remain != null ? Number(remain) : Number(l['数量'])
+      qtyOf[keyOf(l, i)] = Number.isFinite(v) ? v : undefined
     })
     // 打印额度已在上面的 Promise.all 里取到并先行落地(见注释:precision 要赶在首渲染前)
     // 默认全选(与材料码弹窗同款便利):大部分打印就是整单打,勾选仍是权威
@@ -377,11 +393,12 @@ function selectAll() {
 function clearAll() {
   syncPick([])
 }
-/** 数量回填成订单数量**并全选**(用户要重打整单时的复位动作) */
+/** 数量回填成「剩余可打」**并全选**(复位动作;取不到额度时退回订单数量) */
 function fillOrderQty() {
   for (const r of rows.value) {
-    const q = Number(r['数量'])
-    qtyOf[r.__key] = Number.isFinite(q) ? q : undefined
+    const remain = quotaOf.value[String(r.id)]?.['剩余可打']
+    const v = remain != null ? Number(remain) : Number(r['数量'])
+    qtyOf[r.__key] = Number.isFinite(v) ? v : undefined
   }
   selectAll()
 }

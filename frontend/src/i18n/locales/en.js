@@ -262,7 +262,9 @@ export default {
     '本次打印数量必须大于 0（不打印的行请取消勾选）': 'The print qty must be greater than 0 (uncheck the lines you do not want to print)',
     // 打印按超送上限(2026-11-09)
     '可打印上限': 'Printable max',
+    '按剩余可打填充': 'Fill with remaining printable',
     '本次打印数量上限 = 订单数量 ×（1 + 超送比例），超送量按计量单位取整': 'Print qty max = ordered qty × (1 + over-delivery ratio); the over-delivery part is rounded by UOM',
+    '打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印（超送量按计量单位取整）': 'Print max = ordered qty × (1 + over-delivery ratio) − delivered + returned − printed (over-delivery rounded by UOM)',
     '超送比例': 'Over-delivery ratio',
     '本次打印数量超出可打印上限': 'the print qty exceeds the printable max',
     '订单数量 ×（1 + 超送比例）': 'ordered qty × (1 + over-delivery ratio)',
