@@ -4595,3 +4595,6 @@ migrate-lab-mobile-20261109.sql
 
 # 2026-11-09 手机照片从表头下移到明细行:3 张明细表加列 + yj_field(place=detail)、撤表头列与表头字段、附件锚点改为 手机照片-行id
 migrate-lab-mobile-row-photo-20261109.sql
+
+# 2026-11-09 实验室「测试项目」标准库补齐服务器上的 4 条历史遗留条目(item_code=默认、名字写在 content 里;启用 2 条 NSF 42-余氯/NSF 42氯胺)
+migrate-lab-testitem-legacy-20261109.sql
