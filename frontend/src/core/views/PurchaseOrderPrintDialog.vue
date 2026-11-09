@@ -36,7 +36,9 @@
         <span v-if="overRatioPct != null" class="pup-ratio">{{ tt('超送比例') }} {{ overRatioPct }}%</span>
       </div>
 
-      <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" height="330"
+      <!-- 明细表:2026-11-09 用户口径「这个不能收缩,要全列出来」—— 不用固定 height(会截行/出内滚动条),
+           改成 max-height:行少时全展开、行多才滚动 -->
+      <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" max-height="420"
         @selection-change="onPicked">
         <el-table-column type="selection" width="42" />
         <el-table-column prop="行号" :label="tt('行号')" width="64" />
@@ -91,15 +93,18 @@
           <span class="pup-tip">{{ tt('两个版式各自一块、各自登记：已打印只统计本版式，重打只累加次数，作废只作废这张纸') }}</span>
           <span class="pup-tip">{{ tt('点击记录行可查看明细') }}</span>
         </div>
-        <div class="pup-rec-two">
+        <!-- 下面两块**可以收缩**(2026-11-09 用户口径:上面明细不能收缩要全列出来,下面两个可以设置收缩) -->
+        <el-collapse v-model="openRecPanels" class="pup-rec-collapse">
           <!-- ① 对方版式已打印 → 可打印成本版式(打完置灰,不能重复) -->
-          <div class="pup-rec-box">
-            <div class="pup-rec-boxtitle">
-              <span>{{ tt('其它版式已打印') }}（{{ tt(otherFmt) }}）</span>
-              <span class="pup-rec-count">{{ otherRows.length }}</span>
-              <span class="pup-rec-cur">{{ tt('可打印成') }}{{ tt(fmtLabel()) }}</span>
-            </div>
-            <el-table :data="otherRows" border size="small" max-height="168" @row-click="openRecordDetail">
+          <el-collapse-item name="other">
+            <template #title>
+              <span class="pup-rec-boxtitle">
+                <span>{{ tt('其它版式已打印') }}（{{ tt(otherFmt) }}）</span>
+                <span class="pup-rec-count">{{ otherRows.length }}</span>
+                <span class="pup-rec-cur">{{ tt('可打印成') }}{{ tt(fmtLabel()) }}</span>
+              </span>
+            </template>
+            <el-table :data="otherRows" border size="small" max-height="220" @row-click="openRecordDetail">
               <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="132" />
               <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="132" />
               <el-table-column :label="tt('金额合计')" width="88" align="right">
@@ -117,16 +122,18 @@
               </el-table-column>
               <template #empty>{{ tt('该版式还没有打印记录') }}</template>
             </el-table>
-          </div>
+          </el-collapse-item>
 
           <!-- ② 本版式已打印 → 重打 / 作废 -->
-          <div class="pup-rec-box pup-rec-active">
-            <div class="pup-rec-boxtitle">
-              <span>{{ tt('本版式已打印') }}（{{ tt(fmtLabel()) }}）</span>
-              <span class="pup-rec-count">{{ ownRows.length }}</span>
-              <span class="pup-rec-cur">{{ tt('当前版式') }}</span>
-            </div>
-            <el-table :data="ownRows" border size="small" max-height="168" @row-click="openRecordDetail">
+          <el-collapse-item name="own" class="pup-rec-own">
+            <template #title>
+              <span class="pup-rec-boxtitle">
+                <span>{{ tt('本版式已打印') }}（{{ tt(fmtLabel()) }}）</span>
+                <span class="pup-rec-count">{{ ownRows.length }}</span>
+                <span class="pup-rec-cur">{{ tt('当前版式') }}</span>
+              </span>
+            </template>
+            <el-table :data="ownRows" border size="small" max-height="220" @row-click="openRecordDetail">
               <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="132" />
               <el-table-column prop="对应单号" :label="tt('对应单号')" min-width="132" />
               <el-table-column :label="tt('金额合计')" width="88" align="right">
@@ -144,8 +151,8 @@
               </el-table-column>
               <template #empty>{{ tt('该版式还没有打印记录') }}</template>
             </el-table>
-          </div>
-        </div>
+          </el-collapse-item>
+        </el-collapse>
       </div>
     </div>
     <template #footer>
@@ -251,6 +258,8 @@ const showAmount = computed(() => fmt.value === 'amount')
 const dlgWidth = 'min(1460px, 96vw)'
 const tableRef = ref(null)
 const picked = ref([])
+/** 下面两个「已打印记录」框的展开状态(可收缩;默认只展开本版式那块) */
+const openRecPanels = ref(['own'])
 /** 行键 → 本次打印数量(键由 keyOf 生成) */
 const qtyOf = reactive({})
 /** 采购订单行id → { 可打印上限, 小数位数 }(2026-11-09:打印数量按超送+单位精度封顶) */
@@ -646,15 +655,16 @@ async function doVoid(row) {
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
 /* 已打印记录:与上方勾选表隔一道浅线,说明用途 */
 .pup-rec { margin-top: 4px; padding-top: 6px; border-top: 1px dashed #dde5ee; display: flex; flex-direction: column; gap: 4px; }
-/* 两个版式上下各一个独立框(2026-11-09):上=对方版式(可打成本版式),下=本版式(重打/作废) */
-.pup-rec-two { display: flex; flex-direction: column; gap: 8px; }
-.pup-rec-box { border: 1px solid #e3e9f0; border-radius: 6px; padding: 4px 6px 6px; background: #fff; }
-.pup-rec-box.pup-rec-active { border-color: #1f6f4a; box-shadow: 0 0 0 1px rgba(31, 111, 74, .18) inset; }
-.pup-rec-boxtitle { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
+/* 两个版式上下两块、可收缩(2026-11-09):上=对方版式(可打成本版式),下=本版式(重打/作废) */
+.pup-rec-collapse { border-top: none; border-bottom: none; }
+.pup-rec-collapse :deep(.el-collapse-item__header) { height: 34px; line-height: 34px; padding-left: 6px; border-bottom: 1px solid #e3e9f0; }
+.pup-rec-collapse :deep(.el-collapse-item__content) { padding: 6px 0 8px; }
+.pup-rec-collapse .pup-rec-own :deep(.el-collapse-item__header) { color: #1f6f4a; font-weight: 600; }
+.pup-rec-boxtitle { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: inherit; }
 .pup-rec-count { min-width: 18px; padding: 0 5px; border-radius: 9px; background: #eef3f8; color: #5b6b7f; font-size: 11.5px; line-height: 18px; text-align: center; }
 .pup-rec-cur { color: #1f6f4a; font-size: 11.5px; font-weight: 600; }
-.pup-rec-box :deep(.el-table__row) { cursor: pointer; }
-.pup-rec-box :deep(.el-table__row:hover > td) { background: #eef6ff !important; }
+.pup-rec-collapse :deep(.el-table__row) { cursor: pointer; }
+.pup-rec-collapse :deep(.el-table__row:hover > td) { background: #eef6ff !important; }
 .pup-rec-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .pup-rec-title .pup-tip { background: none; border: none; padding: 0; }
 /* 记录行可点击看明细:鼠标手型 + 悬停高亮提示(行内的重打/作废按钮已 @click.stop) */
