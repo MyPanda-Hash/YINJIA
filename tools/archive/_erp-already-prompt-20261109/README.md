@@ -54,12 +54,35 @@
   要看包里有没有新代码就用 `jar xf <jar> BOOT-INF/classes/com/yinjia/mes/service/KingdeePushService.class`
   再在字节里搜 `already`(本目录 `ErpFlagProbe.java` 只查库,不查包)。
 
-## 五、复跑方式
+## 五、顺带发现(未改,留待业务定夺):迁移链上有一条"自己过不了闸门"的脚本
+
+重打包会顺带跑 `tools/sync-db.bat`,现在**每次启动**都报:
+
+```
+[新增] migrate-drop-bak-qc-snapshots-20261102.sql
+[SQL失败] [中止] 闸门未通过,一张表都不删:① 名单外还有备份/临时表:[_bak_pc0000_20261018_inh],
+  [_bak_pc0000_20261018_kucun], [_bak_pc0000_20261018_outh], [_bak_pc0000_baseline],
+  [_bak_pc0000_merge], [kucun_bak_beforelot], [scjl_bak_20261021],
+  [wo_process_line_bak_20261021], [yj_doc_status_bak_20261021];
+=== 同步完成: 执行 0, 跳过 703, 失败 1 ===
+```
+
+- 该脚本**从未登记进 `yj_schema_log`**(`SchemaLogProbe.java` 可复核),所以每轮都被当"新增"重放,
+  每轮都被自己的白名单闸门挡下(==它什么表都没删,是安全的==)。
+- 影响:`DbSync` 遇到失败会**中止后续脚本**。它排在 `db-migrations.txt` 第 4480 行,
+  后面还有 17 条(含 2026-11-06~11-09 那批)—— 那批**已经**在 `yj_schema_log` 里,所以眼下无影响,
+  但**以后新增的迁移会排在它后面被挡住**。
+- 处理方向(需业务先定):① 把上面 9 张 `_bak_*` 补进该脚本的白名单并让它真正删表;
+  ② 或把它从迁移链上摘掉。**本次没动** —— 删备份表是不可逆操作,不该顺手做。
+
+## 六、复跑方式
 
 ```powershell
 # 只读探针:逐张单据头看 是否已转ERP 的实际落值/类型(两账套都可跑)
 cd tools
 java -cp lib\mssql-jdbc.jar archive\_erp-already-prompt-20261109\ErpFlagProbe.java HSDZ_MES
+# 迁移链登记情况(第五节那件事)
+java -cp lib\mssql-jdbc.jar archive\_erp-already-prompt-20261109\SchemaLogProbe.java HSDZ_MES
 
 # 界面回归(ego 浏览器;脚本按 round-NN 顺序执行)
 ego-browser nodejs -e "await import('file:///C:/Users/Lenovo/ego/erp-already-prompt-20261109/round-16.mjs')"
