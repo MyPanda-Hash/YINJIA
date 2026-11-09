@@ -64,10 +64,14 @@
 
         <div v-if="metaLoading" class="labm-empty">{{ tt('加载中…') }}</div>
         <template v-else>
-          <!-- 表头字段(单据编号只读) -->
+          <!-- 审批通过后的单整张只读:先给一句提示,免得现场以为卡住了 -->
+          <div v-if="readOnlyHint" class="labm-lock">🔒 {{ readOnlyHint }}</div>
+
+          <!-- 表头字段(单据编号只读;已保存的单据里"设备名称/仪器/测试项目"这类标识字段也只读) -->
           <div v-for="f in headerFields" :key="'h-' + f.code" class="labm-field">
             <label>
               {{ labelOf(f) }}<span v-if="f.isNotNull && !isDocNo(f)" class="req">*</span>
+              <span v-if="!isDocNo(f) && !headerEditable(f) && !readOnly" class="labm-locktag">{{ tt('已锁定') }}</span>
             </label>
             <el-input v-if="isDocNo(f)" :model-value="form[f.code]" disabled />
 
@@ -76,6 +80,7 @@
               v-model="form[f.code]"
               type="date"
               value-format="YYYY-MM-DD"
+              :disabled="!headerEditable(f)"
               :placeholder="tt('选择日期')"
               style="width: 100%"
             />
@@ -86,13 +91,14 @@
               filterable
               allow-create
               clearable
+              :disabled="!headerEditable(f)"
               :placeholder="tt('选择或输入')"
               style="width: 100%"
             >
               <el-option v-for="o in optionList(f)" :key="o" :label="o" :value="o" />
             </el-select>
 
-            <el-input v-else v-model="form[f.code]" :placeholder="labelOf(f)" />
+            <el-input v-else v-model="form[f.code]" :disabled="!headerEditable(f)" :placeholder="labelOf(f)" />
           </div>
 
           <!-- 明细 -->
@@ -101,7 +107,7 @@
             <span class="labm-sec-num">{{ detailRows.length }}</span>
             <span class="labm-sec-gap"></span>
             <!-- 大按钮(2026-11-09 用户口径「框中的按钮要放大」) -->
-            <el-button size="large" type="primary" plain @click="addRow">{{ tt('加一行') }}</el-button>
+            <el-button size="large" type="primary" plain :disabled="readOnly" :title="readOnly ? tt('这张单已审批通过,只能查看') : ''" @click="addRow">{{ tt('加一行') }}</el-button>
           </div>
 
           <!-- 加标水:明细列**由「测试项目」的标准库模版决定**(2026-11-09 用户口径)。
@@ -134,12 +140,13 @@
                 <el-date-picker
                   v-if="isDate(f)"
                   v-model="row[f.dataName]"
+                  :disabled="readOnly"
                   type="date"
                   value-format="YYYY-MM-DD"
                   :placeholder="tt('选择日期')"
                   style="width: 100%"
                 />
-                <el-input v-else v-model="row[f.dataName]" :placeholder="labelOf(f)" />
+                <el-input v-else v-model="row[f.dataName]" :disabled="readOnly" :placeholder="labelOf(f)" />
               </div>
 
               <!-- 本行附件(2026-11-09 第三轮):按**明细行**存,显示成**附件列表**(不是图片预览),
@@ -151,7 +158,7 @@
                   <span class="labm-rowphoto-title">{{ tt('本行附件') }}</span>
                   <span v-if="!rowPhotoKey(row)" class="labm-rowphoto-hint">{{ tt('保存后自动上传') }}</span>
                   <span class="labm-sec-gap"></span>
-                  <el-button size="small" type="primary" plain @click.stop="pickRowPhoto(idx)">📷 {{ tt('拍照/上传附件') }}</el-button>
+                  <el-button size="small" type="primary" plain :disabled="readOnly" :title="readOnly ? tt('这张单已审批通过,只能查看') : ''" @click.stop="pickRowPhoto(idx)">📷 {{ tt('拍照/上传附件') }}</el-button>
                 </div>
                 <div v-if="!photosOfRow(row).length && !pendingOfRow(row).length" class="labm-rowphoto-empty">
                   {{ tt('这一行还没有附件') }}
@@ -159,7 +166,7 @@
                 <div v-for="p in photosOfRow(row)" :key="'a-' + p.id" class="labm-att">
                   <span class="labm-att-name" :title="tt('点击下载')" @click="downloadPhoto(p)">📎 {{ p.fileName }}</span>
                   <span class="labm-att-size">{{ fmtSize(p.fileSize) }}</span>
-                  <span class="labm-att-del" :title="tt('删除附件')" @click.stop="removeRowPhoto(row, p)">✕</span>
+                  <span class="labm-att-del" :class="{ 'is-off': readOnly }" :title="readOnly ? tt('这张单已审批通过,只能查看') : tt('删除附件')" @click.stop="readOnly ? null : removeRowPhoto(row, p)">✕</span>
                 </div>
                 <div v-for="(c, i) in pendingOfRow(row)" :key="'ap-' + i" class="labm-att is-pending">
                   <span class="labm-att-name">📎 {{ c.name }}</span>
@@ -181,7 +188,7 @@
           />
 
           <div class="labm-actions">
-            <el-button type="primary" size="large" :loading="saving" :disabled="!panel" @click="save()">
+            <el-button type="primary" size="large" :loading="saving" :disabled="!panel || readOnly" :title="readOnly ? tt('这张单已审批通过,只能查看') : ''" @click="save()">
               {{ tt('保存草稿') }}
             </el-button>
             <el-button size="large" :disabled="saving || !isDraft" :title="isDraft ? '' : tt('只有草稿才能清空重填')" @click="startNew">{{ tt('清空重填') }}</el-button>
@@ -239,6 +246,7 @@ import {
   rowPhotoKey, mergeRowIds,
   // 加标水(2026-11-09 第五轮):明细列随「测试项目」变 —— 一个标准库条目一套列结构
   SPIKE_WATER_CODE, TEMPLATE_FIELD, TEMPLATE_LIB, stdLibOptions, stdLibContentOf, visibleDetailFields,
+  canEditDoc, lockedHeaderKeys,
 } from '@/business/labMobile'
 import {
   PHOTO_MAX_MB, loadPanelMeta, loadPanelDoc, queryDocs, saveDraft,
@@ -329,6 +337,22 @@ const isDocNo = (f) => String(f?.code || f?.dataName || '') === '单据编号'
  *  「删除按钮和清空只能删除草稿」⇒ 只有草稿才放开「删除行」与「清空重填」。 */
 const docStatus = ref('草稿')
 const isDraft = computed(() => String(docStatus.value || '').trim() === '草稿')
+
+/* ───── 状态闸门(2026-11-09 第六轮) ─────
+   用户口径:「还有手机点击保存草稿的单据,就不能修改设备名称。还有审批通过后的单据连新增修改都不可以。」
+   ① 已保存(有单据编号)⇒ 标识类表头字段(设备名称 / 仪器名称/型号 / 测试项目)只读;
+   ② 审批通过(已审核/已归档)⇒ 整张只读:加行、改字段、保存、传附件全部关掉。 */
+const readOnly = computed(() => !canEditDoc(docStatus.value))
+/** 这张单是不是"已经保存过"(有单据编号)—— 决定标识字段锁不锁 */
+const savedDoc = computed(() => !!String(editingNo.value || form['单据编号'] || '').trim())
+const lockedHeaders = computed(() => lockedHeaderKeys(headerFields.value, {
+  saved: savedDoc.value,
+  titleField: panel?.titleField || '',
+}))
+/** 某个表头字段此刻能不能改 */
+const headerEditable = (f) => !readOnly.value && !lockedHeaders.value.includes(String(f?.code || f?.dataName || ''))
+/** 整单只读的原因(显示给现场看,免得以为是卡了) */
+const readOnlyHint = computed(() => (readOnly.value ? `${tt('这张单已是')}「${docStatus.value}」${tt(',只能查看;要改请在电脑端按流程处理')}` : ''))
 
 /** 明细行展开状态(用户口径「明细可以收缩,默认是收缩的」):key = 行 __k,true = 展开。
  *  打开单据/换单时清空 ⇒ 全部收起;新加的那一行自动展开(要填)。 */
@@ -518,6 +542,7 @@ async function openRecord(row) {
 }
 
 function addRow() {
+  if (readOnly.value) { ElMessage.warning(tt('这张单已审批通过,只能查看')); return }
   const row = ensureRowKey(emptyDetailRow(detailFields.value))
   detailRows.value.push(row)
   openRows[rowKeyOf(row)] = true   // 新加的行默认展开(等着填),已有行仍保持收缩
@@ -633,6 +658,7 @@ async function onFilesPicked(ev) {
 
 /** 收到某一行的一组文件(来自原生相机或 file input):校验大小 → 立刻上传 或 先排队 */
 async function addRowFiles(row, files) {
+  if (readOnly.value) { ElMessage.warning(tt('这张单已审批通过,只能查看')); return }
   if (!files.length) return
   errText.value = ''
   const bad = []
@@ -711,6 +737,7 @@ function dropRowPendingAll(row) {
 }
 
 async function removeRowPhoto(row, p) {
+  if (readOnly.value) { ElMessage.warning(tt('这张单已审批通过,只能查看')); return }
   try {
     await ElMessageBox.confirm(`${tt('删除附件')}:${p.fileName}?`, tt('确认'), { type: 'warning' })
   } catch (e) {
@@ -772,6 +799,7 @@ function validate() {
  * 这样"先拍照后保存"也能落到正确的行上(新行保存前没有 id,锚点必须等保存后才有)。
  */
 async function save() {
+  if (readOnly.value) { ElMessage.warning(tt('这张单已审批通过,只能查看')); return }
   if (!panel || saving.value) return
   errText.value = ''
   const missing = validate()
@@ -1022,7 +1050,25 @@ defineExpose({ panelCode, panel })
   cursor: pointer;
 }
 .labm-att-del:hover { color: var(--el-color-danger); }
-.labm-att.is-pending { border-style: dashed; border-color: var(--el-color-primary-light-5); }/* 加标水模版(2026-11-09 第五轮):列结构由「测试项目」决定 —— 提示条 + 行内分格小标题 */
+.labm-att.is-pending { border-style: dashed; border-color: var(--el-color-primary-light-5); }/* 加标水模版(2026-11-09 第五轮):列结构由「测试项目」决定 —— 提示条 + 行内分格小标题 *//* 只读态(2026-11-09 第六轮):审批通过后的单整张只读 —— 提示条 + 字段上的"已锁定"小标 */
+.labm-lock {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning-dark-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.labm-locktag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-placeholder);
+  font-size: 10px;
+}
+.labm-att-del.is-off { color: var(--el-text-color-placeholder); cursor: not-allowed; }
 .labm-tpl { margin: 6px 0 10px; font-size: 12px; line-height: 1.5; }
 .labm-tpl-hint { color: var(--el-color-warning); }
 .labm-tpl-warn { color: var(--el-color-warning); }

@@ -365,3 +365,54 @@ export function visibleDetailFields({ isTemplate, layout, metaFields }) {
   const attach = meta.filter((f) => String(f?.dataType || '') === '附件')
   return [...templateDetailFields(cols, meta), ...attach]
 }
+/* ───────────── 状态闸门(2026-11-09 第六轮) ───────────── */
+
+/**
+ * 用户口径(2026-11-09):
+ *   「还有手机点击保存草稿的单据,就不能修改设备名称。还有审批通过后的单据连新增修改都不可以。」
+ *
+ * 两道闸:
+ *   ① **已保存的单据**(有单据编号)⇒ 标识类表头字段(设备名称 / 仪器名称/型号 / 测试项目)只读
+ *      —— 一张单的"设备/仪器/测试项目"就是它的身份,存过就不许再改,避免手机上误改后数据对不上;
+ *   ② **审批通过(已审核/已归档/审批通过)⇒ 整张单只读**:不能加行、不能改字段、不能保存、不能传附件。
+ */
+
+/** 审批通过及之后的状态(只读) */
+export const APPROVED_STATUSES = Object.freeze(['已审核', '已归档', '审批通过', '已作废'])
+
+/** 这张单能不能改(草稿 / 审批中 可改;审批通过后只读) */
+export function canEditDoc(status) {
+  const s = String(status ?? '').trim()
+  if (!s) return true
+  return !APPROVED_STATUSES.includes(s)
+}
+
+/** 审批通过之后的单:整张只读(给页面显示一句提示用) */
+export function isDocReadOnly(status) {
+  return !canEditDoc(status)
+}
+
+/**
+ * 哪些**表头字段**在"单据已保存"后要锁住。
+ *
+ * 取法:面板的 titleField(设备名称/仪器名称/型号/测试项目)+ 其它**标准库类**表头字段
+ * (它们同样是"这张单是什么"的标识:换一个设备就等于换了一张单)。
+ * 新单(还没保存)一律不锁 —— 用户要能选。
+ *
+ * @param {Array} headerFields 表头字段(含 code/dataType)
+ * @param {{saved?: boolean, titleField?: string}} p saved=是否已有单据编号
+ * @returns {string[]} 要置灰的字段键
+ */
+export function lockedHeaderKeys(headerFields, { saved, titleField } = {}) {
+  if (!saved) return []
+  const title = String(titleField ?? '').trim()
+  const out = []
+  for (const f of Array.isArray(headerFields) ? headerFields : []) {
+    const k = String(f?.code ?? f?.dataName ?? '').trim()
+    if (!k) continue
+    const isTitle = title && k === title
+    const isStdLib = String(f?.dataType ?? '').trim() === '标准库'
+    if (isTitle || isStdLib) out.push(k)
+  }
+  return out
+}

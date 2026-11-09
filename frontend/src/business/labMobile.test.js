@@ -19,7 +19,7 @@ import {
   buildSavePayload, rowTitleOf, rowMetaOf, photoCountOf, isImageName, baseNameOf,
   rowPhotoKey, mergeRowIds,
   SPIKE_WATER_CODE, TEMPLATE_FIELD, TEMPLATE_LIB, stdLibOptions, stdLibContentOf,
-  templateDetailFields, visibleDetailFields,
+  templateDetailFields, visibleDetailFields, canEditDoc, isDocReadOnly, lockedHeaderKeys, APPROVED_STATUSES,
 } from './labMobile.js'
 
 /* ── ① 三个面板 ─────────────────────────────────────────────────────────── */
@@ -376,4 +376,35 @@ test('换「测试项目」⇒ 明细列跟着换(同一条路径:取 content �
   const legacy = parseLayout(stdLibContentOf(LIB_ROWS, 'NSF 42-余氯'))
   assert.equal(legacy.ok, false)
   assert.ok(legacy.cols.length >= 6, '退回内置列集不能是空表')
+})
+/* ───────── 状态闸门(2026-11-09 第六轮) ─────────
+   用户口径:「还有手机点击保存草稿的单据,就不能修改设备名称。还有审批通过后的单据连新增修改都不可以。」 */
+
+test('canEditDoc:草稿/审批中可改;审批通过(已审核/已归档/审批通过/已作废)只读', () => {
+  for (const s of ['草稿', '审批中', '', '  草稿  ']) assert.equal(canEditDoc(s), true, s)
+  for (const s of ['已审核', '已归档', '审批通过', '已作废']) assert.equal(canEditDoc(s), false, s)
+  assert.deepEqual([...APPROVED_STATUSES].sort(), ['已审核', '已作废', '已归档', '审批通过'].sort())
+  assert.equal(isDocReadOnly('已审核'), true)
+  assert.equal(isDocReadOnly('草稿'), false)
+})
+
+test('lockedHeaderKeys:新单不锁;已保存的单锁住"标识"字段(设备名称/仪器/测试项目 + 标准库字段)', () => {
+  const header = [
+    { code: '单据编号', dataType: '文本' },
+    { code: '单据日期', dataType: '日期' },
+    { code: '设备名称', dataType: '标准库' },
+    { code: '备注', dataType: '文本' },
+  ]
+  assert.deepEqual(lockedHeaderKeys(header, { saved: false, titleField: '设备名称' }), [], '新单要能选设备')
+  assert.deepEqual(lockedHeaderKeys(header, { saved: true, titleField: '设备名称' }), ['设备名称'],
+    '只有设备名称是标识字段(备注/日期不受影响)')
+  // 普通文本的 titleField 也要锁(即使它不是标准库字段)
+  const h2 = [{ code: '仪器名称/型号', dataType: '文本' }, { code: '备注', dataType: '文本' }]
+  assert.deepEqual(lockedHeaderKeys(h2, { saved: true, titleField: '仪器名称/型号' }), ['仪器名称/型号'])
+})
+
+test('lockedHeaderKeys:脏数据不炸(空列表/无 titleField)', () => {
+  assert.deepEqual(lockedHeaderKeys(null, { saved: true }), [])
+  assert.deepEqual(lockedHeaderKeys([{ code: '设备名称', dataType: '标准库' }], { saved: true }), ['设备名称'],
+    '没有 titleField 时,标准库字段仍然算标识字段')
 })
