@@ -41,6 +41,11 @@
       <!-- 一次可以勾**多行**,但服务端会**每行各出一张打印单**(用户口径「作废不希望连坐」+
            追加「一次是可以打印多行的」)—— 多行并进一张单会让作废连坐,所以粒度落在单上,不在弹窗上 -->
       <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }}</div>
+      <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径) -->
+      <div v-if="lockedBySource" class="mlq-lock">
+        {{ tt('已按采购订单打印记录带入：数量和行已锁定，只能修改上面的批次号和生产日期') }}
+        <span class="mlq-lock-no">{{ sourcePrintNo }}</span>
+      </div>
 
       <el-table ref="tableRef" :data="rows" row-key="id" border size="small" height="330" @selection-change="onPicked">
         <el-table-column type="selection" width="42" :selectable="rowSelectable" />
@@ -55,7 +60,7 @@
         <el-table-column :label="tt('本次打印数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.id]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
+              :disabled="lockedBySource || !(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
@@ -93,8 +98,8 @@
             <el-table-column :label="tt('本次打印数量')" width="150">
               <template #default="{ row }">
                 <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
-                  :controls="false" :disabled="!(Number(row['可补登数量'] || 0) > 0)" :precision="precisionOf(row)"
-                  style="width: 130px" />
+                  :controls="false" :disabled="lockedBySource || !(Number(row['可补登数量'] || 0) > 0)"
+                  :precision="precisionOf(row)" style="width: 130px" />
               </template>
             </el-table-column>
           </el-table>
@@ -155,7 +160,7 @@
             <el-table-column :label="tt('操作')" width="150" align="center">
               <template #default="{ row }">
                 <!-- 2026-11-09 用户口径:按这张记录打过一次后按钮置灰,不能重复打 -->
-                <el-button link type="primary" :disabled="busy || isUsedSrc(row['单据编号'])"
+                <el-button link type="primary" :disabled="busy || lockedBySource || isUsedSrc(row['单据编号'])"
                   @click="applyPoPrint(row)">
                   {{ isUsedSrc(row['单据编号']) ? tt('已打码') : tt('按这次打印打码') }}
                 </el-button>
@@ -167,8 +172,8 @@
       </el-collapse>
     </div>
     <template #footer>
-      <el-button @click="fillRemaining">{{ tt('按剩余量填充') }}</el-button>
-      <el-button @click="clearAll">{{ tt('清空') }}</el-button>
+      <el-button :disabled="lockedBySource" @click="fillRemaining">{{ tt('按剩余量填充') }}</el-button>
+      <el-button :disabled="lockedBySource" @click="clearAll">{{ tt('清空') }}</el-button>
       <el-button type="primary" :loading="busy" @click="confirm">{{ tt('确定并打印') }}</el-button>
     </template>
   </el-dialog>
@@ -234,6 +239,11 @@ const usedSrcSet = computed(() => new Set((data.value['已打码打印单'] || [
  */
 const usedLocal = ref([])
 const isUsedSrc = (no) => usedSrcSet.value.has(String(no)) || usedLocal.value.includes(String(no))
+/**
+ * 是否已按「采购订单打印记录」带入(2026-11-09 用户口径:
+ * 点击按这次打印打码后,不能改变数量和行号,只可以写上面的批次号和生产日期) ⇒ 锁定表格。
+ */
+const lockedBySource = computed(() => !!sourcePrintNo.value)
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
 const totalQty = computed(() => {
@@ -250,9 +260,9 @@ function precisionOf(row) {
   const n = Number(row?.小数位数)
   return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.trunc(n))) : 2
 }
-/** 有可打量才让勾(打满的行不给勾) */
+/** 有可打量才让勾(打满的行不给勾);按打印记录带入后**行锁定**,一律不许改勾选 */
 function rowSelectable(row) {
-  return capOf(row) > 0
+  return !lockedBySource.value && capOf(row) > 0
 }
 
 /* ── 下层「已生单可补打」:已收但还没打码的量(按 订单行 × 已生单批次号 一行) ── */
@@ -263,7 +273,8 @@ const suppQty = reactive({})
 const suppKeyOf = (row) => `${row['采购订单行id']}\u0001${row['批次号']}`
 const suppRows = computed(() => (data.value['补登行'] || []).map((r) => ({ ...r, suppKey: suppKeyOf(r) })))
 function suppSelectable(row) {
-  return Number(row['可补登数量'] || 0) > 0
+  // 按打印记录带入后,补登行也不许再勾(数量/行都锁定)
+  return !lockedBySource.value && Number(row['可补登数量'] || 0) > 0
 }
 function onSuppPicked(list) {
   suppPicked.value = list || []
@@ -366,6 +377,10 @@ async function applyPoPrint(row) {
     }
     syncPick(ids)
     sourcePrintNo.value = no     // 记下来源:打印时带给服务端,打过一次就不能再用这张记录
+    // 带入后数量/行锁定(2026-11-09):补登区一并清空并锁住,只留批次号/生产日期可改
+    suppPicked.value = []
+    for (const k of Object.keys(suppQty)) suppQty[k] = 0
+    suppRef.value?.clearSelection()
     const clamped = rows.value.some((r) => {
       const q = byLine.get(Number(r.id))
       return q != null && q > capOf(r)
@@ -503,6 +518,9 @@ async function doVoid(row) {
 .mlq-tip { color: #8b9893; }
 /* 多行提示条(浅黄底,说明"每行各出一张打印单;作废只影响对应那一行") */
 .mlq-oneline { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
+/* 按打印记录带入后的锁定提示(数量/行锁定,只能改批次号与生产日期) */
+.mlq-lock { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1f6f4a; background: #eef7f1; border: 1px dashed #9fd3b6; border-radius: 4px; padding: 3px 8px; }
+.mlq-lock-no { font-weight: 600; }
 .mlq-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .mlq-records { margin-top: 4px; }
 .mlq-rec-title { font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
