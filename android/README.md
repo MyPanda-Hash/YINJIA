@@ -1,7 +1,7 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-09 出 1.0.7)
-> **产物**:`android/dist/yinjia-mes-1.0.7.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-09 出 1.0.7 / 1.0.8)
+> **产物**:`android/dist/yinjia-mes-1.0.8.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -10,10 +10,12 @@
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.7`、`versionCode=8`(上一版 1.0.6 = 7) |
+| 本版 | `versionName=1.0.8`、`versionCode=9`(上一版 1.0.7 = 8,更早 1.0.6 = 7) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
-| 覆盖升级 | 与 1.0.6 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
-| 本版内容 | 手机扫码新增 **实验室记录手机登记**(3 张研发记录表的手机端:逐行附件拍照/下载、模糊查询、明细折叠、回填电脑端面板) |
+| 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.8 内容 | **拍照上传附件走原生相机**:实验室记录手机登记的「拍照/上传附件」点下去打开原生相机页
+(复用扫码那台相机,底部「拍照」大按钮、点屏幕开关手电),拍完自动回传并上传;网页里 `<input type=file>` 也补上了 `onShowFileChooser`(可进相册/文件) |
+| 1.0.7 内容 | 手机扫码新增 **实验室记录手机登记**(3 张研发记录表的手机端:逐行附件、模糊查询、明细折叠、回填电脑端面板) |
 
 > 铁律:① `com.yinjia.mes.app` 与 `android/debug.keystore` 丢了就无法覆盖升级(只能卸载重装);
 > ② 每次出包 **versionCode 必须比上一版大**(脚本里 `$versionCode`),否则安卓拒绝覆盖安装;
@@ -86,8 +88,8 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
 前置:Android SDK(`ANDROID_HOME` 或 `%LOCALAPPDATA%\Android\Sdk`)、JDK 25(`JAVA_HOME`)。
 脚本会自动探测;`android/libs/zxing-core-3.5.3.jar` 已随仓库提供(离线可构建)。
 
-**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.7.apk` 拷到手机点安装(需允许「安装未知应用」)。
-手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 8>7);装完可从「我的桌面 → 设置」里
+**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.8.apk` 拷到手机点安装(需允许「安装未知应用」)。
+手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 9>8);装完可从「我的桌面 → 设置」里
 看到壳版本,或看 APK 文件名核对。
 
 > 出包前先 `cd frontend && npm run build`(脚本会自己把 `frontend/dist` 收进 `assets/www`,
@@ -199,3 +201,26 @@ powershell -ExecutionPolicy Bypass -File android\build.ps1 -Install
   老 APK 无此方法时退回单码 `scan()`;
 - 多选模式下**收到第一个码就出勾选面板**(不再等第 2 个),底部按钮 `确定(N)`;
 - 版本 `1.0.4`(versionCode 5)。
+
+### 8.4 第五轮(2026-11-09):拍照上传附件走**原生相机**
+
+> 用户:「点击拍照上传附件,并没有调用摄像机,摄像机就同一沿用之前的就行。」
+
+- **根因**:页面跑在 `file:///android_asset/www`,WebView 对 `<input type=file capture>`
+  **不会拉起相机**(壳原先连 `onShowFileChooser` 都没实现)⇒ 点「拍照/上传附件」毫无反应。
+- **做法(复用扫码那台相机)**:`ScanActivity` 加 **photo 模式**
+  (`am ... --ez photo true` / 内部 Intent):同一套 `Camera.open()` 预览 + 自动对焦 + 点屏幕开关手电,
+  只是不再解码;底部多一颗大号「拍照」按钮 → `takePicture` → 压到长边 ≤1280 / JPEG 80 存缓存 →
+  回传路径给 `MainActivity` → 转 `data:image/jpeg;base64,…` →
+  `window.__yjPhotoResult(dataUrl, fileName)` → 网页当普通 `File` 走既有 `/attachment/upload`。
+- **桥**:`YjNative.takePhoto()`(新)+ `YjNative.hasCamera()`;网页侧见
+  `frontend/src/business/nativeCamera.js`(壳内走原生、浏览器自动退化回 file input)。
+- **顺带**:WebChromeClient 补了 `onShowFileChooser` —— 网页里的文件框在 APK 里也能开
+  (进相册/文件),不再是"点了没反应"。
+- **验证**(Android 14 模拟器 + 真机待现场):
+  - `adb install -r` 覆盖安装成功,`dumpsys package` = `versionCode=9 / versionName=1.0.8`;
+  - dex 里可见 `takePhoto` / `hasCamera` / `__yjPhotoResult` / `btn_shoot` / `yj_photo_`;
+  - 临时钩子(仅验证用,已回滚)直接进拍照页:**相机预览出来了、「拍照」按钮在、点了之后回到主界面,
+    `logcat` 无 FATAL / 无 `YjPhoto` 报错**,权限弹窗也按预期出现。
+  - ⚠ 尚未在真机上走完"拍照 → 上传 → 回填"整链(模拟器无真实镜头)。
+- 版本 `1.0.8`(versionCode 9);证据截图 `tools/archive/_lab-native-photo-20261109/`。

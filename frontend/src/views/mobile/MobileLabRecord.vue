@@ -231,6 +231,8 @@ import {
   PHOTO_MAX_MB, loadPanelMeta, loadPanelDoc, queryDocs, saveDraft,
   uploadPhoto, listPhotos, deletePhoto, loadAttachmentBlob, errText as apiErr,
 } from '@/business/labMobileApi'
+// APK 壳里的原生拍照(2026-11-09 第四轮):壳内走原生相机,网页/浏览器自动退化为 file input
+import { hasNativeCamera, takeNativePhoto } from '@/business/nativeCamera'
 
 const route = useRoute()
 
@@ -490,7 +492,26 @@ async function loadPhotos() {
   }
 }
 
-function pickRowPhoto(idx) {
+/**
+ * 「拍照/上传附件」(2026-11-09 第四轮)。
+ *
+ * 用户口径:「点击拍照上传附件,并没有调用摄像机,摄像机就同一沿用之前的就行。」
+ * ⇒ 在 APK 壳里:**走原生相机**(`YjNative.takePhoto()` → 复用扫码页那台相机,拍完回 dataURL);
+ *    在手机浏览器/电脑上:**保持原来的 file input**(`accept=image/* capture`,手机会拉相机)。
+ * 两条路最后都汇到 `addRowFiles(row, [file])`,上传/排队逻辑只有一份。
+ */
+async function pickRowPhoto(idx) {
+  const row = detailRows.value[idx]
+  if (!row) return
+  if (hasNativeCamera()) {
+    try {
+      const f = await takeNativePhoto()
+      if (f) await addRowFiles(row, [f])
+    } catch (e) {
+      errText.value = String(e?.message || tt('拍照失败'))
+    }
+    return
+  }
   photoTargetIdx.value = idx
   fileInput.value?.click?.()
 }
@@ -502,6 +523,12 @@ async function onFilesPicked(ev) {
   photoTargetIdx.value = -1
   const row = detailRows.value[idx]
   if (!files.length || !row) return
+  await addRowFiles(row, files)
+}
+
+/** 收到某一行的一组文件(来自原生相机或 file input):校验大小 → 立刻上传 或 先排队 */
+async function addRowFiles(row, files) {
+  if (!files.length) return
   errText.value = ''
   const bad = []
   const good = []

@@ -3,8 +3,11 @@ package com.yinjia.mes.app;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
@@ -94,6 +97,12 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
     /** 多选模式(生成工单领料/退料单页):勾选多张工单,一次回传多个码 */
     private boolean multiMode = false;
 
+    /** 拍照模式(2026-11-09):不扫码,用同一台相机拍一张照片回传(实验室记录手机登记的逐行附件) */
+    private boolean photoMode = false;
+    /** 正在保存照片:takePicture 回调回来前禁止连点 */
+    private boolean taking = false;
+    private Button shootBtn;
+
     private final MultiFormatReader reader = new MultiFormatReader();
     private GenericMultipleBarcodeReader multi;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -120,6 +129,11 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
         setContentView(com.yinjia.mes.app.R.layout.activity_scan);
 
         multiMode = getIntent() != null && getIntent().getBooleanExtra("multi", false);
+        // 2026-11-09 第四轮:**拍照模式**。用户口径「点击拍照上传附件,并没有调用摄像机,
+        //   摄像机就同一沿用之前的就行」—— 网页里的 <input type=file capture> 在 WebView 里
+        //   根本调不起相机(壳没实现 onShowFileChooser;且 file:// 页面拿不到相机),
+        //   所以复用本页已经调好的 Camera 预览/对焦/手电,只是把"解码"换成"拍一张"。
+        photoMode = getIntent() != null && getIntent().getBooleanExtra("photo", false);
 
         surface = (SurfaceView) findViewById(com.yinjia.mes.app.R.id.preview);
         hint = (TextView) findViewById(com.yinjia.mes.app.R.id.hint);
@@ -145,6 +159,15 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             @Override public void onClick(View v) { setResult(RESULT_CANCELED); finish(); }
         });
 
+        // 拍照模式:露出底部「拍照」按钮,隐藏多码面板;点取景框仍是手电开关
+        shootBtn = (Button) findViewById(com.yinjia.mes.app.R.id.btn_shoot);
+        if (shootBtn != null) {
+            shootBtn.setVisibility(photoMode ? View.VISIBLE : View.GONE);
+            shootBtn.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { takePhoto(); }
+            });
+        }
+
         holder = surface.getHolder();
         holder.addCallback(this);
         holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -169,9 +192,79 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             @Override public void onClick(View v) { toggleTorch(); }
         });
 
-        hint.setText(multiMode
-                ? "对准整张任务单:可一次扫多个码,勾选后点『确定』"
-                : "对准二维码 / 条形码;点屏幕开关手电;返回键取消");
+        hint.setText(photoMode
+                ? "对准要拍的内容;点底部「拍照」保存那张照片,返回键取消"
+                : (multiMode
+                    ? "对准整张任务单:可一次扫多个码,勾选后点『确定』"
+                    : "对准二维码 / 条形码;点屏幕开关手电;返回键取消"));
+    }
+
+    /**
+     * 拍照模式的核心:用**同一个 Camera** 拍一张,压到长边 ≤1280 / JPEG 80,存进 App 缓存目录,
+     * 把文件路径回给 MainActivity 转 base64 → 网页(`window.__yjPhotoResult`)。
+     *
+     * 为什么不把 byte[] 塞 Intent:Intent extra 有 ~1MB 事务限制,原图几 MB 会直接
+     * TransactionTooLargeException;走缓存文件最稳。
+     */
+    private void takePhoto() {
+        if (camera == null) { hint.setText("相机没准备好,请稍后重试"); return; }
+        if (taking) return;
+        taking = true;
+        if (shootBtn != null) shootBtn.setEnabled(false);
+        hint.setText("正在保存照片…");
+        try {
+            camera.takePicture(null, null, new Camera.PictureCallback() {
+                @Override public void onPictureTaken(byte[] raw, Camera cam) {
+                    String path = null;
+                    try {
+                        path = compressToCache(raw);
+                    } catch (Throwable t) {
+                        Log.e(TAG, "保存照片失败: " + t.getMessage());
+                    }
+                    taking = false;
+                    if (path == null) {
+                        if (shootBtn != null) shootBtn.setEnabled(true);
+                        hint.setText("拍照失败,请重试");
+                        try { if (cam != null) cam.startPreview(); } catch (Exception ignore) { }
+                        return;
+                    }
+                    Intent out = new Intent();
+                    out.putExtra("photoPath", path);
+                    setResult(RESULT_OK, out);
+                    finish();
+                }
+            });
+        } catch (Exception e) {
+            taking = false;
+            if (shootBtn != null) shootBtn.setEnabled(true);
+            hint.setText("拍照失败:" + e.getMessage());
+            Log.e(TAG, "takePicture 异常: " + e.getMessage());
+        }
+    }
+
+    /** 原图 JPEG → 缩到长边 ≤1280 → JPEG 80 → 缓存文件;失败返回 null */
+    private String compressToCache(byte[] raw) throws Exception {
+        Bitmap bmp = BitmapFactory.decodeByteArray(raw, 0, raw.length);
+        if (bmp == null) return null;
+        int w = bmp.getWidth(), h = bmp.getHeight();
+        int max = Math.max(w, h);
+        float k = max > 1280 ? 1280f / max : 1f;
+        Bitmap outBmp = bmp;
+        if (k < 1f) {
+            Matrix m = new Matrix();
+            m.postScale(k, k);
+            outBmp = Bitmap.createBitmap(bmp, 0, 0, w, h, m, true);
+        }
+        java.io.File f = new java.io.File(getCacheDir(), "yj_photo_" + System.currentTimeMillis() + ".jpg");
+        java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+        try {
+            outBmp.compress(Bitmap.CompressFormat.JPEG, 80, fos);
+            fos.flush();
+        } finally {
+            try { fos.close(); } catch (Exception ignore) { }
+        }
+        if (outBmp != bmp) bmp.recycle();
+        return f.getAbsolutePath();
     }
 
     private void toggleTorch() {
@@ -207,6 +300,8 @@ public class ScanActivity extends Activity implements SurfaceHolder.Callback {
             camera.setPreviewCallback(new Camera.PreviewCallback() {
                 @Override public void onPreviewFrame(byte[] data, Camera cam) {
                     // 面板打开时也**继续解码**(2026-11-05 修:旧版暂停导致"9 个只收到 7 个")
+                    // 拍照模式只取景不解码(省电;这一页压根不做识别)
+                    if (photoMode) return;
                     if (decoding || found || data == null) return;
                     if ((frameSkip++ % FRAME_SKIP) != 0) return;
                     decoding = true;
