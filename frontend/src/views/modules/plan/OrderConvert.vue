@@ -24,7 +24,11 @@
        ② 超出的行要有醒目提示:输入框红框 + 「超订单」小标 + tooltip 说明(文案走 tt);
          提交时二次确认(列出超出行数与合计超出量),确认后照常提交;
        ③ 默认值仍是剩余数量(原操作习惯不变);行级占用链 form_flow_link.linked_quantity 落实际转单量,
-         备品超出部分也计入占用(转满后本行剩余为负,按「剩余>0」过滤自然退出本页)。 -->
+         备品超出部分也计入占用(转满后本行剩余为负,按「剩余>0」过滤自然退出本页)。
+
+     2026-11-09 用户口径(两页一致):
+       ①左上角日期范围控件抽成通用组件 @core/ui/DateRangeQuery.vue,「订单结转」与「生产工单」共用同一份实现;
+         本页只负责回接,**行为零变化**(默认 [今天,今天]、快捷档、反序交换、查询触发全部留在本页)。 -->
 <template>
   <div class="oc-page">
     <!-- 汇总条(蓝底白字,同参考) -->
@@ -37,13 +41,13 @@
     </div>
 
     <!-- 工具栏:左上角日期范围查询(2026-10-29 用户口径:由「单日/近N天档位」改成**日期范围选择**)
-         + 查询条件 + 动作 + 列设置(显/隐) -->
+         + 查询条件 + 动作 + 列设置(显/隐)。
+         2026-11-09:控件抽成通用组件 @core/ui/DateRangeQuery.vue(生产工单页共用同一份实现,两页口径一致);
+         默认 [今天,今天]、反序交换、查询触发仍由本页 datePick/range/onQuery 持有 ⇒ 行为与抽取前完全一致;
+         宽度走组件默认 width=260px(与抽取前观感相同)。 -->
     <el-form inline class="oc-bar" @submit.prevent>
       <el-form-item :label="tt('日期范围')">
-        <el-date-picker v-model="datePick" type="daterange" unlink-panels value-format="YYYY-MM-DD"
-                        size="small" class="oc-daterange" :clearable="false"
-                        :start-placeholder="tt('开始日期')" :end-placeholder="tt('结束日期')"
-                        :shortcuts="dateShortcuts" @change="onQuery" />
+        <DateRangeQuery v-model="datePick" @change="onQuery" />
       </el-form-item>
       <el-form-item :label="tt('查询条件')">
         <el-input v-model="keyword" :placeholder="tt('订单号 / 客户 / 物料')" clearable style="width: 200px" @keyup.enter="onQuery" />
@@ -189,7 +193,7 @@ import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { canDo } from '@core/auth/panelAccess'
 import { useReportColumns } from '@core/report/useReportColumns'
-import { PRESETS, presetRange } from '@core/dashboard/dateRange'
+import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 import { applyRouteDefaults } from '@/business/routeDefaults'
 
@@ -336,11 +340,9 @@ const range = computed(() => {
 })
 const rangeText = computed(() => (range.value.from === range.value.to ? range.value.from : `${range.value.from} ~ ${range.value.to}`))
 
-/** 日期框内的快捷档(今日/本周/本月/近7天/近30天/上月;文案走 tt,复用看板同一份 PRESETS) */
-const dateShortcuts = computed(() => PRESETS.map((p) => ({
-  text: tt(p.label),
-  value: () => { const r = presetRange(p.key); return [parseDay(r.from), parseDay(r.to)] },
-})))
+// 日期框内的快捷档(今日/本周/本月/近7天/近30天/上月)已随控件抽到通用组件
+// @core/ui/DateRangeQuery.vue(2026-11-09:与生产工单页共用同一份实现,两页口径一致);
+// 本页只保留绑定值/反序兜底/查询触发,快捷档由组件内部生成。
 
 /** 当前页数据(前端分页:渲染行数封顶,勾选跨页保留) */
 const pagedRows = computed(() => {
@@ -573,8 +575,6 @@ onMounted(async () => {
 .oc-summary { background: #1e6fb8; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 13px; line-height: 1.6; }
 .oc-sep { opacity: .8; }
 .oc-bar { margin: 0; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; padding: 6px 10px 0; }
-/* 日期范围选择(2026-10-29):两个日期框 + 分隔符,约 250px */
-.oc-daterange { width: 260px; }
 .oc-count { margin-left: 12px; color: #606266; font-size: 12px; }
 .oc-table { flex: 1; min-height: 0; }
 .oc-pager { display: flex; justify-content: flex-end; }
