@@ -47,11 +47,54 @@ export const LAB_PANELS = Object.freeze([
   },
 ])
 
-/** 手机拍照上传落在哪个字段(与迁移脚本的 head 列 / yj_field 行同名) */
+/** 手机拍照上传落在哪个字段(与迁移脚本的明细列 / yj_field 行同名)。
+ *  2026-11-09 第二轮:照片**按明细行**存(每一行都可能要拍照),见 rowPhotoKey。 */
 export const PHOTO_FIELD = '手机照片'
 
-/** 保存时**不进载荷**的表头键:单据标识与状态由引擎维护,照片列归附件服务维护 */
+/** 保存时**不进载荷**的表头键:单据标识与状态由引擎维护,照片值归明细行/附件服务维护 */
 const SAVE_SKIP_HEADERS = Object.freeze(['单据编号', '单据状态', '编号', '创建时间', '更新时间', PHOTO_FIELD])
+
+/**
+ * 某一明细行的照片**附件锚点**:`手机照片-<行 id>`。
+ *
+ * 用户口径(2026-11-09 第二轮)「附件…加在明细字段内,就是表格里面,每一行都有可能要拍照保存」⇒
+ * 附件不能再按"整单一组"挂,必须按行挂;行 id 是行身份的稳定凭据(后端 AttachmentService 据此只更新那一行)。
+ * 新行在保存前没有 id ⇒ 返回空串,页面据此先把照片排队、保存拿到 id 再补传。
+ * @param {{id?: number|string}|null|undefined} row
+ * @returns {string} 例 '手机照片-12';无 id 返回 ''
+ */
+export function rowPhotoKey(row) {
+  const id = row?.id
+  if (id === null || id === undefined || String(id).trim() === '') return ''
+  return `${PHOTO_FIELD}-${String(id).trim()}`
+}
+
+/**
+ * 保存后把服务端给的**行 id 回填**到本地行模型(照片上传靠它)。
+ *
+ * 为什么要这一步:手机端允许"先拍照、后保存"。新行在保存前没有 id ⇒ 照片先按行排队;
+ * 保存成功后必须知道"刚才是哪一行换来了哪个 id",才谈得上把排队照片传到那一行。
+ * 规则(与后端 upsert 行为对齐):**带 id 的行按 id 对齐;不带 id 的行按出现顺序占用剩下的 id**。
+ * ⚠ 原地改本地行对象(保留 `__k` 等本地字段),不返回新数组 —— 页面里的排队照片是按 `__k` 索引的。
+ * @param {any[]} localRows 页面当前行(可能含 __k / 已上传照片)
+ * @param {any[]} serverRows 保存后重新拉到的明细行(带 id)
+ * @returns {{rows: any[], assigned: number}} assigned = 本次补上 id 的行数
+ */
+export function mergeRowIds(localRows, serverRows) {
+  const local = Array.isArray(localRows) ? localRows : []
+  const server = (Array.isArray(serverRows) ? serverRows : []).filter((r) => r && r.id != null)
+  const usedIds = new Set(local.filter((r) => r && r.id != null).map((r) => String(r.id)))
+  let assigned = 0
+  for (const row of local) {
+    if (!row || row.id != null) continue
+    const hit = server.find((s) => !usedIds.has(String(s.id)))
+    if (!hit) break
+    row.id = hit.id
+    usedIds.add(String(hit.id))
+    assigned += 1
+  }
+  return { rows: local, assigned }
+}
 
 /** 面板配置(按码取;未知码返回 null,页面据此提示"面板编号无效") */
 export function labPanelOf(panelCode) {

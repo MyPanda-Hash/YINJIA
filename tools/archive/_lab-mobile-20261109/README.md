@@ -14,7 +14,11 @@
 | `q4.sql` / `q6.sql` / `q11.sql` / `q12.sql` | 加列前后核对(`COL_LENGTH`、列数 35→36、`yj_field` 3 条、`yj_translation` en) |
 | `q9.sql` | 手机端建单后的落库取证:head(`手机照片='test-photo.png'`)/ `yj_attachment` 行 / 明细行 |
 | `q13-edit.sql` | 改既有草稿(明细带 `id`):头备注更新、明细**按 id 原地更新**(不翻倍) |
-| `q14-noclobber.sql` | 改带照片的单且本次没传照片:`手机照片` 仍是 `test-photo.png`(保存不冲掉附件列) |
+| `q14-noclobber.sql` | 改带照片的单且本次没传照片:行上的 `手机照片` 保持原值(保存不冲掉附件列) |
+| `q20-rowphoto.sql` | **第二版迁移后**:明细列已加、表头列已删、表头那份照片搬到第一行、锚点改成 `手机照片-3` |
+| `q21-after-add.sql` | 手机端在既有单里追加行后的落库(行 4 + 锚点 `手机照片-4`) |
+| `q22-rowphoto-final.sql` | **逐行照片终态**:三行各有文件名;三个锚点 `手机照片-3/4/5`,行行独立不串 |
+| `q23-cols.sql` | 明细表列数(54 / 41 / 43)对照 |
 | `q-config-equip.json` | `GET /px/getPanelConfig?panelCode=RD_EQUIP_USE` 的下发(含新增的「手机照片」附件字段) |
 | `q-newform-equip.json` | `GET /px/getNewFormPermMatrix`(`meta` 表头字段 + `detail.tabs[0].fields` 明细字段 + 默认值) |
 | `q-doc.json` | `GET /px/getFormDescriptor`(已有单据回填形状:`data` + `detailData.items[]` 带 id) |
@@ -26,6 +30,11 @@
 | `ego/round-48-mobile-search.png` | 模糊查询「拍照联调」→ 3 条收敛到 1 条 |
 | `ego/round-50-pc-strip-fixed.png` | **电脑端同一面板**第 1/3 张单纸面上方出现「手机照片:test-photo.png」附件条(回填闭环) |
 | `ego/round-51-spikewater.png` | 加标水面板手机页(21 个明细字段)渲染正常 |
+| `ego/round-61-opened.png` | **第二轮**:手机端打开既有单,行上已有 1 张照片(迁移搬过来的) |
+| `ego/round-62-staged.png` | 既有单里「加一行」+ 给新行拍照 → 新行标「待上传」(还没有行 id) |
+| `ego/round-67-repro.png` | 追加行保存后:新行拿到 id、照片自动补传,三行各 1 张、pending 归零 |
+| `ego/round-68-pc-rowphoto.png` | **电脑端纸面**:表格末尾「手机照片」列每行一个附件格;标题右下角「编号：EU-2026-11-0003」 |
+| `ego/round-69-spikewater.png` | 加标水(列集来自标准库模版)同样自动多出「手机照片」列;手机端每行「本行照片(保存后自动上传)」 |
 
 ## 复跑要点
 

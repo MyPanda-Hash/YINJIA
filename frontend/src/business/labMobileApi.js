@@ -69,21 +69,26 @@ export function saveDraft(panelCode, payload) {
     .then(unpack)
 }
 
-/** 上传一张照片(POST /attachment/upload,multipart) → {files, names} */
-export async function uploadPhoto({ panelCode, docNo, file }) {
+/**
+ * 上传一张照片(POST /attachment/upload,multipart) → {files, names}
+ * @param {{panelCode:string, docNo:string, fieldKey?:string, file:File}} p
+ *   fieldKey 缺省 = 表头字段「手机照片」;按行存时传 `rowPhotoKey(row)`(='手机照片-<行 id>')。
+ */
+export async function uploadPhoto({ panelCode, docNo, fieldKey, file }) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('panelCode', String(panelCode || ''))
   fd.append('docNo', String(docNo || ''))
-  fd.append('field', PHOTO_FIELD)
+  fd.append('field', String(fieldKey || PHOTO_FIELD))
   const res = await request.post('/attachment/upload', fd, { timeout: 120000 })
   return unpack(res)
 }
 
-/** 某单据的全部手机照片 [{id,fileName,fileSize,contentType,uploader,uploadTime}] */
-export function listPhotos(panelCode, docNo) {
+/** 某单据**某字段**的全部照片 [{id,fileName,fileSize,contentType,uploader,uploadTime}]
+ *  (fieldKey 同上:表的整单照片 = '手机照片',按行照片 = '手机照片-<行 id>') */
+export function listPhotos(panelCode, docNo, fieldKey) {
   return request
-    .get('/attachment/list', { params: { panelCode, docNo, field: PHOTO_FIELD } })
+    .get('/attachment/list', { params: { panelCode, docNo, field: String(fieldKey || PHOTO_FIELD) } })
     .then((res) => (Array.isArray(res?.data) ? res.data : []))
 }
 
@@ -95,4 +100,20 @@ export function deletePhoto(id) {
 /** 取附件字节(缩略图/预览共用;鉴权走 axios 拦截器的 Bearer token) */
 export function loadAttachmentBlob(id) {
   return request.get(`/attachment/${id}/download`, { responseType: 'blob', timeout: 120000 })
+}
+
+/**
+ * 错误提示文案:后端 message 优先,其次 HTTP 状态码,**并带上出错的接口路径**。
+ *
+ * 为什么带路径:手机端一次保存会连发好几个请求(取单 → 保存 → 逐行传照片 → 重查列表),
+ * 现场只看到「Request failed with status code 500」根本不知道是哪一步挂的;
+ * 附上 `[api 路径]` 后,手机上截个图就能定位(2026-11-09 排查逐行照片上传时踩到)。
+ */
+export function errText(e, fallback) {
+  const url = e?.config?.url ? ` [${String(e.config.url)}]` : ''
+  const msg = e?.response?.data?.message
+  if (msg) return `${msg}${url}`
+  const status = e?.response?.status
+  if (status) return `${fallback || '操作失败'}(${status})${url}`
+  return `${e?.message || fallback || '操作失败'}${url}`
 }

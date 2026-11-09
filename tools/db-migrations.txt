@@ -4527,3 +4527,6 @@ migrate-pu-label-src-print-20261109.sql
 
 # 2026-11-09 实验室记录手机登记:3 张记录表头加[手机照片]附件列 + yj_field(data_type=附件) + en 译名
 migrate-lab-mobile-20261109.sql
+
+# 2026-11-09 手机照片从表头下移到明细行:3 张明细表加列 + yj_field(place=detail)、撤表头列与表头字段、附件锚点改为 手机照片-行id
+migrate-lab-mobile-row-photo-20261109.sql

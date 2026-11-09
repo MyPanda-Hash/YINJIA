@@ -237,7 +237,7 @@
           </div>
           <RecordSheetPanels
             ref="approvalSheetRef"
-            :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
+            :head="cur" :fields="sheetAllFields" :detail-fields="sheetDetailFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
             :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
@@ -4808,6 +4808,9 @@ const sheetAllFields = computed(() => {
   const detail = cfgCache.value?.detail?.tabs?.[0]?.fields || []
   return [...header, ...detail]
 })
+/** 明细字段元数据(只明细那一份):RecordSheetPanels 靠它发现「明细里的附件字段」
+ *  (2026-11-09 手机照片按下行存 → 纸面数据表末尾自动补一列;见该组件 rowAttachCols)。 */
+const sheetDetailFields = computed(() => cfgCache.value?.detail?.tabs?.[0]?.fields || [])
 const queryDialogFields = computed(() => {
   // 档案/单单据面板(基础资料):表头只剩「备注」,查询条件取元数据登记的常规字段(queryFields,每面板 ≤6 个)
   const fields = (reportMode.value || singleDocMode.value) ? queryFields.value : headerEditFields.value

@@ -17,6 +17,7 @@ import {
   LAB_PANELS, PHOTO_FIELD, labPanelOf, fieldKeyOf, keyOf, today,
   emptyHeader, emptyDetailRow, headerValuesOf, detailRowsOf, rowHasValue,
   buildSavePayload, rowTitleOf, rowMetaOf, photoCountOf, isImageName, baseNameOf,
+  rowPhotoKey, mergeRowIds,
 } from './labMobile.js'
 
 /* ── ① 三个面板 ─────────────────────────────────────────────────────────── */
@@ -188,8 +189,49 @@ test('rowHasValue:只要有任意一格非空就算填过(数字 0 也算填过)
   assert.equal(rowHasValue({ 样品数量: 0 }, [{ dataName: '样品数量' }]), true)
 });
 
-/* ── ⑦ 列表显示 ─────────────────────────────────────────────────────────── */
+/* ── ⑥b 逐行照片(2026-11-09 第二轮:附件加在明细字段内) ─────────────────── */
 
+test('rowPhotoKey:锚点 = 手机照片-<行 id>;新行(还没 id)返回空串', () => {
+  assert.equal(rowPhotoKey({ id: 12 }), '手机照片-12')
+  assert.equal(rowPhotoKey({ id: '7' }), '手机照片-7')
+  assert.equal(rowPhotoKey({ id: null }), '', '新行没有 id ⇒ 不能上传,页面要先把照片排队')
+  assert.equal(rowPhotoKey({}), '')
+  assert.equal(rowPhotoKey(null), '')
+});
+
+test('mergeRowIds:改单行按 id 对齐,新行按顺序拿剩下的 id(原地改,保留 __k)', () => {
+  const local = [
+    { __k: 'a', id: 3, 测试项目: '老行' },
+    { __k: 'b', 测试项目: '新行1' },
+    { __k: 'c', 测试项目: '新行2' },
+  ]
+  const { rows, assigned } = mergeRowIds(local, [
+    { id: 3, 测试项目: '老行' },
+    { id: 10, 测试项目: '新行1' },
+    { id: 11, 测试项目: '新行2' },
+  ])
+  assert.equal(assigned, 2)
+  assert.equal(rows, local, '必须原地改同一个数组(页面按 __k 索引排队照片)')
+  assert.deepEqual(rows.map((r) => r.id), [3, 10, 11])
+  assert.deepEqual(rows.map((r) => r.__k), ['a', 'b', 'c'], '__k 不能被冲掉')
+});
+
+test('mergeRowIds:服务端行不够时只补能补的,不瞎填', () => {
+  const local = [{ __k: 'a' }, { __k: 'b' }]
+  const { assigned } = mergeRowIds(local, [{ id: 5 }])
+  assert.equal(assigned, 1)
+  assert.equal(local[0].id, 5)
+  assert.equal(local[1].id, undefined)
+});
+
+test('mergeRowIds:上次已经拿到 id 的行不会被重复分配', () => {
+  const local = [{ __k: 'a', id: 9 }, { __k: 'b' }]
+  const { assigned } = mergeRowIds(local, [{ id: 9 }, { id: 12 }])
+  assert.equal(assigned, 1)
+  assert.deepEqual(local.map((r) => r.id), [9, 12])
+});
+
+/* ── ⑦ 列表显示 ─────────────────────────────────────────────────────────── */
 test('rowTitleOf:主标题取面板指定字段,取不到退回单据编号', () => {
   const equip = labPanelOf('RD_EQUIP_USE')
   assert.equal(rowTitleOf(equip, { 设备名称: '折叠棉试验机', 单据编号: 'EU-1' }), '折叠棉试验机')

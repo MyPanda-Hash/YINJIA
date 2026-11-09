@@ -5191,6 +5191,13 @@ export default {
     '手机扫码 · 实验室记录手机登记': 'Mobile Scanning · Lab Records Entry',
     // 数据键(列名/字段名,**不翻译**:这里是显示层标签,库里的键仍是中文,ADR-0001)
     '手机照片': 'Mobile Photo',
+    // 逐行照片(2026-11-09 第二轮:附件加在明细字段内,每一行都可能拍照)
+    '本行照片': 'Row photos',
+    '保存后自动上传': 'Uploads after save',
+    '这一行还没有照片': 'No photos on this row yet',
+    '保存后可上传照片': 'Photos can be added after saving',
+    '照片已选好:点「保存草稿」后自动上传到这一行': 'Photos selected — they upload to this row after "Save draft"',
+    '保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。照片按行存进表格里的「手机照片」列,电脑端该行点开即可看。': 'Saved documents stay in Draft status; approve and archive them on the PC panel as usual. Photos are stored per row in the "Mobile Photo" column and can be opened from that row on the PC.',
     // 页面
     '拍照 + 填字段 → 存草稿;数据直接回填到电脑端同一个面板': 'Take photos and fill in the fields, then save as a draft — the record shows up in the same panel on the PC',
     '记录列表': 'Records',

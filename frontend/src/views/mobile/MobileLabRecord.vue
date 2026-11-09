@@ -102,12 +102,12 @@
             <el-button text size="small" @click="addRow">{{ tt('加一行') }}</el-button>
           </div>
 
-          <div v-for="(row, idx) in detailRows" :key="'d-' + idx" class="labm-drow">
+          <div v-for="(row, idx) in detailRows" :key="'d-' + rowKeyOf(row)" class="labm-drow">
             <div class="labm-drow-head">
               <span class="labm-drow-no">{{ tt('第') }} {{ idx + 1 }} {{ tt('行') }}</span>
               <el-button text size="small" @click="removeRow(idx)">{{ tt('删除行') }}</el-button>
             </div>
-            <div v-for="f in detailFields" :key="'d-' + idx + '-' + f.dataName" class="labm-field">
+            <div v-for="f in rowFields" :key="'d-' + idx + '-' + f.dataName" class="labm-field">
               <label>{{ labelOf(f) }}</label>
               <el-date-picker
                 v-if="isDate(f)"
@@ -119,29 +119,35 @@
               />
               <el-input v-else v-model="row[f.dataName]" :placeholder="labelOf(f)" />
             </div>
+
+            <!-- 本行照片(2026-11-09 第二轮):附件按**明细行**存 —— 每一行都可能要拍照。
+                 有行 id(已保存或在既有单里) → 选完即传,锚点 `手机照片-<行id>`;
+                 新行还没 id → 先排队(标「待上传」),保存拿到 id 后自动补传。 -->
+            <div class="labm-rowphoto">
+              <div class="labm-rowphoto-head">
+                <span class="labm-rowphoto-title">{{ tt('本行照片') }}</span>
+                <span v-if="!rowPhotoKey(row)" class="labm-rowphoto-hint">{{ tt('保存后自动上传') }}</span>
+                <span class="labm-sec-gap"></span>
+                <el-button text size="small" @click="pickRowPhoto(idx)">📷 {{ tt('拍照/选图') }}</el-button>
+              </div>
+              <div class="labm-photos">
+                <div v-for="p in photosOfRow(row)" :key="'rp-' + p.id" class="labm-photo">
+                  <img v-if="thumbOf(p)" :src="thumbOf(p)" :alt="p.fileName" @click="preview(p)" />
+                  <div v-else class="labm-photo-name" @click="preview(p)">{{ p.fileName }}</div>
+                  <span class="labm-photo-del" :title="tt('删除照片')" @click.stop="removeRowPhoto(row, p)">✕</span>
+                </div>
+                <div v-for="(c, i) in pendingOfRow(row)" :key="'rpd-' + i" class="labm-photo is-pending">
+                  <img :src="c.url" :alt="c.name" />
+                  <span class="labm-photo-del" :title="tt('取消这张')" @click.stop="dropRowPending(row, i)">✕</span>
+                  <span class="labm-photo-wait">{{ tt('待上传') }}</span>
+                </div>
+                <div v-if="!photosOfRow(row).length && !pendingOfRow(row).length" class="labm-rowphoto-empty">
+                  {{ tt('这一行还没有照片') }}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- 照片:有单号立即上传;新单先挂着,保存拿到单号后自动上传 -->
-          <div class="labm-sec labm-sec2">
-            <span>{{ tt('手机照片') }}</span>
-            <span class="labm-sec-num">{{ photos.length + pending.length }}</span>
-          </div>
-          <div class="labm-photos">
-            <div v-for="p in photos" :key="'ph-' + p.id" class="labm-photo">
-              <img v-if="thumbOf(p)" :src="thumbOf(p)" :alt="p.fileName" @click="preview(p)" />
-              <div v-else class="labm-photo-name" @click="preview(p)">{{ p.fileName }}</div>
-              <span class="labm-photo-del" :title="tt('删除照片')" @click.stop="removePhoto(p)">✕</span>
-            </div>
-            <div v-for="(c, i) in pending" :key="'pd-' + i" class="labm-photo is-pending">
-              <img :src="c.url" :alt="c.name" />
-              <span class="labm-photo-del" :title="tt('取消这张')" @click.stop="dropPending(i)">✕</span>
-              <span class="labm-photo-wait">{{ tt('待上传') }}</span>
-            </div>
-            <div class="labm-photo-add" @click="pickPhoto">
-              <span class="labm-photo-plus">＋</span>
-              <span>{{ tt('拍照/选图') }}</span>
-            </div>
-          </div>
           <input
             ref="fileInput"
             type="file"
@@ -159,7 +165,7 @@
             <el-button size="large" :disabled="saving" @click="startNew">{{ tt('清空重填') }}</el-button>
           </div>
           <div class="labm-hint">
-            {{ tt('保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。拍的照会写进「手机照片」字段,电脑端点开即可看。') }}
+            {{ tt('保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。照片按行存进表格里的「手机照片」列,电脑端该行点开即可看。') }}
           </div>
         </template>
       </section>
@@ -180,8 +186,14 @@
  *   那三张 PC 面板,取元数据 / 取单 / 保存全走通用引擎接口(`/px/getNewFormPermMatrix`、
  *   `/px/getFormDescriptor`、`/px/callButton` 的「保存为草稿」)⇒ 手机存下的单,电脑端面板
  *   里就是同一张单(状态=草稿),审核/归档照电脑端原流程。
- *   照片走既有附件服务(锚点=面板码+单据编号+「手机照片」),服务端把文件名串同步回 head 表的
- *   [手机照片] 列(迁移 migrate-lab-mobile-20261109.sql),电脑端点开即预览。
+ *   照片走既有附件服务,**按明细行**挂(锚点 = 面板码 + 单据编号 + `手机照片-<行 id>`),
+ *   服务端把文件名串同步回该行所在的明细表 `[手机照片]` 列
+ *   (迁移 migrate-lab-mobile-row-photo-20261109.sql),电脑端纸面表格里那行点开即可看。
+ *
+ * 【两种录入入口(用户口径 2026-11-09 第二轮:「手机端要能够实现在原来的单据中增加记录,
+ *   也可以新建单据增加记录」)】
+ *   · 在既有单据里加一行:记录列表点开那张单 → 「加一行」→ 保存(载荷带「编号」,后端按行 upsert);
+ *   · 新建单据:点「新增记录」→ 填 → 保存(不带「编号」,后端 formNoService 发号)。
  *
  * 【字段从哪来】全部元数据驱动,前端零硬编码字段名:
  *   表头 = getNewFormPermMatrix.meta(引擎已按 yj_field 造好:code/name/dataType/isNotNull/options);
@@ -203,10 +215,11 @@ import { openAttachmentPreview } from '@core/panel/attachmentPreview'
 import {
   PHOTO_FIELD, labPanelOf, rowTitleOf, rowMetaOf, photoCountOf, isImageName, baseNameOf,
   emptyHeader, emptyDetailRow, headerValuesOf, detailRowsOf, buildSavePayload,
+  rowPhotoKey, mergeRowIds,
 } from '@/business/labMobile'
 import {
   PHOTO_MAX_MB, loadPanelMeta, loadPanelDoc, queryDocs, saveDraft,
-  uploadPhoto, listPhotos, deletePhoto, loadAttachmentBlob,
+  uploadPhoto, listPhotos, deletePhoto, loadAttachmentBlob, errText as apiErr,
 } from '@/business/labMobileApi'
 
 const route = useRoute()
@@ -230,11 +243,6 @@ const defaults = ref({})
 const form = reactive({})
 const detailRows = ref([])
 const editingNo = ref('')
-
-const photos = ref([])
-const thumbs = reactive({})
-const pending = ref([])       // [{file, name, url}]
-const fileInput = ref(null)
 
 /** 明细页签键(单据面板 = items;兜底取第一个页签) */
 const tabKey = ref('items')
@@ -278,7 +286,7 @@ async function loadMeta() {
   try {
     applyMeta(await loadPanelMeta(panelCode))
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('加载面板配置失败')
+    errText.value = apiErr(e, tt('加载面板配置失败'))
   } finally {
     metaLoading.value = false
   }
@@ -292,7 +300,7 @@ async function loadList() {
     rows.value = Array.isArray(res?.list) ? res.list : []
     total.value = Number(res?.totalSize || rows.value.length || 0)
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('查询记录失败')
+    errText.value = apiErr(e, tt('查询记录失败'))
     rows.value = []
     total.value = 0
   } finally {
@@ -307,12 +315,26 @@ function search() {
 
 /* ───────────── 表单 ───────────── */
 
+/** 每行的本地键(给 Vue :key 用,同时是"排队照片"的索引 —— 保存后行会换到后端 id,__k 不变) */
+let rowSeq = 0
+function ensureRowKey(row) {
+  if (row && !row.__k) row.__k = `r${++rowSeq}`
+  return row
+}
+function rowKeyOf(row) {
+  return ensureRowKey(row).__k
+}
+/** 明细行里要渲染成输入框的字段:附件字段走行内照片区(不重复给输入框) */
+const rowFields = computed(() => (detailFields.value || []).filter((f) => String(f?.dataType || '') !== '附件'))
+
 function resetForm() {
   const next = emptyHeader(headerFields.value, defaults.value)
   for (const k of Object.keys(form)) delete form[k]
   Object.assign(form, next)
   // 新单:先给一行空明细(全空行保存时会被丢掉,不会在电脑端留空行)
-  detailRows.value = detailFields.value.length ? [emptyDetailRow(detailFields.value)] : []
+  detailRows.value = detailFields.value.length
+    ? [ensureRowKey(emptyDetailRow(detailFields.value))]
+    : []
 }
 
 function startNew() {
@@ -338,29 +360,44 @@ async function openRecord(row) {
     Object.assign(form, next)
     let list = detailRowsOf(res?.detailData, tabKey.value)
     if (!list.length) list = detailRowsOf(row?.detail, tabKey.value)
-    detailRows.value = list.length ? list : [emptyDetailRow(detailFields.value)]
+    detailRows.value = list.length
+      ? list.map((r) => ensureRowKey(r))
+      : [ensureRowKey(emptyDetailRow(detailFields.value))]
     await loadPhotos()
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('打开记录失败')
+    errText.value = apiErr(e, tt('打开记录失败'))
   }
 }
 
 function addRow() {
-  detailRows.value.push(emptyDetailRow(detailFields.value))
+  detailRows.value.push(ensureRowKey(emptyDetailRow(detailFields.value)))
 }
 
 function removeRow(idx) {
+  const gone = detailRows.value[idx]
+  if (gone) dropRowPendingAll(gone)
   detailRows.value.splice(idx, 1)
   if (!detailRows.value.length) addRow()
 }
 
-/* ───────────── 照片 ───────────── */
+/* ───────────── 照片(按明细行) ───────────── */
+
+/** 已上传照片:key = 行 id(字符串),value = 附件行数组 */
+const photosByRow = reactive({})
+/** 排队待上传:key = 行 __k,value = [{file,name,url}] */
+const pendingByRow = reactive({})
+const thumbs = reactive({})
+const fileInput = ref(null)
+/** 这一次「拍照/选图」是给哪一行的(隐藏 input 只有一个) */
+const photoTargetIdx = ref(-1)
 
 function clearPending() {
-  for (const p of pending.value) {
-    try { URL.revokeObjectURL(p.url) } catch (e) { /* ignore */ }
+  for (const k of Object.keys(pendingByRow)) {
+    for (const p of pendingByRow[k] || []) {
+      try { URL.revokeObjectURL(p.url) } catch (e) { /* ignore */ }
+    }
+    delete pendingByRow[k]
   }
-  pending.value = []
 }
 
 function clearPhotos() {
@@ -368,38 +405,59 @@ function clearPhotos() {
     try { URL.revokeObjectURL(thumbs[k]) } catch (e) { /* ignore */ }
     delete thumbs[k]
   }
-  photos.value = []
+  for (const k of Object.keys(photosByRow)) delete photosByRow[k]
 }
 
 function thumbOf(p) {
   return isImageName(p?.fileName) ? thumbs[p.id] || '' : ''
 }
 
-async function loadPhotos() {
+function photosOfRow(row) {
+  const id = row?.id
+  if (id === null || id === undefined) return []
+  return photosByRow[String(id)] || []
+}
+
+function pendingOfRow(row) {
+  return pendingByRow[rowKeyOf(row)] || []
+}
+
+/** 取某行的照片列表(按行锚点 `手机照片-<行id>`) */
+async function loadRowPhotos(row) {
   const no = String(editingNo.value || '').trim()
-  if (!no) { photos.value = []; return }
-  try {
-    photos.value = await listPhotos(panelCode, no)
-    for (const p of photos.value) {
-      if (!isImageName(p?.fileName) || thumbs[p.id]) continue
-      try {
-        const blob = await loadAttachmentBlob(p.id)
-        thumbs[p.id] = URL.createObjectURL(blob)
-      } catch (e) { /* 缩略图失败不影响其余 */ }
-    }
-  } catch (e) {
-    photos.value = []
+  const field = rowPhotoKey(row)
+  if (!no || !field) return []
+  const list = await listPhotos(panelCode, no, field)
+  photosByRow[String(row.id)] = list
+  for (const p of list) {
+    if (!isImageName(p?.fileName) || thumbs[p.id]) continue
+    try {
+      const blob = await loadAttachmentBlob(p.id)
+      thumbs[p.id] = URL.createObjectURL(blob)
+    } catch (e) { /* 缩略图失败不影响其余 */ }
+  }
+  return list
+}
+
+async function loadPhotos() {
+  const rows = (detailRows.value || []).filter((r) => r && r.id != null)
+  for (const r of rows) {
+    try { await loadRowPhotos(r) } catch (e) { photosByRow[String(r.id)] = [] }
   }
 }
 
-function pickPhoto() {
+function pickRowPhoto(idx) {
+  photoTargetIdx.value = idx
   fileInput.value?.click?.()
 }
 
 async function onFilesPicked(ev) {
   const files = Array.from(ev?.target?.files || [])
   if (ev?.target) ev.target.value = ''
-  if (!files.length) return
+  const idx = photoTargetIdx.value
+  photoTargetIdx.value = -1
+  const row = detailRows.value[idx]
+  if (!files.length || !row) return
   errText.value = ''
   const bad = []
   const good = []
@@ -410,61 +468,90 @@ async function onFilesPicked(ev) {
   if (bad.length) ElMessage.warning(`${tt('以下照片超过')} ${PHOTO_MAX_MB}MB:${bad.join('、')}`)
   if (!good.length) return
 
-  // 已有单号 → 立刻上传;新单 → 先挂着,保存拿到号后补传
-  if (!String(editingNo.value || '').trim()) {
-    for (const f of good) {
-      pending.value.push({ file: f, name: baseNameOf(f.name), url: URL.createObjectURL(f) })
-    }
-    ElMessage.info(tt('照片已选好:点「保存草稿」后自动上传'))
+  // 这一行已经有行 id(= 已保存/既有单的行)→ 立刻上传;新行 → 先排队,保存拿到 id 后补传
+  if (!rowPhotoKey(row)) {
+    const k = rowKeyOf(row)
+    const box = pendingByRow[k] || (pendingByRow[k] = [])
+    for (const f of good) box.push({ file: f, name: baseNameOf(f.name), url: URL.createObjectURL(f) })
+    ElMessage.info(tt('照片已选好:点「保存草稿」后自动上传到这一行'))
     return
   }
-  await uploadFiles(good)
+  await uploadRowFiles(row, good)
 }
 
-async function uploadFiles(files) {
+/** 把文件传到某一行的锚点上,并把这行这一列的"文件名串"更新成本次服务端返回的名字 */
+async function uploadRowFiles(row, files) {
   const no = String(editingNo.value || '').trim()
-  if (!no || !files.length) return true
+  const field = rowPhotoKey(row)
+  if (!no || !field || !files.length) return true
   saving.value = true
   let ok = 0
+  let names = String(row[PHOTO_FIELD] || '')
   try {
     for (const f of files) {
-      await uploadPhoto({ panelCode, docNo: no, file: f })
+      const res = await uploadPhoto({ panelCode, docNo: no, fieldKey: field, file: f })
+      if (res && typeof res.names === 'string') names = res.names
       ok += 1
     }
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('照片上传失败')
+    errText.value = apiErr(e, tt('照片上传失败'))
   } finally {
     saving.value = false
   }
-  await loadPhotos()
+  row[PHOTO_FIELD] = names
+  await loadRowPhotos(row)
   await loadList()
   if (ok === files.length) ElMessage.success(`${tt('已上传')} ${ok} ${tt('张照片')}`)
   return ok === files.length
 }
 
-function dropPending(i) {
-  const hit = pending.value[i]
-  if (hit?.url) { try { URL.revokeObjectURL(hit.url) } catch (e) { /* ignore */ } }
-  pending.value.splice(i, 1)
+/** 保存成功后:把各新行的排队照片传到它们刚拿到的 id 上 */
+async function uploadRowPending() {
+  for (const row of detailRows.value || []) {
+    if (!row || !rowPhotoKey(row)) continue
+    const k = rowKeyOf(row)
+    const box = pendingByRow[k]
+    if (!box || !box.length) continue
+    const files = box.map((p) => p.file)
+    for (const p of box) { try { URL.revokeObjectURL(p.url) } catch (e) { /* ignore */ } }
+    delete pendingByRow[k]
+    await uploadRowFiles(row, files)
+  }
 }
 
-async function removePhoto(p) {
+function dropRowPending(row, i) {
+  const box = pendingOfRow(row)
+  const hit = box[i]
+  if (hit?.url) { try { URL.revokeObjectURL(hit.url) } catch (e) { /* ignore */ } }
+  box.splice(i, 1)
+}
+
+function dropRowPendingAll(row) {
+  const k = rowKeyOf(row)
+  for (const p of pendingByRow[k] || []) {
+    try { URL.revokeObjectURL(p.url) } catch (e) { /* ignore */ }
+  }
+  delete pendingByRow[k]
+}
+
+async function removeRowPhoto(row, p) {
   try {
     await ElMessageBox.confirm(`${tt('删除照片')}:${p.fileName}?`, tt('确认'), { type: 'warning' })
   } catch (e) {
     return
   }
   try {
-    await deletePhoto(p.id)
+    const res = await deletePhoto(p.id)
+    if (res && typeof res.names === 'string') row[PHOTO_FIELD] = res.names
     if (thumbs[p.id]) {
       try { URL.revokeObjectURL(thumbs[p.id]) } catch (e) { /* ignore */ }
       delete thumbs[p.id]
     }
-    await loadPhotos()
+    await loadRowPhotos(row)
     await loadList()
     ElMessage.success(tt('已删除'))
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('删除失败')
+    errText.value = apiErr(e, tt('删除失败'))
   }
 }
 
@@ -492,6 +579,17 @@ function validate() {
   return missing
 }
 
+/**
+ * 保存(草稿)。
+ *
+ * 【两种入口,同一个按钮】
+ *   · 在**既有单据**里追加记录:记录列表点开一张 → 「加一行」→ 保存(载荷带「编号」,后端按行 upsert);
+ *   · 新建单据加记录:点「新增记录」→ 填 → 保存(不带「编号」,后端发号)。
+ * 用户口径(2026-11-09 第二轮)「手机端要能够实现在原来的单据中增加记录,也可以新建单据增加记录」。
+ *
+ * 【逐行照片的顺序】保存 → mergeRowIds 把后端 id 回填到本地行(保留 __k) → 再按行上传排队照片。
+ * 这样"先拍照后保存"也能落到正确的行上(新行保存前没有 id,锚点必须等保存后才有)。
+ */
 async function save() {
   if (!panel || saving.value) return
   errText.value = ''
@@ -518,23 +616,21 @@ async function save() {
       if (!form['单据编号']) form['单据编号'] = no
     }
     ElMessage.success(`${tt('已保存草稿')}${no ? ':' + no : ''}`)
-    const files = pending.value.map((p) => p.file)
-    clearPending()
-    if (no && files.length) await uploadFiles(files)
-    if (no) await loadPhotos()
-    await loadList()
     if (no) {
+      // 回读明细 → 把行 id 回填给本地行(照片锚点靠它),再补传排队照片
       try {
         const doc = await loadPanelDoc(panelCode, no)
         const next = headerValuesOf(headerFields.value, doc?.data || {})
         for (const k of Object.keys(form)) delete form[k]
         Object.assign(form, next)
-        const list = detailRowsOf(doc?.detailData, tabKey.value)
-        detailRows.value = list.length ? list : [emptyDetailRow(detailFields.value)]
+        mergeRowIds(detailRows.value, detailRowsOf(doc?.detailData, tabKey.value))
       } catch (e) { /* 回读失败不影响"已保存"这个事实 */ }
+      await uploadRowPending()
+      await loadPhotos()
     }
+    await loadList()
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('保存失败')
+    errText.value = apiErr(e, tt('保存失败'))
   } finally {
     saving.value = false
   }
@@ -677,6 +773,26 @@ defineExpose({ panelCode, panel })
   margin-bottom: 8px;
 }
 .labm-drow-no { font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+
+/* 本行照片(2026-11-09 第二轮):附件按明细行存 —— 每行一块,拍照/看/删都在本行里 */
+.labm-rowphoto {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+.labm-rowphoto-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.labm-rowphoto-title { font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+.labm-rowphoto-hint { font-size: 11px; color: var(--el-color-warning); }
+.labm-rowphoto-empty {
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
 
 .labm-photos { display: flex; flex-wrap: wrap; gap: 8px; }
 .labm-photo {
