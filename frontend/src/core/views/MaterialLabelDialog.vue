@@ -42,11 +42,10 @@
            追加「一次是可以打印多行的」)—— 多行并进一张单会让作废连坐,所以粒度落在单上,不在弹窗上 -->
       <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }}</div>
       <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径);
-           但必须留一个「取消带入」的退路(用户口径「点击后,不能取消」) -->
+           「取消带入」放在记录表的操作列(用户口径:取消按钮直接在操作那里) -->
       <div v-if="lockedBySource" class="mlq-lock">
         {{ tt('已按采购订单打印记录带入：数量和行已锁定，只能修改上面的批次号和生产日期') }}
         <span class="mlq-lock-no">{{ sourcePrintNo }}</span>
-        <el-button link type="primary" class="mlq-lock-cancel" @click="cancelSource">{{ tt('取消带入') }}</el-button>
       </div>
 
       <el-table ref="tableRef" :data="rows" row-key="id" border size="small" height="330" @selection-change="onPicked">
@@ -161,8 +160,11 @@
             <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
             <el-table-column :label="tt('操作')" width="150" align="center">
               <template #default="{ row }">
+                <!-- 已带入的那张记录:操作列直接变「取消带入」(2026-11-09 用户口径:取消按钮直接在操作那里) -->
+                <el-button v-if="sourcePrintNo === String(row['单据编号'])" link type="danger" :disabled="busy"
+                  @click="cancelSource">{{ tt('取消带入') }}</el-button>
                 <!-- 2026-11-09 用户口径:按这张记录打过一次后按钮置灰,不能重复打 -->
-                <el-button link type="primary" :disabled="busy || lockedBySource || isUsedSrc(row['单据编号'])"
+                <el-button v-else link type="primary" :disabled="busy || lockedBySource || isUsedSrc(row['单据编号'])"
                   @click="applyPoPrint(row)">
                   {{ isUsedSrc(row['单据编号']) ? tt('已打码') : tt('按这次打印打码') }}
                 </el-button>
@@ -526,7 +528,7 @@ async function doVoid(row) {
 .mlq-oneline { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
 /* 按打印记录带入后的锁定提示(数量/行锁定,只能改批次号与生产日期) */
 .mlq-lock { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #1f6f4a; background: #eef7f1; border: 1px dashed #9fd3b6; border-radius: 4px; padding: 3px 8px; }
-.mlq-lock-no { font-weight: 600; }`r`n.mlq-lock-cancel { margin-left: auto; }
+.mlq-lock-no { font-weight: 600; }
 .mlq-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .mlq-records { margin-top: 4px; }
 .mlq-rec-title { font-size: 12.5px; color: #46586e; margin-bottom: 4px; }
