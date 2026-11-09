@@ -291,6 +291,11 @@ export default {
     // 两版式互相记录/对着打印(2026-11-09)
     '对应单号': 'Paired print doc',
     '当前版式': 'Current version',
+    '其它版式已打印': 'Other version printed',
+    '本版式已打印': 'This version printed',
+    '可打印成': 'can print as ',
+    '打印成': 'Print as ',
+    '已打印成': 'Printed as ',
     '该版式还没有打印记录': 'No print record for this version yet',
     '两个版式各自一块、各自登记：已打印只统计本版式，重打只累加次数，作废只作废这张纸': 'Each version has its own box and its own registration: printed counts only this version; reprint only adds a count; void only voids that sheet',
     '打有金额版': 'Print amount version',
