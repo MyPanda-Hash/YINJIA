@@ -104,6 +104,14 @@
             <el-button size="large" type="primary" plain @click="addRow">{{ tt('加一行') }}</el-button>
           </div>
 
+          <!-- 加标水:明细列**由「测试项目」的标准库模版决定**(2026-11-09 用户口径)。
+               提示放这里,现场才知道"换测试项目 = 换表头"、模版在电脑端维护。 -->
+          <div v-if="isTemplatePanel" class="labm-tpl">
+            <span v-if="!form[TEMPLATE_FIELD]" class="labm-tpl-hint">{{ tt('先选「测试项目」,明细字段会按这个项目的模版显示') }}</span>
+            <span v-else-if="templateUndesigned" class="labm-tpl-warn">{{ tt('这个测试项目还没设计表格结构,先按默认列显示(电脑端「标准库维护」里可编辑)') }}</span>
+            <span v-else class="labm-tpl-ok">{{ tt('明细字段来自「') }}{{ labelOf({ code: TEMPLATE_FIELD }) }}{{ tt('」这一项的模版,共') }} {{ detailFields.length }} {{ tt('列') }}</span>
+          </div>
+
           <!-- 明细行 = 可折叠卡片(2026-11-09 用户口径「明细可以收缩,默认是收缩的」):
                收起时只露「第N行 + 摘要 + 附件数 + 删除行」,展开才显示字段与附件。
                删除行保持小号按钮(用户口径「删除按钮不用放大」),且**只有草稿**能删(见 isDraft)。 -->
@@ -118,7 +126,10 @@
             </div>
 
             <div v-show="isRowOpen(row)" class="labm-drow-body">
-              <div v-for="f in rowFields" :key="'d-' + idx + '-' + f.dataName" class="labm-field">
+              <div v-for="(f, fi) in rowFields" :key="'d-' + idx + '-' + f.dataName" class="labm-field">
+                <!-- 模版里的**分格**(如「试剂用量(g)」):同一 group 的列在手机上并成一段,
+                     只在该段第一列前打一次小标题 —— 与电脑端纸面合并表头同一个口径。 -->
+                <div v-if="groupTitleAt(fi)" class="labm-grp">{{ groupTitleAt(fi) }}</div>
                 <label>{{ labelOf(f) }}</label>
                 <el-date-picker
                   v-if="isDate(f)"
@@ -218,7 +229,7 @@
  * 【权限】菜单与路由按面板码过滤(与 PC 面板同一批权限行),保存由后端 requireButton
  *   (add|modify 词)兜底;前端不绕过任何权限。
  */
-import { computed, ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
@@ -226,11 +237,15 @@ import {
   PHOTO_FIELD, labPanelOf, rowTitleOf, rowMetaOf, photoCountOf, baseNameOf,
   emptyHeader, emptyDetailRow, headerValuesOf, detailRowsOf, buildSavePayload,
   rowPhotoKey, mergeRowIds,
+  // 加标水(2026-11-09 第五轮):明细列随「测试项目」变 —— 一个标准库条目一套列结构
+  SPIKE_WATER_CODE, TEMPLATE_FIELD, TEMPLATE_LIB, stdLibOptions, stdLibContentOf, visibleDetailFields,
 } from '@/business/labMobile'
 import {
   PHOTO_MAX_MB, loadPanelMeta, loadPanelDoc, queryDocs, saveDraft,
-  uploadPhoto, listPhotos, deletePhoto, loadAttachmentBlob, errText as apiErr,
+  uploadPhoto, listPhotos, deletePhoto, loadAttachmentBlob, listStdLib, errText as apiErr,
 } from '@/business/labMobileApi'
+// 模版列结构解析(与电脑端纸面同一份纯函数:解析失败退回内置列集,不让整页白屏)
+import { parseLayout } from '@/core/panel/spikeWaterLayout.js'
 // APK 壳里的原生拍照(2026-11-09 第四轮):壳内走原生相机,网页/浏览器自动退化为 file input
 import { hasNativeCamera, takeNativePhoto } from '@/business/nativeCamera'
 
@@ -250,11 +265,53 @@ const keyword = ref('')
 const rows = ref([])
 
 const headerFields = ref([])
+/** 面板明细元数据字段(原样);**加标水**要按测试项目换列,渲染用下面的 detailFields */
+const metaDetailFields = ref([])
 const detailFields = ref([])
 const defaults = ref({})
 const form = reactive({})
 const detailRows = ref([])
 const editingNo = ref('')
+
+/* ───────── 加标水:明细列跟着「测试项目」变(2026-11-09 第五轮) ─────────
+   用户口径:「加标水配置记录表这个面版的字段是根据测试项目变化的,而且可以新增模板自己进行配置字段。
+             所以手机端要实现能够对应测试项目,明细有所变化」
+   电脑端口径:一个标准库条目 = 一套表格样式(列定义存在 yj_std_lib.content 的 JSON 里)。
+   手机端照着来:选哪个测试项目 → 取那一条的 content → parseLayout → 明细列就是它。 */
+const isTemplatePanel = computed(() => panelCode === SPIKE_WATER_CODE)
+const libRows = ref([])                  // 标准库条目(lab.test_item)
+const layout = ref(null)                 // { cols, ok, reason } —— null = 还没选测试项目
+/** 模版是否"未设计"(老式纯文本条目 / 内容坏了 ⇒ 用内置兜底列集,给用户一句提示) */
+const templateUndesigned = computed(() => !!layout.value && layout.value.ok === false)
+
+/** 取标准库条目(加标水才需要) */
+async function loadTemplateLib() {
+  if (!isTemplatePanel.value) return
+  try {
+    const res = await listStdLib(TEMPLATE_LIB)
+    libRows.value = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : [])
+  } catch (e) {
+    libRows.value = []
+    errText.value = apiErr(e, tt('加载标准库失败'))
+  }
+}
+
+/** 按当前「测试项目」重新取列结构(切项目/打开单都要走一次) */
+function syncTemplateLayout() {
+  if (!isTemplatePanel.value) { layout.value = null; return }
+  const picked = String(form[TEMPLATE_FIELD] ?? '').trim()
+  if (!picked) { layout.value = null; return }
+  layout.value = parseLayout(stdLibContentOf(libRows.value, picked) || null)
+}
+
+/** 重新算「这一屏渲染哪些明细字段」:模版列 + 附件列(见 visibleDetailFields) */
+function refreshDetailFields() {
+  detailFields.value = visibleDetailFields({
+    isTemplate: isTemplatePanel.value,
+    layout: layout.value,
+    metaFields: metaDetailFields.value,
+  })
+}
 
 /** 明细页签键(单据面板 = items;兜底取第一个页签) */
 const tabKey = ref('items')
@@ -282,7 +339,19 @@ function toggleRow(row) {
   openRows[k] = !openRows[k]
 }
 const isDate = (f) => String(f?.dataType || '') === '日期'
-const optionList = (f) => (Array.isArray(f?.options) ? f.options : [])
+/** 下拉候选:加标水「测试项目」来自标准库(与电脑端同一个库/同一套选项名),其余看字段自带的 options */
+const optionList = (f) => {
+  const key = String(f?.code || f?.dataName || '')
+  if (isTemplatePanel.value && key === TEMPLATE_FIELD) return stdLibOptions(libRows.value)
+  return Array.isArray(f?.options) ? f.options : []
+}
+
+/** 「测试项目」换了 ⇒ 重新取列结构 + 重算明细字段(电脑端口径:换条目 = 换表头) */
+watch(() => form[TEMPLATE_FIELD], () => {
+  if (!isTemplatePanel.value) return
+  syncTemplateLayout()
+  refreshDetailFields()
+})
 
 /* ───────────── 取数 ───────────── */
 
@@ -297,9 +366,10 @@ function applyMeta(res) {
   const tabs = Array.isArray(res?.detail?.tabs) ? res.detail.tabs : []
   const tab = tabs[0] || { key: 'items', fields: [] }
   tabKey.value = String(tab.key || 'items')
-  detailFields.value = (Array.isArray(tab.fields) ? tab.fields : []).filter((f) => f?.dataName)
+  metaDetailFields.value = (Array.isArray(tab.fields) ? tab.fields : []).filter((f) => f?.dataName)
   defaults.value = res?.data && typeof res.data === 'object' ? res.data : {}
   docStatus.value = String(defaults.value['单据状态'] || '草稿').trim() || '草稿'
+  refreshDetailFields()
 }
 
 async function loadMeta() {
@@ -311,6 +381,9 @@ async function loadMeta() {
   errText.value = ''
   try {
     applyMeta(await loadPanelMeta(panelCode))
+    await loadTemplateLib()
+    syncTemplateLayout()
+    refreshDetailFields()
   } catch (e) {
     errText.value = apiErr(e, tt('加载面板配置失败'))
   } finally {
@@ -353,6 +426,19 @@ function rowKeyOf(row) {
 /** 明细行里要渲染成输入框的字段:附件字段走行内照片区(不重复给输入框) */
 const rowFields = computed(() => (detailFields.value || []).filter((f) => String(f?.dataType || '') !== '附件'))
 
+/**
+ * 模版分格:行内第 i 个字段要不要在前面打一个分组小标题(= 该列有 group 且与前一列不同)。
+ * 加标水模版里「试剂用量（g）」这种合并表头,在手机上就是一段小标题 + 若干字段。
+ */
+function groupTitleAt(i) {
+  const f = rowFields.value[i]
+  if (!f) return ''
+  const g = String(f.group || '').trim()
+  if (!g) return ''
+  const prev = i > 0 ? String(rowFields.value[i - 1]?.group || '').trim() : ''
+  return g === prev ? '' : g
+}
+
 /** 收起时的行摘要:取前两个**非空**的普通字段值(附件字段不算),空行显示「(未填)」 */
 function rowSummary(row) {
   const parts = []
@@ -380,6 +466,9 @@ function resetForm() {
   const next = emptyHeader(headerFields.value, defaults.value)
   for (const k of Object.keys(form)) delete form[k]
   Object.assign(form, next)
+  // 加标水:新单还没选「测试项目」⇒ 列结构未定,先按面板明细字段给行(选了项目会重建)
+  syncTemplateLayout()
+  refreshDetailFields()
   // 新单:先给一行空明细(全空行保存时会被丢掉,不会在电脑端留空行)
   detailRows.value = detailFields.value.length
     ? [ensureRowKey(emptyDetailRow(detailFields.value))]
@@ -411,6 +500,9 @@ async function openRecord(row) {
     const next = headerValuesOf(headerFields.value, data)
     for (const k of Object.keys(form)) delete form[k]
     Object.assign(form, next)
+    // 加标水:既有单的列结构按**这张单自己的「测试项目」**取(换条目 = 换表头,和电脑端一致)
+    syncTemplateLayout()
+    refreshDetailFields()
     let list = detailRowsOf(res?.detailData, tabKey.value)
     if (!list.length) list = detailRowsOf(row?.detail, tabKey.value)
     detailRows.value = list.length
@@ -699,6 +791,8 @@ async function save() {
         const next = headerValuesOf(headerFields.value, doc?.data || {})
         for (const k of Object.keys(form)) delete form[k]
         Object.assign(form, next)
+        syncTemplateLayout()
+        refreshDetailFields()
         mergeRowIds(detailRows.value, detailRowsOf(doc?.detailData, tabKey.value))
       } catch (e) { /* 回读失败不影响"已保存"这个事实 */ }
       await uploadRowPending()
@@ -915,7 +1009,20 @@ defineExpose({ panelCode, panel })
   cursor: pointer;
 }
 .labm-att-del:hover { color: var(--el-color-danger); }
-.labm-att.is-pending { border-style: dashed; border-color: var(--el-color-primary-light-5); }
+.labm-att.is-pending { border-style: dashed; border-color: var(--el-color-primary-light-5); }/* 加标水模版(2026-11-09 第五轮):列结构由「测试项目」决定 —— 提示条 + 行内分格小标题 */
+.labm-tpl { margin: 6px 0 10px; font-size: 12px; line-height: 1.5; }
+.labm-tpl-hint { color: var(--el-color-warning); }
+.labm-tpl-warn { color: var(--el-color-warning); }
+.labm-tpl-ok { color: var(--el-text-color-secondary); }
+.labm-grp {
+  margin: 10px 0 4px;
+  padding: 3px 8px;
+  border-left: 3px solid var(--el-color-primary);
+  background: var(--el-fill-color-lighter);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+}
 .labm-actions { display: flex; gap: 8px; margin-top: 14px; }
 .labm-actions :deep(.el-button) { flex: 1; margin-left: 0; }
 .labm-hint { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--el-text-color-secondary); }

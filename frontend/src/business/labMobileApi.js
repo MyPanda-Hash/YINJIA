@@ -117,3 +117,10 @@ export function errText(e, fallback) {
   if (status) return `${fallback || '操作失败'}(${status})${url}`
   return `${e?.message || fallback || '操作失败'}${url}`
 }
+
+/** 标准库条目(加标水「测试项目」:一个条目 = 一套明细列结构,content 是列定义 JSON)。
+ *  2026-11-09 第五轮:手机端要跟电脑端一样,明细列随测试项目变,所以要读库。
+ *  `all=1` 连停用条目一起取回(选项侧再按 enabled 过滤,与电脑端同口径)。 */
+export function listStdLib(lib) {
+  return request.get('/stdlib/list', { params: { lib, all: 1 } }).then(unpack)
+}

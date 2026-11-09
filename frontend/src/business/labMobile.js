@@ -242,3 +242,102 @@ export function baseNameOf(name) {
   const i = s.lastIndexOf('/')
   return i >= 0 ? s.slice(i + 1) : s
 }
+
+/* ───────────── 加标水:「测试项目」决定明细列(2026-11-09 第五轮) ───────────── */
+
+/**
+ * 加标水配置记录表的「明细列」跟着**测试项目**变(用户口径 2026-11-09):
+ *   「加标水配置记录表这个面版的字段是根据测试项目变化的,而且可以新增模板自己进行配置字段。
+ *     所以手机端要实现能够对应测试项目,明细有所变化」
+ *
+ * 电脑端的口径(见 core/panel/spikeWaterLayout.js):一个标准库条目 = 一套表格样式,
+ * 列定义存在 `yj_std_lib.content` 的 JSON 里;选了哪个条目就取哪套列。手机端要跟它一致,
+ * 所以这里只放**纯函数**:选项怎么来、选中条目怎么找到、列怎么映射成字段 —— 渲染与取数在页面里。
+ */
+export const SPIKE_WATER_CODE = 'RD_SPIKE_WATER'
+
+/** 决定明细列结构的那条标准库字段(panel=RD_SPIKE_WATER 的表头字段) */
+export const TEMPLATE_FIELD = '测试项目'
+
+/** 加标水「测试项目」的标准库编码(yj_field.dict_sql) */
+export const TEMPLATE_LIB = 'lab.test_item'
+
+const isDisabledLibRow = (r) => String(r?.enabled ?? '1') === '0' || r?.enabled === false
+const rowContentOf = (r) => String(r?.content ?? '').trim()
+const rowCodeOf = (r) => String(r?.item_code ?? r?.item ?? '').trim()
+
+/**
+ * 标准库条目 → 下拉选项名。
+ *
+ * 口径与电脑端「测试项目」下拉一致:**老式条目**(早期手工建的,`item_code` 全是「默认」、
+ * 真正的名字写在 content 里,如 `NSF 42-余氯`)用 content 当选项名;新式条目(content 是列结构 JSON)
+ * 用 item_code。停用条目不进候选(`enabled=0`),同名去重。
+ *
+ * @param {Array} rows `/stdlib/list` 返回的条目
+ * @returns {string[]}
+ */
+export function stdLibOptions(rows) {
+  const out = []
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (r == null || isDisabledLibRow(r)) continue
+    const content = rowContentOf(r)
+    const code = rowCodeOf(r)
+    const label = content.startsWith('{') ? code : (content || code)
+    if (!label || out.includes(label)) continue
+    out.push(label)
+  }
+  return out
+}
+
+/**
+ * 选中项 → 该条目的 content(找不到返回空串)。
+ * 先按"新式条目"匹配 item_code,再按"老式条目"匹配 content —— 与电脑端 loadSpikeWaterLayout 同序。
+ */
+export function stdLibContentOf(rows, picked) {
+  const want = String(picked ?? '').trim()
+  if (!want) return ''
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r && !isDisabledLibRow(r))
+  const asJson = list.find((r) => rowContentOf(r).startsWith('{') && rowCodeOf(r) === want)
+  if (asJson) return rowContentOf(asJson)
+  const hit = list.find((r) => rowCodeOf(r) === want || rowContentOf(r) === want)
+  return hit ? rowContentOf(hit) : ''
+}
+
+/**
+ * 模版列 → 明细字段(页面按 `dataName` 取值,与面板元数据字段同一副形状,渲染路径不用分叉)。
+ * @param {Array<{key:string,label?:string,w?:number,group?:string}>} cols parseLayout 的 cols
+ * @returns {Array<{dataName:string,name:string,dataType:string,width:number,group?:string}>}
+ */
+export function templateDetailFields(cols) {
+  return (Array.isArray(cols) ? cols : [])
+    .filter((c) => c && String(c.key || '').trim())
+    .map((c) => {
+      const key = String(c.key).trim()
+      const f = {
+        dataName: key,
+        name: String(c.label || key).trim() || key,
+        dataType: '文本',
+        width: Number(c.w) > 0 ? Number(c.w) : 90,
+        fromTemplate: true,
+      }
+      if (c.group) f.group = String(c.group)
+      return f
+    })
+}
+
+/**
+ * 手机端这一屏到底渲染哪些明细字段。
+ *
+ *  · 加标水(有模版) ⇒ **模版列** + 元数据里那个附件列(手机照片);模版解析失败时
+ *    `layout.cols` 已是内置兜底列集(parseLayout 保证),渲染不报错;
+ *  · 其它面板(或还没选测试项目)⇒ 原样用面板明细元数据,行为一字不变。
+ *
+ * @param {{isTemplate:boolean, layout:{cols?:Array}|null, metaFields:Array}} p
+ */
+export function visibleDetailFields({ isTemplate, layout, metaFields }) {
+  const meta = Array.isArray(metaFields) ? metaFields : []
+  const cols = layout && Array.isArray(layout.cols) ? layout.cols : null
+  if (!isTemplate || !cols || !cols.length) return meta
+  const attach = meta.filter((f) => String(f?.dataType || '') === '附件')
+  return [...templateDetailFields(cols), ...attach]
+}

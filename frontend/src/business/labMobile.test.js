@@ -18,6 +18,8 @@ import {
   emptyHeader, emptyDetailRow, headerValuesOf, detailRowsOf, rowHasValue,
   buildSavePayload, rowTitleOf, rowMetaOf, photoCountOf, isImageName, baseNameOf,
   rowPhotoKey, mergeRowIds,
+  SPIKE_WATER_CODE, TEMPLATE_FIELD, TEMPLATE_LIB, stdLibOptions, stdLibContentOf,
+  templateDetailFields, visibleDetailFields,
 } from './labMobile.js'
 
 /* ── ① 三个面板 ─────────────────────────────────────────────────────────── */
@@ -263,3 +265,83 @@ test('baseNameOf:去掉 Android 相机给的完整路径', () => {
   assert.equal(baseNameOf('a.png'), 'a.png')
   assert.equal(baseNameOf(null), '')
 });
+
+/* ───────── 加标水:「测试项目」决定明细列(2026-11-09 第五轮) ─────────
+   用户口径:「加标水配置记录表这个面版的字段是根据测试项目变化的,而且可以新增模板自己进行配置字段。
+             所以手机端要实现能够对应测试项目,明细有所变化」 */
+
+/** 三个正式条目(content 是列结构 JSON)+ 两条老式纯文本条目(服务器上就长这样) */
+const LIB_ROWS = [
+  { id: 32, item_code: 'NSF 53-除铅（PH8.5）', content: '{"cols":[{"key":"测试日期","w":90},{"key":"硫酸镁","group":"试剂用量（g）"}]}', enabled: 1, seq: 10 },
+  { id: 33, item_code: 'NSF 53-除汞（PH8.5）', content: '{"cols":[{"key":"测试日期","w":90},{"key":"碳酸氢钠","group":"试剂用量（g）"}]}', enabled: 1, seq: 20 },
+  { id: 34, item_code: 'NSF 53-除VOC', content: '{"cols":[{"key":"测试日期","w":90}]}', enabled: 1, seq: 30 },
+  { id: 411, item_code: '默认', content: 'NSF 42-余氯', enabled: 1, seq: 40 },
+  { id: 417, item_code: '默认', content: 'NSF 42 氯胺  氢氧化钠  次氯酸钠  氯化铵', enabled: 0, seq: 50 },
+  { id: 418, item_code: '默认', content: 'NSF 42氯胺', enabled: 1, seq: 60 },
+  { id: 419, item_code: '默认', content: 'cs', enabled: 0, seq: 70 },
+]
+
+test('模板管的是加标水那张面板,字段名/库编码与电脑端同一口径', () => {
+  assert.equal(SPIKE_WATER_CODE, 'RD_SPIKE_WATER')
+  assert.equal(TEMPLATE_FIELD, '测试项目')
+  assert.equal(TEMPLATE_LIB, 'lab.test_item')
+})
+
+test('stdLibOptions:新式条目用 item_code,老式纯文本条目用 content(停用不进候选)', () => {
+  assert.deepEqual(stdLibOptions(LIB_ROWS), [
+    'NSF 53-除铅（PH8.5）', 'NSF 53-除汞（PH8.5）', 'NSF 53-除VOC', 'NSF 42-余氯', 'NSF 42氯胺',
+  ])
+})
+
+test('stdLibOptions:空/脏数据不炸,同名去重', () => {
+  assert.deepEqual(stdLibOptions(null), [])
+  assert.deepEqual(stdLibOptions([null, {}, { item_code: '', content: '' }]), [])
+  const dup = [{ item_code: 'A', content: '{"cols":[]}' }, { item_code: 'A', content: '{"cols":[]}' }]
+  assert.deepEqual(stdLibOptions(dup), ['A'])
+})
+
+test('stdLibContentOf:按 item_code 命中新式条目,按 content 命中老式条目,停用/找不到返回空串', () => {
+  assert.match(stdLibContentOf(LIB_ROWS, 'NSF 53-除汞（PH8.5）'), /碳酸氢钠/)
+  assert.equal(stdLibContentOf(LIB_ROWS, 'NSF 42-余氯'), 'NSF 42-余氯')
+  assert.equal(stdLibContentOf(LIB_ROWS, 'NSF 42 氯胺  氢氧化钠  次氯酸钠  氯化铵'), '', '停用条目不算')
+  assert.equal(stdLibContentOf(LIB_ROWS, '不存在'), '')
+  assert.equal(stdLibContentOf(LIB_ROWS, ''), '')
+})
+
+test('templateDetailFields:列 → 明细字段(键=列名,label 缺省用键,带分格与列宽)', () => {
+  const fs = templateDetailFields([
+    { key: '测试日期', w: 90 },
+    { key: '配水量\\n（L）', label: '配水量\\n（L）', w: 80 },
+    { key: '碳酸氢钠', label: '碳酸氢钠', w: 70, group: '试剂用量（g）' },
+  ])
+  assert.deepEqual(fs.map((f) => f.dataName), ['测试日期', '配水量\\n（L）', '碳酸氢钠'])
+  assert.equal(fs[0].name, '测试日期')
+  assert.equal(fs[1].width, 80)
+  assert.equal(fs[2].group, '试剂用量（g）')
+  assert.equal(fs[2].dataType, '文本')
+})
+
+test('visibleDetailFields:加标水 = 模版列 + 那个附件列;其它面板/未选项目 = 原样元数据', () => {
+  const meta = [
+    { dataName: '测试日期', dataType: '日期' },
+    { dataName: '负责人', dataType: '文本' },
+    { dataName: PHOTO_FIELD, dataType: '附件' },
+  ]
+  const layout = { cols: [{ key: '测试日期', w: 90 }, { key: '碳酸氢钠', group: '试剂用量（g）' }], ok: true }
+  const tpl = visibleDetailFields({ isTemplate: true, layout, metaFields: meta })
+  assert.deepEqual(tpl.map((f) => f.dataName), ['测试日期', '碳酸氢钠', PHOTO_FIELD], '模版列在前,附件列固定在后')
+  assert.deepEqual(visibleDetailFields({ isTemplate: false, layout, metaFields: meta }), meta)
+  assert.deepEqual(visibleDetailFields({ isTemplate: true, layout: null, metaFields: meta }), meta, '还没选测试项目 ⇒ 先按元数据')
+})
+
+test('换「测试项目」⇒ 明细列跟着换(同一条路径:取 content → parseLayout → 字段)', async () => {
+  const { parseLayout } = await import('../core/panel/spikeWaterLayout.js')
+  const lead = parseLayout(stdLibContentOf(LIB_ROWS, 'NSF 53-除铅（PH8.5）'))
+  const mercury = parseLayout(stdLibContentOf(LIB_ROWS, 'NSF 53-除汞（PH8.5）'))
+  assert.deepEqual(templateDetailFields(lead.cols).map((f) => f.dataName), ['测试日期', '硫酸镁'])
+  assert.deepEqual(templateDetailFields(mercury.cols).map((f) => f.dataName), ['测试日期', '碳酸氢钠'])
+  // 老式条目没有列结构 ⇒ parseLayout 退回内置列集(不报错、不白屏)
+  const legacy = parseLayout(stdLibContentOf(LIB_ROWS, 'NSF 42-余氯'))
+  assert.equal(legacy.ok, false)
+  assert.ok(legacy.cols.length >= 6, '退回内置列集不能是空表')
+})
