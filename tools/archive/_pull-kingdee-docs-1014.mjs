@@ -19,6 +19,13 @@
  *   node tools/archive/_pull-kingdee-docs-1014.mjs                        # 测试账套,9/1 至今,8 类全拉
  *   node tools/archive/_pull-kingdee-docs-1014.mjs --db HSDZ_MES         # 落正式账套
  *   node tools/archive/_pull-kingdee-docs-1014.mjs --types pur_order,sal_order --limit 5   # 试跑
+ *
+ * 🔴 2026-11-09 加 `--skip-existing`(默认 1 = 只补缺):
+ *   本脚本原来对每张单 **先删头行再整单重插** ⇒ 行 id 会变。本地已有单据的行可能被
+ *   form_flow_link.source_line_key(生单链,实测 78 条)与 bl_pu_label.采购订单行id(材料码,41 条)引用,
+ *   重插会把它们全指向不存在的 id。故默认跳过本地已存在的单据(按 单据编号),只补金蝶有、本地没有的;
+ *   确实要覆盖已有单据(明知引用会断)时传 `--skip-existing 0`。
+ *   同时为新补进来的单据镜像 yj_doc_status(否则列表状态会显示"草稿",金蝶侧其实已审核)。
  * 产物: tools/archive/_dump-out/kingdee-pull-<tag>-1014.md(逐类型条数与错误)
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -32,6 +39,8 @@ const FROM = arg('from', '2026-09-01')
 const TO = arg('to', new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))  // 本机本地日期(UTC 口径会在 早上把"今天"算成昨天)
 const LIMIT = Number(arg('limit', '0')) || 0
 const ONLY = arg('types', '') ? arg('types').split(',') : null
+/** 只补缺(默认):本地已有该单据编号就跳过,绝不动已有头/行(行 id 被生单链/材料码引用) */
+const SKIP_EXISTING = arg('skip-existing', '1') !== '0'
 const TAG = DB === 'HSDZ_MES' ? 'prod' : 'test'
 
 const cfg = JSON.parse(readFileSync(new URL('../../deploy/config.json', import.meta.url), 'utf8')).kingdee
@@ -197,10 +206,10 @@ say(`# 金蝶 → MES 拉取(目标库 ${DB};区间 ${FROM} ~ ${TO})`)
 say('')
 say(`- 金蝶账套:惠州市银嘉环保(只读)   落库人:试运行   时间:${new Date().toISOString()}`)
 say('')
-say('| 单据 | 金蝶区间内(按单据日期) | 拉取成功 | 明细行 | 失败 | 备注 |')
-say('|---|---|---|---|---|---|')
+say('| 单据 | 金蝶区间内(按单据日期) | 拉取成功 | 明细行 | 跳过(本地已有) | 失败 | 备注 |')
+say('|---|---|---|---|---|---|---|')
 
-let grandOk = 0, grandLine = 0, grandFail = 0
+let grandOk = 0, grandLine = 0, grandFail = 0, grandSkip = 0
 for (const t of TYPES) {
   if (ONLY && !ONLY.includes(t.kd)) continue
   const headRows = await colsOf(t.head), lineRows = await colsOf(t.line)
@@ -240,9 +249,16 @@ for (const t of TYPES) {
   const pick = LIMIT ? inRange.slice(0, LIMIT) : inRange
   const keyOf = (h) => (t.keyCol === '外部数据ID' ? S(h.id) : S(h.bill_no))
 
-  let ok = 0, lineN = 0, fail = 0
+  let ok = 0, lineN = 0, fail = 0, skip = 0
   for (const row of pick) {
     try {
+      const docNo = S(row.bill_no)
+      // 只补缺:本地已有 → 跳过(不删、不插,行 id 保持不变)
+      if (SKIP_EXISTING) {
+        const ex = await pool.request().input('no', docNo)
+          .query(`SELECT COUNT(*) AS n FROM ${t.head} WHERE 单据编号 = @no`)
+        if ((ex.recordset[0]?.n || 0) > 0) { skip++; continue }
+      }
       const d = (await kingdeeTryGet(cfg, token, t.detail, { id: String(row.id) })).data || {}
       const head = {}
       for (const [kd, col] of hMap) head[col] = toVal(d[kd], headCols.get(col).typ, headCols.get(col).max_length)
@@ -276,10 +292,10 @@ for (const t of TYPES) {
         return o
       })
 
-      // ② 幂等整单重插(事务)
+      // ② 缺单整单插入(事务)。SKIP_EXISTING 下走到这里的都是本地没有的单,
+      //    那两行 DELETE 只是兜底(清掉可能的残留行/软删头,插进去才不会撞唯一键)。
       const tx = new mssql.Transaction(pool); await tx.begin()
       try {
-        const docNo = S(d.bill_no)
         await new mssql.Request(tx).query(`DELETE FROM ${t.line} WHERE 单据编号 = N'${docNo.replace(/'/g, "''")}'`)
         await new mssql.Request(tx).query(`DELETE FROM ${t.head} WHERE ${t.keyCol} = N'${String(keyOf(d)).replace(/'/g, "''")}'`)
         const ins = async (tbl, obj) => {
@@ -291,6 +307,21 @@ for (const t of TYPES) {
         }
         await ins(t.head, head)
         for (const ln of lines) await ins(t.line, ln)
+        // ③ 单据状态镜像(2026-11-09):列表/详情状态从 yj_doc_status 推导,不写这一行的话
+        //    金蝶侧已审核的新单在 MES 里会显示「草稿」。口径与 deploy/sync-core.mjs 同款:
+        //    审核人取金蝶 auditor_name、审核时间取 audit_time,审核人缺失时留「金蝶同步」。
+        if (head['单据状态'] === '已审核') {
+          const req = new mssql.Request(tx)
+          req.input('code', S(t.panel))
+          req.input('no', docNo)
+          req.input('shr', S(d.auditor_name) || '金蝶同步')
+          req.input('shsj', S(d.audit_time) || null)
+          await req.query(`MERGE yj_doc_status AS t USING (VALUES (@code, @no)) AS s(panel_code, doc_no)
+            ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no
+            WHEN MATCHED THEN UPDATE SET shr = @shr, shsj = @shsj, canceled = N'N', pending = N'N', update_at = GETDATE()
+            WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, stopped, pending, update_at)
+              VALUES (s.panel_code, s.doc_no, @shr, @shsj, N'N', N'N', N'N', GETDATE());`)
+        }
         await tx.commit()
         ok++; lineN += lines.length
       } catch (e) { await tx.rollback(); throw e }
@@ -300,11 +331,11 @@ for (const t of TYPES) {
       if (fail <= 3) say(`- ❌ ${t.kdName} ${row.bill_no} 失败:${String(e.message).slice(0, 160)}`)
     }
   }
-  grandOk += ok; grandLine += lineN; grandFail += fail
-  say(`| ${t.kdName} | ${inRange.length} | ${ok} | ${lineN} | ${fail} | 过滤键 ${filterKey}_*;幂等键 ${t.keyCol} |`)
+  grandOk += ok; grandLine += lineN; grandFail += fail; grandSkip += skip
+  say(`| ${t.kdName} | ${inRange.length} | ${ok} | ${lineN} | ${skip} | ${fail} | 过滤键 ${filterKey}_*;幂等键 ${t.keyCol} |`)
 }
 say('')
-say(`**合计**:成功拉取 ${grandOk} 张单据 / ${grandLine} 条明细,失败 ${grandFail} 张。`)
+say(`**合计**:成功补拉 ${grandOk} 张单据 / ${grandLine} 条明细;跳过(本地已有)${grandSkip} 张;失败 ${grandFail} 张。`)
 
 mkdirSync(new URL('./_dump-out/', import.meta.url), { recursive: true })
 const RUNSTAMP = TO.replace(/-/g, '').slice(4)   // 报告名带运行日期(MMDD),不覆盖上一轮留档
