@@ -103,6 +103,29 @@ $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $RunName = 'YinjiaMesPrintAgent'
 $ScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
 
+# ── 配置:优先读同目录 print-agent.config.json(2026-11-10)──────────────────
+# 现场打印机名是 "EPSON LQ-635KII ESC/P2 (副本 1)"(带空格/括号),站点是 "仓库" ——
+# 用 Start-Process -ArgumentList @(...) 传参会按空格拆开(实测只剩 "EPSON"),所以自启与安装
+# 都只传 -File,其余参数从这里的 JSON 读;命令行显式给了的仍然优先。
+$script:CfgPath = Join-Path (Split-Path -Parent $ScriptPath) 'print-agent.config.json'
+if (Test-Path $script:CfgPath) {
+    try {
+        $rawCfg = [System.IO.File]::ReadAllText($script:CfgPath, [System.Text.Encoding]::UTF8)
+        $cfgObj = ConvertFrom-Json $rawCfg
+        if (-not $PSBoundParameters.ContainsKey('Port') -and $cfgObj.port) { $Port = [int]$cfgObj.port }
+        if (-not $PSBoundParameters.ContainsKey('Printer') -and $cfgObj.printer) { $Printer = [string]$cfgObj.printer }
+        if (-not $PSBoundParameters.ContainsKey('Mode') -and $cfgObj.mode) { $Mode = [string]$cfgObj.mode }
+        if (-not $PSBoundParameters.ContainsKey('Server') -and $cfgObj.server) { $Server = [string]$cfgObj.server }
+        if (-not $PSBoundParameters.ContainsKey('User') -and $cfgObj.user) { $User = [string]$cfgObj.user }
+        if (-not $PSBoundParameters.ContainsKey('Pass') -and $cfgObj.pass) { $Pass = [string]$cfgObj.pass }
+        if (-not $PSBoundParameters.ContainsKey('Factory') -and $cfgObj.factory) { $Factory = [string]$cfgObj.factory }
+        if (-not $PSBoundParameters.ContainsKey('Station') -and $cfgObj.station) { $Station = [string]$cfgObj.station }
+        Say ("[配置] 已读取 " + $script:CfgPath) 'DarkGray'
+    } catch {
+        Say ("[WARN] 配置文件读取失败(继续用命令行参数):" + $_.Exception.Message) 'Yellow'
+    }
+}
+
 # PDF 输出目录:默认放在脚本同级的 print-out\(不污染仓库根)
 if (-not $PdfDir) { $PdfDir = Join-Path (Split-Path -Parent $ScriptPath) 'print-out' }
 

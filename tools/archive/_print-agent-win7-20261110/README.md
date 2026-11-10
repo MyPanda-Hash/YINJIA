@@ -1,4 +1,4 @@
-﻿打印代理 · Windows 7 兼容改造(2026-11-10)
+﻿印代理 · Windows 7 兼容改造(2026-11-10)
 
 现场:客户那台 **Windows 7 旗舰版 SP1 / i5-4590 / 12GB** 双击 `安装.bat`,窗口停在
 
@@ -131,3 +131,27 @@ PS2 上走的是我们的替身 `Invoke-WebRequest` 函数,参数表里没有它
 
 回归:`test-http.ps1`(登录 200/token 172、首页 200、错误路径返回对象)、`test-json.ps1` 五组、
 安装 DryRun 成功与错密码两条路都过。
+## 第五轮:[WARN] 代理启动后 12 秒内没响应(2026-11-10)
+
+客户 `print-agent.config.json`:
+
+```json
+{"station":"仓库","port":18777,"mode":"Auto","printer":"EPSON LQ-635KII ESC/P2 (副本 1)","server":"http://36.140.66.163:8090"}
+```
+
+配置写出来了(登录成功),但代理没起来。**原因**:安装脚本用
+`Start-Process -ArgumentList @(...,'-Printer',$Printer,'-Station',$Station)` 传参,
+PowerShell 会用空格把参数**拼成一条命令行**,打印机名 `EPSON LQ-635KII ESC/P2 (副本 1)` 被拆成
+`EPSON` + `LQ-635KII` + …(本机实测 `/health` 里打印机只剩 `EPSON`);PS2 下多余的位置参数还会
+直接报「找不到接受参数的位置」→ 代理进程退出 → 12 秒等不到 /health。
+
+**改法**:
+
+1. 代理支持读同目录 `print-agent.config.json`(命令行显式给的仍然优先);
+2. 安装脚本的**自启项与首次启动都只传 `-File`**,不再拼参数 —— 中文站点名/带空格打印机名都不会被拆;
+3. 启动失败时不再只说"手动跑一次":现在会打印**进程退出码 + `agent.log` 最后 15 行**,
+   客户直接截图就能定位;
+4. 等待时间 12s → 20s(Win7 冷启动慢一点)。
+
+验证:临时目录放一份 config(打印机名带空格、站点"仓库"),只 `-File` 启动 →
+`/health = 200 {"printer":"EPSON LQ-635KII ESC/P2 (副本 1)","mode":"Auto"}`,不再被截断。

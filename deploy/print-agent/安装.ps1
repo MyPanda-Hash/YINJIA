@@ -178,7 +178,8 @@ $argParts = @(
     '-Station', (Quote $Station)
 )
 if ($Printer) { $argParts += @('-Printer', (Quote $Printer)) }
-$cmd = 'powershell.exe ' + ($argParts -join ' ')
+# 只传 -File:参数全在 print-agent.config.json(避免打印机名/站点名带空格被拆开)
+$cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $agent + '"'
 
 $cfgPath = Join-Path $here 'print-agent.config.json'
 @{
@@ -203,19 +204,28 @@ if (Test-AgentAlive) {
     Say "[OK] 代理已在运行(端口 $Port),本次不重复启动" 'Green'
     Say '     (如果刚才改过服务器地址,请先双击「卸载.bat」再重装一次)' 'DarkGray'
 } else {
-    Start-Process powershell -WindowStyle Hidden -ArgumentList @(
-        '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
-        '-File', $agent, '-Port', "$Port", '-Mode', $Mode,
-        '-Server', $Server, '-User', $User, '-Pass', $Pass, '-Factory', $Factory,
-        '-Station', $Station, '-Printer', $Printer
+    # 只传 -File(参数读 config):带空格/中文的参数用数组传会被拆开
+    $agentLog = Join-Path $here 'agent.log'
+    $proc = Start-Process powershell -PassThru -WindowStyle Hidden -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+        '-File', $agent
     )
     $ok = $false
-    for ($i = 0; $i -lt 24; $i++) {
+    for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Milliseconds 500
         if (Test-AgentAlive) { $ok = $true; break }
     }
     if ($ok) { Say "[OK] 代理已启动(端口 $Port,模式 $Mode)" 'Green' }
-    else { Say '[WARN] 代理启动后 12 秒内没响应,请手动跑一次 print-agent.ps1 看报错。' 'Yellow' }
+    else {
+        Say '[WARN] 代理启动后 20 秒内没响应,下面把它的日志打出来(agent.log 最后 15 行):' 'Yellow'
+        try {
+            if ($proc -and $proc.HasExited) { Say ("       进程已退出,退出码 " + $proc.ExitCode) 'Yellow' }
+        } catch { }
+        try {
+            if (Test-Path $agentLog) { Get-Content $agentLog -Tail 15 | ForEach-Object { Say ("       " + $_) } }
+            else { Say '       同目录还没有 agent.log —— 说明脚本连第一行都没跑起来(权限/杀毒拦截?)' 'Yellow' }
+        } catch { }
+    }
 }
 
 # ── ⑤ 结果 ────────────────────────────────────────────────────────
