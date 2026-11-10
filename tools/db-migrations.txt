@@ -4598,3 +4598,5 @@ migrate-lab-mobile-row-photo-20261109.sql
 
 # 2026-11-09 实验室「测试项目」标准库补齐服务器上的 4 条历史遗留条目(item_code=默认、名字写在 content 里;启用 2 条 NSF 42-余氯/NSF 42氯胺)
 migrate-lab-testitem-legacy-20261109.sql
+# 2026-11-10 产品文件列表承载单据兜底补种（PDL-0001 丢失导致面板空白）
+migrate-rd-prod-doclist-shell-reseed-20261110.sql
