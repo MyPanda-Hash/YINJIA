@@ -435,20 +435,39 @@ function Send-LabelToPrinter {
     #   注意:这里只能选**标准纸型**;自定义纸型会被 PDF 驱动丢掉(上面那条踩坑)。
     $script:W100 = 827   # 横向 210mm ≈ 8.27in(1/100 英寸)
     $script:H100 = 583   # 纵向 148mm ≈ 5.83in(A5 短边)
-    $paperKind = if (([string]$Paper).Trim().ToUpper() -eq 'A4') { 'A4' } else { 'A5' }
+    # ── DOT-PAPER-20261110 ─────────────────────────────────────────────
+    # 针式打印机(ESC/P2 连续纸)不能按 A5 横版设:驱动会再旋转一次,结果"横竖反了 + 右侧被裁"。
+    # 这里:针式机 → 自定义纸 241×140mm(中一刀)、**不旋转**;其它机(激光/PDF)→ 原来的 A5/A4 横版。
+    $isDot = $false
+    $pn = ''
+    try { $pn = [string]$doc.PrinterSettings.PrinterName } catch { }
+    if ($pn -match 'LQ-|ESC\s*/\s*P2|FX-|针式|Dot\s*Matrix') { $isDot = $true }
+    $paperOpt = ([string]$Paper).Trim().ToUpper()
+    if ($paperOpt -eq 'LQ' -or $paperOpt -eq 'DOT') { $isDot = $true }
+    $paperKind = if ($paperOpt -eq 'A4') { 'A4' } else { 'A5' }
     try {
-        $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq $paperKind } | Select-Object -First 1
-        if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match $paperKind } | Select-Object -First 1 }
-        if ($ps) {
-            $doc.DefaultPageSettings.PaperSize = $ps
-            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5→210×148 / A4→297×210
+        if ($isDot) {
+            # 241mm × 140mm = 949 × 551(1/100 英寸);Landscape=false:纸本身就是"宽>高",不再转
+            $dotPaper = New-Object System.Drawing.Printing.PaperSize('中一刀 241x140', 949, 551)
+            $doc.DefaultPageSettings.PaperSize = $dotPaper
+            $doc.DefaultPageSettings.Landscape = $false
             $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
-            Say ("[版面] 纸张 = {0} 横打(内容仍 210×148mm,不缩放)" -f $paperKind) 'DarkGray'
+            Say '[版面] 针式打印机 → 自定义纸 241×140mm(中一刀),不旋转' 'DarkGray'
+            $script:IsDotPaper = $true
         } else {
-            Say ("[WARN] 打印机没有 {0} 纸型,按默认纸输出" -f $paperKind) 'Yellow'
+            $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq $paperKind } | Select-Object -First 1
+            if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match $paperKind } | Select-Object -First 1 }
+            if ($ps) {
+                $doc.DefaultPageSettings.PaperSize = $ps
+                $doc.DefaultPageSettings.Landscape = $true    # 横打:A5→210×148 / A4→297×210
+                $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+                Say ("[版面] 纸张 = {0} 横打(内容仍 210×148mm)" -f $paperKind) 'DarkGray'
+            } else {
+                Say ("[WARN] 打印机没有 {0} 纸型,按默认纸输出" -f $paperKind) 'Yellow'
+            }
         }
     } catch {
-        Say ("[WARN] 设置纸张({0} 横版)失败,按默认纸输出: {1}" -f $paperKind, $_.Exception.Message) 'Yellow'
+        Say ("[WARN] 设置纸张失败,按默认纸输出: {0}" -f $_.Exception.Message) 'Yellow'
     }
 
     # 版式数据交给回调(script 作用域,PrintPage 里能读到)
@@ -478,8 +497,27 @@ function Send-LabelToPrinter {
         $g = $e.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
-        $pageW = 827   # 210mm
+        $pageW = 827   # 210mm(版式坐标,不随纸张变)
         $pageH = 583   # 148mm
+        # 纸比版式小时等比缩小并居中:以前固定坐标直接画,针式连续纸(140mm 高)会把下半截裁掉
+        try {
+            $mb = $e.MarginBounds
+            if ($mb -and $mb.Width -gt 50 -and $mb.Height -gt 50) {
+                # 针式机:实际可打印宽度约 203mm(8in),版式 210mm ⇒ 目标宽收到 198mm;
+                # 高度减 1mm 余量,避免 140mm 纸刚好压线。
+                $targetW = 827.0
+                $targetH = 583.0
+                if ($script:IsDotPaper) { $targetW = 780.0; $targetH = 575.0 }
+                $sx = [Math]::Min([double]$mb.Width, $targetW) / 827.0
+                $sy = [Math]::Min([double]$mb.Height, $targetH) / 583.0
+                $sc = [Math]::Min(1.0, [Math]::Min($sx, $sy))
+                $g.TranslateTransform([float]$mb.Left, [float]$mb.Top)
+                if ($sc -lt 0.999) {
+                    $g.ScaleTransform([float]$sc, [float]$sc)
+                    Say ("[版面] 可打印区 {0}×{1} → 缩放 {2:P0}" -f $mb.Width, $mb.Height, $sc) 'DarkGray'
+                }
+            }
+        } catch { }
         $black = [System.Drawing.Brushes]::Black
         $gray  = [System.Drawing.Brushes]::DimGray
 
