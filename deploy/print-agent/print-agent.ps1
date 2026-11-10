@@ -217,6 +217,50 @@ function Get-RealPrinterName {
     return ''
 }
 
+# ── 打印机名核对(2026-11-10)────────────────────────────────────────────
+# 现场配置里是 "EPSON LQ-635KII ESC/P2 (副本 1)",系统里这台"副本"已被删 ⇒ 打印报
+# 「已删除指定的打印机。」。这里按「去掉 (副本 N)、空格、大小写」比对系统清单,
+# 对不上就返回空,让调用方换一台可用真机(并记日志),而不是死在一个陈旧名字上。
+function Get-PrinterNameKey {
+    param([string]$Name)
+    if (-not $Name) { return '' }
+    $k = $Name -replace '\s*\(\s*副本\s*\d+\s*\)\s*', ' '
+    $k = $k -replace '\s+', ' '
+    return $k.Trim().ToUpper()
+}
+
+function Resolve-PrinterName {
+    param([string]$Name)
+    $all = @(Get-InstalledPrinterNames)
+    if ($all.Count -eq 0) { return '' }
+    if ($Name -and ($all -contains $Name)) { return $Name }
+    if (-not $Name) { return '' }
+    $k = Get-PrinterNameKey $Name
+    if (-not $k) { return '' }
+    foreach ($p in $all) { if ((Get-PrinterNameKey $p) -eq $k) { return $p } }
+    foreach ($p in $all) {
+        $pk = Get-PrinterNameKey $p
+        if ($pk -and ($pk.Contains($k) -or $k.Contains($pk))) { return $p }
+    }
+    return ''
+}
+
+# PDF 兜底用的虚拟打印机:Win7 没有 Microsoft Print to PDF,常见是 WPS/福昕/Adobe
+function Get-PdfPrinterName {
+    $all = @(Get-InstalledPrinterNames)
+    $prefer = @(
+        'Microsoft Print to PDF',
+        '导出为WPS PDF', 'WPS PDF', 'WPS Office PDF',
+        'Foxit Reader PDF Printer', 'Foxit PDF Printer', 'Foxit PhantomPDF Printer',
+        'Adobe PDF', 'CutePDF Writer', 'Bullzip PDF Printer'
+    )
+    foreach ($k in $prefer) {
+        foreach ($p in $all) { if ($p -eq $k) { return $p } }
+    }
+    foreach ($p in $all) { if ($p -match 'PDF') { return $p } }
+    return ''
+}
+
 <#
   把一张工单标签送到打印机(**不弹任何对话框**)。
 
@@ -336,18 +380,43 @@ function Send-LabelToPrinter {
     # **静默**落成 PDF —— 不会弹"另存为"对话框(那是普通用户点打印才有的行为)。
     # 关键三件:PrinterName 指向虚拟打印机、PrintToFile=$true、PrintFileName 给死路径。
     if ($PdfPath) {
-        $pdfPrinter = 'Microsoft Print to PDF'
+        $pdfPrinter = Get-PdfPrinterName
+        if (-not $pdfPrinter) {
+            $allPd = @(Get-InstalledPrinterNames)
+            throw ("这台电脑没有可用的 PDF 虚拟打印机(Win7 没有系统自带的 Microsoft Print to PDF)。" +
+                   "请装 WPS/福昕阅读器后重试,或在「打印机」里启用一个 PDF 打印机。当前已装:" + ($allPd -join ' / '))
+        }
+        if ($pdfPrinter -ne 'Microsoft Print to PDF') { Say "[PDF ] 用「$pdfPrinter」落 PDF" 'DarkGray' }
         $doc.PrinterSettings.PrinterName = $pdfPrinter
         if (-not $doc.PrinterSettings.IsValid) {
-            throw "找不到虚拟打印机「$pdfPrinter」:请在 Windows「打印机和传真」里启用它(系统自带,可能被关掉了)"
+            throw "找不到虚拟打印机「$pdfPrinter」:请在 Windows「打印机和传真」里启用它"
         }
         $doc.PrinterSettings.PrintToFile = $true
         $doc.PrinterSettings.PrintFileName = $PdfPath
     } else {
-        if ($PrinterName) { $doc.PrinterSettings.PrinterName = $PrinterName }
-        if (-not $doc.PrinterSettings.IsValid) {
-            throw "打印机不可用:[$PrinterName](检查打印机名称,或在网页里留空使用系统默认打印机)"
+        # 配置的名字可能已失效(如 "…(副本 1)" 被删)⇒ 先核对,再准备候选列表逐台重试
+        $script:PrintCandidates = @()
+        if ($PrinterName) { $script:PrintCandidates += $PrinterName }
+        $resolved = Resolve-PrinterName $PrinterName
+        if ($resolved) { $script:PrintCandidates += $resolved }
+        $realFallback = Get-RealPrinterName -Prefer ''
+        if ($realFallback) { $script:PrintCandidates += $realFallback }
+        # 再兜所有真机:配置那台可能只是驱动残留(名字在、端口/驱动已删)
+        foreach ($n in (Get-InstalledPrinterNames)) {
+            if (-not (Test-VirtualPrinter $n)) { $script:PrintCandidates += $n }
         }
+        $script:PrintCandidates = @($script:PrintCandidates | Where-Object { $_ } | Select-Object -Unique)
+        $picked = ''
+        foreach ($c in $script:PrintCandidates) {
+            $doc.PrinterSettings.PrinterName = $c
+            if ($doc.PrinterSettings.IsValid) { $picked = $c; break }
+        }
+        if (-not $picked) {
+            $allPd = @(Get-InstalledPrinterNames)
+            throw ("打印机不可用:[$PrinterName]。这台电脑上可用的打印机:" + ($allPd -join ' / ') +
+                   " (在「自动打印」页把打印机留空即用系统默认)")
+        }
+        if ($picked -ne $PrinterName) { Say ("[打印机] 配置的「{0}」不在系统里,改用「{1}」" -f $PrinterName, $picked) 'Yellow' }
     }
     $doc.DocumentName = "YINJIA-MES $Title $WoNo"
     # StandardPrintController = 不显示进度对话框 ⇒ 真静默
@@ -573,7 +642,25 @@ function Send-LabelToPrinter {
             throw
         }
     })
-    $doc.Print()
+    # 打印可能因驱动/打印机被删而失败 ⇒ 换候选列表里的下一台重试(最多 3 台)
+    $printed = $false
+    $lastErr = $null
+    $tryIdx = 0
+    while (-not $printed) {
+        try {
+            $doc.Print()
+            $printed = $true
+        } catch {
+            $lastErr = $_.Exception.Message
+            $cands = @($script:PrintCandidates)
+            if ($tryIdx + 1 -ge $cands.Count -or $tryIdx -ge 2) { throw }
+            $tryIdx++
+            $next = $cands[$tryIdx]
+            Say ("[打印机] 打印失败({0}),改试「{1}」" -f $lastErr, $next) 'Yellow'
+            $doc.PrinterSettings.PrinterName = $next
+            if (-not $doc.PrinterSettings.IsValid) { throw }
+        }
+    }
     if ($qrImg) { $qrImg.Dispose() }
 }
 
@@ -644,7 +731,10 @@ function Invoke-PrintJob {
     # 判"能不能打"两条:① 排除虚拟打印机(PDF/XPS/OneNote/Fax,它们不落纸);
     # ② 真打一次,失败(离线/缺纸/驱动报错)也降级 —— 现场不会"点了没反应"。
     try {
-        $real = Get-RealPrinterName -Prefer $printerN
+        # 先按系统清单核对配置名(忽略 (副本 N)),对不上就换可用真机
+        $real = Resolve-PrinterName $printerN
+        if (-not $real) { $real = Get-RealPrinterName -Prefer '' }
+        if ($real -and $printerN -and $real -ne $printerN) { Say ("[打印机] 配置的「{0}」不在系统里,改用「{1}」" -f $printerN, $real) 'Yellow' }
         if (-not $real) {
             Say '[兜底] 本机没有可用打印机,改落 PDF' 'Yellow'
             $pdfPath = & $doPdf
@@ -776,7 +866,13 @@ if ($Server) {
 
 
 $defaultPrinter = Get-SystemPrinterName
-$effective = if ($Printer) { $Printer } elseif ($defaultPrinter) { "$defaultPrinter(系统默认)" } else { '(未检测到默认打印机!)' }
+# 配置的打印机名可能已失效(现场 "…(副本 1)" 被删,打印报「已删除指定的打印机。」)
+$resolvedStartup = Resolve-PrinterName $Printer
+if ($Printer -and -not $resolvedStartup) {
+    Say ("[打印机] 配置的「{0}」在这台电脑上不存在,打印时会自动改用可用打印机" -f $Printer) 'Yellow'
+    foreach ($n in (Get-InstalledPrinterNames)) { Say ("          可选: " + $n) 'DarkGray' }
+}
+$effective = if ($resolvedStartup) { $resolvedStartup } elseif ($Printer) { $Printer + '(未找到!)' } elseif ($defaultPrinter) { "$defaultPrinter(系统默认)" } else { '(未检测到默认打印机!)' }
 Say ''
 Say '════════════════════════════════════════════════════════' 'Cyan'
 Say " YINJIA-MES 本地打印代理 v$AgentVersion" 'Cyan'
