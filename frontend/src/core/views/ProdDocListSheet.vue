@@ -292,6 +292,19 @@ function canApprove(c) {
   return String(csv).split(',').map((s) => s.trim()).includes('specapprove')
 }
 
+/**
+ * 批准按钮的悬停提示。
+ *
+ * ⚠ 2026-11-10 事故：模板里 `:title="approveTitle(row, c)"` 先落了地，函数却漏写 ⇒ 只要这一格
+ *   命中（管理员 × 规格书列 × 状态=开发完毕）渲染就抛 `TypeError: approveTitle is not a function`，
+ *   Vue 把整棵子树丢掉 —— 用户看到的是**整个产品文件列表一片空白**（生产 11-10 报障）。
+ *   组件里"模板用了、脚本没定义"的漏写不会在构建期报错，只能靠这条注释与测试兜住。
+ */
+function approveTitle(row, c) {
+  const no = docNoOf(row, c.panelCode)
+  return no ? tt('批准规格书 {no}（回填批准人与日期）').replace('{no}', no) : tt('批准')
+}
+
 /** 已批准时那格显示的落款（后端 board 回填 批准日期：姓名/yyyy.M.d） */
 function approvedAt(row) {
   return row?.批准日期 || ''
