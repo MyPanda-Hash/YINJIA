@@ -89,16 +89,19 @@ function Say {
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 } catch { }
+# PS2(Win7 自带):没有 ConvertFrom-Json / ConvertTo-Json / Invoke-WebRequest(都是 3.0+ 才有)。
+# 用户口径「要兼容,能够一键完成,不要多余操作」⇒ 加载同目录兼容层,不让客户去装 WMF。
+$script:HereDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if ($PSVersionTable.PSVersion.Major -lt 3) {
-    Say '[FAIL] 这台电脑的 PowerShell 版本太低(需要 3.0 及以上)。' 'Red'
-    Say '       Win7 请先装 WMF 5.1:https://www.microsoft.com/download/details.aspx?id=54616'
-    exit 1
+    $compatFile = Join-Path $script:HereDir 'compat-ps2.ps1'
+    if (-not (Test-Path $compatFile)) { Say "[FAIL] 同目录缺少 compat-ps2.ps1,请把整个文件夹一起拷贝: $compatFile" 'Red'; exit 1 }
+    . $compatFile
 }
 
 $AgentVersion = '1.1.0'
 $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $RunName = 'YinjiaMesPrintAgent'
-$ScriptPath = $PSCommandPath
+$ScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
 
 # PDF 输出目录:默认放在脚本同级的 print-out\(不污染仓库根)
 if (-not $PdfDir) { $PdfDir = Join-Path (Split-Path -Parent $ScriptPath) 'print-out' }
@@ -671,9 +674,11 @@ try {
 #   给了 -Server 才会启动轮询;不给则维持原来"等页面推任务"的模式。
 if ($Server) {
     $srvBase = $Server.TrimEnd('/')
-    $pollArgs = @($srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer)
+    $compatForJob = Join-Path $script:HereDir 'compat-ps2.ps1'
+    $pollArgs = @($compatForJob, $srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer)
     $script:pollJob = Start-Job -ScriptBlock {
-        param($Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX)
+        param($Cmp, $Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX)
+        if ($PSVersionTable.PSVersion.Major -lt 3) { . $Cmp }
         # ⚠ 全部走 Invoke-WebRequest + 手动 UTF-8 解码,不用 Invoke-RestMethod ——
         #   实测 PS 5.1 的 Invoke-RestMethod 会把 JSON 响应按 Latin1 解,中文键名全变乱码
         #   ("二维码内容" → "äºç»´ç å å®¹"),后面 $task.'二维码内容' 就永远取不到值,
@@ -798,7 +803,7 @@ try {
                     $cfg = $raw | ConvertFrom-Json
                     if ($cfg.PSObject.Properties.Name -contains 'mode') {
                         $m = [string]$cfg.mode
-                        if ($m -in @('Auto', 'Printer', 'Pdf')) { $script:Mode = $m }
+                        if (@('Auto', 'Printer', 'Pdf') -contains $m) { $script:Mode = $m }
                     }
                     if ($cfg.PSObject.Properties.Name -contains 'pdfDir') {
                         $d = [string]$cfg.pdfDir
@@ -828,7 +833,7 @@ try {
                 }
             }
             elseif ($req.HttpMethod -eq 'POST' -and $path -eq '/test') {
-                $r = Invoke-PrintJob -Job ([pscustomobject]@{
+                $r = Invoke-PrintJob -Job (New-Object PSObject -Property @{
                     标题 = '打印代理测试'
                     工单号 = 'TEST-0001'
                     工单行号 = 1

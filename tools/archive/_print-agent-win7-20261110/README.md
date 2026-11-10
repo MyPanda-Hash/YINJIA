@@ -1,4 +1,4 @@
-# 打印代理 · Windows 7 兼容改造(2026-11-10)
+﻿# 打印代理 · Windows 7 兼容改造(2026-11-10)
 
 现场:客户那台 **Windows 7 旗舰版 SP1 / i5-4590 / 12GB** 双击 `安装.bat`,窗口停在
 
@@ -60,3 +60,30 @@ node tools/archive/_print-agent-win7-20261110/patch-win7.mjs
 2. 先跑 DryRun(命令见 `说明.md` 第八节),不行就把 `install.log` 发回来;
 3. 报 PowerShell 版本低 → 装 WMF 5.1 后重启;
 4. 还不行再看 `agent.log`(代理)与 `uninstall.log`(卸载)。
+## 追加:PowerShell 2.0 兼容(2026-11-10 第二轮)
+
+第一轮改完现场又报:
+
+```
+[FAIL] 这台电脑的 PowerShell 版本太低(需要 3.0 及以上)。
+       Win7 请先装 WMF 5.1:...
+```
+
+客户那台 Win7 **没装 WMF**,`powershell.exe` 就是 2.0 —— 没有 `ConvertFrom-Json` / `ConvertTo-Json` /
+`Invoke-WebRequest`。用户口径「要兼容,能够一键完成,不要多余操作」⇒ **不再要求装 WMF**,改为自带兼容层:
+
+- 新增 `compat-ps2.ps1`:PS<3 时由三个脚本自动 dot-source;
+  - JSON 用 `System.Web.Extensions` 的 `JavaScriptSerializer`(.NET 3.5,Win7 自带),
+    把 Dictionary/数组递归转成 PSObject,保证 `$obj.data.token`、`$task.'二维码内容'` 这种属性访问在 PS2 下可用;
+  - `Invoke-WebRequest` 用 `HttpWebRequest` 实现(只覆盖脚本用到的参数),返回 `StatusCode/RawContentStream/Content`;
+  - 只在命令**真的缺失**时才占位(PS3+ 用系统自带命令,不覆盖)。
+- 清掉 PS3+ 语法:`-in` → `-contains`;`[pscustomobject]` → `New-Object PSObject -Property`;`$PSCommandPath` → `$MyInvocation.MyCommand.Path`。
+- 代理的轮询跑在 `Start-Job` 子进程里:把兼容层路径作为第一个参数传进去,job 内 `PS<3` 时先 dot-source。
+
+验证(本机 PS5.1):
+
+- `test-compat.ps1`(强制加载兼容层):JSON 序列化、登录 POST(token 172 字符)、GET 返回对象、
+  **中文键 JSON** 解析(`qr=0@A@1 wo=WO-1 rows=1 物料=折叠棉`)全部通过;
+- `安装.ps1 -DryRun`:枚举打印机 + 登录 8090 成功;
+- `print-agent.ps1 -Port 18799 -Mode Pdf -Server ...`:`/health=200`,`mode=Pdf`,打印机识别正常;
+- zip 解压后再跑 DryRun 通过。
