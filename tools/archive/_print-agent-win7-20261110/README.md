@@ -1,4 +1,4 @@
-﻿ 打印代理 · Windows 7 兼容改造(2026-11-10)
+﻿打印代理 · Windows 7 兼容改造(2026-11-10)
 
 现场:客户那台 **Windows 7 旗舰版 SP1 / i5-4590 / 12GB** 双击 `安装.bat`,窗口停在
 
@@ -109,3 +109,25 @@ node tools/archive/_print-agent-win7-20261110/patch-win7.mjs
 顺带:现场打印机列表里第一台是「导出为WPS PDF」,安装脚本原来只排除了微软那几个虚拟打印机 ⇒
 默认打印机选成了 WPS PDF。现在按名字 `PDF|XPS|OneNote|Fax|WPS` 一律当虚拟打印机跳过
 (安装脚本与代理的 Auto 模式同步改)。
+## 第四轮:现场日志 `UseBasicParsing` 找不到参数(2026-11-10)
+
+客户发来的 `install.log`:
+
+```
+[OK] 检测到打印机:EPSON LQ-635KII ESC/P2 (副本 1) / EPSON LQ-635KII ESC/P2
+[..] 正在验证服务器与账号 ...
+[FAIL] 连不上服务器或账号密码不对:找不到与参数名称"UseBasicParsing"匹配的参数。
+```
+
+不是网络问题:地址与账号都还没发出去 —— 调用方带 `-UseBasicParsing`(PS3+ 的 cmdlet 参数),
+PS2 上走的是我们的替身 `Invoke-WebRequest` 函数,参数表里没有它,绑定阶段就报错。
+
+修法:替身补齐 `-UseBasicParsing` / `-DisableKeepAlive` / `-MaximumRedirection`(接收即可),
+并加 `[CmdletBinding()]`(**必须写在函数体内、紧贴 `param`** —— 写在 `function` 外面会报
+`Unexpected attribute 'CmdletBinding'`,这个坑也踩了)。
+
+顺带:密码错时服务器返 401/409,现在给一句人话「账号或密码不对(服务器返回 409)」,
+不再笼统说"连不上"。
+
+回归:`test-http.ps1`(登录 200/token 172、首页 200、错误路径返回对象)、`test-json.ps1` 五组、
+安装 DryRun 成功与错密码两条路都过。

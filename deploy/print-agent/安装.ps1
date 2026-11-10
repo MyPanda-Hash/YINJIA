@@ -141,6 +141,13 @@ try {
     if (-not $obj.data.token) { throw '登录返回里没有 token' }
     Say "[OK] 登录成功($Server)" 'Green'
 } catch {
+    # 4xx = 账号/密码不对(不是网络问题),给一句人话(2026-11-10)
+    $httpStatus = 0
+    try { if ($_.Exception.Response) { $httpStatus = [int]$_.Exception.Response.StatusCode } } catch { }
+    if ($httpStatus -eq 401 -or $httpStatus -eq 409) {
+        Say "[FAIL] 账号或密码不对(服务器返回 $httpStatus):请重新运行安装,输入正确的 admin 密码。" 'Red'
+        exit 1
+    }
     Say "[FAIL] 连不上服务器或账号密码不对:$($_.Exception.Message)" 'Red'
     Say '       检查:① 服务器地址对不对 ② 这台电脑能不能打开那个网址 ③ 账号密码'
     exit 1

@@ -150,14 +150,21 @@ function ConvertTo-JsonCompat {
 
 # ── HTTP:只实现脚本用到的那一小撮参数 ───────────────────────────────────────
 #   返回对象带 .StatusCode / .RawContentStream.ToArray() / .Content / .Headers
+#   ⚠ -UseBasicParsing / -DisableKeepAlive 这些开关 PS3+ 的 cmdlet 才有:调用方会带,
+#     **必须照单接收**(2026-11-10 现场:报「找不到与参数名称 UseBasicParsing 匹配的参数」)。
+# Note: [CmdletBinding()] must be immediately above function (no comment in between)
 function Invoke-WebRequestCompat {
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Uri,
         [string]$Method = 'Get',
         [hashtable]$Headers = @{},
         $Body = $null,
         [string]$ContentType = $null,
-        [int]$TimeoutSec = 30
+        [int]$TimeoutSec = 30,
+        [switch]$UseBasicParsing,
+        [switch]$DisableKeepAlive,
+        [int]$MaximumRedirection = 5
     )
     $req = [System.Net.HttpWebRequest]::Create($Uri)
     $req.Method = $Method.ToUpper()
