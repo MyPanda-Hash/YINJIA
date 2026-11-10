@@ -45,6 +45,11 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 库存口径提示(2026-11-10「库存数量以金蝶真实账套为准」;见 core/views/stockHint.js)----
+    "库存以金蝶为准：本单需「转ERP」并在金蝶审核后才会改变库存（最长 5 分钟同步）":
+      "Stock follows Kingdee: this document changes stock only after 「Transfer to ERP」 and approval in Kingdee (sync within 5 minutes)",
+    "库存以金蝶为准：调拨/盘点不推送金蝶，本单不改变库存（只留流水）":
+      "Stock follows Kingdee: transfers/stocktakes are not pushed to Kingdee, so this document does not change stock (ledger only)",
     // ---- 产品规格书封面右上角编号标识(2026-10-19)----
     "产品编号：": "Product No.:",
     // ---- 扫码领料(条码管理 → 扫码领料,2026-10-18)----

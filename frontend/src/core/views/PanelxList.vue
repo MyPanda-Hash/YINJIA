@@ -2633,6 +2633,8 @@ import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
+// 库存口径提示(2026-11-10「库存以金蝶为准」):审核/审批通过后按后端给的码补一句说明
+import { stockHintText } from './stockHint.js'
 
 const engine = usePanelRuntime()
 const { user, tabs, locale: localeStore } = useAppContext()
@@ -11376,6 +11378,12 @@ async function onButton(action) {
     } else {
       ElMessage.success(`「${action}」执行成功`)
     }
+    // 库存口径提示(2026-11-10 用户口径「库存数量以金蝶为准」):审核/审批通过**当场仍会记账**,
+    // 但那只是临时值 —— 没转ERP或金蝶没审核,下一轮同步(≤5 分钟)就把它抹平。不提示的话,
+    // 业务会以为"审核完库存就减了",然后在库存状况页看到数字又回去(差异列先亮出来)。
+    // 文案与码的映射见 core/views/stockHint.js;后端只在会改库存的面板才带这个码。
+    const stockHint = stockHintText(res?.['库存提示'])
+    if (stockHint) ElMessage.warning(tt(stockHint))
     await load()
     // 立项申请表：提交审批成功后自动跳「项目流程管控」（2026-11-06 用户口径
     //   「填写提交之后自动跳转到项目流程管控」）。

@@ -2439,9 +2439,9 @@ public class ButtonService {
         if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
         // 文件类面板:经审核收尾(修改闭环/弃审留痕) → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeOpenModify(def, no, auditor)) {
-            return result(no, "已归档");
+            return result(def, no, "已归档");
         }
-        return result(no, "已审核");
+        return result(def, no, "已审核");
     }
 
     /**
@@ -2999,9 +2999,9 @@ public class ButtonService {
             //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
             //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
             if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
-            return result(no, "已归档");
+            return result(def, no, "已归档");
         }
-        return result(no, "已审核");
+        return result(def, no, "已审核");
     }
 
     /**
@@ -3066,9 +3066,9 @@ public class ButtonService {
             //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
             //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
             if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
-            return result(no, "已归档");
+            return result(def, no, "已归档");
         }
-        return result(no, "已审核");
+        return result(def, no, "已审核");
     }
 
     /** 审批驳回:仅审批中/待二级审批 → 草稿(意见必填,驳回后修改可重新提交)
@@ -8198,6 +8198,38 @@ public class ButtonService {
         Map<String, Object> out = new HashMap<>();
         out.put("编号", no);
         out.put("单据状态", status);
+        return out;
+    }
+
+    // ============ 库存口径提示(2026-11-10 用户口径「以金蝶库存数量为准」) ============
+    /**
+     * 会改库存、且**能**推金蝶的 6 类单据(与 {@link #listPushableErp} 白名单同源;
+     * 采购订单/暂收退料单不记账,故不在此列)。
+     */
+    private static final Set<String> STOCK_ERP_PUSHABLE = Set.of(
+            "PURCHASE_IN", "SALE_OUT", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT");
+    /** 会改库存但**推不了金蝶**的两类 ⇒ 审核后那笔库存一定会被下一轮同步抹平。 */
+    private static final Set<String> STOCK_LOCAL_ONLY = Set.of("TRANSFER", "STOCKTAKE");
+
+    /**
+     * 审核 / 审批通过 的返回体,附带「库存提示」码(前端据此追加一句说明)。
+     *
+     * <p>为什么必须提示(用户 2026-11-10 口径「以金蝶库存数量为准」,选了严格 A 口径):库存的唯一真源是
+     * 金蝶现存量(`deploy/sync-stock.mjs` 每 5 分钟覆盖 `kucun.yl`),而 MES 审核**仍会当场记账** ——
+     * 那笔改动只是临时值:单据没转ERP、或转了过去但金蝶没审核,下一轮同步就把它抹平。
+     * 不提示的话,业务会觉得"审核了库存就该减",然后在库存页看到数字又回去了。
+     *
+     * <p>码值(前端映射成多语言文案,不要在返回体里写整句中文):
+     * <ul>
+     *   <li>{@code 待转ERP} —— 本单需「转ERP + 金蝶审核」后才真正改变库存;</li>
+     *   <li>{@code 不推送金蝶} —— 调拨/盘点没有转ERP,审核不改变库存(只留流水)。</li>
+     * </ul>
+     */
+    private Map<String, Object> result(PanelRegistry.PanelDef def, String no, String status) {
+        Map<String, Object> out = result(no, status);
+        if (StockLedgerService.postsStock(def.code())) {
+            out.put("库存提示", STOCK_LOCAL_ONLY.contains(def.code()) ? "不推送金蝶" : "待转ERP");
+        }
         return out;
     }
 
