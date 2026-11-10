@@ -169,6 +169,8 @@ $VirtualPrinterNames = @(
 function Test-VirtualPrinter {
     param([string]$Name)
     if (-not $Name) { return $true }
+    # 名字里带 PDF/XPS/OneNote/Fax/WPS 的一律视为虚拟(2026-11-10:WPS 的「导出为WPS PDF」被当成真机选过)
+    if ($Name -match 'PDF|XPS|OneNote|Fax|WPS') { return $true }
     foreach ($v in $VirtualPrinterNames) {
         if ($Name -eq $v -or $Name -like "$v*") { return $true }
     }

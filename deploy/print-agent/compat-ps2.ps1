@@ -71,6 +71,71 @@ function ConvertTo-CompatHashtable {
     return $Value
 }
 
+# ── 手写 JSON 序列化(2026-11-10 第二轮)──────────────────────────────────────
+# 现场 PS2 报:`Serialize` 时 `System.Management.Automation.PSParameterizedProperty` 循环引用 ——
+# PS2 会把 `@{...}` 包成 PSObject,JavaScriptSerializer 顺着适配属性(Keys/Values/…)
+# 一路追下去就炸。与其跟序列化器较劲,不如自己拼 JSON(类型/转义都自己控,PS2/PS5 行为一致)。
+function ConvertTo-JsonEscaped {
+    param([string]$Text)
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append('"')
+    foreach ($ch in $Text.ToCharArray()) {
+        $code = [int]$ch
+        if ($code -eq 34) { [void]$sb.Append('\"') }          # "
+        elseif ($code -eq 92) { [void]$sb.Append('\\') }      # \
+        elseif ($code -eq 8) { [void]$sb.Append('\b') }
+        elseif ($code -eq 12) { [void]$sb.Append('\f') }
+        elseif ($code -eq 10) { [void]$sb.Append('\n') }
+        elseif ($code -eq 13) { [void]$sb.Append('\r') }
+        elseif ($code -eq 9) { [void]$sb.Append('\t') }
+        elseif ($code -lt 32) { [void]$sb.Append(('\u{0:x4}' -f $code)) }
+        else { [void]$sb.Append($ch) }
+    }
+    [void]$sb.Append('"')
+    return $sb.ToString()
+}
+
+function ConvertTo-JsonLiteral {
+    param($Value, [int]$Level = 0)
+    # PS2 的哈希表/数组常被包成 PSObject:只把「底层是集合/值类型」的壳剥掉;
+    # 真正的 PSCustomObject(NoteProperty 挂在 PSObject 上)不能剥,否则属性全丢。
+    if (($null -ne $Value) -and ($Value -is [System.Management.Automation.PSObject])) {
+        $base = $Value.PSObject.BaseObject
+        if (($base -is [System.Collections.IDictionary]) -or
+            (($base -is [System.Collections.IEnumerable]) -and -not ($base -is [string])) -or
+            ($base -is [ValueType]) -or ($base -is [string])) {
+            $Value = $base
+        }
+    }
+    if ($null -eq $Value) { return 'null' }
+    if ($Value -is [bool]) { if ($Value) { return 'true' } return 'false' }
+    if ($Value -is [string]) { return (ConvertTo-JsonEscaped $Value) }
+    if ($Value -is [char]) { return (ConvertTo-JsonEscaped ([string]$Value)) }
+    if (($Value -is [ValueType]) -and -not ($Value -is [System.Management.Automation.PSObject])) {
+        return ([System.Convert]::ToString($Value, [System.Globalization.CultureInfo]::InvariantCulture))
+    }
+    if ($Value -is [System.Collections.IDictionary]) {
+        $parts = @()
+        foreach ($k in @($Value.Keys)) {
+            $parts += ((ConvertTo-JsonEscaped ([string]$k)) + ':' + (ConvertTo-JsonLiteral $Value[$k] ($Level + 1)))
+        }
+        return ('{' + ($parts -join ',') + '}')
+    }
+    if ($Value -is [System.Management.Automation.PSCustomObject]) {
+        $parts = @()
+        foreach ($p in $Value.PSObject.Properties) {
+            $parts += ((ConvertTo-JsonEscaped $p.Name) + ':' + (ConvertTo-JsonLiteral $p.Value ($Level + 1)))
+        }
+        return ('{' + ($parts -join ',') + '}')
+    }
+    if (($Value -is [System.Collections.IEnumerable]) -and -not ($Value -is [string])) {
+        $parts = @()
+        foreach ($i in $Value) { $parts += (ConvertTo-JsonLiteral $i ($Level + 1)) }
+        return ('[' + ($parts -join ',') + ']')
+    }
+    return (ConvertTo-JsonEscaped ([string]$Value))
+}
+
 function ConvertTo-JsonCompat {
     param(
         [Parameter(ValueFromPipeline = $true)]$InputObject,
@@ -79,7 +144,7 @@ function ConvertTo-JsonCompat {
     )
     process {
         if ($null -eq $InputObject) { return 'null' }
-        return $global:YjCompatJsonSer.Serialize((ConvertTo-CompatHashtable $InputObject))
+        return (ConvertTo-JsonLiteral $InputObject 0)
     }
 }
 

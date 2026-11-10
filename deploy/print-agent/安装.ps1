@@ -87,12 +87,13 @@ try {
 
 # Win7 没有 Get-Printer(Win8+/2012+ 才有 PrintManagement 模块)⇒ 用 .NET 的 InstalledPrinters,
 # PS2/.NET2 就有,Win7/Win10 通用。
-$virtualPrinters = @('Microsoft Print to PDF','Microsoft XPS Document Writer','OneNote','OneNote (Desktop)','Send To OneNote','Fax')
+$virtualPattern = 'PDF|XPS|OneNote|Fax|WPS'   # 虚拟打印机(WPS 的「导出为WPS PDF」现场就中招过)
+$virtualPrinters = @()
 $realPrinters = @()
 try {
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
     $realPrinters = @([System.Drawing.Printing.PrinterSettings]::InstalledPrinters |
-        Where-Object { $_ -and ($virtualPrinters -notcontains $_) })
+        Where-Object { $_ -and ($_ -notmatch $virtualPattern) })
 } catch { $realPrinters = @() }
 if ($realPrinters.Count -eq 0) {
     Say '[提示] 这台电脑没有实体打印机 —— 任务会全部存成 PDF 文件。' 'Yellow'
