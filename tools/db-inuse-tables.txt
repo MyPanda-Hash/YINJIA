@@ -114,6 +114,8 @@ table:erp_imp_log   # ERP导入日志(金蝶星辰数据导入批次)
 table:erp_integ_api   # ERP集成接口配置(2026-10-18):一张接口一行 = 方向(导入/转出)+分类(基础资料/单据/设备)+接口地址+对应MES面板+启用/排序;界面=ERP系统集成·ERP集成配置清单
 table:erp_integ_device   # ERP集成设备绑定(2026-10-18):接口×设备(设备编码取 bs_equip),带用途(产量采集/点检对象/保养对象/数据来源)
 table:erp_integ_field   # ERP集成字段映射(2026-10-18):一行 = MES字段/常量 → 金蝶接口字段,带映射层级/转换规则/必填
+table:erp_stock_snapshot   # 金蝶库存快照(2026-11-10,最近一轮):一行 = 一个(物料,仓库,批号)键的金蝶现存量 + 覆盖前MES数量 + 差异 + 处理方式(覆盖/一致/新增/清零);每轮整表替换,历史见 erp_stock_sync_log
+table:erp_stock_sync_log   # 金蝶库存同步日志(2026-11-10,每轮一行):账套指纹/金蝶行数/覆盖·新增·清零·一致行数/差异合计/耗时/状态;deploy/sync-stock.mjs 写入(计划任务 JdyStockSync 每5分钟)
 table:feed_confirm   # 投料确认单头表(阶段:溶解/合成/A液/B液/浆体)
 table:feed_confirm_detail   # 投料确认单行表(投料成分/理论/实际)
 table:form_flow_link   # 单据流链接表(上游生单→下游单据占用,link_status=ACTIVE|RELEASED)

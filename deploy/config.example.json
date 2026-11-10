@@ -27,5 +27,10 @@
     "confirmTimeoutSeconds": 5,
     "logRetentionDays": 365,
     "backupRetentionDays": 365
+  },
+  "stock": {
+    "pageSize": 500,
+    "maxPages": 40,
+    "logRetentionDays": 180
   }
 }

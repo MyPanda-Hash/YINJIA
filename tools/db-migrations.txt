@@ -4598,3 +4598,6 @@ migrate-lab-mobile-row-photo-20261109.sql
 
 # 2026-11-09 实验室「测试项目」标准库补齐服务器上的 4 条历史遗留条目(item_code=默认、名字写在 content 里;启用 2 条 NSF 42-余氯/NSF 42氯胺)
 migrate-lab-testitem-legacy-20261109.sql
+
+# 2026-11-10 库存数量以金蝶真实账套为准:kucun 加[金蝶数量/差异数量(计算列)/金蝶同步时间] + 新增 erp_stock_snapshot(逐键快照)与 erp_stock_sync_log(同步日志) + 库存状况面板3字段 + en/ja/ko/zh-TW 译名
+migrate-erp-stock-sync-20261110.sql

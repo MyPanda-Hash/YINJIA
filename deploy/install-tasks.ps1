@@ -1,7 +1,9 @@
-﻿<#
-  一键注册两个计划任务(幂等,可重复执行):
+<#
+  一键注册三个计划任务(幂等,可重复执行):
     1) JdySalOrderSync        每5分钟增量同步(销售+采购,仅已审核,近31天窗口)
     2) JdySalOrderSyncMonthly 每月1日02:00全量复核(兜底时间窗之外的遗漏)
+    3) JdyStockSync           每5分钟同步金蝶现存量 → 覆盖 kucun(库存数量以金蝶真实账套为准,
+                              2026-11-10 用户口径;错开 1 分钟启动,不与 ① 抢 app-token/锁)
   用法(建议管理员 PowerShell):
     powershell -ExecutionPolicy Bypass -File .\install-tasks.ps1
   说明:
@@ -31,6 +33,7 @@ function Register-FromXml([string]$name, [string]$xml) {
 
 $user = "$env:COMPUTERNAME\$env:USERNAME"
 $start = (Get-Date).AddMinutes(2).ToString('yyyy-MM-ddTHH:mm:ss')
+$startStock = (Get-Date).AddMinutes(3).ToString('yyyy-MM-ddTHH:mm:ss')
 $startMonthly = (Get-Date -Day 1).AddMonths(1).ToString('yyyy-MM-ddT02:00:00')
 
 $xmlFrequent = @"
@@ -85,6 +88,33 @@ $xmlMonthly = @"
 </Task>
 "@
 
+# 2026-11-10:金蝶库存同步(库存数量以金蝶真实账套为准)
+$xmlStock = @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>每5分钟同步金蝶现存量并覆盖 kucun.yl(库存以金蝶为准;先备份前像+闸门保护,日志见 logs/stock-sync-*.log)</Description></RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>$startStock</StartBoundary>
+      <Enabled>true</Enabled>
+      <Repetition><Interval>PT5M</Interval><Duration>P3650D</Duration><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals><Principal id="Author"><UserId>$user</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <Enabled>true</Enabled>
+    <ExecutionTimeLimit>PT15M</ExecutionTimeLimit>
+  </Settings>
+  <Actions Context="Author">
+    <Exec><Command>wscript.exe</Command><Arguments>"$TaskDir\run-hidden.vbs" "sync-stock.mjs"</Arguments><WorkingDirectory>$TaskDir</WorkingDirectory></Exec>
+  </Actions>
+</Task>
+"@
+
 Register-FromXml 'JdySalOrderSync' $xmlFrequent
 Register-FromXml 'JdySalOrderSyncMonthly' $xmlMonthly
-Write-Host '完成:两个计划任务已注册(删除任务:Unregister-ScheduledTask -TaskName <名称> -Confirm:$false)'
+Register-FromXml 'JdyStockSync' $xmlStock
+Write-Host '完成:三个计划任务已注册(删除任务:Unregister-ScheduledTask -TaskName <名称> -Confirm:$false)'
