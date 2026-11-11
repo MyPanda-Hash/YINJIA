@@ -1,0 +1,27 @@
+﻿
+CGRK-20261111-03675 | 2026-11-11 | C | remark= [MES:PI-2026-11-0038]
+   行 seq=1 YJ-YCYX-020 qty=5057 src=YJ-20261103-07/1 batch=-
+
+CGRK-20261107-03676 | 2026-11-07 | C | remark= [MES:PI-2026-11-0025]
+   行 seq=1 YJ-JPL-29 qty=3 src=YJ-20261102-04/2 batch=20261109
+   行 seq=2 YJ-JPL-40 qty=2 src=YJ-20261102-04/3 batch=20261109
+   行 seq=3 YJ-JPL-61 qty=4 src=YJ-20261102-04/4 batch=20261109
+   行 seq=4 YJ-JPL-39 qty=6 src=YJ-20261102-04/7 batch=20261109
+   行 seq=5 YJ-JPL-001 qty=7200 src=YJ-20261102-04/9 batch=20261109
+
+CGRK-20261107-03654 | 2026-11-07 | C | remark=
+   行 seq=1 YJ-SX-014 qty=1700 src=YJ-20261103-03/1 batch=PC0000
+   行 seq=2 YJ-SX-003-1 qty=500 src=YJ-20261103-03/2 batch=PC0000
+   行 seq=3 YJ-SX-003-2 qty=500 src=YJ-20261103-03/3 batch=PC0000
+   行 seq=4 YJ-SX-002-2 qty=800 src=YJ-20261103-03/5 batch=PC0000
+   行 seq=5 YJ-KG-JC-B02 qty=3000 src=YJ-20261103-03/7 batch=-
+   行 seq=6 YJ-SX-001-1 qty=1000 src=YJ-20261023-05/9 batch=PC0000
+   行 seq=7 YJ-SX-002 qty=500 src=YJ-20261023-05/10 batch=PC0000
+   行 seq=8 YJ-SX-003-1 qty=1600 src=YJ-20261023-05/11 batch=PC0000
+   行 seq=9 YJ-SX-003-2 qty=1600 src=YJ-20261023-05/12 batch=PC0000
+   行 seq=10 YJ-SX-072 qty=720 src=YJ-20260923-02/7 batch=PC0000
+   行 seq=11 YJ-SX-016-2 qty=1000 src=YJ-20261018-03/3 batch=PC0000
+   行 seq=12 YJ-SX-016-2 qty=2000 src=YJ-20260918-02/2 batch=PC0000
+
+CGRK-20261111-03673 | 2026-11-11 | C | remark= [MES:PI-2026-11-0033]
+   行 seq=1 YJ-GL-012 qty=800 src=YJ-20261014-03/10 batch=20261111

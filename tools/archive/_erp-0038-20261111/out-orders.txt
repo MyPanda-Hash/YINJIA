@@ -1,0 +1,18 @@
+﻿账套 clientId= 359797 outerInstanceId= 580147507460444160
+
+########## YJ-20261103-07 ##########
+头: bill_status=C io_status=Z bill_close_state=C 供应商=佛山市云创壹芯新材料有限公司(YJ-YCYX) 日期=2026-11-03
+seq | material_number | material_name | unit_name | qty | in_qty | un_out_qty | close_state | entry_realio_status | comment
+1 | YJ-YCYX-020 | 折叠棉 | 支 | 5000 | 5057 | -57 | 0 | C | 11/10,送303
+2 | YJ-YCYX-055 | 折叠棉 | 支 | 1000 | 0 | 1000 | 1 | A | 11/10送华北
+
+########## YJ-20261102-02 ##########
+头: bill_status=C io_status=A bill_close_state=C 供应商=北京黑卡博净化材料有限公司(YJ-HKB) 日期=2026-11-02
+seq | material_number | material_name | unit_name | qty | in_qty | un_out_qty | close_state | entry_realio_status | comment
+1 | YJ-HKB-001 | 黑卡载银炭粉 | kg | 1000 | 0 | 1000 | 1 | A | 
+
+=== 商品档案检验相关键 ===
+YJ-YCYX-020 (折叠棉): check_type="1"
+  custom_field={"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"","custom_field__1__6jiafyhnnjic0w":""}
+YJ-HKB-001 (黑卡载银炭粉): check_type="1"
+  custom_field={"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"","custom_field__1__6jiafyhnnjic0w":""}

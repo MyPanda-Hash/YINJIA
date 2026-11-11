@@ -1,0 +1,12 @@
+﻿import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fetchAppToken, kingdeeGet } from "../../../deploy/kingdee-client.mjs";
+const cfg = JSON.parse(readFileSync(resolve("deploy/config.json"), "utf8").replace(/^\uFEFF/, "")).kingdee;
+const { token, domain } = await fetchAppToken(cfg); cfg.domain = domain;
+const list = await kingdeeGet(cfg, token, "/jdy/v2/scm/pur_order", { page: "1", page_size: "10", bill_no: "YJ-20261102-02" });
+console.log("列表命中 " + (list.rows||[]).length);
+for (const r of (list.rows||[])) console.log(JSON.stringify(r, null, 1));
+const hit = (list.rows||[])[0];
+const d = await kingdeeGet(cfg, token, "/jdy/v2/scm/pur_order_detail", { id: String(hit.id) });
+console.log("\n=== 详情头全部键(去金额) ===");
+for (const k of Object.keys(d)) if (!/amount|price|discount|tax|cess/i.test(k)) console.log(k + " = " + JSON.stringify(d[k]));
