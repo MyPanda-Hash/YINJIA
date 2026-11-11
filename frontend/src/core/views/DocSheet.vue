@@ -8,7 +8,7 @@
        ④ 底部签名:signCells(蓝格标签 + 值区)
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="approval-sheet" :style="sheetStyle">
+  <div ref="sheetRef" class="approval-sheet" :style="sheetStyle">
     <!-- ⛔ 终止审批横幅(项目实施计划:申请终止(阶段处)二级审批 立项人→管理员→落实;打印隐藏) -->
     <div v-if="panelCode === 'RD_PLAN' && term" class="as-term-banner no-print-term" :class="'term-' + term.state">
       <template v-if="term.state === 'T'">
@@ -798,7 +798,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, nextTick, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, nextTick, ref, watch } from 'vue'
 import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
@@ -877,12 +877,68 @@ function gotoLink(row) {
  *   带 !important,仍压过这里的内联样式。
  * 其余文书式面板宽度为 0 ⇒ 不套内联样式,保持原有的自适应行为。
  */
+/**
+ * 窄窗口自适应缩放(2026-11-11 用户口径)。
+ *
+ * <p>用户原话:「项目实施计划，填写不会换行，表格宽度会限制重叠在一起」;追问后确认 =
+ * <b>窗口窄时要横向滚动、内容被挤</b>。</p>
+ *
+ * <p>【改动前】纸宽由 {@link fixedSheetWidth} 定死(1242/1188/1220/1365),
+ * 外层 `.sheet-scroll{overflow-x:auto}` 兜住 ⇒ 1280 窗口下容器约 1100px、纸 1242px,
+ * <b>必须左右拖</b>才能看全(实测 clientW 1102 / scrollW 1242)。</p>
+ *
+ * <p>【口径】装不下就整体缩放:<code>zoom = 容器内宽 ÷ 纸宽</code>,
+ * 上限 1(宽屏**不放大**,保持设计字号) / 下限 {@link MIN_FIT_ZOOM}(再小就没法读了);
+ * 缩到下限仍装不下时才由 `.sheet-scroll` 横向滚动兜底 —— 两条路互补,不是二选一。</p>
+ *
+ * <p>⚠ 只对**定死纸宽**的面板生效:自适应宽的纸(width:940 + max-width:100%)本来就不会溢出,
+ * 对它套 zoom 只会把字变小。</p>
+ * <p>⚠ 打印不受影响:`@media print` 的 `body.approval-printing .approval-sheet{width:100%!important}`
+ * 带 !important,压得过这里写进 style 的 zoom;而且打印前会另算 `--print-zoom`。</p>
+ */
+const MIN_FIT_ZOOM = 0.6
+const sheetRef = ref(null)
+/** 纸面可用宽(容器内宽 - 两侧留白),0 = 还没量到 */
+const availWidth = ref(0)
+let fitObserver = null
+onMounted(() => {
+  const el = sheetRef.value
+  const host = el && el.parentElement
+  if (!host || typeof ResizeObserver === 'undefined') return
+  const measure = () => {
+    // 用**父容器**的 clientWidth:纸面自己会被 zoom 影响,拿它量会自激(越缩越窄)
+    const w = host.clientWidth || 0
+    if (w > 0) availWidth.value = w
+  }
+  measure()
+  fitObserver = new ResizeObserver(measure)
+  fitObserver.observe(host)
+})
+onBeforeUnmount(() => {
+  if (fitObserver) { fitObserver.disconnect(); fitObserver = null }
+})
+const sheetZoom = computed(() => {
+  const paperW = fixedSheetWidth(props.panelCode)
+  if (!paperW) return 1                 // 自适应宽的纸不缩放
+  const avail = availWidth.value
+  if (!avail) return 1                  // 还没量到 ⇒ 先按原样
+  // 两侧各留 8px,免得滚动条/边框把纸挤掉 1px 又触发横向滚动
+  const usable = avail - 16
+  // 先封底(再小就看不清)再封顶(装得下时比例会 >1,但不许放大)
+  return Math.min(1, Math.max(MIN_FIT_ZOOM, usable / paperW))
+})
+
 const sheetStyle = computed(() => {
   const w = fixedSheetWidth(props.panelCode)
   // 表格式纸面（样品申请单）：@media print 用 `width: var(--sg-print-w)` 定死纸宽 —— 两张纸宽度不同
   // （1188 / 1220），不能像 QC 那样在 CSS 里写死像素。
   const printVar = isGrid.value ? { '--sg-print-w': gridW.value + 'px' } : {}
-  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar } : (isGrid.value ? printVar : null)
+  // 窄窗缩放:见 sheetZoom 注释。zoom 与 width 一起写在纸面根节点上,
+  // 打印时被 @media print 的 width:100%!important 覆盖(它压得过内联样式)。
+  const zoomVar = sheetZoom.value !== 1 ? { zoom: String(sheetZoom.value) } : {}
+  return w
+    ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar, ...zoomVar }
+    : (isGrid.value ? { ...printVar, ...zoomVar } : null)
 })
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */

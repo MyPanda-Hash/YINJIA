@@ -62,7 +62,8 @@ test('其余文书式面板不受影响(返回 0 = 保持自适应弹性宽)', (
 })
 
 test('纸面根节点真的套上了 sheetStyle(否则配置只是摆设)', () => {
-  assert.match(docSheet, /<div class="approval-sheet" :style="sheetStyle">/, '模板根节点必须绑定 :style="sheetStyle"')
+  // 2026-11-11 起根节点多了 ref="sheetRef"(窄窗缩放要量容器宽),故只要求 class + :style 都在
+  assert.match(docSheet, /<div[^>]*class="approval-sheet"[^>]*:style="sheetStyle"/, '模板根节点必须绑定 :style="sheetStyle"')
   // 2026-10-28:同一行还 import 了 docnoLabel(右上角编号格标识),故只钉"从 docSheetConfigs 取"
   assert.match(docSheet, /import \{[^}]*\bfixedSheetWidth\b[^}]*\} from '\.\/docSheetConfigs'/,
     '必须从 docSheetConfigs 取宽度表')
@@ -76,7 +77,8 @@ test('定宽三件套齐备:width + maxWidth:none + flex:none', () => {
   assert.match(body, /width: w \+ 'px'/, '要写死宽度')
   assert.match(body, /maxWidth: 'none'/, '要解除 CSS 的 max-width:100%')
   assert.match(body, /flex: 'none'/, '要解除外层 flex:1 的弹性撑满(否则 width 不生效)')
-  assert.match(body, /return w \?[\s\S]*: null/, '未配置定宽的面板要返回 null(不套内联样式)')
+  // 2026-11-11 起返回值可能带 zoom(窄窗缩放),三元可能写成多行 ⇒ 只钉"未定宽时仍返回 null"
+  assert.match(body, /: (isGrid\.value \? [\s\S]*?: )?null/, '未配置定宽的面板要返回 null(不套内联样式)')
 })
 
 test('打印/导出仍是整页宽(定宽不能压过 @media print 的 !important)', () => {
