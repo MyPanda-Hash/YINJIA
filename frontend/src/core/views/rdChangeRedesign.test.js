@@ -101,6 +101,21 @@ test('⑤ 后端提供会签人选人清单，权限挂 RD_CHANGE（不复用别
   assert.match(m[0], /enabledUsers\(\)/, '端点应返回启用账号清单（与其它选人下拉同源）')
 })
 
+test('⑦ 文件编码挪到右上角（替换单据编号）且是固定值', () => {
+  // 用户口径（2026-11-11）:「文件编码挪到右上角，替换单据编号，而且是固定的」。
+  // 机制用既有的两件套（产品信息表/规格书同款）:
+  //   · cfg.docNoStatic → 该格印**常量**，编辑态与只读态都不出输入框/参照控件；
+  //   · head.docnoPrefix（字符串）→ 标识文案，这里由「单据编号」改为「文件编码」。
+  assert.equal(cfg.docNoStatic, 'YJ-QR-130', '右上角那格要印固定的表单编号 YJ-QR-130')
+  assert.equal(cfg.head?.docnoPrefix, '文件编码', '右上角标识文案要改成「文件编码」')
+  // 挪走之后，表格里不能再重复出现「文件编码」这一格（否则一张纸印两处）
+  const bodyCells = (cfg.sections || []).flatMap((s) => s.rows || []).flatMap((r) => r.grid || [])
+  const dup = bodyCells.filter((c) => c.label === '文件编码' || c.fixed === 'YJ-QR-130')
+  assert.deepEqual(dup, [], '表格里不该再保留「文件编码」这一格(已挪到右上角)')
+  // 单据编号仍要在表格里（用户只要求换掉右上角那格，没让把单号删掉）
+  assert.ok(bodyCells.some((c) => c.key === '单据编号'), '表格里的「单据编号」行要保留')
+})
+
 test('⑥ 「四、库存产品处理方式」「五、其它」两段整段删除', () => {
   const bars = (cfg.tailSections || []).map((s) => s.bar)
   assert.ok(!bars.some((b) => String(b).includes('库存产品处理方式')), '四、库存产品处理方式 必须删掉')
