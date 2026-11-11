@@ -250,7 +250,7 @@
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
           <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
-                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" @progress-save="onProgressSave" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -7019,6 +7019,34 @@ async function openL2Pick(no) {
   l2PickHiddenSubmitter.value = (!user.isAdmin && curSubmitter.value) ? curSubmitter.value : ''
   l2PickVisible.value = true
 }
+/* ── 样品单「进度描述」就地保存(2026-11-11) ──
+   用户口径:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+   这个字段**不受归档约束**，但是也是**只能谁提交的谁来修改**」;
+   追问「归档后连 edit_others 也不能改？」→ 答「只锁申请人」。
+
+   为什么单开一条写路径而不走「保存」:常规保存的闸门是 draftEditable(草稿/修改中)，
+   归档后整张纸只读 —— 进度描述明确要能跨归档继续更新，故走 /px/sampleProgress 窄接口，
+   只改这一列、不触发审批流。服务端同口径硬校验(不是这行的申请人就 403)。 */
+async function onProgressSave({ row, text }) {
+  if (panelCode.value !== 'RD_SAMPLE_INT' && panelCode.value !== 'RD_SAMPLE_EXT') return
+  const docNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
+  if (!docNo) return
+  try {
+    const res = await engine.updateSampleProgress({
+      panelCode: panelCode.value,
+      docNo,
+      // 内部单是行级(一单多行、行各归其主) ⇒ 必须带行 id；外部单是头级，不需要
+      rowId: panelCode.value === 'RD_SAMPLE_INT' ? row?.id : undefined,
+      text: String(text ?? ''),
+    })
+    ElMessage.success(tt('进度已更新'))
+    // 回填服务端落库后的值（trim 过 500 字截断），避免界面与库不一致
+    if (row && res && typeof res === 'object' && '进度描述' in res) row['进度描述'] = res['进度描述']
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('进度更新失败'))
+  }
+}
+
 /* ── 外部开发样品申请单:一级审批「回填配方及工艺要求」(2026-11-06) ──
    用户口径:「配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批有一个回填弹窗写这个字段，
    审批通过回填进去，进入二级审批(管理员)，管理员审批完成归档」。

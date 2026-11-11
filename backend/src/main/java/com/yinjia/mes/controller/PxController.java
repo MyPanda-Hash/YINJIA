@@ -1165,6 +1165,35 @@ public class PxController {
         return ApiResult.ok(rdDevProducts.overview());
     }
 
+    /**
+     * 样品单「进度描述」就地更新(2026-11-11 用户口径)。
+     *
+     * <p>原话:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+     * <b>这个字段不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」;
+     * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+     *
+     * <p>为什么单开一个端点而不是走 callButton/保存:常规保存的闸门是 draftEditable（草稿/修改中），
+     * 而本字段明确"不受归档约束"。这条端点只改这一列，不触发审批流、不动其它字段。
+     * 归属校验在 {@link ButtonService#updateSampleProgress}（外部单看头表创建人/申请署名，
+     * 内部单看该明细行的申请人）。</p>
+     *
+     * @param body {panelCode, docNo, rowId(内部单必填), text}
+     * @return 落库后的进度描述
+     */
+    @PostMapping("/sampleProgress")
+    public ApiResult<Map<String, Object>> sampleProgress(@RequestBody Map<String, Object> body) {
+        String panelCode = body.get("panelCode") == null ? "" : String.valueOf(body.get("panelCode"));
+        String docNo = body.get("docNo") == null ? "" : String.valueOf(body.get("docNo"));
+        perm.requirePanelView(panelCode);
+        Object rowId = body.get("rowId");
+        String text = body.get("text") == null ? "" : String.valueOf(body.get("text"));
+        String saved = buttons.updateSampleProgress(panelCode, docNo, rowId, text);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", docNo);
+        out.put("进度描述", saved);
+        return ApiResult.ok(out);
+    }
+
     @PostMapping("/queryFormDataList")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> queryFormDataList(@RequestBody Map<String, Object> body) {

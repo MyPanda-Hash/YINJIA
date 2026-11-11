@@ -182,6 +182,16 @@
                 v-else-if="editable && c.kind === 'docno'" v-model="row[c.key]" size="small"
                 maxlength="30" class="as-docno-input sg-cell-input" @input="emit('dirty')"
               />
+              <!-- 进度描述列(2026-11-11 用户口径):「这个字段**不受归档约束**，但只能谁提交的谁来修改」。
+                   ⚠ 刻意**不看 editable**:editable 的语义是"整张纸能否编辑"(归档后为假),
+                   而进度描述归档后仍要能改 ⇒ 走独立的 progress-save 通道,由父组件调 /px/sampleProgress。
+                   只读态/无权限时仍显示纯文本(sg-ro),不会给一个点了没反应的输入框。 -->
+              <el-input
+                v-else-if="c.key === '进度描述' && progressEditable(row)"
+                v-model="row[c.key]" type="textarea" :maxlength="500" :rows="gridTextRows" resize="none"
+                class="as-fill-input sg-cell-area sg-progress" :placeholder="tt('填写实时进度')"
+                @blur="emit('progress-save', { row, text: row[c.key] })"
+              />
               <!-- 长文本列一律文本域:模板给的行高(150px)足够写多行,单行输入框会显得空 -->
               <el-input
                 v-else-if="editable && c.ro !== true && !cellLocked(row, c)" v-model="row[c.key]" type="textarea"
@@ -826,7 +836,7 @@ const props = defineProps({
    */
   canEditOthers: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty', 'term-changed'])
+const emit = defineEmits(['dirty', 'term-changed', 'progress-save'])
 
 /**
  * 备注栏旁的附件入口(元数据驱动):从下发的 fields 里发现 dataType='附件' 的字段。
@@ -934,6 +944,27 @@ watch(gridRows, () => { if (gridPage.value > gridPageCount.value) gridPage.value
 /** 申请人格:已保存的行(有 id)默认锁定,除非有「改他人行」权限 */
 function cellLocked(row, c) {
   return String(c?.key || '') === '申请人' && !!row?.id && props.canEditOthers !== true
+}
+/**
+ * 进度描述这一格能不能编辑(2026-11-11 用户口径)。
+ *
+ * <p>原话:「这个字段<b>不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」;
+ * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+ *
+ * <p>判据 = **当前登录人就是这一行的申请人**（内部单看行上的「申请人」，外部单看头表创建人归属）。
+ * ⚠ 刻意**不看 props.editable**:editable 表示"整张纸能否编辑"（归档后为假），
+ *   而本字段归档后仍要能改;也**不看 canEditOthers**:用户明确说"只锁申请人"，
+ *   文档管理员(edit_others)对进度描述同样没有写权 —— 服务端 /px/sampleProgress 同口径硬校验。</p>
+ */
+function progressEditable(row) {
+  if (!props.user?.realName && !props.user?.userName) return false
+  // 新行(还没保存,没有 id):谁在填就是谁的，给编辑权（保存后由服务端把申请人落成当前用户）
+  if (!row?.id) return true
+  const owner = String(row?.['申请人'] ?? '').trim()
+  if (!owner) return true
+  const ownerName = owner.includes('/') ? owner.slice(0, owner.indexOf('/')).trim() : owner
+  const me = String(props.user?.realName ?? '').trim()
+  return !!me && ownerName === me
 }
 /**
  * 子表模式下一张新单必须至少有 1 行可填（用户口径「单个样品单下面可以添加多个样品」）：

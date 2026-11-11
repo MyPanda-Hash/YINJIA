@@ -512,6 +512,26 @@ export async function callButton({ panelCode, buttonName, formData, buttonParam,
   return unwrap(await request.post('/px/callButton', { panelCode, buttonName: apiName, formData, buttonParam }, cfg))
 }
 
+/**
+ * 更新样品单「进度描述」(2026-11-11 用户口径)。
+ *
+ * <p>用户原话：「像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+ * 这个字段<b>不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」；
+ * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+ *
+ * <p>为什么不走 callButton/保存:常规保存的闸门是 draftEditable（草稿/修改中），
+ * 而本字段归档后仍要能改 ⇒ 服务端单开 /px/sampleProgress 窄接口，
+ * 只校验「是不是这行/这张单的申请人」，只改这一列，不触发审批流。</p>
+ *
+ * @param panelCode RD_SAMPLE_EXT（外部单，头级）| RD_SAMPLE_INT（内部单，行级）
+ * @param docNo     单据编号
+ * @param rowId     内部单必填：明细行 id（一单多行、行各归其主）
+ * @param text      进度描述正文
+ */
+export async function updateSampleProgress({ panelCode, docNo, rowId, text }) {
+  return unwrap(await request.post('/px/sampleProgress', { panelCode, docNo, rowId, text }))
+}
+
 export async function deleteForms({ panelCode, rowCodes }) {
   return unwrap(await request.post('/px/deleteForms', { panelCode, rowCodes }))
 }

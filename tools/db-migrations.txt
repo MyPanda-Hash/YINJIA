@@ -4602,3 +4602,5 @@ migrate-lab-testitem-legacy-20261109.sql
 migrate-rd-prod-doclist-shell-reseed-20261110.sql
 # 2026-11-11 样品申请单「可见全部单据」(view_all)授给文件负责人/研发审核/管理员（刘磊口径）
 migrate-sample-view-all-20261111.sql
+# 2026-11-11 样品单「进度描述」列（外部头表 / 内部明细，行级；不受归档约束）
+migrate-sample-progress-desc-20261111.sql

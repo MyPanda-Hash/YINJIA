@@ -598,6 +598,75 @@ public class ButtonService {
         return protect;
     }
 
+    /**
+     * 更新样品单「进度描述」(2026-11-11 用户口径)。
+     *
+     * <p>原话:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+     * <b>这个字段不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」；
+     * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+     *
+     * <p>为什么单开一条窄接口、不塞进 saveDoc:saveDoc 的闸门是 draftEditable（草稿/修改中才可写），
+     * 而进度描述明确"不受归档约束" —— 归进常规保存会让它在归档后一起被锁死。
+     * 这条路径只做三件事:① 认出这是哪张单/哪一行;② 校验当前登录人就是该行(该单)的申请人;
+     * ③ 只 UPDATE 进度描述这一列。**不碰**归档态、不碰其它字段、不触发审批流。</p>
+     *
+     * <p>外部单(RD_SAMPLE_EXT):一张单 = 一个样品 ⇒ 归属看头表 asp_user1(创建人)，
+     * 也接受纸面「申请」署名里的姓名(申请人可能是代录)。</p>
+     * <p>内部单(RD_SAMPLE_INT):一单多行、行各归其主 ⇒ 归属看**该明细行的「申请人」**。</p>
+     *
+     * @return 更新后的进度描述
+     */
+    public String updateSampleProgress(String panelCode, String docNo, Object rowId, String text) {
+        String actor = currentUserName();
+        if (panelCode == null || docNo == null || docNo.isBlank())
+            throw new IllegalArgumentException("缺少单据编号");
+        String val = text == null ? "" : text.trim();
+        if (val.length() > 500) val = val.substring(0, 500);
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("未知面板：" + panelCode);
+        String me = actor;
+        String myName = realNameOf(actor);
+
+        if ("RD_SAMPLE_INT".equals(panelCode)) {
+            // 行级归属:必须是这一行的申请人本人
+            if (rowId == null || String.valueOf(rowId).isBlank())
+                throw new IllegalArgumentException("内部样品单需要指定行(id)");
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT id, 申请人 FROM " + def.lineTable()
+                            + " WHERE id = ? AND " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    rowId, docNo);
+            if (rows.isEmpty()) throw new IllegalArgumentException("明细行不存在或已删除：" + rowId);
+            String owner = blankSafe(rows.get(0).get("申请人"));
+            // 申请人格存的是「姓名/日期」这种署名串，取斜杠前的姓名比对
+            String ownerName = owner.contains("/") ? owner.substring(0, owner.indexOf('/')).trim() : owner;
+            if (!owner.isEmpty() && !ownerName.equals(myName) && !ownerName.equals(me))
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "只能修改自己提交的样品进度（该行申请人是 " + ownerName + "）");
+            jdbc.update("UPDATE " + def.lineTable() + " SET 进度描述 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE id = ? AND " + def.groupCol() + " = ?", val, actor, rowId, docNo);
+            return val;
+        }
+
+        if ("RD_SAMPLE_EXT".equals(panelCode)) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT asp_user1, 申请 FROM " + def.headTable()
+                            + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+            if (rows.isEmpty()) throw new IllegalArgumentException("单据不存在：" + docNo);
+            String ownerAcct = blankSafe(rows.get(0).get("asp_user1"));
+            String sign = blankSafe(rows.get(0).get("申请"));
+            String signName = sign.contains("/") ? sign.substring(0, sign.indexOf('/')).trim() : sign;
+            boolean mine = ownerAcct.equals(me) || signName.equals(myName);
+            if (!mine)
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "只能修改自己提交的样品进度（该单申请人是 " + (signName.isEmpty() ? ownerAcct : signName) + "）");
+            jdbc.update("UPDATE " + def.headTable() + " SET 进度描述 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE " + def.groupCol() + " = ?", val, actor, docNo);
+            return val;
+        }
+
+        throw new IllegalArgumentException("该面板没有进度描述：" + panelCode);
+    }
+
     /** 当前账号在该面板是否持有「改他人行」(edit_others)词 —— 管理员恒有 */
     private boolean canEditOtherRows(String panelCode, String actor) {
         if (isAdminUser(actor)) return true;
