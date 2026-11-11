@@ -4614,3 +4614,5 @@ migrate-mold-density-stdlib-20261111.sql
 migrate-mold-recipe-design-unit-20261111.sql
 # 2026-11-11 产品变更申请表：批准人/批准签字/批准日期（备用2/3/4，审批通过时回填、纸面只读）
 migrate-rd-change-approval-sign-20261111.sql
+# 2026-11-11 产品信息表历史单据「一级审核人」统一为陈秀丽（只改这一列，幂等）
+migrate-prodinfo-l1-approver-backfill-20261111.sql
