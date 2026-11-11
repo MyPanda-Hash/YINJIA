@@ -91,6 +91,32 @@ public class QueryService {
      */
     private static final List<String> WH_DOCK_PANELS = List.of("STOCK_DETAIL");
     /**
+     * 左栏「单据状态页签」的取数控制键 —— **只有 {@link #STATUS_TAB_PANELS} 里的面板**认它。
+     *
+     * <p>用户口径(2026-11-10)：「出货功能检验中在左侧的列表中增加对应的页签实现已审核的完成单据和
+     * 未完成的分开显示,增加在当前列表处的部分,不要修改其他页面的这个组件」。
+     *
+     * <p>值:{@code all}(不传/空 等价)= 不过滤 / {@code done} = 已完成 / {@code todo} = 未完成。
+     * 前端只负责把当前页签原样放进 condition,过滤必须在**服务端**做 —— 左栏单据列表是后端分页
+     * (50 条/页、合计 400+ 单),前端手里只有当前页那一屏;在页面上再筛一遍只会把"排到第 2 页的
+     * 已完成单"全部漏掉,「共 N 条」也跟着变来变去。
+     */
+    public static final String STATUS_TAB_KEY = "_statusTab";
+
+    /**
+     * 认 {@link #STATUS_TAB_KEY} 的面板 —— 目前**只有出货检验单 QC_PROC_INSP**(用户明确要求
+     * 「不要修改其他页面的这个组件」)。
+     *
+     * <p>为什么要有这道闸门:前端切换面板时若没把页签清干净(或别的客户端乱传),别的面板收到残留的
+     * {@code _statusTab=done} 就会被静默筛掉一半数据,而界面上看不出任何提示 —— 与
+     * {@link #WH_DOCK_PANELS} 那次「库存明细的查询影响到库存状况表」(2026-10-15)是同一类跨面板串味,
+     * 这里是服务端的第二道防线。转发一个不认识的面板号不该把面板打死,所以闸门外一律**静默忽略**。
+     *
+     * <p>以后别的面板也要这个页签:把面板号加进这个集合即可(前端自己决定要不要画页签),
+     * SQL 一行都不用动。
+     */
+    private static final java.util.Set<String> STATUS_TAB_PANELS = java.util.Set.of("QC_PROC_INSP");
+    /**
      * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
      * 只是显示和权限不一样」)。
      *
@@ -586,6 +612,12 @@ public class QueryService {
             fieldCond.remove("_archTo");
         }
         appendDocFilters(def, where, args, keyword, fieldCond, l2c, split, docCols, docTable, g);
+        // 左栏「全部/已完成/未完成」页签(2026-11-10,只对出货检验单 QC_PROC_INSP 生效,见
+        // appendStatusTabFilter)。**必须跟在其它条件之后、COUNT 之前**:列表是后端分页,
+        // totalSize 与分页 SQL 都要带上同一段 WHERE,否则「共 N 条」和页签内的实际行数对不上。
+        // 传原始 condition(fieldCond 只是剔掉了 _docNo/_archFrom/_archTo 的副本);
+        // _statusTab 以下划线开头,appendDocFilters 里因 l2c 查不到列名自然跳过,不会被当成字段名。
+        appendStatusTabFilter(def, condition, where, args, g);
         String noKw = qDocNo == null ? "" : String.valueOf(qDocNo).trim();
         if (!noKw.isEmpty()) {
             where.append(" AND (t.[").append(g).append("] LIKE ?");
@@ -1482,5 +1514,64 @@ public class QueryService {
             }
             where.append(")");
         }
+    }
+
+    /**
+     * 左栏「全部 / 已完成 / 未完成」页签的服务端过滤(2026-11-10,出货检验单 QC_PROC_INSP)。
+     *
+     * <p>用户原话:「出货功能检验中在左侧的列表中增加对应的页签实现已审核的完成单据和未完成的分开显示,
+     * 增加在当前列表处的部分,不要修改其他页面的这个组件我先确认查看」。所以只有
+     * {@link #STATUS_TAB_PANELS} 里登记的面板认这个键,其余面板的左栏一律照旧。
+     *
+     * <p>为什么必须在服务端过滤:左栏单据列表是**后端分页**(50 条/页,合计 400+ 单),前端手里只有
+     * 当前页那一屏。在页面上再 filter 一遍,得出的只是「当前页里的已完成」——换页就变数,
+     * 「共 N 条」和点进去能看到的单据对不上。所以只认 condition 里的页签名,在这里翻成 WHERE 片段,
+     * 与其它条件一起进 COUNT 和分页 SQL(前端只负责传当前页签)。
+     *
+     * <p><b>done 的判据必须与 {@link #docStatus(Map)} 逐条对齐</b>(列表行上显示的「单据状态」就是它算的),
+     * 否则会出现「页签说已完成、行上却显示草稿」。映射:
+     * <ul>
+     *   <li>已作废({@code canceled='Y'})/ 已中止({@code stopped='Y'} 或 {@code erp_close_state='H'})/
+     *       删除申请中({@code deleting='Y'})⇒ **都不算完成**(先排除);这类异常终态落在「未完成」,
+     *       因为业务上确实没做完 —— 已作废的单据本来也已被 queryDocs 开头那条 canceled 过滤排除,
+     *       这里再排除一次是为了与 docStatus 的优先级保持同一口径,不依赖外层。</li>
+     *   <li>已审核({@code shr} 非空,含下级状态) / 已归档({@code archived='Y'}) /
+     *       已生效({@code effective='Y'}) / 已完成({@code erp_close_state='S'},金蝶自动关单)
+     *       ⇒ 算完成(docStatus 里这几种都排在「已审核」之上或等于,即都过了审核)。</li>
+     * </ul>
+     *
+     * <p>todo = {@code NOT done}(补集):这样 done + todo 恒等于「全部」,任何单据都不会在两个页签里
+     * 凭空消失或重复 —— 包括 yj_doc_status 里**没有状态行**的老单据(列表上显示「草稿」)。
+     * 将来 docStatus 多出新的"未完成"状态,兜底也自动落进 todo,不必回来改两处。
+     *
+     * <p>闸门(静默 return,不抛错):condition 为空 / 面板不在 {@link #STATUS_TAB_PANELS} /
+     * 值为空或 {@code all} / 值不是 {@code done|todo}。认不出的值一律当「全部」,不猜。
+     *
+     * <p>⚠ 与 {@link #docStatus(Map)} **必须同改**(同 ButtonService.docStatusOf 那条规矩):
+     * docStatus 增删状态或调整优先级,这里跟着改,否则页签与行上的状态文字会对不上。
+     */
+    private void appendStatusTabFilter(PanelRegistry.PanelDef def, Map<String, Object> condition,
+                                       StringBuilder where, List<Object> args, String g) {
+        if (condition == null || def == null) return;
+        // 第二道防线:没有登记页签的面板收到残留键也不能被静默过滤(见 STATUS_TAB_PANELS 注释)
+        if (!STATUS_TAB_PANELS.contains(def.code())) return;
+        Object raw = condition.get(STATUS_TAB_KEY);
+        String tab = raw == null ? "" : String.valueOf(raw).trim().toLowerCase(java.util.Locale.ROOT);
+        if (tab.isEmpty() || "all".equals(tab)) return;            // 全部 = 不加任何条件
+        if (!"done".equals(tab) && !"todo".equals(tab)) return;    // 认不出的值当「全部」,不猜
+        // 与 docStatus() 同口径:异常终态(作废/中止/删除申请中)先排除,再认"过了审核/归档/生效/金蝶关单"。
+        // CAST 统一为 nvarchar:组列类型与 doc_no 比较时不会隐式转换失败(同上面 canceled 过滤的写法)。
+        String done = "EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
+                + " AND s.doc_no = CAST(t.[" + g + "] AS nvarchar(100))"
+                + " AND ISNULL(s.canceled,'N') <> 'Y'"
+                + " AND ISNULL(s.stopped,'N') <> 'Y'"
+                + " AND ISNULL(s.erp_close_state,'') <> 'H'"
+                + " AND ISNULL(s.deleting,'N') <> 'Y'"
+                + " AND (s.shr IS NOT NULL OR ISNULL(s.archived,'N') = 'Y'"
+                + " OR ISNULL(s.effective,'N') = 'Y' OR ISNULL(s.erp_close_state,'') = 'S'))";
+        where.append("done".equals(tab) ? " AND " : " AND NOT ").append(done);
+        // 副本面板(供应商采购打印之类)的状态行记在源面板名下,与 loadStatus / 归档区间过滤同一折算,
+        // 见 PanelAliases —— 不折算的话副本面板的页签会恒为空。
+        args.add(com.yinjia.mes.panel.PanelAliases.statusSource(def.code()));
     }
 }

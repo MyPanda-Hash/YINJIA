@@ -138,6 +138,7 @@
           @search="onRailSearch"
           @check="onRailCheck"
           @check-all="onRailCheckAll"
+          @tab="onRailTab"
         />
         <!-- 项目进度查询(RD_PROGRESS)= 汇总查看面板:数据由「项目实施计划归档 / 立项申请」自动导入,
              人工不再往里写 ⇒ **单元格恒只读**(:editable 硬编码 false,2026-10-09 用户口径「去掉自己写入功能」)。
@@ -946,6 +947,7 @@
           @search="onRailSearch"
           @check="onRailCheck"
           @check-all="onRailCheckAll"
+          @tab="onRailTab"
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
@@ -5581,6 +5583,41 @@ const DOC_RAIL_PANELS = {
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
 }
+/**
+ * 左栏「单据状态」页签(2026-11-10,出货检验单 = 制程检验单 QC_PROC_INSP)。
+ * 【用户原话】「出货功能检验中在左侧的列表中增加对应的页签实现已审核的完成单据和未完成的分开显示,
+ *   增加在当前列表处的部分,不要修改其他页面的这个组件我先确认查看」
+ * 【为什么只给这一张单开】用户明说「不要修改其他页面的这个组件」⇒ 页签是**按面板登记**的能力:
+ *   只有出现在这张表里的面板,左栏才会出现页签条;没登记的(其余 20+ 个带左栏的面板)左栏
+ *   与改动前**完全一致**(DocSelectRail 收到 tabs=[] 就不渲染页签条)。用户先看这一张,
+ *   确认样式/交互 OK 后再逐个登记到下面即可,不需要再改组件。
+ * 【键值语义】三键固定 todo/done/all:
+ *   · todo = done 的补集(未完成:草稿/审批中/未审核),两者相加恰好等于全部 ——
+ *            没有第三态、不会漏单;
+ *   · done = 已审核的完成单据 = 正常终态 —— 口径与后端 QueryService 的 docStatus()/
+ *            STATUS_TAB_KEY 逐条对齐:未作废、未中止、未删除申请,且(审核人 shr 非空
+ *            或 archived='Y' 或 effective='Y' 或 erp_close_state='S');即「已审核/已归档/
+ *            已完成/已关闭」这类**可以往下走流程**的单据;
+ *   · all  = 全部(不加任何过滤,与改动前同一条 SQL)。
+ * 【顺序与默认页签】2026-11-11 用户口径:「把未完成放在最左侧作为打开页面的默认选项」
+ *   ⇒ **数组顺序即渲染顺序,且第一项就是默认页签**(railStatusTabDefault 取首项,见下):
+ *   ① 未完成在左、进页面默认停在未完成(用户主要在这张页签上干活,不必每次先点一下);
+ *   ② 其余两项保持「已完成 → 全部」的顺序:状态两组挨着,「全部」作为总览放最右。
+ *   要把默认改成别的键:调换数组顺序即可(不是改 ref 初值 —— 初值只是 SSR 首帧的占位)。
+ * 【谁来过滤】过滤在**后端**:左栏是后端分页(50 条/页,全库 500+ 张),前端只过滤当前页
+ *   等于骗人(切「已完成」时第 2 页可能又冒出未完成的)。前端只负责把当前页签键塞进
+ *   condition 控制键 `_statusTab`(见 load() 里的派生),后端 QueryService 只对登记在
+ *   STATUS_TAB_PANELS 的面板认这个键(其余面板收到就忽略,防串味)。
+ * 【以后怎么给别的面板开】往下面加一行 `<面板编码>: [{key:'todo',label:'未完成'}, …]` 即可;
+ *   label 用中文原文(渲染时走 tt(),10 个语种的词条都已存在,不用新增词条)。
+ */
+const RAIL_STATUS_TABS = {
+  QC_PROC_INSP: [
+    { key: 'todo', label: '未完成' },
+    { key: 'done', label: '已完成' },
+    { key: 'all', label: '全部' },
+  ],
+}
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
  *  字母」判,不硬编码语言清单 —— 中文面板名照旧零间距。 */
@@ -5601,6 +5638,14 @@ const docRailCfg = computed(() => {
   ]
   return { title: railTitle(panelName.value), columns }
 })
+/** 左栏状态页签(2026-11-10):只有登记在 RAIL_STATUS_TABS 的面板才有,其余面板恒为 [](零影响) */
+const railStatusTabs = computed(() => RAIL_STATUS_TABS[panelCode.value] || [])
+/** 页签默认键 = 登记表的**第一项**(QC_PROC_INSP = todo 未完成,2026-11-11 用户口径
+ *  「把未完成放在最左侧作为打开页面的默认选项」);未登记页签的面板恒 'all'(不过滤)。
+ *  ⚠ 默认值由**数组顺序**决定,别在别处硬写 'todo':以后谁调了顺序或加了面板都以登记表为准。 */
+const railStatusTabDefault = computed(() => (railStatusTabs.value.length ? railStatusTabs.value[0].key : 'all'))
+/** 当前生效的状态页签键;初值只是首帧占位,进面板/切面板时由 load() 置成 railStatusTabDefault */
+const railStatusTab = ref('all')
 const railCollapsed = ref(false)
 const railCurNo = computed(() => {
   const c = cur.value || {}
@@ -5624,6 +5669,10 @@ const railBind = computed(() => ({
   // 批量生单(2026-10-31):勾选列 + 已勾单号(按单号保管,翻页不丢)
   selectable: railSelectable.value,
   checked: railChecked.value,
+  // 状态页签(2026-11-10):只有 QC_PROC_INSP 这类登记了 RAIL_STATUS_TABS 的面板才有值,
+  // 其余面板 tabs=[] ⇒ DocSelectRail 不渲染页签条,左栏与改动前完全一致
+  tabs: railStatusTabs.value,
+  activeTab: railStatusTab.value,
 }))
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })
@@ -5643,6 +5692,16 @@ function onRailSearch(kw) {
   const k = String(kw || '').trim()
   if (k === (query.keyword || '')) return
   guardPageAction(async () => { query.keyword = k; query.pageNo = 1; await load(); curIdx.value = 0 })
+}
+
+/** 左栏「单据状态」页签(2026-11-10,仅 QC_PROC_INSP):点页签 = 换一套服务端过滤再取数。
+ *  - 走 guardPageAction(与翻页/切单/模糊搜索同一个未保存草稿守卫),不能绕过草稿丢失提示;
+ *  - 页号归 1、当前单据落回本页首张 —— 换了过滤后旧页号/旧下标已无意义(否则会翻出空页);
+ *  - 实际过滤键不在这里拼:railStatusTab 只是真源,load() 里派生 params.condition._statusTab。 */
+function onRailTab(key) {
+  const k = String(key || 'all')
+  if (k === railStatusTab.value) return
+  guardPageAction(async () => { railStatusTab.value = k; query.pageNo = 1; await load(); curIdx.value = 0 })
 }
 
 async function page(delta) {
@@ -11452,6 +11511,9 @@ async function load(clamping = false) {
   if (railPanelCode !== String(panelCode.value)) {
     railPanelCode = String(panelCode.value)
     railChecked.value = []
+    // 状态页签随面板复位:默认键见 RAIL_STATUS_TABS 的**第一项**(QC_PROC_INSP = 未完成,
+    // 2026-11-11 用户口径「打开页面的默认选项」);别把上一张单的页签带到下一张单。
+    railStatusTab.value = railStatusTabDefault.value
   }
   if (invalidPanel.value) {
     ElMessage.error('面板编号无效，请从菜单重新进入')
@@ -11485,6 +11547,11 @@ async function load(clamping = false) {
     //   用户 2026-10-15(第七轮):**不勾选 = 显示全部**(勾一次仓只是为了收窄,别让人每次都得先勾),
     //   所以这里只在真选了仓库时才加条件;勾选即查询、单选由左栏控制。
     if (isStockDetail.value && whDockSelected.value) params.condition._whCodes = whDockSelected.value
+    // 左栏「单据状态」页签(2026-11-10,仅 QC_PROC_INSP):与上面 _whCodes 同款「请求时派生」控制键 ——
+    //   不写进共用 condition(切面板会被 reset 清掉、还会串到别的面板);
+    //   控制键以 _ 开头,后端只对登记在 STATUS_TAB_PANELS 的面板认这个键(其余面板收到即忽略);
+    //   'all' 不传键 = 与改动前同一条 SQL(零影响),done/todo 由后端按 docStatus() 同一口径拼 WHERE。
+    if (railStatusTabs.value.length && railStatusTab.value !== 'all') params.condition._statusTab = railStatusTab.value
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
     if (fuzzyApplied.value?.valid) {
       Object.assign(params.condition, fuzzyApplied.value.condition || {})
@@ -11515,9 +11582,19 @@ async function load(clamping = false) {
     }
     if (curIdx.value >= list.value.length) curIdx.value = 0
     // 2026-08-25：?focus=单号 定位（选单/生单从表单页跳转过来时直接显示目标单据）
+    // 2026-11-11：默认页签改成「未完成」后，深链要定位的单据可能**不在当前页签里**
+    //   （典型：「查看单据」打开一张已审核的检验单，URL 带 ?focus=ZC-…，但它落在「已完成」页签）。
+    //   此时退回「全部」再取一次，deep link 优先于页签 —— 否则点「查看单据」只会停在第一张，
+    //   用户以为单子丢了。只回退一次（第二趟 railStatusTab 已是 all，不会来回跳）。
     const focus = route.query.focus
     if (focus) {
       const fi = list.value.findIndex((r) => (r['编号'] || r['单据编号'] || r['锭号']) === String(focus))
+      if (fi < 0 && railStatusTabs.value.length && railStatusTab.value !== 'all') {
+        railStatusTab.value = 'all'
+        query.pageNo = 1
+        await load(true) // clamping=true:与上面「页码越界自愈」同一套防递归口径
+        return
+      }
       if (fi >= 0) curIdx.value = fi
       router.replace({ path: route.path, query: { ...route.query, focus: undefined } })
     }

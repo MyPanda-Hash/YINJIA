@@ -8,6 +8,21 @@
       <span class="dsr-title" :title="title">{{ title }}</span>
       <span class="dsr-coll" :title="tt('收起')" @click="$emit('toggle')">«</span>
     </div>
+    <!-- 单据状态页签(2026-11-10 出货检验单用户口径):「未完成 / 已完成 / 全部」三段,
+         **顺序与默认项由挂载方传的 tabs 决定**(数组顺序即渲染顺序,首项 = 打开页面默认选中);
+         由挂载方传 tabs 才渲染(未传 = 本组件与从前一模一样,其他页面的左栏零变化);
+         label 以中文原文下发、此处走 tt() 出译名(同表格列头口径)。
+         过滤是**后端**做的(分页 50 条/页,前端只过滤当前页等于骗人),本组件只上报点了哪个键。 -->
+    <div v-if="tabs.length" class="dsr-tabs">
+      <button
+        v-for="t in tabs"
+        :key="t.key"
+        type="button"
+        class="dsr-tab"
+        :class="{ active: t.key === activeTab }"
+        @click="$emit('tab', t.key)"
+      >{{ tt(t.label) }}</button>
+    </div>
     <div class="dsr-filters">
       <!-- 模糊搜索(2026-09-20):**全库**搜——关键字上抛 PanelxList 走后端 keyword LIKE,跨页命中;
            不在本组件内过滤,故「共有数据」显示的就是命中张数(原部门下拉已按用户口径删除) -->
@@ -112,8 +127,14 @@ const props = defineProps({
   selectable: { type: Boolean, default: false },
   /** 已勾选的单号(PanelxList 是唯一真源) */
   checked: { type: Array, default: () => [] },
+  /** 左栏顶部状态页签(2026-11-10 出货检验单):[{ key, label }],label 是**中文原文**,渲染时走 tt()。
+   *  默认空数组 ⇒ 不渲染页签条,其他面板的左栏与改动前完全一致(用户口径「不要修改其他页面的这个组件」)。
+   *  过滤在后端做:页签键只是上抛给挂载方,由挂载方带进 condition 控制键(见 PanelxList 的 _statusTab)。 */
+  tabs: { type: Array, default: () => [] },
+  /** 当前生效的页签键('all' = 全部/不过滤);父组件是唯一真源 */
+  activeTab: { type: String, default: 'all' },
 })
-const emit = defineEmits(['select', 'toggle', 'page', 'search', 'check', 'checkAll'])
+const emit = defineEmits(['select', 'toggle', 'page', 'search', 'check', 'checkAll', 'tab'])
 
 /** 总页数:按总张数与每页条数算,至少 1 页 */
 const pageCount = computed(() => Math.max(1, Math.ceil((props.total || 0) / Math.max(1, props.pageSize))))
@@ -273,6 +294,38 @@ onBeforeUnmount(detachDrag)
   user-select: none;
 }
 .dsr-coll:hover { color: var(--t-primary, #116a5b); }
+/* 状态页签条(2026-11-10):紧贴栏头下沿,等分三格、字号 11px(与侧栏表格同密度),
+   未激活灰字(透明底边),激活主色字 + 2px 主色底边(不通栏、不描边,保持轻量);
+   高度约 24px,只在挂载方传 tabs 的面板出现 —— 它挤占的是 .dsr-grid 的 flex 余量,
+   不改 .dsr-grid 的 max-height 预算(见下)。 */
+.dsr-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--t-border-light, #edf1ef);
+  background: var(--t-card-bg, #fff);
+}
+.dsr-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--t-text-3, #8b9893);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsr-tab:hover { color: var(--t-text-1, #1e2b27); }
+.dsr-tab.active {
+  color: var(--t-primary, #116a5b);
+  border-bottom-color: var(--t-primary, #116a5b);
+  font-weight: 600;
+}
 .dsr-filters { padding: 8px 10px; border-bottom: 1px solid var(--t-border-light, #edf1ef); }
 .dsr-kw { display: flex; gap: 6px; margin-top: 8px; }
 .dsr-count { margin-top: 8px; font-size: 12px; color: var(--t-text-2, #5d6c67); }
@@ -287,7 +340,10 @@ onBeforeUnmount(detachDrag)
 
 /* 表格外层:宽度跟随侧栏(100%);表格超宽即出横向滚动条(常显),绝不溢出侧栏。
    max-height 钉在视口内(约减去 工具栏+单号行+栏头/筛选 的高度):行数多时列表在侧栏内部
-   纵向滚动(独立的滚动条),不再把整个布局撑高、逼整页滚动;行数少时不生效,行为不变 */
+   纵向滚动(独立的滚动条),不再把整个布局撑高、逼整页滚动;行数少时不生效,行为不变。
+   2026-11-10 状态页签条(.dsr-tabs ≈ 24px)只在传 tabs 的面板出现,它吃掉的是 flex 余量
+   (本元素 flex:1 + min-height:0),所以 max-height 预算**不用跟着改** —— 不带页签的面板
+   与从前一致,带页签的 QC_PROC_INSP 表格整体下移约 24px 但仍在视口内。 */
 .dsr-grid {
   flex: 1;
   width: 100%;
