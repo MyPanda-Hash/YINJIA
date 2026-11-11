@@ -29,17 +29,9 @@
         <div class="title">
           <span class="no">{{ isEdit ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : tt('（新增）') }}</span>
           <el-tag v-if="form['单据状态']" size="small" :type="statusTag(form['单据状态'])" :class="{ 'st-done': form['单据状态'] === '已完成' }">{{ tt(form['单据状态']) }}</el-tag>
-          <!-- 来源提示(2026-11-11 用户口径「不要做成字段,做成个按钮或者是提示就行」):
-               采购入库单表头的「来源 / 来源单号」两列已隐藏,信息挂在单号这里,点一下翻到来源单据 -->
-          <span
-            v-if="sourceHint"
-            class="doc-source"
-            :class="{ 'doc-source-link': sourceHint.canOpen }"
-            :title="sourceHintTitle"
-            @click="openSourceDoc"
-          >
-            {{ tt('来源') }}: {{ tt(sourceHint.type) }} {{ sourceHint.docNo }}
-          </span>
+          <!-- 来源提示(2026-11-11 第三版,用户口径「不需要跳转」):只显示,不点、不跳面板;
+               采购入库单表头的「来源 / 来源单号」两列隐藏,信息挂在单号这里 -->
+          <span v-if="sourceHint" class="doc-source" :class="{ 'doc-source-empty': sourceHint.empty }" :title="sourceHintTitle">{{ sourceHintText }}</span>
         </div>
       </div>
 
@@ -395,8 +387,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['saved'])
 import { tt } from '@/i18n'
-import { sourceHintOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
-import { panelCodeOfName } from '@core/panel/panelCodeByName'
+import { sourceHintOf, sourceHintText as sourceHintTextOf, sourceHintTitle as sourceHintTitleOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
@@ -461,27 +452,17 @@ function isFrontPage() {
 
 const form = reactive({})
 /**
- * 单号旁的「来源」提示(2026-11-11 用户口径:「不要做成字段,做成个按钮或者是提示就行」)。
- * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);老单没有链路 ⇒ null ⇒ 不显示。
- * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来就是可见字段的面板(如 ASM_BOM)不重复挂。
+ * 单号旁的「来源」提示(2026-11-11 第三版:「**不需要跳转**」—— 纯提示,点了没反应)。
+ * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);
+ * 没有上游单据的老单显示「无上游单据」,而不是留空。
+ * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来是可见字段的面板(如 ASM_BOM)不重复挂。
  */
 const sourceHint = computed(() => {
   if (!hasHiddenSourceColumn(meta.value)) return null
-  return sourceHintOf(form, panelCodeOfName)
+  return sourceHintOf(form)
 })
-const sourceHintTitle = computed(() => {
-  const h = sourceHint.value
-  if (!h) return ''
-  if (h.canOpen) return tt('点击打开来源单据') + ': ' + h.docNo
-  return h.docNo ? tt('来源单据') + ': ' + h.docNo : tt('来源')
-})
-
-/** 点提示翻到来源单据(暂收单 / 检验单 / 特采单) */
-function openSourceDoc() {
-  const h = sourceHint.value
-  if (!h?.canOpen) return
-  router.push({ path: '/panelx/form/' + h.panelCode, query: { code: h.docNo } })
-}
+const sourceHintText = computed(() => (sourceHint.value ? sourceHintTextOf(sourceHint.value, tt) : ''))
+const sourceHintTitle = computed(() => (sourceHint.value ? sourceHintTitleOf(sourceHint.value, tt) : ''))
 const meta = ref([])
 const detailDef = ref(null)
 const detailData = reactive({})
@@ -1755,12 +1736,12 @@ watch(() => [panelCode.value, code.value], () => {
   font-weight: 400;
   white-space: nowrap;
 }
-.doc-source-link {
-  cursor: pointer;
-}
-.doc-source-link:hover {
-  background: #d1fae5;
-  border-color: #6ee7b7;
+/* 第三版用户口径「不需要跳转」:提示只是提示,不可点。
+   有来源 = 绿;没有上游单据 = 灰。 */
+.doc-source-empty {
+  color: #6b7280;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
 }
 .fields {
   display: block;

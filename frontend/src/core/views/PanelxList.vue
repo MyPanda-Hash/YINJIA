@@ -58,18 +58,15 @@
           <span class="doc-chip">{{ tt('单据：') }}{{ cur['编号'] || cur['单据编号'] || '-' }}</span>
           <span v-if="cur['批次号']" class="doc-batch" :title="tt('批次号')">{{ tt('批次号') }}: {{ cur['批次号'] }}</span>
           <span v-if="cur['类别']" class="doc-cat">{{ tt(cur['类别']) }}</span>
-          <!-- 来源提示(2026-11-11 用户口径「不要做成字段,做成个按钮或者是提示就行」):
-               采购入库单的表头「来源 / 来源单号」两列已隐藏,信息挂在这里;
-               能反查到面板编码时点一下直接翻到来源单据(暂收单 / 检验单 / 特采单)。 -->
+          <!-- 来源提示(2026-11-11 第三版,用户口径「不需要跳转」):只显示,不点、不跳面板;
+               采购入库单表头的「来源 / 来源单号」两列隐藏,信息挂在这里;
+               没有上游单据的老单显示「无上游单据」(把"为什么没有来源"讲明白)。 -->
           <span
             v-if="sourceHint"
             class="doc-source"
-            :class="{ 'doc-source-link': sourceHint.canOpen }"
+            :class="{ 'doc-source-empty': sourceHint.empty }"
             :title="sourceHintTitle"
-            @click="openSourceDoc"
-          >
-            {{ tt('来源') }}: {{ tt(sourceHint.type) }} {{ sourceHint.docNo }}
-          </span>
+          >{{ sourceHintText }}</span>
           <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
           <template v-if="!singleDocMode">
             <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
@@ -2570,8 +2567,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { sourceHintOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
-import { panelCodeOfName } from '@core/panel/panelCodeByName'
+import { sourceHintOf, sourceHintText as sourceHintTextOf, sourceHintTitle as sourceHintTitleOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
@@ -5390,28 +5386,17 @@ const curNo = computed(() => {
 const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
 
 /**
- * 单据号旁的「来源」提示(2026-11-11 用户口径:「不要做成字段,做成个按钮或者是提示就行」)。
- * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);老单没有链路 ⇒ null ⇒ 不显示。
- * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来就是可见字段的面板(如 ASM_BOM)不重复挂。
+ * 单据号旁的「来源」提示(2026-11-11 第三版:「**不需要跳转**」—— 纯提示,点了没反应)。
+ * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);
+ * 没有上游单据的老单显示「无上游单据」,把"为什么没有来源"讲明白,而不是留空。
+ * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来是可见字段的面板(如 ASM_BOM)不重复挂。
  */
 const sourceHint = computed(() => {
   if (!hasHiddenSourceColumn(cfgCache.value?.dataSchema?.fields)) return null
-  return sourceHintOf(cur.value, panelCodeOfName)
+  return sourceHintOf(cur.value)
 })
-const sourceHintTitle = computed(() => {
-  const h = sourceHint.value
-  if (!h) return ''
-  if (h.canOpen) return tt('点击打开来源单据') + ': ' + h.docNo
-  return h.docNo ? tt('来源单据') + ': ' + h.docNo : tt('来源')
-})
-
-/** 点提示跳到来源单据(暂收单 / 检验单 / 特采单);反查不到面板时提示不可点,这里再兜一道 */
-function openSourceDoc() {
-  const h = sourceHint.value
-  if (!h?.canOpen) return
-  stashCurrentPanelDraft(panelCode.value)
-  router.push({ path: '/panelx/form/' + h.panelCode, query: { code: h.docNo } })
-}
+const sourceHintText = computed(() => (sourceHint.value ? sourceHintTextOf(sourceHint.value, tt) : ''))
+const sourceHintTitle = computed(() => (sourceHint.value ? sourceHintTitleOf(sourceHint.value, tt) : ''))
 
 // 立项申请流程状态(rdFlow)—————————— 必须声明在下面那个 immediate watch 之前 ——————————
 // ⚠ 2026-10-15 TDZ 修复:该 watch 带 immediate,setup 期间就会调 loadRdFlowState() → clearRdFlow() → 读 rdFlow。
@@ -12213,12 +12198,12 @@ onUnmounted(() => {
   border: 1px solid #a7f3d0;
   white-space: nowrap;
 }
-.doc-source-link {
-  cursor: pointer;
-}
-.doc-source-link:hover {
-  background: #d1fae5;
-  border-color: #6ee7b7;
+/* 第三版用户口径「不需要跳转」:提示只是提示,不可点 —— 不设 cursor/hover。
+   有来源 = 绿;没有上游单据 = 灰(便于一眼区分"没走过链路的早期单")。 */
+.doc-source-empty {
+  color: #6b7280;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
 }
 .doc-status {
   font-size: 12px;

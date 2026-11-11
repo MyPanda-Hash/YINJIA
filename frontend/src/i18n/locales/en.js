@@ -397,7 +397,9 @@ export default {
     '单据编号': 'Document no.',
     '编号': 'No.',
     '来源': 'Source',
-    '点击打开来源单据': 'Click to open the source document',
+    '无上游单据': 'No upstream document',
+    '没有暂收/检验/特采上游单据(早期直接录入或 ERP 单号形态的老单)':
+      'No upstream receipt / inspection / concession document (early direct entry or an ERP-numbered legacy document)',
     '查看': 'View',
     '打开': 'Open',
     '查询产品': 'Query Products',

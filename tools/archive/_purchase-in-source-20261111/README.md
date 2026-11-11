@@ -1,46 +1,48 @@
 # 采购入库单「来源」提示 —— 界面取证(2026-11-11)
 
-用户口径两轮:
+用户口径三轮演进:
 
 1. 「采购入库单在表头最末尾,加一个来源(可能是直接暂收来的,可能是检验单来的,也可能是特采来的)和显示对应的单据编号。」
-2. 「**不要做成字段,做成个按钮或者是提示就行**」← **最终形态**
+2. 「**不要做成字段,做成个按钮或者是提示就行**」
+3. 「跳转到的是什么面版的界面,**不需要跳转**。为什么之前的单据就没有来源了。(主要是想要知道来源来区分不同的入库)」← **最终形态**
 
-## 最终形态(第二轮)
+## 最终形态(第三轮)
 
-表头**不再占格子**,改成单据号旁边一条可点的小提示:
+表头不占格子、不可点,单据号旁边一条**纯提示**(有来源=绿,无上游单据=灰):
 
 ```
 单据: PI-2026-11-0001   批次号: 20261009   来源: 来料检验单 IJ-2026-10-0064   草稿
+单据: CGRK-20261014-03407               已审核   来源: 无上游单据
 ```
 
-点它直接翻到那张来源单据(暂收单 / 检验单 / 特采单)。
-
 | 取证 | 说明 |
 |---|---|
-| `r25-list-hint.png` / `r29-list-final.png` | **列表页表头条**:表头字段到「到期日」为止(来源两格已撤),提示挂在本单号后面 |
-| `r27-form-hint.png` | **单据表单页**:同样撤格,提示挂在单号右侧 |
-| `r26-jump-source.png` | 点提示后跳到 `#/panelx/form/QC_INSP?code=IJ-2026-10-0064`(标题 `IJ-2026-10-0064 已审核`) |
-| `r28-list-hint-en.png` | 切 English:`Source: Incoming inspection IJ-…`,`Click to open the source document: IJ-…`(显示名翻译、数据值不翻) |
-| `r30-asm-no-chip.png` | **不串面板**:`ASM_BOM` 的「来源」是**可见**字段,该面板不挂重复提示(判据 `hasHiddenSourceColumn`,有单测) |
+| `r35-with-source.png` | 有来源:绿底「来源: 来料检验单 IJ-2026-10-0064」,**不可点**(cursor: auto,无 click 处理器) |
+| `r36-no-upstream.png` | 没有上游单据的老单(ERP 单号形态):**灰底「来源: 无上游单据」**,悬停解释"早期直接录入或 ERP 单号形态的老单" |
+| `r34-list-no-upstream.png` / `r32-list-with-source.png` | 列表页表头条上同样两种形态 |
+| `r31-list-no-upstream.png` | 点提示**不跳转**(点击前后 `location.hash` 不变) |
 
-## 第一版(字段形态,已按第二轮口径改掉,留档)
+## 「为什么之前的单据就没有来源」—— 查清了两条原因
 
-| 取证 | 说明 |
-|---|---|
-| `r04-recv.png` / `r05-insp.png` | 暂收直达 / 检验入库两张单:表头末尾两格显示 来源 + 来源单号 |
-| `r14 / r15 / r16` | 界面上「审核」`IJ-2026-10-0064` → 自动生成 `PI-2026-11-0001`,来源 = 来料检验单、来源单号 = IJ-2026-10-0064(**写入口径生效的实证**,第二轮只是把它从格子改成提示,写入逻辑没变) |
-| `r19-new-pi-en.png` | 字段形态下的 en 显示名(`Source` / `Source Order No.`) |
+1. **我的回填口径太窄(已修)**:第一版只认 `form_flow_link.link_status='ACTIVE'`,
+   上游作废/删除后链路转 `RELEASED` 的单明明是暂收/检验来的,却被判成"没有来源"。
+   新脚本 `tools/migrate-purchase-in-source-backfill-20261111.sql` 三路补齐
+   (任意状态链路 / 检验行「入库单号」/ 暂收行「入库单号」)⇒ **测试库补回 107 张**。
+2. **数据本身没有出处(补不出来)**:`CGRK-…` / `TCGRK-…` 形态的历史入库单
+   (ERP 单号形态,`是否已转ERP='是'` 且 `ERP单号 = 单据编号`),从没走过 MES 的
+   暂收 → 检验 → 特采 链路,`form_flow_link` / 检验行 / 暂收行里**没有任何一条记录指回它们**。
+   测试库还剩 394 张、正式库 365 张属于这一类 ⇒ 界面显示「无上游单据」,不写库(不把猜测当事实)。
 
 ## 脚本(按轮次)
 
 ```powershell
-ego-browser nodejs -e "await import('file:///C:/Users/Lenovo/ego/purchase-in-source-20261111/round-17.mjs')"
+ego-browser nodejs -e "await import('file:///C:/Users/Lenovo/ego/purchase-in-source-20261111/round-23.mjs')"
 ```
 
-- `round-04` 直接开表单(`#/panelx/form/PURCHASE_IN?code=<单号>`)并 dump 表头 label+value(第一版取数)
+- `round-04` 直接开表单(`#/panelx/form/PURCHASE_IN?code=<单号>`)dump 表头 label+value(第一版取数)
 - `round-08 / 09 / 10` 来料检验单「审核」:审核在 **审批** 分组的下拉里,确认按钮文案是「确认审核」
 - `round-13 / 19` 语言切换器是 `.locale-switch`(el-dropdown),要**真实点击** `page.click('.locale-switch')`
-- `round-15 / 16 / 17 / 18` 第二轮验证;**踩坑**:前端有 cfgCache,改完 yj_field 必须 `page.reload()` 整页重载,否则表头还是旧字段表
+- `round-15`~`round-23` 第二、三轮验证;**踩坑**:前端有 cfgCache,改完 yj_field 必须 `page.reload()` 整页重载
 
 ## 备注
 
