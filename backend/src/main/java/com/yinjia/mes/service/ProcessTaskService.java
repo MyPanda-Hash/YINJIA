@@ -1171,6 +1171,24 @@ public class ProcessTaskService {
             }
             String due = givenDue != null ? givenDue : str(rt.get("计划完工日期"));
             String prevDue = plan.isEmpty() ? null : str(plan.get(plan.size() - 1).get("计划完工日期"));
+            // 🔴 2026-11-11 用户口径「校验需要增加实现下方的工序页不能比上方的工序小的实现」:
+            //   后道工序的日期**不得早于上道工序**(后道开工 ≥ 上道完工,后道完工也随之 ≥ 上道完工)。
+            //   只拒「客户端明确给了、且比上道完工还早」的日期 —— 派生出来的不一致仍按下面原口径顺延,
+            //   不误拦(与 2026-11-09 的倒挂守卫同一条取舍)。
+            if (prevDue != null) {
+                try {
+                    java.time.LocalDate pd = java.time.LocalDate.parse(prevDue);
+                    if (givenStart != null && java.time.LocalDate.parse(givenStart).isBefore(pd))
+                        throw new IllegalArgumentException("工序「" + op + "」计划开工日期不能早于上道工序的计划完工日期("
+                                + prevDue + " → " + givenStart + ")");
+                    if (givenDue != null && java.time.LocalDate.parse(givenDue).isBefore(pd))
+                        throw new IllegalArgumentException("工序「" + op + "」计划完工日期不能早于上道工序的计划完工日期("
+                                + prevDue + " → " + givenDue + ")");
+                } catch (java.time.format.DateTimeParseException e) {
+                    throw new IllegalArgumentException("工序「" + op + "」计划开工/完工日期格式应为 yyyy-MM-dd("
+                            + givenStart + " / " + givenDue + ")");
+                }
+            }
             String start = prevDue != null ? prevDue : givenStart;
             if (start == null) start = java.time.LocalDate.now().toString();
             if (due == null) due = start;

@@ -2752,6 +2752,9 @@ export default {
     '计划开工日期不能晚于计划完工日期': 'La fecha de inicio prevista no puede ser posterior a la fecha de fin prevista',
     '计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}': 'La fecha de inicio prevista no puede ser posterior a la de fin prevista; inicio previsto ajustado a {d}',
     '计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}': 'La fecha de inicio prevista no puede ser posterior a la de fin prevista; fin previsto ajustado a {d}',
+    '下道工序的计划开工日期不能早于上道工序的计划完工日期': 'La operación siguiente no puede empezar antes de que termine la anterior',
+    '下道工序的计划开工日期不能早于上道工序的计划完工日期，已把开工日期调为 {d}': 'La operación siguiente no puede empezar antes de que termine la anterior; inicio previsto ajustado a {d}',
+    '下道工序的计划完工日期不能早于上道工序的计划完工日期，已把完工日期调为 {d}': 'La operación siguiente no puede terminar antes de que termine la anterior; fin previsto ajustado a {d}',
     '生产线': 'Línea de producción',
     // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
     '超订单': 'Sobre pedido',
