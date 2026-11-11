@@ -4699,3 +4699,13 @@ migrate-purchase-in-source-backfill-20261111.sql
 #   字段仍是标准库(候选为空 = 纸面直接输入,想沉淀再用「⧉ 标准库维护」加条目)。
 #   前端同批:处理意见占位词改「直接输入处理意见」(en: Type the disposition)。幂等,两账套均执行。
 migrate-qc-insp-disposal-clear-20261111.sql
+
+# 2026-11-11 来料检验要求两面板瘦身(用户口径「字段删除只保留物料编码和文件编码和检验依据这3个字段和自定义的字段」):
+#   ① qc_insp_req **连物理列一起删**掉 32 个固定检验列(折叠棉/炭棒/…/脏污、头发丝);
+#      保留 id、物料类别(页签键)、物料编号、文件编码、检验依据、备用1..140、asp_*;
+#   ② qc_insp_req_series 本来只有 4 个业务列,不删;两表对应的 yj_field 注册行一并清理;
+#   ③ 前端同批:qcInspReqConfig 的 7 张表只剩三个前置列;自定义字段改为「一个父目录 + 两个子目录」
+#      (FieldManagerDialog 一次建两个子列);检验报告带入按 父目录第1行/子目录1第2行/子目录2第3行,
+#      父行检测标准留空、子行带数据。
+#   删列前已打整库备份 D:\SQLData\HSDZ_MES[-TEST]-before-reqfields-20261111.bak。幂等,两账套均执行。
+migrate-qc-insp-req-trim-fixed-cols-20261111.sql

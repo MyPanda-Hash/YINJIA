@@ -31,10 +31,10 @@ const extFieldRetire = (payload) => engine.extFieldRetire(payload)
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })
-const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '', parent: '' })
+const form = ref({ label: '', label2: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '', parent: '' })
 /** 需要指定「所属页签」的面板:传了 tabs 就是 */
 const needTab = () => Array.isArray(props.tabs) && props.tabs.length > 0
-const blankForm = () => ({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '', parent: '' })
+const blankForm = () => ({ label: '', label2: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '', parent: '' })
 /** 当前所选页签的父字段候选 */
 const parentOptions = computed(() => (needTab() && props.parentOptionsOf ? props.parentOptionsOf(form.value.tab) || [] : []))
 /** 父字段下拉没有候选(该表还没任何分组名)—— 提示"直接输入一个新名字即可新建" */
@@ -84,9 +84,25 @@ function usedOf(pool) { return (pool || []).filter((p) => p.bound).length }
 async function submit() {
   saving.value = true
   try {
-    const payload = { ...form.value, panel: props.panelCode }
-    const res = await extFieldAdd(payload)
-    ElMessage.success(tt('字段已添加') + ':' + res.colName)
+    // 2026-11-11 用户口径:分页签面板(两个来料检验要求)的自定义字段**必须是「一个父目录 + 两个子目录」**
+    // —— 一次提交就建两个子列(同一 parent、同一页签),检验报告带入时按 父目录第1行/子1第2行/子2第3行。
+    const twoChildren = needTab()
+    if (twoChildren) {
+      const p = String(form.value.parent || '').trim()
+      const c1 = String(form.value.label || '').trim()
+      const c2 = String(form.value.label2 || '').trim()
+      if (!p) { ElMessage.warning(tt('请先填写父目录(分组)名称')); saving.value = false; return }
+      if (!c1 || !c2) { ElMessage.warning(tt('请把两个子目录名称都填上')); saving.value = false; return }
+      if (c1 === c2) { ElMessage.warning(tt('两个子目录不能同名')); saving.value = false; return }
+    }
+    const labels = twoChildren ? [form.value.label, form.value.label2] : [form.value.label]
+    const made = []
+    for (const label of labels) {
+      const payload = { ...form.value, label, label2: undefined, panel: props.panelCode }
+      const res = await extFieldAdd(payload)
+      made.push(res.colName)
+    }
+    ElMessage.success(tt('字段已添加') + ':' + made.join('、'))
     form.value = blankForm()
     await load()
     emit('done')
@@ -181,7 +197,12 @@ async function retire(f) {
             </el-select>
             <span v-if="parentEmptyHint" class="fm-parent-hint">{{ tt('该表还没有分组名：直接输入一个名字（回车）即可新建') }}</span>
           </div>
-          <el-tooltip :content="tt('父只做表头分组、没有数据格;检验数据记录只带入子字段')" placement="top"><span class="fm-help">?</span></el-tooltip>
+          <el-tooltip :content="tt('父目录只做表头分组、没有数据格;检验数据记录带入时按 父目录一行 + 两个子目录各一行')" placement="top"><span class="fm-help">?</span></el-tooltip>
+        </el-form-item>
+        <!-- 2026-11-11 用户口径:自定义字段必须是「一个父目录 + 两个子目录」⇒ 一次性填两个子目录名 -->
+        <el-form-item v-if="needTab()" :label="tt('子目录2')">
+          <el-input v-model="form.label2" :placeholder="tt('第二个子目录名(与上面的字段名成一对)')" maxlength="60" />
+          <el-tooltip :content="tt('必须一个父目录带两个子目录:字段名=子目录1,这里=子目录2,一次添加两个子列')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
         <el-form-item :label="tt('英文名')"><el-input v-model="form.labelEn" maxlength="60" /></el-form-item>
         <el-form-item :label="tt('类型')">
@@ -203,7 +224,7 @@ async function retire(f) {
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
-      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label" @click="submit">{{ tt('添加') }}</el-button>
+      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label || (needTab() && !form.label2)" @click="submit">{{ tt('添加') }}</el-button>
     </template>
   </el-dialog>
 </template>

@@ -56,30 +56,53 @@ function fallbackColsOf(rows) {
 
 /**
  * 命中分组 → 检验报告的「检验项 / 检测标准」条目(已去重、已剔除空数据列)。
+ *
+ * 【2026-11-11 用户口径:父目录也占一行】自定义字段是「一个父目录 + 两个子目录」的结构,
+ * 带入检验报告时按 **父目录第 1 行 → 子目录1 第 2 行 → 子目录2 第 3 行**:
+ *   · 父目录行:检验项 = 父目录名,**检测标准留空**(父只做分组,没有自己的数据格);
+ *   · 子行:检验项 = 子目录名,检测标准 = 该子列的数据;数据为空的子列不出行。
+ * 没有父目录的列(历史自定义列/兜底列)仍是「一格一行」。
+ *
  * @param {Array} groups lookupReqGroups 的结果
- * @param {Array<{label:string, tab?:string}>} [extFields] 来料检验要求的动态字段(/px/extFields 的 fields):
- *        每张表各自的自定义列也在这张表里带入(用户口径 2026-10-04「自定义字段单独针对每个表」)。
- *        不传 = 只带固定列(与改动前等价)。
+ * @param {Array<{label:string, tab?:string, parent?:string}>} [extFields] 来料检验要求的动态字段(/px/extFields 的 fields)
  * @returns {Array<{检验项: string, 检测标准: string}>}
  */
 export function carryEntriesOf(groups, extFields) {
   const out = []
   const seen = new Set()
+  const skip = (k) => ID_COLS.includes(k) || HEAD_ONLY_COLS.includes(k) || isNonBiz(k)
   for (const g of Array.isArray(groups) ? groups : []) {
-    // 列序与界面**同源**(colsOfTab):固定列在前(Excel 原列序)、该表的自定义列追加在后;
+    // 列序与界面**同源**(colsOfTab):前置列在前、该表的自定义列追加在后(同父分组保持相邻);
     // 配置外物料类别(理论上不会有)没有页签配置,退回按行自身的键序(后端按 yj_field 顺序下发)。
-    let cols = g?.tab ? colsOfTab(g.tab, extFields).map((c) => c.key) : fallbackColsOf(g?.rows)
+    let colDefs = g?.tab ? colsOfTab(g.tab, extFields) : fallbackColsOf(g?.rows).map((k) => ({ key: k }))
     // 兜底:全自定义页签的列全在动态字段里 —— 字段清单取不到(接口失败/调用方没传)时,
     // 退回按行自身键序,否则那张表会**一条都带不出来**(静默丢数据,比列序不理想严重得多)。
-    if (g?.tab?.dynamicCols && cols.length <= 1) cols = fallbackColsOf(g?.rows)
+    if (g?.tab?.dynamicCols && colDefs.length <= 1) colDefs = fallbackColsOf(g?.rows).map((k) => ({ key: k }))
     for (const row of Array.isArray(g?.rows) ? g.rows : []) {
-      for (const key of cols) {
-        if (ID_COLS.includes(key) || HEAD_ONLY_COLS.includes(key) || isNonBiz(key)) continue
+      // 该行每个父分组下是否真有数据 —— 父目录行只在它有子数据时才占一行(空父目录不添乱)
+      const groupHasData = new Set()
+      for (const c of colDefs) {
+        if (!c?.group || skip(c.key)) continue
+        if (String(row?.[c.key] ?? '').trim()) groupHasData.add(c.group)
+      }
+      const emittedParents = new Set()
+      for (const c of colDefs) {
+        const key = c?.key
+        if (!key || skip(key)) continue
+        // ① 父目录行(该组第一次出现时插在它的子列之前)
+        if (c.group && groupHasData.has(c.group) && !emittedParents.has(c.group)) {
+          emittedParents.add(c.group)
+          const pk = carryKeyOf(c.group)
+          if (pk && !seen.has(pk)) {
+            seen.add(pk)
+            out.push({ 检验项: c.group, 检测标准: '' })
+          }
+        }
+        // ② 子列行:只有该格有数据才成一项(带走一行空标准只会添乱)
         const std = String(row?.[key] ?? '').trim()
-        // 该列数据为空 ⇒ 这条要求没有可填的检测标准,不成一项(带走一行空标准只会添乱)
         if (!std) continue
         const k = carryKeyOf(key)
-        if (!key || !k || seen.has(k)) continue
+        if (!k || seen.has(k)) continue
         seen.add(k)
         out.push({ 检验项: key, 检测标准: std })
       }

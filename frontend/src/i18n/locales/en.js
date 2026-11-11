@@ -1417,6 +1417,16 @@ export default {
     '检测结果': 'Test Result',
     // 处理意见标准库清空后直接手填(2026-11-11 用户口径「不需要先写样例,自己手动填写就行」)
     '直接输入处理意见': 'Type the disposition',
+    // 来料检验要求:自定义字段必须「一个父目录 + 两个子目录」(2026-11-11 用户口径)
+    '子目录2': 'Sub-column 2',
+    '第二个子目录名(与上面的字段名成一对)': 'Second sub-column name (pairs with the name above)',
+    '必须一个父目录带两个子目录:字段名=子目录1,这里=子目录2,一次添加两个子列':
+      'One parent group carries two sub-columns: the field name is sub-column 1 and this is sub-column 2; both are created at once',
+    '父目录只做表头分组、没有数据格;检验数据记录带入时按 父目录一行 + 两个子目录各一行':
+      'The parent is only a header group with no data cell; when carried into the inspection record it becomes one parent row plus one row per sub-column',
+    '请先填写父目录(分组)名称': 'Please fill in the parent group name first',
+    '请把两个子目录名称都填上': 'Please fill in both sub-column names',
+    '两个子目录不能同名': 'The two sub-columns cannot have the same name',
     // 检测结果固定五格(2026-11-11 用户口径):五个格子的显示名,数据键仍是中文 结果1..结果5
     '结果1': 'Result 1',
     '结果2': 'Result 2',
