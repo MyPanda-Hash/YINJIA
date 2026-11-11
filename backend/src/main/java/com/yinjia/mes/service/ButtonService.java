@@ -116,6 +116,43 @@ public class ButtonService {
         }
     }
 
+    /**
+     * 审批结果消息(2026-11-11 用户口径「审批通过和驳回也要有消息提示对应的检验人」)。
+     *
+     * <p>收件人两端各一条:
+     * <ul>
+     *   <li><b>制单人</b>(头表 asp_user1)→ APPROVAL_APPROVED / APPROVAL_REJECTED(原口径不变);</li>
+     *   <li><b>单据上的检验人/检验员</b> → APPROVAL_APPROVED_INSPECTOR / APPROVAL_REJECTED_INSPECTOR
+     *       (文案「您检验的…」)。整条链路是「检验人 → 提交审批 → 审核人 → 审批通过/驳回」,
+     *       所以审批结果必须回到**做检验的那个人**手上,而不只是"谁建的单"。</li>
+     * </ul>
+     * 同一个人不重复发(检验人 = 制单人时只收制单人那条),操作者本人不收自己的动作消息。
+     *
+     * @param approved true=审批通过,false=审批驳回
+     * @return 实际发送条数
+     */
+    private int notifyApprovalResult(PanelRegistry.PanelDef def, String no, boolean approved,
+                                     Map<String, Object> params, String actor) {
+        String head = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String author = messageService.authorOf(head, no).trim();
+        // 检验人格里写的是**账号或姓名**(历史两种都有)⇒ 由 MessageService 解析成账号再发
+        List<String> inspectors = messageService.inspectorAccounts(head, no);
+        String code = approved ? MessageService.APPROVAL_APPROVED : MessageService.APPROVAL_REJECTED;
+        String inspCode = approved ? MessageService.APPROVAL_APPROVED_INSPECTOR : MessageService.APPROVAL_REJECTED_INSPECTOR;
+        int sent = 0;
+        if (!author.isBlank() && !author.equals(actor)) {
+            sent += messageService.send(java.util.List.of(author), code, def.code(), no, params, actor);
+        }
+        List<String> toInsp = inspectors.stream()
+                .filter((u) -> u != null && !u.isBlank())
+                .filter((u) -> !u.equals(actor) && !u.equals(author))
+                .distinct().toList();
+        if (!toInsp.isEmpty()) {
+            sent += messageService.send(toInsp, inspCode, def.code(), no, params, actor);
+        }
+        return sent;
+    }
+
     @Transactional
     public Map<String, Object> callButton(String panelCode, String buttonName,
                                           Map<String, Object> formData, Map<String, Object> buttonParam) {
@@ -2986,9 +3023,8 @@ public class ButtonService {
         // 走 提交审批→审批通过 的库存单据(采购入库/产成品入库/材料出库等)漏记台账。
         // 与 audit() 同序:批次号自洽在前、过账在后;非记账面板 postIn 内部直接跳过。
         stockLedger.postIn(def.code(), no, operator);
-        // 消息:审批通过 → 制单人
-        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
-                def.code(), no, MessageService.APPROVAL_APPROVED,
+        // 消息:审批通过 → 制单人 + 单据上的检验人(2026-11-11:检验人也要收到结果)
+        notify(() -> notifyApprovalResult(def, no, true,
                 Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
         // 文件类面板:审批通过后归档(修改闭环/弃审留痕走 finalizeOpenModify 收尾;随后统一归档)
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
@@ -3040,10 +3076,13 @@ public class ButtonService {
             writeBackSignCell(def, no, "审批人", "审批时间", operator);
             tcInApprovedGenerate(def.code(), no, operator);
             // 消息:批准通过 → 提交人(编制人) + 一级审核人,两端都知情
+            //        + 单据上的检验人(2026-11-11:「审批通过也要提示对应的检验人」)
             final String opA = operator;
             final String sub = submitterOf(def, no);
             final String l1 = l1ApproverOf(def.code(), no);
             final boolean l1Distinct = !l1.isBlank() && !l1.equals(opA) && !l1.equals(sub);
+            // 检验人可能是账号或姓名两种写法 ⇒ 由 MessageService 解析成账号
+            final List<String> inspAcc = messageService.inspectorAccounts(def.headTable(), no);
             notify(() -> {
                 Map<String, Object> ps = Map.of("docNo", no, "actor", opA, "opinion", opinion == null ? "" : opinion);
                 int sent = 0;
@@ -3051,12 +3090,14 @@ public class ButtonService {
                     sent += messageService.send(List.of(sub), MessageService.APPROVAL_APPROVED, def.code(), no, ps, opA);
                 if (l1Distinct)
                     sent += messageService.send(List.of(l1), MessageService.APPROVAL_L2_DONE, def.code(), no, ps, opA);
+                List<String> toInsp = inspAcc.stream().filter((u) -> !u.equals(opA) && !u.equals(sub)).distinct().toList();
+                if (!toInsp.isEmpty())
+                    sent += messageService.send(toInsp, MessageService.APPROVAL_APPROVED_INSPECTOR, def.code(), no, ps, opA);
                 return sent;
             });
             return result(no, "已审核");
         }
-        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
-                def.code(), no, MessageService.APPROVAL_APPROVED,
+        notify(() -> notifyApprovalResult(def, no, true,
                 Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeOpenModify(def, no, operator);
@@ -3121,6 +3162,7 @@ public class ButtonService {
             clearAuditSignCells(def, no);
             final String l1f = l1Before;
             final String sub = submitterOf(def, no);
+            final List<String> inspAcc = messageService.inspectorAccounts(def.headTable(), no);
             notify(() -> {
                 Map<String, Object> ps = Map.of("docNo", no, "actor", rejectBy, "opinion", opinion, "node", String.valueOf(node));
                 int sent = 0;
@@ -3129,13 +3171,16 @@ public class ButtonService {
                 // 二级驳回还要让一级审核人知道(他签过的那张被退了)
                 if (node == 2 && !l1f.isBlank() && !l1f.equals(rejectBy) && !l1f.equals(sub))
                     sent += messageService.send(List.of(l1f), MessageService.APPROVAL_L2_REJECTED, def.code(), no, ps, rejectBy);
+                // 驳回同样要回到检验人手上(2026-11-11)
+                List<String> toInsp = inspAcc.stream().filter((u) -> !u.equals(rejectBy) && !u.equals(sub)).distinct().toList();
+                if (!toInsp.isEmpty())
+                    sent += messageService.send(toInsp, MessageService.APPROVAL_REJECTED_INSPECTOR, def.code(), no, ps, rejectBy);
                 return sent;
             });
             return result(no, "草稿");
         }
-        // 消息:审批驳回 → 制单人(驳回意见随消息带上)
-        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
-                def.code(), no, MessageService.APPROVAL_REJECTED,
+        // 消息:审批驳回 → 制单人 + 单据上的检验人(驳回意见随消息带上)
+        notify(() -> notifyApprovalResult(def, no, false,
                 Map.of("docNo", no, "actor", rejectBy, "opinion", opinion), rejectBy));
         // 产品变更申请单:驳回还要通知**已填写的部门**(部门行的签字人 → 账号),他们会知道要重填(口径 E)
         if (CHANGE_PANEL.equals(def.code())) notifyChangeRejected(def, no, rejectBy, opinion);

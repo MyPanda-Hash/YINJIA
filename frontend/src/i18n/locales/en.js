@@ -3717,6 +3717,9 @@ export default {
     '{actor} 提交了「{panelName} {docNo}」，等待您审批。': '{actor} submitted "{panelName} {docNo}"; awaiting your approval.',
     '您提交的「{panelName} {docNo}」已由 {actor} 审批通过。': 'Your "{panelName} {docNo}" was approved by {actor}.',
     '您提交的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}': 'Your "{panelName} {docNo}" was rejected by {actor}. Comment: {opinion}',
+    // 审批结果 → 单据上的检验人(2026-11-11 用户口径「审批通过和驳回也要有消息提示对应的检验人」)
+    '您检验的「{panelName} {docNo}」已由 {actor} 审批通过。': 'The "{panelName} {docNo}" you inspected was approved by {actor}.',
+    '您检验的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}': 'The "{panelName} {docNo}" you inspected was rejected by {actor}. Comment: {opinion}',
     '{actor} 申请修改「{panelName} {docNo}」，等待您审批。': '{actor} requested a modification of "{panelName} {docNo}"; awaiting your approval.',
     '{actor} 申请删除「{panelName} {docNo}」，等待您审批。': '{actor} requested deletion of "{panelName} {docNo}"; awaiting your approval.',
     '删除申请已通过': 'Deletion request approved',

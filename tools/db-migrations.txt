@@ -4632,3 +4632,13 @@ migrate-pu-print-buyer-contact-20261111.sql
 
 # 2026-11-11 同批词条:需方联系人 / 联系方式(scope=field,10 语言);纸面标题「送货单」是单据模板固定中文,不进翻译表
 i18n-pu-print-buyer-contact-20261111.sql
+
+# 2026-11-11 按**服务器备份的组织结构**配置本机组织架构(用户口径「先根据 D:\YINJIA-main\服务器数据库备份 的组织结构进行配置」):
+#   服务器备份 HSDZ_MES_manual_20261111-110118.bak 还原成巡检库 HSDZ_MES_SRV 后,把 4 张组织架构表整表对齐:
+#   yj_dept 20 行 / yj_role 20 行 / yj_user 32 行 / yj_role_panel 1640 行(整表重灌 + IDENTITY_INSERT)。
+#   为什么要配:检验报告提交审批的收件人 = 该面板 can_approve 角色下的账号 + 管理员;本机原来是
+#   「4 角色 / 7 账号 / 691 行权限」,冯敏(fengmin)停用且没有任何角色勾过审批权 ⇒ 通知永远发不出去。
+#   边界:口令不入库(沿用本机 admin 的哈希,空库回落开发口令)、手机端字段(MobId/phoneNo)不照抄、
+#   本机独有面板(LINE_CAP/QC_CUT_INSP/QC_FIN_SPEC/QC_MOLD_INSP)的授权行保留并按 role_code 重映射角色 id。
+#   生成器 tools/archive/_org-sync-20261111/GenOrgSql.java(勿手改脚本,重跑生成器即覆盖)。幂等,两账套均执行。
+migrate-org-from-server-20261111.sql
