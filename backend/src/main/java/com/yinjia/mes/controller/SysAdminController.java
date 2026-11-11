@@ -189,14 +189,23 @@ public class SysAdminController {
             {"specapprove", "规格书批准"},
     };
 
-    /** 内部开发样品申请单专属动作集 = 通用动作 + 「改他人行」(edit_others)。
-     *  2026-11-06 用户口径:「每个人只能改自己作为申请人的行数据…只能由有更改权限的人来改，
-     *  这个权限写进组织架构对应面板里面」⇒ 在「角色与面板权限」里逐面板勾选。 */
+    /** 样品申请单（内部/外部共用）专属动作集 = 通用动作 + 两个样品专用词。
+     *
+     *  <p>`edit_others`（改他人行）—— 2026-11-06 用户口径:「每个人只能改自己作为申请人的行数据…
+     *  只能由有更改权限的人来改，这个权限写进组织架构对应面板里面」；
+     *  `view_all`（可见全部单据）—— 2026-11-11 用户口径:「刘磊账号需要看到全部外部开发样品单信息」。
+     *  刘磊是「文件负责人(1025)」**不是管理员**，而服务端默认对非管理员强制 `asp_user1 = 当前账号`
+     *  （QueryService.OWN_DOCS_PANELS）⇒ 他一张外部样品单都看不到（生产实测 11 张全不可见）。
+     *  勾了 view_all 即不追加该过滤；勾给谁由组织架构「角色与面板权限」决定（R7 口径）。
+     *
+     *  ⚠ 两个词都**只挂这个动作集**，不进 PERMISSION_ACTIONS：通用集是引擎词表全集，
+     *    混进去会让所有 150+ 面板都多出一列毫无意义的勾选框。 */
     public static final String[][] SAMPLE_INT_ACTIONS;
     static {
         String[][] base = PERMISSION_ACTIONS;
-        SAMPLE_INT_ACTIONS = java.util.Arrays.copyOf(base, base.length + 1);
+        SAMPLE_INT_ACTIONS = java.util.Arrays.copyOf(base, base.length + 2);
         SAMPLE_INT_ACTIONS[base.length] = new String[]{"edit_others", "改他人行"};
+        SAMPLE_INT_ACTIONS[base.length + 1] = new String[]{"view_all", "可见全部单据"};
     }
 
     /**

@@ -64,6 +64,11 @@ public class PanelPermissionService {
             // 改他人行(2026-11-06 内部开发样品申请单):该单是「数据记录表」,每行归属填写的申请人;
             // 勾了这个词才能改别人已保存的行(ButtonService.applySampleIntRowRules 同源判定)。
             Map.entry("edit_others", "改他人行"),
+            // 可见全部单据(2026-11-11 样品申请单):默认非管理员只能看自己创建的单
+            // (QueryService.OWN_DOCS_PANELS 按头表 asp_user1 过滤)。勾上这个词即取消该限制
+            // —— 用户口径「刘磊账号需要看到全部外部开发样品单信息」,而刘磊是文件负责人、非管理员。
+            // 与 edit_others 分工:view_all 管**看得见**(读),edit_others 管**改得动**(写)。
+            Map.entry("view_all", "可见全部单据"),
             Map.entry("warn", "预警配置"),
             Map.entry("date", "修改交期"), Map.entry("convert", "转工单"), Map.entry("assign", "排产"),
             Map.entry("unassign", "撤销排产"), Map.entry("transfer", "调拨"), Map.entry("revoke", "撤回调拨"),

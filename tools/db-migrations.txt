@@ -4600,3 +4600,5 @@ migrate-lab-mobile-row-photo-20261109.sql
 migrate-lab-testitem-legacy-20261109.sql
 # 2026-11-10 产品文件列表承载单据兜底补种（PDL-0001 丢失导致面板空白）
 migrate-rd-prod-doclist-shell-reseed-20261110.sql
+# 2026-11-11 样品申请单「可见全部单据」(view_all)授给文件负责人/研发审核/管理员（刘磊口径）
+migrate-sample-view-all-20261111.sql
