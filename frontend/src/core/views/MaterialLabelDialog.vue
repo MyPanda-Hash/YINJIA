@@ -43,10 +43,10 @@
       <!-- 一次可以勾**多行**,但服务端会**每行各出一张打印单**(用户口径「作废不希望连坐」+
            追加「一次是可以打印多行的」)—— 多行并进一张单会让作废连坐,所以粒度落在单上,不在弹窗上 -->
       <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }}</div>
-      <!-- 每箱数量(2026-11-11 用户口径「材料码多加一个每箱数量打印,每箱数量才等于标识卡上的数量」):
-           标识卡卡面「数量」印的是**每箱数量**(一箱一张卡);本次打印数量仍按整批记账;
-           打几张卡在打印预览里设份数 —— 故这里只提示口径,不自动拆成 N 张 -->
-      <div class="mlq-oneline">{{ tt('标识卡上的「数量」印每箱数量（一箱一张卡）；打几张卡在打印预览里设置份数') }}</div>
+      <!-- 每箱数量(2026-11-11 用户口径「材料码多加一个每箱数量打印,每箱数量才等于标识卡上的数量」;
+           同日追加「打印份数还是通过 打印数量/每箱数量 计算出来,零头箱也根据计算带出」):
+           卡面「数量」印每箱数量,张数 = ⌈本次打印数量 ÷ 每箱数量⌉,最后一箱不足则单独一张印零头。
+           ⚠ 原来这里有一条「打几张卡在打印预览里设份数」的提示 —— 用户明确不要,已撤掉。 -->
       <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径);
            「取消带入」放在记录表的操作列(用户口径:取消按钮直接在操作那里) -->
       <div v-if="lockedBySource" class="mlq-lock">
@@ -70,12 +70,14 @@
               :disabled="lockedBySource || !(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
-        <!-- 每箱数量(2026-11-11):卡面「数量」印它;不填(0)=按本次打印数量印(旧行为) -->
-        <el-table-column :label="tt('每箱数量')" width="150">
+        <!-- 每箱数量(2026-11-11):**必填**(用户口径「这个设计为必填」) —— 卡面「数量」印它,
+             张数 = ⌈本次打印数量 ÷ 每箱数量⌉;0/空直接拦在确定打印那一步 -->
+        <el-table-column width="150">
+          <template #header><span class="mlq-req">{{ tt('每箱数量') }}</span></template>
           <template #default="{ row }">
             <el-input-number v-model="boxOf[row.id]" :min="0" :max="Number(qtyOf[row.id] || 0)" :controls="false"
               :disabled="lockedBySource || !(Number(qtyOf[row.id] || 0) > 0)" :precision="precisionOf(row)"
-              :placeholder="tt('不填按本次打印数量')" style="width: 130px" />
+              :placeholder="tt('必填')" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
@@ -123,12 +125,13 @@
                   :precision="precisionOf(row)" style="width: 130px" />
               </template>
             </el-table-column>
-            <!-- 补登行同样要印卡(2026-11-11):卡面数量也按每箱数量 -->
-            <el-table-column :label="tt('每箱数量')" width="150">
+            <!-- 补登行同样要印卡(2026-11-11):每箱数量同样**必填**,张数按 打印数量÷每箱数量 拆 -->
+            <el-table-column width="150">
+              <template #header><span class="mlq-req">{{ tt('每箱数量') }}</span></template>
               <template #default="{ row }">
                 <el-input-number v-model="suppBox[row.suppKey]" :min="0" :max="Number(suppQty[row.suppKey] || 0)"
                   :controls="false" :disabled="lockedBySource || !(Number(suppQty[row.suppKey] || 0) > 0)"
-                  :precision="precisionOf(row)" :placeholder="tt('不填按本次打印数量')" style="width: 130px" />
+                  :precision="precisionOf(row)" :placeholder="tt('必填')" style="width: 130px" />
               </template>
             </el-table-column>
           </el-table>
@@ -153,6 +156,17 @@
             <el-table-column prop="打印量合计" :label="tt('打印量')" width="90" align="right" />
             <el-table-column prop="已生单合计" :label="tt('已生单')" width="90" align="right" />
             <el-table-column prop="未生单合计" :label="tt('未生单')" width="90" align="right" />
+            <!-- 标签张数 + 零头箱标记(2026-11-11 用户口径「还要记录的打印里面对零头箱做标记」):
+                 张数 = Σ⌈打印量 ÷ 每箱数量⌉(零头单独一张);零头箱一列给数量标签,没有就留横线 -->
+            <el-table-column prop="标签张数" :label="tt('标签张数')" width="90" align="right" />
+            <el-table-column :label="tt('零头箱')" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="Number(row['零头箱']) > 0" type="warning" size="small" effect="dark">
+                  {{ row['零头箱'] }}
+                </el-tag>
+                <span v-else class="mlq-tip">—</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
             <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
             <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
@@ -336,16 +350,27 @@ function remainderQty(qty, box) {
   return Math.round((qty - b * box) * 10000) / 10000
 }
 /**
- * 整箱/零头箱提示文案(2026-11-11 用户口径「按每箱数量打印,并且给他提示零头箱数量不足每箱,
- * 可以单独打印零头箱相关数量」)。只提示,不拦打印。
+ * 这一行要出几张卡 / 零头多少(2026-11-11 用户口径「打印份数还是通过 打印数量/每箱数量 计算出来,
+ * 零头箱也根据计算带出」):
+ *   张数 = ⌊qty ÷ box⌋ + (零头 > 0 ? 1 : 0);最后那张印零头数量。
+ */
+function cardsOfQty(qty, box) {
+  const full = fullBoxes(qty, box)
+  const rem = remainderQty(qty, box)
+  return { full, rem, cards: full + (rem > 0 ? 1 : 0) }
+}
+/**
+ * 弹窗底部提示:逐行给「每箱 X ⇒ 全箱 N 张 + 零头箱 M(单独一张)」。
+ * 2026-11-11 第二轮:零头箱不再是"让用户自己再打一张",而是**由张数计算自动带出**一张零头卡
+ * (用户口径「零头箱也根据计算带出」),所以这里改说"自动出零头卡"。
  */
 function boxHintText(lineNo, qty, box) {
-  const boxes = fullBoxes(qty, box)
-  const rem = remainderQty(qty, box)
-  const head = `${tt('行号')} ${lineNo ?? ''}：${tt('每箱')} ${box} ⇒ `
+  const { full, rem, cards } = cardsOfQty(qty, box)
+  const head = `${tt('行号')} ${lineNo ?? ''}：${tt('每箱')} ${box} ⇒ ${tt('共 {n} 张').replace('{n}', String(cards))}`
+  // 有零头时:零头那张卡已按计算自动带出,这里只把"整箱几箱 + 零头多少"说清楚
   return rem > 0
-    ? `${head}${tt('整箱')} ${boxes} × ${box}，${tt('零头箱')} ${rem} ${tt('不足每箱（可单独打印零头箱）')}`
-    : `${head}${tt('整箱')} ${boxes} × ${box}`
+    ? `${head}（${tt('整箱')} ${full} + ${tt('零头箱')} ${rem}，${tt('零头不足一箱，已自动出卡')}）`
+    : `${head}（${tt('整箱')} ${full}）`
 }
 /** 当前勾选行的整箱/零头提示(没填每箱数量的行不提示) */
 const boxHints = computed(() => {
@@ -520,33 +545,43 @@ async function applyPoPrint(row) {
 /** 出纸:纸上的号 = 库里的号(先落库再打印);生产日期取**服务端回读的单头值**(不取输入框 ——
  *  人工填了又没落库的话,纸上印的就是"系统里没有的日期",返查对不上)
  *
- *  **卡面「数量」= 每箱数量**(2026-11-11 用户口径「每箱数量才等于标识卡上的数量」):
- *  一箱一张卡,贴到箱子上那个数必须是这一箱装的量,而不是整批的本次打印数量;
- *  没填每箱数量(0/NULL,含本需求之前的历史单)才回退印本次打印数量,与旧版纸一致。 */
+ *  **卡面「数量」= 每箱数量;张数 = ⌈本次打印数量 ÷ 每箱数量⌉**(2026-11-11 用户口径
+ *  「每箱数量才等于标识卡上的数量」+ 同日追加「打印份数还是通过 打印数量/每箱数量 计算出来,
+ *  零头箱也根据计算带出」):
+ *    本次 2450 / 每箱 200 ⇒ 12 张整箱卡(各印 200)+ 1 张零头卡(印 50)= 13 张;
+ *    正好整除时不出零头卡。没填每箱数量(0/NULL,仅历史单会出现)才回退「一张卡印整批」的旧行为。 */
 function cardsOf(res) {
   const date = res['生产日期'] || ''
-  return (res?.lines || []).map((l) => {
+  const out = []
+  for (const l of res?.lines || []) {
     const box = Number(l['每箱数量'] || 0) || 0
-    return {
+    const qty = Number(l['打印数量'] || 0) || 0
+    const base = {
       编码: l['物料编码'],
       规格: l['规格型号'] || '',
-      数量: box > 0 ? box : l['打印数量'],
       批次: res['批次号'],
       订单编号: props.orderNo,
       供应商名称: head.value['供应商'] || '',
       生产日期: date,
     }
-  })
+    if (!(box > 0)) { out.push({ ...base, 数量: qty }); continue }
+    const { full, rem } = cardsOfQty(qty, box)
+    for (let i = 0; i < full; i++) out.push({ ...base, 数量: box })     // 整箱:每张印每箱数量
+    if (rem > 0) out.push({ ...base, 数量: rem })                       // 零头箱:单独一张,印零头数量
+  }
+  return out
 }
+
+/** 张数上限:每箱数量填错(比如填 1)会瞬间出上千张纸 —— 超出就先拦下来让人核对 */
+const MAX_CARDS = 1000
 
 async function confirm() {
   const lines = rows.value
     .filter((r) => pickedKeys.value.has(r.id) && Number(qtyOf[r.id] || 0) > 0)
-    .map((r) => {
-      const box = Number(boxOf[r.id] || 0) || 0
-      // 每箱数量:> 0 才带(0/空 = 不按箱,卡面回退本次打印数量);服务端会再校验它 ≤ 本次打印数量
-      return { 采购订单行id: r.id, 打印数量: Number(qtyOf[r.id]), ...(box > 0 ? { 每箱数量: box } : {}) }
-    })
+    .map((r) => ({
+      采购订单行id: r.id, 打印数量: Number(qtyOf[r.id]),
+      每箱数量: Number(boxOf[r.id] || 0) || 0,
+    }))
   // 下层补登行:各自带自己的批次号(该批货单据上的号),标记 补登=true
   const supLines = suppPicked.value
     .filter((r) => Number(suppQty[r.suppKey] || 0) > 0)
@@ -554,16 +589,27 @@ async function confirm() {
       const box = Number(suppBox[r.suppKey] || 0) || 0
       return {
         采购订单行id: r['采购订单行id'], 打印数量: Number(suppQty[r.suppKey]),
-        批次号: String(r['批次号'] || ''), 补登: true,
-        ...(box > 0 ? { 每箱数量: box } : {}),
+        批次号: String(r['批次号'] || ''), 补登: true, 每箱数量: box,
       }
     })
   const all = [...lines, ...supLines]
   if (!all.length) { ElMessage.warning(tt('请至少勾选一行并填写本次打印数量')); return }
+  // 每箱数量**必填**(2026-11-11 第二轮用户口径「这个设计为必填」):张数靠它算,空着就算不出纸
+  const missing = all.filter((l) => !(Number(l['每箱数量']) > 0))
+  if (missing.length) {
+    ElMessage.warning(`${tt('请填写每箱数量（必填）')} —— ${missing.map((l) => `${tt('行号')} ${lineNoOf(l['采购订单行id'])}`).join('；')}`)
+    return
+  }
   // 上层走顶部批次号(未生单的码,公式号/人工号);只勾下层补登行时不需要顶部号
   if (lines.length && isEmpty(batchNo.value)) { ElMessage.warning(tt('请填写批次号')); return }
-  // 零头箱提醒(2026-11-11 用户口径「给他提示零头箱数量不足每箱,可以单独打印零头箱相关数量」):
-  // **只提示不拦** —— 整箱照常打,零头另打一张;提示完继续走打印
+  // 张数守卫(每箱数量填错会出上千张纸)
+  const totalCards = all.reduce((n, l) => n + cardsOfQty(Number(l['打印数量']) || 0, Number(l['每箱数量']) || 0).cards, 0)
+  if (totalCards > MAX_CARDS) {
+    ElMessage.warning(`${tt('按每箱数量算出的标签张数过多（{n} 张），请核对每箱数量').replace('{n}', String(totalCards))}`)
+    return
+  }
+  // 零头箱提醒(2026-11-11 用户口径「还要给出有零头箱的提示」):**只提示不拦** ——
+  // 零头那一张已按计算自动带出,这里只是让人知道"最后一张印的是零头数量"
   const odd = all
     .map((l) => ({ lineNo: lineNoOf(l['采购订单行id']), qty: Number(l['打印数量']) || 0, box: Number(l['每箱数量']) || 0 }))
     .filter((x) => x.box > 0 && remainderQty(x.qty, x.box) > 0)
@@ -571,7 +617,7 @@ async function confirm() {
     ElMessage({
       type: 'warning',
       duration: 6000,
-      message: `${tt('有零头箱：整批不是每箱数量的整数倍，零头箱数量不足每箱，可单独打印零头箱数量')} —— `
+      message: `${tt('有零头箱：整批不是每箱数量的整数倍，零头箱会单独出一张卡（卡面印零头数量）')} —— `
         + odd.map((x) => `${tt('行号')} ${x.lineNo}：${tt('零头箱')} ${remainderQty(x.qty, x.box)}`).join('；'),
     })
   }
@@ -686,10 +732,12 @@ async function doVoid(row) {
 .mlq-coll-title { margin-right: 8px; }
 .mlq-coll-count { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: #eef3f8; color: #5b6b7f; font-size: 11.5px; line-height: 18px; text-align: center; }
 .mlq-coll-tip { margin-bottom: 6px; font-size: 12px; }
-/* 整箱/零头箱提示(2026-11-11):琥珀底色、逐行列出;只提示不拦打印 */
+/* 整箱/零头箱提示(2026-11-11):琥珀底色、逐行列出;零头会单独出卡,这里只是让人心里有数 */
 .mlq-box-hint { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: #8a6d3b;
   background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 4px 8px; }
 .mlq-box-line { white-space: normal; }
+/* 必填列表头:红色星号(每箱数量必填,2026-11-11 用户口径「这个设计为必填」) */
+.mlq-req::before { content: '*'; color: #f56c6c; margin-right: 2px; }
 </style>
 
 <style>

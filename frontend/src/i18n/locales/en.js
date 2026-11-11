@@ -245,10 +245,6 @@ export default {
     '每箱': 'Per box',
     '整箱': 'Full boxes',
     '零头箱': 'Partial box',
-    '不足每箱（可单独打印零头箱）': 'less than a full box (print this partial box separately)',
-    '不填按本次打印数量': 'Blank = print qty this time',
-    '标识卡上的「数量」印每箱数量（一箱一张卡）；打几张卡在打印预览里设置份数': 'The label card prints the qty per box as “Quantity” (one card per box); set the number of copies in the print preview',
-    '有零头箱：整批不是每箱数量的整数倍，零头箱数量不足每箱，可单独打印零头箱数量': 'Partial box: the batch is not a multiple of the qty per box, the partial box is less than a full box and can be printed separately',
     '已打印记录（本订单）': 'Print records (this order)',
     '打印单号': 'Print No.',
     '打印量': 'Printed qty',
@@ -625,6 +621,11 @@ export default {
     '计划完工日期': 'Planned Finish',
     '确认将': 'Confirm to set',
     '每箱数量': 'Qty / Box',
+    '零头不足一箱，已自动出卡': 'the partial box is under a full box; its label is printed automatically',
+    '请填写每箱数量（必填）': 'Please enter the qty per box (required)',
+    '按每箱数量算出的标签张数过多（{n} 张），请核对每箱数量': 'Too many labels from this qty per box ({n}); please check it',
+    '有零头箱：整批不是每箱数量的整数倍，零头箱会单独出一张卡（卡面印零头数量）': 'Partial box: the batch is not a multiple of the qty per box; one extra label is printed for the partial box (showing its qty)',
+    '标签张数': 'Labels',
     '日产能': 'Daily Capacity',
 
     // 工单排产·明细列+取消结案/追溯/打印工单(2026-09-23,旧系统 ProSchedList 对齐)

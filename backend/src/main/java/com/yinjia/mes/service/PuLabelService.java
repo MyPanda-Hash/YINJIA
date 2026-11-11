@@ -262,6 +262,10 @@ public class PuLabelService {
                 m.put("打印量合计", 0d);
                 m.put("已生单合计", 0d);
                 m.put("未生单合计", 0d);
+                // 标签张数 / 零头箱(2026-11-11 用户口径「还要记录的打印里面对零头箱做标记」):
+                // 张数 = Σ⌈打印数量 ÷ 每箱数量⌉(零头单独一张);零头箱 = Σ余数,>0 即"这批里有零头卡"
+                m.put("标签张数", 0);
+                m.put("零头箱", 0d);
                 m.put("lines", new ArrayList<Map<String, Object>>());
                 m.put("补登", true);                 // 下面按行累积,全为补登才是补登单
                 return m;
@@ -271,6 +275,21 @@ public class PuLabelService {
             rec.put("打印量合计", round2(num(rec.get("打印量合计")) + num(r.get("打印数量"))));
             rec.put("已生单合计", round2(num(rec.get("已生单合计")) + num(r.get("已生单量"))));
             rec.put("未生单合计", round2(num(rec.get("未生单合计")) + num(r.get("未生单量"))));
+            // 张数与零头:每箱数量为空的历史单按"一张卡印整批"折算(0 零头)
+            double lineQty = num(r.get("打印数量"));
+            double lineBox = num(r.get("每箱数量"));
+            int lineCards;
+            double lineOdd;
+            if (lineBox > 0) {
+                long full = (long) Math.floor(lineQty / lineBox + 1e-9);
+                lineOdd = Math.max(0d, round2(lineQty - full * lineBox));
+                lineCards = (int) full + (lineOdd > 0 ? 1 : 0);
+            } else {
+                lineOdd = 0d;
+                lineCards = lineQty > 0 ? 1 : 0;
+            }
+            rec.put("标签张数", (int) rec.get("标签张数") + lineCards);
+            rec.put("零头箱", round2(num(rec.get("零头箱")) + lineOdd));
             // 「重打」要用:该单每行的物料与数量(一次一行 ⇒ 实际只有一行,历史单可能多行,故按列表给)
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> lines = (List<Map<String, Object>>) rec.get("lines");
@@ -412,17 +431,18 @@ public class PuLabelService {
                         : "批次号不能为空") + ":行 " + str(line.get("行号")));
             }
             if (qty <= 0) continue;
-            // 每箱数量(2026-11-11 用户口径「每箱数量才等于标识卡上的数量」):
-            // 卡面「数量」印它 ⇒ 它必须是**这一批里每个箱子装的量**,所以:
-            //   · 0/空 = 不按箱打(卡面回退印本次打印数量,与旧版一致);
-            //   · 大于本次打印数量 = 逻辑矛盾(一整箱比整批还多),拒;
-            //   · 记到行表(= 打印时的快照,重打原样重现)。
+            // 每箱数量(2026-11-11 用户口径「每箱数量才等于标识卡上的数量」+ 同日「这个设计为必填」):
+            // 卡面「数量」印它、**标签张数 = ⌈本次打印数量 ÷ 每箱数量⌉** 也靠它算 ⇒ 必须填。
+            //   · 缺失/0 = 必填项没填,拒(说不出该出几张纸);
+            //   · 大于本次打印数量 = 一整箱比整批还多,逻辑矛盾,拒;
+            //   · 记到行表(= 打印时的快照,重打原样重现同一批卡)。
             double boxQty = num(r.get("每箱数量"));
-            if (boxQty < 0 || Double.isNaN(boxQty)) {
-                over.add("第 " + str(line.get("行号")) + " 行:每箱数量不能为负数(" + trim(boxQty) + ")");
+            if (!(boxQty > 0)) {
+                over.add("第 " + str(line.get("行号")) + " 行:请填写每箱数量(必填)"
+                        + "(标识卡上的数量按它印、标签张数按「本次打印数量 ÷ 每箱数量」算)");
                 continue;
             }
-            if (boxQty > 0 && boxQty > qty + 0.000001) {
+            if (boxQty > qty + 0.000001) {
                 over.add("第 " + str(line.get("行号")) + " 行:每箱数量 " + trim(boxQty)
                         + " 大于本次打印数量 " + trim(qty) + "(每箱装得比整批还多,请核对)");
                 continue;
