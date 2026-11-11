@@ -55,56 +55,81 @@ function fallbackColsOf(rows) {
 }
 
 /**
- * 命中分组 → 检验报告的「检验项 / 检测标准」条目(已去重、已剔除空数据列)。
+ * 命中分组 → 检验报告表体的行(已去重、已剔除空数据列)。
  *
- * 【2026-11-11 用户口径:父目录也占一行】自定义字段是「一个父目录 + 两个子目录」的结构,
- * 带入检验报告时按 **父目录第 1 行 → 子目录1 第 2 行 → 子目录2 第 3 行**:
- *   · 父目录行:检验项 = 父目录名,**检测标准留空**(父只做分组,没有自己的数据格);
- *   · 子行:检验项 = 子目录名,检测标准 = 该子列的数据;数据为空的子列不出行。
- * 没有父目录的列(历史自定义列/兜底列)仍是「一格一行」。
+ * 【2026-11-11 用户口径:一个父目录 = 报告里的一行,值分两列】
+ *   检验项   = **父目录名**(父目录自己没有数据,纸面只显示这个标题)
+ *   检测标准 = 子目录1 的数据
+ *   检验方法 = 子目录2 的数据
+ * 判定"哪个子目录进哪一列"的顺序(稳):
+ *   ① 名字里带「方法」⇒ 检验方法 列;带「标准」⇒ 检测标准 列(现有数据就叫 检验方法N / 检验标准N);
+ *   ② 名字看不出来(如 子目录1/子目录2)⇒ 按子列顺序:第 1 个进 检测标准、第 2 个进 检验方法;
+ *   ③ 超过两个子列的部分忽略(与「一个父目录带两个子目录」的格式要求一致)。
+ * 没有父目录的独立列仍是「一格一行」(检验项=列名、检测标准=值)。
  *
  * @param {Array} groups lookupReqGroups 的结果
  * @param {Array<{label:string, tab?:string, parent?:string}>} [extFields] 来料检验要求的动态字段(/px/extFields 的 fields)
- * @returns {Array<{检验项: string, 检测标准: string}>}
+ * @returns {Array<{检验项: string, 检测标准: string, 检验方法: string}>}
  */
 export function carryEntriesOf(groups, extFields) {
   const out = []
   const seen = new Set()
   const skip = (k) => ID_COLS.includes(k) || HEAD_ONLY_COLS.includes(k) || isNonBiz(k)
+  /** 该子列的这格数据落在报告哪一列(检测标准 / 检验方法) */
+  const targetOf = (label, order) => {
+    const s = String(label ?? '')
+    if (s.includes('方法')) return '检验方法'
+    if (s.includes('标准')) return '检测标准'
+    return order === 0 ? '检测标准' : '检验方法'
+  }
   for (const g of Array.isArray(groups) ? groups : []) {
-    // 列序与界面**同源**(colsOfTab):前置列在前、该表的自定义列追加在后(同父分组保持相邻);
-    // 配置外物料类别(理论上不会有)没有页签配置,退回按行自身的键序(后端按 yj_field 顺序下发)。
     let colDefs = g?.tab ? colsOfTab(g.tab, extFields) : fallbackColsOf(g?.rows).map((k) => ({ key: k }))
-    // 兜底:全自定义页签的列全在动态字段里 —— 字段清单取不到(接口失败/调用方没传)时,
-    // 退回按行自身键序,否则那张表会**一条都带不出来**(静默丢数据,比列序不理想严重得多)。
     if (g?.tab?.dynamicCols && colDefs.length <= 1) colDefs = fallbackColsOf(g?.rows).map((k) => ({ key: k }))
     for (const row of Array.isArray(g?.rows) ? g.rows : []) {
-      // 该行每个父分组下是否真有数据 —— 父目录行只在它有子数据时才占一行(空父目录不添乱)
-      const groupHasData = new Set()
-      for (const c of colDefs) {
-        if (!c?.group || skip(c.key)) continue
-        if (String(row?.[c.key] ?? '').trim()) groupHasData.add(c.group)
-      }
-      const emittedParents = new Set()
+      // ① 先把这一行按"父分组"聚起来(按列序),同时收无父的独立列
+      const groupsOfRow = new Map()   // parent -> 子列 key 列表(按列序)
+      const standalone = []
       for (const c of colDefs) {
         const key = c?.key
         if (!key || skip(key)) continue
-        // ① 父目录行(该组第一次出现时插在它的子列之前)
-        if (c.group && groupHasData.has(c.group) && !emittedParents.has(c.group)) {
-          emittedParents.add(c.group)
-          const pk = carryKeyOf(c.group)
-          if (pk && !seen.has(pk)) {
-            seen.add(pk)
-            out.push({ 检验项: c.group, 检测标准: '' })
-          }
+        if (c.group) {
+          if (!groupsOfRow.has(c.group)) groupsOfRow.set(c.group, [])
+          groupsOfRow.get(c.group).push(c)
+        } else {
+          standalone.push(c)
         }
-        // ② 子列行:只有该格有数据才成一项(带走一行空标准只会添乱)
-        const std = String(row?.[key] ?? '').trim()
+      }
+      // ② 每个父目录 = 一行:检验项=父名,子列值按名字/顺序落到 检测标准 / 检验方法
+      for (const [parent, children] of groupsOfRow) {
+        const pk = carryKeyOf(parent)
+        if (!pk || seen.has(pk)) continue
+        const entry = { 检验项: parent, 检测标准: '', 检验方法: '' }
+        let filled = 0
+        children.slice(0, 2).forEach((c, idx) => {
+          const v = String(row?.[c.key] ?? '').trim()
+          if (!v) return
+          const col = targetOf(c.key, idx)
+          // 同列已有值(名字判定与顺序判定打架时)就让位给后一个空列,绝不覆盖已有
+          if (entry[col]) {
+            const other = col === '检测标准' ? '检验方法' : '检测标准'
+            if (!entry[other]) entry[other] = v
+            return
+          }
+          entry[col] = v
+          filled += 1
+        })
+        if (!filled) continue          // 两个子目录都没数据 ⇒ 整组不出行
+        seen.add(pk)
+        out.push(entry)
+      }
+      // ③ 没有父目录的独立列:仍是 一格一行
+      for (const c of standalone) {
+        const std = String(row?.[c.key] ?? '').trim()
         if (!std) continue
-        const k = carryKeyOf(key)
+        const k = carryKeyOf(c.key)
         if (!k || seen.has(k)) continue
         seen.add(k)
-        out.push({ 检验项: key, 检测标准: std })
+        out.push({ 检验项: c.key, 检测标准: std, 检验方法: '' })
       }
     }
   }

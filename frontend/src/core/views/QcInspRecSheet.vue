@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        来料品质·检验数据记录(QC_INSP_REC)—— 纸张式检验报告(YJ-QR-96)
        版式一比一照《品质资料 2026.09.19.xlsx》「检验数据记录模版」页签:
@@ -107,6 +107,9 @@
             >⧉ {{ tt('标准库维护') }}</span>
           </th>
           <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
+          <!-- 检验方法(2026-11-11 用户口径):来料检验要求「父目录+两个子目录」带入时,
+               一个子目录进 检测标准、另一个进 检验方法 —— 报告表体必须有这一列 -->
+          <th class="c-method" rowspan="2">{{ tt('检验方法') }}</th>
           <th class="c-result" colspan="5">{{ tt('检测结果') }}</th>
           <!-- 单项判定必填(2026-11-11 用户口径) -->
           <th class="c-judge" rowspan="2">
@@ -174,6 +177,17 @@
               <span class="qr-cell-text qr-pre">{{ row[K.STD] || '' }}</span>
             </el-tooltip>
           </td>
+          <td class="c-method" :title="row[K.METHOD] || ''">
+            <el-input
+              v-if="editable"
+              v-model="row[K.METHOD]"
+              size="small"
+              class="qr-cell-input"
+              maxlength="1000"
+              @input="emit('dirty')"
+            />
+            <span v-else class="qr-cell-text qr-pre">{{ row[K.METHOD] || '' }}</span>
+          </td>
           <td v-for="k in RESULT_KEYS" :key="'r' + k" class="c-res" :title="row[k] || ''">
             <el-input
               v-if="editable"
@@ -205,7 +219,7 @@
           </td>
         </tr>
         <tr v-if="!items.length">
-          <td :colspan="editable ? 9 : 8" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
+          <td :colspan="editable ? 10 : 9" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
         </tr>
       </tbody>
     </table>
@@ -345,6 +359,8 @@ import {
 const K = Object.freeze({
   ITEM: '检验项',
   STD: '检测标准',
+  /** 检验方法(2026-11-11 新增列):来料检验要求带入时,两个子目录分别落 检测标准 / 检验方法 */
+  METHOD: '检验方法',
   JUDGE: '单项判定',
 })
 
@@ -478,7 +494,7 @@ function headVal(key) {
  *  服务端 ensureDetailRequiredFilled 只校验「载荷里带了这一键」的行 —— 空对象{} 会整行跳过,
  *  于是「单项判定必填」对新增/带入出来的行形同虚设。这里先把键建出来,空值照样被拦。 */
 function blankRow() {
-  return { [K.ITEM]: '', [K.STD]: '', [K.JUDGE]: '' }
+  return { [K.ITEM]: '', [K.STD]: '', [K.METHOD]: '', [K.JUDGE]: '' }
 }
 function insertAfter(i) {
   const d = props.head.detail
@@ -604,7 +620,7 @@ async function carryFromReq(opts = {}) {
     if (!Array.isArray(d.items)) d.items = []
     // 逐列落成行:检验项=表头列名,检测标准=该列数据;结果/判定留空等人填
     // (单项判定显式建空串:必填校验只认"带了这一键"的行,不建键等于放行)
-    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准, [K.JUDGE]: '' })
+    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准, [K.METHOD]: e.检验方法 || '', [K.JUDGE]: '' })
     emit('dirty')
     ElMessage.success(tt('已按来料检验要求带入 {n} 项检验项').replace('{n}', String(plan.add.length)))
     return plan.add.length
@@ -888,14 +904,17 @@ watch(
 .qr-table tr:hover td {
   background: #f7fbff;
 }
-.c-item { width: 20%; }
-.c-std { width: 24%; }
-/* 「检测结果」= 固定五格:表头第一行跨 5 列(42%),第二行 1..5 每格 8.4% */
-.c-result { width: 42%; }
-.c-res { width: 8.4%; }
-.c-judge { width: 14%; }
+/* 2026-11-11 加「检验方法」列后重排列宽(合计 100%):
+   检验项 14% / 检测标准 21% / 检验方法 21% / 检测结果五格 34%(每格 6.8%) / 单项判定 10% */
+.c-item { width: 14%; }
+.c-std { width: 21%; }
+.c-method { width: 21%; }
+/* 「检测结果」= 固定五格:表头第一行跨 5 列(34%),第二行 1..5 每格 6.8% */
+.c-result { width: 34%; }
+.c-res { width: 6.8%; }
+.c-judge { width: 10%; }
 .c-op { width: 46px; text-align: center; }
-/* 五格是窄格(约 8.4%),缩一缩左右内边距,数字/短文本不会被挤掉 */
+/* 五格是窄格(约 6.8%),缩一缩左右内边距,数字/短文本不会被挤掉 */
 .qr-table th.c-res,
 .qr-table td.c-res { padding-left: 2px; padding-right: 2px; }
 .qr-lib-btn {

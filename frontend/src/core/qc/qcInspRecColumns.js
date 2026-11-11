@@ -36,16 +36,19 @@ export const QC_INSP_REC_HEAD_ROWS = Object.freeze([
  */
 export const QC_INSP_REC_RESULT_KEYS = Object.freeze(['结果1', '结果2', '结果3', '结果4', '结果5'])
 
-/** 表体数据列(qc_insp_rec_detail):检验项 | 检测标准 | 结果1..结果5 | 单项判定
- *  ⚠ 旧列 `检测结果`(整段文字)已转历史列(visible=0/hidden=1),不在表体列里 */
+/** 表体数据列(qc_insp_rec_detail):检验项 | 检测标准 | 检验方法 | 结果1..结果5 | 单项判定
+ *  ⚠ 旧列 `检测结果`(整段文字)已转历史列(visible=0/hidden=1),不在表体列里;
+ *  `检验方法` 是 2026-11-11 新增:来料检验要求「父目录 + 两个子目录」带入时,
+ *  一个子目录的值进 检测标准、另一个进 检验方法(用户口径:检验项=父目录标题 / 检验标准=子目录1 / 检验方法=子目录2) */
 export const QC_INSP_REC_DETAIL_COLUMNS = Object.freeze([
-  '检验项', '检测标准', ...QC_INSP_REC_RESULT_KEYS, '单项判定',
+  '检验项', '检测标准', '检验方法', ...QC_INSP_REC_RESULT_KEYS, '单项判定',
 ])
 
 /** 表体列定义(label=表头显示名=落库数据键;width=Excel 导出列宽) */
 export const QC_INSP_REC_COLUMNS = Object.freeze([
   { label: '检验项', key: '检验项', width: 18, lib: 'qc.insp_item' },
   { label: '检测标准', key: '检测标准', width: 24 },
+  { label: '检验方法', key: '检验方法', width: 24 },
   ...QC_INSP_REC_RESULT_KEYS.map((k, i) => ({ label: k, key: k, width: 10, result: i + 1 })),
   { label: '单项判定', key: '单项判定', width: 12 },
 ])

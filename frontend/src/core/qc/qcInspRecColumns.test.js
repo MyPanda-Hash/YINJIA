@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+﻿import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
@@ -16,7 +16,7 @@ import {
 
 /** qc_insp_rec_detail 的元数据列(yj_field place=detail);键必须落在这里,否则保存被静默丢弃。
  *  ⚠ 旧列 `检测结果` 已转历史列(visible=0/hidden=1,整段文字),表体不再用它。 */
-const DB_DETAIL_COLUMNS = ['检验项', '检测标准', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定']
+const DB_DETAIL_COLUMNS = ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定']
 
 test('每个表体列 key 必须存在于 qc_insp_rec_detail 的元数据列里', () => {
   const bad = QC_INSP_REC_COLUMNS
@@ -31,7 +31,7 @@ test('检测结果 = 固定五格:键恰好 结果1..结果5(2026-11-11 用户�
   assert.equal(QC_INSP_REC_RESULT_KEYS.length, 5, '必须固定 5 格,多/少都要同步改迁移脚本')
   // 表体列里这五格各占一列,且排在 检测标准 之后、单项判定 之前
   const labels = QC_INSP_REC_COLUMNS.map((c) => c.label)
-  assert.deepEqual(labels, ['检验项', '检测标准', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
+  assert.deepEqual(labels, ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
   // 老的单列文本 `检测结果` 不得再出现在表体列里(否则纸面上会多出一列旧输入框)
   assert.ok(!labels.includes('检测结果'))
   assert.equal(new Set(labels).size, labels.length, '列名不可重复')
@@ -80,10 +80,10 @@ test('表尾按模板排成两行两对:检验人|检验结论 / 审核人|处�
 
 test('导出:表头=列显示名(五格各一列),行按列定义取值', () => {
   assert.deepEqual(exportHeaderRow(),
-    ['检验项', '检测标准', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
+    ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
   assert.deepEqual(exportRow({ 检验项: '外观', 结果1: '无异常', 结果5: '无异常', 单项判定: '合格' }),
-    ['外观', undefined, '无异常', undefined, undefined, undefined, '无异常', '合格'])
-  assert.deepEqual(exportRow(null), ['', '', '', '', '', '', '', ''])
+    ['外观', undefined, undefined, '无异常', undefined, undefined, undefined, '无异常', '合格'])
+  assert.deepEqual(exportRow(null), ['', '', '', '', '', '', '', '', ''])
 })
 
 /** 源码级回归:纸张组件必须经 K 常量/RESULT_KEYS 取数键,不得裸写中文列名方括号 */
