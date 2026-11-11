@@ -49,6 +49,28 @@ test('分区表不变量:filterKey 合法、filterVal 齐且不重复', () => {
  * 按页面名硬编码写行(如给成型配方页写 表区='成型配方')会造出"没有表认领"的行:**入了库但界面上永不显示**。
  * 这条测试把"表名 → 该用的值"钉死,脚本/探针要写行就从这张表取值,别再按页面名猜。
  */
+test('同面板内只要有一张表带 filterKey，**所有**表都必须带（否则不带的会显示全部行）', () => {
+  // ⚠ 2026-11-11 实测踩过：给 RD_INSP_PLAN 加了「修订记录」页并预铺 18 行空行后，
+  //   「检验项目」表（当时没有 filterVal）把 18 行全显示了出来 —— 序号 1..18 出现在检验项目页，
+  //   而这两张表共用 rd_insp_plan_detail 一张行表。
+  //   本条的判据：**共用行表 + 有一张分块，则所有表都要分块**。
+  //   rowsOf(dt) 对不带 filterKey 的表返回**全部 items**，它会把别的表的行也算进来。
+  const problems = []
+  for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {
+    const dts = cfg.dataTables || []
+    if (dts.length < 2) continue
+    const partitioned = dts.filter((d) => d.filterKey)
+    if (!partitioned.length) continue
+    for (const dt of dts) {
+      if (dt.filterKey) continue
+      const name = dt.bar || dt.pageTitle || `第${(dt.page ?? 0) + 1} 页的表`
+      problems.push(`${panel}「${name}」没有 filterKey，而同面板的「${partitioned[0].bar || partitioned[0].pageTitle}」有 `
+        + '⇒ 它会把别的表的行也显示出来（共用一张行表）')
+    }
+  }
+  assert.deepEqual(problems, [], '\n' + problems.join('\n'))
+})
+
 test('表名 → 表区值(filterVal)对照固化:脚本写行必须用右边这个值', () => {
   const mapOf = (panel) => Object.fromEntries((recordSheetConfigs[panel]?.dataTables || [])
     .filter((dt) => dt.filterVal)

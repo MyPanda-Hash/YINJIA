@@ -2205,7 +2205,13 @@ export const recordSheetConfigs = {
       //   写成 true 会被当成 spec.test 分组库,弹窗形态整个不对。
       // 下面这份是「库里一条都没有」(未跑种子)时的内置兜底展示,**不是真源**;
       // 有 yj_std_lib 数据时一律以库为准(真源,可在弹窗里编辑/停用/恢复)。
-      { bar: '检验项目', libGroupKey: '检验类别', lib: [
+      // 分块键(2026-11-11 修回归):本面板的「修订记录」页与这张表**共用 rd_insp_plan_detail**
+      //   一张行表,而 rowsOf(dt) 对不带 filterKey 的表返回**全部 items** ⇒ 修订记录预铺的 18 行
+      //   会整片显示在检验项目页(实测:序号 1..18 全是空行,用户报「出货检验的不需要预留」)。
+      //   ⇒ 两张表都必须分块,本表标 '检验项目'(存量行由
+      //     migrate-insp-plan-revision-page-20261111.sql 回填,新建行由 addRow/标准库勾选/
+      //     规格书带入/预铺四条路径自动打标,见 RecordSheetPanels 的 dt.filterKey 用法)。
+      { bar: '检验项目', filterKey: '表区', filterVal: '检验项目', libGroupKey: '检验类别', lib: [
         // 每行都带 检验类别 = 该条目在 yj_std_lib 里的 item_code。单表形态没有 filterVal 可推分组,
         // confirmLib 勾选落明细时靠这一格把 必测项/型式检验 带回明细行(row['检验类别'])。
         // ── 内置兜底 A:必测项 ──
@@ -2242,6 +2248,7 @@ export const recordSheetConfigs = {
         // 藏的是**列**不是数据;删掉它们等于断掉标准库往返。
         // ⚠ 老配置里那条 { key: '表区' } 是**幽灵列**:rd_insp_plan_detail 根本没有 [表区] 物理列,
         //   本轮一并删掉(这也正是本面板绝不能用 filterKey:'表区' 的原因)。
+        { key: '表区', label: '表区', hiddenCol: true },
         { key: '检验类别', label: '检验类别', hiddenCol: true },
         { key: '质量控制内容', label: '质量控制内容', hiddenCol: true },
         { key: '检测仪器', label: '检测仪器、工具', hiddenCol: true },

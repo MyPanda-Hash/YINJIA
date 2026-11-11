@@ -417,8 +417,13 @@ test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格�
   assert.ok(Number(revDt.blankRows) > 0, '修订记录表要预铺 A4 行数(blankRows)')
   assert.equal(revDt.fixedRows, true, '修订记录表要 fixedRows:true(不出手工加行按钮)')
   // 原「检验项目表不得有 filterKey」仍成立(它靠 libGroupKey 承载检验类别)
-  const inspDt = (cfg.dataTables || []).find((d) => !d.filterVal)
-  assert.ok(inspDt, '检验项目表应无 filterVal(不分块)')
+  // ⚠ 2026-11-11 修正(同日第二轮)：检验项目表**也必须分块**。
+  //   上一版写的是「检验项目表应无 filterVal」,而它与修订记录共用 rd_insp_plan_detail 一张行表,
+  //   不分块 ⇒ rowsOf 返回全部 items ⇒ 修订记录预铺的 18 行空行整片显示在检验项目页
+  //   （用户截图报「出货检验的不需要预留」）。两张表都分块才是对的。
+  const inspDt = (cfg.dataTables || []).find((d) => d.filterVal === '检验项目')
+  assert.ok(inspDt, '检验项目表必须分块(filterVal=检验项目)')
+  assert.equal(inspDt.filterKey, '表区', '检验项目表同样用 [表区] 分块')
   assert.equal(cfg.headMode, 'report', '报告头版式')
 
   // ── ①grid 7 格,总宽 1187(设计 B..H) ──
@@ -469,14 +474,15 @@ test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格�
     assert.equal(hole, -1, `第 ${ri + 1} 行第 ${hole + 1} 格空着 ⇒ 整页缺格、竖线断(${detail.join(' / ')})`)
   }
 
-  // ── ④表体:检验项目表无 filterKey、可见列宽之和 = grid 之和 ──
-  //     2026-11-11 起本面板有**两张**逻辑表(检验项目 + 修订记录),故不再断言"只有一张";
-  //     约束改为"检验项目那张必须无 filterKey"(修订记录那张必须 filterKey='表区',已在上面钉住)。
+  // ── ④表体:检验项目表也分块(与修订记录共用一张行表)、可见列宽之和 = grid 之和 ──
+  //     2026-11-11 起本面板有**两张**逻辑表(检验项目 + 修订记录),两张都必须 filterKey='表区':
+  //     不带 filterKey 的那张会被 rowsOf 当成"全部行",于是修订记录预铺的空行整片漏进来
+  //     （同日实测回归，见 11674afa7）。
   const dts = cfg.dataTables || []
   assert.equal(dts.length, 2, '本面板应有 2 张逻辑表(检验项目 + 修订记录)')
-  const dt = dts.find((d) => !d.filterKey && !d.filterVal)
-  assert.ok(dt, '缺检验项目表(无 filterKey 的那张)')
-  assert.ok(!dt.filterKey && !dt.filterVal, '检验项目表不得有 filterKey/filterVal')
+  const dt = dts.find((d) => d.filterVal === '检验项目')
+  assert.ok(dt, '缺检验项目表(filterVal=检验项目 的那张)')
+  assert.equal(dt.filterKey, '表区', '检验项目表同样要用 [表区] 分块')
   const vis = (dt.cols || []).filter((c) => !c.hiddenCol)
   assert.equal(vis.length, 7, '可见列应恰好 7 列(设计 B..H)')
   const visSum = vis.reduce((a, c) => a + (c.w || 100), 0)
