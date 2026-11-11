@@ -209,6 +209,7 @@
           ref="approvalSheetRef"
           :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           :metadata="cfgCache?.metadata || {}"
+          :detail-fields="sheetDetailFields"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -1822,6 +1823,7 @@
             <DataRecordSheet
               v-if="dsActive.doc && dsActive.panelCode === 'RD_FILTER_EFF'"
               :head="dsActive.doc" :fields="dsActive.headerFields" :editable="false"
+              :detail-fields="dsActive.detailFields || []"
             />
             <RecordSheetPanels
               v-else-if="dsActive.doc"

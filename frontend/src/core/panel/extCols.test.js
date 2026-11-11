@@ -6,7 +6,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { mergeExtCols, EXT_COL_DEFAULT_W } from './extCols.js'
+import { readFileSync } from 'node:fs'
+import { mergeExtCols, pickExtFields, EXT_COL_DEFAULT_W } from './extCols.js'
 
 const BASE_COLS = [
   { key: '测试时间', label: '测试时间' },
@@ -105,4 +106,31 @@ test('⑧ 不修改入参（免得住进 store 的配置被就地改坏）', () 
   mergeExtCols({ cols, subHeads: subs, detailFields: [{ dataName: 'X', place: 'detail', colGroup: 'G' }] })
   assert.deepEqual(cols, colsCopy)
   assert.deepEqual(subs, subsCopy)
+})
+
+/* ── 手写纸面（功能性滤效 DataRecordSheet）共用同一口径 ─────────────────── */
+test('⑨ pickExtFields：只挑不在既有列集里的字段（配置驱动与手写纸面共用）', () => {
+  const known = new Set(['冲水时间', '测试时间'])
+  const got = pickExtFields([
+    { dataName: '冲水时间', place: 'detail' },
+    { dataName: '浊度NTU', place: 'detail', width: 110, colGroup: '新增分析' },
+    { dataName: '隐藏的', place: 'detail', hidden: true },
+    { dataName: '表头的', place: 'header' },
+  ], known)
+  assert.deepEqual(got.map((x) => x.key), ['浊度NTU'])
+  assert.equal(got[0].w, 110)
+  assert.equal(got[0]._group, '新增分析')
+})
+
+test('⑩ 功能性滤效纸面必须把「流速」也算作既有列，否则会凭空多出一排列', () => {
+  // 实测事故：压力/流速 是**同一个格子**里的两个键，而 DT_COLUMNS 只登记了压力
+  //   ⇒ 若只按 DT_COLUMNS 判"既有"，流速（L/min)样品N 会被当成自定义列渲染成 6 个空列。
+  const sheet = readFileSync(new URL('../views/DataRecordSheet.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /extKnownKeys/, '缺少既有列集 extKnownKeys')
+  assert.match(sheet, /流速（L\/min\)样品\$\{n\}/, '必须把 流速（L/min)样品N 加进既有列集')
+  // 三处渲染都要有自定义列循环（colgroup / 表头两行 / 表体）
+  assert.match(sheet, /v-for="\(e, ei\) in extCols"[\s\S]{0,80}<col/, 'colgroup 要追加自定义列')
+  assert.match(sheet, /v-for="\(h, hi\) in extHeadCells"/, '表头第一行要渲染自定义列（分组占 colspan，无分组占 rowspan=2）')
+  assert.match(sheet, /v-for="\(e, ei\) in extSubCols"/, '表头第二行要渲染分组子列')
+  assert.match(sheet, /row\[e\.key\]/, '表体要按数据键绑定自定义列的值')
 })

@@ -270,6 +270,8 @@
           <col v-if="!dtHidden(`去除率%样品${n}`)" :style="{ width: outColW + 'px' }" />
         </template>
         <col v-if="!dtHidden('测试时间')" style="width:110px" />
+        <!-- 自定义列（运行时新增，追加在硬编码列之后） -->
+        <col v-for="(e, ei) in extCols" :key="'cx' + ei" :style="{ width: e.w + 'px' }" />
         <col v-if="editable" style="width:60px" />
       </colgroup>
       <tbody>
@@ -286,6 +288,10 @@
           <th v-if="dtGroupSpan('出水')" class="rs-th" :colspan="dtGroupSpan('出水')">{{ dtGroupLabel('出水') }}</th>
           <th v-if="dtGroupSpan('去除率')" class="rs-th" :colspan="dtGroupSpan('去除率')">{{ dtGroupLabel('去除率') }}</th>
           <th v-if="!dtHidden('测试时间')" class="rs-th" rowspan="2">{{ dtLabel('测试时间') }}</th>
+          <template v-for="(h, hi) in extHeadCells" :key="'exh' + hi">
+            <th v-if="h.type === 'group'" class="rs-th" :colspan="h.span">{{ h.label }}</th>
+            <th v-else class="rs-th" rowspan="2">{{ h.label }}</th>
+          </template>
           <th v-if="editable" class="rs-th rs-th-op" rowspan="2"></th>
         </tr>
         <tr class="rs-grp2">
@@ -298,6 +304,7 @@
           <template v-for="n in sampleCount" :key="'hr' + n">
             <th v-if="!dtHidden(`去除率%样品${n}`)" class="rs-th">{{ dtLabel(`去除率%样品${n}`, `样品${n}`) }}</th>
           </template>
+          <th v-for="(e, ei) in extSubCols" :key="'exs' + ei" class="rs-th">{{ e.label }}</th>
         </tr>
         <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
           <td v-if="!dtHidden('冲水时间')" class="rs-td"><el-input v-if="editable" v-model="row['冲水时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['冲水时间'] || ' / ' }}</span></td>
@@ -320,6 +327,11 @@
             <td v-if="!dtHidden(`去除率%样品${n}`)" class="rs-td"><el-input v-if="editable" v-model="row[`去除率%样品${n}`]" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row[`去除率%样品${n}`] || ' / ' }}</span></td>
           </template>
           <td v-if="!dtHidden('测试时间')" class="rs-td"><el-input v-if="editable" v-model="row['测试时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['测试时间'] || ' / ' }}</span></td>
+          <!-- 自定义列：编辑态给输入框，只读态给纯文本（数据键=字段 label） -->
+          <td v-for="(e, ei) in extCols" :key="'extd' + ei" class="rs-td">
+            <el-input v-if="editable" v-model="row[e.key]" size="small" class="rs-c-in" @input="emit('dirty')" />
+            <span v-else class="rs-txt">{{ row[e.key] || ' / ' }}</span>
+          </td>
           <td v-if="editable" class="rs-td rs-td-op"><span class="rs-op-add" @click="addRow(i)">＋</span><span class="rs-op-del" @click="removeRow(i)">×</span></td>
         </tr>
         <tr v-if="!items.length"><td :colspan="dtColSpan" class="rs-empty">—</td></tr>
@@ -378,6 +390,7 @@ import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
 import { buildColumnPrefsPayload, isColumnHidden, resolveColumnLabel } from '@core/sheet/columnPrefs'
+import { pickExtFields } from '@core/panel/extCols.js'
 // 按样品铺开的字段名单(样品信息/测试装置及编号/样品配方 + 明细三组)—— 减列清空走它,
 // 漏登记一处就只在"减列"时才暴露(2026-09-30 样品配方即因此漏掉),故集中成单一真源
 import { clearSampleColumn } from '@core/sheet/sampleCols'
@@ -389,6 +402,12 @@ const props = defineProps({
   // 面板元数据(可选):原水水质条件的指标列清单/显示名覆盖从这里来(服务端 yj_panel.config 下发)。
   // 不传时退回内置 8 指标 —— 老调用点行为不变。
   metadata: { type: Object, default: () => ({}) },
+  /**
+   * 明细字段清单(元数据下发的 fieldSpec)。用来识别**运行时新增的自定义列**：
+   * 不在本组件硬编码列集里的那些字段，会追加到「3.数据记录表」最后一列之后。
+   * 口径与配置驱动那套同源 —— 见 @core/panel/extCols.pickExtFields（含单测）。
+   */
+  detailFields: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['dirty'])
 
@@ -597,7 +616,37 @@ function dtGroupLabel(name) {
   const g = DT_GROUPS[name]
   return g ? tt(g.label) : ''
 }
-const dtColSpan = computed(() => dtRenderedKeys.value.length + (props.editable ? 1 : 0))
+/* ── 运行时新增的自定义列（2026-11-11 用户口径）─────────────────────────────────
+ * 本组件的列是照《04数据记录表.xlsx》**手写**的（每列一个 v-if + 一个 <th>/<td>），
+ * 所以自定义列不能靠"合并配置"实现，得在硬编码列**之后**追加一段循环渲染。
+ * 判定口径与配置驱动的 7 张表同源：@core/panel/extCols.pickExtFields。
+ * ⚠ 表头是**两行结构**（分组行 + 子列行）：无分组的自定义列用 rowspan=2 占两行；
+ *   有分组的在分组行占一格 colspan、子列行再各占一格 —— 与既有 压力/出水/去除率 同构。 */
+/**
+ * 本组件**已经渲染**的全部数据键 = 表头列集 ∪ 「压力/流速」组合格里那个不单独成列的流速键。
+ * ⚠ 漏掉后者会把它误判成"自定义列"，凭空多出一排「流速（L/min)样品N」列（实测踩过）。
+ */
+const extKnownKeys = computed(() => {
+  const known = new Set(DT_COLUMNS.map((c) => c.key))
+  for (let n = 1; n <= MAX_SAMPLES; n++) known.add(`流速（L/min)样品${n}`)
+  return known
+})
+const extCols = computed(() => pickExtFields(props.detailFields, extKnownKeys.value))
+/** 表头第一行的自定义格：{type:'group',label,span} 或 {type:'plain',key,label} */
+const extHeadCells = computed(() => {
+  const out = []
+  for (const e of extCols.value) {
+    const g = e._group
+    const last = out[out.length - 1]
+    if (g && last && last.type === 'group' && last.label === g) { last.span += 1; continue }
+    out.push(g ? { type: 'group', label: g, span: 1 } : { type: 'plain', key: e.key, label: e.key })
+  }
+  return out
+})
+/** 表头第二行的自定义格（只有分组列需要） */
+const extSubCols = computed(() => extCols.value.filter((e) => e._group))
+
+const dtColSpan = computed(() => dtRenderedKeys.value.length + extCols.value.length + (props.editable ? 1 : 0))
 
 /** 字段编辑弹窗:改列别名/显隐(存 yj_field.alias/visible,全用户共享) */
 const fieldEditVisible = ref(false)

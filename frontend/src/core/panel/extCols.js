@@ -27,6 +27,38 @@
 export const EXT_COL_DEFAULT_W = 120
 
 /**
+ * 从元数据下发的明细字段里，**只挑出"自定义列"**（= 不在既有列集里的那些）。
+ *
+ * <p>两个纸面引擎共用这一个口径：
+ * · 配置驱动的 RecordSheetPanels → {@link mergeExtCols}（把列并进 cols/subHeads）；
+ * · 手写复刻的 DataRecordSheet（功能性滤效）→ 直接拿这个列表在硬编码列之后追加。</p>
+ *
+ * @param {Array} detailFields fieldSpec 列表（dataName/displayName/width/hidden/place/colGroup）
+ * @param {Set<string>|Array<string>} knownKeys 既有（硬编码/静态配置）列的数据键
+ * @returns {Array<{key:string,label:string,w:number,_group:string}>}
+ */
+export function pickExtFields(detailFields, knownKeys) {
+  const known = knownKeys instanceof Set ? knownKeys : new Set(knownKeys || [])
+  const added = []
+  for (const f of detailFields || []) {
+    if (!f || typeof f !== 'object') continue
+    const key = String(f.dataName ?? f.label ?? '').trim()
+    if (!key) continue
+    if (known.has(key)) continue              // 已经在既有列里 ⇒ 不是自定义列
+    if (f.hidden === true) continue           // 隐藏字段不上纸
+    if (f.place && !String(f.place).includes('detail')) continue  // 只要明细侧字段
+    const w = Number(f.width)
+    added.push({
+      key,
+      label: key,                             // 数据键=label（ADR-0001），别名由展示层兜
+      w: Number.isFinite(w) && w > 0 ? w : EXT_COL_DEFAULT_W,
+      _group: String(f.colGroup || '').trim(),
+    })
+  }
+  return added
+}
+
+/**
  * 把动态明细字段并进纸面列定义。
  *
  * @param {object} p
@@ -38,22 +70,7 @@ export const EXT_COL_DEFAULT_W = 120
 export function mergeExtCols({ cols = [], subHeads = [], detailFields = [] } = {}) {
   const base = (cols || []).map((c) => ({ ...c }))
   const baseKeys = new Set(base.map((c) => String(c.key ?? c.label ?? '').trim()))
-  const added = []
-  for (const f of detailFields || []) {
-    if (!f || typeof f !== 'object') continue
-    const key = String(f.dataName ?? f.label ?? '').trim()
-    if (!key) continue
-    if (baseKeys.has(key)) continue          // 已经在静态列里 ⇒ 不是自定义列
-    if (f.hidden === true) continue           // 隐藏字段不上纸
-    if (f.place && !String(f.place).includes('detail')) continue  // 只要明细侧字段
-    const w = Number(f.width)
-    added.push({
-      key,
-      label: key,                             // 数据键=label（ADR-0001），别名由 effColLabel 兜
-      w: Number.isFinite(w) && w > 0 ? w : EXT_COL_DEFAULT_W,
-      _group: String(f.colGroup || '').trim(),
-    })
-  }
+  const added = pickExtFields(detailFields, baseKeys)
   if (!added.length) {
     return { cols: base, subHeads: (subHeads || []).map((s) => ({ ...s })), addedCount: 0, addedLabels: [] }
   }
