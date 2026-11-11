@@ -133,13 +133,16 @@ SELECT
                 WHERE p.[单据编号] = COALESCE(NULLIF(dd.[入库单号], N''), bi.[入库单号])
                   AND p.[存货编码] = r.[物料编码]
                 ORDER BY CASE WHEN ISNULL(p.[批号], N'') = ISNULL(r.[物料批次], N'') THEN 0 ELSE 1 END, p.id) pl
-  /* 检验目录行:检验状态/是否合格/检测物料类别(已完成的行只在这里看得到) */
+  /* 检验目录行:检验状态/是否合格/检测物料类别(已完成的行只在这里看得到)
+     ⚠ 2026-11-11 修:原先同时要求 `z.物料编码 = r.物料编码`,而早期目录行的物料编码是空的
+     (migrate-qc-catalog.sql 播的那批只写了物料名称),NULL 一比对不上 ⇒ 那些行在明细表里
+     「检验状态」是空的,被默认闸门(只看已完成检验)挡掉,用户看到"已完成 3 条、明细表只有 2 条"。
+     现在只按 检验数据记录单号 关联,物料编码只作**优先级**(同批次号优先),不再当硬条件。 */
   OUTER APPLY (SELECT TOP 1 z.[id], z.[单据编号], z.[检验状态], z.[是否合格], z.[检测物料类别]
                  FROM dbo.qc_catalog_detail z
                 WHERE z.[检验数据记录单号] = r.[单据编号]
-                  AND z.[物料编码] = r.[物料编码]
                   AND ISNULL(z.asp_cancel, 'N') <> 'Y'
-                ORDER BY z.id DESC) c
+                ORDER BY CASE WHEN ISNULL(z.[物料编码], N'') = ISNULL(r.[物料编码], N'') THEN 0 ELSE 1 END, z.id DESC) c
   /* 检测物料类别兜底:商品档案所属类别 */
   OUTER APPLY (SELECT TOP 1 v.[所属类别] FROM dbo.bs_inv v WHERE v.[存货编码] = r.[物料编码] ORDER BY v.id) inv
  WHERE ISNULL(r.asp_cancel, 'N') <> 'Y';
