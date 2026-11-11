@@ -2783,6 +2783,15 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "Vom vorherigen Vorgang liegt noch keine freigegebene Menge vor – bitte zuerst den vorherigen Vorgang melden",
     "超出本道可报量": "Übersteigt die meldbare Menge dieses Vorgangs",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '维护处理意见选项': 'Behandlungsmeinungen verwalten',
+    '处理意见选项维护': 'Behandlungsmeinung-Optionen',
+    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'Die Optionsbibliothek gilt systemweit; Änderungen betreffen alle Belege (bereits gespeicherte Werte bleiben unverändert).',
+    '请输入选项内容': 'Optionsinhalt eingeben',
+    '新增选项': 'Option hinzufügen',
+    '至少保留一个选项': 'Mindestens eine Option erforderlich',
+    '选项内容不能超过30个字': 'Option darf höchstens 30 Zeichen haben',
+    '选项维护失败': 'Speichern der Optionen fehlgeschlagen',
+    '选项已保存': 'Optionen gespeichert',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Aus der Liste wählen oder eine neue Behandlungsmeinung eingeben und Enter drücken (wird automatisch zur Optionsbibliothek hinzugefügt)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
@@ -2813,6 +2822,17 @@ export default {
     '至少保留一个批次': 'Mindestens eine Charge muss bleiben',
     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Beim Löschen der Charge werden alle ihre Beurteilungsergebnisse entfernt. Trotzdem löschen?',
     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Beim Löschen dieser Position werden ihre Datensätze in allen Chargen entfernt. Trotzdem löschen?',
+    "工序在制": "Vorgang in Arbeit",
+    "该道计划量": "Geplante Menge (Vorgang)",
+    "该道已完工": "Erledigt (Vorgang)",
+    "可排产量": "Einplanbare Menge",
+    "不可排产量": "Nicht einplanbare Menge",
+    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Einplanbare Menge = bearbeitbare Menge − erledigte Menge (was diese Linie jetzt schaffen kann)",
+    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Nicht einplanbare Menge = geplante Menge − bearbeitbare Menge (noch nicht vom vorherigen Vorgang zugeflossen)",
+    "上道已完工折成品": "Vorheriger Vorgang erledigt (FG-Basis)",
+    "最后报工时间": "Letzte Meldung",
+    "工单当前工序": "Aktueller Vorgang des Auftrags",
+    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Übersteigt die einplanbare Menge; der Server lehnt ab (max = einplanbare Menge × 1.01)",
   },
 
 }

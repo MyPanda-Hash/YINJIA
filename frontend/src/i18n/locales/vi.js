@@ -2788,6 +2788,15 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "Công đoạn trước chưa có SL hoàn thành đã duyệt, hãy báo cáo công đoạn trước trước",
     "超出本道可报量": "Vượt quá SL có thể báo cáo của công đoạn này",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '维护处理意见选项': 'Quản lý tùy chọn ý kiến',
+    '处理意见选项维护': 'Tùy chọn ý kiến xử lý',
+    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'Thư viện tùy chọn dùng chung toàn hệ thống; thay đổi ảnh hưởng mọi chứng từ (giá trị đã lưu giữ nguyên).',
+    '请输入选项内容': 'Nhập nội dung tùy chọn',
+    '新增选项': 'Thêm tùy chọn',
+    '至少保留一个选项': 'Giữ ít nhất một tùy chọn',
+    '选项内容不能超过30个字': 'Tùy chọn tối đa 30 ký tự',
+    '选项维护失败': 'Lưu tùy chọn thất bại',
+    '选项已保存': 'Đã lưu tùy chọn',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Có thể chọn trong danh sách hoặc nhập ý kiến xử lý mới rồi nhấn Enter (sẽ tự động thêm vào thư viện tùy chọn)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
@@ -2818,6 +2827,17 @@ export default {
     '至少保留一个批次': 'Phải giữ lại ít nhất một lô',
     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Xóa lô sẽ xóa toàn bộ phán định của lô này. Vẫn xóa?',
     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Xóa hạng mục này sẽ xóa bản ghi của nó ở tất cả các lô. Vẫn xóa?',
+    "工序在制": "Công đoạn đang làm",
+    "该道计划量": "SL kế hoạch công đoạn",
+    "该道已完工": "Đã hoàn thành công đoạn",
+    "可排产量": "SL có thể xếp",
+    "不可排产量": "SL chưa thể xếp",
+    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "SL có thể xếp = SL có thể gia công − đã hoàn thành (lượng tuyến này làm được ngay)",
+    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "SL chưa thể xếp = SL kế hoạch − SL có thể gia công (công đoạn trước chưa chuyển xuống)",
+    "上道已完工折成品": "Công đoạn trước đã xong (quy thành phẩm)",
+    "最后报工时间": "Lần báo cáo cuối",
+    "工单当前工序": "Công đoạn hiện tại của lệnh",
+    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Vượt SL có thể xếp; máy chủ sẽ từ chối (tối đa = SL có thể xếp × 1.01)",
   },
 
 }

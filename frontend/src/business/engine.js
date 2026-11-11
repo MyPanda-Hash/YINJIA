@@ -525,6 +525,14 @@ export async function appendFieldOption({ panelCode, label, option }) {
   return unwrap(await request.post('/px/appendFieldOption', { panelCode, label, option }))
 }
 
+/**
+ * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:处理意见「能不能增加按钮或者弹窗?弹窗形式更好维护」)。
+ * 提交整份选项清单(可增/删/改名/排序),写回 `yj_field.dict_sql`;需要该面板的「自定义字段」权。
+ */
+export async function saveFieldOptions({ panelCode, label, options }) {
+  return unwrap(await request.post('/px/saveFieldOptions', { panelCode, label, options }))
+}
+
 /** 表格列自定义:保存排序/栏名/显隐 */
 export async function saveColumnPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveColumnPrefs', { panelCode, columns }))

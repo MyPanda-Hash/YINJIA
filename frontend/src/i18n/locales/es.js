@@ -2783,6 +2783,15 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "El proceso anterior aún no tiene producción aprobada; reporte primero el proceso anterior",
     "超出本道可报量": "Supera la cantidad reportable de este proceso",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '维护处理意见选项': 'Mantener opciones de opinión',
+    '处理意见选项维护': 'Opciones de opinión de tratamiento',
+    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'La biblioteca de opciones es compartida por todo el sistema; los cambios afectan a todos los documentos (los valores ya guardados no cambian).',
+    '请输入选项内容': 'Introduzca el texto de la opción',
+    '新增选项': 'Añadir opción',
+    '至少保留一个选项': 'Conserve al menos una opción',
+    '选项内容不能超过30个字': 'La opción no puede superar 30 caracteres',
+    '选项维护失败': 'No se pudieron guardar las opciones',
+    '选项已保存': 'Opciones guardadas',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Puede elegir de la lista; también puede escribir una opinión nueva y pulsar Enter (se añadirá a la biblioteca de opciones)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
@@ -2813,6 +2822,17 @@ export default {
     '至少保留一个批次': 'Debe quedar al menos un lote',
     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Eliminar el lote borra todos sus dictámenes. ¿Eliminar de todos modos?',
     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Eliminar este punto borra sus registros en todos los lotes. ¿Eliminar de todos modos?',
+    "工序在制": "Proceso en curso",
+    "该道计划量": "Cant. planificada del proceso",
+    "该道已完工": "Completado del proceso",
+    "可排产量": "Cant. programable",
+    "不可排产量": "Cant. no programable",
+    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Cant. programable = cant. procesable − completado del proceso (lo que esta línea puede hacer ahora)",
+    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Cant. no programable = cant. planificada − cant. procesable (aún no viene del proceso anterior)",
+    "上道已完工折成品": "Proceso anterior completado (base PT)",
+    "最后报工时间": "Último reporte",
+    "工单当前工序": "Proceso actual de la OF",
+    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Supera la cant. programable; el servidor lo rechazará (máx = cant. programable × 1.01)",
   },
 
 }

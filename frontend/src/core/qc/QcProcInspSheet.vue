@@ -279,7 +279,15 @@
             />
             <span v-else class="qr-cell-text">{{ headText('表单审核人') || headText('审核人') }}</span>
           </td>
-          <th class="qr-label">{{ tt('处理意见') }}</th>
+          <th class="qr-label">
+            {{ tt('处理意见') }}
+            <span
+              v-if="canEditHead(FOOT_KEYS.disposal) && canMaintainOptions"
+              class="qr-opt-mgr no-print"
+              :title="tt('维护处理意见选项')"
+              @click="openOptManager"
+            >⚙</span>
+          </th>
           <td class="qr-value">
             <el-select
               v-if="canEditHead(FOOT_KEYS.disposal)"
@@ -301,6 +309,28 @@
         </tr>
       </tbody>
     </table>
+
+    <!-- 处理意见「选项库」维护弹窗(2026-11-11 用户口径:弹窗形式更好维护) -->
+    <el-dialog
+      v-model="optManagerVisible"
+      :title="tt('处理意见选项维护')"
+      width="520px"
+      append-to-body
+      class="qr-opt-dialog"
+    >
+      <div class="qr-opt-hint">{{ tt('选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）') }}</div>
+      <div class="qr-opt-list">
+        <div v-for="(o, i) in optDraft" :key="'o' + i" class="qr-opt-row">
+          <el-input v-model="optDraft[i]" size="small" maxlength="30" :placeholder="tt('请输入选项内容')" />
+          <span class="qr-opt-del" :title="tt('删除')" @click="removeOptRow(i)">×</span>
+        </div>
+      </div>
+      <span class="qr-opt-add" @click="addOptRow">＋ {{ tt('新增选项') }}</span>
+      <template #footer>
+        <el-button size="small" @click="optManagerVisible = false">{{ tt('取消') }}</el-button>
+        <el-button size="small" type="primary" :loading="optSaving" @click="saveOptManager">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -308,7 +338,8 @@
 import { computed, ref } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { appendFieldOption } from '@/business/engine'
+import { appendFieldOption, saveFieldOptions } from '@/business/engine'
+import { useUserStore } from '@/stores/user'
 import {
   batchListOf,
   buildProcInspExport,
@@ -328,6 +359,15 @@ const props = defineProps({
   editable: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'open-items'])
+
+/** 「⚙ 维护处理意见选项」入口的权限:与后端 perm.requireFieldConfig 同源 ——
+ *  管理员,或该面板在角色里勾了「自定义字段」(fieldPanels)。没权限的人不显示入口,
+ *  免得点了才发现 403(后端仍然兜底校验,前端只是提前隐藏)。 */
+const user = useUserStore()
+const canMaintainOptions = computed(() => {
+  if (user.isAdmin) return true
+  return Array.isArray(user.fieldPanels) && user.fieldPanels.includes('QC_PROC_INSP')
+})
 
 /** 抬头 3 行 × 2 组(图2):label = 印刷标签,key = 单据头数据键。
  *  `readonly: true` 的两处不是元数据能表达的:检测周期是后端派生虚拟字段(库里没有列);
@@ -848,7 +888,7 @@ const summaryOptions = computed(() => withCurrentOption(
 ))
 const disposalOptions = computed(() => withCurrentOption(
   (() => {
-    const opts = optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK)
+    const opts = (disposalBase.value || optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK)).slice()
     for (const v of disposalExtra.value) if (!opts.includes(v)) opts.push(v)
     return opts
   })(),
@@ -867,6 +907,53 @@ function onDisposalChange(v) {
     appendFieldOption({ panelCode: 'QC_PROC_INSP', label: '处理方式', option: val }).catch(() => { /* 选项库失败不影响保存 */ })
   }
   emit('dirty')
+}
+
+/* ────────────────────── 处理意见「选项库」维护弹窗(2026-11-11) ────────────────────── */
+
+/** 选项库基线:默认取字段元数据下发的 options(元数据没下发时用兜底清单);
+ *  弹窗保存成功后写这里 ⇒ 当前页面立刻用新清单,不必等面板重载配置。 */
+const disposalBase = ref(null)
+/** 弹窗状态:草稿清单(字符串数组)+ 保存中 */
+const optManagerVisible = ref(false)
+const optDraft = ref([])
+const optSaving = ref(false)
+/** 打开维护弹窗:用当前有效选项(基线 ∪ 本会话新增 ∪ 本单当前值)做草稿 */
+function openOptManager() {
+  const base = disposalBase.value || optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK)
+  const list = [...base]
+  for (const v of disposalExtra.value) if (!list.includes(v)) list.push(v)
+  const cur = String(props.head?.['处理方式'] ?? '').trim()
+  if (cur && !list.includes(cur)) list.push(cur)   // 本单的当前值也编进草稿,避免"一打开就丢"
+  optDraft.value = list
+  optManagerVisible.value = true
+}
+function addOptRow() { optDraft.value = [...optDraft.value, ''] }
+function removeOptRow(idx) { optDraft.value = optDraft.value.filter((_, i) => i !== idx) }
+/** 保存:整份清单交给后端(可增/删/改名/排序);失败给出原因、不关弹窗 */
+async function saveOptManager() {
+  if (optSaving.value) return
+  const cleaned = []
+  for (const raw of optDraft.value) {
+    const v = String(raw ?? '').trim()
+    if (!v) continue
+    if (v.length > 30) { ElMessage.warning(tt('选项内容不能超过30个字')); return }
+    if (!cleaned.includes(v)) cleaned.push(v)
+  }
+  if (!cleaned.length) { ElMessage.warning(tt('至少保留一个选项')); return }
+  optSaving.value = true
+  try {
+    const ok = await saveFieldOptions({ panelCode: 'QC_PROC_INSP', label: '处理方式', options: cleaned })
+    if (!ok) { ElMessage.error(tt('选项维护失败')); return }
+    disposalBase.value = cleaned
+    disposalExtra.value = []
+    optManagerVisible.value = false
+    ElMessage.success(tt('选项已保存'))
+  } catch (e) {
+    ElMessage.error(tt('选项维护失败'))
+  } finally {
+    optSaving.value = false
+  }
 }
 
 /* ────────────────────────────── 列宽(动态批次列) ────────────────────────────── */
@@ -1397,5 +1484,26 @@ defineExpose({ exportProcInspExcel })
     size: A4 portrait;
     margin: 8mm;
   }
+}
+
+/* ── 处理意见「选项库」维护(2026-11-11 用户口径:弹窗形式更好维护) ── */
+.qr-label .qr-opt-mgr {
+  margin-left: 4px;
+  cursor: pointer;
+  color: var(--el-color-primary, #116a5b);
+  font-size: 13px;
+  font-weight: 400;
+}
+.qr-label .qr-opt-mgr:hover { text-decoration: underline; }
+.qr-opt-hint { font-size: 12px; line-height: 1.5; color: #8b9893; margin-bottom: 10px; }
+.qr-opt-list { max-height: 260px; overflow-y: auto; }
+.qr-opt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.qr-opt-del { cursor: pointer; color: #c0392b; font-size: 16px; line-height: 1; padding: 0 4px; }
+.qr-opt-add {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--el-color-primary, #116a5b);
+  cursor: pointer;
+  font-size: 13px;
 }
 </style>

@@ -5702,6 +5702,15 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "The previous process has no approved output yet — report the previous process first",
     "超出本道可报量": "Exceeds the reportable qty of this process",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '维护处理意见选项': 'Maintain disposal opinion options',
+    '处理意见选项维护': 'Disposal Opinion Options',
+    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'The option library is shared system-wide; changes affect every document (values already saved stay unchanged).',
+    '请输入选项内容': 'Enter option text',
+    '新增选项': 'Add option',
+    '至少保留一个选项': 'Keep at least one option',
+    '选项内容不能超过30个字': 'An option must be at most 30 characters',
+    '选项维护失败': 'Failed to save options',
+    '选项已保存': 'Options saved',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Available options are listed; you may also type a new disposal opinion and press Enter (it will be added to the option library automatically)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
@@ -5724,6 +5733,17 @@ export default {
     '至少保留一个批次': 'Keep at least one batch',
     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Deleting the batch clears all its judgement results. Delete anyway?',
     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Deleting this item clears its records for every batch. Delete anyway?',
+    "工序在制": "Process WIP",
+    "该道计划量": "Process planned qty",
+    "该道已完工": "Process completed",
+    "可排产量": "Schedulable qty",
+    "不可排产量": "Unschedulable qty",
+    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Schedulable qty = processable qty − completed qty of this process (what this line can do now)",
+    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Unschedulable qty = planned qty of this process − processable qty (still not flowed from the previous process)",
+    "上道已完工折成品": "Prev process completed (FG basis)",
+    "最后报工时间": "Last report time",
+    "工单当前工序": "WO current process",
+    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Exceeds the schedulable qty; the server will reject it (max = schedulable qty × 1.01)",
   },
 
 }

@@ -2679,4 +2679,66 @@ public class PanelConfigService {
             return false;
         }
     }
+
+    /** VALUES 字面量选项 SQL 的正则(两个方法共用一份口径:appendDropdownOption / saveDropdownOptions) */
+    private static final java.util.regex.Pattern VALUES_OPTIONS_RX = java.util.regex.Pattern
+            .compile("(?is)^SELECT\\s+v\\s+FROM\\s*\\(\\s*VALUES\\s*(.*?)\\)\\s*(?:AS\\s+)?t\\(v\\)$");
+    /** 单个选项里的 N'xxx' 字面量 */
+    private static final java.util.regex.Pattern VALUES_LITERAL_RX = java.util.regex.Pattern
+            .compile("N?'((?:[^']|'')*)'");
+
+    /**
+     * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:「能不能增加按钮或者弹窗?我觉得当前实现可行但是
+     * 弹窗形式更好维护」)—— 供纸面上的「⚙ 维护选项」弹窗调用:一次提交整份选项清单(可增、可删、可改名/排序)。
+     *
+     * <p>与 {@link #appendDropdownOption} 同一套边界:只认「下拉框」字段 + VALUES 字面量 dict_sql,
+     * 其它形态一律拒绝(返回 false,不动库)。额外约束:
+     * <ul>
+     *   <li>清单去首尾空格、去空项、去重(保序);</li>
+     *   <li>至少保留 1 项(否则下拉就空了,没法用);</li>
+     *   <li>每项 ≤ 30 字、不含换行;单引号转义;</li>
+     *   <li>写库仍是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)} 形态(与手工维护一致)。</li>
+     * </ul>
+     *
+     * <p>⚠ 删除一个选项**不会**改动历史单据里的值:纸面对"不在选项里的历史值"有临时兜底项,
+     * 老单据照常显示原值(见 QcProcInspSheet.withCurrentOption)。
+     *
+     * @return true = 已保存;false = 拒绝(字段不是下拉框 / dict_sql 非 VALUES 形态 / 清单不合法)
+     */
+    public boolean saveDropdownOptions(String panelCode, String label, java.util.List<String> options) {
+        String code = panelCode == null ? "" : panelCode.trim();
+        String lab = label == null ? "" : label.trim();
+        if (code.isEmpty() || lab.isEmpty() || options == null) return false;
+        java.util.LinkedHashSet<String> cleaned = new java.util.LinkedHashSet<>();
+        for (String raw : options) {
+            String v = raw == null ? "" : raw.trim();
+            if (v.isEmpty()) continue;
+            if (v.length() > 30 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) return false;
+            cleaned.add(v);
+        }
+        if (cleaned.isEmpty()) return false;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT data_type, dict_sql FROM yj_field WHERE panel_code = ? AND label = ?", code, lab);
+            if (rows.isEmpty()) return false;
+            Object type = rows.get(0).get("data_type");
+            Object sqlObj = rows.get(0).get("dict_sql");
+            if (!"下拉框".equals(type == null ? "" : String.valueOf(type).trim())) return false;
+            String sql = sqlObj == null ? "" : String.valueOf(sqlObj).trim();
+            if (!VALUES_OPTIONS_RX.matcher(sql).matches()) return false;   // 非字面量列表形态:不碰
+            StringBuilder values = new StringBuilder();
+            for (String v : cleaned) {
+                if (values.length() > 0) values.append(",");
+                values.append("(N'").append(v.replace("'", "''")).append("')");
+            }
+            String newSql = "SELECT v FROM (VALUES " + values + ") AS t(v)";
+            int n = jdbc.update("UPDATE yj_field SET dict_sql = ? WHERE panel_code = ? AND label = ?",
+                    newSql, code, lab);
+            return n == 1;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[OPTION_LIB] 保存下拉选项失败({} {}): {}", code, lab, e.getMessage());
+            return false;
+        }
+    }
 }

@@ -2783,6 +2783,15 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "L'opération précédente n'a pas encore de production approuvée ; déclarez d'abord l'opération précédente",
     "超出本道可报量": "Dépasse la quantité déclarable de cette opération",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '维护处理意见选项': 'Gérer les options d’avis',
+    '处理意见选项维护': 'Options d’avis de traitement',
+    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'La bibliothèque d’options est commune à tout le système ; les modifications touchent tous les documents (les valeurs déjà enregistrées restent inchangées).',
+    '请输入选项内容': 'Saisir le texte de l’option',
+    '新增选项': 'Ajouter une option',
+    '至少保留一个选项': 'Conservez au moins une option',
+    '选项内容不能超过30个字': 'L’option ne peut pas dépasser 30 caractères',
+    '选项维护失败': 'Échec de l’enregistrement des options',
+    '选项已保存': 'Options enregistrées',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Choisissez dans la liste ou saisissez un nouvel avis puis appuyez sur Entrée (il sera ajouté à la bibliothèque d’options)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
@@ -2813,6 +2822,17 @@ export default {
     '至少保留一个批次': 'Conservez au moins un lot',
     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Supprimer le lot efface tous ses jugements. Supprimer quand même ?',
     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Supprimer ce point efface ses enregistrements pour tous les lots. Supprimer quand même ?',
+    "工序在制": "En-cours opération",
+    "该道计划量": "Qté prévue de l’opération",
+    "该道已完工": "Réalisé de l’opération",
+    "可排产量": "Qté planifiable",
+    "不可排产量": "Qté non planifiable",
+    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Qté planifiable = qté traitable − réalisé de l’opération (ce que cette ligne peut faire maintenant)",
+    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Qté non planifiable = qté prévue − qté traitable (pas encore transférée de l’opération précédente)",
+    "上道已完工折成品": "Opération précédente réalisée (base PF)",
+    "最后报工时间": "Dernier pointage",
+    "工单当前工序": "Opération courante de l’OF",
+    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Dépasse la qté planifiable ; le serveur refusera (max = qté planifiable × 1.01)",
   },
 
 }

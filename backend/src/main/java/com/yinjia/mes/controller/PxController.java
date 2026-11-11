@@ -1321,6 +1321,30 @@ public class PxController {
         return ApiResult.ok(configService.appendDropdownOption(panelCode, label, option));
     }
 
+    /**
+     * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:「能不能增加按钮或者弹窗?弹窗形式更好维护」)。
+     *
+     * <p>纸面「⚙ 维护选项」弹窗提交整份清单(可增/删/改名/排序),写回该字段的 `yj_field.dict_sql`。
+     * 边界/校验见 {@link com.yinjia.mes.service.PanelConfigService#saveDropdownOptions}。
+     * 权限:要求该面板的「自定义字段」权(与管理字段选项同源,`perm.requireFieldConfig`)——
+     * 选项库是全系统共用的,不能谁都能改。
+     *
+     * @return true = 已保存;false = 拒绝(无 VALUES 形态 / 清单不合法)
+     */
+    @PostMapping("/saveFieldOptions")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Boolean> saveFieldOptions(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        String label = String.valueOf(body.getOrDefault("label", ""));
+        perm.requireFieldConfig(panelCode);
+        List<String> options = new java.util.ArrayList<>();
+        Object raw = body.get("options");
+        if (raw instanceof List<?> list) {
+            for (Object o : list) options.add(o == null ? null : String.valueOf(o));
+        }
+        return ApiResult.ok(configService.saveDropdownOptions(panelCode, label, options));
+    }
+
     /** 表格列自定义:保存排序/栏名/显隐 */
     @PostMapping("/saveColumnPrefs")
     @SuppressWarnings("unchecked")
