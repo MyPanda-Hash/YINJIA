@@ -4675,3 +4675,10 @@ migrate-qc-insp-rec-verdict-stdlib-20261111.sql
 #   代码侧同批改为**按列名反查标签**写值(ButtonService/PushGenerateHandler),否则改名后写不进去。
 #   幂等(窄条件 UPDATE + 行数守卫 + 只填空值),两账套均执行。
 migrate-purchase-in-source-20261111.sql
+
+# 2026-11-11 处理意见标准库清空预置样例(用户口径「处理意见的标准库信息删除干净,
+#   不需要先写样例,自己手动填写就行」):
+#   只删本仓库播种的 7 行(asp_user1='migration' + content 在名单里),用户自己加的不动;
+#   字段仍是标准库(候选为空 = 纸面直接输入,想沉淀再用「⧉ 标准库维护」加条目)。
+#   前端同批:处理意见占位词改「直接输入处理意见」(en: Type the disposition)。幂等,两账套均执行。
+migrate-qc-insp-disposal-clear-20261111.sql

@@ -245,7 +245,9 @@
               >⧉ {{ tt('标准库维护') }}</span>
             </th>
             <td class="qr-value">
-              <!-- 处理意见:标准库下拉(与检验项同一套:选现成条目,也能敲新词) -->
+              <!-- 处理意见:标准库下拉(与检验项同一套:选现成条目,也能敲新词)。
+                   2026-11-11 用户口径「不需要先写样例,自己手动填写就行」 ⇒ 库先清空,
+                   候选为空时直接输入即可落库,想沉淀再用「⧉ 标准库维护」加条目。 -->
               <el-select
                 v-if="editable && cell.key === DISPOSAL_KEY"
                 v-model="head[cell.key]"
@@ -254,7 +256,7 @@
                 allow-create
                 default-first-option
                 class="qr-cell-input qr-verdict-sel"
-                :placeholder="tt('请选择')"
+                :placeholder="tt('直接输入处理意见')"
                 @change="emit('dirty')"
               >
                 <el-option v-for="o in disposalOptions" :key="o.value" :label="o.label" :value="o.value" />
