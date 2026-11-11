@@ -2774,6 +2774,11 @@ export default {
     '制程检验': 'Contrôle en cours de fabrication',
     // ---- 看板·工序检验状态(2026-11-08 第4轮):检验步骤「待审核」----
     '待审核': 'En attente de validation',
+    "可报": "Déclarable",
+    "可加工量": "Traitable",
+    "本道可报量 = 上一道已审核完工量(按量流转)": "Quantité déclarable = production approuvée de l'opération précédente (flux par quantité)",
+    "前道工序还没有已审核完工量流入,请先报上一道工序": "L'opération précédente n'a pas encore de production approuvée ; déclarez d'abord l'opération précédente",
+    "超出本道可报量": "Dépasse la quantité déclarable de cette opération",
   },
 
 }

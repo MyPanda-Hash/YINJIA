@@ -5690,6 +5690,11 @@ export default {
     '加载面板配置失败': 'Failed to load the panel configuration',
     '面板编号无效,请从左侧菜单进入「实验室记录手机登记」': 'Invalid panel code — open "Lab Records Mobile Entry" from the left menu',
     '保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。拍的照会写进「手机照片」字段,电脑端点开即可看。': 'Saved documents stay in Draft status; approve and archive them on the PC panel as usual. Photos are written into the "Mobile Photo" field and can be opened on the PC.',
+    "可报": "Reportable",
+    "可加工量": "Processable",
+    "本道可报量 = 上一道已审核完工量(按量流转)": "Reportable qty = approved output of the previous process (flow by quantity)",
+    "前道工序还没有已审核完工量流入,请先报上一道工序": "The previous process has no approved output yet — report the previous process first",
+    "超出本道可报量": "Exceeds the reportable qty of this process",
   },
 
 }

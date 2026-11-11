@@ -2779,6 +2779,11 @@ export default {
     '制程检验': 'Kiểm tra trong quá trình',
     // ---- 看板·工序检验状态(2026-11-08 第4轮):检验步骤「待审核」----
     '待审核': 'Chờ duyệt',
+    "可报": "Có thể báo cáo",
+    "可加工量": "Có thể gia công",
+    "本道可报量 = 上一道已审核完工量(按量流转)": "SL có thể báo cáo = SL hoàn thành đã duyệt của công đoạn trước (luân chuyển theo SL)",
+    "前道工序还没有已审核完工量流入,请先报上一道工序": "Công đoạn trước chưa có SL hoàn thành đã duyệt, hãy báo cáo công đoạn trước trước",
+    "超出本道可报量": "Vượt quá SL có thể báo cáo của công đoạn này",
   },
 
 }

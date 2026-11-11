@@ -2774,6 +2774,11 @@ export default {
     '制程检验': 'Prozessprüfung',
     // ---- 看板·工序检验状态(2026-11-08 第4轮):检验步骤「待审核」----
     '待审核': 'Freigabe ausstehend',
+    "可报": "Meldbar",
+    "可加工量": "Bearbeitbar",
+    "本道可报量 = 上一道已审核完工量(按量流转)": "Meldbare Menge = freigegebene Menge des vorherigen Vorgangs (Mengenfluss)",
+    "前道工序还没有已审核完工量流入,请先报上一道工序": "Vom vorherigen Vorgang liegt noch keine freigegebene Menge vor – bitte zuerst den vorherigen Vorgang melden",
+    "超出本道可报量": "Übersteigt die meldbare Menge dieses Vorgangs",
   },
 
 }

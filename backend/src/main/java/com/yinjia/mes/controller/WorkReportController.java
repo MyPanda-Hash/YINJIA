@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
+import com.yinjia.mes.service.ProcessFlow;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -83,6 +84,14 @@ public class WorkReportController {
 
         // 工序台账(wo_process_line):工序序 / 计划数量 / 状态 / 计划生产线
         String batch = String.valueOf(head.getOrDefault("批号", "") == null ? "" : head.get("批号")).trim();
+        // 🔴 2026-11-11 按量流转:本行各道的**可加工量 / 在制量 / 剩余可报**由 {@link ProcessFlow} 派生
+        //   (唯一口径,与报工闸门、转序、完工判定同源)。前端据此把数量默认成"还能报多少",
+        //   而不是"计划量 − 已报工"(那会让后道把前道还没流下来的量报掉)。
+        java.util.Map<String, ProcessFlow.Step> flowOf = new LinkedHashMap<>();
+        for (ProcessFlow.Step s : ProcessFlow.steps(jdbc, no, rowId,
+                num(head.get("排产数量")), str(head.get("工艺路线")))) {
+            flowOf.put(s.op(), s);
+        }
         List<Map<String, Object>> ledger = new ArrayList<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT ISNULL(工序,N'') AS 工序, ISNULL(工序序,0) AS 工序序,"
@@ -110,6 +119,15 @@ public class WorkReportController {
                     Double.class, no, op, rowId, batch);
             m.put("已报工", done == null ? 0 : done);
             m.put("待审核", pending == null ? 0 : pending);
+            // 按量流转(2026-11-11):可加工量 = 上一道已审报工折成品 × 本道换算率(首道 = 排产数量×本道换算率);
+            //   剩余可报 = 可加工量 − 已报工(不足 0 记 0)⇒ 工序1 只报 200/500 时,工序2 这里就是 200。
+            ProcessFlow.Step step = flowOf.get(op);
+            double avail = step == null ? 0 : step.avail();
+            double approved = done == null ? 0 : done;
+            m.put("可加工量", round4(avail));
+            m.put("在制量", round4(Math.max(avail - approved, 0)));
+            m.put("剩余可报", round4(Math.max(avail - approved, 0)));
+            m.put("上道已完", round4(step == null ? 0 : step.availBase()));
             ledger.add(m);
         }
 
@@ -287,5 +305,10 @@ public class WorkReportController {
     private static double num(Object v) {
         if (v == null) return 0;
         try { return Double.parseDouble(String.valueOf(v).trim()); } catch (Exception e) { return 0; }
+    }
+
+    /** 数量保留 4 位小数(抹掉浮点尾差;可加工量/在制量展示用) */
+    private static double round4(double v) {
+        return Math.round(v * 10000d) / 10000d;
     }
 }

@@ -2774,6 +2774,11 @@ export default {
     '制程检验': 'Inspección en proceso',
     // ---- 看板·工序检验状态(2026-11-08 第4轮):检验步骤「待审核」----
     '待审核': 'Pendiente de aprobación',
+    "可报": "Reportable",
+    "可加工量": "Procesable",
+    "本道可报量 = 上一道已审核完工量(按量流转)": "Cantidad reportable = producción aprobada del proceso anterior (flujo por cantidad)",
+    "前道工序还没有已审核完工量流入,请先报上一道工序": "El proceso anterior aún no tiene producción aprobada; reporte primero el proceso anterior",
+    "超出本道可报量": "Supera la cantidad reportable de este proceso",
   },
 
 }

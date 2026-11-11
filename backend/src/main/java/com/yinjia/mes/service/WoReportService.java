@@ -289,38 +289,29 @@ public class WoReportService {
                         + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([工艺路线],N'')<>N''", String.class, repRowId)
                 : List.of();
         String route = rtRows.isEmpty() ? "" : rtRows.get(0);
-        if (!route.isBlank()) {
-            List<String> ops = jdbc.queryForList(
-                    "SELECT 工序名称 FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                            + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", String.class, route);
-            int idx = ops.indexOf(op);
-            if (idx < 0) {
-                throw new IllegalStateException("工序「" + op + "」不在工单 " + wo + " 的工艺路线「" + route + "」内("
-                        + String.join("→", ops) + "),不能报工");
-            }
-            for (int i = 0; i < idx; i++) {
-                // 不跳序:按**本次报工的行**判(2026-10-15:工单号+工单行号才是唯一工单 ⇒ 前道是否已报
-                //   要看**本行**;原来只按批次号比,同批次多行时会看到别的行的报工)
-                Integer done;
-                if (repRowId != null) {
-                    done = jdbc.queryForObject(
-                            "SELECT COUNT(*) FROM dbo.scjl s WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                                    + " AND ISNULL(s.wgzt,'N')='Y'"
-                                    + " AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
-                                    + "      OR (ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') = ?))",
-                            Integer.class, wo, ops.get(i), repRowId, rptBatch);
-                } else {
-                    // 行定位不到(历史单/没带批次):退回工单级,与旧行为一致
-                    done = jdbc.queryForObject(
-                            "SELECT COUNT(*) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                                    + " AND ISNULL(wgzt,'N')='Y'",
-                            Integer.class, wo, ops.get(i));
-                }
-                if (done == null || done == 0) {
-                    throw new IllegalStateException("前道工序「" + ops.get(i) + "」尚未报工,不能跳到「" + op
-                            + "」(工单路线:" + String.join("→", ops) + ")");
-                }
-            }
+        // ── 本行**按量派生**(2026-11-11 按量流转):路线/换算率/已审报工/可加工量全部读
+        //    {@link ProcessFlow}(唯一口径),报工闸门与转序、完工判定**同源**。
+        //    用户口径(原话)：「第一个工序有500个计划完成量,我就应该有200个报工完成的数量后,
+        //    第二个工序就能报工对应的200来源于上一道工序完成的报工数」。
+        double rowPlanSl = 0;
+        try {
+            rowPlanSl = num(jdbc.queryForObject(
+                    "SELECT ISNULL(pl_sl,0) FROM dbo.plang WHERE id=?", Double.class, repRowId));
+        } catch (Exception ignore) { /* 行不存在:按 0 继续,由落点查询给出可读错误 */ }
+        List<ProcessFlow.Step> flow = ProcessFlow.steps(jdbc, wo, repRowId, rowPlanSl, route);
+        int opIdx = ProcessFlow.indexOf(flow, op);
+        // ① 报工的工序必须在**本行**工艺路线内(未关联路线的历史单不校验,与旧行为一致)
+        if (!route.isBlank() && opIdx < 0) {
+            throw new IllegalStateException("工序「" + op + "」不在工单 " + wo + " 的工艺路线「" + route + "」内("
+                    + String.join("→", flow.stream().map(ProcessFlow.Step::op).toList()) + "),不能报工");
+        }
+        // ② 不跳序(2026-11-11 由「前道有任意一笔已审报工」改为**按量**):
+        //    前道必须真的把量流下来才能报后道。⚠ 不是"前道报满"——前道报 200/计划 500,
+        //    后道就能报 200(用户 2026-11-11 口径);上限由下面第 ③ 段「按量封顶」卡住。
+        ProcessFlow.Step prevOp = opIdx > 0 ? flow.get(opIdx - 1) : null;
+        if (prevOp != null && !prevOp.flowing()) {
+            throw new IllegalStateException("前道工序「" + prevOp.op() + "」还没有已审核报工,不能报「" + op
+                    + "」(工单路线:" + String.join("→", flow.stream().map(ProcessFlow.Step::op).toList()) + ")");
         }
         if (qty <= 0) throw new IllegalStateException("报工数量必须大于 0");
         double dual = num(r.get("dual_qty"));
@@ -360,28 +351,44 @@ public class WoReportService {
             if (closed != null && closed > 0) throw new IllegalStateException("工单 " + wo + " 已结案,不能报工");
             throw new IllegalStateException("工单 " + wo + " 未排产,不能报工(先在快速排产排入产线)");
         }
-        // 工序维度封顶:口径 = **该工单行该道工序的计划量**
-        //   = 本行排产数量 × 该道自己的换算率(与快速排产弹窗、预排台账、转序判据同一口径)。
-        //   现场允许超产 1%;审核时校验「已审核累计 + 本次」不得超过计划量×1.01。
-        //   老口径(首道 Σ×率、其后逐道累乘、按整单)只在拿不到行/路线时兜底(历史数据兼容)。
+        // ③ 工序维度封顶(2026-11-11 **按量流转**,取代"本道计划量封顶"):
+        //   可报上限 = min(本道计划量, 本道**可加工量**) × 1.01
+        //   可加工量 = 上一道已审报工折成品 × 本道换算率(首道 = 排产数量 × 本道换算率)
+        //   ⇒ 工序1 计划 500 只报 200 时,工序2 最多报 200(报 201 被拒)—— 用户 2026-11-11 口径。
+        //   首道的可加工量恒等于计划量 ⇒ 首道封顶与历史口径完全一致(计划量 × 1.01)。
+        //   取不到路线/换算率时退回历史口径(本行排产 × 该道换算率),老单行为不变。
         double rowPl = num(t.get("pl_sl"));
         Object rowIdObj = t.get("plang_id");
         Long plangRowId = rowIdObj == null ? null : ((Number) rowIdObj).longValue();
-        Double rowRate = plangRowId == null ? null : jdbc.queryForObject(
-                "SELECT TOP 1 ISNULL(r.换算率,1) FROM dbo.plang p JOIN dbo.bs_route r"
-                        + "   ON r.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r.工序名称 = ? AND ISNULL(r.asp_cancel,'N')<>'Y'"
-                        + " WHERE p.id = ?", Double.class, op, plangRowId);
+        ProcessFlow.Step curStep = ProcessFlow.stepOf(flow, op);
         double cap;
-        if (rowRate != null && rowPl > 0) {
-            cap = rowPl * (rowRate <= 0 ? 1 : rowRate);
-        } else {
-            cap = processTask.processPlanQty(wo, op);       // 兜底:老口径
-            if (cap <= 0) {
-                Double totalPl = jdbc.queryForObject(
-                        "SELECT ISNULL(SUM(ISNULL(pl_sl,0)),0) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                        Double.class, wo);
-                cap = totalPl == null ? 0 : totalPl;
+        double allowed;
+        String capFrom = "";
+        if (curStep != null && curStep.avail() > ProcessFlow.EPS) {
+            cap = Math.min(curStep.planQty() > ProcessFlow.EPS ? curStep.planQty() : curStep.avail(), curStep.avail());
+            allowed = curStep.reportCap();                       // 已含 1% 容差
+            if (curStep.availBase() < rowPl - ProcessFlow.EPS) {
+                // 后道:说明来料只流下来了多少,报错时让现场一眼看懂"卡在哪"
+                capFrom = "(本道可加工量 " + trimQty(curStep.avail()) + ",来自上一道已审完工折成品 "
+                        + trimQty(curStep.availBase()) + ")";
             }
+        } else {
+            Double rowRate = plangRowId == null ? null : jdbc.queryForObject(
+                    "SELECT TOP 1 ISNULL(r.换算率,1) FROM dbo.plang p JOIN dbo.bs_route r"
+                            + "   ON r.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r.工序名称 = ? AND ISNULL(r.asp_cancel,'N')<>'Y'"
+                            + " WHERE p.id = ?", Double.class, op, plangRowId);
+            if (rowRate != null && rowPl > 0) {
+                cap = rowPl * (rowRate <= 0 ? 1 : rowRate);
+            } else {
+                cap = processTask.processPlanQty(wo, op);       // 兜底:老口径
+                if (cap <= 0) {
+                    Double totalPl = jdbc.queryForObject(
+                            "SELECT ISNULL(SUM(ISNULL(pl_sl,0)),0) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                            Double.class, wo);
+                    cap = totalPl == null ? 0 : totalPl;
+                }
+            }
+            allowed = cap * 1.01d;
         }
         // 已报量也按**该行**(锚 scjl.gd_id → plang_pc.plang_id;老数据按批次兜底)统计,与转序一致
         Double opSum = jdbc.queryForObject(
@@ -392,13 +399,13 @@ public class WoReportService {
                         + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ?))",
                 Double.class, wo, op, rowId, plangRowId, plangRowId, t.get("pc_batch"));
         double reported = opSum == null ? 0 : opSum;
-        double allowed = cap * 1.01d;
-        if (cap <= 0) {
+        if (cap <= 0 && curStep == null) {
             throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能报工");
         }
         if (reported + qty > allowed + 0.0001d) {
-            throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]计划量 " + cap
-                    + ",允许至 " + allowed + ",已报 " + reported + ",本次 " + qty + ")");
+            throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]上限 " + trimQty(cap)
+                    + capFrom + ",允许至 " + trimQty(allowed) + ",已报 " + trimQty(reported)
+                    + ",本次 " + trimQty(qty) + ")");
         }
         return t;
     }
@@ -471,5 +478,11 @@ public class WoReportService {
     private static double num(Object o) {
         if (o == null) return 0;
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /** 数量展示(整数不拖 .0;报错文案用,2026-11-11 按量流转) */
+    private static String trimQty(double v) {
+        if (Math.abs(v - Math.rint(v)) < 0.00005) return String.valueOf((long) Math.rint(v));
+        return java.math.BigDecimal.valueOf(v).stripTrailingZeros().toPlainString();
     }
 }

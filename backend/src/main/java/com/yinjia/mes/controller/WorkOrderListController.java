@@ -189,10 +189,13 @@ public class WorkOrderListController {
                         //   那是**按单号聚合**的整单派生值 ⇒ 同工单所有行显示同一个工序(实测行2 路线是
                         //   GY-2026-10-0003 首道应为混料,却因视图显示成整单的成型)。
                         //   现改为回落 **p.当前工序**(本行自己的状态列,由 ProcessTaskService 按行维护)。
+                        // 当前工序 = 预排台账里**最前一道「已落实」**。2026-11-11 按量流转后可能多道同时在制
+                        //   (成型在做、切炭也在做已流入的那批)⇒ 取最前面还没做完的那道(工序序 ASC),
+                        //   与 ProcessFlow.currentOp 同口径;已完工道由状态过滤自动跳过。
                         + " ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序,"
+                        + "   ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序,"
                         // 当前工序完工量 = **该工单行**该道的已审报工量(2026-10-07:视图按单号聚合=整单口径,
                         //   与单行计划量配对会出现作用域错配「整单 56000 / 单行 75」⇒ 按行锚定)
                         + " ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
@@ -223,11 +226,11 @@ public class WorkOrderListController {
                         //   才是唯一工单」的口径冲突;且它是**一对多**风险源(视图按单号一行,join 尚安全,
                         //   但语义已是整单)。本查询已全部改用行级来源:当前工序取台账→本行 p.[当前工序]、
                         //   当前工序完工量按 p.id 锚定、当前工序计划量按本行路线换算 ⇒ 不再需要该视图。
-                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落**本行** p.当前工序
+                        // 当前工序 = 预排台账**最前一道「已落实」**(按量流转后可能多道在制),缺台账回落**本行** p.当前工序
                         + " CROSS APPLY (SELECT ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
+                        + "   ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
         // 生产状态(2026-10-15 用户口径拆分「完工」与「结案」):

@@ -759,6 +759,20 @@ public class ScheduleBoardService {
         String noLike = key == null ? like : "%" + key[0] + "%";
         Integer xcEq = key == null ? null : Integer.valueOf(key[1]);
         boolean all = "all".equalsIgnoreCase(mode);
+        // 「本线排产数量」SQL 片段(2026-11-11,与 {@link #scheduled()} 的 当前工序/当前工序计划量 同口径):
+        //   当前工序 = 台账里**最前面的**「已落实」道(2026-11-11 按量流转后可多道同时在制 ⇒ ASC,
+        //   与 scheduled() 里 curOp 的 ORDER BY 一致);本线排产量 = 该道台账计划数量,
+        //   取不到回落 成品排产数量 × 该道换算率。
+        final String curOpToday = "ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
+                + " WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
+                + "   AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
+                + " ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序],N''))";
+        final String lineQtyToday = "ISNULL(NULLIF((SELECT TOP 1 ISNULL(w.计划数量,0) FROM dbo.wo_process_line w"
+                + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
+                + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND w.工序 = " + curOpToday + "), 0),"
+                + " ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(换算率,1) FROM dbo.bs_route"
+                + "   WHERE 工艺路线编码 = ISNULL(p.[工艺路线],N'') AND 工序名称 = " + curOpToday
+                + "     AND ISNULL(asp_cancel,'N')<>'Y'), 0))";
         return jdbc.queryForList(
                 "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.lb,N'') AS 排产班组,"
@@ -770,6 +784,10 @@ public class ScheduleBoardService {
                         // 生产状态 = {@link #ST_EXPR}(唯一定义,与工单排产看板/生产工单列表同源)
                         + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量,"
+                        // 本线排产数量(2026-11-11 用户口径):②已排产同样是「工单行 × 当前产线」粒度,
+                        //   这一列显示本线要排/要做的量(= 排产数量 × 该道换算率);
+                        //   成品口径的 排产数量(pl_sl) 照旧返回给打印/切单/未交量等使用。
+                        + " " + lineQtyToday + " AS 本线排产数量,"
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                         // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用
                         + " " + ROW_YL + " AS 余量,"
@@ -889,10 +907,13 @@ public class ScheduleBoardService {
         //   回落值原取 wpp.当前工序 —— 视图 v_wo_process_progress 是**按单号聚合**的整单派生值
         //   ⇒ 同工单所有行显示同一个工序(与行级口径冲突)。现回落 p.[当前工序](本行状态列)。
         //   ⚠ 不跨 CROSS APPLY 引用别名(T-SQL 实测「Invalid column name」)⇒ 拼成局部变量复用
+        // 当前工序 = 预排台账里**最前一道「已落实」**。2026-11-11 按量流转后可能**多道同时在制**
+        //   (成型在做、切炭也在做已流入的那批)⇒ 取最前面还没做完的那道(工序序 ASC),与
+        //   ProcessFlow.currentOp 同口径;已完工道由状态过滤自动跳过,缺台账回落本行 p.[当前工序]。
         final String curOp = "ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                 + " WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                 + "   AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                + " ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序],N''))";
+                + " ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序],N''))";
         final String prevOp = "(SELECT TOP 1 r4.工序名称 FROM dbo.bs_route r4"
                 + " WHERE r4.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND ISNULL(r4.asp_cancel,'N')<>'Y'"
                 + "   AND ISNULL(r4.加工顺序,999) < ISNULL(NULLIF((SELECT TOP 1 w4.工序序 FROM dbo.wo_process_line w4"
@@ -908,7 +929,7 @@ public class ScheduleBoardService {
                 + "   AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
                 + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
                 + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N''))))";
-        return jdbc.queryForList(
+        List<Map<String, Object>> out = jdbc.queryForList(
                 // 行id = **工单行身份**(plang.id),行级键的第一段(2026-10-15「能按行的都按行」):
                 //   下游(打印留痕/取消结案/调拨/追溯)一律拿它定位,不再只靠(工单号+批次号)反查 ——
                 //   同天多笔转单批次号相同,只有 plang.id 才唯一。
@@ -985,6 +1006,16 @@ public class ScheduleBoardService {
                         //   与口径冲突。改为稳定的业务键:工单号 + 工单行号(可预期、可复现,不随交期跳)。
                         + " ORDER BY pc.pl_no, pc.pl_xc",
                 line == null ? "" : line, line == null ? "" : line, ws, ws);
+        // 本线排产数量(2026-11-11 用户口径):本页一行 = 一张工单行在**当前产线**做**当前工序**,
+        //   页面「排产数量」列要显示的是**本线要排/要做的量** = 排产数量 × 该道换算率 ——
+        //   同一次查询里已经有「当前工序计划量」(台账计划数量优先、缺失回落 pl_sl×换算率),
+        //   这里补一个同值别名,让「工单排产 / 快速排产②已排产」两页统一读 `本线排产数量`。
+        //   ⚠ 只读别名:不改 pl_sl、不写库;成品口径的 排产数量(pl_sl) 照旧返回,
+        //     供打印/切单/未交量/领料/结案等既有判据使用。
+        for (Map<String, Object> r : out) {
+            r.put("本线排产数量", r.get("当前工序计划量"));
+        }
+        return out;
     }
 
     /**

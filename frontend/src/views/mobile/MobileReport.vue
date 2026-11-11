@@ -73,6 +73,12 @@
                 <span>{{ fmt(op.已报工) }} / {{ fmt(op.计划数量) }}</span>
                 <span v-if="Number(op.待审核) > 0" class="mp-op-pending">{{ tt('待审') }} {{ fmt(op.待审核) }}</span>
               </div>
+              <!-- 按量流转(2026-11-11 用户口径):本道能报多少 = **上一道已审完工量**流下来的量,
+                   不是本道的计划量。工序1 计划 500 只报 200 ⇒ 工序2 这里显示"可报 200"。 -->
+              <div class="mp-op-flow" :title="tt('本道可报量 = 上一道已审核完工量(按量流转)')">
+                {{ tt('可报') }} <b>{{ fmt(leftOf(op)) }}</b>
+                <span class="mp-op-avail">{{ tt('可加工量') }} {{ fmt(op.可加工量 || 0) }}</span>
+              </div>
               <div class="mp-op-bar"><i :style="{ width: pct(op) + '%' }"></i></div>
             </div>
             <!-- 台账为空 = 该工单行还没预排产(工序任务由「快速排产 → 预排全程线」按工艺路线生成),
@@ -190,6 +196,16 @@ const pct = (op) => {
   if (plan <= 0) return 0
   return Math.min(100, Math.round((done / plan) * 100))
 }
+/**
+ * 本道**剩余可报量**(按量流转,2026-11-11):后端 ProcessFlow 派生 = 可加工量 − 已报工。
+ * 可加工量 = 上一道已审完工量折算到本道(首道 = 排产数量折算),所以后道只能报前道真正流下来的量。
+ * 老接口没有该字段时退回历史口径(计划量 − 已报工),保证不崩。
+ */
+const leftOf = (op) => {
+  if (!op) return 0
+  if (op.剩余可报 !== undefined && op.剩余可报 !== null) return Math.max(Number(op.剩余可报) || 0, 0)
+  return Math.max((Number(op.计划数量) || 0) - (Number(op.已报工) || 0), 0)
+}
 
 /** 工序中文名(库里就是「成型/切炭/组装」;切炭不要写成"切碳") */
 function opLabel(name) {
@@ -212,6 +228,10 @@ const canSubmit = computed(() => !!wo.value && !!picked.value && Number(qty.valu
 const submitHint = computed(() => {
   if (!picked.value) return tt('请先选择工序')
   if (!(Number(qty.value) > 0)) return tt('请填写完工数量')
+  // 按量流转(2026-11-11):超量提示把"可报多少"直接写出来,现场不用猜
+  const left = leftOf(picked.value)
+  if (left <= 0) return tt('前道工序还没有已审核完工量流入,请先报上一道工序')
+  if (Number(qty.value) > left + 0.0001) return tt('超出本道可报量') + ':' + fmt(left)
   return ''
 })
 
@@ -279,15 +299,15 @@ async function loadWo(line) {
     today.value = Array.isArray(data.今日报工) ? data.今日报工 : []
     // 组装物料(2026-11-01):后端按工单行产品编码下发;只有选中「组装」工序时才展示
     asmBom.value = data.组装物料 || null
-    // 默认选中「当前工序」,没有就选第一道未做满的
+    // 默认选中「当前工序」,没有就选第一道还有可报量的
     const cur = String(wo.value?.当前工序 || '').trim()
     const hit = ops.value.find((o) => o.工序 === cur)
-      || ops.value.find((o) => Number(o.计划数量) > 0 && Number(o.已报工) < Number(o.计划数量))
+      || ops.value.find((o) => leftOf(o) > 0)
       || ops.value[0]
     if (hit) {
       pickedOp.value = hit.工序
-      // 数量默认 = 计划量 - 已报工(还差多少),不能为负
-      const left = (Number(hit.计划数量) || 0) - (Number(hit.已报工) || 0)
+      // 数量默认 = **本道剩余可报**(按量流转:上一道流下来多少就只能报多少)
+      const left = leftOf(hit)
       qty.value = left > 0 ? Math.round(left * 10000) / 10000 : 0
     }
   } catch (e) {
@@ -299,7 +319,8 @@ async function loadWo(line) {
 
 function pickOp(op) {
   pickedOp.value = op.工序
-  const left = (Number(op.计划数量) || 0) - (Number(op.已报工) || 0)
+  // 数量默认 = 本道剩余可报(按量流转:计划量在这里不再等于可报量)
+  const left = leftOf(op)
   qty.value = left > 0 ? Math.round(left * 10000) / 10000 : 0
 }
 
@@ -430,6 +451,13 @@ async function submit() {
   margin-top: 4px; font-size: 11px; color: var(--el-text-color-secondary);
 }
 .mp-op-pending { color: var(--el-color-warning); }
+/* 按量流转(2026-11-11):本道可报量 = 上一道已审核完工量流下来的量 —— 现场一眼看到"还能报多少" */
+.mp-op-flow {
+  display: flex; align-items: baseline; gap: 6px;
+  margin-top: 3px; font-size: 11px; color: var(--el-text-color-secondary);
+}
+.mp-op-flow b { color: var(--el-color-primary); font-size: 13px; }
+.mp-op-avail { color: var(--el-text-color-placeholder); }
 .mp-op-bar { height: 4px; margin-top: 6px; border-radius: 2px; background: var(--el-fill-color); overflow: hidden; }
 .mp-op-bar i { display: block; height: 100%; background: var(--el-color-primary); }
 
