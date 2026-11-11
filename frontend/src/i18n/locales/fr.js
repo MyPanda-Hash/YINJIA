@@ -2785,11 +2785,11 @@ export default {
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
     '维护处理意见选项': 'Gérer les options d’avis',
     '处理意见选项维护': 'Options d’avis de traitement',
-    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'La bibliothèque d’options est commune à tout le système ; les modifications touchent tous les documents (les valeurs déjà enregistrées restent inchangées).',
+    '仅「出货检验单功能」使用，改动只影响本面板（历史单据已填的值不受影响）': 'Utilisé uniquement par « Fiche d’inspection sortante (fonctionnelle) » ; les modifications n’affectent que ce panneau.',
     '请输入选项内容': 'Saisir le texte de l’option',
     '新增选项': 'Ajouter une option',
     '至少保留一个选项': 'Conservez au moins une option',
-    '选项内容不能超过30个字': 'L’option ne peut pas dépasser 30 caractères',
+    '选项内容不能超过200个字': 'L’option ne peut pas dépasser 200 caractères',
     '选项维护失败': 'Échec de l’enregistrement des options',
     '选项已保存': 'Options enregistrées',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Choisissez dans la liste ou saisissez un nouvel avis puis appuyez sur Entrée (il sera ajouté à la bibliothèque d’options)',

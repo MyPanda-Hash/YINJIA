@@ -5704,11 +5704,11 @@ export default {
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
     '维护处理意见选项': 'Maintain disposal opinion options',
     '处理意见选项维护': 'Disposal Opinion Options',
-    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'The option library is shared system-wide; changes affect every document (values already saved stay unchanged).',
+    '仅「出货检验单功能」使用，改动只影响本面板（历史单据已填的值不受影响）': 'Used by "Outgoing Inspection Sheet (Functional)" only; changes affect this panel only (values already saved stay unchanged).',
     '请输入选项内容': 'Enter option text',
     '新增选项': 'Add option',
     '至少保留一个选项': 'Keep at least one option',
-    '选项内容不能超过30个字': 'An option must be at most 30 characters',
+    '选项内容不能超过200个字': 'An option must be at most 200 characters',
     '选项维护失败': 'Failed to save options',
     '选项已保存': 'Options saved',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Available options are listed; you may also type a new disposal opinion and press Enter (it will be added to the option library automatically)',

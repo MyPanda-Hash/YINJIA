@@ -314,22 +314,22 @@
     <el-dialog
       v-model="optManagerVisible"
       :title="tt('处理意见选项维护')"
-      width="520px"
+      width="460px"
       append-to-body
       class="qr-opt-dialog"
     >
-      <div class="qr-opt-hint">{{ tt('选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）') }}</div>
+      <div class="qr-opt-hint">{{ tt('仅「出货检验单功能」使用，改动只影响本面板（历史单据已填的值不受影响）') }}</div>
       <div class="qr-opt-list">
         <div v-for="(o, i) in optDraft" :key="'o' + i" class="qr-opt-row">
           <!-- 选项文本按多行域渲染(2026-11-11 用户口径「这个字数过多时需要换行」):
                单行 el-input 不会折行,长文本会把格子撑破/被截断;textarea + autosize 让它在
-               1~3 行之间自动长高并正常换行(仍限 30 字,与后端校验一致)。 -->
+               1~5 行之间自动长高并正常换行(上限 200 字,只防极端值;旧版 30 字限制已按用户口径去掉)。 -->
           <el-input
             v-model="optDraft[i]"
             type="textarea"
             size="small"
-            :autosize="{ minRows: 1, maxRows: 3 }"
-            maxlength="30"
+            :autosize="{ minRows: 1, maxRows: 5 }"
+            maxlength="200"
             resize="none"
             class="qr-opt-input"
             :placeholder="tt('请输入选项内容')"
@@ -949,7 +949,7 @@ async function saveOptManager() {
   for (const raw of optDraft.value) {
     const v = String(raw ?? '').trim()
     if (!v) continue
-    if (v.length > 30) { ElMessage.warning(tt('选项内容不能超过30个字')); return }
+    if (v.length > 200) { ElMessage.warning(tt('选项内容不能超过200个字')); return }
     if (!cleaned.includes(v)) cleaned.push(v)
   }
   if (!cleaned.length) { ElMessage.warning(tt('至少保留一个选项')); return }

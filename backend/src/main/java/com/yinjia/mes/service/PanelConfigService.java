@@ -2636,7 +2636,7 @@ public class PanelConfigService {
      *   <li>只认「下拉框」字段,且 dict_sql 必须是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)}
      *       这种字面量列表形态 —— 其它形态(查字典表/JOIN)一律不动并返回 false;</li>
      *   <li>已存在(去首尾空格比较)直接返回 false,不重复插;</li>
-     *   <li>值长度 ≤ 30、不含换行等控制字符;单引号按 T-SQL 规则转义,避免注入;</li>
+     *   <li>值长度 ≤ 200、不含换行等控制字符;单引号按 T-SQL 规则转义,避免注入;</li>
      *   <li>UPDATE 带 panel_code + label 精确条件,受影响行数 != 1 视为失败。</li>
      * </ul>
      *
@@ -2646,7 +2646,7 @@ public class PanelConfigService {
         String code = panelCode == null ? "" : panelCode.trim();
         String lab = label == null ? "" : label.trim();
         String val = option == null ? "" : option.trim();
-        if (code.isEmpty() || lab.isEmpty() || val.isEmpty() || val.length() > 30) return false;
+        if (code.isEmpty() || lab.isEmpty() || val.isEmpty() || val.length() > 200) return false;
         if (val.indexOf('\n') >= 0 || val.indexOf('\r') >= 0) return false;
         try {
             java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
@@ -2696,7 +2696,7 @@ public class PanelConfigService {
      * <ul>
      *   <li>清单去首尾空格、去空项、去重(保序);</li>
      *   <li>至少保留 1 项(否则下拉就空了,没法用);</li>
-     *   <li>每项 ≤ 30 字、不含换行;单引号转义;</li>
+     *   <li>每项 ≤ 200 字、不含换行;单引号转义;</li>
      *   <li>写库仍是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)} 形态(与手工维护一致)。</li>
      * </ul>
      *
@@ -2713,7 +2713,7 @@ public class PanelConfigService {
         for (String raw : options) {
             String v = raw == null ? "" : raw.trim();
             if (v.isEmpty()) continue;
-            if (v.length() > 30 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) return false;
+            if (v.length() > 200 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) return false;
             cleaned.add(v);
         }
         if (cleaned.isEmpty()) return false;

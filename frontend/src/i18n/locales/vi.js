@@ -2790,11 +2790,11 @@ export default {
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
     '维护处理意见选项': 'Quản lý tùy chọn ý kiến',
     '处理意见选项维护': 'Tùy chọn ý kiến xử lý',
-    '选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）': 'Thư viện tùy chọn dùng chung toàn hệ thống; thay đổi ảnh hưởng mọi chứng từ (giá trị đã lưu giữ nguyên).',
+    '仅「出货检验单功能」使用，改动只影响本面板（历史单据已填的值不受影响）': 'Chỉ dùng cho «Phiếu kiểm tra xuất hàng (chức năng)»; thay đổi chỉ ảnh hưởng bảng này.',
     '请输入选项内容': 'Nhập nội dung tùy chọn',
     '新增选项': 'Thêm tùy chọn',
     '至少保留一个选项': 'Giữ ít nhất một tùy chọn',
-    '选项内容不能超过30个字': 'Tùy chọn tối đa 30 ký tự',
+    '选项内容不能超过200个字': 'Tùy chọn tối đa 200 ký tự',
     '选项维护失败': 'Lưu tùy chọn thất bại',
     '选项已保存': 'Đã lưu tùy chọn',
     '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Có thể chọn trong danh sách hoặc nhập ý kiến xử lý mới rồi nhấn Enter (sẽ tự động thêm vào thư viện tùy chọn)',
