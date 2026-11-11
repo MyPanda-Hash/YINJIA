@@ -3655,16 +3655,32 @@ public class ButtonService {
         return n != null && n > 0;
     }
 
-    /** 一级通过:把选定的二级审核人姓名写回纸面「审核人（二级审批人）」格 */
+    /**
+     * 一级通过:把选定的二级审核人姓名写回纸面「审核人（二级审批人）」**和**「产品负责人」两格。
+     *
+     * <p>用户口径(2026-11-11):「二级审核人是分配的产品责任人（规格书的责任人）是谁就回填显示谁的名字…
+     * 这三个都是只读的，但是都要有对应的数据回填进去」;追问后补充:
+     * 「责任人在一级审批选择二级签核人之前都是空的，选了二级签核人就回填二级签核人进去，后续改动也对应改动」。</p>
+     *
+     * <p>⇒ 两格一起写:纸面「审核人（二级审核）」的物理列是 {@code 审核人二级},
+     * 纸面「产品负责人」的物理列是 {@code 责任人}（实测 yj_field.col_name）。
+     * **时机**固定在"一级审批通过、转待二级"那一刻 —— 选人之前两格都保持空,
+     * 与用户口径「选择之前都是空的」一致。</p>
+     *
+     * <p>⚠ 两格现在都是只读(recordSheetConfigs 的 ro:true + yj_field.editable=0, 见
+     * migrate-prodinfo-approver-cells-20261111.sql) ⇒ 这里是**唯一**能把它们填上的路径,
+     * 别的入口(前端保存)已经写不进来了。改这里前先确认没有别的链路需要写入。</p>
+     */
     private void writeBackL2Approver(String panelCode, String no, String l2Account) {
         if (!"RD_PROD_INFO".equals(panelCode)) return;
         List<String> names = jdbc.queryForList("SELECT real_name FROM yj_user WHERE username = ?", String.class, l2Account);
         String name = names.isEmpty() || names.get(0) == null ? l2Account : names.get(0);
         try {
-            jdbc.update("UPDATE rd_prod_info_head SET 审核人二级 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                    name, no);
+            jdbc.update("UPDATE rd_prod_info_head SET 审核人二级 = ?, 责任人 = ?"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    name, name, no);
         } catch (Exception e) {
-            log.warn("[两级审批] 写回审核人二级失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+            log.warn("[两级审批] 写回审核人二级/责任人失败 panel={} no={}: {}", panelCode, no, e.getMessage());
         }
     }
 

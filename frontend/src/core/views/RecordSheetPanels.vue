@@ -348,8 +348,13 @@
                   hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
-                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
-                <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <!-- pair.ro = 该格只读展示(2026-11-11 用户口径:产品信息表的一级/二级审核人、产品负责人
+                     「这三个都是只读的，但是都要有对应的数据回填进去」)。
+                     ⚠ 此前 pairs 分支**完全没有读 ro** —— c.ro 只对 row.grid 分支生效,
+                       所以只写配置里的 ro:true 界面照旧能改(实测 hasInput=true)。这里补齐两条输入分支的判断。
+                     值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
+                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
             </template>
@@ -1022,8 +1027,13 @@
                   hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
-                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
-                <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <!-- pair.ro = 该格只读展示(2026-11-11 用户口径:产品信息表的一级/二级审核人、产品负责人
+                     「这三个都是只读的，但是都要有对应的数据回填进去」)。
+                     ⚠ 此前 pairs 分支**完全没有读 ro** —— c.ro 只对 row.grid 分支生效,
+                       所以只写配置里的 ro:true 界面照旧能改(实测 hasInput=true)。这里补齐两条输入分支的判断。
+                     值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
+                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
             </template>

@@ -1605,17 +1605,27 @@ export const recordSheetConfigs = {
           // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
           { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
         ]},
-        // 两级审批人**各占一行**(用户口径:原来挤在同一行);固定值 冯总 / 秀丽 由
-        // docDefaults.js 在新建时带出(与 申请立项人/负责人 同机制,仍可人工改)。
+        // 两级审批人各占一行(用户口径:原来挤在同一行)；**三格全部只读**(2026-11-11 用户口径):
+        //   「产品信息表的一级审核人名字改为：陈秀丽，这个是固定的
+        //    二级审核人是分配的产品责任人（规格书的责任人）是谁就回填显示谁的名字
+        //    这三个都是只读的，但是都要有对应的数据回填进去」
+        //   ⇒ 纸面 ro:true 不可编辑；值由系统回填（不是人工填）:
+        //      · 一级:docDefaults 新建时带出「陈秀丽」(固定)；
+        //      · 二级:**一级审批选了二级签核人之后**由 ButtonService.writeBackL2Approver 写
+        //        rd_prod_info_head.审核人二级；选之前为空，后续改人也跟着改；
+        //      · 产品负责人:同二级(分发责任人/规格书责任人就是它)。
+        //   ⚠ 只读是**两处一起**才成立的:纸面 ro:true(这里) + yj_field.editable=0
+        //     (tools/migrate-prodinfo-approver-cells-20261111.sql)。只改一边挡不住绕过界面直接调保存。
+        //   ⚠ 回填链路不受影响:两处回填都是服务端 raw SQL 直写，不走前端保存校验。
         // 原「审核人」列保留为历史列(hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢)。
         { pairs: [
-          { label: '审核人（一级审核）', key: '审核人（一级审批人）', type: 'text', vspan: 3 },
+          { label: '审核人（一级审核）', key: '审核人（一级审批人）', type: 'text', vspan: 3, ro: true },
         ]},
         { pairs: [
-          { label: '审核人（二级审核）', key: '审核人（二级审批人）', type: 'text', vspan: 3 },
+          { label: '审核人（二级审核）', key: '审核人（二级审批人）', type: 'text', vspan: 3, ro: true },
         ]},
         { pairs: [
-          { label: '产品负责人', key: '产品负责人', type: 'text', vspan: 3 },
+          { label: '产品负责人', key: '产品负责人', type: 'text', vspan: 3, ro: true },
         ]},
         { pairs: [
           { label: '备注', key: '备注', vspan: 3 },
