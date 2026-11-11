@@ -4171,11 +4171,16 @@ const hasUserPick = computed(() => {
 })
 /* 账号串 ⇄ 数组 / 账号串 → 姓名：实现与单测在 @core/panel/signerText.js，
    这里只做组件侧的薄封装（切分口径必须与后端 ButtonService.signersOf 逐字一致）。 */
+// ⚠ `head` 只是 **prop**（模板里能直接写 head，但 <script setup> 作用域里没有这个绑定）
+//   ⇒ 脚本里一律 props.head。写成裸 head 会在渲染期抛 ReferenceError: head is not defined，
+//   Vue 捕获后整张纸面**停止更新**（DOM 停在旧状态：分页 0/0、单据编号显示「—」、格子全空），
+//   而且这个错会波及**所有** RecordSheetPanels 面板（实测 RD_PROD_INFO 一起报）。
 function pickListOf(key) {
-  return splitSigners(head[key])
+  return splitSigners(props.head?.[key])
 }
 function setPickList(key, arr) {
-  head[key] = joinSigners(arr)
+  if (!props.head) return
+  props.head[key] = joinSigners(arr)
   emit('dirty')
 }
 /** 账号串 → 人员姓名（查不到回落账号，不让格子空掉） */

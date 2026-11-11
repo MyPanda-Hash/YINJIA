@@ -59,6 +59,40 @@ test('④ 只读态也要显示姓名，不能把账号直接印在纸上', () =
   assert.match(sheet, /signNamesOf/, '只读态缺少账号→姓名映射（否则纸面印出一串英文账号）')
 })
 
+test('④b 顶层函数里必须用 props.head —— 模板能裸写 head，<script setup> 里不行', () => {
+  // 实测事故（2026-11-11）：会签人辅助函数写成裸 `head[key]`，渲染期抛
+  //   ReferenceError: head is not defined —— Vue 捕获后**整张纸面停止更新**，
+  //   DOM 停在旧状态（分页 0/0、单据编号显示「—」、格子全空），而且波及**所有**
+  //   RecordSheetPanels 面板（RD_PROD_INFO 一起报错）。单测抓不到，只有活体看得到，
+  //   所以钉住这条：顶层 function 里出现裸 head 就是引用了不存在的绑定。
+  const raw = sheet.slice(sheet.indexOf('<script setup'), sheet.indexOf('</script>'))
+  // 先去注释，否则文档里"head[]"这类示例会被误判
+  const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const fnRe = /^function\s+(\w+)\s*\(([^)]*)\)\s*\{/gm
+  const problems = []
+  let m
+  while ((m = fnRe.exec(code)) !== null) {
+    const name = m[1]
+    const params = m[2]
+    // 取函数体：从 { 起按花括号配平
+    let i = code.indexOf('{', m.index)
+    let depth = 0
+    let body = ''
+    for (; i < code.length; i++) {
+      const ch = code[i]
+      body += ch
+      if (ch === '{') depth++
+      else if (ch === '}') { depth--; if (depth === 0) break }
+    }
+    if (params.includes('head')) continue           // head 是形参
+    if (/\bconst\s+head\b/.test(body)) continue     // 函数内自己取了本地别名
+    // 裸 head（前面不是点，排除 props.head）
+    const bare = [...body.matchAll(/(^|[^.\w$])head\s*\??\.?\[/gm)]
+    if (bare.length) problems.push(`${name}(): ${bare.length} 处裸 head`)
+  }
+  assert.deepEqual(problems, [], '这些函数在脚本作用域引用了不存在的 head，必须写 props.head：\n' + problems.join('\n'))
+})
+
 test('⑤ 后端提供会签人选人清单，权限挂 RD_CHANGE（不复用别的面板端点）', () => {
   assert.match(px, /@GetMapping\("\/rdChange\/users"\)/, '缺少 /px/rdChange/users 端点')
   const m = px.match(/@GetMapping\("\/rdChange\/users"\)[\s\S]{0,400}?\n    \}/)
