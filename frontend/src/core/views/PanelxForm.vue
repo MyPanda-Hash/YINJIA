@@ -688,7 +688,10 @@ function confirmSelect() {
   const sourceNos = [...new Set(selectRows.value.map((r) => r['单据编号'] || r['编号'] || '').filter(Boolean))]
   if (sourceNos.length) {
     if (cfg.sourceNoField) form[cfg.sourceNoField] = sourceNos.join('、')
-    if (form['来源单据'] === undefined && form['匹配来源单号'] === undefined) form['来源单据'] = cfg.title || '选单'
+    // 来源单据:采购入库单 2026-11-11 起把它正名为「来源」并挪到表头末尾(其余面板仍叫「来源单据」),
+    // 故按**本面板实际登记的键**写,不写死 —— 写死会让改名那张单的键落不下去(保存时被丢弃)。
+    const srcDocKey = ['来源', '来源单据'].find((k) => visibleFormMeta.value.some((f) => f.code === k))
+    if (srcDocKey && form[srcDocKey] === undefined && form['匹配来源单号'] === undefined) form[srcDocKey] = cfg.title || '选单'
   }
   // 明细行来源：默认选中行；配置 detailRows 时（如工序汇报单选生产工单）对每个选中单据取工序明细合并（对齐 T+ 选单带出工序行）
   let srcRows = selectRows.value

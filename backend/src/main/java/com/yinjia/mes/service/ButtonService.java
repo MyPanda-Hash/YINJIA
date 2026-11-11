@@ -4587,10 +4587,14 @@ public class ButtonService {
         // 批次键随链带入:链路身份(按批次反查/链路终点解析用),与批次号各司其职。
         if (h.get("批次键") != null) head.put("批次键", h.get("批次键"));
         head.put("外部单据号", no);
-        head.put("来源单据", "来料检验单");
-        head.put("来源单号", no);
+        // 来源 / 来源单号(2026-11-11 用户口径:采购入库单表头最末尾要看得见「这批货从哪来」+ 来源单据编号)。
+        // 标签按**列名反查**:采购入库单这两列的显示名是「来源」「来源单号」
+        // (tools/migrate-purchase-in-source-20261111.sql),其余面板仍叫「来源单据」。
+        PanelRegistry.PanelDef piDef = registry.panel("PURCHASE_IN");
+        head.put(colLabel(piDef, "来源单据", "来源单据"), "来料检验单");
+        head.put(colLabel(piDef, "来源单号", "来源单号"), no);
         head.put("detail", Map.of("items", items));
-        Map<String, Object> saved = save(registry.panel("PURCHASE_IN"), head, false);
+        Map<String, Object> saved = save(piDef, head, false);
         String piNo = String.valueOf(saved.get("编号"));
         // 行级占用 + 入库单号回填(目标行按保存顺序取 id,与 pass 一一对应)
         List<Integer> tgtIds = jdbc.queryForList(
@@ -5099,10 +5103,14 @@ public class ButtonService {
         if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
             head.put("批次号", ih.get("批次号"));
         }
-        // 注:不写 外部单据号/来源单据/来源单号 —— 采购入库单已按 2026-09-21 用户口径
-        // 「入库单用采购订单号就够了」下线这三列;追溯走 form_flow_link 与检验行「入库单号」
+        // 来源 / 来源单号 = 特采单(2026-11-11 用户口径:特采来的那批也要在入库单表头看得见来源和单号)。
+        // 旧注释「不写 外部单据号/来源单据/来源单号 —— 入库单用采购订单号就够了(2026-09-21 口径)」
+        // 已被本条口径取代:来源列已在表头末尾显示,特采这条链不写就会是空的。
+        PanelRegistry.PanelDef piDef = registry.panel("PURCHASE_IN");
+        head.put(colLabel(piDef, "来源单据", "来源单据"), "特采单");
+        head.put(colLabel(piDef, "来源单号", "来源单号"), no);
         head.put("detail", Map.of("items", List.of(line)));
-        Map<String, Object> saved = save(registry.panel("PURCHASE_IN"), head, false);
+        Map<String, Object> saved = save(piDef, head, false);
         String piNo = String.valueOf(saved.get("编号"));
         List<Integer> tgtIds = jdbc.queryForList(
                 "SELECT id FROM bl_purchase_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
@@ -5692,6 +5700,18 @@ public class ButtonService {
 
     private static String str(Object o) {
         return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o).trim();
+    }
+
+    /**
+     * 目标面板「来源单据 / 来源单号」两列的**字段标签** —— 按列名反查,不写死标签。
+     * 通用保存按标签映射列,查不到标签的键会被静默丢弃:2026-11-11 起采购入库单把这两列的
+     * 显示名正名为「来源」「来源单号」(tools/migrate-purchase-in-source-20261111.sql),
+     * 其余面板仍叫「来源单据」,故这里不能写死。
+     */
+    private static String colLabel(PanelRegistry.PanelDef def, String col, String fallback) {
+        if (def == null) return fallback;
+        PanelRegistry.FieldDef f = def.byCol(col);
+        return f == null ? fallback : f.label();
     }
 
     private int COL_LENGTH(String table, String col) {

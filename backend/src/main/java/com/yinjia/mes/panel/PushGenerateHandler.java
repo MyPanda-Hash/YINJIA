@@ -155,12 +155,12 @@ public class PushGenerateHandler implements PanelActionHandler {
             Object v = head.get(m.get("from"));
             if (v != null) targetHead.put(m.get("to"), v);
         }
-        targetHead.put("来源单据", srcDef.name());
-        targetHead.put("来源单号", sourceNo);
+        PanelRegistry.PanelDef tgtDef = registry.panel(target);
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name());
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), sourceNo);
         // 单据日期=创建当日,不继承来源单日期(2026-09-17 用户口径)。注意:head 键=目标字段标签
         // (save 按标签映射列),而 yj_panel.date_col 是列名(如 QC_RECV 列=单据日期/标签=日期),
         // 故先按列名反查目标字段再用其标签写入;查不到时兜底「单据日期」标签。
-        PanelRegistry.PanelDef tgtDef = registry.panel(target);
         String dateLabel = "单据日期";
         if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
             PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
@@ -243,6 +243,21 @@ public class PushGenerateHandler implements PanelActionHandler {
                 srcItem == null || srcItem.get("物料编码") == null ? null : String.valueOf(srcItem.get("物料编码")),
                 wh == null ? null : String.valueOf(wh));
         if (bin != null) row.put("仓位", bin);
+    }
+
+    /**
+     * 目标面板「来源单据 / 来源单号」两列的**字段标签** —— 按列名反查,不写死标签。
+     *
+     * <p>为什么:2026-11-11 用户口径「采购入库单表头最末尾加一个来源…和显示对应的单据编号」,
+     * 采购入库单把这两列的显示名正名为 **来源** / 来源单号,并挪到表头末尾
+     * (见 {@code tools/migrate-purchase-in-source-20261111.sql}),其余面板仍叫「来源单据」。
+     * 通用保存是**按标签映射列**的,查不到标签的键会被静默丢弃 —— 写死「来源单据」就等于
+     * 入库单这两个字段永远空着,而其余面板照旧(极难察觉)。
+     */
+    private static String colLabel(PanelRegistry.PanelDef def, String col, String fallback) {
+        if (def == null) return fallback;
+        PanelRegistry.FieldDef f = def.byCol(col);
+        return f == null ? fallback : f.label();
     }
 
     private double numOf(Object v) {
@@ -614,8 +629,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             Object v = head.get(m.get("from"));
             if (v != null) targetHead.put(m.get("to"), v);
         }
-        targetHead.put("来源单据", srcDef.name());
-        targetHead.put("来源单号", sourceNo);
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name());
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), sourceNo);
 
         // 批次键 + 批次号(2026-10-04 口径:**生单即定号**,且在生单对话框里可当场改)
         // · 批次键:来源单已带「批次键」时**继承**它(键在「采购订单→送料暂收单」这一跳产生),
@@ -1007,8 +1022,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             Object v = head.get(m.get("from"));
             if (v != null) targetHead.put(m.get("to"), v);
         }
-        targetHead.put("来源单据", srcDef.name());
-        targetHead.put("来源单号", sourceNo);
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name());
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), sourceNo);
         String dateLabel = "单据日期";
         if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
             PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
