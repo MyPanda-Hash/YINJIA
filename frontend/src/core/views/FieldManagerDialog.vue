@@ -91,8 +91,8 @@ async function submit() {
       const p = String(form.value.parent || '').trim()
       const c1 = String(form.value.label || '').trim()
       const c2 = String(form.value.label2 || '').trim()
-      if (!p) { ElMessage.warning(tt('请先填写父目录(分组)名称')); saving.value = false; return }
-      if (!c1 || !c2) { ElMessage.warning(tt('请把两个子目录名称都填上')); saving.value = false; return }
+      if (!p) { ElMessage.warning(tt('请先填写父目录名称')); saving.value = false; return }
+      if (!c1 || !c2) { ElMessage.warning(tt('请把子目录1、子目录2 都填上')); saving.value = false; return }
       if (c1 === c2) { ElMessage.warning(tt('两个子目录不能同名')); saving.value = false; return }
     }
     const labels = twoChildren ? [form.value.label, form.value.label2] : [form.value.label]
@@ -179,10 +179,10 @@ async function retire(f) {
           </el-select>
           <el-tooltip :content="tt('该列只出现在这张表里;检验数据记录带入时也按这张表的列走')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
-        <el-form-item :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
-        <!-- 父字段(分组表头):选了父,这一列就并到那个分组标题下;父只是标题、没有数据格,
-             检验数据记录只带入子字段(用户口径 2026-10-04) -->
-        <el-form-item v-if="needTab()" :label="tt('父字段(分组)')">
+        <!-- 2026-11-11 用户口径(第二轮):两个来料检验要求面板**只填这三项**
+             「直接父目录,子目录1,子目录2就行了」—— 其余(类型/位置/查询/必填/列宽)一律按默认走,
+             不再给选;父目录**必填**(不再是"留空=独立列")。 -->
+        <el-form-item v-if="needTab()" :label="tt('父目录')">
           <div class="fm-parent">
             <el-select
               v-model="form.parent"
@@ -191,35 +191,38 @@ async function retire(f) {
               clearable
               allow-create
               default-first-option
-              :placeholder="tt('留空=独立列;可直接输入新分组名')"
+              :placeholder="tt('选择或输入父目录名(必填)')"
             >
               <el-option v-for="p in parentOptions" :key="p" :label="tt(p)" :value="p" />
             </el-select>
-            <span v-if="parentEmptyHint" class="fm-parent-hint">{{ tt('该表还没有分组名：直接输入一个名字（回车）即可新建') }}</span>
+            <span v-if="parentEmptyHint" class="fm-parent-hint">{{ tt('该表还没有父目录：直接输入一个名字（回车）即可新建') }}</span>
           </div>
           <el-tooltip :content="tt('父目录只做表头分组、没有数据格;检验数据记录带入时按 父目录一行 + 两个子目录各一行')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
-        <!-- 2026-11-11 用户口径:自定义字段必须是「一个父目录 + 两个子目录」⇒ 一次性填两个子目录名 -->
+        <el-form-item v-if="needTab()" :label="tt('子目录1')">
+          <el-input v-model="form.label" :placeholder="tt('第一个子目录名(中文,禁 . % / ( ) 空格)')" maxlength="60" />
+        </el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
         <el-form-item v-if="needTab()" :label="tt('子目录2')">
-          <el-input v-model="form.label2" :placeholder="tt('第二个子目录名(与上面的字段名成一对)')" maxlength="60" />
-          <el-tooltip :content="tt('必须一个父目录带两个子目录:字段名=子目录1,这里=子目录2,一次添加两个子列')" placement="top"><span class="fm-help">?</span></el-tooltip>
+          <el-input v-model="form.label2" :placeholder="tt('第二个子目录名(与子目录1成一对)')" maxlength="60" />
+          <el-tooltip :content="tt('必须一个父目录带两个子目录:子目录1 与 子目录2 一次添加')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
         <el-form-item :label="tt('英文名')"><el-input v-model="form.labelEn" maxlength="60" /></el-form-item>
-        <el-form-item :label="tt('类型')">
+        <el-form-item v-if="!needTab()" :label="tt('类型')">
           <el-select v-model="form.dataType" style="width: 160px">
             <el-option label="文本" value="文本" /><el-option label="下拉框" value="下拉框" /><el-option label="日期" value="日期" /><el-option label="是否" value="是否" />
           </el-select>
           <el-tooltip :content="tt('日期按 ISO 文本存储,排序正确;数值型请走正式迁移(需合计/排序精度)')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
-        <el-form-item v-if="form.dataType === '下拉框'" :label="tt('词表')"><el-input v-model="form.dictOptions" :placeholder="tt('逗号分隔,如: 是,否,待定')" /></el-form-item>
-        <el-form-item v-if="data.headPool" :label="tt('位置')">
+        <el-form-item v-if="!needTab() && form.dataType === '下拉框'" :label="tt('词表')"><el-input v-model="form.dictOptions" :placeholder="tt('逗号分隔,如: 是,否,待定')" /></el-form-item>
+        <el-form-item v-if="!needTab() && data.headPool" :label="tt('位置')">
           <el-radio-group v-model="form.place">
             <el-radio value="detail">{{ tt('明细行') }}</el-radio><el-radio value="header">{{ tt('表头') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item :label="tt('进查询区')"><el-switch v-model="form.inQuery" /></el-form-item>
-        <el-form-item :label="tt('必填')"><el-switch v-model="form.required" /></el-form-item>
-        <el-form-item :label="tt('列宽')"><el-input-number v-model="form.width" :min="60" :max="400" /></el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('进查询区')"><el-switch v-model="form.inQuery" /></el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('必填')"><el-switch v-model="form.required" /></el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('列宽')"><el-input-number v-model="form.width" :min="60" :max="400" /></el-form-item>
       </el-form>
     </div>
     <template #footer>
