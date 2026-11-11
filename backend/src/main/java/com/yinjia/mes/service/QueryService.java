@@ -116,6 +116,19 @@ public class QueryService {
      * SQL 一行都不用动。
      */
     private static final java.util.Set<String> STATUS_TAB_PANELS = java.util.Set.of("QC_PROC_INSP");
+
+    /**
+     * 需要后端派生只读字段「检测周期」的面板 —— 目前**只有出货检验单 QC_PROC_INSP**。
+     *
+     * <p>用户口径(2026-11-11 图2《出货检验功能记录表》抬头第 1 行):「检测周期:首次填写表单时间-末次提交审核时间」;
+     * 设计契约见 {@code docs/design/出货检验功能记录表-表样改造.md} §二 字段清单 / §四 后端:
+     * 「虚拟字段,QueryService 下发,yj_field 不建」—— 所以只在这里算、**不落库**,任何面板元数据都不用动。
+     *
+     * <p>加闸门(而不是所有面板都算)的理由与 {@link #STATUS_TAB_PANELS} 同一类:这张单要多一次
+     * 「按单号分组取 MIN(asp_time1)」的批量查询,只给真要显示的面板付这份代价。
+     */
+    private static final java.util.Set<String> DOC_CYCLE_PANELS = java.util.Set.of("QC_PROC_INSP");
+
     /**
      * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
      * 只是显示和权限不一样」)。
@@ -748,6 +761,12 @@ public class QueryService {
 
         Map<String, Map<String, Object>> status = loadStatus(def.code(), docNos);
 
+        // 「检测周期」的左端(首次填写/保存时间):**一次批量查**全部单号(与 loadStatus 同款),
+        // 不要放进下面的单号循环里逐单查 —— 那会变成一页 50 次查询的 N+1。
+        Map<String, java.sql.Timestamp> firstSave = DOC_CYCLE_PANELS.contains(def.code())
+                ? loadFirstSaveTimes(def, docNos)
+                : Map.of();
+
         List<Map<String, Object>> docs = new ArrayList<>();
         for (String no : byDoc.keySet()) {
             List<Map<String, Object>> items = byDoc.get(no);
@@ -770,6 +789,18 @@ public class QueryService {
             // 2026-11-06 外部开发样品申请单接入两级审批后，前端靠这一格判断「我是不是本单的确认人」
             // （PanelxList.l2ApproverNow）：没有它，非管理员的确认人在「待二级审批」节点看不到按钮。
             doc.put("二级审核人", st == null ? null : st.get("l2_approver"));
+            // 「检测周期」派生只读字段(2026-11-11,出货检验单 QC_PROC_INSP 的图2 表头第 1 行):
+            //   首次填写表单时间(= 头表 asp_time1 的 MIN,即这套单第一次落库/保存的时刻)
+            //   ~ 末次提交/审核时间(= yj_doc_status.pending_at 提交时间 / shsj 审核时间中**有值的较晚者**)。
+            //   草稿只有首次保存时间 ⇒ 单端显示;两端都没有 ⇒ null(前端留空格子)。
+            //   两端按**时间先后**排版(B 案,原因见 docCycleText:存量单是批量导入,asp_time1 晚于历史审核时间,
+            //   照字面会排出倒置区间;新单 first<last,排版前后完全一致)。
+            //   口径来源:用户 2026-11-11 图2 表头注「检测周期:首次填写表单时间-末次提交审核时间」,
+            //   契约见 docs/design/出货检验功能记录表-表样改造.md §二「(派生)检测周期 / 后端派生只读」。
+            //   ⚠ 只读派生、**不落库**:yj_field 里不建这一行(不是字段,是后端合成的行键,与「发起人」同类)。
+            if (DOC_CYCLE_PANELS.contains(def.code())) {
+                doc.put("检测周期", docCycleText(firstSave.get(no), st));
+            }
             doc.put("detail", Map.of("items", items));
             // 「发起人」= 提交审批的人(2026-10-29 用户口径「发起人应该是提交审批的人的账号名,
             // 以提交审批的为准,草稿的可以覆盖」)。
@@ -880,6 +911,99 @@ public class QueryService {
                     }, docNos.toArray());
         }
         return out;
+    }
+
+    /**
+     * 首次填写/保存时间 —— 「检测周期」的左端,**一次批量查**所有单号(按 group_col 取 {@code MIN(asp_time1)})。
+     *
+     * <p>为什么单独查:loadDocs 只 select yj_field 里登记过的列,{@code asp_time1} 是审计列、不一定在字段集合里;
+     * 它放在 {@link #loadStatus} 同一个位置(**进入单号循环之前**)= 一页 50 单只多 1 条 SQL,
+     * 与「发起人」取数同一条纪律(绝不逐单查 → N+1)。
+     *
+     * <p>头行式取头表(一单一行,MIN 与单值等价,写成 MIN 是为了与单表式面板同一句 SQL);
+     * 没有头表的形态用行表兜底。
+     *
+     * <p>取不到(表/列缺失、历史脏数据)只记日志、不阻断:派生字段缺失应当留空格子,
+     * 不能把整张列表打挂 —— 与 {@link #realNameOf} 的容错口径一致。
+     */
+    private Map<String, java.sql.Timestamp> loadFirstSaveTimes(PanelRegistry.PanelDef def, List<String> docNos) {
+        Map<String, java.sql.Timestamp> out = new HashMap<>();
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String g = def.groupCol();
+        if (table == null || table.isBlank() || g == null || g.isBlank()) return out;
+        String in = String.join(",", docNos.stream().map(n -> "?").toList());
+        try {
+            jdbc.query("SELECT t.[" + g + "] AS __no, MIN(t.asp_time1) AS __first FROM " + table
+                    + " t WHERE t.[" + g + "] IN (" + in + ") GROUP BY t.[" + g + "]", rs -> {
+                out.put(rs.getString("__no"), rs.getTimestamp("__first"));
+            }, docNos.toArray());
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(QueryService.class)
+                    .warn("[检测周期] 面板 {} 取首次保存时间失败(该列留空): {}", def.code(), e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * 「检测周期」文本 = 首次填写表单时间 ~ 末次提交/审核时间(格式 {@code yyyy-MM-dd HH:mm})。
+     *
+     * <p><b>用户口径</b>(2026-11-11 图2《出货检验功能记录表》抬头第 1 行):
+     * 「检测周期:首次填写表单时间-末次提交审核时间」。取数:
+     * <ul>
+     *   <li>首次填写 = 首次保存(头表 {@code asp_time1} 的 MIN,见 {@link #loadFirstSaveTimes});</li>
+     *   <li>末次提交/审核 = {@code yj_doc_status.pending_at}(提交审批时间)与 {@code shsj}(审核时间)里
+     *       **有值的较晚者**;只提交没审 ⇒ 到提交为止,审完 ⇒ 到审核为止;</li>
+     *   <li>只有一端就**单端显示**(草稿只有首次保存时间),两端都空 ⇒ {@code null}(前端留空格子)。</li>
+     * </ul>
+     *
+     * <p><b>为什么两端按时间先后排版,而不是硬把「首次」放左边</b>(2026-11-11 用户/Lead 拍板 B 案):
+     * 存量单是 2026-10 批量导入的 —— {@code asp_time1} 是**导入时刻**(实测统一 2026-10-18 08:02:03),
+     * 而 {@code shsj} 是纸面历史审核时刻(2026-10-14/15 08:30)。实测 445 张单里 417 张已审核单
+     * **全部**满足 shsj &lt; MIN(asp_time1)(0 张正常、28 张无审核时间)—— 照字面拼就是倒置区间
+     * 「2026-10-18 08:02 ~ 2026-10-14 08:30」,打在纸面上像个 bug。
+     * ⇒ 两端取**较早者在前、较晚者在后**:新单本来 first &lt; last,输出**一个字都不变**;
+     *   存量单只是把两个真实时间换成可读顺序,不发明时间、也不丢时间。
+     *   (没有改成「只显示左端」:那样会把审核时间藏掉,反而少给了信息。)
+     *
+     * @param firstSave 头表 MIN(asp_time1)({@code java.sql.Timestamp}/LocalDateTime/Date 都能吃)
+     * @param st        {@link #loadStatus} 那一行(yj_doc_status),可为 null
+     */
+    static String docCycleText(Object firstSave, Map<String, Object> st) {
+        java.time.LocalDateTime first = wallClock(firstSave);
+        java.time.LocalDateTime last = null;
+        if (st != null) {
+            last = laterOf(last, wallClock(st.get("pending_at")));   // 提交审批时间
+            last = laterOf(last, wallClock(st.get("shsj")));         // 审核时间
+        }
+        if (first == null && last == null) return null;
+        if (last == null) return first.format(CYCLE_FMT);
+        if (first == null) return last.format(CYCLE_FMT);
+        // 见方法注释 B 案:存量单(批量导入的 asp_time1)会晚于历史审核时刻 ⇒ 按先后排版,避免倒置区间
+        java.time.LocalDateTime start = first.isBefore(last) ? first : last;
+        java.time.LocalDateTime end = first.isBefore(last) ? last : first;
+        return start.format(CYCLE_FMT) + " ~ " + end.format(CYCLE_FMT);
+    }
+
+    /** 两个时间点取较晚者(任一为空就返回另一个);「检测周期」右端用 */
+    private static java.time.LocalDateTime laterOf(java.time.LocalDateTime a, java.time.LocalDateTime b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return b.isAfter(a) ? b : a;
+    }
+
+    /** 库里的时间值 → 本地墙钟 LocalDateTime(口径同 {@link #auditTimeText}:不做时区换算、按字面显示) */
+    private static java.time.LocalDateTime wallClock(Object v) {
+        if (v == null) return null;
+        try {
+            if (v instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+            if (v instanceof java.sql.Date d) return d.toLocalDate().atStartOfDay();
+            if (v instanceof java.time.LocalDateTime d) return d;
+            if (v instanceof java.time.LocalDate d) return d.atStartOfDay();
+            if (v instanceof java.util.Date d) return new java.sql.Timestamp(d.getTime()).toLocalDateTime();
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return null;
     }
 
     /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
@@ -1103,6 +1227,15 @@ public class QueryService {
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final java.time.format.DateTimeFormatter T_FMT =
             java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
+    /**
+     * 「检测周期」两端的时间格式 = {@code yyyy-MM-dd HH:mm}。
+     *
+     * <p>用户 2026-11-11 口径(图2 表头「检测周期」格,同设计契约 §二):写到**分钟**即可 ——
+     * 这一格是给纸面看的「从什么时候开始检、到什么时候交/审完」,秒没有意义且会把格子撑宽;
+     * 与列表/表单里其它虚拟时间字段({@link #DT_FMT} 到秒)刻意不同,别手滑复用。
+     */
+    private static final java.time.format.DateTimeFormatter CYCLE_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /** 直接列过滤(档案模式) */
     private void appendDirectFilters(PanelRegistry.PanelDef def, String table, StringBuilder where,

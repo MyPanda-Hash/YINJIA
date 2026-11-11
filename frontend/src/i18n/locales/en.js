@@ -5698,6 +5698,28 @@ export default {
     "本道可报量 = 上一道已审核完工量(按量流转)": "Reportable qty = approved output of the previous process (flow by quantity)",
     "前道工序还没有已审核完工量流入,请先报上一道工序": "The previous process has no approved output yet — report the previous process first",
     "超出本道可报量": "Exceeds the reportable qty of this process",
+    // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
+    // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
+    '出货检验表观': 'Outgoing Inspection (Appearance)',
+    '出货检验功能记录表': 'Outgoing Inspection Functional Record Sheet',
+    '表单编号': 'Form No.',
+    '检测周期': 'Inspection period',
+    '抽检方案': 'Sampling plan',
+    '产品型号': 'Product Model',
+    '添加批次': 'Add Batch',
+    '删除批次': 'Delete Batch',
+    '本批结果判断': 'Result judgement for this batch',
+    '检验结果及判断': 'Inspection result and judgement',
+    '带入检验项目': 'Add Inspection Items',
+    '暂无检验项': 'No inspection items',
+    '出货控制计划执行': 'Outgoing control plan execution',
+    '批次号不能为空': 'Batch No. cannot be empty',
+    '批次号重复': 'Duplicate batch No.',
+    '删除检验项': 'Delete Inspection Item',
+    '至少保留一个批次': 'Keep at least one batch',
+    '删除批次将清空该批次所有判定结果，确定删除吗？': 'Deleting the batch clears all its judgement results. Delete anyway?',
+    '删除该项目将清除其所有批次的记录，确定删除吗？': 'Deleting this item clears its records for every batch. Delete anyway?',
   },
 
 }

@@ -120,7 +120,11 @@ public class ScheduleBoardService {
     private static final Map<String, InspSpec> INSP_HEAD = Map.of(
             "QC_FIRST_INSP", new InspSpec("qc_first_insp_head", "不合格数量", "首件检验"),
             "QC_PROC_INSP", new InspSpec("qc_proc_insp_head", "不良数量", "制程检验"),
-            "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "组装成品检验"));
+            // ⚠ 2026-11-11 改名(用户口径「将当前的组装成品检验修改为出货检验表观」):只动**显示串**。
+            //   label 会被拼进下面那支 SELECT 的 `检验类型` 下发(见 trace 的 qc 段),所以
+            //   L1404 的 typeOrder 排序表**必须与这里同值**,否则追溯里的检验单排序会掉到末尾(99)。
+            //   面板代号 QC_ASM_INSP / 表名 qc_asm_insp_* / 单号前缀 ZJ / 历史数据一律不动。
+            "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "出货检验表观"));
 
     /** 应检工序:成型、组装 —— 与 {@code QcInspAutoService.OP_PANELS} 同源 */
     private static final List<String> INSP_OPS = List.of("成型", "组装");
@@ -1400,8 +1404,10 @@ public class ScheduleBoardService {
                             + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND h.工单号=?" + qcRowCond,
                     qcArgs.toArray()));
         }
-        // 排序:按 首件 → 制程 → 组装成品 的工序顺序,同类型再按单号(2026-10-18 三张单一起进追溯)
-        List<String> typeOrder = List.of("首件检验", "制程检验", "组装成品检验");
+        // 排序:按 首件 → 制程 → 出货检验表观 的工序顺序,同类型再按单号(2026-10-18 三张单一起进追溯)
+        // ⚠ 2026-11-11:第三项跟着 INSP_HEAD 的 label 一起改名(排序键 = 下发的 `检验类型` 原文,
+        //   两处必须同值,否则 QC_ASM_INSP 的单在追溯里会排到最后)。
+        List<String> typeOrder = List.of("首件检验", "制程检验", "出货检验表观");
         qc.sort((a, b) -> {
             int ia = typeOrder.indexOf(String.valueOf(a.get("检验类型")));
             int ib = typeOrder.indexOf(String.valueOf(b.get("检验类型")));
