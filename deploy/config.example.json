@@ -29,6 +29,7 @@
     "backupRetentionDays": 365
   },
   "stock": {
+    "enabled": true,
     "pageSize": 500,
     "maxPages": 40,
     "logRetentionDays": 180

@@ -42,7 +42,7 @@
 //   · 上一轮还在跑(锁文件记录 PID 且进程存活)。
 // =====================================================================================
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchAppToken, kingdeeTryGet } from './kingdee-client.mjs';
 
@@ -112,7 +112,9 @@ function releaseLock() {
  */
 async function getToken(cfg, statePath) {
   let state = {};
-  try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { state = {}; }
+  // BOM 容错:配置/状态文件若是记事本或 PowerShell 写的(UTF-8 with BOM),JSON.parse 会直接抛
+  // "Unexpected token '\uFEFF'"。这份文件在服务器上可能被人工编辑过,不能假定无 BOM。
+  try { state = JSON.parse(readFileSync(statePath, 'utf8').replace(/^\uFEFF/, '')); } catch { state = {}; }
   if (state.appToken && state.appTokenExpireAt && Date.now() < state.appTokenExpireAt) {
     log('app-token 复用缓存');
     return state.appToken;
@@ -180,30 +182,64 @@ function normalize(rows) {
   return kd;
 }
 
-async function main() {
-  const configPath = argOf('config') || join(HERE, 'config.json');
-  if (!existsSync(configPath)) {
-    console.error(`✗ 未找到配置文件 ${configPath}`);
-    process.exit(1);
+/**
+ * 库存同步主流程(可被两处调用,别各写一套):
+ *   · 单独跑:`node sync-stock.mjs [...]`(本文件底部的直接执行块);
+ *   · 合并跑:`node sync.mjs`(档案/订单同步完顺手做库存)—— 见该文件的 import。
+ *
+ * @param {object}  [opts]
+ * @param {string}  [opts.configPath] 配置文件路径,默认 deploy/config.json
+ * @param {boolean} [opts.dryRun]     只算差异不写库
+ * @param {boolean} [opts.force]      越过"行数骤降"保护
+ * @param {boolean} [opts.probe]      只验金蝶接口(不连库)
+ * @param {string}  [opts.dbName]     目标库,默认取 config.database.database
+ * @param {number}  [opts.pageSize]   现存量分页大小
+ * @param {number}  [opts.maxPages]   最多翻页数
+ * @param {string}  [opts.source]     调用来源(写进日志,便于分辨是哪个入口跑的)
+ * @returns {Promise<{ok:boolean, applied?:boolean, skipped?:string, stats?:object, batchNo?:string}>}
+ */
+export async function runStockSync(opts = {}) {
+  const startedAt = Date.now();
+  log(`—— 库存同步开始(${opts.source || 'standalone'})——`);
+  if (!acquireLock()) return { ok: false, skipped: '已在运行' };
+  try {
+    return await syncOnce(opts);
+  } finally {
+    releaseLock();
+    log(`—— 库存同步结束(${((Date.now() - startedAt) / 1000).toFixed(1)}s)——`);
   }
-  const cfg = JSON.parse(readFileSync(configPath, 'utf8'));
+}
+
+async function syncOnce(opts = {}) {
+  const configPath = opts.configPath || argOf('config') || join(HERE, 'config.json');
+  if (!existsSync(configPath)) {
+    throw new Error(`未找到配置文件 ${configPath}`);
+  }
+  const cfg = JSON.parse(readFileSync(configPath, 'utf8').replace(/^\uFEFF/, ''));
   const s = cfg.stock || {};
-  const pageSize = Number(argOf('page-size') || s.pageSize || 500);
-  const maxPages = Number(argOf('max-pages') || s.maxPages || 40);
+  // 合并跑时允许用配置关掉库存(2026-11-10):config.json 的 stock.enabled=false ⇒ 只同步档案/订单。
+  // 单独跑(sync-stock.mjs)同样尊重它,免得"配了关掉却又被手工跑起来"。
+  if (s.enabled === false && !(opts.forceEnabled === true)) {
+    log('config.stock.enabled=false,本轮跳过库存同步');
+    return { ok: true, applied: false, skipped: 'disabled' };
+  }
+  const pageSize = Number(opts.pageSize || argOf('page-size') || s.pageSize || 500);
+  const maxPages = Number(opts.maxPages || argOf('max-pages') || s.maxPages || 40);
   const keepLogDays = Number(s.logRetentionDays || 180);
-  const dryRun = has('dry-run');
-  const force = has('force');
-  const dbName = argOf('db') || cfg.database.database;
+  const dryRun = opts.dryRun !== undefined ? !!opts.dryRun : has('dry-run');
+  const force = opts.force !== undefined ? !!opts.force : has('force');
+  const probe = opts.probe !== undefined ? !!opts.probe : has('probe');
+  const dbName = opts.dbName || argOf('db') || cfg.database.database;
   const account = `${cfg.kingdee.clientId}/${cfg.kingdee.outerInstanceId}`;
 
   const token = await getToken(cfg, join(HERE, 'state.json'));
 
   // ① 拉金蝶现存量
   const raw = await fetchAllInventory(cfg, token, pageSize, maxPages);
-  if (has('probe')) {
+  if (probe) {
     const first = raw[0] || {};
     log(`probe OK:首行 ${first.material_number} | ${first.stock_number} | lot=${first.batch_no || '(空)'} | qty=${first.qty}`);
-    return;
+    return { ok: true, applied: false, skipped: 'probe' };
   }
   if (!raw.length) throw new Error('金蝶现存量返回 0 行 —— 拒绝覆盖库存(先把接口/授权查清)');
   const kd = normalize(raw);
@@ -280,7 +316,7 @@ async function main() {
 
     if (dryRun) {
       log('--dry-run 结束(未写库)');
-      return;
+      return { ok: true, applied: false, skipped: 'dry-run', stats: { same, changed, added, zeroed, sumDiff } };
     }
 
     // ⑤ 前像备份(本次会被改写/清零的行,落一份 JSONL 便于逐行回滚)
@@ -455,6 +491,14 @@ async function main() {
       log(`已提交:批次 ${batchNo} · 覆盖 ${stat.upd || 0} · 新增 ${stat.ins || 0} · 清零 ${stat.zero || 0}`
         + ` · 一致 ${stat.same || 0} · 差异合计 ${Number(stat.diff || 0).toFixed(2)}`);
       log(`库 ${dbName} 的 kucun 已对齐金蝶(账套 ${account})`);
+      return {
+        ok: true, applied: true, batchNo,
+        stats: {
+          same: Number(stat.same || 0), changed: Number(stat.upd || 0),
+          added: Number(stat.ins || 0), zeroed: Number(stat.zero || 0),
+          diff: Number(stat.diff || 0), kdRows: kd.size,
+        },
+      };
     } catch (e) {
       await tx.rollback();
       // 失败也留一行日志(排查"这一轮为什么没动库存"时有据可查)
@@ -476,12 +520,16 @@ async function main() {
   }
 }
 
-try {
-  if (!acquireLock()) process.exit(0);
-  await main();
-} catch (e) {
-  log(`✗ 库存同步失败:${e.message}`);
-  process.exitCode = 1;
-} finally {
-  releaseLock();
+// ---------- 直接执行(单独跑:node sync-stock.mjs …) ----------
+// 被 sync.mjs 合并调用时**不会**走这里(import 不触发),避免同一个流程跑两遍。
+const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  try {
+    const r = await runStockSync({ source: 'sync-stock.mjs' });
+    if (r && r.ok === false) process.exitCode = 1;
+  } catch (e) {
+    log(`✗ 库存同步失败:${e.message}`);
+    process.exitCode = 1;
+  }
 }
+

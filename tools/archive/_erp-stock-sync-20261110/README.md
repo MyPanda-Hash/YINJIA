@@ -1,8 +1,12 @@
 # _erp-stock-sync-20261110 — 金蝶库存数量同步(以金蝶为准)取证与探针
 
 > **任务**:用户 2026-11-10 ——「同步脚本能不能实时同步金蝶真实账套的库存数量,我们想要以金蝶的库存数量为准」。
-> **交付**:`deploy/sync-stock.mjs`(每 5 分钟一轮)+ `tools/migrate-erp-stock-sync-20261110.sql` + 计划任务 `JdyStockSync`;
+> **交付**:`deploy/sync-stock.mjs`(实现,也可独立跑)+ `tools/migrate-erp-stock-sync-20261110.sql`;
 > 口径文档 `docs/development/金蝶库存同步-以金蝶为准.md`。
+> **2026-11-11 并入**:用户「能不能和之前的商品同步脚本写在一起」⇒ 库存那步由 `deploy/sync.mjs`
+> 一个入口调用(`runStockSync`),计划任务只留 `JdySalOrderSync`(旧的 `JdyStockSync` 由
+> `install-tasks.ps1` 自动删除)。`_q-after-merged.mjs` = 合并入口跑完后的一致性复核
+> (kucun 合计 4,435,020.61 = 库存明细;负行 0;日志 一致 1394/覆盖 0)。
 
 ## 一、探针(只读)
 

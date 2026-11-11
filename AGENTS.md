@@ -112,8 +112,10 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 3. **验收期的权宜之计要留痕**:凡是为了"先过验收"而**忽略批次**的写法(如出库校验改按
    `(物料,仓库)` 合计判断),必须在代码注释里标注 `// 【上线前改写】` 并指向该文档,
    否则上线切换时会被当成"正确实现"保留下来。
-4. **库存数量的真源 = 金蝶真实账套(2026-11-10 起)**:`deploy/sync-stock.mjs` 每 5 分钟把金蝶
-   `inv_inventory_ims` 的现存量**覆盖进 `kucun.yl`**(计划任务 `JdyStockSync`),逐键差异落
+4. **库存数量的真源 = 金蝶真实账套(2026-11-10 起)**:每 5 分钟一轮里**先跑库存、再跑档案/订单**
+   —— 两个步骤同一个入口 `deploy/sync.mjs`(库存实现 `deploy/sync-stock.mjs` 的 `runStockSync`,
+   也可单独 `node sync-stock.mjs`;计划任务只有一个 `JdySalOrderSync`)。
+   库存那步把金蝶 `inv_inventory_ims` 的现存量**覆盖进 `kucun.yl`**,逐键差异落
    `erp_stock_snapshot`、每轮日志落 `erp_stock_sync_log`。口径/闸门/回滚见
    **`docs/development/金蝶库存同步-以金蝶为准.md`**。动库存代码前必须知道两条:
    ① **只认"已转ERP + 金蝶人工审核"**(2026-11-10 用户确认 A 口径):MES 审核仍会立刻记账,
