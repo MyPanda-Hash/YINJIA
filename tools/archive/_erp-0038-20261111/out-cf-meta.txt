@@ -1,0 +1,5 @@
+﻿/jdy/v2/sys/custom_mult_field → OK count=undefined rows=0
+/jdy/v2/sys/custom_field → OK count=undefined rows=0
+/jdy/v2/bd/custom_field → FAIL HTTP 519 status code 519
+/jdy/v2/sys/field → FAIL HTTP 519 status code 519
+/jdy/v2/sys/custom_field_list → FAIL HTTP 519 status code 519

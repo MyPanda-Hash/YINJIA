@@ -1,0 +1,6 @@
+﻿{"entity":"material"} → ok rows=0 keys=["rows"]
+{"entity":"bd_material"} → ok rows=0 keys=["rows"]
+{"form_id":"bd_material"} → ok rows=0 keys=["rows"]
+{"bizType":"material"} → ok rows=0 keys=["rows"]
+{"type":"material"} → ok rows=0 keys=["rows"]
+{"entity":"pur_inbound"} → ok rows=0 keys=["rows"]
