@@ -870,7 +870,7 @@ function gotoLink(row) {
 const sheetStyle = computed(() => {
   const w = fixedSheetWidth(props.panelCode)
   // 表格式纸面（样品申请单）：@media print 用 `width: var(--sg-print-w)` 定死纸宽 —— 两张纸宽度不同
-  // （1188 / 1450），不能像 QC 那样在 CSS 里写死像素。
+  // （1188 / 1220），不能像 QC 那样在 CSS 里写死像素。
   const printVar = isGrid.value ? { '--sg-print-w': gridW.value + 'px' } : {}
   return w ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar } : (isGrid.value ? printVar : null)
 })
@@ -2467,9 +2467,9 @@ defineExpose({ focusField })
     page-break-inside: avoid !important;
   }
   /* 表格式纸面（样品申请单 layout:'grid'，2026-11-06）：
-   * 两张纸 1188/1450px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
+   * 两张纸 1188/1220px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
    * 由 PanelxList.printApprovalSheet 注入 `@page{size:A4 landscape}`（281mm ≈ 1062px）并把
-   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1450 ⇒ 0.73），这里只负责定宽 + 缩放 + 不截断。
+   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1220 ⇒ 0.87），这里只负责定宽 + 缩放 + 不截断。
    * ⚠ 纸宽走 --sg-print-w（内联在 .approval-sheet 上，由 sheetStyle 给），不写死 —— 两张纸宽度不同。 */
   body.approval-printing .approval-sheet:has(.sg-table) {
     width: var(--sg-print-w, 1188px) !important;

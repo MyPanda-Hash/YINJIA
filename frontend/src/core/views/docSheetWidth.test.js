@@ -19,6 +19,31 @@ import { FIXED_SHEET_W, fixedSheetWidth } from './docSheetConfigs.js'
 
 const docSheet = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
 const panelx = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
+const cfgs = readFileSync(new URL('./docSheetConfigs.js', import.meta.url), 'utf8')
+
+/** 从 docSheetConfigs.js 里取某张表格式纸面的 grid.cols 宽度和（源码级解析，避免 import 副作用） */
+function gridColsSum(exportName) {
+  const m = cfgs.match(new RegExp(`export const ${exportName} = \\{[\\s\\S]*?\\n\\}`))
+  assert.ok(m, `找不到 ${exportName}`)
+  const ws = [...m[0].matchAll(/\{ key: '[^']+', label: '[^']+', w: (\d+)/g)].map((x) => Number(x[1]))
+  assert.ok(ws.length > 0, `${exportName} 里没解析到列宽`)
+  return ws.reduce((a, b) => a + b, 0)
+}
+
+test('表格式纸面的纸宽必须等于列宽之和(否则纸右缘空档 + 列被拉宽)', () => {
+  // 2026-11-11 实测缺陷：内部样品单 FIXED_SHEET_W 写 1450，而 13 列只占 1220
+  //   ⇒ 纸面右侧一条 229px 空档、表体只占左边 1221px、标题被滚动容器裁掉 67px。
+  // 口径：纸宽 = Σ列宽（DocSheet 的 .sg-table 用 width:gridW 定宽，两者不等就一定错位）。
+  const pairs = [
+    ['RD_SAMPLE_EXT', 'sampleExtSheetCfg'],
+    ['RD_SAMPLE_INT', 'sampleIntSheetCfg'],
+  ]
+  for (const [panelCode, exportName] of pairs) {
+    const sum = gridColsSum(exportName)
+    assert.equal(fixedSheetWidth(panelCode), sum,
+      `${panelCode} 纸宽 ${fixedSheetWidth(panelCode)} ≠ ${exportName} 列宽和 ${sum}`)
+  }
+})
 
 test('定死纸宽:立项申请/项目实施计划都是 1242px', () => {
   assert.equal(fixedSheetWidth('RD_APPROVAL'), 1242)

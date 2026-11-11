@@ -8042,7 +8042,7 @@ async function printApprovalSheet() {
    *   结果写到 <html> 的 CSS 变量上,样式侧用 var(--print-zoom) 取值 ⇒ 一处算、一处用。
    */
   let A4_CONTENT_PX = Math.round((210 - 16) / 25.4 * 96)   // 194mm @96dpi ≈ 733px
-  // 表格式纸面（2026-11-06 样品申请单）：两张纸 1188 / 1450px，竖向 A4 只能装 733px ⇒ 缩到 0.5，
+  // 表格式纸面（2026-11-06 样品申请单）：两张纸 1188 / 1220px，竖向 A4 只能装 733px ⇒ 缩到 0.5，
   // 字小到看不清。改走**横向 A4**（297-16=281mm ≈ 1062px），zoom ≈ 0.73~0.89，字号才保得住。
   // @page 不认类选择器 ⇒ 只能动态注入一条规则；收尾时按 id 移除（与 prepareDocPrint 同款做法）。
   let sgPageStyle = null
@@ -12420,7 +12420,12 @@ onUnmounted(() => {
 .approval-layout :deep(.approval-sheet),
 .approval-layout :deep(.progress-sheet),
 .approval-layout :deep(.catalog-sheet),
-.approval-layout :deep(.qc-rec-sheet) {
+.approval-layout :deep(.qc-rec-sheet),
+/* 产品文件列表(2026-11-11)：本面板根节点是普通 div，此前不在这一组里 ⇒ 按 min-content 撑开
+   （4 文件×状态矩阵最小列宽和 1216 + padding），1440 窗口实测把 176px 操作栏整条顶出视口
+   （rail.right=1604 > vw=1440）并让正文多出 180px 横向溢出。
+   入组后 width 由 flex 分配，矩阵自身的横向滚动交给组件里的 .pds-scroll{overflow:auto}。 */
+.approval-layout :deep(.prod-doc-sheet) {
   flex: 1;
   min-width: 0;
 }
