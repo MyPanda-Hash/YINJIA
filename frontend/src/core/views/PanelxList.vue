@@ -4712,7 +4712,24 @@ const sheetSideGroups = computed(() => approvalSideGroups.value
  *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
  *    研发管理(RD_*)整块不放该入口(它的动态字段走正式迁移/纸面配置,不吃备用列池这条路);
  *    其它模块(品质/供应链/基础档案)保持原样。服务端能力与权限一行未动,只是研发区不放出按钮。 */
-const hasFieldAdmin = computed(() => !String(panelCode.value).startsWith('RD_')
+/**
+ * 允许「字段管理」(自定义列/备用列池)的面板。
+ *
+ * <p>原判据是 `!panelCode.startsWith('RD_')` —— **整个研发命名空间一律不给入口**。
+ * 那时是对的:RD_ 的纸面列全部写死在 recordSheetConfigs 里,加字段在纸面上根本不会出现,
+ * 给了入口只会让用户白加一轮。2026-11-11 起 RecordSheetPanels 会把这 8 张表的动态字段
+ * 并进纸面列(见 core/panel/extCols.js),纸面能显示了,入口才随之放开 —— **只放这 8 张**,
+ * 其余 RD_ 面板仍不给(它们的纸面列依旧写死)。</p>
+ *
+ * <p>名单与 RecordSheetPanels.EXT_COL_PANELS、后端 PanelConfigService.EXT_FIELD_CAP 同一份,
+ * 三处一起改。</p>
+ */
+const EXT_COL_ADMIN_PANELS = new Set([
+  'RD_FILTER_EFF', 'RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT',
+  'RD_SCALE', 'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC',
+])
+const hasFieldAdmin = computed(() => (!String(panelCode.value).startsWith('RD_')
+    || EXT_COL_ADMIN_PANELS.has(String(panelCode.value)))
   && approvalSideGroups.value.some((g) => actsOf(g).includes('字段管理')))
 /**
  * 审批按钮**显不显示**(2026-10-16 用户报障「产品信息表保存之后不见审批按钮」):

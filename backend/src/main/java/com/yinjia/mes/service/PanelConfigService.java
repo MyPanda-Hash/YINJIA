@@ -757,6 +757,9 @@ public class PanelConfigService {
                 : f.displayName();
         if (!display.equals(f.label())) m.put("displayName", display);
         if (f.width() != null) m.put("width", f.width());
+        // 分组表头(父字段):运行时自定义列「设计分叉」靠它 —— 前端 RecordSheetPanels 用
+        // core/panel/extCols.js 把带 colGroup 的自定义列并进 subHeads(2026-11-11)。
+        if (f.colGroup() != null && !f.colGroup().isBlank()) m.put("colGroup", f.colGroup());
         if (f.hidden()) m.put("hidden", true);
         // 字段编辑的显隐开关(存 yj_field.visible):显式 false 才下发,前端据此隐藏该列
         if (!f.visible()) m.put("visible", false);
@@ -2216,6 +2219,33 @@ public class PanelConfigService {
     private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
 
     /**
+     * 「运行时新增测试数据列」的面板及其**列数上限**(2026-11-11 用户口径)。
+     *
+     * <p>原话:「数据记录表的所有单据的测试数据字段要能新增列功能，自定义列数，**最多插入 8 个列**，
+     * 列还可以设计分叉」。备用列池本身有 20 个，这里按用户口径只放 8 个 ——
+     * 上限写在服务端(而不是只在前端禁用按钮)，否则直接调接口就能绕过。</p>
+     *
+     * <p>与前端的 EXT_COL_PANELS(RecordSheetPanels.vue)同一份名单，两处一起改。</p>
+     */
+    private static final Map<String, Integer> EXT_FIELD_CAP = Map.of(
+            "RD_FILTER_EFF", 8, "RD_ALKALINE", 8, "RD_MINERAL", 8, "RD_ANTIBACT", 8,
+            "RD_SCALE", 8, "RD_RO_PROTECT", 8, "RD_SOAK", 8, "RD_DROP_PREC", 8);
+
+    /** 该面板自定义字段的上限(未登记 = 走备用列池总数) */
+    private static int extFieldCapOf(String panelCode) {
+        Integer cap = EXT_FIELD_CAP.get(panelCode == null ? "" : panelCode);
+        return cap == null ? EXT_SPARE_COUNT : cap;
+    }
+
+    /** 该面板已绑定的动态字段数(备用列上的 yj_field 行) */
+    private int extFieldUsedOf(String panelCode) {
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND col_name LIKE '备用%'",
+                Integer.class, panelCode);
+        return n == null ? 0 : n;
+    }
+
+    /**
      * 工序检验单 —— 工具栏注入「检验项目维护」入口的面板集。
      * 2026-10-09 用户口径:「给出一个按钮,让他可以在组装成品检验处对这个检验项目和检验方案进行维护」;
      * 各单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故都注入(组装单是主入口)。
@@ -2281,6 +2311,11 @@ public class PanelConfigService {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("capacity", EXT_SPARE_COUNT);
+        // 该面板的**自定义列上限**(2026-11-11:8 张数据记录表最多 8 列)与已用量。
+        // 前端据此显示「已用 3/8」并在满额时禁用「添加」;真闸门在 addExtField 同源校验。
+        int cap = extFieldCapOf(panelCode);
+        out.put("cap", cap);
+        out.put("usedOfCap", extFieldUsedOf(panelCode));
         out.put("fields", fields);
         if (isTabbed(panelCode)) {
             // 每张表各 20 个:按页签顺序分段给账(段 = 备用[(i-1)*20+1 .. i*20]);tabs 一并下发,
@@ -2435,7 +2470,10 @@ public class PanelConfigService {
         // 与固定 7 张表的 规格/外观 是同一种东西:前端两行表头算法直接复用,不用另写一套。
         String parent = String.valueOf(body.getOrDefault("parent", "")).trim();
         if (!parent.isEmpty()) {
-            if (!isTabbed(panelCode)) throw new IllegalArgumentException("父字段仅分页签面板支持:" + panelCode);
+            // ⚠ 2026-11-11 放开:原先是"仅分页签面板支持",而用户要求 8 张数据记录表的自定义列
+            //   「列还可以设计分叉…可以自己新建一个分组」—— 这些表都不是分页签面板。
+            //   分组承载本就是 yj_field.col_group 的固有语义(见 migrate-col-group.sql),
+            //   与"分页签"没有本质耦合,限制是历史遗留。下面的大小/字符校验对两者一视同仁。
             if (parent.length() > 50) throw new IllegalArgumentException("父字段名过长(≤50):" + parent);
             for (char ch : parent.toCharArray())
                 if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("父字段名禁止含 . % / ( ) 或空格:" + parent);
@@ -2475,6 +2513,15 @@ public class PanelConfigService {
             sb.append(") AS t(v)");
             dictSql = sb.toString();
             if (dictSql.length() > 500) throw new IllegalArgumentException("词表过长(生成 SQL 超 500 字符),请精简");
+        }
+        // 列数上限(2026-11-11 用户口径:8 张数据记录表「最多插入 8 个列」)。
+        // 放在分配备用列**之前** —— 超限时不能留下任何副作用(绑定/清空/日志)。
+        // 上限在服务端强制:只在界面上禁用按钮，直接调接口就能绕过。
+        int cap = extFieldCapOf(panelCode);
+        int used = extFieldUsedOf(panelCode);
+        if (used >= cap) {
+            throw new IllegalStateException("该面板自定义列已达上限(" + used + "/" + cap + ")，"
+                    + "无法继续新增；如需更多请先停用不用的列。");
         }
         // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)。
         // 分页签面板(来料检验要求):**每张表各 20 个扩展位** —— 只在本页签那一段里找(用户口径 2026-10-04),

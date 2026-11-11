@@ -37,6 +37,25 @@ const needTab = () => Array.isArray(props.tabs) && props.tabs.length > 0
 const blankForm = () => ({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '', parent: '' })
 /** 当前所选页签的父字段候选 */
 const parentOptions = computed(() => (needTab() && props.parentOptionsOf ? props.parentOptionsOf(form.value.tab) || [] : []))
+/**
+ * 该面板是否支持「父字段(分组)」= 分页签面板(下拉候选) 或 支持自定义列的数据记录表(自由输入)。
+ * 判据取后端下发的 cap<capacity(数据记录表 8 < 20),避免前端再写一份面板码白名单。
+ */
+const supportsGroup = computed(() => {
+  if (needTab()) return true
+  const cap = Number(data.value?.cap)
+  const base = Number(data.value?.capacity)
+  return Number.isFinite(cap) && Number.isFinite(base) && cap < base
+})
+/** 自定义列上限用量(数据记录表 8 列;其余面板 = 备用列池总数,不提示) */
+const capInfo = computed(() => {
+  const cap = Number(data.value?.cap)
+  const used = Number(data.value?.usedOfCap)
+  if (!Number.isFinite(cap) || !Number.isFinite(cap)) return null
+  const base = Number(data.value?.capacity)
+  if (!Number.isFinite(base) || cap >= base) return null
+  return { cap, used: Number.isFinite(used) ? used : 0, full: Number.isFinite(used) && used >= cap }
+})
 /** 父字段下拉没有候选(该表还没任何分组名)—— 提示"直接输入一个新名字即可新建" */
 const parentEmptyHint = computed(() => needTab() && parentOptions.value.length === 0)
 /** 字段列表**只显示当前所选页签自己的**自定义字段(用户口径 2026-10-04:切页签要显示他自己的页面的自定义字段)。
@@ -128,6 +147,9 @@ async function retire(f) {
       />
       <div class="fm-summary">
         {{ tt('动态字段') }} {{ visibleFields.length }}
+        <!-- 有列数上限的面板(8 张数据记录表:最多 8 列)先说上限,
+             否则这里显示"备用列池 20"、底部显示"4/8",两个数字打架 -->
+        <template v-if="capInfo"> · {{ tt('上限') }} <b :class="{ 'fm-cap-full': capInfo.full }">{{ capInfo.used }}/{{ capInfo.cap }}</b>{{ tt(' 列') }}</template>
         <template v-if="data.tabPools">
           · {{ tt('每张表各 20 个扩展位') }} · {{ tt('本表已用') }} <b>{{ tabPool ? tabPool.used : 0 }}</b>/{{ data.capacity }}
         </template>
@@ -166,9 +188,15 @@ async function retire(f) {
         <el-form-item :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
         <!-- 父字段(分组表头):选了父,这一列就并到那个分组标题下;父只是标题、没有数据格,
              检验数据记录只带入子字段(用户口径 2026-10-04) -->
-        <el-form-item v-if="needTab()" :label="tt('父字段(分组)')">
+        <!-- 2026-11-11 放开:原先 v-if="needTab()" 只给分页签面板(来料检验要求)。
+             而用户要求 8 张**数据记录表**的自定义列也能「设计分叉…可以自己新建一个分组」——
+             它们都不是分页签面板。分组承载本就是 yj_field.col_group 的固有语义,
+             与"分页签"没有本质耦合。分页签面板仍用下拉(候选来自该表已有分组),
+             其余面板直接用输入框写新分组名(留空=独立列)。 -->
+        <el-form-item v-if="supportsGroup" :label="tt('父字段(分组)')">
           <div class="fm-parent">
             <el-select
+              v-if="needTab()"
               v-model="form.parent"
               style="width: 220px"
               filterable
@@ -179,6 +207,14 @@ async function retire(f) {
             >
               <el-option v-for="p in parentOptions" :key="p" :label="tt(p)" :value="p" />
             </el-select>
+            <el-input
+              v-else
+              v-model="form.parent"
+              style="width: 220px"
+              maxlength="50"
+              clearable
+              :placeholder="tt('留空=独立列;可直接输入新分组名')"
+            />
             <span v-if="parentEmptyHint" class="fm-parent-hint">{{ tt('该表还没有分组名：直接输入一个名字（回车）即可新建') }}</span>
           </div>
           <el-tooltip :content="tt('父只做表头分组、没有数据格;检验数据记录只带入子字段')" placement="top"><span class="fm-help">?</span></el-tooltip>
@@ -203,7 +239,10 @@ async function retire(f) {
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
-      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label" @click="submit">{{ tt('添加') }}</el-button>
+      <span v-if="capInfo" class="fm-cap" :class="{ full: capInfo.full }">
+        {{ tt('自定义列') }} {{ capInfo.used }}/{{ capInfo.cap }}
+      </span>
+      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label || capInfo?.full" @click="submit">{{ tt('添加') }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -215,5 +254,8 @@ async function retire(f) {
 .fm-tabusage-item.cur { color: #1c4f8a; font-weight: 600; }
 .fm-parent { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fm-parent-hint { font-size: 12px; color: #c08a00; }
+/* 自定义列用量(数据记录表上限 8):满额转红,与"添加"按钮的禁用状态配套说明原因 */
+.fm-cap { font-size: 12px; color: #666; margin-right: 10px; }
+.fm-cap.full, .fm-cap-full { color: #d03050; font-weight: 600; }
 .fm-help { margin-left: 6px; color: #909399; cursor: help; }
 </style>

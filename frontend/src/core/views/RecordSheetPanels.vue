@@ -675,7 +675,7 @@
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <tr v-if="dt.subHeads">
+            <tr v-if="subHeadsOf(dt).length">
               <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
@@ -1815,6 +1815,7 @@ import StdLibTemplateManager from './StdLibTemplateManager.vue'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
+import { mergeExtCols } from '@core/panel/extCols.js'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -2959,7 +2960,22 @@ async function loadSpikeWaterLayout() {
     spikeWaterLayout.value = parseLayout(null)
   }
 }
-function colsOf(dt) {
+/**
+ * 允许「运行时新增测试数据列」的面板 = **8 张数据记录表**(2026-11-11 用户口径)。
+ *
+ * <p>用户原话:「数据记录表的所有单据的测试数据字段要能新增列功能，自定义列数，最多插入 8 个列，
+ * 列还可以设计分叉，可以参考加标水配置记录表的列分叉设计」。</p>
+ *
+ * <p>为什么只开这 8 张、不全局开:这些表的纸面列是**静态配置**,而自定义字段是运行时插的
+ * `yj_field` 行(绑备用列)。合并只对"确实要支持运行时加列"的面板做 —— 别的纸面(质量单据/
+ * 工艺清单)若因元数据多一个字段就凭空多出一列,属于不能接受的副作用。</p>
+ */
+const EXT_COL_PANELS = new Set([
+  'RD_FILTER_EFF', 'RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT',
+  'RD_SCALE', 'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC',
+])
+/** 静态列(未含运行时自定义列) */
+function baseColsOf(dt) {
   // 加标水（RD_SPIKE_WATER，2026-11-06 用户口径「可以自定义面板格式……和标准库绑定，
   // 一个标准库条目对应一个设计的表格样式」）：列集**由「测试项目」那个标准库条目的 content 决定**。
   // 选中哪个条目，就用它存的 { cols:[{key,label,w,group,rowspan}] } 当列定义；
@@ -2967,6 +2983,28 @@ function colsOf(dt) {
   const layout = spikeWaterCols.value
   if (layout) return layout
   return activeVariant.value?.cols || dt.cols || []
+}
+/**
+ * 静态列 + 运行时自定义列（只有 EXT_COL_PANELS 才合并）。
+ * 合并规则是纯函数：见 @core/panel/extCols.js（含 8 条单测）。这里只负责喂数据。
+ */
+const extMerged = computed(() => {
+  const map = new Map()
+  if (!EXT_COL_PANELS.has(String(props.panelCode))) return map
+  const fields = props.detailFields || []
+  for (const dt of cfg.value?.dataTables || []) {
+    map.set(dt, mergeExtCols({ cols: baseColsOf(dt), subHeads: dt.subHeads || [], detailFields: fields }))
+  }
+  return map
+})
+function colsOf(dt) {
+  const merged = extMerged.value.get(dt)
+  return merged ? merged.cols : baseColsOf(dt)
+}
+/** 分叉表头 = 静态 subHeads + 自定义列带来的分组 */
+function subHeadsOf(dt) {
+  const merged = extMerged.value.get(dt)
+  return merged ? merged.subHeads : (dt.subHeads || [])
 }
 
 // ── 标准库勾选(规格书检验要求 26 组分组标准库 / 出货检验计划 必测项+型式项) ──
@@ -4226,7 +4264,7 @@ function spreadSubHeads(dt) {
   const total = totalSpan(dt)
   const out = []
   let used = 0
-  for (const sh of dt.subHeads || []) {
+  for (const sh of subHeadsOf(dt)) {
     const span = Math.min(sh.span, total - used)
     if (span > 0) out.push({ label: sh.label, span })
     used += span
