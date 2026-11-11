@@ -1,8 +1,8 @@
 # dump db=HSDZ_MES
-PANEL	PURCHASE_IN	采购入库单	Purchase Receiving Order	库存核算	doc	bd_purchase_in	bl_purchase_in	单据编号	单据日期	PI	50	items	库存管理
+PANEL	PURCHASE_IN	采购入库单	Purchase Receiving Order	库存核算	doc	bd_purchase_in	bl_purchase_in	单据编号	单据日期	PI	50	items	WMS管理
 PANEL	QC_INSP	来料检验单	null	采购管理	doc	qc_insp	qc_insp_detail	单据编号	单据日期	IJ	20	items	品质管理
-PANEL	QC_RECV	送料暂收单	Temporary Material Receipt	库存核算	doc	sl_recv	sl_recv_detail	单据编号	单据日期	SL	20	items	库存管理
-PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail	单据编号	单据日期	TH	20	items	库存管理
+PANEL	QC_RECV	送料暂收单	Temporary Material Receipt	库存核算	doc	sl_recv	sl_recv_detail	单据编号	单据日期	SL	20	items	WMS管理
+PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail	单据编号	单据日期	TH	20	items	WMS管理
 
 ===== QC_RECV =====
 -- yj_field (place, seq)
@@ -674,6 +674,8 @@ FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									13165
 FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									13169
 FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									13173
 FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									13177
+FIELD	header	900	来源	来源单据	文本	130	---V							Source		13045
+FIELD	header	910	来源单号	来源单号	文本	150	---V							Source no.		13048
 FIELD	query,detail	10	存货编码	存货编码	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code		13012
 FIELD	query,header	10	单据日期	单据日期	日期	140	ER-V							Document Date		13013
 FIELD	query,header	20	单据编号	单据编号	文本	140	ER-V							Document Number		13014
@@ -683,8 +685,6 @@ FIELD	query,header	60	供应商	供应商	参照	140	ER-V		GFDA	mc	mc			Vendor		
 FIELD	query,header	70	匹配来源单号	匹配来源单号	文本	130	E-H-							Matched source no.		13025
 FIELD	query,header	80	经手人	经手人	参照	140	E--V		EMP	员工名称	员工名称			Person in charge		13026
 FIELD	query,header	150	验货人	验货人	参照	100	E-H-		EMP	员工名称	员工名称			Inspector		13041
-FIELD	query,header	170	来源单据	来源单据	文本	110	E-H-							Source doc		13045
-FIELD	query,header	190	来源单号	来源单号	文本	120	E-H-							Source no.		13048
 FIELD	query,header	210	销售订单号	销售订单号	文本	130	E-H-							Sales order no.		13054
 FIELD	query,header	290	批次号	批次号	文本	160	---V									13069
 -- config.json -> (空;运行时配置由 PanelConfigService 现算)
