@@ -117,7 +117,7 @@
       </thead>
       <tbody>
         <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-          <td class="c-item">
+          <td class="c-item" :title="row[K.ITEM] || ''">
             <el-select
               v-if="editable"
               v-model="row[K.ITEM]"
@@ -134,11 +134,44 @@
             </el-select>
             <span v-else class="qr-cell-text">{{ row[K.ITEM] || '' }}</span>
           </td>
-          <td class="c-std">
-            <el-input v-if="editable" v-model="row[K.STD]" size="small" class="qr-cell-input" maxlength="500" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row[K.STD] || '' }}</span>
+          <td class="c-std" :title="row[K.STD] || ''">
+            <!-- 检测标准(2026-11-11 用户口径):源文本里本来就可能有**硬换行**(Excel Alt+Enter →
+                 char(10)/char(13)),而这一格原来是单行 el-input —— 换行显示不出来、超宽还被截断,
+                 于是同一份数据"草稿态一行、审核后多行",看着像带入不一致。现在:
+                 · 编辑态 = 多行 textarea(自动增高 1~6 行),硬换行按原样断行;
+                 · 只读态 = 保留换行的 span(.qr-pre = white-space: pre-wrap);
+                 · 两态都挂 tooltip:内容超过格高/格宽时,光标停上去看全文;
+                 · maxlength 500 → 1000(物理列是 nvarchar(1000),原来编辑一下就会被截到 500 字)。 -->
+            <el-tooltip
+              v-if="editable"
+              :content="row[K.STD] || ''"
+              placement="top-start"
+              popper-class="qc-std-tip"
+              :disabled="!row[K.STD]"
+              :show-after="400"
+            >
+              <el-input
+                v-model="row[K.STD]"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 6 }"
+                size="small"
+                class="qr-cell-input qr-std-input"
+                maxlength="1000"
+                @input="emit('dirty')"
+              />
+            </el-tooltip>
+            <el-tooltip
+              v-else
+              :content="row[K.STD] || ''"
+              placement="top-start"
+              popper-class="qc-std-tip"
+              :disabled="!row[K.STD]"
+              :show-after="300"
+            >
+              <span class="qr-cell-text qr-pre">{{ row[K.STD] || '' }}</span>
+            </el-tooltip>
           </td>
-          <td v-for="k in RESULT_KEYS" :key="'r' + k" class="c-res">
+          <td v-for="k in RESULT_KEYS" :key="'r' + k" class="c-res" :title="row[k] || ''">
             <el-input
               v-if="editable"
               v-model="row[k]"
@@ -149,7 +182,7 @@
             />
             <span v-else class="qr-cell-text">{{ row[k] || '' }}</span>
           </td>
-          <td class="c-judge">
+          <td class="c-judge" :title="row[K.JUDGE] || ''">
             <el-select
               v-if="editable"
               v-model="row[K.JUDGE]"
@@ -710,6 +743,17 @@ watch(
   width: 100%;
   word-break: break-all;
 }
+/* 保留源文本里的硬换行(2026-11-11):检验要求里的多段标准带 char(10)/char(13),
+   默认 white-space:normal 会把它们折成空格,导致"审核后断行位置和源表不一致" */
+.qr-pre {
+  white-space: pre-wrap;
+}
+/* 检测标准改成多行输入后:去掉 textarea 自带的 resize 手柄(版面里不该出现),
+   行高与只读态一致(1.6),超 6 行在格内滚动 + 悬停 tooltip 看全文 */
+.qr-std-input :deep(.el-textarea__inner) {
+  resize: none;
+  min-height: 20px !important;
+}
 /* 商品参照单元格(物料名称/物料编码):拟态输入框 —— 点整格即弹参照,未填时给占位提示。
    与 DataRecordSheet/RecordSheetPanels 的参照格同观感(纸面上仍是"一格值",不带边框)。 */
 .qr-ref-ctl {
@@ -872,6 +916,27 @@ watch(
   cursor: pointer;
   user-select: none;
   line-height: 1;
+}
+</style>
+
+<!-- 检测标准的悬停全文(2026-11-11):这一格可能几百字,Element 的 tooltip 默认不限宽,
+     会把提示拉成一条横贯全屏的长条 —— 这里限宽 + 换行(内容里的硬换行也照原样断) -->
+<style>
+.qc-std-tip.el-popper {
+  max-width: 460px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+  font-size: 12.5px;
+  /* 纸面是白底表格,提示必须实底深色,否则半透明叠在文字上看不清 */
+  background: #1f2937;
+  color: #fff;
+  border: 1px solid #374151;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+.qc-std-tip.el-popper .el-popper__arrow::before {
+  background: #1f2937;
+  border-color: #374151;
 }
 </style>
 
