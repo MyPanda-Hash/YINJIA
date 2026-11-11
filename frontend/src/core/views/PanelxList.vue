@@ -7630,6 +7630,21 @@ async function snapSheetPage(el, domToPng) {
     // 行操作列(＋插入/×删除)只在编辑态存在;从"编辑中的单据"直接打印时它会连 60px 一起上纸
     // (2026-10-30 打印体检:成型配方页纸宽 781、scrollWidth 817,多出来的就是这两颗按钮)。
     clone.querySelectorAll('.rs-td-op, .rs-op-pad').forEach((n) => n.remove())
+    // 标准库入口(⌄ 标准库 / ⧉ 标准库维护)是编辑控件,纸张上不许出现「标准库」字样
+    // (2026-11-11 用户报「打印错误……不要显示标准库字样」)。
+    // ⚠ 光靠 CSS 不够:本函数走的是**截图**,CSS 的 @media print / body.approval-printing 都不生效
+    //   (只有 filter 里认的 .no-print 才生效),而 .rsp-lib-pick 身上并没有 no-print。
+    clone.querySelectorAll('.rsp-lib-pick, .rs-lib-btn').forEach((n) => n.remove())
+    // ⚠ textarea 的值必须**写进克隆体的文本节点**(2026-11-11 用户报「配方表打印无数据」的根因):
+    //   modern-screenshot 的 copyInputValue 只 setAttribute('value', ...),而 <textarea> 在
+    //   foreignObject 里显示的是**子文本节点** ⇒ 整格是 textarea 的配方表会印成一片空白
+    //   (成型配方 7 列 × 10 行全是 el-input type=textarea)。原元素与克隆体同序,按同序配对写回。
+    const liveArea = [...el.querySelectorAll('textarea')]
+    const cloneArea = [...clone.querySelectorAll('textarea')]
+    liveArea.forEach((t, i) => {
+      const c = cloneArea[i]
+      if (c && t.value !== undefined) c.textContent = t.value
+    })
     holder.appendChild(clone)
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)

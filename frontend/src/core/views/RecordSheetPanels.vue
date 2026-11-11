@@ -6493,7 +6493,11 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 <style>
 /* 标准库维护入口:屏幕可见,打印不出现(纸张上不留"标准库"字样) */
 .no-print { }
-@media print { .no-print, .rs-lib-btn { display: none !important; } }
+/* 0 层:标准库入口(⧉ 标准库维护 / ⌄ 标准库)都是编辑控件,纸张上不留「标准库」字样
+   —— 2026-11-11 用户口径。两条打印路径各有一条规则,@media print 这条管的是
+   「浏览器 Ctrl+P / 侧栏打印按钮(打印时会挂 body.approval-printing,由下面的规则集兜底)」;
+   截图导出那条路(modern-screenshot)不认 CSS,由 PanelxList.snapSheetPage 里摘节点。 */
+@media print { .no-print, .rs-lib-btn, .rsp-lib-pick { display: none !important; } }
 .stdlib-tip { font-size: 12px; color: #8ba6bd; margin-bottom: 8px; line-height: 1.6; }
 .stdlib-add { display: flex; gap: 8px; margin-bottom: 10px; }
 .stdlib-list { max-height: 320px; overflow: auto; border: 1px solid #e4edf5; border-radius: 4px; }
