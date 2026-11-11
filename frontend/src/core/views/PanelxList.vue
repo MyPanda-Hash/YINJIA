@@ -339,15 +339,21 @@
                   @click="openPreviewCard(c)"
                 >
                   <div class="pc-head">
-                    <span class="pc-no">{{ c.no }}</span>
+                    <span class="pc-no" :title="c.no">{{ c.no }}</span>
                     <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
                   </div>
-                  <div class="pc-date">{{ c.date }}</div>
+                  <!-- 一行摘要（2026-11-11）：登记过摘要字段的面板（立项申请）把「客户名/项目等级」
+                       与日期排在同一行，卡片两行扫完 —— 参照销售订单左侧列表的 日期/客户。
+                       没登记的面板仍逐行 标签：值（行为与改前一致）。 -->
+                  <div class="pc-date">
+                    {{ c.date }}
+                    <span v-if="c.summary" class="pc-sum" :title="c.summary"> · {{ c.summary }}</span>
+                  </div>
                   <div v-for="(f, i) in c.fields" :key="i" class="pc-field">
                     <span class="pc-label">{{ tt(f.label) }}</span>
                     <span class="pc-value">{{ f.value }}</span>
                   </div>
-                  <div v-if="!c.fields.length" class="pc-none">{{ tt('（无摘要字段）') }}</div>
+                  <div v-if="!c.fields.length && !c.summary" class="pc-none">{{ tt('（无摘要字段）') }}</div>
                 </div>
                 <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt(isProdDocMatrix ? '未找到匹配的产品' : '未找到匹配单据') }}</div>
               </div>
@@ -2625,6 +2631,8 @@ import ProdDocListSheet from './ProdDocListSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
+// 单据预览卡片的摘要口径（2026-11-11）：按面板挑「最主要的信息」，纯函数 + 单测
+import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
@@ -4104,21 +4112,20 @@ async function openFuzzyResult(r) {
 const previewMode = ref(false)
 const previewKw = ref('')
 let previewPrevPageSize = null
-/** 摘要字段剔除清单:系统列与阶段明细列不进卡片 */
-const PREVIEW_SKIP = new Set(['单据编号', '编号', '单据日期', '单据状态', '文档编号', '文件管理人', '密级', '文件使用范围', '备注', '打印时间', '公司名称'])
-function previewFieldsOf(row) {
-  const out = []
-  for (const f of headerFields.value || []) {
-    if (out.length >= 4) break
-    const key = headerFieldKey(f)
-    if (!key || PREVIEW_SKIP.has(key) || /^阶段\d+/.test(key)) continue
-    const v = row[key]
-    if (v == null || String(v).trim() === '') continue
-    const s = String(v).replace(/\s+/g, ' ').trim()
-    if (!s) continue
-    out.push({ label: key, value: s.length > 42 ? s.slice(0, 42) + '…' : s })
-  }
-  return out
+/**
+ * 摘要内容 = 纯函数 core/panel/docPreview.js 的口径（2026-11-11 用户口径：
+ * 「立项申请的单据预览做成和销售订单左侧栏类似，显示最主要的信息方便去查找对应单据」）：
+ *   · 登记过摘要字段的面板（立项申请 = 客户名/项目等级）⇒ 只出这几个、不带标签、与日期同行；
+ *   · 其余面板 ⇒ 前 4 个非空业务字段、带标签（与改前逐字一致）。
+ * 口径与断言都在 docPreview.test.js，这里只负责把表头字段定义喂进去。
+ */
+function previewSummaryFor(row) {
+  return previewSummaryOf({
+    row,
+    fields: headerFields.value || [],
+    keyOf: (f) => headerFieldKey(f),
+    panelCode: panelCode.value,
+  })
 }
 const previewCards = computed(() => {
   // 产品文件列表:卡片 = **产品行**(编号 + 受控 + 4 个文件各自的状态),不是单据卡片
@@ -4140,10 +4147,18 @@ const previewCards = computed(() => {
   }
   return (list.value || []).map((row) => {
     const no = String(row['单据编号'] || row['编号'] || '')
-    const fields = previewFieldsOf(row)
+    const sum = previewSummaryFor(row)
     const kw = previewKw.value.trim().toLowerCase()
-    const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
-    return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
+    const hit = !kw || no.toLowerCase().includes(kw) || sum.items.some((x) => x.value.toLowerCase().includes(kw))
+    return {
+      no,
+      date: String(row['单据日期'] || ''),
+      status: String(row['单据状态'] || ''),
+      fields: sum.compact ? [] : sum.items,
+      summary: sum.compact ? previewLineText(sum) : '',
+      hit,
+      row,
+    }
   }).filter((c) => c.hit)
 })
 async function openDocPreview() {
@@ -14003,8 +14018,13 @@ onUnmounted(() => {
 .preview-card:hover { border-color: #7fb0dd; box-shadow: 0 1px 4px rgba(30, 90, 138, .12); }
 .preview-card.on { border-color: #1e5a8a; background: #f0f7ff; }
 .pc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-.pc-no { font-weight: 600; font-size: 13px; color: #1e5a8a; word-break: break-all; }
+/* 单号一行显示（2026-11-11）：侧栏只有 ~140px，LXA-2026-11-0005 这种 16 字符的号
+   原来会折成两行（扫描时一行一单的效果就没了）⇒ nowrap + 省略号，完整号在 title 里。 */
+.pc-no { font-weight: 600; font-size: 12.5px; color: #1e5a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pc-date { font-size: 11px; color: #9aa8b5; margin-bottom: 3px; }
+/* 一行摘要（日期 · 客户名 · 项目等级）：比日期深一档，扫列表时先看到人/客户（2026-11-11） */
+.pc-sum { color: #444; font-size: 12px; }
+.pc-date { line-height: 16px; }
 .pc-field { display: flex; gap: 6px; font-size: 12px; line-height: 18px; min-width: 0; }
 .pc-label { flex: none; color: #8ba6bd; }
 .pc-label::after { content: '：'; }
