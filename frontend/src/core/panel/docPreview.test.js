@@ -20,7 +20,7 @@ import {
 const fields = [
   { dataName: '单据编号' }, { dataName: '单据日期' }, { dataName: '客户名' },
   { dataName: '立项背景' }, { dataName: '机型及应用位置' }, { dataName: '滤芯炭棒规格或结构' },
-  { dataName: '项目开发目标' }, { dataName: '项目等级' },
+  { dataName: '项目开发目标' }, { dataName: '项目等级' }, { dataName: '申请立项人' },
 ]
 const keyOf = (f) => f.dataName
 
@@ -33,14 +33,15 @@ const approvalRow = {
   机型及应用位置: '1',
   滤芯炭棒规格或结构: '1',
   项目等级: '二',
+  申请立项人: '系统管理员',
 }
 
-test('① 立项申请：只出客户名 + 项目等级，且 compact（不带标签、一行拼起来）', () => {
+test('① 立项申请：只出客户名 + 项目等级 + 申请立项人，且 compact（不带标签、一行拼起来）', () => {
   const s = previewSummaryOf({ row: approvalRow, fields, keyOf, panelCode: 'RD_APPROVAL' })
   assert.equal(s.compact, true, '登记过摘要字段的面板必须 compact')
-  assert.deepEqual(s.items.map((x) => x.label), ['客户名', '项目等级'])
-  assert.deepEqual(s.items.map((x) => x.value), ['零售客户', '二'])
-  assert.equal(previewLineText(s), '零售客户 · 二', '日期与这一行同排显示由调用方拼')
+  assert.deepEqual(s.items.map((x) => x.label), ['客户名', '项目等级', '申请立项人'])
+  assert.deepEqual(s.items.map((x) => x.value), ['零售客户', '二', '系统管理员'])
+  assert.equal(previewLineText(s), '零售客户 · 二 · 系统管理员', '日期与这一行同排显示由调用方拼')
   // 长文本一格都不许混进来（那正是"一张卡片十行"的来源）
   const labels = s.items.map((x) => x.label)
   for (const k of ['立项背景', '机型及应用位置', '滤芯炭棒规格或结构', '项目开发目标']) {
@@ -50,7 +51,7 @@ test('① 立项申请：只出客户名 + 项目等级，且 compact（不带�
 
 test('② 立项申请：空摘要字段跳过（不留"客户名：—"这种空行）', () => {
   const s = previewSummaryOf({
-    row: { ...approvalRow, 客户名: '   ', 项目等级: '' }, fields, keyOf, panelCode: 'RD_APPROVAL',
+    row: { ...approvalRow, 客户名: '   ', 项目等级: '', 申请立项人: '' }, fields, keyOf, panelCode: 'RD_APPROVAL',
   })
   assert.deepEqual(s.items, [])
   assert.equal(previewLineText(s), '')
@@ -84,7 +85,7 @@ test('⑤ 指定字段的截断比通用口径短（一行放得下）', () => {
 })
 
 test('⑥ 登记表本身：立项申请有摘要字段，且都是真实存在的表头字段名', () => {
-  assert.deepEqual(PREVIEW_FIELDS.RD_APPROVAL, ['客户名', '项目等级'])
+  assert.deepEqual(PREVIEW_FIELDS.RD_APPROVAL, ['客户名', '项目等级', '申请立项人'])
   const real = new Set(fields.map((f) => f.dataName))
   for (const k of PREVIEW_FIELDS.RD_APPROVAL) assert.ok(real.has(k), `${k} 不在表头字段里(打错字就永远不显示)`)
 })

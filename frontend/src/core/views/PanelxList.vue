@@ -14018,9 +14018,15 @@ onUnmounted(() => {
 .preview-card:hover { border-color: #7fb0dd; box-shadow: 0 1px 4px rgba(30, 90, 138, .12); }
 .preview-card.on { border-color: #1e5a8a; background: #f0f7ff; }
 .pc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-/* 单号一行显示（2026-11-11）：侧栏只有 ~140px，LXA-2026-11-0005 这种 16 字符的号
-   原来会折成两行（扫描时一行一单的效果就没了）⇒ nowrap + 省略号，完整号在 title 里。 */
-.pc-no { font-weight: 600; font-size: 12.5px; color: #1e5a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 单号一行显示（2026-11-11）：侧栏只有 ~180px，LXA-2026-11-0005 这种 16 字符的号
+   原来会折成两行（扫描时一行一单的效果就没了）⇒ nowrap。
+   ⚠ 不许加 overflow/ellipsis：号尾那几位才是区分单据的部分，截成 `LXA-2026-11-0…`
+   等于把最有用的信息切掉（实测踩过）。放不下时让**状态徽标换行**，见下面的 flex-wrap。 */
+.pc-no { font-weight: 600; font-size: 12px; color: #1e5a8a; white-space: nowrap; }
+/* 卡片头：单号优先占满一行，徽标挤不下就落到下一行，别反过来把单号截掉 */
+.pc-head { flex-wrap: wrap; gap: 2px 6px; }
+/* 徽标在卡片里收窄 + 禁折行（侧栏窄，默认的 padding 8px 会把「草稿」挤成上下两行） */
+.preview-card .doc-status { flex: none; white-space: nowrap; font-size: 11px; line-height: 16px; padding: 0 5px; margin-right: 0; }
 .pc-date { font-size: 11px; color: #9aa8b5; margin-bottom: 3px; }
 /* 一行摘要（日期 · 客户名 · 项目等级）：比日期深一档，扫列表时先看到人/客户（2026-11-11） */
 .pc-sum { color: #444; font-size: 12px; }
