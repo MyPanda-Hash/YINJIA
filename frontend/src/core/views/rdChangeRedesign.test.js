@@ -93,6 +93,24 @@ test('④b 顶层函数里必须用 props.head —— 模板能裸写 head，<sc
   assert.deepEqual(problems, [], '这些函数在脚本作用域引用了不存在的 head，必须写 props.head：\n' + problems.join('\n'))
 })
 
+test('⑨ 侧栏「字段管理」要有可见的框（按 antd 默认按钮 token，2026-11-11）', () => {
+  // 用户口径：「设计库设计这个的显示框」——原来走 .sub（透明无边框纯文本），看着不像能点。
+  const px = read('src/core/views/PanelxList.vue')
+  assert.match(px, /class="as-side-btn sub boxed"[^>]*onSideAction\('字段管理'\)/, '字段管理要挂 boxed')
+  const css = px.match(/\.as-side-btn\.sub\.boxed \{[\s\S]*?\n\}/)
+  assert.ok(css, '缺少 .boxed 样式')
+  const b = css[0]
+  // 取值必须来自 antd token（改主题时这里的注释与数值要一起核对）
+  assert.match(b, /border: 1px solid #d9d9d9/, '边框应为 colorBorder #d9d9d9')
+  assert.match(b, /border-radius: 6px/, '圆角应为 borderRadius 6')
+  assert.match(b, /height: 32px/, '高度应为 controlHeight 32')
+  assert.match(b, /background: #fff/, '背景应为 colorBgContainer #fff')
+  assert.match(b, /rgba\(0, 0, 0, 0\.88\)/, '文字应为 colorText rgba(0,0,0,.88)')
+  assert.match(px, /\.as-side-btn\.sub\.boxed:hover \{[\s\S]*?#1677ff/, 'hover 应转 colorPrimary #1677ff')
+  // 只影响这一个，别把另外几个 .sub（审批情况/撤回会签）也带成方框
+  assert.match(px, /\.as-side-btn\.sub \{[\s\S]*?background: transparent/, '.sub 基础样式应保持不变')
+})
+
 test('⑧ 归档后「会签人填本部门行」是**窄口子**：非管理员 + 有部门 + 只写明细', () => {
   // 用户口径（2026-11-11）：「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写」
   //   且确认会签流程**保留**（B）。所以这不是"把归档打开"：

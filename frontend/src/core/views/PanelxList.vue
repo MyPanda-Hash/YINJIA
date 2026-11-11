@@ -626,7 +626,11 @@
                 </div>
               </template>
               <!-- 字段管理:配置类动作(动态字段 / 备用列池),不属于"本单操作" ⇒ 归到输出段末尾,弱化显示 -->
-              <div v-if="hasFieldAdmin" class="as-side-btn sub" @click="onSideAction('字段管理')">{{ tt('字段管理') }}</div>
+              <!-- 2026-11-11 用户口径「设计库设计这个的显示框」：原来走 .sub（透明无边框的纯文本），
+                   在侧栏里看着不像可点的东西。按 antd 默认按钮规格单独加一圈框：
+                   边框 colorBorder #d9d9d9 / 高 controlHeight 32 / 圆角 borderRadius 6 / 白底 colorBgContainer /
+                   文字 colorText rgba(0,0,0,.88)，hover 转 colorPrimary #1677ff。 -->
+              <div v-if="hasFieldAdmin" class="as-side-btn sub boxed" @click="onSideAction('字段管理')">{{ tt('字段管理') }}</div>
 
               <!-- ⑤ 危险操作(2026-10-16 侧栏整理):破坏性 / 中断性动作统一沉底 + 红色描边 ——
                    原先「删除」在段首、弃审夹在中间,容易误触也难找。
@@ -12758,6 +12762,35 @@ onUnmounted(() => {
 }
 .as-side-btn.sub:hover {
   background: #f2f6fa;
+}
+/* 「字段管理」= 配置类次级动作，但仍要一眼看出是可点的框(2026-11-11)。
+   取值全部来自 antd 设计库 token：colorBorder #d9d9d9 / colorBgContainer #fff /
+   colorText rgba(0,0,0,.88) / colorPrimary #1677ff / controlHeight 32 / borderRadius 6。
+   ⚠ 只改 .boxed 这一个，另外 3 个 .sub(审批情况/撤回会签)保持原样。 */
+.as-side-btn.sub.boxed {
+  height: 32px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.as-side-btn.sub.boxed:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+.as-side-btn.sub.boxed.disabled {
+  border-color: #d9d9d9;
+  color: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.04);
+  cursor: not-allowed;
 }
 .as-side-btn.disabled {
   color: #b9c2ce;
