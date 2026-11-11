@@ -134,3 +134,20 @@ test('⑩ 功能性滤效纸面必须把「流速」也算作既有列，否则�
   assert.match(sheet, /v-for="\(e, ei\) in extSubCols"/, '表头第二行要渲染分组子列')
   assert.match(sheet, /row\[e\.key\]/, '表体要按数据键绑定自定义列的值')
 })
+
+test('⑪ 新增列不能把表撑出纸宽：整表等比压缩，总宽回到设计宽', () => {
+  // 用户口径（2026-11-11）：「新增的会超出对应的行宽，应该改为自适应压缩前面的行宽」。
+  // 实测：原实现把自定义列追加在**固定总宽之外**，加 1 列即溢出纸面。
+  const sheet = readFileSync(new URL('../views/DataRecordSheet.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /DT_BASE_TOTAL\s*=\s*1176/, '缺少表格设计总宽常量')
+  assert.match(sheet, /const dtScale = computed/, '缺少压缩系数')
+  assert.match(sheet, /DT_BASE_TOTAL \/ all/, '压缩系数应按 设计总宽÷实际总宽 计算')
+  // 既有固定列必须走 dtW()（否则仍是写死像素，压不动）
+  assert.match(sheet, /dtW\(130, 84\)/, '「冲水时间」列宽要走 dtW 压缩')
+  assert.match(sheet, /dtW\(96, 66\)/, '「累计进水/原水含量」列宽要走 dtW 压缩')
+  // 自定义列也要参与压缩，不能固定用配置宽
+  assert.match(sheet, /extColW\(e\)/, '自定义列的 col 宽必须走 extColW（参与压缩）')
+  // 样品组列宽乘压缩系数
+  assert.match(sheet, /220 \* dtScale\.value/, '压力组列宽要乘压缩系数')
+  assert.match(sheet, /192 \* dtScale\.value/, '出水/去除率组列宽要乘压缩系数')
+})

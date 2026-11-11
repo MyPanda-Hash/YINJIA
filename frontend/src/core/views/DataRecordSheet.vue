@@ -256,22 +256,22 @@
     <!-- ═══ 3.数据记录表(样品组列随样品数,总宽恒定:组总宽÷列数) ═══ -->
     <table class="rs-t rs-dt">
       <colgroup>
-        <col v-if="!dtHidden('冲水时间')" style="width:130px" />
-        <col v-if="!dtHidden('累计进水（L）')" style="width:96px" />
-        <col v-if="!dtHidden('水温（℃）')" style="width:80px" />
+        <col v-if="!dtHidden('冲水时间')" :style="{ width: dtW(130, 84) + 'px' }" />
+        <col v-if="!dtHidden('累计进水（L）')" :style="{ width: dtW(96, 66) + 'px' }" />
+        <col v-if="!dtHidden('水温（℃）')" :style="{ width: dtW(80, 58) + 'px' }" />
         <template v-for="n in sampleCount" :key="'cp' + n">
           <col v-if="!dtHidden(`压力（PSI)样品${n}`)" :style="{ width: pressColW + 'px' }" />
         </template>
-        <col v-if="!dtHidden('原水含量（ug/L）5号缸')" style="width:96px" />
+        <col v-if="!dtHidden('原水含量（ug/L）5号缸')" :style="{ width: dtW(96, 66) + 'px' }" />
         <template v-for="n in sampleCount" :key="'co' + n">
           <col v-if="!dtHidden(`出水含量（ug/L）样品${n}`)" :style="{ width: outColW + 'px' }" />
         </template>
         <template v-for="n in sampleCount" :key="'cr' + n">
           <col v-if="!dtHidden(`去除率%样品${n}`)" :style="{ width: outColW + 'px' }" />
         </template>
-        <col v-if="!dtHidden('测试时间')" style="width:110px" />
+        <col v-if="!dtHidden('测试时间')" :style="{ width: dtW(110, 76) + 'px' }" />
         <!-- 自定义列（运行时新增，追加在硬编码列之后） -->
-        <col v-for="(e, ei) in extCols" :key="'cx' + ei" :style="{ width: e.w + 'px' }" />
+        <col v-for="(e, ei) in extCols" :key="'cx' + ei" :style="{ width: extColW(e) + 'px' }" />
         <col v-if="editable" style="width:60px" />
       </colgroup>
       <tbody>
@@ -494,9 +494,35 @@ async function setSampleCount(n) {
   props.head['样品数'] = String(n)
   emit('dirty')
 }
-/** 样品组列宽:组总宽÷当前列数(总宽恒定,维持表格整齐;下限防过窄) */
-const pressColW = computed(() => Math.max(34, Math.floor(220 / sampleCount.value)))
-const outColW = computed(() => Math.max(30, Math.floor(192 / sampleCount.value)))
+/**
+ * 表格设计总宽(px) = 130+96+80+220+96+192+192+110+60。
+ * 「3.数据记录表」原本是**总宽恒定**模型:样品组按 组总宽÷列数 分摊,整表始终等于这个数。
+ */
+const DT_BASE_TOTAL = 1176
+/**
+ * 新增自定义列后的**等比压缩系数**(2026-11-11 用户口径)。
+ *
+ * <p>用户原话:「新增的会超出对应的行宽，应该改为自适应压缩前面的行宽」——
+ * 原实现把自定义列**追加**在固定总宽之外，列一多就撑出纸面（实测加 1 列即溢出）。</p>
+ *
+ * <p>口径：所有列（既有 + 新增）一起按 `设计总宽 ÷ 实际总宽` 等比压缩，
+ * 下限 0.5（再小就到不了可填宽度）；压缩后整表仍等于设计总宽，纸面不溢出。</p>
+ */
+const extTotalW = computed(() => extCols.value.reduce((sum, e) => sum + (Number(e.w) || 120), 0))
+const dtScale = computed(() => {
+  const all = DT_BASE_TOTAL + extTotalW.value
+  if (all <= DT_BASE_TOTAL) return 1
+  return Math.max(0.5, DT_BASE_TOTAL / all)
+})
+/** 既有列宽：按压缩系数缩，带下限（避免压成看不清） */
+function dtW(base, min) {
+  return Math.max(min, Math.round(base * dtScale.value))
+}
+/** 自定义列宽：同样参与压缩，下限 64px（列名 + 一个数字还看得见） */
+const extColW = (e) => Math.max(64, Math.round((Number(e.w) || 120) * dtScale.value))
+/** 样品组列宽:组总宽÷当前列数(再乘压缩系数;下限防过窄) */
+const pressColW = computed(() => Math.max(34, Math.floor((220 * dtScale.value) / sampleCount.value)))
+const outColW = computed(() => Math.max(30, Math.floor((192 * dtScale.value) / sampleCount.value)))
 /** 某样品组的物理列键(1..样品数) */
 function sampleKeys(prefix) {
   return Array.from({ length: sampleCount.value }, (_, i) => `${prefix}${i + 1}`)
