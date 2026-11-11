@@ -160,7 +160,8 @@
                  table-cell(浏览器另生匿名格包住它,colspan 随之失效 —— 实测 colspan=10 的格子只剩
                  一列宽、公司名与编号挤成两行)。缺省(非 rs-onecell)时这层 div 就是普通块级,
                  与改造前逐字等价。 -->
-            <div class="rs-docno-in" :class="{ 'rs-onecell': sameCellDocno }">
+            <div class="rs-docno-in" :class="{ 'rs-onecell': sameCellDocno }"
+                 :style="sameCellDocno && oneCellDocnoW ? { '--docno-w': oneCellDocnoW + 'px' } : null">
               <!-- 同格版式:公司名与编号同处一格(设计一格含两段文字),公司名内联在编号左边 -->
               <span v-if="sameCellDocno" class="rs-company-inline">{{ COMPANY_NAME }}</span>
               <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
@@ -2233,6 +2234,23 @@ const COMPANY_NAME = '惠州市银嘉环保科技有限公司'
  *                    (改造前是 23 个面板统一带标识,没核过设计的面板不该被顺手改掉纸面观感)。
  *  不写 head.noSpan = 退回下面的动态算法(未按设计逐张核对的面板维持原样,零影响)。 */
 const sameCellDocno = computed(() => effHead.value.noSpan === 0)
+/**
+ * 同格版式（公司名与编号同一格）里，编号控件的宽度（px）。
+ *
+ * <p>用户口径（2026-11-11）：「选择框应该收短与下边平齐，所以的都是」——截图里
+ * 「点击选择」框把整格剩余宽度全吃了（`.rs-onecell > .rs-ref-ctl { flex: 1 1 auto }`），
+ * 右缘虽然贴着纸边，左缘却压到了下方「密级/适用范围」那一块的中段，看着不齐。</p>
+ *
+ * <p>口径：宽度取**下方右侧信息块**（infoLabel + infoValue 那几列）的总宽，
+ * 右对齐 ⇒ 选择框的左缘正好落在信息块标签列的左缘上，与下面逐行对齐。</p>
+ */
+const oneCellDocnoW = computed(() => {
+  const cols = effGrid.value || []
+  const right = Math.max(1, (Number(effHead.value.infoLabel) || 0) + (Number(effHead.value.infoValue) || 0))
+  const tail = cols.slice(Math.max(0, cols.length - right))
+  const w = tail.reduce((s, x) => s + (Number(x) || 0), 0)
+  return w > 0 ? Math.round(w) : 0
+})
 const noGapSpan = computed(() => Math.max(0, Math.floor(Number(effHead.value.noGapSpan) || 0)))
 const gapLeftSpan = computed(() => (sameCellDocno.value ? 0 : noGapSpan.value))
 const gapRightSpan = computed(() => (sameCellDocno.value ? noGapSpan.value : 0))
@@ -5543,10 +5561,14 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   font-weight: 400;
   color: #333;
 }
+/* 同格版式：编号控件**固定为下方信息块的那几列宽**（--docno-w），不再吃满整格剩余宽度。
+   2026-11-11 用户口径「选择框应该收短与下边平齐」——原来 flex:1 1 auto 会让它左缘压到
+   信息块中段，与下面 5 行不齐。未声明 --docno-w 时退回原弹性行为。 */
 .rs-onecell > .rs-docno-wrap,
 .rs-onecell > .rs-ref-ctl {
-  flex: 1 1 auto;
+  flex: 0 0 var(--docno-w, auto);
   min-width: 0;
+  max-width: 100%;
 }
 .rs-docno-empty {
   color: #b6bcc6;

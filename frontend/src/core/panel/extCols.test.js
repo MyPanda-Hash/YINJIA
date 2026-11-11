@@ -181,3 +181,20 @@ test('⑬ 表外元素（「＋ 新增数据记录行」条）必须与表格同
   assert.match(addLine, /dtTableW\(dt\)/, '加行条宽度必须用 dtTableW（否则与表格不同宽）')
   assert.ok(!/dt\.design \? dtW\(dt\) \* designK\(dt\) : dtW\(dt\)/.test(addLine), '不得再退回旧的 dtW 写法')
 })
+
+test('⑭ 同格版式的编号选择框要收短到「下方信息块」的宽度', () => {
+  // 用户口径（2026-11-11）：「选择框应该收短与下边平齐，所以的都是」。
+  // 原来 `.rs-onecell > .rs-ref-ctl { flex: 1 1 auto }` 会把整格剩余宽度吃满，
+  // 选择框左缘压到「密级/适用范围」那一块的中段，与下面逐行不齐。
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /const oneCellDocnoW = computed/, '缺少 oneCellDocnoW 计算')
+  const m = sheet.match(/const oneCellDocnoW = computed\(\(\) => \{[\s\S]*?\n\}\)/)
+  assert.ok(m, 'oneCellDocnoW 实现缺失')
+  const b = m[0]
+  assert.match(b, /infoLabel/, '宽度要含 infoLabel 那几列')
+  assert.match(b, /infoValue/, '宽度要含 infoValue 那几列')
+  assert.match(b, /cols\.slice\(Math\.max\(0, cols\.length - right\)\)/, '要取**末尾**那几列（右对齐）')
+  // 模板挂 CSS 变量 + CSS 用固定宽
+  assert.match(sheet, /'--docno-w': oneCellDocnoW \+ 'px'/, '模板要把宽度作为 --docno-w 挂上')
+  assert.match(sheet, /flex: 0 0 var\(--docno-w, auto\)/, '同格编号控件要改用固定宽，不再 flex:1 1 auto')
+})
