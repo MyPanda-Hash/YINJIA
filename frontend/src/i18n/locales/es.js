@@ -428,6 +428,11 @@ export default {
     '检验目录': 'Catálogo de inspección',
     '待检验目录': 'Inspecciones pendientes',
     '检验数据记录明细表': 'Detalle de registros de inspección',
+    '显示全部状态': 'Mostrar todos los estados',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Por defecto solo se muestran las inspecciones completadas; marque para incluir las que están en curso',
+    '收起条件': 'Ocultar filtros',
+    '展开条件': 'Mostrar filtros',
+    '收起或铺开表头的查询条件': 'Contraer o expandir la fila de filtros del encabezado',
     '暂收退料单': 'Devolución de mercancía temporal',
     '生产异常分析报告': 'Informe de Análisis de Anomalías de Producción',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

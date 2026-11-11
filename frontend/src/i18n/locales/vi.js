@@ -418,6 +418,11 @@ export default {
     '检验目录': 'Danh mục kiểm tra',
     '待检验目录': 'Danh mục chờ kiểm tra',
     '检验数据记录明细表': 'Chi tiết hồ sơ kiểm tra',
+    '显示全部状态': 'Hiện tất cả trạng thái',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Mặc định chỉ hiển thị các phiếu đã kiểm tra xong; tích để hiện cả phiếu đang kiểm tra',
+    '收起条件': 'Ẩn điều kiện',
+    '展开条件': 'Hiện điều kiện',
+    '收起或铺开表头的查询条件': 'Thu gọn hoặc mở rộng dòng điều kiện trên tiêu đề',
     '暂收退料单': 'Phiếu trả hàng tạm nhận',
     '生产异常分析报告': 'Báo cáo phân tích bất thường sản xuất',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

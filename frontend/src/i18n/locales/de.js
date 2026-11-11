@@ -428,6 +428,11 @@ export default {
     '检验目录': 'Prüfkatalog',
     '待检验目录': 'Offene Prüfungen',
     '检验数据记录明细表': 'Prüfdatensatz-Details',
+    '显示全部状态': 'Alle Status anzeigen',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Standardmäßig werden nur abgeschlossene Prüfungen angezeigt; anhaken, um laufende einzublenden',
+    '收起条件': 'Filter ausblenden',
+    '展开条件': 'Filter einblenden',
+    '收起或铺开表头的查询条件': 'Filterzeile im Kopf ein- oder ausblenden',
     '暂收退料单': 'Wareneingangs-Rückgabe',
     '生产异常分析报告': 'Produktionsabweichungsanalysebericht',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

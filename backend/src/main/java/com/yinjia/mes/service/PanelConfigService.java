@@ -628,6 +628,18 @@ public class PanelConfigService {
         // 后端「新增」建单时已写库,但前端新建后的**本地草稿对象**是空的 ——
         // 不下发就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
         if (!def.headDefaults().isEmpty()) metadata.put("headDefaults", def.headDefaults());
+        // 状态闸门 + 查询条件区默认收起(2026-11-11,见 PanelDef.statusGate / collapseQueryBar):
+        //   检验数据记录明细表要「默认只列已完成检验,勾选后才含正在检验中」——闸门本体在
+        //   QueryService 里执行(服务端强制),这里只把声明下发给前端,用来渲染那个复选框;
+        //   collapseQueryBar 让条件区默认收起(用户口径「表头做个收缩」)。
+        PanelRegistry.PanelDef.StatusGate gate = def.statusGate();
+        if (gate != null) {
+            Map<String, Object> gm = new LinkedHashMap<>();
+            gm.put("field", gate.field());
+            gm.put("value", gate.value());
+            metadata.put("statusGate", gm);
+        }
+        if (def.collapseQueryBar()) metadata.put("collapseQueryBar", true);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
         for (Map<String, Object> g : buttonGroups) {

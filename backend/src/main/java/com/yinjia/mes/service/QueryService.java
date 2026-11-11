@@ -320,6 +320,23 @@ public class QueryService {
         // 口径(见其长注释)。**这里不再把名称位当编码比** —— 2026-10-20 事故就是这里写死了
         // `RTRIM(t.[仓库编码]) = 仓库值`,而弹窗里放的是名称 ⇒ 台账查询恒 0 行明细(只剩期初/期末两行)。
         appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
+        // 状态闸门(2026-11-11,声明见 PanelDef.statusGate / yj_panel.config):
+        //   面板可声明「列表默认只返回 某字段=某值 的行」,前端那个「含…」复选框
+        //   会在 condition 里带 `_statusScope='all'` 才放开。
+        //   ⚠ 闸门必须在**服务端**这一层加:否则查询弹窗/高级筛选/关键字/翻页/导出
+        //     都能把被闸住的行捞回来(用户口径「查询也是一样,没勾选之前查询不出来」)。
+        //   ⚠ 字段标签必须已登记(否则拼出「列名无效」直接 500)—— 没登记就不闸,只打一条 warn。
+        PanelRegistry.PanelDef.StatusGate gate = def.statusGate();
+        if (gate != null) {
+            String gateCol = l2c.get(gate.field());
+            if (gateCol == null) {
+                org.slf4j.LoggerFactory.getLogger(QueryService.class)
+                        .warn("[statusGate] 面板 {} 声明的闸门字段「{}」未在 yj_field 登记,闸门不生效", def.code(), gate.field());
+            } else if (!"all".equalsIgnoreCase(strOf(condition == null ? null : condition.get("_statusScope")))) {
+                where.append(" AND t.[").append(gateCol).append("] = ?");
+                args.add(gate.value());
+            }
+        }
         appendAdvFilters(advFilters, where, args, l2c, "t");
 
         Integer total = jdbc.queryForObject(

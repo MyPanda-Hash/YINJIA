@@ -7,6 +7,28 @@
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
       </button>
+      <!-- 状态闸门(2026-11-11):面板声明 metadata.statusGate 时才有这颗复选框。
+           默认不勾 = 只列闸门放行的行(如「已完成检验」);勾上才含其它状态(如「正在检验中」)。
+           闸门在服务端生效,不是前端藏行 —— 不勾时查询也查不出来。 -->
+      <el-checkbox
+        v-if="statusGate && reportMode"
+        class="gated-toggle"
+        :model-value="includeGatedRows"
+        :label="gatedToggleLabel"
+        :title="gatedToggleTitle"
+        @change="onToggleGatedRows"
+      />
+      <!-- 查询条件区收起/铺开(2026-11-11,用户口径「表头做个收缩」):只在 config 声明了才出现 -->
+      <button
+        v-if="cfgCache?.metadata?.collapseQueryBar && reportMode && !reportQueryDialog"
+        type="button"
+        class="toolbar-query-btn"
+        :title="tt('收起或铺开表头的查询条件')"
+        @click.stop="toggleQueryBar"
+      >
+        <span>{{ queryBarOpen ? tt('收起条件') : tt('展开条件') }}</span>
+        <span class="qb-caret">{{ queryBarOpen ? '▲' : '▼' }}</span>
+      </button>
       <!-- 库存状况:仓库下拉(按仓库编码精确过滤,字典改名不影响绑定) -->
       <el-select
         v-if="panelCode === 'STOCK_STATUS'"
@@ -80,8 +102,9 @@
     </div>
 
     <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。
-         查询弹窗/级联面板(收发存/台账/库存状况):查询条件只在弹窗(级联下拉),不显示内联区 -->
-    <div v-if="reportMode && !reportQueryDialog && !isCascadePanel" class="fields udl-fields">
+         查询弹窗/级联面板(收发存/台账/库存状况):查询条件只在弹窗(级联下拉),不显示内联区
+         2026-11-11「表头做个收缩」:声明 collapseQueryBar 的面板用 v-show 收起条件区(状态保留) -->
+    <div v-if="reportMode && !reportQueryDialog && !isCascadePanel" v-show="queryBarOpen" class="fields udl-fields">
       <div class="field" v-for="qr in queryFields" :key="qr.dataName">
         <label :class="{ req: qr.isRequired }">{{ qr.displayName || tt(qr.dataName) }}</label>
         <div v-if="qType(qr) === 'ref' && refModeMap[qr.dataName] === 'select'" class="query-ref-select">
@@ -3448,6 +3471,30 @@ function onQueryDialogClose() {
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
+
+/* ────────── 状态闸门 + 查询条件区收起(2026-11-11)──────────
+ * 状态闸门(statusGate):面板在 yj_panel.config 里声明「默认只列 某字段=某值 的行」,
+ *   **闸门在服务端执行**(QueryService.queryFlat),前端这颗复选框只是把 `_statusScope='all'`
+ *   带给后端 —— 所以不勾选时,查询弹窗/关键字/高级筛选都查不出被闸住的行(用户口径
+ *   「查询也是一样,没勾选之前查询不出来」)。现役:检验数据记录明细表(只看已完成检验)。
+ * 查询条件区收起(collapseQueryBar):用户口径「表头做个收缩」,条件多时先收起,点开关铺开。 */
+const statusGate = computed(() => cfgCache.value?.metadata?.statusGate || null)
+const includeGatedRows = ref(false)
+const queryBarOpen = ref(true)
+/**
+ * 闸门复选框的文案。刻意写成**静态整句**而不是拼 `tt(gate.value)` ——
+ * 拼串在 en/ja/ko 里语序会别扭,而这条口径本来就是一句话。
+ * (将来若有第二个面板用 statusGate 且取值不同,把这两句挪进 config.statusGate.label 即可。)
+ */
+const gatedToggleLabel = computed(() => tt('显示全部状态'))
+const gatedToggleTitle = computed(() => tt('默认只显示已完成检验，勾选后一并显示正在检验中'))
+function onToggleGatedRows(v) {
+  includeGatedRows.value = !!v
+  search()
+}
+function toggleQueryBar() {
+  queryBarOpen.value = !queryBarOpen.value
+}
 /** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
 const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
 /**
@@ -10134,6 +10181,12 @@ async function loadCrg() {
     }
   }
   gridTabs.value = tp?.gridTabs || []
+  // 查询条件区默认收起(2026-11-11,见 yj_panel.config.collapseQueryBar):
+  // 用户口径「表头做个收缩」—— 条件多时一行放不下、表格被挤,故打开面板先收起条件区,
+  // 点工具栏那颗「条件」开关才铺开。没声明该配置的面板不动(仍常显)。
+  queryBarOpen.value = !(cfg?.metadata?.collapseQueryBar === true)
+  // 状态闸门的「含…」复选框每换一个面板都回到默认(未勾选 = 只看闸门放行的那些行)
+  includeGatedRows.value = false
   groups.value = filterGroups(ensureScanFillAction(
     cfg?.metadata?.buttonGroups,
     cfg?.metadata,
@@ -11693,6 +11746,9 @@ async function load(clamping = false) {
       }
       if (reportMode.value && reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
     }
+    // 状态闸门放开(2026-11-11):面板声明了 metadata.statusGate 时,服务端默认只返回闸门放行的行;
+    // 用户勾了「含…」才带 `_statusScope='all'` 让后端放开。`_` 前缀 = 控制键(后端不吃进字段 LIKE)。
+    if (statusGate.value && includeGatedRows.value) params.condition._statusScope = 'all'
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
@@ -11903,6 +11959,8 @@ watch(
     query.keyword = ''
     queryFields.value = []
     gridTabs.value = []
+    // 状态闸门的「含…」勾选属于上一个面板的状态,换面板先复位(新面板的默认值由 loadConfig 重设)
+    includeGatedRows.value = false
     queryRefVisible.value = false
     queryRefField.value = null
     queryDialogVisible.value = false
@@ -12138,6 +12196,25 @@ onUnmounted(() => {
   width: 190px;
   align-self: stretch;
   margin: 3px 8px;
+}
+/* 状态闸门复选框(工具栏内嵌,2026-11-11):与旁边的工具按钮同高、竖线分隔 */
+.gated-toggle {
+  align-self: stretch;
+  height: auto;
+  margin: 0;
+  padding: 0 12px 0 10px;
+  border-right: 1px solid #c8ced8;
+}
+.gated-toggle :deep(.el-checkbox__label) {
+  font-size: 13px;
+  color: #263548;
+  padding-left: 6px;
+}
+/* 查询条件区收起/铺开按钮上的小三角 */
+.qb-caret {
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.7;
 }
 /* 预警数量行内编辑 */
 .warn-editable {

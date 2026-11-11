@@ -1411,6 +1411,11 @@ export default {
     // ---- 2026-11-11 检验目录 → 待检验目录(只显示待检验的行) + 新增「检验数据记录明细表」----
     '待检验目录': 'Pending Inspections',
     '检验数据记录明细表': 'Inspection Record Details',
+    '显示全部状态': 'Show all statuses',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Only "Inspection Completed" rows are listed by default; check to include in-progress ones as well',
+    '收起条件': 'Hide filters',
+    '展开条件': 'Show filters',
+    '收起或铺开表头的查询条件': 'Collapse or expand the header filter row',
     '暂无待检验记录，暂收单生单生成检验单后自动带入': 'No pending inspection — rows are added automatically when a temporary receipt generates an inspection sheet',
     '目录记录由检验单生单自动生成、不可手工修改；本表只列待检验（正在检验中）的行，已完成检验的记录请到「检验数据记录明细表」查询。': 'Catalog records are generated automatically when the inspection sheet is created and cannot be edited by hand; this sheet lists only pending (in progress) rows — completed inspections are found in "Inspection Record Details".',
     '取消完成后该目录行回到「正在检验中」（会重新出现在待检验目录里），之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？': 'After cancelling, this catalog row returns to “In Progress” (it will show up in Pending Inspections again); only then can the linked inspection sheet and inspection data record be un-audited. Cancel completion?',
