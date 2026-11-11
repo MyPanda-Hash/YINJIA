@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sourceHintOf } from './sourceHint.js'
+import { sourceHintOf, hasHiddenSourceColumn } from './sourceHint.js'
 
 /**
  * 采购入库单表头「来源」提示(2026-11-11 用户口径第二版:「不要做成字段,做成个按钮或者是提示就行」)。
@@ -50,4 +50,15 @@ test('不给反查函数也不炸(默认不可点)', () => {
   const hint = sourceHintOf({ 来源: '来料检验单', 来源单号: 'IJ-1' })
   assert.equal(hint.panelCode, '')
   assert.equal(hint.canOpen, false)
+})
+
+test('只在「来源是隐藏列」的面板挂提示(采购入库单),可见来源字段的面板不重复挂', () => {
+  // 采购入库单:来源列 hidden(列表页 dataSchema.fields 用 dataName,表单页 meta 用 code)
+  assert.equal(hasHiddenSourceColumn([{ dataName: '来源', hidden: true }]), true)
+  assert.equal(hasHiddenSourceColumn([{ code: '来源', hidden: true }]), true)
+  // ASM_BOM 的「来源」是可见字段:不该再挂一条同样的提示
+  assert.equal(hasHiddenSourceColumn([{ dataName: '来源', hidden: false }]), false)
+  assert.equal(hasHiddenSourceColumn([{ dataName: '来源' }]), false)
+  assert.equal(hasHiddenSourceColumn([]), false)
+  assert.equal(hasHiddenSourceColumn(null), false)
 })

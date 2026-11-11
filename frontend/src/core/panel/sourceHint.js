@@ -21,6 +21,22 @@
  */
 
 /**
+ * 这个面板是不是「把 `来源` 当隐藏列」的那种(采购入库单就是:2026-11-11 起来源列 hidden,
+ * 信息改由本提示显示)。
+ *
+ * <p>为什么要判:别的面板也有叫 `来源` 的**可见**字段(如 ASM_BOM),那些面板本来就把值摆在表头上,
+ * 再挂一条同样的提示就是重复噪音 —— 只在「来源是隐藏列」的面板上挂。
+ *
+ * @param {Array<object>} fields 面板字段元数据(列表页 dataSchema.fields / 表单页 meta,键是 dataName|code)
+ */
+export function hasHiddenSourceColumn(fields) {
+  return (fields || []).some((f) => {
+    const key = String((f && (f.code || f.dataName)) || '').trim()
+    return key === '来源' && f.hidden === true
+  })
+}
+
+/**
  * 由单据表头算出提示。
  *
  * @param {object} doc 单据表头(键是中文数据键)

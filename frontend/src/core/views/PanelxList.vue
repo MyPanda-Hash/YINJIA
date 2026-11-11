@@ -2570,7 +2570,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { sourceHintOf } from '@core/panel/sourceHint'
+import { sourceHintOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
 import { panelCodeOfName } from '@core/panel/panelCodeByName'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
@@ -5392,8 +5392,12 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 /**
  * 单据号旁的「来源」提示(2026-11-11 用户口径:「不要做成字段,做成个按钮或者是提示就行」)。
  * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);老单没有链路 ⇒ null ⇒ 不显示。
+ * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来就是可见字段的面板(如 ASM_BOM)不重复挂。
  */
-const sourceHint = computed(() => sourceHintOf(cur.value, panelCodeOfName))
+const sourceHint = computed(() => {
+  if (!hasHiddenSourceColumn(cfgCache.value?.dataSchema?.fields)) return null
+  return sourceHintOf(cur.value, panelCodeOfName)
+})
 const sourceHintTitle = computed(() => {
   const h = sourceHint.value
   if (!h) return ''
