@@ -1,16 +1,21 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       来料品质·检验目录(QC_CATALOG)—— 纸张式控制列表(**不可手工编辑**,只读呈现)
+       来料品质·**待检验目录**(QC_CATALOG)—— 纸张式控制列表(**不可手工编辑**,只读呈现)
        数据来源:检验单生单(暂收单→来料检验单)时按明细物料自动生成,检测物料类别取自商品档案「所属类别」;
        数量=检验单送检数量+单位;批次号靠回填;每行带 检验单号 与 检验数据记录单号(数据挂靠键)。
-       行上动作:「完成」(校验挂靠单据已审批→已完成检验+是否合格)/「修改」(回弹状态并写修改记录)/
-                 「删除记录」(挂靠单据还在时拒绝)。
+       行上动作:「完成」(校验挂靠单据已审批→已完成检验+是否合格)/「删除记录」(挂靠单据还在时拒绝)。
        呈现方式与项目进度查询同族:纸张 + 右侧竖排操作栏(PanelxList approval-layout 提供)。
+
+       2026-11-11 用户口径:「已经完成检验的就不用显示了,现在这个检验目录,改名成待检验目录,
+       只需要待检验的数据。」⇒ 本纸面**只渲染 检验状态≠已完成检验 的行**(pendingRows);
+       已完成的那些不再在这里(它们进「检验数据记录明细表」QC_INSP_REC_DETAIL 查),
+       对应的「取消完成」也一并搬到那张表的行内动作(见 PanelxList 的 qcCatalogReopen)。
+       库与 qc_catalog_detail 仍保留全部行,不是删数据 —— 面板编码 QC_CATALOG 也一个字节没动。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="catalog-sheet">
     <!-- ① 标题 -->
     <div class="cs-titlerow">
-      <div class="cs-title">{{ tt('检验目录') }}</div>
+      <div class="cs-title">{{ tt('待检验目录') }}</div>
     </div>
 
     <!-- ② 控制表(两行表头:物料层三列各有列名,检验记录目录跨其后六列) -->
@@ -66,7 +71,7 @@
               </span>
               <span v-else class="cs-cell-text">—</span>
             </td>
-            <!-- 行操作:完成检验 / 修改(两钮常在,不适用时置灰并说明)/ 删除记录 -->
+            <!-- 行操作:完成检验 / 删除记录(「修改/取消完成」在检验数据记录明细表的行内) -->
             <td class="c-op no-print">
               <span
                 class="cs-act"
@@ -76,19 +81,11 @@
                   : tt('完成检验（需关联的检验单与检验数据记录都已审批）')"
                 @click.stop="openComplete(row)"
               >{{ tt('完成检验') }}</span>
-              <span
-                class="cs-act warn"
-                :class="{ disabled: row[K.STATUS] !== QC_STATUS_DONE }"
-                :title="row[K.STATUS] === QC_STATUS_DONE
-                  ? tt('取消完成并回弹为正在检验中（之后才可反审核挂靠单据）')
-                  : tt('仅「已完成检验」的行可取消完成')"
-                @click.stop="row[K.STATUS] === QC_STATUS_DONE && doReopen(row)"
-              >{{ tt('修改') }}</span>
               <span class="cs-act danger" :title="tt('删除该目录记录（需先删除挂靠的检验单与检验数据记录）')" @click.stop="doDelete(row)">✕</span>
             </td>
           </tr>
           <tr v-if="!displayRows.length">
-            <td :colspan="catalogCols.length + 4" class="cs-empty">{{ tt('暂无检验记录，暂收单生单生成检验单后自动带入') }}</td>
+            <td :colspan="catalogCols.length + 4" class="cs-empty">{{ tt('暂无待检验记录，暂收单生单生成检验单后自动带入') }}</td>
           </tr>
         </tbody>
       </table>
@@ -97,7 +94,7 @@
     <!-- ③ 页签脚注(原表第16行)+ 只读说明(「修改记录」入口已移至右侧竖排按钮栏) -->
     <div class="cs-note">
       <div>{{ tt('输入批次号后点击批次号可查阅详细或者新增检验') }}</div>
-      <div class="cs-note-sub">{{ tt('目录记录由检验单生单自动生成、不可手工修改；状态变更走行上的「完成 / 修改」。') }}</div>
+      <div class="cs-note-sub">{{ tt('目录记录由检验单生单自动生成、不可手工修改；本表只列待检验（正在检验中）的行，已完成检验的记录请到「检验数据记录明细表」查询。') }}</div>
     </div>
 
     <!-- 完成弹窗:确认 + 是否合格 -->
@@ -151,7 +148,6 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import {
   QC_CATALOG_COLUMNS,
-  QC_STATUS_DOING,
   QC_STATUS_DONE,
   exportHeaderRow,
   exportRow,
@@ -190,12 +186,20 @@ const items = computed(() => {
 })
 
 /**
+ * 待检验行(2026-11-11 用户口径「已经完成检验的就不用显示了…只需要待检验的数据」):
+ * 只留 检验状态 ≠ 已完成检验 的行;状态为空的行也算待检验(老数据没填状态)。
+ * ⚠ 只是**前端过滤**,qc_catalog_detail 一行不删 —— 已完成的记录在
+ * 「检验数据记录明细表」(QC_INSP_REC_DETAIL)里查,「取消完成」也在那张表的行内。
+ */
+const pendingRows = computed(() => (items.value || []).filter((r) => r?.[K.STATUS] !== QC_STATUS_DONE))
+
+/**
  * 展示顺序(用户口径:类别相同的归为一整个大类):
  * 按「检测物料类别」整块聚合 —— 同类别行不论原来分散在哪都收拢成连续一块(块内保持原顺序),
  * 大类的先后 = 该类别首次出现的位置;类别为空的行不归纳,各自单独成行(在原位置附近输出)。
  */
 const displayRows = computed(() => {
-  const rows = items.value || []
+  const rows = pendingRows.value || []
   const out = []
   const done = new Set()
   for (const r of rows) {
@@ -305,19 +309,6 @@ async function doComplete() {
   ElMessage.success(tt('已标记为已完成检验'))
 }
 
-async function doReopen(row) {
-  try {
-    await ElMessageBox.confirm(
-      tt('取消完成后该目录行回到「正在检验中」，之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？'),
-      tt('取消完成'),
-      { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), type: 'warning' },
-    )
-  } catch { return }
-  const res = await callCatalog('修改', { id: row.id })
-  if (!res) return
-  ElMessage.success(tt('已取消完成（已写入修改记录）'))
-}
-
 async function doDelete(row) {
   try {
     await ElMessageBox.confirm(
@@ -390,11 +381,11 @@ async function reloadDoc() {
   } catch { /* 重取失败保持现状 */ }
 }
 
-/** 导出 Excel:标题 + 列头 + 全部目录行(与 qcCatalogColumns 同源) */
+/** 导出 Excel:标题 + 列头 + 全部待检验行(与 qcCatalogColumns 同源) */
 async function exportCatalogExcel() {
   const XLSX = await import('xlsx')
-  const rows = displayRows.value || []   // 导出与纸面同序(类别整块聚合后的顺序)
-  const title = '检验目录'
+  const rows = displayRows.value || []   // 导出与纸面同序(类别整块聚合后的顺序),且只含待检验行
+  const title = '待检验目录'
   const header = exportHeaderRow()
   const aoa = [[title], [], header, ...rows.map((r) => exportRow(r))]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -505,7 +496,6 @@ defineExpose({ exportCatalogExcel })
   line-height: 20px; cursor: pointer; color: #1c4f8a; background: #f4f9ff; border: 1px solid #8fb4e0;
 }
 .cs-act:hover { background: #e8f2ff; }
-.cs-act.warn { color: #b26a00; background: #fff8ee; border-color: #ffd9a8; }
 .cs-act.danger { color: #c0392b; background: #fff5f5; border-color: #f0b4ae; }
 .cs-act.disabled { opacity: 0.45; cursor: not-allowed; }
 .c-op .cs-act { margin: 1px 1px; padding: 0 4px; font-size: 11.5px; }

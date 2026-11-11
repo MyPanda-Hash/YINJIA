@@ -270,7 +270,7 @@ public class ButtonService {
     private Long catalogRowId(Map<String, Object> formData, Map<String, Object> buttonParam) {
         Object v = formData == null ? null : formData.get("id");
         if (v == null && buttonParam != null) v = buttonParam.get("id");
-        if (v == null) throw new IllegalArgumentException("缺少检验目录行 id");
+        if (v == null) throw new IllegalArgumentException("缺少检验目录行 id(待检验目录/明细表的行 id)");
         return v instanceof Number n ? n.longValue() : Long.valueOf(String.valueOf(v));
     }
 
@@ -286,7 +286,7 @@ public class ButtonService {
      */
     private Map<String, Object> completeCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData,
                                                    Map<String, Object> buttonParam) {
-        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅待检验目录可用");
         Long id = catalogRowId(formData, buttonParam);
         Map<String, Object> row = jdbc.queryForMap("SELECT 检验单号, 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", id);
         String inspNo = row.get("检验单号") == null ? "" : String.valueOf(row.get("检验单号"));
@@ -299,13 +299,13 @@ public class ButtonService {
 
     /** 目录行「修改」:已完成 → 正在检验中(回弹)+ 写修改记录 */
     private Map<String, Object> reopenCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅待检验目录可用");
         return qcCatalog.reopenRow(docNoOf(formData), catalogRowId(formData, null), currentUserName());
     }
 
     /** 目录行「删除记录」:挂靠单据还在时拒绝(提示先删除),否则软删该行 */
     private Map<String, Object> deleteCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅待检验目录可用");
         Long id = catalogRowId(formData, null);
         int n = qcCatalog.deleteRow(id, currentUserName());
         Map<String, Object> out = new LinkedHashMap<>();

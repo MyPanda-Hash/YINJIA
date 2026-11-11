@@ -244,9 +244,9 @@ export const CHAINS = [
             note: '检验单每条明细对应一张数据记录',
           },
           {
-            key: 'qccat', name: '检验目录', code: 'QC_CATALOG', route: '/panelx/list/QC_CATALOG',
+            key: 'qccat', name: '待检验目录', code: 'QC_CATALOG', route: '/panelx/list/QC_CATALOG',
             main: { label: '目录单', ref: 'nodes.QC_CATALOG.docs' },
-            note: '检验项目/方案的占位台账,按目录取检验项',
+            note: '只列待检验的批次；已完成的到「检验数据记录明细表」查',
           },
         ],
       },

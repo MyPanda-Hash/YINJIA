@@ -159,7 +159,8 @@
           @dirty="markInlineDirty"
           @open-sheets="openDataSheets"
         />
-        <!-- 来料品质·检验目录(QC_CATALOG):纸张式控制列表,与项目进度查询同一呈现方式 -->
+        <!-- 来料品质·待检验目录(QC_CATALOG,2026-11-11 由「检验目录」改名并只显示待检验的行):
+             纸张式控制列表,与项目进度查询同一呈现方式 -->
         <QcCatalogSheet
           v-else-if="panelCode === 'QC_CATALOG'"
           ref="approvalSheetRef"
@@ -915,6 +916,12 @@
                     class="doc-no-link"
                     :title="tt('点击查看或复制编号')"
                     @click.stop="openDocNoDialog(row, column.prop)">{{ row[column.prop] }}</span>
+              <!-- 检验数据记录明细表:来料检验单号 / 检验数据记录单号 可点跳转(用户口径「只有上面两个才用」);
+                   采购订单 / 送料暂收单 / 采购入库单 三组只显示单号+行号,走下面的普通单元格 -->
+              <span v-else-if="qcRecLinkPanel(column.prop) && row[column.prop]"
+                    class="doc-no-link"
+                    :title="tt('点击跳转到该单据')"
+                    @click.stop="gotoLinkedDoc(row[column.prop], qcRecLinkPanel(column.prop))">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -936,6 +943,20 @@
             </template>
           </el-table-column>
         </template>
+        <!-- 检验数据记录明细表:已完成检验的行给「取消完成」(待检验目录已不显示这些行,
+             而反审核挂靠单据前必须先取消完成 —— 见 QcCatalogService.assertLinkedRowNotCompleted) -->
+        <el-table-column v-if="qcRecDetailReopen" :label="tt('操作')" width="112" align="center" fixed="right">
+          <template #default="{ row }">
+            <span
+              v-if="row[QC_REC_DETAIL_REOPEN.statusField] === QC_REC_DETAIL_REOPEN.doneStatus"
+              class="doc-no-link"
+              :class="{ disabled: qcRecReopenBusy }"
+              :title="tt('取消完成并回弹为正在检验中（之后才可反审核挂靠的检验单与检验数据记录）')"
+              @click.stop="reopenCatalogRow(row)"
+            >{{ tt('取消完成') }}</span>
+            <span v-else class="qc-reopen-na">—</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 
@@ -2636,6 +2657,12 @@ import { recordSheetConfigs } from './recordSheetConfigs'
 import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
+// 检验数据记录明细表(QC_INSP_REC_DETAIL,2026-11-11):单号跳转列 + 行内「取消完成」的取参口径
+import {
+  QC_REC_DETAIL_PANEL,
+  QC_REC_DETAIL_LINKS,
+  QC_REC_DETAIL_REOPEN,
+} from '@core/qc/qcInspRecDetail'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
@@ -6458,6 +6485,70 @@ function gotoDocNo() {
   }
   docNoDlg.value.visible = false
   router.push({ path: '/panelx/list/' + panel, query: no ? { focus: no } : {} })
+}
+
+/* ══════════ 检验数据记录明细表(QC_INSP_REC_DETAIL):单号跳转 + 行内「取消完成」 ══════════
+ * 2026-11-11 用户口径:「每一条罗列的都要带来料检验单,也要带行号和检验数据记录。还有也要有采购订单,
+ * 送料暂收单,采购入库单(这3个的单号和行号,但是这个不用跳转,只有上面两个才用)。」
+ *   · 只有 来料检验单号 / 检验数据记录单号 渲染成可点跳转(与检验目录的 ↗ 同款:
+ *     /panelx/list/<面板>?docNo=<单号> 定位);
+ *   · 采购订单 / 送料暂收单 / 采购入库单 三组只显示单号+行号,不跳。
+ * 跳转同样要过面板查看权(canViewPanel,与条码面板单号同一口径),没权限只提示不发路由。
+ *
+ * 行内「取消完成」:待检验目录只显示待检验行,已完成的行只剩本表看得到,而反审核挂靠单据的守卫
+ * 要求先在目录行上「取消完成」⇒ 该动作跟着已完成的行搬到这里(后端仍是 QC_CATALOG 的「修改」)。
+ * 字段/面板码见 @core/qc/qcInspRecDetail(唯一真源)。 */
+const qcRecDetailLinks = computed(() => String(panelCode.value) === QC_REC_DETAIL_PANEL ? QC_REC_DETAIL_LINKS : null)
+/** 该列是不是可跳转的单号列;是则返回目标面板编码 */
+function qcRecLinkPanel(prop) {
+  const map = qcRecDetailLinks.value
+  return map ? (map[prop] || '') : ''
+}
+const qcRecDetailReopen = computed(() => String(panelCode.value) === QC_REC_DETAIL_PANEL)
+const qcRecReopenBusy = ref(false)
+
+/** 点单号 → 定位到目标面板的那张单(无查看权只提示) */
+function gotoLinkedDoc(no, targetPanel) {
+  const v = String(no ?? '').trim()
+  if (!v || !targetPanel) return
+  if (!canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, targetPanel)) {
+    ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(targetPanel))
+    return
+  }
+  router.push({ path: '/panelx/list/' + targetPanel, query: { docNo: v } })
+}
+
+/** 已完成检验的行 →「取消完成」:回弹为正在检验中,并写一条修改记录(后端 QC_CATALOG「修改」) */
+async function reopenCatalogRow(row) {
+  const cfg = QC_REC_DETAIL_REOPEN
+  const docNo = String(row?.[cfg.docField] ?? '').trim()
+  const rowId = row?.[cfg.rowIdField]
+  if (!docNo || rowId == null || rowId === '') {
+    ElMessage.warning(tt('该行没有关联的检验目录记录，无法取消完成'))
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      tt('取消完成后该目录行回到「正在检验中」（会重新出现在待检验目录里），之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？'),
+      tt('取消完成'),
+      { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), type: 'warning' },
+    )
+  } catch { return }
+  qcRecReopenBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: cfg.catalogPanel,
+      buttonName: cfg.buttonName,
+      formData: { 编号: docNo, id: rowId },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('已取消完成（已写入修改记录）'))
+    await load()          // 该行状态已变,重取当前页(不跳回第一页)
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('操作失败'))
+  } finally {
+    qcRecReopenBusy.value = false
+  }
 }
 
 /** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
@@ -12021,6 +12112,9 @@ onUnmounted(() => {
 /* 单号链(条码面板):看起来是链接,但只开弹窗 —— 真跳转要过面板权限,不在这里直连 */
 .doc-no-link { color: var(--el-color-primary); cursor: pointer; text-decoration: underline dotted; }
 .doc-no-link:hover { color: var(--el-color-primary-light-3); }
+.doc-no-link.disabled { opacity: 0.45; cursor: not-allowed; }
+/* 检验数据记录明细表:非「已完成检验」行的操作格占位(保持列宽一致) */
+.qc-reopen-na { color: var(--el-text-color-placeholder); }
 .doc-no-dlg-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
 .doc-no-dlg-label { width: 48px; color: var(--el-text-color-secondary); flex: none; }
 .doc-no-dlg-value { word-break: break-all; }

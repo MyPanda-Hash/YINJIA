@@ -416,6 +416,8 @@ export default {
     '来料品质': 'Chất lượng nguyên liệu đầu vào',
     '来料检验单': 'Phiếu kiểm nghiệm đầu vào',
     '检验目录': 'Danh mục kiểm tra',
+    '待检验目录': 'Danh mục chờ kiểm tra',
+    '检验数据记录明细表': 'Chi tiết hồ sơ kiểm tra',
     '暂收退料单': 'Phiếu trả hàng tạm nhận',
     '生产异常分析报告': 'Báo cáo phân tích bất thường sản xuất',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

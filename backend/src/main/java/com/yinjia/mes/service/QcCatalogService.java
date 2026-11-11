@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 检验目录(QC_CATALOG)↔ 检验单(QC_INSP)↔ 检验数据记录(QC_INSP_REC)联动服务(2026-09-22 用户口径)。
+ * 待检验目录(QC_CATALOG)↔ 检验单(QC_INSP)↔ 检验数据记录(QC_INSP_REC)联动服务(2026-09-22 用户口径)。
+ * <p>2026-11-11 面板已改名「待检验目录」(只显示待检验的行);面板编码与下表结构不变。
  *
  * <p>口径(逐条对应需求):
  * <ol>
@@ -169,7 +170,7 @@ public class QcCatalogService {
         if (!no.isBlank()) return no;
         String newNo = formNoService.next("JYML", user);
         jdbc.update("INSERT INTO qc_catalog (单据编号, 单据日期, 备注, asp_user1, asp_time1) VALUES (?,?,?,?,GETDATE())",
-                newNo, LocalDate.now().toString(), "来料品质检验目录(由检验单生单自动维护)", user);
+                newNo, LocalDate.now().toString(), "来料品质待检验目录(由检验单生单自动维护)", user);
         mergeStatus(CATALOG_PANEL, newNo, user, true);
         return newNo;
     }
@@ -280,8 +281,11 @@ public class QcCatalogService {
     // ==================== ③ 守卫 ====================
 
     /**
-     * 反审核守卫:挂靠单据(检验单 / 检验数据记录)在检验目录中已「已完成检验」时拒绝反审核。
-     * 用户口径:已完成的数据需要先在检验目录点「修改」取消,才能反审核改动挂靠单据。
+     * 反审核守卫:挂靠单据(检验单 / 检验数据记录)在目录中已「已完成检验」时拒绝反审核。
+     * 用户口径:已完成的数据需要先「取消完成」把目录行回弹,才能反审核改动挂靠单据。
+     *
+     * <p>2026-11-11 起「取消完成」的入口搬到了**检验数据记录明细表**(QC_INSP_REC_DETAIL)的行内:
+     * 待检验目录(QC_CATALOG)只显示「正在检验中」的行,已完成的行在那里看不到 ⇒ 提示语也指到那张表。
      */
     public void assertLinkedRowNotCompleted(String panelCode, String docNo) {
         if (docNo == null || docNo.isBlank()) return;
@@ -291,8 +295,8 @@ public class QcCatalogService {
                 + " WHERE " + col + "=? AND 检验状态=? AND ISNULL(asp_cancel,'N')<>'Y'", docNo, ST_DONE);
         if (!rows.isEmpty()) {
             Map<String, Object> r = rows.get(0);
-            throw new IllegalStateException("该单据在「检验目录」中已标记「" + ST_DONE + "」(" + str(r.get("物料名称"))
-                    + " / " + str(r.get("批次号")) + "),请先在检验目录点「修改」取消完成,再反审核");
+            throw new IllegalStateException("该单据在「检验数据记录明细表」中已标记「" + ST_DONE + "」(" + str(r.get("物料名称"))
+                    + " / " + str(r.get("批次号")) + "),请先在明细表点「取消完成」,再反审核");
         }
     }
 
@@ -324,7 +328,7 @@ public class QcCatalogService {
     private Map<String, Object> rowOf(Long rowId) {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT id, 检测物料类别, 物料名称, 物料编码, 批次号, 数量,"
                 + " 检验状态, 是否合格, 检验单号, 检验数据记录单号 FROM qc_catalog_detail WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", rowId);
-        if (rows.isEmpty()) throw new IllegalStateException("检验目录记录不存在或已删除:" + rowId);
+        if (rows.isEmpty()) throw new IllegalStateException("待检验目录记录不存在或已删除:" + rowId);
         return rows.get(0);
     }
 

@@ -426,6 +426,8 @@ export default {
     '来料品质': 'Eingangsqualität',
     '来料检验单': 'Wareneingangsprüfung',
     '检验目录': 'Prüfkatalog',
+    '待检验目录': 'Offene Prüfungen',
+    '检验数据记录明细表': 'Prüfdatensatz-Details',
     '暂收退料单': 'Wareneingangs-Rückgabe',
     '生产异常分析报告': 'Produktionsabweichungsanalysebericht',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

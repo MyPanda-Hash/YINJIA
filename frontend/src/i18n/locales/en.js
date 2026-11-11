@@ -1408,6 +1408,15 @@ export default {
     '来料品质': 'Incoming Quality',
     '来料检验单': 'Incoming Inspection Sheet',
     '检验目录': 'Inspection Catalog',
+    // ---- 2026-11-11 检验目录 → 待检验目录(只显示待检验的行) + 新增「检验数据记录明细表」----
+    '待检验目录': 'Pending Inspections',
+    '检验数据记录明细表': 'Inspection Record Details',
+    '暂无待检验记录，暂收单生单生成检验单后自动带入': 'No pending inspection — rows are added automatically when a temporary receipt generates an inspection sheet',
+    '目录记录由检验单生单自动生成、不可手工修改；本表只列待检验（正在检验中）的行，已完成检验的记录请到「检验数据记录明细表」查询。': 'Catalog records are generated automatically when the inspection sheet is created and cannot be edited by hand; this sheet lists only pending (in progress) rows — completed inspections are found in "Inspection Record Details".',
+    '取消完成后该目录行回到「正在检验中」（会重新出现在待检验目录里），之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？': 'After cancelling, this catalog row returns to “In Progress” (it will show up in Pending Inspections again); only then can the linked inspection sheet and inspection data record be un-audited. Cancel completion?',
+    '该行没有关联的检验目录记录，无法取消完成': 'This row has no linked catalog record, so completion cannot be cancelled',
+    '取消完成并回弹为正在检验中（之后才可反审核挂靠的检验单与检验数据记录）': 'Cancel completion and roll back to In Progress (then the linked inspection sheet and inspection data record can be un-audited)',
+    '点击跳转到该单据': 'Click to open this document',
     // ---- 检验数据记录纸张式检验报告(QcInspRecSheet:YJ-QR-96 检验报告) ----
     '检验数据记录': 'Inspection Data Record',
     '检验报告': 'Inspection Report',
