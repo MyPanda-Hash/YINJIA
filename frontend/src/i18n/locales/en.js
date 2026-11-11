@@ -2068,6 +2068,24 @@ export default {
     '点击选择': 'Click to pick',
     // ---- 产品变更申请表·会签人选人控件(2026-11-11)----
     '点击选择会签人（可多选）': 'Click to pick countersigners (multiple)',
+    // ---- 字段管理（自定义列）操作指引（2026-11-11）----
+    '在这里给这张纸面「加列」。填字段名 →（可选）填分组 → 点「添加」；保存单据后，新列出现在纸面表格的最后一列。':
+      'Add a column to this sheet here. Enter a field name → (optional) a group → click "Add". After saving, the new column appears at the end of the sheet table.',
+    '（「承载列」是系统分配的占用列，不用管）': '(The "backing column" is an internal slot assigned by the system — no need to manage it.)',
+    '最多': 'At most',
+    '列，已用': 'columns, used',
+    '自定义列已达上限（已用满），如需再加请先在下方列表「停用」不用的列':
+      'Custom columns are at the limit. To add more, retire unused ones in the list below first.',
+    '这张表还没有自定义列。': 'This sheet has no custom columns yet.',
+    '① 在下面「新增字段」填字段名　② 想单独一列就留空分组；想和别的列共用一个表头就填分组名　③ 点「添加」':
+      '① Enter a field name under "Add field"  ② Leave the group empty for a standalone column, or enter a group name to share a header  ③ Click "Add"',
+    '分组（分叉）': 'Group (split header)',
+    '留空＝单独一列；输入一个新名字＝新建一个表头分组（纸面表头上方会多出一格跨列标题，与「压力 / 出水 / 去除率」同款）。':
+      'Empty = a standalone column; a new name = create a two-level header group (an extra spanning title row appears above the columns, like "Pressure / Outlet / Removal rate").',
+    '明细行＝纸面表格里的数据列（最常用）；表头＝单据抬头字段。':
+      'Detail = a data column inside the sheet table (most common); Header = a field in the document header.',
+    '已达上限，请先停用不用的列': 'Reached the limit — retire unused columns first',
+    '请先填写字段名': 'Enter a field name first',
     '点击选择人员': 'Click to pick people',
     '会签人清单加载失败，可稍后重试': 'Failed to load the countersigner list, please retry later',
     '现存量提取': 'Extract on-hand',
