@@ -422,6 +422,26 @@ public class PxController {
         return ApiResult.ok(puPrint.detail(docNo));
     }
 
+    // ---- 需方联系人候选(2026-11-11 用户口径「需方的联系人和联系方式改为打印前先弹窗。
+    //      下拉选择名字和联系方式。可以新增」):存在 yj_app_setting,不建表/不建面板,内部账号按采购订单的查看权 ----
+
+    /** 需方联系人候选名单(打印弹窗里的下拉选项) */
+    @GetMapping("/puPrint/buyerContacts")
+    public ApiResult<List<Map<String, Object>>> puPrintBuyerContacts() {
+        perm.requirePanelView("PU_ORDER");
+        return ApiResult.ok(puPrint.buyerContacts());
+    }
+
+    /** 新增一条需方联系人候选(姓名 + 联系方式;同一条重复提交不重复存) */
+    @PostMapping("/puPrint/buyerContacts")
+    public ApiResult<List<Map<String, Object>>> puPrintBuyerContactAdd(@RequestBody Map<String, Object> body) {
+        // 往公司级的候选名单里写东西 —— 要「修改」权,不能靠"能看订单"就改
+        perm.requireButton("PU_ORDER", "修改");
+        String name = body.get("姓名") == null ? "" : String.valueOf(body.get("姓名"));
+        String phone = body.get("联系方式") == null ? "" : String.valueOf(body.get("联系方式"));
+        return ApiResult.ok(puPrint.addBuyerContact(name, phone, currentUser()));
+    }
+
     /**
      * 打印额度(2026-11-09 用户口径「打印的时候没有和材料码一样考虑到超送问题」):
      * 每行「剩余可打」= 订单数量 ×(1 + 超送比例) − 已送 + 已退回 − 已打印,

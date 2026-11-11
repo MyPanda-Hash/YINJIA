@@ -930,6 +930,11 @@ export default {
     '完工': 'Completed',
     // 固定版式单据打印按钮(2026-09-23:银嘉采购订单/退货单,版式文字为纸面事实不翻译,按钮/提示入翻译层)
     '打印采购订单': 'Print Purchase Order',
+    '联系方式': 'Phone',
+    '需方联系人': 'Buyer contact',
+    '选择或输入联系人': 'Pick or type a contact',
+    '选择或输入联系方式': 'Pick or type a phone',
+    '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Both are printed in the Buyer box; a name or phone not in the list is saved into the dropdown when you print',
     '打印退货单': 'Print Return Note',
     '请先选择一张单据': 'Select a document first',
     '未取到单据数据': 'Document data not found',

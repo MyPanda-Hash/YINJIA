@@ -4623,3 +4623,12 @@ i18n-pu-label-box-qty2-20261111.sql
 #   前端同批:qcInspRecColumns.js(五格键 + 列定义/导出)+ QcInspRecSheet.vue(两行表头,检测结果 跨 5 列,
 #   第二行 1..5,只读态同 5 格)。幂等,两账套均执行。
 migrate-qc-insp-rec-result5-20261111.sql
+
+# 2026-11-11 采购订单打印:无金额版改名「送货单」+ 下方不印供方/需方(纯版式);
+#   有金额版供方单位名称带入供应商名称、需方联系人/联系方式改打印前弹窗选(下拉+可新增)。
+#   ⇒ 落一条系统参数 yj_app_setting.pu_order.buyer_contacts(姓名|联系方式;默认 孙郝聪|13718162430);
+#   不建表、不建面板;代码在参数缺失时回落到同一默认值。幂等,两账套均执行。
+migrate-pu-print-buyer-contact-20261111.sql
+
+# 2026-11-11 同批词条:需方联系人 / 联系方式(scope=field,10 语言);纸面标题「送货单」是单据模板固定中文,不进翻译表
+i18n-pu-print-buyer-contact-20261111.sql
