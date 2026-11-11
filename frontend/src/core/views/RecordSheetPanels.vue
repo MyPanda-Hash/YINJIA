@@ -421,6 +421,25 @@
                 <!-- 2026-11-11:炭棒尺寸的「选型号」下拉已从本数据格**上移到「炭棒尺寸」标签格**
                      (见上面 rs-label 里的 c.moldPick 分支);四个数据格恢复普通输入框。
                      候选来源与回填逻辑未变:PROD_MOLD(rd_sinter_tolerance) → applyMoldModel。 -->
+                <!-- 选人控件(2026-11-11 用户口径「会签人字段改为下拉勾选对应的账号，就是人员姓名」):
+                     显示**人员姓名**(label=realName)、落库**账号**(value=username)。
+                     为什么值必须是账号:ButtonService.signersOf 按账号切分后校验启用状态、发会签通知、
+                     写 yj_form_approval.operator —— 存姓名会全线失配。
+                     值格式沿用既有的"顿号分隔账号串"(signersOf 按 [,，、;；\s] 切分,顿号最直观)。 -->
+                <template v-else-if="editable && c.userPick">
+                  <el-select
+                    :model-value="pickListOf(c.key)"
+                    multiple
+                    filterable
+                    clearable
+                    size="small"
+                    class="rs-userpick"
+                    :placeholder="c.ph ? tt(c.ph) : tt('点击选择人员')"
+                    @update:model-value="(v) => setPickList(c.key, v)"
+                  >
+                    <el-option v-for="u in signUsers" :key="u.username" :label="u.realName" :value="u.username" />
+                  </el-select>
+                </template>
                 <template v-else-if="editable && c.key && !c.ro">
                   <!-- 带纸面前缀的格:前缀是**渲染**出来的,head 里只存裸数字(口径见
                        core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model。
@@ -445,6 +464,8 @@
                   <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
                              @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
                 </span>
+                <!-- 只读态:账号串 → 人员姓名,纸面不印英文账号 -->
+                <span v-else-if="c.userPick" class="rs-userpick-ro">{{ signNamesOf(head[c.key]) }}</span>
                 <span v-else-if="c.pre" class="rs-pre-cell">
                   <span class="rs-pre">{{ tt(c.pre) }}</span>
                   <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
@@ -1816,6 +1837,7 @@ import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
 import { mergeExtCols } from '@core/panel/extCols.js'
+import { splitSigners, joinSigners, signerNames } from '@core/panel/signerText.js'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -4133,6 +4155,50 @@ function effColLabel(key, fallback) {
 
 const fieldEditVisible = ref(false)
 const fieldEditRows = ref([])
+/* ── 选人控件(会签人,2026-11-11) ─────────────────────────────────────────
+ * 用户口径:「会签人字段改为下拉勾选对应的账号，就是人员姓名」。
+ * 三个约束一起满足:
+ *   ① 界面显示**人员姓名**、落库**账号**(后端按账号校验启用/发通知/写留痕);
+ *   ② 存库格式不变 = 顿号分隔的账号串(与 ButtonService.signersOf 的切分正则对齐);
+ *   ③ 纸面**只读态也要显示姓名** —— 否则打印出来是一串英文账号。
+ */
+const signUsers = ref([])
+/** 本面板是否有选人控件(有才去拉账号清单,别的面板零请求) */
+const hasUserPick = computed(() => {
+  const scan = (secs) => (secs || []).some((sec) => (sec.rows || []).some((r) =>
+    (r.grid || []).some((c) => c.userPick) || (r.pairs || []).some((p) => p.userPick)))
+  return scan(cfg.value?.sections) || scan(cfg.value?.tailSections)
+})
+/* 账号串 ⇄ 数组 / 账号串 → 姓名：实现与单测在 @core/panel/signerText.js，
+   这里只做组件侧的薄封装（切分口径必须与后端 ButtonService.signersOf 逐字一致）。 */
+function pickListOf(key) {
+  return splitSigners(head[key])
+}
+function setPickList(key, arr) {
+  head[key] = joinSigners(arr)
+  emit('dirty')
+}
+/** 账号串 → 人员姓名（查不到回落账号，不让格子空掉） */
+function signNamesOf(v) {
+  return signerNames(v, signUsers.value)
+}
+async function loadSignUsers() {
+  if (!hasUserPick.value) return
+  try {
+    const res = await request.get('/px/rdChange/users')
+    const data = res && res.code === 200 ? res.data : (res && res.data) || []
+    signUsers.value = Array.isArray(data) ? data : []
+  } catch (e) {
+    // 拉不到人不清空已填值:纸面仍按 head 里的账号显示(只读态会回落成账号原文)
+    ElMessage.warning(tt('会签人清单加载失败，可稍后重试') + ':' + String(e?.message || e))
+  }
+}
+// ⚠ 不能只挂 onMounted:本组件的 cfg 是**异步**来的(loadCrg 之后才有 sections),
+//   挂载那一刻 hasUserPick 还是假 ⇒ 清单请求根本不会发(实测 0 次请求)。
+//   改成监听 hasUserPick,cfg 就绪翻成真时再拉;切面板时按 panelCode 重拉。
+watch(hasUserPick, (v) => { if (v && !signUsers.value.length) loadSignUsers() }, { immediate: true })
+watch(() => props.panelCode, () => { signUsers.value = []; loadSignUsers() })
+
 function openFieldEdit() {
   const rows = []
   const seen = new Set()

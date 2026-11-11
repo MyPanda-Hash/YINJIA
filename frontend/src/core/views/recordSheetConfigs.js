@@ -2335,9 +2335,11 @@ export const recordSheetConfigs = {
     //   titleKey 绑一个字段,编辑态是输入框(灰字提示词 = 现在的标题),值为空时纸上仍回落印
     //   staticTitle(逐字同文)⇒ 不改的老单据观感一字不变。
     //   字段由 tools/migrate-change-title-20261016.sql 建(rd_change_head.[标题] + yj_field 登记)。
-    staticTitle: 'KPC管控点申请单',
-    titleKey: '标题',
-    titleKeyPh: 'KPC管控点申请单',
+    // ⚠ 2026-11-11 用户口径改回**固定**标题:「这个产品变更申请表的表的表头标题固定为产品变更申请表」。
+    //   2026-10-16 那轮要求的是"可自由编辑"(见本段上方注释),本轮明确推翻 ⇒ 去掉 titleKey/titleKeyPh,
+    //   只留 staticTitle;纸上永远印「产品变更申请表」,不再渲染输入框。
+    //   旧单据里若已存过「标题」值,不再上纸(key 未声明 ⇒ 不占格),库列原样保留不删。
+    staticTitle: '产品变更申请表',
     titlePlaceholder: 'KPC管控点申请单',
     grid: [111, 205, 441, 147, 210, 128],
     head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
@@ -2388,10 +2390,14 @@ export const recordSheetConfigs = {
           { label: '需会签' },
           { key: '需会签', type: 'checks', single: true, options: ['是', '否'], span: 2 },
         ]},
-        // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
+        // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮。
+        // 2026-11-11 用户口径:「会签人字段改为下拉勾选对应的账号，就是人员姓名」
+        //   ⇒ 由纯文本输入改成**选人下拉(多选)**:界面显示人员姓名、存库仍是账号。
+        //   ⚠ 存库格式不变(顿号分隔的账号串)—— ButtonService.signersOf 按 [,，、;；\s] 切分后
+        //     逐账号校验启用状态 / 发通知 / 写 yj_form_approval.operator,改成存姓名会全线失配。
         { h: 74, grid: [
           { label: '会签人' },
-          { key: '会签人', span: 5, ph: '多人用逗号分隔（账号）' },
+          { key: '会签人', span: 5, userPick: true, multiple: true, ph: '点击选择会签人（可多选）' },
         ]},
       ]},
       { bar: '二、变更/新增申请事由', rows: [
@@ -2450,43 +2456,11 @@ export const recordSheetConfigs = {
           { key: '相关变更', span: 5, area: true, rows: 3, ph: '与哪些文件/工序/在制品相关联' },
         ]},
       ]},
-      { page: 0, bar: '四、库存产品处理方式', rows: [
-        { h: 92, grid: [
-          { label: '原料' },
-          { label: '数量' },
-          { key: '原料数量' },
-          { label: '处理方式' },
-          { key: '原料处理方式', type: 'select', span: 2 },
-        ]},
-        { h: 92, grid: [
-          { label: '半成品' },
-          { label: '数量' },
-          { key: '半成品数量' },
-          { label: '处理方式' },
-          { key: '半成品处理方式', type: 'select', span: 2 },
-        ]},
-        { h: 92, grid: [
-          { label: '成品' },
-          { label: '数量' },
-          { key: '成品数量' },
-          { label: '处理方式' },
-          { key: '成品处理方式', type: 'select', span: 2 },
-        ]},
-      ]},
-      { page: 0, bar: '五、其它', rows: [
-        { h: 92, grid: [
-          { label: '文件管理人' },
-          { key: '文件管理人', span: 2 },
-          { label: '密级' },
-          { key: '密级', type: 'select', span: 2 },
-        ]},
-        { h: 92, grid: [
-          { label: '文件使用范围' },
-          { key: '文件使用范围', type: 'select', span: 2 },
-          { label: '备注' },
-          { key: '备注', span: 2 },
-        ]},
-      ]},
+      // 2026-11-11 用户口径:「四五内容区去掉」——
+      //   「四、库存产品处理方式」(原料/半成品/成品 各 数量+处理方式)与「五、其它」
+      //   (文件管理人/密级/文件使用范围/备注)两段整段删除。
+      //   ⚠ 只删**纸面版式**;这些字段的 yj_field 行与物理列原样保留(历史单据的值不丢,
+      //     也不影响列表/导出),不再出现在这张纸上。要恢复就按原样把两段加回来。
       // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)——手签行也得留够高度
       { page: 0, bar: '批准', rows: [
         { h: 92, grid: [

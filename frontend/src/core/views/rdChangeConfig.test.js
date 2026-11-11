@@ -97,10 +97,16 @@ test('RD_CHANGE 尾段行高 = 原始值与 ×1.5 的**中点**(用户两轮口�
   assert.ok(byBar['三.相关变更'], '尾段「三.相关变更」在')
   assert.equal(byBar['三.相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
   assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
-  for (const bar of ['四、库存产品处理方式', '五、其它', '批准']) {
+  // ⚠ 2026-11-11 用户口径:「四五内容区去掉」—— 「四、库存产品处理方式」与「五、其它」
+  //   已整段删除,故这里不再校验它们的行高;只保留仍存在的「批准」段。
+  for (const bar of ['批准']) {
     const sec = byBar[bar]
     assert.ok(sec, `尾段「${bar}」在`)
     for (const r of sec.rows) assert.equal(r.h, 92, `${bar} 每行 h 应为 92(74 与 111 的中点)`)
+  }
+  // 已删的两段不得回流（防手滑把它们加回来）
+  for (const gone of ['四、库存产品处理方式', '五、其它']) {
+    assert.equal(byBar[gone], undefined, `尾段「${gone}」已于 2026-11-11 按用户口径删除`)
   }
 })
 
@@ -165,13 +171,15 @@ test('分组设计表:非组首行不得再输出序号/组名 <td>(否则整行
  *   ② 配置把大标题绑到它,提示词 = 现在的静态标题;
  *   ③ 值为空时只读态/打印回落 staticTitle —— 不改的老单据观感不变(组件那支已由 RD_PROD_INFO 的用例钉着)。
  */
-test('RD_CHANGE:大标题格改为可编辑输入框(titleKey=标题),提示词与静态标题同文', () => {
+test('RD_CHANGE:大标题**固定**为「产品变更申请表」(2026-11-11 推翻 2026-10-16 的可编辑口径)', () => {
+  // 2026-10-16 曾要求「这个栏改为可自主编辑的普通文本框」;2026-11-11 用户口径明确改回:
+  //   「这个产品变更申请表的表的表头标题固定为产品变更申请表」⇒ 去掉 titleKey/titleKeyPh,
+  //   纸上永远印 staticTitle,不再渲染输入框。旧单据里已存的「标题」值不再上纸(库列保留不删)。
   const cfg = recordSheetConfigs.RD_CHANGE
   assert.ok(cfg, 'RD_CHANGE 配置缺失')
-  assert.equal(cfg.staticTitle, 'KPC管控点申请单', 'staticTitle 保留:空值时纸上仍印这句')
-  assert.equal(cfg.titleKey, '标题', '大标题要绑到「标题」字段(表头字段,可编辑)')
-  assert.equal(cfg.titleKeyPh, 'KPC管控点申请单', '背景提示词 = 现在的这个标题')
-  assert.equal(cfg.titleKeyPh, cfg.staticTitle, '提示词与静态标题同文 —— 不填就是老观感')
+  assert.equal(cfg.staticTitle, '产品变更申请表', '大标题固定为「产品变更申请表」')
+  assert.equal(cfg.titleKey, undefined, '不能再绑 titleKey(否则又变成可编辑输入框)')
+  assert.equal(cfg.titleKeyPh, undefined, 'titleKey 已去掉，提示词一并清理')
 })
 
 test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {  const cfg = recordSheetConfigs.RD_PROD_INFO

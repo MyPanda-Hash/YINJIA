@@ -563,6 +563,22 @@ public class PxController {
     }
 
     /**
+     * 产品变更申请单:启用账号清单(会签人选人下拉,2026-11-11 用户口径
+     * 「会签人字段改为下拉勾选对应的账号，就是人员姓名」)。
+     *
+     * <p>⚠ **不复用 `/rdDev/users` 或 `/rdFlow/users`** —— 那两个分别挂 RD_PROD_INFO / RD_APPROVAL
+     * 的查看权;填变更单的人不必有产品信息表或立项申请的权限,复用会 403(同 DevTaskService 注释口径)。</p>
+     *
+     * <p>返回 {username, realName}:前端 label 用 realName(人员姓名)、value 用 username(账号)——
+     * 落库仍是账号,`ButtonService.signersOf` 按账号校验启用状态、发通知、写 yj_form_approval.operator。</p>
+     */
+    @GetMapping("/rdChange/users")
+    public ApiResult<List<Map<String, Object>>> rdChangeUsers() {
+        perm.requirePanelView("RD_CHANGE");
+        return ApiResult.ok(devTaskService.enabledUsers());
+    }
+
+    /**
      * 四个受控文件「我能不能编这张单」(2026-09-21):前端据此把非责任人的纸张置灰 + 提示责任人是谁。
      * 口径与保存门禁**同一真源**(ButtonService.devFileEditState → devFileEditVerdict),
      * 免得再出现"界面让改、保存被拒"。

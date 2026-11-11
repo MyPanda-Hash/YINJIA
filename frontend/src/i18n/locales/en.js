@@ -2066,6 +2066,10 @@ export default {
     '点行切换当前单据': 'Click a row to switch document',
     '双击选择存货': 'Double-click to pick inventory',
     '点击选择': 'Click to pick',
+    // ---- 产品变更申请表·会签人选人控件(2026-11-11)----
+    '点击选择会签人（可多选）': 'Click to pick countersigners (multiple)',
+    '点击选择人员': 'Click to pick people',
+    '会签人清单加载失败，可稍后重试': 'Failed to load the countersigner list, please retry later',
     '现存量提取': 'Extract on-hand',
     '更多▼': 'More ▼',
     '☑ Ctrl+V列粘贴': '☑ Ctrl+V paste column',
