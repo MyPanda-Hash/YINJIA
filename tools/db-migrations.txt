@@ -4657,3 +4657,11 @@ migrate-qc-insp-rec-approval-notify-20261111.sql
 #   ③ 译名兜底 en(处理意见/检验结论/单项判定)。幂等(窄条件 UPDATE + 仅空库播种),两账套均执行。
 #   版式(两行两对:检验人|检验结论 / 审核人|处理意见)在前端 QcInspRecSheet.vue 的 QC_INSP_REC_FOOT_ROWS。
 migrate-qc-insp-rec-foot-required-20261111.sql
+
+# 2026-11-11 检验数据记录「检验结论」也改标准库(用户口径「只要合格和不合格,没有特采。
+#   还有下面的直接设计成标准库的形式就可以。先有内容」):
+#   ① 检验结论(query + header 两行)data_type 下拉框 → 标准库 / dict_sql=qc.insp_verdict;
+#   ② yj_std_lib 播 2 条:合格 / 不合格(库为空才播);特采不再提供候选;
+#   ③ 历史值不动(老单上的「特采」/整段文字照原值回显,前端 allow-create)。
+#   幂等;两账套均执行。前端同批给「检验结论」标签加 ⧉ 标准库维护入口。
+migrate-qc-insp-rec-verdict-stdlib-20261111.sql

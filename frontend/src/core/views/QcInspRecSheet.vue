@@ -230,8 +230,15 @@
           <template v-for="cell in pair" :key="cell.key">
             <th class="qr-label">
               {{ tt(cell.label) }}<span v-if="isRequired(cell.key)" class="qr-req" :title="tt('必填')">*</span>
+              <!-- 检验结论 / 处理意见:都是标准库(2026-11-11 两轮口径),各自带维护入口 -->
               <span
-                v-if="cell.key === DISPOSAL_KEY && editable"
+                v-if="editable && cell.key === VERDICT_KEY"
+                class="qr-lib-btn no-print"
+                :title="tt('检验结论候选来自标准库，可在此维护')"
+                @click="openStdLib(VERDICT_LIB, '检验结论')"
+              >⧉ {{ tt('标准库维护') }}</span>
+              <span
+                v-else-if="editable && cell.key === DISPOSAL_KEY"
                 class="qr-lib-btn no-print"
                 :title="tt('处理意见候选来自标准库，可在此维护')"
                 @click="openStdLib(DISPOSAL_LIB, '处理意见')"
@@ -252,7 +259,8 @@
               >
                 <el-option v-for="o in disposalOptions" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <!-- 检验结论:下拉选择 特采/合格/不合格,允许自定义补充(2026-10-19 用户口径) -->
+              <!-- 检验结论:标准库下拉(2026-11-11 第二轮:只要 合格/不合格,没有特采;
+                   老单上的历史值不在候选里也能照原样回显 —— allow-create + 值直显) -->
               <el-select
                 v-else-if="editable && cell.key === VERDICT_KEY"
                 v-model="head[cell.key]"
@@ -327,6 +335,7 @@ import {
   QC_INSP_REC_FOOT_ROWS,
   QC_INSP_REC_RESULT_KEYS,
   QC_INSP_REC_DISPOSAL_LIB,
+  QC_INSP_REC_VERDICT_LIB,
   QC_INSP_ITEM_LIB,
 } from '@core/qc/qcInspRecColumns'
 
@@ -342,8 +351,9 @@ const K = Object.freeze({
  *  纸面渲染、导出、迁移脚本三处必须一致 —— 少一格就会有一个值无处落库。 */
 const RESULT_KEYS = QC_INSP_REC_RESULT_KEYS
 
-/** 检验结论(表尾右列第 1 行,2026-10-19 起是下拉框 + 可自定义补充) */
+/** 检验结论(表尾右列第 1 行):2026-11-11 第二轮起改为**标准库**(qc.insp_verdict:合格/不合格) */
 const VERDICT_KEY = '检验结论'
+const VERDICT_LIB = QC_INSP_REC_VERDICT_LIB
 /** 处理意见(表尾右列第 2 行,2026-11-11 起是**标准库**下拉;必填) */
 const DISPOSAL_KEY = '处理意见'
 const DISPOSAL_LIB = QC_INSP_REC_DISPOSAL_LIB
@@ -378,8 +388,8 @@ function isRequired(key) {
 const itemOptions = computed(() => optionsOf(K.ITEM))
 /** 单项判定:下拉(合格/不合格),字典值=中文数据键 */
 const judgeOptions = computed(() => optionsOf(K.JUDGE))
-/** 检验结论候选:特采/合格/不合格(来自 yj_field.dict_sql,不硬编码);
- *  `allow-create` 让用户直接敲一个新结论 —— 历史库里已有的自定义值也照原值回显/可再选 */
+/** 检验结论候选:来自标准库 qc.insp_verdict(2026-11-11 第二轮:只要 合格 / 不合格,没有特采),
+ *  条目在「⧉ 标准库维护」里增删;`allow-create` 让老单上的历史值仍能回显/再选 */
 const verdictOptions = computed(() => optionsOf(VERDICT_KEY))
 /** 处理意见候选:来自标准库 qc.insp_disposal(2026-11-11 用户口径「处理意见做成标准库的形式」),
  *  条目在「⧉ 标准库维护」里增删;同样允许敲新词(allow-create) */

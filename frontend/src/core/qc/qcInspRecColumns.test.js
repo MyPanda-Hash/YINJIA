@@ -8,6 +8,7 @@ import {
   QC_INSP_REC_FOOT_ROWS,
   QC_INSP_REC_RESULT_KEYS,
   QC_INSP_REC_DISPOSAL_LIB,
+  QC_INSP_REC_VERDICT_LIB,
   QC_INSP_ITEM_LIB,
   exportHeaderRow,
   exportRow,
@@ -72,6 +73,9 @@ test('表尾按模板排成两行两对:检验人|检验结论 / 审核人|处�
   assert.equal(QC_INSP_REC_FOOT_ROWS[1][1].key, '处理意见')
   assert.equal(QC_INSP_REC_DISPOSAL_LIB, 'qc.insp_disposal')
   assert.notEqual(QC_INSP_REC_DISPOSAL_LIB, QC_INSP_ITEM_LIB, '两个标准库互不混用')
+  // 检验结论也是标准库(2026-11-11 第二轮:只要 合格/不合格,没有特采)
+  assert.equal(QC_INSP_REC_VERDICT_LIB, 'qc.insp_verdict')
+  assert.notEqual(QC_INSP_REC_VERDICT_LIB, QC_INSP_REC_DISPOSAL_LIB)
 })
 
 test('导出:表头=列显示名(五格各一列),行按列定义取值', () => {
@@ -112,6 +116,9 @@ test('处理意见 = 标准库下拉,且检验结论/处理意见/单项判定�
     '处理意见候选必须取字段 options(标准库下发的)')
   assert.match(src, /el-select[\s\S]{0,200}?v-if="editable && cell\.key === DISPOSAL_KEY"/, '处理意见要渲染成下拉')
   assert.match(src, /openStdLib\(DISPOSAL_LIB, '处理意见'\)/, '处理意见要有自己的标准库维护入口')
+  assert.match(src, /openStdLib\(VERDICT_LIB, '检验结论'\)/, '检验结论也要有自己的标准库维护入口')
+  // 检验结论候选只来自标准库(合格/不合格):不得再写死「特采」选项
+  assert.ok(!/el-option[^>]*特采/.test(src), '检验结论候选中不得再写死「特采」选项')
   assert.match(src, /isRequired\(K\.JUDGE\)/, '单项判定要显示必填星号')
   // 新建行必须把必填列建成空串,否则服务端"只校验带键的行"会放行
   assert.match(src, /function blankRow\(\)[\s\S]{0,120}\[K\.ITEM\]: ''[\s\S]{0,60}\[K\.JUDGE\]: ''/,

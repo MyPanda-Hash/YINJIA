@@ -71,6 +71,10 @@ export const QC_INSP_REC_FOOT_ROWS = Object.freeze([
  *  与「检验项」同一套机制:字段 data_type=标准库、dict_sql 存库编码,条目在 yj_std_lib 里增删维护 */
 export const QC_INSP_REC_DISPOSAL_LIB = 'qc.insp_disposal'
 
+/** 检验结论的标准库编码(2026-11-11 第二轮:「只要合格和不合格,没有特采;直接设计成标准库的形式」)。
+ *  候选由 yj_std_lib 维护(先播 合格 / 不合格),不再写死在 yj_field.dict_sql 的 VALUES 里 */
+export const QC_INSP_REC_VERDICT_LIB = 'qc.insp_verdict'
+
 /** 检验项所在的标准库编码(与原表「检验项为数据库选择」对应) */
 export const QC_INSP_ITEM_LIB = 'qc.insp_item'
 
