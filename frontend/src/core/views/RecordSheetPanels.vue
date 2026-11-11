@@ -1913,6 +1913,12 @@ const props = defineProps({
   // 由面板配置 metadata.changeDepts 下发(服务端按 yj_user.dept_id → yj_change_dept 算),
   // deptLockAll = 管理员豁免(可代填任何部门行)。两者只影响**界面**,服务端另有强制还原。
   myDeptRows: { type: Array, default: () => [] },
+  /**
+   * 已生效/已归档的"会签人填本部门那一行"模式(2026-11-11 用户口径 B)。
+   * 为真时：**只有**声明了 lockKey 的明细表(部门评审意见)的行可以进入编辑，
+   * 其余格子仍按 editable=false 处理 —— 封存契约不破。
+   */
+  deptFillOpen: { type: Boolean, default: false },
   deptLockAll: { type: Boolean, default: false },
 })
 // open-file:变更文件勾选项的跳转入口(2026-10-19)。本组件只管"查出该文件对应哪张单",
@@ -2763,7 +2769,9 @@ function rowLocked(dt, row) {
 
 /** 单元格可否编辑:表可编 + 行不属于锁 + (声明了 lockCols 时)列在放行清单里 */
 function cellEditable(dt, row, c) {
-  if (!props.editable) return false
+  // 常规编辑态；或「已生效后由会签人填本部门行」的窄口子（只对按部门锁行的表开放）
+  const open = props.editable || (props.deptFillOpen && !!dt.lockKey)
+  if (!open) return false
   if (rowLocked(dt, row)) return false
   if (dt.lockCols && !dt.lockCols.includes(c.key)) return false
   return true

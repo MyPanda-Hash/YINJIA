@@ -239,7 +239,7 @@
           <RecordSheetPanels
             ref="approvalSheetRef"
             :head="cur" :fields="sheetAllFields" :detail-fields="sheetDetailFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
-            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
+            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true" :dept-fill-open="changeDeptFillOpen"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
             @open-file="onOpenLinkedFile"
@@ -2740,6 +2740,21 @@ const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
 
+/**
+ * 已生效/已归档时的「会签人填本部门行」模式(2026-11-11 用户口径 B)。
+ *
+ * <p>用户原话：「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写，
+ * 保存之后该单据可见内容，打印出来也是有数据的」；并确认会签流程**保留**(审批前先会签)。</p>
+ *
+ * <p>所以这不是"把归档打开"：只放行**部门评审意见**那一张按部门锁行的表，
+ * 且只有本人部门那一行、只有 lockCols(变更后内容/备注)两列可编；
+ * 服务端 ButtonService.allowChangeDeptFill 另有同口径判定 + 只写明细不写表头。</p>
+ */
+const changeDeptFillOpen = computed(() => String(panelCode.value) === 'RD_CHANGE'
+  && ['已生效', '已归档'].includes(String(current.value?.['单据状态'] || ''))
+  && user?.isAdmin !== true
+  && (changeDeptRows.value || []).length > 0)
+
 // ── 产品变更申请单:会签按钮组的身份判据(2026-09-21)──
 // 会签人 = 头字段「会签人」里的账号(顿号/逗号分隔);发起人 = 纸面「申请人」= 当前用户姓名。
 // 两者只决定**按钮显不显示**:服务端 ButtonService.requireSigner / requireChangeInitiator 才是门禁。
@@ -4746,7 +4761,7 @@ const approvalSideGroups = computed(() => toolbarGroups.value
  *  这是纯展示层取舍,动作本身没被删:状态回到草稿/修改中时它们自动回来。 */
 const sheetSideGroups = computed(() => approvalSideGroups.value
   .map((g) => ({ ...g, actions: actsOf(g).filter((a) => a !== '字段管理'
-    && !(!draftEditable.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
+    && !(!draftEditable.value && !changeDeptFillOpen.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
   .filter((g) => (g.actions || []).length))
 /** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里)。
  *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
@@ -9572,7 +9587,8 @@ function validateInlineDraft() {
  *   用户一眼能看懂「审核前得先把这单存下来,缺的是明细行」。
  */
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false, reason = '' } = {}) {
-  if (!draftEditable.value || inlineSaving.value) return false
+  // changeDeptFillOpen：已生效后由会签人填本部门行，也要能走保存（服务端只写明细）
+  if ((!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value) return false
   // 归档单据「修改单据」后的保存 = 保存修改(2026-11-06 用户口径「修改完成点击保存回到归档状态」):
   //   后端 saveDirectModify 落库后立刻做 修改记录 diff 收尾并把状态拨回 已归档 —— 不能走普通「保存」,
   //   那样只会停在 修改中。
@@ -10198,7 +10214,9 @@ function isDisabled(action) {
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
-    保存: !draftEditable.value || inlineSaving.value,
+    // 2026-11-11：已生效/已归档时，会签人仍可「填本部门那一行」并保存（changeDeptFillOpen）
+    //   —— 只放「保存」这一个动作，保存为草稿/保存新增仍按原口径（草稿才有意义）。
+    保存: (!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value,
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,
     扫描填单: reportMode.value,

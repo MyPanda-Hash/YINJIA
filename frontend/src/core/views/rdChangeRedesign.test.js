@@ -93,6 +93,25 @@ test('④b 顶层函数里必须用 props.head —— 模板能裸写 head，<sc
   assert.deepEqual(problems, [], '这些函数在脚本作用域引用了不存在的 head，必须写 props.head：\n' + problems.join('\n'))
 })
 
+test('⑧ 归档后「会签人填本部门行」是**窄口子**：非管理员 + 有部门 + 只写明细', () => {
+  // 用户口径（2026-11-11）：「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写」
+  //   且确认会签流程**保留**（B）。所以这不是"把归档打开"：
+  //   · 服务端 allowChangeDeptFill 四条判据（面板/非管理员/有部门/状态）
+  //   · 放行后**只写明细不写表头**，避免会签人顺手改掉已生效单的实质内容
+  const btn = read('../backend/src/main/java/com/yinjia/mes/service/ButtonService.java')
+  assert.match(btn, /allowChangeDeptFill/, '缺少 allowChangeDeptFill 判定')
+  const m = btn.match(/private boolean allowChangeDeptFill\([\s\S]*?\n    \}/)
+  assert.ok(m, '找不到 allowChangeDeptFill 实现')
+  const body = m[0]
+  assert.match(body, /isAdminUser\(user\)\) return false/, '管理员不得走这个口子（要改请走「修改申请」）')
+  assert.match(body, /changeDeptsOf\(user\)\.isEmpty\(\)/, '必须有匹配的部门行')
+  assert.match(body, /已生效|已归档/, '只在已生效/已归档状态下生效')
+  // 只写明细：upsertHeadRow 必须被 deptFillOnly 挡掉
+  assert.match(btn, /if \(!deptFillOnly\) upsertHeadRow\(/, '部门填写模式必须跳过表头写入')
+  // 前端：放行只在"按部门锁行的表"上，其余格子仍锁
+  assert.match(sheet, /props\.deptFillOpen && !!dt\.lockKey/, 'deptFillOpen 只能放开按部门锁行的表')
+})
+
 test('⑤ 后端提供会签人选人清单，权限挂 RD_CHANGE（不复用别的面板端点）', () => {
   assert.match(px, /@GetMapping\("\/rdChange\/users"\)/, '缺少 /px/rdChange/users 端点')
   const m = px.match(/@GetMapping\("\/rdChange\/users"\)[\s\S]{0,400}?\n    \}/)

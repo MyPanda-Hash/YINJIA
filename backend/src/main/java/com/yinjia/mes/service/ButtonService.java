@@ -823,7 +823,18 @@ public class ButtonService {
         if ("已中止".equals(stStatus)) throw new IllegalStateException("已中止单据不可保存，请先恢复");
         if ("已终止".equals(stStatus)) throw new IllegalStateException("已终止单据不可保存");
         // 产品变更申请单(2026-09-21):已生效=终态(要改只能再开一张变更单);会签中锁编辑(免得签的和改的不是一版)
-        if ("已生效".equals(stStatus)) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        // 产品变更申请表(2026-11-11 用户口径 B)：会签流程保留（审批前会签），
+        //   「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写」。
+        //   ⇒ 已生效/已归档**整体仍封存**，只对"本单会签人填本部门那一行"开一个窄口子：
+        //     · 只放 RD_CHANGE；管理员不放（他要改走「修改申请」，别绕开契约）；
+        //     · 账号必须有匹配的部门行（changeDeptsOf），否则照旧拒绝；
+        //     · 进这个模式后**只写明细、不写表头**（见下面 upsertHeadRow 的 deptFillOnly 判断）；
+        //     · 状态不变（不退回草稿、不改 pending）。
+        boolean deptFillOnly = false;
+        if ("已生效".equals(stStatus) || "已归档".equals(stStatus)) {
+            deptFillOnly = allowChangeDeptFill(def, no, user);
+            if (!deptFillOnly) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        }
         if ("会签中".equals(stStatus)) throw new IllegalStateException("会签中单据不可保存，请等会签完成或由发起人撤回会签");
         if (stStatus.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不可保存，请等待审批完成或撤回");
         // 在途申请期间锁定(2026-09-12):删除/修改申请待审批时单据不可保存——此前只拦审批中,
@@ -872,7 +883,9 @@ public class ButtonService {
         // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
         assignNewLineSeq(def, items, no);
         if (split) {
-            upsertHeadRow(def, head, no, user);
+            // 已生效/已归档的"部门填写"模式**只写明细**：表头字段（产品编号/变更事由/会签人…）
+            // 一律不落库，否则会签人顺手就能把这张已生效单的实质内容改掉。
+            if (!deptFillOnly) upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user, protectRowIds);
         } else {
             // 单表式:头字段并入每行
@@ -6530,6 +6543,30 @@ public class ButtonService {
             cols.put("变更后内容", "");
             insertRow(def.lineTable(), cols, user);
         }
+    }
+
+    /**
+     * 已生效/已归档状态下，是否允许"会签人填本部门那一行"（2026-11-11 用户口径 B）。
+     *
+     * <p>用户原话：「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写，
+     * 保存之后该单据可见内容，打印出来也是有数据的」。同时确认会签流程**保留**
+     * （审批前先会签），所以这里是"封存后的例外"，不是把归档打开。</p>
+     *
+     * <p>判据（四条全过才放行）：
+     * ① 面板是 RD_CHANGE；
+     * ② **不是管理员** —— 管理员要改已生效单请走「修改申请」，别用这个口子绕开封存契约；
+     * ③ 账号在「部门↔账号」映射里有至少一个部门（changeDeptsOf）；
+     * ④ 单据状态是 已生效 / 已归档。</p>
+     *
+     * <p>放行后真正能改到哪些格子仍由 {@link #gateChangeDetail} 兜底：非本部门的行、
+     * 本部门的非 lockCols 列一律还原成库内现值。</p>
+     */
+    private boolean allowChangeDeptFill(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || !CHANGE_PANEL.equals(def.code())) return false;
+        if (isAdminUser(user)) return false;
+        if (changeDeptsOf(user).isEmpty()) return false;
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        return "已生效".equals(st) || "已归档".equals(st);
     }
 
     /**
