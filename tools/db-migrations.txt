@@ -4608,3 +4608,5 @@ migrate-sample-progress-desc-20261111.sql
 migrate-insp-plan-revision-page-20261111.sql
 # 2026-11-11 产品信息表三格（一级/二级审核人、产品负责人）置只读 + 一级审核人空值补陈秀丽
 migrate-prodinfo-approver-cells-20261111.sql
+# 2026-11-11 烧结工艺清单「密度管控·管控要求」接入标准库（lib=mold.density，可自行维护）
+migrate-mold-density-stdlib-20261111.sql

@@ -390,7 +390,15 @@ const RD_MOLD_PROC_SEC0 = [
           { label: '实际密度管控上限', span: 4 },
         ]},
         { grid: [
-          { key: '密度管控要求', span: 2, ph: '密度范围：~' },
+          // 「管控要求」挂标准库(2026-11-11 用户口径:「把烧结工艺清单面板的密度管控的管控要求
+          //   字段加入标准库,可以自行维护更新」):
+          //   type:'select' + yj_field.data_type='标准库'/dict_sql='mold.density'
+          //   (tools/migrate-mold-density-stdlib-20261111.sql)⇒ RecordSheetPanels 的 select 分支
+          //   渲染 el-select(filterable + allow-create = 可选预设也可手填)并旁挂「⧉ 标准库维护」
+          //   (新增/编辑/停用走 StdLibManager,不用找开发)。
+          //   ⚠ 旁边两格「实际密度管控下限/上限」**故意不动**:用户口径「两个区域不变动」,
+          //     它们仍是手填的密度值,计算只吃这两格(core/mold/recipeSheet.js paramsFromHead)。
+          { key: '密度管控要求', span: 2, ph: '密度范围：~', type: 'select' },
           { key: '实际密度管控下限', span: 4 },
           { key: '实际密度管控上限', span: 4 },
         ]},
