@@ -413,7 +413,7 @@ const { user, tabs: tabsStore, locale: localeStore } = useAppContext()
 // 语言热切换:轻量重拉字段标签与按钮组(仅换显示定义),
 // 表单输入值/明细数据/页签状态全部保留(meta.code 键不随语言变化)。
 watch(() => localeStore.locale, async () => {
-  if (!panelCode.value) return
+  if (!panelCode.value || !isFrontPage()) return
   try {
     const payload = isEdit.value
       ? await engine.getFormDescriptor({ panelCode: panelCode.value, code: code.value })
@@ -430,6 +430,21 @@ const panelCode = computed(() => props.panelCodeProp || route.params.panelCode)
 const operationName = computed(() => route.query.operationName || '新增流程')
 const code = computed(() => props.codeProp || route.query.code)
 const isEdit = computed(() => !!code.value)
+
+/**
+ * 本实例「自己的」页签路径(实例私有快照)+ 「我现在是不是前台页签」。
+ *
+ * 🔴 与 PanelxList 同源的问题(2026-11-11「打开多个单,这个单的名字反复横跳」):
+ *   PortalLayout 按 `route.path` 做 keep-alive key ⇒ 每个表单页签一份实例,而 `route` 是全局共享的。
+ *   被缓存的旧表单实例照样跟着别人的路由变化重算 panelCode/code 并调 load() ——
+ *   于是它按**别人的面板**取回单据,再把「面板名-单号」写到 route.path 指向的页签标题上。
+ *   ⇒ 是否干活 / 改哪个页签,一律用本快照判。
+ */
+const ownPath = ref(String(route.path || ''))
+/** 本实例是不是**前台页签**(= 当前路由就是本实例承载的页面) */
+function isFrontPage() {
+  return !ownPath.value || route.path === ownPath.value
+}
 
 const form = reactive({})
 const meta = ref([])
@@ -1141,6 +1156,8 @@ function validate() {
 }
 
 async function load() {
+  // 缓存实例(不是前台页签)不取数:panelCode/code 都是路由派生值,取回来的是别人页签的单据
+  if (!isFrontPage()) return
   loading.value = true
   try {
     const configPromise = engine.getPanelConfig(panelCode.value).catch(() => null)
@@ -1179,11 +1196,14 @@ async function load() {
     // 页签标题 = 面板名-单据号（新单显示 面板名-新增），便于多单据区分（弹窗嵌入模式跳过）
     if (!props.embedded) {
       const no = isEdit.value ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : '新增'
-      // 复用顶部 tabsStore
-      const cur = tabsStore.tabs.find((x) => x.path === route.path)
-      if (cur) cur.title = (payload.panelName || '表单') + '-' + no
-      // 页面标题 = 真实面板名（路由 meta.title 是通用占位，配置加载后覆盖）
-      document.title = (payload.panelName || '表单') + ' · YINJIA-MES'
+      // 复用顶部 tabsStore。只写**本实例自己**那个页签,且必须仍是前台页签 ——
+      // 缓存实例按 route.path 找人,会把别人的页签改成自己的名字(2026-11-11 名字横跳)
+      if (isFrontPage()) {
+        const cur = tabsStore.tabs.find((x) => x.path === ownPath.value)
+        if (cur) cur.title = (payload.panelName || '表单') + '-' + no
+        // 页面标题 = 真实面板名（路由 meta.title 是通用占位，配置加载后覆盖）
+        document.title = (payload.panelName || '表单') + ' · YINJIA-MES'
+      }
     }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '加载失败')
@@ -1553,6 +1573,10 @@ watch(() => [panelCode.value, code.value], () => {
   scanVisible.value = false
   // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载
   if (!panelCode.value || panelCode.value === 'undefined') return
+  // 🔴 不是本实例的页面(路由已切到别的页签)⇒ 不重载:缓存实例读到的 panelCode/code 是**别人**的,
+  //   照它 load() 会取回别的单据、再把别人的页签改成"面板名-单号"(2026-11-11 名字横跳)。
+  //   真正切回本页时这条 watch 会再触发一次,照常重载。
+  if (!isFrontPage()) return
   // 路由参数变化（同组件切换面板）时关闭所有弹窗，防止 append-to-body 弹窗残留
   selectVisible.value = false
   selVisible.value = false

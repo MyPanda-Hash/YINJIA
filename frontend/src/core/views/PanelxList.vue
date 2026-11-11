@@ -2653,7 +2653,8 @@ const {
 // 语言热切换:仅重拉面板配置(字段标签/面板名/列别名随 Accept-Language 更新),
 // 不重拉数据——分页、滚动、弹窗、筛选、展开状态全部保留。
 watch(() => localeStore.locale, async () => {
-  if (!panelCode.value || invalidPanel.value) return
+  // 缓存实例不要重拉:它的 panelCode 是"当前正显示的面板",拉回来也只会被 loadCrg 丢弃(白跑一趟)
+  if (!panelCode.value || invalidPanel.value || !isFrontPage()) return
   try {
     cfgCache.value = null
     await loadCrg()
@@ -2674,6 +2675,33 @@ const routeProps = defineProps({ panelCode: { type: String, default: '' } })
 const panelCode = computed(() => routeProps.panelCode || route.params.panelCode)
 const operationName = computed(() => route.meta.operationName || route.query.operationName || '新增流程')
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
+
+/**
+ * 本实例「自己的」页签路径 + 面板码(**实例私有快照,创建时定死**)+ 「我现在是不是前台页签」。
+ *
+ * 🔴 为什么必须有(2026-11-11 用户报障「打开多个单,这个单的名字反复横跳」):
+ *   PortalLayout 用 `<component :is :key="route.path">` + keep-alive 给**每个页签一份实例**
+ *   (见 PortalLayout 那段注释),但 `route` 是**全局共享**的 —— 被缓存起来的旧实例照样会跟着
+ *   别人的路由变化重算 `panelCode`、把面板切换 watcher 全部跑一遍、按**别人的面板码**取配置,
+ *   然后在 `loadCrg()` 里把自己刚拿到的面板名写到 `route.path` 指向的那个页签上。
+ *   两边请求乱序返回时,`销售订单` 与 `销售订单明细表` 就互相盖名 —— 用户看到的就是名字横跳。
+ *   ⇒ 「要不要干活」「该改哪个页签」一律用本快照判;`panelCode` 只用来取元数据,
+ *     绝不能拿它判"我在不在前台"(它是路由派生值,缓存实例读到的是别人)。
+ *   (同一个坑的旧注解见下面 `instanceActive`。)
+ */
+const ownPath = ref(String(route.path || ''))
+/** 本实例**自己**的面板码:静态路由给了 props 就用它,否则 = 自身路径 `/panelx/list/<CODE>` 的末段 */
+const ownPanelCode = computed(() => {
+  const fixed = String(routeProps.panelCode || '')
+  if (fixed) return fixed
+  const p = ownPath.value
+  return p.startsWith('/panelx/list/') ? p.slice('/panelx/list/'.length) : ''
+})
+/** 本实例是不是**前台页签**(= 当前路由就是本实例承载的那一页)。路径创建时定死,与后续路由变化无关。 */
+function isFrontPage() {
+  // ownPath 取不到(极端兜底)时按"是前台"处理,退回旧行为,不因快照失败把功能锁死
+  return !ownPath.value || route.path === ownPath.value
+}
 
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
@@ -3638,7 +3666,7 @@ const isStockStatus = computed(() => String(panelCode.value) === 'STOCK_STATUS')
  */
 const canConfigWarnHere = computed(() => canConfigWarn(user, panelCode.value))
 watch(isStockStatus, async (v) => {
-  if (!v || warehouseOptions.value.length) return
+  if (!v || !isFrontPage() || warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
     warehouseOptions.value = res?.data || []
@@ -3661,7 +3689,8 @@ const whDockSelected = ref('')
 watch(isStockDetail, async (v) => {
   // 离开面板:清掉选中态(过滤条件本身不落在 condition 上,见 load() 里的「请求时派生」,不会串到别的面板)
   if (!v) { whDockSelected.value = ''; return }
-  if (warehouseOptions.value.length) return
+  // 取仓库档案只在前台做:缓存实例读到的 panelCode 是"当前正显示的面板",会白跑一趟
+  if (!isFrontPage() || warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
     warehouseOptions.value = res?.data || []
@@ -3685,7 +3714,7 @@ async function loadMcStatus() {
     mcStatus.value = res?.data || null
   } catch { mcStatus.value = null }
 }
-watch(isStockDetail, (v) => { if (v) loadMcStatus() }, { immediate: true })
+watch(isStockDetail, (v) => { if (v && isFrontPage()) loadMcStatus() }, { immediate: true })
 
 // ---------- 库存明细:行展开 → 该 (物料,仓库) 的月结明细;再按**批次号**二次展开看该批单据 ----------
 const mcDetail = ref({})
@@ -4901,6 +4930,8 @@ provideAnnotations({
 onMounted(() => {
   loadAnns()
   watch([() => curDocNo.value, () => panelCode.value], () => {
+    // 面板码是路由派生值:缓存实例读到的是别人面板 ⇒ 不在前台就不取批注(否则每切一次页签发一串请求)
+    if (!isFrontPage()) return
     loadAnns()
     if (!isRdPanel.value) annMode.value = null
   })
@@ -5381,6 +5412,8 @@ const rdFlowUsers = ref([])
 const printBatchLock = ref({ 锁定: false, 批次号: '', 依据: '' })
 watch(() => [panelCode.value, curDocNo.value], async () => {
   printBatchLock.value = { 锁定: false, 批次号: '', 依据: '' }
+  // 批号锁只在本页签前台时问:缓存实例的 panelCode 是别人面板的码,问出来的结果没有意义
+  if (!isFrontPage()) return
   const no = String(curDocNo.value || '')
   if (!no || !batchChainPanel.value) return
   try {
@@ -5397,7 +5430,8 @@ watch(() => [panelCode.value, curDocNo.value], async () => {
 watch(
   () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
   () => {
-    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
+    // isApprovalDoc/panelCode 都是路由派生值 —— 缓存实例会跟着别人面板变化重算 ⇒ 不在前台不补默认值
+    if (!isFrontPage() || !isApprovalDoc.value || !draftEditable.value || !cur.value) return
     applyDocDefaults(panelCode.value, cur.value, user, {
       isNew: isFreshAddedDoc(),
       today: todayStr(),
@@ -5419,6 +5453,8 @@ const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人', RD_ASM_PROC: '表单管
 watch(
   () => [panelCode.value, draftEditable.value, cur.value?.['单据编号'], JSON.stringify(cur.value || {})],
   () => {
+    // panelCode 是路由派生值:缓存实例会算出**别人面板**的码,照它给本实例的单据盖"编辑人"就是盖错格子
+    if (!isFrontPage()) return
     const key = EDITOR_STAMP_FIELDS[panelCode.value]
     if (!key || !cur.value || !draftEditable.value) return
     const name = String(user.realName || user.userName || '').trim()
@@ -5803,6 +5839,8 @@ function onBatchTabRow(row) {
 watch(
   () => [panelCode.value, curDocNo.value, String(cur.value?.['审批状态'] || '')],
   ([pc, no, st]) => {
+    // 缓存实例会算出别人面板的码(pc)⇒ 不在前台不拉批次页签
+    if (!isFrontPage()) return
     if (pc === 'PU_ORDER' && no && APPROVED_STATUS_VALUES.includes(st)) loadBatchTab(no)
   },
   { immediate: true }
@@ -7369,7 +7407,12 @@ async function loadRdFlowState() {
  *   否则「待开发单据」红点与两条漂移黄条**再也不会加载**(页面看着没事,功能静默失效)。
  */
 watch(() => [panelCode.value, cur.value?.['单据编号']],
-  () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift(); loadProdDrift() },
+  () => {
+    // panelCode 是路由派生值:缓存实例会按**别人面板**的码把这 7 个接口全打一遍(每切一次页签一次),
+    // 且结果装进别人的实例 ⇒ 不在前台直接跳过
+    if (!isFrontPage()) return
+    loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift(); loadProdDrift()
+  },
   { immediate: true })
 
 /** 懒加载启用账号清单(两个弹窗共用;接口挂 RD_APPROVAL 查看权,与 /rdDev/users 的 RD_PROD_INFO 权分开) */
@@ -9919,17 +9962,40 @@ const remarkText = computed({
 })
 
 // ---------- 配置与按钮 ----------
+/**
+ * 面板名 → 浏览器标题 + **本实例自己那个页签**的标题。
+ * 只在前台页签上写原子操作:缓存实例(别人的页签)一律不碰 —— 见 ownPath 的注释,
+ * 「页签名字反复横跳」就是从这里写出去的。
+ */
+function applyPanelTitle() {
+  if (!isFrontPage()) return
+  const name = String(panelName.value || '')
+  // 配置没拿到(无该面板权限 403 / 接口失败)时 panelName 会退回**面板码** ——
+  // 这时一个字都不要写:保住菜单给的「采购入库单」,否则页签会在中文名与「PURCHASE_IN」之间来回跳。
+  if (!name || name === String(panelCode.value || '')) return
+  document.title = name + ' · YINJIA-MES'
+  const curTab = tabs.tabs.find((x) => x.path === ownPath.value)
+  if (curTab && curTab.title !== name) curTab.title = name
+}
+
 async function loadCrg() {
-  if (cfgCache.value) return cfgCache.value
-  const cfg = await engine.getPanelConfig(panelCode.value)
+  if (cfgCache.value) {
+    // 命中缓存也要把标题对齐一次:切回页签走 onActivated → 这里,页签名可能被旧版逻辑改过
+    applyPanelTitle()
+    return cfgCache.value
+  }
+  // 🔴 响应回来必须核对两件事,任一不符就**整份丢弃**(不装配置、不写标题、不写 document.title):
+  //   ① 面板码没变 —— 请求在飞的时候本页已经切走了;
+  //   ② 本实例仍是前台页签 —— 缓存实例读到的 panelCode 是"当前正显示的那个面板",拿它取回配置
+  //      再去改 route.path 的页签,就是给别人的页签改名(2026-11-11「名字反复横跳」的根因)。
+  const reqCode = String(panelCode.value || '')
+  if (!reqCode) return null
+  const cfg = await engine.getPanelConfig(reqCode)
+  if (String(panelCode.value || '') !== reqCode || !isFrontPage()) return null
   cfgCache.value = cfg
   const tp = cfg?.metadata?.panelPageDto?.tablePages?.[0]
-  panelName.value = cfg?.metadata?.panelName || panelCode.value
-  // 页面标题 = 真实面板名（路由 meta.title 是通用占位，配置加载后覆盖）
-  document.title = panelName.value + ' · YINJIA-MES'
-  // 页签标题同步（生单直接跳转/页签替换后显示真实面板名）
-  const curTab = tabs.tabs.find((x) => x.path === route.path)
-  if (curTab) curTab.title = panelName.value
+  panelName.value = cfg?.metadata?.panelName || reqCode
+  applyPanelTitle()
   queryFields.value = tp?.queryFields || []
   // 参照字段动态模式检查(≤20 弹窗,>20 下拉):并行判定全部参照字段
   const allRefFields = [...(queryFields.value || []), ...(headerFields.value || [])].filter(isReferenceField)
@@ -10332,7 +10398,12 @@ function hasUnsavedChanges() {
 
 /** 取消离开时页签可能已被 TabsBar 关闭，补回当前页签 */
 function restoreCurrentTab() {
-  try { tabs.open({ path: route.fullPath, title: panelName.value }) } catch { /* 页签兜底失败不阻断 */ }
+  // ⚠ 键必须用 **route.path**(与菜单建页签、keep-alive 的 key 完全同口径),不能用 route.fullPath:
+  //   fullPath 带 ?code=/?docNo=,补回来的页签路径与菜单那条不同 ⇒ tabs.open 去不了重,
+  //   页签栏里会出现两个同名页签(点哪个都像是"名字跳来跳去")。
+  try {
+    tabs.open({ path: ownPath.value || route.path, title: panelName.value })
+  } catch { /* 页签兜底失败不阻断 */ }
 }
 
 // ---- 离开守卫：同步拦截 → 守卫外弹窗 → 选择后放行 ----
@@ -11677,10 +11748,19 @@ watch(
     const prevCode = String(prev?.[0] ?? '')
     // 切面板页签:①把**正要离开**那个面板的未保存填写暂存起来;②清掉已被 × 掉的页签的暂存。
     // 都在清空之前做(此刻 cur/query 还是上一个面板的状态)。顺序不可颠倒。
-    if (prevCode && prevCode !== 'undefined') stashCurrentPanelDraft(prevCode)
+    // ⚠ 暂存键必须是**本实例自己装过的面板**(prevCode 只在本实例离开自己的面板时才对得上):
+    //   缓存实例读到的 prevCode 是别人面板的码,照它暂存会把本页签的填写塞进别人的槽位。
+    //   ownPanelCode 取不到时退回旧行为(宁可暂存,也不丢用户填的字)。
+    const stashable = !ownPanelCode.value || prevCode === ownPanelCode.value
+    if (prevCode && prevCode !== 'undefined' && stashable) stashCurrentPanelDraft(prevCode)
     dropClosedTabDrafts(code)
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
     if (!code || code === 'undefined') return
+    // 🔴 不是本实例的页面(路由已切到别的页签)⇒ 到此为止:不拆除、不取数、不重置弹窗门。
+    //   旧版在这里对着**别人的面板码**清空状态并取数,正是「页签名字反复横跳」与
+    //   「切个页签回来填写没了 / 弹窗自己弹回来」的同一处来源(见 ownPath 的注释)。
+    //   真正切回本页时(route.path 又回到本实例)这条 watch 会再触发一次,照常拆装重载。
+    if (!isFrontPage()) return
     // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
     // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
     list.value = []
@@ -11751,6 +11831,8 @@ function applyDocNoQuery() {
 watch(
   () => route.query.docNo,
   (v) => {
+    // ?docNo= 是**当前路由**上的,缓存实例不该跟着别人的跳转取数(会把别人的单装进自己列表)
+    if (!isFrontPage()) return
     if (!v || Date.now() - lastDocJumpAt < 400) return
     if (applyDocNoQuery()) load()
   }
@@ -11791,7 +11873,8 @@ async function handleNewQuery() {
 watch(
   () => route.query.new,
   (v) => {
-    if (v) handleNewQuery()
+    // 同上:?new=1 属于当前路由,只有前台实例该响应
+    if (v && isFrontPage()) handleNewQuery()
   }
 )
 watch(cfgCache, (cfg) => {
@@ -11819,7 +11902,8 @@ onMounted(() => {
   load()
   // 把"未保存状态 + 保存/放弃"登记给页签栏:× 关闭时由它弹三态问句
   // (2026-10-16 用户口径「叉掉时还应该弹窗提示是否保存」;守卫只覆盖"导航离开",覆盖不到点 × 关后台页签)
-  unsavedGuard.register(route.path, {
+  // 键用**本实例自己的路径**(ownPath):卸载时 route.path 早已指向别的页签,用 route.path 注销会删错键
+  unsavedGuard.register(ownPath.value, {
     hasUnsaved: () => hasUnsavedChanges(),
     save: () => saveInlineDraft('保存', { silent: true }),
     discard: () => discardUnsavedChanges(),
@@ -11829,7 +11913,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  unsavedGuard.unregister(route.path)
+  unsavedGuard.unregister(ownPath.value)
 })
 
 onDeactivated(() => {
