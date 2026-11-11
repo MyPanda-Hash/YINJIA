@@ -4642,3 +4642,9 @@ i18n-pu-print-buyer-contact-20261111.sql
 #   本机独有面板(LINE_CAP/QC_CUT_INSP/QC_FIN_SPEC/QC_MOLD_INSP)的授权行保留并按 role_code 重映射角色 id。
 #   生成器 tools/archive/_org-sync-20261111/GenOrgSql.java(勿手改脚本,重跑生成器即覆盖)。幂等,两账套均执行。
 migrate-org-from-server-20261111.sql
+
+# 2026-11-11 检验数据记录「待审批通知只发给 fm」(用户口径「如果我只想这个数据记录通知 fm 要怎么才能做到」):
+#   在 yj_panel.config 合并 JSON 键 approvalNotify=["fm"];配了它则该面板的提交审批消息只发给这些人(管理员也不再带),
+#   不配/空数组 = 原口径(全部审批人 + 管理员);**审批权不变**(谁能审仍看 yj_role_panel.can_approve)。
+#   代码 MessageService.sendToApprovers → approvalNotifyTargets()。幂等(JSON_MODIFY 只动这一个键),两账套均执行。
+migrate-qc-insp-rec-approval-notify-20261111.sql

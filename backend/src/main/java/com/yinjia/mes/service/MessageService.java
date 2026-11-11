@@ -211,8 +211,42 @@ public class MessageService {
 
     /** 便捷:按面板审批人发送(排除操作者自己) */
     public int sendToApprovers(String panelCode, String code, String docNo, Map<String, Object> params, String actor) {
-        List<String> targets = approversOf(panelCode).stream().filter((a) -> !a.equals(actor)).toList();
+        List<String> configured = approvalNotifyTargets(panelCode);
+        List<String> targets = (configured.isEmpty() ? approversOf(panelCode) : configured)
+                .stream().filter((a) -> !a.equals(actor)).toList();
         return send(targets, code, panelCode, docNo, params, actor);
+    }
+
+    /**
+     * 面板级「待审批通知只发给谁」(2026-11-11 用户口径:「如果我只想这个数据记录通知 fm 要怎么才能做到」)。
+     *
+     * <p>配置位置 = {@code yj_panel.config} 的 JSON 键 {@code approvalNotify},值是账号数组:
+     * <pre>{"approvalNotify":["fm"]}</pre>
+     * 配了它,该面板的「提交审批」消息**只发给这些人**(管理员也不再自动带),审批权本身不受影响 ——
+     * 「谁能审批」仍由 {@code yj_role_panel.can_approve} 决定,两者刻意分开:很多场景是
+     * 「多人都能审,但只在某个人的消息里提醒」。
+     *
+     * <p>没配(或配成空数组/解析失败)⇒ 维持原口径:管理员 ∪ 该面板所有 can_approve 角色的账号。
+     *
+     * @return 配置的账号列表;未配置返回空列表(调用方据此判断走哪条口径)
+     */
+    public List<String> approvalNotifyTargets(String panelCode) {
+        try {
+            String raw = registry.panel(panelCode).config();
+            if (raw == null || !raw.contains("approvalNotify")) return List.of();
+            com.fasterxml.jackson.databind.JsonNode node =
+                    JSON.readTree(raw).path("approvalNotify");
+            if (!node.isArray()) return List.of();
+            List<String> out = new ArrayList<>();
+            for (com.fasterxml.jackson.databind.JsonNode n : node) {
+                String u = n.asText("").trim();
+                if (!u.isEmpty()) out.add(u);
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("approvalNotify 解析失败(按未配置处理): panel={} err={}", panelCode, e.getMessage());
+            return List.of();
+        }
     }
 
     /**
