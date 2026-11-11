@@ -2072,10 +2072,12 @@
          「因为配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批的时候有一个回填弹窗就是写这个配方及
          工艺要求的，审批通过填写这个字段内容回填进去，进入二级审批」)。
          同一张弹窗里既选二级审核人、又填审批回填内容 —— 一次提交两步完成。 -->
-    <el-dialog v-model="sampleL1Visible" :title="tt('一级审批 · 回填配方及工艺要求')" width="880px" append-to-body>
+    <el-dialog v-model="sampleL1Visible" :title="tt(sampleBackfillTitle)" width="880px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">
-          {{ tt('配方及工艺要求由一级审批人在这里补齐；点「审批通过」后内容写入单据，再转二级审核人签核。') }}
+          {{ sampleL1Node === 2
+            ? tt('配方及工艺要求在二级签核时可以继续修改；点「审批通过」后内容写入单据并归档，修改会记入审批留痕（含原值→新值）。')
+            : tt('配方及工艺要求由一级审批人在这里补齐；点「审批通过」后内容写入单据，再转二级审核人签核。') }}
         </div>
         <div v-if="l2PickHiddenSubmitter" class="mod-log-meta" style="margin-bottom:8px">{{ tt('已按「编制与审批分离」排除提交人：') }}{{ l2PickHiddenName }}</div>
         <div v-if="sampleL1Error" class="dq-error">{{ sampleL1Error }}</div>
@@ -7029,10 +7031,17 @@ const sampleL1No = ref('')
 const sampleL1User = ref('')
 const sampleL1Opinion = ref('')
 const sampleL1Rows = ref([])
+/** 回填节点:1=一级(申请→审核) / 2=二级(审核→确认)。决定弹窗标题与提交后的状态迁移。 */
+const sampleL1Node = ref(1)
+/** 弹窗标题按节点切换(2026-11-11:二级签核人看到"一级"字样会以为自己点错了) */
+const sampleBackfillTitle = computed(() => (sampleL1Node.value === 2
+  ? '二级签核 · 回填配方及工艺要求'
+  : '一级审批 · 回填配方及工艺要求'))
 
 /** 打开一级审批回填弹窗:把当前明细行(产品整体规格/炭棒规格/样品数量/配方及工艺要求…)抄一份进来 */
-async function openSampleL1(no) {
+async function openSampleL1(no, node = 1) {
   sampleL1No.value = no
+  sampleL1Node.value = node
   sampleL1User.value = ''
   sampleL1Opinion.value = ''
   sampleL1Error.value = ''
@@ -11186,15 +11195,19 @@ async function onButton(action) {
       // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
       // 外部开发样品申请单（2026-11-06）：同一套「一级选二级(确认)人」弹窗
       if (action === '审批通过' && ['RD_PROD_INFO', 'RD_SAMPLE_EXT'].includes(String(panelCode.value))
-        && current.value['单据状态'] === '审批中') {
+        && ['审批中', '待二级审批'].includes(current.value['单据状态'])) {
         if (draftEditable.value) {
           const saved = await saveInlineDraft('保存', { silent: true })
           if (!saved) return
         }
         const no1 = current.value['编号'] || current.value['单据编号'] || ''
-        // 外部开发样品申请单:一级审批要**回填配方及工艺要求**(2026-11-06 用户口径) ⇒ 专用弹窗;
-        // 产品信息表仍走「只选二级审核人」的老弹窗。
-        if (String(panelCode.value) === 'RD_SAMPLE_EXT') return openSampleL1(no1)
+        // 外部开发样品申请单:一/二级审批都要能**回填配方及工艺要求** ⇒ 同一个专用弹窗。
+        //   2026-11-06 用户口径:一级填配方、进二级;2026-11-11 补齐:「二级签核无法修改配方」→
+        //   二级签核也要能改（后端 applySampleBackfill(node=2) 同一份白名单，留痕记 L2_BACKFILL + diff）。
+        //   产品信息表仍走「只选二级审核人」的老弹窗(它没有回填语义)。
+        if (String(panelCode.value) === 'RD_SAMPLE_EXT') {
+          return openSampleL1(no1, current.value['单据状态'] === '待二级审批' ? 2 : 1)
+        }
         return openL2Pick(no1)
       }
       // 立项申请表(2026-10-08 流程图②):审批通过与项目定级是同一步骤的两个动作 ⇒ 走「审批通过 + 定级」弹窗。

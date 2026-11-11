@@ -2872,7 +2872,7 @@ public class ButtonService {
         // 2026-11-06 用户口径:「因为配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批时弹窗回填
         //   这个字段，审批通过回填进去，再进二级审批(管理员)，管理员审批完成归档」。
         // 落库时机放在状态迁移**之前**:写失败就直接失败,不会出现"已转二级但内容没写进"的半截状态。
-        applyL1Backfill(def, no, formData);
+        applySampleBackfill(def, no, formData, 1);
         // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
             // 固定二级面板(质量单据一族,含出厂检验报告/首件/制程检验单):第二级恒为超级管理员,一级不选人;
@@ -3023,6 +3023,10 @@ public class ButtonService {
                 throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可完成二级审批");
         }
         String opinion = opinionOf(formData);
+        // 二级签核回填(2026-11-11 用户口径:「二级签核无法修改配方」→ 需要修改配方)。
+        // 与一级同一份白名单、同一个方法,只是 node=2 ⇒ 留痕记 L2_BACKFILL 并带原值→新值的 diff。
+        // 时机同一级:放在状态迁移**之前**,写失败就直接失败,不会出现"已通过但内容没写进"的半截状态。
+        applySampleBackfill(def, no, formData, 2);
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), approve_node = NULL, update_at = GETDATE()"
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
@@ -7480,17 +7484,30 @@ public class ButtonService {
      * (空串表示"本次没改",不许把已填内容清掉)。仅对 RD_SAMPLE_EXT 生效 —— 别的面板没有这个动作语义,
      * 多一条入口就是多一条误写数据的路。
      */
-    private void applyL1Backfill(PanelRegistry.PanelDef def, String no, Map<String, Object> formData) {
+    private void applySampleBackfill(PanelRegistry.PanelDef def, String no, Map<String, Object> formData, int node) {
         if (!"RD_SAMPLE_EXT".equals(def.code()) || formData == null) return;
         Object raw = formData.get("明细回填");
         if (!(raw instanceof List<?> rows) || rows.isEmpty()) return;
         Map<String, String> l2c = def.labelToCol();
         java.util.Set<String> allowed = java.util.Set.of("配方及工艺要求", "组装要求", "性能要求");
+        // 用户 2026-11-11 明确要求「留」原值→新值的 diff ⇒ 写之前先把旧值读出来。
+        // 只在**值真变了**的时候记一条,不是"提交了就记",否则审批留痕会被空改动灌满。
+        List<String> diffs = new ArrayList<>();
         int hit = 0;
         for (Object o : rows) {
             if (!(o instanceof Map<?, ?> m)) continue;
             Object id = m.get("id");
             if (id == null || String.valueOf(id).isBlank()) continue;
+            // 旧值(限定本单号,防止跨单读到别人的行)
+            Map<String, Object> old = null;
+            try {
+                List<Map<String, Object>> found = jdbc.queryForList(
+                        "SELECT * FROM " + def.lineTable() + " WHERE " + def.pkCol() + " = ? AND " + def.groupCol() + " = ?"
+                                + " AND ISNULL(asp_cancel,'N') <> 'Y'", id, no);
+                if (!found.isEmpty()) old = found.get(0);
+            } catch (RuntimeException ignore) {
+                // 读旧值失败不阻断回填（留痕降级为"值已写入"），但下面按无旧值处理
+            }
             StringBuilder set = new StringBuilder();
             List<Object> args = new ArrayList<>();
             for (String label : allowed) {
@@ -7498,8 +7515,13 @@ public class ButtonService {
                 if (v == null) continue;
                 String col = l2c.get(label);
                 if (col == null || col.isBlank()) continue;
+                String newV = String.valueOf(v);
+                String oldV = old == null || old.get(col) == null ? "" : String.valueOf(old.get(col));
+                if (!newV.equals(oldV)) {
+                    diffs.add(label + " 行" + id + "：「" + oldV + "」→「" + newV + "」");
+                }
                 set.append(set.length() == 0 ? "" : ", ").append("[").append(col).append("] = ?");
-                args.add(String.valueOf(v));
+                args.add(newV);
             }
             if (set.length() == 0) continue;
             args.add(id);
@@ -7510,8 +7532,15 @@ public class ButtonService {
                     + " WHERE " + def.pkCol() + " = ? AND " + def.groupCol() + " = ?"
                     + " AND ISNULL(asp_cancel,'N') <> 'Y'", args.toArray());
         }
-        if (hit > 0) {
-            recordApproval(def.code(), no, "L1_BACKFILL", "FILLED", "一级审批回填配方及工艺要求（" + hit + " 行）");
+        if (hit > 0 || !diffs.isEmpty()) {
+            String nodeName = node == 2 ? "二级" : "一级";
+            String word = node == 2 ? "L2_BACKFILL" : "L1_BACKFILL";
+            // 留痕正文带原值→新值(用户 2026-11-11 明确要 diff)。空 diff(值没变)时如实说明,
+            // 避免"审批人以为改了、其实内容一致"被误读成一次真实修改。
+            String detail = diffs.isEmpty()
+                    ? nodeName + "审批回填配方及工艺要求（" + hit + " 行，值无变化）"
+                    : nodeName + "审批回填配方及工艺要求（" + hit + " 行）：" + String.join("；", diffs);
+            recordApproval(def.code(), no, word, "FILLED", detail);
         }
     }
 
