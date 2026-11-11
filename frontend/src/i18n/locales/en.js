@@ -397,6 +397,7 @@ export default {
     '单据编号': 'Document no.',
     '编号': 'No.',
     '来源': 'Source',
+    '点击打开来源单据': 'Click to open the source document',
     '查看': 'View',
     '打开': 'Open',
     '查询产品': 'Query Products',

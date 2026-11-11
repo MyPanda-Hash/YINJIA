@@ -58,6 +58,18 @@
           <span class="doc-chip">{{ tt('单据：') }}{{ cur['编号'] || cur['单据编号'] || '-' }}</span>
           <span v-if="cur['批次号']" class="doc-batch" :title="tt('批次号')">{{ tt('批次号') }}: {{ cur['批次号'] }}</span>
           <span v-if="cur['类别']" class="doc-cat">{{ tt(cur['类别']) }}</span>
+          <!-- 来源提示(2026-11-11 用户口径「不要做成字段,做成个按钮或者是提示就行」):
+               采购入库单的表头「来源 / 来源单号」两列已隐藏,信息挂在这里;
+               能反查到面板编码时点一下直接翻到来源单据(暂收单 / 检验单 / 特采单)。 -->
+          <span
+            v-if="sourceHint"
+            class="doc-source"
+            :class="{ 'doc-source-link': sourceHint.canOpen }"
+            :title="sourceHintTitle"
+            @click="openSourceDoc"
+          >
+            {{ tt('来源') }}: {{ tt(sourceHint.type) }} {{ sourceHint.docNo }}
+          </span>
           <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
           <template v-if="!singleDocMode">
             <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
@@ -2558,6 +2570,8 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
+import { sourceHintOf } from '@core/panel/sourceHint'
+import { panelCodeOfName } from '@core/panel/panelCodeByName'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
@@ -5374,6 +5388,26 @@ const curNo = computed(() => {
 })
 /** 总页数(单据面板分页用;与后端 OFFSET/FETCH 口径一致) */
 const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
+
+/**
+ * 单据号旁的「来源」提示(2026-11-11 用户口径:「不要做成字段,做成个按钮或者是提示就行」)。
+ * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);老单没有链路 ⇒ null ⇒ 不显示。
+ */
+const sourceHint = computed(() => sourceHintOf(cur.value, panelCodeOfName))
+const sourceHintTitle = computed(() => {
+  const h = sourceHint.value
+  if (!h) return ''
+  if (h.canOpen) return tt('点击打开来源单据') + ': ' + h.docNo
+  return h.docNo ? tt('来源单据') + ': ' + h.docNo : tt('来源')
+})
+
+/** 点提示跳到来源单据(暂收单 / 检验单 / 特采单);反查不到面板时提示不可点,这里再兜一道 */
+function openSourceDoc() {
+  const h = sourceHint.value
+  if (!h?.canOpen) return
+  stashCurrentPanelDraft(panelCode.value)
+  router.push({ path: '/panelx/form/' + h.panelCode, query: { code: h.docNo } })
+}
 
 // 立项申请流程状态(rdFlow)—————————— 必须声明在下面那个 immediate watch 之前 ——————————
 // ⚠ 2026-10-15 TDZ 修复:该 watch 带 immediate,setup 期间就会调 loadRdFlowState() → clearRdFlow() → 读 rdFlow。
@@ -12163,6 +12197,24 @@ onUnmounted(() => {
   color: #46586e;
   font-weight: 600;
   margin-right: 6px;
+}
+/* 来源提示(2026-11-11):采购入库单的「来源 / 来源单号」不再占表头格子,挂成单据号旁的一条提示 */
+.doc-source {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  margin-right: 6px;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  white-space: nowrap;
+}
+.doc-source-link {
+  cursor: pointer;
+}
+.doc-source-link:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
 }
 .doc-status {
   font-size: 12px;
