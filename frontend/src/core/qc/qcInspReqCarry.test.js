@@ -72,10 +72,11 @@ test('标识列不进检验项(物料编号/物料类别/id 永不成为检验�
   assert.ok(!items.includes('id'))
 })
 
-test('只补缺失项:已有的检验项保留(检测结果/判定不动),缺的按来料检验要求顺序补', () => {
+test('只补缺失项:已有的检验项保留(结果格/判定不动),缺的按来料检验要求顺序补', () => {
   const entries = carryEntriesOf(lookupReqGroups([JB_ROW], 'YJ-JB-001'))
   const existing = [
-    { 检验项: '内径', 检测标准: '6±0.2', 检测结果: '合格', 单项判定: '合格' },
+    // 结果 = 固定五格(结果1..结果5),这里只填了第一格
+    { 检验项: '内径', 检测标准: '6±0.2', 结果1: '合格', 单项判定: '合格' },
     { 检验项: '外观', 检测标准: '无脏污' }, // 要求表里没有的项,照样保留
   ]
   const add = missingCarryRows(existing, entries)
@@ -85,13 +86,13 @@ test('只补缺失项:已有的检验项保留(检测结果/判定不动),缺的
   ])
   // 已有的那行一个字段都没被改动
   assert.equal(existing[0].检测标准, '6±0.2')
-  assert.equal(existing[0].检测结果, '合格')
+  assert.equal(existing[0].结果1, '合格')
 })
 
 test('幂等:补过一遍之后再点带入,一行都不加', () => {
   const plan1 = carryPlan([JB_ROW], 'YJ-JB-001', [])
   assert.equal(plan1.add.length, 3)
-  const after = plan1.add.map((r) => ({ ...r, 检测结果: '合格' })) // 已录入结果
+  const after = plan1.add.map((r) => ({ ...r, 结果1: '合格' })) // 已录入结果
   const plan2 = carryPlan([JB_ROW], 'YJ-JB-001', after)
   assert.deepEqual(plan2.add, [])
   assert.equal(plan2.entries.length, 3, '条目本身照旧全量给出(供界面提示用)')

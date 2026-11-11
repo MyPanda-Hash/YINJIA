@@ -90,11 +90,14 @@
       >⧉ {{ carrying ? tt('带入中…') : tt('带入检验要求') }}</span>
     </div>
 
-    <!-- ④ 表体:检验项 | 检测标准 | 检测结果 | 单项判定 -->
+    <!-- ④ 表体:检验项 | 检测标准 | 检测结果(固定五格) | 单项判定 -->
     <table class="qr-table">
       <thead>
+        <!-- 检测结果 = 固定五格(2026-11-11 用户口径「检验结果改为固定五格」):
+             表头两行 —— 第一行「检测结果」跨 5 列,第二行 1..5 标出第几格;
+             格子数据键 = 结果1..结果5(见 @core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS) -->
         <tr>
-          <th class="c-item">
+          <th class="c-item" rowspan="2">
             {{ tt('检验项') }}
             <span
               v-if="editable"
@@ -103,10 +106,13 @@
               @click="openStdLib"
             >⧉ {{ tt('标准库维护') }}</span>
           </th>
-          <th class="c-std">{{ tt('检测标准') }}</th>
-          <th class="c-result">{{ tt('检测结果') }}</th>
-          <th class="c-judge">{{ tt('单项判定') }}</th>
-          <th v-if="editable" class="c-op"></th>
+          <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
+          <th class="c-result" colspan="5">{{ tt('检测结果') }}</th>
+          <th class="c-judge" rowspan="2">{{ tt('单项判定') }}</th>
+          <th v-if="editable" class="c-op" rowspan="2"></th>
+        </tr>
+        <tr>
+          <th v-for="(k, gi) in RESULT_KEYS" :key="'rh' + k" class="c-res">{{ gi + 1 }}</th>
         </tr>
       </thead>
       <tbody>
@@ -132,18 +138,16 @@
             <el-input v-if="editable" v-model="row[K.STD]" size="small" class="qr-cell-input" maxlength="500" @input="emit('dirty')" />
             <span v-else class="qr-cell-text">{{ row[K.STD] || '' }}</span>
           </td>
-          <td class="c-result">
+          <td v-for="k in RESULT_KEYS" :key="'r' + k" class="c-res">
             <el-input
               v-if="editable"
-              v-model="row[K.RESULT]"
-              type="textarea"
-              :autosize="{ minRows: 1, maxRows: 5 }"
+              v-model="row[k]"
               size="small"
               class="qr-cell-input"
-              maxlength="500"
+              maxlength="200"
               @input="emit('dirty')"
             />
-            <span v-else class="qr-cell-text">{{ row[K.RESULT] || '' }}</span>
+            <span v-else class="qr-cell-text">{{ row[k] || '' }}</span>
           </td>
           <td class="c-judge">
             <el-select
@@ -165,7 +169,7 @@
           </td>
         </tr>
         <tr v-if="!items.length">
-          <td :colspan="editable ? 5 : 4" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
+          <td :colspan="editable ? 9 : 8" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
         </tr>
       </tbody>
     </table>
@@ -281,6 +285,7 @@ import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_FULL,
   QC_INSP_REC_SIGN_ROW,
+  QC_INSP_REC_RESULT_KEYS,
   QC_INSP_ITEM_LIB,
 } from '@core/qc/qcInspRecColumns'
 
@@ -288,9 +293,13 @@ import {
 const K = Object.freeze({
   ITEM: '检验项',
   STD: '检测标准',
-  RESULT: '检测结果',
   JUDGE: '单项判定',
 })
+
+/** 检测结果 = **固定五格**(2026-11-11 用户口径):结果1..结果5,一格一个实测值。
+ *  键与次序只有一处真源(@core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS),
+ *  纸面渲染、导出、迁移脚本三处必须一致 —— 少一格就会有一个值无处落库。 */
+const RESULT_KEYS = QC_INSP_REC_RESULT_KEYS
 
 /** 检验结论(表尾整宽格,2026-10-19 起是下拉框 + 可自定义补充) */
 const VERDICT_KEY = '检验结论'
@@ -787,9 +796,14 @@ watch(
 }
 .c-item { width: 20%; }
 .c-std { width: 24%; }
+/* 「检测结果」= 固定五格:表头第一行跨 5 列(42%),第二行 1..5 每格 8.4% */
 .c-result { width: 42%; }
+.c-res { width: 8.4%; }
 .c-judge { width: 14%; }
 .c-op { width: 46px; text-align: center; }
+/* 五格是窄格(约 8.4%),缩一缩左右内边距,数字/短文本不会被挤掉 */
+.qr-table th.c-res,
+.qr-table td.c-res { padding-left: 2px; padding-right: 2px; }
 .qr-lib-btn {
   margin-left: 6px;
   font-size: 11px;
@@ -916,6 +930,11 @@ watch(
   body.approval-printing .qr-addbar,
   body.approval-printing .qr-lib-btn,
   body.approval-printing .qr-ref-ico {
+    display: none !important;
+  }
+  /* 行操作列(＋/×)是屏幕上的编辑入口,纸面不该出现(2026-11-11 做「检测结果固定五格」时
+     顺带把这一列从打印里摘掉:五格已经占满版面,再留一列空操作格会挤窄格子) */
+  body.approval-printing .c-op {
     display: none !important;
   }
   @page {

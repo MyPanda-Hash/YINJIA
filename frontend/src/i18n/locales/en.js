@@ -1406,6 +1406,12 @@ export default {
     '检验项': 'Inspection Item',
     '检测标准': 'Test Standard',
     '检测结果': 'Test Result',
+    // 检测结果固定五格(2026-11-11 用户口径):五个格子的显示名,数据键仍是中文 结果1..结果5
+    '结果1': 'Result 1',
+    '结果2': 'Result 2',
+    '结果3': 'Result 3',
+    '结果4': 'Result 4',
+    '结果5': 'Result 5',
     '单项判定': 'Item Judgement',
     '物料批次': 'Material Batch',
     '来料日期': 'Arrival Date',

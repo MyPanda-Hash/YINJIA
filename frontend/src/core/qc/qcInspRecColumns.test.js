@@ -7,13 +7,15 @@ import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_FULL,
   QC_INSP_REC_SIGN_ROW,
+  QC_INSP_REC_RESULT_KEYS,
   QC_INSP_ITEM_LIB,
   exportHeaderRow,
   exportRow,
 } from './qcInspRecColumns.js'
 
-/** qc_insp_rec_detail 的元数据列(yj_field place=detail);键必须落在这里,否则保存被静默丢弃 */
-const DB_DETAIL_COLUMNS = ['检验项', '检测标准', '检测结果', '单项判定']
+/** qc_insp_rec_detail 的元数据列(yj_field place=detail);键必须落在这里,否则保存被静默丢弃。
+ *  ⚠ 旧列 `检测结果` 已转历史列(visible=0/hidden=1,整段文字),表体不再用它。 */
+const DB_DETAIL_COLUMNS = ['检验项', '检测标准', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定']
 
 test('每个表体列 key 必须存在于 qc_insp_rec_detail 的元数据列里', () => {
   const bad = QC_INSP_REC_COLUMNS
@@ -23,9 +25,15 @@ test('每个表体列 key 必须存在于 qc_insp_rec_detail 的元数据列里'
   assert.deepEqual([...QC_INSP_REC_DETAIL_COLUMNS], DB_DETAIL_COLUMNS)
 })
 
-test('表体四列一比一:检验项 | 检测标准 | 检测结果 | 单项判定', () => {
-  assert.deepEqual(QC_INSP_REC_COLUMNS.map((c) => c.label), ['检验项', '检测标准', '检测结果', '单项判定'])
-  assert.equal(new Set(QC_INSP_REC_COLUMNS.map((c) => c.label)).size, 4)
+test('检测结果 = 固定五格:键恰好 结果1..结果5(2026-11-11 用户口径)', () => {
+  assert.deepEqual([...QC_INSP_REC_RESULT_KEYS], ['结果1', '结果2', '结果3', '结果4', '结果5'])
+  assert.equal(QC_INSP_REC_RESULT_KEYS.length, 5, '必须固定 5 格,多/少都要同步改迁移脚本')
+  // 表体列里这五格各占一列,且排在 检测标准 之后、单项判定 之前
+  const labels = QC_INSP_REC_COLUMNS.map((c) => c.label)
+  assert.deepEqual(labels, ['检验项', '检测标准', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
+  // 老的单列文本 `检测结果` 不得再出现在表体列里(否则纸面上会多出一列旧输入框)
+  assert.ok(!labels.includes('检测结果'))
+  assert.equal(new Set(labels).size, labels.length, '列名不可重复')
 })
 
 test('检验项挂在标准库 qc.insp_item(原表「检验项为数据库选择」)', () => {
@@ -59,18 +67,32 @@ test('表尾:检验结论/处理意见整宽 + 签名行(检验人锁定、审�
   assert.notEqual(QC_INSP_REC_SIGN_ROW[1].key, '审核人')
 })
 
-test('导出:表头=列显示名,行按列定义取值', () => {
-  assert.deepEqual(exportHeaderRow(), ['检验项', '检测标准', '检测结果', '单项判定'])
-  assert.deepEqual(exportRow({ 检验项: '外观', 单项判定: '合格' }), ['外观', undefined, undefined, '合格'])
-  assert.deepEqual(exportRow(null), ['', '', '', ''])
+test('导出:表头=列显示名(五格各一列),行按列定义取值', () => {
+  assert.deepEqual(exportHeaderRow(),
+    ['检验项', '检测标准', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
+  assert.deepEqual(exportRow({ 检验项: '外观', 结果1: '无异常', 结果5: '无异常', 单项判定: '合格' }),
+    ['外观', undefined, '无异常', undefined, undefined, undefined, '无异常', '合格'])
+  assert.deepEqual(exportRow(null), ['', '', '', '', '', '', '', ''])
 })
 
-/** 源码级回归:纸张组件必须经 K 常量取数键,不得裸写中文列名方括号 */
-test('组件源码里取表体列值必须走 K 常量', () => {
+/** 源码级回归:纸张组件必须经 K 常量/RESULT_KEYS 取数键,不得裸写中文列名方括号 */
+test('组件源码里取表体列值必须走 K 常量或 RESULT_KEYS', () => {
   const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
   const bad = []
   for (const c of QC_INSP_REC_COLUMNS) {
     if (new RegExp(`\\[\\s*'${c.label}'\\s*\\]`).test(src)) bad.push(c.label)
   }
   assert.deepEqual(bad, [], `组件里裸写了列名取值,应改为 K 常量: ${bad.join(', ')}`)
+})
+
+/** 源码级回归:检测结果必须是**五个固定格子**渲染(不是原来那个自由文本域) */
+test('组件按 QC_INSP_REC_RESULT_KEYS 渲染五个格子,且不再用文本域当检测结果', () => {
+  const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
+  assert.match(src, /QC_INSP_REC_RESULT_KEYS/, '五格键必须来自 qcInspRecColumns 的唯一真源')
+  assert.match(src, /v-for="k in RESULT_KEYS"/, '表体检测结果必须按 5 个键循环出格子')
+  assert.match(src, /v-for="\(k, gi\) in RESULT_KEYS"/, '表头第二行必须标出 1..5')
+  assert.match(src, /colspan="5"/, '表头「检测结果」必须跨 5 列')
+  // 原来那一格是 type="textarea" + maxlength="500" 的自由文本域;五格是单值输入
+  assert.ok(!/type="textarea"[\s\S]{0,200}maxlength="500"/.test(src),
+    '检测结果的自由文本域应已换成五个单值格子')
 })
