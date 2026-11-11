@@ -324,5 +324,5 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 161	PURCHASE_IN	换算率_conversion_rate	换算率_conversion_rate	detail	850	文本	120	E-H-								
 162	PURCHASE_IN	本次结算金额本位币	本次结算金额本位币	detail	860	文本	120	E-H-								
 163	PURCHASE_IN	备注	备注	detail	870	文本	200	---V								
-164	PURCHASE_IN	来源单据	来源	header	900	文本	130	---V							Source	
-165	PURCHASE_IN	来源单号	来源单号	header	910	文本	150	---V							Source no.	
+164	PURCHASE_IN	来源单据	来源	header	900	文本	130	--H-							Source	
+165	PURCHASE_IN	来源单号	来源单号	header	910	文本	150	--H-							Source no.	

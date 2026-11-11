@@ -4676,6 +4676,15 @@ migrate-qc-insp-rec-verdict-stdlib-20261111.sql
 #   幂等(窄条件 UPDATE + 行数守卫 + 只填空值),两账套均执行。
 migrate-purchase-in-source-20261111.sql
 
+# 2026-11-11 采购入库单「来源 / 来源单号」:字段 → 隐藏列 + 界面提示(用户口径第二轮:
+#   「不要做成字段,做成个按钮或者是提示就行」):
+#   ① yj_field 两行设回 hidden=1 / visible=0(不删行、不改标签,写入口径仍是 `来源`);
+#   ② 表头不再占格子,值仍随查询下发(selectCols(fieldsAt("header")) 不看 hidden);
+#   ③ 前端在单据号旁显示可点提示「来源: 来料检验单 IJ-…」,点它跳到来源单据
+#      (PanelxList 表头条 / PanelxForm 标题行,frameworks 见 frontend/src/core/panel/sourceHint.js)。
+#   幂等(窄条件 UPDATE + 行数守卫),两账套均执行。
+migrate-purchase-in-source-hint-20261111.sql
+
 # 2026-11-11 处理意见标准库清空预置样例(用户口径「处理意见的标准库信息删除干净,
 #   不需要先写样例,自己手动填写就行」):
 #   只删本仓库播种的 7 行(asp_user1='migration' + content 在名单里),用户自己加的不动;

@@ -17,7 +17,7 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 9e79150b361d(sha256 cdbc6f2faf24a933…)
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 2a76fd168bed(sha256 74537ac480e7d995…)
  *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=38 · PURCHASE_IN=165(共 327 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
@@ -394,8 +394,8 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (161,N'PURCHASE_IN',N'换算率_conversion_rate',N'换算率_conversion_rate',N'文本',NULL,NULL,NULL,NULL,N'detail',850,120,1,0,1,NULL,0,NULL,NULL,NULL),
   (162,N'PURCHASE_IN',N'本次结算金额本位币',N'本次结算金额本位币',N'文本',NULL,NULL,NULL,NULL,N'detail',860,120,1,0,1,NULL,0,NULL,NULL,NULL),
   (163,N'PURCHASE_IN',N'备注',N'备注',N'文本',NULL,NULL,NULL,NULL,N'detail',870,200,0,0,0,NULL,1,NULL,NULL,NULL),
-  (164,N'PURCHASE_IN',N'来源单据',N'来源',N'文本',NULL,NULL,NULL,NULL,N'header',900,130,0,0,0,NULL,1,N'Source',NULL,NULL),
-  (165,N'PURCHASE_IN',N'来源单号',N'来源单号',N'文本',NULL,NULL,NULL,NULL,N'header',910,150,0,0,0,NULL,1,N'Source no.',NULL,NULL);
+  (164,N'PURCHASE_IN',N'来源单据',N'来源',N'文本',NULL,NULL,NULL,NULL,N'header',900,130,0,0,1,NULL,0,N'Source',NULL,NULL),
+  (165,N'PURCHASE_IN',N'来源单号',N'来源单号',N'文本',NULL,NULL,NULL,NULL,N'header',910,150,0,0,1,NULL,0,N'Source no.',NULL,NULL);
 GO
 
 /* ---------- ① 差异行数 → ② 逐面板回正 → ③ 复核 → ④ 自检(单批次 + 单事务) ---------- */

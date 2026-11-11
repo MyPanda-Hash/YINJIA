@@ -674,8 +674,8 @@ FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									13165
 FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									13169
 FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									13173
 FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									13177
-FIELD	header	900	来源	来源单据	文本	130	---V							Source		13045
-FIELD	header	910	来源单号	来源单号	文本	150	---V							Source no.		13048
+FIELD	header	900	来源	来源单据	文本	130	--H-							Source		13045
+FIELD	header	910	来源单号	来源单号	文本	150	--H-							Source no.		13048
 FIELD	query,detail	10	存货编码	存货编码	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code		13012
 FIELD	query,header	10	单据日期	单据日期	日期	140	ER-V							Document Date		13013
 FIELD	query,header	20	单据编号	单据编号	文本	140	ER-V							Document Number		13014
