@@ -345,16 +345,20 @@ const RD_MOLD_PROC_SEC0 = [
         //   规格书带出的检验要求写在**右边那几格真实数据格**上(跌落要求 / 强度要求kgf / 压降标准kpa、
         //   以及尺寸那四格),不写块名格 —— 用户 2026-10-15 实测口径,见本块末尾 autoFillSpec。
         { grid: [
-          { label: '炭棒尺寸', rowspan: 2 },
+          // moldPick 从**数据格**挪到**标签格**(2026-11-11 用户口径:「工艺单-烧结的炭棒选型号选项
+          //   挪开位置，可以放到炭棒尺寸下面（打印时不要显示）」):
+          //   改前挂在外径mm 那一格 ⇒ 下拉占着「炭棒外径mm」的填写位,外径值没地方显眼地填;
+          //   改后挂在「炭棒尺寸」这个 rowspan=2 的标签格内、标签文字**下方**,
+          //   四个数据格恢复普通输入格。选型号 → 仍一次填四格(applyMoldModel 未改)。
+          //   ⚠ 下拉带 no-print:盖纸打印时不留「选型号」控件。
+          { label: '炭棒尺寸', rowspan: 2, moldPick: true },
           { label: '炭棒外径mm', span: 2 },
           { label: '炭棒外径公差mm', span: 3 },
           { label: '炭棒内径mm', span: 2 },
           { label: '炭棒内径公差mm', span: 3 },
         ]},
         { grid: [
-          // moldPick:这一格渲染成「按生产车间筛型号」的下拉,选型号 → 一次填这四格
-          //   (2026-11-04 用户口径:炭棒尺寸要按车间模具型号+公差带出)。落地见 RecordSheetPanels.applyMoldModel。
-          { key: '外径mm', span: 2, moldPick: true },
+          { key: '外径mm', span: 2 },
           { key: '外径公差', span: 3 },
           { key: '内径mm', span: 2 },
           { key: '内径公差', span: 3 },

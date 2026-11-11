@@ -81,12 +81,18 @@ test('③ 配方计算 carrySpec:查产品信息表前剥掉 -tb 后缀', () => 
 })
 
 /* ── ④ 检验要求·炭棒尺寸:按车间筛型号 ──────────────────────────────────── */
-test('④ 外径mm 那格声明 moldPick,四格仍在同一行', () => {
+test('④ 选型号格与四数据格仍在同一段(2026-11-11 起挂「炭棒尺寸」标签格)', () => {
+  // ⚠ 2026-11-11 用户口径:「选型号选项挪开位置，可以放到炭棒尺寸下面（打印时不要显示）」
+  //   ⇒ moldPick 从「外径mm」数据格挪到「炭棒尺寸」标签格,四个数据格恢复普通输入格。
+  //   位置与打印口径的细化断言见 moldPickLabelCell.test.js;本条只钉"四格仍在同一行"。
   const src = read('src/core/views/recordSheetConfigs.js')
-  const at = src.indexOf("{ key: '外径mm', span: 2, moldPick: true }")
-  assert.ok(at > 0, '外径mm 必须是「选型号」格')
-  const row = src.slice(at, at + 260)
+  const at = src.indexOf("{ key: '外径mm', span: 2 }")
+  assert.ok(at > 0, '外径mm 必须是普通数据格(下拉已上移到标签格)')
+  const row = src.slice(at, at + 200)
   for (const k of ['外径公差', '内径mm', '内径公差']) assert.ok(row.includes(k), `四格必须同行:${k}`)
+  // 标签格那一行仍必须声明 moldPick,否则下拉整块消失
+  assert.match(src.slice(Math.max(0, at - 600), at), /label: '炭棒尺寸'[^}]*moldPick: true/,
+    '「炭棒尺寸」标签格必须仍是 moldPick 格')
 })
 
 test('④ 组件:型号下拉按生产车间筛,选中回填四格', () => {

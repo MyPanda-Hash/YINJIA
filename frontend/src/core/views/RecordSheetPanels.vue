@@ -368,6 +368,18 @@
               <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 标签格里的「选型号」(2026-11-11 用户口径):下拉挂在**标签下面**而不是数据格里,
+                     选型号仍一次填四格。editable 才出现;整块带 no-print ⇒ 打印/导出不印控件。 -->
+                <div v-if="editable && c.moldPick" class="rs-mold-pick no-print">
+                  <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                             :placeholder="tt('选型号（按生产车间筛）')"
+                             :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                             @update:model-value="applyMoldModel">
+                    <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                               :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                               :value="r['型号']" />
+                  </el-select>
+                </div>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -401,25 +413,9 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
-                <!-- 检验要求 · 炭棒尺寸:按**生产车间**从生产模具表筛型号,选型号 → 一次填四格
-                     (2026-11-04 用户口径:「选择生产车间…炭棒尺寸要筛选到对应车间的模具型号和公差信息」
-                      「手工选择下拉列表填充炭棒内外径及公差数据」)。
-                     数据源 = 生产模具表 PROD_MOLD(rd_sinter_tolerance,60 行);
-                     车间两套写法的归一在 core/mold/workshopNo.js。 -->
-                <template v-else-if="editable && c.moldPick">
-                  <div class="rs-mold-pick">
-                    <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
-                               :placeholder="tt('选型号（按生产车间筛）')"
-                               :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
-                               @update:model-value="applyMoldModel">
-                      <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
-                                 :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
-                                 :value="r['型号']" />
-                    </el-select>
-                    <span v-if="!moldModelOfHead() && head[c.key]" class="rs-mold-fallback"
-                          :title="tt('手填或规格书带出的值，未匹配到型号')">{{ head[c.key] }}</span>
-                  </div>
-                </template>
+                <!-- 2026-11-11:炭棒尺寸的「选型号」下拉已从本数据格**上移到「炭棒尺寸」标签格**
+                     (见上面 rs-label 里的 c.moldPick 分支);四个数据格恢复普通输入框。
+                     候选来源与回填逻辑未变:PROD_MOLD(rd_sinter_tolerance) → applyMoldModel。 -->
                 <template v-else-if="editable && c.key && !c.ro">
                   <!-- 带纸面前缀的格:前缀是**渲染**出来的,head 里只存裸数字(口径见
                        core/panel/carbonSpec.js 头注),所以这里绝不能把前缀写回 v-model。
@@ -1046,6 +1042,18 @@
               <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 标签格里的「选型号」(2026-11-11 用户口径):下拉挂在**标签下面**而不是数据格里,
+                     选型号仍一次填四格。editable 才出现;整块带 no-print ⇒ 打印/导出不印控件。 -->
+                <div v-if="editable && c.moldPick" class="rs-mold-pick no-print">
+                  <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                             :placeholder="tt('选型号（按生产车间筛）')"
+                             :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                             @update:model-value="applyMoldModel">
+                    <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                               :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                               :value="r['型号']" />
+                  </el-select>
+                </div>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -1252,6 +1260,18 @@
               <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 标签格里的「选型号」(2026-11-11 用户口径):下拉挂在**标签下面**而不是数据格里,
+                     选型号仍一次填四格。editable 才出现;整块带 no-print ⇒ 打印/导出不印控件。 -->
+                <div v-if="editable && c.moldPick" class="rs-mold-pick no-print">
+                  <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                             :placeholder="tt('选型号（按生产车间筛）')"
+                             :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                             @update:model-value="applyMoldModel">
+                    <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                               :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                               :value="r['型号']" />
+                  </el-select>
+                </div>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <template v-if="editable && c.type === 'select'">
@@ -4993,9 +5013,16 @@ function chartOf(dt) {
 <style scoped>
 /* 检验要求 · 炭棒尺寸的「选型号」格(2026-11-04):下拉占满格宽;
    手填/规格书带出的值在型号对不上时以灰字挂在右侧,避免"看不见值" */
-.rs-mold-pick { display: flex; align-items: center; gap: 4px; width: 100%; }
-.rs-mold-pick :deep(.el-select) { flex: 1 1 auto; min-width: 0; }
+/* 「选型号」现在挂在**标签格**里(2026-11-11):标签文字在上、下拉在下,故改竖向排布 */
+.rs-mold-pick { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 100%; margin-top: 4px; }
+.rs-mold-pick :deep(.el-select) { width: 100%; }
+/* 标签格本身是居中排版;下拉占满格宽后文字仍居中,不跟着左对齐 */
 .rs-mold-fallback { flex: 0 0 auto; color: #909399; font-size: 11.5px; white-space: nowrap; }
+/* 打印/导出:**两条路径都要隐掉控件** —— ① @media print(浏览器 Ctrl+P)
+   ② body.approval-printing(侧栏「打印」按钮)。.no-print 只覆盖前者,后者是独立规则集,
+   漏一条就会在盖章纸上留下「选型号（按生产车间筛）」的输入框(用户 2026-11-11 明确要求打印不显示)。 */
+@media print { .rs-mold-pick { display: none !important; } }
+body.approval-printing .rs-mold-pick { display: none !important; }
 
 /* ═══ 纸张/表基础(与功能性滤效同一视觉语言;宽度=网格列宽总和,竖线全页对齐) ═══ */
 .record-sheet {
