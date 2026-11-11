@@ -10351,8 +10351,16 @@ async function directAdd() {
     }
     const formData = {}
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
+    // ⚠ 先识别"HTTP 200 + body code≠200"这类错误体：engine.callButton 用的 unwrap() 不会抛，
+    //   而是把整个 body 原样返回（服务端刻意不用 4xx，否则 axios 拦截器会当成登录失效把人踢下线，
+    //   见 core/panel-engine.js unwrapStrict 的注释）。旧写法直接取 res['编号'] ⇒ undefined
+    //   ⇒ 统一报成「新增失败：未返回单据编号」，把**无权限 / 必填缺失**等真实原因全吞掉了
+    //   （2026-11-11 用户报「功能性滤效新增报错、其它面板也有新增不了」，实际原因被这句话掩盖）。
+    if (res && typeof res === 'object' && res.code != null && res.code !== 200) {
+      throw new Error(res.message || ('新增失败（code=' + res.code + '）'))
+    }
     const no = res && (res['编号'] || res.formNo)
-    if (!no) return ElMessage.error('新增失败：未返回单据编号')
+    if (!no) return ElMessage.error('新增失败：后端未返回单据编号（响应=' + JSON.stringify(res).slice(0, 120) + '）')
     // 标记必须先立:下面的 load() 刷新列表时 cur 就可能切到这张新草稿,文书默认值 watch 在
     // await 期间就会跑;标记晚设会被 isFreshAddedDoc() 判成 false,锁定字段(申请立项人/负责人)就带不出来
     freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
