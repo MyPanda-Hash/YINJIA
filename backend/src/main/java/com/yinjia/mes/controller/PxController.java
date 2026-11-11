@@ -1303,6 +1303,24 @@ public class PxController {
         return request.getRemoteAddr();
     }
 
+    /**
+     * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+     *
+     * <p>前端纸面把「处理意见」做成 el-select(allow-create)后,用户手输一个新意见时调本接口,
+     * 把新值追加进该字段的选项库(`yj_field.dict_sql`),以后所有人在下拉里都能直接选。
+     * 只做加法、只认 VALUES 字面量形态的 dict_sql(判据与实现见
+     * {@link com.yinjia.mes.service.PanelConfigService#appendDropdownOption})。
+     * 返回值 false = 不需要/不允许追加(例如已存在、字段不是下拉框),前端静默即可。
+     */
+    @PostMapping("/appendFieldOption")
+    public ApiResult<Boolean> appendFieldOption(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        String label = String.valueOf(body.getOrDefault("label", ""));
+        String option = String.valueOf(body.getOrDefault("option", ""));
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(configService.appendDropdownOption(panelCode, label, option));
+    }
+
     /** 表格列自定义:保存排序/栏名/显隐 */
     @PostMapping("/saveColumnPrefs")
     @SuppressWarnings("unchecked")

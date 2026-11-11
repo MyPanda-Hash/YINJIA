@@ -2783,6 +2783,7 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "L'opération précédente n'a pas encore de production approuvée ; déclarez d'abord l'opération précédente",
     "超出本道可报量": "Dépasse la quantité déclarable de cette opération",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Choisissez dans la liste ou saisissez un nouvel avis puis appuyez sur Entrée (il sera ajouté à la bibliothèque d’options)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
     '出货检验表观': 'Contrôle expédition (aspect)',

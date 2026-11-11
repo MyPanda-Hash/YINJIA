@@ -4261,6 +4261,9 @@ export default {
       'It returns to the pending pool; changing lines = revoke + re-schedule; this line\'s planned lines are voided as well',
     // 口径拆分(2026-10-07):成品口径(需求/排产/入库/未交量)与工序口径(各道计划量/报工)分开显示
     '当前工序计划量': "Current operation's planned qty",
+    //   成品口径(排产/入库/未交量)仍按 pl_sl,见列头 tooltip
+      'Line scheduled qty = scheduled qty × this operation\'s conversion rate (the current operation\'s planned qty in the process ledger); for the finished-product basis use "Order Qty" on the left',
+      'Line scheduled qty = scheduled qty × this operation\'s conversion rate (the current operation\'s planned qty in the ledger); for the finished-product basis see "Demand Qty / Received Qty"',
     '当前工序完工量': "Current operation's completed qty",
     '上道工序': 'Previous operation',
     '上道完工量': "Previous operation's completed qty",
@@ -5699,6 +5702,7 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "The previous process has no approved output yet — report the previous process first",
     "超出本道可报量": "Exceeds the reportable qty of this process",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Available options are listed; you may also type a new disposal opinion and press Enter (it will be added to the option library automatically)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
     '出货检验表观': 'Outgoing Inspection (Appearance)',
@@ -5723,3 +5727,4 @@ export default {
   },
 
 }
+

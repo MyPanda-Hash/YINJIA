@@ -2788,6 +2788,7 @@ export default {
     "前道工序还没有已审核完工量流入,请先报上一道工序": "Công đoạn trước chưa có SL hoàn thành đã duyệt, hãy báo cáo công đoạn trước trước",
     "超出本道可报量": "Vượt quá SL có thể báo cáo của công đoạn này",
     // ---- 出货检验功能记录表 YJ-QR-154 表样改造 + 「组装成品检验单→出货检验表观」改名(2026-11-11)----
+    '可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）': 'Có thể chọn trong danh sách hoặc nhập ý kiến xử lý mới rồi nhấn Enter (sẽ tự động thêm vào thư viện tùy chọn)',
     // 键 = 中文原文(tt() 的查表键;数据键永不翻译)。由
     // tools/archive/_qc-form-yj154-20261111/_add-qc-yj154-i18n.mjs 生成,缺词自检见同目录 _check-*.mjs。
     '出货检验表观': 'Kiểm tra xuất hàng (ngoại quan)',

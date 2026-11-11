@@ -290,8 +290,9 @@
               allow-create
               default-first-option
               class="qr-cell-input"
+              :title="tt('可下拉选择；也可以直接输入新的处理意见后回车（会自动加入选项库）')"
               :placeholder="tt('请选择')"
-              @change="emit('dirty')"
+              @change="onDisposalChange"
             >
               <el-option v-for="o in disposalOptions" :key="o" :label="o" :value="o" />
             </el-select>
@@ -307,6 +308,7 @@
 import { computed, ref } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { appendFieldOption } from '@/business/engine'
 import {
   batchListOf,
   buildProcInspExport,
@@ -376,10 +378,22 @@ const detailFieldMap = computed(() => new Map((props.detailFields || []).map((f)
  *    JSON.stringify 带进"未保存修改"快照、也不会跟着明细提交给后端)——
  *    否则连点两次「＋新增检验项」(两个都还没填名字)会被同名的空串塌成一组。
  *  ⚠ 行对象可能被 markRaw,WeakMap 照样能用(它按对象引用记,与响应式无关)。 */
-const groupToken = new WeakMap()
+// ⚠ 2026-11-11 实机 bug:原来用 WeakMap<行对象, token> 记身份 —— 但 props.head 可能是 reactive
+//   代理:addItem 里 set 的是**当时的对象引用**,渲染时 groups 拿到的可能是代理(或反过来),
+//   WeakMap 查不到 ⇒ 连点「＋新增检验项」产生的两个空名字行都退化成 'n:' 键、被塌成**同一组**
+//   (实测:明细 items 3 行、groups 只剩 1 组)。改用 **Symbol 键**直接挂在行上:
+//   ① 经代理读照样拿得到;② Symbol 键不会被 Object.keys/展开/JSON.stringify 带走 ⇒
+//   不进"未保存修改"快照、也不随明细提交给后端(与原来的设计约束一致)。
+const ROW_TOKEN = Symbol('qcProcInspRowToken')
 let tokenSeq = 0
+function tokenOf(row) {
+  return row && typeof row === 'object' ? row[ROW_TOKEN] : undefined
+}
+function setToken(row, token) {
+  if (row && typeof row === 'object' && token) row[ROW_TOKEN] = token
+}
 function groupKeyOf(row) {
-  const token = groupToken.get(row)
+  const token = tokenOf(row)
   if (token) return 't:' + token
   return 'n:' + String(row?.['检验项目'] ?? '')
 }
@@ -571,12 +585,12 @@ function normalizeRows(listOverride) {
       if (byBatch.has(b)) extra.push(row)
       else byBatch.set(b, row)
     }
-    const token = groupToken.get(base)
+    const token = tokenOf(base)
     for (const b of list) {
       const hit = byBatch.get(b)
       if (hit) { out.push(hit); continue }
       const row = cloneRowForBatch(base, b)
-      if (token) groupToken.set(row, token)   // 复制出来的行仍属于同一项目
+      if (token) setToken(row, token)   // 复制出来的行仍属于同一项目
       out.push(row)
     }
     for (const row of extra) out.push(row)
@@ -635,8 +649,8 @@ function setResultText(group, batch, v) {
   let row = cellRow(g, batch)
   if (!row) {
     row = cloneRowForBatch(g.rows[0], batch)
-    const token = groupToken.get(g.rows[0])
-    if (token) groupToken.set(row, token)
+    const token = tokenOf(g.rows[0])
+    if (token) setToken(row, token)
     ensureItems().push(row)
   }
   row['实测数值'] = String(v ?? '')
@@ -654,8 +668,8 @@ function setResult(group, batch, v) {
   if (!row) {
     // 规范化后理论上一行不缺;兜底:临时补一行,不丢用户刚选的判定
     row = cloneRowForBatch(g.rows[0], batch)
-    const token = groupToken.get(g.rows[0])
-    if (token) groupToken.set(row, token)
+    const token = tokenOf(g.rows[0])
+    if (token) setToken(row, token)
     ensureItems().push(row)
   }
   row['结果判断'] = String(v ?? '')
@@ -681,7 +695,7 @@ function addItem() {
       内部批次: b,
       结果判断: '',
     }
-    groupToken.set(row, token)
+    setToken(row, token)
     arr.push(row)
   }
   bump.value++
@@ -833,8 +847,27 @@ const summaryOptions = computed(() => withCurrentOption(
   optionsOf(fieldMap, '总结论', SUMMARY_FALLBACK), props.head?.['总结论'],
 ))
 const disposalOptions = computed(() => withCurrentOption(
-  optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK), props.head?.['处理方式'],
+  (() => {
+    const opts = optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK)
+    for (const v of disposalExtra.value) if (!opts.includes(v)) opts.push(v)
+    return opts
+  })(),
+  props.head?.['处理方式'],
 ))
+/** 处理意见(处理方式)的「选项库」本会话增量:用户手输新意见 → 追加到 yj_field.dict_sql(服务端持久化)
+ *  + 本地立即出现(不必刷新)。2026-11-11 用户口径「选择库可自动增加处理意见」——
+ *  只靠 el-select 的 allow-create 只作用于当前浏览器会话、下次打开就没了,所以这里要落库。 */
+const disposalExtra = ref([])
+/** 处理意见变更:新增值(选项库里没有的)= 手输的新意见 ⇒ 调后端加进选项库(失败静默,不阻断保存) */
+function onDisposalChange(v) {
+  const val = String(v ?? '').trim()
+  const base = optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK)
+  if (val && !base.includes(val) && !disposalExtra.value.includes(val)) {
+    disposalExtra.value = [...disposalExtra.value, val]
+    appendFieldOption({ panelCode: 'QC_PROC_INSP', label: '处理方式', option: val }).catch(() => { /* 选项库失败不影响保存 */ })
+  }
+  emit('dirty')
+}
 
 /* ────────────────────────────── 列宽(动态批次列) ────────────────────────────── */
 

@@ -2623,4 +2623,60 @@ public class PanelConfigService {
                     .warn("[EXT_FIELD] 绑定审计写入失败({} {} {}): {}", action, label, col, e.getMessage());
         }
     }
+
+    /**
+     * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+     *
+     * <p>用途:纸面上把「处理意见」做成 el-select(allow-create)后,用户手输一个新意见时,前端调本方法把
+     * 新值追加进该字段的选项库({@code yj_field.dict_sql}),以后所有人在下拉里都能直接选 ——
+     * 只靠 allow-create 的话新值只存在于当前浏览器会话,下次打开又没了(不满足「选择库」语义)。
+     *
+     * <p>实现边界(只做加法,绝不改结构):
+     * <ul>
+     *   <li>只认「下拉框」字段,且 dict_sql 必须是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)}
+     *       这种字面量列表形态 —— 其它形态(查字典表/JOIN)一律不动并返回 false;</li>
+     *   <li>已存在(去首尾空格比较)直接返回 false,不重复插;</li>
+     *   <li>值长度 ≤ 30、不含换行等控制字符;单引号按 T-SQL 规则转义,避免注入;</li>
+     *   <li>UPDATE 带 panel_code + label 精确条件,受影响行数 != 1 视为失败。</li>
+     * </ul>
+     *
+     * @return true = 已追加;false = 不需要/不允许追加(前端静默,不阻断保存)
+     */
+    public boolean appendDropdownOption(String panelCode, String label, String option) {
+        String code = panelCode == null ? "" : panelCode.trim();
+        String lab = label == null ? "" : label.trim();
+        String val = option == null ? "" : option.trim();
+        if (code.isEmpty() || lab.isEmpty() || val.isEmpty() || val.length() > 30) return false;
+        if (val.indexOf('\n') >= 0 || val.indexOf('\r') >= 0) return false;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT data_type, dict_sql FROM yj_field WHERE panel_code = ? AND label = ?", code, lab);
+            if (rows.isEmpty()) return false;
+            Object type = rows.get(0).get("data_type");
+            Object sqlObj = rows.get(0).get("dict_sql");
+            if (!"下拉框".equals(type == null ? "" : String.valueOf(type).trim())) return false;
+            String sql = sqlObj == null ? "" : String.valueOf(sqlObj).trim();
+            // 只认 VALUES 字面量列表:SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?is)^SELECT\\s+v\\s+FROM\\s*\\(\\s*VALUES\\s*(.*?)\\)\\s*(?:AS\\s+)?t\\(v\\)$")
+                    .matcher(sql);
+            if (!m.matches()) return false;
+            String values = m.group(1);
+            // 已有值:抽出所有 N'xxx' 字面量(去首尾空格比较)
+            java.util.regex.Matcher lit = java.util.regex.Pattern.compile("N?'((?:[^']|'')*)'").matcher(values);
+            java.util.List<String> existing = new java.util.ArrayList<>();
+            while (lit.find()) existing.add(lit.group(1).replace("''", "'").trim());
+            if (existing.contains(val)) return false;
+            String escaped = val.replace("'", "''");
+            String newValues = values.trim() + ", (N'" + escaped + "')";
+            String newSql = "SELECT v FROM (VALUES " + newValues + ") AS t(v)";
+            int n = jdbc.update("UPDATE yj_field SET dict_sql = ? WHERE panel_code = ? AND label = ?",
+                    newSql, code, lab);
+            return n == 1;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[OPTION_LIB] 追加下拉选项失败({} {} {}): {}", code, lab, val, e.getMessage());
+            return false;
+        }
+    }
 }
