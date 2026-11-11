@@ -137,6 +137,16 @@ const RD_ASM_PROC_DT_REVISION = {
   // 也没有可改的工艺形态格 —— 留着只会在表头上多一条无作用的「工艺形态：请选择」。
   noVariant: true,
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  autoSeqBar: true,
+  blankRows: 18,
+  fixedRows: true,
+  // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+  //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+  //   两个开关必须**都给**(缺一个就不成立):
+  //     · blankRows: 18 —— 按表预铺 18 行空行(只在本表区为空时铺一次,不覆盖已有数据);
+  //     · fixedRows: true —— 隐藏 ＋/× 与底部「新增数据记录行」(只隐藏按钮,本身不产生行)。
+  //   18 行怎么来的:A4 竖向可打印高 ≈1062px(@96dpi),本页标题≈100px + 表头 44px + 页脚/纸边距≈70px
+  //     ⇒ 可用于数据行 ≈848px;rowH 43 ⇒ floor(848/43)=19,取 18 留一行余量防溢出到第二页。
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
     { key: '序号', label: '序号', w: 50, align: 'center' },
@@ -214,6 +224,16 @@ const RD_MOLD_PROC_DT_REVISION = {
   // 本页无「产品基本信息」区(没有 工艺形态 格可改),也不靠变体切标题 ⇒ 不渲染表头变体切换行
   noVariant: true,
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  autoSeqBar: true,
+  blankRows: 18,
+  fixedRows: true,
+  // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+  //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+  //   两个开关必须**都给**(缺一个就不成立):
+  //     · blankRows: 18 —— 按表预铺 18 行空行(只在本表区为空时铺一次,不覆盖已有数据);
+  //     · fixedRows: true —— 隐藏 ＋/× 与底部「新增数据记录行」(只隐藏按钮,本身不产生行)。
+  //   18 行怎么来的:A4 竖向可打印高 ≈1062px(@96dpi),本页标题≈100px + 表头 44px + 页脚/纸边距≈70px
+  //     ⇒ 可用于数据行 ≈848px;rowH 43 ⇒ floor(848/43)=19,取 18 留一行余量防溢出到第二页。
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
     { key: '序号', label: '序号', w: 50, align: 'center' },
@@ -1409,6 +1429,16 @@ export const recordSheetConfigs = {
         filterKey: '表区', filterVal: '修订记录',
         noVariant: true,
         design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  autoSeqBar: true,
+  blankRows: 18,
+  fixedRows: true,
+  // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+  //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+  //   两个开关必须**都给**(缺一个就不成立):
+  //     · blankRows: 18 —— 按表预铺 18 行空行(只在本表区为空时铺一次,不覆盖已有数据);
+  //     · fixedRows: true —— 隐藏 ＋/× 与底部「新增数据记录行」(只隐藏按钮,本身不产生行)。
+  //   18 行怎么来的:A4 竖向可打印高 ≈1062px(@96dpi),本页标题≈100px + 表头 44px + 页脚/纸边距≈70px
+  //     ⇒ 可用于数据行 ≈848px;rowH 43 ⇒ floor(848/43)=19,取 18 留一行余量防溢出到第二页。
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           // 同上：合计 60+220+170+100+90+140 = 780，与 grid 对齐
@@ -1939,6 +1969,15 @@ export const recordSheetConfigs = {
     dataTables: [
       { page: 1, pageTitle: '修订记录', filterKey: '表区', filterVal: '修订记录',
         design: { titleSize: 21, titleTop: 24, titleGap: 61, headerH: 44, rowH: 43, fontSize: 16 },
+        // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+        //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+        //   两个开关必须**都给**:blankRows 预铺空行(只在本表区为空时铺一次,不覆盖已有数据);
+        //   fixedRows:true 隐藏 ＋/× 与底部「新增数据记录行」(它只隐藏按钮,本身不产生行)。
+        //   本页 titleGap 61(规格书修订记录页标题间距比工艺清单那两个大),可用高 ≈827px
+        //   ⇒ rowH 43 时 floor(827/43)=19,取 18 与其余修订记录页一致(便于统一口径与核对)。
+        autoSeqBar: true,
+        blankRows: 18,
+        fixedRows: true,
         cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 46 },
           { key: '序号', label: '序号', w: 46 },
@@ -2035,6 +2074,20 @@ export const recordSheetConfigs = {
   //   检验类别(必测项/型式检验)改由 libGroupKey 承载,只用于标准库勾选时落分组,不上纸。
   RD_INSP_PLAN: {
     headMode: 'report',
+    /**
+     * 页签(2026-11-11 用户口径):「这个面板也加一个修订记录 tap 页」。
+     *
+     * <p>页 0 = 出货检验项目控制计划(原有的检验项目表);页 1 = 修订记录。</p>
+     * <p>⚠ 修订记录页不出报告头(设计上只有一行居中大标题 + 一行表头,没有公司抬头/编号/信息栏),
+     *   故 showHead:false,由 dt.pageTitle 出标题 —— 与 RD_ASM_PROC / RD_MOLD_PROC 的修订记录页同一做法。</p>
+     * <p>⚠ grid 宽度必须与该页自己的表格列宽合计相等,否则上下竖线对不齐(见各页注释)。</p>
+     */
+    pages: [
+      // 页 0:出货检验项目控制计划。grid 原样保留(7 格 = 144×4 + 294 + 165 + 152 = 1187)
+      { title: '出货检验项目控制计划', headMode: 'report', showHead: true, grid: [144, 144, 144, 144, 294, 165, 152] },
+      // 页 1:修订记录。5 列 110+300+180+170+180+120 = 1060（序号110/更改内容300/更改原因180/更改时间170/责任人180/备注120）
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [110, 300, 180, 170, 180, 120] },
+    ],
     docNoDefault: 'YJ-QR-88',
     titlePlaceholder: '出货检验项目控制计划',
     // 大标题格做成「标题」字段输入框(2026-10-19 用户报障「出货检验计划表出现标题不能为空,
@@ -2176,6 +2229,45 @@ export const recordSheetConfigs = {
       ],
       // 表尾注(设计 r10 的 B10:H10):totalSpan(dt) = 可见列数 = 7 ⇒ 自动跨满七列
       footerNote: '若规格书有变动提示管控文件需更新' },
+      /**
+       * 页 1「修订记录」(2026-11-11 用户口径:「这个面板也加一个修订记录 tap 页」)。
+       *
+       * <p>⚠ 分块键不能用 [表区]:rd_insp_plan_detail **没有** [表区] 物理列
+       *   (本面板上面那段注释就是为这个坑写的)⇒ 借用备用列池的 [备用1] 做分块。
+       *   备用1 是 nvarchar(1000) 的通用占位列,本面板此前只用了 备用1..20 的 0 行数据,
+       *   拿它承担"修订记录"这个标记不冲突。</p>
+       * <p>行数按用户同批口径固定为 A4 可打印行数、无数据留空、不给手工加行
+       *   (blankRows + fixedRows 两个开关,理由见组装工艺清单那处注释)。</p>
+       */
+      {
+        page: 1,
+        pageTitle: '修订记录',
+        // 分块键用项目唯一约定的 [表区]（物理列）—— rd_insp_plan_detail 原本没有这一列，
+        // 由 tools/migrate-insp-plan-revision-page-20261111.sql 补列 + 登记 yj_field。
+        // ⚠ 不能用备用1 之类的替代列：filtervals 测试强制 filterKey 只能是 '表区'，
+        //   且必须是该面板的 yj_field label，否则行写不回库。
+        filterKey: '表区', filterVal: '修订记录',
+        noVariant: true,
+        design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+        autoSeqBar: true,
+        // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+        //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+        //   两个开关必须**都给**:blankRows 预铺空行(只在本表区为空时铺一次,不覆盖已有数据);
+        //   fixedRows:true 隐藏 ＋/× 与底部「新增数据记录行」(它只隐藏按钮,本身不产生行)。
+        //   18 行 = A4 竖向可用高 ≈848px(rowH 43)向下取整后留一行余量,防溢出到第二页。
+        blankRows: 18,
+        fixedRows: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          // 6 列合计 110+300+180+170+180+120 = 1060 = 本页 grid 合计
+          { key: '序号', label: '序号', w: 110, align: 'center' },
+          { key: '更改内容', label: '更改内容', w: 300, area: true },
+          { key: '更改原因', label: '更改原因', w: 180 },
+          { key: '更改时间', label: '更改时间', w: 170 },
+          { key: '责任人', label: '责任人', w: 180 },
+          { key: '备注', label: '备注', w: 120, area: true },
+        ],
+      },
     ],
   },
 

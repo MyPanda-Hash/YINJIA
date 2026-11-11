@@ -83,8 +83,22 @@ test('#8 配方表默认铺 10 行空行,且只有配方表这一张表带 blank
   assert.ok(formula, 'RD_MOLD_PROC 缺配方表')
   assert.equal(Number(formula.blankRows), 10, '配方表应 blankRows:10(用户口径的确定数字)')
 
+  // ⚠ 2026-11-11 用户口径变更:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数」——
+  //   修订记录表现在**也**要带 blankRows。原断言"只有配方表能带"的依据是
+  //   「多挂一张会把空行铺到修订记录页」,而那个前提只在不带分块键时成立:
+  //   实测 RecordSheetPanels 的铺设逻辑是
+  //     ① 每张 dt 用**自己的** filterVal 给行打标（row[filterKey] = dt.filterVal）;
+  //     ② 记账键 `${单据号}::${filterKey}::${filterVal}` ⇒ 每张表独立记账、独立铺;
+  //     ③ rowsOf(dt) 又按 filterVal 过滤 ⇒ 两张表的行在界面上互不可见。
+  //   纯逻辑复现（两张表 10 + 18 行）:总 28 行、配方表可见 10、修订记录可见 18、串味 0 行。
+  //   ⇒ 真正该守的约束是「**每张带 blankRows 的表都必须有 filterKey+filterVal**」,
+  //     没有分块键才会真的混进同一桶。
   const withBlank = dts.filter((d) => Number(d.blankRows) > 0)
-  assert.deepEqual(withBlank.map((d) => d.filterVal), ['配方表'],
-    '只有配方表可以带 blankRows —— 修订记录表与它共用一张行表,多挂一张会把空行铺到修订记录页')
+  assert.ok(withBlank.length >= 1, '配方表/修订记录至少各有一张该带 blankRows')
+  for (const d of withBlank) {
+    assert.ok(d.filterKey && d.filterVal,
+      `「${d.filterVal || d.bar || d.pageTitle}」带 blankRows 但没有 filterKey+filterVal `
+      + '⇒ 空行会混进同面板所有表共用的那一桶(这才是原本要防的串味)')
+  }
 })
 
