@@ -285,39 +285,63 @@ public class OrderConvertService {
      * (2026-09-26 数据源单轨:不再写 bd/bl_manu_order,不再跳转生产加工单表单页)。
      * 行内若修改了 交货日期 → 先回写订单行(applyDateEdit),工单 计划完工日期 取修正后交期。
      *
+     * <p>🔴 2026-11-11 工单号口径(用户拍板):**同一次转单里,同一销售订单的多行 = 同一张新工单号**
+     * (工单行号 pl_xc 各取自己的订单行号);**同一销售订单分多次转单(数量分批)时每次另取新工单号**。
+     * 故这里先按 订单号 分组(保持勾选顺序),每组的第 1 行取新号、同组后续行追加进这张工单
+     * ({@link QuickScheduleService#createFromOrderLine(String, String, Double, String, String, String)})。
+     * 用户原话:「同一个销售订单都应该为同一个工单号只是工单行号不同;订单结转可能存在不是一次转单
+     * 完成的情况,数量可能多次,这个时候对这个订单结转的不同行就需要为不同的工单号」。
+     *
      * <p>⚠ 不加 @Transactional(2026-09-26 修复):行级独立提交——此前外层事务+内层事务方法
      * 的组合,某行守卫失败会把共享事务标 rollback-only,提交即抛
      * "Transaction rolled back because it has been marked as rollback-only"(用户实测报障)。
      * 行级捕获 RuntimeException:失败行自身回滚进 failed,成功行各自提交(created/failed 双清单语义)。
+     * 分组只决定「用哪个工单号」,不改变逐行独立提交:某行失败不影响同组其它行(它们仍追加进同一张单)。
      */
     public Map<String, Object> toManu(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转工单的订单行");
-        List<String> created = new ArrayList<>();
-        List<String> failed = new ArrayList<>();
+        // 按 订单号 分组(LinkedHashMap:取号顺序 = 勾选顺序,现场对得上)
+        Map<String, List<Map<String, Object>>> byOrder = new LinkedHashMap<>();
         for (Map<String, Object> r : rows) {
             String soNo = str(r.get("订单号"));
             String lineId = str(r.get("行id"));
             if (soNo == null || lineId == null) throw new IllegalArgumentException("转单行缺少 订单号/行id");
-            try {
-                applyDateEdit(r, user);   // 交期修正先回写订单行 → createFromOrderLine 读行交期即为修正值(cp_date)
-                Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
-                // 未选工艺路线 = **不能转工单**(2026-10-05 用户口径:没有填写工艺路线应该提示并且不能转工单)
-                // 选了但**未审核**也**不能转**(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」)
-                //   —— 未审核的拒绝在 createFromOrderLine.requireRouteAudited 里(服务端唯一凭据)，
-                //      这里只做"未选"的前置提示，避免整批走完才报错。
-                String route = str(r.get("工艺路线"));
-                if (route == null || route.isBlank()) {
-                    failed.add(soNo + "#" + lineId + ":未选择工艺路线,不能转工单");
-                    continue;
+            byOrder.computeIfAbsent(soNo, k -> new ArrayList<>()).add(r);
+        }
+        List<String> created = new ArrayList<>();      // 工单号(去重,按首次生成顺序)
+        List<String> failed = new ArrayList<>();
+        int lineCount = 0;
+        for (Map.Entry<String, List<Map<String, Object>>> e : byOrder.entrySet()) {
+            String soNo = e.getKey();
+            // 本订单**本次转单**的工单号:组内第一行取新号,其余行追加进它。
+            // 首行失败(未选路线/超限等)时它仍为 null ⇒ 下一行照常取新号,不会出现"半张空单"。
+            String plNo = null;
+            for (Map<String, Object> r : e.getValue()) {
+                String lineId = str(r.get("行id"));
+                try {
+                    applyDateEdit(r, user);   // 交期修正先回写订单行 → createFromOrderLine 读行交期即为修正值(cp_date)
+                    Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
+                    // 未选工艺路线 = **不能转工单**(2026-10-05 用户口径:没有填写工艺路线应该提示并且不能转工单)
+                    // 选了但**未审核**也**不能转**(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」)
+                    //   —— 未审核的拒绝在 createFromOrderLine.requireRouteAudited 里(服务端唯一凭据)，
+                    //      这里只做"未选"的前置提示，避免整批走完才报错。
+                    String route = str(r.get("工艺路线"));
+                    if (route == null || route.isBlank()) {
+                        failed.add(soNo + "#" + lineId + ":未选择工艺路线,不能转工单");
+                        continue;
+                    }
+                    plNo = quickSchedule.createFromOrderLine(soNo, lineId, qty, user, route, plNo);
+                    if (!created.contains(plNo)) created.add(plNo);
+                    lineCount++;
+                } catch (RuntimeException ex) {
+                    failed.add(soNo + "#" + lineId + ":" + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
                 }
-                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user, route));
-            } catch (RuntimeException e) {
-                failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
         }
         if (created.isEmpty()) throw new IllegalStateException("无行可转:" + String.join("; ", failed));
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("生成张数", created.size());
+        out.put("生成张数", created.size());         // 新工单张数(按销售订单×本次转单计)
+        out.put("生成行数", lineCount);              // 实际落库的工单行数(成功转出的订单行)
         out.put("编号清单", created);
         out.put("失败行", failed);
         return out;
