@@ -591,7 +591,11 @@
         <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
             <template v-if="effPlain || dtOwnsWidth(dt)">
-              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : 1)).toFixed(1) + 'px' }" />
+              <!-- ⚠ span 必须写进 <col>：`样品信息` 这类 span:3 的列，若只生成一个不带 span 的 <col>，
+                   浏览器就把它当 1 列宽 + 把另外两列当"无宽度列" ⇒ 表头 colspan=3 与下面的格子对不上，
+                   整表宽度也会小于纸宽（2026-11-11 用户报「新增一个列字段之后」版面被压窄的根因）。 -->
+              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :span="(c.span || 1) > 1 ? c.span : undefined"
+                   :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : dtFillK(dt))).toFixed(1) + 'px' }" />
             </template>
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
@@ -3684,6 +3688,22 @@ function variantSpan(dt) {
 }
 
 // ── 像素级还原(dt.design):配置为设计图像素单位,按 k = 网格宽 / 可见列设计宽 等比缩放 ──
+/**
+ * 「有运行时新增列」的明细表 → 让整表宽度回到纸宽（2026-11-11 用户口径）。
+ *
+ * <p>背景：这些表的列宽是逐列固定像素（`(c.w || 100)`），累加值本来就不等于纸宽；
+ * 再加一个自定义列，表头 colspan 与 colgroup 的总宽就对不上，整表被浏览器压窄
+ * （用户报「新增一个列字段之后」版面缩到一半）。</p>
+ *
+ * <p>口径：<b>只对带自定义列的表</b>按 `纸宽 ÷ 各列(含 span)宽度之和` 等比缩放，
+ * 使总宽恰好等于纸宽；<b>没加过列的表返回 1</b> —— 既有版面一个像素都不动。</p>
+ */
+function dtFillK(dt) {
+  const merged = extMerged.value.get(dt)
+  if (!merged || !merged.addedCount) return 1
+  const want = visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+  return want ? gridW.value / want : 1
+}
 function designK(dt) {
   if (!dt.design) return 1
   const w = visCols(dt).reduce((s, c) => s + (c.w || 100), 0)

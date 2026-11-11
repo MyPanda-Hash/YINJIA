@@ -151,3 +151,17 @@ test('⑪ 新增列不能把表撑出纸宽：整表等比压缩，总宽回到�
   assert.match(sheet, /220 \* dtScale\.value/, '压力组列宽要乘压缩系数')
   assert.match(sheet, /192 \* dtScale\.value/, '出水/去除率组列宽要乘压缩系数')
 })
+
+test('⑫ 配置驱动表的 colgroup 必须带 span，且加列后整表回到纸宽', () => {
+  // 用户口径（2026-11-11）：「这个面板（抑菌）会出现这种情况，新增一个列字段之后」——版面被压窄。
+  // 根因两条：① `样品信息` 这类 span:3 的列只生成了 1 个不带 span 的 <col>，
+  //            表头 colspan=3 与下面格子对不上、总宽也和纸宽对不上；
+  //          ② 列宽是逐列固定像素，累加本来就不等于纸宽，再加一列就彻底错位。
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /:span="\(c\.span \|\| 1\) > 1 \? c\.span : undefined"/, '<col> 必须带 span（多变列列才能对齐）')
+  assert.match(sheet, /function dtFillK\(dt\)/, '缺少"加列后填充纸宽"的缩放函数')
+  const m = sheet.match(/function dtFillK\(dt\)[\s\S]*?\n\}/)
+  assert.ok(m, 'dtFillK 实现缺失')
+  assert.match(m[0], /addedCount/, '没加过列的表必须返回 1（既有版面零影响）')
+  assert.match(m[0], /gridW\.value \/ want/, '应按 纸宽÷各列(含span)宽度和 缩放')
+})
