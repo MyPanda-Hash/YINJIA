@@ -1053,7 +1053,10 @@
    "文件管理人": "文件管理人",
    "文件使用范围": "文件使用范围",
    "变更来源单号": "变更来源单号",
-   "备注": "备注"
+   "备注": "备注",
+   "备用2": "批准人",
+   "备用3": "批准签字",
+   "备用4": "批准日期"
   },
   "labels": [
    "表区",
@@ -1087,7 +1090,10 @@
    "文件管理人",
    "文件使用范围",
    "变更来源单号",
-   "备注"
+   "备注",
+   "批准人",
+   "批准签字",
+   "批准日期"
   ],
   "req": {
    "表区": {
@@ -1246,6 +1252,21 @@
     "visible": true
    },
    "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准签字": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准日期": {
     "required": false,
     "hidden": false,
     "visible": true

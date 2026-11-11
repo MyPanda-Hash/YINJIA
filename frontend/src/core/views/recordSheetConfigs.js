@@ -2472,11 +2472,17 @@ export const recordSheetConfigs = {
           { label: '签字', span: 2 },
           { label: '日期', span: 2 },
         ]},
-        // 下方三格 = 手签空白区:**不带 key** ⇒ 纸面只读、按钮输入不进来(用户口径「不能填写」)
+        // 下方三格 = 审批通过时**自动回填**的批准人/签字/日期(2026-11-11 用户口径):
+        //   「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期，
+        //     …保存之后该单据可见内容，打印出来也是有数据的」
+        //   · 三个字段由 migrate-rd-change-approval-sign-20261111.sql 登记在 备用2/3/4，
+        //     yj_field.editable=0；纸面再标 ro:true ⇒ 无论如何都只渲染纯文本，人手改不进来。
+        //   · 真源只有「审批通过」这一条路径（ButtonService 的 RD_CHANGE 分支负责写）。
+        //   ⚠ 原来这三格**不带 key**（纯手签留白）。改成带 key 是为了把审批结果落库并打印出来。
         { h: 92, grid: [
-          { span: 2, ro: true },
-          { span: 2, ro: true },
-          { span: 2, ro: true },
+          { key: '批准人', span: 2, ro: true },
+          { key: '批准签字', span: 2, ro: true },
+          { key: '批准日期', span: 2, ro: true },
         ]},
       ]},
     ],

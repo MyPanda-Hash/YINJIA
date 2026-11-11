@@ -2236,6 +2236,31 @@
       </template>
     </el-dialog>
 
+    <!-- 产品变更申请表：审批通过 + 签字/日期（2026-11-11）。
+         这三个值通过后写进 rd_change_head 备用2/3/4，纸面「批准 / 签字 / 日期」三格即显示并可打印。 -->
+    <el-dialog v-model="chgApvVisible" :title="tt('审批通过（签字）')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('批准后，签字与日期会回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('签字') }}</span>
+          <el-input v-model="chgApvSign" maxlength="30" :placeholder="tt('签字（默认当前登录人姓名）')" />
+        </div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('日期') }}</span>
+          <el-date-picker v-model="chgApvDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD"
+                          style="flex:1" :placeholder="tt('日期（默认今天）')" />
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="chgApvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="chgApvVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="chgApvBusy" @click="confirmChangeApprove">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
@@ -7240,6 +7265,50 @@ async function confirmDomApprove() {
     domApvBusy.value = false
   }
 }
+/* ── 产品变更申请表：审批通过 + 签字/日期回填（2026-11-11 用户口径）───────────────
+ * 用户原话：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期，
+ *   保存之后该单据可见内容，打印出来也是有数据的」。
+ * 与立项申请「审批+定级」、测试申请单「审批+分发」同一范式：**专用弹窗**收集本次审批的额外输入，
+ * 通过即在同一个 callButton 里提交；后端 ButtonService 的 RD_CHANGE 分支写进
+ * rd_change_head 备用2/3/4（那三格 yj_field.editable=0，只有审批动作写得进去）。
+ * 默认值：签字 = 当前登录人姓名，日期 = 今天 —— 审批人通常就是签自己名字、签当天。 */
+const chgApvVisible = ref(false)
+const chgApvBusy = ref(false)
+const chgApvDocNo = ref('')
+const chgApvSign = ref('')
+const chgApvDate = ref('')
+const chgApvOpinion = ref('')
+function openChangeApprove(no) {
+  chgApvDocNo.value = no || ''
+  chgApvSign.value = String(user?.realName || user?.userName || '').trim()
+  chgApvDate.value = todayStr()
+  chgApvOpinion.value = ''
+  chgApvVisible.value = true
+}
+async function confirmChangeApprove() {
+  if (chgApvBusy.value) return
+  chgApvBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'RD_CHANGE', buttonName: '审批通过',
+      formData: {
+        编号: chgApvDocNo.value,
+        // 空串不发：后端兜底为「审批人姓名 / 当天」，不会把格子覆盖成空
+        ...(chgApvSign.value ? { 批准签字: chgApvSign.value } : {}),
+        ...(chgApvDate.value ? { 批准日期: chgApvDate.value } : {}),
+        ...(chgApvOpinion.value ? { 审批意见: chgApvOpinion.value } : {}),
+      },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('审批通过'))
+    chgApvVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    chgApvBusy.value = false
+  }
+}
 async function openRdApprove(no) {
   apvDocNo.value = no
   // 已定过级的单据默认选中当前等级(改级场景);新单默认空,必须选(与用户口径「审批与定级同一步」一致)
@@ -11311,6 +11380,15 @@ async function onButton(action) {
           if (!saved) return
         }
         return openDomApprove(current.value['编号'] || current.value['单据编号'] || '')
+      }
+      // 产品变更申请表(2026-11-11):审批通过要**同时落签字与日期**到纸面「批准/签字/日期」三格
+      //   ⇒ 专用弹窗（通用 prompt 只有一个意见框，收不到签字/日期）。
+      if (action === '审批通过' && panelCode.value === 'RD_CHANGE') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openChangeApprove(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {

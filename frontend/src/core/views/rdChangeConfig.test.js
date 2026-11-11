@@ -110,16 +110,21 @@ test('RD_CHANGE 尾段行高 = 原始值与 ×1.5 的**中点**(用户两轮口�
   }
 })
 
-test('「批准」段下方三格是**手签空白区**:只读、不给 key(用户口径「批注/签字/日期不能填写」)', () => {
+test('「批准」段下方三格：审批通过时回填、纸面只读（2026-11-11 口径变更）', () => {
   const sec = (recordSheetConfigs.RD_CHANGE.tailSections || []).find((s) => s.bar === '批准')
   assert.ok(sec, '批准段在')
   const labelRow = sec.rows[0].grid
   assert.deepEqual(labelRow.map((c) => c.label), ['批准', '签字', '日期'], '第一行是三个静态标签')
   const signRow = sec.rows[1].grid
-  assert.equal(signRow.length, 3, '第二行三格手签区')
+  assert.equal(signRow.length, 3, '第二行三格')
+  // ⚠ 2026-11-11 口径变更：原来是「不留 key 的手签空白区」；用户要求
+  //   「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期…打印出来也是有数据的」
+  //   ⇒ 三格改为绑字段（批准人/批准签字/批准日期，落在 备用2/3/4，yj_field.editable=0），
+  //   纸面仍标 ro:true ⇒ 任何状态下都只渲染纯文本，人手改不进来；真源只有「审批通过」动作。
+  //   旧断言（key 必须 undefined）已按新口径替换，改为钉住"有 key 且只读"。
+  assert.deepEqual(signRow.map((c) => c.key), ['批准人', '批准签字', '批准日期'], '三格绑审批回填字段')
   for (const c of signRow) {
-    assert.equal(c.key, undefined, '手签格**不能**带 key —— 带了就真能填了(纸面是留给手签的)')
-    assert.equal(c.ro, true, '手签格显式标 ro,意图写在配置里')
+    assert.equal(c.ro, true, '三格必须 ro:true（只读，值只有审批动作写得进去）')
   }
   // 渲染侧:不带 key 的格必须落到只读文本(AnnotatedText),不能落进可编辑分支
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')

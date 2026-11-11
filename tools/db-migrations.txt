@@ -4612,3 +4612,5 @@ migrate-prodinfo-approver-cells-20261111.sql
 migrate-mold-density-stdlib-20261111.sql
 # 2026-11-11 配方表「设计添加量」存量行补单位（粉料/胶粉 % ，颗粒/折算 g/支）+ 2 位小数
 migrate-mold-recipe-design-unit-20261111.sql
+# 2026-11-11 产品变更申请表：批准人/批准签字/批准日期（备用2/3/4，审批通过时回填、纸面只读）
+migrate-rd-change-approval-sign-20261111.sql
