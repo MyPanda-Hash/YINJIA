@@ -50,18 +50,26 @@ export const QC_INSP_REC_COLUMNS = Object.freeze([
   { label: '单项判定', key: '单项判定', width: 12 },
 ])
 
-/** 表尾区:检验结论/处理意见(整宽) + 签名行 */
-export const QC_INSP_REC_FOOT_FULL = Object.freeze([
-  { label: '检验结论', key: '检验结论' },
-  { label: '处理意见', key: '处理意见' },
+/** 表尾区(2026-11-11 用户口径:按 YJ-QR-96 模板排成**两行两对** ——
+ *  左列「检验人 / 审核人」、右列「检验结论 / 处理意见」;
+ *  原来是「检验结论」「处理意见」各占整行、签名行单独一行(三行),与模板不一致):
+ *
+ *    第 1 行: 检验人 | 值 | 检验结论 | 值
+ *    第 2 行: 审核人 | 值 | 处理意见 | 值
+ *
+ *  `locked`:检验人=新增时按登录人生成 → 只读;
+ *  审核人落库列是 表单审核人(叫「审核人」会被 ButtonService 当审核留痕丢弃),纸面仍印「审核人」。 */
+export const QC_INSP_REC_FOOT_ROWS = Object.freeze([
+  [{ label: '检验人', key: '检验人', locked: true }, { label: '检验结论', key: '检验结论' }],
+  [
+    { label: '审核人', key: '表单审核人', displayKey: '表单审核人', auditKey: '审核人' },
+    { label: '处理意见', key: '处理意见' },
+  ],
 ])
-export const QC_INSP_REC_SIGN_ROW = Object.freeze([
-  { label: '检验人', key: '检验人', locked: true },
-  // 原表印「审核人 固定:冯敏」。落库列名不能叫「审核人」——ButtonService 保存时显式丢弃
-  // 「审核人/审核时间」(那是 yj_doc_status.shr 审核留痕的虚拟字段),故用专属列 表单审核人,
-  // 纸面仍按原表显示「审核人」;单据真审核后另有虚拟键 审核人(=shr)可作只读兜底。
-  { label: '审核人', key: '表单审核人', displayKey: '表单审核人', auditKey: '审核人' },
-])
+
+/** 处理意见的标准库编码(2026-11-11:「处理意见做成标准库的形式」)——
+ *  与「检验项」同一套机制:字段 data_type=标准库、dict_sql 存库编码,条目在 yj_std_lib 里增删维护 */
+export const QC_INSP_REC_DISPOSAL_LIB = 'qc.insp_disposal'
 
 /** 检验项所在的标准库编码(与原表「检验项为数据库选择」对应) */
 export const QC_INSP_ITEM_LIB = 'qc.insp_item'

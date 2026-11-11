@@ -5,9 +5,9 @@ import {
   QC_INSP_REC_COLUMNS,
   QC_INSP_REC_DETAIL_COLUMNS,
   QC_INSP_REC_HEAD_ROWS,
-  QC_INSP_REC_FOOT_FULL,
-  QC_INSP_REC_SIGN_ROW,
+  QC_INSP_REC_FOOT_ROWS,
   QC_INSP_REC_RESULT_KEYS,
+  QC_INSP_REC_DISPOSAL_LIB,
   QC_INSP_ITEM_LIB,
   exportHeaderRow,
   exportRow,
@@ -57,14 +57,21 @@ test('抬头四行成对(左标签-右值),与 Excel 模版一致', () => {
   assert.equal(QC_INSP_REC_HEAD_ROWS[0][0].locked, undefined, '物料名称可填')
 })
 
-test('表尾:检验结论/处理意见整宽 + 签名行(检验人锁定、审核人走专属列)', () => {
-  assert.deepEqual(QC_INSP_REC_FOOT_FULL.map((c) => c.label), ['检验结论', '处理意见'])
-  assert.deepEqual(QC_INSP_REC_SIGN_ROW.map((c) => c.label), ['检验人', '审核人'])
-  assert.equal(QC_INSP_REC_SIGN_ROW[0].locked, true, '检验人=账号登录人自动生成 → 锁定')
-  assert.ok(!QC_INSP_REC_SIGN_ROW[1].locked, '审核人可填(默认 固定:冯敏)')
+test('表尾按模板排成两行两对:检验人|检验结论 / 审核人|处理意见', () => {
+  assert.equal(QC_INSP_REC_FOOT_ROWS.length, 2, '两行')
+  const labels = QC_INSP_REC_FOOT_ROWS.map((pair) => pair.map((c) => c.label))
+  assert.deepEqual(labels, [['检验人', '检验结论'], ['审核人', '处理意见']])
+  for (const pair of QC_INSP_REC_FOOT_ROWS) assert.equal(pair.length, 2, '每行两对(左签名 / 右结论)')
+  // 检验人=新增时按登录人生成 → 锁定只读
+  assert.equal(QC_INSP_REC_FOOT_ROWS[0][0].locked, true)
   // 落库键必须是专属列「表单审核人」:叫「审核人」会被 ButtonService 保存时显式丢弃
-  assert.equal(QC_INSP_REC_SIGN_ROW[1].key, '表单审核人')
-  assert.notEqual(QC_INSP_REC_SIGN_ROW[1].key, '审核人')
+  const reviewer = QC_INSP_REC_FOOT_ROWS[1][0]
+  assert.equal(reviewer.key, '表单审核人')
+  assert.notEqual(reviewer.key, '审核人')
+  // 处理意见来自标准库(2026-11-11 用户口径)
+  assert.equal(QC_INSP_REC_FOOT_ROWS[1][1].key, '处理意见')
+  assert.equal(QC_INSP_REC_DISPOSAL_LIB, 'qc.insp_disposal')
+  assert.notEqual(QC_INSP_REC_DISPOSAL_LIB, QC_INSP_ITEM_LIB, '两个标准库互不混用')
 })
 
 test('导出:表头=列显示名(五格各一列),行按列定义取值', () => {
@@ -95,4 +102,18 @@ test('组件按 QC_INSP_REC_RESULT_KEYS 渲染五个格子,且不再用文本域
   // 原来那一格是 type="textarea" + maxlength="500" 的自由文本域;五格是单值输入
   assert.ok(!/type="textarea"[\s\S]{0,200}maxlength="500"/.test(src),
     '检测结果的自由文本域应已换成五个单值格子')
+})
+
+/** 源码级回归:「处理意见」必须走标准库下拉 + 两个必填星号(2026-11-11 用户口径) */
+test('处理意见 = 标准库下拉,且检验结论/处理意见/单项判定带必填标记', () => {
+  const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
+  assert.match(src, /DISPOSAL_KEY = '处理意见'/, '处理意见键要单列常量')
+  assert.match(src, /disposalOptions = computed\(\(\) => optionsOf\(DISPOSAL_KEY\)\)/,
+    '处理意见候选必须取字段 options(标准库下发的)')
+  assert.match(src, /el-select[\s\S]{0,200}?v-if="editable && cell\.key === DISPOSAL_KEY"/, '处理意见要渲染成下拉')
+  assert.match(src, /openStdLib\(DISPOSAL_LIB, '处理意见'\)/, '处理意见要有自己的标准库维护入口')
+  assert.match(src, /isRequired\(K\.JUDGE\)/, '单项判定要显示必填星号')
+  // 新建行必须把必填列建成空串,否则服务端"只校验带键的行"会放行
+  assert.match(src, /function blankRow\(\)[\s\S]{0,120}\[K\.ITEM\]: ''[\s\S]{0,60}\[K\.JUDGE\]: ''/,
+    '新增行要把 检验项/检测标准/单项判定 的键建出来(空串),必填才拦得住')
 })

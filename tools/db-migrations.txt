@@ -4648,3 +4648,12 @@ migrate-org-from-server-20261111.sql
 #   不配/空数组 = 原口径(全部审批人 + 管理员);**审批权不变**(谁能审仍看 yj_role_panel.can_approve)。
 #   代码 MessageService.sendToApprovers → approvalNotifyTargets()。幂等(JSON_MODIFY 只动这一个键),两账套均执行。
 migrate-qc-insp-rec-approval-notify-20261111.sql
+
+# 2026-11-11 检验数据记录表尾(用户口径「红框四项按模板排列;处理意见做成标准库的形式;
+#   检验结论和处理意见必填;单项判定也必填」):
+#   ① 处理意见 文本 → 标准库(data_type=标准库 / dict_sql=qc.insp_disposal)+ yj_std_lib 播 7 条常用处理意见;
+#   ② required=1:检验结论(header)/ 处理意见(header)/ 单项判定(detail)——
+#      服务端 ButtonService.ensureRequiredFilled / ensureDetailRequiredFilled 会拦;
+#   ③ 译名兜底 en(处理意见/检验结论/单项判定)。幂等(窄条件 UPDATE + 仅空库播种),两账套均执行。
+#   版式(两行两对:检验人|检验结论 / 审核人|处理意见)在前端 QcInspRecSheet.vue 的 QC_INSP_REC_FOOT_ROWS。
+migrate-qc-insp-rec-foot-required-20261111.sql

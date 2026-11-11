@@ -98,17 +98,20 @@
              格子数据键 = 结果1..结果5(见 @core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS) -->
         <tr>
           <th class="c-item" rowspan="2">
-            {{ tt('检验项') }}
+            {{ tt('检验项') }}<span v-if="isRequired(K.ITEM)" class="qr-req" :title="tt('必填')">*</span>
             <span
               v-if="editable"
               class="qr-lib-btn no-print"
               :title="tt('检验项来自数据库选择，可在此维护')"
-              @click="openStdLib"
+              @click="openStdLib()"
             >⧉ {{ tt('标准库维护') }}</span>
           </th>
           <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
           <th class="c-result" colspan="5">{{ tt('检测结果') }}</th>
-          <th class="c-judge" rowspan="2">{{ tt('单项判定') }}</th>
+          <!-- 单项判定必填(2026-11-11 用户口径) -->
+          <th class="c-judge" rowspan="2">
+            {{ tt('单项判定') }}<span v-if="isRequired(K.JUDGE)" class="qr-req" :title="tt('必填')">*</span>
+          </th>
           <th v-if="editable" class="c-op" rowspan="2"></th>
         </tr>
         <tr>
@@ -210,9 +213,12 @@
       <div class="qr-add" @click="addItem">＋ {{ tt('新增检验项') }}</div>
     </div>
 
-    <!-- ⑤ 表尾:检验结论 / 处理意见(值格铺满表格右侧,对齐原表 C:I 合并) + 签名行 -->
+    <!-- ⑤ 表尾(2026-11-11 用户口径:按模板排成**两行两对** ——
+         左「检验人 / 审核人」、右「检验结论 / 处理意见」):
+           检验人 | 值 | 检验结论 | 值
+           审核人 | 值 | 处理意见 | 值
+         处理意见 = 标准库(qc.insp_disposal,可维护、可自定义输入);检验结论/处理意见必填(★)。 -->
     <table class="qr-foot-table">
-      <!-- 列宽与原表一致:标签列=表体首列(B),值区=C:I(其余三列合并) -->
       <colgroup>
         <col class="fc-label" />
         <col class="fc-v1" />
@@ -220,47 +226,49 @@
         <col class="fc-v2" />
       </colgroup>
       <tbody>
-        <tr v-for="cell in QC_INSP_REC_FOOT_FULL" :key="cell.key">
-          <th class="qr-label">{{ tt(cell.label) }}</th>
-          <td class="qr-value qr-value-wide" colspan="3">
-            <!-- 检验结论(2026-10-19 用户口径 task 2):改**下拉选择** 特采/合格/不合格,
-                 且允许"自定义补充" —— filterable + allow-create:预置三项可选,也能直接敲一个新结论回车即落库
-                 (与表体「检验项」同款交互)。选项来自 yj_field.dict_sql(migrate-qc-insp-rec-verdict-dropdown-20261019.sql),
-                 不硬编码;历史库里已有的其它结论文本照原样显示(allow-create 的输入值即原值)。 -->
-            <el-select
-              v-if="editable && cell.key === VERDICT_KEY"
-              v-model="head[cell.key]"
-              size="small"
-              filterable
-              allow-create
-              default-first-option
-              clearable
-              class="qr-cell-input qr-verdict-sel"
-              :placeholder="tt('请选择')"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in verdictOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-input
-              v-else-if="editable"
-              v-model="head[cell.key]"
-              type="textarea"
-              :autosize="{ minRows: 2, maxRows: 8 }"
-              size="small"
-              class="qr-cell-input"
-              maxlength="1000"
-              @input="emit('dirty')"
-            />
-            <span v-else class="qr-cell-text">{{ head[cell.key] || '' }}</span>
-          </td>
-        </tr>
-        <!-- 签名行:检验人=新增时按登录人生成(锁定) / 审核人=固定:冯敏(落库列 表单审核人) -->
-        <tr>
-          <template v-for="cell in QC_INSP_REC_SIGN_ROW" :key="cell.key">
-            <th class="qr-label">{{ tt(cell.label) }}</th>
+        <tr v-for="(pair, ri) in QC_INSP_REC_FOOT_ROWS" :key="'fr' + ri">
+          <template v-for="cell in pair" :key="cell.key">
+            <th class="qr-label">
+              {{ tt(cell.label) }}<span v-if="isRequired(cell.key)" class="qr-req" :title="tt('必填')">*</span>
+              <span
+                v-if="cell.key === DISPOSAL_KEY && editable"
+                class="qr-lib-btn no-print"
+                :title="tt('处理意见候选来自标准库，可在此维护')"
+                @click="openStdLib(DISPOSAL_LIB, '处理意见')"
+              >⧉ {{ tt('标准库维护') }}</span>
+            </th>
             <td class="qr-value">
+              <!-- 处理意见:标准库下拉(与检验项同一套:选现成条目,也能敲新词) -->
+              <el-select
+                v-if="editable && cell.key === DISPOSAL_KEY"
+                v-model="head[cell.key]"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                class="qr-cell-input qr-verdict-sel"
+                :placeholder="tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in disposalOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <!-- 检验结论:下拉选择 特采/合格/不合格,允许自定义补充(2026-10-19 用户口径) -->
+              <el-select
+                v-else-if="editable && cell.key === VERDICT_KEY"
+                v-model="head[cell.key]"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                class="qr-cell-input qr-verdict-sel"
+                :placeholder="tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in verdictOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
               <el-input
-                v-if="editable && !cell.locked"
+                v-else-if="editable && !cell.locked"
                 v-model="head[cell.key]"
                 size="small"
                 class="qr-cell-input"
@@ -275,9 +283,9 @@
       </tbody>
     </table>
 
-    <!-- 标准库维护(检验项候选的数据库,可增删改;与项目记录表同一组件) -->
-    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt('检验项')" width="680px" append-to-body>
-      <StdLibManager :lib="QC_INSP_ITEM_LIB" @changed="onStdLibChanged" />
+    <!-- 标准库维护(检验项 / 处理意见各一套,可增删改;与项目记录表同一组件) -->
+    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibTitle)" width="680px" append-to-body>
+      <StdLibManager :lib="stdLibCode" @changed="onStdLibChanged" />
       <template #footer>
         <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
       </template>
@@ -316,9 +324,9 @@ import { carryPlan } from '@core/qc/qcInspReqCarry'
 import { qcInspReqTabs, tabsOfPanel } from './qcInspReqConfig'
 import {
   QC_INSP_REC_HEAD_ROWS,
-  QC_INSP_REC_FOOT_FULL,
-  QC_INSP_REC_SIGN_ROW,
+  QC_INSP_REC_FOOT_ROWS,
   QC_INSP_REC_RESULT_KEYS,
+  QC_INSP_REC_DISPOSAL_LIB,
   QC_INSP_ITEM_LIB,
 } from '@core/qc/qcInspRecColumns'
 
@@ -334,8 +342,11 @@ const K = Object.freeze({
  *  纸面渲染、导出、迁移脚本三处必须一致 —— 少一格就会有一个值无处落库。 */
 const RESULT_KEYS = QC_INSP_REC_RESULT_KEYS
 
-/** 检验结论(表尾整宽格,2026-10-19 起是下拉框 + 可自定义补充) */
+/** 检验结论(表尾右列第 1 行,2026-10-19 起是下拉框 + 可自定义补充) */
 const VERDICT_KEY = '检验结论'
+/** 处理意见(表尾右列第 2 行,2026-11-11 起是**标准库**下拉;必填) */
+const DISPOSAL_KEY = '处理意见'
+const DISPOSAL_LIB = QC_INSP_REC_DISPOSAL_LIB
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -357,6 +368,12 @@ function optionsOf(key) {
     ? { value: o.value ?? o.label, label: o.label ?? o.value }
     : { value: o, label: o }))
 }
+/** 该格是否必填(取元数据的 isRequired —— 面板配置里 yj_field.required 就下发达一字段;
+ *  纸面显示 ★,服务端保存/提交时由 ButtonService.ensureRequiredFilled 强制) */
+function isRequired(key) {
+  const f = fieldMap.value.get(key)
+  return !!(f && (f.isRequired || f.required))
+}
 /** 检验项候选:来自标准库 qc.insp_item(原表「检验项为数据库选择」) */
 const itemOptions = computed(() => optionsOf(K.ITEM))
 /** 单项判定:下拉(合格/不合格),字典值=中文数据键 */
@@ -364,6 +381,9 @@ const judgeOptions = computed(() => optionsOf(K.JUDGE))
 /** 检验结论候选:特采/合格/不合格(来自 yj_field.dict_sql,不硬编码);
  *  `allow-create` 让用户直接敲一个新结论 —— 历史库里已有的自定义值也照原值回显/可再选 */
 const verdictOptions = computed(() => optionsOf(VERDICT_KEY))
+/** 处理意见候选:来自标准库 qc.insp_disposal(2026-11-11 用户口径「处理意见做成标准库的形式」),
+ *  条目在「⧉ 标准库维护」里增删;同样允许敲新词(allow-create) */
+const disposalOptions = computed(() => optionsOf(DISPOSAL_KEY))
 
 /* ── 来料检验单号链接(2026-10-19 用户口径 task 6)──
    报告建单时落了「来料检验单号」(QcCatalogService.createInspRecord),这里只做跳转:
@@ -442,10 +462,16 @@ function headVal(key) {
 }
 
 /** 行增删(与检验目录同款 ＋/× 操作) */
+/** 新建行的空白骨架:**把必填列显式建成空串**(2026-11-11)。
+ *  服务端 ensureDetailRequiredFilled 只校验「载荷里带了这一键」的行 —— 空对象{} 会整行跳过,
+ *  于是「单项判定必填」对新增/带入出来的行形同虚设。这里先把键建出来,空值照样被拦。 */
+function blankRow() {
+  return { [K.ITEM]: '', [K.STD]: '', [K.JUDGE]: '' }
+}
 function insertAfter(i) {
   const d = props.head.detail
   if (!d || !Array.isArray(d.items)) return
-  d.items.splice(i + 1, 0, {})
+  d.items.splice(i + 1, 0, blankRow())
   emit('dirty')
 }
 function removeItem(i) {
@@ -456,13 +482,18 @@ function removeItem(i) {
 function addItem() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  d.items.push({})
+  d.items.push(blankRow())
   emit('dirty')
 }
 
 /** 标准库维护:改完让面板重拉一次配置(选项随之刷新) */
 const stdLibVisible = ref(false)
-function openStdLib() {
+/** 当前维护的是哪一个标准库(检验项 qc.insp_item / 处理意见 qc.insp_disposal) */
+const stdLibCode = ref(QC_INSP_ITEM_LIB)
+const stdLibTitle = ref('检验项')
+function openStdLib(lib = QC_INSP_ITEM_LIB, title = '检验项') {
+  stdLibCode.value = lib
+  stdLibTitle.value = title
   stdLibVisible.value = true
 }
 function onStdLibChanged() {
@@ -560,7 +591,8 @@ async function carryFromReq(opts = {}) {
     const d = props.head.detail || (props.head.detail = {})
     if (!Array.isArray(d.items)) d.items = []
     // 逐列落成行:检验项=表头列名,检测标准=该列数据;结果/判定留空等人填
-    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准 })
+    // (单项判定显式建空串:必填校验只认"带了这一键"的行,不建键等于放行)
+    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准, [K.JUDGE]: '' })
     emit('dirty')
     ElMessage.success(tt('已按来料检验要求带入 {n} 项检验项').replace('{n}', String(plan.add.length)))
     return plan.add.length
@@ -720,6 +752,12 @@ watch(
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
+}
+/* 必填标记(2026-11-11:检验结论 / 处理意见 / 单项判定必填) */
+.qr-req {
+  color: #c0392b;
+  font-weight: 700;
+  margin-left: 2px;
 }
 /* 整张纸共用一套列宽(与原表 B|C:D|E|F:I 同节奏):
    标签列 20% / 值列 30% / 标签列 20% / 值列 30%;表尾「检验结论/处理意见」值格跨后三列铺到表格右缘 */
