@@ -1831,6 +1831,8 @@ import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/pane
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 import { sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
+// 配方表「设计添加量」的单位口径 + 导出件（2026-11-11）:纸面合计与导出件共用同一份格式化结果
+import { buildRecipeAoa, designTotalText } from '@/core/mold/recipeExport.js'
 // X烧结「炭棒规格」三格的三层兜底(独立字段 → 异名键 → 整串解析),单测见 core/xsinter/
 import { rodSpecFromProdInfo } from '@/core/xsinter/rodSpecFromProdInfo.js'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
@@ -2870,6 +2872,9 @@ defineExpose({
   focusField,
   focusFields,
   pageOfKey,
+  // 配方表专属导出(2026-11-11):接管「导出」菜单里这两个面板的 Excel 输出 ——
+  //   通用导出会把配方表按原文本倒出来(无单位/无合计/空白行全在),用户报的就是那个。
+  exportRecipeExcel,
   // 多页导出用(2026-10-28):整份文书导出「所有页面」时,由 PanelxList 逐页切页签再截图。
   //   pageCount  = 本面板页签数(单页 = 1);
   //   pageTitles = 页签标题(仅诊断用);
@@ -3709,7 +3714,12 @@ function stageSpan(sec, ri) {
 // ── 合计行(成型配方):对指定列求数值和 ──
 // 位数跟本列明细走(2026-10-03 口径,见 @core/panel/sumTotals):原先固定收敛到 4 位,
 // 明细若写 5~6 位(库内确有 scale=6 的列)合计仍会少位。
+// ⚠ 「设计添加量」列例外(2026-11-11 用户口径「设计添加量的和只需要计算 % 的就行,
+//   这个最终的数值一定是 100%」):同一列里粉料/胶粉是百分数、功能料-颗粒是 g/支,
+//   两者不同量纲不能相加 ⇒ 走 core/mold/recipeExport.js 的 designTotalText(只加 % 行),
+//   表配置里用 `designTotal: '设计添加量'` 指过来。
 function totalOf(dt, key) {
+  if (dt?.designTotal && key === dt.designTotal) return designTotalText(rowsOf(dt))
   const sum = sumKeepScale(rowsOf(dt).map((r) => r[key]))
   return sum ? String(sum) : ''
 }
@@ -4925,8 +4935,46 @@ function onXSinterApplied(payload) {
   emit('dirty')
 }
 
-// ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
-// 列表维护(增/编/停用/恢复)交给 StdLibManager;本处保留「多行新增」框与「勾选→填入」到当前章节字段
+/**
+ * 导出 Excel：**配方表**（成型配方页 / X烧结配方页共用，2026-11-11 用户口径）。
+ *
+ * 为什么要专属导出，而不是走 PanelxList 的通用导出（头字段键值 + 明细页签）：
+ *   通用导出把每格的原文本原样倒出来 —— 于是出现用户报的那三条：
+ *     ① 物料第一行（补差位）那格在库里是空的/0，导出就是空的；
+ *     ② 粉料段/胶粉的研究添加量没有 `%` 单位，颗粒料没有 `g/支`；
+ *     ③ 没有合计，而且空白行（只有「物料种类」没有编号名称的行）一行不落地全导出来。
+ *   现在统一走 core/mold/recipeExport.js 的 buildRecipeAoa：只导有物料的行走，
+ *   数值 2 位小数，设计添加量按物料种类补 `%` / `g/支`，末行给合计（设计添加量只加 % 行 = 100%）。
+ *
+ * 返回 false 表示本面板没有配方表（调用方回落到通用导出）。
+ */
+async function exportRecipeExcel() {
+  const cfgv = cfg.value || {}
+  const dt = (cfgv.dataTables || []).find((t) => t && (t.recipeCalc || t.filterVal === '配方表'))
+  if (!dt) return false
+  const head = props.head || {}
+  const no = head['单据编号'] || head['编号'] || ''
+  const title = String(cfgv.staticTitle || cfgv.title || '配方表')
+  const cols = (dt.cols || []).filter((c) => c && c.key && !c.hiddenCol)
+  const XLSX = await import('xlsx')
+  const aoa = [
+    [`${title}${no ? '　' + no : ''}`],
+    [`惠州市银嘉环保科技有限公司　　单据编号：${no || ''}`],
+    [],
+    ...buildRecipeAoa({ cols, rows: rowsOf(dt) }),
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  // 列宽照纸面比例给（序号窄、名称最宽），导出件不必再手拉列宽
+  ws['!cols'] = cols.map((c) => ({
+    wch: c.key === '序号' ? 6 : (c.key === '物料名称' ? 34 : (c.key === dt.designTotal ? 14 : 18)),
+  }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '配方表')
+  XLSX.writeFile(wb, `${title}-配方表-${no || '导出'}.xlsx`)
+  return true
+}
+
+// ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──// 列表维护(增/编/停用/恢复)交给 StdLibManager;本处保留「多行新增」框与「勾选→填入」到当前章节字段
 const secLibVisible = ref(false)
 const secLibRef = ref(null)
 const secLibLabel = ref('')

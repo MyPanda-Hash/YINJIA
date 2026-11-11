@@ -4610,3 +4610,5 @@ migrate-insp-plan-revision-page-20261111.sql
 migrate-prodinfo-approver-cells-20261111.sql
 # 2026-11-11 烧结工艺清单「密度管控·管控要求」接入标准库（lib=mold.density，可自行维护）
 migrate-mold-density-stdlib-20261111.sql
+# 2026-11-11 配方表「设计添加量」存量行补单位（粉料/胶粉 % ，颗粒/折算 g/支）+ 2 位小数
+migrate-mold-recipe-design-unit-20261111.sql

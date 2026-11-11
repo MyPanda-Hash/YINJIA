@@ -7982,18 +7982,27 @@ async function exportSheetExcel() {
     QC_CATALOG: 'exportCatalogExcel',
     QC_PROC_INSP: 'exportProcInspExcel',
     QC_FIRST_INSP: 'exportFirstInspExcel',
+    // 配方表专属导出（2026-11-11）：通用导出把配方表按原文本倒出来（设计添加量无单位、
+    // 无合计、空白行全在），用户报的「炭棒配方管控清单-设计添加量导出错误」就是它。
+    // 版式口径在 RecordSheetPanels.exportRecipeExcel + core/mold/recipeExport.js。
+    RD_MOLD_PROC: 'exportRecipeExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value
     if (sheet && typeof sheet[catalogExporter] === 'function') {
       try {
-        sheet[catalogExporter]()
-        ElMessage.success(tt('已导出') + ' Excel')
+        // await：配方表导出要动态 import('xlsx')，是异步的（同步导出器 await 也无副作用）
+        // 返回 false = 本面板其实没有配方表（如 RD_MOLD_PROC 的老变体）⇒ 落到下面的通用导出
+        const done = await sheet[catalogExporter]()
+        if (done !== false) {
+          ElMessage.success(tt('已导出') + ' Excel')
+          return
+        }
       } catch (e) {
         console.error('sheet-excel-export failed', e)
         ElMessage.error(tt('导出失败'))
+        return
       }
-      return
     }
   }
   try {

@@ -485,7 +485,11 @@ const RD_MOLD_FORMULA = {
       // blankRows:10 —— 2026-10-27 用户口径(#8)「炭棒配方管控清单页面:配方表默认填充 10 行表格」,
       //   用户另确认「没有的留空就行」⇒ 只铺空的 10 行(只带 表区 + 序号),不编造物料/比例。
       //   ⚠ 按**表**铺(不是面板级 seedRows):同面板的修订记录表共用一张行表,seedRows 会连它一起铺。
-      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
+      // designTotal:'设计添加量' —— 这一列是**混单位**的(粉料/胶粉 = %，功能料-颗粒 = g/支),
+      //   合计不能当一列普通数字相加(用户 2026-11-11 口径「设计添加量的和只需要计算 % 的就行,
+      //   这个最终的数值一定是 100%」)⇒ 交给 core/mold/recipeExport.designTotalText 只加 % 行。
+      //   其余列仍走 sumTotals 那套「位数跟明细走」。
+      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, designTotal: '设计添加量', recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
           // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
