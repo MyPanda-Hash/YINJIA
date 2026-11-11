@@ -321,7 +321,19 @@
       <div class="qr-opt-hint">{{ tt('选项库全系统共用，改动会影响所有单据（历史单据已填的值不受影响）') }}</div>
       <div class="qr-opt-list">
         <div v-for="(o, i) in optDraft" :key="'o' + i" class="qr-opt-row">
-          <el-input v-model="optDraft[i]" size="small" maxlength="30" :placeholder="tt('请输入选项内容')" />
+          <!-- 选项文本按多行域渲染(2026-11-11 用户口径「这个字数过多时需要换行」):
+               单行 el-input 不会折行,长文本会把格子撑破/被截断;textarea + autosize 让它在
+               1~3 行之间自动长高并正常换行(仍限 30 字,与后端校验一致)。 -->
+          <el-input
+            v-model="optDraft[i]"
+            type="textarea"
+            size="small"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            maxlength="30"
+            resize="none"
+            class="qr-opt-input"
+            :placeholder="tt('请输入选项内容')"
+          />
           <span class="qr-opt-del" :title="tt('删除')" @click="removeOptRow(i)">×</span>
         </div>
       </div>
@@ -1329,6 +1341,35 @@ defineExpose({ exportProcInspExcel })
 .qr-grid td .qr-cell-text {
   word-break: break-word;
 }
+
+/* ── 处理意见「选项库」维护(2026-11-11 用户口径:弹窗形式更好维护) ── */
+.qr-label .qr-opt-mgr {
+  margin-left: 4px;
+  cursor: pointer;
+  color: var(--el-color-primary, #116a5b);
+  font-size: 13px;
+  font-weight: 400;
+}
+.qr-label .qr-opt-mgr:hover { text-decoration: underline; }
+.qr-opt-hint { font-size: 12px; line-height: 1.5; color: #8b9893; margin-bottom: 10px; }
+.qr-opt-list { max-height: 260px; overflow-y: auto; }
+.qr-opt-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+/* 多行域:宽度铺满、内部自动换行(长串也按字符断行,不横向溢出) */
+.qr-opt-input { flex: 1 1 auto; min-width: 0; }
+.qr-opt-input :deep(.el-textarea__inner) {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.qr-opt-del { flex: none; cursor: pointer; color: #c0392b; font-size: 16px; line-height: 1; padding: 6px 4px 0; }
+.qr-opt-add {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--el-color-primary, #116a5b);
+  cursor: pointer;
+  font-size: 13px;
+}
 </style>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
@@ -1486,24 +1527,5 @@ defineExpose({ exportProcInspExcel })
   }
 }
 
-/* ── 处理意见「选项库」维护(2026-11-11 用户口径:弹窗形式更好维护) ── */
-.qr-label .qr-opt-mgr {
-  margin-left: 4px;
-  cursor: pointer;
-  color: var(--el-color-primary, #116a5b);
-  font-size: 13px;
-  font-weight: 400;
-}
-.qr-label .qr-opt-mgr:hover { text-decoration: underline; }
-.qr-opt-hint { font-size: 12px; line-height: 1.5; color: #8b9893; margin-bottom: 10px; }
-.qr-opt-list { max-height: 260px; overflow-y: auto; }
-.qr-opt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.qr-opt-del { cursor: pointer; color: #c0392b; font-size: 16px; line-height: 1; padding: 0 4px; }
-.qr-opt-add {
-  display: inline-block;
-  margin-top: 4px;
-  color: var(--el-color-primary, #116a5b);
-  cursor: pointer;
-  font-size: 13px;
-}
+
 </style>
