@@ -92,6 +92,26 @@ test('⑥ 列表筛选：编号/名称/立项文档编号，大小写无关；�
   assert.equal(filterFlowRows(rows, '').length, 2, '空关键字不过滤')
 })
 
+test('⑨ 处理人：产品信息表=填写提交审批的人；规格书=二级负责人；其余=分发的负责人', () => {
+  // 后端 /px/rdDevOverview 的下发口径（2026-11-11 用户口径）：
+  //   「产品信息表显示的是填写提交审批的人，规格书是由产品信息表二级负责人来处理，
+  //     成型、组装、出货这三个也是对应的产品信息表签核之后分发的对应的负责人来处理」
+  const rowWithOwners = {
+    ...row('A-9', '己', '已归档', [
+      { ...node('RD_SPEC_DOC', '规格书', '开发中', false, false, 'S-9'), owner: '陈秀丽' },
+      { ...node('RD_MOLD_PROC', '成型工艺清单', '未开发', false, false, ''), owner: '杨茂林' },
+      { ...node('RD_ASM_PROC', '组装工艺清单', '未开发', false, false, ''), owner: '秦文静' },
+      { ...node('RD_INSP_PLAN', '出货检验计划表', '未开发', false, false, ''), owner: '陈柯余' },
+    ]),
+    填写人: '李梓维',
+  }
+  const steps = flowStepsOf(rowWithOwners)
+  assert.equal(steps[0].owner, '李梓维', '第一步 = 填写人（不是审核人）')
+  assert.equal(steps[1].owner, '陈秀丽', '规格书 = 产品信息表二级负责人')
+  assert.deepEqual(steps.slice(2).map((s) => s.owner), ['杨茂林', '秦文静', '陈柯余'], '其余三份 = 分发的负责人')
+  assert.equal(flowStepsOf(row('B', 'b', '草稿', ZERO))[1].owner, '', '没有处理人就给空串，不编造')
+})
+
 test('⑧ 整包状态只看 4 张文件：产品信息表已归档但一份文件没起 = 未开工', () => {
   const archivedNoFiles = flowStatusOf(row('A', 'a', '已归档', ZERO))
   assert.equal(archivedNoFiles, STEP_STATE.none, '已归档只说明"允许开发",不等于开工')

@@ -73,6 +73,9 @@
                   <div class="pfl-step-body">
                     <span class="pfl-step-name">{{ tt(st.label) }}</span>
                     <span class="pfl-step-no">{{ st.docNo || '—' }}</span>
+                    <!-- 处理人（2026-11-11）:产品信息表=填写并提交审批的人;规格书=二级负责人;
+                         成型/组装/出货=签核后分发的负责人。空着只显示"—",不编造 -->
+                    <span class="pfl-step-owner" :title="tt('处理人')">{{ tt('处理人') }}<b>{{ st.owner || '—' }}</b></span>
                   </div>
                   <span class="pfl-step-state">{{ tt(st.state || (st.tone === 'none' ? '未开始' : '')) }}</span>
                   <span v-if="st.reaudited" class="pfl-step-flag">{{ tt('待重走') }}</span>
@@ -218,6 +221,8 @@ onMounted(load)
 .pfl-step-body { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .pfl-step-name { font-weight: 500; color: #1f2d3d; }
 .pfl-step-no { font-size: 12px; color: #8a97a5; }
+.pfl-step-owner { font-size: 12px; color: #8a97a5; }
+.pfl-step-owner b { margin-left: 4px; font-weight: 500; color: #1f2d3d; }
 .pfl-step-state { margin-left: auto; font-size: 12px; color: #5c6b7a; }
 .pfl-step-flag { margin-left: 8px; padding: 0 6px; line-height: 18px; border-radius: 9px; background: #fdf3e7; color: #a0641a; font-size: 11px; }
 

@@ -86,9 +86,18 @@ public class RdDevProductService {
         // 老库可能还没有 立项文档编号 列(迁移未跑):缺列时退化为空串,不让整个接口 500
         boolean hasLink = hasColumn("rd_prod_info_head", "立项文档编号");
         String linkSel = hasLink ? "ISNULL([立项文档编号],N'')" : "N''";
+        // 2026-11-11 用户口径(流程面板要显示每一步「谁在处理」):
+        //   · 产品信息表 = **填写提交审批的人** ⇒ 制单人 asp_user1(→姓名)；
+        //   · 规格书 = **产品信息表的二级负责人** ⇒ [审核人二级]，空了退 [责任人]（=产品负责人）；
+        //   · 成型/组装/出货 = 产品信息表签核后**按文件分发**的负责人 ⇒ rd_dev_task.负责人；
+        boolean hasL2 = hasColumn("rd_prod_info_head", "审核人二级");
+        String l2Sel = hasL2 ? "ISNULL([审核人二级],N'')" : "N''";
+        boolean hasDuty = hasColumn("rd_prod_info_head", "责任人");
+        String dutySel = hasDuty ? "ISNULL([责任人],N'')" : "N''";
         List<Map<String, Object>> pis = jdbc.queryForList(
                 "SELECT [单据编号] AS no, ISNULL([产品编号],N'') AS code, ISNULL([产品名称],N'') AS name,"
-                        + " ISNULL([客户项目名称],N'') AS project, " + linkSel + " AS linkNo"
+                        + " ISNULL([客户项目名称],N'') AS project, " + linkSel + " AS linkNo,"
+                        + " ISNULL(h.asp_user1,N'') AS creator, " + l2Sel + " AS l2, " + dutySel + " AS duty"
                         + " FROM rd_prod_info_head h WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
                         + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PROD_INFO'"
                         + " AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
@@ -103,10 +112,23 @@ public class RdDevProductService {
             one.put("立项文档编号", str(pi.get("linkNo")) == null ? "" : str(pi.get("linkNo")));
             one.put("项目名称", str(pi.get("project")) == null ? "" : str(pi.get("project")));
             one.put("state", statusOf("RD_PROD_INFO", no));
+            // 处理人（2026-11-11）：第一步=填写并提交审批的人；规格书=二级负责人
+            String filler = displayName(str(pi.get("creator")));
+            String l2Owner = str(pi.get("l2"));
+            if (l2Owner == null) l2Owner = str(pi.get("duty"));
+            one.put("填写人", filler == null ? "" : filler);
+            one.put("二级负责人", l2Owner == null ? "" : l2Owner);
+            Map<String, String> owners = devTaskOwners();
             List<Map<String, Object>> nodes = new ArrayList<>();
             int done = 0;
             for (String[] f : DEV_FILES) {
                 Map<String, Object> n = nodeOf(f[0], f[1], code);
+                // 规格书：优先用产品信息表的二级负责人；成型/组装/出货：用分发给该文件的负责人
+                String byTask = owners.get(f[0] + "|" + (code == null ? "" : code));
+                String owner = "RD_SPEC_DOC".equals(f[0])
+                        ? (l2Owner != null ? l2Owner : byTask)
+                        : byTask;
+                n.put("owner", owner == null ? "" : owner);
                 if (Boolean.TRUE.equals(n.get("done"))) done++;
                 nodes.add(n);
             }
@@ -116,6 +138,43 @@ public class RdDevProductService {
             rows.add(one);
         }
         return rows;
+    }
+
+    /**
+     * 每个产品、每份文件**分发到的负责人**（rd_dev_task.负责人，账号→姓名）。
+     * key = `面板码|原始产品编号`（rd_dev_task 存的就是产品信息表的原始编号，不走 -tb 变体）。
+     */
+    private Map<String, String> devTaskOwners() {
+        Map<String, String> out = new LinkedHashMap<>();
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT [产品编号] AS code, [目标面板] AS panel, [负责人] AS owner FROM rd_dev_task"
+                            + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([负责人],N'') <> N''"
+                            + " ORDER BY id");
+            for (Map<String, Object> r : rows) {
+                String code = str(r.get("code"));
+                String panel = str(r.get("panel"));
+                String owner = str(r.get("owner"));
+                if (code == null || panel == null || owner == null) continue;
+                out.put(panel + "|" + code, displayName(owner));
+            }
+        } catch (Exception e) {
+            // rd_dev_task 异常不该拦住整张流程图：处理人留空，其余照常
+        }
+        return out;
+    }
+
+    /** 账号 → 姓名；取不到姓名退回账号本身（历史单据的制单账号可能已不在 yj_user 里） */
+    private String displayName(String username) {
+        if (username == null || username.isBlank()) return null;
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT real_name FROM yj_user WHERE username = ?", String.class, username);
+            String name = rows.isEmpty() ? null : str(rows.get(0));
+            return name == null ? username : name;
+        } catch (Exception e) {
+            return username;
+        }
     }
 
     /** 某个产品在某个文件面板上的节点:单号/状态/是否完成/是否反审核待重走 */

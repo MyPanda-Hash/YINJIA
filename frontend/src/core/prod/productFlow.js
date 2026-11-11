@@ -40,6 +40,9 @@ export function flowStepsOf(row) {
     key: 'RD_PROD_INFO',
     label: '产品信息表',
     docNo: String(row['单据编号'] || ''),
+    // 处理人（2026-11-11 用户口径）：产品信息表 = **填写并提交审批的人**；
+    // 规格书 = 产品信息表的二级负责人；成型/组装/出货 = 签核后分发给该文件的负责人。
+    owner: String(row['填写人'] || ''),
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),
@@ -49,6 +52,7 @@ export function flowStepsOf(row) {
     key: String(n.panel || n.label || ''),
     label: String(n.label || n.panel || ''),
     docNo: String(n.docNo || ''),
+    owner: String(n.owner || ''),
     state: String(n.state || ''),
     tone: stepStateOf(n),
     reaudited: !!n.reaudited,

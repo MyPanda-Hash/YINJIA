@@ -369,6 +369,10 @@
               <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
                    矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
               <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
+                   入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
+                   KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
+              <div v-if="isProdDocMatrix" class="as-side-btn" @click="openProductFlow">{{ tt('流程管控') }}</div>
 
               <!-- ② 本单操作(2026-10-16 用户口径「侧边栏按钮放得有点乱,整理一下」)——
                    **位置固定、内容随状态换**:这一段永远只放"本单这一步该做什么"。
@@ -4201,6 +4205,12 @@ const previewCards = computed(() => {
     }
   }).filter((c) => c.hit)
 })
+/** 打开「产品文件流程管控」独立页(2026-11-11):与 ProgressControlSheet.openDoc 同一套地址拼法 */
+function openProductFlow() {
+  const url = `${window.location.origin}${window.location.pathname}#/rd/productFlow`
+  window.open(url, '_blank')
+}
+
 async function openDocPreview() {
   if (fuzzyMode.value) { // 与模糊搜索互斥:模糊条件失效,pageSize 直接接管
     fuzzyMode.value = false

@@ -4992,6 +4992,8 @@ export default {
     '待重走': 'Redo',
     '下一步': 'Next step',
     '填写人': 'Filled by',
+    '流程管控': 'Flow Control',
+    '处理人': 'Handled by',
     '没有查看产品进度数据的权限（需要「项目进度查询」或「产品文件列表」的查看权）':
       'No permission to view product progress (requires view access to Project Progress or Product File List)',
     /* ── 研发管理·项目管理 → 项目流程管控 /rd/projectFlow(2026-10-20 新增) ── */
