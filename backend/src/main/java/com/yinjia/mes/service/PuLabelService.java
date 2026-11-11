@@ -91,6 +91,9 @@ public class PuLabelService {
         Map<String, Double> returnedByLine = batchService.returnedByOrderLine(orderNo);
         List<Map<String, Object>> labels = labelRows(orderNo);
         Map<Integer, List<Map<String, Object>>> byLine = groupByLine(labels);
+        // 每箱数量预填(2026-11-11):取该订单行**最近一次打印**填过的值 —— 同一个物料包装规格不变,
+        // 每次重新抄一遍纯属重复劳动;从没填过的行给 0(前端按"未填"处理,卡面回退本次打印数量)。
+        Map<Integer, Double> lastBox = lastBoxQtyByLine(orderNo);
         // 已生单批次明细(补登用):每个「订单行 × 已生单批次号」的已收量
         List<Map<String, Object>> supplements = supplementRows(orderNo, labels);
 
@@ -128,6 +131,8 @@ public class PuLabelService {
             // 剩余可打 = 该行头寸 − 已被预约占住的部分;负数归 0(已预约满就打不了新的)。
             // 上限**向下取整到单位精度**(计件单位不给 4.8 这种"半个")。
             row.put("剩余可打", UnitPrecision.floorTo(Math.max(0d, allowed - reserved), nd));
+            // 每箱数量(2026-11-11):卡面「数量」印的是它;0 = 该行还没填过(前端空着,出纸回退本次打印数量)
+            row.put("每箱数量", lastBox.getOrDefault(lineId, 0d));
             // 可补登 = 该行**已收(已生单)但还没打码**的量 = 已送 − 已补登(不按批次拆的口径,仅用于概览)
             row.put("可补登数量", UnitPrecision.roundTo(Math.max(0d, used - marked), nd));
             rows.add(row);
@@ -206,6 +211,7 @@ public class PuLabelService {
         }
 
         List<Map<String, Object>> out = new ArrayList<>();
+        Map<Integer, Double> lastBox = lastBoxQtyByLine(orderNo);
         for (Map<String, Object> it : jdbc.queryForList(
                 "SELECT id, [行号] AS 行号, [物料编码] AS 物料编码, [物料名称] AS 物料名称, [规格型号] AS 规格型号,"
                         + " [单位] AS 计量单位 FROM " + LINE_TABLE
@@ -231,6 +237,8 @@ public class PuLabelService {
                 row.put("已收数量", UnitPrecision.roundTo(got, nd));
                 row.put("已补登数量", UnitPrecision.roundTo(done, nd));
                 row.put("可补登数量", UnitPrecision.roundTo(can, nd));      // 本次最多能补登这么多
+                // 每箱数量(2026-11-11):补登表同样按"该行最近一次打印填过的值"预填
+                row.put("每箱数量", lastBox.getOrDefault(lineId, 0d));
                 out.add(row);
             }
         }
@@ -404,6 +412,21 @@ public class PuLabelService {
                         : "批次号不能为空") + ":行 " + str(line.get("行号")));
             }
             if (qty <= 0) continue;
+            // 每箱数量(2026-11-11 用户口径「每箱数量才等于标识卡上的数量」):
+            // 卡面「数量」印它 ⇒ 它必须是**这一批里每个箱子装的量**,所以:
+            //   · 0/空 = 不按箱打(卡面回退印本次打印数量,与旧版一致);
+            //   · 大于本次打印数量 = 逻辑矛盾(一整箱比整批还多),拒;
+            //   · 记到行表(= 打印时的快照,重打原样重现)。
+            double boxQty = num(r.get("每箱数量"));
+            if (boxQty < 0 || Double.isNaN(boxQty)) {
+                over.add("第 " + str(line.get("行号")) + " 行:每箱数量不能为负数(" + trim(boxQty) + ")");
+                continue;
+            }
+            if (boxQty > 0 && boxQty > qty + 0.000001) {
+                over.add("第 " + str(line.get("行号")) + " 行:每箱数量 " + trim(boxQty)
+                        + " 大于本次打印数量 " + trim(qty) + "(每箱装得比整批还多,请核对)");
+                continue;
+            }
             if (supplement) {
                 // ★ 已生单补登:只为**已收(已生单)**的量补打码 —— 不预约、不出隔离行,上限 = 已收 − 已补登
                 double capSup = supCan.getOrDefault(lineId + "\u0001" + rowBatch, -1d);
@@ -449,10 +472,11 @@ public class PuLabelService {
                     prod == null ? null : java.sql.Date.valueOf(prod),
                     srcPrint.isEmpty() ? null : srcPrint, user, user);
             jdbc.update("INSERT INTO bl_pu_label ([单据编号],[采购订单行号],[采购订单行id],[物料编码],[物料名称],"
-                            + " [规格型号],[计量单位],[打印数量],[补登],[去向单据],asp_user1,asp_time1,asp_cancel)"
-                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",
+                            + " [规格型号],[计量单位],[打印数量],[每箱数量],[补登],[去向单据],asp_user1,asp_time1,asp_cancel)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,SYSDATETIME(),'N')",
                     docNo, line.get("行号"), lineId, line.get("物料编码"), line.get("物料名称"),
-                    line.get("规格型号"), line.get("计量单位"), qty, supplement ? "Y" : "N",
+                    line.get("规格型号"), line.get("计量单位"), qty,
+                    boxQty > 0 ? boxQty : null, supplement ? "Y" : "N",
                     supplement ? supDoc.get(lineId + "\u0001" + rowBatch) : null, user);
             docNos.add(docNo);
             Map<String, Object> o = new LinkedHashMap<>();
@@ -464,6 +488,7 @@ public class PuLabelService {
             o.put("规格型号", line.get("规格型号"));
             o.put("计量单位", line.get("计量单位"));
             o.put("打印数量", qty);
+            o.put("每箱数量", boxQty > 0 ? boxQty : null);   // 出纸用:卡面「数量」印它(空 ⇒ 前端回退打印数量)
             o.put("批次号", rowBatch);
             o.put("补登", supplement);
             outRows.add(o);
@@ -504,9 +529,11 @@ public class PuLabelService {
         if (head == null) throw new IllegalStateException("打印记录不存在或已作废:" + no);
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT [采购订单行号] AS 行号, [物料编码] AS 物料编码, [物料名称] AS 物料名称,"
-                        + " [规格型号] AS 规格型号, [计量单位] AS 计量单位, ISNULL([打印数量],0) AS 打印数量"
+                        + " [规格型号] AS 规格型号, [计量单位] AS 计量单位, ISNULL([打印数量],0) AS 打印数量,"
+                        + " [每箱数量] AS 每箱数量"
                         + " FROM bl_pu_label WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         if (lines.isEmpty()) throw new IllegalStateException("该打印单没有存活行,无法重打:" + no);
+        for (Map<String, Object> l : lines) l.put("每箱数量", num(l.get("每箱数量")));   // null → 0(未填)
         jdbc.update("UPDATE bd_pu_label SET [打印人] = ?, [打印时间] = SYSDATETIME(),"
                 + " [打印次数] = ISNULL([打印次数],0) + 1, asp_user2 = ?, asp_time2 = SYSDATETIME()"
                 + " WHERE [单据编号] = ?", user, user, no);
@@ -558,11 +585,34 @@ public class PuLabelService {
      * 批次号混单时会把"原行送的"也算进"已打印行送的")。所以这里必须用同一个键去数 link,
      * 两处口径必须一致,改一处就得改另一处。
      */
+    /**
+     * 每个采购订单行**最近一次**填过的「每箱数量」(2026-11-11)。
+     *
+     * <p>用途:弹窗再次打开时预填 —— 同一物料的包装规格不变,每次重抄纯属重复劳动。
+     * 只认存活打印行里 &gt; 0 的值;从没填过(含本需求之前的历史行 NULL)⇒ 不在表里,
+     * 前端按"未填"处理(卡面回退印本次打印数量,与旧版行为一致)。
+     */
+    private Map<Integer, Double> lastBoxQtyByLine(String orderNo) {
+        Map<Integer, Double> out = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT l.[采购订单行id] AS lineId, l.[每箱数量] AS box FROM bl_pu_label l"
+                        + " JOIN bd_pu_label h ON h.[单据编号] = l.[单据编号]"
+                        + " WHERE h.[采购订单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                        + "   AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                        + "   AND l.[每箱数量] IS NOT NULL AND l.[每箱数量] > 0 ORDER BY l.id", orderNo)) {
+            int lineId = intOf(r.get("lineId"));
+            // 按 l.id 升序读,后写覆盖前写 ⇒ 留下的就是最近一次
+            if (lineId > 0) out.put(lineId, num(r.get("box")));
+        }
+        return out;
+    }
+
     public List<Map<String, Object>> labelRows(String orderNo) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT l.id AS 行id, l.[采购订单行id] AS 采购订单行id, l.[采购订单行号] AS 采购订单行号,"
                         + " l.[物料编码] AS 物料编码, l.[物料名称] AS 物料名称, l.[规格型号] AS 规格型号,"
                         + " l.[计量单位] AS 计量单位, ISNULL(l.[打印数量],0) AS 打印数量,"
+                        + " l.[每箱数量] AS 每箱数量,"
                         + " ISNULL(l.[补登], N'N') AS 补登, l.[去向单据] AS 去向单据,"
                         + " h.[单据编号] AS 单据编号, h.[批次号] AS 批次号,"
                         + " CONVERT(varchar(10), h.[生产日期], 120) AS 生产日期,"
@@ -582,6 +632,7 @@ public class PuLabelService {
             double generated = num(r.get("已生单量"));
             boolean sup = isSupplement(r);
             r.put("打印数量", round2(printed));
+            r.put("每箱数量", round2(num(r.get("每箱数量"))));   // 2026-11-11:重打/记录展示用(0=未填)
             r.put("已生单量", round2(generated));
             // 补登行**恒为 0**:它是给已经收完的货补打的码,从来不等生单(不产生隔离行)
             r.put("未生单量", sup ? 0d : round2(Math.max(0d, printed - generated)));

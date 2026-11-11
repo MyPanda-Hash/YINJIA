@@ -4601,3 +4601,20 @@ migrate-lab-testitem-legacy-20261109.sql
 
 # 2026-11-10 库存数量以金蝶真实账套为准:kucun 加[金蝶数量/差异数量(计算列)/金蝶同步时间] + 新增 erp_stock_snapshot(逐键快照)与 erp_stock_sync_log(同步日志) + 库存状况面板3字段 + en/ja/ko/zh-TW 译名
 migrate-erp-stock-sync-20261110.sql
+
+# 2026-11-11 材料码打印加「每箱数量」:bl_pu_label 加 [每箱数量] decimal(18,4) NULL(可空 ⇒ 历史行卡面回退印本次打印数量)
+#   用户口径「材料码多加一个每箱数量打印,每箱数量才等于标识卡上的数量」+ 确认「用 B(仍一行一张卡,卡面数量印每箱数量,
+#   打几张卡在预览里选份数)」+「提示零头箱不足每箱,可单独打印零头箱」。表清单 bl_pu_label 列数 17→18。幂等,两账套均执行。
+migrate-pu-label-box-qty-20261111.sql
+
+# 2026-11-11 「每箱数量」显示层词条(scope=field,10 语言):每箱数量 / 每箱 / 整箱 / 零头箱 / 不足每箱;已存在即跳过不覆盖人工校对
+i18n-pu-label-box-qty-20261111.sql
+
+# 2026-11-11 检验数据记录(检验报告 YJ-QR-96)「检测结果」改**固定五格**(用户口径「检验数据记录的检验结果改为固定五格」):
+#   qc_insp_rec_detail 加 [结果1..结果5] nvarchar(200) NULL + 逐列 MS_Description(列表 31 列→36 列);
+#   yj_field 登记 5 行(place=detail / seq 31..35,紧跟 检测结果 之后、单项判定 之前,可见可编辑);
+#   旧列 [检测结果] 转历史列(yj_field visible=0 / hidden=1 / editable=0,物理列与数据保留);
+#   历史回填 结果1 ← 检测结果(只填空值);结果1..结果5 补 en/ja/ko/zh-TW 译名。
+#   前端同批:qcInspRecColumns.js(五格键 + 列定义/导出)+ QcInspRecSheet.vue(两行表头,检测结果 跨 5 列,
+#   第二行 1..5,只读态同 5 格)。幂等,两账套均执行。
+migrate-qc-insp-rec-result5-20261111.sql
