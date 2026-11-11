@@ -26,6 +26,8 @@ export const menuTree = [
           //   项目流程管控,通过立项申请表的编号查流程走到哪里」。只读盯单页(页面级虚拟面板 PROJECT_FLOW,
           //   定义见后端 PagePanelRegistry),按立项单号把 10 个环节逐条判出来:卡在谁手上、停留几天。
           { code: 'rdFlow', title: '项目流程管控', path: '/rd/projectFlow', icon: 'Connection', panelCode: 'PROJECT_FLOW' },
+          // 产品文件流程管控（2026-11-11）：产品信息表 + 4 张受控文件的流程一览，权限挂 RD_PROD_DOCLIST
+          { code: 'rdProductFlow', title: '产品文件流程管控', path: '/rd/productFlow', icon: 'Share', panelCode: 'RD_PROD_DOCLIST' },
         ],
       },
       // 2026-11-06 用户口径：「现在要加新面板，这个单独做一个二级目录：样品就在研发管理里面」

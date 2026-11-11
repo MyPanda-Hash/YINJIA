@@ -35,11 +35,19 @@ test('样品组：外部-开发样品 / 内部-开发样品 两张单', () => {
  * 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个项目流程管控,
  *   通过立项申请表的编号查流程走到哪里」。⇒ 项目管理组多一张只读盯单页 PROJECT_FLOW(排最后)。
  */
-test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询 → 项目流程管控', () => {
-  assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'PROJECT_FLOW'])
+test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询 → 项目流程管控 → 产品文件流程管控', () => {
+  assert.deepEqual(leafCodes(group('rdProject')),
+    ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'PROJECT_FLOW', 'RD_PROD_DOCLIST'])
   const flow = group('rdProject').children.find((c) => c.panelCode === 'PROJECT_FLOW')
   assert.equal(flow.title, '项目流程管控')
   assert.equal(flow.path, '/rd/projectFlow', '页面级虚拟面板走专用路由,不是 /panelx/list')
+  // 2026-11-11:产品文件流程管控 = 产品信息表 + 4 张受控文件的流程一览(专门的面板,版式照项目流程管控)。
+  // 它复用 RD_PROD_DOCLIST 的查看权(不新造虚拟面板),但走自己的路由 —— 所以这里按 panelCode 会
+  // 和「产品文件列表」那个菜单项撞码,只有一处出现是**设计如此**(同一张表的数据,同一份权限)。
+  const pfl = group('rdProject').children.find((c) => c.code === 'rdProductFlow')
+  assert.equal(pfl.title, '产品文件流程管控')
+  assert.equal(pfl.path, '/rd/productFlow')
+  assert.equal(pfl.panelCode, 'RD_PROD_DOCLIST', '权限挂已有面板,不新增虚拟面板码')
 })
 
 test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 张', () => {
@@ -212,11 +220,13 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
  * 2026-11-06:新增 外部/内部开发样品申请单(RD_SAMPLE_EXT / RD_SAMPLE_INT)⇒ 24 → 26 张。
  * 计数断言保留价值:防止面板被误删/误加而不自知。
  */
-test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两张样品单)', () => {
+test('研发管理 27 个面板一个不少(含新增 项目流程管控 / 产品文件流程管控 与两张样品单)', () => {
+  // 2026-11-11:产品文件流程管控 复用了 RD_PROD_DOCLIST 的权限码 ⇒ panelCode 会重复一次
+  // (菜单项 + 流程页),所以"个数"按 panelCode 去重后是 26、按菜单叶子是 27。
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 26)
-  assert.equal(new Set(codes).size, 26)
+  assert.equal(codes.length, 27)
+  assert.equal(new Set(codes).size, 26, 'RD_PROD_DOCLIST 出现两次(产品文件列表 + 产品文件流程管控)')
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
   // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,
   // 由 @core/views/MoldProcPanel.vue 承载 ⇒ **不占菜单项**,这里也不该出现。

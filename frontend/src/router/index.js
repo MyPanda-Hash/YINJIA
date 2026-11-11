@@ -104,6 +104,11 @@ const routes = [
       // 项目流程管控(研发管理·项目管理,2026-10-20):按立项单号查流程走到哪一步。
       // 页面级虚拟面板 PROJECT_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'rd/projectFlow', component: () => import('@/views/rd/ProjectFlow.vue'), meta: { title: '项目流程管控', code: 'rdFlow', panelCode: 'PROJECT_FLOW' } },
+      // 产品文件流程管控（2026-11-11 用户口径）:把「产品文件列表 · 流程全览」升级成一个**专门的面板**,
+      // 版式照 项目流程管控（KPI → 检索 → 清单 + 时间轴）。
+      // 权限:不新造虚拟面板,直接挂 RD_PROD_DOCLIST 的查看权 —— 这份流程本来就是那张表的数据,
+      // 没有它的查看权也不该看这条流程（省掉一条 yj_role_panel 迁移）。
+      { path: 'rd/productFlow', component: () => import('@/views/rd/ProductFlow.vue'), meta: { title: '产品文件流程管控', code: 'rdProductFlow', panelCode: 'RD_PROD_DOCLIST' } },
       // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;不进 flatMenus 自动路由。
       // 2026-10-16 权限化:四处看板页面各挂**页面级虚拟面板码**(定义见后端 PagePanelRegistry),
       // meta.panelCode 供下方守卫拦「直接敲 URL」——菜单隐藏挡不住手输地址。

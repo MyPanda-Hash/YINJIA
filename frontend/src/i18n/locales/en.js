@@ -4970,6 +4970,30 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
+    /* ── 研发管理·项目管理 → 产品文件流程管控 /rd/productFlow(2026-11-11 新增) ── */
+    '产品文件流程管控': 'Product File Flow Control',
+    '按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中':
+      'Track a product development package by product: product info sheet + four controlled files — which step has no document yet and which one is still in progress',
+    '数据来源：产品信息表与 4 个文件面板的实时单据状态，本页只读不改单':
+      'Computed live from the product info sheet and the four file panels. Read-only',
+    '产品数': 'Products',
+    '已开发完毕': 'Fully developed',
+    '未开工': 'Not started',
+    '已下发开发的产品': 'Products dispatched for development',
+    '5 步全部完成': 'All five steps completed',
+    '至少一份文件在建/已归档': 'At least one file created or archived',
+    '4 份文件一份都没起': 'None of the four files started',
+    '输入产品编号 / 产品名称 / 立项文档编号（支持片段）':
+      'Product No. / name / project doc No. (a fragment is enough)',
+    '展开行看 5 步时间轴': 'Expand a row to see all five steps',
+    '没有符合条件的产品': 'No product matches',
+    '卡在': 'Stuck at',
+    '5 步已全部完成': 'All five steps completed',
+    '待重走': 'Redo',
+    '下一步': 'Next step',
+    '填写人': 'Filled by',
+    '没有查看产品进度数据的权限（需要「项目进度查询」或「产品文件列表」的查看权）':
+      'No permission to view product progress (requires view access to Project Progress or Product File List)',
     /* ── 研发管理·项目管理 → 项目流程管控 /rd/projectFlow(2026-10-20 新增) ── */
     '项目流程管控': 'Project Flow Control',
     '按立项申请单号查这条项目走到哪一步：哪个环节还没审批、哪个环节该谁动手、单据建了内容有没有开始填':
