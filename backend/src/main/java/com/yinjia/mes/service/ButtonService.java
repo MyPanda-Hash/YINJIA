@@ -3000,6 +3000,13 @@ public class ButtonService {
         if ("RD_SPEC_DOC".equals(def.code())) {
             writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, operator);
         }
+        // 产品变更申请表(2026-11-11 用户口径):「审批的时候弹出弹窗，审批人可以进行批准，还有签字，
+        //   把信息回填进这里面，还有日期」—— 纸面「批准 / 签字 / 日期」三格由**这一次审批**回填。
+        //   落点是 rd_change_head 的备用列池(批准人=备用2 / 批准签字=备用3 / 批准日期=备用4,
+        //   见 migrate-rd-change-approval-sign-20261111.sql),三格 yj_field.editable=0 ⇒ 只有这里能写。
+        if ("RD_CHANGE".equals(def.code())) {
+            writeChangeApprovalSign(def, no, formData, operator);
+        }
         // 内部开发样品申请单(单节点:提交 → 确认人确认 → 制备):纸面「确认人」= 审批通过的人
         writeSampleSign(def.code(), no, SAMPLE_SIGN_CONFIRM, operator);
         // 立项申请:审批与定级是**同一步骤的两个动作**(2026-10-08 用户口径②「冯总审核及定级」)——
@@ -3681,6 +3688,35 @@ public class ButtonService {
                     name, name, no);
         } catch (Exception e) {
             log.warn("[两级审批] 写回审核人二级/责任人失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
+    }
+
+    /**
+     * 产品变更申请表：把「批准人 / 批准签字 / 批准日期」写回纸面三格（2026-11-11 用户口径）。
+     *
+     * <p>用户原话：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，
+     * 还有日期，…保存之后该单据可见内容，打印出来也是有数据的」。</p>
+     *
+     * <p>三格绑在 rd_change_head 的备用列池（批准人=备用2 / 批准签字=备用3 / 批准日期=备用4），
+     * 且这三个 yj_field 是 editable=0 ⇒ **本方法就是唯一真源**；前端保存链写不进这三格。</p>
+     *
+     * <p>取值：批准人 = 审批通过的人（姓名，不接受前端传）；签字与日期优先取弹窗载荷，
+     * 没带则兜底为「审批人姓名」与「当天」—— 这样老前端/老的确认框流程也不会留空白。</p>
+     */
+    private void writeChangeApprovalSign(PanelRegistry.PanelDef def, String no, Map<String, Object> formData, String operator) {
+        String approver = signNameOf(operator);
+        if (approver.isEmpty()) return;
+        String sign = pickOf(formData, "批准签字").trim();
+        if (sign.isEmpty()) sign = approver;
+        String date = pickOf(formData, "批准日期").trim();
+        if (date.isEmpty()) date = java.time.LocalDate.now().toString();
+        try {
+            jdbc.update("UPDATE rd_change_head SET 备用2 = ?, 备用3 = ?, 备用4 = ?"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    approver, sign, date, no);
+        } catch (Exception e) {
+            // 备用列缺失(未跑迁移)不该阻断审批 —— 与 writeBackSignCell 同一口径,静默降级
+            log.warn("[变更审批] 写回批准人/签字/日期失败 no={}: {}", no, e.getMessage());
         }
     }
 
@@ -5631,6 +5667,13 @@ public class ButtonService {
         sel.append(", (SELECT TOP 1 CONVERT(nvarchar(19), s2.archived_at, 120) FROM rd_approval a"
                 + " JOIN yj_doc_status s2 ON s2.panel_code = 'RD_APPROVAL' AND s2.doc_no = a.[单据编号]"
                 + " WHERE a.[文档编号] = p.[文档编号] AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_archived_at");
+        // 2026-11-11 用户口径:「项目负责人要显示项目实施计划的负责人,这个负责人是谁填写的
+        //   项目实施计划就是谁」⇒ 计划表头那格「负责人」空着时,回落到**这张计划是谁建的**
+        //   (rd_plan.asp_user1 → yj_user.real_name,取不到名字就退回账号),不让进度表留空。
+        //   为什么要回落:纸面「负责人」是手填格,现场大量单据建好就归档、那一格根本没填,
+        //   于是项目进度查询的「项目负责人」整列空着(用户截图)。
+        sel.append(", COALESCE(NULLIF((SELECT TOP 1 u.[real_name] FROM yj_user u"
+                + " WHERE u.[username] = p.[asp_user1]), N''), p.[asp_user1]) AS plan_owner_by");
         sel.append(" FROM rd_plan p WHERE p.[单据编号] = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'");
         sel.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PLAN'"
                 + " AND s.doc_no = p.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')");
@@ -5682,7 +5725,9 @@ public class ButtonService {
         //   立项里取不到才退回实施计划自己的参照带入值。
         String level = str(plan.get("appr_level"));
         if (level == null || level.isBlank()) level = str(plan.get("项目定级"));
+        // 「项目负责人」= 计划的负责人;那格空着就按"谁填写的实施计划就是谁"回落制单人
         String owner = str(plan.get("负责人"));
+        if (owner == null) owner = str(plan.get("plan_owner_by"));
         String due = latestDone != null ? latestDone : lastPlanDue;
         String initiator = str(plan.get("appr_initiator"));       // → 进度表「项目发起人」
         String startDate = str(plan.get("appr_archived_at"));     // → 进度表「立项日期」= 立项申请的归档日期
