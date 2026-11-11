@@ -945,7 +945,7 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="editable && !dt.fixedRows" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable && !dt.fixedRows" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? dtTableW(dt) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -3683,8 +3683,24 @@ function dtOwnsWidth(dt) {
  */
 function variantSpan(dt) {
   return Math.max(2, Math.min(6, totalSpan(dt) - 1))
-}function dtW(dt) {
+}
+/** 各列宽度之和（**不含** span、不含缩放）—— 既有调用点的原口径，勿改语义 */
+function dtW(dt) {
   return visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
+}
+/**
+ * 明细表**实际渲染宽度**（px）—— 与 colgroup 完全同一口径，供「＋ 新增数据记录行」等
+ * 表外元素对齐用（2026-11-11 用户口径「这个也要对齐」）。
+ *
+ * <p>此前那几处各自用 `dtW(dt)`（= Σ(c.w||100)）算宽，漏了两件事：
+ * ① `样品信息` 这类 span:3 的列要按 3 份宽算；② 有自定义列时整表按 dtFillK 缩放到纸宽。
+ * 结果就是表格 898px、下面那根「新增数据记录行」只有 720px（用户截图）。</p>
+ */
+function dtColSum(dt) {
+  return visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+}
+function dtTableW(dt) {
+  return dtColSum(dt) * (dt.design ? designK(dt) : dtFillK(dt))
 }
 
 // ── 像素级还原(dt.design):配置为设计图像素单位,按 k = 网格宽 / 可见列设计宽 等比缩放 ──

@@ -165,3 +165,19 @@ test('⑫ 配置驱动表的 colgroup 必须带 span，且加列后整表回到�
   assert.match(m[0], /addedCount/, '没加过列的表必须返回 1（既有版面零影响）')
   assert.match(m[0], /gridW\.value \/ want/, '应按 纸宽÷各列(含span)宽度和 缩放')
 })
+
+test('⑬ 表外元素（「＋ 新增数据记录行」条）必须与表格同宽', () => {
+  // 用户口径（2026-11-11）：「这个也要对齐」——截图里表格 898px、加行条只有 720px。
+  // 根因：加行条宽度用 dtW(dt)=Σ(c.w||100)，漏了 ①span:3 列按 3 份算 ②有自定义列时按 dtFillK 缩放到纸宽。
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /function dtColSum\(dt\)/, '缺少含 span 的列宽求和')
+  assert.match(sheet, /function dtTableW\(dt\)/, '缺少"表格实际渲染宽度"函数')
+  const m = sheet.match(/function dtTableW\(dt\)[\s\S]*?\n\}/)
+  assert.ok(m, 'dtTableW 实现缺失')
+  assert.match(m[0], /designK\(dt\) : dtFillK\(dt\)/, 'dtTableW 要与 colgroup 同一口径（design / dtFillK）')
+  // 加行条宽度必须走 dtTableW
+  const addLine = sheet.split('\n').find((l) => l.includes('新增数据记录行') && l.includes('class="rs-add"'))
+  assert.ok(addLine, '找不到加行条那一行')
+  assert.match(addLine, /dtTableW\(dt\)/, '加行条宽度必须用 dtTableW（否则与表格不同宽）')
+  assert.ok(!/dt\.design \? dtW\(dt\) \* designK\(dt\) : dtW\(dt\)/.test(addLine), '不得再退回旧的 dtW 写法')
+})
