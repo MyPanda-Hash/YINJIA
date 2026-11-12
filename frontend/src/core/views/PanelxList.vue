@@ -9538,9 +9538,51 @@ function validateArchiveUniqueKeys() {
   return ''
 }
 
+/**
+ * 最近一次必填校验的**结构化**缺失清单（2026-11-12 用户口径「弹窗提示一次，并高亮显示未填写内容」）。
+ * validateInlineDraft 原来只返回一句合并文案，弹窗要逐条列出来，所以把明细存在这里。
+ */
+let lastMissingRequired = []
+
+/**
+ * 必填缺失的**弹窗**提示（2026-11-12 用户口径）。
+ *
+ * <p>用户原话：「在没有填写完就提交审批的情况下，弹窗提示一次，并高亮显示未填写内容」。</p>
+ *
+ * <p>与旧行为的差别：原来只 `ElMessage.warning` 弹一条合并文案（"还有 N 项必填没填：A、B…"），
+ * 十几项时后半截被截断、看不全。现在改成**一次弹窗 + 逐条清单**，
+ * 高亮仍由 validateInlineDraft 内部对每个缺失点调 focusMissingFields 完成（会翻到对应页并闪烁）。</p>
+ *
+ * <p>⚠ 用 `ElMessageBox.alert` 而不是 warning：这是"要用户回去补"的阻塞式反馈；
+ * 且必须 `.catch(() => {})` —— 用户点右上角关闭会 reject，否则控制台报未处理异常。</p>
+ */
+function promptMissingRequired(pre, fallbackText) {
+  const items = (lastMissingRequired || []).map((m) => String(m.text || '')).filter(Boolean)
+  if (!items.length) {
+    ElMessage.warning(pre + fallbackText)
+    return
+  }
+  const shown = items.slice(0, 20)
+  const more = items.length - shown.length
+  const html = `<div style="line-height:22px">`
+    + `<div style="margin-bottom:8px;color:rgba(0,0,0,.65)">`
+    + tt('以下内容还没填写完，已用高亮标出，请补齐后再提交：')
+    + `</div><ol style="margin:0;padding-left:20px">`
+    + shown.map((t) => `<li>${t.replace(/</g, '&lt;')}</li>`).join('')
+    + `</ol>`
+    + (more > 0 ? `<div style="margin-top:6px;color:rgba(0,0,0,.45)">${tt('还有 {n} 项…').replace('{n}', String(more))}</div>` : '')
+    + `</div>`
+  ElMessageBox.alert(html, (pre || '') + tt('还有 {n} 项必填未填写').replace('{n}', String(items.length)), {
+    confirmButtonText: tt('去填写'),
+    type: 'warning',
+    dangerouslyUseHTMLString: true,
+  }).catch(() => { /* 关闭弹窗不算错误 */ })
+}
+
 function validateInlineDraft() {
   /** 缺失项:{key(数据键), text(人话)} —— 明细页签整表必填时 key 是页签键 */
   const missing = []
+  lastMissingRequired = missing
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
@@ -9627,7 +9669,10 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   //   用户口径:保存为草稿不做必填限制;保存/提交才做。
   const validation = skipValidation ? '' : validateInlineDraft()
   if (validation) {
-    ElMessage.warning(pre + validation)
+    // 2026-11-12 用户口径：未填完就提交审批时**弹窗提示一次**，并高亮未填写内容。
+    // 高亮已由 validateInlineDraft 内部对每个缺失点调用 focusMissingFields 完成（翻页 + 闪烁）；
+    // 这里负责"一次说清"：把全部缺失项列成一个清单，而不是像原来那样只弹一条 toast。
+    promptMissingRequired(pre, validation)
     // 定位(翻页/滚动/高亮)已改为在 validateInlineDraft 的**每个失败点**就地调用
     // focusMissingField(精确的数据键,含明细行字段)。此处不再从提示文案反推字段名:
     // 反推出来的常是「明细工序控制」这类不存在的键,还会把已生效的高亮覆盖掉。

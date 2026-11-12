@@ -2086,6 +2086,11 @@ export default {
       'Detail = a data column inside the sheet table (most common); Header = a field in the document header.',
     '已达上限，请先停用不用的列': 'Reached the limit — retire unused columns first',
     '请先填写字段名': 'Enter a field name first',
+    // ---- 必填校验弹窗（2026-11-12）----
+    '以下内容还没填写完，已用高亮标出，请补齐后再提交：': 'The following are still empty (highlighted on the sheet). Please complete them before submitting:',
+    '还有 {n} 项必填未填写': '{n} required field(s) still empty',
+    '还有 {n} 项…': 'and {n} more…',
+    '去填写': 'Fill in',
     '点击选择人员': 'Click to pick people',
     '会签人清单加载失败，可稍后重试': 'Failed to load the countersigner list, please retry later',
     '现存量提取': 'Extract on-hand',

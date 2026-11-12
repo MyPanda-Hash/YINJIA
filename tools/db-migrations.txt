@@ -4616,3 +4616,5 @@ migrate-mold-recipe-design-unit-20261111.sql
 migrate-rd-change-approval-sign-20261111.sql
 # 2026-11-11 产品信息表历史单据「一级审核人」统一为陈秀丽（只改这一列，幂等）
 migrate-prodinfo-l1-approver-backfill-20261111.sql
+# 2026-11-12 产品信息表一/二区字段置必填（项目编号/项目名称豁免；三区"至少一行"走 tab.isRequired）
+migrate-prodinfo-required-20261112.sql
