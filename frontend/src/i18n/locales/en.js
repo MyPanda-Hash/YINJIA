@@ -4261,8 +4261,12 @@ export default {
       'It returns to the pending pool; changing lines = revoke + re-schedule; this line\'s planned lines are voided as well',
     // 口径拆分(2026-10-07):成品口径(需求/排产/入库/未交量)与工序口径(各道计划量/报工)分开显示
     '当前工序计划量': "Current operation's planned qty",
+    // 本线排产数量(2026-11-11):「工单排产 / 快速排产②已排产」的数量主列 = 排产数量 × 该道换算率,
     //   成品口径(排产/入库/未交量)仍按 pl_sl,见列头 tooltip
+    '本线排产数量': 'Line scheduled qty',
+    '本线排产数量 = 排产数量 × 该工序自己的换算率(取该行当前工序的台账计划数量);成品口径请用左侧「订单数量」':
       'Line scheduled qty = scheduled qty × this operation\'s conversion rate (the current operation\'s planned qty in the process ledger); for the finished-product basis use "Order Qty" on the left',
+    '本线排产数量 = 排产数量 × 该工序自己的换算率（当前工序台账计划数量）;成品口径看「需求数量/入库数量」':
       'Line scheduled qty = scheduled qty × this operation\'s conversion rate (the current operation\'s planned qty in the ledger); for the finished-product basis see "Demand Qty / Received Qty"',
     '当前工序完工量': "Current operation's completed qty",
     '上道工序': 'Previous operation',
@@ -5696,6 +5700,10 @@ export default {
     '加载面板配置失败': 'Failed to load the panel configuration',
     '面板编号无效,请从左侧菜单进入「实验室记录手机登记」': 'Invalid panel code — open "Lab Records Mobile Entry" from the left menu',
     '保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。拍的照会写进「手机照片」字段,电脑端点开即可看。': 'Saved documents stay in Draft status; approve and archive them on the PC panel as usual. Photos are written into the "Mobile Photo" field and can be opened on the PC.',
+    // ---- 生产工单·滚动加载(2026-11-09:分页改滚动加载,首屏 50 行,向下滚动追加下一批)----
+    '已加载': 'Loaded',
+    '向下滚动加载更多': 'Scroll down to load more',
+    '已全部加载': 'All loaded',
     "可报": "Reportable",
     "可加工量": "Processable",
     "本道可报量 = 上一道已审核完工量(按量流转)": "Reportable qty = approved output of the previous process (flow by quantity)",
@@ -5733,18 +5741,20 @@ export default {
     '至少保留一个批次': 'Keep at least one batch',
     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Deleting the batch clears all its judgement results. Delete anyway?',
     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Deleting this item clears its records for every batch. Delete anyway?',
-    "工序在制": "Process WIP",
-    "该道计划量": "Process planned qty",
-    "该道已完工": "Process completed",
-    "可排产量": "Schedulable qty",
-    "不可排产量": "Unschedulable qty",
-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Schedulable qty = processable qty − completed qty of this process (what this line can do now)",
-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Unschedulable qty = planned qty of this process − processable qty (still not flowed from the previous process)",
-    "上道已完工折成品": "Prev process completed (FG basis)",
-    "最后报工时间": "Last report time",
-    "工单当前工序": "WO current process",
-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Exceeds the schedulable qty; the server will reject it (max = schedulable qty × 1.01)",
+    "上道完工(折成品)": "Upstream Output (Converted)",
+    "待报量": "Reportable Remaining",
+    "待流入量": "Pending Inflow",
+    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Upstream output (converted) = approved output of the previous process / its conversion rate; first process = scheduled qty",
+    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "Processable qty = upstream output (converted) x this process conversion rate",
+    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Reportable remaining = processable qty - approved output of this process",
+    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Pending inflow = planned qty - processable qty (still to flow in from the previous process)",
+    "工序流转明细": "Process Flow Detail",
+    "按量流转:上一道报多少,下一道最多做多少": "Flow by qty: the next process can only do what the previous one reported",
+    "已审完工": "Approved Output",
+    "本线待做": "To do on this line",
+    "该工序排在本线,但工单当前工序在别的产线": "This process is assigned to this line, while the work order current process is on another line",
+    "上道完工量 = 上一道已审核报工数(上一道自己的计量单位,不折算);换算率不同时,本道能做多少看「可加工量」": "Upstream completed qty = approved output of the previous process (in its own unit, not converted); when conversion rates differ, see \"Processable\" for how much this process can do",
+    "可加工量 = 上一道流下来的量(已按换算率折到本道单位),也就是本道现在最多能做多少": "Processable = quantity flowed in from the previous process (already converted to this process unit) — the maximum this process can do now",
   },
 
 }
-

@@ -58,7 +58,7 @@
             <span v-if="shop" class="wb-shop">{{ tt('当前车间') }}：{{ shop }}</span>
           </span>
           <span class="wb-ctx-stats">
-            {{ tt('排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
+            {{ tt('本线排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
           </span>
         </div>
 
@@ -117,9 +117,47 @@
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
             </div>
           </div>
-          <el-table v-if="viewMode === '排产明细'" :data="schedRows" size="small" border height="100%" empty-text=""
+          <el-table :data="schedRows" size="small" border height="100%" empty-text=""
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
+            <!-- 按量流转·逐道明细(2026-11-12 方案A):一行只显示"当前工序",后道必须展开才看得到;
+                 展开区渲染后端给的「工序流转明细」,只读。 -->
+            <el-table-column type="expand" width="30">
+              <template #default="{ row }">
+                <div class="wb-flow-box">
+                  <div class="wb-flow-title">{{ tt('工序流转明细') }}（{{ tt('按量流转:上一道报多少,下一道最多做多少') }}）</div>
+                  <table class="wb-flow-tbl">
+                    <thead>
+                      <tr>
+                        <th>{{ tt('工序') }}</th>
+                        <th class="num">{{ tt('换算率') }}</th>
+                        <th class="num">{{ tt('计划量') }}</th>
+                        <th class="num">{{ tt('可加工量') }}</th>
+                        <th class="num">{{ tt('已审完工') }}</th>
+                        <th class="num">{{ tt('待报量') }}</th>
+                        <th class="num">{{ tt('待流入量') }}</th>
+                        <th>{{ tt('状态') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(f, i) in (row.工序流转明细 || [])" :key="i" :class="{ 'is-cur': f.当前 }">
+                        <td>{{ tt(f.工序) }}</td>
+                        <td class="num">{{ flowNum(f.换算率) }}</td>
+                        <td class="num">{{ flowNum(f.计划量) }}</td>
+                        <td class="num">{{ flowNum(f.可加工量) }}</td>
+                        <td class="num">{{ flowNum(f.已审完工) }}</td>
+                        <td class="num">{{ flowNum(f.待报量) }}</td>
+                        <td class="num" :class="{ 'wb-flow-gap': Number(f.待流入量 || 0) > 0 }">{{ flowNum(f.待流入量) }}</td>
+                        <td>{{ tt(f.状态) }}</td>
+                      </tr>
+                      <tr v-if="!(row.工序流转明细 || []).length">
+                        <td colspan="9" class="empty">{{ tt('该工单行没有工序台账(没预排产)') }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </el-table-column>
             <!-- ══════════ 冻结区(2026-11-08 用户口径)══════════
                  用户原话:「排单界面物产品编码、产品规格、订单数量,显示在前面冻结,方便看。……进行修改还需要
                  考虑当前冻结后如何显示其他的信息对其他信息进行处理要如何实现。」
@@ -164,15 +202,58 @@
               </template>
             </el-table-column>
             <el-table-column :label="tt('实际完工日期')" prop="实际完工日期" width="105" />
-            <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
+            <!-- 本线排产数量(2026-11-11 用户口径):本页一行 = 一张工单行在**当前产线**做**当前工序**,
+                 所以「排产数量」列要看的是**本线要排/要做的量** = 排产数量 × 该道换算率
+                 (= 该行当前工序的台账计划数量,接口既有字段 `当前工序计划量`)。
+                 成品口径的排产数量 pl_sl 仍由接口返回,供打印/切单/未交量/领料使用 —— 本列不改任何数据。 -->
+            <el-table-column prop="本线排产数量" width="110" align="right">
+              <template #header>
+                <span :title="tt('本线排产数量 = 排产数量 × 该工序自己的换算率(取该行当前工序的台账计划数量);成品口径请用左侧「订单数量」')">{{ tt('本线排产数量') }}</span>
+              </template>
+              <!-- 后端 scheduled() 已返回同值别名 本线排产数量;老服务/老数据取不到时回退既有字段 当前工序计划量 -->
+              <template #default="{ row }">{{ num(row['本线排产数量'] ?? row['当前工序计划量']) }}</template>
+            </el-table-column>
             <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-            <!-- 工序口径:当前工序 = 该行**现在该做的工序**(预排台账位置;在切炭线就显示切炭),
-                 旁边给「上道工序 + 上道完工量」= 来料量(上一道已审报工量) -->
+            <!-- 工序口径(2026-11-12 用户口径「这些数据完成需要放在前面…放在工序那边」):
+                 工序块从左到右读成一条链 ——
+                 当前工序 → 本道计划量 → 本道已做 → 上道工序/上道已做 → 能做多少 → 还能报 → 还缺。
+                 上道工序/上道完工量从原来的"日期列后面"前移到这里;未交量属整单口径,留在原位不动。 -->
             <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
               <template #default="{ row }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</template>
             </el-table-column>
             <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
             <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
+            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
+              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
+            </el-table-column>
+            <el-table-column width="110" align="right">
+              <template #header>
+                <span :title="tt('上道完工量 = 上一道已审核报工数(上一道自己的计量单位,不折算);换算率不同时,本道能做多少看「可加工量」')">{{ tt('上道完工量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.上道完工量) }}</template>
+            </el-table-column>
+            <!-- 按量流转(2026-11-12,只读展示):可加工量(= 上一道流下来、本道现在最多能做多少) /
+                 待报量(还能报) / 待流入量(还等上一道)。上道做了多少看上面前移的「上道完工量」。 -->
+            <el-table-column width="100" align="right">
+              <template #header>
+                <span :title="tt('可加工量 = 上一道流下来的量(已按换算率折到本道单位),也就是本道现在最多能做多少')">{{ tt('可加工量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.当前工序可加工量) }}</template>
+            </el-table-column>
+            <el-table-column width="92" align="right">
+              <template #header>
+                <span :title="tt('待报量 = 可加工量 − 本工序已审报工(本道还能报多少)')">{{ tt('待报量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.当前工序待报量) }}</template>
+            </el-table-column>
+            <el-table-column width="100" align="right">
+              <template #header>
+                <span :title="tt('待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)')">{{ tt('待流入量') }}</span>
+              </template>
+              <template #default="{ row }">
+                <span :class="{ 'wb-flow-gap': Number(row.当前工序待流入量 || 0) > 0 }">{{ flowNum(row.当前工序待流入量) }}</span>
+              </template>
+            </el-table-column>
             <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),紧跟工序完工口径。
                  每个日期格都可填计划(含今天以前的日期 —— 用户口径「23~28 号填不了」);
                  格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
@@ -215,11 +296,9 @@
                 </span>
               </template>
             </el-table-column>
-            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
-              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
-            </el-table-column>
-            <el-table-column :label="tt('上道完工量')" prop="上道完工量" width="110" align="right" />
-            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数) -->
+            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数)
+                 ⚠ 2026-11-12 用户口径:未交量是**整张工单**的口径,不属于工序块 ⇒ 保持原位(日期列之后),
+                   不随「上道工序/上道完工量」一起前移到工序列。 -->
             <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
             <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):它是「本工单行需求 − 本行订单占用」
                  (form_flow_link SO→PLANG)的口径 —— 新口径下需求=转单量、占用链也写同一个数,余量恒为 0
@@ -243,80 +322,9 @@
             <el-table-column :label="tt('打印次数')" prop="打印次数" width="80" align="right" />
             <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" fixed="right" />
           </el-table>
-
-          <!-- ═════ 工序在制(2026-11-11 用户口径)═════
-               「完成一部分当前报工后,能在**下一道工序的产线**中查看到这个工单排产,并且能处理
-                 当前的可排产量和不可排产量」。
-               行 = 工单行 × 该道**已落实**工序,归到该道自己的**实际生产线**(无则计划线)。
-               所以前道只报了 500/2500 时,装箱线也能在这里看到「装箱 · 可排 400 · 不可排 4000」。 -->
-          <el-table v-else v-loading="wipLoading" :data="wipRows" size="small" border height="100%" empty-text="">
-            <el-table-column type="index" label="#" width="46" />
-            <el-table-column :label="tt('工单号')" prop="工单号" width="150" show-overflow-tooltip />
-            <el-table-column :label="tt('工单行号')" prop="工单行号" width="88" align="right" />
-            <el-table-column :label="tt('产品编码')" prop="产品编码" width="120" show-overflow-tooltip />
-            <el-table-column :label="tt('产品规格')" prop="规格型号" width="130" show-overflow-tooltip />
-            <el-table-column :label="tt('订单数量')" prop="订单数量" width="95" align="right" />
-            <el-table-column :label="tt('工序')" width="90">
-              <template #default="{ row }">{{ row.工序 ? tt(row.工序) : '-' }}</template>
-            </el-table-column>
-            <el-table-column :label="tt('计划生产线')" prop="计划生产线" width="118" show-overflow-tooltip />
-            <el-table-column :label="tt('实际生产线')" prop="实际生产线" width="118" show-overflow-tooltip />
-            <el-table-column :label="tt('该道计划量')" prop="该道计划量" width="108" align="right" />
-            <el-table-column :label="tt('该道已完工')" prop="该道已完工" width="108" align="right" />
-            <!-- 可排产量 = 可加工量 − 该道已完工(**这条线现在能做的量**);
-                 不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量,做了也没料) -->
-            <el-table-column :label="tt('可排产量')" width="110" align="right">
-              <template #header>
-                <span :title="tt('可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)')">{{ tt('可排产量') }}</span>
-              </template>
-              <template #default="{ row }"><b class="wb-can">{{ num(row.可排产量) }}</b></template>
-            </el-table-column>
-            <el-table-column :label="tt('不可排产量')" width="115" align="right">
-              <template #header>
-                <span :title="tt('不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)')">{{ tt('不可排产量') }}</span>
-              </template>
-              <template #default="{ row }"><span class="wb-cannot">{{ num(row.不可排产量) }}</span></template>
-            </el-table-column>
-            <el-table-column :label="tt('上道工序')" width="95">
-              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
-            </el-table-column>
-            <el-table-column :label="tt('上道已完工折成品')" prop="上道已完工折成品" width="140" align="right" />
-            <el-table-column :label="tt('最后报工时间')" prop="最后报工时间" width="135" />
-            <el-table-column :label="tt('工单当前工序')" width="112">
-              <template #default="{ row }">{{ row.工单当前工序 ? tt(row.工单当前工序) : '-' }}</template>
-            </el-table-column>
-            <el-table-column :label="tt('操作')" width="92" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" type="primary" plain @click="openReport(row)">{{ tt('报工') }}</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
         </div>
       </div>
     </div>
-
-    <!-- 工序在制 · 行内报工(2026-11-11):直接在当前产线把「可排产量」报掉,
-         复用手机端工序报工同一接口 /px/workReport/submit(保存+审核/送审一条链,后端按量校验)。 -->
-    <el-dialog v-model="repVisible" :title="tt('工序报工')" width="460px" append-to-body>
-      <el-form label-width="110px">
-        <el-form-item :label="tt('工单号')">{{ repRow.工单号 }} #{{ repRow.工单行号 }}</el-form-item>
-        <el-form-item :label="tt('工序')">{{ repRow.工序 ? tt(repRow.工序) : '' }}</el-form-item>
-        <el-form-item :label="tt('该道计划量')">{{ num(repRow.该道计划量) }}</el-form-item>
-        <el-form-item :label="tt('该道已完工')">{{ num(repRow.该道已完工) }}</el-form-item>
-        <el-form-item :label="tt('可排产量')"><b class="wb-can">{{ num(repRow.可排产量) }}</b></el-form-item>
-        <el-form-item :label="tt('不可排产量')"><span class="wb-cannot">{{ num(repRow.不可排产量) }}</span></el-form-item>
-        <el-form-item :label="tt('完工数量')">
-          <el-input-number v-model="repQty" :min="0" :precision="2" :step="1" style="width: 100%" />
-        </el-form-item>
-        <el-form-item :label="tt('提示')" v-if="Number(repQty) > Number(repRow.可排产量 || 0)">
-          <span class="wb-cannot">{{ tt('超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)') }}</span>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="repVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :loading="repSaving" @click="submitReport">{{ tt('提交报工') }}</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 排单计划打印设置(2026-11-05):默认打印天数 —— 客户要"打印就显示 3 天/3~4 天,自己可设" -->
     <el-dialog v-model="printSetVisible" :title="tt('排单计划打印设置')" width="380px" append-to-body>
@@ -412,10 +420,6 @@ const day = ref(new Date().toISOString().slice(0, 10))
 const lineSummary = ref([])
 const sel = reactive({ line: '' })
 const scope = ref('未完工')
-/** 视图切换(2026-11-11 用户口径):排产明细 = 工单行视角;工序在制 = 工单行 × 在制工序(下道产线的待办) */
-const viewMode = ref('排产明细')
-const wipRows = ref([])
-const wipLoading = ref(false)
 const schedRows = ref([])
 const checkedSched = ref([])
 const s = ref({})
@@ -463,9 +467,15 @@ const raLimited = ref(false)
 const raLines = computed(() => raLinesAll.value.filter((l) => !raShop.value || l.生产车间 === raShop.value))
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
+/** 按量流转字段展示(2026-11-12):没数显示 '-'，0 照显示(缺口 0 有意义) */
+function flowNum(v) { return (v === null || v === undefined || v === '') ? '-' : num(v) }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
-const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
+// 本线排产数量合计(2026-11-11 用户口径「顶部合计同步按本线量算」):
+//   与本页「本线排产数量」列同源 = 当前工序台账计划数量(= 排产数量 × 该道换算率)。
+//   ⚠ 跨工序相加口径不同(成型件 + 装箱件),只在同工序/同车间内看这个合计才有意义;
+//   成品口径的合计看右侧「未完工量」(= Σ 未交量,排产 − 入库)。
+const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number((r.本线排产数量 ?? r.当前工序计划量) || 0), 0))
 /** 左侧按工序/工艺两级分组(2026-10-05):第1级=成型/切炭/组装,第2级=产线分组(成型下 烧结/X烧结) */
 const lineGroups = computed(() => {
   const m = new Map()
@@ -490,7 +500,6 @@ const overQty = computed(() => Number(s.value['今日超额合计'] || 0))
 
 function select(l) {
   sel.line = l.生产线
-  if (viewMode.value === '工序在制') { loadWip(); return }
   loadScheduled().then(() => loadDayPlan())
 }
 
@@ -511,58 +520,6 @@ async function loadScheduled() {
     // 日期列(2026-10-29):先给每行挂上空的日计划/日报工,模板里的 v-model 才有可写路径
     schedRows.value = (res.data || []).map((r) => ({ ...r, 日计划: {}, 日报工: {} }))
   } catch (e) { err(e, '查询失败') }
-}
-
-/**
- * **工序在制**(2026-11-11 用户口径):某条产线上「各道已落实工序」的待办。
- * 用户原话:「完成一部分当前报工后,能在下一道工序的产线中查看到这个工单排产,
- * 并且这里能处理当前的可排产量和不可排产量」。
- * 行 = 工单行 × 该道已落实工序,归该道自己的实际/计划产线;数量口径走后端 ProcessFlow(唯一口径)。
- */
-async function loadWip() {
-  if (!sel.line) { wipRows.value = []; return }
-  wipLoading.value = true
-  try {
-    const res = await request.post('/px/scheduleBoard/wip', { 生产线: sel.line })
-    wipRows.value = res.data || []
-  } catch (e) { err(e, '查询失败') } finally { wipLoading.value = false }
-}
-
-/** 视图切换:换到「工序在制」当场按量取一次(不依赖刷新按钮) */
-function onViewMode() {
-  if (viewMode.value === '工序在制') loadWip()
-  else loadScheduled().then(() => loadDayPlan())
-}
-
-// ── 工序在制 · 行内报工(2026-11-11):复用手机端工序报工同一接口 ──
-const repVisible = ref(false)
-const repRow = ref({})
-const repQty = ref(0)
-const repSaving = ref(false)
-function openReport(row) {
-  repRow.value = row || {}
-  repQty.value = Number(row?.可排产量 || 0)      // 默认 = 这条线现在能做的量
-  repVisible.value = true
-}
-async function submitReport() {
-  const q = Number(repQty.value) || 0
-  if (q <= 0) { ElMessage.warning(tt('请填写完工数量')); return }
-  repSaving.value = true
-  try {
-    const res = await request.post('/px/workReport/submit', {
-      woNo: repRow.value.工单号,
-      工单行号: repRow.value.工单行号,
-      工序: repRow.value.工序,
-      数量: q,
-    })
-    const d = res.data || {}
-    ElMessage.success(tt('报工已提交') + (d.报工单号 ? ':' + d.报工单号 : '')
-      + (d.生效方式 ? '（' + d.生效方式 + '）' : ''))
-    repVisible.value = false
-    await loadWip()
-    await loadSummary()
-    await loadStats()
-  } catch (e) { err(e, '提交报工失败') } finally { repSaving.value = false }
 }
 
 async function loadStats() {
@@ -697,7 +654,7 @@ async function loadAll() {
   // 故 Promise.all 只会全部成功 ⇒ finally 收口即可。
   loading.value = true
   try {
-    await Promise.all([loadSummary(), loadScheduled(), loadStats(), viewMode.value === '工序在制' ? loadWip() : Promise.resolve()])
+    await Promise.all([loadSummary(), loadScheduled(), loadStats()])
     await loadDayPlan()
   } finally { loading.value = false }
 }
@@ -819,10 +776,11 @@ async function printTask(mode) {
     商品名称: r.产品名称 || '',
     规格型号: r.规格型号 || '',
     订单数量: r.需求数量,
-    成型折算后数量: r.排产数量,
+    成型折算后数量: r.行来源 === '本线工序' ? (r.本线排产数量 ?? r.当前工序计划量 ?? r.排产数量) : r.排产数量,
     计划完工日期: r.计划完工日期 || '',
     批号: r.批号 || '', 物料编码: r.物料编码 || '',
-    排产数量: r.排产数量, 生产线: r.生产线 || sel.line || '',
+    排产数量: r.行来源 === '本线工序' ? (r.本线排产数量 ?? r.排产数量) : r.排产数量, 生产线: r.生产线 || sel.line || '',
+    工序: r.当前工序 || '',
   }))
   // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
   const okPrint = await printWorkTaskSheet(mode, rowsToPrint)
@@ -994,9 +952,17 @@ onMounted(() => {
 .wb-print-set-form { padding-top: 4px; }
 .wb-print-set-hint { margin-top: 6px; font-size: 12px; line-height: 1.6; color: #909399; }
 .wb-closed { color: #f56c6c; font-weight: 600; }
-/* 工序在制(2026-11-11):可排产量(这条线现在能做的量)/ 不可排产量(前道还没流下来) */
-.wb-can { color: #1e6fb8; font-weight: 700; }
-.wb-cannot { color: #909399; }
+/* 按量流转「待流入量」>0 = 还在等上一道流下来,标橙提示 */
+.wb-flow-gap { color: #e6a23c; font-weight: 600; }
+/* 按量流转·逐道明细(展开行) */
+.wb-flow-box { padding: 8px 12px 10px 12px; background: #fafbfc; }
+.wb-flow-title { font-size: 12px; color: #909399; margin-bottom: 6px; }
+.wb-flow-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.wb-flow-tbl th, .wb-flow-tbl td { border: 1px solid #ebeef5; padding: 4px 8px; text-align: left; }
+.wb-flow-tbl th { background: #f5f7fa; color: #606266; font-weight: 600; }
+.wb-flow-tbl td.num, .wb-flow-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.wb-flow-tbl tr.is-cur td { background: #eef6ff; font-weight: 600; }
+.wb-flow-tbl td.empty { text-align: center; color: #909399; }
 .wb-trace-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .wb-trace-no { font-size: 16px; font-weight: 700; color: #1e6fb8; }
 .wb-trace-desc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: #606266; background: #fdf6ec; border: 1px solid #f5dab1; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
