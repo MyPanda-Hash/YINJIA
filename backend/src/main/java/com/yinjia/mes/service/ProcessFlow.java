@@ -358,15 +358,26 @@ public final class ProcessFlow {
         return lines;
     }
 
-    /** 台账计划数量(按行锚定,同名工序取第一条);没有台账 ⇒ 空(调用方回落 pl_sl × rate) */
+    /**
+     * 台账计划数量(按**工单行id**锚定,同名工序取第一条);没有台账 ⇒ 空(调用方回落 pl_sl × rate)
+     *
+     * <p>🔴 2026-11-12 收口:**台账的唯一权威键 = 工单行id**(2026-10-15 用户口径「工单号+工单行号
+     * 确定当前唯一工单」),{@code 工单号} 只是兼容/展示列。存量里有 2026-10-10 早于「行级锚定」
+     * 修好的台账行({@code 工单行id=123} 指向 GD-2026-09-0049 行5,却存着 {@code 工单号=GD-2026-10-0003}),
+     * 旧的 {@code 工单号=? AND (工单行id=? OR 工单行id IS NULL)} 会把它们整个漏掉
+     * ⇒ 计划量回落成 pl_sl×rate、台账状态永久漂移(与 {@code ScheduleBoardService.ledgerOfRow} 同口径;
+     * 存量订正见 {@code tools/migrate-wo-ledger-rowid-align-20261112.sql})。
+     *
+     * <p>故这里**先按工单行id查**,只有老数据({@code 工单行id IS NULL})才回落按工单号匹配。
+     */
     private static Map<String, Double> ledgerPlanQty(JdbcTemplate jdbc, String plNo, Long rowId) {
         Map<String, Double> out = new LinkedHashMap<>();
         if (rowId == null || rowId <= 0) return out;
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT 工序, ISNULL(计划数量,0) AS 计划数量 FROM dbo.wo_process_line"
-                        + " WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + "   AND (工单行id=? OR 工单行id IS NULL)"
-                        + " ORDER BY ISNULL(工序序,999), id", plNo, rowId)) {
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                        + "   AND (工单行id=? OR (工单行id IS NULL AND 工单号=?))"
+                        + " ORDER BY ISNULL(工序序,999), id", rowId, plNo)) {
             String op = str(r.get("工序"));
             if (!op.isEmpty()) out.putIfAbsent(op, num(r.get("计划数量")));
         }

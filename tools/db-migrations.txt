@@ -4615,3 +4615,6 @@ migrate-qc-asm-insp-batch-table-20261112.sql
 migrate-qc-asm-insp-unlink-finish-in-20261112.sql
 # 2026-11-12 产成品入库单关联出货检验功能单/表观单(阶段1:落两个表头参照字段+10语种译名,零业务门禁)
 migrate-finish-in-insp-link-20261112.sql
+
+# 2026-11-12 工单工序台账按「工单行id」收口:① 工单号 回正(行id→plang.pl_no) ② 按 ProcessFlow 同口径按行id 对账重算整行台账 状态/实际生产线/落实时间 ③ 自检 工单号漂移=0·状态漂移=0(零DDL;幂等;两账套)
+migrate-wo-ledger-rowid-align-20261112.sql

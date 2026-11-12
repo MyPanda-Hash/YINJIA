@@ -1,7 +1,10 @@
 <!-- WorkOrderBoard.vue — 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板,参考旧系统工单排产页)
      产线骨架:左侧=生产线档案**全部线**(与基础资料对应,停用线标记可查看);选中线 → 右侧正在运行的工单明细
      (未完工/已完工/全部);勾选已排 → 批量调线(启用线)/转领料(默认 BOM×排产数量 生成领料单草稿,2026-10-14)。
-     无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。 -->
+     无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。
+     2026-11-12(用户报障「左侧边栏显示的数量和…本线排产数量…当前工序报工数量没有任何关联」):
+     左侧每线主数字从**成品口径** 未交量(排产−入库)改为**本线排产数量**,并加「已报 · 未完工」次行;
+     顶部统计三项同步改工序口径 —— 三处与右侧「未完工」页签明细同源(详见左栏注释)。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -25,7 +28,14 @@
     </div>
 
     <div class="wb-body">
-      <!-- 左:各线 未交量(=基础资料生产线档案,含停用) -->
+      <!-- 左:各线「本线排产数量」+「已报/未完工」次行(2026-11-12 用户报障)───────────────────────
+           原话:「左侧边栏显示的数量和当前的生产线排产数量(本线排产数量)和当前工序报工数量没有任何关联」。
+           原因:主数字原先是**成品口径** 未交量(= 排产 − 入库),与右侧明细的工序口径毫无关系 ⇒
+           出现「左侧该线 0、右侧明细 5421 / 报工 1100」这种自相矛盾的现场。
+           现改为与右侧「未完工」页签明细**同一批行**的合计(接口 linesSummary 新增 3 个数字字段):
+             主数字 = 本线排产数量(字段暂缺 ⇒ 回退成品口径 未交量,不显示空白/NaN)
+             次行   = 已报完工量 · 本线未完工量(两个字段都缺 ⇒ 整行隐藏,不占高度)
+           左侧是产线骨架,口径固定按「未完工」页签,不随右侧页签切换(右侧切「已完工/全部」时只有顶部统计变)。 -->
       <div class="wb-left">
         <div class="wb-left-head">{{ tt('工序/工艺') }} / {{ tt('生产线') }}</div>
         <!-- 按工序/工艺分组(2026-10-05,依《新系统产线命名.xlsx》):分发维度=生产线,功能分组=成型/切炭/组装 -->
@@ -38,7 +48,7 @@
               <span v-if="l.停用" class="wb-tag off-line">{{ tt('停用') }}</span>
             </div>
             <div class="wb-line-row">
-              <span class="wb-qty">{{ num(l.未交量) }}</span>
+              <span class="wb-qty" :title="tt('本线排产数量(该线「未完工」页签明细合计,与右侧顶部统计同源)')">{{ num(lineQty(l)) }}</span>
               <!-- 今日已排/日产能(2026-10-31):只显示、不拦截;未配产能的线明确写"未配",不显示 0 -->
               <span v-if="Number(l.日产能 || 0) > 0" class="wb-daycap"
                     :class="{ over: l.今日余量 != null && Number(l.今日余量) < 0 }"
@@ -47,6 +57,9 @@
               </span>
               <span v-else class="wb-daycap unset" :title="tt('产线档案未配日产能')">{{ tt('未配产能') }}</span>
             </div>
+            <!-- 次行(2026-11-12):本线已报完工量 · 本线未完工量,与主数字同一批行(11px 灰字,210px 栏内单行省略) -->
+            <div v-if="lineFlowText(l)" class="wb-line-sub"
+                 :title="tt('已报完工量·本线未完工量(本线排产−已报,按「未完工」页签口径)')">{{ lineFlowText(l) }}</div>
           </div>
         </template>
       </div>
@@ -57,8 +70,11 @@
           <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b>
             <span v-if="shop" class="wb-shop">{{ tt('当前车间') }}：{{ shop }}</span>
           </span>
-          <span class="wb-ctx-stats">
-            {{ tt('本线排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
+          <!-- 顶部统计(2026-11-12 改口径):三项全是**工序口径** = 右侧「未完工」页签明细行合计,
+               与左侧每线数字同源(选中哪条线,左侧该线主数字 = 这里的「本线排产数量」)。
+               成品口径的未交量(排产−入库)不再冒充「未完工量」,只在 tooltip 里报合计供对账。 -->
+          <span class="wb-ctx-stats" :title="ctxStatsTitle">
+            {{ tt('本线排产数量') }} {{ num(selQty) }}　|　{{ tt('已报完工量') }} {{ num(selDone) }}　|　{{ tt('未完工量') }} {{ num(selRemaining) }}
           </span>
         </div>
 
@@ -469,13 +485,43 @@ const raLines = computed(() => raLinesAll.value.filter((l) => !raShop.value || l
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 /** 按量流转字段展示(2026-11-12):没数显示 '-'，0 照显示(缺口 0 有意义) */
 function flowNum(v) { return (v === null || v === undefined || v === '') ? '-' : num(v) }
+/**
+ * 左侧每线**主数字**(2026-11-12):= 接口新字段「本线排产数量」(该线「未完工」页签明细行的计划量合计)。
+ * 字段暂缺(后端未升级/联调中)⇒ 回退成品口径「未交量」,绝不渲染空白或 NaN。
+ */
+function lineQty(l) {
+  const v = l['本线排产数量']
+  return (v === undefined || v === null || v === '') ? l['未交量'] : v
+}
+/**
+ * 左侧每线**次行**文案「已报 X · 未完工 Y」(2026-11-12):X=本线已报完工量、Y=本线未完工量,
+ * 与主数字同一批行;两个字段都缺 ⇒ 返回空串 ⇒ 模板整行不渲染(不留一条 0/0 的假数据)。
+ */
+function lineFlowText(l) {
+  const parts = []
+  const done = l['本线已报完工量']
+  const left = l['本线未完工量']
+  if (done !== undefined && done !== null && done !== '') parts.push(`${tt('已报')} ${num(done)}`)
+  if (left !== undefined && left !== null && left !== '') parts.push(`${tt('未完工')} ${num(left)}`)
+  return parts.join(' · ')
+}
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 // 本线排产数量合计(2026-11-11 用户口径「顶部合计同步按本线量算」):
 //   与本页「本线排产数量」列同源 = 当前工序台账计划数量(= 排产数量 × 该道换算率)。
-//   ⚠ 跨工序相加口径不同(成型件 + 装箱件),只在同工序/同车间内看这个合计才有意义;
-//   成品口径的合计看右侧「未完工量」(= Σ 未交量,排产 − 入库)。
+//   ⚠ 跨工序相加口径不同(成型件 + 装箱件),只在同工序/同车间内看这个合计才有意义。
+//   2026-11-12:它同时是左侧每线主数字的口径(接口 linesSummary 的 本线排产数量 = 同一批行合计),
+//   ⇒ 选中线时「左侧该线数字 = 顶部这里」;成品口径(Σ 未交量)见 selOutstanding(只进 tooltip)。
 const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number((r.本线排产数量 ?? r.当前工序计划量) || 0), 0))
+/** 本线已报完工量合计(2026-11-12):与左侧次行同源 = 同一批「未完工」页签行,Σ 当前工序完工量 */
+const selDone = computed(() => schedRows.value.reduce((a, r) => a + Number(r['当前工序完工量'] || 0), 0))
+/** 本线未完工量合计(2026-11-12):**逐行** max(本线排产 − 已报, 0) 再相加 ——
+ *  先加后减会把"某行超报"的富余抵掉别行的缺口,与左侧按行汇总的数字对不上。 */
+const selRemaining = computed(() => schedRows.value.reduce((a, r) => {
+  const plan = Number(r['本线排产数量'] ?? r['当前工序计划量'] ?? 0)
+  const done = Number(r['当前工序完工量'] || 0)
+  return a + Math.max(plan - done, 0)
+}, 0))
 /** 左侧按工序/工艺两级分组(2026-10-05):第1级=成型/切炭/组装,第2级=产线分组(成型下 烧结/X烧结) */
 const lineGroups = computed(() => {
   const m = new Map()
@@ -491,8 +537,17 @@ const shop = computed(() => {
   const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
   return set.length === 1 ? set[0] : ''
 })
-// 未完工量=Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量
+// 未交量合计 = Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量。
+//   ⚠ 2026-11-12 口径纠偏:它**不再**充当顶部「未完工量」—— 顶部「未完工量」改按工序口径(selRemaining,
+//     与右侧明细/左侧每线同源);本值只进顶部统计的 tooltip,用来对账"成品口径还欠多少"。
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
+/** 顶部统计 tooltip(2026-11-12):说清这是**工序口径**(与右侧明细表格同源),并交代成品口径未交量合计 */
+const ctxStatsTitle = computed(() => [
+  tt('工序口径:与右侧明细表格同源(当前页签下选中线的行合计;「未完工」页签时与左侧每线数字一致)'),
+  tt('本线已报完工量') + ' = Σ' + tt('当前工序完工量') + '；'
+    + tt('本线未完工量') + ' = Σmax(' + tt('本线排产数量') + '−' + tt('当前工序完工量') + ',0)',
+  tt('成品口径的未交量合计') + ' = ' + num(selOutstanding.value),
+].join('\n'))
 // 产能可见(2026-10-31 用户口径「产能只显示、不拦截;不影响实际排产量」):
 //   顶部汇总 = 全部启用线今天「已排 > 日产能」的条数与合计超额(/stats 实时算,不落表)。
 const overLineCount = computed(() => Number(s.value['今日超载线数'] || 0))
@@ -876,13 +931,17 @@ onMounted(() => {
 .wb-line.active { background: #e6f3ef; }
 .wb-line.off .wb-line-name { color: #909399; }
 .wb-line-name { font-size: 12px; color: #303133; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.wb-line-sub { font-size: 11px; color: #909399; }
-.wb-line-row { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+/* 左侧行次行「已报 X · 未完工 Y」(2026-11-12):11px 灰字;左栏固定 210px ⇒ 单行省略,
+   长数字(如 12345)也不换行、不横向撑破;字段缺失时模板整行不渲染 */
+.wb-line-sub { margin-top: 1px; font-size: 11px; color: #909399; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 左侧行:主数字(=本线排产数量) + 今日已排/日产能小标签;窄栏放不下时换行,不溢出 */
+.wb-line-row { display: flex; align-items: center; justify-content: space-between; gap: 2px 6px; flex-wrap: wrap; margin-top: 2px; }
 .wb-tag { font-size: 11px; padding: 0 6px; border-radius: 3px; cursor: pointer; }
 .wb-tag.open { background: #67c23a; color: #fff; }
 .wb-tag.closed { background: #f56c6c; color: #fff; }
 .wb-tag.off-line { background: #909399; color: #fff; cursor: default; }
-.wb-qty { font-weight: 600; color: #303133; font-size: 12px; }
+.wb-qty { font-weight: 600; color: #303133; font-size: 12px; font-variant-numeric: tabular-nums; }
 .wb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .wb-ctx { display: flex; align-items: center; gap: 14px; padding: 8px 10px; background: #eef6ff; border: 1px solid #b3d4f5; border-radius: 4px; flex-wrap: wrap; }
 .wb-ctx-label { font-size: 13px; color: #606266; }
@@ -903,7 +962,11 @@ onMounted(() => {
 .ra-hint { font-size: 12px; font-weight: 600; color: #e6a23c; }
 .ra-tip { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; line-height: 1.6; color: #f56c6c; }
 .ra-note { margin-top: 6px; padding-top: 10px; border-top: 1px dashed #ebeef5; font-size: 12px; line-height: 1.6; color: #909399; }
-.wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
+/* 顶部「本线排产数量 | 已报完工量 | 未完工量」(2026-11-12 改工序口径):整块不拆行,
+   放不下时由 .wb-ctx 的 flex-wrap 整块换到第二行;窗口再窄才内部省略(不横向撑出滚动条);
+   cursor:help 提示有 tooltip(成品口径未交量合计) */
+.wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; white-space: nowrap;
+  cursor: help; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }

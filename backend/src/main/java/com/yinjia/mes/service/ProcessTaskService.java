@@ -1361,13 +1361,20 @@ public class ProcessTaskService {
             rowId = rs.get(0);
         }
         final Long row = rowId;
+        // 🔴 台账权威键 = **工单行id**(2026-10-15 用户口径「工单号+工单行号确定当前唯一工单」);
+        //   {@code 工单号} 只是兼容/展示列 —— 存量里有 2026-10-10 早于「行级锚定」修好的行
+        //   (实测 wo_process_line id=16/17/18:工单行id=123 指向 GD-2026-09-0049 行5,却存着
+        //   工单号=GD-2026-10-0003),按 工单号=? 查会整行漏掉 ⇒ 这些行状态永远停在「已落实」,
+        //   看板上被当成「待装箱」的活。故按 工单行id 查,只有老数据(工单行id IS NULL)才回落按工单号。
+        //   存量订正见 tools/migrate-wo-ledger-rowid-align-20261112.sql;看板侧同口径见
+        //   {@code ScheduleBoardService.ledgerOfRow}。
         List<Map<String, Object>> ledgers = jdbc.queryForList(
                 "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
                         + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(计划数量,0) AS 计划数量,"
                         + " ISNULL(状态,N'计划') AS 状态"
-                        + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + "   AND (工单行id=? OR 工单行id IS NULL)"
-                        + " ORDER BY ISNULL(工序序,999), id", no, row);
+                        + " FROM dbo.wo_process_line WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                        + "   AND (工单行id=? OR (工单行id IS NULL AND 工单号=?))"
+                        + " ORDER BY ISNULL(工序序,999), id", row, no);
         // ⚠ 没有预排台账 ≠ 什么都不做:历史上大量工单行没排过线(正式库 400+ 行),它们**仍要**
         //   重算工单行的「当前工序 / 当前工序完工量 / 完工状态」(2026-11-11 前的 syncOneRowState 就是这样),
         //   只是台账那一段跳过。若在这里直接 return,这些工单报满后永远不会变成「生产完工」。

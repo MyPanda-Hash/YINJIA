@@ -614,6 +614,19 @@ export default {
     '确认将': 'Confirm to set',
     '每箱数量': 'Qty / Box',
     '日产能': 'Daily Capacity',
+    // 左侧每线主数字 + 次行 / 顶部三项统计(2026-11-12 口径纠偏:全部改「本线」工序口径,
+    //   与右侧「未完工」页签明细同源;成品口径的未交量只留在 tooltip 里对账)
+    '已报': 'Reported',
+    '已报完工量': 'Reported completed qty',
+    '本线已报完工量': 'Line reported completed qty',
+    '本线未完工量': 'Line open qty',
+    '本线排产数量(该线「未完工」页签明细合计,与右侧顶部统计同源)':
+      'Line scheduled qty (sum of rows under this line\'s "Unfinished" tab; same source as the stats at the top right)',
+    '已报完工量·本线未完工量(本线排产−已报,按「未完工」页签口径)':
+      'Reported completed qty · line open qty (line scheduled − reported, per the "Unfinished" tab)',
+    '工序口径:与右侧明细表格同源(当前页签下选中线的行合计;「未完工」页签时与左侧每线数字一致)':
+      'Operation basis: same source as the detail table on the right (sum of the selected line\'s rows under the current tab; on the "Unfinished" tab it matches the per-line figures on the left)',
+    '成品口径的未交量合计': 'Finished-goods-basis backlog total',
 
     // 工单排产·明细列+取消结案/追溯/打印工单(2026-09-23,旧系统 ProSchedList 对齐)
     '取消结案': 'Unclose',

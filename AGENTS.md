@@ -252,4 +252,5 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 - **数据库表清单**:**`docs/development/数据库表清单.md`**(全库表 + 视图逐张登记 + §0 命名与归属规范 + §0.1 在册表登记;建表/改表/查表先看它,刷新命令见文档末尾)
 - **在册表台账**:**`tools/db-inuse-tables.txt`**(「确定下来的后台表」:206 张在册 + 3 张例外保留;不在册即脏数据;判定口径与逐表证据 `tools/archive/_table-audit/`、清理迁移 `tools/migrate-drop-unused-tables.sql`)
 - **代码规范与防臃肿**:**`docs/development/代码规范与防臃肿.md`**(A 分层边界/B 契约数据驱动/C 文件红线/D 反复制粘贴/E 清理与技术债台账/F 自动化防线);新代码必须满足该规范,违背即视为任务未完成
+- **工单排产看板数量口径**:**`docs/development/工单排产看板-本线任务量口径.md`**(左侧每线数字 = 顶部统计 = 右侧明细,三处同源;**改这三处数字/台账查询前必读**;台账唯一权威键 = 工单行id,存量订正迁移 `tools/migrate-wo-ledger-rowid-align-20261112.sql`)
 - **踩坑台账**:`docs/development/开发与质量.md` §5.5(前端导出/探针专项:jsPDF px 单位、html2canvas、`$el` fragment 锚点、离屏克隆全宽截图、PS 命令通道 CJK 键、`char(2)` 尾空格等)**涉 PDF 生成/截图导出/CDP 探针/PS 工具脚本/定长列比较,先读该节再动手,违者即重复事故**
