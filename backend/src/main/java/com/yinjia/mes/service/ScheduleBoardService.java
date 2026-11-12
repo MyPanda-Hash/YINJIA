@@ -1057,8 +1057,11 @@ public class ScheduleBoardService {
      */
     private List<Map<String, Object>> lineProcessRows(String line, String scope, String ws) {
         StringBuilder stCond = new StringBuilder();
+        // 2026-11-12 用户口径(第二轮):「当前只要流入到下面存在有数据的才要显示,没有流入到工序的不进行显示」
+        //   ⇒ 未完工侧只列「已落实」(= 上一道已审报工折成品 > 0,真的有量流下来);
+        //     「计划」= 还没流入,一律不显示(不再是"提前打印排产计划"的口径)。
         if ("已完工".equals(scope)) stCond.append(" AND ISNULL(w.状态,N'')=N'已完工'");
-        else stCond.append(" AND ISNULL(w.状态,N'')<>N'已完工'");
+        else stCond.append(" AND ISNULL(w.状态,N'')=N'已落实'");
         // 车间过滤:选中线属于哪个车间,只取该车间的线(与既有 workshop 收敛同口径)
         StringBuilder wsCond = new StringBuilder();
         List<Object> args = new ArrayList<>();
