@@ -1020,12 +1020,107 @@ public class ScheduleBoardService {
         //     供打印/切单/未交量/领料/结案等既有判据使用。
         for (Map<String, Object> r : out) {
             r.put("本线排产数量", r.get("当前工序计划量"));
+            r.put("行来源", "当前线");
+        }
+        // 🔴 2026-11-12 用户口径(报障:「怎么没有看到这个单据在装箱线的存在呢?组装里面没有这个单,
+        //   我要打工单和排产计划啊」):**本线工序任务** —— 后道车间必须能在自己的线上看到"等我的那批",
+        //   并且能打印工单/排产计划。
+        //   为什么原来看不到:行来源只有 `plang_pc.scx = 选中线`(工单**当前**线,单值);
+        //   而台账里后道工序的「计划生产线」早就排好了(例:GD-2026-11-0012 的装箱 → 装箱2(新厂),
+        //   状态已落实、可加工 1000),只是工单当前线还停在 1号车间(成型)。
+        //   ⇒ 这里再取一遍「该线有工序台账、但工单当前不在该线」的行:当前工序 = **本线那道工序**,
+        //     本线排产数量 = 该道台账计划数量;其余(可加工/待报/待流入)由 enrichRowFlow 按该道算。
+        //   ⚠ 只读:不改 pc.scx、不写库、不影响报工/转序(转序仍由 applyNextProcess 按量推进)。
+        if (line != null && !line.isBlank()) {
+            out.addAll(lineProcessRows(line.trim(), scope, ws));
         }
         // 按量流转展示(2026-11-12 用户口径「方案A = 只做显示」):补
         //   上道完工(折成品) / 本工序可加工量 / 待报量 / 待流入量 —— **只读**,不写库、不影响报工。
         //   口径与报工页/追溯同源(ProcessFlow);取数 3 条批量查询,不随行数放大。
         ProcessFlow.enrichRowFlow(jdbc, out);
         return out;
+    }
+
+    /**
+     * **本线工序任务**:该产线在台账里负责、但工单**当前线不在本线**的工序行(2026-11-12)。
+     *
+     * <p>用途:后道车间(切炭/组装/装箱)在自己的线看板上能看到"等我的那批",并能勾选打印工单/排单计划。
+     * 行口径与 {@link #scheduled} 完全一致(同列名),区别只有:
+     * <ul>
+     *   <li>{@code 当前工序} = **本线那道工序**(不是工单当前工序);</li>
+     *   <li>{@code 当前工序计划量}/{@code 本线排产数量} = 该道台账计划数量;</li>
+     *   <li>{@code 当前工序完工量} = 该道已审报工量(行级锚定);</li>
+     *   <li>{@code 行来源} = {@code 本线工序}(前端据此打标记、打印取该道数量)。</li>
+     * </ul>
+     * 状态筛选:页签「已完工」→ 该道台账状态=已完工;其它页签 → 该道未完工(含"计划"=还没流入)。
+     * 去重:同一工单行同一道工序有多条台账时只取一条(优先有实际线的)。只读,不写库。
+     */
+    private List<Map<String, Object>> lineProcessRows(String line, String scope, String ws) {
+        StringBuilder stCond = new StringBuilder();
+        if ("已完工".equals(scope)) stCond.append(" AND ISNULL(w.状态,N'')=N'已完工'");
+        else stCond.append(" AND ISNULL(w.状态,N'')<>N'已完工'");
+        // 车间过滤:选中线属于哪个车间,只取该车间的线(与既有 workshop 收敛同口径)
+        StringBuilder wsCond = new StringBuilder();
+        List<Object> args = new ArrayList<>();
+        args.add(line);
+        args.add(line);
+        args.add(line);
+        args.add(line);   // 第 4 个:ISNULL(pp.scx,N'') <> ?(工单当前不在本线)
+        if (!ws.isEmpty()) {
+            wsCond.append(" AND EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = ?")
+                    .append(" AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?)");
+            args.add(line);
+            args.add(ws);
+        }
+        return jdbc.queryForList(
+                "SELECT * FROM ("
+                        + " SELECT p.id AS 行id, pp.pl_no AS 加工单号, pp.pl_xc AS 工单行号, ISNULL(p.comm,N'') AS 公司代码,"
+                        + "        ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(dk.khjb,N'') AS 客户等级,"
+                        + "        ? AS 生产线,"
+                        + "        CONVERT(varchar(10), w.计划开工日期, 120) AS 开工日期,"
+                        + "        CONVERT(varchar(10), COALESCE(w.计划完工日期, pp.cp_date), 120) AS 计划完工日期,"
+                        + "        CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
+                        + "        ISNULL(p.od_no,N'') AS 客户PO, p.dm AS 物料编码,"
+                        + "        ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.jldw,N'') AS 单位,"
+                        + "        N'未完工' AS 生产状态,"
+                        + "        ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
+                        + "        " + ROW_YL + " AS 余量,"
+                        + "        ISNULL(pp.[批次号],N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                        + "        ISNULL(pp.pl_man,N'') AS 操作员,"
+                        + "        CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
+                        + "        ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
+                        + "        N'' AS 计划线,"
+                        + "        " + PlangClose.closedFlag("p") + " AS 结案, N'' AS 结案人, CAST(NULL AS datetime) AS 结案时间,"
+                        + "        ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
+                        + "        ISNULL(p.asp_print,0) AS 打印次数,"
+                        + "        w.工序 AS 当前工序, ISNULL(w.工序序,0) AS 当前工序序,"
+                        + "        ISNULL(w.计划数量,0) AS 当前工序计划量,"
+                        + "        ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
+                        + "           WHERE s.gldh = pp.pl_no AND s.gxdm = w.工序"
+                        + "             AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "             AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
+                        + "                  OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N'')))), 0) AS 当前工序完工量,"
+                        + "        N'' AS 上道工序, 0 AS 上道完工量,"
+                        + "        CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN 0"
+                        + "             ELSE ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) END AS 未交量,"
+                        + "        ISNULL(p.[工艺路线],N'') AS 工艺路线,"
+                        + "        ISNULL(pp.[批次号],N'') AS 批次号,"
+                        + "        ISNULL(w.计划数量,0) AS 本线排产数量,"
+                        + "        N'本线工序' AS 行来源,"
+                        + "        ROW_NUMBER() OVER (PARTITION BY p.id, w.工序"
+                        + "           ORDER BY CASE WHEN ISNULL(w.实际生产线,N'')<>N'' THEN 0 ELSE 1 END, w.id) AS rn"
+                        + " FROM dbo.wo_process_line w"
+                        + " JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " JOIN dbo.plang_pc pp ON pp.plang_id = p.id AND ISNULL(pp.asp_cancel,'N')<>'Y'"
+                        + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
+                        + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
+                        + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
+                        + " WHERE ISNULL(w.asp_cancel,'N')<>'Y'"
+                        + "   AND (ISNULL(w.实际生产线,N'') = ? OR (ISNULL(w.实际生产线,N'')=N'' AND ISNULL(w.计划生产线,N'') = ?))"
+                        + "   AND ISNULL(pp.scx,N'') <> ?"          // 工单当前**不在**本线(在本线的由上面的查询出)
+                        + wsCond + stCond
+                        + ") t WHERE t.rn = 1 ORDER BY t.加工单号, t.工单行号, t.当前工序序",
+                args.toArray());
     }
 
     /**
