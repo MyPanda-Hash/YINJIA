@@ -3,6 +3,15 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '退货': 'Devolución',
+    '待退货': 'Pendiente de devolución',
+    '待特采': 'Pendiente de concesión',
+    '显示已隐藏': 'Mostrar ocultos',
+    '已隐藏': 'Ocultos',
+    '已转ERP': 'Enviado a ERP',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '部分不合格': 'Parcialmente no conforme',
 
 

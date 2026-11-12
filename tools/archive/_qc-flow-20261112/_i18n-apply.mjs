@@ -1,4 +1,4 @@
-﻿// _i18n-apply.mjs — 把「品质流程监控」新增 UI 词条写入各语言包 biz 块(2026-11-12)
+// _i18n-apply.mjs — 把「品质流程监控」新增 UI 词条写入各语言包 biz 块(2026-11-12)
 // 用法: node tools/archive/_qc-flow-20261112/_i18n-apply.mjs [--dry]
 import fs from 'node:fs'
 import path from 'node:path'
@@ -36,6 +36,12 @@ const T = {
     'ใบรับเข้าที่ซิงก์จาก Kingdee ไม่มีเลขที่อ้างอิง MES จึงจับคู่ได้ตามเลขล็อตเท่านั้น หากจับคู่ไม่ได้จะแสดง “ยังไม่สร้าง”',
   ],
   '部分不合格': ['Partially failed', '部分不合格', '一部不合格', '일부 부적합', 'Parcialmente no conforme', 'Partiellement non conforme', 'Teilweise fehlerhaft', 'Частично брак', 'Một phần không đạt', 'บางส่วนไม่ผ่าน'],
+  '退货': ['Return', '退貨', '返品', '반품', 'Devolución', 'Retour', 'Rückgabe', 'Возврат', 'Trả hàng', 'คืนสินค้า'],
+  '待退货': ['To return', '待退貨', '返品待ち', '반품 대기', 'Pendiente de devolución', 'En attente de retour', 'Wartet auf Rückgabe', 'Ожидает возврата', 'Chờ trả hàng', 'รอคืนสินค้า'],
+  '待特采': ['To concede', '待特採', '特採待ち', '특채 대기', 'Pendiente de concesión', 'En attente de dérogation', 'Wartet auf Sonderfreigabe', 'Ожидает спецразрешения', 'Chờ chấp nhận đặc biệt', 'รออนุมัติพิเศษ'],
+  '显示已隐藏': ['Show hidden', '顯示已隱藏', '非表示を表示', '숨김 표시', 'Mostrar ocultos', 'Afficher masqués', 'Ausgeblendete anzeigen', 'Показать скрытые', 'Hiện mục đã ẩn', 'แสดงรายการที่ซ่อน'],
+  '已隐藏': ['Hidden', '已隱藏', '非表示', '숨김', 'Ocultos', 'Masqués', 'Ausgeblendet', 'Скрыто', 'Đã ẩn', 'ซ่อนแล้ว'],
+  '已转ERP': ['Pushed to ERP', '已轉ERP', 'ERP転送済', 'ERP 전송됨', 'Enviado a ERP', "Transféré à l'ERP", 'An ERP übertragen', 'Передано в ERP', 'Đã chuyển ERP', 'ส่งเข้า ERP แล้ว'],
   '需检验': ['Need inspection', '需檢驗', '要検査', '검사 필요', 'Requiere inspección', 'Contrôle requis', 'Prüfpflichtig', 'Требует контроля', 'Cần kiểm', 'ต้องตรวจ'],
   '仅需检验': ['Inspection required only', '僅需檢驗', '検査対象のみ', '검사 대상만', 'Solo requieren inspección', 'Contrôle requis uniquement', 'Nur prüfpflichtige', 'Только подлежащие контролю', 'Chỉ hàng cần kiểm', 'เฉพาะที่ต้องตรวจ'],
   '来料性质': ['Incoming type', '來料性質', '入荷区分', '입고 구분', 'Tipo de entrada', "Nature d'entrée", 'Eingangsart', 'Вид поступления', 'Tính chất nhập', 'ประเภทการรับเข้า'],

@@ -1,24 +1,30 @@
 /**
  * qcFlow.js — 「品质流程监控」(QC_FLOW)的**纯逻辑**:把后端一行数据摊成
- * 送料暂收单 → 来料检验单 → 采购入库单 三个节点,并给出每个节点的时态与跳转目标。
+ * 「送料 → 检验 → 入库」主链 + 「不合格 → 退回 / 特采」分支,并给出每个节点的时态与跳转目标。
  *
  * 为什么单独成模块而不是写在 QcFlowMonitor.vue 里:
- *   · 三个节点的时态判定(已审核/草稿/审批中/作废/未生成/免检)是这一页最容易改错的地方,
+ *   · 五张单的时态判定(已审核/草稿/审批中/作废/未生成/免检)是这一页最容易改错的地方,
  *     抽出来才能单测(见 qcFlow.test.js);
- *   · 跳转**必须**先过面板查看权 —— 判定放在这里,前端各处(看板节点、列表链接)只有一个实现,
+ *   · 跳转**必须**先过面板查看权 —— 判定放在这里,前端各处(主链节点、分支节点、列表链接)只有一个实现,
  *     不会出现"看板点了会拦、列表点了不拦"的漂移。
  *
  * 口径与后端 QcFlowService 一一对应:
  *   状态 5 档 = yj_doc_status 折叠(已作废 > 已中止 > 审批中 > 已审核 > 草稿);
- *   「免检」= 该物料 bs_inv.来料检验 <> '是' 且还没有检验单(免检批次不走来料检验)。
+ *   「免检」= 该物料 bs_inv.来料检验 <> '是' 且还没有检验单(免检批次不走来料检验);
+ *   分支链只在「有退回单/特采单,或检验被判不合格」时才显示(全合格批次不占版面)。
  */
 import { canViewPanel } from '../auth/panelAccess.js'
 
-/** 三个节点对应的目标面板(面板码是跳转的唯一凭据) */
+/**
+ * 五张单对应的目标面板(面板码是跳转的唯一凭据)。
+ * recv/insp/in 是主链;ret(暂收退回单)/tc(特采单)是不合格分支。
+ */
 export const FLOW_PANELS = Object.freeze({
   recv: Object.freeze({ code: 'QC_RECV', name: '送料暂收单' }),
   insp: Object.freeze({ code: 'QC_INSP', name: '来料检验单' }),
   in: Object.freeze({ code: 'PURCHASE_IN', name: '采购入库单' }),
+  ret: Object.freeze({ code: 'QC_RETURN', name: '暂收退回单' }),
+  tc: Object.freeze({ code: 'QC_TC_IN', name: '特采单' }),
 })
 
 /** 单据状态 → 展示档位(tone 同时给看板节点底色与列表 el-tag 用) */
@@ -67,32 +73,54 @@ export function poText(row) {
 }
 
 /**
- * 一行 → 三个节点。
- * @param {object} row 后端 /px/qcFlow/list 的一行
- * @returns {Array<{key:string,name:string,panel:string,no:string,status:string,date:string,state:string,tone:string,skip:boolean}>}
+ * 造一个节点。
+ * @param {string} key FLOW_PANELS 的键
+ * @param {any} no 单据编号
+ * @param {any} status 单据状态
+ * @param {any} date 单据日期
+ * @param {{skip?:boolean, qty?:any}} [opt]
  */
-export function buildSteps(row) {
-  const needInsp = Number(row?.['需检验'] ?? 0) === 1
-  const one = (key, no, status, date, skip) => {
-    const docNo = String(no ?? '').trim()
-    const st = String(status ?? '').trim() || '未生成'
-    return {
-      key,
-      name: FLOW_PANELS[key].name,
-      panel: FLOW_PANELS[key].code,
-      no: docNo,
-      status: docNo ? st : (skip ? '免检' : '未生成'),
-      date: String(date ?? '').trim(),
-      state: stepState(docNo, st, { skip }),
-      tone: skip && !docNo ? STATUS_TONE['免检'] : (STATUS_TONE[st] || STATUS_TONE['未生成']),
-      skip: !!skip && !docNo,
-    }
+export function makeNode(key, no, status, date, opt = {}) {
+  const docNo = String(no ?? '').trim()
+  const st = String(status ?? '').trim() || '未生成'
+  const skip = !!opt.skip && !docNo
+  return {
+    key,
+    name: FLOW_PANELS[key].name,
+    panel: FLOW_PANELS[key].code,
+    no: docNo,
+    status: docNo ? st : (skip ? '免检' : '未生成'),
+    date: String(date ?? '').trim(),
+    state: stepState(docNo, st, { skip: !!opt.skip }),
+    tone: skip ? STATUS_TONE['免检'] : (STATUS_TONE[st] || STATUS_TONE['未生成']),
+    skip,
+    qty: opt.qty == null ? '' : String(opt.qty),
   }
-  return [
-    one('recv', row?.['送料暂收单号'], row?.['送料状态'], row?.['送料日期'], false),
-    one('insp', row?.['检验单号'], row?.['检验状态'], row?.['检验日期'], !needInsp),
-    one('in', row?.['入库单号'], row?.['入库状态'], row?.['入库日期'], false),
+}
+
+/**
+ * 一行 → 主链(送料→检验→入库)+ 不合格分支(退回→特采)。
+ *
+ * @param {object} row 后端 /px/qcFlow/list 的一行
+ * @returns {{main: Array, ng: Array, showNg: boolean, needInsp: boolean}}
+ */
+export function buildChain(row) {
+  const needInsp = Number(row?.['需检验'] ?? 0) === 1
+  const verdict = String(row?.['检验结论'] ?? '').trim()
+  const main = [
+    makeNode('recv', row?.['送料暂收单号'], row?.['送料状态'], row?.['送料日期']),
+    makeNode('insp', row?.['检验单号'], row?.['检验状态'], row?.['检验日期'], { skip: !needInsp }),
+    makeNode('in', row?.['入库单号'], row?.['入库状态'], row?.['入库日期']),
   ]
+  const ng = [
+    makeNode('ret', row?.['退货单号'], row?.['退货状态'], row?.['退货日期']),
+    makeNode('tc', row?.['特采单号'], row?.['特采状态'], row?.['特采日期']),
+  ]
+  // 分支链什么时候出现:有退回/特采单,或检验判了不合格(含部分不合格)。
+  // 全合格 / 免检 / 还没检的批次不显示,免得每行都挂着两条"未生成"。
+  const hasNgDoc = !!(String(row?.['退货单号'] ?? '').trim() || String(row?.['特采单号'] ?? '').trim())
+  const showNg = hasNgDoc || verdict === '不合格' || verdict === '部分不合格'
+  return { main, ng, showNg, needInsp }
 }
 
 /**
@@ -103,7 +131,7 @@ export function buildSteps(row) {
  * 没权限时 `ok=false`、`path=null` —— 调用方只提示「无查看该面板的权限」,**不要**发路由。
  *
  * @param {{isAdmin?:boolean, visiblePanels?:string[]}|null|undefined} user
- * @param {'QC_RECV'|'QC_INSP'|'PURCHASE_IN'|string} panel
+ * @param {'QC_RECV'|'QC_INSP'|'PURCHASE_IN'|'QC_RETURN'|'QC_TC_IN'|string} panel
  * @param {string} docNo
  * @returns {{ok:boolean, path:string|null, query:object, reason:string}}
  */

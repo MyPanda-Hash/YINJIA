@@ -47,6 +47,14 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '退货': 'Return',
+    '待退货': 'To return',
+    '待特采': 'To concede',
+    '显示已隐藏': 'Show hidden',
+    '已转ERP': 'Pushed to ERP',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '部分不合格': 'Partially failed',
 
 

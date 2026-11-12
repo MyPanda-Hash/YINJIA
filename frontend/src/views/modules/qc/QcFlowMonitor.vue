@@ -36,6 +36,10 @@
           <el-option v-for="o in STATE_OPTIONS" :key="o.value" :label="tt(o.label)" :value="o.value" />
         </el-select>
         <el-checkbox v-model="onlyInspect" size="small" class="qcf-only" @change="reload">{{ tt('仅需检验') }}</el-checkbox>
+        <!-- 已转ERP 的批次默认隐藏(用户口径 2026-11-12);勾上就把它们显示回来,节点照常可点开 -->
+        <el-checkbox v-model="showHidden" size="small" class="qcf-only" @change="reload">
+          {{ tt('显示已隐藏') }}<template v-if="stat.hidden"> ({{ stat.hidden }})</template>
+        </el-checkbox>
         <el-input v-model="keyword" size="small" clearable class="qcf-kw"
                   :placeholder="tt('搜索单号、物料编码、物料批号或供应商')"
                   @keyup.enter="reload" @clear="reload" />
@@ -58,8 +62,11 @@
       <span class="qcf-stat is-done"><em>{{ tt('已完成') }}</em><b>{{ stat.done }}</b></span>
       <span class="qcf-stat is-wait"><em>{{ tt('需检验') }}</em><b>{{ stat.needInsp }}</b></span>
       <span class="qcf-stat is-wait"><em>{{ tt('待检验') }}</em><b>{{ stat.waitInsp }}</b></span>
+      <span class="qcf-stat is-bad"><em>{{ tt('待退货') }}</em><b>{{ stat.waitRet }}</b></span>
+      <span class="qcf-stat is-warn"><em>{{ tt('待特采') }}</em><b>{{ stat.waitTc }}</b></span>
       <span class="qcf-stat is-wait"><em>{{ tt('待入库') }}</em><b>{{ stat.waitIn }}</b></span>
       <span class="qcf-stat is-bad"><em>{{ tt('异常') }}</em><b>{{ stat.bad }}</b></span>
+      <span v-if="stat.hidden" class="qcf-stat is-muted"><em>{{ tt('已隐藏') }}</em><b>{{ stat.hidden }}</b></span>
       <span class="qcf-legend">
         <i class="lg lg-done">{{ tt('绿=已审核/已完成') }}</i>
         <i class="lg lg-doing">{{ tt('蓝=待办') }}</i>
@@ -124,29 +131,54 @@
               {{ tt('来料性质') }}: <em>{{ row['来料性质'] }}</em>
             </div>
           </div>
-          <!-- ③ 流程三节点(点节点跳该单据;无权限不可跳) -->
+          <!-- ③ 流程:主链 送料→检验→入库 + 不合格分支 退回→特采(点节点跳该单据;无权限不可跳) -->
           <div class="qcf-cell qcf-flow">
-            <template v-for="(s, i) in stepsOf(row)" :key="s.key">
-              <span v-if="i" class="qcf-arrow" aria-hidden="true">→</span>
-              <div class="qcf-node" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
-                   :title="nodeTitle(s)" role="button" tabindex="0"
-                   @click.stop="openDoc(s.panel, s.no)"
-                   @keydown.enter.prevent="openDoc(s.panel, s.no)"
-                   @keydown.space.prevent="openDoc(s.panel, s.no)">
-                <span class="qcf-node-name">{{ tt(s.name) }}</span>
-                <span v-if="s.no" class="qcf-node-no" :title="s.no">{{ s.no }}</span>
-                <!-- 没有单据时,「未生成 / 免检」在这一个位置说一次就够(不再重复挂徽标) -->
-                <span v-else class="qcf-node-no is-empty">{{ s.state === 'skip' ? tt('免检') : tt('未生成') }}</span>
-                <span class="qcf-node-meta">
-                  <em v-if="s.no" class="qcf-badge" :class="'tone-' + s.tone">{{ tt(s.status) }}</em>
-                  <i v-if="s.date">{{ s.date }}</i>
-                </span>
-                <span v-if="s.qty" class="qcf-node-qty" :title="s.qtyTitle">{{ s.qty }}</span>
-                <span v-if="s.no && !canOpen(s.panel)" class="qcf-lock" :title="tt('无查看该面板的权限')">
-                  <el-icon><Lock /></el-icon>
-                </span>
-              </div>
-            </template>
+            <div class="qcf-lane">
+              <template v-for="(s, i) in chainOf(row).main" :key="s.key">
+                <span v-if="i" class="qcf-arrow" aria-hidden="true">→</span>
+                <div class="qcf-node" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
+                     :title="nodeTitle(s)" role="button" tabindex="0"
+                     @click.stop="openDoc(s.panel, s.no)"
+                     @keydown.enter.prevent="openDoc(s.panel, s.no)"
+                     @keydown.space.prevent="openDoc(s.panel, s.no)">
+                  <span class="qcf-node-name">{{ tt(s.name) }}</span>
+                  <span v-if="s.no" class="qcf-node-no" :title="s.no">{{ s.no }}</span>
+                  <!-- 没有单据时,「未生成 / 免检」在这一个位置说一次就够(不再重复挂徽标) -->
+                  <span v-else class="qcf-node-no is-empty">{{ s.state === 'skip' ? tt('免检') : tt('未生成') }}</span>
+                  <span class="qcf-node-meta">
+                    <em v-if="s.no" class="qcf-badge" :class="'tone-' + s.tone">{{ tt(s.status) }}</em>
+                    <i v-if="s.date">{{ s.date }}</i>
+                  </span>
+                  <span v-if="s.qty" class="qcf-node-qty" :title="s.qtyTitle">{{ s.qty }}</span>
+                  <span v-if="s.no && !canOpen(s.panel)" class="qcf-lock" :title="tt('无查看该面板的权限')">
+                    <el-icon><Lock /></el-icon>
+                  </span>
+                </div>
+              </template>
+            </div>
+            <!-- 不合格分支:只在「有退回/特采单」或「检验判了不合格」时出现,全合格批次不占版面 -->
+            <div v-if="chainOf(row).showNg" class="qcf-lane qcf-lane-ng">
+              <span class="qcf-lane-tag">{{ tt('不合格') }}</span>
+              <template v-for="(s, i) in chainOf(row).ng" :key="s.key">
+                <span v-if="i" class="qcf-arrow" aria-hidden="true">→</span>
+                <div class="qcf-node is-ng" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
+                     :title="nodeTitle(s)" role="button" tabindex="0"
+                     @click.stop="openDoc(s.panel, s.no)"
+                     @keydown.enter.prevent="openDoc(s.panel, s.no)"
+                     @keydown.space.prevent="openDoc(s.panel, s.no)">
+                  <span class="qcf-node-name">{{ tt(s.name) }}</span>
+                  <span v-if="s.no" class="qcf-node-no" :title="s.no">{{ s.no }}</span>
+                  <span v-else class="qcf-node-no is-empty">{{ tt('未生成') }}</span>
+                  <span class="qcf-node-meta">
+                    <em v-if="s.no" class="qcf-badge" :class="'tone-' + s.tone">{{ tt(s.status) }}</em>
+                    <i v-if="s.date">{{ s.date }}</i>
+                  </span>
+                  <span v-if="s.no && !canOpen(s.panel)" class="qcf-lock" :title="tt('无查看该面板的权限')">
+                    <el-icon><Lock /></el-icon>
+                  </span>
+                </div>
+              </template>
+            </div>
           </div>
           <!-- ④ 当前环节 / 停留天数 -->
           <div class="qcf-cell qcf-stage">
@@ -157,6 +189,7 @@
             <div v-if="row['检验结论']" class="qcf-verdict" :class="'tone-' + verdictTone(row)">
               {{ tt('检验') }} {{ tt(row['检验结论']) }}
             </div>
+            <div v-if="Number(row['已隐藏'] || 0) === 1" class="qcf-hidden-tag">{{ tt('已转ERP') }}</div>
           </div>
         </div>
       </div>
@@ -223,9 +256,18 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('当前环节')" width="92" align="center">
+          <el-table-column :label="tt('当前环节')" width="134" align="center">
             <template #default="{ row }">
               <el-tag size="small" effect="light" :type="stageTagType(row)">{{ tt(row['当前环节'] || '-') }}</el-tag>
+              <!-- 不合格分支的单号挂在这里(列表列宽已排满,不再单开一列压出横向滚动) -->
+              <div v-if="row['退货单号']" class="qcf-l-sub">
+                <a class="qcf-link" :title="nodeTitleOf(row, 'ret')"
+                   @click.stop="openDoc('QC_RETURN', row['退货单号'])">{{ tt('退货') }} {{ row['退货单号'] }}</a>
+              </div>
+              <div v-if="row['特采单号']" class="qcf-l-sub">
+                <a class="qcf-link" :title="nodeTitleOf(row, 'tc')"
+                   @click.stop="openDoc('QC_TC_IN', row['特采单号'])">{{ tt('特采') }} {{ row['特采单号'] }}</a>
+              </div>
             </template>
           </el-table-column>
           <el-table-column :label="tt('停留天数')" width="84" align="right">
@@ -247,7 +289,7 @@ import { ElMessage } from 'element-plus'
 import { Lock, Refresh, Tickets, WarningFilled } from '@element-plus/icons-vue'
 import request from '@core/request'
 import { canViewPanel } from '@core/auth/panelAccess'
-import { FLOW_PANELS, STATUS_TONE, buildSteps, jumpTarget, poText, tagTypeOf } from '@core/qc/qcFlow'
+import { FLOW_PANELS, STATUS_TONE, buildChain, jumpTarget, poText, tagTypeOf } from '@core/qc/qcFlow'
 import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
 
@@ -261,6 +303,8 @@ const AUTO_REFRESH_MS = 60 * 1000
 const STATE_OPTIONS = [
   { value: '未完成', label: '未完成' },
   { value: '待检验', label: '待检验' },
+  { value: '待退货', label: '待退货' },
+  { value: '待特采', label: '待特采' },
   { value: '待入库', label: '待入库' },
   { value: '异常', label: '异常' },
   { value: '已完成', label: '已完成' },
@@ -278,6 +322,7 @@ const viewMode = ref('board')
 const stateFilter = ref('未完成')
 const keyword = ref('')
 const onlyInspect = ref(false)
+const showHidden = ref(false)
 const autoRefresh = ref(true)
 const rows = ref([])
 const summary = ref({})
@@ -324,10 +369,13 @@ async function load(opts = {}) {
   const seq = ++loadSeq
   if (!silent) loading.value = true
   error.value = ''
-  const payload = { 状态: stateFilter.value, limit: 300 }
+  // 上限直接取后端最大值(800):正式库整条链才 502 行,全量铺开才不会出现
+  // 「批次行数 300 但实际有 447 条未完成」这种静默截断;行数见汇总条,与界面一致。
+  const payload = { 状态: stateFilter.value, limit: 800 }
   const kw = keyword.value.trim()
   if (kw) payload.keyword = kw
   if (onlyInspect.value) payload['仅需检验'] = true
+  if (showHidden.value) payload['含已隐藏'] = true
   try {
     const res = await request.post(API_LIST, payload)
     if (seq !== loadSeq) return
@@ -362,8 +410,12 @@ const stat = computed(() => {
     // 需检验行数 = 总行数 − 免检行数(后端「汇总.免检」现成口径,不在前端另算一遍)
     needInsp: Math.max(0, total - count('免检', (r) => !Number(r?.['需检验'] || 0))),
     waitInsp: count('待检验', (r) => r?.['当前环节'] === '检验'),
+    waitRet: count('待退货', (r) => r?.['当前环节'] === '退货'),
+    waitTc: count('待特采', (r) => r?.['当前环节'] === '特采'),
     waitIn: count('待入库', (r) => r?.['当前环节'] === '入库'),
     bad: count('异常', (r) => !!r?.['异常']),
+    // 已隐藏条数由后端单独数(默认查询里根本不含它们,前端口径算不出来)
+    hidden: Number(s['已隐藏'] ?? 0) || 0,
   }
 })
 
@@ -373,18 +425,31 @@ function rowKey(row) {
 }
 
 /**
- * 三个节点(送料 / 检验 / 入库)+ 该节点的数量副标(检验给 合格/不合格,入库给 实收)。
- * 时态与状态文案由 @core/qc/qcFlow.buildSteps 定,这里只补 quantities 与 tt 文案。
+ * 主链(送料 / 检验 / 入库)+ 不合格分支(退回 / 特采)节点,并给节点补数量副标:
+ * 检验给 合格/不合格,入库给 实收,退货给 退货数量,特采给 不合格品数量。
+ * 时态与状态文案由 @core/qc/qcFlow.buildChain 定,这里只补 quantities 与 tt 文案。
  */
-function stepsOf(row) {
+function chainOf(row) {
+  const chain = buildChain(row)
   const insp = inspQty(row)
   const inNo = String(row?.['入库单号'] || '').trim()
-  return buildSteps(row).map((s) => {
-    if (s.key !== 'insp' && s.key !== 'in') return s
-    const qty = s.key === 'insp' ? insp : (inNo ? `${tt('实收')} ${num(row?.['实收数量'])}` : '')
-    const qtyTitle = s.key === 'insp' ? inspQtyTitle(row) : inQtyTitle(row)
-    return { ...s, qty, qtyTitle }
-  })
+  const retQty = row?.['退货数量']
+  const tcQty = row?.['特采数量']
+  return {
+    ...chain,
+    main: chain.main.map((s) => {
+      if (s.key === 'insp') return { ...s, qty: insp, qtyTitle: inspQtyTitle(row) }
+      if (s.key === 'in') {
+        return { ...s, qty: inNo ? `${tt('实收')} ${num(row?.['实收数量'])}` : '', qtyTitle: inQtyTitle(row) }
+      }
+      return s
+    }),
+    ng: chain.ng.map((s) => {
+      if (s.key === 'ret') return { ...s, qty: retQty != null ? `${tt('退货')} ${num(retQty)}` : '' }
+      if (s.key === 'tc') return { ...s, qty: tcQty != null ? `${tt('特采')} ${num(tcQty)}` : '' }
+      return s
+    }),
+  }
 }
 
 function inspQty(row) {
@@ -418,6 +483,8 @@ function nodeTitle(s) {
 function nodeTitleOf(row, key) {
   if (key === 'recv') return nodeTitle({ no: row?.['送料暂收单号'], panel: 'QC_RECV' })
   if (key === 'insp') return nodeTitle({ no: row?.['检验单号'], panel: 'QC_INSP' })
+  if (key === 'ret') return nodeTitle({ no: row?.['退货单号'], panel: 'QC_RETURN' })
+  if (key === 'tc') return nodeTitle({ no: row?.['特采单号'], panel: 'QC_TC_IN' })
   return nodeTitle({ no: row?.['入库单号'], panel: 'PURCHASE_IN' })
 }
 
@@ -425,6 +492,8 @@ function stageTone(row) {
   const stage = String(row?.['当前环节'] || '')
   if (row?.['异常']) return 'void'
   if (stage === '完成') return 'done'
+  if (stage === '退货') return 'void'
+  if (stage === '特采') return 'warn'
   if (stage === '检验') return 'warn'
   if (stage === '入库') return 'draft'
   return 'doing'
@@ -624,6 +693,12 @@ onBeforeUnmount(stopTimers)
 .qcf-stat.is-bad b {
   color: #f56c6c;
 }
+.qcf-stat.is-warn b {
+  color: #e6a23c;
+}
+.qcf-stat.is-muted b {
+  color: #909399;
+}
 .qcf-legend {
   display: inline-flex;
   align-items: center;
@@ -801,15 +876,40 @@ onBeforeUnmount(stopTimers)
   -webkit-line-clamp: 2;
 }
 
-/* ③ 流程三节点 */
+/* ③ 流程:主链一行 + 不合格分支一行 */
 .qcf-flow {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.qcf-lane {
+  display: flex;
+  align-items: stretch;
   gap: 2px;
   min-width: 0;
 }
+/* 不合格分支:比主链矮一号、左缩进一点,一眼能看出是"另一条路" */
+.qcf-lane-ng {
+  align-items: center;
+  padding-left: 6px;
+  border-left: 2px dashed #fbc4c4;
+  margin-left: 4px;
+}
+.qcf-lane-tag {
+  flex: none;
+  padding: 0 5px;
+  margin-right: 2px;
+  border-radius: 9px;
+  background: #fef0f0;
+  color: #f56c6c;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
 .qcf-arrow {
   flex: none;
+  align-self: center;
   color: #c0c4cc;
   font-size: 12px;
   line-height: 1;
@@ -822,11 +922,15 @@ onBeforeUnmount(stopTimers)
   min-width: 0;
   flex: 1 1 0;
   max-width: 168px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 1px solid #ebeef5;
   border-radius: 4px;
   background: #fafafa;
   outline: none;
+}
+.qcf-lane-ng .qcf-node {
+  padding: 4px 7px;
+  max-width: 150px;
 }
 .qcf-node.is-link {
   cursor: pointer;
@@ -1003,6 +1107,16 @@ onBeforeUnmount(stopTimers)
 }
 .qcf-verdict.tone-warn {
   color: #e6a23c;
+}
+/* 已转ERP 的批次(只有在勾了「显示已隐藏」时才看得见) */
+.qcf-hidden-tag {
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #f4f4f5;
+  color: #909399;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 
 /* 空 / 错状态 */
