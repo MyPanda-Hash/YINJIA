@@ -121,7 +121,15 @@
         <el-table-column :label="tt('品名')" prop="品名" min-width="130" show-overflow-tooltip />
         <el-table-column :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
         <el-table-column :label="tt('生产状态')" prop="生产状态" width="80" />
-        <el-table-column :label="tt('排产数量')" prop="排产数量" width="85" align="right" />
+        <!-- 本线排产数量(2026-11-11 用户口径):与「工单排产」页同口径 = 排产数量 × 该工序自己的换算率
+             (= 该行当前工序的台账计划数量,后端 today() 返回 `本线排产数量`);
+             后端未升级/老数据取不到时回退显示成品口径的排产数量,不显示成空白。 -->
+        <el-table-column prop="本线排产数量" width="110" align="right">
+          <template #header>
+            <span :title="tt('本线排产数量 = 排产数量 × 该工序自己的换算率（当前工序台账计划数量）;成品口径看「需求数量/入库数量」')">{{ tt('本线排产数量') }}</span>
+          </template>
+          <template #default="{ row }">{{ num(row['本线排产数量'] ?? row['排产数量']) }}</template>
+        </el-table-column>
         <el-table-column :label="tt('需求数量')" prop="需求数量" width="85" align="right" />
         <el-table-column :label="tt('入库数量')" prop="入库数量" width="80" align="right" />
         <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):该口径=本工单行需求 − 本行订单占用,
