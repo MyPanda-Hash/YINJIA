@@ -54,15 +54,18 @@ function railStatusPanelCodes(block) {
   return [...block.matchAll(/^ {2}([A-Z][A-Z0-9_]*):\s*\[/gm)].map((m) => m[1])
 }
 
-test('PanelxList:RAIL_STATUS_TABS 只登记 QC_PROC_INSP 一张单(其他面板左栏必须零变化)', () => {
+test('PanelxList:RAIL_STATUS_TABS 只登记出货检验两张单(其他面板左栏必须零变化)', () => {
   const codes = railStatusPanelCodes(railStatusTabsBlock(list))
-  assert.deepEqual(codes, ['QC_PROC_INSP'],
-    '状态页签只能对出货检验单(制程检验单)开启 —— 用户口径「不要修改其他页面的这个组件」')
+  // 2026-11-12 用户口径「这个页签也为当前的出货检验表观增加」⇒ 功能单 + 表观单,别的面板一律不开
+  assert.deepEqual(codes, ['QC_PROC_INSP', 'QC_ASM_INSP'],
+    '状态页签只对出货检验两张单开启 —— 用户口径「不要修改其他页面的这个组件」')
   // 三个键齐全且顺序固定:未完成 / 已完成 / 全部
   // (2026-11-11 用户口径「把未完成放在最左侧」⇒ 顺序即渲染顺序,首项 = 默认页签,别随手挪)
   const block = railStatusTabsBlock(list)
   const keys = [...block.matchAll(/key:\s*'([a-z]+)'/g)].map((m) => m[1])
-  assert.deepEqual(keys, ['todo', 'done', 'all'], '页签顺序必须是 未完成(todo) → 已完成(done) → 全部(all);后端 _statusTab 同名')
+  // 两个面板各一份、三键顺序相同(2026-11-12 表观单接入后共 6 个 key)
+  assert.deepEqual(keys, ['todo', 'done', 'all', 'todo', 'done', 'all'],
+    '两个面板的页签顺序都必须是 未完成(todo) → 已完成(done) → 全部(all);后端 _statusTab 同名')
   for (const label of ['全部', '已完成', '未完成']) {
     assert.ok(block.includes(`label: '${label}'`), `页签 label 缺「${label}」`)
   }
@@ -144,8 +147,8 @@ test('后端 QueryService.STATUS_TAB_PANELS 只认 QC_PROC_INSP', () => {
   const stmtEnd = backendSrc.indexOf(';', anchor)
   const decl = backendSrc.slice(anchor, stmtEnd === -1 ? anchor + 800 : stmtEnd)
   const codes = [...new Set([...decl.matchAll(/["']([A-Z][A-Z0-9_]+)["']/g)].map((m) => m[1]))]
-  assert.deepEqual(codes, ['QC_PROC_INSP'],
-    'STATUS_TAB_PANELS 只能含 QC_PROC_INSP(其他面板收到 _statusTab 必须忽略,防串味成空列表)')
+  assert.deepEqual([...codes].sort(), ['QC_ASM_INSP', 'QC_PROC_INSP'],
+    'STATUS_TAB_PANELS 只含出货检验两张单(其他面板收到 _statusTab 必须忽略,防串味成空列表)')
   // 键名对齐:前端 condition._statusTab ⇔ 后端 STATUS_TAB_KEY
   assert.match(backendSrc, /STATUS_TAB_KEY\s*=\s*"_statusTab"/, '后端控制键必须叫 _statusTab(与前端一致)')
 })

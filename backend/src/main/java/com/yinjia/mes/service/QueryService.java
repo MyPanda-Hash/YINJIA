@@ -115,7 +115,7 @@ public class QueryService {
      * <p>以后别的面板也要这个页签:把面板号加进这个集合即可(前端自己决定要不要画页签),
      * SQL 一行都不用动。
      */
-    private static final java.util.Set<String> STATUS_TAB_PANELS = java.util.Set.of("QC_PROC_INSP");
+    private static final java.util.Set<String> STATUS_TAB_PANELS = java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
 
     /**
      * 需要后端派生只读字段「检测周期」的面板 —— 出货检验单 **QC_PROC_INSP** 与
