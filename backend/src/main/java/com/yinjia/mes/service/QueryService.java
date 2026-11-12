@@ -118,16 +118,23 @@ public class QueryService {
     private static final java.util.Set<String> STATUS_TAB_PANELS = java.util.Set.of("QC_PROC_INSP");
 
     /**
-     * 需要后端派生只读字段「检测周期」的面板 —— 目前**只有出货检验单 QC_PROC_INSP**。
+     * 需要后端派生只读字段「检测周期」的面板 —— 出货检验单 **QC_PROC_INSP** 与
+     * 出货检验表观 **QC_ASM_INSP**(2026-11-12 起表观单也按图2 纸面出,抬头第 1 行同款要这一格)。
      *
      * <p>用户口径(2026-11-11 图2《出货检验功能记录表》抬头第 1 行):「检测周期:首次填写表单时间-末次提交审核时间」;
      * 设计契约见 {@code docs/design/出货检验功能记录表-表样改造.md} §二 字段清单 / §四 后端:
      * 「虚拟字段,QueryService 下发,yj_field 不建」—— 所以只在这里算、**不落库**,任何面板元数据都不用动。
      *
+     * <p>2026-11-12:QC_ASM_INSP(出货检验表观,原「组装成品检验单」)落成同款图2 矩阵纸面
+     * (明细同样一行 = 检验项目 × 内部批次),所以它也要「检测周期」⇒ 一并纳入本闸门。
+     * ⚠ 首次保存时间**不能写死表名**:见 {@link #loadFirstSaveTimes},表名取当前面板元数据的
+     *   {@code head_table}。写死 {@code qc_proc_insp_head} 会让表观单拿到**别的单**的首次保存时间
+     *   (两面板单号前缀不同,看似"查不到",实质是查错表)。
+     *
      * <p>加闸门(而不是所有面板都算)的理由与 {@link #STATUS_TAB_PANELS} 同一类:这张单要多一次
      * 「按单号分组取 MIN(asp_time1)」的批量查询,只给真要显示的面板付这份代价。
      */
-    private static final java.util.Set<String> DOC_CYCLE_PANELS = java.util.Set.of("QC_PROC_INSP");
+    private static final java.util.Set<String> DOC_CYCLE_PANELS = java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
 
     /**
      * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
@@ -789,7 +796,8 @@ public class QueryService {
             // 2026-11-06 外部开发样品申请单接入两级审批后，前端靠这一格判断「我是不是本单的确认人」
             // （PanelxList.l2ApproverNow）：没有它，非管理员的确认人在「待二级审批」节点看不到按钮。
             doc.put("二级审核人", st == null ? null : st.get("l2_approver"));
-            // 「检测周期」派生只读字段(2026-11-11,出货检验单 QC_PROC_INSP 的图2 表头第 1 行):
+            // 「检测周期」派生只读字段(2026-11-11,出货检验单 QC_PROC_INSP /
+            //   2026-11-12 起同款表观单 QC_ASM_INSP 的图2 表头第 1 行):
             //   首次填写表单时间(= 头表 asp_time1 的 MIN,即这套单第一次落库/保存的时刻)
             //   ~ 末次提交/审核时间(= yj_doc_status.pending_at 提交时间 / shsj 审核时间中**有值的较晚者**)。
             //   草稿只有首次保存时间 ⇒ 单端显示;两端都没有 ⇒ null(前端留空格子)。
@@ -923,11 +931,20 @@ public class QueryService {
      * <p>头行式取头表(一单一行,MIN 与单值等价,写成 MIN 是为了与单表式面板同一句 SQL);
      * 没有头表的形态用行表兜底。
      *
+     * <p>🔴 <b>表名必须取当前面板的元数据({@code def.headTable()}),绝不写死任何一张表</b>
+     * (2026-11-12 本闸门纳入了第二个面板 QC_ASM_INSP 时再次确认):出货检验单 QC_PROC_INSP →
+     * {@code qc_proc_insp_head}、出货检验表观 QC_ASM_INSP → {@code qc_asm_insp_head},两面板单号
+     * 前缀/表都不同。若有人图省事写成 {@code FROM qc_proc_insp_head},表观单就查了**别人的表**:
+     * 单号对不上 ⇒ 全部落在 catch 里只留空格子,而列表接口不报错 —— 界面表现为「检测周期永远空」,
+     * 从 SQL 日志看不出是代码写死造成的。
+     *
      * <p>取不到(表/列缺失、历史脏数据)只记日志、不阻断:派生字段缺失应当留空格子,
      * 不能把整张列表打挂 —— 与 {@link #realNameOf} 的容错口径一致。
      */
     private Map<String, java.sql.Timestamp> loadFirstSaveTimes(PanelRegistry.PanelDef def, List<String> docNos) {
         Map<String, java.sql.Timestamp> out = new HashMap<>();
+        // 表名只认面板元数据(见方法注释 🔴):头行式取 head_table,单表式退回 line_table。
+        // ⚠ 不要改成写死 qc_proc_insp_head / qc_asm_insp_head —— 这里同时服务两个出货检验面板。
         String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
         String g = def.groupCol();
         if (table == null || table.isBlank() || g == null || g.isBlank()) return out;

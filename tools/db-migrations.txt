@@ -4604,3 +4604,6 @@ migrate-wo-process-line-qty-20261111.sql
 
 # 2026-11-11 出货检验功能记录表(图2)落库:qc_proc_insp_detail+ 内部批次 / qc_proc_insp_head + 内部批次清单 · 表单审核人 + yj_field 三行 + 总结论/处理方式改下拉 + QC_ASM_INSP 改名出货检验表观
 migrate-qc-proc-insp-batch-table-20261111.sql
+
+# 2026-11-12 出货检验表观(QC_ASM_INSP,原组装成品检验单)接图2 表样:qc_asm_insp_* 加 内部批次 / 内部批次清单 / 表单审核人 + yj_field 三行 + 总结论·处理方式改下拉 + 4 个字段标签译名(面板显示名/代号/底表/前缀 ZJ 不动)
+migrate-qc-asm-insp-batch-table-20261112.sql

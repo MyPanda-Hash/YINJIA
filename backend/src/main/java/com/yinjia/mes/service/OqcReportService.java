@@ -286,27 +286,38 @@ public class OqcReportService {
     /** 把三张单的明细按「报告项目」归并成候选值列表(已按对齐表优先级排序) */
     private Map<String, List<Map<String, Object>>> loadSourceRows(String asmNo, String procNo, String firstNo) {
         Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
+        // 🔴 2026-11-11 / 2026-11-12(图2《出货检验功能记录表》矩阵表样改造):
+        //   **出货检验单 QC_PROC_INSP** 与 **出货检验表观 QC_ASM_INSP** 的明细从此
+        //   **一行 = (检验项目 × 内部生产批次)** —— 横表里一个检验项目对 N 个内部批次就是 N 行,
+        //   而本报告要的是「一个检验项目一格」的候选值。若照旧逐行 addCandidate,
+        //   同一个检验项目会出现 N 份候选、N 个测量值拼串,报告行数跟着批次数量膨胀(实测 12 行 → 4 个项目)。
+        //   ⇒ 这两张单的候选 SQL 一律按 检验项目 GROUP BY 收敛(两句逐列同款,只有来源表与列名映射不同:
+        //     制程单 表区/实测数值 ↔ 表观单 检验类型/检验结果):
+        //      · 判定 = 任一批次「不合格」则该检验项目「不合格」(不合格优先),否则取 MAX(结果判断)——
+        //        与「一组批次里只要有一个不合格,这一项就不能算合格」的质量口径一致;
+        //      · 值文本/ 5 个测量值 / 检验类型取 MAX:同一项目的各批次行是**同一份**
+        //        检验要求与实测值(UI 编辑时写穿到同项目所有行),MAX 只是从等值里挑一个,
+        //        顺带兼容「个别批次行留空」的老数据;测量值是 decimal,MAX 是数值最大,不会出现空值覆盖非空;
+        //      · 排序仍按该项目首行的 行号(MIN(行号)),与改造前的报告行序一致。
+        //   ⚠ 只有首件 QC_FIRST_INSP 的明细**没有**批次摊行,仍是一行一个检验项目,不能跟着聚合
+        //     —— 否则多行同名项目会被悄悄合并、丢了原有的取值优先级(见下面的首件分支)。
         if (asmNo != null) {
+            // 出货检验表观 QC_ASM_INSP:2026-11-12 起明细也一行 = (检验项目 × 内部批次),
+            // 与制程单同款 GROUP BY(聚合口径见上面统一注释;本表列名是 检验类型/检验结果)。
             for (Map<String, Object> r : jdbc.queryForList(
-                    "SELECT 检验类型, 检验项目, 检验结果 AS 值文本, 测量值1, 测量值2, 测量值3, 测量值4, 测量值5, 结果判断 AS 判定"
-                            + " FROM qc_asm_insp_detail WHERE 单据编号 = ? ORDER BY 行号", asmNo)) {
+                    "SELECT MAX(ISNULL(检验类型,N'')) AS 检验类型, 检验项目,"
+                            + " MAX(检验结果) AS 值文本, MAX(测量值1) AS 测量值1, MAX(测量值2) AS 测量值2,"
+                            + " MAX(测量值3) AS 测量值3, MAX(测量值4) AS 测量值4, MAX(测量值5) AS 测量值5,"
+                            + " CASE WHEN SUM(CASE WHEN 结果判断 = N'不合格' THEN 1 ELSE 0 END) > 0"
+                            + "      THEN N'不合格' ELSE MAX(结果判断) END AS 判定"
+                            + " FROM qc_asm_insp_detail WHERE 单据编号 = ?"
+                            + " GROUP BY 检验项目 ORDER BY MIN(行号)", asmNo)) {
                 addCandidate(out, "QC_ASM_INSP", asmNo, r);
             }
         }
         if (procNo != null) {
-            // 🔴 2026-11-11(图2《出货检验功能记录表》矩阵表样改造):制程/出货检验单 QC_PROC_INSP 的明细
-            //   从此**一行 = (检验项目 × 内部生产批次)** —— 横表里一个检验项目对 N 个内部批次就是 N 行,
-            //   而本报告要的是「一个检验项目一格」的候选值。若照旧逐行 addCandidate,
-            //   同一个检验项目会出现 N 份候选、N 个测量值拼串,报告行数跟着批次数量膨胀(实测 12 行 → 4 个项目)。
-            //   ⇒ 只在这一段按 检验项目 GROUP BY 收敛:
-            //      · 判定 = 任一批次「不合格」则该检验项目「不合格」(不合格优先),否则取 MAX(结果判断)——
-            //        与「一组批次里只要有一个不合格,这一项就不能算合格」的质量口径一致;
-            //      · 值文本(实测数值)/ 5 个测量值 / 检验类型(表区)取 MAX:同一项目的各批次行是**同一份**
-            //        检验要求与实测值(UI 编辑时写穿到同项目所有行),MAX 只是从等值里挑一个,
-            //        顺带兼容「个别批次行留空」的老数据;测量值是 decimal.MAX 是数值最大,不会出现空值覆盖非空;
-            //      · 排序仍按该项目首行的 行号(MIN(行号)),与改造前的报告行序一致。
-            //   ⚠ 另外两张单(组装成品 QC_ASM_INSP、首件 QC_FIRST_INSP)的明细**没有**批次摊行,
-            //     仍是一行一个检验项目,不能跟着聚合 —— 否则多行同名项目会被悄悄合并、丢了原有的取值优先级。
+            // 制程/出货检验单 QC_PROC_INSP:与上面表观单逐列同款(2026-11-11 起明细一行 = 检验项目 × 内部批次),
+            // 聚合口径见 loadSourceRows 开头的统一注释,勿只改其中一句。
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT MAX(ISNULL(表区,N'')) AS 检验类型, 检验项目,"
                             + " MAX(实测数值) AS 值文本, MAX(测量值1) AS 测量值1, MAX(测量值2) AS 测量值2,"
@@ -319,6 +330,8 @@ public class OqcReportService {
             }
         }
         if (firstNo != null) {
+            // 首件检验单 QC_FIRST_INSP:明细仍是**一行 = 一个检验项目**(没有内部批次摊行),因此**不聚合**
+            // —— 多行同名项目保留各自的候选,按对齐表优先级取第一个有值的(与改造前完全一致)。
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT ISNULL(表区,N'') AS 检验类型, 检验项目, 实测数值 AS 值文本, 测量值1, 测量值2, 测量值3, 测量值4, 测量值5, 结果判断 AS 判定"
                             + " FROM qc_first_insp_detail WHERE 单据编号 = ? ORDER BY 行号", firstNo)) {

@@ -170,11 +170,22 @@
              纸张式可填写报表 —— 表区横向分组(外观|尺寸|出货重量 并排,组名横跨本组列)。
              写法与 QcInspRecSheet 同款:props=head/fields/editable,行取 head.detail,
              单元格 v-model 直绑 + @input=emit('dirty') 走引擎脏标记(markRaw 行不可直写)。 -->
+        <!-- 出货检验两张单共用同一份纸面组件(2026-11-12):
+             功能单 QC_PROC_INSP(出货检验功能记录表)/ 表观单 QC_ASM_INSP(出货检验表观,原组装成品检验单)。
+             版式与字段完全同一套(图2),差异只通过 props 注入:
+               · title            纸面标题(表观单=「出货检验表观」,用户口径「还是叫出货检验表观」)
+               · formCode         右上表单编号(用户口径「沿用原来的表单编号」⇒ 两张都用 YJ-QR-154)
+               · panelCode        选项库维护接口按面板落库(处理意见选项各自独立)
+               · resultTextField  「录入对应结果」落哪列:功能单=实测数值、表观单=检验结果(各自历史数据所在列) -->
         <QcProcInspSheet
-          v-else-if="panelCode === 'QC_PROC_INSP'"
+          v-else-if="PROC_INSP_SHEET_PANELS.includes(String(panelCode))"
           ref="approvalSheetRef"
           :head="cur" :fields="headerFields" :detail-fields="sheetDetailFields"
           :editable="draftEditable && !annOn"
+          :panel-code="String(panelCode)"
+          :title="procInspSheetTitle"
+          form-code="YJ-QR-154"
+          :result-text-field="procInspResultTextField"
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
         />
@@ -2676,11 +2687,24 @@ const operationName = computed(() => route.meta.operationName || route.query.ope
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
 
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
+/** 使用「出货检验纸面」(QcProcInspSheet / 图2 表样)的面板(2026-11-12 起两张单共用):
+ *  出货检验单功能 QC_PROC_INSP + 出货检验表观 QC_ASM_INSP(原组装成品检验单)。
+ *  纸面标题:功能单印「出货检验功能记录表」、表观单印「出货检验表观」(用户口径「还是叫出货检验表观」);
+ *  表单编号:两张都印 YJ-QR-154(用户口径「沿用原来的表单编号即可」)。
+ *  「录入对应结果」落库列:功能单=实测数值;表观单=检验结果(原组装成品检验的历史数据都在这列,
+ *  不切换的话老单在新纸面上会看起来"全空")。 */
+const PROC_INSP_SHEET_PANELS = ['QC_PROC_INSP', 'QC_ASM_INSP']
+const procInspSheetTitle = computed(() => (String(panelCode.value) === 'QC_ASM_INSP' ? '出货检验表观' : '出货检验功能记录表'))
+const procInspResultTextField = computed(() => (String(panelCode.value) === 'QC_ASM_INSP' ? '检验结果' : '实测数值'))
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC',
   // 制程检验单(2026-10-12):用户口径「参考检验数据记录的做法」—— 作为文书式面板,
   // 整页纸张居中 + 功能按钮右侧竖排,由 QcProcInspSheet 以报表形态接管
   'QC_PROC_INSP', 'QC_FIRST_INSP',
+  // 出货检验表观(原组装成品检验单 QC_ASM_INSP,2026-11-12 用户口径「将出货检验表观的格式也修改为这种格式」):
+  // 与出货检验单功能共用 QcProcInspSheet 同一套纸面(图2);数据侧只多两列
+  // (qc_asm_insp_detail.内部批次 / head 内部批次清单·表单审核人,见 migrate-qc-asm-insp-batch-table-20261112.sql)。
+  'QC_ASM_INSP',
   // 出厂检验报告(2026-11-01 用户口径):「和首件检验单相同的形式」——
   // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
   'QC_OQC_REPORT',
@@ -8003,6 +8027,7 @@ async function exportSheetExcel() {
     RD_PROGRESS: 'exportProgressExcel',
     QC_CATALOG: 'exportCatalogExcel',
     QC_PROC_INSP: 'exportProcInspExcel',
+    QC_ASM_INSP: 'exportProcInspExcel',
     QC_FIRST_INSP: 'exportFirstInspExcel',
   }[panelCode.value]
   if (catalogExporter) {

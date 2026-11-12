@@ -37,8 +37,8 @@
   <div class="qr-sheet" :class="{ 'is-editing': editable }">
     <!-- ① 纸头:标题居中 + 右上表单编号(图2;表单编号是受控表单号,固定印刷不翻译数字部分) -->
     <div class="qr-paper-head">
-      <div class="qr-title">{{ tt(PROC_INSP_TITLE) }}</div>
-      <div class="qr-formno">{{ tt('表单编号') }}：{{ PROC_INSP_FORM_CODE }}</div>
+      <div class="qr-title">{{ tt(props.title || PROC_INSP_TITLE) }}</div>
+      <div class="qr-formno">{{ tt('表单编号') }}：{{ props.formCode || PROC_INSP_FORM_CODE }}</div>
     </div>
 
     <!-- ② 抬头 3 行 × 2 组「标签|值」
@@ -363,6 +363,16 @@ import {
 const props = defineProps({
   /** 当前单据(列表行:表头字段平铺 + detail.items 明细) */
   head: { type: Object, required: true },
+  /** 面板代号:本组件由「出货检验单功能(QC_PROC_INSP)」与「出货检验表观(QC_ASM_INSP)」共用。
+   *  只影响 ①选项库维护接口带的 panelCode ②权限判定;版式/字段完全同一套。 */
+  panelCode: { type: String, default: 'QC_PROC_INSP' },
+  /** 纸面标题(中文原文,渲染时走 tt)。功能单=出货检验功能记录表;表观单=出货检验表观(2026-11-12 用户口径)。 */
+  title: { type: String, default: '出货检验功能记录表' },
+  /** 右上角表单编号(用户口径「沿用原来的表单编号」⇒ 两张单都用 YJ-QR-154)。 */
+  formCode: { type: String, default: 'YJ-QR-154' },
+  /** 「录入对应结果」落在哪个明细字段:功能单=实测数值(历史数据在这列);
+   *  表观单(原组装成品检验单)历史数据在「检验结果」列 ⇒ 由挂载方指定,免得老单看起来全是空。 */
+  resultTextField: { type: String, default: '实测数值' },
   /** 表头字段元数据(yj_field 下发,已过滤 hidden) */
   fields: { type: Array, default: () => [] },
   /** 明细字段元数据(yj_field 下发;纸面只消费「下拉框」的 options,如「结果判断」合格/不合格) */
@@ -378,7 +388,7 @@ const emit = defineEmits(['dirty', 'open-items'])
 const user = useUserStore()
 const canMaintainOptions = computed(() => {
   if (user.isAdmin) return true
-  return Array.isArray(user.fieldPanels) && user.fieldPanels.includes('QC_PROC_INSP')
+  return Array.isArray(user.fieldPanels) && user.fieldPanels.includes(props.panelCode)
 })
 
 /** 抬头 3 行 × 2 组(图2):label = 印刷标签,key = 单据头数据键。
@@ -551,7 +561,7 @@ function cellValue(group, batch) {
 }
 /** 单元格「录入对应结果」值(图2:每批第一列 = 录入结果文本,落库「实测数值」;空值统一成空串) */
 function cellResultText(group, batch) {
-  return String(cellRow(group, batch)?.['实测数值'] ?? '')
+  return String(cellRow(group, batch)?.[props.resultTextField] ?? '')
 }
 
 /* ────────────────────────────── 规范化(草稿首次编辑时回填) ────────────────────────────── */
@@ -566,7 +576,7 @@ function cloneRowForBatch(base, batch) {
   const row = {}
   for (const k of Object.keys(base || {})) {
     if (k === 'id') continue
-    if (k === '结果判断' || k === '实测数值' || k === '内部批次' || k === '行号' || k.startsWith('_')) continue
+    if (k === '结果判断' || k === '实测数值' || k === '检验结果' || k === '内部批次' || k === '行号' || k.startsWith('_')) continue
     row[k] = base[k]
   }
   if (!('表区' in row)) row['表区'] = ''
@@ -705,7 +715,7 @@ function setResultText(group, batch, v) {
     if (token) setToken(row, token)
     ensureItems().push(row)
   }
-  row['实测数值'] = String(v ?? '')
+  row[props.resultTextField] = String(v ?? '')
   bump.value++
   emit('dirty')
 }
@@ -916,7 +926,7 @@ function onDisposalChange(v) {
   const base = optionsOf(fieldMap, '处理方式', DISPOSAL_FALLBACK)
   if (val && !base.includes(val) && !disposalExtra.value.includes(val)) {
     disposalExtra.value = [...disposalExtra.value, val]
-    appendFieldOption({ panelCode: 'QC_PROC_INSP', label: '处理方式', option: val }).catch(() => { /* 选项库失败不影响保存 */ })
+    appendFieldOption({ panelCode: props.panelCode, label: '处理方式', option: val }).catch(() => { /* 选项库失败不影响保存 */ })
   }
   emit('dirty')
 }
@@ -955,7 +965,7 @@ async function saveOptManager() {
   if (!cleaned.length) { ElMessage.warning(tt('至少保留一个选项')); return }
   optSaving.value = true
   try {
-    const ok = await saveFieldOptions({ panelCode: 'QC_PROC_INSP', label: '处理方式', options: cleaned })
+    const ok = await saveFieldOptions({ panelCode: props.panelCode, label: '处理方式', options: cleaned })
     if (!ok) { ElMessage.error(tt('选项维护失败')); return }
     disposalBase.value = cleaned
     disposalExtra.value = []
@@ -1038,9 +1048,9 @@ async function exportProcInspExcel() {
     `${tt('单据状态')}：${tt(headText('单据状态'))}`,
   ].join('　　')
   const { aoa, cols, merges } = buildProcInspExport({
-    title: tt(PROC_INSP_TITLE),
+    title: tt(props.title || PROC_INSP_TITLE),
     subtitle,
-    formCode: PROC_INSP_FORM_CODE,
+    formCode: props.formCode || PROC_INSP_FORM_CODE,
     // 标签文字也走词条:英文界面导出的区块标题/表单编号标签跟着变
     // (列头「检验项目/检验方法/检验要求/批次号/本批结果判断」按受控表单印刷文字保持中文,由导出模块定义)
     formCodeLabel: tt('表单编号'),
