@@ -4800,3 +4800,7 @@ migrate-qc-insp-rec-detail-tail-20261112.sql
 #   本脚本只做两件事:① 按「已授 QC_INSP / QC_RECV 可见」的角色等价补授 QC_FLOW(view,query);
 #   ② yj_translation 面板名 10 语言。页面级面板**不往 yj_panel 插行**。幂等。两账套均执行。
 migrate-qc-flow-monitor-20261112.sql
+# 2026-11-12 采购链「现存量」贯通:来料检验/暂收退回/特采单补隐藏字段(hidden=1 visible=0)+ 存量回填;
+#   用户口径:「采购订单的现存量……需要从采购订单→送料暂收单→采购入库全流程都有这个信息(中间可能有检验,退料,特采),可以隐藏但要保留字段全流程存在」。
+#   值口径:金蝶采购订单行 inv_qty = 制单时库存快照(非实时),见 deploy/金蝶采购订单现存量口径.md。两账套均执行。
+migrate-po-stock-fullchain-20261112.sql

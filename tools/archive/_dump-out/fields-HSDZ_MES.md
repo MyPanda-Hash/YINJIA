@@ -40,7 +40,7 @@ FIELD	detail	320	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc					12960
 FIELD	detail	330	折扣%	折扣%	小数	80	E--V		GFDA	mc	mc					12961
 FIELD	detail	340	预计到货日期	预计到货日期	日期	120	E--V		GFDA	mc	mc					12962
 FIELD	detail	350	备注	备注	文本	200	E--V		GFDA	mc	mc					12963
-FIELD	detail	360	现存量	现存量	小数	90	E-H-		GFDA	mc	mc					12964
+FIELD	detail	360	现存量	现存量	小数	90	E-H-		GFDA	mc	mc			Current inventory		12964
 FIELD	detail	370	仓库	仓库	文本	120	E-H-		GFDA	mc	mc					12965
 FIELD	detail	380	折扣金额	折扣金额	小数	100	E-H-		GFDA	mc	mc					12966
 FIELD	detail	400	发货数量	发货数量	小数	100	E-H-		GFDA	mc	mc					12968
@@ -229,6 +229,7 @@ FIELD	detail	220	结案	结案	文本	80	E-H-		GFDA	mc	mc					12893
 FIELD	detail	230	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称			Department		12895
 FIELD	detail	250	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc			Department Name		12899
 FIELD	detail	260	入库单号	入库单号	文本	130	---V		GFDA	mc	mc			Receipt No.		12901
+FIELD	detail	265	现存量	现存量	小数	100	--H-							Current inventory		14421
 FIELD	detail	270	仓库代码	仓库代码	文本	120	E-H-		GFDA	mc	mc			Warehouse Code		12903
 FIELD	header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称			Salesperson		12856
 FIELD	header	90	部门	部门	参照	140	E--V		DEPT	部门名称	部门名称					12868
@@ -382,6 +383,7 @@ COL	qc_insp_detail	抽样方案	nvarchar(200)	null	抽样方案(来料检验抽�
 COL	qc_insp_detail	品质复核人	nvarchar(100)	null	品质复核人(参照职员档案 EMP,检验完成后复核签字的责任人)
 COL	qc_insp_detail	品质复核时间	nvarchar(60)	null	品质复核时间(本地墙钟,与品质复核人成对)
 COL	qc_insp_detail	业务员	nvarchar(100)	null	业务员(供应商侧对接的业务人员,参照职员档案 EMP)
+COL	qc_insp_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验 逐站下传,仅供追溯,不可用于可用量/缺料判断。实时库存见 kucun。
 
 ===== QC_RETURN =====
 -- yj_field (place, seq)
@@ -394,6 +396,7 @@ FIELD	detail	85	送检数量	送检数量	小数	100	---V									11585
 FIELD	detail	88	特采	特采	是否	60	E--V									11587
 FIELD	detail	90	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		7546
 FIELD	detail	100	采购订单行号	采购订单行号	文本	110	E--V									7545
+FIELD	detail	105	现存量	现存量	小数	100	--H-							Current inventory		14422
 FIELD	detail	120	报废数量	报废数量	小数	100	E-H-									7654
 FIELD	detail	130	剩余数量	剩余数量	小数	100	E-H-									7655
 FIELD	detail	206	批次号	批次号	文本	150	---V									11465
@@ -519,6 +522,7 @@ COL	qc_return_detail	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	送检数量	decimal(9)	null	送检数量:来料检验单明细的送检数量(检验单审核自动生成本退料单时随链带入,只读);特采按钮按它填特采单「总数量」
 COL	qc_return_detail	特采	bit(1)	NOT NULL	特采:勾选=该行做特采(让步接收)。本退料单**审核/审批通过**时,勾了的行逐行生成特采单(总数量=本行送检数量、不合格品数量=本行退货数量);特采单审批通过后全部数量进采购入库单(不走退料)
+COL	qc_return_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验→暂收退回 逐站下传(退料行由检验行镜像),仅供追溯。实时库存见 kucun。
 
 ===== PURCHASE_IN =====
 -- yj_field (place, seq)

@@ -1556,6 +1556,8 @@ public class ButtonService {
                     jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.规格型号 = s.规格型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
                                     + " d.计量单位 = s.计量单位, d.单价 = s.单价, d.采购订单行号 = s.采购订单行号,"
+                                    // 现存量(2026-11-12):采购链透传字段,暂收行 → 检验行镜像同值(隐藏字段)
+                                    + " d.现存量 = s.现存量,"
                                     + " d.备注 = s.备注, d.结案 = s.结案,"
                                     + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
                                     + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
@@ -4525,7 +4527,7 @@ public class ButtonService {
                 //   (注释写着"退回行另有单位列,原先只写计量单位 → 单位全空"却没把列取回来)⇒ 补进 SELECT。
                 //   「数量」是 2026-09-20 已改名为「送检数量」的旧列(无 yj_field、恒 NULL),不再取。
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                        + " 送检数量, 部门名称, 生产日期, 备注"
+                        + " 送检数量, 部门名称, 生产日期, 备注, 现存量"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:特采判定已移到「暂收退料单」按钮 —— 检验行不再分流,
                         // 合格数量>0 一律进采购入库单(特采与否由退料单→特采单那条链表达)
@@ -4562,6 +4564,8 @@ public class ButtonService {
             if (r.get("备注") != null) line.put("备注", r.get("备注"));
             // 采购订单行号 → 采购入库行(列 源单行号,标签 采购订单行号):转ERP 时推 src_seq
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+            // 现存量(2026-11-12 用户口径):采购链透传字段,检验行 → 采购入库行,隐藏但全流程都在
+            if (r.get("现存量") != null) line.put("现存量", r.get("现存量"));
             // 批次号随链带入采购入库行(2026-09-20 分批送料:同一批次可反查四单)
             if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) line.put("批次号", h.get("批次号"));
             // 行仓库(2026-09-23 正名):检验行「仓库代码」的值(名称形)落入库行「仓库」——
@@ -4671,7 +4675,7 @@ public class ButtonService {
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号,"
                         + " ISNULL(NULLIF(送检数量,0), 数量) AS 送检数量,"
                         + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量,"
-                        + " 备注, 单位, 计量单位, 单价, 采购订单行号"
+                        + " 备注, 单位, 计量单位, 单价, 采购订单行号, 现存量"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:不再排除特采行 —— 特采改由本退料单审批通过后的「特采」按钮发起,
                         // 退料单因此成为特采的前置单据(它的「送检数量」就是特采单总数量的来源)
@@ -4703,6 +4707,8 @@ public class ButtonService {
             if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+            // 现存量(2026-11-12 用户口径):检验行 → 暂收退回行(隐藏字段,退料链也留痕)
+            if (r.get("现存量") != null) line.put("现存量", r.get("现存量"));
             // 批次号随链带入退回行(2026-09-20 分批送料:退回不回冲送货量,但批次号要能追到同一批)
             if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) line.put("批次号", h.get("批次号"));
             Object m = r.get("备注");
@@ -4850,7 +4856,7 @@ public class ButtonService {
         try {
             rows = jdbc.queryForList(
                     "SELECT id, 物料编码, 物料名称, ISNULL(规格型号, N'') AS 规格型号, 计量单位, 单位,"
-                            + " 送检数量, " + qtyLabel + " AS 退货数量"
+                            + " 送检数量, " + qtyLabel + " AS 退货数量, 现存量"
                             + " FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                             + " AND ISNULL(特采, 0) = 1 ORDER BY id", no);
         } catch (org.springframework.dao.DataAccessException e) {
@@ -4890,6 +4896,9 @@ public class ButtonService {
                     ? h.get("采购订单号") : ih.get("采购订单号");
             if (poNo != null && !String.valueOf(poNo).isBlank()) head.put("采购单号", poNo);
             head.put("产品名称", r.get("物料名称"));
+            // 现存量(2026-11-12 用户口径):特采单是**一物料一单**、只有表头,故落在表头;
+            // 值取退料行(它由检验行镜像、检验行由暂收行/采购订单带来),隐藏字段仅供追溯
+            if (r.get("现存量") != null) head.put("现存量", r.get("现存量"));
             head.put("不合格品数量", bad);
             head.put("不合格品比例", trimZero(Math.round(bad / tot * 1000.0) / 10.0) + "%");
             // 总数量 = 数值+单位拼合(2026-09-24 用户口径:三面板数量与单位合在一起,不拆列;
@@ -5010,7 +5019,7 @@ public class ButtonService {
             rowId = idOfLineKey(str(src.get(0).get("lineKey")));
         }
         List<Map<String, Object>> tcs = jdbc.queryForList(
-                "SELECT 总数量, 采购单号, 产品名称 FROM qc_tc_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT 总数量, 采购单号, 产品名称, 现存量 FROM qc_tc_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (tcs.isEmpty()) throw new IllegalStateException("特采单不存在:" + no);
         Map<String, Object> tc = tcs.get(0);
         List<Map<String, Object>> iheads = jdbc.queryForList(
@@ -5022,12 +5031,12 @@ public class ButtonService {
         if (rowId != null) {
             drows = jdbc.queryForList("SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
                     + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                    + " 送检数量, 部门名称, 生产日期, 备注 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId);
+                    + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId);
         } else {
             // 链路断了的兜底:按「检验单号 + 物料名称」取检验行(特采单头的产品名称就是从检验行物料名称带下来的)
             drows = jdbc.queryForList("SELECT TOP 1 id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
                     + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                    + " 送检数量, 部门名称, 生产日期, 备注 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                    + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                     + " AND (物料名称 = ? OR 物料编码 IS NULL) ORDER BY id", inspNo, str(tc.get("产品名称")));
         }
         if (drows.isEmpty()) throw new IllegalStateException("来源检验行不存在(特采单 " + no + " 的检验单号 " + inspNo + ")");
@@ -5080,6 +5089,9 @@ public class ButtonService {
         if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
         if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
         if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+        // 现存量(2026-11-12 用户口径):特采链也要留痕 —— 优先取检验行(真源),检验行没有则回落特采单头
+        Object stockQty = r.get("现存量") != null ? r.get("现存量") : tc.get("现存量");
+        if (stockQty != null) line.put("现存量", stockQty);
         // 批次号随链带入入库行(2026-10-04 口径:号在生单那一刻就有,逐站继承,不再逆流回填)
         if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
             line.put("批次号", ih.get("批次号"));

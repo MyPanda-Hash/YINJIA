@@ -58,7 +58,7 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 57	QC_RECV	折扣%	折扣%	detail	330	小数	80	E--V		GFDA	mc	mc				
 58	QC_RECV	预计到货日期	预计到货日期	detail	340	日期	120	E--V		GFDA	mc	mc				
 59	QC_RECV	备注	备注	detail	350	文本	200	E--V		GFDA	mc	mc				
-60	QC_RECV	现存量	现存量	detail	360	小数	90	E-H-		GFDA	mc	mc				
+60	QC_RECV	现存量	现存量	detail	360	小数	90	E-H-		GFDA	mc	mc			Current inventory	
 61	QC_RECV	仓库	仓库	detail	370	文本	120	E-H-		GFDA	mc	mc				
 62	QC_RECV	折扣金额	折扣金额	detail	380	小数	100	E-H-		GFDA	mc	mc				
 63	QC_RECV	条码	条码	query,detail	390	文本	140	E-H-		GFDA	mc	mc				
@@ -120,9 +120,10 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 49	QC_INSP	部门名称	部门名称	detail	250	文本	100	E-H-		GFDA	mc	mc			Department Name	
 50	QC_INSP	审核人	审核人	header	260	参照	90	---V		EMP	员工名称	员工名称			Approved by	
 51	QC_INSP	入库单号	入库单号	detail	260	文本	130	---V		GFDA	mc	mc			Receipt No.	
-52	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
-53	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E-H-		GFDA	mc	mc			Warehouse Code	
-54	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
+52	QC_INSP	现存量	现存量	detail	265	小数	100	--H-							Current inventory	
+53	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
+54	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E-H-		GFDA	mc	mc			Warehouse Code	
+55	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
 1	QC_RETURN	单据编号	单据编号	query,header	10	文本	140	-R-V							Document Number	
 2	QC_RETURN	单据日期	单据日期	query,header	20	日期	120	ER-V							Document Date	
 3	QC_RETURN	物料编码	物料编码	query,detail	20	参照	120	ER-V		INV	存货编码	存货名称			Material Code	
@@ -143,24 +144,25 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 18	QC_RETURN	计量单位	计量单位	detail	90	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement	
 19	QC_RETURN	经手人	经手人	header	100	参照	100	E--V		EMP	员工名称	员工名称			Person in charge	
 20	QC_RETURN	采购订单行号	采购订单行号	detail	100	文本	110	E--V								
-21	QC_RETURN	单据状态	单据状态	query,header	110	文本	90	---V							Doc status	
-22	QC_RETURN	不良原因	不良原因	query,detail	110	参照	150	E--V		REJECT	不合格原因	不合格原因				
-23	QC_RETURN	审核人	审核人	header	120	参照	90	---V		EMP	员工名称	员工名称			Approved by	
-24	QC_RETURN	报废数量	报废数量	detail	120	小数	100	E-H-								
-25	QC_RETURN	审核时间	审核时间	header	130	文本	140	---V							Approved at	
-26	QC_RETURN	剩余数量	剩余数量	detail	130	小数	100	E-H-								
-27	QC_RETURN	备注	备注	header,detail	140	文本	220	E--V							Remark	
-28	QC_RETURN	附件1	附件1	header	150	附件	220	E--V								
-29	QC_RETURN	附件2	附件2	header	160	附件	220	E--V								
-30	QC_RETURN	附件3	附件3	header	170	附件	220	E--V								
-31	QC_RETURN	附件4	附件4	header	180	附件	220	E--V								
-32	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
-33	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
-34	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
-35	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
-36	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
-37	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
-38	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
+21	QC_RETURN	现存量	现存量	detail	105	小数	100	--H-							Current inventory	
+22	QC_RETURN	单据状态	单据状态	query,header	110	文本	90	---V							Doc status	
+23	QC_RETURN	不良原因	不良原因	query,detail	110	参照	150	E--V		REJECT	不合格原因	不合格原因				
+24	QC_RETURN	审核人	审核人	header	120	参照	90	---V		EMP	员工名称	员工名称			Approved by	
+25	QC_RETURN	报废数量	报废数量	detail	120	小数	100	E-H-								
+26	QC_RETURN	审核时间	审核时间	header	130	文本	140	---V							Approved at	
+27	QC_RETURN	剩余数量	剩余数量	detail	130	小数	100	E-H-								
+28	QC_RETURN	备注	备注	header,detail	140	文本	220	E--V							Remark	
+29	QC_RETURN	附件1	附件1	header	150	附件	220	E--V								
+30	QC_RETURN	附件2	附件2	header	160	附件	220	E--V								
+31	QC_RETURN	附件3	附件3	header	170	附件	220	E--V								
+32	QC_RETURN	附件4	附件4	header	180	附件	220	E--V								
+33	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
+34	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
+35	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
+36	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
+37	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
+38	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
+39	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
 1	PURCHASE_IN	存货编码	存货编码	query,detail	10	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code	
 2	PURCHASE_IN	单据日期	单据日期	query,header	10	日期	140	ER-V							Document Date	
 3	PURCHASE_IN	单据编号	单据编号	query,header	20	文本	140	ER-V							Document Number	

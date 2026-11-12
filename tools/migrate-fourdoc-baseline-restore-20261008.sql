@@ -17,8 +17,8 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 2a76fd168bed(sha256 74537ac480e7d995…)
- *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=38 · PURCHASE_IN=165(共 327 行)。
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 7dc8826fb827(sha256 6d450bb4794db12e…)
+ *   回正行数:QC_RECV=70 · QC_INSP=55 · QC_RETURN=39 · PURCHASE_IN=165(共 329 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
  *   生成器:tools/archive/_gen-fourdoc-restore.mjs(手改本文件无效,请改生成器重跑)。
@@ -43,7 +43,7 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-/* ---------- ⓪ 基线行集(2026-10-03 dump,327 行) ---------- */
+/* ---------- ⓪ 基线行集(2026-10-03 dump,329 行) ---------- */
 IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
 CREATE TABLE #base (
   ord           int           NOT NULL,
@@ -128,7 +128,7 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (57,N'QC_RECV',N'折扣%',N'折扣%',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',330,80,1,0,0,NULL,1,NULL,NULL,NULL),
   (58,N'QC_RECV',N'预计到货日期',N'预计到货日期',N'日期',NULL,N'GFDA',N'mc',N'mc',N'detail',340,120,1,0,0,NULL,1,NULL,NULL,NULL),
   (59,N'QC_RECV',N'备注',N'备注',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',350,200,1,0,0,NULL,1,NULL,NULL,NULL),
-  (60,N'QC_RECV',N'现存量',N'现存量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',360,90,1,0,1,NULL,0,NULL,NULL,NULL),
+  (60,N'QC_RECV',N'现存量',N'现存量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',360,90,1,0,1,NULL,0,N'Current inventory',NULL,NULL),
   (61,N'QC_RECV',N'仓库',N'仓库',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',370,120,1,0,1,NULL,0,NULL,NULL,NULL),
   (62,N'QC_RECV',N'折扣金额',N'折扣金额',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',380,100,1,0,1,NULL,0,NULL,NULL,NULL),
   (63,N'QC_RECV',N'条码',N'条码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'query,detail',390,140,1,0,1,NULL,0,NULL,NULL,NULL),
@@ -190,9 +190,10 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (49,N'QC_INSP',N'部门名称',N'部门名称',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',250,100,1,0,1,NULL,0,N'Department Name',NULL,NULL),
   (50,N'QC_INSP',N'审核人',N'审核人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'header',260,90,0,0,0,NULL,1,N'Approved by',NULL,NULL),
   (51,N'QC_INSP',N'入库单号',N'入库单号',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',260,130,0,0,0,NULL,1,N'Receipt No.',NULL,NULL),
-  (52,N'QC_INSP',N'审核时间',N'审核时间',N'文本',NULL,N'GFDA',N'mc',N'mc',N'header',270,140,0,0,0,NULL,1,N'Approved at',NULL,NULL),
-  (53,N'QC_INSP',N'仓库代码',N'仓库代码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',270,120,1,0,1,NULL,0,N'Warehouse Code',NULL,NULL),
-  (54,N'QC_INSP',N'批次键',N'批次键',N'整数',NULL,N'GFDA',N'mc',N'mc',N'header',280,80,0,0,1,NULL,0,NULL,NULL,NULL),
+  (52,N'QC_INSP',N'现存量',N'现存量',N'小数',NULL,NULL,NULL,NULL,N'detail',265,100,0,0,1,NULL,0,N'Current inventory',NULL,NULL),
+  (53,N'QC_INSP',N'审核时间',N'审核时间',N'文本',NULL,N'GFDA',N'mc',N'mc',N'header',270,140,0,0,0,NULL,1,N'Approved at',NULL,NULL),
+  (54,N'QC_INSP',N'仓库代码',N'仓库代码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',270,120,1,0,1,NULL,0,N'Warehouse Code',NULL,NULL),
+  (55,N'QC_INSP',N'批次键',N'批次键',N'整数',NULL,N'GFDA',N'mc',N'mc',N'header',280,80,0,0,1,NULL,0,NULL,NULL,NULL),
   (1,N'QC_RETURN',N'单据编号',N'单据编号',N'文本',NULL,NULL,NULL,NULL,N'query,header',10,140,0,1,0,NULL,1,N'Document Number',NULL,NULL),
   (2,N'QC_RETURN',N'单据日期',N'单据日期',N'日期',NULL,NULL,NULL,NULL,N'query,header',20,120,1,1,0,NULL,1,N'Document Date',NULL,NULL),
   (3,N'QC_RETURN',N'物料编码',N'物料编码',N'参照',NULL,N'INV',N'存货编码',N'存货名称',N'query,detail',20,120,1,1,0,NULL,1,N'Material Code',NULL,NULL),
@@ -213,24 +214,25 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (18,N'QC_RETURN',N'计量单位',N'计量单位',N'参照',NULL,N'UOM',N'计量单位名称',N'计量单位名称',N'detail',90,90,1,0,0,NULL,1,N'Unit of measurement',NULL,NULL),
   (19,N'QC_RETURN',N'经手人',N'经手人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'header',100,100,1,0,0,NULL,1,N'Person in charge',NULL,NULL),
   (20,N'QC_RETURN',N'采购订单行号',N'采购订单行号',N'文本',NULL,NULL,NULL,NULL,N'detail',100,110,1,0,0,NULL,1,NULL,NULL,NULL),
-  (21,N'QC_RETURN',N'单据状态',N'单据状态',N'文本',NULL,NULL,NULL,NULL,N'query,header',110,90,0,0,0,NULL,1,N'Doc status',NULL,NULL),
-  (22,N'QC_RETURN',N'不良原因',N'不良原因',N'参照',NULL,N'REJECT',N'不合格原因',N'不合格原因',N'query,detail',110,150,1,0,0,NULL,1,NULL,NULL,NULL),
-  (23,N'QC_RETURN',N'审核人',N'审核人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'header',120,90,0,0,0,NULL,1,N'Approved by',NULL,NULL),
-  (24,N'QC_RETURN',N'报废数量',N'报废数量',N'小数',NULL,NULL,NULL,NULL,N'detail',120,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (25,N'QC_RETURN',N'审核时间',N'审核时间',N'文本',NULL,NULL,NULL,NULL,N'header',130,140,0,0,0,NULL,1,N'Approved at',NULL,NULL),
-  (26,N'QC_RETURN',N'剩余数量',N'剩余数量',N'小数',NULL,NULL,NULL,NULL,N'detail',130,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (27,N'QC_RETURN',N'备注',N'备注',N'文本',NULL,NULL,NULL,NULL,N'header,detail',140,220,1,0,0,NULL,1,N'Remark',NULL,NULL),
-  (28,N'QC_RETURN',N'附件1',N'附件1',N'附件',NULL,NULL,NULL,NULL,N'header',150,220,1,0,0,NULL,1,NULL,NULL,NULL),
-  (29,N'QC_RETURN',N'附件2',N'附件2',N'附件',NULL,NULL,NULL,NULL,N'header',160,220,1,0,0,NULL,1,NULL,NULL,NULL),
-  (30,N'QC_RETURN',N'附件3',N'附件3',N'附件',NULL,NULL,NULL,NULL,N'header',170,220,1,0,0,NULL,1,NULL,NULL,NULL),
-  (31,N'QC_RETURN',N'附件4',N'附件4',N'附件',NULL,NULL,NULL,NULL,N'header',180,220,1,0,0,NULL,1,NULL,NULL,NULL),
-  (32,N'QC_RETURN',N'附件5',N'附件5',N'附件',NULL,NULL,NULL,NULL,N'header',190,220,1,0,0,NULL,1,NULL,NULL,NULL),
-  (33,N'QC_RETURN',N'附件6',N'附件6',N'附件',NULL,NULL,NULL,NULL,N'header',200,220,1,0,0,NULL,1,NULL,NULL,NULL),
-  (34,N'QC_RETURN',N'批次号',N'批次号',N'文本',NULL,NULL,NULL,NULL,N'detail',206,150,0,0,0,NULL,1,NULL,NULL,NULL),
-  (35,N'QC_RETURN',N'ERP单号',N'ERP单号',N'文本',NULL,NULL,NULL,NULL,N'header',300,130,0,0,0,NULL,1,NULL,NULL,NULL),
-  (36,N'QC_RETURN',N'是否已转ERP',N'是否已转ERP',N'文本',NULL,NULL,NULL,NULL,N'header',310,130,0,0,0,NULL,1,NULL,NULL,NULL),
-  (37,N'QC_RETURN',N'转ERP操作人',N'转ERP操作人',N'文本',NULL,NULL,NULL,NULL,N'header',320,130,0,0,0,NULL,1,NULL,NULL,NULL),
-  (38,N'QC_RETURN',N'转ERP时间',N'转ERP时间',N'文本',NULL,NULL,NULL,NULL,N'header',330,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (21,N'QC_RETURN',N'现存量',N'现存量',N'小数',NULL,NULL,NULL,NULL,N'detail',105,100,0,0,1,NULL,0,N'Current inventory',NULL,NULL),
+  (22,N'QC_RETURN',N'单据状态',N'单据状态',N'文本',NULL,NULL,NULL,NULL,N'query,header',110,90,0,0,0,NULL,1,N'Doc status',NULL,NULL),
+  (23,N'QC_RETURN',N'不良原因',N'不良原因',N'参照',NULL,N'REJECT',N'不合格原因',N'不合格原因',N'query,detail',110,150,1,0,0,NULL,1,NULL,NULL,NULL),
+  (24,N'QC_RETURN',N'审核人',N'审核人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'header',120,90,0,0,0,NULL,1,N'Approved by',NULL,NULL),
+  (25,N'QC_RETURN',N'报废数量',N'报废数量',N'小数',NULL,NULL,NULL,NULL,N'detail',120,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (26,N'QC_RETURN',N'审核时间',N'审核时间',N'文本',NULL,NULL,NULL,NULL,N'header',130,140,0,0,0,NULL,1,N'Approved at',NULL,NULL),
+  (27,N'QC_RETURN',N'剩余数量',N'剩余数量',N'小数',NULL,NULL,NULL,NULL,N'detail',130,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (28,N'QC_RETURN',N'备注',N'备注',N'文本',NULL,NULL,NULL,NULL,N'header,detail',140,220,1,0,0,NULL,1,N'Remark',NULL,NULL),
+  (29,N'QC_RETURN',N'附件1',N'附件1',N'附件',NULL,NULL,NULL,NULL,N'header',150,220,1,0,0,NULL,1,NULL,NULL,NULL),
+  (30,N'QC_RETURN',N'附件2',N'附件2',N'附件',NULL,NULL,NULL,NULL,N'header',160,220,1,0,0,NULL,1,NULL,NULL,NULL),
+  (31,N'QC_RETURN',N'附件3',N'附件3',N'附件',NULL,NULL,NULL,NULL,N'header',170,220,1,0,0,NULL,1,NULL,NULL,NULL),
+  (32,N'QC_RETURN',N'附件4',N'附件4',N'附件',NULL,NULL,NULL,NULL,N'header',180,220,1,0,0,NULL,1,NULL,NULL,NULL),
+  (33,N'QC_RETURN',N'附件5',N'附件5',N'附件',NULL,NULL,NULL,NULL,N'header',190,220,1,0,0,NULL,1,NULL,NULL,NULL),
+  (34,N'QC_RETURN',N'附件6',N'附件6',N'附件',NULL,NULL,NULL,NULL,N'header',200,220,1,0,0,NULL,1,NULL,NULL,NULL),
+  (35,N'QC_RETURN',N'批次号',N'批次号',N'文本',NULL,NULL,NULL,NULL,N'detail',206,150,0,0,0,NULL,1,NULL,NULL,NULL),
+  (36,N'QC_RETURN',N'ERP单号',N'ERP单号',N'文本',NULL,NULL,NULL,NULL,N'header',300,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (37,N'QC_RETURN',N'是否已转ERP',N'是否已转ERP',N'文本',NULL,NULL,NULL,NULL,N'header',310,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (38,N'QC_RETURN',N'转ERP操作人',N'转ERP操作人',N'文本',NULL,NULL,NULL,NULL,N'header',320,130,0,0,0,NULL,1,NULL,NULL,NULL),
+  (39,N'QC_RETURN',N'转ERP时间',N'转ERP时间',N'文本',NULL,NULL,NULL,NULL,N'header',330,130,0,0,0,NULL,1,NULL,NULL,NULL),
   (1,N'PURCHASE_IN',N'存货编码',N'存货编码',N'参照',NULL,N'INV',N'存货编码',N'存货名称',N'query,detail',10,120,1,1,0,NULL,1,N'Inventory Code',NULL,NULL),
   (2,N'PURCHASE_IN',N'单据日期',N'单据日期',N'日期',NULL,NULL,NULL,NULL,N'query,header',10,140,1,1,0,NULL,1,N'Document Date',NULL,NULL),
   (3,N'PURCHASE_IN',N'单据编号',N'单据编号',N'文本',NULL,NULL,NULL,NULL,N'query,header',20,140,1,1,0,NULL,1,N'Document Number',NULL,NULL),
