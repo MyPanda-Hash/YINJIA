@@ -214,6 +214,13 @@ public final class ProcessFlow {
             r.put("当前工序可加工量", round4(cur.avail()));
             r.put("当前工序待报量", round4(Math.max(cur.avail() - cur.done(), 0)));
             r.put("当前工序待流入量", round4(Math.max(cur.planQty() - cur.avail(), 0)));
+            // 上道工序 / 上道完工量(2026-11-12 用户口径):沿用**原有那两列**,显示**上一道自己的报工数**
+            //   (工序口径原值,不折算) —— 不再另起"折成品"列;折算后的"本道能做多少"只体现在 可加工量。
+            //   ⚠ 本线工序行(工单当前线不在本线)原来这两列是空/0,这里统一按 ProcessFlow 补上,口径与当前线行一致。
+            int ci = indexOf(flow, cur.op());
+            Step prev = ci > 0 ? flow.get(ci - 1) : null;
+            r.put("上道工序", prev == null ? "" : prev.op());
+            r.put("上道完工量", prev == null ? 0d : round4(prev.done()));
             // 全道明细(2026-11-12):一行只能显示"当前工序",后道(如装箱 1000/待流入4000)在单值列里看不到
             //   ⇒ 每行带一份**逐道**明细,前端用「展开行」渲染。纯内存计算(数据已批量取好),不查库。
             List<Map<String, Object>> detail = new ArrayList<>();
@@ -222,7 +229,6 @@ public final class ProcessFlow {
                 d.put("工序", st.op());
                 d.put("换算率", round4(st.rate()));
                 d.put("计划量", round4(st.planQty()));
-                d.put("上道完工折成品", round4(st.availBase()));
                 d.put("可加工量", round4(st.avail()));
                 d.put("已审完工", round4(st.done()));
                 d.put("待报量", round4(Math.max(st.avail() - st.done(), 0)));
