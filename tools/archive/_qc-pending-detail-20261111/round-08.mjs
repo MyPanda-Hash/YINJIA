@@ -1,27 +1,29 @@
-/* round-08.mjs — 硬刷新后再看一次(确认「首进 0 条」是否可复现) */
-const task = await taskSpace('qc-pending-detail-20261111')
+/* round-08.mjs — 四组「单号 + 行号」分列复核 + 找那条行号不一致的真实数据(正式库 8090) */
+const task = await taskSpace('qc-carry-20261112')
 const page = task.page('p1')
 
-await page.reload({ timeout: 60000 })
-await page.waitForTimeout(6000)
+await page.goto('http://127.0.0.1:8090/#/panelx/list/QC_INSP_REC_DETAIL', { timeout: 60000 })
+await page.waitForTimeout(9000)
 
-const out = await page.evaluate(() => {
-  const bodyRows = [...document.querySelectorAll('.el-table__body-wrapper tbody tr')]
-  const txt = (document.querySelector('.report-body') || document.body).innerText.replace(/\s+/g, ' ')
-  const m = txt.match(/共\s*(\d+)\s*条/)
-  const pagerIdx = txt.indexOf('第 ')
-  return {
-    hash: location.hash,
-    rowCount: bodyRows.length,
-    total: m ? m[1] : null,
-    pagerText: pagerIdx >= 0 ? txt.slice(pagerIdx, pagerIdx + 30) : '',
-    firstRow: bodyRows[0] ? [...bodyRows[0].querySelectorAll('td')].map((td) => (td.innerText || '').replace(/\s+/g, ' ').trim()) : [],
-  }
+const th = await page.evaluate(() =>
+  [...document.querySelectorAll('.el-table__header th')]
+    .map((el) => (el.innerText || '').replace(/[\s⇅]+/g, ' ').trim()).filter(Boolean))
+console.log('8090 表头 ->', JSON.stringify(th))
+
+// 勾上「显示全部状态」再按 检验数据记录单号 找 JYSJ-2026-10-0081(检验单行1 / 暂收行6 的那条)
+await page.evaluate(() => {
+  const cb = document.querySelector('.gated-toggle input[type=checkbox]') || document.querySelector('.gated-toggle')
+  if (cb) cb.click()
 })
-console.log(JSON.stringify(out, null, 2))
-try {
-  const w = await page.cdp('Browser.getWindowForTarget', {})
-  if (w && w.windowId) await task.cdp('Browser.setWindowBounds', { windowId: w.windowId, bounds: { windowState: 'normal' } })
-  await page.waitForTimeout(400)
-} catch (e) { }
-await page.screenshot({ path: 'C:/Users/Lenovo/ego/qc-pending-detail-20261111/round-08-reload.png' })
+await page.waitForTimeout(3500)
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll('.toolbar-query-btn')].find((x) => /条件/.test(x.innerText || ''))
+  if (b) b.click()
+})
+await page.waitForTimeout(1200)
+
+const rows = await page.evaluate(() => {
+  const bodyRows = [...document.querySelectorAll('.el-table__body-wrapper tbody tr')]
+  return bodyRows.slice(0, 5).map((tr) => [...tr.querySelectorAll('td')].map((td) => (td.innerText || '').replace(/\s+/g, ' ').trim()))
+})
+console.log('前 5 行(前 13 列) ->', JSON.stringify(rows.map((r) => r.slice(0, 13)), null, 2))
