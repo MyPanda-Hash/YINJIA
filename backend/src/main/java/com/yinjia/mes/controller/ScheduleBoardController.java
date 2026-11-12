@@ -51,21 +51,17 @@ public class ScheduleBoardController {
     private final ExternalReportAbsorbService absorbService;
     /** 工单日排产(2026-10-29):生产工单/工单排产两页表格内的日期列 —— 读计划 + 写计划(不另记完成量) */
     private final WorkOrderDayPlanService dayPlanService;
-    /** 工序在制看板(2026-11-11):按产线看「下一道在等我多少」= 可排产量 / 不可排产量 */
-    private final com.yinjia.mes.service.WoWipBoardService wipBoardService;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
                                    WorkOrderTransferService transferService, ProcessTaskService processTask,
                                    ExternalReportAbsorbService absorbService,
-                                   WorkOrderDayPlanService dayPlanService,
-                                   com.yinjia.mes.service.WoWipBoardService wipBoardService) {
+                                   WorkOrderDayPlanService dayPlanService) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
         this.processTask = processTask;
         this.absorbService = absorbService;
         this.dayPlanService = dayPlanService;
-        this.wipBoardService = wipBoardService;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -150,23 +146,6 @@ public class ScheduleBoardController {
         // 故**不放行 SCHEDULE_BOARD**(收紧:拿"快速排产"权限的人不该读到别的页面的骨架数据)。
         perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(service.linesSummary(str(body == null ? null : body.get("开工日期")), workshop()));
-    }
-
-    /**
-     * **工序在制(2026-11-11 用户口径)**：「当前工单排产在完成一部分报工后，能在**下一道工序的产线**中
-     * 查看到这个工单，并且能处理当前的可排产量和不可排产量」。
-     *
-     * <p>与 {@link #scheduled} 的区别：{@code /scheduled} 是**工单行视角**（一行工单归一条线、只显示最前工序），
-     * 本端点是**工单行 × 在制工序视角**（每道已落实工序归它自己的实际/计划生产线）。
-     * 前道只报了一部分时，后道产线在本端点里就能看到「等我的量 = 可排产量」与「前道还没流下来的量 = 不可排产量」。
-     *
-     * <p>只读；权限 = 工单排产看板 页面查看。
-     * body: {@code { 生产线 }}（必填）
-     */
-    @PostMapping("/wip")
-    public ApiResult<List<Map<String, Object>>> wip(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_BOARD);
-        return ApiResult.ok(wipBoardService.byLine(str(body == null ? null : body.get("生产线")), workshop()));
     }
 
     /** 选中线 的排产明细(scope=未完工/已完工/全部);9.29 批次③:车间账号只认本车间的产线 */
