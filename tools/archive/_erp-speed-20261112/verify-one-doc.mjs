@@ -8,6 +8,6 @@ const c = { ...cfg, domain }
 const r = await kingdeeTryGet(c, token, '/jdy/v2/scm/pur_inbound', { page: '1', page_size: '100' })
 if (!r.ok) throw new Error(r.error)
 const rows = r.data.rows || []
-const hit = rows.filter((x) => String(x.remark || '').includes('TCGRK-0049'))
-console.log(`最近返回 ${rows.length} 张;remark 含 [MES:TCGRK-0049] 的 = ${hit.length}`)
+const hit = rows.filter((x) => String(x.remark || '').includes(process.argv[2] || 'TCGRK-0049'))
+console.log(`最近返回 ${rows.length} 张;remark 含 [MES:' + (process.argv[2] || 'TCGRK-0049') + '] 的 = ${hit.length}`)
 hit.forEach((x) => console.log(`  · bill_no=${x.bill_no} create_time=${x.create_time} remark=${JSON.stringify(x.remark)}`))

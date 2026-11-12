@@ -16,15 +16,18 @@
 const BASE = process.env.MES_BASE || 'http://127.0.0.1:8090'
 const PANEL = process.argv[2] || 'PURCHASE_IN'
 const DOC = process.argv[3] || 'TCGRK-0049'
+// 登录工厂:YJ = 正式库(HSDZ_MES)、YJ_TEST = 测试库(HSDZ_MES_TEST)。
+// 🔴 测试点击一律传 YJ_TEST(用户口径 2026-11-12:测试不能污染正式账);见 scripts 顶端说明。
+const FACTORY = process.argv[4] || 'YJ'
 
 const login = await (await fetch(`${BASE}/api/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userName: 'admin', password: '123456' }),
+  body: JSON.stringify({ userName: 'admin', password: '123456', factory: FACTORY }),
 })).json()
 const token = login?.data?.token
 if (!token) throw new Error('登录失败:' + JSON.stringify(login).slice(0, 300))
-console.log(`已登录(${BASE}),目标单据 = ${PANEL} / ${DOC}`)
+console.log(`已登录(${BASE}, 工厂=${FACTORY} → ${FACTORY === 'YJ_TEST' ? '测试库 HSDZ_MES_TEST' : '正式库 HSDZ_MES'}),目标单据 = ${PANEL} / ${DOC}`)
 
 const call = async (tag) => {
   const t0 = Date.now()
