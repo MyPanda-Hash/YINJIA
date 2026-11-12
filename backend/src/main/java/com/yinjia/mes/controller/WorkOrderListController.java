@@ -210,6 +210,8 @@ public class WorkOrderListController {
                         + "     AND ISNULL(r.asp_cancel,'N')<>'Y'), 0) AS 当前工序计划量,"
                         // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用,不足 0 记 0
                         + " " + ROW_YL + " AS 余量,"
+                        // 按量流转展示(2026-11-12 方案A,只读):enrichRowFlow 需要本行路线编码
+                        + " ISNULL(p.[工艺路线], N'') AS 工艺路线,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
                         + " CONVERT(varchar(10), p.st_date, 120) AS 计划开工日期,"
@@ -247,6 +249,10 @@ public class WorkOrderListController {
             m.put("生产状态", com.yinjia.mes.service.PlangStatus.of(m));
             out.add(m);
         }
+        // 按量流转展示(2026-11-12 用户口径「方案A = 只做显示」):
+        //   补 上道完工(折成品) / 本工序可加工量 / 待报量 / 待流入量 —— **只读**,不写库、不影响报工校验。
+        //   取数是 3 条批量查询(与行数无关),别改成逐行子查询(本页一次返回 400+ 行)。
+        com.yinjia.mes.service.ProcessFlow.enrichRowFlow(jdbc, out);
         return ApiResult.ok(out);
     }
 

@@ -992,6 +992,8 @@ public class ScheduleBoardService {
                         //   ⚠ 未交量是**本行当前**的状态(还没入库=还没交),与上道做了多少无关(2026-10-07 用户确认)
                         + " CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN 0"
                         + "      ELSE ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) END AS 未交量,"
+                        // 按量流转展示(2026-11-12 方案A,只读):enrichRowFlow 需要本行路线编码
+                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线,"
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
@@ -1019,6 +1021,10 @@ public class ScheduleBoardService {
         for (Map<String, Object> r : out) {
             r.put("本线排产数量", r.get("当前工序计划量"));
         }
+        // 按量流转展示(2026-11-12 用户口径「方案A = 只做显示」):补
+        //   上道完工(折成品) / 本工序可加工量 / 待报量 / 待流入量 —— **只读**,不写库、不影响报工。
+        //   口径与报工页/追溯同源(ProcessFlow);取数 3 条批量查询,不随行数放大。
+        ProcessFlow.enrichRowFlow(jdbc, out);
         return out;
     }
 

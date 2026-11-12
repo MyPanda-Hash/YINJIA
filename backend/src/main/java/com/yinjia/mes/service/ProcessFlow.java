@@ -4,8 +4,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * **工序间「按量流转」的唯一口径**(2026-11-11 用户拍板)。
@@ -110,26 +112,172 @@ public final class ProcessFlow {
      * @param route 本行工艺路线编码(可空 ⇒ 兜底 {@link #DEFAULT_OPS})
      */
     public static List<Step> steps(JdbcTemplate jdbc, String plNo, Long rowId, double plSl, String route) {
+        if (plNo == null || plNo.isBlank()) return new ArrayList<>();
+        // 数据侧只做"取数",算式统一走下面的纯计算重载(两处不可能出现两套公式)
+        List<Map<String, Object>> rls = routeLines(jdbc, route);
+        Map<String, Double> done = new LinkedHashMap<>();
+        for (Map<String, Object> line : rls) {
+            String op = str(line.get("工序名称"));
+            if (!op.isEmpty()) done.put(op, WoInspGate.reportedQty(jdbc, plNo.trim(), rowId, op));
+        }
+        return steps(rls, plSl, ledgerPlanQty(jdbc, plNo.trim(), rowId), done);
+    }
+
+    /**
+     * **纯计算版**(不查库) —— 给"一次要算几百行"的列表/看板用:数据由调用方**批量预取**后传进来。
+     *
+     * <p>与 {@link #steps(JdbcTemplate, String, Long, double, String)} 共用同一套算式;
+     * 唯一的区别是数据来源(逐行查库 vs 批量预取),口径不会分化。
+     *
+     * @param routeLines 路线明细(键:{@code 工序名称}/{@code 换算率};空 ⇒ 返回空表,由调用方兜底)
+     * @param plSl       本行排产数量(成品口径)
+     * @param ledgerPlan 台账计划量(键=工序名;缺 ⇒ 回落 plSl × rate)
+     * @param doneByOp   各道**已审**报工量(键=工序名;缺 ⇒ 0)
+     */
+    public static List<Step> steps(List<Map<String, Object>> routeLines, double plSl,
+                                   Map<String, Double> ledgerPlan, Map<String, Double> doneByOp) {
         List<Step> out = new ArrayList<>();
-        if (plNo == null || plNo.isBlank()) return out;
-        Map<String, Double> ledgerPlan = ledgerPlanQty(jdbc, plNo.trim(), rowId);
+        if (routeLines == null || routeLines.isEmpty()) return out;
         double prevDoneBase = 0;
         boolean first = true;
-        for (Map<String, Object> line : routeLines(jdbc, route)) {
+        for (Map<String, Object> line : routeLines) {
             String op = str(line.get("工序名称"));
+            if (op.isEmpty()) continue;
             double rate = num(line.get("换算率"));
             if (rate <= 0) rate = 1;
-            double done = WoInspGate.reportedQty(jdbc, plNo.trim(), rowId, op);
+            double done = doneByOp == null ? 0 : doneByOp.getOrDefault(op, 0d);
             double doneBase = done / rate;
             double availBase = first ? plSl : prevDoneBase;
             double avail = availBase * rate;
-            double planQty = ledgerPlan.getOrDefault(op, 0d);
+            double planQty = ledgerPlan == null ? 0 : ledgerPlan.getOrDefault(op, 0d);
             if (planQty <= 0) planQty = plSl * rate;
             out.add(new Step(op, rate, planQty, done, doneBase, availBase, avail, Math.max(avail - done, 0)));
             prevDoneBase = doneBase;
             first = false;
         }
         return out;
+    }
+
+    /**
+     * **批量给「工单行」列表补 4 个只读展示字段**(2026-11-12 用户口径:方案 A = 只做显示):
+     * <pre>
+     *   上道完工折成品  = 首道 ? 排产数量 : 上道已审报工 ÷ 上道换算率     (成品口径)
+     *   当前工序可加工量 = 上道完工折成品 × 本工序换算率                  (工序口径)
+     *   当前工序待报量   = max(可加工量 − 本工序已审报工, 0)
+     *   当前工序待流入量 = max(本工序计划量 − 可加工量, 0)
+     * </pre>
+     *
+     * <p>⚠ **只读**:这里只往行 Map 里 put 展示字段,不写任何库、不改报工校验/转序判据。
+     * 取数只做 3 条批量查询(台账计划量 / 已审报工 / 路线换算率),与行数无关
+     * —— 列表页一次返回 400+ 行,逐行查库会秒级卡顿(实测教训)。
+     *
+     * <p>入参行需带:{@code 行id}(plang.id)、{@code 排产数量}、{@code 当前工序}、{@code 工艺路线}。
+     */
+    public static void enrichRowFlow(JdbcTemplate jdbc, List<Map<String, Object>> rows) {
+        if (jdbc == null || rows == null || rows.isEmpty()) return;
+        List<Long> ids = new ArrayList<>();
+        Set<String> routes = new LinkedHashSet<>();
+        for (Map<String, Object> r : rows) {
+            Object id = r.get("行id");
+            if (id instanceof Number n) ids.add(n.longValue());
+            String route = str(r.get("工艺路线"));
+            if (!route.isEmpty()) routes.add(route);
+            r.put("上道完工折成品", 0d);
+            r.put("当前工序可加工量", 0d);
+            r.put("当前工序待报量", 0d);
+            r.put("当前工序待流入量", 0d);
+        }
+        if (ids.isEmpty() || routes.isEmpty()) return;
+        Map<Long, Map<String, Double>> ledger = batchLedgerPlan(jdbc, ids);
+        Map<Long, Map<String, Double>> done = batchDone(jdbc, ids);
+        Map<String, List<Map<String, Object>>> routeCache = new LinkedHashMap<>();
+        for (Map<String, Object> rl : jdbc.queryForList(
+                "SELECT 工艺路线编码, 工序名称, ISNULL(换算率,1) AS 换算率 FROM dbo.bs_route"
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N''"
+                        + "   AND 工艺路线编码 IN (" + placeholders(routes.size()) + ")"
+                        + " ORDER BY ISNULL(加工顺序,999), id", routes.toArray())) {
+            routeCache.computeIfAbsent(str(rl.get("工艺路线编码")), k -> new ArrayList<>()).add(rl);
+        }
+        for (Map<String, Object> r : rows) {
+            Object idObj = r.get("行id");
+            if (!(idObj instanceof Number n)) continue;
+            long pid = n.longValue();
+            List<Map<String, Object>> rls = routeCache.get(str(r.get("工艺路线")));
+            if (rls == null || rls.isEmpty()) continue;
+            double plSl = num(r.get("排产数量"));
+            List<Step> flow = steps(rls, plSl, ledger.get(pid), done.get(pid));
+            String curOp = str(r.get("当前工序"));
+            if (curOp.isEmpty()) curOp = currentOp(flow, plSl);
+            Step cur = stepOf(flow, curOp);
+            if (cur == null) continue;
+            r.put("上道完工折成品", round4(cur.availBase()));
+            r.put("当前工序可加工量", round4(cur.avail()));
+            r.put("当前工序待报量", round4(Math.max(cur.avail() - cur.done(), 0)));
+            r.put("当前工序待流入量", round4(Math.max(cur.planQty() - cur.avail(), 0)));
+            // 全道明细(2026-11-12):一行只能显示"当前工序",后道(如装箱 1000/待流入4000)在单值列里看不到
+            //   ⇒ 每行带一份**逐道**明细,前端用「展开行」渲染。纯内存计算(数据已批量取好),不查库。
+            List<Map<String, Object>> detail = new ArrayList<>();
+            for (Step st : flow) {
+                Map<String, Object> d = new LinkedHashMap<>();
+                d.put("工序", st.op());
+                d.put("换算率", round4(st.rate()));
+                d.put("计划量", round4(st.planQty()));
+                d.put("上道完工折成品", round4(st.availBase()));
+                d.put("可加工量", round4(st.avail()));
+                d.put("已审完工", round4(st.done()));
+                d.put("待报量", round4(Math.max(st.avail() - st.done(), 0)));
+                d.put("待流入量", round4(Math.max(st.planQty() - st.avail(), 0)));
+                d.put("状态", st.state(plSl));
+                d.put("当前", st.op().equals(curOp));
+                detail.add(d);
+            }
+            r.put("工序流转明细", detail);
+        }
+    }
+
+    /** 批量:台账计划量(键 = 工单行id → 工序 → 计划数量;同名工序取第一条) */
+    private static Map<Long, Map<String, Double>> batchLedgerPlan(JdbcTemplate jdbc, List<Long> ids) {
+        Map<Long, Map<String, Double>> out = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT 工单行id AS pid, 工序, ISNULL(计划数量,0) AS 计划数量 FROM dbo.wo_process_line"
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND 工单行id IN (" + placeholders(ids.size()) + ")"
+                        + " ORDER BY ISNULL(工序序,999), id", ids.toArray())) {
+            Object pid = r.get("pid");
+            if (!(pid instanceof Number n)) continue;
+            out.computeIfAbsent(n.longValue(), k -> new LinkedHashMap<>())
+                    .putIfAbsent(str(r.get("工序")), num(r.get("计划数量")));
+        }
+        return out;
+    }
+
+    /** 批量:各工单行各道**已审**报工量(锚 scjl.gd_id → plang_pc.plang_id,老数据按批次兜底 —— 与列表口径同源) */
+    private static Map<Long, Map<String, Double>> batchDone(JdbcTemplate jdbc, List<Long> ids) {
+        Map<Long, Map<String, Double>> out = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT p.id AS pid, ISNULL(s.gxdm,N'') AS op, SUM(ISNULL(s.sl,0)) AS qty"
+                        + " FROM dbo.plang p JOIN dbo.scjl s ON s.gldh = p.pl_no"
+                        + "   AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = p.id)"
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')=ISNULL(p.[批次号],N'')))"
+                        + " WHERE p.id IN (" + placeholders(ids.size()) + ")"
+                        + " GROUP BY p.id, s.gxdm", ids.toArray())) {
+            Object pid = r.get("pid");
+            if (!(pid instanceof Number n)) continue;
+            String op = str(r.get("op"));
+            if (op.isEmpty()) continue;
+            out.computeIfAbsent(n.longValue(), k -> new LinkedHashMap<>()).put(op, num(r.get("qty")));
+        }
+        return out;
+    }
+
+    private static String placeholders(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) { if (i > 0) sb.append(','); sb.append('?'); }
+        return sb.toString();
+    }
+
+    private static double round4(double v) {
+        return Math.round(v * 10000d) / 10000d;
     }
 
     /** 取某道工序的按量结果;工序不在路线上 ⇒ null */
