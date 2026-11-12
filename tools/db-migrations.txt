@@ -4602,14 +4602,16 @@ migrate-lab-testitem-legacy-20261109.sql
 # 2026-11-11 工序按量流转:台账状态按「上一道已审完工量」口径一次性对账重算(零 DDL;幂等;两账套)
 migrate-wo-process-line-qty-20261111.sql
 
+# 2026-11-11 切炭直销(裁切双出口)下线:删 WO_REPORT/WO_REPORT_LIST 的「直销数量」字段行 + 译名(物理列保留:0 非零数据/0 代码引用)
+migrate-drop-dualout-direct-sale-20261111.sql
+
 # 2026-11-11 出货检验功能记录表(图2)落库:qc_proc_insp_detail+ 内部批次 / qc_proc_insp_head + 内部批次清单 · 表单审核人 + yj_field 三行 + 总结论/处理方式改下拉 + QC_ASM_INSP 改名出货检验表观
 migrate-qc-proc-insp-batch-table-20261111.sql
 
 # 2026-11-12 出货检验表观(QC_ASM_INSP,原组装成品检验单)接图2 表样:qc_asm_insp_* 加 内部批次 / 内部批次清单 / 表单审核人 + yj_field 三行 + 总结论·处理方式改下拉 + 4 个字段标签译名(面板显示名/代号/底表/前缀 ZJ 不动)
 migrate-qc-asm-insp-batch-table-20261112.sql
 
-# 2026-11-12 出货检验表观(QC_ASM_INSP)与产成品入库解绑:合格数量 必填→非必填(零DDL;审核不再生成入库单,存量入库单不动)
-migrate-qc-asm-insp-unlink-finish-in-20261112.sql
-
+# 2026-11-12 出货检验表观(QC_ASM_INSP)与产成品入库解绑:合格数量 必填→非必填(零DDL;审核不再生成入库单,存量入库单不动)
+migrate-qc-asm-insp-unlink-finish-in-20261112.sql
 # 2026-11-12 产成品入库单关联出货检验功能单/表观单(阶段1:落两个表头参照字段+10语种译名,零业务门禁)
 migrate-finish-in-insp-link-20261112.sql

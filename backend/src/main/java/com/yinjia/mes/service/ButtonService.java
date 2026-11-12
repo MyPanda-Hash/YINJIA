@@ -2423,7 +2423,6 @@ public class ButtonService {
     }
 
 
-
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         // 直审收权(2026-09-22):直接「审核」仅管理员——此前与审批通过/驳回同口径(管理员 ∪ can_approve),
         // 有审批权的角色现在走 提交审批→审批通过(同效已审核,钩子同口径);前端审批下拉对非管理员同步隐藏
@@ -2582,8 +2581,6 @@ public class ButtonService {
         // 组装成品检验单(出货检验表观)弃审**不再联动产成品入库单**(2026-11-12 用户口径:
         //   「入库不和这个单据强关联了,把之前的实现安全去除掉」)⇒ 原 asmInspUnauditCascade 已删除;
         //   存量入库单保持现状,弃审检验单不会再去作废/拦截它们。
-        // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
-        dualOutRedReverse(def.code(), no, currentUserName());
         // 不良品处理冲回钩子同样随 QC_DISPOSAL 下架移除(见审核侧注释,2026-10-09)
         // 来料检验单弃审联动:自动生成的采购入库单为草稿则作废+释放占用+清入库单号回填;
         // 已审核(可能已记台账)则拒绝,提示先弃审入库单——防止"检验弃审了、库存已入账"的错位
@@ -2734,8 +2731,6 @@ public class ButtonService {
         // 组装成品检验单审核**不再自动生成产成品入库单**(2026-11-12 用户口径:
         //   「入库不和这个单据强关联了,把之前的实现安全去除掉。之后入库数量的进行得调换到其他单据」)
         //   ⇒ 原 asmInspToStock 及其数量口径类 AsmInspStockQty 已整体删除;存量已生成的入库单不动。
-        // 切炭双出口:直销数量自动生成成品入库单并审核入账(成品仓)
-        dualOutFinishIn(def.code(), no, user);
         // 生产工单执行回填(入库回写 rk_sl/rk_no、领料回写 ll_no2)
         manuWriteback.post(def.code(), no, user);
         // 组装成品检验审核 → 重算结案(组装成品检验已审核 + 入库≥排产)
@@ -4083,101 +4078,6 @@ public class ButtonService {
         return out;
     }
 
-    /**
-     * 切炭双出口(流程图已确认:合格品一部分直销入成品仓,其余继续组装):
-     * 切炭报工单审核后,若[直销数量]>0 → 自动生成成品入库单(成品仓,带产品批号)并审核入账;
-     * 完成数量仍全额累计切炭进度(直销+组装都在切炭完成量内)。
-     * 幂等:经 form_flow_link 占用,同一报工单重审不重复生成;弃审报工不自动冲回入库单(需单独弃审入库单)。
-     */
-    private void dualOutFinishIn(String panelCode, String no, String user) {
-        if (!"WO_REPORT".equals(panelCode)) return;
-        // 2026-09-27 单表化:报工数据直读 scjl(按 报工单号)
-        // 2026-10-15 行级:带上 gd_id(=plang_pc.id → 工单行),入库单要按行写「批次号 + 工单行号」
-        List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
-                        + " ISNULL([直销数量],0) AS 直销数量, ISNULL([批次号],N'') AS 报工批次,"
-                        + " ISNULL(gd_id,0) AS gd_id FROM dbo.scjl"
-                        + " WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(wgzt,'N')='Y'", no);
-        if (reps.isEmpty()) return;
-        Map<String, Object> rep = reps.get(0);
-        if (!"切炭".equals(String.valueOf(rep.get("工序")))) return;
-        double dual = numOr(rep.get("直销数量"));
-        if (dual <= 0) return;
-        double done = numOr(rep.get("报工数量"));
-        if (dual > done + 0.0001) throw new IllegalStateException("直销数量(" + dual + ")不能大于报工数量(" + done + ")");
-        Integer linked = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code = 'WO_REPORT' AND source_form_no = ?"
-                        + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
-        if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
-        String wo = String.valueOf(rep.get("工单号"));
-        // 本单锚定的**工单行**(scjl.gd_id = plang_pc.id → plang_pc.plang_id = plang.id);
-        //   老数据没有 gd_id 时按(工单号+批次号)找该行 —— 与 WoReportService.reportRows 同一口径
-        Map<String, Object> woRow = resolveWoRow(wo, (long) numOr(rep.get("gd_id")), String.valueOf(rep.get("报工批次")));
-        // 工单数据源(2026-09-27 切 plang 单轨):工单号=plang.pl_no,产品/单位/批号取 plang 行;
-        // 批号 lot_no 空时现场取号并回写 plang 全部行
-        List<Map<String, Object>> ws = jdbc.queryForList(
-                "SELECT TOP 1 [dm] AS 产品编码, [mc] AS 产品名称, [jldw] AS 单位, [lot_no] AS 产品批号,"
-                        + " ISNULL([dj], 0) AS 单价 FROM plang WHERE [pl_no] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", wo);
-        boolean fromManu = !ws.isEmpty();
-        if (ws.isEmpty()) {
-            ws = jdbc.queryForList(
-                    "SELECT [产品编码], [产品名称], [单位], [产品批号] FROM wo_order WHERE [单据编号] = ?", wo);
-        }
-        if (ws.isEmpty()) throw new IllegalStateException("工单不存在:" + wo);
-        Map<String, Object> w = ws.get(0);
-        Object lotObj = w.get("产品批号");
-        String lot = lotObj == null || String.valueOf(lotObj).isBlank() ? null : String.valueOf(lotObj).trim();
-        if (lot == null) {
-            lot = lotSeqService.next();
-            jdbc.update(fromManu
-                            ? "UPDATE plang SET [lot_no] = ? WHERE [pl_no] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                            : "UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?",
-                    lot, wo);
-        }
-        // 成品仓解析:优先成品类启用仓(名称/分类含"成品"),无则取首个启用仓——本地档案无"成品仓"时硬编码会审拒绝
-        List<String> whs = jdbc.queryForList(
-                "SELECT TOP 1 仓库名称 FROM bs_wh WHERE ISNULL(停用,0) = 0 AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + " AND (仓库名称 LIKE N'%成品%' OR 仓库分类 LIKE N'%成品%') ORDER BY id", String.class);
-        if (whs.isEmpty()) {
-            whs = jdbc.queryForList(
-                    "SELECT TOP 1 仓库名称 FROM bs_wh WHERE ISNULL(停用,0) = 0 AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", String.class);
-        }
-        String finishWh = whs.isEmpty() ? "成品仓" : whs.get(0);
-        Map<String, Object> line = new LinkedHashMap<>();
-        line.put("产品编码", w.get("产品编码"));
-        line.put("产品名称", w.get("产品名称"));
-        line.put("实收数量", dual);
-        line.put("单价", numOr(w.get("单价")));   // 成本台账 收入金额 非空守卫(plang.dj 空则 0)
-        line.put("计量单位", w.get("单位"));
-        line.put("批号", lot);
-        line.put("仓库", finishWh);
-        Map<String, Object> head = new LinkedHashMap<>();
-        head.put("单据日期", LocalDate.now().toString());
-        // 🔴 2026-10-15 修:必须写「业务类型」—— 正式库 bd_finish_in.[业务类型] 是 **NOT NULL**,
-        //   而测试库该列**允许 NULL**(两账套结构不一致)⇒ 自动生单在测试账套跑得通、到正式库报
-        //   「Cannot insert the value NULL into column '业务类型'」。值取该字段字典里的「产成品入库」。
-        head.put("业务类型", "产成品入库");
-        head.put("仓库", finishWh);
-        head.put("生产车间", "切炭车间");
-        head.put("加工单号", wo);
-        // 行级键(2026-10-15):工单行号 + 批次号写进入库单头 ⇒ 工单追溯「入库段」能按行收敛
-        //   (列随 migrate-finish-in-wo-line-20261015.sql 新增;yj_field 已注册 header,否则被 labelsToCols 静默丢弃)
-        if (woRow != null) {
-            head.put("工单行号", woRow.get("pl_xc"));
-            if (woRow.get("批次号") != null && !String.valueOf(woRow.get("批次号")).isBlank()) {
-                head.put("批次号", woRow.get("批次号"));
-            }
-        }
-        head.put("经手人", user);
-        head.put("detail", Map.of("items", List.of(line)));
-        Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
-        String fiNo = String.valueOf(saved.get("编号"));
-        audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) fiNo));
-        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key, target_panel_code, target_form_no, link_status, create_by, create_time)"
-                        + " VALUES ('WO_REPORT', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())", no, fiNo, user);
-        // 直销入库回执回填报工行(参考库 scjl.post_no 对齐;单表化后直接写 scjl)
-        jdbc.update("UPDATE dbo.scjl SET post_no = ? WHERE [报工单号] = ?", fiNo, no);
-    }
 
     private static double numOr(Object o) {
         if (o == null || String.valueOf(o).isBlank()) return 0;
@@ -5007,59 +4907,6 @@ public class ButtonService {
         }
     }
 
-    /**
-     * 切炭双出口红字冲回:弃审切炭报工单时,若已自动生成直销入库单(ACTIVE link),
-     * 则自动生成一张红字(负数量)成品入库单并审核 → 台账 rkl/yl 对称扣减,库中留痕。
-     * 原入库单保留(审计线索),红字单独立存在;link 释放后重审可再生成新入库单。
-     * 幂等:无 ACTIVE link(未生成过或已冲回)则跳过。
-     */
-    private void dualOutRedReverse(String panelCode, String no, String user) {
-        if (!"WO_REPORT".equals(panelCode)) return;
-        // 查报工行是否为切炭且有直销(2026-09-27 单表化:直读 scjl)
-        List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL([直销数量],0) AS 直销数量"
-                        + " FROM dbo.scjl WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-        if (reps.isEmpty() || !"切炭".equals(String.valueOf(reps.get(0).get("工序")))) return;
-        if (numOr(reps.get(0).get("直销数量")) <= 0) return;
-        // 查 ACTIVE link → 原入库单号
-        List<String> fiNos = jdbc.queryForList(
-                "SELECT target_form_no FROM form_flow_link WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
-                        + " AND target_panel_code='FINISH_IN' AND link_status='ACTIVE'", String.class, no);
-        if (fiNos.isEmpty()) return; // 未生成过或已冲回
-        String srcFi = fiNos.get(0);
-        // 读原入库单明细行(取第一行——双出口只生成单行)
-        List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT [产品编码], [产品名称], [实收数量], [计量单位], [批号], [仓库] FROM bl_finish_in"
-                        + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", srcFi);
-        if (lines.isEmpty()) throw new IllegalStateException("红字冲回失败:原入库单 " + srcFi + " 无有效行");
-        Map<String, Object> src = lines.get(0);
-        double srcQty = numOr(src.get("实收数量"));
-        if (srcQty <= 0) return; // 原行已非正数,无需冲回
-        String wo = String.valueOf(reps.get(0).get("工单号"));
-        // 生成红字入库单(负数量)
-        Map<String, Object> line = new LinkedHashMap<>();
-        line.put("产品编码", src.get("产品编码"));
-        line.put("产品名称", src.get("产品名称"));
-        line.put("实收数量", -srcQty);
-        line.put("计量单位", src.get("计量单位"));
-        line.put("批号", src.get("批号"));
-        line.put("仓库", src.get("仓库"));
-        Map<String, Object> head = new LinkedHashMap<>();
-        head.put("单据日期", LocalDate.now().toString());
-        head.put("仓库", src.get("仓库"));
-        head.put("生产车间", "切炭车间");
-        head.put("加工单号", wo);
-        head.put("经手人", user);
-        head.put("备注", "红字冲回:弃审报工 " + no + " 对应直销入库 " + srcFi);
-        head.put("detail", Map.of("items", List.of(line)));
-        Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
-        String redNo = String.valueOf(saved.get("编号"));
-        audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) redNo));
-        // 释放原 link → 重审可再生成新入库单
-        jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=GETDATE()"
-                + " WHERE source_panel_code='WO_REPORT' AND source_form_no=? AND target_form_no=? AND link_status='ACTIVE'",
-                no, srcFi);
-    }
 
     /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
 

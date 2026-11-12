@@ -231,8 +231,7 @@ public class WoReportService {
                 "SELECT id, ISNULL(gldh,N'') AS gldh, ISNULL(gxdm,N'') AS gxdm, ISNULL(sl,0) AS sl,"
                         + " ISNULL([批次号],N'') AS rpt_batch, ISNULL(gd_id,0) AS gd_id,"
                         // 「工单行号」= 保存时由 stampRowNo 落库的行标识(2026-10-15 行级锚点)
-                        + " [工单行号] AS own_xc,"
-                        + " ISNULL([直销数量],0) AS dual_qty FROM dbo.scjl"
+                        + " [工单行号] AS own_xc FROM dbo.scjl"
                         + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
     }
 
@@ -314,8 +313,6 @@ public class WoReportService {
                     + "」(工单路线:" + String.join("→", flow.stream().map(ProcessFlow.Step::op).toList()) + ")");
         }
         if (qty <= 0) throw new IllegalStateException("报工数量必须大于 0");
-        double dual = num(r.get("dual_qty"));
-        if (dual > qty + 0.0001) throw new IllegalStateException("直销数量(" + dual + ")不能大于报工数量(" + qty + ")");
         // 守卫+落点:plang 未结案行 × plang_pc 排产行
         //   用户口径(2026-10-15)「工单号+工单行号确定当前唯一工单」:报工单**必须**锚到本行。
         //   锚定优先级:① 本单已有 gd_id(重审/再报)② 本单带的**工单行号**(界面已显示该列)
