@@ -4152,6 +4152,10 @@ public class ButtonService {
      * ⇒ 触发点从「本批第一张报工」「组装报工审核」改为「**该工序累计已报工量 ≥ 该道计划量**」,
      * 与转序 {@code applyNextProcess} 同一个达标口径;手机端/外部直写走
      * {@link ExternalReportAbsorbService} 调 {@link #generateInspFromReportRow(long, String)}。</p>
+     *
+     * <p>2026-11-12:出货检验表观 {@code QC_ASM_INSP} **脱离**这套「达计划量」判据,改由
+     * 「进入组装/装箱环节即出单」触发(判据 {@code AsmInspEntry})—— 同一条报工审核钩子里,
+     * 首件/制程仍按量判,表观单按进入判;两条互不绑定。</p>
      */
     private void woInspGenerate(String panelCode, String repNo, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
@@ -4195,13 +4199,26 @@ public class ButtonService {
         for (QcInspAutoService.Draft d : r.drafts()) {
             Map<String, Object> saved = save(registry.panel(d.panelCode()), d.head(), false);
             String no = str(saved.get("编号"));
+            // 占用链的来源分两类(2026-11-12):
+            //  · 按报工工序触发的单(首件/制程)=> 挂到"那张报工单"上,弃审报工要能级联作废它们
+            //    (见 woInspUnauditCascade 只认 source_panel_code='WO_REPORT');
+            //  · 出货检验表观是**进入组装/装箱**触发的(常见于切炭报工把量流进组装那一刻)=> 不能挂到
+            //    那条切炭报工上:否则弃审切炭报工会被"表观单已审核"挡住(业务上弃审切炭与表观单无关)。
+            //    故来源记 ASM_ENTRY + 工单号,只作追溯,不进任何级联。
+            boolean entry = d.entryTriggered();
+            String srcPanel = entry ? "ASM_ENTRY" : sourcePanel;
+            String srcNo = entry ? str(d.head().get("工单号")) : sourceNo;
+            String srcLine = entry
+                    ? str(d.head().get("工单号")) + "#" + str(d.head().get("工单行号"))
+                    : lineKey;
             jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
                             + " target_panel_code, target_form_no, link_status, create_by, create_time)"
                             + " VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
-                    sourcePanel, sourceNo, lineKey, d.panelCode(), no, user);
+                    srcPanel, srcNo, srcLine, d.panelCode(), no, user);
             nos.add(d.panelCode() + " " + no);
-            log.info("[工序检验] {} 达计划量(累计报工 {}) ⇒ 生成 {} {} 草稿",
-                    r.op(), r.done(), d.panelCode(), no);
+            log.info("[工序检验] {} {} ⇒ 生成 {} {} 草稿",
+                    entry ? "进入组装/装箱" : ("达计划量(累计报工 " + r.done() + ")"),
+                    entry ? srcNo : r.op(), d.panelCode(), no);
         }
         return nos;
     }

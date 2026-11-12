@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== asm-fixture-cleanup.sql ==
+  | ZJ-2026-11-0005 | GD-TEST-ASM-20261112 | 组装 | 
+  | 0 | 0 | 0 | 0 | 
+[OK] asm-fixture-cleanup.sql (1 batches)

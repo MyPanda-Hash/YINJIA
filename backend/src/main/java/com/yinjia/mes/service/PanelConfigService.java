@@ -575,7 +575,9 @@ public class PanelConfigService {
                     // 当前的生产工单」)—— 排在「取出货检验计划」之前:先按工单行建单,再带检验项目。
                     // 通用「选单」不可用(见 QcProcInspController 类注释:来源须已审核 + 须带量明细行 +
                     // 头行映射只认来源表头),故走专用入口。
-                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("选生产工单")) {
+                    // 2026-11-12:出货检验表观(QC_ASM_INSP)同口径接入(用户口径「同时增加当前出货表观可选
+                    //   生产工单,实现方式和出货功能检验的选择工单一致」),入口=/qc/asmInsp,准入=已进入组装/装箱。
+                    if (WO_PICK_PANELS.contains(def.code()) && !merged.contains("选生产工单")) {
                         int at = merged.indexOf("取出货检验计划");
                         merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
                     }
@@ -2248,6 +2250,15 @@ public class PanelConfigService {
      */
     private static final java.util.Set<String> SHIP_PLAN_PANELS =
             java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP");
+
+    /**
+     * 「选生产工单」入口下发的面板集(2026-11-12 从「仅 QC_PROC_INSP」扩到表观单):
+     * 制程检验单 QC_PROC_INSP(2026-10-15)+ 出货检验表观 QC_ASM_INSP(2026-11-12 用户口径
+     * 「同时增加当前出货表观可选生产工单,实现方式和出货功能检验的选择工单一致」)。
+     * 首件检验单 QC_FIRST_INSP 不在此集 —— 它有自己的注入条件(见上面 FIRST_INSP_PANEL 那段)。
+     */
+    private static final java.util.Set<String> WO_PICK_PANELS =
+            java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
 
     /** 首件检验单(2026-10-15):工具栏注入「取成型工艺清单」入口 */
     private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";

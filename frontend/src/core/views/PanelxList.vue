@@ -8992,22 +8992,29 @@ function applyProductRows(items) {
 }
 
 /**
- * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15 制程检验单 / 2026-10-16 首件检验单)。
+ * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15 制程检验单 / 2026-10-16 首件检验单 /
+ * 2026-11-12 出货检验表观)。
  *
- * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线;制程明细留空、首件按工艺清单预铺),
- * 这里只做两件事:说清结果 + 让用户看到那张单。幂等命中时服务端回 `已存在=true` 并给**原来那张**单号,
- * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
+ * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线;制程明细留空、首件按工艺清单预铺、
+ * 表观按出货检验计划预铺),这里只做两件事:说清结果 + 让用户看到那张单。幂等命中时服务端回
+ * `已存在=true` 并给**原来那张**单号,故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
  * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
  */
 async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
-  const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
-  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成出货检验单功能'))
+  // 三张单共用同一个弹窗与回执:话术按目标面板分(首件/表观/制程)
+  const kind = target === 'QC_FIRST_INSP' ? 'first' : (target === 'QC_ASM_INSP' ? 'asm' : 'proc')
+  if (!no) {
+    return ElMessage.warning(kind === 'first' ? tt('未生成首件检验单')
+      : (kind === 'asm' ? tt('未生成出货检验表观') : tt('未生成出货检验单功能')))
+  }
   const existed = res?.['已存在'] === true
-  ElMessage.success(existed
-    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有出货检验单功能')}：${no}`
-    : `${isFirst ? tt('已生成首件检验单') : tt('已生成出货检验单功能')}：${no}`)
+  const existedText = kind === 'first' ? tt('该工单行已有首件检验单')
+    : (kind === 'asm' ? tt('该工单行已有出货检验表观') : tt('该工单行已有出货检验单功能'))
+  const createdText = kind === 'first' ? tt('已生成首件检验单')
+    : (kind === 'asm' ? tt('已生成出货检验表观') : tt('已生成出货检验单功能'))
+  ElMessage.success(`${existed ? existedText : createdText}：${no}`)
   if (target === panelCode.value) {
     // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
     //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。
@@ -10922,12 +10929,15 @@ async function onButton(action) {
     qcInspPlanVisible.value = true
     return
   }
-  // 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单):用户口径「选择生产工单加工单行号
-  // 唯一确定当前的生产工单」+「让当前的首件检验单也可以选择到生产工单,参照制程检验单的实现方式」。
-  // 弹窗列生产工单行(plang),选中一行 → 服务端按面板各自生成草稿(幂等:同一工单行已有存活单则
-  // 返回那张)→ 这里按既有 gotoPanel 惯例跳过去。生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
+  // 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单 / 2026-11-12 出货检验表观):
+  // 用户口径「选择生产工单加工单行号唯一确定当前的生产工单」+「让当前的首件检验单也可以选择到
+  // 生产工单,参照制程检验单的实现方式」+「同时增加当前出货表观可选生产工单,实现方式和出货功能
+  // 检验的选择工单一致」。弹窗列生产工单行(plang),选中一行 → 服务端按面板各自生成草稿
+  // (幂等:同一工单行已有存活单则返回那张)→ 这里按既有 gotoPanel 惯例跳过去。
+  // 生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
   if (action === '选生产工单') {
-    woPickerMode.value = panelCode.value === 'QC_FIRST_INSP' ? 'first' : 'proc'
+    woPickerMode.value = panelCode.value === 'QC_FIRST_INSP' ? 'first'
+      : (panelCode.value === 'QC_ASM_INSP' ? 'asm' : 'proc')
     woPickerVisible.value = true
     return
   }

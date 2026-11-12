@@ -175,37 +175,21 @@ public final class ProcessFlow {
      */
     public static void enrichRowFlow(JdbcTemplate jdbc, List<Map<String, Object>> rows) {
         if (jdbc == null || rows == null || rows.isEmpty()) return;
-        List<Long> ids = new ArrayList<>();
-        Set<String> routes = new LinkedHashSet<>();
         for (Map<String, Object> r : rows) {
-            Object id = r.get("行id");
-            if (id instanceof Number n) ids.add(n.longValue());
-            String route = str(r.get("工艺路线"));
-            if (!route.isEmpty()) routes.add(route);
             r.put("上道完工折成品", 0d);
             r.put("当前工序可加工量", 0d);
             r.put("当前工序待报量", 0d);
             r.put("当前工序待流入量", 0d);
         }
-        if (ids.isEmpty() || routes.isEmpty()) return;
-        Map<Long, Map<String, Double>> ledger = batchLedgerPlan(jdbc, ids);
-        Map<Long, Map<String, Double>> done = batchDone(jdbc, ids);
-        Map<String, List<Map<String, Object>>> routeCache = new LinkedHashMap<>();
-        for (Map<String, Object> rl : jdbc.queryForList(
-                "SELECT 工艺路线编码, 工序名称, ISNULL(换算率,1) AS 换算率 FROM dbo.bs_route"
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N''"
-                        + "   AND 工艺路线编码 IN (" + placeholders(routes.size()) + ")"
-                        + " ORDER BY ISNULL(加工顺序,999), id", routes.toArray())) {
-            routeCache.computeIfAbsent(str(rl.get("工艺路线编码")), k -> new ArrayList<>()).add(rl);
-        }
+        Map<Long, List<Step>> flows = batchSteps(jdbc, rows);
+        if (flows.isEmpty()) return;
         for (Map<String, Object> r : rows) {
             Object idObj = r.get("行id");
             if (!(idObj instanceof Number n)) continue;
             long pid = n.longValue();
-            List<Map<String, Object>> rls = routeCache.get(str(r.get("工艺路线")));
-            if (rls == null || rls.isEmpty()) continue;
+            List<Step> flow = flows.get(pid);
+            if (flow == null || flow.isEmpty()) continue;
             double plSl = num(r.get("排产数量"));
-            List<Step> flow = steps(rls, plSl, ledger.get(pid), done.get(pid));
             String curOp = str(r.get("当前工序"));
             if (curOp.isEmpty()) curOp = currentOp(flow, plSl);
             Step cur = stepOf(flow, curOp);
@@ -239,6 +223,55 @@ public final class ProcessFlow {
             }
             r.put("工序流转明细", detail);
         }
+    }
+
+    /**
+     * **批量算全道按量派生**(2026-11-12 从 {@link #enrichRowFlow} 抽出,供「一次要算 N 行」的场景复用)。
+     *
+     * <p>与 {@link #steps(JdbcTemplate, String, Long, double, String)}(单行)共用同一套算式与同一批
+     * 取数口径({@link #batchLedgerPlan} / {@link #batchDone} + 路线换算率);唯一区别是**数据一次取齐**,
+     * 查询条数与行数无关。调用方:
+     * <ul>
+     *   <li>{@link #enrichRowFlow} —— 工单列表 / 排产看板的只读展示字段;</li>
+     *   <li>{@code AsmInspEntry.checkPage} —— 出货检验表观「选生产工单」弹窗的进入状态判定。</li>
+     * </ul>
+     *
+     * <p>⚠ 入参行需带:{@code 行id}(plang.id)、{@code 排产数量}、{@code 工艺路线}。
+     * 路线为空的行与 {@link #enrichRowFlow} 原口径一致:不出现在返回值里(调用方按 0/空处理)。
+     *
+     * @return 键 = 工单行id(plang.id) → 该行全道按量派生(顺序 = 路线加工顺序)
+     */
+    public static Map<Long, List<Step>> batchSteps(JdbcTemplate jdbc, List<Map<String, Object>> rows) {
+        Map<Long, List<Step>> out = new LinkedHashMap<>();
+        if (jdbc == null || rows == null || rows.isEmpty()) return out;
+        List<Long> ids = new ArrayList<>();
+        Set<String> routes = new LinkedHashSet<>();
+        for (Map<String, Object> r : rows) {
+            Object id = r.get("行id");
+            if (id instanceof Number n) ids.add(n.longValue());
+            String route = str(r.get("工艺路线"));
+            if (!route.isEmpty()) routes.add(route);
+        }
+        if (ids.isEmpty() || routes.isEmpty()) return out;
+        Map<Long, Map<String, Double>> ledger = batchLedgerPlan(jdbc, ids);
+        Map<Long, Map<String, Double>> done = batchDone(jdbc, ids);
+        Map<String, List<Map<String, Object>>> routeCache = new LinkedHashMap<>();
+        for (Map<String, Object> rl : jdbc.queryForList(
+                "SELECT 工艺路线编码, 工序名称, ISNULL(换算率,1) AS 换算率 FROM dbo.bs_route"
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N''"
+                        + "   AND 工艺路线编码 IN (" + placeholders(routes.size()) + ")"
+                        + " ORDER BY ISNULL(加工顺序,999), id", routes.toArray())) {
+            routeCache.computeIfAbsent(str(rl.get("工艺路线编码")), k -> new ArrayList<>()).add(rl);
+        }
+        for (Map<String, Object> r : rows) {
+            Object idObj = r.get("行id");
+            if (!(idObj instanceof Number n)) continue;
+            long pid = n.longValue();
+            List<Map<String, Object>> rls = routeCache.get(str(r.get("工艺路线")));
+            if (rls == null || rls.isEmpty()) continue;
+            out.put(pid, steps(rls, num(r.get("排产数量")), ledger.get(pid), done.get(pid)));
+        }
+        return out;
     }
 
     /** 批量:台账计划量(键 = 工单行id → 工序 → 计划数量;同名工序取第一条) */

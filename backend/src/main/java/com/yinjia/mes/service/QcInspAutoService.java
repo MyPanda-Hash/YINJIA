@@ -35,8 +35,11 @@ import java.util.Map;
  * <h3>工序 → 检验单</h3>
  * <ul>
  *   <li>{@code 成型} 累计达计划量 ⇒ 首件检验单 {@code QC_FIRST_INSP} + 制程检验单 {@code QC_PROC_INSP};</li>
- *   <li>{@code 组装} 累计达计划量 ⇒ 组装成品检验单 {@code QC_ASM_INSP};</li>
- *   <li>切炭/混料/装箱不出单(2026-10-16 成型/切炭两张工序检验单已下架;混料/装箱无载体)。</li>
+ *   <li>{@code 组装/装箱} ⇒ 出货检验表观 {@code QC_ASM_INSP} —— 🔴 2026-11-12 口径变更:不再等
+ *       「组装累计达计划量」,改成**进入组装/装箱环节就出单**(判据见 {@link AsmInspEntry})。
+ *       用户原话:「出货表观在组装/装箱环节就要进行检验……在进入到组装/装箱这个工序或者产线的时候就
+ *       生成这个出货表观的表单」;</li>
+ *   <li>切炭/混料 不出单(2026-10-16 成型/切炭两张工序检验单已下架;混料无载体)。</li>
  * </ul>
  *
  * <h3>计划量取数(逐级兜底,取不到不瞎猜)</h3>
@@ -51,7 +54,12 @@ import java.util.Map;
 public class QcInspAutoService {
 
     /** 一张待保存的检验单草稿(调用方负责 save + 写占用链) */
-    public record Draft(String panelCode, Map<String, Object> head) {}
+    public record Draft(String panelCode, Map<String, Object> head, boolean entryTriggered) {
+        /** 兼容旧构造(按报工工序触发的那几张单) */
+        public Draft(String panelCode, Map<String, Object> head) {
+            this(panelCode, head, false);
+        }
+    }
 
     /**
      * 一次判定的结果。
@@ -66,9 +74,12 @@ public class QcInspAutoService {
         public boolean empty() { return drafts.isEmpty(); }
     }
 
-    /** 工序 → 检验单面板(顺序即出单顺序;改口径只改这一处) */
     /**
      * 工序 → 检验单面板(顺序即出单顺序;改口径只改这一处)。
+     *
+     * <p>🔴 2026-11-12 口径变更:**「组装」不再走这张表** —— 出货检验表观的触发时机改成
+     * 「进入组装/装箱环节」(判据在 {@link AsmInspEntry}),与报工工序不再绑定:切炭报工把量流进组装、
+     * 或组装报工本身,都会出表观单。故本表只剩成型侧两张单。</p>
      *
      * <p>🔴 2026-10-29 修正(实测,必须记下来):2026-10-21 曾把成型改成只出 {@code QC_MOLD_INSP}
      * (前提是「首件/制程两张单及其表已下架」)——**该前提到 2026-10-29 已不成立**:
@@ -80,8 +91,10 @@ public class QcInspAutoService {
      * 与 {@link ScheduleBoardService} 的追溯检验段、{@link ButtonService} 的弃审级联同一口径。
      */
     private static final Map<String, List<String>> OP_PANELS = Map.of(
-            "成型", List.of("QC_FIRST_INSP", "QC_PROC_INSP"),
-            "组装", List.of("QC_ASM_INSP"));
+            "成型", List.of("QC_FIRST_INSP", "QC_PROC_INSP"));
+
+    /** 出货检验表观(2026-11-11 起由「组装成品检验单」改显示名;代号/表/单号前缀不动) */
+    public static final String ASM_PANEL = "QC_ASM_INSP";
 
     /** 面板 → 头表(幂等查重;取值全是本类常量,无拼接注入面) */
     private static final Map<String, String> HEAD_TABLE = Map.of(
@@ -117,9 +130,6 @@ public class QcInspAutoService {
             return new Result(List.of(), "报工行缺工单号/工序,无法判定", op, 0, 0);
         }
         List<String> panels = OP_PANELS.get(op);
-        if (panels == null || panels.isEmpty()) {
-            return new Result(List.of(), "工序「" + op + "」不出检验单", op, 0, 0);
-        }
 
         int xc = (int) num(r.get("行号"));
         Map<String, Object> p = resolvePlangRow(wo, xc, (long) num(r.get("gd_id")), str(r.get("批次号")));
@@ -129,53 +139,68 @@ public class QcInspAutoService {
         long rowId = (long) num(p.get("id"));
         if (xc == 0) xc = (int) num(p.get("pl_xc"));
 
-        double plan = planQty(wo, rowId, op, p);
-        double done = WoInspGate.reportedQty(jdbc, wo, rowId, op);
-        boolean reached = plan <= 0 ? done > 0 : done + 0.0001 >= plan;
-        if (!reached) {
-            return new Result(List.of(),
-                    "该工序累计已报工 " + trim(done) + " < 计划 " + trim(plan) + ",未达标暂不出单",
-                    op, done, plan);
-        }
-        // 保留 2026-10-19 的工序前置:成型未达标 ⇒ 后面的单也不出(除非本道就是成型,或路线没有成型 = 免门禁)。
-        // 手机端直写可以跳过「不得跳序」,这里必须自己兜住。
-        if (!"成型".equals(op)) {
-            double moldPlan = planQty(wo, rowId, "成型", p);
-            double moldDone = WoInspGate.reportedQty(jdbc, wo, rowId, "成型");
-            if (moldPlan > 0 && moldDone + 0.0001 < moldPlan) {
-                return new Result(List.of(),
-                        "成型累计已报工 " + trim(moldDone) + " < 计划 " + trim(moldPlan) + ",成型未达标暂不出单",
-                        op, done, plan);
-            }
-        }
-
         List<Draft> drafts = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
-        for (String panel : panels) {
-            if (existsLive(panel, wo, xc)) {
-                skipped.add(panel);
-                continue;
+        List<String> reasons = new ArrayList<>();
+        double opDone = 0;
+        double opPlan = 0;
+
+        // ── ① 按报工工序触发的单(2026-11-12 起只剩成型侧:首件 + 制程)──
+        if (panels != null && !panels.isEmpty()) {
+            opPlan = planQty(wo, rowId, op, p);
+            opDone = WoInspGate.reportedQty(jdbc, wo, rowId, op);
+            boolean reached = opPlan <= 0 ? opDone > 0 : opDone + 0.0001 >= opPlan;
+            if (!reached) {
+                reasons.add("该工序累计已报工 " + trim(opDone) + " < 计划 " + trim(opPlan) + ",未达标暂不出单");
+            } else {
+                for (String panel : panels) {
+                    if (existsLive(panel, wo, xc)) {
+                        skipped.add(panel);
+                        continue;
+                    }
+                    drafts.add(new Draft(panel, head(panel, r, p, op, xc, opDone, repNo)));
+                }
             }
-            drafts.add(new Draft(panel, head(panel, r, p, op, xc, done, repNo)));
+        } else {
+            reasons.add("工序「" + op + "」不出检验单");
         }
-        String reason = drafts.isEmpty()
-                ? "已达计划量,但 " + String.join("/", skipped) + " 已有存活单(幂等跳过)"
-                : "";
-        return new Result(drafts, reason, op, done, plan);
+
+        // ── ② 出货检验表观:进入组装/装箱环节即出(2026-11-12 用户口径,判据在 AsmInspEntry)──
+        //    与①互不绑定:切炭报工把量流进组装时会出;组装/装箱自己报工也会出(此时①本来就没有这张单)。
+        AsmInspEntry.Status asm = AsmInspEntry.of(jdbc, rowId);
+        if (asm.entered()) {
+            if (existsLive(ASM_PANEL, wo, xc)) {
+                skipped.add(ASM_PANEL);
+            } else {
+                drafts.add(new Draft(ASM_PANEL, asmInspHead(r, p, asm, xc, repNo), true));
+            }
+        } else if (!asm.reason().isBlank()) {
+            reasons.add(asm.reason());
+        }
+
+        String reason;
+        if (!drafts.isEmpty()) {
+            reason = "";
+        } else if (!skipped.isEmpty()) {
+            reason = "已达出单条件,但 " + String.join("/", skipped) + " 已有存活单(幂等跳过)";
+        } else {
+            reason = String.join("；", reasons);
+        }
+        return new Result(drafts, reason, op, opDone, opPlan);
     }
 
     // ────────────────────────────── 单头组装 ──────────────────────────────
 
     private Map<String, Object> head(String panel, Map<String, Object> r, Map<String, Object> p,
                                      String op, int xc, double done, String repNo) {
-        // ⚠ 三张单的「检验员」**都不在这里写**(2026-10-21):后台定时吸收没有登录人,
+        // ⚠ 各单的「检验员」**都不在这里写**(2026-10-21):后台定时吸收没有登录人,
         //   写 system 占位没有意义;真值 = 保存时在电脑前操作的那个人,见
         //   ButtonService.defaultQcInspector(保存兜底)+ core/qc/qcInspector.js(打开即带出)。
+        // 2026-11-12:出货检验表观不在这里 —— 它按「进入组装/装箱」触发(见 asmInspHead / AsmInspEntry)。
         return switch (panel) {
             // 成型两道检验单(2026-10-29 恢复):首件按《成型工艺清单》预铺、制程留空由品质带入
             case "QC_FIRST_INSP" -> firstInspHead(r, p, op, xc, done, repNo);
             case "QC_PROC_INSP" -> procInspHead(p, xc, done, op, repNo);
-            case "QC_ASM_INSP" -> asmInspHead(r, p, op, xc, done, repNo);
             default -> Map.of();
         };
     }
@@ -261,34 +286,73 @@ public class QcInspAutoService {
         return head;
     }
 
-    /** 组装成品检验单(与 {@code ButtonService.woInspGenerate} 原组装分支同一套字段;明细按出货检验计划预铺) */
-    private Map<String, Object> asmInspHead(Map<String, Object> r, Map<String, Object> p, String op,
-                                            int xc, double done, String repNo) {
+    /**
+     * **出货检验表观**(QC_ASM_INSP,原组装成品检验单):进入组装/装箱环节即出单(2026-11-12 口径)。
+     *
+     * <p>「工序」取**组装环节的工序**(组装/装箱),不是触发那条报工的工序 —— 切炭报工把量流进组装时,
+     * 表观单上的工序必须是「组装」而不是「切炭」。
+     *
+     * <p>「报工数量」= 进入本环节的**可加工量**(上游已审报工折成品流下来的量);若该道已经报过工,
+     * 至少取已报工量 —— 原来写的是「组装累计已报工」,提前出单那一刻它还是 0,纸面会像个空单。
+     *
+     * <p>明细按《出货检验计划表》预铺外观/尺寸/出货重量三类({@link AsmInspItems});与自动出单同一份,
+     * 手工「选生产工单」建的与自动出的长得一样。
+     */
+    private Map<String, Object> asmInspHead(Map<String, Object> r, Map<String, Object> p,
+                                            AsmInspEntry.Status e, int xc, String repNo) {
         String today = LocalDate.now().toString();
         String productCode = firstNonBlank(str(r.get("产品编码")), str(p.get("dm")));
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", today);
-        head.put("工单号", str(r.get("工单号")));
+        head.put("工单号", firstNonBlank(str(r.get("工单号")), str(p.get("pl_no"))));
         if (xc != 0) head.put("工单行号", xc);
-        if (!repNo.isBlank()) head.put("报工单号", repNo);
-        head.put("工序", op);
-        String batch = str(r.get("批次号"));
+        // 报工单号只在「确实是组装/装箱报工」时留痕;切炭报工触发的提前出单不写,免得纸面看着像切炭单
+        if (!repNo.isBlank() && AsmInspEntry.OPS.contains(str(r.get("工序")))) head.put("报工单号", repNo);
+        head.put("工序", e.op());
+        // 批次优先取**工单行**的批次(进入组装的是这一行的批次),报工行批次只在工单行没有时兜底
+        String batch = firstNonBlank(str(p.get("批次号")), str(r.get("批次号")));
         if (!batch.isEmpty()) head.put("批次号", batch);
         head.put("产品编码", productCode);
         head.put("产品名称", firstNonBlank(str(r.get("产品名称")), str(p.get("mc"))));
         String spec = firstNonBlank(str(r.get("规格型号")), str(p.get("gg")));
         if (!spec.isEmpty()) head.put("规格型号", spec);
-        String line = firstNonBlank(str(r.get("生产线")), str(p.get("scx")));
+        // 生产线取**组装/装箱那道**的实际线(自动补线后 plang.scx 已切到该线;台账实际线更准)
+        String line = firstNonBlank(e.line(), firstNonBlank(str(r.get("生产线")), str(p.get("scx"))));
         if (!line.isEmpty()) {
             head.put("生产线", line);
             String shop = lineShop(line);
             if (shop != null) head.put("生产车间", shop);
         }
-        head.put("报工数量", round(done));
+        head.put("报工数量", round(Math.max(e.avail(), e.done())));
         head.put("检验日期", today);
         AsmInspItems.Result items = AsmInspItems.load(jdbc, productCode);
         head.put("detail", Map.of("items", items.rows()));
         return head;
+    }
+
+    /**
+     * **手工路径**「选生产工单」建表观单:按工单行 id 组装表头 + 预铺明细。
+     *
+     * <p>与自动出单共用 {@link #asmInspHead} 同一份组装逻辑;调用方(控制器)已做准入判定与幂等查重。
+     * 按 id 定行(而不是按 工单号+行号):实测存在同一工单两行「行号=1」的旧数据。
+     *
+     * @return 可直接交给 {@code ButtonService.save} 的表头;该行不存在/作废时返回 {@code null}
+     */
+    public Map<String, Object> asmInspHeadForRow(long rowId, int xc) {
+        Map<String, Object> p = plangRowById(rowId);
+        if (p == null) return null;
+        AsmInspEntry.Status e = AsmInspEntry.of(jdbc, rowId);
+        if (!e.entered()) return null;
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("工单号", str(p.get("pl_no")));
+        r.put("工序", e.op());
+        r.put("产品编码", str(p.get("dm")));
+        r.put("产品名称", str(p.get("mc")));
+        r.put("规格型号", str(p.get("gg")));
+        r.put("批次号", str(p.get("批次号")));
+        r.put("生产线", str(p.get("scx")));
+        int lineNo = xc != 0 ? xc : (int) num(p.get("pl_xc"));
+        return asmInspHead(r, p, e, lineNo, "");
     }
 
     // ────────────────────────────── 取数 ──────────────────────────────
@@ -310,17 +374,11 @@ public class QcInspAutoService {
      * ① 工单号 + 工单行号 → ② gd_id → plang_pc.plang_id → ③ 工单号 + 批次号(恰一行才认)。
      */
     private Map<String, Object> resolvePlangRow(String wo, int xc, long gdId, String batch) {
-        String cols = "SELECT p.id, ISNULL(p.pl_no,N'') AS pl_no, ISNULL(p.pl_xc,0) AS pl_xc,"
-                + " ISNULL(p.dm,N'') AS dm, ISNULL(p.mc,N'') AS mc,"
-                + " ISNULL(p.gg,N'') AS gg, ISNULL(p.scx,N'') AS scx, ISNULL(p.khdm,N'') AS 客户代码,"
-                + " ISNULL(dk.mc,N'') AS 客户名称, ISNULL(p.[工艺路线],N'') AS 工艺路线,"
-                + " ISNULL(p.pl_sl,0) AS pl_sl, ISNULL(p.[批次号],N'') AS 批次号"
-                + " FROM dbo.plang p LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm";
         // ① gd_id 最可靠(手机端报工自带 plang_pc.id;2026-10-18 实测同工单存在两行「行号=1」,
         //    只按行号会选到旧行 ⇒ 计划量/批次全错)。
         if (gdId > 0) {
             List<Map<String, Object>> r = jdbc.queryForList(
-                    cols + " JOIN dbo.plang_pc pc ON pc.plang_id = p.id"
+                    PLANG_COLS + " JOIN dbo.plang_pc pc ON pc.plang_id = p.id"
                             + " WHERE pc.id=? AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(pc.asp_cancel,'N')<>'Y'",
                     gdId);
             if (!r.isEmpty()) return r.get(0);
@@ -328,19 +386,34 @@ public class QcInspAutoService {
         // ② 工单号 + 工单行号(恰一行才认;多行说明数据有重复,交给 gd_id/批次)
         if (xc > 0) {
             List<Map<String, Object>> r = jdbc.queryForList(
-                    cols + " WHERE p.pl_no=? AND ISNULL(p.pl_xc,0)=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id",
+                    PLANG_COLS + " WHERE p.pl_no=? AND ISNULL(p.pl_xc,0)=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id",
                     wo, xc);
             if (r.size() == 1) return r.get(0);
         }
         // ③ 工单号 + 批次号(恰一行才认)
         if (!batch.isBlank()) {
             List<Map<String, Object>> r = jdbc.queryForList(
-                    cols + " WHERE p.pl_no=? AND ISNULL(p.[批次号],N'')=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                    PLANG_COLS + " WHERE p.pl_no=? AND ISNULL(p.[批次号],N'')=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
                             + " ORDER BY p.id", wo, batch);
             if (r.size() == 1) return r.get(0);
         }
         return null;
     }
+
+    /** 工单行取数(单行;手工建单按 id 定行,避免「同一工单存在重复行号」时定位不到) */
+    private Map<String, Object> plangRowById(long rowId) {
+        List<Map<String, Object>> r = jdbc.queryForList(
+                PLANG_COLS + " WHERE p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'", rowId);
+        return r.isEmpty() ? null : r.get(0);
+    }
+
+    /** 工单行取数公共列(两处定位共用;改列只改这里) */
+    private static final String PLANG_COLS = "SELECT p.id, ISNULL(p.pl_no,N'') AS pl_no,"
+            + " ISNULL(p.pl_xc,0) AS pl_xc, ISNULL(p.dm,N'') AS dm, ISNULL(p.mc,N'') AS mc,"
+            + " ISNULL(p.gg,N'') AS gg, ISNULL(p.scx,N'') AS scx, ISNULL(p.khdm,N'') AS 客户代码,"
+            + " ISNULL(dk.mc,N'') AS 客户名称, ISNULL(p.[工艺路线],N'') AS 工艺路线,"
+            + " ISNULL(p.pl_sl,0) AS pl_sl, ISNULL(p.[批次号],N'') AS 批次号"
+            + " FROM dbo.plang p LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm";
 
     /**
      * 该工单行该道工序的**计划量**:①预排台账 → ②排产数量×路线换算率 → ③0(不做数量门禁)。
