@@ -405,7 +405,7 @@ import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 // 「删除」结果提示口径(2026-11-04):只认服务端回写的真实状态,不许无条件报"已删除"
 import { deleteOutcome } from './deleteOutcome.js'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, erpClickBlocked } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_UNAUDIT_WARN, erpClickBlocked } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -1344,8 +1344,17 @@ async function onButton(action) {
     }
   } else if (action === '弃审') {
     if (status.value !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
+    // 已转过 ERP 的单据弃审:确认框里把"先去金蝶删掉那张"说清(2026-11-12 用户口径:
+    // 弃审→审核→重推是正常流程,MES 改错就靠它;但旧单不清就会在金蝶留两张)
+    const erpNo = String(form['ERP单号'] || '').trim()
+    const pushed = String(form['是否已转ERP'] || '') === '是' || erpNo !== ''
     try {
-      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
+      await ElMessageBox.confirm(
+        pushed
+          ? tt(ERP_UNAUDIT_WARN).replace('{no}', erpNo || '—')
+          : tt('确认弃审该单据？弃审后需重新审核。'),
+        tt('弃审确认'), { type: 'warning' },
+      )
     } catch (e) {
       return
     }

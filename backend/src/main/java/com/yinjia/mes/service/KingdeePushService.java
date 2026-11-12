@@ -199,9 +199,19 @@ public class KingdeePushService {
         }
     }
 
+    /** 转ERP 支持的面板(与 ButtonService.ERP_HEAD_TABLE 同一套;下面用 isXxx 布尔推导表名/接口路径) */
+    private static final Set<String> ERP_PANELS = Set.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT",
+            "FINISH_IN", "OTHER_IN", "OTHER_OUT", "QC_RETURN");
+
     /** 转ERP 实现(只由 {@link #pushDocument} 调用,以保证单号级互斥) */
     private Map<String, Object> doPushDocument(String panelCode, String docNo, String operator) throws Exception {
         long tBegin = System.currentTimeMillis();
+        // 面板白名单先行(2026-11-12):下面那串 isPur/isOrder/... 的**兜底分支是销售出库**
+        // (`: "bd_sale_out"` / `: "/jdy/v2/scm/sal_out_bound"`)—— 将来若有调用方传来未知面板,
+        // 它会被当成销售出库单推出去(最坏:单据类型推错、账对不上)。这里先拦住。
+        if (!ERP_PANELS.contains(panelCode)) {
+            throw new IllegalStateException("不支持的转ERP 面板:" + panelCode);
+        }
         assertPushTargetAllowed(); // 守卫先行:真实账套未开启 allowProd 时,连 token 都不取
         boolean isPur = "PURCHASE_IN".equals(panelCode);
         // 采购订单直推(2026-09-23):作为**金蝶采购订单**落到目标账套(用户口径:测试沙箱的采购订单里);
@@ -270,7 +280,7 @@ public class KingdeePushService {
             out.put("转ERP操作人", str(head.get("转ERP操作人")));
             out.put("转ERP时间", str(head.get("转ERP时间")));
             out.put("message", "该单据已转入ERP" + (erpNo.isEmpty() ? "" : "（ERP单号 " + erpNo + "）")
-                    + "，不可重复转入；如需重新转ERP，请先「弃审」再「审核」");
+                    + "，不可重复转入；如需重新转ERP，请先「弃审」→「审核」，并在金蝶删除原单据，否则金蝶侧会有两张");
             return out;
         }
 

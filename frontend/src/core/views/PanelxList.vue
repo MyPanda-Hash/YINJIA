@@ -2706,7 +2706,7 @@ import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_BATCH_BUSY_KEY, erpClickBlocked } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_BATCH_BUSY_KEY, ERP_UNAUDIT_WARN, erpClickBlocked } from './erpOutcome.js'
 // 库存口径提示(2026-11-10「库存以金蝶为准」):审核/审批通过后按后端给的码补一句说明
 import { stockHintText } from './stockHint.js'
 
@@ -11469,8 +11469,17 @@ async function onButton(action) {
     } else if (!['已审核', '修改中', '已生效'].includes(st)) {
       return ElMessage.warning(tt('仅已审核或修改中状态可弃审'))
     } else {
+      // 已转过 ERP 的单据弃审:确认框里必须把"先去金蝶删掉那张"说清(2026-11-12 用户口径:
+      // 弃审→审核→重推是正常流程,MES 改错就靠它;但旧单不清就会在金蝶留两张)
+      const erpNo = String(current.value['ERP单号'] || '').trim()
+      const pushed = String(current.value['是否已转ERP'] || '') === '是' || erpNo !== ''
       try {
-        await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
+        await ElMessageBox.confirm(
+          pushed
+            ? tt(ERP_UNAUDIT_WARN).replace('{no}', erpNo || '—')
+            : tt('确认弃审该单据？弃审后需重新审核。'),
+          tt('弃审确认'), { type: 'warning' },
+        )
       } catch (e) {
         return
       }

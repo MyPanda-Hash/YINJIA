@@ -2644,16 +2644,16 @@ public class ButtonService {
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         // 产品入库单 / 其他入库单 / 其他出库单 2026-10-14 接入转ERP,同批纳入本联动
         // 暂收退料单 2026-10-19 接入(《10.19 问题》第 8 条),同样纳入
-        if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
-                "QC_RETURN").contains(def.code())) {
-            String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
-                    : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
-                    : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out"
-                    : "FINISH_IN".equals(def.code()) ? "bd_finish_in"
-                    : "OTHER_IN".equals(def.code()) ? "bd_other_in"
-                    : "OTHER_OUT".equals(def.code()) ? "bd_other_out"
-                    : "QC_RETURN".equals(def.code()) ? "qc_return" : "bd_sale_out";
-            jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
+        //
+        // ⚠ 面板清单与表名统一取 ERP_HEAD_TABLE(唯一真源):用户 2026-11-12 明确要的
+        //   「弃审后重新审核要确保可以重新转ERP(MES 改错、ERP 重新同步)」就靠这一段 ——
+        //   这里漏清标记,重审后点转ERP 会被「是否已转ERP=是」守卫挡住,等于单据被永久焊死。
+        if (supportsErp(def.code())) {
+            String tbl = ERP_HEAD_TABLE.get(def.code());
+            int cleared = jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL,"
+                    + " 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
+            // 留痕:清了几行(0 行 = 该单本就没转过,属正常;>1 行 = 头上同号重复,值得排查)
+            if (cleared != 0) log.info("[弃审清ERP标记] {} {} → {} 行", tbl, no, cleared);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
         // 2026-11-09:首件/制程检验单单级审批弃审 ⇒ 纸面「审核人/审核时间」与两级节点标记一并清空
@@ -5812,18 +5812,39 @@ public class ButtonService {
         return out;
     }
 
+    /**
+     * 支持转ERP 的面板 → 单据头表(**唯一真源**)。
+     *
+     * <p>为什么收成一张表:这三件事原先各写了一份面板清单,只要有一处漏更新,后果都是"这张单的转ERP 坏掉":
+     * <ol>
+     *   <li>转ERP 白名单({@link #pushToErp} / {@link #listPushableErp});</li>
+     *   <li>批量转ERP 的取数表;</li>
+     *   <li>**弃审时清 是否已转ERP/ERP单号/操作人/时间**({@code unaudit}) ——
+     *       这一处漏了就会出现「弃审重审后点转ERP 仍被'已转'守卫挡住」,
+     *       也就是用户 2026-11-12 明确要的「弃审后重新审核要可以重新转ERP(MES 改错、ERP 重新同步)」失效。</li>
+     * </ol>
+     * 新增转ERP 面板时**只改这一处**,三处自动跟随。
+     */
+    private static final Map<String, String> ERP_HEAD_TABLE = Map.of(
+            "PURCHASE_IN", "bd_purchase_in",
+            "SALE_OUT", "bd_sale_out",
+            "PU_ORDER", "bd_pu_order",
+            "MATERIAL_OUT", "bd_material_out",
+            "FINISH_IN", "bd_finish_in",
+            "OTHER_IN", "bd_other_in",
+            "OTHER_OUT", "bd_other_out",
+            // 2026-10-19《10.19 问题》第 8 条:暂收退料单接转ERP(金蝶「采购退货单」pur_ret)
+            "QC_RETURN", "qc_return");
+
+    /** 支持转ERP 的面板清单(= {@link #ERP_HEAD_TABLE} 的键) */
+    private static boolean supportsErp(String panelCode) {
+        return ERP_HEAD_TABLE.containsKey(panelCode);
+    }
+
     private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
-                // 2026-10-19《10.19 问题》第 8 条:暂收退料单接转ERP(金蝶「采购退货单」pur_ret)
-                "QC_RETURN").contains(def.code()))
+        if (!supportsErp(def.code()))
             throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
-        String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
-                : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
-                : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out"
-                : "FINISH_IN".equals(def.code()) ? "bd_finish_in"
-                : "OTHER_IN".equals(def.code()) ? "bd_other_in"
-                : "OTHER_OUT".equals(def.code()) ? "bd_other_out"
-                : "QC_RETURN".equals(def.code()) ? "qc_return" : "bd_sale_out";
+        String tbl = ERP_HEAD_TABLE.get(def.code());
         // 材料出库单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
         // 产品入库单(2026-10-14 接入转ERP)是生产完工入库,同样无 客户/供应商 列,往来单位取「经手人」
         // 其他入库单=供应商往来;其他出库单=内部领用,往来单位取「经手人」
@@ -5846,8 +5867,7 @@ public class ButtonService {
 
     /** 转ERP:已审核+未转过的采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单 → 推金蝶,回写ERP单号 */
     private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
-                "QC_RETURN").contains(def.code()))
+        if (!supportsErp(def.code()))
             throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
         String docNo = String.valueOf(formData.getOrDefault("编号", formData.getOrDefault("单据编号", "")));
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, erpClickBlocked, ERP_ALREADY_KEY, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_TIMEOUT_KEY } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, erpClickBlocked, ERP_ALREADY_KEY, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_TIMEOUT_KEY, ERP_UNAUDIT_WARN } from './erpOutcome.js'
 
 /**
  * 「转ERP」结果提示(2026-11-09 用户报障):
@@ -23,6 +23,21 @@ test('已转(新服务端给 already=true)⇒ warning,带 ERP 单号与"弃审�
   const text = erpOutcomeText(o, (s) => s)
   assert.ok(text.includes('CGRK-20261014-03407'), '文案要带出已有的 ERP 单号')
   assert.ok(text.includes('弃审') && text.includes('审核'), '文案要说清"要重转得先弃审再审核"')
+  assert.ok(text.includes('删除'), '还要说清"旧那张要在金蝶删掉" —— 不删金蝶侧就是两张(2026-11-12 用户口径)')
+})
+
+/**
+ * 弃审一张已转过 ERP 的单据时,确认框必须把话说完(2026-11-12 用户口径):
+ * 「弃审后重新审核要确保是可以重新转erp的…原先修改前的单据就可以他们在 erp 上删除就行」
+ * —— 重推是允许的正常流程,但**旧单必须先删**,否则金蝶侧留两张。这句话弹在弃审那一刻才有人看。
+ */
+test('弃审已转单:提示里同时出现"已转过/金蝶删除/再审核再转",不能只是"确认弃审？"', () => {
+  const t = ERP_UNAUDIT_WARN
+  assert.ok(t.includes('{no}'), '要带 ERP 单号占位')
+  assert.ok(t.includes('已转过ERP'))
+  assert.ok(t.includes('删除'), '必须点明去金蝶删除原单据')
+  assert.ok(t.includes('审核') && t.includes('重新转ERP'), '要说清重推的路径:审核后再转')
+  assert.notEqual(t, '确认弃审该单据？弃审后需重新审核。', '不能退回通用文案')
 })
 
 test('老 jar 没有 already 标记 ⇒ 按文案里的「已转入ERP」认出来(部署过渡期必须成立)', () => {
