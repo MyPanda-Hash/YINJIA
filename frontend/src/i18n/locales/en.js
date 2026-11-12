@@ -47,6 +47,16 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Exempt (skipped)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'This item is inspection-exempt, so no incoming inspection is needed (after the receiving note is audited you can create the purchase receipt directly)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'This batch has no purchase receipt yet: open the receiving note and click "Generate inspection / receipt" to create the receipt directly (inspection-exempt items skip inspection)',
+    '还没有送料暂收单': 'No receiving note yet',
+    '还没有来料检验单': 'No incoming inspection yet',
+    '还没有暂收退回单': 'No return note yet',
+    '还没有特采单': 'No concession yet',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '退货': 'Return',
     '待退货': 'To return',
     '待特采': 'To concede',

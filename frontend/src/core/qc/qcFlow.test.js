@@ -70,8 +70,11 @@ test('免检批次(需检验=0 且没有检验单):检验节点显示「免检�
   assert.equal(insp.status, '免检')
   assert.equal(insp.state, 'skip')
   assert.equal(insp.tone, 'skip')
+  // 界面据此把这个节点画成「免检跳过」小标(不是带"未生成"的单据框)—— 免检是跳过,不是缺单
+  assert.equal(insp.skip, true)
   assert.equal(chain.main[2].status, '未生成')
   assert.equal(chain.main[2].state, 'todo')
+  assert.equal(chain.main[2].skip, false)
 })
 
 test('缺字段的行不炸(接口降级/老数据):主链仍是 todo,分支不显示', () => {

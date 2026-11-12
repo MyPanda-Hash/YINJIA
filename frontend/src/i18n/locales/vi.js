@@ -3,6 +3,16 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Miễn kiểm (bỏ qua)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'Vật tư này miễn kiểm nên không cần kiểm tra đầu vào (sau khi duyệt phiếu nhận có thể tạo phiếu nhập mua ngay)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Lô này chưa có phiếu nhập mua: mở phiếu nhận và bấm "Tạo phiếu kiểm tra/nhập kho" để nhập trực tiếp (vật tư miễn kiểm không cần kiểm)',
+    '还没有送料暂收单': 'Chưa có phiếu nhận hàng',
+    '还没有来料检验单': 'Chưa có phiếu kiểm tra',
+    '还没有暂收退回单': 'Chưa có phiếu trả hàng',
+    '还没有特采单': 'Chưa có phiếu chấp nhận đặc biệt',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '退货': 'Trả hàng',
     '待退货': 'Chờ trả hàng',
     '待特采': 'Chờ chấp nhận đặc biệt',

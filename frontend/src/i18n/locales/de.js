@@ -3,6 +3,16 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Prüfbefreit (übersprungen)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'Dieser Artikel ist prüfbefreit (nach Freigabe des Wareneingangsbelegs kann der Eingangsbeleg direkt erzeugt werden)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Für diese Charge gibt es noch keinen Eingangsbeleg: im Wareneingangsbeleg auf „Prüfung/Eingang erzeugen" klicken, dann direkt einlagern (prüfbefreite Artikel werden nicht geprüft)',
+    '还没有送料暂收单': 'Noch kein Wareneingangsbeleg',
+    '还没有来料检验单': 'Noch keine Eingangsprüfung',
+    '还没有暂收退回单': 'Noch kein Rückgabebeleg',
+    '还没有特采单': 'Noch keine Sonderfreigabe',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '退货': 'Rückgabe',
     '待退货': 'Wartet auf Rückgabe',
     '待特采': 'Wartet auf Sonderfreigabe',

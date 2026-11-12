@@ -3,6 +3,16 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Exonéré (ignoré)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'Cet article est exonéré de contrôle (après validation du bon de réception, vous pouvez créer l entrée achat directement)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Ce lot n a pas encore d entrée achat : sur le bon de réception, cliquez sur « Générer contrôle / entrée » pour la créer directement (les articles exonérés ne sont pas contrôlés)',
+    '还没有送料暂收单': 'Pas encore de bon de réception',
+    '还没有来料检验单': 'Pas encore de contrôle réception',
+    '还没有暂收退回单': 'Pas encore de bon de retour',
+    '还没有特采单': 'Pas encore de dérogation',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '退货': 'Retour',
     '待退货': 'En attente de retour',
     '待特采': 'En attente de dérogation',

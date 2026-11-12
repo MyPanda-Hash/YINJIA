@@ -136,15 +136,18 @@
             <div class="qcf-lane">
               <template v-for="(s, i) in chainOf(row).main" :key="s.key">
                 <span v-if="i" class="qcf-arrow" aria-hidden="true">→</span>
-                <div class="qcf-node" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
+                <!-- 免检物料:来料检验这一步是被**跳过**的,不是"没做" —— 不给它单据框,只留一个灰色小标,
+                     免得看成「检验单未生成」把免检批次误当成卡单(2026-11-12 用户提问) -->
+                <div v-if="s.skip" class="qcf-skip-chip" :title="nodeTitle(s)">{{ tt('免检跳过') }}</div>
+                <div v-else class="qcf-node" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
                      :title="nodeTitle(s)" role="button" tabindex="0"
                      @click.stop="openDoc(s.panel, s.no)"
                      @keydown.enter.prevent="openDoc(s.panel, s.no)"
                      @keydown.space.prevent="openDoc(s.panel, s.no)">
                   <span class="qcf-node-name">{{ tt(s.name) }}</span>
                   <span v-if="s.no" class="qcf-node-no" :title="s.no">{{ s.no }}</span>
-                  <!-- 没有单据时,「未生成 / 免检」在这一个位置说一次就够(不再重复挂徽标) -->
-                  <span v-else class="qcf-node-no is-empty">{{ s.state === 'skip' ? tt('免检') : tt('未生成') }}</span>
+                  <!-- 没有单据时,「未生成」在这一个位置说一次就够(不再重复挂徽标) -->
+                  <span v-else class="qcf-node-no is-empty">{{ tt('未生成') }}</span>
                   <span class="qcf-node-meta">
                     <em v-if="s.no" class="qcf-badge" :class="'tone-' + s.tone">{{ tt(s.status) }}</em>
                     <i v-if="s.date">{{ s.date }}</i>
@@ -474,8 +477,23 @@ function inQtyTitle(row) {
   return `${tt('实收数量')} ${num(row?.['实收数量'])}${how}`
 }
 
+/**
+ * 节点提示:没有单据时按**是哪一张单**说清楚该去做什么(2026-11-12 用户提问:
+ * 「送料暂收免检不是直接到采购入库单吗,为什么会出现未生成的情况」—— 因为免检批次不在审核时自动开入库单,
+ * 要回送料暂收单点「生成检验或入库单」;这条提示直接写出来)。
+ */
 function nodeTitle(s) {
-  if (!s.no) return s.state === 'skip' ? tt('该物料免检，不需要来料检验') : tt('该环节还没有单据')
+  if (s.state === 'skip') return tt('该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）')
+  if (!s.no) {
+    const msg = {
+      recv: '还没有送料暂收单',
+      insp: '还没有来料检验单',
+      in: '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）',
+      ret: '还没有暂收退回单',
+      tc: '还没有特采单',
+    }[s.key] || '该环节还没有单据'
+    return tt(msg)
+  }
   return canOpen(s.panel) ? `${tt('点击跳转到')} ${tt(PANEL_NAME[s.panel])}` : `${tt('无查看该面板的权限')}:${tt(PANEL_NAME[s.panel])}`
 }
 
@@ -931,6 +949,19 @@ onBeforeUnmount(stopTimers)
 .qcf-lane-ng .qcf-node {
   padding: 4px 7px;
   max-width: 150px;
+}
+/* 免检跳过:这一道工序根本不走,只留一个小标,不给单据框 */
+.qcf-skip-chip {
+  flex: none;
+  align-self: center;
+  padding: 3px 8px;
+  border: 1px dashed #d3d6db;
+  border-radius: 4px;
+  background: #fafafa;
+  color: #a3aab6;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 .qcf-node.is-link {
   cursor: pointer;
