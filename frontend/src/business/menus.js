@@ -95,6 +95,13 @@ export const menuTree = [
           //     代码里的样品编号唯一性校验与归档登记同批移除。
           //     要恢复:反向重跑该脚本(元数据)+ 放开本行 + 恢复那两处代码。
           { code: 'rdProdDocList', title: '产品文件列表', path: '/panelx/list/RD_PROD_DOCLIST', panelCode: 'RD_PROD_DOCLIST', icon: 'Grid' },
+          // 2026-11-12 用户口径:「文件管理的流程管控面板没有在服务器上…好像有缺失」——
+          //   该页 /rd/productFlow 2026-11-11 就做了，但**只挂在产品文件列表的侧栏按钮**上
+          //   （点开 window.open 新标签页），左侧菜单里查不到 ⇒ 用户的结论是"服务器上没有这个面板"。
+          //   这里补一条菜单项，与「项目管理 → 项目流程管控」平级对应（一个是项目流程、一个是产品文件流程）。
+          //   panelCode 复用 RD_PROD_DOCLIST：本页的数据源就是产品文件列表的同一份派生数据
+          //   （GET /px/rdDevOverview），看得到产品文件列表的人才该看到它，不必新造一套授权。
+          { code: 'rdProductFlow', title: '产品文件流程管控', path: '/rd/productFlow', panelCode: 'RD_PROD_DOCLIST', icon: 'Connection' },
           // 2026-09-21 新增:产品变更申请单(RD_CHANGE,YJ-QR-130《KPC变更申请通知单》)——
           // 产品变更**走单**的载体:发起人建单 → 各受控文件勾选 → 部门按账号填本部门栏 →(需会签时)会签
           // → 冯总(admin)审批 → 生效即按勾选文件建下一版草稿并通知责任人重走受控审核。
