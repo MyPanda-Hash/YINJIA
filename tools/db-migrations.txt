@@ -4607,3 +4607,6 @@ migrate-qc-proc-insp-batch-table-20261111.sql
 
 # 2026-11-12 出货检验表观(QC_ASM_INSP,原组装成品检验单)接图2 表样:qc_asm_insp_* 加 内部批次 / 内部批次清单 / 表单审核人 + yj_field 三行 + 总结论·处理方式改下拉 + 4 个字段标签译名(面板显示名/代号/底表/前缀 ZJ 不动)
 migrate-qc-asm-insp-batch-table-20261112.sql
+
+# 2026-11-12 出货检验表观(QC_ASM_INSP)与产成品入库解绑:合格数量 必填→非必填(零DDL;审核不再生成入库单,存量入库单不动)
+migrate-qc-asm-insp-unlink-finish-in-20261112.sql
