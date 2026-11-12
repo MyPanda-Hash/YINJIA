@@ -4808,3 +4808,7 @@ migrate-po-stock-fullchain-20261112.sql
 #   QC_RECV 现存量 → visible=1 hidden=0 editable=0(列在备注之后、表格最末尾,不打乱既有 22 列);
 #   来料检验/暂收退回/特采三站保持隐藏。两账套均执行。
 migrate-qc-recv-stock-visible-20261112.sql
+# 2026-11-12 清理 3 张非金蝶来源的采购订单(PO-2026-08-0001/0002、PO-2026-10-0001):
+#   用户口径「不是从金蝶来的删除掉」;头/行/状态/批注/修改留痕/分批预约一并删,yj_usage_log 保留。
+#   三道守卫(外部数据ID 必须为空、无下游引用、头数≤3);库内无此三单时整段跳过(测试库属此情形)。两账套均执行。
+migrate-cleanup-non-kingdee-po-20261112.sql
