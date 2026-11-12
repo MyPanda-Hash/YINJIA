@@ -1,6 +1,59 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '送检': 'Soumis',
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Les entrées synchronisées depuis Kingdee n’ont pas de numéro source MES ; le rapprochement se fait par lot. Sans correspondance, l’étape affiche « Non créé »',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Contrôle requis',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Contrôle requis uniquement',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': "Nature d'entrée",
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Suivi du processus qualité',
+    '物料批号': 'N° de lot',
+    '物料批号与物料编码': 'Lot et code article',
+    '供应商与采购订单': 'Fournisseur et commande',
+    '搜索单号、物料编码、物料批号或供应商': 'Rechercher n°, code, lot ou fournisseur',
+    '批次行数': 'Lignes de lot',
+    '停留': 'Attente',
+    '停留天数': "Jours d'attente",
+    '天': 'j',
+    '免检': 'Exonéré',
+    '匹配方式': 'Rapprochement',
+    '检验单行': 'Ligne de contrôle',
+    '批号推定': 'Déduit par lot',
+    '实收': 'Reçu',
+    '异常': 'Anomalie',
+    '待检': 'En attente de contrôle',
+    '待入库': "En attente d'entrée",
+    '入库': 'Entrée',
+    '合格数量': 'Qté conforme',
+    '不合格数量': 'Qté non conforme',
+    '当前环节': 'Étape en cours',
+    '未填批号': 'Lot vide',
+    '该物料免检，不需要来料检验': 'Cet article est exonéré de contrôle à réception',
+    '该环节还没有单据': 'Aucun document à cette étape',
+    '点击跳转到': 'Cliquer pour ouvrir',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Cliquez sur un nœud pour ouvrir le document ; nécessite le droit du panneau',
+    '没有符合条件的批次': 'Aucun lot correspondant',
+    '送料 → 检验 → 入库': 'Réception → Contrôle → Entrée',
+    '绿=已审核/已完成': 'Vert = Validé/Terminé',
+    '蓝=待办': 'Bleu = À faire',
+    '橙=审批中': 'Orange = En approbation',
+    '红=作废/不合格': 'Rouge = Annulé/Non conforme',
+    '无查看该面板的权限': 'Aucun droit de voir ce panneau',
+
     // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
     '结案回正': 'Annuler clôture',
     '没有需要回正的结案行': 'Aucun ordre à rouvrir',

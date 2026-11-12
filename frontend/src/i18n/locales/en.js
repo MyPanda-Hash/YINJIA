@@ -45,6 +45,51 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Purchase receipts synced from Kingdee carry no MES source number, so they can only be matched by lot no.; if no match, the step shows “Not created”',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Need inspection',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Inspection required only',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Incoming type',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Quality Process Monitor',
+    '物料批号': 'Material lot no.',
+    '物料批号与物料编码': 'Lot no. & item code',
+    '供应商与采购订单': 'Supplier & PO',
+    '搜索单号、物料编码、物料批号或供应商': 'Search no. / item code / lot no. / supplier',
+    '批次行数': 'Batch rows',
+    '停留': 'Dwell',
+    '免检': 'Exempt',
+    '匹配方式': 'Match',
+    '检验单行': 'Inspection line',
+    '批号推定': 'Inferred by lot',
+    '实收': 'Received',
+    '异常': 'Abnormal',
+    '待检': 'To inspect',
+    '待入库': 'To put away',
+    '未填批号': 'No lot no.',
+    '该物料免检，不需要来料检验': 'This item is inspection-exempt; no incoming inspection needed',
+    '该环节还没有单据': 'No document at this step yet',
+    '点击跳转到': 'Click to open',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Click a node to open that document; requires permission for that panel',
+    '没有符合条件的批次': 'No matching batches',
+    '送料 → 检验 → 入库': 'Receipt → Inspection → Put-away',
+    '绿=已审核/已完成': 'Green = Audited / Done',
+    '蓝=待办': 'Blue = To do',
+    '橙=审批中': 'Orange = In approval',
+    '红=作废/不合格': 'Red = Void / Failed',
+
     // ---- 库存口径提示(2026-11-10「库存数量以金蝶真实账套为准」;见 core/views/stockHint.js)----
     "库存以金蝶为准：本单需「转ERP」并在金蝶审核后才会改变库存（最长 5 分钟同步）":
       "Stock follows Kingdee: this document changes stock only after 「Transfer to ERP」 and approval in Kingdee (sync within 5 minutes)",

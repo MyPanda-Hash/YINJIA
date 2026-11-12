@@ -567,6 +567,11 @@ export const menuTree = [
         // 《品质资料 2026.09.19.xlsx》检验目录页签一比一;改名后**只显示待检验(正在检验中)的行**,
         // 已完成检验的记录到下面的「检验数据记录明细表」查(面板编码/路径/权限一个字节没动)。
         code: 'incoming', title: '来料品质', children: [
+          // 品质流程监控(2026-11-12 用户口径「流程监控:从送料->检验单->入库……主要要显示物料批号和物料编码」):
+          // 页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,菜单/路由显式注册。
+          // 一行 = 送料暂收单的一条物料行(= 一个来料批次),右侧 送料 → 检验 → 入库 三节点带单号/状态/日期;
+          // 点节点跳对应面板定位该单,**没有该面板查看权时只提示不跳**。
+          { code: 'qcFlowMonitor', title: '品质流程监控', path: '/qc/flowMonitor', icon: 'DataLine', panelCode: 'QC_FLOW' },
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
           { code: 'qcCatalog', title: '待检验目录', path: '/panelx/list/QC_CATALOG', icon: 'Notebook', panelCode: 'QC_CATALOG' },
           // 检验数据记录(2026-09-22):纸张式检验报告 YJ-QR-96,版式对照《品质资料 2026.09.19.xlsx》「检验数据记录模版」;

@@ -1,6 +1,59 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '送检': 'Eingereicht',
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Aus Kingdee synchronisierte Eingangsbelege haben keine MES-Quellnummer; die Zuordnung erfolgt nur über die Charge. Ohne Treffer steht dort „Nicht erzeugt“',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Prüfpflichtig',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Nur prüfpflichtige',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Eingangsart',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Qualitätsprozess-Monitor',
+    '物料批号': 'Chargennummer',
+    '物料批号与物料编码': 'Charge und Artikelcode',
+    '供应商与采购订单': 'Lieferant und Bestellung',
+    '搜索单号、物料编码、物料批号或供应商': 'Beleg-Nr., Artikelcode, Charge oder Lieferant suchen',
+    '批次行数': 'Chargenzeilen',
+    '停留': 'Verweildauer',
+    '停留天数': 'Tage',
+    '天': 'T',
+    '免检': 'Prüfbefreit',
+    '匹配方式': 'Zuordnung',
+    '检验单行': 'Prüfzeile',
+    '批号推定': 'Über Charge zugeordnet',
+    '实收': 'Erhalten',
+    '异常': 'Anomalie',
+    '待检': 'Wartet auf Prüfung',
+    '待入库': 'Wartet auf Einlagerung',
+    '入库': 'Einlagerung',
+    '合格数量': 'Gutmenge',
+    '不合格数量': 'Fehlmenge',
+    '当前环节': 'Aktueller Schritt',
+    '未填批号': 'Charge leer',
+    '该物料免检，不需要来料检验': 'Dieser Artikel ist von der Eingangsprüfung befreit',
+    '该环节还没有单据': 'In diesem Schritt gibt es noch keinen Beleg',
+    '点击跳转到': 'Klicken zum Öffnen',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Klicken Sie auf einen Knoten, um den Beleg zu öffnen; Panel-Berechtigung erforderlich',
+    '没有符合条件的批次': 'Keine passenden Chargen',
+    '送料 → 检验 → 入库': 'Wareneingang → Prüfung → Einlagerung',
+    '绿=已审核/已完成': 'Grün = Geprüft/Erledigt',
+    '蓝=待办': 'Blau = Offen',
+    '橙=审批中': 'Orange = In Genehmigung',
+    '红=作废/不合格': 'Rot = Storniert/Fehlerhaft',
+    '无查看该面板的权限': 'Keine Berechtigung für dieses Panel',
+
     // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
     '结案回正': 'Abschluss zurücksetzen',
     '没有需要回正的结案行': 'Keine Aufträge zum Zurücksetzen',

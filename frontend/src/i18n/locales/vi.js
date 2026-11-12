@@ -1,6 +1,59 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '送检': 'Đã gửi',
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Phiếu nhập kho đồng bộ từ Kingdee không có số nguồn MES nên chỉ khớp theo số lô. Không khớp sẽ hiển thị “Chưa tạo”',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Cần kiểm',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Chỉ hàng cần kiểm',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Tính chất nhập',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Giám sát quy trình chất lượng',
+    '物料批号': 'Số lô vật tư',
+    '物料批号与物料编码': 'Số lô và mã vật tư',
+    '供应商与采购订单': 'Nhà cung cấp và đơn mua',
+    '搜索单号、物料编码、物料批号或供应商': 'Tìm số phiếu, mã vật tư, số lô hoặc nhà cung cấp',
+    '批次行数': 'Số dòng lô',
+    '停留': 'Lưu lại',
+    '停留天数': 'Số ngày lưu',
+    '天': 'ngày',
+    '免检': 'Miễn kiểm',
+    '匹配方式': 'Cách khớp',
+    '检验单行': 'Dòng phiếu kiểm',
+    '批号推定': 'Suy theo lô',
+    '实收': 'Thực nhận',
+    '异常': 'Bất thường',
+    '待检': 'Chờ kiểm',
+    '待入库': 'Chờ nhập kho',
+    '入库': 'Nhập kho',
+    '合格数量': 'SL đạt',
+    '不合格数量': 'SL không đạt',
+    '当前环节': 'Bước hiện tại',
+    '未填批号': 'Chưa có số lô',
+    '该物料免检，不需要来料检验': 'Vật tư này miễn kiểm, không cần kiểm tra đầu vào',
+    '该环节还没有单据': 'Bước này chưa có chứng từ',
+    '点击跳转到': 'Nhấn để mở',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Nhấn vào nút để mở chứng từ tương ứng; cần quyền xem bảng đó',
+    '没有符合条件的批次': 'Không có lô phù hợp',
+    '送料 → 检验 → 入库': 'Nhận hàng → Kiểm tra → Nhập kho',
+    '绿=已审核/已完成': 'Xanh lá = Đã duyệt/Hoàn tất',
+    '蓝=待办': 'Xanh dương = Cần làm',
+    '橙=审批中': 'Cam = Đang duyệt',
+    '红=作废/不合格': 'Đỏ = Hủy/Không đạt',
+    '无查看该面板的权限': 'Không có quyền xem bảng này',
+
     // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
     '结案回正': 'Hoàn tác đóng lệnh',
     '没有需要回正的结案行': 'Không có lệnh nào cần hoàn tác',

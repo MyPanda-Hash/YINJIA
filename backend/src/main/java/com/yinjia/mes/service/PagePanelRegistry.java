@@ -59,6 +59,18 @@ public final class PagePanelRegistry {
      */
     public static final String WORK_ORDER_PROGRESS = "WORK_ORDER_PROGRESS";
     /**
+     * 品质流程监控(2026-11-12,用户口径「流程监控:从送料->检验单->入库。为品质做一个流程监控的面版,
+     * 可以知道每个单据的状态,和跳转,如果没有对应面版的权限就无法跳转过去……主要要显示物料批号和物料编码」)。
+     *
+     * <p>一行 = 送料暂收单的一条物料行(= 一个来料批次),右侧按「送料 → 检验 → 入库」三个节点显示
+     * 单号 + 单据状态 + 日期;点节点跳对应面板并定位该单(**没有该面板查看权时只提示、不跳**)。
+     * 取数口径见 {@link QcFlowService}(状态真源 {@code yj_doc_status},入库三级关联,免检批次跳过检验)。
+     *
+     * <p>页面 = {@code views/modules/qc/QcFlowMonitor.vue},**不是** yj_panel 单据面板 ⇒ 页面级虚拟面板,
+     * 授权落 {@code yj_role_panel};本页只读,动作只有 view/query。
+     */
+    public static final String QC_FLOW = "QC_FLOW";
+    /**
      * ERP 集成配置清单(2026-10-18):导入 / 转出两向 × 分类的接口、设备、字段映射统一配置页。
      * 数据源是三张配置表(erp_integ_api / _field / _device),**不是** yj_panel 单据面板,
      * 故同样按页面级虚拟面板登记 —— 授权落 yj_role_panel,页面菜单按 panelCode 显隐。
@@ -248,6 +260,15 @@ public final class PagePanelRegistry {
      * 页面本身不写任何单据(要排产/报工/结案回原页面操作),故动作只有可见 + 查询。
      */
     private static final String[][] WORK_ORDER_PROGRESS_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+    };
+
+    /**
+     * 品质流程监控(2026-11-12):**只读**盯批次页 —— 一条来料批次在 送料/检验/入库 三张单上走到哪。
+     * 页面本身不写任何单据(要审核/生单回原面板操作),故动作只有可见 + 查询。
+     */
+    private static final String[][] QC_FLOW_ACTIONS = {
             {"view",  "可见"},
             {"query", "查询"},
     };
@@ -459,7 +480,9 @@ public final class PagePanelRegistry {
             // 2026-10-24 用户口径:「采购管理里面多增加俩个面版,一个是供应商采购打印面版,一个是供应商权限配置」
             //   两者都挂在「智能供应链 > 采购管理」下(menus.js 同步),故分组=智能供应链。
             new PagePanelDef(SUPPLIER_PRINT, "供应商采购打印", "智能供应链", SUPPLIER_PRINT_ACTIONS),
-            new PagePanelDef(SUPPLIER_ACCOUNT, "供应商权限配置", "智能供应链", SUPPLIER_ACCOUNT_ACTIONS));
+            new PagePanelDef(SUPPLIER_ACCOUNT, "供应商权限配置", "智能供应链", SUPPLIER_ACCOUNT_ACTIONS),
+            // 2026-11-12 品质流程监控:一条来料批次 × 送料/检验/入库三张单的状态与跳转,归「品质管理」组
+            new PagePanelDef(QC_FLOW, "品质流程监控", "品质管理", QC_FLOW_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

@@ -1,6 +1,59 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '送检': 'Enviado',
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Las entradas sincronizadas de Kingdee no traen número de origen MES; solo se pueden cruzar por lote. Si no coincide, se muestra «No creado»',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Requiere inspección',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Solo requieren inspección',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Tipo de entrada',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Monitor del proceso de calidad',
+    '物料批号': 'Lote del material',
+    '物料批号与物料编码': 'Lote y código de material',
+    '供应商与采购订单': 'Proveedor y pedido',
+    '搜索单号、物料编码、物料批号或供应商': 'Buscar n.º, código, lote o proveedor',
+    '批次行数': 'Filas de lote',
+    '停留': 'Permanencia',
+    '停留天数': 'Días en espera',
+    '天': 'd',
+    '免检': 'Exento',
+    '匹配方式': 'Coincidencia',
+    '检验单行': 'Línea de inspección',
+    '批号推定': 'Estimado por lote',
+    '实收': 'Recibido',
+    '异常': 'Anomalía',
+    '待检': 'Pendiente de inspección',
+    '待入库': 'Pendiente de entrada',
+    '入库': 'Entrada',
+    '合格数量': 'Cantidad conforme',
+    '不合格数量': 'Cantidad no conforme',
+    '当前环节': 'Etapa actual',
+    '未填批号': 'Sin lote',
+    '该物料免检，不需要来料检验': 'Este material está exento de inspección',
+    '该环节还没有单据': 'Aún no hay documento en esta etapa',
+    '点击跳转到': 'Clic para abrir',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Haga clic en un nodo para abrir el documento; requiere permiso del panel',
+    '没有符合条件的批次': 'No hay lotes que coincidan',
+    '送料 → 检验 → 入库': 'Recepción → Inspección → Entrada',
+    '绿=已审核/已完成': 'Verde = Auditado/Completado',
+    '蓝=待办': 'Azul = Pendiente',
+    '橙=审批中': 'Naranja = En aprobación',
+    '红=作废/不合格': 'Rojo = Anulado/No conforme',
+    '无查看该面板的权限': 'Sin permiso para ver este panel',
+
     // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
     '结案回正': 'Revertir cierre',
     '没有需要回正的结案行': 'No hay órdenes por revertir',
