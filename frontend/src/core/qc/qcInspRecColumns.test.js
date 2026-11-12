@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
@@ -123,4 +123,16 @@ test('处理意见 = 标准库下拉,且检验结论/处理意见/单项判定�
   // 新建行必须把必填列建成空串,否则服务端"只校验带键的行"会放行
   assert.match(src, /function blankRow\(\)[\s\S]{0,120}\[K\.ITEM\]: ''[\s\S]{0,60}\[K\.JUDGE\]: ''/,
     '新增行要把 检验项/检测标准/单项判定 的键建出来(空串),必填才拦得住')
+})
+
+/**
+ * 2026-11-12 用户口径:「检验项现在是带入的,不需要标准库维护」
+ * ⇒ 检验项列头的「⧉ 标准库维护」入口必须摘掉;检验结论/处理意见两处保留。
+ */
+test('检验项列不再挂「标准库维护」入口(检验项改为带入),检验结论/处理意见仍保留', () => {
+  const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
+  assert.ok(!/openStdLib\(\)/.test(src), '检验项那处 openStdLib() 无参调用必须已摘掉')
+  assert.ok(!/QC_INSP_ITEM_LIB/.test(src), '组件不应再导入检验项标准库(仅保留 检验结论/处理意见 两处)')
+  assert.match(src, /openStdLib\(VERDICT_LIB, '检验结论'\)/, '检验结论的标准库维护入口要保留')
+  assert.match(src, /openStdLib\(DISPOSAL_LIB, '处理意见'\)/, '处理意见的标准库维护入口要保留')
 })

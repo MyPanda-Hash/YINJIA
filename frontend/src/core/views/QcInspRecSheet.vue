@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        来料品质·检验数据记录(QC_INSP_REC)—— 纸张式检验报告(YJ-QR-96)
        版式一比一照《品质资料 2026.09.19.xlsx》「检验数据记录模版」页签:
@@ -99,12 +99,10 @@
         <tr>
           <th class="c-item" rowspan="2">
             {{ tt('检验项') }}<span v-if="isRequired(K.ITEM)" class="qr-req" :title="tt('必填')">*</span>
-            <span
-              v-if="editable"
-              class="qr-lib-btn no-print"
-              :title="tt('检验项来自数据库选择，可在此维护')"
-              @click="openStdLib()"
-            >⧉ {{ tt('标准库维护') }}</span>
+            <!-- 2026-11-12 用户口径:「检验项现在是带入的,不需要标准库维护」
+                 ⇒ 检验项列不再挂「⧉ 标准库维护」入口(检验项由「带入检验要求」带出来,
+                    历史值仍在下拉候选里可回显/可选,输入框本就 allow-create 可自由敲)。
+                 检验结论 / 处理意见 两处入口不受影响(它们仍是标准库下拉)。 -->
           </th>
           <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
           <!-- 检验方法(2026-11-11 用户口径):来料检验要求「父目录+两个子目录」带入时,
@@ -352,7 +350,6 @@ import {
   QC_INSP_REC_RESULT_KEYS,
   QC_INSP_REC_DISPOSAL_LIB,
   QC_INSP_REC_VERDICT_LIB,
-  QC_INSP_ITEM_LIB,
 } from '@core/qc/qcInspRecColumns'
 
 /** 表体数据键(与 qc_insp_rec_detail 物理列同名) */
@@ -514,12 +511,14 @@ function addItem() {
   emit('dirty')
 }
 
-/** 标准库维护:改完让面板重拉一次配置(选项随之刷新) */
+/** 标准库维护:改完让面板重拉一次配置(选项随之刷新)
+ *  ⚠ 2026-11-12 起只有 **检验结论**(qc.insp_verdict)与 **处理意见**(qc.insp_disposal)两个入口 ——
+ *  用户口径「检验项现在是带入的,不需要标准库维护」,检验项那一列的入口已摘掉
+ *  (qc.insp_item 这个库本身还在:历史值仍是下拉候选,回显不受影响)。 */
 const stdLibVisible = ref(false)
-/** 当前维护的是哪一个标准库(检验项 qc.insp_item / 处理意见 qc.insp_disposal) */
-const stdLibCode = ref(QC_INSP_ITEM_LIB)
-const stdLibTitle = ref('检验项')
-function openStdLib(lib = QC_INSP_ITEM_LIB, title = '检验项') {
+const stdLibCode = ref('')
+const stdLibTitle = ref('')
+function openStdLib(lib, title) {
   stdLibCode.value = lib
   stdLibTitle.value = title
   stdLibVisible.value = true

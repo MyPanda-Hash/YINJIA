@@ -78,7 +78,9 @@ export const QC_INSP_REC_DISPOSAL_LIB = 'qc.insp_disposal'
  *  候选由 yj_std_lib 维护(先播 合格 / 不合格),不再写死在 yj_field.dict_sql 的 VALUES 里 */
 export const QC_INSP_REC_VERDICT_LIB = 'qc.insp_verdict'
 
-/** 检验项所在的标准库编码(与原表「检验项为数据库选择」对应) */
+/** 检验项所在的标准库编码(与原表「检验项为数据库选择」对应)。
+ *  ⚠ 2026-11-12 用户口径「检验项现在是带入的,不需要标准库维护」⇒ **面板不再提供维护入口**;
+ *  这个库本身保留:历史检验项仍是下拉候选(回显/再选),新条目由「带入检验要求」带出。 */
 export const QC_INSP_ITEM_LIB = 'qc.insp_item'
 
 /** Excel 导出:表头行 + 一行取值 */
