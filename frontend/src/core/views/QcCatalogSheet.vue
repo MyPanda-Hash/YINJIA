@@ -18,7 +18,17 @@
       <div class="cs-title">{{ tt('待检验目录') }}</div>
     </div>
 
-    <!-- ② 控制表(两行表头:物料层三列各有列名,检验记录目录跨其后六列) -->
+    <!-- ② 数据定位条(2026-11-12):本面板全部行都在同一张目录单里 ⇒ 查询=在行里定位 -->
+    <div v-if="locateActive" class="cs-locate no-print">
+      <span class="cs-locate-title">{{ tt('数据定位') }}</span>
+      <span v-for="it in locateItems" :key="'lc' + it.k" class="cs-locate-chip">
+        {{ tt(it.k) }}: <b>{{ it.v }}</b>
+      </span>
+      <span class="cs-locate-count">{{ tt('匹配') }} {{ displayRows.length }} {{ tt('行') }}</span>
+      <span class="cs-locate-clear" :title="tt('清除定位，显示全部待检验行')" @click="clearLocate">{{ tt('清除定位') }} ✕</span>
+    </div>
+
+    <!-- ③ 控制表(两行表头:物料层三列各有列名,检验记录目录跨其后六列) -->
     <div class="cs-scroll">
       <table class="cs-table">
         <thead>
@@ -35,7 +45,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in displayRows" :key="row.id ?? ('r' + i)">
+          <tr
+            v-for="(row, i) in displayRows"
+            :key="row.id ?? ('r' + i)"
+            :data-row-id="row.id ?? undefined"
+            :class="{ 'is-hit': flashRowId != null && row.id === flashRowId }"
+          >
             <!-- 检测物料类别(第1类):同类别合并;类别为空不归纳(单独成行) -->
             <td v-if="isGroupHead(i, K.CAT)" class="c-cat" :rowspan="groupSpan(i, K.CAT)">
               <span class="cs-cell-text cs-block">{{ row[K.CAT] || '—' }}</span>
@@ -85,7 +100,11 @@
             </td>
           </tr>
           <tr v-if="!displayRows.length">
-            <td :colspan="catalogCols.length + 4" class="cs-empty">{{ tt('暂无待检验记录，暂收单生单生成检验单后自动带入') }}</td>
+            <td :colspan="catalogCols.length + 4" class="cs-empty">
+              {{ locateActive
+                ? tt('没有匹配的行，点上面的「清除定位」看全部待检验行')
+                : tt('暂无待检验记录，暂收单生单生成检验单后自动带入') }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -141,7 +160,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
@@ -193,13 +212,38 @@ const items = computed(() => {
  */
 const pendingRows = computed(() => (items.value || []).filter((r) => r?.[K.STATUS] !== QC_STATUS_DONE))
 
+/* ══════════ 数据定位(2026-11-12 用户口径)══════════
+ * 「待检目录查询有问题,应该做的是数据定位,因为他的所有数据都在一张单据里」
+ * 本面板是 singleDoc:全部行都在同一张目录单(qc_catalog_detail)里 ⇒ 「查询」不该再去
+ * 查另一张单据(那只会永远返回这一张),而应当**在这张单据的行里定位**:
+ *   · 顶部/右侧的「查询」弹窗照旧填条件(检测物料类别/物料名称/批次号/检验状态…),
+ *     提交后由 PanelxList 调本组件的 applyLocate(conds) —— **不动服务端、不重新取数**;
+ *   · 命中行留下、其余行收起,并自动滚到第一行 + 闪一下;条件条上显示「匹配 N 行」与「清除定位」。
+ * 匹配口径 = 各条件 **包含**(忽略大小写)且 AND;空值条件忽略(与查询弹窗"留空即不限"一致)。
+ */
+const locateConds = ref({})
+const locateActive = computed(() => Object.keys(locateConds.value).length > 0)
+/** 命中行(再交给原来的「同类别归块」排序) */
+const matchedRows = computed(() => {
+  const rows = pendingRows.value || []
+  const conds = Object.entries(locateConds.value)
+    .map(([k, v]) => [k, String(v ?? '').trim()])
+    .filter(([, v]) => v !== '')
+  if (!conds.length) return rows
+  return rows.filter((r) => conds.every(([k, v]) =>
+    String(r?.[k] ?? '').toLowerCase().includes(v.toLowerCase())))
+})
+/** 第一条命中行(定位后闪一下,让人一眼看到落点) */
+const flashRowId = ref(null)
+
 /**
  * 展示顺序(用户口径:类别相同的归为一整个大类):
  * 按「检测物料类别」整块聚合 —— 同类别行不论原来分散在哪都收拢成连续一块(块内保持原顺序),
  * 大类的先后 = 该类别首次出现的位置;类别为空的行不归纳,各自单独成行(在原位置附近输出)。
+ * 定位生效时只对**命中行**做同样的归块。
  */
 const displayRows = computed(() => {
-  const rows = pendingRows.value || []
+  const rows = matchedRows.value || []
   const out = []
   const done = new Set()
   for (const r of rows) {
@@ -211,6 +255,29 @@ const displayRows = computed(() => {
   }
   return out
 })
+
+/** 应用定位条件(PanelxList 的「查询」提交时调):空对象 = 清除定位 */
+async function applyLocate(conds) {
+  locateConds.value = Object.fromEntries(
+    Object.entries(conds || {}).filter(([, v]) => String(v ?? '').trim() !== ''))
+  flashRowId.value = null
+  await nextTick()
+  const first = displayRows.value.find((r) => r?.id != null)
+  if (first) {
+    flashRowId.value = first.id
+    const el = document.querySelector(`.cs-table tbody tr[data-row-id="${first.id}"]`)
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' })
+    setTimeout(() => { flashRowId.value = null }, 1600)
+  }
+  return displayRows.value.length
+}
+function clearLocate() {
+  locateConds.value = {}
+  flashRowId.value = null
+}
+/** 条件条上的展示文案(键是中文数据键,显示前过 tt) */
+const locateItems = computed(() => Object.entries(locateConds.value).map(([k, v]) => ({ k, v })))
+
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 function optionsOf(key) {
@@ -402,7 +469,7 @@ async function exportCatalogExcel() {
   XLSX.writeFile(wb, `${title}-${props.head['单据编号'] || '导出'}.xlsx`)
 }
 
-defineExpose({ exportCatalogExcel })
+defineExpose({ exportCatalogExcel, applyLocate, clearLocate })
 </script>
 
 <style scoped>
@@ -505,6 +572,20 @@ defineExpose({ exportCatalogExcel })
 }
 .cs-note-sub { margin-top: 2px; font-size: 11.5px; color: #8a97a6; }
 .cs-empty { text-align: center; color: #98a4b3; padding: 18px 0 !important; }
+/* ═══ 数据定位条(2026-11-12):查询=在这张单据的行里定位,条件与命中数挂在纸头上 ═══ */
+.cs-locate {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  border-bottom: 1px solid #cfe3f6; background: #f2f9ff; padding: 4px 10px; font-size: 12.5px; color: #1f5fa8;
+}
+.cs-locate-title { font-weight: 600; }
+.cs-locate-chip {
+  padding: 0 8px; border-radius: 10px; background: #e2f0ff; border: 1px solid #b9dbf8; color: #1f5fa8; line-height: 20px;
+}
+.cs-locate-count { margin-left: 4px; color: #1677ff; font-weight: 600; }
+.cs-locate-clear { margin-left: auto; cursor: pointer; color: #b26a00; }
+.cs-locate-clear:hover { text-decoration: underline; }
+/* 定位落点闪一下(1.6s 后自动消失) */
+.cs-table tbody tr.is-hit td { background: #fff6d6 !important; transition: background 0.4s ease; }
 /* ═══ 弹窗 ═══ */
 .cs-dlg-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .cs-dlg-label { width: 100px; text-align: right; color: #333; font-weight: 600; }

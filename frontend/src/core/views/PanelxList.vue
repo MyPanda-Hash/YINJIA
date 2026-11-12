@@ -3,7 +3,12 @@
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <!-- 来料检验要求(档案特例):7 页签 Excel 复刻整表,工具栏/单据卡片/明细表格/页脚全部不渲染,由组件自带迷你工具栏接管 -->
     <div v-if="!isApprovalDoc && !isQcInspReq" class="tools">
-      <button type="button" class="toolbar-query-btn" :title="tt('按表头字段查询单据')" @click.stop="openQueryDialog">
+      <button
+        type="button"
+        class="toolbar-query-btn"
+        :title="isRowLocatePanel ? tt('按物料/批次等条件在本单的行里定位') : tt('按表头字段查询单据')"
+        @click.stop="openQueryDialog"
+      >
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
       </button>
@@ -387,15 +392,24 @@
             </div>
             <div v-else class="as-side-btns">
               <div class="as-side-section">{{ tt('① 查找') }}</div>
-              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
-                   ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
-              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
-              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单;
-                   矩阵面板的字段清单换成矩阵列(产品编号/是否受控/受控日期/状态（任一文件）) -->
-              <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
-              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
-                   矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
-              <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <!-- 单表多行面板(待检验目录 QC_CATALOG,2026-11-12 用户口径「待检目录查询有问题,
+                   应该做的是数据定位,因为他的所有数据都在一张单据里」):
+                   全部行都在同一张目录单里 ⇒ 查单据/模糊搜索/单据预览三件套都是"扫单据",在这里恒等于
+                   同一张单、毫无用处;改成**在这张单据的行里定位**(条件照旧填,命中行留下并滚过去)。 -->
+              <template v-if="isRowLocatePanel">
+                <div class="as-side-btn" :title="tt('按物料/批次/检验状态等条件在本单的行里定位（不换单据）')" @click="openQueryDialog">{{ tt('查询定位') }}</div>
+              </template>
+              <template v-else>
+                <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
+                     ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
+                <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
+                <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单;
+                     矩阵面板的字段清单换成矩阵列(产品编号/是否受控/受控日期/状态（任一文件）) -->
+                <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
+                <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
+                     矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
+                <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              </template>
 
               <!-- ② 本单操作(2026-10-16 用户口径「侧边栏按钮放得有点乱,整理一下」)——
                    **位置固定、内容随状态换**:这一段永远只放"本单这一步该做什么"。
@@ -3471,6 +3485,15 @@ function onQueryDialogClose() {
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
+
+/**
+ * **单表多行面板**(2026-11-12 用户口径「待检目录查询有问题,应该做的是数据定位,因为他的所有数据
+ * 都在一张单据里」):整份数据都挂在一张单据的明细行上 ⇒ 「查询」的语义是**在这张单据的行里定位**,
+ * 而不是"去查另一张单据"。现役只有待检验目录(QC_CATALOG)。
+ * 依据:面板是 singleDoc,且它的查询字段全是明细行上的列(检测物料类别/物料名称/批次号/检验状态…)——
+ * 服务端的 header 条件过滤对它们无效,所以查询弹窗在这里原本等于没查(用户报的就是这个)。
+ */
+const isRowLocatePanel = computed(() => String(panelCode.value) === 'QC_CATALOG')
 
 /* ────────── 状态闸门 + 查询条件区收起(2026-11-11)──────────
  * 状态闸门(statusGate):面板在 yj_panel.config 里声明「默认只列 某字段=某值 的行」,
@@ -9904,6 +9927,14 @@ function onQueryRefConfirm(rows) {
 }
 
 function applyHeaderQuery() {
+  return applyHeaderQueryAsync()
+}
+
+/**
+ * 查询提交(异步:单表多行面板要把条件交给纸面**定位并等它算完命中数**,
+ * 同步返回 Promise 会让"已定位 N 行"永远判成 0 —— 2026-11-12 实测踩到)。
+ */
+async function applyHeaderQueryAsync() {
   // 查询弹窗面板:单据日期(区间)必填;台账加验 仓库/存货 必填(单一仓库的一种存货)
   // 判据在 @core/report/reportQuery.validateReportQuery(单测钉死),这里只映射提示文案。
   if (reportQueryDialog.value) {
@@ -9936,6 +9967,15 @@ function applyHeaderQuery() {
   rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页;后台 load 也不再自动弹窗)
   rqdOpening.value = false
   queryDialogVisible.value = false
+  // 单表多行面板(待检验目录,2026-11-12 用户口径「应该做的是数据定位,因为他的所有数据都在一张单据里」):
+  // 条件提交后**不重新取数**,直接交给纸面在行里定位(命中行留下 + 滚过去 + 闪一下)。
+  // 服务端本来就只会返回同一张目录单,再查一遍既没意义也会把定位状态冲掉。
+  if (isRowLocatePanel.value) {
+    const n = (await approvalSheetRef.value?.applyLocate?.(condition)) ?? 0
+    if (n > 0) ElMessage.success(`${tt('已定位')} ${n} ${tt('行')}`)
+    else ElMessage.warning(tt('没有匹配的行，请调整条件或点「清除定位」'))
+    return
+  }
   search()
 }
 
@@ -11786,6 +11826,11 @@ async function load(clamping = false) {
 function search() {
   query.pageNo = 1
   curIdx.value = 0
+  // 单表多行面板:刷新/重置 = 回到"全部待检验行",把上一次的定位条件一并清掉(否则行被继续藏着)
+  if (isRowLocatePanel.value) {
+    approvalSheetRef.value?.clearLocate?.()
+    Object.keys(condition).forEach((k) => delete condition[k])
+  }
   load()
 }
 
