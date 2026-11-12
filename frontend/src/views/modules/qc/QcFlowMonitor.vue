@@ -436,6 +436,8 @@ function stageTagType(row) {
 
 function verdictTone(row) {
   const v = String(row?.['检验结论'] || '')
+  // 部分不合格(同批既有合格又有不合格)用橙色:要人去看,但不像"整批报废"那样红
+  if (v === '部分不合格') return 'warn'
   if (v === '不合格') return 'void'
   if (v === '合格') return 'done'
   return 'draft'
@@ -997,6 +999,9 @@ onBeforeUnmount(stopTimers)
   color: #f56c6c;
 }
 .qcf-verdict.tone-draft {
+  color: #e6a23c;
+}
+.qcf-verdict.tone-warn {
   color: #e6a23c;
 }
 

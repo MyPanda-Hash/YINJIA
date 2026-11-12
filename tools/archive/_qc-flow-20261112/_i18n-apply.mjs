@@ -35,6 +35,7 @@ const T = {
     'Phiếu nhập kho đồng bộ từ Kingdee không có số nguồn MES nên chỉ khớp theo số lô. Không khớp sẽ hiển thị “Chưa tạo”',
     'ใบรับเข้าที่ซิงก์จาก Kingdee ไม่มีเลขที่อ้างอิง MES จึงจับคู่ได้ตามเลขล็อตเท่านั้น หากจับคู่ไม่ได้จะแสดง “ยังไม่สร้าง”',
   ],
+  '部分不合格': ['Partially failed', '部分不合格', '一部不合格', '일부 부적합', 'Parcialmente no conforme', 'Partiellement non conforme', 'Teilweise fehlerhaft', 'Частично брак', 'Một phần không đạt', 'บางส่วนไม่ผ่าน'],
   '需检验': ['Need inspection', '需檢驗', '要検査', '검사 필요', 'Requiere inspección', 'Contrôle requis', 'Prüfpflichtig', 'Требует контроля', 'Cần kiểm', 'ต้องตรวจ'],
   '仅需检验': ['Inspection required only', '僅需檢驗', '検査対象のみ', '검사 대상만', 'Solo requieren inspección', 'Contrôle requis uniquement', 'Nur prüfpflichtige', 'Только подлежащие контролю', 'Chỉ hàng cần kiểm', 'เฉพาะที่ต้องตรวจ'],
   '来料性质': ['Incoming type', '來料性質', '入荷区分', '입고 구분', 'Tipo de entrada', "Nature d'entrée", 'Eingangsart', 'Вид поступления', 'Tính chất nhập', 'ประเภทการรับเข้า'],

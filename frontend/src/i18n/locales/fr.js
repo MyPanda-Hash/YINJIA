@@ -3,6 +3,10 @@ export default {
   biz: {
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '部分不合格': 'Partiellement non conforme',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '送检': 'Soumis',
     '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Les entrées synchronisées depuis Kingdee n’ont pas de numéro source MES ; le rapprochement se fait par lot. Sans correspondance, l’étape affiche « Non créé »',
 

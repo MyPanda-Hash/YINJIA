@@ -16,6 +16,11 @@
 | `round-05` | 管理员(正式账套 YJ)看板 + 列表 | 看板 300 行;汇总 `批次行数300 / 未完成300 / 需检验7 / 待检验1 / 待入库294 / 异常0`;列表 10 列全显示 | `round-05-board-prod.png`、`round-05-list-prod.png` |
 | `round-06` | 列表列宽收敛后复核 | 10 列,**横向溢出 0px**(`scrollWidth - clientWidth = 0`) | `round-06-board.png`、`round-06-list.png` |
 | `round-09` | 菜单浮层核对 | 鼠标悬停「品质管理 → 来料品质」,浮层第一项 = **品质流程监控**,点它回到本页 | `round-09-menu-card.png` |
+| `round-10` | **8090 打包版**(jar 内 static + 新后端 class) | 页面正常(该会话在测试账套 → 108 行) | `round-10-8090.png` |
+| `round-11` | 检验结论三档复核(合格/部分不合格/不合格) | `60 合格 / 40 不合格` 显示 **「检验 部分不合格」**(橙色 warn),不再一口咬定"不合格" | `round-11-final.png` |
+
+> ⚠ 8090 的静态资源带缓存:rebuild 后首次打开可能仍是旧 chunk(实测出现过"文案新、配色旧"),
+> 用带查询串的地址(如 `/?v=20261112b#/qc/flowMonitor`)强制换新即可 —— 与源码版 5173 对照可判定。
 
 > ⚠ `round-03` 用的演示账号 `qcflowdemo`(仅测试账套)**验完即删**:
 > 建号 `_mk-demo-user-testdb.sql`、删号 `_rm-demo-user-testdb.sql`,两脚本都在本目录,密码哈希沿用 admin。
@@ -46,5 +51,7 @@ java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar SqlRunner.java `
 |---|---|
 | `_api-probe.mjs` | 四种状态筛选的汇总 + 环节分布 + 各环节样例 |
 | `_api-probe2.mjs` | 有检验单的行明细、`仅需检验` 筛选后的汇总 |
+| `_api-probe4.mjs` | 检验结论分布(全部 502 行:空 489 / 部分不合格 3 / 不合格 2 / 合格 8) |
+| `_api-probe6.mjs` | 测试账套同一口径复核(部分不合格 30 / 合格 131 / 不合格 32),用来验证三档判定 |
 | `_i18n-apply.mjs` | 把本页新增 UI 词条写入 10 个语言包(`biz` 块,幂等:已存在则跳过) |
 | `_i18n-check.mjs` | 反查:`QcFlowMonitor.vue` 里每个 `tt('中文')` 在 10 个语言包里是否都有译名(当前:缺 0) |

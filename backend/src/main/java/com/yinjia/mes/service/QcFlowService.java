@@ -194,7 +194,10 @@ public class QcFlowService {
                     ins.送检数量 AS 送检数量,
                     ins.合格数量 AS 合格数量,
                     ins.不合格数量 AS 不合格数量,
+                    /* 检验结论:合格 / 不合格 / 部分不合格(同一批既有合格又有不合格时不能一口咬定"不合格",
+                       否则品质会去追一批其实大部分合格的料);三者都为空 = 还没填结果 */
                     CASE WHEN ins.检验单号 IS NULL THEN NULL
+                         WHEN ISNULL(ins.合格数量, 0) > 0 AND ISNULL(ins.不合格数量, 0) > 0 THEN N'部分不合格'
                          WHEN ISNULL(ins.不合格数量, 0) > 0 THEN N'不合格'
                          WHEN ISNULL(ins.合格数量, 0) > 0 THEN N'合格'
                          ELSE NULL END AS 检验结论,
