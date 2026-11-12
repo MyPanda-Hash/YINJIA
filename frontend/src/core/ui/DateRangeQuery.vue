@@ -8,7 +8,7 @@
        · **反序由调用页自行处理**(用户先点结束日、再点开始日时会拿到反序数组;先交换还是回退默认值
          属于各页自己的查询口径,放这里会让两页悄悄分叉,所以本组件原样抛出、不纠正);
        · clearable 默认 false:订单结转「打开就只看今天、总得有个区间」;生产工单要「清空=查全量」⇒ 由调用页传 true。
-     样式:宽度由 `width` prop 指定(默认 260px,两页同宽);并且必须带 `flex: 0 0 auto` ——
+     样式:宽度由 `width` prop 指定(默认 240px,两页同宽);并且必须带 `flex: 0 0 auto` ——
      el-date-picker 的根元素同时是 `.el-input__wrapper`(Element Plus 给它 `flex-grow:1`),
      放在生产工单页的 flex 查询行里会把 260px 撑成 296px(2026-11-09 实测),两页就不等宽了。
      宽度**不要**用本组件的 scoped class 写死:验收实测 scoped `.drq-picker{width:...}` 命中不了
@@ -40,8 +40,8 @@ defineProps({
   modelValue: { type: Array, default: () => [] },
   /** 是否允许清空:默认 false(订单结转口径=总有查询区间);生产工单「清空=查全量」时传 true */
   clearable: { type: Boolean, default: false },
-  /** 控件宽度(两页统一 260px = 两个 YYYY-MM-DD 框 + 分隔符放得下;要调就改这里,别去 CSS 里写 scoped 类) */
-  width: { type: String, default: '260px' },
+  /** 控件宽度(两页统一 240px = 两个 YYYY-MM-DD 框 + 分隔符放得下;要调就改这里,别去 CSS 里写 scoped 类) */
+  width: { type: String, default: '240px' },
 })
 const emit = defineEmits(['update:modelValue', 'change'])
 
