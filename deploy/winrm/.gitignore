@@ -1,0 +1,4 @@
+# 本地私有配置（含服务器/数据库口令），绝不入库；模板见 config.example.json
+config.json
+__pycache__/
+*.pyc
