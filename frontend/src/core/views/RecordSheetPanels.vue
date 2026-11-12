@@ -1638,6 +1638,19 @@
       <!-- ── 源 ②:商品档案(四栏级联收窄 + 勾选落行)── -->
       <template v-else>
         <div class="gp-bar">
+          <!-- 自由文本搜索(2026-11-12):顶部四栏是下拉且候选被截断(存货编码 3983 个,下拉只给 300)
+               ⇒ 在下拉里敲编号常常"明明有却搜不到"。这个输入框直接在**全部商品行**上模糊匹配
+               存货编码/存货名称/规格型号/所属类别/计量单位,与四栏筛选是 AND 关系。 -->
+          <div class="gp-filter gp-filter-kw">
+            <span class="gp-filter-label">{{ tt('搜索') }}</span>
+            <el-input
+              v-model="matPickKeyword"
+              size="small"
+              clearable
+              :placeholder="tt('存货编码 / 名称 / 规格型号，直接输入即可')"
+              class="gp-filter-input"
+            />
+          </div>
           <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
             <span class="gp-filter-label">{{ tt(f.key) }}</span>
             <el-select
@@ -1842,6 +1855,7 @@ import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
 import { mergeExtCols } from '@core/panel/extCols.js'
+import { matchKeyword } from '@core/panel/goodsPick.js'
 import { splitSigners, joinSigners, signerNames } from '@core/panel/signerText.js'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
@@ -4626,6 +4640,12 @@ watch(
 const matPickVisible = ref(false)
 const matPickLoading = ref(false)
 const matPickRows = ref([])
+/**
+ * 商品弹窗的**自由文本搜索**（2026-11-12 用户口径）。
+ * 顶部四栏是 el-select，候选被 FACET_CAP=300 截断（存货编码有 3983 个），
+ * 在下拉里敲编号大多命中不了 ⇒ 单独给一条"直接在全部行上模糊匹配"的输入框。
+ */
+const matPickKeyword = ref('')
 const matPickChecked = ref([])
 const matPickTargetDt = ref(null)
 /** 四栏筛选值(键 = 商品面板的列名;空串 = 不筛) */
@@ -4635,11 +4655,13 @@ function onMatPickSelection(sel) {
 }
 function resetMatPickFilters() {
   for (const k of GOODS_FACETS) matPickFilters[k] = ''
+  matPickKeyword.value = ''
 }
 /** 每栏的候选值 —— 按**其它三栏**的当前条件收窄(用户要的"范围缩小"),capped 见 goodsPick.FACET_CAP */
 const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facetValues(matPickRows.value, k, matPickFilters) })))
 /** 表格数据 = 四栏 AND 之后的结果 */
-const matPickFiltered = computed(() => matchGoods(matPickRows.value, matPickFilters))
+const matPickFiltered = computed(() =>
+  matchGoods(matchKeyword(matPickRows.value, matPickKeyword.value), matPickFilters))
 const matPickHint = computed(() => {
   if (matPickLoading.value) return tt('加载中…')
   // 源 ①:物料清单 —— 勾的是整张单,提示要说清「整单子件会全部带入」
@@ -6242,6 +6264,9 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 .gp-filter { display: flex; align-items: center; gap: 6px; }
 .gp-filter-label { font-size: 12px; color: #606266; white-space: nowrap; }
 .gp-filter-select { width: 190px; }
+/* 关键字搜索框(2026-11-12)：比四栏略宽一点，放第一位，一眼看到"这儿能直接搜编号" */
+.gp-filter-kw { margin-right: 6px; }
+.gp-filter-input { width: 260px; }
 .gp-more { font-size: 11px; color: #c0c4cc; }
 .pp-foot { margin-top: 6px; font-size: 12px; color: #909399; }
 /* 行的三种态:已开发(不可选,压灰)/ 当前待引用(高亮)/ 普通。
@@ -6615,8 +6640,18 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 }
 
 /* ═══ 矿化:表+图并排(复刻 Excel 表格在左、散点图在右) ═══ */
+/* 2026-11-12 用户口径（产品信息表/产品变更申请截图）：
+   「在三区与四区之间有一个小的分隔，两块不是共用一条边框线的」。
+   纸面是由**多个独立 <table class="rs-t">** 拼起来的（一段一张表），原本数据表外面多套了
+   一层 .rsp-dt-wrap 并给了 margin-bottom:6px ⇒ 只有"数据表→下一段"这一处出现 6px 空隙（实测
+   其余相邻段间距都是 0）；再加上两张表各自带 1px 表框，相接处就是**两条线**而不是一条。
+   改法：① 去掉这层的外边距，让段落紧贴；② 用 -1px 让两张表的边框**重叠**成一条线。 */
 .rsp-dt-wrap {
-  margin-bottom: 6px;
+  margin-bottom: 0;
+}
+/* 数据表 → 下一段：两张独立 table 的边框重叠 1px，使相接处只有一条线 */
+.rsp-dt-wrap + table.rs-t {
+  margin-top: -1px;
 }
 .rsp-dt-wrap.with-chart {
   display: flex;

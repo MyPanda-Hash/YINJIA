@@ -69,7 +69,7 @@ test('RD_CHANGE 的数据表行也要有最小行高 rowH(空表时别压扁)', 
   assert.match(rec, /:style="dt\.rowH \? \{ height: dt\.rowH \+ 'px' \} : null"/, '数据表行渲染要读 dt.rowH')
 })
 
-// ── 表尾段(三.相关变更 / 四、库存产品处理方式 / 五、其它 / 批准)──
+// ── 表尾段(四、相关变更 / 批准)── 2026-11-12：原「三.相关变更」与三区撞号，已改为「四、相关变更」
 /**
  * 2026-10-16 用户口径:「这个产品变更申请表的这个位置的格子要大一点,现在有点窄了,
  *   每个格子竖向加长到原来的 1.5 倍」。
@@ -94,9 +94,9 @@ test('表尾段渲染必须认 row.grid 与 row.h(否则调 h 也不生效,行�
 test('RD_CHANGE 尾段行高 = 原始值与 ×1.5 的**中点**(用户两轮口径:先 ×1.5,再"太长了取中间值")', () => {
   const tail = recordSheetConfigs.RD_CHANGE.tailSections || []
   const byBar = Object.fromEntries(tail.map((s) => [s.bar, s]))
-  assert.ok(byBar['三.相关变更'], '尾段「三.相关变更」在')
-  assert.equal(byBar['三.相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
-  assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
+  assert.ok(byBar['四、相关变更'], '尾段「四、相关变更」在')
+  assert.equal(byBar['四、相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
+  assert.equal(byBar['四、相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
   // ⚠ 2026-11-11 用户口径:「四五内容区去掉」—— 「四、库存产品处理方式」与「五、其它」
   //   已整段删除,故这里不再校验它们的行高;只保留仍存在的「批准」段。
   for (const bar of ['批准']) {

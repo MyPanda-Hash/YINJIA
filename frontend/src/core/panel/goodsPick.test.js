@@ -4,7 +4,8 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { matchGoods, facetValues, goodsToDetail, GOODS_FACETS } from './goodsPick.js'
+import { readFileSync } from 'node:fs'
+import { matchGoods, matchKeyword, facetValues, goodsToDetail, GOODS_FACETS } from './goodsPick.js'
 
 const ROWS = [
   { 所属类别: '功能炭棒', 存货编码: 'T382', 存货名称: '除重金属炭棒/滤芯', 规格型号: '2支装白盒', 备注: '炭棒尺寸' },
@@ -106,4 +107,33 @@ test('⑤ 四栏与商品面板的列名一致(改列名必须同步这里)', ()
   for (const r of ROWS) {
     for (const k of GOODS_FACETS) assert.ok(k in r, `样例数据缺少 ${k}`)
   }
+})
+
+/* ── 关键字搜索（2026-11-12 用户口径「直接搜索编号找不到」）────────────── */
+test('matchKeyword：直接在全量行上模糊匹配，不受下拉 300 项上限影响', () => {
+  const rows = [
+    { 所属类别: '炭粉', 存货编码: 'YJ-YKRS-014', 存货名称: '专用炭X5(80-250目）', 规格型号: '80-250目', 计量单位: 'kg' },
+    { 所属类别: 'PP棉', 存货编码: 'YJ-AJ-040', 存货名称: 'PP棉', 规格型号: '60*49*180', 计量单位: '支' },
+  ]
+  // 按编号（原问题：编号有 3983 个，下拉只给 300，敲了也找不到）
+  assert.deepEqual(matchKeyword(rows, 'YJ-AJ-040').map((r) => r.存货编码), ['YJ-AJ-040'])
+  // 按名称 / 规格 / 类别
+  assert.deepEqual(matchKeyword(rows, 'pp棉').map((r) => r.存货编码), ['YJ-AJ-040'], '不区分大小写')
+  assert.deepEqual(matchKeyword(rows, '80-250').map((r) => r.存货编码), ['YJ-YKRS-014'])
+  assert.deepEqual(matchKeyword(rows, '炭粉').map((r) => r.存货编码), ['YJ-YKRS-014'])
+  // 空关键字 = 全量；无命中 = 空
+  assert.equal(matchKeyword(rows, '').length, 2)
+  assert.equal(matchKeyword(rows, '   ').length, 2)
+  assert.equal(matchKeyword(rows, '压根没有').length, 0)
+  // 不修改入参
+  assert.equal(rows.length, 2)
+})
+
+test('BOM 导入弹窗必须有自由文本搜索框，且走 matchKeyword（而非只靠下拉）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /class="gp-filter-input"/, '弹窗里要有搜索输入框')
+  assert.match(sheet, /matPickKeyword/, '要有 matPickKeyword 状态')
+  assert.match(sheet, /matchGoods\(matchKeyword\(matPickRows\.value, matPickKeyword\.value\), matPickFilters\)/,
+    '过滤链必须先过关键字再过四栏（AND）')
+  assert.match(sheet, /matPickKeyword\.value = ''/, '「清空筛选」要一并清关键字')
 })

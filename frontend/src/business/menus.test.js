@@ -60,11 +60,22 @@ test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 �
   assert.ok(!JSON.stringify(menuTree).includes('内部委托测试申请单'), '旧菜单名不应残留')
 })
 
-test('产品文件组 7 张(2026-10-30 X烧结并入烧结工艺清单的双模板 Tab,不单独占菜单)', () => {
-  assert.deepEqual(leafCodes(group('rdFiles')), [
+test('产品文件组 7 张面板 + 1 个页面(2026-10-30 X烧结并入烧结工艺清单的双模板 Tab,不单独占菜单)', () => {
+  // 2026-11-12:新增「产品文件流程管控」/rd/productFlow。它是**页面级只读视图**
+  //   （数据源 GET /px/rdDevOverview，与产品文件列表同源），不是新面板，
+  //   故 panelCode **刻意复用 RD_PROD_DOCLIST** —— 看得到产品文件列表的人才该看到它，
+  //   不必新造一套授权，也不用动后端 PagePanelRegistry 与 yj_role_panel。
+  //   ⇒ 叶子项 +1，但面板仍是 7 张，所以下面按"去重后的面板码"断言。
+  const leaves = leafCodes(group('rdFiles'))
+  assert.deepEqual(leaves, [
     'RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_ASM_PROC', 'RD_INSP_PLAN',
-    'RD_PROD_DOCLIST', 'RD_CHANGE',
-  ])
+    'RD_PROD_DOCLIST', 'RD_PROD_DOCLIST', 'RD_CHANGE',
+  ], '产品文件流程管控复用 RD_PROD_DOCLIST 权限，作为第 8 个叶子项')
+  assert.equal(new Set(leaves).size, 7, '去重后仍是 7 张面板')
+  // 页面入口必须真的指向独立路由，别写成同一个 path
+  const flowLeaf = group('rdFiles').children.find((c) => c.code === 'rdProductFlow')
+  assert.ok(flowLeaf, '缺 rdProductFlow 菜单项')
+  assert.equal(flowLeaf.path, '/rd/productFlow')
   // 下线面板不得从别处溜回导航(RD_MOLD_FORMULA/RD_ASM_BOM 仍是合法面板,只是没有菜单入口)
   const all = JSON.stringify(menuTree)
   assert.ok(!all.includes('RD_MOLD_FORMULA'), '菜单树里不应再有 RD_MOLD_FORMULA 入口')
@@ -218,8 +229,10 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
 test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两张样品单)', () => {
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 26)
-  assert.equal(new Set(codes).size, 26)
+  // 2026-11-12:叶子项 26 → 27（新增「产品文件流程管控」页面入口，panelCode 复用 RD_PROD_DOCLIST）
+  //   ⇒ **面板仍是 26 张**，叶子项 27。这里两个数都钉住，避免"多一个入口"被误当成"多一张面板"。
+  assert.equal(codes.length, 27, '叶子项 27 个（含产品文件流程管控页面）')
+  assert.equal(new Set(codes).size, 26, '去重后仍是 26 张面板')
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
   // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,
   // 由 @core/views/MoldProcPanel.vue 承载 ⇒ **不占菜单项**,这里也不该出现。
