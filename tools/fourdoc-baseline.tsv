@@ -58,7 +58,7 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 57	QC_RECV	折扣%	折扣%	detail	330	小数	80	E--V		GFDA	mc	mc				
 58	QC_RECV	预计到货日期	预计到货日期	detail	340	日期	120	E--V		GFDA	mc	mc				
 59	QC_RECV	备注	备注	detail	350	文本	200	E--V		GFDA	mc	mc				
-60	QC_RECV	现存量	现存量	detail	360	小数	90	E-H-		GFDA	mc	mc			Current inventory	
+60	QC_RECV	现存量	现存量	detail	360	小数	90	---V		GFDA	mc	mc			Current inventory	
 61	QC_RECV	仓库	仓库	detail	370	文本	120	E-H-		GFDA	mc	mc				
 62	QC_RECV	折扣金额	折扣金额	detail	380	小数	100	E-H-		GFDA	mc	mc				
 63	QC_RECV	条码	条码	query,detail	390	文本	140	E-H-		GFDA	mc	mc				

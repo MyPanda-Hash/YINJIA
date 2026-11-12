@@ -17,7 +17,7 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 7dc8826fb827(sha256 6d450bb4794db12e…)
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git d965fc81e45c(sha256 d64fe3bf3b370d6e…)
  *   回正行数:QC_RECV=70 · QC_INSP=55 · QC_RETURN=39 · PURCHASE_IN=165(共 329 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
@@ -128,7 +128,7 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (57,N'QC_RECV',N'折扣%',N'折扣%',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',330,80,1,0,0,NULL,1,NULL,NULL,NULL),
   (58,N'QC_RECV',N'预计到货日期',N'预计到货日期',N'日期',NULL,N'GFDA',N'mc',N'mc',N'detail',340,120,1,0,0,NULL,1,NULL,NULL,NULL),
   (59,N'QC_RECV',N'备注',N'备注',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',350,200,1,0,0,NULL,1,NULL,NULL,NULL),
-  (60,N'QC_RECV',N'现存量',N'现存量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',360,90,1,0,1,NULL,0,N'Current inventory',NULL,NULL),
+  (60,N'QC_RECV',N'现存量',N'现存量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',360,90,0,0,0,NULL,1,N'Current inventory',NULL,NULL),
   (61,N'QC_RECV',N'仓库',N'仓库',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',370,120,1,0,1,NULL,0,NULL,NULL,NULL),
   (62,N'QC_RECV',N'折扣金额',N'折扣金额',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',380,100,1,0,1,NULL,0,NULL,NULL,NULL),
   (63,N'QC_RECV',N'条码',N'条码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'query,detail',390,140,1,0,1,NULL,0,NULL,NULL,NULL),
