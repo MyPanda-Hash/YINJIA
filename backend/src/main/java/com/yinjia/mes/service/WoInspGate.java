@@ -55,6 +55,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * 用户口径「首件检验单需要关联当前的生产工单即可,不需要实现成型报工完成流程才产生」。
  * 首件改成按「未完工 + 未被本单占用」选工单,见 {@code QcFirstInspController.woLines};
  * 制程/组装成品两张单不变。</p>
+ *
+ * <p><b>🔴 2026-11-12</b>:自动出单侧的**首件**已完全不经过本门禁,且**不再等成型达计划量** ——
+ * 改为「成型当天首笔报工即出、一天一张(每天一个生产批次)」,见 {@code QcInspAutoService.build} ①;
+ * 本类继续管制程检验单与出货检验表的**手工建单**准入(门禁档位/强制开单/留痕一整套不变)。</p>
  */
 public final class WoInspGate {
 

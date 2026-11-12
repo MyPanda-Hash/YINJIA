@@ -9010,7 +9010,7 @@ async function openPickedProcInsp(res) {
       : (kind === 'asm' ? tt('未生成出货检验表观') : tt('未生成出货检验单功能')))
   }
   const existed = res?.['已存在'] === true
-  const existedText = kind === 'first' ? tt('该工单行已有首件检验单')
+  const existedText = kind === 'first' ? tt('该工单行今天已有首件检验单')
     : (kind === 'asm' ? tt('该工单行已有出货检验表观') : tt('该工单行已有出货检验单功能'))
   const createdText = kind === 'first' ? tt('已生成首件检验单')
     : (kind === 'asm' ? tt('已生成出货检验表观') : tt('已生成出货检验单功能'))

@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _cleanup.sql ==
+  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 
+[OK] _cleanup.sql (1 batches)

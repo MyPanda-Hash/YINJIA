@@ -34,7 +34,11 @@ import java.util.Map;
  *
  * <h3>工序 → 检验单</h3>
  * <ul>
- *   <li>{@code 成型} 累计达计划量 ⇒ 首件检验单 {@code QC_FIRST_INSP} + 制程检验单 {@code QC_PROC_INSP};</li>
+ *   <li>{@code 成型}(第一个工序)**当天首次报工** ⇒ 首件检验单 {@code QC_FIRST_INSP} —— 🔴 2026-11-12
+ *       口径变更:不再等「成型累计达计划量」,改成**每天一个生产批次** —— 当天第一笔成型报工就出单,
+ *       一天一张、与数量无关(用户原话:「按每天一个生产批次吧,就是每天的第一个工序报工一次后就产生。」);</li>
+ *   <li>{@code 成型} 累计达计划量 ⇒ 制程检验单 {@code QC_PROC_INSP}(2026-10-18 口径;
+ *       **2026-11-12 明确「制程的先不处理」**,与首件脱钩后保持原判据);</li>
  *   <li>{@code 组装/装箱} ⇒ 出货检验表观 {@code QC_ASM_INSP} —— 🔴 2026-11-12 口径变更:不再等
  *       「组装累计达计划量」,改成**进入组装/装箱环节就出单**(判据见 {@link AsmInspEntry})。
  *       用户原话:「出货表观在组装/装箱环节就要进行检验……在进入到组装/装箱这个工序或者产线的时候就
@@ -48,7 +52,11 @@ import java.util.Map;
  * ③ 都为 0 ⇒ 不做数量门禁(有已报工就出单),与旧行为一致 —— 老工单没有台账时不会永远出不了单。
  *
  * <h3>幂等</h3>
- * 唯一键 = {@code (工单号, 工单行号)} × 面板;已有存活单则跳过(作废后可再次生成)。
+ * <ul>
+ *   <li>首件检验单:唯一键 = {@code (工单号, 工单行号, 单据日期)} —— **一天一张**(2026-11-12);
+ *       同一工单行同一天重复报工不再出单,次日再报则再出一张;</li>
+ *   <li>制程检验单 / 出货检验表观:唯一键 = {@code (工单号, 工单行号)};已有存活单则跳过(作废后可再次生成)。</li>
+ * </ul>
  */
 @Service
 public class QcInspAutoService {
@@ -75,11 +83,25 @@ public class QcInspAutoService {
     }
 
     /**
+     * **第一个工序**(首件检验单的触发工序)—— 与 {@code bs_route.工序名称}、{@code scjl.gxdm} 同一份字典值;
+     * 改工艺口径只改这一处。首件≠"路线第一道"的动态推断:现役路线首道就是成型,而首件检验本来就是
+     * **成型那道工序的质检数据**(见 {@link WoInspGate#GATE_OP}、{@link ScheduleBoardService} 追溯段)。
+     */
+    private static final String FIRST_OP = "成型";
+
+    /** 首件检验单(每天一张:该工单行成型当天首笔报工即出,2026-11-12) */
+    public static final String FIRST_PANEL = "QC_FIRST_INSP";
+
+    /** 制程检验单(成型累计达计划量,2026-10-18 口径不变) */
+    public static final String PROC_PANEL = "QC_PROC_INSP";
+
+    /**
      * 工序 → 检验单面板(顺序即出单顺序;改口径只改这一处)。
      *
-     * <p>🔴 2026-11-12 口径变更:**「组装」不再走这张表** —— 出货检验表观的触发时机改成
-     * 「进入组装/装箱环节」(判据在 {@link AsmInspEntry}),与报工工序不再绑定:切炭报工把量流进组装、
-     * 或组装报工本身,都会出表观单。故本表只剩成型侧两张单。</p>
+     * <p>🔴 2026-11-12 口径变更:这张表**只剩制程** ——
+     * ①「组装」不再走这里:出货检验表观改成「进入组装/装箱环节」触发(判据 {@link AsmInspEntry}),
+     *    与报工工序不再绑定;②「首件」不再走这里:改成「成型当天首笔报工即出、一天一张」,
+     *    由 {@link #build} 的 ① 分支单独判定(它不再要求达计划量)。</p>
      *
      * <p>🔴 2026-10-29 修正(实测,必须记下来):2026-10-21 曾把成型改成只出 {@code QC_MOLD_INSP}
      * (前提是「首件/制程两张单及其表已下架」)——**该前提到 2026-10-29 已不成立**:
@@ -91,16 +113,16 @@ public class QcInspAutoService {
      * 与 {@link ScheduleBoardService} 的追溯检验段、{@link ButtonService} 的弃审级联同一口径。
      */
     private static final Map<String, List<String>> OP_PANELS = Map.of(
-            "成型", List.of("QC_FIRST_INSP", "QC_PROC_INSP"));
+            FIRST_OP, List.of(PROC_PANEL));
 
     /** 出货检验表观(2026-11-11 起由「组装成品检验单」改显示名;代号/表/单号前缀不动) */
     public static final String ASM_PANEL = "QC_ASM_INSP";
 
     /** 面板 → 头表(幂等查重;取值全是本类常量,无拼接注入面) */
     private static final Map<String, String> HEAD_TABLE = Map.of(
-            "QC_FIRST_INSP", "qc_first_insp_head",
-            "QC_PROC_INSP", "qc_proc_insp_head",
-            "QC_ASM_INSP", "qc_asm_insp_head");
+            FIRST_PANEL, "qc_first_insp_head",
+            PROC_PANEL, "qc_proc_insp_head",
+            ASM_PANEL, "qc_asm_insp_head");
 
     private final JdbcTemplate jdbc;
 
@@ -129,7 +151,6 @@ public class QcInspAutoService {
         if (wo.isEmpty() || op.isEmpty()) {
             return new Result(List.of(), "报工行缺工单号/工序,无法判定", op, 0, 0);
         }
-        List<String> panels = OP_PANELS.get(op);
 
         int xc = (int) num(r.get("行号"));
         Map<String, Object> p = resolvePlangRow(wo, xc, (long) num(r.get("gd_id")), str(r.get("批次号")));
@@ -145,7 +166,24 @@ public class QcInspAutoService {
         double opDone = 0;
         double opPlan = 0;
 
-        // ── ① 按报工工序触发的单(2026-11-12 起只剩成型侧:首件 + 制程)──
+        // ── ① 首件检验单(成型 = 第一个工序):每天一张,当天首次报工即出(2026-11-12 用户口径)──
+        //    用户原话:「按每天一个生产批次吧,就是每天的第一个工序报工一次后就产生。」
+        //    ⇒ 不再等「成型累计达计划量」(2026-10-18 口径);日期取**报工日期**
+        //    (sc_date → wgsj → asp_time1,与 WorkOrderDayPlanService.actualByDate 同一口径),
+        //    同一工单行同一天已有存活单就不重复出(次日再报会再出一张)。
+        if (FIRST_OP.equals(op)) {
+            String day = str(r.get("报工日期"));
+            if (day.isBlank()) day = LocalDate.now().toString();
+            if (existsLiveOnDay(FIRST_PANEL, wo, xc, day)) {
+                skipped.add(FIRST_PANEL + "(当天)");
+            } else {
+                drafts.add(new Draft(FIRST_PANEL,
+                        firstInspHead(r, p, op, xc, num(r.get("数量")), repNo, day)));
+            }
+        }
+
+        // ── ② 制程检验单(成型):累计已审报工 ≥ 该道计划量(2026-10-18 口径;2026-11-12「制程先不处理」)──
+        List<String> panels = OP_PANELS.get(op);
         if (panels != null && !panels.isEmpty()) {
             opPlan = planQty(wo, rowId, op, p);
             opDone = WoInspGate.reportedQty(jdbc, wo, rowId, op);
@@ -161,12 +199,12 @@ public class QcInspAutoService {
                     drafts.add(new Draft(panel, head(panel, r, p, op, xc, opDone, repNo)));
                 }
             }
-        } else {
+        } else if (!FIRST_OP.equals(op) && !AsmInspEntry.OPS.contains(op)) {
             reasons.add("工序「" + op + "」不出检验单");
         }
 
-        // ── ② 出货检验表观:进入组装/装箱环节即出(2026-11-12 用户口径,判据在 AsmInspEntry)──
-        //    与①互不绑定:切炭报工把量流进组装时会出;组装/装箱自己报工也会出(此时①本来就没有这张单)。
+        // ── ③ 出货检验表观:进入组装/装箱环节即出(2026-11-12 用户口径,判据在 AsmInspEntry)──
+        //    与①②互不绑定:切炭报工把量流进组装时会出;组装/装箱自己报工也会出(此时①②本来就没有这张单)。
         AsmInspEntry.Status asm = AsmInspEntry.of(jdbc, rowId);
         if (asm.entered()) {
             if (existsLive(ASM_PANEL, wo, xc)) {
@@ -196,30 +234,34 @@ public class QcInspAutoService {
         // ⚠ 各单的「检验员」**都不在这里写**(2026-10-21):后台定时吸收没有登录人,
         //   写 system 占位没有意义;真值 = 保存时在电脑前操作的那个人,见
         //   ButtonService.defaultQcInspector(保存兜底)+ core/qc/qcInspector.js(打开即带出)。
-        // 2026-11-12:出货检验表观不在这里 —— 它按「进入组装/装箱」触发(见 asmInspHead / AsmInspEntry)。
+        // 2026-11-12:首件改按天出(build ① 直接调 firstInspHead)、出货检验表观按「进入组装/装箱」出
+        //   (见 asmInspHead / AsmInspEntry),本方法只剩制程走这里。
         return switch (panel) {
-            // 成型两道检验单(2026-10-29 恢复):首件按《成型工艺清单》预铺、制程留空由品质带入
-            case "QC_FIRST_INSP" -> firstInspHead(r, p, op, xc, done, repNo);
             case "QC_PROC_INSP" -> procInspHead(p, xc, done, op, repNo);
             default -> Map.of();
         };
     }
 
     /**
-     * 首件检验单(与 {@code ButtonService.firstInspGenerate} 原实现同一套字段):
-     * 头照抄报工行 + 工单行;明细按《成型工艺清单》RD_MOLD_PROC 预铺;
-     * 生产日期/批号由工单行**首批完工**时回填(见 {@link FirstInspBackfill}),出单时不写死今天。
+     * 首件检验单(2026-11-12:成型**当天首笔报工**即出,一天一张;头照抄报工行 + 工单行):
+     * <ul>
+     *   <li>「单据日期 / 检验日期」= 该报工的**报工日期**({@code yyyy-MM-dd},每天一个生产批次),
+     *       不是服务器当天 —— 补录/跨零点审核时纸面日期跟着业务日期走;</li>
+     *   <li>「报工数量」= 触发本次出单的那笔报工数量(当天首笔成型报工);</li>
+     *   <li>明细按《成型工艺清单》RD_MOLD_PROC 预铺;</li>
+     *   <li>生产日期/批号由工单行**首批完工**时回填(见 {@link FirstInspBackfill})——出单时先留空,
+     *       2026-11-12 用户口径「先做后回填」。</li>
+     * </ul>
      */
     private Map<String, Object> firstInspHead(Map<String, Object> r, Map<String, Object> p, String op,
-                                              int xc, double done, String repNo) {
-        String today = LocalDate.now().toString();
+                                              int xc, double qty, String repNo, String day) {
         String wo = str(r.get("工单号"));
         String productCode = firstNonBlank(str(r.get("产品编码")), str(p.get("dm")));
         String batch = str(r.get("批次号"));
 
         Map<String, Object> head = new LinkedHashMap<>();
-        head.put("单据日期", today);
-        head.put("检验日期", today);
+        head.put("单据日期", day);
+        head.put("检验日期", day);
         head.put("工单号", wo);
         if (xc != 0) head.put("工单行号", xc);
         if (!repNo.isBlank()) head.put("报工单号", repNo);
@@ -245,7 +287,7 @@ public class QcInspAutoService {
             String shop = lineShop(line);
             if (shop != null) head.put("生产车间", shop);
         }
-        head.put("报工数量", round(done));
+        head.put("报工数量", round(qty));
         FirstInspItems.Result items = FirstInspItems.load(jdbc, productCode);
         if (items.docNo() != null) head.put("工艺清单单号", items.docNo());
         head.put("detail", Map.of("items", items.rows()));
@@ -363,7 +405,11 @@ public class QcInspAutoService {
                         + " ISNULL(s.[批次号],N'') AS 批次号, ISNULL(s.[工单行号],0) AS 行号,"
                         + " ISNULL(s.gd_id,0) AS gd_id, ISNULL(s.[报工单号],N'') AS 报工单号,"
                         + " ISNULL(s.scx,N'') AS 生产线, ISNULL(s.wzdm,N'') AS 产品编码,"
-                        + " ISNULL(s.mc,N'') AS 产品名称, ISNULL(s.gg,N'') AS 规格型号"
+                        + " ISNULL(s.mc,N'') AS 产品名称, ISNULL(s.gg,N'') AS 规格型号,"
+                        // 报工日期(2026-11-12 首件按天出单用):与 WorkOrderDayPlanService.actualByDate
+                        // 同一口径 —— 单据日期(sc_date)→ 完工时刻(wgsj)→ 录入时刻(asp_time1) 逐级回落,
+                        // 别让没填单据日期的老报工在日期维度上消失。
+                        + " CONVERT(varchar(10), CAST(COALESCE(s.sc_date, s.wgsj, s.asp_time1) AS date), 120) AS 报工日期"
                         + " FROM dbo.scjl s WHERE s.id=? AND ISNULL(s.asp_cancel,'N')<>'Y'",
                 scjlId);
         return rows.isEmpty() ? null : rows.get(0);
@@ -456,6 +502,24 @@ public class QcInspAutoService {
                 "SELECT COUNT(*) FROM dbo." + table + " WHERE 工单号=? AND ISNULL(工单行号,0)=?"
                         + " AND ISNULL(asp_cancel,'N')<>'Y'",
                 Integer.class, wo, xc);
+        return n != null && n > 0;
+    }
+
+    /**
+     * 该面板在该工单行上**某一天**是否已有存活单(首件检验单「每天一张」的幂等键,2026-11-12)。
+     *
+     * <p>日期取单据头「单据日期」({@code qc_first_insp_head.单据日期} 实测是 {@code date} 列);
+     * {@code day} 由 Java 侧按业务日期算好传 {@code yyyy-MM-dd},SQL 侧 {@code CAST(? AS date)}
+     * —— **不用 {@code GETDATE()}**:SQL Server 在 Docker 里是 UTC,取当天会错日
+     * (与 {@code WoReportService} 墙钟口径同一教训)。</p>
+     */
+    private boolean existsLiveOnDay(String panel, String wo, int xc, String day) {
+        String table = HEAD_TABLE.get(panel);
+        if (table == null) return false;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo." + table + " WHERE 工单号=? AND ISNULL(工单行号,0)=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 = CAST(? AS date)",
+                Integer.class, wo, xc, day);
         return n != null && n > 0;
     }
 

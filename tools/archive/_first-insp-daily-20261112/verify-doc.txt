@@ -1,0 +1,12 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== _verify.sql ==
+  | SJ-2026-11-0003 | 1 | 成型 | 2026-11-11 | 2026-11-11 | 10.0000 |  |  |  | 2026-11-12 23:49:56 | 
+  | SJ-2026-11-0004 | 1 | 成型 | 2026-11-12 | 2026-11-12 | 1.0000 |  |  |  | 2026-11-12 23:50:11 | 
+  | ZC-2026-11-0004 | 成型 | 2026-11-12 | 1001.0000 | 
+  | ZJ-2026-11-0006 | 组装 | 2026-11-12 | 1001.0000 | 
+  | ASM_ENTRY | GD-TEST-FIRST-261112 | GD-TEST-FIRST-261112#1 | QC_ASM_INSP | ZJ-2026-11-0006 | ACTIVE | 
+  | SCJL | 4392 | SCJL#4392 | QC_FIRST_INSP | SJ-2026-11-0003 | ACTIVE | 
+  | SCJL | 4393 | SCJL#4393 | QC_FIRST_INSP | SJ-2026-11-0004 | ACTIVE | 
+  | SCJL | 4392 | SCJL#4392 | QC_PROC_INSP | ZC-2026-11-0004 | ACTIVE | 
+  | 2 | 1 | 1 | 1 | 1 | 1001.0 | 
+[OK] _verify.sql (1 batches)

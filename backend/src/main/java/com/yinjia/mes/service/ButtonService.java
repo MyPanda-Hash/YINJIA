@@ -2725,8 +2725,10 @@ public class ButtonService {
                 }
             }
         }
-        // 工序检验单:报工审核 → 按「该工序累计报工 ≥ 计划量」出草稿(成型→首件+制程;组装→组装成品;
-        // 2026-10-18 起判据在 QcInspAutoService,手机端吸收也走同一份)
+        // 工序检验单(2026-11-12 三张单时机各不同,判定统一在 QcInspAutoService,手机端吸收走同一份):
+        //   首件 QC_FIRST_INSP  = 成型**当天首笔报工**即出(一天一张,不等达标)
+        //   制程 QC_PROC_INSP   = 成型累计已审报工 ≥ 该道计划量(不变)
+        //   表观 QC_ASM_INSP    = 进入组装/装箱环节即出(判据 AsmInspEntry)
         woInspGenerate(def.code(), no, user);
         // 最后一道工序报工审核 → 按日期批次自动生成产成品入库单草稿(2026-11-12 phase2b)
         finishInDraftFromReport(def.code(), no, user);
@@ -4258,17 +4260,21 @@ public class ButtonService {
             "QC_PROC_INSP", "qc_proc_insp_head");
 
     /**
-     * 报工单审核 → 按**报工量达标**自动生成检验单草稿(判据/单头组装都在 {@link QcInspAutoService})。
+     * 报工单审核 → 自动生成检验单草稿(判据/单头组装都在 {@link QcInspAutoService})。
      *
      * <p>2026-10-18 口径变更(用户原话):「手机端报工是直接写入当前数据库表……检验单生成的形式
      * 修改为当前排产转产线相同的形式实现,**只要当前报工数量达到当前要求就可以进入到下一步**」
-     * ⇒ 触发点从「本批第一张报工」「组装报工审核」改为「**该工序累计已报工量 ≥ 该道计划量**」,
-     * 与转序 {@code applyNextProcess} 同一个达标口径;手机端/外部直写走
-     * {@link ExternalReportAbsorbService} 调 {@link #generateInspFromReportRow(long, String)}。</p>
+     * ⇒ 手机端/外部直写走 {@link ExternalReportAbsorbService} 调
+     * {@link #generateInspFromReportRow(long, String)},与报工审核共用同一份判定。</p>
      *
-     * <p>2026-11-12:出货检验表观 {@code QC_ASM_INSP} **脱离**这套「达计划量」判据,改由
-     * 「进入组装/装箱环节即出单」触发(判据 {@code AsmInspEntry})—— 同一条报工审核钩子里,
-     * 首件/制程仍按量判,表观单按进入判;两条互不绑定。</p>
+     * <p>🔴 2026-11-12 口径(用户逐条拍板,三张单的时机各不相同):
+     * <ul>
+     *   <li>**首件** {@code QC_FIRST_INSP}:成型**当天首笔报工**即出,**一天一张**
+     *       (用户原话「按每天一个生产批次吧,就是每天的第一个工序报工一次后就产生」)—— 不再等达计划量;</li>
+     *   <li>**制程** {@code QC_PROC_INSP}:仍按「成型累计已报工 ≥ 该道计划量」(用户原话「制程的先不处理」);</li>
+     *   <li>**出货检验表观** {@code QC_ASM_INSP}:脱离数量判据,改由「进入组装/装箱环节即出单」
+     *       (判据 {@code AsmInspEntry})。三条互不绑定,同一条报工审核钩子里各判各的。</li>
+     * </ul>
      */
     private void woInspGenerate(String panelCode, String repNo, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
@@ -4329,17 +4335,23 @@ public class ButtonService {
                             + " VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
                     srcPanel, srcNo, srcLine, d.panelCode(), no, user);
             nos.add(d.panelCode() + " " + no);
-            log.info("[工序检验] {} {} ⇒ 生成 {} {} 草稿",
-                    entry ? "进入组装/装箱" : ("达计划量(累计报工 " + r.done() + ")"),
-                    entry ? srcNo : r.op(), d.panelCode(), no);
+            log.info("[工序检验] {} {} ⇒ 生成 {} {} 草稿", triggerOf(r, d, entry, srcNo), r.op(), d.panelCode(), no);
         }
         return nos;
     }
 
+    /** 自动出单日志里的「触发口径」一句话(三张单时机不同:首件按天 / 制程达标 / 表观进入组装,2026-11-12) */
+    private static String triggerOf(QcInspAutoService.Result r, QcInspAutoService.Draft d,
+                                    boolean entry, String srcNo) {
+        if (entry) return "进入组装/装箱 " + srcNo;
+        if (QcInspAutoService.FIRST_PANEL.equals(d.panelCode())) return "成型当天首笔报工";
+        return "达计划量(累计报工 " + r.done() + ")";
+    }
+
     // 【已迁移】firstInspGenerate(报工审核 → 首件检验单草稿)——
-    //   2026-10-18 起判据与单头组装统一收到 {@link QcInspAutoService}(成型累计报工 ≥ 计划量才出单,
-    //   手机端吸收与报工审核共用同一份实现),本类不再保留第二份。首件/制程/组装三个面板的
-    //   幂等键统一为「工单号 + 工单行号」。
+    //   2026-10-18 起判据与单头组装统一收到 {@link QcInspAutoService}(手机端吸收与报工审核共用同一份实现),
+    //   本类不再保留第二份。2026-11-12 起首件改「成型当天首笔报工即出、一天一张」,
+    //   幂等键 = 工单号 + 工单行号 + 单据日期(制程仍是 工单号 + 工单行号)。
 
     // 【已删除】finSpecGenerate(组装报工审核 → 生成「成品检验规范 QC_FIN_SPEC」空格式草稿)——
     //   2026-10-16 用户口径「删除…以及成品检验规范」,面板与 qc_fin_spec_head/_detail 已随
