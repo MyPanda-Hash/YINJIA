@@ -2139,6 +2139,8 @@ export default {
     '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Chứng từ này đã được chuyển sang ERP ({no}), không thể chuyển lại. Nếu muốn chuyển lại, hãy bỏ duyệt rồi duyệt lại.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Chuyển hàng loạt sang ERP hoàn tất: thành công {ok}, đã chuyển và bỏ qua {skip}, thất bại {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'Yêu cầu chuyển sang ERP đã quá thời gian: máy chủ có thể vẫn đang chuyển. Hãy làm mới danh sách sau và kiểm tra "Đã chuyển sang ERP" trước khi thao tác lại; đừng bấm lại ngay.',
+    '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "Chứng từ đang được chuyển sang ERP (đang kết nối Kingdee, thường mất vài giây). Vui lòng không nhấp lại; số ERP sẽ hiển thị trong danh sách khi hoàn tất",
+    '批量转ERP正在执行，请等待本批完成，勿重复点击': "Đang chạy chuyển hàng loạt sang ERP; hãy chờ đợt này xong và không nhấp lại",
     '供应商/客户': 'Nhà cung cấp/Khách hàng',
     '暂无已审核且未转ERP的单据': 'Không có tài liệu nào đã được xem xét và chưa được chuyển giao cho ERP',
     '材料二维码标签': 'Nhãn mã QR vật liệu',

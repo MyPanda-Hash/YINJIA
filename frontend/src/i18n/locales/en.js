@@ -5766,6 +5766,8 @@ export default {
     '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'This document has already been pushed to ERP ({no}) and cannot be pushed again. To push it again, first un-approve it and then approve it again.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Batch push to ERP finished: succeeded {ok}, already pushed and skipped {skip}, failed {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'ERP push timed out: the server may still be pushing. Refresh the list later and check "Pushed to ERP" before acting again — do not click again right away.',
+    '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "This document is being pushed to ERP (connecting to Kingdee, usually 10-20 seconds). Please do not click again; the ERP number will appear in the list when it finishes",
+    '批量转ERP正在执行，请等待本批完成，勿重复点击': "Batch push to ERP is running; wait for this batch to finish and do not click again",
     '制程检验单(成型产出)': 'Process inspection (moulding output)',
     '生产扫码登记': 'Production Scan Registration',
     '实验室记录手机登记': 'Lab Records Mobile Entry',

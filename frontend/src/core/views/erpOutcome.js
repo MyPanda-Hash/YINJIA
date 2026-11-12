@@ -37,6 +37,23 @@ export const ERP_CALL_TIMEOUT_MS = 180000
 export const ERP_TIMEOUT_KEY = '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点'
 
 /**
+ * 「上一次转ERP 还没结束」的中文键(2026-11-12 客户报障「点了两下就生成两个入库单」)。
+ *
+ * 背景:转ERP 要连金蝶(冷启动十几秒很常见),原来的按钮**点一下不灰** ⇒ 用户看没反应就再点一次,
+ * 两个请求几乎同时进后端,都读到「是否已转ERP=否」⇒ 金蝶落两张入库单(重复入库)。
+ * 现在前端在推送期间把按钮置灰(本键=点击时的解释文案),服务端另有单号级互斥兜底
+ * (KingdeePushService.pushDocument),两边同时点、开两个标签页也只会推一次。
+ */
+export const ERP_BUSY_KEY = '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号'
+
+/**
+ * 「批量转ERP 正在跑」的中文键。
+ * 批量弹窗里的「开始转ERP」也是连点高发区:上一批没跑完再点一次 = 把同一批单据**并行再推一遍**,
+ * 与单张双击是同一种重复入库风险。按钮本身已带 loading,这里再兜一层。
+ */
+export const ERP_BATCH_BUSY_KEY = '批量转ERP正在执行，请等待本批完成，勿重复点击'
+
+/**
  * 判定一次「转ERP」调用的结果。
  * @param {any} res 服务端 `callButton` 返回的 data(可能为 null:老 jar / 异常路径)
  * @returns {{already:boolean, level:'success'|'warning', erpNo:string, key:string}}
@@ -80,4 +97,18 @@ export function erpFailureOutcome(err) {
   const isTimeout = err?.code === 'ECONNABORTED' || /timeout/i.test(msg)
   if (isTimeout) return { timeout: true, level: 'warning', key: ERP_TIMEOUT_KEY }
   return { timeout: false, level: 'error', key: '' }
+}
+
+/**
+ * 「这次点击该不该被拦下」的唯一判据(列表页/表单页共用,避免两处各写一遍又慢慢走偏)。
+ *
+ * 为什么单独抽出来:重复入库这道闸最怕"某天有人只改了一边"。抽成纯函数后
+ * erpOutcome.test.js 能直接钉住(组件只负责把 erpPushing 传进来)。
+ *
+ * @param {string} action    按钮动作名
+ * @param {boolean} pushing  该单据是否有一次转ERP 正在飞
+ * @returns {boolean} true = 拦下(不发请求)
+ */
+export function erpClickBlocked(action, pushing) {
+  return action === '转ERP' && pushing === true
 }

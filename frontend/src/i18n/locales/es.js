@@ -2134,6 +2134,8 @@ export default {
     '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Este documento ya fue transferido a ERP ({no}) y no puede transferirse de nuevo. Para volver a transferirlo, anule primero la aprobación y vuelva a aprobarlo.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Transferencia por lotes a ERP completada: correctos {ok}, ya transferidos omitidos {skip}, fallidos {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'La solicitud de transferencia a ERP agotó el tiempo: el servidor puede seguir transfiriendo. Actualice la lista más tarde y compruebe "Transferido a ERP" antes de volver a actuar; no haga clic de nuevo de inmediato.',
+    '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "Este documento se está transfiriendo a ERP (conectando con Kingdee, normalmente unos segundos). No haga clic de nuevo; el número ERP aparecerá en la lista al terminar",
+    '批量转ERP正在执行，请等待本批完成，勿重复点击': "La transferencia por lotes a ERP está en ejecución; espere a que termine este lote y no vuelva a hacer clic",
     '供应商/客户': 'Proveedor/cliente',
     '暂无已审核且未转ERP的单据': 'No hay documentos auditados y no transferidos a ERP',
     '材料二维码标签': 'Etiqueta de código QR de material',

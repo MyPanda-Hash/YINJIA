@@ -405,7 +405,7 @@ import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 // 「删除」结果提示口径(2026-11-04):只认服务端回写的真实状态,不许无条件报"已删除"
 import { deleteOutcome } from './deleteOutcome.js'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, erpClickBlocked } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -574,6 +574,12 @@ function filterGroups(raw) {
 
 const loading = ref(false)
 const saving = ref(false)
+/**
+ * 转ERP 推送中(2026-11-12 客户报障「转ERP 反应好慢,点了两下就生成两个入库单」)。
+ * 表单页的转ERP 与列表页同款:推送期间按钮置灰 + 再点只弹提示。
+ * 服务端 KingdeePushService.pushDocument 另有单号级互斥,兜住前端管不到的情况(两个标签页/两台电脑)。
+ */
+const erpPushing = ref(false)
 const payloadCache = ref(null)
 const approvalVisible = ref(false)
 const approvalNo = ref('')
@@ -800,6 +806,8 @@ function fieldLocked(r) {
 
 function isDisabled(action) {
   const s = status.value
+  // 转ERP 正在推送中(连金蝶,十几秒很常见):这一次没结束前不许再点 —— 重复点击 = 重复入库
+  if (erpClickBlocked(action, erpPushing.value)) return true
   const map = {
     保存: !editable.value,
     保存新增: !editable.value,
@@ -833,6 +841,9 @@ function isDisabled(action) {
  */
 function disabledReason(action) {
   const s = status.value
+  // 转ERP 推送中:说清"正在推,别重复点"(否则只是灰着,用户以为按钮坏了)。
+  // 必须排在 saving 之前 —— 转ERP 也走 saving 那套 finally,不排前面只会说成"正在保存"
+  if (erpClickBlocked(action, erpPushing.value)) return tt(ERP_BUSY_KEY)
   if (saving.value) return tt('正在保存，请稍候')
   // 新增态还没建单:审核/弃审/删除/修改都点不动,原因不是状态而是「这张单还不存在」
   if (!isEdit.value) return tt('该单据尚未保存') + '，' + '「' + tt(action) + '」' + tt('不可用')
@@ -1236,6 +1247,9 @@ async function onButton(action) {
   // 2026-08-25：灰按钮（disabled）点击不执行；
   // 2026-10-13：改为「不执行 + 说清为什么点不动」(与列表页同口径)
   if (isDisabled(action)) { warnDisabled(action); return }
+  // 转ERP 未结束前再点一律拦下(2026-11-12 客户报障「点两下生成两个入库单」);
+  // isDisabled 已置灰,这里再拦一道防"置灰样式还没刷新就被连点"的竞态。
+  if (erpClickBlocked(action, erpPushing.value)) { ElMessage.warning(tt(ERP_BUSY_KEY)); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
   }
@@ -1379,6 +1393,8 @@ async function onButton(action) {
     return
   }
   saving.value = true
+  // 转ERP 推送期间置"进行中":按钮随即置灰(见 isDisabled/disabledReason),连点不会发第二次请求
+  if (action === '转ERP') erpPushing.value = true
   try {
     const rd = { ...form }
     if (tabs.value.length) rd.detail = { ...detailData }
@@ -1455,6 +1471,8 @@ async function onButton(action) {
     else ElMessage.error(msg)
   } finally {
     saving.value = false
+    // 无论成败都要放开:卡在 true 会让转ERP 按钮永久点不动
+    if (action === '转ERP') erpPushing.value = false
   }
 }
 

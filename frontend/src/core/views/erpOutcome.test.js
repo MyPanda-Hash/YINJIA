@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_ALREADY_KEY, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, erpClickBlocked, ERP_ALREADY_KEY, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_TIMEOUT_KEY } from './erpOutcome.js'
 
 /**
  * 「转ERP」结果提示(2026-11-09 用户报障):
@@ -89,4 +89,34 @@ test('普通失败(服务端报错)保持 error,不冒充超时', () => {
 
 test('转ERP 的请求超时必须比默认 15s 宽(金蝶取 token + 保存可能远超)', () => {
   assert.ok(ERP_CALL_TIMEOUT_MS >= 60000, '15s 默认值会把"推成功但慢"错报成失败')
+})
+
+/**
+ * 「推送中点第二下」的文案(2026-11-12 客户报障「转ERP 反应好慢,有时点了两下就生成两个入库单」)。
+ *
+ * 这条文案是前端置灰按钮时唯一的解释来源:必须让用户明白 ①正在推、②别重复点、③结果以后看列表。
+ * 光靠灰按钮不说原因 = 用户以为按钮坏了,反而更会去点。
+ */
+test('推送中的提示:说清"正在连金蝶/别重复点/完成后看列表",不能只是"请稍候"', () => {
+  assert.ok(ERP_BUSY_KEY.includes('正在转ERP'))
+  assert.ok(ERP_BUSY_KEY.includes('请勿重复点击'), '必须直接说"请勿重复点击" —— 重复点=重复入库')
+  assert.ok(ERP_BUSY_KEY.includes('金蝶'), '要让用户知道慢的原因是在等金蝶')
+  assert.ok(ERP_BUSY_KEY.includes('ERP 单号'), '要告诉用户结果去哪看(列表里的 ERP 单号)')
+  assert.notEqual(ERP_BUSY_KEY, ERP_TIMEOUT_KEY, '与"请求超时"是两件事,别复用同一句')
+})
+
+/**
+ * 拦截判据(列表页与表单页共用,2026-11-12)。
+ * 只要「这一次转ERP 还在飞」,同一个按钮的第二次点击必须被拦下 —— 这是前端这一侧唯一的口径,
+ * 两个组件都调它,避免"只改了一边"。
+ */
+test('erpClickBlocked:转ERP 在飞时拦下,飞完放行;别的动作一律不受影响', () => {
+  assert.equal(erpClickBlocked('转ERP', true), true, '在飞 ⇒ 拦')
+  assert.equal(erpClickBlocked('转ERP', false), false, '没在飞 ⇒ 放行(第一次点击)')
+  // 不能误伤其它按钮:批量转ERP/审核/保存 都照常
+  for (const a of ['批量转ERP', '审核', '保存', '弃审', '删除']) {
+    assert.equal(erpClickBlocked(a, true), false, `「${a}」不能被转ERP 的进行中状态影响`)
+  }
+  // 值不是严格 true(未初始化/undefined)时不拦 —— 宁可漏拦(服务端还有单号级互斥),也不能把按钮卡死
+  assert.equal(erpClickBlocked('转ERP', undefined), false)
 })

@@ -2706,7 +2706,7 @@ import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_BATCH_BUSY_KEY, erpClickBlocked } from './erpOutcome.js'
 // 库存口径提示(2026-11-10「库存以金蝶为准」):审核/审批通过后按后端给的码补一句说明
 import { stockHintText } from './stockHint.js'
 
@@ -2990,8 +2990,22 @@ const batchErpVisible = ref(false)
 const batchErpList = ref([])
 const batchErpSel = ref([])
 const batchErpLoading = ref(false)
+/** 查询可转单据进行中(防双击弹出两个弹窗 / 重复查询) */
+const batchErpQuerying = ref(false)
+
+/**
+ * 转ERP 推送中(2026-11-12 客户报障「转ERP 反应好慢,有时点了两下就生成两个入库单,有重复入库的风险」)。
+ *
+ * 转ERP 要连金蝶取 token 再保存单据,慢的时候十几秒;按钮原来**点一下不灰**,
+ * 用户看没反应就再点一次 ⇒ 两个请求几乎同时进服务端、都读到「是否已转ERP=否」⇒ 金蝶落两张入库单。
+ * 这里挡住前端这一侧(推送期间按钮置灰 + 再点只弹提示),服务端 KingdeePushService.pushDocument
+ * 另有**单号级互斥**兜住"两个标签页/两台电脑/超时后再点"这些前端管不到的情况。
+ */
+const erpPushing = ref(false)
 
 async function openBatchErp() {
+  if (batchErpQuerying.value) return
+  batchErpQuerying.value = true
   try {
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '查询可转ERP', formData: {}, buttonParam: {} })
     batchErpList.value = (res?.list || []).map((r) => ({ ...r, result: '' }))
@@ -3000,11 +3014,15 @@ async function openBatchErp() {
     if (!batchErpList.value.length) ElMessage.info('暂无已审核且未转ERP的单据')
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  } finally {
+    batchErpQuerying.value = false
   }
 }
 
 async function doBatchErp() {
   if (!batchErpSel.value.length) return
+  // 防重复开始:上一批没跑完时再点会**并行再推一遍**同样的单据(同样的重复入库风险)
+  if (batchErpLoading.value) return ElMessage.warning(tt(ERP_BATCH_BUSY_KEY))
   batchErpLoading.value = true
   let ok = 0, skip = 0, fail = 0
   for (const row of batchErpSel.value) {
@@ -10283,6 +10301,8 @@ async function loadCrg() {
 
 function isDisabled(action) {
   const st = current.value?.['单据状态']
+  // 转ERP 正在推送中(连金蝶,十几秒很常见):这一次没结束前不许再点 —— 重复点击 = 重复入库
+  if (erpClickBlocked(action, erpPushing.value)) return true
   const map = {
     新增: false, // 单单据面板新增按钮不置灰
     删除: !current.value,
@@ -10356,6 +10376,8 @@ function disabledReason(action) {
   const st = current.value?.['单据状态']
   const stText = st ? tt(String(st)) : tt('未知')
   if (inlineSaving.value) return tt('正在保存，请稍候')
+  // 转ERP 推送中:说清"正在推,别重复点"(否则只是灰着,用户以为按钮坏了)
+  if (erpClickBlocked(action, erpPushing.value)) return tt(ERP_BUSY_KEY)
   if (action === '扫描填单' && reportMode.value) return tt('报表为只读，不可编辑')
   if (!current.value) return tt('请先选择一张单据')
   // 保存类:draftEditable 为假的四种成因,按优先级逐档说清
@@ -10733,6 +10755,9 @@ async function onButton(action) {
   // 2026-08-25：灰按钮（disabled）点击不执行；
   // 2026-10-13 用户报障「点了『保存为草稿』没反应，以为保存了草稿也不给编辑」⇒ 补一次原因提示
   if (isDisabled(action)) { warnDisabled(action); return }
+  // 转ERP 未结束前再点一律拦下(2026-11-12 客户报障「点两下生成两个入库单」)。
+  // isDisabled 已经把按钮置灰,这里再拦一道是防"置灰样式还没刷新出来就被连点"的竞态。
+  if (erpClickBlocked(action, erpPushing.value)) { ElMessage.warning(tt(ERP_BUSY_KEY)); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
   }
@@ -11590,6 +11615,8 @@ async function onButton(action) {
       const saved = await saveInlineDraft('保存', { silent: true, reason: action })
       if (!saved) return
     }
+    // 转ERP 推送期间置"进行中":按钮随即置灰(见 isDisabled/disabledReason),连点不会发第二次请求
+    if (action === '转ERP') erpPushing.value = true
     const res = await engine.callButton({
       panelCode: panelCode.value,
       buttonName: action,
@@ -11688,6 +11715,9 @@ async function onButton(action) {
     focusMissingField(missingKeyFromMessage(msg))
     if (msg.includes('演示环境暂未实现')) ElMessage.info(msg)
     else ElMessage.error(msg)
+  } finally {
+    // 无论成败都要放开:卡在 true 会让这张单的转ERP 按钮永久点不动
+    if (action === '转ERP') erpPushing.value = false
   }
 }
 
