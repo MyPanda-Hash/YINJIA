@@ -1620,7 +1620,7 @@
             顶部四栏互为筛选项(所属类别/存货编码/存货名称/规格型号),
             勾选后 物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 落行。
             数量**不带**(商品档案没有用量口径)。 -->
-    <el-dialog v-model="matPickVisible" :title="tt(matPickTitle)" width="900px" append-to-body>
+    <el-dialog v-model="matPickVisible" :title="tt(matPickTitle)" width="1040px" append-to-body class="gp-dialog">
       <!-- ── 源 ①:物料清单单(表头),整单带入子件 ── -->
       <template v-if="matPickSource === 'mate'">
         <el-table v-loading="matPickLoading" :data="matPickRows" size="small" border max-height="420"
@@ -1637,48 +1637,57 @@
       </template>
       <!-- ── 源 ②:商品档案(四栏级联收窄 + 勾选落行)── -->
       <template v-else>
+        <!-- 筛选区(2026-11-12 用设计库重排)：
+             原布局把「搜索 + 四栏 + 清空」全塞进一个会换行的 flex 行，label 与控件挤在一排、
+             每栏后面还各挂一句「还有 N 项…」，六列弹窗里横向被撑得七零八落。
+             按 antd 列表页模板「筛选区在最上方、总体→具体」分两段：
+               第 1 行 = 关键字搜索（总体） + 右侧「清空筛选」（次要动作靠右）
+               第 2 行 = 四个等宽下拉（具体），label 放控件上方（12px colorTextTertiary）
+             取值全部来自设计库 token：padding 16 / marginXS 8 / fontSizeSM 12 /
+             colorFillAlter rgba(0,0,0,.02) / colorBorder #d9d9d9 / borderRadius 6。 -->
         <div class="gp-bar">
-          <!-- 自由文本搜索(2026-11-12):顶部四栏是下拉且候选被截断(存货编码 3983 个,下拉只给 300)
-               ⇒ 在下拉里敲编号常常"明明有却搜不到"。这个输入框直接在**全部商品行**上模糊匹配
-               存货编码/存货名称/规格型号/所属类别/计量单位,与四栏筛选是 AND 关系。 -->
-          <div class="gp-filter gp-filter-kw">
-            <span class="gp-filter-label">{{ tt('搜索') }}</span>
+          <div class="gp-bar-top">
             <el-input
               v-model="matPickKeyword"
-              size="small"
+              class="gp-search"
               clearable
-              :placeholder="tt('存货编码 / 名称 / 规格型号，直接输入即可')"
-              class="gp-filter-input"
-            />
-          </div>
-          <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
-            <span class="gp-filter-label">{{ tt(f.key) }}</span>
-            <el-select
-              v-model="matPickFilters[f.key]"
-              size="small"
-              filterable
-              clearable
-              :placeholder="tt('全部')"
-              class="gp-filter-select"
+              :placeholder="tt('搜索存货编码 / 名称 / 规格型号')"
             >
-              <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
-            </el-select>
-            <span v-if="f.more" class="gp-more">{{ tt('还有 {n} 项，输入关键字筛选').replace('{n}', String(f.more)) }}</span>
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
+            <el-button text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
           </div>
-          <el-button size="small" text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
+          <div class="gp-bar-facets">
+            <div v-for="f in matPickFacets" :key="f.key" class="gp-facet">
+              <span class="gp-facet-label">{{ tt(f.key) }}</span>
+              <el-select
+                v-model="matPickFilters[f.key]"
+                filterable
+                clearable
+                :placeholder="tt('全部')"
+                class="gp-facet-select"
+                :title="f.more ? tt('候选项较多，已省略 {n} 项；直接在左侧搜索框输入关键字更准').replace('{n}', String(f.more)) : ''"
+              >
+                <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
+              </el-select>
+            </div>
+          </div>
         </div>
         <el-table v-loading="matPickLoading" :data="matPickFiltered" size="small" border max-height="420"
                   row-key="__k" @selection-change="onMatPickSelection">
           <el-table-column type="selection" width="42" />
-          <el-table-column prop="所属类别" :label="tt('所属类别')" width="130" show-overflow-tooltip />
-          <el-table-column prop="存货编码" :label="tt('存货编码')" width="150" show-overflow-tooltip />
-          <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="230" show-overflow-tooltip />
-          <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="190" show-overflow-tooltip />
+          <!-- 列宽(2026-11-12 重排)：把弹性宽度留给**存货名称**——它是勾选时唯一要读的内容；
+               备注往往是空的，给固定 140 即可，别让它跟名称抢空间（原来三个 min-width
+               一起分剩余宽度，备注反而比名称宽）。 -->
+          <el-table-column prop="所属类别" :label="tt('所属类别')" width="120" show-overflow-tooltip />
+          <el-table-column prop="存货编码" :label="tt('存货编码')" width="160" show-overflow-tooltip />
+          <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="规格型号" :label="tt('规格型号')" width="170" show-overflow-tooltip />
           <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" align="center" />
-          <el-table-column prop="备注" :label="tt('备注')" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="备注" :label="tt('备注')" width="140" show-overflow-tooltip />
         </el-table>
       </template>
-      <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
+      <div class="gp-foot-hint">{{ matPickHint }}</div>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" @click="confirmMaterialPick">{{ tt('引用') }}({{ matPickChecked.length }})</el-button>
@@ -6261,13 +6270,35 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   gap: 8px 16px;
   margin-bottom: 10px;
 }
-.gp-filter { display: flex; align-items: center; gap: 6px; }
-.gp-filter-label { font-size: 12px; color: #606266; white-space: nowrap; }
-.gp-filter-select { width: 190px; }
-/* 关键字搜索框(2026-11-12)：比四栏略宽一点，放第一位，一眼看到"这儿能直接搜编号" */
-.gp-filter-kw { margin-right: 6px; }
-.gp-filter-input { width: 260px; }
-.gp-more { font-size: 11px; color: #c0c4cc; }
+/* ── 商品引用弹窗筛选区(2026-11-12 按设计库重排) ──────────────────────────
+   取值：padding 16 / marginXS 8 / borderRadius 6 / colorFillAlter rgba(0,0,0,.02) /
+        colorBorder #d9d9d9 / colorTextTertiary rgba(0,0,0,.45) / fontSizeSM 12。
+   分两段：搜索（总体）一行 + 四栏等宽（具体）一行，label 在控件上方。 */
+.gp-bar {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.gp-bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.gp-search { width: 360px; }
+.gp-bar-facets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.gp-facet { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gp-facet-label { font-size: 12px; line-height: 20px; color: rgba(0, 0, 0, 0.45); }
+.gp-facet-select { width: 100%; }
+/* 表格下方那行统计：左对齐小字，与筛选区同色系 */
+.gp-foot-hint { margin-top: 12px; font-size: 12px; line-height: 20px; color: rgba(0, 0, 0, 0.45); }
 .pp-foot { margin-top: 6px; font-size: 12px; color: #909399; }
 /* 行的三种态:已开发(不可选,压灰)/ 当前待引用(高亮)/ 普通。
    ⚠ 必须走 .pp-body :deep(...) —— el-table 的行由组件自己渲染,拿不到本组件的

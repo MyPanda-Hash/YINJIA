@@ -131,7 +131,10 @@ test('matchKeyword：直接在全量行上模糊匹配，不受下拉 300 项上
 
 test('BOM 导入弹窗必须有自由文本搜索框，且走 matchKeyword（而非只靠下拉）', () => {
   const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
-  assert.match(sheet, /class="gp-filter-input"/, '弹窗里要有搜索输入框')
+  assert.match(sheet, /class="gp-search"/, '弹窗里要有搜索输入框')
+  // 2026-11-12 按设计库重排：四栏改成等宽栅格 + label 在上（原来是 label/控件挤一行的 flex）
+  assert.match(sheet, /class="gp-bar-facets"/, '四栏要用等宽栅格承载')
+  assert.match(sheet, /class="gp-facet-label"/, '每栏 label 要独立一行')
   assert.match(sheet, /matPickKeyword/, '要有 matPickKeyword 状态')
   assert.match(sheet, /matchGoods\(matchKeyword\(matPickRows\.value, matPickKeyword\.value\), matPickFilters\)/,
     '过滤链必须先过关键字再过四栏（AND）')
