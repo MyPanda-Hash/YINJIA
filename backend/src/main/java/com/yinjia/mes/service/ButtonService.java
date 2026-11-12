@@ -2373,6 +2373,57 @@ public class ButtonService {
 
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
+    // ══════════════════════════════════════════════════════════════════════════════════
+    // 产成品入库单(FINISH_IN)与两张出货检验单的**关联门禁**(2026-11-12 用户口径)
+    //   用户原话:「修改当前的产成品入库,让他需要关联当前的出货检验功能记录表和出货检验表观,
+    //   当这两个完成后按照每天的批次实现对这个产成品入库单的入库数量进行填写和创建。」
+    //   确认口径:表头两个参照字段必填;两张单都必须**已审核**;本单批次必须同时出现在两张单的明细
+    //   「内部批次」里、且两单该批次的每一行都判「合格」才允许入库(任一行未判/不合格即拒绝)。
+    //   ⚠ 只门禁 MES 自建单(外部单据号为空):金蝶导入的历史入库单没有这两张检验单,不追溯。
+    //   ⚠ 只在 提交审批/审批通过/审核 三个**真正产生库存**的入口校验;保存草稿不拦(仓库可边填边存)。
+    // ══════════════════════════════════════════════════════════════════════════════════
+    private void assertFinishInInspLink(String no) {
+        if (no == null || no.isBlank()) return;
+        java.util.List<java.util.Map<String, Object>> hs = jdbc.queryForList(
+                "SELECT ISNULL(外部单据号,N'') AS ext, ISNULL(出货检验功能单号,N'') AS func,"
+                        + " ISNULL(出货检验表观单号,N'') AS look, ISNULL(批次号,N'') AS batch"
+                        + " FROM bd_finish_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+        if (hs.isEmpty()) return;   // 单据不存在由 ensureDocExists 兜底,这里不重复抛
+        java.util.Map<String, Object> h = hs.get(0);
+        String ext = String.valueOf(h.get("ext") == null ? "" : h.get("ext")).trim();
+        if (!ext.isEmpty()) return; // 金蝶导入的历史单:不纳入本门禁
+        String func = String.valueOf(h.get("func") == null ? "" : h.get("func")).trim();
+        String look = String.valueOf(h.get("look") == null ? "" : h.get("look")).trim();
+        String batch = String.valueOf(h.get("batch") == null ? "" : h.get("batch")).trim();
+        if (func.isEmpty() || look.isEmpty())
+            throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核");
+        if (batch.isEmpty())
+            throw new IllegalStateException("请先填写本单「批次号」(一张入库单对应一个生产日期批次)");
+        checkInspBatchAudited("出货检验功能", "QC_PROC_INSP", "qc_proc_insp_detail", func, batch);
+        checkInspBatchAudited("出货检验表观", "QC_ASM_INSP", "qc_asm_insp_detail", look, batch);
+    }
+
+    /** 单张检验单校验:已审核 + 该批次有记录 + 该批次所有行都判「合格」 */
+    private void checkInspBatchAudited(String label, String panel, String detailTable, String docNo, String batch) {
+        String status = String.valueOf(docStatusOf(panel, docNo).get("status"));
+        if (!"已审核".equals(status))
+            throw new IllegalStateException("「" + label + "」" + docNo + " 当前是「" + status + "」,必须已审核才能入库");
+        java.util.Map<String, Object> c = jdbc.queryForMap(
+                "SELECT COUNT(*) AS total,"
+                        + " SUM(CASE WHEN ISNULL([结果判断],N'') <> N'合格' THEN 1 ELSE 0 END) AS bad"
+                        + " FROM " + detailTable
+                        + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([内部批次],N'')=?",
+                docNo, batch);
+        long total = c.get("total") == null ? 0L : ((Number) c.get("total")).longValue();
+        long bad = c.get("bad") == null ? 0L : ((Number) c.get("bad")).longValue();
+        if (total == 0L)
+            throw new IllegalStateException("「" + label + "」" + docNo + " 里没有批次「" + batch + "」的检验记录,请核对批次号");
+        if (bad > 0L)
+            throw new IllegalStateException("批次「" + batch + "」在「" + label + "」里存在未判合格/不合格的检验项,不能入库");
+    }
+
+
+
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         // 直审收权(2026-09-22):直接「审核」仅管理员——此前与审批通过/驳回同口径(管理员 ∪ can_approve),
         // 有审批权的角色现在走 提交审批→审批通过(同效已审核,钩子同口径);前端审批下拉对非管理员同步隐藏
@@ -2382,6 +2433,7 @@ public class ButtonService {
         if (!def.isDoc()) throw new IllegalStateException("档案面板无审核动作");
         String no = requireNo(formData);
         ensureDocExists(def, no);
+        if ("FINISH_IN".equals(def.code())) assertFinishInInspLink(no);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if ("已作废".equals(st.get("status"))) throw new IllegalStateException("已作废单据不可审核");
         if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可审核，请先恢复");
@@ -2753,6 +2805,7 @@ public class ButtonService {
     private Map<String, Object> submitApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         ensureDocExists(def, no);
+        if ("FINISH_IN".equals(def.code())) assertFinishInInspLink(no);
         String operator = currentUserName();
         // 产品变更申请单(2026-09-21):提交审批 = 发起人(∪管理员)的动作;勾了「需会签=是」的单
         // 必须先会签全部通过才能送审(用户口径:会签通过才进审核)
@@ -2849,6 +2902,7 @@ public class ButtonService {
      */
     private Map<String, Object> approveApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
+        if ("FINISH_IN".equals(def.code())) assertFinishInInspLink(no);
         String operator = currentUserName();
         int node = pendingNodeOf(def.code(), no);
         if (node == 2) return approveSecond(def, no, operator, formData);
@@ -3014,6 +3068,7 @@ public class ButtonService {
      * 出厂检验报告 2026-11-04 接入、首件/制程检验单 2026-11-06 接入,口径同)。
      */
     private Map<String, Object> approveSecond(PanelRegistry.PanelDef def, String no, String operator, Map<String, Object> formData) {
+        if ("FINISH_IN".equals(def.code())) assertFinishInInspLink(no);
         if (ADMIN_L2_PANELS.contains(def.code())) {
             if (!isAdminUser(operator))
                 throw new org.springframework.security.access.AccessDeniedException(
