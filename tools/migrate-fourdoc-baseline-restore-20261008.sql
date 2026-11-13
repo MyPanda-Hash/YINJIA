@@ -17,8 +17,8 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git d965fc81e45c(sha256 d64fe3bf3b370d6e…)
- *   回正行数:QC_RECV=70 · QC_INSP=55 · QC_RETURN=39 · PURCHASE_IN=165(共 329 行)。
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 09429d3910fd(sha256 87396ec3ef37a363…)
+ *   回正行数:QC_RECV=73 · QC_INSP=58 · QC_RETURN=39 · PURCHASE_IN=165(共 335 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
  *   生成器:tools/archive/_gen-fourdoc-restore.mjs(手改本文件无效,请改生成器重跑)。
@@ -43,7 +43,7 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-/* ---------- ⓪ 基线行集(2026-10-03 dump,329 行) ---------- */
+/* ---------- ⓪ 基线行集(2026-10-03 dump,335 行) ---------- */
 IF OBJECT_ID('tempdb..#base') IS NOT NULL DROP TABLE #base;
 CREATE TABLE #base (
   ord           int           NOT NULL,
@@ -129,16 +129,19 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (58,N'QC_RECV',N'预计到货日期',N'预计到货日期',N'日期',NULL,N'GFDA',N'mc',N'mc',N'detail',340,120,1,0,0,NULL,1,NULL,NULL,NULL),
   (59,N'QC_RECV',N'备注',N'备注',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',350,200,1,0,0,NULL,1,NULL,NULL,NULL),
   (60,N'QC_RECV',N'现存量',N'现存量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',360,90,0,0,0,NULL,1,N'Current inventory',NULL,NULL),
-  (61,N'QC_RECV',N'仓库',N'仓库',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',370,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (62,N'QC_RECV',N'折扣金额',N'折扣金额',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',380,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (63,N'QC_RECV',N'条码',N'条码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'query,detail',390,140,1,0,1,NULL,0,NULL,NULL,NULL),
-  (64,N'QC_RECV',N'发货数量',N'发货数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',400,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (65,N'QC_RECV',N'剩余数量',N'剩余数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',410,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (66,N'QC_RECV',N'退料数量',N'退料数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',420,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (67,N'QC_RECV',N'报废数量',N'报废数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',430,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (68,N'QC_RECV',N'制单号',N'制单号',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',440,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (69,N'QC_RECV',N'品质复核人',N'品质复核人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'detail',450,100,1,0,1,NULL,0,NULL,NULL,NULL),
-  (70,N'QC_RECV',N'品质复核时间',N'品质复核时间',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',460,140,1,0,1,NULL,0,NULL,NULL,NULL),
+  (61,N'QC_RECV',N'仓库',N'仓库',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',370,120,1,0,0,NULL,1,NULL,NULL,NULL),
+  (62,N'QC_RECV',N'仓位编码',N'仓位',N'参照',NULL,N'WHLOC',N'仓位编码',N'仓位编码',N'detail',375,120,1,0,0,NULL,1,N'Bin',NULL,N'仓库=$仓库'),
+  (63,N'QC_RECV',N'仓位名称',N'仓位名称',N'文本',NULL,NULL,NULL,NULL,N'detail',376,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (64,N'QC_RECV',N'仓位id',N'仓位id',N'文本',NULL,NULL,NULL,NULL,N'detail',377,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (65,N'QC_RECV',N'折扣金额',N'折扣金额',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',380,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (66,N'QC_RECV',N'条码',N'条码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'query,detail',390,140,1,0,1,NULL,0,NULL,NULL,NULL),
+  (67,N'QC_RECV',N'发货数量',N'发货数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',400,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (68,N'QC_RECV',N'剩余数量',N'剩余数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',410,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (69,N'QC_RECV',N'退料数量',N'退料数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',420,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (70,N'QC_RECV',N'报废数量',N'报废数量',N'小数',NULL,N'GFDA',N'mc',N'mc',N'detail',430,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (71,N'QC_RECV',N'制单号',N'制单号',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',440,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (72,N'QC_RECV',N'品质复核人',N'品质复核人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'detail',450,100,1,0,1,NULL,0,NULL,NULL,NULL),
+  (73,N'QC_RECV',N'品质复核时间',N'品质复核时间',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',460,140,1,0,1,NULL,0,NULL,NULL,NULL),
   (1,N'QC_INSP',N'单据编号',N'单据编号',N'文本',NULL,N'GFDA',N'mc',N'mc',N'query,header',10,140,0,1,0,NULL,1,N'Document Number',NULL,NULL),
   (2,N'QC_INSP',N'物料编码',N'物料编码',N'参照',NULL,N'INV',N'存货编码',N'存货名称',N'query,detail',10,120,1,1,0,NULL,1,N'Material Code',NULL,NULL),
   (3,N'QC_INSP',N'单据日期',N'单据日期',N'日期',NULL,N'GFDA',N'mc',N'mc',N'query,header',20,120,1,1,0,NULL,1,N'Document Date',NULL,NULL),
@@ -192,8 +195,11 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (51,N'QC_INSP',N'入库单号',N'入库单号',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',260,130,0,0,0,NULL,1,N'Receipt No.',NULL,NULL),
   (52,N'QC_INSP',N'现存量',N'现存量',N'小数',NULL,NULL,NULL,NULL,N'detail',265,100,0,0,1,NULL,0,N'Current inventory',NULL,NULL),
   (53,N'QC_INSP',N'审核时间',N'审核时间',N'文本',NULL,N'GFDA',N'mc',N'mc',N'header',270,140,0,0,0,NULL,1,N'Approved at',NULL,NULL),
-  (54,N'QC_INSP',N'仓库代码',N'仓库代码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',270,120,1,0,1,NULL,0,N'Warehouse Code',NULL,NULL),
-  (55,N'QC_INSP',N'批次键',N'批次键',N'整数',NULL,N'GFDA',N'mc',N'mc',N'header',280,80,0,0,1,NULL,0,NULL,NULL,NULL),
+  (54,N'QC_INSP',N'仓库代码',N'仓库代码',N'文本',NULL,N'GFDA',N'mc',N'mc',N'detail',270,120,1,0,0,NULL,1,N'Warehouse Code',NULL,NULL),
+  (55,N'QC_INSP',N'仓位编码',N'仓位',N'参照',NULL,N'WHLOC',N'仓位编码',N'仓位编码',N'detail',275,120,1,0,0,NULL,1,N'Bin',NULL,N'仓库=$仓库代码'),
+  (56,N'QC_INSP',N'仓位名称',N'仓位名称',N'文本',NULL,NULL,NULL,NULL,N'detail',276,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (57,N'QC_INSP',N'仓位id',N'仓位id',N'文本',NULL,NULL,NULL,NULL,N'detail',277,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (58,N'QC_INSP',N'批次键',N'批次键',N'整数',NULL,N'GFDA',N'mc',N'mc',N'header',280,80,0,0,1,NULL,0,NULL,NULL,NULL),
   (1,N'QC_RETURN',N'单据编号',N'单据编号',N'文本',NULL,NULL,NULL,NULL,N'query,header',10,140,0,1,0,NULL,1,N'Document Number',NULL,NULL),
   (2,N'QC_RETURN',N'单据日期',N'单据日期',N'日期',NULL,NULL,NULL,NULL,N'query,header',20,120,1,1,0,NULL,1,N'Document Date',NULL,NULL),
   (3,N'QC_RETURN',N'物料编码',N'物料编码',N'参照',NULL,N'INV',N'存货编码',N'存货名称',N'query,detail',20,120,1,1,0,NULL,1,N'Material Code',NULL,NULL),

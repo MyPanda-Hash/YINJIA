@@ -59,16 +59,19 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 58	QC_RECV	预计到货日期	预计到货日期	detail	340	日期	120	E--V		GFDA	mc	mc				
 59	QC_RECV	备注	备注	detail	350	文本	200	E--V		GFDA	mc	mc				
 60	QC_RECV	现存量	现存量	detail	360	小数	90	---V		GFDA	mc	mc			Current inventory	
-61	QC_RECV	仓库	仓库	detail	370	文本	120	E-H-		GFDA	mc	mc				
-62	QC_RECV	折扣金额	折扣金额	detail	380	小数	100	E-H-		GFDA	mc	mc				
-63	QC_RECV	条码	条码	query,detail	390	文本	140	E-H-		GFDA	mc	mc				
-64	QC_RECV	发货数量	发货数量	detail	400	小数	100	E-H-		GFDA	mc	mc				
-65	QC_RECV	剩余数量	剩余数量	detail	410	小数	100	E-H-		GFDA	mc	mc				
-66	QC_RECV	退料数量	退料数量	detail	420	小数	100	E-H-		GFDA	mc	mc				
-67	QC_RECV	报废数量	报废数量	detail	430	小数	100	E-H-		GFDA	mc	mc				
-68	QC_RECV	制单号	制单号	detail	440	文本	130	E-H-		GFDA	mc	mc				
-69	QC_RECV	品质复核人	品质复核人	detail	450	参照	100	E-H-		EMP	员工名称	员工名称				
-70	QC_RECV	品质复核时间	品质复核时间	detail	460	文本	140	E-H-		GFDA	mc	mc				
+61	QC_RECV	仓库	仓库	detail	370	文本	120	E--V		GFDA	mc	mc				
+62	QC_RECV	仓位编码	仓位	detail	375	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin	
+63	QC_RECV	仓位名称	仓位名称	detail	376	文本	120	E-H-								
+64	QC_RECV	仓位id	仓位id	detail	377	文本	120	E-H-								
+65	QC_RECV	折扣金额	折扣金额	detail	380	小数	100	E-H-		GFDA	mc	mc				
+66	QC_RECV	条码	条码	query,detail	390	文本	140	E-H-		GFDA	mc	mc				
+67	QC_RECV	发货数量	发货数量	detail	400	小数	100	E-H-		GFDA	mc	mc				
+68	QC_RECV	剩余数量	剩余数量	detail	410	小数	100	E-H-		GFDA	mc	mc				
+69	QC_RECV	退料数量	退料数量	detail	420	小数	100	E-H-		GFDA	mc	mc				
+70	QC_RECV	报废数量	报废数量	detail	430	小数	100	E-H-		GFDA	mc	mc				
+71	QC_RECV	制单号	制单号	detail	440	文本	130	E-H-		GFDA	mc	mc				
+72	QC_RECV	品质复核人	品质复核人	detail	450	参照	100	E-H-		EMP	员工名称	员工名称				
+73	QC_RECV	品质复核时间	品质复核时间	detail	460	文本	140	E-H-		GFDA	mc	mc				
 1	QC_INSP	单据编号	单据编号	query,header	10	文本	140	-R-V		GFDA	mc	mc			Document Number	
 2	QC_INSP	物料编码	物料编码	query,detail	10	参照	120	ER-V		INV	存货编码	存货名称			Material Code	
 3	QC_INSP	单据日期	单据日期	query,header	20	日期	120	ER-V		GFDA	mc	mc			Document Date	
@@ -122,8 +125,11 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 51	QC_INSP	入库单号	入库单号	detail	260	文本	130	---V		GFDA	mc	mc			Receipt No.	
 52	QC_INSP	现存量	现存量	detail	265	小数	100	--H-							Current inventory	
 53	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
-54	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E-H-		GFDA	mc	mc			Warehouse Code	
-55	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
+54	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E--V		GFDA	mc	mc			Warehouse Code	
+55	QC_INSP	仓位编码	仓位	detail	275	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库代码		Bin	
+56	QC_INSP	仓位名称	仓位名称	detail	276	文本	120	E-H-								
+57	QC_INSP	仓位id	仓位id	detail	277	文本	120	E-H-								
+58	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
 1	QC_RETURN	单据编号	单据编号	query,header	10	文本	140	-R-V							Document Number	
 2	QC_RETURN	单据日期	单据日期	query,header	20	日期	120	ER-V							Document Date	
 3	QC_RETURN	物料编码	物料编码	query,detail	20	参照	120	ER-V		INV	存货编码	存货名称			Material Code	

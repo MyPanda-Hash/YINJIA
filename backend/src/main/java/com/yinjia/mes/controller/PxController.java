@@ -959,6 +959,7 @@ public class PxController {
         String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
         if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
         Map<String, Double> qtyByLine = null;
+        Map<String, Map<String, Object>> whBinByLine = new java.util.LinkedHashMap<>();
         Object raw = body.get("lines");
         if (raw instanceof List<?> list && !list.isEmpty()) {
             qtyByLine = new java.util.LinkedHashMap<>();
@@ -968,6 +969,8 @@ public class PxController {
                 Object qty = m.get("qty");
                 if (key == null) continue;
                 qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
+                Map<String, Object> wb = whBinOfLine(m);
+                if (!wb.isEmpty()) whBinByLine.put(String.valueOf(key), wb);
             }
         }
         // 材料码隔离行(行键 `...#行id@打印行id`)的批次号由后端按行自取,前端不需要另传
@@ -976,7 +979,8 @@ public class PxController {
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
                         : Double.parseDouble(String.valueOf(body.get("overRatio"))),
-                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")),
+                whBinByLine.isEmpty() ? null : whBinByLine);
         return ApiResult.ok(res);
     }
 
@@ -1033,6 +1037,8 @@ public class PxController {
                 String sourceNo = String.valueOf(m.get("sourceNo") == null ? "" : m.get("sourceNo"));
                 if (sourceNo.isBlank()) continue;
                 Map<String, Double> qtyByLine = new java.util.LinkedHashMap<>();
+                // 行级「仓库 / 仓位」预填(2026-11-13 用户口径「生单可以选仓库和仓位,可以每行不一样」)
+                Map<String, Map<String, Object>> whBinByLine = new java.util.LinkedHashMap<>();
                 Object rawLines = m.get("lines");
                 if (rawLines instanceof List<?> lineList) {
                     for (Object lo : lineList) {
@@ -1041,6 +1047,8 @@ public class PxController {
                         if (key == null) continue;
                         qtyByLine.put(String.valueOf(key), lm.get("qty") == null ? 0d
                                 : Double.parseDouble(String.valueOf(lm.get("qty"))));
+                        Map<String, Object> wb = whBinOfLine(lm);
+                        if (!wb.isEmpty()) whBinByLine.put(String.valueOf(key), wb);
                     }
                 }
                 Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -1048,7 +1056,8 @@ public class PxController {
                 try {
                     Map<String, Object> res = generateByAction(sourcePanel, action, sourceNo, user,
                             qtyByLine.isEmpty() ? null : qtyByLine,
-                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")));
+                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")),
+                            whBinByLine.isEmpty() ? null : whBinByLine);
                     row.put("编号", res.get("编号"));
                     row.put("面板", res.getOrDefault("gotoPanel", target));
                     row.put("批次号", res.get("批次号"));
@@ -1101,12 +1110,30 @@ public class PxController {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> generateByAction(String sourcePanel, String action, String sourceNo, String user,
-                                                 Map<String, Double> qtyByLine, String batchNo) {
+                                                 Map<String, Double> qtyByLine, String batchNo,
+                                                 Map<String, Map<String, Object>> whBinByLine) {
         if (com.yinjia.mes.panel.QcRecvGenerateHandler.PANEL.equals(sourcePanel)
                 && com.yinjia.mes.panel.QcRecvGenerateHandler.ACTION.equals(action)) {
             return qcRecvGenerate.generateSelected(sourceNo, user, qtyByLine);
         }
-        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo);
+        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo, whBinByLine);
+    }
+
+    /**
+     * 生单请求里某一行的「仓库 / 仓位」预填(2026-11-13 用户口径:生单时就能按行选仓库仓位)。
+     *
+     * <p>键与 {@code PushGenerateHandler.WHBIN_KEYS} 同口径;空值不进 map(避免把"没选"当成"清空")。
+     */
+    private static Map<String, Object> whBinOfLine(Map<?, ?> line) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        for (String k : new String[]{"仓库", "仓库编码", "仓库id", "仓库启用仓位管理", "仓位", "仓位id", "仓位名称"}) {
+            Object v = line.get(k);
+            if (v == null) continue;
+            String s = String.valueOf(v).trim();
+            if (s.isEmpty()) continue;
+            out.put(k, s);
+        }
+        return out;
     }
 
     /** 报表栏目设置读取(报表表头筛选与排序补丁) */    @GetMapping("/reportColumnSettings")

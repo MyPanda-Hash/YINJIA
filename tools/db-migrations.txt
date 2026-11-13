@@ -4832,3 +4832,5 @@ migrate-rd-change-approval-sign-20261111.sql
 migrate-prodinfo-l1-approver-backfill-20261111.sql
 # 2026-11-12 产品信息表一/二区字段置必填（项目编号/项目名称豁免；三区"至少一行"走 tab.isRequired）
 migrate-prodinfo-required-20261112.sql
+# 2026-11-13 采购链仓库仓位随生单预填:暂收/检验行补仓位编码/名称/id 列 + 显示仓库列(QC_RECV/QC_INSP)
+migrate-gen-wh-bin-prefill-20261113.sql

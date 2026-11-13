@@ -238,11 +238,46 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 口径与 ButtonService.inspAutoPurchaseIn(检验审核→入库)完全一致 —— 共用 presetBinFor 一份实现:
         //   物料默认(bs_inv.默认仓位) ⇢ 该仓默认(bs_wh_loc.是否默认),且仅当该仓启用仓位管理=1。
         // 仓库取本行已映射的值;取不到时回落来源行的「仓库」(detailMap 未登记该列时的兜底)。
+        // ⚠ 2026-11-13:只有本行**还没有**仓位时才预设 —— 用户/上游链路已经带下来的仓位不许被覆盖
+        //    (生单对话框按行选的仓位、暂收行带下来的仓位都走这条路,覆盖等于把用户的选择改掉)。
+        if (row.get("仓位") != null && !String.valueOf(row.get("仓位")).isBlank()) return;
         Object wh = row.get("仓库") != null ? row.get("仓库") : (srcItem == null ? null : srcItem.get("仓库"));
         String bin = buttonService.presetBinFor(
                 srcItem == null || srcItem.get("物料编码") == null ? null : String.valueOf(srcItem.get("物料编码")),
                 wh == null ? null : String.valueOf(wh));
         if (bin != null) row.put("仓位", bin);
+    }
+
+    /**
+     * 生单对话框里按行选的「仓库 / 仓位」键(2026-11-13 用户口径)。
+     * 目标面板**没有**对应明细标签的键静默丢弃(与通用保存"按标签映射列"同一口径);
+     * 唯一例外是仓库:来料检验单的仓库列叫「仓库代码」,按异名落上去。
+     */
+    private static final List<String> WHBIN_KEYS = List.of(
+            "仓库", "仓库编码", "仓库id", "仓库启用仓位管理", "仓位", "仓位编码", "仓位名称", "仓位id");
+
+    /** 取某行的仓库/仓位预填(没有则 null;空 map 也按没有处理) */
+    private static Map<String, Object> whBinOf(Map<String, Map<String, Object>> whBinByLine, String lineKey) {
+        if (whBinByLine == null || lineKey == null) return null;
+        Map<String, Object> v = whBinByLine.get(lineKey);
+        return v == null || v.isEmpty() ? null : v;
+    }
+
+    /** 把「仓库 / 仓位」预填落到目标明细行(见 {@link #WHBIN_KEYS}) */
+    private void applyWhBin(Map<String, Object> row, Map<String, Object> whBin,
+                            PanelRegistry.PanelDef tgtDef) {
+        if (row == null || whBin == null || whBin.isEmpty() || tgtDef == null) return;
+        java.util.Set<String> det = new java.util.HashSet<>();
+        for (PanelRegistry.FieldDef f : tgtDef.fieldsAt("detail")) det.add(f.label());
+        for (String k : WHBIN_KEYS) {
+            Object v = whBin.get(k);
+            if (v == null || String.valueOf(v).isBlank()) continue;
+            if (det.contains(k)) {
+                row.put(k, v);
+            } else if ("仓库".equals(k) && det.contains("仓库代码")) {
+                row.put("仓库代码", v);     // 来料检验行的仓库列异名
+            }
+        }
     }
 
     /**
@@ -514,6 +549,23 @@ public class PushGenerateHandler implements PanelActionHandler {
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey,
                                              Double overRatioOverride, String batchNoOverride) {
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, overRatioOverride,
+                batchNoOverride, null);
+    }
+
+    /**
+     * 分批生单(带**行级仓库/仓位**预填):whBinByLine = lineKey → {仓库,仓位,...}(生单对话框按行选的)。
+     *
+     * <p>见 {@link #generateOne} 的同名参数说明。落点在这条链路的**合并行之后**:同一订单行的
+     * 隔离行 + 原行会被合并成一行,这时取该组里第一个带了仓库/仓位的成员(同一订单行本就是同一物料,
+     * 仓库/仓位也该是同一个值)。
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
+                                             String user, Map<String, Double> qtyByLineKey,
+                                             Double overRatioOverride, String batchNoOverride,
+                                             Map<String, Map<String, Object>> whBinByLine) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
         PanelRegistry.PanelDef tgtDef = registry.panel(targetPanel);
         if (!isBatchTarget(targetPanel)) throw new IllegalStateException("目标面板未启用分批送料:" + targetPanel);
@@ -711,6 +763,13 @@ public class PushGenerateHandler implements PanelActionHandler {
             row.put(tgtQtyLabel, round2(qty));      // 合并后的本次送料数量(打印量 + 未打印量)
             if (rowHasBatch) row.put("批次号", batchNo);   // 行随单头(同一批次号,头行一致)
             applySourceFlags(sourcePanel, targetPanel, item, row);
+            // 生单对话框按行选的 仓库/仓位:合并组里取第一个有值的成员(同一订单行 = 同一物料同一仓位)
+            Map<String, Object> whBin = null;
+            for (Map<String, Object> p : members) {
+                whBin = whBinOf(whBinByLine, str(p.get("lineKey")));
+                if (whBin != null) break;
+            }
+            applyWhBin(row, whBin, tgtDef);
             targetItems.add(row);
         }
 
@@ -936,12 +995,28 @@ public class PushGenerateHandler implements PanelActionHandler {
     @Transactional
     public Map<String, Object> generateOne(String sourcePanel, String action, String sourceNo, String user,
                                            Map<String, Double> qtyByLineKey, String batchNo) {
+        return generateOne(sourcePanel, action, sourceNo, user, qtyByLineKey, batchNo, null);
+    }
+
+    /**
+     * 生单(带**行级仓库/仓位**预填)。
+     *
+     * <p>2026-11-13 用户口径:「从采购订单生单的时候就开始预填仓库仓位」「生单可以选仓库和仓位,
+     * 可以每行不一样,也可以所有行带入第一个填入的仓库和仓位」。
+     * 前端在生单对话框里按行选好 仓库/仓位 后随行一起提交({@code whBinByLine}: lineKey → 值),
+     * 这里在**行映射之后**落到目标行上(用户选的优先于来源行自动带过来的值),
+     * 后续各站(暂收→检验→入库)只要目标面板有对应字段,就由映射继续往下带。
+     */
+    @Transactional
+    public Map<String, Object> generateOne(String sourcePanel, String action, String sourceNo, String user,
+                                           Map<String, Double> qtyByLineKey, String batchNo,
+                                           Map<String, Map<String, Object>> whBinByLine) {
         String target = pushTarget(sourcePanel, action);
         if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
         if (isBatchTarget(target)) {
-            return generateBatch(sourcePanel, target, sourceNo, user, qtyByLineKey, null, batchNo);
+            return generateBatch(sourcePanel, target, sourceNo, user, qtyByLineKey, null, batchNo, whBinByLine);
         }
-        return generateLines(sourcePanel, action, target, sourceNo, user, qtyByLineKey);
+        return generateLines(sourcePanel, action, target, sourceNo, user, qtyByLineKey, whBinByLine);
     }
 
     /**
@@ -958,7 +1033,8 @@ public class PushGenerateHandler implements PanelActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> generateLines(String sourcePanel, String action, String target,
-                                              String sourceNo, String user, Map<String, Double> qtyByLineKey) {
+                                              String sourceNo, String user, Map<String, Double> qtyByLineKey,
+                                              Map<String, Map<String, Object>> whBinByLine) {
         // 1) 来源必须已审核(与整单推式生单同一句话,前端置灰 + 后端兜底)
         String status = str(buttonService.docStatus(sourcePanel, sourceNo).get("status"));
         if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
@@ -1042,6 +1118,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             // 本次数量**压掉**映射带过来的整行数量(这正是"可以选择数量"的落点)
             row.put(tgtQtyLabel, round2((double) p.get("qty")));
             applySourceFlags(sourcePanel, target, item, row);
+            // 生单对话框里按行选的 仓库/仓位(用户选择优先于映射带过来的值,见 applyWhBin)
+            applyWhBin(row, whBinOf(whBinByLine, str(p.get("lineKey"))), tgtDef);
             targetItems.add(row);
         }
 

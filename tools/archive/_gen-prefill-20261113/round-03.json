@@ -1,0 +1,63 @@
+{
+  "pops": [
+    {
+      "i": 0,
+      "cls": "el-select-dropdown",
+      "display": "block",
+      "visible": false,
+      "items": 2,
+      "rect": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "i": 1,
+      "cls": "el-select-dropdown",
+      "display": "block",
+      "visible": false,
+      "items": 3,
+      "rect": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "i": 2,
+      "cls": "el-select-dropdown",
+      "display": "block",
+      "visible": true,
+      "items": 0,
+      "rect": [
+        935,
+        210,
+        118,
+        40
+      ]
+    },
+    {
+      "i": 3,
+      "cls": "el-select-dropdown",
+      "display": "block",
+      "visible": false,
+      "items": 0,
+      "rect": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "anyItem": [
+    "全部事件",
+    "产品开发业务流",
+    "美金",
+    "薪酬核算",
+    "人民币"
+  ]
+}

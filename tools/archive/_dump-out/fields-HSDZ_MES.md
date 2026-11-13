@@ -41,7 +41,10 @@ FIELD	detail	330	折扣%	折扣%	小数	80	E--V		GFDA	mc	mc					14480
 FIELD	detail	340	预计到货日期	预计到货日期	日期	120	E--V		GFDA	mc	mc					14481
 FIELD	detail	350	备注	备注	文本	200	E--V		GFDA	mc	mc					14482
 FIELD	detail	360	现存量	现存量	小数	90	---V		GFDA	mc	mc			Current inventory		14483
-FIELD	detail	370	仓库	仓库	文本	120	E-H-		GFDA	mc	mc					14484
+FIELD	detail	370	仓库	仓库	文本	120	E--V		GFDA	mc	mc					14484
+FIELD	detail	375	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin		14504
+FIELD	detail	376	仓位名称	仓位名称	文本	120	E-H-									14505
+FIELD	detail	377	仓位id	仓位id	文本	120	E-H-									14506
 FIELD	detail	380	折扣金额	折扣金额	小数	100	E-H-		GFDA	mc	mc					14485
 FIELD	detail	400	发货数量	发货数量	小数	100	E-H-		GFDA	mc	mc					14487
 FIELD	detail	410	剩余数量	剩余数量	小数	100	E-H-		GFDA	mc	mc					14488
@@ -203,6 +206,9 @@ COL	sl_recv_detail	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	sl_recv_detail	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	sl_recv_detail	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	sl_recv_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
+COL	sl_recv_detail	仓位编码	nvarchar(400)	null	送料暂收行的仓位编码(界面显示名「仓位」)。由采购订单生单时按行预填;参照仓位档案 WHLOC,按本行仓库级联。
+COL	sl_recv_detail	仓位名称	nvarchar(800)	null	送料暂收行的仓位名称(隐藏辅助列,参照回写用,与采购入库行同构)。
+COL	sl_recv_detail	仓位id	nvarchar(2000)	null	送料暂收行的仓位id(隐藏辅助列,参照回写/反查用)。
 
 ===== QC_INSP =====
 -- yj_field (place, seq)
@@ -230,7 +236,10 @@ FIELD	detail	230	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称		
 FIELD	detail	250	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc			Department Name		12899
 FIELD	detail	260	入库单号	入库单号	文本	130	---V		GFDA	mc	mc			Receipt No.		12901
 FIELD	detail	265	现存量	现存量	小数	100	--H-							Current inventory		14421
-FIELD	detail	270	仓库代码	仓库代码	文本	120	E-H-		GFDA	mc	mc			Warehouse Code		12903
+FIELD	detail	270	仓库代码	仓库代码	文本	120	E--V		GFDA	mc	mc			Warehouse Code		12903
+FIELD	detail	275	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库代码		Bin		14507
+FIELD	detail	276	仓位名称	仓位名称	文本	120	E-H-									14508
+FIELD	detail	277	仓位id	仓位id	文本	120	E-H-									14509
 FIELD	header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称			Salesperson		12856
 FIELD	header	90	部门	部门	参照	140	E--V		DEPT	部门名称	部门名称					12868
 FIELD	header	100	部门编码	部门编码	参照	140	E--V		DEPT	部门编码	部门名称					12870
@@ -384,6 +393,9 @@ COL	qc_insp_detail	品质复核人	nvarchar(100)	null	品质复核人(参照职�
 COL	qc_insp_detail	品质复核时间	nvarchar(60)	null	品质复核时间(本地墙钟,与品质复核人成对)
 COL	qc_insp_detail	业务员	nvarchar(100)	null	业务员(供应商侧对接的业务人员,参照职员档案 EMP)
 COL	qc_insp_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验 逐站下传,仅供追溯,不可用于可用量/缺料判断。实时库存见 kucun。
+COL	qc_insp_detail	仓位编码	nvarchar(400)	null	来料检验行的仓位编码(界面显示名「仓位」)。随送料暂收单生单带入;参照仓位档案 WHLOC,按本行仓库级联。
+COL	qc_insp_detail	仓位名称	nvarchar(800)	null	来料检验行的仓位名称(隐藏辅助列,参照回写用)。
+COL	qc_insp_detail	仓位id	nvarchar(2000)	null	来料检验行的仓位id(隐藏辅助列,参照回写/反查用)。
 
 ===== QC_RETURN =====
 -- yj_field (place, seq)

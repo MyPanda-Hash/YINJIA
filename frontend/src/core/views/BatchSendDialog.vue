@@ -12,7 +12,8 @@
   <el-dialog
     :model-value="modelValue"
     :title="tt('分批送料') + ' · ' + sourceNo"
-    width="900px"
+    width="96vw"
+    top="1vh"
     append-to-body
     destroy-on-close
     @update:model-value="(v) => emit('update:modelValue', v)"
@@ -54,9 +55,15 @@
         </span>
         <span v-if="(batches || []).length" class="bsd-chip">{{
           tt('已有批次') }}: {{ batches.map((b) => b.batchNo || tt('待编号')).join('、') }}</span>
+        <!-- 2026-11-13 用户口径「也可以所有行带入第一个填入的仓库和仓位」 -->
+        <el-button v-if="showWhBin" link type="primary" size="small"
+                   :title="tt('把第一行填好的仓库与仓位套用到本单所有行')"
+                   @click="applyWhBinToAll">{{ tt('仓库仓位应用到所有行') }}</el-button>
       </div>
       <!-- ① 上层:采购订单明细(原行)。「数量」= 订单数量 **已扣掉已打印量**(那部分被隔离到下层去了) -->
-      <el-table ref="tableRef" :data="rows" row-key="lineKey" border size="small" height="300" @selection-change="onPicked">
+      <!-- 2026-11-13 用户口径「不要滚动，一次显示全部」:表不再固定高度(height/max-height 会出内层滚动条),
+           全部行一次铺开;弹窗放到 96vw 宽。 -->
+      <el-table ref="tableRef" :data="rows" row-key="lineKey" border size="small" @selection-change="onPicked">
         <el-table-column type="selection" width="42" :selectable="rowSelectable" />
         <el-table-column prop="行号" :label="tt('行号')" width="55" />
         <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
@@ -72,6 +79,25 @@
         <el-table-column prop="剩余数量" :label="tt('剩余')" width="80" align="right" />
         <el-table-column :label="tt('可送上限')" width="95" align="right">
           <template #default="{ row }">{{ capOf(row) }}</template>
+        </el-table-column>
+        <!-- 仓库 / 仓位(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」):
+             按行选、可以每行不一样;行头「仓库仓位应用到所有行」把第一行填好的套满本单。 -->
+        <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
+          <template #default="{ row }">
+            <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
+                       :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
+              <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
+          <template #default="{ row }">
+            <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
+                       :disabled="!whOf[row.lineKey]"
+                       :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')" style="width: 120px">
+              <el-option v-for="b in binsOfLine(row)" :key="b.code" :label="b.code" :value="b.code" />
+            </el-select>
+          </template>
         </el-table-column>
         <el-table-column :label="tt('本次送料数量')" width="150">
           <template #default="{ row }">
@@ -96,7 +122,7 @@
           {{ tt('已打印待生单') }}
           <span class="bsd-tip">{{ tt('勾选即按该批次号生单；勾到多个批次号会按号分成多张单据') }}</span>
         </div>
-        <el-table ref="printedRef" :data="printedRows" row-key="lineKey" border size="small" max-height="260"
+        <el-table ref="printedRef" :data="printedRows" row-key="lineKey" border size="small"
           @selection-change="onPrintedPicked">
           <el-table-column type="selection" width="42" :selectable="rowSelectable" />
           <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
@@ -106,6 +132,23 @@
           <el-table-column prop="数量" :label="tt('打印数量')" width="95" align="right" />
           <el-table-column prop="已送数量" :label="tt('已生单')" width="90" align="right" />
           <el-table-column prop="剩余数量" :label="tt('未生单')" width="90" align="right" />
+          <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
+            <template #default="{ row }">
+              <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
+                         :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
+                <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
+            <template #default="{ row }">
+              <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
+                         :disabled="!whOf[row.lineKey]"
+                         :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')" style="width: 120px">
+                <el-option v-for="b in binsOfLine(row)" :key="b.code" :label="b.code" :value="b.code" />
+              </el-select>
+            </template>
+          </el-table-column>
           <el-table-column :label="tt('本次送料数量')" width="150">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
@@ -138,6 +181,8 @@ import { usePanelRuntime } from '@core/panel-runtime'
 // 生单行构造:勾选是权威(未勾选的行不生成)—— 纯函数,见 core/selection/batchSendLines.js
 // 可送上限同源纯函数 overAllowance(2026-09-22 口径:按订单全部数量算,超送最高 50%)
 import { buildBatchSendLines, defaultPickKeys, sumPickedQty, overAllowance } from '@core/selection/batchSendLines'
+// 生单时的「仓库 / 仓位」预填(2026-11-13 用户口径):取数/级联候选/提交键都在这一份纯函数里
+import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
 
 const engine = usePanelRuntime()
 
@@ -163,6 +208,42 @@ const nextBatchNo = ref('')
 const batchNo = ref('')
 /** 两层共用一个「本次送料数量」映射:行键唯一(隔离行是 `...#行id@打印行id`),不会撞 */
 const qtyOf = reactive({})
+
+/* ── 仓库 / 仓位按行预填(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」)──
+   只在**采购订单 → 送料暂收单**这一跳出现(该对话框就是这条链路的单张生单入口);
+   其它链路(生产工单→产成品入库单等)不进这个对话框,不受影响。 */
+const showWhBin = computed(() => String(props.sourcePanel) === 'PU_ORDER')
+const whSrc = reactive({ warehouses: [], bins: [] })
+const whOf = reactive({})
+const binOf = reactive({})
+
+/** 某行可选的仓位(按本行仓库级联) */
+function binsOfLine(row) {
+  return binsOfWarehouse(whSrc.bins, whOf[row?.lineKey])
+}
+
+/** 换仓库:仓位候选随之收窄;已选仓位不在新仓里就清掉,空则按该仓默认仓位预填 */
+function onWhChange(row) {
+  const list = binsOfLine(row)
+  const cur = String(binOf[row.lineKey] || '')
+  if (cur && !list.some((b) => b.code === cur)) binOf[row.lineKey] = ''
+  if (!binOf[row.lineKey]) binOf[row.lineKey] = defaultBinOf(whSrc.bins, whOf[row.lineKey])
+}
+
+/** 「所有行带入第一行填好的仓库与仓位」(用户口径原话) */
+function applyWhBinToAll() {
+  const first = allRows.value.find((r) => String(whOf[r.lineKey] || '').trim() !== '')
+  if (!first) {
+    ElMessage.warning(tt('请先在任意一行选好仓库，再套用到所有行'))
+    return
+  }
+  const wh = whOf[first.lineKey]
+  const bin = binOf[first.lineKey] || defaultBinOf(whSrc.bins, wh)
+  for (const r of allRows.value) {
+    whOf[r.lineKey] = wh
+    binOf[r.lineKey] = bin
+  }
+}
 
 /* ── 已打印隔离行(2026-10-04 材料码):上下两层 —— 上层原行、下层已打印行 ──
    用户口径「打印后的那一行是已经从原来数量隔离出来的,没有作废之前是不会与生单有关联的」:
@@ -263,6 +344,21 @@ async function load() {
     batchNo.value = nextBatchNo.value      // 预填 = 公式算出来的号;用户可在对话框里改
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of allRows.value) qtyOf[r.lineKey] = Number(r.剩余数量) > 0 ? Number(r.剩余数量) : 0
+    // 仓库/仓位档案(采购订单这一跳才需要):取一次,失败也不阻断生单
+    Object.keys(whOf).forEach((k) => delete whOf[k])
+    Object.keys(binOf).forEach((k) => delete binOf[k])
+    if (showWhBin.value) {
+      const src = await loadWhBinSources(engine)
+      whSrc.warehouses = src.warehouses
+      whSrc.bins = src.bins
+      for (const r of allRows.value) {
+        // 来源行本身带仓库/仓位就继承(采购订单行可以手工填过);有仓库没仓位按该仓默认仓位预填
+        const wh = String(r['仓库'] || r['仓库编码'] || '').trim()
+        if (wh) whOf[r.lineKey] = wh
+        const bin = String(r['仓位'] || r['仓位编码'] || '').trim()
+        binOf[r.lineKey] = bin || (wh ? defaultBinOf(whSrc.bins, wh) : '')
+      }
+    }
     // 默认勾选:上层**原行**里有剩余的(保留"打开即可全送"的便利);下层已打印行**默认不勾**
     // (用户口径「打印后的那一行…没有作废之前是不会与生单有关联的」⇒ 必须显式勾)
     await nextTick()
@@ -340,6 +436,15 @@ async function confirm() {
     ...buildBatchSendLines(printedRows.value, printedKeys.value, qtyOf),
   ]
   if (!lines.length) { ElMessage.warning(tt('请至少勾选一行并填写本次送料数量')); return }
+  // 仓库 / 仓位随行提交(2026-11-13):空值不写键 —— 后端据此判"没选",走来源映射/默认仓位那套
+  if (showWhBin.value) {
+    for (const l of lines) {
+      Object.assign(l, whBinPayload({
+        warehouses: whSrc.warehouses, bins: whSrc.bins,
+        warehouse: whOf[l.lineKey] || '', bin: binOf[l.lineKey] || '',
+      }))
+    }
+  }
   const rowOf = (lineKey) => allRows.value.find((r) => r.lineKey === lineKey) || {}
   const isPrinted = (l) => rowOf(l.lineKey).rowKind === 'printed'
   const resvKeys = [...new Set(lines.filter(isPrinted).map((l) => String(rowOf(l.lineKey)['批次号'] || '')).filter(Boolean))]

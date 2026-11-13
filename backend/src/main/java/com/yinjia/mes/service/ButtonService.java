@@ -4740,9 +4740,16 @@ public class ButtonService {
             // 单据选仓库字段已全局统一叫「仓库」(migrate-wh-field-rename),参照/必填/推送兜底同列
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
-            // 仓位预设(2026-10-09 用户口径「物料默认 ⇢ 仓位默认兜底」):该仓启用仓位管理才预设
-            Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
-            if (binA != null) line.put("仓位", binA);
+            // 仓位:先吃**上游带下来的**(2026-11-13 用户口径「从采购订单生单时就开始预填仓库仓位」——
+            // 采购订单生单 → 暂收 → 检验 逐站继承,检验行已有 仓位 列),没有才按
+            // 「物料默认 ⇢ 仓位默认兜底」预设(2026-10-09 口径)。不能反过来:预设会盖掉用户选的值。
+            Object binCarried = r.get("仓位");
+            if (binCarried != null && !String.valueOf(binCarried).isBlank()) {
+                line.put("仓位", binCarried);
+            } else {
+                Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
+                if (binA != null) line.put("仓位", binA);
+            }
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
