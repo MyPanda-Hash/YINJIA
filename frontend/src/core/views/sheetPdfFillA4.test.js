@@ -148,3 +148,33 @@ test('⑨ 签名行要能铺满整张纸（不被备注列截在 3/4 处）', ()
   // 不能写死百分比宽度（会随备注列变化而错位）
   assert.doesNotMatch(block, /width:\s*\d+%/, '签名行不许写死百分比宽')
 })
+
+/**
+ * 2026-11-13 第三轮：「调整为单行显示」。
+ *
+ * 实测数据（733px 纸宽）：备注列 190px 时表格只有 541px，签名项各约 287/254，
+ * 「申请立项人」的值区只剩 85px < 文字宽 70px + padding 20px ⇒ 折成两行。
+ * 收到 150px 后值区 106px（内容 86px ≥ 文字 70px）⇒ 单行。
+ */
+test('⑩ 备注列足够窄，签名行的值区能放下一行名字', () => {
+  const ds = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  const i = ds.indexOf('.as-remark {')
+  const block = ds.slice(i, ds.indexOf('}', i) + 1)
+  // 注释里也写「width:250px」「190 → 150」之类，先把注释剥掉再取值
+  const clean = block.replace(/\/\*[\s\S]*?\*\//g, '')
+  const m = clean.match(/width:\s*(\d+)px/)
+  assert.ok(m, '备注列要有基准 width')
+  const w = Number(m[1])
+  // 733 纸宽下：备注 w ⇒ 表格 (733-w)，签名首项约 53% ⇒ 值区 ≈ (733-w)*0.53 - 标签宽
+  // 标签 202px 时值区要 ≥ 90px（文字 70 + padding 20）才单行 ⇒ w ≤ 733 - (90+202)/0.53 ≈ 182
+  assert.ok(w <= 182, `备注列 ${w}px 太宽：733px 纸宽下签名值区放不下一行名字（应 ≤182px）`)
+})
+
+test('⑪ 签名标签格能收缩（不许 flex:none 把值区挤到换行）', () => {
+  const ds = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  const i = ds.indexOf('.as-sign-cell {')
+  const block = ds.slice(i, ds.indexOf('}', i) + 1).replace(/\/\*[\s\S]*?\*\//g, '')
+  assert.doesNotMatch(block, /flex:\s*none/, '标签格不许 flex:none（那样压窄时值区必换行）')
+  assert.match(block, /flex-shrink:\s*[2-9]/, '标签格收缩系数要大于值区，优先让标签让宽')
+  assert.match(block, /min-width:\s*\d+px/, '标签格要有最小宽度兜底')
+})

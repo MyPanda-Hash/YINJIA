@@ -740,7 +740,18 @@
           v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair"
           :style="{ flexGrow: c.flex || 1, flexShrink: 1, flexBasis: '0%' }"
         >
-          <div class="as-sign-cell" :class="{ 'white-shell': c.white }" :style="{ width: c.w + 'px' }">{{ tt(c.label) }}</div>
+          <!-- 2026-11-13：标签格原先写死 `width: c.w px`（202 / 150）内联宽 —— 内联样式压过
+               样式表的 min-width，于是压到 A4 宽（733px）时标签仍占 202px，值区只剩 85px，
+               「系统管理员」被折成两行。改成 **basis + 上限**：宽时保持设计宽（202px），
+               窄时按 flex 收缩（min-width:68px 兜底），把宽度让给值区。 -->
+          <!-- 2026-11-13：标签格宽度改 `flex: 0 1 <设计宽>` 语义 ——
+               宽时按设计宽（202/150）、窄时**先缩标签保住值区**（min-width:68px）。
+               ⚠ 不能用 `max-width: 设计宽` + flexBasis：那样在窄排版里 basis 撑住不让，
+                 标签仍吃满 202px，值区只剩 85px ⇒「系统管理员」折两行。 -->
+          <div
+            class="as-sign-cell" :class="{ 'white-shell': c.white }"
+            :style="{ flexBasis: (c.w || 120) + 'px' }"
+          >{{ tt(c.label) }}</div>
           <div class="as-sign-val">
             <el-input
               v-if="editable && c.type === 'text' && !signLocked(c)"
@@ -1925,9 +1936,13 @@ defineExpose({ focusField })
      是 flex:1）优先拿宽度，窄排版（导出 A4 733px）时备注先让路。
      base 宽度 250 → 190：实际单据的备注基本是空的，200 左右足够写两行字。 */
   flex: 0 1 auto;
-  width: 190px;
-  min-width: 96px;
-  max-width: 220px;
+  /* 2026-11-13 第二轮（「调整为单行显示」）：备注再收一档 190 → 150。
+     实测 733px 纸宽下：备注 190px 时表格只剩 541px，签名项各约 287/254，
+     「系统管理员」在 85px 的值区里折两行；收到 150px 后表格 581px，
+     值区约 125px ⇒ 能放下 6 个字（用户口径「备注不会写那么多」）。 */
+  width: 150px;
+  min-width: 88px;
+  max-width: 190px;
   border-left: 3px dotted #9a9a9a;
   display: flex;
   flex-direction: column;
@@ -2485,7 +2500,12 @@ defineExpose({ focusField })
      完全不收缩 ⇒ 压窄后值区只剩几十像素，**「系统管理员」被挤成一字一行**（截图实测）。
      现在：允许收缩但保住最小可读宽度（min-width + 文字不换行），
      多余的空间缺口由 .as-sign-val 承担（它的 min-width 见下）。 */
-  flex: 0 1 auto;
+  /* 2026-11-13 用户口径「调整为单行显示」：
+     标签格在**窄排版**下要主动让宽给值区，否则值区只有 85px，「系统管理员」被折两行。
+     做法：`flex-shrink` 放大（让收缩发生在标签上，而不是值区），并且下限压到文字宽（68px）。
+     basis 由内联样式给（= 设计宽 202/150）。 */
+  flex-grow: 0;
+  flex-shrink: 8;
   min-width: 68px;
   white-space: nowrap;
   background: #29b8f0;
@@ -2503,7 +2523,9 @@ defineExpose({ focusField })
   color: #1f5fa8;
 }
 .as-sign-val {
-  flex: 1;
+  /* 值区优先吃剩余宽度（grow 比标签格大很多），并在单行放得下时不换行 ——
+     用户口径「调整为单行显示」（2026-11-13）：同一行里标签在左、值在右，值不折行。 */
+  flex: 100 1 0%;
   /* 最小宽度 = 能放下 4 个中文字（约 64px）；再窄就会变成一字一行（2026-11-13 实测）。
      真装不下时由 .as-sign-row 溢出/换行处理，而不是把字竖排。 */
   min-width: 64px;
