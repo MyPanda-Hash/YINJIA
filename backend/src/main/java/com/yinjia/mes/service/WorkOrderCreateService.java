@@ -158,12 +158,17 @@ public class WorkOrderCreateService {
         String gg = str(product.get("规格型号"));
         String unit = str(product.get("计量单位"));
 
-        // ── 数量(需求=订单数量;生产数量默认等于订单数量) ──
-        double orderQty = num(b.get("订单数量"));
-        if (!(orderQty > 0)) throw new IllegalArgumentException("订单数量必须大于 0");
+        // ── 数量(2026-11-13 用户口径第二轮:手工新增没有销售订单,页面**不再填订单数量**)──
+        //   · 生产数量 = 唯一必填数量(pl_sl);
+        //   · 订单数量 = 可空 —— 旧调用方/草稿历史数据还会带,带了就用;不带则**按生产数量兜底**
+        //     (手工单"需求 = 要生产的量",保证列表/排单计划的「需求数量」不为 0;
+        //      转换来的工单仍由 QuickScheduleService 写真实订单数量,不受影响);
+        //   · 不再要求「订单数量必须大于 0」——那会让没有销售订单的手工单建不出来。
         double planQty = num(b.get("生产数量"));
-        if (!(planQty > 0)) planQty = orderQty;
+        if (!(planQty > 0)) planQty = num(b.get("订单数量"));
         if (!(planQty > 0)) throw new IllegalArgumentException("生产数量必须大于 0");
+        double orderQty = num(b.get("订单数量"));
+        if (!(orderQty > 0)) orderQty = planQty;
 
         // ── 客户(可空;填了必须存在于客户档案) ──
         String khdm = str(b.get("客户编码"));

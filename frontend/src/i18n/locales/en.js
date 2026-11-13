@@ -5897,6 +5897,12 @@ export default {
     '确认提交草稿': 'Submit this draft and create the work order?',
     '当前有未保存的修改，离开将丢失，是否继续？': 'There are unsaved changes. Leave and lose them?',
     '提交': 'Submit',
+    // ---- 生产工单「删除工单」(2026-11-13 第二轮:订单结转来的删除会释放订单行回订单结转)----
+    '删除工单': 'Delete Work Order',
+    '确认删除工单': 'Delete this work order?',
+    '删除后该订单行会回到订单结转(可重新转单);已排产/有报工的工单不能删除。':
+      'The order line will return to Order Conversion (can be converted again); scheduled work orders or ones with reports cannot be deleted.',
+    '工单已删除': 'Work order deleted',
   },
 
 }

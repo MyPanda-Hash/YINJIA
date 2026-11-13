@@ -2,7 +2,7 @@
      入口:生产工单页工具栏「草稿箱」按钮(带草稿数角标;按钮与角标由 Lead 接线,本组件自包含)。
      口径(详见 tools/archive/_wo-draft-20261113/CONTRACT.md「组件 2」):
        · 打开即 `POST /px/workOrderList/draft/list {keyword:''}`;列:草稿号/工单类型/产品编码/产品名称/
-         订单数量/客户/创建人/更新时间/操作;
+         生产数量/客户/创建人/更新时间/操作;
        · 继续编辑 → emit('edit',{草稿id}) 并关闭(生产工单页据此跳整页编制 `?draftId=…`);
        · 提交 → 确认 → `POST draft/submit` → 成功提示 + emit('submitted',{工单号,草稿号}) + 重拉列表;
        · 删除 → 确认 → `POST draft/delete` → 提示 + 重拉列表 + emit('changed')。
@@ -44,8 +44,8 @@
       <el-table-column prop="产品名称" :label="tt('产品名称')" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row['产品名称'] || '-' }}</template>
       </el-table-column>
-      <el-table-column prop="订单数量" :label="tt('订单数量')" width="100" align="right">
-        <template #default="{ row }">{{ qty(row['订单数量']) }}</template>
+      <el-table-column prop="生产数量" :label="tt('生产数量')" width="100" align="right">
+        <template #default="{ row }">{{ qty(row['生产数量']) }}</template>
       </el-table-column>
       <!-- 客户:名称为空时退回编码(草稿阶段可能只选了客户编码) -->
       <el-table-column :label="tt('客户')" min-width="150" show-overflow-tooltip>

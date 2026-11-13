@@ -5,6 +5,7 @@ import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.WorkOrderBomService;
 import com.yinjia.mes.service.WorkOrderCreateService;
+import com.yinjia.mes.service.WorkOrderDeleteService;
 import com.yinjia.mes.service.WorkOrderDraftService;
 import com.yinjia.mes.service.WorkOrderPickingService;
 import com.yinjia.mes.service.WorkOrderRecipeService;
@@ -72,12 +73,14 @@ public class WorkOrderListController {
     private final WorkOrderBomService bomService;
     /** 生产工单编制草稿(2026-11-13 方案 A:保存草稿/草稿箱/提交生成正式工单) */
     private final WorkOrderDraftService draftService;
+    /** 工单删除(2026-11-13 用户口径第二条:可删除;订单结转来的释放占用回订单结转;已排产/有报工不能删) */
+    private final WorkOrderDeleteService deleteService;
 
     public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
                                    WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService,
                                    com.yinjia.mes.service.WorkOrderCloseGuard closeGuard,
                                    WorkOrderCreateService createService, WorkOrderBomService bomService,
-                                   WorkOrderDraftService draftService) {
+                                   WorkOrderDraftService draftService, WorkOrderDeleteService deleteService) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
@@ -87,6 +90,7 @@ public class WorkOrderListController {
         this.createService = createService;
         this.bomService = bomService;
         this.draftService = draftService;
+        this.deleteService = deleteService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -586,6 +590,28 @@ public class WorkOrderListController {
         perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("数量", draftService.count());
+        return ApiResult.ok(out);
+    }
+
+    // ══════════ 删除工单(2026-11-13 用户口径第二条)══════════
+    // 用户原话:「当前工单应该可以删除,从订单结转处转来的工单删除应该回到订单结转中,
+    //   而已经排产的不能删除。其他存在报工的自然也不能删除了。」
+    // 规则见 WorkOrderDeleteService:软删 plang;订单结转来源的释放 SO→PLANG 占用链(订单行回订单结转);
+    //   已排产/有报工/已入库/已领料/已结案/切单子单/已有下游单据一律拒绝并点名原因。
+    // 权限:查看权 + 页面动作词 del(「删除」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。
+
+    /** 删除工单行(单行) */
+    @PostMapping("/workOrderList/delete")
+    public ApiResult<Map<String, Object>> delete(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "删除工单", "del");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Long rowId = longOf(b.get("行id"));
+        if (rowId == null || rowId <= 0) throw new IllegalArgumentException("缺少工单行id");
+        String user = currentUser();
+        Map<String, Object> out = deleteService.delete(rowId, user);
+        logUsage(user, "删除工单", String.valueOf(out.get("工单号")),
+                out.get("工单行号") instanceof Number n ? n.intValue() : null);
         return ApiResult.ok(out);
     }
 

@@ -17,6 +17,13 @@
          `draft/submit`,没有草稿走 `workOrderList/create`;成功跳回列表并带 keyword 定位新单;
        · **离开守卫**:与「最后一次保存/提交成功的快照」比较(formSnapshot),
          有未保存修改 → ElMessageBox.confirm 问一句再走。
+     2026-11-13 第二轮用户反馈(附截图:点「提交生成工单」只报「新增工单失败」看不到原因):
+       · **手工新增的工单没有销售订单** ⇒ 页面去掉「订单数量」字段(订单数量/订单号是「订单结转」
+         转来的单才有的字段),只保留「生产数量」作为唯一数量(required >0);
+         纯逻辑同步:blankForm 不再有 订单数量、validateWorkOrder 只校验 生产数量>0、
+         create/draft 请求体都不再发送 订单数量(后端缺省按生产数量兜底)、draftToState 只取 生产数量;
+       · 失败原因**必须看得见**:保存/提交的 catch 依次取 `后端 message → 异常 message → 兜底文案`,
+         并在控制台打一行带状态码的诊断(用户报障时可直接截图/复制)。
      校验/请求体组装/快照全在 business/workOrderCreate.js(纯函数,带 node --test 单测);
      本组件只负责请求、渲染与提示。显示层文案一律 tt()(新词条由 Lead 统一追加 en.js,本文件不改它)。 -->
 <template>
@@ -86,21 +93,15 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="tt('订单数量')" required>
-              <!-- 改订单数量时:生产数量还没被手改过,或仍等于旧订单数量 ⇒ 跟着同步(契约口径) -->
-              <el-input-number v-model="form.订单数量" :min="0" :controls="false" style="width: 100%"
-                               @change="onOrderQtyChange" />
+            <!-- 手工新增的工单**没有销售订单**(订单数量/订单号是「订单结转」来的单才有)
+                 ⇒ 本页唯一数量就是生产数量,required >0(2026-11-13 用户口径) -->
+            <el-form-item :label="tt('生产数量')" required>
+              <el-input-number v-model="form.生产数量" :min="0" :controls="false" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
 
         <el-row :gutter="12">
-          <el-col :span="8">
-            <el-form-item :label="tt('生产数量')" required>
-              <el-input-number v-model="form.生产数量" :min="0" :controls="false" style="width: 100%"
-                               @change="producedTouched = true" />
-            </el-form-item>
-          </el-col>
           <el-col :span="8">
             <el-form-item :label="tt('工单日期')">
               <el-date-picker v-model="form.工单日期" type="date" value-format="YYYY-MM-DD"
@@ -113,16 +114,16 @@
                               style="width: 100%" />
             </el-form-item>
           </el-col>
-        </el-row>
-
-        <el-row :gutter="12">
           <el-col :span="8">
             <el-form-item :label="tt('交期')">
               <el-date-picker v-model="form.交期" type="date" value-format="YYYY-MM-DD"
                               style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="16">
+        </el-row>
+
+        <el-row :gutter="12">
+          <el-col :span="8">
             <el-form-item :label="tt('工艺路线')" required>
               <!-- 只允许「已审核」的路线(2026-10-16 用户口径:工艺路线审核完成后才能被使用);
                    未审核的置灰,label 后缀标（未审核）让用户知道卡在哪 -->
@@ -133,10 +134,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-        </el-row>
-
-        <el-row :gutter="12">
-          <el-col :span="24">
+          <el-col :span="16">
             <el-form-item :label="tt('备注')">
               <el-input v-model="form.备注" type="textarea" :rows="2" />
             </el-form-item>
@@ -269,9 +267,6 @@ const submitting = ref(false)
 const bomLoading = ref(false)
 /** 校验失败后才给问题行标红(刚点「添加行」的空行不先飘红,免得一打开就满屏红) */
 const showErrors = ref(false)
-/** 生产数量是否被手工改过(没改过 ⇒ 跟着订单数量同步) */
-const producedTouched = ref(false)
-const prevOrderQty = ref(undefined)
 /** 当前明细是用哪个主物料带出来的(换主物料时据此清掉旧料,避免把 A 的用料存到 B 上) */
 const bomProductCode = ref('')
 
@@ -281,7 +276,6 @@ const isDirty = computed(
 )
 
 const str = (v) => (v === null || v === undefined ? '' : String(v).trim())
-const sameQty = (a, b) => (Number(a) || 0) === (Number(b) || 0)
 const isAudited = (r) => str(r && r.审核状态) === '已审核'
 
 /** 商品档案行 → el-select 候选(label = 编码 — 名称;row 留着选中后回填用) */
@@ -338,7 +332,6 @@ async function initPage() {
   draftNo.value = ''
   savedAt.value = ''
   showErrors.value = false
-  producedTouched.value = false
   bomProductCode.value = ''
   draftSaving.value = false
   submitting.value = false
@@ -355,7 +348,6 @@ async function initPage() {
   if (!str(form.value.工艺路线)) {
     form.value.工艺路线 = pickDefaultRoute({ routes: routes.value, fallback: options.value.默认工艺路线 })
   }
-  prevOrderQty.value = form.value.订单数量
   // 初始化完成 = 当前状态就是「已保存的基线」:此时离开不该弹未保存提示
   lastSnapshot.value = formSnapshot(form.value, lines.value, kind.value)
 }
@@ -410,17 +402,16 @@ async function loadDraft(id) {
     savedAt.value = str(d.更新时间)
     // 草稿里的明细是「这个产品的用料」⇒ 换主物料时同样要清掉(与从标准BOM带出同一口径)
     bomProductCode.value = str(d.产品编码)
-    prevOrderQty.value = form.value.订单数量
   } catch (e) {
-    // 草稿可能已被别人提交/删除:如实提示后端原因,页面留空让用户重新编一张
-    ElMessage.error(e?.response?.data?.message || tt('该草稿不存在或已提交'))
+    // 草稿可能已被别人提交/删除:如实提示后端原因(拿不到后端文案时至少给出异常本身),页面留空让用户重新编一张
+    ElMessage.error(e?.response?.data?.message || e?.message || tt('该草稿不存在或已提交'))
   }
 }
 
 watch(kind, () => { showErrors.value = false })
 
 // ══════════════════════════════════════════════════════════════════════════════════
-// 主物料 / 客户 / 数量联动
+// 主物料 / 客户
 // ══════════════════════════════════════════════════════════════════════════════════
 /** 远程搜商品档案(空关键字不发请求:档案分支忽略 pageSize,空关键字 = 拉全表) */
 async function searchProducts(keyword) {
@@ -476,15 +467,6 @@ async function onProductPick(code) {
 function onCustomerPick(code) {
   const hit = customers.value.find((c) => str(c && c.客户编码) === str(code))
   form.value.客户名称 = str(hit && hit.客户名称)
-}
-
-/** 订单数量变化:生产数量未被手改过、或仍等于旧订单数量 ⇒ 同步(契约口径) */
-function onOrderQtyChange(v) {
-  const next = v === undefined || v === null || v === '' ? undefined : Number(v)
-  if (!producedTouched.value || sameQty(form.value.生产数量, prevOrderQty.value)) {
-    form.value.生产数量 = next
-  }
-  prevOrderQty.value = next
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════
@@ -614,7 +596,12 @@ async function saveDraft() {
     }
     ElMessage.success(`${tt('草稿已保存')} ${draftNo.value}`.trim())
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || tt('保存草稿失败'))
+    // 用户口径(2026-11-13):「点保存/提交只报一句『失败』,看不到原因」⇒ 依次取
+    //   ① 后端 message(业务校验原文,如「工艺路线尚未审核，不能用于生产工单」)
+    //   ② 异常自身 message(网络错误/超时等,axios 给的是可读英文)
+    //   ③ 兜底的中文文案
+    console.warn('[工单草稿保存] 失败:', e?.response?.status, e?.response?.data || (e && e.message) || e)
+    ElMessage.error(e?.response?.data?.message || e?.message || tt('保存草稿失败'))
   } finally {
     draftSaving.value = false
   }
@@ -654,8 +641,10 @@ async function submit() {
       leavingBySubmit = false             // 离开守卫已消费;万一没触发也复位,别让下次离开静默跳过
     }
   } catch (e) {
-    // 草稿提交失败时后端返回可读中文原因(草稿仍是草稿态,留在本页可继续改)
-    ElMessage.error(e?.response?.data?.message || tt(useDraft ? '提交失败' : '新增工单失败'))
+    // 用户口径(2026-11-13):提交失败必须**看得见原因** —— 后端 message 原样显示(草稿仍是草稿态,
+    // 留在本页可继续改);拿不到后端文案时退回异常自身 message(网络/超时),最后才是兜底文案。
+    console.warn('[工单提交] 失败:', e?.response?.status, e?.response?.data || (e && e.message) || e)
+    ElMessage.error(e?.response?.data?.message || e?.message || tt(useDraft ? '提交失败' : '新增工单失败'))
   } finally {
     submitting.value = false
   }

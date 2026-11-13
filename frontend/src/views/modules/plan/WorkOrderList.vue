@@ -46,6 +46,11 @@
       <el-button v-if="canCreate" size="small" plain @click="draftBoxVisible = true">
         {{ tt('草稿箱') }}<span v-if="draftCount > 0" class="wol-draft-cnt">{{ draftCount }}</span>
       </el-button>
+      <!-- 删除工单(2026-11-13 用户口径第二条):软删;订单结转转来的会释放 SO→PLANG 占用、订单行回到
+           订单结转可重转;已排产/有报工/已入库/已领料/已结案/切单子单/已有下游单据会被后端点名拒绝。
+           权限 = 页面动作词 del(「删除」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。 -->
+      <el-button v-if="canDo('del')" size="small" type="danger" plain @click="onDeleteWorkOrder"
+                 :disabled="!checked.length && !currentRow">{{ tt('删除工单') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
       <!-- 结案回正(2026-10-18):把「手机端小程序/参考库直连库误写成已结案」的行改回未结案。
@@ -1255,10 +1260,41 @@ function openMixingRecipe() {
   previewMixing()
 }
 
-/** 新增生产工单保存成功(2026-11-13):按当前查询条件重查,把新单带出来(新单日期=今天,默认窗口内可见) */
 /** 新增生产工单(2026-11-13 方案 A):跳整页编制(页面内可「保存草稿」),不再开弹窗 */
 function goCreate() {
   router.push({ path: '/prod/plan/workOrderCreate' })
+}
+
+/**
+ * 删除工单(2026-11-13 用户口径第二条)。
+ *
+ * <p>只允许**单行**(勾选或当前行):后端 `WorkOrderDeleteService` 会软删该行,若是订单结转转来的
+ * 还会释放 SO→PLANG 占用链 ⇒ 该订单行回到「订单结转」可重新转单;已排产/有报工/已入库/已领料/
+ * 已结案/切单子单/已有下游单据一律拒绝并点名原因(前端把后端 message 原样弹出)。
+ */
+async function onDeleteWorkOrder() {
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
+  const list = alive.length ? alive : (cur ? [cur] : [])
+  if (list.length !== 1) {
+    ElMessage.warning(list.length ? tt('请只勾选一张工单') : tt('请先勾选一张工单'))
+    return
+  }
+  const r = list[0]
+  const label = `${r['工单号']}${r['工单行号'] != null ? '#' + r['工单行号'] : ''}`
+  try {
+    await ElMessageBox.confirm(
+      `${tt('确认删除工单')} ${label}?\n${tt('删除后该订单行会回到订单结转(可重新转单);已排产/有报工的工单不能删除。')}`,
+      tt('删除工单'), { type: 'warning', confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  try {
+    const res = await request.post('/px/workOrderList/delete', { 行id: r['行id'] })
+    ElMessage.success((res.data && res.data['提示']) || tt('工单已删除'))
+    checked.value = []
+    currentRow.value = null
+    tableRef.value?.clearSelection?.()
+    await load()
+  } catch (e) { err(e, '删除失败') }
 }
 
 /** 草稿箱「继续编辑」:跳整页编制并带草稿 id 回填 */
