@@ -4621,3 +4621,6 @@ migrate-wo-ledger-rowid-align-20261112.sql
 
 # 2026-11-13 报工记录查询区参照字段「输入即查」:yj_panel.config 声明 queryInputRef=true + 后端参照字段 _fuzzy 模糊过滤 + 前端可输入联想(零DDL;幂等;两账套)
 migrate-wo-report-list-query-input-20261113.sql
+
+# 2026-11-13 生产工单「新增生产工单」(含临时工单):新表 wo_bom 工单物料清单 + 生产工单页面动作词 create(新增)授权(不动旧表;幂等;两账套)
+migrate-wo-bom-20261113.sql
