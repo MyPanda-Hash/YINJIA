@@ -5822,6 +5822,42 @@ export default {
     '输入片段即联想；未选候选回车按名称/编码片段查询':
       'Suggestions appear while you type; press Enter without picking one to search by name/code fragment',
     '打开参照': 'Open reference picker',
+    // ---- 生产工单四项需求(2026-11-13):
+    //   ①排单计划纸表加「订单数量」列;②生产工单页「新增」+ 新建弹窗;③新建弹窗「临时工单」页签
+    //   (临时 BOM 用料);④生产工单页「列设置」。键 = 中文原文(tt() 的显示层查表键),
+    //   数据键(工单类型/来源 的存储值 常规/临时)照旧存中文,只在显示时 tt()。
+    //   ⚠ 纸表/单据纸面文字不入本表(ADR-0001:纸面是固定版式事实)。
+    '工单类型': 'Work Order Type',
+    '日排产日期列': 'Daily Schedule Date Columns',
+    '新增生产工单': 'New Production Work Order',
+    '常规工单': 'Standard Work Order',
+    '临时工单': 'Temporary Work Order',
+    '主物料': 'Main Material',
+    '所需物料': 'Required Materials',
+    '子件规格': 'Component Spec',
+    '从标准BOM带出': 'Load from Standard BOM',
+    '添加行': 'Add Line',
+    '临时工单用料': 'Temporary Work Order Materials',
+    '临时': 'Temporary',
+    '常规': 'Standard',
+    '临时工单的用料保存到本工单自己的物料清单（临时BOM），领料/报工优先按它取料；常规工单不用填子件，领料按产品的《组装物料清单》标准BOM取料':
+      "Temporary work order materials are stored in this work order's own BOM (temporary BOM) and are used first for picking and reporting. A standard work order needs no component lines: picking uses the product's standard Assembly BOM.",
+    '临时工单至少要填写一行所需物料（子件）': 'A temporary work order needs at least one required material line',
+    '该产品没有标准组装BOM，请手工添加子件': 'No standard assembly BOM for this product; please add component lines manually',
+    '请选择主物料': 'Select the main material',
+    '订单数量必须大于 0': 'Order quantity must be greater than 0',
+    '生产数量必须大于 0': 'Production quantity must be greater than 0',
+    '请选择工艺路线': 'Select a process route',
+    '工艺路线尚未审核，不能用于生产工单': 'The process route is not approved and cannot be used',
+    '新增工单失败': 'Failed to create the work order',
+    '已新增生产工单': 'Production work order created',
+    '物料清单读取失败': 'Failed to load the BOM',
+    // 物料清单弹窗(2026-11-13):BOM 来源徽标 + 空清单提示(来源值是数据键 标准BOM/临时工单,显示时 tt())
+    '标准BOM': 'Standard BOM',
+    '该工单行没有维护物料清单': 'No material list is maintained for this work order line',
+    // 生产工单页两条历史 tooltip(2026-11-13 补译;此前一直缺 en,页面走查时补齐,非本次新增功能)
+    '该工单行没有工序台账(没预排产)': 'No process ledger for this work order line (not pre-scheduled)',
+    '不在本行排产区间(开工日~计划完工日)内': 'Outside this line\'s schedule window (start date to planned finish date)',
   },
 
 }

@@ -36,6 +36,11 @@
          无该动作词的角色不显示按钮 —— 此前本页连列表接口都没有校验(登录即可读全部工单/客户/数量)。
          2026-11-05:「转领料单」按钮下架(picking 词已从矩阵动作集移除),后端实现保留。 -->
     <div class="wol-btns">
+      <!-- 新增(2026-11-13 用户口径「让当前的生产工单可以新建生产工单」):打开「新增生产工单」弹窗。
+           弹窗两个页签 —— 常规工单(只填主物料,用料按产品的标准组装 BOM 取)/
+           临时工单(主物料 + 本工单自己的子件用料,落 wo_bom;领料/报工优先按它取料)。
+           权限 = 页面动作词 create(「新增」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。 -->
+      <el-button v-if="canCreate" size="small" type="primary" @click="createVisible = true">{{ tt('新增') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
       <!-- 结案回正(2026-10-18):把「手机端小程序/参考库直连库误写成已结案」的行改回未结案。
@@ -60,6 +65,10 @@
         </template>
       </el-dropdown>
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
+      <!-- 物料清单(2026-11-13):看这一行按哪份 BOM 领料 —— 临时工单 = 本工单用料(wo_bom),
+           常规工单 = 产品的标准组装物料清单(bs_asm_bom)。只读弹窗(权限=可见),也是"BOM 查不查得到"
+           这个问题的现场取证入口。 -->
+      <el-button size="small" plain :disabled="!checked.length && !currentRow" @click="openBom">{{ tt('物料清单') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <!-- 列设置(2026-11-13 用户口径「生产工单增加列设置,像订单结转那样」):勾选决定表格显示哪些列、
            拖动/▲▼ 调整列顺序;与订单结转共用系统级实现(useReportColumns + /px/reportColumnSettings,
@@ -254,7 +263,7 @@
     <!-- 滚动加载状态条(2026-11-09 用户口径 2.0:不要分页,改为「向下滚动才加载下一批」)
          数据一次查询已在前端内存(后端列表 ~330ms,不是瓶颈;卡的是 el-table 一次渲染全部行),
          所以「加载」= 继续渲染下一批,按当前显示顺序从上到下:首屏 50 行,滚近底部追加 50 行。
-         渲染本表一页的成本不低(列多:基础 36 + 日排产日期列,全量时 119 列),所以批次不敢再大;
+         渲染本表一页的成本不低(列多:基础 37(2026-11-13 加「工单类型」)+ 日排产日期列,全量时 120 列),所以批次不敢再大;
          到底后显示「已全部加载」。这里的提示也可点击(不滚轮/无滚动的场景也能继续加载)。 -->
     <div class="wol-loadmore" :class="{ 'is-end': !hasMore }">
       <span v-if="loadingMore" class="wol-lm-busy">{{ tt('加载中…') }}</span>
@@ -341,6 +350,53 @@
         <el-button type="primary" :loading="splitLoading" @click="doSplit">{{ tt('确认切单') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 新增生产工单(2026-11-13 用户口径):常规工单 / 临时工单两页签。
+         常规工单只填主物料(用料仍取产品标准组装 BOM);临时工单 = 上方主物料 + 下方所需物料
+         (落 wo_bom,领料/报工优先按它取料)。组件自包含,保存成功后 load() 刷新列表。 -->
+    <WorkOrderCreateDialog v-model="createVisible" @saved="onCreated" />
+
+    <!-- 工单物料清单(只读):临时工单=本工单用料(wo_bom);常规工单=产品标准组装 BOM。
+         用户提问「只填主物料、没写子物料会不会导致 BOM 查不到」的现场答案 —— 这里直接标出
+         「来源」与取到的行;两者都没有时提示去维护。 -->
+    <el-dialog v-model="bomVisible" :title="tt('物料清单')" width="820px" append-to-body>
+      <div v-if="bomTarget" class="wol-split">
+        <div class="wol-split-row">
+          <span>{{ tt('工单号') }} / {{ tt('工单行号') }}</span>
+          <b>{{ bomTarget['工单号'] }} #{{ bomTarget['工单行号'] ?? 1 }}</b>
+        </div>
+        <div class="wol-split-row">
+          <span>{{ tt('产品名称') }}</span>
+          <span>{{ bomTarget['产品名称'] }}（{{ bomTarget['物料编码'] }}）</span>
+        </div>
+        <div class="wol-split-row">
+          <span>{{ tt('来源') }}</span>
+          <span>
+            <el-tag size="small" :type="bomData?.来源 === '临时工单' ? 'warning' : 'success'">
+              {{ bomData?.来源 ? tt(bomData.来源) : '-' }}
+            </el-tag>
+            <template v-if="bomData?.单据编号"> · {{ bomData.单据编号 }}</template>
+            <template v-if="bomData?.版本号"> · {{ bomData.版本号 }}</template>
+          </span>
+        </div>
+      </div>
+      <el-table :data="bomData?.行 || []" size="small" border max-height="380" v-loading="bomLoading">
+        <el-table-column prop="行序" :label="tt('行序')" width="62" align="center" />
+        <el-table-column prop="子件编码" :label="tt('子件编码')" width="130" show-overflow-tooltip />
+        <el-table-column prop="子件名称" :label="tt('子件名称')" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="子件规格" :label="tt('子件规格')" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="计量单位" :label="tt('计量单位')" width="80" />
+        <el-table-column prop="标准用量" :label="tt('标准用量')" width="100" align="right" />
+        <el-table-column prop="损耗量" :label="tt('损耗量')" width="90" align="right" />
+        <el-table-column prop="备注" :label="tt('备注')" min-width="120" show-overflow-tooltip />
+      </el-table>
+      <div v-if="bomData && !(bomData.行 || []).length" class="wol-split-tip">
+        {{ tt('该工单行没有维护物料清单') }}
+      </div>
+      <template #footer>
+        <el-button @click="bomVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -355,6 +411,7 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
+import WorkOrderCreateDialog from './WorkOrderCreateDialog.vue'
 import { qtyText, dayColState, isToday, isPast, dayCellView, historyShortfalls, shortfallTotals, isOutOfPlanRange } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
@@ -372,6 +429,8 @@ import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 const permUser = useUserStore()
 const canDo = (word) => canDoPerm(permUser, 'WORK_ORDER_LIST', word)
 const canSchedule = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'SCHEDULE_BOARD'], 'assign'))
+/** 新增生产工单(2026-11-13):页面动作词 create(「新增」);后端 /workOrderList/create 同口径复核 */
+const canCreate = computed(() => canDo('create'))
 
 /** 路由:applyRouteKeyword 用 route 读 keyword、router.replace 清查询串 */
 const router = useRouter()
@@ -474,6 +533,13 @@ const mixingLoading = ref(false)
 const mixingData = ref(null)
 const mixingTarget = ref(null)
 const mixingQty = ref(0)
+/** 新增生产工单弹窗(2026-11-13):常规/临时两页签;保存成功后 load() 刷新列表 */
+const createVisible = ref(false)
+/** 物料清单弹窗(2026-11-13,只读):临时工单=本工单用料;常规工单=产品标准组装 BOM */
+const bomVisible = ref(false)
+const bomLoading = ref(false)
+const bomTarget = ref(null)
+const bomData = ref(null)
 /** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
 const traceVisible = ref(false)
 const traceNo = ref('')
@@ -539,6 +605,148 @@ const filtered = computed(() => rows.value.filter((r) => {
   return true
 }))
 
+// ── 表格列设置「什么查看什么不查看 + 列顺序」(2026-11-13 用户口径「增加列设置,像订单结转那样」)──────
+// 复用系统级实现:useReportColumns(列显隐/顺序 + 后端持久化 /px/reportColumnSettings,panelCode=WORK_ORDER_LIST)。
+// 弹窗里只放**可调整列**(显隐 + 顺序);以下列永远显示且固定在两端(它们是行标识与状态判据,
+//   隐藏后按钮点不了/看不出为什么不能操作):
+//   选择框(selection) / 展开(expand) / 工单号(fixed left,链接进追溯) / 生产状态(fixed right) / 结案(fixed right)。
+// ⚠ 顺序:草稿数组顺序 = 表格列顺序(visibleProps 按草稿顺序返回),保存后刷新仍按该顺序渲染。
+// prop = 列设置里的稳定键(= 中文标签,存进设置 JSON 里可读);key = 行数据键(默认同 prop;
+//   「工单行号→行号」「工单日期→单据日期」「转单数量→排产数量」这类列名与数据键不同的必须给 key,
+//   同时让 el-table 的 sortable 按正确的数据键排序。)
+const MID_COLUMNS = [
+  // 基础信息
+  { prop: '公司代码', width: 90, showOverflow: true },
+  { prop: '工单行号', key: '行号', width: 90, sortable: true },
+  { prop: '批次号', width: 100, sortable: true },
+  { prop: '源工单号', width: 140, showOverflow: true },
+  { prop: '拆分序号', width: 85, align: 'right' },
+  { prop: '工单日期', key: '单据日期', width: 100, sortable: true },
+  { prop: '转单时间', width: 140, sortable: true, showOverflow: true },
+  { prop: '物料编码', width: 130, showOverflow: true },
+  { prop: '产品名称', minWidth: 180, showOverflow: true },
+  { prop: '规格型号', minWidth: 160, showOverflow: true },
+  { prop: '客户', minWidth: 120, showOverflow: true },
+  { prop: '订单号', width: 150, showOverflow: true },
+  { prop: '订单行号', width: 90, align: 'right' },
+  { prop: '生产线', width: 110, showOverflow: true },
+  { prop: '需求数量', width: 100, align: 'right', sortable: true },
+  { prop: '转单数量', key: '排产数量', width: 95, align: 'right' },
+  { prop: '入库数量', width: 90, align: 'right' },
+  // 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):该列 = 本工单行需求 − 本行订单占用
+  //   (form_flow_link SO→PLANG 的 linked_quantity) —— 新口径(需求=转单量、占用链也写同一个数)下恒为 0,
+  //   正式库实测 399 行里 397 行为 0;有值时也只是"占用链没记全"的数据异常信号,与「当前工序还剩多少
+  //   未生产」无关、极易误读。后台字段照旧返回,界面不再展示(CSV 导出同步去掉)。
+  //   要看"还剩多少":用「工序进度」列(当前工序完工量/计划量),或工单排产页的「未交量」(排产−入库)。
+  //   要恢复:在上表里加 { prop: '余量', width: 90, align: 'right' } 即可(2026-11-13 起列定义集中在这里)。
+  // 领料单号(2026-10-18):一张工单可对应多张领料单,列里是逗号分隔的全部已审核单号 —— 加宽便于直接看
+  { prop: '领料单号', width: 200, showOverflow: true },
+  { prop: '成型配方', width: 170, showOverflow: true },
+  { prop: '打印人', width: 90 },
+  { prop: '打印时间', width: 140 },
+  { prop: '当前工序', width: 100, sortable: true },
+  // 排产日期与交期(2026-10-31:计划开工/完工日期双击弹「排产快速调整」,见模板渲染分支)
+  { prop: '计划开工日期', width: 112 },
+  { prop: '计划完工日期', width: 112 },
+  { prop: '交期紧迫度', width: 90, align: 'right' },
+  { prop: '7天需交付', width: 92, align: 'right' },
+  { prop: '15天需交付', width: 96, align: 'right' },
+  { prop: '大于15天需交付', width: 112, align: 'right' },
+  { prop: '7天已排', width: 88, align: 'right' },
+  { prop: '15天已排', width: 92, align: 'right' },
+  { prop: '大于15天已排', width: 108, align: 'right' },
+  // 工序进度与按量流转(2026-11-12,只读展示):上道完工量(上一道自己的报工数) → 可加工量(本道能做多少)
+  //   → 待报量(还能报) → 待流入量(还等上一道流下来)。
+  //   口径与报工页/追溯同源(后端 ProcessFlow.enrichRowFlow);这里只显示,不参与任何判定。
+  //   ⚠ 四个按量流转列的表头 tooltip 保留(move 到 headerTip,模板统一渲染)。
+  { prop: '工序进度', width: 120, align: 'right' },
+  { prop: '上道完工量', width: 110, align: 'right',
+    headerTip: '上道完工量 = 上一道已审核报工数(上一道自己的计量单位,不折算);换算率不同时,本道能做多少看「可加工量」' },
+  { prop: '可加工量', width: 100, align: 'right',
+    headerTip: '可加工量 = 上一道流下来的量(已按换算率折到本道单位),也就是本道现在最多能做多少' },
+  { prop: '待报量', width: 92, align: 'right',
+    headerTip: '待报量 = 可加工量 − 本工序已审报工(本道还能报多少)' },
+  { prop: '待流入量', width: 100, align: 'right',
+    headerTip: '待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)' },
+  // 新列(2026-11-13 生产工单四项需求):工单类型 = '临时'(该工单行有临时工单用料 wo_bom)/ '常规';
+  //   值是数据键(存中文),显示层 tt() 翻成 Standard / Temporary。
+  { prop: '工单类型', width: 100, align: 'center' },
+]
+/**
+ * 列设置末尾的**伪列**:控制整组「日排产日期列」的显隐(日期列本身不进列设置 ——
+ * 天数由后端按数据生成,几十列塞进弹窗没法用;用户要的是"整组要不要看")。
+ * 它只作为草稿里的一项存在:渲染时被 orderedColumns 过滤掉(不在 MID_COLUMNS 里),只读它的勾选态。
+ */
+const DAY_PLAN_COL_PROP = '日排产日期列'
+/** 传进 useReportColumns 的字段名列表(末尾附伪列 ⇒ 弹窗里排最后一项;默认顺序 = 上表顺序) */
+const MID_PROPS = [...MID_COLUMNS.map((c) => c.prop), DAY_PLAN_COL_PROP]
+const {
+  columnVisible, columnDraft, visibleProps,
+  openDialog, saveDialog, cancelDialog, init: initColumns, resetDraft,
+} = useReportColumns(ref('WORK_ORDER_LIST'), computed(() => MID_PROPS), rows)
+
+/** 表格实际渲染的可调整列:按「列设置」草稿顺序 + 显隐过滤(未保存过 = 默认顺序、全部显示) */
+const orderedColumns = computed(() => visibleProps.value
+  .map((prop) => MID_COLUMNS.find((c) => c.prop === prop))
+  .filter(Boolean))
+
+/** 日排产日期列组是否显示:由伪列「日排产日期列」的勾选态决定(草稿还没建好 = 默认可见) */
+const dayPlanColVisible = computed(() => {
+  const hit = columnDraft.value.find((c) => c.prop === DAY_PLAN_COL_PROP)
+  return hit ? hit.visible !== false : true
+})
+/** 实际渲染的日期列(隐藏时给空数组,避免用 template v-if 包一层 el-table-column) */
+const dayPlanCols = computed(() => (dayPlanColVisible.value ? planCols.value : []))
+
+/** 勾选/取消勾选:只改草稿,点弹窗「保存」才落后端 */
+function onColToggle({ prop, visible }) {
+  const col = columnDraft.value.find((c) => c.prop === prop)
+  if (col) col.visible = visible
+}
+/**
+ * ▲/▼ 调整列顺序:只改草稿数组顺序(草稿即预览),点「保存」才落后端;
+ * delta=-1 上移/靠左,+1 下移/靠右。
+ */
+function onColMove({ prop, delta }) {
+  const arr = columnDraft.value
+  const i = arr.findIndex((c) => c.prop === prop)
+  const j = i + (Number(delta) || 0)
+  if (i < 0 || j < 0 || j >= arr.length) return
+  const [moved] = arr.splice(i, 1)
+  arr.splice(j, 0, moved)
+}
+/** 拖动换位:把某行拖到另一行的位置 = 从 from 摘下插到 to(下标基于草稿全量数组);同样只改草稿 */
+function onColReorder({ from, to }) {
+  const arr = columnDraft.value
+  const a = Number(from)
+  const b = Number(to)
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return
+  if (a < 0 || b < 0 || a >= arr.length || b >= arr.length || a === b) return
+  const [moved] = arr.splice(a, 1)
+  arr.splice(b, 0, moved)
+}
+/**
+ * 弹窗开/关:关(取消按钮或右上角 X)= **丢弃未保存的勾选与顺序**,回到后端已保存那份。
+ * 不这么做的话,草稿即生效(visibleProps 从草稿派生)⇒ 点「取消」列也已经被改掉了。
+ */
+function onColumnDialogToggle(open) {
+  if (open) { columnVisible.value = true; return }
+  cancelDialog()
+  // 列数可能变回来 ⇒ 表格 body 可能重建,滚动容器要重绑(否则向下滚动不再追加)
+  nextTick(() => bindTableScroll())
+}
+/**
+ * 保存列设置(后端按 panelCode 存一份,刷新/换浏览器都生效;失败如实提示,不谎报「已保存」)。
+ * 保存后可见列数变了 ⇒ el-table 可能重建 body 滚动容器,重新绑定滚动加载监听。
+ */
+async function saveColumns() {
+  const ok = await saveDialog()
+  if (ok) ElMessage.success(tt('已保存'))
+  else ElMessage.warning(tt('保存失败'))
+  await nextTick()
+  bindTableScroll()
+}
+
 /**
  * 滚动加载(2026-11-09 用户口径 2.0,取代上一版分页):**不要分页,向下滚动才加载下一批**。
  *
@@ -547,7 +755,7 @@ const filtered = computed(() => rows.value.filter((r) => {
  * 所以这里做「增量渲染」:先渲染前 50 行(当前显示顺序 = 后端返回顺序,从上到下),滚到接近底部再追加 50 行。
  * 行数据始终全部在内存里 ⇒ 跨页/跨批勾选(reserve-selection)、导出、结案/切单/打印等原能力不变。
  *
- * 为什么一批 50:本表列数极多(基础 36 列 + 数据驱动的日排产日期列,全量时 119 列),验收实测
+ * 为什么一批 50:本表列数极多(基础 37 列(2026-11-13 加「工单类型」)+ 数据驱动的日排产日期列,全量时 120 列),验收实测
  * 50 行一批的渲染成本已到 ~2 秒长任务量级;批次再大就会重新变成"滚动一下卡几秒"。
  */
 const LOAD_BATCH = 50
@@ -1041,6 +1249,44 @@ function openMixingRecipe() {
   previewMixing()
 }
 
+/** 新增生产工单保存成功(2026-11-13):按当前查询条件重查,把新单带出来(新单日期=今天,默认窗口内可见) */
+async function onCreated(payload) {
+  createVisible.value = false
+  const no = payload && payload['工单号'] ? payload['工单号'] : ''
+  if (no) {
+    // 默认窗口是"近 15 天";新单日期=今天 ⇒ 正常能查到。这里不改查询条件,避免打断现场当前视图。
+    ElMessage.success(`${tt('已新增生产工单')} ${no}`)
+  }
+  await load()
+}
+
+/**
+ * 物料清单(2026-11-13,只读):取当前勾选/当前行(单行)的 BOM。
+ *
+ * <p>口径见 {@code WorkOrderBomService}:临时工单 → 本工单用料(wo_bom);常规工单 → 产品标准组装 BOM
+ * (bs_asm_bom,按产品编码取最新一版)。这也是"只填主物料会不会查不到 BOM"的现场答案:
+ * 常规工单即使没填子件,这里照样能查到产品的标准用料。
+ */
+async function openBom() {
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
+  const list = alive.length ? alive : (cur ? [cur] : [])
+  if (!list.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
+  const row = list[0]
+  bomTarget.value = row
+  bomData.value = null
+  bomVisible.value = true
+  bomLoading.value = true
+  try {
+    const res = await request.post('/px/workOrderList/bom', { 行id: row['行id'], 物料编码: row['物料编码'] })
+    bomData.value = res.data || res || null
+  } catch (e) {
+    err(e, '物料清单读取失败')
+  } finally {
+    bomLoading.value = false
+  }
+}
+
 async function previewMixing() {
   if (!mixingTarget.value) return
   try {
@@ -1153,6 +1399,9 @@ function dayStr(n) {
 }
 
 onMounted(async () => {
+  // 列设置(2026-11-13):先把后端已保存的列显隐/顺序应用上 —— 不打开弹窗也要按用户口径渲染,
+  // 否则刷新后表格又是全部列(与订单结转页同一口径)。读取失败 ⇒ 草稿=全部可见,不阻断页面。
+  await initColumns()
   // 从桌面「单据入口」带 keyword 进来优先(否则按默认 15 天窗口取数)
   const routed = applyRouteKeyword()
   if (!routed && !(datePick.value || []).length) {

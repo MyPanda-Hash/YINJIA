@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.ProcessFlow;
+import com.yinjia.mes.service.WorkOrderBomService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,10 +42,13 @@ public class WorkReportController {
 
     private final JdbcTemplate jdbc;
     private final ButtonService buttons;
+    /** BOM 取数(2026-11-13 收口):临时工单用料 wo_bom 优先 → 产品标准组装 BOM 兜底 */
+    private final WorkOrderBomService bomService;
 
-    public WorkReportController(JdbcTemplate jdbc, ButtonService buttons) {
+    public WorkReportController(JdbcTemplate jdbc, ButtonService buttons, WorkOrderBomService bomService) {
         this.jdbc = jdbc;
         this.buttons = buttons;
+        this.bomService = bomService;
     }
 
     /**
@@ -149,59 +153,21 @@ public class WorkReportController {
         out.put("可报工行", rows);      // 同工单其它行(扫错行时可切换)
         // 组装物料清单(2026-11-01 用户口径:「只有组装工序有 BOM;工序报工这里选到『组装』时,
         //   要能看到当前工单对应的组装 BOM,其它工序的 BOM 和这个无关」)。
-        // 取数 = bs_asm_bom(组装物料清单,一行=一个子件,按 BOM编码 分组);前端只在选中「组装」时展示。
-        out.put("组装物料", asmBomOf(str(head.get("物料编码"))));
+        // 2026-11-13:取数收口到 {@link WorkOrderBomService} —— **临时工单用料(wo_bom)优先**,
+        //   否则按产品编码取标准组装 BOM;与手机扫码领料端同一口径(不再各写一套 SQL)。
+        WorkOrderBomService.Bom bom = bomService.ofRow(rowId, str(head.get("物料编码")));
+        Map<String, Object> asmBom = new LinkedHashMap<>();
+        // 临时工单没有独立 BOM 单号 ⇒ 用「临时工单」占位显示;标准 BOM 沿用原「单据编号」语义
+        asmBom.put("BOM编号", bom.temporary() ? "临时工单" : bom.docNo());
+        asmBom.put("版本号", bom.version());
+        asmBom.put("来源", bom.temporary() ? "临时工单" : bom.origin());
+        asmBom.put("行", bom.lines());
+        out.put("组装物料", asmBom);
         return ApiResult.ok(out);
     }
 
-    /**
-     * 工单行产品的**组装物料清单**(2026-11-01 用户口径:只有「组装」工序有 BOM,
-     * 工序报工页面选到「组装」时显示当前工单的组装物料;其它工序的 BOM 与此无关)。
-     *
-     * <p>只读:按 产品编码 + 工序=N'组装' + 状态≠停用 取一张 BOM 单 ——
-     * 「默认BOM=是」优先,其次版本号最大(当前库每个产品只有 1 个版本,无歧义);
-     * 再按 行序 取该单的全部子件行。查不到时返回空行集合,由前端提示"该产品还没有维护组装BOM"。
-     *
-     * @param productCode 工单行的产品编码(plang.dm)
-     * @return { BOM编号, 版本号, 来源, 行:[{行序,子件编码,子件名称,子件规格,计量单位,标准用量,损耗量,备注}] }
-     */
-    private Map<String, Object> asmBomOf(String productCode) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("BOM编号", "");
-        out.put("版本号", "");
-        out.put("来源", "");
-        out.put("行", List.of());
-        String code = productCode == null ? "" : productCode.trim();
-        if (code.isEmpty()) return out;
-        List<Map<String, Object>> docs = jdbc.queryForList(
-                "SELECT TOP 1 单据编号, 版本号, ISNULL(默认BOM,N'') AS 默认BOM, ISNULL(来源,N'') AS 来源"
-                        + " FROM dbo.bs_asm_bom"
-                        + " WHERE 产品编码=? AND 工序=N'组装' AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + "   AND ISNULL(状态,N'启用')<>N'停用'"
-                        + " GROUP BY 单据编号, 版本号, 默认BOM, 来源"
-                        // 2026-11-04 与 MobilePickController.latestAsmBom 对齐为**同一套三段排序**:
-                        //   默认BOM='是' 优先 → 版本号 DESC → 单据编号 DESC(tie-break)。
-                        //   补最后一段的理由:bs_asm_bom 没有「单据日期」列 ⇒ nextVersionNo 对同日新建的多张 BOM
-                        //   恒产出 V<当天>-01,同产品两版**版本号可能相同**;此时只按 版本号 DESC 两端会拿到不同
-                        //   的一张(报工端/领料端不一致)。单号 DESC 兜底让两端结果确定且一致。
-                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'')=N'是' THEN 0 ELSE 1 END,"
-                        + " 版本号 DESC, 单据编号 DESC",
-                code);
-        if (docs.isEmpty()) return out;
-        Map<String, Object> doc = docs.get(0);
-        String bomNo = str(doc.get("单据编号"));
-        out.put("BOM编号", bomNo);
-        out.put("版本号", str(doc.get("版本号")));
-        out.put("来源", str(doc.get("来源")));
-        out.put("行", jdbc.queryForList(
-                "SELECT ISNULL(行序,0) AS 行序, ISNULL(子件编码,N'') AS 子件编码,"
-                        + " ISNULL(子件名称,N'') AS 子件名称, ISNULL(子件规格,N'') AS 子件规格,"
-                        + " ISNULL(计量单位,N'') AS 计量单位, ISNULL(标准用量,0) AS 标准用量,"
-                        + " ISNULL(损耗量,0) AS 损耗量, ISNULL(行备注,N'') AS 备注"
-                        + " FROM dbo.bs_asm_bom WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " ORDER BY ISNULL(行序,999), id", bomNo));
-        return out;
-    }
+    // ⚠ 2026-11-13:原 private asmBomOf(...) 已删除 —— BOM 取数收口到 {@link WorkOrderBomService}
+    //   (临时工单用料 wo_bom 优先 → 产品标准组装 BOM 兜底),与手机扫码领料端同一口径。
 
     /**
      * 提交报工:建 {@code WO_REPORT} 报工单并**立即审核** —— 只有审核才会触发

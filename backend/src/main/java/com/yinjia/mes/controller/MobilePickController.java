@@ -6,6 +6,7 @@ import com.yinjia.mes.service.FormNoService;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.WoPickDocService;
+import com.yinjia.mes.service.WorkOrderBomService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,7 +43,9 @@ import java.util.Map;
  * <h3>BOM 来源(2026-10-30 二次确认;2026-11-02 换表)</h3>
  * 用户二次确认:「就是组装BOM表(RD_ASM_BOM),我去把数据录进去」。
  * ⚠ 2026-11-02 起数据源已迁到 {@code bs_asm_bom}(数据建模 → 生产 → 组装物料清单,面板 ASM_BOM,
- * 单表 doc 模式;取数与明细见 {@code latestAsmBom} / {@code bomDetail} 的方法注释)。
+ * 单表 doc 模式;取数与明细见 {@link com.yinjia.mes.service.WorkOrderBomService})。
+ * 2026-11-13 起再上一层:**临时工单用料(wo_bom)优先**,没有才回落 {@code bs_asm_bom} 标准 BOM
+ * (用户口径「新增生产工单→临时工单,上方主物料下方所需物料」)。
  * 取数口径 = 按工单行的**产品编号 + 工序=N'组装'**取最新一版 BOM(默认BOM='是' 优先,其次版本号最大),
  * 再取该单 {@code 子件编码 / 子件名称 / 子件规格 / 标准用量}。
  *
@@ -93,15 +96,21 @@ public class MobilePickController {
     private final PanelPermissionService perm;
     /** 单号池:生单时**只取号**(LL-…),不建材料出库单 —— 那张单要等提交才生成 */
     private final FormNoService formNo;
+    /**
+     * 工单 BOM 取数(2026-11-13 收口):临时工单用料 wo_bom 优先 → 产品标准组装 BOM 兜底。
+     * 此前后端在本类与 WorkReportController 各写一套 SQL,改排序就要改两处(见类注释)。
+     */
+    private final WorkOrderBomService bomService;
 
     public MobilePickController(JdbcTemplate jdbc, WoPickDocService docs,
                                 ButtonService buttons, PanelPermissionService perm,
-                                FormNoService formNo) {
+                                FormNoService formNo, WorkOrderBomService bomService) {
         this.jdbc = jdbc;
         this.docs = docs;
         this.buttons = buttons;
         this.perm = perm;
         this.formNo = formNo;
+        this.bomService = bomService;
     }
 
     // ══════════════════════════ ⓪ 开单工作台(批量生单) ══════════════════════════
@@ -329,19 +338,38 @@ public class MobilePickController {
             return existingResult(exist, lineWoNo, line, wo, wantPrint);
         }
 
-        // 按产品编号取该产品的组装 BOM 表头 → 其明细行
+        // BOM 取数(2026-11-13 收口到 WorkOrderBomService):
+        //   **临时工单用料(wo_bom)优先** → 产品标准组装物料清单(bs_asm_bom)兜底。
+        //   用户提问「只填主物料、没写子物料会不会查不到 BOM」:常规工单本来就不在工单上填子件,
+        //   它是**按产品编码**去查标准 BOM 的 ⇒ 只要产品维护过《组装物料清单》就查得到;
+        //   临时工单（产品没标准 BOM / 用料与标准不同）才在工单上填子件，这里优先用它。
         String productCode = str(wo.get("物料编码"));
-        Map<String, Object> bomHead = latestAsmBom(productCode);
-        if (bomHead == null) {
-            throw new IllegalStateException("该工单的产品(" + (productCode.isEmpty() ? "未填产品编号" : productCode)
-                    + ")在《组装物料清单》里还没有维护用料,无法生成领料单:"
-                    + "请先到 数据建模 → 生产 → 组装物料清单 维护该产品的物料清单");
+        WorkOrderBomService.Bom bom = bomService.ofRow(wo.get("行id"), productCode);
+        if (bom.isEmpty()) {
+            throw new IllegalStateException("该工单行没有任何可用物料清单,无法生成领料单:工单 " + lineWoNo + " 第 " + line + " 行"
+                    + (productCode.isEmpty() ? "(未填产品编号)" : "(产品 " + productCode + ")")
+                    + " 既没有临时工单用料(wo_bom),产品在《组装物料清单》里也没有维护标准 BOM。"
+                    + "请先到 数据建模 → 生产 → 组装物料清单 维护该产品,或用「生产工单 → 新增 → 临时工单」录入所需物料");
         }
-        List<Map<String, Object>> bomLines = bomDetail(str(bomHead.get("单据编号")));
+        // 映射成本类下游沿用的领料行形态(物料编号/物料名/物料规格/用量/计量单位)
+        List<Map<String, Object>> bomLines = new ArrayList<>();
+        for (Map<String, Object> b : bom.lines()) {
+            String code = str(b.get("子件编码"));
+            if (code.isEmpty()) continue;      // 没有物料编号的行不参与领料
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("物料编号", code);
+            m.put("物料名", str(b.get("子件名称")));
+            m.put("物料规格", str(b.get("子件规格")));
+            m.put("用量", num(b.get("标准用量")));
+            m.put("计量单位", str(b.get("计量单位")));
+            bomLines.add(m);
+        }
         if (bomLines.isEmpty()) {
-            throw new IllegalStateException("《组装物料清单》" + str(bomHead.get("单据编号"))
-                    + " 没有明细行(该产品没维护物料),无法生成领料单");
+            throw new IllegalStateException("「" + ("临时工单".equals(bom.source()) ? "临时工单用料" : "组装物料清单 " + bom.docNo())
+                    + "」没有可用的明细行(物料编码为空),无法生成领料单");
         }
+        // BOM 抬头文案:临时工单没有独立单号,备注里写「临时工单用料」;标准 BOM 沿用原「组装工艺清单 <单号>」
+        final String bomLabel = "临时工单".equals(bom.source()) ? "临时工单用料" : "组装工艺清单 " + bom.docNo();
         // 单位缺失时**在生单前**就给出点名提示(而不是让 ButtonService 抛"明细第 N 行计量单位不能为空")
         List<String> noUnit = new ArrayList<>();
         for (Map<String, Object> b : bomLines) {
@@ -402,7 +430,7 @@ public class MobilePickController {
             if (!lineWh[1].isEmpty()) item.put("仓库编码", lineWh[1]);
             // 备注留痕:**单件用量、工单数量、需求合计**都写清楚 —— 现场看到 2000 时能自己算出
             // 「2/支 × 1000 支 = 2000」。bomUsageOf 取的是「需求 N」里的 N(合计),不是单件用量。
-            item.put("明细备注", "生产领料·组装工艺清单 " + str(bomHead.get("单据编号"))
+            item.put("明细备注", "生产领料·" + bomLabel
                     + "(用量 " + fmtQty(unit) + " × 工单 " + fmtQty(woQty) + " = 需求 " + fmtQty(need) + ")");
             outItems.add(item);
             // 单头仓库:第一行有仓就记第一行的(全部同仓时才是"这单从哪个仓出")
@@ -456,7 +484,8 @@ public class MobilePickController {
         out.put("id", id);
         out.put("领料单号", outNo);
         out.put("工单", wo);
-        out.put("BOM单据编号", str(bomHead.get("单据编号")));
+        out.put("BOM单据编号", bom.docNo());
+        out.put("BOM来源", bom.source());
         out.put("物料项数", bomLines.size());
         out.put("状态", WoPickDocService.STATE_OPEN);
         out.put("重复", false);
@@ -1370,7 +1399,7 @@ public class MobilePickController {
      * 没带行号时取该工单的第一行(与工序报工 context 接口同一退化口径)。
      */
     private Map<String, Object> resolveWoLine(String woNo, int line) {
-        String sql = "SELECT TOP 1 p.pl_no AS 工单号, p.pl_xc AS 工单行号, ISNULL(p.dm,N'') AS 物料编码,"
+        String sql = "SELECT TOP 1 p.pl_no AS 工单号, p.pl_xc AS 工单行号, p.id AS 行id, ISNULL(p.dm,N'') AS 物料编码,"
                 + " ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.jldw,N'') AS 计量单位,"
                 + " ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.lot_no,N'') AS 批号,"
                 + " ISNULL(p.完工状态,N'') AS 完工状态"
@@ -1389,75 +1418,10 @@ public class MobilePickController {
         return wo;
     }
 
-    /**
-     * 取该产品**最新一张**《组装工艺清单》的表头(用于领料展开与追溯留痕)。
-     * <p>🔴 2026-11-02 用户口径:「生成生产领料单的 bom,关联改为用数据建模的生产里面的组装物料清单」。
-     * <ul>
-     *   <li>数据源从 {@code rd_asm_proc_head/_detail}(研发管理 → 组装工艺清单 → 页签1「组装BOM表」)
-     *       **迁到** {@code bs_asm_bom}(数据建模 → 生产 → 组装物料清单,面板 ASM_BOM,单表 doc 模式)。</li>
-     *   <li>为什么换:两处各维护一份组装用料,现场在「组装物料清单」里改完,
-     *       领料单还按「组装工艺清单」那一份走 ⇒ 领的料与工艺不一致;</li>
-     *   <li>取数口径(2026-11-04 起与工序报工端 WorkReportController.asmBomOf **同口径**):
-     *       同一产品可能有多版 BOM —— **优先 默认BOM='是'**,其次 **版本号最大**,最后 单据编号 DESC 兜底
-     *       (同版本时排序稳定,tie-break 用)。</li>
-     *   <li>⚠ 为什么不再按「单据编号最大 = 最新版本」推断(2026-11-04):表头可维护后,现场新增的
-     *       BOM 走 MES 自动号 {@code BOM-yyyy-MM-nnnn},其字符串序**恒小于**金蝶历史号
-     *       {@code T387_V0001} / {@code A-32-09_V0002} ⇒ 旧口径(单号 DESC)会把新版本判成旧单:
-     *       工序报工端按版本号取到新 BOM、扫码领料端却取旧 BOM,两份数据不一致、可能领错料。
-     *       版本号列是 nvarchar,{@code V0001}/{@code V2026-…} 的字符串序即版本序(与报工端同一假设)。</li>
-     *   <li>只认 {@code 工序='组装'}:这张单表还承载成型/切炭等工序的用料,不过滤会串料。</li>
-     * </ul>
-     */
-    private Map<String, Object> latestAsmBom(String productCode) {
-        if (productCode == null || productCode.isBlank()) return null;
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP 1 单据编号, 产品编码 AS 产品编号, 产品名称,"
-                        + " ISNULL(版本号,N'') AS 版本号, ISNULL(默认BOM,N'') AS 默认BOM"
-                        + " FROM dbo.bs_asm_bom"
-                        + " WHERE 产品编码 = ? AND 工序 = N'组装' AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + "   AND ISNULL(状态,N'') <> N'作废'"
-                        // 2026-11-04 与 WorkReportController.asmBomOf 同口径:默认BOM 优先 → 版本号最大 →
-                        // 单据编号兜底。历史「单号最大=最新版本」对 MES 自动号(BOM-2026-…)失效,见方法注释。
-                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'') = N'是' THEN 0 ELSE 1 END,"
-                        + " 版本号 DESC, 单据编号 DESC",
-                productCode.trim());
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    /**
-     * 组装物料清单(ASM_BOM)里这张 BOM 的明细行(物料编号/物料名/物料规格/用量)。
-     *
-     * <p>🔴 数据源 = {@code bs_asm_bom}(2026-11-02 起;此前是 {@code rd_asm_proc_detail} 的
-     * {@code 表区='物料清单'} 行)。这张表本来就是「一行一个子件」的单表结构,不需要表区过滤。
-     *
-     * <p>⚠ 用量取 {@code 标准用量}(导入时已按 用量分子/用量分母 折算成 4 位小数),
-     * 不用分子分母再算一遍 —— 两边口径必须一致,否则领料数量与清单对不上。
-     *
-     * <p>⚠ 计量单位:清单里这一列允许为空(导入时先空、由存货档案回填) ⇒
-     * 空时退回 {@code bs_inv.计量单位};两边都空时上层会点名报错(材料出库单该列必填)。
-     */
-    private List<Map<String, Object>> bomDetail(String bomNo) {
-        List<Map<String, Object>> raw = jdbc.queryForList(
-                "SELECT ISNULL(d.子件编码,N'') AS 物料编号, ISNULL(d.子件名称,N'') AS 物料名,"
-                        + " ISNULL(d.子件规格,N'') AS 物料规格, ISNULL(d.标准用量,0) AS 用量,"
-                        + " ISNULL(NULLIF(ISNULL(d.计量单位,N''),N''), ISNULL(i.计量单位,N'')) AS 计量单位,"
-                        + " ISNULL(i.规格型号,N'') AS 档案规格"
-                        + " FROM dbo.bs_asm_bom d"
-                        + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = d.子件编码 AND ISNULL(i.asp_cancel,'N') <> 'Y'"
-                        + " WHERE d.单据编号 = ? AND ISNULL(d.asp_cancel,'N') <> 'Y'"
-                        + " ORDER BY d.行序, d.id", bomNo);
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> r : raw) {
-            if (str(r.get("物料编号")).isEmpty()) continue;   // 没有物料编号的行不参与领料
-            Map<String, Object> m = new LinkedHashMap<>(r);
-            // BOM 上的规格优先(那是这一版工艺的写法),没有就用存货档案的规格
-            String spec = str(r.get("物料规格"));
-            if (spec.isEmpty()) m.put("物料规格", str(r.get("档案规格")));
-            m.put("计量单位", str(r.get("计量单位")));
-            out.add(m);
-        }
-        return out;
-    }
+    // ⚠ 2026-11-13:原 private latestAsmBom(...) / bomDetail(...) 已删除 —— BOM 取数收口到
+    //   {@link WorkOrderBomService}(临时工单用料 wo_bom 优先 → 标准组装 BOM 兜底),避免本类与
+    //   WorkReportController 各写一套排序/单位兜底(2026-11-04 出过两端取到不同 BOM 版本的事故)。
+    //   历史注释与口径留档见 {@link WorkOrderBomService#standardOf(String)}。
 
     /**
      * 保存一张草稿单,返回单号(空单号由 FormNoService 生成)。

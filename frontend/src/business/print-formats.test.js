@@ -254,6 +254,8 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     客户等级: '', 客户: '张莉', 加工单号: 'GD-2026-10-0226-1', 工单行号: 1, 公司代码: '0',
     物料编码: 'S031-3', 规格型号: '28*12*178', 生产线: '1号机',
     未交量: 10, 排产数量: 10, 当前工序完工量: 0,
+    // 2026-11-13 新增「订单数量」列:老数据没有 订单数量 键 ⇒ 印 需求数量 兜底
+    需求数量: 200,
     交期: '2026-11-05', 交期紧迫度: 5, '7天已排': 10, '15天已排': 10, '大于15天已排': 0,
     日计划: { '2026-10-31': 2, '2026-11-01': 2, '2026-11-05': 3 },
   }]
@@ -265,6 +267,14 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     '生产计划<br>数量', '实际完成<br>数量', '成型交期', '成型交期<br>紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
+  // 2026-11-13 用户口径「所有生产工单排单计划增加订单数量这个字段」:
+  //   列头单行(订单数量),位置在「未完成总数」之后、「生产计划数量」之前;值取 订单数量 ?? 需求数量。
+  assert.ok(html.includes('>订单数量</th>'), '表头应含 订单数量')
+  const iDone = html.indexOf('>未完成<br>总数</th>')
+  const iOrder = html.indexOf('>订单数量</th>')
+  const iPlan = html.indexOf('>生产计划<br>数量</th>')
+  assert.ok(iDone >= 0 && iDone < iOrder && iOrder < iPlan, '列顺序:未完成总数 → 订单数量 → 生产计划数量')
+  assert.ok(html.includes('<td class="r">200</td>'), '订单数量为空时退回 需求数量(200)照印,不是空列')
   // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
   assert.ok(!html.includes('>客户等级</th>'), '客户等级全空 ⇒ 默认隐藏该列')
   // 有值时才印(甲/乙/丙…)——用同一行补一个非空等级再生成一次
@@ -282,6 +292,29 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
   assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+// 2026-11-13 用户口径:排单计划纸表加「订单数量」列。
+//   取数口径 = `订单数量 ?? 需求数量`:工单行自己有订单数量(plang.xq_sl)就用它,
+//   没有(老数据/老接口没回这个键)才退回需求数量 —— 绝不打出空列。
+test('schedPlanSheetHtml:订单数量列 — 有订单数量取它,没有退回需求数量', async () => {
+  const base = {
+    客户: 'A', 加工单号: 'GD-ORD-1', 工单行号: 1, 公司代码: '0', 物料编码: 'S031-3',
+    规格型号: '28*12', 生产线: '1号机', 未交量: 10, 排产数量: 10, 当前工序完工量: 0,
+    日计划: { '2026-10-31': 1 },
+  }
+  const withOrder = await schedPlanSheetHtml([{ ...base, 订单数量: 300, 需求数量: 200 }],
+    ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(withOrder.includes('>订单数量</th>'), '订单数量为固定列(单行表头)')
+  assert.ok(withOrder.includes('<td class="r">300</td>'), '有订单数量 ⇒ 印订单数量(不是需求数量)')
+  assert.ok(!withOrder.includes('<td class="r">200</td>'), '有订单数量时不再印需求数量')
+
+  const fallback = await schedPlanSheetHtml([{ ...base, 需求数量: 200 }], ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(fallback.includes('<td class="r">200</td>'), '没有订单数量 ⇒ 退回需求数量')
+
+  const empty = await schedPlanSheetHtml([{ ...base }], ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(empty.includes('>订单数量</th>'), '订单数量是固定版式列:没有数据也照印表头(不留手写空格)')
+  assert.ok(!empty.includes('undefined'), '两个键都没有 ⇒ 空格子,不得漏出 undefined')
 })
 
 // 2026-11-05 客户口径:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置」
@@ -399,8 +432,9 @@ test('schedPlanSheetHtml:2026-11-05 版式 — 日期先占 6%/天,固定列拿�
   const rows = [mk(1), mk(2), mk(3)]
   const h3d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29', '2026-10-30', '2026-10-31'] })
   assert.ok(h3d.includes('<col style="width:6.00%"/>'), '3 天 ⇒ 每天 6%(≈65px,4 位数字 + 横排表头都放得下)')
-  // 固定列按剩余宽度分:客户名称/单据编号拿 10.49%(旧的压窄算法只有 9%/10%)
-  assert.ok(h3d.includes('<col style="width:10.49%"/>'), '客户名称/单据编号 各 10.49%')
+  // 固定列按剩余宽度分:客户名称/单据编号 各 9.84%(旧的压窄算法只有 9%/10%;
+  //   2026-11-13 加「订单数量」列后固定列总基准宽度变大 ⇒ 10.49% → 9.84%)
+  assert.ok(h3d.includes('<col style="width:9.84%"/>'), '客户名称/单据编号 各 9.84%')
   assert.ok(h3d.includes('padding:3px 3px;font-size:10.5px'), '正文 10.5px(≈7.9pt)、内边距 3px')
   assert.ok(h3d.includes('font-weight:600;text-align:center;font-size:9.5px'), '表头 9.5px')
   assert.ok(h3d.includes('@page{size:A4 landscape;margin:8mm 6mm}'), 'A4 横向,上下 8mm / 左右 6mm')
@@ -436,8 +470,8 @@ test('schedPlanSheetHtml:日期表头始终横排;超过 10 列只印前 10 列'
   const d31 = planSheetWindow('2026-10-01', 31)
   const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
   assert.equal((h31.match(/<th class="dt"/g) || []).length, 10, '31 天入参也只印前 10 列')
-  // 每行日期格 10 个 + 数字列 7 个(未完成总数/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
-  assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 7), '每行 10 个日期格 + 7 个数字列')
+  // 每行日期格 10 个 + 数字列 8 个(未完成总数/订单数量/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
+  assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 8), '每行 10 个日期格 + 8 个数字列')
   assert.ok(!h31.includes('td.d{font-size:7px'), '不再需要「极窄格降字号」那套补丁')
 })
 

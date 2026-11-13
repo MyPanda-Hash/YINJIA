@@ -358,8 +358,12 @@ public class QuickScheduleService {
      * <p>为什么走 yj_doc_status 而不是读 {@code bs_route.审核状态} 列：那一列是**显示投影**，
      * 依赖触发器是否触发;状态表才是状态机的唯一凭据(与 {@code docStatusOf} 同源)。
      * 取不到状态行 ⇒ 该路线从未走过审核流 ⇒ 视为未审核。</p>
+     *
+     * <p>2026-11-13:由 {@code private} 提升为 {@code public} —— 新增的「生产工单 → 新增生产工单」
+     * ({@link WorkOrderCreateService})与订单结转走**同一道**路线审核闸门,不另写一套判据
+     * (两套判据必然分叉;本仓库 2026-10-16 的教训即此)。</p>
      */
-    private void requireRouteAudited(String route) {
+    public void requireRouteAudited(String route) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT shr FROM yj_doc_status WHERE panel_code = 'ROUTE' AND doc_no = ?", route);
         if (rows.isEmpty()) {

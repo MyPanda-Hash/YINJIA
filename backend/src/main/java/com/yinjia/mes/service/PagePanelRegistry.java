@@ -231,6 +231,9 @@ public final class PagePanelRegistry {
     private static final String[][] WORK_ORDER_LIST_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询"},
+            // 2026-11-13:新增生产工单(常规/临时两页签)。此前本页数据只由「订单结转」产生,
+            //   用户口径「让当前的生产工单可以新建生产工单」⇒ 多一个直接建单入口。
+            {"create",  "新增"},
             {"print",   "打印"},
             {"close",   "结案"},
             {"split",   "切单"},

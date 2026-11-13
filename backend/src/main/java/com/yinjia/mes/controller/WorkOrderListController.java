@@ -3,6 +3,8 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
+import com.yinjia.mes.service.WorkOrderBomService;
+import com.yinjia.mes.service.WorkOrderCreateService;
 import com.yinjia.mes.service.WorkOrderPickingService;
 import com.yinjia.mes.service.WorkOrderRecipeService;
 import com.yinjia.mes.service.WorkOrderSplitService;
@@ -63,16 +65,23 @@ public class WorkOrderListController {
     private final WorkOrderRecipeService recipeService;
     /** 结案守卫:反查/回正「外部程序误写成已结案」的行(判据与 ProcessTaskService.syncCloseState 同源) */
     private final com.yinjia.mes.service.WorkOrderCloseGuard closeGuard;
+    /** 新增生产工单(2026-11-13 用户口径:生产工单页要能新建,含临时工单) */
+    private final WorkOrderCreateService createService;
+    /** 工单 BOM 取数(临时工单用料优先 → 产品标准组装 BOM 兜底) */
+    private final WorkOrderBomService bomService;
 
     public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
                                    WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService,
-                                   com.yinjia.mes.service.WorkOrderCloseGuard closeGuard) {
+                                   com.yinjia.mes.service.WorkOrderCloseGuard closeGuard,
+                                   WorkOrderCreateService createService, WorkOrderBomService bomService) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
         this.pickingService = pickingService;
         this.recipeService = recipeService;
         this.closeGuard = closeGuard;
+        this.createService = createService;
+        this.bomService = bomService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -216,8 +225,16 @@ public class WorkOrderListController {
                         + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
                         + " CONVERT(varchar(10), p.st_date, 120) AS 计划开工日期,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
-                        + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
+                        + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
+                        // 工单类型(2026-11-13,用户口径「新增生产工单→临时工单」):有按本工单定制的
+                        //   临时用料(wo_bom)即为「临时」,否则「常规」。常规工单只填主物料、用料走
+                        //   产品标准组装物料清单 bs_asm_bom(见 WorkOrderBomService 的口径说明)。
+                        + " CASE WHEN ISNULL(wb.n, 0) > 0 THEN N'临时' ELSE N'常规' END AS 工单类型,"
+                        + " ISNULL(wb.n, 0) AS 临时物料项数"
                         + " FROM dbo.plang p"
+                        // 临时用料行数(一次分组聚合,不逐行子查询 —— 本页一次返回 400+ 行)
+                        + " LEFT JOIN (SELECT b.工单行id, COUNT(*) AS n FROM dbo.wo_bom b"
+                        + "            WHERE ISNULL(b.asp_cancel,'N') <> 'Y' GROUP BY b.工单行id) wb ON wb.工单行id = p.id"
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         // 订单追溯(2026-10-31):od_xc 存销售订单行 id ⇒ 反查行号(见 SELECT 段注释)。
                         + com.yinjia.mes.service.PlangOrderLine.join("p")
@@ -247,6 +264,9 @@ public class WorkOrderListController {
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
             m.put("生产状态", com.yinjia.mes.service.PlangStatus.of(m));
+            // 工单类型(2026-11-13):SQL 已按 wo_bom 有无给出;老数据/空值兜底「常规」,前端列/图标不出空白
+            Object wbType = m.get("工单类型");
+            if (wbType == null || String.valueOf(wbType).isBlank()) m.put("工单类型", WorkOrderCreateService.KIND_NORMAL);
             out.add(m);
         }
         // 按量流转展示(2026-11-12 用户口径「方案A = 只做显示」):
@@ -439,6 +459,74 @@ public class WorkOrderListController {
         perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "获取混料配方");
         return ApiResult.ok(recipeService.bind(str(body.get("工单号")), longOf(body.get("行id")),
                 doubleOf(body.get("混料数量")), currentUser()));
+    }
+
+    // ══════════ 新增生产工单(2026-11-13 用户口径)══════════
+    // 用户原话:「让当前的生产工单可以新建生产工单」+「在当前新建生产工单中增加一个页签按钮,
+    //   为增加临时工单,临时工单需要实现上方为主物料下方为所需的物料」。
+    // 两种形态共用一个弹窗:常规工单(只填主物料,用料按产品标准组装 BOM 查)/
+    //   临时工单(主物料 + 本工单定制的子件明细,落 wo_bom;取料优先用它,见 WorkOrderBomService)。
+    // 权限:查看权 + 页面动作词 create(「新增」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。
+    // 业务规则全部在 WorkOrderCreateService(Controller 零业务,规范 A2)。
+
+    /** 弹窗选项:客户列表 + 默认工艺路线 */
+    @PostMapping("/workOrderList/options")
+    public ApiResult<Map<String, Object>> createOptions() {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        return ApiResult.ok(createService.options());
+    }
+
+    /** 选中产品编码 → 回填名称/规格/单位/档案绑定路线 */
+    @PostMapping("/workOrderList/productInfo")
+    public ApiResult<Map<String, Object>> productInfo(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(createService.productInfo(strOf(b.get("存货编码"))));
+    }
+
+    /** 标准组装物料清单(stdBom 带出用):来源=标准BOM;产品没维护时 行=[] */
+    @PostMapping("/workOrderList/stdBom")
+    public ApiResult<Map<String, Object>> stdBom(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(bomService.viewOf(bomService.standardOf(strOf(b.get("产品编码")))));
+    }
+
+    /**
+     * 工单行 BOM(生产工单页「物料清单」按钮):临时工单用料优先,否则产品标准组装 BOM。
+     *
+     * <p>用户提问「只填写主物料、没写子物料会不会导致当前 bom 没法被查询到?」——
+     * 本端点就是答案的取证入口:常规工单返回 来源=标准BOM(按产品编码查 bs_asm_bom),
+     * 临时工单返回 来源=临时工单(按工单行查 wo_bom);两者都没有时 行=[] 且页面提示去维护。
+     */
+    @PostMapping("/workOrderList/bom")
+    public ApiResult<Map<String, Object>> bom(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Long rowId = longOf(b.get("行id"));
+        String productCode = strOf(b.get("物料编码"));
+        if (productCode.isEmpty() && rowId != null) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL(dm,N'') AS 物料编码 FROM dbo.plang WHERE id = ?", rowId);
+            if (!rows.isEmpty()) productCode = strOf(rows.get(0).get("物料编码"));
+        }
+        return ApiResult.ok(bomService.viewOf(bomService.ofRow(rowId, productCode)));
+    }
+
+    /** 新建生产工单(常规/临时两页签共用;临时工单必须带物料清单) */
+    @PostMapping("/workOrderList/create")
+    public ApiResult<Map<String, Object>> create(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        String user = currentUser();
+        Map<String, Object> out = createService.create(body == null ? Map.of() : body, user);
+        logUsage(user, "新增生产工单", String.valueOf(out.get("工单号")), null);
+        return ApiResult.ok(out);
+    }
+
+    /** 取字符串并 trim;空 → 空串(不返回 null,前端少判一种情况) */
+    private static String strOf(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
     }
 
     private static Long longOf(Object o) {
