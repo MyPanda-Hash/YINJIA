@@ -4627,3 +4627,6 @@ migrate-wo-bom-20261113.sql
 
 # 2026-11-13 生产工单「保存草稿 + 整页编制 + 草稿箱」(方案 A):新表 wo_draft_head/wo_draft_line 编制草稿(不写 plang;提交时生成正式工单);幂等;两账套
 migrate-wo-draft-20261113.sql
+
+# 2026-11-13 生产工单「删除工单」(第二轮):页面动作词 del(删除)授权,给已有 create 的角色补授(零DDL;幂等;两账套)
+migrate-wo-list-del-perm-20261113.sql
