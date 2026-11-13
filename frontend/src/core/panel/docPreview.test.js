@@ -102,36 +102,29 @@ test('RD_PROD_INFO 必须登记摘要字段，卡片才对得齐', () => {
     '产品信息表摘要 = 产品编号 / 产品名称 / 客户名称（找单三线索，都是短字段）')
 })
 
-test('单据预览 = 展开左侧「单据选择」栏（表格），不是弹窗', () => {
-  // 2026-11-13 用户口径（逐字）：「单据预览做的不对，应该是侧边栏展开的形式而不是弹窗，
-  //   而且要显示效果要和表格单据的左侧边栏一样」。
-  // 演进史（别改回去）：窄侧栏卡片 → 弹窗浮层（方向错）→ **复用 DocSelectRail 左栏**。
+test('单据预览 = 替换右侧操作栏 + 返回按钮（不是弹窗，也不是展开左栏）', () => {
+  // 用户口径演进（每一步都是被纠正出来的，别往回改）：
+  //   ① 窄侧栏卡片 → ② 弹窗浮层（「应该是侧边栏不是弹窗」）
+  //   → ③ 展开左侧 DocSelectRail（「把侧边栏换成右边展开」）→ ④ **替换右侧操作栏 + 返回**。
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
-  // ① 按钮点的是"展开左栏"，不是弹 dialog
-  assert.match(vue, /canPreviewRail \? openPreviewRail\(\) : openDocPreview\(\)/,
-    '按钮要按面板分派：这两个面板展开左栏，其余走原逻辑')
-  // ② 展开函数必须是"确保展开"，不能取反 —— 左栏默认就是开的，取反等于把它关掉
-  const at = vue.indexOf('function openPreviewRail()')
-  assert.ok(at > 0, '缺 openPreviewRail')
-  // 必须能展开**也能收起**（用户 2026-11-13 报障「展开之后点击单据预览收不回去」：
-  //   当时写死 `= false` 只展开不收起）
-  assert.match(vue.slice(at, at + 300), /railCollapsed\.value = !railCollapsed\.value/,
-    '必须 toggle（既能展开也能收起）')
-  // 且这两个面板要**默认收起**：否则用户进页面左栏就开着，
-  // 点一下变成收起，看起来仍像"收不回去/行为不对"
-  assert.match(vue, /const railCollapsed = ref\(PREVIEW_RAIL_PANELS\.has\(String\(panelCode\.value\)\)\)/,
-    '产品信息表/立项申请必须默认收起；其余面板保持默认展开')
-  // ③ 不得再残留弹窗浮层
-  assert.ok(!vue.includes('pv-grid'), '不应再残留 pv-grid 浮层')
-  assert.ok(!vue.includes('previewGridVisible'), '不应再残留浮层状态')
+  // ① 按钮分派到 openSidePreview
+  assert.match(vue, /canPreviewSide \? openSidePreview\(\) : openDocPreview\(\)/,
+    '按钮要按面板分派：这两个面板走右栏预览，其余走原逻辑')
+  // ② 预览态必须**替换**右栏：操作按钮在预览态不渲染
+  assert.match(vue, /<template v-if="!sideCollapsed && !previewInSide">/,
+    '预览态必须把原操作栏一起关掉（替换而不是叠加）')
+  // ③ 必须有返回按钮，且返回后恢复操作栏
+  assert.match(vue, /class="ps-back"/, '缺「返回」按钮')
+  assert.ok(vue.includes('closeSidePreview'), '缺返回函数')
+  // ④ 不得再有弹窗残留
+  assert.ok(!vue.includes('pv-grid'), '不应残留弹窗浮层')
 })
 
-test('这两个面板必须在 DOC_RAIL_PANELS 登记，左栏才有列可显示', () => {
+test('这两个面板不再需要登记左侧 DOC_RAIL_PANELS（预览已改到右边）', () => {
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
   const at = vue.indexOf('const DOC_RAIL_PANELS = {')
-  assert.ok(at > 0, '缺 DOC_RAIL_PANELS')
   const block = vue.slice(at, at + 14000)
-  assert.ok(block.includes('RD_PROD_INFO: ['), '产品信息表未登记左栏列')
-  assert.ok(block.includes('RD_APPROVAL: ['), '立项申请未登记左栏列')
-  assert.match(vue, /const middles = DOC_RAIL_PANELS\[panelCode\.value\]/, '左栏列应从 DOC_RAIL_PANELS 取')
+  // 左栏登记是为方案③准备的；方案④改到右栏后，这两个面板不该再挂左栏
+  assert.ok(!block.includes('RD_PROD_INFO: ['), '左栏登记应已撤销（预览改到右边栏）')
+  assert.ok(!block.includes('RD_APPROVAL: ['), '左栏登记应已撤销（预览改到右边栏）')
 })

@@ -256,11 +256,54 @@
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
-          <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
+          <!-- ═══ 单据预览：**替换**右侧栏（2026-11-13 用户口径）────────────────────────
+               用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
+               形态：点「单据预览」→ 右栏整体换成「单据预览」面板（表格列表 + 返回按钮）；
+               点「返回」或再点「单据预览」→ 恢复原来的操作按钮栏。两者互斥，不叠在一起。 -->
+          <template v-if="previewInSide">
+            <div class="as-side-title">
+              <span class="ps-back" :title="tt('返回')" @click="closeSidePreview">← {{ tt('返回') }}</span>
+              <span class="ps-title">{{ tt('单据预览') }}</span>
+            </div>
+            <div class="ps-body">
+              <el-input
+                v-model="previewKw"
+                size="small"
+                clearable
+                :placeholder="tt('输入编号或任意内容快速筛选')"
+                class="ps-kw"
+              />
+              <div class="ps-count">{{ tt('共 {n} 张').replace('{n}', String(previewCards.length)) }}</div>
+              <div class="ps-list">
+                <div
+                  v-for="c in previewCards"
+                  :key="c.no"
+                  class="ps-row"
+                  :class="{ on: c.no === curDocNo }"
+                  @click="openPreviewCard(c)"
+                >
+                  <div class="ps-row-head">
+                    <span class="ps-row-no" :title="c.no">{{ c.no }}</span>
+                    <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
+                  </div>
+                  <div class="ps-row-date">
+                    {{ c.date }}
+                    <span v-if="c.summary" class="ps-row-sum" :title="c.summary"> · {{ c.summary }}</span>
+                  </div>
+                  <div v-for="(f, i) in c.fields" :key="i" class="ps-row-field">
+                    <span class="ps-row-label">{{ tt(f.label) }}</span>
+                    <span class="ps-row-value" :title="f.value">{{ f.value }}</span>
+                  </div>
+                </div>
+                <div v-if="!previewCards.length" class="ps-empty">{{ tt('没有匹配的单据') }}</div>
+              </div>
+            </div>
+          </template>
+          <div v-else class="as-side-title" @click="sideCollapsed = !sideCollapsed">
             <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
-          <template v-if="!sideCollapsed">
+          <template v-if="!sideCollapsed && !previewInSide">
             <!-- 单据状态胶囊 + 单据切换分页器(2026-10-09 用户口径「把进度查询表侧边栏上边的单据切换去掉」):
                  单单据面板(RD_PROGRESS)全库只有一张单,切换无意义 ⇒ 这两块整块不渲染。 -->
             <div v-if="!singleDocMode" class="as-side-status-row">
@@ -369,12 +412,10 @@
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
               <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
                    矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
-              <!-- 2026-11-13 用户口径：「单据预览应该是侧边栏展开的形式而不是弹窗，
-                   而且要显示效果要和表格单据的左侧边栏一样」。
-                   ⇒ 这两个面板已在 DOC_RAIL_PANELS 登记，本按钮只负责把左栏**展开**
-                     （若已展开则收起），表格/翻页/模糊搜索全部复用 DocSelectRail。
-                   其余面板仍走原来的窄侧栏卡片预览（openDocPreview），行为逐字不变。 -->
-              <div class="as-side-btn" @click="canPreviewRail ? openPreviewRail() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <!-- 2026-11-13 用户口径：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
+                   ⇒ 产品信息表 / 立项申请：点本按钮把**右侧操作栏整体换成预览面板**（带返回）；
+                     其余面板仍走原来的窄侧栏卡片预览（openDocPreview），行为逐字不变。 -->
+              <div class="as-side-btn" @click="canPreviewSide ? openSidePreview() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
               <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
                    入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
                    KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
@@ -4185,28 +4226,40 @@ async function openFuzzyResult(r) {
 const previewMode = ref(false)
 const previewKw = ref('')
 /**
- * 「单据预览」= **展开/收起**左侧「单据选择」栏（2026-11-13 用户口径定稿）。
+ * 「单据预览」= **替换右侧操作栏**（2026-11-13 用户口径定稿）。
  *
- * <p>用户原话：「单据预览做的不对，应该是侧边栏展开的形式而不是弹窗，
- * 而且要显示效果要和表格单据的左侧边栏一样」。</p>
+ * <p>用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。</p>
  *
- * <p>演进：① 原来是窄侧栏里的卡片列表（一列 3~4 张，扫得慢）→
- * ② 2026-11-12 我改成了弹出浮层横向多列（**方向错了**，用户要的是侧边栏不是弹窗）→
- * ③ 现在：这两个面板直接登记进 {@link DOC_RAIL_PANELS}，由 DocSelectRail 渲染
- * **与表格单据完全一致的左栏**（单号 | 日期 | 中间列… | 审核状态、上方翻页条、
- * 模糊搜索全库跨页、可拖宽）；「单据预览」按钮只负责把它**展开/收起**。</p>
- *
- * <p>为什么不再自造一套：DocSelectRail 是这套系统里"单据选择栏"的唯一实现，
- * 翻页/搜索/拖宽/勾选都在里面；预览再写一份卡片版必然两边漂移。</p>
+ * <p>演进史（每一步都是用户纠正的，别再往回改）：
+ * ① 窄侧栏卡片列表 —— 一列 3~4 张，扫得慢；
+ * ② 弹窗浮层横向多列 —— 「应该是侧边栏展开的形式而不是弹窗」；
+ * ③ 左侧 DocSelectRail 表格 —— 「把侧边栏换成右边展开」；
+ * ④ **现在**：点「单据预览」→ 右侧操作栏整体换成预览面板（表格列表 + 「← 返回」），
+ *    点返回或再点「单据预览」→ 恢复原来的操作按钮栏。两者**互斥替换**，不叠在一起。</p>
  */
-const PREVIEW_RAIL_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
-const canPreviewRail = computed(() => PREVIEW_RAIL_PANELS.has(String(panelCode.value)))
-/** 点「单据预览」= **确保左栏展开**（表格形态）。
- *  ⚠ 不能写成 `railCollapsed = !railCollapsed` —— 实测这两个面板左栏**默认就是展开的**
- *  （`railCollapsed` 初值 false），取反等于"点一下把它收起来"，与用户意图正好相反。
- *  要收起用左栏自己的「«」把手。 */
-function openPreviewRail() {
-  railCollapsed.value = !railCollapsed.value
+const PREVIEW_SIDE_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
+const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
+/** 右栏是否处于「单据预览」态 */
+const previewInSide = ref(false)
+/**
+ * 打开右栏预览。取数口径与 openDocPreview 一致（pageSize 拉到 200 一次取全、客户端筛选），
+ * 但**不走 previewMode** —— previewMode 是"把左栏/整页切走"的老预览态，这里只替换右栏内容。
+ */
+async function openSidePreview() {
+  if (canPreviewSide.value && previewInSide.value) { closeSidePreview(); return }
+  previewKw.value = ''
+  previewInSide.value = true
+  sideCollapsed.value = false
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+/** 返回：恢复右侧操作栏（操作按钮原样回来） */
+function closeSidePreview() {
+  previewInSide.value = false
+  previewKw.value = ''
 }
 let previewPrevPageSize = null
 /**
@@ -5717,14 +5770,6 @@ const DOC_RAIL_PANELS = {
   //   一个工单行 = 一个生产批次 ⇒ 左栏给工单号,业务能一眼对上生产批次;
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
-  // ── 2026-11-13 用户口径：「单据预览应该是侧边栏展开的形式而不是弹窗，
-  //    而且要显示效果要和表格单据的左侧边栏一样」──────────────────────────────
-  //   ⇒ 单据预览不再自造一套卡片浮层，而是**复用 DOC_RAIL_PANELS + DocSelectRail**
-  //     （单号 | 日期 | 中间列… | 审核状态 的表格、上方翻页条、模糊搜索、可拖宽）。
-  //     这两个面板在此登记即自动获得左栏；「单据预览」按钮只负责把左栏**展开**。
-  //   中间列按"找单线索"挑，且必须是实测有值的短字段：
-  RD_PROD_INFO: ['产品编号', '产品名称', '客户名称'],
-  RD_APPROVAL: ['客户名', '项目等级', '申请立项人'],
 }
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
@@ -5746,18 +5791,7 @@ const docRailCfg = computed(() => {
   ]
   return { title: railTitle(panelName.value), columns }
 })
-/**
- * 左栏初始是否收起。
- *
- * <p>2026-11-13 用户报障：「展开之后点击单据预览收不回去」—— 根因是 `openPreviewRail()`
- * 当时写死成 `= false`（只展开不收起）。改成 toggle 之后又暴露第二个体验问题：
- * 这两个面板**进页面时左栏就已经展开**（初值 false），用户没点过它，
- * 于是"点单据预览 → 变窄"看上去仍像"收不回去/行为不对"。</p>
- *
- * <p>故：**产品信息表 / 立项申请默认收起**（点「单据预览」才展开，再点收起），
- * 其余本来就有左栏的表格单据保持原有的"默认展开"行为不变。</p>
- */
-const railCollapsed = ref(PREVIEW_RAIL_PANELS.has(String(panelCode.value)))
+const railCollapsed = ref(false)
 const railCurNo = computed(() => {
   const c = cur.value || {}
   return String(c['编号'] || c['单据编号'] || c['单号'] || '')
@@ -7816,7 +7850,37 @@ async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
-    const w0 = Math.max(el.scrollWidth, el.offsetWidth)
+    const paperW = Math.max(el.scrollWidth, el.offsetWidth)
+    /**
+     * A4 内容宽(px)：194mm @96dpi ≈ 733px。
+     *
+     * 🔴 2026-11-13 用户口径：「在导出 PDF 拉长一点，现在就缩在一半，把整个面板进行排版重新设计，
+     *   拉长一点，宽度不够填写数据自动换行，适配 A4 纸」。
+     *
+     * 【为什么要"重排"而不是"缩小"】立项申请的纸按**固定 1242px** 设计（FIXED_SHEET_W），
+     *   而 A4 竖向只有 733px 内容宽 ⇒ 只能整体缩到 0.59。缩小是全比例的：
+     *     · 宽：1242 × 0.59 → 正好铺满 194mm（看起来"横向满了"）；
+     *     · 高：纸张本身只有 928px 高（行高是设计写死的 min-height），
+     *           928 × 0.59 ≈ 145mm，而 A4 内容高 272mm ⇒ **纵向只占一半**（用户实测 49%）。
+     *   所以"缩在一半"不是缩放系数算错，而是**为了塞下过宽的纸把高度一起缩掉了**。
+     *
+     * 【现在的做法】导出/打印截图时，把克隆体**压到 A4 内容宽重新排版**：
+     *   值区变窄 ⇒ 长文本按既有规则换行（DocSheet 的 textarea pre-wrap + break-word）⇒
+     *   行高随内容撑开（模板用 min-height）⇒ 版面自然"拉长"，纵向填满 A4。
+     *   只有**比 A4 宽**的纸才压；本来就窄的（组装/BOM 表等）保持原宽，行为不变。
+     */
+    const A4_CONTENT_PX = Math.floor((SHEET_PAGE_W - SHEET_MARGIN * 2) / SHEET_MM)
+    /**
+     * 只对**文书式**纸面重排；表格式纸面（`layout:'grid'`，样品两张申请单）**不压**。
+     *
+     * 为什么：表格式纸面的列宽是写死的 px（`<colgroup>` 的 `col w`，见 DocSheet 的 sg-table），
+     * 压窄外层容器**表格不会跟着缩**（实测：1188 → 733 时表宽仍是 1189，直接横向溢出被裁）。
+     * 那类纸本来就按 A4 设计过（1188/1220/1365 三档，planSheetPages 已按宽度铺满或纵向切张），
+     * 硬压只会裁掉右边几列。判据用纸面自己的结构类名，不写死面板码。
+     */
+    const isTableStyleSheet = !!(el.querySelector && el.querySelector('.sg-table'))
+    const reflow = !isTableStyleSheet && paperW > A4_CONTENT_PX
+    const w0 = reflow ? A4_CONTENT_PX : paperW
     holder = document.createElement('div')
     holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${w0}px;background:#ffffff;`
     const clone = el.cloneNode(true)
@@ -14295,6 +14359,44 @@ onUnmounted(() => {
 .rpt-up-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }
 /* ── 单据预览查找(文书侧栏,文件档案查看效果) ── */
+/* ── 右栏「单据预览」态（2026-11-13 用户口径：替换右边栏 + 返回按钮）────────
+   右栏宽约 200~240px，故列表是**一列紧凑行**（不是横向多列——那是弹窗时代的要求，
+   换成右栏后横向空间不够）。每行 = 单号+状态 / 日期(·摘要) / 字段行，
+   与左栏表格信息量对齐但更省宽度。
+   取值：padding 8/10、colorBorderSecondary #f0f0f0、colorTextSecondary rgba(0,0,0,.45)。 */
+.ps-back {
+  cursor: pointer;
+  color: #1e5a8a;
+  font-size: 12px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.ps-back:hover { text-decoration: underline; }
+.ps-title { font-size: 12px; color: rgba(0, 0, 0, 0.65); }
+.ps-body { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 8px; }
+.ps-kw { margin-bottom: 6px; }
+.ps-count { font-size: 12px; color: rgba(0, 0, 0, 0.45); margin-bottom: 6px; }
+.ps-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.ps-row {
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 0;
+}
+.ps-row:hover { border-color: #1677ff; }
+.ps-row.on { border-color: #1677ff; background: #f0f7ff; }
+.ps-row-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
+.ps-row-no { font-weight: 600; font-size: 12px; color: #1e5a8a; white-space: nowrap; }
+.ps-row-head .doc-status { flex: none; white-space: nowrap; font-size: 11px; line-height: 16px; padding: 0 5px; }
+.ps-row-date { font-size: 11px; line-height: 16px; color: rgba(0, 0, 0, 0.45); }
+.ps-row-sum { color: rgba(0, 0, 0, 0.65); }
+.ps-row-field { display: flex; gap: 4px; font-size: 11px; line-height: 16px; min-width: 0; }
+.ps-row-label { flex: none; color: rgba(0, 0, 0, 0.45); }
+.ps-row-value { color: rgba(0, 0, 0, 0.88); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-empty { padding: 24px 0; text-align: center; font-size: 12px; color: rgba(0, 0, 0, 0.45); }
 .preview-kw { margin: 4px 0 6px; }
 .preview-cards { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
 .preview-card {
