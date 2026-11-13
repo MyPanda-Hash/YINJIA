@@ -202,3 +202,44 @@ test('⑫ 跨页勾选不丢（勾选状态自己维护，不靠 el-table 的 se
   // 仍要有 onMatPickSelection 兜底（mate 源仍用整表 selection）
   assert.match(sheet, /onMatPickSelection/, '物料清单源(mate)仍走整表 selection')
 })
+
+/**
+ * 2026-11-13 第二轮用户口径（在分页修好之后）：
+ *   ① 「这个应该是预渲染在缓存，这样子打开就秒开了，搜索也会快一点」
+ *   ② 「勾选也优化一下，点击该行数据就判为勾选，这样子就不需要强制勾选前面方框了」
+ *
+ * ① 预取：商品档案是**档案型面板**（一次返回全量、不分页），所以"打开弹窗才请求"必然有
+ *    一次 300ms~1s 的空窗。改成进面板就预取并缓存，点「直接导入采购物料清单」时直接命中缓存。
+ * ② 整行可点：不必去点前面那个 42px 的小方框，点行内任意位置即切换勾选。
+ */
+
+test('⑬ 商品档案要预取并缓存（进面板就拉，打开弹窗不再等请求）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /matPickCache/, '要有商品档案缓存容器')
+  assert.match(sheet, /prefetchMatPickRows/, '要有预取函数')
+  // matPickCache 是 ref ⇒ 取值要走 .value（别写死成裸变量）
+  assert.match(sheet, /if \(matPickCache\.value\.length\)[\s\S]{0,200}matPickRows\.value = matPickCache\.value\.slice\(\)/,
+    '打开弹窗时要先命中缓存（命中就不再请求）')
+  // 预取挂在 onMounted 上
+  const mount = sheet.slice(sheet.indexOf('onMounted(() => {'))
+  assert.match(mount.slice(0, 600), /prefetchMatPickRows\(\)/,
+    '进面板（onMounted）就要预取，而不是等用户点按钮')
+})
+
+test('⑭ 点行即勾选（不用去点前面那个小方框）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /@row-click="onMatPickRowClick"/, '商品源表格要绑 row-click')
+  assert.match(sheet, /function onMatPickRowClick\(/, '要有行点击处理函数')
+  // 点行 = 切换勾选；但点复选框本身不能再触发一次（否则会翻两下 = 没反应）
+  const fn = sheet.slice(sheet.indexOf('function onMatPickRowClick('))
+  assert.match(fn.slice(0, 500), /toggleMatPickRow/, '行点击要切换该行勾选')
+  assert.match(fn.slice(0, 500), /closest|stopPropagation|__k/,
+    '要防止「点复选框」再走一遍行点击（否则勾了立刻又被切回去）')
+})
+
+test('⑮ 行要有选中态样式（点过哪几行一眼看得出来）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(sheet, /:row-class-name="matPickRowClass"/, '要按勾选状态给行加类名')
+  assert.match(sheet, /\.mat-pick-picked/, '要有选中行的样式类')
+  assert.match(sheet, /cursor:\s*pointer/, '整行可点 ⇒ 要有 pointer 光标（否则用户不敢点）')
+})
