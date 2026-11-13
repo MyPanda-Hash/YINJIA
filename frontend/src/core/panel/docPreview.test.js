@@ -134,7 +134,13 @@ test('右栏预览必须复用 DocSelectRail 本体（左栏那套表格），�
   assert.ok(!block.includes('RD_PROD_INFO: ['), 'RD_PROD_INFO 不能进 DOC_RAIL_PANELS（会多出左栏）')
   assert.ok(!block.includes('RD_APPROVAL: ['), 'RD_APPROVAL 不能进 DOC_RAIL_PANELS（会多出左栏）')
   // ④ 预览态右栏要加宽（176px 放不下 6 列，实测只露出单号+日期）
-  assert.match(vue, /\.approval-side\.preview-on \{ width: 382px; \}/, '预览态右栏必须加宽，否则表格列被挤掉')
+  // ④ 预览态右栏要加宽到**能完整放下 6 列**。
+  //    实测演进：176px 只露「单号+日期」；382px 仍不够（产品信息表表格 scrollWidth=416px，
+  //    .dsr-grid 是 overflow-x:auto ⇒「审核状态」被推到右侧看不见）⇒ 现为 440px。
+  const wm = vue.match(/\.approval-side\.preview-on \{ width: (\d+)px; \}/)
+  assert.ok(wm, '预览态右栏必须加宽，否则表格列被挤掉')
+  assert.ok(Number(wm[1]) >= 420,
+    `预览态右栏宽度 ${wm[1]}px 不足以完整显示 6 列表格（实测需 ≥416px）`)
 })
 
 test('预览态必须替换操作栏（按钮不渲染），返回后恢复', () => {

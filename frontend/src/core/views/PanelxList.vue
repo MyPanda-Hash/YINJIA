@@ -7949,6 +7949,39 @@ async function snapSheetPage(el, domToPng) {
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    /**
+     * 🔴 textarea 的**高度要按克隆体的新宽度重算**（2026-11-13 实测踩到）。
+     *
+     * 现象：填了 175 字的「立项背景」，屏幕 1242px 宽时 3 行就够（框高 143px），
+     *   压到 733px 后需要 7 行 —— 但克隆体里 `height` 还是从原元素带过来的 143px，
+     *   于是后 4 行**直接看不见**（导出的 PDF 里文字显示到"流量不低于每"就断了）。
+     * 原因：Element Plus 的 autosize 是**组件在响应式里监听 input 才重算**的，
+     *   克隆出来的裸 <textarea> 没人给它算高度 ⇒ 必须在这里手动按 scrollHeight 撑开。
+     * 顺序：value 已经写进文本节点（上面那段），此时 scrollHeight 才是真实内容高。
+     * 只增不减（Math.max）：原本更高的框（用户手动拉过）不该被压回去。
+     */
+    clone.querySelectorAll('textarea').forEach((c) => {
+      try {
+        const cs = getComputedStyle(c)
+        const extra = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+          + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0)
+        const need = c.scrollHeight + extra
+        const cur = parseFloat(c.style.height) || parseFloat(cs.height) || 0
+        if (need > cur) {
+          c.style.height = need + 'px'
+          c.style.overflowY = 'hidden'
+          // 行容器的 min-height 也要跟着抬，否则 flex 行会压回去
+          const row = c.closest('.as-row, .q-pairs, .q-section, .q-dept')
+          if (row) {
+            const rowCur = parseFloat(getComputedStyle(row).minHeight) || 0
+            const rowNeed = row.scrollHeight
+            if (rowNeed > rowCur) row.style.minHeight = rowNeed + 'px'
+          }
+        }
+      } catch (e) { /* 量不出来就保持原样，不影响出图 */ }
+    })
+    // 撑高后再等一帧，让承载它的行/表按新高度完成布局
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
     /**
      * 行边界（2026-11-13）：`shotsForPages` 纵向切张时要**避开行中间**，
@@ -14412,8 +14445,12 @@ onUnmounted(() => {
    挂到右边要改成 border-left）；③ 去掉它自己的宽度（交给右栏宽度决定）。 */
 /* 预览态右栏加宽：左栏那套表格有 6 列（单号/日期/中间3列/审核状态），
    176px 的常规宽度放不下（实测只露出"单号+日期"，其余列溢出不可见）。
-   382px 是实测能完整放下 6 列的最小值（列内容都是短字段，不需要更宽）。 */
-.approval-side.preview-on { width: 382px; }
+   ⚠ 382px 仍不够：实测产品信息表那张表格 **scrollWidth=416px**，
+      `.dsr-grid` 是 `overflow-x:auto` ⇒ 「审核状态」被推到右侧看不见
+      （用户 2026-11-13 报障「产品信息表的应该显示全，现在显示不全」）。
+   故按最宽的那个面板给足：**440px**（416 + 滚动条/内边距余量），
+   两个面板共用同一宽度，切换时不跳动。 */
+.approval-side.preview-on { width: 440px; }
 .ps-wrap {
   display: flex;
   flex-direction: column;
