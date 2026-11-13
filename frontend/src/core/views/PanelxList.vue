@@ -4185,7 +4185,7 @@ async function openFuzzyResult(r) {
 const previewMode = ref(false)
 const previewKw = ref('')
 /**
- * 「单据预览」= 展开左侧「单据选择」栏（2026-11-13 用户口径定稿）。
+ * 「单据预览」= **展开/收起**左侧「单据选择」栏（2026-11-13 用户口径定稿）。
  *
  * <p>用户原话：「单据预览做的不对，应该是侧边栏展开的形式而不是弹窗，
  * 而且要显示效果要和表格单据的左侧边栏一样」。</p>
@@ -4206,7 +4206,7 @@ const canPreviewRail = computed(() => PREVIEW_RAIL_PANELS.has(String(panelCode.v
  *  （`railCollapsed` 初值 false），取反等于"点一下把它收起来"，与用户意图正好相反。
  *  要收起用左栏自己的「«」把手。 */
 function openPreviewRail() {
-  railCollapsed.value = false
+  railCollapsed.value = !railCollapsed.value
 }
 let previewPrevPageSize = null
 /**
@@ -5746,7 +5746,18 @@ const docRailCfg = computed(() => {
   ]
   return { title: railTitle(panelName.value), columns }
 })
-const railCollapsed = ref(false)
+/**
+ * 左栏初始是否收起。
+ *
+ * <p>2026-11-13 用户报障：「展开之后点击单据预览收不回去」—— 根因是 `openPreviewRail()`
+ * 当时写死成 `= false`（只展开不收起）。改成 toggle 之后又暴露第二个体验问题：
+ * 这两个面板**进页面时左栏就已经展开**（初值 false），用户没点过它，
+ * 于是"点单据预览 → 变窄"看上去仍像"收不回去/行为不对"。</p>
+ *
+ * <p>故：**产品信息表 / 立项申请默认收起**（点「单据预览」才展开，再点收起），
+ * 其余本来就有左栏的表格单据保持原有的"默认展开"行为不变。</p>
+ */
+const railCollapsed = ref(PREVIEW_RAIL_PANELS.has(String(panelCode.value)))
 const railCurNo = computed(() => {
   const c = cur.value || {}
   return String(c['编号'] || c['单据编号'] || c['单号'] || '')

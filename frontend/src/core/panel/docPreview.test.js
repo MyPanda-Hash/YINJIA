@@ -113,8 +113,14 @@ test('单据预览 = 展开左侧「单据选择」栏（表格），不是弹�
   // ② 展开函数必须是"确保展开"，不能取反 —— 左栏默认就是开的，取反等于把它关掉
   const at = vue.indexOf('function openPreviewRail()')
   assert.ok(at > 0, '缺 openPreviewRail')
-  assert.match(vue.slice(at, at + 300), /railCollapsed\.value = false/,
-    '必须确保展开；取反会把默认已展开的左栏关掉')
+  // 必须能展开**也能收起**（用户 2026-11-13 报障「展开之后点击单据预览收不回去」：
+  //   当时写死 `= false` 只展开不收起）
+  assert.match(vue.slice(at, at + 300), /railCollapsed\.value = !railCollapsed\.value/,
+    '必须 toggle（既能展开也能收起）')
+  // 且这两个面板要**默认收起**：否则用户进页面左栏就开着，
+  // 点一下变成收起，看起来仍像"收不回去/行为不对"
+  assert.match(vue, /const railCollapsed = ref\(PREVIEW_RAIL_PANELS\.has\(String\(panelCode\.value\)\)\)/,
+    '产品信息表/立项申请必须默认收起；其余面板保持默认展开')
   // ③ 不得再残留弹窗浮层
   assert.ok(!vue.includes('pv-grid'), '不应再残留 pv-grid 浮层')
   assert.ok(!vue.includes('previewGridVisible'), '不应再残留浮层状态')
