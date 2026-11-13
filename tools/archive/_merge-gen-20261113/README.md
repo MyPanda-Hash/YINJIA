@@ -1,0 +1,59 @@
+# 采购订单「合单生单」取证（2026-11-13）
+
+用户口径（本次需求原文）：
+
+> 采购订单新增一个合单生单在生单按钮下面，可以选择同一供应商的单据，进行合单，合成一张送料暂收单。
+> 并且要注意后面的逻辑（对应的行号有的是对应采购订单行号，是合单前的行号。有些对应行号的送料暂收后的
+> 行号是送料暂收的行号，是合单后的行号）。
+
+## 一、上线后的行为
+
+| 点 | 做法 |
+|---|---|
+| 入口 | 采购订单「生单 ▼」下拉里多出 **合单生单**（与「批量生单」并列；只有采购订单/供应商门户这两个面板有） |
+| 选单 | 沿用左栏勾选（与批量生单同一手势）；**必须勾 ≥2 张、全是「已审核」、同一供应商** —— 前端先按供应商分组拦一次并点名，后端 `generateMerged` 再校验一次 |
+| 结果 | N 张订单的行并进 **一张**送料暂收单，共用一个单据号 / 一个批次号 |
+| 行级溯源 | 每个暂收行写 **采购单号 = 合单前的订单号**、**采购订单行号 = 合单前的订单行号**；暂收单自己的行 id（`暂收单号#行id`、`form_flow_link.source_line_key`）才是**合单后的行号**，占用/反查用它 |
+| 下游 | 暂收→检验→退回/入库 逐行带「采购单号」；转ERP 时**行级** `src_bill_no` 用本行订单号（表头是"订单1、订单2"这种合单串，不再拿它当源单号） |
+| 仓库/仓位 | 沿用上一轮的能力：合单对话框里也能按行选仓库/仓位，随行带到暂收单（round-01 的两行分别是 A1-09-1 / A1-09-2） |
+
+## 二、代码落点
+
+- 前端：`PanelxList.vue`（`MERGE_GENERATE_ACTION` / `canMergeGenerate` / 下拉项 / 同供应商前置校验 / `openGenerateDialog(..., true)`）、
+  `GenerateLinesDialog.vue`（`merge` 开关：标题、提示条、按钮文案、`pushFlowMerge` 分支）、`engine.js`（`pushFlowMerge`）。
+- 后端：`PxController` `POST /px/push/merge`；`PushGenerateHandler.generateMerged`（两轮：先校状态+供应商，再逐行算量）；
+  `PanelConfigService.FLOW_DETAIL_SYNONYMS` 加 `采购单号→采购单号`；`ButtonService` 检验→入库/退回逐行带 `采购单号`；
+  `KingdeePushService` 行级 `采购单号` 优先 + `resolveLinePoRef`（MES 号 → ERP单号 兜底，逐行解析并缓存）。
+- 库：`tools/migrate-merge-gen-20261113.sql`（`qc_insp_detail` / `qc_return_detail` / `bl_purchase_in` 各加一列 `采购单号` +
+  yj_field 可见登记 + en 译名 + MS_Description），两账套 `DbSync` 均「执行 1 / 失败 0」；采购链四单基线按 §8 重生成，
+  `FourDocAudit` 两账套 **PASS**（QC_RECV 73 / QC_INSP 59 / QC_RETURN 40 / PURCHASE_IN 166）。
+
+## 三、取证结果（测试账套，跑完即删）
+
+`round-01.mjs`：
+
+| 断言 | 结果 |
+|---|---|
+| 两张同供应商订单合单 → **只出一张**暂收单 | `{"编号":"SL-2026-11-0003","合单来源":["PO-2026-11-0003","PO-2026-11-0004"],"合单行数":2,"本次送料合计":50}` |
+| 每行各带**合单前**的订单号 | `YJ-XH-002 → 采购单号=PO-2026-11-0003`、`CL004 → 采购单号=PO-2026-11-0004`（仓库/仓位也各保留 A1-09-1 / A1-09-2） |
+| 暂收审核 → 检验单继续带行级订单号 | `IJ-2026-11-0003` 两行分别 `采购单号=PO-2026-11-0003 / PO-2026-11-0004` |
+
+`round-02.mjs`：
+
+| 断言 | 结果 |
+|---|---|
+| 界面「生单 ▼」下拉项 | `["批量生单","合单生单"]` |
+| 异供应商合单必须被拒（且报的是供应商那条，不是"某行超量"） | `409 合单生单只允许**同一供应商**的单据:PO-2026-11-0006 是「福建鑫恒碳业有限公司」,PO-2026-11-0007 是「东莞市真炙包装材料有限公司」` |
+| 同供应商两单合单 | `SL-2026-11-0004`，2 行、合计 37，行级 `采购单号` 各正确 |
+
+清理：脚本末尾逐张弃审+删除，`round-01/02.json` 的 `cleanup` 全是 `删除=200`，测试账套没留脏数据。
+
+## 四、复跑
+
+```powershell
+# 需 8090 + 5173 在跑；脚本会自己切到「YINJIA-MES·测试库」(不是测试库直接拒绝执行)
+ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_merge-gen-20261113/round-01.mjs')"
+ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_merge-gen-20261113/round-02.mjs')"
+```
+
+⚠ 这台机器的 ego 浏览器 `Page.captureScreenshot` 一直 CDP 超时，故证据是**接口原文 + DOM 断言**，没有截图。

@@ -710,6 +710,16 @@ export async function pushFlowGenerate({ panelCode, action, docs, overRatio }) {
   return unwrapStrict(await request.post('/px/push/generate', { panelCode, action, docs, overRatio }))
 }
 
+/**
+ * **合单生单**(2026-11-13 用户口径):多张**同一供应商**的采购订单 → **一张**送料暂收单。
+ *
+ * 与 {@link pushFlowGenerate} 的入参完全一致(docs 结构相同、仓库/仓位按行带),区别只在后端:
+ * generate 逐张各出一张目标单,merge 把所有行并进同一张。故前端两个对话框可以共用同一份行契约。
+ */
+export async function pushFlowMerge({ panelCode, action, docs, batchNo }) {
+  return unwrapStrict(await request.post('/px/push/merge', { panelCode, action, docs, batchNo }))
+}
+
 
 
 /**

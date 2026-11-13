@@ -4834,3 +4834,5 @@ migrate-prodinfo-l1-approver-backfill-20261111.sql
 migrate-prodinfo-required-20261112.sql
 # 2026-11-13 采购链仓库仓位随生单预填:暂收/检验行补仓位编码/名称/id 列 + 显示仓库列(QC_RECV/QC_INSP)
 migrate-gen-wh-bin-prefill-20261113.sql
+# 2026-11-13 合单生单:检验/退回/入库行补「采购单号」(行级来源采购订单号,合单后逐行溯源 + 转ERP 行级 src_bill_no)
+migrate-merge-gen-20261113.sql

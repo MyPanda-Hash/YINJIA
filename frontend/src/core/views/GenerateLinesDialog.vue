@@ -29,6 +29,8 @@
       <div class="gl-bar">
         <span class="gl-chip">{{ tt('目标单据') }}: {{ meta.targetName ? tt(meta.targetName) : '-' }}</span>
         <span class="gl-chip">{{ tt('来源单据') }}: {{ docs.length }} {{ tt('张') }}</span>
+        <!-- 合单模式(2026-11-13):N 张来源单 → 一张目标单;必须同一供应商 -->
+        <span v-if="merge" class="gl-chip gl-merge">{{ tt('合单生单：这些行会合成一张单据（行级「采购单号」保留合单前的订单号）') }}</span>
         <!-- 超送比例**只有采购订单这一跳有**(用户口径 2026-10-31:「除了采购订单,别的生单没有超送比例」)——
              送料暂收→检验/入库、销售订单→销售出库单 等一律不显示,上限就是剩余量 -->
         <span v-if="showOverRatio" class="gl-ratio">
@@ -130,7 +132,9 @@
       <el-button @click="fillRemaining">{{ tt('按剩余量填充') }}</el-button>
       <el-button @click="clearAll">{{ tt('清空') }}</el-button>
       <el-button @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
-      <el-button type="primary" :loading="saving" :disabled="!count" @click="confirm">{{ tt('确定生单') }}</el-button>
+      <el-button type="primary" :loading="saving" :disabled="!count" @click="confirm">
+        {{ merge ? tt('确定合单生单') : tt('确定生单') }}
+      </el-button>
     </template>
   </el-dialog>
 </template>
@@ -157,6 +161,12 @@ const props = defineProps({
   action: { type: String, default: '' },
   /** 勾选的来源单据号(1 张 = 原「生单」;多张 = 「批量生单」) */
   sourceNos: { type: Array, default: () => [] },
+  /**
+   * **合单模式**(2026-11-13 用户口径「采购订单新增一个合单生单…合成一张送料暂收单」):
+   * true ⇒ N 张来源单的行并进**同一张**目标单(共用单据号/批次号),
+   * 行级「采购单号」逐行记住合单前的订单号;false ⇒ 原行为(逐张各出一张)。
+   */
+  merge: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'generated'])
 
@@ -218,7 +228,9 @@ function applyWhBinToAll(doc) {
 }
 
 /** 标题里也带目标面板名 → 同样过 tt()(面板名走 yj_translation scope=panel,英文界面不掉回中文) */
-const title = computed(() => `${tt('生单')} → ${meta.targetName ? tt(meta.targetName) : tt('目标单据')}`)
+const title = computed(() => `${tt(props.merge ? '合单生单' : '生单')} → ${meta.targetName ? tt(meta.targetName) : tt('目标单据')}`)
+/** 合单模式(2026-11-13):N 张来源单 → 一张目标单 */
+const merge = computed(() => !!props.merge)
 /**
  * 收料超送额度**只属于采购订单这一跳**(2026-10-31 用户口径:「除了采购订单,别的生单没有超送比例」)。
  * 供应商采购打印(SUPPLIER_PU_ORDER)是采购订单的副本面板,同一张订单、同一套口径,一并放行。
@@ -350,11 +362,35 @@ async function confirm() {
   saving.value = true
   failed.value = []
   try {
-    const res = await engine.pushFlowGenerate({
-      panelCode: props.sourcePanel, action: props.action, docs: payloadDocs,
-      // 分批链路才带比例;非采购订单恒 0(= 不许超送),后端 generateBatch 按 0 校验
-      overRatio: meta.batchFlow ? ratioPct.value / 100 : undefined,
-    })
+    // 合单生单(2026-11-13):N 张来源单的行 → **一张**目标单(后端 /px/push/merge)。
+    // 批次号取第一张来源单预告的那个号(同一批货一个号;后端仍可现场覆盖)。
+    const res = props.merge
+      ? await engine.pushFlowMerge({
+        panelCode: props.sourcePanel, action: props.action, docs: payloadDocs,
+        batchNo: String(batchNoOf[docs.value[0]?.sourceNo] || ''),
+      })
+      : await engine.pushFlowGenerate({
+        panelCode: props.sourcePanel, action: props.action, docs: payloadDocs,
+        // 分批链路才带比例;非采购订单恒 0(= 不许超送),后端 generateBatch 按 0 校验
+        overRatio: meta.batchFlow ? ratioPct.value / 100 : undefined,
+      })
+    if (props.merge) {
+      // 合单:后端只回一张单(编号/批次号),没有"生成清单/失败清单"
+      const no = String(res?.['编号'] || '')
+      const batch = String(res?.['批次号'] || '')
+      ElMessage.success(`${tt('已合单生成')} ${no}${batch ? `（${tt('批次号')} ${batch}）` : ''}`
+        + `：${(res?.['合单来源'] || []).length || docs.value.length} ${tt('张采购订单合成一张')}`)
+      emit('generated', {
+        panel: res?.gotoPanel || meta.targetPanel,
+        no,
+        count: 1,
+        docs: [{ 编号: no, 面板: res?.gotoPanel || meta.targetPanel, 批次号: batch }],
+        failed: [],
+        sourceCount: props.sourceNos.length,
+      })
+      emit('update:modelValue', false)
+      return
+    }
     const made = res?.['生成'] || []
     failed.value = res?.['失败'] || []
     // 一条动作两个去向(暂收单 → 来料检验单 + 采购入库单)时,后端把这两张放在该来源单的
@@ -396,6 +432,8 @@ async function confirm() {
 .gl { display: flex; flex-direction: column; gap: 10px; }
 .gl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12.5px; color: #46586e; }
 .gl-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
+/* 合单生单:提示条用主色描边,一眼看出"这次不是逐张出单" */
+.gl-merge { background: #eef6ff; border-color: #b9d7f5; color: #1e6fb8; }
 .gl-ratio { display: inline-flex; align-items: center; gap: 4px; }
 .gl-tip { color: #8b9893; }
 .gl-doc { border: 1px solid #e4e9ef; border-radius: 4px; padding: 6px 8px 8px; background: #fff; }

@@ -215,6 +215,7 @@ COL	sl_recv_detail	仓位id	nvarchar(2000)	null	送料暂收行的仓位id(隐�
 FIELD	detail	20	物料名称	物料名称	参照	160	E--V		INV	存货名称	存货名称			Material Name		12854
 FIELD	detail	30	规格型号	规格型号	文本	140	E--V		GFDA	mc	mc			Specification		12855
 FIELD	detail	40	采购订单行号	采购订单行号	文本	110	E--V		GFDA	mc	mc					12858
+FIELD	detail	41	采购单号	采购单号	文本	140	---V							Src PO No.		14510
 FIELD	detail	50	单位	单位	参照	70	E-H-		UOM	计量单位名称	计量单位名称			UOM		12859
 FIELD	detail	60	单价	单价	小数	100	E--V		GFDA	mc	mc			Unit Price		12861
 FIELD	detail	70	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		12864
@@ -396,6 +397,7 @@ COL	qc_insp_detail	现存量	decimal(9)	null	现存量(采购链透传字段,202
 COL	qc_insp_detail	仓位编码	nvarchar(400)	null	来料检验行的仓位编码(界面显示名「仓位」)。随送料暂收单生单带入;参照仓位档案 WHLOC,按本行仓库级联。
 COL	qc_insp_detail	仓位名称	nvarchar(800)	null	来料检验行的仓位名称(隐藏辅助列,参照回写用)。
 COL	qc_insp_detail	仓位id	nvarchar(2000)	null	来料检验行的仓位id(隐藏辅助列,参照回写/反查用)。
+COL	qc_insp_detail	采购单号	nvarchar(400)	null	来料检验行的来源采购订单号(行级)。合单生单后一张暂收单可能跨多张采购订单,靠它与「采购订单行号」一起认出本行原属哪张订单的哪一行。
 
 ===== QC_RETURN =====
 -- yj_field (place, seq)
@@ -408,6 +410,7 @@ FIELD	detail	85	送检数量	送检数量	小数	100	---V									11585
 FIELD	detail	88	特采	特采	是否	60	E--V									11587
 FIELD	detail	90	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		7546
 FIELD	detail	100	采购订单行号	采购订单行号	文本	110	E--V									7545
+FIELD	detail	101	采购单号	采购单号	文本	140	---V							Src PO No.		14511
 FIELD	detail	105	现存量	现存量	小数	100	--H-							Current inventory		14422
 FIELD	detail	120	报废数量	报废数量	小数	100	E-H-									7654
 FIELD	detail	130	剩余数量	剩余数量	小数	100	E-H-									7655
@@ -535,6 +538,7 @@ COL	qc_return_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	送检数量	decimal(9)	null	送检数量:来料检验单明细的送检数量(检验单审核自动生成本退料单时随链带入,只读);特采按钮按它填特采单「总数量」
 COL	qc_return_detail	特采	bit(1)	NOT NULL	特采:勾选=该行做特采(让步接收)。本退料单**审核/审批通过**时,勾了的行逐行生成特采单(总数量=本行送检数量、不合格品数量=本行退货数量);特采单审批通过后全部数量进采购入库单(不走退料)
 COL	qc_return_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验→暂收退回 逐站下传(退料行由检验行镜像),仅供追溯。实时库存见 kucun。
+COL	qc_return_detail	采购单号	nvarchar(400)	null	暂收退回行的来源采购订单号(行级),口径同来料检验行。
 
 ===== PURCHASE_IN =====
 -- yj_field (place, seq)
@@ -566,6 +570,7 @@ FIELD	detail	250	仓库id	仓库id	文本	120	E-H-									13062
 FIELD	detail	260	仓库启用仓位管理	仓库启用仓位管理	文本	120	E-H-									13064
 FIELD	detail	270	仓位id	仓位id	文本	120	E-H-									13066
 FIELD	detail	290	采购订单行号	源单行号	文本	110	E--V									13068
+FIELD	detail	291	采购单号	采购单号	文本	140	---V							Src PO No.		14512
 FIELD	detail	300	辅助属性id	辅助属性id	文本	120	E-H-									13070
 FIELD	detail	310	批次号	批次号	文本	150	---V									13073
 FIELD	detail	320	辅助属性名称	辅助属性名称	文本	120	E-H-									13074
@@ -1013,3 +1018,4 @@ COL	bl_purchase_in	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
+COL	bl_purchase_in	采购单号	nvarchar(400)	null	采购入库行的来源采购订单号(行级)。转ERP 时用它作金蝶 src_bill_no(行级优先于表头「采购订单号」),合单后一张入库单跨多张订单也挂得对。

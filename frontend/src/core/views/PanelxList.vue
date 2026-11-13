@@ -1601,6 +1601,7 @@
       :source-panel="panelCode"
       :action="genAction"
       :source-nos="genDocNos"
+      :merge="genMerge"
       @generated="onGenerateDone"
     />
 
@@ -3646,6 +3647,8 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   // 一个生单动作一项(销售订单有 生成生产工单 / 生成销售出库单 两个去向,文案带动作名区分)。
   if (name === '生单' && railSelectable.value) {
     const extra = batchGenerateItems.value.map((it) => it.label).filter((l) => !actions.includes(l))
+    // 合单生单(2026-11-13):只有采购订单这一跳有,排在「批量生单」之后(下拉里两项并列)
+    if (canMergeGenerate.value) extra.push(MERGE_GENERATE_ACTION)
     if (extra.length) return { ...group, name, actions: [...actions, ...extra] }
   }
   return { ...group, name, actions }
@@ -5270,6 +5273,20 @@ const batchGenerateItems = computed(() => {
 })
 /** 左栏勾选框只在「有批量生单链路 + 有单据选择栏」时出现(报表/文书面板不显示) */
 const railSelectable = computed(() => !!docRailCfg.value && batchGenerateItems.value.length > 0 && !reportMode.value)
+
+/**
+ * **合单生单**(2026-11-13 用户口径):多张同供应商采购订单 → 一张送料暂收单。
+ *
+ * 只有**采购订单**这一跳有(用户原话「采购订单新增一个合单生单在生单按钮下面」);
+ * 入口放在「生单 ▼」下拉里(与「批量生单」并列),选单方式沿用左栏勾选 —— 少一个"再选一次单"的弹窗。
+ * 生单动作取该面板唯一的生单动作(采购订单 = 生成送料暂收单)。
+ */
+const MERGE_GENERATE_ACTION = '合单生单'
+const MERGE_GENERATE_PANELS = new Set(['PU_ORDER', 'SUPPLIER_PU_ORDER'])
+const canMergeGenerate = computed(() => MERGE_GENERATE_PANELS.has(String(panelCode.value))
+  && generatableActions.value.length > 0 && !!docRailCfg.value && !reportMode.value)
+/** 合单走哪个生单动作(采购订单 → 生成送料暂收单;取第一个已登记链路) */
+const genMergeAction = computed(() => generatableActions.value[0] || '')
 /** 左栏勾选(单号数组;PanelxList 是唯一真源,翻页/切换当前单都不丢) */
 const railChecked = ref([])
 /** 勾选归属的面板 —— 切面板必须清零:单号是上一个面板的,留着会拿错单去生单 */
@@ -5290,17 +5307,20 @@ function onRailCheckAll({ nos, checked }) {
   }
   railChecked.value = [...set]
 }
-/** 统一生单对话框(单张=原「生单」/ 多张=「批量生单」共用) */
+/** 统一生单对话框(单张=原「生单」/ 多张=「批量生单」/ 合单=「合单生单」共用) */
 const genVisible = ref(false)
 const genAction = ref('')
 const genDocNos = ref([])
+/** 合单模式(2026-11-13):N 张来源单的行并进**同一张**目标单(见 GenerateLinesDialog 的 merge 分支) */
+const genMerge = ref(false)
 /** 列表行 → 单号(与 DocSelectRail 的取值顺序一致:编号 → 单据编号 → 单号) */
 const docNoOfRow = (r) => String(r?.['编号'] || r?.['单据编号'] || r?.['单号'] || '')
-function openGenerateDialog(action, sourceNos) {
+function openGenerateDialog(action, sourceNos, merge = false) {
   const nos = (sourceNos || []).filter(Boolean)
   if (!action || !nos.length) return
   genAction.value = action
   genDocNos.value = nos
+  genMerge.value = !!merge
   genVisible.value = true
 }
 /**
@@ -10815,6 +10835,26 @@ async function onButton(action) {
   }
   if (action === '扫描填单') {
     scanVisible.value = true
+    return
+  }
+  // **合单生单**(2026-11-13 用户口径:「采购订单新增一个合单生单在生单按钮下面,可以选择同一供应商的单据,
+  //   进行合单,合成一张送料暂收单」):
+  //   · 选单方式与「批量生单」一致(左栏勾多张采购订单),但**必须同一供应商** —— 这里先按供应商分组,
+  //     混了多家直接拦下并点名,不让用户到对话框里才发现(后端 generateMerged 同口径再校验一次);
+  //   · 出的是**一张**送料暂收单:行级「采购单号」= 合单前的订单号、「采购订单行号」= 合单前的订单行号,
+  //     暂收单自己的行 id 才是合单后的行号(下游占用/反查用它)。
+  if (action === MERGE_GENERATE_ACTION) {
+    const rows = list.value.filter((r) => railChecked.value.includes(docNoOfRow(r)))
+    if (rows.length < 2) return ElMessage.warning(tt('合单生单请先在左侧勾选至少两张采购订单'))
+    const audited = rows.filter((r) => String(r['单据状态'] || '') === '已审核')
+    if (audited.length !== rows.length) {
+      return ElMessage.warning(tt('合单生单只能勾「已审核」的采购订单：勾选里有草稿/审批中的单据'))
+    }
+    const suppliers = [...new Set(audited.map((r) => String(r['供应商'] || '').trim()))]
+    if (suppliers.length > 1) {
+      return ElMessage.warning(`${tt('合单生单只能选同一供应商的采购订单，当前勾了')}：${suppliers.join('、')}`)
+    }
+    openGenerateDialog(genMergeAction.value, audited.map(docNoOfRow), true)
     return
   }
   // 批量生单(2026-10-31 用户口径):左栏勾多张来源单 → 统一生单对话框(勾行 + 本次数量)

@@ -621,31 +621,45 @@ public class KingdeePushService {
             // 批次号写在表头;金蝶 inv_product 的 batch_no 是行级键,实测仅批次管理商品才落库)
             if (isFinIn && batch.isEmpty()) batch = str(head.get("批次号"));
             if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
-            // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
-            // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
+            // 来源单:行级 src_bill_no=**本行**的采购订单号(2026-11-13 合单生单起,行级优先),
+            // 行上没有才退回表头;src_seq=该行对应的采购订单行号(订单→暂收→检验→入库 逐站带下来)
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
             // 否则金蝶会因"源单分录不存在"整单被拒(用分录映射当白名单)。
-            if (linkSrc) {
-                if (materialId.isEmpty()) {
-                    throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
-                            + "无法挂来源单(采购订单[" + poNo + "]):请核对商品档案或账套后重试");
+            if (isPur) {
+                // ★ 合单生单:一张采购入库单可能跨多张采购订单(行级「采购单号」各带各的),
+                //   表头「采购订单号」这时是"订单1、订单2"这种人读串 —— 不能拿它当 src_bill_no。
+                String linePo = str(line.get("采购单号"));
+                boolean multiOrderHead = poNo.contains("、") || poNo.contains(",");
+                // 计数口径:同一张订单的行 → 全部挂该订单;行上没有号时才用表头(且表头不是多单串)
+                String srcPo = !linePo.isEmpty() ? linePo : (multiOrderHead ? "" : poNo);
+                PoLineRef hit = srcPo.isEmpty() ? null : poLineRefCache.computeIfAbsent(srcPo, this::resolveLinePoRef);
+                if (hit == null && !srcPo.isEmpty()) {
+                    log.warn("采购入库单[{}]第{}行 采购订单[{}]在金蝶账套内未找到:该行不带 src_bill_no/src_seq",
+                            docNo, rowNo, srcPo);
                 }
-                e.put("src_bill_no", poNo);
-                e.put("src_bill_type_id", "pur_bill_order");
-                e.put("src_bill_type_number", "pur_bill_order");
-                e.put("src_bill_type_name", "采购订单");
-                e.put("src_inter_id", poRefs.billId());
-                Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
-                if (srcSeq == null) {
-                    log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
-                } else {
-                    String entryId = poRefs.entryIdBySeq().get(srcSeq);
-                    if (entryId == null) {
-                        log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
-                                docNo, rowNo, srcSeq, poNo);
+                if (hit != null) {
+                    PoRefs refs = hit.refs();
+                    if (materialId.isEmpty()) {
+                        throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
+                                + "无法挂来源单(采购订单[" + srcPo + "]):请核对商品档案或账套后重试");
+                    }
+                    e.put("src_bill_no", hit.billNo());
+                    e.put("src_bill_type_id", "pur_bill_order");
+                    e.put("src_bill_type_number", "pur_bill_order");
+                    e.put("src_bill_type_name", "采购订单");
+                    e.put("src_inter_id", refs.billId());
+                    Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
+                    if (srcSeq == null) {
+                        log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
                     } else {
-                        e.put("src_seq", srcSeq);
-                        e.put("src_entry_id", entryId);
+                        String entryId = refs.entryIdBySeq().get(srcSeq);
+                        if (entryId == null) {
+                            log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
+                                    docNo, rowNo, srcSeq, srcPo);
+                        } else {
+                            e.put("src_seq", srcSeq);
+                            e.put("src_entry_id", entryId);
+                        }
                     }
                 }
             }
@@ -728,6 +742,29 @@ public class KingdeePushService {
 
     /** 采购订单引用缓存(单号→引用;转ERP 为低频操作,进程内缓存即可;失败不缓存以便重试) */
     private final Map<String, PoRefs> poRefsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 行级订单解析结果:金蝶侧**真实**单号(可能是 MES 号回写后的 ERP单号)+ 引用 */
+    private record PoLineRef(String billNo, PoRefs refs) {}
+
+    /** 行级解析缓存(合单生单后一张入库单可跨多张采购订单,逐行解析;同号只解析一次) */
+    private final Map<String, PoLineRef> poLineRefCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * **行级**采购订单解析(2026-11-13 合单生单):先按 MES 单号解析,解析不到再按该单的 ERP单号 兜底
+     * (直推过金蝶的订单,金蝶侧号已被回写到 bd_pu_order.ERP单号)。返回的 {@code billNo} 是**金蝶侧真实号**
+     * —— src_bill_no 必须写它才挂得上;两者都解析不到返回 null(该行不挂源单,不阻塞整单)。
+     */
+    private PoLineRef resolveLinePoRef(String poNo) {
+        if (poNo == null || poNo.isBlank()) return null;
+        PoRefs refs = resolvePoRefs(poNo);
+        if (refs != null) return new PoLineRef(poNo, refs);
+        String erpNo = mesOrderErpNo(poNo);
+        if (!erpNo.isEmpty()) {
+            PoRefs byErp = resolvePoRefs(erpNo);
+            if (byErp != null) return new PoLineRef(erpNo, byErp);
+        }
+        return null;
+    }
 
     /**
      * 按采购订单号向金蝶解析 订单单据id + 各分录id(推送 src_inter_id/src_entry_id 用)。

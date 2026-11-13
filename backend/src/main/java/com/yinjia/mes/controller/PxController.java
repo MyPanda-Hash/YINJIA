@@ -1085,6 +1085,42 @@ public class PxController {
         return ApiResult.ok(out);
     }
 
+    /**
+     * **合单生单**(2026-11-13 用户口径):多张**同一供应商**的采购订单 → **一张**送料暂收单。
+     *
+     * <p>请求体:{@code {panelCode, action, batchNo?, docs:[{sourceNo, lines:[{lineKey, qty, 仓库/仓位...}]}]}}
+     * —— docs 结构与 {@code /push/generate} 完全一致(前端复用同一份行契约与仓库/仓位预填),
+     * 区别只在于后端把**所有 docs 的行并进同一张目标单**,而不是逐张各出一张。
+     *
+     * <p>行号语义见 {@code PushGenerateHandler.generateMerged} 的类注释:行级「采购单号」= 合单**前**的订单号,
+     * 「采购订单行号」= 合单**前**的订单行号;占用/反查用的 source_line_key 是合单**后**的暂收行 id。
+     */
+    @PostMapping("/push/merge")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> pushMerge(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        String sourcePanel = String.valueOf(body.getOrDefault("panelCode", ""));
+        String action = String.valueOf(body.getOrDefault("action", ""));
+        String target = configService.pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalArgumentException("该动作没有可用的生单目标:" + action);
+        perm.requirePanelView(sourcePanel);
+        perm.requireButton(target, "保存");
+        String user = SecurityContextHolder.getContext().getAuthentication() == null
+                ? "system" : SecurityContextHolder.getContext().getAuthentication().getName();
+        List<Map<String, Object>> docs = new java.util.ArrayList<>();
+        Object rawDocs = body.get("docs");
+        if (rawDocs instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) docs.add((Map<String, Object>) m);
+            }
+        }
+        Map<String, Object> res = pushGenerateHandler.generateMerged(sourcePanel, action, docs,
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")), user);
+        Map<String, Object> out = new java.util.LinkedHashMap<>(res);
+        out.put("targetPanel", target);
+        recordUsage(sourcePanel, action, String.valueOf(res.get("编号")), request);
+        return ApiResult.ok(out);
+    }
+
     /** 请求体里的字符串数组(容忍 null / 逗号串 / 单值) */
     private static List<String> strList(Object raw) {
         List<String> out = new java.util.ArrayList<>();
