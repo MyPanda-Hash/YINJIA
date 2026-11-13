@@ -626,9 +626,10 @@ public class KingdeePushService {
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
             // 否则金蝶会因"源单分录不存在"整单被拒(用分录映射当白名单)。
             if (isPur) {
-                // ★ 合单生单:一张采购入库单可能跨多张采购订单(行级「采购单号」各带各的),
+                // ★ 合单生单:一张采购入库单可能跨多张采购订单(行级「源单编号」各带各的),
                 //   表头「采购订单号」这时是"订单1、订单2"这种人读串 —— 不能拿它当 src_bill_no。
-                String linePo = str(line.get("采购单号"));
+                String linePo = str(line.get("源单编号"));
+                if (linePo.isEmpty()) linePo = str(line.get("采购单号"));   // 兼容口径
                 boolean multiOrderHead = poNo.contains("、") || poNo.contains(",");
                 // 计数口径:同一张订单的行 → 全部挂该订单;行上没有号时才用表头(且表头不是多单串)
                 String srcPo = !linePo.isEmpty() ? linePo : (multiOrderHead ? "" : poNo);

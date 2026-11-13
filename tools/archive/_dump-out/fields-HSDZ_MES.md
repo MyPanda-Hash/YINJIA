@@ -570,7 +570,6 @@ FIELD	detail	250	仓库id	仓库id	文本	120	E-H-									13062
 FIELD	detail	260	仓库启用仓位管理	仓库启用仓位管理	文本	120	E-H-									13064
 FIELD	detail	270	仓位id	仓位id	文本	120	E-H-									13066
 FIELD	detail	290	采购订单行号	源单行号	文本	110	E--V									13068
-FIELD	detail	291	采购单号	采购单号	文本	140	---V							Src PO No.		14512
 FIELD	detail	300	辅助属性id	辅助属性id	文本	120	E-H-									13070
 FIELD	detail	310	批次号	批次号	文本	150	---V									13073
 FIELD	detail	320	辅助属性名称	辅助属性名称	文本	120	E-H-									13074
@@ -608,7 +607,7 @@ FIELD	detail	630	默认浮动数量	默认浮动数量	文本	120	E-H-									1
 FIELD	detail	640	辅助换算系数	辅助换算系数	文本	120	E-H-									13139
 FIELD	detail	650	换算系数	换算系数	文本	120	E-H-									13141
 FIELD	detail	660	折扣额	折扣额	文本	120	E-H-									13143
-FIELD	detail	670	源单编号	源单编号	文本	120	E-H-									13145
+FIELD	detail	670	源单编号	源单编号	文本	120	---V									13145
 FIELD	detail	680	源单类型id	源单类型id	文本	120	E-H-									13147
 FIELD	detail	690	源单类型名称	源单类型名称	文本	120	E-H-									13148
 FIELD	detail	700	源单类型编码	源单类型编码	文本	120	E-H-									13150
@@ -1018,4 +1017,3 @@ COL	bl_purchase_in	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
-COL	bl_purchase_in	采购单号	nvarchar(400)	null	采购入库行的来源采购订单号(行级)。转ERP 时用它作金蝶 src_bill_no(行级优先于表头「采购订单号」),合单后一张入库单跨多张订单也挂得对。

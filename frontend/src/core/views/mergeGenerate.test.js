@@ -72,11 +72,13 @@ test('③ 行号:行级「采购单号」= 合单前的订单号;占用仍用合
   assert.match(body, /p\.lineKey\(\)/, '占用按来源行键记(合单前那一行的已送量),两种行号各司其职')
 })
 
-test('④ 下游:检验/退回/入库逐行带采购单号;转ERP 行级 src_bill_no 用它', () => {
+test('④ 下游:检验/退回逐行带采购单号;入库行用它落「源单编号」;转ERP 行级 src_bill_no 用它', () => {
   assert.match(buttonService, /if \(r\.get\("采购单号"\) != null\) line\.put\("采购单号", r\.get\("采购单号"\)\)/,
-    '检验审核自动生的入库/退回行要带行级采购单号')
+    '检验审核自动生的退回行要带行级采购单号')
+  assert.match(buttonService, /if \(r\.get\("采购单号"\) != null\) line\.put\("源单编号", r\.get\("采购单号"\)\)/,
+    '入库行落的是**已有的 源单编号**(金蝶 src_bill_no 同名),不再另开 采购单号 列')
   assert.match(buttonService, /" 采购单号,"[\s\S]{0,80}" 送检数量/, '入库行取数 SELECT 要把采购单号取回来')
-  assert.match(kingdee, /String linePo = str\(line\.get\("采购单号"\)\)/, '转ERP 行级优先用本行订单号')
+  assert.match(kingdee, /String linePo = str\(line\.get\("源单编号"\)\)/, '转ERP 行级优先用本行的 源单编号')
   assert.match(kingdee, /multiOrderHead/, '表头是"订单1、订单2"这种合单串时不能当 src_bill_no')
   assert.match(kingdee, /e\.put\("src_bill_no", hit\.billNo\(\)\)/, 'src_bill_no 写解析到的金蝶真实号')
 })
