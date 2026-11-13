@@ -102,29 +102,37 @@ test('RD_PROD_INFO 必须登记摘要字段，卡片才对得齐', () => {
     '产品信息表摘要 = 产品编号 / 产品名称 / 客户名称（找单三线索，都是短字段）')
 })
 
-test('单据预览 = 替换右侧操作栏 + 返回按钮（不是弹窗，也不是展开左栏）', () => {
-  // 用户口径演进（每一步都是被纠正出来的，别往回改）：
+test('右栏预览必须复用 DocSelectRail 本体（左栏那套表格），不是自造卡片列表', () => {
+  // 用户口径（2026-11-13）：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」。
+  // 演进史（每一步都是被纠正出来的，别再往回改）：
   //   ① 窄侧栏卡片 → ② 弹窗浮层（「应该是侧边栏不是弹窗」）
-  //   → ③ 展开左侧 DocSelectRail（「把侧边栏换成右边展开」）→ ④ **替换右侧操作栏 + 返回**。
+  //   → ③ 展开左侧 → ④ 右栏但用自造卡片列表（「要左边栏的展示效果」）
+  //   → ⑤ **右栏里直接放 DocSelectRail**（本版）。
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
-  // ① 按钮分派到 openSidePreview
-  assert.match(vue, /canPreviewSide \? openSidePreview\(\) : openDocPreview\(\)/,
-    '按钮要按面板分派：这两个面板走右栏预览，其余走原逻辑')
-  // ② 预览态必须**替换**右栏：操作按钮在预览态不渲染
-  assert.match(vue, /<template v-if="!sideCollapsed && !previewInSide">/,
-    '预览态必须把原操作栏一起关掉（替换而不是叠加）')
-  // ③ 必须有返回按钮，且返回后恢复操作栏
-  assert.match(vue, /class="ps-back"/, '缺「返回」按钮')
-  assert.ok(vue.includes('closeSidePreview'), '缺返回函数')
-  // ④ 不得再有弹窗残留
-  assert.ok(!vue.includes('pv-grid'), '不应残留弹窗浮层')
+  // ① 预览态里必须是 DocSelectRail 组件本体
+  const at = vue.indexOf('<template v-if="previewInSide">')
+  const at2 = vue.indexOf('<div v-if="previewInSide" class="ps-wrap">')
+  const from = at > 0 ? at : at2
+  assert.ok(from > 0, '找不到预览态模板')
+  const seg = vue.slice(from, from + 1400)
+  assert.match(seg, /<DocSelectRail/, '右栏预览里必须直接用 DocSelectRail（与左栏同一组件）')
+  assert.match(seg, /class="ps-back"/, '必须有返回按钮')
+  // ② 不能再有自己的卡片列表（那是方案④，被否掉了）
+  assert.ok(!vue.includes('ps-row'), '不应再有自造卡片行 ps-row')
+  // ③ 列配置必须登记，否则表格没有中间列
+  const dir = vue.indexOf('const DOC_RAIL_PANELS = {')
+  const block = vue.slice(dir, dir + 14000)
+  assert.ok(block.includes('RD_PROD_INFO: ['), '产品信息表未登记左栏列')
+  assert.ok(block.includes('RD_APPROVAL: ['), '立项申请未登记左栏列')
+  // ④ 预览态右栏要加宽（176px 放不下 6 列，实测只露出单号+日期）
+  assert.match(vue, /\.approval-side\.preview-on \{ width: 382px; \}/, '预览态右栏必须加宽，否则表格列被挤掉')
 })
 
-test('这两个面板不再需要登记左侧 DOC_RAIL_PANELS（预览已改到右边）', () => {
+test('预览态必须替换操作栏（按钮不渲染），返回后恢复', () => {
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
-  const at = vue.indexOf('const DOC_RAIL_PANELS = {')
-  const block = vue.slice(at, at + 14000)
-  // 左栏登记是为方案③准备的；方案④改到右栏后，这两个面板不该再挂左栏
-  assert.ok(!block.includes('RD_PROD_INFO: ['), '左栏登记应已撤销（预览改到右边栏）')
-  assert.ok(!block.includes('RD_APPROVAL: ['), '左栏登记应已撤销（预览改到右边栏）')
+  assert.match(vue, /<template v-if="!sideCollapsed && !previewInSide">/,
+    '预览态要把原操作栏一起关掉（替换而不是叠加）')
+  assert.match(vue, /canPreviewSide \? openSidePreview\(\) : openDocPreview\(\)/,
+    '按钮要按面板分派：这两个面板走右栏预览，其余走原逻辑')
+  assert.ok(vue.includes('closeSidePreview'), '缺返回函数')
 })

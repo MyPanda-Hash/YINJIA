@@ -255,50 +255,30 @@
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
-        <div class="approval-side" :class="{ collapsed: sideCollapsed }">
+        <div class="approval-side" :class="{ collapsed: sideCollapsed, 'preview-on': previewInSide }">
           <!-- ═══ 单据预览：**替换**右侧栏（2026-11-13 用户口径）────────────────────────
                用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
                形态：点「单据预览」→ 右栏整体换成「单据预览」面板（表格列表 + 返回按钮）；
                点「返回」或再点「单据预览」→ 恢复原来的操作按钮栏。两者互斥，不叠在一起。 -->
-          <template v-if="previewInSide">
-            <div class="as-side-title">
+          <!-- ═══ 单据预览：**把左侧「单据选择」栏那套表格搬到右栏**（2026-11-13 用户口径）═══
+               用户原话：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」。
+               ⇒ 直接复用 DocSelectRail（与表格单据左栏**同一个组件**：单号 | 日期 | 中间列… |
+                 审核状态 的表格、上方翻页条、模糊搜索全库跨页、可拖宽），
+                 只是挂在右边，并在标题处给一个「← 返回」。 -->
+          <div v-if="previewInSide" class="ps-wrap">
+            <div class="ps-backbar">
               <span class="ps-back" :title="tt('返回')" @click="closeSidePreview">← {{ tt('返回') }}</span>
-              <span class="ps-title">{{ tt('单据预览') }}</span>
+              <span class="ps-cap">{{ tt('单据预览') }}</span>
             </div>
-            <div class="ps-body">
-              <el-input
-                v-model="previewKw"
-                size="small"
-                clearable
-                :placeholder="tt('输入编号或任意内容快速筛选')"
-                class="ps-kw"
-              />
-              <div class="ps-count">{{ tt('共 {n} 张').replace('{n}', String(previewCards.length)) }}</div>
-              <div class="ps-list">
-                <div
-                  v-for="c in previewCards"
-                  :key="c.no"
-                  class="ps-row"
-                  :class="{ on: c.no === curDocNo }"
-                  @click="openPreviewCard(c)"
-                >
-                  <div class="ps-row-head">
-                    <span class="ps-row-no" :title="c.no">{{ c.no }}</span>
-                    <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
-                  </div>
-                  <div class="ps-row-date">
-                    {{ c.date }}
-                    <span v-if="c.summary" class="ps-row-sum" :title="c.summary"> · {{ c.summary }}</span>
-                  </div>
-                  <div v-for="(f, i) in c.fields" :key="i" class="ps-row-field">
-                    <span class="ps-row-label">{{ tt(f.label) }}</span>
-                    <span class="ps-row-value" :title="f.value">{{ f.value }}</span>
-                  </div>
-                </div>
-                <div v-if="!previewCards.length" class="ps-empty">{{ tt('没有匹配的单据') }}</div>
-              </div>
-            </div>
-          </template>
+            <DocSelectRail
+              v-if="previewRailBind"
+              v-bind="previewRailBind"
+              @select="onRailSelect"
+              @toggle="closeSidePreview"
+              @page="onRailPage"
+              @search="onRailSearch"
+            />
+          </div>
           <div v-else class="as-side-title" @click="sideCollapsed = !sideCollapsed">
             <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
@@ -5770,6 +5750,13 @@ const DOC_RAIL_PANELS = {
   //   一个工单行 = 一个生产批次 ⇒ 左栏给工单号,业务能一眼对上生产批次;
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
+  // ── 2026-11-13 用户口径：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」
+  //   ⇒ 这两个面板的「单据预览」直接复用 DocSelectRail（与表格单据左栏同一个组件），
+  //     只是挂在**右边**。故列配置必须在这里登记，docRailCfg 才组得出
+  //     单号 | 日期 | 中间列… | 审核状态。
+  //   中间列按"找单线索"挑，且是实测有值的短字段：
+  RD_PROD_INFO: ['产品编号', '产品名称', '客户名称'],
+  RD_APPROVAL: ['客户名', '项目等级', '申请立项人'],
 }
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
@@ -5815,6 +5802,26 @@ const railBind = computed(() => ({
   selectable: railSelectable.value,
   checked: railChecked.value,
 }))
+/**
+ * 预览态专用的 rail 绑定：与 railBind 同一套字段，但
+ * · `collapsed` 恒 false —— 预览态必须显示表格本体，不能是那个 « 把手；
+ * · `title` 用「XX选择」，与左栏一致。
+ * 数据源照样是 list / total / query，翻页与模糊搜索走上面同一批 handler。
+ */
+const previewRailBind = computed(() => ({
+  title: docRailCfg.value ? docRailCfg.value.title : '',
+  columns: docRailCfg.value ? docRailCfg.value.columns : null,
+  rows: list.value,
+  currentNo: railCurNo.value,
+  collapsed: false,
+  total: total.value,
+  pageNo: query.pageNo,
+  pageSize: query.pageSize,
+  keyword: query.keyword,
+  selectable: false,
+  checked: [],
+}))
+
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })
 }
@@ -14377,6 +14384,42 @@ onUnmounted(() => {
 .rpt-up-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }
 /* ── 单据预览查找(文书侧栏,文件档案查看效果) ── */
+/* ── 右栏「单据预览」态（2026-11-13）──────────────────────────────────────
+   用户口径：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」
+   ⇒ 右栏里直接放 DocSelectRail 本体（与表格单据左栏同一组件、同一套表格/翻页/搜索）。
+   这里只做三件事：① 造一个"返回"条；② 让 rail 在右栏里铺满（它默认带 border-right，
+   挂到右边要改成 border-left）；③ 去掉它自己的宽度（交给右栏宽度决定）。 */
+/* 预览态右栏加宽：左栏那套表格有 6 列（单号/日期/中间3列/审核状态），
+   176px 的常规宽度放不下（实测只露出"单号+日期"，其余列溢出不可见）。
+   382px 是实测能完整放下 6 列的最小值（列内容都是短字段，不需要更宽）。 */
+.approval-side.preview-on { width: 382px; }
+.ps-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ps-backbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #dce4e1;
+  background: #fafbfd;
+  flex: none;
+}
+.ps-cap { font-size: 12px; color: rgba(0, 0, 0, 0.45); }
+/* rail 在右栏里：铺满宽度、边框换到左侧、不要它自带的固定宽度与拖宽把手 */
+.ps-wrap :deep(.doc-select-rail) {
+  width: 100% !important;
+  flex: 1;
+  min-height: 0;
+  border-right: none;
+  border-left: 1px solid #dce4e1;
+}
+.ps-wrap :deep(.dsr-resizer) { display: none; }
+.ps-wrap :deep(.dsr-coll) { display: none; }
+
 /* ── 右栏「单据预览」态（2026-11-13 用户口径：替换右边栏 + 返回按钮）────────
    右栏宽约 200~240px，故列表是**一列紧凑行**（不是横向多列——那是弹窗时代的要求，
    换成右栏后横向空间不够）。每行 = 单号+状态 / 日期(·摘要) / 字段行，
@@ -14390,31 +14433,8 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .ps-back:hover { text-decoration: underline; }
-.ps-title { font-size: 12px; color: rgba(0, 0, 0, 0.65); }
-.ps-body { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 8px; }
-.ps-kw { margin-bottom: 6px; }
-.ps-count { font-size: 12px; color: rgba(0, 0, 0, 0.45); margin-bottom: 6px; }
-.ps-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.ps-row {
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  background: #fff;
-  padding: 6px 8px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  min-width: 0;
-}
-.ps-row:hover { border-color: #1677ff; }
-.ps-row.on { border-color: #1677ff; background: #f0f7ff; }
-.ps-row-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
-.ps-row-no { font-weight: 600; font-size: 12px; color: #1e5a8a; white-space: nowrap; }
-.ps-row-head .doc-status { flex: none; white-space: nowrap; font-size: 11px; line-height: 16px; padding: 0 5px; }
-.ps-row-date { font-size: 11px; line-height: 16px; color: rgba(0, 0, 0, 0.45); }
-.ps-row-sum { color: rgba(0, 0, 0, 0.65); }
-.ps-row-field { display: flex; gap: 4px; font-size: 11px; line-height: 16px; min-width: 0; }
-.ps-row-label { flex: none; color: rgba(0, 0, 0, 0.45); }
-.ps-row-value { color: rgba(0, 0, 0, 0.88); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ps-empty { padding: 24px 0; text-align: center; font-size: 12px; color: rgba(0, 0, 0, 0.45); }
+.ps-cap { font-size: 12px; color: rgba(0, 0, 0, 0.45); }
+
 .preview-kw { margin: 4px 0 6px; }
 .preview-cards { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
 .preview-card {
