@@ -26,6 +26,7 @@ table:yj_doc_status   # 单据状态表(shr审核/canceled作废/stopped中止/p
 table:yj_erp_wh_map   # 金蝶仓库编码 → MES 仓库编码 映射(条码/库存面板按此把外部仓归到 MES 仓;改口径只改数据:CK00006/YCL-01→WH-CL)
 table:yj_ext_bind_log   # 动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)
 table:yj_field   # 面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)
+table:yj_field_view   # 角色字段视图(2026-11-13):同一面板各角色「显示/隐藏哪些字段」;只存显隐(顺序与栏名仍由 yj_field=系统整体决定),同一角色所有账号共用;行存在=显式设定,行不存在=跟随整体 —— 原「表格调整/表头调整」对 yj_field 的写入一点没改
 table:yj_form_approval   # 审批流记录(提交/通过/驳回留痕)
 table:yj_locale   # 语言表(启用语言清单,插行即出现语言切换器)
 table:yj_lot_seq   # 批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)

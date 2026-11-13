@@ -4836,3 +4836,5 @@ migrate-prodinfo-required-20261112.sql
 migrate-gen-wh-bin-prefill-20261113.sql
 # 2026-11-13 合单生单:检验/退回/入库行补「采购单号」(行级来源采购订单号,合单后逐行溯源 + 转ERP 行级 src_bill_no)
 migrate-merge-gen-20261113.sql
+# 2026-11-13 角色字段视图:新建 yj_field_view(同一面板各角色显示/隐藏哪些字段;只存显隐,不碰 yj_field)
+migrate-role-field-view-20261113.sql
