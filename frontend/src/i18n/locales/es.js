@@ -2740,6 +2740,15 @@ export default {
     '切炭': 'Corte de carbón',
     '组装': 'Ensamblaje',
     '装箱': 'Embalaje',
+    // ---- 生产工序进度看板·工序可点 + 检验单跳转(2026-11-13:提示语 + 行/工序/检验徽标点击说明)----
+    '该工单未进行排产': 'Esta orden de trabajo aún no está programada',
+    '该工序未到达': 'Esta operación aún no se ha alcanzado',
+    '该工序暂无检验单': 'No hay hoja de inspección para esta operación',
+    '未在工单排产中找到该工单行': 'Línea de la orden no encontrada en la programación de órdenes',
+    '点击工序跳转到该工序排产': 'Haga clic en una operación para abrirla en la programación de órdenes',
+    '点击查看检验单': 'Haga clic para ver la hoja de inspección',
+    '已定位': 'Localizado',
+    '点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Haga clic en una fila para abrir la orden de trabajo; haga clic en una operación para abrir su programación; haga clic en la marca de inspección para abrir la hoja de inspección',
     // ---- 看板追加生产工单主要属性(2026-11-08:产品编码/规格型号显式标签、需求·入库·余量、交期、订单号)----
     '产品': 'Producto',
     '交期': 'Fecha de entrega',

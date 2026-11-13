@@ -2745,6 +2745,15 @@ export default {
     '切炭': 'Cắt than',
     '组装': 'Lắp ráp',
     '装箱': 'Đóng hộp',
+    // ---- 生产工序进度看板·工序可点 + 检验单跳转(2026-11-13:提示语 + 行/工序/检验徽标点击说明)----
+    '该工单未进行排产': 'Phiếu công việc này chưa được lên lịch sản xuất',
+    '该工序未到达': 'Chưa đến công đoạn này',
+    '该工序暂无检验单': 'Công đoạn này chưa có phiếu kiểm tra',
+    '未在工单排产中找到该工单行': 'Không tìm thấy dòng phiếu công việc trong lịch sản xuất',
+    '点击工序跳转到该工序排产': 'Nhấn vào công đoạn để mở công đoạn đó trong lịch sản xuất',
+    '点击查看检验单': 'Nhấn để xem phiếu kiểm tra',
+    '已定位': 'Đã định vị',
+    '点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Nhấn vào dòng để mở phiếu công việc; nhấn vào công đoạn để mở lịch sản xuất của công đoạn đó; nhấn vào dấu kiểm tra để mở phiếu kiểm tra',
     // ---- 看板追加生产工单主要属性(2026-11-08:产品编码/规格型号显式标签、需求·入库·余量、交期、订单号)----
     '产品': 'Sản phẩm',
     '交期': 'Ngày giao hàng',

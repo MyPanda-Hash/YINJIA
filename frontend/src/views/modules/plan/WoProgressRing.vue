@@ -10,10 +10,16 @@
       当前工序 = 系统蓝细描边 + 浅蓝底(#ecf5ff)高亮,不要发光/呼吸大特效。
   版式仍按参考图的信息结构:环上=工序名、环内=百分比、环下=完工量/计划量。
   状态口径由后端四态给出(ProcessTaskService.stepsSummary),前端不猜业务。
+
+  🔴 2026-11-13(契约 CONTRACT.md §3.1/§3.2/§4):整环可点 → emit('step-click', step)
+    (父组件负责「未排产 / 未到达」提示与跳工单排产);环下检验徽标可点 → emit('insp-click', step)
+    (父组件负责选单并跳检验单面板)。组件仍是纯展示:只发事件,不取数、不跳转、不弹提示。
+    两处都 @click.stop(别把父级整行点击带起来),cursor:pointer + 轻量 hover 反馈 + title 提示。
 -->
 <template>
-  <div class="wpr" :class="['st-' + tone, { 'is-current': isCurrent }]"
-       :style="{ width: size + 8 + 'px' }" :title="tipText">
+  <!-- 整环(工序名 + 环 + 数字)可点:点工序 → 该工序排产 -->
+  <div class="wpr is-clickable" :class="['st-' + tone, { 'is-current': isCurrent }]"
+       :style="{ width: size + 8 + 'px' }" :title="stepTip" @click.stop="onStepClick">
     <span class="wpr-name">{{ tt(step['工序'] || '') }}</span>
     <div class="wpr-ring" :style="{ width: size + 'px', height: size + 'px' }">
       <svg :width="size" :height="size" :viewBox="`0 0 ${size} ${size}`" aria-hidden="true">
@@ -34,8 +40,10 @@
       <b>{{ fmt(step['完工量']) }}</b><i>/</i><em>{{ fmt(step['计划量']) }}</em>
     </span>
     <!-- 检验徽标(2026-11-08 第4轮):应检工序(成型/组装)才有;用户口径
-         「进行到哪一步,那个环节会提示品质进行检验」——环下直接给状态色 + 悬停列出检验单 -->
-    <span v-if="inspect" class="wpr-ins" :class="'ins-' + insTone" :title="insTip">{{ insText }}</span>
+         「进行到哪一步,那个环节会提示品质进行检验」——环下直接给状态色 + 悬停列出检验单
+         2026-11-13:徽标可点 → 打开该工序的检验单(父组件选单/跳转) -->
+    <span v-if="inspect" class="wpr-ins is-clickable" :class="'ins-' + insTone"
+          :title="insTitle" @click.stop="onInspClick">{{ insText }}</span>
   </div>
 </template>
 
@@ -53,6 +61,19 @@ const props = defineProps({
   /** 环宽(px) */
   strokeW: { type: Number, default: 6 },
 })
+
+/**
+ * 2026-11-13(契约 §4):只发事件,判定与跳转全在父组件 WorkOrderProgressBoard
+ *   step-click → 点工序(未排产/未到达 → 提示;否则跳工单排产的该工序)
+ *   insp-click → 点检验徽标(选单跳检验单面板)
+ */
+const emit = defineEmits(['step-click', 'insp-click'])
+function onStepClick() {
+  emit('step-click', props.step)
+}
+function onInspClick() {
+  emit('insp-click', props.step)
+}
 
 const half = computed(() => props.size / 2)
 /** 留 2px 给描边/描边外圈,避免被 viewBox 裁掉 */
@@ -122,6 +143,9 @@ const tipText = computed(() => {
   return parts.join(' · ')
 })
 
+/** 整环悬停 title:进度信息 + 可点提示(2026-11-13 契约 §5 词条) */
+const stepTip = computed(() => `${tipText.value} · ${tt('点击工序跳转到该工序排产')}`)
+
 /* ===== 检验徽标(2026-11-08 第4轮新增;接口未给「检验」时全部静默不显示) ===== */
 const inspect = computed(() => {
   const ins = props.step?.['检验']
@@ -165,6 +189,9 @@ const insTip = computed(() => {
   if (!insDocs.value.length) lines.push(tt('暂无检验单'))
   return lines.join('\n')
 })
+
+/** 检验徽标悬停 title:检验状态/单据列表 + 可点提示(2026-11-13 契约 §5 词条) */
+const insTitle = computed(() => (insTip.value ? `${insTip.value}\n${tt('点击查看检验单')}` : tt('点击查看检验单')))
 </script>
 
 <style scoped>
@@ -183,6 +210,18 @@ const insTip = computed(() => {
 }
 .wpr.st-doing {
   --wpr-color: #409eff;
+}
+
+/* 2026-11-13(契约 §3.1/§3.2):整环可点 / 检验徽标可点 —— 只给 cursor + 轻量 hover 反馈,
+   不加动画、不发光(与既有浅色系统风一致) */
+.wpr.is-clickable {
+  cursor: pointer;
+}
+.wpr.is-clickable:hover .wpr-name {
+  color: #409eff;
+}
+.wpr.is-clickable:hover .wpr-track {
+  stroke: #dcdfe6;
 }
 
 .wpr-name {
@@ -306,6 +345,13 @@ const insTip = computed(() => {
 .wpr-ins.ins-need {
   background: #f4f4f5;
   color: #909399;
+}
+/* 检验徽标可点(2026-11-13):cursor + 轻量 hover(仅轻微压暗,不放大/不发光) */
+.wpr-ins.is-clickable {
+  cursor: pointer;
+}
+.wpr-ins.is-clickable:hover {
+  filter: brightness(0.94);
 }
 
 @media (prefers-reduced-motion: reduce) {

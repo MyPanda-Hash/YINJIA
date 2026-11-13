@@ -2740,6 +2740,15 @@ export default {
     '切炭': 'Kohlenstoffschnitt',
     '组装': 'Montage',
     '装箱': 'Verpackung',
+    // ---- 生产工序进度看板·工序可点 + 检验单跳转(2026-11-13:提示语 + 行/工序/检验徽标点击说明)----
+    '该工单未进行排产': 'Dieser Fertigungsauftrag ist noch nicht eingeplant',
+    '该工序未到达': 'Dieser Arbeitsgang ist noch nicht erreicht',
+    '该工序暂无检验单': 'Für diesen Arbeitsgang liegt kein Prüfbeleg vor',
+    '未在工单排产中找到该工单行': 'Auftragsposition in der Auftragsplanung nicht gefunden',
+    '点击工序跳转到该工序排产': 'Arbeitsgang anklicken, um ihn in der Auftragsplanung zu öffnen',
+    '点击查看检验单': 'Klicken, um den Prüfbeleg zu öffnen',
+    '已定位': 'Gefunden',
+    '点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Zeile anklicken, um den Fertigungsauftrag zu öffnen; Arbeitsgang anklicken, um seine Planung zu öffnen; Prüfmarkierung anklicken, um den Prüfbeleg zu öffnen',
     // ---- 看板追加生产工单主要属性(2026-11-08:产品编码/规格型号显式标签、需求·入库·余量、交期、订单号)----
     '产品': 'Produkt',
     '交期': 'Liefertermin',

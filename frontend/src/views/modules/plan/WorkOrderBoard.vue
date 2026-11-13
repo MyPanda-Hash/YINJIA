@@ -8,7 +8,11 @@
      2026-11-13(用户口径「增加一个原计划量/报工数,当天结束后未完成会进行提示」):
      日期格从「一个数」改成**原计划/报工**两数(例 715/15);日期 < 今天且报工 < 原计划 ⇒ 该格标红,
      页面顶部再给一行红色汇总(处数 + 合计欠产,悬停看明细),不弹窗。未完成的量由后端
-     `DayPlanSpread.mergeReported` 向今天及以后重排,前端只负责显示。 -->
+     `DayPlanSpread.mergeReported` 向今天及以后重排,前端只负责显示。
+     2026-11-13(契约 tools/archive/_wo-progress-click-20261113/CONTRACT.md §3.1):新增**深链定位** ——
+     从「生产工序进度看板」点某道工序跳来(?line&wo&rowid&op):按 line 选线 → 定位该工单行
+     (浅蓝底高亮 + 滚到表格中间 + 自动展开「工序流转明细」并把该工序标出来)→ 上下文区提示「已定位」;
+     参数用完即摘(router.replace),keep-alive 再次跳入靠 watch(route.query)/onActivated 重新定位。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -90,6 +94,10 @@
           <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b>
             <span v-if="shop" class="wb-shop">{{ tt('当前车间') }}：{{ shop }}</span>
           </span>
+          <!-- 深链定位提示(2026-11-13,契约 CONTRACT.md §3.1):从「生产工序进度看板」点某道工序跳来时
+               显示「已定位:工单号#行号 · 工序」,让用户知道为什么停在这一行;参数用完即摘,
+               提示只留到切产线/切片签/刷新(那些动作会 clearFocus) -->
+          <span v-if="focusTip" class="wb-focus-tip" :title="focusTip">{{ focusTip }}</span>
           <!-- 顶部统计(2026-11-12 改口径):三项全是**工序口径** = 右侧「未完工」页签明细行合计,
                与左侧每线数字同源(选中哪条线,左侧该线主数字 = 这里的「本线排产数量」)。
                成品口径的未交量(排产−入库)不再冒充「未完工量」,只在 tooltip 里报合计供对账。 -->
@@ -153,8 +161,15 @@
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
             </div>
           </div>
-          <el-table :data="schedRows" size="small" border height="100%" empty-text=""
-                    @selection-change="(r) => (checkedSched = r)">
+          <!-- ⚠ 深链定位(2026-11-13,契约 §3.1)给表格补了 4 个绑定,别删:
+               ref=schedTable   → 定位后从表格内部 .el-table__body 找高亮行做 scrollIntoView
+               :row-key         → el-table 展开行 / expand-row-keys 的**行身份**,必须唯一
+                                  (行id 优先,极端缺 id 时用 工单号|行号|批次号 兜底,见 rowKeyOf)
+               :row-class-name  → 命中的行挂 .wb-focus-row(浅蓝底 + 左侧 3px 蓝边)
+               :expand-row-keys → 自动展开该行「工序流转明细」(受控:展开/收起变化由 @expand-change 回写) -->
+          <el-table ref="schedTable" :data="schedRows" size="small" border height="100%" empty-text=""
+                    :row-key="rowKeyOf" :row-class-name="rowClassName" :expand-row-keys="expandedKeys"
+                    @selection-change="(r) => (checkedSched = r)" @expand-change="onExpandChange">
             <el-table-column type="selection" width="42" />
             <!-- 按量流转·逐道明细(2026-11-12 方案A):一行只显示"当前工序",后道必须展开才看得到;
                  展开区渲染后端给的「工序流转明细」,只读。 -->
@@ -176,7 +191,8 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(f, i) in (row.工序流转明细 || [])" :key="i" :class="{ 'is-cur': f.当前 }">
+                      <tr v-for="(f, i) in (row.工序流转明细 || [])" :key="i"
+                          :class="{ 'is-cur': f.当前, 'is-focus': isFocusFlow(row, f) }">
                         <td>{{ tt(f.工序) }}</td>
                         <td class="num">{{ flowNum(f.换算率) }}</td>
                         <td class="num">{{ flowNum(f.计划量) }}</td>
@@ -434,7 +450,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS } from '@/business/print-formats'
@@ -577,9 +594,13 @@ const ctxStatsTitle = computed(() => [
 const overLineCount = computed(() => Number(s.value['今日超载线数'] || 0))
 const overQty = computed(() => Number(s.value['今日超额合计'] || 0))
 
+/** 选中一条产线:重取该线排产明细 + 日计划(既有行为不变)。
+ *  2026-11-13 深链定位要复用同一条路径 ⇒ 返回 Promise(模板点击忽略返回值,深链里 await 它再定位行);
+ *  同时清掉上一次的定位高亮/展开/提示(用户主动切线 = 不再"定位在某行")。 */
 function select(l) {
+  clearFocus()
   sel.line = l.生产线
-  loadScheduled().then(() => loadDayPlan())
+  return loadScheduled().then(() => loadDayPlan())
 }
 
 async function loadSummary() {
@@ -779,9 +800,208 @@ async function loadDayPlan() {
 // ⚠ 2026-10-31 最终口径:日计划默认由系统自动均摊,只允许「就地改某一天」(其余天按剩余量重摊);
 //   不再有「全量手填 + 保存日排产」那套入口。
 
-/** 页签(未完工/已完工/全部)变化:排产明细 + 日排产一起换 */
+/** 页签(未完工/已完工/全部)变化:排产明细 + 日排产一起换(顺带清掉深链定位痕迹:换了页签行集就变了) */
 function onScope() {
+  clearFocus()
   loadScheduled().then(() => loadDayPlan())
+}
+
+// ───────── 深链定位(2026-11-13,契约 CONTRACT.md §3.1)──────────────────────────────
+// 来源:「生产工序进度看板」点某道工序跳过来 ——
+//   /prod/plan/workOrderBoard?line=<生产线>&wo=<工单号>&rowid=<行id>&op=<工序>
+// 本页做四件事:
+//   ① loadSummary() 后按 line **精确匹配** linesSummary 的生产线 → select(该线)(复用既有 select:
+//      loadScheduled + loadDayPlan),不另写一套取数;
+//   ② 定位行:行id 精确匹配 rowid 优先,其次 加工单号===wo(有行号时再按 工单行号 收窄);
+//   ③ 命中:该行高亮(.wb-focus-row)+ scrollIntoView 居中 + 自动展开「工序流转明细」并把 工序===op
+//      那道标 .is-focus + 上下文区提示「已定位:工单号#行号 · 工序」;
+//   ④ 参数**用完即摘**(router.replace 只删这 4 个 key),避免 keep-alive 回到本页被旧参数反复复写;
+//      同一页面再次从看板点别的工序进来(只变 query 不重新挂载)⇒ watch(route.query) 重新定位。
+//   ⚠ 找不到行 / 该线不在 linesSummary:ElMessage.warning + 摘参数后照常可用(不白屏、不死循环);
+//     其中「行在别处页签」(看板切了已完工/全部才点的工序)会先切本页既有的「全部」页签再找一次,
+//     真正不存在才 warning(见 consumeFocus 里第 ② 步的注释)。
+const route = useRoute()
+const router = useRouter()
+/** 深链 query 键(契约 §3.1 只这四个) */
+const FOCUS_KEYS = ['line', 'wo', 'rowid', 'op']
+/** 可选兜底:契约没定义行号参数,但发送端若顺带带上 行号/rowno,定位多个同号工单行时用它收窄 */
+const FOCUS_ROWNO_KEYS = ['行号', 'rowno']
+/** 本页路径(hash 路由,route.path 不含 '#');keep-alive 缓存实例里靠它判断这次路由变化是不是本页 */
+const SELF_PATH = '/prod/plan/workOrderBoard'
+/** 高亮行的 row-key 值(空 = 无高亮) */
+const focusKey = ref('')
+/** 要高亮的工序(定位行「工序流转明细」里那道) */
+const focusOp = ref('')
+/** 上下文区提示文案,如「已定位:WO001#2 · 成型」 */
+const focusTip = ref('')
+/** el-table 展开行 keys(:expand-row-keys 受控) */
+const expandedKeys = ref([])
+/** 竞态计数:连续跳入/连点时只让最后一次定位生效,前一次 await 的结果作废 */
+let focusSeq = 0
+/** 正在消费的参数指纹:keep-alive 下 onActivated 与 watch(route.query) 会在同一 tick 各触发一次,
+ *  同一个目标只消费一次(否则同一次跳入会白跑两遍取数/两遍定位) */
+let focusInflight = ''
+/** 排产明细表(定位后从它的 DOM 里找高亮行滚到中间) */
+const schedTable = ref(null)
+
+/**
+ * 行身份 key(2026-11-13):`:row-key` / `:expand-row-keys` 依赖它,**必须唯一** ——
+ * 正常行 = 行id(plang.id);极端情况下缺 行id 时用 工单号|行号|批次号 兜底,
+ * 否则多行共用 'undefined' 会被 expand-row-keys 一起展开。
+ */
+function rowKeyOf(r) {
+  if (r && r.行id !== undefined && r.行id !== null && r.行id !== '') return String(r.行id)
+  return [r?.加工单号 ?? r?.工单号 ?? '', r?.工单行号 ?? '', r?.批次号 ?? ''].join('|')
+}
+/** 定位行的行级高亮类(只影响样式,不动数据/勾选) */
+function rowClassName({ row }) {
+  return focusKey.value && rowKeyOf(row) === focusKey.value ? 'wb-focus-row' : ''
+}
+/** 展开区里 工序===op 的那道高亮(且只高亮**定位的那一行**的展开区,手动展开别的行不会跟着亮) */
+function isFocusFlow(row, f) {
+  return !!focusOp.value && rowKeyOf(row) === focusKey.value
+    && String(f?.工序 ?? '') === String(focusOp.value)
+}
+/** 展开/收起变化回写 keys(受控 prop 与表格内部状态保持一致;setExpandRowKeys 不回发事件,不会死循环) */
+function onExpandChange(row, expanded) {
+  const rows = Array.isArray(expanded) ? expanded : (Array.isArray(row) ? row : [])
+  expandedKeys.value = rows.map(rowKeyOf)
+}
+/** 清掉定位痕迹(切产线/切片签/重新定位前调用) */
+function clearFocus() {
+  focusKey.value = ''
+  focusOp.value = ''
+  focusTip.value = ''
+  expandedKeys.value = []
+}
+/** 取这条路由 query 里的深链参数(空串/undefined 一律视为没传) */
+function focusQueryOf(q) {
+  const out = {}
+  for (const k of [...FOCUS_KEYS, ...FOCUS_ROWNO_KEYS]) {
+    const v = q?.[k]
+    if (v !== undefined && v !== null && String(v) !== '') out[k] = Array.isArray(v) ? String(v[0] ?? '') : String(v)
+  }
+  return out
+}
+function hasFocusQuery(q) {
+  return FOCUS_KEYS.some((k) => {
+    const v = q?.[k]
+    return v !== undefined && v !== null && String(v) !== ''
+  })
+}
+/** 当前路由是否就是本页(keep-alive 下 route 会变成别的页,不能拿别的页的 query 来定位) */
+function onThisPage() {
+  return String(route.path || '').replace(/\/+$/, '') === SELF_PATH
+}
+/** 用完即摘:只删这四个(可选的兜底行号一起删),其余 query(如 ?trace=)原样保留;
+ *  用 replace 不新增历史记录 —— 免得用户按「后退」又回到带深链参数的地址来回触发。 */
+function stripFocusQuery() {
+  const q = { ...route.query }
+  let dirty = false
+  for (const k of [...FOCUS_KEYS, ...FOCUS_ROWNO_KEYS]) {
+    if (k in q) { delete q[k]; dirty = true }
+  }
+  if (!dirty) return
+  try { router.replace({ path: route.path, query: q })?.catch?.(() => { /* 重复导航忽略 */ }) } catch { /* 忽略 */ }
+}
+/** 在已取到的 schedRows 里定位目标行:rowid 精确优先,其次 加工单号(+行号) */
+function findFocusRow(q) {
+  const rows = schedRows.value || []
+  if (q.rowid !== undefined) {
+    const hit = rows.find((r) => String(r.行id) === String(q.rowid))
+    if (hit) return hit
+  }
+  if (q.wo !== undefined) {
+    const same = rows.filter((r) => String(r.加工单号 ?? r.工单号 ?? '') === String(q.wo))
+    if (same.length === 1) return same[0]
+    const ln = q['行号'] ?? q['rowno']
+    if (same.length > 1 && ln !== undefined) {
+      const hit = same.find((r) => String(r.工单行号 ?? '') === String(ln))
+      if (hit) return hit
+    }
+  }
+  return null
+}
+/** 把高亮行滚到表格可视区中间(容器 = 表格自己的滚动区 .el-scrollbar__wrap) */
+function scrollToFocusRow() {
+  const root = schedTable.value?.$el
+  if (!root || !focusKey.value) return
+  const tr = root.querySelector('.el-table__body tr.wb-focus-row')
+    || root.querySelector('tbody tr.wb-focus-row')
+  if (!tr || typeof tr.scrollIntoView !== 'function') return
+  try { tr.scrollIntoView({ block: 'center', inline: 'nearest' }) } catch { /* 老浏览器忽略 */ }
+}
+/** 展开行插入/表格重排会把行位置挪一点 ⇒ nextTick 滚一次,下一帧再校正一次(幂等,不循环) */
+function scheduleScroll() {
+  nextTick(() => {
+    scrollToFocusRow()
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => scrollToFocusRow())
+  })
+}
+/**
+ * 消费深链参数并定位(幂等:没有深链参数直接返回,所以 watch/onActivated/onMounted 都可安全调用)。
+ * 顺序:摘参数 → 骨架就绪 → 按 line 选线 → 定位行 → 高亮/展开/提示/滚动。
+ */
+async function consumeFocus() {
+  if (!hasFocusQuery(route.query)) return
+  const q = focusQueryOf(route.query)
+  // 同一目标去重(keep-alive 激活 + query 变化会同 tick 各触发一次,只消费一次)
+  const sig = JSON.stringify(q)
+  if (focusInflight === sig) return
+  focusInflight = sig
+  const seq = ++focusSeq
+  try {
+    clearFocus()
+    // 用完即摘:先摘再定位 ⇒ 后面的取数/渲染过程中即使发生路由变化,也不会再拿到这份旧参数;
+    //   摘完 route.query 变化会再触发一次 watch,但那时已无深链参数 ⇒ 直接 return(不会递归)
+    stripFocusQuery()
+    // ① 骨架(产线列表)就绪才谈得上「按 line 选线」;onMounted 已 loadAll 时这里不重复请求
+    if (!(lineSummary.value || []).length) await loadSummary()
+    if (seq !== focusSeq) return
+    const findLine = () => (lineSummary.value || []).find((l) => String(l.生产线) === q.line)
+    let target = q.line ? findLine() : null
+    // keep-alive 缓存实例里的骨架可能已过期(别处新建/启用/改名产线)⇒ 先重取一次骨架再判"找不到"
+    if (!target) {
+      await loadSummary()
+      if (seq !== focusSeq) return
+      target = q.line ? findLine() : null
+    }
+    if (!target) {
+      // 该线不在 linesSummary(停用线被过滤/换账套/产线名改过):提示后放弃,页面照常可用
+      ElMessage.warning(tt('未在工单排产中找到该工单行'))
+      return
+    }
+    // ② 选中该线(既有 select:loadScheduled + loadDayPlan),等明细落地再找行
+    await select(target)
+    if (seq !== focusSeq) return
+    let row = findFocusRow(q)
+    // 页签口径差异(2026-11-13):生产工序进度看板自己也有「未完工/已完工/全部」筛选,从它的「已完工/全部」
+    //   点工序跳来时会指到**已完工**的工单行,而本页默认停在「未完工」页签 ⇒ 明细里根本没有那一行。
+    //   这时不给 warning(那会像"功能坏了"),先切到**既有「全部」页签**(纯查看动作,不改任何数据)再找一次;
+    //   仍未命中才 warning。契约 §3.1 的 happy path 不受影响(未完工页签里能命中就不会走这里)。
+    if (!row && scope.value !== '全部') {
+      scope.value = '全部'
+      await select(target)
+      if (seq !== focusSeq) return
+      row = findFocusRow(q)
+    }
+    if (!row) {
+      ElMessage.warning(tt('未在工单排产中找到该工单行'))
+      return
+    }
+    // ③ 高亮 + 自动展开 + 展开区 op 那道高亮 + 上下文提示 + 滚到中间
+    focusKey.value = rowKeyOf(row)
+    focusOp.value = q.op || ''
+    expandedKeys.value = [focusKey.value]
+    const no = row.加工单号 ?? row.工单号 ?? q.wo ?? ''
+    const ln = row.工单行号
+    let tip = tt('已定位') + '：' + no + (ln !== undefined && ln !== null && ln !== '' ? '#' + ln : '')
+    if (q.op) tip += ' · ' + tt(q.op)
+    focusTip.value = tip
+    scheduleScroll()
+  } finally {
+    if (seq === focusSeq) focusInflight = ''
+  }
 }
 
 async function loadAll() {
@@ -988,12 +1208,34 @@ async function doTransferRevoke() {
 //    **2026-10-18 补**:口径改为「先排产后领料」——本页(排产)是领料的前置:转领料单要求该工单行
 //    已排入产线(scx 非空)且排产数量>0;同一工单行可开多张领料单(见 WorkOrderPickingService)。
 
-onMounted(() => {
-  loadAll()
+// ── 挂载 / keep-alive 激活 / 路由 query 变化:三条入口都走同一个幂等的 consumeFocus ──────────
+//   ⚠ 本页在 PortalLayout 里被 <keep-alive :max="20"> 按 route.path 缓存 ⇒ 从别的页签切回来、
+//     或从「生产工序进度看板」再次点工序进来(同一个 path 只变 query)**不会重新挂载**,
+//     所以必须有 watch(route.query) 与 onActivated 兜住,只在 onMounted 里做会漏掉后续跳入。
+/** 首次 onActivated 紧接着 onMounted 触发(深链的活由 onMounted 负责)⇒ 跳过它,避免同一次进入跑两遍 */
+let firstActivated = true
+
+onMounted(async () => {
   // 外部跳入(生产加工单列表「追溯」):?trace=工单号 直开追溯弹窗
+  //   ⚠ 必须在下面 await 之前同步读:深链的 stripFocusQuery 会 router.replace 重写 query
   const q = new URLSearchParams(location.hash.split('?')[1] || '')
   const tno = q.get('trace')
+  // 先跑完既有首屏取数(骨架+明细+统计+日计划),再消费深链 —— 深链要按 line 选线并定位行,
+  // 必须等 linesSummary 落地;反过来则会与 loadAll 的取数互相覆盖。
+  await loadAll()
+  await consumeFocus()
   if (tno) setTimeout(() => openTrace(tno), 600)
+})
+
+onActivated(() => {
+  if (firstActivated) { firstActivated = false; return }
+  consumeFocus()
+})
+
+watch(() => route.query, () => {
+  // keep-alive 缓存实例:切到别的页签时 route 已变成那页,不能拿它的 query 来定位本页
+  if (!onThisPage()) return
+  consumeFocus()
 })
 </script>
 
@@ -1124,4 +1366,22 @@ onMounted(() => {
 .wb-trace-block { margin-bottom: 12px; }
 .wb-trace-block .wb-block-title { display: block; border-left: 3px solid #1e6fb8; padding-left: 8px; margin-bottom: 6px; }
 .wb-trace-sub { font-size: 12px; color: #909399; margin: 6px 0 4px; }
+
+/* ── 深链定位(2026-11-13,契约 CONTRACT.md §3.1)──────────────────────────────────
+   从「生产工序进度看板」点某道工序跳过来时,告诉用户"定位到哪一行、哪一道工序":
+   ① 上下文区一枚小提示(与上下文条同色系,不抢眼);② 命中行浅蓝底 + 左侧 3px 蓝边;
+   ③ 展开区里 工序===op 的那道同样浅蓝底 + 左蓝边(比 .is-cur 更强调,后写覆盖)。
+   全部是静态样式(不用发光动画):截图/打印稳定,也符合本页"信息为主"的风格。 */
+.wb-focus-tip { padding: 1px 8px; background: #ecf5ff; border: 1px solid #b3d4f5; border-radius: 3px;
+  font-size: 12px; font-weight: 600; color: #1e6fb8; white-space: nowrap; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; }
+/* 命中行:选择器要压过 el-table 自带的 hover-row / current-row / striped 底色(那些带 2~3 个类),
+   故这里同时写 :hover 与 .hover-row 两条;固定列(sticky)与滚动区在同一张 table 里,行类一并生效。 */
+:deep(.el-table__body tr.wb-focus-row > td.el-table__cell),
+:deep(.el-table__body tr.wb-focus-row:hover > td.el-table__cell),
+:deep(.el-table__body tr.wb-focus-row.hover-row > td.el-table__cell) { background-color: #ecf5ff; }
+:deep(.el-table__body tr.wb-focus-row > td.el-table__cell:first-child) { box-shadow: inset 3px 0 0 #409eff; }
+/* 展开区里目标工序那一道(与 .is-cur 同优先级,写在后面 ⇒ 定位工序既是当前工序时以定位色为准) */
+.wb-flow-tbl tr.is-focus td { background: #ecf5ff; font-weight: 700; }
+.wb-flow-tbl tr.is-focus td:first-child { box-shadow: inset 3px 0 0 #409eff; }
 </style>

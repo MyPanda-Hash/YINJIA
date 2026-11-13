@@ -2740,6 +2740,15 @@ export default {
     '切炭': 'Découpe du carbone',
     '组装': 'Assemblage',
     '装箱': 'Emballage',
+    // ---- 生产工序进度看板·工序可点 + 检验单跳转(2026-11-13:提示语 + 行/工序/检验徽标点击说明)----
+    '该工单未进行排产': 'Cet ordre de fabrication n\'est pas encore planifié',
+    '该工序未到达': 'Cette opération n\'est pas encore atteinte',
+    '该工序暂无检验单': 'Aucune fiche d\'inspection pour cette opération',
+    '未在工单排产中找到该工单行': 'Ligne d\'ordre introuvable dans la planification des ordres de fabrication',
+    '点击工序跳转到该工序排产': 'Cliquez sur une opération pour l\'ouvrir dans la planification des ordres de fabrication',
+    '点击查看检验单': 'Cliquez pour voir la fiche d\'inspection',
+    '已定位': 'Localisé',
+    '点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Cliquez sur une ligne pour ouvrir l\'ordre de fabrication ; cliquez sur une opération pour ouvrir sa planification ; cliquez sur le repère d\'inspection pour ouvrir la fiche d\'inspection',
     // ---- 看板追加生产工单主要属性(2026-11-08:产品编码/规格型号显式标签、需求·入库·余量、交期、订单号)----
     '产品': 'Produit',
     '交期': 'Date de livraison',

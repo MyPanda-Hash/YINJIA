@@ -5647,6 +5647,15 @@ export default {
     '没有符合条件的工单行': 'No work-order lines match the filters',
     '工单编号': 'WO No.',
     '工单状态': 'WO Status',
+    // ---- 生产工序进度看板·工序可点 + 检验单跳转(2026-11-13:提示语 + 行/工序/检验徽标点击说明)----
+    '该工单未进行排产': 'This work order has not been scheduled',
+    '该工序未到达': 'This process has not been reached',
+    '该工序暂无检验单': 'No inspection sheet for this process',
+    '未在工单排产中找到该工单行': 'Work order row not found in work order scheduling',
+    '点击工序跳转到该工序排产': 'Click a process to open it in work order scheduling',
+    '点击查看检验单': 'Click to view the inspection sheet',
+    '已定位': 'Located',
+    '点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Click a row to open the work order; click a process to open its scheduling; click the inspection badge to open the inspection sheet',
     // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
     '超订单': 'Over order',
     '本次转单数量超过订单剩余数量，将按备品转出': 'Transfer qty exceeds the order remaining; the excess will be transferred as spare parts',
