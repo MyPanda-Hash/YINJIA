@@ -4838,3 +4838,5 @@ migrate-gen-wh-bin-prefill-20261113.sql
 migrate-merge-gen-20261113.sql
 # 2026-11-13 角色字段视图:新建 yj_field_view(同一面板各角色显示/隐藏哪些字段;只存显隐,不碰 yj_field)
 migrate-role-field-view-20261113.sql
+# 2026-11-13 角色字段视图加序号:yj_field_view.seq(角色内位置 1..n,只对勾选=显示的字段有值)
+migrate-role-field-view-seq-20261113.sql
