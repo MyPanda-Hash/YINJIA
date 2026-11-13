@@ -1,0 +1,102 @@
+# DB=HSDZ_MES_TEST
+
+== yj_role 列 ==
+  n=id | ty=int | len=4 | nul=0 | ident=1 | 
+  n=role_code | ty=nvarchar | len=80 | nul=0 | ident=0 | 
+  n=role_name | ty=nvarchar | len=120 | nul=0 | ident=0 | 
+  n=remark | ty=nvarchar | len=400 | nul=1 | ident=0 | 
+  n=is_admin | ty=char | len=1 | nul=0 | ident=0 | 
+
+== yj_role 行 ==
+  id=1 | role_code=admin | role_name=管理员 | remark=全部面板与审批权限 | is_admin=Y | 
+  id=2 | role_code=user | role_name=普通用户 | remark=按角色授权面板 | is_admin=N | 
+  id=1025 | role_code=rd_file_owner | role_name=文件负责人 | remark=产品开发四个受控文件的编写责任人(规格书 / 成型工艺清单 / 组装工艺清单 / 出货检验计划表)。2026-09-30 依《产品开发系统需求汇总.xlsx》sheet「文件汇总表」的 5.2/5.3/5.4 固定责任人新建;面板权限由 role_code=user 整份复制。本角色**不含审批权**:文件审批仍由管理员/研发审核角色承担。 | is_admin=N | 
+  id=1026 | role_code=rd_review | role_name=研发审核 | remark=数据记录表(实验室 8 张)的审核人角色。2026-09-30 新建:此前全库 can_approve=Y 为 0 行,只有 admin 能审。权限由 role_code=user 整份复制而来,cp(陈秀丽)挂此角色。 | is_admin=N | 
+  id=1029 | role_code=xiaoshou | role_name=销售 | remark= | is_admin=N | 
+  id=1031 | role_code=ckgl | role_name=仓库管理 | remark= | is_admin=N | 
+  id=1033 | role_code=sc | role_name=生产 | remark= | is_admin=N | 
+  id=1036 | role_code=scxs | role_name=生产销售 | remark=两个部门权限 | is_admin=N | 
+  id=1037 | role_code=caigou | role_name=采购 | remark= | is_admin=N | 
+  id=1039 | role_code=zhiliangshenhe | role_name=质量审核 | remark= | is_admin=N | 
+  id=1040 | role_code=zhiliangjiance | role_name=质量检测 | remark= | is_admin=N | 
+  id=1041 | role_code=检验科 | role_name=检验工程师 | remark= | is_admin=N | 
+  id=1042 | role_code=csgly | role_name=总经理 | remark= | is_admin=N | 
+  id=1043 | role_code=cksh | role_name=仓库审核 | remark= | is_admin=N | 
+  id=1044 | role_code=cggl | role_name=采购管理 | remark= | is_admin=N | 
+  id=1045 | role_code=xsgl | role_name=销售管理 | remark= | is_admin=N | 
+  id=1046 | role_code=scgl | role_name=生产管理 | remark= | is_admin=N | 
+  id=1047 | role_code=pzgl | role_name=品质管理 | remark= | is_admin=N | 
+  id=1048 | role_code=pzsh | role_name=品质审核 | remark= | is_admin=N | 
+  id=1049 | role_code=smbgll | role_name=扫码报工领料 | remark=负责车间的扫码报工与领料 | is_admin=N | 
+
+== yj_user 列 ==
+  n=id | ty=int | len=4 | nul=0 | ident=1 | 
+  n=username | ty=nvarchar | len=80 | nul=0 | ident=0 | 
+  n=password_hash | ty=nvarchar | len=400 | nul=0 | ident=0 | 
+  n=real_name | ty=nvarchar | len=120 | nul=1 | ident=0 | 
+  n=is_admin | ty=char | len=1 | nul=0 | ident=0 | 
+  n=dept_id | ty=int | len=4 | nul=1 | ident=0 | 
+  n=role_id | ty=int | len=4 | nul=1 | ident=0 | 
+  n=enabled | ty=char | len=1 | nul=0 | ident=0 | 
+  n=MobId | ty=nvarchar | len=100 | nul=1 | ident=0 | 
+  n=PrintNa | ty=nvarchar | len=100 | nul=1 | ident=0 | 
+  n=asp_cancel | ty=nvarchar | len=2 | nul=1 | ident=0 | 
+  n=asp_print | ty=int | len=4 | nul=1 | ident=0 | 
+  n=asp_time1 | ty=datetime2 | len=8 | nul=1 | ident=0 | 
+  n=asp_time2 | ty=datetime2 | len=8 | nul=1 | ident=0 | 
+  n=asp_time3 | ty=datetime2 | len=8 | nul=1 | ident=0 | 
+  n=asp_time4 | ty=datetime2 | len=8 | nul=1 | ident=0 | 
+  n=asp_user1 | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=asp_user2 | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=asp_user3 | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=asp_user4 | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=comm | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=dlxz | ty=nvarchar | len=2 | nul=1 | ident=0 | 
+  n=islogin | ty=nvarchar | len=2 | nul=1 | ident=0 | 
+  n=khdm | ty=nvarchar | len=200 | nul=1 | ident=0 | 
+  n=phoneNo | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=usertype | ty=nvarchar | len=40 | nul=1 | ident=0 | 
+  n=生产车间 | ty=nvarchar | len=100 | nul=1 | ident=0 | 
+  n=供应商编码 | ty=nvarchar | len=200 | nul=1 | ident=0 | 
+
+== yj_field 列 ==
+  n=id | ty=int | len=4 | nul=0 | ident=1 | 
+  n=panel_code | ty=varchar | len=40 | nul=0 | ident=0 | 
+  n=col_name | ty=sysname | len=256 | nul=0 | ident=0 | 
+  n=label | ty=nvarchar | len=120 | nul=0 | ident=0 | 
+  n=data_type | ty=nvarchar | len=40 | nul=0 | ident=0 | 
+  n=dict_sql | ty=nvarchar | len=1000 | nul=1 | ident=0 | 
+  n=ref_panel | ty=varchar | len=40 | nul=1 | ident=0 | 
+  n=ref_field | ty=sysname | len=256 | nul=1 | ident=0 | 
+  n=display_field | ty=sysname | len=256 | nul=1 | ident=0 | 
+  n=place | ty=varchar | len=60 | nul=0 | ident=0 | 
+  n=seq | ty=int | len=4 | nul=0 | ident=0 | 
+  n=width | ty=int | len=4 | nul=1 | ident=0 | 
+  n=editable | ty=bit | len=1 | nul=0 | ident=0 | 
+  n=required | ty=bit | len=1 | nul=0 | ident=0 | 
+  n=hidden | ty=bit | len=1 | nul=0 | ident=0 | 
+  n=alias | ty=nvarchar | len=120 | nul=1 | ident=0 | 
+  n=visible | ty=bit | len=1 | nul=0 | ident=0 | 
+  n=label_en | ty=nvarchar | len=400 | nul=1 | ident=0 | 
+  n=col_group | ty=nvarchar | len=100 | nul=1 | ident=0 | 
+  n=ref_filter | ty=nvarchar | len=400 | nul=1 | ident=0 | 
+  n=tab_key | ty=nvarchar | len=100 | nul=1 | ident=0 | 
+
+== yj_field 总行数 / 隐藏行 / 改过栏名 ==
+  字段行=4977 | 隐藏行=1301 | 改过栏名=19 | 
+
+== 样本面板 SL_RECV 字段现状 ==
+  (0 rows)
+
+== yj_field 整表校验和(迁移前后比对,证明一行未动) ==
+  n=4977 | ck=534593652 | 
+
+== 是否已存在 yj_field_view ==
+  object_id=1708845450 | 
+
+== yj_role_panel 样本 ==
+  panel_code=RD_SHARE_FILE | perms=view,query | 
+  panel_code=RD_PROD_DOCLIST | perms=view,query,export,print | 
+  panel_code=QC_INSP_REQ | perms=view,query | 
+  panel_code=SO_ORDER | perms=view,query,add,modify,modlog,del,export | 
+  panel_code=SALES_ORDER_DETAIL | perms=view,query,export,print | 

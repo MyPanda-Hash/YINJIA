@@ -1,6 +1,23 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
+    '字段视图': 'Feldansicht',
+    '系统整体': 'Systemweit',
+    '本角色': 'Meine Rolle',
+    '本角色定制': 'Für meine Rolle anpassen',
+    '本角色已定制 {n} 个面板': 'Für diese Rolle angepasste Panels: {n}',
+    '这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。': 'Hier lässt sich nur „Anzeigen / Ausblenden“ einstellen: gilt für alle Konten dieser Rolle; Reihenfolge und Spaltennamen folgen weiterhin der Systemeinstellung.',
+    '已定制': 'Angepasst',
+    '恢复继承': 'Vererbung wiederherstellen',
+    '已恢复继承（系统整体）': 'Vererbung wiederhergestellt (systemweit)',
+    '将清除本角色在该面板的全部字段显示/隐藏设置，恢复为系统整体？': 'Dadurch werden alle Anzeigen/Ausblenden-Einstellungen dieser Rolle für dieses Panel gelöscht und die Systemeinstellung wiederhergestellt. Fortfahren?',
+    '本角色字段视图已保存': 'Feldansicht dieser Rolle gespeichert',
+    '必填字段不可隐藏，已跳过：': 'Pflichtfelder können nicht ausgeblendet werden; übersprungen: ',
+    '当前账号未分配角色，已切到「系统整体」。': 'Dieses Konto hat keine Rolle – auf „Systemweit“ umgestellt.',
+    '拖动或用箭头调整列顺序；勾选=显示；栏名可改。': 'Zum Sortieren ziehen oder Pfeile nutzen; Häkchen = anzeigen; Spaltennamen sind änderbar.',
+    '「本角色定制」由本角色任一账号在「表格调整 / 表头调整」里设置，对本角色所有账号生效；「系统整体」只看未定制时的样子。': '„Für meine Rolle anpassen“ wird von jedem Konto dieser Rolle über „Tabelle anpassen / Kopf anpassen“ gesetzt und gilt für alle Konten der Rolle; „Systemweit“ zeigt den nicht angepassten Zustand.',
+    '恢复失败': 'Zurücksetzen fehlgeschlagen',
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '免检跳过': 'Prüfbefreit (übersprungen)',

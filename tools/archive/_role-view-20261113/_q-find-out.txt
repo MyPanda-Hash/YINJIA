@@ -1,0 +1,13 @@
+# HSDZ_MES_TEST / user=zz_fv_a
+  panel_code=QC_RECV | mode=doc | line_table=sl_recv_detail | head_table=sl_recv | group_col=单据编号 | pk_col=id | 
+  (0 rows)
+  (0 rows)
+
+== 最近 2 小时新建的暂收单(任何操作人) ==
+  (err) 对象名 'dbo.qc_recv_head' 无效。
+
+== 抄送/创建人 = zz_fv_a 的单 ==
+  (err) 对象名 'dbo.qc_recv_head' 无效。
+
+== 对应明细行数 ==
+  (err) 对象名 'dbo.qc_recv_detail' 无效。

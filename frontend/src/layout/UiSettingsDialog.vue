@@ -14,6 +14,15 @@
         <div class="set-label">{{ tt('侧边栏默认折叠') }}</div>
         <el-switch :model-value="app.collapsed" @change="app.toggleCollapse()" />
       </div>
+      <!-- 字段视图(2026-11-13):两层=系统整体 → 角色。切换后所有面板都按所选视图显示。 -->
+      <div class="set-row">
+        <div class="set-label">{{ tt('字段视图') }}</div>
+        <el-radio-group v-model="fieldScope" @change="(v) => app.setFieldScope(v)">
+          <el-radio-button value="role">{{ tt('本角色定制') }}</el-radio-button>
+          <el-radio-button value="system">{{ tt('系统整体') }}</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div class="set-hint">{{ tt('「本角色定制」由本角色任一账号在「表格调整 / 表头调整」里设置，对本角色所有账号生效；「系统整体」只看未定制时的样子。') }}</div>
       <div class="set-hint">{{ tt('设置实时生效并保存到本机浏览器。') }}</div>
     </div>
   </el-dialog>
@@ -30,10 +39,15 @@ defineEmits(['update:modelValue'])
 
 const app = useAppStore()
 const mode = ref(app.menuMode)
+const fieldScope = ref(app.fieldScope)
 
 watch(
   () => app.menuMode,
   (v) => { mode.value = v }
+)
+watch(
+  () => app.fieldScope,
+  (v) => { fieldScope.value = v }
 )
 </script>
 

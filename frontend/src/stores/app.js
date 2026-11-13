@@ -48,6 +48,13 @@ export const useAppStore = defineStore('app', {
     // 换肤(2026-10-30):皮肤 id 存在本机;颜色全在 styles/skins.css,这里只记"选了哪套"
     skin: readSkin(),
     menuMode: localStorage.getItem('mes_menu_mode') || 'accordion',
+    /**
+     * 字段视图(2026-11-13):「本角色定制」(默认) 还是 「系统整体」。
+     * 只决定"请求面板配置时叠不叠本角色的显示/隐藏覆盖",覆盖数据本身在服务端
+     * (yj_field_view),所以换台电脑、手机端看到的都一致;这里存的是"我选择看哪一层"。
+     * 值同时被 business/engine.js 的 getPanelConfig 直接读取(那边不依赖 store)。
+     */
+    fieldScope: localStorage.getItem('mes_field_scope') === 'system' ? 'system' : 'role',
     fullscreen: false,
     deskSettings: loadDeskSettings(),
     // T+ 门户形态：内容区最大化（隐藏左侧导航）
@@ -71,6 +78,15 @@ export const useAppStore = defineStore('app', {
     setMenuMode(mode) {
       this.menuMode = mode
       localStorage.setItem('mes_menu_mode', mode)
+    },
+    /**
+     * 切字段视图(2026-11-13):本角色定制 / 系统整体。
+     * 落 localStorage + 广播事件 —— 已打开的面板页签各自清缓存重载,否则要手动刷新才换过来。
+     */
+    setFieldScope(scope) {
+      this.fieldScope = scope === 'system' ? 'system' : 'role'
+      localStorage.setItem('mes_field_scope', this.fieldScope)
+      window.dispatchEvent(new CustomEvent('mes:field-scope'))
     },
     /**
      * 切皮肤:落 `<html data-skin>` + localStorage,并回写 store(脏值会被 applySkin 纠正,

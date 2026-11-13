@@ -1,6 +1,23 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
+    '字段视图': 'Vista de campos',
+    '系统整体': 'Todo el sistema',
+    '本角色': 'Mi rol',
+    '本角色定制': 'Personalizar para mi rol',
+    '本角色已定制 {n} 个面板': 'Paneles personalizados para este rol: {n}',
+    '这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。': 'Aquí solo se puede ajustar «mostrar / ocultar»: se aplica a todas las cuentas de este rol; el orden y los nombres de columna siguen la configuración del sistema.',
+    '已定制': 'Personalizado',
+    '恢复继承': 'Volver a heredar',
+    '已恢复继承（系统整体）': 'Herencia restablecida (todo el sistema)',
+    '将清除本角色在该面板的全部字段显示/隐藏设置，恢复为系统整体？': 'Se borrarán todos los ajustes de mostrar/ocultar de este rol en este panel y se volverá a la configuración del sistema. ¿Continuar?',
+    '本角色字段视图已保存': 'Vista de campos de este rol guardada',
+    '必填字段不可隐藏，已跳过：': 'Los campos obligatorios no se pueden ocultar; omitidos: ',
+    '当前账号未分配角色，已切到「系统整体」。': 'Esta cuenta no tiene rol; se cambió a «Todo el sistema».',
+    '拖动或用箭头调整列顺序；勾选=显示；栏名可改。': 'Arrastre o use las flechas para ordenar las columnas; marcado = mostrar; los nombres de columna se pueden editar.',
+    '「本角色定制」由本角色任一账号在「表格调整 / 表头调整」里设置，对本角色所有账号生效；「系统整体」只看未定制时的样子。': '«Personalizar para mi rol» lo ajusta cualquier cuenta de este rol desde «Ajustar tabla / Ajustar encabezado» y se aplica a todas las cuentas del rol; «Todo el sistema» muestra el estado sin personalizar.',
+    '恢复失败': 'No se pudo restablecer',
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '免检跳过': 'Exento (omitido)',

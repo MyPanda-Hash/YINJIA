@@ -1,6 +1,23 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
+    '字段视图': 'Chế độ xem trường',
+    '系统整体': 'Toàn hệ thống',
+    '本角色': 'Vai trò của tôi',
+    '本角色定制': 'Tùy chỉnh cho vai trò của tôi',
+    '本角色已定制 {n} 个面板': 'Số bảng đã tùy chỉnh cho vai trò này: {n}',
+    '这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。': 'Ở đây chỉ chỉnh được「hiện / ẩn」: áp dụng cho mọi tài khoản cùng vai trò này; thứ tự và tên cột vẫn theo cấu hình toàn hệ thống.',
+    '已定制': 'Đã tùy chỉnh',
+    '恢复继承': 'Khôi phục kế thừa',
+    '已恢复继承（系统整体）': 'Đã khôi phục kế thừa (toàn hệ thống)',
+    '将清除本角色在该面板的全部字段显示/隐藏设置，恢复为系统整体？': 'Thao tác này sẽ xóa toàn bộ thiết lập hiện/ẩn của vai trò này trên bảng này và trở về cấu hình toàn hệ thống. Tiếp tục?',
+    '本角色字段视图已保存': 'Đã lưu chế độ xem trường của vai trò này',
+    '必填字段不可隐藏，已跳过：': 'Không thể ẩn trường bắt buộc; đã bỏ qua: ',
+    '当前账号未分配角色，已切到「系统整体」。': 'Tài khoản này chưa được gán vai trò, đã chuyển sang「Toàn hệ thống」.',
+    '拖动或用箭头调整列顺序；勾选=显示；栏名可改。': 'Kéo hoặc dùng mũi tên để sắp xếp cột; tích = hiện; có thể sửa tên cột.',
+    '「本角色定制」由本角色任一账号在「表格调整 / 表头调整」里设置，对本角色所有账号生效；「系统整体」只看未定制时的样子。': '「Tùy chỉnh cho vai trò của tôi」do bất kỳ tài khoản nào thuộc vai trò này đặt trong「Điều chỉnh bảng / Điều chỉnh đầu biểu」và áp dụng cho mọi tài khoản của vai trò; 「Toàn hệ thống」hiển thị trạng thái chưa tùy chỉnh.',
+    '恢复失败': 'Khôi phục thất bại',
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '免检跳过': 'Miễn kiểm (bỏ qua)',

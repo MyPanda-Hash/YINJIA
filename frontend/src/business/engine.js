@@ -330,8 +330,16 @@ export function fieldOptions(field) {
 
 // ==================== SQL 后端接口 ====================
 
+/**
+ * 面板配置。
+ *
+ * 2026-11-13 角色字段视图:默认带 `view=role`,由后端在 yj_field 之上叠"本角色显示/隐藏"。
+ * 界面设置里把视图切成「系统整体」时,这里改发 `view=system` —— 只是不叠覆盖,数据一行不动。
+ * 直接读 localStorage 而不是拿 pinia store:本模块被大量非组件代码调用,担不起"store 还没装好"。
+ */
 export async function getPanelConfig(panelCode) {
-  return normalizeApprovalConfig(unwrap(await request.get('/px/getPanelConfig', { params: { panelCode } })))
+  const view = localStorage.getItem('mes_field_scope') === 'system' ? 'system' : 'role'
+  return normalizeApprovalConfig(unwrap(await request.get('/px/getPanelConfig', { params: { panelCode, view } })))
 }
 
 export async function getPermMatrix(panelCode) {
@@ -544,6 +552,26 @@ export async function saveColumnPrefs({ panelCode, columns }) {
 /** 表头调整:保存表头字段的排序/栏名/显隐(hidden+visible 同开同关) */
 export async function saveHeaderPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveHeaderPrefs', { panelCode, columns }))
+}
+
+// ==================== 角色字段视图(2026-11-13,两层:系统整体 → 角色) ====================
+// 口径:原「表格调整 / 表头调整」照旧写 yj_field(系统整体);这一组只写"本角色显示/隐藏",
+// 同一角色所有账号看到的一样,不细分个人;顺序与栏名仍由整体决定。
+// 三态:行存在=本角色显式设定,行不存在=跟随系统整体(与整体相同会被自动删行)。
+
+/** 对话框数据源:本角色在该面板表头/明细逐行的 shown/baseShown/overridden/required */
+export async function getFieldView(panelCode) {
+  return unwrap(await request.get('/px/fieldView', { params: { panelCode } }))
+}
+
+/** 保存本角色视图(只存显隐):place = header | detail;columns = [{label, visible}] */
+export async function saveRoleFieldView({ panelCode, place, columns }) {
+  return unwrap(await request.post('/px/saveRoleFieldView', { panelCode, place, columns }))
+}
+
+/** 恢复继承:清掉本角色在该面板的显隐覆盖(panelCode 传空 = 全部面板) */
+export async function resetRoleFieldView({ panelCode } = {}) {
+  return unwrap(await request.post('/px/resetRoleFieldView', { panelCode: panelCode || '' }))
 }
 
 // ==================== 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ====================

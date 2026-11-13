@@ -1,0 +1,9 @@
+# HSDZ_MES_TEST / QC_RECV
+  id=1 | admin | 管理员 | view,query,add,modify,modlog,del,export
+  id=2 | user | 普通用户 | view,query,add,modify,modlog,del,export,print,field,warn
+  id=1029 | xiaoshou | 销售 | view,query,export,print,warn
+  id=1031 | ckgl | 仓库管理 | view,query,add,modify,modlog,del,export,print
+  id=1036 | scxs | 生产销售 | view,query,export,print,warn
+  id=1042 | csgly | 总经理 | view,query,add,modify,modlog,del,export,print,audit,field,warn
+  id=1043 | cksh | 仓库审核 | view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit
+  id=1049 | smbgll | 扫码报工领料 | view,query,add,modify,modlog,del,export,print,audit,field,warn

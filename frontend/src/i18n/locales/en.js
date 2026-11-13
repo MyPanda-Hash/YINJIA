@@ -45,6 +45,21 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
+    '字段视图': 'Field view',
+    '系统整体': 'System (all users)',
+    '本角色': 'My role',
+    '本角色定制': 'Customize for my role',
+    '本角色已定制 {n} 个面板': 'Panels customized for this role: {n}',
+    '这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。': 'Only “show / hide” can be changed here: it applies to every account with this role, while order and column names still follow the system setting.',
+    '恢复继承': 'Reset to inherited',
+    '已恢复继承（系统整体）': 'Reset to inherited (system setting)',
+    '将清除本角色在该面板的全部字段显示/隐藏设置，恢复为系统整体？': 'This clears every field show/hide setting of this role on this panel and falls back to the system setting. Continue?',
+    '本角色字段视图已保存': 'Field view for this role saved',
+    '必填字段不可隐藏，已跳过：': 'Required fields cannot be hidden; skipped: ',
+    '当前账号未分配角色，已切到「系统整体」。': 'This account has no role, switched to “System (all users)”.',
+    '拖动或用箭头调整列顺序；勾选=显示；栏名可改。': 'Drag or use the arrows to reorder columns; tick = show; column names are editable.',
+    '「本角色定制」由本角色任一账号在「表格调整 / 表头调整」里设置，对本角色所有账号生效；「系统整体」只看未定制时的样子。': '“Customize for my role” is set by any account with this role via “Adjust table / Adjust header” and applies to every account with the role; “System (all users)” shows the un-customized state.',
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
     '免检跳过': 'Exempt (skipped)',

@@ -2455,28 +2455,47 @@
       @apply="onScanApply"
     />
 
-    <!-- 表格列自定义(排序/栏名/显隐) -->
-    <el-dialog v-model="colPrefVisible" title="表格调整" width="520px" append-to-body :close-on-click-modal="false">
-      <div class="col-pref-tip">拖动或用箭头调整列顺序;勾选=显示;栏名可改。
-        <span class="col-pref-count">总 {{ colPrefRows.length }} 列 / 显示 {{ colPrefRows.filter(r => r.visible).length }}</span>
+    <!-- 表格列自定义(排序/栏名/显隐)+ 字段视图作用域(2026-11-13 两层:系统整体 → 角色) -->
+    <el-dialog v-model="colPrefVisible" :title="tt('表格调整')" width="560px" append-to-body :close-on-click-modal="false">
+      <div class="col-pref-scope">
+        <el-radio-group v-model="colPrefScope" size="small" @change="onColPrefScopeChange">
+          <el-radio-button value="system">{{ tt('系统整体') }}</el-radio-button>
+          <el-radio-button value="role">{{ fieldScopeRoleLabel }}</el-radio-button>
+        </el-radio-group>
+        <span v-if="colPrefScope === 'role'" class="col-pref-count">
+          {{ tt('本角色已定制 {n} 个面板').replace('{n}', fieldScopePanelCount) }}
+        </span>
+      </div>
+      <div class="col-pref-tip">
+        <template v-if="colPrefScope === 'role'">{{ tt('这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。') }}</template>
+        <template v-else>{{ tt('拖动或用箭头调整列顺序；勾选=显示；栏名可改。') }}</template>
+        <span class="col-pref-count">{{ tt('总') }} {{ colPrefRows.length }} {{ tt('列') }} / {{ tt('显示') }} {{ colPrefRows.filter(r => r.visible).length }}</span>
       </div>
       <div class="col-pref-list">
-        <div v-for="(item, idx) in colPrefRows" :key="item.label" class="col-pref-row" draggable="true"
+        <div v-for="(item, idx) in colPrefRows" :key="item.label" class="col-pref-row"
+             :draggable="colPrefScope === 'system'"
              @dragstart="colDragIdx = idx" @dragover.prevent @drop="onColDrop(idx)">
-          <div class="cp-drag" title="拖动排序">⋮⋮</div>
+          <div class="cp-drag" :title="colPrefScope === 'system' ? tt('拖动排序') : ''">{{ colPrefScope === 'system' ? '⋮⋮' : '·' }}</div>
           <div class="cp-order">
-            <el-button link size="small" :disabled="idx === 0" @click="moveCol(idx, -1)">▲</el-button>
-            <el-button link size="small" :disabled="idx === colPrefRows.length - 1" @click="moveCol(idx, 1)">▼</el-button>
+            <el-button link size="small" :disabled="colPrefScope !== 'system' || idx === 0" @click="moveCol(idx, -1)">▲</el-button>
+            <el-button link size="small" :disabled="colPrefScope !== 'system' || idx === colPrefRows.length - 1" @click="moveCol(idx, 1)">▼</el-button>
           </div>
-          <el-checkbox v-model="item.visible" class="cp-vis" />
-          <div class="cp-label">{{ item.label }}</div>
-          <el-input v-model="item.alias" class="cp-alias" size="small" :placeholder="item.label" clearable />
+          <el-checkbox v-model="item.visible" class="cp-vis" :disabled="!!item.required" />
+          <div class="cp-label">
+            {{ item.label }}
+            <span v-if="item.required" class="cp-flag">{{ tt('必填') }}</span>
+            <span v-else-if="item.overridden" class="cp-flag cp-flag-own">{{ tt('已定制') }}</span>
+          </div>
+          <el-input v-model="item.alias" class="cp-alias" size="small" :placeholder="item.label" clearable
+                    :disabled="colPrefScope === 'role'" />
         </div>
       </div>
       <template #footer>
-        <el-button size="small" @click="colPrefVisible = false">取消</el-button>
-        <el-button size="small" @click="resetColPrefs">恢复默认</el-button>
-        <el-button type="primary" size="small" :loading="colPrefSaving" @click="saveColPrefs">保存</el-button>
+        <el-button size="small" @click="colPrefVisible = false">{{ tt('取消') }}</el-button>
+        <el-button size="small" :loading="colPrefResetting" @click="resetColPrefs">
+          {{ colPrefScope === 'role' ? tt('恢复继承') : tt('恢复默认') }}
+        </el-button>
+        <el-button type="primary" size="small" :loading="colPrefSaving" @click="saveColPrefs">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2553,27 +2572,46 @@
       </template>
     </el-dialog>
 
-    <!-- 表头字段自定义(表头调整:排序/栏名/显隐,与表格调整同款交互) -->
-    <el-dialog v-model="headPrefVisible" :title="tt('表头调整')" width="520px" append-to-body :close-on-click-modal="false">
-      <div class="col-pref-tip">{{ tt('拖动或用箭头调整字段顺序;勾选=显示;栏名可改。') }}
+    <!-- 表头字段自定义(表头调整:排序/栏名/显隐)+ 字段视图作用域(2026-11-13 两层:系统整体 → 角色) -->
+    <el-dialog v-model="headPrefVisible" :title="tt('表头调整')" width="560px" append-to-body :close-on-click-modal="false">
+      <div class="col-pref-scope">
+        <el-radio-group v-model="headPrefScope" size="small" @change="onHeadPrefScopeChange">
+          <el-radio-button value="system">{{ tt('系统整体') }}</el-radio-button>
+          <el-radio-button value="role">{{ fieldScopeRoleLabel }}</el-radio-button>
+        </el-radio-group>
+        <span v-if="headPrefScope === 'role'" class="col-pref-count">
+          {{ tt('本角色已定制 {n} 个面板').replace('{n}', fieldScopePanelCount) }}
+        </span>
+      </div>
+      <div class="col-pref-tip">
+        <template v-if="headPrefScope === 'role'">{{ tt('这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。') }}</template>
+        <template v-else>{{ tt('拖动或用箭头调整字段顺序；勾选=显示；栏名可改。') }}</template>
         <span class="col-pref-count">{{ tt('总') }} {{ headPrefRows.length }} {{ tt('个') }} / {{ tt('显示') }} {{ headPrefRows.filter(r => r.visible).length }}</span>
       </div>
       <div class="col-pref-list">
-        <div v-for="(item, idx) in headPrefRows" :key="item.label" class="col-pref-row" draggable="true"
+        <div v-for="(item, idx) in headPrefRows" :key="item.label" class="col-pref-row"
+             :draggable="headPrefScope === 'system'"
              @dragstart="headDragIdx = idx" @dragover.prevent @drop="onHeadDrop(idx)">
-          <div class="cp-drag" :title="tt('拖动排序')">⋮⋮</div>
+          <div class="cp-drag" :title="headPrefScope === 'system' ? tt('拖动排序') : ''">{{ headPrefScope === 'system' ? '⋮⋮' : '·' }}</div>
           <div class="cp-order">
-            <el-button link size="small" :disabled="idx === 0" @click="moveHead(idx, -1)">▲</el-button>
-            <el-button link size="small" :disabled="idx === headPrefRows.length - 1" @click="moveHead(idx, 1)">▼</el-button>
+            <el-button link size="small" :disabled="headPrefScope !== 'system' || idx === 0" @click="moveHead(idx, -1)">▲</el-button>
+            <el-button link size="small" :disabled="headPrefScope !== 'system' || idx === headPrefRows.length - 1" @click="moveHead(idx, 1)">▼</el-button>
           </div>
-          <el-checkbox v-model="item.visible" class="cp-vis" />
-          <div class="cp-label">{{ item.label }}</div>
-          <el-input v-model="item.alias" class="cp-alias" size="small" :placeholder="item.label" clearable />
+          <el-checkbox v-model="item.visible" class="cp-vis" :disabled="!!item.required" />
+          <div class="cp-label">
+            {{ item.label }}
+            <span v-if="item.required" class="cp-flag">{{ tt('必填') }}</span>
+            <span v-else-if="item.overridden" class="cp-flag cp-flag-own">{{ tt('已定制') }}</span>
+          </div>
+          <el-input v-model="item.alias" class="cp-alias" size="small" :placeholder="item.label" clearable
+                    :disabled="headPrefScope === 'role'" />
         </div>
       </div>
       <template #footer>
         <el-button size="small" @click="headPrefVisible = false">{{ tt('取消') }}</el-button>
-        <el-button size="small" @click="resetHeadPrefs">{{ tt('恢复默认') }}</el-button>
+        <el-button size="small" :loading="headPrefResetting" @click="resetHeadPrefs">
+          {{ headPrefScope === 'role' ? tt('恢复继承') : tt('恢复默认') }}
+        </el-button>
         <el-button type="primary" size="small" :loading="headPrefSaving" @click="saveHeadPrefs">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
@@ -2951,6 +2989,41 @@ const woPickerVisible = ref(false)
 const woPickerMode = ref('proc')          // 'proc' = 制程检验单 / 'first' = 首件检验单
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
+/**
+ * 字段视图作用域(2026-11-13,两层:系统整体 → 角色):
+ *   system = 原「表格调整 / 表头调整」——写 yj_field,**功能一字未改**(用户要求保留);
+ *   role   = 本角色只调「显示 / 隐藏」,写 yj_field_view,同一角色所有账号生效。
+ * 默认跟随「界面设置 → 字段视图」(localStorage mes_field_scope,缺省 role)。
+ */
+const colPrefScope = ref(scopeDefault())
+const headPrefScope = ref(scopeDefault())
+const fieldScopeRoleName = ref('')
+const fieldScopePanelCount = ref(0)
+const colPrefResetting = ref(false)
+const headPrefResetting = ref(false)
+const fieldScopeRoleLabel = computed(() =>
+  fieldScopeRoleName.value ? `${tt('本角色')}（${fieldScopeRoleName.value}）` : tt('本角色'))
+
+/** 界面设置里的默认作用域(与 business/engine.js 读同一个键) */
+function scopeDefault() {
+  return localStorage.getItem('mes_field_scope') === 'system' ? 'system' : 'role'
+}
+
+/**
+ * 拉本角色在该面板的表头/明细逐行显隐。
+ * 返回 {header, detail, roleCode, roleName, panelCount};无角色(或接口失败)返回 null。
+ */
+async function fetchRoleFieldRows() {
+  try {
+    const v = await engine.getFieldView(panelCode.value)
+    fieldScopeRoleName.value = v.roleName || ''
+    fieldScopePanelCount.value = Number(v.panelCount || 0)
+    if (!v.roleCode) return null
+    return v
+  } catch (e) {
+    return null
+  }
+}
 
 // ── 批量转ERP ──
 const batchErpVisible = ref(false)
@@ -3115,19 +3188,65 @@ async function doOqcGenerate() {
 
 const colDragIdx = ref(-1)
 
-function openColPrefs() {
+/** 系统整体作用域的行(与原 openColPrefs 逐字同源:明细页签字段 + 可见列 + 栏名) */
+function systemColPrefRows() {
   const gridTab = gridTabs.value?.[0]
   const aliases = gridTab?.columnAliases || {}
   const allFields = cfgCache.value?.detail?.tabs?.[0]?.fields || []
   const visibleCols = new Set(gridTab?.columns || [])
-  colPrefRows.value = allFields.map((f) => {
+  return allFields.map((f) => {
     const label = f.dataName || f.name || f.code
     return { label, alias: aliases[label] || f.displayName || '', visible: visibleCols.has(label) }
   })
+}
+
+/** 本角色作用域的行:后端按数据键(label)给出 shown/baseShown/overridden/required */
+async function loadColPrefRowsByScope() {
+  if (colPrefScope.value !== 'role') {
+    colPrefRows.value = systemColPrefRows()
+    return true
+  }
+  const v = await fetchRoleFieldRows()
+  if (!v) return false
+  // 与系统整体对话框显示同一批行、同一顺序(分页签面板只显示当前页签那批)
+  const allowed = new Set(systemColPrefRows().map((r) => r.label))
+  colPrefRows.value = (v.detail || [])
+    .filter((r) => allowed.has(r.label))
+    .map((r) => ({ label: r.label, alias: '', visible: !!r.shown, required: !!r.required, overridden: !!r.overridden }))
+  return true
+}
+
+async function openColPrefs() {
+  colPrefScope.value = scopeDefault()
+  if (!(await loadColPrefRowsByScope())) {
+    // 当前账号没有角色(或接口失败)⇒ 落回系统整体,不让用户看到一张空表
+    colPrefScope.value = 'system'
+    colPrefRows.value = systemColPrefRows()
+    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+  }
   colPrefVisible.value = true
 }
 
+/** 对话框里切作用域:重算行(系统整体保留顺序/栏名,本角色只有显隐) */
+async function onColPrefScopeChange() {
+  if (!(await loadColPrefRowsByScope())) {
+    colPrefScope.value = 'system'
+    colPrefRows.value = systemColPrefRows()
+    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+  }
+}
+
+/** 表头调整的同款入口 */
+async function onHeadPrefScopeChange() {
+  if (!(await loadHeadPrefRowsByScope())) {
+    headPrefScope.value = 'system'
+    headPrefRows.value = systemHeadPrefRows()
+    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+  }
+}
+
 function moveCol(idx, dir) {
+  if (colPrefScope.value !== 'system') return
   const rows = colPrefRows.value
   const target = idx + dir
   if (target < 0 || target >= rows.length) return
@@ -3137,6 +3256,7 @@ function moveCol(idx, dir) {
 }
 
 function onColDrop(idx) {
+  if (colPrefScope.value !== 'system') return
   const from = colDragIdx.value
   if (from < 0 || from === idx) return
   const rows = colPrefRows.value
@@ -3148,11 +3268,24 @@ function onColDrop(idx) {
 async function saveColPrefs() {
   colPrefSaving.value = true
   try {
-    await engine.saveColumnPrefs({
-      panelCode: panelCode.value,
-      columns: colPrefRows.value.map((r) => ({ label: r.label, alias: r.alias || '', visible: !!r.visible })),
-    })
-    ElMessage.success('表格调整已保存')
+    if (colPrefScope.value === 'role') {
+      // 本角色:只提交显隐;与系统整体相同的项由服务端删行(恢复继承)
+      const res = await engine.saveRoleFieldView({
+        panelCode: panelCode.value,
+        place: 'detail',
+        columns: colPrefRows.value.map((r) => ({ label: r.label, visible: !!r.visible })),
+      })
+      ElMessage.success(tt('本角色字段视图已保存'))
+      if (res?.skippedRequired?.length) {
+        ElMessage.warning(tt('必填字段不可隐藏，已跳过：') + res.skippedRequired.join('、'))
+      }
+    } else {
+      await engine.saveColumnPrefs({
+        panelCode: panelCode.value,
+        columns: colPrefRows.value.map((r) => ({ label: r.label, alias: r.alias || '', visible: !!r.visible })),
+      })
+      ElMessage.success('表格调整已保存')
+    }
     colPrefVisible.value = false
     cfgCache.value = null
     await load()
@@ -3163,7 +3296,32 @@ async function saveColPrefs() {
   }
 }
 
-function resetColPrefs() {
+async function resetColPrefs() {
+  if (colPrefScope.value === 'role') {
+    // 本角色:清掉本面板的覆盖 = 回到系统整体
+    try {
+      await ElMessageBox.confirm(
+        tt('将清除本角色在该面板的全部字段显示/隐藏设置，恢复为系统整体？'),
+        tt('恢复继承'), { type: 'warning' },
+      )
+    } catch (e) {
+      return   // 用户取消
+    }
+    colPrefResetting.value = true
+    try {
+      await engine.resetRoleFieldView({ panelCode: panelCode.value })
+      ElMessage.success(tt('已恢复继承（系统整体）'))
+      await loadColPrefRowsByScope()
+      cfgCache.value = null
+      await load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('恢复失败'))
+    } finally {
+      colPrefResetting.value = false
+    }
+    return
+  }
+  // 系统整体:沿用原逻辑(改完还要点保存)
   colPrefRows.value.forEach((r) => { r.alias = ''; r.visible = true })
   ElMessage.info('已恢复默认(需保存生效)')
 }
@@ -3174,18 +3332,43 @@ const headPrefSaving = ref(false)
 const headPrefRows = ref([])
 const headDragIdx = ref(-1)
 
-function openHeadPrefs() {
+/** 系统整体作用域的表头行(与原 openHeadPrefs 逐字同源) */
+function systemHeadPrefRows() {
   const fields = cfgCache.value?.dataSchema?.fields || []
-  if (!fields.length) return ElMessage.warning(tt('该面板没有可调整的表头字段'))
-  headPrefRows.value = fields.map((f) => ({
+  return fields.map((f) => ({
     label: f.dataName || f.name || f.code,
     alias: f.displayName || '',
     visible: f.hidden !== true && f.visible !== false,
   }))
+}
+
+async function loadHeadPrefRowsByScope() {
+  if (headPrefScope.value !== 'role') {
+    headPrefRows.value = systemHeadPrefRows()
+    return headPrefRows.value.length > 0
+  }
+  const v = await fetchRoleFieldRows()
+  if (!v) return false
+  const allowed = new Set(systemHeadPrefRows().map((r) => r.label))
+  headPrefRows.value = (v.header || [])
+    .filter((r) => allowed.has(r.label))
+    .map((r) => ({ label: r.label, alias: '', visible: !!r.shown, required: !!r.required, overridden: !!r.overridden }))
+  return true
+}
+
+async function openHeadPrefs() {
+  headPrefScope.value = scopeDefault()
+  if (!(await loadHeadPrefRowsByScope())) {
+    headPrefScope.value = 'system'
+    headPrefRows.value = systemHeadPrefRows()
+    if (!headPrefRows.value.length) return ElMessage.warning(tt('该面板没有可调整的表头字段'))
+    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+  }
   headPrefVisible.value = true
 }
 
 function moveHead(idx, dir) {
+  if (headPrefScope.value !== 'system') return
   const rows = headPrefRows.value
   const target = idx + dir
   if (target < 0 || target >= rows.length) return
@@ -3195,6 +3378,7 @@ function moveHead(idx, dir) {
 }
 
 function onHeadDrop(idx) {
+  if (headPrefScope.value !== 'system') return
   const from = headDragIdx.value
   if (from < 0 || from === idx) return
   const rows = headPrefRows.value
@@ -3206,11 +3390,23 @@ function onHeadDrop(idx) {
 async function saveHeadPrefs() {
   headPrefSaving.value = true
   try {
-    await engine.saveHeaderPrefs({
-      panelCode: panelCode.value,
-      columns: headPrefRows.value.map((r) => ({ label: r.label, alias: r.alias || '', visible: !!r.visible })),
-    })
-    ElMessage.success(tt('表头调整已保存'))
+    if (headPrefScope.value === 'role') {
+      const res = await engine.saveRoleFieldView({
+        panelCode: panelCode.value,
+        place: 'header',
+        columns: headPrefRows.value.map((r) => ({ label: r.label, visible: !!r.visible })),
+      })
+      ElMessage.success(tt('本角色字段视图已保存'))
+      if (res?.skippedRequired?.length) {
+        ElMessage.warning(tt('必填字段不可隐藏，已跳过：') + res.skippedRequired.join('、'))
+      }
+    } else {
+      await engine.saveHeaderPrefs({
+        panelCode: panelCode.value,
+        columns: headPrefRows.value.map((r) => ({ label: r.label, alias: r.alias || '', visible: !!r.visible })),
+      })
+      ElMessage.success(tt('表头调整已保存'))
+    }
     headPrefVisible.value = false
     cfgCache.value = null
     await load()
@@ -3221,10 +3417,49 @@ async function saveHeadPrefs() {
   }
 }
 
-function resetHeadPrefs() {
+async function resetHeadPrefs() {
+  if (headPrefScope.value === 'role') {
+    try {
+      await ElMessageBox.confirm(
+        tt('将清除本角色在该面板的全部字段显示/隐藏设置，恢复为系统整体？'),
+        tt('恢复继承'), { type: 'warning' },
+      )
+    } catch (e) {
+      return
+    }
+    headPrefResetting.value = true
+    try {
+      await engine.resetRoleFieldView({ panelCode: panelCode.value })
+      ElMessage.success(tt('已恢复继承（系统整体）'))
+      await loadHeadPrefRowsByScope()
+      cfgCache.value = null
+      await load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('恢复失败'))
+    } finally {
+      headPrefResetting.value = false
+    }
+    return
+  }
   headPrefRows.value.forEach((r) => { r.alias = ''; r.visible = true })
   ElMessage.info(tt('已恢复默认(需保存生效)'))
 }
+
+/**
+ * 界面设置里切「字段视图」时,已打开的面板页签要跟着换:
+ * 清配置缓存 + 重载(否则要手动刷新才生效)。单实例(keep-alive)监听,卸载时摘掉。
+ */
+onMounted(() => window.addEventListener('mes:field-scope', onFieldScopeChanged))
+onUnmounted(() => window.removeEventListener('mes:field-scope', onFieldScopeChanged))
+async function onFieldScopeChanged() {
+  cfgCache.value = null
+  try {
+    await load()
+  } catch (e) {
+    // 重载失败不弹错:面板下次进入还会再拉一次
+  }
+}
+
 // ---- 参照字段动态模式(≤20 下拉 / >20 弹窗):缓存计数 + 下拉选项 ----
 // 数据量跨越阈值时(增删档案后)由 refreshRefModes 重新判定,模式随之切换。
 const refModeMap = reactive({})      // fieldKey -> 'dialog' | 'select'
@@ -14130,6 +14365,7 @@ onUnmounted(() => {
 .col-filter-inp .el-input__inner { font-size: 12px; padding: 0 6px; height: 24px; }
 
 /* 表格列自定义对话框 */
+.col-pref-scope { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .col-pref-tip { font-size: 12px; color: #888; margin-bottom: 10px; }
 .col-pref-count { margin-left: 8px; padding: 1px 8px; border-radius: 8px; background: #e8f4ff; color: #409eff; font-weight: 500; }
 .col-pref-list { max-height: 400px; overflow-y: auto; border: 1px solid #e8ecf1; border-radius: 4px; }
@@ -14147,6 +14383,9 @@ onUnmounted(() => {
 .cp-label { flex: 1; font-size: 13px; color: #333; min-width: 80px; }
 .cp-alias { width: 140px; }
 .cp-alias .el-input__inner { font-size: 12px; }
+/* 字段视图(2026-11-13):必填不可隐藏 / 本角色已改过 */
+.cp-flag { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; background: #f4f4f5; color: #909399; }
+.cp-flag-own { background: #ecf5ff; color: #409eff; }
 
 /* 生成出厂检验报告弹窗(2026-11-01,销售出库单):标准行数=0 / 批次不可用的醒目提示 */
 .oqc-warn {

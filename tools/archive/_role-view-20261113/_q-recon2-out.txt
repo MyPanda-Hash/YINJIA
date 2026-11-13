@@ -1,0 +1,62 @@
+# DB=HSDZ_MES_TEST
+  username=admin | real_name=系统管理员 | is_admin=Y | enabled=1 | role_code=admin | role_name=管理员 | 
+  username=cp | real_name=陈秀丽 | is_admin=N | enabled=1 | role_code=rd_review | role_name=研发审核 | 
+  username=liulei | real_name=刘磊 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=chaishanyin | real_name=柴善银 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=fengmin | real_name=冯敏 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=Lily | real_name=张莉 | is_admin=N | enabled=1 | role_code=xiaoshou | role_name=销售 | 
+  username=WANGGUANGZHEN | real_name=王光珍 | is_admin=N | enabled=1 | role_code=sc | role_name=生产 | 
+  username=LIZIWEI | real_name=李梓维 | is_admin=N | enabled=1 | role_code=xiaoshou | role_name=销售 | 
+  username=TANCHENG | real_name=谭成 | is_admin=N | enabled=1 | role_code=sc | role_name=生产 | 
+  username=xieqin | real_name=谢琴 | is_admin=N | enabled=1 | role_code=xiaoshou | role_name=销售 | 
+  username=Facai_Zhen | real_name=练玉珍 | is_admin=N | enabled=1 | role_code=xiaoshou | role_name=销售 | 
+  username=Smm | real_name=孙淼淼 | is_admin=N | enabled=1 | role_code=scxs | role_name=生产销售 | 
+  username=chenxiuli | real_name=陈秀丽 | is_admin=N | enabled=1 | role_code=rd_review | role_name=研发审核 | 
+  username=yangmaolin | real_name=杨茂林 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=qinwenjing | real_name=秦文静 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=chenkeyu | real_name=陈柯余 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=mengfanjiao | real_name=孟凡娇 | is_admin=N | enabled=1 | role_code=rd_file_owner | role_name=文件负责人 | 
+  username=cmj | real_name=车美晶 | is_admin=N | enabled=1 | role_code=zhiliangshenhe | role_name=质量审核 | 
+  username=zfy | real_name=钟芳云 | is_admin=N | enabled=1 | role_code=zhiliangjiance | role_name=质量检测 | 
+  username=cyx | real_name=陈艺心 | is_admin=N | enabled=1 | role_code=zhiliangjiance | role_name=质量检测 | 
+  username=cxy | real_name=崔晓云 | is_admin=N | enabled=1 | role_code=zhiliangjiance | role_name=质量检测 | 
+  username=hyl | real_name=黄玉玲 | is_admin=N | enabled=1 | role_code=zhiliangjiance | role_name=质量检测 | 
+  username=yyt | real_name=叶运婷 | is_admin=N | enabled=1 | role_code=zhiliangjiance | role_name=质量检测 | 
+  username=txj | real_name=涂小娟 | is_admin=N | enabled=1 | role_code=zhiliangjiance | role_name=质量检测 | 
+  username=fm | real_name=冯敏 | is_admin=N | enabled=1 | role_code=zhiliangshenhe | role_name=质量审核 | 
+  username=zjl | real_name=冯总 | is_admin=Y | enabled=1 | role_code=admin | role_name=管理员 | 
+  username=jxg | real_name=蒋小刚 | is_admin=N | enabled=1 | role_code=cksh | role_name=仓库审核 | 
+  username=qietan | real_name=切炭车间 | is_admin=N | enabled=1 | role_code=smbgll | role_name=扫码报工领料 | 
+  username=chengxing | real_name=成型车间 | is_admin=N | enabled=1 | role_code=smbgll | role_name=扫码报工领料 | 
+  username=zuzhuang | real_name=组装车间 | is_admin=N | enabled=1 | role_code=smbgll | role_name=扫码报工领料 | 
+  username=hunliao | real_name=混料车间 | is_admin=N | enabled=1 | role_code=smbgll | role_name=扫码报工领料 | 
+  username=user | real_name=屏幕演示 | is_admin=N | enabled=1 | role_code=user | role_name=普通用户 | 
+
+== 面板 QC_RECV 是否存在 ==
+  panel_code=PU_ORDER | panel_name=采购订单 | mode=doc | module_group=智能供应链 | 
+  panel_code=QC_RECV | panel_name=送料暂收单 | mode=doc | module_group=WMS管理 | 
+
+== QC_RECV 字段(前 20) ==
+  place=detail | seq=10 | col_name=单据编号 | label=单号 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=30 | col_name=采购单号 | label=采购单号 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=40 | col_name=采购订单行号 | label=采购订单行号 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=50 | col_name=物料名称 | label=物料名称 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=60 | col_name=规格型号 | label=规格型号 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=70 | col_name=批次号 | label=批次号 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=80 | col_name=物料描述 | label=物料描述 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=90 | col_name=单价 | label=单价 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=100 | col_name=数量 | label=数量 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=110 | col_name=计量单位 | label=计量单位 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=120 | col_name=数量2 | label=数量2 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=130 | col_name=计量单位2 | label=计量单位2 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=140 | col_name=金额 | label=金额 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=150 | col_name=日期 | label=日期 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=160 | col_name=税率% | label=税率% | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=170 | col_name=含税单价 | label=含税单价 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=180 | col_name=税额 | label=税额 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=190 | col_name=含税金额 | label=含税金额 | hidden=0 | visible=1 | required=0 | 
+  place=detail | seq=200 | col_name=折扣 | label=折扣 | hidden=1 | visible=0 | required=0 | 
+  place=detail | seq=210 | col_name=供应商 | label=供应商 | hidden=1 | visible=0 | required=0 | 
+
+== yj_field_view 现状 ==
+  n=0 | 

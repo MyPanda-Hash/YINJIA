@@ -64,6 +64,8 @@ public class PxController {
      * 送料暂收单按商品档案分流({@link com.yinjia.mes.panel.QcRecvGenerateHandler}),见 generateByAction。
      */
     private final com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate;
+    /** 角色字段视图(2026-11-13):同一面板各角色看到不同字段,只存显隐,不碰 yj_field */
+    private final com.yinjia.mes.service.PanelFieldViewService fieldView;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -83,7 +85,8 @@ public class PxController {
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.service.WorkOrderPickService woPick,
                         com.yinjia.mes.service.WoPickScanLogService woPickLog,
-                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate) {
+                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
+                        com.yinjia.mes.service.PanelFieldViewService fieldView) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -104,6 +107,7 @@ public class PxController {
         this.woPick = woPick;
         this.woPickLog = woPickLog;
         this.qcRecvGenerate = qcRecvGenerate;
+        this.fieldView = fieldView;
     }
 
     // ============ 工单扫码领料取数(2026-10-21,手机端) ============
@@ -1190,10 +1194,13 @@ public class PxController {
     }
 
     @GetMapping("/getPanelConfig")
-    public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode) {
+    public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode,
+                                                        @RequestParam(required = false) String view) {
         // 面板元数据(字段/参照绑定)不是人人可取:按读放行集合(可见 ∪ 参照目标 ∪ 同模块)校验,2026-09-22 补
         perm.requirePanelRead(panelCode);
-        return ApiResult.ok(service.getPanelConfig(panelCode));
+        // view=system ⇒ 不叠角色字段视图(界面设置"字段视图=系统整体"时用);缺省=本角色(2026-11-13)
+        boolean roleView = !"system".equalsIgnoreCase(view);
+        return ApiResult.ok(configService.getPanelConfig(panelCode, roleView));
     }
 
     @GetMapping("/getPermMatrix")
@@ -1451,6 +1458,41 @@ public class PxController {
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveHeaderPrefs(panelCode, columns);
         return ApiResult.ok(null);
+    }
+
+    // ---------- 角色字段视图(2026-11-13,两层:系统整体 → 角色) ----------
+    // 口径:原「表格调整/表头调整」照旧写 yj_field(系统整体,功能不变);
+    // 这里只在其上盖一层"本角色显示/隐藏",同一角色所有账号看到的一样,不细分个人。
+    // 三态:行存在=本角色显式设定,行不存在=跟随系统整体。
+
+    /** 对话框回显:本角色在该面板的表头/明细逐行"显示或隐藏" + 本角色一共定制过几个面板 */
+    @GetMapping("/fieldView")
+    public ApiResult<Map<String, Object>> fieldView(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(fieldView.dialogOf(panelCode));
+    }
+
+    /** 保存角色视图(只存显隐;与系统整体相同的项自动恢复继承;必填字段跳过并回报) */
+    @PostMapping("/saveRoleFieldView")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> saveRoleFieldView(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String place = String.valueOf(body.getOrDefault("place", ""));
+        List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
+        return ApiResult.ok(fieldView.saveRoleView(panelCode, place, columns));
+    }
+
+    /** 恢复继承:清掉本角色在该面板(panelCode 为空 = 全部面板)的显隐覆盖 */
+    @PostMapping("/resetRoleFieldView")
+    public ApiResult<Map<String, Object>> resetRoleFieldView(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        if (!panelCode.isBlank()) perm.requirePanelRead(panelCode);
+        int removed = fieldView.resetRoleView(panelCode);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("removed", removed);
+        out.put("panelCount", fieldView.rolePanelCount(fieldView.currentRoleCode()));
+        return ApiResult.ok(out);
     }
 
     /**

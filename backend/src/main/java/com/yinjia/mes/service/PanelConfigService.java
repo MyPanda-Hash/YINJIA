@@ -34,14 +34,22 @@ public class PanelConfigService {
      * 前端数量输入/显示按它走 —— 个/卷=0、kg/米=3,与后端保存/过账的取整口径同源。
      */
     private final BatchService batchService;
+    /**
+     * 角色字段视图(2026-11-13):同一面板按角色叠加"显示/隐藏"。
+     * 只在这里取一次覆盖 {@link PanelFieldViewService#applyTo},下游(fieldSpec/buildGridColumns/
+     * fieldsAt)全部照旧 —— 所以界面、查询、导出自动一致,前端渲染代码零改动。
+     */
+    private final PanelFieldViewService fieldView;
 
     public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations,
-                              CalcRuleService calcRules, BatchService batchService) {
+                              CalcRuleService calcRules, BatchService batchService,
+                              PanelFieldViewService fieldView) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.translations = translations;
         this.calcRules = calcRules;
         this.batchService = batchService;
+        this.fieldView = fieldView;
     }
 
     /** 当前请求的目标语言键(en/ja/ko/...;zh 系=zh)。 */
@@ -71,8 +79,23 @@ public class PanelConfigService {
         return buildConfig(registry.panel(panelCode));
     }
 
+    /**
+     * {@code roleView=false} = 按「系统整体」出配置(界面设置里"字段视图=系统整体"时用)。
+     * 默认 true:叠上本角色的显示/隐藏覆盖(无覆盖时 {@link PanelFieldViewService#applyTo}
+     * 原样返回同一个对象,零开销)。
+     */
+    public Map<String, Object> getPanelConfig(String panelCode, boolean roleView) {
+        return buildConfig(registry.panel(panelCode), roleView);
+    }
+
     public Map<String, Object> buildConfig(PanelRegistry.PanelDef def) {
-        Map<String, Object> out = "archive".equals(def.mode()) ? buildArchiveConfig(def) : buildDocConfig(def);
+        return buildConfig(def, true);
+    }
+
+    public Map<String, Object> buildConfig(PanelRegistry.PanelDef def, boolean roleView) {
+        // 角色字段视图:只换字段清单的 hidden/visible,其余一律原样(2026-11-13)
+        PanelRegistry.PanelDef view = roleView ? fieldView.applyTo(def) : def;
+        Map<String, Object> out = "archive".equals(view.mode()) ? buildArchiveConfig(view) : buildDocConfig(view);
         // 单位精度快照(2026-11-09):所有面板一份,前端数量输入/显示按单位小数位走。
         // 放顶层而不是 metadata:metadata 在档案/单据两条构建路径里各有一份,这里一次挂全。
         try {
