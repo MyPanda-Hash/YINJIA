@@ -2526,7 +2526,14 @@ public class ButtonService {
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String auditor = currentUserName();
         boolean admin = isAdminUser(auditor);
-        requireApprover(def.code());
+        // 2026-11-13 用户口径「本人自审权限绑定审核按钮」:
+        //   原来这里无条件 requireApprover —— 只勾了「本人自审」的角色连**自己的单**都点不动
+        //   (接口层先 403,前端按钮也整颗不渲染)。现在改成**条件式**:
+        //     · 有审批权(∪管理员) → 照旧,和以前逐字一致;
+        //     · 没有审批权、但本面板授了「本人自审」且这单是**本人制的** → 放行(记 self_audit='Y');
+        //     · 没有审批权、别人制的单 → 仍然 403(不会因为勾了自审就能审所有人)。
+        //   byAuthor 要取到单号和制单人才知道,故把闸门挪到下面取完 author 之后再判。
+        boolean hasApprove = canApprove(auditor, def.code());
         if (!def.isDoc()) throw new IllegalStateException("档案面板无审核动作");
         String no = requireNo(formData);
         ensureDocExists(def, no);
@@ -2550,6 +2557,10 @@ public class ButtonService {
         String author = authorOfDoc(def, no);
         boolean byAuthor = !author.isBlank() && author.equals(auditor);
         boolean selfGranted = byAuthor && canSelfAudit(auditor, def.code());
+        // 审批权闸门(2026-11-13 条件化,见方法开头注释):只有「非本人的单」才硬要求审批权
+        if (!hasApprove && !selfGranted)
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "当前用户无审批权限（如需审核自己制的单，请让管理员在组织架构为本角色勾「本人自审」）");
         if (byAuthor && !admin && !selfGranted)
             throw new org.springframework.security.access.AccessDeniedException(
                     "审核人不能与制单人相同（编制与审批分离）：本面板未授「本人自审」，请走「提交审批」→「审批通过」由他人审核");

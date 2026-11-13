@@ -47,11 +47,52 @@ test('默认保留原逻辑：没有 selfaudit 词时，提交人自己审批仍
     '未授权时必须仍走这条拒绝分支（原逻辑一字不动）')
 })
 
-test('自审不等于审批权：requireApprover 仍在自审判定之前', () => {
+test('「审批通过」:自审不等于审批权,requireApprover 仍在自审判定之前', () => {
   const iApprover = button.indexOf('requireApprover(def.code());')
   const iSelf = button.indexOf('boolean selfAudit =', iApprover)
   assert.ok(iApprover > 0 && iSelf > iApprover,
     '顺序必须是 先 requireApprover 再判 selfaudit —— 否则只勾「本人自审」就能审任何单')
+})
+
+/**
+ * 2026-11-13 用户口径追加:「本人自审权限绑定审核按钮」。
+ * 之前的规则是「selfaudit 只解除编制与审批分离,审批权照旧要过」—— 结果只勾了「本人自审」的角色
+ * 连**自己制的单**都点不动(接口层 403 + 前端按钮整颗不渲染),权限授了等于没授。
+ * 现在:审核按钮对「自审权」开放,但**只对本人制的单**;别人的单仍要求审批权。
+ */
+test('审核:自审权只替代「本人制的单」的审批权,别人的单仍然要 audit', () => {
+  const iAudit = button.indexOf('private Map<String, Object> audit(PanelRegistry.PanelDef def')
+  assert.ok(iAudit > 0, '找不到 audit()')
+  const body = button.slice(iAudit, iAudit + 6000)
+  assert.match(body, /boolean hasApprove = canApprove\(auditor, def\.code\(\)\);/,
+    'audit() 必须先算出有没有审批权(不抛异常)')
+  assert.ok(!/if \(!def\.isDoc\(\)\)[\s\S]{0,80}requireApprover\(def\.code\(\)\)/.test(body)
+    && !/^\s*requireApprover\(def\.code\(\)\);\s*$/m.test(body),
+    'audit() 里不能再无条件 requireApprover —— 那样自审权永远用不上')
+  assert.match(body, /if \(!hasApprove && !selfGranted\)/,
+    '闸门必须是「既没审批权、又不是本人自审」才拒')
+  assert.match(body, /if \(byAuthor && !admin && !selfGranted\)/,
+    '原有「编制与审批分离」拒绝分支必须保留(未授自审仍拒)')
+  assert.match(body, /boolean selfGranted = byAuthor && canSelfAudit\(auditor, def\.code\(\)\);/,
+    'selfGranted 只能是「本人制的单 + 有自审词」')
+})
+
+test('接口层:只有「审核/审批通过/审批驳回」允许 selfaudit 放行,别扩大到弃审/中止', () => {
+  assert.match(permSvc, /SELF_AUDIT_ACTIONS = Set\.of\("审核", "审批通过", "审批驳回"\)/,
+    '白名单必须是这三颗 —— 服务层只有它们带 canSelfAudit 判据')
+  assert.match(permSvc, /if \(perms\.contains\("selfaudit"\) && SELF_AUDIT_ACTIONS\.contains\(buttonName\)\) return;/,
+    'requireButton 里要有这条放行,否则接口先 403,按钮点了必报错')
+})
+
+test('前端:「审核」按钮对自审权开放(只扩这一颗,不扩审批组)', () => {
+  assert.match(panelx, /function canAuditHere\(\) \{\s*\n\s*return canApproveHere\(\) \|\| canSelfAuditHere\(\)/,
+    'canAuditHere = 审批权 ∪ 自审权')
+  assert.match(panelx, /v-if="canAuditHere\(\)"/, '审核按钮的 v-if 要用 canAuditHere')
+  // 审批通过/驳回组仍由 canApproveHere（∪ 二级审批人）决定 —— 自审权不能把审批权带出来
+  assert.match(panelx, /const approvalBtnsVisible = computed\(\(\) =>[\s\S]{0,300}canApproveHere\(\)/,
+    '审批组显隐仍是 canApproveHere，不能挂 canAuditHere')
+  const auditUses = (panelx.match(/canAuditHere\(\)/g) || []).length
+  assert.equal(auditUses, 2, `canAuditHere 只应出现 2 次(定义 + 审核按钮 v-if),实际 ${auditUses} 次 —— 别扩到别的按钮`)
 })
 
 test('自审留痕：写 self_audit=Y，审批情况查询回 selfAudit', () => {

@@ -459,7 +459,7 @@
                      品质单据…)的侧栏也放一颗直审,和工具栏那颗同一条判据(有审批权 ∪ 状态∈草稿/修改中,
                      已提交审批的只能用「审批通过」——见 isDisabled/disabledReason 的 DIRECT_AUDIT_ACTION 分支)。 -->
                 <div
-                  v-if="canApproveHere()"
+                  v-if="canAuditHere()"
                   class="as-side-btn"
                   :class="{ disabled: isDisabled('审核') }"
                   :title="isDisabled('审核') ? disabledReason('审核') : tt('审核：一步到位（草稿 → 已审核），不需要再走提交审批')"
@@ -4125,6 +4125,21 @@ const openDelMenu = ref(false)
 function canApproveHere() {
   const ap = user.approvePanels || []
   return user.isAdmin || ap.includes('*') || ap.includes(String(panelCode.value))
+}
+
+/**
+ * 「审核」按钮的显隐(2026-11-13 用户口径「本人自审权限绑定审核按钮」)。
+ *
+ * <p>为什么不能只看审批权:角色只勾了「本人自审」(selfaudit)、没勾审批列时,
+ * 原来按钮**整颗不渲染** —— 权限授了却点不到,等于没授。这里把「本人自审」也算进入口,
+ * 点下去之后能审的只是**自己制的那张单**:服务端 `ButtonService.audit()` 对
+ * "无审批权 + 有 selfaudit" 只放行 `byAuthor` 的情形,别人的单一律 403。</p>
+ *
+ * <p>⚠ 只扩**审核**这一颗,不扩「审批通过/审批驳回」组 —— 那两颗仍由 canApproveHere 决定,
+ * 否则等于把审批权白送出去。</p>
+ */
+function canAuditHere() {
+  return canApproveHere() || canSelfAuditHere()
 }
 
 /**
