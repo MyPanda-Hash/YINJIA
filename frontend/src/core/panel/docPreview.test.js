@@ -105,8 +105,9 @@ test('RD_PROD_INFO 必须登记摘要字段，卡片才对得齐', () => {
 test('产品信息表的单据预览走"大块浮层横向多列"，其余面板仍走窄侧栏', () => {
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
   // 只有产品信息表在白名单里
-  assert.match(vue, /const PREVIEW_GRID_PANELS = new Set\(\['RD_PROD_INFO'\]\)/,
-    '浮层白名单必须只有 RD_PROD_INFO（本次范围只做产品信息表）')
+  assert.ok(vue.includes("new Set(['RD_PROD_INFO', 'RD_APPROVAL'])"),
+    '浮层白名单 = 产品信息表 + 立项申请（2026-11-13 用户口径追加立项申请）')
+
   // 侧栏按钮按开关分派，不能一刀切改掉所有面板
   assert.match(vue, /canPreviewGrid \? openPreviewGrid\(\) : openDocPreview\(\)/,
     '按钮要按面板分派：产品信息表走浮层，其余走原逻辑')

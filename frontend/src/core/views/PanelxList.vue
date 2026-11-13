@@ -4241,10 +4241,14 @@ const previewKw = ref('')
  * <p>现状：点侧栏「单据预览」→ 把**窄侧栏**切成卡片列表（`.preview-cards` 是
  * `flex-direction: column`，侧栏实宽 ~180px）⇒ 一屏只能扫 3~4 张，找单据很慢。</p>
  *
- * <p>本次：**只对产品信息表**（RD_PROD_INFO）改成点开一个覆盖大半屏的浮层，
- * 内部卡片 `grid` 横向多列（自适应 4 列）。其余面板仍走原来的窄侧栏，逐字不变。</p>
+ * <p>本次：**产品信息表（RD_PROD_INFO）与立项申请（RD_APPROVAL）**改成点开一个覆盖大半屏的
+ * 浮层，内部卡片 `grid` 横向多列（自适应 4 列）。其余面板仍走原来的窄侧栏，逐字不变。</p>
+ *
+ * <p>立项申请是 2026-11-13 用户口径追加的：「把立项申请的单据预览也做刚才的产品信息表的改动」。
+ * 它的摘要字段早在 2026-11-11 就登记过（PREVIEW_FIELDS.RD_APPROVAL = 客户名/项目等级/申请立项人），
+ * 所以只需加进本白名单，卡片本来就已经是"两行等高"的形态，无需再改摘要口径。</p>
  */
-const PREVIEW_GRID_PANELS = new Set(['RD_PROD_INFO'])
+const PREVIEW_GRID_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
 const canPreviewGrid = computed(() => PREVIEW_GRID_PANELS.has(String(panelCode.value)))
 const previewGridVisible = ref(false)
 /**
