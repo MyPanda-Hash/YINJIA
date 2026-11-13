@@ -5903,6 +5903,10 @@ export default {
     '删除后该订单行会回到订单结转(可重新转单);已排产/有报工的工单不能删除。':
       'The order line will return to Order Conversion (can be converted again); scheduled work orders or ones with reports cannot be deleted.',
     '工单已删除': 'Work order deleted',
+    // ---- 排产:排产数量 < 需求数量 ⇒ 剩余自动切单(2026-11-13 第五轮)----
+    '排产数量小于需求数量时，剩余数量会自动切出子工单（子工单进待排产池，可单独排产）':
+      'If the scheduled quantity is less than the required quantity, the remainder is automatically split into a child work order (it goes to the pending pool and can be scheduled separately).',
+    '剩余数量已自动切出子工单': 'The remaining quantity was automatically split into a child work order:',
   },
 
 }

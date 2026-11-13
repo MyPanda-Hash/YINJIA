@@ -6,6 +6,7 @@ import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
 import com.yinjia.mes.service.ProcessTaskService;
+import com.yinjia.mes.service.SchedulePreplanService;
 import com.yinjia.mes.service.WorkOrderDayPlanService;
 import com.yinjia.mes.service.WorkOrderTransferService;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -51,17 +52,21 @@ public class ScheduleBoardController {
     private final ExternalReportAbsorbService absorbService;
     /** 工单日排产(2026-10-29):生产工单/工单排产两页表格内的日期列 —— 读计划 + 写计划(不另记完成量) */
     private final WorkOrderDayPlanService dayPlanService;
+    /** 工序路线排线编排(2026-11-13 第五轮):排产数量 &lt; 需求数量时先把剩余数量自动切单,再排产 */
+    private final SchedulePreplanService preplanService;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
                                    WorkOrderTransferService transferService, ProcessTaskService processTask,
                                    ExternalReportAbsorbService absorbService,
-                                   WorkOrderDayPlanService dayPlanService) {
+                                   WorkOrderDayPlanService dayPlanService,
+                                   SchedulePreplanService preplanService) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
         this.processTask = processTask;
         this.absorbService = absorbService;
         this.dayPlanService = dayPlanService;
+        this.preplanService = preplanService;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -125,7 +130,7 @@ public class ScheduleBoardController {
         Object qty = body.get("排产数量");
         Double planQty = qty == null || String.valueOf(qty).isBlank() || "null".equals(String.valueOf(qty))
                 ? null : Double.valueOf(String.valueOf(qty));
-        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), planQty, currentUser()));
+        return ApiResult.ok(preplanService.preplan(no, lineId, steps, str(body.get("排产班组")), planQty, currentUser()));
     }
 
     /** 撤销排产回池(换线=撤销+重排);有报工/入库不可撤销 */

@@ -4,6 +4,7 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.panel.PanelRuntimeService;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DevTaskService;
+import com.yinjia.mes.service.InvOptionRank;
 import com.yinjia.mes.service.PanelConfigService;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.PanelRegistry;
@@ -845,7 +846,13 @@ public class PxController {
         if (kind != null && !kind.isBlank()) cond.put("所属类别", kind.trim());
         // 档案模式(INV 是档案面板)会忽略 pageSize 全量返回 ⇒ 靠 condition 收窄到一个类别,
         // 与前端原调用(queryFormDataList + condition{所属类别})行为完全一致。
-        return ApiResult.ok(queryService.queryFormDataList("INV", keyword, cond, 1, 5000));
+        Map<String, Object> raw = queryService.queryFormDataList("INV", keyword, cond, 1, 5000);
+        // 范围筛选 + 命中优先级排序(2026-11-13 用户口径「模糊搜索要做一个范围筛选,符合输入的数字的在前面」):
+        // 上面那条查询对 INV 的**全部 75 列**做 %kw% OR、排序只有 t.id DESC ⇒ 规格型号含 123 的
+        // Y-S-T(硫酸氧钛 123334-00-9)会排到编码/名称含 123 的 SP00013 前面(用户截图)。
+        // 规则在 service(见 {@link InvOptionRank}),这里只转发;响应形状原样保留({totalSize, list[…]})。
+        // keyword 为空 ⇒ 不筛不排不截断(配方计算器「该类别全部物料」的既有行为不变)。
+        return ApiResult.ok(InvOptionRank.rankResult(raw, keyword));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
