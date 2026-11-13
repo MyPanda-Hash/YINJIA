@@ -14,8 +14,30 @@
  *   3. 格内两个数要分清:上=计划,下=报工(「实」标 + 绿色);日期列分段:
  *      今天列标「今」+ 浅蓝底、过去列灰底(历史对照段)。
  *
+ * ⚠ 2026-11-13 用户口径(附两张截图,逐条拍板):
+ *   「在这里增加一个原计划量/报工数,当天结束后未完成会进行提示」
+ *   「报工后显示在当前位置和原计划量/实际报工量,未达到数量进行提示,
+ *     未达到计划数量的向后序数量进行处理」
+ *   ⇒ 日期格从「一个数」改成「**原计划/报工**」两个数(例 715/15),不再把计划藏在 tooltip 里;
+ *     日期 < 今天(当天已结束)且 报工 < 原计划 ⇒ 该格欠产(标红),页面顶部再给一行红色汇总;
+ *     「未达到计划数量的向后序数量进行处理」由后端既有口径保证(未报工的量由
+ *     {@code DayPlanSpread.mergeReported} 向今天及以后重摊;下道工序的「可加工量」只认上一道
+ *     **已审报工**的实际量),本文件不重复实现。
+ *
  * 本文件只放这些**纯判定**(便于单测),接口调用见 `business/dayPlanApi.js`,组件只管状态与渲染。
  */
+
+/** 数值兜底:null/undefined/NaN 一律当 0(避免格子出现 NaN) */
+function num(v) {
+  const n = Number(v == null ? 0 : v)
+  return Number.isFinite(n) ? n : 0
+}
+
+/** 4 位小数(与 plang/wo_day_plan 的 decimal 精度一致;比较用 1e-6 容差) */
+function round4(v) { return Math.round(num(v) * 10000) / 10000 }
+
+/** 比较容差:两个本应相等的 decimal 不要因为二进制误差判成"欠 0.0000001" */
+const EPS = 1e-6
 
 /** 数量显示:0/空显示空白(日期格没排就是空的,免得满屏 0) */
 export function qtyText(v) {
@@ -73,6 +95,9 @@ export function isOverCapacity(planned, capacity) {
  *
  * <p>计划值不丢:进格子的 tooltip(`计划 X · 实报 Y`),屏幕上不再挤两行数字。
  *
+ * <p>⚠ 2026-11-13 起两页日期格改用 {@link dayCellView}(原计划/报工两数 + 历史欠产判定);
+ * 本函数保留给「后端未返回 原计划」的降级路径与旧单测,勿再新增调用方。
+ *
  * @param {number} plan   当日计划(人工指定 ∪ 自动摊剩余后的值)
  * @param {number} actual 当日已审核报工量
  * @returns {{qty:number, isActual:boolean}} qty=要显示的数; isActual=显示的是实际值(前端标绿)
@@ -123,4 +148,100 @@ export function isOutOfPlanRange(date, start, due) {
   if (s && d < s) return true
   if (e && d > e) return true
   return false
+}
+
+/**
+ * 日期格的「**原计划 / 报工**」显示模型(2026-11-13 用户口径,取代 {@link dayCellQty} 的单数显示)。
+ *
+ * <p>口径(与后端 `WorkOrderDayPlanService.data` 的 `原计划` 字段配套):
+ * <ul>
+ *   <li><b>原计划量</b> = 工序计划量按「开工日→交期」全量均摊的基线(`DayPlanSpread.merge`),
+ *       **不扣已审报工、历史日期也保留** —— 回答"那天本来打算做多少";</li>
+ *   <li><b>报工数</b> = 当天已审核报工量(`日报工`,含手机端吸收);</li>
+ *   <li>格内:有报工 ⇒ `原计划/报工`(例 715/15);没报工 ⇒ 计划(今天及以后的重摊值,原样);
+ *       **已结束的日期**且原计划&gt;0但没报工 ⇒ `原计划/0`(整格欠产);</li>
+ *   <li><b>欠产(short)</b> 只在"当天已结束"(日期 &lt; 今天)时判定:
+ *       {@code max(原计划 − 报工, 0)};今天还没结束 ⇒ 不判,免得白天的正常进度被标红。</li>
+ * </ul>
+ *
+ * <p><b>兼容</b>:后端没升级(返回里没有 `原计划`)或该日期不在原计划区间 ⇒ baseline 为空/0,
+ * 退回 2026-10-31 的单数显示(有报工显示报工,否则显示计划),不显示假数据 ——
+ * 这是 5173(vite 源码)连旧 8090(jar)时的过渡态,新老后端都能正常渲染。
+ *
+ * @param {number} plan     当天日计划(今天及以后的重摊值;历史日期通常为空)
+ * @param {number} actual   当天已审核报工量
+ * @param {number} baseline 原计划量(可空)
+ * @param {boolean} past    该日期是否已经结束(日期 &lt; 今天)
+ * @returns {{text:string, planText:string, actualText:string, hasActual:boolean, hasBaseline:boolean, short:number}}
+ *   text=格内要显示的一串(两数用 `/` 连);planText/actualText 供模板分别着色;
+ *   hasActual=有报工(绿色);short&gt;0=该日欠产(标红 + 汇总提示)
+ */
+export function dayCellView(plan, actual, baseline, past) {
+  const p = num(plan)
+  const a = num(actual)
+  const b = num(baseline)
+  const hasActual = a > 0
+  const hasBaseline = b > 0
+  let planText = ''
+  let actualText = ''
+  let short = 0
+  if (hasActual) {
+    actualText = qtyText(a)
+    if (hasBaseline) {
+      planText = qtyText(b)
+      if (past && a < b - EPS) short = round4(b - a)
+    }
+    // 没有基线(老后端/该日不在原计划区间)⇒ **只显示报工**:不拿"今天起还要做多少"冒充原计划
+  } else if (past && hasBaseline) {
+    // 当天已结束、原计划有量却一笔没报 ⇒ 整格欠产(显示 `原计划/0`)
+    planText = qtyText(b)
+    actualText = '0'
+    short = round4(b)
+  } else {
+    planText = qtyText(p)
+  }
+  const text = actualText ? (planText ? `${planText}/${actualText}` : actualText) : planText
+  return { text, planText, actualText, hasActual, hasBaseline, short }
+}
+
+/**
+ * **历史欠产明细**(2026-11-13 用户口径「当天结束后未完成会进行提示」):
+ * 逐行 × 逐日挑出「日期 &lt; 今天 且 报工 &lt; 原计划」的格子。
+ *
+ * <p>只吃后端返回的两张账:{@code row.原计划}(基线)、{@code row.日报工}(实际);
+ * 行标签由调用方自己取(工单号/行号),这里只回 row 引用,便于两页共用同一套判定。
+ *
+ * <p>今天**不算**(还没结束) —— 判定口径与 {@link dayCellView} 的 short 严格一致。
+ *
+ * @param {Array<object>} rows  行对象(需含 `原计划`:`日期→数量`、`日报工`:`日期→数量`)
+ * @param {string} today        yyyy-MM-dd
+ * @returns {Array<{row:object, date:string, plan:number, actual:number, short:number}>} 按日期升序
+ */
+export function historyShortfalls(rows, today) {
+  const out = []
+  const t = String(today || '').slice(0, 10)
+  if (!t) return out
+  for (const row of rows || []) {
+    const base = row && row['原计划']
+    if (!base || typeof base !== 'object') continue
+    const done = (row && row['日报工']) || {}
+    for (const k of Object.keys(base)) {
+      const day = String(k || '').slice(0, 10)
+      if (!day || day >= t) continue        // 今天及以后不判"未完成"(当天还没结束)
+      const p = num(base[k])
+      if (p <= 0) continue                  // 原计划 0 = 没排/已重摊走,不算欠产
+      const a = num(done[k])
+      if (a >= p - EPS) continue            // 达成(允许 1% 级超产)
+      out.push({ row, date: day, plan: p, actual: a, short: round4(p - a) })
+    }
+  }
+  out.sort((x, y) => (x.date === y.date ? 0 : x.date < y.date ? -1 : 1))
+  return out
+}
+
+/** 历史欠产合计:处数 + 欠产量(顶部红色汇总提示直接用) */
+export function shortfallTotals(items) {
+  let qty = 0
+  for (const it of items || []) qty += num(it.short)
+  return { count: (items || []).length, qty: round4(qty) }
 }

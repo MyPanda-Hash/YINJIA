@@ -2210,6 +2210,24 @@ export default {
     '今日已排/日产能/今日余量': 'Scheduled today / daily capacity / remaining today',
     '未分配量': 'Unallocated qty',
     '已分': 'Allocated',
+    // 日排产「原计划 / 报工」两本账(2026-11-13 用户口径,附两张截图):
+    //   「在这里增加一个原计划量/报工数,当天结束后未完成会进行提示」
+    //   「报工后显示在当前位置和原计划量/实际报工量,未达到数量进行提示」
+    //   ⇒ 日期格内 = 原计划/报工(例 715/15);原计划 = 工序计划量按「开工日→交期」均摊出来的**基线**
+    //     (不扣已审报工、历史日期也保留,与"今天起还要做多少"的日计划是两本账);
+    //     **标红** = 当天已结束(日期 < 今天)且报工 < 原计划;页面顶部给一行红色汇总提示(处数 + 合计欠产)。
+    '原计划': 'Planned',
+    '报工数': 'Reported qty',
+    '欠产': 'Shortfall',
+    '当天未完成': 'Not completed that day',
+    '未完成量已并入后续日期重排': 'The shortfall has been rolled into the following days',
+    '历史未完成': 'Past days incomplete',
+    '合计欠产': 'Total shortfall',
+    '历史未完成明细': 'Past shortfall details',
+    '标红格 = 当天已结束但报工未达原计划(汇总含未显示为列的日期)':
+      'Red cells = the day has ended but reported qty is below the plan (the total also counts dates not shown as columns)',
+    '格内:原计划/报工;原计划 = 工序计划量按 开工日→交期 均摊(不扣报工、历史也保留);标红 = 当天已结束未达成':
+      'Cell: planned/reported; planned = operation planned qty evenly spread over start → due date (not reduced by reports; past days kept); red = the day has ended below plan',
     '计划合计': 'Planned total',
     // 工序路线排线·计划开工/实际开工(2026-10-29)
     '计划开工日期': 'Planned Start',

@@ -4,7 +4,11 @@
      无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。
      2026-11-12(用户报障「左侧边栏显示的数量和…本线排产数量…当前工序报工数量没有任何关联」):
      左侧每线主数字从**成品口径** 未交量(排产−入库)改为**本线排产数量**,并加「已报 · 未完工」次行;
-     顶部统计三项同步改工序口径 —— 三处与右侧「未完工」页签明细同源(详见左栏注释)。 -->
+     顶部统计三项同步改工序口径 —— 三处与右侧「未完工」页签明细同源(详见左栏注释)。
+     2026-11-13(用户口径「增加一个原计划量/报工数,当天结束后未完成会进行提示」):
+     日期格从「一个数」改成**原计划/报工**两数(例 715/15);日期 < 今天且报工 < 原计划 ⇒ 该格标红,
+     页面顶部再给一行红色汇总(处数 + 合计欠产,悬停看明细),不弹窗。未完成的量由后端
+     `DayPlanSpread.mergeReported` 向今天及以后重排,前端只负责显示。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -25,6 +29,17 @@
       <span class="wb-over" :class="{ hot: overLineCount > 0 }">
         {{ tt('今日超载') }} {{ overLineCount }} {{ tt('条线') }}<template v-if="overQty > 0">，{{ tt('合计超') }} {{ num(overQty) }}</template>
       </span>
+    </div>
+
+    <!-- 历史欠产汇总条(2026-11-13 用户口径「当天结束后未完成会进行提示」)───────────────
+         口径 = 当前选线「未完工/已完工/全部」页签明细里,日期 < 今天 且 报工 < 原计划 的格子合计;
+         不弹窗:一条红色汇总 + 悬停看逐条明细(:title,最多 15 行)。后端没返回「原计划」时
+         shortInfo.count = 0 ⇒ 整条不渲染(老后端/老数据自然降级,不出假提示)。 -->
+    <div v-if="shortInfo.count" class="wb-short-bar" :title="shortTitle">
+      <span class="wb-short-main">
+        {{ tt('历史未完成') }} {{ shortInfo.count }} {{ tt('处') }} · {{ tt('合计欠产') }} {{ num(shortInfo.qty) }}
+      </span>
+      <span class="wb-short-hint">{{ tt('标红格 = 当天已结束但报工未达原计划(汇总含未显示为列的日期)') }}</span>
     </div>
 
     <div class="wb-body">
@@ -280,16 +295,18 @@
             <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
             <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
             <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
-            <!-- 日期列(2026-10-31):列头多一行「该线当天 已排/日产能」——产能只显示、不拦截录入。
-                 超产能只把列头标红(不弹窗、不改数、不禁填);未配产能(档案日产能 0/空)写"未配",不判超载。
+            <!-- 日期列(2026-10-31;2026-11-13 改「原计划/报工」两数):列头多一行「该线当天 已排/日产能」
+                 ——产能只显示、不拦截录入。超产能只把列头标红(不弹窗、不改数、不禁填);
+                 未配产能(档案日产能 0/空)写"未配",不判超载。
                  列分段:今天列标「今」+ 浅蓝底;过去列灰底 = 历史对照段;
-                 格内两个数分清:上方计划(**自动算,只读**)/ 下方报工(绿色 + 「实」标),两行居中对齐。 -->
+                 格内 = **原计划/报工**(例 715/15;没报工只显示计划;当天已结束且原计划>0没报工 =
+                 `原计划/0`);日期 < 今天且报工 < 原计划 ⇒ 该格标红(short),顶部另有红色汇总条。 -->
             <el-table-column v-for="d in planDates" :key="d" width="88" align="center"
                              :label-class-name="'dp-col-' + dayColState(d, planToday)"
                              :class-name="'dp-col-' + dayColState(d, planToday)">
               <template #header>
                 <div class="dp-head" :class="{ over: isOverDay(d), past: dayColState(d, planToday) === 'past' }"
-                     :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊;双击数量弹出调整')">
+                     :title="dayHeadTitle">
                   <div class="dp-date">{{ d.slice(5) }}<span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span></div>
                   <div v-if="lineCap > 0" class="dp-cap" :title="tt('该线当天已排/日产能')">
                     {{ qtyText(dayTotal[d]) }}/{{ qtyText(lineCap) }}
@@ -301,13 +318,14 @@
                 <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
                                  :controls="false" :min="0" class="dp-input" autofocus
                                  @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
-                <!-- 区间外(开工日~计划完工日之外)且当天无计划/实报:画「/」——这一天不归本行排
+                <!-- 区间外(开工日~计划完工日之外)且当天无计划/原计划/实报:画「/」——这一天不归本行排
                      (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
                 <span v-else-if="isOutCell(row, d)" class="dp-out"
                       :title="tt('不在本行排产区间(开工日~计划完工日)内')">/</span>
-                <span v-else class="dp-plan" :class="{ manual: isManual(row, d), actual: dayCell(row, d).isActual }"
+                <span v-else class="dp-plan"
+                      :class="{ manual: isManual(row, d), actual: cell(row, d).hasActual, short: cell(row, d).short > 0 }"
                       :title="dayTitle(row, d)" @click="startQtyEdit(row, d)">
-                  {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
+                  {{ cell(row, d).text }}<span v-if="isManual(row, d)" class="dp-hand"
                     :class="{ over: Number(row.超分配 || 0) > 0 }" :title="overTitle(row)">{{ tt('手') }}</span>
                 </span>
               </template>
@@ -419,7 +437,8 @@ import { Setting } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
-import { qtyText, isOverCapacity, dayColState, isToday, dayCellQty, isOutOfPlanRange } from '@/business/dayPlan'
+import { qtyText, isOverCapacity, dayColState, isToday, isPast, isOutOfPlanRange,
+  dayCellView, historyShortfalls, shortfallTotals } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -593,6 +612,29 @@ const planDates = ref([])
 const planToday = ref('')
 /** 「日排产」权(改当天数量/日期):两页任一授予即可;没权限时格内不给编辑 */
 const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
+// ── 历史欠产汇总(2026-11-13 用户口径「当天结束后未完成会进行提示」)──────────────────
+//   判定全部在 business/dayPlan.js(historyShortfalls 只数 日期 < 今天 的格子,与格内 short 同口径);
+//   这里只做「当前页签明细行」的合计与 tooltip 文案。
+//   ⚠ 后端没返回 row.原计划(老 jar/该日不在原计划区间)⇒ items 为空 ⇒ 汇总条 v-if 自然不渲染。
+const shortItems = computed(() => historyShortfalls(schedRows.value, planToday.value))
+const shortInfo = computed(() => shortfallTotals(shortItems.value))
+/** 顶部汇总条悬停明细:每行「工单号#行号 · 日期 · 原计划 X / 报工数 Y · 欠产 Z」,最多 15 行 */
+const shortTitle = computed(() => {
+  const MAX = 15
+  const lines = [tt('历史未完成明细')]
+  for (const x of shortItems.value.slice(0, MAX)) {
+    const no = x.row['加工单号'] ?? x.row['工单号'] ?? ''
+    const ln = x.row['工单行号']
+    lines.push(`${no}${ln != null && ln !== '' ? '#' + ln : ''} · ${x.date} · `
+      + `${tt('原计划')} ${qtyText(x.plan)} / ${tt('报工数')} ${qtyText(x.actual) || '0'} · ${tt('欠产')} ${qtyText(x.short)}`)
+  }
+  const rest = shortItems.value.length - MAX
+  if (rest > 0) lines.push(`… ${tt('共')} ${shortItems.value.length} ${tt('处')}`)
+  return lines.join('\n')
+})
+/** 日期列头 tooltip(2026-11-13 新口径:`原计划/报工` 两数 + 标红含义) */
+const dayHeadTitle = computed(() =>
+  tt('格内:原计划/报工;原计划 = 工序计划量按 开工日→交期 均摊(不扣报工、历史也保留);标红 = 当天已结束未达成'))
 // ── 产能可见(2026-10-31,用户口径「产能只显示、不拦截;不影响实际排产量」)──────────────
 //   lineCap  = 产线档案 bs_prod_line.日产能(0/空 = 未配产能 ⇒ 不判超载);
 //   dayTotal = 该线每天已排合计(后端按 plang.scx 当前归属算,不分页签;含人工指定);
@@ -617,25 +659,55 @@ function overTitle(row) {
   return over > 0 ? `${tt('人工指定')} · ${tt('超分配')} ${qtyText(over)}` : tt('人工指定')
 }
 
-/** 格内显示一个数:计划 ∪ 实际融合(未达成显示实际;没报工显示计划) —— 见 business/dayPlan.js */
-function dayCell(row, d) {
-  return dayCellQty((row.日计划 || {})[d], (row.日报工 || {})[d])
+/**
+ * 日期格显示模型(2026-11-13 用户口径):`原计划/报工` 两数(例 715/15),判定口径全在
+ * business/dayPlan.js 的 dayCellView(两页共用,单测覆盖):
+ *   有报工 ⇒ 原计划/报工;没报工 ⇒ 计划;已结束且原计划>0没报工 ⇒ 原计划/0(short=整格欠产);
+ *   short 只在 日期 < 今天 时 > 0(今天还没结束,不判欠产)。
+ * ⚠ 后端没返回「原计划」(老 jar)⇒ baseline 为空 ⇒ dayCellView 自动退回单数显示,不显示假数据。
+ * ⚠ planToday 在 script setup 里是 ref:script 内取 .value(模板自动解包,别在模板里传 planToday)。
+ */
+function cell(row, d) {
+  return dayCellView((row.日计划 || {})[d], (row.日报工 || {})[d], (row.原计划 || {})[d],
+    isPast(d, planToday.value))
 }
 /** 本行排产区间(开工日~计划完工日)之外的空白格:画「/」(2026-11-01 用户口径,
- *  例:开工日改成 11-02 后,11-01 那格要画 /)。有计划/实报/人工指定的格子照旧显示数字。 */
+ *  例:开工日改成 11-02 后,11-01 那格要画 /)。有计划/原计划/实报/人工指定的格子照旧显示数字
+ *  (2026-11-13:加「原计划」—— 历史日期计划已不在 日计划 里,但原计划基线还在,不能画杠)。 */
 function isOutCell(row, d) {
   const p = Number((row.日计划 || {})[d] || 0)
   const a = Number((row.日报工 || {})[d] || 0)
-  if (p > 0 || a > 0) return false
+  const b = Number((row.原计划 || {})[d] || 0)
+  if (p > 0 || a > 0 || b > 0) return false
   return isOutOfPlanRange(d, row.计划开工日期 || '', row.计划完工日期 || '')
 }
-/** 格 tooltip:计划 / 实报都摆出来,但不占版面 */
+/** 格 tooltip(2026-11-13 新口径):欠产时把「当天未完成 · 原计划/报工/欠产 · 已并入后续重排」写全;
+ *  有报工/有计划时给 原计划 + 报工 + 编辑提示;空格只留编辑提示。 */
 function dayTitle(row, d) {
-  const p = Number((row.日计划 || {})[d] || 0)
-  const a = Number((row.日报工 || {})[d] || 0)
-  let t = `${tt('计划')} ${qtyText(p)}`
-  if (a > 0) t += ` · ${tt('实报')} ${qtyText(a)}` + (a < p ? ` (${tt('差')} ${qtyText(p - a)})` : '')
-  return t + ' · ' + tt('双击直接填当天数量;清空恢复自动')
+  const v = cell(row, d)
+  if (v.short > 0) {
+    return `${tt('当天未完成')} · ${tt('原计划')} ${v.planText} · ${tt('报工数')} ${v.actualText || '0'}`
+      + ` · ${tt('欠产')} ${qtyText(v.short)} · ${tt('未完成量已并入后续日期重排')}`
+  }
+  if (v.hasActual) {
+    // 基线缺失(老后端/该日不在原计划区间)⇒ dayCellView 只返回报工数(planText 为空)⇒ 文案也只写报工,
+    // 不能拿"今天起还要做多少"冒充原计划(2026-11-13 口径:降级只显示单数,不造对照)。
+    const hint = tt('双击直接填当天数量;清空恢复自动')
+    return (v.planText ? `${tt('原计划')} ${v.planText} · ` : '') + `${tt('报工数')} ${v.actualText} · ${hint}`
+  }
+  if (v.text) return `${tt('计划')} ${v.text} · ${tt('双击直接填当天数量;清空恢复自动')}`
+  return tt('双击直接填当天数量;清空恢复自动')
+}
+
+/**
+ * 双击改数量的「计划值」(2026-11-13,两处共用:编辑框预填 + commitQty 的 before 比较)。
+ * 口径 = 人工指定 ▸ 日计划 ▸ 原计划 ▸ 0。
+ * ⚠ 不能用格内显示值:格内是 `原计划/报工` 两数,拿显示值当 before 会把「没改」误判成「改成了报工数」,
+ *   一失焦就把人工指定写成报工数(例:格内 715/15,预填 15 ⇒ 人工指定被写成 15)。
+ */
+function planEditValue(row, d) {
+  const v = (row.人工指定 || {})[d] ?? (row.日计划 || {})[d] ?? (row.原计划 || {})[d] ?? 0
+  return Number(v || 0)
 }
 
 /** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
@@ -645,13 +717,13 @@ function qtyKey(row, d) { return `${row.行id}|${d}` }
 function startQtyEdit(row, d) {
   if (!canDayPlan.value) return
   qtyEdit.value = qtyKey(row, d)
-  qtyDraft.value = Number(dayCell(row, d).qty || 0) || undefined
+  qtyDraft.value = planEditValue(row, d) || undefined
 }
 function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
 async function commitQty(row, d) {
   if (qtyEdit.value !== qtyKey(row, d)) return
   const v = Number(qtyDraft.value || 0)
-  const before = Number(dayCell(row, d).qty || 0)
+  const before = planEditValue(row, d)
   qtyEdit.value = ''
   if (v === before) return
   try {
@@ -681,6 +753,9 @@ async function loadDayPlan() {
       row.工序日 = p ? p['工序'] : (row.当前工序 || '')
       row.日计划 = { ...((p && p['日计划']) || {}) }
       row.日报工 = { ...((p && p['日报工']) || {}) }
+      // 原计划基线(2026-11-13):工序计划量按「开工日→交期」全量均摊,不扣报工、历史日期也保留 ——
+      //   日期格的 `原计划/报工` 与顶部欠产汇总都用它。老后端没这个字段 ⇒ 空对象 ⇒ 自动降级单数显示。
+      row.原计划 = { ...((p && p['原计划']) || {}) }
       row.人工指定 = { ...((p && p['人工指定']) || {}) }
       row.超分配 = p ? Number(p['超分配'] || 0) : 0
       row.工序计划量 = p ? Number(p['工序计划量'] || 0) : 0
@@ -923,6 +998,14 @@ onMounted(() => {
 .wb-title { font-weight: 600; }
 .wb-top .wb-stats { margin-left: auto; font-weight: 600; }
 .wb-p { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #606266; }
+/* 历史欠产汇总条(2026-11-13 用户口径「当天结束后未完成会进行提示」):浅红底/红边/红字,
+   与页面现有块(4px 圆角、8px 行距)同风格;只占一行、放不下时整块换行,不横向撑破版面。
+   hint 灰字说明「标红格」的含义;明细在 :title 里(悬停看,不弹窗)。 */
+.wb-short-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;
+  padding: 6px 12px; background: #fef0f0; border: 1px solid #fbc4c4; border-radius: 4px;
+  color: #f56c6c; font-size: 12px; line-height: 1.5; cursor: help; }
+.wb-short-main { font-weight: 700; }
+.wb-short-hint { color: #909399; }
 .wb-body { display: flex; gap: 8px; flex: 1; min-height: 0; }
 .wb-left { width: 210px; flex: none; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; overflow: auto; }
 .wb-left-head { padding: 8px 10px; font-weight: 600; font-size: 13px; color: #116a5b; border-bottom: 1px solid #e4e7ed; }
@@ -970,7 +1053,8 @@ onMounted(() => {
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
-/* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */
+/* 2026-10-31 融合显示:当天有报工 ⇒ 绿色(2026-11-13 起格内是 `原计划/报工` 两数,整格标绿);
+   没报工显示计划(深色) */
 .dp-plan.actual { color: #529b2e; }
 /* 2026-11-01:本行排产区间(开工日~计划完工日)之外的空白格画「/」——
    一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
@@ -978,6 +1062,9 @@ onMounted(() => {
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
 .dp-plan.manual { color: #b88230; }
+/* 2026-11-13 历史欠产:日期 < 今天 且 报工 < 原计划 ⇒ 整格红色加粗。
+   放在 .actual / .manual **之后**(同优先级靠后生效),保证「既有报工又欠产」的格子是红色而不是绿色/橙色。 */
+.dp-plan.short { color: #f56c6c; font-weight: 700; }
 .dp-hand { margin-left: 2px; padding: 0 2px; font-size: 10px; font-weight: 700; color: #fff;
   background: #e6a23c; border-radius: 3px; vertical-align: top; }
 .dp-hand.over { background: #f56c6c; }

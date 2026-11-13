@@ -37,7 +37,10 @@ import java.util.TreeSet;
  *   <li>工序:生产工单页 = 该行 {@code plang.[当前工序]}(空则回落台账当前道);工单排产页 = 所选产线车间的工序;</li>
  *   <li>报工锚 {@code scjl.gd_id → plang_pc.plang_id},老数据 {@code gd_id=0} 按(工单号+批次号)
  *       唯一命中兜底;只认 {@code wgzt='Y'}(草稿/待审核不算完成);</li>
- *   <li>两账不合一:计划是派生值(算出来的),完成量永远是报工事实,互不覆盖。</li>
+ *   <li>两账不合一:计划是派生值(算出来的),完成量永远是报工事实,互不覆盖;</li>
+ *   <li><b>三份账</b>(2026-11-13):「原计划」= 工序计划量按「开工日→交期」全量均摊的基线(含历史、
+ *       不扣报工);「日计划」= 扣掉已审报工后从今天起重摊的**剩余**;「日报工」= 事实。
+ *       原计划与日计划是两本账,只用于「计划/实际」对照,不可相加。</li>
  * </ul>
  */
 @Service
@@ -59,7 +62,12 @@ public class WorkOrderDayPlanService {
     }
 
     /**
-     * 读:窗口内每行的日计划 / 日报工。
+     * 读:窗口内每行的原计划 / 日计划 / 日报工。
+     *
+     * <p><b>每行字段</b>:行id、工序、交期、交期紧迫度、需求数量、排产数量、工序计划量、7天/15天/大于15天需交付、
+     * 7天/15天/大于15天已排、日计划、日报工、计划合计、完工合计、已报工、剩余量、人工指定、超分配、
+     * 计划开工日期、计划完工日期;2026-11-13 增 <b>原计划</b>(日期 → 原计划量,全量均摊基线,含历史、
+     * 不扣报工 —— 与「日计划」两本账,见 row 构造处注释)。
      *
      * @param ids        生产工单页:当前表格里的行 id(空 = 走产线模式)
      * @param line       工单排产页:选中产线
@@ -178,6 +186,21 @@ public class WorkOrderDayPlanService {
                 if (m.get(d) != null) manualOut.put(d.toString(), m.get(d));
             }
             row.put("人工指定", manualOut);
+            // 「原计划」基线(2026-11-13 用户口径,附截图)：「报工后显示在当前位置 原计划量/实际报工量」
+            //   「当天结束后未完成会进行提示」。此前每格只出一个数(有报工就显示报工、否则显示计划),
+            //   原计划只藏在 tooltip 里 ⇒ 现场看不出"原本排多少、实际做了多少",过去日期有没有完成无从判断。
+            // 口径(与上面的「日计划」是**两本账**,不可合并、也不可相加):
+            //   · 原计划 = 工序计划量按「开工日→交期」**全量均摊**的基线(人工指定的格子用人工值),
+            //     **不扣已审报工**(报工在「日报工」里另算)、**历史日期也保留**(那天原本排多少是已经发生的事实);
+            //   · 日计划 = {@link DayPlanSpread#mergeReported}:扣掉已报工、从今天起重摊、历史不输出 —— 回答"还剩多少活";
+            //   ⇒ 前端把「原计划」与「日报工」同格对照:过去日期 报工 &lt; 原计划 = 当天未完成(标红 + 页面顶部汇总提示)。
+            //   merge 返回的 LinkedHashMap 已按日期升序,直接转字符串 key(不做 slice:历史列可能不在「日期」窗口里)。
+            Map<String, Double> originOut = new LinkedHashMap<>();
+            for (Map.Entry<LocalDate, Double> od : DayPlanSpread.merge(opCaps.getOrDefault(key, 0d),
+                    r.start(), r.due(), today, m).entrySet()) {
+                originOut.put(od.getKey().toString(), od.getValue());
+            }
+            row.put("原计划", originOut);
             row.put("超分配", DayPlanSpread.overAllocated(opCaps.getOrDefault(key, 0d), m));
             // 排产区间(2026-11-01):前端用它给「区间外的日期格」画斜杠 ——
             //   区间 = 开工日 → 计划完工日(与 DayPlanSpread 摊分的区间同一份来源);
