@@ -5041,6 +5041,9 @@ public class ButtonService {
         try {
             rows = jdbc.queryForList(
                     "SELECT id, 物料编码, 物料名称, ISNULL(规格型号, N'') AS 规格型号, 计量单位, 单位,"
+                            // 行级采购单号(2026-11-13 合单/全链):特采单是"一物料一单、只有表头",
+                            // 订单号要落在表头,取值必须取**退料行**的这一行(合单后表头可能是多单串)
+                            + " 采购单号, 采购订单行号,"
                             + " 送检数量, " + qtyLabel + " AS 退货数量, 现存量"
                             + " FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                             + " AND ISNULL(特采, 0) = 1 ORDER BY id", no);
@@ -5077,8 +5080,12 @@ public class ButtonService {
             head.put("单据日期", LocalDate.now().toString());
             Object sup = h.get("供应商") != null ? h.get("供应商") : ih.get("供应商");
             if (sup != null) head.put("供应商", sup);
-            Object poNo = h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()
-                    ? h.get("采购订单号") : ih.get("采购订单号");
+            // 采购单号(2026-11-13):**行级优先** —— 合单后退料单头可能是"订单1、订单2"的人读串,
+            // 而特采单是"一物料一单",它的采购单号必须是这一行自己的订单号(下游入库单要拿它挂源单)。
+            Object poNo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                    ? r.get("采购单号")
+                    : (h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()
+                    ? h.get("采购订单号") : ih.get("采购订单号"));
             if (poNo != null && !String.valueOf(poNo).isBlank()) head.put("采购单号", poNo);
             head.put("产品名称", r.get("物料名称"));
             // 现存量(2026-11-12 用户口径):特采单是**一物料一单**、只有表头,故落在表头;
@@ -5215,12 +5222,12 @@ public class ButtonService {
         List<Map<String, Object>> drows;
         if (rowId != null) {
             drows = jdbc.queryForList("SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
-                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
+                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号,"
                     + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId);
         } else {
             // 链路断了的兜底:按「检验单号 + 物料名称」取检验行(特采单头的产品名称就是从检验行物料名称带下来的)
             drows = jdbc.queryForList("SELECT TOP 1 id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
-                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
+                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号,"
                     + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                     + " AND (物料名称 = ? OR 物料编码 IS NULL) ORDER BY id", inspNo, str(tc.get("产品名称")));
         }
@@ -5274,6 +5281,11 @@ public class ButtonService {
         if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
         if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
         if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+        // 行级订单号(2026-11-13 全链口径):入库行落「源单编号」(= 金蝶 src_bill_no)。
+        // 值取**检验行**的采购单号,退到特采单头(它是本物料那一个订单号)—— 合单后靠它逐行挂对源单。
+        Object poLine = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                ? r.get("采购单号") : tc.get("采购单号");
+        if (poLine != null && !String.valueOf(poLine).isBlank()) line.put("源单编号", poLine);
         // 现存量(2026-11-12 用户口径):特采链也要留痕 —— 优先取检验行(真源),检验行没有则回落特采单头
         Object stockQty = r.get("现存量") != null ? r.get("现存量") : tc.get("现存量");
         if (stockQty != null) line.put("现存量", stockQty);
@@ -5293,7 +5305,11 @@ public class ButtonService {
         head.put("供应商编码", ih.get("供应商代码"));
         String poNo = tc.get("采购单号") != null && !String.valueOf(tc.get("采购单号")).isBlank()
                 ? String.valueOf(tc.get("采购单号")) : String.valueOf(ih.get("采购订单号") == null ? "" : ih.get("采购订单号"));
-        if (!poNo.isBlank()) head.put("采购订单号", poNo);
+        // 表头采购订单号:优先**行级**(本行那个订单号);检验单头在合单后可能是"订单1、订单2"的人读串,
+        // 拿它当单值会让下游按号查询/挂源单落空。逐行订单号在「源单编号」上,这里只放单值便于查看。
+        String headPo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                ? String.valueOf(r.get("采购单号")) : poNo;
+        if (!headPo.isBlank()) head.put("采购订单号", headPo);
         head.put("批次键", ih.get("批次键"));
         // 批次号:继承来源检验单/特采链的号(2026-10-04 口径);为空时由 saveDoc→BatchService.syncBatchNo
         // 按「供应商编码 + 当天」兜底取号,保证入库单绝不会没有批次号。

@@ -605,6 +605,12 @@ public class BatchService {
      * 退货回冲:采购订单行号 → 退货数量合计。
      * 只认**已审核且未作废**的暂收退回单(QC_RETURN):草稿退回还没定论,不应提前把额度放回去。
      * 兜底:退货行没写「采购订单行号」时按订单行号为空分组(不参与任何行,避免错回冲)。
+     *
+     * <p>⚠ 2026-11-13(合单/全链行级订单号):匹配口径从"退回单**表头** 采购订单号 = 订单号"
+     * 改为"退回行**行级** 采购单号 = 订单号",表头只作兜底 ——
+     * 合单之后一张退回单可能跨多张采购订单,表头是"订单1、订单2"的人读串,
+     * 拿它等值匹配会**一条都匹配不上** ⇒ 退货回冲额度放不回去(可送上限虚低)。
+     * 老单据没有行级采购单号(该列 2026-11-13 前恒空),故仍要退回表头判断。
      */
     public Map<String, Double> returnedByOrderLine(String srcNo) {
         Map<String, Double> out = new LinkedHashMap<>();
@@ -612,14 +618,16 @@ public class BatchService {
             jdbc.query("SELECT LTRIM(RTRIM(CAST(d.采购订单行号 AS nvarchar(50)))) ln,"
                             + " SUM(COALESCE(TRY_CAST(d.退货数量 AS decimal(18,4)),0))"
                             + " FROM qc_return_detail d JOIN qc_return r ON r.单据编号 = d.单据编号"
-                            + " WHERE r.采购订单号 = ? AND ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(d.asp_cancel,'N')<>'Y'"
+                            + " WHERE (LTRIM(RTRIM(ISNULL(d.采购单号, N''))) = ?"
+                            + "        OR (LTRIM(RTRIM(ISNULL(d.采购单号, N''))) = N'' AND r.采购订单号 = ?))"
+                            + "   AND ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(d.asp_cancel,'N')<>'Y'"
                             + "   AND EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='QC_RETURN'"
                             + "               AND s.doc_no = r.单据编号 AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y')"
                             + " GROUP BY LTRIM(RTRIM(CAST(d.采购订单行号 AS nvarchar(50))))",
                     rs -> {
                         String k = rs.getString(1);
                         if (k != null && !k.isBlank()) out.put(k, rs.getDouble(2));
-                    }, srcNo);
+                    }, srcNo, srcNo);
         } catch (Exception ignore) { /* 表未建 */ }
         return out;
     }

@@ -442,11 +442,15 @@ public class KingdeePushService {
         //   按无来源单的普通入库单推送,并在返回消息里明确提示,避免"账套里没有该订单 → 转ERP 直接失败"。
         String poNo = str(head.get("采购订单号"));
         String linkWarning = "";
+        // ★ 合单生单(2026-11-13):表头「采购订单号」这时可能是"订单1、订单2"的人读串 ——
+        //   它不是任何一张真实订单号,拿去做等值解析必然失败。这类单**逐行**用行级「源单编号」解析
+        //   (见下面 entities 循环),这里跳过表头预解析,也不给"未找到订单"的误导提示。
+        boolean multiOrderHead = poNo.contains("、") || poNo.contains(",");
         PoRefs poRefs = null;
         if (isPur && poNo.isEmpty()) {
             log.warn("采购入库单[{}]头上无采购订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
                     + "金蝶侧显示为无来源单的普通入库单", docNo);
-        } else if (isPur) {
+        } else if (isPur && !multiOrderHead) {
             poRefs = resolvePoRefs(poNo);
             if (poRefs == null) {
                 // 兜底(2026-09-23):订单直推过金蝶的话,MES 已把金蝶侧真实号回写在 bd_pu_order.ERP单号
@@ -462,8 +466,9 @@ public class KingdeePushService {
                         + "或先在金蝶补建该订单后重审再转)";
                 log.warn("采购入库单[{}] 未挂来源单:金蝶账套内无采购订单[{}]", docNo, poNo);
             }
+        } else if (isPur) {
+            log.info("采购入库单[{}] 表头采购订单号为多单串[{}]:按**行级源单编号**逐行挂金蝶源单", docNo, poNo);
         }
-        boolean linkSrc = isPur && poRefs != null;
 
         // ── 销售出库单挂来源销售订单(2026-10-15 用户口径:
         //   「转erp时要把这个销售订单号与销售订单行号转成源订单号和源订单行号(在金蝶上)」)──
@@ -630,7 +635,7 @@ public class KingdeePushService {
                 //   表头「采购订单号」这时是"订单1、订单2"这种人读串 —— 不能拿它当 src_bill_no。
                 String linePo = str(line.get("源单编号"));
                 if (linePo.isEmpty()) linePo = str(line.get("采购单号"));   // 兼容口径
-                boolean multiOrderHead = poNo.contains("、") || poNo.contains(",");
+                // 表头是多单串(合单)时,行上没有源单编号 ⇒ 该行不挂源单(不能拿串去当单号)
                 // 计数口径:同一张订单的行 → 全部挂该订单;行上没有号时才用表头(且表头不是多单串)
                 String srcPo = !linePo.isEmpty() ? linePo : (multiOrderHead ? "" : poNo);
                 PoLineRef hit = srcPo.isEmpty() ? null : poLineRefCache.computeIfAbsent(srcPo, this::resolveLinePoRef);

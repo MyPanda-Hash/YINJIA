@@ -735,6 +735,8 @@ public class PushGenerateHandler implements PanelActionHandler {
         targetHead.put(dateLabel, java.time.LocalDate.now().toString());
 
         boolean rowHasBatch = tgtDef.fieldsAt("detail").stream().anyMatch(f -> "批次号".equals(f.label()));
+        // 行级「采购单号」(2026-11-13 用户口径「明细行都要带采购订单号,不能只有表头有」)
+        boolean rowHasPoNo = detailHas(tgtDef, "采购单号");
         // ★ 合并成一行明细(2026-10-04 用户口径「与打印的明细组合生单是需要合并的」):
         //   同一个采购订单行上,"已打印那一行(隔离行)"与"原行未打印量"如果被一起勾上,
         //   生成的单据里**只出现一行、数量相加**(400 = 350 + 50),不再出现同一物料两行。
@@ -762,6 +764,10 @@ public class PushGenerateHandler implements PanelActionHandler {
             }
             row.put(tgtQtyLabel, round2(qty));      // 合并后的本次送料数量(打印量 + 未打印量)
             if (rowHasBatch) row.put("批次号", batchNo);   // 行随单头(同一批次号,头行一致)
+            // 行级「采购单号」(2026-11-13 用户口径「明细行都要带采购订单号,不能只有表头有」):
+            // 头一跳(来源 = 采购订单)时把**订单号**写进每一行;下游各站由 detailMap 的
+            // 采购单号→采购单号 同义词原样继承(这里不覆盖,否则会把上游订单号写成暂收单号)。
+            if (rowHasPoNo && isOrderSource(sourcePanel)) row.put("采购单号", sourceNo);
             applySourceFlags(sourcePanel, targetPanel, item, row);
             // 生单对话框按行选的 仓库/仓位:合并组里取第一个有值的成员(同一订单行 = 同一物料同一仓位)
             Map<String, Object> whBin = null;
@@ -1183,6 +1189,17 @@ public class PushGenerateHandler implements PanelActionHandler {
     /** 目标面板明细里有没有这个标签(合单生单写行级「采购单号」前先判) */
     private static boolean detailHas(PanelRegistry.PanelDef def, String label) {
         return def != null && def.fieldsAt("detail").stream().anyMatch(f -> label.equals(f.label()));
+    }
+
+    /**
+     * 来源面板是不是**采购订单**(含供应商门户的采购订单副本)。
+     *
+     * <p>用来判断"本跳要不要把采购单号写进行":链路头一跳(采购订单)必须写;
+     * 下游(暂收→检验→退回/入库)一律由映射继承,绝不拿 sourceNo 覆盖
+     * —— 否则会把「采购单号」写成暂收单号,整条溯源就断了。
+     */
+    private static boolean isOrderSource(String sourcePanel) {
+        return "PU_ORDER".equals(sourcePanel) || "SUPPLIER_PU_ORDER".equals(sourcePanel);
     }
 
     // ==================== 合单生单(2026-11-13 用户口径) ====================
