@@ -1,4 +1,4 @@
-# HSDZ_MES_TEST
+# HSDZ_MES
 
 == yj_panel ==
   panel_code=PU_ORDER | mode=doc | head_table=bd_pu_order | line_table=bl_pu_order | 
@@ -16,7 +16,7 @@
   p=MANU_ORDER | place=detail | seq=350 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
   p=MANU_ORDER | place=header | seq=450 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
   p=MATERIAL_OUT | place=detail | seq=60 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
-  p=MATERIAL_OUT | place=query,header,detail | seq=10 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT | place=query,header,detail | seq=40 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=1 | visible=0 | 
   p=MATERIAL_OUT_DETAIL | place=detail | seq=240 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
   p=MATERIAL_OUT_DETAIL | place=query,detail | seq=60 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
   p=MATERIAL_OUT_STATS | place=detail | seq=90 | col_name=单价(主单位) | label=单价(主单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
@@ -55,7 +55,7 @@
   p=PU_ORDER_DETAIL | place=detail | seq=220 | col_name=含税单价 | label=含税单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
   p=PU_ORDER_DETAIL | place=detail | seq=270 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
   p=PU_ORDER_STATS | place=detail | seq=120 | col_name=平均单价 | label=平均单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
-  p=PURCHASE_IN | place=detail | seq=80 | col_name=单价 | label=单价 | data_type=小数 | required=1 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN | place=detail | seq=80 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
   p=PURCHASE_IN | place=detail | seq=110 | col_name=含税单价 | label=含税单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
   p=PURCHASE_IN | place=detail | seq=190 | col_name=仓库 | label=仓库 | data_type=参照 | required=1 | hidden=0 | visible=1 | 
   p=PURCHASE_IN_DETAIL | place=detail | seq=220 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 

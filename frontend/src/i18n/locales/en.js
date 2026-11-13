@@ -45,6 +45,7 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    '（界面上已隐藏）': ' (hidden in UI)',
     // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
     '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Tick = visible for this role; the number sets the order (only ticked fields have a number, 1 first); column names still come from the system setting.',
     '从系统整体复制': 'Copy from system',

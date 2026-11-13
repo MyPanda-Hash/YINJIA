@@ -2297,7 +2297,16 @@ public class ButtonService {
             Object v = row.get(f.label());
             Object normalized = v == null ? null : normalizeByType(f, v);
             if (normalized != null) out.put(f.col(), normalized);
-            else if (keepClearedAsNull) out.put(f.col(), null);   // 清空:显式写 NULL
+            else if (keepClearedAsNull) {
+                // 🔴 用户红线(2026-11-13):「不显示的字段也要能传 ERP,不能因为隐藏字段就把之前的数据删减」。
+                //    界面上不显示的字段(hidden / !visible),前端可能以空串占位提交(新行物化、
+                //    局部回填都会这样);这时**绝不能**当成"用户清空了它"写 NULL ——
+                //    那些列一旦被清,转 ERP 读的就是空值(KingdeePushService 是 SELECT * + 物理列名,
+                //    显隐不影响它,但**数据库里没值**它也就没得推)。
+                //    所以:隐藏字段只接受"有值就写",一律不接受空串清空。
+                if (f.hidden() || !f.visible()) continue;
+                out.put(f.col(), null);   // 可见字段:清空 = 显式写 NULL
+            }
         }
         return out;
     }

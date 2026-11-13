@@ -1,6 +1,7 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '（界面上已隐藏）': ' (in der Oberfläche ausgeblendet)',
     // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
     '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Häkchen = für diese Rolle sichtbar; die Nummer bestimmt die Reihenfolge (nur angehakte Felder haben eine Nummer, 1 zuerst); Spaltennamen kommen weiterhin aus der Systemeinstellung.',
     '从系统整体复制': 'Aus Systemeinstellung kopieren',

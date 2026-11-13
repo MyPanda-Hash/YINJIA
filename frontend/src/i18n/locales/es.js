@@ -1,6 +1,7 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '（界面上已隐藏）': ' (oculto en la interfaz)',
     // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
     '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Marcado = visible para este rol; el número define el orden (solo los campos marcados tienen número, 1 primero); los nombres de columna siguen viniendo de la configuración del sistema.',
     '从系统整体复制': 'Copiar desde todo el sistema',

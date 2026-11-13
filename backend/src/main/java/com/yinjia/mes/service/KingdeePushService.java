@@ -300,6 +300,11 @@ public class KingdeePushService {
                     + "(如确需重推:先在金蝶删除该订单并弃审本单清标记后再转)");
         }
 
+        // 🔴 取数口径(2026-11-13 用户红线,别改成"按面板可见字段取"):
+        //    「传数据时,不显示的字段也要做到能传 ERP,不能因为隐藏字段就将之前转 ERP 的数据给删减」
+        //    ⇒ 这里**必须** `SELECT *`(物理列),键是列名而不是面板标签;推哪些列由下面逐键硬编码决定。
+        //    一旦改成走 `def.fieldsAt(...)` 并过滤 hidden/visible,前端/角色视图一藏字段,ERP 载荷就少一块,
+        //    而且首转之后的历史单会呈现"数据被删减"。字段显隐只属于**界面**层,与推送无关。
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
