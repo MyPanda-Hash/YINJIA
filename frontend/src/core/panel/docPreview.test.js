@@ -102,16 +102,30 @@ test('RD_PROD_INFO 必须登记摘要字段，卡片才对得齐', () => {
     '产品信息表摘要 = 产品编号 / 产品名称 / 客户名称（找单三线索，都是短字段）')
 })
 
-test('产品信息表的单据预览走"大块浮层横向多列"，其余面板仍走窄侧栏', () => {
+test('单据预览 = 展开左侧「单据选择」栏（表格），不是弹窗', () => {
+  // 2026-11-13 用户口径（逐字）：「单据预览做的不对，应该是侧边栏展开的形式而不是弹窗，
+  //   而且要显示效果要和表格单据的左侧边栏一样」。
+  // 演进史（别改回去）：窄侧栏卡片 → 弹窗浮层（方向错）→ **复用 DocSelectRail 左栏**。
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
-  // 只有产品信息表在白名单里
-  assert.ok(vue.includes("new Set(['RD_PROD_INFO', 'RD_APPROVAL'])"),
-    '浮层白名单 = 产品信息表 + 立项申请（2026-11-13 用户口径追加立项申请）')
+  // ① 按钮点的是"展开左栏"，不是弹 dialog
+  assert.match(vue, /canPreviewRail \? openPreviewRail\(\) : openDocPreview\(\)/,
+    '按钮要按面板分派：这两个面板展开左栏，其余走原逻辑')
+  // ② 展开函数必须是"确保展开"，不能取反 —— 左栏默认就是开的，取反等于把它关掉
+  const at = vue.indexOf('function openPreviewRail()')
+  assert.ok(at > 0, '缺 openPreviewRail')
+  assert.match(vue.slice(at, at + 300), /railCollapsed\.value = false/,
+    '必须确保展开；取反会把默认已展开的左栏关掉')
+  // ③ 不得再残留弹窗浮层
+  assert.ok(!vue.includes('pv-grid'), '不应再残留 pv-grid 浮层')
+  assert.ok(!vue.includes('previewGridVisible'), '不应再残留浮层状态')
+})
 
-  // 侧栏按钮按开关分派，不能一刀切改掉所有面板
-  assert.match(vue, /canPreviewGrid \? openPreviewGrid\(\) : openDocPreview\(\)/,
-    '按钮要按面板分派：产品信息表走浮层，其余走原逻辑')
-  // 浮层用 grid 横向多列（而不是窄侧栏的 column）
-  assert.match(vue, /grid-template-columns: repeat\(auto-fill, minmax\(240px, 1fr\)\)/,
-    '浮层卡片必须是横向多列栅格')
+test('这两个面板必须在 DOC_RAIL_PANELS 登记，左栏才有列可显示', () => {
+  const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
+  const at = vue.indexOf('const DOC_RAIL_PANELS = {')
+  assert.ok(at > 0, '缺 DOC_RAIL_PANELS')
+  const block = vue.slice(at, at + 14000)
+  assert.ok(block.includes('RD_PROD_INFO: ['), '产品信息表未登记左栏列')
+  assert.ok(block.includes('RD_APPROVAL: ['), '立项申请未登记左栏列')
+  assert.match(vue, /const middles = DOC_RAIL_PANELS\[panelCode\.value\]/, '左栏列应从 DOC_RAIL_PANELS 取')
 })
