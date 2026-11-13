@@ -7984,6 +7984,29 @@ async function snapSheetPage(el, domToPng) {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
     /**
+     * 🔴 截图宽度必须取**重排后的真实内容宽**，不能用写死的 `w0`（2026-11-13 用户报障）。
+     *
+     * 现象：导出的 PDF 右侧被切掉——立项申请「单据编号 YJ-QR-1…」只印出半截，
+     *   规格书、产品信息表同样缺右缘。
+     *
+     * 根因：为了让 PDF 纵向填满 A4，上面把克隆体压到 `A4_CONTENT_PX`(733px) 重排；
+     *   但纸面里的**固定 px 子元素**（`.as-docno` 的 250px、表格 `<colgroup>` 的列宽、
+     *   以及各段写死的列宽）**不会跟着缩**。实测立项申请克隆体：
+     *     容器 733px → 实际渲染 641px，而 `scrollWidth = 731px`
+     *     （`.as-topbar` / `.as-title-row` / `.as-body` 全是 w=639 / sw=731）
+     *   ⇒ 内容比容器宽，而 `domToPng({ width: w0 })` 按 `w0` 裁图 ⇒ **右侧凭空消失**。
+     *
+     * 改法：`w0` 之后再用克隆体的 `scrollWidth` 兜底（取大者）。压窄重排仍然保留
+     *   （纵向填满 A4 的效果不变），只是**不再把溢出部分裁掉**：宁可整张略宽、
+     *   由 PDF 侧按 `k = min(contentW/iw, contentH/ih)` 等比缩放，也不丢内容。
+     */
+    const realW = Math.max(
+      clone.scrollWidth || 0,
+      clone.offsetWidth || 0,
+      Math.ceil(clone.getBoundingClientRect().width) || 0,
+      w0,
+    )
+    /**
      * 行边界（2026-11-13）：`shotsForPages` 纵向切张时要**避开行中间**，
      * 否则一张单会被切成"上半行在第 1 页、下半行在第 2 页"，读起来是断的。
      * 这里把每个可切块（.as-row / .sg-table 的 tr / 明细表 tr）的**底边**记下来，
@@ -8004,12 +8027,12 @@ async function snapSheetPage(el, domToPng) {
     const dataUrl = await domToPng(clone, {
       scale: 2,
       backgroundColor: '#ffffff',
-      width: w0,
+      width: realW,
       height: h0,
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    return { dataUrl, w0, h0, rowBreaks }
+    return { dataUrl, w0: realW, h0, rowBreaks }
   } finally {
     if (holder) holder.remove()
   }
@@ -10603,24 +10626,38 @@ function warnDisabled(action) {
  * ⇒ 直接打开它，不再新建。反复进出点「新增」都落回同一张，库里不会堆一串空草稿。
  * 只看 RD_APPROVAL：其它文书面板（实施计划等）的「新增」行为逐字不变。
  */
-function reusableBlankApproval() {
-  if (String(panelCode.value || '') !== 'RD_APPROVAL') return null
-  return (list.value || []).find((it) => {
-    const saved = String(it['saved'] ?? '').toUpperCase()
-    const blank = !String(it['客户名'] ?? '').trim()
-      && !String(it['立项背景'] ?? '').trim()
-      && !String(it['文档编号'] ?? '').trim()
-    return saved === 'N' && blank
+/**
+ * 已有**没填过内容**的草稿单 → 直接复用它，不再新建（2026-11-06 口径）。
+ *
+ * 🔴 2026-11-13 修：原判据要求 `it['saved'] === 'N'`，但 `saved` 是**前端本地标记**，
+ *   列表接口从来不下发它（全文件搜不到任何 `.saved =` 赋值）⇒ 这个函数**恒为 null**，
+ *   复用从来没生效过。实测：进出面板 7 次就攒了 7 张空白的 LXA-2026-11-0006…0012。
+ *   现在改按**业务上是否空白**判断（不依赖任何前端临时标记）：
+ *     单据状态是草稿 && 关键内容字段全空 ⇒ 这就是一张可以接着填的空单。
+ *   ⚠ 只认「草稿」：已提交/已审核的单即使字段空着也不能被当成"可复用"（那是别人的在办单）。
+ */
+function reusableBlankDraft(code) {
+  const c = String(code || '')
+  const isBlank = (it, keys) => keys.every((k) => !String(it?.[k] ?? '').trim())
+  const find = (keys) => (list.value || []).find((it) => {
+    const st = String(it['单据状态'] ?? '').trim()
+    // 列表行的状态键可能是『单据状态』或被 tt 过的值；草稿就这两种写法
+    const isDraft = st === '草稿' || st === ''
+    return isDraft && isBlank(it, keys)
   }) || null
+  if (c === 'RD_APPROVAL') return find(['客户名', '立项背景', '文档编号'])
+  // 产品信息表：产品编号是唯一标识，它空着且没有客户/项目 ⇒ 就是一张空草稿
+  if (c === 'RD_PROD_INFO') return find(['产品编号', '产品名称', '客户名称'])
+  return null
 }
 async function directAdd() {
   try {
     // 立项申请表：已有空白草稿就复用，不再建第二张（2026-11-06 用户口径）
-    const reuse = reusableBlankApproval()
+    const reuse = reusableBlankDraft(panelCode.value)
     if (reuse) {
       const idx = list.value.findIndex((item) => item['编号'] === reuse['编号'])
       if (idx >= 0) curIdx.value = idx
-      ElMessage.info(tt('已有一张未填写的立项申请草稿，直接打开它'))
+      ElMessage.info(tt('已有一张未填写的草稿，直接打开它'))
       return
     }
     const formData = {}
@@ -10649,6 +10686,49 @@ async function directAdd() {
     ElMessage.success(`已新增 ${panelName.value}-${no}，请在列表页填写并保存`)
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '新增失败')
+  }
+}
+
+/**
+ * 「点进去就能开始填写新的草稿」（2026-11-13 用户口径）。
+ *
+ * <p>原话：「立项申请和产品信息表我现在点进去看到的是旧的单据，我想要点击进去就能开始填写
+ * 新的草稿了」。此前面板载入后 `cur = list[curIdx]`、`curIdx=0` ⇒ 永远显示**列表第一张旧单**。</p>
+ *
+ * <p>【为什么只对这两张】它们是**以"草稿"为主要录入形态**的单据（立项申请、产品信息表），
+ * 用户 90% 的进入动作是"新建一张"。订单/工单/检验单这类面板进去多半是"看已有单据"，
+ * 一刀切自动建草稿会把"新增"变成副作用、越攒越多空单。</p>
+ *
+ * <p>【复用而非总是新建】走 {@link directAdd}，它内部已有「已有空白草稿就复用」的口径
+ * （见 reusableBlankApproval），反复进出不会攒空单。产品信息表暂无该口径，
+ * 但它有「产品编号唯一」的天然约束，空单不会太多。</p>
+ *
+ * <p>【只在"进入"时触发】用 `autoDraftPanel` 记住上次为哪个面板建过 ——
+ * 同面板内翻页/查询/刷新不再触发（那些路径也会走 load()）。</p>
+ *
+ * <p>【失败静默降级】无新增权限 / 后端报错时**不弹错**，退回原来的"显示列表第一张"，
+ * 不能让一个自动行为把整个面板拦住。</p>
+ */
+const AUTO_DRAFT_PANELS = ['RD_APPROVAL', 'RD_PROD_INFO']
+/** 上次自动建草稿是为哪个面板（同一面板内重复 load 不再触发） */
+let autoDraftPanel = ''
+/** 正在建单（防重入：load 在一轮里会被多处调用） */
+let autoDraftBusy = false
+async function autoDraftOnEnter() {
+  const code = String(panelCode.value || '')
+  if (!AUTO_DRAFT_PANELS.includes(code)) return
+  if (autoDraftPanel === code) return      // 本面板已经处理过（翻页/查询/刷新不再建）
+  // ⚠ 闸门必须**先**置位再 await：load() 在一轮里可能被触发两次，
+  //   后置位会在 await 期间重复建出两张草稿。
+  autoDraftPanel = code
+  if (autoDraftBusy) return
+  autoDraftBusy = true
+  try {
+    await directAdd()
+  } catch (e) {
+    // 自动行为失败不打扰用户：停在"显示列表第一张"即可（这正是改前的行为）
+  } finally {
+    autoDraftBusy = false
   }
 }
 
@@ -12028,6 +12108,11 @@ async function load(clamping = false) {
     markSavedSnapshot() // 未保存离开守卫的基线快照（载入即干净；保存成功也会经此刷新）
     inlineDirtyFlag.value = false
     restoreFreshDraft() // 刷新/重进后恢复「本次新增未保存草稿」标记,守卫仍可撤回
+    // 「点进去就能填新草稿」（2026-11-13）：只对白名单里的两张单据，且每个面板只做一次。
+    // 放在 load 成功之后 —— 建完草稿 directAdd 自己会再 load() 一次刷新列表并定位到新单。
+    // ⚠ 这里**不能 await**：await 会让 load() 的调用方（onMounted/翻页/查询）多等一个建单往返；
+    //   而 autoDraftOnEnter 内部有闸门，异步跑不会重复建。
+    autoDraftOnEnter()
   } catch (e) {
     const msg = engine.errMsg(e) || '加载失败'
     ElMessage.error(msg)
