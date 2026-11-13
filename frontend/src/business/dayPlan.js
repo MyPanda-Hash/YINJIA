@@ -239,9 +239,23 @@ export function historyShortfalls(rows, today) {
   return out
 }
 
-/** 历史欠产合计:处数 + 欠产量(顶部红色汇总提示直接用) */
+/**
+ * 历史欠产合计:处数 + **计划 / 报工 / 欠产** 三个数(顶部红色汇总提示直接用)。
+ *
+ * <p>2026-11-13 用户反馈:「两天的计划量是 1067…欠缺的数应该是计划量-实际报工数量」——
+ * 实际两天计划量是 834+833=1667、报工 600、欠产才是 1067;提示里只放一个数容易被读成"计划合计"。
+ * 故这里把三个数一起回出去,页面按 `原计划 X − 报工 Y = 欠产 Z` 并列显示,算式自证。
+ *
+ * @returns {{count:number, plan:number, actual:number, qty:number}} plan/actual 只统计"欠产的那几格"
+ */
 export function shortfallTotals(items) {
+  let plan = 0
+  let actual = 0
   let qty = 0
-  for (const it of items || []) qty += num(it.short)
-  return { count: (items || []).length, qty: round4(qty) }
+  for (const it of items || []) {
+    plan += num(it.plan)
+    actual += num(it.actual)
+    qty += num(it.short)
+  }
+  return { count: (items || []).length, plan: round4(plan), actual: round4(actual), qty: round4(qty) }
 }

@@ -154,12 +154,21 @@ test('historyShortfalls:只数已结束日期;今天/未来/原计划0 都不算
     [1, '2026-11-10', 700, 15, 685],
     [2, '2026-11-11', 300, 0, 300],
   ])
-  assert.deepEqual(shortfallTotals(items), { count: 2, qty: 985 })
+  assert.deepEqual(shortfallTotals(items), { count: 2, plan: 1000, actual: 15, qty: 985 })
+})
+
+test('shortfallTotals:三数并列(原计划 / 报工 / 欠产),让「欠产 = 计划−报工」自证', () => {
+  // 2026-11-13 用户反馈的现场数:两天原计划 1667、报工 600、欠产 1067(曾被误读成"计划量 1067")
+  const items = [
+    { plan: 834, actual: 500, short: 334 },
+    { plan: 833, actual: 100, short: 733 },
+  ]
+  assert.deepEqual(shortfallTotals(items), { count: 2, plan: 1667, actual: 600, qty: 1067 })
 })
 
 test('historyShortfalls:后端未升级(没有 原计划)/空行 ⇒ 空,顶部提示整行不出现', () => {
   assert.deepEqual(historyShortfalls([{ 行id: 1 }], '2026-11-13'), [])
   assert.deepEqual(historyShortfalls([], '2026-11-13'), [])
   assert.deepEqual(historyShortfalls([{ 原计划: { '2026-11-10': 5 } }], ''), [])   // 没拿到今天不判
-  assert.deepEqual(shortfallTotals(null), { count: 0, qty: 0 })
+  assert.deepEqual(shortfallTotals(null), { count: 0, plan: 0, actual: 0, qty: 0 })
 })
