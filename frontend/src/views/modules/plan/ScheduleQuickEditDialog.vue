@@ -233,6 +233,14 @@ async function save() {
   const stChanged = String(st.value || '') !== origSt.value
   const cpChanged = String(cp.value || '') !== origCp.value
   const transfer = canTransferPerm.value && canTransfer.value && !!line2.value && line2.value !== (props.line || '')
+  // 计划开工不得晚于预定完成日期(2026-11-09 用户口径「开工日期不得大于完工日期」):
+  //   日期这块一改就先拦,别等 /rowDates 回来才报(后端同口径守卫仍在,防绕过)。
+  //   只在**本次改动了日期**时才判 —— 历史脏数据两条都反着来时,不该连带把「只改数量」也拦住。
+  if ((stChanged || cpChanged) && String(st.value || '') && String(cp.value || '')
+      && String(st.value) > String(cp.value)) {
+    ElMessage.warning(`${tt('计划开工日期不能晚于计划完工日期')}: ${st.value} → ${cp.value}`)
+    return
+  }
   if (!qtyChanged && !stChanged && !cpChanged && !transfer) { ElMessage.info(tt('没有需要保存的改动')); return }
   saving.value = true
   try {

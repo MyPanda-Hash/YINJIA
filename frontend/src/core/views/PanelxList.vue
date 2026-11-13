@@ -3,36 +3,9 @@
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <!-- 来料检验要求(档案特例):7 页签 Excel 复刻整表,工具栏/单据卡片/明细表格/页脚全部不渲染,由组件自带迷你工具栏接管 -->
     <div v-if="!isApprovalDoc && !isQcInspReq" class="tools">
-      <button
-        type="button"
-        class="toolbar-query-btn"
-        :title="isRowLocatePanel ? tt('按物料/批次等条件在本单的行里定位') : tt('按表头字段查询单据')"
-        @click.stop="openQueryDialog"
-      >
+      <button type="button" class="toolbar-query-btn" :title="tt('按表头字段查询单据')" @click.stop="openQueryDialog">
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
-      </button>
-      <!-- 状态闸门(2026-11-11):面板声明 metadata.statusGate 时才有这颗复选框。
-           默认不勾 = 只列闸门放行的行(如「已完成检验」);勾上才含其它状态(如「正在检验中」)。
-           闸门在服务端生效,不是前端藏行 —— 不勾时查询也查不出来。 -->
-      <el-checkbox
-        v-if="statusGate && reportMode"
-        class="gated-toggle"
-        :model-value="includeGatedRows"
-        :label="gatedToggleLabel"
-        :title="gatedToggleTitle"
-        @change="onToggleGatedRows"
-      />
-      <!-- 查询条件区收起/铺开(2026-11-11,用户口径「表头做个收缩」):只在 config 声明了才出现 -->
-      <button
-        v-if="cfgCache?.metadata?.collapseQueryBar && reportMode && !reportQueryDialog"
-        type="button"
-        class="toolbar-query-btn"
-        :title="tt('收起或铺开表头的查询条件')"
-        @click.stop="toggleQueryBar"
-      >
-        <span>{{ queryBarOpen ? tt('收起条件') : tt('展开条件') }}</span>
-        <span class="qb-caret">{{ queryBarOpen ? '▲' : '▼' }}</span>
       </button>
       <!-- 库存状况:仓库下拉(按仓库编码精确过滤,字典改名不影响绑定) -->
       <el-select
@@ -85,15 +58,6 @@
           <span class="doc-chip">{{ tt('单据：') }}{{ cur['编号'] || cur['单据编号'] || '-' }}</span>
           <span v-if="cur['批次号']" class="doc-batch" :title="tt('批次号')">{{ tt('批次号') }}: {{ cur['批次号'] }}</span>
           <span v-if="cur['类别']" class="doc-cat">{{ tt(cur['类别']) }}</span>
-          <!-- 来源提示(2026-11-11 第三版,用户口径「不需要跳转」):只显示,不点、不跳面板;
-               采购入库单表头的「来源 / 来源单号」两列隐藏,信息挂在这里;
-               没有上游单据的老单显示「无上游单据」(把"为什么没有来源"讲明白)。 -->
-          <span
-            v-if="sourceHint"
-            class="doc-source"
-            :class="{ 'doc-source-empty': sourceHint.empty }"
-            :title="sourceHintTitle"
-          >{{ sourceHintText }}</span>
           <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
           <template v-if="!singleDocMode">
             <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
@@ -107,9 +71,8 @@
     </div>
 
     <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。
-         查询弹窗/级联面板(收发存/台账/库存状况):查询条件只在弹窗(级联下拉),不显示内联区
-         2026-11-11「表头做个收缩」:声明 collapseQueryBar 的面板用 v-show 收起条件区(状态保留) -->
-    <div v-if="reportMode && !reportQueryDialog && !isCascadePanel" v-show="queryBarOpen" class="fields udl-fields">
+         查询弹窗/级联面板(收发存/台账/库存状况):查询条件只在弹窗(级联下拉),不显示内联区 -->
+    <div v-if="reportMode && !reportQueryDialog && !isCascadePanel" class="fields udl-fields">
       <div class="field" v-for="qr in queryFields" :key="qr.dataName">
         <label :class="{ req: qr.isRequired }">{{ qr.displayName || tt(qr.dataName) }}</label>
         <div v-if="qType(qr) === 'ref' && refModeMap[qr.dataName] === 'select'" class="query-ref-select">
@@ -187,8 +150,7 @@
           @dirty="markInlineDirty"
           @open-sheets="openDataSheets"
         />
-        <!-- 来料品质·待检验目录(QC_CATALOG,2026-11-11 由「检验目录」改名并只显示待检验的行):
-             纸张式控制列表,与项目进度查询同一呈现方式 -->
+        <!-- 来料品质·检验目录(QC_CATALOG):纸张式控制列表,与项目进度查询同一呈现方式 -->
         <QcCatalogSheet
           v-else-if="panelCode === 'QC_CATALOG'"
           ref="approvalSheetRef"
@@ -247,6 +209,7 @@
           ref="approvalSheetRef"
           :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           :metadata="cfgCache?.metadata || {}"
+          :detail-fields="sheetDetailFields"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -277,7 +240,7 @@
           <RecordSheetPanels
             ref="approvalSheetRef"
             :head="cur" :fields="sheetAllFields" :detail-fields="sheetDetailFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
-            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
+            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true" :dept-fill-open="changeDeptFillOpen"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
             @open-file="onOpenLinkedFile"
@@ -288,7 +251,7 @@
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
           <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
-                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" @progress-save="onProgressSave" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -377,39 +340,40 @@
                   @click="openPreviewCard(c)"
                 >
                   <div class="pc-head">
-                    <span class="pc-no">{{ c.no }}</span>
+                    <span class="pc-no" :title="c.no">{{ c.no }}</span>
                     <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
                   </div>
-                  <div class="pc-date">{{ c.date }}</div>
+                  <!-- 一行摘要（2026-11-11）：登记过摘要字段的面板（立项申请）把「客户名/项目等级」
+                       与日期排在同一行，卡片两行扫完 —— 参照销售订单左侧列表的 日期/客户。
+                       没登记的面板仍逐行 标签：值（行为与改前一致）。 -->
+                  <div class="pc-date">
+                    {{ c.date }}
+                    <span v-if="c.summary" class="pc-sum" :title="c.summary"> · {{ c.summary }}</span>
+                  </div>
                   <div v-for="(f, i) in c.fields" :key="i" class="pc-field">
                     <span class="pc-label">{{ tt(f.label) }}</span>
                     <span class="pc-value">{{ f.value }}</span>
                   </div>
-                  <div v-if="!c.fields.length" class="pc-none">{{ tt('（无摘要字段）') }}</div>
+                  <div v-if="!c.fields.length && !c.summary" class="pc-none">{{ tt('（无摘要字段）') }}</div>
                 </div>
                 <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt(isProdDocMatrix ? '未找到匹配的产品' : '未找到匹配单据') }}</div>
               </div>
             </div>
             <div v-else class="as-side-btns">
               <div class="as-side-section">{{ tt('① 查找') }}</div>
-              <!-- 单表多行面板(待检验目录 QC_CATALOG,2026-11-12 用户口径「待检目录查询有问题,
-                   应该做的是数据定位,因为他的所有数据都在一张单据里」):
-                   全部行都在同一张目录单里 ⇒ 查单据/模糊搜索/单据预览三件套都是"扫单据",在这里恒等于
-                   同一张单、毫无用处;改成**在这张单据的行里定位**(条件照旧填,命中行留下并滚过去)。 -->
-              <template v-if="isRowLocatePanel">
-                <div class="as-side-btn" :title="tt('按物料/批次/检验状态等条件在本单的行里定位（不换单据）')" @click="openQueryDialog">{{ tt('查询定位') }}</div>
-              </template>
-              <template v-else>
-                <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
-                     ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
-                <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
-                <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单;
-                     矩阵面板的字段清单换成矩阵列(产品编号/是否受控/受控日期/状态（任一文件）) -->
-                <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
-                <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
-                     矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
-                <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
-              </template>
+              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
+                   ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
+              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
+              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单;
+                   矩阵面板的字段清单换成矩阵列(产品编号/是否受控/受控日期/状态（任一文件）) -->
+              <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
+              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
+                   矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
+              <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
+                   入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
+                   KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
+              <div v-if="isProdDocMatrix" class="as-side-btn" @click="openProductFlow">{{ tt('流程管控') }}</div>
 
               <!-- ② 本单操作(2026-10-16 用户口径「侧边栏按钮放得有点乱,整理一下」)——
                    **位置固定、内容随状态换**:这一段永远只放"本单这一步该做什么"。
@@ -662,7 +626,11 @@
                 </div>
               </template>
               <!-- 字段管理:配置类动作(动态字段 / 备用列池),不属于"本单操作" ⇒ 归到输出段末尾,弱化显示 -->
-              <div v-if="hasFieldAdmin" class="as-side-btn sub" @click="onSideAction('字段管理')">{{ tt('字段管理') }}</div>
+              <!-- 2026-11-11 用户口径「设计库设计这个的显示框」：原来走 .sub（透明无边框的纯文本），
+                   在侧栏里看着不像可点的东西。按 antd 默认按钮规格单独加一圈框：
+                   边框 colorBorder #d9d9d9 / 高 controlHeight 32 / 圆角 borderRadius 6 / 白底 colorBgContainer /
+                   文字 colorText rgba(0,0,0,.88)，hover 转 colorPrimary #1677ff。 -->
+              <div v-if="hasFieldAdmin" class="as-side-btn sub boxed" @click="onSideAction('字段管理')">{{ tt('字段管理') }}</div>
 
               <!-- ⑤ 危险操作(2026-10-16 侧栏整理):破坏性 / 中断性动作统一沉底 + 红色描边 ——
                    原先「删除」在段首、弃审夹在中间,容易误触也难找。
@@ -953,12 +921,6 @@
                     class="doc-no-link"
                     :title="tt('点击查看或复制编号')"
                     @click.stop="openDocNoDialog(row, column.prop)">{{ row[column.prop] }}</span>
-              <!-- 检验数据记录明细表:来料检验单号 / 检验数据记录单号 可点跳转(用户口径「只有上面两个才用」);
-                   采购订单 / 送料暂收单 / 采购入库单 三组只显示单号+行号,走下面的普通单元格 -->
-              <span v-else-if="qcRecLinkPanel(column.prop) && row[column.prop]"
-                    class="doc-no-link"
-                    :title="tt('点击跳转到该单据')"
-                    @click.stop="gotoLinkedDoc(row[column.prop], qcRecLinkPanel(column.prop))">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -980,20 +942,6 @@
             </template>
           </el-table-column>
         </template>
-        <!-- 检验数据记录明细表:已完成检验的行给「取消完成」(待检验目录已不显示这些行,
-             而反审核挂靠单据前必须先取消完成 —— 见 QcCatalogService.assertLinkedRowNotCompleted) -->
-        <el-table-column v-if="qcRecDetailReopen" :label="tt('操作')" width="112" align="center" fixed="right">
-          <template #default="{ row }">
-            <span
-              v-if="row[QC_REC_DETAIL_REOPEN.statusField] === QC_REC_DETAIL_REOPEN.doneStatus"
-              class="doc-no-link"
-              :class="{ disabled: qcRecReopenBusy }"
-              :title="tt('取消完成并回弹为正在检验中（之后才可反审核挂靠的检验单与检验数据记录）')"
-              @click.stop="reopenCatalogRow(row)"
-            >{{ tt('取消完成') }}</span>
-            <span v-else class="qc-reopen-na">—</span>
-          </template>
-        </el-table-column>
       </el-table>
     </div>
 
@@ -1879,6 +1827,7 @@
             <DataRecordSheet
               v-if="dsActive.doc && dsActive.panelCode === 'RD_FILTER_EFF'"
               :head="dsActive.doc" :fields="dsActive.headerFields" :editable="false"
+              :detail-fields="dsActive.detailFields || []"
             />
             <RecordSheetPanels
               v-else-if="dsActive.doc"
@@ -2139,10 +2088,12 @@
          「因为配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批的时候有一个回填弹窗就是写这个配方及
          工艺要求的，审批通过填写这个字段内容回填进去，进入二级审批」)。
          同一张弹窗里既选二级审核人、又填审批回填内容 —— 一次提交两步完成。 -->
-    <el-dialog v-model="sampleL1Visible" :title="tt('一级审批 · 回填配方及工艺要求')" width="880px" append-to-body>
+    <el-dialog v-model="sampleL1Visible" :title="tt(sampleBackfillTitle)" width="880px" append-to-body>
       <div class="dq-form">
         <div class="mod-log-meta" style="margin-bottom:8px">
-          {{ tt('配方及工艺要求由一级审批人在这里补齐；点「审批通过」后内容写入单据，再转二级审核人签核。') }}
+          {{ sampleL1Node === 2
+            ? tt('配方及工艺要求在二级签核时可以继续修改；点「审批通过」后内容写入单据并归档，修改会记入审批留痕（含原值→新值）。')
+            : tt('配方及工艺要求由一级审批人在这里补齐；点「审批通过」后内容写入单据，再转二级审核人签核。') }}
         </div>
         <div v-if="l2PickHiddenSubmitter" class="mod-log-meta" style="margin-bottom:8px">{{ tt('已按「编制与审批分离」排除提交人：') }}{{ l2PickHiddenName }}</div>
         <div v-if="sampleL1Error" class="dq-error">{{ sampleL1Error }}</div>
@@ -2292,6 +2243,31 @@
       <template #footer>
         <el-button @click="domApvVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" :loading="domApvBusy" @click="confirmDomApprove">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 产品变更申请表：审批通过 + 签字/日期（2026-11-11）。
+         这三个值通过后写进 rd_change_head 备用2/3/4，纸面「批准 / 签字 / 日期」三格即显示并可打印。 -->
+    <el-dialog v-model="chgApvVisible" :title="tt('审批通过（签字）')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('批准后，签字与日期会回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('签字') }}</span>
+          <el-input v-model="chgApvSign" maxlength="30" :placeholder="tt('签字（默认当前登录人姓名）')" />
+        </div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('日期') }}</span>
+          <el-date-picker v-model="chgApvDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD"
+                          style="flex:1" :placeholder="tt('日期（默认今天）')" />
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="chgApvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="chgApvVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="chgApvBusy" @click="confirmChangeApprove">{{ tt('确认审批通过') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2625,7 +2601,6 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { sourceHintOf, sourceHintText as sourceHintTextOf, sourceHintTitle as sourceHintTitleOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
@@ -2691,15 +2666,11 @@ import ProdDocListSheet from './ProdDocListSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
+// 单据预览卡片的摘要口径（2026-11-11）：按面板挑「最主要的信息」，纯函数 + 单测
+import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
-// 检验数据记录明细表(QC_INSP_REC_DETAIL,2026-11-11):单号跳转列 + 行内「取消完成」的取参口径
-import {
-  QC_REC_DETAIL_PANEL,
-  QC_REC_DETAIL_LINKS,
-  QC_REC_DETAIL_REOPEN,
-} from '@core/qc/qcInspRecDetail'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
@@ -2707,8 +2678,6 @@ import ProductImportDialog from './ProductImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_BATCH_BUSY_KEY, ERP_UNAUDIT_WARN, erpClickBlocked } from './erpOutcome.js'
-// 库存口径提示(2026-11-10「库存以金蝶为准」):审核/审批通过后按后端给的码补一句说明
-import { stockHintText } from './stockHint.js'
 
 const engine = usePanelRuntime()
 const { user, tabs, locale: localeStore } = useAppContext()
@@ -2727,8 +2696,7 @@ const {
 // 语言热切换:仅重拉面板配置(字段标签/面板名/列别名随 Accept-Language 更新),
 // 不重拉数据——分页、滚动、弹窗、筛选、展开状态全部保留。
 watch(() => localeStore.locale, async () => {
-  // 缓存实例不要重拉:它的 panelCode 是"当前正显示的面板",拉回来也只会被 loadCrg 丢弃(白跑一趟)
-  if (!panelCode.value || invalidPanel.value || !isFrontPage()) return
+  if (!panelCode.value || invalidPanel.value) return
   try {
     cfgCache.value = null
     await loadCrg()
@@ -2749,33 +2717,6 @@ const routeProps = defineProps({ panelCode: { type: String, default: '' } })
 const panelCode = computed(() => routeProps.panelCode || route.params.panelCode)
 const operationName = computed(() => route.meta.operationName || route.query.operationName || '新增流程')
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
-
-/**
- * 本实例「自己的」页签路径 + 面板码(**实例私有快照,创建时定死**)+ 「我现在是不是前台页签」。
- *
- * 🔴 为什么必须有(2026-11-11 用户报障「打开多个单,这个单的名字反复横跳」):
- *   PortalLayout 用 `<component :is :key="route.path">` + keep-alive 给**每个页签一份实例**
- *   (见 PortalLayout 那段注释),但 `route` 是**全局共享**的 —— 被缓存起来的旧实例照样会跟着
- *   别人的路由变化重算 `panelCode`、把面板切换 watcher 全部跑一遍、按**别人的面板码**取配置,
- *   然后在 `loadCrg()` 里把自己刚拿到的面板名写到 `route.path` 指向的那个页签上。
- *   两边请求乱序返回时,`销售订单` 与 `销售订单明细表` 就互相盖名 —— 用户看到的就是名字横跳。
- *   ⇒ 「要不要干活」「该改哪个页签」一律用本快照判;`panelCode` 只用来取元数据,
- *     绝不能拿它判"我在不在前台"(它是路由派生值,缓存实例读到的是别人)。
- *   (同一个坑的旧注解见下面 `instanceActive`。)
- */
-const ownPath = ref(String(route.path || ''))
-/** 本实例**自己**的面板码:静态路由给了 props 就用它,否则 = 自身路径 `/panelx/list/<CODE>` 的末段 */
-const ownPanelCode = computed(() => {
-  const fixed = String(routeProps.panelCode || '')
-  if (fixed) return fixed
-  const p = ownPath.value
-  return p.startsWith('/panelx/list/') ? p.slice('/panelx/list/'.length) : ''
-})
-/** 本实例是不是**前台页签**(= 当前路由就是本实例承载的那一页)。路径创建时定死,与后续路由变化无关。 */
-function isFrontPage() {
-  // ownPath 取不到(极端兜底)时按"是前台"处理,退回旧行为,不因快照失败把功能锁死
-  return !ownPath.value || route.path === ownPath.value
-}
 
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
@@ -2808,6 +2749,21 @@ const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
+
+/**
+ * 已生效/已归档时的「会签人填本部门行」模式(2026-11-11 用户口径 B)。
+ *
+ * <p>用户原话：「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写，
+ * 保存之后该单据可见内容，打印出来也是有数据的」；并确认会签流程**保留**(审批前先会签)。</p>
+ *
+ * <p>所以这不是"把归档打开"：只放行**部门评审意见**那一张按部门锁行的表，
+ * 且只有本人部门那一行、只有 lockCols(变更后内容/备注)两列可编；
+ * 服务端 ButtonService.allowChangeDeptFill 另有同口径判定 + 只写明细不写表头。</p>
+ */
+const changeDeptFillOpen = computed(() => String(panelCode.value) === 'RD_CHANGE'
+  && ['已生效', '已归档'].includes(String(current.value?.['单据状态'] || ''))
+  && user?.isAdmin !== true
+  && (changeDeptRows.value || []).length > 0)
 
 // ── 产品变更申请单:会签按钮组的身份判据(2026-09-21)──
 // 会签人 = 头字段「会签人」里的账号(顿号/逗号分隔);发起人 = 纸面「申请人」= 当前用户姓名。
@@ -3503,39 +3459,6 @@ function onQueryDialogClose() {
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
-
-/**
- * **单表多行面板**(2026-11-12 用户口径「待检目录查询有问题,应该做的是数据定位,因为他的所有数据
- * 都在一张单据里」):整份数据都挂在一张单据的明细行上 ⇒ 「查询」的语义是**在这张单据的行里定位**,
- * 而不是"去查另一张单据"。现役只有待检验目录(QC_CATALOG)。
- * 依据:面板是 singleDoc,且它的查询字段全是明细行上的列(检测物料类别/物料名称/批次号/检验状态…)——
- * 服务端的 header 条件过滤对它们无效,所以查询弹窗在这里原本等于没查(用户报的就是这个)。
- */
-const isRowLocatePanel = computed(() => String(panelCode.value) === 'QC_CATALOG')
-
-/* ────────── 状态闸门 + 查询条件区收起(2026-11-11)──────────
- * 状态闸门(statusGate):面板在 yj_panel.config 里声明「默认只列 某字段=某值 的行」,
- *   **闸门在服务端执行**(QueryService.queryFlat),前端这颗复选框只是把 `_statusScope='all'`
- *   带给后端 —— 所以不勾选时,查询弹窗/关键字/高级筛选都查不出被闸住的行(用户口径
- *   「查询也是一样,没勾选之前查询不出来」)。现役:检验数据记录明细表(只看已完成检验)。
- * 查询条件区收起(collapseQueryBar):用户口径「表头做个收缩」,条件多时先收起,点开关铺开。 */
-const statusGate = computed(() => cfgCache.value?.metadata?.statusGate || null)
-const includeGatedRows = ref(false)
-const queryBarOpen = ref(true)
-/**
- * 闸门复选框的文案。刻意写成**静态整句**而不是拼 `tt(gate.value)` ——
- * 拼串在 en/ja/ko 里语序会别扭,而这条口径本来就是一句话。
- * (将来若有第二个面板用 statusGate 且取值不同,把这两句挪进 config.statusGate.label 即可。)
- */
-const gatedToggleLabel = computed(() => tt('显示全部状态'))
-const gatedToggleTitle = computed(() => tt('默认只显示已完成检验，勾选后一并显示正在检验中'))
-function onToggleGatedRows(v) {
-  includeGatedRows.value = !!v
-  search()
-}
-function toggleQueryBar() {
-  queryBarOpen.value = !queryBarOpen.value
-}
 /** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
 const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
 /**
@@ -3791,7 +3714,7 @@ const isStockStatus = computed(() => String(panelCode.value) === 'STOCK_STATUS')
  */
 const canConfigWarnHere = computed(() => canConfigWarn(user, panelCode.value))
 watch(isStockStatus, async (v) => {
-  if (!v || !isFrontPage() || warehouseOptions.value.length) return
+  if (!v || warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
     warehouseOptions.value = res?.data || []
@@ -3814,8 +3737,7 @@ const whDockSelected = ref('')
 watch(isStockDetail, async (v) => {
   // 离开面板:清掉选中态(过滤条件本身不落在 condition 上,见 load() 里的「请求时派生」,不会串到别的面板)
   if (!v) { whDockSelected.value = ''; return }
-  // 取仓库档案只在前台做:缓存实例读到的 panelCode 是"当前正显示的面板",会白跑一趟
-  if (!isFrontPage() || warehouseOptions.value.length) return
+  if (warehouseOptions.value.length) return
   try {
     const res = await request.get('/base/warehouse/list')
     warehouseOptions.value = res?.data || []
@@ -3839,7 +3761,7 @@ async function loadMcStatus() {
     mcStatus.value = res?.data || null
   } catch { mcStatus.value = null }
 }
-watch(isStockDetail, (v) => { if (v && isFrontPage()) loadMcStatus() }, { immediate: true })
+watch(isStockDetail, (v) => { if (v) loadMcStatus() }, { immediate: true })
 
 // ---------- 库存明细:行展开 → 该 (物料,仓库) 的月结明细;再按**批次号**二次展开看该批单据 ----------
 const mcDetail = ref({})
@@ -4258,21 +4180,20 @@ async function openFuzzyResult(r) {
 const previewMode = ref(false)
 const previewKw = ref('')
 let previewPrevPageSize = null
-/** 摘要字段剔除清单:系统列与阶段明细列不进卡片 */
-const PREVIEW_SKIP = new Set(['单据编号', '编号', '单据日期', '单据状态', '文档编号', '文件管理人', '密级', '文件使用范围', '备注', '打印时间', '公司名称'])
-function previewFieldsOf(row) {
-  const out = []
-  for (const f of headerFields.value || []) {
-    if (out.length >= 4) break
-    const key = headerFieldKey(f)
-    if (!key || PREVIEW_SKIP.has(key) || /^阶段\d+/.test(key)) continue
-    const v = row[key]
-    if (v == null || String(v).trim() === '') continue
-    const s = String(v).replace(/\s+/g, ' ').trim()
-    if (!s) continue
-    out.push({ label: key, value: s.length > 42 ? s.slice(0, 42) + '…' : s })
-  }
-  return out
+/**
+ * 摘要内容 = 纯函数 core/panel/docPreview.js 的口径（2026-11-11 用户口径：
+ * 「立项申请的单据预览做成和销售订单左侧栏类似，显示最主要的信息方便去查找对应单据」）：
+ *   · 登记过摘要字段的面板（立项申请 = 客户名/项目等级）⇒ 只出这几个、不带标签、与日期同行；
+ *   · 其余面板 ⇒ 前 4 个非空业务字段、带标签（与改前逐字一致）。
+ * 口径与断言都在 docPreview.test.js，这里只负责把表头字段定义喂进去。
+ */
+function previewSummaryFor(row) {
+  return previewSummaryOf({
+    row,
+    fields: headerFields.value || [],
+    keyOf: (f) => headerFieldKey(f),
+    panelCode: panelCode.value,
+  })
 }
 const previewCards = computed(() => {
   // 产品文件列表:卡片 = **产品行**(编号 + 受控 + 4 个文件各自的状态),不是单据卡片
@@ -4294,12 +4215,26 @@ const previewCards = computed(() => {
   }
   return (list.value || []).map((row) => {
     const no = String(row['单据编号'] || row['编号'] || '')
-    const fields = previewFieldsOf(row)
+    const sum = previewSummaryFor(row)
     const kw = previewKw.value.trim().toLowerCase()
-    const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
-    return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
+    const hit = !kw || no.toLowerCase().includes(kw) || sum.items.some((x) => x.value.toLowerCase().includes(kw))
+    return {
+      no,
+      date: String(row['单据日期'] || ''),
+      status: String(row['单据状态'] || ''),
+      fields: sum.compact ? [] : sum.items,
+      summary: sum.compact ? previewLineText(sum) : '',
+      hit,
+      row,
+    }
   }).filter((c) => c.hit)
 })
+/** 打开「产品文件流程管控」独立页(2026-11-11):与 ProgressControlSheet.openDoc 同一套地址拼法 */
+function openProductFlow() {
+  const url = `${window.location.origin}${window.location.pathname}#/rd/productFlow`
+  window.open(url, '_blank')
+}
+
 async function openDocPreview() {
   if (fuzzyMode.value) { // 与模糊搜索互斥:模糊条件失效,pageSize 直接接管
     fuzzyMode.value = false
@@ -4860,13 +4795,30 @@ const approvalSideGroups = computed(() => toolbarGroups.value
  *  这是纯展示层取舍,动作本身没被删:状态回到草稿/修改中时它们自动回来。 */
 const sheetSideGroups = computed(() => approvalSideGroups.value
   .map((g) => ({ ...g, actions: actsOf(g).filter((a) => a !== '字段管理'
-    && !(!draftEditable.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
+    && !(!draftEditable.value && !changeDeptFillOpen.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
   .filter((g) => (g.actions || []).length))
 /** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里)。
  *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
  *    研发管理(RD_*)整块不放该入口(它的动态字段走正式迁移/纸面配置,不吃备用列池这条路);
  *    其它模块(品质/供应链/基础档案)保持原样。服务端能力与权限一行未动,只是研发区不放出按钮。 */
-const hasFieldAdmin = computed(() => !String(panelCode.value).startsWith('RD_')
+/**
+ * 允许「字段管理」(自定义列/备用列池)的面板。
+ *
+ * <p>原判据是 `!panelCode.startsWith('RD_')` —— **整个研发命名空间一律不给入口**。
+ * 那时是对的:RD_ 的纸面列全部写死在 recordSheetConfigs 里,加字段在纸面上根本不会出现,
+ * 给了入口只会让用户白加一轮。2026-11-11 起 RecordSheetPanels 会把这 8 张表的动态字段
+ * 并进纸面列(见 core/panel/extCols.js),纸面能显示了,入口才随之放开 —— **只放这 8 张**,
+ * 其余 RD_ 面板仍不给(它们的纸面列依旧写死)。</p>
+ *
+ * <p>名单与 RecordSheetPanels.EXT_COL_PANELS、后端 PanelConfigService.EXT_FIELD_CAP 同一份,
+ * 三处一起改。</p>
+ */
+const EXT_COL_ADMIN_PANELS = new Set([
+  'RD_FILTER_EFF', 'RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT',
+  'RD_SCALE', 'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC',
+])
+const hasFieldAdmin = computed(() => (!String(panelCode.value).startsWith('RD_')
+    || EXT_COL_ADMIN_PANELS.has(String(panelCode.value)))
   && approvalSideGroups.value.some((g) => actsOf(g).includes('字段管理')))
 /**
  * 审批按钮**显不显示**(2026-10-16 用户报障「产品信息表保存之后不见审批按钮」):
@@ -5055,8 +5007,6 @@ provideAnnotations({
 onMounted(() => {
   loadAnns()
   watch([() => curDocNo.value, () => panelCode.value], () => {
-    // 面板码是路由派生值:缓存实例读到的是别人面板 ⇒ 不在前台就不取批注(否则每切一次页签发一串请求)
-    if (!isFrontPage()) return
     loadAnns()
     if (!isRdPanel.value) annMode.value = null
   })
@@ -5500,19 +5450,6 @@ const curNo = computed(() => {
 /** 总页数(单据面板分页用;与后端 OFFSET/FETCH 口径一致) */
 const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
 
-/**
- * 单据号旁的「来源」提示(2026-11-11 第三版:「**不需要跳转**」—— 纯提示,点了没反应)。
- * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);
- * 没有上游单据的老单显示「无上游单据」,把"为什么没有来源"讲明白,而不是留空。
- * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来是可见字段的面板(如 ASM_BOM)不重复挂。
- */
-const sourceHint = computed(() => {
-  if (!hasHiddenSourceColumn(cfgCache.value?.dataSchema?.fields)) return null
-  return sourceHintOf(cur.value)
-})
-const sourceHintText = computed(() => (sourceHint.value ? sourceHintTextOf(sourceHint.value, tt) : ''))
-const sourceHintTitle = computed(() => (sourceHint.value ? sourceHintTitleOf(sourceHint.value, tt) : ''))
-
 // 立项申请流程状态(rdFlow)—————————— 必须声明在下面那个 immediate watch 之前 ——————————
 // ⚠ 2026-10-15 TDZ 修复:该 watch 带 immediate,setup 期间就会调 loadRdFlowState() → clearRdFlow() → 读 rdFlow。
 //   而 rdFlow 原先声明在 4906 行(远在这个 watch 之后) ⇒ 每次进**任何**面板页都抛
@@ -5550,8 +5487,6 @@ const rdFlowUsers = ref([])
 const printBatchLock = ref({ 锁定: false, 批次号: '', 依据: '' })
 watch(() => [panelCode.value, curDocNo.value], async () => {
   printBatchLock.value = { 锁定: false, 批次号: '', 依据: '' }
-  // 批号锁只在本页签前台时问:缓存实例的 panelCode 是别人面板的码,问出来的结果没有意义
-  if (!isFrontPage()) return
   const no = String(curDocNo.value || '')
   if (!no || !batchChainPanel.value) return
   try {
@@ -5568,8 +5503,7 @@ watch(() => [panelCode.value, curDocNo.value], async () => {
 watch(
   () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
   () => {
-    // isApprovalDoc/panelCode 都是路由派生值 —— 缓存实例会跟着别人面板变化重算 ⇒ 不在前台不补默认值
-    if (!isFrontPage() || !isApprovalDoc.value || !draftEditable.value || !cur.value) return
+    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
     applyDocDefaults(panelCode.value, cur.value, user, {
       isNew: isFreshAddedDoc(),
       today: todayStr(),
@@ -5591,8 +5525,6 @@ const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人', RD_ASM_PROC: '表单管
 watch(
   () => [panelCode.value, draftEditable.value, cur.value?.['单据编号'], JSON.stringify(cur.value || {})],
   () => {
-    // panelCode 是路由派生值:缓存实例会算出**别人面板**的码,照它给本实例的单据盖"编辑人"就是盖错格子
-    if (!isFrontPage()) return
     const key = EDITOR_STAMP_FIELDS[panelCode.value]
     if (!key || !cur.value || !draftEditable.value) return
     const name = String(user.realName || user.userName || '').trim()
@@ -5977,8 +5909,6 @@ function onBatchTabRow(row) {
 watch(
   () => [panelCode.value, curDocNo.value, String(cur.value?.['审批状态'] || '')],
   ([pc, no, st]) => {
-    // 缓存实例会算出别人面板的码(pc)⇒ 不在前台不拉批次页签
-    if (!isFrontPage()) return
     if (pc === 'PU_ORDER' && no && APPROVED_STATUS_VALUES.includes(st)) loadBatchTab(no)
   },
   { immediate: true }
@@ -6573,70 +6503,6 @@ function gotoDocNo() {
   }
   docNoDlg.value.visible = false
   router.push({ path: '/panelx/list/' + panel, query: no ? { focus: no } : {} })
-}
-
-/* ══════════ 检验数据记录明细表(QC_INSP_REC_DETAIL):单号跳转 + 行内「取消完成」 ══════════
- * 2026-11-11 用户口径:「每一条罗列的都要带来料检验单,也要带行号和检验数据记录。还有也要有采购订单,
- * 送料暂收单,采购入库单(这3个的单号和行号,但是这个不用跳转,只有上面两个才用)。」
- *   · 只有 来料检验单号 / 检验数据记录单号 渲染成可点跳转(与检验目录的 ↗ 同款:
- *     /panelx/list/<面板>?docNo=<单号> 定位);
- *   · 采购订单 / 送料暂收单 / 采购入库单 三组只显示单号+行号,不跳。
- * 跳转同样要过面板查看权(canViewPanel,与条码面板单号同一口径),没权限只提示不发路由。
- *
- * 行内「取消完成」:待检验目录只显示待检验行,已完成的行只剩本表看得到,而反审核挂靠单据的守卫
- * 要求先在目录行上「取消完成」⇒ 该动作跟着已完成的行搬到这里(后端仍是 QC_CATALOG 的「修改」)。
- * 字段/面板码见 @core/qc/qcInspRecDetail(唯一真源)。 */
-const qcRecDetailLinks = computed(() => String(panelCode.value) === QC_REC_DETAIL_PANEL ? QC_REC_DETAIL_LINKS : null)
-/** 该列是不是可跳转的单号列;是则返回目标面板编码 */
-function qcRecLinkPanel(prop) {
-  const map = qcRecDetailLinks.value
-  return map ? (map[prop] || '') : ''
-}
-const qcRecDetailReopen = computed(() => String(panelCode.value) === QC_REC_DETAIL_PANEL)
-const qcRecReopenBusy = ref(false)
-
-/** 点单号 → 定位到目标面板的那张单(无查看权只提示) */
-function gotoLinkedDoc(no, targetPanel) {
-  const v = String(no ?? '').trim()
-  if (!v || !targetPanel) return
-  if (!canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, targetPanel)) {
-    ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(targetPanel))
-    return
-  }
-  router.push({ path: '/panelx/list/' + targetPanel, query: { docNo: v } })
-}
-
-/** 已完成检验的行 →「取消完成」:回弹为正在检验中,并写一条修改记录(后端 QC_CATALOG「修改」) */
-async function reopenCatalogRow(row) {
-  const cfg = QC_REC_DETAIL_REOPEN
-  const docNo = String(row?.[cfg.docField] ?? '').trim()
-  const rowId = row?.[cfg.rowIdField]
-  if (!docNo || rowId == null || rowId === '') {
-    ElMessage.warning(tt('该行没有关联的检验目录记录，无法取消完成'))
-    return
-  }
-  try {
-    await ElMessageBox.confirm(
-      tt('取消完成后该目录行回到「正在检验中」（会重新出现在待检验目录里），之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？'),
-      tt('取消完成'),
-      { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), type: 'warning' },
-    )
-  } catch { return }
-  qcRecReopenBusy.value = true
-  try {
-    await engine.callButton({
-      panelCode: cfg.catalogPanel,
-      buttonName: cfg.buttonName,
-      formData: { 编号: docNo, id: rowId },
-      buttonParam: {},
-    })
-    ElMessage.success(tt('已取消完成（已写入修改记录）'))
-    await load()          // 该行状态已变,重取当前页(不跳回第一页)
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('操作失败'))
-  } finally {
-    qcRecReopenBusy.value = false
-  }
 }
 
 /** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
@@ -7259,6 +7125,34 @@ async function openL2Pick(no) {
   l2PickHiddenSubmitter.value = (!user.isAdmin && curSubmitter.value) ? curSubmitter.value : ''
   l2PickVisible.value = true
 }
+/* ── 样品单「进度描述」就地保存(2026-11-11) ──
+   用户口径:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+   这个字段**不受归档约束**，但是也是**只能谁提交的谁来修改**」;
+   追问「归档后连 edit_others 也不能改？」→ 答「只锁申请人」。
+
+   为什么单开一条写路径而不走「保存」:常规保存的闸门是 draftEditable(草稿/修改中)，
+   归档后整张纸只读 —— 进度描述明确要能跨归档继续更新，故走 /px/sampleProgress 窄接口，
+   只改这一列、不触发审批流。服务端同口径硬校验(不是这行的申请人就 403)。 */
+async function onProgressSave({ row, text }) {
+  if (panelCode.value !== 'RD_SAMPLE_INT' && panelCode.value !== 'RD_SAMPLE_EXT') return
+  const docNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
+  if (!docNo) return
+  try {
+    const res = await engine.updateSampleProgress({
+      panelCode: panelCode.value,
+      docNo,
+      // 内部单是行级(一单多行、行各归其主) ⇒ 必须带行 id；外部单是头级，不需要
+      rowId: panelCode.value === 'RD_SAMPLE_INT' ? row?.id : undefined,
+      text: String(text ?? ''),
+    })
+    ElMessage.success(tt('进度已更新'))
+    // 回填服务端落库后的值（trim 过 500 字截断），避免界面与库不一致
+    if (row && res && typeof res === 'object' && '进度描述' in res) row['进度描述'] = res['进度描述']
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('进度更新失败'))
+  }
+}
+
 /* ── 外部开发样品申请单:一级审批「回填配方及工艺要求」(2026-11-06) ──
    用户口径:「配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批有一个回填弹窗写这个字段，
    审批通过回填进去，进入二级审批(管理员)，管理员审批完成归档」。
@@ -7271,10 +7165,17 @@ const sampleL1No = ref('')
 const sampleL1User = ref('')
 const sampleL1Opinion = ref('')
 const sampleL1Rows = ref([])
+/** 回填节点:1=一级(申请→审核) / 2=二级(审核→确认)。决定弹窗标题与提交后的状态迁移。 */
+const sampleL1Node = ref(1)
+/** 弹窗标题按节点切换(2026-11-11:二级签核人看到"一级"字样会以为自己点错了) */
+const sampleBackfillTitle = computed(() => (sampleL1Node.value === 2
+  ? '二级签核 · 回填配方及工艺要求'
+  : '一级审批 · 回填配方及工艺要求'))
 
 /** 打开一级审批回填弹窗:把当前明细行(产品整体规格/炭棒规格/样品数量/配方及工艺要求…)抄一份进来 */
-async function openSampleL1(no) {
+async function openSampleL1(no, node = 1) {
   sampleL1No.value = no
+  sampleL1Node.value = node
   sampleL1User.value = ''
   sampleL1Opinion.value = ''
   sampleL1Error.value = ''
@@ -7411,6 +7312,50 @@ async function confirmDomApprove() {
     ElMessage.error(engine.errMsg(e) || '审批失败')
   } finally {
     domApvBusy.value = false
+  }
+}
+/* ── 产品变更申请表：审批通过 + 签字/日期回填（2026-11-11 用户口径）───────────────
+ * 用户原话：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期，
+ *   保存之后该单据可见内容，打印出来也是有数据的」。
+ * 与立项申请「审批+定级」、测试申请单「审批+分发」同一范式：**专用弹窗**收集本次审批的额外输入，
+ * 通过即在同一个 callButton 里提交；后端 ButtonService 的 RD_CHANGE 分支写进
+ * rd_change_head 备用2/3/4（那三格 yj_field.editable=0，只有审批动作写得进去）。
+ * 默认值：签字 = 当前登录人姓名，日期 = 今天 —— 审批人通常就是签自己名字、签当天。 */
+const chgApvVisible = ref(false)
+const chgApvBusy = ref(false)
+const chgApvDocNo = ref('')
+const chgApvSign = ref('')
+const chgApvDate = ref('')
+const chgApvOpinion = ref('')
+function openChangeApprove(no) {
+  chgApvDocNo.value = no || ''
+  chgApvSign.value = String(user?.realName || user?.userName || '').trim()
+  chgApvDate.value = todayStr()
+  chgApvOpinion.value = ''
+  chgApvVisible.value = true
+}
+async function confirmChangeApprove() {
+  if (chgApvBusy.value) return
+  chgApvBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'RD_CHANGE', buttonName: '审批通过',
+      formData: {
+        编号: chgApvDocNo.value,
+        // 空串不发：后端兜底为「审批人姓名 / 当天」，不会把格子覆盖成空
+        ...(chgApvSign.value ? { 批准签字: chgApvSign.value } : {}),
+        ...(chgApvDate.value ? { 批准日期: chgApvDate.value } : {}),
+        ...(chgApvOpinion.value ? { 审批意见: chgApvOpinion.value } : {}),
+      },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('审批通过'))
+    chgApvVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    chgApvBusy.value = false
   }
 }
 async function openRdApprove(no) {
@@ -7609,12 +7554,7 @@ async function loadRdFlowState() {
  *   否则「待开发单据」红点与两条漂移黄条**再也不会加载**(页面看着没事,功能静默失效)。
  */
 watch(() => [panelCode.value, cur.value?.['单据编号']],
-  () => {
-    // panelCode 是路由派生值:缓存实例会按**别人面板**的码把这 7 个接口全打一遍(每切一次页签一次),
-    // 且结果装进别人的实例 ⇒ 不在前台直接跳过
-    if (!isFrontPage()) return
-    loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift(); loadProdDrift()
-  },
+  () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs(); loadSpecDrift(); loadProdDrift() },
   { immediate: true })
 
 /** 懒加载启用账号清单(两个弹窗共用;接口挂 RD_APPROVAL 查看权,与 /rdDev/users 的 RD_PROD_INFO 权分开) */
@@ -7840,6 +7780,21 @@ async function snapSheetPage(el, domToPng) {
     // 行操作列(＋插入/×删除)只在编辑态存在;从"编辑中的单据"直接打印时它会连 60px 一起上纸
     // (2026-10-30 打印体检:成型配方页纸宽 781、scrollWidth 817,多出来的就是这两颗按钮)。
     clone.querySelectorAll('.rs-td-op, .rs-op-pad').forEach((n) => n.remove())
+    // 标准库入口(⌄ 标准库 / ⧉ 标准库维护)是编辑控件,纸张上不许出现「标准库」字样
+    // (2026-11-11 用户报「打印错误……不要显示标准库字样」)。
+    // ⚠ 光靠 CSS 不够:本函数走的是**截图**,CSS 的 @media print / body.approval-printing 都不生效
+    //   (只有 filter 里认的 .no-print 才生效),而 .rsp-lib-pick 身上并没有 no-print。
+    clone.querySelectorAll('.rsp-lib-pick, .rs-lib-btn').forEach((n) => n.remove())
+    // ⚠ textarea 的值必须**写进克隆体的文本节点**(2026-11-11 用户报「配方表打印无数据」的根因):
+    //   modern-screenshot 的 copyInputValue 只 setAttribute('value', ...),而 <textarea> 在
+    //   foreignObject 里显示的是**子文本节点** ⇒ 整格是 textarea 的配方表会印成一片空白
+    //   (成型配方 7 列 × 10 行全是 el-input type=textarea)。原元素与克隆体同序,按同序配对写回。
+    const liveArea = [...el.querySelectorAll('textarea')]
+    const cloneArea = [...clone.querySelectorAll('textarea')]
+    liveArea.forEach((t, i) => {
+      const c = cloneArea[i]
+      if (c && t.value !== undefined) c.textContent = t.value
+    })
     holder.appendChild(clone)
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
@@ -8192,18 +8147,27 @@ async function exportSheetExcel() {
     QC_CATALOG: 'exportCatalogExcel',
     QC_PROC_INSP: 'exportProcInspExcel',
     QC_FIRST_INSP: 'exportFirstInspExcel',
+    // 配方表专属导出（2026-11-11）：通用导出把配方表按原文本倒出来（设计添加量无单位、
+    // 无合计、空白行全在），用户报的「炭棒配方管控清单-设计添加量导出错误」就是它。
+    // 版式口径在 RecordSheetPanels.exportRecipeExcel + core/mold/recipeExport.js。
+    RD_MOLD_PROC: 'exportRecipeExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value
     if (sheet && typeof sheet[catalogExporter] === 'function') {
       try {
-        sheet[catalogExporter]()
-        ElMessage.success(tt('已导出') + ' Excel')
+        // await：配方表导出要动态 import('xlsx')，是异步的（同步导出器 await 也无副作用）
+        // 返回 false = 本面板其实没有配方表（如 RD_MOLD_PROC 的老变体）⇒ 落到下面的通用导出
+        const done = await sheet[catalogExporter]()
+        if (done !== false) {
+          ElMessage.success(tt('已导出') + ' Excel')
+          return
+        }
       } catch (e) {
         console.error('sheet-excel-export failed', e)
         ElMessage.error(tt('导出失败'))
+        return
       }
-      return
     }
   }
   try {
@@ -8289,7 +8253,7 @@ async function printApprovalSheet() {
    *   结果写到 <html> 的 CSS 变量上,样式侧用 var(--print-zoom) 取值 ⇒ 一处算、一处用。
    */
   let A4_CONTENT_PX = Math.round((210 - 16) / 25.4 * 96)   // 194mm @96dpi ≈ 733px
-  // 表格式纸面（2026-11-06 样品申请单）：两张纸 1188 / 1450px，竖向 A4 只能装 733px ⇒ 缩到 0.5，
+  // 表格式纸面（2026-11-06 样品申请单）：两张纸 1188 / 1220px，竖向 A4 只能装 733px ⇒ 缩到 0.5，
   // 字小到看不清。改走**横向 A4**（297-16=281mm ≈ 1062px），zoom ≈ 0.73~0.89，字号才保得住。
   // @page 不认类选择器 ⇒ 只能动态注入一条规则；收尾时按 id 移除（与 prepareDocPrint 同款做法）。
   let sgPageStyle = null
@@ -9592,9 +9556,51 @@ function validateArchiveUniqueKeys() {
   return ''
 }
 
+/**
+ * 最近一次必填校验的**结构化**缺失清单（2026-11-12 用户口径「弹窗提示一次，并高亮显示未填写内容」）。
+ * validateInlineDraft 原来只返回一句合并文案，弹窗要逐条列出来，所以把明细存在这里。
+ */
+let lastMissingRequired = []
+
+/**
+ * 必填缺失的**弹窗**提示（2026-11-12 用户口径）。
+ *
+ * <p>用户原话：「在没有填写完就提交审批的情况下，弹窗提示一次，并高亮显示未填写内容」。</p>
+ *
+ * <p>与旧行为的差别：原来只 `ElMessage.warning` 弹一条合并文案（"还有 N 项必填没填：A、B…"），
+ * 十几项时后半截被截断、看不全。现在改成**一次弹窗 + 逐条清单**，
+ * 高亮仍由 validateInlineDraft 内部对每个缺失点调 focusMissingFields 完成（会翻到对应页并闪烁）。</p>
+ *
+ * <p>⚠ 用 `ElMessageBox.alert` 而不是 warning：这是"要用户回去补"的阻塞式反馈；
+ * 且必须 `.catch(() => {})` —— 用户点右上角关闭会 reject，否则控制台报未处理异常。</p>
+ */
+function promptMissingRequired(pre, fallbackText) {
+  const items = (lastMissingRequired || []).map((m) => String(m.text || '')).filter(Boolean)
+  if (!items.length) {
+    ElMessage.warning(pre + fallbackText)
+    return
+  }
+  const shown = items.slice(0, 20)
+  const more = items.length - shown.length
+  const html = `<div style="line-height:22px">`
+    + `<div style="margin-bottom:8px;color:rgba(0,0,0,.65)">`
+    + tt('以下内容还没填写完，已用高亮标出，请补齐后再提交：')
+    + `</div><ol style="margin:0;padding-left:20px">`
+    + shown.map((t) => `<li>${t.replace(/</g, '&lt;')}</li>`).join('')
+    + `</ol>`
+    + (more > 0 ? `<div style="margin-top:6px;color:rgba(0,0,0,.45)">${tt('还有 {n} 项…').replace('{n}', String(more))}</div>` : '')
+    + `</div>`
+  ElMessageBox.alert(html, (pre || '') + tt('还有 {n} 项必填未填写').replace('{n}', String(items.length)), {
+    confirmButtonText: tt('去填写'),
+    type: 'warning',
+    dangerouslyUseHTMLString: true,
+  }).catch(() => { /* 关闭弹窗不算错误 */ })
+}
+
 function validateInlineDraft() {
   /** 缺失项:{key(数据键), text(人话)} —— 明细页签整表必填时 key 是页签键 */
   const missing = []
+  lastMissingRequired = missing
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
@@ -9657,7 +9663,8 @@ function validateInlineDraft() {
  *   用户一眼能看懂「审核前得先把这单存下来,缺的是明细行」。
  */
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false, reason = '' } = {}) {
-  if (!draftEditable.value || inlineSaving.value) return false
+  // changeDeptFillOpen：已生效后由会签人填本部门行，也要能走保存（服务端只写明细）
+  if ((!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value) return false
   // 归档单据「修改单据」后的保存 = 保存修改(2026-11-06 用户口径「修改完成点击保存回到归档状态」):
   //   后端 saveDirectModify 落库后立刻做 修改记录 diff 收尾并把状态拨回 已归档 —— 不能走普通「保存」,
   //   那样只会停在 修改中。
@@ -9680,7 +9687,10 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   //   用户口径:保存为草稿不做必填限制;保存/提交才做。
   const validation = skipValidation ? '' : validateInlineDraft()
   if (validation) {
-    ElMessage.warning(pre + validation)
+    // 2026-11-12 用户口径：未填完就提交审批时**弹窗提示一次**，并高亮未填写内容。
+    // 高亮已由 validateInlineDraft 内部对每个缺失点调用 focusMissingFields 完成（翻页 + 闪烁）；
+    // 这里负责"一次说清"：把全部缺失项列成一个清单，而不是像原来那样只弹一条 toast。
+    promptMissingRequired(pre, validation)
     // 定位(翻页/滚动/高亮)已改为在 validateInlineDraft 的**每个失败点**就地调用
     // focusMissingField(精确的数据键,含明细行字段)。此处不再从提示文案反推字段名:
     // 反推出来的常是「明细工序控制」这类不存在的键,还会把已生效的高亮覆盖掉。
@@ -9945,14 +9955,6 @@ function onQueryRefConfirm(rows) {
 }
 
 function applyHeaderQuery() {
-  return applyHeaderQueryAsync()
-}
-
-/**
- * 查询提交(异步:单表多行面板要把条件交给纸面**定位并等它算完命中数**,
- * 同步返回 Promise 会让"已定位 N 行"永远判成 0 —— 2026-11-12 实测踩到)。
- */
-async function applyHeaderQueryAsync() {
   // 查询弹窗面板:单据日期(区间)必填;台账加验 仓库/存货 必填(单一仓库的一种存货)
   // 判据在 @core/report/reportQuery.validateReportQuery(单测钉死),这里只映射提示文案。
   if (reportQueryDialog.value) {
@@ -9985,15 +9987,6 @@ async function applyHeaderQueryAsync() {
   rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页;后台 load 也不再自动弹窗)
   rqdOpening.value = false
   queryDialogVisible.value = false
-  // 单表多行面板(待检验目录,2026-11-12 用户口径「应该做的是数据定位,因为他的所有数据都在一张单据里」):
-  // 条件提交后**不重新取数**,直接交给纸面在行里定位(命中行留下 + 滚过去 + 闪一下)。
-  // 服务端本来就只会返回同一张目录单,再查一遍既没意义也会把定位状态冲掉。
-  if (isRowLocatePanel.value) {
-    const n = (await approvalSheetRef.value?.applyLocate?.(condition)) ?? 0
-    if (n > 0) ElMessage.success(`${tt('已定位')} ${n} ${tt('行')}`)
-    else ElMessage.warning(tt('没有匹配的行，请调整条件或点「清除定位」'))
-    return
-  }
   search()
 }
 
@@ -10181,40 +10174,17 @@ const remarkText = computed({
 })
 
 // ---------- 配置与按钮 ----------
-/**
- * 面板名 → 浏览器标题 + **本实例自己那个页签**的标题。
- * 只在前台页签上写原子操作:缓存实例(别人的页签)一律不碰 —— 见 ownPath 的注释,
- * 「页签名字反复横跳」就是从这里写出去的。
- */
-function applyPanelTitle() {
-  if (!isFrontPage()) return
-  const name = String(panelName.value || '')
-  // 配置没拿到(无该面板权限 403 / 接口失败)时 panelName 会退回**面板码** ——
-  // 这时一个字都不要写:保住菜单给的「采购入库单」,否则页签会在中文名与「PURCHASE_IN」之间来回跳。
-  if (!name || name === String(panelCode.value || '')) return
-  document.title = name + ' · YINJIA-MES'
-  const curTab = tabs.tabs.find((x) => x.path === ownPath.value)
-  if (curTab && curTab.title !== name) curTab.title = name
-}
-
 async function loadCrg() {
-  if (cfgCache.value) {
-    // 命中缓存也要把标题对齐一次:切回页签走 onActivated → 这里,页签名可能被旧版逻辑改过
-    applyPanelTitle()
-    return cfgCache.value
-  }
-  // 🔴 响应回来必须核对两件事,任一不符就**整份丢弃**(不装配置、不写标题、不写 document.title):
-  //   ① 面板码没变 —— 请求在飞的时候本页已经切走了;
-  //   ② 本实例仍是前台页签 —— 缓存实例读到的 panelCode 是"当前正显示的那个面板",拿它取回配置
-  //      再去改 route.path 的页签,就是给别人的页签改名(2026-11-11「名字反复横跳」的根因)。
-  const reqCode = String(panelCode.value || '')
-  if (!reqCode) return null
-  const cfg = await engine.getPanelConfig(reqCode)
-  if (String(panelCode.value || '') !== reqCode || !isFrontPage()) return null
+  if (cfgCache.value) return cfgCache.value
+  const cfg = await engine.getPanelConfig(panelCode.value)
   cfgCache.value = cfg
   const tp = cfg?.metadata?.panelPageDto?.tablePages?.[0]
-  panelName.value = cfg?.metadata?.panelName || reqCode
-  applyPanelTitle()
+  panelName.value = cfg?.metadata?.panelName || panelCode.value
+  // 页面标题 = 真实面板名（路由 meta.title 是通用占位，配置加载后覆盖）
+  document.title = panelName.value + ' · YINJIA-MES'
+  // 页签标题同步（生单直接跳转/页签替换后显示真实面板名）
+  const curTab = tabs.tabs.find((x) => x.path === route.path)
+  if (curTab) curTab.title = panelName.value
   queryFields.value = tp?.queryFields || []
   // 参照字段动态模式检查(≤20 弹窗,>20 下拉):并行判定全部参照字段
   const allRefFields = [...(queryFields.value || []), ...(headerFields.value || [])].filter(isReferenceField)
@@ -10239,12 +10209,6 @@ async function loadCrg() {
     }
   }
   gridTabs.value = tp?.gridTabs || []
-  // 查询条件区默认收起(2026-11-11,见 yj_panel.config.collapseQueryBar):
-  // 用户口径「表头做个收缩」—— 条件多时一行放不下、表格被挤,故打开面板先收起条件区,
-  // 点工具栏那颗「条件」开关才铺开。没声明该配置的面板不动(仍常显)。
-  queryBarOpen.value = !(cfg?.metadata?.collapseQueryBar === true)
-  // 状态闸门的「含…」复选框每换一个面板都回到默认(未勾选 = 只看闸门放行的那些行)
-  includeGatedRows.value = false
   groups.value = filterGroups(ensureScanFillAction(
     cfg?.metadata?.buttonGroups,
     cfg?.metadata,
@@ -10331,7 +10295,9 @@ function isDisabled(action) {
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
-    保存: !draftEditable.value || inlineSaving.value,
+    // 2026-11-11：已生效/已归档时，会签人仍可「填本部门那一行」并保存（changeDeptFillOpen）
+    //   —— 只放「保存」这一个动作，保存为草稿/保存新增仍按原口径（草稿才有意义）。
+    保存: (!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value,
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,
     扫描填单: reportMode.value,
@@ -10458,8 +10424,16 @@ async function directAdd() {
     }
     const formData = {}
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
+    // ⚠ 先识别"HTTP 200 + body code≠200"这类错误体：engine.callButton 用的 unwrap() 不会抛，
+    //   而是把整个 body 原样返回（服务端刻意不用 4xx，否则 axios 拦截器会当成登录失效把人踢下线，
+    //   见 core/panel-engine.js unwrapStrict 的注释）。旧写法直接取 res['编号'] ⇒ undefined
+    //   ⇒ 统一报成「新增失败：未返回单据编号」，把**无权限 / 必填缺失**等真实原因全吞掉了
+    //   （2026-11-11 用户报「功能性滤效新增报错、其它面板也有新增不了」，实际原因被这句话掩盖）。
+    if (res && typeof res === 'object' && res.code != null && res.code !== 200) {
+      throw new Error(res.message || ('新增失败（code=' + res.code + '）'))
+    }
     const no = res && (res['编号'] || res.formNo)
-    if (!no) return ElMessage.error('新增失败：未返回单据编号')
+    if (!no) return ElMessage.error('新增失败：后端未返回单据编号（响应=' + JSON.stringify(res).slice(0, 120) + '）')
     // 标记必须先立:下面的 load() 刷新列表时 cur 就可能切到这张新草稿,文书默认值 watch 在
     // await 期间就会跑;标记晚设会被 isFreshAddedDoc() 判成 false,锁定字段(申请立项人/负责人)就带不出来
     freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
@@ -10627,12 +10601,7 @@ function hasUnsavedChanges() {
 
 /** 取消离开时页签可能已被 TabsBar 关闭，补回当前页签 */
 function restoreCurrentTab() {
-  // ⚠ 键必须用 **route.path**(与菜单建页签、keep-alive 的 key 完全同口径),不能用 route.fullPath:
-  //   fullPath 带 ?code=/?docNo=,补回来的页签路径与菜单那条不同 ⇒ tabs.open 去不了重,
-  //   页签栏里会出现两个同名页签(点哪个都像是"名字跳来跳去")。
-  try {
-    tabs.open({ path: ownPath.value || route.path, title: panelName.value })
-  } catch { /* 页签兜底失败不阻断 */ }
+  try { tabs.open({ path: route.fullPath, title: panelName.value }) } catch { /* 页签兜底失败不阻断 */ }
 }
 
 // ---- 离开守卫：同步拦截 → 守卫外弹窗 → 选择后放行 ----
@@ -11500,15 +11469,19 @@ async function onButton(action) {
       // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
       // 外部开发样品申请单（2026-11-06）：同一套「一级选二级(确认)人」弹窗
       if (action === '审批通过' && ['RD_PROD_INFO', 'RD_SAMPLE_EXT'].includes(String(panelCode.value))
-        && current.value['单据状态'] === '审批中') {
+        && ['审批中', '待二级审批'].includes(current.value['单据状态'])) {
         if (draftEditable.value) {
           const saved = await saveInlineDraft('保存', { silent: true })
           if (!saved) return
         }
         const no1 = current.value['编号'] || current.value['单据编号'] || ''
-        // 外部开发样品申请单:一级审批要**回填配方及工艺要求**(2026-11-06 用户口径) ⇒ 专用弹窗;
-        // 产品信息表仍走「只选二级审核人」的老弹窗。
-        if (String(panelCode.value) === 'RD_SAMPLE_EXT') return openSampleL1(no1)
+        // 外部开发样品申请单:一/二级审批都要能**回填配方及工艺要求** ⇒ 同一个专用弹窗。
+        //   2026-11-06 用户口径:一级填配方、进二级;2026-11-11 补齐:「二级签核无法修改配方」→
+        //   二级签核也要能改（后端 applySampleBackfill(node=2) 同一份白名单，留痕记 L2_BACKFILL + diff）。
+        //   产品信息表仍走「只选二级审核人」的老弹窗(它没有回填语义)。
+        if (String(panelCode.value) === 'RD_SAMPLE_EXT') {
+          return openSampleL1(no1, current.value['单据状态'] === '待二级审批' ? 2 : 1)
+        }
         return openL2Pick(no1)
       }
       // 立项申请表(2026-10-08 流程图②):审批通过与项目定级是同一步骤的两个动作 ⇒ 走「审批通过 + 定级」弹窗。
@@ -11528,6 +11501,15 @@ async function onButton(action) {
           if (!saved) return
         }
         return openDomApprove(current.value['编号'] || current.value['单据编号'] || '')
+      }
+      // 产品变更申请表(2026-11-11):审批通过要**同时落签字与日期**到纸面「批准/签字/日期」三格
+      //   ⇒ 专用弹窗（通用 prompt 只有一个意见框，收不到签字/日期）。
+      if (action === '审批通过' && panelCode.value === 'RD_CHANGE') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openChangeApprove(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
@@ -11692,12 +11674,6 @@ async function onButton(action) {
     } else {
       ElMessage.success(`「${action}」执行成功`)
     }
-    // 库存口径提示(2026-11-10 用户口径「库存数量以金蝶为准」):审核/审批通过**当场仍会记账**,
-    // 但那只是临时值 —— 没转ERP或金蝶没审核,下一轮同步(≤5 分钟)就把它抹平。不提示的话,
-    // 业务会以为"审核完库存就减了",然后在库存状况页看到数字又回去(差异列先亮出来)。
-    // 文案与码的映射见 core/views/stockHint.js;后端只在会改库存的面板才带这个码。
-    const stockHint = stockHintText(res?.['库存提示'])
-    if (stockHint) ElMessage.warning(tt(stockHint))
     await load()
     // 立项申请表：提交审批成功后自动跳「项目流程管控」（2026-11-06 用户口径
     //   「填写提交之后自动跳转到项目流程管控」）。
@@ -11825,9 +11801,6 @@ async function load(clamping = false) {
       }
       if (reportMode.value && reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
     }
-    // 状态闸门放开(2026-11-11):面板声明了 metadata.statusGate 时,服务端默认只返回闸门放行的行;
-    // 用户勾了「含…」才带 `_statusScope='all'` 让后端放开。`_` 前缀 = 控制键(后端不吃进字段 LIKE)。
-    if (statusGate.value && includeGatedRows.value) params.condition._statusScope = 'all'
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
@@ -11865,11 +11838,6 @@ async function load(clamping = false) {
 function search() {
   query.pageNo = 1
   curIdx.value = 0
-  // 单表多行面板:刷新/重置 = 回到"全部待检验行",把上一次的定位条件一并清掉(否则行被继续藏着)
-  if (isRowLocatePanel.value) {
-    approvalSheetRef.value?.clearLocate?.()
-    Object.keys(condition).forEach((k) => delete condition[k])
-  }
   load()
 }
 
@@ -12002,19 +11970,10 @@ watch(
     const prevCode = String(prev?.[0] ?? '')
     // 切面板页签:①把**正要离开**那个面板的未保存填写暂存起来;②清掉已被 × 掉的页签的暂存。
     // 都在清空之前做(此刻 cur/query 还是上一个面板的状态)。顺序不可颠倒。
-    // ⚠ 暂存键必须是**本实例自己装过的面板**(prevCode 只在本实例离开自己的面板时才对得上):
-    //   缓存实例读到的 prevCode 是别人面板的码,照它暂存会把本页签的填写塞进别人的槽位。
-    //   ownPanelCode 取不到时退回旧行为(宁可暂存,也不丢用户填的字)。
-    const stashable = !ownPanelCode.value || prevCode === ownPanelCode.value
-    if (prevCode && prevCode !== 'undefined' && stashable) stashCurrentPanelDraft(prevCode)
+    if (prevCode && prevCode !== 'undefined') stashCurrentPanelDraft(prevCode)
     dropClosedTabDrafts(code)
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
     if (!code || code === 'undefined') return
-    // 🔴 不是本实例的页面(路由已切到别的页签)⇒ 到此为止:不拆除、不取数、不重置弹窗门。
-    //   旧版在这里对着**别人的面板码**清空状态并取数,正是「页签名字反复横跳」与
-    //   「切个页签回来填写没了 / 弹窗自己弹回来」的同一处来源(见 ownPath 的注释)。
-    //   真正切回本页时(route.path 又回到本实例)这条 watch 会再触发一次,照常拆装重载。
-    if (!isFrontPage()) return
     // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
     // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
     list.value = []
@@ -12043,8 +12002,6 @@ watch(
     query.keyword = ''
     queryFields.value = []
     gridTabs.value = []
-    // 状态闸门的「含…」勾选属于上一个面板的状态,换面板先复位(新面板的默认值由 loadConfig 重设)
-    includeGatedRows.value = false
     queryRefVisible.value = false
     queryRefField.value = null
     queryDialogVisible.value = false
@@ -12087,8 +12044,6 @@ function applyDocNoQuery() {
 watch(
   () => route.query.docNo,
   (v) => {
-    // ?docNo= 是**当前路由**上的,缓存实例不该跟着别人的跳转取数(会把别人的单装进自己列表)
-    if (!isFrontPage()) return
     if (!v || Date.now() - lastDocJumpAt < 400) return
     if (applyDocNoQuery()) load()
   }
@@ -12129,8 +12084,7 @@ async function handleNewQuery() {
 watch(
   () => route.query.new,
   (v) => {
-    // 同上:?new=1 属于当前路由,只有前台实例该响应
-    if (v && isFrontPage()) handleNewQuery()
+    if (v) handleNewQuery()
   }
 )
 watch(cfgCache, (cfg) => {
@@ -12158,8 +12112,7 @@ onMounted(() => {
   load()
   // 把"未保存状态 + 保存/放弃"登记给页签栏:× 关闭时由它弹三态问句
   // (2026-10-16 用户口径「叉掉时还应该弹窗提示是否保存」;守卫只覆盖"导航离开",覆盖不到点 × 关后台页签)
-  // 键用**本实例自己的路径**(ownPath):卸载时 route.path 早已指向别的页签,用 route.path 注销会删错键
-  unsavedGuard.register(ownPath.value, {
+  unsavedGuard.register(route.path, {
     hasUnsaved: () => hasUnsavedChanges(),
     save: () => saveInlineDraft('保存', { silent: true }),
     discard: () => discardUnsavedChanges(),
@@ -12169,7 +12122,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  unsavedGuard.unregister(ownPath.value)
+  unsavedGuard.unregister(route.path)
 })
 
 onDeactivated(() => {
@@ -12254,9 +12207,6 @@ onUnmounted(() => {
 /* 单号链(条码面板):看起来是链接,但只开弹窗 —— 真跳转要过面板权限,不在这里直连 */
 .doc-no-link { color: var(--el-color-primary); cursor: pointer; text-decoration: underline dotted; }
 .doc-no-link:hover { color: var(--el-color-primary-light-3); }
-.doc-no-link.disabled { opacity: 0.45; cursor: not-allowed; }
-/* 检验数据记录明细表:非「已完成检验」行的操作格占位(保持列宽一致) */
-.qc-reopen-na { color: var(--el-text-color-placeholder); }
 .doc-no-dlg-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
 .doc-no-dlg-label { width: 48px; color: var(--el-text-color-secondary); flex: none; }
 .doc-no-dlg-value { word-break: break-all; }
@@ -12280,25 +12230,6 @@ onUnmounted(() => {
   width: 190px;
   align-self: stretch;
   margin: 3px 8px;
-}
-/* 状态闸门复选框(工具栏内嵌,2026-11-11):与旁边的工具按钮同高、竖线分隔 */
-.gated-toggle {
-  align-self: stretch;
-  height: auto;
-  margin: 0;
-  padding: 0 12px 0 10px;
-  border-right: 1px solid #c8ced8;
-}
-.gated-toggle :deep(.el-checkbox__label) {
-  font-size: 13px;
-  color: #263548;
-  padding-left: 6px;
-}
-/* 查询条件区收起/铺开按钮上的小三角 */
-.qb-caret {
-  font-size: 9px;
-  line-height: 1;
-  opacity: 0.7;
 }
 /* 预警数量行内编辑 */
 .warn-editable {
@@ -12441,24 +12372,6 @@ onUnmounted(() => {
   color: #46586e;
   font-weight: 600;
   margin-right: 6px;
-}
-/* 来源提示(2026-11-11):采购入库单的「来源 / 来源单号」不再占表头格子,挂成单据号旁的一条提示 */
-.doc-source {
-  font-size: 12px;
-  padding: 1px 8px;
-  border-radius: 8px;
-  margin-right: 6px;
-  color: #0f766e;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  white-space: nowrap;
-}
-/* 第三版用户口径「不需要跳转」:提示只是提示,不可点 —— 不设 cursor/hover。
-   有来源 = 绿;没有上游单据 = 灰(便于一眼区分"没走过链路的早期单")。 */
-.doc-source-empty {
-  color: #6b7280;
-  background: #f3f4f6;
-  border-color: #e5e7eb;
 }
 .doc-status {
   font-size: 12px;
@@ -12808,7 +12721,12 @@ onUnmounted(() => {
 .approval-layout :deep(.approval-sheet),
 .approval-layout :deep(.progress-sheet),
 .approval-layout :deep(.catalog-sheet),
-.approval-layout :deep(.qc-rec-sheet) {
+.approval-layout :deep(.qc-rec-sheet),
+/* 产品文件列表(2026-11-11)：本面板根节点是普通 div，此前不在这一组里 ⇒ 按 min-content 撑开
+   （4 文件×状态矩阵最小列宽和 1216 + padding），1440 窗口实测把 176px 操作栏整条顶出视口
+   （rail.right=1604 > vw=1440）并让正文多出 180px 横向溢出。
+   入组后 width 由 flex 分配，矩阵自身的横向滚动交给组件里的 .pds-scroll{overflow:auto}。 */
+.approval-layout :deep(.prod-doc-sheet) {
   flex: 1;
   min-width: 0;
 }
@@ -12928,6 +12846,35 @@ onUnmounted(() => {
 }
 .as-side-btn.sub:hover {
   background: #f2f6fa;
+}
+/* 「字段管理」= 配置类次级动作，但仍要一眼看出是可点的框(2026-11-11)。
+   取值全部来自 antd 设计库 token：colorBorder #d9d9d9 / colorBgContainer #fff /
+   colorText rgba(0,0,0,.88) / colorPrimary #1677ff / controlHeight 32 / borderRadius 6。
+   ⚠ 只改 .boxed 这一个，另外 3 个 .sub(审批情况/撤回会签)保持原样。 */
+.as-side-btn.sub.boxed {
+  height: 32px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.as-side-btn.sub.boxed:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+.as-side-btn.sub.boxed.disabled {
+  border-color: #d9d9d9;
+  color: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.04);
+  cursor: not-allowed;
 }
 .as-side-btn.disabled {
   color: #b9c2ce;
@@ -14304,8 +14251,19 @@ onUnmounted(() => {
 .preview-card:hover { border-color: #7fb0dd; box-shadow: 0 1px 4px rgba(30, 90, 138, .12); }
 .preview-card.on { border-color: #1e5a8a; background: #f0f7ff; }
 .pc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-.pc-no { font-weight: 600; font-size: 13px; color: #1e5a8a; word-break: break-all; }
+/* 单号一行显示（2026-11-11）：侧栏只有 ~180px，LXA-2026-11-0005 这种 16 字符的号
+   原来会折成两行（扫描时一行一单的效果就没了）⇒ nowrap。
+   ⚠ 不许加 overflow/ellipsis：号尾那几位才是区分单据的部分，截成 `LXA-2026-11-0…`
+   等于把最有用的信息切掉（实测踩过）。放不下时让**状态徽标换行**，见下面的 flex-wrap。 */
+.pc-no { font-weight: 600; font-size: 12px; color: #1e5a8a; white-space: nowrap; }
+/* 卡片头：单号优先占满一行，徽标挤不下就落到下一行，别反过来把单号截掉 */
+.pc-head { flex-wrap: wrap; gap: 2px 6px; }
+/* 徽标在卡片里收窄 + 禁折行（侧栏窄，默认的 padding 8px 会把「草稿」挤成上下两行） */
+.preview-card .doc-status { flex: none; white-space: nowrap; font-size: 11px; line-height: 16px; padding: 0 5px; margin-right: 0; }
 .pc-date { font-size: 11px; color: #9aa8b5; margin-bottom: 3px; }
+/* 一行摘要（日期 · 客户名 · 项目等级）：比日期深一档，扫列表时先看到人/客户（2026-11-11） */
+.pc-sum { color: #444; font-size: 12px; }
+.pc-date { line-height: 16px; }
 .pc-field { display: flex; gap: 6px; font-size: 12px; line-height: 18px; min-width: 0; }
 .pc-label { flex: none; color: #8ba6bd; }
 .pc-label::after { content: '：'; }

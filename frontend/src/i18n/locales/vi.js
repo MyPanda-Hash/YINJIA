@@ -2864,6 +2864,9 @@ export default {
     '订单行号': 'Dòng đơn hàng',
     '计划完工日期': 'Ngày hoàn thành dự kiến',
     '计划开工日期': 'Ngày bắt đầu dự kiến',
+    '计划开工日期不能晚于计划完工日期': 'Ngày bắt đầu dự kiến không được muộn hơn ngày kết thúc dự kiến',
+    '计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}': 'Ngày bắt đầu dự kiến không được muộn hơn ngày kết thúc dự kiến; ngày bắt đầu dự kiến đã điều chỉnh thành {d}',
+    '计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}': 'Ngày bắt đầu dự kiến không được muộn hơn ngày kết thúc dự kiến; ngày kết thúc dự kiến đã điều chỉnh thành {d}',
     '生产线': 'Dây chuyền sản xuất',
     // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
     '超订单': 'Vượt đơn hàng',

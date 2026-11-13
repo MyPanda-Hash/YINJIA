@@ -49,6 +49,28 @@ test('分区表不变量:filterKey 合法、filterVal 齐且不重复', () => {
  * 按页面名硬编码写行(如给成型配方页写 表区='成型配方')会造出"没有表认领"的行:**入了库但界面上永不显示**。
  * 这条测试把"表名 → 该用的值"钉死,脚本/探针要写行就从这张表取值,别再按页面名猜。
  */
+test('同面板内只要有一张表带 filterKey，**所有**表都必须带（否则不带的会显示全部行）', () => {
+  // ⚠ 2026-11-11 实测踩过：给 RD_INSP_PLAN 加了「修订记录」页并预铺 18 行空行后，
+  //   「检验项目」表（当时没有 filterVal）把 18 行全显示了出来 —— 序号 1..18 出现在检验项目页，
+  //   而这两张表共用 rd_insp_plan_detail 一张行表。
+  //   本条的判据：**共用行表 + 有一张分块，则所有表都要分块**。
+  //   rowsOf(dt) 对不带 filterKey 的表返回**全部 items**，它会把别的表的行也算进来。
+  const problems = []
+  for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {
+    const dts = cfg.dataTables || []
+    if (dts.length < 2) continue
+    const partitioned = dts.filter((d) => d.filterKey)
+    if (!partitioned.length) continue
+    for (const dt of dts) {
+      if (dt.filterKey) continue
+      const name = dt.bar || dt.pageTitle || `第${(dt.page ?? 0) + 1} 页的表`
+      problems.push(`${panel}「${name}」没有 filterKey，而同面板的「${partitioned[0].bar || partitioned[0].pageTitle}」有 `
+        + '⇒ 它会把别的表的行也显示出来（共用一张行表）')
+    }
+  }
+  assert.deepEqual(problems, [], '\n' + problems.join('\n'))
+})
+
 test('表名 → 表区值(filterVal)对照固化:脚本写行必须用右边这个值', () => {
   const mapOf = (panel) => Object.fromEntries((recordSheetConfigs[panel]?.dataTables || [])
     .filter((dt) => dt.filterVal)
@@ -83,8 +105,22 @@ test('#8 配方表默认铺 10 行空行,且只有配方表这一张表带 blank
   assert.ok(formula, 'RD_MOLD_PROC 缺配方表')
   assert.equal(Number(formula.blankRows), 10, '配方表应 blankRows:10(用户口径的确定数字)')
 
+  // ⚠ 2026-11-11 用户口径变更:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数」——
+  //   修订记录表现在**也**要带 blankRows。原断言"只有配方表能带"的依据是
+  //   「多挂一张会把空行铺到修订记录页」,而那个前提只在不带分块键时成立:
+  //   实测 RecordSheetPanels 的铺设逻辑是
+  //     ① 每张 dt 用**自己的** filterVal 给行打标（row[filterKey] = dt.filterVal）;
+  //     ② 记账键 `${单据号}::${filterKey}::${filterVal}` ⇒ 每张表独立记账、独立铺;
+  //     ③ rowsOf(dt) 又按 filterVal 过滤 ⇒ 两张表的行在界面上互不可见。
+  //   纯逻辑复现（两张表 10 + 18 行）:总 28 行、配方表可见 10、修订记录可见 18、串味 0 行。
+  //   ⇒ 真正该守的约束是「**每张带 blankRows 的表都必须有 filterKey+filterVal**」,
+  //     没有分块键才会真的混进同一桶。
   const withBlank = dts.filter((d) => Number(d.blankRows) > 0)
-  assert.deepEqual(withBlank.map((d) => d.filterVal), ['配方表'],
-    '只有配方表可以带 blankRows —— 修订记录表与它共用一张行表,多挂一张会把空行铺到修订记录页')
+  assert.ok(withBlank.length >= 1, '配方表/修订记录至少各有一张该带 blankRows')
+  for (const d of withBlank) {
+    assert.ok(d.filterKey && d.filterVal,
+      `「${d.filterVal || d.bar || d.pageTitle}」带 blankRows 但没有 filterKey+filterVal `
+      + '⇒ 空行会混进同面板所有表共用的那一桶(这才是原本要防的串味)')
+  }
 })
 

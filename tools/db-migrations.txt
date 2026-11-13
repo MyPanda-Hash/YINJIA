@@ -4812,3 +4812,23 @@ migrate-qc-recv-stock-visible-20261112.sql
 #   用户口径「不是从金蝶来的删除掉」;头/行/状态/批注/修改留痕/分批预约一并删,yj_usage_log 保留。
 #   三道守卫(外部数据ID 必须为空、无下游引用、头数≤3);库内无此三单时整段跳过(测试库属此情形)。两账套均执行。
 migrate-cleanup-non-kingdee-po-20261112.sql
+# 2026-11-10 产品文件列表承载单据兜底补种（PDL-0001 丢失导致面板空白）
+migrate-rd-prod-doclist-shell-reseed-20261110.sql
+# 2026-11-11 样品申请单「可见全部单据」(view_all)授给文件负责人/研发审核/管理员（刘磊口径）
+migrate-sample-view-all-20261111.sql
+# 2026-11-11 样品单「进度描述」列（外部头表 / 内部明细，行级；不受归档约束）
+migrate-sample-progress-desc-20261111.sql
+# 2026-11-11 出货检验计划表新增「修订记录」页签所需的 [表区] 物理分块列 + yj_field 登记
+migrate-insp-plan-revision-page-20261111.sql
+# 2026-11-11 产品信息表三格（一级/二级审核人、产品负责人）置只读 + 一级审核人空值补陈秀丽
+migrate-prodinfo-approver-cells-20261111.sql
+# 2026-11-11 烧结工艺清单「密度管控·管控要求」接入标准库（lib=mold.density，可自行维护）
+migrate-mold-density-stdlib-20261111.sql
+# 2026-11-11 配方表「设计添加量」存量行补单位（粉料/胶粉 % ，颗粒/折算 g/支）+ 2 位小数
+migrate-mold-recipe-design-unit-20261111.sql
+# 2026-11-11 产品变更申请表：批准人/批准签字/批准日期（备用2/3/4，审批通过时回填、纸面只读）
+migrate-rd-change-approval-sign-20261111.sql
+# 2026-11-11 产品信息表历史单据「一级审核人」统一为陈秀丽（只改这一列，幂等）
+migrate-prodinfo-l1-approver-backfill-20261111.sql
+# 2026-11-12 产品信息表一/二区字段置必填（项目编号/项目名称豁免；三区"至少一行"走 tab.isRequired）
+migrate-prodinfo-required-20261112.sql

@@ -309,7 +309,7 @@ test('尺寸回退:炭棒规格空时用检验要求的 外径mm/内径mm', () =
   assert.equal(params.length, 200)
 })
 
-test('引擎结果 → 回填补丁:页 1 十一个格 + 配方表两列,位数与百分号照设计文档', () => {
+test('引擎结果 → 回填补丁:页 1 十一个格 + 配方表三列,位数与百分号照设计文档', () => {
   const { slots } = slotsFromRows(rows14)
   slots.forEach((s) => { s.moisture = s.group === '折算料' ? 0.08 : 0.06 })
   const { params } = paramsFromHead(
@@ -337,11 +337,18 @@ test('引擎结果 → 回填补丁:页 1 十一个格 + 配方表两列,位数�
     实际密度管控上限: '0.60',
   })
   assert.equal(patch.rows.length, 10)
-  assert.deepEqual(patch.rows[0], { rowIndex: 0, code: 'YJ-XH-001', 实际添加比例: '62.00%', 单支物料含量: '145.55' })
+  // 第三列「设计添加量」是 2026-11-11 加进来的:纸面/导出件都带单位(用户口径),
+  // 而且**补差位那一行**(料位 1 = 1 − Σ料位2~7)只有引擎算得出来 —— 那正是用户报的
+  // 「物料1第一行无带出的设计添加量数据」。料位 1 的补差值 = 62.00%(总比例恒为 100%)。
+  assert.deepEqual(patch.rows[0],
+    { rowIndex: 0, code: 'YJ-XH-001', 实际添加比例: '62.00%', 单支物料含量: '145.55', 设计添加量: '62.00%' })
   assert.equal(patch.rows[5].实际添加比例, '33.00%')
   assert.equal(patch.rows[5].单支物料含量, '77.47')
+  assert.equal(patch.rows[5].设计添加量, '33.00%', '胶粉位按比例落格,带 %')
   assert.equal(patch.rows[6].实际添加比例, '5.00%')
   assert.equal(patch.rows[6].单支物料含量, '11.74')
+  // 折算料位(第 8~10 个料位)落的是**克/支**,不是百分数
+  assert.match(patch.rows.find((r) => r.设计添加量.includes('g/支')).设计添加量, /^[\d.]+ g\/支$/)
 })
 
 test('回填补丁只针对有行或有值的料位,空料位不产生行补丁', () => {

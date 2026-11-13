@@ -2859,6 +2859,9 @@ export default {
     '订单行号': 'Ligne de commande',
     '计划完工日期': 'Date de fin prévue',
     '计划开工日期': 'Date de début prévue',
+    '计划开工日期不能晚于计划完工日期': 'La date de début prévue ne peut pas être postérieure à la date de fin prévue',
+    '计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}': 'La date de début prévue ne peut pas être postérieure à la date de fin prévue ; début prévu ajusté au {d}',
+    '计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}': 'La date de début prévue ne peut pas être postérieure à la date de fin prévue ; fin prévue ajustée au {d}',
     '生产线': 'Ligne de production',
     // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
     '超订单': 'Au-delà de la commande',

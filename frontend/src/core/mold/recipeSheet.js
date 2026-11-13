@@ -48,12 +48,36 @@ export function groupOfMaterialType(type) {
   return ''
 }
 
+/**
+ * 剥掉数值文本尾巴上的**单位**，只留能 Number() 的那一截。
+ *
+ * 2026-11-11 起「设计添加量」在纸面和导出件里都带单位（用户口径「纸面和导出件都带单位」）：
+ * 粉料/胶粉写 `50.00%`、功能料-颗粒（折算料位）写 `3.00 g/支`（见 core/mold/recipeExport.js）。
+ * 既然**写进去了**，读的时候就必须读得回来 —— 否则把单子关掉再打开，`3.00 g/支`
+ * 会被 Number() 成 NaN、折算料位的克数静默变 0（这正是"静默错数"那类 bug 的入口）。
+ *
+ * 认的单位：`%` `％`、`g` / `G`、`克`，以及 `/支`(可带空格)后缀；千分位逗号一并吃掉。
+ * 认不出来的（`--`、`待定`）原样返回，由调用方 Number() 得到 NaN 后按"没有值"处理。
+ *
+ * @param {unknown} text 任意单元格文本
+ * @returns {string} 纯数字文本（可能为空串）
+ */
+export function stripUnit(text) {
+  let s = String(text ?? '').trim()
+  if (!s) return ''
+  s = s.replace(/[，,]/g, '').replace(/\s+/g, '')
+  // 先剥 /支 这类**分母**后缀，再剥前面的单位字母（g/支 → g → 空）
+  s = s.replace(/\/\s*(支|根|个|只)$/i, '')
+  s = s.replace(/(mm|cm|kg|mg|g|克|%|％)$/i, '')
+  return s
+}
+
 /** 「设计添加量」→ 比例:小数原样,'62'/'62%' 按百分数解释(并标记,弹窗要提示) */
 export function parseRatio(text) {
   const raw = String(text ?? '').trim()
   if (!raw) return null
-  const explicitPercent = raw.includes('%')
-  const num = Number(raw.replace('%', '').trim())
+  const explicitPercent = raw.includes('%') || raw.includes('％')
+  const num = Number(stripUnit(raw))
   if (!Number.isFinite(num)) return null
   if (explicitPercent) return { value: num / 100, percentAssumed: false }
   if (num > 1) return { value: num / 100, percentAssumed: true }
@@ -64,7 +88,7 @@ export function parseRatio(text) {
 function parseNumber(text) {
   const raw = String(text ?? '').trim()
   if (!raw) return null
-  const num = Number(raw.replace('%', '').trim())
+  const num = Number(stripUnit(raw))
   return Number.isFinite(num) ? num : null
 }
 
@@ -430,11 +454,16 @@ export function sinterLengthWarning(row, length) {
 }
 
 /**
- * 配方表里"有物料的行"数:物料编号/物料名称/物料种类任一非空才算数。
+ * 配方表里"有物料的行"数:**物料编号或物料名称**非空才算数。
  * 整行空白的行不算(明细表格天生会留空行),否则"0 行"这道闸永远拦不住。
+ *
+ * 2026-11-11 口径收紧:判据不再含「物料种类」(旧口径是编号/名称/种类任一非空)。
+ * 只有种类的行 = **空白行**(种类是料位不是物料,编号名称全空时比例/含量恒为 0),
+ * 它在纸面上看着像"还没填完的一行",于是既躲过了这道 0 行闸、又被当成有效行落了库。
+ * 与 recipeRows.js 的 hasMaterial、recipeExport.js 的 rowHasMaterial 同一判据。
  */
 export function materialRowCount(rows) {
-  const keys = ['物料编号', '物料名称', '物料种类']
+  const keys = ['物料编号', '物料名称']
   return (Array.isArray(rows) ? rows : []).filter((r) => keys.some((k) => String(r?.[k] ?? '').trim())).length
 }
 
@@ -497,6 +526,30 @@ export function paramsFromHead(head, overrides = {}, rows) {
 const fixed = (x, digits) => (Number.isFinite(x) ? x.toFixed(digits) : '')
 
 /**
+ * 料位 → 纸面/导出件「设计添加量」那一格的文本：2 位小数 + 单位。
+ *
+ * 2026-11-11 用户口径（研发管理优化 第 3 条）：「粉料段和胶粉导出的设计添加量没有百分比号单位
+ *   （若为功能料-颗粒属性则单位为 g/支）」「纸面和导出件都带单位」。
+ * 单位按**料位分组**判（分组又按「物料种类」判，见 groupOfMaterialType）：
+ *   · 折算料位（功能料-颗粒 / 折算物料）= 克/支，写 `3.00 g/支`；
+ *   · 粉料 / 胶粉位 = 比例，写 `50.00%`。
+ * 料位 1 是补差位，传进来的 designRatio 就是 1 − Σ料位2~7 的反推值 ⇒ 那一行不会再有空值
+ * （用户报的「物料1第一行无带出的设计添加量数据」就是这里补上的）。
+ *
+ * @param {string} group 料位分组(SLOT_GROUPS)
+ * @param {{designRatio?: number|null, amountG?: number|null}} slot 料位
+ * @returns {string} `50.00%` / `3.00 g/支` / ''(算不出数就给空,不写 0 骗人)
+ */
+export function designSlotText(group, slot) {
+  if (group === SLOT_GROUPS.CONVERTED) {
+    const g = fixed(Number(slot?.amountG), 2)
+    return g === '' ? '' : `${g} g/支`
+  }
+  const pct = fixed(Number(slot?.designRatio) * 100, 2)
+  return pct === '' ? '' : `${pct}%`
+}
+
+/**
  * 把物料档案里的含水率(bs_inv.水分含量,小数)并进弹窗输入。
  * 口径:只有粉料位的含水率参与计算(胶粉/折算料不进公式),所以只填粉料位;
  * **用户手改过的格不许被覆盖**(touched 下标),档案没有的物料编号记进 missingCodes 让人手填。
@@ -555,6 +608,10 @@ export function buildPatch(result, slots, extraHead) {
       code: s.code,
       实际添加比例: `${fixed(result.final_ratios[i] * 100, 2)}%`,
       单支物料含量: fixed(result.final_amounts[i], 2),
+      // 设计添加量也一并落格(带单位):料位 1 的行原本是空的 ⇒ 纸面/导出件第一行没有数据
+      // (2026-11-11 用户报的第一条)。这里写的是**引擎口径**的值,不是用户手填的原文 ——
+      // 补差位尤其只有引擎算得出来(1 − Σ料位2~7)。
+      设计添加量: designSlotText(s.group, s),
     })
   })
   return { head, rows }

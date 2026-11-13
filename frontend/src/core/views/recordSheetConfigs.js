@@ -137,6 +137,16 @@ const RD_ASM_PROC_DT_REVISION = {
   // 也没有可改的工艺形态格 —— 留着只会在表头上多一条无作用的「工艺形态：请选择」。
   noVariant: true,
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  autoSeqBar: true,
+  blankRows: 18,
+  fixedRows: true,
+  // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+  //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+  //   两个开关必须**都给**(缺一个就不成立):
+  //     · blankRows: 18 —— 按表预铺 18 行空行(只在本表区为空时铺一次,不覆盖已有数据);
+  //     · fixedRows: true —— 隐藏 ＋/× 与底部「新增数据记录行」(只隐藏按钮,本身不产生行)。
+  //   18 行怎么来的:A4 竖向可打印高 ≈1062px(@96dpi),本页标题≈100px + 表头 44px + 页脚/纸边距≈70px
+  //     ⇒ 可用于数据行 ≈848px;rowH 43 ⇒ floor(848/43)=19,取 18 留一行余量防溢出到第二页。
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
     { key: '序号', label: '序号', w: 50, align: 'center' },
@@ -214,6 +224,16 @@ const RD_MOLD_PROC_DT_REVISION = {
   // 本页无「产品基本信息」区(没有 工艺形态 格可改),也不靠变体切标题 ⇒ 不渲染表头变体切换行
   noVariant: true,
   design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  autoSeqBar: true,
+  blankRows: 18,
+  fixedRows: true,
+  // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+  //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+  //   两个开关必须**都给**(缺一个就不成立):
+  //     · blankRows: 18 —— 按表预铺 18 行空行(只在本表区为空时铺一次,不覆盖已有数据);
+  //     · fixedRows: true —— 隐藏 ＋/× 与底部「新增数据记录行」(只隐藏按钮,本身不产生行)。
+  //   18 行怎么来的:A4 竖向可打印高 ≈1062px(@96dpi),本页标题≈100px + 表头 44px + 页脚/纸边距≈70px
+  //     ⇒ 可用于数据行 ≈848px;rowH 43 ⇒ floor(848/43)=19,取 18 留一行余量防溢出到第二页。
   cols: [
     { key: '表区', label: '表区', hiddenCol: true, w: 46 },
     { key: '序号', label: '序号', w: 50, align: 'center' },
@@ -345,16 +365,20 @@ const RD_MOLD_PROC_SEC0 = [
         //   规格书带出的检验要求写在**右边那几格真实数据格**上(跌落要求 / 强度要求kgf / 压降标准kpa、
         //   以及尺寸那四格),不写块名格 —— 用户 2026-10-15 实测口径,见本块末尾 autoFillSpec。
         { grid: [
-          { label: '炭棒尺寸', rowspan: 2 },
+          // moldPick 从**数据格**挪到**标签格**(2026-11-11 用户口径:「工艺单-烧结的炭棒选型号选项
+          //   挪开位置，可以放到炭棒尺寸下面（打印时不要显示）」):
+          //   改前挂在外径mm 那一格 ⇒ 下拉占着「炭棒外径mm」的填写位,外径值没地方显眼地填;
+          //   改后挂在「炭棒尺寸」这个 rowspan=2 的标签格内、标签文字**下方**,
+          //   四个数据格恢复普通输入格。选型号 → 仍一次填四格(applyMoldModel 未改)。
+          //   ⚠ 下拉带 no-print:盖纸打印时不留「选型号」控件。
+          { label: '炭棒尺寸', rowspan: 2, moldPick: true },
           { label: '炭棒外径mm', span: 2 },
           { label: '炭棒外径公差mm', span: 3 },
           { label: '炭棒内径mm', span: 2 },
           { label: '炭棒内径公差mm', span: 3 },
         ]},
         { grid: [
-          // moldPick:这一格渲染成「按生产车间筛型号」的下拉,选型号 → 一次填这四格
-          //   (2026-11-04 用户口径:炭棒尺寸要按车间模具型号+公差带出)。落地见 RecordSheetPanels.applyMoldModel。
-          { key: '外径mm', span: 2, moldPick: true },
+          { key: '外径mm', span: 2 },
           { key: '外径公差', span: 3 },
           { key: '内径mm', span: 2 },
           { key: '内径公差', span: 3 },
@@ -366,7 +390,15 @@ const RD_MOLD_PROC_SEC0 = [
           { label: '实际密度管控上限', span: 4 },
         ]},
         { grid: [
-          { key: '密度管控要求', span: 2, ph: '密度范围：~' },
+          // 「管控要求」挂标准库(2026-11-11 用户口径:「把烧结工艺清单面板的密度管控的管控要求
+          //   字段加入标准库,可以自行维护更新」):
+          //   type:'select' + yj_field.data_type='标准库'/dict_sql='mold.density'
+          //   (tools/migrate-mold-density-stdlib-20261111.sql)⇒ RecordSheetPanels 的 select 分支
+          //   渲染 el-select(filterable + allow-create = 可选预设也可手填)并旁挂「⧉ 标准库维护」
+          //   (新增/编辑/停用走 StdLibManager,不用找开发)。
+          //   ⚠ 旁边两格「实际密度管控下限/上限」**故意不动**:用户口径「两个区域不变动」,
+          //     它们仍是手填的密度值,计算只吃这两格(core/mold/recipeSheet.js paramsFromHead)。
+          { key: '密度管控要求', span: 2, ph: '密度范围：~', type: 'select' },
           { key: '实际密度管控下限', span: 4 },
           { key: '实际密度管控上限', span: 4 },
         ]},
@@ -453,7 +485,11 @@ const RD_MOLD_FORMULA = {
       // blankRows:10 —— 2026-10-27 用户口径(#8)「炭棒配方管控清单页面:配方表默认填充 10 行表格」,
       //   用户另确认「没有的留空就行」⇒ 只铺空的 10 行(只带 表区 + 序号),不编造物料/比例。
       //   ⚠ 按**表**铺(不是面板级 seedRows):同面板的修订记录表共用一张行表,seedRows 会连它一起铺。
-      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
+      // designTotal:'设计添加量' —— 这一列是**混单位**的(粉料/胶粉 = %，功能料-颗粒 = g/支),
+      //   合计不能当一列普通数字相加(用户 2026-11-11 口径「设计添加量的和只需要计算 % 的就行,
+      //   这个最终的数值一定是 100%」)⇒ 交给 core/mold/recipeExport.designTotalText 只加 % 行。
+      //   其余列仍走 sumTotals 那套「位数跟明细走」。
+      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, designTotal: '设计添加量', recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
           // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
@@ -619,7 +655,12 @@ export const recordSheetConfigs = {
      *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
     dualDocNo: '文档编号',
     titlePlaceholder: '阻垢炭棒阻垢率测试',
-    grid: [125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125],
+    // 2026-11-11 用户口径:「这个太宽了，根本不协调，那些都是数据，可以适当缩短一些的」——
+    //   原设计 11 列 × 125 = 1375px，比同族数据记录表（碱性 1184 / 浸泡 1161 / 功能性滤效 1180）
+    //   明显宽一截。总宽收到 1176（与同族一致），但**不是均分**：
+    //   前 5 列是日期/流量/水温/硬度这类短值，给 80~110 够用；
+    //   后 6 列的标签是「1.2mm-12g(1.1:1)」这种长串，给 116 才不会折行（均分 107 实测会断行）。
+    grid: [90, 95, 80, 105, 110, 116, 116, 116, 116, 116, 116],
     // 设计「阻垢性能」第 1 行是**一格含两段文字**:A1:J1 = 公司名 + 靠右的编号
     // "惠州市银嘉环保科技有限公司……YJ-PD-01",第 11 列 K1 空 ⇒ noSpan:0(同格)+ 右侧留 1 空列
     head: { title: 6, infoLabel: 1, infoValue: 4, noSpan: 0, noGapSpan: 1, docnoPrefix: false },
@@ -1405,6 +1446,16 @@ export const recordSheetConfigs = {
         filterKey: '表区', filterVal: '修订记录',
         noVariant: true,
         design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  autoSeqBar: true,
+  blankRows: 18,
+  fixedRows: true,
+  // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+  //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+  //   两个开关必须**都给**(缺一个就不成立):
+  //     · blankRows: 18 —— 按表预铺 18 行空行(只在本表区为空时铺一次,不覆盖已有数据);
+  //     · fixedRows: true —— 隐藏 ＋/× 与底部「新增数据记录行」(只隐藏按钮,本身不产生行)。
+  //   18 行怎么来的:A4 竖向可打印高 ≈1062px(@96dpi),本页标题≈100px + 表头 44px + 页脚/纸边距≈70px
+  //     ⇒ 可用于数据行 ≈848px;rowH 43 ⇒ floor(848/43)=19,取 18 留一行余量防溢出到第二页。
         cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           // 同上：合计 60+220+170+100+90+140 = 780，与 grid 对齐
@@ -1571,17 +1622,27 @@ export const recordSheetConfigs = {
           // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
           { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
         ]},
-        // 两级审批人**各占一行**(用户口径:原来挤在同一行);固定值 冯总 / 秀丽 由
-        // docDefaults.js 在新建时带出(与 申请立项人/负责人 同机制,仍可人工改)。
+        // 两级审批人各占一行(用户口径:原来挤在同一行)；**三格全部只读**(2026-11-11 用户口径):
+        //   「产品信息表的一级审核人名字改为：陈秀丽，这个是固定的
+        //    二级审核人是分配的产品责任人（规格书的责任人）是谁就回填显示谁的名字
+        //    这三个都是只读的，但是都要有对应的数据回填进去」
+        //   ⇒ 纸面 ro:true 不可编辑；值由系统回填（不是人工填）:
+        //      · 一级:docDefaults 新建时带出「陈秀丽」(固定)；
+        //      · 二级:**一级审批选了二级签核人之后**由 ButtonService.writeBackL2Approver 写
+        //        rd_prod_info_head.审核人二级；选之前为空，后续改人也跟着改；
+        //      · 产品负责人:同二级(分发责任人/规格书责任人就是它)。
+        //   ⚠ 只读是**两处一起**才成立的:纸面 ro:true(这里) + yj_field.editable=0
+        //     (tools/migrate-prodinfo-approver-cells-20261111.sql)。只改一边挡不住绕过界面直接调保存。
+        //   ⚠ 回填链路不受影响:两处回填都是服务端 raw SQL 直写，不走前端保存校验。
         // 原「审核人」列保留为历史列(hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢)。
         { pairs: [
-          { label: '审核人（一级审核）', key: '审核人（一级审批人）', type: 'text', vspan: 3 },
+          { label: '审核人（一级审核）', key: '审核人（一级审批人）', type: 'text', vspan: 3, ro: true },
         ]},
         { pairs: [
-          { label: '审核人（二级审核）', key: '审核人（二级审批人）', type: 'text', vspan: 3 },
+          { label: '审核人（二级审核）', key: '审核人（二级审批人）', type: 'text', vspan: 3, ro: true },
         ]},
         { pairs: [
-          { label: '产品负责人', key: '产品负责人', type: 'text', vspan: 3 },
+          { label: '产品负责人', key: '产品负责人', type: 'text', vspan: 3, ro: true },
         ]},
         { pairs: [
           { label: '备注', key: '备注', vspan: 3 },
@@ -1935,6 +1996,15 @@ export const recordSheetConfigs = {
     dataTables: [
       { page: 1, pageTitle: '修订记录', filterKey: '表区', filterVal: '修订记录',
         design: { titleSize: 21, titleTop: 24, titleGap: 61, headerH: 44, rowH: 43, fontSize: 16 },
+        // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+        //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+        //   两个开关必须**都给**:blankRows 预铺空行(只在本表区为空时铺一次,不覆盖已有数据);
+        //   fixedRows:true 隐藏 ＋/× 与底部「新增数据记录行」(它只隐藏按钮,本身不产生行)。
+        //   本页 titleGap 61(规格书修订记录页标题间距比工艺清单那两个大),可用高 ≈827px
+        //   ⇒ rowH 43 时 floor(827/43)=19,取 18 与其余修订记录页一致(便于统一口径与核对)。
+        autoSeqBar: true,
+        blankRows: 18,
+        fixedRows: true,
         cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 46 },
           { key: '序号', label: '序号', w: 46 },
@@ -2031,6 +2101,20 @@ export const recordSheetConfigs = {
   //   检验类别(必测项/型式检验)改由 libGroupKey 承载,只用于标准库勾选时落分组,不上纸。
   RD_INSP_PLAN: {
     headMode: 'report',
+    /**
+     * 页签(2026-11-11 用户口径):「这个面板也加一个修订记录 tap 页」。
+     *
+     * <p>页 0 = 出货检验项目控制计划(原有的检验项目表);页 1 = 修订记录。</p>
+     * <p>⚠ 修订记录页不出报告头(设计上只有一行居中大标题 + 一行表头,没有公司抬头/编号/信息栏),
+     *   故 showHead:false,由 dt.pageTitle 出标题 —— 与 RD_ASM_PROC / RD_MOLD_PROC 的修订记录页同一做法。</p>
+     * <p>⚠ grid 宽度必须与该页自己的表格列宽合计相等,否则上下竖线对不齐(见各页注释)。</p>
+     */
+    pages: [
+      // 页 0:出货检验项目控制计划。grid 原样保留(7 格 = 144×4 + 294 + 165 + 152 = 1187)
+      { title: '出货检验项目控制计划', headMode: 'report', showHead: true, grid: [144, 144, 144, 144, 294, 165, 152] },
+      // 页 1:修订记录。5 列 110+300+180+170+180+120 = 1060（序号110/更改内容300/更改原因180/更改时间170/责任人180/备注120）
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [110, 300, 180, 170, 180, 120] },
+    ],
     docNoDefault: 'YJ-QR-88',
     titlePlaceholder: '出货检验项目控制计划',
     // 大标题格做成「标题」字段输入框(2026-10-19 用户报障「出货检验计划表出现标题不能为空,
@@ -2126,7 +2210,13 @@ export const recordSheetConfigs = {
       //   写成 true 会被当成 spec.test 分组库,弹窗形态整个不对。
       // 下面这份是「库里一条都没有」(未跑种子)时的内置兜底展示,**不是真源**;
       // 有 yj_std_lib 数据时一律以库为准(真源,可在弹窗里编辑/停用/恢复)。
-      { bar: '检验项目', libGroupKey: '检验类别', lib: [
+      // 分块键(2026-11-11 修回归):本面板的「修订记录」页与这张表**共用 rd_insp_plan_detail**
+      //   一张行表,而 rowsOf(dt) 对不带 filterKey 的表返回**全部 items** ⇒ 修订记录预铺的 18 行
+      //   会整片显示在检验项目页(实测:序号 1..18 全是空行,用户报「出货检验的不需要预留」)。
+      //   ⇒ 两张表都必须分块,本表标 '检验项目'(存量行由
+      //     migrate-insp-plan-revision-page-20261111.sql 回填,新建行由 addRow/标准库勾选/
+      //     规格书带入/预铺四条路径自动打标,见 RecordSheetPanels 的 dt.filterKey 用法)。
+      { bar: '检验项目', filterKey: '表区', filterVal: '检验项目', libGroupKey: '检验类别', lib: [
         // 每行都带 检验类别 = 该条目在 yj_std_lib 里的 item_code。单表形态没有 filterVal 可推分组,
         // confirmLib 勾选落明细时靠这一格把 必测项/型式检验 带回明细行(row['检验类别'])。
         // ── 内置兜底 A:必测项 ──
@@ -2163,6 +2253,7 @@ export const recordSheetConfigs = {
         // 藏的是**列**不是数据;删掉它们等于断掉标准库往返。
         // ⚠ 老配置里那条 { key: '表区' } 是**幽灵列**:rd_insp_plan_detail 根本没有 [表区] 物理列,
         //   本轮一并删掉(这也正是本面板绝不能用 filterKey:'表区' 的原因)。
+        { key: '表区', label: '表区', hiddenCol: true },
         { key: '检验类别', label: '检验类别', hiddenCol: true },
         { key: '质量控制内容', label: '质量控制内容', hiddenCol: true },
         { key: '检测仪器', label: '检测仪器、工具', hiddenCol: true },
@@ -2172,6 +2263,45 @@ export const recordSheetConfigs = {
       ],
       // 表尾注(设计 r10 的 B10:H10):totalSpan(dt) = 可见列数 = 7 ⇒ 自动跨满七列
       footerNote: '若规格书有变动提示管控文件需更新' },
+      /**
+       * 页 1「修订记录」(2026-11-11 用户口径:「这个面板也加一个修订记录 tap 页」)。
+       *
+       * <p>⚠ 分块键不能用 [表区]:rd_insp_plan_detail **没有** [表区] 物理列
+       *   (本面板上面那段注释就是为这个坑写的)⇒ 借用备用列池的 [备用1] 做分块。
+       *   备用1 是 nvarchar(1000) 的通用占位列,本面板此前只用了 备用1..20 的 0 行数据,
+       *   拿它承担"修订记录"这个标记不冲突。</p>
+       * <p>行数按用户同批口径固定为 A4 可打印行数、无数据留空、不给手工加行
+       *   (blankRows + fixedRows 两个开关,理由见组装工艺清单那处注释)。</p>
+       */
+      {
+        page: 1,
+        pageTitle: '修订记录',
+        // 分块键用项目唯一约定的 [表区]（物理列）—— rd_insp_plan_detail 原本没有这一列，
+        // 由 tools/migrate-insp-plan-revision-page-20261111.sql 补列 + 登记 yj_field。
+        // ⚠ 不能用备用1 之类的替代列：filtervals 测试强制 filterKey 只能是 '表区'，
+        //   且必须是该面板的 yj_field label，否则行写不回库。
+        filterKey: '表区', filterVal: '修订记录',
+        noVariant: true,
+        design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+        autoSeqBar: true,
+        // 2026-11-11 用户口径:「所有的修订记录 tap 页都要预先设置符合 A4 打印的行数，而不是要自己
+        //   一个一个去加，这个是固定下来，没有数据填写就表格空着」。
+        //   两个开关必须**都给**:blankRows 预铺空行(只在本表区为空时铺一次,不覆盖已有数据);
+        //   fixedRows:true 隐藏 ＋/× 与底部「新增数据记录行」(它只隐藏按钮,本身不产生行)。
+        //   18 行 = A4 竖向可用高 ≈848px(rowH 43)向下取整后留一行余量,防溢出到第二页。
+        blankRows: 18,
+        fixedRows: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          // 6 列合计 110+300+180+170+180+120 = 1060 = 本页 grid 合计
+          { key: '序号', label: '序号', w: 110, align: 'center' },
+          { key: '更改内容', label: '更改内容', w: 300, area: true },
+          { key: '更改原因', label: '更改原因', w: 180 },
+          { key: '更改时间', label: '更改时间', w: 170 },
+          { key: '责任人', label: '责任人', w: 180 },
+          { key: '备注', label: '备注', w: 120, area: true },
+        ],
+      },
     ],
   },
 
@@ -2210,25 +2340,31 @@ export const recordSheetConfigs = {
     //   titleKey 绑一个字段,编辑态是输入框(灰字提示词 = 现在的标题),值为空时纸上仍回落印
     //   staticTitle(逐字同文)⇒ 不改的老单据观感一字不变。
     //   字段由 tools/migrate-change-title-20261016.sql 建(rd_change_head.[标题] + yj_field 登记)。
-    staticTitle: 'KPC管控点申请单',
-    titleKey: '标题',
-    titleKeyPh: 'KPC管控点申请单',
+    // ⚠ 2026-11-11 用户口径改回**固定**标题:「这个产品变更申请表的表的表头标题固定为产品变更申请表」。
+    //   2026-10-16 那轮要求的是"可自由编辑"(见本段上方注释),本轮明确推翻 ⇒ 去掉 titleKey/titleKeyPh,
+    //   只留 staticTitle;纸上永远印「产品变更申请表」,不再渲染输入框。
+    //   旧单据里若已存过「标题」值,不再上纸(key 未声明 ⇒ 不占格),库列原样保留不删。
+    staticTitle: '产品变更申请表',
     titlePlaceholder: 'KPC管控点申请单',
     grid: [111, 205, 441, 147, 210, 128],
-    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    // 右上角编号格(2026-11-11 用户口径「文件编码挪到右上角，替换单据编号，而且是固定的」):
+    //   · docnoPrefix 由「单据编号」改为「文件编码」—— 那格印的是**受控表单编号**，不是本单流水号；
+    //   · docNoStatic → 该格印**常量**，编辑态/只读态都不出输入框(既有机制，产品信息表/规格书同款)。
+    //   本单的单据编号(CHG-…)仍在表体那一行显示，也仍在左侧选单栏与列表页。
+    docNoStatic: 'YJ-QR-130',
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编码', docNoKey: '单据编号' },
     info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
     sections: [
       { bar: '一、基础信息', rows: [
         { h: 74, grid: [
-          // 「申请日期」要和下一行的「性质」**左右对齐**(2026-10-19 用户口径)。
-          // 原写法 `{fixed:'YJ-QR-130'}` + `{label:'申请日期'}` 让日期标签落在第 3 列(=441px 的宽列),
-          // 而「性质」标签在第 4 列(=147px)⇒ 两个标签框宽窄、起点都不一样,看着错位。
-          // 现在让编号格跨 2 列,日期标签就正好落到第 4 列,与「性质」同列同宽。
-          // gridCols = [111,205,441,147,210,128](合计 1242):1+2+1+2 = 6 列,rowspan 不变。
-          { label: '文件编码' },
-          { fixed: 'YJ-QR-130', span: 2 },
+          // 2026-11-11:「文件编码」挪到右上角编号格(见上面 docNoStatic / docnoPrefix)，
+          //   本行不再重复印它 —— 同一张纸印两处同一个表单编号是冗余。
+          //   ⚠ 2026-10-19 那轮让「申请日期」与下一行「性质」左右对齐，靠的是前两格占掉 3 列
+          //     (文件编码 label 1 列 + 值 2 列)把日期标签顶到第 4 列；前两格撤掉后对齐的**前提**没了，
+          //     若只删不补，整行只剩 3 列、短一截(格子对不齐)。故改为「标签 1 列 + 值 5 列」占满整行
+          //     (gridCols = [111,205,441,147,210,128] 合计 1242，1+5 = 6 列不变)。
           { label: '申请日期' },
-          { key: '申请日期', span: 2 },
+          { key: '申请日期', span: 5 },
         ]},
         { h: 74, grid: [
           { label: '申请部门' },
@@ -2263,10 +2399,14 @@ export const recordSheetConfigs = {
           { label: '需会签' },
           { key: '需会签', type: 'checks', single: true, options: ['是', '否'], span: 2 },
         ]},
-        // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
+        // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮。
+        // 2026-11-11 用户口径:「会签人字段改为下拉勾选对应的账号，就是人员姓名」
+        //   ⇒ 由纯文本输入改成**选人下拉(多选)**:界面显示人员姓名、存库仍是账号。
+        //   ⚠ 存库格式不变(顿号分隔的账号串)—— ButtonService.signersOf 按 [,，、;；\s] 切分后
+        //     逐账号校验启用状态 / 发通知 / 写 yj_form_approval.operator,改成存姓名会全线失配。
         { h: 74, grid: [
           { label: '会签人' },
-          { key: '会签人', span: 5, ph: '多人用逗号分隔（账号）' },
+          { key: '会签人', span: 5, userPick: true, multiple: true, ph: '点击选择会签人（可多选）' },
         ]},
       ]},
       { bar: '二、变更/新增申请事由', rows: [
@@ -2319,49 +2459,20 @@ export const recordSheetConfigs = {
     //     三个标签格是静态文字,下方三格不带 key ⇒ 渲染成只读文本格(实测可编辑态下 input/textarea 数 = 0),
     //     打印出来就是留给领导手签的空白格。别给它们补 key,补了就真能填了。
     tailSections: [
-      { page: 0, bar: '三.相关变更', rows: [
+      // 2026-11-12 用户口径:「还出现了两个三区标题头，应该是有一个四才对」——
+      //   本单正文段依次是 一、基础信息 / 二、变更·新增申请事由 / 三、部门评审意见，
+      //   这一段理应是**四**。原来写成「三.相关变更」（还是半角点），与三区撞号。
+      { page: 0, bar: '四、相关变更', rows: [
         { h: 115, grid: [
           { label: '相关变更' },
           { key: '相关变更', span: 5, area: true, rows: 3, ph: '与哪些文件/工序/在制品相关联' },
         ]},
       ]},
-      { page: 0, bar: '四、库存产品处理方式', rows: [
-        { h: 92, grid: [
-          { label: '原料' },
-          { label: '数量' },
-          { key: '原料数量' },
-          { label: '处理方式' },
-          { key: '原料处理方式', type: 'select', span: 2 },
-        ]},
-        { h: 92, grid: [
-          { label: '半成品' },
-          { label: '数量' },
-          { key: '半成品数量' },
-          { label: '处理方式' },
-          { key: '半成品处理方式', type: 'select', span: 2 },
-        ]},
-        { h: 92, grid: [
-          { label: '成品' },
-          { label: '数量' },
-          { key: '成品数量' },
-          { label: '处理方式' },
-          { key: '成品处理方式', type: 'select', span: 2 },
-        ]},
-      ]},
-      { page: 0, bar: '五、其它', rows: [
-        { h: 92, grid: [
-          { label: '文件管理人' },
-          { key: '文件管理人', span: 2 },
-          { label: '密级' },
-          { key: '密级', type: 'select', span: 2 },
-        ]},
-        { h: 92, grid: [
-          { label: '文件使用范围' },
-          { key: '文件使用范围', type: 'select', span: 2 },
-          { label: '备注' },
-          { key: '备注', span: 2 },
-        ]},
-      ]},
+      // 2026-11-11 用户口径:「四五内容区去掉」——
+      //   「四、库存产品处理方式」(原料/半成品/成品 各 数量+处理方式)与「五、其它」
+      //   (文件管理人/密级/文件使用范围/备注)两段整段删除。
+      //   ⚠ 只删**纸面版式**;这些字段的 yj_field 行与物理列原样保留(历史单据的值不丢,
+      //     也不影响列表/导出),不再出现在这张纸上。要恢复就按原样把两段加回来。
       // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)——手签行也得留够高度
       { page: 0, bar: '批准', rows: [
         { h: 92, grid: [
@@ -2369,11 +2480,17 @@ export const recordSheetConfigs = {
           { label: '签字', span: 2 },
           { label: '日期', span: 2 },
         ]},
-        // 下方三格 = 手签空白区:**不带 key** ⇒ 纸面只读、按钮输入不进来(用户口径「不能填写」)
+        // 下方三格 = 审批通过时**自动回填**的批准人/签字/日期(2026-11-11 用户口径):
+        //   「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期，
+        //     …保存之后该单据可见内容，打印出来也是有数据的」
+        //   · 三个字段由 migrate-rd-change-approval-sign-20261111.sql 登记在 备用2/3/4，
+        //     yj_field.editable=0；纸面再标 ro:true ⇒ 无论如何都只渲染纯文本，人手改不进来。
+        //   · 真源只有「审批通过」这一条路径（ButtonService 的 RD_CHANGE 分支负责写）。
+        //   ⚠ 原来这三格**不带 key**（纯手签留白）。改成带 key 是为了把审批结果落库并打印出来。
         { h: 92, grid: [
-          { span: 2, ro: true },
-          { span: 2, ro: true },
-          { span: 2, ro: true },
+          { key: '批准人', span: 2, ro: true },
+          { key: '批准签字', span: 2, ro: true },
+          { key: '批准日期', span: 2, ro: true },
         ]},
       ]},
     ],

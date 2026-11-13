@@ -8,18 +8,24 @@
      **后端实现原样保留**:/px/workOrderList/toPicking + WorkOrderPickingService(含回写)不动,
      端点闸门仍认 picking 词(见 PanelPermissionService.BUTTON_PERMS_OVERRIDE 的说明);
      领料单改由「材料出库单」面板手工建单,审核出库后照旧回写工单「领料单号」(ManuWritebackService)。
-     取数窗口:默认预填最近 15 天(2026-10-05 用户口径,防单据累积后卡),清空日期框=查全量。 -->
+     取数窗口:默认预填最近 15 天(2026-10-05 用户口径,防单据累积后卡),清空日期范围=查全量。
+      2026-11-09 两项用户口径:①日期范围控件换成与「订单结转」同一个实现(`@core/ui/DateRangeQuery`:单框
+      daterange + 快捷档);②「刷新规则」改为**前端分页渲染**(默认 50 行/页,上限 200)—— 原来一次渲染
+      全部行(日期范围越大行数越多,实测 399 行 × 88 列 ≈ 3.5 万单元格,主线程阻塞 15 秒+、页面无响应)。
+      默认页大小 50 是验收实测的结果:本表列数极多(基础 36 列 + 数据驱动的「日排产」日期列,全量时共 119 列),
+      100 行/页即便合并成单次渲染仍 >5 秒;50 行/页可稳定在 3 秒级。100/200 仍可选(用户自选,代价更慢)。 -->
 <template>
   <div class="wol-page">
-    <!-- 查询行:日期范围 + 单框模糊搜索 -->
+    <!-- 查询行:日期范围 + 单框模糊搜索
+         2026-11-09 用户口径:日期范围改为与「订单结转」页**同一个控件实现**(DateRangeQuery:
+         单框 daterange + 今日/本周/本月/近7天/近30天/上月快捷档),不再用两个独立日期框。
+         选完日期即查(与订单结转同口径),回车/点「查找」同样按新区间查询并回第 1 页。 -->
     <div class="wol-query">
       <span class="wol-lb">{{ tt('日期范围') }}</span>
-      <el-date-picker v-model="dateFrom" type="date" value-format="YYYY-MM-DD" size="small" style="width: 130px" />
-      <span class="wol-sep">-</span>
-      <el-date-picker v-model="dateTo" type="date" value-format="YYYY-MM-DD" size="small" style="width: 130px" />
+      <DateRangeQuery v-model="datePick" clearable @change="onQuery" />
       <span class="wol-lb" style="margin-left: 12px">{{ tt('模糊搜索') }}</span>
-      <el-input v-model="qText" size="small" style="width: 220px" :placeholder="tt('输入查询条件...')" clearable @keyup.enter="load" />
-      <el-button size="small" type="success" @click="load">{{ tt('查找') }}</el-button>
+      <el-input v-model="qText" size="small" style="width: 220px" :placeholder="tt('输入查询条件...')" clearable @keyup.enter="onQuery" />
+      <el-button size="small" type="success" @click="onQuery">{{ tt('查找') }}</el-button>
       <span class="wol-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </div>
 
@@ -55,7 +61,8 @@
       </el-dropdown>
       <el-button v-if="canDo('recipe')" size="small" type="warning" plain @click="openMixingRecipe" :disabled="!checked.length && !currentRow">{{ tt('获取混料配方') }}</el-button>
       <el-button v-if="canDo('export')" size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
-      <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
+      <!-- 刷新 = 按当前条件重查并回第 1 页(2026-11-09 与订单结转同口径;翻页只切渲染页,不重查) -->
+      <el-button size="small" @click="onQuery">{{ tt('刷新') }}</el-button>
       <!-- 日排产(2026-10-29):表格内的日期列 —— 列由后端按数据生成。
            2026-10-31 用户口径「**当前不需要手填,能自动算就可以了**」⇒ 「保存日排产」按钮已撤(含均摊弹窗),
            日期格改为<b>只读</b>:计划由后端按「工序计划量 ÷ 开工日→交期」自动均摊算出。 -->
@@ -211,6 +218,19 @@
       </el-table-column>
     </el-table>
 
+    <!-- 分页条(2026-11-09 用户口径「日期范围选择较大时数量过大导致页面卡住」):
+         根因是原来把查询到的**全部行**一次交给 el-table 渲染(实测全量 399 行 × 88 列 ≈ 3.5 万单元格,
+         主线程阻塞 15 秒以上、页面完全无响应;日期范围越大行数越多,越卡)。
+         现在只渲染当前页(默认 50 行/页),行数据仍在内存里 ⇒ 跨页勾选/导出/结案/打印等原有能力不变;
+         日期/关键字/状态筛选变化回第 1 页,动作后的刷新保持当前页(页码越界自动夹回)。
+         页大小上限 200:本表列数极多(全量时 119 列),100/200 行/页比 50 明显更慢,只作为用户自选项。 -->
+    <div class="wol-pager">
+      <!-- size="small" 取代布尔 small(2026-10-19):布尔值在 Element Plus 3.0 会废弃 -->
+      <el-pagination size="small" background layout="total, sizes, prev, pager, next, jumper"
+                     :total="filtered.length" v-model:current-page="pageNo" v-model:page-size="pageSize"
+                     :page-sizes="[50, 100, 200]" />
+    </div>
+
     <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**。
          单行:按「工单号+工单行号」收敛 ⇒ 只显示这一行;
          多行(2026-10-30):按「行id列表」把①池收敛成勾选的这些行并默认全选,勾多行点「批量排产」。 -->
@@ -281,11 +301,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onDeactivated, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
@@ -329,8 +350,8 @@ function applyRouteKeyword() {
   if (!kw && !focus) return false
   if (kw) {
     qText.value = kw
-    dateFrom.value = ''
-    dateTo.value = ''
+    // 清空日期范围 = 不按日期过滤(2026-11-09 换 daterange 控件后,`[]` 即「清空」语义)
+    datePick.value = []
   }
   // 用完即摘(?focus 同款口径):keep-alive 再次切回时不该被旧关键词复写
   if (route.query.keyword !== undefined || route.query.focus !== undefined) {
@@ -350,6 +371,11 @@ async function applyRouteFocus() {
   focusPending.value = ''
   const row = rows.value.find((r) => String(r.行id) === id)
   if (!row) return
+  // 2026-11-09 分页后:目标行不在第 1 页时先翻到它所在页(否则 setCurrentRow 画在当页但看不见);
+  // 被「未完工/已完工」筛掉时先清筛选,保证跳进来能看到目标行。
+  if (!filtered.value.some((r) => String(r.行id) === id)) stateFilter.value = ''
+  const idx = filtered.value.findIndex((r) => String(r.行id) === id)
+  if (idx >= 0) pageNo.value = Math.floor(idx / pageSize.value) + 1
   await nextTick()
   tableRef.value?.setCurrentRow?.(row)
   currentRow.value = row
@@ -370,12 +396,22 @@ const lineCode = ref('')
 const stateFilter = ref('')
 /**
  * 默认取数窗口 = 最近 15 天(2026-10-05 用户口径:单据一多就卡,默认不拉全量)。
- * 进页面时预填「今天-14 ~ 今天」(含今天共 15 天);**清空两个日期即查全量**。
+ * 进页面时预填「今天-14 ~ 今天」(含今天共 15 天);**清空日期范围即查全量**。
  * 注意:日期串按本机时区拼(不用 toISOString —— UTC 下东八区 00:00~08:00 会退一天)。
+ *
+ * 2026-11-09:日期范围控件换成与「订单结转」页同一个实现(`@core/ui/DateRangeQuery`,
+ * 单框 daterange + 快捷档)。绑定值是 ['开始','结束'](YYYY-MM-DD);`[]`/null = 不按日期过滤。
  */
 const DEFAULT_WINDOW_DAYS = 15
-const dateFrom = ref('')
-const dateTo = ref('')
+const datePick = ref([])
+/** 生效区间(含端点):反序自动交换(先点结束日再点开始日不丢条件);清空/半截 = 不带日期条件 */
+const queryRange = computed(() => {
+  const a = String((datePick.value || [])[0] || '').slice(0, 10)
+  const b = String((datePick.value || [])[1] || '').slice(0, 10)
+  const re = /^\d{4}-\d{2}-\d{2}$/
+  if (!re.test(a) || !re.test(b)) return { from: '', to: '' }
+  return a <= b ? { from: a, to: b } : { from: b, to: a }
+})
 const qText = ref('')
 // 切单(9.29 批次①):弹窗状态 + 预览(可切上限)
 const splitVisible = ref(false)
@@ -452,7 +488,37 @@ const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '已完工' && r.生产状态 !== '完工') return false
   return true
 }))
-const paged = computed(() => filtered.value)
+
+/**
+ * 列表分页(2026-11-09 用户口径「日期范围选择较大时数量过大导致页面卡住」)。
+ *
+ * 根因:原来 `paged = filtered` —— 查询到的**全部行**一次性交给 el-table 渲染。日期范围越大返回行越多
+ * (实测全量 399 行 × 88 列 ≈ 3.5 万单元格),主线程被渲染整段占死,页面 15 秒以上点不动。
+ * 现在渲染行数封顶一页(**默认 50**),行数据仍全部在内存里 ⇒ 跨页勾选(reserve-selection)、
+ * 导出(filtered)、结案/切单/打印等原能力不受影响,只是表格一次少画几行。
+ * 为什么是 50 不是 100:本表列数极多(基础 36 列 + 数据驱动的日排产日期列,全量时 119 列),
+ * 验收实测 100 行/页即便合并成单次渲染仍 >5 秒,50 行/页 3 秒级;100/200 保留为自选项。
+ */
+const pageNo = ref(1)
+const pageSize = ref(50)
+const paged = computed(() => {
+  const start = (pageNo.value - 1) * pageSize.value
+  return filtered.value.slice(start, start + pageSize.value)
+})
+/** 页码夹回合法区间(筛选/换页大小/数据变少后不能停在空页) */
+function clampPage() {
+  const maxPage = Math.max(1, Math.ceil(filtered.value.length / pageSize.value))
+  if (pageNo.value > maxPage) pageNo.value = maxPage
+  if (pageNo.value < 1) pageNo.value = 1
+}
+/** 状态筛选变化:回第 1 页(原来 @change 挂的 applyFilter 根本没定义,只是靠 computed 隐式生效) */
+function applyFilter() { pageNo.value = 1 }
+/**
+ * 查询/重查(日期范围变化、模糊搜索、查找、刷新):回第 1 页再取数。
+ * 动作后(结案/切单/打印/排产弹窗关闭)的 load() 保持当前页,避免用户被弹回首页。
+ */
+function onQuery() { pageNo.value = 1; load() }
+watch([pageSize, () => filtered.value.length], clampPage)
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
@@ -533,32 +599,42 @@ async function commitQty(row, d) {
   } catch (e) { err(e, '保存失败') }
 }
 
-async function loadDayPlan() {
-  const ids = rows.value.map((r) => r.行id).filter((x) => x != null)
-  if (!ids.length) { planDates.value = []; planToday.value = ''; return }
-  try {
-    const data = await fetchDayPlan({ 行id列表: ids })
-    planDates.value = data['日期'] || []
-    planToday.value = data['今天'] || ''
-    const byId = new Map()
-    for (const p of data['行'] || []) byId.set(String(p['行id']), p)
-    for (const row of rows.value) {
-      const p = byId.get(String(row.行id))
-      row.工序日 = p ? p['工序'] : (row.当前工序 || '')
-      row.日计划 = { ...((p && p['日计划']) || {}) }
-      row.日报工 = { ...((p && p['日报工']) || {}) }
-      row.人工指定 = { ...((p && p['人工指定']) || {}) }
-      row.超分配 = p ? Number(p['超分配'] || 0) : 0
-      row.工序计划量 = p ? Number(p['工序计划量'] || 0) : 0
-      // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
-      if (p) {
-        for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
-          '7天需交付', '15天需交付', '大于15天需交付',
-          '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计',
-          // 排产区间(画斜杠用):与后端摊分日计划同一份开工/完工日期
-          '计划开工日期', '计划完工日期']) row[k] = p[k]
-      }
+/**
+ * 把日排产接口返回的「日期列 / 今天 / 每行日计划」写进给定的行对象。
+ *
+ * 2026-11-09:抽成纯函数的原因见 {@link load} —— 它要在**给 rows 赋值之前**就把日计划并进去,
+ * 让整表只渲染一次;就地改某天(commitQty)之后的刷新仍走 {@link loadDayPlan}(改内存行)。
+ */
+function applyDayPlan(rowsList, data) {
+  planDates.value = (data && data['日期']) || []
+  planToday.value = (data && data['今天']) || ''
+  const byId = new Map()
+  for (const p of (data && data['行']) || []) byId.set(String(p['行id']), p)
+  for (const row of rowsList) {
+    const p = byId.get(String(row.行id))
+    row.工序日 = p ? p['工序'] : (row.当前工序 || '')
+    row.日计划 = { ...((p && p['日计划']) || {}) }
+    row.日报工 = { ...((p && p['日报工']) || {}) }
+    row.人工指定 = { ...((p && p['人工指定']) || {}) }
+    row.超分配 = p ? Number(p['超分配'] || 0) : 0
+    row.工序计划量 = p ? Number(p['工序计划量'] || 0) : 0
+    // 纸表口径的整行汇总(交期/紧迫度/7天·15天·大于15天 需求与已排)—— 由后端算,前端只显示
+    if (p) {
+      for (const k of ['交期', '交期紧迫度', '需求数量', '排产数量',
+        '7天需交付', '15天需交付', '大于15天需交付',
+        '7天已排', '15天已排', '大于15天已排', '计划合计', '完工合计',
+        // 排产区间(画斜杠用):与后端摊分日计划同一份开工/完工日期
+        '计划开工日期', '计划完工日期']) row[k] = p[k]
     }
+  }
+}
+
+/** 就地刷新当前列表的日排产(改某天数量/改排产日期后用):只改内存行,不重查工单列表 */
+async function loadDayPlan() {
+  if (!rows.value.length) { planDates.value = []; planToday.value = ''; return }
+  try {
+    const data = await fetchDayPlan({ 行id列表: rows.value.map((r) => r.行id).filter((x) => x != null) })
+    applyDayPlan(rows.value, data)
   } catch (e) { err(e, '查询失败') }
 }
 
@@ -567,23 +643,42 @@ async function loadDayPlan() {
 
 async function load() {  try {
     const cond = {}
-    if (dateFrom.value) cond['日期从'] = dateFrom.value
-    if (dateTo.value) cond['日期到'] = dateTo.value
+    // 日期区间(2026-11-09:来自 daterange 控件;两端都有值才作为条件,清空 = 查全量)
+    const rg = queryRange.value
+    if (rg.from) cond['日期从'] = rg.from
+    if (rg.to) cond['日期到'] = rg.to
     if (qText.value.trim()) cond['keyword'] = qText.value.trim()
     if (lineFilter.value) cond['生产线'] = lineFilter.value
     const res = await request.post('/px/workOrderList', cond)
-    rows.value = (res.data || []).map((r) => ({
+    const list = (res.data || []).map((r) => ({
       ...r,
       rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)),
       日计划: {}, 日报工: {},
     }))
+    // 2026-11-09 性能修复(验收 FAIL #4b):**先取日排产、把日期列+每行日计划并进还没上屏的行对象,
+    //   最后才给 rows 赋值** ⇒ 整表只渲染 1 次。
+    //   原实现是「赋值 rows(首次渲染 36 列)→ 再 loadDayPlan:先加 30+ 个日排产列(整表重渲)→
+    //   再逐行写日计划(又重渲)」,大范围全量时 100 行 × 119 列要整表重渲 3 次、主线程 10 秒+。
+    //   日排产取不到时只少「日排产」相关列,不阻断工单列表本身。
+    if (list.length) {
+      const ids = list.map((r) => r.行id).filter((x) => x != null)
+      if (ids.length) {
+        try { applyDayPlan(list, await fetchDayPlan({ 行id列表: ids })) } catch { applyDayPlan(list, null) }
+      } else {
+        applyDayPlan(list, null)
+      }
+    } else {
+      applyDayPlan([], null)
+    }
+    rows.value = list
     // 2026-10-05 修复:刷新后清掉旧勾选 —— reserve-selection 会保留"已从列表消失的行"的勾选(且无法手动取消),
     // 造成切单/撤回切单永久提示「请先勾选一张工单」。
     checked.value = []
     currentRow.value = null
     tableRef.value?.clearSelection?.()
     applyLineMeta()
-    await loadDayPlan()
+    // 2026-11-09:结果变少时页码夹回合法区间(否则会停在空页上)
+    clampPage()
   } catch (e) { err(e, '查询失败') }
 }
 
@@ -847,10 +942,9 @@ function dayStr(n) {
 onMounted(async () => {
   // 从桌面「单据入口」带 keyword 进来优先(否则按默认 15 天窗口取数)
   const routed = applyRouteKeyword()
-  if (!routed && !dateFrom.value && !dateTo.value) {
-    // 已填过值(如热更重挂)不覆盖用户输入
-    dateFrom.value = dayStr(-(DEFAULT_WINDOW_DAYS - 1))
-    dateTo.value = dayStr(0)
+  if (!routed && !(datePick.value || []).length) {
+    // 已填过值(如热更重挂)不覆盖用户输入;daterange 绑定值 = [开始, 结束]
+    datePick.value = [dayStr(-(DEFAULT_WINDOW_DAYS - 1)), dayStr(0)]
   }
   await load()
   loadLines()
@@ -899,6 +993,8 @@ onDeactivated(() => { traceVisible.value = false })
 .wol-sep { color: #909399; }
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
+/* 分页条(2026-11-09):靠右、不参与表格高度分配 */
+.wol-pager { display: flex; justify-content: flex-end; padding-top: 2px; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
 /* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */

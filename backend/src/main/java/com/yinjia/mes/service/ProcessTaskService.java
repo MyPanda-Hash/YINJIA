@@ -1141,6 +1141,24 @@ public class ProcessTaskService {
             //   (历史台账日期各排各的,不能把计划链打断)。
             String givenStart = str(given.get("计划开工日期"));
             String givenDue = str(given.get("计划完工日期"));
+            // 🔴 2026-11-09 用户口径「计划开工日期不得大于计划完工日期」:客户端**明确给了**两个日期却倒挂 ⇒
+            //   直接拒,不再静默纠正(前端两个排线弹窗已自动调平,这里只兜绕过前端的调用方)。
+            //   ⚠ 只判「两个都给且倒挂」这一种:客户端没给日期时 due 会回落到**交期**(可能早于计划链开工,
+            //     逾期工单就是这种),那是**派生**出来的不一致,按下面原口径顺延,不能拒(否则逾期单排不进去)。
+            if (givenStart != null && givenDue != null) {
+                java.time.LocalDate gs;
+                java.time.LocalDate gd;
+                try {
+                    gs = java.time.LocalDate.parse(givenStart);
+                    gd = java.time.LocalDate.parse(givenDue);
+                } catch (RuntimeException e) {
+                    throw new IllegalArgumentException("工序「" + op + "」计划开工/完工日期格式应为 yyyy-MM-dd("
+                            + givenStart + " / " + givenDue + ")");
+                }
+                if (gd.isBefore(gs))
+                    throw new IllegalArgumentException("工序「" + op + "」计划开工日期不能晚于计划完工日期("
+                            + givenStart + " → " + givenDue + ")");
+            }
             String due = givenDue != null ? givenDue : str(rt.get("计划完工日期"));
             String prevDue = plan.isEmpty() ? null : str(plan.get(plan.size() - 1).get("计划完工日期"));
             String start = prevDue != null ? prevDue : givenStart;

@@ -8,7 +8,7 @@
        ④ 底部签名:signCells(蓝格标签 + 值区)
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="approval-sheet" :style="sheetStyle">
+  <div ref="sheetRef" class="approval-sheet" :style="sheetStyle">
     <!-- ⛔ 终止审批横幅(项目实施计划:申请终止(阶段处)二级审批 立项人→管理员→落实;打印隐藏) -->
     <div v-if="panelCode === 'RD_PLAN' && term" class="as-term-banner no-print-term" :class="'term-' + term.state">
       <template v-if="term.state === 'T'">
@@ -181,6 +181,16 @@
               <el-input
                 v-else-if="editable && c.kind === 'docno'" v-model="row[c.key]" size="small"
                 maxlength="30" class="as-docno-input sg-cell-input" @input="emit('dirty')"
+              />
+              <!-- 进度描述列(2026-11-11 用户口径):「这个字段**不受归档约束**，但只能谁提交的谁来修改」。
+                   ⚠ 刻意**不看 editable**:editable 的语义是"整张纸能否编辑"(归档后为假),
+                   而进度描述归档后仍要能改 ⇒ 走独立的 progress-save 通道,由父组件调 /px/sampleProgress。
+                   只读态/无权限时仍显示纯文本(sg-ro),不会给一个点了没反应的输入框。 -->
+              <el-input
+                v-else-if="c.key === '进度描述' && progressEditable(row)"
+                v-model="row[c.key]" type="textarea" :maxlength="500" :rows="gridTextRows" resize="none"
+                class="as-fill-input sg-cell-area sg-progress" :placeholder="tt('填写实时进度')"
+                @blur="emit('progress-save', { row, text: row[c.key] })"
               />
               <!-- 长文本列一律文本域:模板给的行高(150px)足够写多行,单行输入框会显得空 -->
               <el-input
@@ -788,7 +798,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, nextTick, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, nextTick, ref, watch } from 'vue'
 import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
@@ -826,7 +836,7 @@ const props = defineProps({
    */
   canEditOthers: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty', 'term-changed'])
+const emit = defineEmits(['dirty', 'term-changed', 'progress-save'])
 
 /**
  * 备注栏旁的附件入口(元数据驱动):从下发的 fields 里发现 dataType='附件' 的字段。
@@ -867,12 +877,68 @@ function gotoLink(row) {
  *   带 !important,仍压过这里的内联样式。
  * 其余文书式面板宽度为 0 ⇒ 不套内联样式,保持原有的自适应行为。
  */
+/**
+ * 窄窗口自适应缩放(2026-11-11 用户口径)。
+ *
+ * <p>用户原话:「项目实施计划，填写不会换行，表格宽度会限制重叠在一起」;追问后确认 =
+ * <b>窗口窄时要横向滚动、内容被挤</b>。</p>
+ *
+ * <p>【改动前】纸宽由 {@link fixedSheetWidth} 定死(1242/1188/1220/1365),
+ * 外层 `.sheet-scroll{overflow-x:auto}` 兜住 ⇒ 1280 窗口下容器约 1100px、纸 1242px,
+ * <b>必须左右拖</b>才能看全(实测 clientW 1102 / scrollW 1242)。</p>
+ *
+ * <p>【口径】装不下就整体缩放:<code>zoom = 容器内宽 ÷ 纸宽</code>,
+ * 上限 1(宽屏**不放大**,保持设计字号) / 下限 {@link MIN_FIT_ZOOM}(再小就没法读了);
+ * 缩到下限仍装不下时才由 `.sheet-scroll` 横向滚动兜底 —— 两条路互补,不是二选一。</p>
+ *
+ * <p>⚠ 只对**定死纸宽**的面板生效:自适应宽的纸(width:940 + max-width:100%)本来就不会溢出,
+ * 对它套 zoom 只会把字变小。</p>
+ * <p>⚠ 打印不受影响:`@media print` 的 `body.approval-printing .approval-sheet{width:100%!important}`
+ * 带 !important,压得过这里写进 style 的 zoom;而且打印前会另算 `--print-zoom`。</p>
+ */
+const MIN_FIT_ZOOM = 0.6
+const sheetRef = ref(null)
+/** 纸面可用宽(容器内宽 - 两侧留白),0 = 还没量到 */
+const availWidth = ref(0)
+let fitObserver = null
+onMounted(() => {
+  const el = sheetRef.value
+  const host = el && el.parentElement
+  if (!host || typeof ResizeObserver === 'undefined') return
+  const measure = () => {
+    // 用**父容器**的 clientWidth:纸面自己会被 zoom 影响,拿它量会自激(越缩越窄)
+    const w = host.clientWidth || 0
+    if (w > 0) availWidth.value = w
+  }
+  measure()
+  fitObserver = new ResizeObserver(measure)
+  fitObserver.observe(host)
+})
+onBeforeUnmount(() => {
+  if (fitObserver) { fitObserver.disconnect(); fitObserver = null }
+})
+const sheetZoom = computed(() => {
+  const paperW = fixedSheetWidth(props.panelCode)
+  if (!paperW) return 1                 // 自适应宽的纸不缩放
+  const avail = availWidth.value
+  if (!avail) return 1                  // 还没量到 ⇒ 先按原样
+  // 两侧各留 8px,免得滚动条/边框把纸挤掉 1px 又触发横向滚动
+  const usable = avail - 16
+  // 先封底(再小就看不清)再封顶(装得下时比例会 >1,但不许放大)
+  return Math.min(1, Math.max(MIN_FIT_ZOOM, usable / paperW))
+})
+
 const sheetStyle = computed(() => {
   const w = fixedSheetWidth(props.panelCode)
   // 表格式纸面（样品申请单）：@media print 用 `width: var(--sg-print-w)` 定死纸宽 —— 两张纸宽度不同
-  // （1188 / 1450），不能像 QC 那样在 CSS 里写死像素。
+  // （1188 / 1220），不能像 QC 那样在 CSS 里写死像素。
   const printVar = isGrid.value ? { '--sg-print-w': gridW.value + 'px' } : {}
-  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar } : (isGrid.value ? printVar : null)
+  // 窄窗缩放:见 sheetZoom 注释。zoom 与 width 一起写在纸面根节点上,
+  // 打印时被 @media print 的 width:100%!important 覆盖(它压得过内联样式)。
+  const zoomVar = sheetZoom.value !== 1 ? { zoom: String(sheetZoom.value) } : {}
+  return w
+    ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar, ...zoomVar }
+    : (isGrid.value ? { ...printVar, ...zoomVar } : null)
 })
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
@@ -934,6 +1000,27 @@ watch(gridRows, () => { if (gridPage.value > gridPageCount.value) gridPage.value
 /** 申请人格:已保存的行(有 id)默认锁定,除非有「改他人行」权限 */
 function cellLocked(row, c) {
   return String(c?.key || '') === '申请人' && !!row?.id && props.canEditOthers !== true
+}
+/**
+ * 进度描述这一格能不能编辑(2026-11-11 用户口径)。
+ *
+ * <p>原话:「这个字段<b>不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」;
+ * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+ *
+ * <p>判据 = **当前登录人就是这一行的申请人**（内部单看行上的「申请人」，外部单看头表创建人归属）。
+ * ⚠ 刻意**不看 props.editable**:editable 表示"整张纸能否编辑"（归档后为假），
+ *   而本字段归档后仍要能改;也**不看 canEditOthers**:用户明确说"只锁申请人"，
+ *   文档管理员(edit_others)对进度描述同样没有写权 —— 服务端 /px/sampleProgress 同口径硬校验。</p>
+ */
+function progressEditable(row) {
+  if (!props.user?.realName && !props.user?.userName) return false
+  // 新行(还没保存,没有 id):谁在填就是谁的，给编辑权（保存后由服务端把申请人落成当前用户）
+  if (!row?.id) return true
+  const owner = String(row?.['申请人'] ?? '').trim()
+  if (!owner) return true
+  const ownerName = owner.includes('/') ? owner.slice(0, owner.indexOf('/')).trim() : owner
+  const me = String(props.user?.realName ?? '').trim()
+  return !!me && ownerName === me
 }
 /**
  * 子表模式下一张新单必须至少有 1 行可填（用户口径「单个样品单下面可以添加多个样品」）：
@@ -2467,9 +2554,9 @@ defineExpose({ focusField })
     page-break-inside: avoid !important;
   }
   /* 表格式纸面（样品申请单 layout:'grid'，2026-11-06）：
-   * 两张纸 1188/1450px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
+   * 两张纸 1188/1220px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
    * 由 PanelxList.printApprovalSheet 注入 `@page{size:A4 landscape}`（281mm ≈ 1062px）并把
-   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1450 ⇒ 0.73），这里只负责定宽 + 缩放 + 不截断。
+   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1220 ⇒ 0.87），这里只负责定宽 + 缩放 + 不截断。
    * ⚠ 纸宽走 --sg-print-w（内联在 .approval-sheet 上，由 sheetStyle 给），不写死 —— 两张纸宽度不同。 */
   body.approval-printing .approval-sheet:has(.sg-table) {
     width: var(--sg-print-w, 1188px) !important;

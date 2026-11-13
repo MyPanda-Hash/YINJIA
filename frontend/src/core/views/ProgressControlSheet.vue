@@ -434,6 +434,9 @@ async function loadRefOptions() {
         const planNo = r['单据编号'] || r['编号'] || ''
         const prev = stageMap[r[K['项目名称']]]
         // 同名多张实施计划:取最新一张(列表按单据编号倒序,先到的即最新)
+        // 负责人 = 实施计划表头的「负责人」;那格空着时**后端会回落成计划的制单人**
+        //   (ButtonService.syncPlanToProgress,2026-11-11 用户口径「谁填写的项目实施计划就是谁」),
+        //   所以进度行上的值可能比 r['负责人'] 多——这里只负责"手点同步/加行"这一路的带出。
         if (!prev) stageMap[r[K['项目名称']]] = { planNo, head: r, stages, summary, 负责人: r['负责人'] || '' }
         return { value: r[K['项目名称']], label: `${r[K['项目名称']]}（${planNo}）` }
       })

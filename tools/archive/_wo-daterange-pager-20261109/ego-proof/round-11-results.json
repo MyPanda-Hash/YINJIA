@@ -1,0 +1,236 @@
+[
+  {
+    "sample": 1,
+    "def": {
+      "rows": 12,
+      "countText": "共有数据: 12 条",
+      "pageSize": 50,
+      "pager": "共 12 条 50条/页 1 前往 页",
+      "inputs": [
+        {
+          "ph": "开始日期",
+          "v": "2026-10-26"
+        },
+        {
+          "ph": "结束日期",
+          "v": "2026-11-09"
+        }
+      ],
+      "drqWidth": 260
+    },
+    "wall": 4536,
+    "settleElapsed": 4456,
+    "finalRows": 50,
+    "ths": 119,
+    "cells": 5950,
+    "countText": "共有数据: 399 条",
+    "pager": "共 399 条 50条/页 1 2 3 4 5 6 8 前往 页",
+    "activePage": "1",
+    "lastLongEndRel": 3885,
+    "longTaskSum": 3092,
+    "longTaskMax": 2148,
+    "longTasks": [
+      {
+        "startRel": 790,
+        "endRel": 2938,
+        "dur": 2148
+      },
+      {
+        "startRel": 2938,
+        "endRel": 3009,
+        "dur": 71
+      },
+      {
+        "startRel": 3012,
+        "endRel": 3885,
+        "dur": 873
+      }
+    ],
+    "resources": [
+      {
+        "name": "/api/px/workOrderList",
+        "start": 603,
+        "responseEnd": 644,
+        "duration": 41,
+        "transferSize": 1850
+      },
+      {
+        "name": "/api/px/scheduleBoard/dayPlan/data",
+        "start": 683,
+        "responseEnd": 735,
+        "duration": 52,
+        "transferSize": 1373
+      },
+      {
+        "name": "/api/px/workOrderList",
+        "start": 9948,
+        "responseEnd": 10298,
+        "duration": 350,
+        "transferSize": 25257
+      },
+      {
+        "name": "/api/px/scheduleBoard/dayPlan/data",
+        "start": 10302,
+        "responseEnd": 10702,
+        "duration": 401,
+        "transferSize": 8954
+      }
+    ]
+  },
+  {
+    "sample": 2,
+    "def": {
+      "rows": 12,
+      "countText": "共有数据: 12 条",
+      "pageSize": 50,
+      "pager": "共 12 条 50条/页 1 前往 页",
+      "inputs": [
+        {
+          "ph": "开始日期",
+          "v": "2026-10-26"
+        },
+        {
+          "ph": "结束日期",
+          "v": "2026-11-09"
+        }
+      ],
+      "drqWidth": 260
+    },
+    "wall": 4376,
+    "settleElapsed": 4261,
+    "finalRows": 50,
+    "ths": 119,
+    "cells": 5950,
+    "countText": "共有数据: 399 条",
+    "pager": "共 399 条 50条/页 1 2 3 4 5 6 8 前往 页",
+    "activePage": "1",
+    "lastLongEndRel": 3694,
+    "longTaskSum": 2891,
+    "longTaskMax": 2038,
+    "longTasks": [
+      {
+        "startRel": 799,
+        "endRel": 2837,
+        "dur": 2038
+      },
+      {
+        "startRel": 2838,
+        "endRel": 2909,
+        "dur": 71
+      },
+      {
+        "startRel": 2912,
+        "endRel": 3694,
+        "dur": 782
+      }
+    ],
+    "resources": [
+      {
+        "name": "/api/px/workOrderList",
+        "start": 554,
+        "responseEnd": 588,
+        "duration": 34,
+        "transferSize": 1850
+      },
+      {
+        "name": "/api/px/scheduleBoard/dayPlan/data",
+        "start": 622,
+        "responseEnd": 663,
+        "duration": 41,
+        "transferSize": 1373
+      },
+      {
+        "name": "/api/px/workOrderList",
+        "start": 7490,
+        "responseEnd": 7826,
+        "duration": 337,
+        "transferSize": 25257
+      },
+      {
+        "name": "/api/px/scheduleBoard/dayPlan/data",
+        "start": 7831,
+        "responseEnd": 8253,
+        "duration": 422,
+        "transferSize": 8954
+      }
+    ]
+  },
+  {
+    "sample": 3,
+    "def": {
+      "rows": 12,
+      "countText": "共有数据: 12 条",
+      "pageSize": 50,
+      "pager": "共 12 条 50条/页 1 前往 页",
+      "inputs": [
+        {
+          "ph": "开始日期",
+          "v": "2026-10-26"
+        },
+        {
+          "ph": "结束日期",
+          "v": "2026-11-09"
+        }
+      ],
+      "drqWidth": 260
+    },
+    "wall": 4301,
+    "settleElapsed": 4297,
+    "finalRows": 50,
+    "ths": 119,
+    "cells": 5950,
+    "countText": "共有数据: 399 条",
+    "pager": "共 399 条 50条/页 1 2 3 4 5 6 8 前往 页",
+    "activePage": "1",
+    "lastLongEndRel": 3749,
+    "longTaskSum": 2958,
+    "longTaskMax": 2034,
+    "longTasks": [
+      {
+        "startRel": 790,
+        "endRel": 2824,
+        "dur": 2034
+      },
+      {
+        "startRel": 2824,
+        "endRel": 2898,
+        "dur": 74
+      },
+      {
+        "startRel": 2899,
+        "endRel": 3749,
+        "dur": 850
+      }
+    ],
+    "resources": [
+      {
+        "name": "/api/px/workOrderList",
+        "start": 483,
+        "responseEnd": 513,
+        "duration": 30,
+        "transferSize": 1850
+      },
+      {
+        "name": "/api/px/scheduleBoard/dayPlan/data",
+        "start": 557,
+        "responseEnd": 591,
+        "duration": 34,
+        "transferSize": 1373
+      },
+      {
+        "name": "/api/px/workOrderList",
+        "start": 7405,
+        "responseEnd": 7747,
+        "duration": 342,
+        "transferSize": 25257
+      },
+      {
+        "name": "/api/px/scheduleBoard/dayPlan/data",
+        "start": 7751,
+        "responseEnd": 8167,
+        "duration": 415,
+        "transferSize": 8954
+      }
+    ]
+  }
+]

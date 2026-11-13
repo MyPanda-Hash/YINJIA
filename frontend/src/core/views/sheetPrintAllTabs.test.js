@@ -78,8 +78,13 @@ test('⑥ 研发管理的多页签面板确实存在(口径变了要同步本文
   const multi = Object.entries(recordSheetConfigs)
     .filter(([, v]) => (v.pages || []).length > 1)
     .map(([k]) => k)
-  // 这 4 张是 2026-10-29 实测的多页签面板;2026-10-30 新增 X烧结工艺清单(2 页)后变 5 张。
+  // 这 4 张是 2026-10-29 实测的多页签面板;2026-10-30 新增 X烧结工艺清单(2 页)后变 5 张;
+  // 2026-11-11 新增出货检验计划表(研判记录页)后变 6 张。
   // 数量变化本身不是 bug,但要有人看一眼:打印多页逻辑影响的就是这几张,确认新面板也能整份打印。
-  assert.deepEqual(multi.sort(), ['RD_ASM_PROC', 'RD_DOM_TEST', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_X_SINTER'],
+  // 2026-11-11 已实测 RD_INSP_PLAN:pkg 页签 2 个(.rsp-page-tab 可见且可切换),
+  //   RecordSheetPanels 的 pageCount = cfg.pages.length ⇒ 打印逐页出纸逻辑对它是通用的
+  //   (pageList/pageCount/setActivePage 三件套按配置驱动,没有按面板码白名单)。
+  assert.deepEqual(multi.sort(),
+    ['RD_ASM_PROC', 'RD_DOM_TEST', 'RD_INSP_PLAN', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_X_SINTER'],
     '多页签面板清单变了 —— 打印多页逻辑影响的就是这几张,确认新面板也能整份打印')
 })

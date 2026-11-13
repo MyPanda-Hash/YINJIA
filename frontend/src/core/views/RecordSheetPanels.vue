@@ -160,7 +160,8 @@
                  table-cell(浏览器另生匿名格包住它,colspan 随之失效 —— 实测 colspan=10 的格子只剩
                  一列宽、公司名与编号挤成两行)。缺省(非 rs-onecell)时这层 div 就是普通块级,
                  与改造前逐字等价。 -->
-            <div class="rs-docno-in" :class="{ 'rs-onecell': sameCellDocno }">
+            <div class="rs-docno-in" :class="{ 'rs-onecell': sameCellDocno }"
+                 :style="sameCellDocno && oneCellDocnoW ? { '--docno-w': oneCellDocnoW + 'px' } : null">
               <!-- 同格版式:公司名与编号同处一格(设计一格含两段文字),公司名内联在编号左边 -->
               <span v-if="sameCellDocno" class="rs-company-inline">{{ COMPANY_NAME }}</span>
               <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
@@ -348,8 +349,13 @@
                   hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
-                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
-                <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <!-- pair.ro = 该格只读展示(2026-11-11 用户口径:产品信息表的一级/二级审核人、产品负责人
+                     「这三个都是只读的，但是都要有对应的数据回填进去」)。
+                     ⚠ 此前 pairs 分支**完全没有读 ro** —— c.ro 只对 row.grid 分支生效,
+                       所以只写配置里的 ro:true 界面照旧能改(实测 hasInput=true)。这里补齐两条输入分支的判断。
+                     值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
+                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
             </template>
@@ -368,6 +374,18 @@
               <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 标签格里的「选型号」(2026-11-11 用户口径):下拉挂在**标签下面**而不是数据格里,
+                     选型号仍一次填四格。editable 才出现;整块带 no-print ⇒ 打印/导出不印控件。 -->
+                <div v-if="editable && c.moldPick" class="rs-mold-pick no-print">
+                  <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                             :placeholder="tt('选型号（按生产车间筛）')"
+                             :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                             @update:model-value="applyMoldModel">
+                    <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                               :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                               :value="r['型号']" />
+                  </el-select>
+                </div>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -401,24 +419,27 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
-                <!-- 检验要求 · 炭棒尺寸:按**生产车间**从生产模具表筛型号,选型号 → 一次填四格
-                     (2026-11-04 用户口径:「选择生产车间…炭棒尺寸要筛选到对应车间的模具型号和公差信息」
-                      「手工选择下拉列表填充炭棒内外径及公差数据」)。
-                     数据源 = 生产模具表 PROD_MOLD(rd_sinter_tolerance,60 行);
-                     车间两套写法的归一在 core/mold/workshopNo.js。 -->
-                <template v-else-if="editable && c.moldPick">
-                  <div class="rs-mold-pick">
-                    <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
-                               :placeholder="tt('选型号（按生产车间筛）')"
-                               :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
-                               @update:model-value="applyMoldModel">
-                      <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
-                                 :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
-                                 :value="r['型号']" />
-                    </el-select>
-                    <span v-if="!moldModelOfHead() && head[c.key]" class="rs-mold-fallback"
-                          :title="tt('手填或规格书带出的值，未匹配到型号')">{{ head[c.key] }}</span>
-                  </div>
+                <!-- 2026-11-11:炭棒尺寸的「选型号」下拉已从本数据格**上移到「炭棒尺寸」标签格**
+                     (见上面 rs-label 里的 c.moldPick 分支);四个数据格恢复普通输入框。
+                     候选来源与回填逻辑未变:PROD_MOLD(rd_sinter_tolerance) → applyMoldModel。 -->
+                <!-- 选人控件(2026-11-11 用户口径「会签人字段改为下拉勾选对应的账号，就是人员姓名」):
+                     显示**人员姓名**(label=realName)、落库**账号**(value=username)。
+                     为什么值必须是账号:ButtonService.signersOf 按账号切分后校验启用状态、发会签通知、
+                     写 yj_form_approval.operator —— 存姓名会全线失配。
+                     值格式沿用既有的"顿号分隔账号串"(signersOf 按 [,，、;；\s] 切分,顿号最直观)。 -->
+                <template v-else-if="editable && c.userPick">
+                  <el-select
+                    :model-value="pickListOf(c.key)"
+                    multiple
+                    filterable
+                    clearable
+                    size="small"
+                    class="rs-userpick"
+                    :placeholder="c.ph ? tt(c.ph) : tt('点击选择人员')"
+                    @update:model-value="(v) => setPickList(c.key, v)"
+                  >
+                    <el-option v-for="u in signUsers" :key="u.username" :label="u.realName" :value="u.username" />
+                  </el-select>
                 </template>
                 <template v-else-if="editable && c.key && !c.ro">
                   <!-- 带纸面前缀的格:前缀是**渲染**出来的,head 里只存裸数字(口径见
@@ -444,6 +465,8 @@
                   <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
                              @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
                 </span>
+                <!-- 只读态:账号串 → 人员姓名,纸面不印英文账号 -->
+                <span v-else-if="c.userPick" class="rs-userpick-ro">{{ signNamesOf(head[c.key]) }}</span>
                 <span v-else-if="c.pre" class="rs-pre-cell">
                   <span class="rs-pre">{{ tt(c.pre) }}</span>
                   <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
@@ -569,7 +592,11 @@
         <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
             <template v-if="effPlain || dtOwnsWidth(dt)">
-              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : 1)).toFixed(1) + 'px' }" />
+              <!-- ⚠ span 必须写进 <col>：`样品信息` 这类 span:3 的列，若只生成一个不带 span 的 <col>，
+                   浏览器就把它当 1 列宽 + 把另外两列当"无宽度列" ⇒ 表头 colspan=3 与下面的格子对不上，
+                   整表宽度也会小于纸宽（2026-11-11 用户报「新增一个列字段之后」版面被压窄的根因）。 -->
+              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :span="(c.span || 1) > 1 ? c.span : undefined"
+                   :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : dtFillK(dt))).toFixed(1) + 'px' }" />
             </template>
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
@@ -674,7 +701,7 @@
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <tr v-if="dt.subHeads">
+            <tr v-if="subHeadsOf(dt).length">
               <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
@@ -919,7 +946,7 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="editable && !dt.fixedRows" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable && !dt.fixedRows" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? dtTableW(dt) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -1026,8 +1053,13 @@
                   hide-when-empty
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
-                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
-                <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <!-- pair.ro = 该格只读展示(2026-11-11 用户口径:产品信息表的一级/二级审核人、产品负责人
+                     「这三个都是只读的，但是都要有对应的数据回填进去」)。
+                     ⚠ 此前 pairs 分支**完全没有读 ro** —— c.ro 只对 row.grid 分支生效,
+                       所以只写配置里的 ro:true 界面照旧能改(实测 hasInput=true)。这里补齐两条输入分支的判断。
+                     值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
+                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
             </template>
@@ -1046,6 +1078,18 @@
               <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 标签格里的「选型号」(2026-11-11 用户口径):下拉挂在**标签下面**而不是数据格里,
+                     选型号仍一次填四格。editable 才出现;整块带 no-print ⇒ 打印/导出不印控件。 -->
+                <div v-if="editable && c.moldPick" class="rs-mold-pick no-print">
+                  <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                             :placeholder="tt('选型号（按生产车间筛）')"
+                             :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                             @update:model-value="applyMoldModel">
+                    <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                               :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                               :value="r['型号']" />
+                  </el-select>
+                </div>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -1252,6 +1296,18 @@
               <td v-if="c.label" class="rs-td rs-label" :class="{ 'rs-req': isReq(c.key || c.label) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 标签格里的「选型号」(2026-11-11 用户口径):下拉挂在**标签下面**而不是数据格里,
+                     选型号仍一次填四格。editable 才出现;整块带 no-print ⇒ 打印/导出不印控件。 -->
+                <div v-if="editable && c.moldPick" class="rs-mold-pick no-print">
+                  <el-select :model-value="moldModelOfHead()" size="small" filterable clearable
+                             :placeholder="tt('选型号（按生产车间筛）')"
+                             :no-data-text="tt('该车间没有可用型号，请先在生产模具表维护')"
+                             @update:model-value="applyMoldModel">
+                    <el-option v-for="r in moldRowsInWorkshop" :key="r['型号']"
+                               :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`"
+                               :value="r['型号']" />
+                  </el-select>
+                </div>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <template v-if="editable && c.type === 'select'">
@@ -1564,7 +1620,7 @@
             顶部四栏互为筛选项(所属类别/存货编码/存货名称/规格型号),
             勾选后 物料编码←存货编码 / 物料名称←存货名称 / 规格参数←规格型号 落行。
             数量**不带**(商品档案没有用量口径)。 -->
-    <el-dialog v-model="matPickVisible" :title="tt(matPickTitle)" width="900px" append-to-body>
+    <el-dialog v-model="matPickVisible" :title="tt(matPickTitle)" width="1040px" append-to-body class="gp-dialog">
       <!-- ── 源 ①:物料清单单(表头),整单带入子件 ── -->
       <template v-if="matPickSource === 'mate'">
         <el-table v-loading="matPickLoading" :data="matPickRows" size="small" border max-height="420"
@@ -1581,35 +1637,57 @@
       </template>
       <!-- ── 源 ②:商品档案(四栏级联收窄 + 勾选落行)── -->
       <template v-else>
+        <!-- 筛选区(2026-11-12 用设计库重排)：
+             原布局把「搜索 + 四栏 + 清空」全塞进一个会换行的 flex 行，label 与控件挤在一排、
+             每栏后面还各挂一句「还有 N 项…」，六列弹窗里横向被撑得七零八落。
+             按 antd 列表页模板「筛选区在最上方、总体→具体」分两段：
+               第 1 行 = 关键字搜索（总体） + 右侧「清空筛选」（次要动作靠右）
+               第 2 行 = 四个等宽下拉（具体），label 放控件上方（12px colorTextTertiary）
+             取值全部来自设计库 token：padding 16 / marginXS 8 / fontSizeSM 12 /
+             colorFillAlter rgba(0,0,0,.02) / colorBorder #d9d9d9 / borderRadius 6。 -->
         <div class="gp-bar">
-          <div v-for="f in matPickFacets" :key="f.key" class="gp-filter">
-            <span class="gp-filter-label">{{ tt(f.key) }}</span>
-            <el-select
-              v-model="matPickFilters[f.key]"
-              size="small"
-              filterable
+          <div class="gp-bar-top">
+            <el-input
+              v-model="matPickKeyword"
+              class="gp-search"
               clearable
-              :placeholder="tt('全部')"
-              class="gp-filter-select"
+              :placeholder="tt('搜索存货编码 / 名称 / 规格型号')"
             >
-              <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
-            </el-select>
-            <span v-if="f.more" class="gp-more">{{ tt('还有 {n} 项，输入关键字筛选').replace('{n}', String(f.more)) }}</span>
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
+            <el-button text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
           </div>
-          <el-button size="small" text @click="resetMatPickFilters">{{ tt('清空筛选') }}</el-button>
+          <div class="gp-bar-facets">
+            <div v-for="f in matPickFacets" :key="f.key" class="gp-facet">
+              <span class="gp-facet-label">{{ tt(f.key) }}</span>
+              <el-select
+                v-model="matPickFilters[f.key]"
+                filterable
+                clearable
+                :placeholder="tt('全部')"
+                class="gp-facet-select"
+                :title="f.more ? tt('候选项较多，已省略 {n} 项；直接在左侧搜索框输入关键字更准').replace('{n}', String(f.more)) : ''"
+              >
+                <el-option v-for="v in f.values" :key="v" :label="v" :value="v" />
+              </el-select>
+            </div>
+          </div>
         </div>
         <el-table v-loading="matPickLoading" :data="matPickFiltered" size="small" border max-height="420"
                   row-key="__k" @selection-change="onMatPickSelection">
           <el-table-column type="selection" width="42" />
-          <el-table-column prop="所属类别" :label="tt('所属类别')" width="130" show-overflow-tooltip />
-          <el-table-column prop="存货编码" :label="tt('存货编码')" width="150" show-overflow-tooltip />
-          <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="230" show-overflow-tooltip />
-          <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="190" show-overflow-tooltip />
+          <!-- 列宽(2026-11-12 重排)：把弹性宽度留给**存货名称**——它是勾选时唯一要读的内容；
+               备注往往是空的，给固定 140 即可，别让它跟名称抢空间（原来三个 min-width
+               一起分剩余宽度，备注反而比名称宽）。 -->
+          <el-table-column prop="所属类别" :label="tt('所属类别')" width="120" show-overflow-tooltip />
+          <el-table-column prop="存货编码" :label="tt('存货编码')" width="160" show-overflow-tooltip />
+          <el-table-column prop="存货名称" :label="tt('存货名称')" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="规格型号" :label="tt('规格型号')" width="170" show-overflow-tooltip />
           <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" align="center" />
-          <el-table-column prop="备注" :label="tt('备注')" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="备注" :label="tt('备注')" width="140" show-overflow-tooltip />
         </el-table>
       </template>
-      <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
+      <div class="gp-foot-hint">{{ matPickHint }}</div>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" @click="confirmMaterialPick">{{ tt('引用') }}({{ matPickChecked.length }})</el-button>
@@ -1785,6 +1863,9 @@ import StdLibTemplateManager from './StdLibTemplateManager.vue'
 import { sumKeepScale } from '@/core/panel/sumTotals'
 import { groupRows, stampGroup, groupValues } from '@/core/panel/recordGroup'
 import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows, detailRowsOf, slashFillHead } from '@/core/insp/specCarry'
+import { mergeExtCols } from '@core/panel/extCols.js'
+import { matchKeyword } from '@core/panel/goodsPick.js'
+import { splitSigners, joinSigners, signerNames } from '@core/panel/signerText.js'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -1801,6 +1882,8 @@ import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/pane
 // 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
 import { carbonSpecFrom } from '@/core/panel/carbonSpec'
 import { sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
+// 配方表「设计添加量」的单位口径 + 导出件（2026-11-11）:纸面合计与导出件共用同一份格式化结果
+import { buildRecipeAoa, designTotalText } from '@/core/mold/recipeExport.js'
 // X烧结「炭棒规格」三格的三层兜底(独立字段 → 异名键 → 整串解析),单测见 core/xsinter/
 import { rodSpecFromProdInfo } from '@/core/xsinter/rodSpecFromProdInfo.js'
 // 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
@@ -1858,6 +1941,12 @@ const props = defineProps({
   // 由面板配置 metadata.changeDepts 下发(服务端按 yj_user.dept_id → yj_change_dept 算),
   // deptLockAll = 管理员豁免(可代填任何部门行)。两者只影响**界面**,服务端另有强制还原。
   myDeptRows: { type: Array, default: () => [] },
+  /**
+   * 已生效/已归档的"会签人填本部门那一行"模式(2026-11-11 用户口径 B)。
+   * 为真时：**只有**声明了 lockKey 的明细表(部门评审意见)的行可以进入编辑，
+   * 其余格子仍按 editable=false 处理 —— 封存契约不破。
+   */
+  deptFillOpen: { type: Boolean, default: false },
   deptLockAll: { type: Boolean, default: false },
 })
 // open-file:变更文件勾选项的跳转入口(2026-10-19)。本组件只管"查出该文件对应哪张单",
@@ -2168,6 +2257,23 @@ const COMPANY_NAME = '惠州市银嘉环保科技有限公司'
  *                    (改造前是 23 个面板统一带标识,没核过设计的面板不该被顺手改掉纸面观感)。
  *  不写 head.noSpan = 退回下面的动态算法(未按设计逐张核对的面板维持原样,零影响)。 */
 const sameCellDocno = computed(() => effHead.value.noSpan === 0)
+/**
+ * 同格版式（公司名与编号同一格）里，编号控件的宽度（px）。
+ *
+ * <p>用户口径（2026-11-11）：「选择框应该收短与下边平齐，所以的都是」——截图里
+ * 「点击选择」框把整格剩余宽度全吃了（`.rs-onecell > .rs-ref-ctl { flex: 1 1 auto }`），
+ * 右缘虽然贴着纸边，左缘却压到了下方「密级/适用范围」那一块的中段，看着不齐。</p>
+ *
+ * <p>口径：宽度取**下方右侧信息块**（infoLabel + infoValue 那几列）的总宽，
+ * 右对齐 ⇒ 选择框的左缘正好落在信息块标签列的左缘上，与下面逐行对齐。</p>
+ */
+const oneCellDocnoW = computed(() => {
+  const cols = effGrid.value || []
+  const right = Math.max(1, (Number(effHead.value.infoLabel) || 0) + (Number(effHead.value.infoValue) || 0))
+  const tail = cols.slice(Math.max(0, cols.length - right))
+  const w = tail.reduce((s, x) => s + (Number(x) || 0), 0)
+  return w > 0 ? Math.round(w) : 0
+})
 const noGapSpan = computed(() => Math.max(0, Math.floor(Number(effHead.value.noGapSpan) || 0)))
 const gapLeftSpan = computed(() => (sameCellDocno.value ? 0 : noGapSpan.value))
 const gapRightSpan = computed(() => (sameCellDocno.value ? noGapSpan.value : 0))
@@ -2708,7 +2814,9 @@ function rowLocked(dt, row) {
 
 /** 单元格可否编辑:表可编 + 行不属于锁 + (声明了 lockCols 时)列在放行清单里 */
 function cellEditable(dt, row, c) {
-  if (!props.editable) return false
+  // 常规编辑态；或「已生效后由会签人填本部门行」的窄口子（只对按部门锁行的表开放）
+  const open = props.editable || (props.deptFillOpen && !!dt.lockKey)
+  if (!open) return false
   if (rowLocked(dt, row)) return false
   if (dt.lockCols && !dt.lockCols.includes(c.key)) return false
   return true
@@ -2840,6 +2948,9 @@ defineExpose({
   focusField,
   focusFields,
   pageOfKey,
+  // 配方表专属导出(2026-11-11):接管「导出」菜单里这两个面板的 Excel 输出 ——
+  //   通用导出会把配方表按原文本倒出来(无单位/无合计/空白行全在),用户报的就是那个。
+  exportRecipeExcel,
   // 多页导出用(2026-10-28):整份文书导出「所有页面」时,由 PanelxList 逐页切页签再截图。
   //   pageCount  = 本面板页签数(单页 = 1);
   //   pageTitles = 页签标题(仅诊断用);
@@ -2924,7 +3035,22 @@ async function loadSpikeWaterLayout() {
     spikeWaterLayout.value = parseLayout(null)
   }
 }
-function colsOf(dt) {
+/**
+ * 允许「运行时新增测试数据列」的面板 = **8 张数据记录表**(2026-11-11 用户口径)。
+ *
+ * <p>用户原话:「数据记录表的所有单据的测试数据字段要能新增列功能，自定义列数，最多插入 8 个列，
+ * 列还可以设计分叉，可以参考加标水配置记录表的列分叉设计」。</p>
+ *
+ * <p>为什么只开这 8 张、不全局开:这些表的纸面列是**静态配置**,而自定义字段是运行时插的
+ * `yj_field` 行(绑备用列)。合并只对"确实要支持运行时加列"的面板做 —— 别的纸面(质量单据/
+ * 工艺清单)若因元数据多一个字段就凭空多出一列,属于不能接受的副作用。</p>
+ */
+const EXT_COL_PANELS = new Set([
+  'RD_FILTER_EFF', 'RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT',
+  'RD_SCALE', 'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC',
+])
+/** 静态列(未含运行时自定义列) */
+function baseColsOf(dt) {
   // 加标水（RD_SPIKE_WATER，2026-11-06 用户口径「可以自定义面板格式……和标准库绑定，
   // 一个标准库条目对应一个设计的表格样式」）：列集**由「测试项目」那个标准库条目的 content 决定**。
   // 选中哪个条目，就用它存的 { cols:[{key,label,w,group,rowspan}] } 当列定义；
@@ -2932,6 +3058,28 @@ function colsOf(dt) {
   const layout = spikeWaterCols.value
   if (layout) return layout
   return activeVariant.value?.cols || dt.cols || []
+}
+/**
+ * 静态列 + 运行时自定义列（只有 EXT_COL_PANELS 才合并）。
+ * 合并规则是纯函数：见 @core/panel/extCols.js（含 8 条单测）。这里只负责喂数据。
+ */
+const extMerged = computed(() => {
+  const map = new Map()
+  if (!EXT_COL_PANELS.has(String(props.panelCode))) return map
+  const fields = props.detailFields || []
+  for (const dt of cfg.value?.dataTables || []) {
+    map.set(dt, mergeExtCols({ cols: baseColsOf(dt), subHeads: dt.subHeads || [], detailFields: fields }))
+  }
+  return map
+})
+function colsOf(dt) {
+  const merged = extMerged.value.get(dt)
+  return merged ? merged.cols : baseColsOf(dt)
+}
+/** 分叉表头 = 静态 subHeads + 自定义列带来的分组 */
+function subHeadsOf(dt) {
+  const merged = extMerged.value.get(dt)
+  return merged ? merged.subHeads : (dt.subHeads || [])
 }
 
 // ── 标准库勾选(规格书检验要求 26 组分组标准库 / 出货检验计划 必测项+型式项) ──
@@ -3576,11 +3724,43 @@ function dtOwnsWidth(dt) {
  */
 function variantSpan(dt) {
   return Math.max(2, Math.min(6, totalSpan(dt) - 1))
-}function dtW(dt) {
+}
+/** 各列宽度之和（**不含** span、不含缩放）—— 既有调用点的原口径，勿改语义 */
+function dtW(dt) {
   return visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
+}
+/**
+ * 明细表**实际渲染宽度**（px）—— 与 colgroup 完全同一口径，供「＋ 新增数据记录行」等
+ * 表外元素对齐用（2026-11-11 用户口径「这个也要对齐」）。
+ *
+ * <p>此前那几处各自用 `dtW(dt)`（= Σ(c.w||100)）算宽，漏了两件事：
+ * ① `样品信息` 这类 span:3 的列要按 3 份宽算；② 有自定义列时整表按 dtFillK 缩放到纸宽。
+ * 结果就是表格 898px、下面那根「新增数据记录行」只有 720px（用户截图）。</p>
+ */
+function dtColSum(dt) {
+  return visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+}
+function dtTableW(dt) {
+  return dtColSum(dt) * (dt.design ? designK(dt) : dtFillK(dt))
 }
 
 // ── 像素级还原(dt.design):配置为设计图像素单位,按 k = 网格宽 / 可见列设计宽 等比缩放 ──
+/**
+ * 「有运行时新增列」的明细表 → 让整表宽度回到纸宽（2026-11-11 用户口径）。
+ *
+ * <p>背景：这些表的列宽是逐列固定像素（`(c.w || 100)`），累加值本来就不等于纸宽；
+ * 再加一个自定义列，表头 colspan 与 colgroup 的总宽就对不上，整表被浏览器压窄
+ * （用户报「新增一个列字段之后」版面缩到一半）。</p>
+ *
+ * <p>口径：<b>只对带自定义列的表</b>按 `纸宽 ÷ 各列(含 span)宽度之和` 等比缩放，
+ * 使总宽恰好等于纸宽；<b>没加过列的表返回 1</b> —— 既有版面一个像素都不动。</p>
+ */
+function dtFillK(dt) {
+  const merged = extMerged.value.get(dt)
+  if (!merged || !merged.addedCount) return 1
+  const want = visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+  return want ? gridW.value / want : 1
+}
 function designK(dt) {
   if (!dt.design) return 1
   const w = visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
@@ -3679,7 +3859,12 @@ function stageSpan(sec, ri) {
 // ── 合计行(成型配方):对指定列求数值和 ──
 // 位数跟本列明细走(2026-10-03 口径,见 @core/panel/sumTotals):原先固定收敛到 4 位,
 // 明细若写 5~6 位(库内确有 scale=6 的列)合计仍会少位。
+// ⚠ 「设计添加量」列例外(2026-11-11 用户口径「设计添加量的和只需要计算 % 的就行,
+//   这个最终的数值一定是 100%」):同一列里粉料/胶粉是百分数、功能料-颗粒是 g/支,
+//   两者不同量纲不能相加 ⇒ 走 core/mold/recipeExport.js 的 designTotalText(只加 % 行),
+//   表配置里用 `designTotal: '设计添加量'` 指过来。
 function totalOf(dt, key) {
+  if (dt?.designTotal && key === dt.designTotal) return designTotalText(rowsOf(dt))
   const sum = sumKeepScale(rowsOf(dt).map((r) => r[key]))
   return sum ? String(sum) : ''
 }
@@ -4055,6 +4240,55 @@ function effColLabel(key, fallback) {
 
 const fieldEditVisible = ref(false)
 const fieldEditRows = ref([])
+/* ── 选人控件(会签人,2026-11-11) ─────────────────────────────────────────
+ * 用户口径:「会签人字段改为下拉勾选对应的账号，就是人员姓名」。
+ * 三个约束一起满足:
+ *   ① 界面显示**人员姓名**、落库**账号**(后端按账号校验启用/发通知/写留痕);
+ *   ② 存库格式不变 = 顿号分隔的账号串(与 ButtonService.signersOf 的切分正则对齐);
+ *   ③ 纸面**只读态也要显示姓名** —— 否则打印出来是一串英文账号。
+ */
+const signUsers = ref([])
+/** 本面板是否有选人控件(有才去拉账号清单,别的面板零请求) */
+const hasUserPick = computed(() => {
+  const scan = (secs) => (secs || []).some((sec) => (sec.rows || []).some((r) =>
+    (r.grid || []).some((c) => c.userPick) || (r.pairs || []).some((p) => p.userPick)))
+  return scan(cfg.value?.sections) || scan(cfg.value?.tailSections)
+})
+/* 账号串 ⇄ 数组 / 账号串 → 姓名：实现与单测在 @core/panel/signerText.js，
+   这里只做组件侧的薄封装（切分口径必须与后端 ButtonService.signersOf 逐字一致）。 */
+// ⚠ `head` 只是 **prop**（模板里能直接写 head，但 <script setup> 作用域里没有这个绑定）
+//   ⇒ 脚本里一律 props.head。写成裸 head 会在渲染期抛 ReferenceError: head is not defined，
+//   Vue 捕获后整张纸面**停止更新**（DOM 停在旧状态：分页 0/0、单据编号显示「—」、格子全空），
+//   而且这个错会波及**所有** RecordSheetPanels 面板（实测 RD_PROD_INFO 一起报）。
+function pickListOf(key) {
+  return splitSigners(props.head?.[key])
+}
+function setPickList(key, arr) {
+  if (!props.head) return
+  props.head[key] = joinSigners(arr)
+  emit('dirty')
+}
+/** 账号串 → 人员姓名（查不到回落账号，不让格子空掉） */
+function signNamesOf(v) {
+  return signerNames(v, signUsers.value)
+}
+async function loadSignUsers() {
+  if (!hasUserPick.value) return
+  try {
+    const res = await request.get('/px/rdChange/users')
+    const data = res && res.code === 200 ? res.data : (res && res.data) || []
+    signUsers.value = Array.isArray(data) ? data : []
+  } catch (e) {
+    // 拉不到人不清空已填值:纸面仍按 head 里的账号显示(只读态会回落成账号原文)
+    ElMessage.warning(tt('会签人清单加载失败，可稍后重试') + ':' + String(e?.message || e))
+  }
+}
+// ⚠ 不能只挂 onMounted:本组件的 cfg 是**异步**来的(loadCrg 之后才有 sections),
+//   挂载那一刻 hasUserPick 还是假 ⇒ 清单请求根本不会发(实测 0 次请求)。
+//   改成监听 hasUserPick,cfg 就绪翻成真时再拉;切面板时按 panelCode 重拉。
+watch(hasUserPick, (v) => { if (v && !signUsers.value.length) loadSignUsers() }, { immediate: true })
+watch(() => props.panelCode, () => { signUsers.value = []; loadSignUsers() })
+
 function openFieldEdit() {
   const rows = []
   const seen = new Set()
@@ -4186,7 +4420,7 @@ function spreadSubHeads(dt) {
   const total = totalSpan(dt)
   const out = []
   let used = 0
-  for (const sh of dt.subHeads || []) {
+  for (const sh of subHeadsOf(dt)) {
     const span = Math.min(sh.span, total - used)
     if (span > 0) out.push({ label: sh.label, span })
     used += span
@@ -4415,6 +4649,12 @@ watch(
 const matPickVisible = ref(false)
 const matPickLoading = ref(false)
 const matPickRows = ref([])
+/**
+ * 商品弹窗的**自由文本搜索**（2026-11-12 用户口径）。
+ * 顶部四栏是 el-select，候选被 FACET_CAP=300 截断（存货编码有 3983 个），
+ * 在下拉里敲编号大多命中不了 ⇒ 单独给一条"直接在全部行上模糊匹配"的输入框。
+ */
+const matPickKeyword = ref('')
 const matPickChecked = ref([])
 const matPickTargetDt = ref(null)
 /** 四栏筛选值(键 = 商品面板的列名;空串 = 不筛) */
@@ -4424,11 +4664,13 @@ function onMatPickSelection(sel) {
 }
 function resetMatPickFilters() {
   for (const k of GOODS_FACETS) matPickFilters[k] = ''
+  matPickKeyword.value = ''
 }
 /** 每栏的候选值 —— 按**其它三栏**的当前条件收窄(用户要的"范围缩小"),capped 见 goodsPick.FACET_CAP */
 const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facetValues(matPickRows.value, k, matPickFilters) })))
 /** 表格数据 = 四栏 AND 之后的结果 */
-const matPickFiltered = computed(() => matchGoods(matPickRows.value, matPickFilters))
+const matPickFiltered = computed(() =>
+  matchGoods(matchKeyword(matPickRows.value, matPickKeyword.value), matPickFilters))
 const matPickHint = computed(() => {
   if (matPickLoading.value) return tt('加载中…')
   // 源 ①:物料清单 —— 勾的是整张单,提示要说清「整单子件会全部带入」
@@ -4895,8 +5137,46 @@ function onXSinterApplied(payload) {
   emit('dirty')
 }
 
-// ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
-// 列表维护(增/编/停用/恢复)交给 StdLibManager;本处保留「多行新增」框与「勾选→填入」到当前章节字段
+/**
+ * 导出 Excel：**配方表**（成型配方页 / X烧结配方页共用，2026-11-11 用户口径）。
+ *
+ * 为什么要专属导出，而不是走 PanelxList 的通用导出（头字段键值 + 明细页签）：
+ *   通用导出把每格的原文本原样倒出来 —— 于是出现用户报的那三条：
+ *     ① 物料第一行（补差位）那格在库里是空的/0，导出就是空的；
+ *     ② 粉料段/胶粉的研究添加量没有 `%` 单位，颗粒料没有 `g/支`；
+ *     ③ 没有合计，而且空白行（只有「物料种类」没有编号名称的行）一行不落地全导出来。
+ *   现在统一走 core/mold/recipeExport.js 的 buildRecipeAoa：只导有物料的行走，
+ *   数值 2 位小数，设计添加量按物料种类补 `%` / `g/支`，末行给合计（设计添加量只加 % 行 = 100%）。
+ *
+ * 返回 false 表示本面板没有配方表（调用方回落到通用导出）。
+ */
+async function exportRecipeExcel() {
+  const cfgv = cfg.value || {}
+  const dt = (cfgv.dataTables || []).find((t) => t && (t.recipeCalc || t.filterVal === '配方表'))
+  if (!dt) return false
+  const head = props.head || {}
+  const no = head['单据编号'] || head['编号'] || ''
+  const title = String(cfgv.staticTitle || cfgv.title || '配方表')
+  const cols = (dt.cols || []).filter((c) => c && c.key && !c.hiddenCol)
+  const XLSX = await import('xlsx')
+  const aoa = [
+    [`${title}${no ? '　' + no : ''}`],
+    [`惠州市银嘉环保科技有限公司　　单据编号：${no || ''}`],
+    [],
+    ...buildRecipeAoa({ cols, rows: rowsOf(dt) }),
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  // 列宽照纸面比例给（序号窄、名称最宽），导出件不必再手拉列宽
+  ws['!cols'] = cols.map((c) => ({
+    wch: c.key === '序号' ? 6 : (c.key === '物料名称' ? 34 : (c.key === dt.designTotal ? 14 : 18)),
+  }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '配方表')
+  XLSX.writeFile(wb, `${title}-配方表-${no || '导出'}.xlsx`)
+  return true
+}
+
+// ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──// 列表维护(增/编/停用/恢复)交给 StdLibManager;本处保留「多行新增」框与「勾选→填入」到当前章节字段
 const secLibVisible = ref(false)
 const secLibRef = ref(null)
 const secLibLabel = ref('')
@@ -4993,9 +5273,16 @@ function chartOf(dt) {
 <style scoped>
 /* 检验要求 · 炭棒尺寸的「选型号」格(2026-11-04):下拉占满格宽;
    手填/规格书带出的值在型号对不上时以灰字挂在右侧,避免"看不见值" */
-.rs-mold-pick { display: flex; align-items: center; gap: 4px; width: 100%; }
-.rs-mold-pick :deep(.el-select) { flex: 1 1 auto; min-width: 0; }
+/* 「选型号」现在挂在**标签格**里(2026-11-11):标签文字在上、下拉在下,故改竖向排布 */
+.rs-mold-pick { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 100%; margin-top: 4px; }
+.rs-mold-pick :deep(.el-select) { width: 100%; }
+/* 标签格本身是居中排版;下拉占满格宽后文字仍居中,不跟着左对齐 */
 .rs-mold-fallback { flex: 0 0 auto; color: #909399; font-size: 11.5px; white-space: nowrap; }
+/* 打印/导出:**两条路径都要隐掉控件** —— ① @media print(浏览器 Ctrl+P)
+   ② body.approval-printing(侧栏「打印」按钮)。.no-print 只覆盖前者,后者是独立规则集,
+   漏一条就会在盖章纸上留下「选型号（按生产车间筛）」的输入框(用户 2026-11-11 明确要求打印不显示)。 */
+@media print { .rs-mold-pick { display: none !important; } }
+body.approval-printing .rs-mold-pick { display: none !important; }
 
 /* ═══ 纸张/表基础(与功能性滤效同一视觉语言;宽度=网格列宽总和,竖线全页对齐) ═══ */
 .record-sheet {
@@ -5305,10 +5592,14 @@ function chartOf(dt) {
   font-weight: 400;
   color: #333;
 }
+/* 同格版式：编号控件**固定为下方信息块的那几列宽**（--docno-w），不再吃满整格剩余宽度。
+   2026-11-11 用户口径「选择框应该收短与下边平齐」——原来 flex:1 1 auto 会让它左缘压到
+   信息块中段，与下面 5 行不齐。未声明 --docno-w 时退回原弹性行为。 */
 .rs-onecell > .rs-docno-wrap,
 .rs-onecell > .rs-ref-ctl {
-  flex: 1 1 auto;
+  flex: 0 0 var(--docno-w, auto);
   min-width: 0;
+  max-width: 100%;
 }
 .rs-docno-empty {
   color: #b6bcc6;
@@ -5979,10 +6270,35 @@ function chartOf(dt) {
   gap: 8px 16px;
   margin-bottom: 10px;
 }
-.gp-filter { display: flex; align-items: center; gap: 6px; }
-.gp-filter-label { font-size: 12px; color: #606266; white-space: nowrap; }
-.gp-filter-select { width: 190px; }
-.gp-more { font-size: 11px; color: #c0c4cc; }
+/* ── 商品引用弹窗筛选区(2026-11-12 按设计库重排) ──────────────────────────
+   取值：padding 16 / marginXS 8 / borderRadius 6 / colorFillAlter rgba(0,0,0,.02) /
+        colorBorder #d9d9d9 / colorTextTertiary rgba(0,0,0,.45) / fontSizeSM 12。
+   分两段：搜索（总体）一行 + 四栏等宽（具体）一行，label 在控件上方。 */
+.gp-bar {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.gp-bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.gp-search { width: 360px; }
+.gp-bar-facets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.gp-facet { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gp-facet-label { font-size: 12px; line-height: 20px; color: rgba(0, 0, 0, 0.45); }
+.gp-facet-select { width: 100%; }
+/* 表格下方那行统计：左对齐小字，与筛选区同色系 */
+.gp-foot-hint { margin-top: 12px; font-size: 12px; line-height: 20px; color: rgba(0, 0, 0, 0.45); }
 .pp-foot { margin-top: 6px; font-size: 12px; color: #909399; }
 /* 行的三种态:已开发(不可选,压灰)/ 当前待引用(高亮)/ 普通。
    ⚠ 必须走 .pp-body :deep(...) —— el-table 的行由组件自己渲染,拿不到本组件的
@@ -6355,8 +6671,18 @@ function chartOf(dt) {
 }
 
 /* ═══ 矿化:表+图并排(复刻 Excel 表格在左、散点图在右) ═══ */
+/* 2026-11-12 用户口径（产品信息表/产品变更申请截图）：
+   「在三区与四区之间有一个小的分隔，两块不是共用一条边框线的」。
+   纸面是由**多个独立 <table class="rs-t">** 拼起来的（一段一张表），原本数据表外面多套了
+   一层 .rsp-dt-wrap 并给了 margin-bottom:6px ⇒ 只有"数据表→下一段"这一处出现 6px 空隙（实测
+   其余相邻段间距都是 0）；再加上两张表各自带 1px 表框，相接处就是**两条线**而不是一条。
+   改法：① 去掉这层的外边距，让段落紧贴；② 用 -1px 让两张表的边框**重叠**成一条线。 */
 .rsp-dt-wrap {
-  margin-bottom: 6px;
+  margin-bottom: 0;
+}
+/* 数据表 → 下一段：两张独立 table 的边框重叠 1px，使相接处只有一条线 */
+.rsp-dt-wrap + table.rs-t {
+  margin-top: -1px;
 }
 .rsp-dt-wrap.with-chart {
   display: flex;
@@ -6408,7 +6734,11 @@ function chartOf(dt) {
 <style>
 /* 标准库维护入口:屏幕可见,打印不出现(纸张上不留"标准库"字样) */
 .no-print { }
-@media print { .no-print, .rs-lib-btn { display: none !important; } }
+/* 0 层:标准库入口(⧉ 标准库维护 / ⌄ 标准库)都是编辑控件,纸张上不留「标准库」字样
+   —— 2026-11-11 用户口径。两条打印路径各有一条规则,@media print 这条管的是
+   「浏览器 Ctrl+P / 侧栏打印按钮(打印时会挂 body.approval-printing,由下面的规则集兜底)」;
+   截图导出那条路(modern-screenshot)不认 CSS,由 PanelxList.snapSheetPage 里摘节点。 */
+@media print { .no-print, .rs-lib-btn, .rsp-lib-pick { display: none !important; } }
 .stdlib-tip { font-size: 12px; color: #8ba6bd; margin-bottom: 8px; line-height: 1.6; }
 .stdlib-add { display: flex; gap: 8px; margin-bottom: 10px; }
 .stdlib-list { max-height: 320px; overflow: auto; border: 1px solid #e4edf5; border-radius: 4px; }

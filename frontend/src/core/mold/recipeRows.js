@@ -38,9 +38,19 @@ export function editRowsFrom(rows) {
   return (Array.isArray(rows) ? rows : []).map((r) => ({ ...blankRecipeRow(), ...(r || {}) }))
 }
 
-/** 这行算不算"有物料":物料种类/编号/名称任一非空(与 recipeSheet.materialRowCount 同一口径) */
+/**
+ * 这行算不算"有物料"：**物料编号或物料名称**任一非空。
+ *
+ * 2026-11-11 口径收紧（用户指着 5 行空白说「没有数据的行就自动删除，不需要保留……
+ * 还有很多的空白的行还展示出来」）：
+ *   旧判据是「物料种类/编号/名称任一非空」，于是**只有「物料种类」的行**（炭粉/胶粉/
+ *   功能料-颗粒 + 编号名称全空）被当成有效行落了库 —— 那正是那 5 行空白行的来源。
+ *   种类是**料位**不是**物料**：只有种类认不出是哪颗料，实际添加比例/单支含量全是 0，
+ *   留着只会让人以为"这一格还没填完"。
+ * 与 core/mold/recipeExport.js 的 rowHasMaterial 同一判据（导出件按它筛行）。
+ */
 function hasMaterial(row) {
-  return RECIPE_INPUT_KEYS.slice(0, 3).some((k) => String(row?.[k] ?? '').trim() !== '')
+  return ['物料编号', '物料名称'].some((k) => String(row?.[k] ?? '').trim() !== '')
 }
 
 /**
@@ -74,6 +84,11 @@ export function buildRecipeRows(editRows, patchRows) {
     if (hit) {
       row['实际添加比例'] = hit['实际添加比例']
       row['单支物料含量'] = hit['单支物料含量']
+      // 设计添加量也并回来（2026-11-11）：引擎给的是**带单位 + 2 位小数**的文本
+      // （`50.00%` / `3.00 g/支`），且补差位那行只有引擎算得出来 —— 用户报的
+      // 「物料第一行的设计添加量没有把自动补差的值带出来」就靠这一行补齐。
+      // 旧单据里那一格是空/0 的，重算一次就正了。
+      if (hit['设计添加量'] !== undefined) row['设计添加量'] = hit['设计添加量']
     }
     out.push(row)
   })

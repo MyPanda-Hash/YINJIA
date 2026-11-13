@@ -2199,6 +2199,33 @@ export default {
     '点行切换当前单据': 'Click a row to switch document',
     '双击选择存货': 'Double-click to pick inventory',
     '点击选择': 'Click to pick',
+    // ---- 产品变更申请表·会签人选人控件(2026-11-11)----
+    '点击选择会签人（可多选）': 'Click to pick countersigners (multiple)',
+    // ---- 字段管理（自定义列）操作指引（2026-11-11）----
+    '在这里给这张纸面「加列」。填字段名 →（可选）填分组 → 点「添加」；保存单据后，新列出现在纸面表格的最后一列。':
+      'Add a column to this sheet here. Enter a field name → (optional) a group → click "Add". After saving, the new column appears at the end of the sheet table.',
+    '（「承载列」是系统分配的占用列，不用管）': '(The "backing column" is an internal slot assigned by the system — no need to manage it.)',
+    '最多': 'At most',
+    '列，已用': 'columns, used',
+    '自定义列已达上限（已用满），如需再加请先在下方列表「停用」不用的列':
+      'Custom columns are at the limit. To add more, retire unused ones in the list below first.',
+    '这张表还没有自定义列。': 'This sheet has no custom columns yet.',
+    '① 在下面「新增字段」填字段名　② 想单独一列就留空分组；想和别的列共用一个表头就填分组名　③ 点「添加」':
+      '① Enter a field name under "Add field"  ② Leave the group empty for a standalone column, or enter a group name to share a header  ③ Click "Add"',
+    '分组（分叉）': 'Group (split header)',
+    '留空＝单独一列；输入一个新名字＝新建一个表头分组（纸面表头上方会多出一格跨列标题，与「压力 / 出水 / 去除率」同款）。':
+      'Empty = a standalone column; a new name = create a two-level header group (an extra spanning title row appears above the columns, like "Pressure / Outlet / Removal rate").',
+    '明细行＝纸面表格里的数据列（最常用）；表头＝单据抬头字段。':
+      'Detail = a data column inside the sheet table (most common); Header = a field in the document header.',
+    '已达上限，请先停用不用的列': 'Reached the limit — retire unused columns first',
+    '请先填写字段名': 'Enter a field name first',
+    // ---- 必填校验弹窗（2026-11-12）----
+    '以下内容还没填写完，已用高亮标出，请补齐后再提交：': 'The following are still empty (highlighted on the sheet). Please complete them before submitting:',
+    '还有 {n} 项必填未填写': '{n} required field(s) still empty',
+    '还有 {n} 项…': 'and {n} more…',
+    '去填写': 'Fill in',
+    '点击选择人员': 'Click to pick people',
+    '会签人清单加载失败，可稍后重试': 'Failed to load the countersigner list, please retry later',
     '现存量提取': 'Extract on-hand',
     '更多▼': 'More ▼',
     '☑ Ctrl+V列粘贴': '☑ Ctrl+V paste column',
@@ -2305,6 +2332,9 @@ export default {
     '计划合计': 'Planned total',
     // 工序路线排线·计划开工/实际开工(2026-10-29)
     '计划开工日期': 'Planned Start',
+    '计划开工日期不能晚于计划完工日期': 'Planned start cannot be later than planned finish',
+    '计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}': 'Planned start cannot be later than planned finish; planned start adjusted to {d}',
+    '计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}': 'Planned start cannot be later than planned finish; planned finish adjusted to {d}',
     '实际开工': 'Actual Start',
     '实际完工': 'Actual Finish',
     '上一道的计划完工日期 = 下一道的计划开工日期': "The previous step's planned finish = the next step's planned start",
@@ -5099,6 +5129,32 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
+    /* ── 研发管理·项目管理 → 产品文件流程管控 /rd/productFlow(2026-11-11 新增) ── */
+    '产品文件流程管控': 'Product File Flow Control',
+    '按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中':
+      'Track a product development package by product: product info sheet + four controlled files — which step has no document yet and which one is still in progress',
+    '数据来源：产品信息表与 4 个文件面板的实时单据状态，本页只读不改单':
+      'Computed live from the product info sheet and the four file panels. Read-only',
+    '产品数': 'Products',
+    '已开发完毕': 'Fully developed',
+    '未开工': 'Not started',
+    '已下发开发的产品': 'Products dispatched for development',
+    '5 步全部完成': 'All five steps completed',
+    '至少一份文件在建/已归档': 'At least one file created or archived',
+    '4 份文件一份都没起': 'None of the four files started',
+    '输入产品编号 / 产品名称 / 立项文档编号（支持片段）':
+      'Product No. / name / project doc No. (a fragment is enough)',
+    '展开行看 5 步时间轴': 'Expand a row to see all five steps',
+    '没有符合条件的产品': 'No product matches',
+    '卡在': 'Stuck at',
+    '5 步已全部完成': 'All five steps completed',
+    '待重走': 'Redo',
+    '下一步': 'Next step',
+    '填写人': 'Filled by',
+    '流程管控': 'Flow Control',
+    '处理人': 'Handled by',
+    '没有查看产品进度数据的权限（需要「项目进度查询」或「产品文件列表」的查看权）':
+      'No permission to view product progress (requires view access to Project Progress or Product File List)',
     /* ── 研发管理·项目管理 → 项目流程管控 /rd/projectFlow(2026-10-20 新增) ── */
     '项目流程管控': 'Project Flow Control',
     '按立项申请单号查这条项目走到哪一步：哪个环节还没审批、哪个环节该谁动手、单据建了内容有没有开始填':

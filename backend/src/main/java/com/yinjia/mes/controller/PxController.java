@@ -583,6 +583,22 @@ public class PxController {
     }
 
     /**
+     * 产品变更申请单:启用账号清单(会签人选人下拉,2026-11-11 用户口径
+     * 「会签人字段改为下拉勾选对应的账号，就是人员姓名」)。
+     *
+     * <p>⚠ **不复用 `/rdDev/users` 或 `/rdFlow/users`** —— 那两个分别挂 RD_PROD_INFO / RD_APPROVAL
+     * 的查看权;填变更单的人不必有产品信息表或立项申请的权限,复用会 403(同 DevTaskService 注释口径)。</p>
+     *
+     * <p>返回 {username, realName}:前端 label 用 realName(人员姓名)、value 用 username(账号)——
+     * 落库仍是账号,`ButtonService.signersOf` 按账号校验启用状态、发通知、写 yj_form_approval.operator。</p>
+     */
+    @GetMapping("/rdChange/users")
+    public ApiResult<List<Map<String, Object>>> rdChangeUsers() {
+        perm.requirePanelView("RD_CHANGE");
+        return ApiResult.ok(devTaskService.enabledUsers());
+    }
+
+    /**
      * 四个受控文件「我能不能编这张单」(2026-09-21):前端据此把非责任人的纸张置灰 + 提示责任人是谁。
      * 口径与保存门禁**同一真源**(ButtonService.devFileEditState → devFileEditVerdict),
      * 免得再出现"界面让改、保存被拒"。
@@ -1183,6 +1199,35 @@ public class PxController {
     public ApiResult<Map<String, Object>> rdDevOverview() {
         perm.requirePanelView("RD_PROGRESS");
         return ApiResult.ok(rdDevProducts.overview());
+    }
+
+    /**
+     * 样品单「进度描述」就地更新(2026-11-11 用户口径)。
+     *
+     * <p>原话:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+     * <b>这个字段不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」;
+     * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+     *
+     * <p>为什么单开一个端点而不是走 callButton/保存:常规保存的闸门是 draftEditable（草稿/修改中），
+     * 而本字段明确"不受归档约束"。这条端点只改这一列，不触发审批流、不动其它字段。
+     * 归属校验在 {@link ButtonService#updateSampleProgress}（外部单看头表创建人/申请署名，
+     * 内部单看该明细行的申请人）。</p>
+     *
+     * @param body {panelCode, docNo, rowId(内部单必填), text}
+     * @return 落库后的进度描述
+     */
+    @PostMapping("/sampleProgress")
+    public ApiResult<Map<String, Object>> sampleProgress(@RequestBody Map<String, Object> body) {
+        String panelCode = body.get("panelCode") == null ? "" : String.valueOf(body.get("panelCode"));
+        String docNo = body.get("docNo") == null ? "" : String.valueOf(body.get("docNo"));
+        perm.requirePanelView(panelCode);
+        Object rowId = body.get("rowId");
+        String text = body.get("text") == null ? "" : String.valueOf(body.get("text"));
+        String saved = buttons.updateSampleProgress(panelCode, docNo, rowId, text);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", docNo);
+        out.put("进度描述", saved);
+        return ApiResult.ok(out);
     }
 
     @PostMapping("/queryFormDataList")

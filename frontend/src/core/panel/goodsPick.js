@@ -51,6 +51,29 @@ export function matchGoods(rows, filters, excludeKey = '') {
 }
 
 /**
+ * 关键字搜索（2026-11-12 用户口径）。
+ *
+ * <p>用户原话：「商品查找功能有缺失，现在只能通过分类进行一个范围的一个缩小的筛选，
+ * 不能直接通过查找编号等进行查找，会出现明明是有这个产品但是直接搜索编号就找不到，
+ * 只能分类去找，反而更麻烦」。</p>
+ *
+ * <p>根因：顶部四栏是 `<el-select filterable>`，候选值是**去重后的值列表**，
+ * 而 {@link FACET_CAP}=300 —— 存货编码有 3983 个，绝大多数根本不在下拉里，
+ * 所以在下拉里输入编号当然找不到。这里给它一条**独立的自由文本通道**：
+ * 直接在**全部行**上做子串匹配（不经过下拉候选，天然不受 cap 限制）。</p>
+ *
+ * @param {any[]} rows 全量行
+ * @param {string} keyword 用户输入（空=不过滤）
+ * @param {string[]} [keys] 参与匹配的列，缺省 = 四栏 + 计量单位
+ */
+export function matchKeyword(rows, keyword, keys = [...GOODS_FACETS, '计量单位']) {
+  const kw = String(keyword ?? '').trim().toLowerCase()
+  const all = Array.isArray(rows) ? rows : []
+  if (!kw) return all.slice()
+  return all.filter((r) => keys.some((k) => String(r?.[k] ?? '').toLowerCase().includes(kw)))
+}
+
+/**
  * 某一栏的下拉候选值 —— **按其它三栏的当前条件收窄**(这就是用户要的"范围缩小")。
  * 本栏已选的值即使不在候选里也补在最前面,免得用户看不到自己选了什么。
  *

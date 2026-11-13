@@ -1053,7 +1053,10 @@
    "文件管理人": "文件管理人",
    "文件使用范围": "文件使用范围",
    "变更来源单号": "变更来源单号",
-   "备注": "备注"
+   "备注": "备注",
+   "备用2": "批准人",
+   "备用3": "批准签字",
+   "备用4": "批准日期"
   },
   "labels": [
    "表区",
@@ -1087,7 +1090,10 @@
    "文件管理人",
    "文件使用范围",
    "变更来源单号",
-   "备注"
+   "备注",
+   "批准人",
+   "批准签字",
+   "批准日期"
   ],
   "req": {
    "表区": {
@@ -1246,6 +1252,21 @@
     "visible": true
    },
    "备注": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准签字": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "批准日期": {
     "required": false,
     "hidden": false,
     "visible": true
@@ -1762,14 +1783,14 @@
  "RD_FILTER_EFF": {
   "cols": {
    "冲水时间": "冲水时间",
-   "压力样品1": "压力（PSI)样品1",
-   "压力样品2": "压力（PSI)样品2",
    "累计进水L": "累计进水（L）",
    "水温": "水温",
+   "压力样品1": "压力（PSI)样品1",
    "压力（PSI)样品3": "压力（PSI)样品3",
    "压力（PSI)样品4": "压力（PSI)样品4",
    "压力（PSI)样品5": "压力（PSI)样品5",
    "压力（PSI)样品6": "压力（PSI)样品6",
+   "压力样品2": "压力（PSI)样品2",
    "流速样品1": "流速（L/min)样品1",
    "流速（L/min)样品3": "流速（L/min)样品3",
    "流速（L/min)样品4": "流速（L/min)样品4",
@@ -1838,14 +1859,14 @@
   },
   "labels": [
    "冲水时间",
-   "压力（PSI)样品1",
-   "压力（PSI)样品2",
    "累计进水（L）",
    "水温（℃）",
+   "压力（PSI)样品1",
    "压力（PSI)样品3",
    "压力（PSI)样品4",
    "压力（PSI)样品5",
    "压力（PSI)样品6",
+   "压力（PSI)样品2",
    "流速（L/min)样品1",
    "流速（L/min)样品3",
    "流速（L/min)样品4",
@@ -1919,20 +1940,17 @@
     "hidden": false,
     "visible": true
    },
-   "压力（PSI)样品1": {
-    "required": false,
-    "hidden": true
-   },
-   "压力（PSI)样品2": {
-    "required": false,
-    "hidden": true
-   },
    "累计进水（L）": {
     "required": false,
     "hidden": false,
     "visible": true
    },
    "水温（℃）": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品1": {
     "required": false,
     "hidden": false,
     "visible": true
@@ -1953,6 +1971,11 @@
     "visible": true
    },
    "压力（PSI)样品6": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "压力（PSI)样品2": {
     "required": false,
     "hidden": false,
     "visible": true
@@ -2292,6 +2315,7 @@
  "RD_INSP_PLAN": {
   "cols": {
    "序号": "序号",
+   "表区": "表区",
    "检验类别": "检验类别",
    "控制项目": "控制项目",
    "质量控制内容": "质量控制内容",
@@ -2304,6 +2328,10 @@
    "检验内容": "检验内容",
    "控制方法": "控制方法",
    "备注": "备注",
+   "备用3": "更改内容",
+   "备用4": "更改原因",
+   "备用5": "更改时间",
+   "备用6": "责任人",
    "单据编号": "单据编号",
    "单据日期": "单据日期",
    "文档编号": "文档编号",
@@ -2328,6 +2356,7 @@
   },
   "labels": [
    "序号",
+   "表区",
    "检验类别",
    "控制项目",
    "质量控制内容",
@@ -2340,6 +2369,10 @@
    "检验内容",
    "控制方法",
    "备注",
+   "更改内容",
+   "更改原因",
+   "更改时间",
+   "责任人",
    "单据编号",
    "单据日期",
    "文档编号",
@@ -2366,6 +2399,11 @@
    "序号": {
     "required": false,
     "hidden": false,
+    "visible": true
+   },
+   "表区": {
+    "required": false,
+    "hidden": true,
     "visible": true
    },
    "检验类别": {
@@ -2426,6 +2464,26 @@
    "备注": {
     "required": false,
     "hidden": false,
+    "visible": true
+   },
+   "更改内容": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "更改原因": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "更改时间": {
+    "required": false,
+    "hidden": true,
+    "visible": true
+   },
+   "责任人": {
+    "required": false,
+    "hidden": true,
     "visible": true
    },
    "单据编号": {
@@ -4161,19 +4219,19 @@
    "产品编号": "产品编号",
    "项目编号": "项目编号",
    "项目名称": "项目名称",
-   "客户名称": "客户名称",
    "立项文档编号": "立项文档编号",
    "产品名称": "产品名称",
+   "客户名称": "客户名称",
    "客户编码": "客户编码",
    "客户项目名称": "客户项目名称",
    "产品管控等级": "产品管控等级",
    "产品功能类别": "产品功能类别",
+   "应用场景": "应用场景",
    "编辑人": "编辑人",
    "产品类别": "产品类别",
    "产品类型": "产品类型",
    "产品整体尺寸": "产品整体尺寸",
    "客户料号": "客户料号",
-   "应用场景": "应用场景",
    "炭棒尺寸": "炭棒尺寸",
    "炭棒外径": "炭棒外径",
    "炭棒内径": "炭棒内径",
@@ -4200,19 +4258,19 @@
    "产品编号",
    "项目编号",
    "项目名称",
-   "客户名称",
    "立项文档编号",
    "产品名称",
+   "客户名称",
    "客户编码",
    "客户项目名称",
    "产品管控等级",
    "产品功能类别",
+   "应用场景",
    "编辑人",
    "产品类别",
    "产品类型",
    "产品整体尺寸",
    "客户料号",
-   "应用场景",
    "炭棒尺寸",
    "炭棒外径",
    "炭棒内径",
@@ -4279,11 +4337,6 @@
     "hidden": false,
     "visible": true
    },
-   "客户名称": {
-    "required": false,
-    "hidden": false,
-    "visible": true
-   },
    "立项文档编号": {
     "required": false,
     "hidden": false,
@@ -4291,6 +4344,11 @@
    },
    "产品名称": {
     "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名称": {
+    "required": false,
     "hidden": false,
     "visible": true
    },
@@ -4310,6 +4368,11 @@
     "visible": true
    },
    "产品功能类别": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "应用场景": {
     "required": false,
     "hidden": false,
     "visible": true
@@ -4335,11 +4398,6 @@
     "visible": true
    },
    "客户料号": {
-    "required": false,
-    "hidden": false,
-    "visible": true
-   },
-   "应用场景": {
     "required": false,
     "hidden": false,
     "visible": true
@@ -4921,11 +4979,6 @@
  },
  "RD_SAMPLE_EXT": {
   "cols": {
-   "单据编号": "单据编号",
-   "单据日期": "单据日期",
-   "客户名称": "客户名称",
-   "费用": "费用",
-   "期望交期": "期望交期",
    "产品整体规格": "产品整体规格",
    "炭棒规格": "炭棒规格",
    "样品数量": "样品数量",
@@ -4934,17 +4987,18 @@
    "背景": "背景",
    "性能要求": "性能要求",
    "配方及工艺要求": "配方及工艺要求",
+   "单据编号": "单据编号",
+   "单据日期": "单据日期",
+   "客户名称": "客户名称",
+   "费用": "费用",
+   "期望交期": "期望交期",
    "申请": "申请",
    "审核": "审核",
    "确认": "确认",
+   "进度描述": "进度描述",
    "备注": "备注"
   },
   "labels": [
-   "单据编号",
-   "单据日期",
-   "客户名称",
-   "费用",
-   "期望交期",
    "产品整体规格",
    "炭棒规格",
    "样品数量",
@@ -4953,37 +5007,18 @@
    "背景",
    "性能要求",
    "配方及工艺要求",
+   "单据编号",
+   "单据日期",
+   "客户名称",
+   "费用",
+   "期望交期",
    "申请",
    "审核",
    "确认",
+   "进度描述",
    "备注"
   ],
   "req": {
-   "单据编号": {
-    "required": false,
-    "hidden": false,
-    "visible": true
-   },
-   "单据日期": {
-    "required": false,
-    "hidden": false,
-    "visible": true
-   },
-   "客户名称": {
-    "required": true,
-    "hidden": false,
-    "visible": true
-   },
-   "费用": {
-    "required": false,
-    "hidden": false,
-    "visible": true
-   },
-   "期望交期": {
-    "required": false,
-    "hidden": false,
-    "visible": true
-   },
    "产品整体规格": {
     "required": false,
     "hidden": false,
@@ -5024,6 +5059,31 @@
     "hidden": false,
     "visible": true
    },
+   "单据编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "客户名称": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "费用": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "期望交期": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
    "申请": {
     "required": false,
     "hidden": false,
@@ -5039,6 +5099,11 @@
     "hidden": false,
     "visible": true
    },
+   "进度描述": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
    "备注": {
     "required": false,
     "hidden": false,
@@ -5048,8 +5113,9 @@
  },
  "RD_SAMPLE_INT": {
   "cols": {
-   "单据编号": "单据编号",
-   "单据日期": "单据日期",
+   "申请日期": "申请日期",
+   "申请人": "申请人",
+   "样品编号": "样品编号",
    "项目名": "项目名",
    "炭棒尺寸": "炭棒尺寸",
    "数量": "数量",
@@ -5058,13 +5124,17 @@
    "工艺要求": "工艺要求",
    "物料批次要求": "物料批次要求",
    "期望交期": "期望交期",
-   "样品状态": "样品状态",
    "确认人": "确认人",
+   "样品状态": "样品状态",
+   "进度描述": "进度描述",
+   "单据编号": "单据编号",
+   "单据日期": "单据日期",
    "备注": "备注"
   },
   "labels": [
-   "单据编号",
-   "单据日期",
+   "申请日期",
+   "申请人",
+   "样品编号",
    "项目名",
    "炭棒尺寸",
    "数量",
@@ -5073,17 +5143,25 @@
    "工艺要求",
    "物料批次要求",
    "期望交期",
-   "样品状态",
    "确认人",
+   "样品状态",
+   "进度描述",
+   "单据编号",
+   "单据日期",
    "备注"
   ],
   "req": {
-   "单据编号": {
+   "申请日期": {
+    "required": true,
+    "hidden": false,
+    "visible": true
+   },
+   "申请人": {
     "required": false,
     "hidden": false,
     "visible": true
    },
-   "单据日期": {
+   "样品编号": {
     "required": false,
     "hidden": false,
     "visible": true
@@ -5128,12 +5206,27 @@
     "hidden": false,
     "visible": true
    },
+   "确认人": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
    "样品状态": {
     "required": false,
     "hidden": false,
     "visible": true
    },
-   "确认人": {
+   "进度描述": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据编号": {
+    "required": false,
+    "hidden": false,
+    "visible": true
+   },
+   "单据日期": {
     "required": false,
     "hidden": false,
     "visible": true

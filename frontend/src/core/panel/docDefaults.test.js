@@ -135,16 +135,22 @@ test('未知面板:不做任何写入', () => {
  *   (实测 测试账套 PI-2026-10-0013 两列皆 NULL)。
  *   **这条测试此前测的是错的行为,不是漏测 —— 断言照抄了生产代码的键名。**
  *
- * ⚠ 2026-10-29 改值:冯敏 → **冯总**。用户口径「两个审核人默认填写为冯总和陈秀丽」,
- *   并补充「不是冯敏,就是冯总,因为冯总使用的是管理员的账号」——
- *   冯总本人用 admin 账号,库里没有「冯总」这个 yj_user;但这两列是**纯展示文字**,
- *   审批人匹配走 yj_doc_status.l2_approver(存账号),不按姓名反查 ⇒ 写「冯总」不影响权限。
+ * ⚠ 2026-10-29 曾把一级改成「冯总」;⚠ 2026-11-11 用户口径**再次变更**:
+ *   「产品信息表的一级审核人名字改为：陈秀丽，这个是固定的
+ *    二级审核人是分配的产品责任人（规格书的责任人）是谁就回填显示谁的名字
+ *    这三个都是只读的，但是都要有对应的数据回填进去」
+ *   追问后确认:① 一级只读恒显示陈秀丽、**一级审批权限不变**;② 二级**一级选人之后才回填**、
+ *   选之前为空;③ 产品负责人同②。⇒ 一级默认=陈秀丽;二级**不给默认值**(留空,等一级选人时由
+ *   ButtonService.writeBackL2Approver 回填到 rd_prod_info_head.审核人二级)。
+ *   三格同时改为只读(recordSheetConfigs ro:true + yj_field.editable=0,见
+ *   tools/migrate-prodinfo-approver-cells-20261111.sql)。
  */
-test('产品信息表:两级审批人默认带出 冯总 / 陈秀丽(键=字段标签,不是物理列名)', () => {
+test('产品信息表:一级默认陈秀丽、二级留空(选择前为空,选后回填)', () => {
   const form = {}
   applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
-  assert.equal(form['审核人（一级审批人）'], '冯总')
-  assert.equal(form['审核人（二级审批人）'], '陈秀丽')
+  assert.equal(form['审核人（一级审批人）'], '陈秀丽')
+  // 二级不得有默认值:有默认值就会在"一级还没选人"时显示一个假签核人
+  assert.equal(form['审核人（二级审批人）'] ?? '', '', '二级审核人选择前必须为空，不能给默认值')
   // 防回归:绝不能再退回物理列名做键(那两个名字在 yj_field.label 里不存在 ⇒ 两头都丢)
   assert.equal(form['审核人一级'], undefined, '键不能是物理列名「审核人一级」')
   assert.equal(form['审核人二级'], undefined, '键不能是物理列名「审核人二级」')
@@ -152,7 +158,7 @@ test('产品信息表:两级审批人默认带出 冯总 / 陈秀丽(键=字段�
   const filled = { '审核人（一级审批人）': '张三' }
   applyDocDefaults('RD_PROD_INFO', filled, USER, { isNew: true, today: T })
   assert.equal(filled['审核人（一级审批人）'], '张三', '已有值不应被默认值覆盖')
-  assert.equal(filled['审核人（二级审批人）'], '陈秀丽', '空值仍应带出默认')
+  assert.equal(filled['审核人（二级审批人）'] ?? '', '', '二级仍不给默认值')
 })
 
 test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', () => {
