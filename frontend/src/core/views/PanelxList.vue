@@ -5750,11 +5750,20 @@ const DOC_RAIL_PANELS = {
   //   一个工单行 = 一个生产批次 ⇒ 左栏给工单号,业务能一眼对上生产批次;
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
-  // ── 2026-11-13 用户口径：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」
-  //   ⇒ 这两个面板的「单据预览」直接复用 DocSelectRail（与表格单据左栏同一个组件），
-  //     只是挂在**右边**。故列配置必须在这里登记，docRailCfg 才组得出
-  //     单号 | 日期 | 中间列… | 审核状态。
-  //   中间列按"找单线索"挑，且是实测有值的短字段：
+}
+
+/**
+ * 「单据预览」右栏表格的中间列（2026-11-13）。
+ *
+ * <p>⚠ **不能登记进 DOC_RAIL_PANELS** —— 那张表是"这个面板有左侧单据选择栏"的开关，
+ * `docRailCfg` 读它、两个左栏渲染点（网格分支 / 纸面分支）都 `v-if="docRailCfg"`。
+ * 我图省事把 RD_PROD_INFO / RD_APPROVAL 加进去后，**左边平白多出一条左栏**
+ * （用户 2026-11-13 报障：「把左边的删掉，现在多了」）。</p>
+ *
+ * <p>故预览的列配置独立放这里，只被 {@link previewRailBind} 使用，左栏完全不受影响。</p>
+ */
+const PREVIEW_COLUMNS = {
+  // 中间列按"找单线索"挑，且是实测有值的短字段
   RD_PROD_INFO: ['产品编号', '产品名称', '客户名称'],
   RD_APPROVAL: ['客户名', '项目等级', '申请立项人'],
 }
@@ -5808,9 +5817,20 @@ const railBind = computed(() => ({
  * · `title` 用「XX选择」，与左栏一致。
  * 数据源照样是 list / total / query，翻页与模糊搜索走上面同一批 handler。
  */
-const previewRailBind = computed(() => ({
-  title: docRailCfg.value ? docRailCfg.value.title : '',
-  columns: docRailCfg.value ? docRailCfg.value.columns : null,
+const previewRailBind = computed(() => {
+  // 列从 PREVIEW_COLUMNS 自建，与左栏的 docRailCfg 完全解耦
+  const middles = PREVIEW_COLUMNS[panelCode.value]
+  const columns = middles
+    ? [
+        { label: '单号', keys: ['编号', '单据编号', '单号'], align: 'left', no: true },
+        { label: '日期', keys: ['日期', '单据日期'], align: 'left' },
+        ...middles.map((m) => (typeof m === 'string' ? { label: m, keys: [m], align: 'left' } : m)),
+        { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
+      ]
+    : null
+  return {
+  title: railTitle(panelName.value),
+  columns,
   rows: list.value,
   currentNo: railCurNo.value,
   collapsed: false,
@@ -5820,7 +5840,8 @@ const previewRailBind = computed(() => ({
   keyword: query.keyword,
   selectable: false,
   checked: [],
-}))
+  }
+})
 
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })

@@ -119,11 +119,20 @@ test('右栏预览必须复用 DocSelectRail 本体（左栏那套表格），�
   assert.match(seg, /class="ps-back"/, '必须有返回按钮')
   // ② 不能再有自己的卡片列表（那是方案④，被否掉了）
   assert.ok(!vue.includes('ps-row'), '不应再有自造卡片行 ps-row')
-  // ③ 列配置必须登记，否则表格没有中间列
+  // ③ 列配置必须登记在 PREVIEW_COLUMNS（预览专用），**不能**进 DOC_RAIL_PANELS
+  const pv = vue.indexOf('const PREVIEW_COLUMNS = {')
+  assert.ok(pv > 0, '缺 PREVIEW_COLUMNS')
+  const pvBlock = vue.slice(pv, pv + 900)
+  assert.ok(pvBlock.includes('RD_PROD_INFO: ['), '产品信息表未登记预览列')
+  assert.ok(pvBlock.includes('RD_APPROVAL: ['), '立项申请未登记预览列')
+  // ⚠ 关键回归守卫（用户 2026-11-13 报障「把左边的删掉，现在多了」）：
+  //   DOC_RAIL_PANELS 是"这个面板有左侧选择栏"的开关，登记进去就会平白多出一条左栏。
   const dir = vue.indexOf('const DOC_RAIL_PANELS = {')
-  const block = vue.slice(dir, dir + 14000)
-  assert.ok(block.includes('RD_PROD_INFO: ['), '产品信息表未登记左栏列')
-  assert.ok(block.includes('RD_APPROVAL: ['), '立项申请未登记左栏列')
+  // 只取该对象本体（到 PREVIEW_COLUMNS 之前），否则会把预览的列配置也算进来
+  const dirEnd = vue.indexOf('const PREVIEW_COLUMNS = {')
+  const block = dirEnd > dir ? vue.slice(dir, dirEnd) : vue.slice(dir, dir + 14000)
+  assert.ok(!block.includes('RD_PROD_INFO: ['), 'RD_PROD_INFO 不能进 DOC_RAIL_PANELS（会多出左栏）')
+  assert.ok(!block.includes('RD_APPROVAL: ['), 'RD_APPROVAL 不能进 DOC_RAIL_PANELS（会多出左栏）')
   // ④ 预览态右栏要加宽（176px 放不下 6 列，实测只露出单号+日期）
   assert.match(vue, /\.approval-side\.preview-on \{ width: 382px; \}/, '预览态右栏必须加宽，否则表格列被挤掉')
 })
