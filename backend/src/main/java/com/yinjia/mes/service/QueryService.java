@@ -117,7 +117,8 @@ public class QueryService {
      * <p>以后别的面板也要这个页签:把面板号加进这个集合即可(前端自己决定要不要画页签),
      * SQL 一行都不用动。
      */
-    private static final java.util.Set<String> STATUS_TAB_PANELS = java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
+    private static final java.util.Set<String> STATUS_TAB_PANELS =
+            java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP", "QC_FIRST_INSP");
 
     /**
      * 需要后端派生只读字段「检测周期」的面板 —— 出货检验单 **QC_PROC_INSP** 与
@@ -805,8 +806,10 @@ public class QueryService {
             //   草稿只有首次保存时间 ⇒ 单端显示;两端都没有 ⇒ null(前端留空格子)。
             //   两端按**时间先后**排版(B 案,原因见 docCycleText:存量单是批量导入,asp_time1 晚于历史审核时间,
             //   照字面会排出倒置区间;新单 first<last,排版前后完全一致)。
-            //   口径来源:用户 2026-11-11 图2 表头注「检测周期:首次填写表单时间-末次提交审核时间」,
-            //   契约见 docs/design/出货检验功能记录表-表样改造.md §二「(派生)检测周期 / 后端派生只读」。
+            //   口径来源:用户 2026-11-11 图2 表头注「检测周期:首次填写表单时间-末次提交审核时间」;
+            //   2026-11-13 用户修正「审批通过后才确定第二个日期」⇒ 右端只认审核时间 shsj,
+            //   提交审批后不再固定(弃审后自动退回单端)。契约见
+            //   docs/design/出货检验功能记录表-表样改造.md §二「(派生)检测周期 / 后端派生只读」。
             //   ⚠ 只读派生、**不落库**:yj_field 里不建这一行(不是字段,是后端合成的行键,与「发起人」同类)。
             if (DOC_CYCLE_PANELS.contains(def.code())) {
                 doc.put("检测周期", docCycleText(firstSave.get(no), st));
@@ -967,12 +970,16 @@ public class QueryService {
      * 「检测周期」文本 = 首次填写表单时间 ~ 末次提交/审核时间(格式 {@code yyyy-MM-dd HH:mm})。
      *
      * <p><b>用户口径</b>(2026-11-11 图2《出货检验功能记录表》抬头第 1 行):
-     * 「检测周期:首次填写表单时间-末次提交审核时间」。取数:
+     * 「检测周期:首次填写表单时间-末次提交审核时间」;**2026-11-13 用户修正**:
+     * 「需要在审批通过后才确定下来这个检测周期的第二个日期,当前提交审批后日期就被固定下来了,
+     *   可能存在弃审的情况,所以要求审批通过后这个数据才保存下来」。取数:
      * <ul>
      *   <li>首次填写 = 首次保存(头表 {@code asp_time1} 的 MIN,见 {@link #loadFirstSaveTimes});</li>
-     *   <li>末次提交/审核 = {@code yj_doc_status.pending_at}(提交审批时间)与 {@code shsj}(审核时间)里
-     *       **有值的较晚者**;只提交没审 ⇒ 到提交为止,审完 ⇒ 到审核为止;</li>
-     *   <li>只有一端就**单端显示**(草稿只有首次保存时间),两端都空 ⇒ {@code null}(前端留空格子)。</li>
+     *   <li>右端 = **审核通过时间 {@code shsj}**(审批通过那一刻写值),**不再吃 {@code pending_at}
+     *       (提交审批时间)** —— 提交后弃审会把 {@code shr/shsj} 清空(见 ButtonService.unaudit),
+     *       于是右端自动消失、只显示首次填写;再提交/再审通过时重新落最新的审核时间。
+     *       这样"周期"只表达**真正审过的区间**,不会因为提交过就被钉死;</li>
+     *   <li>只有一端就**单端显示**(草稿/审批中只有首次保存时间),两端都空 ⇒ {@code null}(前端留空格子)。</li>
      * </ul>
      *
      * <p><b>为什么两端按时间先后排版,而不是硬把「首次」放左边</b>(2026-11-11 用户/Lead 拍板 B 案):
@@ -989,11 +996,10 @@ public class QueryService {
      */
     static String docCycleText(Object firstSave, Map<String, Object> st) {
         java.time.LocalDateTime first = wallClock(firstSave);
-        java.time.LocalDateTime last = null;
-        if (st != null) {
-            last = laterOf(last, wallClock(st.get("pending_at")));   // 提交审批时间
-            last = laterOf(last, wallClock(st.get("shsj")));         // 审核时间
-        }
+        // 右端**只认审批通过时间**(2026-11-13 用户口径):提交审批(pending_at)不锁定周期;
+        // 弃审清空 shr/shsj ⇒ 这里自然回到单端显示(不留下"已经被固定"的假周期)。
+        java.time.LocalDateTime last = st == null ? null : wallClock(st.get("shsj"));
+        if (last == null && st != null) last = null;   // 明确:不使用 pending_at
         if (first == null && last == null) return null;
         if (last == null) return first.format(CYCLE_FMT);
         if (first == null) return last.format(CYCLE_FMT);
