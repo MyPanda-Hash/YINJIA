@@ -7870,6 +7870,16 @@ async function snapSheetPage(el, domToPng) {
     clone.style.width = w0 + 'px'
     clone.style.maxWidth = 'none'
     clone.style.overflow = 'visible'
+    // 🔴 2026-11-13 用户报障「立项申请表的 PDF 导出有问题，应该是完整的页面才是」——
+    //   导出的 PDF 里单据只占纸张左上角一块（内容约 2/3 宽，右侧大片空白）。
+    //   根因：DocSheet 为「窄窗口别撑出横向滚动条」给纸面根节点写了**内联 zoom**
+    //   （sheetZoom = 容器内宽 ÷ 纸宽，见 DocSheet.vue 注释），而 cloneNode 会把它一起复制。
+    //   这里随后只覆盖了 width/maxWidth/overflow，zoom 留着 ⇒ 截图宽按**未缩放的纸宽**定，
+    //   克隆体内部却按 zoom 排版，右边就成了空白。
+    //   （浏览器实测：原元素 zoom=0.6 ⇒ 克隆体 zoom=0.6 ⇒ 内容只占截图宽 60%。）
+    //   导出件要的是**完整纸面**：屏幕上的窄窗适配与纸面尺寸无关，必须清掉。
+    //   ⚠ 单页面板走 window.print() 不受影响 —— 那条路按 CSS 变量 --print-zoom 另算。
+    clone.style.zoom = '1'
     // 页签条是编辑控件,不进导出件(打印时由 body.approval-printing 隐藏;导出走同一口径)
     clone.querySelectorAll('.rsp-pages').forEach((n) => n.remove())
     // 行操作列(＋插入/×删除)只在编辑态存在;从"编辑中的单据"直接打印时它会连 60px 一起上纸
