@@ -162,7 +162,11 @@ public class WorkOrderListController {
                         + " ISNULL(p.[批次号], N'') AS 批次号,"
                         + " p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 行号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
-                        + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
+                        // 转单时间(2026-11-13 用户报障「15:07 的单显示成 07:07」):
+                        //   asp_time1 由 SYSDATETIME()/GETDATE() 写入,而本机 SQL Server 跑在 Docker 里
+                        //   **TZ=UTC** ⇒ 库里存的是 UTC 墙钟;列表要按北京时间显示 ⇒ +8 小时
+                        //   (中国无夏令时,固定偏移安全)。⚠ 只改**显示**,不改库里的值、不影响排序。
+                        + " CONVERT(varchar(16), DATEADD(hour, 8, p.asp_time1), 120) AS 转单时间,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
                         // 订单追溯(2026-10-31 用户口径「工单里要有订单ID或订单号,订单行号,能够保持订单的追溯」):
                         //   · 订单号 = plang.od_no(转单时从销售订单带入);
@@ -259,7 +263,13 @@ public class WorkOrderListController {
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
                         + "   ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
-                        + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
+                        // 默认排序(2026-11-13 用户口径「新工单应排在旧工单上方」):
+                        //   ① 先按**工单日期**倒序(业务口径不变:日期越近越靠前);
+                        //   ② 同一天内按 **id DESC**(自增主键 = 建单先后)⇒ 后建的单排最上面。
+                        //   此前是 `pl_date DESC, pl_no, pl_xc`:同一天按工单号**升序**,号越大(越新)
+                        //   反而越靠下 —— 用户看到「刚建的两张单沉在今天这组末尾」正是这个原因。
+                        //   ⚠ pl_no 是 nvarchar,不要用 pl_no 做时间先后判据(跨月/跨年前缀会翻车)。
+                        + w + " ORDER BY p.pl_date DESC, p.id DESC, p.pl_xc",
                 args.toArray());
         // 生产状态(2026-10-15 用户口径拆分「完工」与「结案」):
         //   · 已结案 = **plang.ja**(唯一结案标志;由「组装成品检验已审核 + 入库≥排产」重算,或手工结案);

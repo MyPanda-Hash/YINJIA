@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -182,8 +184,16 @@ public class WorkOrderCreateService {
         }
 
         // ── 日期 ──
-        Timestamp plDate = dateOf(b.get("工单日期"), "工单日期");
-        if (plDate == null) plDate = Timestamp.valueOf(LocalDate.now().atStartOfDay());
+        // 工单日期(2026-11-13 用户口径「排序/转单时间问题」,方案 B):
+        //   此前手工建单一律写 **当天 00:00:00**(只保留日期),于是同一天建的单在 pl_date 上完全并列,
+        //   列表只能按工单号升序 → 新单沉到当天最下方。现在改成 **用户选的日期 + 当前时刻**:
+        //   · 日期部分 = 用户选的工单日期(不传 = 本地今天)⇒「单据日期」列显示的仍是用户选的那天;
+        //   · 时刻部分 = **UTC 墙钟**(与本机 SQL Server 容器 TZ=UTC、订单结转 pl_date=GETDATE() 同一口径),
+        //     否则手工单写本地时刻、结转单写 UTC 时刻,同一天内的先后会错乱(本地 16:10 > UTC 08:20)。
+        //   ⇒ 同一天后建的单 pl_date 更大 ⇒ 列表 `pl_date DESC + id DESC` 自然把它排到最上面。
+        Timestamp chosen = dateOf(b.get("工单日期"), "工单日期");
+        LocalDate plDay = chosen == null ? LocalDate.now() : chosen.toLocalDateTime().toLocalDate();
+        Timestamp plDate = Timestamp.valueOf(plDay.atTime(LocalTime.now(ZoneOffset.UTC).withNano(0)));
         Timestamp stDate = dateOf(b.get("计划开工日期"), "计划开工日期");
         Timestamp cpDate = dateOf(b.get("交期"), "交期");
 
