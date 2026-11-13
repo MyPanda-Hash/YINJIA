@@ -84,9 +84,11 @@ test('接口层:只有「审核/审批通过/审批驳回」允许 selfaudit 放
     'requireButton 里要有这条放行,否则接口先 403,按钮点了必报错')
 })
 
-test('前端:「审核」按钮对自审权开放(只扩这一颗,不扩审批组)', () => {
-  assert.match(panelx, /function canAuditHere\(\) \{\s*\n\s*return canApproveHere\(\) \|\| canSelfAuditHere\(\)/,
-    'canAuditHere = 审批权 ∪ 自审权')
+test('前端:「审核」按钮对自审权开放,但**只在自己的单上**显示(别人的单没审批权就不出现)', () => {
+  assert.match(panelx, /function authoredByMe\(\)|const authoredByMe = computed/,
+    '必须有「纯事实」的 我是不是制单人 判断(不含权限)')
+  assert.match(panelx, /function canAuditHere\(\) \{\s*\n\s*if \(canApproveHere\(\)\) return true\s*\n\s*if \(!canSelfAuditHere\(\)\) return false\s*\n\s*return authoredByMe\.value !== false/,
+    'canAuditHere 必须是:审批权 → 显示;只有自审权 → 仅自己的单(null 兜底放行)')
   assert.match(panelx, /v-if="canAuditHere\(\)"/, '审核按钮的 v-if 要用 canAuditHere')
   // 审批通过/驳回组仍由 canApproveHere（∪ 二级审批人）决定 —— 自审权不能把审批权带出来
   assert.match(panelx, /const approvalBtnsVisible = computed\(\(\) =>[\s\S]{0,300}canApproveHere\(\)/,

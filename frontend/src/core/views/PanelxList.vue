@@ -4131,15 +4131,20 @@ function canApproveHere() {
  * 「审核」按钮的显隐(2026-11-13 用户口径「本人自审权限绑定审核按钮」)。
  *
  * <p>为什么不能只看审批权:角色只勾了「本人自审」(selfaudit)、没勾审批列时,
- * 原来按钮**整颗不渲染** —— 权限授了却点不到,等于没授。这里把「本人自审」也算进入口,
- * 点下去之后能审的只是**自己制的那张单**:服务端 `ButtonService.audit()` 对
- * "无审批权 + 有 selfaudit" 只放行 `byAuthor` 的情形,别人的单一律 403。</p>
+ * 原来按钮**整颗不渲染** —— 权限授了却点不到,等于没授。</p>
  *
- * <p>⚠ 只扩**审核**这一颗,不扩「审批通过/审批驳回」组 —— 那两颗仍由 canApproveHere 决定,
- * 否则等于把审批权白送出去。</p>
+ * <p><b>但也不能"有自审权就到处显示"</b>(用户 2026-11-13 追问确认):只有自审权、没有审批权的人,
+ * 在**别人的单**上点审核必被服务端 403(「当前用户无审批权限」)。仓库既有口径是"不给点了必被拒的按钮",
+ * 所以这里收紧成:有审批权 → 一直显示;只有自审权 → **只在自己的单上显示**。</p>
+ *
+ * <p>兜底:拿不到「发起人账号」(个别面板没这一格)时按<b>显示</b>处理 —— 入口不藏,交给后端裁决,
+ * 免得把"本来能审"的人挡在门外。真闸门仍是 `ButtonService.audit()`
+ * (`!hasApprove && !selfGranted` 才拒,selfGranted 要求 byAuthor)。</p>
  */
 function canAuditHere() {
-  return canApproveHere() || canSelfAuditHere()
+  if (canApproveHere()) return true
+  if (!canSelfAuditHere()) return false
+  return authoredByMe.value !== false   // true=我制的 / null=拿不到制单人(放行给后端判)
 }
 
 /**
@@ -4185,11 +4190,21 @@ const isDirectAuditBlocked = computed(() => DIRECT_AUDIT_BLOCKED.includes(String
  *   (所以只在草稿/修改中判断才有意义,那时它就是制单人)。
  * 拿不到这一格(个别面板没有 制单人/申请人 字段)时返回 false ⇒ 不拦,交给后端裁决,提示照旧清楚。
  */
-const iAmDraftAuthor = computed(() => {
-  if (user.isAdmin || canSelfAuditHere()) return false
+/**
+ * 「这张单是不是我制的」——**纯事实判断,不含任何权限**(2026-11-13 抽出)。
+ * 判据与后端 authorOfDoc 同源:`发起人账号`(草稿阶段 = 表头 asp_user1 制单人;
+ * 提交审批后被 pending_by 覆盖,故只对草稿/修改中有意义)。
+ * 拿不到这一格(个别面板没有 制单人/申请人 字段)返回 null ⇒ 调用方自行决定放宽还是收紧。
+ */
+const authoredByMe = computed(() => {
   const me = String(user.userName || user.account || '')
   const who = String(cur.value?.['发起人账号'] || '').trim()
-  return !!me && !!who && who === me
+  if (!me || !who) return null
+  return who === me
+})
+const iAmDraftAuthor = computed(() => {
+  if (user.isAdmin || canSelfAuditHere()) return false
+  return authoredByMe.value === true
 })
 /** 这一次点「审批通过」会不会走自审(用于按钮旁提前说明;真正的裁决在后端 canSelfAudit) */
 const selfAuditNow = computed(() => curSubmitter.value === String(user.userName || user.account || '')
