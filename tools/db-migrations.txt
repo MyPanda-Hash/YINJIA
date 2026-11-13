@@ -4842,3 +4842,5 @@ migrate-role-field-view-20261113.sql
 migrate-role-field-view-seq-20261113.sql
 # 2026-11-13 采购订单明细「单价」「仓库」改为非必填(只改 yj_field.required,两行;不碰表结构)
 migrate-pu-order-price-wh-not-required-20261113.sql
+# 2026-11-13 采购入库明细「单价」改为非必填(「仓库」保持必填,脚本内含断言;只改 yj_field.required 一行)
+migrate-purchase-in-price-not-required-20261113.sql
