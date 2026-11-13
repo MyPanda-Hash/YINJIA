@@ -548,7 +548,7 @@ FIELD	detail	40	实收数量	实收数量	小数	110	ER-V							Actual received 
 FIELD	detail	50	计量单位	计量单位	下拉框	140	ER-V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement		13021
 FIELD	detail	60	实收数量2	实收数量2	小数	110	E--V							Paid-in quantity 2		13023
 FIELD	detail	70	计量单位2	计量单位2	下拉框	140	E--V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement 2		13024
-FIELD	detail	80	单价	单价	小数	110	ER-V							Unit Price		13027
+FIELD	detail	80	单价	单价	小数	110	E--V							Unit Price		13027
 FIELD	detail	90	金额	金额	小数	110	E--V							Amount		13028
 FIELD	detail	100	税率%	税率%	小数	110	E--V						SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)	Tax rate%		13030
 FIELD	detail	110	含税单价	含税单价	小数	110	E--V							Unit price including tax		13032

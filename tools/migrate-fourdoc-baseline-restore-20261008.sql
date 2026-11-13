@@ -17,7 +17,7 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 9bcb48068bc2(sha256 f4ebe4f9c12b528f…)
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git a2dae7b3a171(sha256 8e62ad9612bef5f5…)
  *   回正行数:QC_RECV=73 · QC_INSP=59 · QC_RETURN=40 · PURCHASE_IN=165(共 337 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
@@ -256,7 +256,7 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (13,N'PURCHASE_IN',N'计量单位2',N'计量单位2',N'下拉框',N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)',NULL,NULL,NULL,N'detail',70,140,1,0,0,NULL,1,N'Unit of measurement 2',NULL,NULL),
   (14,N'PURCHASE_IN',N'匹配来源单号',N'匹配来源单号',N'文本',NULL,NULL,NULL,NULL,N'query,header',70,130,1,0,1,NULL,0,N'Matched source no.',NULL,NULL),
   (15,N'PURCHASE_IN',N'经手人',N'经手人',N'参照',NULL,N'EMP',N'员工名称',N'员工名称',N'query,header',80,140,1,0,0,NULL,1,N'Person in charge',NULL,NULL),
-  (16,N'PURCHASE_IN',N'单价',N'单价',N'小数',NULL,NULL,NULL,NULL,N'detail',80,110,1,1,0,NULL,1,N'Unit Price',NULL,NULL),
+  (16,N'PURCHASE_IN',N'单价',N'单价',N'小数',NULL,NULL,NULL,NULL,N'detail',80,110,1,0,0,NULL,1,N'Unit Price',NULL,NULL),
   (17,N'PURCHASE_IN',N'金额',N'金额',N'小数',NULL,NULL,NULL,NULL,N'detail',90,110,1,0,0,NULL,1,N'Amount',NULL,NULL),
   (18,N'PURCHASE_IN',N'附件1',N'附件1',N'附件',NULL,NULL,NULL,NULL,N'header',90,220,1,0,0,NULL,1,NULL,NULL,NULL),
   (19,N'PURCHASE_IN',N'税率%',N'税率%',N'小数',N'SELECT v FROM (VALUES (N''0''),(N''3''),(N''6''),(N''9''),(N''13'')) AS t(v)',NULL,NULL,NULL,N'detail',100,110,1,0,0,NULL,1,N'Tax rate%',NULL,NULL),

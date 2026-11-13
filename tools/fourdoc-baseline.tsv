@@ -186,7 +186,7 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 13	PURCHASE_IN	计量单位2	计量单位2	detail	70	下拉框	140	E--V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement 2	
 14	PURCHASE_IN	匹配来源单号	匹配来源单号	query,header	70	文本	130	E-H-							Matched source no.	
 15	PURCHASE_IN	经手人	经手人	query,header	80	参照	140	E--V		EMP	员工名称	员工名称			Person in charge	
-16	PURCHASE_IN	单价	单价	detail	80	小数	110	ER-V							Unit Price	
+16	PURCHASE_IN	单价	单价	detail	80	小数	110	E--V							Unit Price	
 17	PURCHASE_IN	金额	金额	detail	90	小数	110	E--V							Amount	
 18	PURCHASE_IN	附件1	附件1	header	90	附件	220	E--V								
 19	PURCHASE_IN	税率%	税率%	detail	100	小数	110	E--V						SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)	Tax rate%	
