@@ -90,6 +90,38 @@
             <el-option v-for="o in (refSelectData[qr.dataName]?.options || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </div>
+        <!-- 查询区参照字段「输入即查」(2026-11-13 用户口径「报工记录中上方的查询不能只是选择查询的,
+             而是可以输入后就查询的形式」):只在后端下发 metadata.queryInputRef === true 时启用
+             (真源 = yj_panel.config,目前仅报工记录 WO_REPORT_LIST);标志不下发 ⇒ 走下面原来的只读分支,
+             行为与改造前逐字一致。
+             交互口径(与后端 QueryService.appendDirectFilters 的 `_fuzzy` / 数组契约配套):
+               · 边打边联想(debounce 300ms;空关键字一个请求都不发),下拉显示「编码 — 名称」;
+               · 选中候选 ⇒ 条件写**编码**、摘掉模糊标记(后端等值);
+               · 未选候选直接回车(名称片段「钢管」也必须查得到)⇒ 先拿片段去参照档案里解析命中档案的
+                 **编码集合**,条件写编码数组(后端 IN)、摘标记;一条都解析不到才退化写输入文本 + `_fuzzy`
+                 标记(后端对编码列 RTRIM LIKE 片段);
+               · 清空 ⇒ 删条件 + 摘标记;放大镜保留,精确选择仍走原 RefPickDialog,确认后回显编码。 -->
+        <div v-else-if="qType(qr) === 'ref' && queryInputRef" class="query-ref query-ref-input">
+          <el-autocomplete
+            :model-value="queryInputTextOf(qr.dataName)"
+            value-key="value"
+            :debounce="300"
+            :trigger-on-focus="false"
+            select-when-unmatched
+            clearable
+            :fetch-suggestions="(kw, cb) => fetchQueryInputSuggestions(qr, kw, cb)"
+            :placeholder="qr.placeholder || tt('输入编码或名称，回车查询')"
+            :title="tt('输入片段即联想；未选候选回车按名称/编码片段查询')"
+            @update:model-value="(v) => setQueryInputText(qr.dataName, v)"
+            @select="(item) => onQueryInputCommit(qr, item)"
+            @clear="onQueryInputClear(qr)"
+          >
+            <template #default="{ item }">
+              <span class="query-input-opt">{{ item.text }}</span>
+            </template>
+          </el-autocomplete>
+          <el-button :icon="Search" :title="tt('打开参照')" @click="openQueryRef(qr, 'page')" />
+        </div>
         <div v-else-if="qType(qr) === 'ref'" class="query-ref">
           <el-input
             :model-value="condition[qr.dataName] || ''"
@@ -2610,6 +2642,8 @@ import {
   validateReportQuery,
 } from '@core/report/reportQuery'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
+// 查询区参照字段「输入即查」(2026-11-13):条件写入/摘 `_fuzzy` 标记的纯函数(单测见 queryInput.test.js)
+import { applyCodes, applyFuzzy, applyPicked, clearField, normalizeCodeList } from '@core/search/queryInput'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
@@ -3262,6 +3296,133 @@ async function loadRefSelectOptions(field, fieldKey, keyword) {
 
 function isRefSelect(field) {
   return isReferenceField(field) && refModeMap[headerFieldKey(field)] === 'select'
+}
+
+// ---- 查询区参照字段「输入即查」(2026-11-13 用户口径,仅报工记录 WO_REPORT_LIST)----
+// 真源 = 后端 metadata.queryInputRef(来自 yj_panel.config);不下发 ⇒ 走原来的「只读+放大镜」分支。
+// 只影响**内联查询区**里「弹窗模式」的参照字段(refModeMap==='dialog' 或尚未判定):
+// ≤20 条的下拉模式仍走 el-select(那一支本来就支持 remote 搜索),弹窗/表头/明细单元格一概不动。
+const queryInputRef = computed(() => cfgCache.value?.metadata?.queryInputRef === true)
+/** 输入框显示文本(字段 label → 文本):**与 condition 分开维护**。
+ *  用户正在打的片段未必已经生效(回车/选中候选才写进 condition),所以文本是本地的;
+ *  键不存在 = 没在编辑 ⇒ 回显 condition 里的值(面板切回/查询方案应用/弹窗选完都能对上)。
+ *  ⚠ condition 的值可能是**编码数组**(名称片段展开成「这些档案之一」),数组没有对应的文本表示
+ *  ⇒ 返回空串,绝不 String(array)(否则框里会出现 "A,B" 甚至 [object Object])。 */
+const queryInputText = reactive({})
+/** 最近一次联想候选(字段 label → [{value(编码), label(名称), row, picked, text}])。
+ *  回车时先在这里找「输入文本 == 某候选编码」的精确命中(用户打的本来就是编码/刚点过候选)。 */
+const queryInputOptions = reactive({})
+/** 每字段操作序号:回车后的"按片段解析编码集合"是**异步**的(档案搜索可能要一两秒),
+ *  解析回来时若用户已经清空/改了别的输入,就只认最后一次操作的结果(否则清掉的框会自己填回去)。 */
+const queryInputSeq = reactive({})
+function nextQueryInputSeq(key) {
+  queryInputSeq[key] = (queryInputSeq[key] || 0) + 1
+  return queryInputSeq[key]
+}
+function queryInputTextOf(key) {
+  if (queryInputText[key] !== undefined) return queryInputText[key]
+  const cond = condition[key]
+  return Array.isArray(cond) ? '' : String(cond ?? '')
+}
+function setQueryInputText(key, value) {
+  queryInputText[key] = String(value ?? '')
+}
+/** 清掉输入框草稿文本与候选缓存:切面板 / reset() / 应用查询方案后重新按 condition 回显(优先 condition)。
+ *  候选缓存必须一起清:上一个面板/上一轮条件的候选不能拿来判定"这个输入是不是编码"。 */
+function syncQueryInputText() {
+  Object.keys(queryInputText).forEach((k) => delete queryInputText[k])
+  Object.keys(queryInputOptions).forEach((k) => delete queryInputOptions[k])
+  Object.keys(queryInputSeq).forEach((k) => delete queryInputSeq[k])
+}
+/** 联想候选:engine.refSelectOptions 返回 [{label(名称), value(编码), row}]。
+ *  **空关键字一个请求都不发**:服务端 keyword 是"本面板所有字段 LIKE %kw%",空关键字等于不过滤,
+ *  而档案分支不吃 pageSize(几千行 × 上百列),白拉一次就要好几秒(同 RecordSheetPanels 的口径)。
+ *  下拉项显示「编码 — 名称」两段(只报名称时重名分不清),写进条件的仍是编码。 */
+async function fetchQueryInputSuggestions(field, keyword, cb) {
+  const key = field.dataName
+  const kw = String(keyword ?? '').trim()
+  if (!kw) { cb([]); return }
+  let options = []
+  try {
+    options = await engine.refSelectOptions(field, kw)
+  } catch (e) {
+    options = [] // 参照取数失败:退化成"手打片段直接回车模糊查",不弹错
+  }
+  const mapped = options.map((o) => {
+    const code = String(o.value ?? '')
+    const name = String(o.label ?? '')
+    return { value: code, label: name, row: o.row, picked: true, text: name && name !== code ? `${code} — ${name}` : code }
+  })
+  queryInputOptions[key] = mapped // 回车时的"输入==编码"精确命中就查这份
+  cb(mapped)
+}
+/** 按片段在参照档案里找编码集合(名称片段也能查到):
+ *  engine.refSelectOptions(field, 片段) 返回最多 100 条匹配档案(服务端 keyword 模糊搜参照面板),
+ *  取出各自的编码 → 去重/trim/上限 200。取不到(或接口报错)返回 [](调用方退化成 `_fuzzy` LIKE)。 */
+async function resolveQueryInputCodes(field, keyword) {
+  const kw = String(keyword ?? '').trim()
+  if (!kw) return []
+  try {
+    const options = await engine.refSelectOptions(field, kw)
+    return normalizeCodeList(options.map((o) => o.value))
+  } catch (e) {
+    return []
+  }
+}
+/** 候选选中 / 未选候选回车 的统一入口(el-autocomplete 的 select 事件;
+ *  select-when-unmatched 让"没有高亮候选时按回车"也走这里,那种 item 只有 value、没有 row):
+ *   · 精确选中候选 ⇒ condition[字段] = 编码、摘 `_fuzzy`(后端等值);
+ *   · 自由输入回车(2026-11-13 第二轮补强:名称片段也必须查得到)——
+ *       ① 已加载候选里有 value 与输入完全相同的 ⇒ 按精确编码处理(同选中候选);
+ *       ② 否则拿片段去参照档案里解析编码集合:非空 ⇒ condition[字段] = 编码数组(后端 IN)、摘 `_fuzzy`;
+ *       ③ 一条都没解析到 ⇒ 退化:condition[字段] = 输入文本 + `_fuzzy`(后端对编码列 LIKE)。
+ *  三种情形都把用户输入原样留在输入框里(queryInputText);数组形态没有文本表示,尤其不能覆盖显示。 */
+async function onQueryInputCommit(field, item) {
+  const key = field.dataName
+  const text = String(item?.value ?? '').trim()
+  if (item && item.picked) {
+    applyPicked(condition, key, item.value)
+    setQueryInputText(key, item.value)
+    search()
+    return
+  }
+  if (!text) { // 空输入回车 = 清空这一格
+    clearField(condition, key)
+    setQueryInputText(key, '')
+    search()
+    return
+  }
+  // ① 候选里"输入就是编码"的精确命中
+  const exact = (queryInputOptions[key] || []).find((o) => String(o.value) === text)
+  if (exact) {
+    applyPicked(condition, key, exact.value)
+    setQueryInputText(key, text)
+    search()
+    return
+  }
+  // ② 名称/编码片段 → 参照档案编码集合(数组 ⇒ 后端 IN)
+  const seq = nextQueryInputSeq(key)
+  const codes = await resolveQueryInputCodes(field, text)
+  if (queryInputSeq[key] !== seq) return // 期间被清空/改过别的输入:丢弃这次迟到的解析结果
+  if (codes.length) {
+    applyCodes(condition, key, codes)
+    setQueryInputText(key, text)
+    search()
+    return
+  }
+  // ③ 退化:按输入的编码片段 LIKE
+  applyFuzzy(condition, key, text)
+  setQueryInputText(key, text)
+  search()
+}
+/** 清空(输入框 clearable 图标):删条件 + 摘 `_fuzzy` 标记 + 清掉候选缓存 + 重查 */
+function onQueryInputClear(field) {
+  const key = field.dataName
+  nextQueryInputSeq(key) // 让还在飞的"按片段解析编码集合"作废(否则清掉的框会被迟到结果填回去)
+  clearField(condition, key)
+  delete queryInputText[key]
+  delete queryInputOptions[key]
+  search()
 }
 
 /** 草稿表头下拉选中带回:与表头参照弹窗同口径,按 refMap 把选中项源数据行的其他字段整串回填。
@@ -9762,7 +9923,13 @@ function clearQueryRef(qr, context = 'page') {
     if (isCascadePanel.value && key === '存货') delete queryDraft['_itemCode']
     return
   }
-  delete condition[key]
+  // 「输入即查」现场(2026-11-13):清空 = 删条件 + 摘 `_fuzzy` 标记 + 同步清掉输入框草稿文本
+  if (queryInputRef.value) {
+    clearField(condition, key)
+    delete queryInputText[key]
+  } else {
+    delete condition[key]
+  }
   search()
 }
 
@@ -9773,7 +9940,15 @@ function onQueryRefConfirm(rows) {
   const ref = field.ref && typeof field.ref === 'object' ? field.ref : field
   const valueField = ref.field || ref.refField || ref.display || ref.displayField || headerFieldKey(field)
   const target = queryRefContext.value === 'dialog' ? queryDraft : condition
-  target[headerFieldKey(field)] = row[valueField] ?? ''
+  const fieldKey = headerFieldKey(field)
+  const pickedValue = row[valueField] ?? ''
+  target[fieldKey] = pickedValue
+  // 「输入即查」现场(2026-11-13):放大镜里精确选中 = 选的是一个实体 ⇒ 写编码、摘掉该字段的 `_fuzzy`
+  // (后端回到等值匹配),并把编码回显到输入框(输入框文本与 condition 分开维护)。
+  if (queryRefContext.value === 'page' && queryInputRef.value) {
+    applyPicked(condition, fieldKey, pickedValue)
+    setQueryInputText(fieldKey, pickedValue)
+  }
   // 台账/状况表:参照行携带编码,选中即绑码(_whCode/_itemCode)——查询条件按编码过滤,名称仅回显
   if (queryRefContext.value === 'dialog' && isCascadePanel.value) {
     const key = headerFieldKey(field)
@@ -9822,6 +9997,8 @@ function applyHeaderQuery() {
   // 控制键(`_whCode`/`_itemCode`/`_whCodes`…)必须原样带上:它们是台账按**编码**精确过滤的唯一来源,
   // 而 cleanCondition 只负责去空值(不再顺手丢掉 `_` 开头 —— 否则台账查出来永远是"期初+期末两行")。
   for (const [key, value] of Object.entries(cleanReportCondition(queryDraft))) condition[key] = value
+  // 「输入即查」现场(2026-11-13):条件被整套替换(应用查询方案/弹窗查询)⇒ 输入框按新条件重新回显
+  syncQueryInputText()
   // 高级筛选定格为「生效中」:报表/单据面板随本次查询 POST 给后端全表过滤(分页/导出口径一致;
   // 单据面板 2026-09-24 起同样服务端化);档案面板仍是前端过滤。
   // 日期范围(起/止)在此并入(ge/le 两条),不占可见条件行。
@@ -9935,6 +10112,7 @@ function planSummary(plan) {
 function resetHeaderQuery() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.keys(condition).forEach((key) => delete condition[key])
+  syncQueryInputText() // 「输入即查」输入框草稿一并清空(condition 已空 ⇒ 回显为空)
   rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
   dateFrom.value = ''
@@ -11663,6 +11841,7 @@ function search() {
 
 function reset() {
   Object.keys(condition).forEach((k) => delete condition[k])
+  syncQueryInputText() // 「输入即查」输入框随条件一起清空(否则框里还留着上一轮的片段)
   query.keyword = ''
   if (isStockStatus.value) stockWh.value = ''
   search()
@@ -11819,6 +11998,7 @@ watch(
     qOptCache.clear()
     Object.keys(condition).forEach((key) => delete condition[key])
     Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
+    syncQueryInputText() // 「输入即查」输入框草稿属于上一个面板(同名字段也不能把片段带过去)
     query.keyword = ''
     queryFields.value = []
     gridTabs.value = []
@@ -12814,6 +12994,17 @@ onUnmounted(() => {
   width: 28px;
   min-height: 26px;
   padding: 0;
+}
+/* 查询区「输入即查」参照(el-autocomplete):与 .query-ref 同宽,输入框占满按钮以外的空间 */
+.query-ref-input :deep(.el-autocomplete) {
+  flex: 1;
+  width: 160px;
+}
+.query-input-opt {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dict-pick-search {
   margin-bottom: 8px;

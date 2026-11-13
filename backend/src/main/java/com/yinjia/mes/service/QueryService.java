@@ -5,9 +5,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 查询服务:把 HSDZ_MES 真实表数据映射为 light-mes 行契约。
@@ -1259,6 +1261,25 @@ public class QueryService {
                                      List<Object> args, String keyword, Map<String, Object> condition,
                                      Map<String, String> l2c, String alias) {
         if (condition != null) {
+            // 查询区参照字段「输入即查」的模糊名单(2026-11-13)——
+            // 用户口径:「报工记录中上方的查询不能只是选择查询的,而是可以输入后就查询的形式」。
+            // 前端在**用户自由输入、没从候选里精确选中**时带控制键 `_fuzzy` = 逗号分隔的**字段 label**
+            // (例:`产品编码,客户编码`,中文数据键口径不变);命中名单的参照字段走 `RTRIM(列) LIKE '%值%'`,
+            // 不在名单里(含完全没带该键)仍走等值 `= ?`。
+            // ⚠ 口径红线:**精确选择仍等值,只有自由输入才 LIKE** —— 从放大镜/下拉里选中的是一个实体,
+            //   子串匹配会串档(仓库「成品仓」命中「半成品仓」的事故见下方 2026-10-20 注释);
+            //   只有用户手打的片段才允许模糊,并且仅限该面板显式开了 queryInputRef 的那几个参照字段。
+            // `_fuzzy` 以 `_` 开头 ⇒ 属控制键:不进下面的通用循环(循环开头已 skip `_` 前缀),也不参与 l2c 映射。
+            // 二期(同日):参照字段的值若是**数组**(前端按名称片段解析出的编码集合),走 IN(...) ——
+            //   与 `_fuzzy` 无关,也不再要求本键(见通用循环里的 refCodesOf 与参照分支)。
+            Set<String> fuzzyLabels = new HashSet<>();
+            Object fuzzyRaw = condition.get("_fuzzy");
+            if (fuzzyRaw != null && !String.valueOf(fuzzyRaw).isBlank()) {
+                for (String s : String.valueOf(fuzzyRaw).split(",")) {
+                    String t = s.trim();
+                    if (!t.isEmpty()) fuzzyLabels.add(t);
+                }
+            }
             // 仓库下拉(库存状况):按仓库编码(ckdm)精确过滤(_ckdm);绑定编码,仓库字典改名不影响
             Object ck = condition.get("_ckdm");
             if (ck != null && !String.valueOf(ck).isBlank()) {
@@ -1358,7 +1379,12 @@ public class QueryService {
                 if (key != null && key.startsWith("_")) continue; // 控制键(_whCode/_itemCode/_whCodes/_ckdm/_docNo…)
                 String col = l2c.get(key);
                 Object v = e.getValue();
-                if (col == null || v == null || String.valueOf(v).isBlank()) continue;
+                if (col == null || v == null) continue;
+                // 参照字段的「编码集合」形态(2026-11-13 输入即查二期):值为数组时**不能**落到下面的
+                // String.valueOf/args(List 会被拼成 "[CJ001, CJ002]" 塞进 SQL)。先解析成 List<String>
+                // (非集合值返回 null),参照分支据此拼 IN(...);非参照字段收到数组则按调用方异常忽略。
+                List<String> codes = refCodesOf(v);
+                if (codes == null && String.valueOf(v).isBlank()) continue;
                 if ("开始日期".equals(key) || "结束日期".equals(key)) continue; // 已按期次区间处理
                 // 仓库/存货已由 appendWhItemFilter 按「编码优先、退化名称」处理完毕(前端仍回显名称,不重复叠加)
                 if ("仓库".equals(key) && byWh) continue;
@@ -1367,10 +1393,31 @@ public class QueryService {
                 // LIKE 子串会串仓:仓库「成品仓」会同时命中「半成品仓」、「不良品仓」命中「原料不良品仓」
                 // (库存台账实测:查 成品仓 返回 93 行 = 成品仓 34 + 半成品仓 59,台账按仓分户的口径直接失真)。
                 // 文本字段保持模糊;RTRIM 防 nchar/手工导入尾随空格(与台账联动选项同款口径)。
+                // 例外(2026-11-13 输入即查):本字段 label 出现在 `_fuzzy` 名单里 = 用户是**手打片段**而非
+                // 精确选中 ⇒ 按 LIKE '%片段%' 模糊匹配(与同面板文本字段同口径,RTRIM 同上);
+                // 其余情况(精确选择/没带 `_fuzzy`)一律维持等值 —— 见方法开头的 `_fuzzy` 解析注释。
+                // 二期(2026-11-13,同日):值为**编码数组**时走 IN(...) —— 见上方 `codes` 的说明。
                 PanelRegistry.FieldDef fd = def.byLabel(key);
                 if (fd != null && "参照".equals(fd.dataType())) {
-                    where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
-                    args.add(String.valueOf(v).trim());
+                    // ① 编码集合(前端自由输入「名称片段」时,先按关键字解析出匹配档案的编码再传过来)⇒ IN (...)。
+                    //    数组本身语义就是「这些编码之一」,故**不看也不要求** `_fuzzy`;两种并存时以数组优先。
+                    //    全部为空(前端一个编码都没解析到)⇒ **不加条件**,别把查询静默变成 0 行。
+                    if (codes != null) {
+                        if (codes.isEmpty()) continue;
+                        where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) IN (")
+                                .append(String.join(",", java.util.Collections.nCopies(codes.size(), "?"))).append(")");
+                        args.addAll(codes);
+                    } else if (fuzzyLabels.contains(key)) {
+                        where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) LIKE ?");
+                        args.add("%" + String.valueOf(v).trim() + "%");
+                    } else {
+                        where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
+                        args.add(String.valueOf(v).trim());
+                    }
+                } else if (codes != null) {
+                    // 防御:数组值只对参照字段有意义(编码集合)。文本/日期等字段收到数组属调用方 bug,
+                    // 宁可不加条件,也不能把 "[CJ001, CJ002]" 经 String.valueOf 拼进 LIKE。
+                    continue;
                 } else {
                     where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
                     args.add("%" + v + "%");
@@ -1389,6 +1436,52 @@ public class QueryService {
                 args.addAll(kargs);
             }
         }
+    }
+
+    /** 参照字段「编码集合」上限(2026-11-13 输入即查二期):前端约定最多传 200 个,超出截断 ——
+     *  防 IN 参数膨胀(SQL Server 上限 2100)与慢查询;与前端侧同一上限口径。 */
+    private static final int REF_IN_CODES_MAX = 200;
+
+    /**
+     * 参照字段的值若是**集合**({@link java.util.Collection};前端 JSON 数组经 Jackson 反序列化即 ArrayList)
+     * 或 Java 数组,解析成**去重后的编码列表**;非集合值返回 {@code null}(调用方据此走原有的 LIKE/等值分支)。
+     *
+     * <p>用户口径(2026-11-13,输入即查二期):用户直接回车打的是「名称片段」(如「钢管」)时,单靠
+     * {@code LIKE %片段%} 匹配编码列(wzdm)—— 名称与编码不同源 —— 查不到;改由前端先按关键字解析出
+     * 匹配档案的**编码集合**传过来,后端落成 {@code IN (...)}。
+     *
+     * <p>防呆口径(契约):
+     * <ul>
+     *   <li>trim + 丢弃 null/空白项;</li>
+     *   <li>去重(保序,LinkedHashSet);</li>
+     *   <li>最多 {@value #REF_IN_CODES_MAX} 个,超出**截断**(不报错);</li>
+     *   <li>全部为空 ⇒ 返回**空列表**(不是 null)⇒ 调用方**不加条件**,
+     *       绝不能静默变成「0 行」把用户吓一跳。</li>
+     * </ul>
+     *
+     * <p>⚠ 这里存在的意义:List 一旦落到 {@code String.valueOf(v)} 就会拼出 {@code "[CJ001, CJ002]"}
+     * 进 SQL/args,所以数组必须在通用循环里被本方法提前接住,转成 IN 的参数列表。
+     */
+    private static List<String> refCodesOf(Object v) {
+        if (v == null) return null;
+        List<Object> raw = new ArrayList<>();
+        if (v instanceof java.util.Collection<?> c) {
+            raw.addAll(c);
+        } else if (v.getClass().isArray()) {
+            int n = java.lang.reflect.Array.getLength(v);
+            for (int i = 0; i < n; i++) raw.add(java.lang.reflect.Array.get(v, i));
+        } else {
+            return null;   // 普通标量值 ⇒ 非集合形态,走原分支
+        }
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (Object o : raw) {
+            if (o == null) continue;
+            String t = String.valueOf(o).trim();
+            if (t.isEmpty()) continue;
+            out.add(t);
+            if (out.size() >= REF_IN_CODES_MAX) break;   // 超出截断
+        }
+        return new ArrayList<>(out);
     }
 
     /**

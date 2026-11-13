@@ -4618,3 +4618,6 @@ migrate-finish-in-insp-link-20261112.sql
 
 # 2026-11-12 工单工序台账按「工单行id」收口:① 工单号 回正(行id→plang.pl_no) ② 按 ProcessFlow 同口径按行id 对账重算整行台账 状态/实际生产线/落实时间 ③ 自检 工单号漂移=0·状态漂移=0(零DDL;幂等;两账套)
 migrate-wo-ledger-rowid-align-20261112.sql
+
+# 2026-11-13 报工记录查询区参照字段「输入即查」:yj_panel.config 声明 queryInputRef=true + 后端参照字段 _fuzzy 模糊过滤 + 前端可输入联想(零DDL;幂等;两账套)
+migrate-wo-report-list-query-input-20261113.sql

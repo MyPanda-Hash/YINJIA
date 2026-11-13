@@ -482,6 +482,12 @@ public class PanelConfigService {
         metadata.put("panelCategory", def.category());
         // 报表查询弹窗入口(T+ 同款):进入面板先弹查询条件(日期段必填),关闭弹窗即退出页面;前端 PanelxList 消费
         if (List.of("STOCK_SUMMARY", "STOCK_LEDGER").contains(def.code())) metadata.put("reportQueryDialog", true);
+        // 查询区参照字段「输入即查」开关(yj_panel.config 的 queryInputRef,2026-11-13):
+        // 用户口径「报工记录中上方的查询不能只是选择查询的,而是可以输入后就查询的形式」⇒ 前端据此把
+        // 查询区里只读+放大镜的参照字段改成可输入联想;自由输入时带控制键 `_fuzzy`,后端 appendDirectFilters
+        // 对这些字段做 RTRIM(列) LIKE '%值%'(精确选择仍等值)。真源 = yj_panel.config,不加代码。
+        // 只下发 true、不下发 false:缺省键 ⇒ 前端按现行为(只可精确选择),所有面板 metadata 形状不变。
+        if (def.queryInputRef()) metadata.put("queryInputRef", true);
         metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出

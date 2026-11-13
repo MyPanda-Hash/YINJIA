@@ -5814,6 +5814,14 @@ export default {
     "该工序排在本线,但工单当前工序在别的产线": "This process is assigned to this line, while the work order current process is on another line",
     "上道完工量 = 上一道已审核报工数(上一道自己的计量单位,不折算);换算率不同时,本道能做多少看「可加工量」": "Upstream completed qty = approved output of the previous process (in its own unit, not converted); when conversion rates differ, see \"Processable\" for how much this process can do",
     "可加工量 = 上一道流下来的量(已按换算率折到本道单位),也就是本道现在最多能做多少": "Processable = quantity flowed in from the previous process (already converted to this process unit) — the maximum this process can do now",
+    // 查询区参照字段「输入即查」(2026-11-13 用户口径:「报工记录中上方的查询不能只是选择查询的,
+    // 而是可以输入后就查询的形式」):报工记录(WO_REPORT_LIST)查询区的参照字段改成可输入 + 联想下拉,
+    // 未选候选直接回车 = 按名称/编码片段查(先解析成档案编码集合,解析不到才按片段模糊)。
+    // 文案只在显示层用 tt(),提交给后端的数据键仍是中文原值。
+    '输入编码或名称，回车查询': 'Type a code or name, press Enter to search',
+    '输入片段即联想；未选候选回车按名称/编码片段查询':
+      'Suggestions appear while you type; press Enter without picking one to search by name/code fragment',
+    '打开参照': 'Open reference picker',
   },
 
 }
