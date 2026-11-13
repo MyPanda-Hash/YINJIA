@@ -588,6 +588,18 @@ public class KingdeePushService {
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
             e.put("unit_id", unitId);
+            // 基本单位族(2026-11-13 沙箱实测):产品入库 inv_product / 生产领料 inv_pick **还要** base_unit_* ——
+            // 只发 unit_id 时金蝶直接拒单「第1行分录:基本单位为空,请重新录入商品 / 单位为空,请重新选择单位」。
+            // 行上有「基本单位id/编码」(金蝶拉取的历史单都有,见出入库单据字段文档 §2)就用它,没有沿用 unit_id。
+            if (isFinIn || isMatOut) {
+                String baseId = str(line.get("基本单位id"));
+                String baseNo = str(line.get("基本单位编码"));
+                e.put("base_unit_id", baseId.isEmpty() ? unitId : baseId);
+                if (!baseNo.isEmpty()) e.put("base_unit_number", baseNo);
+                if (!unit.isEmpty()) e.put("unit_number", unit);
+                // MES 侧没有"基本数量"独立列(单位=基本单位时两者相等),按本行数量同值推
+                e.put("base_qty", plainDecimal(num(line, qtyKey)));
+            }
             // 仓库:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
             // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来。
             // 采购订单不推仓库(订单无入库语义)

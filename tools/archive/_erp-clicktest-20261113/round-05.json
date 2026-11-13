@@ -1,0 +1,76 @@
+[
+  {
+    "panel": "QC_RETURN",
+    "docNo": "TH-2026-11-0001",
+    "ok": false,
+    "btn": {
+      "has": true,
+      "disabled": false,
+      "doc": "单据：TH-2026-11-0001"
+    },
+    "msgs": [
+      "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:单据[CGTH-20261112-00001]商品[YJ-XH-001，鑫恒（80-250）]在仓库[正品仓]库存扣减后，即时库存不足"
+    ]
+  },
+  {
+    "panel": "FINISH_IN",
+    "docNo": "FI-2026-10-0001",
+    "ok": false,
+    "why": "未在左栏找到该单",
+    "picked": {
+      "ok": false,
+      "railCount": 50
+    }
+  },
+  {
+    "panel": "OTHER_IN",
+    "docNo": "OI-2026-11-0002",
+    "ok": false,
+    "why": "未在左栏找到该单",
+    "picked": {
+      "ok": false,
+      "railCount": 1
+    }
+  },
+  {
+    "panel": "SALE_OUT",
+    "docNo": "XSCK-20270901-00001",
+    "ok": false,
+    "btn": {
+      "has": true,
+      "disabled": false,
+      "doc": "单据：XSCK-20270901-00001"
+    },
+    "msgs": [
+      "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:单据[XSCK-20270901-00001]商品[A-48-01，A级烧结炭棒/滤芯]在仓库[成品B仓]库存扣减后，即时库存不足单据[XSCK-20270901-00001]商品[A-48-12，X烧结炭棒/滤芯]在仓库[成品B仓]库存扣减后，即时库存不足单据[XSCK-20270901-00001]商品[A-48-17，A+级烧结炭棒]在仓库[成品B仓]库存扣减后，即时库存不足"
+    ],
+    "是否已转ERP": "否"
+  },
+  {
+    "panel": "MATERIAL_OUT",
+    "docNo": "LL-2026-11-0008",
+    "ok": false,
+    "btn": {
+      "has": true,
+      "disabled": false,
+      "doc": "单据：LL-2026-11-0008"
+    },
+    "msgs": [
+      "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:第1行基础资料[物料编码]字段不能为空"
+    ]
+  },
+  {
+    "panel": "OTHER_OUT",
+    "docNo": "QTCK-20261014-01170",
+    "ok": false,
+    "btn": {
+      "has": true,
+      "disabled": false,
+      "doc": "单据：QTCK-20261014-01170"
+    },
+    "msgs": [
+      "服务异常：转ERP失败: 仅已审核(审批通过)单据可转ERP"
+    ],
+    "是否已转ERP": "否"
+  }
+]
