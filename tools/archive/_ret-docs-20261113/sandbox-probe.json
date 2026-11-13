@@ -1,0 +1,526 @@
+{
+  "商品": [
+    {
+      "number": "C-95-13",
+      "name": "006项目/功能炭棒滤芯"
+    },
+    {
+      "number": "C-95-13**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-13**TB)"
+    },
+    {
+      "number": "C-95-14",
+      "name": "006项目/功能炭棒滤芯(C-95-14)"
+    },
+    {
+      "number": "C-95-14**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-14**TB)"
+    },
+    {
+      "number": "C-95-15",
+      "name": "006项目/功能炭棒滤芯(C-95-15)"
+    },
+    {
+      "number": "C-95-15**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-15**TB)"
+    },
+    {
+      "number": "C-95-16",
+      "name": "006项目/功能炭棒滤芯(C-95-16)"
+    },
+    {
+      "number": "C-95-16**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-16**TB)"
+    },
+    {
+      "number": "C-95-17",
+      "name": "006项目/功能炭棒滤芯(C-95-17)"
+    },
+    {
+      "number": "C-95-17**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-17**TB)"
+    },
+    {
+      "number": "C-95-18",
+      "name": "006项目/功能炭棒滤芯(C-95-18)"
+    },
+    {
+      "number": "C-95-18**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-18**TB)"
+    },
+    {
+      "number": "C-95-19",
+      "name": "006项目/功能炭棒滤芯(C-95-19)"
+    },
+    {
+      "number": "C-95-19**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-19**TB)"
+    },
+    {
+      "number": "C-95-20",
+      "name": "006项目/功能炭棒滤芯(C-95-20)"
+    },
+    {
+      "number": "C-95-20**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-20**TB)"
+    },
+    {
+      "number": "C-95-21",
+      "name": "006项目/功能炭棒滤芯(C-95-21)"
+    },
+    {
+      "number": "C-95-21**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-21**TB)"
+    },
+    {
+      "number": "C-95-13-V2",
+      "name": "006项目/功能炭棒滤芯(全字段)"
+    },
+    {
+      "number": "A-43-05",
+      "name": "032"
+    }
+  ],
+  "客户": [
+    {
+      "number": "001",
+      "name": "长江"
+    },
+    {
+      "number": "004",
+      "name": "紫高"
+    },
+    {
+      "number": "005",
+      "name": "津达"
+    },
+    {
+      "number": "006",
+      "name": "汕尾鼎裕科技有限公司"
+    },
+    {
+      "number": "007",
+      "name": "灿达"
+    },
+    {
+      "number": "2010001",
+      "name": "加温"
+    },
+    {
+      "number": "2010002",
+      "name": "东莞市加炜"
+    },
+    {
+      "number": "2010003",
+      "name": "制玉"
+    },
+    {
+      "number": "2010004",
+      "name": "紫高(2010004)"
+    },
+    {
+      "number": "2010005",
+      "name": "汕尾鼎裕科技有限公司(2010005)"
+    },
+    {
+      "number": "2020001",
+      "name": "建生(2020001)"
+    },
+    {
+      "number": "2020002",
+      "name": "建生"
+    },
+    {
+      "number": "2020003",
+      "name": "蓝颜"
+    },
+    {
+      "number": "2020004",
+      "name": "长江(2020004)"
+    },
+    {
+      "number": "2020005",
+      "name": "津达(2020005)"
+    },
+    {
+      "number": "2020006",
+      "name": "东莞市捷康电子科技有限公司"
+    },
+    {
+      "number": "2020007",
+      "name": "加炜电子有限公司"
+    },
+    {
+      "number": "222",
+      "name": "333"
+    },
+    {
+      "number": "333",
+      "name": "乔讯"
+    },
+    {
+      "number": "A-26",
+      "name": "广州市鑫万电子商务有限公司"
+    }
+  ],
+  "仓库": [
+    {
+      "number": "CK04",
+      "name": "半成品仓"
+    },
+    {
+      "number": "CK00003",
+      "name": "包材仓"
+    },
+    {
+      "number": "CK05",
+      "name": "不良品仓"
+    },
+    {
+      "number": "CK07",
+      "name": "不良品仓(CK07)"
+    },
+    {
+      "number": "WH-CL",
+      "name": "材料仓"
+    },
+    {
+      "number": "YJ-08",
+      "name": "车间仓"
+    },
+    {
+      "number": "CP-02",
+      "name": "成品B仓"
+    },
+    {
+      "number": "CK03",
+      "name": "成品仓"
+    },
+    {
+      "number": "CK02",
+      "name": "辅料仓"
+    },
+    {
+      "number": "WH-GL",
+      "name": "隔离仓"
+    },
+    {
+      "number": "CK06",
+      "name": "隔离仓(CK06)"
+    },
+    {
+      "number": "YCL-01",
+      "name": "恒亿仓"
+    },
+    {
+      "number": "CK00006",
+      "name": "华北工控仓"
+    },
+    {
+      "number": "CK00002",
+      "name": "临期仓"
+    },
+    {
+      "number": "WH-XB-CX",
+      "name": "线边仓-成型"
+    },
+    {
+      "number": "WH-XB-QT",
+      "name": "线边仓-切炭"
+    },
+    {
+      "number": "WH-XB-ZZWL",
+      "name": "线边仓-自制物料"
+    },
+    {
+      "number": "WH-XB-ZZ",
+      "name": "线边仓-组装"
+    },
+    {
+      "number": "CK00005",
+      "name": "原料不良品仓"
+    },
+    {
+      "number": "CK01",
+      "name": "原料仓"
+    }
+  ],
+  "供应商": [
+    {
+      "number": "GYS00014",
+      "name": "KG"
+    },
+    {
+      "number": "GYS00008",
+      "name": "TBRW"
+    },
+    {
+      "number": "GYS00004",
+      "name": "xxx供应商2"
+    },
+    {
+      "number": "GYS00003",
+      "name": "xx配件"
+    },
+    {
+      "number": "GYS00013",
+      "name": "YJ"
+    },
+    {
+      "number": "GYS00007",
+      "name": "YJ-YM"
+    },
+    {
+      "number": "YJ-HKB",
+      "name": "北京黑卡博净化材料有限公司"
+    },
+    {
+      "number": "YJ-YBS",
+      "name": "北京燕百顺商贸有限公司"
+    },
+    {
+      "number": "YJ-YF",
+      "name": "博罗县尧丰化工有限公司"
+    },
+    {
+      "number": "TEST-SUP-A",
+      "name": "测试供应商A"
+    },
+    {
+      "number": "YJ-HD",
+      "name": "赤壁市宏鼎材料科技有限公司"
+    },
+    {
+      "number": "YJ-DGM",
+      "name": "达格玛（厦门）环保科技有限公司"
+    },
+    {
+      "number": "YJ-DHHG",
+      "name": "鼎海塑胶化工有限公司"
+    },
+    {
+      "number": "YJ-DHKG",
+      "name": "鼎辉控股（广州）有限公司"
+    },
+    {
+      "number": "YJ-HG",
+      "name": "东莞华港国际贸易有限公司"
+    },
+    {
+      "number": "YJ-MG",
+      "name": "东莞美固环保设备有限公司"
+    },
+    {
+      "number": "GYS00006",
+      "name": "东莞市大朗镇金朗路118号"
+    },
+    {
+      "number": "YJ-HJ",
+      "name": "东莞市汉捷胶粘制品有限公司"
+    },
+    {
+      "number": "YJ-JH",
+      "name": "东莞市骏豪泡棉制品有限公司"
+    },
+    {
+      "number": "GYS00012",
+      "name": "东莞市山一塑化有限公司"
+    }
+  ],
+  "单位": [
+    {
+      "number": "g",
+      "name": "g"
+    },
+    {
+      "number": "kg",
+      "name": "kg"
+    },
+    {
+      "number": "个",
+      "name": "个"
+    },
+    {
+      "number": "件",
+      "name": "件"
+    },
+    {
+      "number": "元",
+      "name": "元"
+    },
+    {
+      "number": "包",
+      "name": "包"
+    },
+    {
+      "number": "套",
+      "name": "套"
+    },
+    {
+      "number": "张",
+      "name": "张"
+    },
+    {
+      "number": "支",
+      "name": "支"
+    },
+    {
+      "number": "次",
+      "name": "次"
+    },
+    {
+      "number": "瓶",
+      "name": "瓶"
+    },
+    {
+      "number": "箱",
+      "name": "箱"
+    },
+    {
+      "number": "袋",
+      "name": "袋"
+    }
+  ],
+  "库存": [
+    {
+      "material": "C-95-13",
+      "name": "006项目/功能炭棒滤芯",
+      "stock": "CK04",
+      "stockName": "半成品仓",
+      "qty": 766
+    },
+    {
+      "material": "C-95-14",
+      "name": "006项目/功能炭棒滤芯(C-95-14)",
+      "stock": "CK04",
+      "stockName": "半成品仓",
+      "qty": 2316
+    },
+    {
+      "material": "C-95-14**TB",
+      "name": "006项目/功能炭棒滤芯(C-95-14**TB)",
+      "stock": "CK04",
+      "stockName": "半成品仓",
+      "qty": 945
+    },
+    {
+      "material": "CL002",
+      "name": "6061铝锭",
+      "stock": "CK04",
+      "stockName": "半成品仓",
+      "qty": 206
+    },
+    {
+      "material": "CL005",
+      "name": "包装木箱",
+      "stock": "CK03",
+      "stockName": "成品仓",
+      "qty": 566
+    },
+    {
+      "material": "CP002",
+      "name": "铝板 6061",
+      "stock": "CK04",
+      "stockName": "半成品仓",
+      "qty": 855
+    },
+    {
+      "material": "CP005",
+      "name": "轴套 C",
+      "stock": "CK04",
+      "stockName": "半成品仓",
+      "qty": 194
+    },
+    {
+      "material": "TEST-MAT-A",
+      "name": "测试物料A",
+      "stock": "CK00001",
+      "stockName": "正品仓",
+      "qty": 80
+    },
+    {
+      "material": "TEST-MAT-B",
+      "name": "测试物料B",
+      "stock": "CK00001",
+      "stockName": "正品仓",
+      "qty": 50
+    },
+    {
+      "material": "Y-S-T",
+      "name": "硫酸氧钛",
+      "stock": "CK00005",
+      "stockName": "原料不良品仓",
+      "qty": 100
+    },
+    {
+      "material": "Y-XC-2040",
+      "name": "方解石(20-40目）",
+      "stock": "CK06",
+      "stockName": "隔离仓(CK06)",
+      "qty": 400
+    },
+    {
+      "material": "YJ-AJ-016-1",
+      "name": "PP棉",
+      "stock": "CK00005",
+      "stockName": "原料不良品仓",
+      "qty": 2000
+    },
+    {
+      "material": "YJ-AJ-016-1",
+      "name": "PP棉",
+      "stock": "YCL-01",
+      "stockName": "恒亿仓",
+      "qty": 10000
+    },
+    {
+      "material": "YJ-AJ-016-2",
+      "name": "PP棉(YJ-AJ-016-2)",
+      "stock": "CK00006",
+      "stockName": "华北工控仓",
+      "qty": 200
+    },
+    {
+      "material": "YJ-AJ-016-2",
+      "name": "PP棉(YJ-AJ-016-2)",
+      "stock": "YCL-01",
+      "stockName": "恒亿仓",
+      "qty": 10000
+    },
+    {
+      "material": "YJ-AJ-017",
+      "name": "PP棉(YJ-AJ-017)",
+      "stock": "CK00003",
+      "stockName": "包材仓",
+      "qty": 22
+    },
+    {
+      "material": "YJ-AJ-017",
+      "name": "PP棉(YJ-AJ-017)",
+      "stock": "YCL-01",
+      "stockName": "恒亿仓",
+      "qty": 2000
+    },
+    {
+      "material": "YJ-AJ-022",
+      "name": "PP棉(YJ-AJ-022)",
+      "stock": "CK00005",
+      "stockName": "原料不良品仓",
+      "qty": 6000
+    },
+    {
+      "material": "YJ-HDN-001",
+      "name": "胶粒",
+      "stock": "CK00005",
+      "stockName": "原料不良品仓",
+      "qty": 100
+    },
+    {
+      "material": "YJ-HDN-001",
+      "name": "胶粒",
+      "stock": "YCL-01",
+      "stockName": "恒亿仓",
+      "qty": 100
+    }
+  ]
+}

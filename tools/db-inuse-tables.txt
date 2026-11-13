@@ -308,3 +308,11 @@ table:qc_oqc_detail     # 出厂检验报告行表(序号/检验项目/要求/�
 table:qc_oqc_item_map   # 出厂检验项目对齐表(报告项目 ← 源面板+源表区+源项目名,按优先级取第一个有值的)
 view:v_oqc_std          # 出厂检验标准层只读视图(取自 rd_insp_plan_head/_detail;不改计划表任何一列)
 view:v_qc_insp_rec_detail   # 检验数据记录明细表只读视图(2026-11-11:一行=一条检验数据记录=来料检验单一行物料;摊平 来料检验单号+行号/检验数据记录单号/采购订单号+行号/送料暂收单号+行号/采购入库单号+行号;QC_INSP_REC_DETAIL 取数,不改任何业务表)
+table:bd_sale_in         # 销售退货单头表(2026-11-13 按金蝶 sal_in_bound 键集克隆 bd_sale_out;转ERP 推金蝶 sal_in_bound)
+table:bl_sale_in         # 销售退货单明细表(同 bl_sale_out;行键含 return_qty/src_order_bill_no 族)
+table:bd_material_ret    # 生产退料单头表(2026-11-13 按金蝶 inv_pick_ret 键集克隆 bd_material_out;转ERP 推 inv_pick_ret)
+table:bl_material_ret    # 生产退料单明细表(同 bl_material_out;inv_pick_ret 是 inv_pick 的严格子集)
+view:v_sale_in_detail    # 销售退货单明细表只读视图(头+行摊平,含审核人)
+view:v_sale_in_stats     # 销售退货单统计表只读视图(按存货/计量单位汇总)
+view:v_material_ret_detail  # 生产退料单明细表只读视图
+view:v_material_ret_stats   # 生产退料单统计表只读视图

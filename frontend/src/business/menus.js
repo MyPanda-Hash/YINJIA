@@ -236,7 +236,13 @@ export const menuTree = [
               // (migrate-other-docs-rebuild-20261014.sql);委外入库单(OUTSOURCE_IN)仍保持 2026-10-08 下架状态。
               { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增' },
               { code: 'saleOut', title: '销售出库单', path: '/panelx/list/SALE_OUT', icon: 'Upload', panelCode: 'SALE_OUT', operationName: '新增流程' },
+              // 销售退货单(2026-11-13 新增):金蝶有、MES 缺的退货类单据之一,
+              // 面板/表/字段由 tools/migrate-return-docs-20261113.sql 按 sal_in_bound 键集克隆销售出库单;
+              // 紧跟销售出库单(一出一进配成对,找单的人不会跑错组)。
+              { code: 'saleIn', title: '销售退货单', path: '/panelx/list/SALE_IN', icon: 'RefreshLeft', panelCode: 'SALE_IN', operationName: '新增流程' },
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
+              // 生产退料单(2026-11-13 新增):金蝶 inv_pick_ret,MES 侧与材料出库单成对(领/退同组)。
+              { code: 'materialRet', title: '生产退料单', path: '/panelx/list/MATERIAL_RET', icon: 'RefreshLeft', panelCode: 'MATERIAL_RET', operationName: '新增流程' },
               // 生产领料(2026-10-22 用户口径「在库存核算里面加一个生产领料的查看面版,与混料记录一样;
               //   把 outh 里面的材料出库单据显示出来」):只读报表,形态对齐「混料记录」——
               //   flat + 报表,面板码 PROD_PICK_LIST,数据源 = 包装视图 v_prod_pick_list
@@ -266,7 +272,9 @@ export const menuTree = [
           { code: 'otherInDetail', title: '其他入库单明细表', path: '/panelx/list/OTHER_IN_DETAIL', panelCode: 'OTHER_IN_DETAIL', icon: 'List' },
           { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
+          { code: 'saleInDetail', title: '销售退货单明细表', path: '/panelx/list/SALE_IN_DETAIL', panelCode: 'SALE_IN_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          { code: 'materialRetDetail', title: '生产退料单明细表', path: '/panelx/list/MATERIAL_RET_DETAIL', panelCode: 'MATERIAL_RET_DETAIL', icon: 'List' },
           // 2026-10-18 新增:调拨单/盘点单明细表(视图 v_transfer_detail / v_stocktake_detail)
           { code: 'transferDetail', title: '调拨单明细表', path: '/panelx/list/TRANSFER_DETAIL', panelCode: 'TRANSFER_DETAIL', icon: 'List' },
           { code: 'stocktakeDetail', title: '盘点单明细表', path: '/panelx/list/STOCKTAKE_DETAIL', panelCode: 'STOCKTAKE_DETAIL', icon: 'List' },
@@ -283,7 +291,9 @@ export const menuTree = [
           { code: 'otherInStats', title: '其他入库单统计表', path: '/panelx/list/OTHER_IN_STATS', panelCode: 'OTHER_IN_STATS', icon: 'Histogram' },
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
+          { code: 'saleInStats', title: '销售退货单统计表', path: '/panelx/list/SALE_IN_STATS', panelCode: 'SALE_IN_STATS', icon: 'Histogram' },
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
+          { code: 'materialRetStats', title: '生产退料单统计表', path: '/panelx/list/MATERIAL_RET_STATS', panelCode: 'MATERIAL_RET_STATS', icon: 'Histogram' },
           // 2026-10-18 新增:调拨单/盘点单统计表(视图 v_transfer_stats / v_stocktake_stats)
           { code: 'transferStats', title: '调拨单统计表', path: '/panelx/list/TRANSFER_STATS', panelCode: 'TRANSFER_STATS', icon: 'Histogram' },
           { code: 'stocktakeStats', title: '盘点单统计表', path: '/panelx/list/STOCKTAKE_STATS', panelCode: 'STOCKTAKE_STATS', icon: 'Histogram' },

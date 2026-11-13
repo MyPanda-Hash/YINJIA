@@ -489,8 +489,10 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   // 2026-10-21:再加「工单扫码领料」页面级面板码 WORK_ORDER_PICK(按工单+BOM 作业);
   //   「扫码领料记录」复用同一个面板码(同一作业的留痕查询,不另开权限码)
   //   ⇒ 合并后挂点 37、唯一 36(重复的只有 WORK_ORDER_PICK,这是共用面板码的**预期**)。
-  assert.equal(invCodes.length, 37, `WMS管理应有 37 个面板码挂点,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 36, 'WMS管理内唯一面板码应为 36(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
+  // 2026-11-13 新增两张退货类单据(销售退货单 SALE_IN / 生产退料单 MATERIAL_RET)+ 各自明细表/统计表,
+  //   6 个新挂点全唯一 ⇒ 挂点 37+6=43、唯一 36+6=42。
+  assert.equal(invCodes.length, 43, `WMS管理应有 43 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 42, 'WMS管理内唯一面板码应为 42(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
   // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
   const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
   // ⚠ 子组 code 以远端改版为准:invAcctDoc(原 doc)
@@ -499,8 +501,14 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   assert.equal(pickLeaf?.title, '生产领料')
   assert.equal(pickLeaf?.path, '/panelx/list/PROD_PICK_LIST')
   const docCodes = (docGroup.children || []).map((c) => c.panelCode)
-  assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_OUT') + 1,
-    '生产领料应紧跟材料出库单')
+  // 2026-11-13:材料出库单后面紧跟「生产退料单」(MATERIAL_RET,领/退成对),再往后才是只读报表「生产领料」
+  assert.equal(docCodes.indexOf('MATERIAL_RET'), docCodes.indexOf('MATERIAL_OUT') + 1,
+    '生产退料单应紧跟材料出库单')
+  assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_RET') + 1,
+    '生产领料应紧跟生产退料单')
+  // 销售退货单紧跟销售出库单(一出一进配成对)
+  assert.equal(docCodes.indexOf('SALE_IN'), docCodes.indexOf('SALE_OUT') + 1,
+    '销售退货单应紧跟销售出库单')
   assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
   assert.ok(invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料应挂页面级面板码(2026-10-21)')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')

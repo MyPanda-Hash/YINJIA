@@ -6064,22 +6064,30 @@ public class ButtonService {
             "OTHER_IN", "bd_other_in",
             "OTHER_OUT", "bd_other_out",
             // 2026-10-19《10.19 问题》第 8 条:暂收退料单接转ERP(金蝶「采购退货单」pur_ret)
-            "QC_RETURN", "qc_return");
+            "QC_RETURN", "qc_return",
+            // 2026-11-13 补齐两张金蝶有、MES 没有的退货类单据(用户口径「补齐这两个单,并且测试转erp」):
+            //   销售退货单 → 金蝶「销售退货单」sal_in_bound;生产退料单 → 金蝶「生产退料单」inv_pick_ret
+            "SALE_IN", "bd_sale_in",
+            "MATERIAL_RET", "bd_material_ret");
 
     /** 支持转ERP 的面板清单(= {@link #ERP_HEAD_TABLE} 的键) */
     private static boolean supportsErp(String panelCode) {
         return ERP_HEAD_TABLE.containsKey(panelCode);
     }
 
+    /** 转ERP 白名单文案(2026-11-13 起含销售退货单/生产退料单):只在这两处抛错时使用,避免文案与清单脱节 */
+    private static final String ERP_UNSUPPORTED_MSG =
+            "仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单/销售退货单/生产退料单支持转ERP";
+
     private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
         if (!supportsErp(def.code()))
-            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
+            throw new IllegalStateException(ERP_UNSUPPORTED_MSG);
         String tbl = ERP_HEAD_TABLE.get(def.code());
         // 材料出库单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
         // 产品入库单(2026-10-14 接入转ERP)是生产完工入库,同样无 客户/供应商 列,往来单位取「经手人」
         // 其他入库单=供应商往来;其他出库单=内部领用,往来单位取「经手人」
         // 暂收退料单=退给供应商,头上有「供应商」(名称)列 ⇒ 走默认「供应商」
-        String partnerCol = "SALE_OUT".equals(def.code()) ? "客户"
+        String partnerCol = "SALE_OUT".equals(def.code()) || "SALE_IN".equals(def.code()) ? "客户"
                 : "MATERIAL_OUT".equals(def.code()) ? "领用人"
                 : "FINISH_IN".equals(def.code()) || "OTHER_OUT".equals(def.code()) ? "经手人" : "供应商";
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -6098,7 +6106,7 @@ public class ButtonService {
     /** 转ERP:已审核+未转过的采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单 → 推金蝶,回写ERP单号 */
     private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         if (!supportsErp(def.code()))
-            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
+            throw new IllegalStateException(ERP_UNSUPPORTED_MSG);
         String docNo = String.valueOf(formData.getOrDefault("编号", formData.getOrDefault("单据编号", "")));
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
         String operator = currentUserName();

@@ -4844,3 +4844,6 @@ migrate-role-field-view-seq-20261113.sql
 migrate-pu-order-price-wh-not-required-20261113.sql
 # 2026-11-13 采购入库明细「单价」改为非必填(「仓库」保持必填,脚本内含断言;只改 yj_field.required 一行)
 migrate-purchase-in-price-not-required-20261113.sql
+# 2026-11-13 补齐两张退货类单据:销售退货单 SALE_IN(bd_sale_in/bl_sale_in)、生产退料单 MATERIAL_RET(bd_material_ret/bl_material_ret)
+#   —— 各带明细表/统计表视图面板;字段按金蝶 sal_in_bound / inv_pick_ret 键集克隆销售出库单/材料出库单;两账套已执行
+migrate-return-docs-20261113.sql
