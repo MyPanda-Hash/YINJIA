@@ -3008,6 +3008,7 @@ public class ButtonService {
         java.util.List<java.util.Map<String, Object>> items = new java.util.ArrayList<>();
         for (java.util.Map<String, Object> item : need) {
             java.util.Map<String, Object> line = new java.util.LinkedHashMap<>();
+            line.put("序号", items.size() + 1);
             line.put("产品编码", inv);
             line.put("产品名称", invName);
             if (!spec.isEmpty()) line.put("规格型号", spec);
