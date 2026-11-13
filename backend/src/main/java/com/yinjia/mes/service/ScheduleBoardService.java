@@ -1516,25 +1516,44 @@ public class ScheduleBoardService {
         // 行级收敛(2026-10-15 步5,结构变更已随 migrate-finish-in-wo-line-20261015.sql 落地):
         //   带 rowId 时按「本行」取 —— 优先 [工单行号]=本行 pl_xc,**老单没有行号**(该列 2026-10-15 才加)
         //   时按 [批次号]=本行批次兜底;两者都空=历史未标注,归入整单口径(不猜、不回填)。
+        // 2026-11-13(用户口径「工单会存在多个批次号,可以在工单详情追溯中看到不同的批次号进入」):
+        //   一张入库单可有多条明细行,每行一个完工日批次(批号+实收数量) ⇒ 这里按**明细行**展开返回,
+        //   表头字段重复填写、批次号取明细批号(无明细的老单回退表头批次);界面据此列不同批次号。
         List<Map<String, Object>> fins = byRow
                 ? jdbc.queryForList(
                         "SELECT f.[单据编号], CONVERT(varchar(10), f.[单据日期], 120) AS 单据日期,"
                                 + " ISNULL(f.[入库类别],N'') AS 入库类别, ISNULL(f.[经手人],N'') AS 经手人, ISNULL(f.[备注],N'') AS 备注,"
-                                + " ISNULL(f.[批次号],N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " COALESCE(NULLIF(d.[批号],N''), f.[批次号], N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " ISNULL(d.[实收数量],0) AS 实收数量, ISNULL(d.[产品编码],N'') AS 产品编码,"
+                                + " ISNULL(d.[产品名称],N'') AS 产品名称,"
+                                + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
+                                + "      WHEN s.shr IS NOT NULL THEN N'已审核'"
+                                + "      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS 单据状态,"
                                 + " CASE WHEN f.[工单行号] IS NOT NULL THEN N'按工单行'"
                                 + "      WHEN ISNULL(f.[批次号],N'')<>N'' THEN N'按批次' ELSE N'历史未标注' END AS 收敛口径"
-                                + " FROM bd_finish_in f WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
+                                + " FROM bd_finish_in f"
+                                + " LEFT JOIN bl_finish_in d ON d.[单据编号]=f.[单据编号] AND ISNULL(d.asp_cancel,'N')<>'Y'"
+                                + " LEFT JOIN yj_doc_status s ON s.panel_code=N'FINISH_IN' AND s.doc_no=f.[单据编号]"
+                                + " WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
                                 + "   AND (f.[工单行号]=? OR (f.[工单行号] IS NULL AND ISNULL(f.[批次号],N'')=?"
                                 + "        AND ISNULL(f.[批次号],N'')<>N''))"
-                                + " ORDER BY f.[单据编号]", doc, curRow.get("工单行号"), rowBatch)
+                                + " ORDER BY f.[单据编号], d.[序号]", doc, curRow.get("工单行号"), rowBatch)
                 : jdbc.queryForList(
                         "SELECT f.[单据编号], CONVERT(varchar(10), f.[单据日期], 120) AS 单据日期,"
                                 + " ISNULL(f.[入库类别],N'') AS 入库类别, ISNULL(f.[经手人],N'') AS 经手人, ISNULL(f.[备注],N'') AS 备注,"
-                                + " ISNULL(f.[批次号],N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " COALESCE(NULLIF(d.[批号],N''), f.[批次号], N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " ISNULL(d.[实收数量],0) AS 实收数量, ISNULL(d.[产品编码],N'') AS 产品编码,"
+                                + " ISNULL(d.[产品名称],N'') AS 产品名称,"
+                                + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
+                                + "      WHEN s.shr IS NOT NULL THEN N'已审核'"
+                                + "      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS 单据状态,"
                                 + " CASE WHEN f.[工单行号] IS NOT NULL THEN N'按工单行'"
                                 + "      WHEN ISNULL(f.[批次号],N'')<>N'' THEN N'按批次' ELSE N'历史未标注' END AS 收敛口径"
-                                + " FROM bd_finish_in f WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
-                                + " ORDER BY f.[单据编号]", doc);
+                                + " FROM bd_finish_in f"
+                                + " LEFT JOIN bl_finish_in d ON d.[单据编号]=f.[单据编号] AND ISNULL(d.asp_cancel,'N')<>'Y'"
+                                + " LEFT JOIN yj_doc_status s ON s.panel_code=N'FINISH_IN' AND s.doc_no=f.[单据编号]"
+                                + " WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
+                                + " ORDER BY f.[单据编号], d.[序号]", doc);
         // 领料数据:材料出库单(领料单)—— **按 工单号+工单行号 收敛**(2026-10-15,用户口径)。
         // 🔴 原实现 `WHERE m.[加工单号]=?` 查的是**明细行** bl_material_out.[加工单号] —— 该列**实测全为空**
         //   (转领料单只写单头,明细由仓库补填)⇒ 这一段永远返回空,用户看到的就是"领料数据没有"。

@@ -138,11 +138,16 @@
           {{ tt('入库单据') }}（{{ (trace['入库单据'] || []).length }}）
           <span class="wb-scope-cap" :class="capsule('入库单据')">{{ tt(scopeOf('入库单据')) }}</span>
         </div>
-        <el-table :data="trace['入库单据']" size="small" border max-height="140" :empty-text="tt('暂无入库')">
+        <el-table :data="trace['入库单据']" size="small" border max-height="180" :empty-text="tt('暂无入库')">
           <el-table-column :label="tt('入库单号')" prop="单据编号" width="170" />
           <el-table-column :label="tt('单据日期')" prop="单据日期" width="100" />
           <el-table-column :label="tt('入库类别')" prop="入库类别" width="110" />
+          <!-- 2026-11-13 多批次:一张入库单可有多条明细行,每行一个完工日批次(批号+实收数量) -->
           <el-table-column :label="tt('批次号')" prop="批次号" width="110" />
+          <el-table-column :label="tt('实收数量')" prop="实收数量" width="100" align="right" />
+          <el-table-column :label="tt('产品编码')" prop="产品编码" width="130" show-overflow-tooltip />
+          <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="150" show-overflow-tooltip />
+          <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
           <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" align="right">
             <template #default="{ row }">{{ row['工单行号'] ?? '-' }}</template>
           </el-table-column>
