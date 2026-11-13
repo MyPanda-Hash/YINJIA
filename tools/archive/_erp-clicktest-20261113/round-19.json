@@ -1,0 +1,35 @@
+[
+  {
+    "panel": "SALE_OUT",
+    "label": "销售出库-沙箱客户+沙箱物料",
+    "no": "SO-2026-11-0003",
+    "saveMsg": "success",
+    "auditMsg": "success",
+    "erp": {
+      "status": 200,
+      "code": 200,
+      "msg": "success",
+      "data": {
+        "是否已转ERP": "是",
+        "ERP单号": "XSCK-20261113-00001",
+        "转ERP操作人": "admin",
+        "转ERP时间": "2026-11-13 14:10:55",
+        "message": "已成功转入金蝶ERP，ERP单号: XSCK-20261113-00001（请在金蝶界面审核）"
+      }
+    }
+  },
+  {
+    "panel": "FINISH_IN",
+    "label": "产品入库-沙箱物料",
+    "no": "FI-2026-11-0004",
+    "saveMsg": "success",
+    "auditMsg": "仓库档案不存在:[材料仓],请先在基础档案-仓库中建立"
+  },
+  {
+    "panel": "MATERIAL_OUT",
+    "label": "材料出库-沙箱物料",
+    "no": "LL-2026-11-0020",
+    "saveMsg": "success",
+    "auditMsg": "仓库档案不存在:[材料仓],请先在基础档案-仓库中建立"
+  }
+]

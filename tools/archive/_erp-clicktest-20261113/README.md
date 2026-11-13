@@ -12,27 +12,43 @@
 | MES 账套 | `YINJIA-MES·测试库`（`HSDZ_MES_TEST`），每次写库前脚本都断言账套名 | 各 round 首行 `FACTORY ...测试库` |
 | 金蝶账套 | **测试沙箱**：`clientId 359220` + `sandboxInstanceId`，`kingdee.push.allowProd=false` | `deploy/push/config.json`（已脱敏）、`application.yml` `kingdee.push.*` |
 
-## 二、7 张有「转ERP」按钮的单据 —— 逐张点击结果
+## 二、7 张有「转ERP」按钮的单据 —— 逐张点击结果（**最终 7/7 全部成功**）
 
-| # | 面板 | 结果 | 证据 / 卡在哪 |
-|---|---|---|---|
-| 1 | 采购入库单 `PURCHASE_IN` | ✅ **成功**（合单、表头多单号） | `round-04.json`：`PI-2026-11-0013` 表头 `采购订单号 = PO-2026-11-0015、PO-2026-11-0016`，点「转ERP」→ **ERP单号 `CGRK-20261113-00047`**，`是否已转ERP=是` |
-| 2 | 暂收退料单 `QC_RETURN` | ✅ **成功** | `round-10.json`：`TH-2026-11-0007`（供应商=深圳市陶氏、物料 `YJ-TS-004`、表头仓库=恒亿仓）→ 金蝶受理 |
-| 3 | 其他入库单 `OTHER_IN` | ✅ **成功** | `round-09.json`：`OI-2026-11-0003`（`YJ-TS-004` @ 恒亿仓，1 件） |
-| 4 | 其他出库单 `OTHER_OUT` | ✅ **成功** | `round-12.json`：`OO-2026-11-0003`（同上，1 件；去掉经手人编码后过） |
-| 5 | 销售出库单 `SALE_OUT` | ⛔ 卡沙箱主数据 | `round-13.json`：`客户必填`（不带客户编码）；带 `C-84` 时报 `参数number[C-84]不存在` ⇒ 沙箱客户档案里没有该客户 |
-| 6 | 产品入库单 `FINISH_IN` | ⛔ 卡沙箱商品档案 | `round-13.json`：`第1行分录:基本单位为空,请重新录入商品 … 请填写"商品分录"第1行:"单位"`（已补 `base_unit_*`，沙箱商品仍无基本单位） |
-| 7 | 材料出库单 `MATERIAL_OUT` | ⛔ 卡沙箱商品档案 | `round-12.json`：同上报错（`请填写"材料分录"第1行:"单位"`） |
+> 第二轮（用户要求"补充完整后重新测试"）：先把**沙箱真实档案**摸清（`probe-sandbox-master2.mjs` /
+> `probe-sandbox-stock-units.mjs`，带 `app-token` 头直连金蝶），再按沙箱档案造单，7 张全部拿到金蝶单号。
 
-**结论**：4 张绿灯（含最关键的采购入库·合单多单号那张），3 张被**金蝶沙箱主数据**挡住（不是代码/报文问题）：
-报错都发生在金蝶的业务校验层（字段解析、供应商/客户/商品档案），不是 MES 侧构造报文失败。
-要让这 3 张也变绿，需要先在沙箱补数据：
-- 销售出库：沙箱「客户」档案建一个客户（并在 MES 客户档案同编码），或把单据客户换成沙箱已有的客户；
-- 产品入库 / 材料出库：沙箱「商品」档案给对应商品补**基本单位**（`base_unit`），否则金蝶一律拒单。
+| # | 面板 | 单据 | ERP单号 | 结果 |
+|---|---|---|---|---|
+| 1 | 采购入库单 | `PI-2026-11-0015` | `CGRK-20261113-00048` | ✅ |
+| 2 | 暂收退料单 | `TH-2026-11-0008` | `CGTH-20261113-00002` | ✅ |
+| 3 | 产品入库单 | `FI-2026-11-0006` | `CPRK-20261113-00002` | ✅ |
+| 4 | 其他入库单 | `OI-2026-11-0004` | `QTRK-20261113-00006` | ✅ |
+| 5 | 销售出库单 | `SO-2026-11-0004` | `XSCK-20261113-00002` | ✅ |
+| 6 | 材料出库单 | `LL-2026-11-0022` | `SCLL-20261113-00002` | ✅ |
+| 7 | 其他出库单 | `OO-2026-11-0004` | `QTCK-20261113-00004` | ✅ |
+| 附 | 采购入库单（**合单·表头多单号**） | `PI-2026-11-0013` | `CGRK-20261113-00047` | ✅（round-04） |
 
-> 本轮顺带做了一处**真修复**（对用户是改善）：`KingdeePushService` 给产品入库/材料出库补发了
-> `base_unit_id / base_unit_number / unit_number / base_qty`（金蝶字段族的单位组），
-> 只发 `unit_id` 时金蝶必报「基本单位为空」。
+### 第一轮为什么有 3 张红（后来改了数据就绿了）
+
+| 面板 | 第一轮报错 | 真正原因 / 改法 |
+|---|---|---|
+| 销售出库 | `客户必填` / `参数number[C-84]不存在` | 沙箱客户档案里没有 C-84；改用沙箱真实客户 **`001 长江`** ⇒ 绿 |
+| 产品入库 / 材料出库 | `第1行分录:基本单位为空,请重新录入商品 … 请填写"商品分录"第1行:"单位"` | ① MES 侧单位填了「支(3)」而沙箱商品基本单位是「个(1)」；② 仓库名 `材料仓(YCL-01)` MES 档案里没有 ⇒ 审核就被拦。改法：单位一律 **个/id=1 + 基本单位三件套**，仓库用 **恒亿仓(CK00006)**（沙箱有库存、MES 也有档案）⇒ 绿 |
+| 采购入库（补测时） | `供应商必填` | 只给了供应商名称、没给编码；补 `供应商编码` 后 ⇒ 绿（正式链路由 采购订单 带入，本来就有编码） |
+
+### 沙箱档案实况（复现用，`probe-sandbox-master2.mjs` 输出）
+
+| 档案 | 结论 |
+|---|---|
+| 计量单位 | 13 个；**`个`=id 1**、`支`=id 3、`kg`=7、`张`=2574929687809865728 |
+| 客户 | 50+ 个，例如 `001 长江`、`004 紫高`、`2010002 东莞市加炜` |
+| 仓库 | 21 个，例如 `CK00006`、`CP-02 成品B仓`、`YCL-01 材料仓`、`CK04 半成品仓` |
+| 商品 | 298 个；多数 **base_unit_id=1（个）**、`is_batch=false`（如 `A-48-01`/`YJ-TS-004`/`CL004`） |
+| 现存量 | 33 个"有货组合"，集中在 `YCL-01`(8)、`CK00006`(7)、`CK04`(6)、`CK00005`(4)；`YJ-XWR-003` 在 CK00006 有 20000 |
+
+> ⚠ 拿沙箱 token 的关键：沙箱配置只有 `sandboxInstanceId`（`appKey/appSecret` 为空），
+> 必须像后端 `dynamicInstanceId()` 一样把 **sandboxInstanceId 当 outerInstanceId** 去取动态授权；
+> 并且 GET 基础资料要带 **`app-token` 请求头**，否则网关直接 404 `no Route matched`。
 
 ## 三、表头多单号的四条影响（全部点击测试）
 
@@ -47,14 +63,19 @@
 
 ```powershell
 # 前置：8090(jar) + 5173(vite) 在跑；脚本自己断言"测试库"，不是测试库直接拒绝
-ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-01.mjs')"   # 盘点候选
-ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-02.mjs')"   # 合单链 + 入库转ERP
-ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-09.mjs')"   # 其余面板造单+推送
-ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-14.mjs')"   # 四条影响的点击测试
-ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-18.mjs')"   # 清理（弃审+删除本轮造的单）
+# ① 只读：摸清沙箱档案（客户/仓库/商品基本单位/现存量）
+node tools/archive/_erp-clicktest-20261113/probe-sandbox-master2.mjs
+node tools/archive/_erp-clicktest-20261113/probe-sandbox-stock-units.mjs
+# ② 7 张单统一验收（各造一张 → 审核 → 转ERP，打印成功表）
+ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-21.mjs')"
+# ③ 补最后一张采购入库（带供应商编码）+ 清理本轮所有测试单
+ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-22.mjs')"
+# ④ 合单·表头多单号那张（采购入库）另有专证
+ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_erp-clicktest-20261113/round-04.mjs')"
 ```
 
-- 清理：`round-18.json` 里 16 张单全部 `弃审=200 / 删除=200`，测试账套已恢复干净。
-- 只读取证：`ProbeStock2.java`（测试库库存）、`probe-sandbox-stock.mjs`（沙箱现存量，本机取 token 失败，故本轮改用"实推报错"反推沙箱档案）。
+- 清理：`round-22.json` 里 13 张单全部 `删除=200`（`round-18.json` 是上一轮的 16 张），测试账套已恢复干净。
+- 只读取证：`probe-sandbox-master2.mjs`（客户/单位/仓库/商品）、`probe-sandbox-stock-units.mjs`（沙箱现存量+商品基本单位）、
+  `probe-sandbox-raw.mjs`（原始返回，用来确认 404 是缺 `app-token` 头）、`ProbeStock2.java`（测试库库存）。
 - ⚠ 本机 ego 浏览器 `Page.captureScreenshot` 一直 CDP 超时，证据为 DOM/接口原文，无截图。
 - ⚠ 点过「打印」后浏览器弹的是**原生打印预览**，会把该标签页的脚本挂起（round-15/16/17 因此超时）；关掉预览窗即可恢复。

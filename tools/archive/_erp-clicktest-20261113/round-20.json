@@ -1,0 +1,40 @@
+[
+  {
+    "panel": "FINISH_IN",
+    "label": "产品入库-恒亿仓",
+    "no": "FI-2026-11-0005",
+    "saveMsg": "success",
+    "auditMsg": "success",
+    "erp": {
+      "status": 200,
+      "code": 200,
+      "msg": "success",
+      "data": {
+        "是否已转ERP": "是",
+        "ERP单号": "CPRK-20261113-00001",
+        "转ERP操作人": "admin",
+        "转ERP时间": "2026-11-13 14:11:23",
+        "message": "已成功转入金蝶ERP，ERP单号: CPRK-20261113-00001（请在金蝶界面审核）"
+      }
+    }
+  },
+  {
+    "panel": "MATERIAL_OUT",
+    "label": "材料出库-恒亿仓",
+    "no": "LL-2026-11-0021",
+    "saveMsg": "success",
+    "auditMsg": "success",
+    "erp": {
+      "status": 200,
+      "code": 200,
+      "msg": "success",
+      "data": {
+        "是否已转ERP": "是",
+        "ERP单号": "SCLL-20261113-00001",
+        "转ERP操作人": "admin",
+        "转ERP时间": "2026-11-13 14:11:25",
+        "message": "已成功转入金蝶ERP，ERP单号: SCLL-20261113-00001（请在金蝶界面审核）"
+      }
+    }
+  }
+]
