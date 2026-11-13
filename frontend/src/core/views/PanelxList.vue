@@ -7984,21 +7984,22 @@ async function snapSheetPage(el, domToPng) {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
     /**
-     * 🔴 截图宽度必须取**重排后的真实内容宽**，不能用写死的 `w0`（2026-11-13 用户报障）。
+     * 🔴 截图宽度必须取**重排后的真实内容宽**，不能用写死的 `w0`（2026-11-13 用户报障
+     *   「这些 PDF 都有缺失」——规格书/产品信息表右缘被切掉一截）。
      *
-     * 现象：导出的 PDF 右侧被切掉——立项申请「单据编号 YJ-QR-1…」只印出半截，
-     *   规格书、产品信息表同样缺右缘。
+     * 【根因（生产实测数据）】为了让 PDF 纵向填满 A4，上面会把克隆体压到
+     *   `A4_CONTENT_PX`(733px) 重新排版。但这两张纸的**列宽是写死的 px**
+     *   （`<colgroup>` 的 `col w` / 各段固定列宽），压窄容器它们**不会跟着缩**：
+     *     · 规格书      纸宽 794 → 压到 733 后 `scrollWidth` 仍是 794 ⇒ 溢出 61px
+     *     · 产品信息表  纸宽 781 → 压到 733 后 `scrollWidth` 仍是 781 ⇒ 溢出 48px
+     *     · 立项申请    纸宽 1242 → 压到 733 后 `scrollWidth` 731 ⇒ 正常（它本来就按比例重排）
+     *   而 `domToPng({ width: w0 })` 是按 `w0=733` 去裁图的 ⇒ 超出的 61/48px **被直接切掉**。
+     *   （立项申请不缺，正是因为它压得下去；所以只有这两张报"缺失"。）
      *
-     * 根因：为了让 PDF 纵向填满 A4，上面把克隆体压到 `A4_CONTENT_PX`(733px) 重排；
-     *   但纸面里的**固定 px 子元素**（`.as-docno` 的 250px、表格 `<colgroup>` 的列宽、
-     *   以及各段写死的列宽）**不会跟着缩**。实测立项申请克隆体：
-     *     容器 733px → 实际渲染 641px，而 `scrollWidth = 731px`
-     *     （`.as-topbar` / `.as-title-row` / `.as-body` 全是 w=639 / sw=731）
-     *   ⇒ 内容比容器宽，而 `domToPng({ width: w0 })` 按 `w0` 裁图 ⇒ **右侧凭空消失**。
-     *
-     * 改法：`w0` 之后再用克隆体的 `scrollWidth` 兜底（取大者）。压窄重排仍然保留
-     *   （纵向填满 A4 的效果不变），只是**不再把溢出部分裁掉**：宁可整张略宽、
-     *   由 PDF 侧按 `k = min(contentW/iw, contentH/ih)` 等比缩放，也不丢内容。
+     * 【改法】用克隆体实测的 `scrollWidth` 兜底（取与 `w0` 的较大者）：
+     *   压窄重排仍然保留（纵向填满 A4 的效果不变），只是**不再把溢出部分裁掉**；
+     *   多出来的宽度由 PDF 侧按 `k = min(contentW/iw, contentH/ih)` 等比缩放吸收，
+     *   宁可整张略窄一点也不丢内容。本来就是 733 的页面行为完全不变（取 max 后仍是 733）。
      */
     const realW = Math.max(
       clone.scrollWidth || 0,

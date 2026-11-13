@@ -178,3 +178,25 @@ test('⑪ 签名标签格能收缩（不许 flex:none 把值区挤到换行）',
   assert.match(block, /flex-shrink:\s*[2-9]/, '标签格收缩系数要大于值区，优先让标签让宽')
   assert.match(block, /min-width:\s*\d+px/, '标签格要有最小宽度兜底')
 })
+
+/* ── 截图宽度必须用实测内容宽（2026-11-13 用户报障「这些 PDF 都有缺失」）────── */
+test('截图宽度不能用写死的 w0，必须用实测 scrollWidth 兜底', () => {
+  // 根因（生产实测）：规格书 794→733 溢出 61px、产品信息表 781→733 溢出 48px，
+  // 纸的列宽是写死 px，压窄容器它们不跟着缩；而 domToPng({width: w0}) 按 w0 裁图
+  // ⇒ 溢出部分被直接切掉，导出件右缘就"缺一块"。
+  const vue = list   // 文件顶部已读入 PanelxList.vue 源码
+  assert.match(vue, /const realW = Math\.max\(/, '缺 realW（实测内容宽）')
+  const at = vue.indexOf('const realW = Math.max(')
+  const seg = vue.slice(at, at + 320)
+  assert.match(seg, /clone\.scrollWidth/, 'realW 必须含 scrollWidth —— 溢出量就藏在这里')
+  assert.match(seg, /\bw0\b/, 'realW 要与 w0 取 max（不缩窄原本就正常的页面）')
+  // domToPng 与返回值都必须用 realW，不能回退到 w0
+  assert.match(vue, /width: realW,/, 'domToPng 必须按 realW 裁图')
+  assert.match(vue, /return \{ dataUrl, w0: realW, h0, rowBreaks \}/, '返回的 w0 必须是 realW')
+})
+
+test('克隆体必须清掉屏幕适配的 zoom（否则内容只占截图宽的一部分）', () => {
+  // a9c1a2876 修过：DocSheet 的窄窗自适应会写内联 zoom，cloneNode 一并带走
+  // ⇒ 截图宽按未缩放的纸宽定、内容却按 zoom 排版，右边成了空白。
+  assert.match(list, /clone\.style\.zoom = '1'/, '克隆体必须把 zoom 归 1')
+})
