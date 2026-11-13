@@ -114,3 +114,37 @@ test('⑦ 压窄后签名/标签格不许被挤成一字一行', () => {
   assert.match(ds, /\.as-name\s*\{[^}]*min-width|\.as-name\s*\{[^}]*flex-shrink:\s*0/,
     '标签格要有最小宽度/不收缩（否则压窄后被挤成竖排字）')
 })
+
+/**
+ * 2026-11-13 用户口径（填数据测试后追加）：
+ *   「申请立项时间可以往右边挪，因为备注不会写那么多」
+ *
+ * 现象：底部签名行「申请立项人 | 系统管理员 | 申请立项日期 | 2026-11-13」被挤在左侧约 3/4，
+ *   右边空着是备注列（固定 250px，`flex:none`）—— 而备注在实际单据上基本不写字。
+ * 口径：**备注列不需要那么宽**，把省下来的宽度让给签名行/表格正文。
+ */
+test('⑧ 备注列不该固定占 250px（用户口径：备注不会写那么多）', () => {
+  const ds = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  const i = ds.indexOf('.as-remark {')
+  assert.ok(i > 0, '应有 .as-remark 样式')
+  // 只取**规则体**（第一个 } 之前）：注释里也提到 width/flex，混进来会误判
+  const block = ds.slice(i, ds.indexOf('}', i) + 1)
+  // 允许保留一个上限（备注仍要能写字），但不许再是 `width:250px; flex:none` 的硬固定
+  assert.doesNotMatch(block, /width:\s*250px;\s*\n\s*flex:\s*none/,
+    '备注列不许再是 250px + flex:none（那样签名行永远拿不到右边那 250px）')
+  assert.match(block, /max-width|width:\s*\d{2,3}px/, '备注列要有一个合理上限')
+  // 必须可收缩，让正文/签名行优先拿到宽度
+  assert.match(block, /flex:\s*0\s+1\s+auto|flex-shrink:\s*1|min-width/,
+    '备注列要允许收缩（正文优先）')
+})
+
+test('⑨ 签名行要能铺满整张纸（不被备注列截在 3/4 处）', () => {
+  const ds = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  // 签名行在同一 flex 容器内、宽 100%
+  const i = ds.indexOf('.as-sign-row {')
+  assert.ok(i > 0, '应有 .as-sign-row')
+  const block = ds.slice(i, i + 260)
+  assert.match(block, /display:\s*flex/, '签名行仍是 flex')
+  // 不能写死百分比宽度（会随备注列变化而错位）
+  assert.doesNotMatch(block, /width:\s*\d+%/, '签名行不许写死百分比宽')
+})

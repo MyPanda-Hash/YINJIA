@@ -731,7 +731,15 @@
         </div>
       </div>
       <div v-else class="as-sign-row">
-        <div v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair" :style="{ flex: c.flex }">
+        <!-- 2026-11-13 用户口径「申请立项时间可以往右边挪」——
+             原来 `:style="{ flex: c.flex }"` 传的是**裸数字**（53 / 47），CSS 里 flex 简写的
+             flex-grow 虽可无单位，但这里同时想要"按占比铺满整行"，裸值会被当作 flex-basis:0%
+             之外的另一种解释，实测两个项只吃到 266+302=568（签名行宽 541 之外还有余量没用上）。
+             改成显式 flex-grow + flex-basis:0 ⇒ 严格按 53:47 铺满签名行。 -->
+        <div
+          v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair"
+          :style="{ flexGrow: c.flex || 1, flexShrink: 1, flexBasis: '0%' }"
+        >
           <div class="as-sign-cell" :class="{ 'white-shell': c.white }" :style="{ width: c.w + 'px' }">{{ tt(c.label) }}</div>
           <div class="as-sign-val">
             <el-input
@@ -1582,8 +1590,12 @@ defineExpose({ focusField })
 .approval-sheet :deep(.as-cell-input) {
   width: 100%;
 }
+/* 2026-11-13：导出压到 A4 宽（733px）后，签名行的日期格只剩 ~100px，
+   固定 132px 会把日期截成「2026-...」。改成"尽量 132，装不下就吃掉可用宽度但不小于 108px"。 */
 .approval-sheet :deep(.as-date) {
   width: 132px;
+  max-width: 100%;
+  min-width: 108px;
 }
 /* 输入控件去边框:保持原版表格线条(编辑/聚焦均无提示线) */
 .approval-sheet :deep(.el-input__wrapper),
@@ -1906,8 +1918,16 @@ defineExpose({ focusField })
   min-width: 0;
 }
 .as-remark {
-  width: 250px;
-  flex: none;
+  /* 2026-11-13 用户口径：「申请立项时间可以往右边挪，因为备注不会写那么多」。
+     原来是 `width:250px; flex:none` —— 它**永远**占满右侧 250px，于是底部签名行
+     （申请立项人 / 申请立项日期）被截在纸宽 3/4 处，右边空着却用不上。
+     现在：给一个**上限**（备注仍要能写字），但允许收缩 —— 正文（.as-body > .as-table
+     是 flex:1）优先拿宽度，窄排版（导出 A4 733px）时备注先让路。
+     base 宽度 250 → 190：实际单据的备注基本是空的，200 左右足够写两行字。 */
+  flex: 0 1 auto;
+  width: 190px;
+  min-width: 96px;
+  max-width: 220px;
   border-left: 3px dotted #9a9a9a;
   display: flex;
   flex-direction: column;
@@ -2456,6 +2476,8 @@ defineExpose({ focusField })
 }
 .as-sign-pair {
   display: flex;
+  /* 允许收缩到比内容更窄（否则长值会把整行撑破、或让相邻项吃不到宽度） */
+  min-width: 0;
 }
 .as-sign-cell {
   /* 2026-11-13 用户口径「宽度不够填写数据自动换行，适配 A4 纸」——
