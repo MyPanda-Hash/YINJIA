@@ -5782,6 +5782,7 @@ export default {
     '按这次打印打码': 'Print labels per this record',
     '已打码': 'Labels printed',
     '已按采购订单打印记录带入：数量和行已锁定，只能修改上面的批次号和生产日期': 'Loaded from the purchase-order print record: quantities and lines are locked; only the batch no. and production date above can be changed',
+    '已按采购订单打印记录带入：本次打印数量和行已锁定；「每箱数量」仍可填，也能改上面的批次号与生产日期': 'Loaded from the purchase-order print record: the print qty and lines are locked; the qty per box is still editable, as are the batch no. and production date above',
     '取消带入': 'Cancel load',
     '点「按这次打印打码」把这次采购订单纸上的数量带入上面各行的本次打印数量（取该版式的剩余可打封顶）': 'Click "Print labels per this record" to load this paper\'s qty into the rows above (capped by the remaining printable of that format); only amount-version records are listed',
     '该订单还没有打印过采购订单': 'This order has no purchase-order print records yet',

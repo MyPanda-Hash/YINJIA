@@ -1,0 +1,32 @@
+{
+  "fill": [
+    {
+      "i": 0,
+      "qty": "240",
+      "qtyDisabled": true,
+      "box": "120",
+      "boxDisabled": false
+    },
+    {
+      "i": 1,
+      "qty": "18",
+      "qtyDisabled": true,
+      "box": "",
+      "boxDisabled": false
+    }
+  ],
+  "after": {
+    "boxes": [
+      "120",
+      "9",
+      null
+    ],
+    "hint": "行号 1.0000：每箱 120 ⇒ 共 2 张（整箱 2）行号 2.0000：每箱 9 ⇒ 共 2 张（整箱 2）",
+    "banner": "已按采购订单打印记录带入：本次打印数量和行已锁定；「每箱数量」仍可填，也能改上面的批次号与生产日期 MP-2026-11-0027"
+  },
+  "cancelled": true,
+  "restored": {
+    "banner": "",
+    "qtyDisabled": false
+  }
+}

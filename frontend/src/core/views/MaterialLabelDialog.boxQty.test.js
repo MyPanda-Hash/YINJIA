@@ -98,8 +98,20 @@ test('⑤ 撤掉「打几张卡在打印预览里设置份数」这条提示(用
   assert.ok(!/不填按本次打印数量/.test(src), '"不填按本次打印数量"的占位词也要撤(字段已必填)')
 })
 
-test('⑥ 弹窗放大:宽度跟屏幕走(不再写死 1000px),表高自适应', () => {
-  assert.ok(!/width="1000px"/.test(src), '不得再写死 1000px')
+test('⑦ 按打印记录带入后:只锁「本次打印数量」,「每箱数量」仍可填(2026-11-13 用户口径)', () => {
+  // 用户原话:「打印材料码带入后,每箱数量填不了,只锁定本次打印数量就行,每箱数量可以填」
+  // ⇒ 数量输入框保留 lockedBySource;每箱数量**不许**带 lockedBySource(否则带入后没法打码)
+  const qtyBlock = mainTable.slice(mainTable.indexOf("tt('本次打印数量')"), mainTable.indexOf("tt('每箱数量')"))
+  assert.ok(/lockedBySource/.test(qtyBlock), '「本次打印数量」带入后仍要锁')
+  const boxBlock = mainTable.slice(mainTable.indexOf("tt('每箱数量')"))
+  assert.ok(!/lockedBySource/.test(boxBlock), '「每箱数量」不能吃 lockedBySource(带入后必须能填)')
+  assert.ok(/:disabled="!\(Number\(qtyOf\[row\.id\] \|\| 0\) > 0\)"/.test(boxBlock),
+    '每箱数量的可填条件只剩"本行有本次打印数量"')
+  const suppBoxBlock = suppTable.slice(suppTable.indexOf("tt('每箱数量')"))
+  assert.ok(!/lockedBySource/.test(suppBoxBlock), '补登行的每箱数量同样不受带入锁定')
+})
+
+test('⑥ 弹窗放大:宽度跟屏幕走(不再写死 1000px),表高自适应', () => {  assert.ok(!/width="1000px"/.test(src), '不得再写死 1000px')
   assert.ok(/:width="dlgWidth"/.test(src), '宽度应绑 dlgWidth')
   assert.ok(/const dlgWidth = 'min\(1560px, 96vw\)'/.test(src), 'dlgWidth = min(1560px, 96vw)')
   assert.ok(/top="3vh"/.test(src), '向上扩(3vh 顶距),把纵向空间也吃满')
@@ -114,6 +126,8 @@ test('多语言:本轮词条都有英文译文(切 en 不露中文)', () => {
     '按每箱数量算出的标签张数过多（{n} 张），请核对每箱数量',
     '有零头箱：整批不是每箱数量的整数倍，零头箱会单独出一张卡（卡面印零头数量）',
     '标签张数',
+    // 2026-11-13:带入后只锁数量,每箱数量仍可填 —— 锁定提示随之改写
+    '已按采购订单打印记录带入：本次打印数量和行已锁定；「每箱数量」仍可填，也能改上面的批次号与生产日期',
   ]
   for (const k of keys) {
     const rx = new RegExp(`'${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}':\\s*'([^']*)'`)
