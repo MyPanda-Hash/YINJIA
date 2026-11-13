@@ -23,13 +23,21 @@
 
 证据截图（本目录）：
 
-- `final-01-board-3shop.png` — 工单排产 3号车间（`715/15`）
-- `final-02-board-1shop.png` — 工单排产 1号车间（红色欠产 + 顶部汇总）
-- `final-03-list.png` — 生产工单页（汇总 35 处 / 10846）
+- `evidence-01-board-3shop-715-15.png` — 3号车间 11-13 今 格：`715/15`（绿，今天不判未完成）
+- `evidence-02-board-1shop-short-cells.png` — 1号车间 11-11/11-12：`834/500`、`833/100` 红色（欠产）
+- `evidence-03-board-banner.png` — 顶部红色汇总条：`历史未完成 2 处 · 合计欠产 1067 标红格 = …(汇总含未显示为列的日期)`
+- `final-01-board-3shop.png` — 工单排产 3号车间整屏
+- `final-02-board-1shop.png` — 工单排产 1号车间整屏（红色欠产 + 顶部汇总）
+- `final-03-list.png` — 生产工单页整屏（汇总 35 处 / 10846）
 - `final-04-board-en.png` / `final-05-list-en.png` — 英文版
+- `source-zoom-board-3shop.png` / `source-zoom-board-1shop.png` — 50% 缩放整屏（`evidence-01/02` 的裁切源；页面太宽，
+  日期列在 100% 缩放下会被左侧固定列遮住，取证时先把页面缩到 50% 再截，见 `ego/round-12.mjs`、`round-13.mjs`）
 - `round-01-current.png` — 改前现状（日期格只显示 15，计划 700 只在 tooltip）
 - `round-09-5173-degraded.png` — 降级态（5173 + 旧 8090 jar）
 - `round-12-edit-prefill2.png` — 双击改数量的预填值
+
+> 说明：`evidence-01/02` 是按「50% 缩放截图 + 像素坐标裁切 + LANCZOS 放大」做的可读性裁图
+> （原始整屏在同目录 `source-zoom-*.png`，裁切坐标见各图中标注的列头；没有改任何 DOM/数据）。
 
 ## 可复跑步骤
 
