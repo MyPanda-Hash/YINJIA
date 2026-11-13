@@ -1,0 +1,86 @@
+/**
+ * sheetPdfFillA4.test.js —— 「在导出 PDF 拉长一点，现在就缩在一半，把整个面板进行排版重新设计，
+ *                            拉长一点，宽度不够填写数据自动换行，适配 A4 纸」（2026-11-13 用户口径）
+ *
+ * 【现象·实测】
+ *   导出件里内容横向占纸宽 92%（几乎铺满），**纵向只占纸高 49%** —— 下面一半全白。
+ *   用户的话是「缩在一半」，指的就是这个纵向半张纸。
+ *
+ * 【根因】
+ *   立项申请的纸面按**固定 1242px** 排版（FIXED_SHEET_W），而 A4 竖向去掉 8mm 边距只有
+ *   194mm ≈ 733px 内容宽 ⇒ 必须缩小到 0.59 才塞得下。缩小是全比例的，所以：
+ *     · 宽度：1242 × 0.59 → 正好铺满 194mm（92%，看起来对）；
+ *     · 高度：纸张自身只有 928px 高（行高是 min-height 写死的设计值），
+ *             928 × 0.59 ≈ 145mm，而 A4 内容高有 272mm ⇒ 只占 53%。
+ *   一句话：**为了塞下过宽的纸而整体缩小，高度跟着一起缩掉了**。
+ *
+ * 【口径】用户要的是「适配 A4 纸」+「宽度不够填写数据自动换行」：
+ *   导出/打印时**不再整体缩小**，而是按 A4 内容宽（≈733px）**重新排版**一遍纸面；
+ *   值区宽度不够时文字自动换行，行高随内容长高 ⇒ 纵向自然撑满 A4。
+ *
+ * 这些断言钉住「A4 排版宽常量存在、截图按它重排、且换行规则在」。
+ */
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const list = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
+const docSheet = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+const paper = readFileSync(new URL('../panel/sheetPrintHtml.js', import.meta.url), 'utf8')
+
+test('① A4 内容宽有唯一常量（733px = (210-16)mm @96dpi），截图按它重排', () => {
+  // 常量必须来自 sheetPrintHtml（纸张/边距/96dpi 的唯一真源），不许在两处各写一个 733
+  assert.match(paper, /SHEET_PAGE_W\s*=\s*210/, 'A4 宽 210mm')
+  assert.match(paper, /SHEET_MARGIN\s*=\s*8/, '页边距 8mm')
+  assert.match(list, /A4_CONTENT_PX/, 'PanelxList 要按 A4 内容宽算排版宽')
+  // 导出截图时，若纸面比 A4 内容宽**更宽**，要把克隆体压到 A4 宽重新排版（而不是整体缩小）
+  assert.match(list, /paperW\s*>\s*A4_CONTENT_PX/, '要判断"纸比 A4 宽"这件事')
+  // 实现是 `const w0 = reflow ? A4_CONTENT_PX : paperW`（可读性比 Math.min 好：
+  // 一眼能看出"重排与否"这个分支，且能挂上排除表格式纸面的条件）
+  assert.match(list, /reflow\s*\?\s*A4_CONTENT_PX\s*:\s*paperW/,
+    '克隆体宽度要取 min(纸宽, A4 内容宽) —— 这就是"重新排版"而不是"缩小"')
+  // 表格式纸面（样品申请单）列宽写死，压窄只会横向溢出 ⇒ 必须排除
+  assert.match(list, /isTableStyleSheet/, '表格式纸面要排除在重排之外')
+  assert.match(list, /querySelector\(\'\.sg-table\'\)/, '判据用纸面结构类名，不写死面板码')
+})
+
+test('② 重排后高度要重新量（压窄会换行⇒变高，不能沿用原高度）', () => {
+  const body = list.slice(list.indexOf('async function snapSheetPage('))
+  const fn = body.slice(0, body.indexOf('\nasync function shotsForPages('))
+  // h0 必须在设完宽度、双 raf 之后量
+  const wi = fn.indexOf('clone.style.width')
+  const hi = fn.indexOf('const h0 = Math.max(')
+  assert.ok(wi > 0 && hi > 0 && wi < hi, '先定宽、后量高（窄排版换行后高度才准）')
+  assert.match(fn.slice(wi, hi + 120), /requestAnimationFrame/,
+    '定宽与量高之间要等一次布局（双 raf），否则量到的是旧高度')
+})
+
+test('③ 值区窄了要自动换行（否则数据被截断/溢出格子）', () => {
+  // 文本域：pre-wrap + break-word（已有）
+  assert.match(docSheet, /white-space:\s*pre-wrap/, '文本域要保留换行')
+  assert.match(docSheet, /word-break:\s*break-word|overflow-wrap:\s*anywhere/, '长串要能断行')
+  // 只读文本（打印时值多是只读渲染）也要换行，不能 nowrap 截断
+  const roIdx = docSheet.indexOf('.as-ro-text')
+  assert.ok(roIdx > 0, '应有只读值区样式 .as-ro-text')
+  const roBlock = docSheet.slice(roIdx, roIdx + 400)
+  assert.doesNotMatch(roBlock, /white-space:\s*nowrap/, '只读值区不许 nowrap（窄排版会截断）')
+})
+
+test('④ 行高用 min-height（内容变多要能长高，不许把文字裁掉）', () => {
+  // 模板里 as-row 用的是 minHeight，不是 height
+  assert.match(docSheet, /class="as-row"[^>]*minHeight|:style="\{ minHeight:/,
+    '行高必须是 min-height（内容撑得开）')
+  // 值区内边距/行高给换行留出空间
+  assert.match(docSheet, /\.as-fill-area\s*:deep\(\.el-textarea__inner\)\s*\{[\s\S]{0,80}line-height/,
+    '文本域行高要有明确值（换行后高度可预测）')
+})
+
+test('⑤ 打印/导出不是「整体缩小」：不许靠 zoom 把宽纸压进 A4', () => {
+  const body = list.slice(list.indexOf('async function snapSheetPage('))
+  const fn = body.slice(0, body.indexOf('\nasync function shotsForPages('))
+  // 截图克隆体上只允许清 zoom（=1），不许设成小于 1 去"凑宽度"
+  assert.doesNotMatch(fn, /clone\.style\.zoom\s*=\s*['"]?0\./,
+    '不许在截图时把 zoom 设成小于 1（那是整体缩小，正是用户报的"缩在一半"）')
+  assert.match(fn, /clone\.style\.zoom\s*=\s*'1'|clone\.style\.zoom\s*=\s*1/,
+    '截图时 zoom 必须清成 1（按重排后的像素直接出图）')
+})

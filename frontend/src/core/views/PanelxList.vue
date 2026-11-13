@@ -7922,6 +7922,24 @@ async function snapSheetPage(el, domToPng) {
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
+    /**
+     * 行边界（2026-11-13）：`shotsForPages` 纵向切张时要**避开行中间**，
+     * 否则一张单会被切成"上半行在第 1 页、下半行在第 2 页"，读起来是断的。
+     * 这里把每个可切块（.as-row / .sg-table 的 tr / 明细表 tr）的**底边**记下来，
+     * 切分点就近吸附到最近的块边界。元素相对克隆体顶部的偏移 = rect.top - cloneRect.top。
+     */
+    let rowBreaks = []
+    try {
+      const baseTop = clone.getBoundingClientRect().top
+      const blocks = clone.querySelectorAll('.as-row, .sg-table > tbody > tr, .rs-row, table > tbody > tr')
+      rowBreaks = [...blocks]
+        .map((n) => Math.round(n.getBoundingClientRect().bottom - baseTop))
+        .filter((y) => y > 0 && y < h0)
+      // 去重 + 升序（嵌套结构会重复报同一个底边）
+      rowBreaks = [...new Set(rowBreaks)].sort((a, b) => a - b)
+    } catch (e) {
+      rowBreaks = []
+    }
     const dataUrl = await domToPng(clone, {
       scale: 2,
       backgroundColor: '#ffffff',
@@ -7930,7 +7948,7 @@ async function snapSheetPage(el, domToPng) {
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    return { dataUrl, w0, h0 }
+    return { dataUrl, w0, h0, rowBreaks }
   } finally {
     if (holder) holder.remove()
   }
