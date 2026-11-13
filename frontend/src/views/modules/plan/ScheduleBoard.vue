@@ -247,6 +247,10 @@ async function loadPool() {
     poolTable.value?.clearSelection?.()
     // 多行模式:生产工单页已经勾过 ⇒ 进来默认全选,直接点「批量排产」
     if (scoped.value) await selectAllPool()
+    // 单行内嵌模式(2026-11-13 用户口径,附截图):生产工单页点「排产」打开本弹窗时,
+    //   ①待排产池里当前这一行也**默认勾选** —— 与多行模式同一体验:打开即可直接点「排产」,
+    //   不必先手动勾一次(此前单行模式只做了 keyword 收敛,没有默认勾选)。
+    else if (props.embedded && props['工单号']) await selectEmbeddedRows()
   } catch (e) { err(e, '查询失败') } finally { loading.value = false }
 }
 
@@ -256,6 +260,26 @@ async function selectAllPool() {
   const t = poolTable.value
   if (!t) return
   for (const row of pool.value) t.toggleRowSelection(row, true)
+}
+
+/**
+ * 单行内嵌模式:默认勾选「当前工单号(+工单行号)」对应的待排产行(2026-11-13 用户口径)。
+ *
+ * <p>匹配口径与打开本弹窗时 keyword 收敛同一把尺子:
+ * 带工单行号 ⇒ 精确到「工单号 + 行号」(同工单多行时只勾当前那一行);
+ * 不带行号 ⇒ 勾该工单号在池里的全部行(与 keyword=工单号 的收敛结果一致)。
+ */
+async function selectEmbeddedRows() {
+  await nextTick()
+  const t = poolTable.value
+  if (!t) return
+  const no = String(props['工单号'] || '').trim()
+  if (!no) return
+  const xc = props['工单行号']
+  const hasXc = !(xc === null || xc === undefined || xc === '')
+  const rows = pool.value.filter((r) => String(r['加工单号'] || '').trim() === no
+    && (!hasXc || String(r['工单行号'] ?? '').trim() === String(xc).trim()))
+  for (const row of rows) t.toggleRowSelection(row, true)
 }
 
 async function loadStats() {
