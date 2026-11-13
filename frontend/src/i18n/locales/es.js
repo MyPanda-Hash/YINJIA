@@ -1,6 +1,18 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
+    '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Marcado = visible para este rol; el número define el orden (solo los campos marcados tienen número, 1 primero); los nombres de columna siguen viniendo de la configuración del sistema.',
+    '从系统整体复制': 'Copiar desde todo el sistema',
+    '套用到其他角色': 'Aplicar a otro rol',
+    '将用「系统整体」当前的字段显隐与顺序覆盖本角色在这个面板的设置，继续？': 'Se sobrescribirá la configuración de este rol en este panel con la visibilidad y el orden actuales del sistema. ¿Continuar?',
+    '已从系统整体复制（{n} 个字段）': 'Copiado desde todo el sistema ({n} campos)',
+    '复制失败': 'No se pudo copiar',
+    '把本角色在这个面板的字段显隐与顺序整份复制给所选角色；目标角色原有定制会被覆盖。': 'Copia la visibilidad y el orden de campos de este rol en este panel al rol seleccionado; su personalización existente se sobrescribirá.',
+    '确定套用': 'Aplicar',
+    '已套用到所选角色': 'Aplicado al rol seleccionado',
+    '套用失败': 'No se pudo aplicar',
+    '读取角色清单失败': 'No se pudo leer la lista de roles',
     // 角色字段视图:无角色/接口未就绪时落回系统整体的提示(2026-11-13)
     '当前账号未分配角色或本角色视图不可用，已切到「系统整体」。': 'Esta cuenta no tiene rol o la vista de campos del rol no está disponible; se cambió a «Todo el sistema».',
     // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----

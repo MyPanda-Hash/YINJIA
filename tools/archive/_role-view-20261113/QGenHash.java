@@ -4,7 +4,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 public class QGenHash {
     public static void main(String[] a) {
-        String plain = a.length > 0 ? a[0] : "《一次性临时口令,账号已删除》";
+        String plain = a.length > 0 ? a[0] : "Tmp#FieldView2026";
         String hash = new BCryptPasswordEncoder().encode(plain);
         System.out.println("plain=" + plain);
         System.out.println("hash=" + hash);

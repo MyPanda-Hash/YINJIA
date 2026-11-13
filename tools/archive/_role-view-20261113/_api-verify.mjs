@@ -73,8 +73,8 @@ async function fieldView(token) {
 
 const main = async () => {
   console.log(`== 角色字段视图接口验证 @ ${BASE} (测试库) ==`)
-  const a = await login('zz_fv_a', '《一次性临时口令,账号已删除》')
-  const b = await login('zz_fv_b', '《一次性临时口令,账号已删除》')
+  const a = await login('zz_fv_a', 'Tmp#FieldView2026')
+  const b = await login('zz_fv_b', 'Tmp#FieldView2026')
 
   const fvA = await fieldView(a)
   ok(fvA.roleCode === 'xiaoshou', `zz_fv_a 命中的角色 = 销售(xiaoshou)`, `实际 ${fvA.roleCode}`)

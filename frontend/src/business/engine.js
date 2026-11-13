@@ -564,14 +564,29 @@ export async function getFieldView(panelCode) {
   return unwrap(await request.get('/px/fieldView', { params: { panelCode } }))
 }
 
-/** 保存本角色视图(只存显隐):place = header | detail;columns = [{label, visible}] */
+/** 保存本角色视图(显隐 + 角色内序号):place = header | detail;columns = [{label, visible, seq}] */
 export async function saveRoleFieldView({ panelCode, place, columns }) {
   return unwrap(await request.post('/px/saveRoleFieldView', { panelCode, place, columns }))
 }
 
-/** 恢复继承:清掉本角色在该面板的显隐覆盖(panelCode 传空 = 全部面板) */
+/** 恢复继承:清掉本角色在该面板的覆盖(panelCode 传空 = 全部面板) */
 export async function resetRoleFieldView({ panelCode } = {}) {
   return unwrap(await request.post('/px/resetRoleFieldView', { panelCode: panelCode || '' }))
+}
+
+/** 角色模板 · 从系统整体一键复制到本角色(把整体的显隐与顺序落成显式视图) */
+export async function copyRoleFieldViewFromSystem({ panelCode, roleCode }) {
+  return unwrap(await request.post('/px/copyRoleFieldViewFromSystem', { panelCode, roleCode: roleCode || '' }))
+}
+
+/** 角色模板 · 把本角色的视图套用到另一个角色(仅管理员) */
+export async function copyRoleFieldViewToRole({ panelCode, roleCode }) {
+  return unwrap(await request.post('/px/copyRoleFieldViewToRole', { panelCode, roleCode: roleCode || '' }))
+}
+
+/** 可套用的角色清单 */
+export async function fieldViewRoles(panelCode) {
+  return unwrap(await request.get('/px/fieldViewRoles', { params: { panelCode } }))
 }
 
 // ==================== 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ====================

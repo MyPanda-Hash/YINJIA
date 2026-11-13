@@ -14,7 +14,7 @@ const get = async (p, token) => {
   return { status: r.status, text: await r.text() }
 }
 
-const lg = await post('/api/auth/login', { userName: 'zz_fv_a', password: '《一次性临时口令,账号已删除》', factory: 'YJ_TEST' })
+const lg = await post('/api/auth/login', { userName: 'zz_fv_a', password: 'Tmp#FieldView2026', factory: 'YJ_TEST' })
 console.log('login', lg.status)
 const lj = JSON.parse(lg.text)
 const token = lj?.data?.token

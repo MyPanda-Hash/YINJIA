@@ -2467,20 +2467,32 @@
         </span>
       </div>
       <div class="col-pref-tip">
-        <template v-if="colPrefScope === 'role'">{{ tt('这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。') }}</template>
+        <template v-if="colPrefScope === 'role'">{{ tt('勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。') }}</template>
         <template v-else>{{ tt('拖动或用箭头调整列顺序；勾选=显示；栏名可改。') }}</template>
         <span class="col-pref-count">{{ tt('总') }} {{ colPrefRows.length }} {{ tt('列') }} / {{ tt('显示') }} {{ colPrefRows.filter(r => r.visible).length }}</span>
       </div>
+      <div v-if="colPrefScope === 'role'" class="col-pref-tpl">
+        <el-button link size="small" @click="copyRoleFromSystem('detail')">{{ tt('从系统整体复制') }}</el-button>
+        <el-button v-if="fieldScopeIsAdmin" link size="small" @click="openApplyRole('detail')">{{ tt('套用到其他角色') }}</el-button>
+      </div>
       <div class="col-pref-list">
         <div v-for="(item, idx) in colPrefRows" :key="item.label" class="col-pref-row"
-             :draggable="colPrefScope === 'system'"
+             draggable="true"
              @dragstart="colDragIdx = idx" @dragover.prevent @drop="onColDrop(idx)">
-          <div class="cp-drag" :title="colPrefScope === 'system' ? tt('拖动排序') : ''">{{ colPrefScope === 'system' ? '⋮⋮' : '·' }}</div>
+          <div class="cp-drag" :title="tt('拖动排序')">⋮⋮</div>
           <div class="cp-order">
-            <el-button link size="small" :disabled="colPrefScope !== 'system' || idx === 0" @click="moveCol(idx, -1)">▲</el-button>
-            <el-button link size="small" :disabled="colPrefScope !== 'system' || idx === colPrefRows.length - 1" @click="moveCol(idx, 1)">▼</el-button>
+            <el-button link size="small" :disabled="idx === 0" @click="moveCol(idx, -1)">▲</el-button>
+            <el-button link size="small" :disabled="idx === colPrefRows.length - 1" @click="moveCol(idx, 1)">▼</el-button>
           </div>
-          <el-checkbox v-model="item.visible" class="cp-vis" :disabled="!!item.required" />
+          <!-- 角色作用域:序号(只有勾选的字段有);系统整体作用域不显示序号 -->
+          <div v-if="colPrefScope === 'role'" class="cp-seq">
+            <el-input-number v-if="item.visible" :model-value="item.seq" :min="1" :max="colPrefRows.filter(r => r.visible).length"
+                             :controls="false" size="small" class="cp-seq-input"
+                             @change="(v) => onColSeqInput(item.label, v)" />
+            <span v-else class="cp-seq-dash">—</span>
+          </div>
+          <el-checkbox v-model="item.visible" class="cp-vis" :disabled="!!item.required"
+                       @change="() => onColToggle()" />
           <div class="cp-label">
             {{ item.label }}
             <span v-if="item.required" class="cp-flag">{{ tt('必填') }}</span>
@@ -2584,20 +2596,31 @@
         </span>
       </div>
       <div class="col-pref-tip">
-        <template v-if="headPrefScope === 'role'">{{ tt('这里只调「显示 / 隐藏」：本角色所有账号生效，顺序与栏名仍按系统整体。') }}</template>
+        <template v-if="headPrefScope === 'role'">{{ tt('勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。') }}</template>
         <template v-else>{{ tt('拖动或用箭头调整字段顺序；勾选=显示；栏名可改。') }}</template>
         <span class="col-pref-count">{{ tt('总') }} {{ headPrefRows.length }} {{ tt('个') }} / {{ tt('显示') }} {{ headPrefRows.filter(r => r.visible).length }}</span>
       </div>
+      <div v-if="headPrefScope === 'role'" class="col-pref-tpl">
+        <el-button link size="small" @click="copyRoleFromSystem('header')">{{ tt('从系统整体复制') }}</el-button>
+        <el-button v-if="fieldScopeIsAdmin" link size="small" @click="openApplyRole('header')">{{ tt('套用到其他角色') }}</el-button>
+      </div>
       <div class="col-pref-list">
         <div v-for="(item, idx) in headPrefRows" :key="item.label" class="col-pref-row"
-             :draggable="headPrefScope === 'system'"
+             draggable="true"
              @dragstart="headDragIdx = idx" @dragover.prevent @drop="onHeadDrop(idx)">
-          <div class="cp-drag" :title="headPrefScope === 'system' ? tt('拖动排序') : ''">{{ headPrefScope === 'system' ? '⋮⋮' : '·' }}</div>
+          <div class="cp-drag" :title="tt('拖动排序')">⋮⋮</div>
           <div class="cp-order">
-            <el-button link size="small" :disabled="headPrefScope !== 'system' || idx === 0" @click="moveHead(idx, -1)">▲</el-button>
-            <el-button link size="small" :disabled="headPrefScope !== 'system' || idx === headPrefRows.length - 1" @click="moveHead(idx, 1)">▼</el-button>
+            <el-button link size="small" :disabled="idx === 0" @click="moveHead(idx, -1)">▲</el-button>
+            <el-button link size="small" :disabled="idx === headPrefRows.length - 1" @click="moveHead(idx, 1)">▼</el-button>
           </div>
-          <el-checkbox v-model="item.visible" class="cp-vis" :disabled="!!item.required" />
+          <div v-if="headPrefScope === 'role'" class="cp-seq">
+            <el-input-number v-if="item.visible" :model-value="item.seq" :min="1" :max="headPrefRows.filter(r => r.visible).length"
+                             :controls="false" size="small" class="cp-seq-input"
+                             @change="(v) => onHeadSeqInput(item.label, v)" />
+            <span v-else class="cp-seq-dash">—</span>
+          </div>
+          <el-checkbox v-model="item.visible" class="cp-vis" :disabled="!!item.required"
+                       @change="() => onHeadToggle()" />
           <div class="cp-label">
             {{ item.label }}
             <span v-if="item.required" class="cp-flag">{{ tt('必填') }}</span>
@@ -2613,6 +2636,22 @@
           {{ headPrefScope === 'role' ? tt('恢复继承') : tt('恢复默认') }}
         </el-button>
         <el-button type="primary" size="small" :loading="headPrefSaving" @click="saveHeadPrefs">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 角色字段模板:套用到其他角色(仅管理员) -->
+    <el-dialog v-model="applyRoleVisible" :title="tt('套用到其他角色')" width="440px" append-to-body>
+      <div class="col-pref-tip">
+        {{ tt('把本角色在这个面板的字段显隐与顺序整份复制给所选角色；目标角色原有定制会被覆盖。') }}
+      </div>
+      <el-select v-model="applyRoleTarget" filterable :placeholder="tt('选择目标角色')" style="width: 100%">
+        <el-option v-for="r in applyRoleOptions" :key="r.code" :label="`${r.name}（${r.code}）`" :value="r.code" />
+      </el-select>
+      <template #footer>
+        <el-button size="small" @click="applyRoleVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" size="small" :loading="applyRoleSaving" :disabled="!applyRoleTarget" @click="doApplyRole">
+          {{ tt('确定套用') }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -2998,9 +3037,18 @@ const colPrefRows = ref([])
 const colPrefScope = ref(scopeDefault())
 const headPrefScope = ref(scopeDefault())
 const fieldScopeRoleName = ref('')
+const fieldScopeRoleCode = ref('')
 const fieldScopePanelCount = ref(0)
+/** 「套用到其他角色」只给管理员(后端同样按 is_admin 拦) */
+const fieldScopeIsAdmin = ref(false)
 const colPrefResetting = ref(false)
 const headPrefResetting = ref(false)
+// 角色模板 · 套用到其他角色(一次只服务一个对话框,place 记录是表头还是明细)
+const applyRoleVisible = ref(false)
+const applyRolePlace = ref('detail')
+const applyRoleTarget = ref('')
+const applyRoleOptions = ref([])
+const applyRoleSaving = ref(false)
 const fieldScopeRoleLabel = computed(() =>
   fieldScopeRoleName.value ? `${tt('本角色')}（${fieldScopeRoleName.value}）` : tt('本角色'))
 
@@ -3010,14 +3058,16 @@ function scopeDefault() {
 }
 
 /**
- * 拉本角色在该面板的表头/明细逐行显隐。
- * 返回 {header, detail, roleCode, roleName, panelCount};无角色(或接口失败)返回 null。
+ * 拉本角色在该面板的表头/明细逐行显隐与序号。
+ * 返回 {header, detail, roleCode, roleName, panelCount, isAdmin};无角色(或接口失败)返回 null。
  */
 async function fetchRoleFieldRows() {
   try {
     const v = await engine.getFieldView(panelCode.value)
     fieldScopeRoleName.value = v.roleName || ''
+    fieldScopeRoleCode.value = v.roleCode || ''
     fieldScopePanelCount.value = Number(v.panelCount || 0)
+    fieldScopeIsAdmin.value = !!v.isAdmin
     if (!v.roleCode) return null
     return v
   } catch (e) {
@@ -3200,7 +3250,7 @@ function systemColPrefRows() {
   })
 }
 
-/** 本角色作用域的行:后端按数据键(label)给出 shown/baseShown/overridden/required */
+/** 本角色作用域的行:后端按数据键(label)给出 shown/seq/baseShown/overridden/required */
 async function loadColPrefRowsByScope() {
   if (colPrefScope.value !== 'role') {
     colPrefRows.value = systemColPrefRows()
@@ -3212,8 +3262,82 @@ async function loadColPrefRowsByScope() {
   const allowed = new Set(systemColPrefRows().map((r) => r.label))
   colPrefRows.value = (v.detail || [])
     .filter((r) => allowed.has(r.label))
-    .map((r) => ({ label: r.label, alias: '', visible: !!r.shown, required: !!r.required, overridden: !!r.overridden }))
+    .map((r) => ({
+      label: r.label, alias: '', visible: !!r.shown, seq: r.seq,
+      required: !!r.required, overridden: !!r.overridden,
+    }))
   return true
+}
+
+/**
+ * 角色作用域的行序:勾选的按顺序编 1..n,没勾的挪到末尾且没有序号
+ * —— 正是用户口径「只有勾选的字段才有序号」。
+ */
+function normalizeRoleRows(rows) {
+  const vis = rows.filter((r) => r.visible)
+  const hid = rows.filter((r) => !r.visible)
+  vis.forEach((r, i) => { r.seq = i + 1 })
+  hid.forEach((r) => { r.seq = null })
+  return [...vis, ...hid]
+}
+
+/** 表头与明细共用:按「序号」把某一行挪到第 n 位 */
+function moveRowToSeq(rows, label, n) {
+  const vis = rows.filter((r) => r.visible)
+  const idx = vis.findIndex((r) => r.label === label)
+  if (idx < 0) return rows
+  const item = vis.splice(idx, 1)[0]
+  const at = Math.max(0, Math.min(vis.length, (Number(n) || 1) - 1))
+  vis.splice(at, 0, item)
+  return [...vis, ...rows.filter((r) => !r.visible)]
+}
+
+/** 角色模板 · 从系统整体一键复制:把整体的显隐与顺序落成本角色的显式视图 */
+async function copyRoleFromSystem(place) {
+  try {
+    await ElMessageBox.confirm(
+      tt('将用「系统整体」当前的字段显隐与顺序覆盖本角色在这个面板的设置，继续？'),
+      tt('从系统整体复制'), { type: 'warning' },
+    )
+  } catch (e) {
+    return   // 用户取消
+  }
+  try {
+    const res = await engine.copyRoleFieldViewFromSystem({ panelCode: panelCode.value })
+    ElMessage.success(tt('已从系统整体复制（{n} 个字段）').replace('{n}', res?.saved ?? 0))
+    await (place === 'header' ? loadHeadPrefRowsByScope() : loadColPrefRowsByScope())
+    cfgCache.value = null
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('复制失败'))
+  }
+}
+
+/** 角色模板 · 套用到其他角色(仅管理员;非管理员按钮不显示,后端也会拦) */
+async function openApplyRole(place) {
+  applyRolePlace.value = place
+  applyRoleTarget.value = ''
+  try {
+    const list = await engine.fieldViewRoles(panelCode.value)
+    applyRoleOptions.value = (list || []).filter((r) => r.code !== fieldScopeRoleCode.value)
+    applyRoleVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('读取角色清单失败'))
+  }
+}
+
+async function doApplyRole() {
+  if (!applyRoleTarget.value) return
+  applyRoleSaving.value = true
+  try {
+    await engine.copyRoleFieldViewToRole({ panelCode: panelCode.value, roleCode: applyRoleTarget.value })
+    ElMessage.success(tt('已套用到所选角色'))
+    applyRoleVisible.value = false
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('套用失败'))
+  } finally {
+    applyRoleSaving.value = false
+  }
 }
 
 async function openColPrefs() {
@@ -3246,34 +3370,45 @@ async function onHeadPrefScopeChange() {
 }
 
 function moveCol(idx, dir) {
-  if (colPrefScope.value !== 'system') return
   const rows = colPrefRows.value
   const target = idx + dir
   if (target < 0 || target >= rows.length) return
   const tmp = rows[idx]
   rows[idx] = rows[target]
   rows[target] = tmp
+  if (colPrefScope.value === 'role') colPrefRows.value = normalizeRoleRows(rows)
 }
 
 function onColDrop(idx) {
-  if (colPrefScope.value !== 'system') return
   const from = colDragIdx.value
   if (from < 0 || from === idx) return
   const rows = colPrefRows.value
   const item = rows.splice(from, 1)[0]
   rows.splice(idx, 0, item)
   colDragIdx.value = -1
+  if (colPrefScope.value === 'role') colPrefRows.value = normalizeRoleRows(rows)
+}
+
+/** 勾选/取消勾选:角色作用域下没勾的字段没有序号、自动挪到底部 */
+function onColToggle() {
+  if (colPrefScope.value === 'role') colPrefRows.value = normalizeRoleRows(colPrefRows.value)
+}
+
+/** 直接输入序号:把该行挪到第 n 位 */
+function onColSeqInput(label, n) {
+  colPrefRows.value = moveRowToSeq(normalizeRoleRows(colPrefRows.value), label, n)
 }
 
 async function saveColPrefs() {
   colPrefSaving.value = true
   try {
     if (colPrefScope.value === 'role') {
-      // 本角色:只提交显隐;与系统整体相同的项由服务端删行(恢复继承)
+      // 本角色:显隐 + 角色内序号(只有勾选的字段有号);没提交的字段 = 跟随系统整体
+      const rows = normalizeRoleRows(colPrefRows.value)
       const res = await engine.saveRoleFieldView({
         panelCode: panelCode.value,
         place: 'detail',
-        columns: colPrefRows.value.map((r) => ({ label: r.label, visible: !!r.visible })),
+        columns: rows.map((r) => ({ label: r.label, visible: !!r.visible, seq: r.visible ? r.seq : null })),
       })
       ElMessage.success(tt('本角色字段视图已保存'))
       if (res?.skippedRequired?.length) {
@@ -3352,7 +3487,10 @@ async function loadHeadPrefRowsByScope() {
   const allowed = new Set(systemHeadPrefRows().map((r) => r.label))
   headPrefRows.value = (v.header || [])
     .filter((r) => allowed.has(r.label))
-    .map((r) => ({ label: r.label, alias: '', visible: !!r.shown, required: !!r.required, overridden: !!r.overridden }))
+    .map((r) => ({
+      label: r.label, alias: '', visible: !!r.shown, seq: r.seq,
+      required: !!r.required, overridden: !!r.overridden,
+    }))
   return true
 }
 
@@ -3368,33 +3506,42 @@ async function openHeadPrefs() {
 }
 
 function moveHead(idx, dir) {
-  if (headPrefScope.value !== 'system') return
   const rows = headPrefRows.value
   const target = idx + dir
   if (target < 0 || target >= rows.length) return
   const tmp = rows[idx]
   rows[idx] = rows[target]
   rows[target] = tmp
+  if (headPrefScope.value === 'role') headPrefRows.value = normalizeRoleRows(rows)
 }
 
 function onHeadDrop(idx) {
-  if (headPrefScope.value !== 'system') return
   const from = headDragIdx.value
   if (from < 0 || from === idx) return
   const rows = headPrefRows.value
   const item = rows.splice(from, 1)[0]
   rows.splice(idx, 0, item)
   headDragIdx.value = -1
+  if (headPrefScope.value === 'role') headPrefRows.value = normalizeRoleRows(rows)
+}
+
+function onHeadToggle() {
+  if (headPrefScope.value === 'role') headPrefRows.value = normalizeRoleRows(headPrefRows.value)
+}
+
+function onHeadSeqInput(label, n) {
+  headPrefRows.value = moveRowToSeq(normalizeRoleRows(headPrefRows.value), label, n)
 }
 
 async function saveHeadPrefs() {
   headPrefSaving.value = true
   try {
     if (headPrefScope.value === 'role') {
+      const rows = normalizeRoleRows(headPrefRows.value)
       const res = await engine.saveRoleFieldView({
         panelCode: panelCode.value,
         place: 'header',
-        columns: headPrefRows.value.map((r) => ({ label: r.label, visible: !!r.visible })),
+        columns: rows.map((r) => ({ label: r.label, visible: !!r.visible, seq: r.visible ? r.seq : null })),
       })
       ElMessage.success(tt('本角色字段视图已保存'))
       if (res?.skippedRequired?.length) {
@@ -14383,9 +14530,14 @@ onUnmounted(() => {
 .cp-label { flex: 1; font-size: 13px; color: #333; min-width: 80px; }
 .cp-alias { width: 140px; }
 .cp-alias .el-input__inner { font-size: 12px; }
-/* 字段视图(2026-11-13):必填不可隐藏 / 本角色已改过 */
+/* 字段视图(2026-11-13):必填不可隐藏 / 本角色已改过 / 角色内序号 / 模板按钮 */
 .cp-flag { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; background: #f4f4f5; color: #909399; }
 .cp-flag-own { background: #ecf5ff; color: #409eff; }
+.col-pref-tpl { display: flex; gap: 12px; margin: -2px 0 8px; }
+.cp-seq { width: 46px; flex: none; text-align: center; }
+.cp-seq-input { width: 44px; }
+.cp-seq-input .el-input__inner { padding: 0 4px; text-align: center; }
+.cp-seq-dash { color: #c0c4cc; font-size: 12px; }
 
 /* 生成出厂检验报告弹窗(2026-11-01,销售出库单):标准行数=0 / 批次不可用的醒目提示 */
 .oqc-warn {

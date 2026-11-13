@@ -45,6 +45,17 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
+    '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Tick = visible for this role; the number sets the order (only ticked fields have a number, 1 first); column names still come from the system setting.',
+    '从系统整体复制': 'Copy from system',
+    '套用到其他角色': 'Apply to another role',
+    '将用「系统整体」当前的字段显隐与顺序覆盖本角色在这个面板的设置，继续？': 'This overwrites this role’s settings on this panel with the current system field visibility and order. Continue?',
+    '已从系统整体复制（{n} 个字段）': 'Copied from the system setting ({n} fields)',
+    '把本角色在这个面板的字段显隐与顺序整份复制给所选角色；目标角色原有定制会被覆盖。': 'Copies this role’s field visibility and order on this panel to the selected role; that role’s existing customisation will be overwritten.',
+    '确定套用': 'Apply',
+    '已套用到所选角色': 'Applied to the selected role',
+    '套用失败': 'Apply failed',
+    '读取角色清单失败': 'Failed to load the role list',
     // 角色字段视图:无角色/接口未就绪时落回系统整体的提示(2026-11-13)
     '当前账号未分配角色或本角色视图不可用，已切到「系统整体」。': 'This account has no role, or the role field view is unavailable; switched to “System (all users)”.',
     // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----

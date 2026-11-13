@@ -6,7 +6,7 @@ import java.sql.*;
 public class QSeedUsers {
     static final String DB = "HSDZ_MES_TEST";
     static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=" + DB + ";encrypt=false";
-    /** 明文 《一次性临时口令,账号已删除》 的 bcrypt(由 QGenHash 生成,已 verify=true) */
+    /** 明文 Tmp#FieldView2026 的 bcrypt(由 QGenHash 生成,已 verify=true) */
     static final String HASH = "$2a$10$WoE3koB3qicLqfwijbkMROJdv5TpFVv2QEyjSq1TYz4wvH8AnAHtC";
     static final String[][] USERS = {
             {"zz_fv_a", "字段视图走查A", "1029"},   // 销售

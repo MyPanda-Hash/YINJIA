@@ -1483,7 +1483,7 @@ public class PxController {
         return ApiResult.ok(fieldView.saveRoleView(panelCode, place, columns));
     }
 
-    /** 恢复继承:清掉本角色在该面板(panelCode 为空 = 全部面板)的显隐覆盖 */
+    /** 恢复继承:清掉本角色在该面板(panelCode 为空 = 全部面板)的显隐/序号覆盖 */
     @PostMapping("/resetRoleFieldView")
     public ApiResult<Map<String, Object>> resetRoleFieldView(@RequestBody Map<String, Object> body) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
@@ -1493,6 +1493,31 @@ public class PxController {
         out.put("removed", removed);
         out.put("panelCount", fieldView.rolePanelCount(fieldView.currentRoleCode()));
         return ApiResult.ok(out);
+    }
+
+    /** 角色模板 · 从系统整体一键复制到本角色(或管理员指定的角色) */
+    @PostMapping("/copyRoleFieldViewFromSystem")
+    public ApiResult<Map<String, Object>> copyRoleFieldViewFromSystem(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String targetRole = String.valueOf(body.getOrDefault("roleCode", ""));
+        return ApiResult.ok(fieldView.copyFromSystem(panelCode, targetRole));
+    }
+
+    /** 角色模板 · 把本角色的视图套用到另一个角色(仅管理员) */
+    @PostMapping("/copyRoleFieldViewToRole")
+    public ApiResult<Map<String, Object>> copyRoleFieldViewToRole(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String toRole = String.valueOf(body.getOrDefault("roleCode", ""));
+        return ApiResult.ok(fieldView.copyToRole(panelCode, toRole));
+    }
+
+    /** 可套用的角色清单(套用弹窗的下拉) */
+    @GetMapping("/fieldViewRoles")
+    public ApiResult<List<Map<String, Object>>> fieldViewRoles(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(fieldView.roleList());
     }
 
     /**

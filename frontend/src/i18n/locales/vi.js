@@ -1,6 +1,18 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
+    '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Tích = hiển thị cho vai trò này; số quyết định thứ tự (chỉ trường được tích mới có số, 1 là đầu tiên); tên cột vẫn theo cấu hình toàn hệ thống.',
+    '从系统整体复制': 'Sao chép từ toàn hệ thống',
+    '套用到其他角色': 'Áp dụng cho vai trò khác',
+    '将用「系统整体」当前的字段显隐与顺序覆盖本角色在这个面板的设置，继续？': 'Sẽ ghi đè thiết lập của vai trò này trên bảng này bằng hiển thị và thứ tự hiện tại của toàn hệ thống. Tiếp tục?',
+    '已从系统整体复制（{n} 个字段）': 'Đã sao chép từ toàn hệ thống ({n} trường)',
+    '复制失败': 'Sao chép thất bại',
+    '把本角色在这个面板的字段显隐与顺序整份复制给所选角色；目标角色原有定制会被覆盖。': 'Sao chép toàn bộ hiển thị và thứ tự trường của vai trò này trên bảng này sang vai trò đã chọn; tùy chỉnh hiện có của vai trò đó sẽ bị ghi đè.',
+    '确定套用': 'Xác nhận áp dụng',
+    '已套用到所选角色': 'Đã áp dụng cho vai trò đã chọn',
+    '套用失败': 'Áp dụng thất bại',
+    '读取角色清单失败': 'Không đọc được danh sách vai trò',
     // 角色字段视图:无角色/接口未就绪时落回系统整体的提示(2026-11-13)
     '当前账号未分配角色或本角色视图不可用，已切到「系统整体」。': 'Tài khoản này chưa có vai trò hoặc không dùng được chế độ xem trường của vai trò, đã chuyển sang「Toàn hệ thống」.',
     // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----

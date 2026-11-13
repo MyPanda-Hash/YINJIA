@@ -1,6 +1,18 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 角色字段视图第二轮:序号排序 + 角色模板(从整体复制 / 套用到另一角色)----
+    '勾选=本角色显示；序号决定顺序（只有勾选的字段才有序号，1 在最前）；栏名仍按系统整体。': 'Coché = visible pour ce rôle ; le numéro définit l’ordre (seuls les champs cochés ont un numéro, 1 en premier) ; les noms de colonnes viennent toujours du réglage système.',
+    '从系统整体复制': 'Copier depuis le système',
+    '套用到其他角色': 'Appliquer à un autre rôle',
+    '将用「系统整体」当前的字段显隐与顺序覆盖本角色在这个面板的设置，继续？': 'Les réglages de ce rôle sur ce panel seront remplacés par la visibilité et l’ordre actuels du réglage système. Continuer ?',
+    '已从系统整体复制（{n} 个字段）': 'Copié depuis le système ({n} champs)',
+    '复制失败': 'Échec de la copie',
+    '把本角色在这个面板的字段显隐与顺序整份复制给所选角色；目标角色原有定制会被覆盖。': 'Copie la visibilité et l’ordre des champs de ce rôle sur ce panel vers le rôle choisi ; sa personnalisation existante sera écrasée.',
+    '确定套用': 'Appliquer',
+    '已套用到所选角色': 'Appliqué au rôle choisi',
+    '套用失败': 'Échec de l’application',
+    '读取角色清单失败': 'Impossible de charger la liste des rôles',
     // 角色字段视图:无角色/接口未就绪时落回系统整体的提示(2026-11-13)
     '当前账号未分配角色或本角色视图不可用，已切到「系统整体」。': 'Ce compte n’a pas de rôle ou la vue des champs du rôle est indisponible ; passage à « Système (tous) ».',
     // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
