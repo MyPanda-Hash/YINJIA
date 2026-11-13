@@ -45,6 +45,8 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // 角色字段视图:无角色/接口未就绪时落回系统整体的提示(2026-11-13)
+    '当前账号未分配角色或本角色视图不可用，已切到「系统整体」。': 'This account has no role, or the role field view is unavailable; switched to “System (all users)”.',
     // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
     '字段视图': 'Field view',
     '系统整体': 'System (all users)',

@@ -3222,7 +3222,7 @@ async function openColPrefs() {
     // 当前账号没有角色(或接口失败)⇒ 落回系统整体,不让用户看到一张空表
     colPrefScope.value = 'system'
     colPrefRows.value = systemColPrefRows()
-    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+    ElMessage.warning(tt('当前账号未分配角色或本角色视图不可用，已切到「系统整体」。'))
   }
   colPrefVisible.value = true
 }
@@ -3232,7 +3232,7 @@ async function onColPrefScopeChange() {
   if (!(await loadColPrefRowsByScope())) {
     colPrefScope.value = 'system'
     colPrefRows.value = systemColPrefRows()
-    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+    ElMessage.warning(tt('当前账号未分配角色或本角色视图不可用，已切到「系统整体」。'))
   }
 }
 
@@ -3241,7 +3241,7 @@ async function onHeadPrefScopeChange() {
   if (!(await loadHeadPrefRowsByScope())) {
     headPrefScope.value = 'system'
     headPrefRows.value = systemHeadPrefRows()
-    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+    ElMessage.warning(tt('当前账号未分配角色或本角色视图不可用，已切到「系统整体」。'))
   }
 }
 
@@ -3362,7 +3362,7 @@ async function openHeadPrefs() {
     headPrefScope.value = 'system'
     headPrefRows.value = systemHeadPrefRows()
     if (!headPrefRows.value.length) return ElMessage.warning(tt('该面板没有可调整的表头字段'))
-    ElMessage.warning(tt('当前账号未分配角色，已切到「系统整体」。'))
+    ElMessage.warning(tt('当前账号未分配角色或本角色视图不可用，已切到「系统整体」。'))
   }
   headPrefVisible.value = true
 }

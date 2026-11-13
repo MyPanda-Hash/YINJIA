@@ -1,6 +1,8 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // 角色字段视图:无角色/接口未就绪时落回系统整体的提示(2026-11-13)
+    '当前账号未分配角色或本角色视图不可用，已切到「系统整体」。': 'Esta cuenta no tiene rol o la vista de campos del rol no está disponible; se cambió a «Todo el sistema».',
     // ---- 角色字段视图(2026-11-13):表格调整/表头调整的作用域 + 界面设置「字段视图」----
     '字段视图': 'Vista de campos',
     '系统整体': 'Todo el sistema',
