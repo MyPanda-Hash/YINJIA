@@ -110,8 +110,8 @@
             select-when-unmatched
             clearable
             :fetch-suggestions="(kw, cb) => fetchQueryInputSuggestions(qr, kw, cb)"
-            :placeholder="qr.placeholder || tt('输入编码或名称，回车查询')"
-            :title="tt('输入片段即联想；未选候选回车按名称/编码片段查询')"
+            :placeholder="qr.placeholder || tt('编码/名称，回车查询')"
+            :title="tt('输入编码或名称，回车即查；也可从下拉选中精确档案')"
             @update:model-value="(v) => setQueryInputText(qr.dataName, v)"
             @select="(item) => onQueryInputCommit(qr, item)"
             @clear="onQueryInputClear(qr)"
@@ -12999,6 +12999,13 @@ onUnmounted(() => {
 .query-ref-input :deep(.el-autocomplete) {
   flex: 1;
   width: 160px;
+}
+/* placeholder 必须**完整显示**(2026-11-13 用户口径:提示文字被截成「输入编码或名称,回…」不行):
+   160px 输入框减内边距约 152px 可用,13px 字号放不下 12 个中文字 ⇒ 提示语已缩短为
+   「编码/名称，回车查询」并把 placeholder 字号收到 12px(英文译名同样按此宽度选词)。
+   完整说明仍挂在 title(悬停可见),不影响点击后下拉的候选显示。 */
+.query-ref-input :deep(.el-input__inner::placeholder) {
+  font-size: 12px;
 }
 .query-input-opt {
   display: block;

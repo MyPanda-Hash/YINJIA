@@ -5840,9 +5840,9 @@ export default {
     // 而是可以输入后就查询的形式」):报工记录(WO_REPORT_LIST)查询区的参照字段改成可输入 + 联想下拉,
     // 未选候选直接回车 = 按名称/编码片段查(先解析成档案编码集合,解析不到才按片段模糊)。
     // 文案只在显示层用 tt(),提交给后端的数据键仍是中文原值。
-    '输入编码或名称，回车查询': 'Type a code or name, press Enter to search',
-    '输入片段即联想；未选候选回车按名称/编码片段查询':
-      'Suggestions appear while you type; press Enter without picking one to search by name/code fragment',
+    '编码/名称，回车查询': 'Code/name, Enter', // 提示语刻意短:160px 输入框要完整显示(2026-11-13 用户口径)
+    '输入编码或名称，回车即查；也可从下拉选中精确档案':
+      'Type a code or name and press Enter to search, or pick an exact record from the list',
     '打开参照': 'Open reference picker',
     // ---- 生产工单四项需求(2026-11-13):
     //   ①排单计划纸表加「订单数量」列;②生产工单页「新增」+ 新建弹窗;③新建弹窗「临时工单」页签
