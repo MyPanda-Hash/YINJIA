@@ -4416,6 +4416,10 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_OQC_REPORT'
   || String(panelCode.value) === 'QC_PROC_INSP'
   || String(panelCode.value) === 'QC_FIRST_INSP'
+  // 出货检验表观(2026-11-13 用户口径「为当前的出货检验表观增加审批流程」):
+  //   与出货检验功能同形(单级审批:提交审批 → 审批通过 = 已审核 → 弃审回草稿),后端
+  //   ButtonService.SINGLE_LEVEL_INSP_PANELS 同批登记;这里只管显示,能否点由 isDisabled + 后端裁决。
+  || String(panelCode.value) === 'QC_ASM_INSP'
   || String(panelCode.value) === 'RD_DOM_TEST'
   // 开发样品申请单（2026-11-06 用户口径「里面的对应流程已经给出了，把这个流程也跑通」）：
   //   外部单 提交 → 审核(一级,选确认人) → 确认(二级) → 已审核。

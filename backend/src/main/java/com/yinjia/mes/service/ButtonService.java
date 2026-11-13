@@ -2447,7 +2447,8 @@ public class ButtonService {
         if (no == null || no.isBlank()) return;
         java.util.List<java.util.Map<String, Object>> hs = jdbc.queryForList(
                 "SELECT ISNULL(外部单据号,N'') AS ext, ISNULL(出货检验功能单号,N'') AS func,"
-                        + " ISNULL(出货检验表观单号,N'') AS look"
+                        + " ISNULL(出货检验表观单号,N'') AS look, ISNULL(加工单号,N'') AS wo,"
+                        + " ISNULL(工单行号,0) AS xc"
                         + " FROM bd_finish_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
         if (hs.isEmpty()) return;   // 单据不存在由 ensureDocExists 兜底,这里不重复抛
         java.util.Map<String, Object> h = hs.get(0);
@@ -2455,8 +2456,26 @@ public class ButtonService {
         if (!ext.isEmpty()) return; // 金蝶导入的历史单:不纳入本门禁
         String func = String.valueOf(h.get("func") == null ? "" : h.get("func")).trim();
         String look = String.valueOf(h.get("look") == null ? "" : h.get("look")).trim();
+        // 2026-11-13:草稿允许先空着两张检验单号,提交/审核时**自动补**同工单行最新已审核的检验单号
+        //   (用户流程「等两张检验单审核完成后再提交」——不该再让人手挑单号)
+        String wo = String.valueOf(h.get("wo") == null ? "" : h.get("wo")).trim();
+        int xc = h.get("xc") instanceof Number n ? n.intValue() : 0;
+        if (func.isEmpty() && !wo.isEmpty()) {
+            String auto = latestAuditedInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
+            if (!auto.isEmpty()) {
+                func = auto;
+                jdbc.update("UPDATE bd_finish_in SET 出货检验功能单号=? WHERE 单据编号=? AND ISNULL(出货检验功能单号,N'')=N''", auto, no);
+            }
+        }
+        if (look.isEmpty() && !wo.isEmpty()) {
+            String auto = latestAuditedInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
+            if (!auto.isEmpty()) {
+                look = auto;
+                jdbc.update("UPDATE bd_finish_in SET 出货检验表观单号=? WHERE 单据编号=? AND ISNULL(出货检验表观单号,N'')=N''", auto, no);
+            }
+        }
         if (func.isEmpty() || look.isEmpty())
-            throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核");
+            throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核(等两张检验单审核完成后自动带入)");
         // 2026-11-13:只要求两张检验单已审核(不再按批次比明细、不再要求全合格)
         checkInspAudited("出货检验功能", "QC_PROC_INSP", func);
         checkInspAudited("出货检验表观", "QC_ASM_INSP", look);
