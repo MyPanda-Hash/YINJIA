@@ -17,6 +17,9 @@
       <!-- 级联字段的空态说明(2026-10-09):仓位这类「按本行仓库收窄」的参照,候选为空时
            光一句「暂无数据」说不清是没选上级还是上级真的没有数据 —— 这里把原因讲明。 -->
       <div v-if="!loading && cascadeHint" class="rpd-cascade-hint">{{ cascadeHint }}</div>
+      <!-- 点行即勾选（2026-11-13 用户口径：「其他的这种弹窗的勾选形式都进行改动，都做点击行就判定勾选
+           的操作，比如客户名称这个」）—— 不必再去点前面那个 45px 的小方框。
+           复选框列保留：表头全选、跨页 reserve-selection 与键盘可达性都还要靠它。 -->
       <el-table
         ref="tableRef"
         :data="pagedRows"
@@ -26,6 +29,8 @@
         border
         height="380"
         highlight-current-row
+        class="rpd-table"
+        @row-click="onRowClick"
         @selection-change="(r) => (selected = r)"
       >
         <!-- reserve-selection:跨页保留勾选(多选导入语义),row-key 用载入时分配的稳定 __rk -->
@@ -103,6 +108,23 @@ const pagedRows = computed(() => {
   const s = (page.value - 1) * pageSize.value
   return rows.value.slice(s, s + pageSize.value)
 })
+/**
+ * 点行即勾选（2026-11-13）。
+ *
+ * 口径：
+ *   · 点行内任意位置 = 切换该行勾选（复选框列除外，见下）；
+ *   · **点复选框本身不重复处理** —— 那一下 el-checkbox 自己的 change 已经翻过一次，
+ *     若再走行点击就会翻第二次 ⇒ 看起来像"点了没反应"。判据 closest('.el-checkbox')；
+ *   · 切换走 el-table 的 toggleRowSelection（不自己维护数组）：这一源本来就用
+ *     `reserve-selection` 跨页保留，自己另存一份会跟表格内部状态打架。
+ */
+function onRowClick(row, column, event) {
+  const t = event?.target
+  if (t && typeof t.closest === 'function' && t.closest('.el-checkbox, .el-checkbox__input')) return
+  if (!row || row.__rk === undefined) return
+  const isOn = selected.value.some((r) => r && r.__rk === row.__rk)
+  tableRef.value?.toggleRowSelection(row, !isOn)
+}
 function onSizeChange() { page.value = 1 }
 /** reserve-selection 的稳定行键:载入时按序分配(过滤/翻页后仍指向同一行对象) */
 function rowKeyOf(r) { return r.__rk }
@@ -212,6 +234,9 @@ function confirm() {
   justify-content: flex-end;
   margin-top: 8px;
 }
+/* 整行可点（2026-11-13）：手型光标提示"这一行能点"；勾中的行由 highlight-current-row 之外
+   再给一层底色，跨页翻回来也看得见自己勾过哪几行。 */
+.rpd-table :deep(.el-table__body-wrapper tbody tr) { cursor: pointer; }
 /* 产品开发状态标注 */
 .rpd-dev {
   display: inline-block;

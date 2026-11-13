@@ -5511,13 +5511,13 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   text-align: center;
   font-weight: 500;
 }
-/* 必填星号(2026-11-06 用户口径「要打*号」):挂在标签格上,伪元素出星,不改模板文案 */
-.rs-req::after {
-  content: '*';
-  margin-left: 3px;
-  color: #f56c6c;
-  font-weight: 700;
-  vertical-align: top;
+/* 必填标记(2026-11-06「要打*号」→ 2026-11-13 用户口径「把必填项的红点标识去掉，
+   保留必填项的属性就行，只是去掉红点」)。
+   ⚠ 只去掉**视觉**：`.rs-req` 这个类名仍然挂在标签格上（isReq/isPairReq 的判据照旧），
+     保存校验、必填缺失时的定位闪烁(rsFieldBlink)全都不受影响。
+     哪天要把星号画回来，只改这一处即可。 */
+.rs-req {
+  /* 留空即可：类名本身就是"这格必填"的钩子 */
 }
 
 /* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时跳转提示) */
